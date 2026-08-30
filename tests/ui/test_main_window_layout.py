@@ -44,6 +44,41 @@ def test_top_combo_keeps_compact_control_but_expands_popup(qtbot):
     assert combo.view().minimumWidth() > width
 
 
+class _ReferenceDB:
+    def __init__(self):
+        self.active = "图库甲"
+        self.loaded = 0
+
+    def load(self):
+        self.loaded += 1
+
+    def get_spaces(self):
+        return ["图库甲", "图库乙"]
+
+    def get_active_space(self):
+        return self.active
+
+    def set_active_space(self, name):
+        self.active = name
+        return True
+
+
+def test_main_reference_combo_selects_and_activates_space(qtbot):
+    combo = QComboBox()
+    qtbot.addWidget(combo)
+    db = _ReferenceDB()
+    host = SimpleNamespace(reference_space_combo=combo, _reference_db=db)
+
+    MainWindow._refresh_reference_space_combo(host)
+    combo.currentIndexChanged.connect(
+        lambda index: MainWindow._on_reference_space_changed(host, index))
+    combo.setCurrentText("图库乙")
+
+    assert [combo.itemText(i) for i in range(combo.count())] == ["图库甲", "图库乙"]
+    assert combo.currentText() == "图库乙"
+    assert db.active == "图库乙"
+
+
 def test_workflow_note_is_wrapped_and_shown_above_parameters(qtbot):
     note_label = _create_workflow_note_label()
     param_panel = QGroupBox()

@@ -9,7 +9,7 @@
 - 失败重试：写入失败时询问用户是否重试（最多3次）
 
 节点语义：session.json 顶层 key 即节点（ui_state / daily / settings /
-active_layout / active_space 等），各调用方只操作自己的节点。
+actives 等），各调用方只操作自己的节点。
 
 ui_state 的页面子节点禁止直接通过 update_node 嵌套写入；该方法只做
 顶层浅合并，会整体覆盖同名页面。页面状态统一使用
@@ -35,6 +35,12 @@ from fasteners import InterProcessLock
 from loguru import logger
 
 from ..fs_util import atomic_write_text
+
+_ACTIVE_LEGACY_KEYS = {
+    "user": "active_user",
+    "layout": "active_layout",
+    "space": "active_space",
+}
 
 
 class LockTimeoutError(Exception):
@@ -247,6 +253,38 @@ class SessionStore:
             data.pop(key, None)
 
         self._mutate_disk_with_retry(_delete)
+
+    # ─── 激活项（actives）─────────────────────────────────
+
+    def get_active(self, kind: str, default: Any = None) -> Any:
+        """读取 ``actives.<kind>``，缺失时兼容旧顶层 ``active_<kind>``。"""
+        if kind not in _ACTIVE_LEGACY_KEYS:
+            raise KeyError(f"unknown active kind: {kind}")
+        with self._thread_lock:
+            actives = self._data.get("actives")
+            if isinstance(actives, dict) and kind in actives:
+                return deepcopy(actives[kind])
+            legacy = self._data.get(_ACTIVE_LEGACY_KEYS[kind])
+            return deepcopy(legacy) if legacy is not None else default
+
+    def set_active(self, kind: str, value: Any) -> None:
+        """写入一个激活项，并原子迁移、删除全部旧 ``active_*`` 顶层键。"""
+        if kind not in _ACTIVE_LEGACY_KEYS:
+            raise KeyError(f"unknown active kind: {kind}")
+
+        def _set(data: dict) -> None:
+            current = data.get("actives")
+            actives = deepcopy(current) if isinstance(current, dict) else {}
+            # 写任意一项时先保全其余旧值，再统一删除旧键。
+            for active_kind, legacy_key in _ACTIVE_LEGACY_KEYS.items():
+                if active_kind not in actives and legacy_key in data:
+                    actives[active_kind] = deepcopy(data[legacy_key])
+            actives[kind] = deepcopy(value)
+            data["actives"] = actives
+            for legacy_key in _ACTIVE_LEGACY_KEYS.values():
+                data.pop(legacy_key, None)
+
+        self._mutate_disk_with_retry(_set)
 
     def reload(self):
         """重新读盘，刷新内存态"""

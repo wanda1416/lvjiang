@@ -44,6 +44,7 @@ from lvjiang.apps import get_registry
 from ...core.config import load_available_envs, load_env, load_user_config
 from ...core.config.users import SessionManager
 from ...core.layout_manager import LayoutConfigManager
+from ...core.reference_db import ReferenceDatabase
 from ...core.user_config import UserConfigManager
 from ...i18n import tr
 from ..button_styles import apply_button_style
@@ -249,6 +250,7 @@ class MainWindow(
         self._user_manager = UserConfigManager()
         self._session_manager = SessionManager()
         self._layout_manager = LayoutConfigManager()
+        self._reference_db = ReferenceDatabase()
         self._user_config = load_user_config()
         self._backend = None
         self._cleanup_callbacks: list = []  # 插件注册的关闭时清理回调
@@ -352,13 +354,24 @@ class MainWindow(
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
 
-        # === 顶部：用户 + 环境 + 布局 ===
+        # === 顶部：用户 + 图库 + 环境 + 布局 ===
         top_row = QHBoxLayout()
         top_row.addWidget(QLabel(tr("用户")))
         self.user_combo = QComboBox()
         self.user_combo.setMinimumWidth(150)
         self.user_combo.currentIndexChanged.connect(self._on_user_changed)
         top_row.addWidget(self.user_combo)
+        top_row.addSpacing(20)
+        top_row.addWidget(QLabel(tr("图库：")))
+        self.reference_space_combo = QComboBox()
+        _set_combo_character_capacity(self.reference_space_combo)
+        # ReferenceDatabase 构造时已经 load，启动构建不重复解析当前图库。
+        self.reference_space_combo.addItems(self._reference_db.get_spaces())
+        self.reference_space_combo.setCurrentText(
+            self._reference_db.get_active_space())
+        self.reference_space_combo.currentIndexChanged.connect(
+            self._on_reference_space_changed)
+        top_row.addWidget(self.reference_space_combo)
         top_row.addSpacing(20)
         top_row.addWidget(QLabel(tr("环境")))
         self._env_combo = _BatchContextComboBox()

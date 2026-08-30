@@ -687,12 +687,12 @@ class TestCreateAndDelete:
         assert mgr.get_all_rule_keys_and_names() == [("t1", "旧名称")]
 
         path.write_text(
-            yaml.dump(minimal_rule(name="新名称"), allow_unicode=True),
+            yaml.dump(minimal_rule(name="新的名称"), allow_unicode=True),
             encoding="utf-8",
         )
         mgr.reload()
 
-        assert mgr.get_all_rule_keys_and_names() == [("t1", "新名称")]
+        assert mgr.get_all_rule_keys_and_names() == [("t1", "新的名称")]
 
     def test_create_rule(self, tmp_path):
         mgr = TuningRuleManager(rules_dir=tmp_path)

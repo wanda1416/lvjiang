@@ -27,6 +27,7 @@ install_project_config_write_guard(root)
         [sys.executable, "-c", script],
         cwd=Path(__file__).parents[2],
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
     )
@@ -109,6 +110,7 @@ finally:
         [sys.executable, "-c", script],
         cwd=Path(__file__).parents[2],
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
     )

@@ -5,7 +5,7 @@
 #%   "从拾香"（不要点击）后开始执行脚本。
 #% parameters:
 #%   - name: rounds
-#%     label: 执行轮数（一般12轮满不肝）
+#%     label: 执行轮数
 #%     type: number
 #%     default: 12
 #%     min: 1

@@ -139,6 +139,7 @@ class PositionalTraversal(BagTraversal):
             # ── 第 1 列：读取兼作行指纹 ──
             name, fp, equip = wf._read_row(detail_scene, win_row)
             if wf.slot_level_exhausted:
+                wf._close_equipment_detail()
                 logger.info(f"  新行{logical_row} 命中槽位级终止条件")
                 break
             if not fp:
@@ -146,9 +147,14 @@ class PositionalTraversal(BagTraversal):
                 break
             fps.append(fp)
             logger.info(f"  新行{logical_row} grid[{win_row}][1] {name} fp={fp}")
-            new_fp = wf._process_equipment(name, equip, detail_scene,
-                                           row=win_row)
+            if wf._equipment_read_state(equip) == "valid":
+                new_fp = wf._process_equipment(
+                    name, equip, detail_scene, row=win_row)
+            else:
+                # _read_row 已记录异常并关闭详情；保留内部锚点继续遍历。
+                new_fp = fp
             if wf.slot_level_exhausted:
+                wf._close_equipment_detail()
                 logger.info(f"  新行{logical_row} 命中等级终止条件")
                 break
             # 调律会给该行首列装备加词条 → 指纹变化；用处理后指纹覆盖。
@@ -212,6 +218,8 @@ class PositionalTraversal(BagTraversal):
         long_count = 0
         while not wf.is_stopped:
             _, nfp, equip1 = wf._read_row(detail_scene, 1)
+            # 滚动校验只读取指纹，不处理装备；比较前结束本次详情生命周期。
+            wf._close_equipment_detail()
             if wf.slot_level_exhausted:
                 logger.info("  滚动校验读到槽位级终止条件 → 到底")
                 return ScrollState.BOTTOM, alignment.n_rows
@@ -276,6 +284,7 @@ class PositionalTraversal(BagTraversal):
                 # （硬到底）」：
                 label = wf._equip_label(equip1)
                 _, nfp2, equip2 = wf._read_row(detail_scene, 2)
+                wf._close_equipment_detail()
                 if wf.slot_level_exhausted:
                     logger.info("  第二行读到槽位级终止条件 → 到底")
                     return ScrollState.BOTTOM, alignment.n_rows

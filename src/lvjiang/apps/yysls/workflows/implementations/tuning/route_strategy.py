@@ -63,9 +63,9 @@ class TuningRouteStrategy(ABC):
         """回收确认弹窗判定装备锁定后，恢复本环境回收入口的 UI 状态。"""
         raise NotImplementedError
 
-    def grid_click_x_ratio(self, col: int) -> float:
-        """背包格子内的横向点击比例（0~1）；默认居中点击。"""
-        return 0.5
+    def close_equipment_detail(self) -> None:
+        """关闭当前装备详情；移动端无需额外动作。"""
+        return None
 
     def _require_engine(self, operation: str) -> SubcallEnginePort:
         engine = self._wf.engine
@@ -144,12 +144,16 @@ class DesktopTuningRouteStrategy(TuningRouteStrategy):
         self._wf.press("SPACE", wait=None)
 
     def close_recycle_entry_on_lock(self) -> None:
-        # 桌面端被锁定不会出现任何现象，但也要等待
+        # 桌面端被锁定时不出现确认弹窗，且 X 已经退出装备详情；这里只等待
+        # 页面稳定，调用方不得再补 ESC。
         self._wf.wait_delay("step_interval")
 
-    def grid_click_x_ratio(self, col: int) -> float:
-        # 第 1 列：装备详情弹窗的功能区域遮挡格子左半区，偏移到右 3/4 处避开遮挡
-        return 0.75 if col == 1 else 0.5
+    def close_equipment_detail(self) -> None:
+        # 端游装备详情覆盖在背包网格上。必须先 ESC 关闭再继续对齐/点击；
+        # 偏移点击只能绕开局部遮挡，无法恢复被遮罩破坏的网格轮廓。
+        logger.info("  [桌面端] 按 ESC 关闭装备详情")
+        self._wf.press("ESC", wait=None)
+        self._wf.wait_stable("page_refresh")
 
 
 def create_tuning_route_strategy(

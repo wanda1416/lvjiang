@@ -94,14 +94,23 @@ def test_desktop_waits_after_locked_recycle():
     wf.wait_delay.assert_called_once_with("step_interval")
 
 
-def test_grid_click_ratios():
+def test_desktop_closes_equipment_detail_with_escape():
     wf = MagicMock()
-    android = AndroidTuningRouteStrategy(wf)
-    desktop = DesktopTuningRouteStrategy(wf)
+    routes = DesktopTuningRouteStrategy(wf)
 
-    assert android.grid_click_x_ratio(1) == 0.5
-    assert desktop.grid_click_x_ratio(1) == 0.75
-    assert desktop.grid_click_x_ratio(2) == 0.5
+    routes.close_equipment_detail()
+
+    wf.press.assert_called_once_with("ESC", wait=None)
+    wf.wait_stable.assert_called_once_with("page_refresh")
+
+
+def test_android_does_not_close_equipment_detail_explicitly():
+    wf = MagicMock()
+    routes = AndroidTuningRouteStrategy(wf)
+
+    routes.close_equipment_detail()
+
+    wf.press.assert_not_called()
 
 
 def test_navigation_subcall_failure_is_propagated():

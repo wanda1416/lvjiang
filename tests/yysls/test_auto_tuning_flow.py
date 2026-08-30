@@ -269,28 +269,110 @@ def test_workflow_shares_route_strategy_between_components():
     assert wf.recycler._routes is wf.route_strategy
 
 
-def test_desktop_first_grid_col_uses_detected_slot_bounds(monkeypatch):
-    """首列偏移基于实际检测边界，不能按列数假设网格严格等分。"""
+def test_grid_click_uses_aligned_slot_center():
+    """详情由 ESC 收起后，所有格子恢复使用正常的对齐中心。"""
     wf = MagicMock()
     wf.GRID_SCENE = AutoTuningWorkflow.GRID_SCENE
     wf.GRID_PANEL = AutoTuningWorkflow.GRID_PANEL
-    wf.route_strategy.grid_click_x_ratio.return_value = 0.75
-    cal = MagicMock(n_rows=4, n_cols=6)
-    cal.slot_center.return_value = (0.18, 0.35)
-    cal.slot_bounds.return_value = (0.10, 0.20, 0.30, 0.50)
-    wf._ensure_aligned.return_value = cal
-    panel_obj = object()
-    wf._find_panel.return_value = panel_obj
-    wf._panel_ratio_to_screen.return_value = (123, 456)
+    wf.click_panel.return_value = True
 
     result = AutoTuningWorkflow._click_grid(wf, row=1, col=1)
 
     assert result is True
-    wf.route_strategy.grid_click_x_ratio.assert_called_once_with(1)
-    # 实际边界 [0.10, 0.30] 的 75% 位置为 0.25；旧等分公式为 0.2217。
-    wf._panel_ratio_to_screen.assert_called_once_with(panel_obj, 0.25, 0.35)
-    wf._input.click_screen.assert_called_once_with(
-        123, 456, "grid_shifted(bag_equip_detail.bag_grid[1][1])")
+    wf.click_panel.assert_called_once_with(
+        AutoTuningWorkflow.GRID_SCENE, AutoTuningWorkflow.GRID_PANEL, 1, 1)
+
+
+class DesktopDetailFakeWF(FakeWF):
+    """记录端游详情收尾按键，不触碰真实输入后端。"""
+
+    def __init__(self):
+        super().__init__("desktop")
+        self.presses: list[str] = []
+
+    def press(self, key, wait="step_interval"):
+        self.presses.append(key)
+
+
+def _script_equipment_read(monkeypatch, wf, equip):
+    wf._ocr_map[WEAPON_DETAIL] = {
+        "equip_level": "OCR", "equip_type": "OCR", "base_attr": "OCR",
+    }
+    monkeypatch.setattr(
+        wf, "call_function", lambda name, args, engine=None: dict(equip))
+
+
+def test_desktop_empty_slot_does_not_press_escape(monkeypatch):
+    wf = DesktopDetailFakeWF()
+    _script_equipment_read(monkeypatch, wf, {"level": 0, "type": None})
+
+    _, fp, equip = wf._read_row(WEAPON_DETAIL, 1)
+
+    assert fp == ""
+    assert wf._equipment_read_state(equip) == "empty"
+    assert wf.presses == []
+
+
+def test_desktop_incomplete_equipment_logs_skip_and_closes(monkeypatch):
+    wf = DesktopDetailFakeWF()
+    _script_equipment_read(monkeypatch, wf, {
+        "name": "无法识别类型", "level": 110, "type": None,
+    })
+
+    _, fp, equip = wf._read_row(WEAPON_DETAIL, 1)
+
+    assert fp.startswith("invalid:")
+    assert wf._equipment_read_state(equip) == "invalid"
+    assert wf.presses == ["ESC"]
+
+
+def test_desktop_retained_equipment_closes_after_processing(monkeypatch):
+    wf = DesktopDetailFakeWF()
+    equip = _equip(2)
+    _script_equipment_read(monkeypatch, wf, equip)
+    name, _, parsed = wf._read_row(WEAPON_DETAIL, 1)
+    monkeypatch.setattr(
+        wf, "_process_equipment_once", lambda *a, **k: ("fp_after", None))
+
+    assert wf.presses == []  # OCR 后仍需在详情中处理，不能提前关闭
+    assert wf._process_equipment(name, parsed, WEAPON_DETAIL) == "fp_after"
+    assert wf.presses == ["ESC"]
+
+
+def test_desktop_recycled_equipment_does_not_press_escape(monkeypatch):
+    wf = DesktopDetailFakeWF()
+    equip = _equip(2)
+    _script_equipment_read(monkeypatch, wf, equip)
+    name, _, parsed = wf._read_row(WEAPON_DETAIL, 1)
+    monkeypatch.setattr(
+        wf, "_process_equipment_once",
+        lambda *a, **k: ("", auto_tuning.RecycleOutcome.RECYCLED))
+
+    assert wf._process_equipment(name, parsed, WEAPON_DETAIL) == ""
+    assert wf.presses == []
+
+
+def test_desktop_locked_recycle_does_not_press_escape(monkeypatch):
+    wf = DesktopDetailFakeWF()
+    equip = _equip(5)
+    _script_equipment_read(monkeypatch, wf, equip)
+    name, fp, parsed = wf._read_row(WEAPON_DETAIL, 1)
+    monkeypatch.setattr(
+        wf, "_process_equipment_once",
+        lambda *a, **k: (fp, auto_tuning.RecycleOutcome.LOCKED))
+
+    assert wf._process_equipment(name, parsed, WEAPON_DETAIL) == fp
+    assert wf.presses == []
+
+
+def test_desktop_equipped_slot_closes_before_grid_alignment(monkeypatch):
+    wf = DesktopDetailFakeWF()
+    _script_equipment_read(monkeypatch, wf, _equip(2))
+
+    equipped = wf._read_equipped("main_weapon")
+
+    assert equipped is not None
+    assert wf.presses == ["ESC"]
 
 
 def test_already_full(monkeypatch):
@@ -1473,7 +1555,8 @@ def test_recycle_refill_reprocesses_slot():
     names: list[str] = []
     wf._process_equipment_once = \
         lambda name, equip, scene, **k: (names.append(name), outcomes.pop(0))[1]
-    wf._read_row = lambda scene, row, col=1: ("补位剑", "FB", {"n": 1})
+    wf._read_row = lambda scene, row, col=1: (
+        "补位剑", "FB", {"name": "补位剑", "type": "剑", "level": 110})
     fp = wf._process_equipment("原剑", {"n": 0}, WEAPON_DETAIL, row=2)
 
     assert fp == "fp_b"
@@ -1648,6 +1731,11 @@ class RowColsFakeWF(FakeWF):
 
     def _read_row(self, detail_scene, row, col=1):
         return self.cell_map.get((row, col), ("", "", {}))
+
+    @staticmethod
+    def _equipment_read_state(equip):
+        # 本组测试的最小装备替身用 {"n": ...} 表示有效装备。
+        return "valid" if equip else "empty"
 
     def _process_equipment(self, name, equip, detail_scene,
                            row=None, col=1):

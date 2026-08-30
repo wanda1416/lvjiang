@@ -73,7 +73,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     _regions: list[Region]
     _selected_idx: int
     _field_selected: bool
-    _drag_mode: DragMode
+    _drag_mode: DragMode | None
     _drag_handle: HandlePos | None
     _drag_start: QPointF
     _drag_orig: Region | None
@@ -90,6 +90,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     _canvas_drag_orig: CanvasConfig | None
     _panel_drag_start: QPointF | None
     _panel_drag_current: QPointF | None
+    _subscene_drag_start: QPointF | None
+    _subscene_drag_current: QPointF | None
+    _subscene_edit_mode: DragMode | None
+    _subscene_edit_orig: SubsceneRef | None
     on_region_changed: Callable | None
     on_canvas_changed: Callable | None
 
@@ -117,7 +121,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
         return -1, None
 
-    def _hit_handle(self, r: Region, pos: QPointF) -> HandlePos | None:
+    def _hit_handle(
+        self, r: Region | SubsceneRef, pos: QPointF,
+    ) -> HandlePos | None:
         """检测是否命中区域的缩放手柄"""
         handles = self._get_handle_positions(r)
         for hpos, center in handles.items():
@@ -129,7 +135,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 return hpos
         return None
 
-    def _get_handle_positions(self, r: Region) -> dict[HandlePos, QPointF]:
+    def _get_handle_positions(
+        self, r: Region | SubsceneRef,
+    ) -> dict[HandlePos, QPointF]:
         """获取 8 个缩放手柄的 widget 坐标"""
         rect = self._region_rect_widget(r)
         cx = rect.center().x()

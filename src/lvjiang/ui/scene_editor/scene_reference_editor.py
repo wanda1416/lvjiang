@@ -42,6 +42,7 @@ class SceneReferenceEditorMixin:
         self._reference_table.setEditTriggers(
             QTableWidget.EditTrigger.NoEditTriggers)
         header = self._reference_table.horizontalHeader()
+        assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._reference_table.currentCellChanged.connect(
             self._on_reference_selection)

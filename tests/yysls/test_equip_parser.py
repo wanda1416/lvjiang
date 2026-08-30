@@ -92,10 +92,10 @@ class TestParseEquipLevel:
         assert parser._parse_equip_level("100阶") == (100, False)
 
     def test_empty(self, parser):
-        assert parser._parse_equip_level("") == (None, False)
+        assert parser._parse_equip_level("") == (0, False)
 
     def test_chengyin_without_level(self, parser):
-        assert parser._parse_equip_level("承音") == (None, True)
+        assert parser._parse_equip_level("承音") == (0, True)
 
 
 # ─── base_attr 解析 ────────────────────────────────────────

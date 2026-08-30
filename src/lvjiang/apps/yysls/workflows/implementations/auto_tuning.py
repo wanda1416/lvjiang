@@ -29,6 +29,9 @@ _traverse_bag、_ensure_base_group、_ensure_judge_config、
 _resolve_selected_slots。
 """
 
+import hashlib
+import json
+
 from loguru import logger
 
 from lvjiang.apps.yysls.config import get_game_config
@@ -338,6 +341,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.executor.reset_state()
             self._run_state = TuningRunState()
             self._equipment_session = None
+            self._equipment_detail_open = False
             self._ensure_judge_config()
             group = self._ensure_base_group()
             self.recorder.reset()  # 重置所有记录状态
@@ -518,10 +522,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                                      if detail_scene == self.ARMOR_DETAIL else [])
         raw = self.ocr_scene(detail_scene, fields)
         equip = self.call_function("to_equipment", [raw]) if raw else {}
-        if not equip or not equip.get("type"):
+        state = self._equipment_read_state(equip)
+        if state != "empty":
+            self._equipment_detail_open = True
+            self._close_equipment_detail()
+        if state != "valid":
             logger.error(
                 f"槽位 {slot} 已装备装备解析失败（raw={raw!r}），"
-                f"类型未知：该部位退化为按部位终止语义，不再做武器分组判定")
+                f"level={equip.get('level')!r}, type={equip.get('type')!r}："
+                f"该部位退化为按部位终止语义，不再做武器分组判定")
             return None
         return equip
 
@@ -587,9 +596,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 滚动后目标行在可见区第 1 行
         name, fp, equip = self._read_row(detail_scene, 1, col)
         if self.slot_level_exhausted:
+            self._close_equipment_detail()
             return
         if not fp:
             logger.warning(f"指定调律: 目标格 ({row},{col}) 为空，无装备可处理")
+            return
+        if self._equipment_read_state(equip) != "valid":
             return
         logger.info(f"指定调律: 定位到 ({row},{col})，装备={name or fp}")
         self._process_equipment(name, equip, detail_scene, row=1, col=col)
@@ -597,31 +609,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     # ─── 背包遍历（滚动策略实现见 bag_traversal）──────────────
 
     def _click_grid(self, row: int, col: int) -> bool:
-        """点击背包网格格子。
-
-        格内横向点击位置由环境策略决定（见
-        TuningRouteStrategy.grid_click_x_ratio）：部分环境的详情弹窗
-        功能区域会遮挡格子局部，需偏移点击位置避开遮挡。
-        """
-        x_ratio = self.route_strategy.grid_click_x_ratio(col)
-        if x_ratio == 0.5:
-            return self.click_panel(self.GRID_SCENE, self.GRID_PANEL, row, col)
-        cal = self._ensure_aligned(self.GRID_SCENE, self.GRID_PANEL)
-        if cal is None:
-            return False
-        row_idx, col_idx = row - 1, col - 1
-        if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
-            return False
-        panel_obj = self._find_panel(self.GRID_SCENE, self.GRID_PANEL)
-        _, cy = cal.slot_center(row_idx, col_idx)
-        x1, _, x2, _ = cal.slot_bounds(row_idx, col_idx)
-        # 使用自动对齐得到的实际格子边界，落在格内横向 x_ratio 处。
-        cx_shifted = x1 + x_ratio * (x2 - x1)
-        sx, sy = self._panel_ratio_to_screen(panel_obj, cx_shifted, cy)
-        self._input.click_screen(
-            sx, sy,
-            f"grid_shifted({self.GRID_SCENE}.{self.GRID_PANEL}[{row}][{col}])")
-        return True
+        """按对齐结果点击背包网格中心。"""
+        return self.click_panel(self.GRID_SCENE, self.GRID_PANEL, row, col)
 
     def _read_row(self, detail_scene: str, row: int,
                   col: int = 1) -> tuple[str, str, dict]:
@@ -634,6 +623,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                                      if detail_scene == self.ARMOR_DETAIL else [])
         raw = self.ocr_scene(detail_scene, fields)
         equip = self.call_function("to_equipment", [raw]) if raw else {}
+        state = self._equipment_read_state(equip)
+        if state != "empty":
+            self._equipment_detail_open = True
         # 武库标记：status 字段含“武库”说明该装备存放在武库中
         is_wuku = bool(raw and "武库" in (raw.get("status") or ""))
         if equip:
@@ -643,6 +635,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         name = (equip.get("name") or "") if equip else ""
         self._mark_non_weapon_wuku_bottom(is_wuku, name)
         fp = self._make_fingerprint(equip)
+        if state == "invalid":
+            logger.error(
+                f"  grid[{row}][{col}] 装备解析异常："
+                f"level={equip.get('level')!r}, type={equip.get('type')!r}, "
+                f"raw={raw!r}；跳过本件")
+            # 不得让“存在但字段不完整”的装备以空指纹冒充空槽，否则首列
+            # 会让整个背包提前到底。内部锚点只供遍历去重，不进入装备业务。
+            fp = self._make_invalid_read_fingerprint(equip, raw)
+            self._close_equipment_detail()
         if fp:
             logger.debug(
                 f"  读格 grid[{row}][{col}] → {self._equip_label(equip)} "
@@ -668,11 +669,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 break
             name, fp, equip = self._read_row(detail_scene, win_row, col)
             if self.slot_level_exhausted:
+                self._close_equipment_detail()
                 break
             if not fp:
                 logger.info(
                     f"  行{logical_row} grid[{win_row}][{col}] 空 slot → 本行到此为止")
                 break
+            if self._equipment_read_state(equip) != "valid":
+                col += 1
+                continue
             logger.info(f"  行{logical_row} grid[{win_row}][{col}] {name} fp={fp}")
             self.run_state.last_processing_result = None
             self._process_equipment(name, equip, detail_scene,
@@ -719,12 +724,17 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         新代码使用结构化 EquipmentProcessingResult；现有 BagTraversal 仍以
         指纹字符串为协议，待遍历 Port 迁移时再移除此兼容外壳。
         """
-        result = self._process_equipment_result(
-            name, equip, detail_scene, row=row, col=col)
-        self.run_state.last_processing_result = result
-        # 迁移期兼容测试替身和旧遍历扩展；生产决策已读取结构化结果。
-        self.recorder.equipment_recycled = result.slot_changed
-        return result.fingerprint
+        try:
+            result = self._process_equipment_result(
+                name, equip, detail_scene, row=row, col=col)
+            self.run_state.last_processing_result = result
+            # 迁移期兼容测试替身和旧遍历扩展；生产决策已读取结构化结果。
+            self.recorder.equipment_recycled = result.slot_changed
+            return result.fingerprint
+        finally:
+            # 仅关闭仍然存在的装备详情。回收成功会清除 open 标记；空槽和
+            # 完全不可理解的点击从不设置该标记。
+            self._close_equipment_detail()
 
     def _process_equipment_result(
         self, name: str, equip: dict, detail_scene: str,
@@ -739,6 +749,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         返回结构化格位影响，供列遍历判断是否留在原列处理补位装备。
         """
         fp, outcome = self._process_equipment_once(name, equip, detail_scene)
+        if outcome is not None and outcome.detail_closed:
+            self._equipment_detail_open = False
         if outcome is not RecycleOutcome.RECYCLED:
             return EquipmentProcessingResult(fp, recycle_outcome=outcome)
         if row is None:
@@ -757,9 +769,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 logger.info(f"  grid[{row}][{col}] 回收后已空，该格结束")
                 return EquipmentProcessingResult(
                     "", SlotEffect.REMOVED, outcome)
+            if self._equipment_read_state(equip) != "valid":
+                return EquipmentProcessingResult(
+                    fp, SlotEffect.REMOVED, outcome)
             logger.info(f"  回收补位 grid[{row}][{col}] → {name} fp={fp}")
             fp, outcome = self._process_equipment_once(name, equip,
                                                         detail_scene)
+            if outcome is not None and outcome.detail_closed:
+                self._equipment_detail_open = False
             if outcome is not RecycleOutcome.RECYCLED:
                 return EquipmentProcessingResult(
                     fp, SlotEffect.REMOVED, outcome)
@@ -1445,6 +1462,36 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return fp
         from ...core.equip_parser.models import make_fingerprint
         return make_fingerprint(equip)
+
+    @staticmethod
+    def _equipment_read_state(equip: dict) -> str:
+        """将 OCR 装备结果分为 empty / invalid / valid 三态。"""
+        if not isinstance(equip, dict):
+            return "empty"
+        level = equip.get("level")
+        has_level = (isinstance(level, (int, float))
+                     and not isinstance(level, bool) and level > 0)
+        has_type = bool(equip.get("type"))
+        if not has_level and not has_type:
+            return "empty"
+        if not has_level or not has_type:
+            return "invalid"
+        return "valid"
+
+    @staticmethod
+    def _make_invalid_read_fingerprint(equip: dict, raw: dict) -> str:
+        """为存在但不可理解的装备生成仅用于遍历的稳定锚点。"""
+        payload = json.dumps(
+            {"equip": equip, "raw": raw}, ensure_ascii=False,
+            sort_keys=True, default=str).encode("utf-8")
+        return "invalid:" + hashlib.sha1(payload).hexdigest()
+
+    def _close_equipment_detail(self) -> None:
+        """仅在确认当前存在装备详情时执行环境对应的关闭动作。"""
+        if not getattr(self, "_equipment_detail_open", False):
+            return
+        self.route_strategy.close_equipment_detail()
+        self._equipment_detail_open = False
 
     @staticmethod
     def _equip_label(equip: dict) -> str:

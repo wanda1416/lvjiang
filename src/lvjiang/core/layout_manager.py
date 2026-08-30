@@ -457,7 +457,14 @@ def load_layout_by_name(name: str) -> Layout | None:
     从 layouts.yaml 读 canvas，从 layouts/{name}/ 目录逐场景加载。
     别名布局（带 extends）的 scene 从根布局目录加载，canvas 取自身条目。
     """
-    from .layout_models import Arrow, Panel, Point, Region, _apply_legacy_disabled
+    from .layout_models import (
+        Arrow,
+        Panel,
+        Point,
+        Region,
+        SubsceneRef,
+        _apply_legacy_disabled,
+    )
 
     resolver = get_resolver()
     merged = resolver.load_merged(_LAYOUTS_YAML_REL)
@@ -485,6 +492,8 @@ def load_layout_by_name(name: str) -> Layout | None:
     points: dict[str, list[Point]] = {}
     arrows: dict[str, list[Arrow]] = {}
     panels: dict[str, list[Panel]] = {}
+    crop_canvases: dict[str, CanvasConfig] = {}
+    subscene_refs: dict[str, list[SubsceneRef]] = {}
 
     for scene_key in scene_keys:
         path = resolver.resolve_read(_scene_rel(scene_dir_name, scene_key))
@@ -503,6 +512,10 @@ def load_layout_by_name(name: str) -> Layout | None:
             arrows[scene_key] = [Arrow.from_dict(a) for a in data["arrows"]]
         if "panels" in data:
             panels[scene_key] = [Panel.from_dict(p) for p in data["panels"]]
+        if isinstance(data.get("crop_canvas"), dict):
+            crop_canvases[scene_key] = CanvasConfig.from_dict(data["crop_canvas"])
+        if "subscene_refs" in data:
+            subscene_refs[scene_key] = [SubsceneRef.from_dict(r) for r in data["subscene_refs"]]
         # 向后兼容：旧格式 disabled 段迁移到实例属性
         if "disabled" in data and isinstance(data["disabled"], dict):
             _apply_legacy_disabled(
@@ -511,7 +524,8 @@ def load_layout_by_name(name: str) -> Layout | None:
             )
 
     return Layout(name=name, desc=desc, canvas=canvas, regions=regions,
-                  points=points, arrows=arrows, panels=panels)
+                  points=points, arrows=arrows, panels=panels,
+                  crop_canvases=crop_canvases, subscene_refs=subscene_refs)
 
 
 # ─── 布局配置管理器 ──────────────────────────────────────
@@ -677,7 +691,9 @@ class LayoutConfigManager:
         resolver.save_merged(_LAYOUTS_YAML_REL, merged)
 
         # 3. 写场景 JSON 文件（增量或全量）；别名布局落到根布局目录
-        all_scene_keys = set(layout.regions) | set(layout.points) | set(layout.arrows) | set(layout.panels)
+        all_scene_keys = (set(layout.regions) | set(layout.points) | set(layout.arrows)
+                          | set(layout.panels) | set(layout.crop_canvases)
+                          | set(layout.subscene_refs))
         versions = content_versions or {}
         scene_keys = all_scene_keys if changed_scenes is None else (
             (changed_scenes & all_scene_keys) | set(versions))
@@ -698,6 +714,11 @@ class LayoutConfigManager:
             if pnls:
                 panel_order = {p.key: i for i, p in enumerate(get_panel_defs(sk))}
                 entry["panels"] = [p.to_dict() for p in sorted(pnls, key=lambda p: panel_order.get(p.key, 999))]
+            if sk in layout.crop_canvases:
+                entry["crop_canvas"] = layout.crop_canvases[sk].to_dict()
+            refs = layout.subscene_refs.get(sk) or []
+            if refs:
+                entry["subscene_refs"] = [r.to_dict() for r in refs]
             resolver.write_entity(
                 _scene_rel(scene_dir_name, sk),
                 json.dumps(entry, ensure_ascii=False, indent=2),

@@ -1,4 +1,4 @@
-"""面板编辑混入类 - Panel 列表构建、刷新、CRUD、编辑弹窗"""
+"""网格编辑混入类 - Panel（兼容存储名）列表构建、刷新、CRUD、编辑弹窗"""
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -92,16 +92,16 @@ class PanelEditorMixin:
         layout.addWidget(self._panel_table)
 
         btn_row = QHBoxLayout()
-        self._btn_new_panel = QPushButton(tr("+ 创建面板"))
+        self._btn_new_panel = QPushButton(tr("+ 创建网格"))
         self._btn_new_panel.setToolTip(tr("在场景 YAML 中新增 Panel 定义（声明式网格）"))
         self._btn_new_panel.clicked.connect(self._on_new_panel_def)
         btn_row.addWidget(self._btn_new_panel)
-        self._btn_del_panel = QPushButton(tr("删除面板"))
+        self._btn_del_panel = QPushButton(tr("删除网格"))
         self._btn_del_panel.setToolTip(tr("从场景 YAML 中删除 Panel 定义"))
         self._btn_del_panel.clicked.connect(self._on_delete_panel_def)
         self._btn_del_panel.setEnabled(False)
         btn_row.addWidget(self._btn_del_panel)
-        self._btn_bind_panel = QPushButton(tr("绑定面板"))
+        self._btn_bind_panel = QPushButton(tr("绑定网格"))
         self._btn_bind_panel.setToolTip(
             tr("在画布上框选一个矩形区域，绑定到选中的 Panel 定义")
         )

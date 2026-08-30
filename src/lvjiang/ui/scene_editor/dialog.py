@@ -28,6 +28,8 @@ from ...core.layout_models import Layout
 from ...core.scene_registry import (
     get_registry,
     get_scene_name,
+    get_subscene_ref_defs,
+    is_subscene,
 )
 from ...i18n import tr
 from ..button_styles import apply_button_style
@@ -386,7 +388,6 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         """
         if self._current_layout is None:
             return
-        canvas = self._current_layout.get_canvas()
         layout_name = self._current_layout.name
         self._loaded_scenes = set()  # 布局变更，所有底图待重新加载
         from ...core.layout_manager import scene_layout_rels
@@ -396,7 +397,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         try:
             self._ensure_scene_tab_loaded(self._get_current_scene_key())
             for scene_key, tab in self._tabs.items():
-                self._apply_layout_to_tab(scene_key, tab, canvas)
+                self._apply_layout_to_tab(scene_key, tab)
         finally:
             self._applying_layout = False
         self._set_dirty(False)
@@ -414,15 +415,17 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             lambda sk=scene_key: self._on_scene_data_changed(sk))
         tab.canvas.on_panel_changed = (
             lambda sk=scene_key: self._on_scene_data_changed(sk))
+        tab.canvas.on_subscene_ref_changed = (
+            lambda sk=scene_key: self._on_scene_data_changed(sk))
         tab.canvas.on_status_message = (
             lambda msg: self._status_bar.showMessage(msg, 5000))
         tab.on_view_changed = self._on_tab_view_changed
+        tab.on_scene_type_changed = self._on_scene_type_changed
         tab.on_version_pending_changed = self._on_version_pending_changed
         if self._current_layout is not None and not self._applying_layout:
             self._apply_layout_to_tab(scene_key, tab)
 
-    def _apply_layout_to_tab(self, scene_key: str, tab: SceneTab,
-                             canvas=None) -> None:
+    def _apply_layout_to_tab(self, scene_key: str, tab: SceneTab) -> None:
         """只初始化一个已经创建的场景 Tab。"""
         if self._current_layout is None:
             return
@@ -430,7 +433,13 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         tab.set_points(self._current_layout.get_scene_points(scene_key))
         tab.set_arrows(self._current_layout.get_scene_arrows(scene_key))
         tab.set_panels(self._current_layout.get_scene_panels(scene_key))
-        tab.set_canvas_config(canvas or self._current_layout.get_canvas())
+        tab.set_subscene_refs(
+            self._current_layout.get_scene_subscene_refs(scene_key))
+        tab.set_subscene_contents(self._subscene_contents(scene_key))
+        tab.set_canvas_config(
+            self._current_layout.get_scene_crop_canvas(scene_key)
+            if is_subscene(scene_key)
+            else self._current_layout.get_canvas())
         tab.set_layout_name(
             self._current_layout.name,
             self._scene_layout_paths.get(scene_key),
@@ -443,6 +452,26 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         tab._refresh_point_list()
         tab._refresh_arrow_list()
         tab._refresh_panel_list()
+        tab._refresh_reference_list()
+
+    def _subscene_contents(self, scene_key: str) -> dict[str, dict[str, list]]:
+        """根据当前 Layout 快照构建父场景内的只读子场景投影。"""
+        if self._current_layout is None:
+            return {}
+        return {
+            ref.key: {
+                "regions": self._current_layout.get_scene_regions(ref.scene),
+                "points": self._current_layout.get_scene_points(ref.scene),
+                "panels": self._current_layout.get_scene_panels(ref.scene),
+            }
+            for ref in get_subscene_ref_defs(scene_key)
+        }
+
+    def _refresh_loaded_subscene_contents(self) -> None:
+        """子场景坐标入 Layout 后，刷新所有已加载父场景的投影。"""
+        for scene_key, tab in self._tabs.items():
+            if get_subscene_ref_defs(scene_key):
+                tab.set_subscene_contents(self._subscene_contents(scene_key))
 
     def _get_cached_screenshot(self, layout_name: str, scene_key: str, view: str):
         """取截图，命中缓存则直接返回；None（无图）也缓存以免反复读盘"""
@@ -461,6 +490,8 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         img = self._get_cached_screenshot(self._current_layout.name, scene_key, tab.current_view)
         if img is not None:
             tab.canvas.set_image(img)
+            if is_subscene(scene_key):
+                tab.canvas.focus_canvas()
         else:
             tab.canvas.clear_image()
         self._loaded_scenes.add(scene_key)
@@ -470,7 +501,16 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
         scene_key = self._get_current_scene_key()
         self._ensure_scene_tab_loaded(scene_key)
         self._ensure_tab_image(scene_key)
+        self._update_canvas_button_text()
         self._update_info_label()
+
+    def _on_scene_type_changed(self, scene_key: str):
+        tab = self._tabs.get(scene_key)
+        if tab is not None and self._current_layout is not None:
+            tab.set_canvas_config(
+                self._current_layout.get_scene_crop_canvas(scene_key)
+                if is_subscene(scene_key) else self._current_layout.get_canvas())
+        self._update_canvas_button_text()
 
     def _clear_all_tabs(self):
         """清空所有 Tab 的区域/坐标/方向/面板"""
@@ -479,6 +519,7 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             tab.set_points([])
             tab.set_arrows([])
             tab.set_panels([])
+            tab.set_subscene_refs([])
 
     def _on_tab_view_changed(self, scene_key: str, view: str):
         """某 Tab 切换视图：换上该视图的底图（走缓存）"""
@@ -514,6 +555,9 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
                 temp.set_scene_points(sk, tab.get_points())
                 temp.set_scene_arrows(sk, tab.get_arrows())
                 temp.set_scene_panels(sk, tab.get_panels())
+                temp.set_scene_subscene_refs(sk, tab.get_subscene_refs())
+                if is_subscene(sk):
+                    temp.set_scene_crop_canvas(sk, tab.get_canvas_config())
             migrated = migrate_layout_item(temp, source, target, kind, key)
             if migrated:
                 for sk in (source, target):
@@ -611,11 +655,20 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
                 tab.set_canvas_mode()
             else:
                 tab.set_region_mode()
-        self._btn_canvas_mode.setText(tr("退出画布编辑") if checked else tr("编辑画布"))
+        self._update_canvas_button_text()
         if checked:
             self._status_bar.showMessage(tr("画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框"))
         else:
             self._status_bar.showMessage(tr("已退出画布编辑模式"))
+
+    def _update_canvas_button_text(self):
+        crop = is_subscene(self._get_current_scene_key())
+        if self._btn_canvas_mode.isChecked():
+            self._btn_canvas_mode.setText(
+                tr("退出裁剪画布") if crop else tr("退出画布编辑"))
+        else:
+            self._btn_canvas_mode.setText(
+                tr("裁剪画布") if crop else tr("编辑画布"))
 
     def _on_any_canvas_changed(self):
         """任一 Tab 的画布被修改时，以当前正在编辑的 Tab 为源，同步到其他所有 Tab
@@ -631,11 +684,17 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             return
         canvas = source_tab.get_canvas_config()
         if self._current_layout is not None:
-            self._current_layout.set_canvas(canvas)
-        for tab in self._tabs.values():
-            if tab is not source_tab:
-                tab.set_canvas_config(canvas)
-        self._set_dirty(True)
+            if is_subscene(source_tab.scene_key):
+                self._current_layout.set_scene_crop_canvas(
+                    source_tab.scene_key, canvas)
+                source_tab.canvas.focus_canvas()
+                self._mark_scene_dirty(source_tab.scene_key)
+            else:
+                self._current_layout.set_canvas(canvas)
+                for key, tab in self._tabs.items():
+                    if tab is not source_tab and not is_subscene(key):
+                        tab.set_canvas_config(canvas)
+                self._set_dirty(True)
         self._update_info_label()
 
     def _on_scene_data_changed(self, scene_key: str):
@@ -649,6 +708,8 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
                 current._on_poi_changed()
             if hasattr(current, '_on_panel_changed'):
                 current._on_panel_changed()
+            if hasattr(current, '_refresh_reference_list'):
+                current._refresh_reference_list()
 
     def _mark_scene_dirty(self, scene_key: str):
         """标记指定场景为已变更，更新 Tab 标题绿点 + 全局 dirty 指示"""

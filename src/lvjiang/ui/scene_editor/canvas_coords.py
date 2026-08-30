@@ -93,6 +93,24 @@ class CanvasCoordMixin:
         cy = (sy - c.y_ratio) / c.h_ratio
         return max(0.0, min(1.0, cx)), max(0.0, min(1.0, cy))
 
+    def _widget_delta_to_canvas_norm(
+        self, start: QPointF, end: QPointF,
+    ) -> tuple[float, float]:
+        """widget 像素位移 -> 画布局部归一化位移。
+
+        Region/Panel 坐标相对于画布，而 ``_widget_to_norm`` 返回相对于整张
+        截图的比例。非全幅裁剪画布必须再除以画布宽高比例，否则拖动会缩小，
+        拉伸则会把截图绝对坐标误当局部坐标而瞬间漂移。
+        """
+        display_w = self._display_rect.width()
+        display_h = self._display_rect.height()
+        c = self._canvas_config
+        dx = ((end.x() - start.x()) / display_w / c.w_ratio
+              if display_w > 0 and c.w_ratio > 0 else 0.0)
+        dy = ((end.y() - start.y()) / display_h / c.h_ratio
+              if display_h > 0 and c.h_ratio > 0 else 0.0)
+        return dx, dy
+
     def _canvas_rect_widget(self) -> QRectF:
         """画布框的 widget 坐标矩形"""
         c = self._canvas_config

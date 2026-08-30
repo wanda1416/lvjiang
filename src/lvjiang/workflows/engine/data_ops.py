@@ -22,9 +22,15 @@ from ..grammar import (
     PanelRef,
     Recognize,
     Scan,
+    SubsceneEntityRef,
     VarRef,
 )
-from ..runtime_layout import enabled_regions, require_enabled
+from ..runtime_layout import (
+    enabled_regions,
+    require_enabled,
+    resolve_subscene_region,
+    resolve_subscene_target_scene,
+)
 from .signals import WorkflowUserError, _ReturnSignal
 
 
@@ -103,6 +109,9 @@ class _DataOpsMixin:
             else:
                 self._scan_panel_cell(node)
             return
+        if isinstance(node.scene, SubsceneEntityRef):
+            self._scan_subscene(node)
+            return
         # 解析场景名（可能是 str 或 VarRef）
         scene_ref = node.scene.scene if isinstance(node.scene, EntityRef) else node.scene
         if isinstance(scene_ref, VarRef):
@@ -148,6 +157,28 @@ class _DataOpsMixin:
                 regions = enabled_regions(regions)
             self._coord_meta[var_name] = {r.key: r for r in regions}
 
+    def _scan_subscene(self, node: Scan) -> None:
+        ref = node.scene
+        scene = str(self._resolve(ref.scene))
+        reference = str(self._resolve(ref.reference))
+        entity = str(self._resolve(ref.entity))
+        target_scene = resolve_subscene_target_scene(scene, reference)
+        region = resolve_subscene_region(
+            self._layout, scene, reference, entity)
+        var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
+        min_conf = self._resolve_min_confidence(node.where)
+        workflow = self._ensure_workflow()
+        if node.by is not None:
+            target = self._resolve(node.by.target)
+            self.variables[var_name] = workflow.ocr_scene_by(
+                target_scene, [entity], target, node.by.match_mode,
+                min_confidence=min_conf, regions_override=[region])
+        else:
+            self.variables[var_name] = workflow.ocr_scene(
+                target_scene, [entity], min_confidence=min_conf,
+                regions_override=[region])
+            self._coord_meta[var_name] = {entity: region}
+
     def _exec_recognize(self, node: Recognize):
         """执行 recognize：匹配场景字段，并可经 ``with`` 转换 rich 结果。"""
         # with 子句必须配合 as rich 使用
@@ -164,6 +195,9 @@ class _DataOpsMixin:
                 self._recognize_panel_range(node)
             else:
                 self._recognize_panel_cell(node)
+            return
+        if isinstance(node.scene, SubsceneEntityRef):
+            self._recognize_subscene(node)
             return
         # 解析场景名（可能是 str 或 VarRef）
         scene_ref = node.scene.scene if isinstance(node.scene, EntityRef) else node.scene
@@ -218,6 +252,38 @@ class _DataOpsMixin:
             )
             self.variables[var_name] = result           # {slot_key: "参考图标识"}
             self._coord_meta[var_name] = region_map     # {slot_key: Region}
+
+    def _recognize_subscene(self, node: Recognize) -> None:
+        ref = node.scene
+        scene = str(self._resolve(ref.scene))
+        reference = str(self._resolve(ref.reference))
+        entity = str(self._resolve(ref.entity))
+        target_scene = resolve_subscene_target_scene(scene, reference)
+        region = resolve_subscene_region(
+            self._layout, scene, reference, entity)
+        var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
+        group = self._resolve(node.group) if node.group is not None else None
+        min_conf = self._resolve_min_confidence(node.where)
+        workflow = self._ensure_workflow()
+        if node.by is not None:
+            target = self._resolve(node.by.target)
+            self.variables[var_name] = workflow.recognize_references_by(
+                target_scene, [entity], target, node.by.match_mode,
+                group=group, min_confidence=min_conf, full=node.by.full,
+                regions_override=[region])
+        elif node.rich:
+            result, region_map = workflow.recognize_references_rich(
+                target_scene, [entity], group=group,
+                min_confidence=min_conf, with_func=node.with_func,
+                regions_override=[region])
+            self.variables[var_name] = result
+            self._coord_meta[var_name] = region_map
+        else:
+            result, region_map = workflow.recognize_references(
+                target_scene, [entity], group=group,
+                min_confidence=min_conf, regions_override=[region])
+            self.variables[var_name] = result
+            self._coord_meta[var_name] = region_map
 
     def _exec_collect(self, node: Collect):
         """collect $var | field_access | literal [as "label" | as $alias_var] — 将值存入输出 dict"""

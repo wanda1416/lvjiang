@@ -33,12 +33,13 @@ from ..grammar import (
     Place,
     Press,
     Scroll,
+    SubsceneEntityRef,
     VarRef,
     Wait,
     WaitStable,
 )
 from ..grammar.ast_nodes import Align, PressMode, TupleLiteral
-from ..runtime_layout import require_enabled
+from ..runtime_layout import require_enabled, resolve_subscene_entity
 from .signals import WorkflowUserError
 
 # FoundRegion 延迟导入，避免循环依赖
@@ -60,6 +61,27 @@ class _ActionsMixin:
 
     _key_registry: "KeyStateRegistry | None"
     _pressed_mouse_buttons: set[str]
+
+    def _subscene_target_to_screen(
+        self, target: SubsceneEntityRef,
+    ) -> tuple[int, int, str]:
+        """把三段引用解析到父画布屏幕坐标，供 click/move/scroll 共用。"""
+        scene = str(self._resolve(target.scene))
+        reference = str(self._resolve(target.reference))
+        entity = str(self._resolve(target.entity))
+        item = resolve_subscene_entity(
+            self._layout, scene, reference, entity)
+        from ...core.layout_models import Point, Region
+        workflow = self._ensure_workflow()
+        if isinstance(item, Region):
+            x, y = workflow._region_to_screen(item, jitter=True)
+        elif isinstance(item, Point):
+            x, y = workflow._point_to_screen(item)
+        else:
+            x, y = workflow._ratio_to_screen(
+                item.x_ratio + item.w_ratio / 2,
+                item.y_ratio + item.h_ratio / 2)
+        return x, y, f"{scene}/{reference}/{entity}"
 
     def _exec_mouse_button(self, node):
         """mouse BUTTON down|up — 在当前光标位置发送原始鼠标键事件。"""
@@ -89,6 +111,11 @@ class _ActionsMixin:
             x, y = self._panel_ref_to_screen(node.target)
             if x is not None and y is not None:
                 self._input.click_screen(x, y, f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])", **kw)
+            return
+        if isinstance(node.target, SubsceneEntityRef):
+            x, y, label = self._subscene_target_to_screen(node.target)
+            self._input.click_screen(
+                x, y, label, **kw)
             return
         if isinstance(node.target, EntityRef):
             # 解析 scene（可能是 str 或 VarRef）
@@ -198,6 +225,10 @@ class _ActionsMixin:
                     f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])",
                     duration=duration)
             return
+        if isinstance(node.target, SubsceneEntityRef):
+            x, y, label = self._subscene_target_to_screen(node.target)
+            self._input.move_screen(x, y, label, duration=duration)
+            return
         if isinstance(node.target, EntityRef):
             # 解析 scene
             if isinstance(node.target.scene, VarRef):
@@ -295,6 +326,10 @@ class _ActionsMixin:
                     x, y, direction, amount,
                     f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])",
                 )
+            return
+        if isinstance(node.target, SubsceneEntityRef):
+            x, y, label = self._subscene_target_to_screen(node.target)
+            self._input.scroll_screen(x, y, direction, amount, label)
             return
         if isinstance(node.target, EntityRef):
             if isinstance(node.target.scene, VarRef):

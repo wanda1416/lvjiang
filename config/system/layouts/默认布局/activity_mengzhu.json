@@ -45,6 +45,20 @@
       "r_ratio": 0.044827403155208806
     },
     {
+      "key": "item_2",
+      "cx_ratio": 0,
+      "cy_ratio": 0,
+      "r_ratio": 0.015,
+      "disabled": true
+    },
+    {
+      "key": "item_3",
+      "cx_ratio": 0,
+      "cy_ratio": 0,
+      "r_ratio": 0.015,
+      "disabled": true
+    },
+    {
       "key": "cangku",
       "cx_ratio": 0.7832233682803702,
       "cy_ratio": 0.7260524611658496,

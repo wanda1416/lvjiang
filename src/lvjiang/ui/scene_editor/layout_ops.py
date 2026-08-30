@@ -35,7 +35,8 @@ class LayoutOpsMixin:
         _manager, _current_layout, _tabs, _layout_combo, _status_bar,
         _btn_save, _btn_save_as, _btn_delete, _dirty_scenes,
         _set_dirty(), _mark_all_scenes_clean(), _get_dirty_scene_names(),
-        _apply_layout_to_tabs(), _clear_all_tabs(), _update_ui_state()
+        _apply_layout_to_tabs(), _clear_all_tabs(), _update_ui_state(),
+        _refresh_loaded_subscene_contents()
     """
 
     # ─── 名称校验 ─────────────────────────────────────────
@@ -136,12 +137,26 @@ class LayoutOpsMixin:
         current_tab = self._current_scene_tab() or next(
             iter(self._tabs.values()), None)
         if current_tab is not None:
-            self._current_layout.set_canvas(current_tab.get_canvas_config())
+            scene = get_registry().get_scene(current_tab.scene_key)
+            if scene and scene.is_subscene:
+                self._current_layout.set_scene_crop_canvas(
+                    current_tab.scene_key, current_tab.get_canvas_config())
+            else:
+                self._current_layout.set_canvas(current_tab.get_canvas_config())
         for scene_key, tab in self._tabs.items():
             self._current_layout.set_scene_regions(scene_key, tab.get_regions())
             self._current_layout.set_scene_points(scene_key, tab.get_points())
             self._current_layout.set_scene_arrows(scene_key, tab.get_arrows())
             self._current_layout.set_scene_panels(scene_key, tab.get_panels())
+            self._current_layout.set_scene_subscene_refs(
+                scene_key, tab.get_subscene_refs())
+            scene = get_registry().get_scene(scene_key)
+            if scene and scene.is_subscene:
+                self._current_layout.set_scene_crop_canvas(
+                    scene_key, tab.get_canvas_config())
+        # 父场景画布持有子场景实体的只读投影。Layout 快照更新后必须同步
+        # 重建，否则已加载的父页会一直绘制首次进入时的旧坐标。
+        self._refresh_loaded_subscene_contents()
 
     def _clone_current_layout(self, name: str) -> Layout | None:
         """克隆当前完整布局；未访问场景继续来自内存中的 Layout 快照。"""

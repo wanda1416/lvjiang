@@ -15,6 +15,7 @@ from .scene_definition_models import (
     PanelDef,
     PointDef,
     RegionDef,
+    SubsceneRefDef,
     ViewDef,
 )
 
@@ -207,6 +208,25 @@ def get_region_defs(scene_key: str) -> list[RegionDef]:
     return list(scene.regions)
 
 
+def is_subscene(scene_key: str) -> bool:
+    scene = _registry.get_scene(scene_key)
+    return bool(scene and scene.is_subscene)
+
+
+def get_subscene_ref_defs(scene_key: str) -> list[SubsceneRefDef]:
+    scene = _registry.get_scene(scene_key)
+    return list(scene.subscene_refs) if scene else []
+
+
+def get_subscene_ref_def(scene_key: str, ref_key: str) -> SubsceneRefDef | None:
+    return next((r for r in get_subscene_ref_defs(scene_key) if r.key == ref_key), None)
+
+
+def get_subscene_scenes() -> list[tuple[str, str]]:
+    return [(key, scene.name) for key, scene in _registry.all_scenes().items()
+            if scene.is_subscene]
+
+
 # ─── 视图 ───────────────────────────────────────────────
 
 def get_scene_views(scene_key: str) -> list[ViewDef]:
@@ -236,7 +256,8 @@ def get_view_visible_keys(scene_key: str, current_view: str) -> set[str] | None:
         return set()
     return {
         i.key
-        for i in (*scene.regions, *scene.points, *scene.panels)
+        for i in (*scene.regions, *scene.points, *scene.panels,
+                  *scene.subscene_refs)
         if is_view_visible(i.view, current_view)
     }
 

@@ -1,11 +1,12 @@
 layout_scenes:
-  group_1:
+  general:
   - game_main_page
   - game_menu_page
   - game_login_page
   - general_control
   - general_action
-  group_2:
+  - general_chat
+  training:
   - equip_detail
   - equip_weapon_detail
   - equip_armor_detail
@@ -13,25 +14,28 @@ layout_scenes:
   - training_main
   - training_xinfa
   - role_detail
-  group_3:
+  resource:
   - bag_equip_detail
   - bag_item_detail
   - bag_wallet_detail
   - bugan_detail
   - zhanling_detail
-  group_4:
+  social:
   - school_main
   - baiye_main
   - waiguan_yigui
   - waiguan_qingjing
-  group_5:
+  activity:
   - activity_main
   - activity_jianghu
   - activity_huoyun
   - activity_mengzhu
+  component:
+  - jianghu_card
 group_names:
-  group_1: 通用
-  group_2: 培养
-  group_3: 物资
-  group_4: 社交
-  group_5: 活动
+  general: 通用
+  training: 培养
+  resource: 物资
+  social: 社交
+  component: 组件
+  activity: 活动

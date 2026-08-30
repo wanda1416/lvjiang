@@ -94,6 +94,19 @@ class PanelDef:
 
 
 @dataclass
+class SubsceneRefDef:
+    """父场景中的可复用子场景引用声明。
+
+    ``scene`` 指向一个 ``type: subscene`` 的场景；具体摆放外框属于布局实例，
+    保存在布局 JSON 的 SubsceneRef 中。
+    """
+    key: str
+    name: str
+    scene: str
+    view: str = ""
+
+
+@dataclass
 class SceneDef:
     """单个场景的完整定义
 
@@ -106,3 +119,9 @@ class SceneDef:
     points: list[PointDef] = field(default_factory=list)
     panels: list[PanelDef] = field(default_factory=list)
     views: list[ViewDef] = field(default_factory=list)
+    type: str = "scene"
+    subscene_refs: list[SubsceneRefDef] = field(default_factory=list)
+
+    @property
+    def is_subscene(self) -> bool:
+        return self.type == "subscene"

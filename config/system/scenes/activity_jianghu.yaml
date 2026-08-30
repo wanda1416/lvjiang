@@ -50,6 +50,11 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
+- key: space
+  name: 空白区
+  type: attr
+  is_text: true
+  is_clickable: false
 subscene_refs:
 - key: card_1
   name: 任务卡片1

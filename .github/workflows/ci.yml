@@ -33,12 +33,33 @@ jobs:
         run: python -m mypy
 
       - name: Run tests
+        id: tests
+        continue-on-error: true
         run: >-
           python -m pytest tests
           --cov=lvjiang
           --cov-branch
           --cov-report=term-missing:skip-covered
           --cov-report=xml
+          --junitxml=pytest-results.xml
+
+      - name: Annotate test failures
+        if: steps.tests.outcome == 'failure'
+        shell: pwsh
+        run: |
+          [xml]$report = Get-Content pytest-results.xml
+          $failures = Select-Xml -Xml $report -XPath '//testcase[failure or error]'
+          foreach ($item in $failures) {
+            $case = $item.Node
+            $failure = if ($case.failure) { $case.failure } else { $case.error }
+            $details = "$($case.classname)::$($case.name)`n$($failure.InnerText)"
+            if ($details.Length -gt 4000) {
+              $details = $details.Substring($details.Length - 4000)
+            }
+            $details = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=pytest failure::$details"
+          }
+          exit 1
 
       - name: Upload coverage report
         if: always()

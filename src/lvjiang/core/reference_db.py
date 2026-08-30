@@ -67,8 +67,8 @@ _PREDEFINED_INPUT_KEYS = frozenset({"label", "group", "notes"})
 # rich reference dict 的引擎保留字段；output OCR 字段会被摊平，不能占用。
 REFERENCE_OUTPUT_RESERVED_KEYS = frozenset({"label", "group", "confidence", "meta"})
 
-# 默认图库空间名（名册缺失时的回退空间）
-DEFAULT_SPACE = tr("默认")
+# 默认图库空间名（也是配置文件名，属于稳定数据 key，不参与界面翻译）
+DEFAULT_SPACE = "手游"
 
 
 def validate_crop(values: list[float]) -> list[float] | None:

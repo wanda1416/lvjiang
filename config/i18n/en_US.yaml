@@ -791,6 +791,7 @@ auto_strings:
   图像检测: Image Detection
   图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: Minimum confidence for image recognition (0~1); below this value is considered unmatched; higher is stricter
   图库已刷新: Gallery Refreshed
+  图库：: 'Gallery:'
   '图库空间:': 'Gallery Space:'
   图库管理: Reference Manager
   图库识别（分类）: Gallery Recognition (Classification)

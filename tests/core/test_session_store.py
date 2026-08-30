@@ -85,6 +85,53 @@ class TestNodeOps:
         assert store.get_node("daily") == {"list": [1, 2]}
 
 
+class TestActivesMigration:
+    def test_reads_legacy_active_keys_without_writing(self, tmp_path):
+        path = tmp_path / "session.json"
+        path.write_text(json.dumps({
+            "active_user": "旧用户",
+            "active_layout": "旧布局",
+            "active_space": "旧图库",
+        }), encoding="utf-8")
+        store = SessionStore(path)
+
+        assert store.get_active("user") == "旧用户"
+        assert store.get_active("layout") == "旧布局"
+        assert store.get_active("space") == "旧图库"
+        assert "actives" not in json.loads(path.read_text(encoding="utf-8"))
+
+    def test_new_actives_take_precedence_over_legacy(self, tmp_path):
+        path = tmp_path / "session.json"
+        path.write_text(json.dumps({
+            "actives": {"layout": "新布局"},
+            "active_layout": "旧布局",
+        }), encoding="utf-8")
+        store = SessionStore(path)
+
+        assert store.get_active("layout") == "新布局"
+
+    def test_any_active_write_migrates_all_legacy_keys_atomically(self, tmp_path):
+        path = tmp_path / "session.json"
+        path.write_text(json.dumps({
+            "active_user": "旧用户",
+            "active_layout": "旧布局",
+            "active_space": "旧图库",
+            "daily": {"workflow_id": "task"},
+        }), encoding="utf-8")
+        store = SessionStore(path)
+
+        store.set_active("space", "新图库")
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["actives"] == {
+            "user": "旧用户",
+            "layout": "旧布局",
+            "space": "新图库",
+        }
+        assert not ({"active_user", "active_layout", "active_space"} & data.keys())
+        assert data["daily"] == {"workflow_id": "task"}
+
+
 class TestDiskSemantics:
     def test_existing_file_loaded_lazily(self, tmp_path):
         path = tmp_path / "session.json"

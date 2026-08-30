@@ -6,6 +6,7 @@
 依赖主类提供：
     _layout_manager / _user_manager / _user_config / _hotkey_listener、
     _refresh_capture / _refresh_layout_combo / _refresh_user_combo /
+    _refresh_reference_space_combo /
     _load_workflow_configs / _refresh_run_button / _refresh_pause_button /
     _main_global_hotkey_bindings / _open_batch_config、
     preview_container / btn_hide_window
@@ -189,6 +190,8 @@ class MenuOpsMixin:
         from ..reference import ReferenceManagerDialog
         dialog = ReferenceManagerDialog(parent=self, screenshot_callback=self._refresh_capture)
         dialog.exec()
+        # 管理器内仍保留空间选择；关闭后同步可能新增/删除/激活的空间。
+        self._refresh_reference_space_combo()
         if dialog.data_changed:
             # 工作流引擎按运行生命周期持有 reference 服务；下次运行会加载新数据。
             self.statusBar().showMessage(tr("图库已刷新"), 3000)

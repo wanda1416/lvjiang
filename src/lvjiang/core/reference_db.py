@@ -10,7 +10,7 @@
           + config/system/references/{space}/{bucket}/*.png
 - 用户层：config/local/references/{space}.yaml（条目级 diff：references + deleted）
           + config/local/references/{space}/{bucket}/*.png
-- 激活空间：config/session/session.json 的 active_space 字段（纯运行态）
+- 激活空间：config/session/session.json 的 actives.space 字段（兼容旧 active_space）
 
 桶（bucket）：每个空间的桶目录由代码扫描空间目录下的全部二级子目录自动发现。
 文件随机分配到某个桶，YAML 中 file 字段只存文件名（不含桶路径）。
@@ -348,13 +348,13 @@ class ReferenceDatabase:
         return get_session_store()
 
     def _read_session_active_space(self) -> str:
-        """从 session.json 读取 active_space，缺失/非法返回空串"""
-        value = self._get_session_store().get_node("active_space")
+        """读取 actives.space，缺失时兼容旧 active_space。"""
+        value = self._get_session_store().get_active("space")
         return str(value) if value else ""
 
     def _write_session_active_space(self, name: str) -> None:
-        """写 active_space 到 session.json（经 SessionStore，不影响其他节点）"""
-        self._get_session_store().set_node("active_space", name)
+        """写 actives.space，并清理旧 active_* 顶层键。"""
+        self._get_session_store().set_active("space", name)
 
     def _resolve_space(self) -> None:
         """解析激活空间：session.json → DEFAULT_SPACE → 首个 → DEFAULT_SPACE"""

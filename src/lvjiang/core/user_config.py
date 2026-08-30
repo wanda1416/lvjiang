@@ -67,7 +67,7 @@ class UserConfigManager:
                 if isinstance(u_data, dict):
                     user = User.from_dict(u_data)
                     self._users[user.name] = user
-        active = store.get_node("active_user", "")
+        active = store.get_active("user", "")
         self._active_user = active if isinstance(active, str) else ""
         if self._active_user and self._active_user not in self._users:
             self._active_user = ""
@@ -86,7 +86,7 @@ class UserConfigManager:
         # 原子化保存用户列表
         store.mutate_node("users", lambda _: [u.to_dict() for u in self._users.values()])
         # 原子化保存当前用户
-        store.mutate_node("active_user", lambda _: self._active_user)
+        store.set_active("user", self._active_user)
 
     def _create_default_user(self):
         """创建默认用户"""
@@ -166,4 +166,3 @@ class UserConfigManager:
         self._save()
         logger.info(f"已切换到用户: {name}")
         return True
-

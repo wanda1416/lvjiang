@@ -10,7 +10,14 @@ builtins.system 用 from-import 在加载时绑定了本地名，所以
 platforms 与 system 两处都要补丁。
 """
 
+from pathlib import Path
+
 import pytest
+
+from tests.config_write_guard import install_project_config_write_guard
+
+# 在收集测试模块前就封死真实 config；不能只依赖各用例自觉使用 tmp_path。
+install_project_config_write_guard(Path(__file__).parents[1] / "config")
 
 
 @pytest.fixture(autouse=True)
@@ -27,13 +34,14 @@ def _no_native_dialogs(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _reset_session_store():
-    """每个用例前重置 SessionStore 单例
-
-    单例内存态懒加载后常驻；用例里 monkeypatch constants.SESSION_PATH
-    指向 tmp 目录时，旧内存态会造成跨用例串扰。生产环境不受影响。
-    """
+def _isolate_session_store(tmp_path, monkeypatch):
+    """每个用例默认使用独立 session.json，禁止测试接触用户会话数据。"""
+    from lvjiang import constants
     from lvjiang.core.config.session import reset_session_store
+
+    monkeypatch.setattr(
+        constants, "SESSION_PATH", tmp_path / "session" / "session.json",
+    )
     reset_session_store()
     yield
     reset_session_store()

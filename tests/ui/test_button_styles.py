@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 
+import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QCheckBox, QPushButton
 
@@ -130,6 +131,32 @@ def test_script_config_row_move_rebuilds_owned_cell_widgets(qtbot, monkeypatch):
 # 这两处此前漏了统一样式，是系统默认灰按钮，跟同页其他按钮不一样。
 # 断言写成「与同页参照按钮一致」而不是硬编码某个 variant，这样以后调色板
 # 换了也不用改测试，跑偏了照样能抓到。
+
+# 构造这些对话框会连带加载 profile 配置，而 config/session/profile.yaml
+# 是本机真实用户数据，其中的 quota key 可能引用**插件注册**的周期
+# （如燕云的 half_season）。通用 UI 用例不加载插件，配置校验就会抛
+# ValueError——与按钮样式毫无关系，纯粹是被本机数据绊倒。
+# 这里按插件的方式补注册同名周期，只补名字不实现边界解析：构造对话框
+# 不会走到边界计算。用 monkeypatch 写入以便自动还原，避免污染真正导入
+# 插件周期模块的用例（周期名重复注册会直接报错）。
+_PLUGIN_PERIODS = ("season", "half_season")
+
+
+@pytest.fixture(autouse=True)
+def stub_plugin_profile_periods(monkeypatch):
+    """模拟插件周期注册，让 profile 配置校验能通过。"""
+    from lvjiang.core.profile import periods as periods_mod
+
+    for name in _PLUGIN_PERIODS:
+        # 同进程内已有用例导入过插件周期模块时不要再补，交给 monkeypatch 还原
+        if periods_mod.get_profile_period(name) is not None:
+            continue
+        monkeypatch.setitem(
+            periods_mod._PERIODS,
+            name,
+            periods_mod.ProfilePeriod(name, name, lambda _t, now, _d: now),
+        )
+
 
 def _profile_overview(qtbot):
     from unittest.mock import MagicMock

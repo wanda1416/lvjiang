@@ -59,7 +59,9 @@ class _RecognitionMixin:
 
     # ─── 截图与 OCR ────────────────────────────────────────
 
-    def ocr_scene(self, scene_key: str, field_keys: list[str] | None = None, min_confidence: float | None = None) -> dict[str, str]:
+    def ocr_scene(self, scene_key: str, field_keys: list[str] | None = None,
+                  min_confidence: float | None = None,
+                  regions_override: list[Region] | None = None) -> dict[str, str]:
         """对指定场景执行截图 + OCR
 
         Args:
@@ -76,8 +78,9 @@ class _RecognitionMixin:
             return {}
 
         canvas = self._layout.get_canvas()
-        regions = self._layout.get_scene_regions(scene_key)
-        if field_keys:
+        regions = (regions_override if regions_override is not None
+                   else self._layout.get_scene_regions(scene_key))
+        if field_keys and regions_override is None:
             regions = self._require_regions(scene_key, field_keys, regions)
         else:
             regions = enabled_regions(regions)
@@ -98,6 +101,7 @@ class _RecognitionMixin:
         slot_keys: list[str] | None = None,
         group: str | list[str] | None = None,
         min_confidence: float | None = None,
+        regions_override: list[Region] | None = None,
     ) -> tuple[dict[str, str], dict]:
         """对指定场景的每个 slot 执行参考图匹配
 
@@ -118,8 +122,9 @@ class _RecognitionMixin:
             return {}, {}
 
         canvas = self._layout.get_canvas()
-        regions = self._layout.get_scene_regions(scene_key)
-        if slot_keys:
+        regions = (regions_override if regions_override is not None
+                   else self._layout.get_scene_regions(scene_key))
+        if slot_keys and regions_override is None:
             regions = self._require_regions(scene_key, slot_keys, regions)
         else:
             regions = enabled_regions(regions)
@@ -171,6 +176,7 @@ class _RecognitionMixin:
         group: str | list[str] | None = None,
         min_confidence: float | None = None,
         with_func=None,
+        regions_override: list[Region] | None = None,
     ) -> tuple[dict[str, dict], dict]:
         """rich 模式参考图识别：返回包含输入/输出元数据的富 dict
 
@@ -199,8 +205,9 @@ class _RecognitionMixin:
             return {}, {}
 
         canvas = self._layout.get_canvas()
-        regions = self._layout.get_scene_regions(scene_key)
-        if slot_keys:
+        regions = (regions_override if regions_override is not None
+                   else self._layout.get_scene_regions(scene_key))
+        if slot_keys and regions_override is None:
             regions = self._require_regions(scene_key, slot_keys, regions)
         else:
             regions = enabled_regions(regions)
@@ -355,6 +362,7 @@ class _RecognitionMixin:
         target_value,
         mode: str,
         min_confidence: float | None = None,
+        regions_override: list[Region] | None = None,
     ) -> str:
         """短路 OCR：一次截图，逐字段识别，首个命中即返回字段名
 
@@ -379,8 +387,9 @@ class _RecognitionMixin:
             return ""
 
         canvas = self._layout.get_canvas()
-        regions = self._layout.get_scene_regions(scene_key)
-        if field_keys:
+        regions = (regions_override if regions_override is not None
+                   else self._layout.get_scene_regions(scene_key))
+        if field_keys and regions_override is None:
             # 按 field_keys 顺序识别，未绑定的 key 直接报错（否则会被当成未命中）
             ordered_regions = self._require_regions(scene_key, field_keys, regions)
         else:
@@ -414,6 +423,7 @@ class _RecognitionMixin:
         group: str | list[str] | None = None,
         min_confidence: float | None = None,
         full: bool = False,
+        regions_override: list[Region] | None = None,
     ) -> str:
         """参考图识别：一次截图，逐 slot 识别
 
@@ -442,8 +452,9 @@ class _RecognitionMixin:
             return ""
 
         canvas = self._layout.get_canvas()
-        regions = self._layout.get_scene_regions(scene_key)
-        if field_keys:
+        regions = (regions_override if regions_override is not None
+                   else self._layout.get_scene_regions(scene_key))
+        if field_keys and regions_override is None:
             ordered_regions = self._require_regions(scene_key, field_keys, regions)
         else:
             ordered_regions = enabled_regions(regions)

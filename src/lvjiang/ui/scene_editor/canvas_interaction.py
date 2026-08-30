@@ -8,7 +8,7 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QCursor, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QInputDialog, QMenu
 
-from ...core.layout_models import CanvasConfig, Panel, Region
+from ...core.layout_models import CanvasConfig, Panel, Region, SubsceneRef
 from ...i18n import tr
 from .canvas_coords import CanvasCoordMixin
 
@@ -173,25 +173,45 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def _snap_threshold_x(self) -> float:
         """x 方向吸附阈值（归一化），基于像素阈值换算"""
-        w = self._display_rect.width()
+        w = self._display_rect.width() * self._canvas_config.w_ratio
         return SNAP_PIXELS / w if w > 0 else 0.0
 
     def _snap_threshold_y(self) -> float:
         """y 方向吸附阈值（归一化）"""
-        hgt = self._display_rect.height()
+        hgt = self._display_rect.height() * self._canvas_config.h_ratio
         return SNAP_PIXELS / hgt if hgt > 0 else 0.0
 
-    def _collect_snap_targets(self, exclude_idx: int) -> tuple[list[float], list[float]]:
-        """收集其他区域的吸附参考线（归一化）
+    def _collect_snap_targets(
+        self, exclude_kind: str, exclude_idx: int,
+    ) -> tuple[list[float], list[float]]:
+        """收集其他可见矩形的吸附参考线（归一化）。
+
+        区域、面板和子场景引用共用同一套画布局部坐标。引用内部实体跟随
+        外框变换且不可独立编辑，因此只纳入引用外边界。
+
         返回 (xs, ys)：xs 为竖线 x 值（左边/右边/中心），ys 为横线 y 值（上边/下边/中心）
         """
         xs: list[float] = []
         ys: list[float] = []
-        for i, r in enumerate(self._regions):
-            if i == exclude_idx:
-                continue
-            xs.extend([r.x_ratio, r.x_ratio + r.w_ratio, r.x_ratio + r.w_ratio / 2])
-            ys.extend([r.y_ratio, r.y_ratio + r.h_ratio, r.y_ratio + r.h_ratio / 2])
+        candidates = (
+            ("region", self._regions),
+            ("panel", self._panels),
+            ("subscene_ref", self._subscene_refs),
+        )
+        for kind, items in candidates:
+            for i, rect in enumerate(items):
+                if kind == exclude_kind and i == exclude_idx:
+                    continue
+                xs.extend([
+                    rect.x_ratio,
+                    rect.x_ratio + rect.w_ratio,
+                    rect.x_ratio + rect.w_ratio / 2,
+                ])
+                ys.extend([
+                    rect.y_ratio,
+                    rect.y_ratio + rect.h_ratio,
+                    rect.y_ratio + rect.h_ratio / 2,
+                ])
         return xs, ys
 
     @staticmethod
@@ -206,9 +226,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 best = t
         return best
 
-    def _apply_move_snap(self, r: Region):
-        """移动时将区域的左/右/中心、上/下/中心向其他区域吸附对齐"""
-        xs, ys = self._collect_snap_targets(self._selected_idx)
+    def _apply_move_snap(self, r, exclude_kind: str, exclude_idx: int):
+        """移动时将矩形的左/右/中心、上/下/中心向其他矩形吸附。"""
+        xs, ys = self._collect_snap_targets(exclude_kind, exclude_idx)
         thx, thy = self._snap_threshold_x(), self._snap_threshold_y()
         self._snap_lines_x = []
         self._snap_lines_y = []
@@ -239,11 +259,56 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             r.y_ratio = max(0.0, min(1 - r.h_ratio, r.y_ratio + best[1]))
             self._snap_lines_y.append(best[2])
 
+    def _snap_resize_edges(
+        self,
+        x1: float, y1: float, x2: float, y2: float,
+        *,
+        moving_left: bool, moving_right: bool,
+        moving_top: bool, moving_bottom: bool,
+        exclude_kind: str, exclude_idx: int,
+        min_size: float, shift_held: bool,
+    ) -> tuple[float, float, float, float]:
+        """吸附矩形正在拖动的边，并返回调整后的四条边。"""
+        self._snap_lines_x = []
+        self._snap_lines_y = []
+        if shift_held:
+            return x1, y1, x2, y2
+
+        xs, ys = self._collect_snap_targets(exclude_kind, exclude_idx)
+        thx, thy = self._snap_threshold_x(), self._snap_threshold_y()
+        if moving_left:
+            target = self._nearest(x1, xs, thx)
+            if target is not None and target < x2 - min_size:
+                x1 = target
+                self._snap_lines_x.append(target)
+        if moving_right:
+            target = self._nearest(x2, xs, thx)
+            if target is not None and target > x1 + min_size:
+                x2 = target
+                self._snap_lines_x.append(target)
+        if moving_top:
+            target = self._nearest(y1, ys, thy)
+            if target is not None and target < y2 - min_size:
+                y1 = target
+                self._snap_lines_y.append(target)
+        if moving_bottom:
+            target = self._nearest(y2, ys, thy)
+            if target is not None and target > y1 + min_size:
+                y2 = target
+                self._snap_lines_y.append(target)
+        return x1, y1, x2, y2
+
     # ─── 鼠标事件 ────────────────────────────────────────
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.RightButton:
             pos = event.position()
+            # 引用绘制在面板之上，右键命中优先级与左键保持一致。
+            if 0 <= self._subscene_selected_idx < len(self._subscene_refs):
+                ref = self._subscene_refs[self._subscene_selected_idx]
+                if self._subscene_ref_rect_widget(ref).contains(pos):
+                    self._show_subscene_ref_context_menu(pos)
+                    return
             # Panel 右键菜单优先：命中已选中 panel 则弹出复制/删除
             if self._panel_selected_idx >= 0 and self._panel_selected_idx < len(self._panels):
                 p = self._panels[self._panel_selected_idx]
@@ -273,6 +338,12 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         self._press_pos = pos
 
         # ── Panel 放置模式优先介入 ──
+        if self._pending_subscene_ref_def is not None:
+            self._subscene_drag_start = pos
+            self._subscene_drag_current = pos
+            self.update()
+            return
+
         if self._pending_panel_def is not None:
             self._panel_drag_start = pos
             self._panel_drag_current = pos
@@ -306,6 +377,29 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             # 继续往下走，进入全局模式逻辑
 
         # ── Panel 移动/缩放介入 ──
+        if self._edit_mode == EditMode.REGION and self._subscene_refs:
+            ref_idx, ref_handle = self._hit_subscene_ref_test(pos)
+            if ref_idx >= 0:
+                self._subscene_selected_idx = ref_idx
+                # 引用命中后会提前返回，需在这里清理其他对象的旧选中态。
+                self._panel_selected_idx = -1
+                self._selected_idx = -1
+                self._field_selected = False
+                self._selected_point_idx = -1
+                self._selected_arrow_idx = -1
+                self._subscene_edit_mode = (DragMode.RESIZING if ref_handle
+                                            else DragMode.MOVING)
+                self._subscene_edit_handle = ref_handle
+                self._subscene_edit_start = pos
+                ref = self._subscene_refs[ref_idx]
+                self._subscene_edit_orig = SubsceneRef.from_dict(ref.to_dict())
+                self._notify_selection_changed()
+                self.update()
+                return
+            if self._subscene_selected_idx >= 0:
+                self._subscene_selected_idx = -1
+                self._notify_selection_changed()
+
         if self._edit_mode == EditMode.REGION and self._panels:
             p_idx, p_handle = self._hit_panel_test(pos)
             if p_idx >= 0:
@@ -396,6 +490,41 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     def mouseMoveEvent(self, event: QMouseEvent):
         pos = event.position()
 
+        if self._subscene_drag_start is not None:
+            self._subscene_drag_current = pos
+            self.update()
+            return
+
+        if self._subscene_edit_mode is not None:
+            if not self._beyond_dead_zone(pos):
+                return
+            ref = self._subscene_refs[self._subscene_selected_idx]
+            orig = self._subscene_edit_orig
+            if orig is None:
+                return
+            sx, sy = self._widget_to_norm(pos)
+            ox, oy = self._widget_to_norm(self._subscene_edit_start)
+            dx_s, dy_s = sx - ox, sy - oy
+            c = self._canvas_config
+            dx = dx_s / c.w_ratio if c.w_ratio else 0
+            dy = dy_s / c.h_ratio if c.h_ratio else 0
+            if self._subscene_edit_mode == DragMode.MOVING:
+                ref.x_ratio = max(0, min(1 - ref.w_ratio, orig.x_ratio + dx))
+                ref.y_ratio = max(0, min(1 - ref.h_ratio, orig.y_ratio + dy))
+                if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                    self._snap_lines_x = []
+                    self._snap_lines_y = []
+                else:
+                    self._apply_move_snap(
+                        ref, "subscene_ref", self._subscene_selected_idx)
+            else:
+                self._apply_subscene_ref_resize(
+                    ref, orig, dx, dy,
+                    bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier),
+                )
+            self.update()
+            return
+
         if self._panning:
             # 右键拖拽平移画布
             delta = pos - self._pan_start
@@ -416,14 +545,21 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 return  # 死区内：点击时的手抖不改数据
             p = self._panels[self._panel_selected_idx]
             o = self._panel_edit_orig
-            dx_n, dy_n = self._widget_to_norm(pos)
-            dx_n -= self._widget_to_norm(self._panel_edit_start)[0]
-            dy_n -= self._widget_to_norm(self._panel_edit_start)[1]
+            dx_n, dy_n = self._widget_delta_to_canvas_norm(
+                self._panel_edit_start, pos)
             if self._panel_edit_mode == DragMode.MOVING:
                 p.x_ratio = max(0, min(1 - p.w_ratio, o.x_ratio + dx_n))
                 p.y_ratio = max(0, min(1 - p.h_ratio, o.y_ratio + dy_n))
+                if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                    self._snap_lines_x = []
+                    self._snap_lines_y = []
+                else:
+                    self._apply_move_snap(p, "panel", self._panel_selected_idx)
             elif self._panel_edit_mode == DragMode.RESIZING:
-                self._apply_panel_resize(p, o, pos)
+                self._apply_panel_resize(
+                    p, o, pos,
+                    bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier),
+                )
             self._notify_panel_changed()
             self.update()
             return
@@ -469,9 +605,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         elif self._drag_mode == DragMode.MOVING:
             if not self._beyond_dead_zone(pos):
                 return  # 死区内：点击时的手抖不改数据
-            dx_n, dy_n = self._widget_to_norm(pos)
-            dx_n -= self._widget_to_norm(self._drag_start)[0]
-            dy_n -= self._widget_to_norm(self._drag_start)[1]
+            dx_n, dy_n = self._widget_delta_to_canvas_norm(
+                self._drag_start, pos)
             r = self._regions[self._selected_idx]
             r.x_ratio = max(0, min(1 - r.w_ratio, self._drag_orig.x_ratio + dx_n))
             r.y_ratio = max(0, min(1 - r.h_ratio, self._drag_orig.y_ratio + dy_n))
@@ -480,7 +615,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 self._snap_lines_x = []
                 self._snap_lines_y = []
             else:
-                self._apply_move_snap(r)
+                self._apply_move_snap(r, "region", self._selected_idx)
             self.update()
 
         elif self._drag_mode == DragMode.RESIZING:
@@ -504,6 +639,40 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             return
         # 本次按下已结束，死区判定随之失效（下面各分支都不再用它）
         self._press_pos = None
+
+        if self._subscene_drag_start is not None and self._pending_subscene_ref_def is not None:
+            sx0, sy0 = self._widget_to_norm(self._subscene_drag_start)
+            sx1, sy1 = self._widget_to_norm(event.position())
+            cx0, cy0 = self._screenshot_to_canvas_norm(sx0, sy0)
+            cx1, cy1 = self._screenshot_to_canvas_norm(sx1, sy1)
+            x, y = min(cx0, cx1), min(cy0, cy1)
+            w, h = abs(cx1 - cx0), abs(cy1 - cy0)
+            if w >= 0.01 and h >= 0.01:
+                ref = SubsceneRef(
+                    key=self._pending_subscene_ref_def.key,
+                    x_ratio=x, y_ratio=y, w_ratio=w, h_ratio=h)
+                self._subscene_refs.append(ref)
+                self._subscene_selected_idx = len(self._subscene_refs) - 1
+                self._notify_subscene_ref_changed()
+            self.cancel_subscene_ref_place()
+            return
+
+        if self._subscene_edit_mode is not None:
+            changed = False
+            if self._subscene_edit_orig is not None and self._subscene_selected_idx >= 0:
+                changed = (self._subscene_refs[self._subscene_selected_idx].to_dict()
+                           != self._subscene_edit_orig.to_dict())
+            self._subscene_edit_mode = None
+            self._subscene_edit_handle = None
+            self._subscene_edit_orig = None
+            self._snap_lines_x = []
+            self._snap_lines_y = []
+            if changed:
+                self._notify_subscene_ref_changed()
+            else:
+                self._notify_selection_changed()
+            self.update()
+            return
 
         # ── Panel 放置模式完成 ──
         if self._panel_drag_start is not None and self._pending_panel_def is not None:
@@ -547,6 +716,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self._panel_edit_mode = None  # type: ignore[assignment]
             self._panel_edit_handle = None
             self._panel_edit_orig = None  # type: ignore[assignment]
+            self._snap_lines_x = []
+            self._snap_lines_y = []
             if moved:
                 self._notify_panel_changed()
             else:
@@ -622,7 +793,12 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             if self._poi_handle_escape():
                 return
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
-            self.delete_selected()
+            if 0 <= self._subscene_selected_idx < len(self._subscene_refs):
+                self._delete_selected_subscene_ref()
+            elif 0 <= self._panel_selected_idx < len(self._panels):
+                self._delete_selected_panel()
+            else:
+                self.delete_selected()
         else:
             super().keyPressEvent(event)
 
@@ -630,7 +806,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def _apply_resize(self, pos: QPointF, shift_held: bool = False):
         """根据手柄位置调整矩形大小"""
-        nx, ny = self._widget_to_norm(pos)
+        sx, sy = self._widget_to_norm(pos)
+        nx, ny = self._screenshot_to_canvas_norm(sx, sy)
         r = self._regions[self._selected_idx]
         assert r is not None
         o = self._drag_orig
@@ -654,33 +831,13 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if moving_bottom:
             y2 = max(ny, y1 + 0.01)
 
-        # Shift 按下时禁用吸附
-        self._snap_lines_x = []
-        self._snap_lines_y = []
-        if not shift_held:
-            # 对正在拖动的边做吸附
-            xs, ys = self._collect_snap_targets(self._selected_idx)
-            thx, thy = self._snap_threshold_x(), self._snap_threshold_y()
-            if moving_left:
-                t = self._nearest(x1, xs, thx)
-                if t is not None and t < x2 - 0.01:
-                    x1 = t
-                    self._snap_lines_x.append(t)
-            if moving_right:
-                t = self._nearest(x2, xs, thx)
-                if t is not None and t > x1 + 0.01:
-                    x2 = t
-                    self._snap_lines_x.append(t)
-            if moving_top:
-                t = self._nearest(y1, ys, thy)
-                if t is not None and t < y2 - 0.01:
-                    y1 = t
-                    self._snap_lines_y.append(t)
-            if moving_bottom:
-                t = self._nearest(y2, ys, thy)
-                if t is not None and t > y1 + 0.01:
-                    y2 = t
-                    self._snap_lines_y.append(t)
+        x1, y1, x2, y2 = self._snap_resize_edges(
+            x1, y1, x2, y2,
+            moving_left=moving_left, moving_right=moving_right,
+            moving_top=moving_top, moving_bottom=moving_bottom,
+            exclude_kind="region", exclude_idx=self._selected_idx,
+            min_size=0.01, shift_held=shift_held,
+        )
 
         r.x_ratio = max(0.0, x1)
         r.y_ratio = max(0.0, y1)
@@ -716,10 +873,45 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         self._canvas_config.w_ratio = min(1.0, x2) - self._canvas_config.x_ratio
         self._canvas_config.h_ratio = min(1.0, y2) - self._canvas_config.y_ratio
 
+    def _apply_subscene_ref_resize(
+        self, ref, orig, dx: float, dy: float, shift_held: bool = False,
+    ):
+        h = self._subscene_edit_handle
+        x1, y1 = orig.x_ratio, orig.y_ratio
+        x2, y2 = x1 + orig.w_ratio, y1 + orig.h_ratio
+        if h in (HandlePos.LEFT, HandlePos.TOP_LEFT, HandlePos.BOTTOM_LEFT):
+            x1 = min(x1 + dx, x2 - 0.01)
+        if h in (HandlePos.RIGHT, HandlePos.TOP_RIGHT, HandlePos.BOTTOM_RIGHT):
+            x2 = max(x1 + 0.01, x2 + dx)
+        if h in (HandlePos.TOP, HandlePos.TOP_LEFT, HandlePos.TOP_RIGHT):
+            y1 = min(y1 + dy, y2 - 0.01)
+        if h in (HandlePos.BOTTOM, HandlePos.BOTTOM_LEFT, HandlePos.BOTTOM_RIGHT):
+            y2 = max(y1 + 0.01, y2 + dy)
+        x1, y1, x2, y2 = self._snap_resize_edges(
+            x1, y1, x2, y2,
+            moving_left=h in (HandlePos.LEFT, HandlePos.TOP_LEFT, HandlePos.BOTTOM_LEFT),
+            moving_right=h in (HandlePos.RIGHT, HandlePos.TOP_RIGHT, HandlePos.BOTTOM_RIGHT),
+            moving_top=h in (HandlePos.TOP, HandlePos.TOP_LEFT, HandlePos.TOP_RIGHT),
+            moving_bottom=h in (HandlePos.BOTTOM, HandlePos.BOTTOM_LEFT, HandlePos.BOTTOM_RIGHT),
+            exclude_kind="subscene_ref", exclude_idx=self._subscene_selected_idx,
+            min_size=0.01, shift_held=shift_held,
+        )
+        ref.x_ratio = max(0.0, x1)
+        ref.y_ratio = max(0.0, y1)
+        ref.w_ratio = min(1.0, x2) - ref.x_ratio
+        ref.h_ratio = min(1.0, y2) - ref.y_ratio
+
     # ─── 光标管理 ────────────────────────────────────────
 
     def _update_cursor(self, pos: QPointF):
         """根据鼠标位置更新光标"""
+        if self._edit_mode == EditMode.REGION and self._subscene_refs:
+            idx, handle = self._hit_subscene_ref_test(pos)
+            if idx >= 0:
+                self.setCursor(QCursor(HANDLE_CURSORS[handle]) if handle
+                               else QCursor(Qt.CursorShape.SizeAllCursor))
+                return
+
         # Panel 光标优先（仅在区域编辑模式下）
         if self._edit_mode == EditMode.REGION and self._panels:
             p_idx, p_handle = self._hit_panel_test(pos)
@@ -901,6 +1093,45 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         del self._panels[self._panel_selected_idx]
         self._panel_selected_idx = -1
         self._notify_panel_changed()
+        self.update()
+
+    # ─── 子场景引用右键菜单 ──────────────────────────────
+
+    def _show_subscene_ref_context_menu(self, pos: QPointF):
+        """显示引用菜单；解除绑定不会删除场景 YAML 中的引用定义。"""
+        menu = QMenu(self)  # type: ignore[call-overload]
+        menu.setStyleSheet(
+            "QMenu { background-color: palette(base); padding: 4px; }"
+            "QMenu::item { padding: 4px 16px; }"
+            "QMenu::item:selected { background-color: #ddd; }"
+        )
+        copy_action = menu.addAction(tr("复制 DSL 引用"))
+        unbind_action = menu.addAction(tr("解除引用绑定"))
+        action = menu.exec(self.mapToGlobal(pos.toPoint()))
+        if action == copy_action:
+            self._copy_subscene_ref_key()
+        elif action == unbind_action:
+            self._delete_selected_subscene_ref()
+
+    def _copy_subscene_ref_key(self):
+        """复制选中引用的两段式 DSL 前缀。"""
+        if not (0 <= self._subscene_selected_idx < len(self._subscene_refs)):
+            return
+        ref = self._subscene_refs[self._subscene_selected_idx]
+        from PyQt6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        if self._scene_key:
+            clipboard.setText(f"[{self._scene_key}].[{ref.key}]")
+        else:
+            clipboard.setText(f"[{ref.key}]")
+
+    def _delete_selected_subscene_ref(self):
+        """从当前布局解除选中引用实例，保留引用定义以便重新绑定。"""
+        if not (0 <= self._subscene_selected_idx < len(self._subscene_refs)):
+            return
+        del self._subscene_refs[self._subscene_selected_idx]
+        self._subscene_selected_idx = -1
+        self._notify_subscene_ref_changed()
         self.update()
 
     # ─── 拖拽死区 ────────────────────────────────────────

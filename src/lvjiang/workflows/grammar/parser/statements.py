@@ -26,6 +26,7 @@ from ..ast_nodes import (
     ReplayInputTrace,
     Scan,
     Scroll,
+    SubsceneEntityRef,
     TupleLiteral,
     VarRef,
     Wait,
@@ -196,6 +197,39 @@ class _StmtMixin:
         scene_val = self._resolve_const_or_var(scene)
         coord_val = self._resolve_const_or_var(coord)
         return Click(target=EntityRef(scene=scene_val, entity=coord_val), line_no=self._line(items))
+
+    def click_subscene_target(self, items):
+        return Click(target=SubsceneEntityRef(
+            scene=self._resolve_const_or_var(items[0]),
+            reference=self._resolve_const_or_var(items[1]),
+            entity=self._resolve_const_or_var(items[2])),
+            line_no=self._line(items))
+
+    def scan_subscene_stmt(self, items):
+        ref = SubsceneEntityRef(*(self._resolve_const_or_var(i) for i in items[:3]))
+        target = items[3]
+        by_clause = next((i for i in items[4:] if isinstance(i, ByClause)), None)
+        where_clause = next((i for i in items[4:] if isinstance(i, WhereClause)), None)
+        self._reject_image_by(by_clause, "scan", items)
+        return Scan(scene=ref, target=target, by=by_clause, where=where_clause,
+                    line_no=self._line(items))
+
+    def recognize_subscene_stmt(self, items):
+        ref = SubsceneEntityRef(*(self._resolve_const_or_var(i) for i in items[:3]))
+        rich = any(isinstance(i, Token) and i.type == "RICH_KEYWORD" for i in items)
+        values = [i for i in items[3:]
+                  if not (isinstance(i, Token) and i.type == "RICH_KEYWORD")]
+        target = values[0]
+        by_clause = next((i for i in values[1:] if isinstance(i, ByClause)), None)
+        where_clause = next((i for i in values[1:] if isinstance(i, WhereClause)), None)
+        with_func = next((Literal(value=i[1]) for i in values[1:]
+                          if isinstance(i, tuple) and i[0] == "__with_func__"), None)
+        group = next((i for i in values[1:]
+                      if isinstance(i, (Literal, VarRef, list))), None)
+        self._reject_image_by(by_clause, "recognize", items)
+        return Recognize(scene=ref, target=target, by=by_clause, group=group,
+                         where=where_clause, rich=rich, with_func=with_func,
+                         line_no=self._line(items))
 
     def click_coord_target(self, items):
         """click (rx, ry) — 画布归一化坐标点"""

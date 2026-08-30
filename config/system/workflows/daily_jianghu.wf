@@ -56,19 +56,18 @@ for idx in ["1", "2", "3", "4", "5", "6"]
       return -1
    end
 
-   # 动态构造本组的 label / btn region 名
-   eval $label = "label_" + $idx
-   eval $btn = "btn_" + $idx
+   # 动态构造本组的子场景引用 key
+   eval $label = "card_" + $idx
 
    # 先识别当前任务是否已是目标任务
-   scan [activity_jianghu].$label as $hit by contains_any $targets
+   scan [activity_jianghu].$label.[label] as $hit by contains_any $targets
    if $hit
       log "任务 " + $idx + " 已是目标任务"
    else
       # 不断刷新直到命中目标任务
       loop $max_refresh
-         click [activity_jianghu].$btn after wait stable @page_refresh least 0.3
-         scan [activity_jianghu].$label as $hit by contains_any $targets
+         click [activity_jianghu].$label.[refresh] after wait stable @page_refresh least 0.3
+         scan [activity_jianghu].$label.[label] as $hit by contains_any $targets
          if $hit
             log "任务 " + $idx + " 刷新命中目标任务"
             break
@@ -81,8 +80,8 @@ for idx in ["1", "2", "3", "4", "5", "6"]
 
    # 命中目标任务 → 读取任务文本，分发执行对应动作
    if $hit
-      scan [activity_jianghu].$label as $text_result
-      eval $task_text = $text_result.$label
+      scan [activity_jianghu].$label.[label] as $text_result
+      eval $task_text = $text_result.label
       log "任务 " + $idx + " 命中：" + $task_text
 
       if $task_text contains "换装"
@@ -159,7 +158,7 @@ end
 # 领奖后会弹出一个奖励窗口：末个任务领完即进入收尾，
 # 需多点一次返回先关闭弹窗，收尾才能顺利退回游戏首页
 def claim_reward($label, $idx)
-   click [activity_jianghu].$label after wait @step_interval
+   click [activity_jianghu].$label.[label] after wait @step_interval
    log "任务 " + $idx + " 奖励已领取"
    if $idx equals "6"
       click [activity_jianghu].[back] after wait @step_interval
@@ -168,12 +167,12 @@ def claim_reward($label, $idx)
 end
 
 # ─── 各活动动作过程 ────────────────────────────────────────
-# 每个 def 接收命中任务的 label region 名（如 "label_1"），
+# 每个 def 接收命中任务的卡片引用 key（如 "card_1"），
 # 从江湖号令页面出发执行对应活动，完成后需回到本页面。
 
 # 换装：点击任务 → 前往 → 外观衣柜（穿搭方案 → 方案1 → 套用方案） → 返回三次回到活动页
 def action_huanzhuang($label)
-   click [activity_jianghu].$label after wait @step_interval
+   click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait stable @page_refresh least 0.5
    click [waiguan_yigui].[chuanda] after wait @step_interval
    click [waiguan_yigui].[fangan_1] after wait @step_interval
@@ -187,7 +186,7 @@ end
 # 退出拍照会落到游戏首页（桌面），拍照结束后主动返回号令页；
 # 末个任务仅在需要领奖时才返回，否则留在桌面
 def action_heying($label, $idx)
-   click [activity_jianghu].$label after wait @step_interval
+   click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait stable @page_refresh least 0.5
 
    if env("android")
@@ -214,7 +213,7 @@ end
 # → 情境编辑视图（保存 → 取消按钮出现则点一次 → 等 6s）
 # → 情境基底返回退回号令页 → 号令页连点两次返回回到号令主页面
 def action_qingjing($label)
-   click [activity_jianghu].$label after wait @step_interval
+   click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait @step_interval
    if env("android")
       click [activity_jianghu].[confirm] after wait @step_interval
@@ -264,7 +263,7 @@ end
 # → 点第一个选择 → 连点两次返回回到游戏首页（桌面），看报结束后主动返回号令页；
 # 末个任务仅在需要领奖时才返回，否则留在桌面
 def action_dongfang($label, $idx)
-   click [activity_jianghu].$label after wait @step_interval
+   click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait @step_interval
 
    # 整面板扫描动作列表，定位「看报」所在行列（行列数读自布局定义）

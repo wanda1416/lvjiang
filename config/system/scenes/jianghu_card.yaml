@@ -1,0 +1,15 @@
+content_version: 1
+key: jianghu_card
+name: 任务卡片
+type: subscene
+regions:
+- key: label
+  name: 标签
+  type: attr
+  is_text: true
+  is_clickable: true
+- key: refresh
+  name: 刷新
+  type: func
+  is_text: false
+  is_clickable: true

@@ -21,6 +21,7 @@ from .scene_definition_models import (
     PointDef,
     RegionDef,
     SceneDef,
+    SubsceneRefDef,
     ViewDef,
 )
 
@@ -115,6 +116,11 @@ class SceneRegistry:
         for vd in data.get("views", []):
             views.append(ViewDef(key=vd["key"], name=vd.get("name", vd["key"])))
         view_keys = {v.key for v in views}
+        scene_type = str(data.get("type", "scene"))
+        if scene_type not in ("scene", "subscene"):
+            raise ValueError(f"场景 {key} 的 type 必须为 scene 或 subscene")
+        if scene_type == "subscene" and views:
+            raise ValueError(f"子场景 {key} 不能启用多视图")
 
         def _view_of(d: dict) -> str:
             """读取并校验定义的归属视图（未开启多视图时一律视为基底）"""
@@ -166,14 +172,27 @@ class SceneRegistry:
                 scroll_direction=str(pd.get("scroll_direction", "vertical")),
             ))
 
+        subscene_refs = []
+        for rd in data.get("subscene_refs", []):
+            subscene_refs.append(SubsceneRefDef(
+                key=rd["key"],
+                name=rd.get("name", rd["key"]),
+                scene=rd["scene"],
+                view=_view_of(rd),
+            ))
+        if scene_type == "subscene" and subscene_refs:
+            raise ValueError(f"子场景 {key} 不能嵌套引用其他子场景")
+
         # region 与 point 同场景内 key 不得重复（共享命名空间）
-        all_keys = [r.key for r in regions] + [p.key for p in points] + [p.key for p in panels]
+        all_keys = ([r.key for r in regions] + [p.key for p in points]
+                    + [p.key for p in panels] + [r.key for r in subscene_refs])
         dup = {k for k in all_keys if all_keys.count(k) > 1}
         if dup:
             raise ValueError(f"场景 {key} 的 region/point/panel key 重复: {dup}")
 
         return SceneDef(key=key, name=name, regions=regions, points=points,
-                        panels=panels, views=views)
+                        panels=panels, views=views, type=scene_type,
+                        subscene_refs=subscene_refs)
 
     def get_scene(self, key: str) -> SceneDef | None:
         """获取场景定义，不存在返回 None"""
@@ -340,6 +359,10 @@ class SceneRegistry:
         """删除场景 YAML 文件并从注册表移除"""
         if key not in self._scenes:
             raise ValueError(f"场景不存在: {key}")
+        owners = [s.key for s in self._scenes.values()
+                  if any(r.scene == key for r in s.subscene_refs)]
+        if owners:
+            raise ValueError(f"场景 {key} 正被以下场景引用，不能删除: {', '.join(owners)}")
         self._resolver.delete_entity(f"scenes/{key}.yaml")
         del self._scenes[key]
         self._order.remove(key)
@@ -384,6 +407,15 @@ class SceneRegistry:
                 scenes_list = self._group_scenes[group]
                 gidx = scenes_list.index(key)
                 scenes_list[gidx] = new_key
+            # 引用目标跟随场景 key 重命名。
+            for owner in self._scenes.values():
+                changed = False
+                for ref in owner.subscene_refs:
+                    if ref.scene == key:
+                        ref.scene = new_key
+                        changed = True
+                if changed:
+                    self._save_scene_yaml(owner)
         logger.info(f"已重命名场景: {key} -> {new_key}")
 
     def reorder_scenes(self, new_order: list[str]):
@@ -415,6 +447,8 @@ class SceneRegistry:
     def enable_scene_views(self, scene_key: str) -> list[ViewDef]:
         """把场景改为多视图：生成基底视图，已有定义全部归属基底（view 留空即基底）"""
         scene = self._require_scene(scene_key)
+        if scene.is_subscene:
+            raise ValueError("子场景不能启用多视图")
         if scene.views:
             return list(scene.views)
         scene.views = [ViewDef(key=BASE_VIEW_KEY, name=BASE_VIEW_NAME)]
@@ -428,7 +462,8 @@ class SceneRegistry:
         if len(scene.views) > 1:
             raise ValueError(f"仍存在 {len(scene.views) - 1} 个非基底视图，无法取消多视图")
         scene.views = []
-        for item in (*scene.regions, *scene.points, *scene.panels):
+        for item in (*scene.regions, *scene.points, *scene.panels,
+                     *scene.subscene_refs):
             item.view = ""
         self._save_scene_yaml(scene)
         logger.info(f"场景 {scene_key} 已取消多视图")
@@ -475,7 +510,8 @@ class SceneRegistry:
         view.key = new_key
         view.name = new_name
         # 更新所有引用该视图的 region/point/panel
-        for item in (*scene.regions, *scene.points, *scene.panels):
+        for item in (*scene.regions, *scene.points, *scene.panels,
+                     *scene.subscene_refs):
             if item.view == old_key:
                 item.view = new_key
             # 空字符串等价于基底视图 key，需要同步更新
@@ -506,7 +542,8 @@ class SceneRegistry:
         if not any(v.key == view_key for v in scene.views):
             raise ValueError(f"视图不存在: {view_key}")
         used = [
-            i.key for i in (*scene.regions, *scene.points, *scene.panels)
+            i.key for i in (*scene.regions, *scene.points, *scene.panels,
+                            *scene.subscene_refs)
             if i.view == view_key
         ]
         if used:
@@ -520,6 +557,57 @@ class SceneRegistry:
         if not scene:
             raise ValueError(f"场景不存在: {scene_key}")
         return scene
+
+    def set_scene_type(self, scene_key: str, scene_type: str) -> None:
+        """切换普通场景/子场景；子场景禁止多视图和嵌套引用。"""
+        scene = self._require_scene(scene_key)
+        if scene_type not in ("scene", "subscene"):
+            raise ValueError("场景类型必须为 scene 或 subscene")
+        if scene_type == "subscene":
+            if scene.views:
+                raise ValueError("多视图场景不能转为子场景，请先取消多视图")
+            if scene.subscene_refs:
+                raise ValueError("包含子场景引用的场景不能转为子场景")
+        elif scene.is_subscene:
+            owners = [s.key for s in self._scenes.values()
+                      if any(r.scene == scene_key for r in s.subscene_refs)]
+            if owners:
+                raise ValueError(
+                    f"该子场景仍被以下场景引用，不能取消: {', '.join(owners)}")
+        scene.type = scene_type
+        self._save_scene_yaml(scene)
+
+    def add_subscene_ref_to_scene(self, scene_key: str,
+                                  ref_def: SubsceneRefDef) -> None:
+        scene = self._require_scene(scene_key)
+        if scene.is_subscene:
+            raise ValueError("子场景不能嵌套引用")
+        target = self._require_scene(ref_def.scene)
+        if not target.is_subscene:
+            raise ValueError(f"引用目标不是子场景: {ref_def.scene}")
+        self._check_key_unique(scene, ref_def.key)
+        scene.subscene_refs.append(ref_def)
+        self._save_scene_yaml(scene)
+
+    def update_subscene_ref_in_scene(self, scene_key: str, old_key: str,
+                                     ref_def: SubsceneRefDef) -> None:
+        scene = self._require_scene(scene_key)
+        target = self._require_scene(ref_def.scene)
+        if not target.is_subscene:
+            raise ValueError(f"引用目标不是子场景: {ref_def.scene}")
+        if old_key != ref_def.key:
+            self._check_key_unique_excluding(scene, ref_def.key, old_key)
+        for index, current in enumerate(scene.subscene_refs):
+            if current.key == old_key:
+                scene.subscene_refs[index] = ref_def
+                self._save_scene_yaml(scene)
+                return
+        raise ValueError(f"子场景引用不存在: {old_key}")
+
+    def remove_subscene_ref_from_scene(self, scene_key: str, ref_key: str) -> None:
+        scene = self._require_scene(scene_key)
+        scene.subscene_refs = [r for r in scene.subscene_refs if r.key != ref_key]
+        self._save_scene_yaml(scene)
 
     # ─── 区域/坐标 编辑 ───────────────────────────────────────
 
@@ -666,6 +754,7 @@ class SceneRegistry:
             [r.key for r in scene.regions]
             + [p.key for p in scene.points]
             + [p.key for p in scene.panels]
+            + [r.key for r in scene.subscene_refs]
         )
         if new_key in all_keys:
             raise ValueError(f"key 已存在: {new_key}")
@@ -676,6 +765,7 @@ class SceneRegistry:
             [r.key for r in scene.regions if r.key != exclude_key]
             + [p.key for p in scene.points if p.key != exclude_key]
             + [p.key for p in scene.panels if p.key != exclude_key]
+            + [r.key for r in scene.subscene_refs if r.key != exclude_key]
         )
         if new_key in all_keys:
             raise ValueError(f"key 已存在: {new_key}")
@@ -696,6 +786,8 @@ class SceneRegistry:
                          content_version: int | None = None):
         """将场景定义经 resolver 写入 YAML（开发→system/scenes，用户→local/scenes）"""
         data: dict[str, Any] = {"key": scene.key, "name": scene.name}
+        if scene.type != "scene":
+            data["type"] = scene.type
         if scene.views:
             data["views"] = [v.to_dict() for v in scene.views]
         if scene.regions:
@@ -733,6 +825,12 @@ class SceneRegistry:
                     **({"scroll_direction": p.scroll_direction} if p.scroll_direction != "vertical" else {}),
                 }
                 for p in scene.panels
+            ]
+        if scene.subscene_refs:
+            data["subscene_refs"] = [
+                {"key": r.key, "name": r.name, "scene": r.scene,
+                 **({"view": r.view} if r.view else {})}
+                for r in scene.subscene_refs
             ]
         self._resolver.write_entity(
             f"scenes/{scene.key}.yaml",

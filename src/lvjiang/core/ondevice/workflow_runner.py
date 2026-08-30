@@ -54,7 +54,7 @@ def _default_layout_name() -> str:
     Raises:
         RuntimeError: 无任何可用布局时
     """
-    name = get_session_store().get_node("active_layout", "")
+    name = get_session_store().get_active("layout", "")
     if name:
         return name
     merged = get_resolver().load_merged("layouts.yaml")

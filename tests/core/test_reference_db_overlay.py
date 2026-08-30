@@ -503,8 +503,9 @@ class TestReferenceSpaces:
         assert db.set_active_space("幽灵") is False  # 未扫到的空间拒绝
         assert db.set_active_space("空间A") is True
         data = json.loads(space_env["session"].read_text(encoding="utf-8"))
-        assert data["active_space"] == "空间A"
-        assert data["active_user"] == "tester"
+        assert data["actives"] == {"space": "空间A", "user": "tester"}
+        assert "active_space" not in data
+        assert "active_user" not in data
 
     def test_save_writes_active_space_yaml(self, space_env):
         """dev 模式 save 落盘到激活空间的 yaml"""
@@ -650,7 +651,8 @@ class TestDeleteSpace:
         assert db.get_active_space() == DEFAULT_SPACE
         assert [e.label for e in db.entries] == ["甲"]  # 已重载到新激活空间
         data = json.loads(space_env["session"].read_text(encoding="utf-8"))
-        assert data["active_space"] == DEFAULT_SPACE
+        assert data["actives"]["space"] == DEFAULT_SPACE
+        assert "active_space" not in data
 
     def test_deleting_inactive_space_keeps_active(self, space_env):
         """删非激活空间：激活空间与已加载条目不受影响"""

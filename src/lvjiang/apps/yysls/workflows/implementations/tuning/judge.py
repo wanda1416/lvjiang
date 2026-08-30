@@ -19,6 +19,7 @@ from lvjiang.apps.yysls.core.evaluator import (
     summarize_potential,
 )
 from lvjiang.apps.yysls.core.tuning_rules import (
+    JUDGE_SCOPE_LABELS,
     RATING_LABELS,
     RATING_RANK,
     RatingProvider,
@@ -126,7 +127,23 @@ class TuningJudge:
                         f"  [行为评级] {label} 仅按首词条判定评级"
                         f"（忽略其他 {len(equip_data.affixes) - 1} 条）")
                 results = self.judge_by_scope(target, scope, keys)
-                cache[ck] = self.expect_key(results) or "junk"
+                rating = self.expect_key(results) or "junk"
+                cache[ck] = rating
+                winning_names = [
+                    str(result.get("name") or key)
+                    for key, result in results.items()
+                    if not result.get("skipped")
+                    and not result.get("not_applicable")
+                    and result.get("rating") == RATING_LABELS.get(rating)
+                ]
+                scope_label = JUDGE_SCOPE_LABELS.get(scope, scope)
+                winners = (
+                    f"（命中规则：{'、'.join(winning_names)}）"
+                    if winning_names else "（无适用规则，兜底）"
+                )
+                logger.info(
+                    f"  [行为评级] {label} 按{scope_label}判定为 "
+                    f"{RATING_LABELS.get(rating, rating)}{winners}")
             return cache[ck]
 
         return rating_of

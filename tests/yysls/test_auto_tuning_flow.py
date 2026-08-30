@@ -262,11 +262,12 @@ def test_desktop_route_leaves_detail_without_menu_click():
 
 
 def test_workflow_shares_route_strategy_between_components():
-    """导航与回收必须共享同一策略实例，不能各自重复判断环境。"""
+    """导航、回收与重置必须共享同一策略实例，不能各自判断环境。"""
     wf = FakeWF()
 
     assert wf.navigator.routes is wf.route_strategy
     assert wf.recycler._routes is wf.route_strategy
+    assert wf.resetter._routes is wf.route_strategy
 
 
 def test_grid_click_uses_aligned_slot_center():

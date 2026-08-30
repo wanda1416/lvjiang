@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -47,13 +48,9 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tune_config,
     standard_playstyle_attrs,
 )
-from lvjiang.core.config.resolver import (
-    LAYER_LOCAL,
-    LAYER_REMOTE,
-    LAYER_SYSTEM,
-    EntityOrigin,
-)
+from lvjiang.core.config.resolver import LAYER_SYSTEM, EntityOrigin
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.config_origin import layer_style, origin_tooltip
 
 from .....i18n import tr
 
@@ -84,6 +81,7 @@ class RuleSettingsPage(QWidget):
                  on_enable_changed: Callable[[bool], None] | None = None,
                  protected: bool = False,
                  version_origin: EntityOrigin | None = None,
+                 version_origins: tuple[EntityOrigin, ...] = (),
                  on_bump_version: Callable[[], int] | None = None,
                  parent=None):
         super().__init__(parent)
@@ -94,6 +92,8 @@ class RuleSettingsPage(QWidget):
         self._on_enable_changed = on_enable_changed
         self._protected = protected
         self._version_origin = version_origin or EntityOrigin("", None)
+        self._version_origins = version_origins or (
+            (self._version_origin,) if self._version_origin.layer else ())
         self._on_bump_version = on_bump_version
         self._loading = True
         # 武器/增伤词条候选来自游戏配置数据源（保存时已刷新单例）
@@ -130,8 +130,22 @@ class RuleSettingsPage(QWidget):
         key_row = QHBoxLayout()
         self._key_label = QLabel()
         key_row.addWidget(self._key_label)
-        key_row.addSpacing(18)
-        key_row.addWidget(QLabel(tr("版本号：")))
+        # 「重命名」改的就是左边这个 key，必须紧挨着它
+        self._btn_rename_key = QPushButton(tr("重命名"))
+        self._btn_rename_key.clicked.connect(self._rename_key)
+        apply_button_style(self._btn_rename_key, variant="neutral")
+        key_row.addWidget(self._btn_rename_key)
+
+        # 版本号是另一码事（配置分发的代次，与 key 无关），拉开距离并用
+        # 竖线隔断，否则挨着 key 摆容易被读成「key 的版本」
+        key_row.addSpacing(28)
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        key_row.addWidget(sep)
+        key_row.addSpacing(12)
+        self._version_title = QLabel(tr("规则版本："))
+        key_row.addWidget(self._version_title)
         self._version_label = QLabel()
         key_row.addWidget(self._version_label)
         self._btn_bump_version = QPushButton(tr("提升"))
@@ -141,11 +155,6 @@ class RuleSettingsPage(QWidget):
             self._btn_bump_version.setToolTip(tr("仅开发模式可以提升系统配置版本"))
         apply_button_style(self._btn_bump_version, variant="neutral")
         key_row.addWidget(self._btn_bump_version)
-        key_row.addSpacing(18)
-        self._btn_rename_key = QPushButton(tr("重命名"))
-        self._btn_rename_key.clicked.connect(self._rename_key)
-        apply_button_style(self._btn_rename_key, variant="neutral")
-        key_row.addWidget(self._btn_rename_key)
         key_row.addStretch()
         # 删除入口收在首行最右，避免与表格编辑区混排误触
         self._btn_delete = QPushButton(tr("删除本规则"))
@@ -158,6 +167,7 @@ class RuleSettingsPage(QWidget):
             self._btn_rename_key.setToolTip(hint)
             self._btn_delete.setEnabled(False)
             self._btn_delete.setToolTip(hint)
+        self._key_row = key_row     # 排布有讲究（见上），留给测试盯住
         form.addRow(tr("标识 key："), key_row)
         self._set_version_display(
             self._version_origin.version, self._version_origin.layer)
@@ -463,21 +473,17 @@ class RuleSettingsPage(QWidget):
         self._name_label.setText(name)
 
     def _set_version_display(self, version: int | None, layer: str) -> None:
-        labels = {
-            LAYER_SYSTEM: tr("系统"),
-            LAYER_LOCAL: tr("用户"),
-            LAYER_REMOTE: tr("远程下发"),
-        }
-        styles = {
-            LAYER_LOCAL: "color: palette(highlight);",
-            LAYER_REMOTE: "color: #D97706;",
-            LAYER_SYSTEM: "color: palette(mid);",
-        }
         self._version_label.setText("-" if version is None else f"v{version}")
-        self._version_label.setStyleSheet(styles.get(layer, "color: palette(mid);"))
-        self._version_label.setToolTip(
-            tr("配置来源：{source}").format(
-                source=labels.get(layer, tr("未知"))))
+        self._version_label.setStyleSheet(layer_style(layer))
+        # 标题、数值、按钮都挂上说明：只给数值挂，用户悬停在「规则版本：」
+        # 上什么也看不到，等于没做
+        current = EntityOrigin(layer, version)
+        tip = origin_tooltip(current, self._version_origins)
+        for widget in (self._version_title, self._version_label,
+                       self._btn_bump_version):
+            if widget is self._btn_bump_version and not widget.isEnabled():
+                continue                      # 保留「仅开发模式可提升」那条
+            widget.setToolTip(tip)
 
     def _bump_version(self) -> None:
         if self._on_bump_version is None:
@@ -487,6 +493,14 @@ class RuleSettingsPage(QWidget):
         except Exception as e:  # noqa: BLE001
             QMessageBox.warning(self, tr("版本提升失败"), str(e))
             return
+        self._version_origins = tuple(
+            EntityOrigin(LAYER_SYSTEM, version)
+            if origin.layer == LAYER_SYSTEM else origin
+            for origin in self._version_origins
+        )
+        if not any(origin.layer == LAYER_SYSTEM
+                   for origin in self._version_origins):
+            self._version_origins += (EntityOrigin(LAYER_SYSTEM, version),)
         self._set_version_display(version, LAYER_SYSTEM)
 
     def _show_playstyle_tips(self):

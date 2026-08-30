@@ -10,6 +10,7 @@ builtins.system 用 from-import 在加载时绑定了本地名，所以
 platforms 与 system 两处都要补丁。
 """
 
+import os
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,24 @@ from tests.config_write_guard import install_project_config_write_guard
 
 # 在收集测试模块前就封死真实 config；不能只依赖各用例自觉使用 tmp_path。
 install_project_config_write_guard(Path(__file__).parents[1] / "config")
+
+
+def pytest_runtest_logreport(report):
+    """把 Actions 中的失败暴露为 check annotation，便于无日志权限时定位。"""
+    if os.environ.get("GITHUB_ACTIONS") != "true" or not report.failed:
+        return
+
+    path, line, _ = report.location
+    details = report.longreprtext[-4000:]
+    message = f"{report.nodeid}\n{details}"
+    # GitHub workflow command 的数据区需要转义，否则换行会截断注解。
+    message = (message.replace("%", "%25")
+               .replace("\r", "%0D")
+               .replace("\n", "%0A"))
+    print(
+        f"::error file={path},line={line + 1},title=pytest failure::{message}",
+        flush=True,
+    )
 
 
 @pytest.fixture(autouse=True)

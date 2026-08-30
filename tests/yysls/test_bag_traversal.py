@@ -75,6 +75,11 @@ class DedupFakeWF(AutoTuningWorkflow):
         fp = win[row - 1] if row <= len(win) else ""
         return (fp or "空", fp, {"fp": fp} if fp else {})
 
+    @staticmethod
+    def _equipment_read_state(equip):
+        # 遍历策略测试只关心脚本指纹，非空替身即代表有效装备。
+        return "valid" if equip else "empty"
+
     def _process_equipment(self, name, equip, detail_scene,
                            row=None, col=1):
         fp = equip["fp"]

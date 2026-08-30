@@ -122,20 +122,28 @@ class DedupTraversal(BagTraversal):
                 break
             name, fp, equip = wf._read_row(detail_scene, row)
             if wf.slot_level_exhausted:
+                wf._close_equipment_detail()
                 logger.info("  检测到当前部位槽位级终止条件 → 结束遍历")
                 return window, new_count, False
             if not fp:
                 logger.info(f"  grid[{row}][1] 空 slot → 背包尽头")
                 return window, new_count, True
             if fp in recent:
+                wf._close_equipment_detail()
                 logger.info(f"  grid[{row}][1] {name} fp={fp} 已见过 → 跳过")
                 window.append(fp)
                 continue
             new_count += 1
             self._seq += 1
             logger.info(f"  新行{self._seq} grid[{row}][1] {name} fp={fp}")
-            new_fp = wf._process_equipment(name, equip, detail_scene, row=row)
+            if wf._equipment_read_state(equip) == "valid":
+                new_fp = wf._process_equipment(
+                    name, equip, detail_scene, row=row)
+            else:
+                # _read_row 已记录异常并关闭详情；保留内部锚点继续遍历。
+                new_fp = fp
             if wf.slot_level_exhausted:
+                wf._close_equipment_detail()
                 return window, new_count, False
             if not new_fp:
                 # 回收链后该格已空（无装备补位）→ 背包尽头
@@ -149,6 +157,7 @@ class DedupTraversal(BagTraversal):
             if new_fp != fp:
                 # 调律/回收改动了该格 → 回读首列取实际 OCR 指纹
                 _, refp, _ = wf._read_row(detail_scene, row)
+                wf._close_equipment_detail()
                 if wf.slot_level_exhausted:
                     return window, new_count, False
                 logger.info(

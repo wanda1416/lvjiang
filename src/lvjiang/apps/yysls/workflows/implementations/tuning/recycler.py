@@ -33,6 +33,11 @@ class RecycleOutcome(Enum):
     def retry_blocked(self) -> bool:
         return self in (RecycleOutcome.LOCKED, RecycleOutcome.UNAVAILABLE)
 
+    @property
+    def detail_closed(self) -> bool:
+        """回收动作结束后是否已经离开原装备详情。"""
+        return self in (RecycleOutcome.RECYCLED, RecycleOutcome.LOCKED)
+
 
 class TuningRecycler:
     """执行装备回收并报告格位是否变化。"""
@@ -50,8 +55,8 @@ class TuningRecycler:
         进入时背包详情页无弹窗；Android 未找到回收入口时收起
         弹窗返回 UNAVAILABLE（装备保留原地）。桌面端直接按 X，
         再由确认弹窗识别结果判定。成功后背包刷新、后续装备前移补位。
-        装备锁定检测：确认弹窗内无「确认」字样 = 装备被锁定，
-        收起弹窗返回 LOCKED。
+        装备锁定检测：确认弹窗内无「确认」字样 = 装备被锁定；此时装备
+        虽然仍在原格，但回收动作已经退出装备详情，返回 LOCKED。
         """
         label = equip_data.name or equip_data.type
         stage_label = BEHAVIOR_STAGE_LABELS.get(stage, stage)

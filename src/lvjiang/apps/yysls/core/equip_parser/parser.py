@@ -265,12 +265,12 @@ class EquipmentParser:
 
     # ─── equip_level 解析 ──────────────────────────────────
 
-    def _parse_equip_level(self, raw: str) -> tuple[int | None, bool]:
+    def _parse_equip_level(self, raw: str) -> tuple[int, bool]:
         """解析装备等级
 
         "承音 | 110阶" → (110, True)
         "100阶"        → (100, False)
-        ""             → (None, False)
+        ""             → (0, False)
 
         Returns:
             (level, is_chengyin)
@@ -281,7 +281,9 @@ class EquipmentParser:
         is_chengyin = "承音" in raw
 
         m = re.search(r"(\d+)\s*阶", raw)
-        level = int(m.group(1)) if m else None
+        # 0 是“无法确定等级”的唯一哨兵。后续仍会尝试用基础属性值
+        # 反查等级；反查也失败时保持 0，避免 None/0 两套空值语义并存。
+        level = int(m.group(1)) if m else 0
 
         return level, is_chengyin
 

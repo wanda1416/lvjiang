@@ -4,6 +4,7 @@
 """
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -425,12 +426,24 @@ def _declare_spaces(ref_dir, spaces):
 
 
 class TestReferenceSpaces:
+    def test_factory_spaces_are_platform_named_and_mobile_is_default(self):
+        references_dir = (
+            Path(__file__).parents[2] / "config" / "system" / "references"
+        )
+
+        assert DEFAULT_SPACE == "手游"
+        assert sorted(path.stem for path in references_dir.glob("*.yaml")) == [
+            "手游", "端游",
+        ]
+        assert not (references_dir / "默认.yaml").exists()
+        assert not (references_dir / "默认").exists()
+
     def test_spaces_scanned_from_both_layers(self, space_env):
         """空间列表 = system 目录扫描 ∪ local 目录扫描，各自按名排序去重"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
         _declare_spaces(space_env["local_ref"], ["空间A", "空间B"])
         db = ReferenceDatabase(dev_mode=False)
-        assert db.get_spaces() == ["空间A", DEFAULT_SPACE, "空间B"]
+        assert db.get_spaces() == [DEFAULT_SPACE, "空间A", "空间B"]
         # local 同名 yaml 是覆盖层，不产生第二个空间
         assert db.get_spaces().count("空间A") == 1
 

@@ -1200,6 +1200,31 @@ def test_judge_by_scope_filter(monkeypatch):
     assert captured["keys"] is None           # all = 全部规则
 
 
+def test_behavior_rating_logs_winning_rule_names(monkeypatch):
+    """行为评级二次判定必须说明最高档由哪些调律规则产生。"""
+    wf = FakeWF()
+    equip_data = EquipmentData.from_dict(_equip(2))
+    results = {
+        "small": {"name": "会心小外", "rating": "顶级",
+                  "skipped": False, "not_applicable": False},
+        "fire": {"name": "治疗火拳", "rating": "垃圾",
+                 "skipped": False, "not_applicable": False},
+        "skip": {"name": "已跳过规则", "rating": "顶级",
+                 "skipped": True, "not_applicable": False},
+    }
+    monkeypatch.setattr(wf.judge, "judge_by_scope",
+                        lambda *args, **kwargs: results)
+    info = MagicMock()
+    monkeypatch.setattr(tuning_judge.logger, "info", info)
+
+    rating_of = wf.judge.rating_provider(equip_data)
+
+    assert rating_of("all", [], False) == "top"
+    messages = [str(call.args[0]) for call in info.call_args_list]
+    assert any("按全部规则判定为 顶级（命中规则：会心小外）" in msg
+               for msg in messages)
+
+
 def test_tune_recycles_after_hit(monkeypatch):
     """结束处理回收：首轮规则命中 recycle → back 回背包页后回收"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",

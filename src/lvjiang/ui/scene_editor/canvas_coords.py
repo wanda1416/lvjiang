@@ -2,7 +2,7 @@
 
 from PyQt6.QtCore import QPointF, QRectF
 
-from ...core.layout_models import CanvasConfig, Point, Region
+from ...core.layout_models import CanvasConfig, Point, Region, SubsceneRef
 
 
 class CanvasCoordMixin:
@@ -65,7 +65,7 @@ class CanvasCoordMixin:
         """区域的归一化矩形"""
         return QRectF(r.x_ratio, r.y_ratio, r.w_ratio, r.h_ratio)
 
-    def _region_rect_widget(self, r: Region) -> QRectF:
+    def _region_rect_widget(self, r: Region | SubsceneRef) -> QRectF:
         """区域的 widget 坐标矩形（叠加画布变换）"""
         sx, sy = self._canvas_to_screenshot_norm(r.x_ratio, r.y_ratio)
         sw, sh = self._canvas_to_screenshot_norm(

@@ -17,7 +17,13 @@ from PyQt6.QtWidgets import QWidget
 from ...core.layout_models import Arrow, CanvasConfig, Panel, Point, Region, SubsceneRef
 from ...core.scene_registry import get_region_name, get_subscene_ref_def
 from ...i18n import tr
-from .canvas_interaction import HANDLE_SIZE, CanvasInteractionMixin, EditMode, HandlePos
+from .canvas_interaction import (
+    HANDLE_SIZE,
+    CanvasInteractionMixin,
+    DragMode,
+    EditMode,
+    HandlePos,
+)
 from .canvas_poi import CanvasPoiMixin
 
 # ─── 颜色方案 ────────────────────────────────────────────
@@ -72,7 +78,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._hidden_subscene_refs: list[SubsceneRef] = []
 
         # 交互状态
-        self._drag_mode = None  # DragMode
+        self._drag_mode: DragMode | None = None
         self._drag_handle: HandlePos | None = None
         self._drag_start = QPointF()   # 鼠标按下位置（归一化）
         self._drag_orig: Region | None = None  # 拖拽前的原始区域
@@ -124,7 +130,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._pending_subscene_ref_def = None
         self._subscene_drag_start: QPointF | None = None
         self._subscene_drag_current: QPointF | None = None
-        self._subscene_edit_mode = None
+        self._subscene_edit_mode: DragMode | None = None
         self._subscene_edit_handle: HandlePos | None = None
         self._subscene_edit_start = QPointF()
         self._subscene_edit_orig: SubsceneRef | None = None

@@ -67,6 +67,7 @@ git log v0.1.1..HEAD --oneline
 
 - `config/local` **无条件**优先于 system。用户自己改过 / 重画过的那份配置，系统修正**到不了他**。凡是修了系统配置的，都要提示「若你改过这项，需要手动同步或删除本地覆盖」。
 - `config/remote` 只在 `content_version` **严格大于** system 时才顶替。改了系统内容却不 bump 版本号，已下发过的用户拿不到修正。
+- **发布流程严禁自动或批量提升 `content_version`。** 应用发版、修改了 `config/system`、递增 Android `versionCode`，都不代表要创建新的远端下发代次；三者之间不存在自动联动。发布 Agent 只能检查并报告当前版本，不能因为“文件有改动”就修改该字段。只有开发者明确决定发布一代远端配置，并在编辑器中主动点击「提升至 vN / 提升」时，才允许改变 `content_version`。
 - **`content_version` 不再自动 +1**（0.9 起）。开发模式的普通保存只**保留**原版本号，提升必须在编辑器里显式操作：场景编辑器点「提升至 vN」再保存，调律规则点 key 行的「提升」按钮。这条以前是自动的，现在纯人工，本轮改过、要走在线下发的配置**逐个确认版本号**。
 - 开发模式下若线上版本正顶替某个文件，普通保存写进 system 也不会生效（版本号没超过线上那份）。编辑器保存后会明确提示「尚未生效」，看到就去点提升。
 - Android 的 `versionCode` 是配置解压 stamp，不递增则设备上仍是旧配置。
@@ -153,7 +154,7 @@ git push
 - [ ] `android/app/build.gradle.kts` versionCode 已递增（如有 config/布局变更）
 - [ ] `docs/50-releases/vX.Y.Z.md` 发布文档已编写
 - [ ] **不兼容变动已逐项排查**（对照上表八类），每条都写了「现象 / 原因 / 如何调整」；确认无不兼容时也已明确写出
-- [ ] 改动过的系统配置已确认：需要下发的已在编辑器里**显式提升** `content_version`（不再自动 +1，见上）；会被 `config/local` 遮蔽的已在发布说明里提示用户
+- [ ] 已确认本次是否有开发者**明确安排的远端配置下发**：没有则保持所有 `content_version` 原值不动；有则仅核对开发者已在编辑器里显式提升的目标文件。发布 Agent 不得自行提升；会被 `config/local` 遮蔽的内容已在发布说明里提示用户
 - [ ] `python scripts/add_content_version.py --check` 通过（存量/新增文件的版本字段齐全）
 - [ ] `packaging/package.bat` 打包成功
 - [ ] `dist/lvjiang-vX.Y.Z-win64.zip` 已生成

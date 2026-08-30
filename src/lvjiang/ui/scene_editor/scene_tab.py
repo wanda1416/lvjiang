@@ -38,30 +38,6 @@ from .scene_region_panel import RegionPanelMixin
 from .scene_view_dialog import ViewManagerDialog
 
 
-def _source_label(layer: str) -> str:
-    """配置层内部标识对应的界面文案。"""
-    from ...core.config.resolver import (
-        LAYER_LOCAL,
-        LAYER_REMOTE,
-        LAYER_SYSTEM,
-    )
-
-    labels = {
-        LAYER_LOCAL: tr("本地"),
-        LAYER_REMOTE: tr("远程下发"),
-        LAYER_SYSTEM: tr("系统"),
-    }
-    return labels.get(layer, layer)
-
-
-def describe_entity_version(rel_path: str) -> tuple[int | None, str]:
-    """返回实体当前生效版本与来源文案，供版本控件和纯函数测试使用。"""
-    from ...core.config.resolver import get_resolver
-
-    origin = get_resolver().describe_entity(rel_path)
-    return origin.version, _source_label(origin.layer)
-
-
 class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
     """单个场景的编辑 Tab：左侧画布 + 右侧四 Tab（区域列表 / 坐标列表 / 方向列表 / 面板列表）"""
 
@@ -147,7 +123,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         bar.addWidget(self._btn_manage_views)
         bar.addSpacing(12)
 
-        self._scene_version_title = QLabel(tr("场景版本号："))
+        self._scene_version_title = QLabel(tr("场景版本："))
         self._scene_version_value = QLabel()
         self._scene_version_link = QLabel()
         for label in (
@@ -164,7 +140,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         bar.addWidget(self._scene_version_link)
         bar.addSpacing(18)
 
-        self._layout_version_title = QLabel(tr("布局版本号："))
+        self._layout_version_title = QLabel(tr("布局版本："))
         self._layout_version_value = QLabel()
         self._layout_version_link = QLabel()
         for label in (
@@ -209,33 +185,28 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         from ...core.layout_manager import scene_layout_rel
         return scene_layout_rel(self._layout_name, self._scene_key)
 
-    @staticmethod
-    def _source_style(layer: str) -> str:
-        from ...core.config.resolver import LAYER_LOCAL, LAYER_REMOTE
-        if layer == LAYER_REMOTE:
-            return "color: #D97706;"
-        if layer == LAYER_LOCAL:
-            return "color: palette(highlight);"
-        return "color: palette(mid);"
-
     def _refresh_version_control(self, kind: str, value: QLabel,
-                                 link: QLabel) -> None:
+                                 link: QLabel, title: QLabel) -> None:
         from ...core.config.resolver import get_resolver
+        from ..config_origin import layer_style, origin_tooltip
 
         resolver = get_resolver()
         rel_path = self._version_rel_path(kind)
         origin = resolver.describe_entity(rel_path) if rel_path else None
+        available = resolver.list_entity_origins(rel_path) if rel_path else ()
         pending = (self._pending_scene_version if kind == "scene"
                    else self._pending_layout_version)
-        version = pending if pending is not None else (
-            origin.version if origin is not None else None)
-        value.setText("-" if version is None else f"v{version}")
-        value.setStyleSheet(self._source_style(origin.layer if origin else ""))
-        source = _source_label(origin.layer) if origin is not None else ""
-        value.setToolTip(
-            tr("来源：{source}\n路径：{path}\n当前版本：{version}").format(
-                source=source or tr("未知"), path=rel_path or "-",
-                version="-" if version is None else f"v{version}"))
+        layer = origin.layer if origin else ""
+        version = origin.version if origin is not None else None
+        value.setText("-" if (pending or version) is None
+                      else f"v{pending if pending is not None else version}")
+        value.setStyleSheet(layer_style(layer))
+        # 三个控件都挂同一份说明：没人知道非要悬停在数字上才有提示
+        from ...core.config.resolver import EntityOrigin
+        tip = origin_tooltip(
+            origin or EntityOrigin("", None), available, pending)
+        for widget in (title, value, link):
+            widget.setToolTip(tip)
 
         if not rel_path or origin is None or origin.version is None \
                 or not resolver.is_dev_mode():
@@ -252,9 +223,11 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         if not hasattr(self, "_scene_version_value"):
             return
         self._refresh_version_control(
-            "scene", self._scene_version_value, self._scene_version_link)
+            "scene", self._scene_version_value, self._scene_version_link,
+            self._scene_version_title)
         self._refresh_version_control(
-            "layout", self._layout_version_value, self._layout_version_link)
+            "layout", self._layout_version_value, self._layout_version_link,
+            self._layout_version_title)
 
     def _on_version_link(self, kind: str) -> None:
         from ...core.config.resolver import get_resolver

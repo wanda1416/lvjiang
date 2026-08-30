@@ -340,3 +340,15 @@ class TestDescribeEntity:
         _write_scene(dirs[2], "a.yaml", 7)
         origin = _resolver(dirs, dev_mode=True).describe_entity("scenes/a.yaml")
         assert origin.layer == "remote"
+
+    def test_lists_every_existing_layer_in_priority_order(self, dirs):
+        _write_scene(dirs[0], "a.yaml", 9)
+        _write_scene(dirs[2], "a.yaml", 3)
+        _write_scene(dirs[1], "a.yaml", 1)
+        origins = _resolver(dirs).list_entity_origins("scenes/a.yaml")
+        assert [(item.layer, item.version) for item in origins] == [
+            ("local", 1), ("remote", 3), ("system", 9),
+        ]
+
+    def test_lists_no_origins_for_missing_entity(self, dirs):
+        assert _resolver(dirs).list_entity_origins("scenes/missing.yaml") == ()

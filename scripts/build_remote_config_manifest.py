@@ -25,7 +25,7 @@
 
 **撤回**：manifest 是全量声明，从发布目录里删掉某个文件重新生成即可，
 客户端下次同步会删掉本地副本。把 content_version 改小是**没用的**
-（闸门要求远端严格大于 system），必须从 manifest 移除。
+（闸门要求远程严格大于 system），必须从 manifest 移除。
 """
 from __future__ import annotations
 

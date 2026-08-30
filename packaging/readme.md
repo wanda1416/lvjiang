@@ -56,7 +56,7 @@ git log v0.1.1..HEAD --oneline
 |------|---------|---------|
 | 默认值变更 | `git log -p -- src/lvjiang/core/config/models.py` | 存量用户保留旧值、与新文档不符 |
 | 配置结构 / 存储位置迁移 | 搜索本周期新增的迁移函数、`session.json` 节点变化 | 旧配置读不到，设置像是「丢了」 |
-| 出厂配置语义变更 | `git diff <tag>..HEAD -- config/system` | 同样的输入产出不同结果 |
+| 系统配置语义变更 | `git diff <tag>..HEAD -- config/system` | 同样的输入产出不同结果 |
 | 校验变严 | 新增的 raise / 校验函数 | 原本能跑的用户内容被拒 |
 | DSL / `.wf` 语法与内置函数 | `git diff <tag>..HEAD -- src/lvjiang/workflows` | 用户自写脚本报错 |
 | 键名 / 场景 / 区域重命名 | 布局与场景 yaml 的 key 改名 | 引用旧名的脚本或本地覆盖失效 |
@@ -65,8 +65,10 @@ git log v0.1.1..HEAD --oneline
 
 **注意 config 分层的三个坑**（这类问题在发布说明里不写清，用户永远排查不出来）：
 
-- `config/local` **无条件**优先于 system。用户自己改过 / 重画过的那份配置，出厂修正**到不了他**。凡是修了出厂配置的，都要提示「若你改过这项，需要手动同步或删除本地覆盖」。
-- `config/remote` 只在 `content_version` **严格大于** system 时才顶替。改了出厂内容却不 bump 版本号，已下发过的用户拿不到修正。
+- `config/local` **无条件**优先于 system。用户自己改过 / 重画过的那份配置，系统修正**到不了他**。凡是修了系统配置的，都要提示「若你改过这项，需要手动同步或删除本地覆盖」。
+- `config/remote` 只在 `content_version` **严格大于** system 时才顶替。改了系统内容却不 bump 版本号，已下发过的用户拿不到修正。
+- **`content_version` 不再自动 +1**（0.9 起）。开发模式的普通保存只**保留**原版本号，提升必须在编辑器里显式操作：场景编辑器点「提升至 vN」再保存，调律规则点 key 行的「提升」按钮。这条以前是自动的，现在纯人工，本轮改过、要走在线下发的配置**逐个确认版本号**。
+- 开发模式下若线上版本正顶替某个文件，普通保存写进 system 也不会生效（版本号没超过线上那份）。编辑器保存后会明确提示「尚未生效」，看到就去点提升。
 - Android 的 `versionCode` 是配置解压 stamp，不递增则设备上仍是旧配置。
 
 **🔧 修复章节的收录原则：**
@@ -151,7 +153,8 @@ git push
 - [ ] `android/app/build.gradle.kts` versionCode 已递增（如有 config/布局变更）
 - [ ] `docs/50-releases/vX.Y.Z.md` 发布文档已编写
 - [ ] **不兼容变动已逐项排查**（对照上表八类），每条都写了「现象 / 原因 / 如何调整」；确认无不兼容时也已明确写出
-- [ ] 改动过的出厂配置已确认：需要下发的已 bump `content_version`；会被 `config/local` 遮蔽的已在发布说明里提示用户
+- [ ] 改动过的系统配置已确认：需要下发的已在编辑器里**显式提升** `content_version`（不再自动 +1，见上）；会被 `config/local` 遮蔽的已在发布说明里提示用户
+- [ ] `python scripts/add_content_version.py --check` 通过（存量/新增文件的版本字段齐全）
 - [ ] `packaging/package.bat` 打包成功
 - [ ] `dist/lvjiang-vX.Y.Z-win64.zip` 已生成
 - [ ] `dist/lvjiang-vX.Y.Z-win64-setup.exe` 已生成

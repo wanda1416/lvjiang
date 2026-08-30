@@ -540,6 +540,23 @@ class ConfigResolver:
             layer = LAYER_SYSTEM
         return EntityOrigin(layer=layer, version=versioning.read_version(path))
 
+    def list_entity_origins(self, rel_path: str) -> tuple[EntityOrigin, ...]:
+        """列出实体在各配置层实际存在的副本，按读取优先级排序。
+
+        与 :meth:`describe_entity` 的区别是：后者只回答当前生效的是谁；本方法
+        同时保留被遮蔽的 remote/system 副本，供界面解释完整版本关系。
+        """
+        candidates = (
+            (LAYER_LOCAL, self.local_dir / rel_path),
+            (LAYER_REMOTE, self.remote_dir / rel_path),
+            (LAYER_SYSTEM, self.system_dir / rel_path),
+        )
+        return tuple(
+            EntityOrigin(layer=layer, version=versioning.read_version(path))
+            for layer, path in candidates
+            if path.is_file()
+        )
+
     def enumerate_entities(self, rel_dir: str, pattern: str, *,
                            include_internal: bool = False) -> list[str]:
         """枚举实体文件名：system ∪ local ∪ remote 并集，剔除墓碑，跳过 _ 前缀

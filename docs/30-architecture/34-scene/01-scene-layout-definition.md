@@ -16,10 +16,12 @@ Scene（场景）          ← 逻辑定义层：游戏中一个界面
   └── Panel（容器）    ← 可寻址的复合区域（type 区分内部结构）
         ├── grid       ← 行列网格，[r][c] 寻址（已实现）
         └── regions    ← Region 集合，[name] 寻址（规划中）
+  └── SubsceneRef      ← 对 type=subscene 场景的可复用实例引用
 
 Layout（布局）          ← 物理绑定层：一套投屏方案
   ├── Area-Coord 绑定  ← 每个 Area 在屏幕上的实际坐标
   ├── Panel-Coord 绑定  ← 每个 Panel 在屏幕上的实际坐标
+  ├── SubsceneRef 绑定  ← 子场景实例在父画布上的外框
   └── Action           ← 基于 Area 的交互动作
         └── Arrow      ← 拖拽（两点间拖拽）
 ```
@@ -67,6 +69,39 @@ panels:                         # 可寻址容器（默认 type=grid）
     rows: 3
     cols: 6
 ```
+
+### Subscene — 可复用场景
+
+子场景仍是完整 Scene，只增加 `type: subscene` 标记。它不能启用多视图，也不能
+嵌套引用其他子场景。父场景通过 `subscene_refs` 声明实例 key 和目标场景：
+
+```yaml
+# card.yaml
+key: card
+name: 通用卡片
+type: subscene
+regions:
+  - key: label
+    name: 标签
+
+# parent.yaml
+subscene_refs:
+  - key: card_1
+    name: 卡片1
+    scene: card
+```
+
+子场景自己的布局 JSON 保存 `crop_canvas` 和局部实体坐标；父场景布局 JSON 的
+`subscene_refs` 保存各实例外框。运行时按以下方式组合坐标：
+
+```text
+absolute_x = reference.x + child.x * reference.w
+absolute_y = reference.y + child.y * reference.h
+absolute_w = child.w * reference.w
+absolute_h = child.h * reference.h
+```
+
+组合结果仍位于父场景的布局画布坐标系，随后再走全局 Canvas 到屏幕坐标的既有变换。
 
 ---
 

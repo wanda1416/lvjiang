@@ -426,6 +426,14 @@ class EntityRef:
 
 
 @dataclass(frozen=True)
+class SubsceneEntityRef:
+    """子场景实例内的实体：[parent].[reference].[entity]。"""
+    scene: Any
+    reference: Any
+    entity: Any
+
+
+@dataclass(frozen=True)
 class PanelRef:
     """panel 三级索引：[scene].[panel][row][col]
 

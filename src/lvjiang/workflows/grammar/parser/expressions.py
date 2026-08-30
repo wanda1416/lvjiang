@@ -620,6 +620,11 @@ class _ExprMixin:
         """[scene].[entity] → EntityRef（表达式上下文，用于赋值与算术运算）"""
         return EntityRef(scene=str(items[0]), entity=str(items[1]))
 
+    def subscene_entity_ref(self, items):
+        from ..ast_nodes import SubsceneEntityRef
+        return SubsceneEntityRef(
+            scene=str(items[0]), reference=str(items[1]), entity=str(items[2]))
+
     def bracket_expr(self, items):
         """[name] → str（场景名或实体名，由父节点组装为 EntityRef）"""
         return str(items[0])

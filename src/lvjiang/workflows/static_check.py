@@ -64,13 +64,43 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
     problems: list[RefProblem] = []
     cache: dict[str, dict[str, set[str]]] = {}
     for ref in refs:
+        if ref.is_subscene:
+            from ..core.scene_registry import get_subscene_ref_def, is_subscene
+            instances = layout.get_scene_subscene_refs(ref.scene)
+            # 引用 key 为变量时无法知道具体实例，但仍可像普通动态区域一样
+            # 校验到父场景层级，不能把整条三段引用从预检中丢掉。
+            if ref.reference is None:
+                if not instances:
+                    problems.append(RefProblem(
+                        ref, tr("场景未绑定任何子场景引用")))
+                continue
+            ref_def = get_subscene_ref_def(ref.scene, ref.reference)
+            if ref_def is None:
+                problems.append(RefProblem(ref, tr("子场景引用未定义")))
+                continue
+            if not is_subscene(ref_def.scene):
+                problems.append(RefProblem(ref, tr("引用目标不是子场景")))
+                continue
+            if not any(i.key == ref.reference for i in instances):
+                problems.append(RefProblem(ref, tr("子场景引用未绑定坐标")))
+                continue
+            if ref.key is None:
+                continue
+            child_keys = {r.key for r in layout.get_scene_regions(ref_def.scene)}
+            if ref.kind != "scan":
+                child_keys |= {p.key for p in layout.get_scene_points(ref_def.scene)}
+                child_keys |= {p.key for p in layout.get_scene_panels(ref_def.scene)}
+            if ref.key not in child_keys:
+                problems.append(RefProblem(
+                    ref, f"子场景「{ref_def.scene}」的区域未绑定"))
+            continue
         bound = cache.setdefault(ref.scene, _bound_keys(layout, ref.scene))
         if not any(bound.values()):
             problems.append(RefProblem(ref, tr("场景未绑定任何坐标")))
             continue
         if ref.key is None:
             continue
-        if ref.kind == "click_target":
+        if ref.kind in ("click_target", "move_target", "scroll_target"):
             ok = ref.key in bound["region"] or ref.key in bound["point"] or ref.key in bound["panel"]
         elif ref.kind == "drag_target":
             ok = ref.key in bound["arrow"] or ref.key in bound["region"]
@@ -110,7 +140,9 @@ def format_problems(problems: list[RefProblem]) -> str:
     """拼成多行报错文本，每行一处问题"""
     lines = [f"静态检查未通过，脚本有 {len(problems)} 处引用在当前布局中找不到："]
     for p in problems:
-        key = f".[{p.ref.key}]" if p.ref.key else ""
+        key = ((f".[{p.ref.reference or '$动态'}].[{p.ref.key or '$动态'}]"
+                if p.ref.is_subscene else
+                (f".[{p.ref.key}]" if p.ref.key else "")))
         lines.append(f"  {_where(p.ref)}  [{p.ref.scene}]{key} — {p.reason}")
     lines.append(tr("请核对脚本里的 key 拼写（DSL 只认 key，不认中文名），或在场景布局编辑器中绑定"))
     return "\n".join(lines)

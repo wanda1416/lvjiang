@@ -7,3 +7,8 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: region
+  name: 区域
+  type: attr
+  is_text: true
+  is_clickable: false

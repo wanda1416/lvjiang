@@ -245,6 +245,42 @@ class Panel:
         )
 
 
+@dataclass
+class SubsceneRef:
+    """子场景引用实例（父场景画布中的归一化外框）。"""
+    key: str
+    x_ratio: float
+    y_ratio: float
+    w_ratio: float
+    h_ratio: float
+    disabled: bool = False
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        if not self.disabled:
+            d.pop("disabled", None)
+        return d
+
+    def to_coord_ref(self) -> RectCoordRef:
+        return RectCoordRef(
+            cx=self.x_ratio + self.w_ratio / 2,
+            cy=self.y_ratio + self.h_ratio / 2,
+            w=self.w_ratio,
+            h=self.h_ratio,
+        )
+
+    @staticmethod
+    def from_dict(d: dict) -> "SubsceneRef":
+        return SubsceneRef(
+            key=d["key"],
+            x_ratio=d["x_ratio"],
+            y_ratio=d["y_ratio"],
+            w_ratio=d["w_ratio"],
+            h_ratio=d["h_ratio"],
+            disabled=d.get("disabled", False),
+        )
+
+
 def _apply_legacy_disabled(
     disabled_section: dict,
     regions: dict[str, list[Region]],
@@ -302,6 +338,8 @@ class Layout:
     points: dict[str, list[Point]] = field(default_factory=dict)
     arrows: dict[str, list[Arrow]] = field(default_factory=dict)
     panels: dict[str, list[Panel]] = field(default_factory=dict)
+    crop_canvases: dict[str, CanvasConfig] = field(default_factory=dict)
+    subscene_refs: dict[str, list[SubsceneRef]] = field(default_factory=dict)
     # regions = {"equip_detail": [Region, ...], "equip_tune": [Region, ...]}
 
     def get_scene_regions(self, scene_key: str) -> list[Region]:
@@ -328,6 +366,18 @@ class Layout:
     def set_scene_panels(self, scene_key: str, panels: list[Panel]):
         self.panels[scene_key] = panels
 
+    def get_scene_crop_canvas(self, scene_key: str) -> CanvasConfig:
+        return self.crop_canvases.get(scene_key, CanvasConfig())
+
+    def set_scene_crop_canvas(self, scene_key: str, canvas: CanvasConfig):
+        self.crop_canvases[scene_key] = canvas
+
+    def get_scene_subscene_refs(self, scene_key: str) -> list[SubsceneRef]:
+        return self.subscene_refs.get(scene_key, [])
+
+    def set_scene_subscene_refs(self, scene_key: str, refs: list[SubsceneRef]):
+        self.subscene_refs[scene_key] = refs
+
     def get_canvas(self) -> CanvasConfig:
         return self.canvas
 
@@ -336,7 +386,9 @@ class Layout:
 
     def to_dict(self) -> dict:
         # 汇总所有出现过的场景 key
-        scene_keys = set(self.regions) | set(self.points) | set(self.arrows) | set(self.panels)
+        scene_keys = (set(self.regions) | set(self.points) | set(self.arrows)
+                      | set(self.panels) | set(self.crop_canvases)
+                      | set(self.subscene_refs))
         scenes_out: dict[str, dict] = {}
         for sk in scene_keys:
             entry: dict = {}
@@ -351,6 +403,11 @@ class Layout:
             pnls = self.panels.get(sk) or []
             if pnls:
                 entry["panels"] = [p.to_dict() for p in pnls]
+            if sk in self.crop_canvases:
+                entry["crop_canvas"] = self.crop_canvases[sk].to_dict()
+            refs = self.subscene_refs.get(sk) or []
+            if refs:
+                entry["subscene_refs"] = [r.to_dict() for r in refs]
             scenes_out[sk] = entry
         return {
             "canvas": self.canvas.to_dict(),
@@ -368,6 +425,8 @@ class Layout:
         points: dict[str, list[Point]] = {}
         arrows: dict[str, list[Arrow]] = {}
         panels: dict[str, list[Panel]] = {}
+        crop_canvases: dict[str, CanvasConfig] = {}
+        subscene_refs: dict[str, list[SubsceneRef]] = {}
 
         def _parse_scene_entry(scene_key: str, scene_data: dict):
             if "regions" in scene_data:
@@ -378,6 +437,10 @@ class Layout:
                 arrows[scene_key] = [Arrow.from_dict(a) for a in scene_data["arrows"]]
             if "panels" in scene_data:
                 panels[scene_key] = [Panel.from_dict(p) for p in scene_data["panels"]]
+            if isinstance(scene_data.get("crop_canvas"), dict):
+                crop_canvases[scene_key] = CanvasConfig.from_dict(scene_data["crop_canvas"])
+            if "subscene_refs" in scene_data:
+                subscene_refs[scene_key] = [SubsceneRef.from_dict(r) for r in scene_data["subscene_refs"]]
             # 向后兼容：旧格式 disabled 段迁移到实例属性
             if "disabled" in scene_data and isinstance(scene_data["disabled"], dict):
                 _apply_legacy_disabled(
@@ -391,4 +454,5 @@ class Layout:
                 if isinstance(scene_data, dict):
                     _parse_scene_entry(scene_key, scene_data)
         return Layout(name=name, canvas=canvas, regions=regions,
-                      points=points, arrows=arrows, panels=panels)
+                      points=points, arrows=arrows, panels=panels,
+                      crop_canvases=crop_canvases, subscene_refs=subscene_refs)

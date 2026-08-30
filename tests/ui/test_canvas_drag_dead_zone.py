@@ -21,9 +21,9 @@ from PyQt6.QtCore import QEvent, QPointF, Qt
 from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication
 
-from lvjiang.core.layout_models import Panel, Point, Region
+from lvjiang.core.layout_models import CanvasConfig, Panel, Point, Region
 from lvjiang.ui.scene_editor.canvas import RegionCanvas
-from lvjiang.ui.scene_editor.canvas_interaction import DRAG_DEAD_ZONE_PX
+from lvjiang.ui.scene_editor.canvas_interaction import DRAG_DEAD_ZONE_PX, HandlePos
 
 
 @pytest.fixture
@@ -40,6 +40,23 @@ def canvas(qtbot):
     c._dirty_hits = 0
     for name in ("on_region_changed", "on_poi_changed", "on_panel_changed"):
         setattr(c, name, lambda c=c: setattr(c, "_dirty_hits", c._dirty_hits + 1))
+    return c
+
+
+@pytest.fixture
+def cropped_canvas(qtbot):
+    """模拟子场景：实体坐标相对于截图中的裁剪画布。"""
+    c = RegionCanvas()
+    qtbot.addWidget(c)
+    c.resize(800, 600)
+    c.set_image(np.zeros((600, 800, 3), dtype=np.uint8))
+    c.set_canvas_config(CanvasConfig(
+        x_ratio=0.2, y_ratio=0.25, w_ratio=0.4, h_ratio=0.5,
+    ))
+    c.set_regions([Region(key="foo", x_ratio=0.2, y_ratio=0.2,
+                          w_ratio=0.3, h_ratio=0.3)])
+    c.set_panels([Panel(key="pan1", x_ratio=0.1, y_ratio=0.7,
+                        w_ratio=0.2, h_ratio=0.15, cols=2, rows=2)])
     return c
 
 
@@ -127,3 +144,40 @@ class TestRealDragStillWorks:
         _drag(one, _region_center(one), 20, 10, steps=1)
         _drag(canvas, _region_center(canvas), 20, 10, steps=20)
         assert one.get_regions()[0].to_dict() == canvas.get_regions()[0].to_dict()
+
+
+class TestCroppedCanvasCoordinates:
+    """子场景实体使用画布局部坐标，拖拽距离也必须按裁剪画布换算。"""
+
+    def test_resize_region_does_not_jump_to_screenshot_coordinates(
+        self, cropped_canvas,
+    ):
+        cropped_canvas.select_region(0)
+        region = cropped_canvas._regions[0]
+        right = cropped_canvas._get_handle_positions(region)[HandlePos.RIGHT]
+
+        # 裁剪画布宽 800 * 0.4 = 320 px；右移 32 px 应只增加 0.1。
+        _drag(cropped_canvas, right, 32, 0)
+
+        resized = cropped_canvas.get_regions()[0]
+        assert resized.x_ratio == pytest.approx(0.2)
+        assert resized.w_ratio == pytest.approx(0.4)
+
+    def test_move_region_uses_cropped_canvas_size(self, cropped_canvas):
+        # 裁剪画布为 320 x 300 px；(32, 30) px 对应局部坐标 (0.1, 0.1)。
+        _drag(cropped_canvas, _region_center(cropped_canvas), 32, 30)
+
+        moved = cropped_canvas.get_regions()[0]
+        assert moved.x_ratio == pytest.approx(0.3)
+        assert moved.y_ratio == pytest.approx(0.3)
+
+    def test_resize_panel_uses_cropped_canvas_size(self, cropped_canvas):
+        cropped_canvas.select_panel_by_key("pan1")
+        panel = cropped_canvas._panels[0]
+        right = cropped_canvas._panel_handle_positions(panel)[HandlePos.RIGHT]
+
+        _drag(cropped_canvas, right, 32, 0)
+
+        resized = cropped_canvas.get_panels()[0]
+        assert resized.x_ratio == pytest.approx(0.1)
+        assert resized.w_ratio == pytest.approx(0.3)

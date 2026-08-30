@@ -5,7 +5,11 @@ from collections.abc import Callable
 import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -24,21 +28,25 @@ from ...core.layout_models import (
     Region,
 )
 from ...core.scene_registry import (
+    get_registry,
     get_scene_point_pairs,
     get_scene_regions,
     get_scene_views,
     get_view_visible_keys,
+    is_subscene,
 )
 from ...i18n import tr
 from ..button_styles import apply_button_style
 from .canvas import EditMode, RegionCanvas
 from .scene_panel_editor import PanelEditorMixin
 from .scene_poi_panel import PoiPanelMixin
+from .scene_reference_editor import SceneReferenceEditorMixin
 from .scene_region_panel import RegionPanelMixin
 from .scene_view_dialog import ViewManagerDialog
 
 
-class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
+class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
+               SceneReferenceEditorMixin, QWidget):
     """单个场景的编辑 Tab：左侧画布 + 右侧四 Tab（区域列表 / 坐标列表 / 方向列表 / 面板列表）"""
 
     def __init__(self, scene_key: str, image: np.ndarray | None = None, parent=None):
@@ -49,6 +57,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         # 当前视图 key（空 = 看全部）；视图切换回调：(scene_key, view)，由 dialog 注入换底图
         self._current_view: str = ""
         self.on_view_changed: Callable[[str, str], None] | None = None
+        self.on_scene_type_changed: Callable[[str], None] | None = None
         # 当前布局名，由 dialog 经 set_layout_name 注入（解析布局坐标文件来源用）
         self._layout_name: str = ""
         self._layout_rel_path: str = ""
@@ -76,12 +85,14 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         left_layout.addWidget(self._canvas)
         self._splitter.addWidget(left)
 
-        # 右侧四 Tab
+        # 右侧五列布局组件
         self._right_tabs = QTabWidget()
-        self._right_tabs.addTab(self._build_region_panel(), tr("区域列表"))
-        self._right_tabs.addTab(self._build_point_panel(), tr("坐标列表"))
-        self._right_tabs.addTab(self._build_arrow_panel(), tr("方向列表"))
-        self._right_tabs.addTab(self._build_panel_panel(), tr("面板列表"))
+        self._right_tabs.addTab(self._build_region_panel(), tr("区域"))
+        self._right_tabs.addTab(self._build_point_panel(), tr("坐标"))
+        self._right_tabs.addTab(self._build_arrow_panel(), tr("方向"))
+        self._right_tabs.addTab(self._build_panel_panel(), tr("网格"))
+        self._right_tabs.addTab(self._build_reference_panel(), tr("引用"))
+        self._refresh_scene_type_ui()
         self._splitter.addWidget(self._right_tabs)
         self._splitter.setSizes([650, 250])
 
@@ -93,9 +104,11 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self._refresh_point_list()
         self._refresh_arrow_list()
         self._refresh_panel_list()
+        self._refresh_reference_list()
         self._canvas.on_region_changed = self._refresh_region_list
         self._canvas.on_poi_changed = self._on_poi_changed
         self._canvas.on_panel_changed = self._on_panel_changed
+        self._canvas.on_subscene_ref_changed = self._on_subscene_ref_changed
         # 选中态变化只刷新列表高亮，不走 dialog 的 dirty 链路
         self._canvas.on_selection_changed = self._on_selection_changed
 
@@ -106,12 +119,16 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         bar = QHBoxLayout()
         # 作为 SceneTab 内容的首行，保持与上方分组/场景 Tab 紧密衔接。
         bar.setContentsMargins(0, 0, 0, 0)
-        view_label = QLabel(tr("视图"))
-        view_label.setSizePolicy(
+        self._btn_scene_manage = QPushButton(tr("场景管理"))
+        self._btn_scene_manage.clicked.connect(self._on_scene_manage)
+        apply_button_style(self._btn_scene_manage, variant="neutral")
+        bar.addWidget(self._btn_scene_manage)
+        self._view_label = QLabel(tr("视图"))
+        self._view_label.setSizePolicy(
             QSizePolicy.Policy.Preferred,
             QSizePolicy.Policy.Fixed,
         )
-        bar.addWidget(view_label)
+        bar.addWidget(self._view_label)
         self._view_combo = QComboBox()
         self._view_combo.setMinimumWidth(120)
         self._view_combo.currentIndexChanged.connect(self._on_view_combo_changed)
@@ -159,6 +176,49 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
 
         self._refresh_view_combo()
         return bar
+
+    def _refresh_scene_type_ui(self):
+        subscene = is_subscene(self._scene_key)
+        for widget in (self._view_label, self._view_combo, self._btn_manage_views):
+            widget.setVisible(not subscene)
+        if hasattr(self, "_right_tabs"):
+            self._right_tabs.setTabEnabled(4, not subscene)
+
+    def _on_scene_manage(self):
+        registry = get_registry()
+        scene = registry.get_scene(self._scene_key)
+        if scene is None:
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("场景管理"))
+        form = QFormLayout(dialog)
+        checkbox = QCheckBox(tr("可作为引用子场景"))
+        checkbox.setChecked(scene.is_subscene)
+        if scene.views and not scene.is_subscene:
+            checkbox.setEnabled(False)
+            checkbox.setToolTip(tr("多视图场景不能转为子场景，请先取消多视图"))
+        form.addRow(checkbox)
+        box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel)
+        box.accepted.connect(dialog.accept)
+        box.rejected.connect(dialog.reject)
+        form.addRow(box)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            registry.set_scene_type(
+                self._scene_key, "subscene" if checkbox.isChecked() else "scene")
+        except ValueError as exc:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, tr("设置失败"), str(exc))
+            return
+        self._current_view = ""
+        self._refresh_view_combo()
+        self._refresh_scene_type_ui()
+        self._refresh_reference_list()
+        if self.on_scene_type_changed:
+            self.on_scene_type_changed(self._scene_key)
 
     def set_layout_name(self, layout_name: str,
                         rel_path: str | None = None):
@@ -370,6 +430,16 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self._canvas.set_panels(panels)
         self._refresh_panel_list()
 
+    def get_subscene_refs(self):
+        return self._canvas.get_subscene_refs()
+
+    def set_subscene_refs(self, refs):
+        self._canvas.set_subscene_refs(refs)
+        self._refresh_reference_list()
+
+    def set_subscene_contents(self, contents):
+        self._canvas.set_subscene_contents(contents)
+
     # ─── 画布配置 / 模式 ─────────────────────────────────
 
     def set_canvas_config(self, config: CanvasConfig):
@@ -396,10 +466,14 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin, QWidget):
         self._refresh_region_list()
         self._refresh_point_list()
         self._refresh_panel_list()
+        self._refresh_reference_list()
 
     def _on_panel_changed(self):
         """画布 panel 数据变化时刷新面板列表"""
         self._refresh_panel_list()
+
+    def _on_subscene_ref_changed(self):
+        self._refresh_reference_list()
 
     def _on_selection_changed(self):
         """画布选中态变化（非数据修改）：仅刷新各列表显示"""

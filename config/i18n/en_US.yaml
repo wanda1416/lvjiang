@@ -531,7 +531,6 @@ auto_strings:
   (空行): (Blank Line)
   + 创建区域: + Create Region
   + 创建坐标: + Create Point
-  + 创建面板: + Create Panel
   '- 未分组 -': '- Ungrouped -'
   '- 未命名 -': '- Unnamed -'
   0=红 1=绿 2=蓝: 0=Red 1=Green 2=Blue
@@ -728,7 +727,6 @@ auto_strings:
   区域/面板: Region/Panel
   '区域中心偏移比例:': 'Region Center Offset Ratio:'
   区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）: Random offset ratio of the click point from the region center (must be under 0.5 to avoid landing outside the region)
-  区域列表: Region List
   区域里接近目标色的像素比例 0–1，判断按钮亮没亮/在哪个界面: Fraction (0-1) of pixels in the region close to the target color; used to tell whether a button is lit / which screen is showing
   匿名使用数据收集: Anonymous Usage Data Collection
   单cell尺寸: Cell Size
@@ -813,7 +811,6 @@ auto_strings:
   场景必须包含 key 和 name: Scene must contain key and name
   场景未绑定任何坐标: The scene has no coordinates bound
   坐标: Coordinate
-  坐标列表: Coordinate List
   坐标点: Coordinate Point
   '坐标随机偏移(px):': 'Coordinate Random Offset (px):'
   基于 PyQt6 · RapidOCR · OpenCV: Based on PyQt6 · RapidOCR · OpenCV
@@ -825,6 +822,7 @@ auto_strings:
   复制到本地: Copy to Local
   复制到本地以修改: Copy to Local for Editing
   复制坐标: Copy Coordinates
+  解除引用绑定: Unbind Reference
   失败退出: Exit on Failure
   好的: OK
   如 $x > 0.5 / $v contains "ok" / not $hit: e.g. $x > 0.5 / $v contains "ok" / not $hit
@@ -987,7 +985,6 @@ auto_strings:
   新热键已保存，但当前进程重建全局监听失败；本次运行继续使用原热键，重启后将重试新设置。: New hotkeys were saved, but the current process failed to rebuild the global listener; this run keeps using the old hotkeys, and the new settings will be retried after restart.
   方向: Direction
   方向/区域: Direction/Region
-  方向列表: Direction List
   无主窗口，无法截图: No main window; cannot take a screenshot
   无主窗口，无法获取运行环境: No main window; cannot get the runtime environment
   无可用坐标: No Available Points
@@ -1278,7 +1275,6 @@ auto_strings:
   需安装律匠 App 并开启无障碍服务；仅改变输入通道，不改变截图方式；不可达时回退 ADB shell input: Requires the LvJiang App with Accessibility Service enabled; only changes the input channel, not the screenshot method; falls back to ADB shell input if unreachable
   面板: Panel
   面板/区域: Panel/Region
-  面板列表: Panel List
   颜色占比: Color Ratio
   颜色特征识别器尚未实现: Color-feature recognizer not yet implemented
   '高:': 'H:'
@@ -1343,3 +1339,29 @@ auto_strings:
   可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试: 'The network may be unavailable. Unable to access {url} for updates; check your network settings and try again.'
   可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试: 'The network may be unavailable. Unable to access {url} for announcements; check your network settings and try again.'
   '无法访问 {url} 获取更新：HTTP {code}': 'Unable to access {url} for updates: HTTP {code}'
+  subscene_create_grid: + Create Grid
+  subscene_new_ref: + New Reference
+  subscene_delete_ref: Delete Reference
+  subscene_delete_grid: Delete Grid
+  subscene_reusable: Reusable as Subscene
+  subscene_multiview_blocked: Multi-view scenes cannot become subscenes; disable multiple views first
+  subscene_name: Subscene
+  'subscene_label:': 'Subscene:'
+  subscene_ref_undefined: Subscene reference is undefined
+  subscene_ref_unbound: Subscene reference has no bound coordinates
+  subscene_no_bound_refs: Scene has no bound subscene references
+  subscene_target_invalid: Reference target is not a subscene
+  subscene_reference: Reference
+  subscene_all_bound: All references are bound, or no references have been created.
+  subscene_new_reference: New Reference
+  subscene_no_available_ref: No Available Reference
+  subscene_none: No Subscenes
+  'subscene_confirm_delete_{key}': 'Delete reference {key}?'
+  subscene_bind_ref: Bind Reference
+  subscene_bind_grid: Bind Grid
+  subscene_edit_ref: Edit Reference
+  subscene_grid: Grid
+  subscene_crop_canvas: Crop Canvas
+  subscene_set_failed: Setting Failed
+  subscene_mark_help: Mark the target scene as a reusable subscene in Scene Management first.
+  subscene_exit_crop_canvas: Exit Crop Canvas

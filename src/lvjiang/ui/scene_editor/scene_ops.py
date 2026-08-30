@@ -42,6 +42,14 @@ class _SceneTabPlaceholder(QWidget):
         self.scene_key = scene_key
 
 
+class _SceneGroupTabWidget(QTabWidget):
+    """携带稳定分组身份的二级 Tab 容器。"""
+
+    def __init__(self, group_key: str):
+        super().__init__()
+        self.group_key = group_key
+
+
 class SceneOpsMixin:
     """场景/分组管理混入类
 
@@ -61,7 +69,7 @@ class SceneOpsMixin:
         self._tabs.clear()
         registry = get_registry()
         for group_key, group_name in registry.get_groups():
-            scene_tab_widget = QTabWidget()
+            scene_tab_widget = _SceneGroupTabWidget(group_key)
             scene_tab_widget.setMovable(True)
             scene_tab_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             scene_tab_widget.customContextMenuRequested.connect(
@@ -101,15 +109,10 @@ class SceneOpsMixin:
         if loaded is not None:
             return loaded
 
-        registry = get_registry()
-        group_key = registry.get_scene_group(scene_key)
-        scene_tab_widget = self._group_tabs.get(group_key or "")
-        if scene_tab_widget is None:
+        location = self._find_scene_tab(scene_key)
+        if location is None:
             return None
-        scene_keys = registry.get_group_scenes(group_key) if group_key else []
-        if scene_key not in scene_keys:
-            return None
-        index = scene_keys.index(scene_key)
+        _group_key, scene_tab_widget, index = location
         old_widget = scene_tab_widget.widget(index)
         title = scene_tab_widget.tabText(index)
         tooltip = scene_tab_widget.tabToolTip(index)
@@ -136,52 +139,46 @@ class SceneOpsMixin:
 
     # ─── 当前场景辅助 ────────────────────────────────────
 
+    def _find_scene_tab(
+            self, scene_key: str) -> tuple[str, QTabWidget, int] | None:
+        """按控件携带的 scene_key 定位 Tab，不依赖 registry 的位置顺序。"""
+        for group_key, tab_widget in self._group_tabs.items():
+            for index in range(tab_widget.count()):
+                if getattr(tab_widget.widget(index), "scene_key", "") == scene_key:
+                    return group_key, tab_widget, index
+        return None
+
     def _get_current_scene_key(self) -> str:
         """获取当前激活的场景 key"""
-        idx = self._group_tab_widget.currentIndex()
-        groups = get_registry().get_groups()
-        if not (0 <= idx < len(groups)):
+        scene_tab_widget = self._group_tab_widget.currentWidget()
+        if not isinstance(scene_tab_widget, QTabWidget):
             return ""
-        group_key = groups[idx][0]
-        scene_tab_widget = self._group_tabs.get(group_key)
-        if scene_tab_widget is None:
-            return ""
-        scene_idx = scene_tab_widget.currentIndex()
-        scene_keys = get_registry().get_group_scenes(group_key)
-        return scene_keys[scene_idx] if 0 <= scene_idx < len(scene_keys) else ""
+        widget = scene_tab_widget.currentWidget()
+        return getattr(widget, "scene_key", "")
 
     def _current_group_key(self) -> str:
         """获取当前激活的分组 key"""
-        idx = self._group_tab_widget.currentIndex()
+        widget = self._group_tab_widget.currentWidget()
+        group_key = getattr(widget, "group_key", "")
+        if group_key:
+            return group_key
         groups = get_registry().get_groups()
-        if 0 <= idx < len(groups):
-            return groups[idx][0]
         return groups[0][0] if groups else ""
 
     def _select_scene(self, scene_key: str):
         """重建 Tab 后将选中态定位到指定场景（一级分组 + 二级场景）
 
-        Tab 顺序与 registry.get_groups() / get_group_scenes() 一致，据此换算索引。
+        直接按控件携带的稳定身份定位，不要求 Tab 与 registry 顺序同步。
         """
         if not scene_key:
             return
-        registry = get_registry()
-        group_key = registry.get_scene_group(scene_key)
-        if not group_key:
+        location = self._find_scene_tab(scene_key)
+        if location is None:
             return
-        groups = registry.get_groups()
-        group_idx = next(
-            (i for i, (gk, _) in enumerate(groups) if gk == group_key), -1
-        )
-        if group_idx < 0:
-            return
+        _group_key, scene_tab_widget, scene_idx = location
+        group_idx = self._group_tab_widget.indexOf(scene_tab_widget)
         self._group_tab_widget.setCurrentIndex(group_idx)
-        scene_tab_widget = self._group_tabs.get(group_key)
-        if scene_tab_widget is None:
-            return
-        scene_keys = registry.get_group_scenes(group_key)
-        if scene_key in scene_keys:
-            scene_tab_widget.setCurrentIndex(scene_keys.index(scene_key))
+        scene_tab_widget.setCurrentIndex(scene_idx)
 
     # ─── 场景 CRUD ────────────────────────────────────────
 
@@ -441,10 +438,11 @@ class SceneOpsMixin:
         tab_index = self._group_tab_widget.tabBar().tabAt(pos)
         if tab_index < 0:
             return
-        groups = get_registry().get_groups()
-        if tab_index >= len(groups):
+        group_widget = self._group_tab_widget.widget(tab_index)
+        group_key = getattr(group_widget, "group_key", "")
+        if not group_key:
             return
-        group_key, group_name = groups[tab_index]
+        groups = get_registry().get_groups()
         menu = QMenu(self)  # type: ignore[arg-type]
         rename_action = menu.addAction(tr("重命名分组"))
         delete_action = menu.addAction(tr("删除分组"))
@@ -494,10 +492,9 @@ class SceneOpsMixin:
         tab_index = scene_tab_widget.tabBar().tabAt(pos)
         if tab_index < 0:
             return
-        scene_keys = get_registry().get_group_scenes(group_key)
-        if tab_index >= len(scene_keys):
+        scene_key = getattr(scene_tab_widget.widget(tab_index), "scene_key", "")
+        if not scene_key:
             return
-        scene_key = scene_keys[tab_index]
         menu = QMenu(self)  # type: ignore[call-overload]
         rename_action = menu.addAction(tr("重命名"))
         delete_action = menu.addAction(tr("删除"))

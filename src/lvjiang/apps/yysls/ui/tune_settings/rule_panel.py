@@ -152,6 +152,7 @@ class RulePanel(QWidget):
             on_enable_changed=self._on_rule_enable_changed,
             protected=self._manager.is_system_rule(self._key),
             version_origin=self._manager.describe_rule_version(self._key),
+            version_origins=self._manager.list_rule_versions(self._key),
             on_bump_version=(self._bump_rule_version
                              if self._manager.can_bump_rule_version() else None))
         # 回填启用状态（从 tune_config.tuning_rules 读取）
@@ -218,6 +219,20 @@ class RulePanel(QWidget):
             self._status_cb(tr("保存失败：{e}").format(e=e), True)
             return
         now = datetime.now().strftime("%H:%M:%S")
+        override = self._manager.system_save_override(self._key)
+        if override is not None:
+            from lvjiang.core.config.resolver import LAYER_LOCAL
+            if override.layer == LAYER_LOCAL:
+                message = tr(
+                    "已保存到系统层，但本地配置仍在生效；"
+                    "系统修改尚未生效，请先还原本地覆盖（{now}）")
+            else:
+                message = tr(
+                    "已保存到系统层，但远程 v{version} 仍在生效；"
+                    "系统修改尚未生效，请点「提升」（{now}）")
+            self._status_cb(message.format(
+                version=override.version, now=now), "warn")
+            return
         warn = self._soft_pool_warning()
         if warn:
             self._status_cb(tr("已保存并生效（{now}）").format(now=now) + "；" + warn, "warn")

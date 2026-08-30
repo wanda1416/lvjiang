@@ -1301,9 +1301,9 @@ auto_strings:
   '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} is a system script. To change it, right-click it in the tree and choose "Copy to Local for Editing".'
   丢弃 {name} 的本地修改，恢复系统版本？此操作不可恢复。: Discard local changes to {name} and restore the system version? This cannot be undone.
   仅开发模式可以提升系统配置版本: Only developer mode can bump system configuration versions
-  场景版本号：: 'Scene version:'
+  场景版本：: 'Scene version:'
   已还原为系统版本: Restored to the system version
-  布局版本号：: 'Layout version:'
+  布局版本：: 'Layout version:'
   ? '把系统脚本 {name} 复制到本地后才能修改。
   
     复制之后这个文件不再跟随系统更新，确定？'
@@ -1314,8 +1314,7 @@ auto_strings:
   '提升至 v{version}': 'Bump to v{version}'
   撤销提升: Cancel bump
   本地覆盖系统: Local override of system
-  "来源：{source}\n路径：{path}\n当前版本：{version}": "Source: {source}\nPath: {path}\nCurrent version: {version}"
-  版本号：: 'Version:'
+  规则版本：: 'Rule version:'
   版本提升失败: Version bump failed
   系统场景不可删除: System scenes cannot be deleted
   系统场景不能修改 key: The key of a system scene cannot be changed
@@ -1330,6 +1329,14 @@ auto_strings:
   '规则版本已提升至 v{version} 并生效': 'Rule version bumped to v{version} and applied'
   还原为系统: Restore System Version
   这是系统脚本的本地副本，删不掉；右键「还原为系统」可丢弃本地修改: This is a local copy of a system script and cannot be deleted; right-click and choose "Restore System Version" to discard local changes
-  '远程下发': 'Remote delivery'
-  '配置来源：{source}': 'Configuration source: {source}'
+  远程: Remote
   '，提升 {count} 项版本': ', bumped {count} versions'
+  无: None
+  当前生效：{current}: 'Currently effective: {current}'
+  现有版本：{count} 份，来自 {sources} 个来源: '{count} versions from {sources} sources'
+  待保存：系统将提升至 v{version}: 'Pending save: system will be bumped to v{version}'
+  已保存到系统层，但本地配置仍在生效；系统修改尚未生效，请先还原本地覆盖（{now}）: Saved to the system layer, but the local copy is still effective; restore the local override to apply the system change ({now})
+  已保存到系统层，但远程 v{version} 仍在生效；系统修改尚未生效，请点「提升」（{now}）: Saved to the system layer, but remote v{version} is still effective; click Bump to apply the system change ({now})
+  '{scenes} 仍由本地副本生效，请先还原本地覆盖': '{scenes} still use local copies; restore the local overrides first'
+  '{scenes} 仍由远程版本生效，请提升版本后再保存': '{scenes} still use remote versions; bump their versions and save again'
+  已保存布局「{name}」到系统层，但尚未生效：{reasons}: 'Layout "{name}" was saved to the system layer but is not yet effective: {reasons}'

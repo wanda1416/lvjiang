@@ -84,6 +84,7 @@ find_stmt: "find"i scene_target "as"i var_ref by_clause where_clause? _NL -> fin
 // 省略时默认左键，不影响任何既有脚本。
 click_stmt: "click"i click_target CLICK_BUTTON? wait_clauses? _NL
 click_target: const_or_var "." const_or_var panel_index panel_index -> click_panel_target
+            | const_or_var "." const_or_var "." const_or_var       -> click_subscene_target
             | const_or_var "." const_or_var                          -> click_scene_target
             | var_ref                                                  -> click_var_target
             | coord_point                                              -> click_coord_target
@@ -202,7 +203,8 @@ tuple_elem: number | var_ref
 //   1. [scene].[region] — 场景区域 OCR
 //   2. [scene].[panel][row][col] — panel cell 级 OCR
 //      row/col 支持范围索引 [start...end]，仅扫描指定行列子集
-scan_stmt: "scan"i scene_target "as"i var_ref by_clause? where_clause? _NL
+scan_stmt: "scan"i const_or_var "." const_or_var "." const_or_var "as"i var_ref by_clause? where_clause? _NL -> scan_subscene_stmt
+         | "scan"i scene_target "as"i var_ref by_clause? where_clause? _NL
          | "scan"i const_or_var "." const_or_var scan_panel_index scan_panel_index "as"i var_ref by_clause? where_clause? _NL -> scan_panel_stmt
 
 // scan 专用 panel 索引：在单格 [INT] / [$var] 基础上，额外支持范围 [start...end]
@@ -218,7 +220,8 @@ scan_range_endpoint: INT | var_ref
 // rich 关键字：as rich $var 返回包含输入/输出元数据的富 dict
 // with 子句：as rich $var with func_name — 指定 dict→dict 转换函数
 RICH_KEYWORD: "rich"i
-recognize_stmt: "recognize"i scene_target "as"i RICH_KEYWORD? var_ref by_clause? group_clause? where_clause? with_clause? _NL
+recognize_stmt: "recognize"i const_or_var "." const_or_var "." const_or_var "as"i RICH_KEYWORD? var_ref by_clause? group_clause? where_clause? with_clause? _NL -> recognize_subscene_stmt
+              | "recognize"i scene_target "as"i RICH_KEYWORD? var_ref by_clause? group_clause? where_clause? with_clause? _NL
               | "recognize"i const_or_var "." const_or_var recognize_panel_index recognize_panel_index "as"i RICH_KEYWORD? var_ref by_clause? group_clause? where_clause? with_clause? _NL -> recognize_panel_stmt
 
 // recognize 专用 panel 索引：在单格 [INT] / [$var] 基础上，额外支持范围 [start...end]
@@ -545,7 +548,8 @@ dict_pair: STRING ":" dict_value
 
 // 实体引用（表达式上下文）：[scene].[entity] → EntityRef → CoordRef
 // 用于赋值（$a = [scene].[region]）和算术运算（$b - $a）
-entity_ref: bracket_expr "." bracket_expr
+entity_ref: bracket_expr "." bracket_expr "." bracket_expr -> subscene_entity_ref
+          | bracket_expr "." bracket_expr                    -> entity_ref
 
 var_ref: "$" NAME
 

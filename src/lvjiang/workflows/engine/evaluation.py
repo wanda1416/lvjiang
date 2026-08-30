@@ -27,6 +27,7 @@ from ..grammar import (
     NotEqual,
     NumericEqual,
     Or,
+    SubsceneEntityRef,
     VarRef,
 )
 from ..grammar.ast_nodes import TupleLiteral
@@ -256,6 +257,12 @@ class _EvalMixin:
                 return self._call_func(node)
             case EntityRef():
                 return self._resolve_entity_ref(node)
+            case SubsceneEntityRef():
+                from ..runtime_layout import resolve_subscene_entity
+                return resolve_subscene_entity(
+                    self._layout, str(self._resolve(node.scene)),
+                    str(self._resolve(node.reference)),
+                    str(self._resolve(node.entity))).to_coord_ref()
             case TupleLiteral():
                 return self._resolve_tuple(node)
             case int() | float():

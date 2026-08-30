@@ -40,7 +40,7 @@ points:
   is_clickable: true
 - key: item_3
   name: 技能3
-  type: attr
+  type: func
   is_text: false
   is_clickable: true
 - key: cangku

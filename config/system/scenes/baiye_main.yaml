@@ -1,6 +1,11 @@
 content_version: 1
 key: baiye_main
 name: 百业
+views:
+- key: base
+  name: 基底
+- key: activity
+  name: 活动
 regions:
 - key: back
   name: 返回

@@ -14,8 +14,8 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
-from ...core.layout_models import Arrow, CanvasConfig, Panel, Point, Region
-from ...core.scene_registry import get_region_name
+from ...core.layout_models import Arrow, CanvasConfig, Panel, Point, Region, SubsceneRef
+from ...core.scene_registry import get_region_name, get_subscene_ref_def
 from ...i18n import tr
 from .canvas_interaction import HANDLE_SIZE, CanvasInteractionMixin, EditMode, HandlePos
 from .canvas_poi import CanvasPoiMixin
@@ -69,6 +69,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._visible_keys: set[str] | None = None
         self._hidden_regions: list[Region] = []
         self._hidden_panels: list[Panel] = []
+        self._hidden_subscene_refs: list[SubsceneRef] = []
 
         # 交互状态
         self._drag_mode = None  # DragMode
@@ -90,6 +91,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self.on_region_changed = None  # callable() -> None
         self.on_canvas_changed = None  # callable() -> None
         self.on_panel_changed = None  # callable() -> None
+        self.on_subscene_ref_changed = None  # callable() -> None
         self.on_selection_changed = None  # callable() -> None（仅选中态变化，不代表数据修改，不应标记 dirty）
         self.on_status_message = None  # callable(str) -> None（面向用户的提示，显示到对话框状态栏）
 
@@ -114,6 +116,18 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._panel_edit_handle: HandlePos | None = None  # 拉伸手柄
         self._panel_edit_start = QPointF()  # 拖拽起始 widget 坐标
         self._panel_edit_orig: Panel | None = None  # type: ignore[assignment]
+
+        # 子场景引用：外框可编辑，内部实体只读绘制
+        self._subscene_refs: list[SubsceneRef] = []
+        self._subscene_contents: dict[str, dict[str, list]] = {}
+        self._subscene_selected_idx = -1
+        self._pending_subscene_ref_def = None
+        self._subscene_drag_start: QPointF | None = None
+        self._subscene_drag_current: QPointF | None = None
+        self._subscene_edit_mode = None
+        self._subscene_edit_handle: HandlePos | None = None
+        self._subscene_edit_start = QPointF()
+        self._subscene_edit_orig: SubsceneRef | None = None
 
         # 画布编辑模式的交互状态
         self._canvas_drag_mode = None  # DragMode
@@ -147,6 +161,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
             self.on_poi_changed()
         elif kind == "panel" and self.on_panel_changed:
             self.on_panel_changed()
+        elif kind == "subscene_ref" and self.on_subscene_ref_changed:
+            self.on_subscene_ref_changed()
 
     def get_disabled_keys(self, kind: str) -> set[str]:
         """获取某类型中已标记 disabled 的全部 key"""
@@ -163,6 +179,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
             return self._points + self._hidden_points
         if kind == "arrow":
             return self._arrows + self._hidden_arrows
+        if kind == "subscene_ref":
+            return self._subscene_refs + self._hidden_subscene_refs
         return []
 
     def _find_item_by_kind(self, kind: str, key: str):
@@ -183,6 +201,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
             return Arrow(key=key, from_key="", disabled=True)
         if kind == "panel":
             return Panel(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True)
+        if kind == "subscene_ref":
+            return SubsceneRef(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True)
         raise ValueError(f"unknown kind: {kind}")
 
     def _append_to_kind(self, kind: str, item):
@@ -195,6 +215,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
             self._arrows.append(item)
         elif kind == "panel":
             self._panels.append(item)
+        elif kind == "subscene_ref":
+            self._subscene_refs.append(item)
 
     def set_current_regions(self, regions: list[tuple[str, str]]):
         """设置当前场景的区域列表（由对话框调用）"""
@@ -246,6 +268,9 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._panels, self._hidden_panels = self._split_by_filter(
             self._panels + self._hidden_panels
         )
+        self._subscene_refs, self._hidden_subscene_refs = self._split_by_filter(
+            self._subscene_refs + self._hidden_subscene_refs
+        )
         self._apply_poi_filter()
         self._selected_idx = -1
         self._field_selected = False
@@ -257,6 +282,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         if 0 <= idx < len(self._regions):
             self._selected_idx = idx
             self._field_selected = True
+            self._panel_selected_idx = -1
+            self._subscene_selected_idx = -1
             self.update()
 
     def delete_selected(self):
@@ -301,6 +328,9 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         for i, p in enumerate(self._panels):
             if p.key == key:
                 self._panel_selected_idx = i
+                self._selected_idx = -1
+                self._field_selected = False
+                self._subscene_selected_idx = -1
                 self.update()
                 return
         self._panel_selected_idx = -1
@@ -383,31 +413,118 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
                 return i, None
         return -1, None
 
-    def _apply_panel_resize(self, p: Panel, orig: Panel, pos: QPointF):
+    def _apply_panel_resize(
+        self, p: Panel, orig: Panel, pos: QPointF, shift_held: bool = False,
+    ):
         """根据拖拽手柄位置调整 panel 大小"""
         # widget 位移 -> 归一化位移
-        dx_n, dy_n = self._widget_to_norm(pos)
-        dx_n -= self._widget_to_norm(self._panel_edit_start)[0]
-        dy_n -= self._widget_to_norm(self._panel_edit_start)[1]
+        dx_n, dy_n = self._widget_delta_to_canvas_norm(
+            self._panel_edit_start, pos)
         handle = self._panel_edit_handle
-        x, y, w, h = orig.x_ratio, orig.y_ratio, orig.w_ratio, orig.h_ratio
+        x1, y1 = orig.x_ratio, orig.y_ratio
+        x2 = x1 + orig.w_ratio
+        y2 = y1 + orig.h_ratio
         min_size = 0.02
-        if handle in (HandlePos.LEFT, HandlePos.TOP_LEFT, HandlePos.BOTTOM_LEFT):
-            new_x = x + dx_n
-            new_w = w - dx_n
-            if new_w >= min_size:
-                p.x_ratio = new_x
-                p.w_ratio = new_w
-        if handle in (HandlePos.RIGHT, HandlePos.TOP_RIGHT, HandlePos.BOTTOM_RIGHT):
-            p.w_ratio = max(min_size, w + dx_n)
-        if handle in (HandlePos.TOP, HandlePos.TOP_LEFT, HandlePos.TOP_RIGHT):
-            new_y = y + dy_n
-            new_h = h - dy_n
-            if new_h >= min_size:
-                p.y_ratio = new_y
-                p.h_ratio = new_h
-        if handle in (HandlePos.BOTTOM, HandlePos.BOTTOM_LEFT, HandlePos.BOTTOM_RIGHT):
-            p.h_ratio = max(min_size, h + dy_n)
+        moving_left = handle in (
+            HandlePos.LEFT, HandlePos.TOP_LEFT, HandlePos.BOTTOM_LEFT)
+        moving_right = handle in (
+            HandlePos.RIGHT, HandlePos.TOP_RIGHT, HandlePos.BOTTOM_RIGHT)
+        moving_top = handle in (
+            HandlePos.TOP, HandlePos.TOP_LEFT, HandlePos.TOP_RIGHT)
+        moving_bottom = handle in (
+            HandlePos.BOTTOM, HandlePos.BOTTOM_LEFT, HandlePos.BOTTOM_RIGHT)
+        if moving_left:
+            x1 = min(x1 + dx_n, x2 - min_size)
+        if moving_right:
+            x2 = max(x1 + min_size, x2 + dx_n)
+        if moving_top:
+            y1 = min(y1 + dy_n, y2 - min_size)
+        if moving_bottom:
+            y2 = max(y1 + min_size, y2 + dy_n)
+        x1, y1, x2, y2 = self._snap_resize_edges(
+            x1, y1, x2, y2,
+            moving_left=moving_left, moving_right=moving_right,
+            moving_top=moving_top, moving_bottom=moving_bottom,
+            exclude_kind="panel", exclude_idx=self._panel_selected_idx,
+            min_size=min_size, shift_held=shift_held,
+        )
+        p.x_ratio = max(0.0, x1)
+        p.y_ratio = max(0.0, y1)
+        p.w_ratio = min(1.0, x2) - p.x_ratio
+        p.h_ratio = min(1.0, y2) - p.y_ratio
+
+    # ─── 子场景引用管理 ─────────────────────────────────
+
+    def set_subscene_refs(self, refs: list[SubsceneRef]):
+        self._subscene_refs, self._hidden_subscene_refs = self._split_by_filter(
+            [SubsceneRef.from_dict(r.to_dict()) for r in refs])
+        self._subscene_selected_idx = -1
+        self.update()
+
+    def get_subscene_refs(self) -> list[SubsceneRef]:
+        return [SubsceneRef.from_dict(r.to_dict())
+                for r in self._subscene_refs + self._hidden_subscene_refs]
+
+    def set_subscene_contents(self, contents: dict[str, dict[str, list]]):
+        self._subscene_contents = contents
+        self.update()
+
+    def select_subscene_ref_by_key(self, key: str):
+        self._subscene_selected_idx = next(
+            (i for i, r in enumerate(self._subscene_refs) if r.key == key), -1)
+        if self._subscene_selected_idx >= 0:
+            self._selected_idx = -1
+            self._field_selected = False
+            self._panel_selected_idx = -1
+        self.update()
+
+    def begin_place_subscene_ref(self, ref_def):
+        self._pending_subscene_ref_def = ref_def
+        self._subscene_drag_start = None
+        self._subscene_drag_current = None
+        self.setCursor(Qt.CursorShape.CrossCursor)
+        self.setFocus()
+        self.update()
+
+    def cancel_subscene_ref_place(self):
+        self._pending_subscene_ref_def = None
+        self._subscene_drag_start = None
+        self._subscene_drag_current = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self.update()
+
+    def _subscene_ref_rect_widget(self, ref: SubsceneRef) -> QRectF:
+        return self._region_rect_widget(ref)  # geometry 与 Region 相同
+
+    def _hit_subscene_ref_test(self, pos: QPointF):
+        if self._subscene_selected_idx >= 0:
+            ref = self._subscene_refs[self._subscene_selected_idx]
+            handle = self._hit_handle(ref, pos)
+            if handle is not None:
+                return self._subscene_selected_idx, handle
+        for i in range(len(self._subscene_refs) - 1, -1, -1):
+            if self._subscene_ref_rect_widget(self._subscene_refs[i]).contains(pos):
+                return i, None
+        return -1, None
+
+    def _notify_subscene_ref_changed(self):
+        if self.on_subscene_ref_changed:
+            self.on_subscene_ref_changed()
+
+    def focus_canvas(self):
+        """把当前画布裁剪区域按宽或高完整填入显示区。"""
+        if not self._pixmap or self.width() <= 0 or self.height() <= 0:
+            return
+        c = self._canvas_config
+        crop_w = max(1.0, self._img_w * c.w_ratio)
+        crop_h = max(1.0, self._img_h * c.h_ratio)
+        scale = min(self.width() / crop_w, self.height() / crop_h)
+        self._zoom = max(0.1, scale / max(self._base_scale, 1e-9))
+        full_w, full_h = self._img_w * scale, self._img_h * scale
+        x = (self.width() - crop_w * scale) / 2 - c.x_ratio * full_w
+        y = (self.height() - crop_h * scale) / 2 - c.y_ratio * full_h
+        self._display_rect = QRectF(x, y, full_w, full_h)
+        self.update()
 
     # ─── 模式切换 ───────────────────────────────────
 
@@ -553,6 +670,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
 
         # 绘制 panel（在 point/arrow 之下，region 之上）
         self._draw_panels(painter)
+        self._draw_subscene_refs(painter)
 
         # 绘制 panel 放置模式的拖拽预览矩形
         if self._panel_drag_start is not None and self._panel_drag_current is not None:
@@ -575,7 +693,68 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
                         label,
                     )
 
+        if self._subscene_drag_start is not None and self._subscene_drag_current is not None:
+            preview = QRectF(self._subscene_drag_start, self._subscene_drag_current).normalized()
+            painter.setPen(QPen(QColor(80, 220, 255), 2, Qt.PenStyle.DashLine))
+            painter.setBrush(QColor(80, 220, 255, 35))
+            painter.drawRect(preview)
+
         painter.end()
+
+    def _draw_subscene_refs(self, painter: QPainter):
+        for index, ref in enumerate(self._subscene_refs):
+            rect = self._subscene_ref_rect_widget(ref)
+            if rect.width() < 1 or rect.height() < 1:
+                continue
+            # 内部结构只读：使用变换后的父画布坐标绘制细线，不进入命中列表。
+            content = self._subscene_contents.get(ref.key, {})
+            for child in content.get("regions", []):
+                virtual = Region(
+                    key=child.key,
+                    x_ratio=ref.x_ratio + child.x_ratio * ref.w_ratio,
+                    y_ratio=ref.y_ratio + child.y_ratio * ref.h_ratio,
+                    w_ratio=child.w_ratio * ref.w_ratio,
+                    h_ratio=child.h_ratio * ref.h_ratio,
+                )
+                child_rect = self._region_rect_widget(virtual)
+                painter.setPen(QPen(QColor(120, 220, 255, 170), 1))
+                painter.setBrush(QColor(80, 180, 230, 25))
+                painter.drawRect(child_rect)
+            for child in content.get("panels", []):
+                virtual = Region(
+                    key=child.key,
+                    x_ratio=ref.x_ratio + child.x_ratio * ref.w_ratio,
+                    y_ratio=ref.y_ratio + child.y_ratio * ref.h_ratio,
+                    w_ratio=child.w_ratio * ref.w_ratio,
+                    h_ratio=child.h_ratio * ref.h_ratio,
+                )
+                painter.setPen(QPen(QColor(160, 120, 255, 170), 1,
+                                    Qt.PenStyle.DashLine))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRect(self._region_rect_widget(virtual))
+            for child in content.get("points", []):
+                cx = ref.x_ratio + child.cx_ratio * ref.w_ratio
+                cy = ref.y_ratio + child.cy_ratio * ref.h_ratio
+                center = self._canvas_norm_center_widget(cx, cy)
+                painter.setPen(QPen(QColor(120, 255, 180, 200), 2))
+                painter.setBrush(QColor(120, 255, 180, 80))
+                painter.drawEllipse(center, 3, 3)
+            selected = index == self._subscene_selected_idx
+            painter.setPen(QPen(QColor(255, 255, 0) if selected else QColor(40, 200, 255),
+                                3 if selected else 2))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(rect)
+            ref_def = get_subscene_ref_def(self._scene_key, ref.key)
+            painter.setPen(QColor(255, 255, 255))
+            painter.drawText(rect.adjusted(4, 2, -4, -2),
+                             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+                             ref_def.name if ref_def else ref.key)
+            if selected:
+                painter.setBrush(QColor(255, 255, 0))
+                for center in self._get_handle_positions(ref).values():
+                    painter.drawRect(QRectF(center.x() - HANDLE_SIZE,
+                                            center.y() - HANDLE_SIZE,
+                                            HANDLE_SIZE * 2, HANDLE_SIZE * 2))
 
     def _draw_placeholder(self, painter: QPainter):
         """无图片时绘制占位提示"""

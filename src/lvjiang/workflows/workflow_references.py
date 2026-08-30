@@ -34,6 +34,7 @@ from .grammar.ast_nodes import (
     Recognize,
     Scan,
     Scroll,
+    SubsceneEntityRef,
     Try,
     UntilLoop,
     WaitStable,
@@ -43,6 +44,8 @@ from .grammar.ast_nodes import (
 # 引用类别 → 需要在布局中查找的对象类型说明（错误提示用）
 KIND_LABELS = {
     "click_target": tr("区域/坐标点/面板"),
+    "move_target": tr("区域/坐标点/面板"),
+    "scroll_target": tr("区域/坐标点/面板"),
     "drag_target": tr("方向/区域"),
     "drag_grid_target": tr("面板/区域"),
     "arrow": tr("方向"),
@@ -70,6 +73,8 @@ class RefUse:
     kind: str
     line_no: int
     source: str = ""
+    reference: str | None = None
+    is_subscene: bool = False
 
 
 def _static_key(node) -> str | None:
@@ -87,10 +92,21 @@ def _add(acc: list[RefUse], scene, key, kind: str, line: int) -> None:
         acc.append(RefUse(scene, _static_key(key), kind, line))
 
 
+def _add_subscene(acc: list[RefUse], node: SubsceneEntityRef,
+                  kind: str, line: int) -> None:
+    reference = _static_key(node.reference)
+    entity = _static_key(node.entity)
+    if isinstance(node.scene, str) and node.scene:
+        acc.append(RefUse(node.scene, entity, kind, line,
+                          reference=reference, is_subscene=True))
+
+
 def _collect_from_expr(node, acc: list[RefUse], line: int) -> None:
     """递归遍历表达式节点，收集其中的 EntityRef（用于赋值与算术上下文）"""
     if isinstance(node, EntityRef):
         _add(acc, node.scene, node.entity, "expr_ref", line)
+    elif isinstance(node, SubsceneEntityRef):
+        _add_subscene(acc, node, "expr_ref", line)
     elif isinstance(node, ArithOp):
         _collect_from_expr(node.left, acc, line)
         _collect_from_expr(node.right, acc, line)
@@ -106,18 +122,24 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
         if isinstance(target, EntityRef):
             # click_any 先查 region 再查 point 再查 panel
             _add(acc, target.scene, target.entity, "click_target", line)
+        elif isinstance(target, SubsceneEntityRef):
+            _add_subscene(acc, target, "click_target", line)
         elif isinstance(target, PanelRef):
             _add(acc, target.scene, target.panel, "panel", line)
     elif isinstance(stmt, Move):
         target = stmt.target
         if isinstance(target, EntityRef):
             _add(acc, target.scene, target.entity, "move_target", line)
+        elif isinstance(target, SubsceneEntityRef):
+            _add_subscene(acc, target, "move_target", line)
         elif isinstance(target, PanelRef):
             _add(acc, target.scene, target.panel, "panel", line)
     elif isinstance(stmt, Scroll):
         target = stmt.target
         if isinstance(target, EntityRef):
             _add(acc, target.scene, target.entity, "scroll_target", line)
+        elif isinstance(target, SubsceneEntityRef):
+            _add_subscene(acc, target, "scroll_target", line)
         elif isinstance(target, PanelRef):
             _add(acc, target.scene, target.panel, "panel", line)
     elif isinstance(stmt, Drag):
@@ -148,6 +170,8 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
                     _add(acc, scene_ref.scene, field, kind, line)
             else:
                 _add(acc, scene_ref.scene, None, "region", line)
+        elif isinstance(scene_ref, SubsceneEntityRef):
+            _add_subscene(acc, scene_ref, "scan", line)
     elif isinstance(stmt, Find):
         # find 指令的搜索区域（若有）需要校验绑定
         # 支持 region 和 panel（两者对 find 等价，都提供矩形裁剪区域）

@@ -49,7 +49,7 @@ end
 
 # 同时扫描页面标题和“当周获取号令”，避免单个标题区域偶发识别失败。
 def is_in_haoling_page()
-   scan [activity_jianghu].[label_0, haoling_of_week] as $found by contains "号令"
+   scan [activity_jianghu].[label_0, haoling_label] as $found by contains "号令"
    if $found
        return 1
    else

@@ -1,0 +1,9 @@
+content_version: 1
+key: general_chat
+name: 对话
+regions:
+- key: chat_area
+  name: 对话区域
+  type: func
+  is_text: true
+  is_clickable: true

@@ -161,10 +161,32 @@ class TuningRuleManager:
         """原始 YAML dict 的深拷贝（UI 编辑用）"""
         return copy.deepcopy(self._raw.get(key) or {})
 
+    def rule_rel_path(self, key: str) -> str:
+        """规则实体在配置层里的相对路径"""
+        return self._rel(self._files.get(key) or f"{key}.yaml")
+
     def describe_rule_version(self, key: str):
         """返回规则实体来源与版本，供配置页展示。"""
-        filename = self._files.get(key) or f"{key}.yaml"
-        return self._resolver.describe_entity(self._rel(filename))
+        return self._resolver.describe_entity(self.rule_rel_path(key))
+
+    def list_rule_versions(self, key: str):
+        """返回规则在本地、远程、系统各层现存的版本。"""
+        return self._resolver.list_entity_origins(self.rule_rel_path(key))
+
+    def system_save_override(self, key: str):
+        """开发模式写 system 后仍由其他层生效时，返回该来源。
+
+        local 恒高于 system；remote 在版本更新时也会顶替 system。两者都会
+        让“已保存并生效”成为假话，不能只检查 remote。
+        """
+        from lvjiang.core.config.resolver import LAYER_SYSTEM
+
+        if not self._resolver.is_dev_mode():
+            return None      # 用户模式写 local，local 恒赢，不存在这个问题
+        if self._resolver.system_dir == self._resolver.local_dir:
+            return None      # 测试/孤立目录采用单层直写语义
+        origin = self._resolver.describe_entity(self.rule_rel_path(key))
+        return origin if origin.layer and origin.layer != LAYER_SYSTEM else None
 
     def can_bump_rule_version(self) -> bool:
         return self._resolver.is_dev_mode()

@@ -602,9 +602,70 @@ class TestSaveAndRaw:
         assert versioning.read_version(rules / "t1.yaml") == 1
         assert mgr.get_rule("t1").name == "远程规则"
 
+        # 普通保存写进 system 了，但线上版本更高、reload 读回的仍是线上那份，
+        # 规则实际没生效。UI 必须能问出这个状态，否则只会报「已保存并生效」，
+        # 作者对着没变化的界面白排查。
+        override = mgr.system_save_override("t1")
+        assert override is not None
+        assert (override.layer, override.version) == ("remote", 3)
+
         assert mgr.bump_rule_version("t1", edited) == 4
         assert versioning.read_version(rules / "t1.yaml") == 4
         assert mgr.get_rule("t1").name == "普通保存"
+        assert mgr.system_save_override("t1") is None      # 提升后真生效了
+
+    def test_not_superseded_without_remote(self, tmp_path):
+        mgr = TuningRuleManager(rules_dir=tmp_path)
+        mgr.create_rule("plain", "普通规则")
+        assert mgr.system_save_override("plain") is None
+
+    def test_dev_system_save_reports_local_override(self, tmp_path):
+        system, local, remote = (tmp_path / n for n in ("system", "local", "remote"))
+        for root, name in ((system, "系统规则"), (local, "本地规则")):
+            directory = root / "yysls" / "tuning_rules"
+            directory.mkdir(parents=True)
+            (directory / "t1.yaml").write_text(
+                yaml.dump({"content_version": 1, **minimal_rule(name=name)},
+                          allow_unicode=True, sort_keys=False),
+                encoding="utf-8")
+        scratch = tmp_path / "scratch"
+        scratch.mkdir()
+        mgr = TuningRuleManager(rules_dir=scratch)
+        mgr._resolver = ConfigResolver(  # type: ignore[attr-defined]
+            system_dir=system, local_dir=local, remote_dir=remote,
+            dev_mode=True)
+        mgr._rel_dir = "yysls/tuning_rules"  # type: ignore[attr-defined]
+        mgr.reload()
+
+        override = mgr.system_save_override("t1")
+        assert override is not None
+        assert (override.layer, override.version) == ("local", 1)
+
+    def test_user_mode_never_reports_superseded(self, tmp_path, monkeypatch):
+        """用户模式写的是 local 影子，恒为最高优先级，不存在被顶替的问题"""
+        monkeypatch.setitem(
+            versioning.VERSIONED_DIRS,
+            "yysls/tuning_rules",
+            versioning.VersionedDir(
+                "yysls/tuning_rules", "*.yaml", 1, allow_remote_new=True),
+        )
+        system, local, remote = (tmp_path / n for n in ("system", "local", "remote"))
+        for root, ver, name in ((system, 1, "系统规则"), (remote, 3, "远程规则")):
+            d = root / "yysls" / "tuning_rules"
+            d.mkdir(parents=True)
+            (d / "t1.yaml").write_text(
+                yaml.dump({"content_version": ver, **minimal_rule(name=name)},
+                          allow_unicode=True, sort_keys=False),
+                encoding="utf-8")
+        scratch = tmp_path / "scratch"
+        scratch.mkdir()
+        mgr = TuningRuleManager(rules_dir=scratch)
+        mgr._resolver = ConfigResolver(  # type: ignore[attr-defined]
+            system_dir=system, local_dir=local, remote_dir=remote,
+            dev_mode=False)
+        mgr._rel_dir = "yysls/tuning_rules"  # type: ignore[attr-defined]
+        mgr.reload()
+        assert mgr.system_save_override("t1") is None
 
 
 # ─── 创建与删除 ────────────────────────────────────────────

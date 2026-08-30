@@ -12,8 +12,17 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ...core.config.resolver import get_resolver
-from ...core.layout_manager import copy_screenshots, delete_screenshots
+from ...core.config.resolver import (
+    LAYER_LOCAL,
+    LAYER_SYSTEM,
+    EntityOrigin,
+    get_resolver,
+)
+from ...core.layout_manager import (
+    copy_screenshots,
+    delete_screenshots,
+    scene_layout_rels,
+)
 from ...core.layout_models import Layout
 from ...core.scene_registry import get_registry
 from ...i18n import tr
@@ -100,6 +109,49 @@ class LayoutOpsMixin:
                     self._inherit_label.hide()
             else:
                 self._inherit_label.hide()
+
+    def _system_save_overrides(
+            self, layout_name: str,
+            written: set[str]) -> dict[str, EntityOrigin]:
+        """返回开发模式写入 system 后仍在生效的更高优先级副本。
+
+        同时覆盖 local 与 remote 两种情况，并经批量路径入口只解析一次
+        ``layouts.yaml``。用户模式写入 local，本身就是最高优先级，无需提示。
+        """
+        resolver = get_resolver()
+        if not resolver.is_dev_mode() or not written:
+            return {}
+        paths = scene_layout_rels(layout_name, sorted(written))
+        result = {}
+        for scene_key, rel_path in paths.items():
+            origin = resolver.describe_entity(rel_path)
+            if origin.layer and origin.layer != LAYER_SYSTEM:
+                result[scene_key] = origin
+        return result
+
+    def _sync_loaded_tabs_to_current_layout(self) -> None:
+        """把已创建编辑器里的最新数据合并回完整 Layout 快照。"""
+        if self._current_layout is None:
+            return
+        current_tab = self._current_scene_tab() or next(
+            iter(self._tabs.values()), None)
+        if current_tab is not None:
+            self._current_layout.set_canvas(current_tab.get_canvas_config())
+        for scene_key, tab in self._tabs.items():
+            self._current_layout.set_scene_regions(scene_key, tab.get_regions())
+            self._current_layout.set_scene_points(scene_key, tab.get_points())
+            self._current_layout.set_scene_arrows(scene_key, tab.get_arrows())
+            self._current_layout.set_scene_panels(scene_key, tab.get_panels())
+
+    def _clone_current_layout(self, name: str) -> Layout | None:
+        """克隆当前完整布局；未访问场景继续来自内存中的 Layout 快照。"""
+        if self._current_layout is None:
+            return None
+        self._sync_loaded_tabs_to_current_layout()
+        clone = Layout.from_dict(name, self._current_layout.to_dict())
+        clone.desc = self._current_layout.desc
+        clone.name = name
+        return clone
 
     def _confirm_discard_changes(self, action: str) -> bool:
         """存在未保存修改时弹窗确认
@@ -203,16 +255,7 @@ class LayoutOpsMixin:
             self._status_bar.showMessage(tr("没有已加载的布局"))
             return
         name = self._current_layout.name
-        # 画布配置从当前激活 Tab 获取（用户编辑的是当前 Tab 的画布）
-        current_tab = self._current_scene_tab() or next(iter(self._tabs.values()), None)
-        if current_tab is not None:
-            self._current_layout.set_canvas(current_tab.get_canvas_config())
-        # 从所有 Tab 收集数据到 Layout 对象（内存操作，始终全量）
-        for scene_key, tab in self._tabs.items():
-            self._current_layout.set_scene_regions(scene_key, tab.get_regions())
-            self._current_layout.set_scene_points(scene_key, tab.get_points())
-            self._current_layout.set_scene_arrows(scene_key, tab.get_arrows())
-            self._current_layout.set_scene_panels(scene_key, tab.get_panels())
+        self._sync_loaded_tabs_to_current_layout()
         # 增量写盘：只写变更的场景文件。
         #
         # 恒传集合，**不能在没有脏场景时传 None** —— save_layout 的 None 是
@@ -252,10 +295,27 @@ class LayoutOpsMixin:
         version_count = len(layout_versions) + len(scene_versions)
         if version_count:
             saved_info += tr("，提升 {count} 项版本").format(count=version_count)
-        self._status_bar.showMessage(
-            f"已保存布局「{name}」（{saved_info}），"
-            f"共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向 / {total_pn} 个面板"
-        )
+        overrides = self._system_save_overrides(name, changed)
+        if overrides:
+            local_scenes = [key for key, origin in overrides.items()
+                            if origin.layer == LAYER_LOCAL]
+            remote_scenes = [key for key, origin in overrides.items()
+                             if origin.layer != LAYER_LOCAL]
+            reasons = []
+            if local_scenes:
+                reasons.append(tr("{scenes} 仍由本地副本生效，请先还原本地覆盖")
+                               .format(scenes="、".join(local_scenes)))
+            if remote_scenes:
+                reasons.append(tr("{scenes} 仍由远程版本生效，请提升版本后再保存")
+                               .format(scenes="、".join(remote_scenes)))
+            self._status_bar.showMessage(tr(
+                "已保存布局「{name}」到系统层，但尚未生效：{reasons}"
+            ).format(name=name, reasons="；".join(reasons)))
+        else:
+            self._status_bar.showMessage(
+                f"已保存布局「{name}」（{saved_info}），"
+                f"共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向 / {total_pn} 个面板"
+            )
         self._mark_all_scenes_clean()
         # 显式版本提升随保存落盘，标识要跟着刷新。
         for tab in self._tabs.values():
@@ -364,23 +424,11 @@ class LayoutOpsMixin:
             logger.info(f"别名布局已创建: {name} (extends {extends_name})")
         else:
             # 正常另存为：独立副本
-            current_tab = self._current_scene_tab() or next(iter(self._tabs.values()), None)
-            self._current_layout.set_canvas(
-                current_tab.get_canvas_config()
-                if current_tab is not None
-                else self._current_layout.get_canvas()
-            )
-            for scene_key, tab in self._tabs.items():
-                self._current_layout.set_scene_regions(scene_key, tab.get_regions())
-                self._current_layout.set_scene_points(scene_key, tab.get_points())
-                self._current_layout.set_scene_arrows(scene_key, tab.get_arrows())
-                self._current_layout.set_scene_panels(scene_key, tab.get_panels())
-
             # 未访问过的场景没有 SceneTab，但完整数据始终保留在当前 Layout。
             # 从它克隆，不能只复制已创建的控件，否则另存为会静默丢场景。
-            temp = Layout.from_dict(name, self._current_layout.to_dict())
-            temp.desc = self._current_layout.desc
-            temp.name = name
+            temp = self._clone_current_layout(name)
+            if temp is None:
+                return
             if not self._manager.save_layout(temp):
                 QMessageBox.warning(self, tr("另存为失败"), tr("布局写入失败，请检查日志。"))
                 return

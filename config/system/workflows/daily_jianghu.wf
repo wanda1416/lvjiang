@@ -1,5 +1,7 @@
 #% name: 每日江湖号令
 #% env: [android, desktop]
+#% note: |-
+#%   请准备好'黄泉酿'并收藏
 #% parameters:
 #%   - name: max_refresh
 #%     label: 单任务最大刷新次数
@@ -10,6 +12,11 @@
 #%     label: 领取奖励
 #%     type: bool
 #%     default: false
+#%   - name: max_claim_reputation
+#%     label: 最大领取声望
+#%     type: number
+#%     default: 1500
+#%     min: 0
 #
 # 江湖号令任务刷新流程
 #
@@ -26,15 +33,20 @@
 #
 # 参数：
 #   max_refresh — 单个任务最大刷新次数，默认 50
-#   claim_reward — 是否领取奖励，默认 false；勾选后每个任务完成
-#                  切到下一个 label 前再点一次领取。第六个任务若落在
-#                  桌面（合影/看报），会先返回号令页领取再由收尾退回桌面
+#   claim_reward — 是否领取奖励，默认 false
+#   max_claim_reputation — 最大领取声望，默认 1500；仅当任务确实完成且
+#                          当周已领取声望小于该值时才领奖
 
 default $max_refresh = 50
 default $claim_reward = false
+default $max_claim_reputation = 1500
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
+
+# 子过程变量表隔离，def 内读不到顶层 $claim_reward，
+# 写入 context 供各动作子过程读取
+eval context.claim_reward = $claim_reward
 
 # 目标任务关键词列表
 eval $targets = ["合影", "换装", "情境", "东方", "醉意", "觉障林"]
@@ -45,6 +57,11 @@ call $haoling_ok = ensure_at_haoling("起始", 1)
 if $haoling_ok < 0
    return -1
 end
+
+# 首次进入读取一次：识别到有效值即写入 profile，无效 OCR 记为 -1，
+# 本轮后续不再尝试领奖。
+# 此后只有领奖会改变该值，故「读取即写入」足以保证实时与存储一致。
+call $haoling_of_week = sync_haoling_of_week()
 
 for idx in ["1", "2", "3", "4", "5", "6"]
 
@@ -59,15 +76,30 @@ for idx in ["1", "2", "3", "4", "5", "6"]
    # 动态构造本组的子场景引用 key
    eval $label = "card_" + $idx
 
-   # 先识别当前任务是否已是目标任务
-   scan [activity_jianghu].$label.[label] as $hit by contains_any $targets
+   # 每轮先扫描一次，完成判定和后续任务匹配共用同一份文字结果。
+   scan [activity_jianghu].$label.[label] as $text_result
+   call $task_completed = is_task_completed($text_result)
+   if $task_completed
+      log "任务 " + $idx + " 在处理前已经完成，跳过任务切换与执行"
+      if $claim_reward
+         call $haoling_of_week = claim_completed_reward(
+            $label, $idx, $haoling_of_week, $max_claim_reputation)
+      end
+      continue
+   end
+
+   # 复用上面的 OCR 文字判断是否为目标任务，不重复扫描。
+   eval $task_text = $text_result.label
+   call $hit = is_target_task($task_text, $targets)
    if $hit
       log "任务 " + $idx + " 已是目标任务"
    else
       # 不断刷新直到命中目标任务
       loop $max_refresh
          click [activity_jianghu].$label.[refresh] after wait stable @page_refresh least 0.3
-         scan [activity_jianghu].$label.[label] as $hit by contains_any $targets
+         scan [activity_jianghu].$label.[label] as $text_result
+         eval $task_text = $text_result.label
+         call $hit = is_target_task($task_text, $targets)
          if $hit
             log "任务 " + $idx + " 刷新命中目标任务"
             break
@@ -80,8 +112,6 @@ for idx in ["1", "2", "3", "4", "5", "6"]
 
    # 命中目标任务 → 读取任务文本，分发执行对应动作
    if $hit
-      scan [activity_jianghu].$label.[label] as $text_result
-      eval $task_text = $text_result.label
       log "任务 " + $idx + " 命中：" + $task_text
 
       if $task_text contains "换装"
@@ -103,10 +133,18 @@ for idx in ["1", "2", "3", "4", "5", "6"]
          call action_juezhanglin($label)
       end
 
-      # 领取奖励（勾选时）：动作完成后、切到下一个 label 前再点一次任务标签
-      # 觉障林未实现，点击会卡页面，无论是否勾选均跳过领奖
+      # 领取奖励（勾选时）：先确认任务文字已经消失。完成后的卡片会变成
+      # 领奖提示，因此 label 必然为空；仍有文字说明任务没有真正完成。
+      # 觉障林未实现，点击会卡页面，无论是否勾选均跳过领奖。
       if $claim_reward and not $task_text contains "觉障林"
-         call claim_reward($label, $idx)
+         scan [activity_jianghu].$label.[label] as $text_result
+         call $task_completed = is_task_completed($text_result)
+         if $task_completed
+            call $haoling_of_week = claim_completed_reward(
+               $label, $idx, $haoling_of_week, $max_claim_reputation)
+         else
+            log "任务 " + $idx + " 执行后标签仍有文字，判定未真正完成，跳过领奖"
+         end
       end
    end
 
@@ -121,6 +159,85 @@ if $at_haoling
    click [activity_jianghu].[back] after wait @step_interval
    click [school_main].[back] after wait @step_interval
    click [game_menu_page].[back] after wait @step_interval
+end
+
+# 判断一次扫描结果是否代表任务已经完成。
+# 完成后任务文字消失，label 为空并显示领奖提示；所有调用点统一走这里，
+# 避免处理前跳过与动作后领奖使用不同判定。
+# OCR 可能只残留少量乱码/碎字，5 个字符以内（含）视同空文本。
+def is_task_completed($text_result)
+   eval $text = trim($text_result.label)
+   if len($text) <= 5
+      return 1
+   end
+   return 0
+end
+
+# 判断任务文字是否包含任一目标关键词。传入已扫描出的文字，避免为了
+# contains_any 再次 OCR 同一张卡片。
+def is_target_task($text, $targets)
+   for target in $targets
+      if $text contains $target
+         return 1
+      end
+   end
+   return 0
+end
+
+# 对已经确认完成的任务执行声望上限检查与领奖，返回更新后的当周声望。
+# 返回 -1 会传回主循环，使后续卡片继续跳过领奖。
+def claim_completed_reward($label, $idx, $current, $maximum)
+   if $current < 0
+      log "任务 " + $idx + " 已完成，但当周声望识别无效，跳过领奖"
+      return $current
+   end
+   if $current < $maximum
+      call claim_reward($label, $idx)
+      # 领奖改变了当周累计值，立即刷新并写入 profile；识别失败转为 -1，
+      # 防止后续任务在未知额度下继续领奖。
+      call $current = sync_haoling_of_week()
+      return $current
+   end
+   # $current 来自上一次 sync_haoling_of_week，当时已写入 profile，
+   # 未领奖即无变化，无需重复写
+   log "当周已领取声望 " + $current + "，达到最大领取声望 " + $maximum + "，跳过领奖"
+   return $current
+end
+
+# 读取号令页的当周累计声望，识别成功时同步写入 profile。
+# 这是当周声望的**唯一读取入口**，读取即写入：只要识别到有效值且有
+# profile 定义就落盘，避免只有实际领奖时才更新，导致未领奖、已达上限
+# 等分支下 profile 停留在旧值（实时与存储不一致）。
+# 返回：有效的非负整数；识别失败时返回 -1（不写 profile）。
+# OCR 可能带乱码，用 extract_int 提取其中的完整整数；0 是合法值，
+# 只有没有解析出整数时才视为失败。
+def sync_haoling_of_week()
+   scan [activity_jianghu].[haoling_of_week] as $result
+   eval $value = extract_int($result.haoling_of_week)
+   if $value < 0
+      log "当周已领取声望识别失败: " + $result.haoling_of_week + "，本轮后续跳过领奖"
+      return -1
+   end
+   log "当周已领取声望: " + $value
+   call write_haoling_profile($value)
+   return $value
+end
+
+# 只更新用户 profile 中已经声明的 haoling_of_week；没有该 key 的用户
+# 保持原配置不变，不创建隐式字段。
+# 由 sync_haoling_of_week 在每次识别成功后调用，调用方无需各自判断。
+def write_haoling_profile($value)
+   if $value < 0
+      return 0
+   end
+   eval $model = profile_model("haoling_of_week")
+   if not $model
+      log "profile 未定义 haoling_of_week，跳过写入"
+      return 0
+   end
+   eval profile_set("haoling_of_week", $value)
+   log "已写入 profile haoling_of_week: " + $value
+   return 0
 end
 
 # 校验当前是否位于江湖号令页，不在则先设法回到号令页再校验一次。
@@ -152,18 +269,14 @@ def ensure_at_haoling($idx, $auto_nav)
    return -1
 end
 
-# 领取奖励：动作完成后再次点击任务标签领取
+# 领取奖励：动作完成后再次点击任务标签领取。
 # 调用时必定已在号令页（状态由各动作保证：非末个任务动作结束后
 # 主动返回；末个任务需领奖时动作内也已返回），无需再扫描定位。
-# 领奖后会弹出一个奖励窗口：末个任务领完即进入收尾，
-# 需多点一次返回先关闭弹窗，收尾才能顺利退回游戏首页
+# 领奖后弹出全屏奖励窗口，点一次空白区域关闭，否则遮挡下一轮页面校验。
 def claim_reward($label, $idx)
    click [activity_jianghu].$label.[label] after wait @step_interval
    log "任务 " + $idx + " 奖励已领取"
-   if $idx equals "6"
-      click [activity_jianghu].[back] after wait @step_interval
-      log "末个任务领奖弹出奖励窗口，多点一次返回关闭"
-   end
+   click [activity_jianghu].[space] after wait @step_interval
 end
 
 # ─── 各活动动作过程 ────────────────────────────────────────
@@ -202,7 +315,7 @@ def action_heying($label, $idx)
    end
 
    # 拍照结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
-   if $idx equals "6" and not $claim_reward
+   if $idx equals "6" and not context.claim_reward
       log "末个任务合影完成且无需领奖，留在桌面"
    else
       call back_to_haoling()
@@ -309,7 +422,7 @@ def action_dongfang($label, $idx)
    env:"desktop" -> press "ESC" after wait @step_interval
 
    # 看报结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
-   if $idx equals "6" and not $claim_reward
+   if $idx equals "6" and not context.claim_reward
       log "末个任务看报完成且无需领奖，留在桌面"
    else
       call back_to_haoling()
@@ -388,7 +501,7 @@ def action_zuiyi($label, $idx)
    # ── 关闭背包，退回首页 ──
    call nav_back_to_main()
 
-   if $idx equals "6" and not $claim_reward
+   if $idx equals "6" and not context.claim_reward
       log "末个任务醉意完成且无需领奖，留在桌面"
    else
       call back_to_haoling()
@@ -400,6 +513,40 @@ def action_juezhanglin($label)
    log "觉障林动作暂未实现"
 end
 
+# 跳转到多人模式：前置在菜单页。江湖号令需多人模式，
+# 识别到单人模式则经模式选择页切换并踏入，轮询等待回到游戏主页；
+# 已是多人模式则不动作。
+# 后置：切换过则在游戏主页（调用方需重新打开菜单），未切换仍在菜单页
+def switch_to_multi_mode()
+   scan [game_menu_page].[mode] as $is_single by contains "单人"
+   if not $is_single
+      return 0
+   end
+
+   log "检测到单人模式，切换至多人模式"
+   click [game_menu_page].[mode] after wait @step_interval
+   click [game_menu_page].[mp_mode] after wait @step_interval
+   click [game_menu_page].[enter_mode] after wait @page_refresh
+
+   # 踏入后每 2s 检测一次游戏主页，最多 10 次
+   eval $main_i = 0
+   eval $in_main = 0
+   loop while $main_i < 10
+      eval $main_i = $main_i + 1
+      wait 2
+      call $in_main = is_in_main_page()
+      if $in_main
+         log "已进入多人模式，回到游戏主页"
+         break
+      end
+   end
+   if not $in_main
+      log "等待 20s 仍未回到游戏主页"
+      eval pause("切换多人模式后未检测到游戏主页，请手动处理后点击确定")
+   end
+   return 0
+end
+
 # 首页 → 江湖号令页：菜单 → find 门派 → 门派首页 → find 江湖号令
 # 每步找不到时 pause 通知用户手动定位，用户点确定后重试一次
 def back_to_haoling()
@@ -408,6 +555,20 @@ def back_to_haoling()
       eval pause("打不开菜单页，请手动定位到菜单页后点击确定")
       call $in_menu = is_in_menu_page()
       if $in_menu < 1
+         return -1
+      end
+   end
+
+   # 首次打开菜单时检查游戏模式，识别到单人则切到多人模式；
+   # 切换后会回到游戏主页，需重新打开菜单；未切换则仍在菜单页，
+   # 无需再次导航。子过程变量表隔离，跨调用共享的标记存 context
+   # （每次顶层执行重置，下次运行会重新检查）
+   if not context.mode_checked
+      eval context.mode_checked = true
+      call switch_to_multi_mode()
+      # 切换后落在游戏主页，重新打开菜单继续导航
+      call $nav_result = nav_main_to_menu()
+      if $nav_result < 0
          return -1
       end
    end

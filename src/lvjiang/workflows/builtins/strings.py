@@ -117,3 +117,38 @@ def _to_num(s):
     """
     result = to_number(s)
     return result if result is not None else 0
+
+
+_NUMBER_BOUNDARY_LEFT = r"(?<![\d.,，+\-])"
+_NUMBER_BOUNDARY_RIGHT = r"(?![\d.,，])"
+
+
+@builtin_func("extract_int")
+def _extract_int(s, *args) -> int:
+    """从文本中提取第一项非负整数（容忍数字之外的 OCR 乱码）。
+
+    小数、负数和带逗号分隔符的数字不按整数的一部分误提取；找不到
+    完整整数时返回 -1，使合法的 0 与解析失败保持可区分。
+    """
+    s = str(s) if s is not None else ""
+    match = re.search(
+        rf"{_NUMBER_BOUNDARY_LEFT}\d+{_NUMBER_BOUNDARY_RIGHT}", s,
+    )
+    return int(match.group(0)) if match else -1
+
+
+@builtin_func("extract_num")
+def _extract_num(s, *args) -> int | float:
+    """从文本中提取第一项非负数（整数或小数）。
+
+    找不到完整数字时返回 -1，使合法的 0 与解析失败保持可区分。
+    """
+    s = str(s) if s is not None else ""
+    match = re.search(
+        rf"{_NUMBER_BOUNDARY_LEFT}\d+(?:\.\d+)?{_NUMBER_BOUNDARY_RIGHT}",
+        s,
+    )
+    if not match:
+        return -1
+    text = match.group(0)
+    return float(text) if "." in text else int(text)

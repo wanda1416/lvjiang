@@ -10,48 +10,53 @@
 #   3. TODO: 后续补充货运具体操作
 
 import "subcall/page_detection.wf"
+import "subcall/navigation.wf"
+import "subcall/record/baiye_freight.wf"
 
 # ─── 导航：从首页到百业驻地 ─────────────────────────────
-click [game_main_page].[menu] after wait @step_interval
-
-scan [game_menu_page].[menu] as $menu_check by contains "菜单"
-if not $menu_check
-    eval pause("未进入菜单页，请手动导航后点击继续")
+call $nav_result = nav_main_to_menu()
+if $nav_result < 0
+    return -1
 end
 
 find [game_menu_page].[menu] as $found by contains "百业"
-if $found
-    click $found after wait stable @page_refresh
+
+if not $found
+    log "菜单中未找到「百业」入口"
+    eval notify("找不到百业入口，任务结束")
+    return -1
+end
+
+click $found after wait stable @page_refresh
+if env("android")
     click [baiye_main].[goto_baiye] after wait @page_refresh
+else
+    press "SPACE" after wait @page_refresh
+end
 
-    scan [general_control].[confirm] as $confirm by contains "确定"
-    if $confirm
+scan [general_control].[confirm] as $confirm by contains "确定"
+if $confirm
+    if env("android")
         click [general_control].[confirm] after wait @page_refresh
-
-        # 通过 check_in_baiye 检查是否抵达百业，最多等待 20s
-        eval $arrived = 0
-        loop 10
-            call $result = check_in_baiye()
-            if $result == 0
-                eval $arrived = 1
-                break
-            end
-            wait 2
-        end
-        if not $arrived
-            eval pause("等待进入百业驻地超时，请手动检查后点击继续")
-        end
-    else
-        log "找不到百业驻地入口确认弹窗，请手动进入百业驻地"
-        eval pause("请手动进入百业驻地后点击继续")
+    else 
+        press "SPACE" after wait @page_refresh
+    end
+    # 通过 check_in_baiye 检查是否抵达百业，最多等待 20s
+    eval $arrived = 0
+    loop 10
         call $result = check_in_baiye()
-        if $result != 0
-            eval pause("仍未检测到百业驻地，请确认页面状态后点击继续")
-        end
+        if $result == 0
+            eval $arrived = 1
+        break
+    end
+    wait @step_interval
+    end
+    if not $arrived
+        eval pause("等待进入百业驻地超时，请手动检查后点击继续")
     end
 else
-    log "菜单中未找到「百业」入口"
-    eval pause("请手动导航到百业驻地后点击继续")
+    log "找不到百业驻地入口确认弹窗，请手动进入百业驻地"
+    eval pause("请手动进入百业驻地后点击继续")
     call $result = check_in_baiye()
     if $result != 0
         eval pause("仍未检测到百业驻地，请确认页面状态后点击继续")
@@ -61,10 +66,32 @@ end
 log "已抵达百业驻地"
 
 # ─── TODO: 后续补充货运具体操作 ──────────────────────────
+if env("desktop")
+    call nav_home_to_freight()
+else
 
-# ─── 返回主页 ──────────────────────────────────────────
-click [baiye_main].[back] after wait @page_refresh
-click [game_menu_page].[back] after wait @page_refresh
+end
+
+# 和温无双开始对话
+find [general_chat].[chat_area] as $found by contains "温无双"
+
+if not $found
+    log error "找不到温无双对话"
+    return -1
+end
+
+env:"android" -> click $found
+env:"desktop" -> press "F"
+
+wait (5,6)
+
+env:"android" -> log "暂未实现"
+env:"desktop" -> press "F"
+
+
+
+
+
 log "百业货运流程结束"
 
 # ─── 检查是否抵达百业驻地 ──────────────────────────────

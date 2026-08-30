@@ -107,6 +107,24 @@ end
         assert run('eval $n = to_num($text)', {"text": "3.14"})["n"] == 3.14
         assert run('eval $n = to_num($text)', {"text": "not_a_number"})["n"] == 0.0
 
+    def test_extract_int(self):
+        """整数提取允许 0，并拒绝把小数或格式错误数字截成整数。"""
+        assert run('eval $n = extract_int($text)', {"text": "当周已获取 1234 声望"})["n"] == 1234
+        assert run('eval $n = extract_int($text)', {"text": "当周已获取 0 声望"})["n"] == 0
+        assert run('eval $n = extract_int($text)', {"text": "a1b23"})["n"] == 1
+        assert run('eval $n = extract_int($text)', {"text": "乱码o12.5x"})["n"] == -1
+        assert run('eval $n = extract_int($text)', {"text": "1,500"})["n"] == -1
+        assert run('eval $n = extract_int($text)', {"text": "没有任何数字"})["n"] == -1
+
+    def test_extract_num(self):
+        """通用数字提取接受整数和小数，并以 -1 表示失败。"""
+        assert run('eval $n = extract_num($text)', {"text": "当周已获取 1234 声望"})["n"] == 1234
+        assert run('eval $n = extract_num($text)', {"text": "数值为0"})["n"] == 0
+        assert run('eval $n = extract_num($text)', {"text": "乱码o12.5x"})["n"] == 12.5
+        assert run('eval $n = extract_num($text)', {"text": "a1b23"})["n"] == 1
+        assert run('eval $n = extract_num($text)', {"text": "没有任何数字"})["n"] == -1
+        assert run('eval $n = extract_num($text)', {"text": ""})["n"] == -1
+
     def test_split_with_for(self):
         code = '''eval $count = 0
 for item in split($csv, ",")

@@ -13,6 +13,7 @@ import pytest
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_file, parse_text
+from lvjiang.workflows.metadata import parse_metadata
 from lvjiang.workflows.workflow_references import collect_refs, collect_scene_keys
 
 # ─── 搜集单元测试 ─────────────────────────────────────────
@@ -180,9 +181,68 @@ def test_daily_jianghu_reuses_shared_page_detector():
     assert "scan [activity_jianghu].[label_0" not in daily_text
     assert "def is_in_haoling_page()" in detection_text
     assert (
-        'scan [activity_jianghu].[label_0, haoling_of_week] '
+        'scan [activity_jianghu].[label_0, haoling_label] '
         'as $found by contains "号令"'
     ) in detection_text
+
+
+def test_daily_jianghu_claim_reputation_guard():
+    """领奖必须受完成状态和声望上限约束；当周声望读取即写入 profile。"""
+    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    text = wf.read_text(encoding="utf-8")
+    metadata = parse_metadata(text)
+    parameters = {item["name"]: item for item in metadata["parameters"]}
+
+    assert parameters["max_claim_reputation"] == {
+        "name": "max_claim_reputation",
+        "label": "最大领取声望",
+        "type": "number",
+        "default": 1500,
+        "min": 0,
+    }
+    assert "default $max_claim_reputation = 1500" in text
+    # 声望只接受非负整数；0 合法，只有提取失败（< 0）才跳过领奖
+    assert "extract_int($result.haoling_of_week)" in text
+    assert "if $value < 0" in text
+    assert "return -1" in text
+    # 领奖后全屏奖励弹窗用号令页空白区域点击关闭，避免遮挡下一轮页面校验
+    claim_def = text[text.index("def claim_reward("):text.index("def claim_reward(") + 500]
+    assert "click [activity_jianghu].[space]" in claim_def
+
+    completed_call = "call $task_completed = is_task_completed($text_result)"
+    initial_scan = "scan [activity_jianghu].$label.[label] as $text_result"
+    target_call = "call $hit = is_target_task($task_text, $targets)"
+    assert "def is_task_completed($text_result)" in text
+    assert text.count(completed_call) == 2  # 处理前与动作后共用同一判定
+    assert text.index(initial_scan) < text.index(completed_call)
+    assert text.index(completed_call) < text.index(target_call)
+    assert "continue" in text[text.index(completed_call):text.index(target_call)]
+    assert "def is_target_task($text, $targets)" in text
+    assert "as $hit by contains_any $targets" not in text
+
+    # 当周声望「读取即写入」：唯一读取入口是 sync_haoling_of_week，它在识别
+    # 成功后直接落盘。若仍由各调用点自行 sync，未领奖 / 已达上限等分支就会
+    # 漏写，profile 停留在旧值，与实时值不一致。
+    assert "read_haoling_of_week" not in text  # 不得绕过唯一入口
+    assert text.count("call $haoling_of_week = sync_haoling_of_week()") == 1
+    # 起始进入即写入，不依赖后续是否领奖
+    assert text.index("call $haoling_of_week = sync_haoling_of_week()") < text.index(
+        "for idx in"
+    )
+    sync_proc = text.index("def sync_haoling_of_week(")
+    sync_body = text[sync_proc:sync_proc + 800]
+    assert "extract_int($result.haoling_of_week)" in sync_body
+    assert "if $value < 0" in sync_body
+    assert "call write_haoling_profile($value)" in sync_body
+    assert "return -1" in sync_body  # 识别失败不写 profile
+
+    claim_proc = text.index("def claim_completed_reward(")
+    limit = text.index("if $current < $maximum", claim_proc)
+    claim = text.index("call claim_reward($label, $idx)", claim_proc)
+    reread = text.index("call $current = sync_haoling_of_week()", claim_proc)
+    assert claim_proc < limit < claim < reread
+    assert 'eval $model = profile_model("haoling_of_week")' in text
+    assert 'eval profile_set("haoling_of_week", $value)' in text
 
 
 # ─── engine 启动期绑定校验（集成） ────────────────────────

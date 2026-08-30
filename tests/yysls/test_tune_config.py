@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QPushButton
+from PyQt6.QtWidgets import QApplication, QComboBox, QHeaderView, QPushButton
 
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
@@ -25,6 +25,9 @@ from lvjiang.apps.yysls.ui.tune_settings.behavior_pages import (
     ScanBehaviorPage,
     TuneBehaviorPage,
 )
+from lvjiang.apps.yysls.ui.tune_settings.material_config_page import (
+    MaterialConfigPage,
+)
 from lvjiang.apps.yysls.ui.tune_settings.rule_panel import RulePanel
 
 PROJECT_ROOT = Path(__file__).parents[2]
@@ -34,6 +37,16 @@ BASE_FILE = PROJECT_ROOT / "config" / "system" / "yysls" / "tune_config.yaml"
 
 ALL_KEYS = ["huiyi_general", "huixin_small", "huixin_big",
             "heal_pure", "heal_fire"]
+
+
+def _assert_combo_text_fits(combo: QComboBox, minimum: int = 0):
+    longest = max(
+        combo.fontMetrics().horizontalAdvance(combo.itemText(i))
+        for i in range(combo.count())
+    )
+    assert combo.minimumWidth() >= minimum
+    assert combo.minimumWidth() > longest
+    assert combo.view().minimumWidth() >= combo.minimumWidth()
 
 
 @pytest.fixture
@@ -114,6 +127,10 @@ class TestDialog:
         assert buttons
         assert all(button.styleSheet() for button in buttons)
 
+        # 基础规则 + 三大处理页的规则组选择必须完整显示中文名称。
+        for combo in [dialog._base_page._combo, *dialog._group_dropdowns]:
+            _assert_combo_text_fits(combo, 200)
+
     def test_lazy_placeholder_tracks_add_rename_delete(
             self, qtbot, monkeypatch):
         dialog = TuningRulesDialog()
@@ -139,6 +156,36 @@ class TestDialog:
 
 class TestBehaviorPages:
     """行为处理页 smoke：真实配置回填 + 变更即校验即保存"""
+
+    def test_all_dropdowns_keep_readable_width(self, qtbot,
+                                               tmp_group_manager):
+        scan = ScanBehaviorPage(
+            tmp_group_manager, "default", lambda _t, _e: None)
+        tune = TuneBehaviorPage(
+            tmp_group_manager, "default", lambda _t, _e: None)
+        material = MaterialConfigPage(
+            tmp_group_manager, "default", lambda _t, _e: None)
+        for page in (scan, tune, material):
+            qtbot.addWidget(page)
+
+        for combo in (scan._min_level_combo, scan._entry_combo,
+                      tune._exhausted_combo, material._stone_action):
+            _assert_combo_text_fits(combo)
+
+        for page in (scan, tune):
+            row = 0
+            for key in ("quality", "judge", "action"):
+                combo = page._table.cellWidget(row, page._ci[key])
+                _assert_combo_text_fits(combo)
+                assert (page._table.horizontalHeader().sectionResizeMode(
+                    page._ci[key])
+                    == QHeaderView.ResizeMode.ResizeToContents)
+
+        for col in (2, 3, 4, 5):
+            combo = material._table.cellWidget(0, col)
+            _assert_combo_text_fits(combo)
+            assert (material._table.horizontalHeader().sectionResizeMode(col)
+                    == QHeaderView.ResizeMode.ResizeToContents)
 
     def test_scan_page_entry_rating_roundtrip(self, qtbot,
                                                tmp_group_manager):

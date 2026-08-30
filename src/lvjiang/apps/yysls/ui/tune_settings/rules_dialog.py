@@ -43,6 +43,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tuning_group_manager,
     get_tuning_rule_manager,
 )
+from lvjiang.apps.yysls.ui.layout_helpers import fit_combo_to_contents
 from lvjiang.core.config.wf_configs import get_wf_config
 from lvjiang.ui.button_styles import apply_button_style
 
@@ -334,6 +335,7 @@ class TuningRulesDialog(QDialog):
             idx = combo.findData(group_key)
             if idx >= 0:
                 combo.setCurrentIndex(idx)
+            fit_combo_to_contents(combo, minimum=200)
             combo.blockSignals(False)
 
     def _on_group_dropdown_changed(self, idx: int, combo: QComboBox):

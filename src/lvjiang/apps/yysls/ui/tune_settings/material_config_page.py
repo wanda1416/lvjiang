@@ -46,6 +46,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     TuningGroup,
     TuningGroupManager,
 )
+from lvjiang.apps.yysls.ui.layout_helpers import fit_combo_to_contents
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
@@ -133,6 +134,7 @@ class MaterialConfigPage(QWidget):
             tr("询问是否继续：弹窗确认，继续则本次运行不再检查"))
         self._stone_action.currentIndexChanged.connect(
             lambda _i: self._apply())
+        fit_combo_to_contents(self._stone_action, minimum=140)
         stone_row.addWidget(self._stone_action)
         stone_row.addStretch()
         layout.addLayout(stone_row)
@@ -144,10 +146,13 @@ class MaterialConfigPage(QWidget):
             "全部不命中则不添加") + "）"))
         self._table = QTableWidget(0, len(_COLS))
         self._table.setHorizontalHeaderLabels([tr(c) for c in _COLS])
-        self._table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch)
+        header = self._table.horizontalHeader()
+        # 下拉列按内容宽度展示；首词条数值列吸收剩余空间。窗口不足时
+        # 表格自然出现横向滚动，不再把中文选项压到只剩箭头。
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         # 序号列固定宽度，隐藏原生行号
-        self._table.horizontalHeader().setSectionResizeMode(
+        header.setSectionResizeMode(
             _SEQ_COL, QHeaderView.ResizeMode.Fixed)
         self._table.setColumnWidth(_SEQ_COL, 32)
         self._table.verticalHeader().setVisible(False)
@@ -207,6 +212,7 @@ class MaterialConfigPage(QWidget):
         expect = QComboBox()
         for key in FOOD_EXPECT_KEYS:
             expect.addItem(RATING_LABELS.get(key, key), key)
+        fit_combo_to_contents(expect, minimum=88)
         expect.setCurrentIndex(max(expect.findData(rule.min_expect), 0))
         expect.currentIndexChanged.connect(lambda _i: self._apply())
         self._table.setCellWidget(row, 2, expect)
@@ -214,6 +220,7 @@ class MaterialConfigPage(QWidget):
         quality = QComboBox()
         for key in _QUALITY_KEYS:
             quality.addItem(QUALITY_LABELS.get(key, key), key)
+        fit_combo_to_contents(quality, minimum=88)
         quality.setCurrentIndex(max(quality.findData(rule.min_quality), 0))
         quality.currentIndexChanged.connect(lambda _i: self._apply())
         self._table.setCellWidget(row, 3, quality)
@@ -222,6 +229,7 @@ class MaterialConfigPage(QWidget):
         food.addItem(_NO_FOOD, "")
         for label in FOOD_LABELS:
             food.addItem(label, label)
+        fit_combo_to_contents(food, minimum=104)
         food.setCurrentIndex(max(food.findData(rule.food), 0))
         food.currentIndexChanged.connect(lambda _i: self._apply())
         self._table.setCellWidget(row, 4, food)
@@ -229,6 +237,7 @@ class MaterialConfigPage(QWidget):
         action = QComboBox()
         for key, label in INSUFFICIENT_LABELS.items():
             action.addItem(label, key)
+        fit_combo_to_contents(action, minimum=132)
         action.setCurrentIndex(max(action.findData(rule.on_insufficient), 0))
         action.currentIndexChanged.connect(lambda _i: self._apply())
         self._table.setCellWidget(row, 5, action)

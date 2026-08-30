@@ -67,6 +67,14 @@ class TuningRouteStrategy(ABC):
         """关闭当前装备详情；移动端无需额外动作。"""
         return None
 
+    def open_reset_dialog(self) -> None:
+        """打开重置调律弹窗；移动端点击现有按钮区域。"""
+        self._wf.click_region(self._wf.TUNE_SCENE, "reset_tune")
+
+    def confirm_reset(self, region: str) -> None:
+        """确认重置；移动端点击对应阶段的确认区域。"""
+        self._wf.click_region(self._wf.TUNE_SCENE, region)
+
     def _require_engine(self, operation: str) -> SubcallEnginePort:
         engine = self._wf.engine
         if engine is None:
@@ -154,6 +162,16 @@ class DesktopTuningRouteStrategy(TuningRouteStrategy):
         logger.info("  [桌面端] 按 ESC 关闭装备详情")
         self._wf.press("ESC", wait=None)
         self._wf.wait_stable("page_refresh")
+
+    def open_reset_dialog(self) -> None:
+        logger.info("  [桌面端] 按 R 打开重置调律")
+        self._wf.press("R", wait=None)
+
+    def confirm_reset(self, region: str) -> None:
+        # 端游的两阶段重置确认都由空格触发。region 仅用于让移动端保留
+        # reset_confirm / reset_confirm_2 两个既有扫描区域。
+        logger.info("  [桌面端] 按空格确认重置调律")
+        self._wf.press("SPACE", wait=None)
 
 
 def create_tuning_route_strategy(

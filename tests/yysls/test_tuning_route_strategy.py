@@ -7,6 +7,9 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.recycler import (
     RecycleOutcome,
     TuningRecycler,
 )
+from lvjiang.apps.yysls.workflows.implementations.tuning.resetter import (
+    TuningResetter,
+)
 from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
     AndroidTuningRouteStrategy,
     DesktopTuningRouteStrategy,
@@ -111,6 +114,86 @@ def test_android_does_not_close_equipment_detail_explicitly():
     routes.close_equipment_detail()
 
     wf.press.assert_not_called()
+
+
+def test_android_opens_reset_dialog_by_clicking_existing_region():
+    wf = MagicMock(TUNE_SCENE="equip_tune_detail")
+    routes = AndroidTuningRouteStrategy(wf)
+
+    routes.open_reset_dialog()
+
+    wf.click_region.assert_called_once_with("equip_tune_detail", "reset_tune")
+    wf.press.assert_not_called()
+
+
+def test_desktop_opens_reset_dialog_with_r_but_keeps_region_for_scanning():
+    wf = MagicMock(TUNE_SCENE="equip_tune_detail")
+    routes = DesktopTuningRouteStrategy(wf)
+
+    routes.open_reset_dialog()
+
+    wf.press.assert_called_once_with("R", wait=None)
+    wf.click_region.assert_not_called()
+
+
+def test_android_confirms_reset_by_clicking_each_region():
+    wf = MagicMock(TUNE_SCENE="equip_tune_detail")
+    routes = AndroidTuningRouteStrategy(wf)
+
+    routes.confirm_reset("reset_confirm")
+    routes.confirm_reset("reset_confirm_2")
+
+    assert wf.click_region.call_args_list == [
+        call("equip_tune_detail", "reset_confirm"),
+        call("equip_tune_detail", "reset_confirm_2"),
+    ]
+    wf.press.assert_not_called()
+
+
+def test_desktop_confirms_both_reset_stages_with_space():
+    wf = MagicMock(TUNE_SCENE="equip_tune_detail")
+    routes = DesktopTuningRouteStrategy(wf)
+
+    routes.confirm_reset("reset_confirm")
+    routes.confirm_reset("reset_confirm_2")
+
+    assert wf.press.call_args_list == [
+        call("SPACE", wait=None),
+        call("SPACE", wait=None),
+    ]
+    wf.click_region.assert_not_called()
+
+
+def test_desktop_reset_confirms_with_space_around_secondary_delay():
+    wf = MagicMock(TUNE_SCENE="equip_tune_detail")
+
+    def ocr_scene(_scene, fields):
+        values = {
+            "reset_tune": "重置调律 3/3",
+            "reset_check": "当前装备剩余可重置次数：3",
+            "reset_info": "持有 4",
+        }
+        return {key: values[key] for key in fields}
+
+    wf.ocr_scene.side_effect = ocr_scene
+    routes = DesktopTuningRouteStrategy(wf)
+    resetter = TuningResetter(wf, routes)
+
+    result = resetter.try_reset_tune(
+        SimpleNamespace(max_resets=3),
+        resets_used=0,
+        why="测试规则命中",
+        min_material_count=2,
+    )
+
+    assert result is True
+    calls = wf.method_calls
+    first_space = calls.index(call.press("SPACE", wait=None))
+    delay = calls.index(call.wait_delay("secondary_confirm"))
+    second_space = calls.index(call.press("SPACE", wait=None), first_space + 1)
+    assert first_space < delay < second_space
+    assert call.click_region("equip_tune_detail", "reset_confirm") not in calls
+    assert call.click_region("equip_tune_detail", "reset_confirm_2") not in calls
 
 
 def test_navigation_subcall_failure_is_propagated():

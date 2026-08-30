@@ -197,7 +197,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     @property
     def resetter(self) -> TuningResetter:
         if self._resetter is None:
-            self._resetter = TuningResetter(self)
+            self._resetter = TuningResetter(self, self.route_strategy)
         return self._resetter
 
     @property

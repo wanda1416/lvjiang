@@ -68,6 +68,10 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     rule_affix_candidates,
 )
 from lvjiang.apps.yysls.ui.game_settings.level_combo import LevelCombo
+from lvjiang.apps.yysls.ui.layout_helpers import (
+    fit_combo_popup_to_contents,
+    fit_combo_to_contents,
+)
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
@@ -376,6 +380,7 @@ class _JudgeScopeCell(QComboBox):
         self._prev = 0
         for scope in JUDGE_SCOPES:
             self.addItem(JUDGE_SCOPE_LABELS.get(scope, scope), scope)
+        fit_combo_to_contents(self, minimum=140)
         self.setToolTip(
             tr("本条规则的判定方式：传入规则=运行期勾选的规则；全部规则；"
                "自选规则=弹窗勾选；自选词条=判定结果列改勾词条，"
@@ -420,6 +425,8 @@ class _JudgeScopeCell(QComboBox):
             text = (first if len(self._keys) == 1
                     else f"{first} 等{len(self._keys)}个")
         self.setItemText(idx, text)
+        # 自选规则摘要可能比固定四项更长；同步放宽闭合控件与弹出列表。
+        fit_combo_to_contents(self, minimum=140)
 
 
 class _BehaviorPageBase(QWidget):
@@ -489,17 +496,23 @@ class _BehaviorPageBase(QWidget):
         self._ci = {k: i for i, k in enumerate(keys)}
         self._table = QTableWidget(0, len(keys))
         self._table.setHorizontalHeaderLabels([tr(titles[k]) for k in keys])
-        self._table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch)
+        header = self._table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        # 部位/判定结果是按钮式多选，可拉伸吸收剩余空间；真正的下拉列
+        # 按最长中文选项保宽，窗口不足时使用横向滚动。
+        header.setSectionResizeMode(
+            self._ci["parts"], QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(
+            self._ci["ratings"], QHeaderView.ResizeMode.Stretch)
         # 序号列固定宽度，首词条列（符号 + 数值）与仅首词条列
         # 按内容自适应，隐藏原生行号
-        self._table.horizontalHeader().setSectionResizeMode(
+        header.setSectionResizeMode(
             _SEQ_COL, QHeaderView.ResizeMode.Fixed)
         self._table.setColumnWidth(_SEQ_COL, 32)
-        self._table.horizontalHeader().setSectionResizeMode(
+        header.setSectionResizeMode(
             self._ci["pct"], QHeaderView.ResizeMode.ResizeToContents)
         if "first_affix" in self._ci:
-            self._table.horizontalHeader().setSectionResizeMode(
+            header.setSectionResizeMode(
                 self._ci["first_affix"],
                 QHeaderView.ResizeMode.ResizeToContents)
         self._table.verticalHeader().setVisible(False)
@@ -588,6 +601,7 @@ class _BehaviorPageBase(QWidget):
         quals = QComboBox()
         for q in _QUALITY_KEYS:
             quals.addItem(_QUALITY_LABELS.get(q, q), q)
+        fit_combo_to_contents(quals, minimum=112)
         quals.setCurrentIndex(max(quals.findData(rule.max_quality), 0))
         quals.currentIndexChanged.connect(lambda _i: self._apply())
         table.setCellWidget(row, self._ci["quality"], quals)
@@ -619,6 +633,7 @@ class _BehaviorPageBase(QWidget):
                 ratings, scope, []),
         )
         judge.set_value(rule.judge_scope, rule.judge_rules)
+        fit_combo_popup_to_contents(judge, minimum=140)
         table.setCellWidget(row, self._ci["judge"], judge)
 
         action = QComboBox()
@@ -629,6 +644,7 @@ class _BehaviorPageBase(QWidget):
             idx = action.count() - 1
             action.setItemData(idx, BEHAVIOR_ACTION_TOOLTIPS.get(key, ""),
                                Qt.ItemDataRole.ToolTipRole)
+        fit_combo_to_contents(action, minimum=152)
         action.setCurrentIndex(max(action.findData(rule.action), 0))
         action.currentIndexChanged.connect(lambda _i: self._apply())
         table.setCellWidget(row, self._ci["action"], action)
@@ -838,6 +854,7 @@ class ScanBehaviorPage(_BehaviorPageBase):
         threshold_row = QHBoxLayout()
         threshold_row.addWidget(QLabel(tr("等级门槛")))
         self._min_level_combo = LevelCombo(allow_empty=False)
+        fit_combo_to_contents(self._min_level_combo, minimum=88)
         self._min_level_combo.setToolTip(tr("低于该等级的装备直接跳过，不进入任何判定"))
         self._min_level_combo.currentIndexChanged.connect(lambda _v: self._apply())
         threshold_row.addWidget(self._min_level_combo)
@@ -847,6 +864,7 @@ class ScanBehaviorPage(_BehaviorPageBase):
         # 从高到低：顶级 → 优秀 → 一般 → 垃圾
         for key in reversed(RATING_KEYS):
             self._entry_combo.addItem(RATING_LABELS.get(key, key), key)
+        fit_combo_to_contents(self._entry_combo, minimum=96)
         self._entry_combo.setToolTip(tr("预期评级 ≥ 该档即进入调律（固定用传入规则判定）"))
         self._entry_combo.currentIndexChanged.connect(lambda _i: self._apply())
         threshold_row.addWidget(self._entry_combo)
@@ -924,6 +942,7 @@ class TuneBehaviorPage(_BehaviorPageBase):
         labels = _STAGE_ACTION_LABELS["tune"]
         for act in ("recycle", "skip"):
             self._exhausted_combo.addItem(labels.get(act, act), act)
+        fit_combo_to_contents(self._exhausted_combo, minimum=132)
         self._exhausted_combo.setToolTip(
             tr("规则命中重置但次数已用尽（按钮文本读不到数字）"
                "时的转处置动作"))

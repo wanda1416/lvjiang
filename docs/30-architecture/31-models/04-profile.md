@@ -28,6 +28,17 @@ DSL 读写函数，以及「用户总览」和「用户信息」两个通用页�
 - `profile_history` 表结构不变。
 - `session.json.profile` 中的分组、活跃分组和告警历史节点不变。
 
+「用户信息」页的便利贴不属于 Profile：它不需要预先在
+`profile.yaml` 定义 key，也不参与 DSL、周期计算或变更历史。便利贴
+由 `core/user_notes.py` 按用户独立存储在
+`config/session/users/{username}.notes.json`，避免被工作流的
+`{username}.json` session 快照整体回写覆盖。
+
+用户头像同样不属于 Profile。裁剪后的 512×512 PNG 统一存放在
+`config/session/avatars/`，形成可复用的历史头像库；`session.json.users`
+中的每个用户只保存安全的头像文件名。删除用户只移除引用，不删除头像库资产，
+因为同一头像可以被多个用户选择。
+
 Profile 是全局共享的用户数据。不增加 `app_id`，不做 app 分库或租户隔离。
 多个 app 可以同时读写一份 Profile；key 位于共享命名空间，应由定义者
 自行避免冲突。

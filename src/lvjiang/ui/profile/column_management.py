@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.config import get_session_store
+from lvjiang.ui.button_styles import apply_button_style, fit_button_width
 
 from ...core.profile.models import ALL_MODELS, MODEL_LABELS
 from ...core.profile.schema import get_profile_config
@@ -245,6 +246,9 @@ class ProfileColumnMixin:
         btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(dialog.reject)
         btn_row.addWidget(btn_cancel)
+        apply_button_style(btn_ok)
+        apply_button_style(btn_cancel, variant="neutral")
+        fit_button_width(btn_ok, btn_cancel)
         layout.addLayout(btn_row)
 
         if dialog.exec():
@@ -282,6 +286,9 @@ class ProfileColumnMixin:
         btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(dialog.reject)
         btn_row.addWidget(btn_cancel)
+        apply_button_style(btn_ok)
+        apply_button_style(btn_cancel, variant="neutral")
+        fit_button_width(btn_ok, btn_cancel)
         layout.addLayout(btn_row)
 
         if dialog.exec():
@@ -332,6 +339,7 @@ class ProfileColumnMixin:
 
         btn = QPushButton(_label_for_key(current_key) if current_key else tr("（请选择）"))
         btn.setMinimumWidth(200)
+        apply_button_style(btn, variant="neutral")
 
         def show_menu():
             menu = QMenu(btn)

@@ -26,12 +26,15 @@ class TestUser:
     def test_to_dict(self):
         u = User(name="张三", created_at="2026-01-01T00:00:00")
         d = u.to_dict()
-        assert d == {"name": "张三", "created_at": "2026-01-01T00:00:00"}
+        assert d == {
+            "name": "张三", "created_at": "2026-01-01T00:00:00", "avatar": "",
+        }
 
     def test_from_dict(self):
         u = User.from_dict({"name": "李四", "created_at": "2026-06-15"})
         assert u.name == "李四"
         assert u.created_at == "2026-06-15"
+        assert u.avatar == ""
 
     def test_from_dict_missing_fields(self):
         u = User.from_dict({})
@@ -110,6 +113,19 @@ class TestUserConfigManagerCRUD:
         assert mgr.delete_user("待删除") is True
         assert "待删除" not in mgr.list_users()
 
+    def test_delete_user_removes_sticky_notes(self, session_env, tmp_path, monkeypatch):
+        from lvjiang import constants
+        from lvjiang.core.user_notes import UserNotesRepository
+
+        monkeypatch.setattr(constants, "USERS_DIR", tmp_path)
+        mgr = UserConfigManager()
+        mgr.create_user("待删除")
+        repo = UserNotesRepository("待删除")
+        repo.add("私人备忘")
+
+        assert mgr.delete_user("待删除") is True
+        assert not repo.path.exists()
+
     def test_delete_user_not_found(self, session_env):
         mgr = UserConfigManager()
         assert mgr.delete_user("不存在") is False
@@ -165,6 +181,41 @@ class TestUserConfigManagerCRUD:
         mgr2 = UserConfigManager()
         assert "持久用户" in mgr2.list_users()
         assert mgr2.get_active_user_name() == "持久用户"
+
+    def test_avatar_filename_persists_and_rejects_unsafe_paths(self, session_env):
+        mgr = UserConfigManager()
+        name = mgr.get_active_user_name()
+        assert mgr.set_user_avatar(name, "avatar_0123456789abcdef.png") is True
+        assert mgr.get_user(name).avatar == "avatar_0123456789abcdef.png"
+        assert mgr.set_user_avatar(name, "../escape.png") is False
+
+        reset_session_store()
+        loaded = UserConfigManager()
+        assert loaded.get_user(name).avatar == "avatar_0123456789abcdef.png"
+
+    def test_invalid_avatar_from_disk_falls_back_to_empty(self, session_env):
+        import json
+        session_env.write_text(json.dumps({
+            "users": [{
+                "name": "用户A", "created_at": "", "avatar": "../escape.png",
+            }],
+        }), encoding="utf-8")
+        reset_session_store()
+
+        assert UserConfigManager().get_user("用户A").avatar == ""
+
+    def test_avatar_update_rolls_back_in_memory_when_save_fails(
+        self, session_env, monkeypatch,
+    ):
+        mgr = UserConfigManager()
+        name = mgr.get_active_user_name()
+        monkeypatch.setattr(
+            mgr, "_save", lambda: (_ for _ in ()).throw(OSError("disk full")))
+
+        with pytest.raises(OSError, match="disk full"):
+            mgr.set_user_avatar(name, "avatar_0123456789abcdef.png")
+
+        assert mgr.get_user(name).avatar == ""
 
 
 class TestUsernameValidation:

@@ -1,7 +1,9 @@
 """用户管理对话框 - 左右分列式布局"""
 
+from collections.abc import Callable
+
 from loguru import logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -24,6 +26,8 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.user_config import UserConfigManager
 
 from ..i18n import tr
+from .avatar_editor_dialog import AvatarEditorDialog
+from .avatar_widget import AvatarWidget
 
 # ─── 样式常量 ────────────────────────────────────────────
 
@@ -119,13 +123,22 @@ def _format_iso_time(iso_str: str) -> str:
 class UserManagerDialog(QDialog):
     """用户管理对话框：左侧用户列表 + 右侧用户详情"""
 
-    def __init__(self, user_manager: UserConfigManager, parent=None):
+    avatar_changed = pyqtSignal(str, str)
+
+    def __init__(
+        self,
+        user_manager: UserConfigManager,
+        parent=None,
+        *,
+        screenshot_callback: Callable[[], object] | None = None,
+    ):
         super().__init__(parent)
         self.setWindowTitle(tr("用户管理"))
         self.setMinimumSize(720, 480)
         self.resize(760, 520)
 
         self._user_manager = user_manager
+        self._screenshot_callback = screenshot_callback
         self._setup_ui()
         self._refresh_user_list()
 
@@ -233,11 +246,15 @@ class UserManagerDialog(QDialog):
         info_card = QFrame()
         info_card.setObjectName("detailCard")
         info_card.setStyleSheet(_STYLE_CARD)
-        info_layout = QVBoxLayout(info_card)
+        info_layout = QHBoxLayout(info_card)
         info_layout.setContentsMargins(20, 16, 20, 16)
-        info_layout.setSpacing(10)
+        info_layout.setSpacing(24)
 
-        info_layout.addWidget(self._section_title(tr("基本信息")))
+        text_panel = QWidget()
+        text_layout = QVBoxLayout(text_panel)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(10)
+        text_layout.addWidget(self._section_title(tr("基本信息")))
 
         form = QFormLayout()
         form.setHorizontalSpacing(24)
@@ -249,7 +266,22 @@ class UserManagerDialog(QDialog):
         self._lbl_created = QLabel("-")
         form.addRow(self._field_label(tr("创建时间")), self._lbl_created)
 
-        info_layout.addLayout(form)
+        text_layout.addLayout(form)
+        text_layout.addStretch()
+        info_layout.addWidget(text_panel, stretch=1)
+
+        avatar_panel = QVBoxLayout()
+        avatar_title = self._section_title(tr("用户头像"))
+        avatar_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar_panel.addWidget(avatar_title)
+        self._avatar = AvatarWidget(editable=True, size=156)
+        self._avatar.edit_requested.connect(self._open_avatar_editor)
+        avatar_panel.addWidget(self._avatar, alignment=Qt.AlignmentFlag.AlignCenter)
+        avatar_hint = QLabel(tr("悬浮点击编辑，或双击头像"))
+        avatar_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar_hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        avatar_panel.addWidget(avatar_hint)
+        info_layout.addLayout(avatar_panel)
         layout.addWidget(info_card)
 
         # ─── 数据统计卡片（预留） ───
@@ -351,6 +383,7 @@ class UserManagerDialog(QDialog):
         self._badge_active.setVisible(is_active)
         self._lbl_name.setText(user.name)
         self._lbl_created.setText(_format_iso_time(user.created_at))
+        self._avatar.set_avatar(user.name, user.avatar)
 
     def _clear_detail(self):
         """清空详情显示"""
@@ -358,6 +391,7 @@ class UserManagerDialog(QDialog):
         self._badge_active.setVisible(False)
         self._lbl_name.setText("-")
         self._lbl_created.setText("-")
+        self._avatar.set_avatar("", "")
 
     def _current_user_name(self) -> str | None:
         """当前选中的用户名"""
@@ -367,6 +401,24 @@ class UserManagerDialog(QDialog):
         return item.data(Qt.ItemDataRole.UserRole)
 
     # ─── 操作 ────────────────────────────────────────────
+
+    def _open_avatar_editor(self):
+        name = self._current_user_name()
+        if not name:
+            return
+        dialog = AvatarEditorDialog(
+            name,
+            self._user_manager,
+            self,
+            screenshot_callback=self._screenshot_callback,
+        )
+        dialog.avatar_changed.connect(self._on_avatar_changed)
+        dialog.exec()
+
+    def _on_avatar_changed(self, username: str, filename: str) -> None:
+        if username == self._current_user_name():
+            self._avatar.set_avatar(username, filename)
+        self.avatar_changed.emit(username, filename)
 
     def _on_rows_moved(self, *_args):
         """拖拽排序后持久化新顺序"""
@@ -410,7 +462,9 @@ class UserManagerDialog(QDialog):
 
         reply = QMessageBox.question(
             self, tr("确认删除"),
-            tr("确定要删除用户「{name}」吗？\n该用户的所有数据将被清除，此操作不可恢复。").format(name=name),
+            tr("确定要删除用户「{name}」吗？\n"
+               "该用户的关联数据将被清除；已保存头像仍保留在头像库中。"
+               "此操作不可恢复。").format(name=name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:

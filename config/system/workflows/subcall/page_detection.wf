@@ -27,7 +27,7 @@ end
 
 def is_in_bag_page()
    eval $bag_items = ["制造", "整理", "培养", "道具", "任务", "钱袋"]
-   scan [bag_equip_detail].[zhizao, zhengli, sub_baoguo] as $found by contains_any $bag_items
+   scan [bag_detail].[zhizao, zhengli, sub_baoguo] as $found by contains_any $bag_items
    if $found
        return 1
    else

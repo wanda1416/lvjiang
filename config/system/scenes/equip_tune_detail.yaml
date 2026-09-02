@@ -6,16 +6,22 @@ views:
   name: 基底
 - key: result
   name: 调律结果
+  homomorphic: false
 - key: reset_tune
   name: 重置调律
-- key: reset_confrim
+  homomorphic: false
+- key: reset_confirm
   name: 重置确认
+  homomorphic: false
+- key: return_good
+  name: 狗粮返还
 regions:
 - key: back
   name: 返回
   type: func
   is_text: false
   is_clickable: true
+  view: base
 - key: affix_gong
   name: 词条宫
   type: attr
@@ -51,6 +57,8 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+  view: base
+  to: /result
 - key: auto_add_2
   name: 未展开提示
   type: func
@@ -79,23 +87,21 @@ regions:
   is_text: false
   is_clickable: true
   view: result
+  to: /base
 - key: reset_tune
   name: 重置调律
   type: func
   is_text: true
   is_clickable: true
+  view: base
+  to: /reset_tune
 - key: reset_confirm
   name: 确认重置
   type: func
   is_text: true
   is_clickable: true
   view: reset_tune
-- key: reset_confirm_2
-  name: 二次确认
-  type: func
-  is_text: true
-  is_clickable: true
-  view: reset_confrim
+  to: /reset_confirm
 - key: reset_check
   name: 冷静期检查
   type: attr
@@ -108,15 +114,23 @@ regions:
   is_text: true
   is_clickable: false
   view: reset_tune
-- key: reset_cancel_2
-  name: 重置取消
+- key: reset_back
+  name: 重置返回
   type: attr
   is_text: true
   is_clickable: true
-  view: reset_confrim
+  view: reset_tune
+  to: /base
 panels:
 - key: materials
   name: 材料格
   min_visible: 0.95
   calibration: even
   scroll_direction: none
+references:
+- scene: general_control
+  entity: confirm
+  view: reset_confirm
+- scene: general_control
+  entity: cancel
+  view: reset_confirm

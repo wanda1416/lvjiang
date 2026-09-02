@@ -6,6 +6,8 @@ views:
   name: 基底
 - key: zhihuan
   name: 心得置换
+- key: purchase_confirm
+  name: 购买确认
 - key: recycle_xinfa
   name: 回收书票
 regions:
@@ -56,19 +58,13 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-  view: zhihuan
+  view: purchase_confirm
 - key: confirm
   name: 确认
   type: func
   is_text: true
   is_clickable: true
-  view: zhihuan
-- key: blank
-  name: 空白
-  type: func
-  is_text: false
-  is_clickable: true
-  view: zhihuan
+  view: purchase_confirm
 - key: count
   name: 书票数量
   type: attr

@@ -1,11 +1,6 @@
 content_version: 1
 key: equip_detail
 name: 装备
-views:
-- key: base
-  name: 基底
-- key: recycle
-  name: 回收装备
 regions:
 - key: main_func
   name: 主功能
@@ -37,18 +32,6 @@ regions:
   type: func
   is_text: true
   is_clickable: true
-- key: recycle_confirm
-  name: 回收确认
-  type: func
-  is_text: true
-  is_clickable: true
-  view: recycle
-- key: recycle_cancel
-  name: 取消回收
-  type: func
-  is_text: true
-  is_clickable: true
-  view: recycle
 - key: func_area
   name: 功能区
   type: func

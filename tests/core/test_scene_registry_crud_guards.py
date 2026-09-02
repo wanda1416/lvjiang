@@ -5,6 +5,7 @@ import yaml
 
 from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
 from lvjiang.core.scene_definition import SceneRegistry
+from lvjiang.core.scene_definition_models import PointDef, RegionDef
 
 
 def _registry_with_groups(*keys: str) -> SceneRegistry:
@@ -89,3 +90,60 @@ def test_explicit_scene_version_is_written_only_when_saved(tmp_path):
     registry.save_scene_content_version("factory", 3)
     assert yaml.safe_load(path.read_text(encoding="utf-8"))[
         "content_version"] == 3
+
+
+def test_region_transition_survives_registry_reload(tmp_path):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    scenes = system / "scenes"
+    scenes.mkdir(parents=True)
+    path = scenes / "factory.yaml"
+    path.write_text(
+        yaml.dump({
+            "key": "factory", "name": "系统场景",
+            "regions": [{
+                "key": "open", "name": "打开", "type": "func",
+                "is_text": False, "is_clickable": True,
+            }],
+        }, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    resolver = ConfigResolver(
+        system_dir=system, local_dir=local, dev_mode=True)
+    registry = SceneRegistry(resolver=resolver)
+
+    registry.update_region_in_scene(
+        "factory", "open",
+        RegionDef(
+            key="open", name="打开", type="func", is_text=False,
+            is_clickable=True, to="/result"),
+    )
+
+    reloaded = SceneRegistry(resolver=resolver)
+    assert reloaded.get_scene("factory").regions[0].to == "/result"
+
+
+def test_non_clickable_entities_never_serialize_transitions(tmp_path):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    scenes = system / "scenes"
+    scenes.mkdir(parents=True)
+    path = scenes / "factory.yaml"
+    path.write_text(
+        yaml.dump({"key": "factory", "name": "系统场景"},
+                  allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    registry = SceneRegistry(resolver=ConfigResolver(
+        system_dir=system, local_dir=local, dev_mode=True))
+
+    registry.add_region_to_scene(
+        "factory", RegionDef(
+            key="label", name="标签", is_clickable=False, to="other"))
+    registry.add_point_to_scene(
+        "factory", PointDef(
+            key="marker", name="标记", is_clickable=False, to="other"))
+
+    saved = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert "to" not in saved["regions"][0]
+    assert "to" not in saved["points"][0]

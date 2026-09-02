@@ -11,12 +11,6 @@ views:
 - key: kanbao
   name: 报纸阅读
 regions:
-- key: back_confirm
-  name: 拍照返回确认
-  type: func
-  is_text: true
-  is_clickable: true
-  view: camera
 - key: camera_shot
   name: 拍照
   type: func
@@ -58,12 +52,6 @@ regions:
   is_text: true
   is_clickable: true
   view: biaoqing
-- key: space_area
-  name: 空白区域
-  type: func
-  is_text: true
-  is_clickable: true
-  view: kanbao
 panels:
 - key: actions
   name: 动作列表

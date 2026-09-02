@@ -9,6 +9,7 @@ from loguru import logger
 
 from ..i18n import tr
 from .config.resolver import get_resolver
+from .scene_config import load_scene_manifest
 from .scene_definition import SceneRegistry
 from .scene_definition_models import (
     BASE_VIEW_KEY,
@@ -20,48 +21,23 @@ from .scene_definition_models import (
 )
 
 
-def _load_scene_order() -> list[str] | None:
-    """从 scenes.yaml（合并视图）读取场景加载顺序"""
+def _load_manifest():
+    """读取并兼容转换 scenes.yaml。"""
     try:
-        data = get_resolver().load_merged("scenes.yaml")
-        layout_scenes = data.get("layout_scenes")
-        if isinstance(layout_scenes, dict):
-            # 从分组结构中提取场景顺序
-            order = []
-            for scenes in layout_scenes.values():
-                order.extend(scenes)
-            return order
-        return None
+        return load_scene_manifest(get_resolver())
     except Exception as e:
-        logger.warning(f"读取 layout_scenes 失败: {e}")
+        logger.warning(f"读取 scenes.yaml 失败: {e}")
         return None
-
-
-def _load_group_config() -> tuple[dict[str, list[str]] | None, dict[str, str] | None]:
-    """从 scenes.yaml（合并视图）读取分组配置，返回 (group_config, group_names)"""
-    try:
-        data = get_resolver().load_merged("scenes.yaml")
-        layout_scenes = data.get("layout_scenes")
-        # 新格式：dict of groups
-        if isinstance(layout_scenes, dict):
-            group_names = data.get("group_names")
-            if not isinstance(group_names, dict):
-                group_names = None
-            return layout_scenes, group_names
-        return None, None
-    except Exception as e:
-        logger.warning(f"读取分组配置失败: {e}")
-        return None, None
 
 
 # ─── 场景注册表（从 YAML 加载） ─────────────────────────
 
-_scene_order = _load_scene_order()
-_group_config, _group_names = _load_group_config()
+_manifest = _load_manifest()
 _registry = SceneRegistry(
-    scene_order=_scene_order,
-    group_config=_group_config,
-    group_names=_group_names,
+    scene_order=_manifest.order if _manifest else None,
+    group_config=_manifest.groups if _manifest else None,
+    group_names=_manifest.group_names if _manifest else None,
+    disabled_scenes=_manifest.disabled if _manifest else None,
 )
 
 # 场景 → (场景中文名, [(region_key, region_name), ...])
@@ -122,15 +98,19 @@ def get_registry() -> SceneRegistry:
 
 
 def reload_scene_registry():
-    """重新加载场景注册表（场景/分组增删后调用）"""
-    global _registry
-    scene_order = _load_scene_order()
-    group_config, group_names = _load_group_config()
-    _registry = SceneRegistry(
-        scene_order=scene_order,
-        group_config=group_config,
-        group_names=group_names,
+    """原位重新加载注册表，避免已打开编辑器持有失效对象。"""
+    manifest = _load_manifest()
+    refreshed = SceneRegistry(
+        scene_order=manifest.order if manifest else None,
+        group_config=manifest.groups if manifest else None,
+        group_names=manifest.group_names if manifest else None,
+        disabled_scenes=manifest.disabled if manifest else None,
     )
+    # 配置写入会同步触发本函数。若直接替换模块单例，已打开的区域编辑器、
+    # 视图管理器仍会继续修改旧 SceneRegistry，下一次写入就可能把刚保存的
+    # to/views 等字段覆盖回去。保留对象身份，只替换其最新磁盘状态。
+    _registry.__dict__.clear()
+    _registry.__dict__.update(refreshed.__dict__)
     _rebuild_scene_globals()
 
 
@@ -190,14 +170,50 @@ def get_scene_regions(scene_key: str) -> list[tuple[str, str]]:
 
 
 
+def _referenced_entity_name(scene, entity_key: str) -> str | None:
+    """跨场景引用实体的显示名：引用只存 key，名字在源场景里。
+
+    引用项在本场景的 regions/points 里查不到，名称查询若就此退回 key，画布
+    标签和列表里的引用行就会和本场景原生实体长得不一样。统一回源取名。
+    """
+    for ref in getattr(scene, "references", ()):
+        if ref.entity != entity_key:
+            continue
+        source = _registry.get_scene(ref.scene)
+        if source is None:
+            continue
+        entity = next(
+            (e for e in (*source.regions, *source.points)
+             if e.key == entity_key), None)
+        if entity is not None:
+            return entity.name
+    return None
+
+
 def get_region_name(scene_key: str, region_key: str) -> str:
-    """通过 scene_key + region_key 查找区域中文名"""
+    """通过 scene_key + region_key 查找区域中文名（含跨场景引用）"""
     scene = _registry.get_scene(scene_key)
     if scene:
         for r in scene.regions:
             if r.key == region_key:
                 return r.name
+        referenced = _referenced_entity_name(scene, region_key)
+        if referenced is not None:
+            return referenced
     return region_key
+
+
+def get_point_name(scene_key: str, point_key: str) -> str:
+    """通过 scene_key + point_key 查找坐标点中文名（含跨场景引用）"""
+    scene = _registry.get_scene(scene_key)
+    if scene:
+        for p in scene.points:
+            if p.key == point_key:
+                return p.name
+        referenced = _referenced_entity_name(scene, point_key)
+        if referenced is not None:
+            return referenced
+    return point_key
 
 
 def get_region_defs(scene_key: str) -> list[RegionDef]:
@@ -211,6 +227,14 @@ def get_region_defs(scene_key: str) -> list[RegionDef]:
 def is_subscene(scene_key: str) -> bool:
     scene = _registry.get_scene(scene_key)
     return bool(scene and scene.is_subscene)
+
+
+def get_region_def(scene_key: str, region_key: str) -> RegionDef | None:
+    """获取场景内指定 region 的类型定义（与 get_point_def 对称）"""
+    scene = _registry.get_scene(scene_key)
+    if not scene:
+        return None
+    return next((r for r in scene.regions if r.key == region_key), None)
 
 
 def get_subscene_ref_defs(scene_key: str) -> list[SubsceneRefDef]:
@@ -234,17 +258,24 @@ def get_scene_views(scene_key: str) -> list[ViewDef]:
     return _registry.get_scene_views(scene_key)
 
 
-def is_view_visible(item_view: str, current_view: str) -> bool:
+def is_view_visible(item_view: str | list[str], current_view: str) -> bool:
     """当前视图下某定义是否可见
 
     current_view 为空 = 看全部；选定视图时只看该视图自身的定义
     （基底是普通视图，不叠加展示；定义的 view 字段为空等价于归属基底）。
+
+    ``item_view`` 接受单值或**归属视图列表**：同一个按钮可以同时属于多个视图
+    （``close_btn`` 在结果视图和返还视图都在），只要命中其一就可见。
     """
     if not current_view:
         return True
+    views = ([item_view] if isinstance(item_view, str)
+             else list(item_view or []))
+    if not views:
+        views = [""]
     if current_view == BASE_VIEW_KEY:
-        return item_view in ("", BASE_VIEW_KEY)
-    return item_view == current_view
+        return any(v in ("", BASE_VIEW_KEY) for v in views)
+    return current_view in views
 
 
 def get_view_visible_keys(scene_key: str, current_view: str) -> set[str] | None:
@@ -255,10 +286,13 @@ def get_view_visible_keys(scene_key: str, current_view: str) -> set[str] | None:
     if not scene:
         return set()
     return {
+        # references 必须算进来：引用项的坐标已在布局加载时展开进本场景，
+        # 但视图过滤是按场景定义算的——漏掉它们，选中视图后画布就不画引用项，
+        # 而它们明明在右侧列表里。
         i.key
         for i in (*scene.regions, *scene.points, *scene.panels,
-                  *scene.subscene_refs)
-        if is_view_visible(i.view, current_view)
+                  *scene.subscene_refs, *scene.references)
+        if is_view_visible(i.views, current_view)
     }
 
 

@@ -10,12 +10,18 @@ views:
   name: 菜单底页
 - key: mode
   name: 游戏模式
+  homomorphic: false
 regions:
 - key: back
   name: 返回
   type: func
   is_text: false
   is_clickable: true
+  views:
+  - base
+  - page_1
+  - page_2
+  to: game_main_page
 - key: yanji
   name: 燕叽
   type: func
@@ -72,12 +78,14 @@ regions:
   is_text: true
   is_clickable: true
   view: page_1
+  to: bag_detail
 - key: peiyang
   name: 培养
   type: func
   is_text: true
   is_clickable: true
   view: page_1
+  to: training_main
 - key: wulinlu
   name: 武林录
   type: func
@@ -241,6 +249,7 @@ regions:
   is_text: true
   is_clickable: true
   view: mode
+  to: /mode
 - key: enter_mode
   name: 踏入
   type: func

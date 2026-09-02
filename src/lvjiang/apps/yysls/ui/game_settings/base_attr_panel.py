@@ -14,7 +14,7 @@
 """
 
 from loguru import logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -24,8 +24,10 @@ from PyQt6.QtWidgets import (
     QInputDialog,
     QLabel,
     QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QSplitter,
     QTableWidget,
@@ -66,6 +68,20 @@ _QUALITY_NAMES = {
 # 部位 key → 显示名称（BASE_ATTR_PARTS 与 EQUIP_PART_NAMES 同序映射，
 # 用于 affix_parts 过滤时按当前部位 key 查对应中文名）
 _PART_TO_NAME = dict(zip(BASE_ATTR_PARTS, EQUIP_PART_NAMES, strict=True))
+
+# 等阶名称与真实部位共用左侧导航，但它们不是装备类型，
+# 不参与基础属性、等级或品阶推断。
+_NAV_ITEMS = (
+    ("series", "output", tr("输出")),
+    ("part", "weapon", tr("武器")),
+    ("part", "ring", tr("环")),
+    ("part", "pendant", tr("佩")),
+    ("series", "armor", tr("防具")),
+    ("part", "head", tr("冠胄")),
+    ("part", "chest", tr("胸甲")),
+    ("part", "leg", tr("胫甲")),
+    ("part", "wrist", tr("腕甲")),
+)
 
 
 class _RangeCell(QWidget):
@@ -121,6 +137,131 @@ class _RangeCell(QWidget):
         return {"min": min_v, "max": max_v}
 
 
+class _NameListEditor(QWidget):
+    """名称集合编辑器：逐项新增、可多选删除，不暴露分隔符格式。"""
+
+    changed = pyqtSignal()
+
+    def __init__(self, title: str, parent=None):
+        super().__init__(parent)
+        self._loading = False
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        header = QHBoxLayout()
+        header.addWidget(QLabel(title))
+        header.addStretch()
+        self._btn_add = QPushButton(tr("添加"))
+        self._btn_remove = QPushButton(tr("删除"))
+        self._btn_add.clicked.connect(self._add_name)
+        self._btn_remove.clicked.connect(self._remove_selected)
+        apply_button_style(self._btn_add, variant="neutral")
+        apply_button_style(self._btn_remove, variant="danger")
+        header.addWidget(self._btn_add)
+        header.addWidget(self._btn_remove)
+        layout.addLayout(header)
+
+        self._list = QListWidget()
+        self._list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self._list.setMaximumHeight(110)
+        self._list.setToolTip(tr("双击名称或按 F2 可编辑"))
+        self._list.itemSelectionChanged.connect(self._refresh_remove_enabled)
+        self._list.itemChanged.connect(self._on_item_changed)
+        layout.addWidget(self._list)
+        self._refresh_remove_enabled()
+
+    def values(self) -> list[str]:
+        result: list[str] = []
+        for index in range(self._list.count()):
+            item = self._list.item(index)
+            if item is not None:
+                result.append(item.text())
+        return result
+
+    def set_values(self, values: list[str]) -> None:
+        self._loading = True
+        self._list.clear()
+        for value in dict.fromkeys(
+                str(value).strip() for value in values if str(value).strip()):
+            self._append_item(value)
+        self._loading = False
+        self._refresh_remove_enabled()
+
+    def _append_item(self, value: str) -> QListWidgetItem:
+        item = QListWidgetItem(value)
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+        item.setData(Qt.ItemDataRole.UserRole, value)
+        self._list.addItem(item)
+        return item
+
+    def _add_name(self) -> None:
+        value, ok = QInputDialog.getText(
+            self, tr("添加名称"), tr("名称"))
+        value = value.strip()
+        if not ok or not value:
+            return
+        if any(separator in value for separator in (",", "，", "、")):
+            QMessageBox.warning(
+                self, tr("格式错误"),
+                tr("请一次添加一个名称，无需使用逗号分隔。"))
+            return
+        existing = self.values()
+        if value in existing:
+            self._list.setCurrentRow(existing.index(value))
+            return
+        self._append_item(value)
+        self._list.setCurrentRow(self._list.count() - 1)
+        self.changed.emit()
+
+    def _on_item_changed(self, item: QListWidgetItem) -> None:
+        if self._loading:
+            return
+        old_value = str(item.data(Qt.ItemDataRole.UserRole) or "")
+        value = item.text().strip()
+        invalid_separator = any(
+            separator in value for separator in (",", "，", "、"))
+        duplicate = False
+        for index in range(self._list.count()):
+            other = self._list.item(index)
+            if other is not None and other is not item and other.text() == value:
+                duplicate = True
+                break
+        if not value or invalid_separator or duplicate:
+            if invalid_separator:
+                message = tr("请一次添加一个名称，无需使用逗号分隔。")
+            elif duplicate:
+                message = tr("名称不能重复。")
+            else:
+                message = tr("名称不能为空。")
+            QMessageBox.warning(self, tr("格式错误"), message)
+            self._loading = True
+            item.setText(old_value)
+            self._loading = False
+            return
+        self._loading = True
+        item.setText(value)
+        item.setData(Qt.ItemDataRole.UserRole, value)
+        self._loading = False
+        if value != old_value:
+            self.changed.emit()
+
+    def _remove_selected(self) -> None:
+        rows = sorted(
+            (self._list.row(item) for item in self._list.selectedItems()),
+            reverse=True,
+        )
+        if not rows:
+            return
+        for row in rows:
+            self._list.takeItem(row)
+        self._refresh_remove_enabled()
+        self.changed.emit()
+
+    def _refresh_remove_enabled(self) -> None:
+        self._btn_remove.setEnabled(bool(self._list.selectedItems()))
+
+
 class BaseAttrPanel(QWidget):
     """基础属性规则面板"""
 
@@ -128,6 +269,7 @@ class BaseAttrPanel(QWidget):
         super().__init__(parent)
         self._data: dict = {}  # 完整配置数据
         self._current_part: str | None = None
+        self._current_series: str | None = None
         self._saving = False  # 防止递归保存
         self._init_ui()
         self._load_data()
@@ -138,7 +280,7 @@ class BaseAttrPanel(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter)
 
-        # 左侧：部位列表（固定七个部位）
+        # 左侧：输出/防具等阶名称 + 固定七个部位
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -146,8 +288,8 @@ class BaseAttrPanel(QWidget):
 
         self._part_list = QListWidget()
         configure_navigation_list(self._part_list, minimum_width=200)
-        for part in BASE_ATTR_PARTS:
-            self._part_list.addItem(_PART_NAMES.get(part, part))
+        for _kind, _key, label in _NAV_ITEMS:
+            self._part_list.addItem(label)
         self._part_list.currentRowChanged.connect(self._on_part_changed)
         left_layout.addWidget(self._part_list)
 
@@ -157,6 +299,12 @@ class BaseAttrPanel(QWidget):
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
+
+        name_structure_hint = QLabel(tr(
+            "装备名称结构：等阶名称 + 标准名称 | 部位名称"))
+        name_structure_hint.setStyleSheet(
+            "font-weight: 600; color: palette(highlight); padding: 2px 8px;")
+        right_layout.addWidget(name_structure_hint)
 
         # 属性跟随控件（合入基础属性行，仅控制基础属性表格）
         self._check_follow = QCheckBox(tr("属性跟随"))
@@ -186,6 +334,28 @@ class BaseAttrPanel(QWidget):
         first_affix_layout.addWidget(self._first_affix_hint)
         self._first_affix_frame.setVisible(False)
         right_layout.addWidget(self._first_affix_frame)
+
+        # ── 等阶名称（只用于名称合法性佐证，不参与等级推断）──
+        self._series_frame = QFrame()
+        series_layout = QVBoxLayout(self._series_frame)
+        series_layout.setContentsMargins(8, 4, 8, 4)
+        series_hint = QLabel(tr(
+            "配置每个装备等级的等阶名称，仅用于校验装备名称；"
+            "承音不改变等阶名称，因此不能据此推断装备等级。"))
+        series_hint.setStyleSheet("color: palette(mid);")
+        series_layout.addWidget(series_hint)
+        self._series_table = QTableWidget()
+        self._series_table.setColumnCount(2)
+        self._series_table.setHorizontalHeaderLabels([tr("等级"), tr("等阶名称")])
+        self._series_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._series_table.cellChanged.connect(self._on_series_changed)
+        series_layout.addWidget(self._series_table)
+        self._btn_add_series_level = QPushButton(tr("添加等级"))
+        self._btn_add_series_level.clicked.connect(self._add_series_level)
+        apply_button_style(self._btn_add_series_level)
+        series_layout.addWidget(self._btn_add_series_level, alignment=Qt.AlignmentFlag.AlignRight)
+        self._series_frame.setVisible(False)
+        right_layout.addWidget(self._series_frame)
 
         # ── 武器类型（仅主武器部位；维护 weapon_types 注册表）──
         self._weapon_frame = QFrame()
@@ -228,15 +398,41 @@ class BaseAttrPanel(QWidget):
         wuxue_layout.addWidget(self._combo_wuxue_affix, 1)
         weapon_layout.addLayout(wuxue_layout)
 
+        weapon_name_layout = QHBoxLayout()
+        self._weapon_standard_names = _NameListEditor(tr("标准名称"))
+        self._weapon_part_names = _NameListEditor(tr("部位名称"))
+        self._weapon_standard_names.changed.connect(self._on_weapon_names_changed)
+        self._weapon_part_names.changed.connect(self._on_weapon_names_changed)
+        weapon_name_layout.addWidget(self._weapon_standard_names, 1)
+        weapon_name_layout.addWidget(self._weapon_part_names, 1)
+        weapon_layout.addLayout(weapon_name_layout)
+
         self._weapon_frame.setVisible(False)
         right_layout.addWidget(self._weapon_frame)
 
+        # 非武器装备的标准名称与部位名称。
+        self._part_name_frame = QFrame()
+        # 非武器页没有武器列表等上方内容，若保持默认 Preferred，QVBoxLayout
+        # 会把剩余高度分给这个短表单，造成名称列表上下出现大片空白。
+        self._part_name_frame.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        part_name_layout = QHBoxLayout(self._part_name_frame)
+        part_name_layout.setContentsMargins(8, 4, 8, 4)
+        self._part_standard_names = _NameListEditor(tr("标准名称"))
+        self._part_part_names = _NameListEditor(tr("部位名称"))
+        self._part_standard_names.changed.connect(self._on_part_names_changed)
+        self._part_part_names.changed.connect(self._on_part_names_changed)
+        part_name_layout.addWidget(self._part_standard_names, 1)
+        part_name_layout.addWidget(self._part_part_names, 1)
+        self._part_name_frame.setVisible(False)
+        right_layout.addWidget(self._part_name_frame)
+
         # ── 基础属性说明 + 属性跟随（仅控制基础属性表格）──
-        attr_frame = QFrame()
-        attr_frame.setStyleSheet(
+        self._attr_frame = QFrame()
+        self._attr_frame.setStyleSheet(
             "QFrame { background-color: palette(alternate-base); border-radius: 4px; padding: 4px; }"
         )
-        attr_layout = QHBoxLayout(attr_frame)
+        attr_layout = QHBoxLayout(self._attr_frame)
         attr_layout.setContentsMargins(8, 4, 8, 4)
         self._attr_label = QLabel("")
         attr_layout.addWidget(self._attr_label)
@@ -244,7 +440,7 @@ class BaseAttrPanel(QWidget):
         attr_layout.addWidget(self._check_follow)
         attr_layout.addWidget(self._combo_follow)
         attr_layout.addWidget(self._follow_hint)
-        right_layout.addWidget(attr_frame)
+        right_layout.addWidget(self._attr_frame)
 
         self._table = QTableWidget()
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -289,17 +485,80 @@ class BaseAttrPanel(QWidget):
 
     def _on_part_changed(self, row: int):
         """切换部位时更新跟随配置与表格"""
-        if row < 0 or row >= len(BASE_ATTR_PARTS):
+        if row < 0 or row >= len(_NAV_ITEMS):
             self._current_part = None
+            self._current_series = None
             self._table.setRowCount(0)
             return
 
-        self._current_part = BASE_ATTR_PARTS[row]
+        kind, key, _label = _NAV_ITEMS[row]
+        self._current_series = key if kind == "series" else None
+        self._current_part = key if kind == "part" else None
+        is_series = self._current_series is not None
+        self._series_frame.setVisible(is_series)
+        for widget in (
+            self._first_affix_frame, self._weapon_frame, self._part_name_frame,
+            self._attr_frame, self._table, self._btn_add_level,
+        ):
+            widget.setVisible(not is_series)
+        if is_series:
+            self._refresh_series_table()
+            return
+
         self._refresh_follow_controls()
         self._refresh_first_affixes()
         self._refresh_weapon_types()
+        self._refresh_part_names()
         self._refresh_attr_label()
         self._refresh_table()
+
+    # ── 等阶名称 ──────────────────────────────────
+
+    def _refresh_series_table(self):
+        self._saving = True
+        series = (self._data.get("equipment_name_series") or {}).get(
+            self._current_series, {})
+        levels = sorted(series, key=lambda value: int(value), reverse=True)
+        self._series_table.setRowCount(len(levels))
+        for row, level in enumerate(levels):
+            combo = LevelCombo(allow_empty=False)
+            combo.set_level(int(level))
+            combo.currentIndexChanged.connect(
+                lambda _value, r=row: self._on_series_changed(r, 0))
+            self._series_table.setCellWidget(row, 0, combo)
+            self._series_table.setItem(
+                row, 1, QTableWidgetItem(str(series[level] or "")))
+        self._saving = False
+
+    def _add_series_level(self):
+        if not self._current_series:
+            return
+        row = self._series_table.rowCount()
+        self._saving = True
+        self._series_table.insertRow(row)
+        combo = LevelCombo(allow_empty=True)
+        combo.currentIndexChanged.connect(
+            lambda _value, r=row: self._on_series_changed(r, 0))
+        self._series_table.setCellWidget(row, 0, combo)
+        self._series_table.setItem(row, 1, QTableWidgetItem(""))
+        self._saving = False
+
+    def _on_series_changed(self, _row: int, _column: int):
+        if self._saving or not self._current_series:
+            return
+        values: dict[int, str] = {}
+        for row in range(self._series_table.rowCount()):
+            combo = self._series_table.cellWidget(row, 0)
+            item = self._series_table.item(row, 1)
+            if not isinstance(combo, LevelCombo) or item is None:
+                continue
+            level = combo.get_level()
+            name = item.text().strip()
+            if level is not None and name:
+                values[level] = name
+        self._data.setdefault("equipment_name_series", {})[
+            self._current_series] = values
+        self._save_data()
 
     # ── 武器类型（weapon_types 注册表）──────────────────
 
@@ -358,12 +617,17 @@ class BaseAttrPanel(QWidget):
         if item is None:
             self._combo_wuxue_affix.setEnabled(False)
             self._combo_wuxue_affix.clear()
+            self._weapon_standard_names.set_values([])
+            self._weapon_part_names.set_values([])
+            self._weapon_standard_names.setEnabled(False)
+            self._weapon_part_names.setEnabled(False)
             return
-        # 从显示文本中提取武器名
-        display_text = item.text()
-        weapon_name = display_text.split("（")[0] if "（" in display_text else display_text
+        weapon_name = self._selected_weapon_name()
+        if not weapon_name:
+            return
         candidates = self._wuxue_affix_candidates()
         current_affix = self._get_weapon_wuxue_affix(weapon_name)
+        current = self._weapon_types_raw()[self._weapon_list.currentRow()]
 
         self._saving = True
         self._combo_wuxue_affix.setEnabled(True)
@@ -373,7 +637,30 @@ class BaseAttrPanel(QWidget):
         if current_affix and current_affix not in candidates:
             self._combo_wuxue_affix.addItem(current_affix)
         self._combo_wuxue_affix.setCurrentText(current_affix)
+        self._weapon_standard_names.setEnabled(True)
+        self._weapon_part_names.setEnabled(True)
+        self._weapon_standard_names.set_values(current.get("name_suffixes") or [])
+        self._weapon_part_names.set_values(current.get("type_aliases") or [])
         self._saving = False
+
+    def _selected_weapon_name(self) -> str | None:
+        row = self._weapon_list.currentRow()
+        raw = self._weapon_types_raw()
+        if row < 0 or row >= len(raw):
+            return None
+        return str(raw[row].get("name") or "") or None
+
+    def _on_weapon_names_changed(self):
+        if self._saving:
+            return
+        row = self._weapon_list.currentRow()
+        raw = self._weapon_types_raw()
+        if row < 0 or row >= len(raw):
+            return
+        raw[row]["name_suffixes"] = self._weapon_standard_names.values()
+        raw[row]["type_aliases"] = self._weapon_part_names.values()
+        self._data["weapon_types"] = raw
+        self._save_data()
 
     def _on_weapon_selected(self, row: int):
         """选中武器变化时刷新武学增效下拉框与删除按钮可用性"""
@@ -383,10 +670,7 @@ class BaseAttrPanel(QWidget):
     def _refresh_del_weapon_enabled(self):
         """系统武器类型不允许用户删除，置灰并说明原因"""
         item = self._weapon_list.currentItem()
-        name = None
-        if item is not None:
-            text = item.text()
-            name = text.split("（")[0] if "（" in text else text
+        name = self._selected_weapon_name()
         ok, hint = deletable(
             name, factory_list_values(_ATTRS_REL, "weapon_types", field="name"))
         self._btn_del_weapon.setEnabled(item is not None and ok)
@@ -399,8 +683,9 @@ class BaseAttrPanel(QWidget):
         item = self._weapon_list.currentItem()
         if item is None:
             return
-        display_text = item.text()
-        weapon_name = display_text.split("（")[0] if "（" in display_text else display_text
+        weapon_name = self._selected_weapon_name()
+        if not weapon_name:
+            return
         # 更新 weapon_types 中对应武器的 wuxue_affix
         raw = self._weapon_types_raw()
         for t in raw:
@@ -439,7 +724,7 @@ class BaseAttrPanel(QWidget):
             QMessageBox.warning(self, tr("无法添加"), tr("武器类型「{name}」已存在。").format(name=name))
             return
         raw = self._weapon_types_raw()
-        raw.append({"name": name})
+        raw.append({"name": name, "type_aliases": [name]})
         self._data["weapon_types"] = raw
         self._save_data()
         self._refresh_weapon_types()
@@ -449,8 +734,9 @@ class BaseAttrPanel(QWidget):
         item = self._weapon_list.currentItem()
         if item is None:
             return
-        display_text = item.text()
-        name = display_text.split("（")[0] if "（" in display_text else display_text
+        name = self._selected_weapon_name()
+        if not name:
+            return
         users = self._schools_using_weapon(name)
         if users:
             QMessageBox.warning(
@@ -466,6 +752,28 @@ class BaseAttrPanel(QWidget):
         self._data["weapon_types"] = raw
         self._save_data()
         self._refresh_weapon_types()
+
+    # ── 非武器标准名称/部位名称配置 ─────────────────────
+
+    def _refresh_part_names(self):
+        visible = bool(self._current_part and self._current_part != "weapon")
+        self._part_name_frame.setVisible(visible)
+        if not visible:
+            return
+        data = self._part_data(self._current_part)
+        self._saving = True
+        self._part_standard_names.set_values(data.get("_name_suffixes") or [])
+        self._part_part_names.set_values(data.get("_type_aliases") or [])
+        self._saving = False
+
+    def _on_part_names_changed(self):
+        if self._saving or not self._current_part or self._current_part == "weapon":
+            return
+        data = self._part_data(self._current_part)
+        data["_name_suffixes"] = self._part_standard_names.values()
+        data["_type_aliases"] = self._part_part_names.values()
+        self._data.setdefault("base_attrs", {})[self._current_part] = data
+        self._save_data()
 
     # ── 首词条（每个部位限定首词条候选，数据存于 _first_affixes）──
 

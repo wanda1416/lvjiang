@@ -3,70 +3,14 @@ key: huixin_big
 name: 会心大外
 default_rating: excellent
 playstyles:
-  纯唐:
-    main:
-      weapon: 横刀
-      damage: 横刀武学增伤
-    sub:
-      weapon: 陌刀
-      damage: null
-    attr: 裂石
-  双切:
-    main:
-      weapon: 陌刀
-      damage: 陌刀武学增伤
-    sub:
-      weapon: 横刀
-      damage: null
-    attr: 裂石
-  威威:
-    main:
-      weapon: 陌刀
-      damage: 陌刀武学增伤
-    sub:
-      weapon: 枪
-      damage: null
-    attr: 裂石
-  鸢鸢:
-    main:
-      weapon: 手甲
-      damage: 手甲武学增伤
-    sub:
-      weapon: 绳镖
-      damage: null
-    attr: 破竹
-  双刀:
-    main:
-      weapon: 双刀
-      damage: 双刀武学增伤
-    sub:
-      weapon: 绳镖
-      damage: 绳镖武学增伤
-    attr: 破竹
-  尘尘:
-    main:
-      weapon: 伞
-      damage: 伞武学增效
-    sub:
-      weapon: 绳镖
-      damage: null
-    attr: 破竹
-  翊翊:
-    main:
-      weapon: 舞绫鼓
-      damage: 舞绫鼓武学增伤
-    sub:
-      weapon: 扇
-      damage: null
-    attr: 牵丝
-  樽樽:
-    main:
-      weapon: 手甲
-      damage: 手甲武学增伤
-    sub:
-      weapon: 双刀
-      damage: 双刀武学增伤
-    attr: 破竹
+- 纯唐
+- 双切
+- 威威
+- 鸢鸢
+- 双刀
+- 尘尘
+- 翊翊
+- 樽樽
 transmute_priority:
 - 最大外功攻击
 - 劲

@@ -54,6 +54,37 @@ OUTPUTS = {
 }
 
 
+def _workbook_inputs(workbook) -> dict[str, str]:
+    """返回该工作簿的输入单元格。
+
+    大多数流派在 B21 只有一个指定技能定音；破竹·风在 B21/B22
+    分别有轻击和老鼠定音。输入不能靠固定行数猜，应当一直读到
+    「固伤加成」为止。保留首个 ``special_bonus`` 键以维持旧方案结构稳定。
+    """
+    inputs = dict(INPUTS)
+    sheet = workbook["期望"]
+    fixed_row = next(
+        (row for row in range(21, sheet.max_row + 1)
+         if str(sheet.cell(row, 1).value or "").strip() == "固伤加成"),
+        None,
+    )
+    if fixed_row is None:
+        raise RuntimeError("Excel 期望页缺少「固伤加成」行")
+    index = 2
+    for row in range(22, fixed_row):
+        if not str(sheet.cell(row, 1).value or "").strip():
+            continue
+        inputs[f"special_bonus_{index}"] = f"期望!B{row}"
+        index += 1
+    return inputs
+
+
+def _is_dynamic_affix_input(name: str) -> bool:
+    return name in {"weapon_bonus_primary", "weapon_bonus_secondary"} or (
+        name == "special_bonus" or name.startswith("special_bonus_")
+    )
+
+
 def _json_value(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
@@ -65,17 +96,21 @@ def _version(filename: str) -> str:
     return match.group(1) if match else "unknown"
 
 
-def _affix_input_names(workbook, school: str) -> dict[str, list[str]]:
+def _affix_input_names(
+    workbook, school: str, inputs: dict[str, str],
+) -> dict[str, list[str]]:
     config = yaml.safe_load(GAME_CONFIG_PATH.read_text(encoding="utf-8"))
-    labels = {
-        "all_skill_bonus": workbook["期望"]["A15"].value,
-        "boss_bonus": workbook["期望"]["A16"].value,
-        "weapon_bonus_primary": workbook["期望"]["A17"].value,
-        "weapon_bonus_secondary": workbook["期望"]["A18"].value,
-        "single_qs_bonus": workbook["期望"]["A19"].value,
-        "group_qs_bonus": workbook["期望"]["A20"].value,
-        "special_bonus": workbook["期望"]["A21"].value,
+    named_inputs = {
+        "all_skill_bonus", "boss_bonus", "weapon_bonus_primary",
+        "weapon_bonus_secondary", "single_qs_bonus", "group_qs_bonus",
     }
+    labels: dict[str, Any] = {}
+    for name, target in inputs.items():
+        if name not in named_inputs and not _is_dynamic_affix_input(name):
+            continue
+        _sheet, coordinate = target.split("!", 1)
+        row = workbook["期望"][coordinate].row
+        labels[name] = workbook["期望"].cell(row, 1).value
     canonical_names: set[str] = set()
     for category in (config.get("affix_caps") or {}).values():
         raw = category.get("_aliases", []) if isinstance(category, dict) else []
@@ -141,7 +176,9 @@ def _affix_input_names(workbook, school: str) -> dict[str, list[str]]:
                 f"{school} Excel 输入 {input_name} 的字段名为空。"
                 "请修正 Excel，或在词组配置中补充对应别名后重新导入。"
             )
-        if input_name == "special_bonus":
+        if input_name == "special_bonus" or input_name.startswith(
+            "special_bonus_"
+        ):
             # 只在当前流派的指定技能增效分组中反查，按配置顺序取第一个。
             matches = [
                 str(affix_name) for affix_name in school_skill_names
@@ -177,9 +214,22 @@ def _cell_value(formulas, cached, address: str) -> Any:
     return _json_value(cached_value if cached_value is not None else formulas[sheet][coordinate].value)
 
 
+def _label_row(sheet, label: str) -> int:
+    row = next(
+        (index for index in range(1, sheet.max_row + 1)
+         if str(sheet.cell(index, 1).value or "").strip() == label),
+        None,
+    )
+    if row is None:
+        raise RuntimeError(f"Excel 期望页缺少「{label}」行")
+    return row
+
+
 def _extract_environment(formulas, cached) -> dict[str, Any]:
     sheet = formulas["期望"]
     cached_sheet = cached["期望"]
+    fixed_row = _label_row(sheet, "固伤加成")
+    food_row = _label_row(sheet, "食物加成")
     team_buffs = []
     for row in range(16, 21):
         for name_col, enabled_col in ((3, 4), (5, 6)):
@@ -199,24 +249,29 @@ def _extract_environment(formulas, cached) -> dict[str, Any]:
             monster[str(name)] = _json_value(value)
     return {
         "food_bonus": {
-            "min_outer": _cell_value(formulas, cached, "期望!B23"),
-            "max_outer": _cell_value(formulas, cached, "期望!B24"),
+            "min_outer": _cell_value(
+                formulas, cached, f"期望!B{food_row}"),
+            "max_outer": _cell_value(
+                formulas, cached, f"期望!B{food_row + 1}"),
         },
-        "fixed_damage_bonus": _cell_value(formulas, cached, "期望!B22"),
+        "fixed_damage_bonus": _cell_value(
+            formulas, cached, f"期望!B{fixed_row}"),
         "team_buffs": team_buffs,
         "monster": monster,
         "combat_time": _cell_value(formulas, cached, "期望!I8"),
     }
 
 
-def _baseline_attrs(model: dict[str, Any], affix_names: dict[str, list[str]]) -> dict[str, Any]:
+def _baseline_attrs(
+    model: dict[str, Any], affix_names: dict[str, list[str]],
+    inputs: dict[str, str],
+) -> dict[str, Any]:
     runtime = FormulaModel(model)
     attrs: dict[str, Any] = {}
     extra_attrs: dict[str, float] = {}
-    dynamic = {"weapon_bonus_primary", "weapon_bonus_secondary", "special_bonus"}
-    for name, target in INPUTS.items():
+    for name, target in inputs.items():
         value = float(runtime.value(target) or 0)
-        if name in dynamic:
+        if _is_dynamic_affix_input(name):
             names = affix_names[name]
             if names:
                 extra_attrs[names[0]] = value
@@ -229,12 +284,11 @@ def _baseline_attrs(model: dict[str, Any], affix_names: dict[str, list[str]]) ->
 
 def _compile_v2(
     workbook_model: dict[str, Any], school: str, affix_names: dict[str, list[str]],
-    environment: dict[str, Any],
+    environment: dict[str, Any], inputs: dict[str, str],
 ) -> dict[str, Any]:
-    dynamic = {"weapon_bonus_primary", "weapon_bonus_secondary", "special_bonus"}
     bindings: dict[str, dict[str, str]] = {}
-    for name, target in INPUTS.items():
-        if name in dynamic:
+    for name, target in inputs.items():
+        if _is_dynamic_affix_input(name):
             names = affix_names[name]
             if not names:
                 # A deliberately empty skill bonus remains a fixed zero.
@@ -247,7 +301,7 @@ def _compile_v2(
         name: OUTPUTS[name]
         for name in ("combat_time", "total_damage", "dps")
     })
-    baseline_attrs = _baseline_attrs(workbook_model, affix_names)
+    baseline_attrs = _baseline_attrs(workbook_model, affix_names, inputs)
     input_values = []
     extra = baseline_attrs.get("extra_attrs", {})
     for spec in program["inputs"]:
@@ -297,7 +351,8 @@ def convert_workbook(path: Path, school: str) -> dict[str, Any]:
     formulas = openpyxl.load_workbook(path, data_only=False, read_only=False)
     cached = openpyxl.load_workbook(path, data_only=True, read_only=False)
     try:
-        affix_names = _affix_input_names(formulas, school)
+        inputs = _workbook_inputs(formulas)
+        affix_names = _affix_input_names(formulas, school, inputs)
         sheets: dict[str, Any] = {}
         formula_count = 0
         for worksheet in formulas.worksheets:
@@ -341,23 +396,22 @@ def convert_workbook(path: Path, school: str) -> dict[str, Any]:
             "inputs": {
                 name: {
                     "type": "number",
-                    "unit": "ratio" if name in RATIO_INPUTS or name in {
-                        "weapon_bonus_primary", "weapon_bonus_secondary",
-                        "special_bonus",
-                    } else "point",
+                    "unit": "ratio" if (
+                        name in RATIO_INPUTS or _is_dynamic_affix_input(name)
+                    ) else "point",
                     "target": target,
                     **({"label_ref": f"期望!A{target.rsplit('B', 1)[-1]}",
                         "affix_names": affix_names[name]}
                        if name in affix_names else {}),
                 }
-                for name, target in INPUTS.items()
+                for name, target in inputs.items()
             },
             "outputs": {name: {"ref": ref} for name, ref in OUTPUTS.items()},
             "sheets": sheets,
         }
         return _compile_v2(
             workbook_model, school, affix_names,
-            _extract_environment(formulas, cached),
+            _extract_environment(formulas, cached), inputs,
         )
     finally:
         formulas.close()

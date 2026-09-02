@@ -57,9 +57,9 @@ class TestParserDelegation:
         return parser._parse_single_affix(cleaned)
 
     def test_bianwuxue_corrected_to_shan(self, parser):
-        # 扁武学 → 扇武学 后由 WUXUE_PATTERN 正常匹配
-        affix = self._clean_then_parse(parser, "扁武学增伤 8.2%")
-        assert affix.name == "扇武学增伤"
+        # 扁武学 → 扇武学，再由配置词库正常匹配。
+        affix = self._clean_then_parse(parser, "扁武学增效 8.2%")
+        assert affix.name == "扇武学增效"
         assert affix.value == 8.2
 
     def test_caizhun_corrected(self, parser):

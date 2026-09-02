@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 from typing import Callable
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -49,8 +50,9 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     standard_playstyle_attrs,
 )
 from lvjiang.core.config.resolver import LAYER_SYSTEM, EntityOrigin
-from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.button_styles import apply_button_style, apply_compact_tool_button_style
 from lvjiang.ui.config_origin import layer_style, origin_tooltip
+from lvjiang.ui.widgets import centered_cell_widget
 
 from .....i18n import tr
 
@@ -197,23 +199,42 @@ class RuleSettingsPage(QWidget):
         title_row.addWidget(QLabel("<b>" + tr("玩法设定") + "</b>"))
         self._playstyle_tips_btn = QToolButton()
         self._playstyle_tips_btn.setText("?")
+        self._playstyle_tips_btn.setFixedSize(20, 20)
+        apply_compact_tool_button_style(self._playstyle_tips_btn)
         self._playstyle_tips_btn.clicked.connect(self._show_playstyle_tips)
         title_row.addWidget(self._playstyle_tips_btn)
         title_row.addStretch()
         layout.addLayout(title_row)
-        self._playstyle_table = QTableWidget(0, 7)
+        # 玩法定义已提到公共的「玩法配置」，规则只勾选引用哪些。
+        # 以前每个规则各自内嵌一份定义，同一个「纯唐」在多个规则文件里重复
+        # （实测 14 个玩法跨文件零差异），玩法因此没有唯一归属。
+        # 只列本规则**已引用**的玩法。把全部玩法铺出来让人勾选，规则一多就
+        # 分不清哪些是这条规则真正在用的。
+        self._playstyle_table = QTableWidget(0, 6)
         self._playstyle_table.setHorizontalHeaderLabels(
-            [tr("名字"), tr("主武器"), tr("主增伤词条"), tr("副武器"), tr("副增伤词条"), tr("属性"),
-             tr("绑定开关")])
-        # 增伤词条列比武器列更宽；不拉伸末列，列宽固定、列表偏左，
-        # 未占满 dialog 时右侧留白（避免末列被拉升占满全宽）
-        for col, width in enumerate((80, 90, 150, 90, 150, 90, 120)):
+            [tr("名字"), tr("主武器"), tr("主增伤词条"), tr("副武器"),
+             tr("属性"), tr("绑定开关")])
+        for col, width in enumerate((90, 90, 150, 90, 90, 120)):
             self._playstyle_table.setColumnWidth(col, width)
-        self._playstyle_table.cellChanged.connect(self._apply_playstyles)
+        # 定义列只读（改定义去玩法配置），只有绑定开关是本规则自己的事
+        self._playstyle_table.setEditTriggers(
+            QTableWidget.EditTrigger.NoEditTriggers)
         self._fix_table_height(self._playstyle_table, 10)
         layout.addWidget(self._playstyle_table)
-        layout.addLayout(
-            self._table_buttons(self._playstyle_table, self._apply_playstyles))
+        hint = QLabel(tr("玩法定义在「游戏配置 → 玩法配置」中维护，此处只引用"))
+        hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        layout.addWidget(hint)
+        ps_btns = QHBoxLayout()
+        self._btn_add_playstyle = QPushButton(tr("新增玩法"))
+        self._btn_add_playstyle.clicked.connect(self._on_add_playstyle_ref)
+        ps_btns.addWidget(self._btn_add_playstyle)
+        self._btn_del_playstyle = QPushButton(tr("删除玩法"))
+        self._btn_del_playstyle.clicked.connect(self._on_del_playstyle_ref)
+        ps_btns.addWidget(self._btn_del_playstyle)
+        apply_button_style(self._btn_add_playstyle)
+        apply_button_style(self._btn_del_playstyle, variant="danger")
+        ps_btns.addStretch()
+        layout.addLayout(ps_btns)
 
         # ── 品阶门槛覆盖（只列出需覆盖全局默认的部位）──
         q_title = QHBoxLayout()
@@ -325,96 +346,6 @@ class RuleSettingsPage(QWidget):
             self._data.pop("quality_thresholds", None)
         self._on_changed()
 
-    # ── 玩法设定表行构建（名字为文本格，其余列为下拉格）──
-
-    def _insert_playstyle_row(self, row: int,
-                              values: tuple = (
-                                  "", "", "", "", "", GENERIC_ATTR, "")):
-        table = self._playstyle_table
-        table.insertRow(row)
-        table.setItem(row, 0, QTableWidgetItem(values[0]))
-        for col in range(1, 7):
-            # 增伤列（col 2/4）候选随同侧武器（col 1/3）绑定收窄
-            candidates = (self._damage_candidates(values[col - 1])
-                          if col in (2, 4) else None)
-            table.setCellWidget(
-                row, col, self._make_cell_combo(col, values[col], candidates))
-
-    def _damage_candidates(self, weapon: str) -> list[str]:
-        """增伤词条候选：武器已绑定武学增效词条时仅保留该词条，
-        未选武器/未绑定时回退全量候选"""
-        bound = self._weapon_affixes.get(weapon.strip()) if weapon else ""
-        return [bound] if bound else self._col_candidates[2]
-
-    def _make_cell_combo(self, col: int, value: str,
-                         candidates: list[str] | None = None,
-                         ) -> QComboBox:
-        """单元格下拉框：候选来自游戏配置数据源；
-        失效旧值保留展示便于改正"""
-        combo = QComboBox()
-        if col in (2, 4):  # 增伤留空项以占位文案展示（收集时仍写入空）
-            combo.addItem(_NO_DAMAGE_LABEL)
-        elif col == 6:  # 绑定开关列：留空 = 不绑定
-            combo.addItem("")
-        elif col != 5:  # 属性列必选（默认通用），无留空项
-            combo.addItem("")  # 留空 = 未配置
-        if candidates is None:
-            candidates = self._col_candidates[col]
-        combo.addItems(candidates)
-        if value and value not in candidates:
-            combo.addItem(value)
-        if col == 6:
-            combo.setCurrentText(value or "")
-        elif col == 5:
-            combo.setCurrentText(value or GENERIC_ATTR)
-        elif col in (2, 4):
-            combo.setCurrentText(value or _NO_DAMAGE_LABEL)
-        else:
-            combo.setCurrentText(value)
-        combo.currentTextChanged.connect(
-            lambda _text: self._on_combo_changed(combo, col))
-        return combo
-
-    def _on_combo_changed(self, combo: QComboBox, col: int):
-        # 武器列变更时先收窄同侧增伤列候选，再统一收集保存
-        if col in (1, 3):
-            self._sync_damage_candidates(combo, col)
-        self._apply_playstyles()
-
-    def _sync_damage_candidates(self, weapon_combo: QComboBox,
-                                weapon_col: int):
-        """重建同侧增伤列候选；现值不在新候选内则重置为留空"""
-        row = self._find_widget_row(weapon_combo, weapon_col)
-        if row < 0:
-            return
-        dmg_col = weapon_col + 1
-        dmg = self._playstyle_table.cellWidget(row, dmg_col)
-        if dmg is None:
-            return
-        current = dmg.currentText()
-        dmg.blockSignals(True)
-        dmg.clear()
-        dmg.addItem(_NO_DAMAGE_LABEL)
-        dmg.addItems(
-            self._damage_candidates(weapon_combo.currentText()))
-        if dmg.findText(current) >= 0:
-            dmg.setCurrentText(current)
-        else:
-            dmg.setCurrentIndex(0)
-        dmg.blockSignals(False)
-
-    def _find_widget_row(self, widget: QWidget, col: int) -> int:
-        table = self._playstyle_table
-        for r in range(table.rowCount()):
-            if table.cellWidget(r, col) is widget:
-                return r
-        return -1
-
-    def _combo_text(self, row: int, col: int) -> str:
-        widget = self._playstyle_table.cellWidget(row, col)
-        text = widget.currentText().strip() if widget else ""
-        return "" if text == _NO_DAMAGE_LABEL else text
-
     # ── 回填 ──
 
     def _load(self):
@@ -428,21 +359,35 @@ class RuleSettingsPage(QWidget):
         self._default_rating_combo.setCurrentIndex(max(idx, 0))
         self._default_rating_combo.blockSignals(False)
 
-        rules = d.get("playstyles") or {}
+        referenced = list(d.get("playstyles") or [])
+        switches = dict(d.get("playstyle_switches") or {})
+        registry = get_game_config().get_playstyles()
+        try:
+            switch_keys = [""] + list(get_tune_config().switches)
+        except Exception:  # noqa: BLE001 — 开关注册表异常不该让规则页打不开
+            switch_keys = [""]
         self._playstyle_table.blockSignals(True)
         self._playstyle_table.setRowCount(0)
-        for name, raw in rules.items():
-            raw = raw or {}
-            main = raw.get("main") or {}
-            sub = raw.get("sub") or {}
-            self._insert_playstyle_row(self._playstyle_table.rowCount(), (
-                name,
-                str(main.get("weapon") or ""),
-                str(main.get("damage") or ""),
-                str(sub.get("weapon") or ""),
-                str(sub.get("damage") or ""),
-                str(raw.get("attr") or GENERIC_ATTR),
-                str(raw.get("switch") or "")))
+        for name in referenced:
+            cfg = registry.get(name) or {}
+            row = self._playstyle_table.rowCount()
+            self._playstyle_table.insertRow(row)
+            for col, text in enumerate((
+                name, cfg.get("main_weapon", ""), cfg.get("main_damage", ""),
+                cfg.get("sub_weapon", ""), cfg.get("attr", ""),
+            )):
+                item = QTableWidgetItem(str(text))
+                if col:
+                    item.setForeground(Qt.GlobalColor.gray)   # 定义只读
+                self._playstyle_table.setItem(row, col, item)
+            # 绑定开关属于本规则：开关控制的是非武器增伤这类判定口径，同一个
+            # 玩法在不同规则下可以绑不同开关，甚至不绑。
+            combo = QComboBox()
+            combo.addItems(switch_keys)
+            combo.setCurrentText(str(switches.get(name) or ""))
+            combo.currentTextChanged.connect(
+                lambda _t: self._apply_playstyles())
+            self._playstyle_table.setCellWidget(row, 5, combo)
         self._playstyle_table.blockSignals(False)
 
         thresholds = d.get("quality_thresholds") or {}
@@ -546,31 +491,59 @@ class RuleSettingsPage(QWidget):
     def _apply_playstyles(self):
         if self._loading:
             return
-        rules: dict = {}
+        # 只写引用名 + 本规则的开关绑定；玩法定义在公共配置里
+        names: list[str] = []
+        switches: dict[str, str] = {}
         for i in range(self._playstyle_table.rowCount()):
             name = self._cell(self._playstyle_table, i, 0)
             if not name:
                 continue
-            rules[name] = {
-                "main": {
-                    "weapon": self._combo_text(i, 1),
-                    "damage": self._combo_text(i, 2) or None,
-                },
-                "sub": {
-                    "weapon": self._combo_text(i, 3),
-                    "damage": self._combo_text(i, 4) or None,
-                },
-                "attr": self._combo_text(i, 5) or GENERIC_ATTR,
-            }
-            # 绑定开关（留空 = 不绑定，不写入字段）
-            sw = self._combo_text(i, 6)
-            if sw:
-                rules[name]["switch"] = sw
-        if rules:
-            self._data["playstyles"] = rules
+            names.append(name)
+            combo = self._playstyle_table.cellWidget(i, 5)
+            bound = combo.currentText().strip() if combo else ""
+            if bound:
+                switches[name] = bound
+        if names:
+            self._data["playstyles"] = names
         else:
             self._data.pop("playstyles", None)
+        if switches:
+            self._data["playstyle_switches"] = switches
+        else:
+            self._data.pop("playstyle_switches", None)
         self._on_changed()
+
+    def _on_add_playstyle_ref(self):
+        """从公共玩法里挑一个加进本规则的引用。"""
+        referenced = set(self._data.get("playstyles") or [])
+        available = sorted(
+            n for n in get_game_config().get_playstyles() if n not in referenced)
+        if not available:
+            QMessageBox.information(
+                self, tr("新增玩法"),
+                tr("所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」"))
+            return
+        name, ok = QInputDialog.getItem(
+            self, tr("新增玩法"), tr("选择要引用的玩法:"), available, 0, False)
+        if not ok or not name:
+            return
+        self._data["playstyles"] = list(
+            self._data.get("playstyles") or []) + [name]
+        self._load()
+        self._apply_playstyles()
+
+    def _on_del_playstyle_ref(self):
+        row = self._playstyle_table.currentRow()
+        if row < 0:
+            return
+        name = self._cell(self._playstyle_table, row, 0)
+        if not name:
+            return
+        self._data["playstyles"] = [
+            n for n in (self._data.get("playstyles") or []) if n != name]
+        (self._data.get("playstyle_switches") or {}).pop(name, None)
+        self._load()
+        self._apply_playstyles()
 
     @staticmethod
     def _cell(table: QTableWidget, row: int, col: int) -> str:

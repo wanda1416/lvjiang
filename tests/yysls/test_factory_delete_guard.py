@@ -121,6 +121,7 @@ class TestPanelsDisableDeleteForFactoryEntries:
         )
         panel = BaseAttrPanel()
         qtbot.addWidget(panel)
+        panel._part_list.setCurrentRow(1)  # 输出系列下方的武器页
         texts = [panel._weapon_list.item(i).text()
                  for i in range(panel._weapon_list.count())]
         idx = next(i for i, t in enumerate(texts) if t.startswith("剑"))

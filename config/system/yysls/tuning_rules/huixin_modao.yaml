@@ -109,14 +109,7 @@ patterns:
           max: 0
 default_rating: excellent
 playstyles:
-  威威:
-    main:
-      weapon: 陌刀
-      damage: 陌刀武学增伤
-    sub:
-      weapon: 枪
-      damage: null
-    attr: 裂石
+- 威威
 common_conditions:
   normal_conditions:
   - - count_min:

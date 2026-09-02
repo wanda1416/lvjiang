@@ -42,7 +42,10 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     TuningGroupManager,
 )
 from lvjiang.apps.yysls.ui.layout_helpers import fit_combo_to_contents
-from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.button_styles import (
+    apply_button_style,
+    apply_dialog_button_box_style,
+)
 
 from .....i18n import tr
 
@@ -72,11 +75,7 @@ class _NewGroupDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
-        apply_button_style(buttons.button(QDialogButtonBox.StandardButton.Ok))
-        apply_button_style(
-            buttons.button(QDialogButtonBox.StandardButton.Cancel),
-            variant="neutral",
-        )
+        apply_dialog_button_box_style(buttons)
         layout.addWidget(buttons)
 
     def _on_accept(self):

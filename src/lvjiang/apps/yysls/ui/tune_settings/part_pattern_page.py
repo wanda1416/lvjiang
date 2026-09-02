@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.core.tuning_rules import RATING_KEYS, RATING_LABELS
-from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.button_styles import apply_button_style, apply_compact_tool_button_style
 
 from .....i18n import tr
 from .affix_picker import AffixSelectSortDialog
@@ -129,7 +129,8 @@ class PartPatternPage(QWidget):
         first_row.addWidget(QLabel("<b>" + tr("首词条") + "</b>"))
         tips_btn = QToolButton()
         tips_btn.setText("ⓘ")
-        tips_btn.setAutoRaise(True)
+        tips_btn.setFixedSize(20, 20)
+        apply_compact_tool_button_style(tips_btn)
         tips_btn.setToolTip(tr(_FIRST_TIPS))
         tips_btn.clicked.connect(
             lambda: QToolTip.showText(QCursor.pos(), tr(_FIRST_TIPS)))

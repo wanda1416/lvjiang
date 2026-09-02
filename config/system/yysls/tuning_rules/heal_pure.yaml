@@ -3,14 +3,7 @@ key: heal_pure
 name: 治疗纯奶
 default_rating: excellent
 playstyles:
-  纯奶:
-    main:
-      weapon: 扇
-      damage: 扇武学增效
-    sub:
-      weapon: 伞
-      damage: null
-    attr: 牵丝
+- 纯奶
 transmute_priority:
 - 最大外功攻击
 - 劲

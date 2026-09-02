@@ -138,10 +138,21 @@ test("未知事件类型被丢弃", async () => {
 test("已知类型但未知 schema 版本被丢弃", async () => {
   const { db, calls } = fakeDB();
   const body = envelope({
-    batches: [{ batch_id: "b", events: [event({ version: 2 })] }],
+    batches: [{ batch_id: "b", events: [event({ version: 3 })] }],
   });
   await worker.fetch(post(body), { DB: db });
   assert.equal(batchInsert(calls), undefined);
+});
+
+test("v2 调律事件及稳定 event_id 正常落库", async () => {
+  const { db, calls } = fakeDB();
+  const body = envelope({
+    batches: [{ batch_id: "b", events: [event({
+      version: 2, event_id: "1".repeat(32),
+    })] }],
+  });
+  await worker.fetch(post(body), { DB: db });
+  assert.equal(batchInsert(calls).args[5], 1);
 });
 
 test("缺 version 字段被丢弃", async () => {

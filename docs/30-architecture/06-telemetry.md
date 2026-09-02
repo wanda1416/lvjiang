@@ -5,7 +5,9 @@
 Cloudflare Workers + D1）两侧。本文档只讲**服务端数据落地之后长什么样、
 以后怎么查**；用户可见的收集范围与隐私边界见 [`PRIVACY.md`](../../PRIVACY.md)，
 客户端的字段白名单机制与采集点见 `core/telemetry/schema.py` 和
-`apps/yysls/workflows/implementations/auto_tuning.py` 的模块注释。
+`apps/yysls/telemetry/history_source.py`。调律事件现在从版本化本地历史中
+投影，用户开启统计时补传最近 7 天尚未上报的数据；完整本地模型、数据表与
+状态机见 [07-tuning-history.md](07-tuning-history.md)。
 
 生产地址：`https://lvjiang-stats.wyxj.net`（Custom Domain，绑在
 `wyxj.net` 这个已有域名下；`*.workers.dev` 默认域名已停用）。

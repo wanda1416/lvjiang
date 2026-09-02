@@ -10,7 +10,7 @@ from lvjiang.apps.yysls.telemetry.schemas import TUNING_SESSION_SCHEMA
 from lvjiang.core.telemetry.schema import FieldSpec, ListSpec
 
 _EXPECTED_FIELDS = frozenset({
-    "install_id", "date", "part", "weapon_type", "level", "quality",
+    "event_id", "install_id", "date", "part", "weapon_type", "level", "quality",
     "mode", "active_rule", "season", "game_config_customized",
     "initial_affixes", "rolls",
     "stop_reason", "final_rating", "total_rounds", "resets",

@@ -43,6 +43,7 @@ default $max_claim_reputation = 1500
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
+import "subcall/page_action.wf"
 
 # 子过程变量表隔离，def 内读不到顶层 $claim_reward，
 # 写入 context 供各动作子过程读取
@@ -78,6 +79,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
 
    # 每轮先扫描一次，完成判定和后续任务匹配共用同一份文字结果。
    scan [activity_jianghu].$label.[label] as $text_result
+   log "任务 " + $idx + "（" + $label + "）初次扫描：" + $text_result.label
    call $task_completed = is_task_completed($text_result)
    if $task_completed
       log "任务 " + $idx + " 在处理前已经完成，跳过任务切换与执行"
@@ -99,6 +101,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
          click [activity_jianghu].$label.[refresh] after wait stable @page_refresh least 0.3
          scan [activity_jianghu].$label.[label] as $text_result
          eval $task_text = $text_result.label
+         log "任务 " + $idx + "（" + $label + "）刷新扫描：" + $task_text
          call $hit = is_target_task($task_text, $targets)
          if $hit
             log "任务 " + $idx + " 刷新命中目标任务"
@@ -112,7 +115,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
 
    # 命中目标任务 → 读取任务文本，分发执行对应动作
    if $hit
-      log "任务 " + $idx + " 命中：" + $task_text
+      log "任务 " + $idx + "（" + $label + "）执行前：" + $task_text
 
       if $task_text contains "换装"
          call action_huanzhuang($label)
@@ -138,6 +141,7 @@ for idx in ["1", "2", "3", "4", "5", "6"]
       # 觉障林未实现，点击会卡页面，无论是否勾选均跳过领奖。
       if $claim_reward and not $task_text contains "觉障林"
          scan [activity_jianghu].$label.[label] as $text_result
+         log "任务 " + $idx + "（" + $label + "）执行后扫描：" + $text_result.label
          call $task_completed = is_task_completed($text_result)
          if $task_completed
             call $haoling_of_week = claim_completed_reward(
@@ -276,7 +280,7 @@ end
 def claim_reward($label, $idx)
    click [activity_jianghu].$label.[label] after wait @step_interval
    log "任务 " + $idx + " 奖励已领取"
-   click [activity_jianghu].[space] after wait @step_interval
+   click [general_control].[blank_area] after wait @step_interval
 end
 
 # ─── 各活动动作过程 ────────────────────────────────────────
@@ -295,24 +299,17 @@ def action_huanzhuang($label)
    click [activity_jianghu].[back] after wait @step_interval
 end
 
-# 合影拍照：点击任务 → 前往 → 拍照页面（动作控制·拍照）→ 等待刷新 → 游戏菜单·返回×2 → 动作控制·返回确认
+# 合影拍照：点击任务 → 前往 → 拍照页面（动作控制·拍照）→ 等待刷新 → 返回×2 → 可选确认
 # 退出拍照会落到游戏首页（桌面），拍照结束后主动返回号令页；
 # 末个任务仅在需要领奖时才返回，否则留在桌面
 def action_heying($label, $idx)
    click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait stable @page_refresh least 0.5
 
-   if env("android")
-      click [general_action].[camera_shot] after wait @page_refresh
-      click [general_action].[back] after wait @step_interval
-      click [general_action].[back] after wait @step_interval
-      click [general_action].[back_confirm] after wait @step_interval
-   else
-      PRESS "SPACE" after wait @page_refresh
-      PRESS "ESC" after wait @step_interval
-      PRESS "ESC" after wait @step_interval
-      PRESS "SPACE" after wait @step_interval
-   end
+   click [general_action].[camera_shot] after wait @page_refresh
+   click [general_action].[back] after wait @step_interval
+   click [general_action].[back] after wait @step_interval
+   call scan_and_confirm("退出拍照", 0)
 
    # 拍照结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
    if $idx equals "6" and not context.claim_reward
@@ -322,14 +319,13 @@ def action_heying($label, $idx)
    end
 end
 
-# 情境：点击任务 → 弹出情境视图（确认×2 → 展开 → 前往编辑情境）
+# 情境：点击任务 → 弹出情境视图（展开 → 前往编辑情境）
 # → 情境编辑视图（保存 → 取消按钮出现则点一次 → 等 6s）
 # → 情境基底返回退回号令页 → 号令页连点两次返回回到号令主页面
 def action_qingjing($label)
    click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait @step_interval
    if env("android")
-      click [activity_jianghu].[confirm] after wait @step_interval
       click [activity_jianghu].[expand_up] after wait @step_interval
    end
    click [activity_jianghu].[goto_qingjing] after wait @secondary_confirm
@@ -346,10 +342,10 @@ def action_qingjing($label)
    click [waiguan_qingjing].[save] after wait @secondary_confirm
    
    # 保存后可能弹出二次确认，识别到取消按钮才点一次
-   scan [waiguan_qingjing].[cancel] as $has_cancel by contains "取消"
+   scan [general_control].[cancel] as $has_cancel by contains "取消"
    if $has_cancel
       log "情境保存弹出取消按钮，点击一次"
-      click [waiguan_qingjing].[cancel] after wait @step_interval
+      click [general_control].[cancel] after wait @step_interval
    end
    # 轮询检查 save 区域是否出现「保存」，最多等待 10 次
    eval $save_i = 0
@@ -434,7 +430,7 @@ end
 # 点第一个选择 → 返回 → 处理确认弹窗 → 检查是否已回到主页
 def do_kanbao()
    click [general_action].[choose_1] after wait stable @page_refresh least 0.5
-   click [general_action].[space_area] after wait stable @page_refresh least 0.5
+   click [general_control].[blank_area] after wait stable @page_refresh least 0.5
 
    # 投票后可能弹出确认弹窗，识别到"确认"则点击"取消"关闭
    scan [general_control].[confirm] as $has_confirm by contains "确认"

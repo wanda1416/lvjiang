@@ -21,9 +21,9 @@ def _build_loadout_panel(host):
     return LoadoutPanel(host)
 
 
-def _build_tuning_progress_tab(host):
-    from .ui.tuning.progress_widget import TuningProgressWidget
-    return TuningProgressWidget()
+def _build_tuning_management_tab(host):
+    from .ui.tuning.management_widget import TuningManagementWidget
+    return TuningManagementWidget()
 
 
 def _build_menu(host, menubar):
@@ -45,7 +45,7 @@ hooks = AppHooks(
     left_tab_builders=[(tr("调律"), _build_tuning_tab)],
     right_tab_builders=[
         (tr("备战方案"), _build_loadout_panel),
-        (tr("调律进度"), _build_tuning_progress_tab),
+        (tr("调律管理"), _build_tuning_management_tab),
     ],
     menu_builders=[_build_menu],
     theme_stylesheet_builders=[_quality_stylesheet],
@@ -74,6 +74,7 @@ hooks = AppHooks(
     # 统计事件 schema（导入即触发 register_schema 注册）
     telemetry_modules=[
         "lvjiang.apps.yysls.telemetry.schemas",
+        "lvjiang.apps.yysls.telemetry.history_source",
     ],
     telemetry_disclosures=[TelemetryDisclosure(
         title=tr("装备调律过程"),
@@ -83,6 +84,7 @@ hooks = AppHooks(
         ),),
         excluded=(tr("游戏账号、角色名、装备名称、装备指纹、截图和日志"),),
         schema_names=("yysls.tuning_session",),
+        historical_upload_days=7,
     )],
 
     # 配置合并策略（导入即触发 register_registry_list_paths /

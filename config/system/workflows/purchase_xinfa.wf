@@ -1,21 +1,49 @@
 #% name: 自动购买心法
 #% env: [android, desktop]
+#% parameters:
+#%   - name: open_bag_xinfa
+#%     label: 打开背包全部心法
+#%     type: bool
+#%     default: false
+#%   - name: max_xinfa_boxes
+#%     label: 最多打开心法心得数
+#%     type: number
+#%     default: 5
+#%     min: 1
 
 # 自动购买心法流程
 #
 # 流程结构：
-#   1. 导航：从首页 → 菜单 → 培养 → 功法 → 心法 → 置换
-#   2. 循环购买：
+#   1. 可选：进入背包普通道具，打开当前页及滚动一次后的全部心法心得
+#   2. 导航：从首页 → 菜单 → 培养 → 功法 → 心法 → 置换
+#   3. 循环购买：
 #      a. 扫描 5 个散本槽位，寻找含"自选"标记的槽位
 #      b. 未找到 → 返回并结束
 #      c. 先执行回收，清空已有心法（避免书票不足或心法过多）
 #      d. 点击目标槽位 → 全部添加 → 购买
 #      e. 检查是否出现确认弹窗（未出现说明书票不足）→ 返回并结束
 #      f. 最大数量添加 → 确认购买 → 点击空白处重置
-#   3. 重复步骤 2 直到无法继续购买
+#   4. 重复步骤 3 直到无法继续购买
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
+
+default $open_bag_xinfa = false
+default $max_xinfa_boxes = 5
+
+# ─── 可选：打开背包中的全部心法心得 ─────────────────────
+if $open_bag_xinfa
+    call $open_result = open_all_bag_xinfa()
+    if $open_result < 0
+        return -1
+    end
+
+    # 原购买流程以主页为起点；清理背包后先恢复原有前置状态。
+    call $back_result = nav_back_to_main()
+    if $back_result < 0
+        return -1
+    end
+end
 
 # ─── 导航：从首页到心法置换视图 ─────────────────────────
 call $nav_result = nav_main_to_menu()
@@ -44,6 +72,87 @@ def go_back()
     click [game_menu_page].[back] after wait @page_refresh
 end
 
+# ─── 打开背包中的全部心法心得 ───────────────────────────
+# 每次 recognize by 只返回第一个命中的格子；处理并等待背包补位后重新扫描。
+# 当前页找不到时按实际可见行数滚动 rows-1 行，并且只滚动一次。
+# 命中分支最多执行 max_xinfa_boxes 次：含滚动后的可见范围内一般不会有更多
+# 独立心法箱子，超出即说明本轮没有真正消耗掉道具（打开失败/确认点空/背包
+# 未补位），继续扫描只会对同一个格子反复点击。
+def open_all_bag_xinfa()
+    call $nav_result = nav_main_to_item()
+    if $nav_result < 0
+        return -1
+    end
+
+    eval $scrolled = false
+    eval $opened_count = 0
+    loop while 1 == 1
+        recognize [bag_item_detail].[bag_grid] as $xinfa_pos \
+            by equals "心法心得" \
+            on group "普通道具" \
+            where confidence >= 0.6
+
+        if $xinfa_pos
+            eval $xinfa_row = $xinfa_pos.row
+            eval $xinfa_col = $xinfa_pos.col
+            log info "找到心法心得：row=" + $xinfa_row + ", col=" + $xinfa_col
+
+            click [bag_item_detail].[bag_grid][$xinfa_row][$xinfa_col] \
+                after wait stable @page_refresh on [general_control].[menu_area]
+
+            # 道具详情的按钮位置可能随文本宽度变化，用 OCR 返回区域直接点击。
+            find [bag_item_detail].[main_area] as $open_btn by contains "打开"
+            if not $open_btn
+                log warn "找到心法心得，但主功能区未找到「打开」按钮"
+                eval pause("心法心得详情中未找到「打开」按钮，请保持现场并检查布局")
+                return -1
+            end
+
+            click $open_btn \
+                after wait stable @page_refresh on [general_control].[menu_area]
+
+            # 有确认按钮的是自选心得：保留默认类型，加到最大后确认。
+            # 没有确认按钮的是直接开启型：点击空白区域关闭结果提示。
+            scan [training_xinfa].[confirm] as $has_confirm by contains "确认"
+            if $has_confirm
+                log info "心法心得需要选择类型，使用默认类型并加到最大"
+                click [training_xinfa].[add_max] after wait @step_interval
+                click [training_xinfa].[confirm] after wait @page_refresh
+                log info "心法心得已选择全部打开，关闭结果提示"
+                click [general_control].[blank_area]
+            else
+                log info "心法心得已直接全部打开，关闭结果提示"
+                click [general_control].[blank_area]
+            end
+
+            wait stable @page_refresh on [general_control].[menu_area]
+            eval $opened_count = $opened_count + 1
+            if $opened_count >= $max_xinfa_boxes
+                log warn "已打开 " + $opened_count \
+                    + " 件心法心得，达到上限 " + $max_xinfa_boxes \
+                    + "，停止扫描并继续购买心法流程"
+                break
+            end
+            continue
+        end
+
+        if not $scrolled
+            eval $visible_rows = panel_rows("bag_item_detail", "bag_grid")
+            eval $scroll_rows = $visible_rows - 1
+            log info "当前页未找到心法心得，背包向上滚动 " + $scroll_rows + " 行"
+            drag [bag_item_detail].[bag_grid] up $scroll_rows
+            wait stable @page_refresh on [general_control].[menu_area]
+            eval $scrolled = true
+            continue
+        end
+
+        log info "背包两段可见范围均无心法心得，继续购买心法流程"
+        break
+    end
+
+    return 0
+end
+
 # 循环购买心法
 loop while 1 == 1
     # 检查有没有找到自选标记
@@ -59,19 +168,11 @@ loop while 1 == 1
     click [training_xinfa].[count] after wait @step_interval
     click [training_xinfa].[recycle_entry] after wait @step_interval
     click [training_xinfa].[recycle] after wait @step_interval
-    if env("android")
-        click [training_xinfa].[confirm] after wait @page_refresh
-    else 
-        press "SPACE" after wait @page_refresh
-    end
+    click [training_xinfa].[confirm] after wait @page_refresh
 
     click [training_xinfa].$zixuan after wait @step_interval
     click [training_xinfa].[add_all] after wait @step_interval
-    if env("android")
-        click [training_xinfa].[purchase] after wait @page_refresh
-    else 
-        press "SPACE" after wait @page_refresh
-    end
+    click [training_xinfa].[purchase] after wait @page_refresh
 
     # 检查购买后是否出现确认按钮（未出现则数量不足）
     scan [training_xinfa].[confirm] as $confirm by contains "确认"
@@ -82,11 +183,6 @@ loop while 1 == 1
     end
 
     click [training_xinfa].[add_max] after wait @step_interval
-    if env("android")
-        click [training_xinfa].[confirm] after wait @page_refresh
-        click [training_xinfa].[blank] after wait @step_interval
-    else 
-        press "SPACE" after wait @page_refresh
-        press "SPACE" after wait @step_interval
-    end
+    click [training_xinfa].[confirm] after wait @page_refresh
+    click [general_control].[blank_area] after wait @step_interval
 end

@@ -16,8 +16,8 @@ GenericTuningJudge 加载 TuningRule（YAML 外置规则）完成 judge
    when 全部匹配才参与判定（未配置的开关视作 False）。
 
 潜力判定（check_tuning_worthiness）按可用词条库（affix_pool，
-声明序即全局价值序）填充空槽、模拟一次转律后复用同一套完整
-定级，返回评级上限（详见 _eval_partial）。
+声明序即全局价值序）填充空槽，并穷举当前装备仍然合法的转律结果后复用
+同一套完整定级，返回评级上限（详见 _eval_partial）。
 
 武器部位按用户勾选的玩法设定（如 纯唐/双切）逐一尝试，装备武器名
 匹配主/副武器即产生一次判定（携带该侧增伤要求与玩法属性），取评级
@@ -258,12 +258,11 @@ class GenericTuningJudge(TuningJudge):
         武器规则要求增伤且缺失时第一个空槽先补增伤（n_free=0 时由
         _grade 判垃圾），其余空槽按候选价值序填满（候选耗尽则留空）。
 
-        模拟转律：非首词条（存在+填充）中按价值挑最差一条转出
-        （池外词条最优先，池内按 affix_pool 排位靠后者优先，身份集
-        取最优排位；增伤词条豁免），转入取转律词条库
-        （transmute_priority，同样经部位过滤）中身份未出现的最高
-        优先级词条，替换后再定级，与不转律基线取评级较高者。填充
-        与转律后均复用 _grade（与完整定级同一套条件求值）。
+        模拟转律：没有已转律词条时，可从全部非首词条中选择转出槽；已有
+        转律词条时，只有非承音装备且当前等级允许无限转律，才能再次转律，
+        并且槽位固定为已转律槽。对每个合法转出槽穷举转律词条库中的全部
+        合法结果，取最终评级上限。填充与转律后均复用 _grade（与完整定级
+        同一套条件求值）。config.can_transmute=false 可显式关闭整个模拟。
         """
         from ...config import get_game_config
         gc = get_game_config()
@@ -323,7 +322,7 @@ class GenericTuningJudge(TuningJudge):
                                   switches=switches)
         reason = label(why)
 
-        # 转律分支：转掉最差一条换转律库最高优先级，取评级较高者
+        # 转律分支：按装备状态确定合法槽位，再穷举所有合法转入词条。
         if filled and self.config.get("can_transmute", True):
             pool = self.rule.pool_set
             order = self.rule.affix_pool
@@ -338,25 +337,44 @@ class GenericTuningJudge(TuningJudge):
                 pos = [order.index(n) for n in ids(t) if n in order]
                 return min(pos) if pos else 10 ** 3
 
-            idx = max(range(len(filled)),
-                      key=lambda i: sac_score(filled[i]))
-            dropped = filled[idx]
-            if sac_score(dropped) >= 0:  # 存在可转出词条（非增伤）
+            transferred = [
+                i for i, affix in enumerate(result.equipment.affixes[1:])
+                if affix.is_transferred
+            ]
+            is_retransfer = bool(transferred)
+            if is_retransfer:
+                level_cfg = gc.level_config_for(result.equipment.level or 0)
+                can_retransfer = (
+                    not result.equipment.is_chengyin
+                    and level_cfg is not None
+                    and level_cfg.allow_retransfer
+                )
+                candidate_indices = transferred if can_retransfer else []
+            else:
+                candidate_indices = list(range(len(filled)))
+
+            # 垃圾/低价值词条优先，只影响同档结果的说明；评级仍穷举取上限。
+            candidate_indices.sort(
+                key=lambda i: sac_score(filled[i]), reverse=True)
+            for idx in candidate_indices:
+                dropped = filled[idx]
+                if sac_score(dropped) < 0:  # 必需增伤不可转出
+                    continue
                 rest = filled[:idx] + filled[idx + 1:]
                 excluded = ids(dropped)
                 for t in rest:
                     excluded |= ids(t)
-                gain = next(
-                    (n for n in self.rule.transmute_priority
-                     if part_ok(n) and not ids(n) & excluded), None)
-                if gain:
+                for gain in self.rule.transmute_priority:
+                    if not part_ok(gain) or ids(gain) & excluded:
+                        continue
                     r2, why2 = self._grade(
                         pattern, damage, first_token, rest + [gain], equiv,
                         switches=switches)
                     if _RANK[r2] > _RANK[rating]:
                         rating = r2
+                        action = "再次转律为" if is_retransfer else "转律为"
                         reason = label(
-                            f"{dropped} 转律为 {gain}，{why2}")
+                            f"{dropped} {action} {gain}，{why2}")
 
         result.rating = rating
         result.reasons.append(reason)

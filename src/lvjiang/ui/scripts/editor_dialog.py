@@ -76,6 +76,7 @@ from ...workflows.file_tree import (
     list_workflow_files,
 )
 from ..button_styles import apply_button_style
+from ..dialog_guards import EscapeCloseConfirmationMixin
 from ..theme import get_theme_manager
 
 #: 脚本 id = 文件名 stem；``_`` 前缀被发现层视为临时文件，不允许
@@ -289,7 +290,7 @@ class WfHighlighter(QSyntaxHighlighter):
 
 # ─── 对话框 ─────────────────────────────────────────────
 
-class ScriptEditorDialog(QDialog):
+class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
     """脚本列表 + 编辑区 + 新建/保存/另存为/删除/检查"""
 
     def __init__(self, main_window=None):

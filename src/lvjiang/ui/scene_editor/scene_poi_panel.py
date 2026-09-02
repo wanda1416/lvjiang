@@ -246,7 +246,7 @@ class PoiPanelMixin:
             is_placed = ref.entity in placed
             assigned = placed_by_key.get(ref.entity)
             cells = [
-                f"{'\u2713' if is_placed else '\u25cb'} {source_def.name}",
+                f"{'✓' if is_placed else '○'} {source_def.name}",
                 ref.entity, source_def.type,
                 "\u2713" if source_def.is_text else "",
                 "\u2713" if source_def.is_clickable else "",
@@ -261,6 +261,7 @@ class PoiPanelMixin:
                 self._point_list.setItem(row, col, item)
             # 「来源」列显示场景名，源 key 退到 tooltip 与行数据
             source_item = self._point_list.item(row, 8)
+            assert source_item is not None
             source_item.setData(Qt.ItemDataRole.UserRole, ref.scene)
             source_item.setToolTip(ref.scene)
 

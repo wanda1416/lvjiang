@@ -13,6 +13,7 @@ import pytest
 
 from lvjiang.core.config import load_user_config
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
+from lvjiang.core.key_validation import validate_layout_activation_keys
 from lvjiang.workflows.engine import WorkflowEngine
 
 
@@ -73,6 +74,38 @@ def test_system_layouts_and_workflows_exist():
     """门禁自身的前提：清单非空，否则下面的参数化会静默零用例通过"""
     assert _system_layouts(), "config/system/layouts 下没有布局，门禁形同虚设"
     assert _system_wf_files(), "config/system/workflows 下没有 .wf"
+
+
+def test_desktop_layout_has_required_activation_bindings():
+    """统一 DSL 后，桌面布局必须把等价实体准确绑定到对应按键。"""
+    layout = _validator("桌面布局")._layout
+    expected = {
+        ("general_control", "confirm"): "SPACE",
+        ("equip_tune_detail", "reset_tune"): "R",
+        ("equip_tune_detail", "reset_confirm"): "SPACE",
+        ("general_action", "camera_shot"): "SPACE",
+        ("general_action", "back"): "ESC",
+        ("training_xinfa", "purchase"): "SPACE",
+        ("training_xinfa", "confirm"): "SPACE",
+        ("baiye_main", "goto_baiye"): "SPACE",
+        ("game_main_page", "menu"): "ESC",
+        ("bag_detail", "back"): "ESC",
+        ("game_menu_page", "back"): "ESC",
+    }
+    for (scene_key, entity_key), activation_key in expected.items():
+        entity = next(
+            item for item in layout.get_scene_regions(scene_key)
+            if item.key == entity_key
+        )
+        assert entity.activation_key == activation_key, (
+            f"{scene_key}.{entity_key} 应绑定 {activation_key}，"
+            f"实际为 {entity.activation_key!r}"
+        )
+
+
+def test_desktop_layout_has_no_activation_key_conflicts():
+    """桌面布局同一场景视图内，一个按键只能表示一个动作。"""
+    validate_layout_activation_keys(_validator("桌面布局")._layout)
 
 
 @pytest.mark.parametrize("layout_name", _system_layouts())

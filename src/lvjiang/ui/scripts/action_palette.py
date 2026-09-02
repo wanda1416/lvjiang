@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 
 from ...i18n import tr
 from ...workflows import action_catalog as cat
+from ..button_styles import apply_button_style
 
 
 @dataclass
@@ -136,6 +137,7 @@ class ActionPalette(QWidget):
         row = QHBoxLayout()
         row.addStretch()
         self.btn_insert = QPushButton(tr("插入到脚本"))
+        apply_button_style(self.btn_insert)
         self.btn_insert.clicked.connect(self._on_insert)
         self.btn_insert.setEnabled(False)
         row.addWidget(self.btn_insert)
@@ -249,6 +251,7 @@ class ActionPalette(QWidget):
             edit.setPlaceholderText({"coord": "(x, y)", "rect": "(x, y, w, h)", "color": "#rrggbb"}[kind])
             edit.textChanged.connect(self._refresh_preview)
             btn = QPushButton(tr("取画布"))
+            apply_button_style(btn, variant="neutral")
             getter = {"coord": self._p.last_coord, "rect": self._p.last_rect, "color": self._p.last_color}[kind]
 
             def fill(_checked=False, _e=edit, _g=getter):

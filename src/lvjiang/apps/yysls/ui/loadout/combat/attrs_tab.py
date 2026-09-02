@@ -369,6 +369,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
     def _on_scheme_changed(self, _scheme: str):
         """毕业率方案切换。"""
         self._refresh_display()
+        self._save_selection()
 
     def _on_equipment_changed(self) -> None:
         """装备变更：清除缓存并刷新显示"""
@@ -440,18 +441,42 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
     # ── 配置选择持久化 ──────────────────────────────────────────
 
     def _save_selection(self):
-        """保存当前配置选择到 session.json settings.combat_attrs_selections"""
+        """按方案保存战斗配置，按用户保存纯显示选项。"""
         from lvjiang.core.config.session import load_settings, save_settings
 
+        if self._restoring:
+            return
         user_name = self._host.active_user_name()
         if not user_name:
             return
 
+        # 属性、弓玦、毕业率方案属于当前备战方案。先比较再写，避免仅切换
+        # 显示选项也无意义地增加方案 revision。
+        try:
+            from ....core.loadout import LoadoutRepository
+
+            repo = LoadoutRepository(user_name)
+            plan = repo.load().active_plan
+            values = (
+                self._combo_play_style.currentText(),
+                self._get_current_gongjue(),
+                self._combo_scheme.currentText(),
+            )
+            if values != (
+                plan.base_attribute, plan.gongjue, plan.graduation_scheme
+            ):
+                repo.configure_plan(
+                    plan.id,
+                    base_attribute=values[0],
+                    gongjue=values[1],
+                    graduation_scheme=values[2],
+                )
+        except Exception as e:
+            logger.debug(f"保存备战方案战斗配置失败: {e}")
+
+        # 复选框只控制页面展示/计算假设，继续按用户保存；下拉框不再写到
+        # 用户级，避免不同备战方案互相覆盖。
         selection = {
-            "school": self._combo_school.currentText(),
-            "play_style": self._combo_play_style.currentText(),
-            "gongjue": self._get_current_gongjue(),
-            "scheme": self._combo_scheme.currentText(),
             "resistance_only": self._chk_resistance_only.isChecked(),
             "full_chengyin": self._chk_full_chengyin.isChecked(),
             "full_dingyin": self._chk_full_dingyin.isChecked(),
@@ -469,8 +494,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         except Exception as e:
             logger.debug(f"保存战斗属性选择失败: {e}")
 
-    def _restore_selection(self):
-        """从 session.json 恢复当前用户的配置选择。
+    def _restore_selection(self, plan=None, school: str | None = None):
+        """恢复当前方案配置和当前用户的显示选项。
 
         回填 4 个下拉框和若干勾选框，每一个都会触发自己的 _on_*_changed →
         _refresh_display()。加载一次用户因此要做 5 次全量属性重算（日志里
@@ -487,25 +512,41 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             settings = load_settings()
             selections = settings.get("combat_attrs_selections", {})
             if not isinstance(selections, dict):
-                return
+                selections = {}
             selection = selections.get(user_name, {})
             if not isinstance(selection, dict):
-                return
+                selection = {}
+
+            if plan is None:
+                from ....core.loadout import LoadoutRepository
+                plan = LoadoutRepository(user_name).load().active_plan
+            if school is None:
+                from ....config import get_game_config
+                from ....core.loadout import resolve_school
+                school = resolve_school(
+                    plan.main_martial_art,
+                    plan.sub_martial_art,
+                    get_game_config().get_schools(),
+                ) or ""
+
+            # 旧版错误保存到用户级的四个下拉字段直接废弃，不迁移到任一
+            # 方案。旧方案缺少新字段时由模型统一按空值读取。
+            play_style = plan.base_attribute
+            gongjue = plan.gongjue
+            scheme = plan.graduation_scheme
 
             self._restoring = True
-            school = selection.get("school", "")
-            play_style = selection.get("play_style", "")
-            gongjue = selection.get("gongjue", "")
-            scheme = selection.get("scheme", "")
             resistance_only = selection.get("resistance_only", False)
 
-            # 恢复流派
+            # 流派由当前方案的主副武学派生，不读取用户级旧选择。
             if school:
                 idx = self._combo_school.findText(school)
                 if idx >= 0:
                     self._combo_school.setCurrentIndex(idx)
-                    self._refresh_play_styles()
-                    self._refresh_schemes()
+            else:
+                self._combo_school.setCurrentIndex(0)
+            self._refresh_play_styles()
+            self._refresh_schemes()
 
             # 恢复基础属性
             if play_style:
@@ -514,10 +555,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                     self._combo_play_style.setCurrentIndex(idx)
 
             # 恢复弓玦
-            if gongjue:
-                idx = self._combo_gongjue.findData(gongjue)
-                if idx >= 0:
-                    self._combo_gongjue.setCurrentIndex(idx)
+            idx = self._combo_gongjue.findData(gongjue)
+            self._combo_gongjue.setCurrentIndex(max(0, idx))
 
             # 恢复方案；不存在或失效时保留第一项
             if scheme:
@@ -535,6 +574,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                 selection.get("full_dingyin", False))
             self._chk_full_level.setChecked(
                 selection.get("full_level", False))
+
         except Exception as e:
             logger.debug(f"恢复战斗属性选择失败: {e}")
         finally:

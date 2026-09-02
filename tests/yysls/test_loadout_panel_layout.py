@@ -139,6 +139,132 @@ def test_panel_refresh_reloads_edited_equipped_snapshot(
     assert combat._equipped_cache["head"]["name"] == "编辑后"
 
 
+def test_plan_switch_restores_independent_combat_selections(
+        qtbot, tmp_path, monkeypatch):
+    """属性、弓玦和毕业率方案随备战方案切换，不能按用户共享。"""
+    import lvjiang.apps.yysls.config as game_config_module
+    import lvjiang.constants
+
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    monkeypatch.setattr(
+        game_config_module, "get_play_styles",
+        lambda _school: {"属性甲": {}, "属性乙": {}},
+    )
+    game_config = game_config_module.get_game_config()
+    monkeypatch.setattr(
+        game_config, "get_graduation_schemes",
+        lambda _school: ["方案甲", "方案乙"],
+    )
+
+    repo = LoadoutRepository("alice", tmp_path)
+    first = repo.load().active_plan_id
+    repo.configure_plan(
+        first,
+        main_martial_art="无名剑法",
+        sub_martial_art="无名枪法",
+        base_attribute="属性甲",
+        gongjue="会意",
+        graduation_scheme="方案甲",
+    )
+    second = repo.create_plan("方案乙", "无名剑法", "无名枪法").id
+    repo.configure_plan(
+        second,
+        base_attribute="属性乙",
+        gongjue="精准",
+        graduation_scheme="方案乙",
+    )
+    repo.switch_plan(first)
+
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    combat = panel._character._combat_attrs_tab
+
+    assert combat._combo_school.currentText() == "鸣金·虹"
+    assert combat._combo_play_style.currentText() == "属性甲"
+    assert combat._get_current_gongjue() == "会意"
+    assert combat._combo_scheme.currentText() == "方案甲"
+
+    panel._plans.setCurrentIndex(panel._plans.findData(second))
+
+    assert combat._combo_school.currentText() == "鸣金·虹"
+    assert combat._combo_play_style.currentText() == "属性乙"
+    assert combat._get_current_gongjue() == "精准"
+    assert combat._combo_scheme.currentText() == "方案乙"
+
+    # 修改 B 后，A 的选择保持不变；切回 A 必须完整恢复。
+    combat._combo_gongjue.setCurrentIndex(
+        combat._combo_gongjue.findData("会心"))
+    assert LoadoutRepository("alice", tmp_path).load().plans[first].gongjue == "会意"
+    panel._plans.setCurrentIndex(panel._plans.findData(first))
+    assert combat._combo_play_style.currentText() == "属性甲"
+    assert combat._get_current_gongjue() == "会意"
+    assert combat._combo_scheme.currentText() == "方案甲"
+
+
+def test_legacy_user_dropdown_selection_is_ignored(
+        qtbot, tmp_path, monkeypatch):
+    """旧版错误共享的下拉选择直接废弃，不能污染当前方案。"""
+    import json
+
+    import lvjiang.apps.yysls.config as game_config_module
+    import lvjiang.constants
+
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    session_path = tmp_path / "session.json"
+    monkeypatch.setattr(lvjiang.constants, "SESSION_PATH", session_path)
+    monkeypatch.setattr(
+        game_config_module, "get_play_styles",
+        lambda _school: {"默认属性": {}, "旧属性": {}},
+    )
+    game_config = game_config_module.get_game_config()
+    monkeypatch.setattr(
+        game_config, "get_graduation_schemes",
+        lambda _school: ["默认方案", "旧方案"],
+    )
+
+    repo = LoadoutRepository("alice", tmp_path)
+    state = repo.load()
+    repo.configure_plan(
+        state.active_plan_id,
+        main_martial_art="无名剑法",
+        sub_martial_art="无名枪法",
+    )
+    # 模拟旧版方案 JSON：三项方案级字段尚不存在。
+    payload = json.loads(repo.path.read_text(encoding="utf-8"))
+    plan_json = payload["plans"][payload["active_plan_id"]]
+    for key in ("base_attribute", "gongjue", "graduation_scheme"):
+        plan_json.pop(key)
+    repo.path.write_text(
+        json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    session_path.write_text(json.dumps({"settings": {
+        "combat_attrs_selections": {"alice": {
+            "school": "鸣金·虹",
+            "play_style": "旧属性",
+            "gongjue": "会心",
+            "scheme": "旧方案",
+        }}
+    }}, ensure_ascii=False), encoding="utf-8")
+
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    combat = panel._character._combat_attrs_tab
+
+    assert combat._combo_play_style.currentText() == "默认属性"
+    assert combat._get_current_gongjue() == ""
+    assert combat._combo_scheme.currentText() == "默认方案"
+    unchanged = LoadoutRepository("alice", tmp_path).load().active_plan
+    assert (
+        unchanged.base_attribute,
+        unchanged.gongjue,
+        unchanged.graduation_scheme,
+    ) == ("", "", "")
+
 def test_inventory_sync_can_publish_equipment_change(monkeypatch):
     """已穿戴模拟装备编辑完同步卡片时，必须通知毕业率消费者。"""
     from lvjiang.apps.yysls.ui.loadout.equip import status_tab

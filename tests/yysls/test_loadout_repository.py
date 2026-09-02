@@ -204,6 +204,64 @@ def test_create_plan_requires_both_martial_arts(tmp_path: Path):
     assert (plan.main_martial_art, plan.sub_martial_art) == ("主功法", "副功法")
 
 
+def test_combat_selections_are_independent_per_plan(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    first = repo.load().active_plan_id
+    second = repo.create_plan("second", "主功法", "副功法").id
+
+    repo.configure_plan(
+        first,
+        base_attribute="属性甲",
+        gongjue="会意",
+        graduation_scheme="方案甲",
+    )
+    repo.configure_plan(
+        second,
+        base_attribute="属性乙",
+        gongjue="精准",
+        graduation_scheme="方案乙",
+    )
+
+    reloaded = repo.load()
+    assert (
+        reloaded.plans[first].base_attribute,
+        reloaded.plans[first].gongjue,
+        reloaded.plans[first].graduation_scheme,
+    ) == ("属性甲", "会意", "方案甲")
+    assert (
+        reloaded.plans[second].base_attribute,
+        reloaded.plans[second].gongjue,
+        reloaded.plans[second].graduation_scheme,
+    ) == ("属性乙", "精准", "方案乙")
+
+
+def test_legacy_plan_defaults_new_combat_selections_to_empty(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    state = repo.load()
+    payload = state.to_dict()
+    plan = payload["plans"][state.active_plan_id]
+    plan.pop("base_attribute")
+    plan.pop("gongjue")
+    plan.pop("graduation_scheme")
+    repo.path.write_text(json.dumps(payload), encoding="utf-8")
+
+    legacy = repo.load().active_plan
+
+    assert (
+        legacy.base_attribute,
+        legacy.gongjue,
+        legacy.graduation_scheme,
+    ) == ("", "", "")
+
+    # 旧方案下一次正常写入时，直接按新结构落盘，不迁移任何用户级旧值。
+    repo.configure_plan(legacy.id, name="旧方案改名")
+    saved = json.loads(repo.path.read_text(encoding="utf-8"))
+    saved_plan = saved["plans"][legacy.id]
+    assert saved_plan["base_attribute"] == ""
+    assert saved_plan["gongjue"] == ""
+    assert saved_plan["graduation_scheme"] == ""
+
+
 def test_cannot_delete_last_plan(tmp_path: Path):
     repo = LoadoutRepository("alice", tmp_path)
     with pytest.raises(ValueError):

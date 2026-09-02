@@ -35,6 +35,11 @@ class LoadoutPlan:
     # 候选由两个武学**无序**匹配出来——主副只是顺序标签，判别式是「要谁的
     # 增伤」。武学没登记进任何玩法时留空，此时只是算不出定音目标，方案照常可用。
     playstyle: str = ""
+    # 战斗属性页“当前配置”中随备战方案切换的三项选择。流派由主副武学
+    # 派生，不重复存储；显示选项属于用户偏好，仍保存在 session settings。
+    base_attribute: str = ""
+    gongjue: str = ""
+    graduation_scheme: str = ""
     equipment: dict[str, str | None] = field(default_factory=_empty_slots)
 
     @classmethod
@@ -55,6 +60,9 @@ class LoadoutPlan:
             main_martial_art=str(data.get("main_martial_art") or ""),
             sub_martial_art=str(data.get("sub_martial_art") or ""),
             playstyle=str(data.get("playstyle") or ""),
+            base_attribute=str(data.get("base_attribute") or ""),
+            gongjue=str(data.get("gongjue") or ""),
+            graduation_scheme=str(data.get("graduation_scheme") or ""),
             equipment=slots,
         )
 
@@ -64,6 +72,9 @@ class LoadoutPlan:
             "main_martial_art": self.main_martial_art,
             "sub_martial_art": self.sub_martial_art,
             "playstyle": self.playstyle,
+            "base_attribute": self.base_attribute,
+            "gongjue": self.gongjue,
+            "graduation_scheme": self.graduation_scheme,
             "equipment": dict(self.equipment),
         }
 

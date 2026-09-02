@@ -7,6 +7,7 @@
 """
 
 import json
+from types import SimpleNamespace
 
 import pytest
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -29,6 +30,10 @@ class _FakeHost(QObject):
         self.stop_requests = 0
         self.logs: list[str] = []
         self.run_calls: list[tuple] = []
+        self.user_manager = SimpleNamespace(
+            list_users=lambda: ["测试用户", "备用用户"],
+            get_active_user_name=lambda: "测试用户",
+        )
 
     @property
     def is_running(self) -> bool:
@@ -43,8 +48,11 @@ class _FakeHost(QObject):
     def active_user_name(self) -> str:
         return "测试用户"
 
-    def run_workflow_implementation(self, impl_name, flow_name, configure):
-        self.run_calls.append((impl_name, flow_name, configure))
+    def run_workflow_implementation(
+        self, impl_name, flow_name, configure, *, execution_username=None,
+    ):
+        self.run_calls.append(
+            (impl_name, flow_name, configure, execution_username))
 
 
 @pytest.fixture
@@ -72,6 +80,17 @@ def _make_tab(qtbot, host):
 # ─── 会话加载 / 保存 ───────────────────────────────────────
 
 class TestSessionRoundtrip:
+    def test_execution_user_defaults_to_follow_and_is_not_persisted(
+        self, qtbot, host, session_path,
+    ):
+        tab = _make_tab(qtbot, host)
+        assert tab._execution_user_selector.combo.currentText() == "跟随当前用户"
+        tab._execution_user_selector.combo.setCurrentIndex(
+            tab._execution_user_selector.combo.findData("备用用户"))
+
+        rebuilt = _make_tab(qtbot, host)
+        assert rebuilt._execution_user_selector.combo.currentText() == "跟随当前用户"
+
     def test_load_selected_slots_from_session(self, qtbot, host, session_path):
         session_path.write_text(json.dumps({
             "wf_configs": {"auto_tuning": {"selected_slots": ["ring", "head"]}},
@@ -168,6 +187,8 @@ class TestF9Run:
 
     def test_starts_via_host_with_configure(self, qtbot, host, session_path):
         tab = _make_tab(qtbot, host)
+        tab._execution_user_selector.combo.setCurrentIndex(
+            tab._execution_user_selector.combo.findData("备用用户"))
         # 通过 UI 设置部位（触发 _save_tuning_config 写入 wf_configs）
         for cb in tab._tuning_checkboxes:
             cb.setChecked(cb.objectName() in ("ring", "head"))
@@ -180,9 +201,10 @@ class TestF9Run:
         tab.f9_run()
 
         assert len(host.run_calls) == 1
-        impl_name, flow_name, configure = host.run_calls[0]
+        impl_name, flow_name, configure, execution_username = host.run_calls[0]
         assert impl_name == "auto_tuning"
         assert flow_name == "自动调律"
+        assert execution_username == "备用用户"
 
         # configure 回调向工作流实例注入运行上下文并输出开始日志
         class _Wf:
@@ -291,7 +313,7 @@ class TestSkipTarget:
         tab.f9_run()
 
         assert len(host.run_calls) == 1
-        _, _, configure = host.run_calls[0]
+        _, _, configure, _ = host.run_calls[0]
 
         class _Wf:
             pass
@@ -307,7 +329,7 @@ class TestSkipTarget:
         tab._sp_target_col.setValue(5)
         tab.f9_run()
 
-        _, _, configure = host.run_calls[0]
+        _, _, configure, _ = host.run_calls[0]
 
         class _Wf:
             pass

@@ -31,6 +31,10 @@ class _FailingWorkflow(_StoppingWorkflow):
         raise ValueError("boom")
 
 
+class _SilentFailingWorkflow(_FailingWorkflow):
+    LOG_PARTIAL_OUTPUT_ON_FAILURE = False
+
+
 def test_python_workflow_treats_break_signal_as_normal_stop(monkeypatch):
     """DSL 子调用传播的停止信号不应被记录为 Python 异常。"""
     errors = []
@@ -79,6 +83,26 @@ def test_partial_output_is_logged_before_failure_propagates(caplog):
     dumped = "".join(records)
     assert "失败前已产生的输出" in dumped
     assert "processed" in dumped and "4" in dumped
+
+
+def test_workflow_can_suppress_partial_output_dump_without_hiding_failure():
+    from lvjiang.workflows.engine import core as core_mod
+
+    engine = make_engine()
+    records: list[str] = []
+    handler = core_mod.logger.add(
+        lambda message: records.append(message),
+        level="ERROR",
+        format="{message}",
+    )
+    try:
+        with pytest.raises(WorkflowExecutionError) as caught:
+            engine._execute_python_workflow(_SilentFailingWorkflow())
+    finally:
+        core_mod.logger.remove(handler)
+
+    assert caught.value.partial_output == {"processed": 4}
+    assert "失败前已产生的输出" not in "".join(records)
 
 
 def test_logging_failure_does_not_mask_the_real_exception():

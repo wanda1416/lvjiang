@@ -46,6 +46,13 @@
                 android:paddingBottom="6dp" />
 
             <TextView
+                android:id="@+id/check_pc_connection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:paddingBottom="6dp" />
+
+            <TextView
                 android:id="@+id/check_overlay"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

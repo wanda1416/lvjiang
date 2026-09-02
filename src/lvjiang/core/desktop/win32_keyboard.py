@@ -25,22 +25,15 @@ KEYEVENTF_EXTENDEDKEY = 0x0001
 # PostMessage 键盘消息常量
 _WM_KEYDOWN = 0x0100
 _WM_KEYUP = 0x0101
-_WM_SYSKEYDOWN = 0x0104
-_WM_SYSKEYUP = 0x0105
 
 # 扩展键集合（需要 KEYEVENTF_EXTENDEDKEY 标志）
 # 仅包含扫描码带 0xE0 前缀的键；左修饰键（LSHIFT=0x2A/LCTRL=0x1D/LALT=0x38）
 # 无 E0 前缀，不应设置此标志。SHIFT/CTRL/ALT 映射到左侧 VK，同样不包含。
 _EXTENDED_KEYS = {
-    0xA3, 0xA5,        # RCONTROL, RMENU (RALT)
-    0x90,        # NUMLOCK
-    0x91,        # SCROLL
-    0x24, 0x25,  # HOME, END
-    0x21, 0x22,  # PRIOR (PGUP), NEXT (PGDN)
-    0x26, 0x28,  # UP, DOWN
-    0x23, 0x27,  # LEFT, RIGHT
-    0x2D, 0x2E,  # INSERT, DELETE
-    0x5B, 0x5C,  # LWIN, RWIN
+    "RCTRL", "RALT", "NUMLOCK",
+    "HOME", "END", "PAGEUP", "PAGEDOWN",
+    "UP", "DOWN", "LEFT", "RIGHT", "INSERT", "DELETE",
+    "LWIN", "RWIN", "NUMPAD_DIVIDE", "NUMPAD_ENTER",
 }
 
 
@@ -79,8 +72,27 @@ KEY_NAME_TO_VK: dict[str, int] = {
     **{str(d): 0x30 + d for d in range(10)},
     # 小键盘 0-9
     **{f"NUMPAD{d}": 0x60 + d for d in range(10)},
+    "NUMPAD_MULTIPLY": 0x6A,
+    "NUMPAD_ADD": 0x6B,
+    "NUMPAD_SUBTRACT": 0x6D,
+    "NUMPAD_DECIMAL": 0x6E,
+    "NUMPAD_DIVIDE": 0x6F,
+    "NUMPAD_ENTER": 0x0D,
     # 功能键 F1-F12
     **{f"F{i}": 0x70 + i - 1 for i in range(1, 13)},
+    # 主键盘 OEM 标点物理键
+    "GRAVE": 0xC0,
+    "MINUS": 0xBD,
+    "EQUALS": 0xBB,
+    "LBRACKET": 0xDB,
+    "RBRACKET": 0xDD,
+    "BACKSLASH": 0xDC,
+    "SEMICOLON": 0xBA,
+    "APOSTROPHE": 0xDE,
+    "COMMA": 0xBC,
+    "PERIOD": 0xBE,
+    "SLASH": 0xBF,
+    "OEM102": 0xE2,
     # 特殊键
     "ESC": 0x1B,
     "ENTER": 0x0D,
@@ -156,11 +168,10 @@ def post_keyboard_input(hwnd: int, vk: int, scan: int, flags: int) -> None:
         flags: 0（按下）或 KEYEVENTF_KEYUP（释放），可组合 KEYEVENTF_EXTENDEDKEY
     """
     lparam = _make_key_lparam(scan, flags)
-    is_extended = bool(flags & KEYEVENTF_EXTENDEDKEY)
     if flags & KEYEVENTF_KEYUP:
-        msg = _WM_SYSKEYUP if is_extended else _WM_KEYUP
+        msg = _WM_KEYUP
     else:
-        msg = _WM_SYSKEYDOWN if is_extended else _WM_KEYDOWN
+        msg = _WM_KEYDOWN
     _user32.PostMessageW(wintypes.HWND(hwnd), msg, vk, lparam)
 
 
@@ -180,5 +191,4 @@ def key_to_vk_scan(key: str) -> tuple[int, int]:
 
 def is_extended_key(key: str) -> bool:
     """判断标准化键名是否为扩展键（需要 KEYEVENTF_EXTENDEDKEY 标志）"""
-    vk = KEY_NAME_TO_VK[key]
-    return vk in _EXTENDED_KEYS
+    return key in _EXTENDED_KEYS

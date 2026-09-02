@@ -3,6 +3,8 @@ package com.lvjiang.app
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.View
@@ -16,10 +18,9 @@ import java.util.concurrent.Executors
 /**
  * MainActivity — 主页：权限状态卡 + 功能区 + 开发者自检。
  *
- * 权限状态卡（普通用户可见面）：权限清单 + 一颗主按钮，按钮永远指向下一件
- * 要做的事（无障碍 → 悬浮窗 → 启动悬浮图标），每步附一行操作提示。
- * 通知权限不单独设步：不是硬门槛（缺了只是前台通知不显示），在启动
- * 悬浮图标时顺带申请一次。
+ * 权限状态卡（普通用户可见面）：明确显示辅助与 PC 连接状态。PC 设备端手势
+ * 只要求无障碍（或高级用户使用 Shizuku），不把手机独立任务所需的悬浮窗
+ * 误报为前置条件；悬浮窗与通知都在功能区按需授权。
  *
  * 功能区：调律参数配置入口（TuningConfigActivity，不依赖任何权限）+
  * 悬浮图标启停合一按钮（文案随 FloatService.isRunning 切换）。
@@ -35,6 +36,16 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
     private val executor = Executors.newSingleThreadExecutor()
+    private val ui = Handler(Looper.getMainLooper())
+    private val statusPoller = object : Runnable {
+        override fun run() {
+            if (!isSelfTest()) {
+                refreshGuide()
+                refreshStatus()
+                ui.postDelayed(this, STATUS_POLL_INTERVAL_MS)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -136,13 +147,11 @@ class MainActivity : AppCompatActivity() {
 
     // ── 首次启动引导 ──────────────────────────────────────
 
-    /** 当前引导进度：主按钮永远指向第一个未完成项 */
-    private enum class GuideStep { A11Y, OVERLAY, FLOAT, READY }
+    /** 当前引导进度：PC 手势只把辅助通道作为硬门槛。 */
+    private enum class GuideStep { A11Y, READY }
 
     private fun currentStep(): GuideStep = when {
         !A11yBridge.isReady() -> GuideStep.A11Y
-        !Settings.canDrawOverlays(this) -> GuideStep.OVERLAY
-        !FloatService.isRunning -> GuideStep.FLOAT
         else -> GuideStep.READY
     }
 
@@ -152,9 +161,14 @@ class MainActivity : AppCompatActivity() {
         val notif = notificationGranted()
 
         findViewById<TextView>(R.id.check_a11y).text =
-            "${mark(a11y)} 无障碍服务（必需，截屏与点击都靠它）"
+            "${mark(a11y)} 辅助已开启（PC 端手势必需）"
+        findViewById<TextView>(R.id.check_pc_connection).text = if (AgentServer.isPcConnected()) {
+            "✅ PC 已连接（${AgentServer.activeConnectionCount()}）"
+        } else {
+            "⬜ PC 未连接（等待 ADB 连接）"
+        }
         findViewById<TextView>(R.id.check_overlay).text =
-            "${mark(overlay)} 悬浮窗（必需，悬浮图标的容身之处）"
+            "${mark(overlay)} 悬浮窗（仅手机独立运行任务需要）"
         findViewById<TextView>(R.id.check_notification).text =
             "${mark(notif)} 通知（建议，缺了只是看不到运行状态通知）"
 
@@ -165,17 +179,9 @@ class MainActivity : AppCompatActivity() {
                 btn.text = getString(R.string.guide_step_a11y)
                 hint.text = getString(R.string.guide_hint_a11y)
             }
-            GuideStep.OVERLAY -> {
-                btn.text = getString(R.string.guide_step_overlay)
-                hint.text = getString(R.string.guide_hint_overlay)
-            }
-            GuideStep.FLOAT -> {
-                btn.text = getString(R.string.guide_step_float)
-                hint.text = getString(R.string.guide_hint_float)
-            }
             GuideStep.READY -> {
                 btn.text = getString(R.string.guide_all_ready)
-                hint.text = getString(R.string.guide_hint_float)
+                hint.text = getString(R.string.guide_hint_ready)
             }
         }
 
@@ -192,7 +198,13 @@ class MainActivity : AppCompatActivity() {
             stopService(Intent(this, FloatService::class.java))
         } else {
             if (!Settings.canDrawOverlays(this)) {
-                toast("请先授予悬浮窗权限")
+                toast("手机独立运行任务需要悬浮窗权限")
+                startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:$packageName"),
+                    )
+                )
                 return
             }
             startForegroundService(Intent(this, FloatService::class.java))
@@ -207,23 +219,10 @@ class MainActivity : AppCompatActivity() {
                 toast("请在列表里找到「律匠自动操作」并开启")
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
-            GuideStep.OVERLAY -> startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName"),
-                )
+            GuideStep.READY -> toast(
+                if (AgentServer.isPcConnected()) "辅助已开启，PC 已连接"
+                else "辅助已开启，正在等待 PC 通过 ADB 连接"
             )
-            GuideStep.FLOAT -> {
-                // 通知权限顺带申请，不单独设步：拒授也不阻塞使用
-                if (!notificationGranted()) {
-                    requestPermissions(
-                        arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 100)
-                }
-                startForegroundService(Intent(this, FloatService::class.java))
-                // isRunning 要等 onCreate 跑完才翻真，稍等一拍再刷新
-                statusText.postDelayed({ refreshGuide() }, 500)
-            }
-            GuideStep.READY -> toast("悬浮图标已在运行，可直接使用")
         }
     }
 
@@ -291,21 +290,36 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         // 自检期间不刷状态：刷一下就会把「点击已生效」或报告正文覆掉，
         // 而闭环自检正是靠读屏幕上的这些字来判定的
-        if (intent?.getStringExtra("selftest") == null) {
+        if (!isSelfTest()) {
             refreshGuide()
             refreshStatus()
+            ui.removeCallbacks(statusPoller)
+            ui.postDelayed(statusPoller, STATUS_POLL_INTERVAL_MS)
         }
     }
 
+    override fun onPause() {
+        ui.removeCallbacks(statusPoller)
+        super.onPause()
+    }
+
+    private fun isSelfTest(): Boolean = intent?.getStringExtra("selftest") != null
+
     private fun refreshStatus() {
         val overlay = if (Settings.canDrawOverlays(this)) "已授予" else "未授予"
-        val a11y = if (A11yBridge.isReady()) "已连接" else "未开启（必需）"
+        val a11y = if (A11yBridge.isReady()) "已开启" else "未开启（PC 手势必需）"
         val shizuku = when {
             !ShellBridge.isShizukuAlive() -> "未运行"
             ShellBridge.hasPermission() -> "已授权"
             else -> "未授权"
         }
-        statusText.text = "悬浮窗：$overlay\n无障碍：$a11y\nShizuku：$shizuku（可选）"
+        val pc = if (AgentServer.isPcConnected()) {
+            "已连接（${AgentServer.activeConnectionCount()}）· ${AgentServer.lastCommandSummary()}"
+        } else {
+            "未连接"
+        }
+        statusText.text =
+            "PC：$pc\n辅助：$a11y\n悬浮窗：$overlay（手机独立运行可选）\nShizuku：$shizuku（可选）"
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
@@ -318,5 +332,6 @@ class MainActivity : AppCompatActivity() {
 
         /** 哨兵行：adb 侧靠它判断报告已输出完整，不必靠等固定秒数 */
         private const val SELFTEST_END = "=== SELFTEST END ==="
+        private const val STATUS_POLL_INTERVAL_MS = 1000L
     }
 }

@@ -12,6 +12,7 @@
 
 import pytest
 
+from lvjiang.core.input_base import InputBackendKind
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine
@@ -67,6 +68,34 @@ class TestPressMode:
 
 
 class TestComboKeys:
+    def test_inline_shift_grave_combo(self):
+        """单条组合键按书写顺序按下、逆序释放，字符别名转物理键。"""
+        _, inp = _run('press "SHIFT" + "`"\n')
+
+        assert [call.args[0] for call in inp.key_down.call_args_list] == [
+            "SHIFT", "GRAVE",
+        ]
+        assert [call.args[0] for call in inp.key_up.call_args_list] == [
+            "GRAVE", "SHIFT",
+        ]
+
+    def test_inline_three_key_combo(self):
+        _, inp = _run('press "CTRL" + "SHIFT" + "S"\n')
+
+        assert [call.args[0] for call in inp.key_down.call_args_list] == [
+            "CTRL", "SHIFT", "S",
+        ]
+        assert [call.args[0] for call in inp.key_up.call_args_list] == [
+            "S", "SHIFT", "CTRL",
+        ]
+
+    def test_duplicate_inline_key_is_rejected_before_input(self):
+        eng = make_engine()
+        program = parse_text('press "CTRL" + "CTRL"\n')
+        with pytest.raises(WorkflowUserError, match="重复按键"):
+            eng._exec_body(program.body)
+        eng._input.key_down.assert_not_called()
+
     def test_ctrl_c_combo(self):
         """组合键：CTRL down → C → CTRL up"""
         code = '''press "CTRL" down
@@ -107,6 +136,54 @@ press "W" down
         """press "W" hold -1 → 报错"""
         with pytest.raises(WorkflowUserError, match="> 0"):
             _run('press "W" hold -1\n')
+
+    def test_validate_only_rejects_invalid_literal_before_execution(
+        self, wf_root,
+    ):
+        wf = wf_root / "invalid_key.wf"
+        wf.write_text('press "NOT_A_KEY"\n', encoding="utf-8")
+
+        with pytest.raises(WorkflowUserError, match="press 使用了非法按键"):
+            make_engine().validate_only(wf)
+
+    def test_validate_only_accepts_alias_and_dynamic_key(self, wf_root):
+        wf = wf_root / "valid_keys.wf"
+        wf.write_text(
+            'press "escape"\n'
+            'eval $key = "SPACE"\n'
+            'press $key\n',
+            encoding="utf-8",
+        )
+
+        make_engine().validate_only(wf)
+
+
+class TestReservedGlobalHotkeys:
+    def test_sendinput_rejects_current_hotkey(self, monkeypatch):
+        from lvjiang.core import config as config_mod
+
+        monkeypatch.setattr(
+            config_mod, "load_settings",
+            lambda: {"hotkeys": {
+                "start": "F7", "stop": "F8", "pause": "F9", "record": "F12",
+            }},
+        )
+        eng = make_engine()
+        eng._input.kind = InputBackendKind.SEND
+        program = parse_text('press "F8"\n')
+
+        with pytest.raises(WorkflowUserError, match="当前全局热键 F8"):
+            eng._exec_body(program.body)
+        eng._input.key_down.assert_not_called()
+
+    def test_postmessage_can_send_same_key(self):
+        eng = make_engine()
+        eng._input.kind = InputBackendKind.POST
+        program = parse_text('press "F10"\n')
+
+        eng._exec_body(program.body)
+
+        eng._input.key_down.assert_called_once_with("F10")
 
 
 class TestCleanup:

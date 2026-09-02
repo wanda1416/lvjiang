@@ -706,29 +706,80 @@ class _ActionsMixin:
             from .key_state import KeyStateRegistry
             self._key_registry = KeyStateRegistry(self._input)
 
-        key_raw = self._resolve(node.key)
-        if key_raw is None:
-            raise WorkflowUserError("press: 按键变量未定义")
-        key = normalize_key(str(key_raw))
+        keys: list[str] = []
+        for item in node.keys or (node.key,):
+            key_raw = self._resolve(item)
+            if key_raw is None:
+                raise WorkflowUserError("press: 按键变量未定义")
+            keys.append(normalize_key(str(key_raw)))
+        if len(set(keys)) != len(keys):
+            raise WorkflowUserError(f"press 组合键包含重复按键: {' + '.join(keys)}")
+
+        # SendInput 进入系统全局键盘钩子；发送当前配置的开始/停止/暂停/录制
+        # 热键会反过来控制本程序。PostMessage 只投递目标窗口，不作此限制。
+        from ...core.input_base import InputBackendKind
+        if getattr(self._input, "kind", InputBackendKind.UNKNOWN) is InputBackendKind.SEND:
+            from ...core.config import HotkeyConfig, load_settings
+            raw_hotkeys = load_settings().get("hotkeys", {})
+            known_hotkeys = {"start", "stop", "pause", "record"}
+            hotkeys = (HotkeyConfig(**{
+                name: value for name, value in raw_hotkeys.items()
+                if name in known_hotkeys
+            }) if isinstance(raw_hotkeys, dict) else HotkeyConfig())
+            reserved = {
+                hotkeys.start, hotkeys.stop, hotkeys.pause, hotkeys.record,
+            }
+            conflicts = [key for key in keys if key in reserved]
+            if conflicts:
+                raise WorkflowUserError(
+                    "SendInput 前台模式禁止 press 当前全局热键 "
+                    f"{', '.join(conflicts)}；请改用 PostMessage 后台模式，"
+                    "或先在配置管理→热键设置中改绑")
+
         reg = self._key_registry
+
+        def down_all() -> list[str]:
+            pressed: list[str] = []
+            try:
+                for key in keys:
+                    reg.key_down(key)
+                    pressed.append(key)
+            except Exception:
+                for key in reversed(pressed):
+                    try:
+                        reg.key_up(key)
+                    except Exception:
+                        logger.exception(f"press 组合键回滚释放 {key} 失败")
+                raise
+            return pressed
+
+        def up_all(pressed: list[str]) -> None:
+            first_error: Exception | None = None
+            for key in reversed(pressed):
+                try:
+                    reg.key_up(key)
+                except Exception as exc:
+                    first_error = first_error or exc
+            if first_error is not None:
+                raise first_error
 
         match node.mode:
             case PressMode.PRESS:
-                logger.debug(f"press: {key}")
-                reg.key_down(key)
+                logger.debug(f"press: {' + '.join(keys)}")
+                pressed = down_all()
                 try:
                     # down/up 之间留短暂随机间隔，确保 Windows/目标应用识别为
                     # 一次有效按键（零间隔时部分应用会忽略，认为从未真正按下）
                     time.sleep(random.uniform(0.025, 0.035))
                 finally:
-                    reg.key_up(key)
+                    up_all(pressed)
 
             case PressMode.HOLD:
                 duration = float(self._resolve(node.duration))
                 if duration <= 0:
                     raise WorkflowUserError(f"press hold 时长必须 > 0，得到 {duration}")
-                logger.debug(f"press: {key} hold {duration}s")
-                reg.key_down(key)
+                logger.debug(f"press: {' + '.join(keys)} hold {duration}s")
+                pressed = down_all()
                 try:
                     # 可中断等待：暂停阻塞不触发 finally，停止抛 _BreakSignal 触发 finally
                     deadline = time.monotonic() + duration
@@ -740,15 +791,20 @@ class _ActionsMixin:
                         remaining = deadline - time.monotonic()
                         time.sleep(min(0.05, max(0.0, remaining)))
                 finally:
-                    reg.key_up(key)
+                    up_all(pressed)
 
             case PressMode.DOWN:
-                logger.debug(f"press: {key} down")
-                reg.key_down(key)
+                logger.debug(f"press: {' + '.join(keys)} down")
+                down_all()
 
             case PressMode.UP:
-                logger.debug(f"press: {key} up")
-                reg.key_up(key)
+                logger.debug(f"press: {' + '.join(keys)} up")
+                # 先完整校验，避免组合键只释放一半才发现状态错误。
+                missing = [key for key in keys if not reg.is_pressed(key)]
+                if missing:
+                    raise WorkflowUserError(
+                        f"Key '{missing[0]}' is not pressed")
+                up_all(keys)
 
     def _exec_wait(self, node: Wait):
         delay = node.delay

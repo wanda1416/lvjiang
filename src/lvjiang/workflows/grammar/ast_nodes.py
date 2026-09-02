@@ -268,6 +268,7 @@ class Press:
     mode: PressMode = PressMode.PRESS
     duration: Any = None  # None | float | VarRef（hold 模式必须有且 > 0）
     line_no: int = 0
+    keys: tuple[Any, ...] = ()  # 组合键；置后以兼容 Press(key, mode, ...) 调用
 
 
 @dataclass(frozen=True)

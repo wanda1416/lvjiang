@@ -28,7 +28,7 @@ from .input_trace import (
     InputTrace,
     InputTraceEvent,
 )
-from .key_names import KNOWN_KEY_NAMES
+from .key_names import CHARACTER_TO_KEY_NAME, KNOWN_KEY_NAMES
 
 try:
     from pynput import keyboard as pynput_keyboard
@@ -63,7 +63,7 @@ _SPECIAL_KEY_NAMES: dict[str, str] = {
     "backspace": "BACKSPACE", "delete": "DELETE", "insert": "INSERT",
     "home": "HOME", "end": "END", "page_up": "PAGEUP", "page_down": "PAGEDOWN",
     "up": "UP", "down": "DOWN", "left": "LEFT", "right": "RIGHT",
-    "shift": "SHIFT", "shift_l": "SHIFT", "shift_r": "SHIFT",
+    "shift": "SHIFT", "shift_l": "LSHIFT", "shift_r": "RSHIFT",
     "ctrl": "CTRL", "ctrl_l": "LCTRL", "ctrl_r": "RCTRL",
     "alt": "ALT", "alt_l": "LALT", "alt_r": "RALT", "alt_gr": "RALT",
     "cmd": "WIN", "cmd_l": "LWIN", "cmd_r": "RWIN",
@@ -88,6 +88,9 @@ def _pynput_key_to_dsl_name(key) -> str | None:
     """
     char = getattr(key, "char", None)
     if char:
+        physical = CHARACTER_TO_KEY_NAME.get(char)
+        if physical:
+            return physical
         name = char.upper()
         return name if name in KNOWN_KEY_NAMES else None
     name = _SPECIAL_KEY_NAMES.get(getattr(key, "name", ""))

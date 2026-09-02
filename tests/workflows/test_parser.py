@@ -1082,6 +1082,12 @@ def test_press_no_wait():
     assert isinstance(program.body[0], Press)
 
 
+def test_press_inline_combo():
+    program = parse_text('press "SHIFT" + "`"\n')
+    assert program.body[0].key == "SHIFT"
+    assert program.body[0].keys == ("SHIFT", "`")
+
+
 def test_press_after_wait_stable():
     """press "KEY" after wait stable -> [Press, WaitStable]"""
     program = parse_text('press "A" after wait stable 5')

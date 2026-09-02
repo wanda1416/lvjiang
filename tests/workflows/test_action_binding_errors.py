@@ -50,9 +50,18 @@ class _FakeInput:
     def __init__(self):
         self.clicks = []
         self.drags = []
+        self.keys = []
+        self.before_click_wait = (0, 0)
+        self.after_click_wait = (0, 0)
 
-    def click_screen(self, x, y, tag):
-        self.clicks.append((x, y, tag))
+    def click_screen(self, x, y, tag, **kw):
+        self.clicks.append((x, y, tag, kw))
+
+    def key_down(self, key):
+        self.keys.append(("down", key))
+
+    def key_up(self, key):
+        self.keys.append(("up", key))
 
     def drag_screen(self, x1, y1, x2, y2, tag, duration=None, hold=None):
         self.drags.append((x1, y1, x2, y2, tag))
@@ -91,6 +100,32 @@ def test_click_region_bound_still_clicks():
     actor = _Actor(_FakeLayout(regions=[_region("btn_ok")]))
     actor.click_region(SCENE, "btn_ok")
     assert len(actor._input.clicks) == 1
+
+
+def test_click_region_with_activation_key_presses_instead_of_clicking():
+    region = Region(
+        key="btn_ok", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
+        activation_key="space",
+    )
+    actor = _Actor(_FakeLayout(regions=[region]), capture_size=(0, 0))
+
+    actor.click_region(SCENE, "btn_ok", pre_delay=(0, 0), post_delay=(0, 0))
+
+    assert actor._input.clicks == []
+    assert actor._input.keys == [("down", "SPACE"), ("up", "SPACE")]
+
+
+def test_explicit_right_click_ignores_activation_key():
+    region = Region(
+        key="btn_ok", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
+        activation_key="SPACE",
+    )
+    actor = _Actor(_FakeLayout(regions=[region]))
+
+    actor.click_region(SCENE, "btn_ok", button="right")
+
+    assert actor._input.keys == []
+    assert actor._input.clicks[0][3] == {"button": "right"}
 
 
 def test_click_any_unbound_raises():

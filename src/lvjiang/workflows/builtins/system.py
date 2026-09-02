@@ -38,9 +38,19 @@ def _confirm(_engine=None, message: str = "", *args) -> bool:
     return native_confirm(text)
 
 
+def pause_user(_engine=None, message: str = "", *args) -> str:
+    """暂停执行，直到用户点击确定。"""
+    text = _build_text(message or tr("工作流已暂停，点击确定继续"), args)
+    if _engine is not None and getattr(_engine, '_ui_callback', None) is not None:
+        _engine._ui_callback("pause", message=text)
+        return ""
+    native_pause(text)
+    return ""
+
+
 @builtin_func("pause")
 def _pause(_engine=None, message: str = "", *args) -> str:
-    """暂停执行，直到用户点击确定
+    """暂停 DSL 执行，直到用户点击确定。
 
     通过 engine._ui_callback 调度到 Qt 主线程显示。
 
@@ -48,13 +58,7 @@ def _pause(_engine=None, message: str = "", *args) -> str:
         eval pause("请手动处理异常，完成后点击确定")
         eval pause()    # 无消息暂停
     """
-    text = _build_text(message or tr("工作流已暂停，点击确定继续"), args)
-    if _engine is not None and getattr(_engine, '_ui_callback', None) is not None:
-        _engine._ui_callback("pause", message=text)
-        return ""
-    # 回退：平台原生弹窗
-    native_pause(text)
-    return ""
+    return pause_user(_engine, message, *args)
 
 
 @builtin_func("notify")
@@ -162,7 +166,7 @@ def _env(_engine=None, name: str | None = None) -> str | bool:
 
         # 条件判断
         if env("desktop")
-            send_key esc
+            press "esc"
         end
 
         if env("android")

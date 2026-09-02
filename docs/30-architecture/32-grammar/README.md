@@ -16,7 +16,8 @@
 | [03.1-basic-commands.md](03.1-basic-commands.md) | 基础指令：collect、eval、default、call、log |
 | [03.2-interaction.md](03.2-interaction.md) | 时间与辅助：wait、wait stable、align、screenshot |
 | [03.3-mouse.md](03.3-mouse.md) | 鼠标操作：click、drag、后缀等待子句、隐藏延迟 |
-| [03.4-keyboard.md](03.4-keyboard.md) | 键盘输入：press 四种模式、KeyStateRegistry、键名表 |
+| [03.4-keyboard.md](03.4-keyboard.md) | 键盘输入：press 四种模式、状态管理和后端机制 |
+| [03.5-key-reference.md](03.5-key-reference.md) | 按键速查：物理键名、字符别名、组合键和平台限制 |
 | [04-data-flow.md](04-data-flow.md) | 感知指令概览与对比表 |
 | [04.1-scan.md](04.1-scan.md) | scan — OCR 文字扫描 |
 | [04.2-recognize.md](04.2-recognize.md) | recognize — 图像材料识别 |
@@ -112,10 +113,10 @@ Panel   → 可寻址网格容器（[r][c] 二维索引，r/c 从 1 开始）
 
 ## 五、交互指令
 
-### click — 点击
+### click — 激活
 
 ```
-click [scene].[region]                  # 点击区域中心
+click [scene].[region]                  # 按布局激活：默认点击中心，也可绑定按键
 click [scene].$var                      # 动态区域
 click [scene].[panel][r][c]             # Panel 格子中心
 click [scene].[panel]                   # Panel 中心
@@ -155,7 +156,8 @@ wait (1, 2)                             # 随机范围
 
 ```
 wait stable <timeout>                                           # 基本形式
-wait stable <timeout> threshold <v> interval <v> duration <v> least <v>  # 完整参数
+wait stable <timeout> on [scene].[region]                       # 只比较指定区域
+wait stable <timeout> [on [scene].[region]] threshold <v> interval <v> duration <v> least <v>
 ```
 
 | 参数 | 默认值 | 说明 |
@@ -165,8 +167,19 @@ wait stable <timeout> threshold <v> interval <v> duration <v> least <v>  # 完�
 | `interval` | 0.3 | 截图间隔 |
 | `duration` | 0.5 | 需持续稳定的时长 |
 | `least` | 0.5 | 最低等待秒数 |
+| `on` | 全画面 | 当前布局中的普通区域 `[scene].[region]`；只在该区域内计算帧差异 |
 
-所有参数支持字面量 / `@命名延迟` / `$变量`。可作为 click/drag 子句：`click ... after wait stable 5`。
+时间及阈值参数支持字面量 / `@命名延迟` / `$变量`。`on` 的场景名和区域名也可使用变量，例如 `on $scene.$region`。`on` 必须位于 `timeout` 之后、其他选项之前；省略时比较整张截图。
+
+区域限定会按当前布局的画布与区域坐标换算出像素裁剪框，适合排除角色动画、粒子等无关变化。它只支持普通 Region，不支持坐标点、方向、网格单元或三段子场景引用。静态区域在执行前校验，动态区域在运行时解析；未绑定或禁用会报错。
+
+可作为操作的等待子句：
+
+```wf
+click [scene].[button] after wait stable 5 on [scene].[content]
+```
+
+等待区域不会自动继承操作目标；不写 `on` 的内联 `wait stable` 仍检查全画面。完整说明见 [03.2-interaction.md](03.2-interaction.md#12-稳定等待wait-stable)。
 
 ### align / screenshot
 

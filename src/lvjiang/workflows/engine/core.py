@@ -17,6 +17,7 @@ from ...core.config import DelayParam, InputSimConfig
 from ...core.config.resolver import get_resolver
 from ...core.input_base import InputBackend
 from ...core.input_trace import InputTrace, InputTraceError, load_input_trace
+from ...core.key_validation import validate_key_name
 from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
 from ...core.recognizers import ReferenceRecognizer
@@ -233,13 +234,17 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         if self.statement_hook is None and not self.step_mode:
             return
         line_no = getattr(node, "line_no", 0) or 0
+        # 必须在通知 UI 前清除事件。若先 emit，UI 的“单步”可能立刻 set，
+        # 随后又被工作线程 clear，导致这次放行永久丢失。
+        pause_event = self._pause_event if self.step_mode else None
+        if pause_event is not None:
+            pause_event.clear()
         if self.statement_hook is not None:
             try:
                 self.statement_hook(line_no, dict(self.variables))
             except Exception as e:  # noqa: BLE001 — 调试面板出错不能把脚本带崩
                 logger.warning(f"statement_hook 异常: {e}")
-        if self.step_mode and self._pause_event is not None:
-            self._pause_event.clear()
+        if pause_event is not None:
             self._wait_if_paused()
             # 「停止」是靠 set 事件把阻塞中的引擎唤醒的——醒来后必须再看一眼停止标志，
             # 否则会把当前这条语句执行掉才在下一条边界退出
@@ -354,6 +359,9 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
         # 静态校验：wait 引用的命名等待参数必须已定义，未定义直接报错不执行
         self._validate_named_waits(program)
+        # 静态校验：press 的字面量按键必须存在于公共合法键名库。
+        # 变量按键无法预知，仍由执行时 normalize_key 校验。
+        self._validate_literal_press_keys(program)
         # 静态校验：脚本引用的场景 / 区域 / 方向 / 面板必须已在当前布局绑定坐标
         self._validate_refs_bound(program, reachable_only=reachable_only)
         # 高精度轨迹在执行任何动作前完成路径与内容校验（含 import 引入的过程）。
@@ -727,6 +735,45 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             raise WorkflowUserError(
                 f"wait 引用了未定义的等待参数: {detail}，请先在配置管理→等待参数中定义")
 
+    def _validate_literal_press_keys(self, program) -> None:
+        """校验顶层及 import/def 中的 ``press \"KEY\"`` 字面量。"""
+        problems: list[str] = []
+        self._collect_invalid_press_keys(
+            program.body, str(program.source or ""), problems)
+        for name, proc in self._procs.items():
+            self._collect_invalid_press_keys(
+                proc.body, self._proc_sources.get(name, ""), problems)
+        if problems:
+            raise WorkflowUserError(
+                "press 使用了非法按键：\n" + "\n".join(problems))
+
+    def _collect_invalid_press_keys(
+        self, stmts: list, source: str, problems: list[str],
+    ) -> None:
+        """递归收集非法 press 字面量；``press $var`` 不在静态范围内。"""
+        for node in stmts:
+            if isinstance(node, Press):
+                for key in node.keys or (node.key,):
+                    if not isinstance(key, str):
+                        continue
+                    try:
+                        validate_key_name(key)
+                    except ValueError:
+                        location = (f"{source}:{node.line_no}"
+                                    if source else f"行 {node.line_no}")
+                        problems.append(f"{location}: {key!r}")
+            if isinstance(node, If):
+                self._collect_invalid_press_keys(
+                    node.then_body, source, problems)
+                self._collect_invalid_press_keys(
+                    node.else_body, source, problems)
+            elif isinstance(node, (For, ForRange, Loop, WhileLoop, UntilLoop)):
+                self._collect_invalid_press_keys(node.body, source, problems)
+            elif isinstance(node, Try):
+                self._collect_invalid_press_keys(node.body, source, problems)
+                self._collect_invalid_press_keys(
+                    node.catch_body, source, problems)
+
     def _collect_missing_waits(self, stmts: list, missing: dict[str, int]):
         """递归收集语句体中引用未定义命名等待的 Wait / WaitStable 节点"""
         for node in stmts:
@@ -803,12 +850,13 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             # 意外异常必须作为失败传播到运行线程/UI。过去这里返回部分 output，
             # 调用方会按“正常完成”保存 session 和结果，掩盖真实失败。
             #
-            # 失败前已产生的输出在这里记进日志：异常一路抛到 UI 后走的是
-            # 「异常退出」分支，那条路不落盘结果，output/ 下不会有 JSON。
-            # 崩溃排障时人看的是日志，把数据留在这儿比挂在异常上更实用
-            # ——挂着但无人读取，只会让人误以为它被妥善保存了。
+            # 默认把失败前已产生的输出记进日志：异常一路抛到 UI 后走的是
+            # 「异常退出」分支，那条路不落盘结果。拥有专用报告且输出很大的
+            # 工作流可关闭该日志；partial_output 仍保留在异常对象中。
             name = workflow.__class__.__name__
-            if workflow.output:
+            log_partial_output = getattr(
+                workflow, "LOG_PARTIAL_OUTPUT_ON_FAILURE", True)
+            if workflow.output and log_partial_output:
                 # default=str：output 里可能有 dataclass / Path 等非 JSON 类型。
                 # 整段再套 try：日志失败绝不能盖住真正的异常。
                 try:

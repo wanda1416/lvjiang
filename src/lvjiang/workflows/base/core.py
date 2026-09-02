@@ -32,6 +32,10 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
     # 函数的 UI 交互 confirm/pause/input 走 Qt 主线程桥）
     _engine: Optional["WorkflowEngine"] = None
 
+    # 通用工作流异常时会把已产生的结构化输出写入日志帮助排障。拥有专用
+    # 报告/历史视图且输出体量很大的工作流可关闭，异常本身仍照常传播。
+    LOG_PARTIAL_OUTPUT_ON_FAILURE = True
+
     @property
     def engine(self) -> Optional["WorkflowEngine"]:
         """获取执行引擎引用（供 subcall 桥等需要访问引擎的场景使用）"""

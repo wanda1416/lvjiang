@@ -478,8 +478,15 @@ class _StmtMixin:
 
     # ─── press 指令 ─────────────────────────────────────
 
+    def press_key_chain(self, items):
+        """组合键各项；字符串去引号，变量保持 VarRef。"""
+        return tuple(
+            item if isinstance(item, VarRef) else self._unquote(str(item))
+            for item in items
+        )
+
     def press_stmt(self, items):
-        """press "KEY"|$var [hold N | down | up] [before|after|around wait ...]
+        """press key ("+" key)* [hold N | down | up] [wait ...]
 
         按键名可以是字符串字面量，也可以是变量——引擎侧 _exec_press 用
         _resolve 取值后统一 str() 再 normalize_key，所以变量存数字也能按
@@ -488,9 +495,8 @@ class _StmtMixin:
         wait_clause 展开为独立 Wait 语句，按语义顺序排列：before 在前，after 在后。
         press 没有默认延迟，不需要 suppress_defaults。
         """
-        key_node = items[0]  # Token(STRING) | VarRef
-        key = (key_node if isinstance(key_node, VarRef)
-               else self._unquote(str(key_node)))
+        keys = tuple(items[0])
+        key = keys[0]
         mode = PressMode.PRESS
         duration = None
         # 先用共享 helper 提取 wait_pairs
@@ -502,7 +508,9 @@ class _StmtMixin:
             if isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], PressMode):
                 mode, duration = item
 
-        press_node = Press(key=key, mode=mode, duration=duration, line_no=self._line(items))
+        press_node = Press(
+            key=key, keys=keys, mode=mode, duration=duration,
+            line_no=self._line(items))
         return self._expand_wait_clauses(press_node, wait_pairs)
 
     def press_hold(self, items):

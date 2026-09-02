@@ -11,6 +11,7 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.EOFException
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * AgentServer — 把设备端的无障碍 / Shizuku 能力借给 PC 端用的代理通道。
@@ -50,6 +51,20 @@ object AgentServer {
     @Volatile
     private var server: LocalServerSocket? = null
 
+    private val activeClients = AtomicInteger(0)
+
+    @Volatile
+    private var connectedSinceMs = 0L
+
+    @Volatile
+    private var lastOp = ""
+
+    @Volatile
+    private var lastOpOk = false
+
+    @Volatile
+    private var lastOpAtMs = 0L
+
     /** 应用 Context（App.onCreate 登记），标定覆盖层要用；无障碍服务在时优先用它的 */
     @Volatile
     var appContext: android.content.Context? = null
@@ -58,6 +73,16 @@ object AgentServer {
     private val dispatchLock = Any()
 
     fun isRunning(): Boolean = server != null
+
+    fun activeConnectionCount(): Int = activeClients.get()
+
+    fun isPcConnected(): Boolean = activeConnectionCount() > 0
+
+    fun lastCommandSummary(): String = when {
+        lastOp.isEmpty() -> "尚无指令"
+        lastOpOk -> "$lastOp 成功"
+        else -> "$lastOp 失败"
+    }
 
     /** 幂等启动；socket 名被占用（极少见）只记日志，不影响 app 其它功能 */
     @Synchronized
@@ -104,6 +129,7 @@ object AgentServer {
     }
 
     private fun serve(client: LocalSocket) {
+        var counted = false
         try {
             val uid = try {
                 client.peerCredentials.uid
@@ -114,6 +140,17 @@ object AgentServer {
                 Log.w(TAG, "拒绝来自 uid=$uid 的连接（只接受 adb / 本进程）")
                 return
             }
+            val count = activeClients.incrementAndGet()
+            counted = true
+            if (count == 1) {
+                connectedSinceMs = System.currentTimeMillis()
+                lastOp = ""
+                lastOpOk = false
+                lastOpAtMs = 0L
+            }
+            // PC 控制期间隐藏悬浮球并收起面板，避免进入 screencap/scrcpy 截图，
+            // 也避免用户从悬浮面板并行发起另一套操作。
+            FloatService.setPcConnected(true)
             val input = DataInputStream(client.inputStream.buffered())
             val output = DataOutputStream(client.outputStream.buffered())
             while (true) {
@@ -134,6 +171,13 @@ object AgentServer {
         } catch (e: IOException) {
             Log.d(TAG, "连接结束: ${e.message}")
         } finally {
+            if (counted) {
+                val remaining = activeClients.decrementAndGet().coerceAtLeast(0)
+                if (remaining == 0) {
+                    connectedSinceMs = 0L
+                    FloatService.setPcConnected(false)
+                }
+            }
             try {
                 client.close()
             } catch (_: IOException) {
@@ -163,12 +207,18 @@ object AgentServer {
             return fail("请求不是合法 JSON: ${e.message}")
         }
         val op = req.optString("op", "")
-        return try {
+        val result = try {
             synchronized(dispatchLock) { dispatch(op, req) }
         } catch (e: Throwable) {
             Log.e(TAG, "op=$op 执行异常", e)
             fail("$op 执行异常: $e")
         }
+        if (op.isNotEmpty() && op != "ping" && op != "status") {
+            lastOp = op
+            lastOpOk = result.first.optBoolean("ok", false)
+            lastOpAtMs = System.currentTimeMillis()
+        }
+        return result
     }
 
     private fun dispatch(op: String, req: JSONObject): Pair<JSONObject, ByteArray?> = when (op) {
@@ -199,6 +249,12 @@ object AgentServer {
         // 屏幕映射：非恒等时 PC 端在连接日志里提示一句，免得用户不知道点击坐标被改写过
         put("calib_identity", ScreenMap.current().isIdentity)
         put("screen", screenInfo())
+        put("pc_connected", isPcConnected())
+        put("pc_connections", activeConnectionCount())
+        put("pc_connected_since_ms", connectedSinceMs)
+        put("last_op", lastOp)
+        put("last_op_ok", lastOpOk)
+        put("last_op_at_ms", lastOpAtMs)
     }
 
     // ─── 屏幕映射标定（截图坐标 → 输入坐标，见 ScreenMap / CalibOverlay）──────

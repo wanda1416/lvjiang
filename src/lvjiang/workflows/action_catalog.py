@@ -138,10 +138,10 @@ CAT_DATA = tr("数据与输出")
 
 ACTIONS: tuple[Action, ...] = (
     # ── 交互 ──
-    Action("click_region", tr("点击区域"), CAT_INTERACT,
+    Action("click_region", tr("激活区域"), CAT_INTERACT,
            "click {scene}.{region}{wait}",
            (Slot("scene", tr("场景"), "scene"), Slot("region", tr("区域/点"), "region"), _wait_slot()),
-           doc=tr("点击布局里已定义的区域或坐标点中心"), keywords=("click",)),
+           doc=tr("激活布局实体；默认点击中心，布局可改为按键"), keywords=("click",)),
     Action("click_coord", tr("点击坐标"), CAT_INTERACT,
            "click {coord}{wait}",
            (Slot("coord", tr("坐标"), "coord", help=tr("画布上点一下取值")), _wait_slot()),

@@ -2,7 +2,7 @@
 
 > Layer owner：L7 Contract（PC 与设备 app 之间的线协议）
 > Feeds/Affects：L8 `src/lvjiang/core/android/agent.py`、`android/.../AgentServer.kt`；L6 ADB 模式的截图/输入后端选择
-> Stability：稳定（协议版本 1；两端实现必须同步改）
+> Stability：稳定（协议版本 2；两端实现必须同步改）
 
 ## 为什么要有它
 
@@ -26,7 +26,11 @@ PC 端 ADB 模式原先只有两条路控制手机：`adb shell input tap/swipe`
 - PC 端：`adb forward tcp:<27300–27399 随机> localabstract:lvjiang-agent`，TCP 连 `127.0.0.1:<port>`。
 - 安全：服务端校验对端 uid，只接受 adbd（shell 2000 / root 0）与本进程；其它 app 的连接直接断开。
 - 一个连接上请求串行，一问一答；服务端对所有 op 加全局锁，跨连接也串行。
-- PC 侧传输失败（断线/超时）就地重连一次（forward 仍在）；再失败抛 `AgentTransportError`。
+- PC 侧握手不仅校验协议，还要求无障碍或 Shizuku 至少一条输入通道可用；App 在线但输入
+  通道均未就绪时拒绝代理并回退 ADB。传输失败（断线/超时）就地重连一次，再失败抛
+  `AgentTransportError`；设备端返回 `ok=false` 也向工作流传播，不能把未执行的手势当成功。
+- App 主页每秒刷新“辅助 / PC 连接 / 最近指令”状态。PC 连接存在期间悬浮球自动隐藏并
+  收起面板，避免进入 PC 截图或与 PC 工作流并行操作；最后一条连接断开后恢复显示。
 
 ## 帧格式
 
@@ -54,7 +58,7 @@ PC 端 ADB 模式原先只有两条路控制手机：`adb shell input tap/swipe`
 
 | op | 请求字段 | 响应 |
 |---|---|---|
-| `ping` / `status` | — | `protocol`、`app`（versionName）、`sdk`、`a11y`、`shizuku`（在跑）、`shizuku_granted`、`calib_identity`（屏幕映射是否恒等）、`screen{w,h,rotation}` |
+| `ping` / `status` | — | `protocol`、`app`（versionName）、`sdk`、`a11y`、`shizuku`（在跑）、`shizuku_granted`、`calib_identity`、`screen{w,h,rotation}`，以及仅供 App/诊断展示的 `pc_connected`、`pc_connections`、`pc_connected_since_ms`、`last_op`、`last_op_ok`、`last_op_at_ms` |
 | `screenshot` | `via`、`timeout_ms`(5000) | a11y：`fmt:"rgba"`, `w`, `h` + RGBA 裸字节；shell：`fmt:"png"` + PNG。节流失败 `retryable:true` |
 | `tap` | `x`,`y`,`duration_ms`(50) | — |
 | `long_press` | `x`,`y`,`duration_ms`(800) | — |

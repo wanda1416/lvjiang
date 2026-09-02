@@ -4,14 +4,24 @@ from types import SimpleNamespace
 
 import pytest
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QCheckBox, QPushButton
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QDialogButtonBox,
+    QMessageBox,
+    QPushButton,
+)
 
 from lvjiang.ui.button_styles import (
     ACTION_BUTTON_STYLE,
+    COMPACT_TOOL_BUTTON_STYLE,
     DANGER_BUTTON_STYLE,
     NEUTRAL_BUTTON_STYLE,
     apply_button_style,
+    apply_compact_tool_button_style,
+    apply_dialog_button_box_style,
+    apply_message_box_button_style,
 )
+from lvjiang.ui.notices.about_dialog import AboutDialog
 from lvjiang.ui.ocr.dialog import OCRDialog
 from lvjiang.ui.scripts.config_dialog import ScriptConfigDialog
 from lvjiang.ui.widgets import centered_cell_widget
@@ -34,6 +44,69 @@ def test_shared_button_styles_keep_geometry_consistent(qtbot):
     for button in (action, neutral, danger):
         assert "border-radius: 5px" in button.styleSheet()
         assert "padding: 5px 11px" in button.styleSheet()
+
+
+def test_compact_tool_button_uses_dedicated_style(qtbot):
+    from PyQt6.QtWidgets import QToolButton
+
+    button = QToolButton()
+    qtbot.addWidget(button)
+    apply_compact_tool_button_style(button)
+
+    assert button.styleSheet() == COMPACT_TOOL_BUTTON_STYLE
+
+
+def test_about_dialog_actions_use_shared_styles(qtbot):
+    dialog = AboutDialog()
+    qtbot.addWidget(dialog)
+
+    assert dialog._check_update_btn.styleSheet() == ACTION_BUTTON_STYLE
+    assert dialog._github_btn.styleSheet() == ACTION_BUTTON_STYLE
+
+
+def test_message_box_standard_buttons_use_shared_styles(qtbot):
+    box = QMessageBox(
+        QMessageBox.Icon.Question,
+        "title",
+        "message",
+        QMessageBox.StandardButton.Yes
+        | QMessageBox.StandardButton.No
+        | QMessageBox.StandardButton.Cancel,
+    )
+    qtbot.addWidget(box)
+
+    apply_message_box_button_style(box)
+
+    yes = box.button(QMessageBox.StandardButton.Yes)
+    no = box.button(QMessageBox.StandardButton.No)
+    cancel = box.button(QMessageBox.StandardButton.Cancel)
+    assert yes.styleSheet() == ACTION_BUTTON_STYLE
+    assert no.styleSheet() == NEUTRAL_BUTTON_STYLE
+    assert cancel.styleSheet() == NEUTRAL_BUTTON_STYLE
+
+
+def test_dialog_button_box_standard_buttons_use_shared_styles(qtbot):
+    box = QDialogButtonBox(
+        QDialogButtonBox.StandardButton.Save
+        | QDialogButtonBox.StandardButton.Cancel
+        | QDialogButtonBox.StandardButton.Discard
+    )
+    qtbot.addWidget(box)
+
+    apply_dialog_button_box_style(box)
+
+    assert (
+        box.button(QDialogButtonBox.StandardButton.Save).styleSheet()
+        == ACTION_BUTTON_STYLE
+    )
+    assert (
+        box.button(QDialogButtonBox.StandardButton.Cancel).styleSheet()
+        == NEUTRAL_BUTTON_STYLE
+    )
+    assert (
+        box.button(QDialogButtonBox.StandardButton.Discard).styleSheet()
+        == DANGER_BUTTON_STYLE
+    )
 
 
 def test_centered_cell_widget_centers_checkbox(qtbot):

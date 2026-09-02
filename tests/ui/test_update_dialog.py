@@ -36,4 +36,6 @@ def test_four_action_buttons_are_single_row_and_equal_size(qtbot):
     assert len({button.y() for button in buttons}) == 1
     assert len({button.height() for button in buttons}) == 1
     assert max(button.width() for button in buttons) - min(button.width() for button in buttons) <= 1
-    assert "#4CAF50" in dialog._download_btn.styleSheet()
+    assert "palette(highlight)" in dialog._download_btn.styleSheet()
+    assert "padding: 5px 11px" in dialog._download_btn.styleSheet()
+    assert "palette(button)" in dialog._close_btn.styleSheet()

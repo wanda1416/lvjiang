@@ -26,6 +26,7 @@ from ...core.announcement import (
     cache_manifest,
 )
 from ...i18n import tr
+from ..button_styles import apply_button_style
 
 _LEVEL_LABELS = {
     "critical": "严重",
@@ -104,6 +105,8 @@ class AnnouncementDialog(QDialog):
         close_btn = QPushButton(tr("关闭"))
         close_btn.clicked.connect(self.accept)
         buttons.addWidget(close_btn)
+        apply_button_style(self._refresh_btn, self._details_btn)
+        apply_button_style(close_btn, variant="neutral")
         layout.addLayout(buttons)
 
     def set_manifest(

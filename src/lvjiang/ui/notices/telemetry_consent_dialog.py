@@ -74,7 +74,7 @@ class TelemetryConsentDialog(QDialog):
             f"{self._disclosure_markdown()}"
             f"{tr('不收集什么')}：\n\n"
             f"- {tr('账号、姓名或其他能认出你是谁的信息')}\n"
-            f"- {tr('截图、日志、config/session/ 目录里的任何内容')}\n\n"
+            f"- {tr('截图、日志、配置文件或其他未在上方列明的本地内容')}\n\n"
             f"{tr('用来做什么')}：{tr('仅用于所列功能改进，不公开发布原始数据')}。\n\n"
             f"{id_line}\n\n"
             f"{tr('同意后随时可在「配置管理 → 网络与隐私」关闭。')}\n\n"
@@ -89,6 +89,10 @@ class TelemetryConsentDialog(QDialog):
             lines.append(f"- **{item.title}**：{item.purpose}")
             lines.extend(f"  - {text}" for text in item.collected)
             lines.extend(f"  - {tr('不收集')}：{text}" for text in item.excluded)
+            if vars(item).get("historical_upload_days"):
+                lines.append("  - " + tr(
+                    "开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。"
+                ).format(days=vars(item).get("historical_upload_days")))
         return "\n".join(lines) + ("\n\n" if lines else "\n")
 
     @staticmethod

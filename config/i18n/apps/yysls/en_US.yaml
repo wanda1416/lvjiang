@@ -58,7 +58,10 @@ yysls:
   名称不能重复。: Names must be unique.
   名称不能为空。: Name cannot be empty.
   双击名称或按 F2 可编辑: Double-click a name or press F2 to edit it
-  配置每个装备等级的等阶名称，仅用于校验装备名称；承音不改变等阶名称，因此不能据此推断装备等级。: Configure the tier name for each equipment level for name validation only. Chengyin does not change the tier name, so it cannot be used to infer equipment level.
+  配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；承音不改变等阶名称，无法匹配时原始等级为 0。: Configure tier names to validate equipment names and identify original levels. Chengyin does not change the tier name; unmatched original levels are 0.
+  承音后转律: Transfer After Chengyin
+  原始等级: Original Level
+  该原始等级装备承音后是否仍允许在已转律词条上无限转律: Whether equipment of this original level may infinitely retransfer its transferred affix after Chengyin
   装备名称结构：等阶名称 + 标准名称 | 部位名称: 'Equipment name format: Tier Name + Standard Name | Equipment Part Name'
   输出: Output
   防具: Armor
@@ -1363,5 +1366,5 @@ auto_strings:
   ，该武器对应「{expected}」: ', this weapon corresponds to "{expected}"'
   指纹: Fingerprint
   更新时间: Updated At
-  查看装备来源、指纹和时间: View equipment source, fingerprint, and timestamps
+  查看装备来源、指纹、原始等级和时间: View equipment source, fingerprint, original level, and timestamps
   装备属性: Equipment Properties

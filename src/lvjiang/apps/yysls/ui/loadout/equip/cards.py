@@ -181,6 +181,7 @@ def _equipment_properties_text(equip: dict) -> str:
     return "\n".join((
         f"{tr('来源')}：{source}",
         f"{tr('指纹')}：{equip.get('_fp') or ''}",
+        f"{tr('原始等级')}：{int(equip.get('original_level') or 0)}",
         f"{tr('创建时间')}：{_format_equipment_time(equip.get('created_at'))}",
         f"{tr('更新时间')}：{_format_equipment_time(equip.get('updated_at'))}",
     ))
@@ -746,7 +747,7 @@ class _CompactEquipCard(QFrame):
             action.triggered.connect(
                 partial(self._emit_menu_action, signal, data, group))
         properties_action = menu.addAction(tr("属性"))
-        properties_action.setToolTip(tr("查看装备来源、指纹和时间"))
+        properties_action.setToolTip(tr("查看装备来源、指纹、原始等级和时间"))
         properties_action.triggered.connect(
             partial(self._show_properties, self.window(), data))
         menu.popup(global_pos)

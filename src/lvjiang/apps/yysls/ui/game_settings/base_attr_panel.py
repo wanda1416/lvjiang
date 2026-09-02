@@ -335,13 +335,13 @@ class BaseAttrPanel(QWidget):
         self._first_affix_frame.setVisible(False)
         right_layout.addWidget(self._first_affix_frame)
 
-        # ── 等阶名称（只用于名称合法性佐证，不参与等级推断）──
+        # ── 等阶名称（用于名称校验和原始等级识别）──
         self._series_frame = QFrame()
         series_layout = QVBoxLayout(self._series_frame)
         series_layout.setContentsMargins(8, 4, 8, 4)
         series_hint = QLabel(tr(
-            "配置每个装备等级的等阶名称，仅用于校验装备名称；"
-            "承音不改变等阶名称，因此不能据此推断装备等级。"))
+            "配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；"
+            "承音不改变等阶名称，无法匹配时原始等级为 0。"))
         series_hint.setStyleSheet("color: palette(mid);")
         series_layout.addWidget(series_hint)
         self._series_table = QTableWidget()

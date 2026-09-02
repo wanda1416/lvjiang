@@ -63,6 +63,7 @@ class EquipmentData:
         "type": "剑",
         "name": "踏雪含光",
         "level": 110,
+        "original_level": 105,
         "quality": null,
         "is_chengyin": true,
         "base_attr": { "name": "外功攻击", "value": [100, 232] },
@@ -77,6 +78,7 @@ class EquipmentData:
     type: str | None = None        # 武器类型（剑/枪/...）或防具类别（冠胄/...）或首饰（环/佩）
     name: str | None = None        # 装备名称
     level: int | None = None
+    original_level: int = 0       # 仅按名称中的等阶名称识别；0 表示未知
     quality: str | None = None     # gold/purple/blue/green，OCR 暂无法识别
     is_chengyin: bool = False
     base_attr: EquipAttr | None = None
@@ -116,6 +118,7 @@ class EquipmentData:
             "type": self.type,
             "name": self.name,
             "level": self.level,
+            "original_level": self.original_level,
             "quality": self.quality,
             "is_chengyin": self.is_chengyin,
             "base_attr": self.base_attr.to_dict() if self.base_attr else None,
@@ -144,10 +147,18 @@ class EquipmentData:
             if key in d and d[key] is not None:
                 affixes.append(Affix.from_dict(d[key]))
 
+        original_level = d.get("original_level")
+        if original_level is None:
+            # 兼容新增字段前保存的装备；仍严格只按等阶名称补算。
+            from ...config import get_game_config
+            original_level = get_game_config().infer_original_equipment_level(
+                d.get("name"))
+
         return cls(
             type=d.get("type"),
             name=d.get("name"),
             level=d.get("level"),
+            original_level=int(original_level or 0),
             quality=d.get("quality"),
             is_chengyin=d.get("is_chengyin", False),
             base_attr=EquipAttr.from_dict(d["base_attr"]) if d.get("base_attr") else None,

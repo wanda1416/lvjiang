@@ -5,6 +5,7 @@
 - 支持重置：该等级是否允许重置调律
 - 支持承音：该等级装备是否允许进入承音合并候选
 - 无限转律：该等级已转律词条是否允许再次转律
+- 承音后转律：该原始等级装备承音后是否仍允许再次转律
 - 最低材料数量：该等级要求的最低材料数量
 - 判定抗性：判定抗性百分比（>= 0）
 - 增益抗性：增益抗性百分比（>= 0）
@@ -47,11 +48,13 @@ _LEVEL_COL = 1
 _RESET_COL = 2
 _CHENGYIN_COL = 3
 _RETRANSFER_COL = 4
-_MATERIAL_COL = 5
-_JUDGE_RES_COL = 6
-_BUFF_RES_COL = 7
+_CHENGYIN_RETRANSFER_COL = 5
+_MATERIAL_COL = 6
+_JUDGE_RES_COL = 7
+_BUFF_RES_COL = 8
 _COLS = (
     "#", tr("等级"), tr("支持重置"), tr("支持承音"), tr("无限转律"),
+    tr("承音后转律"),
     tr("最低材料数量"), tr("判定抗性(%)"), "增益抗性(%)",
 )  # runtime tr()
 
@@ -90,7 +93,10 @@ class LevelConfigPanel(QWidget):
             _SEQ_COL, QHeaderView.ResizeMode.Fixed)
         self._table.setColumnWidth(_SEQ_COL, 32)
         # 布尔能力列按内容自适应
-        for col in (_RESET_COL, _CHENGYIN_COL, _RETRANSFER_COL):
+        for col in (
+            _RESET_COL, _CHENGYIN_COL, _RETRANSFER_COL,
+            _CHENGYIN_RETRANSFER_COL,
+        ):
             self._table.horizontalHeader().setSectionResizeMode(
                 col, QHeaderView.ResizeMode.ResizeToContents)
         self._table.verticalHeader().setVisible(False)
@@ -197,6 +203,20 @@ class LevelConfigPanel(QWidget):
         retransfer_layout.addWidget(retransfer_cb)
         retransfer_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._table.setCellWidget(row, _RETRANSFER_COL, retransfer_widget)
+
+        # 承音后转律（按装备名称识别出的原始等级判断）
+        cy_retransfer_cb = QCheckBox()
+        cy_retransfer_cb.setToolTip(tr(
+            "该原始等级装备承音后是否仍允许在已转律词条上无限转律"))
+        cy_retransfer_cb.setChecked(cfg.allow_retransfer_after_chengyin)
+        cy_retransfer_cb.stateChanged.connect(lambda _s: self._apply())
+        cy_retransfer_widget = QWidget()
+        cy_retransfer_layout = QHBoxLayout(cy_retransfer_widget)
+        cy_retransfer_layout.setContentsMargins(0, 0, 0, 0)
+        cy_retransfer_layout.addWidget(cy_retransfer_cb)
+        cy_retransfer_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._table.setCellWidget(
+            row, _CHENGYIN_RETRANSFER_COL, cy_retransfer_widget)
 
         # 最低材料数量（可选，默认空）
         material_spin = QSpinBox()
@@ -316,6 +336,9 @@ class LevelConfigPanel(QWidget):
         chengyin_cb = chengyin_widget.findChild(QCheckBox)
         retransfer_widget = self._table.cellWidget(row, _RETRANSFER_COL)
         retransfer_cb = retransfer_widget.findChild(QCheckBox)
+        cy_retransfer_widget = self._table.cellWidget(
+            row, _CHENGYIN_RETRANSFER_COL)
+        cy_retransfer_cb = cy_retransfer_widget.findChild(QCheckBox)
         material_spin: QSpinBox = self._table.cellWidget(row, _MATERIAL_COL)
         judge_spin: QSpinBox = self._table.cellWidget(row, _JUDGE_RES_COL)
         buff_spin: QSpinBox = self._table.cellWidget(row, _BUFF_RES_COL)
@@ -336,6 +359,8 @@ class LevelConfigPanel(QWidget):
             "allow_chengyin": bool(chengyin_cb and chengyin_cb.isChecked()),
             "allow_retransfer": bool(
                 retransfer_cb and retransfer_cb.isChecked()),
+            "allow_retransfer_after_chengyin": bool(
+                cy_retransfer_cb and cy_retransfer_cb.isChecked()),
             "min_material_count": material_val if material_val > 0 else None,
             "judge_resistance": judge_val if judge_val > 0 else None,
             "buff_resistance": buff_val if buff_val > 0 else None,
@@ -365,6 +390,14 @@ class LevelConfigPanel(QWidget):
             retransfer_cb.blockSignals(True)
             retransfer_cb.setChecked(values["allow_retransfer"])
             retransfer_cb.blockSignals(False)
+        cy_retransfer_widget = self._table.cellWidget(
+            row, _CHENGYIN_RETRANSFER_COL)
+        cy_retransfer_cb = cy_retransfer_widget.findChild(QCheckBox)
+        if cy_retransfer_cb:
+            cy_retransfer_cb.blockSignals(True)
+            cy_retransfer_cb.setChecked(
+                values["allow_retransfer_after_chengyin"])
+            cy_retransfer_cb.blockSignals(False)
         material_spin: QSpinBox = self._table.cellWidget(row, _MATERIAL_COL)
         material_spin.blockSignals(True)
         # None 表示空，设置为 0（显示为空）

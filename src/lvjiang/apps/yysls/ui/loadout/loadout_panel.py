@@ -375,10 +375,7 @@ class LoadoutPanel(QWidget):
         # 下游消费者（装备页/战斗属性页）已显式驱动，无需再 emit
         # equipment_changed：emit 会导致信号订阅者重复全量刷新
         self._equipment._refresh_all()
-        school_index = combat._combo_school.findText(school or "")
-        combat._combo_school.setCurrentIndex(max(0, school_index))
-        combat._refresh_play_styles()
-        combat._refresh_schemes()
+        combat._restore_selection(state.active_plan, school or "")
         combat._refresh_display()
 
     def _on_equipment_changed(self):

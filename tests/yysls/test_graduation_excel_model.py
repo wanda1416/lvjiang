@@ -7,7 +7,12 @@ from pathlib import Path
 import pytest
 
 from lvjiang.apps.yysls.config import get_game_config
-from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
+from lvjiang.apps.yysls.core.combat.combat_attrs import (
+    CombatAttributes,
+    aggregate_equipment_attrs,
+    apply_hypothetical_caps,
+    build_graduation_attrs,
+)
 from lvjiang.apps.yysls.core.graduation import (
     get_graduation_calculator,
     get_graduation_scheme_combat_attrs,
@@ -63,6 +68,24 @@ def test_converter_ignores_blank_skill_affix_label() -> None:
         get_game_config().get_alias_groups("指定技能增效")["牵丝·霖"]
     )
     assert not skill_group.intersection(model["baseline_attrs"].get("extra_attrs", {}))
+
+
+@pytest.mark.slow
+def test_converter_supports_multiple_skill_affixes_and_shifted_environment() -> None:
+    """破竹·风比通用表多一行老鼠定音，后续环境行也随之下移。"""
+    path = next(EXCEL_DIR.glob("破竹风*.xlsx"), None)
+    if path is None:
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/破竹风*.xlsx")
+
+    model = convert_workbook(path, "破竹·风")
+    extra = model["baseline_attrs"]["extra_attrs"]
+    assert extra["泥犁三垢强效轻击增伤"] == 0
+    assert extra["粟子游尘鼠鼠增伤"] == pytest.approx(0.32)
+    assert model["environment"]["fixed_damage_bonus"] == pytest.approx(0.4)
+    assert model["environment"]["food_bonus"] == {
+        "min_outer": 200,
+        "max_outer": 400,
+    }
 
 
 @pytest.mark.parametrize("school", SCHOOLS)
@@ -254,3 +277,65 @@ def test_runtime_only_consumes_canonical_affix_names() -> None:
         },
     )
     assert calculator.calculate(scanned) == calculator.calculate(configured)
+
+
+def test_pozhu_feng_runtime_consumes_mouse_dingyin() -> None:
+    calculator = get_graduation_calculator("破竹·风")
+    assert calculator is not None
+    attrs = get_graduation_scheme_combat_attrs("破竹·风", "基础方案")
+
+    attrs.extra_attrs["粟子游尘鼠鼠增伤"] = 0
+    without_mouse = calculator.calculate(attrs)
+    attrs.extra_attrs["粟子游尘鼠鼠增伤"] = 0.32
+    with_mouse = calculator.calculate(attrs)
+
+    assert with_mouse.dps > without_mouse.dps
+    assert with_mouse.graduation_rate > without_mouse.graduation_rate
+
+
+def test_pozhu_feng_mouse_dingyin_reaches_formula_from_equipment() -> None:
+    """双刀四件防具满定音应经现有装备链路变成公式的 0.32 输入。"""
+    equipped = {
+        slot: {
+            "name": f"模拟{part}",
+            "type": part,
+            "level": 110,
+            "quality": "gold",
+            "dingyin": {
+                "name": "泥犁三垢强效轻击增伤",
+                "value": 1.0,
+            },
+        }
+        for slot, part in (
+            ("head", "冠胄"),
+            ("chest", "胸甲"),
+            ("leg", "胫甲"),
+            ("wrist", "腕甲"),
+        )
+    }
+    replaced = apply_hypothetical_caps(
+        equipped, full_dingyin=True, playstyle="双刀",
+    )
+    assert {
+        equip["dingyin"]["name"] for equip in replaced.values()
+    } == {"粟子游尘鼠鼠增伤"}
+
+    equipment_attrs = aggregate_equipment_attrs(replaced)
+    assert equipment_attrs.extra_attrs["粟子游尘鼠鼠增伤"] == pytest.approx(
+        0.368,
+    )
+    effective = build_graduation_attrs(
+        CombatAttributes(), equipment_attrs, "破竹·风",
+    )
+    assert effective.extra_attrs["粟子游尘鼠鼠增伤"] == pytest.approx(
+        0.32,
+    )
+
+    calculator = get_graduation_calculator("破竹·风")
+    assert calculator is not None
+    baseline = get_graduation_scheme_combat_attrs("破竹·风", "基础方案")
+    baseline.extra_attrs.pop("粟子游尘鼠鼠增伤", None)
+    without_mouse = calculator.calculate(baseline)
+    with_mouse = calculator.calculate(baseline + effective)
+    assert with_mouse.dps > without_mouse.dps
+    assert with_mouse.graduation_rate == pytest.approx(1.0, rel=1e-8)

@@ -112,15 +112,13 @@ class TestKeepDanti:
                        quality="purple")
         assert judge_pvp.judge(e).rating == Rating.TOP
 
-    def test_helm_danti_bound_by_playstyle(self):
-        """火九玩法绑定 keep_danti：冠胄单体奇术不触发垃圾"""
+    def test_helm_danti_not_bound_by_playstyle(self):
+        """九剑只描述武学组合，不再隐式开启“保留单体奇术增”。"""
         judge = get_tuning_judge("huiyi_general",
-                                  {"playstyles": ["火九"]})
+                                  {"playstyles": ["九剑"]})
         e = make_equip("冠胄", ["会意率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
                        quality="purple")
-        # 火九绑定 keep_danti → 垃圾条件(when keep_danti=false)不生效
-        # 单体奇术增伤满足顶级条件 count_min[势/劲/单体类奇术增伤]≥2
-        assert judge.judge(e).rating == Rating.TOP
+        assert judge.judge(e).rating == Rating.JUNK
 
 
 class TestKeepWanjia:

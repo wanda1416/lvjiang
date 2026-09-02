@@ -7,23 +7,8 @@ quality_thresholds:
   - gold
   - purple
 playstyles:
-  无名:
-    main:
-      weapon: 剑
-      damage: 剑武学增伤
-    sub:
-      weapon: 枪
-      damage: null
-    attr: 鸣金
-  火九:
-    main:
-      weapon: 剑
-      damage: 剑武学增伤
-    sub:
-      weapon: 枪
-      damage: null
-    attr: 鸣金
-    switch: keep_danti
+- 无名
+- 九剑
 transmute_priority:
 - 最大外功攻击
 - 势

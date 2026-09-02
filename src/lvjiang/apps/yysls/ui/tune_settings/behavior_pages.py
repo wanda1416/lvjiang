@@ -72,7 +72,10 @@ from lvjiang.apps.yysls.ui.layout_helpers import (
     fit_combo_popup_to_contents,
     fit_combo_to_contents,
 )
-from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.button_styles import (
+    apply_button_style,
+    apply_dialog_button_box_style,
+)
 
 from .....i18n import tr
 
@@ -243,13 +246,7 @@ class _JudgeRulesDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel)
         self._buttons.accepted.connect(self.accept)
         self._buttons.rejected.connect(self.reject)
-        apply_button_style(
-            self._buttons.button(QDialogButtonBox.StandardButton.Ok)
-        )
-        apply_button_style(
-            self._buttons.button(QDialogButtonBox.StandardButton.Cancel),
-            variant="neutral",
-        )
+        apply_dialog_button_box_style(self._buttons)
         layout.addWidget(self._buttons)
         self._sync_ok()
 
@@ -290,13 +287,7 @@ class _AffixEntriesDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel)
         self._buttons.accepted.connect(self.accept)
         self._buttons.rejected.connect(self.reject)
-        apply_button_style(
-            self._buttons.button(QDialogButtonBox.StandardButton.Ok)
-        )
-        apply_button_style(
-            self._buttons.button(QDialogButtonBox.StandardButton.Cancel),
-            variant="neutral",
-        )
+        apply_dialog_button_box_style(self._buttons)
         layout.addWidget(self._buttons)
         self._sync_ok()
 

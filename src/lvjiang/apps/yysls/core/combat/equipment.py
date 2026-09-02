@@ -6,6 +6,7 @@ import copy
 from loguru import logger
 
 from ..loadout import EQUIPMENT_SLOTS, LoadoutRepository
+from ..loadout.repository import stamp_equipment_write
 
 
 class EquipmentInventory:
@@ -164,9 +165,8 @@ class EquipmentInventory:
             for slot, equip in combo_equipped.items():
                 fp = str(equip.get("_fp") or "") or make_fingerprint(
                     equip, is_mock=bool(equip.get("_extra", {}).get("is_mock")))
-                value = copy.deepcopy(equip)
-                value["_fp"] = fp
-                state.equipment_items[fp] = value
+                state.equipment_items[fp] = stamp_equipment_write(
+                    equip, fp, state.equipment_items.get(fp))
                 plan.equipment[slot] = fp
         self._repo.update(mutate)
         self.reload()

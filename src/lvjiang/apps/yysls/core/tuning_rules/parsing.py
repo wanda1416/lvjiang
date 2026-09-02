@@ -193,6 +193,51 @@ def _parse_condition_groups(raw: list | None, vocab: set[str],
     return groups
 
 
+def resolve_playstyles(raw) -> dict:
+    """把规则里的 playstyles 字段规范化成 {玩法名: 定义}。
+
+    新格式是引用列表，旧格式是内嵌 dict——UI 和校验都只该看规范化后的结果。
+    """
+    if isinstance(raw, list):
+        return _resolve_playstyle_refs(raw)
+    return dict(raw or {})
+
+
+def _resolve_playstyle_refs(names: list, switches: dict | None = None) -> dict:
+    """把 ``playstyles: [纯唐, 双切]`` 解析成公共玩法定义。
+
+    引用了未登记的玩法直接报错——静默跳过会让规则悄悄少判一种打法。
+
+    ``switches`` 来自规则自己的 ``playstyle_switches``：开关控制的是非武器
+    增伤这类**判定口径**，属于规则的事，不该写进公共玩法定义。同一个玩法在
+    不同规则下可以绑不同开关，甚至不绑。
+    """
+    from ...config import get_game_config
+
+    registry = get_game_config().get_playstyles()
+    resolved: dict = {}
+    for raw in names:
+        name = str(raw).strip()
+        if not name:
+            continue
+        cfg = registry.get(name)
+        if cfg is None:
+            raise RuleValidationError(
+                f"playstyles: 引用了未登记的玩法 {name!r}，"
+                "请先在游戏配置→玩法配置中添加")
+        side = {}
+        for key in ("main", "sub"):
+            weapon = cfg.get(f"{key}_weapon", "")
+            if weapon:
+                side[key] = {"weapon": weapon,
+                             "damage": cfg.get(f"{key}_damage") or None}
+        resolved[name] = {**side, "attr": cfg.get("attr") or GENERIC_ATTR}
+        bound = str((switches or {}).get(name) or "").strip()
+        if bound:
+            resolved[name]["switch"] = bound
+    return resolved
+
+
 def _parse_weapon_side(raw, vocab: set[str], where: str) -> WeaponSide:
     """{weapon, damage} → WeaponSide"""
     if not isinstance(raw, dict):
@@ -288,7 +333,15 @@ def parse_tuning_rule(data: dict,
     attr_vocab = set(standard_playstyle_attrs())
 
     playstyles: dict[str, Playstyle] = {}
-    for w_name, w_raw in (data.get("playstyles") or {}).items():
+    raw_playstyles = data.get("playstyles") or {}
+    if isinstance(raw_playstyles, list):
+        # 新格式：规则只引用玩法名，定义在 game_config 的公共 playstyles 里。
+        # 同一个「纯唐」以前在每个规则文件里各写一遍（实测 14 个玩法、跨文件
+        # 零差异的重复），玩法因此没有唯一归属——用户是纯唐还是双切只能从
+        # 「他勾了哪条规则的哪个玩法」反推。提到公共层之后规则不再自定义。
+        raw_playstyles = _resolve_playstyle_refs(
+            raw_playstyles, data.get("playstyle_switches") or {})
+    for w_name, w_raw in raw_playstyles.items():
         w_name = str(w_name).strip()
         if not w_name:
             raise RuleValidationError(tr("playstyles: 名字不能为空"))

@@ -16,6 +16,8 @@ from .affix_caps_panel import AffixCapsPanel
 from .base_attr_panel import BaseAttrPanel
 from .equip_display_panel import EquipDisplayPanel
 from .level_config_panel import LevelConfigPanel
+from .martial_art_panel import MartialArtPanel
+from .playstyle_panel import PlaystylePanel
 from .school_panel import SchoolPanel
 from .season_config_panel import SeasonConfigPanel
 
@@ -42,9 +44,17 @@ class GameConfigTab(QWidget):
         self._base_panel = BaseAttrPanel()
         self._tabs.addTab(self._base_panel, tr("装备配置"))
 
+        # 武学配置面板（流派/玩法的共同前置：武器和属性由武学派生）
+        self._martial_art_panel = MartialArtPanel()
+        self._tabs.addTab(self._martial_art_panel, tr("武学配置"))
+
         # 流派配置面板
         self._school_panel = SchoolPanel()
         self._tabs.addTab(self._school_panel, tr("流派配置"))
+
+        # 玩法配置面板（决定调律方向：要什么增伤、定什么音）
+        self._playstyle_panel = PlaystylePanel()
+        self._tabs.addTab(self._playstyle_panel, tr("玩法配置"))
 
         # 等级配置面板（按等级区分重置支持与材料要求）
         self._level_panel = LevelConfigPanel()

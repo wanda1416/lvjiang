@@ -5,10 +5,14 @@ from __future__ import annotations
 from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import (
     QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
     QListWidget,
     QSizePolicy,
     QStyle,
     QStyleOptionComboBox,
+    QWidget,
 )
 
 
@@ -71,6 +75,41 @@ def configure_navigation_list(
     nav.setMinimumWidth(minimum_width)
     nav.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
     nav.setSpacing(2)
+
+
+def config_field_card(
+    label: str,
+    editor: QWidget,
+    *,
+    label_width: int = 150,
+) -> QFrame:
+    """Create the spacious single-setting row used by configuration panels.
+
+    A plain ``QFormLayout`` visually collapses several unrelated settings into
+    one dense block.  The established game-config presentation gives every
+    setting its own alternate-surface region, so labels remain easy to scan
+    even when the editor contains many similarly named fields.
+    """
+    frame = QFrame()
+    frame.setProperty("configFieldCard", True)
+    frame.setStyleSheet(
+        'QFrame[configFieldCard="true"] {'
+        ' background-color: palette(alternate-base);'
+        ' border-radius: 6px;'
+        '}'
+    )
+    row = QHBoxLayout(frame)
+    row.setContentsMargins(14, 9, 14, 9)
+    row.setSpacing(18)
+
+    title = QLabel(label)
+    title.setMinimumWidth(label_width)
+    row.addWidget(title)
+
+    editor.setSizePolicy(
+        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    row.addWidget(editor, stretch=1)
+    return frame
 
 
 def navigation_width_for_chars(nav: QListWidget, count: int) -> int:

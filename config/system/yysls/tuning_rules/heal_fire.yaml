@@ -3,14 +3,7 @@ key: heal_fire
 name: 治疗火拳
 default_rating: excellent
 playstyles:
-  火拳:
-    main:
-      weapon: 扇
-      damage: null
-    sub:
-      weapon: 伞
-      damage: null
-    attr: 牵丝
+- 火拳
 transmute_priority:
 - 最大外功攻击
 - 劲

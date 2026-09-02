@@ -613,7 +613,10 @@ class BehaviorRule:
 
     def summary(self) -> str:
         """条件摘要文本（日志与说明文档）"""
-        parts = "/".join(self.parts) if self.parts else tr("不限部位")
+        if set(self.parts) == set(QUALITY_PARTS):
+            parts = tr("全部")
+        else:
+            parts = "/".join(self.parts) if self.parts else tr("不限部位")
         if self.max_quality == "gold":
             quals = tr("不限品阶")
         elif self.max_quality == "gold_only":
@@ -714,8 +717,10 @@ class TuneBehavior:
     无命中默认：未满=继续调律、满=跳过该装备；未启用同默认。
     max_resets: 单件装备重置次数上限（按钮文本携带剩余次数另作
     硬门，不超过游戏硬限 MAX_TUNE_RESETS）；
-    reset_exhausted_action: 规则命中重置但次数已用尽（含 OCR
-    读不到次数）时的转处置动作：recycle / skip。
+    reset_exhausted_action: 规则命中重置但重置**确定且永久**不可用时的
+    转处置动作：recycle / skip。仅两种情况够格——按钮上读到明确的 0，
+    以及本地 max_resets 门槛。OCR 读不到次数属识别异常（下次可能就读到
+    了），一律强制跳过并记 count_unreadable，绝不在这里转回收。
     """
     enabled: bool = False
     rules: list[BehaviorRule] = field(default_factory=list)

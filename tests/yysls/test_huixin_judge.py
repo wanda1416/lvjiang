@@ -36,8 +36,8 @@ def small():
 # ─── 大外：武器规则展开与择优 ──────────────────────────────
 
 class TestBigWeaponRules:
-    def test_modao_shuangqie_main_top(self, big):
-        # 陌刀命中 双切/威威 主武器，增伤齐全 → 顶级
+    def test_modao_required_damage_top(self, big):
+        # 陌刀命中 双切副武器/威威主武器，增伤齐全 → 顶级
         e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "敏"])
         assert big.judge(e).rating == Rating.TOP
 
@@ -57,7 +57,7 @@ class TestBigWeaponRules:
         assert any("缺失必需增伤词条" in s for s in r.reasons)
 
     def test_hengdao_chuntang_main_top_with_label(self, big):
-        # 横刀命中 纯唐 主武器（双切副的横刀武学增伤是池外词条 → 垃圾）
+        # 横刀命中纯唐/双切主武器；纯唐要求横刀增伤，命中后取顶级
         e = make_equip("横刀", ["最大外功攻击", "横刀武学增伤", "最大外功攻击", "劲", "敏"])
         r = big.judge(e)
         assert r.rating == Rating.TOP

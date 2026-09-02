@@ -408,6 +408,7 @@ def search_optimal_combo(
     full_chengyin: bool = False,
     full_dingyin: bool = False,
     full_level: int = 0,
+    playstyle: str = "",
     progress_counter: Any = None,  # 具有 evaluated, total, message 属性的对象
 ) -> list[dict[str, Any]]:
     """Search for the best equipment combinations.
@@ -428,6 +429,8 @@ def search_optimal_combo(
         If > 0, apply linear-score Top-K safety net after pruning.
     cancel_flag:
         Callable returning True to abort search early.
+    playstyle:
+        满定音时使用的玩法目标；空字符串保留现有定音名，只顶满数值。
     progress_counter:
         具有 evaluated, total, message 属性的对象，用于轮询进度。
 
@@ -452,7 +455,10 @@ def search_optimal_combo(
                 e for _k, e in sorted(
                     apply_hypothetical_caps(
                         {i: e for i, e in enumerate(candidates[slot_key])},
-                        full_chengyin, full_dingyin, full_level,
+                        full_chengyin=full_chengyin,
+                        full_dingyin=full_dingyin,
+                        full_level=full_level,
+                        playstyle=playstyle,
                     ).items()
                 )
             ]

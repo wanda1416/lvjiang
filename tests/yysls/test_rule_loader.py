@@ -73,6 +73,12 @@ def minimal_rule(**overrides) -> dict:
     return data
 
 
+def test_behavior_rule_summary_condenses_all_parts():
+    summary = BehaviorRule(parts=list(QUALITY_PARTS)).summary()
+    assert summary.startswith("全部 且 ")
+    assert "/".join(QUALITY_PARTS) not in summary
+
+
 def write_rule(tmp_path: Path, data: dict, name: str = "t1.yaml") -> Path:
     path = tmp_path / name
     with open(path, "w", encoding="utf-8") as f:
@@ -159,12 +165,16 @@ class TestBuiltinRules:
         # 玩法定义持续变更：不硬编码内容，对照 YAML 原文校验解析
         mgr = get_tuning_rule_manager()
         for key, rule in get_tuning_rules().items():
-            raw = mgr.get_raw(key).get("playstyles") or {}
-            assert raw, key  # 每个规则至少一条玩法
-            assert set(rule.playstyles) == set(raw)
+            # 规则现在只引用玩法名，定义在公共玩法配置里
+            refs = mgr.get_raw(key).get("playstyles") or []
+            assert refs, key  # 每个规则至少引用一条玩法
+            assert isinstance(refs, list), f"{key} 仍在内嵌定义玩法"
+            assert set(rule.playstyles) == set(refs)
+            registry = get_game_config().get_playstyles()
             for name, ps in rule.playstyles.items():
-                assert ps.main.weapon == (raw[name]["main"].get("weapon") or "")
-                assert ps.main.damage == raw[name]["main"].get("damage")
+                shared = registry[name]
+                assert ps.main.weapon == shared["main_weapon"]
+                assert ps.main.damage == (shared["main_damage"] or None)
                 # 摘要供 UI 勾选项展示
                 assert rule.playstyle_options[name] == (
                     f"主 {ps.main.weapon} / 副 {ps.sub.weapon}")
@@ -174,31 +184,31 @@ class TestBuiltinRules:
 
     def test_playstyle_weapons_match_school_registry(self):
         """所有内置玩法的主副武器必须与全局流派注册一致。"""
-        # value = (正式流派名, 是否有意对调主副手)。裂石·钧的“双切”
-        # 是唯一反向持有武器的玩法，其余玩法均直接沿用注册表顺序。
+        # value = 正式流派名。绑定后主副手必须直接沿用流派注册表顺序；
+        # 玩法差异由主/副增伤要求表达，不再靠调换武学顺序表达。
         bindings = {
-            ("huiyi_general", "无名"): ("鸣金·虹", False),
-            ("huiyi_general", "火九"): ("鸣金·影", False),
-            ("huixin_small", "纯唐"): ("裂石·钧", False),
-            ("huixin_small", "双切"): ("裂石·钧", True),
-            ("huixin_small", "鸢鸢"): ("破竹·鸢", False),
-            ("huixin_small", "双刀"): ("破竹·风", False),
-            ("huixin_small", "尘尘"): ("破竹·尘", False),
-            ("huixin_small", "翊翊"): ("牵丝·翊", False),
-            ("huixin_small", "樽樽"): ("破竹·樽", False),
-            ("huixin_big", "纯唐"): ("裂石·钧", False),
-            ("huixin_big", "双切"): ("裂石·钧", True),
-            ("huixin_big", "威威"): ("裂石·威", False),
-            ("huixin_big", "鸢鸢"): ("破竹·鸢", False),
-            ("huixin_big", "双刀"): ("破竹·风", False),
-            ("huixin_big", "尘尘"): ("破竹·尘", False),
-            ("huixin_big", "翊翊"): ("牵丝·翊", False),
-            ("huixin_big", "樽樽"): ("破竹·樽", False),
-            ("huixin_modao", "威威"): ("裂石·威", False),
-            ("huixin_yuyu", "走地玉"): ("牵丝·玉", False),
-            ("huixin_yuyu", "飞天玉"): ("牵丝·玉", False),
-            ("heal_pure", "纯奶"): ("牵丝·霖", False),
-            ("heal_fire", "火拳"): ("牵丝·霖", False),
+            ("huiyi_general", "无名"): "鸣金·虹",
+            ("huiyi_general", "九剑"): "鸣金·影",
+            ("huixin_small", "纯唐"): "裂石·钧",
+            ("huixin_small", "双切"): "裂石·钧",
+            ("huixin_small", "鸢鸢"): "破竹·鸢",
+            ("huixin_small", "双刀"): "破竹·风",
+            ("huixin_small", "尘尘"): "破竹·尘",
+            ("huixin_small", "翊翊"): "牵丝·翊",
+            ("huixin_small", "樽樽"): "破竹·樽",
+            ("huixin_big", "纯唐"): "裂石·钧",
+            ("huixin_big", "双切"): "裂石·钧",
+            ("huixin_big", "威威"): "裂石·威",
+            ("huixin_big", "鸢鸢"): "破竹·鸢",
+            ("huixin_big", "双刀"): "破竹·风",
+            ("huixin_big", "尘尘"): "破竹·尘",
+            ("huixin_big", "翊翊"): "牵丝·翊",
+            ("huixin_big", "樽樽"): "破竹·樽",
+            ("huixin_modao", "威威"): "裂石·威",
+            ("huixin_yuyu", "走地玉"): "牵丝·玉",
+            ("huixin_yuyu", "飞天玉"): "牵丝·玉",
+            ("heal_pure", "纯奶"): "牵丝·霖",
+            ("heal_fire", "火拳"): "牵丝·霖",
         }
         rules = get_tuning_rules()
         actual = {
@@ -210,12 +220,9 @@ class TestBuiltinRules:
 
         game = get_game_config()
         schools = game.get_schools()
-        for (rule_key, playstyle), (school, reversed_sides) in bindings.items():
+        for (rule_key, playstyle), school in bindings.items():
             cfg = schools[school]
-            expected = (
-                cfg["main"]["weapon"], cfg["sub"]["weapon"])
-            if reversed_sides:
-                expected = expected[::-1]
+            expected = (cfg["main"]["weapon"], cfg["sub"]["weapon"])
             plan = rules[rule_key].playstyles[playstyle]
             assert (plan.main.weapon, plan.sub.weapon) == expected, (
                 rule_key, playstyle, school)
@@ -228,13 +235,12 @@ class TestBuiltinRules:
 
     def test_playstyle_attr_per_plan(self):
         # attr 随配置变更：只校验解析值与 YAML 一致且在合法集内
-        mgr = get_tuning_rule_manager()
         vocab = set(standard_playstyle_attrs())
         for key, rule in get_tuning_rules().items():
-            raw = mgr.get_raw(key).get("playstyles") or {}
+            registry = get_game_config().get_playstyles()
             for name, ps in rule.playstyles.items():
                 assert ps.attr in vocab
-                expected = raw[name].get("attr") or "通用"
+                expected = registry[name].get("attr") or "通用"
                 assert ps.attr == expected, (key, name)
 
     def test_when_references_registered_switches(self):

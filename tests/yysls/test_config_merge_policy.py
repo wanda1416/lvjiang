@@ -26,7 +26,7 @@ def test_hooks_only_contributes_profile_periods_and_business_tabs():
     ]
     assert [label for label, _builder in yysls_hooks.right_tab_builders] == [
         "备战方案",
-        "调律进度",
+        "调律管理",
     ]
 
 
@@ -45,4 +45,5 @@ def test_game_config_lists_registered_as_protected():
 def test_core_registry_list_paths_stays_domain_agnostic():
     """core 自己只声明 scenes.yaml——不认识任何插件领域词汇。"""
     assert "scenes.yaml" in resolver.REGISTRY_LIST_PATHS
-    assert resolver.REGISTRY_LIST_PATHS["scenes.yaml"] == ("layout_scenes.*",)
+    assert resolver.REGISTRY_LIST_PATHS["scenes.yaml"] == (
+        "layout_scenes.*", "scenes.*.items", "scenes.*.disabled")

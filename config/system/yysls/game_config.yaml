@@ -50,6 +50,10 @@ base_attrs:
     - 最大无相攻击
     - 最小无相攻击
   ring:
+    _name_suffixes:
+    - 云珑
+    _type_aliases:
+    - 环
     _attr: 最小外功攻击
     110:
       gold: 133
@@ -71,6 +75,10 @@ base_attrs:
     - 最大外功攻击
     - 最小外功攻击
   pendant:
+    _name_suffixes:
+    - 辟邪
+    _type_aliases:
+    - 佩
     _attr: 最大外功攻击
     110:
       gold: 199
@@ -92,6 +100,12 @@ base_attrs:
     - 最大外功攻击
     - 最小外功攻击
   head:
+    _name_suffixes:
+    - 冠
+    _type_aliases:
+    - 冠胄
+    - 冠
+    - 胄
     _attr: 气血最大值
     110:
       gold: 9723
@@ -116,6 +130,11 @@ base_attrs:
     - 外功防御
     - 气血最大值
   chest:
+    _name_suffixes:
+    - 甲
+    _type_aliases:
+    - 胸甲
+    - 胸
     _attr: 气血最大值
     110:
       gold: 19445
@@ -140,6 +159,11 @@ base_attrs:
     - 外功防御
     - 气血最大值
   leg:
+    _name_suffixes:
+    - 缚袴
+    - 缚
+    _type_aliases:
+    - 胫甲
     _follow: head
     _first_affixes:
     - 劲
@@ -150,6 +174,10 @@ base_attrs:
     - 外功防御
     - 气血最大值
   wrist:
+    _name_suffixes:
+    - 披膊
+    _type_aliases:
+    - 腕甲
     _follow: head
     _first_affixes:
     - 劲
@@ -236,7 +264,7 @@ affix_caps:
     105:
       cap: 10.8
     100:
-      cap: 9.2
+      cap: 9.4
   指定武学增效:
     _unit: '%'
     _aliases:
@@ -449,27 +477,359 @@ affix_categories:
   - 御
   - 气血最大值
   - 外功防御
+equipment_name_series:
+  output:
+    110: 流星
+    105: 踏雪
+    100: 绝尘
+    96: 惊沙
+    91: 飞将
+  armor:
+    110: 吴钩
+    105: 雁南飞
+    100: 万仞山
+    96: 陇上
+    91: 夜征人
 weapon_types:
 - name: 剑
   wuxue_affix: 剑武学增伤
+  name_suffixes:
+  - 含光
+  type_aliases:
+  - 剑
 - name: 枪
   wuxue_affix: 枪武学增伤
+  name_suffixes:
+  - 羽林
+  type_aliases:
+  - 枪
 - name: 伞
   wuxue_affix: 伞武学增效
+  type_aliases:
+  - 伞
+  name_suffixes:
+  - 云伞
 - name: 扇
   wuxue_affix: 扇武学增效
+  type_aliases:
+  - 扇
+  name_suffixes:
+  - 画扇
 - name: 陌刀
   wuxue_affix: 陌刀武学增伤
+  type_aliases:
+  - 陌刀
+  name_suffixes:
+  - 碎刃
 - name: 双刀
   wuxue_affix: 双刀武学增伤
+  type_aliases:
+  - 双刀
+  name_suffixes:
+  - 双鲤
 - name: 绳镖
   wuxue_affix: 绳镖武学增伤
+  type_aliases:
+  - 绳镖
+  name_suffixes:
+  - 鸣镖
 - name: 横刀
   wuxue_affix: 横刀武学增伤
+  type_aliases:
+  - 横刀
+  name_suffixes:
+  - 断水
 - name: 手甲
   wuxue_affix: 手甲武学增伤
+  type_aliases:
+  - 手甲
+  name_suffixes:
+  - 动岳
 - name: 舞绫鼓
   wuxue_affix: 舞绫鼓武学增伤
+  type_aliases:
+  - 舞绫鼓
+  - 鼓
+  name_suffixes:
+  - 凌波
+martial_arts:
+- name: 九重春色
+  weapon: 伞
+  attr: 牵丝
+- name: 千香引魂蛊
+  weapon: 伞
+  attr: 牵丝
+- name: 明川药典
+  weapon: 扇
+  attr: 牵丝
+- name: 杏游草野
+  weapon: 扇
+  attr: 牵丝
+- name: 青山执笔
+  weapon: 扇
+  attr: 牵丝
+- name: 文动霓裳
+  weapon: 舞绫鼓
+  attr: 牵丝
+- name: 醉梦游春
+  weapon: 伞
+  attr: 破竹
+- name: 断水双诀
+  weapon: 双刀
+  attr: 破竹
+- name: 泥犁三垢
+  weapon: 双刀
+  attr: 破竹
+- name: 天志垂象
+  weapon: 手甲
+  attr: 破竹
+- name: 悬身拳法
+  weapon: 手甲
+  attr: 破竹
+- name: 千机索天
+  weapon: 绳镖
+  attr: 破竹
+- name: 粟子游尘
+  weapon: 绳镖
+  attr: 破竹
+- name: 粟子行云
+  weapon: 绳镖
+  attr: 破竹
+- name: 八方风雷枪
+  weapon: 枪
+  attr: 裂石
+- name: 斩雪刀法
+  weapon: 横刀
+  attr: 裂石
+- name: 十方破阵
+  weapon: 陌刀
+  attr: 裂石
+- name: 嗟夫刀法
+  weapon: 陌刀
+  attr: 裂石
+- name: 无名剑法
+  weapon: 剑
+  attr: 鸣金
+- name: 积矩九剑
+  weapon: 剑
+  attr: 鸣金
+- name: 九曲惊神枪
+  weapon: 枪
+  attr: 鸣金
+- name: 无名枪法
+  weapon: 枪
+  attr: 鸣金
+playstyles:
+- name: 火拳
+  school: 牵丝·霖
+  attr: 牵丝
+  arts:
+  - 明川药典
+  - 千香引魂蛊
+  main_weapon: 扇
+  sub_weapon: 伞
+  output_dingyin: 外功穿透
+  defense_dingyin: ''
+  main_damage: ''
+  sub_damage: ''
+  all_skill_requirement: 不需要
+  qishu_requirement: 单体
+  unit_requirement: 首领
+- name: 纯奶
+  school: 牵丝·霖
+  attr: 牵丝
+  arts:
+  - 明川药典
+  - 千香引魂蛊
+  main_weapon: 扇
+  main_damage: 扇武学增效
+  sub_weapon: 伞
+  output_dingyin: 外功穿透
+  defense_dingyin: 明川药典治疗技增疗
+  sub_damage: ''
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 玩家
+- name: 纯唐
+  school: 裂石·钧
+  attr: 裂石
+  arts:
+  - 斩雪刀法
+  - 十方破阵
+  main_weapon: 横刀
+  main_damage: 横刀武学增伤
+  sub_weapon: 陌刀
+  output_dingyin: 外功穿透
+  defense_dingyin: 斩雪刀法轻重击派生技增伤
+  sub_damage: ''
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+- name: 双切
+  school: 裂石·钧
+  attr: 裂石
+  arts:
+  - 斩雪刀法
+  - 十方破阵
+  main_weapon: 横刀
+  main_damage: ''
+  sub_weapon: 陌刀
+  sub_damage: 陌刀武学增伤
+  output_dingyin: 外功穿透
+  defense_dingyin: 十方破阵蓄力技增伤
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+- name: 威威
+  school: 裂石·威
+  attr: 裂石
+  arts:
+  - 嗟夫刀法
+  - 八方风雷枪
+  main_weapon: 陌刀
+  main_damage: 陌刀武学增伤
+  sub_weapon: 枪
+  output_dingyin: 外功穿透
+  defense_dingyin: 嗟夫刀法蓄力技增伤
+  sub_damage: ''
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+- name: 鸢鸢
+  school: 破竹·鸢
+  attr: 破竹
+  arts:
+  - 天志垂象
+  - 千机索天
+  main_weapon: 手甲
+  main_damage: 手甲武学增伤
+  sub_weapon: 绳镖
+  output_dingyin: 外功穿透
+  defense_dingyin: 天志垂象蓄力技增伤
+  sub_damage: ''
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+- name: 双刀
+  school: 破竹·风
+  attr: 破竹
+  arts:
+  - 泥犁三垢
+  - 粟子游尘
+  main_weapon: 双刀
+  main_damage: 双刀武学增伤
+  sub_weapon: 绳镖
+  sub_damage: 绳镖武学增伤
+  output_dingyin: 外功穿透
+  defense_dingyin: 粟子游尘鼠鼠增伤
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+- name: 尘尘
+  school: 破竹·尘
+  attr: 破竹
+  arts:
+  - 醉梦游春
+  - 粟子行云
+  main_weapon: 伞
+  main_damage: 伞武学增效
+  sub_weapon: 绳镖
+  output_dingyin: 外功穿透
+  defense_dingyin: 醉梦游春武学技增伤
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+  sub_damage: ''
+- name: 翊翊
+  school: 牵丝·翊
+  attr: 牵丝
+  arts:
+  - 文动霓裳
+  - 杏游草野
+  main_weapon: 舞绫鼓
+  main_damage: 舞绫鼓武学增伤
+  sub_weapon: 扇
+  output_dingyin: 外功穿透
+  defense_dingyin: 文动霓裳特殊技增伤
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+  sub_damage: ''
+- name: 樽樽
+  school: 破竹·樽
+  attr: 破竹
+  arts:
+  - 悬身拳法
+  - 断水双诀
+  main_weapon: 手甲
+  main_damage: 手甲武学增伤
+  sub_weapon: 双刀
+  sub_damage: 双刀武学增伤
+  output_dingyin: 外功穿透
+  defense_dingyin: 悬身断水·浓醺技能增伤
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+- name: 走地玉
+  school: 牵丝·玉
+  attr: 牵丝
+  arts:
+  - 九重春色
+  - 青山执笔
+  main_weapon: 伞
+  main_damage: 伞武学增效
+  sub_weapon: 扇
+  output_dingyin: 外功穿透
+  defense_dingyin: 九重春色高频弹道增伤
+  sub_damage: ''
+  all_skill_requirement: 需要
+  qishu_requirement: 单体
+  unit_requirement: 首领
+- name: 飞天玉
+  school: 牵丝·玉
+  attr: 牵丝
+  arts:
+  - 九重春色
+  - 青山执笔
+  main_weapon: 伞
+  main_damage: 伞武学增效
+  sub_weapon: 扇
+  output_dingyin: 外功穿透
+  defense_dingyin: 九重春色高频弹道增伤
+  sub_damage: ''
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+- name: 无名
+  school: 鸣金·虹
+  attr: 鸣金
+  arts:
+  - 无名剑法
+  - 无名枪法
+  main_weapon: 剑
+  main_damage: 剑武学增伤
+  sub_weapon: 枪
+  output_dingyin: 外功穿透
+  defense_dingyin: 无名剑法蓄力技增伤
+  sub_damage: ''
+  all_skill_requirement: 需要
+  qishu_requirement: 不需要
+  unit_requirement: 首领
+- name: 九剑
+  school: 鸣金·影
+  attr: 鸣金
+  arts:
+  - 积矩九剑
+  - 九曲惊神枪
+  main_weapon: 剑
+  main_damage: 剑武学增伤
+  sub_weapon: 枪
+  output_dingyin: 外功穿透
+  defense_dingyin: 积矩九剑流血增伤
+  sub_damage: ''
+  all_skill_requirement: 需要
+  qishu_requirement: 单体
+  unit_requirement: 首领
 schools:
   鸣金·虹:
     schemes:
@@ -536,11 +896,11 @@ schools:
     - 基础方案
     attr: 牵丝
     main:
-      weapon: 舞绫鼓
       martial_art: 文动霓裳
+      weapon: 舞绫鼓
     sub:
-      weapon: 扇
       martial_art: 杏游草野
+      weapon: 扇
   破竹·风:
     schemes:
     - 基础方案
@@ -632,6 +992,8 @@ affix_aliases:
   - 玩家增
   醉梦游春武学技增伤:
   - 回旋伞定音
+  粟子游尘鼠鼠增伤:
+  - 老鼠定音
 affix_parts:
   最大无相攻击:
   - 武器

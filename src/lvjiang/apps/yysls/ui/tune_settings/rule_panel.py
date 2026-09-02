@@ -100,7 +100,10 @@ class RulePanel(QWidget):
         """含通用属性玩法（混搭流）时候选排除动态词条
         （不做动态归类，引用属死引用；保存校验为兜底）"""
         names = rule_affix_candidates()
-        playstyles = self._data.get("playstyles") or {}
+        from ...core.tuning_rules.parsing import resolve_playstyles
+
+        # playstyles 现在是引用列表（定义在公共玩法配置里），规范化后再看 attr
+        playstyles = resolve_playstyles(self._data.get("playstyles"))
         has_generic = any(
             (str((ps or {}).get("attr") or GENERIC_ATTR).strip()
              or GENERIC_ATTR) == GENERIC_ATTR

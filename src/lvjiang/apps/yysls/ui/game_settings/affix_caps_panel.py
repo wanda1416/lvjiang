@@ -40,7 +40,10 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
-from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.button_styles import (
+    apply_button_style,
+    apply_dialog_button_box_style,
+)
 
 from .....i18n import tr
 from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
@@ -120,11 +123,7 @@ class _PartsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         apply_button_style(btn_all, btn_invert, variant="neutral")
-        apply_button_style(buttons.button(QDialogButtonBox.StandardButton.Ok))
-        apply_button_style(
-            buttons.button(QDialogButtonBox.StandardButton.Cancel),
-            variant="neutral",
-        )
+        apply_dialog_button_box_style(buttons)
         layout.addWidget(buttons)
 
     def selected(self) -> list[str]:

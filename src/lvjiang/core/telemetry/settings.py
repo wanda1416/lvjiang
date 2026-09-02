@@ -1,4 +1,4 @@
-"""三条网络行为开关与本地统计数据清理的读写入口。
+"""三条网络行为开关与临时统计缓冲清理的读写入口。
 
 ``save_settings()``（core/config/session.py）只在 ``settings`` 节点做
 **一级浅合并**——直接传 ``{"network": {...}}`` 会整个替换掉
@@ -30,9 +30,10 @@ def set_network_feature(feature: str, value: bool) -> None:
 
 
 def set_telemetry_enabled(value: bool) -> None:
-    """开关统计功能：关闭时同步清除本地缓冲与标识，开启时补生成标识。
+    """开关统计功能：关闭时清除临时缓冲与标识，开启时补生成标识。
 
-    必须同步执行——用户点关闭的瞬间，本地就不该再有可上报的数据。
+    用户功能产生的结构化历史不属于临时统计缓冲，不在这里删除；再次
+    开启后，各已注册数据源可按公开的回溯窗口补传尚未上报的历史投影。
     """
     from . import identity as identity_mod
     from . import spool

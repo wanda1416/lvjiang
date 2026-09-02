@@ -14,12 +14,16 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
+from loguru import logger
+
 from . import spool as spool_mod
+from .sources import SourceBatch
 from .spool import SpoolChunk
 from .transport import post_report
 
@@ -39,10 +43,12 @@ MAX_ENVELOPE_BYTES = 128 * 1024
 class ReportJob:
     heartbeat: dict | None  # None 表示今天已经发过心跳，本次只发调律批次
     batches: tuple[SpoolChunk, ...]
+    source_batches: tuple[SourceBatch, ...] = ()
 
     @property
     def is_empty(self) -> bool:
-        return self.heartbeat is None and not self.batches
+        return (self.heartbeat is None and not self.batches
+                and not self.source_batches)
 
 
 @dataclass(frozen=True)
@@ -50,6 +56,7 @@ class ReportOutcome:
     heartbeat_attempted: bool
     heartbeat_ok: bool
     sent_batches: tuple[SpoolChunk, ...]  # 已成功上报，主线程据此 drop
+    sent_source_batches: tuple[SourceBatch, ...] = ()
 
 
 def build_job() -> ReportJob:
@@ -62,7 +69,7 @@ def build_job() -> ReportJob:
     from .consent import NetFeature, is_network_feature_enabled
 
     if not is_network_feature_enabled(NetFeature.TELEMETRY):
-        return ReportJob(heartbeat=None, batches=())
+        return ReportJob(heartbeat=None, batches=(), source_batches=())
 
     from . import heartbeat as heartbeat_mod
     from . import identity as identity_mod
@@ -73,10 +80,22 @@ def build_job() -> ReportJob:
         hb = heartbeat_mod.build_heartbeat_payload(
             install_id=identity.install_id, first_seen=identity.first_seen)
     batches = tuple(spool_mod.take_batches(MAX_BATCHES_PER_STARTUP))
-    return ReportJob(heartbeat=hb, batches=batches)
+    # collect_batches 会读持久化数据源（当前是调律历史 SQLite），而本函数按
+    # 上面的约束跑在主线程上，最坏情况会卡住界面。埋点先量出真实耗时，够不够
+    # 格拆线程等实测数据说话。
+    started = time.perf_counter()
+    from .sources import collect_batches
+    source_batches = collect_batches()
+    elapsed = time.perf_counter() - started
+    log = logger.warning if elapsed >= 0.5 else logger.info
+    log(f"[telemetry] build_job 采集持久化数据源耗时 {elapsed:.3f}s"
+        f"（主线程，{len(source_batches)} 批）")
+    return ReportJob(
+        heartbeat=hb, batches=batches, source_batches=source_batches)
 
 
-def _envelope(heartbeat: dict | None, chunks: Sequence[SpoolChunk]) -> dict:
+def _envelope(heartbeat: dict | None,
+              chunks: Sequence[SpoolChunk | SourceBatch]) -> dict:
     from datetime import datetime, timezone
 
     from .heartbeat import normalized_app_version
@@ -90,7 +109,9 @@ def _envelope(heartbeat: dict | None, chunks: Sequence[SpoolChunk]) -> dict:
         "app_version": normalized_app_version(),
         "heartbeat": heartbeat,
         "batches": [
-            {"batch_id": chunk.path.stem, "events": list(chunk.events)}
+            {"batch_id": (chunk.path.stem if isinstance(chunk, SpoolChunk)
+                          else chunk.batch_id),
+             "events": list(chunk.events)}
             for chunk in chunks
         ],
     }
@@ -100,7 +121,9 @@ def _envelope_bytes(envelope: dict) -> int:
     return len(json.dumps(envelope, ensure_ascii=False).encode("utf-8"))
 
 
-def plan_requests(job: ReportJob) -> list[tuple[dict | None, tuple[SpoolChunk, ...]]]:
+def plan_requests(job: ReportJob) -> list[
+    tuple[dict | None, tuple[SpoolChunk | SourceBatch, ...]]
+]:
     """把一次上报拆成若干个不超过 ``MAX_ENVELOPE_BYTES`` 的请求。
 
     心跳挂在第一个请求上；批次按体积贪心装箱。单个批次自己就超限时仍然
@@ -108,9 +131,11 @@ def plan_requests(job: ReportJob) -> list[tuple[dict | None, tuple[SpoolChunk, .
     静默丢弃（丢了就再也没有了，而服务端拒收只是这一批不落地）。
     """
     heartbeat = job.heartbeat
-    plans: list[tuple[dict | None, tuple[SpoolChunk, ...]]] = []
-    current: list[SpoolChunk] = []
-    for chunk in job.batches:
+    plans: list[
+        tuple[dict | None, tuple[SpoolChunk | SourceBatch, ...]]
+    ] = []
+    current: list[SpoolChunk | SourceBatch] = []
+    for chunk in (*job.batches, *job.source_batches):
         candidate = current + [chunk]
         if current and _envelope_bytes(_envelope(heartbeat, candidate)) > MAX_ENVELOPE_BYTES:
             plans.append((heartbeat, tuple(current)))
@@ -138,9 +163,10 @@ class TelemetryReporter(QThread):
         if job.is_empty:
             self.finished_ok.emit(
                 ReportOutcome(heartbeat_attempted=False, heartbeat_ok=False,
-                              sent_batches=()))
+                              sent_batches=(), sent_source_batches=()))
             return
         sent: list[SpoolChunk] = []
+        sent_sources: list[SourceBatch] = []
         heartbeat_ok = False
         try:
             for heartbeat, chunks in plan_requests(job):
@@ -151,7 +177,9 @@ class TelemetryReporter(QThread):
                     break
                 if heartbeat is not None:
                     heartbeat_ok = True
-                sent.extend(chunks)
+                sent.extend(c for c in chunks if isinstance(c, SpoolChunk))
+                sent_sources.extend(
+                    c for c in chunks if isinstance(c, SourceBatch))
         except Exception as e:  # noqa: BLE001 —— 见模块 docstring：探针出任何意外都不能外抛
             self.failed.emit(str(e))
             return
@@ -160,6 +188,7 @@ class TelemetryReporter(QThread):
                 heartbeat_attempted=job.heartbeat is not None,
                 heartbeat_ok=heartbeat_ok,
                 sent_batches=tuple(sent),
+                sent_source_batches=tuple(sent_sources),
             ))
 
 
@@ -171,3 +200,6 @@ def apply_outcome(outcome: ReportOutcome) -> None:
         heartbeat_mod.mark_attempt(success=outcome.heartbeat_ok)
     for chunk in outcome.sent_batches:
         spool_mod.drop(chunk)
+    from .sources import mark_reported
+    for batch in outcome.sent_source_batches:
+        mark_reported(batch)

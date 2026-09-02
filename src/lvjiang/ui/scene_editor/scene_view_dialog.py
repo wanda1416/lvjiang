@@ -60,6 +60,7 @@ class ViewManagerDialog(QDialog):
         # 拉开行距 + 加厚行内边距 + 给每行描边，让每个视图各占一块。
         self._list.setSpacing(6)
         self._list.setStyleSheet(
+            "QListWidget { outline: none; }"
             "QListWidget::item {"
             "  min-height: 34px;"
             "  padding: 8px 10px;"
@@ -67,6 +68,8 @@ class ViewManagerDialog(QDialog):
             "  border-radius: 4px;"
             "}"
             "QListWidget::item:selected {"
+            "  background-color: palette(highlight);"
+            "  color: palette(highlighted-text);"
             "  border: 1px solid palette(highlight);"
             "}"
         )
@@ -74,11 +77,11 @@ class ViewManagerDialog(QDialog):
         self._list.currentRowChanged.connect(self._refresh_contract)
         layout.addWidget(self._list, 1)
 
-        self._cb_homomorphic = QCheckBox(tr("同态视图（与基底同层，如滚动后的另一屏）"))
-        self._cb_homomorphic.setToolTip(
-            tr("同态视图没有入口，只有跳转；取消勾选表示它是独立页面，需要声明入口"))
-        self._cb_homomorphic.toggled.connect(self._on_toggle_homomorphic)
-        layout.addWidget(self._cb_homomorphic)
+        self._cb_same_layer = QCheckBox(tr("同层视图（与基底同一图层，如滚动后的另一屏）"))
+        self._cb_same_layer.setToolTip(
+            tr("同层视图没有入口，只有跳转；取消勾选表示它是独立页面，需要声明入口"))
+        self._cb_same_layer.toggled.connect(self._on_toggle_same_layer)
+        layout.addWidget(self._cb_same_layer)
 
         # 页面切换契约：选中视图由哪些按钮进入、又能转向哪里。
         # 只读展示——契约是逐步补全的声明，不驱动执行。
@@ -156,6 +159,7 @@ class ViewManagerDialog(QDialog):
                                 lines: list[tuple[str, str]]) -> None:
         while target.count():
             item = target.takeAt(0)
+            assert item is not None
             widget = item.widget()
             if widget is not None:
                 # deleteLater() 本身不会马上移除可见子控件；连续切换视图时旧文案
@@ -183,8 +187,8 @@ class ViewManagerDialog(QDialog):
             self._list.addItem(item)
         for v in views:
             label = f"{v.name}  ({v.key})"
-            if v.key != BASE_VIEW_KEY and getattr(v, "homomorphic", False):
-                label += tr("  · 同态")
+            if v.key != BASE_VIEW_KEY and getattr(v, "same_layer", False):
+                label += tr("  · 同层")
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, v.key)
             self._list.addItem(item)
@@ -209,11 +213,11 @@ class ViewManagerDialog(QDialog):
         view_key = self._selected_view_key()
         if not view_key:
             self._contract.setVisible(False)
-            self._cb_homomorphic.setVisible(False)
+            self._cb_same_layer.setVisible(False)
             return
         self._contract.setVisible(True)
         is_base = view_key == BASE_VIEW_KEY
-        self._cb_homomorphic.setVisible(not is_base)
+        self._cb_same_layer.setVisible(not is_base)
         scenes = self._registry.all_scenes()
         entries = entries_of_view(scenes, self._scene_key, view_key)
         exits = exits_of_view(scenes, self._scene_key, view_key)
@@ -250,21 +254,21 @@ class ViewManagerDialog(QDialog):
 
         view = next((v for v in self._registry.get_scene_views(self._scene_key)
                      if v.key == view_key), None)
-        homomorphic = bool(view is not None and not is_base
-                           and getattr(view, "homomorphic", False))
-        self._cb_homomorphic.blockSignals(True)
-        self._cb_homomorphic.setChecked(homomorphic)
-        self._cb_homomorphic.blockSignals(False)
+        same_layer = bool(view is not None and not is_base
+                          and getattr(view, "same_layer", False))
+        self._cb_same_layer.blockSignals(True)
+        self._cb_same_layer.setChecked(same_layer)
+        self._cb_same_layer.blockSignals(False)
         if entries:
             entry_lines = [_entry_line(t) for t in entries]
         elif view_key == BASE_VIEW_KEY:
             entry_lines = [(tr("基底视图是场景入口"), "")]
-        elif homomorphic:
-            # 同态视图只是同一页滚过去的另一个取景，本就没有"进入"这回事。
-            entry_lines = [(tr("同态视图与基底同层，无入口"), "")]
+        elif same_layer:
+            # 同层视图只是同一图层滚过去的另一个取景，本就没有“进入”这回事。
+            entry_lines = [(tr("同层视图与基底处于同一图层，无入口"), "")]
         else:
             entry_lines = [(
-                tr("无入口（死视图：补 to: 声明，或改标为同态视图）"), "")]
+                tr("无入口（死视图：补 to: 声明，或改标为同层视图）"), "")]
         exit_lines = ([_exit_line(t) for t in exits] if exits
                       else [(tr("未声明"), "")])
         self._replace_contract_lines(self._entry_lines, entry_lines)
@@ -473,17 +477,17 @@ class ViewManagerDialog(QDialog):
         if idx >= 0:
             self._list.setCurrentRow(idx)
 
-    def _on_toggle_homomorphic(self, checked: bool):
-        """切换选中视图的同态属性并落盘。"""
+    def _on_toggle_same_layer(self, checked: bool):
+        """切换选中视图的同层属性并落盘。"""
         view_key = self._selected_view_key()
         if not view_key or view_key == BASE_VIEW_KEY:
             return
         views = self._registry.get_scene_views(self._scene_key)
         view = next((v for v in views if v.key == view_key), None)
-        if view is None or view.homomorphic == checked:
+        if view is None or view.same_layer == checked:
             return
-        view.homomorphic = checked
+        view.same_layer = checked
         self._registry.save_scene_views(self._scene_key)
         self._changed = True
-        # 列表行文本带「· 同态」后缀，只刷契约区会让它停在勾选前的状态。
+        # 列表行文本带「· 同层」后缀，只刷契约区会让它停在勾选前的状态。
         self._refresh()

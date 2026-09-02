@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
+from ..dialog_guards import EscapeCloseConfirmationMixin
 
 _STYLE_IDLE = (
     "background-color: #607D8B; color: white; font-weight: bold; "
@@ -44,7 +45,7 @@ _STYLE_RECORDING = (
 _STYLE_ACTION = "font-weight: bold; font-size: 13px; padding: 8px 16px;"
 
 
-class ScriptRecordDialog(QDialog):
+class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
     """脚本录制：录制按钮 + 实时 DSL 展示 + 保存/复制/清除"""
 
     line_captured = pyqtSignal(str)

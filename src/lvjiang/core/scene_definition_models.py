@@ -30,21 +30,21 @@ class ViewDef:
     """
     key: str
     name: str
-    # 同态视图：与基底处于**同一层**，只是滚动/翻页后的另一个取景，不是另一个
+    # 同层视图：与基底处于**同一图层**，只是滚动/翻页后的另一个取景，不是另一个
     # 页面。菜单的 page_1 / page_2 就是典型。
     #
-    # 因此同态视图**没有入口、只有跳转**：没有任何按钮"进入"它，你只是把同一页
+    # 因此同层视图**没有入口、只有跳转**：没有任何按钮“进入”它，你只是把同一页
     # 滚过去了；但它上面的按钮照样可以跳到别处。死视图检测必须跳过它们，否则
     # 满屏都是假警报。
     #
     # 默认为真：新建视图多半是滚动态，这个默认值不会制造假警报；确实是独立页面
     # 时再取消勾选，那时才要求它有入口。基底视图不适用（它是场景入口）。
-    homomorphic: bool = True
+    same_layer: bool = True
 
     def to_dict(self) -> dict:
-        d = {"key": self.key, "name": self.name}
-        if not self.homomorphic:
-            d["homomorphic"] = False
+        d: dict[str, object] = {"key": self.key, "name": self.name}
+        if not self.same_layer:
+            d["same_layer"] = False
         return d
 
 

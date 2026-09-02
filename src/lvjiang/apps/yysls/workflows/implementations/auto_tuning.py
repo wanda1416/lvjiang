@@ -1004,8 +1004,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if affix_count >= self.MAX_AFFIX:
             logger.info(f"  [{name}] 词条已满（{affix_count}），仅做终局判定")
             judgement = self.judge.final_judge(equip_data)
-            actual_rating = self.judge.compute_actual_rating(equip_data) or ""
-            self._emit_assessment(judgement, actual_rating)
+            final_rating = self.judge.expect_key(judgement) or ""
+            self._emit_assessment(judgement, final_rating)
             self.recorder.report_set("status", "already_full")
             self.recorder.report_set("final_judgement", judgement)
             outcome = self._on_scan_reject(
@@ -1014,11 +1014,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             if outcome is RecycleOutcome.RECYCLED:
                 self._emit_equip_finish(name, equip_data, affix_count=affix_count,
                                         status="recycled",
-                                        final_rating=actual_rating)
+                                        final_rating=final_rating)
                 self.recorder.discard_report()
                 return "", outcome
             self._emit_equip_finish(name, equip_data, affix_count=affix_count,
-                                    final_rating=actual_rating,
+                                    final_rating=final_rating,
                                     status="already_full")
             self.recorder.discard_report()
             return self._make_fingerprint(equip_data.to_dict()), outcome
@@ -1136,7 +1136,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         rounds = 0
         stop_reason = stop_reason or ""
         last_food_reason = ""
-        last_actual: str | None = None  # 缓存最后一轮的实际评级
+        last_final: str | None = None  # 缓存满词条后的最终评级上限
         while not self.is_stopped and not skip_tune_loop:
             logger.info(f"  ═══ [{name}] 调律轮次 #{rounds + 1}"
                         f"（当前 {affix_count}/{self.MAX_AFFIX}）═══")
@@ -1177,12 +1177,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             incoming, new_expect = \
                 self.judge.refresh_expectation(equip_data)
             self.equipment_session.expected_rating = new_expect
-            # 实际评级仅在词条满 5 条后才有意义
+            # 最终评级仅在词条满 5 条后才有意义；它包含当前仍合法的转律上限。
             if affix_count >= self.MAX_AFFIX:
-                last_actual = self.judge.compute_actual_rating(equip_data)
-                actual_for_signal = last_actual
+                last_final = new_expect
+                final_for_signal = last_final
             else:
-                actual_for_signal = None
+                final_for_signal = None
             # 进度信号：单轮调律完成（含更新后的评级）
             self._emit_progress("tune_round_completed", {
                 "round_no": rounds,
@@ -1193,7 +1193,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 "current_affixes": [a.to_dict() for a in equip_data.affixes],
                 "affix_count": affix_count,
                 "expect_rating": new_expect,
-                "actual_rating": actual_for_signal,
+                "final_rating": final_for_signal,
                 "rule_ratings": incoming,
                 "new_affix_data": (
                     equip_data.affixes[-1].to_dict()
@@ -1260,17 +1260,17 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self.output.setdefault("tuning_reports", []).extend(
             self.recorder.collect_reports()[-1:])
         # 进度信号：装备处理结束
-        # 实际评级仅在词条满 5 条后才有意义（复用循环中缓存的结果，避免重复计算）
-        if affix_count >= self.MAX_AFFIX and last_actual is not None:
-            actual_rating = last_actual or ""
+        # 最终评级是满词条装备当前仍能合法达到的评级上限。
+        if affix_count >= self.MAX_AFFIX and last_final is not None:
+            final_rating = last_final or ""
         elif affix_count >= self.MAX_AFFIX:
             # 兆底：循环未执行但词条已满（路径 A 已单独处理，此处保险）
-            actual_rating = self.judge.compute_actual_rating(equip_data) or ""
+            final_rating = self.judge.expect_key(judgement) or ""
         else:
-            actual_rating = ""
+            final_rating = ""
         self._emit_progress("equipment_finished", {
             "name": name,
-            "final_rating": actual_rating,
+            "final_rating": final_rating,
             "rounds": rounds,
             "affix_count": affix_count,
             "final_affixes": [a.to_dict() for a in equip_data.affixes],

@@ -40,6 +40,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
+from ..button_styles import apply_button_style
 from ..ocr.pick_canvas import PickCanvas
 
 #: 临时运行文件（与场景编辑器试运行共用；``_`` 前缀不会被发现层当成正式脚本）
@@ -152,6 +153,13 @@ class DebugPanel(QWidget):
         self.btn_ins_color.clicked.connect(self._insert_color)
         self.btn_ins_rect = QPushButton(tr("插入区域"))
         self.btn_ins_rect.clicked.connect(self._insert_rect)
+        apply_button_style(
+            self.btn_snap,
+            self.btn_ins_point,
+            self.btn_ins_color,
+            self.btn_ins_rect,
+            variant="neutral",
+        )
         for b in (self.btn_snap, self.btn_ins_point, self.btn_ins_color, self.btn_ins_rect):
             row.addWidget(b)
         row.addStretch()
@@ -183,6 +191,12 @@ class DebugPanel(QWidget):
         self.btn_pause.clicked.connect(self._on_pause)
         self.btn_stop = QPushButton(tr("停止"))
         self.btn_stop.clicked.connect(self._on_stop)
+        apply_button_style(self.btn_run)
+        apply_button_style(
+            self.btn_step, self.btn_continue, self.btn_pause,
+            variant="neutral",
+        )
+        apply_button_style(self.btn_stop, variant="danger")
         for b in (self.btn_run, self.btn_step, self.btn_continue, self.btn_pause, self.btn_stop):
             row2.addWidget(b)
         row2.addStretch()

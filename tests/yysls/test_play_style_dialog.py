@@ -1,4 +1,4 @@
-"""_CreatePlayStyleDialog 预填（initial_values）测试
+"""基础属性表单的预填安全与工作流非模态契约测试。
 
 重点覆盖一个容易踩的坑：角色面板会展示"非本流派"的属攻数值（装备词条
 带的其他流派属攻，如裂石流派角色装备恰好有牵丝词条），basic 属性里不
@@ -12,10 +12,42 @@
 并有被误保存的风险。
 """
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QComboBox, QPushButton, QWidget
+
 from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
 from lvjiang.apps.yysls.ui.loadout.combat.play_style_dialog import (
+    PlayStyleDialogMixin,
     _CreatePlayStyleDialog,
 )
+
+
+class _DialogHost(QWidget, PlayStyleDialogMixin):
+    def __init__(self):
+        super().__init__()
+        self.clicks = 0
+        self._school = "测试流派"
+        self._combo_play_style = QComboBox(self)
+        self.main_button = QPushButton("主界面操作", self)
+        self.main_button.clicked.connect(self._record_click)
+
+    def _record_click(self):
+        self.clicks += 1
+
+    def _get_current_school(self):
+        return self._school
+
+    def _compute_equip_base_attrs(self):
+        return CombatAttributes()
+
+    def _compute_equip_attrs(self):
+        return CombatAttributes()
+
+    def _compute_gongjue_attrs(self):
+        return CombatAttributes()
+
+    def _refresh_play_styles(self):
+        pass
 
 
 class TestResolveInitialValues:
@@ -139,3 +171,39 @@ class TestOffSchoolAttackDataNeverLeaksIntoPanelAttrs:
 
         assert "min_qiansi" not in saved_field_names
         assert "min_lieshi" in saved_field_names
+
+
+class TestWorkflowTriggeredFormIsNonModal:
+    def test_prefilled_form_keeps_host_interactive(self, qtbot):
+        host = _DialogHost()
+        qtbot.addWidget(host)
+        host.show()
+        dialog = _CreatePlayStyleDialog(host, school_attr="裂石")
+
+        host._finish_play_style_dialog(
+            "测试流派", dialog, workflow_triggered=True
+        )
+
+        assert dialog.isVisible()
+        assert not dialog.isModal()
+        assert dialog.windowModality() == Qt.WindowModality.NonModal
+        assert host.isEnabled()
+        qtbot.mouseClick(host.main_button, Qt.MouseButton.LeftButton)
+        assert host.clicks == 1
+        dialog.reject()
+
+    def test_missing_school_warning_is_non_modal(self, qtbot):
+        host = _DialogHost()
+        qtbot.addWidget(host)
+        host.show()
+        host._school = ""
+
+        host._on_open_play_style_form({"precision": 12.0})
+
+        box = next(iter(host._workflow_message_dialogs))
+        assert box.isVisible()
+        assert not box.isModal()
+        assert box.windowModality() == Qt.WindowModality.NonModal
+        qtbot.mouseClick(host.main_button, Qt.MouseButton.LeftButton)
+        assert host.clicks == 1
+        box.close()

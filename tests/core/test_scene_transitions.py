@@ -19,15 +19,15 @@ from lvjiang.core.scene_transitions import (
 )
 
 
-def _scene(key, *, views=(), regions=(), points=(), homomorphic=()):
-    """views 里列出的 key 默认非同态（独立页面），便于测死视图检测。
+def _scene(key, *, views=(), regions=(), points=(), same_layer=()):
+    """views 里列出的 key 默认非同层（独立页面），便于测死视图检测。
 
-    生产默认是同态——新建视图多半是滚动态。这里反过来，是因为绝大多数用例
-    要验的是"独立页面缺入口"。要同态的显式写进 homomorphic。
+    生产默认是同层——新建视图多半是滚动态。这里反过来，是因为绝大多数用例
+    要验的是“独立页面缺入口”。要同层的显式写进 same_layer。
     """
     return SceneDef(
         key=key, name=key,
-        views=[ViewDef(key=v, name=v, homomorphic=v in homomorphic)
+        views=[ViewDef(key=v, name=v, same_layer=v in same_layer)
                for v in views],
         regions=list(regions), points=list(points))
 
@@ -102,24 +102,24 @@ def test_base_view_never_counts_as_unreachable():
     assert find_unreachable_views(scenes) == []
 
 
-def test_homomorphic_views_are_exempt():
-    """同态视图与基底同层，只是滚动后的另一个取景，本就没有"进入"这回事。
+def test_same_layer_views_are_exempt():
+    """同层视图与基底处于同一图层，只是滚动后的另一个取景，本就没有“进入”这回事。
 
     菜单的 page_1 / page_2 就是典型：没有按钮进入它们，你只是把同一页滚过去了。
     不豁免的话死视图检测会满屏假警报。
     """
     scenes = {"menu": _scene(
         "menu", views=("base", "page_1", "page_2"),
-        homomorphic=("page_1", "page_2"))}
+        same_layer=("page_1", "page_2"))}
 
     assert find_unreachable_views(scenes) == []
 
 
-def test_homomorphic_view_still_contributes_exits():
-    """同态视图没有入口，但它上面的按钮照样能跳到别处。"""
+def test_same_layer_view_still_contributes_exits():
+    """同层视图没有入口，但它上面的按钮照样能跳到别处。"""
     scenes = {
         "menu": _scene("menu", views=("base", "page_2"),
-                       homomorphic=("page_2",),
+                       same_layer=("page_2",),
                        regions=[RegionDef(key="bag", name="包裹",
                                           is_clickable=True,
                                           views=["page_2"], to="bag")]),

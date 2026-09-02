@@ -9,6 +9,7 @@ from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
 
 from ...i18n import tr
+from ..button_styles import apply_button_style, fit_button_width
 
 
 class _AdbConnSignalBridge(QObject):
@@ -94,7 +95,7 @@ class _DeviceWorker(QObject):
         if self._agent_mode:
             agent = connect_agent(device)
             if agent is None:
-                self.notice.emit(tr("[设备端手势] 连不上手机上的律匠 app（未安装或未开无障碍），回退 adb shell input"))
+                self.notice.emit(tr("[设备端手势] App 不可达或设备端输入通道未就绪，回退 adb shell input"))
             else:
                 self.notice.emit(f"[设备端手势] 已连接 {agent.describe()}")
 
@@ -151,6 +152,9 @@ class _WirelessScanDialog(QObject):
         btn_layout = QHBoxLayout()
         self._scan_btn = QPushButton(tr("扫描"))
         self._cancel_btn = QPushButton(tr("取消"))
+        apply_button_style(self._scan_btn)
+        apply_button_style(self._cancel_btn, variant="neutral")
+        fit_button_width(self._scan_btn, self._cancel_btn)
         btn_layout.addStretch()
         btn_layout.addWidget(self._scan_btn)
         btn_layout.addWidget(self._cancel_btn)

@@ -18,7 +18,7 @@
 
 | DSL 写法 | 类别 | 查布局的 |
 |----------|------|----------|
-| `click [scene].[key]` | click | regions，再 points（`click_any` 的顺序） |
+| `click [scene].[key]` | activate | regions，再 points（运行时按布局决定点击坐标或按键） |
 | `drag [scene].[key]` | arrow | arrows；命中后再查方向两端的 point |
 | `align [scene].[panel]`、`[scene].[panel][r][c]`、`drag [scene].[panel] up` | panel | panels |
 | `scan/recognize [scene].[f1, f2]` | region | regions |

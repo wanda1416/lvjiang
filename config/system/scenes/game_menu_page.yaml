@@ -10,7 +10,7 @@ views:
   name: 菜单底页
 - key: mode
   name: 游戏模式
-  homomorphic: false
+  same_layer: false
 regions:
 - key: back
   name: 返回

@@ -97,8 +97,8 @@ def _project(row: dict, install_id: str) -> dict | None:
         rolls.append(entry)
 
     rule_snapshot = _json_value(row.get("rule_snapshot_json"), [])
-    rule_keys = [item.get("key") for item in rule_snapshot
-                 if isinstance(item, dict) and item.get("key")]
+    rule_keys = [key for item in rule_snapshot if isinstance(item, dict)
+                 and isinstance((key := item.get("key")), str) and key]
     config = _json_value(row.get("config_snapshot_json"), {})
     started = str(row.get("tuning_started_at") or "")
     fields = {

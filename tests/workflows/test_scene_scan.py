@@ -150,7 +150,7 @@ def test_daily_jianghu_matches_legacy_required_scenes():
 
     这里按引擎 _load_and_validate 的方式先合并 import 链的 procs 再搜集，
     断言的才是运行期真正的校验范围。只 parse_file 会漏掉靠子过程引用的
-    场景（如 game_main_page 走 nav_main_to_menu、bag_equip_detail 走
+    场景（如 game_main_page 走 nav_main_to_menu、bag_detail 走
     背包子过程），那样每次把一句 click 挪进 subcall 都要改一次期望，
     却并没有任何覆盖真的丢失。
     """
@@ -164,7 +164,7 @@ def test_daily_jianghu_matches_legacy_required_scenes():
         "activity_jianghu", "waiguan_yigui", "waiguan_qingjing",
         "general_action", "game_menu_page", "game_main_page",
         "general_control", "school_main",
-        "bag_item_detail", "bag_equip_detail",
+        "bag_detail", "bag_item_detail",
     }
 
 
@@ -205,9 +205,9 @@ def test_daily_jianghu_claim_reputation_guard():
     assert "extract_int($result.haoling_of_week)" in text
     assert "if $value < 0" in text
     assert "return -1" in text
-    # 领奖后全屏奖励弹窗用号令页空白区域点击关闭，避免遮挡下一轮页面校验
+    # 领奖后全屏奖励弹窗用通用空白区域点击关闭，避免遮挡下一轮页面校验
     claim_def = text[text.index("def claim_reward("):text.index("def claim_reward(") + 500]
-    assert "click [activity_jianghu].[space]" in claim_def
+    assert "click [general_control].[blank_area]" in claim_def
 
     completed_call = "call $task_completed = is_task_completed($text_result)"
     initial_scan = "scan [activity_jianghu].$label.[label] as $text_result"

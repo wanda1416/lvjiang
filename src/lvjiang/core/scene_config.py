@@ -71,28 +71,30 @@ def normalize_scene_doc(doc: dict) -> dict:
         raise ValueError(f"不支持的 scenes.yaml schema_version={version}")
     if version == 2:
         result = deepcopy(doc)
-        groups = result.get("scenes")
-        if groups is not None and not isinstance(groups, dict):
+        v2_groups = result.get("scenes")
+        if v2_groups is not None and not isinstance(v2_groups, dict):
             raise ValueError("scenes.yaml 的 scenes 必须是映射")
         return result
 
-    layout_scenes = doc.get("layout_scenes")
-    group_names = doc.get("group_names")
-    if layout_scenes is not None and not isinstance(layout_scenes, dict):
+    raw_layout_scenes = doc.get("layout_scenes")
+    raw_group_names = doc.get("group_names")
+    if raw_layout_scenes is not None and not isinstance(raw_layout_scenes, dict):
         raise ValueError("v1 scenes.yaml 的 layout_scenes 必须是映射")
-    if group_names is not None and not isinstance(group_names, dict):
+    if raw_group_names is not None and not isinstance(raw_group_names, dict):
         raise ValueError("v1 scenes.yaml 的 group_names 必须是映射")
+    layout_scenes: dict = raw_layout_scenes or {}
+    group_names: dict = raw_group_names or {}
 
     groups: dict = {}
-    group_keys = list((layout_scenes or {}).keys())
-    for key in (group_names or {}):
+    group_keys = list(layout_scenes.keys())
+    for key in group_names:
         if key not in group_keys:
             group_keys.append(key)
     for key in group_keys:
         group: dict = {}
-        if key in (group_names or {}):
+        if key in group_names:
             group["name"] = deepcopy(group_names[key])
-        if key in (layout_scenes or {}):
+        if key in layout_scenes:
             # 普通列表和 __added__/__removed__/__order__ 增量都原样迁到 items。
             group["items"] = deepcopy(layout_scenes[key])
         groups[key] = group

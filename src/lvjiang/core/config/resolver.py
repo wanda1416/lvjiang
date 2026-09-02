@@ -117,7 +117,9 @@ _REGISTRY_KEYS = (ADDED_KEY, REMOVED_KEY, ORDER_KEY)
 #: `apps/yysls/config/merge_policy.py`，经 `AppHooks.config_policy_modules`
 #: 「import 即注册」接入（同 `builtin_modules`/`telemetry_modules` 的约定）。
 REGISTRY_LIST_PATHS: dict[str, tuple[str, ...]] = {
-    "scenes.yaml": ("layout_scenes.*",),
+    # v1 路径保留给通用 resolver 的存量兼容；v2 的专用跨 schema 合并见
+    # core.scene_config（必须先分别转换 system/local，不能直接混合结构）。
+    "scenes.yaml": ("layout_scenes.*", "scenes.*.items", "scenes.*.disabled"),
 }
 
 
@@ -840,6 +842,10 @@ class ConfigResolver:
         """
         return self._load_yaml(self.system_dir / rel_path)
 
+    def load_local(self, rel_path: str) -> dict:
+        """只读 local 层原始文档，供需要分层 schema 迁移的聚合配置使用。"""
+        return self._load_yaml(self.local_dir / rel_path)
+
     def load_merged(self, rel_path: str) -> dict:
         """聚合读：system 文档 ← local diff 深合并"""
         base = self._load_yaml(self.system_dir / rel_path)
@@ -849,7 +855,9 @@ class ConfigResolver:
         registry = REGISTRY_LIST_PATHS.get(rel_path, ())
         return merge_doc(base, self._load_yaml(overlay_path), registry)
 
-    def save_merged(self, rel_path: str, full_doc: dict):
+    def save_merged(self, rel_path: str, full_doc: dict, *,
+                    base_doc: dict | None = None,
+                    registry: tuple[str, ...] | None = None):
         """聚合写：开发→全量写 system；用户→逆向求 diff 写 local
         （diff 为空则删 local 覆盖文件）
 
@@ -877,9 +885,11 @@ class ConfigResolver:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(text, encoding="utf-8")
         else:
-            base = self._load_yaml(self.system_dir / rel_path)
+            base = (deepcopy(base_doc) if base_doc is not None
+                    else self._load_yaml(self.system_dir / rel_path))
             diff = compute_diff(
-                base, full_doc, REGISTRY_LIST_PATHS.get(rel_path, ()),
+                base, full_doc, (registry if registry is not None
+                                 else REGISTRY_LIST_PATHS.get(rel_path, ())),
                 deletable=DELETABLE_PATHS.get(rel_path, ()),
                 protected=PROTECTED_LIST_PATHS.get(rel_path, {}))
             overlay_path = self.local_dir / rel_path

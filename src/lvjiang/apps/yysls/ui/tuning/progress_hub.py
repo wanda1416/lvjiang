@@ -40,7 +40,7 @@ class TuningProgressHub(QObject):
     # equipment_assessed 提供。
 
     equipment_assessed = pyqtSignal(object)
-    # dict: {expect_rating, actual_rating?, rule_ratings: dict, stage}
+    # dict: {expect_rating, rule_ratings: dict, stage}
 
     round_prepared = pyqtSignal(object)
     # dict: {round_no, food_used, food_reason, material_stock, will_tune}
@@ -49,9 +49,9 @@ class TuningProgressHub(QObject):
     tune_round_completed = pyqtSignal(object)
     # dict: {round_no, new_affix: dict|None, food_used, food_reason,
     #        material_stock: dict, current_affixes: list[dict], affix_count,
-    #        expect_rating, actual_rating}
+    #        expect_rating, final_rating}
     # expect_rating: 本轮调律后刷新的最大预期评级
-    # actual_rating: 实际评级（仅词条满 5 条时有值，否则为 None）
+    # final_rating: 合法转律后的评级上限（仅词条满 5 条时有值，否则为 None）
 
     # ─── 当前执行阶段（长耗时动作开始前即时更新）──────────
     operation_updated = pyqtSignal(object)
@@ -77,7 +77,7 @@ class TuningProgressHub(QObject):
     equipment_finished = pyqtSignal(object)
     # dict: {name, final_rating, rounds, affix_count,
     #        final_affixes: list[dict], status, reason?}
-    # final_rating: 实际评级（仅词条满 5 条时有值，否则为空串）
+    # final_rating: 合法转律后的评级上限（仅词条满 5 条时有值，否则为空串）
 
     # ─── 批次进度 ────────────────────────────────────────
     batch_progress = pyqtSignal(object)

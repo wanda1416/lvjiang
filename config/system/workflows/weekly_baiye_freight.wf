@@ -11,6 +11,7 @@
 
 import "subcall/page_detection.wf"
 import "subcall/navigation.wf"
+import "subcall/page_action.wf"
 import "subcall/record/baiye_freight.wf"
 
 # ─── 导航：从首页到百业驻地 ─────────────────────────────
@@ -28,19 +29,10 @@ if not $found
 end
 
 click $found after wait stable @page_refresh
-if env("android")
-    click [baiye_main].[goto_baiye] after wait @page_refresh
-else
-    press "SPACE" after wait @page_refresh
-end
+click [baiye_main].[goto_baiye] after wait @page_refresh
 
-scan [general_control].[confirm] as $confirm by contains "确定"
-if $confirm
-    if env("android")
-        click [general_control].[confirm] after wait @page_refresh
-    else 
-        press "SPACE" after wait @page_refresh
-    end
+call $confirmed = scan_and_confirm("前往百业", 1)
+if $confirmed
     # 通过 check_in_baiye 检查是否抵达百业，最多等待 20s
     eval $arrived = 0
     loop 10

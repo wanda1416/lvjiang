@@ -19,6 +19,7 @@ class TelemetryDisclosure:
     collected: tuple[str, ...] = ()
     excluded: tuple[str, ...] = ()
     schema_names: tuple[str, ...] = ()
+    historical_upload_days: int | None = None
 
 
 @dataclass

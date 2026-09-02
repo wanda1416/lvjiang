@@ -95,8 +95,12 @@ class TuningHistoryWidget(QWidget):
         self._table.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.setAlternatingRowColors(True)
-        self._table.verticalHeader().setVisible(False)
-        self._table.horizontalHeader().setStretchLastSection(True)
+        vertical_header = self._table.verticalHeader()
+        horizontal_header = self._table.horizontalHeader()
+        assert vertical_header is not None
+        assert horizontal_header is not None
+        vertical_header.setVisible(False)
+        horizontal_header.setStretchLastSection(True)
         self._table.itemSelectionChanged.connect(self._selection_changed)
         self._table.cellDoubleClicked.connect(
             lambda _row, _column: self._open_selected())

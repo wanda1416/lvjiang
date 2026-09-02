@@ -39,6 +39,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tuning_group,
 )
 from lvjiang.apps.yysls.core.tuning_rules.models import FOOD_LABELS
+from lvjiang.ui.button_styles import apply_button_style
 
 from ......i18n import tr
 from ...game_settings.level_combo import LevelCombo
@@ -376,6 +377,8 @@ class EquipJudgeTestDialog(QDialog):
         self.btn_simulate = QPushButton(tr("模拟调律"))
         self.btn_simulate.clicked.connect(self._on_simulate)
         btn_row.addWidget(self.btn_simulate)
+        apply_button_style(self.btn_judge)
+        apply_button_style(self.btn_simulate, variant="neutral")
         right.addLayout(btn_row)
         self.result_text = QTextEdit()
         self.result_text.setReadOnly(True)

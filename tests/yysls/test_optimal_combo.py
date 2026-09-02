@@ -379,6 +379,29 @@ class TestSearchOptimalCombo:
         for i in range(len(results) - 1):
             assert results[i]["rate"] >= results[i + 1]["rate"]
 
+    def test_full_dingyin_uses_selected_playstyle(self) -> None:
+        """组合搜索的满定音与属性面板口径一致，不能只顶满旧定音。"""
+        calc = _get_calculator()
+        equip = {
+            "name": "测试剑",
+            "type": "剑",
+            "level": 110,
+            "quality": "gold",
+            "part": "剑",
+            "dingyin": {"name": "无相穿透", "value": 1.0},
+        }
+
+        results = search_optimal_combo(
+            {"main_weapon": [equip]}, calc, CombatAttributes(),
+            use_dominance_pruning=False,
+            full_dingyin=True,
+            playstyle="无名",
+        )
+
+        dingyin = results[0]["equipped"]["main_weapon"]["dingyin"]
+        assert dingyin["name"] == "外功穿透"
+        assert dingyin["value"] > 1.0
+
     def test_search_result_ge_any_random_combo(self) -> None:
         """The optimal result's rate should be >= rate of any random combination."""
         calc = _get_calculator()

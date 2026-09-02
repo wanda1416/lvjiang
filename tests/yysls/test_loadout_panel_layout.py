@@ -3,6 +3,8 @@ from types import SimpleNamespace
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
 
+from lvjiang.apps.yysls.core.loadout import LoadoutRepository
+from lvjiang.apps.yysls.ui.events import EQUIPMENT_CHANGED, get_event_hub
 from lvjiang.apps.yysls.ui.loadout import LoadoutPanel
 from lvjiang.apps.yysls.ui.loadout.combat.layout import (
     DISPLAY_MODE_FULL,
@@ -34,6 +36,129 @@ class Host(QWidget):
     def switch_user(self, name):
         self._active_user = name
         self.user_changed.emit(name)
+
+
+def test_equipment_updates_refresh_only_while_tab_is_visible(
+        qtbot, tmp_path, monkeypatch):
+    """隐藏的备战方案不消费扫描事件；显示时实时刷新并补读最新快照。"""
+    import lvjiang.constants
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    refreshes: list[bool] = []
+    monkeypatch.setattr(panel, "refresh", lambda: refreshes.append(True))
+    hub = get_event_hub(host)
+
+    # 尚未进入该 Tab，不订阅装备刷新。
+    hub.publish(EQUIPMENT_CHANGED)
+    qtbot.wait(250)
+    assert refreshes == []
+
+    # 进入时补读一次快照，随后每批扫描事件实时刷新一次。
+    panel.show()
+    qtbot.wait(20)
+    assert refreshes == [True]
+    refreshes.clear()
+    hub.publish(EQUIPMENT_CHANGED)
+    hub.publish(EQUIPMENT_CHANGED)
+    qtbot.wait(250)
+    assert refreshes == [True]
+
+    # 离开后取消订阅；再次进入仍会补读最新数据。
+    panel.hide()
+    refreshes.clear()
+    hub.publish(EQUIPMENT_CHANGED)
+    qtbot.wait(250)
+    assert refreshes == []
+    panel.show()
+    qtbot.wait(20)
+    assert refreshes == [True]
+
+
+def test_panel_refresh_invalidates_equipment_before_consumers_run(
+        qtbot, tmp_path, monkeypatch):
+    """手动刷新不能让战斗属性继续复用旧穿戴快照。"""
+    import lvjiang.constants
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    combat = panel._character._combat_attrs_tab
+    calls: list[str] = []
+    monkeypatch.setattr(
+        combat, "invalidate_equipment_snapshot",
+        lambda: calls.append("invalidate"))
+    monkeypatch.setattr(
+        panel._equipment, "_refresh_all",
+        lambda: calls.append("equipment"))
+    monkeypatch.setattr(
+        combat, "_refresh_display", lambda: calls.append("graduation"))
+
+    panel.refresh()
+
+    assert calls[0] == "invalidate"
+    assert "equipment" in calls
+    assert "graduation" in calls
+
+
+def test_panel_refresh_reloads_edited_equipped_snapshot(
+        qtbot, tmp_path, monkeypatch):
+    """穿戴装备在磁盘上变更后，刷新必须用新装备安排毕业率计算。"""
+    import lvjiang.constants
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+    combat = panel._character._combat_attrs_tab
+    combat._session_user = "alice"
+    combat._equipped_cache = {"head": {"name": "编辑前"}}
+    repo = LoadoutRepository("alice")
+
+    def edit_equipped(state):
+        fp = "mock_edited"
+        state.equipment_items[fp] = {
+            "_fp": fp, "name": "编辑后", "type": "冠胄",
+            "level": 110, "affixes": [], "_extra": {"is_mock": True},
+        }
+        state.active_plan.equipment["head"] = fp
+
+    repo.update(edit_equipped)
+
+    panel.refresh()
+
+    assert combat._equipped_cache["head"]["name"] == "编辑后"
+
+
+def test_inventory_sync_can_publish_equipment_change(monkeypatch):
+    """已穿戴模拟装备编辑完同步卡片时，必须通知毕业率消费者。"""
+    from lvjiang.apps.yysls.ui.loadout.equip import status_tab
+
+    published = []
+    monkeypatch.setattr(
+        status_tab, "get_event_hub",
+        lambda _host: SimpleNamespace(
+            publish=lambda topic: published.append(topic)))
+    fake = SimpleNamespace(
+        _host=object(),
+        _inv=SimpleNamespace(equipped={"head": {"name": "新装备"}},
+                             bag_items={}, mock_items={}),
+        _refresh_slots=lambda: None,
+        _rebuild_grid=lambda: None,
+    )
+
+    status_tab.EquipStatusTab._sync_inv(fake, notify=True)
+
+    assert published == [EQUIPMENT_CHANGED]
 
 
 def test_three_view_modes(qtbot, tmp_path, monkeypatch):

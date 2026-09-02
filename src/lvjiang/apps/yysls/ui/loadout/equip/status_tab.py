@@ -129,9 +129,9 @@ class EquipStatusTab(QWidget):
         self._slot_cards: dict[str, _SlotCard] = {}
         self._setup_ui()
         self._refresh_all()
-        # 订阅装备变更信号（UI 操作与工作流写入均会触发），完整刷新展示
+        # graduation_updated 只更新状态行。equipment_changed 由外层
+        # LoadoutPanel 统一编排，避免父子同时订阅后重复重建整套装备卡。
         events = get_event_hub(self._host)
-        events.equipment_changed.connect(self._refresh_all)
         events.graduation_updated.connect(self._update_status_row)
 
     def _setup_ui(self):
@@ -567,7 +567,7 @@ class EquipStatusTab(QWidget):
             return
         try:
             inv.unequip(slot_key)
-            self._sync_inv()
+            self._sync_inv(notify=True)
         except Exception as e:
             logger.error(f"卸载装备失败: {e}")
             QMessageBox.critical(self, tr("卸载失败"), str(e))
@@ -594,7 +594,7 @@ class EquipStatusTab(QWidget):
             # 携带旧指纹走「先写新、后清旧」链路，避免遗留同名孤儿装备
             old_fp = equip.get("_fp", "")
             inv.replace_equipped_mock(slot_key, old_fp, result)
-            self._sync_inv()
+            self._sync_inv(notify=True)
         except Exception as e:
             logger.error(f"编辑槽位模拟装备失败: {e}")
             QMessageBox.critical(self, tr("编辑失败"), str(e))
@@ -751,6 +751,7 @@ class EquipStatusTab(QWidget):
 
     def _on_refresh(self):
         self._refresh_all()
+        get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
 
     def _update_status_row(self, result=None):
         """更新状态展示行：从 LoadoutPanel 读取 DPS 和毕业率。"""
@@ -799,6 +800,8 @@ class EquipStatusTab(QWidget):
             from ....core.combat.equipment import EquipmentInventory
             self._inv = EquipmentInventory(user_name)
             self._sync_inv()
+            self._update_status_row()
+            return
         except Exception as e:
             logger.error(f"加载装备失败: {e}")
             self._inv = None
@@ -810,7 +813,7 @@ class EquipStatusTab(QWidget):
         self._rebuild_grid()
         self._update_status_row()
 
-    def _sync_inv(self) -> None:
+    def _sync_inv(self, *, notify: bool = False) -> None:
         """从 EquipmentInventory 同步本地缓存并刷新 UI。"""
         if self._inv is None:
             return
@@ -819,6 +822,8 @@ class EquipStatusTab(QWidget):
         self._mock_items = self._inv.mock_items
         self._refresh_slots()
         self._rebuild_grid()
+        if notify:
+            get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
 
     def _require_inventory(self):
         """返回已加载的装备库存；不可用时给出统一提示。"""
@@ -902,8 +907,7 @@ class EquipStatusTab(QWidget):
             return
         try:
             inv.equip_to_slot(target_slot, equip_data, group_key)
-            self._sync_inv()
-            get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
+            self._sync_inv(notify=True)
             logger.info(f"已装备 {equip_data.get('name', '未知')} 到 {target_slot}")
         except Exception as e:
             logger.error(f"装备失败: {e}")
@@ -946,7 +950,7 @@ class EquipStatusTab(QWidget):
             return
         try:
             inv.delete_from_bag(group_key, fp)
-            self._sync_inv()
+            self._sync_inv(notify=True)
             logger.info(f"已删除 {equip_name}")
         except Exception as e:
             logger.error(f"删除失败: {e}")
@@ -1044,7 +1048,7 @@ class EquipStatusTab(QWidget):
             return
         try:
             inv.delete_from_mock(group_key, fp)
-            self._sync_inv()
+            self._sync_inv(notify=True)
             logger.info(f"已删除模拟装备 {equip_name}")
         except Exception as e:
             logger.error(f"删除失败: {e}")
@@ -1075,7 +1079,7 @@ class EquipStatusTab(QWidget):
             return
         try:
             inv.update_mock(group_key, old_fp, result, new_group_key)
-            self._sync_inv()
+            self._sync_inv(notify=True)
             logger.info(f"已编辑模拟装备 {result.get('name', '未知')}")
         except Exception as e:
             logger.error(f"编辑模拟装备失败: {e}")

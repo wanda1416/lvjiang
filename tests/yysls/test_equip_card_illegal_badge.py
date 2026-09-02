@@ -9,7 +9,7 @@ isVisible() 恒为 False，区分不出「显式隐藏」与「父窗口未显�
 """
 
 import pytest
-from PyQt6.QtCore import QPoint
+from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtWidgets import QLabel, QWidget
 
 from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
@@ -19,6 +19,9 @@ from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
 from lvjiang.apps.yysls.core.equip_validator import ILLEGAL_KEY
 from lvjiang.apps.yysls.ui.loadout.equip.cards import (
     _CompactEquipCard,
+    _equipment_properties_text,
+    _EquipmentPropertiesDialog,
+    _show_equipment_properties,
     _SlotCard,
 )
 
@@ -185,6 +188,92 @@ class TestContextMenuNonBlocking:
         actions = {a.text(): a for a in menus[0].actions()}
         actions["删除"].trigger()
         assert got == [(equip, "g1")]
+
+    def test_every_equipment_menu_exposes_properties(self, qtbot, monkeypatch):
+        import lvjiang.apps.yysls.ui.loadout.equip.cards as mod
+        menus: list = []
+        monkeypatch.setattr(mod.QMenu, "popup",
+                            lambda self, pos: menus.append(self))
+        card = _CompactEquipCard()
+        qtbot.addWidget(card)
+        card.set_equip(_equip(), "主武器")
+        card._show_context_menu(QPoint(0, 0))
+
+        assert "属性" in {action.text() for action in menus[0].actions()}
+
+    def test_equipped_slot_menu_opens_the_same_properties(
+        self, qtbot, monkeypatch,
+    ):
+        import lvjiang.apps.yysls.ui.loadout.equip.cards as mod
+
+        monkeypatch.setattr(
+            mod.QMenu, "exec",
+            lambda menu, _pos: next(
+                action for action in menu.actions() if action.text() == "属性"),
+        )
+        shown: list[dict] = []
+        monkeypatch.setattr(
+            mod, "_show_equipment_properties",
+            lambda _parent, equip: shown.append(equip),
+        )
+        card = _SlotCard("main_weapon", "主武器", "weapon")
+        qtbot.addWidget(card)
+        equip = _equip()
+        card.set_equip(equip)
+
+        event = type("MenuEvent", (), {
+            "globalPos": lambda self: QPoint(0, 0),
+            "accept": lambda self: None,
+        })()
+        card.contextMenuEvent(event)
+
+        assert shown == [equip]
+
+
+def test_equipment_properties_show_source_fp_and_empty_missing_times():
+    equip = _equip()
+    equip["_fp"] = "abc123"
+    assert _equipment_properties_text(equip).splitlines() == [
+        "来源：扫描",
+        "指纹：abc123",
+        "创建时间：",
+        "更新时间：",
+    ]
+
+
+def test_equipment_properties_show_mock_and_formatted_times():
+    equip = _equip()
+    equip.update({
+        "_fp": "mock_abc123",
+        "created_at": "2026-09-01T01:02:03",
+        "updated_at": "2026-09-02T04:05:06",
+    })
+    equip["_extra"]["is_mock"] = True
+    assert _equipment_properties_text(equip).splitlines() == [
+        "来源：模拟",
+        "指纹：mock_abc123",
+        "创建时间：2026-09-01 01:02:03",
+        "更新时间：2026-09-02 04:05:06",
+    ]
+
+
+def test_equipment_properties_use_plain_selectable_dialog(qtbot, monkeypatch):
+    shown: list[_EquipmentPropertiesDialog] = []
+    monkeypatch.setattr(
+        _EquipmentPropertiesDialog, "exec", lambda self: shown.append(self))
+
+    equip = _equip()
+    equip["_fp"] = "abc123"
+    _show_equipment_properties(None, equip)
+
+    assert len(shown) == 1
+    dialog = shown[0]
+    qtbot.addWidget(dialog)
+    assert dialog.windowTitle() == "装备属性"
+    text = dialog.findChild(QLabel, "equipmentPropertiesText")
+    assert text is not None
+    assert "指纹：abc123" in text.text()
+    assert text.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
 
 
 class TestSlotCardEmpty:

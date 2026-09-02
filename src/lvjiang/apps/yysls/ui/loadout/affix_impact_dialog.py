@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
+from .....ui.button_styles import apply_dialog_button_box_style
 from ...config.tune_slots import SLOT_LABELS
 from ...core.graduation.affix_impact import (
     AffixCombinationResult,
@@ -176,6 +177,7 @@ class AffixImpactDialog(QDialog):
         layout.addWidget(tabs, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        apply_dialog_button_box_style(buttons)
         close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
         if close_button is not None:
             close_button.setText(tr("完成"))

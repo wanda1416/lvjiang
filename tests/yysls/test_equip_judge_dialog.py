@@ -161,7 +161,7 @@ class TestTuningConfigWidget:
         result = w.get_config()
         assert result["huiyi_general"]["enabled"]
         # 缺 playstyles 键 = 全选
-        assert result["huiyi_general"]["playstyles"] == ["无名", "火九"]
+        assert result["huiyi_general"]["playstyles"] == ["无名", "九剑"]
         assert result["huixin_big"]["playstyles"] == ["双切"]
         assert not result["huixin_small"]["enabled"]
 

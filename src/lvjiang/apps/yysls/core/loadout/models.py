@@ -8,6 +8,18 @@ EQUIPMENT_SLOTS = (
     "head", "chest", "leg", "wrist",
 )
 
+EQUIPMENT_CREATED_AT = "created_at"
+EQUIPMENT_UPDATED_AT = "updated_at"
+
+
+def normalize_equipment_times(equip: dict) -> dict:
+    """复制装备并把历史数据缺失的时间字段规范为空字符串。"""
+    value = dict(equip)
+    for key in (EQUIPMENT_CREATED_AT, EQUIPMENT_UPDATED_AT):
+        timestamp = value.get(key)
+        value[key] = timestamp if isinstance(timestamp, str) else ""
+    return value
+
 
 def _empty_slots() -> dict[str, str | None]:
     return {key: None for key in EQUIPMENT_SLOTS}
@@ -19,6 +31,10 @@ class LoadoutPlan:
     name: str
     main_martial_art: str = ""
     sub_martial_art: str = ""
+    # 玩法：决定这套方案的调律方向（要什么增伤、定什么音）。
+    # 候选由两个武学**无序**匹配出来——主副只是顺序标签，判别式是「要谁的
+    # 增伤」。武学没登记进任何玩法时留空，此时只是算不出定音目标，方案照常可用。
+    playstyle: str = ""
     equipment: dict[str, str | None] = field(default_factory=_empty_slots)
 
     @classmethod
@@ -38,6 +54,7 @@ class LoadoutPlan:
             name=str(data.get("name") or "未命名方案"),
             main_martial_art=str(data.get("main_martial_art") or ""),
             sub_martial_art=str(data.get("sub_martial_art") or ""),
+            playstyle=str(data.get("playstyle") or ""),
             equipment=slots,
         )
 
@@ -46,6 +63,7 @@ class LoadoutPlan:
             "name": self.name,
             "main_martial_art": self.main_martial_art,
             "sub_martial_art": self.sub_martial_art,
+            "playstyle": self.playstyle,
             "equipment": dict(self.equipment),
         }
 
@@ -79,12 +97,17 @@ class LoadoutState:
         if active not in plans:
             active = next(iter(plans))
         items = data.get("equipment_items", {})
+        normalized_items = {
+            str(fp): normalize_equipment_times(value)
+            for fp, value in items.items()
+            if isinstance(value, dict)
+        } if isinstance(items, dict) else {}
         ui = data.get("ui_state", {})
         return cls(
             revision=int(data.get("revision") or 0),
             active_plan_id=active,
             plans=plans,
-            equipment_items=dict(items) if isinstance(items, dict) else {},
+            equipment_items=normalized_items,
             ui_state=dict(ui) if isinstance(ui, dict) else {},
         )
 

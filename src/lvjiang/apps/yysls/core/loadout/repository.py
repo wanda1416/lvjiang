@@ -6,13 +6,74 @@ import os
 import tempfile
 import threading
 from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from .models import EQUIPMENT_SLOTS, LoadoutPlan, LoadoutState
+from .models import (
+    EQUIPMENT_CREATED_AT,
+    EQUIPMENT_SLOTS,
+    EQUIPMENT_UPDATED_AT,
+    LoadoutPlan,
+    LoadoutState,
+)
 
 _LOCKS_GUARD = threading.Lock()
 _LOCKS: dict[str, threading.RLock] = {}
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
+def stamp_equipment_write(
+    equip: dict,
+    fp: str,
+    existing: dict | None,
+    *,
+    now: str | None = None,
+) -> dict:
+    """生成一次 fp 写入的数据。
+
+    新 fp 同时记录创建和更新时间；已有 fp 保留其创建时间并刷新更新时间。
+    历史装备没有创建时间时保持空值，不能用当前时间伪造，也不允许调用方
+    携带的旧时间覆盖仓储中的事实。
+    """
+    timestamp = now or _now_iso()
+    value = copy.deepcopy(equip)
+    value["_fp"] = fp
+    if existing is None:
+        value[EQUIPMENT_CREATED_AT] = timestamp
+    else:
+        created = existing.get(EQUIPMENT_CREATED_AT)
+        value[EQUIPMENT_CREATED_AT] = (
+            created if isinstance(created, str) else "")
+    value[EQUIPMENT_UPDATED_AT] = timestamp
+    return value
+
+
+def _timestamp_rank(value) -> float | None:
+    """合法 ISO 时间转排序值；缺失/损坏都视为无数据。"""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
+def _pick_timestamp(values, *, latest: bool) -> str:
+    valid = [
+        (rank, value)
+        for value in values
+        if (rank := _timestamp_rank(value)) is not None
+    ]
+    if not valid:
+        return ""
+    return (max if latest else min)(valid, key=lambda item: item[0])[1]
 
 
 def _path_lock(path: Path) -> threading.RLock:
@@ -103,7 +164,8 @@ class LoadoutRepository:
 
     def configure_plan(self, plan_id: str, *, name: str | None = None,
                        main_martial_art: str | None = None,
-                       sub_martial_art: str | None = None) -> None:
+                       sub_martial_art: str | None = None,
+                       playstyle: str | None = None) -> None:
         def mutate(state: LoadoutState) -> None:
             if plan_id not in state.plans:
                 raise KeyError(plan_id)
@@ -114,6 +176,8 @@ class LoadoutRepository:
                 plan.main_martial_art = main_martial_art
             if sub_martial_art is not None:
                 plan.sub_martial_art = sub_martial_art
+            if playstyle is not None:
+                plan.playstyle = playstyle
         self.update(mutate)
 
     def upsert_item(self, equip: dict) -> str:
@@ -124,9 +188,10 @@ class LoadoutRepository:
             fp = make_fingerprint(equip, is_mock=is_mock)
         if not fp:
             raise ValueError("装备数据无法生成指纹")
-        value = copy.deepcopy(equip)
-        value["_fp"] = fp
-        self.update(lambda state: state.equipment_items.__setitem__(fp, value))
+        def mutate(state: LoadoutState) -> None:
+            state.equipment_items[fp] = stamp_equipment_write(
+                equip, fp, state.equipment_items.get(fp))
+        self.update(mutate)
         return fp
 
     def assign_equipment(self, plan_id: str, slot_key: str, equip: dict) -> str:
@@ -139,12 +204,11 @@ class LoadoutRepository:
                 equip, is_mock=bool(equip.get("_extra", {}).get("is_mock")))
         if not fp:
             raise ValueError("装备数据无法生成指纹")
-        value = copy.deepcopy(equip)
-        value["_fp"] = fp
         def mutate(state: LoadoutState) -> None:
             if plan_id not in state.plans:
                 raise ValueError("目标备战方案已不存在")
-            state.equipment_items[fp] = value
+            state.equipment_items[fp] = stamp_equipment_write(
+                equip, fp, state.equipment_items.get(fp))
             state.plans[plan_id].equipment[slot_key] = fp
         self.update(mutate)
         return fp
@@ -197,6 +261,21 @@ class LoadoutRepository:
                 for slot, fp in plan.equipment.items():
                     if fp in resolved:
                         plan.equipment[slot] = resolved[fp]
+            # 合并只是在存量快照之间建立同一实体关系，不算一次装备内容更新。
+            # 保留版本继承整组最早创建时间和最新更新时间；全组旧数据都没有
+            # 时间时明确写空，绝不退化成 Unix 纪元。
+            grouped: dict[str, list[dict]] = {}
+            for old, new in resolved.items():
+                grouped.setdefault(new, []).append(state.equipment_items[old])
+            for new, old_items in grouped.items():
+                target = state.equipment_items[new]
+                all_items = [target, *old_items]
+                target[EQUIPMENT_CREATED_AT] = _pick_timestamp(
+                    (item.get(EQUIPMENT_CREATED_AT) for item in all_items),
+                    latest=False)
+                target[EQUIPMENT_UPDATED_AT] = _pick_timestamp(
+                    (item.get(EQUIPMENT_UPDATED_AT) for item in all_items),
+                    latest=True)
             for old in resolved:
                 state.equipment_items.pop(old, None)
 
@@ -225,12 +304,12 @@ class LoadoutRepository:
         value = copy.deepcopy(equip)
         value.setdefault("_extra", {})["is_mock"] = True
         new_fp = make_fingerprint(value, is_mock=True)
-        value["_fp"] = new_fp
         def mutate(state: LoadoutState) -> None:
             if plan_id not in state.plans:
                 raise ValueError("目标备战方案已不存在")
             # 第一步：写入新数据并切换槽位引用
-            state.equipment_items[new_fp] = value
+            state.equipment_items[new_fp] = stamp_equipment_write(
+                value, new_fp, state.equipment_items.get(new_fp))
             state.plans[plan_id].equipment[slot_key] = new_fp
             # 第二步：清理旧指纹（仅当新旧不同且不再被任何方案引用）
             if old_fp and old_fp != new_fp:
@@ -263,12 +342,13 @@ class LoadoutRepository:
         value = copy.deepcopy(equip)
         value.setdefault("_extra", {})["is_mock"] = True
         new_fp = make_fingerprint(value, is_mock=True)
-        value["_fp"] = new_fp
         def mutate(state: LoadoutState) -> None:
             if not old_fp.startswith("mock_"):
                 raise ValueError("只能编辑模拟装备")
+            stamped = stamp_equipment_write(
+                value, new_fp, state.equipment_items.get(new_fp))
             state.equipment_items.pop(old_fp, None)
-            state.equipment_items[new_fp] = value
+            state.equipment_items[new_fp] = stamped
             for plan in state.plans.values():
                 for slot, fp in plan.equipment.items():
                     if fp == old_fp:

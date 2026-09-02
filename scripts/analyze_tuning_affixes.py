@@ -2,7 +2,7 @@
 """
 调律词条分布统计脚本
 
-分析 logs/tuning 目录下的所有调律报告，统计：
+默认分析结构化调律历史数据库，也兼容读取旧版 Markdown 报告，统计：
 1. 不同部位的词条分布
 2. 第 N 个词条出现各种词条的概率
 3. 给定首词条后，后续词条的条件概率
@@ -10,6 +10,7 @@
 
 import json
 import re
+import sqlite3
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -40,6 +41,65 @@ def parse_tuning_file(filepath: Path) -> List[Dict]:
 
     # fallback：markdown 正则解析
     return _parse_markdown(content, filepath.name)
+
+
+def parse_history_db(filepath: Path) -> List[Dict]:
+    """读取新版结构化调律历史；只分析真正进入调律页的装备。"""
+    quality_map = {'gold': '金色', 'purple': '紫色', 'blue': '蓝色'}
+    rating_map = {
+        'top': '顶级', 'excellent': '优秀',
+        'normal': '一般', 'junk': '垃圾',
+    }
+    slot_map = {
+        'main_weapon': '主武器', 'sub_weapon': '副武器',
+        'ring': '环', 'pendant': '佩', 'head': '冠胄',
+        'chest': '胸甲', 'leg': '胫甲', 'wrist': '腕甲',
+    }
+    conn = sqlite3.connect(filepath)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute("""
+            SELECT e.*, r.run_id
+            FROM tuning_equipment e
+            JOIN tuning_runs r ON r.run_id=e.run_id
+            WHERE e.tuning_started_at <> ''
+            ORDER BY r.started_at ASC, e.sequence_id ASC
+        """).fetchall()
+    except sqlite3.Error as exc:
+        print(f"警告：无法读取调律历史数据库 {filepath}: {exc}",
+              file=sys.stderr)
+        return []
+    finally:
+        conn.close()
+
+    records = []
+    for row in rows:
+        initial = json.loads(row['initial_affixes_json'] or '[]')
+        rounds = json.loads(row['round_details_json'] or '[]')
+        first_affix = initial[0].get('name') if initial else None
+        new_affixes = []
+        for detail in rounds:
+            if detail.get('completed') is False:
+                continue
+            raw = detail.get('new_affix_data') or {}
+            name = raw.get('name')
+            if name:
+                new_affixes.append(name)
+        affixes = ([first_affix] if first_affix else []) + new_affixes
+        rating = rating_map.get(
+            row['telemetry_final_rating'] or row['final_rating'])
+        records.append({
+            'name': row['name'],
+            'part': slot_map.get(row['slot_key'], row['slot_key']),
+            'level': row['level'],
+            'rarity': quality_map.get(row['quality'], row['quality']),
+            'affixes': affixes,
+            'first_affix': first_affix,
+            'new_affixes': new_affixes,
+            'rating': rating,
+            'file': f"history:{row['run_id']}",
+        })
+    return records
 
 
 def _parse_json_block(content: str, filename: str) -> List[Dict] | None:
@@ -417,26 +477,38 @@ def print_report(stats: Dict, records: List[Dict]):
 
 
 def main():
+    repo_root = Path(__file__).parent.parent
     if len(sys.argv) > 1:
-        tuning_dir = Path(sys.argv[1])
+        source = Path(sys.argv[1])
     else:
-        tuning_dir = Path(__file__).parent.parent / 'logs' / 'tuning'
+        source = repo_root / 'config' / 'session' / 'tuning_history.db'
 
-    if not tuning_dir.exists():
-        print(f"错误：目录不存在：{tuning_dir}", file=sys.stderr)
+    if not source.exists():
+        print(f"错误：数据源不存在：{source}", file=sys.stderr)
         sys.exit(1)
 
-    md_files = list(tuning_dir.glob('调律说明_*.md'))
-    if not md_files:
-        print(f"错误：未找到调律报告文件：{tuning_dir}", file=sys.stderr)
-        sys.exit(1)
+    # 显式传入的路径不做隐式替换：传目录就只在该目录里找数据源，找不到就
+    # 按旧版 Markdown 处理，绝不悄悄回落到仓库默认库去分析别的数据。
+    history_db = source if source.is_file() else None
+    if source.is_dir():
+        candidate = source / 'tuning_history.db'
+        history_db = candidate if candidate.exists() else None
 
-    print(f"找到 {len(md_files)} 个调律报告文件")
-
-    all_records = []
-    for f in md_files:
-        records = parse_tuning_file(f)
-        all_records.extend(records)
+    if history_db is not None:
+        print(f"读取结构化调律历史：{history_db}")
+        all_records = parse_history_db(history_db)
+        output_file = repo_root / 'logs' / 'tuning_report.txt'
+    else:
+        md_files = list(source.glob('调律说明_*.md'))
+        if not md_files:
+            print(f"错误：未找到调律历史数据库或报告文件：{source}",
+                  file=sys.stderr)
+            sys.exit(1)
+        print(f"找到 {len(md_files)} 个旧版调律报告文件")
+        all_records = []
+        for path in md_files:
+            all_records.extend(parse_tuning_file(path))
+        output_file = source.parent / 'tuning_report.txt'
 
     if not all_records:
         print("错误：未解析到任何装备数据", file=sys.stderr)
@@ -447,7 +519,7 @@ def main():
     stats = analyze(all_records)
 
     # 输出到文件
-    output_file = tuning_dir.parent / 'tuning_report.txt'
+    output_file.parent.mkdir(parents=True, exist_ok=True)
     with open(output_file, 'w', encoding='utf-8') as f:
         old_stdout = sys.stdout
         sys.stdout = f

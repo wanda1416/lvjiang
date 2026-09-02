@@ -1,7 +1,9 @@
+import json
 from pathlib import Path
 
 import pytest
 
+import lvjiang.apps.yysls.core.loadout.repository as repository_module
 from lvjiang.apps.yysls.core.loadout import LoadoutRepository, resolve_school
 
 
@@ -26,6 +28,68 @@ def test_upsert_is_idempotent(tmp_path: Path):
     state = repo.load()
     assert list(state.equipment_items) == ["real-fp"]
     assert state.equipment_items["real-fp"]["level"] == 111
+
+
+def test_new_fp_records_both_times_and_existing_fp_refreshes_update(
+    tmp_path: Path, monkeypatch,
+):
+    timestamps = iter([
+        "2026-09-01T01:00:00.000+00:00",
+        "2026-09-01T02:00:00.000+00:00",
+    ])
+    monkeypatch.setattr(repository_module, "_now_iso", lambda: next(timestamps))
+    repo = LoadoutRepository("alice", tmp_path)
+
+    repo.upsert_item(equip())
+    created = repo.load().equipment_items["real-fp"]
+    assert created["created_at"] == "2026-09-01T01:00:00.000+00:00"
+    assert created["updated_at"] == "2026-09-01T01:00:00.000+00:00"
+
+    repo.upsert_item({**equip(), "level": 111})
+    updated = repo.load().equipment_items["real-fp"]
+    assert updated["created_at"] == created["created_at"]
+    assert updated["updated_at"] == "2026-09-01T02:00:00.000+00:00"
+
+
+def test_legacy_equipment_times_are_empty_and_creation_is_not_fabricated(
+    tmp_path: Path, monkeypatch,
+):
+    repo = LoadoutRepository("alice", tmp_path)
+    state = repo.load()
+    payload = state.to_dict()
+    payload["equipment_items"] = {"real-fp": equip()}
+    repo.path.write_text(json.dumps(payload), encoding="utf-8")
+
+    legacy = repo.load().equipment_items["real-fp"]
+    assert legacy["created_at"] == ""
+    assert legacy["updated_at"] == ""
+
+    monkeypatch.setattr(
+        repository_module, "_now_iso",
+        lambda: "2026-09-01T03:00:00.000+00:00")
+    repo.upsert_item(equip())
+    refreshed = repo.load().equipment_items["real-fp"]
+    assert refreshed["created_at"] == ""
+    assert refreshed["updated_at"] == "2026-09-01T03:00:00.000+00:00"
+
+
+def test_combo_application_uses_the_same_timestamp_write_path(
+    tmp_path: Path, monkeypatch,
+):
+    import lvjiang.constants
+    from lvjiang.apps.yysls.core.combat.equipment import EquipmentInventory
+
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        repository_module, "_now_iso",
+        lambda: "2026-09-01T04:00:00.000+00:00")
+    inventory = EquipmentInventory("alice")
+
+    inventory.apply_combos({"ring": equip()})
+
+    item = LoadoutRepository("alice", tmp_path).load().equipment_items["real-fp"]
+    assert item["created_at"] == "2026-09-01T04:00:00.000+00:00"
+    assert item["updated_at"] == "2026-09-01T04:00:00.000+00:00"
 
 
 def test_delete_clears_all_plan_references(tmp_path: Path):
@@ -97,6 +161,27 @@ def test_update_equipped_mock_noop_edit_keeps_single_item(tmp_path: Path):
     assert new_fp == old_fp
     assert old_fp in state.equipment_items
     assert state.active_plan.equipment["main_weapon"] == new_fp
+
+
+def test_noop_mock_edit_preserves_creation_and_refreshes_update(
+    tmp_path: Path, monkeypatch,
+):
+    timestamps = iter([
+        "2026-09-01T01:00:00.000+00:00",
+        "2026-09-01T02:00:00.000+00:00",
+    ])
+    monkeypatch.setattr(repository_module, "_now_iso", lambda: next(timestamps))
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_id = repo.load().active_plan_id
+    old = {"type": "剑", "name": "模拟剑", "level": 110,
+           "_extra": {"is_mock": True}}
+    fp = repo.assign_equipment(plan_id, "main_weapon", old)
+
+    repo.update_equipped_mock(plan_id, "main_weapon", fp, {**old})
+
+    item = repo.load().equipment_items[fp]
+    assert item["created_at"] == "2026-09-01T01:00:00.000+00:00"
+    assert item["updated_at"] == "2026-09-01T02:00:00.000+00:00"
 
 
 def test_exact_school_resolution():

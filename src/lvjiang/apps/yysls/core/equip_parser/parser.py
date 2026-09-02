@@ -11,8 +11,6 @@ from .....i18n import tr
 from .constants import (
     AFFIX_NAMES,
     PERCENT_AFFIXES,
-    WEAPON_TYPES,
-    WUXUE_PATTERN,
     infer_category,
 )
 from .dingyin_parser import (
@@ -25,20 +23,6 @@ from .models import Affix, EquipAttr, EquipmentData
 
 class EquipmentParser:
     """装备 OCR 数据转换器"""
-
-    # 部位单字 → 类型（类型段单字足以说明部位，容忍 OCR 错字）
-    #
-    # key 匹配的是 OCR 截屏文字，恒为中文，绝不能过 tr()——英文界面下会拿
-    # 翻译后的英文去匹配中文截屏，永远匹配不上。value 是 equip.type，会被
-    # 全 app 当成规范内部标识使用（大量 UI/config 代码以 tr("环")/tr("佩")
-    # 等作为 dict key 查表），所以要过 tr() 才能保持一致；不能像这里原来
-    # 那样一部分 tr() 一部分裸写，那会导致同一部位从不同单字命中时
-    # equip.type 取值不一致。
-    _PART_CHAR_TO_TYPE = {
-        "冠": tr("冠胄"), "胄": tr("冠胄"),
-        "胸": tr("胸甲"), "胫": tr("胫甲"), "腕": tr("腕甲"),
-        "环": tr("环"), "佩": tr("佩"),
-    }
 
     def __init__(self):
         from ...config import get_game_config
@@ -193,75 +177,38 @@ class EquipmentParser:
 
         parts = [p.strip() for p in raw.split("|") if p.strip()]
 
-        if len(parts) == 1:
-            # 无分隔符，只有名称
-            name = parts[0].strip("· ")
-            inferred_type = self._infer_type_from_name(name)
-            return name, inferred_type
-
-        # 名称取第一段，清理尾部残留符号
+        # 名称取第一段，清理尾部残留符号。装备标准名称与最后一段部位名称
+        # 分开解析：部位名称是游戏明确给出的类型，优先级更高。
         name = parts[0].strip("· ")
+        name_type = self._infer_type_from_name(name)
 
-        # 类型从最后一段提取
+        if len(parts) == 1:
+            return name, name_type
+
+        # OCR 偶尔会多切出中间脏段；C 恒取最后一个非空段。
         last = parts[-1]
-        weapon_type = self._extract_weapon_type(last)
+        label_type = self._extract_weapon_type(last)
+        if label_type and name_type and label_type != name_type:
+            logger.error(
+                "装备类型冲突："
+                f"标准名称 {name!r} 推断为 {name_type!r}，"
+                f"部位名称 {last!r} 推断为 {label_type!r}；以部位名称为准"
+            )
 
-        # 如果提取失败，尝试从名称推断
-        if weapon_type is None:
-            weapon_type = self._infer_type_from_name(name)
-
-        return name, weapon_type
+        return name, label_type or name_type
 
     def _infer_type_from_name(self, name: str) -> str | None:
-        """从装备名称推断类型（固定规则）
-
-        - 名称含"云珑" → 环
-        - 名称含"辟邪" → 佩
-        - 名称含"冠" → 冠胄（头部装备）
-        - 名称含"胸" → 胸甲
-        - 名称含"胫" → 胫甲
-        - 名称含"腕" → 腕甲
-
-        name 是 OCR 出来的装备名称，恒为中文，匹配侧不能过 tr()（同上）；
-        返回值是 equip.type，过 tr() 以保持与全 app 的规范表示一致。
-        """
-        if "云珑" in name:
-            return tr("环")
-        if "辟邪" in name:
-            return tr("佩")
-        # 防具类型推断（按名称中的关键字）
-        if "冠" in name:
-            return tr("冠胄")
-        if "胸" in name:
-            return tr("胸甲")
-        if "胫" in name:
-            return tr("胫甲")
-        if "腕" in name:
-            return tr("腕甲")
-        return None
+        """从配置的标准名称反查装备类型。"""
+        return self._attr_config.infer_equipment_type_from_name(name)
 
     def _extract_weapon_type(self, text: str) -> str | None:
-        """从文本中提取武器类型或防具/首饰类别
+        """从部位名称中提取武器类型或防具/首饰类别
 
         "武器·剑" → "剑"
         "冠胄"    → "冠胄"
-        "胸申"    → "胸甲"  [OCR 错字，单字命中]
         "一杆"    → None（脏数据）
         """
-        # 武器格式：武器·XX
-        # text 是 OCR 截屏文字，恒为中文，不能过 tr()（同上）。
-        if "武器" in text:
-            for wt in WEAPON_TYPES:
-                if wt in text:
-                    return wt
-            return None
-
-        # 防具/首饰：单字足以说明部位，容忍 OCR 错字
-        for char, part_type in self._PART_CHAR_TO_TYPE.items():
-            if char in text:
-                return part_type
-
-        return None
+        return self._attr_config.infer_equipment_type_from_label(text)
 
     # ─── equip_level 解析 ──────────────────────────────────
 
@@ -463,18 +410,13 @@ class EquipmentParser:
         matched_name = None
         remainder = text
 
-        # 先尝试武学增伤（动态前缀）
-        wuxue_m = WUXUE_PATTERN.match(text)
-        if wuxue_m:
-            matched_name = wuxue_m.group(0)  # 如 "剑武学增伤"
-            remainder = text[wuxue_m.end():]
-        else:
-            # 按长度降序匹配，保证最长前缀
-            for name in AFFIX_NAMES:
-                if text.startswith(name):
-                    matched_name = name
-                    remainder = text[len(name):]
-                    break
+        # 按配置词条全集的长度降序匹配，保证最长前缀；武学增效也必须
+        # 先在词组配置登记，配置外 OCR 文本不能渗入领域模型。
+        for name in AFFIX_NAMES:
+            if text.startswith(name):
+                matched_name = name
+                remainder = text[len(name):]
+                break
 
         if matched_name is None:
             return None

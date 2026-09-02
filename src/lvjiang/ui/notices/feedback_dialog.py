@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 from ...core import group_qrcode
 from ...core.update import GITHUB_REPO
 from ...i18n import tr
+from ..button_styles import apply_button_style
 
 ISSUE_GUIDE_URL = (
     f"https://github.com/{GITHUB_REPO}/blob/master/"
@@ -63,6 +64,8 @@ class GroupQrDialog(QDialog):
         close_btn = QPushButton(tr("关闭"))
         close_btn.clicked.connect(self.accept)
         btn_layout.addWidget(close_btn)
+        apply_button_style(self._refresh_btn)
+        apply_button_style(close_btn, variant="neutral")
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
@@ -186,6 +189,12 @@ class FeedbackDialog(QDialog):
         self._close_btn = QPushButton(tr("关闭"))
         self._close_btn.clicked.connect(self.accept)
         btn_layout.addWidget(self._close_btn)
+        apply_button_style(
+            self._group_btn,
+            self._details_btn,
+            self._github_btn,
+        )
+        apply_button_style(self._close_btn, variant="neutral")
         layout.addLayout(btn_layout)
 
     def _open_group_qr(self):

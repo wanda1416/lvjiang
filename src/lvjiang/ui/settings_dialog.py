@@ -1,8 +1,8 @@
 """配置管理对话框（多 Tab）
 
 Tab1 基础配置、Tab2 输入模拟（引擎级点击参数）、Tab3 等待参数（命名等待）、
-Tab4 系统参数（可用工作环境）、Tab5 热键设置（F7~F12 按键位）。
-Tab1/Tab5 写 session.json（settings 节点）；Tab2/Tab3/Tab4 写 app.yaml（input_simulation / delay_params / envs，
+Tab4 系统参数（可用工作环境）、Tab5 字体设置、Tab6 热键设置（F7~F12 按键位）。
+Tab1/Tab5/Tab6 写 session.json（settings 节点）；Tab2/Tab3/Tab4 写 app.yaml（input_simulation / delay_params / envs，
 system ← local 合并），保存后以配置文件为准覆盖代码默认值。
 Tab5 修改的热键保存后立即重建全局监听并生效。
 """
@@ -38,7 +38,7 @@ from ..core.config import (
     save_settings,
 )
 from ..i18n import tr
-from .button_styles import apply_button_style
+from .button_styles import apply_button_style, apply_compact_tool_button_style
 
 # 引擎级点击参数（InputBackend 自动生效，不暴露 key）：(字段名, 显示标签, 用途说明)
 # 二元组范围用 min~max 两个输入框，用途说明通过行尾「?」按钮点击查看
@@ -73,6 +73,7 @@ class SettingsDialog(QDialog):
     """配置管理：Tab1 基础配置 + Tab2 输入模拟 + Tab3 等待参数"""
 
     hotkeys_saved = pyqtSignal(dict)
+    font_sizes_saved = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -93,6 +94,7 @@ class SettingsDialog(QDialog):
         self._tabs.addTab(self._build_input_tab(), tr("输入模拟"))
         self._tabs.addTab(self._build_wait_tab(), tr("等待参数"))
         self._tabs.addTab(self._build_env_tab(), tr("系统参数"))
+        self._tabs.addTab(self._build_font_tab(), tr("字体设置"))
         self._tabs.addTab(self._build_hotkey_tab(), tr("热键设置"))
         self._privacy_tab_index = self._tabs.addTab(
             self._build_privacy_tab(), tr("网络与隐私"))
@@ -143,6 +145,8 @@ class SettingsDialog(QDialog):
             self._connect_row_dirty(entry)
         for combo in self._hotkey_combos.values():
             combo.currentIndexChanged.connect(self._mark_dirty)
+        self._overview_font_spin.valueChanged.connect(self._mark_dirty)
+        self._user_info_font_spin.valueChanged.connect(self._mark_dirty)
 
     def _connect_row_dirty(self, entry: dict):
         """连接单行等待参数的变更信号"""
@@ -363,7 +367,48 @@ class SettingsDialog(QDialog):
             widget.deleteLater()
         self._mark_dirty()
 
-    # ─── Tab5 热键设置（F7~F12 按键位）─────────────
+    # ─── Tab5 字体设置 ─────────────────────────────
+
+    @staticmethod
+    def _default_font_point_size(widget: QWidget) -> int:
+        size = widget.font().pointSize()
+        return size if 8 <= size <= 24 else 10
+
+    def _build_font_tab(self) -> QWidget:
+        """用户总览/用户信息内容区字号，不影响顶部工具栏。"""
+        tab = QWidget()
+        vbox = QVBoxLayout(tab)
+
+        caption = QLabel(tr(
+            "只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，"
+            "包括列表表头；顶部工具栏和底部「数据模型」按钮保持不变。"
+        ))
+        caption.setWordWrap(True)
+        vbox.addWidget(caption)
+
+        form = QFormLayout()
+        default_size = self._default_font_point_size(tab)
+        fonts = self._config.font_sizes
+
+        self._overview_font_spin = QSpinBox()
+        self._overview_font_spin.setRange(8, 24)
+        self._overview_font_spin.setSuffix(" pt")
+        self._overview_font_spin.setValue(fonts.user_overview or default_size)
+        self._overview_font_spin.setFixedWidth(_SPIN_WIDTH)
+        form.addRow(tr("用户总览字号") + ":", self._overview_font_spin)
+
+        self._user_info_font_spin = QSpinBox()
+        self._user_info_font_spin.setRange(8, 24)
+        self._user_info_font_spin.setSuffix(" pt")
+        self._user_info_font_spin.setValue(fonts.user_info or default_size)
+        self._user_info_font_spin.setFixedWidth(_SPIN_WIDTH)
+        form.addRow(tr("用户信息字号") + ":", self._user_info_font_spin)
+
+        vbox.addLayout(form)
+        vbox.addStretch()
+        return tab
+
+    # ─── Tab6 热键设置（F7~F12 按键位）─────────────
 
     def _build_hotkey_tab(self) -> QWidget:
         """热键设置 Tab：自定义全局热键按键位（限 F7~F12）。"""
@@ -416,6 +461,7 @@ class SettingsDialog(QDialog):
         btn = QToolButton()
         btn.setText("?")
         btn.setFixedSize(20, 20)
+        apply_compact_tool_button_style(btn)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.clicked.connect(lambda: QToolTip.showText(QCursor.pos(), tip, btn))
         return btn
@@ -629,9 +675,16 @@ class SettingsDialog(QDialog):
             if item.excluded else item.purpose
             for item in get_registry().get("telemetry_disclosures", ())
         ]
+        history_notices = [
+            tr("开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。").format(
+                days=vars(item).get("historical_upload_days"))
+            for item in get_registry().get("telemetry_disclosures", ())
+            if vars(item).get("historical_upload_days")
+        ]
         if not parts:
             return tr("仅上报匿名的运行环境信息，不含任何游戏内数据。")
-        return tr("不公开发布原始数据。") + " " + " ".join(parts)
+        return (tr("不公开发布原始数据。") + " " + " ".join(parts)
+                + ((" " + " ".join(history_notices)) if history_notices else ""))
 
     def _refresh_remote_config_status(self):
         """展示在线配置版本——用户得能知道自己在跑哪一版。
@@ -671,6 +724,10 @@ class SettingsDialog(QDialog):
         from ..core.telemetry.settings import set_telemetry_enabled
         set_telemetry_enabled(checked)
         self._refresh_privacy_tab_state()
+        if checked:
+            starter = getattr(self.parent(), "_start_telemetry_report_on_startup", None)
+            if callable(starter):
+                starter()
 
     def _on_reset_telemetry_id(self):
         reply = QMessageBox.question(
@@ -800,6 +857,10 @@ class SettingsDialog(QDialog):
             "desktop_background_input": self._input_combo.currentData(),
             "desktop_window_title": self._title_edit.text().strip(),
             "hotkeys": hotkeys,
+            "font_sizes": {
+                "user_overview": self._overview_font_spin.value(),
+                "user_info": self._user_info_font_spin.value(),
+            },
         }
         # 保存语言设置（需重启生效）
         lang = self._lang_combo.currentData()
@@ -818,6 +879,7 @@ class SettingsDialog(QDialog):
         envs = self._collect_envs()
         save_app_config(input_sim, delay_params, envs)
         self.hotkeys_saved.emit(hotkeys)
+        self.font_sizes_saved.emit(settings["font_sizes"])
         # 保存后不关闭：置灰保存按钮，当前各行均视为已保存，可继续修改
         for entry in self._custom_rows:
             entry["saved"] = bool(entry["key"].text().strip())

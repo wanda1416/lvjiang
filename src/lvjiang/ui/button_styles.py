@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtWidgets import (
+    QDialogButtonBox,
+    QMessageBox,
+    QPushButton,
+    QToolButton,
+)
 
 ACTION_BUTTON_STYLE = (
     "QPushButton { border: 1px solid palette(highlight); "
@@ -31,6 +36,14 @@ DANGER_BUTTON_STYLE = (
     "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
 )
 
+COMPACT_TOOL_BUTTON_STYLE = (
+    "QToolButton { background: transparent; color: palette(button-text); "
+    "border: 1px solid palette(mid); border-radius: 10px; padding: 0; "
+    "font-weight: 600; }"
+    "QToolButton:hover { background-color: palette(midlight); }"
+    "QToolButton:pressed { background-color: palette(mid); }"
+)
+
 
 def apply_button_style(
     *buttons: QPushButton | None,
@@ -46,6 +59,76 @@ def apply_button_style(
     for button in buttons:
         if button is not None:
             button.setStyleSheet(style)
+
+
+def apply_compact_tool_button_style(*buttons: QToolButton | None) -> None:
+    """Style compact help/info controls without regular-button padding."""
+    for button in buttons:
+        if button is not None:
+            button.setStyleSheet(COMPACT_TOOL_BUTTON_STYLE)
+
+
+def apply_message_box_button_style(box: QMessageBox) -> None:
+    """Apply the shared geometry to buttons created by ``QMessageBox``.
+
+    ``QMessageBox`` owns its buttons, so callers cannot style them until the
+    standard buttons have been installed.  Destructive buttons retain the
+    danger semantic; dismissive buttons use the neutral variant; all other
+    choices use the normal action style.
+    """
+    danger = {
+        QMessageBox.StandardButton.Abort,
+        QMessageBox.StandardButton.Discard,
+    }
+    neutral = {
+        QMessageBox.StandardButton.Cancel,
+        QMessageBox.StandardButton.Close,
+        QMessageBox.StandardButton.Ignore,
+        QMessageBox.StandardButton.No,
+    }
+    for standard in QMessageBox.StandardButton:
+        button = box.button(standard)
+        if not isinstance(button, QPushButton):
+            continue
+        variant = (
+            "danger" if standard in danger
+            else "neutral" if standard in neutral
+            else "action"
+        )
+        apply_button_style(button, variant=variant)
+
+
+def apply_dialog_button_box_style(box: QDialogButtonBox) -> None:
+    """Style standard dialog buttons according to their interaction role."""
+    danger = {
+        QDialogButtonBox.StandardButton.Abort,
+        QDialogButtonBox.StandardButton.Discard,
+    }
+    neutral = {
+        QDialogButtonBox.StandardButton.Cancel,
+        QDialogButtonBox.StandardButton.Close,
+        QDialogButtonBox.StandardButton.Help,
+        QDialogButtonBox.StandardButton.Ignore,
+        QDialogButtonBox.StandardButton.No,
+        QDialogButtonBox.StandardButton.Reset,
+        QDialogButtonBox.StandardButton.RestoreDefaults,
+    }
+    for standard in QDialogButtonBox.StandardButton:
+        button = box.button(standard)
+        if not isinstance(button, QPushButton):
+            continue
+        variant = (
+            "danger" if standard in danger
+            else "neutral" if standard in neutral
+            else "action"
+        )
+        apply_button_style(button, variant=variant)
+
+
+def exec_styled_message_box(box: QMessageBox) -> int:
+    """Style and execute a fully configured message box."""
+    apply_message_box_button_style(box)
+    return box.exec()
 
 
 def fit_button_width(

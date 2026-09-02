@@ -27,6 +27,7 @@ from ...core.update import (
     is_newer_version,
 )
 from ...i18n import tr
+from ..button_styles import apply_button_style, exec_styled_message_box
 
 # 导出供外部使用
 __all__ = ["AboutDialog", "GITHUB_REPO"]
@@ -101,6 +102,7 @@ class AboutDialog(QDialog):
         self._github_btn = QPushButton("GitHub")
         self._github_btn.clicked.connect(self._open_github)
         btn_layout.addWidget(self._github_btn)
+        apply_button_style(self._check_update_btn, self._github_btn)
 
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
@@ -138,17 +140,28 @@ class AboutDialog(QDialog):
             from .update_dialog import UpdateDialog
             UpdateDialog(release, self).exec()
         else:
-            QMessageBox.information(
-                self,
+            box = QMessageBox(
+                QMessageBox.Icon.Information,
                 tr("已是最新版本"),
-                tr("当前版本 v{current} 已是最新版本").format(current=current_version),
+                tr("当前版本 v{current} 已是最新版本").format(
+                    current=current_version),
+                QMessageBox.StandardButton.Ok,
+                self,
             )
+            exec_styled_message_box(box)
 
     def _on_update_error(self, error_msg: str):
         """检查更新失败"""
         self._check_update_btn.setEnabled(True)
         self._check_update_btn.setText(tr("检查更新"))
-        QMessageBox.warning(self, tr("检查更新失败"), error_msg)
+        box = QMessageBox(
+            QMessageBox.Icon.Warning,
+            tr("检查更新失败"),
+            error_msg,
+            QMessageBox.StandardButton.Ok,
+            self,
+        )
+        exec_styled_message_box(box)
 
     def _open_github(self):
         """打开 GitHub 仓库页面"""

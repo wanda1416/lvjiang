@@ -6,7 +6,7 @@ from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication
 
-from lvjiang.core.layout_models import Panel, Region, SubsceneRef
+from lvjiang.core.layout_models import Panel, Point, Region, SubsceneRef
 from lvjiang.ui.scene_editor.canvas import RegionCanvas
 from lvjiang.ui.scene_editor.canvas_interaction import CanvasInteractionMixin
 
@@ -30,6 +30,45 @@ def canvas(qtbot):
                     w_ratio=0.15, h_ratio=0.14),
     ])
     return c
+
+
+def test_canvas_accepts_compact_disabled_placeholders(qtbot):
+    """持久化可省略零坐标，但画布内存复制不能依赖精简后的字典。"""
+    canvas = RegionCanvas()
+    qtbot.addWidget(canvas)
+    region = Region(
+        key="unbound_region", x_ratio=0, y_ratio=0,
+        w_ratio=0, h_ratio=0, disabled=True)
+    point = Point(
+        key="unbound_point", cx_ratio=0, cy_ratio=0, disabled=True)
+    panel = Panel(
+        key="unbound_panel", x_ratio=0, y_ratio=0,
+        w_ratio=0, h_ratio=0, disabled=True)
+
+    canvas.set_regions([region])
+    canvas.set_points([point])
+    canvas.set_panels([panel])
+
+    assert canvas.get_regions()[0] == region
+    assert canvas.get_points()[0] == point
+    assert canvas.get_panels()[0] == panel
+
+
+def test_canvas_memory_clones_preserve_reference_source(qtbot):
+    canvas = RegionCanvas()
+    qtbot.addWidget(canvas)
+    region = Region(
+        key="shared_region", x_ratio=0.1, y_ratio=0.2,
+        w_ratio=0.3, h_ratio=0.4, source_scene="general_control")
+    point = Point(
+        key="shared_point", cx_ratio=0.5, cy_ratio=0.6,
+        source_scene="general_control")
+
+    canvas.set_regions([region])
+    canvas.set_points([point])
+
+    assert canvas.get_regions()[0].source_scene == "general_control"
+    assert canvas.get_points()[0].source_scene == "general_control"
 
 
 def test_snap_targets_merge_all_visible_rect_types(canvas):

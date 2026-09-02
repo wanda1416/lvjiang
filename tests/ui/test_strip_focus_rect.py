@@ -84,9 +84,10 @@ class TestHeavyWidgetTeardown:
         toolbar_height = max(
             tab._view_combo.height(), tab._btn_manage_views.height()
         )
+        assert tab._btn_manage_views.text() == "视图管理"
         assert tab._canvas.y() <= toolbar_height + 2
 
-        disabled_cell = tab._region_table.cellWidget(0, 5)
+        disabled_cell = tab._region_table.cellWidget(0, 6)
         assert disabled_cell.findChild(QCheckBox) is not None
         alignment = disabled_cell.layout().itemAt(0).alignment()
         assert alignment

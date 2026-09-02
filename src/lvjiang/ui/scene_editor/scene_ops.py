@@ -28,6 +28,7 @@ from ...core.scene_registry import (
     reload_scene_registry,
 )
 from ...i18n import tr
+from ..button_styles import apply_dialog_button_box_style
 from .scene_tab import SceneTab
 
 # key 格式校验：小写字母开头，仅含小写字母/数字/下划线
@@ -205,6 +206,7 @@ class SceneOpsMixin:
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
+        apply_dialog_button_box_style(buttons)
         form.addRow(buttons)
 
         # 实时校验：非空 + key 格式 + key 重复
@@ -278,6 +280,7 @@ class SceneOpsMixin:
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
+        apply_dialog_button_box_style(buttons)
         form.addRow(buttons)
         # 实时校验：格式 + key 重复
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
@@ -344,6 +347,7 @@ class SceneOpsMixin:
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
+        apply_dialog_button_box_style(buttons)
         form.addRow(buttons)
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
         registry = get_registry()
@@ -569,6 +573,7 @@ class SceneOpsMixin:
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
+        apply_dialog_button_box_style(buttons)
         form.addRow(buttons)
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
         registry = get_registry()

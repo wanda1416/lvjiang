@@ -8,7 +8,7 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QCursor, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QInputDialog, QMenu
 
-from ...core.layout_models import CanvasConfig, Panel, Region, SubsceneRef
+from ...core.layout_models import CanvasConfig, Region, SubsceneRef
 from ...i18n import tr
 from .canvas_coords import CanvasCoordMixin
 
@@ -367,14 +367,14 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 self._drag_mode = DragMode.RESIZING
                 self._drag_handle = handle
                 self._drag_start = pos
-                self._drag_orig = Region(**r.to_dict())
+                self._drag_orig = r.clone()
                 self.update()
                 return
             rect = self._region_rect_widget(r)
             if rect.contains(pos):
                 self._drag_mode = DragMode.MOVING
                 self._drag_start = pos
-                self._drag_orig = Region(**r.to_dict())
+                self._drag_orig = r.clone()
                 self.update()
                 return
             # 点击空白：退出单区域模式，回到全局模式
@@ -400,7 +400,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 self._subscene_edit_handle = ref_handle
                 self._subscene_edit_start = pos
                 ref = self._subscene_refs[ref_idx]
-                self._subscene_edit_orig = SubsceneRef.from_dict(ref.to_dict())
+                self._subscene_edit_orig = ref.clone()
                 self._notify_selection_changed()
                 self.update()
                 return
@@ -419,12 +419,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                     self._panel_edit_mode = DragMode.MOVING
                 self._panel_edit_start = pos
                 p = self._panels[p_idx]
-                self._panel_edit_orig = Panel(
-                    key=p.key, x_ratio=p.x_ratio, y_ratio=p.y_ratio,
-                    w_ratio=p.w_ratio, h_ratio=p.h_ratio,
-                    cols=p.cols, rows=p.rows, min_visible=p.min_visible,
-                    scroll_direction=p.scroll_direction,
-                )
+                self._panel_edit_orig = p.clone()
                 # 仅选中，数据未变 → 不能标记 dirty
                 self._notify_selection_changed()
                 self.update()
@@ -478,7 +473,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             else:
                 self._drag_mode = DragMode.MOVING
             self._drag_start = pos
-            self._drag_orig = Region(**r.to_dict())
+            self._drag_orig = r.clone()
             self.update()
             return
 

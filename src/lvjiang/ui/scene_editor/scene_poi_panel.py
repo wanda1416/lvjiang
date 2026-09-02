@@ -21,23 +21,34 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ...core.key_names import normalize_key
 from ...core.layout_manager import rename_item_key_across_all_layouts
 from ...core.scene_definition import VALID_REGION_TYPES, PointDef
+from ...core.scene_definition_models import SceneRefDef
 from ...core.scene_registry import (
     get_point_def,
     get_registry,
+    get_scene_name,
     get_scene_point_pairs,
     is_view_visible,
     sync_scene_cache,
 )
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from ..widgets import centered_cell_widget, strip_focus_rect
+from .entity_edit_form import (
+    add_activation_key_row,
+    add_attribute_row,
+    add_definition_separator,
+    add_dialog_action_row,
+    validate_activation_key_edit,
+)
 from .scene_select import (
     add_scene_combo_row,
-    add_view_combo_row,
-    combo_view_value,
-    connect_scene_view_sync,
+    add_transition_row,
+    add_views_checklist_row,
+    checklist_views_value,
+    connect_scene_views_sync,
 )
 
 _RE_ARROW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -66,13 +77,17 @@ class PoiPanelMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._point_list = QTableWidget()
-        self._point_list.setColumnCount(6)
-        self._point_list.setHorizontalHeaderLabels([tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击"), tr("禁用")])
-        # 列宽：名称/Key 自适应内容，后三列固定窄宽
+        # 列与区域表保持一致：坐标和区域本质都是 area，属性同构
+        self._point_list.setColumnCount(9)
+        self._point_list.setHorizontalHeaderLabels([
+            tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击"),
+            tr("按键"), tr("禁用"), tr("跳转"), tr("来源"),
+        ])
+        # 列宽：名称/Key 自适应内容，布尔状态列固定窄宽
         header = self._point_list.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        for col in (3, 4, 5):
+        for col in (3, 4, 6):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             header.resizeSection(col, 50)
         self._point_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -93,6 +108,11 @@ class PoiPanelMixin:
         self._btn_new_point_def.setToolTip(tr("在场景 YAML 中新增坐标点定义（meta 数据）"))
         self._btn_new_point_def.clicked.connect(self._on_new_point_def)
         btn_row.addWidget(self._btn_new_point_def)
+        self._btn_add_point_ref = QPushButton(tr("+ 引用坐标"))
+        self._btn_add_point_ref.setToolTip(
+            tr("引用其他一级场景已定义的坐标；坐标属于源场景，本场景只读"))
+        self._btn_add_point_ref.clicked.connect(self._on_add_point_reference)
+        btn_row.addWidget(self._btn_add_point_ref)
         self._btn_del_point = QPushButton(tr("删除坐标"))
         self._btn_del_point.setToolTip(tr("从场景 YAML 中删除坐标点定义（meta 数据）"))
         self._btn_del_point.clicked.connect(self._on_delete_point_def)
@@ -102,6 +122,7 @@ class PoiPanelMixin:
         self._btn_bind_point.clicked.connect(self._on_new_point)
         btn_row.addWidget(self._btn_bind_point)
         apply_button_style(self._btn_new_point_def)
+        apply_button_style(self._btn_add_point_ref, variant="neutral")
         apply_button_style(self._btn_bind_point, variant="neutral")
         apply_button_style(self._btn_del_point, variant="danger")
         btn_row.addStretch()
@@ -160,7 +181,7 @@ class PoiPanelMixin:
             return
         placed = {p.key for p in self._canvas.get_points()}
         for point_def in scene.points:
-            if not is_view_visible(point_def.view, self._current_view):
+            if not is_view_visible(point_def.views, self._current_view):
                 continue
             row = self._point_list.rowCount()
             self._point_list.insertRow(row)
@@ -192,8 +213,56 @@ class PoiPanelMixin:
             cb.stateChanged.connect(
                 lambda state, k=point_def.key: self._on_toggle_poi_disabled(k, "point", state)
             )
-            self._point_list.setCellWidget(row, 5, centered_cell_widget(cb))
+            # 当前布局绑定的激活按键；空值代表使用默认坐标点击
+            placed_by_key = {p.key: p for p in self._canvas.get_points()}
+            assigned = placed_by_key.get(point_def.key)
+            key_item = QTableWidgetItem(
+                assigned.activation_key if assigned else "")
+            key_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._point_list.setItem(row, 5, key_item)
+            self._point_list.setCellWidget(row, 6, centered_cell_widget(cb))
+            self._point_list.setItem(
+                row, 7, QTableWidgetItem(point_def.to or ""))
+            self._point_list.setItem(row, 8, QTableWidgetItem(""))
+
+        self._append_point_reference_rows(scene, placed)
         self._point_list.blockSignals(False)
+
+    def _append_point_reference_rows(self, scene, placed) -> None:
+        """追加跨场景引用的坐标行。
+
+        引用项属于源场景，**只读**：不显示禁用复选框、不进编辑弹窗，坐标要改
+        得去源场景改。这里只让它在本场景的列表和画布里看得见。
+        """
+        placed_by_key = {p.key: p for p in self._canvas.get_points()}
+        for ref in getattr(scene, "references", ()):
+            if not is_view_visible(ref.views, self._current_view):
+                continue
+            source_def = get_point_def(ref.scene, ref.entity)
+            if source_def is None:
+                continue   # 该引用指向的是区域，由区域面板展示
+            row = self._point_list.rowCount()
+            self._point_list.insertRow(row)
+            is_placed = ref.entity in placed
+            assigned = placed_by_key.get(ref.entity)
+            cells = [
+                f"{'\u2713' if is_placed else '\u25cb'} {source_def.name}",
+                ref.entity, source_def.type,
+                "\u2713" if source_def.is_text else "",
+                "\u2713" if source_def.is_clickable else "",
+                assigned.activation_key if assigned else "",
+                "", source_def.to or "", get_scene_name(ref.scene),
+            ]
+            for col, text in enumerate(cells):
+                item = QTableWidgetItem(text)
+                if col in (3, 4, 5, 6):
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                item.setForeground(Qt.GlobalColor.gray)
+                self._point_list.setItem(row, col, item)
+            # 「来源」列显示场景名，源 key 退到 tooltip 与行数据
+            source_item = self._point_list.item(row, 8)
+            source_item.setData(Qt.ItemDataRole.UserRole, ref.scene)
+            source_item.setToolTip(ref.scene)
 
     def _refresh_arrow_list(self):
         """刷新方向列表"""
@@ -312,7 +381,7 @@ class PoiPanelMixin:
         result = self._show_point_edit_dialog(None)
         if result is None:
             return
-        point_def, _ = result
+        point_def, _, _ = result
         registry = get_registry()
         try:
             registry.add_point_to_scene(self._scene_key, point_def)
@@ -338,7 +407,7 @@ class PoiPanelMixin:
         result = self._show_point_edit_dialog(old_def)
         if result is None:
             return
-        new_def, target_scene = result
+        new_def, target_scene, activation_key = result
         old_key = old_def.key
         new_key = new_def.key
         key_changed = new_key != old_key
@@ -372,6 +441,8 @@ class PoiPanelMixin:
                 QMessageBox.warning(self, tr("更新失败"), str(e))
                 return
             sync_scene_cache(self._scene_key)
+            self._canvas.set_item_activation_key(
+                "point", new_key, activation_key)
             self._refresh_lists()
             return
         # 跨场景迁移：目标场景视图体系不同，归属视图重置为基底
@@ -382,6 +453,23 @@ class PoiPanelMixin:
         except ValueError as e:
             QMessageBox.warning(self, tr("迁移失败"), str(e))
             return
+        if key_changed:
+            rename_item_key_across_all_layouts(
+                self._scene_key, "point", old_key, new_key)
+            points = self._canvas.get_points()
+            for point in points:
+                if point.key == old_key:
+                    point.key = new_key
+            self._canvas.set_points(points)
+            arrows = self._canvas.get_arrows()
+            for arrow in arrows:
+                if arrow.from_key == old_key:
+                    arrow.from_key = new_key
+                if arrow.to_key == old_key:
+                    arrow.to_key = new_key
+            self._canvas.set_arrows(arrows)
+        self._canvas.set_item_activation_key(
+            "point", new_key, activation_key)
         registry.remove_point_from_scene(self._scene_key, old_key)
         sync_scene_cache(self._scene_key)
         sync_scene_cache(target_scene)
@@ -471,7 +559,9 @@ class PoiPanelMixin:
 
     # ─── 编辑弹窗 ────────────────────────────────────────
 
-    def _show_point_edit_dialog(self, point_def: PointDef | None) -> tuple[PointDef, str] | None:
+    def _show_point_edit_dialog(
+        self, point_def: PointDef | None,
+    ) -> tuple[PointDef, str, str] | None:
         """弹窗编辑坐标点属性，返回 (新 PointDef, 目标场景 key) 或 None（取消）
 
         仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
@@ -484,7 +574,7 @@ class PoiPanelMixin:
         key_edit.setPlaceholderText(tr("英文，如 my_point"))
         if point_def:
             key_edit.setText(point_def.key)
-            # 允许编辑 key，但需要校验唯一性
+        # 允许编辑 key，但需要校验唯一性
         form.addRow("Key:", key_edit)
 
         name_edit = QLineEdit()
@@ -502,14 +592,24 @@ class PoiPanelMixin:
         is_text_check = QCheckBox(tr("含文本"))
         if point_def:
             is_text_check.setChecked(point_def.is_text)
-        form.addRow(is_text_check)
-
         is_clickable_check = QCheckBox(tr("可点击"))
         if point_def:
             is_clickable_check.setChecked(point_def.is_clickable)
         else:
             is_clickable_check.setChecked(True)
-        form.addRow(is_clickable_check)
+        add_attribute_row(form, is_text_check, is_clickable_check)
+
+        placed = bool(
+            point_def
+            and any(p.key == point_def.key for p in self._canvas.get_points())
+        )
+        activation_edit = add_activation_key_row(
+            form,
+            self._canvas.get_item_activation_key(
+                "point", point_def.key) if point_def else "",
+            enabled=placed,
+        )
+        add_definition_separator(form)
 
         # 仅编辑模式可选择归属场景（跨场景迁移）
         scene_combo = None
@@ -517,21 +617,28 @@ class PoiPanelMixin:
             scene_combo = add_scene_combo_row(form, self._scene_key)
 
         # 多视图场景可选择归属视图；新建默认落在当前视图
-        view_combo = add_view_combo_row(
+        view_list = add_views_checklist_row(
             form, self._scene_key,
-            point_def.view if point_def else self._current_view,
+            list(point_def.views) if point_def else [self._current_view],
         )
+        transition = add_transition_row(
+            form, self._scene_key, point_def.to if point_def else "")
+        transition.set_transition_enabled(is_clickable_check.isChecked())
+        is_clickable_check.toggled.connect(transition.set_transition_enabled)
 
         # 场景切换时同步更新视图下拉框
         if scene_combo is not None:
-            connect_scene_view_sync(scene_combo, view_combo)
+            connect_scene_views_sync(scene_combo, view_list)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        form.addRow(buttons)
+        apply_dialog_button_box_style(buttons)
+        error_label = add_dialog_action_row(
+            form, buttons, leading_button=transition._local_views_button)
 
-        # 实时校验
+        # key/name 实时校验；按键只在点击确定时校验，
+        # 避免输入 ESC 时对 E / ES 这类中间态报错。
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
         scene = get_registry().get_scene(self._scene_key)
         # region/point/panel 共享命名空间
@@ -546,13 +653,20 @@ class PoiPanelMixin:
             # 检查 key 是否被占用（新建时检查全部，编辑时排除自身）
             if k in existing and k != old_key:
                 ok_btn.setEnabled(False)
+                error_label.setText(f"key 已被使用: {k}")
                 return
+            error_label.clear()
             ok_btn.setEnabled(bool(k and name_edit.text().strip()))
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
+        activation_edit.textChanged.connect(_validate)
         _validate()
 
-        buttons.accepted.connect(dialog.accept)
+        def _accept():
+            if validate_activation_key_edit(activation_edit, error_label):
+                dialog.accept()
+
+        buttons.accepted.connect(_accept)
         buttons.rejected.connect(dialog.reject)
 
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -561,11 +675,74 @@ class PoiPanelMixin:
         target_scene = (
             scene_combo.currentData() if scene_combo is not None else self._scene_key
         )
+        activation_key = activation_edit.text().strip()
         return PointDef(
             key=key_edit.text().strip(),
             name=name_edit.text().strip(),
             type=type_combo.currentText(),
             is_text=is_text_check.isChecked(),
             is_clickable=is_clickable_check.isChecked(),
-            view=combo_view_value(view_combo, self._current_view),
-        ), target_scene
+            views=checklist_views_value(view_list, self._current_view),
+            to=transition.value() if is_clickable_check.isChecked() else "",
+        ), target_scene, normalize_key(activation_key) if activation_key else ""
+
+    # ─── 跨场景引用 ──────────────────────────────────────
+
+    def _on_add_point_reference(self):
+        """引用另一个一级场景的坐标。
+
+        坐标和区域本质都是 area，都可以被引用；只能引用一级场景——其坐标同属
+        画布归一化，原样可用、零变换。
+        """
+        registry = get_registry()
+        scene = registry.get_scene(self._scene_key)
+        if scene is None:
+            return
+        taken = ({r.key for r in scene.regions} | {p.key for p in scene.points}
+                 | {p.key for p in scene.panels}
+                 | {r.key for r in scene.subscene_refs}
+                 | {r.key for r in scene.references})
+        candidates: list[tuple[str, str, str]] = []
+        for key, other in registry.all_scenes().items():
+            if key == self._scene_key or other.is_subscene:
+                continue
+            for pd in other.points:
+                if pd.key in taken:
+                    continue   # 同名会与本场景定义抢 key，直接不给选
+                candidates.append(
+                    (key, pd.key, f"{other.name} ({key}) · {pd.name}"))
+        if not candidates:
+            QMessageBox.information(
+                self, tr("引用坐标"),
+                tr("没有可引用的坐标：一级场景中同名的 key 已被本场景占用。"))
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("引用坐标"))
+        form = QFormLayout(dialog)
+        combo = QComboBox()
+        for scene_key, entity, label in candidates:
+            combo.addItem(label, userData=(scene_key, entity))
+        form.addRow(tr("来源:"), combo)
+        view_list = add_views_checklist_row(
+            form, self._scene_key, [self._current_view])
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        apply_dialog_button_box_style(buttons)
+        form.addRow(buttons)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        scene_key, entity = combo.currentData()
+        try:
+            registry.add_scene_reference(self._scene_key, SceneRefDef(
+                scene=scene_key, entity=entity,
+                views=checklist_views_value(view_list, self._current_view)))
+        except ValueError as exc:
+            QMessageBox.warning(self, tr("引用坐标"), str(exc))
+            return
+        sync_scene_cache(self._scene_key)
+        self._refresh_lists()

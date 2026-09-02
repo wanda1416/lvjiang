@@ -26,6 +26,7 @@ from lvjiang.core.reference_db import ReferenceDatabase
 
 from ...i18n import tr
 from ..button_styles import apply_button_style
+from ..dialog_guards import EscapeCloseConfirmationMixin
 from .browser_panel import BrowserPanel
 from .canvas import ReferenceCanvas
 from .combo_sizing import set_combo_minimum_character_capacity
@@ -42,7 +43,7 @@ def _set_space_combo_minimum_capacity(combo: QComboBox) -> int:
     )
 
 
-class ReferenceManagerDialog(QDialog):
+class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
     """图库管理对话框
 
     三个顶级 Tab，完全独立的工作流：
@@ -568,10 +569,10 @@ class ReferenceManagerDialog(QDialog):
         """提交切割结果到数据库
 
         Args:
-            cells_data: list of (image, label, group, meta)
+            cells_data: list of (image, label, group, notes, meta)
         """
         count = 0
-        for image, label, group, cell_meta in cells_data:
+        for image, label, group, notes, cell_meta in cells_data:
             if image is None:
                 continue
             meta = dict(cell_meta)
@@ -581,6 +582,7 @@ class ReferenceManagerDialog(QDialog):
                 label=label,
                 meta=meta,
                 source=self._source_name,
+                notes=notes,
                 image_data=image,
             )
             count += 1

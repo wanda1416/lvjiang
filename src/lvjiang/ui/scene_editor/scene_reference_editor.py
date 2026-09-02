@@ -23,7 +23,7 @@ from ...core.scene_registry import (
     is_view_visible,
 )
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..button_styles import apply_button_style, apply_dialog_button_box_style
 
 
 class SceneReferenceEditorMixin:
@@ -76,7 +76,7 @@ class SceneReferenceEditorMixin:
         self._reference_table.blockSignals(True)
         self._reference_table.setRowCount(0)
         for ref in refs:
-            if not is_view_visible(ref.view, self._current_view):
+            if not is_view_visible(ref.views, self._current_view):
                 continue
             row = self._reference_table.rowCount()
             self._reference_table.insertRow(row)
@@ -116,6 +116,7 @@ class SceneReferenceEditorMixin:
         box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel)
+        apply_dialog_button_box_style(box)
         box.accepted.connect(dialog.accept)
         box.rejected.connect(dialog.reject)
         form.addRow(box)

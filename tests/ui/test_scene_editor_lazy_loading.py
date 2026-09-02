@@ -1,11 +1,14 @@
 """场景管理启动只构建当前页，其他重量级编辑器按需创建。"""
 
 from PyQt6.QtCore import QEvent, QObject
-from PyQt6.QtWidgets import QApplication, QWidget
+from PyQt6.QtWidgets import QApplication, QStyle, QStyleOptionComboBox, QWidget
 
 from lvjiang.core.layout_models import CanvasConfig, Region
 from lvjiang.core.scene_registry import get_registry, is_subscene
-from lvjiang.ui.scene_editor.dialog import SceneEditorDialog
+from lvjiang.ui.scene_editor.dialog import (
+    _REFERENCE_GROUP_COMBO_CHARACTER_CAPACITY,
+    SceneEditorDialog,
+)
 
 
 def test_scene_tabs_are_created_on_first_visit(qtbot, monkeypatch):
@@ -82,6 +85,22 @@ def test_reference_groups_stay_lazy_until_dropdown_is_used(qtbot, monkeypatch):
 
     assert dialog._combo_ref_group._loaded is False
     assert dialog._combo_ref_group.count() == 1
+
+    combo = dialog._combo_ref_group
+    option = QStyleOptionComboBox()
+    option.initFrom(combo)
+    option.rect = combo.rect()
+    option.rect.setWidth(combo.minimumWidth())
+    content = combo.style().subControlRect(
+        QStyle.ComplexControl.CC_ComboBox,
+        option,
+        QStyle.SubControl.SC_ComboBoxEditField,
+        combo,
+    )
+    expected = combo.fontMetrics().horizontalAdvance(
+        "汉" * _REFERENCE_GROUP_COMBO_CHARACTER_CAPACITY
+    )
+    assert content.width() >= expected
 
 
 def test_save_keeps_data_from_unvisited_scenes(qtbot, monkeypatch):

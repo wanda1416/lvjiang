@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ......i18n import tr
+from ......ui.button_styles import apply_dialog_button_box_style
 from ....core.combat.combat_attrs import (
     COMBAT_ATTR_FIELDS,
     PLAY_STYLE_FIELD_GROUPS,
@@ -95,8 +96,9 @@ class PlayStyleDialogMixin:
         """
         school = self._get_current_school()
         if not school:
-            QMessageBox.warning(
-                self._play_style_dialog_parent(), tr("无法创建"),
+            self._show_workflow_message(
+                QMessageBox.Icon.Warning,
+                tr("无法创建"),
                 tr("请先选择一个流派后再确认基础属性识别结果"),
             )
             return
@@ -110,38 +112,128 @@ class PlayStyleDialogMixin:
             school_attr=school_attr,
             initial_values=prefill,
         )
-        self._finish_play_style_dialog(school, dlg)
+        self._finish_play_style_dialog(school, dlg, workflow_triggered=True)
 
-    def _finish_play_style_dialog(self, school: str, dlg: "_CreatePlayStyleDialog"):
+    def _finish_play_style_dialog(
+        self,
+        school: str,
+        dlg: "_CreatePlayStyleDialog",
+        *,
+        workflow_triggered: bool = False,
+    ):
         """展示对话框并处理保存：重名检查、反推基础值、写入、刷新。
 
         手动按钮（_on_create_play_style）和工作流预填触发
-        （_on_open_play_style_form）共用这段尾逻辑。
+        （_on_open_play_style_form）共用保存逻辑。工作流触发时必须非模态：
+        自动化本身不等待表单，主窗口也不能因表单而被禁用。
         """
+        if workflow_triggered:
+            dlg.setModal(False)
+            dlg.setWindowModality(Qt.WindowModality.NonModal)
+            dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+            self._workflow_play_style_dialog = dlg
+
+            def finished(code: int) -> None:
+                if getattr(self, "_workflow_play_style_dialog", None) is dlg:
+                    self._workflow_play_style_dialog = None
+                if code == QDialog.DialogCode.Accepted:
+                    self._process_play_style_dialog(
+                        school, dlg, workflow_triggered=True)
+
+            dlg.finished.connect(finished)
+            dlg.show()
+            dlg.raise_()
+            dlg.activateWindow()
+            return
+
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
+        self._process_play_style_dialog(school, dlg, workflow_triggered=False)
+
+    def _process_play_style_dialog(
+        self,
+        school: str,
+        dlg: "_CreatePlayStyleDialog",
+        *,
+        workflow_triggered: bool,
+    ) -> None:
+        """Validate an accepted form, then save now or after overwrite choice."""
 
         panel_attrs = dlg.get_panel_attrs()
         name = dlg.get_play_style_name()
 
         if not name:
-            QMessageBox.warning(
-                self._play_style_dialog_parent(),
-                tr("无法保存"),
-                tr("基础属性名称不能为空"),
-            )
+            if workflow_triggered:
+                self._show_workflow_message(
+                    QMessageBox.Icon.Warning,
+                    tr("无法保存"),
+                    tr("基础属性名称不能为空"),
+                )
+            else:
+                QMessageBox.warning(
+                    self._play_style_dialog_parent(),
+                    tr("无法保存"),
+                    tr("基础属性名称不能为空"),
+                )
             return
 
         # 检查重名
         from ....config import get_play_styles
         existing = get_play_styles(school)
         if name in existing:
+            message = tr("基础属性「{name}」已存在，是否覆盖？").format(
+                name=name
+            )
+            if workflow_triggered:
+                self._show_workflow_overwrite(
+                    school, name, panel_attrs, message
+                )
+                return
             ret = QMessageBox.question(
                 self._play_style_dialog_parent(), tr("基础属性已存在"),
-                tr("基础属性「{name}」已存在，是否覆盖？").format(name=name),
+                message,
             )
             if ret != QMessageBox.StandardButton.Yes:
                 return
+
+        self._commit_play_style(
+            school, name, panel_attrs, workflow_triggered=workflow_triggered
+        )
+
+    def _show_workflow_overwrite(
+        self,
+        school: str,
+        name: str,
+        panel_attrs: CombatAttributes,
+        message: str,
+    ) -> None:
+        """Ask overwrite without disabling the main window."""
+        box = self._show_workflow_message(
+            QMessageBox.Icon.Question,
+            tr("基础属性已存在"),
+            message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        def save_if_confirmed(_code: int) -> None:
+            clicked = box.clickedButton()
+            if (clicked is not None and
+                    box.standardButton(clicked) == QMessageBox.StandardButton.Yes):
+                self._commit_play_style(
+                    school, name, panel_attrs, workflow_triggered=True
+                )
+
+        box.finished.connect(save_if_confirmed)
+
+    def _commit_play_style(
+        self,
+        school: str,
+        name: str,
+        panel_attrs: CombatAttributes,
+        *,
+        workflow_triggered: bool,
+    ) -> None:
+        """Reverse equipment contributions, persist, then refresh the selector."""
 
         # 反推：base = panel - equip_base - equip_affix - gongjue
         # equip_base: 装备基础外功攻击（武器/环/佩，根据品阶不同）
@@ -160,15 +252,58 @@ class PlayStyleDialogMixin:
             setattr(base_attrs, pen_field, panel_val)
 
         # 保存
-        self._save_play_style(school, name, base_attrs)
-        QMessageBox.information(
-            self._play_style_dialog_parent(), tr("保存成功"),
-            tr("基础属性「{name}」已保存到流派「{school}」").format(name=name, school=school),
-        )
+        try:
+            self._save_play_style(school, name, base_attrs)
+        except Exception as exc:
+            if workflow_triggered:
+                self._show_workflow_message(
+                    QMessageBox.Icon.Warning, tr("无法保存"), str(exc)
+                )
+            else:
+                QMessageBox.warning(
+                    self._play_style_dialog_parent(), tr("无法保存"), str(exc)
+                )
+            return
+
+        saved_message = tr(
+            "基础属性「{name}」已保存到流派「{school}」"
+        ).format(name=name, school=school)
+        if workflow_triggered:
+            self._show_workflow_message(
+                QMessageBox.Icon.Information, tr("保存成功"), saved_message
+            )
+        else:
+            QMessageBox.information(
+                self._play_style_dialog_parent(), tr("保存成功"), saved_message
+            )
 
         # 刷新
         self._refresh_play_styles()
         self._combo_play_style.setCurrentText(name)
+
+    def _show_workflow_message(
+        self,
+        icon: QMessageBox.Icon,
+        title: str,
+        message: str,
+        buttons: QMessageBox.StandardButton = QMessageBox.StandardButton.Ok,
+    ) -> QMessageBox:
+        """Show a workflow-originated message while keeping the host interactive."""
+        parent = self._play_style_dialog_parent()
+        box = QMessageBox(icon, title, message, buttons, parent)
+        box.setModal(False)
+        box.setWindowModality(Qt.WindowModality.NonModal)
+        box.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        dialogs = getattr(self, "_workflow_message_dialogs", None)
+        if dialogs is None:
+            dialogs = set()
+            self._workflow_message_dialogs = dialogs
+        dialogs.add(box)
+        box.finished.connect(lambda _code, item=box: dialogs.discard(item))
+        box.show()
+        box.raise_()
+        box.activateWindow()
+        return box
 
     def _save_play_style(self, school: str, name: str, base_attrs: CombatAttributes):
         """保存基础属性到 session 配置（仅保存允许的字段）。"""
@@ -377,6 +512,7 @@ class _CreatePlayStyleDialog(QDialog):
             QDialogButtonBox.StandardButton.Save |
             QDialogButtonBox.StandardButton.Cancel
         )
+        apply_dialog_button_box_style(buttons)
         buttons.button(QDialogButtonBox.StandardButton.Save).setText(tr("保存"))
         buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(tr("取消"))
         buttons.accepted.connect(self._on_save)

@@ -80,6 +80,7 @@ class LoadoutPanel(QWidget):
         self._host = host
         self._repo = None
         self._refreshing = False
+        self._equipment_events_connected = False
         self._graduation_result = None
         saved = load_ui_page_state(_UI_PAGE_KEY)
         mode = saved.get("view_mode")
@@ -92,9 +93,12 @@ class LoadoutPanel(QWidget):
         )
         self._build_ui()
         host.user_changed.connect(lambda _name: self.refresh())
-        get_event_hub(host).graduation_updated.connect(self._sync_metrics)
-        # 装备变更（UI 操作与工作流写入）：刷新方案展示并同步指标
-        get_event_hub(host).equipment_changed.connect(self._on_equipment_changed)
+        self._event_hub = get_event_hub(host)
+        self._event_hub.graduation_updated.connect(self._sync_metrics)
+        self._equipment_refresh_timer = QTimer(self)
+        self._equipment_refresh_timer.setSingleShot(True)
+        self._equipment_refresh_timer.timeout.connect(
+            self._refresh_visible_equipment)
         self.refresh()
 
     def _build_ui(self):
@@ -165,11 +169,18 @@ class LoadoutPanel(QWidget):
         plan_row.addWidget(QLabel(tr("副武学")))
         self._sub_art = QComboBox()
         plan_row.addWidget(self._sub_art, 1)
+        # 玩法决定调律方向（要什么增伤、定什么音）；流派只决定毕业率计算。
+        # 候选由两个武学**无序**匹配——主副只是顺序标签，纯唐和双切的武学对
+        # 完全相同，区别只在增伤要求落在哪一边，所以两个都该列出来由用户挑。
+        plan_row.addWidget(QLabel(tr("玩法")))
+        self._playstyle = QComboBox()
+        plan_row.addWidget(self._playstyle, 1)
         self._school = QLabel(tr("无方案"))
         self._school.setMinimumWidth(80)
         plan_row.addWidget(self._school)
         self._main_art.currentTextChanged.connect(self._configure_arts)
         self._sub_art.currentTextChanged.connect(self._configure_arts)
+        self._playstyle.currentTextChanged.connect(self._configure_arts)
         root.addLayout(plan_row)
 
         # Row 3: symmetrical public metrics.
@@ -283,7 +294,43 @@ class LoadoutPanel(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._subscribe_equipment_updates()
+        # 隐藏期间不订阅、也不积压消息；进入页面时直接读取最新快照。
+        self._schedule_equipment_refresh()
         self._apply_split_sizes()
+
+    def hideEvent(self, event):
+        self._unsubscribe_equipment_updates()
+        self._equipment_refresh_timer.stop()
+        super().hideEvent(event)
+
+    def _subscribe_equipment_updates(self) -> None:
+        """仅页面可见期间订阅逐件扫描结果。"""
+        if self._equipment_events_connected:
+            return
+        self._event_hub.equipment_changed.connect(
+            self._schedule_equipment_refresh)
+        self._equipment_events_connected = True
+
+    def _unsubscribe_equipment_updates(self) -> None:
+        if not self._equipment_events_connected:
+            return
+        self._event_hub.equipment_changed.disconnect(
+            self._schedule_equipment_refresh)
+        self._equipment_events_connected = False
+
+    def _schedule_equipment_refresh(self) -> None:
+        """合并同一事件循环内的变更，不让刷新重入。"""
+        if self.isVisible() and not self._equipment_refresh_timer.isActive():
+            self._equipment_refresh_timer.start(0)
+
+    def _refresh_visible_equipment(self) -> None:
+        if not self.isVisible():
+            return
+        if self._refreshing:
+            self._equipment_refresh_timer.start(0)
+            return
+        self._on_equipment_changed()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -296,6 +343,10 @@ class LoadoutPanel(QWidget):
         return LoadoutRepository(username) if username else None
 
     def refresh(self):
+        # refresh 的语义是重新读取装备数据。必须在任何下拉框联动触发
+        # _refresh_display 之前废弃旧穿戴快照，否则“刷新”仍会复用旧装备。
+        combat = self._character._combat_attrs_tab
+        combat.invalidate_equipment_snapshot()
         self._repo = self._current_repo()
         if self._repo is None:
             return
@@ -313,6 +364,7 @@ class LoadoutPanel(QWidget):
             (cfg.get("sub") or {}).get("martial_art", "") for cfg in schools.values()))
         self._set_combo(self._main_art, main_arts, state.active_plan.main_martial_art)
         self._set_combo(self._sub_art, sub_arts, state.active_plan.sub_martial_art)
+        self._refresh_playstyles(state)
         school = resolve_school(
             state.active_plan.main_martial_art,
             state.active_plan.sub_martial_art,
@@ -323,7 +375,6 @@ class LoadoutPanel(QWidget):
         # 下游消费者（装备页/战斗属性页）已显式驱动，无需再 emit
         # equipment_changed：emit 会导致信号订阅者重复全量刷新
         self._equipment._refresh_all()
-        combat = self._character._combat_attrs_tab
         school_index = combat._combo_school.findText(school or "")
         combat._combo_school.setCurrentIndex(max(0, school_index))
         combat._refresh_play_styles()
@@ -407,6 +458,22 @@ class LoadoutPanel(QWidget):
             except ValueError as exc:
                 QMessageBox.warning(self, tr("删除失败"), str(exc))
 
+    def _refresh_playstyles(self, state) -> None:
+        """按当前两个武学列出可选玩法。
+
+        武学没登记进任何玩法时列表为空——那只是算不出定音目标，方案照常可用，
+        不该因此报错或硬塞一个玩法给用户（那等于替他决定怎么打）。
+        """
+        from ...config import get_game_config
+
+        plan = state.active_plan
+        arts = [plan.main_martial_art, plan.sub_martial_art]
+        names = get_game_config().get_playstyles_for_arts(arts)
+        self._set_combo(self._playstyle, [""] + names, plan.playstyle)
+        self._playstyle.setEnabled(bool(names))
+        self._playstyle.setToolTip(
+            "" if names else tr("这两个武学尚未登记到任何玩法"))
+
     def _configure_arts(self):
         if self._refreshing or not self._repo:
             return
@@ -418,5 +485,6 @@ class LoadoutPanel(QWidget):
             state.active_plan_id,
             main_martial_art=main_art,
             sub_martial_art=sub_art,
+            playstyle=self._playstyle.currentText(),
         )
         self.refresh()

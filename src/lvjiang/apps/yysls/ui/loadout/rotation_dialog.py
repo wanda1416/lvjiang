@@ -30,6 +30,10 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
+from .....ui.button_styles import (
+    apply_button_style,
+    apply_dialog_button_box_style,
+)
 from ...core.graduation.rotation import (
     Rotation,
     RotationParseError,
@@ -76,6 +80,7 @@ class RotationDialog(QDialog):
         bar.addWidget(self._lbl_source, stretch=1)
         btn_open = QPushButton(tr("导入 Excel"))
         btn_open.clicked.connect(self._on_open)
+        apply_button_style(btn_open)
         bar.addWidget(btn_open)
         layout.addLayout(bar)
 
@@ -91,6 +96,7 @@ class RotationDialog(QDialog):
         layout.addWidget(self._tabs, stretch=1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        apply_dialog_button_box_style(buttons)
         buttons.rejected.connect(self.reject)
         buttons.accepted.connect(self.accept)
         layout.addWidget(buttons)

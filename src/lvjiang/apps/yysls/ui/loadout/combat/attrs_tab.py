@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.button_styles import apply_button_style
 from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from lvjiang.ui.user_toolbar import add_user_nav_buttons
 
@@ -72,6 +73,10 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         # ✅ 会话级缓存：避免反复load装备文件（多进程安全）
         self._session_user = None  # 当前会话的用户
         self._equipped_cache = None  # 缓存的装备数据
+        # 隐藏期间攒下的重载请求；showEvent 时补做一次
+        self._reload_pending = False
+        # _restore_selection 批量回填下拉时抑制刷新，见该方法
+        self._restoring = False
 
         self._graduation_generation = 0
         self._pending_graduation: tuple[int, str, str, str, CombatAttributes] | None = None
@@ -135,6 +140,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._btn_edit_play_style.setMinimumHeight(30)
         self._btn_edit_play_style.setToolTip(tr("在游戏配置中编辑当前属性"))
         self._btn_edit_play_style.clicked.connect(self._on_edit_play_style)
+        apply_button_style(self._btn_edit_play_style, variant="neutral")
 
         gongjue_field = QWidget()
         gongjue_layout = QHBoxLayout(gongjue_field)
@@ -163,6 +169,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._btn_create_play = QPushButton(tr("新建属性"))
         self._btn_create_play.setMinimumHeight(30)
         self._btn_create_play.clicked.connect(self._on_create_play_style)
+        apply_button_style(self._btn_create_play)
 
         self._config_fields = (
             school_field, base_field, self._btn_edit_play_style,
@@ -252,8 +259,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         scroll.setWidget(self._attrs_widget)
         layout.addWidget(scroll, stretch=1)
 
-        # 订阅装备变更信号（装备数据 Tab 中穿戴/卸下装备时触发）
-        get_event_hub(self._host).equipment_changed.connect(self._on_equipment_changed)
+        # equipment_changed 由外层 LoadoutPanel 统一刷新装备与战斗属性，
+        # 子页面不再重复订阅同一事件。
         # 订阅用户切换信号（上一个/下一个用户按钮触发）
         self._host.user_changed.connect(self._on_user_changed)
         # 订阅工作流请求打开"创建基础属性"面板并预填数值
@@ -366,27 +373,58 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
     def _on_equipment_changed(self) -> None:
         """装备变更：清除缓存并刷新显示"""
         logger.debug("CombatAttrsTab: 装备已变更，清除缓存")
-        # ✅ 清除装备缓存（因为装备数据已改变）
-        self._equipped_cache = None
+        self.invalidate_equipment_snapshot()
         # 重新加载并显示
         self._refresh_display()
 
-    def _on_user_changed(self, _name: str) -> None:
-        """切换用户时立即废弃尚未完成的毕业率请求。"""
-        logger.info(f"CombatAttrsTab: 用户切换到 {_name}，清除会话缓存")
-        # ✅ 清除会话缓存（多进程安全）
-        self._clear_session_cache()
-
+    def invalidate_equipment_snapshot(self) -> None:
+        """废弃穿戴快照及依赖它的在途毕业率请求。"""
+        self._equipped_cache = None
         self._graduation_generation += 1
         self._graduation_timer.stop()
         self._pending_graduation = None
+
+    def _on_user_changed(self, _name: str) -> None:
+        """切换用户时立即废弃尚未完成的毕业率请求。"""
+        logger.debug(f"CombatAttrsTab: 用户切换到 {_name}，清除会话缓存")
+        # ✅ 清除会话缓存（多进程安全）
+        self._clear_session_cache()
+        # 隐藏时只作废旧状态，不做重载：重载要读装备文件并全量重算属性，
+        # 而这个页面可能从头到尾都没被打开过——切换用户不该为它买单。
+        # _save_selection 必须一起推迟：此刻下拉框里还是上一个用户的选择，
+        # 现在存就会把它写到新用户名下。
+        if not self.isVisible():
+            self._reload_pending = True
+            return
+        self._reload_pending = False
         self._load_data()
         self._save_selection()
+
+    def showEvent(self, event):
+        """补做隐藏期间攒下的重载。"""
+        super().showEvent(event)
+        if self._reload_pending:
+            self._reload_pending = False
+            self._load_data()
+            self._save_selection()
+
+    def _active_playstyle(self) -> str:
+        """当前备战方案绑定的玩法；取不到就空串（退回旧的满定音语义）。"""
+        user_name = self._host.active_user_name()
+        if not user_name:
+            return ""
+        try:
+            from ....core.loadout import LoadoutRepository
+
+            return LoadoutRepository(user_name).load().active_plan.playstyle
+        except Exception as exc:  # noqa: BLE001 — 取不到玩法只降级，不影响展示
+            logger.debug(f"读取方案玩法失败: {exc}")
+            return ""
 
     def _clear_session_cache(self):
         """清除会话级缓存（用户切换/刷新时调用）"""
         self._session_user = None
-        self._equipped_cache = None
+        self.invalidate_equipment_snapshot()
 
     def _get_current_gongjue(self) -> str:
         value = self._combo_gongjue.currentData()
@@ -432,7 +470,13 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             logger.debug(f"保存战斗属性选择失败: {e}")
 
     def _restore_selection(self):
-        """从 session.json 恢复当前用户的配置选择"""
+        """从 session.json 恢复当前用户的配置选择。
+
+        回填 4 个下拉框和若干勾选框，每一个都会触发自己的 _on_*_changed →
+        _refresh_display()。加载一次用户因此要做 5 次全量属性重算（日志里
+        表现为连续多条「复用缓存装备数据」）。用 _restoring 抑制，
+        由 _load_data 末尾统一刷一次。
+        """
         from lvjiang.core.config.session import load_settings
 
         user_name = self._host.active_user_name()
@@ -448,6 +492,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             if not isinstance(selection, dict):
                 return
 
+            self._restoring = True
             school = selection.get("school", "")
             play_style = selection.get("play_style", "")
             gongjue = selection.get("gongjue", "")
@@ -492,6 +537,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                 selection.get("full_level", False))
         except Exception as e:
             logger.debug(f"恢复战斗属性选择失败: {e}")
+        finally:
+            self._restoring = False
 
     # ── 属性展示 ──────────────────────────────────────────────
 
@@ -508,6 +555,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
     def _refresh_display(self):
         """刷新属性显示"""
+        if self._restoring:
+            return
         from ....core.combat.combat_attrs import (
             WUXIANG_TO_ATTR_PEN,
             apply_bonus_resistance,
@@ -549,6 +598,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                         full_chengyin=self._chk_full_chengyin.isChecked(),
                         full_dingyin=self._chk_full_dingyin.isChecked(),
                         full_level=self._get_full_level(),
+                        playstyle=self._active_playstyle(),
                     )
             except Exception as e:
                 logger.error(f"读取装备数据失败: {e}")
@@ -873,6 +923,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                     full_chengyin=self._chk_full_chengyin.isChecked(),
                     full_dingyin=self._chk_full_dingyin.isChecked(),
                     full_level=self._get_full_level(),
+                    playstyle=self._active_playstyle(),
                 )
             return aggregate_equipment_attrs(equipped)
         except Exception as e:

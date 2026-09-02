@@ -55,9 +55,9 @@ class TestParseEquipType:
         ("流星云珑", "环"),
         ("玄玉辟邪", "佩"),
         ("雁南飞冠", "冠胄"),
-        ("寒山胸甲", "胸甲"),
-        ("寒山胫甲", "胫甲"),
-        ("寒山腕甲", "腕甲"),
+        ("雁南飞甲", "胸甲"),
+        ("吴钩缚袴", "胫甲"),
+        ("吴钩披膊", "腕甲"),
     ])
     def test_infer_type_from_name(self, parser, name, expected):
         # 无类型段时按名称关键字推断
@@ -70,6 +70,19 @@ class TestParseEquipType:
         name, equip_type = parser._parse_equip_type("神秘物品 | 一杆")
         assert name == "神秘物品"
         assert equip_type is None
+
+    def test_c_has_priority_and_conflict_is_logged(self, parser, monkeypatch):
+        errors = []
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.core.equip_parser.parser.logger.error",
+            errors.append,
+        )
+        assert parser._parse_equip_type("雁南飞冠 | 胸甲") == (
+            "雁南飞冠", "胸甲")
+        assert errors and "装备类型冲突" in errors[0]
+
+    def test_missing_c_falls_back_to_b(self, parser):
+        assert parser._parse_equip_type("雁南飞甲") == ("雁南飞甲", "胸甲")
 
     @pytest.mark.parametrize("raw,expected_type", [
         ("吴钩霜甲 | 胸申", "胸甲"),   # "甲"错识别，"胸"单字命中
@@ -264,16 +277,15 @@ class TestParseFullChain:
         assert equip.affixes[0].cap_pct == 100.0
         assert equip.affixes[1].cap_pct == 50.0
 
-    def test_type_not_backfilled_from_base_attr(self, parser):
-        # equip_type 未识别到类型关键字 → type 为 None，不做反推
-        # 即使 base_attr 19445 唯一命中 chest 110 gold，也不回填 type
+    def test_chest_name_suffix_is_recognized_without_base_attr_backfill(self, parser):
+        # 胸甲名称固定以“甲”结尾，直接由名称识别；这不是基础属性反推。
         equip = parser.parse({
             "equip_type": "吴钩霜甲",
             "equip_level": "110阶",
             "base_attr": "气血最大值 19445",
             "affix_gong": "劲 +76.8",
         })
-        assert equip.type is None
+        assert equip.type == "胸甲"
         assert equip.quality == "gold"
 
     def test_type_none_when_unrecognized(self, parser):
@@ -358,11 +370,9 @@ class TestOcrMatchingSurvivesTranslation:
         assert parser._parse_equip_type("踏雪含光 | 武器·剑") == ("踏雪含光", "剑")
 
     def test_armor_type_from_name_still_recognized(self, parser):
-        # 匹配侧（name 里找"云珑"/"辟邪"）恒为裸中文；返回值调用时才过 tr()，
-        # 在本测试的伪造翻译下会变成 RING/PENDANT——这正是期望行为：
-        # 匹配不受语言影响，返回值该翻译的地方仍然翻译。
-        assert parser._parse_equip_type("流星云珑") == ("流星云珑", "RING")
-        assert parser._parse_equip_type("玄玉辟邪") == ("玄玉辟邪", "PENDANT")
+        # 配置中的游戏原始词及规范类型都不经界面翻译。
+        assert parser._parse_equip_type("流星云珑") == ("流星云珑", "环")
+        assert parser._parse_equip_type("玄玉辟邪") == ("玄玉辟邪", "佩")
 
     def test_armor_type_segment_still_recognized(self, parser):
         assert parser._parse_equip_type("雁南飞冠 | 冠胄") == ("雁南飞冠", "冠胄")

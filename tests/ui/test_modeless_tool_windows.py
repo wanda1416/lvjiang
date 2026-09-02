@@ -1,5 +1,7 @@
 """Main-window modeless tool lifetime and re-entry guard tests."""
 
+import pytest
+from PyQt6 import sip
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QMainWindow, QMessageBox
 
@@ -43,6 +45,69 @@ def test_modeless_tool_is_single_instance_and_can_reopen(qtbot, monkeypatch):
     third = host._show_modeless_tool("scene", factory)
     assert third is not first
     assert len(created) == 2
+
+
+def test_deleted_modeless_wrapper_is_replaced_before_qt_access(qtbot):
+    """窗口未发 finished 就销毁时，下次访问必须先剔除悬空包装对象。"""
+    host = _Host()
+    qtbot.addWidget(host)
+    created = []
+
+    def factory():
+        dialog = QDialog(host)
+        created.append(dialog)
+        return dialog
+
+    first = host._show_modeless_tool("record", factory)
+    assert first is not None
+    sip.delete(first)
+
+    assert sip.isdeleted(first)
+    second = host._show_modeless_tool("record", factory)
+    assert second is not None and second is not first
+    assert len(created) == 2
+
+
+def test_stale_deleted_modeless_wrapper_is_defensively_replaced(qtbot):
+    """即使注册表已含历史悬空引用，重复打开也不能调用其 Qt 方法。"""
+    host = _Host()
+    qtbot.addWidget(host)
+    stale = QDialog(host)
+    sip.delete(stale)
+    host._modeless_tool_windows = {"record": stale}
+
+    reopened = host._show_modeless_tool(
+        "record", lambda: QDialog(host))
+
+    assert reopened is not None
+    assert host._modeless_tool_windows == {"record": reopened}
+
+
+@pytest.mark.parametrize("key", [
+    "scene_editor",
+    "reference_manager",
+    "script_record",
+    "script_editor",
+    "task_history",
+])
+def test_every_registered_modeless_tool_survives_close_without_finished(
+        qtbot, key):
+    """所有共享入口都覆盖“closeEvent 直接接受、未发 finished”的路径。"""
+    class DirectCloseDialog(QDialog):
+        def closeEvent(self, event):  # noqa: N802
+            event.accept()
+
+    host = _Host()
+    qtbot.addWidget(host)
+    first = host._show_modeless_tool(
+        key, lambda: DirectCloseDialog(host))
+    assert first is not None
+
+    first.close()
+    qtbot.waitUntil(lambda: sip.isdeleted(first))
+
+    reopened = host._show_modeless_tool(key, lambda: QDialog(host))
+    assert reopened is not None and reopened is not first
 
 
 def test_modeless_tool_guard_blocks_reentrant_factory(qtbot):

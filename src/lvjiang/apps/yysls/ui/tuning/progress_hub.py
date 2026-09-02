@@ -55,14 +55,17 @@ class TuningProgressHub(QObject):
 
     # ─── 当前执行阶段（长耗时动作开始前即时更新）──────────
     operation_updated = pyqtSignal(object)
-    # dict: {phase, message, action?, reason?, affix_count?, resets?}
+    # dict: {phase, message, action?, reason?, affix_count?, resets?,
+    #        reset_outcome?}
     # phase: scan/navigation/material/tuning/decision/reset/finish
+    # reset_outcome: completed/cooldown/exhausted/exhausted_recycled/
+    #                material_shortage/failed
 
     # ─── 重置边界：重置前归档为上一件，重置后作为新当前装备 ──
     equipment_reset = pyqtSignal(object)
     # dict: {name, type, level, quality, before_affixes, after_affixes,
     #        before_affix_count, after_affix_count, resets_used,
-    #        before_rating, expect_rating}
+    #        before_rating, expect_rating, tuning_mode}
     # expect_rating 在重置边界固定为空，等待 equipment_assessed 刷新。
 
     # ─── 扫描处理决策（评级未达门槛 / 词条已满）──────────
@@ -73,7 +76,7 @@ class TuningProgressHub(QObject):
     # ─── 装备处理结束 ────────────────────────────────────
     equipment_finished = pyqtSignal(object)
     # dict: {name, final_rating, rounds, affix_count,
-    #        final_affixes: list[dict], status}
+    #        final_affixes: list[dict], status, reason?}
     # final_rating: 实际评级（仅词条满 5 条时有值，否则为空串）
 
     # ─── 批次进度 ────────────────────────────────────────

@@ -32,6 +32,7 @@ class TuningRunContext:
     judge_rule_keys: list[str] | None = None  # 参与判定的规则 key 顺序
     skip_tuning: bool = False                 # 测试开关：跳过实际调律，仅模拟进出调律页
     doc_dir: Path | None = None               # 说明文档输出目录覆盖（供测试）
+    history_db_path: Path | None = None        # 历史数据库路径覆盖（供测试）
     scroll_strategy: str = ""                 # 背包遍历策略 key（空=读 session/默认）
     skip_start: tuple[int, int] | None = None    # 初始跳过 (row, col)；None=不跳过
     target_cell: tuple[int, int] | None = None   # 指定调律 (row, col)；None=不指定

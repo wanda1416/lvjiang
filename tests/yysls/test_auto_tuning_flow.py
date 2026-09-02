@@ -51,6 +51,7 @@ from lvjiang.workflows.engine import WorkflowEngine
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL
 ARMOR_DETAIL = AutoTuningWorkflow.ARMOR_DETAIL
 EQUIP_DETAIL = AutoTuningWorkflow.EQUIP_DETAIL
+CONTROL_SCENE = AutoTuningWorkflow.CONTROL_SCENE
 # 调律页与调律结果弹窗已合并为同一场景（结果在 result 视图），
 # 故 _ocr_map 里两者字段共用一个场景条目
 TUNE_SCENE = AutoTuningWorkflow.TUNE_SCENE
@@ -126,7 +127,11 @@ class FakeWF(AutoTuningWorkflow):
     @property
     def is_stopped(self) -> bool:
         # 与真实属性对齐：材料耗尽也视为停止（阻断不触发回收）
-        return self._stopped or self.executor.materials_exhausted
+        return (
+            self._stopped
+            or self.executor.materials_exhausted
+            or self.run_state.end_requested
+        )
 
     def wait_delay(self, name: str):
         pass
@@ -144,9 +149,11 @@ class FakeWF(AutoTuningWorkflow):
 
     def ocr_scene(self, scene_key, field_keys=None, min_confidence=None):
         data = dict(self._ocr_map.get(scene_key, {}))
-        # 默认值：回收确认弹窗包含「确认」（除非测试显式覆盖为锁定场景）
-        if scene_key == EQUIP_DETAIL and "recycle_confirm" not in data:
-            data["recycle_confirm"] = "确认"
+        # 默认值：标准确认弹窗包含「确认」（除非测试显式覆盖）。
+        if scene_key == CONTROL_SCENE and "confirm" not in data:
+            data["confirm"] = "确认"
+        if scene_key == TUNE_SCENE and "reset_confirm" not in data:
+            data["reset_confirm"] = "确认"
         # 导航预检：菜单页检查
         if scene_key == "game_menu_page":
             data.setdefault("baoguo", "包裹")
@@ -154,13 +161,18 @@ class FakeWF(AutoTuningWorkflow):
         if scene_key == "game_main_page":
             data.setdefault("menu", "菜单")
         # 导航预检：包裹页 tab 检查
-        if scene_key == "bag_equip_detail":
+        if scene_key == "bag_detail":
             data.setdefault("sub_baoguo", "培养")
         if field_keys:
             return {k: v for k, v in data.items() if k in field_keys}
         return data
 
     def ocr_scene_by(self, scene_key, field_keys, target_value, mode, min_confidence=None):
+        # page_action.scan_and_confirm 通过 by contains_any 扫描通用确认区。
+        if scene_key == CONTROL_SCENE and "confirm" in field_keys:
+            text = self._ocr_map.get(scene_key, {}).get("confirm", "确认")
+            targets = target_value if isinstance(target_value, list) else [target_value]
+            return "confirm" if any(target in text for target in targets) else ""
         # 导航预检：菜单页检查（is_in_menu_page 用）
         if scene_key == "game_menu_page" and ("baoguo" in field_keys or "peiyang" in field_keys or "wulinlu" in field_keys):
             return "baoguo" if "baoguo" in field_keys else "wulinlu"
@@ -168,7 +180,7 @@ class FakeWF(AutoTuningWorkflow):
         if scene_key == "game_main_page":
             return "菜单"  # 模拟在主页
         # 导航预检：包裹页 tab 检查
-        if scene_key == "bag_equip_detail" and "sub_baoguo" in field_keys:
+        if scene_key == "bag_detail" and "sub_baoguo" in field_keys:
             return "培养"  # 模拟在培养 tab
         # 导航预检：装备列表检查（recycle + sub_equip）
         if scene_key == "bag_equip_detail" and ("recycle" in field_keys or "sub_equip" in field_keys):
@@ -364,6 +376,24 @@ def test_desktop_locked_recycle_does_not_press_escape(monkeypatch):
 
     assert wf._process_equipment(name, parsed, WEAPON_DETAIL) == fp
     assert wf.presses == []
+
+
+def test_manual_recycle_end_stops_run_without_recording_locked():
+    wf = FakeWF()
+    wf._recycler = MagicMock()
+    wf._recycler.recycle_current.return_value = (
+        auto_tuning.RecycleOutcome.STOPPED)
+    equip = EquipmentData(
+        type="剑", name="待处理剑", level=110, quality="gold")
+
+    outcome = wf._recycle_current(
+        equip, WEAPON_DETAIL, "scan", "手动处理")
+
+    assert outcome is auto_tuning.RecycleOutcome.STOPPED
+    assert wf.run_state.end_requested is True
+    assert wf.is_stopped is True
+    assert wf.output["stop_reason"] == "用户选择结束任务"
+    assert not wf.run_state.locked_fingerprints
 
 
 def test_desktop_equipped_slot_closes_before_grid_alignment(monkeypatch):
@@ -1000,7 +1030,7 @@ def test_scan_recycles_junk(monkeypatch):
     # 回收链：展开「更多」→ 子菜单「回收」→ 确认弹窗
     assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 1
     assert (EQUIP_DETAIL, "sub_func_1") in wf.clicks
-    assert (EQUIP_DETAIL, "recycle_confirm") in wf.clicks
+    assert (CONTROL_SCENE, "confirm") in wf.clicks
     items = wf.output["recycled_items"]
     assert len(items) == 1 and items[0]["stage"] == "scan"
     assert not wf.output.get("tuning_reports")
@@ -1061,7 +1091,7 @@ def test_scan_recycles_when_no_applicable_rule(monkeypatch):
                                WEAPON_DETAIL)
 
     assert fp == ""
-    assert (EQUIP_DETAIL, "recycle_confirm") in wf.clicks
+    assert (CONTROL_SCENE, "confirm") in wf.clicks
     items = wf.output["recycled_items"]
     assert len(items) == 1 and items[0]["stage"] == "scan"
 
@@ -1085,7 +1115,7 @@ def test_scan_custom_scope_protects(monkeypatch):
 
     assert fp   # 保留，正常返回指纹
     assert "recycled_items" not in wf.output
-    assert (EQUIP_DETAIL, "recycle_confirm") not in wf.clicks
+    assert (CONTROL_SCENE, "confirm") not in wf.clicks
 
 
 # 自选词条语义：紫武器带金色数值珍贵词条（首词条≥90%）→
@@ -1107,7 +1137,7 @@ def test_scan_affix_scope_protects_purple_weapon(monkeypatch):
 
     assert fp   # 保留，正常返回指纹
     assert "recycled_items" not in wf.output
-    assert (EQUIP_DETAIL, "recycle_confirm") not in wf.clicks
+    assert (CONTROL_SCENE, "confirm") not in wf.clicks
 
 
 def test_scan_affix_scope_pct_insufficient_recycles(monkeypatch):
@@ -1247,7 +1277,7 @@ def test_tune_recycles_after_hit(monkeypatch):
     assert len(items) == 1 and items[0]["stage"] == "tune"
     # 回收发生在 back 回背包页之后
     assert (wf.clicks.index((TUNE_SCENE, "back"))
-            < wf.clicks.index((EQUIP_DETAIL, "recycle_confirm")))
+            < wf.clicks.index((CONTROL_SCENE, "confirm")))
 
 
 def test_tune_skip_ends_keeps(monkeypatch):
@@ -1304,13 +1334,13 @@ def test_tune_reset_restores_and_retunes(monkeypatch):
     assert "跳过该装备" in reports[0]["stop_reason"]  # 词条满默认
     assert (TUNE_SCENE, "reset_tune") in wf.clicks
     assert (TUNE_SCENE, "reset_confirm") in wf.clicks
-    assert (TUNE_SCENE, "reset_confirm_2") in wf.clicks
+    assert (CONTROL_SCENE, "confirm") in wf.clicks
     assert (TUNE_SCENE, "close_btn") in wf.clicks  # 关闭重置结果弹窗
     assert "recycled_items" not in wf.output
 
 
-def test_tune_reset_blocked_ocr_zero(monkeypatch):
-    """按钮文本无数字 = 次数用尽 → 不重置，默认转处置忽略不回收"""
+def test_tune_reset_blocked_ocr_unreadable(monkeypatch):
+    """按钮文本无数字 = 识别异常 → 跳过该装备，不重置也不回收"""
     calls = {"n": 0}
 
     def judge(*a, **k):
@@ -1336,8 +1366,11 @@ def test_tune_reset_blocked_ocr_zero(monkeypatch):
     assert reports[0]["status"] == "tuned"
     assert reports[0]["rounds"] == 1
     assert reports[0]["resets"] == 0
-    assert "重置装备" in reports[0]["stop_reason"]   # 命中规则的决策说明
+    # 停止原因换成识别异常本身，而不是命中规则的决策说明——用户要能从报告
+    # 里看出这件是"没看清楚"而不是"规则让它停"。
+    assert "无法识别重置次数" in reports[0]["stop_reason"]
     assert (TUNE_SCENE, "reset_confirm") not in wf.clicks
+    # 关键：识别不出次数绝不能触发回收。
     assert "recycled_items" not in wf.output
 
 
@@ -1374,7 +1407,12 @@ def test_tune_reset_local_cap(monkeypatch):
 
 
 def test_tune_reset_cooldown_check_fails(monkeypatch):
-    """冷却期检查：reset_check 无「可调律重置」→ 点返回回调律页，强制跳过装备"""
+    """冷却期：reset_check 是「6小时32分后可调律重置」→ 退回调律页强制跳过。
+
+    原用例的 docstring 把「可调律重置」当成可重置的标志，实际相反——那正是
+    冷却期文案；可重置文案是「当前装备剩余可重置次数:1」。fixture 也用的是
+    编造的「冷却中」，没有真正验到游戏原文。
+    """
     calls = {"n": 0}
 
     def judge(*a, **k):
@@ -1393,7 +1431,8 @@ def test_tune_reset_cooldown_check_fails(monkeypatch):
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律(3)",
-                               "reset_check": "冷却中"}  # 无「可调律重置」
+                               # 游戏原文
+                               "reset_check": "6小时32分后可调律重置"}
     fp = wf._process_equipment("冷却剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -1428,7 +1467,7 @@ def test_tune_reset_exhausted_recycles(monkeypatch):
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
-                               "tune_tip": "", "reset_tune": "重置调律"}
+                               "tune_tip": "", "reset_tune": "重置调律(0)"}
     fp = wf._process_equipment("用尽剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -1452,7 +1491,7 @@ def test_full_equipment_recycled(monkeypatch):
 
     assert fp == ""
     assert len(wf.full_calls) == 1
-    assert (EQUIP_DETAIL, "recycle_confirm") in wf.clicks
+    assert (CONTROL_SCENE, "confirm") in wf.clicks
     items = wf.output["recycled_items"]
     assert len(items) == 1 and items[0]["stage"] == "scan"
     assert not wf.output.get("tuning_reports")
@@ -1467,7 +1506,7 @@ def test_recycle_locked_equipment(monkeypatch):
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
     # 模拟装备锁定：回收确认弹窗内无「确认」字样
-    wf._ocr_map[EQUIP_DETAIL] = {"recycle_confirm": "装备已锁定"}
+    wf._ocr_map[CONTROL_SCENE] = {"confirm": "装备已锁定"}
     fp = wf._process_equipment("锁定剑", _equip(2), WEAPON_DETAIL)
 
     # 装备被锁定，应返回指纹（保留），不收集 recycled_items
@@ -1475,8 +1514,8 @@ def test_recycle_locked_equipment(monkeypatch):
     # 回收链应停在确认检测：展开「更多」→ 子菜单「回收」，但不应点击确认
     assert wf.clicks.count((EQUIP_DETAIL, "more_func")) >= 1
     assert (EQUIP_DETAIL, "sub_func_1") in wf.clicks
-    # 关键：不应点击 recycle_confirm（因为检测到锁定）
-    assert (EQUIP_DETAIL, "recycle_confirm") not in wf.clicks
+    # 关键：不应点击通用确认按钮（因为检测到锁定）
+    assert (CONTROL_SCENE, "confirm") not in wf.clicks
     # 不应收集回收记录
     assert not wf.output.get("recycled_items")
 
@@ -1488,7 +1527,7 @@ def test_recycle_locked_equipment_not_retried(monkeypatch):
     base = _behavior_base(scan=ScanBehavior(enabled=True,
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
-    wf._ocr_map[EQUIP_DETAIL] = {"recycle_confirm": "装备已锁定"}
+    wf._ocr_map[CONTROL_SCENE] = {"confirm": "装备已锁定"}
     equip = _equip(2, name="锁定剑")
 
     fp1 = wf._process_equipment("锁定剑", equip, WEAPON_DETAIL, row=1, col=2)
@@ -1530,7 +1569,7 @@ def test_locked_block_is_fingerprint_scoped(monkeypatch):
     base = _behavior_base(scan=ScanBehavior(enabled=True,
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
-    wf._ocr_map[EQUIP_DETAIL] = {"recycle_confirm": "装备已锁定"}
+    wf._ocr_map[CONTROL_SCENE] = {"confirm": "装备已锁定"}
     equip = _equip(2, name="同款锁定剑")
 
     wf._process_equipment("同款锁定剑A", equip, WEAPON_DETAIL, row=1, col=2)
@@ -1564,14 +1603,20 @@ def test_materials_block_no_behavior(monkeypatch):
 
 
 def test_reset_remaining_parses():
-    """_reset_remaining：括号/斜杠样式均可解，无数字 = 用尽返 0"""
+    """括号/斜杠样式均可解；明确的 0 与"没读出数字"必须分开。"""
     wf = FakeWF()
     wf._ocr_map[TUNE_SCENE] = {"reset_tune": "重置调律(3)"}
     assert wf.resetter.reset_remaining() == 3
     wf._ocr_map[TUNE_SCENE] = {"reset_tune": "重置调律 2/3"}
     assert wf.resetter.reset_remaining() == 2
-    wf._ocr_map[TUNE_SCENE] = {"reset_tune": "重置调律"}
+    # 明确读到 0 = 无疑义的次数用尽，可以转处置。
+    wf._ocr_map[TUNE_SCENE] = {"reset_tune": "重置调律(0)"}
     assert wf.resetter.reset_remaining() == 0
+    # 没读出数字 = 识别异常，绝不能当成 0。
+    wf._ocr_map[TUNE_SCENE] = {"reset_tune": "重置调律"}
+    assert wf.resetter.reset_remaining() is None
+    wf._ocr_map[TUNE_SCENE] = {"reset_tune": ""}
+    assert wf.resetter.reset_remaining() is None
 
 
 def test_recycle_refill_reprocesses_slot():
@@ -2342,3 +2387,41 @@ class TestWukuPanelEvents:
         wf._process_equipment_once("武库枪", equip, ARMOR_DETAIL)
         assert self._statuses(seen) == ["wuku_bottom"]
         assert wf.slot_level_exhausted
+
+
+def test_food_refund_popup_closed_only_when_detected(patch_worth, monkeypatch):
+    """识别到提示才补关并记返还；没出字就什么都不做。
+
+    只要真的返还，提示区必然出字，所以按识别结果开关即可。这里不做文本
+    区分——两端文案不同（安卓「点击空白区域关闭」/ PC「[space]继续」，其中
+    [space] 基本 OCR 不出），非空即算命中。
+    """
+    base = TuningGroup(materials=MaterialSettings(food_rules=[
+        FoodRule(pct=90, min_expect="excellent", food="金狗粮")]))
+
+    def run(tip: str):
+        wf = _wf_with(base)
+        wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
+                                   "tune_btn": "调律",
+                                   "tune_affix": "最大外功攻击 100",
+                                   "tune_tip": tip}
+        wf._material_infos = {(1, 3): _reference("金狗粮", count=42)}
+        wf._process_equipment("返还剑", _equip(2, quality="gold", cap_pct=95),
+                              WEAPON_DETAIL)
+        return wf, wf.output["tuning_reports"][0]["rounds"]
+
+    # 没出字：每轮只关一次结果弹窗，不补关，也不标返还。
+    wf, rounds = run("")
+    assert rounds == 3
+    assert wf.clicks.count((TUNE_SCENE, "close_btn")) == rounds
+    assert wf.executor.round_food_refunded is False
+
+    # PC 端只认得出「继续」两字，同样算命中：每轮补关一次。
+    wf, rounds = run("继续")
+    assert wf.clicks.count((TUNE_SCENE, "close_btn")) == rounds * 2
+    assert wf.executor.round_food_refunded is True
+
+    # 安卓端文案，不做文本区分，一样命中。
+    wf, rounds = run("点击空白区域关闭")
+    assert wf.clicks.count((TUNE_SCENE, "close_btn")) == rounds * 2
+    assert wf.executor.round_food_refunded is True

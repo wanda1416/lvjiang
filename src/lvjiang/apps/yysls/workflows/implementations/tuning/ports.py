@@ -24,6 +24,8 @@ class RouteHostPort(Protocol):
 
     TUNE_SCENE: str
     EQUIP_DETAIL: str
+    CONTROL_SCENE: str
+
     @property
     def engine(self) -> SubcallEnginePort | None: ...
 
@@ -42,6 +44,13 @@ class RouteHostPort(Protocol):
         min_confidence: float | None = None,
     ) -> str: ...
 
+    def ocr_scene(
+        self,
+        scene_key: str,
+        field_keys: list[str] | None = None,
+        min_confidence: float | None = None,
+    ) -> dict[str, str]: ...
+
     def press(self, key: str, wait: str | None = "step_interval") -> Any: ...
 
 
@@ -51,14 +60,8 @@ class RecycleHostPort(Protocol):
     EQUIP_DETAIL: str
     output: dict
 
-    def ocr_scene(
-        self,
-        scene_key: str,
-        field_keys: list[str] | None = None,
-        min_confidence: float | None = None,
-    ) -> dict[str, str]: ...
-
-    def click_region(self, scene_key: str, field_key: str, **kwargs) -> Any: ...
+    @property
+    def engine(self) -> SubcallEnginePort | None: ...
 
     def wait_stable(self, timeout: float | str) -> Any: ...
 
@@ -67,6 +70,10 @@ class ResetHostPort(Protocol):
     """调律重置用例所需的最小 Workflow 能力。"""
 
     TUNE_SCENE: str
+    CONTROL_SCENE: str
+
+    @property
+    def engine(self) -> SubcallEnginePort | None: ...
 
     def ocr_scene(
         self,

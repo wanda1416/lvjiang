@@ -66,6 +66,14 @@ class TestTuningDocWriter:
         writer.start_run("u", [], ["ring"], {})
         assert "- 开关 " not in _read(writer)
 
+    def test_all_ui_slots_are_summarized_as_all(self, writer):
+        from lvjiang.apps.yysls.config.tune_slots import DEFAULT_SLOTS
+
+        writer.start_run("u", [], list(DEFAULT_SLOTS), {})
+        text = _read(writer)
+        assert "- 调律部位：全部" in text
+        assert "主武器、环" not in text
+
     def test_equipment_section(self, writer):
         equip = {
             "name": "无极棍", "type": "长枪", "level": 125, "quality": "gold",
@@ -191,4 +199,6 @@ class TestRunSummary:
 
     def test_empty_items(self, writer):
         writer.run_summary([])
-        assert "本次无一般及以上成品。" in _read(writer)
+        text = _read(writer)
+        assert "本次无一般及以上成品。" in text
+        assert "TUNING_DATA_JSON" not in text

@@ -30,9 +30,9 @@ class TuningNavigator:
         return self._routes
 
     def load_dependencies(self) -> None:
-        """加载导航所需的 DSL subcall 文件
+        """加载导航和页面公共动作所需的 DSL subcall 文件
 
-        在工作流启动时调用一次，确保后续导航操作能正确执行。
+        在工作流启动时调用一次，确保后续导航和确认操作能正确执行。
         每次运行都重新加载，保证文件修改立即生效。
         """
         self._routes.load_dependencies()

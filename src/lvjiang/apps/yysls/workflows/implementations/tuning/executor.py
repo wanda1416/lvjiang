@@ -327,13 +327,25 @@ class TuningExecutor:
         wf.wait_delay("step_interval")
 
         # 狗粮返还机制：添加过狗粮的轮次，关闭结果弹窗后可能命中概率返还，
-        # 再弹一个无边框弹窗（同样 tune_tip「点击空白区域关闭」）。若不补关，
-        # 它会挡住「一键添加」等后续点击，导致误判无法继续调律。
+        # 再弹一个无边框弹窗。若不补关，它会挡住「一键添加」等后续点击，导致
+        # 误判无法继续调律。
+        #
+        # 只要真的返还，这块提示区必然出字，所以识别到再补关即可，不必无条件点。
+        # 但**不做文本区分**：两端文案不同——安卓是「点击空白区域关闭」，PC 是
+        # 「[space]继续」，其中 [space] 基本 OCR 不出来，只有「继续」两字能认。
+        # 原始文本按 tune_tip=... 打进日志，供排查两端识别差异。
+        #
+        # 「出字」这一个条件同时决定两件事，不能拆开：
+        #   1. 补点一次 close_btn 关掉返还弹窗；
+        #   2. 置 round_food_refunded，调用方据此**跳过**本轮的狗粮缓存 -1
+        #      （auto_tuning：返还时不消耗，相当于把扣掉的那个补回来）。
+        # 也就是说漏识别既会漏关弹窗、又会多扣一次缓存，两个后果同源。
         if food:
             wf.wait_stable("page_refresh")  # 关闭结果弹窗后检查狗粮返还
-            bonus = wf.ocr_scene(wf.RESULT_SCENE, ["tune_tip"])
-            if bonus.get("tune_tip"):
-                logger.info(f"检测到狗粮返还弹窗: {bonus}，补点一次关闭")
+            bonus = wf.ocr_scene(wf.RESULT_SCENE, ["tune_tip"]).get(
+                "tune_tip", "") or ""
+            logger.info(f"狗粮返还检查: tune_tip={bonus!r}")
+            if bonus:
                 wf.click_region(wf.RESULT_SCENE, "close_btn")
                 wf.wait_delay("step_interval")
                 self.round_food_refunded = True  # 标记返还，调用方据此恢复缓存

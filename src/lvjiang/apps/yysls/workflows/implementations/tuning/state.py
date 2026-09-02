@@ -73,6 +73,7 @@ class TuningRunState:
     current_slot: str = ""
     locked_fingerprints: set[str] = field(default_factory=set)
     last_processing_result: EquipmentProcessingResult | None = None
+    end_requested: bool = False
 
     def enter_slot(self, slot: str) -> None:
         """切换部位时清空仅对上一部位有效的锁定指纹。"""

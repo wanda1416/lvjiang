@@ -11,11 +11,10 @@
 """
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from pathlib import Path
 
-from lvjiang.apps.yysls.config.tune_slots import SLOT_LABELS
+from lvjiang.apps.yysls.config.tune_slots import DEFAULT_SLOTS, SLOT_LABELS
 from lvjiang.constants import PROJECT_ROOT
 
 from ....i18n import tr
@@ -51,9 +50,6 @@ class TuningDocWriter:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.path = base / f"调律说明_{username}_{ts}.md"
         self._fh = self.path.open("w", encoding="utf-8")
-        # 结构化数据收集（用于末尾 JSON 数据块）
-        self._json_records: list[dict] = []
-        self._current_json: dict | None = None
 
     # ─── 底层写 ────────────────────────────────────────────
 
@@ -81,7 +77,11 @@ class TuningDocWriter:
         self._write(f"- 启用规则：{rules_text}")
         for name, state in (switches or {}).items():
             self._write(f"- 开关 {name}：{tr('是') if state else tr('否')}")
-        slot_names = "、".join(SLOT_LABELS.get(s, s) for s in slots)
+        slot_names = (
+            tr("全部")
+            if set(slots) == set(DEFAULT_SLOTS)
+            else "、".join(SLOT_LABELS.get(s, s) for s in slots)
+        )
         self._write(f"- 调律部位：{slot_names}")
 
     def start_equipment(self, seq: int, equip: dict):
@@ -101,22 +101,6 @@ class TuningDocWriter:
         for a in affixes:
             assert isinstance(a, dict)
             self._write(f"- {format_affix(a)}")
-        # 收集结构化数据
-        self._current_json = {
-            "name": name, "type": etype,
-            "level": level, "quality": quality_raw,
-            "initial_affixes": [
-                {"name": a.get("name"), "value": a.get("value"),
-                 "unit": a.get("unit") or "",
-                 "cap_pct": a.get("cap_pct")}
-                for a in affixes if isinstance(a, dict)
-            ],
-            "rounds": [],
-            "final_rating": None,
-            "stop_reason": None,
-            "total_rounds": 0,
-            "final_affix_count": len(affixes),
-        }
 
     def worthiness_matched(self, results: dict[str, dict]):
         """符合的规则：只写命中 顶级/优秀 的规则（不写不符合的）
@@ -145,13 +129,6 @@ class TuningDocWriter:
         action = (f"添加 {food} + 一键添加律准石" if food
                   else tr("一键添加律准石"))
         self._write(f"第 {round_no} 轮：{action} → 新词条「{new_affix}」")
-        # 收集结构化数据
-        if self._current_json is not None:
-            self._current_json["rounds"].append({
-                "round": round_no,
-                "food": food or None,
-                "new_affix": new_affix,
-            })
 
     def round_decision(self, text: str):
         """紧随轮次之后的继续/结束判定说明"""
@@ -167,29 +144,16 @@ class TuningDocWriter:
         """本件收尾：最终评级（有效结论，不写"不适用"）+ 小结"""
         self._write()
         lines = []
-        rating_texts = []
         for r in (judgement or {}).values():
             if r.get("not_applicable"):
                 continue
             tag = tr("跳过") if r.get("skipped") else r.get("rating", "")
             detail = "；".join(r.get("reasons") or [])
             lines.append(f"{r['name']}：{tag}（{detail}）")
-            if not r.get("skipped"):
-                rating_texts.append(f"{r['name']}：{tag}")
         final_rating_str = '；'.join(lines) if lines else tr('无有效结论')
         self._write(f"最终评级：{final_rating_str}")
         self._write(f"本件小结：共 {rounds} 轮，词条 {affix_count}/5，"
                     f"结束原因：{stop_reason}")
-        # 收集结构化数据
-        if self._current_json is not None:
-            self._current_json["final_rating"] = (
-                '；'.join(rating_texts) if rating_texts else None
-            )
-            self._current_json["stop_reason"] = stop_reason
-            self._current_json["total_rounds"] = rounds
-            self._current_json["final_affix_count"] = affix_count
-            self._json_records.append(self._current_json)
-            self._current_json = None
 
     def end_run(self, interrupted: bool, tuned_count: int, total_rounds: int):
         """运行结束：结束时间、正常/中断、实际调律件数与总轮数"""
@@ -217,7 +181,6 @@ class TuningDocWriter:
         self._write()
         if not items:
             self._write(tr("本次无一般及以上成品。"))
-            self._write_json_block()
             return
         for i, it in enumerate(items, start=1):
             name = it.get("name") or tr("未知装备")
@@ -237,17 +200,3 @@ class TuningDocWriter:
             self._write(f"   - 首词条：{format_affix(affixes[0])}")
             rest = "、".join(format_affix(a) for a in affixes[1:])
             self._write(f"   - 其余词条：{rest if rest else tr('无')}")
-        # 末尾输出结构化 JSON 数据块
-        self._write_json_block()
-
-    # ─── 结构化数据输出 ────────────────────────────────────
-
-    def _write_json_block(self):
-        """在报告末尾输出 JSON 数据块（HTML 注释包裹，不影响阅读）"""
-        if not self._json_records:
-            return
-        self._write()
-        self._write("<!-- TUNING_DATA_JSON")
-        self._write(json.dumps(
-            self._json_records, ensure_ascii=False, indent=2))
-        self._write("TUNING_DATA_JSON -->")

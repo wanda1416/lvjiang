@@ -13,7 +13,7 @@ regions:
   name: 确认
   type: func
   is_text: true
-  is_clickable: false
+  is_clickable: true
   view: confirm
 - key: cancel
   name: 取消
@@ -23,6 +23,11 @@ regions:
   view: confirm
 - key: close_item
   name: 关闭提示
+  type: func
+  is_text: false
+  is_clickable: true
+- key: blank_area
+  name: 空白区域
   type: func
   is_text: false
   is_clickable: true

@@ -27,11 +27,11 @@ def _make_layout(name: str = "测试布局") -> Layout:
     layout = Layout(name=name)
     layout.canvas = CanvasConfig(x_ratio=0.1, y_ratio=0.2, w_ratio=0.8, h_ratio=0.9)
     layout.set_scene_regions("scene_a", [
-        Region("btn", 0.1, 0.2, 0.3, 0.4),
+        Region("btn", 0.1, 0.2, 0.3, 0.4, activation_key="space"),
         Region("label", 0.5, 0.5, 0.1, 0.1),
     ])
     layout.set_scene_points("scene_a", [
-        Point("origin", 0.4, 0.6),
+        Point("origin", 0.4, 0.6, activation_key="esc"),
     ])
     layout.set_scene_arrows("scene_a", [
         Arrow("fwd", from_key="origin", to_cx_ratio=0.9, to_cy_ratio=0.1),
@@ -58,6 +58,35 @@ def env(tmp_path, monkeypatch):
 
 
 class TestSaveLoadRoundtrip:
+    def test_unbound_disabled_region_omits_meaningless_zero_coordinates(self):
+        placeholder = Region(
+            "exit_to_desktop", 0, 0, 0, 0, disabled=True)
+
+        compact = placeholder.to_dict()
+
+        assert compact == {"key": "exit_to_desktop", "disabled": True}
+        assert Region.from_dict(compact) == placeholder
+
+    def test_disabled_region_with_existing_coordinates_keeps_them(self):
+        placed = Region("close", 0.1, 0.2, 0.3, 0.4, disabled=True)
+
+        saved = placed.to_dict()
+
+        assert saved["x_ratio"] == pytest.approx(0.1)
+        assert Region.from_dict(saved) == placed
+
+    def test_enabled_region_still_requires_coordinates(self):
+        with pytest.raises(KeyError):
+            Region.from_dict({"key": "broken"})
+
+    @pytest.mark.parametrize("item", [
+        Point("point", 0, 0, disabled=True),
+        Panel("panel", 0, 0, 0, 0, disabled=True),
+    ])
+    def test_other_unbound_disabled_items_are_compact(self, item):
+        assert item.to_dict() == {"key": item.key, "disabled": True}
+        assert type(item).from_dict(item.to_dict()) == item
+
     def test_roundtrip_preserves_all_data(self, env):
         mgr = LayoutConfigManager()
         original = _make_layout()
@@ -75,9 +104,11 @@ class TestSaveLoadRoundtrip:
         regions = loaded.get_scene_regions("scene_a")
         assert [r.key for r in regions] == ["btn", "label"]
         assert regions[0].x_ratio == pytest.approx(0.1)
+        assert regions[0].activation_key == "SPACE"
         # points
         points = loaded.get_scene_points("scene_a")
         assert [p.key for p in points] == ["origin"]
+        assert points[0].activation_key == "ESC"
         # arrows
         arrows = loaded.get_scene_arrows("scene_a")
         assert [a.key for a in arrows] == ["fwd"]
@@ -104,6 +135,24 @@ class TestSaveLoadRoundtrip:
         doc = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
         assert "测试布局" in doc["layouts"]
         assert doc["layouts"]["测试布局"]["canvas"]["w_ratio"] == pytest.approx(0.8)
+
+    def test_rejects_invalid_activation_key_before_writing(self, env):
+        mgr = LayoutConfigManager()
+        layout = _make_layout()
+        # 模拟非 UI 调用方绕过 Region 构造期的标准化。
+        layout.get_scene_regions("scene_a")[0].activation_key = "NOT_A_KEY"
+
+        assert mgr.save_layout(layout) is False
+        assert not (env / "system" / "layouts.yaml").exists()
+        assert not (env / "system" / "layouts" / "测试布局").exists()
+
+    def test_rejects_non_string_activation_key_before_writing(self, env):
+        mgr = LayoutConfigManager()
+        layout = _make_layout()
+        layout.get_scene_points("scene_a")[0].activation_key = 3  # type: ignore[assignment]
+
+        assert mgr.save_layout(layout) is False
+        assert not (env / "system" / "layouts.yaml").exists()
 
 
 class TestListLayouts:

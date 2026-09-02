@@ -21,6 +21,7 @@ from ..constants import SESSION_CONFIG_DIR
 from ..i18n import tr
 from .config.resolver import get_resolver
 from .config.session import get_session_store
+from .key_validation import validate_layout_activation_keys
 from .layout_models import CanvasConfig, Layout
 from .scene_registry import (
     get_panel_defs,
@@ -523,9 +524,59 @@ def load_layout_by_name(name: str) -> Layout | None:
                 regions, points, arrows, panels, scene_key,
             )
 
+    _expand_scene_references(regions, points)
+
     return Layout(name=name, desc=desc, canvas=canvas, regions=regions,
                   points=points, arrows=arrows, panels=panels,
                   crop_canvases=crop_canvases, subscene_refs=subscene_refs)
+
+
+def _expand_scene_references(regions: dict, points: dict) -> None:
+    """把场景声明的跨场景 area 引用展开进本场景的坐标表。
+
+    只允许引用一级场景，其实体坐标本就是画布归一化，**原样搬过来即可，
+    零变换**——这正是"只引用一级场景"这条约束换来的简化。
+
+    展开在加载期做而不是查表期做，好处是运行期零改动：``get_scene_regions``
+    仍是纯字典查表，``click [equip_tune_detail].[confirm]`` 自然就通了，
+    click_region / click_any / _validate_refs_bound 一行都不用改。
+
+    展开项带 ``source_scene`` 标记，编辑器据此锁死、保存路径据此过滤。
+    """
+    from dataclasses import replace as _replace
+
+    from .scene_registry import get_registry
+
+    try:
+        scenes = get_registry().all_scenes()
+    except Exception as exc:  # noqa: BLE001 — 注册表异常不能让布局加载失败
+        logger.warning(f"跨场景引用展开跳过（场景注册表不可用）: {exc}")
+        return
+
+    for scene_key, scene in scenes.items():
+        for ref in getattr(scene, "references", ()):
+            for table in (regions, points):
+                source = next(
+                    (item for item in table.get(ref.scene, [])
+                     if item.key == ref.entity), None)
+                if source is None:
+                    continue
+                target = table.setdefault(scene_key, [])
+                if any(item.key == ref.entity for item in target):
+                    # 场景加载期的 key 去重本应拦下同名，走到这里说明配置被
+                    # 绕过了。宁可不展开也不覆盖——覆盖等于让运行期点到另一
+                    # 个位置，而且完全静默。
+                    logger.error(
+                        f"跨场景引用 {scene_key}.{ref.entity} 与本场景已有定义"
+                        f"同名，已跳过展开")
+                else:
+                    target.append(_replace(source, source_scene=ref.scene))
+                break
+            else:
+                # 源场景在当前布局里没给这个实体标坐标，跑到它就会失败。
+                logger.warning(
+                    f"跨场景引用 {scene_key}.{ref.entity} 在本布局中无坐标"
+                    f"（源场景 {ref.scene} 未绑定）")
 
 
 # ─── 布局配置管理器 ──────────────────────────────────────
@@ -665,6 +716,14 @@ class LayoutConfigManager:
         scene 文件写入根布局目录（别名自身不维护 scene）。
         extends 条目非法（目标缺失/多级继承）时拒绝写盘。
         """
+        # 持久化入口做最终门禁：UI 表单会实时校验，但导入、
+        # 测试替身或其他调用方仍可能构造出非法的内存布局。
+        try:
+            validate_layout_activation_keys(layout)
+        except ValueError as exc:
+            logger.error(f"布局 [{layout.name}] 按键校验失败，拒绝保存：{exc}")
+            return False
+
         resolver = get_resolver()
 
         # 1. 校验 extends 合法性（与加载侧对称：目标缺失/多级继承拒绝写盘）
@@ -701,9 +760,13 @@ class LayoutConfigManager:
             entry: dict = {}
             # 按场景定义顺序排序 regions/points/panels，避免编辑顺序影响输出
             region_order = {r.key: i for i, r in enumerate(get_region_defs(sk))}
-            regions = layout.regions.get(sk) or []
+            # 引用项属于源场景，写回就烘死成拷贝，源场景改坐标不再同步。
+            # Region.to_dict 也剔了 source_scene，这里是第二道闸。
+            regions = [r for r in (layout.regions.get(sk) or [])
+                       if not getattr(r, "source_scene", "")]
             entry["regions"] = [r.to_dict() for r in sorted(regions, key=lambda r: region_order.get(r.key, 999))]
-            pts = layout.points.get(sk) or []
+            pts = [p for p in (layout.points.get(sk) or [])
+                   if not getattr(p, "source_scene", "")]
             if pts:
                 point_order = {p.key: i for i, p in enumerate(get_point_defs(sk))}
                 entry["points"] = [p.to_dict() for p in sorted(pts, key=lambda p: point_order.get(p.key, 999))]

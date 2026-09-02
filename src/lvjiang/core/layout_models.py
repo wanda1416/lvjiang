@@ -7,9 +7,10 @@
 「布局 JSON 中保存的具体坐标值」，由 layout_manager 加载并供引擎运行时使用。
 """
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 
 from .coord_types import CircleCoordRef, RectCoordRef
+from .key_names import normalize_key
 
 
 @dataclass
@@ -62,7 +63,8 @@ class FoundRegion:
 class Region:
     """单个区域实例（归一化坐标）
 
-    仅存储位置数据，名称等元信息通过 key 从场景定义 (RegionDef) 获取。
+    存储布局级位置和可选激活动作，名称等元信息通过 key 从场景定义
+    (RegionDef) 获取。
     disabled 标记该区域在当前布局中不可用，静态检查时视为已绑定。
     """
     key: str
@@ -71,12 +73,37 @@ class Region:
     w_ratio: float
     h_ratio: float
     disabled: bool = False
+    activation_key: str = ""
+    # 跨场景引用来源；非空表示这一项不属于本场景，是加载时从 source_scene
+    # 转读进来的。**绝不能写回布局 JSON**——写回就把引用烘死成拷贝，源场景
+    # 再改坐标也不同步，正好毁掉这个特性的全部意义。to_dict 无条件剔除，
+    # 保存路径另有一道过滤，两处都不能少。
+    source_scene: str = ""
+
+    def __post_init__(self):
+        if self.activation_key:
+            self.activation_key = normalize_key(self.activation_key)
+
+    @property
+    def is_reference(self) -> bool:
+        return bool(self.source_scene)
 
     def to_dict(self) -> dict:
         d = asdict(self)
+        d.pop("source_scene", None)
+        if self.disabled and not any((
+                self.x_ratio, self.y_ratio, self.w_ratio, self.h_ratio)):
+            for key in ("x_ratio", "y_ratio", "w_ratio", "h_ratio"):
+                d.pop(key, None)
         if not d.get("disabled"):
             d.pop("disabled", None)
+        if not d.get("activation_key"):
+            d.pop("activation_key", None)
         return d
+
+    def clone(self) -> "Region":
+        """完整内存副本；不得借用会省略持久化字段的 ``to_dict``。"""
+        return replace(self)
 
     def to_coord_ref(self) -> RectCoordRef:
         """转换为 RectCoordRef（左上角 → 中心点）"""
@@ -86,30 +113,53 @@ class Region:
 
     @staticmethod
     def from_dict(d: dict) -> "Region":
+        disabled = bool(d.get("disabled", False))
         return Region(
             key=d["key"],
-            x_ratio=d["x_ratio"],
-            y_ratio=d["y_ratio"],
-            w_ratio=d["w_ratio"],
-            h_ratio=d["h_ratio"],
-            disabled=d.get("disabled", False),
+            x_ratio=d.get("x_ratio", 0.0) if disabled else d["x_ratio"],
+            y_ratio=d.get("y_ratio", 0.0) if disabled else d["y_ratio"],
+            w_ratio=d.get("w_ratio", 0.0) if disabled else d["w_ratio"],
+            h_ratio=d.get("h_ratio", 0.0) if disabled else d["h_ratio"],
+            disabled=disabled,
+            activation_key=d.get("activation_key", ""),
         )
 
 
 @dataclass
 class Point:
-    """单个坐标点实例（归一化中心 + 半径）"""
+    """单个坐标点实例（归一化中心 + 半径 + 可选激活按键）"""
     key: str
     cx_ratio: float
     cy_ratio: float
     r_ratio: float = 0.015
     disabled: bool = False
+    activation_key: str = ""
+    source_scene: str = ""   # 见 Region.source_scene
+
+    def __post_init__(self):
+        if self.activation_key:
+            self.activation_key = normalize_key(self.activation_key)
+
+    @property
+    def is_reference(self) -> bool:
+        return bool(self.source_scene)
 
     def to_dict(self) -> dict:
         d = asdict(self)
+        d.pop("source_scene", None)
+        if (self.disabled and self.cx_ratio == 0 and self.cy_ratio == 0
+                and self.r_ratio == 0.015):
+            for key in ("cx_ratio", "cy_ratio", "r_ratio"):
+                d.pop(key, None)
         if not d.get("disabled"):
             d.pop("disabled", None)
+        if not d.get("activation_key"):
+            d.pop("activation_key", None)
         return d
+
+    def clone(self) -> "Point":
+        """完整内存副本；保留引用来源和占位坐标。"""
+        return replace(self)
 
     def to_coord_ref(self) -> CircleCoordRef:
         """转换为 CircleCoordRef（已是中心点）"""
@@ -117,12 +167,14 @@ class Point:
 
     @staticmethod
     def from_dict(d: dict) -> "Point":
+        disabled = bool(d.get("disabled", False))
         return Point(
             key=d["key"],
-            cx_ratio=d["cx_ratio"],
-            cy_ratio=d["cy_ratio"],
+            cx_ratio=d.get("cx_ratio", 0.0) if disabled else d["cx_ratio"],
+            cy_ratio=d.get("cy_ratio", 0.0) if disabled else d["cy_ratio"],
             r_ratio=d.get("r_ratio", 0.015),
-            disabled=d.get("disabled", False),
+            disabled=disabled,
+            activation_key=d.get("activation_key", ""),
         )
 
 
@@ -152,6 +204,9 @@ class Arrow:
         if self.disabled:
             d["disabled"] = True
         return d
+
+    def clone(self) -> "Arrow":
+        return replace(self)
 
     @staticmethod
     def from_dict(d: dict) -> "Arrow":
@@ -218,9 +273,24 @@ class Panel:
 
     def to_dict(self) -> dict:
         d = asdict(self)
+        if self.disabled and not any((
+                self.x_ratio, self.y_ratio, self.w_ratio, self.h_ratio)):
+            for key in ("x_ratio", "y_ratio", "w_ratio", "h_ratio"):
+                d.pop(key, None)
+            defaults = {
+                "cols": 6, "rows": 3, "min_visible": 0.95,
+                "calibration": "auto", "scroll_direction": "vertical",
+            }
+            for key, default in defaults.items():
+                if d.get(key) == default:
+                    d.pop(key)
         if not d.get("disabled"):
             d.pop("disabled", None)
         return d
+
+    def clone(self) -> "Panel":
+        """完整内存副本；保留精简序列化会省略的默认参数。"""
+        return replace(self)
 
     def to_coord_ref(self) -> RectCoordRef:
         """转换为 RectCoordRef（左上角 → 中心点）"""
@@ -230,18 +300,19 @@ class Panel:
 
     @staticmethod
     def from_dict(d: dict) -> "Panel":
+        disabled = bool(d.get("disabled", False))
         return Panel(
             key=d["key"],
-            x_ratio=d["x_ratio"],
-            y_ratio=d["y_ratio"],
-            w_ratio=d["w_ratio"],
-            h_ratio=d["h_ratio"],
+            x_ratio=d.get("x_ratio", 0.0) if disabled else d["x_ratio"],
+            y_ratio=d.get("y_ratio", 0.0) if disabled else d["y_ratio"],
+            w_ratio=d.get("w_ratio", 0.0) if disabled else d["w_ratio"],
+            h_ratio=d.get("h_ratio", 0.0) if disabled else d["h_ratio"],
             cols=int(d.get("cols", 6)),
             rows=int(d.get("rows", 3)),
             min_visible=float(d.get("min_visible", 0.95)),
             calibration=str(d.get("calibration", "auto")),
             scroll_direction=str(d.get("scroll_direction", "vertical")),
-            disabled=d.get("disabled", False),
+            disabled=disabled,
         )
 
 
@@ -260,6 +331,9 @@ class SubsceneRef:
         if not self.disabled:
             d.pop("disabled", None)
         return d
+
+    def clone(self) -> "SubsceneRef":
+        return replace(self)
 
     def to_coord_ref(self) -> RectCoordRef:
         return RectCoordRef(

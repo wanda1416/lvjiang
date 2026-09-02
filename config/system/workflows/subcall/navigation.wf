@@ -20,7 +20,7 @@ import "subcall/page_detection.wf"
 # 从主界面导航到背包页面
 # 路径：主界面 → 菜单 → 包裹
 # 前置：在主界面或菜单页
-# 后置：在背包页（bag_equip_detail），通过 sub_baoguo 判定当前 tab
+# 后置：在背包页，通过 bag_detail.sub_baoguo 判定当前 tab
 # 返回：1=培养, 2=道具, 3=任务, 4=钱袋；0=已确认在背包页但 tab 未识别；-1=失败
 
 def nav_main_to_bag()
@@ -56,7 +56,7 @@ def nav_main_to_bag()
     end
 
     # 通过 sub_baoguo 判定当前 tab
-    scan [bag_equip_detail].[sub_baoguo] as $tab_text
+    scan [bag_detail].[sub_baoguo] as $tab_text
     eval $tab = 0
     if $tab_text.sub_baoguo contains "培养"
         eval $tab = 1
@@ -73,7 +73,7 @@ def nav_main_to_bag()
 
     if $tab == 0
         # tab 未识别，通过 zhengli 区域二次确认是否在背包页
-        scan [bag_equip_detail].[zhengli] as $zhengli_text
+        scan [bag_detail].[zhengli] as $zhengli_text
         if $zhengli_text.zhengli contains "整理"
             log info "通过整理按钮确认在背包页"
         else
@@ -100,7 +100,7 @@ def nav_main_to_equip()
     # 不在培养 tab 则点击切换
     if $tab != 1
         log info "从包裹页切换到培养页"
-        click [bag_equip_detail].[peiyang] after wait @page_refresh
+        click [bag_detail].[peiyang] after wait @page_refresh
     end
     # 幂等点击，没必要额外判断
     click [bag_equip_detail].[sub_equip] after wait @step_interval
@@ -132,14 +132,14 @@ def nav_main_to_wallet()
     # 不在钱袋 tab 则点击切换
     if $tab != 4
         log info "从包裹页切换到钱袋页"
-        click [bag_equip_detail].[qiandai] after wait @page_refresh
+        click [bag_detail].[qiandai] after wait @page_refresh
     end
 
     # 校验是否到达钱袋页
-    scan [bag_equip_detail].[sub_baoguo] as $wallet_check by contains "钱袋"
+    scan [bag_detail].[sub_baoguo] as $wallet_check by contains "钱袋"
     if not $wallet_check
         eval pause("未进入钱袋页面，请手动导航后点击继续")
-        scan [bag_equip_detail].[sub_baoguo] as $wallet_check by contains "钱袋"
+        scan [bag_detail].[sub_baoguo] as $wallet_check by contains "钱袋"
         if not $wallet_check
             return -1
         end
@@ -163,12 +163,12 @@ def nav_main_to_item()
     # 不在道具 tab 则点击切换
     if $tab != 2
         log info "从包裹页切换到道具页"
-        click [bag_equip_detail].[item] after wait @page_refresh
+        click [bag_detail].[item] after wait @page_refresh
     end
 
     # 道具识别错误率较高，暂时注释掉
     # 校验是否到达道具页
-    #scan [bag_equip_detail].[sub_baoguo] as $item_check by contains "道具"
+    #scan [bag_detail].[sub_baoguo] as $item_check by contains "道具"
     #if not $item_check
     #    eval pause("未进入道具页面，请手动导航后点击继续")
     #end
@@ -189,11 +189,7 @@ def nav_main_to_menu()
     if $in_menu
         return 0
     end
-    if env("android")
-        click [game_main_page].[menu] after wait @page_refresh
-    else
-        press "ESC" after wait @page_refresh
-    end
+    click [game_main_page].[menu] after wait @page_refresh
     call $in_menu = is_in_menu_page()
     if not $in_menu
         eval pause("未进入菜单页面，请手动导航后点击继续")
@@ -241,21 +237,15 @@ end
 # ─── nav_back_to_main ─────────────────────────────────────
 # 从背包装备页返回主界面
 # 检测式返回：循环检测是否在背包页，点击返回直到离开背包页，再从菜单页返回主界面
-# 前置：在背包页（bag_equip_detail 场景内）
+# 前置：在背包页（公共 bag_detail 场景内）
 # 后置：在主界面
 
 def nav_back_to_main()
-    eval $is_android = env("android")
-
     eval $tries = 0
     loop while $tries < 3
         call $in_bag = is_in_bag_page()
         if $in_bag
-            if $is_android
-                click [bag_equip_detail].[back] after wait @step_interval
-            else
-                press "ESC" after wait @step_interval
-            end
+            click [bag_detail].[back] after wait @step_interval
         else
             break
         end
@@ -264,11 +254,7 @@ def nav_back_to_main()
 
     call $in_menu = is_in_menu_page()
     if $in_menu
-        if $is_android
-            click [game_menu_page].[back] after wait @step_interval
-        else
-            press "ESC" after wait @step_interval
-        end
+        click [game_menu_page].[back] after wait @step_interval
     end
 
     call $in_main = is_in_main_page()

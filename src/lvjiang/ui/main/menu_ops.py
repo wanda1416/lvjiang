@@ -17,6 +17,7 @@ from collections.abc import Callable
 from typing import cast
 
 from loguru import logger
+from PyQt6 import sip
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QDialog, QMessageBox, QToolButton, QWidget
@@ -52,8 +53,12 @@ class MenuOpsMixin:
         if opening is None:
             opening = set()
             self._modeless_tool_opening = opening
-
         existing = windows.get(key)
+        if existing is not None and sip.isdeleted(existing):
+            # 某些对话框接受 closeEvent 后会由 WA_DeleteOnClose 直接销毁，
+            # 不一定经过 QDialog.finished；旧包装对象绝不能继续调用 Qt API。
+            windows.pop(key, None)
+            existing = None
         if existing is not None:
             if existing.isMinimized():
                 existing.showNormal()
@@ -75,26 +80,36 @@ class MenuOpsMixin:
         finally:
             opening.discard(key)
 
-        finalized = False
+        callback_called = False
 
-        def release(*_args) -> None:
-            nonlocal finalized
-            if finalized:
-                return
-            finalized = True
+        def forget(*_args) -> None:
             if windows.get(key) is dialog:
                 windows.pop(key, None)
+
+        def finish(*_args) -> None:
+            nonlocal callback_called
+            forget()
+            if callback_called:
+                return
+            callback_called = True
             if on_finished is not None:
                 on_finished(dialog)
 
-        dialog.finished.connect(release)
+        # 正常结束时立即释放；覆写 closeEvent 而不发 finished 的窗口由
+        # 下次访问前的 sip.isdeleted 检查惰性清理。不要连接 destroyed：
+        # C++ 析构期间回调 Python 在部分 PyQt6 版本中可能触发原生崩溃。
+        dialog.finished.connect(finish)
         dialog.show()
         return dialog
 
     def _close_modeless_tools(self) -> bool:
         """关闭全部非模态工具；任一窗口拒绝关闭时返回 False。"""
         windows = getattr(self, "_modeless_tool_windows", {})
-        for dialog in list(windows.values()):
+        for key, dialog in list(windows.items()):
+            if sip.isdeleted(dialog):
+                if windows.get(key) is dialog:
+                    windows.pop(key, None)
+                continue
             if dialog.isVisible():
                 dialog.close()
                 if dialog.isVisible():

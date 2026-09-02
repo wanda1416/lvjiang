@@ -259,11 +259,12 @@ class GenericTuningJudge(TuningJudge):
         _grade 判垃圾），其余空槽按候选价值序填满（候选耗尽则留空）。
 
         模拟转律：没有已转律词条时，可从全部非首词条中选择转出槽；已有
-        转律词条时，非承音装备由当前等级的无限转律能力决定；承音装备则要求
-        名称识别出的原始等级同时允许无限转律和承音后转律。再次转律的槽位
-        固定为已转律槽。对每个合法转出槽穷举转律词条库中的全部合法结果，
-        取最终评级上限。填充与转律后均复用 _grade（与完整定级同一套条件
-        求值）。config.can_transmute=false 可显式关闭整个模拟。
+        转律词条时，非承音装备由当前等级的无限转律能力决定；承音装备则只看
+        名称识别出的原始等级是否同时允许无限转律和承音后转律，刻意不读取
+        当前等级的能力。再次转律的槽位固定为已转律槽。对每个合法转出槽穷举
+        转律词条库中的全部合法结果，取最终评级上限。填充与转律后均复用
+        _grade（与完整定级同一套条件求值）。config.can_transmute=false
+        可显式关闭整个模拟。
         """
         from ...config import get_game_config
         gc = get_game_config()
@@ -344,8 +345,9 @@ class GenericTuningJudge(TuningJudge):
             ]
             is_retransfer = bool(transferred)
             if is_retransfer:
-                level_cfg = gc.level_config_for(result.equipment.level or 0)
                 if result.equipment.is_chengyin:
+                    # 承音后的当前等级不能代表装备来源；是否还能转律只由
+                    # 名称等阶识别出的原始等级及其专用开关决定。
                     original_cfg = gc.level_config_for(
                         result.equipment.original_level)
                     can_retransfer = bool(
@@ -354,6 +356,8 @@ class GenericTuningJudge(TuningJudge):
                         and original_cfg.allow_retransfer_after_chengyin
                     )
                 else:
+                    level_cfg = gc.level_config_for(
+                        result.equipment.level or 0)
                     can_retransfer = bool(
                         level_cfg is not None and level_cfg.allow_retransfer)
                 candidate_indices = transferred if can_retransfer else []

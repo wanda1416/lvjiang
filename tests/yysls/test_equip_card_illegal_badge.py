@@ -233,9 +233,11 @@ class TestContextMenuNonBlocking:
 def test_equipment_properties_show_source_fp_and_empty_missing_times():
     equip = _equip()
     equip["_fp"] = "abc123"
+    equip["original_level"] = 105
     assert _equipment_properties_text(equip).splitlines() == [
         "来源：扫描",
         "指纹：abc123",
+        "原始等级：105",
         "创建时间：",
         "更新时间：",
     ]
@@ -245,6 +247,7 @@ def test_equipment_properties_show_mock_and_formatted_times():
     equip = _equip()
     equip.update({
         "_fp": "mock_abc123",
+        "original_level": 110,
         "created_at": "2026-09-01T01:02:03",
         "updated_at": "2026-09-02T04:05:06",
     })
@@ -252,6 +255,7 @@ def test_equipment_properties_show_mock_and_formatted_times():
     assert _equipment_properties_text(equip).splitlines() == [
         "来源：模拟",
         "指纹：mock_abc123",
+        "原始等级：110",
         "创建时间：2026-09-01 01:02:03",
         "更新时间：2026-09-02 04:05:06",
     ]
@@ -273,6 +277,7 @@ def test_equipment_properties_use_plain_selectable_dialog(qtbot, monkeypatch):
     text = dialog.findChild(QLabel, "equipmentPropertiesText")
     assert text is not None
     assert "指纹：abc123" in text.text()
+    assert "原始等级：0" in text.text()
     assert text.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
 
 

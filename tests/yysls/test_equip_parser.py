@@ -10,6 +10,7 @@
 
 import pytest
 
+from lvjiang.apps.yysls.core.equip_parser.models import EquipmentData
 from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
 from lvjiang.apps.yysls.core.equip_validator import (
     ILLEGAL_KEY,
@@ -109,6 +110,29 @@ class TestParseEquipLevel:
 
     def test_chengyin_without_level(self, parser):
         assert parser._parse_equip_level("承音") == (0, True)
+
+
+class TestOriginalLevel:
+    @pytest.mark.parametrize("raw,expected", [
+        ("流星云珑 | 环", 110),
+        ("吴钩霜甲 | 胸甲", 110),
+        ("踏雪含光 | 武器·剑", 105),
+        ("雁南飞冠 | 冠胄", 105),
+        ("未知冠 | 冠胄", 0),
+    ])
+    def test_parse_original_level_from_tier_name_only(
+            self, parser, raw, expected):
+        equip = parser.parse({"equip_type": raw, "equip_level": "110阶"})
+        assert equip.original_level == expected
+
+    def test_original_level_roundtrip_and_legacy_backfill(self):
+        equip = EquipmentData(name="流星云珑", original_level=110)
+        restored = EquipmentData.from_dict(equip.to_dict(include_fp=False))
+        assert restored.original_level == 110
+
+        legacy = equip.to_dict(include_fp=False)
+        legacy.pop("original_level")
+        assert EquipmentData.from_dict(legacy).original_level == 110
 
 
 # ─── base_attr 解析 ────────────────────────────────────────

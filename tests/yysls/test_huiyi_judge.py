@@ -234,6 +234,49 @@ class TestTransmuteSimulation:
         assert result.rating == Rating.EXCELLENT
         assert "最小外功攻击 再次转律为 势" in "；".join(result.reasons)
 
+    @pytest.mark.parametrize("name", ["流星云珑", "吴钩霜甲"])
+    def test_native_level_110_chengyin_can_retransfer(self, judge, name):
+        """原生 110 级装备承音后仍可在固定槽上无限转律。"""
+        equip = self._full_crown()
+        equip.name = name
+        equip.level = 110
+        equip.original_level = 110
+        equip.is_chengyin = True
+        equip.affixes[3].is_transferred = True
+
+        result = judge.check_tuning_worthiness(equip)
+
+        assert result.rating == Rating.EXCELLENT
+        assert "最小外功攻击 再次转律为 势" in "；".join(result.reasons)
+
+    def test_native_level_110_chengyin_without_transfer_uses_slots_2_to_5(
+            self, judge):
+        """承音不妨碍尚未转律的原生 110 装备执行首次转律模拟。"""
+        equip = self._full_crown()
+        equip.name = "吴钩霜甲"
+        equip.level = 110
+        equip.original_level = 110
+        equip.is_chengyin = True
+
+        result = judge.check_tuning_worthiness(equip)
+
+        assert result.rating == Rating.EXCELLENT
+        assert "最小外功攻击 转律为 势" in "；".join(result.reasons)
+
+    def test_chengyin_retransfer_requires_known_native_level(self, judge):
+        """当前等级为 110 不能代替名称等阶识别出的原始等级。"""
+        equip = self._full_crown()
+        equip.name = "未知装备"
+        equip.level = 110
+        equip.original_level = 0
+        equip.is_chengyin = True
+        equip.affixes[3].is_transferred = True
+
+        result = judge.check_tuning_worthiness(equip)
+
+        assert result.rating == Rating.JUNK
+        assert "再次转律为" not in "；".join(result.reasons)
+
     @pytest.mark.parametrize("level,is_chengyin", [
         (100, False),
         (105, True),

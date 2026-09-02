@@ -1117,6 +1117,7 @@ level_configs:
   allow_reset: true
   allow_chengyin: true
   allow_retransfer: true
+  allow_retransfer_after_chengyin: true
   min_material_count: 2
   judge_resistance: 145
   buff_resistance: 15

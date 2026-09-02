@@ -375,6 +375,8 @@ class GameConfigManager:
                 allow_chengyin=bool(item.get("allow_chengyin", level >= 91)),
                 allow_retransfer=bool(
                     item.get("allow_retransfer", level >= 105)),
+                allow_retransfer_after_chengyin=bool(
+                    item.get("allow_retransfer_after_chengyin", False)),
                 min_material_count=item.get("min_material_count"),
                 judge_resistance=item.get("judge_resistance"),
                 buff_resistance=item.get("buff_resistance"),
@@ -665,8 +667,29 @@ class GameConfigManager:
         return types.pop() if len(types) == 1 else None
 
     def get_equipment_name_series(self, group: str) -> dict[int, str]:
-        """等阶名称配置；仅用于名称合法性佐证，不参与等级推断。"""
+        """取得指定输出/防具分组的等阶名称配置。"""
         return dict(self._equipment_name_series.get(group, {}))
+
+    def infer_original_equipment_level(self, equipment_name: str | None) -> int:
+        """仅按装备名称开头的等阶名称推断原始等级，无法唯一匹配时返回 0。
+
+        承音不会改变等阶名称，因此这里刻意不参考当前等级、基础属性或部位；
+        最长前缀优先，相同前缀若配置到了不同等级则视为歧义。
+        """
+        name = str(equipment_name or "").strip()
+        if not name:
+            return 0
+        matches: list[tuple[int, int]] = []
+        for series in self._equipment_name_series.values():
+            for level, tier_name in series.items():
+                tier = str(tier_name or "").strip()
+                if tier and name.startswith(tier):
+                    matches.append((len(tier), int(level)))
+        if not matches:
+            return 0
+        longest = max(length for length, _level in matches)
+        levels = {level for length, level in matches if length == longest}
+        return levels.pop() if len(levels) == 1 else 0
 
     def get_wuxue_affix_names(self) -> list[str]:
         """全部指定武学增效词条（affix_caps 这类别的 _aliases）

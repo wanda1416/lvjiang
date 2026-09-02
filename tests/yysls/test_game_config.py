@@ -47,6 +47,8 @@ class TestResolveAffixCategory:
         assert not levels[100].allow_retransfer
         assert levels[105].allow_chengyin
         assert levels[105].allow_retransfer
+        assert not levels[105].allow_retransfer_after_chengyin
+        assert levels[110].allow_retransfer_after_chengyin
 
     def test_legacy_level_config_gets_capability_defaults(self, tmp_path):
         path = tmp_path / "game_config.yaml"
@@ -68,6 +70,20 @@ class TestResolveAffixCategory:
         assert not levels[91].allow_retransfer
         assert levels[105].allow_retransfer
         assert not levels[110].allow_retransfer
+        assert not levels[110].allow_retransfer_after_chengyin
+
+    @pytest.mark.parametrize("name,expected", [
+        ("流星云珑", 110),
+        ("吴钩霜甲", 110),
+        ("踏雪含光", 105),
+        ("雁南飞冠", 105),
+        ("承音 | 110阶", 0),
+        ("未知装备", 0),
+        (None, 0),
+    ])
+    def test_original_level_is_inferred_only_from_tier_name(
+            self, mgr, name, expected):
+        assert mgr.infer_original_equipment_level(name) == expected
 
     def test_get_aliases_for_category(self, mgr):
         aliases = mgr.get_aliases_for_category("外功攻击")

@@ -52,6 +52,9 @@ class EquipmentParser:
         category = infer_category(equip_type)
 
         equip = EquipmentData(type=equip_type, name=name)
+        # 原始等级只能由名称中的等阶名称确定；承音后的当前等级和基础属性
+        # 都不得参与反推。无法匹配时保持 0（未知）。
+        equip.original_level = self._attr_config.infer_original_equipment_level(name)
 
         # equip_level → level + is_chengyin
         equip.level, equip.is_chengyin = self._parse_equip_level(

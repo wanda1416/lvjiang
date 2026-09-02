@@ -13,7 +13,7 @@
     }
 
 输出格式（标准装备领域模型）：
-    EquipmentData(slot, type, name, level, quality, is_chengyin,
+    EquipmentData(type, name, level, original_level, quality, is_chengyin,
                   base_attr, base_attr_2, affixes, warnings)
 """
 

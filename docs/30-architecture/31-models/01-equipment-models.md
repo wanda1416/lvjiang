@@ -15,6 +15,7 @@
   "slot": "main_weapon",
   "type": "剑",
   "level": 110,
+  "original_level": 110,
   "quality": "gold",
   "is_chengyin": true,
   "base_attr": { "name": "外功攻击", "value": [100, 232] },
@@ -66,12 +67,16 @@
 | 舞绫鼓 | 牵丝·翊 |
 | 扇 | 牵丝·翊 |
 
-### 2.3 装备等阶 `level` + `is_chengyin`
+### 2.3 装备等阶 `level` + `original_level` + `is_chengyin`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `level` | int | 装备等阶数字（如 96、100、105、110） |
+| `original_level` | int | 原始等级；仅按名称开头的等阶名称识别，无法匹配为 0 |
 | `is_chengyin` | bool | 是否为承音装备 |
+
+`level` 是当前显示等级，可能受承音影响；`original_level` 不得用当前等级或基础
+属性反推。系统配置中，输出装备的“流星”和防具的“吴钩”均识别为原始 110 级。
 
 ### 2.4 装备品阶 `quality`
 
@@ -345,6 +350,7 @@ _fp = MD5(拼接字符串)[:8]   # 取前 8 位十六进制字符
 |------|------|------|
 | `type` | ✓ | 装备类型（如 "剑""环"） |
 | `level` | ✓ | 等级（如 110） |
+| `original_level` | ✗ | 可由名称等阶重新识别，不参与实体指纹 |
 | `quality` | ✓ | 品阶（"gold""purple"） |
 | `is_chengyin` | ✓ | 是否承音（True/False） |
 | `affix_1` ~ `affix_5` | ✓ | 每条词条的 `name:value` |

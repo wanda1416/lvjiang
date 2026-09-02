@@ -109,14 +109,18 @@ class TestLevelConfig:
         row_91 = self._row_for_level(panel, 91)
         row_100 = self._row_for_level(panel, 100)
         row_105 = self._row_for_level(panel, 105)
+        row_110 = self._row_for_level(panel, 110)
 
         assert self._checked(panel, row_91, 3)
         assert not self._checked(panel, row_100, 4)
         assert self._checked(panel, row_105, 3)
         assert self._checked(panel, row_105, 4)
+        assert not self._checked(panel, row_105, 5)
+        assert self._checked(panel, row_110, 5)
         values = {item["level"]: item for item in panel._configs_raw()}
         assert values[91]["allow_chengyin"] is True
         assert values[105]["allow_retransfer"] is True
+        assert values[110]["allow_retransfer_after_chengyin"] is True
 
 
 # ─── 武器类型增删往返 ──────────────────────────────────────

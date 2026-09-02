@@ -103,6 +103,7 @@ class _SearchWorker(QRunnable):
         full_chengyin: bool = False,
         full_dingyin: bool = False,
         full_level: int = 0,
+        playstyle: str = "",
     ) -> None:
         super().__init__()
         self.candidates = candidates
@@ -113,6 +114,7 @@ class _SearchWorker(QRunnable):
         self.full_chengyin = full_chengyin
         self.full_dingyin = full_dingyin
         self.full_level = full_level
+        self.playstyle = playstyle
         self.signals = _SearchSignals()
         self._cancel_event = threading.Event()
         # 进度计数器（线程安全，由 GIL 保证）
@@ -142,6 +144,7 @@ class _SearchWorker(QRunnable):
                 full_chengyin=self.full_chengyin,
                 full_dingyin=self.full_dingyin,
                 full_level=self.full_level,
+                playstyle=self.playstyle,
                 progress_counter=self,
             )
             self.signals.finished.emit(results)
@@ -937,6 +940,8 @@ class OptimalComboDialog(QDialog):
             else:
                 configs = gc.get_level_configs()
                 full_level = configs[-1].level if configs else 0
+        tuning_data = self._combo_tuning.currentData()
+        playstyle = tuning_data[1] if tuning_data else ""
         self._worker = _SearchWorker(
             candidates,
             self._school,
@@ -946,6 +951,7 @@ class OptimalComboDialog(QDialog):
             full_chengyin=self._chk_full_chengyin.isChecked(),
             full_dingyin=self._chk_full_dingyin.isChecked(),
             full_level=full_level,
+            playstyle=playstyle,
         )
         # 使用 QueuedConnection 确保 slot 在 UI 线程执行
         # （signal 从后台线程 emit，但 _SearchSignals 的线程亲和性是 UI 线程）

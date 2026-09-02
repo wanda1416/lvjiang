@@ -4,11 +4,14 @@
 """
 from __future__ import annotations
 
+from datetime import datetime
 from functools import partial
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPainter, QPaintEvent
 from PyQt6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -19,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ......i18n import tr
+from ......ui.button_styles import apply_dialog_button_box_style
 from ....core.equip_parser.dingyin_parser import (
     DINGYIN_NOTICE_KEY,
     is_zhige_dingyin,
@@ -155,6 +159,65 @@ def _show_illegal_reasons(parent, reasons: list[str]) -> None:
            "通常是识别误读，请手工校正：") + "\n\n"
         + "\n".join(f"· {r}" for r in reasons),
     )
+
+
+def _format_equipment_time(value) -> str:
+    """ISO 时间转本地可读文本；无数据保持空，绝不使用 epoch 默认值。"""
+    if not isinstance(value, str) or not value.strip():
+        return ""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return value
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone()
+    return parsed.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _equipment_properties_text(equip: dict) -> str:
+    """构建所有装备卡片共用的属性文本。"""
+    is_mock = bool((equip.get("_extra") or {}).get("is_mock"))
+    source = tr("模拟") if is_mock else tr("扫描")
+    return "\n".join((
+        f"{tr('来源')}：{source}",
+        f"{tr('指纹')}：{equip.get('_fp') or ''}",
+        f"{tr('创建时间')}：{_format_equipment_time(equip.get('created_at'))}",
+        f"{tr('更新时间')}：{_format_equipment_time(equip.get('updated_at'))}",
+    ))
+
+
+class _EquipmentPropertiesDialog(QDialog):
+    """不触发系统消息提示音的装备属性只读对话框。"""
+
+    def __init__(self, equip: dict, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setObjectName("equipmentPropertiesDialog")
+        self.setWindowTitle(tr("装备属性"))
+        self.setMinimumWidth(420)
+
+        layout = QVBoxLayout(self)
+        properties = QLabel(_equipment_properties_text(equip))
+        properties.setObjectName("equipmentPropertiesText")
+        properties.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        properties.setWordWrap(True)
+        layout.addWidget(properties)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        apply_dialog_button_box_style(buttons)
+        close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
+        if close_button is not None:
+            close_button.setText(tr("关闭"))
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+
+def _show_equipment_properties(parent, equip: dict) -> None:
+    try:
+        parent.isVisible()
+    except (AttributeError, RuntimeError):
+        parent = None
+    _EquipmentPropertiesDialog(equip, parent).exec()
 
 
 class _IllegalBadge(QLabel):
@@ -380,6 +443,7 @@ class _SlotCard(QFrame):
             edit_action = menu.addAction(tr("编辑"))
         copy_action = menu.addAction(tr("复制"))
         copy_action.setToolTip(tr("复制装备数据到创建对话框"))
+        properties_action = menu.addAction(tr("属性"))
         action = menu.exec(event.globalPos())
         if action == unequip_action:
             parent = self.parent()
@@ -399,6 +463,8 @@ class _SlotCard(QFrame):
                 parent = parent.parent()
             if parent:
                 parent._on_copy_requested(self._equip_data, self._equip_data.get("_extra", {}).get("group_key", ""))
+        elif action == properties_action:
+            _show_equipment_properties(self.window(), self._equip_data)
         event.accept()
 
     # ── 数据填充 ──
@@ -679,12 +745,20 @@ class _CompactEquipCard(QFrame):
             action.setToolTip(tip)
             action.triggered.connect(
                 partial(self._emit_menu_action, signal, data, group))
+        properties_action = menu.addAction(tr("属性"))
+        properties_action.setToolTip(tr("查看装备来源、指纹和时间"))
+        properties_action.triggered.connect(
+            partial(self._show_properties, self.window(), data))
         menu.popup(global_pos)
 
     @staticmethod
     def _emit_menu_action(signal, data, group, _checked=False) -> None:
         """菜单动作统一出口（triggered 会多传一个 checked 参数）。"""
         signal.emit(data, group)
+
+    @staticmethod
+    def _show_properties(parent, data, _checked=False) -> None:
+        _show_equipment_properties(parent, data)
 
     def set_equip(
         self, equip_data: dict, part_label: str,

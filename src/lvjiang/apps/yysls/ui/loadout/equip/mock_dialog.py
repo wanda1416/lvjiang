@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ......i18n import tr
+from ......ui.button_styles import apply_dialog_button_box_style
 
 # 部位 → group_key 映射
 _PART_TO_GROUP = {
@@ -453,6 +454,7 @@ class MockEquipDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
         )
+        apply_dialog_button_box_style(buttons)
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)

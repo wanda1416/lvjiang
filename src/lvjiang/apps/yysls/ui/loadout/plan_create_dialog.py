@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
+from .....ui.button_styles import apply_dialog_button_box_style
 from ...core.loadout import resolve_school
 
 
@@ -42,6 +43,7 @@ class PlanCreateDialog(QDialog):
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)
+        apply_dialog_button_box_style(buttons)
         buttons.accepted.connect(self._validate_and_accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)

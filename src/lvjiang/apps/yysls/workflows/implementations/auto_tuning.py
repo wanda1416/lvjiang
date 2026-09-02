@@ -46,7 +46,6 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     RATING_RANK,
     get_tune_config,
 )
-from lvjiang.apps.yysls.telemetry import probe as telemetry_probe
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL,
     TRAVERSALS,
@@ -98,6 +97,10 @@ def _best_rating(judgement: dict | None) -> str | None:
 class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     """自动调律工作流"""
 
+    # 调律结果由历史记录和专用报告承载；无论正常结束还是异常退出，均不在
+    # 控制台倾倒可能长达数千行的 tuning_reports JSON。
+    LOG_PARTIAL_OUTPUT_ON_FAILURE = False
+
     # 脚本元数据（供发现层暴露到日常下拉与设备端悬浮面板）。
     # 暂不定义 PARAMETERS：本流程的配置面（部位多选 + 每规则玩法多选 + 全局开关）
     # 超出现有 select/number 参数 schema 的表达力，设备端先按内置默认配置运行
@@ -115,7 +118,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     GROUPED_SLOTS = {"main_weapon", "sub_weapon"}
     WEAPON_DETAIL = "equip_weapon_detail"
     ARMOR_DETAIL = "equip_armor_detail"
-    EQUIP_DETAIL = "equip_detail"  # 通用交互区域（more_func/sub_func_*/recycle_*）
+    EQUIP_DETAIL = "equip_detail"  # 装备详情通用交互区域（more_func/sub_func_*）
+    CONTROL_SCENE = "general_control"  # 标准确认/取消弹窗
 
     SCAN_FIELDS = [
         "equip_type", "equip_level", "base_attr",
@@ -150,6 +154,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     _route_strategy: TuningRouteStrategy | None = None
     _run_state: TuningRunState | None = None
     _equipment_session: EquipmentSession | None = None
+    _history_session = None
+    _history_markdown_path: str = ""
 
     @property
     def run_state(self) -> TuningRunState:
@@ -207,7 +213,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         return self._recorder
 
     def _emit_progress(self, signal_name: str, *args):
-        """经 engine 向 UI 发送进度信号；异常时静默跳过（测试/设备端兼容）"""
+        """先归档统一领域事件，再经 engine 向 UI 发送进度信号。"""
+        history = getattr(self, "_history_session", None)
+        if history is not None:
+            history.consume(signal_name, *args)
         try:
             hub = getattr(self.engine, '_progress_hub', None) if self.engine else None
             if hub is not None:
@@ -272,20 +281,29 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if outcome is RecycleOutcome.LOCKED:
             fp = self._make_fingerprint(equip_data.to_dict())
             self.run_state.record_locked(fp)
+        elif outcome is RecycleOutcome.STOPPED:
+            self.run_state.end_requested = True
+            self.output.setdefault("stop_reason", "用户选择结束任务")
         return outcome
 
     # ─── 生命周期 ─────────────────────────────────────────
 
     @property
     def is_stopped(self) -> bool:
-        """停止请求或材料耗尽（大律准石低于基准）都视为停止，
-        背包遍历与部位循环全部收束，复用用户中断的退出路径。
+        """停止请求、手动结束或材料耗尽都视为停止。
+
+        背包遍历与部位循环全部收束；用户在回收异常对话框选择结束时，
+        复用用户中断的结果封存路径。
 
         super().is_stopped 放在前面求值：它内部会先过暂停检查点
         （_wait_if_paused），若放在 or 后面，一旦材料耗尽，短路求值会
         跳过暂停阻塞——用户此时按暂停热键会被静默吞掉，直接当结束处理。
         """
-        return super().is_stopped or self.executor.materials_exhausted
+        return (
+            super().is_stopped
+            or self.executor.materials_exhausted
+            or self.run_state.end_requested
+        )
 
     @property
     def slot_level_exhausted(self) -> bool:
@@ -360,6 +378,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return {"error": msg}
         logger.info(f"基础规则组: {group.name}")
 
+        self._open_history(selected, group)
         self._open_doc(selected)
         try:
             if not self.navigator.navigate_to_equip():
@@ -404,9 +423,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 first_slot = False
 
             # 区分用户中断和材料耗尽：前者保留页面，后者返回主页
-            user_interrupt = (hasattr(self, '_stop_check')
-                             and callable(self._stop_check)
-                             and self._stop_check())
+            user_interrupt = (
+                self.run_state.end_requested
+                or (hasattr(self, '_stop_check')
+                    and callable(self._stop_check)
+                    and self._stop_check())
+            )
             if user_interrupt:
                 # 先封存当前装备、写完 Markdown 调律报告并关闭文件，随后才
                 # 对 UI 宣告流程结束；避免“已结束”时报告仍缺最后一件。
@@ -420,12 +442,21 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                         "affix_count": partial.get("final_affix_count", 0),
                         "final_affixes": partial.get("final_affixes", []),
                         "status": "interrupted",
+                        "tuning_mode": (
+                            self._equipment_session.mode.value
+                            if self._equipment_session else "normal"
+                        ),
+                        "telemetry_stop_reason": "user_stopped",
+                        "telemetry_final_rating": "",
+                        "resets": partial.get("resets", 0),
                     })
                 self.output["tuning_reports"] = list(
                     self.recorder.collect_reports())
                 if "stop_reason" not in self.output:
                     self.output["stop_reason"] = "用户中断"
             self._close_doc()
+            # 历史先完成，主线程收到 tuning_finished 后即可立即刷新列表。
+            self._close_history()
             # 进度信号：整体完成
             self._emit_progress("tuning_finished", {
                 "total_equipment": _slot_idx,
@@ -450,7 +481,63 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                     logger.info("自动调律完成，已返回主页")
         finally:
             self._close_doc()
+            self._close_history()
         return self.output
+
+    # ─── 结构化调律历史 ───────────────────────────────────
+
+    def _open_history(self, slots: list[str], group) -> None:
+        """建立独立历史会话；失败只降级历史功能，不影响主流程。"""
+        self._history_session = None
+        self._history_markdown_path = ""
+        try:
+            from lvjiang.apps.yysls.tuning_history.repository import (
+                TuningHistoryRepository,
+            )
+            from lvjiang.apps.yysls.tuning_history.session import TuningRunSession
+
+            username = (self.engine.run_username if self.engine else "") or "default"
+            rules = [
+                {"key": key, "config": cfg}
+                for key, cfg in (self.ctx.judge_configs or {}).items()
+            ]
+            config = {
+                "base_group": getattr(group, "key", "") or group.name,
+                "base_group_name": group.name,
+                "min_level": self.ctx.min_level,
+                "skip_tuning": self.ctx.skip_tuning,
+            }
+            from lvjiang.apps.yysls.telemetry import vocab
+            config["game_config_customized"] = vocab.game_config_customized()
+            config["season"] = vocab.current_season_number()
+            repo = TuningHistoryRepository(self.ctx.history_db_path)
+            self._history_session = TuningRunSession(
+                repo, username=username, selected_slots=slots,
+                rule_snapshot=rules, config_snapshot=config,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"调律历史初始化失败，本轮不保存历史: {exc}")
+
+    def _close_history(self) -> None:
+        session = getattr(self, "_history_session", None)
+        if session is None:
+            return
+        error = str(self.output.get("error") or "")
+        reason = str(self.output.get("stop_reason") or error)
+        user_interrupt = reason == "用户中断"
+        if error:
+            status = "failed"
+        elif user_interrupt:
+            status = "interrupted"
+        elif self.executor.materials_exhausted:
+            status = "material_exhausted"
+        else:
+            status = "completed"
+        session.finish(
+            status=status, stop_reason=reason,
+            markdown_path=self._history_markdown_path,
+        )
+        self._history_session = None
 
     # ─── 调律说明文档（可交付阅读的叙事输出）──────────────
 
@@ -468,6 +555,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.recorder.set_doc(None)
             return
         self.recorder.set_doc(doc)
+        self._history_markdown_path = str(doc.path)
         # 各规则配置的开关聚合（any 语义），再映射为显示名 → 状态
         merged: dict[str, bool] = {}
         for cfg in (self.ctx.judge_configs or {}).values():
@@ -1015,12 +1103,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         base_affixes = list(equip_data.affixes)
         resets_used = 0
         tune_recycle_reason = ""
-        # 统计采集：一件装备一条事件，这里只开场，逐轮 record_roll 追加，
-        # 离开调律页后 end_session 才落盘。探针内部有 @never_raises 护栏
-        # + 未同意时早退，绝不中断调律主流程。
-        telemetry_probe.begin_session(
-            equip_data=equip_data, initial_affixes=base_affixes,
-            rule_keys=self.ctx.judge_rule_keys)
+        # 结构化历史会话已在 material 阶段标记本件进入调律；逐轮与终态
+        # 均通过统一进度事件归档，匿名统计再从最近七天历史做白名单投影。
         stop_key = "completed"
 
         # ── 初始判定（initial_check）：第一次调律前先执行一次结束处理 ──
@@ -1080,14 +1164,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             new_affix = self.navigator.collect_new_affix(
                 equip_data, result.get("tune_affix", "")) \
                 or result.get("tune_affix", "")
-            # 统计采集：解析失败（equip_data.affixes 未增长）时传 None，
-            # 探针据此作废**整条会话**——序列里挖个洞会让下游把第 4 轮
-            # 误读成紧跟第 2 轮，条件概率直接算错。
-            telemetry_probe.record_roll(
-                new_affix=(equip_data.affixes[-1]
-                          if len(equip_data.affixes) > _affix_count_before else None),
-                slot=affix_count, resets=resets_used,
-                food_label=self.executor.round_food)
             self.recorder.report_set("rounds", rounds)
             self.recorder.report_set("final_affix_count", affix_count)
             self.recorder.report_set(
@@ -1119,6 +1195,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 "expect_rating": new_expect,
                 "actual_rating": actual_for_signal,
                 "rule_ratings": incoming,
+                "new_affix_data": (
+                    equip_data.affixes[-1].to_dict()
+                    if len(equip_data.affixes) > _affix_count_before else None
+                ),
+                "resets": resets_used,
             })
             # 扣减本轮狗粮缓存：返还时不消耗（不变），否则 -1
             if not self.executor.round_food_refunded:
@@ -1164,12 +1245,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             stop_reason = ("用户中断" if self.is_stopped
                            else "调律结束")
             stop_key = "user_stopped" if self.is_stopped else "completed"
-        telemetry_probe.end_session(
-            # mode 在这里取：会话中途可能被判定切成调满回收/强制调律
-            mode=self.equipment_session.mode.value,
-            stop_reason=stop_key,
-            final_rating=_best_rating(judgement),
-            total_rounds=rounds, resets=resets_used)
         self.recorder.doc_finish_equipment(rounds, affix_count, stop_reason,
                                            judgement)
         # 命中回收的装备在回到背包页后执行（阻断时不回收）
@@ -1179,6 +1254,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             outcome = self._recycle_current(
                 equip_data, detail_scene, "tune", tune_recycle_reason,
                 report)
+            if outcome is RecycleOutcome.STOPPED:
+                return self._make_fingerprint(equip_data.to_dict()), outcome
         self.recorder.commit_report("tuned")
         self.output.setdefault("tuning_reports", []).extend(
             self.recorder.collect_reports()[-1:])
@@ -1198,6 +1275,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             "affix_count": affix_count,
             "final_affixes": [a.to_dict() for a in equip_data.affixes],
             "status": "recycled" if outcome is RecycleOutcome.RECYCLED else "done",
+            "reason": stop_reason,
+            "tuning_mode": self.equipment_session.mode.value,
+            "telemetry_stop_reason": stop_key,
+            "telemetry_final_rating": _best_rating(judgement) or "",
+            "resets": resets_used,
         })
         if outcome is RecycleOutcome.RECYCLED:
             return "", outcome
@@ -1334,13 +1416,21 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             logger.error(
                 f"  [{prefix}] 等级配置缺失（level={equip_data.level}），"
                 "视为异常，跳过该装备")
-            return "skip", f"等级配置缺失（level={equip_data.level}）", resets_used
+            why = f"等级配置缺失（level={equip_data.level}）"
+            self._emit_operation(
+                "reset", why, action="reset_failed", reason=why,
+                reset_outcome="failed", resets=resets_used)
+            return "skip", why, resets_used
         if level_cfg.allow_reset is False:
             # 该等级不支持重置 → 视为重置次数用尽
             action = tune_cfg.reset_exhausted_action
             why = (f"等级 {equip_data.level} 不支持重置"
                    f"（视为重置次数用尽）转{action}")
             logger.info(f"  [{prefix}] {why}")
+            outcome = "exhausted_recycled" if action == "recycle" else "exhausted"
+            self._emit_operation(
+                "reset", why, action=f"reset_{outcome}", reason=why,
+                reset_outcome=outcome, resets=resets_used)
             return action, why, resets_used
         # 等级配置允许重置，继续正常重置流程
         self._emit_operation(
@@ -1365,16 +1455,30 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 # recorder 中的评级属于重置前装备；重置后等待重新判定。
                 "before_rating": self.equipment_session.expected_rating or "",
                 "expect_rating": "",
+                "tuning_mode": self.equipment_session.mode.value,
             })
+            self._emit_operation(
+                "reset", "重置完毕，继续调律", action="reset_completed",
+                reason=why, reset_outcome="completed", resets=resets_used + 1)
             return "continue", why, resets_used + 1
-        if isinstance(result, str):
-            # 冷却期/材料不足拒绝 → 强制跳过（不走 reset_exhausted_action）
-            return "skip", result, resets_used
+        if isinstance(result, tuple):
+            # 冷却期/材料不足/识别异常 → 强制跳过（不走 reset_exhausted_action）。
+            # outcome 由 resetter 直接给出，不再从中文原因串反推——那在英文
+            # 界面下 tr() 之后必然认错档。
+            outcome, message = result
+            self._emit_operation(
+                "reset", message, action=f"reset_{outcome}", reason=message,
+                reset_outcome=outcome, resets=resets_used)
+            return "skip", message, resets_used
         # 重置次数已用尽（本地上限或按钮无次数）→ 按配置转处置
         action = tune_cfg.reset_exhausted_action
         if action == "recycle":
             why = f"重置次数已用尽转回收（{why}）"
             logger.info(f"  [{prefix}] {why}")
+        outcome = "exhausted_recycled" if action == "recycle" else "exhausted"
+        self._emit_operation(
+            "reset", why, action=f"reset_{outcome}", reason=why,
+            reset_outcome=outcome, resets=resets_used)
         return action, why, resets_used
 
     # ─── 行为处置（按 tune_config.behavior 行为点配置驱动）──────
@@ -1398,6 +1502,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         Returns:
             RECYCLED：已回收（该格已被补位装备占据）；
             LOCKED/UNAVAILABLE：尝试回收但装备仍保留；
+            STOPPED：用户在异常处理对话框中要求结束任务；
             None：没有触发回收动作。
         """
         label = equip_data.name or equip_data.type

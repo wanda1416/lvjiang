@@ -3,6 +3,7 @@
 import json
 import threading
 import traceback
+from dataclasses import fields, is_dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -27,6 +28,30 @@ def _to_serializable(obj):
     return obj
 
 
+def _to_history_snapshot(obj):
+    """无深拷贝地把专用任务运行上下文转成稳定输入快照。"""
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, Path):
+        return str(obj)
+    if isinstance(obj, (list, tuple, set)):
+        return [_to_history_snapshot(item) for item in obj]
+    if isinstance(obj, dict):
+        return {str(key): _to_history_snapshot(value)
+                for key, value in obj.items()}
+    if is_dataclass(obj) and not isinstance(obj, type):
+        return {
+            field.name: _to_history_snapshot(getattr(obj, field.name))
+            for field in fields(obj)
+        }
+    if hasattr(obj, "to_dict"):
+        try:
+            return _to_history_snapshot(obj.to_dict())
+        except Exception:  # noqa: BLE001
+            pass
+    return str(obj)
+
+
 def _log_workflow_result(flow_id: str, result: Any, *, interrupted: bool) -> bool:
     """Log a workflow's structured result unless it has a dedicated report.
 
@@ -48,13 +73,26 @@ def _log_workflow_result(flow_id: str, result: Any, *, interrupted: bool) -> boo
 class WorkflowWorker(QThread):
     """工作流异步执行线程"""
 
-    def __init__(self, flow_id: str, fn, parent=None):
+    def __init__(self, flow_id: str, fn, parent=None, *, task_run=None):
         super().__init__(parent)
         self.flow_id = flow_id
         self._fn = fn
+        self.task_run = task_run
         self.result_or_exception: Any = None
 
     def run(self):
+        if self.task_run is not None:
+            with self.task_run.capture_logs():
+                logger.info(
+                    f"任务开始: task_run_id={self.task_run.task_run_id}, "
+                    f"task_id={self.flow_id}")
+                self._execute()
+                logger.info(
+                    f"任务线程结束: task_run_id={self.task_run.task_run_id}")
+        else:
+            self._execute()
+
+    def _execute(self):
         try:
             self.result_or_exception = self._fn()
         except BaseException as e:
@@ -64,14 +102,15 @@ class WorkflowWorker(QThread):
 
 
 class _UIHelper(QObject):
-    """工作流线程 → 主线程的对话框桥（confirm/pause/input）
+    """工作流线程 → 主线程的非模态对话框桥。
 
     请求以 dict 携带（信号用 object 签名，避免 QVariant 拷贝、保持引用）：
-    主线程槽弹对话框 → 写 req["result"] → set req["done"]，
-    工作流线程用 threading.Event 等待，无竞态、无需事件循环。
+    主线程展示非模态对话框；用户完成交互后写 req["result"] 并 set
+    req["done"]，工作流线程可以等待业务结果，但 Qt 主窗口始终可操作。
     槽是 QObject 方法，AutoConnection 跨线程投递行为确定为 Queued。
     """
     request = pyqtSignal(object)
+    dismiss_active = pyqtSignal()
 
     def __init__(
         self,
@@ -83,24 +122,62 @@ class _UIHelper(QObject):
         self._stop_check = stop_check or (lambda: False)
         self._active_dialog: Any = None
         self.request.connect(self._on_request)
+        self.dismiss_active.connect(self._dismiss_active_dialog)
 
     def _on_request(self, req: dict):
-        """主线程：显示对话框并回填结果，无论成败都唤醒工作流线程"""
+        """主线程：展示非模态交互；完成前只阻塞工作流线程。"""
         try:
             # F10 可能先于 queued request 抵达主线程；此时直接释放工作线程，
             # 不能在停止请求之后再打开一个新的阻塞弹窗。
             if self._stop_check():
+                self._complete(req, None)
                 return
-            req["result"] = self._show(req["action"], req["kwargs"])
+            self._show_non_modal(req)
         except Exception as e:
             logger.error(f"UI 交互对话框异常: {e}")
-        finally:
-            self._active_dialog = None
-            req["done"].set()
+            self._complete(req, None)
 
-    def _show(self, action: str, kwargs: dict):
+    def _complete(self, req: dict, result: Any) -> None:
+        """Exactly-once completion shared by buttons, title-bar close and F10."""
+        if req.get("_completed"):
+            return
+        req["_completed"] = True
+        req["result"] = result
+        req["done"].set()
+
+    def _install_dialog(
+        self,
+        req: dict,
+        dialog: Any,
+        resolve: Callable[[int], Any],
+    ) -> None:
+        """Show one task dialog without disabling its parent window."""
+        dialog.setModal(False)
+        dialog.setWindowModality(Qt.WindowModality.NonModal)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self._active_dialog = dialog
+
+        def finished(code: int) -> None:
+            if self._active_dialog is dialog:
+                self._active_dialog = None
+            try:
+                result = resolve(code)
+            except Exception as exc:
+                logger.error(f"工作流交互结果处理失败: {exc}")
+                result = None
+            self._complete(req, result)
+
+        dialog.finished.connect(finished)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _show_non_modal(self, req: dict) -> None:
+        action = req["action"]
+        kwargs = req["kwargs"]
         from PyQt6.QtWidgets import (
             QAbstractButton,
+            QDialog,
             QInputDialog,
             QMessageBox,
             QPushButton,
@@ -112,8 +189,19 @@ class _UIHelper(QObject):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 self._window,
             )
-            self._active_dialog = box
-            return box.exec() == QMessageBox.StandardButton.Yes
+            def resolve_confirm(_code: int) -> bool:
+                clicked = box.clickedButton()
+                return (
+                    clicked is not None and
+                    box.standardButton(clicked) == QMessageBox.StandardButton.Yes
+                )
+
+            self._install_dialog(
+                req,
+                box,
+                resolve_confirm,
+            )
+            return
         if action == "choose":
             # 通用多选一对话框；业务文案和值全部由调用方提供。
             box = QMessageBox(self._window)
@@ -143,12 +231,14 @@ class _UIHelper(QObject):
                     default_button = button
             if default_button is not None:
                 box.setDefaultButton(default_button)
-            self._active_dialog = box
-            box.exec()
-            clicked = box.clickedButton()
-            if clicked is None:
-                return kwargs.get("cancel_value")
-            return buttons.get(clicked, kwargs.get("cancel_value"))
+            self._install_dialog(
+                req,
+                box,
+                lambda _code: buttons.get(
+                    box.clickedButton(), kwargs.get("cancel_value")
+                ),
+            )
+            return
         if action == "pause":
             box = QMessageBox(self._window)
             box.setIcon(QMessageBox.Icon.Information)
@@ -162,20 +252,26 @@ class _UIHelper(QObject):
             )
             if continue_button is not None:
                 box.setDefaultButton(continue_button)
-            self._active_dialog = box
-            box.exec()
-            if stop_button is not None and box.clickedButton() is stop_button:
-                request_stop = getattr(self._window, "request_stop", None)
-                if callable(request_stop):
-                    request_stop()
-            return None
+            def resolve_pause(_code: int) -> None:
+                if stop_button is not None and box.clickedButton() is stop_button:
+                    request_stop = getattr(self._window, "request_stop", None)
+                    if callable(request_stop):
+                        request_stop()
+                return None
+
+            self._install_dialog(req, box, resolve_pause)
+            return
         if action == "input":
             dlg = QInputDialog(self._window)
             dlg.setWindowTitle(tr("工作流输入"))
             dlg.setLabelText(kwargs.get("prompt", ""))
-            self._active_dialog = dlg
-            ok = dlg.exec()
-            return dlg.textValue() if ok else None
+            self._install_dialog(
+                req,
+                dlg,
+                lambda code: dlg.textValue()
+                if code == QDialog.DialogCode.Accepted else None,
+            )
+            return
         if action == "notify":
             # DSL notify: 写入告警面板（弹窗已在 builtin 层完成）
             message = kwargs.get("message", "")
@@ -184,22 +280,28 @@ class _UIHelper(QObject):
             # push_alert 内部调用 add_alert（含去重），同时更新 UI
             if self._window and getattr(self._window, 'alert_panel', None) is not None:
                 self._window.alert_panel.push_alert(alert_id, message, now.isoformat())
-            return None
+            self._complete(req, None)
+            return
         if action == "app_event":
             from ..app_events import AppEvent
             event = kwargs.get("event")
             if self._window is not None and isinstance(event, AppEvent):
                 self._window.app_event.emit(event)
-            return None
+            self._complete(req, None)
+            return
         logger.warning(f"未知 UI 交互类型: {action}")
-        return None
+        self._complete(req, None)
 
     def close_active_dialog(self):
-        """主线程：关闭当前活动对话框（F10 停止时调用）
+        """关闭当前活动对话框（可安全地从全局热键线程调用）。
 
         confirm 返回 false、input 返回 null、pause 立即返回，
         使阻塞在对话框上的工作流能响应停止请求。
         """
+        self.dismiss_active.emit()
+
+    def _dismiss_active_dialog(self) -> None:
+        """Helper 所在线程执行真正的 Qt 窗口操作。"""
         if self._active_dialog is not None:
             self._active_dialog.reject()
 
@@ -394,6 +496,11 @@ class RunControlMixin:
         if idx >= 0:
             self.user_combo.setCurrentIndex(idx)
         self.user_combo.blockSignals(False)
+        # 日常/调律的执行用户选择是纯运行期状态；用户增删后刷新候选，
+        # 仍保留有效的固定选择，不参与 session/config 持久化。
+        from ..execution_user_selector import ExecutionUserSelector
+        for selector in self.findChildren(ExecutionUserSelector):
+            selector.refresh_users()
 
     def _on_user_changed(self, index: int):
         """用户选择器切换"""
@@ -566,23 +673,38 @@ class RunControlMixin:
         return path
 
     def _show_workflow_start_error(self, message: str):
-        """报告启动前错误：控制台、日志与可见弹窗保持一致。"""
+        """报告启动前错误，但不因提示窗口禁用主界面。"""
         from PyQt6.QtWidgets import QMessageBox, QWidget
 
         self.log_text.append(f"[错误] {message}")
         logger.error(message)
-        QMessageBox.critical(
-            self if isinstance(self, QWidget) else None,  # type: ignore[arg-type]
+        box = QMessageBox(
+            QMessageBox.Icon.Critical,
             tr("无法启动工作流"),
             message,
+            QMessageBox.StandardButton.Ok,
+            self if isinstance(self, QWidget) else None,  # type: ignore[arg-type]
         )
+        box.setModal(False)
+        box.setWindowModality(Qt.WindowModality.NonModal)
+        box.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self._workflow_start_error_dialog = box
+        box.finished.connect(
+            lambda _code, item=box: setattr(
+                self, "_workflow_start_error_dialog", None
+            ) if getattr(self, "_workflow_start_error_dialog", None) is item
+            else None
+        )
+        box.show()
+        box.raise_()
+        box.activateWindow()
 
     def _create_ui_callback(self):
-        """创建线程安全的 UI 交互回调（confirm/pause/input/notify）
+        """创建线程安全的任务交互回调。
 
-        _UIHelper 常驻主线程，工作流线程发信号请求弹窗，
-        用 threading.Event 等待结果，避免 QEventLoop 的
-        "结果先于 exec() 到达"竞态。notify 同时走弹窗
+        _UIHelper 常驻主线程并只展示非模态窗口；工作流线程用
+        threading.Event 等待业务结果。这样 confirm/pause/choose/input
+        可以暂停自动化步骤，但不会禁用主界面。notify 同时走弹窗
         （native_notify）和告警面板（_ui_callback → alert_panel）双通道。
         """
         import threading
@@ -846,6 +968,16 @@ class RunControlMixin:
                     tr("工作流文件不存在: {path}").format(path=wf_file))
                 return
 
+        selector = getattr(self, "_daily_execution_user_selector", None)
+        username = (
+            selector.resolve_username()
+            if selector is not None
+            else self._user_manager.get_active_user_name()
+        )
+        if not username:
+            self.log_text.append(tr("[错误] 请选择有效的执行用户"))
+            return
+
         if not self._begin_automation(flow_name):
             return
 
@@ -883,12 +1015,8 @@ class RunControlMixin:
             stop_check=self._is_stopped,
             pause_event=self._pause_event,
         )
-        # session/context 初始化：启动时快照当前用户，全程只依赖此绑定值
-        username = self._user_manager.get_active_user_name()
-        engine.session = self._session_manager.load(username)
-        engine.run_username = username
-        # context 由 execute() 自动初始化为空 dict
-        engine._save_callback = self._session_manager.save_fn(username, engine.session)
+        # session/context 初始化：启动时快照执行用户，全程只依赖此绑定值
+        self._bind_engine_user(engine, username)
         engine._ui_callback = self._create_ui_callback()
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
@@ -904,6 +1032,7 @@ class RunControlMixin:
             self._save_daily_config()
 
         self.log_text.append(f"[开始] {flow_name} 流程...")
+        self.log_text.append(f"[执行用户] {username}")
         if flow_params:
             self.log_text.append(f"[参数] {flow_params}")
 
@@ -923,19 +1052,39 @@ class RunControlMixin:
                 stop_check=self._is_stopped,
                 pause_event=self._pause_event,
             )
-            self._start_workflow(flow_id, flow_name,
-                                 lambda: engine.execute(wf_instance, initial_variables=flow_params))
+            self._start_workflow(
+                flow_id, flow_name,
+                lambda: engine.execute(
+                    wf_instance, initial_variables=flow_params),
+                record_history=True, username=username, params=flow_params,
+                task_scope=flow_cfg.get("scope", "daily"),
+            )
         else:
             # DSL 路径已在进入运行态之前完成校验。
             assert wf_path is not None
-            self._start_workflow(flow_id, flow_name,
-                                 lambda: engine.execute(wf_path, initial_variables=flow_params))
+            self._start_workflow(
+                flow_id, flow_name,
+                lambda: engine.execute(wf_path, initial_variables=flow_params),
+                record_history=True, username=username, params=flow_params,
+                task_scope=flow_cfg.get("scope", "daily"),
+            )
 
     # ─── 异步工作流执行 ────────────────────────────────────
 
-    def _start_workflow(self, flow_id: str, flow_name: str, workflow_fn):
+    def _start_workflow(
+        self, flow_id: str, flow_name: str, workflow_fn, *,
+        record_history: bool = False, username: str = "", params=None,
+        task_scope: str = "daily",
+    ):
         """启动工作流线程"""
-        worker = WorkflowWorker(flow_id, workflow_fn)
+        task_run = None
+        if record_history:
+            from ...core.daily_history import try_create_task_run
+            task_run = try_create_task_run(
+                username=username or "default", task_id=flow_id,
+                task_name=flow_name, task_scope=task_scope,
+                params=params if params is not None else {}, source="single")
+        worker = WorkflowWorker(flow_id, workflow_fn, task_run=task_run)
         worker.finished.connect(self._on_workflow_finished)
         self._current_worker = worker  # type: ignore[assignment]  # 保持引用防止被垃圾回收
         # 在 worker 上附加 flow_name 以便日志显示
@@ -955,6 +1104,13 @@ class RunControlMixin:
         if isinstance(result_or_exception, BaseException):
             self.log_text.append(f"[错误] {flow_name}流程异常退出: {result_or_exception}")
             logger.error(f"{flow_name}流程异常退出: {result_or_exception}")
+            result_path = self._save_workflow_result(flow_id, {
+                "error": str(result_or_exception),
+                "exception_type": type(result_or_exception).__name__,
+            })
+            self._finish_task_run(
+                worker, status="failed", result_path=result_path,
+                error_message=str(result_or_exception))
             # 异常不保存 session
         else:
             result = result_or_exception
@@ -962,6 +1118,10 @@ class RunControlMixin:
             if isinstance(result, dict) and result.get("error"):
                 self.log_text.append(f"[错误] {flow_name}: {result['error']}")
                 logger.error(f"工作流 {flow_id} 启动被拒绝: {result['error']}")
+                result_path = self._save_workflow_result(flow_id, result)
+                self._finish_task_run(
+                    worker, status="failed", result_path=result_path,
+                    error_message=str(result["error"]))
                 self._end_automation(flow_name)
                 return
             interrupted = self._stop_requested
@@ -972,13 +1132,29 @@ class RunControlMixin:
             else:
                 # 正常结束 → 自动保存 session
                 self._auto_save_session()
-            self._save_workflow_result(flow_id, result, interrupted=interrupted)
+            result_path = self._save_workflow_result(
+                flow_id, result, interrupted=interrupted)
+            self._finish_task_run(
+                worker,
+                status="interrupted" if interrupted else "completed",
+                result_path=result_path,
+            )
             # 通用控制台输出；已有专用报告的工作流不再重复倾倒结果。
             _log_workflow_result(flow_id, result, interrupted=interrupted)
             if not interrupted:
                 self.log_text.append(f"[完成] {flow_name} 结果已保存")
 
         self._end_automation(flow_name)
+
+    @staticmethod
+    def _finish_task_run(worker, **kwargs) -> None:
+        task_run = getattr(worker, "task_run", None)
+        if task_run is None:
+            return
+        try:
+            task_run.finish(**kwargs)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"任务历史收尾失败，继续退出任务: {exc}")
 
     def _auto_save_session(self):
         """正常结束时自动保存 session（存入启动时绑定的用户名）"""
@@ -990,31 +1166,33 @@ class RunControlMixin:
         """保存工作流结果到 local/output/{username}/{flow_id}_{timestamp}.json
 
         中断（F10）的部分结果同样落盘，文件名带 _interrupted 后缀；
-        中断且尚无任何已收集数据时不产生空文件。
+        即使结果为空也保留 JSON，确保历史记录始终能定位本次返回值。
         """
         if not isinstance(result, (dict, list)):
-            return
-        if interrupted and not result:
-            return
+            return None
+        try:
+            serializable = _to_serializable(result)
+            from ...constants import OUTPUT_DIR
+            # 输出目录归属启动时绑定的用户名，不受运行期间 UI 切换影响
+            engine = self._current_engine
+            username = (engine.run_username if engine is not None else "") or "default"
+            user_output_dir = OUTPUT_DIR / username
+            user_output_dir.mkdir(parents=True, exist_ok=True)
 
-        serializable = _to_serializable(result)
-
-        from ...constants import OUTPUT_DIR
-        # 输出目录归属启动时绑定的用户名，不受运行期间 UI 切换影响
-        engine = self._current_engine
-        username = (engine.run_username if engine is not None else "") or "default"
-        user_output_dir = OUTPUT_DIR / username
-        user_output_dir.mkdir(parents=True, exist_ok=True)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        suffix = "_interrupted" if interrupted else ""
-        save_path = user_output_dir / f"{flow_id}_{timestamp}{suffix}.json"
-        save_path.write_text(
-            json.dumps(serializable, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            suffix = "_interrupted" if interrupted else ""
+            save_path = user_output_dir / f"{flow_id}_{timestamp}{suffix}.json"
+            save_path.write_text(
+                json.dumps(serializable, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"工作流结果保存失败，继续任务收尾: {exc}")
+            self.log_text.append(f"[警告] {flow_id} 结果 JSON 保存失败: {exc}")
+            return None
         logger.info(f"工作流结果已保存: {save_path}")
         self.log_text.append(f"[保存] {flow_id} → output/{username}/{save_path.name}")
+        return save_path
 
     # ─── 运行按钮 ──────────────────────────────────────────
 
@@ -1042,6 +1220,9 @@ class RunControlMixin:
                 "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         self.automation_state_changed.emit(state)
+        from ..execution_user_selector import ExecutionUserSelector
+        for selector in self.findChildren(ExecutionUserSelector):
+            selector.setEnabled(not self._running)
         # 任务开始/结束/暂停恢复都会走到这里：顺带刷新"后台模式"开关的锁定态
         # （定位后可自由切换，仅任务运行期间锁定）
         if hasattr(self, "_refresh_bg_mode_lock"):
@@ -1068,8 +1249,15 @@ class RunControlMixin:
 
     # ─── 插件工作流执行 ────────────────────────────────────
 
-    def run_workflow_implementation(self, impl_name: str, flow_name: str,
-                                    configure):
+    def run_workflow_implementation(
+        self,
+        impl_name: str,
+        flow_name: str,
+        configure,
+        *,
+        execution_username: str | None = None,
+        history_params=None,
+    ):
         """插件页面启动已注册工作流实现的通用入口（异步）。
 
         通用脚手架：backend/布局校验 → 创建引擎与工作流实例 →
@@ -1081,6 +1269,15 @@ class RunControlMixin:
         """
         if self._running:
             self._request_stop()
+            return
+
+        username = (
+            execution_username
+            if execution_username is not None
+            else self._user_manager.get_active_user_name()
+        )
+        if not username or username not in self._user_manager.list_users():
+            self.log_text.append(tr("[错误] 请选择有效的执行用户"))
             return
 
         if not self._backend_ready():
@@ -1122,10 +1319,7 @@ class RunControlMixin:
             stop_check=self._is_stopped,
             pause_event=self._pause_event,
         )
-        username = self._user_manager.get_active_user_name()
-        engine.session = self._session_manager.load(username)
-        engine.run_username = username
-        engine._save_callback = self._session_manager.save_fn(username, engine.session)
+        self._bind_engine_user(engine, username)
         engine._ui_callback = self._create_ui_callback()
         self._current_engine = engine  # type: ignore[assignment]
         from ...workflows.implementations import get_workflow_class
@@ -1146,5 +1340,25 @@ class RunControlMixin:
         # 插件写入专属参数（如判定器、部位选择等）并输出开始日志
         configure(wf_instance, engine)
 
-        self._start_workflow(impl_name, flow_name,
-                             lambda: engine.execute(wf_instance))
+        if history_params is None:
+            run_context = getattr(wf_instance, "run_ctx", {})
+            try:
+                history_params = _to_history_snapshot(run_context)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"任务输入参数快照失败，使用文本快照: {exc}")
+                history_params = {"run_context": str(run_context)}
+
+        self._start_workflow(
+            impl_name, flow_name, lambda: engine.execute(wf_instance),
+            record_history=True, username=username,
+            params=history_params if history_params is not None else {},
+            task_scope="dedicated",
+        )
+
+    def _bind_engine_user(self, engine: WorkflowEngine, username: str) -> None:
+        """Bind all user-scoped runtime data to the launch-time user snapshot."""
+        engine.session = self._session_manager.load(username)
+        engine.run_username = username
+        # context 由 execute() 自动初始化为空 dict。
+        engine._save_callback = self._session_manager.save_fn(
+            username, engine.session)

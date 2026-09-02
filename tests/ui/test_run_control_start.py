@@ -76,23 +76,23 @@ def test_missing_workflow_is_rejected_before_running_state():
     assert stub._run_state == "idle"
 
 
-def test_start_error_is_logged_and_shown_in_dialog(monkeypatch):
-    from PyQt6.QtWidgets import QMessageBox
+def test_start_error_is_logged_without_modal_main_window(qtbot):
+    from PyQt6.QtCore import Qt
 
     messages: list[str] = []
-    dialogs: list[tuple] = []
     stub = type("S", (), {
         "log_text": type("L", (), {
             "append": lambda self, text: messages.append(text),
         })(),
     })()
-    monkeypatch.setattr(
-        QMessageBox, "critical",
-        lambda *args: dialogs.append(args),
-    )
 
     RunControlMixin._show_workflow_start_error(stub, "工作流文件不存在: x.wf")
 
     assert messages == ["[错误] 工作流文件不存在: x.wf"]
-    assert dialogs and dialogs[0][1:] == (
-        "无法启动工作流", "工作流文件不存在: x.wf")
+    dialog = stub._workflow_start_error_dialog
+    assert dialog.windowTitle() == "无法启动工作流"
+    assert dialog.text() == "工作流文件不存在: x.wf"
+    assert dialog.isVisible()
+    assert not dialog.isModal()
+    assert dialog.windowModality() == Qt.WindowModality.NonModal
+    dialog.close()

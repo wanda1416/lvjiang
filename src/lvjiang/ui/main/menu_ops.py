@@ -13,22 +13,93 @@
 """
 
 import sys
+from collections.abc import Callable
 from typing import cast
 
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QMessageBox, QToolButton, QWidget
+from PyQt6.QtWidgets import QDialog, QMessageBox, QToolButton, QWidget
 
 from lvjiang.apps import get_registry
 
 from ...core.config import load_user_config
 from ...i18n import tr
+from ..button_styles import exec_styled_message_box
 from ..theme import get_theme_manager
 
 
 class MenuOpsMixin:
     """菜单栏与对话框入口混入类"""
+
+    def _show_modeless_tool(
+        self,
+        key: str,
+        factory: Callable[[], QDialog],
+        on_finished: Callable[[QDialog], None] | None = None,
+    ) -> QDialog | None:
+        """原子地打开单实例非模态工具窗口；重复触发只前置现有窗口。
+
+        Qt 窗口只能在 GUI 线程创建，因此 ``opening`` 集合在一次事件循环调用内
+        就是原子防重入门闩。它在调用 factory 前写入，连构造函数间接触发同一
+        菜单动作的极端情况也不会创建第二个实例。
+        """
+        windows = getattr(self, "_modeless_tool_windows", None)
+        if windows is None:
+            windows = {}
+            self._modeless_tool_windows = windows
+        opening = getattr(self, "_modeless_tool_opening", None)
+        if opening is None:
+            opening = set()
+            self._modeless_tool_opening = opening
+
+        existing = windows.get(key)
+        if existing is not None:
+            if existing.isMinimized():
+                existing.showNormal()
+            else:
+                existing.show()
+            existing.raise_()
+            existing.activateWindow()
+            return existing
+        if key in opening:
+            return None
+
+        opening.add(key)
+        try:
+            dialog = factory()
+            dialog.setModal(False)
+            dialog.setWindowModality(Qt.WindowModality.NonModal)
+            dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+            windows[key] = dialog
+        finally:
+            opening.discard(key)
+
+        finalized = False
+
+        def release(*_args) -> None:
+            nonlocal finalized
+            if finalized:
+                return
+            finalized = True
+            if windows.get(key) is dialog:
+                windows.pop(key, None)
+            if on_finished is not None:
+                on_finished(dialog)
+
+        dialog.finished.connect(release)
+        dialog.show()
+        return dialog
+
+    def _close_modeless_tools(self) -> bool:
+        """关闭全部非模态工具；任一窗口拒绝关闭时返回 False。"""
+        windows = getattr(self, "_modeless_tool_windows", {})
+        for dialog in list(windows.values()):
+            if dialog.isVisible():
+                dialog.close()
+                if dialog.isVisible():
+                    return False
+        return True
 
     def _setup_menu(self):
         menubar = self.menuBar()
@@ -81,6 +152,11 @@ class MenuOpsMixin:
         batch_settings = QAction(tr("批量配置"), self)
         batch_settings.triggered.connect(self._open_batch_config)
         tools_menu.addAction(batch_settings)
+
+        daily_history = QAction(tr("任务历史"), self)
+        daily_history.triggered.connect(
+            lambda: MenuOpsMixin._open_task_history(self))
+        tools_menu.addAction(daily_history)
 
         # ── 插件菜单（一个插件一个菜单，插在帮助之前）──
         registry = get_registry()
@@ -155,19 +231,22 @@ class MenuOpsMixin:
     def _open_script_record(self):
         """仅通过用户菜单操作打开脚本录制对话框。"""
         from ..scripts import ScriptRecordDialog
-        dialog = ScriptRecordDialog(self)
-        try:
-            dialog.exec()
-        finally:
-            dialog.stop_f12_hotkey()
+        self._show_modeless_tool(
+            "script_record",
+            lambda: ScriptRecordDialog(self),
+            lambda dialog: dialog.stop_f12_hotkey(),
+        )
 
     def _open_script_editor(self):
         """打开脚本编辑对话框；有新建/保存/删除时刷新日常页脚本下拉。"""
         from ..scripts import ScriptEditorDialog
-        dialog = ScriptEditorDialog(self)
-        dialog.exec()
-        if dialog.changed:
-            self._load_workflow_configs()
+        self._show_modeless_tool(
+            "script_editor",
+            lambda: ScriptEditorDialog(self),
+            lambda dialog: (
+                self._load_workflow_configs() if dialog.changed else None
+            ),
+        )
 
     def _open_script_config(self):
         """打开脚本配置对话框；保存后刷新日常页脚本下拉。"""
@@ -176,25 +255,42 @@ class MenuOpsMixin:
         if dialog.exec():
             self._load_workflow_configs()
 
+    def _open_task_history(self):
+        """打开日常与专用任务共用的历史查询窗口。"""
+        from ..daily_history_dialog import DailyHistoryDialog
+        self._show_modeless_tool(
+            "task_history", lambda: DailyHistoryDialog(self))
+
     def _open_scene_editor(self):
         from ..scene_editor import SceneEditorDialog
-        dialog = SceneEditorDialog(
-            layout_manager=self._layout_manager,
-            refresh_callback=self._refresh_capture,
-            parent=self,
+        self._show_modeless_tool(
+            "scene_editor",
+            lambda: SceneEditorDialog(
+                layout_manager=self._layout_manager,
+                refresh_callback=self._refresh_capture,
+                parent=self,
+            ),
+            lambda _dialog: self._refresh_layout_combo(),
         )
-        dialog.exec()
-        self._refresh_layout_combo()
 
     def _open_reference_manager(self):
         from ..reference import ReferenceManagerDialog
-        dialog = ReferenceManagerDialog(parent=self, screenshot_callback=self._refresh_capture)
-        dialog.exec()
-        # 管理器内仍保留空间选择；关闭后同步可能新增/删除/激活的空间。
-        self._refresh_reference_space_combo()
-        if dialog.data_changed:
-            # 工作流引擎按运行生命周期持有 reference 服务；下次运行会加载新数据。
-            self.statusBar().showMessage(tr("图库已刷新"), 3000)
+
+        def finished(dialog: QDialog) -> None:
+            # 管理器内仍保留空间选择；关闭后同步可能新增/删除/激活的空间。
+            self._refresh_reference_space_combo()
+            if dialog.data_changed:
+                # 工作流引擎按运行生命周期持有 reference 服务；下次运行会加载新数据。
+                self.statusBar().showMessage(tr("图库已刷新"), 3000)
+
+        self._show_modeless_tool(
+            "reference_manager",
+            lambda: ReferenceManagerDialog(
+                parent=self,
+                screenshot_callback=self._refresh_capture,
+            ),
+            finished,
+        )
 
     def _show_about(self):
         from ..notices.about_dialog import AboutDialog
@@ -228,15 +324,24 @@ class MenuOpsMixin:
             if is_newer_version(release.version, current_version):
                 UpdateDialog(release, self).exec()
             else:
-                QMessageBox.information(
-                    self,
+                box = QMessageBox(
+                    QMessageBox.Icon.Information,
                     tr("已是最新版本"),
                     tr("当前版本 v{current} 已是最新版本").format(current=current_version),
+                    QMessageBox.StandardButton.Ok,
+                    self,
                 )
+                exec_styled_message_box(box)
 
         def on_error(error_msg: str):
-            QMessageBox.warning(
-                cast(QWidget, self), tr("检查更新失败"), error_msg)
+            box = QMessageBox(
+                QMessageBox.Icon.Warning,
+                tr("检查更新失败"),
+                error_msg,
+                QMessageBox.StandardButton.Ok,
+                cast(QWidget, self),
+            )
+            exec_styled_message_box(box)
 
         checker.finished.connect(on_finished)
         checker.error.connect(on_error)
@@ -259,7 +364,15 @@ class MenuOpsMixin:
 
     def _open_user_manager(self):
         from ..user_manager_dialog import UserManagerDialog
-        dialog = UserManagerDialog(self._user_manager, self)
+        dialog = UserManagerDialog(
+            self._user_manager,
+            self,
+            screenshot_callback=self._refresh_capture,
+        )
+        user_info_tab = getattr(self, "_user_info_tab", None)
+        if user_info_tab is not None:
+            dialog.avatar_changed.connect(
+                lambda _username, _filename: user_info_tab._refresh_current_user())
         dialog.exec()
         self._refresh_user_combo()
 
@@ -267,6 +380,7 @@ class MenuOpsMixin:
         from ..settings_dialog import SettingsDialog
         dialog = SettingsDialog(self)
         dialog.hotkeys_saved.connect(self._apply_hotkey_settings)
+        dialog.font_sizes_saved.connect(self._apply_font_size_settings)
         if dialog.exec():
             # 保存后重新加载配置；已创建的输入后端延迟参数在下次创建时生效
             active_hotkeys = self._user_config.hotkeys
@@ -275,6 +389,19 @@ class MenuOpsMixin:
             # 覆盖切换失败时仍可用的运行期键位。
             self._user_config.hotkeys = active_hotkeys
             self.statusBar().showMessage(tr("配置已保存"), 3000)
+
+    def _apply_font_size_settings(self, values: dict) -> None:
+        """保存字体设置后立即应用到两个用户页面。"""
+        from ...core.config import FontSizeConfig
+
+        font_sizes = FontSizeConfig(**values)
+        self._user_config.font_sizes = font_sizes
+        profile_tab = getattr(self, "_profile_tab", None)
+        if profile_tab is not None:
+            profile_tab.apply_content_font_size(font_sizes.user_overview)
+        user_info_tab = getattr(self, "_user_info_tab", None)
+        if user_info_tab is not None:
+            user_info_tab.apply_content_font_size(font_sizes.user_info)
 
     def _apply_hotkey_settings(self, values: dict) -> None:
         """保存热键后替换全局监听并刷新相关界面文案。"""

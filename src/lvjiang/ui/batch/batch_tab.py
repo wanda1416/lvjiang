@@ -40,6 +40,7 @@ from ...core.batch_config import (
     save_enabled_rows,
 )
 from ...i18n import tr
+from ..button_styles import apply_button_style, fit_button_width
 from ..theme import get_theme_manager
 from .batch_runner import (
     ST_FAILED,
@@ -203,6 +204,12 @@ class BatchTab(QWidget):
         self._btn_script_down.setFixedWidth(72)
         self._btn_script_down.clicked.connect(lambda: self._move_selected_script(1))
         title_row.addWidget(self._btn_script_down)
+        apply_button_style(
+            self._btn_script_up, self._btn_script_down, variant="neutral"
+        )
+        fit_button_width(
+            self._btn_script_up, self._btn_script_down, minimum=72
+        )
         layout.addLayout(title_row)
 
         self._script_list = QTreeWidget()
@@ -365,6 +372,8 @@ class BatchTab(QWidget):
         btn_none.setFixedWidth(60)
         btn_none.clicked.connect(lambda: self._set_all_entries_checked(False))
         select_row.addWidget(btn_none)
+        apply_button_style(btn_all, btn_none, variant="neutral")
+        fit_button_width(btn_all, btn_none, minimum=60)
         layout.addLayout(select_row)
 
         # 行勾选列表（放在 scroll 中）
@@ -710,6 +719,7 @@ class BatchTab(QWidget):
                 name=cfg["name"],
                 wf_file=cfg.get("wf_file", ""),
                 class_name=cfg.get("class", ""),
+                scope=cfg.get("scope", "daily"),
             ))
         return scripts
 

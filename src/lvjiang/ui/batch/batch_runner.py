@@ -17,6 +17,7 @@ from __future__ import annotations
 import copy
 import json
 import traceback
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable
@@ -58,6 +59,7 @@ class BatchScript:
     name: str
     wf_file: str = ""       # DSL 工作流文件（相对 workflows/ 或绝对路径）
     class_name: str = ""    # Python 类实现（与 wf_file 二选一）
+    scope: str = "daily"    # 任务定义性质；daily / dedicated 都进入历史
 
 
 @dataclass
@@ -120,7 +122,23 @@ class BatchWorker(QThread):
     # ─── 主循环 ─────────────────────────────────────────
 
     def run(self):
+        from ...core.daily_history import try_create_batch_run
+        batch_run = try_create_batch_run(
+            config_name=self._config.name,
+            input_snapshot={
+                "rows": [row for _index, row in self._enabled_rows],
+                "scripts": [
+                    {"task_id": item.id, "task_name": item.name,
+                     "scope": item.scope}
+                    for item in self._scripts
+                ],
+                "workflows": self._config.workflows.to_dict(),
+                "user_column": self._config.user_column,
+            },
+        )
+        batch_run_id = batch_run.batch_run_id if batch_run is not None else ""
         summary: dict = {
+            "batch_run_id": batch_run_id,
             "entries": {}, "stopped": False, "lifecycle": {},
         }
         total = len(self._enabled_rows)
@@ -229,17 +247,75 @@ class BatchWorker(QThread):
                 self.progress.emit(run_idx, label, script.id, ST_RUNNING)
                 self.log.emit(f"[批量] {label} → {script.name} ...")
                 report.start_script(script.id, script.name)
+                params = self._load_script_params(script.id)
+                from ...core.daily_history import try_create_task_run
+                task_run = try_create_task_run(
+                    username=username or "unknown", task_id=script.id,
+                    task_name=script.name, task_scope=script.scope,
+                    params=params, source="batch", batch_run_id=batch_run_id,
+                    repository=(batch_run.repository
+                                if batch_run is not None else None),
+                )
                 try:
-                    result = self._run_script(script, session, username)
+                    capture = (task_run.capture_logs()
+                               if task_run is not None else nullcontext())
+                    with capture:
+                        if task_run is not None:
+                            logger.info(
+                                f"任务开始: task_run_id={task_run.task_run_id}, "
+                                f"batch_run_id={batch_run_id}, task_id={script.id}")
+                        try:
+                            result = self._run_script(script, session, username)
+                        except Exception:
+                            tb = traceback.format_exc()
+                            logger.error(
+                                f"批量执行 {label}/{script.name} 异常:\n{tb}")
+                            raise
+                        if task_run is not None:
+                            logger.info(
+                                f"任务线程结束: task_run_id={task_run.task_run_id}")
                     entry_result["scripts"][script.id] = ST_SUCCESS
                     self.progress.emit(run_idx, label, script.id, ST_SUCCESS)
                     self.log.emit(f"[批量] {label} → {script.name} 完成")
                     report.end_script(ST_SUCCESS, result)
                     any_success = True
-                    self._save_result(username or "unknown", script, result)
+                    try:
+                        result_path = self._save_result(
+                            username or "unknown", script, result)
+                    except Exception as output_exc:  # noqa: BLE001
+                        result_path = None
+                        logger.warning(f"批量结果保存失败，继续任务收尾: {output_exc}")
+                        self.log.emit(
+                            f"[批量] {label} → {script.name} 结果 JSON 保存失败: "
+                            f"{output_exc}")
+                    if task_run is not None:
+                        try:
+                            task_run.finish(
+                                status=("interrupted" if self._stop_check()
+                                        else "completed"),
+                                result_path=result_path,
+                            )
+                        except Exception as history_exc:  # noqa: BLE001
+                            logger.warning(
+                                f"任务历史收尾失败，继续批量任务: {history_exc}")
                 except Exception as e:
-                    tb = traceback.format_exc()
-                    logger.error(f"批量执行 {label}/{script.name} 异常:\n{tb}")
+                    result_path = None
+                    try:
+                        result_path = self._save_result(
+                            username or "unknown", script, {
+                                "error": str(e),
+                                "exception_type": type(e).__name__,
+                            })
+                    except Exception as output_exc:  # noqa: BLE001
+                        logger.warning(f"批量失败结果保存失败: {output_exc}")
+                    if task_run is not None:
+                        try:
+                            task_run.finish(
+                                status="failed", result_path=result_path,
+                                error_message=str(e))
+                        except Exception as history_exc:  # noqa: BLE001
+                            logger.warning(
+                                f"任务历史收尾失败，继续批量任务: {history_exc}")
                     entry_result["scripts"][script.id] = ST_FAILED
                     self.progress.emit(run_idx, label, script.id, ST_FAILED)
                     self.log.emit(f"[批量] {label} → {script.name} 失败: {e}")
@@ -300,6 +376,7 @@ class BatchWorker(QThread):
 
         # 6. 生成报告
         report.end_batch(stopped=self._stopped)
+        report_path = None
         try:
             report_path = report.write()
             if report_path:
@@ -307,6 +384,27 @@ class BatchWorker(QThread):
         except Exception as e:
             logger.error(f"批量报告写入失败: {e}")
             self.log.emit(f"[批量] 报告写入失败（不影响执行结果）: {e}")
+
+        if batch_run is not None:
+            task_failed = any(
+                ST_FAILED in entry.get("scripts", {}).values()
+                or entry.get("prepare") == ST_FAILED
+                or entry.get("finish") == ST_FAILED
+                for entry in summary["entries"].values()
+            )
+            lifecycle_failed = any(
+                value == RESULT_FAILED
+                for value in summary["lifecycle"].values()
+            )
+            try:
+                batch_run.finish(
+                    status=("interrupted" if self._stopped else
+                            "failed" if task_failed or lifecycle_failed else
+                            "completed"),
+                    report_path=report_path,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"批量历史收尾失败，继续退出批量任务: {exc}")
 
         self.finished_all.emit(summary)
 
@@ -470,7 +568,13 @@ class BatchWorker(QThread):
                 state=batch_state,
             )
 
-    def _run_script(self, script: BatchScript, session: dict, username: str | None) -> dict:
+    @staticmethod
+    def _load_script_params(script_id: str) -> dict:
+        from ...core.config.wf_configs import get_wf_config
+        return get_wf_config(script_id) or {}
+
+    def _run_script(self, script: BatchScript, session: dict,
+                    username: str | None, *, params: dict | None = None) -> dict:
         """执行单个脚本，返回 collect 结果
 
         参数从 wf_configs 按 script.id 加载，批量层不传递参数。
@@ -484,8 +588,8 @@ class BatchWorker(QThread):
             engine._save_callback = self._session_manager.save_fn(username, session)
 
         # 参数由执行时从 wf_configs 加载，而非批量层传递
-        from ...core.config.wf_configs import get_wf_config
-        params = get_wf_config(script.id) or {}
+        if params is None:
+            params = self._load_script_params(script.id)
 
         if script.class_name:
             from ...workflows.implementations import get_workflow_class
@@ -516,8 +620,8 @@ class BatchWorker(QThread):
     @staticmethod
     def _save_result(role: str, script: BatchScript, result: dict):
         """结果落盘 output/{role}/{script_id}_{timestamp}.json"""
-        if not isinstance(result, (dict, list)) or not result:
-            return
+        if not isinstance(result, (dict, list)):
+            return None
         from ...constants import OUTPUT_DIR
 
         def _ser(obj):
@@ -531,10 +635,11 @@ class BatchWorker(QThread):
 
         user_dir = OUTPUT_DIR / role
         user_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         path = user_dir / f"{script.id}_{ts}.json"
         path.write_text(
             json.dumps(_ser(result), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         logger.info(f"批量结果已保存: {path}")
+        return path

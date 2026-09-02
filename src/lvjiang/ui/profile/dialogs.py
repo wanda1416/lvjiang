@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.profile.repository import db_get_history
 from ...i18n import tr
+from ..button_styles import apply_dialog_button_box_style
 
 # ProfileDefinitionDialog 位于 settings_dialog.py，此处 re-export 便于统一导入。
 from .settings_dialog import ProfileDefinitionDialog  # noqa: F401
@@ -184,6 +185,7 @@ def ask_value_dialog(
     buttons = QDialogButtonBox(
         QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
     )
+    apply_dialog_button_box_style(buttons)
     buttons.rejected.connect(dialog.reject)
     layout.addRow(buttons)
 

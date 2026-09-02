@@ -32,18 +32,25 @@ class User:
     """用户数据 — 核心标识，仅用于产出归档与 session 隔离。"""
     name: str
     created_at: str = ""      # ISO 格式时间戳
+    avatar: str = ""          # config/session/avatars 下的安全文件名
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
             "created_at": self.created_at,
+            "avatar": self.avatar,
         }
 
     @staticmethod
     def from_dict(d: dict) -> "User":
+        from .user_avatars import is_safe_avatar_filename
+
+        raw_avatar = d.get("avatar", "")
+        avatar = raw_avatar if is_safe_avatar_filename(raw_avatar) else ""
         return User(
             name=d.get("name", ""),
             created_at=d.get("created_at", ""),
+            avatar=avatar,
         )
 
 
@@ -139,6 +146,12 @@ class UserConfigManager:
             self._active_user = next(iter(self._users))
 
         self._save()
+        try:
+            from .user_notes import delete_user_notes
+
+            delete_user_notes(name)
+        except Exception as exc:  # 用户删除已落盘，清理失败不应伪装成删除失败
+            logger.warning(f"清理用户 {name} 的便利贴失败: {exc}")
         logger.info(f"用户已删除: {name}")
         return True
 
@@ -149,6 +162,25 @@ class UserConfigManager:
         self._users = {name: self._users[name] for name in names}
         self._save()
         logger.info(f"用户顺序已更新: {names}")
+        return True
+
+    def set_user_avatar(self, name: str, filename: str) -> bool:
+        """Set a user's avatar basename; an empty string removes the reference."""
+        from .user_avatars import is_safe_avatar_filename
+
+        user = self._users.get(name)
+        if user is None:
+            return False
+        if filename and not is_safe_avatar_filename(filename):
+            return False
+        previous = user.avatar
+        user.avatar = filename
+        try:
+            self._save()
+        except Exception:
+            user.avatar = previous
+            raise
+        logger.info(f"用户头像已更新: {name}")
         return True
 
     # ─── 激活用户 ────────────────────────────────────────

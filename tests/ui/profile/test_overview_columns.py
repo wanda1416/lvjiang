@@ -4,13 +4,14 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
-from PyQt6.QtWidgets import QTableWidget
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem
 
 import lvjiang.core.profile as profile_core
 import lvjiang.ui.profile.column_management as column_management
 import lvjiang.ui.profile.tab as profile_tab
 from lvjiang.ui.profile.column_management import ProfileColumnMixin
-from lvjiang.ui.profile.tab import ProfileTab
+from lvjiang.ui.profile.tab import ProfileOverviewTable, ProfileTab
 
 
 class _Schema:
@@ -158,3 +159,65 @@ def test_remove_visible_column_does_not_remove_preceding_hidden_key(qtbot, monke
     host._remove_column("默认", 0)
 
     assert removed == [("默认", "left")]
+
+
+def _build_overview_table(qtbot) -> ProfileOverviewTable:
+    table = ProfileOverviewTable()
+    table.setColumnCount(3)
+    table.setRowCount(2)
+    table.setHorizontalHeaderLabels(["用户名", "等级", "备注"])
+    values = [
+        ["alice", "10", "甲"],
+        ["bob", "20", "乙"],
+    ]
+    for row, row_values in enumerate(values):
+        for column, value in enumerate(row_values):
+            table.setItem(row, column, QTableWidgetItem(value))
+    table.resize(480, 240)
+    table.show()
+    qtbot.addWidget(table)
+    return table
+
+
+def test_clicking_username_selects_and_copies_whole_row(qtbot):
+    table = _build_overview_table(qtbot)
+
+    qtbot.mouseClick(
+        table.viewport(),
+        Qt.MouseButton.LeftButton,
+        pos=table.visualItemRect(table.item(1, 0)).center(),
+    )
+
+    assert {(index.row(), index.column()) for index in table.selectedIndexes()} == {
+        (1, 0), (1, 1), (1, 2),
+    }
+    qtbot.keyClick(table, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier)
+    assert QApplication.clipboard().text() == "bob\t20\t乙"
+
+
+def test_clicking_header_selects_and_copies_whole_column(qtbot):
+    table = _build_overview_table(qtbot)
+    header = table.horizontalHeader()
+    x = header.sectionViewportPosition(1) + header.sectionSize(1) // 2
+
+    qtbot.mouseClick(
+        header.viewport(),
+        Qt.MouseButton.LeftButton,
+        pos=QPoint(x, header.height() // 2),
+    )
+
+    assert {(index.row(), index.column()) for index in table.selectedIndexes()} == {
+        (0, 1), (1, 1),
+    }
+    qtbot.keyClick(table, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier)
+    assert QApplication.clipboard().text() == "10\n20"
+
+
+def test_ctrl_a_then_ctrl_c_copies_whole_table(qtbot):
+    table = _build_overview_table(qtbot)
+    table.setFocus()
+
+    qtbot.keyClick(table, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
+    qtbot.keyClick(table, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier)
+
+    assert QApplication.clipboard().text() == "alice\t10\t甲\nbob\t20\t乙"

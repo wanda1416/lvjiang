@@ -23,7 +23,8 @@ class RecycleOutcome(Enum):
 
     RECYCLED = "recycled"       # 装备已移除，当前格由补位装备/空位占据
     LOCKED = "locked"           # 装备锁定无法回收，当前格仍是原装备
-    UNAVAILABLE = "unavailable" # 未找到回收入口，当前格仍是原装备
+    UNAVAILABLE = "unavailable"  # 未找到回收入口，当前格仍是原装备
+    STOPPED = "stopped"         # 用户要求结束任务，不推断装备最终状态
 
     @property
     def slot_changed(self) -> bool:
@@ -31,12 +32,20 @@ class RecycleOutcome(Enum):
 
     @property
     def retry_blocked(self) -> bool:
-        return self in (RecycleOutcome.LOCKED, RecycleOutcome.UNAVAILABLE)
+        return self in (
+            RecycleOutcome.LOCKED,
+            RecycleOutcome.UNAVAILABLE,
+            RecycleOutcome.STOPPED,
+        )
 
     @property
     def detail_closed(self) -> bool:
         """回收动作结束后是否已经离开原装备详情。"""
-        return self in (RecycleOutcome.RECYCLED, RecycleOutcome.LOCKED)
+        return self in (
+            RecycleOutcome.RECYCLED,
+            RecycleOutcome.LOCKED,
+            RecycleOutcome.STOPPED,
+        )
 
 
 class TuningRecycler:
@@ -55,8 +64,11 @@ class TuningRecycler:
         进入时背包详情页无弹窗；Android 未找到回收入口时收起
         弹窗返回 UNAVAILABLE（装备保留原地）。桌面端直接按 X，
         再由确认弹窗识别结果判定。成功后背包刷新、后续装备前移补位。
-        装备锁定检测：确认弹窗内无「确认」字样 = 装备被锁定；此时装备
-        虽然仍在原格，但回收动作已经退出装备详情，返回 LOCKED。
+        确认弹窗同时读取「确认」与「取消」，任一按钮命中即说明弹窗正常，
+        随后激活确认区域。两者都未命中时先判断是否已在背包页：在背包页
+        才判定装备锁定，且仅 Android 收起仍然可见的更多菜单；不在背包页
+        则属于异常状态，要求用户手动处理后明确选择「已回收」「保留装备」
+        或「结束任务」。这里不复扫确认，也不根据回收入口是否可见推断状态。
         """
         label = equip_data.name or equip_data.type
         stage_label = BEHAVIOR_STAGE_LABELS.get(stage, stage)
@@ -71,21 +83,55 @@ class TuningRecycler:
                                 stage: str, stage_label: str, reason: str,
                                 report: dict | None) -> RecycleOutcome:
         """回收确认弹窗处理（android/desktop 共用）"""
+        if not self._routes.try_confirm_recycle_dialog():
+            if self._routes.is_in_bag_page():
+                logger.warning("  未识别到回收弹窗的确认或取消按钮，"
+                               "当前已在背包页，判定装备锁定并保留")
+                self._routes.close_recycle_entry_on_lock()
+                return RecycleOutcome.LOCKED
+            logger.error("  未识别到回收弹窗的确认或取消按钮，"
+                         "且当前不在背包页，回收状态异常")
+            outcome = self._ask_manual_recycle_outcome()
+            if outcome is not RecycleOutcome.RECYCLED:
+                return outcome
+            logger.info("  用户确认已手动回收装备")
+        return self._record_recycled(
+            equip_data, stage, stage_label, reason, report)
+
+    def _ask_manual_recycle_outcome(self) -> RecycleOutcome:
+        """异常回收现场由用户确认真实结果，禁止默认记成锁定。"""
+        engine = self._wf.engine
+        callback = getattr(engine, "_ui_callback", None) if engine else None
+        if callback is None:
+            logger.error("无 UI 回调，无法确认手动回收结果，结束任务")
+            return RecycleOutcome.STOPPED
+        choice = callback(
+            "choose",
+            message=(
+                "回收装备失败，请手动处理并回到背包页，"
+                "然后选择装备的实际处理结果。"
+            ),
+            choices=[
+                {"label": "已回收", "value": "recycled", "role": "accept"},
+                {"label": "保留装备", "value": "kept",
+                 "role": "destructive"},
+                {"label": "结束任务", "value": "stopped", "role": "reject"},
+            ],
+            cancel_value="stopped",
+        )
+        outcomes = {
+            "recycled": RecycleOutcome.RECYCLED,
+            "kept": RecycleOutcome.LOCKED,
+            "stopped": RecycleOutcome.STOPPED,
+        }
+        return outcomes.get(choice, RecycleOutcome.STOPPED)
+
+    def _record_recycled(self, equip_data: EquipmentData,
+                         stage: str, stage_label: str, reason: str,
+                         report: dict | None) -> RecycleOutcome:
+        """提交真实回收结果；自动确认和人工确认共用同一记录出口。"""
         wf = self._wf
         label = equip_data.name or equip_data.type
-        # 装备锁定检测：确认弹窗内应含「确认」，否则装备被锁定
-        confirm_text = wf.ocr_scene(wf.EQUIP_DETAIL,
-                                    ["recycle_confirm"]).get("recycle_confirm", "") or ""
-        # confirm_text 是游戏截屏 OCR 结果，恒为中文，不能过 tr()
-        # （英文界面下会拿翻译后的英文去匹配中文截屏，永远匹配不上）。
-        if "确认" not in confirm_text:
-            logger.warning(f"  回收确认弹窗未识别到「确认」"
-                           f"（recycle_confirm={confirm_text!r}），"
-                           f"装备被锁定，保留")
-            self._routes.close_recycle_entry_on_lock()
-            return RecycleOutcome.LOCKED
-        # 确认方式按环境分派：安卓点确认区域，端游按空格
-        self._routes.confirm_recycle()
         wf.wait_stable("page_refresh")  # 回收完成，背包刷新补位
         if report is not None:
             report["recycled"] = True

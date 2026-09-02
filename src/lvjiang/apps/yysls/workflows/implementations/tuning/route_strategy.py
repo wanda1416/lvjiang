@@ -17,6 +17,10 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
 )
 
 _NAV_FILE = "subcall/navigation.wf"
+_PAGE_DETECTION_FILE = "subcall/page_detection.wf"
+_RECYCLE_ENTRY_FIELDS = [
+    "sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4",
+]
 
 
 class TuningRouteStrategy(ABC):
@@ -28,8 +32,10 @@ class TuningRouteStrategy(ABC):
         self._wf = wf
 
     def load_dependencies(self) -> None:
+        """加载导航与回收失败后的页面状态判断，不加载通用页面动作。"""
         engine = self._require_engine("load_dependencies")
         engine.load_subcalls(_NAV_FILE)
+        engine.load_subcalls(_PAGE_DETECTION_FILE)
 
     def enter_equip(self) -> bool:
         result = self._call_subcall("nav_main_to_equip")
@@ -53,10 +59,28 @@ class TuningRouteStrategy(ABC):
         """打开装备回收确认弹窗。返回 False 表示当前环境未找到入口。"""
         raise NotImplementedError
 
-    @abstractmethod
-    def confirm_recycle(self) -> None:
-        """确认回收（弹窗已确认含「确认」后调用）。"""
-        raise NotImplementedError
+    def try_confirm_recycle_dialog(self) -> bool:
+        """识别并确认回收专用弹窗，不改变通用页面确认方法的语义。"""
+        values = self._wf.ocr_scene(
+            self._wf.CONTROL_SCENE, ["confirm", "cancel"])
+        confirm = values.get("confirm", "") or ""
+        cancel = values.get("cancel", "") or ""
+        visible = (
+            "确认" in confirm
+            or "确定" in confirm
+            or "取消" in cancel
+        )
+        if not visible:
+            logger.warning(
+                "回收确认弹窗未识别到确认或取消："
+                f"confirm={confirm!r}, cancel={cancel!r}")
+            return False
+        self._wf.click_region(self._wf.CONTROL_SCENE, "confirm")
+        return True
+
+    def is_in_bag_page(self) -> bool:
+        """复用页面状态库判断当前是否已经回到背包页。"""
+        return self._call_subcall("is_in_bag_page") == 1
 
     @abstractmethod
     def close_recycle_entry_on_lock(self) -> None:
@@ -68,12 +92,15 @@ class TuningRouteStrategy(ABC):
         return None
 
     def open_reset_dialog(self) -> None:
-        """打开重置调律弹窗；移动端点击现有按钮区域。"""
+        """通过当前布局定义的动作打开重置调律弹窗。"""
         self._wf.click_region(self._wf.TUNE_SCENE, "reset_tune")
 
     def confirm_reset(self, region: str) -> None:
-        """确认重置；移动端点击对应阶段的确认区域。"""
-        self._wf.click_region(self._wf.TUNE_SCENE, region)
+        """通过当前布局定义的动作确认重置。"""
+        if region == "confirm":
+            self._wf.click_region(self._wf.CONTROL_SCENE, "confirm")
+        else:
+            self._wf.click_region(self._wf.TUNE_SCENE, region)
 
     def _require_engine(self, operation: str) -> SubcallEnginePort:
         engine = self._wf.engine
@@ -111,7 +138,7 @@ class AndroidTuningRouteStrategy(TuningRouteStrategy):
         # 永远匹配不上，回收功能会在英文界面下完全失效）。
         key = wf.ocr_scene_by(
             wf.EQUIP_DETAIL,
-            ["sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4"],
+            _RECYCLE_ENTRY_FIELDS,
             "回收", "contains")
         if not key:
             logger.warning("未找到回收按钮，装备保留")
@@ -121,10 +148,6 @@ class AndroidTuningRouteStrategy(TuningRouteStrategy):
         wf.click_region(wf.EQUIP_DETAIL, key)
         wf.wait_stable("page_refresh")  # 回收确认弹窗
         return True
-
-    def confirm_recycle(self) -> None:
-        wf = self._wf
-        wf.click_region(wf.EQUIP_DETAIL, "recycle_confirm")
 
     def close_recycle_entry_on_lock(self) -> None:
         wf = self._wf
@@ -138,18 +161,12 @@ class DesktopTuningRouteStrategy(TuningRouteStrategy):
     def open_recycle_dialog(self) -> bool:
         # 桌面端回收始终由 X 触发；按键本身无副作用，无需先 OCR
         # 判断功能区是否存在「回收」。是否真正打开回收弹窗，由
-        # TuningRecycler 紧接着识别 recycle_confirm 中的「确认」判定。
+        # TuningRecycler 紧接着联合识别通用确认区域中的确认/取消判定。
         wf = self._wf
         logger.info("  [桌面端] 按 X 回收")
         wf.press("X", wait=None)
         wf.wait_stable("page_refresh")  # 回收确认弹窗
         return True
-
-    def confirm_recycle(self) -> None:
-        # 端游的回收确认走键盘：确认区域在端游布局下并不是一个可点的按钮，
-        # 点它不生效；空格才是确认键（与 X 触发回收成对）。
-        logger.info("  [桌面端] 按空格确认回收")
-        self._wf.press("SPACE", wait=None)
 
     def close_recycle_entry_on_lock(self) -> None:
         # 桌面端被锁定时不出现确认弹窗，且 X 已经退出装备详情；这里只等待
@@ -162,16 +179,6 @@ class DesktopTuningRouteStrategy(TuningRouteStrategy):
         logger.info("  [桌面端] 按 ESC 关闭装备详情")
         self._wf.press("ESC", wait=None)
         self._wf.wait_stable("page_refresh")
-
-    def open_reset_dialog(self) -> None:
-        logger.info("  [桌面端] 按 R 打开重置调律")
-        self._wf.press("R", wait=None)
-
-    def confirm_reset(self, region: str) -> None:
-        # 端游的两阶段重置确认都由空格触发。region 仅用于让移动端保留
-        # reset_confirm / reset_confirm_2 两个既有扫描区域。
-        logger.info("  [桌面端] 按空格确认重置调律")
-        self._wf.press("SPACE", wait=None)
 
 
 def create_tuning_route_strategy(

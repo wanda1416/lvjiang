@@ -40,11 +40,30 @@
 | 文件 | 顶层键 | 主要消费方 |
 |------|--------|-----------|
 | `app.yaml` | `input_simulation` / `delay_params` / `envs` | `load_app_config()` |
-| `scenes.yaml` | `layout_scenes` / `group_names` | `core/scene_registry.py`、`scene_definition.py` |
+| `scenes.yaml` | `schema_version: 2` / `scenes` | `core/scene_config.py`、`scene_registry.py`、`scene_definition.py` |
 | `layouts.yaml` | `layouts` | `core/layout_manager.py`、`screen_calib.py` |
 | `ocr_rules.yaml` | `replacements` / `patterns` | `core/ocr_cleaner.py` |
 | `yysls/game_config.yaml` | `base_attrs` / `affix_caps` / `schools` / `weapon_types` 等 9 项 | `apps/yysls/config/manager.py` |
 | `yysls/tune_config.yaml` | `base_rules` / `tuning_rules` / `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
+
+`scenes.yaml` 的当前结构版本为 2，与 `layouts.yaml` 一样使用单一领域顶层键：
+
+```yaml
+schema_version: 2
+scenes:
+  activity:
+    name: 活动
+    items:
+      - activity_main
+      - activity_mengzhu
+    disabled:
+      - activity_mengzhu
+```
+
+`disabled` 场景只从场景管理 UI 隐藏，定义仍注册并可被旧布局、工作流引用。
+缺少 `schema_version`（或显式为 1）的旧 `layout_scenes + group_names` 文档按
+v1 读取。system 与 local 必须各自转换为 v2 后再合并，不能先把两种 schema
+深合并；旧文件在兼容读取时不落盘，下一次真正保存场景结构时统一写成 v2。
 
 ### 例外：telemetry/ 不是覆盖层镜像
 
@@ -102,7 +121,7 @@ system 层扫出的空间即**系统空间**（`is_system_space()`）：用户�
 
 | 文件 | 路径 | 声明方 |
 |------|------|--------|
-| `scenes.yaml` | `layout_scenes.*` | core（`resolver.py` 常量表） |
+| `scenes.yaml` | `scenes.*.items` / `scenes.*.disabled`（兼容 v1 `layout_scenes.*`） | core（`resolver.py` 常量表） |
 | `yysls/tune_config.yaml` | `base_rules` | 插件（`apps/yysls/config/merge_policy.py`） |
 
 local 形如：

@@ -28,7 +28,7 @@
 |------|------|-----------|----------|
 | **A. 本地遥测缓冲** `config/local/telemetry/spool/ready/*.ndjson` | 只有你自己这台机器、且尚未上报的部分 | 完整 | 零成本，文件就在本地 |
 | **B. D1 生产库导出** | 所有同意上报的用户，90 天 | 完整 | 需要 wrangler 凭据 |
-| **C. 调律说明文档** `logs/tuning/**/*.md` 里的 `TUNING_DATA_JSON` 块 | 只有你自己，但**保留全部历史** | 另一套字段 | 零成本 |
+| **C. 本地调律历史** `config/session/tuning_history.db` | 只有你自己，但**保留全部历史** | 完整本地字段 | 零成本 |
 
 三份不是替代关系：
 
@@ -37,8 +37,8 @@
   **一条 = 一件装备从进调律页面到离开**，带初始词条、逐轮产出序列、
   结束原因与最终评级。A 只是 B 的一小片，适合先把脚本跑通、确认输出长
   什么样，再去动生产数据。
-- **C 覆盖面更窄但保留全部历史**：只有本机，按「一件装备」组织，字段与
-  A/B 不同（`rounds[].food`、`final_rating`、自由文本的 `stop_reason`）。
+- **C 覆盖面更窄但保留全部历史**：只有本机，按「一次运行 → 一件装备」
+  组织，包含实时总览所用的槽位、处理顺序、终态和逐轮详情。
   A/B 现在也是按件粒度，所以两者能回答的问题**基本重合**了；C 的价值在于
   它保留了开启统计之前的历史记录。
 
@@ -122,12 +122,12 @@ python scripts/analyze_telemetry_rolls.py rolls.json \
 ### 路径 C：分析自己的历史调律记录
 
 ```bash
-python scripts/analyze_tuning_affixes.py logs/tuning
+python scripts/analyze_tuning_affixes.py config/session/tuning_history.db
 ```
 
-这个脚本比遥测分析器更早存在，回答的是 C 类问题：部位词条分布、第 N 个词条
-的分布、**给定首词条后的条件概率**。它优先读 `TUNING_DATA_JSON` 块，读不到
-才回退到 markdown 正则（兼容早期报告）。
+这个脚本回答的是 C 类问题：部位词条分布、第 N 个词条的分布、**给定首词条
+后的条件概率**。它优先读取版本化历史数据库；传入旧 `logs/tuning` 目录且
+找不到数据库时，才回退到 Markdown 正则解析旧报告。
 
 ### 常用参数
 

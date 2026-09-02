@@ -41,6 +41,7 @@ CONFIG_DIR = PROJECT_ROOT / "config"
 SESSION_CONFIG_DIR = CONFIG_DIR / "session"
 SESSION_PATH = SESSION_CONFIG_DIR / "session.json"
 USERS_DIR = SESSION_CONFIG_DIR / "users"
+AVATARS_DIR = SESSION_CONFIG_DIR / "avatars"
 OUTPUT_DIR = SESSION_CONFIG_DIR / "output"
 
 # 用户采集产出（录屏/截屏，与场景布局截图、工作流产出分开）

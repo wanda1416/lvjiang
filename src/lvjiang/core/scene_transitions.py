@@ -103,23 +103,23 @@ def validate_transitions(scenes: dict) -> list[str]:
 
 
 def find_unreachable_views(scenes: dict) -> list[str]:
-    """找出没有任何入口的非基底、非同态视图。
+    """找出没有任何入口的非基底、非同层视图。
 
     两类视图**天然没有入口**，不算死视图：
 
     - **基底视图**：场景入口，不需要场景内的按钮指向它；
-    - **同态视图**：与基底同一层，只是滚动/翻页后的另一个取景（菜单的
+    - **同层视图**：与基底处于同一图层，只是滚动/翻页后的另一个取景（菜单的
       page_1 / page_2）。没有任何按钮"进入"它，你只是把同一页滚过去了。
 
     其余视图若没有任何 ``to:`` 指过来，就是**死视图**——要么漏声明了入口，
-    要么它根本不该是个独立视图（也许该标成同态）。
+    要么它根本不该是个独立视图（也许该标成同层）。
     """
     reached = {(t.to_scene, t.to_view or BASE_VIEW_KEY)
                for t in collect_transitions(scenes)}
     dead: list[str] = []
     for scene_key, scene in scenes.items():
         for view in scene.views:
-            if view.key == BASE_VIEW_KEY or getattr(view, "homomorphic", False):
+            if view.key == BASE_VIEW_KEY or getattr(view, "same_layer", False):
                 continue
             if (scene_key, view.key) not in reached:
                 dead.append(f"{scene_key}/{view.key}")

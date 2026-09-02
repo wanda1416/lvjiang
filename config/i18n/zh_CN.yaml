@@ -2,6 +2,9 @@ meta:
   language: zh_CN
   display_name: 简体中文
   version: 0.2.5
+dialog_guard:
+  confirm_close: 确认关闭
+  confirm_close_message: 确定要关闭此窗口吗？
 main_window:
   title: 律匠 - 通用视觉 RPA 引擎
   menu_general: 通用
@@ -77,6 +80,10 @@ settings_dialog:
   window_title_label: '默认窗口标题:'
   window_title_placeholder: 空串不自动定位窗口
   status_saved: 配置已保存
+  tab_fonts: 字体设置
+  user_overview_font_size: 用户总览字号
+  user_info_font_size: 用户信息字号
+  font_scope_tip: 只调整「用户总览」和「用户信息」中刷新工具栏下方的内容字号，包括列表表头；顶部工具栏和底部「数据模型」按钮保持不变。
 about_dialog:
   title: 关于律匠
   app_name: 律匠
@@ -129,11 +136,63 @@ user_manager:
   username_exists: 用户名已存在
   username_invalid: 用户名只能用中文、字母、数字、下划线和连字符，最多 32 个字符。
   confirm_delete_title: 确认删除
+
   confirm_delete_message: '确定要删除用户「{name}」吗？
 
-    该用户的所有数据将被清除，此操作不可恢复。'
+    该用户的关联数据将被清除；已保存头像仍保留在头像库中。此操作不可恢复。'
   user_deleted: '用户已删除: {name}'
   cannot_delete: 无法删除该用户
+user_avatar:
+  title: 用户头像
+  edit_action: 编辑头像
+  double_click: 双击编辑头像
+  edit_title: 编辑“{name}”的头像
+  hover_hint: 悬浮点击编辑，或双击头像
+  library: 头像库
+  library_hint: 选择之前保存的头像，或导入一张新图片
+  current: 当前使用
+  import: 导入图片
+  import_title: 导入头像图片
+  import_placeholder: 导入图片或从剪贴板粘贴
+  paste: 从剪贴板粘贴
+  screenshot_hint: 从当前设备或窗口获取最新截图
+  paste_hint: 可拖动图片定位，滚轮或滑块缩放 · Ctrl+V 粘贴
+  zoom: 缩放
+  reset: 重置
+  remove: 移除当前头像
+  save_use: 保存并使用
+  use_selected: 使用此头像
+  cancel: 取消
+  image_filter: 图片文件 (*.png *.jpg *.jpeg *.webp *.bmp)
+  import_failed: 导入失败
+  paste_failed: 无法粘贴
+  no_image: 没有读取到有效图片
+  clipboard_empty: 剪贴板中没有图片
+  too_large: 图片尺寸过大，请选择不超过 4000 万像素的图片
+  read_failed: 无法读取图片：{error}
+  empty_crop: 没有可保存的裁剪图片
+  reference_failed: 无法更新用户头像引用
+  save_failed: 保存头像失败：{error}
+  remove_failed: 移除头像失败：{error}
+  delete_history: 删除历史头像
+  delete_confirm: 确定永久删除这张历史头像吗？此操作无法撤销。
+  delete_failed: 删除历史头像失败：{error}
+  delete_invalid: 头像文件不存在或文件名无效
+  in_use_title: 头像正在使用
+  in_use_message: "该头像正被以下用户使用，不能删除：\n{users}\n\n请先为这些用户更换或移除头像。"
+user_notes:
+  title: 便利贴
+  btn_add: ＋ 添加便利贴
+  empty: 暂无便利贴
+  add_title: 新增便利贴
+  edit_title: 编辑便利贴
+  content_label: '便利贴内容:'
+  empty_error: 便利贴内容不能为空
+  length_error: 便利贴内容不能超过 {limit} 个字符
+  load_error: 读取便利贴失败：{error}
+  save_error: 保存便利贴失败：{error}
+  delete_confirm: 确定要删除这条便利贴吗？
+  delete_error: 删除便利贴失败：{error}
 script_record:
   title: 脚本录制
   btn_record: ● 录制脚本 (F12)
@@ -359,167 +418,236 @@ config:
   delay_page_refresh: Page Refresh Wait
   delay_scroll_settle: Scroll Settle Wait
 auto_strings:
-  profile_core_001: "DSL 写入"
-  profile_core_002: "Key '{key}' 已在该分组中显示"
-  profile_core_003: "Key '{key}' 已存在"
-  profile_core_004: "Key 只能包含字母、数字和下划线"
-  profile_core_005: "profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式"
-  profile_core_006: "{field}不能大于 999999"
-  profile_core_007: "{field}不能小于 {min}"
-  profile_core_008: "{field}必须是有效数字"
-  profile_core_009: "{label} 必须是整数"
-  profile_core_010: "{title} Key ({model})"
-  profile_core_011: "上一个用户"
-  profile_core_012: "上限"
-  profile_core_013: "上限:"
-  profile_core_014: "下一个用户"
-  profile_core_015: "下一点恢复: 已达上限"
-  profile_core_016: "不提醒"
-  profile_core_017: "中文，如 周任务"
-  profile_core_018: "保存 profile.yaml 失败:\n{e}"
-  profile_core_019: "倍率"
-  profile_core_020: "全向"
-  profile_core_021: "再生"
-  profile_core_022: "写入冲突"
-  profile_core_023: "准点/{unit}"
-  profile_core_024: "准点:{val}/{period}"
-  profile_core_025: "准点周期:"
-  profile_core_026: "准点恢复"
-  profile_core_027: "减少..."
-  profile_core_028: "减少后数值不能小于 0（当前值: {cur}，输入: {inp}）"
-  profile_core_029: "减少量:"
-  profile_core_030: "分组 '{name}' 已存在"
-  profile_core_031: "分组名不能为空"
-  profile_core_032: "分组名称:"
-  profile_core_033: "分钟"
-  profile_core_034: "删除分组"
-  profile_core_035: "删除当前列"
-  profile_core_036: "刷新"
-  profile_core_037: "勾选：按 action 语义处理，触发配置 sync_targets 的同步。\n取消：按纯覆写语义处理，仅写本 key，不触发任何同步。"
-  profile_core_038: "单向增加"
-  profile_core_039: "变更记录"
-  profile_core_040: "可选"
-  profile_core_041: "右侧新增列"
-  profile_core_042: "同步:{sync}"
-  profile_core_043: "同步到:"
-  profile_core_044: "同步变更依赖方"
-  profile_core_045: "同步目标:"
-  profile_core_046: "同步目标不能指向自身"
-  profile_core_047: "否"
-  profile_core_048: "周"
-  profile_core_049: "周一"
-  profile_core_050: "周三"
-  profile_core_051: "周二"
-  profile_core_052: "周五"
-  profile_core_053: "周六"
-  profile_core_054: "周四"
-  profile_core_055: "周期"
-  profile_core_056: "周期:"
-  profile_core_057: "回写用户数据失败:\n{e}"
-  profile_core_058: "增减幅度:"
-  profile_core_059: "增减幅度格式错误: '{part}'，应为整数或 整数:来源"
-  profile_core_060: "增减量（正增负减）:"
-  profile_core_061: "增加..."
-  profile_core_062: "增加量:"
-  profile_core_063: "备注"
-  profile_core_064: "备注内容:"
-  profile_core_065: "天"
-  profile_core_066: "如: -900:打本消耗,-1100 或 1,10:商店"
-  profile_core_067: "如: 1:任务奖励,10 或 -1"
-  profile_core_068: "如: 1:兑换,10 或 -1"
-  profile_core_069: "定义数据模型 key"
-  profile_core_070: "定义数据模型的 key。双击行可编辑。"
-  profile_core_071: "定时"
-  profile_core_072: "实时/{unit}"
-  profile_core_073: "实时:{val}/{unit}"
-  profile_core_074: "实时恢复"
-  profile_core_075: "小时"
-  profile_core_076: "展示上限"
-  profile_core_077: "已完成"
-  profile_core_078: "幅度:{steps}"
-  profile_core_079: "库存"
-  profile_core_080: "开启后允许输入小数，UI 使用 DoubleValidator"
-  profile_core_081: "当前值: {val}"
-  profile_core_082: "恢复类型:"
-  profile_core_083: "恢复类型: 准点恢复"
-  profile_core_084: "恢复类型: 实时恢复"
-  profile_core_085: "提示"
-  profile_core_086: "操作"
-  profile_core_087: "支持小数"
-  profile_core_088: "数值无效"
-  profile_core_089: "数据模型"
-  profile_core_090: "新值"
-  profile_core_091: "新值:"
-  profile_core_092: "新名称:"
-  profile_core_093: "新增"
-  profile_core_094: "无上限"
-  profile_core_095: "旧值"
-  profile_core_096: "时间"
-  profile_core_097: "未完成"
-  profile_core_098: "来源/用途"
-  profile_core_099: "来源:"
-  profile_core_100: "查看历史记录"
-  profile_core_101: "标签"
-  profile_core_102: "标签:"
-  profile_core_103: "橙色"
-  profile_core_104: "橙色阈值:"
-  profile_core_105: "橙警:>={val}"
-  profile_core_106: "正向"
-  profile_core_108: "每周"
-  profile_core_109: "每天"
-  profile_core_110: "每日"
-  profile_core_111: "每月"
-  profile_core_112: "每次恢复:"
-  profile_core_114: "没有可用的数据模型 key，请先在数据模型定义中添加"
-  profile_core_115: "添加同步目标"
-  profile_core_116: "用户数据模型定义"
-  profile_core_117: "用途"
-  profile_core_118: "用途:"
-  profile_core_119: "目标"
-  profile_core_120: "确定"
-  profile_core_121: "确定要删除 key '{key}' 吗？"
-  profile_core_122: "确定要删除分组 '{name}' 吗？"
-  profile_core_123: "类型"
-  profile_core_124: "红色"
-  profile_core_125: "红色阈值:"
-  profile_core_126: "红警:>={val}"
-  profile_core_127: "编辑"
-  profile_core_128: "编辑备注 - {label}"
-  profile_core_129: "编辑文本..."
-  profile_core_130: "自定义增减 - {label}"
-  profile_core_131: "至少保留一个分组"
-  profile_core_132: "英文，如 "
-  profile_core_133: "覆写"
-  profile_core_134: "覆写 - {label}"
-  profile_core_135: "覆写..."
-  profile_core_136: "该数值已被其他进程更新，本次增减未写入。请刷新后重试。"
-  profile_core_137: "详情"
-  profile_core_138: "详情摘要"
-  profile_core_139: "请先选择用户"
-  profile_core_140: "请输入 Key"
-  profile_core_141: "请输入{field}"
-  profile_core_142: "请输入数值"
-  profile_core_143: "请输入标签"
-  profile_core_144: "负向"
-  profile_core_145: "软上限"
-  profile_core_146: "输入错误"
-  profile_core_147: "选择字段"
-  profile_core_148: "选择或输入新{label}"
-  profile_core_149: "逗号分隔，减少时供下拉选择，如: 导出,扣减,清理"
-  profile_core_150: "逗号分隔，增加时供下拉选择，如: 同步,导入,人工录入"
-  profile_core_151: "速率单位:"
-  profile_core_152: "速率数值:"
-  profile_core_153: "配额"
-  profile_core_154: "重复"
-  profile_core_155: "重新读取用户数据"
-  profile_core_156: "重置:{time}"
-  profile_core_157: "重置日(几号):"
-  profile_core_158: "重置日(周几):"
-  profile_core_159: "重置日:{day}"
-  profile_core_160: "重置日:{day}号"
-  profile_core_161: "重置时刻:"
-  profile_core_162: "错误"
-  profile_core_163: "（请选择）"
+  全武学增伤要求: 全武学增伤要求
+  奇术增伤要求: 奇术增伤要求
+  对单位增伤要求: 对单位增伤要求
+  以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算: 以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算
+  + 引用坐标: + 引用坐标
+  引用坐标: 引用坐标
+  引用其他一级场景已定义的坐标；坐标属于源场景，本场景只读: 引用其他一级场景已定义的坐标；坐标属于源场景，本场景只读
+  没有可引用的坐标：一级场景中同名的 key 已被本场景占用。: 没有可引用的坐标：一级场景中同名的 key 已被本场景占用。
+  删除玩法: 删除玩法
+  '选择要引用的玩法:': '选择要引用的玩法:'
+  所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」: 所有玩法都已引用；要新建玩法请到「游戏配置 → 玩法配置」
+  玩法定义在「游戏配置 → 玩法配置」中维护，此处只引用: 玩法定义在「游戏配置 → 玩法配置」中维护，此处只引用
+  '主武学:': '主武学:'
+  '副武学:': '副武学:'
+  主武学增伤要求: 主武学增伤要求
+  副武学增伤要求: 副武学增伤要求
+  武学类型: 武学类型
+  玩法类型: 玩法类型
+  + 武学: + 武学
+  '- 武学': '- 武学'
+  + 玩法: + 玩法
+  '- 玩法': '- 玩法'
+  '武学名称:': '武学名称:'
+  武学配置: 武学配置
+  玩法: 玩法
+  玩法配置: 玩法配置
+  新增武学: 新增武学
+  新增玩法: 新增玩法
+  '玩法名称:': '玩法名称:'
+  该武学已存在: 该武学已存在
+  该玩法已存在: 该玩法已存在
+  输出装备定音: 输出装备定音
+  防御装备定音: 防御装备定音
+  属性与主副武学由绑定流派提供，已锁定: 属性与主副武学由绑定流派提供，已锁定
+  自定义玩法可自由选择属性与武学，并显示全部防御定音: 自定义玩法可自由选择属性与武学，并显示全部防御定音
+  这两个武学尚未登记到任何玩法: 这两个武学尚未登记到任何玩法
+  以下流派仍在使用该武学：{schools}: 以下流派仍在使用该武学：{schools}
+  以下调律规则仍在引用该玩法：{rules}: 以下调律规则仍在引用该玩法：{rules}
+  流派与玩法只引用武学，武器由此派生，不在别处录入: 流派与玩法只引用武学，武器由此派生，不在别处录入
+  随武学: 随武学
+  执行用户：: 执行用户：
+  跟随当前用户: 跟随当前用户
+  请选择有效的执行用户: 请选择有效的执行用户
+  '[错误] 请选择有效的执行用户': '[错误] 请选择有效的执行用户'
+  同层视图与基底处于同一图层，无入口: 同层视图与基底处于同一图层，无入口
+  '无入口（死视图：补 to: 声明，或改标为同层视图）': '无入口（死视图：补 to: 声明，或改标为同层视图）'
+  '  · 同层': '  · 同层'
+  同层视图（与基底同一图层，如滚动后的另一屏）: 同层视图（与基底同一图层，如滚动后的另一屏）
+  同层视图没有入口，只有跳转；取消勾选表示它是独立页面，需要声明入口: 同层视图没有入口，只有跳转；取消勾选表示它是独立页面，需要声明入口
+  入口: 入口
+  基底  （单视图）: 基底  （单视图）
+  '跳转:': '跳转:'
+  基底视图是场景入口: 基底视图是场景入口
+  未声明: 未声明
+  + 引用区域: + 引用区域
+  引用区域: 引用区域
+  没有可引用的区域：一级场景中同名的 key 已被本场景占用。: 没有可引用的区域：一级场景中同名的 key 已被本场景占用。
+  确定移除对 {scene}.{entity} 的引用吗？源场景的定义不受影响。: 确定移除对 {scene}.{entity} 的引用吗？源场景的定义不受影响。
+  移除引用: 移除引用
+  '来源:': '来源:'
+  来源: 来源
+  跳转: 跳转
+  不跳转: 不跳转
+  profile_core_001: DSL 写入
+  profile_core_002: Key '{key}' 已在该分组中显示
+  profile_core_003: Key '{key}' 已存在
+  profile_core_004: Key 只能包含字母、数字和下划线
+  profile_core_005: profile.yaml 为旧格式（含 fields/groups），请手动更新为新格式
+  profile_core_006: '{field}不能大于 999999'
+  profile_core_007: '{field}不能小于 {min}'
+  profile_core_008: '{field}必须是有效数字'
+  profile_core_009: '{label} 必须是整数'
+  profile_core_010: '{title} Key ({model})'
+  profile_core_011: 上一个用户
+  profile_core_012: 上限
+  profile_core_013: '上限:'
+  profile_core_014: 下一个用户
+  profile_core_015: '下一点恢复: 已达上限'
+  profile_core_016: 不提醒
+  profile_core_017: 中文，如 周任务
+  profile_core_018: '保存 profile.yaml 失败:
+
+    {e}'
+  profile_core_019: 倍率
+  profile_core_020: 全向
+  profile_core_021: 再生
+  profile_core_022: 写入冲突
+  profile_core_023: 准点/{unit}
+  profile_core_024: 准点:{val}/{period}
+  profile_core_025: '准点周期:'
+  profile_core_026: 准点恢复
+  profile_core_027: 减少...
+  profile_core_028: '减少后数值不能小于 0（当前值: {cur}，输入: {inp}）'
+  profile_core_029: '减少量:'
+  profile_core_030: 分组 '{name}' 已存在
+  profile_core_031: 分组名不能为空
+  profile_core_032: '分组名称:'
+  profile_core_033: 分钟
+  profile_core_034: 删除分组
+  profile_core_035: 删除当前列
+  profile_core_036: 刷新
+  profile_core_037: '勾选：按 action 语义处理，触发配置 sync_targets 的同步。
+
+    取消：按纯覆写语义处理，仅写本 key，不触发任何同步。'
+  profile_core_038: 单向增加
+  profile_core_039: 变更记录
+  profile_core_040: 可选
+  profile_core_041: 右侧新增列
+  profile_core_042: 同步:{sync}
+  profile_core_043: '同步到:'
+  profile_core_044: 同步变更依赖方
+  profile_core_045: '同步目标:'
+  profile_core_046: 同步目标不能指向自身
+  profile_core_047: 否
+  profile_core_048: 周
+  profile_core_049: 周一
+  profile_core_050: 周三
+  profile_core_051: 周二
+  profile_core_052: 周五
+  profile_core_053: 周六
+  profile_core_054: 周四
+  profile_core_055: 周期
+  profile_core_056: '周期:'
+  profile_core_057: '回写用户数据失败:
+
+    {e}'
+  profile_core_058: '增减幅度:'
+  profile_core_059: '增减幅度格式错误: ''{part}''，应为整数或 整数:来源'
+  profile_core_060: '增减量（正增负减）:'
+  profile_core_061: 增加...
+  profile_core_062: '增加量:'
+  profile_core_063: 备注
+  profile_core_064: '备注内容:'
+  profile_core_065: 天
+  profile_core_066: '如: -900:打本消耗,-1100 或 1,10:商店'
+  profile_core_067: '如: 1:任务奖励,10 或 -1'
+  profile_core_068: '如: 1:兑换,10 或 -1'
+  profile_core_069: 定义数据模型 key
+  profile_core_070: 定义数据模型的 key。双击行可编辑。
+  profile_core_071: 定时
+  profile_core_072: 实时/{unit}
+  profile_core_073: 实时:{val}/{unit}
+  profile_core_074: 实时恢复
+  profile_core_075: 小时
+  profile_core_076: 展示上限
+  profile_core_077: 已完成
+  profile_core_078: 幅度:{steps}
+  profile_core_079: 库存
+  profile_core_080: 开启后允许输入小数，UI 使用 DoubleValidator
+  profile_core_081: '当前值: {val}'
+  profile_core_082: '恢复类型:'
+  profile_core_083: '恢复类型: 准点恢复'
+  profile_core_084: '恢复类型: 实时恢复'
+  profile_core_085: 提示
+  profile_core_086: 操作
+  profile_core_087: 支持小数
+  profile_core_088: 数值无效
+  profile_core_089: 数据模型
+  profile_core_090: 新值
+  profile_core_091: '新值:'
+  profile_core_092: '新名称:'
+  profile_core_093: 新增
+  profile_core_094: 无上限
+  profile_core_095: 旧值
+  profile_core_096: 时间
+  profile_core_097: 未完成
+  profile_core_098: 来源/用途
+  profile_core_099: '来源:'
+  profile_core_100: 查看历史记录
+  profile_core_101: 标签
+  profile_core_102: '标签:'
+  profile_core_103: 橙色
+  profile_core_104: '橙色阈值:'
+  profile_core_105: 橙警:>={val}
+  profile_core_106: 正向
+  profile_core_108: 每周
+  profile_core_109: 每天
+  profile_core_110: 每日
+  profile_core_111: 每月
+  profile_core_112: '每次恢复:'
+  profile_core_114: 没有可用的数据模型 key，请先在数据模型定义中添加
+  profile_core_115: 添加同步目标
+  profile_core_116: 用户数据模型定义
+  profile_core_117: 用途
+  profile_core_118: '用途:'
+  profile_core_119: 目标
+  profile_core_120: 确定
+  profile_core_121: 确定要删除 key '{key}' 吗？
+  profile_core_122: 确定要删除分组 '{name}' 吗？
+  profile_core_123: 类型
+  profile_core_124: 红色
+  profile_core_125: '红色阈值:'
+  profile_core_126: 红警:>={val}
+  profile_core_127: 编辑
+  profile_core_128: 编辑备注 - {label}
+  profile_core_129: 编辑文本...
+  profile_core_130: 自定义增减 - {label}
+  profile_core_131: 至少保留一个分组
+  profile_core_132: '英文，如 '
+  profile_core_133: 覆写
+  profile_core_134: 覆写 - {label}
+  profile_core_135: 覆写...
+  profile_core_136: 该数值已被其他进程更新，本次增减未写入。请刷新后重试。
+  profile_core_137: 详情
+  profile_core_138: 详情摘要
+  profile_core_139: 请先选择用户
+  profile_core_140: 请输入 Key
+  profile_core_141: 请输入{field}
+  profile_core_142: 请输入数值
+  profile_core_143: 请输入标签
+  profile_core_144: 负向
+  profile_core_145: 软上限
+  profile_core_146: 输入错误
+  profile_core_147: 选择字段
+  profile_core_148: 选择或输入新{label}
+  profile_core_149: '逗号分隔，减少时供下拉选择，如: 导出,扣减,清理'
+  profile_core_150: '逗号分隔，增加时供下拉选择，如: 同步,导入,人工录入'
+  profile_core_151: '速率单位:'
+  profile_core_152: '速率数值:'
+  profile_core_153: 配额
+  profile_core_154: 重复
+  profile_core_155: 重新读取用户数据
+  profile_core_156: 重置:{time}
+  profile_core_157: '重置日(几号):'
+  profile_core_158: '重置日(周几):'
+  profile_core_159: 重置日:{day}
+  profile_core_160: 重置日:{day}号
+  profile_core_161: '重置时刻:'
+  profile_core_162: 错误
+  profile_core_163: （请选择）
   '  未导入图片': '  未导入图片'
   '## 汇总': '## 汇总'
   (可选): (可选)
@@ -576,7 +704,7 @@ auto_strings:
   '[模式] 已切换到前台模式（SendInput，移动光标）': '[模式] 已切换到前台模式（SendInput，移动光标）'
   '[模式] 已切换到后台模式（PostMessage，不移动光标）': '[模式] 已切换到后台模式（PostMessage，不移动光标）'
   '[状态] 重新扫描窗口，旧定位已失效': '[状态] 重新扫描窗口，旧定位已失效'
-  '[设备端手势] 连不上手机上的律匠 app（未安装或未开无障碍），回退 adb shell input': '[设备端手势] 连不上手机上的律匠 app（未安装或未开无障碍），回退 adb shell input'
+  '[设备端手势] App 不可达或设备端输入通道未就绪，回退 adb shell input': '[设备端手势] App 不可达或设备端输入通道未就绪，回退 adb shell input'
   '[错误] 当前工作环境 {env} 不在该脚本支持的环境 {envs} 中': '[错误] 当前工作环境 {env} 不在该脚本支持的环境 {envs} 中'
   '[错误] 无主窗口，无法获取运行环境': '[错误] 无主窗口，无法获取运行环境'
   '[错误] 暂无配置，请先通过 工具 → 批量配置 添加': '[错误] 暂无配置，请先通过 工具 → 批量配置 添加'
@@ -791,7 +919,7 @@ auto_strings:
   图像检测: 图像检测
   图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格: 图像识别的最低置信度（0~1），低于此值视为未匹配；越高越严格
   图库已刷新: 图库已刷新
-  图库：: 图库：
+  图库: 图库
   '图库空间:': '图库空间:'
   图库管理: 图库管理
   图库识别（分类）: 图库识别（分类）
@@ -920,7 +1048,7 @@ auto_strings:
   成功: 成功
   或点击停止: 或点击停止
   截图: 截图
-  截图、日志、config/session/ 目录里的任何内容: 截图、日志、config/session/ 目录里的任何内容
+  截图、日志、配置文件或其他未在上方列明的本地内容: 截图、日志、配置文件或其他未在上方列明的本地内容
   截图功能不可用，请先在主窗口定位窗口或连接设备: 截图功能不可用，请先在主窗口定位窗口或连接设备
   截图失败: 截图失败
   截图失败：无障碍服务未连接或截图被节流: 截图失败：无障碍服务未连接或截图被节流
@@ -1076,13 +1204,18 @@ auto_strings:
   点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果: 点击「识别全部字段」查看 OCR 结果，点击「识别全部参考图」查看匹配结果
   点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果: 点击「识别全部字段」查看 OCR 结果，点击「识别全部材料」查看材料识别结果
   点击前延迟(秒): 点击前延迟(秒)
-  点击区域: 点击区域
+  激活区域: 激活区域
   点击变量: 点击变量
   点击后延迟(秒): 点击后延迟(秒)
   点击在脚本编辑器光标处插入当前场景 key: 点击在脚本编辑器光标处插入当前场景 key
   点击坐标: 点击坐标
   点击坐标附加 ±N 像素的随机偏移: 点击坐标附加 ±N 像素的随机偏移
-  点击布局里已定义的区域或坐标点中心: 点击布局里已定义的区域或坐标点中心
+  激活布局实体；默认点击中心，布局可改为按键: 激活布局实体；默认点击中心，布局可改为按键
+  '属性:': '属性:'
+  '按键:': '按键:'
+  留空则点击坐标，如 SPACE / ESC / R: 留空则点击坐标，如 SPACE / ESC / R
+  仅作用于当前布局；click 将改为按下该按键: 仅作用于当前布局；click 将改为按下该按键
+  请先在当前布局中放置该实体，再设置激活按键: 请先在当前布局中放置该实体，再设置激活按键
   点击画布归一化坐标: 点击画布归一化坐标
   热键不能重复绑定同一个按键，请检查后重试: 热键不能重复绑定同一个按键，请检查后重试
   热键已更新并立即生效: 热键已更新并立即生效
@@ -1127,7 +1260,9 @@ auto_strings:
   等待（秒）: 等待（秒）
   等级: 等级
   简体中文: 简体中文
-  管理视图: 管理视图
+  视图管理: 视图管理
+  本场景视图: 本场景视图
+  快速选择当前场景内的目标视图: 快速选择当前场景内的目标视图
   '类型:': '类型:'
   粘贴 (Ctrl+V): 粘贴 (Ctrl+V)
   系统: 系统
@@ -1152,6 +1287,7 @@ auto_strings:
   网格参数: 网格参数
   网格线间隔像素，用于过滤黑边: 网格线间隔像素，用于过滤黑边
   网络与隐私: 网络与隐私
+  开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。: 开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。
   脚本 id 不能为空: 脚本 id 不能为空
   脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）: 脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）
   脚本 id 只能用字母、数字、下划线，且以字母开头: 脚本 id 只能用字母、数字、下划线，且以字母开头
@@ -1302,13 +1438,13 @@ auto_strings:
   已还原为系统版本: 已还原为系统版本
   布局版本：: 布局版本：
   ? '把系统脚本 {name} 复制到本地后才能修改。
-  
+
     复制之后这个文件不再跟随系统更新，确定？'
   : '把系统脚本 {name} 复制到本地后才能修改。
-  
+
     复制之后这个文件不再跟随系统更新，确定？'
   提升: 提升
-  '提升至 v{version}': '提升至 v{version}'
+  提升至 v{version}: 提升至 v{version}
   撤销提升: 撤销提升
   本地覆盖系统: 本地覆盖系统
   规则版本：: 规则版本：
@@ -1323,11 +1459,11 @@ auto_strings:
   系统脚本只读——右键「复制到本地以修改」后才能保存: 系统脚本只读——右键「复制到本地以修改」后才能保存
   系统脚本只读——右键「复制到本地以修改」后才能编辑: 系统脚本只读——右键「复制到本地以修改」后才能编辑
   系统（只读）: 系统（只读）
-  '规则版本已提升至 v{version} 并生效': '规则版本已提升至 v{version} 并生效'
+  规则版本已提升至 v{version} 并生效: 规则版本已提升至 v{version} 并生效
   还原为系统: 还原为系统
   这是系统脚本的本地副本，删不掉；右键「还原为系统」可丢弃本地修改: 这是系统脚本的本地副本，删不掉；右键「还原为系统」可丢弃本地修改
   远程: 远程
-  '，提升 {count} 项版本': '，提升 {count} 项版本'
+  ，提升 {count} 项版本: ，提升 {count} 项版本
   无: 无
   当前生效：{current}: 当前生效：{current}
   现有版本：{count} 份，来自 {sources} 个来源: 现有版本：{count} 份，来自 {sources} 个来源
@@ -1339,7 +1475,7 @@ auto_strings:
   已保存布局「{name}」到系统层，但尚未生效：{reasons}: 已保存布局「{name}」到系统层，但尚未生效：{reasons}
   可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试: 可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试
   可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试: 可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试
-  '无法访问 {url} 获取更新：HTTP {code}': '无法访问 {url} 获取更新：HTTP {code}'
+  无法访问 {url} 获取更新：HTTP {code}: 无法访问 {url} 获取更新：HTTP {code}
   subscene_create_grid: + 创建网格
   subscene_new_ref: + 新建引用
   subscene_delete_ref: 删除引用
@@ -1357,7 +1493,7 @@ auto_strings:
   subscene_new_reference: 新建引用
   subscene_no_available_ref: 无可用引用
   subscene_none: 没有子场景
-  'subscene_confirm_delete_{key}': '确定删除引用 {key} 吗？'
+  subscene_confirm_delete_{key}: 确定删除引用 {key} 吗？
   subscene_bind_ref: 绑定引用
   subscene_bind_grid: 绑定网格
   subscene_edit_ref: 编辑引用
@@ -1366,3 +1502,35 @@ auto_strings:
   subscene_set_failed: 设置失败
   subscene_mark_help: 请先在目标场景的「场景管理」中标记为引用子场景。
   subscene_exit_crop_canvas: 退出裁剪画布
+task_history:
+  task: 任务
+  title: 任务历史
+  unavailable: 任务历史暂不可用
+  task_count: 任务数
+  task_run_id: 任务记录 ID
+  single_run: 单独运行
+  missing_path: 对应文件不存在或已被移动
+  invalid_date_order: 开始日期不能晚于结束日期
+  current_batch: 当前仅显示批量记录：
+  scope: 性质
+  open_log: 打开执行日志
+  open_batch_report: 打开批量报告
+  open_result: 打开结果 JSON
+  batch_history: 批量历史
+  batch_report: 批量报告
+  batch_run_id: 批量记录 ID
+  batch_run: 批量运行
+  file_missing: 文件不存在
+  source: 方式
+  invalid_date_range: 日期范围无效
+  yes: 有
+  view_tasks: 查看全部单任务
+  query: 查询
+  no_tasks: 没有符合条件的任务历史
+  no_batches: 没有符合条件的批量历史
+  filters: 筛选条件（用户和任务可多选；不选择表示全部）
+  finished_at: 结束时间
+  duration: 耗时
+  clear_batch: 返回全部任务
+  select_batch: 选择一条批量记录查看输入快照
+  select_task: 选择一条记录查看输入参数和文件路径

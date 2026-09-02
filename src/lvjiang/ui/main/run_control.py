@@ -234,8 +234,10 @@ class _UIHelper(QObject):
             self._install_dialog(
                 req,
                 box,
-                lambda _code: buttons.get(
-                    box.clickedButton(), kwargs.get("cancel_value")
+                lambda _code: (
+                    buttons.get(clicked, kwargs.get("cancel_value"))
+                    if (clicked := box.clickedButton()) is not None
+                    else kwargs.get("cancel_value")
                 ),
             )
             return

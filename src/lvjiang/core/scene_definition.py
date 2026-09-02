@@ -166,7 +166,7 @@ class SceneRegistry:
         for vd in data.get("views", []):
             views.append(ViewDef(
                 key=vd["key"], name=vd.get("name", vd["key"]),
-                homomorphic=bool(vd.get("homomorphic", True))))
+                same_layer=bool(vd.get("same_layer", True))))
         view_keys = {v.key for v in views}
         scene_type = str(data.get("type", "scene"))
         if scene_type not in ("scene", "subscene"):
@@ -638,7 +638,7 @@ class SceneRegistry:
         logger.info(f"场景 {scene_key} 视图顺序调整: {view_key} {'上移' if direction < 0 else '下移'}")
 
     def save_scene_views(self, scene_key: str):
-        """视图属性（如同态标记）改动后落盘。"""
+        """视图属性（如同层标记）改动后落盘。"""
         scene = self._require_scene(scene_key)
         self._save_scene_yaml(scene)
 

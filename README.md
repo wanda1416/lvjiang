@@ -120,7 +120,7 @@ lvjiang/
 │               ├── loadout/       # 装备展示与方案面板
 │               ├── profile/       # Profile 数据面板
 │               ├── tune_settings/ # 调律规则编辑面板
-│               └── tuning/        # 调律进度面板
+│               └── tuning/        # 调律管理、实时总览与历史详情
 ├── android/                   # 安卓独立执行端（Kotlin + Chaquopy 宿主工程）
 ├── config/
 │   ├── system/                # 随版本发布的配置

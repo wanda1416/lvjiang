@@ -4,7 +4,7 @@
 - 批次进度（部位 X / Y）
 - 当前装备信息（名称、类型、等级、品阶）
 - 词条进度（当前 / 目标）
-- 调律状态（轮次、预期评级、实际评级、最近结果）
+- 调律状态（轮次、预期评级、最终评级、最近结果）
 
 hub 可在构造时为空，工作流启动后通过 reconnect() 绑定。
 """
@@ -180,9 +180,9 @@ class TuningProgressWidget(QWidget):
         self._expect_label = QLabel(tr("最大预期：-"))
         self._expect_label.setStyleSheet("font-size: 12px;")
         status_layout.addWidget(self._expect_label)
-        self._actual_label = QLabel(tr("实际评级：-"))
-        self._actual_label.setStyleSheet("font-size: 12px;")
-        status_layout.addWidget(self._actual_label)
+        self._final_label = QLabel(tr("最终评级：-"))
+        self._final_label.setStyleSheet("font-size: 12px;")
+        status_layout.addWidget(self._final_label)
         self._last_result_label = QLabel("")
         self._last_result_label.setStyleSheet(
             "font-size: 11px; color: palette(mid); padding: 2px;")
@@ -286,7 +286,7 @@ class TuningProgressWidget(QWidget):
         self._round_label.setText(tr("轮次：0"))
         self._operation_label.setText(tr("当前阶段：等待开始"))
         self._expect_label.setText(tr("最大预期：-"))
-        self._actual_label.setText(tr("实际评级：-"))
+        self._final_label.setText(tr("最终评级：-"))
         self._last_result_label.setText("")
         self._status_msg_label.setVisible(False)
         self._scan_decision_label.setVisible(False)
@@ -428,7 +428,7 @@ class TuningProgressWidget(QWidget):
         self._rule_ratings_label.setText(tr("等待评级..."))
         self._round_label.setText(tr("轮次：0"))
         self._expect_label.setText(tr("最大预期：-"))
-        self._actual_label.setText(tr("实际评级：-"))
+        self._final_label.setText(tr("最终评级：-"))
         self._last_result_label.setText("")
         self._operation_label.setText(tr("当前阶段：等待下一件装备"))
         self._scan_decision_label.setVisible(False)
@@ -529,7 +529,7 @@ class TuningProgressWidget(QWidget):
                 f"{tr('最大预期：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
         else:
             self._expect_label.setText(tr("最大预期：判定中..."))
-        self._actual_label.setText(tr("实际评级：-"))
+        self._final_label.setText(tr("最终评级：-"))
         self._round_label.setText(tr("轮次：0"))
         self._operation_label.setText(tr("当前阶段：扫描判定 — 已读取装备，计算调律潜力"))
         self._last_result_label.setText("")
@@ -622,13 +622,13 @@ class TuningProgressWidget(QWidget):
             rating_cn, rating_style = _RATING_STYLE.get(expect, (expect, "#333"))
             self._expect_label.setText(
                 f"{tr('最大预期：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
-        actual = info.get("actual_rating")
-        if actual:
-            rating_cn, rating_style = _RATING_STYLE.get(actual, (actual, "#333"))
-            self._actual_label.setText(
-                f"{tr('实际评级：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
+        final = info.get("final_rating")
+        if final:
+            rating_cn, rating_style = _RATING_STYLE.get(final, (final, "#333"))
+            self._final_label.setText(
+                f"{tr('最终评级：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
         else:
-            self._actual_label.setText(tr("实际评级：-"))
+            self._final_label.setText(tr("最终评级：-"))
         if "rule_ratings" in info:
             self._on_equipment_assessed({
                 "expect_rating": expect,
@@ -671,10 +671,10 @@ class TuningProgressWidget(QWidget):
         self._operation_label.setText(
             tr("当前阶段：收尾处理 — 当前装备处理完成"))
         if rating:
-            self._actual_label.setText(
-                f"{tr('实际评级：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
+            self._final_label.setText(
+                f"{tr('最终评级：')}<span style='{rating_style}'>{tr(rating_cn)}</span>")
         else:
-            self._actual_label.setText(tr("实际评级：-"))
+            self._final_label.setText(tr("最终评级：-"))
         final_affixes = info.get("final_affixes", [])
         self._affix_current_label.setText(
             self._format_affix_lines(final_affixes, len(final_affixes),

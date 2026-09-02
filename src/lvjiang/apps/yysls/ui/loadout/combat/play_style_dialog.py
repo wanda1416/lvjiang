@@ -63,6 +63,8 @@ class PlayStyleDialogMixin:
     - self._combo_play_style (QComboBox)
     """
 
+    _workflow_play_style_dialog: _CreatePlayStyleDialog | None
+
     def _play_style_dialog_parent(self) -> QWidget:
         """Return the concrete QWidget host expected by Qt dialog APIs."""
         return cast(QWidget, self)

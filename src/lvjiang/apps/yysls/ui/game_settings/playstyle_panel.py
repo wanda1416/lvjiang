@@ -200,8 +200,8 @@ class PlaystylePanel(QWidget):
         self._combo_output.addItems(
             [""] + sorted(gc.get_affix_names_in_category("外功增益")
                           + gc.get_affix_names_in_category("属攻增益")))
-        keep = self._list.currentItem()
-        keep = keep.text() if keep else ""
+        current_item = self._list.currentItem()
+        keep = current_item.text() if current_item else ""
         self._list.clear()
         self._list.addItems([e["name"] for e in self._entries()])
         self._loading = False

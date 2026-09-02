@@ -581,6 +581,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 dx_s -= self._widget_to_norm(self._canvas_drag_start)[0]
                 dy_s -= self._widget_to_norm(self._canvas_drag_start)[1]
                 o = self._canvas_drag_orig
+                assert o is not None
                 self._canvas_config.x_ratio = max(0.0, min(1.0 - o.w_ratio, o.x_ratio + dx_s))
                 self._canvas_config.y_ratio = max(0.0, min(1.0 - o.h_ratio, o.y_ratio + dy_s))
                 self.update()
@@ -611,6 +612,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             dx_n, dy_n = self._widget_delta_to_canvas_norm(
                 self._drag_start, pos)
             r = self._regions[self._selected_idx]
+            assert self._drag_orig is not None
             r.x_ratio = max(0, min(1 - r.w_ratio, self._drag_orig.x_ratio + dx_n))
             r.y_ratio = max(0, min(1 - r.h_ratio, self._drag_orig.y_ratio + dy_n))
             # Shift 按下时禁用吸附
@@ -624,7 +626,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         elif self._drag_mode == DragMode.RESIZING:
             if not self._beyond_dead_zone(pos):
                 return  # 死区内：点击时的手抖不改数据
-            self._apply_resize(pos, event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+            self._apply_resize(
+                pos, bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier))
             self.update()
 
         else:

@@ -127,6 +127,26 @@ class NetworkConfig:
             setattr(self, f.name, bool(getattr(self, f.name)))
 
 
+@dataclass
+class FontSizeConfig:
+    """用户页面内容字号（session.json settings.font_sizes）。
+
+    0 表示沿用 Qt/系统默认字号，用户一旦在配置页保存就会落下
+    8~24 之间的明确值。这样新增功能不会在未操作时改变现有界面。
+    """
+
+    user_overview: int = 0
+    user_info: int = 0
+
+    def __post_init__(self):
+        for name in ("user_overview", "user_info"):
+            try:
+                value = int(getattr(self, name))
+            except (TypeError, ValueError):
+                value = 0
+            setattr(self, name, value if value == 0 or 8 <= value <= 24 else 0)
+
+
 def _from_known(cls, raw: dict):
     """按 dataclass 的字段名过滤后构造，忽略未知键。
 
@@ -159,6 +179,7 @@ class UserConfig:
     delay_params: dict[str, DelayParam] = field(default_factory=dict)     # 命名延迟参数
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)           # 全局热键按键位
     network: NetworkConfig = field(default_factory=NetworkConfig)         # 联网行为开关
+    font_sizes: FontSizeConfig = field(default_factory=FontSizeConfig)    # 用户页面内容字号
 
     def __post_init__(self):
         if self.theme not in {"light", "dark"}:
@@ -175,4 +196,6 @@ class UserConfig:
             self.hotkeys = _from_known(HotkeyConfig, self.hotkeys)
         if isinstance(self.network, dict):
             self.network = _from_known(NetworkConfig, self.network)
+        if isinstance(self.font_sizes, dict):
+            self.font_sizes = _from_known(FontSizeConfig, self.font_sizes)
         self.delay_params = parse_delay_params(self.delay_params)

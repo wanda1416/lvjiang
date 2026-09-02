@@ -11,7 +11,6 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QComboBox, QHeaderView, QPushButton
 
-from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
 from lvjiang.apps.yysls.core.tuning_rules import (
     TuneConfigManager,
@@ -486,4 +485,3 @@ class TestSettingsPageBasics:
         panel._settings_page._rename_key()
         assert panel.rule_key == "heal_pure"
         assert tmp_manager.get_rule("heal_pure") is not None
-

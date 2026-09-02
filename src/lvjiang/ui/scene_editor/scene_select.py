@@ -305,6 +305,7 @@ class TransitionPicker(QWidget):
         menu = QMenu(self._local_views_button)
         for view in views:
             action = menu.addAction(view.name)
+            assert action is not None
             action.setData(view.key)
             action.triggered.connect(
                 lambda _checked=False, key=view.key:

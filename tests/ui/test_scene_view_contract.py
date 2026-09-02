@@ -43,8 +43,8 @@ def _scenes():
         "tune": SceneDef(
             key="tune", name="调律",
             views=[ViewDef("base", "基底"),
-                   ViewDef("result", "结果", homomorphic=False),
-                   ViewDef("return_good", "狗粮返还", homomorphic=False)],
+                   ViewDef("result", "结果", same_layer=False),
+                   ViewDef("return_good", "狗粮返还", same_layer=False)],
             regions=[RegionDef(key="close_btn", name="关闭",
                                is_clickable=True, views=["result"],
                                to="/base")]),
@@ -89,6 +89,16 @@ def test_view_with_an_entry_shows_where_it_comes_from(qtbot, monkeypatch):
     assert dlg._entry_lines.itemAt(0).widget().toolTip() == "bag [tune]"
 
 
+def test_selected_view_has_explicit_readable_colours(qtbot, monkeypatch):
+    """局部列表样式不能把全局主题的选中背景或文字色覆盖掉。"""
+    dlg = _dialog(qtbot, monkeypatch)
+
+    style = dlg._list.styleSheet()
+    assert "QListWidget::item:selected" in style
+    assert "background-color: palette(highlight)" in style
+    assert "color: palette(highlighted-text)" in style
+
+
 def test_view_without_an_entry_is_flagged_as_dead(qtbot, monkeypatch):
     """没有任何 to: 指过来的非基底视图 = 死视图，视图管理要直说。"""
     dlg = _dialog(qtbot, monkeypatch)
@@ -124,8 +134,8 @@ def test_base_view_with_incoming_edges_shows_them(qtbot, monkeypatch):
     assert "关闭" in text
 
 
-def test_homomorphic_view_is_not_flagged_as_dead(qtbot, monkeypatch):
-    """同态视图（如菜单翻页）没有入口是正常的，不该报死视图。"""
+def test_same_layer_view_is_not_flagged_as_dead(qtbot, monkeypatch):
+    """同层视图（如菜单翻页）没有入口是正常的，不该报死视图。"""
     registry = _FakeRegistry({
         "menu": SceneDef(key="menu", name="菜单",
                          views=[ViewDef("base", "基底"),
@@ -139,8 +149,8 @@ def test_homomorphic_view_is_not_flagged_as_dead(qtbot, monkeypatch):
 
     text = _contract_text(dlg)
     assert "死视图" not in text
-    assert "同态视图" in text
-    assert dlg._cb_homomorphic.isChecked()
+    assert "同层视图" in text
+    assert dlg._cb_same_layer.isChecked()
 
 
 def test_single_view_is_exposed_as_base_and_shows_its_entries(
@@ -192,11 +202,11 @@ def test_refresh_removes_old_contract_labels_immediately(qtbot, monkeypatch):
     assert not old_entry.isVisible()
 
 
-def test_unchecking_homomorphic_drops_the_tag_from_the_list_row(
+def test_unchecking_same_layer_drops_the_tag_from_the_list_row(
         qtbot, monkeypatch):
-    """取消勾选同态后列表行要立刻掉掉「· 同态」，不能停在勾选前的文案。"""
+    """取消勾选同层后列表行要立刻移除「· 同层」，不能停在勾选前的文案。"""
     scenes = _scenes()
-    scenes["tune"].views[1].homomorphic = True
+    scenes["tune"].views[1].same_layer = True
     registry = _FakeRegistry(scenes)
     monkeypatch.setattr(
         "lvjiang.ui.scene_editor.scene_view_dialog.get_registry",
@@ -204,13 +214,13 @@ def test_unchecking_homomorphic_drops_the_tag_from_the_list_row(
     dlg = ViewManagerDialog("tune")
     qtbot.addWidget(dlg)
     _select(dlg, "result")
-    assert "· 同态" in dlg._list.currentItem().text()
+    assert "· 同层" in dlg._list.currentItem().text()
 
-    dlg._cb_homomorphic.setChecked(False)
+    dlg._cb_same_layer.setChecked(False)
 
     assert dlg._list.currentItem().data(0x0100) == "result"
-    assert "· 同态" not in dlg._list.currentItem().text()
+    assert "· 同层" not in dlg._list.currentItem().text()
 
-    dlg._cb_homomorphic.setChecked(True)
+    dlg._cb_same_layer.setChecked(True)
 
-    assert "· 同态" in dlg._list.currentItem().text()
+    assert "· 同层" in dlg._list.currentItem().text()

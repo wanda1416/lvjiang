@@ -26,6 +26,7 @@ install_project_config_write_guard(root)
     return subprocess.run(
         [sys.executable, "-c", script],
         cwd=Path(__file__).parents[2],
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         text=True,
         encoding="utf-8",
         capture_output=True,

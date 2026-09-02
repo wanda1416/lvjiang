@@ -49,8 +49,9 @@ builder 约定：
 - `host.active_user_name() -> str`：当前活跃用户名
 - `host.is_running` / `host.request_stop()`：自动化运行状态与停止
 - `host.append_log(text)`：写运行日志
-- `host.run_workflow_implementation(impl_name, flow_name, required_scenes, configure)`：
-  启动已注册工作流（通用脚手架 + `configure(wf_instance, engine)` 回调写入专属参数）
+- `host.run_workflow_implementation(impl_name, flow_name, configure, *, execution_username=None)`：
+  启动已注册工作流（通用脚手架 + `configure(wf_instance, engine)` 回调写入专属参数）；
+  专属 Tab 可传启动时解析出的执行用户，不传则跟随当前用户
 - 信号 `automation_state_changed(str)`（"running"/"not_ready"/"ready"）、
   `user_changed(str)`
 - F9 分发：当前左侧 Tab 若实现 `f9_run()` 则交由其处理，否则走通用工作流

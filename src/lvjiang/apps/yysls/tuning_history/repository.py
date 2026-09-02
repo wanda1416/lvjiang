@@ -230,7 +230,10 @@ class TuningHistoryRepository:
                 "SELECT id FROM tuning_equipment WHERE run_id=? AND sequence_id=?",
                 (run_id, item.equipment_id),
             ).fetchone()
-            equipment_pk = int(row[0] if row else cur.lastrowid)
+            equipment_id = row[0] if row else cur.lastrowid
+            if equipment_id is None:
+                raise RuntimeError("未能取得调律装备记录 ID")
+            equipment_pk = int(equipment_id)
             if item.entered_tuning and event_id:
                 conn.execute("""
                     INSERT OR IGNORE INTO telemetry_deliveries (

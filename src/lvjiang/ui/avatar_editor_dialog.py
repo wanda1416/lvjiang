@@ -543,7 +543,9 @@ class AvatarEditorDialog(QDialog):
         self._library.setCurrentItem(item)
         menu = QMenu(self)
         delete_action = menu.addAction(tr("删除历史头像"))
-        selected = menu.exec(self._library.viewport().mapToGlobal(pos))
+        viewport = self._library.viewport()
+        assert viewport is not None
+        selected = menu.exec(viewport.mapToGlobal(pos))
         if selected is delete_action:
             self._delete_library_item(item)
 

@@ -6,13 +6,13 @@ views:
   name: 基底
 - key: result
   name: 调律结果
-  homomorphic: false
+  same_layer: false
 - key: reset_tune
   name: 重置调律
-  homomorphic: false
+  same_layer: false
 - key: reset_confirm
   name: 重置确认
-  homomorphic: false
+  same_layer: false
 - key: return_good
   name: 狗粮返还
 regions:

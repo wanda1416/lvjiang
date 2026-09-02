@@ -12,6 +12,8 @@
 | [02-player-profile.md](02-player-profile.md) | 玩家档案系统：毕业率分析、货币追踪、心力体力管理 | 部分实现 |
 | [03-wf-editor-plugin.md](03-wf-editor-plugin.md) | 工作流 DSL 编辑器插件：语法高亮、实时诊断、语义智能 | ✅ 已实现 |
 | [04-i18n.md](04-i18n.md) | 国际化支持框架：tr() 函数、翻译文件、UI 改造 | ✅ 已实现 |
+| [05-tuning-management.md](05-tuning-management.md) | 调律管理：实时总览、版本化历史、七天匿名补传 | ✅ 已实现 |
+| [06-task-history.md](06-task-history.md) | 任务历史：单任务/批量两级 ID、参数与产出查询、独立日志 | ✅ 已实现 |
 
 ## 子需求
 

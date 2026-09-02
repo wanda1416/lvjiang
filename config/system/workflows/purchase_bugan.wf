@@ -82,7 +82,7 @@ call parse_bugan_jindu($jindu_str.bugan_jindu)
 scan [bugan_detail].[purchase] as $found by contains "全部领取"
 if $found
     click [bugan_detail].[purchase] after wait @step_interval
-    click [general_action].[space_area] after wait @step_interval
+    click [general_control].[blank_area] after wait @step_interval
     log "领取本周不肝奖励"
 end
 

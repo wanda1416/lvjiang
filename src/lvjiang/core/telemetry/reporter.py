@@ -18,9 +18,8 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from PyQt6.QtCore import QThread, pyqtSignal
-
 from loguru import logger
+from PyQt6.QtCore import QThread, pyqtSignal
 
 from . import spool as spool_mod
 from .sources import SourceBatch
@@ -135,7 +134,9 @@ def plan_requests(job: ReportJob) -> list[
         tuple[dict | None, tuple[SpoolChunk | SourceBatch, ...]]
     ] = []
     current: list[SpoolChunk | SourceBatch] = []
-    for chunk in (*job.batches, *job.source_batches):
+    chunks: tuple[SpoolChunk | SourceBatch, ...] = (
+        *job.batches, *job.source_batches)
+    for chunk in chunks:
         candidate = current + [chunk]
         if current and _envelope_bytes(_envelope(heartbeat, candidate)) > MAX_ENVELOPE_BYTES:
             plans.append((heartbeat, tuple(current)))

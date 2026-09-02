@@ -206,6 +206,62 @@ class TestWorthiness:
 # ─── 潜力模拟：转律词条域 / 可转律开关 / 转律标注 ──────────
 
 class TestTransmuteSimulation:
+    @staticmethod
+    def _full_crown() -> EquipmentData:
+        return make_equip("冠胄", [
+            "会意率", "会意率", "最大外功攻击", "最小外功攻击",
+            "最大鸣金攻击",
+        ])
+
+    def test_full_level_105_first_transfer_reaches_excellent(self, judge):
+        """雁南飞冠#0104：无已转律槽时，完整模拟应把唯一垃圾词条转出。"""
+        equip = self._full_crown()
+        equip.level = 105
+
+        result = judge.check_tuning_worthiness(equip)
+
+        assert result.rating == Rating.EXCELLENT
+        assert "最小外功攻击 转律为 势" in "；".join(result.reasons)
+
+    def test_full_level_105_retransfer_uses_fixed_transferred_slot(self, judge):
+        """105 级非承音装备只允许在已有转律槽上再次转律。"""
+        equip = self._full_crown()
+        equip.level = 105
+        equip.affixes[3].is_transferred = True
+
+        result = judge.check_tuning_worthiness(equip)
+
+        assert result.rating == Rating.EXCELLENT
+        assert "最小外功攻击 再次转律为 势" in "；".join(result.reasons)
+
+    @pytest.mark.parametrize("level,is_chengyin", [
+        (100, False),
+        (105, True),
+    ])
+    def test_existing_transfer_cannot_move_when_retransfer_is_illegal(
+            self, judge, level, is_chengyin):
+        """等级不支持或装备已承音时，不得虚构再次转律结果。"""
+        equip = self._full_crown()
+        equip.level = level
+        equip.is_chengyin = is_chengyin
+        equip.affixes[3].is_transferred = True
+
+        result = judge.check_tuning_worthiness(equip)
+
+        assert result.rating == Rating.JUNK
+        assert "再次转律为" not in "；".join(result.reasons)
+
+    def test_retransfer_does_not_move_to_a_different_junk_slot(self, judge):
+        """已有转律槽是好词条时，不能改去转另一个垃圾槽。"""
+        equip = self._full_crown()
+        equip.level = 105
+        equip.affixes[1].is_transferred = True
+
+        result = judge.check_tuning_worthiness(equip)
+
+        assert result.rating == Rating.JUNK
+        assert "最小外功攻击 转律为" not in "；".join(result.reasons)
+
     def test_out_of_library_affix_not_obtainable(self, judge):
         # 对首领单位增伤 不在转律词条库 → 转律补不出，垃圾封顶不可解除
         e = make_equip("腕甲",

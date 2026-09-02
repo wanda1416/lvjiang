@@ -56,6 +56,23 @@ def test_round_completion_moves_to_end_processing(qtbot):
     assert "结束处理" in widget._operation_label.text()
 
 
+def test_full_round_shows_legal_final_rating(qtbot):
+    hub = TuningProgressHub()
+    widget = TuningProgressWidget(hub)
+    qtbot.addWidget(widget)
+
+    hub.tune_round_completed.emit({
+        "round_no": 4,
+        "current_affixes": [],
+        "affix_count": 5,
+        "expect_rating": "excellent",
+        "final_rating": "excellent",
+    })
+
+    qtbot.waitUntil(lambda: "优秀" in widget._final_label.text())
+    assert "最终评级" in widget._final_label.text()
+
+
 def test_finished_equipment_moves_to_previous_column(qtbot):
     hub = TuningProgressHub()
     widget = TuningProgressWidget(hub)

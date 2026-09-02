@@ -183,3 +183,48 @@ def test_merge_repository_migrates_all_plan_references(tmp_path):
     state = repo.load()
     assert old_fp not in state.equipment_items
     assert state.plans[plan_id].equipment["main_weapon"] == new_fp
+
+
+def test_merge_inherits_earliest_creation_and_latest_update(tmp_path):
+    repo = LoadoutRepository("tester", users_dir=tmp_path)
+    old = _equip()
+    new = _equip(level=105, values=(11, 21, 31, 41, 51))
+    old_fp = repo.upsert_item(old)
+    new_fp = repo.upsert_item(new)
+
+    def set_times(state):
+        state.equipment_items[old_fp].update({
+            "created_at": "2026-08-01T01:00:00+00:00",
+            "updated_at": "2026-08-03T01:00:00+00:00",
+        })
+        state.equipment_items[new_fp].update({
+            "created_at": "2026-08-02T01:00:00+00:00",
+            "updated_at": "2026-08-04T01:00:00+00:00",
+        })
+    repo.update(set_times)
+
+    repo.merge_items({old_fp: new_fp})
+
+    merged = repo.load().equipment_items[new_fp]
+    assert merged["created_at"] == "2026-08-01T01:00:00+00:00"
+    assert merged["updated_at"] == "2026-08-04T01:00:00+00:00"
+
+
+def test_merge_with_no_time_data_keeps_empty_values(tmp_path):
+    repo = LoadoutRepository("tester", users_dir=tmp_path)
+    old = _equip()
+    new = _equip(level=105, values=(11, 21, 31, 41, 51))
+    old_fp = repo.upsert_item(old)
+    new_fp = repo.upsert_item(new)
+
+    def clear_times(state):
+        for fp in (old_fp, new_fp):
+            state.equipment_items[fp]["created_at"] = ""
+            state.equipment_items[fp]["updated_at"] = ""
+    repo.update(clear_times)
+
+    repo.merge_items({old_fp: new_fp})
+
+    merged = repo.load().equipment_items[new_fp]
+    assert merged["created_at"] == ""
+    assert merged["updated_at"] == ""

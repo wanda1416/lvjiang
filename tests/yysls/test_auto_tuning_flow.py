@@ -424,6 +424,27 @@ def test_already_full(monkeypatch):
     assert "recycled_items" not in wf.output
 
 
+def test_already_full_emits_legal_potential_as_final_rating(monkeypatch):
+    """满词条最终评级必须沿用合法转律模拟结论，不能退回静态评级。"""
+    from types import SimpleNamespace
+
+    potential = {"s": {"name": "通用会意", "rating": "优秀",
+                       "skipped": False, "not_applicable": False,
+                       "reasons": ["最小外功攻击 转律为 势"]}}
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: potential)
+    monkeypatch.setattr(tuning_judge, "judge_equipment_potential",
+                        lambda *a, **k: potential)
+    seen: list[dict] = []
+    wf = FakeWF()
+    wf._engine = SimpleNamespace(_progress_hub=SimpleNamespace(
+        equipment_finished=SimpleNamespace(emit=seen.append)))
+
+    wf._process_equipment("满词条冠胄", _equip(5), WEAPON_DETAIL)
+
+    assert seen[-1]["final_rating"] == "excellent"
+
+
 def test_below_entry_not_tuned(monkeypatch):
     """预期未达进入门槛 → 调 _on_scan_reject，不进调律，不收集 report"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",

@@ -207,6 +207,7 @@ class RegionPanelMixin:
             # 「来源」列显示场景名，源 key 只作 tooltip 与行数据——
             # _selected_reference() 靠这份数据回查引用项，不能拿显示名去匹配。
             source_item = self._region_table.item(row, 8)
+            assert source_item is not None
             source_item.setData(Qt.ItemDataRole.UserRole, ref.scene)
             source_item.setToolTip(ref.scene)
 

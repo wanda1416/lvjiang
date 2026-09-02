@@ -89,9 +89,29 @@ class _BatchContextComboBox(QComboBox):
     def eventFilter(self, watched, event):
         if watched is self and self._batch_locked:
             if event.type() == QEvent.Type.MouseButtonPress:
-                QMessageBox.information(
-                    self.window(), tr("提示"), _BATCH_CONTEXT_LOCK_MESSAGE
-                )
+                notice = getattr(self, "_batch_lock_notice", None)
+                if notice is None or not notice.isVisible():
+                    notice = QMessageBox(
+                        QMessageBox.Icon.Information,
+                        tr("提示"),
+                        _BATCH_CONTEXT_LOCK_MESSAGE,
+                        QMessageBox.StandardButton.Ok,
+                    )
+                    notice.setModal(False)
+                    notice.setWindowModality(Qt.WindowModality.NonModal)
+                    notice.setAttribute(
+                        Qt.WidgetAttribute.WA_DeleteOnClose, True
+                    )
+                    self._batch_lock_notice = notice
+                    notice.finished.connect(
+                        lambda _code, item=notice: setattr(
+                            self, "_batch_lock_notice", None
+                        ) if self._batch_lock_notice is item else None
+                    )
+                    notice.show()
+                else:
+                    notice.raise_()
+                    notice.activateWindow()
             if event.type() in (
                 QEvent.Type.MouseButtonPress,
                 QEvent.Type.MouseButtonRelease,
@@ -362,7 +382,7 @@ class MainWindow(
         self.user_combo.currentIndexChanged.connect(self._on_user_changed)
         top_row.addWidget(self.user_combo)
         top_row.addSpacing(20)
-        top_row.addWidget(QLabel(tr("图库：")))
+        top_row.addWidget(QLabel(tr("图库")))
         self.reference_space_combo = QComboBox()
         _set_combo_character_capacity(self.reference_space_combo)
         # ReferenceDatabase 构造时已经 load，启动构建不重复解析当前图库。
@@ -620,6 +640,11 @@ class MainWindow(
         btn_layout.addWidget(self.btn_pause_resume)
         daily_layout.addLayout(btn_layout)
 
+        from ..execution_user_selector import ExecutionUserSelector
+        self._daily_execution_user_selector = ExecutionUserSelector(
+            self._user_manager)
+        daily_layout.addWidget(self._daily_execution_user_selector)
+
         wf_group = QGroupBox(tr("脚本"))
         wf_layout = QHBoxLayout(wf_group)
         self.workflow_combo = QComboBox()
@@ -704,8 +729,10 @@ class MainWindow(
             profile_engine.start()
             self.register_cleanup(stop_engine)
 
-        self.tabs.addTab(ProfileTab(self), tr("用户总览"))
-        self.tabs.addTab(UserInfoTab(self), tr("用户信息"))
+        self._profile_tab = ProfileTab(self)
+        self._user_info_tab = UserInfoTab(self)
+        self.tabs.addTab(self._profile_tab, tr("用户总览"))
+        self.tabs.addTab(self._user_info_tab, tr("用户信息"))
 
         # ── 插件注入的右侧 Tab（按 -reg 顺序追加）──
         self._add_plugin_tabs(self.tabs, "right_tab_builders")
@@ -923,6 +950,12 @@ class MainWindow(
             if reply != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
+        # 非模态工具可能有未保存内容；让各窗口执行自己的关闭保护。任一窗口
+        # 拒绝关闭时，主窗口也保持打开，且此时尚未请求停止运行中的工作流。
+        if not self._close_modeless_tools():
+            event.ignore()
+            return
+        if self._running:
             self._request_stop()
         self._close_cleanup_started = True
         if self._tray_icon is not None:

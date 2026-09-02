@@ -49,8 +49,7 @@ return $result
 
 def exit_to_login()
     # 1. 主页 → 菜单
-    # 走标准导航：安卓点菜单按钮、桌面按 ESC，并自带到位校验。
-    # 直接 click [game_main_page].[menu] 会让端游走安卓的路径。
+    # 走标准导航并自带到位校验；click 由布局选择点菜单或按 ESC。
     call $in_menu = nav_main_to_menu()
     if $in_menu < 0
         log "未能进入菜单页，退出流程可能落空"

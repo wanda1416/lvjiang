@@ -1,9 +1,80 @@
 yysls:
+  调律管理: Tuning Management
+  当前任务: Current Task
+  历史记录: History
+  历史记录暂不可用: Tuning history is temporarily unavailable
+  历史调律记录: Tuning History
+  刷新记录: Refresh Records
+  查看详情: View Details
+  删除记录: Delete Record
+  删除调律记录: Delete Tuning Record
+  删除调律记录失败: Failed to Delete Tuning Record
+  '确定删除 {time} 的调律任务及其全部装备详情吗？未上报的统计记录也会删除；此操作无法撤销。': 'Delete the tuning run at {time} and all its equipment details? Unreported telemetry records will also be deleted. This cannot be undone.'
+  开始时间: Started
+  状态: Status
+  用户: User
+  处理结果: Results
+  总轮次: Rounds
+  暂无调律历史记录: No tuning history yet
+  进行中: Running
+  历史状态_已中断: Interrupted
+  材料耗尽: Materials Exhausted
+  失败: Failed
+  默认规则: Default Rules
+  调律记录详情: Tuning Run Details
+  当前正在运行任务: Currently Running Task
+  '历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}': 'Runs {runs} · Processed {total} · Tuned {tuned} · Recycled {recycled} · Skipped {skipped} · Reset {reset}'
+  '处理 {total} · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset}': 'Processed {total} · Tuned {tuned} · Recycled {recycled} · Skipped {skipped} · Reset {reset}'
+  已跳过: Skipped
+  跳过 {count}: 'Skipped {count}'
+  首饰: Accessories
+  '{slot} · {type} · Lv{level} · {quality} · {rounds} 轮 · {rating}': '{slot} · {type} · Lv{level} · {quality} · {rounds} rounds · {rating}'
+  全部结果: All Results
+  共 {count} 件: '{count} Total'
+  卡片始终按处理顺序展示: Cards always follow processing order
+  回收 {count}: 'Recycled {count}'
+  搜索装备、类型或词条: Search equipment, type, or affix
+  调律 {count}: 'Tuned {count}'
+  重置 {count}: 'Reset {count}'
+  重置相关: Reset Related
+  装备详情: Equipment Details
+  装备部位: Equipment Slots
+  本轮还没有可展示的装备处理结果: No equipment processing results to display for this run yet
+  传律石不够: Insufficient Reset Stones
+  冷却期中: On Cooldown
+  冷却期等待: Waiting for Cooldown
+  次数耗尽转回收: Attempts Exhausted; Recycled
+  重置完毕: Reset Completed
+  重置检查失败: Reset Check Failed
+  重置未执行: Reset Not Performed
+  重置次数耗尽: Reset Attempts Exhausted
+  重置结果：{result}: 'Reset result: {result}'
+  标准名称: Standard Names
+  部位名称: Equipment Part Names
+  等阶名称: Tier Name
+  添加名称: Add Name
+  格式错误: Invalid Format
+  请一次添加一个名称，无需使用逗号分隔。: Add one name at a time; comma separators are not needed.
+  名称不能重复。: Names must be unique.
+  名称不能为空。: Name cannot be empty.
+  双击名称或按 F2 可编辑: Double-click a name or press F2 to edit it
+  配置每个装备等级的等阶名称，仅用于校验装备名称；承音不改变等阶名称，因此不能据此推断装备等级。: Configure the tier name for each equipment level for name validation only. Chengyin does not change the tier name, so it cannot be used to infer equipment level.
+  装备名称结构：等阶名称 + 标准名称 | 部位名称: 'Equipment name format: Tier Name + Standard Name | Equipment Part Name'
+  输出: Output
+  防具: Armor
   其他装备: Other Equipment
   其他装备展示开发中: Other equipment display under development…
   刷新装备数据: Refresh Equipment Data
   开关: 'Switch: '
   当前装备: Current Equipment
+  调律装备总览: Tuning Equipment Overview
+  查看当前详情_count: View Current Details ({count})
+  在独立窗口中查看本轮全部装备处理结果: View all equipment processing results from this run in a separate window
+  处理意见: Processing Decision
+  已调律: Tuned
+  调律后回收: Tuned and Recycled
+  无可展示词条: No affixes to display
+  绿色: Green
   承音: Chengyin
   无词条: No Affixes
   未装备: Not Equipped
@@ -144,7 +215,6 @@ yysls:
   武器类型: Weapon Type
   武器类型_{name}_已存在: Weapon type '{name}' already exists.
   武器类型_{name}_正被流派_{users}_引用_请先在流派配置中解除绑定: Weapon type '{name}' is referenced by playstyle {users}, please unbind in playstyle config first.
-  武学名称: Martial Name
   武学增效: Martial Enhancement
   流派_{name}_已存在: Playstyle '{name}' already exists.
   流派名不能为空或与已有流派重名: Playstyle name cannot be empty or duplicate.
@@ -203,7 +273,6 @@ yysls:
   删除选中规则组_至少保留一个: Delete selected rule group (keep at least one)
   判定条件: Judgment Conditions
   判定顺序_垃圾_一般_优秀_顶级_命中即定档: 'Judgment order: Junk → Normal → Excellent → Top, first hit sets tier'
-  副增伤词条: Sub Damage Affix
   勾选装备词条名_至少一项: 'Check equipment affix names (at least one):'
   单件重置次数上限: Per-item Max Reset Count
   双击_规则说明_列可编辑_选中一行后可复制_删除该规则组: Double-click 'Rule Description' column to edit; select a row to copy/delete the rule group
@@ -291,7 +360,6 @@ yysls:
   移除选中: Remove Selected
   等级门槛: Level Threshold
   等级门槛_调律门槛_扫描_材料_结束处理: Level threshold + tuning threshold + scan/material/end processing,
-  绑定开关: Binding Switch
   结束处理: End Processing
   自选判定规则: Custom Judgment Rules
   自选词条: Custom Affixes
@@ -399,6 +467,7 @@ yysls:
   上一个用户: Previous User
   下一个用户: Next User
   已完成: Completed
+  已重置: Reset
   未完成: Incomplete
   请先选择用户: Please select a user first
   Key_{key}_已存在: Key '{key}' already exists
@@ -467,6 +536,15 @@ yysls:
   重置日_{day}号: Reset day:{day}
   重置时刻: 'Reset Time:'
   默认: Default
+  传律石不够（持有 {held} < 要求 {need}），跳过该装备: Not enough Chuanlv Stones (held {held} < required {need}); skipping this equipment
+  异常：{result}: 'Anomaly: {result}'
+  无法识别重置次数: Reset count unreadable
+  无法识别重置次数，跳过该装备: Cannot read the remaining reset count; skipping this equipment
+  异常: Anomalies
+  本次运行有 {n} 件装备识别异常: '{n} equipment item(s) in this run had recognition anomalies'
+  历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}: Runs {runs} · Processed {total} · Tuned {tuned} · Recycled {recycled} · Skipped {skipped} · Reset {reset} · Anomalies {anomaly}
+  全部评级: All ratings
+  绑定开关: Binding Switch
 config:
   wf_scan_equipped: Equipment Analysis
   wf_scan_unequipped: Full Equipment Scan
@@ -535,6 +613,9 @@ auto_strings:
   '下一点恢复: 已达上限': 'Next point recovers: cap reached'
   不应用规则: Don't Apply Rule
   不添加狗粮: Don't Add Fodder
+  逐轮狗粮决策: Round-by-Round Fodder Decisions
+  本轮未执行调律: Tuning Not Performed
+  '第 {n} 轮：{food}{outcome}': 'Round {n}: {food}{outcome}'
   不适用: N/A
   不限品阶: No Quality Limit
   不限评级: No Rating Limit
@@ -722,8 +803,8 @@ auto_strings:
   定义数据模型的 key。双击行可编辑。: Defines the data model's key. Double-click a row to edit.
   定时: Scheduled
   定音: Dingyin
-  实际评级：: 'Actual Rating:'
-  实际评级：-: 'Actual Rating: -'
+  最终评级：: 'Final Rating:'
+  最终评级：-: 'Final Rating: -'
   实验性：导入毕业率计算器 Excel，查看竞速轴与伤害来源: 'Experimental: import a graduation-rate calculator Excel file to view the race axis and damage sources'
   宫: Gong
   宫为首词条 · 商角徵羽不可重复: Gong must be the first affix · Shang/Jue/Zhi/Yu cannot repeat
@@ -999,7 +1080,7 @@ auto_strings:
   没有启用任何调律规则，请在调律页勾选至少一个规则: No tuning rule is enabled; check at least one on the Tuning page
   没有找到符合条件的疑似重复装备: No suspected duplicate equipment found
   没有激活的用户: No Active User
-  流派: Playstyle
+  流派: School
   测试模式跳过调律: Test Mode Skips Tuning
   测试装备: Test Equipment
   测高: Measure Height
@@ -1248,9 +1329,11 @@ auto_strings:
   重命名方案: Rename Plan
   重命名词条名: Rename Affix Name
   重新计算: Recalculate
+  重置二次确认识别失败，跳过该装备: Failed to recognize the reset secondary confirmation; skipping this equipment
   重置前快照（已执行重置）: Snapshot Before Reset (reset already performed)
   重置完成：以首词条状态重新开始调律: 'Reset complete: tuning restarts from the first-affix state'
   重置材料信息识别失败，跳过该装备: Failed to recognize reset material info; skipping this equipment
+  重置确认按钮识别失败，跳过该装备: Failed to recognize the reset confirmation button; skipping this equipment
   重置装备: Reset Equipment
   重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）: 'Reset Equipment: clears all affixes except the first and continues (limited by cooldown, once per piece)'
   重置调律: Reset Tuning
@@ -1278,3 +1361,7 @@ auto_strings:
   （须为小写字母开头的英文/数字/下划线）: (Must be alphanumeric starting with lowercase letter, underscores allowed)
   ，仅首词条: ', first affix only'
   ，该武器对应「{expected}」: ', this weapon corresponds to "{expected}"'
+  指纹: Fingerprint
+  更新时间: Updated At
+  查看装备来源、指纹和时间: View equipment source, fingerprint, and timestamps
+  装备属性: Equipment Properties

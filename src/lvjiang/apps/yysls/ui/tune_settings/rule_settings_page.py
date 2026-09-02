@@ -42,7 +42,6 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.tuning_rules import (
-    GENERIC_ATTR,
     QUALITY_PARTS,
     RATING_KEYS,
     RATING_LABELS,
@@ -52,7 +51,6 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 from lvjiang.core.config.resolver import LAYER_SYSTEM, EntityOrigin
 from lvjiang.ui.button_styles import apply_button_style, apply_compact_tool_button_style
 from lvjiang.ui.config_origin import layer_style, origin_tooltip
-from lvjiang.ui.widgets import centered_cell_widget
 
 from .....i18n import tr
 

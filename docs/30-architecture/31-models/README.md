@@ -10,6 +10,7 @@
 | [02-scene-implementations.md](02-scene-implementations.md) | 场景实现定义：九个场景的具体字段（Area / Region）配置 |
 | [03-session-and-context.md](03-session-and-context.md) | Session 与 Context 数据模型：持久状态与运行时上下文 |
 | [04-profile.md](04-profile.md) | Profile 共享模块：存储契约、周期扩展与 UI 边界 |
+| [05-martial-arts-and-playstyles.md](05-martial-arts-and-playstyles.md) | 武学/流派/玩法三层：玩法决定调律方向，流派决定毕业率 |
 
 ## 关联文档
 

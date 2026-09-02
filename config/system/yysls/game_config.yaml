@@ -313,11 +313,15 @@ affix_caps:
     - 气血最大值
     110:
       cap: 4610
+    105:
+      cap: 4010
   外功防御:
     _aliases:
     - 外功防御
     110:
       cap: 60.6
+    105:
+      cap: 52.8
   外功增益:
     _pool: dingyin
     _unit: '%'

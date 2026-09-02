@@ -65,16 +65,16 @@ class AlertPanel(QWidget):
         content_row = QHBoxLayout()
         content_row.setSpacing(8)
 
-        self._message_label = QLabel()
-        self._message_label.setWordWrap(True)
-        self._message_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        content_row.addWidget(self._message_label, stretch=1)
-
         self._close_btn = QPushButton("×")
         self._close_btn.setFixedSize(24, 24)
         self._close_btn.setToolTip(tr("关闭此告警"))
         self._close_btn.clicked.connect(self._on_close_clicked)
         content_row.addWidget(self._close_btn)
+
+        self._message_label = QLabel()
+        self._message_label.setWordWrap(True)
+        self._message_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        content_row.addWidget(self._message_label, stretch=1)
 
         layout.addLayout(content_row)
 

@@ -2,6 +2,7 @@
 from unittest.mock import patch
 
 from PyQt6.QtCore import QUrl
+from PyQt6.QtWidgets import QPushButton
 
 from lvjiang.core.announcement import Announcement, AnnouncementManifest
 from lvjiang.ui.notices.announcement_dialog import AnnouncementDialog
@@ -55,6 +56,19 @@ def test_empty_cache_has_manual_refresh_guidance(qtbot):
     assert "重新获取" in dialog._status_label.text()
     assert not dialog._refresh_btn.isHidden()
     assert not dialog._details_btn.isEnabled()
+
+
+def test_all_announcement_actions_use_shared_button_styles(qtbot):
+    dialog = AnnouncementDialog(None)
+    qtbot.addWidget(dialog)
+
+    buttons = dialog.findChildren(QPushButton)
+    assert {button.text() for button in buttons} == {
+        "重新获取", "查看详情", "关闭",
+    }
+    assert all("padding: 5px 11px" in button.styleSheet() for button in buttons)
+    close = next(button for button in buttons if button.text() == "关闭")
+    assert "palette(button)" in close.styleSheet()
 
 
 def test_body_links_only_open_https():

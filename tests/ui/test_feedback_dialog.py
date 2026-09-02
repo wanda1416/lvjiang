@@ -2,6 +2,8 @@
 from io import BytesIO
 from unittest.mock import patch
 
+from PyQt6.QtWidgets import QPushButton
+
 from lvjiang.core import group_qrcode
 from lvjiang.i18n import init_i18n
 from lvjiang.ui.notices.feedback_dialog import (
@@ -40,6 +42,9 @@ def test_feedback_dialog_shows_policy_without_qr(qtbot):
     assert dialog._details_btn.text() == "查看详细规范"
     assert dialog._github_btn.text() == "提交 GitHub Issue"
     assert not hasattr(dialog, "_image_label")
+    buttons = dialog.findChildren(QPushButton)
+    assert all("padding: 5px 11px" in button.styleSheet() for button in buttons)
+    assert "palette(button)" in dialog._close_btn.styleSheet()
 
 
 def test_feedback_links_open_guide_and_new_issue(qtbot):
@@ -76,6 +81,10 @@ def test_group_qr_dialog_loads_image(qtbot):
     assert dialog.windowTitle() == "扫码加群"
     assert dialog._image_label.pixmap() is not None
     assert not dialog._image_label.pixmap().isNull()
+    assert all(
+        "padding: 5px 11px" in button.styleSheet()
+        for button in dialog.findChildren(QPushButton)
+    )
 
 
 def test_refresh_qrcode_downloads_and_replaces_local_file(qtbot, tmp_path, monkeypatch):

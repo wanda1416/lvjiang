@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.update import ReleaseInfo, get_version, set_skip_version
 from ...i18n import tr
+from ..button_styles import apply_button_style
 
 
 class UpdateDialog(QDialog):
@@ -86,10 +87,6 @@ class UpdateDialog(QDialog):
         btn_layout.addWidget(self._release_notes_btn, 1)
 
         self._download_btn = QPushButton(tr("下载该版本"))
-        self._download_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; }"
-            "QPushButton:disabled { background-color: #9E9E9E; color: #EEEEEE; }"
-        )
         self._download_btn.clicked.connect(self._on_download)
         btn_layout.addWidget(self._download_btn, 1)
 
@@ -105,6 +102,16 @@ class UpdateDialog(QDialog):
         ):
             button.setMinimumHeight(36)
             button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+        apply_button_style(
+            self._release_notes_btn,
+            self._download_btn,
+        )
+        apply_button_style(
+            self._skip_btn,
+            self._close_btn,
+            variant="neutral",
+        )
 
         layout.addLayout(btn_layout)
 

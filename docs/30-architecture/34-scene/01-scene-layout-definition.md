@@ -231,11 +231,12 @@ align [scene].[panel]           # 手动触发对齐
 
 一个 Layout 对应一套投屏方案（特定设备/分辨率），全局唯一。每个布局独立保存各场景的实例数据。
 
-Layout 内部包含三个独立层次：
+Layout 内部包含四个独立层次：
 
 | 层次 | 职责 | 数据内容 |
 |------|------|----------|
 | **Area-Coord 绑定** | 位置 | 每个 Area（Point / Region）在屏幕上的归一化坐标 |
+| **Area-Action 绑定** | 激活方式 | 可选 `activation_key`；为空时默认点击坐标 |
 | **Panel-Coord 绑定** | 位置 | 每个 Panel 在屏幕上的归一化坐标（grid 型还包含校准缓存） |
 | **Action → Arrow** | 行为 | 基于 Area 的拖拽动作（from → to） |
 
@@ -245,6 +246,29 @@ Layout 内部包含三个独立层次：
 
 - **Region** 的坐标：`(x_ratio, y_ratio, w_ratio, h_ratio)` — 画布内归一化矩形
 - **Point** 的坐标：`(cx_ratio, cy_ratio, r_ratio)` — 中心 + 半径，画布内归一化
+
+Region / Point 实例还可设置可选的 `activation_key`。它属于 Layout，而不属于
+Scene：同一个语义实体在手游布局中可保持默认坐标点击，在桌面布局中可绑定
+`SPACE`、`ESC`、`R` 等标准键名。DSL 仍统一写 `click [scene].[entity]`。
+
+布局编辑器中“按键”留空表示默认左键点击；填入按键表示用该键激活。实体的
+坐标仍会保留并继续用于 `scan` / `recognize`，按键绑定只改变 `click` 的动作。
+
+### 跨场景 area 引用
+
+一块屏幕区域只应有一处坐标真源。其他场景需要它时用 `references` 声明引用，
+坐标运行期从源场景转读，不复制：
+
+```yaml
+references:
+- scene: general_control
+  entity: confirm
+  view: reset_confirm
+```
+
+只能引用**一级场景**（其坐标同属画布归一化，零变换），与几何嵌套的
+`subscene_refs` 是两件事。详见
+[03-cross-scene-references.md](03-cross-scene-references.md)。
 
 ### Action → Arrow
 
@@ -268,7 +292,7 @@ DSL 中通过 `drag [equip_tune_detail].[tune_drag]` 执行拖拽。
 
 ### 实例数据
 
-布局 JSON 存储上述三层数据（`config/local/layouts/{布局名}.json`）：
+布局 JSON 存储上述数据（`config/local/layouts/{布局名}.json`）：
 
 ```json
 {
@@ -279,7 +303,7 @@ DSL 中通过 `drag [equip_tune_detail].[tune_drag]` 执行拖拽。
   "scenes": {
     "scene_key": {
       "regions": [
-        { "key": "region_key", "x_ratio": 0.1, "y_ratio": 0.2, "w_ratio": 0.3, "h_ratio": 0.1 }
+        { "key": "region_key", "x_ratio": 0.1, "y_ratio": 0.2, "w_ratio": 0.3, "h_ratio": 0.1, "activation_key": "SPACE" }
       ],
       "points": [
         { "key": "point_key", "cx_ratio": 0.5, "cy_ratio": 0.7, "r_ratio": 0.015 }

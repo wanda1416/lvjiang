@@ -14,6 +14,8 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+  view: base
+  to: game_menu_page
 - key: huodong
   name: 活动
   type: func
@@ -34,6 +36,8 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+  view: base
+  to: zhanling_detail
 - key: heming
   name: 和鸣
   type: func

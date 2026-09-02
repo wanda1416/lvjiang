@@ -6,7 +6,8 @@
       "x_ratio": 0.9630520549030617,
       "y_ratio": 0.010462368560027123,
       "w_ratio": 0.02669915617218488,
-      "h_ratio": 0.043840455038666355
+      "h_ratio": 0.043840455038666355,
+      "activation_key": "ESC"
     },
     {
       "key": "huodong",
@@ -48,37 +49,27 @@
       "x_ratio": 0.011255536905781384,
       "y_ratio": 0.027517914891851757,
       "w_ratio": 0.10563864546341992,
-      "h_ratio": 0.17633474552177508
+      "h_ratio": 0.17633474552177508,
+      "activation_key": "M"
     },
     {
       "key": "zudui",
       "x_ratio": 0.014982379014105096,
       "y_ratio": 0.757471696831148,
       "w_ratio": 0.023401014313945402,
-      "h_ratio": 0.04016751474480318
+      "h_ratio": 0.04016751474480318,
+      "activation_key": "U"
     },
     {
       "key": "huanma",
-      "x_ratio": 0,
-      "y_ratio": 0,
-      "w_ratio": 0,
-      "h_ratio": 0,
       "disabled": true
     },
     {
       "key": "tingfeng",
-      "x_ratio": 0,
-      "y_ratio": 0,
-      "w_ratio": 0,
-      "h_ratio": 0,
       "disabled": true
     },
     {
       "key": "more_func",
-      "x_ratio": 0,
-      "y_ratio": 0,
-      "w_ratio": 0,
-      "h_ratio": 0,
       "disabled": true
     },
     {
@@ -86,14 +77,16 @@
       "x_ratio": 0.018101043024741924,
       "y_ratio": 0.8392830650549241,
       "w_ratio": 0.016108320235708018,
-      "h_ratio": 0.030448456307891503
+      "h_ratio": 0.030448456307891503,
+      "activation_key": "F2"
     },
     {
       "key": "liaotian",
       "x_ratio": 0.01844377324252295,
       "y_ratio": 0.9083753389505246,
       "w_ratio": 0.01576559001792699,
-      "h_ratio": 0.028926033492496894
+      "h_ratio": 0.028926033492496894,
+      "activation_key": "ENTER"
     },
     {
       "key": "north",

@@ -164,10 +164,11 @@ function isSafeValue(v, depth) {
 //
 // 不校验的代价是具体的：payload 是不透明 JSON，垃圾事件混进 roll_batch 后
 // 只有跑分析时才会发现，而那时它已经计进 n_events 和每日配额了。version
-// 也必须看——schema 改版后字段语义会变（例如 v1 的一条事件=一轮，v2=一件），
-// 混着聚合会算出无意义的均值，且事后无法从 payload 里区分。
+// 也必须看——schema 改版后字段语义可能变化，混着聚合会算出无意义的
+// 均值，且事后无法从 payload 里区分。
 const KNOWN_SCHEMAS = {
-  "yysls.tuning_session": new Set([1]),
+  // v2 在保持“一件装备一次完整过程”语义的基础上增加稳定 event_id。
+  "yysls.tuning_session": new Set([1, 2]),
 };
 
 /**

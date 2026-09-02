@@ -11,7 +11,7 @@ D1 行数同比例下降。
 字段集合仍是达成这个目标的最小集：不含装备名、账号、角色名、截图。
 词条名一律经 ``vocab.normalize_affix_name`` 精确命中普通词条池
 （``get_normal_affix_names()``，当前 37 条）才允许出现；命中不了的整条
-丢弃，见 probe.py 的说明。
+丢弃，见 history_source.py 的说明。
 """
 from __future__ import annotations
 
@@ -55,8 +55,10 @@ _MAX_INITIAL_AFFIXES = 5
 _MAX_ROLLS = 64
 
 TUNING_SESSION_SCHEMA = EventSchema(
-    name="yysls.tuning_session", version=1,
+    name="yysls.tuning_session", version=2,
     fields=(
+        FieldSpec("event_id", str, pattern=_UUID_HEX_PATTERN,
+                  example="1" * 32),
         FieldSpec("install_id", str, pattern=_UUID_HEX_PATTERN, example="0" * 32),
         FieldSpec("date", str, pattern=_DATE_PATTERN, example="2026-01-01"),
         # ── 装备静态属性（整件不变）──

@@ -32,6 +32,7 @@ _STOP_REASON_CHOICES = (
     "judged_before_tuning",  # 初始判定即不进调律循环
     "cannot_continue",       # 律准石/材料不足等 executor.abort_reason
     "user_stopped",          # 用户按停止键
+    "reset_completed",       # 成功重置；重置后状态作为新的调律事件
     "completed",             # 正常走完的兜底
 )
 

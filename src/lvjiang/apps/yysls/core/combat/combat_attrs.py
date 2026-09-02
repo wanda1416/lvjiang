@@ -459,13 +459,18 @@ def apply_hypothetical_caps(
     full_chengyin: bool = False,
     full_dingyin: bool = False,
     full_level: int = 0,
+    playstyle: str = "",
 ) -> dict:
     """假设装备升至理想状态，返回变换后的装备副本。
 
     Args:
         equipped: {slot_key: equip_dict}
         full_chengyin: 承音装备的普通词条 → 承音上限 (cap×0.94)
-        full_dingyin: 所有装备的定音词条 → 上限 (cap, 100%)
+        full_dingyin: 定音假设。给了 playstyle 时**换成该玩法要求的定音**再取
+            上限；没有玩法时退回旧行为（保持原定音名、只把数值顶满）。
+        playstyle: 目标玩法名。这是「满定音」真正想问的问题——不是"我现在的
+            定音满了会怎样"，而是"我按这个玩法配齐了会怎样"。非目标定音会被
+            清零（那个定音位是白定的），四件防具则收敛到同一个技能增效。
         full_level: 目标等级（>0 时，低于该等级的装备升至该等级）
             仅升基础属性；词条/定音数值是否升级取决于 full_chengyin/full_dingyin。
             词条上限按升级后的等级查询。
@@ -516,10 +521,19 @@ def apply_hypothetical_caps(
 
         # 定音词条
         dingyin = equip.get("dingyin")
-        if full_dingyin and dingyin and isinstance(dingyin, dict) and dingyin.get("name") and effective_level:
-            caps = gc.get_affix_caps(effective_level, dingyin["name"])
-            if caps:
-                dingyin["value"] = caps["cap"]
+        if full_dingyin and effective_level:
+            target = (gc.get_playstyle_dingyin(playstyle, equip.get("type", ""))
+                      if playstyle else "")
+            if target:
+                # 按玩法配齐：装备原本定的音不是目标就是白定的，直接换掉。
+                caps = gc.get_affix_caps(effective_level, target)
+                equip["dingyin"] = (
+                    {"name": target, "value": caps["cap"]} if caps else {})
+            elif dingyin and isinstance(dingyin, dict) and dingyin.get("name"):
+                # 没有玩法（或玩法没配该部位定音）时退回旧行为：只顶数值。
+                caps = gc.get_affix_caps(effective_level, dingyin["name"])
+                if caps:
+                    dingyin["value"] = caps["cap"]
 
         result[slot_key] = equip
 

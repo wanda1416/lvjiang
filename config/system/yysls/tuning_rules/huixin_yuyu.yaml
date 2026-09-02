@@ -130,20 +130,5 @@ common_conditions:
       - 最大无相攻击
       min: 1
 playstyles:
-  走地玉:
-    main:
-      weapon: 伞
-      damage: 伞武学增效
-    sub:
-      weapon: 扇
-      damage: null
-    attr: 牵丝
-    switch: keep_danti
-  飞天玉:
-    main:
-      weapon: 伞
-      damage: 伞武学增效
-    sub:
-      weapon: 扇
-      damage: null
-    attr: 牵丝
+- 走地玉
+- 飞天玉

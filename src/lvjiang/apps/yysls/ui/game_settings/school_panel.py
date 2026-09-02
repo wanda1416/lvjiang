@@ -125,19 +125,22 @@ class SchoolPanel(QWidget):
         row_attr.addStretch()
         attr_layout.addLayout(row_attr)
 
-        # 第二/三行：主武器+主武学 / 副武器+副武学
-        self._combo_main_weapon = QComboBox()
-        self._combo_main_weapon.setMinimumWidth(100)
-        self._edit_main_martial = QLineEdit()
-        self._edit_main_martial.setPlaceholderText(tr("武学名称"))
-        self._edit_main_martial.setMaxLength(6)
-        self._edit_main_martial.setFixedWidth(100)
-        self._combo_sub_weapon = QComboBox()
-        self._combo_sub_weapon.setMinimumWidth(100)
-        self._edit_sub_martial = QLineEdit()
-        self._edit_sub_martial.setPlaceholderText(tr("武学名称"))
-        self._edit_sub_martial.setMaxLength(6)
-        self._edit_sub_martial.setFixedWidth(100)
+        # 第二/三行：主武学+主武器 / 副武学+副武器。
+        # 武学是下拉（来自武学配置），武器由武学派生且只读——这两个字段以前
+        # 各录各的，写成「武器=枪 + 武学=无名剑法」也存得下来，然后毕业率按枪
+        # 算、词条按剑法找，全程静默。派生之后这种不一致在数据层就不存在。
+        self._combo_main_martial = QComboBox()
+        self._combo_main_martial.setMinimumWidth(100)
+        self._edit_main_weapon = QLineEdit()
+        self._edit_main_weapon.setReadOnly(True)
+        self._edit_main_weapon.setFixedWidth(100)
+        self._edit_main_weapon.setPlaceholderText(tr("随武学"))
+        self._combo_sub_martial = QComboBox()
+        self._combo_sub_martial.setMinimumWidth(100)
+        self._edit_sub_weapon = QLineEdit()
+        self._edit_sub_weapon.setReadOnly(True)
+        self._edit_sub_weapon.setFixedWidth(100)
+        self._edit_sub_weapon.setPlaceholderText(tr("随武学"))
 
         def _pair(label: str, widget) -> QHBoxLayout:
             lay = QHBoxLayout()
@@ -150,12 +153,15 @@ class SchoolPanel(QWidget):
         grid = QGridLayout()
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        grid.addLayout(_pair(tr("主武器"), self._combo_main_weapon), 0, 0)
-        grid.addLayout(_pair(tr("主武学"), self._edit_main_martial), 0, 1)
-        grid.addLayout(_pair(tr("副武器"), self._combo_sub_weapon), 1, 0)
-        grid.addLayout(_pair(tr("副武学"), self._edit_sub_martial), 1, 1)
+        grid.addLayout(_pair(tr("主武学"), self._combo_main_martial), 0, 0)
+        grid.addLayout(_pair(tr("主武器"), self._edit_main_weapon), 0, 1)
+        grid.addLayout(_pair(tr("副武学"), self._combo_sub_martial), 1, 0)
+        grid.addLayout(_pair(tr("副武器"), self._edit_sub_weapon), 1, 1)
         attr_layout.addLayout(grid)
 
+        for combo in (self._combo_main_martial, self._combo_sub_martial):
+            combo.currentTextChanged.connect(
+                lambda _t: self._sync_derived_weapons())
         for combo in self._combos():
             combo.currentTextChanged.connect(self._on_field_changed)
         for edit in self._edits():
@@ -225,12 +231,12 @@ class SchoolPanel(QWidget):
     def _combos(self) -> list[QComboBox]:
         return [
             self._combo_attr,
-            self._combo_main_weapon,
-            self._combo_sub_weapon,
+            self._combo_main_martial,
+            self._combo_sub_martial,
         ]
 
     def _edits(self) -> list[QLineEdit]:
-        return [self._edit_main_martial, self._edit_sub_martial]
+        return []
 
     def showEvent(self, event):
         """每次显示时重新加载（武器类型可能已在其他面板变更）"""
@@ -251,6 +257,27 @@ class SchoolPanel(QWidget):
 
     def _schools(self) -> dict[str, dict]:
         return self._data.get("schools") or {}
+
+    def _martial_art_candidates(self) -> list[str]:
+        """武学下拉候选，按属性+武器排序，便于用户成组挑选。"""
+        raw = self._data.get("martial_arts") or []
+        entries = [e for e in raw if isinstance(e, dict) and e.get("name")]
+        entries.sort(key=lambda e: (str(e.get("attr") or ""),
+                                    str(e.get("weapon") or ""),
+                                    str(e["name"])))
+        return [str(e["name"]) for e in entries]
+
+    def _weapon_of(self, martial_art: str) -> str:
+        """武器由武学派生，不接受独立录入。"""
+        for e in (self._data.get("martial_arts") or []):
+            if isinstance(e, dict) and e.get("name") == martial_art:
+                return str(e.get("weapon") or "")
+        return ""
+
+    def _sync_derived_weapons(self) -> None:
+        for combo, edit in ((self._combo_main_martial, self._edit_main_weapon),
+                            (self._combo_sub_martial, self._edit_sub_weapon)):
+            edit.setText(self._weapon_of(combo.currentText().strip()))
 
     def _weapon_candidates(self) -> list[str]:
         """武器候选：支持新格式（dict 列表）和旧格式（字符串列表）"""
@@ -308,12 +335,11 @@ class SchoolPanel(QWidget):
 
         prev_loading = self._loading
         self._loading = True
-        weapons = self._weapon_candidates()
+        arts = self._martial_art_candidates()
         self._fill_combo(self._combo_attr, _SCHOOL_ATTRS, cfg.get("attr"))
-        self._fill_combo(self._combo_main_weapon, weapons, main.get("weapon"))
-        self._edit_main_martial.setText(main.get("martial_art", "") or "")
-        self._fill_combo(self._combo_sub_weapon, weapons, sub.get("weapon"))
-        self._edit_sub_martial.setText(sub.get("martial_art", "") or "")
+        self._fill_combo(self._combo_main_martial, arts, main.get("martial_art"))
+        self._fill_combo(self._combo_sub_martial, arts, sub.get("martial_art"))
+        self._sync_derived_weapons()
         enabled = name is not None
         for combo in self._combos():
             combo.setEnabled(enabled)
@@ -404,16 +430,19 @@ class SchoolPanel(QWidget):
         attr = self._combo_attr.currentText()
         if attr:
             cfg["attr"] = attr
-        for key, combo_w, edit_m in (
-            ("main", self._combo_main_weapon, self._edit_main_martial),
-            ("sub", self._combo_sub_weapon, self._edit_sub_martial),
+        for key, combo_m in (
+            ("main", self._combo_main_martial),
+            ("sub", self._combo_sub_martial),
         ):
             group = {}
-            if combo_w.currentText():
-                group["weapon"] = combo_w.currentText()
-            martial = edit_m.text().strip()
+            martial = combo_m.currentText().strip()
             if martial:
                 group["martial_art"] = martial
+                # 武器仍然落盘：配置文件格式不变，只是它现在恒等于派生值，
+                # 不再是一个可以和武学矛盾的独立录入项。
+                weapon = self._weapon_of(martial)
+                if weapon:
+                    group["weapon"] = weapon
             if group:
                 cfg[key] = group
         self._data.setdefault("schools", {})[name] = cfg

@@ -295,6 +295,22 @@ class TestWeaponTypesAndSchools:
         assert mgr.get_weapon_wuxue_affix("扇") == "扇武学增效"
         assert mgr.get_weapon_wuxue_affix("未注册") == ""
 
+    def test_equipment_name_mapping_is_config_driven(self, mgr):
+        assert mgr.infer_equipment_type_from_name("踏雪含光") == "剑"
+        assert mgr.infer_equipment_type_from_name("雁南飞甲") == "胸甲"
+        assert mgr.infer_equipment_type_from_name("吴钩缚袴") == "胫甲"
+        assert mgr.infer_equipment_type_from_label("武器·鼓") == "舞绫鼓"
+        assert mgr.infer_equipment_type_from_label("腕甲") == "腕甲"
+
+    def test_name_series_is_evidence_not_level_inference(self, mgr):
+        output = mgr.get_equipment_name_series("output")
+        armor = mgr.get_equipment_name_series("armor")
+        # 这里只验证已知映射，不限制配置总量；后续新增等级不应破坏用例。
+        assert output.items() >= {110: "流星", 105: "踏雪"}.items()
+        assert armor.items() >= {110: "吴钩", 105: "雁南飞"}.items()
+        # 等阶名称只有显式 getter，解析器的等级仍来自“X 阶”/基础属性。
+        assert not hasattr(mgr, "infer_level_from_equipment_name")
+
     def test_get_schools_structure(self, mgr):
         schools = mgr.get_schools()
         assert len(schools) == 11

@@ -64,13 +64,16 @@ class TestDialog:
         qtbot.addWidget(dialog)
         assert dialog.windowTitle() == "游戏配置"
         tabs = dialog._tab._tabs
-        assert tabs.count() == 6
+        # 顺序即依赖顺序：武学是流派和玩法的共同前置，玩法引用武学
+        assert tabs.count() == 8
         assert tabs.tabText(0) == "词组配置"
         assert tabs.tabText(1) == "装备配置"
-        assert tabs.tabText(2) == "流派配置"
-        assert tabs.tabText(3) == "等级配置"
-        assert tabs.tabText(4) == "赛季配置"
-        assert tabs.tabText(5) == "字体设置"
+        assert tabs.tabText(2) == "武学配置"
+        assert tabs.tabText(3) == "流派配置"
+        assert tabs.tabText(4) == "玩法配置"
+        assert tabs.tabText(5) == "等级配置"
+        assert tabs.tabText(6) == "赛季配置"
+        assert tabs.tabText(7) == "字体设置"
         for nav in (
             dialog._tab._affix_panel._affix_list,
             dialog._tab._base_panel._part_list,
@@ -122,16 +125,18 @@ class TestWeaponTypes:
     def test_weapon_frame_only_on_weapon_part(self, qtbot, tmp_attrs):
         panel = BaseAttrPanel()
         qtbot.addWidget(panel)
-        # 默认选中首行 weapon
+        # 首行为输出系列，武器在第二行
+        panel._part_list.setCurrentRow(1)
         assert not panel._weapon_frame.isHidden()
         assert panel._weapon_list.count() == 10
         # 切到环：武器类型区块隐藏
-        panel._part_list.setCurrentRow(1)
+        panel._part_list.setCurrentRow(2)
         assert panel._weapon_frame.isHidden()
 
     def test_add_and_delete_roundtrip(self, qtbot, tmp_attrs, monkeypatch):
         panel = BaseAttrPanel()
         qtbot.addWidget(panel)
+        panel._part_list.setCurrentRow(1)
 
         # 添加新武器「双剑」
         monkeypatch.setattr(
@@ -158,6 +163,7 @@ class TestWeaponTypes:
     def test_delete_refused_when_referenced(self, qtbot, tmp_attrs, monkeypatch):
         panel = BaseAttrPanel()
         qtbot.addWidget(panel)
+        panel._part_list.setCurrentRow(1)
         warnings: list[str] = []
         monkeypatch.setattr(
             base_attr_panel.QMessageBox, "warning",
@@ -170,6 +176,108 @@ class TestWeaponTypes:
         assert warnings and "鸣金·虹" in warnings[0]
         weapon_names = [t["name"] for t in _load_yaml(tmp_attrs)["weapon_types"]]
         assert "剑" in weapon_names
+
+    def test_weapon_standard_and_part_names_save(self, qtbot, tmp_attrs,
+                                                 monkeypatch):
+        panel = BaseAttrPanel()
+        qtbot.addWidget(panel)
+        panel._part_list.setCurrentRow(1)
+        panel._weapon_list.setCurrentRow(0)  # 剑
+        assert panel._weapon_standard_names.values() == ["含光"]
+        assert panel._weapon_part_names.values() == ["剑"]
+        monkeypatch.setattr(
+            base_attr_panel.QInputDialog, "getText",
+            staticmethod(lambda *a, **k: ("宝剑", True)),
+        )
+        panel._weapon_part_names._add_name()
+        sword = _load_yaml(tmp_attrs)["weapon_types"][0]
+        assert sword["type_aliases"] == ["剑", "宝剑"]
+
+
+class TestEquipmentNames:
+    def test_name_list_supports_multi_select_removal(self, qtbot):
+        editor = base_attr_panel._NameListEditor("测试名称")
+        qtbot.addWidget(editor)
+        editor.set_values(["名称一", "名称二", "名称三"])
+        editor._list.item(0).setSelected(True)
+        editor._list.item(2).setSelected(True)
+
+        editor._remove_selected()
+
+        assert editor.values() == ["名称二"]
+
+    def test_output_and_armor_series_are_separate_pages(self, qtbot, tmp_attrs):
+        panel = BaseAttrPanel()
+        qtbot.addWidget(panel)
+        assert not panel._series_frame.isHidden()
+        assert panel._current_series == "output"
+        assert panel._series_table.horizontalHeaderItem(1).text() == "等阶名称"
+        assert panel._series_table.item(0, 1).text() == "流星"
+
+        panel._part_list.setCurrentRow(4)
+        assert panel._current_series == "armor"
+        names = {
+            panel._series_table.item(row, 1).text()
+            for row in range(panel._series_table.rowCount())
+        }
+        # 允许后续继续追加等级，只验证防具页包含既有名称且没有串入输出名称。
+        assert names >= {"吴钩", "雁南飞"}
+        assert names.isdisjoint({"流星", "踏雪"})
+
+    def test_part_standard_and_part_names_save(self, qtbot, tmp_attrs,
+                                               monkeypatch):
+        panel = BaseAttrPanel()
+        qtbot.addWidget(panel)
+        panel._part_list.setCurrentRow(6)  # 胸甲
+        assert panel._part_standard_names.values() == ["甲"]
+        assert panel._part_part_names.values() == ["胸甲", "胸"]
+        monkeypatch.setattr(
+            base_attr_panel.QInputDialog, "getText",
+            staticmethod(lambda *a, **k: ("上衣", True)),
+        )
+        panel._part_part_names._add_name()
+        added = panel._part_part_names._list.item(2)
+        assert added is not None
+        added.setText("外衣")
+        chest = _load_yaml(tmp_attrs)["base_attrs"]["chest"]
+        assert chest["_name_suffixes"] == ["甲"]
+        assert chest["_type_aliases"] == ["胸甲", "胸", "外衣"]
+
+    def test_non_weapon_name_frame_does_not_absorb_vertical_space(
+        self, qtbot, tmp_attrs,
+    ):
+        panel = BaseAttrPanel()
+        qtbot.addWidget(panel)
+        panel.resize(1100, 760)
+        panel.show()
+        panel._part_list.setCurrentRow(6)
+        qtbot.wait(1)
+
+        assert panel._part_name_frame.sizePolicy().verticalPolicy() == (
+            base_attr_panel.QSizePolicy.Policy.Maximum)
+        assert panel._part_name_frame.height() <= (
+            panel._part_name_frame.sizeHint().height() + 2)
+
+    def test_name_editor_rejects_comma_separated_input(
+        self, qtbot, tmp_attrs, monkeypatch,
+    ):
+        panel = BaseAttrPanel()
+        qtbot.addWidget(panel)
+        panel._part_list.setCurrentRow(6)
+        warnings: list[str] = []
+        monkeypatch.setattr(
+            base_attr_panel.QInputDialog, "getText",
+            staticmethod(lambda *a, **k: ("胸甲,胸", True)),
+        )
+        monkeypatch.setattr(
+            base_attr_panel.QMessageBox, "warning",
+            staticmethod(lambda *a, **k: warnings.append(a[2])),
+        )
+
+        panel._part_part_names._add_name()
+
+        assert warnings == ["请一次添加一个名称，无需使用逗号分隔。"]
+        assert panel._part_part_names.values() == ["胸甲", "胸"]
 
 
 # ─── 词条部位往返 ────────────────────────────────────
@@ -263,10 +371,12 @@ class TestSchoolPanel:
         names = [panel._school_list.item(i).text() for i in range(11)]
         panel._school_list.setCurrentRow(names.index("裂石·钧"))
         assert panel._combo_attr.currentText() == "裂石"
-        assert panel._combo_main_weapon.currentText() == "横刀"
-        assert panel._edit_main_martial.text() == "斩雪刀法"
-        assert panel._combo_sub_weapon.currentText() == "陌刀"
-        assert panel._edit_sub_martial.text() == "十方破阵"
+        # 武学是选择项，武器由武学派生且只读
+        assert panel._combo_main_martial.currentText() == "斩雪刀法"
+        assert panel._edit_main_weapon.text() == "横刀"
+        assert panel._edit_main_weapon.isReadOnly()
+        assert panel._combo_sub_martial.currentText() == "十方破阵"
+        assert panel._edit_sub_weapon.text() == "陌刀"
         assert panel._scheme_list.count() == 1
         assert panel._scheme_list.item(0).text() == "基础方案"
         assert panel._scheme_list.currentRow() == 0
@@ -340,16 +450,38 @@ class TestSchoolPanel:
         assert all(cell is not None and cell.height() == 24 for cell in empty_cells)
 
     def test_field_edit_saves(self, qtbot, tmp_attrs):
+        """改武学时武器随之落盘，且恒等于武学派生值。"""
         panel = SchoolPanel()
         qtbot.addWidget(panel)
         names = [panel._school_list.item(i).text() for i in range(11)]
         panel._school_list.setCurrentRow(names.index("鸣金·虹"))
-        panel._combo_sub_weapon.setCurrentText("伞")
+        panel._combo_sub_martial.setCurrentText("九重春色")   # 伞 / 牵丝
+
         cfg = _load_yaml(tmp_attrs)["schools"]["鸣金·虹"]
-        assert cfg["sub"]["weapon"] == "伞"
+        assert cfg["sub"] == {"martial_art": "九重春色", "weapon": "伞"}
         # 属性与主武器组不受影响（affix 已移至装备配置）
         assert cfg["attr"] == "鸣金"
-        assert cfg["main"] == {"weapon": "剑", "martial_art": "无名剑法"}
+        assert cfg["main"] == {"martial_art": "无名剑法", "weapon": "剑"}
+
+    def test_weapon_cannot_diverge_from_the_martial_art(self, qtbot, tmp_attrs):
+        """武器不再是可独立录入的字段——这是拆分要修掉的那类静默错误。
+
+        拆分前写成「武器=枪 + 武学=无名剑法」也存得下来，然后毕业率按枪算、
+        词条按剑法找，没有任何地方会喊。
+        """
+        panel = SchoolPanel()
+        qtbot.addWidget(panel)
+        names = [panel._school_list.item(i).text() for i in range(11)]
+        panel._school_list.setCurrentRow(names.index("鸣金·虹"))
+
+        assert panel._edit_main_weapon.isReadOnly()
+        panel._combo_main_martial.setCurrentText("积矩九剑")
+        assert panel._edit_main_weapon.text() == "剑"
+        panel._combo_main_martial.setCurrentText("八方风雷枪")
+        assert panel._edit_main_weapon.text() == "枪"
+
+        saved = _load_yaml(tmp_attrs)["schools"]["鸣金·虹"]["main"]
+        assert saved == {"martial_art": "八方风雷枪", "weapon": "枪"}
 
     def test_add_rename_delete_roundtrip(self, qtbot, tmp_attrs, monkeypatch):
         panel = SchoolPanel()

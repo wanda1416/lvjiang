@@ -29,6 +29,8 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
+from .....ui.button_styles import apply_button_style, fit_button_width
+from .....ui.execution_user_selector import ExecutionUserSelector
 from ...config.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
 from .config_widget import TuningConfigWidget, TuningGlobalsWidget
 
@@ -82,6 +84,10 @@ class TuningTab(QWidget):
         self.btn_pause_resume.clicked.connect(self._on_pause_resume_clicked)
         btn_layout.addWidget(self.btn_pause_resume)
         tab_layout.addLayout(btn_layout)
+
+        self._execution_user_selector = ExecutionUserSelector(
+            self._host.user_manager)
+        tab_layout.addWidget(self._execution_user_selector)
 
         config_tabs = QTabWidget()
         config_tabs.addTab(self._build_rules_page(), tr("规则"))
@@ -223,12 +229,12 @@ class TuningTab(QWidget):
         slots_header.addStretch()
         btn_select_all = QPushButton(tr("全选"))
         btn_select_all.clicked.connect(lambda: self._set_all_tuning_checks(True))
-        btn_select_all.setFixedWidth(70)
         slots_header.addWidget(btn_select_all)
         btn_deselect_all = QPushButton(tr("取消全选"))
         btn_deselect_all.clicked.connect(lambda: self._set_all_tuning_checks(False))
-        btn_deselect_all.setFixedWidth(70)
         slots_header.addWidget(btn_deselect_all)
+        apply_button_style(btn_select_all, btn_deselect_all, variant="neutral")
+        fit_button_width(btn_select_all, btn_deselect_all, minimum=70)
         layout.addLayout(slots_header)
         self._tuning_checkboxes: list[QCheckBox] = []
 
@@ -406,6 +412,13 @@ class TuningTab(QWidget):
         host = self._host
         self._clear_status()
 
+        execution_username = self._execution_user_selector.resolve_username()
+        if not execution_username:
+            msg = tr("请选择有效的执行用户")
+            host.append_log(f"[错误] {msg}")
+            self._show_status_error(msg)
+            return
+
         # 图库空间预检（UI 即时反馈，与工作流 run() 预检同契约）
         if self._missing_tuning_output_fields():
             msg = tr("当前图库空间缺少 levels/counts 输出字段，无法启动自动调律")
@@ -503,7 +516,7 @@ class TuningTab(QWidget):
             if engine is not None:
                 from .progress_hub import TuningProgressHub
                 engine._progress_hub = TuningProgressHub()
-                # 连接右侧调律进度 Tab
+                # 连接右侧调律管理中的进度页
                 widget = self._find_progress_widget()
                 if widget is not None:
                     widget.reconnect(engine._progress_hub)
@@ -523,22 +536,27 @@ class TuningTab(QWidget):
             host.append_log(
                 f"[开始] {flow_name} 流程，基础规则: {base_group.name}，"
                 f"规则: {rule_names_text}，部位: {selected_slots}，"
-                f"最低等级: {effective_min_level}"
+                f"最低等级: {effective_min_level}，"
+                f"执行用户: {execution_username}"
                 + ("" if min_level_override is None else "（UI 覆盖）"))
 
         host.run_workflow_implementation(
-            "auto_tuning", flow_name, configure)
+            "auto_tuning", flow_name, configure,
+            execution_username=execution_username)
 
     # ─── 进度控件查找 ────────────────────────────────
 
     def _find_progress_widget(self):
-        """在右侧 Tab 中查找 TuningProgressWidget"""
+        """查找可连接进度桥的调律管理容器（兼容旧进度控件）。"""
+        from .management_widget import TuningManagementWidget
         from .progress_widget import TuningProgressWidget
         tabs = getattr(self._host, 'tabs', None)
         if tabs is None:
             return None
         for i in range(tabs.count()):
             w = tabs.widget(i)
+            if isinstance(w, TuningManagementWidget):
+                return w
             if isinstance(w, TuningProgressWidget):
                 return w
         return None

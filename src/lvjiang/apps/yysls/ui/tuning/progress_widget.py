@@ -10,6 +10,8 @@ hub 可在构造时为空，工作流启动后通过 reconnect() 绑定。
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PyQt6.QtWidgets import (
     QFrame,
     QGroupBox,
@@ -17,12 +19,19 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
     QProgressBar,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from .....i18n import tr
+from .....ui.button_styles import apply_button_style
 from .progress_hub import TuningProgressHub
+from .result_store import TuningResultStore
+from .styles import HEADER_TITLE_STYLE
+
+if TYPE_CHECKING:
+    from .result_dialog import TuningResultsDialog
 
 # 品阶 key → 颜色
 _QUALITY_COLORS = {
@@ -48,6 +57,8 @@ class TuningProgressWidget(QWidget):
     def __init__(self, hub: TuningProgressHub | None = None, parent=None):
         super().__init__(parent)
         self._hub = hub
+        self._result_store = TuningResultStore(hub, self)
+        self._results_dialog: TuningResultsDialog | None = None
         self._equipment_count = 0
         self._round_count = 0
         self._current_equipment_info: dict = {}
@@ -62,6 +73,22 @@ class TuningProgressWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
+
+        # 独立总览只订阅进度事件；打开、关闭都不影响工作流。
+        toolbar = QHBoxLayout()
+        self._title_label = QLabel(tr("调律进度"))
+        self._title_label.setStyleSheet(HEADER_TITLE_STYLE)
+        toolbar.addWidget(self._title_label)
+        toolbar.addStretch(1)
+        self._results_button = QPushButton()
+        self._results_button.setToolTip(
+            tr("在独立窗口中查看本轮全部装备处理结果"))
+        self._results_button.clicked.connect(self._open_results_dialog)
+        apply_button_style(self._results_button, variant="action")
+        toolbar.addWidget(self._results_button)
+        layout.addLayout(toolbar)
+        self._result_store.changed.connect(self._update_results_button)
+        self._update_results_button()
 
         # ── 批次进度条 ──
         batch_group = QGroupBox(tr("批次进度"))
@@ -239,10 +266,12 @@ class TuningProgressWidget(QWidget):
         """切换到新 hub（每次启动工作流 hub 重建）"""
         self._disconnect_signals()
         self._hub = hub
+        self._result_store.reconnect(hub)
         self._connect_signals()
 
     def reset_state(self):
         """重置 UI 到初始状态（新工作流启动时调用）"""
+        self._result_store.clear()
         self._equipment_count = 0
         self._round_count = 0
         self._current_equipment_info = {}
@@ -266,6 +295,24 @@ class TuningProgressWidget(QWidget):
         self._previous_group.setTitle(tr("上一件装备"))
         self._previous_info_label.setText("")
         self._previous_process.clear()
+
+    def _update_results_button(self) -> None:
+        count = len(self._result_store.results)
+        self._results_button.setText(
+            tr("查看当前详情（{count}）").format(count=count))
+
+    def _open_results_dialog(self) -> None:
+        """打开非模态窗口；重复点击复用同一个窗口和运行期 Store。"""
+        from .result_dialog import TuningResultsDialog
+
+        if self._results_dialog is None:
+            self._results_dialog = TuningResultsDialog(
+                self._result_store, self.window())
+        self._results_dialog.setWindowTitle(
+            tr("调律记录详情") + " · " + tr("当前正在运行任务"))
+        self._results_dialog.show()
+        self._results_dialog.raise_()
+        self._results_dialog.activateWindow()
 
     def mark_done(self):
         """工作流结束回调"""

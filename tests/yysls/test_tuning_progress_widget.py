@@ -1,5 +1,6 @@
 """自动调律进度页的实时阶段信息。"""
 
+from lvjiang.apps.yysls.ui.tuning.history_widget import TuningHistoryWidget
 from lvjiang.apps.yysls.ui.tuning.progress_hub import TuningProgressHub
 from lvjiang.apps.yysls.ui.tuning.progress_widget import TuningProgressWidget
 
@@ -19,6 +20,25 @@ def test_operation_update_is_shown_immediately(qtbot):
     text = widget._operation_label.text()
     assert "重置调律" in text
     assert "规则2命中垃圾" in text
+
+
+def test_live_header_matches_history_and_detail_title_marks_running(qtbot, tmp_path):
+    from lvjiang.apps.yysls.tuning_history.repository import TuningHistoryRepository
+
+    widget = TuningProgressWidget()
+    history = TuningHistoryWidget(TuningHistoryRepository(tmp_path / "history.db"))
+    qtbot.addWidget(widget)
+    qtbot.addWidget(history)
+
+    assert widget._title_label.styleSheet() == history._title_label.styleSheet()
+    assert "palette(highlight)" in widget._results_button.styleSheet()
+
+    widget._open_results_dialog()
+
+    assert widget._results_dialog is not None
+    assert widget._results_dialog.windowTitle() == (
+        "调律记录详情 · 当前正在运行任务"
+    )
 
 
 def test_round_completion_moves_to_end_processing(qtbot):
@@ -154,3 +174,28 @@ def test_round_plan_is_visible_before_tuning_completes(qtbot):
     qtbot.waitUntil(lambda: "第 3 轮" in widget._operation_label.text())
     assert "金狗粮" in widget._last_result_label.text()
     assert "大律准石×81" in widget._material_label.text()
+
+
+def test_results_entry_opens_non_modal_live_dialog(qtbot):
+    hub = TuningProgressHub()
+    widget = TuningProgressWidget(hub)
+    qtbot.addWidget(widget)
+
+    assert widget._results_button.text() == "查看当前详情（0）"
+    hub.slot_entered.emit("wrist", "腕甲")
+    hub.equipment_started.emit({
+        "name": "总览腕甲", "type": "腕甲", "level": 110,
+        "quality": "gold", "affixes": [], "target_affixes": [],
+    })
+    hub.equipment_finished.emit({
+        "name": "总览腕甲", "rounds": 1, "status": "done",
+        "final_affixes": [{"name": "劲", "value": 76}],
+    })
+    qtbot.waitUntil(lambda: "（1）" in widget._results_button.text())
+
+    widget._results_button.click()
+    dialog = widget._results_dialog
+    assert dialog is not None
+    assert dialog.isVisible()
+    assert not dialog.isModal()
+    assert [card.result.name for card in dialog._cards] == ["总览腕甲"]

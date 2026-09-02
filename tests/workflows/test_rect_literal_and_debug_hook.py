@@ -136,6 +136,24 @@ class TestStepMode:
         t.join(3)
         assert not t.is_alive() and eng.variables["c"] == 3
 
+    def test_release_from_statement_hook_is_not_lost(self):
+        """UI 收到 stepped 后立即放行，也不能被引擎随后 clear 掉。"""
+        pause = threading.Event()
+        pause.set()
+        eng = make_engine(stop_check=lambda: False, pause_event=pause)
+        prog = parse_text("$a = 1\n")
+        eng._procs = dict(prog.procs)
+        eng.step_mode = True
+        eng.statement_hook = lambda _line, _vars: pause.set()
+
+        worker = threading.Thread(
+            target=eng._exec_body, args=(prog.body,), daemon=True)
+        worker.start()
+        worker.join(1)
+
+        assert not worker.is_alive()
+        assert eng.variables["a"] == 1
+
     def test_stop_wakes_blocked_engine(self):
         eng, prog, pause, stopped, lines = self._engine("$a = 1\n$b = 2\n")
         worker = threading.Thread(target=lambda: self._run_swallow(eng, prog), daemon=True)

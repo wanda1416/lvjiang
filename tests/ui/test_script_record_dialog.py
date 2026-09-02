@@ -7,7 +7,11 @@
 
 import time
 
-from lvjiang.core.macro_recorder import PRECISION_HIGH, MacroRecorder
+from lvjiang.core.macro_recorder import (
+    PRECISION_HIGH,
+    MacroRecorder,
+    _pynput_key_to_dsl_name,
+)
 
 
 class _MockKey:
@@ -28,6 +32,12 @@ def _char_key(char: str) -> _MockKey:
 def _special_key(name: str) -> _MockKey:
     """模拟 pynput Key 枚举（特殊键，无 .char 属性）"""
     return _MockKey(char=None, name=name)
+
+
+def test_shifted_punctuation_is_restored_to_physical_key():
+    assert _pynput_key_to_dsl_name(_char_key("~")) == "GRAVE"
+    assert _pynput_key_to_dsl_name(_char_key("?")) == "SLASH"
+    assert _pynput_key_to_dsl_name(_special_key("shift_r")) == "RSHIFT"
 
 
 class _Capture:

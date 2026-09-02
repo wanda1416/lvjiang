@@ -17,6 +17,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
@@ -48,6 +49,7 @@ class FloatService : Service() {
     private var floatParams: WindowManager.LayoutParams? = null
     private var panelView: View? = null
     private var statusLine: TextView? = null
+    private var agentLine: TextView? = null
     private var logLine: TextView? = null
     private var actionArea: LinearLayout? = null
 
@@ -92,16 +94,17 @@ class FloatService : Service() {
     // ── 悬浮图标 ──────────────────────────────────────────
 
     private fun addFloatIcon() {
+        val iconSize = dp(42)
         val params = WindowManager.LayoutParams(
-            ICON_SIZE_PX, ICON_SIZE_PX,
+            iconSize, iconSize,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 40
-            y = 400
+            x = dp(12)
+            y = dp(120)
         }
 
         val icon = ImageView(this).apply {
@@ -116,6 +119,8 @@ class FloatService : Service() {
             private var startX = 0
             private var startY = 0
             private var moved = false
+            private val touchSlop =
+                ViewConfiguration.get(this@FloatService).scaledTouchSlop.toFloat()
 
             override fun onTouch(v: View, event: MotionEvent): Boolean {
                 when (event.action) {
@@ -129,10 +134,15 @@ class FloatService : Service() {
                     MotionEvent.ACTION_MOVE -> {
                         val dx = event.rawX - downX
                         val dy = event.rawY - downY
-                        if (moved || abs(dx) > TOUCH_SLOP || abs(dy) > TOUCH_SLOP) {
+                        if (moved || abs(dx) > touchSlop || abs(dy) > touchSlop) {
                             moved = true
-                            params.x = startX + dx.toInt()
-                            params.y = startY + dy.toInt()
+                            val metrics = resources.displayMetrics
+                            params.x = (startX + dx.toInt()).coerceIn(
+                                0, maxOf(0, metrics.widthPixels - params.width),
+                            )
+                            params.y = (startY + dy.toInt()).coerceIn(
+                                0, maxOf(0, metrics.heightPixels - params.height),
+                            )
                             windowManager.updateViewLayout(v, params)
                         }
                     }
@@ -147,7 +157,12 @@ class FloatService : Service() {
         windowManager.addView(icon, params)
         floatView = icon
         floatParams = params
-        if (iconHidden) icon.visibility = View.INVISIBLE
+        applyIconVisibility()
+    }
+
+    private fun applyIconVisibility() {
+        floatView?.visibility =
+            if (iconHidden || pcConnected) View.INVISIBLE else View.VISIBLE
     }
 
     private fun tintIcon(state: String) {
@@ -174,6 +189,7 @@ class FloatService : Service() {
         panelView?.let { runCatching { windowManager.removeView(it) } }
         panelView = null
         statusLine = null
+        agentLine = null
         logLine = null
         actionArea = null
     }
@@ -195,6 +211,15 @@ class FloatService : Service() {
         }
         root.addView(status)
         statusLine = status
+
+        val agent = TextView(this).apply {
+            setTextColor(0xFF90CAF9.toInt())
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+            text = "PC 未连接"
+            setPadding(0, dp(3), 0, 0)
+        }
+        root.addView(agent)
+        agentLine = agent
 
         val log = TextView(this).apply {
             setTextColor(0xFFAAAAAA.toInt())
@@ -264,8 +289,9 @@ class FloatService : Service() {
         val gap = dp(4)
         val panelHApprox = dp(300)  // status + 日志 + 170dp 滚动区 + 收起按钮，估个上限用于 clamp
 
-        val toRight = icon.x + ICON_SIZE_PX / 2 < screenW / 2
-        val rawX = if (toRight) icon.x + ICON_SIZE_PX + gap else icon.x - panelW - gap
+        val iconW = floatView?.width?.takeIf { it > 0 } ?: dp(42)
+        val toRight = icon.x + iconW / 2 < screenW / 2
+        val rawX = if (toRight) icon.x + iconW + gap else icon.x - panelW - gap
         params.x = rawX.coerceIn(gap, maxOf(gap, screenW - panelW - gap))
         params.y = icon.y.coerceIn(gap, maxOf(gap, screenH - panelHApprox))
     }
@@ -321,6 +347,11 @@ class FloatService : Service() {
                     else -> message.ifEmpty { "空闲：选择一个任务开始" }
                 }
                 statusLine?.text = header
+                agentLine?.text = if (AgentServer.isPcConnected()) {
+                    "PC 已连接 · ${AgentServer.lastCommandSummary()}"
+                } else {
+                    "PC 未连接"
+                }
                 logLine?.text = tail
                 tintIcon(state)
                 updateNotification(
@@ -413,8 +444,8 @@ class FloatService : Service() {
     }
 
     private fun launchTask(taskId: String, taskName: String) {
-        // 无障碍是截图与点击的唯一主通道，被系统关掉后所有动作都会静默失败。
-        // 在这里拦一次并直接把用户送到开关页，比让任务跑起来再报一堆截图失败清楚得多。
+        // 手机独立任务固定使用无障碍截图与点击。在这里拦一次并直接把用户送到开关页，
+        // 比让任务启动后再报一串截图失败更清楚；PC 代理另可使用 Shizuku 通道。
         if (!A11yBridge.isReady()) {
             toast("无障碍服务未开启，正在打开设置页")
             openAccessibilitySettings()
@@ -501,6 +532,10 @@ class FloatService : Service() {
         var iconHidden = false
             private set
 
+        /** PC 代理连接期间隐藏悬浮 UI，防止它进入截图或与 PC 工作流并发操作。 */
+        @Volatile
+        private var pcConnected = false
+
         /**
          * 动态显隐悬浮图标（主线程执行）。截图 / 屏幕标定前藏起来，否则图标会被截进画面、
          * 用户可能把它当成地标去点。返回悬浮服务是否在运行（没在跑本来就没图标，返回 false）。
@@ -509,17 +544,23 @@ class FloatService : Service() {
             iconHidden = hidden
             val svc = instance ?: return false
             svc.ui.post {
-                svc.floatView?.visibility = if (hidden) View.INVISIBLE else View.VISIBLE
+                svc.applyIconVisibility()
                 if (hidden) svc.closePanel()
             }
             return true
         }
 
+        fun setPcConnected(connected: Boolean) {
+            pcConnected = connected
+            val svc = instance ?: return
+            svc.ui.post {
+                svc.applyIconVisibility()
+                if (connected) svc.closePanel()
+            }
+        }
+
         private const val TAG = "FloatService"
         private const val NOTIFICATION_ID = 1
-        private const val ICON_SIZE_PX = 140
-        private const val TOUCH_SLOP = 12f
-
         /** 轮询间隔：任务是秒级节奏的，1s 足够跟上，也不至于把 Binder 打满 */
         private const val POLL_INTERVAL_MS = 1000L
         private const val LOG_TAIL_LINES = 4

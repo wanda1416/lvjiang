@@ -10,6 +10,7 @@ import time
 
 from loguru import logger
 
+from ...core.key_names import normalize_key
 from ..runtime_layout import require_enabled
 
 
@@ -18,8 +19,33 @@ class _ActionMixin:
 
     # ─── 点击操作 ──────────────────────────────────────────
 
+    def _activate_bound_key(self, key: str, target: str, **kw) -> None:
+        """以按键激活实体，同时保持 click 的默认/显式前后等待语义。"""
+        pre_delay = kw.pop("pre_delay", None)
+        post_delay = kw.pop("post_delay", None)
+        button = kw.pop("button", "left")
+        if kw:
+            unknown = ", ".join(sorted(kw))
+            raise TypeError(f"按键激活不支持参数: {unknown}")
+        if button != "left":
+            raise ValueError(f"按键激活仅支持默认左键语义，收到 mouse button={button!r}")
+
+        normalized = normalize_key(key)
+        before = self._input.before_click_wait if pre_delay is None else pre_delay
+        after = self._input.after_click_wait if post_delay is None else post_delay
+        if before != (0, 0):
+            time.sleep(random.uniform(*before))
+        logger.debug(f"激活: {target} -> press {normalized}")
+        self._input.key_down(normalized)
+        try:
+            time.sleep(random.uniform(0.025, 0.035))
+        finally:
+            self._input.key_up(normalized)
+        if after != (0, 0):
+            time.sleep(random.uniform(*after))
+
     def click_region(self, scene_key: str, field_key: str, jitter: bool = True, **kw):
-        """点击指定场景中指定区域的中心（带随机抖动）"""
+        """激活区域：默认点击中心，布局绑定 activation_key 时改为按键。"""
         regions = self._layout.get_scene_regions(scene_key)
         region = next((r for r in regions if r.key == field_key), None)
         if region is None:
@@ -28,6 +54,14 @@ class _ActionMixin:
                 f"请在场景布局编辑器中绑定后重试"
             )
         require_enabled(region, scene_key, "region")
+
+        # 非左键是明确的鼠标操作，不应用语义激活绑定。
+        activation_key = getattr(region, "activation_key", "")
+        if (isinstance(activation_key, str) and activation_key
+                and kw.get("button", "left") == "left"):
+            self._activate_bound_key(
+                activation_key, f"{scene_key}/{field_key}", **kw)
+            return
 
         screen_x, screen_y = self._region_to_screen(region, jitter)
         logger.debug(f"点击: {scene_key}/{field_key} -> 屏幕({screen_x},{screen_y})")
@@ -41,7 +75,7 @@ class _ActionMixin:
     # ─── Point / Arrow 操作 ────────────────────────────────
 
     def click_any(self, scene_key: str, key: str, **kw):
-        """点击 region / point / panel（自动识别，region → point → panel 顺序）"""
+        """激活 region / point；panel 仍点击中心。"""
         regions = self._layout.get_scene_regions(scene_key)
         region = next((r for r in regions if r.key == key), None)
         if region is not None:
@@ -107,12 +141,18 @@ class _ActionMixin:
         )
 
     def click_point(self, scene_key: str, point_key: str, **kw):
-        """点击 point 中心（带半径内随机偏移）"""
+        """激活 point：默认点击中心，布局绑定 activation_key 时改为按键。"""
         points = self._layout.get_scene_points(scene_key)
         point = next((p for p in points if p.key == point_key), None)
         if point is None:
             raise ValueError(f"场景 {scene_key} 的坐标点未绑定: {point_key}")
         require_enabled(point, scene_key, "point")
+        activation_key = getattr(point, "activation_key", "")
+        if (isinstance(activation_key, str) and activation_key
+                and kw.get("button", "left") == "left"):
+            self._activate_bound_key(
+                activation_key, f"{scene_key}/{point_key}", **kw)
+            return
         screen_x, screen_y = self._point_to_screen(point)
         logger.debug(f"点击 point: {scene_key}/{point_key} -> 屏幕({screen_x},{screen_y})")
         self._input.click_screen(screen_x, screen_y, f"{scene_key}/{point_key}", **kw)

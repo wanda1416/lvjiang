@@ -5,7 +5,7 @@ AdbDevice 换成记录 forward/remove_forward 调用的桩。覆盖：
 - 帧编解码（长度前缀 / JSON 头 / 二进制负载）
 - 握手：协议版本校验、连不上/假连接（连上即关）→ connect() 返回 False 且撤 forward
 - AgentCapture：RGBA → BGR、PNG 解码、节流 retryable 重试、尺寸缓存
-- AgentInput：tap / swipe / hold_move / key 分派与参数换算，失败只记日志不抛
+- AgentInput：tap / swipe / hold_move / key 分派与参数换算，设备端失败向工作流传播
 - 传输断开后自动重连一次
 - 工厂：有代理用 AgentInput/AgentCapture，无代理退回 Adb*
 """
@@ -191,6 +191,14 @@ def test_connect_rejects_protocol_mismatch(fake):
     assert not client.connected and dev.removed  # forward 已撤
 
 
+def test_connect_rejects_agent_without_usable_input_channel(fake):
+    """App 在线不等于手势可用：无障碍和 Shizuku 都不可用时必须回退 ADB。"""
+    _, dev = fake(lambda req: (_status(a11y=False, shizuku_granted=False), b""))
+    client = AgentClient(dev)
+    assert client.connect() is False
+    assert not client.connected and dev.removed
+
+
 def test_connect_fake_connection_closed_immediately(fake):
     """adb forward 到不存在的目标：连上即关 → 握手读到 EOF → False"""
     srv, dev = fake(lambda req: "close")
@@ -358,13 +366,14 @@ def test_agent_input_dispatch(fake, monkeypatch):
     client.close()
 
 
-def test_agent_input_failure_logs_not_raises(fake, monkeypatch):
+def test_agent_input_failure_is_propagated(fake, monkeypatch):
     monkeypatch.setattr(agent_mod.time, "sleep", lambda *_: None)
     srv, dev = fake(_ok_handler(lambda req: ({"ok": False, "error": "手势被取消"}, b"")))
     client = AgentClient(dev)
     assert client.connect()
     inp = AgentInput(client, _cfg())
-    inp.click_screen(1, 1)  # 不抛
+    with pytest.raises(AgentOpError, match="手势被取消"):
+        inp.click_screen(1, 1)
     assert _ops(srv) == [{"op": "tap", "x": 1, "y": 1}]
     client.close()
 

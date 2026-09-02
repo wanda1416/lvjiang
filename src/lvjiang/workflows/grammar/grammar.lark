@@ -53,7 +53,10 @@ start: (_NL | statement)*
 // press "SHIFT" down    — 按下保持
 // press "SHIFT" up      — 释放
 // press $key            — 按键名来自变量（值按字符串处理）
-press_stmt: "press"i (STRING | var_ref) press_modifier? wait_clauses? _NL
+// press "CTRL" + "C"   — 组合键，从左到右按下、从右到左释放
+press_stmt: "press"i press_key_chain press_modifier? wait_clauses? _NL
+press_key_chain: press_key ("+" press_key)*
+?press_key: STRING | var_ref
 press_modifier: "hold"i number -> press_hold
               | "down"i        -> press_down
               | "up"i          -> press_up

@@ -106,7 +106,7 @@ class TestPalette:
     def test_list_has_headers_and_actions(self, qtbot):
         p = self._palette(qtbot)
         texts = [p.list.item(i).text() for i in range(p.list.count())]
-        assert texts[0].startswith("—") and any("点击区域" in t for t in texts)
+        assert texts[0].startswith("—") and any("激活区域" in t for t in texts)
         p.search.setText("找图")
         assert p.list.count() == 2 and "找图" in p.list.item(1).text()
 

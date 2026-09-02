@@ -215,6 +215,13 @@ class AgentClient:
                 self.close()
                 return False
             self._status = header
+            if not self.a11y_ready and not self.shell_ready:
+                logger.warning(
+                    "[Agent] app 已连接，但无障碍服务未开启且 Shizuku 未授权，"
+                    "设备端没有可用输入通道"
+                )
+                self.close()
+                return False
             logger.info(f"[Agent] 已连接设备端代理 app={header.get('app')} "
                         f"a11y={header.get('a11y')} shizuku_granted={header.get('shizuku_granted')}")
             return True
@@ -411,13 +418,13 @@ class AgentInput(InputBackend):
     def client(self) -> AgentClient:
         return self._client
 
-    def _call(self, op: str, what: str, **params: Any) -> bool:
+    def _call(self, op: str, what: str, **params: Any) -> None:
+        """下发输入；失败必须传播，不能让工作流误以为动作已经执行。"""
         try:
             self._client.call(op, **params)
-            return True
         except AgentError as e:
             logger.warning(f"[Agent] {what}未成功: {e}")
-            return False
+            raise
 
     # ─── 点击 ─────────────────────────────────────────────
 

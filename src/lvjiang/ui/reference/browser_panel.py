@@ -5,7 +5,7 @@
 
 import numpy as np
 from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QIcon, QImage, QPainter, QPixmap
+from PyQt6.QtGui import QIcon, QImage, QImageReader, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -91,6 +91,14 @@ class ThumbnailCheckboxDelegate(QStyledItemDelegate):
 
 
 _UNSET = "__unset__"  # 筛选“未填写”标记
+
+
+def _reference_file_text(filename: str, image_path) -> str:
+    """格式化参考图文件信息；无法读取图片时保留原文件名展示。"""
+    size = QImageReader(str(image_path)).size()
+    if size.isValid():
+        return f"文件: {filename} ({size.width()} × {size.height()})"
+    return f"文件: {filename}"
 
 
 class _BatchListWidget(QListWidget):
@@ -677,7 +685,9 @@ class BrowserPanel(QWidget):
         if not entry:
             return
 
-        self._file_label.setText(f"文件: {entry.file}")
+        self._file_label.setText(
+            _reference_file_text(entry.file, self._db.image_path(entry.file))
+        )
         self._label_edit.setText(entry.label)
         self._update_group_edit()
         self._group_edit.setEditText(entry.group)

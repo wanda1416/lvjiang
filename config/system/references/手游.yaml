@@ -306,3 +306,9 @@ references:
     group: 增益道具
   source: screenshot
   notes: 收藏
+- file: F05F0803.png
+  label: 心法心得
+  meta:
+    group: 普通道具
+  source: screenshot
+  notes: ''

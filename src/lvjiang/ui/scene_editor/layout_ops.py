@@ -18,6 +18,7 @@ from ...core.config.resolver import (
     EntityOrigin,
     get_resolver,
 )
+from ...core.key_validation import validate_layout_activation_keys
 from ...core.layout_manager import (
     copy_screenshots,
     delete_screenshots,
@@ -26,6 +27,7 @@ from ...core.layout_manager import (
 from ...core.layout_models import Layout
 from ...core.scene_registry import get_registry
 from ...i18n import tr
+from ..button_styles import apply_button_style, fit_button_width
 
 
 class LayoutOpsMixin:
@@ -57,6 +59,18 @@ class LayoutOpsMixin:
                 self, tr("名称不合法"),  # type: ignore[arg-type]
                 tr("布局名称不能以空格或点开头"),
             )
+            return False
+        return True
+
+    def _validate_layout_keys_for_save(self, layout: Layout) -> bool:
+        """保存前向用户展示具体的非法按键绑定。"""
+        try:
+            validate_layout_activation_keys(layout)
+        except ValueError as exc:
+            QMessageBox.warning(
+                self, tr("保存失败"), str(exc),  # type: ignore[arg-type]
+            )
+            self._status_bar.showMessage(str(exc))
             return False
         return True
 
@@ -271,6 +285,8 @@ class LayoutOpsMixin:
             return
         name = self._current_layout.name
         self._sync_loaded_tabs_to_current_layout()
+        if not self._validate_layout_keys_for_save(self._current_layout):
+            return
         # 增量写盘：只写变更的场景文件。
         #
         # 恒传集合，**不能在没有脏场景时传 None** —— save_layout 的 None 是
@@ -372,6 +388,9 @@ class LayoutOpsMixin:
         button_layout = QHBoxLayout()
         ok_button = QPushButton(tr("确定"))
         cancel_button = QPushButton(tr("取消"))
+        apply_button_style(ok_button)
+        apply_button_style(cancel_button, variant="neutral")
+        fit_button_width(ok_button, cancel_button)
         button_layout.addWidget(ok_button)
         button_layout.addWidget(cancel_button)
         layout.addLayout(button_layout)
@@ -443,6 +462,8 @@ class LayoutOpsMixin:
             # 从它克隆，不能只复制已创建的控件，否则另存为会静默丢场景。
             temp = self._clone_current_layout(name)
             if temp is None:
+                return
+            if not self._validate_layout_keys_for_save(temp):
                 return
             if not self._manager.save_layout(temp):
                 QMessageBox.warning(self, tr("另存为失败"), tr("布局写入失败，请检查日志。"))

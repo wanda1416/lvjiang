@@ -33,12 +33,16 @@ from ...core.scene_registry import (
 )
 from ...i18n import tr
 from ..button_styles import apply_button_style
+from ..dialog_guards import EscapeCloseConfirmationMixin
+from ..reference.combo_sizing import set_combo_minimum_character_capacity
 from ..theme import get_theme_manager
 from .layout_ops import LayoutOpsMixin
 from .recognition_ops import RecognitionOpsMixin
 from .scene_ops import SceneOpsMixin
 from .scene_tab import SceneTab
 from .script_ops import ScriptOpsMixin, _SceneKeyButton
+
+_REFERENCE_GROUP_COMBO_CHARACTER_CAPACITY = 8
 
 
 class _LazyReferenceGroupCombo(QComboBox):
@@ -60,7 +64,14 @@ class _LazyReferenceGroupCombo(QComboBox):
         super().showPopup()
 
 
-class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, ScriptOpsMixin, QDialog):
+class SceneEditorDialog(
+    EscapeCloseConfirmationMixin,
+    LayoutOpsMixin,
+    SceneOpsMixin,
+    RecognitionOpsMixin,
+    ScriptOpsMixin,
+    QDialog,
+):
     """场景编辑器对话框 - 布局→场景 层级结构"""
 
     def __init__(
@@ -301,6 +312,10 @@ class SceneEditorDialog(LayoutOpsMixin, SceneOpsMixin, RecognitionOpsMixin, Scri
             self._refresh_ref_group_combo)
         self._combo_ref_group.addItem(tr("全部"), None)
         self._combo_ref_group.setToolTip(tr("限定参考图识别的分组范围"))
+        set_combo_minimum_character_capacity(
+            self._combo_ref_group,
+            _REFERENCE_GROUP_COMBO_CHARACTER_CAPACITY,
+        )
         btn_row.addWidget(self._combo_ref_group)
         from PyQt6.QtWidgets import QCheckBox
         self._chk_live_image = QCheckBox(tr("使用实时图像"))

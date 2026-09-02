@@ -36,7 +36,7 @@ from ...core.scene_registry import (
     is_subscene,
 )
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from .canvas import EditMode, RegionCanvas
 from .scene_panel_editor import PanelEditorMixin
 from .scene_poi_panel import PoiPanelMixin
@@ -133,7 +133,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self._view_combo.setMinimumWidth(120)
         self._view_combo.currentIndexChanged.connect(self._on_view_combo_changed)
         bar.addWidget(self._view_combo)
-        self._btn_manage_views = QPushButton(tr("管理视图"))
+        self._btn_manage_views = QPushButton(tr("视图管理"))
         self._btn_manage_views.setToolTip(tr("开启多视图、新增/重命名/删除视图"))
         self._btn_manage_views.clicked.connect(self._on_manage_views)
         apply_button_style(self._btn_manage_views, variant="neutral")
@@ -201,6 +201,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel)
+        apply_dialog_button_box_style(box)
         box.accepted.connect(dialog.accept)
         box.rejected.connect(dialog.reject)
         form.addRow(box)

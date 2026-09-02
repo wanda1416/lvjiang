@@ -16,6 +16,7 @@ from PyQt6.QtGui import QBrush, QColor, QCursor, QFont, QPainter, QPen, QPolygon
 from PyQt6.QtWidgets import QInputDialog, QMenu, QMessageBox
 
 from ...core.layout_models import Arrow, Point
+from ...core.scene_registry import get_point_name
 from ...i18n import tr
 
 # ─── 常量 ────────────────────────────────────────────────
@@ -110,7 +111,7 @@ class CanvasPoiMixin:
 
     def set_points(self, points: list):
         self._points, self._hidden_points = self._split_by_filter(
-            [Point.from_dict(p.to_dict()) for p in points]
+            [point.clone() for point in points]
         )
         self._selected_point_idx = -1
         self.update()
@@ -118,13 +119,13 @@ class CanvasPoiMixin:
     def get_points(self) -> list:
         """全部坐标点（含被视图过滤隐藏的，保存布局时不能写丢）"""
         return [
-            Point.from_dict(p.to_dict())
-            for p in self._points + self._hidden_points
+            point.clone()
+            for point in self._points + self._hidden_points
         ]
 
     def set_arrows(self, arrows: list):
         self._arrows, self._hidden_arrows = self._split_arrows(
-            [Arrow.from_dict(a.to_dict()) for a in arrows]
+            [arrow.clone() for arrow in arrows]
         )
         self._selected_arrow_idx = -1
         self.update()
@@ -132,13 +133,13 @@ class CanvasPoiMixin:
     def get_arrows(self) -> list:
         """全部方向（含被视图过滤隐藏的）"""
         return [
-            Arrow.from_dict(a.to_dict())
-            for a in self._arrows + self._hidden_arrows
+            arrow.clone()
+            for arrow in self._arrows + self._hidden_arrows
         ]
 
     def get_visible_arrows(self) -> list:
         """当前视图下可见的方向（供列表展示）"""
-        return [Arrow.from_dict(a.to_dict()) for a in self._arrows]
+        return [arrow.clone() for arrow in self._arrows]
 
     def _split_arrows(self, arrows: list) -> tuple[list, list]:
         """方向没有独立的视图归属，跟随其起点坐标点的可见性
@@ -174,7 +175,9 @@ class CanvasPoiMixin:
         for k, n in self._current_points:
             if k == key:
                 return n
-        return key
+        # 跨场景引用的点不在本场景 points 里，名字要回源场景取，否则画布上
+        # 只有它一个标着 key。
+        return get_point_name(self._scene_key, key)
 
     def _notify_poi_changed(self):
         if self.on_poi_changed:

@@ -181,3 +181,18 @@ class TestCroppedCanvasCoordinates:
         resized = cropped_canvas.get_panels()[0]
         assert resized.x_ratio == pytest.approx(0.1)
         assert resized.w_ratio == pytest.approx(0.3)
+
+
+def test_layout_activation_key_edit_is_preserved_and_notified(canvas):
+    changed = []
+    canvas.on_region_changed = lambda: changed.append(True)
+
+    assert canvas.set_item_activation_key("region", "foo", "SPACE") is True
+
+    assert canvas.get_item_activation_key("region", "foo") == "SPACE"
+    assert canvas.get_regions()[0].activation_key == "SPACE"
+    assert changed == [True]
+
+    # 只编辑场景定义、按键值没变时不能误标布局 dirty。
+    assert canvas.set_item_activation_key("region", "foo", "space") is True
+    assert changed == [True]

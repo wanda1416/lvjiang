@@ -14,6 +14,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
+from ...core.key_names import normalize_key
 from ...core.layout_models import Arrow, CanvasConfig, Panel, Point, Region, SubsceneRef
 from ...core.scene_registry import get_region_name, get_subscene_ref_def
 from ...i18n import tr
@@ -175,6 +176,30 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         items = self._items_by_kind(kind)
         return {item.key for item in items if item.disabled}
 
+    def get_item_activation_key(self, kind: str, key: str) -> str:
+        """读取当前布局实体的激活按键；未放置或未绑定时为空。"""
+        if kind not in ("region", "point"):
+            return ""
+        item = self._find_item_by_kind(kind, key)
+        return getattr(item, "activation_key", "") if item is not None else ""
+
+    def set_item_activation_key(self, kind: str, key: str, value: str) -> bool:
+        """修改已放置实体的布局级激活按键，并触发布局 dirty。"""
+        if kind not in ("region", "point"):
+            raise ValueError(f"实体类型不支持激活按键: {kind}")
+        item = self._find_item_by_kind(kind, key)
+        if item is None:
+            return False
+        normalized = normalize_key(value) if value else ""
+        if item.activation_key == normalized:
+            return True
+        item.activation_key = normalized
+        if kind == "region":
+            self._notify_changed()
+        else:
+            self._notify_poi_changed()
+        return True
+
     def _items_by_kind(self, kind: str) -> list:
         """按类型取实例列表（含隐藏项）"""
         if kind == "region":
@@ -231,7 +256,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
     def set_regions(self, regions: list[Region]):
         """设置区域列表（从预设加载）"""
         self._regions, self._hidden_regions = self._split_by_filter(
-            [Region(**r.to_dict()) for r in regions]
+            [region.clone() for region in regions]
         )
         self._selected_idx = -1
         self._field_selected = False
@@ -240,14 +265,14 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
     def get_regions(self) -> list[Region]:
         """获取全部区域列表（含被视图过滤隐藏的，保存布局时不能写丢）"""
         return [
-            Region(**r.to_dict())
-            for r in self._regions + self._hidden_regions
-            if r.key
+            region.clone()
+            for region in self._regions + self._hidden_regions
+            if region.key
         ]
 
     def get_visible_regions(self) -> list[Region]:
         """获取当前视图下可见的区域列表（识别/OCR 只应作用于可见区域）"""
-        return [Region(**r.to_dict()) for r in self._regions if r.key]
+        return [region.clone() for region in self._regions if region.key]
 
     # ─── 视图过滤 ─────────────────────────────────────────
 
@@ -316,18 +341,19 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
     def set_panels(self, panels: list[Panel]):
         """设置面板列表（从布局加载）"""
         self._panels, self._hidden_panels = self._split_by_filter(
-            [Panel(**p.to_dict()) for p in panels]
+            [panel.clone() for panel in panels]
         )
         self._panel_selected_idx = -1
         self.update()
 
     def get_panels(self) -> list[Panel]:
         """获取全部面板列表（含被视图过滤隐藏的）"""
-        return [Panel(**p.to_dict()) for p in self._panels + self._hidden_panels]
+        return [panel.clone()
+                for panel in self._panels + self._hidden_panels]
 
     def get_visible_panels(self) -> list[Panel]:
         """获取当前视图下可见的面板列表（识别/OCR 只应作用于可见面板）"""
-        return [Panel(**p.to_dict()) for p in self._panels]
+        return [panel.clone() for panel in self._panels]
 
     def select_panel_by_key(self, key: str):
         """按 key 选中面板"""
@@ -463,13 +489,13 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
 
     def set_subscene_refs(self, refs: list[SubsceneRef]):
         self._subscene_refs, self._hidden_subscene_refs = self._split_by_filter(
-            [SubsceneRef.from_dict(r.to_dict()) for r in refs])
+            [ref.clone() for ref in refs])
         self._subscene_selected_idx = -1
         self.update()
 
     def get_subscene_refs(self) -> list[SubsceneRef]:
-        return [SubsceneRef.from_dict(r.to_dict())
-                for r in self._subscene_refs + self._hidden_subscene_refs]
+        return [ref.clone()
+                for ref in self._subscene_refs + self._hidden_subscene_refs]
 
     def set_subscene_contents(self, contents: dict[str, dict[str, list]]):
         self._subscene_contents = contents

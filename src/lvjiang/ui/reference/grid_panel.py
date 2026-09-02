@@ -24,7 +24,7 @@ from ..button_styles import apply_button_style
 
 
 class CellEditor(QWidget):
-    """单个切割 cell 的编辑组件：缩略图 + 名称 + 分组 + 动态 meta 字段"""
+    """单个切割 cell：名称、分组、备注及自定义输入元数据。"""
 
     def __init__(self, index: int, image: np.ndarray,
                  meta_fields: list[MetaFieldDef] | None = None, parent=None):
@@ -62,9 +62,14 @@ class CellEditor(QWidget):
         self.group_edit.setEditable(True)
         info_layout.addWidget(self.group_edit, 1, 1)
 
-        # 动态 meta 字段（文本），从第 2 行起依次排列
+        info_layout.addWidget(QLabel(tr("备注:")), 2, 0)
+        self.notes_edit = QLineEdit()
+        info_layout.addWidget(self.notes_edit, 2, 1)
+
+        # 动态输入 meta 字段（文本），从第 3 行起依次排列。
+        # 输出字段由参考图匹配后的 OCR 产生，不能出现在录入表单中。
         for offset, field in enumerate(meta_fields or []):
-            r = 2 + offset
+            r = 3 + offset
             info_layout.addWidget(QLabel(f"{field.name}:"), r, 0)
             edit = QLineEdit()
             info_layout.addWidget(edit, r, 1)
@@ -129,6 +134,10 @@ class CellEditor(QWidget):
     def cell_group(self) -> str:
         return self.group_edit.currentText().strip()
 
+    @property
+    def cell_notes(self) -> str:
+        return self.notes_edit.text().strip()
+
     def set_group_suggestions(self, groups: list[str], labels_by_group: dict[str, list[str]] | None = None):
         """设置分组下拉建议和名称数据"""
         if labels_by_group:
@@ -158,7 +167,8 @@ class GridPanel(QWidget):
     generate_grid_requested = pyqtSignal(int, int, int, int, int)  # rows, cols, gap, height, width
     clear_grid_requested = pyqtSignal()  # 清除网格
     execute_requested = pyqtSignal()  # 执行切割
-    submit_cells = pyqtSignal(list)  # list of (image, label, group, meta: dict)
+    # list of (image, label, group, notes, meta: dict)
+    submit_cells = pyqtSignal(list)
 
     def __init__(self, rows: int = 3, cols: int = 6, gap: int = 0,
                  height: int = 100, width: int = 100, parent=None):
@@ -335,8 +345,16 @@ class GridPanel(QWidget):
             editor.set_group_suggestions(groups, self._labels_by_group)
 
     def set_meta_fields(self, fields: list[MetaFieldDef]):
-        """设置当前 meta 字段定义（应用于下一次切割的 cell 编辑器）"""
-        self._meta_fields = list(fields)
+        """设置下一次切割使用的自定义输入元数据字段。
+
+        名称、分组和备注由 :class:`CellEditor` 固定提供；output 字段是识别
+        后的 OCR 产物，两类字段都不能再生成动态输入框。
+        """
+        builtin = {"label", "group", "notes"}
+        self._meta_fields = [
+            field for field in fields
+            if field.scope == "input" and field.key not in builtin
+        ]
 
     # ── 槽函数 ──
 
@@ -401,6 +419,7 @@ class GridPanel(QWidget):
                 editor.image,
                 editor.cell_label,
                 editor.cell_group,
+                editor.cell_notes,
                 editor.cell_meta,
             ))
         self.submit_cells.emit(results)

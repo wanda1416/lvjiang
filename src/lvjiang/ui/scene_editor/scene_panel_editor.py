@@ -28,13 +28,13 @@ from ...core.scene_registry import (
     sync_scene_cache,
 )
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from ..widgets import centered_cell_widget, strip_focus_rect
 from .scene_select import (
     add_scene_combo_row,
-    add_view_combo_row,
-    combo_view_value,
-    connect_scene_view_sync,
+    add_views_checklist_row,
+    checklist_views_value,
+    connect_scene_views_sync,
 )
 
 
@@ -127,7 +127,7 @@ class PanelEditorMixin:
             return
         bound_keys = {p.key for p in self._canvas.get_panels()}
         for panel_def in scene.panels:
-            if not is_view_visible(panel_def.view, self._current_view):
+            if not is_view_visible(panel_def.views, self._current_view):
                 continue
             row = self._panel_table.rowCount()
             self._panel_table.insertRow(row)
@@ -456,19 +456,20 @@ class PanelEditorMixin:
             scene_combo = add_scene_combo_row(form, self._scene_key)
 
         # 多视图场景可选择归属视图；新建默认落在当前视图
-        view_combo = add_view_combo_row(
+        view_list = add_views_checklist_row(
             form, self._scene_key,
-            panel_def.view if panel_def else self._current_view,
+            list(panel_def.views) if panel_def else [self._current_view],
         )
 
         # 场景切换时同步更新视图下拉框
         if scene_combo is not None:
-            connect_scene_view_sync(scene_combo, view_combo)
+            connect_scene_views_sync(scene_combo, view_list)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
         )
+        apply_dialog_button_box_style(buttons)
         form.addRow(buttons)
 
         # 实时校验
@@ -506,7 +507,7 @@ class PanelEditorMixin:
             key=key_edit.text().strip(),
             name=name_edit.text().strip(),
             min_visible=round(vis_spin.value(), 2),
-            view=combo_view_value(view_combo, self._current_view),
+            views=checklist_views_value(view_list, self._current_view),
             calibration=calibration_combo.currentData(),
             scroll_direction=scroll_combo.currentData(),
         ), target_scene, rows_spin.value(), cols_spin.value()

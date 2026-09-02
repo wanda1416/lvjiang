@@ -4,6 +4,7 @@ import re
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -15,12 +16,19 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from ...core.layout_manager import rename_view_screenshots
 from ...core.scene_definition import BASE_VIEW_KEY
 from ...core.scene_registry import get_registry, sync_scene_cache
+from ...core.scene_transitions import entries_of_view, exits_of_view
 from ...i18n import tr
+from ..button_styles import (
+    apply_button_style,
+    apply_dialog_button_box_style,
+    fit_button_width,
+)
 
 _RE_VIEW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -35,8 +43,9 @@ class ViewManagerDialog(QDialog):
         super().__init__(parent)
         self._scene_key = scene_key
         self._registry = get_registry()
-        self.setWindowTitle(tr("管理视图"))
-        self.setMinimumWidth(360)
+        self.setWindowTitle(tr("视图管理"))
+        self.setMinimumSize(640, 560)
+        self.resize(760, 680)
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(
@@ -46,8 +55,49 @@ class ViewManagerDialog(QDialog):
 
         self._list = QListWidget()
         self._list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self._list.setMinimumHeight(240)
+        # 默认行高下几条视图会挤成一片文字，读不出「这是几条独立视图」。
+        # 拉开行距 + 加厚行内边距 + 给每行描边，让每个视图各占一块。
+        self._list.setSpacing(6)
+        self._list.setStyleSheet(
+            "QListWidget::item {"
+            "  min-height: 34px;"
+            "  padding: 8px 10px;"
+            "  border: 1px solid palette(mid);"
+            "  border-radius: 4px;"
+            "}"
+            "QListWidget::item:selected {"
+            "  border: 1px solid palette(highlight);"
+            "}"
+        )
         self._list.currentRowChanged.connect(self._update_move_buttons)
-        layout.addWidget(self._list)
+        self._list.currentRowChanged.connect(self._refresh_contract)
+        layout.addWidget(self._list, 1)
+
+        self._cb_homomorphic = QCheckBox(tr("同态视图（与基底同层，如滚动后的另一屏）"))
+        self._cb_homomorphic.setToolTip(
+            tr("同态视图没有入口，只有跳转；取消勾选表示它是独立页面，需要声明入口"))
+        self._cb_homomorphic.toggled.connect(self._on_toggle_homomorphic)
+        layout.addWidget(self._cb_homomorphic)
+
+        # 页面切换契约：选中视图由哪些按钮进入、又能转向哪里。
+        # 只读展示——契约是逐步补全的声明，不驱动执行。
+        self._contract = QWidget()
+        contract_layout = QVBoxLayout(self._contract)
+        contract_layout.setContentsMargins(0, 4, 0, 4)
+        contract_layout.setSpacing(2)
+        self._entry_title = self._contract_title(tr("入口"))
+        contract_layout.addWidget(self._entry_title)
+        self._entry_lines = QVBoxLayout()
+        self._entry_lines.setSpacing(3)
+        contract_layout.addLayout(self._entry_lines)
+        contract_layout.addSpacing(5)
+        self._exit_title = self._contract_title(tr("跳转"))
+        contract_layout.addWidget(self._exit_title)
+        self._exit_lines = QVBoxLayout()
+        self._exit_lines.setSpacing(3)
+        contract_layout.addLayout(self._exit_lines)
+        layout.addWidget(self._contract)
 
         btn_row = QHBoxLayout()
         self._btn_add = QPushButton(tr("新增视图"))
@@ -82,6 +132,12 @@ class ViewManagerDialog(QDialog):
         btn_close = QPushButton(tr("关闭"))
         btn_close.clicked.connect(self.accept)
         bottom_row.addWidget(btn_close)
+        apply_button_style(self._btn_add)
+        apply_button_style(self._btn_rename, self._btn_up, self._btn_down,
+                           btn_close, variant="neutral")
+        apply_button_style(self._btn_delete, self._btn_disable,
+                           variant="danger")
+        fit_button_width(self._btn_up, self._btn_down, minimum=32)
         layout.addLayout(bottom_row)
 
         self._changed = False
@@ -89,21 +145,130 @@ class ViewManagerDialog(QDialog):
 
     # ─── 数据 ────────────────────────────────────────────
 
+    @staticmethod
+    def _contract_title(text: str) -> QLabel:
+        label = QLabel(text)
+        label.setStyleSheet("font-weight: 700; color: palette(text);")
+        return label
+
+    @staticmethod
+    def _replace_contract_lines(target: QVBoxLayout,
+                                lines: list[tuple[str, str]]) -> None:
+        while target.count():
+            item = target.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                # deleteLater() 本身不会马上移除可见子控件；连续切换视图时旧文案
+                # 会与新行重叠。先同步隐藏、脱离父控件，再安排销毁。
+                widget.hide()
+                widget.setParent(None)
+                widget.deleteLater()
+        for text, tooltip in lines:
+            label = QLabel(text)
+            label.setTextFormat(Qt.TextFormat.PlainText)
+            label.setWordWrap(False)
+            label.setTextInteractionFlags(
+                Qt.TextInteractionFlag.TextSelectableByMouse)
+            label.setIndent(12)
+            label.setToolTip(tooltip)
+            target.addWidget(label)
+
     def _refresh(self):
+        selected = self._selected_view_key()
         self._list.clear()
         views = self._registry.get_scene_views(self._scene_key)
         if not views:
-            item = QListWidgetItem(tr("（未开启多视图，点「新增视图」自动开启）"))
-            item.setForeground(Qt.GlobalColor.gray)
-            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            item = QListWidgetItem(tr("基底  （单视图）"))
+            item.setData(Qt.ItemDataRole.UserRole, BASE_VIEW_KEY)
             self._list.addItem(item)
         for v in views:
-            item = QListWidgetItem(f"{v.name}  ({v.key})")
+            label = f"{v.name}  ({v.key})"
+            if v.key != BASE_VIEW_KEY and getattr(v, "homomorphic", False):
+                label += tr("  · 同态")
+            item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, v.key)
             self._list.addItem(item)
+        wanted = selected or BASE_VIEW_KEY
+        selected_row = next(
+            (row for row in range(self._list.count())
+             if self._list.item(row).data(Qt.ItemDataRole.UserRole) == wanted),
+            0,
+        )
+        self._list.setCurrentRow(selected_row)
         self._btn_disable.setEnabled(len(views) == 1)
         # 更新上移/下移按钮状态
         self._update_move_buttons()
+        self._refresh_contract()
+
+    def _refresh_contract(self, *_args):
+        """展示选中视图的入口与转移。
+
+        基底视图是场景入口，没有场景内按钮指向它是正常的；其余视图没有任何
+        入口就是**死视图**——要么漏声明了入口，要么它根本不该存在。
+        """
+        view_key = self._selected_view_key()
+        if not view_key:
+            self._contract.setVisible(False)
+            self._cb_homomorphic.setVisible(False)
+            return
+        self._contract.setVisible(True)
+        is_base = view_key == BASE_VIEW_KEY
+        self._cb_homomorphic.setVisible(not is_base)
+        scenes = self._registry.all_scenes()
+        entries = entries_of_view(scenes, self._scene_key, view_key)
+        exits = exits_of_view(scenes, self._scene_key, view_key)
+
+        def _scene_view_name(scene_key: str, view_key: str) -> str:
+            scene = scenes.get(scene_key)
+            scene_name = scene.name if scene is not None else scene_key
+            if scene is None or not scene.views:
+                return f"{scene_name} / {tr('基底')}"
+            normalized = view_key or BASE_VIEW_KEY
+            view = next((v for v in scene.views if v.key == normalized), None)
+            return f"{scene_name} / {view.name if view else normalized}"
+
+        def _entity_name(scene_key: str, entity_key: str) -> str:
+            scene = scenes.get(scene_key)
+            if scene is None:
+                return entity_key
+            entity = next(
+                (item for item in (*scene.regions, *scene.points)
+                 if item.key == entity_key), None)
+            return entity.name if entity is not None else entity_key
+
+        def _entry_line(t) -> tuple[str, str]:
+            text = (f"{_scene_view_name(t.from_scene, t.from_view)} · "
+                    f"{_entity_name(t.from_scene, t.entity)}")
+            source = t.from_scene + (f"/{t.from_view}" if t.from_view else "")
+            return text, f"{source} [{t.entity}]"
+
+        def _exit_line(t) -> tuple[str, str]:
+            text = (f"{_entity_name(t.from_scene, t.entity)} → "
+                    f"{_scene_view_name(t.to_scene, t.to_view)}")
+            target = t.to_scene + (f"/{t.to_view}" if t.to_view else "")
+            return text, f"[{t.entity}] → {target}"
+
+        view = next((v for v in self._registry.get_scene_views(self._scene_key)
+                     if v.key == view_key), None)
+        homomorphic = bool(view is not None and not is_base
+                           and getattr(view, "homomorphic", False))
+        self._cb_homomorphic.blockSignals(True)
+        self._cb_homomorphic.setChecked(homomorphic)
+        self._cb_homomorphic.blockSignals(False)
+        if entries:
+            entry_lines = [_entry_line(t) for t in entries]
+        elif view_key == BASE_VIEW_KEY:
+            entry_lines = [(tr("基底视图是场景入口"), "")]
+        elif homomorphic:
+            # 同态视图只是同一页滚过去的另一个取景，本就没有"进入"这回事。
+            entry_lines = [(tr("同态视图与基底同层，无入口"), "")]
+        else:
+            entry_lines = [(
+                tr("无入口（死视图：补 to: 声明，或改标为同态视图）"), "")]
+        exit_lines = ([_exit_line(t) for t in exits] if exits
+                      else [(tr("未声明"), "")])
+        self._replace_contract_lines(self._entry_lines, entry_lines)
+        self._replace_contract_lines(self._exit_lines, exit_lines)
 
     def _selected_view_key(self) -> str | None:
         item = self._list.currentItem()
@@ -132,6 +297,7 @@ class ViewManagerDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
         )
+        apply_dialog_button_box_style(buttons)
         form.addRow(buttons)
 
         # 实时校验：key 格式 + 保留 key + 重复
@@ -208,6 +374,7 @@ class ViewManagerDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
         )
+        apply_dialog_button_box_style(buttons)
         form.addRow(buttons)
         # 实时校验
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
@@ -305,3 +472,18 @@ class ViewManagerDialog(QDialog):
         idx = next((i for i, v in enumerate(views) if v.key == key), -1)
         if idx >= 0:
             self._list.setCurrentRow(idx)
+
+    def _on_toggle_homomorphic(self, checked: bool):
+        """切换选中视图的同态属性并落盘。"""
+        view_key = self._selected_view_key()
+        if not view_key or view_key == BASE_VIEW_KEY:
+            return
+        views = self._registry.get_scene_views(self._scene_key)
+        view = next((v for v in views if v.key == view_key), None)
+        if view is None or view.homomorphic == checked:
+            return
+        view.homomorphic = checked
+        self._registry.save_scene_views(self._scene_key)
+        self._changed = True
+        # 列表行文本带「· 同态」后缀，只刷契约区会让它停在勾选前的状态。
+        self._refresh()

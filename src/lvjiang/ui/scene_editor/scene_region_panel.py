@@ -9,7 +9,6 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -19,17 +18,34 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ...core.key_names import normalize_key
 from ...core.layout_manager import rename_item_key_across_all_layouts
 from ...core.scene_definition import VALID_REGION_TYPES, RegionDef
-from ...core.scene_registry import get_registry, is_view_visible, sync_scene_cache
+from ...core.scene_definition_models import SceneRefDef
+from ...core.scene_registry import (
+    get_region_def,
+    get_registry,
+    get_scene_name,
+    is_view_visible,
+    sync_scene_cache,
+)
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from ..widgets import centered_cell_widget, strip_focus_rect
+from .entity_edit_form import (
+    add_activation_key_row,
+    add_attribute_row,
+    add_definition_separator,
+    add_dialog_action_row,
+    validate_activation_key_edit,
+)
 from .scene_select import (
+    SceneAreaReferencePicker,
     add_scene_combo_row,
-    add_view_combo_row,
-    combo_view_value,
-    connect_scene_view_sync,
+    add_transition_row,
+    add_views_checklist_row,
+    checklist_views_value,
+    connect_scene_views_sync,
 )
 
 
@@ -47,13 +63,16 @@ class RegionPanelMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._region_table = QTableWidget()
-        self._region_table.setColumnCount(6)
-        self._region_table.setHorizontalHeaderLabels([tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击"), tr("禁用")])
-        # 列宽：名称/Key 自适应内容，后三列固定窄宽
+        self._region_table.setColumnCount(9)
+        self._region_table.setHorizontalHeaderLabels([
+            tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击"),
+            tr("按键"), tr("禁用"), tr("跳转"), tr("来源"),
+        ])
+        # 列宽：名称/Key/类型/按键自适应内容，布尔状态列固定窄宽
         header = self._region_table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        for col in (3, 4, 5):
+        for col in (3, 4, 6):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             header.resizeSection(col, 50)
         self._region_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -77,8 +96,13 @@ class RegionPanelMixin:
         self._btn_del_region.clicked.connect(self._on_delete_region)
         self._btn_del_region.setEnabled(False)
         btn_row.addWidget(self._btn_del_region)
+        # 跨场景引用：只能新增/移除，坐标属于源场景，本场景改不了
+        self._btn_add_ref = QPushButton(tr("+ 引用区域"))
+        self._btn_add_ref.clicked.connect(self._on_add_scene_reference)
+        btn_row.addWidget(self._btn_add_ref)
         apply_button_style(self._btn_new_region)
         apply_button_style(self._btn_del_region, variant="danger")
+        apply_button_style(self._btn_add_ref, variant="neutral")
         btn_row.addStretch()
         layout.addLayout(btn_row)
         return panel
@@ -95,9 +119,10 @@ class RegionPanelMixin:
             self._region_table.blockSignals(False)
             return
         assigned = self._canvas.get_regions()
-        assigned_keys = {r.key for r in assigned}
+        assigned_by_key = {r.key: r for r in assigned}
+        assigned_keys = set(assigned_by_key)
         for region_def in scene.regions:
-            if not is_view_visible(region_def.view, self._current_view):
+            if not is_view_visible(region_def.views, self._current_view):
                 continue
             row = self._region_table.rowCount()
             self._region_table.insertRow(row)
@@ -122,6 +147,14 @@ class RegionPanelMixin:
             click_item = QTableWidgetItem("\u2713" if region_def.is_clickable else "")
             click_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._region_table.setItem(row, 4, click_item)
+            # 当前布局绑定的激活按键；空值代表使用默认坐标点击
+            assigned_region = assigned_by_key.get(region_def.key)
+            activation_key = (
+                assigned_region.activation_key if assigned_region else ""
+            )
+            activation_item = QTableWidgetItem(activation_key)
+            activation_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._region_table.setItem(row, 5, activation_item)
             # 禁用复选框
             disabled_keys = self._canvas.get_disabled_keys("region")
             cb = QCheckBox()
@@ -129,8 +162,53 @@ class RegionPanelMixin:
             cb.stateChanged.connect(
                 lambda state, k=region_def.key: self._on_toggle_disabled(k, "region", state)
             )
-            self._region_table.setCellWidget(row, 5, centered_cell_widget(cb))
+            self._region_table.setCellWidget(row, 6, centered_cell_widget(cb))
+            # 跳转（页面切换契约）
+            self._region_table.setItem(
+                row, 7, QTableWidgetItem(region_def.to or ""))
+            # 来源：原生留空
+            self._region_table.setItem(row, 8, QTableWidgetItem(""))
+
+        self._append_reference_rows(scene, assigned_by_key)
         self._region_table.blockSignals(False)
+
+    def _append_reference_rows(self, scene, assigned_by_key) -> None:
+        """追加跨场景引用行。
+
+        引用项属于源场景，**只读**：不显示禁用复选框、双击不进编辑弹窗，
+        坐标要改得去源场景改。这里只让它在本场景的列表和画布里看得见。
+        """
+        for ref in getattr(scene, "references", ()):
+            if not is_view_visible(ref.views, self._current_view):
+                continue
+            source_def = get_region_def(ref.scene, ref.entity)
+            if source_def is None:
+                continue
+            row = self._region_table.rowCount()
+            self._region_table.insertRow(row)
+            placed = ref.entity in assigned_by_key
+            status = "\u2713" if placed else "\u25cb"
+            cells = [
+                f"{status} {source_def.name}",
+                ref.entity, source_def.type,
+                "\u2713" if source_def.is_text else "",
+                "\u2713" if source_def.is_clickable else "",
+                (assigned_by_key[ref.entity].activation_key
+                 if placed else ""),
+                "", source_def.to or "", get_scene_name(ref.scene),
+            ]
+            for col, text in enumerate(cells):
+                item = QTableWidgetItem(text)
+                if col in (3, 4, 5, 6):
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                # 整行置灰，和本场景原生定义一眼区分开
+                item.setForeground(Qt.GlobalColor.gray)
+                self._region_table.setItem(row, col, item)
+            # 「来源」列显示场景名，源 key 只作 tooltip 与行数据——
+            # _selected_reference() 靠这份数据回查引用项，不能拿显示名去匹配。
+            source_item = self._region_table.item(row, 8)
+            source_item.setData(Qt.ItemDataRole.UserRole, ref.scene)
+            source_item.setToolTip(ref.scene)
 
     def _on_toggle_disabled(self, key: str, kind: str, state: int):
         """切换某 key 的禁用状态，标记场景 dirty"""
@@ -167,7 +245,7 @@ class RegionPanelMixin:
         result = self._show_region_edit_dialog(old_def)
         if result is None:
             return
-        new_def, target_scene = result
+        new_def, target_scene, activation_key = result
         old_key = old_def.key
         new_key = new_def.key
         key_changed = new_key != old_key
@@ -193,6 +271,8 @@ class RegionPanelMixin:
                 QMessageBox.warning(self, tr("更新失败"), str(e))
                 return
             sync_scene_cache(self._scene_key)
+            self._canvas.set_item_activation_key(
+                "region", new_key, activation_key)
             self._refresh_lists()
             return
         # 跨场景迁移：目标场景视图体系不同，归属视图重置为基底
@@ -203,6 +283,16 @@ class RegionPanelMixin:
         except ValueError as e:
             QMessageBox.warning(self, tr("迁移失败"), str(e))
             return
+        if key_changed:
+            rename_item_key_across_all_layouts(
+                self._scene_key, "region", old_key, new_key)
+            regions = self._canvas.get_regions()
+            for region in regions:
+                if region.key == old_key:
+                    region.key = new_key
+            self._canvas.set_regions(regions)
+        self._canvas.set_item_activation_key(
+            "region", new_key, activation_key)
         registry.remove_region_from_scene(self._scene_key, old_key)
         sync_scene_cache(self._scene_key)
         sync_scene_cache(target_scene)
@@ -232,7 +322,7 @@ class RegionPanelMixin:
         result = self._show_region_edit_dialog(None)
         if result is None:
             return
-        region_def, _ = result
+        region_def, _, _ = result
         registry = get_registry()
         try:
             registry.add_region_to_scene(self._scene_key, region_def)
@@ -272,7 +362,9 @@ class RegionPanelMixin:
 
     # ─── 编辑弹窗 ────────────────────────────────────────
 
-    def _show_region_edit_dialog(self, region_def: RegionDef | None) -> tuple[RegionDef, str] | None:
+    def _show_region_edit_dialog(
+        self, region_def: RegionDef | None,
+    ) -> tuple[RegionDef, str, str] | None:
         """弹窗编辑区域属性，返回 (新 RegionDef, 目标场景 key) 或 None（取消）
 
         仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
@@ -285,12 +377,8 @@ class RegionPanelMixin:
         key_edit.setPlaceholderText(tr("英文，如 my_region"))
         if region_def:
             key_edit.setText(region_def.key)
-            # 允许编辑 key，但需要校验唯一性
+        # 允许编辑 key，但需要校验唯一性
         form.addRow("Key:", key_edit)
-        error_label = QLabel()
-        error_label.setStyleSheet("color: #c62828;")
-        error_label.hide()
-        form.addRow("", error_label)
 
         name_edit = QLineEdit()
         name_edit.setPlaceholderText(tr("中文名称"))
@@ -309,35 +397,52 @@ class RegionPanelMixin:
             is_text_check.setChecked(region_def.is_text)
         else:
             is_text_check.setChecked(True)
-        form.addRow(is_text_check)
-
         is_clickable_check = QCheckBox(tr("可点击"))
         if region_def:
             is_clickable_check.setChecked(region_def.is_clickable)
-        form.addRow(is_clickable_check)
+        add_attribute_row(form, is_text_check, is_clickable_check)
+
+        placed = bool(
+            region_def
+            and any(r.key == region_def.key for r in self._canvas.get_regions())
+        )
+        activation_edit = add_activation_key_row(
+            form,
+            self._canvas.get_item_activation_key(
+                "region", region_def.key) if region_def else "",
+            enabled=placed,
+        )
+        add_definition_separator(form)
 
         # 仅编辑模式可选择归属场景（跨场景迁移）
         scene_combo = None
         if region_def is not None:
             scene_combo = add_scene_combo_row(form, self._scene_key)
 
-        # 多视图场景可选择归属视图；新建默认落在当前视图
-        view_combo = add_view_combo_row(
+        # 多视图场景可勾选多个归属视图；新建默认落在当前视图
+        view_list = add_views_checklist_row(
             form, self._scene_key,
-            region_def.view if region_def else self._current_view,
+            list(region_def.views) if region_def else [self._current_view],
         )
+        # 点击后到达的场景/视图——页面切换契约，只声明不驱动执行
+        transition = add_transition_row(
+            form, self._scene_key, region_def.to if region_def else "")
+        transition.set_transition_enabled(is_clickable_check.isChecked())
+        is_clickable_check.toggled.connect(transition.set_transition_enabled)
 
-        # 场景切换时同步更新视图下拉框
+        # 场景切换时同步更新视图清单
         if scene_combo is not None:
-            connect_scene_view_sync(scene_combo, view_combo)
+            connect_scene_views_sync(scene_combo, view_list)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        form.addRow(buttons)
+        apply_dialog_button_box_style(buttons)
+        error_label = add_dialog_action_row(
+            form, buttons, leading_button=transition._local_views_button)
 
-        # 实时校验：key/name 非空 + key 不与现有 region/point/panel 重复
-        # （重复时红字提示并禁用 OK，避免提交时才报错且对话框已关闭）
+        # key/name 实时校验；按键只在点击确定时校验，
+        # 避免输入 ESC 时对 E / ES 这类中间态报错。
         ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
         scene = get_registry().get_scene(self._scene_key)
         # region/point/panel 共享命名空间
@@ -353,16 +458,20 @@ class RegionPanelMixin:
             if k in existing and k != old_key:
                 ok_btn.setEnabled(False)
                 error_label.setText(f"key 已被使用: {k}")
-                error_label.show()
                 return
-            error_label.hide()
+            error_label.clear()
             ok_btn.setEnabled(bool(k and name_edit.text().strip()))
 
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
+        activation_edit.textChanged.connect(_validate)
         _validate()
 
-        buttons.accepted.connect(dialog.accept)
+        def _accept():
+            if validate_activation_key_edit(activation_edit, error_label):
+                dialog.accept()
+
+        buttons.accepted.connect(_accept)
         buttons.rejected.connect(dialog.reject)
 
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -371,11 +480,100 @@ class RegionPanelMixin:
         target_scene = (
             scene_combo.currentData() if scene_combo is not None else self._scene_key
         )
+        activation_key = activation_edit.text().strip()
         return RegionDef(
             key=key_edit.text().strip(),
             name=name_edit.text().strip(),
             type=type_combo.currentText(),
             is_text=is_text_check.isChecked(),
             is_clickable=is_clickable_check.isChecked(),
-            view=combo_view_value(view_combo, self._current_view),
-        ), target_scene
+            views=checklist_views_value(view_list, self._current_view),
+            to=transition.value() if is_clickable_check.isChecked() else "",
+        ), target_scene, normalize_key(activation_key) if activation_key else ""
+
+    # ─── 跨场景引用 ──────────────────────────────────────
+
+    def _selected_reference(self):
+        """当前选中行若是引用，返回它，否则 None。"""
+        row = self._region_table.currentRow()
+        if row < 0:
+            return None
+        source_item = self._region_table.item(row, 8)
+        key_item = self._region_table.item(row, 1)
+        if source_item is None or key_item is None:
+            return None
+        source_key = source_item.data(Qt.ItemDataRole.UserRole)
+        if not source_key:
+            return None
+        scene = get_registry().get_scene(self._scene_key)
+        if not scene:
+            return None
+        return next((r for r in scene.references
+                     if r.entity == key_item.text()
+                     and r.scene == source_key), None)
+
+    def _on_add_scene_reference(self):
+        """引用另一个一级场景的区域。
+
+        只能引用一级场景：其坐标同属画布归一化，原样可用、零变换。子场景的
+        坐标相对外框，搬过来要做变换，是另一回事（见 subscene_refs）。
+        """
+        registry = get_registry()
+        scene = registry.get_scene(self._scene_key)
+        if scene is None:
+            return
+        taken = ({r.key for r in scene.regions} | {p.key for p in scene.points}
+                 | {p.key for p in scene.panels}
+                 | {r.key for r in scene.subscene_refs}
+                 | {r.key for r in scene.references})
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("引用区域"))
+        form = QFormLayout(dialog)
+        source = SceneAreaReferencePicker(self._scene_key, taken)
+        if not source.has_candidates:
+            QMessageBox.information(
+                self, tr("引用区域"),
+                tr("没有可引用的区域：一级场景中同名的 key 已被本场景占用。"))
+            return
+        form.addRow(tr("来源:"), source)
+        view_list = add_views_checklist_row(
+            form, self._scene_key, [self._current_view])
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        apply_dialog_button_box_style(buttons)
+        form.addRow(buttons)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        selected = source.value()
+        if selected is None:
+            return
+        scene_key, entity = selected
+        try:
+            registry.add_scene_reference(self._scene_key, SceneRefDef(
+                scene=scene_key, entity=entity,
+                views=checklist_views_value(view_list, self._current_view)))
+        except ValueError as exc:
+            QMessageBox.warning(self, tr("引用区域"), str(exc))
+            return
+        sync_scene_cache(self._scene_key)
+        self._refresh_lists()
+
+    def _on_remove_scene_reference(self):
+        ref = self._selected_reference()
+        if ref is None:
+            return
+        if QMessageBox.question(
+            self, tr("移除引用"),
+            tr("确定移除对 {scene}.{entity} 的引用吗？源场景的定义不受影响。")
+                .format(scene=ref.scene, entity=ref.entity),
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        registry = get_registry()
+        registry.remove_scene_reference(self._scene_key, ref.scene, ref.entity)
+        sync_scene_cache(self._scene_key)
+        self._refresh_lists()

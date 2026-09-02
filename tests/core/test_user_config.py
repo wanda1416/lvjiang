@@ -54,6 +54,8 @@ class TestLoadUserConfig:
         assert config.hotkeys.stop == "F10"
         assert config.hotkeys.pause == "F11"
         assert config.hotkeys.record == "F12"
+        assert config.font_sizes.user_overview == 0
+        assert config.font_sizes.user_info == 0
 
     def test_hotkeys_only_allow_f7_through_f12(self, session_env, monkeypatch):
         """F1~F6 与现有菜单功能键隔离，非法值按动作回退默认。"""
@@ -102,6 +104,7 @@ class TestLoadUserConfig:
                 "android_input_method": "device_gesture",
                 "desktop_window_title": "手机投屏",
                 "theme": "dark",
+                "font_sizes": {"user_overview": 13, "user_info": 15},
             }
         }), encoding="utf-8")
         reset_session_store()
@@ -111,6 +114,24 @@ class TestLoadUserConfig:
         assert config.desktop_window_title == "手机投屏"
         assert config.theme == "dark"
         assert config.desktop_background_input is True  # 未配置项保持默认
+        assert config.font_sizes.user_overview == 13
+        assert config.font_sizes.user_info == 15
+
+    def test_invalid_font_sizes_fall_back_to_system_default(
+            self, session_env, monkeypatch):
+        monkeypatch.setattr(
+            "lvjiang.core.config.load_app_config", lambda: {})
+        session_env.write_text(json.dumps({
+            "settings": {
+                "font_sizes": {"user_overview": 7, "user_info": 99},
+            }
+        }), encoding="utf-8")
+        reset_session_store()
+
+        config = load_user_config()
+
+        assert config.font_sizes.user_overview == 0
+        assert config.font_sizes.user_info == 0
 
     def test_obsolete_material_grid_is_not_loaded(self, session_env, monkeypatch):
         """0.8 不再兼容旧键，用户需要重新保存 reference_grid。"""

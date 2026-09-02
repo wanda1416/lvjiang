@@ -15,9 +15,11 @@ ProfileTab: 宽表展示所有用户的概要信息，交互式列头配置。
 from __future__ import annotations
 
 from loguru import logger
-from PyQt6.QtCore import QObject, Qt, QTimer
+from PyQt6.QtCore import QModelIndex, QObject, Qt, QTimer
+from PyQt6.QtGui import QFont, QKeyEvent, QKeySequence
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -65,6 +67,59 @@ def _make_debounce_timer(parent: QObject, callback, interval_ms: int = 500) -> Q
     return timer
 
 
+class ProfileOverviewTable(QTableWidget):
+    """支持按用户名选行、按表头选列和复制选区的总览表。"""
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.cellClicked.connect(self._select_username_row)
+
+        header = self.horizontalHeader()
+        assert header is not None
+        header.sectionClicked.connect(self.selectColumn)
+
+    def _select_username_row(self, row: int, column: int) -> None:
+        if column == 0:
+            self.selectRow(row)
+
+    def _selected_text(self) -> str:
+        """按表格当前视觉顺序将选中单元格序列化为 TSV。"""
+        selected = self.selectedIndexes()
+        if not selected:
+            return ""
+
+        rows: dict[int, list[QModelIndex]] = {}
+        for index in selected:
+            rows.setdefault(index.row(), []).append(index)
+
+        lines: list[str] = []
+        for row in sorted(rows):
+            indexes = sorted(
+                rows[row],
+                key=lambda index: self.visualColumn(index.column()),
+            )
+            lines.append("\t".join(str(index.data() or "") for index in indexes))
+        return "\n".join(lines)
+
+    def keyPressEvent(self, event: QKeyEvent | None) -> None:  # noqa: N802 - Qt override
+        if event is None:
+            return super().keyPressEvent(event)
+        if (
+            self.state() != QAbstractItemView.State.EditingState
+            and event.matches(QKeySequence.StandardKey.Copy)
+        ):
+            text = self._selected_text()
+            if text:
+                clipboard = QApplication.clipboard()
+                if clipboard is not None:
+                    clipboard.setText(text)
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+
 # ─── 档案总览 Tab ────────────────────────────────────────────
 
 
@@ -84,6 +139,13 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         self._reordering = False
         self._refresh_timer = _make_debounce_timer(self, self._refresh_when_idle)
         self._setup_ui()
+        size = getattr(
+            getattr(getattr(host, "_user_config", None), "font_sizes", None),
+            "user_overview",
+            0,
+        )
+        if isinstance(size, int) and size > 0:
+            self.apply_content_font_size(size)
         self._connect_profile_engine()
 
     def _connect_profile_engine(self) -> None:
@@ -201,15 +263,14 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
 
     def _create_table_for_group(self, group_name: str) -> QTableWidget:
         """为指定分组创建并绑定一个 QTableWidget"""
-        table = QTableWidget()
+        table = ProfileOverviewTable()
         table.setAlternatingRowColors(True)
         table.setShowGrid(True)
         v_header = table.verticalHeader()
         assert v_header is not None
         v_header.setDefaultSectionSize(24)
         v_header.setVisible(False)
-        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        # 选中行保持轻量提示，当前编辑/移动焦点格使用更深的底色突出。
+        # 选区保持轻量提示，当前编辑/移动焦点格使用更深的底色突出。
         table.setStyleSheet("""
             QTableWidget::item:selected {
                 background-color: palette(midlight);
@@ -261,6 +322,24 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         """刷新所有分组的表格数据"""
         for group_name, table in self._tables.items():
             self._refresh_group(group_name, table)
+
+    def apply_content_font_size(self, point_size: int) -> None:
+        """只调整顶部工具栏下方的分组与表格字号。"""
+        if not 8 <= int(point_size) <= 24:
+            return
+        font = QFont(self._tab_widget.font())
+        font.setPointSize(int(point_size))
+        self._tab_widget.setFont(font)
+        for child in self._tab_widget.findChildren(QWidget):
+            child.setFont(font)
+        for table in self._tables.values():
+            v_header = table.verticalHeader()
+            if v_header is not None:
+                v_header.setDefaultSectionSize(
+                    max(24, table.fontMetrics().height() + 8)
+                )
+        # 表头有显式的粗体 QTableWidgetItem，需在新字体下重建。
+        self.refresh()
 
     def _refresh_group(self, group_name: str, table: QTableWidget):
         """刷新指定分组的表格数据"""

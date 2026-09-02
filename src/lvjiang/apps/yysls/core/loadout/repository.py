@@ -165,7 +165,10 @@ class LoadoutRepository:
     def configure_plan(self, plan_id: str, *, name: str | None = None,
                        main_martial_art: str | None = None,
                        sub_martial_art: str | None = None,
-                       playstyle: str | None = None) -> None:
+                       playstyle: str | None = None,
+                       base_attribute: str | None = None,
+                       gongjue: str | None = None,
+                       graduation_scheme: str | None = None) -> None:
         def mutate(state: LoadoutState) -> None:
             if plan_id not in state.plans:
                 raise KeyError(plan_id)
@@ -178,6 +181,12 @@ class LoadoutRepository:
                 plan.sub_martial_art = sub_martial_art
             if playstyle is not None:
                 plan.playstyle = playstyle
+            if base_attribute is not None:
+                plan.base_attribute = base_attribute
+            if gongjue is not None:
+                plan.gongjue = gongjue
+            if graduation_scheme is not None:
+                plan.graduation_scheme = graduation_scheme
         self.update(mutate)
 
     def upsert_item(self, equip: dict) -> str:

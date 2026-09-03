@@ -188,6 +188,9 @@ class _DispatchStub:
         self._left_tabs = _FakeLeftTabs(widget)
         self.generic_runs = 0
 
+    def _plan_allows_backend(self) -> bool:
+        return True
+
     def _on_run_workflow(self):
         self.generic_runs += 1
 

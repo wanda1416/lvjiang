@@ -114,14 +114,18 @@ class TrayOpsMixin:
             return
         icon_state = state if state in ("running", "paused") else "idle"
         self._tray_icon.setIcon(_make_tray_icon(icon_state))
+        from .run_control import STATE_PLAN_UNSUPPORTED
         status_text = {
             "running": tr("运行中"),
             "paused": tr("已暂停"),
             "not_ready": tr("未就绪"),
+            STATE_PLAN_UNSUPPORTED: tr("方案不支持"),
         }.get(state, tr("空闲"))
         self._tray_icon.setToolTip(f"{self.windowTitle()} - {status_text}")
         running_or_paused = state in ("running", "paused")
-        self._tray_action_start.setEnabled(not running_or_paused)
+        # 方案不支持时托盘的「开始」也得灰掉，否则等于给灰按钮开了后门。
+        self._tray_action_start.setEnabled(
+            not running_or_paused and state != STATE_PLAN_UNSUPPORTED)
         self._tray_action_pause.setEnabled(running_or_paused)
         self._tray_action_pause.setText(tr("恢复") if state == "paused" else tr("暂停"))
         self._tray_action_stop.setEnabled(running_or_paused)

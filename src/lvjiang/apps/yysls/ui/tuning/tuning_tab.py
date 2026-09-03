@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style, fit_button_width
 from .....ui.execution_user_selector import ExecutionUserSelector
+from .....ui.main.run_control import STATE_PLAN_UNSUPPORTED
 from ...config.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
 from .config_widget import TuningConfigWidget, TuningGlobalsWidget
 
@@ -329,6 +330,12 @@ class TuningTab(QWidget):
             self.btn_run_tuning.setText(tr("未就绪"))
             self.btn_run_tuning.setStyleSheet(
                 "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
+            )
+        elif state == STATE_PLAN_UNSUPPORTED:
+            # 不能落进下面的 else：那里除了变绿还会 mark_done()，会误报完成。
+            self.btn_run_tuning.setText(tr("方案不支持"))
+            self.btn_run_tuning.setStyleSheet(
+                "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         else:
             self.btn_run_tuning.setText(f"{tr('开始调律')} ({hk.start})")

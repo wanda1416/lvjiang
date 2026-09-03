@@ -319,6 +319,8 @@ class MainWindow(
         self._refresh_run_button()
         self._refresh_user_combo()
         self._refresh_layout_combo()
+        # 必须排在布局之后：恢复选中方案要往已填充的布局下拉里选值。
+        self._refresh_plan_combo()
         self._load_workflow_configs()
         self._restore_daily_config()
 
@@ -403,13 +405,20 @@ class MainWindow(
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
 
-        # === 顶部：用户 + 图库 + 环境 + 布局 ===
+        # === 顶部：用户 + 方案 + 图库 + 环境 + 布局 ===
+        # 方案是后三者的具名组合：选中方案即锁定并填充它们。
         top_row = QHBoxLayout()
         top_row.addWidget(QLabel(tr("用户")))
         self.user_combo = QComboBox()
         self.user_combo.setMinimumWidth(150)
         self.user_combo.currentIndexChanged.connect(self._on_user_changed)
         top_row.addWidget(self.user_combo)
+        top_row.addSpacing(20)
+        top_row.addWidget(QLabel(tr("方案")))
+        self.plan_combo = _ContextComboBox()
+        _set_combo_character_capacity(self.plan_combo)
+        self.plan_combo.currentIndexChanged.connect(self._on_plan_changed)
+        top_row.addWidget(self.plan_combo)
         top_row.addSpacing(20)
         top_row.addWidget(QLabel(tr("图库")))
         self.reference_space_combo = _ContextComboBox()

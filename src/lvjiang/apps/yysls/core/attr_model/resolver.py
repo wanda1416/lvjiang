@@ -257,7 +257,7 @@ def resolve(
     unmodeled = [
         UnmodeledSource(effect.source_id, effect.label, effect.kind)
         for effect in effects
-        if not effect.modeled
+        if effect.pending
     ]
     if unmodeled:
         logger.debug(

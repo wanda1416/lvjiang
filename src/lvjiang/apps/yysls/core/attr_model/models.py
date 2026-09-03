@@ -186,6 +186,15 @@ class StatEffect:
     #: 该条目是否已填数值。未填的进 breakdown 的「未建模」清单，
     #: 贡献 0，由反解兜底成用户手填值。
     modeled: bool = True
+    #: 已确认此条目不提供基础属性（心法六重里大量是触发类效果，只改
+    #: 战斗行为不进面板）。与「未填」区分开，进度才能真的走到 100%，
+    #: 否则永远有一堆查过、确认没有、却仍显示待填的条目。
+    no_effect: bool = False
+
+    @property
+    def pending(self) -> bool:
+        """仍需人工确认：既没填数值，也没确认过无贡献"""
+        return not self.modeled and not self.no_effect
 
     def __post_init__(self) -> None:
         if self.kind not in SOURCE_KINDS:

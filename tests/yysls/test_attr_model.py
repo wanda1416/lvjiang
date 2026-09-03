@@ -397,3 +397,85 @@ def test_shipped_full_affix_entry_tracks_the_real_affix_caps() -> None:
 
     total = result.combat_attrs.min_outer + result.combat_attrs.max_outer
     assert total == pytest.approx(cap["cap"], abs=0.05)
+
+
+# ── 写回 ──────────────────────────────────────────────────
+
+@pytest.fixture
+def sources_dir(tmp_path):
+    """独立的来源目录，避免测试写坏仓库里的配置"""
+    from lvjiang.apps.yysls.core.attr_model import AttrModelManager
+
+    (tmp_path / "inner_way.yaml").write_text(
+        "# 头部注释要在写回后保留\nkind: inner_way\nentries:\n  甲·二重:\n    modeled: false\n",
+        encoding="utf-8",
+    )
+    return AttrModelManager(tmp_path), tmp_path
+
+
+def test_saving_an_entry_persists_and_reloads(sources_dir) -> None:
+    manager, _ = sources_dir
+
+    manager.save_entry("甲·二重", {"full_affix": "外功攻击"})
+
+    assert manager.raw_entry("甲·二重") == {"full_affix": "外功攻击"}
+    assert manager.progress("inner_way") == (1, 1)
+
+
+def test_saving_keeps_the_file_header(sources_dir) -> None:
+    """文件头写着 schema 与游戏事实，yaml.dump 会丢注释，必须补回。"""
+    manager, path = sources_dir
+
+    manager.save_entry("甲·二重", {"stats": {"crit_rate": 0.01}})
+
+    assert (path / "inner_way.yaml").read_text(encoding="utf-8").startswith(
+        "# 头部注释要在写回后保留")
+
+
+def test_saving_an_invalid_entry_is_rejected_before_it_reaches_disk(
+    sources_dir,
+) -> None:
+    manager, path = sources_dir
+    before = (path / "inner_way.yaml").read_text(encoding="utf-8")
+
+    with pytest.raises(AttrModelError):
+        manager.save_entry("甲·二重", {"打错的字段": 1})
+
+    assert (path / "inner_way.yaml").read_text(encoding="utf-8") == before
+
+
+def test_create_and_delete_entry(sources_dir) -> None:
+    manager, _ = sources_dir
+
+    manager.create_entry("inner_way", "乙·五重")
+    assert manager.progress("inner_way") == (0, 2)
+
+    manager.delete_entry("乙·五重")
+    assert manager.progress("inner_way") == (0, 1)
+
+
+def test_create_rejects_a_duplicate_id(sources_dir) -> None:
+    """同名条目在加载时会被静默跳过，所以必须在新增时就挡住。"""
+    manager, _ = sources_dir
+
+    with pytest.raises(AttrModelError):
+        manager.create_entry("inner_way", "甲·二重")
+
+
+def test_confirmed_no_effect_counts_as_done(sources_dir) -> None:
+    """心法六重里大量是触发类效果；确认无贡献要能推进进度，
+    否则永远有一堆查过、确认没有、却仍显示待填的条目。"""
+    manager, _ = sources_dir
+
+    manager.save_entry("甲·二重", {"no_effect": True})
+
+    assert manager.progress("inner_way") == (1, 1)
+    assert manager.resolve(level=110, school_attr="牵丝").unmodeled == []
+
+
+def test_no_effect_with_values_is_rejected(sources_dir) -> None:
+    manager, _ = sources_dir
+
+    with pytest.raises(AttrModelError):
+        manager.save_entry(
+            "甲·二重", {"no_effect": True, "stats": {"crit_rate": 0.01}})

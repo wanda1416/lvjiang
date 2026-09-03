@@ -93,6 +93,18 @@ def test_tag_input_commits_on_enter_and_chip_can_be_removed(qtbot):
     assert widget.tags() == ["新词条，允许全角符号"]
 
 
+def test_tag_input_stays_single_line_and_scrolls_when_full(qtbot):
+    widget = _TagInputWidget([f"较长词条{index}" for index in range(8)])
+    qtbot.addWidget(widget)
+    widget.resize(240, 52)
+    widget.show()
+    QtWidgets.QApplication.processEvents()
+
+    assert widget._scroll.horizontalScrollBar().maximum() > 0
+    assert widget._scroll.verticalScrollBar().maximum() == 0
+    assert widget.minimumHeight() == widget.maximumHeight() == 52
+
+
 def test_change_rules_require_name_for_shortcut_amount(qtbot):
     widget = _ChangeRulesWidget([])
     qtbot.addWidget(widget)

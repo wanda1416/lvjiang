@@ -20,9 +20,11 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLayout,
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QSplitter,
     QTableWidget,
@@ -53,7 +55,6 @@ from ...core.profile.models import (
 from ...core.profile.periods import get_profile_period, list_profile_periods
 from ...i18n import tr
 from ..button_styles import apply_button_style, fit_button_width
-from ..widgets import FlowLayout
 
 # 模型 TAB 顺序
 _MODEL_ORDER = [MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN, MODEL_NOTE]
@@ -237,16 +238,11 @@ class _SyncTargetsWidget(QWidget):
 class _TagInputWidget(QFrame):
     """按 Enter 创建可删除标签的来源/用途词条输入框。"""
 
-    def __init__(
-        self,
-        values: list[str],
-        parent=None,
-        *,
-        placeholder: str | None = None,
-    ) -> None:
+    def __init__(self, values: list[str], parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("profileTagInput")
-        self.setMinimumHeight(38)
+        self.setMinimumHeight(52)
+        self.setMaximumHeight(52)
         self.setStyleSheet(
             "QFrame#profileTagInput { border: 1px solid palette(mid); "
             "border-radius: 4px; background: palette(base); }"
@@ -261,23 +257,30 @@ class _TagInputWidget(QFrame):
 
         self._values: list[str] = []
         self._chips: dict[str, QFrame] = {}
-        self._flow = FlowLayout(self, spacing=5)
-        self._flow.setContentsMargins(5, 4, 5, 4)
+
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(1, 1, 1, 1)
+        self._scroll = QScrollArea()
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll.setWidgetResizable(False)
+        self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        outer_layout.addWidget(self._scroll)
+
+        self._content = QWidget()
+        self._row = QHBoxLayout(self._content)
+        self._row.setContentsMargins(4, 3, 4, 3)
+        self._row.setSpacing(5)
+        self._row.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        self._scroll.setWidget(self._content)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText(placeholder or tr("输入后按 Enter 添加"))
         self._input.setMinimumWidth(150)
         self._input.returnPressed.connect(self._commit_input)
 
-        self._flow.addWidget(self._input)
+        self._row.addWidget(self._input)
         for value in values:
             self.add_tag(value)
-
-    def hasHeightForWidth(self) -> bool:
-        return True
-
-    def heightForWidth(self, width: int) -> int:
-        return max(self.minimumHeight(), self._flow.heightForWidth(width))
 
     def _commit_input(self) -> None:
         value = self._input.text().strip()
@@ -302,13 +305,11 @@ class _TagInputWidget(QFrame):
         remove.clicked.connect(lambda _checked, text=value: self.remove_tag(text))
         chip_layout.addWidget(remove)
 
-        # 输入框始终位于标签之后。
-        if self._flow.indexOf(self._input) >= 0:
-            self._flow.removeWidget(self._input)
         self._values.append(value)
         self._chips[value] = chip
-        self._flow.addWidget(chip)
-        self._flow.addWidget(self._input)
+        # 输入框始终位于标签之后。
+        self._row.insertWidget(max(0, self._row.count() - 1), chip)
+        self._content.adjustSize()
         self.updateGeometry()
         return True
 
@@ -317,8 +318,9 @@ class _TagInputWidget(QFrame):
         if chip is None:
             return
         self._values.remove(value)
-        self._flow.removeWidget(chip)
+        self._row.removeWidget(chip)
         chip.deleteLater()
+        self._content.adjustSize()
         self.updateGeometry()
 
     def tags(self) -> list[str]:
@@ -329,11 +331,7 @@ class _AmountTagInputWidget(_TagInputWidget):
     """一行内可录入多个正整数快捷数量。"""
 
     def __init__(self, amounts: list[int], parent=None) -> None:
-        super().__init__(
-            [str(amount) for amount in amounts if amount > 0],
-            parent,
-            placeholder=tr("输入数量后按 Enter 添加"),
-        )
+        super().__init__([str(amount) for amount in amounts if amount > 0], parent)
         self._input.setValidator(QIntValidator(1, 999999, self._input))
         self._input.setMinimumWidth(170)
 

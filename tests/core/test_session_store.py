@@ -131,6 +131,28 @@ class TestActivesMigration:
         assert not ({"active_user", "active_layout", "active_space"} & data.keys())
         assert data["daily"] == {"workflow_id": "task"}
 
+    def test_plan_kind_has_no_legacy_top_level_key(self, tmp_path):
+        """plan 是新 kind：只走 actives，不该去找伪造的 active_plan。"""
+        path = tmp_path / "session.json"
+        path.write_text(json.dumps({"active_plan": "不该被读到"}),
+                        encoding="utf-8")
+        store = SessionStore(path)
+
+        assert store.get_active("plan", "") == ""
+
+        store.set_active("plan", "7f3a")
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["actives"] == {"plan": "7f3a"}
+
+    def test_unknown_active_kind_still_rejected(self, tmp_path):
+        store = SessionStore(tmp_path / "session.json")
+
+        with pytest.raises(KeyError):
+            store.get_active("没这个东西")
+        with pytest.raises(KeyError):
+            store.set_active("没这个东西", "x")
+
 
 class TestDiskSemantics:
     def test_existing_file_loaded_lazily(self, tmp_path):

@@ -36,11 +36,17 @@ from loguru import logger
 
 from ..fs_util import atomic_write_text
 
+# 旧顶层 active_* 键 → actives 子键。只有历史上真正写过顶层键的三项在此，
+# 新增的 kind 不要伪造 legacy key，加进 _ACTIVE_KINDS 即可。
 _ACTIVE_LEGACY_KEYS = {
     "user": "active_user",
     "layout": "active_layout",
     "space": "active_space",
 }
+
+# 合法的激活项 kind。plan 是机器级方案（图库+环境+布局+模式的组合），
+# 与用户无关，没有旧顶层键。
+_ACTIVE_KINDS = frozenset(_ACTIVE_LEGACY_KEYS) | {"plan"}
 
 
 class LockTimeoutError(Exception):
@@ -258,18 +264,19 @@ class SessionStore:
 
     def get_active(self, kind: str, default: Any = None) -> Any:
         """读取 ``actives.<kind>``，缺失时兼容旧顶层 ``active_<kind>``。"""
-        if kind not in _ACTIVE_LEGACY_KEYS:
+        if kind not in _ACTIVE_KINDS:
             raise KeyError(f"unknown active kind: {kind}")
         with self._thread_lock:
             actives = self._data.get("actives")
             if isinstance(actives, dict) and kind in actives:
                 return deepcopy(actives[kind])
-            legacy = self._data.get(_ACTIVE_LEGACY_KEYS[kind])
+            legacy_key = _ACTIVE_LEGACY_KEYS.get(kind)
+            legacy = self._data.get(legacy_key) if legacy_key else None
             return deepcopy(legacy) if legacy is not None else default
 
     def set_active(self, kind: str, value: Any) -> None:
         """写入一个激活项，并原子迁移、删除全部旧 ``active_*`` 顶层键。"""
-        if kind not in _ACTIVE_LEGACY_KEYS:
+        if kind not in _ACTIVE_KINDS:
             raise KeyError(f"unknown active kind: {kind}")
 
         def _set(data: dict) -> None:
@@ -403,10 +410,12 @@ def load_env() -> str:
 
 
 def save_env(env: str) -> None:
-    """保存工作环境到 session.json 的 settings.env 节点"""
-    existing = load_settings()
-    existing["env"] = env
-    get_session_store().set_node("settings", existing)
+    """保存工作环境到 session.json 的 settings.env 节点
+
+    ⚠️ 走 update_node 浅合并，禁止 load+set_node：后者会把读盘到写盘之间
+    别的组件写进 settings 的内容整体覆盖掉。
+    """
+    get_session_store().update_node("settings", {"env": env})
 
 
 # ─── 便捷函数：alert_info 告警存储 ────────────────────────────

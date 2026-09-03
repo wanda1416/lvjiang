@@ -633,4 +633,10 @@ references:
     group: 货币资产
   source: clipboard
   notes: ''
+- file: 3C45D25D.png
+  label: 心法心得
+  meta:
+    group: 普通道具
+  source: screenshot
+  notes: ''
 match_threshold: 0.35

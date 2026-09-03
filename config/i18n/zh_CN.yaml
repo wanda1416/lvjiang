@@ -1524,7 +1524,6 @@ auto_strings:
   subscene_set_failed: 设置失败
   subscene_mark_help: 请先在目标场景的「场景管理」中标记为引用子场景。
   subscene_exit_crop_canvas: 退出裁剪画布
-  '五维换算已修正，这套基础属性需要重新填写面板反推': '五维换算已修正，这套基础属性需要重新填写面板反推'
 task_history:
   task: 任务
   title: 任务历史

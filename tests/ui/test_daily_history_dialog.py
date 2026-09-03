@@ -53,10 +53,25 @@ def test_task_filters_use_fixed_multi_column_layout(qtbot, tmp_path):
         assert (widget.selectionMode()
                 == QAbstractItemView.SelectionMode.MultiSelection)
 
-    dialog._users.addItems([f"用户{i}" for i in range(6)])
+    dialog._users.addItems(["一二三四五六"]
+                           + [f"用户{i}" for i in range(5)])
+    dialog._users.fit_text_width()
     dialog._tasks.addItems([f"任务{i}" for i in range(4)])
     dialog.show()
     qtbot.wait(10)
+
+    assert dialog._users.visible_rows == 6
+    assert dialog._tasks.visible_rows == 6
+    assert (dialog._users.viewport().height()
+            == dialog._users.gridSize().height() * 6)
+    username_width = dialog._users.fontMetrics().horizontalAdvance(
+        "一二三四五六")
+    max_gap = dialog._users.fontMetrics().horizontalAdvance("字字字")
+    assert username_width <= dialog._users.gridSize().width()
+    assert dialog._users.gridSize().width() - username_width <= max_gap
+    task_width = dialog._tasks.fontMetrics().horizontalAdvance("任务0")
+    assert task_width <= dialog._tasks.gridSize().width()
+    assert dialog._tasks.gridSize().width() - task_width <= max_gap
 
     user_rects = [dialog._users.visualItemRect(dialog._users.item(i))
                   for i in range(4)]
@@ -76,3 +91,21 @@ def test_task_filters_use_fixed_multi_column_layout(qtbot, tmp_path):
         qtbot.mouseClick(dialog._users.viewport(),
                          Qt.MouseButton.LeftButton, pos=rect.center())
     assert len(dialog._users.selectedItems()) == 2
+    for rect in task_rects[:2]:
+        qtbot.mouseClick(dialog._tasks.viewport(),
+                         Qt.MouseButton.LeftButton, pos=rect.center())
+    assert len(dialog._tasks.selectedItems()) == 2
+
+    qtbot.mouseClick(dialog._clear_users_button,
+                     Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(dialog._clear_tasks_button,
+                     Qt.MouseButton.LeftButton)
+    assert not dialog._users.selectedItems()
+    assert not dialog._tasks.selectedItems()
+
+    initial_height = dialog._users.height()
+    filter_height, results_height = dialog._task_filter_splitter.sizes()
+    dialog._task_filter_splitter.setSizes(
+        [filter_height + 50, results_height - 50])
+    qtbot.wait(10)
+    assert dialog._users.height() > initial_height

@@ -22,6 +22,9 @@ _RESULT_LOG_SUPPRESSED_FLOW_IDS = frozenset({"auto_tuning"})
 LOCK_REASON_BATCH = "batch"
 LOCK_REASON_PLAN = "plan"
 
+# 方案下拉的「不使用方案」项，userData 为空串。
+PLAN_CUSTOM_LABEL = tr("- 自定义 -")
+
 def _to_serializable(obj):
     """将包含 to_dict() 对象的列表/字典转为可 JSON 序列化的结构"""
     if isinstance(obj, list):
@@ -332,6 +335,8 @@ class RunControlMixin:
     _run_state = "idle"         # 运行状态：idle / running / paused
     _pause_event: threading.Event | None = None  # 暂停事件：set=运行，clear=暂停阻塞
     _stop_confirm_pending = False  # 暂停中点结束的二次确认弹窗是否正打开（挡暂停热键竞态）
+    # 进入方案前暂存的自定义组合 (图库, 环境 key, 布局)；切回自定义时还原
+    _custom_context: tuple[str, Any, str] | None = None
 
     @property
     def _running(self) -> bool:
@@ -610,6 +615,126 @@ class RunControlMixin:
                 desc = layout.desc
         self.layout_desc_label.setText(desc)
 
+    # ─── 方案选择器 ────────────────────────────────────────
+
+    def _refresh_plan_combo(self):
+        """刷新方案下拉，并按 actives.plan 恢复选中态。"""
+        from ...core.config.plans import (
+            get_active_plan_id,
+            load_plans,
+            set_active_plan_id,
+        )
+        stored = get_active_plan_id()
+        self.plan_combo.blockSignals(True)
+        self.plan_combo.clear()
+        self.plan_combo.addItem(PLAN_CUSTOM_LABEL, "")
+        for plan in load_plans():
+            self.plan_combo.addItem(plan.name, plan.id)
+        idx = self.plan_combo.findData(stored)
+        self.plan_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.plan_combo.blockSignals(False)
+        if stored and idx < 0:
+            # 上次选中的方案已被删除：说清楚，并把失效引用清掉。
+            logger.warning(f"上次选中的方案 {stored} 已不存在，回到自定义")
+            self.log_text.append(tr("[提示] 上次选中的方案已不存在，已回到自定义"))
+            set_active_plan_id("")
+        self._apply_selected_plan(persist=False)
+
+    def _selected_plan(self):
+        """当前下拉选中的方案；「自定义」或引用已失效时返回 None。"""
+        from ...core.config.plans import load_plans
+        plan_id = self.plan_combo.currentData()
+        if not plan_id:
+            return None
+        for plan in load_plans():
+            if plan.id == plan_id:
+                return plan
+        return None
+
+    def _on_plan_changed(self, index: int):
+        """方案下拉切换：选方案则填充并锁定三个选择器，选自定义则放开。"""
+        if index < 0:
+            return
+        self._apply_selected_plan(persist=True)
+
+    def _apply_selected_plan(self, *, persist: bool) -> None:
+        plan_id = self.plan_combo.currentData() or ""
+        plan = self._selected_plan()
+        if plan_id and plan is None:
+            # 方案被删除但 actives.plan 还指着它：降级回自定义，别静默。
+            logger.warning(f"方案 {plan_id} 已不存在，回到自定义")
+            self.log_text.append(tr("[提示] 选中的方案已不存在，已回到自定义"))
+            self.plan_combo.blockSignals(True)
+            self.plan_combo.setCurrentIndex(0)
+            self.plan_combo.blockSignals(False)
+            plan_id = ""
+        if persist:
+            from ...core.config.plans import set_active_plan_id
+            set_active_plan_id(plan_id)
+        if plan is None:
+            self._release_plan_context()
+            return
+        self._stash_custom_context()
+        missing = self._apply_plan_context(plan)
+        if missing:
+            logger.warning(f"方案「{plan.name}」引用了不存在的内容: {missing}")
+            self.log_text.append(
+                tr("[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用").format(
+                    name=plan.name, missing="、".join(missing)))
+        self._set_context_controls_locked(LOCK_REASON_PLAN, True)
+        self._refresh_run_button()
+
+    def _apply_plan_context(self, plan) -> list[str]:
+        """把方案的三项写进选择器，返回未能套用的项名。"""
+        missing: list[str] = []
+        if plan.space:
+            idx = self.reference_space_combo.findText(plan.space)
+            if idx >= 0:
+                self.reference_space_combo.setCurrentIndex(idx)
+            else:
+                missing.append(tr("图库"))
+        if plan.env:
+            idx = self._env_combo.findData(plan.env)
+            if idx >= 0:
+                self._env_combo.setCurrentIndex(idx)
+            else:
+                missing.append(tr("环境"))
+        if plan.layout:
+            idx = self.layout_combo.findText(plan.layout)
+            if idx >= 0:
+                self.layout_combo.setCurrentIndex(idx)
+            else:
+                missing.append(tr("布局"))
+        return missing
+
+    def _stash_custom_context(self) -> None:
+        """进入方案前记下手上的自定义组合，切回自定义时原样还原。"""
+        if getattr(self, "_custom_context", None) is not None:
+            return
+        self._custom_context = (
+            self.reference_space_combo.currentText(),
+            self._env_combo.currentData(),
+            self.layout_combo.currentText(),
+        )
+
+    def _release_plan_context(self) -> None:
+        """回到自定义：解锁三个选择器并还原进入方案前的组合。"""
+        self._set_context_controls_locked(LOCK_REASON_PLAN, False)
+        stashed = getattr(self, "_custom_context", None)
+        self._custom_context = None
+        if stashed is not None:
+            space, env, layout = stashed
+            idx = self.reference_space_combo.findText(space)
+            if idx >= 0:
+                self.reference_space_combo.setCurrentIndex(idx)
+            idx = self._env_combo.findData(env)
+            if idx >= 0:
+                self._env_combo.setCurrentIndex(idx)
+            idx = self.layout_combo.findText(layout)
+            if idx >= 0:
+                self.layout_combo.setCurrentIndex(idx)
+        self._refresh_run_button()
+
     # ─── 自动化状态管理 ────────────────────────────────────
 
     def _begin_automation(self, name: str) -> bool:
@@ -658,11 +783,14 @@ class RunControlMixin:
     def _set_context_controls_locked(self, reason: str, locked: bool) -> None:
         """按锁定原因禁用顶部上下文选择器。
 
-        批量只锁环境和布局（图库在批量期间切换属于既有行为，不在本次改动
-        范围内）；方案锁三个都锁，因为三者正是方案定义的内容。
+        批量锁环境、布局，外加方案下拉——切方案会连带改掉环境和布局，等于
+        绕过这把锁（图库在批量期间切换属于既有行为，不在本次改动范围内）。
+        方案锁则锁图库、环境、布局三个，因为它们正是方案定义的内容；方案
+        下拉自己不能锁，否则用户无法切回自定义。
         """
         names = ("reference_space_combo", "_env_combo", "layout_combo") \
-            if reason == LOCK_REASON_PLAN else ("_env_combo", "layout_combo")
+            if reason == LOCK_REASON_PLAN \
+            else ("plan_combo", "_env_combo", "layout_combo")
         for name in names:
             combo = getattr(self, name, None)
             setter = getattr(combo, "set_locked", None)

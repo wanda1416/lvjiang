@@ -418,6 +418,11 @@ config:
   delay_page_refresh: Page Refresh Wait
   delay_scroll_settle: Scroll Settle Wait
 auto_strings:
+  '- 自定义 -': '- Custom -'
+  '[提示] 上次选中的方案已不存在，已回到自定义': '[Notice] The previously selected plan no longer exists; back to Custom'
+  '[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用': '[Notice] The {missing} of plan "{name}" no longer exists; it was not fully applied'
+  '[提示] 选中的方案已不存在，已回到自定义': '[Notice] The selected plan no longer exists; back to Custom'
+  当前正在使用方案，如需手动调整请先切换为「自定义」: 'A plan is in use; switch to "Custom" first to adjust these manually'
   全武学增伤要求: All-art damage bonus
   奇术增伤要求: Qishu damage bonus
   对单位增伤要求: Target damage bonus

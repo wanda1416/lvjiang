@@ -418,6 +418,14 @@ config:
   delay_page_refresh: Page Refresh Wait
   delay_scroll_settle: Scroll Settle Wait
 auto_strings:
+  从当前组合新建: New from current
+  支持模式: Supported modes
+  新方案: New plan
+  方案「{name}」至少要勾选一种连接模式: 'Plan "{name}" needs at least one connection mode'
+  方案名称不能为空: Plan name cannot be empty
+  方案把图库、环境、布局绑成一个整体，并声明支持的连接模式。: A plan binds gallery, environment and layout together and declares the connection modes it supports.
+  方案设置: Plan Settings
+  确定删除方案「{name}」吗？: 'Delete plan "{name}"?'
   ADB 模式: ADB mode
   当前方案「{name}」不支持{mode}: 'Plan "{name}" does not support {mode}'
   方案不支持: Unsupported by plan

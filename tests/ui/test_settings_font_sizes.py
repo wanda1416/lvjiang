@@ -8,7 +8,7 @@ from lvjiang.ui.main.menu_ops import MenuOpsMixin
 from lvjiang.ui.settings_dialog import SettingsDialog
 
 
-def test_font_tab_follows_system_parameters_and_loads_saved_values(
+def test_font_tab_follows_plan_settings_and_loads_saved_values(
     qtbot, monkeypatch,
 ):
     config = UserConfig(font_sizes=FontSizeConfig(13, 15))
@@ -20,7 +20,7 @@ def test_font_tab_follows_system_parameters_and_loads_saved_values(
     qtbot.addWidget(dialog)
     labels = [dialog._tabs.tabText(i) for i in range(dialog._tabs.count())]
 
-    assert labels.index("字体设置") == labels.index("系统参数") + 1
+    assert labels.index("字体设置") == labels.index("方案设置") + 1
     assert dialog._overview_font_spin.value() == 13
     assert dialog._user_info_font_spin.value() == 15
     assert dialog._overview_font_spin.minimum() == 8

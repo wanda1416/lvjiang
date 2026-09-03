@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PyQt6 import QtWidgets
+from PyQt6.QtCore import Qt
 
 from lvjiang.core.profile.models import (
     MODEL_QUOTA,
@@ -11,7 +12,11 @@ from lvjiang.core.profile.models import (
 )
 from lvjiang.ui.profile import cell_editing
 from lvjiang.ui.profile.cell_editing import ProfileCellEditingMixin
-from lvjiang.ui.profile.settings_dialog import _ChangeRulesWidget
+from lvjiang.ui.profile.settings_dialog import (
+    ProfileDefinitionDialog,
+    _ChangeRulesWidget,
+    _SyncTargetsWidget,
+)
 
 
 def test_change_rules_merge_legacy_vocab_and_steps(qtbot):
@@ -45,6 +50,42 @@ def test_change_rules_require_name_for_shortcut_amount(qtbot):
     widget.add_row(widget._KIND_USE, amount=10)
 
     assert "填写来源或用途" in widget.validation_error()
+
+
+def test_change_rules_and_sync_targets_are_vertically_resizable(qtbot, monkeypatch):
+    parent = QtWidgets.QWidget()
+    qtbot.addWidget(parent)
+    captured: list[tuple[int, int]] = []
+
+    def inspect_dialog(dialog):
+        splitter = dialog.findChild(QtWidgets.QSplitter)
+        assert splitter is not None
+        assert splitter.orientation() == Qt.Orientation.Vertical
+        assert splitter.count() == 2
+        assert not splitter.childrenCollapsible()
+        assert splitter.widget(0).findChild(_ChangeRulesWidget) is not None
+        assert splitter.widget(1).findChild(_SyncTargetsWidget) is not None
+
+        dialog.resize(720, 760)
+        dialog.show()
+        QtWidgets.QApplication.processEvents()
+        splitter.setSizes([130, 360])
+        QtWidgets.QApplication.processEvents()
+        captured.append(tuple(splitter.sizes()))
+        return 0
+
+    monkeypatch.setattr(QtWidgets.QDialog, "exec", inspect_dialog)
+    ProfileDefinitionDialog.open_key_editor(
+        parent,
+        MODEL_STOCK,
+        StockKeyDef(key="currency", label="货币"),
+        {"currency"},
+    )
+
+    assert captured
+    upper, lower = captured[0]
+    assert upper > 0
+    assert lower > upper
 
 
 class _Signal:

@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -107,6 +108,7 @@ class _SyncTargetsWidget(QWidget):
         self._table = QTableWidget()
         self._table.setColumnCount(5)
         self._table.setHorizontalHeaderLabels([tr("目标"), tr("倍率"), tr("方向"), tr("来源"), ""])
+        self._table.setMinimumHeight(110)
         v_header = self._table.verticalHeader()
         if v_header is not None:
             v_header.setVisible(False)
@@ -264,7 +266,7 @@ class _ChangeRulesWidget(QWidget):
         headers.append("")
         self._table.setHorizontalHeaderLabels(headers)
         self._table.setAlternatingRowColors(True)
-        self._table.setMinimumHeight(190)
+        self._table.setMinimumHeight(110)
         vertical_header = self._table.verticalHeader()
         if vertical_header is not None:
             vertical_header.setVisible(False)
@@ -1058,7 +1060,6 @@ class ProfileDefinitionDialog(QDialog):
             existing_steps,
             allow_steps=model_type != MODEL_NOTE,
         )
-        layout.addRow(tr("变动规则:"), change_rules_widget)
         widgets["change_rules"] = change_rules_widget
 
         # 同步目标动态列表（三种模型通用，下拉排除自身）
@@ -1066,8 +1067,29 @@ class ProfileDefinitionDialog(QDialog):
         if existing and existing.sync_targets:
             for t in existing.sync_targets:
                 sync_targets_widget.add_row(t)
-        layout.addRow(tr("同步目标:"), sync_targets_widget)
         widgets["sync_targets"] = sync_targets_widget
+
+        # 两块列表可能都很长，使用纵向 splitter 让用户按当前任务分配空间。
+        change_pane = QWidget()
+        change_layout = QFormLayout(change_pane)
+        change_layout.setContentsMargins(0, 0, 0, 0)
+        change_layout.addRow(tr("变动规则:"), change_rules_widget)
+
+        sync_pane = QWidget()
+        sync_layout = QFormLayout(sync_pane)
+        sync_layout.setContentsMargins(0, 0, 0, 0)
+        sync_layout.addRow(tr("同步目标:"), sync_targets_widget)
+
+        rules_splitter = QSplitter(Qt.Orientation.Vertical)
+        rules_splitter.setChildrenCollapsible(False)
+        rules_splitter.setHandleWidth(7)
+        rules_splitter.addWidget(change_pane)
+        rules_splitter.addWidget(sync_pane)
+        rules_splitter.setStretchFactor(0, 3)
+        rules_splitter.setStretchFactor(1, 2)
+        rules_splitter.setSizes([240, 180])
+        layout.addRow(rules_splitter)
+        widgets["rules_splitter"] = rules_splitter
 
         # 按钮行
         btn_row = QHBoxLayout()

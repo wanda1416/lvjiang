@@ -26,6 +26,17 @@ from .models import (
     UserConfig,
     parse_delay_params,
 )
+from .plans import (
+    PLAN_MODE_ADB,
+    PLAN_MODE_WINDOW,
+    PLAN_MODES,
+    Plan,
+    get_active_plan,
+    get_active_plan_id,
+    load_plans,
+    save_plans,
+    set_active_plan_id,
+)
 from .resolver import (
     DELETED_KEY,
     TOMBSTONE_SUFFIX,
@@ -92,6 +103,16 @@ __all__ = [
     "save_env",
     "load_available_envs",
     "load_user_config",
+    # 方案（机器级的图库+环境+布局+连接模式组合）
+    "Plan",
+    "PLAN_MODES",
+    "PLAN_MODE_ADB",
+    "PLAN_MODE_WINDOW",
+    "load_plans",
+    "save_plans",
+    "get_active_plan",
+    "get_active_plan_id",
+    "set_active_plan_id",
     # 工作流配置统一存储
     "get_wf_config",
     "set_wf_config",

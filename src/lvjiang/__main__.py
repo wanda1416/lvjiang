@@ -91,6 +91,12 @@ def main() -> int:
     _configure_dpi()
     _configure_logging()
 
+    # 插件会在 QApplication 创建前加载；先初始化文本翻译，避免插件 hooks
+    # 和模块级显示标签永远按默认中文固化。run_app 会在 QApplication 创建后
+    # 再初始化一次，以安装 Qt 自带控件的翻译器。
+    from .i18n import init_i18n, load_app_i18n
+    init_i18n()
+
     args = _parse_args()
     logger = logging.getLogger("lvjiang.__main__")
 
@@ -115,6 +121,7 @@ def main() -> int:
     hooks_list = []
     for name in args.apps or []:
         logger.info("加载插件: %s", name)
+        load_app_i18n(name)
         hooks = load_app(name)
         register_hooks(hooks)
         hooks_list.append(hooks)

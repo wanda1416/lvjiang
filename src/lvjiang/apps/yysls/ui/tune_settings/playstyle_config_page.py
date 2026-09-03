@@ -38,6 +38,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
+from ..domain_labels import domain_label
 
 _QUALITIES = ("gold", "purple", "blue")
 
@@ -127,7 +128,8 @@ class PlaystyleConfigPage(QWidget):
         qualities = qualities or set()
         table = self._q_table
         table.insertRow(row)
-        item = QTableWidgetItem(part)
+        item = QTableWidgetItem(domain_label(part))
+        item.setData(Qt.ItemDataRole.UserRole, part)
         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         table.setItem(row, 0, item)
         for i, q in enumerate(_QUALITIES, start=1):
@@ -177,7 +179,7 @@ class PlaystyleConfigPage(QWidget):
         quality: dict[str, list[str]] = {}
         for r in range(self._q_table.rowCount()):
             item = self._q_table.item(r, 0)
-            part = item.text().strip() if item else ""
+            part = str(item.data(Qt.ItemDataRole.UserRole) or "").strip() if item else ""
             if not part:
                 continue
             chosen = []

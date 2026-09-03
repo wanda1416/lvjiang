@@ -42,69 +42,71 @@ from lvjiang.apps.yysls.core.tuning_rules.models import FOOD_LABELS
 from lvjiang.ui.button_styles import apply_button_style
 
 from ......i18n import tr
+from ...domain_labels import domain_label
 from ...game_settings.level_combo import LevelCombo
 from ...tuning.config_widget import TuningConfigWidget
 
 # 部位下拉：武器合并为单项 + 首饰 + 防具（共 7 项）；
 # 选中「武器」时另出二级下拉选具体武器，避免武器与部位混叠
-PART_WEAPON = tr("武器")
-PART_ITEMS: list[str] = [PART_WEAPON, tr("环"), tr("佩"), tr("冠胄"), tr("胸甲"), tr("胫甲"), tr("腕甲")]
+PART_WEAPON = "武器"
+PART_ITEMS: list[str] = [PART_WEAPON, "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲"]
 
 # 调律词条池（词条 2-5，全部位可出，attributes.yaml 标准字段名）
 _COMMON_AFFIXES: list[str] = [
-    tr("最大外功攻击"), tr("最小外功攻击"),
-    tr("劲"), tr("势"), tr("敏"), tr("体"), tr("御"),
-    tr("会意率"), tr("会心率"), tr("精准率"),
+    "最大外功攻击", "最小外功攻击",
+    "劲", "势", "敏", "体", "御",
+    "会意率", "会心率", "精准率",
     *[f"{prefix}{attr}攻击"
-      for attr in (tr("无相"), tr("裂石"), tr("牵丝"), tr("破竹"), tr("鸣金"))
-      for prefix in (tr("最大"), tr("最小"))],
+      for attr in ("无相", "裂石", "牵丝", "破竹", "鸣金")
+      for prefix in ("最大", "最小")],
 ]
 
 # 初始词条池（词条 1，按部位区分，源：01-equipment-system.md 三.1）
 _INITIAL_WEAPON: list[str] = [
-    tr("最大外功攻击"), tr("最小外功攻击"),
-    tr("最大无相攻击"), tr("最小无相攻击"), tr("敏"), tr("势"),
+    "最大外功攻击", "最小外功攻击",
+    "最大无相攻击", "最小无相攻击", "敏", "势",
 ]
-_INITIAL_JEWELRY: list[str] = [tr("最大外功攻击"), tr("最小外功攻击")]
+_INITIAL_JEWELRY: list[str] = ["最大外功攻击", "最小外功攻击"]
 _INITIAL_HEAD_CHEST: list[str] = [
-    tr("会心率"), tr("会意率"), tr("精准率"), tr("气血最大值"), tr("外功防御"),
+    "会心率", "会意率", "精准率", "气血最大值", "外功防御",
 ]
 _INITIAL_LEG_WRIST: list[str] = [
-    tr("会心率"), tr("会意率"), tr("劲"), tr("精准率"), tr("体"), tr("御"),
-    tr("气血最大值"), tr("外功防御"),
+    "会心率", "会意率", "劲", "精准率", "体", "御",
+    "气血最大值", "外功防御",
 ]
 _INITIAL_AFFIXES: dict[str, list[str]] = {
     **{w: _INITIAL_WEAPON for w in WEAPON_TYPES},
-    tr("环"): _INITIAL_JEWELRY, tr("佩"): _INITIAL_JEWELRY,
-    tr("冠胄"): _INITIAL_HEAD_CHEST, tr("胸甲"): _INITIAL_HEAD_CHEST,
-    tr("胫甲"): _INITIAL_LEG_WRIST, tr("腕甲"): _INITIAL_LEG_WRIST,
+    "环": _INITIAL_JEWELRY, "佩": _INITIAL_JEWELRY,
+    "冠胄": _INITIAL_HEAD_CHEST, "胸甲": _INITIAL_HEAD_CHEST,
+    "胫甲": _INITIAL_LEG_WRIST, "腕甲": _INITIAL_LEG_WRIST,
 }
 
 # 武器 → 专属武学增伤/增效词条
 _WEAPON_WUXUE: dict[str, list[str]] = {
-    tr("陌刀"): [tr("陌刀武学增伤")],
-    tr("舞绫鼓"): [tr("舞绫鼓武学增伤")],
-    tr("双刀"): [tr("双刀武学增伤")],
-    tr("绳镖"): [tr("绳镖武学增伤")],
-    tr("横刀"): [tr("横刀武学增伤")],
-    tr("手甲"): [tr("手甲武学增伤")],
-    tr("剑"): [tr("剑武学增伤")],
-    tr("枪"): [tr("枪武学增伤")],
-    tr("扇"): [tr("扇武学增伤"), tr("扇武学增效")],
-    tr("伞"): [tr("伞武学增伤")],
+    "陌刀": ["陌刀武学增伤"],
+    "舞绫鼓": ["舞绫鼓武学增伤"],
+    "双刀": ["双刀武学增伤"],
+    "绳镖": ["绳镖武学增伤"],
+    "横刀": ["横刀武学增伤"],
+    "手甲": ["手甲武学增伤"],
+    "剑": ["剑武学增伤"],
+    "枪": ["枪武学增伤"],
+    "扇": ["扇武学增伤", "扇武学增效"],
+    "伞": ["伞武学增伤"],
 }
 
 # 非武器部位 → 专属神力词条
 _PART_EXTRA: dict[str, list[str]] = {
-    tr("环"): [tr("全武学增效")],
-    tr("佩"): [tr("全武学增效")],
-    tr("冠胄"): [tr("单体类奇术增伤")],
-    tr("胸甲"): [tr("单体类奇术增伤")],
-    tr("胫甲"): [tr("对首领单位增伤"), tr("对玩家单位增效")],
-    tr("腕甲"): [tr("对首领单位增伤"), tr("对玩家单位增效")],
+    "环": ["全武学增效"],
+    "佩": ["全武学增效"],
+    "冠胄": ["单体类奇术增伤"],
+    "胸甲": ["单体类奇术增伤"],
+    "胫甲": ["对首领单位增伤", "对玩家单位增效"],
+    "腕甲": ["对首领单位增伤", "对玩家单位增效"],
 }
 
 _NONE_ITEM = tr("（未选）")
+_NONE_ITEM_KEY = ""
 _AFFIX_ROWS = 5
 
 # 模拟模式虚拟库存（假定材料充足，不统计消耗）
@@ -144,14 +146,16 @@ class EquipAffixEditor(QWidget):
         form.setContentsMargins(0, 0, 0, 0)
 
         self.part_combo = QComboBox()
-        self.part_combo.addItems(PART_ITEMS)
+        for part in PART_ITEMS:
+            self.part_combo.addItem(domain_label(part), part)
         self.part_combo.currentIndexChanged.connect(self._on_part_changed)
         form.addRow(tr("部位："), self.part_combo)
 
         # 二级选择：部位为「武器」时显示，选具体武器
         self._weapon_label = QLabel(tr("武器："))
         self.weapon_combo = QComboBox()
-        self.weapon_combo.addItems(WEAPON_TYPES)
+        for weapon in WEAPON_TYPES:
+            self.weapon_combo.addItem(domain_label(weapon), weapon)
         self.weapon_combo.currentIndexChanged.connect(
             self._rebuild_affix_options)
         form.addRow(self._weapon_label, self.weapon_combo)
@@ -197,13 +201,13 @@ class EquipAffixEditor(QWidget):
 
     def current_type(self) -> str:
         """当前装备类型：部位为武器时取二级下拉的具体武器"""
-        part = self.part_combo.currentText()
-        return (self.weapon_combo.currentText()
+        part = str(self.part_combo.currentData())
+        return (str(self.weapon_combo.currentData())
                 if part == PART_WEAPON else part)
 
     def _on_part_changed(self):
         """部位变更：切换二级武器下拉可见性并重建词条候选"""
-        is_weapon = self.part_combo.currentText() == PART_WEAPON
+        is_weapon = self.part_combo.currentData() == PART_WEAPON
         self._weapon_label.setVisible(is_weapon)
         self.weapon_combo.setVisible(is_weapon)
         self._rebuild_affix_options()
@@ -230,8 +234,9 @@ class EquipAffixEditor(QWidget):
         for i, (combo, spin) in enumerate(
                 zip(self._affix_combos, self._affix_spins, strict=False)):
             combo.clear()
-            combo.addItem(_NONE_ITEM)
-            combo.addItems(initial if i == 0 else tuning)
+            combo.addItem(_NONE_ITEM, _NONE_ITEM_KEY)
+            for name in (initial if i == 0 else tuning):
+                combo.addItem(domain_label(name), name)
             spin.setValue(0)
         for chk in self._tune_checkboxes:
             chk.setChecked(False)
@@ -241,16 +246,18 @@ class EquipAffixEditor(QWidget):
         """词条 2-5 去重：排除其他 2-5 行已选名，保留自身当前选中"""
         self._updating = True
         names = self._tuning_candidates()
-        selected = [c.currentText() for c in self._affix_combos]
+        selected = [str(c.currentData()) for c in self._affix_combos]
         for i in range(1, _AFFIX_ROWS):
             combo = self._affix_combos[i]
             own = selected[i]
             taken = {selected[j] for j in range(1, _AFFIX_ROWS)
-                     if j != i and selected[j] != _NONE_ITEM}
+                     if j != i and selected[j] != _NONE_ITEM_KEY}
             combo.clear()
-            combo.addItem(_NONE_ITEM)
-            combo.addItems([n for n in names if n not in taken])
-            idx = combo.findText(own)
+            combo.addItem(_NONE_ITEM, _NONE_ITEM_KEY)
+            for name in names:
+                if name not in taken:
+                    combo.addItem(domain_label(name), name)
+            idx = combo.findData(own)
             combo.setCurrentIndex(idx if idx >= 0 else 0)
         self._updating = False
 
@@ -258,8 +265,8 @@ class EquipAffixEditor(QWidget):
         """选中词条：自动填承音值（94% cap）并刷新 2-5 去重"""
         if self._updating:
             return
-        name = self._affix_combos[row].currentText()
-        if name != _NONE_ITEM:
+        name = str(self._affix_combos[row].currentData())
+        if name != _NONE_ITEM_KEY:
             level = self._level_combo.get_level()
             caps = get_game_config().get_affix_caps(level, name) if level else None
             if caps is not None:
@@ -276,8 +283,8 @@ class EquipAffixEditor(QWidget):
         affixes: list[Affix] = []
         for combo, spin in zip(self._affix_combos, self._affix_spins,
                                strict=False):
-            name = combo.currentText()
-            if name == _NONE_ITEM:
+            name = str(combo.currentData())
+            if name == _NONE_ITEM_KEY:
                 continue
             level = self._level_combo.get_level()
             caps = mgr.get_affix_caps(level, name) if level else None
@@ -300,8 +307,8 @@ class EquipAffixEditor(QWidget):
         # 词条 1 始终是扫描时已有
         combo = self._affix_combos[0]
         spin = self._affix_spins[0]
-        name = combo.currentText()
-        if name != _NONE_ITEM:
+        name = str(combo.currentData())
+        if name != _NONE_ITEM_KEY:
             level = self._level_combo.get_level()
             caps = mgr.get_affix_caps(level, name) if level else None
             unit = caps["unit"] or None if caps else None
@@ -312,8 +319,8 @@ class EquipAffixEditor(QWidget):
                 self._tune_checkboxes, strict=False):
             if chk.isChecked():
                 continue  # 勾选"待调出"的不算扫描时已有
-            name = combo.currentText()
-            if name == _NONE_ITEM:
+            name = str(combo.currentData())
+            if name == _NONE_ITEM_KEY:
                 continue
             level = self._level_combo.get_level()
             caps = mgr.get_affix_caps(level, name) if level else None
@@ -329,8 +336,8 @@ class EquipAffixEditor(QWidget):
                                      self._tune_checkboxes, strict=False):
             if not chk.isChecked():
                 continue
-            name = combo.currentText()
-            if name == _NONE_ITEM:
+            name = str(combo.currentData())
+            if name == _NONE_ITEM_KEY:
                 continue
             level = self._level_combo.get_level()
             caps = mgr.get_affix_caps(level, name) if level else None

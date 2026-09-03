@@ -25,6 +25,7 @@ from .constants import (
     POOL_DINGYIN,
     POOL_NORMAL,
     WUXUE_CATEGORY,
+    normalize_equip_part,
 )
 from .models import AttrRange, LevelConfig, LevelRule, SeasonConfig
 
@@ -243,7 +244,11 @@ class GameConfigManager:
         for name, parts in raw_parts.items():
             if not isinstance(parts, list):
                 continue
-            valid = [p for p in parts if p in EQUIP_PART_NAMES]
+            valid = [
+                normalized
+                for p in parts
+                if (normalized := normalize_equip_part(p)) in EQUIP_PART_NAMES
+            ]
             if valid:
                 self._affix_parts[str(name)] = valid
 
@@ -341,7 +346,10 @@ class GameConfigManager:
             raw_parts = levels.get("_parts")
             if isinstance(raw_parts, list) and raw_parts:
                 self._category_parts[category] = [
-                    p for p in raw_parts if p in EQUIP_PART_NAMES
+                    normalized
+                    for p in raw_parts
+                    if (normalized := normalize_equip_part(p))
+                    in EQUIP_PART_NAMES
                 ]
             for level_str, entry in levels.items():
                 # 跳过 _aliases 等非等级 key
@@ -580,36 +588,34 @@ class GameConfigManager:
         武器名称从配置动态加载，新增武器自动生效。
         """
         if not hasattr(self, '_type_to_group_cache') or self._type_to_group_cache is None:
-            from lvjiang.i18n import tr
             mapping: dict[str, str] = {}
             # 所有武器具体名称 → "weapon"
             for wt in self._weapon_types:
                 mapping[wt] = "weapon"
             # 武器显示名（对话框部位下拉用）
-            mapping[tr("武器")] = "weapon"
+            mapping["武器"] = "weapon"
             # 非武器部位
             mapping.update({
-                tr("环"): "ring",
-                tr("佩"): "pendant",
-                tr("冠胄"): "head",
-                tr("胸甲"): "chest",
-                tr("胫甲"): "leg",
-                tr("腕甲"): "wrist",
+                "环": "ring",
+                "佩": "pendant",
+                "冠胄": "head",
+                "胸甲": "chest",
+                "胫甲": "leg",
+                "腕甲": "wrist",
             })
             self._type_to_group_cache = mapping
         return dict(self._type_to_group_cache)
 
     def get_group_to_part(self) -> dict[str, str]:
         """分组 key → 部位显示名的反向映射。"""
-        from lvjiang.i18n import tr
         return {
-            "weapon": tr("武器"),
-            "ring": tr("环"),
-            "pendant": tr("佩"),
-            "head": tr("冠胄"),
-            "chest": tr("胸甲"),
-            "leg": tr("胫甲"),
-            "wrist": tr("腕甲"),
+            "weapon": "武器",
+            "ring": "环",
+            "pendant": "佩",
+            "head": "冠胄",
+            "chest": "胸甲",
+            "leg": "胫甲",
+            "wrist": "腕甲",
         }
 
     def get_first_affixes(self, part: str) -> list[str]:

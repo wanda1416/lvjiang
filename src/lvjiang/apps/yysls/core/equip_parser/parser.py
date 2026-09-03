@@ -7,7 +7,6 @@ import re
 
 from loguru import logger
 
-from .....i18n import tr
 from .constants import (
     AFFIX_NAMES,
     PERCENT_AFFIXES,
@@ -292,7 +291,7 @@ class EquipmentParser:
         nums = re.findall(r"\d+", raw)
         if nums:
             name_match = re.match(r"^([^\d|]+?)\s*\|?\s*(?=\d)", raw)
-            name = name_match.group(1).strip() if name_match else tr("未知")
+            name = name_match.group(1).strip() if name_match else "未知"
             logger.warning(f"base_attr 未匹配已知属性名，回退裁剪: {raw!r} → name={name!r}")
             if len(nums) >= 2 and "~" in raw:
                 return EquipAttr(name=name, value=[int(nums[0]), int(nums[1])])
@@ -345,7 +344,7 @@ class EquipmentParser:
         AFFIX_KEYS = [
             "affix_gong", "affix_shang", "affix_jue", "affix_zhi", "affix_yu"
         ]
-        KEY_NAMES = [tr("宫"), tr("商"), tr("角"), tr("徵"), tr("羽")]
+        KEY_NAMES = ["宫", "商", "角", "徵", "羽"]
 
         affixes: list[Affix] = []
         warnings: list[str] = []

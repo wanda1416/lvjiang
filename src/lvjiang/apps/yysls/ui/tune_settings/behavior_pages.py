@@ -78,6 +78,7 @@ from lvjiang.ui.button_styles import (
 )
 
 from .....i18n import tr
+from ..domain_labels import domain_label
 
 # 品阶候选（从高到低，最高档 = 不限；扫描/结束处理共用）
 _QUALITY_KEYS = ("gold", "gold_only", "purple_only", "purple", "blue")
@@ -584,7 +585,10 @@ class _BehaviorPageBase(QWidget):
         seq_label.setProperty("rule_enabled", rule.enabled)
         table.setCellWidget(row, _SEQ_COL, seq_label)
 
-        parts = _MultiSelect([(p, p) for p in QUALITY_PARTS], self._apply)
+        parts = _MultiSelect(
+            [(part, domain_label(part)) for part in QUALITY_PARTS],
+            self._apply,
+        )
         parts.set_selected(rule.parts)
         table.setCellWidget(row, self._ci["parts"], parts)
 
@@ -777,7 +781,7 @@ class _BehaviorPageBase(QWidget):
         selected_parts = parts.selected()
         # 全选时折叠为简写，保持 YAML 紧凑
         if set(selected_parts) == set(QUALITY_PARTS):
-            selected_parts = [tr("全部")]
+            selected_parts = ["全部"]
         rule = {
             "enabled": bool(seq.property("rule_enabled")),
             "parts": selected_parts,

@@ -13,6 +13,7 @@ from .constants import (
     POOL_DINGYIN,
     POOL_NORMAL,
     WUXUE_CATEGORY,
+    normalize_equip_part,
 )
 from .manager import GameConfigManager, get_game_config
 from .models import AttrRange, LevelConfig, LevelRule, SeasonConfig
@@ -31,6 +32,7 @@ __all__ = [
     "POOL_DINGYIN",
     "POOL_NORMAL",
     "WUXUE_CATEGORY",
+    "normalize_equip_part",
     # 游戏配置模型
     "AttrRange",
     "LevelConfig",

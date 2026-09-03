@@ -55,6 +55,37 @@ _VALID_QUALITIES = ("gold", "purple", "blue")
 _VALID_RULE_QUALITIES = ("gold", "gold_only", "purple_only", "purple",
                          "blue")
 
+# 领域数据固定使用现有中文值。英文别名只用于兼容曾由英文界面写入的
+# 配置；解析结果始终归一化，不能让 UI 语言进入规则模型。
+_QUALITY_PART_ALIASES = {
+    "weapon": "武器",
+    "ring": "环",
+    "pendant": "佩",
+    "head guard": "冠胄",
+    "head": "冠胄",
+    "chest armor": "胸甲",
+    "chest": "胸甲",
+    "shin guard": "胫甲",
+    "leg": "胫甲",
+    "wrist guard": "腕甲",
+    "wrist": "腕甲",
+}
+_PATTERN_PART_ALIASES = {
+    "main weapon": "主武器",
+    "off weapon": "副武器",
+    "ring": "环",
+    "head guard": "冠胄",
+    "head": "冠胄",
+    "shin guard": "胫甲",
+    "leg": "胫甲",
+}
+_ALL_PART_ALIASES = {"全部", "all", "- all -"}
+
+
+def _normalize_part(value: object, aliases: dict[str, str]) -> str:
+    text = str(value).strip()
+    return aliases.get(text.casefold(), text)
+
 
 def _parse_quality_thresholds(raw, where: str,
                               require_all: bool = False,
@@ -67,7 +98,8 @@ def _parse_quality_thresholds(raw, where: str,
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
     result: dict[str, list[str]] = {}
-    for part, qs in raw.items():
+    for raw_part, qs in raw.items():
+        part = _normalize_part(raw_part, _QUALITY_PART_ALIASES)
         if part not in QUALITY_PARTS:
             raise RuleValidationError(
                 f"{where}: 未知部位 {part!r}（须为 {list(QUALITY_PARTS)}）")
@@ -380,7 +412,8 @@ def parse_tuning_rule(data: dict,
                             "transmute_priority")
 
     patterns: dict[str, PartPattern] = {}
-    for part, p_raw in (data.get("patterns") or {}).items():
+    for raw_part, p_raw in (data.get("patterns") or {}).items():
+        part = _normalize_part(raw_part, _PATTERN_PART_ALIASES)
         if part not in PART_KEYS:
             raise RuleValidationError(f"未知部位 key {part!r}")
         patterns[part] = _parse_pattern(p_raw, vocab, f"patterns.{part}")
@@ -518,11 +551,17 @@ def _parse_behavior_rule(raw, where: str,
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
     raw_parts = raw.get("parts") or []
-    # 支持特殊值 "全部" 展开为所有部位
-    if raw_parts == [tr("全部")]:
+    # "全部" 是持久化领域值；兼容旧英文界面可能写入的 All/- All -。
+    if (
+        len(raw_parts) == 1
+        and str(raw_parts[0]).strip().casefold() in _ALL_PART_ALIASES
+    ):
         parts = list(QUALITY_PARTS)
     else:
-        parts = list(raw_parts)
+        parts = [
+            _normalize_part(part, _QUALITY_PART_ALIASES)
+            for part in raw_parts
+        ]
     bad = [p for p in parts if p not in QUALITY_PARTS]
     if bad:
         raise RuleValidationError(

@@ -41,18 +41,18 @@ from .....i18n import tr
 # ─── 固定词汇（写死在代码，不进 YAML） ─────────────────────
 
 # 属性攻击词组类别（玩法属性候选 + 属攻→无相等价的数据源）
-ATTR_ATTACK_CATEGORY = tr("属性攻击")
+ATTR_ATTACK_CATEGORY = "属性攻击"
 # 通用属性（其属攻即无相攻击，混搭流玩法不做动态归类）
-GENERIC_ATTR = tr("通用")
+GENERIC_ATTR = "通用"
 
 # 动态词条（规则层词汇，非 attributes.yaml 真实词条）：判定时按
 # 玩法属性把装备上的具体属攻归类为 本属（=该属性）/外属（=其余
 # 属性，多对一），大/小对齐词组内声明序（最大↔大、最小↔小）
-DYNAMIC_AFFIXES = (tr("最大本属攻击"), tr("最小本属攻击"),
-                   tr("最大外属攻击"), tr("最小外属攻击"))
+DYNAMIC_AFFIXES = ("最大本属攻击", "最小本属攻击",
+                   "最大外属攻击", "最小外属攻击")
 # 动态词条在规则编辑器中的归属分类名（与属攻类并列，不入
 # game_config 归属体系）
-DYNAMIC_CATEGORY = tr("动态类")
+DYNAMIC_CATEGORY = "动态类"
 
 # 条件原语类型
 COND_KINDS = {"contains_all", "not_together", "count_max", "count_min"}
@@ -67,13 +67,13 @@ RATING_LABELS = {"junk": tr("垃圾"), "normal": tr("一般"),
                  "excellent": tr("优秀"), "top": tr("顶级")}
 
 # 部位归并：佩→环、胸甲→冠胄、腕甲→胫甲
-PART_ALIAS = {tr("佩"): tr("环"), tr("胸甲"): tr("冠胄"), tr("腕甲"): tr("胫甲")}
+PART_ALIAS = {"佩": "环", "胸甲": "冠胄", "腕甲": "胫甲"}
 
 # 模式部位 key 全集
-PART_KEYS = (tr("主武器"), tr("副武器"), tr("环"), tr("冠胄"), tr("胫甲"))
+PART_KEYS = ("主武器", "副武器", "环", "冠胄", "胫甲")
 
 # 品阶门槛部位全集（固定 7 项，与 equip_parser.infer_part 输出对齐）
-QUALITY_PARTS = (tr("武器"), tr("环"), tr("佩"), tr("冠胄"), tr("胸甲"), tr("胫甲"), tr("腕甲"))
+QUALITY_PARTS = ("武器", "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲")
 
 
 def standard_affix_names() -> list[str]:

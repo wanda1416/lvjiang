@@ -39,13 +39,18 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps.yysls.config import AFFIX_CATEGORY_NAMES, EQUIP_PART_NAMES
+from lvjiang.apps.yysls.config import (
+    AFFIX_CATEGORY_NAMES,
+    EQUIP_PART_NAMES,
+    normalize_equip_part,
+)
 from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
 
 from .....i18n import tr
+from ..domain_labels import domain_label
 from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 from .level_combo import LevelCombo
@@ -95,7 +100,8 @@ class _PartsDialog(QDialog):
         grid = QGridLayout()
         grid.setSpacing(6)
         for i, part in enumerate(EQUIP_PART_NAMES):
-            cb = QCheckBox(part)
+            cb = QCheckBox(domain_label(part))
+            cb.setProperty("part_key", part)
             cb.setChecked(part in selected)
             grid.addWidget(cb, i // 4, i % 4)
             self._checks.append(cb)
@@ -128,7 +134,11 @@ class _PartsDialog(QDialog):
 
     def selected(self) -> list[str]:
         """已勾选部位（按 EQUIP_PART_NAMES 定序）"""
-        return [cb.text() for cb in self._checks if cb.isChecked()]
+        return [
+            str(cb.property("part_key"))
+            for cb in self._checks
+            if cb.isChecked()
+        ]
 
 
 class AffixCapsPanel(QWidget):
@@ -756,7 +766,8 @@ class AffixCapsPanel(QWidget):
         category_data = affix_caps.get(self._current_affix, {})
         parts = category_data.get("_parts") if isinstance(category_data, dict) else None
         if isinstance(parts, list) and parts:
-            return [p for p in parts if p in EQUIP_PART_NAMES]
+            normalized = {normalize_equip_part(part) for part in parts}
+            return [part for part in EQUIP_PART_NAMES if part in normalized]
         return list(EQUIP_PART_NAMES)
 
     def _pick_category_parts(self):
@@ -968,16 +979,19 @@ class AffixCapsPanel(QWidget):
 
         # 归属下拉（空串 + 5 类；定音词组禁用并置空）
         combo = QComboBox()
-        combo.addItem("")
-        combo.addItems(list(AFFIX_CATEGORY_NAMES))
+        combo.addItem("", "")
+        for category in AFFIX_CATEGORY_NAMES:
+            combo.addItem(domain_label(category), category)
         fit_combo_to_contents(combo, minimum=90)
         if self._is_dingyin():
-            combo.setCurrentText("")
+            combo.setCurrentIndex(0)
             combo.setEnabled(False)
         else:
-            combo.setCurrentText(self._get_affix_category(alias))
-            combo.currentTextChanged.connect(
-                lambda text, a=alias: self._on_category_changed(a, text))
+            combo.setCurrentIndex(max(
+                combo.findData(self._get_affix_category(alias)), 0))
+            combo.currentIndexChanged.connect(
+                lambda _index, a=alias, c=combo:
+                self._on_category_changed(a, str(c.currentData() or "")))
         row_layout.addWidget(combo)
 
         # 外部简称（毕业率 Excel 等外部系统严格按此匹配）
@@ -1029,7 +1043,8 @@ class AffixCapsPanel(QWidget):
         """从 self._data['affix_parts'] 读词条部位（未配置 = 全部位）"""
         parts = (self._data.get("affix_parts") or {}).get(alias)
         if isinstance(parts, list):
-            valid = [p for p in EQUIP_PART_NAMES if p in parts]
+            normalized = {normalize_equip_part(part) for part in parts}
+            valid = [part for part in EQUIP_PART_NAMES if part in normalized]
             if valid:
                 return valid
         return list(EQUIP_PART_NAMES)
@@ -1070,8 +1085,8 @@ class AffixCapsPanel(QWidget):
             return tr("全部")
         if len(parts) >= 5:
             excluded = [p for p in all_parts if p not in parts]
-            return tr("非 ") + "/".join(excluded)
-        return "/".join(parts)
+            return tr("非 ") + "/".join(domain_label(part) for part in excluded)
+        return "/".join(domain_label(part) for part in parts)
 
     def _pick_affix_parts(self, alias: str, btn: QPushButton):
         """弹部位多选对话框；全选（或全不选）视为不限部位，不落盘"""

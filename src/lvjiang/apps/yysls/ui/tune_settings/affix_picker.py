@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListWidget,
+    QListWidgetItem,
     QPushButton,
     QScrollArea,
     QSplitter,
@@ -45,12 +46,13 @@ from lvjiang.ui.button_styles import (
 )
 
 from .....i18n import tr
+from ..domain_labels import domain_label
 
 # 候选无归属时归入的兜底桶名
-_UNCATEGORIZED = tr("未归类")
+_UNCATEGORIZED = "未归类"
 
 # 动态类展示位置锚点：插在该分类之后
-_DYNAMIC_ANCHOR = tr("属攻类")
+_DYNAMIC_ANCHOR = "属攻类"
 
 # 右列复选网格列数
 _COLS = 3
@@ -134,9 +136,16 @@ class AffixSelectSortDialog(QDialog):
         if not flat:
             self._cat_list = QListWidget()
             self._cat_list.setFixedWidth(120)
-            self._cat_list.currentTextChanged.connect(self._show_category)
+            self._cat_list.currentItemChanged.connect(
+                lambda current, _previous: self._show_category(
+                    str(current.data(Qt.ItemDataRole.UserRole))
+                    if current is not None else ""
+                )
+            )
             for cat in self._by_category:
-                self._cat_list.addItem(cat)
+                item = QListWidgetItem(domain_label(cat))
+                item.setData(Qt.ItemDataRole.UserRole, cat)
+                self._cat_list.addItem(item)
             bottom_layout.addWidget(self._cat_list)
 
         self._grid_host = QWidget()

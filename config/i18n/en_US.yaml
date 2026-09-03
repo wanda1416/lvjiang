@@ -544,17 +544,12 @@ auto_strings:
   profile_core_057: 'Failed to write back user data:
 
     {e}'
-  profile_core_058: 'Step Values:'
-  profile_core_059: 'Step format error: ''{part}'', expected integer or int:source'
   profile_core_060: 'Change amount (+/-):'
   profile_core_061: Increase...
   profile_core_062: 'Increase Amount:'
   profile_core_063: Note
   profile_core_064: 'Note Content:'
   profile_core_065: Day
-  profile_core_066: 'e.g.: -900:dungeon,-1100 or 1,10:shop'
-  profile_core_067: 'e.g.: 1:quest reward,10 or -1'
-  profile_core_068: 'e.g.: 1:exchange,10 or -1'
   profile_core_069: Define data model keys
   profile_core_070: Defines the data model's key. Double-click a row to edit.
   profile_core_071: Scheduled
@@ -564,7 +559,6 @@ auto_strings:
   profile_core_075: Hour
   profile_core_076: Show Cap
   profile_core_077: Completed
-  profile_core_078: Steps:{steps}
   profile_core_079: Stock
   profile_core_080: When enabled, allows decimal input; UI uses DoubleValidator
   profile_core_081: 'Current Value: {val}'
@@ -602,7 +596,6 @@ auto_strings:
   profile_core_115: Add Sync Target
   profile_core_116: User Data Model Definition
   profile_core_117: Purpose
-  profile_core_118: 'Usage:'
   profile_core_119: Target
   profile_core_120: OK
   profile_core_121: Delete key '{key}'?
@@ -633,8 +626,6 @@ auto_strings:
   profile_core_146: Input Error
   profile_core_147: Select Field
   profile_core_148: Select or enter new {label}
-  profile_core_149: 'Comma-separated, dropdown source for decreases, e.g.: Export,Deduct,Cleanup'
-  profile_core_150: 'Comma-separated, dropdown source for increases, e.g.: Sync,Import,Manual Entry'
   profile_core_151: 'Rate Unit:'
   profile_core_152: 'Rate Value:'
   profile_core_153: Quota
@@ -648,6 +639,19 @@ auto_strings:
   profile_core_161: 'Reset Time:'
   profile_core_162: Error
   profile_core_163: (Please select)
+  profile_rules_001: 0 means vocabulary only for custom changes
+  profile_rules_002: Vocabulary only
+  profile_rules_003: 'Change rules:'
+  profile_rules_004: 'Duplicate change rule: {name} ({amount})'
+  profile_rules_005: 'Change rule row {row} has a shortcut amount; enter a source or usage'
+  profile_rules_006: 'e.g. Harmony Draw'
+  profile_rules_007: 'e.g. Mail Gift'
+  profile_rules_008: Shortcut Amount
+  profile_rules_009: Source (Increase)
+  profile_rules_010: Add Source
+  profile_rules_011: Add Usage
+  profile_rules_012: Usage (Decrease)
+  profile_rules_013: Quick rules:{count}
   profile_core_164: Edit Current Column
   '  未导入图片': '  No image imported'
   '## 汇总': '## Summary'

@@ -544,17 +544,12 @@ auto_strings:
   profile_core_057: '回写用户数据失败:
 
     {e}'
-  profile_core_058: '增减幅度:'
-  profile_core_059: '增减幅度格式错误: ''{part}''，应为整数或 整数:来源'
   profile_core_060: '增减量（正增负减）:'
   profile_core_061: 增加...
   profile_core_062: '增加量:'
   profile_core_063: 备注
   profile_core_064: '备注内容:'
   profile_core_065: 天
-  profile_core_066: '如: -900:打本消耗,-1100 或 1,10:商店'
-  profile_core_067: '如: 1:任务奖励,10 或 -1'
-  profile_core_068: '如: 1:兑换,10 或 -1'
   profile_core_069: 定义数据模型 key
   profile_core_070: 定义数据模型的 key。双击行可编辑。
   profile_core_071: 定时
@@ -564,7 +559,6 @@ auto_strings:
   profile_core_075: 小时
   profile_core_076: 展示上限
   profile_core_077: 已完成
-  profile_core_078: 幅度:{steps}
   profile_core_079: 库存
   profile_core_080: 开启后允许输入小数，UI 使用 DoubleValidator
   profile_core_081: '当前值: {val}'
@@ -602,7 +596,6 @@ auto_strings:
   profile_core_115: 添加同步目标
   profile_core_116: 用户数据模型定义
   profile_core_117: 用途
-  profile_core_118: '用途:'
   profile_core_119: 目标
   profile_core_120: 确定
   profile_core_121: 确定要删除 key '{key}' 吗？
@@ -633,8 +626,6 @@ auto_strings:
   profile_core_146: 输入错误
   profile_core_147: 选择字段
   profile_core_148: 选择或输入新{label}
-  profile_core_149: '逗号分隔，减少时供下拉选择，如: 导出,扣减,清理'
-  profile_core_150: '逗号分隔，增加时供下拉选择，如: 同步,导入,人工录入'
   profile_core_151: '速率单位:'
   profile_core_152: '速率数值:'
   profile_core_153: 配额
@@ -648,6 +639,19 @@ auto_strings:
   profile_core_161: '重置时刻:'
   profile_core_162: 错误
   profile_core_163: （请选择）
+  profile_rules_001: 0 表示仅作为自定义增减时的候选词条
+  profile_rules_002: 仅词条
+  profile_rules_003: '变动规则:'
+  profile_rules_004: 变动规则存在重复项：{name}（{amount}）
+  profile_rules_005: 变动规则第 {row} 行设置了快捷数量，请填写来源或用途
+  profile_rules_006: 如：和鸣抽奖
+  profile_rules_007: 如：邮件赠送
+  profile_rules_008: 快捷数量
+  profile_rules_009: 来源（增加）
+  profile_rules_010: 添加来源
+  profile_rules_011: 添加用途
+  profile_rules_012: 用途（减少）
+  profile_rules_013: 快捷规则:{count}项
   profile_core_164: 编辑当前列
   '  未导入图片': '  未导入图片'
   '## 汇总': '## 汇总'

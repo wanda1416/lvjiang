@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from loguru import logger
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFontMetrics
+from PyQt6.QtGui import QFontMetrics, QIntValidator
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -237,7 +237,13 @@ class _SyncTargetsWidget(QWidget):
 class _TagInputWidget(QFrame):
     """按 Enter 创建可删除标签的来源/用途词条输入框。"""
 
-    def __init__(self, values: list[str], parent=None) -> None:
+    def __init__(
+        self,
+        values: list[str],
+        parent=None,
+        *,
+        placeholder: str | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("profileTagInput")
         self.setMinimumHeight(38)
@@ -259,7 +265,7 @@ class _TagInputWidget(QFrame):
         self._flow.setContentsMargins(5, 4, 5, 4)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText(tr("输入后按 Enter 添加"))
+        self._input.setPlaceholderText(placeholder or tr("输入后按 Enter 添加"))
         self._input.setMinimumWidth(150)
         self._input.returnPressed.connect(self._commit_input)
 
@@ -319,6 +325,41 @@ class _TagInputWidget(QFrame):
         return list(self._values)
 
 
+class _AmountTagInputWidget(_TagInputWidget):
+    """一行内可录入多个正整数快捷数量。"""
+
+    def __init__(self, amounts: list[int], parent=None) -> None:
+        super().__init__(
+            [str(amount) for amount in amounts if amount > 0],
+            parent,
+            placeholder=tr("输入数量后按 Enter 添加"),
+        )
+        self._input.setValidator(QIntValidator(1, 999999, self._input))
+        self._input.setMinimumWidth(170)
+
+    def amounts(self) -> list[int]:
+        return [int(value) for value in self.tags()]
+
+
+class _ChangeRulesTable(QTableWidget):
+    """前三列按 2:2:6 分配，删除列固定贴在最右侧。"""
+
+    _REMOVE_WIDTH = 40
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        viewport = self.viewport()
+        if viewport is None:
+            return
+        available = max(0, viewport.width() - self._REMOVE_WIDTH)
+        type_width = available * 2 // 10
+        name_width = available * 2 // 10
+        self.setColumnWidth(0, type_width)
+        self.setColumnWidth(1, name_width)
+        self.setColumnWidth(2, available - type_width - name_width)
+        self.setColumnWidth(3, self._REMOVE_WIDTH)
+
+
 def _standalone_terms(vocabulary: list[str], steps: list[StepDef], *, positive: bool) -> list[str]:
     """仅返回没有被变动规则隐式提供的独立词条。"""
     bound = {
@@ -350,7 +391,7 @@ class _ChangeRulesWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        self._table = QTableWidget()
+        self._table = _ChangeRulesTable()
         self._table.setColumnCount(4)
         self._table.setHorizontalHeaderLabels(
             [tr("类型"), tr("来源/用途"), tr("快捷数量"), ""]
@@ -364,12 +405,13 @@ class _ChangeRulesWidget(QWidget):
         header = self._table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        self._table.setColumnWidth(0, 110)
-        self._table.setColumnWidth(2, 120)
-        self._table.setColumnWidth(3, 44)
+        self._table.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self._table.setColumnWidth(3, _ChangeRulesTable._REMOVE_WIDTH)
         layout.addWidget(self._table)
 
         buttons = QHBoxLayout()
@@ -384,13 +426,25 @@ class _ChangeRulesWidget(QWidget):
         buttons.addStretch()
         layout.addLayout(buttons)
 
-        # 展示顺序与快捷菜单一致：用途在上，来源在下。
-        for step in (s for s in steps if s.value < 0):
-            self.add_row(self._KIND_USE, step.source, abs(step.value))
-        for step in (s for s in steps if s.value > 0):
-            self.add_row(self._KIND_SOURCE, step.source, step.value)
+        # 展示顺序与快捷菜单一致：用途在上、来源在下；同名规则合并数量。
+        grouped: dict[tuple[str, str], list[int]] = {}
+        ordered_steps = [s for s in steps if s.value < 0]
+        ordered_steps.extend(s for s in steps if s.value > 0)
+        for step in ordered_steps:
+            kind = self._KIND_USE if step.value < 0 else self._KIND_SOURCE
+            amounts = grouped.setdefault((kind, step.source), [])
+            amount = abs(step.value)
+            if amount not in amounts:
+                amounts.append(amount)
+        for (kind, name), amounts in grouped.items():
+            self.add_row(kind, name, amounts)
 
-    def add_row(self, kind: str, name: str = "", amount: int = 1) -> None:
+    def add_row(
+        self,
+        kind: str,
+        name: str = "",
+        amounts: list[int] | None = None,
+    ) -> None:
         row = self._table.rowCount()
         self._table.setRowCount(row + 1)
 
@@ -408,10 +462,9 @@ class _ChangeRulesWidget(QWidget):
         )
         self._table.setCellWidget(row, 1, name_input)
 
-        amount_spin = QSpinBox()
-        amount_spin.setRange(1, 999999)
-        amount_spin.setValue(max(1, amount))
-        self._table.setCellWidget(row, 2, amount_spin)
+        amount_tags = _AmountTagInputWidget(amounts or [])
+        self._table.setCellWidget(row, 2, amount_tags)
+        self._table.resizeRowToContents(row)
 
         remove_button = QPushButton("×")
         remove_button.setFixedWidth(36)
@@ -434,33 +487,35 @@ class _ChangeRulesWidget(QWidget):
         for row in range(self._table.rowCount()):
             kind_combo = self._table.cellWidget(row, 0)
             name_input = self._table.cellWidget(row, 1)
-            amount_spin = self._table.cellWidget(row, 2)
+            amount_tags = self._table.cellWidget(row, 2)
             if not (
                 isinstance(kind_combo, QComboBox)
                 and isinstance(name_input, QLineEdit)
-                and isinstance(amount_spin, QSpinBox)
+                and isinstance(amount_tags, _AmountTagInputWidget)
             ):
                 continue
             kind = kind_combo.currentData()
-            amount = amount_spin.value()
-            step = StepDef(
-                value=-amount if kind == self._KIND_USE else amount,
-                source=name_input.text().strip(),
-            )
-            (use_steps if kind == self._KIND_USE else source_steps).append(step)
+            target = use_steps if kind == self._KIND_USE else source_steps
+            for amount in amount_tags.amounts():
+                target.append(
+                    StepDef(
+                        value=-amount if kind == self._KIND_USE else amount,
+                        source=name_input.text().strip(),
+                    )
+                )
         return use_steps + source_steps
 
     def validation_error(self) -> str:
         """检查每条快捷规则都绑定了名称，且不存在完全重复项。"""
-        seen: set[tuple[str, str, int]] = set()
+        seen: set[tuple[str, str]] = set()
         for row in range(self._table.rowCount()):
             kind_combo = self._table.cellWidget(row, 0)
             name_input = self._table.cellWidget(row, 1)
-            amount_spin = self._table.cellWidget(row, 2)
+            amount_tags = self._table.cellWidget(row, 2)
             if not (
                 isinstance(kind_combo, QComboBox)
                 and isinstance(name_input, QLineEdit)
-                and isinstance(amount_spin, QSpinBox)
+                and isinstance(amount_tags, _AmountTagInputWidget)
             ):
                 continue
             name = name_input.text().strip()
@@ -468,12 +523,11 @@ class _ChangeRulesWidget(QWidget):
                 return tr("变动规则第 {row} 行设置了快捷数量，请填写来源或用途").format(
                     row=row + 1
                 )
-            identity = (str(kind_combo.currentData()), name, amount_spin.value())
+            if not amount_tags.amounts():
+                return tr("变动规则第 {row} 行至少添加一个快捷数量").format(row=row + 1)
+            identity = (str(kind_combo.currentData()), name)
             if identity in seen:
-                return tr("变动规则存在重复项：{name}（{amount}）").format(
-                    name=name,
-                    amount=amount_spin.value(),
-                )
+                return tr("变动规则中的来源或用途重复，请把数量合并到同一行：{name}").format(name=name)
             seen.add(identity)
         return ""
 

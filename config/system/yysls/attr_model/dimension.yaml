@@ -1,0 +1,4 @@
+# 来源类别: dimension
+# schema 见 core/attr_model/parsing.py
+kind: dimension
+entries: {}

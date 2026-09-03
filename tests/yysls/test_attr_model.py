@@ -4,6 +4,9 @@ import pytest
 
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.attr_model import (
+    DIMENSION_JIN,
+    DIMENSION_MIN,
+    DIMENSION_SHI,
     SCOPE_COMBAT,
     SOURCE_KINDS,
     AttrModelError,
@@ -11,13 +14,19 @@ from lvjiang.apps.yysls.core.attr_model import (
     FullAffix,
     StatEffect,
     diff_against_panel,
+    dimension_effects,
     get_attr_model_manager,
     parse_source_file,
     resolve,
     solve_residual,
     split_affix_cap,
 )
-from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
+from lvjiang.apps.yysls.core.combat.combat_attrs import (
+    JIN_TO_MIN_OUTER,
+    MIN_TO_MIN_OUTER,
+    CombatAttributes,
+    convert_five_dims,
+)
 
 #: 测试用满值表：只覆盖用到的两个词条，避免依赖真实 game_config
 _CAPS = {
@@ -305,6 +314,57 @@ def test_unknown_stat_field_is_rejected_at_resolve_time() -> None:
 def test_formula_referencing_unknown_source_is_rejected() -> None:
     with pytest.raises(AttrModelError):
         _resolve([_effect("x", stats={"min_outer": Formula(source="不存在")})])
+
+
+# ── 内建的五维转换 ────────────────────────────────────────
+
+def test_builtin_dimension_conversion_matches_convert_five_dims() -> None:
+    """内建转换与 combat_attrs.convert_five_dims 必须给出同一结果。
+
+    装备词条上的五维走 convert_five_dims，基础属性里的五维走本模块。
+    两条路径共用 combat_attrs 里的同一组系数，这里守住它们不漂移——
+    真出现两份系数时，这个断言是唯一会红的地方。
+    """
+    jin, shi, agility = 137.0, 96.0, 211.0
+    effects = [
+        _effect(
+            "五维来源",
+            kind="breakthrough",
+            stats={"dim_jin": jin, "dim_shi": shi, "dim_min": agility},
+        ),
+        *dimension_effects(),
+    ]
+
+    result = _resolve(effects).combat_attrs
+    expected = convert_five_dims(jin=jin, shi=shi, min_val=agility)
+
+    for name in ("min_outer", "max_outer", "crit_rate", "intent_rate"):
+        assert getattr(result, name) == pytest.approx(getattr(expected, name))
+
+
+def test_dimension_conversion_is_always_applied_regardless_of_selection() -> None:
+    """五维转换是结构性的，用户选的是上哪几门心法，不是要不要转换。"""
+    manager = get_attr_model_manager()
+
+    result = manager.resolve(level=110, school_attr="牵丝", selected=())
+
+    assert {m.source_id for m in result.modifiers} >= {
+        DIMENSION_JIN, DIMENSION_SHI, DIMENSION_MIN
+    }
+
+
+def test_dimension_breakdown_separates_each_dimension() -> None:
+    """最小外功攻击同时来自劲和敏，breakdown 要能分开看。"""
+    effects = [
+        _effect("底子", kind="base", stats={"dim_jin": 100.0, "dim_min": 100.0}),
+        *dimension_effects(),
+    ]
+
+    result = _resolve(effects)
+    sources = {m.source_id: m.delta for m in result.modifiers_for("min_outer")}
+
+    assert sources[DIMENSION_JIN] == pytest.approx(100.0 * JIN_TO_MIN_OUTER)
+    assert sources[DIMENSION_MIN] == pytest.approx(100.0 * MIN_TO_MIN_OUTER)
 
 
 # ── 随仓库分发的配置 ──────────────────────────────────────

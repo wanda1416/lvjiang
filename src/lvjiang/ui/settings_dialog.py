@@ -431,6 +431,11 @@ class SettingsDialog(QDialog):
             bool(plan) and PLAN_MODE_ADB in plan.modes)
         for widget in widgets:
             widget.blockSignals(False)
+        # 上面是在 blockSignals 里填的，编辑回调不会触发；而 max(idx, 0) 会把
+        # 空值或已失效的值静默显示成第一项。不回写的话表单显示的和方案里存的
+        # 就对不上——新建的方案三项全是空串，选中后主界面三个框纹丝不动。
+        if plan is not None and self._write_form_into_plan(plan):
+            self._mark_dirty()
 
     def _on_plan_row_changed(self, _row: int) -> None:
         self._load_plan_into_form(self._current_plan())
@@ -445,21 +450,34 @@ class SettingsDialog(QDialog):
             item.setText(text)
         self._mark_dirty()
 
-    def _on_plan_field_edited(self, *_args) -> None:
+    def _write_form_into_plan(self, plan) -> bool:
+        """把表单当前显示的值写进方案，返回是否真的有变化。
+
+        所见即所存：表单上显示什么，方案里就必须存什么。
+        """
         from ..core.config.plans import PLAN_MODE_ADB, PLAN_MODE_WINDOW
 
-        plan = self._current_plan()
-        if plan is None:
-            return
-        plan.space = self._plan_space_combo.currentText()
-        plan.env = self._plan_env_combo.currentData() or ""
-        plan.layout = self._plan_layout_combo.currentText()
         modes = []
         if self._plan_mode_window.isChecked():
             modes.append(PLAN_MODE_WINDOW)
         if self._plan_mode_adb.isChecked():
             modes.append(PLAN_MODE_ADB)
-        plan.modes = modes
+        updated = (
+            self._plan_space_combo.currentText(),
+            self._plan_env_combo.currentData() or "",
+            self._plan_layout_combo.currentText(),
+            modes,
+        )
+        if (plan.space, plan.env, plan.layout, plan.modes) == updated:
+            return False
+        plan.space, plan.env, plan.layout, plan.modes = updated
+        return True
+
+    def _on_plan_field_edited(self, *_args) -> None:
+        plan = self._current_plan()
+        if plan is None:
+            return
+        self._write_form_into_plan(plan)
         self._mark_dirty()
 
     def _append_plan(self, plan) -> None:

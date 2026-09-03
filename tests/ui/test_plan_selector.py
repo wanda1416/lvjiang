@@ -114,6 +114,34 @@ def test_switching_back_to_custom_unlocks_and_restores(qtbot):
     assert get_active_plan_id() == ""
 
 
+def test_switching_from_one_plan_to_another_refills_all_three(qtbot):
+    host = _host(qtbot)
+    save_plans([
+        _desktop_plan(),
+        Plan.create("模拟器", space="手游", env="android", layout="默认布局"),
+    ])
+    _refresh(host)
+    _select(host, "端游")
+
+    _select(host, "模拟器")
+
+    assert host.reference_space_combo.currentText() == "手游"
+    assert host._env_combo.currentData() == "android"
+    assert host.layout_combo.currentText() == "默认布局"
+
+
+def test_plan_without_stored_context_leaves_the_selectors_alone(qtbot):
+    """三项为空的方案不该把选择器清成第一项——空表示「没记录」，不是「选第一个」。"""
+    host = _host(qtbot)
+    save_plans([Plan.create("空方案")])
+    _refresh(host)
+    host.reference_space_combo.setCurrentText("端游")
+
+    _select(host, "空方案")
+
+    assert host.reference_space_combo.currentText() == "端游"
+
+
 def test_switching_between_plans_keeps_the_original_custom_stash(qtbot):
     """连着换两个方案后回自定义，还原的仍是最初手上的那套。"""
     host = _host(qtbot)

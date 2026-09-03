@@ -1524,7 +1524,6 @@ auto_strings:
   subscene_set_failed: Setting Failed
   subscene_mark_help: Mark the target scene as a reusable subscene in Scene Management first.
   subscene_exit_crop_canvas: Exit Crop Canvas
-  '五维换算已修正，这套基础属性需要重新填写面板反推': 'The five-dimension conversion was corrected; these base attributes must be re-derived from the panel'
 task_history:
   task: Task
   title: Task History

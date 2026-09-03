@@ -18,10 +18,14 @@ from .constants import (
 from .manager import GameConfigManager, get_game_config
 from .models import AttrRange, LevelConfig, LevelRule, SeasonConfig
 from .play_styles import (
+    BASE_ATTR_VERSION,
     delete_play_style,
+    get_play_style_version,
     get_play_styles,
+    is_play_style_stale,
     rename_play_style,
     save_play_style,
+    stale_play_styles,
 )
 
 __all__ = [
@@ -42,7 +46,11 @@ __all__ = [
     "GameConfigManager",
     "get_game_config",
     # 基础属性配置存储（保留 play_style API 名称以兼容已有数据）
+    "BASE_ATTR_VERSION",
     "get_play_styles",
+    "get_play_style_version",
+    "is_play_style_stale",
+    "stale_play_styles",
     "save_play_style",
     "delete_play_style",
     "rename_play_style",

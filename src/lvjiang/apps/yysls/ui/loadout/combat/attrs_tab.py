@@ -293,7 +293,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
     def _refresh_play_styles(self):
         """刷新基础属性下拉（根据当前选择的流派）。"""
-        from ....config import get_play_styles
+        from ....config import get_play_styles, is_play_style_stale
 
         school = self._get_current_school()
         self._combo_play_style.blockSignals(True)
@@ -303,6 +303,15 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             play_styles = get_play_styles(school)
             for name in play_styles:
                 self._combo_play_style.addItem(name)
+                # 五维换算修正前反推的基础属性已不准，且无法自动补偿
+                # （只存了反推结果，没存面板值与装备快照）。这里只提示，
+                # 不改条目文本——文本就是配置名，改了会取不到。
+                if is_play_style_stale(school, name):
+                    self._combo_play_style.setItemData(
+                        self._combo_play_style.count() - 1,
+                        tr("五维换算已修正，这套基础属性需要重新填写面板反推"),
+                        Qt.ItemDataRole.ToolTipRole,
+                    )
 
         fit_combo_to_contents(self._combo_play_style, minimum=104)
         self._combo_play_style.blockSignals(False)

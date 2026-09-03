@@ -76,7 +76,8 @@ class _MultiColumnListWidget(QListWidget):
 
     def _widest_text_width(self) -> int:
         return max((self.fontMetrics().horizontalAdvance(
-            self.item(index).text()) for index in range(self.count())),
+            item.text()) for index in range(self.count())
+            if (item := self.item(index)) is not None),
             default=0)
 
     def sizeHint(self) -> QSize:  # noqa: N802
@@ -90,13 +91,15 @@ class _MultiColumnListWidget(QListWidget):
         if not text_width:
             return
         column_width = text_width + self.fontMetrics().horizontalAdvance("字")
-        chrome_width = (self.verticalScrollBar().sizeHint().width()
+        sb = self.verticalScrollBar()
+        chrome_width = ((sb.sizeHint().width() if sb else 0)
                         + self.frameWidth() * 2 + self.column_count)
         self.setMinimumWidth(column_width * self.column_count + chrome_width)
         self._update_grid_size()
 
     def _update_grid_size(self) -> None:
-        chrome_width = (self.verticalScrollBar().sizeHint().width()
+        sb = self.verticalScrollBar()
+        chrome_width = ((sb.sizeHint().width() if sb else 0)
                         + self.frameWidth() * 2 + self.column_count)
         available_width = max(1, self.width() - chrome_width)
         equal_column_width = max(1, available_width // self.column_count)
@@ -358,7 +361,9 @@ class DailyHistoryDialog(QDialog):
         self._users.clear()
         self._users.addItems(users)
         for index in range(self._users.count()):
-            self._users.item(index).setToolTip(self._users.item(index).text())
+            item = self._users.item(index)
+            if item is not None:
+                item.setToolTip(item.text())
         self._users.fit_text_width()
         self._tasks.clear()
         for task_id, task_name in tasks:

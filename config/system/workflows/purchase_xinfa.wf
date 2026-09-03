@@ -101,7 +101,9 @@ def open_all_bag_xinfa()
                 after wait stable @page_refresh on [general_control].[menu_area]
 
             # 道具详情的按钮位置可能随文本宽度变化，用 OCR 返回区域直接点击。
-            find [bag_item_detail].[main_area] as $open_btn by contains "打开"
+            $area_name = "main_area"
+            env:"desktop" -> $area_name = "sub_func_area"
+            find [bag_item_detail].$area_name as $open_btn by contains "打开"
             if not $open_btn
                 log warn "找到心法心得，但主功能区未找到「打开」按钮"
                 eval pause("心法心得详情中未找到「打开」按钮，请保持现场并检查布局")

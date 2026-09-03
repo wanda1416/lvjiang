@@ -5,7 +5,7 @@ import json
 from datetime import date
 
 from loguru import logger
-from PyQt6.QtCore import QDate, Qt, QUrl
+from PyQt6.QtCore import QDate, QSize, Qt, QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QListView,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -43,6 +44,31 @@ _STATUS_LABELS = {
 }
 _SOURCE_LABELS = {"single": tr("单独运行"), "batch": tr("批量运行")}
 _SCOPE_LABELS = {"daily": tr("日常"), "dedicated": tr("专用")}
+
+
+class _MultiColumnListWidget(QListWidget):
+    """按固定列数横向排列的筛选列表。"""
+
+    def __init__(self, column_count: int, parent=None):
+        super().__init__(parent)
+        self.column_count = column_count
+        self.setFlow(QListView.Flow.LeftToRight)
+        self.setWrapping(True)
+        self.setResizeMode(QListView.ResizeMode.Adjust)
+        self.setMovement(QListView.Movement.Static)
+        self.setUniformItemSizes(True)
+        self.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        available_width = (self.viewport().width()
+                           - self.verticalScrollBar().sizeHint().width()
+                           - self.column_count)
+        width = max(1, available_width // self.column_count)
+        row_height = max(self.fontMetrics().height() + 8,
+                         self.sizeHintForRow(0))
+        self.setGridSize(QSize(width, row_height))
 
 
 def _qdate(value: date) -> QDate:
@@ -81,15 +107,15 @@ class DailyHistoryDialog(QDialog):
         filters = QGroupBox(tr("筛选条件（用户和任务可多选；不选择表示全部）"))
         grid = QGridLayout(filters)
         grid.addWidget(QLabel(tr("用户")), 0, 0)
-        self._users = QListWidget()
+        self._users = _MultiColumnListWidget(3)
         self._users.setSelectionMode(
-            QAbstractItemView.SelectionMode.ExtendedSelection)
+            QAbstractItemView.SelectionMode.MultiSelection)
         self._users.setMaximumHeight(90)
         grid.addWidget(self._users, 1, 0)
         grid.addWidget(QLabel(tr("任务")), 0, 1)
-        self._tasks = QListWidget()
+        self._tasks = _MultiColumnListWidget(2)
         self._tasks.setSelectionMode(
-            QAbstractItemView.SelectionMode.ExtendedSelection)
+            QAbstractItemView.SelectionMode.MultiSelection)
         self._tasks.setMaximumHeight(90)
         grid.addWidget(self._tasks, 1, 1)
         dates = self._build_date_controls()

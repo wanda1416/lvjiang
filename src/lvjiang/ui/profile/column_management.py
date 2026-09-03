@@ -269,7 +269,9 @@ class ProfileColumnMixin:
             )
             return
 
-        self._build_groups()
+        # key 被锁定，编辑定义不会改变分组或列结构。原表就地刷新即可，
+        # 避免重建 QTableWidget 时丢失用户总览当前的字体等视图状态。
+        self.refresh()
 
     def _on_header_double_clicked(self: ProfileTab, logical_index: int, group_name: str):  # type: ignore[misc]
         """表头双击：选择字段"""

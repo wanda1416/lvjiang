@@ -1531,6 +1531,9 @@ task_history:
   filters: User and task filters (multi-select; no selection means all)
   finished_at: End Time
   duration: Duration
+  clear_selection: Clear
+  clear_users_tooltip: Clear selection and use all users
+  clear_tasks_tooltip: Clear selection and use all tasks
   clear_batch: Back to All Tasks
   select_batch: Select a batch run to view its input snapshot
   select_task: Select a task run to view its input parameters and file paths

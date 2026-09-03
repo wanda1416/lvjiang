@@ -1531,6 +1531,9 @@ task_history:
   filters: 筛选条件（用户和任务可多选；不选择表示全部）
   finished_at: 结束时间
   duration: 耗时
+  clear_selection: 清除
+  clear_users_tooltip: 清除已选，改为全部用户
+  clear_tasks_tooltip: 清除已选，改为全部任务
   clear_batch: 返回全部任务
   select_batch: 选择一条批量记录查看输入快照
   select_task: 选择一条记录查看输入参数和文件路径

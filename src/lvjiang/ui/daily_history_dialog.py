@@ -49,9 +49,10 @@ _SCOPE_LABELS = {"daily": tr("日常"), "dedicated": tr("专用")}
 class _MultiColumnListWidget(QListWidget):
     """按固定列数横向排列的筛选列表。"""
 
-    def __init__(self, column_count: int, parent=None):
+    def __init__(self, column_count: int, visible_rows: int = 6, parent=None):
         super().__init__(parent)
         self.column_count = column_count
+        self.visible_rows = visible_rows
         self.setFlow(QListView.Flow.LeftToRight)
         self.setWrapping(True)
         self.setResizeMode(QListView.ResizeMode.Adjust)
@@ -59,16 +60,58 @@ class _MultiColumnListWidget(QListWidget):
         self.setUniformItemSizes(True)
         self.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setMinimumHeight(self._height_for_rows(visible_rows))
 
-    def resizeEvent(self, event) -> None:  # noqa: N802
-        super().resizeEvent(event)
+    def _row_height(self) -> int:
+        return max(self.fontMetrics().height() + 8, self.sizeHintForRow(0))
+
+    def _height_for_rows(self, rows: int) -> int:
+        return self._row_height() * rows + self.frameWidth() * 2
+
+    def _widest_text_width(self) -> int:
+        return max((self.fontMetrics().horizontalAdvance(
+            self.item(index).text()) for index in range(self.count())),
+            default=0)
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        hint = super().sizeHint()
+        hint.setHeight(self._height_for_rows(self.visible_rows))
+        return hint
+
+    def fit_text_width(self) -> None:
+        """扩展列表最小宽度，确保每列最长文本完整显示。"""
+        text_width = self._widest_text_width()
+        if not text_width:
+            return
+        column_width = text_width + self.fontMetrics().horizontalAdvance("字")
+        chrome_width = (self.verticalScrollBar().sizeHint().width()
+                        + self.frameWidth() * 2 + self.column_count)
+        self.setMinimumWidth(column_width * self.column_count + chrome_width)
+        self._update_grid_size()
+
+    def refresh_column_width(self) -> None:
+        """按当前内容重新计算列宽。"""
+        self._update_grid_size()
+
+    def _update_grid_size(self) -> None:
+        chrome_width = (self.verticalScrollBar().sizeHint().width()
+                        + self.frameWidth() * 2 + self.column_count)
         available_width = (self.viewport().width()
                            - self.verticalScrollBar().sizeHint().width()
                            - self.column_count)
-        width = max(1, available_width // self.column_count)
-        row_height = max(self.fontMetrics().height() + 8,
-                         self.sizeHintForRow(0))
-        self.setGridSize(QSize(width, row_height))
+        equal_column_width = max(1, available_width // self.column_count)
+        text_width = self._widest_text_width()
+        max_gap = self.fontMetrics().horizontalAdvance("字字字")
+        natural_width = text_width + max_gap if text_width else equal_column_width
+        width = min(equal_column_width, natural_width)
+        if text_width:
+            self.setMaximumWidth(natural_width * self.column_count
+                                 + chrome_width)
+        self.setGridSize(QSize(width, self._row_height()))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._update_grid_size()
 
 
 def _qdate(value: date) -> QDate:
@@ -104,25 +147,46 @@ class DailyHistoryDialog(QDialog):
     def _build_task_page(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        self._task_filter_splitter = QSplitter(Qt.Orientation.Vertical)
+        self._task_filter_splitter.setChildrenCollapsible(False)
+        layout.addWidget(self._task_filter_splitter)
+
         filters = QGroupBox(tr("筛选条件（用户和任务可多选；不选择表示全部）"))
         grid = QGridLayout(filters)
-        grid.addWidget(QLabel(tr("用户")), 0, 0)
         self._users = _MultiColumnListWidget(3)
         self._users.setSelectionMode(
             QAbstractItemView.SelectionMode.MultiSelection)
-        self._users.setMaximumHeight(90)
+        user_header = QHBoxLayout()
+        user_header.addWidget(QLabel(tr("用户")))
+        user_header.addStretch(1)
+        self._clear_users_button = QPushButton(tr("清除"))
+        self._clear_users_button.setToolTip(tr("清除已选，改为全部用户"))
+        self._clear_users_button.clicked.connect(self._users.clearSelection)
+        user_header.addWidget(self._clear_users_button)
+        grid.addLayout(user_header, 0, 0)
         grid.addWidget(self._users, 1, 0)
-        grid.addWidget(QLabel(tr("任务")), 0, 1)
         self._tasks = _MultiColumnListWidget(2)
         self._tasks.setSelectionMode(
             QAbstractItemView.SelectionMode.MultiSelection)
-        self._tasks.setMaximumHeight(90)
+        task_header = QHBoxLayout()
+        task_header.addWidget(QLabel(tr("任务")))
+        task_header.addStretch(1)
+        self._clear_tasks_button = QPushButton(tr("清除"))
+        self._clear_tasks_button.setToolTip(tr("清除已选，改为全部任务"))
+        self._clear_tasks_button.clicked.connect(self._tasks.clearSelection)
+        task_header.addWidget(self._clear_tasks_button)
+        grid.addLayout(task_header, 0, 1)
         grid.addWidget(self._tasks, 1, 1)
         dates = self._build_date_controls()
         grid.addWidget(dates, 1, 2)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        layout.addWidget(filters)
+        grid.setRowStretch(1, 1)
+        self._task_filter_splitter.addWidget(filters)
+
+        results = QWidget()
+        results_layout = QVBoxLayout(results)
+        results_layout.setContentsMargins(0, 0, 0, 0)
 
         batch_filter_row = QHBoxLayout()
         self._batch_filter_label = QLabel()
@@ -132,7 +196,7 @@ class DailyHistoryDialog(QDialog):
         self._clear_batch_filter_button.clicked.connect(self._clear_batch_filter)
         self._clear_batch_filter_button.setVisible(False)
         batch_filter_row.addWidget(self._clear_batch_filter_button)
-        layout.addLayout(batch_filter_row)
+        results_layout.addLayout(batch_filter_row)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         self._task_table = QTableWidget(0, 10)
@@ -167,8 +231,13 @@ class DailyHistoryDialog(QDialog):
         splitter.addWidget(detail)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
-        layout.addWidget(splitter, 1)
+        results_layout.addWidget(splitter, 1)
+        self._task_filter_splitter.addWidget(results)
+        self._task_filter_splitter.setStretchFactor(0, 0)
+        self._task_filter_splitter.setStretchFactor(1, 1)
         apply_button_style(
+            self._clear_users_button,
+            self._clear_tasks_button,
             self._clear_batch_filter_button,
             self._open_result_button,
             self._open_log_button,
@@ -277,11 +346,17 @@ class DailyHistoryDialog(QDialog):
             return
         self._users.clear()
         self._users.addItems(users)
+        for index in range(self._users.count()):
+            self._users.item(index).setToolTip(self._users.item(index).text())
+        self._users.fit_text_width()
         self._tasks.clear()
         for task_id, task_name in tasks:
-            item = QListWidgetItem(f"{task_name} ({task_id})")
+            text = f"{task_name} ({task_id})"
+            item = QListWidgetItem(text)
+            item.setToolTip(text)
             item.setData(Qt.ItemDataRole.UserRole, task_id)
             self._tasks.addItem(item)
+        self._tasks.refresh_column_width()
         for start_widget in (self._start_date, self._batch_start_date):
             start_widget.setDate(_qdate(earliest))
         for end_widget in (self._end_date, self._batch_end_date):

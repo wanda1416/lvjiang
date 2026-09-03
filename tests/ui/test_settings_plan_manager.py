@@ -228,6 +228,33 @@ def test_existing_plans_are_loaded_into_the_list(qtbot, monkeypatch):
     assert not dlg._plan_mode_adb.isChecked()
 
 
+def test_legacy_empty_plan_can_open_settings_and_is_marked_dirty(
+        qtbot, monkeypatch):
+    """旧版方案三项为空时，初始化归一化发生在保存按钮创建之前。"""
+    save_plans([Plan.create(
+        "旧空方案",
+        modes=[PLAN_MODE_WINDOW, PLAN_MODE_ADB],
+    )])
+    monkeypatch.setattr(
+        "lvjiang.ui.settings_dialog.load_user_config", UserConfig)
+    monkeypatch.setattr(
+        SettingsDialog, "_available_spaces", lambda _self: ["手游", "端游"])
+    monkeypatch.setattr(
+        SettingsDialog, "_available_layouts",
+        lambda _self: ["默认布局", "桌面布局"])
+
+    dlg = SettingsDialog()
+    qtbot.addWidget(dlg)
+
+    plan = dlg._collect_plans()[0]
+    assert (plan.space, plan.env, plan.layout) == (
+        "手游",
+        dlg._plan_env_combo.currentData(),
+        "默认布局",
+    )
+    assert dlg._save_btn.isEnabled()
+
+
 def test_delete_removes_the_selected_plan(dialog, monkeypatch):
     from PyQt6.QtWidgets import QMessageBox
     monkeypatch.setattr(

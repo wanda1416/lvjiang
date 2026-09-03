@@ -52,7 +52,11 @@ from ..overlay import BorderOverlay
 from ..widgets import TrimmedLogEdit
 from .capture_ops import CaptureOpsMixin
 from .menu_ops import MenuOpsMixin
-from .run_control import RunControlMixin
+from .run_control import (
+    LOCK_REASON_BATCH,
+    LOCK_REASON_PLAN,
+    RunControlMixin,
+)
 from .startup_ops import StartupOpsMixin
 from .tray_ops import TrayOpsMixin
 from .ui_state import UiStateMixin
@@ -67,34 +71,59 @@ class _LogBridge(QObject):
 DEFAULT_TITLE = tr("律匠 - 通用视觉 RPA 引擎")
 _TOP_COMBO_CHARACTER_CAPACITY = 6
 _BATCH_CONTEXT_LOCK_MESSAGE = tr("批量任务运行过程中不可修改环境和布局")
+_PLAN_CONTEXT_LOCK_MESSAGE = tr(
+    "当前正在使用方案，如需手动调整请先切换为「自定义」")
+
+# 同时存在多个锁定原因时的提示优先级：批量是临时且更紧急的那个。
+_LOCK_MESSAGES = (
+    (LOCK_REASON_BATCH, _BATCH_CONTEXT_LOCK_MESSAGE),
+    (LOCK_REASON_PLAN, _PLAN_CONTEXT_LOCK_MESSAGE),
+)
 
 
-class _BatchContextComboBox(QComboBox):
-    """Combo whose user interaction can be locked for a running batch."""
+class _ContextComboBox(QComboBox):
+    """顶部上下文选择器：用户交互可按「原因」锁定。
+
+    锁定原因可以叠加（批量运行中 + 选中了方案），任一存在即锁定，解除其中
+    一个不会影响另一个——批量结束时的无条件解锁不能把方案锁一起解掉。
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._batch_locked = False
+        self._lock_reasons: set[str] = set()
         self.installEventFilter(self)
 
-    def set_batch_locked(self, locked: bool) -> None:
-        self._batch_locked = locked
-        self.setEnabled(not locked)
+    def set_locked(self, reason: str, locked: bool) -> None:
+        if locked:
+            self._lock_reasons.add(reason)
+        else:
+            self._lock_reasons.discard(reason)
+        is_locked = bool(self._lock_reasons)
+        self.setEnabled(not is_locked)
         self.setCursor(
-            Qt.CursorShape.ForbiddenCursor if locked
+            Qt.CursorShape.ForbiddenCursor if is_locked
             else Qt.CursorShape.ArrowCursor
         )
-        self.setToolTip(_BATCH_CONTEXT_LOCK_MESSAGE if locked else "")
+        self.setToolTip(self.lock_message())
+
+    def is_locked(self) -> bool:
+        return bool(self._lock_reasons)
+
+    def lock_message(self) -> str:
+        for reason, message in _LOCK_MESSAGES:
+            if reason in self._lock_reasons:
+                return message
+        return ""
 
     def eventFilter(self, watched, event):
-        if watched is self and self._batch_locked:
+        if watched is self and self._lock_reasons:
             if event.type() == QEvent.Type.MouseButtonPress:
-                notice = getattr(self, "_batch_lock_notice", None)
+                notice = getattr(self, "_lock_notice", None)
                 if notice is None or not notice.isVisible():
                     notice = QMessageBox(
                         QMessageBox.Icon.Information,
                         tr("提示"),
-                        _BATCH_CONTEXT_LOCK_MESSAGE,
+                        self.lock_message(),
                         QMessageBox.StandardButton.Ok,
                     )
                     notice.setModal(False)
@@ -102,11 +131,11 @@ class _BatchContextComboBox(QComboBox):
                     notice.setAttribute(
                         Qt.WidgetAttribute.WA_DeleteOnClose, True
                     )
-                    self._batch_lock_notice = notice
+                    self._lock_notice = notice
                     notice.finished.connect(
                         lambda _code, item=notice: setattr(
-                            self, "_batch_lock_notice", None
-                        ) if self._batch_lock_notice is item else None
+                            self, "_lock_notice", None
+                        ) if self._lock_notice is item else None
                     )
                     notice.show()
                 else:
@@ -383,7 +412,7 @@ class MainWindow(
         top_row.addWidget(self.user_combo)
         top_row.addSpacing(20)
         top_row.addWidget(QLabel(tr("图库")))
-        self.reference_space_combo = QComboBox()
+        self.reference_space_combo = _ContextComboBox()
         _set_combo_character_capacity(self.reference_space_combo)
         # ReferenceDatabase 构造时已经 load，启动构建不重复解析当前图库。
         self.reference_space_combo.addItems(self._reference_db.get_spaces())
@@ -394,7 +423,7 @@ class MainWindow(
         top_row.addWidget(self.reference_space_combo)
         top_row.addSpacing(20)
         top_row.addWidget(QLabel(tr("环境")))
-        self._env_combo = _BatchContextComboBox()
+        self._env_combo = _ContextComboBox()
         _set_combo_character_capacity(self._env_combo)
         for key, display in load_available_envs():
             self._env_combo.addItem(display, key)
@@ -427,7 +456,7 @@ class MainWindow(
         top_row.addWidget(env_tips_btn)
         top_row.addSpacing(20)
         top_row.addWidget(QLabel(tr("布局")))
-        self.layout_combo = _BatchContextComboBox()
+        self.layout_combo = _ContextComboBox()
         _set_combo_character_capacity(self.layout_combo)
         self.layout_combo.currentIndexChanged.connect(self._on_layout_changed)
         top_row.addWidget(self.layout_combo)
@@ -904,7 +933,7 @@ class MainWindow(
         )
 
         self._current_worker = worker  # type: ignore[assignment]
-        self._set_batch_context_controls_locked(True)
+        self._set_context_controls_locked(LOCK_REASON_BATCH, True)
         worker.start()
         return True
 

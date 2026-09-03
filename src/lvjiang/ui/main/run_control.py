@@ -17,6 +17,11 @@ from ...workflows.engine import WorkflowEngine
 
 _RESULT_LOG_SUPPRESSED_FLOW_IDS = frozenset({"auto_tuning"})
 
+# 顶部上下文选择器的锁定原因。定义在这里而不是 window.py：window 已经
+# import 本模块，反向 import 会成环。
+LOCK_REASON_BATCH = "batch"
+LOCK_REASON_PLAN = "plan"
+
 def _to_serializable(obj):
     """将包含 to_dict() 对象的列表/字典转为可 JSON 序列化的结构"""
     if isinstance(obj, list):
@@ -641,7 +646,7 @@ class RunControlMixin:
         if pause_event is not None:
             pause_event.set()
         self._current_worker = None
-        self._set_batch_context_controls_locked(False)
+        self._set_context_controls_locked(LOCK_REASON_BATCH, False)
         self._refresh_run_button()
         self._refresh_pause_button()
         banner = getattr(self, '_adb_banner', None)
@@ -650,13 +655,19 @@ class RunControlMixin:
         self.statusBar().showMessage(f"{name} 已结束")
         logger.info(f"自动化结束: {name}")
 
-    def _set_batch_context_controls_locked(self, locked: bool) -> None:
-        """Lock environment/layout user interaction for a running batch."""
-        for name in ("_env_combo", "layout_combo"):
+    def _set_context_controls_locked(self, reason: str, locked: bool) -> None:
+        """按锁定原因禁用顶部上下文选择器。
+
+        批量只锁环境和布局（图库在批量期间切换属于既有行为，不在本次改动
+        范围内）；方案锁三个都锁，因为三者正是方案定义的内容。
+        """
+        names = ("reference_space_combo", "_env_combo", "layout_combo") \
+            if reason == LOCK_REASON_PLAN else ("_env_combo", "layout_combo")
+        for name in names:
             combo = getattr(self, name, None)
-            setter = getattr(combo, "set_batch_locked", None)
+            setter = getattr(combo, "set_locked", None)
             if setter is not None:
-                setter(locked)
+                setter(reason, locked)
 
     def _is_stopped(self) -> bool:
         """工作流回调：检查是否请求了停止"""

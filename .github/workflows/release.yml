@@ -48,6 +48,16 @@ jobs:
           if (-not (Test-Path $notes -PathType Leaf)) {
             throw "Missing release notes: $notes"
           }
+          $titleLine = Get-Content -LiteralPath $notes -Encoding utf8 |
+            Where-Object { $_ -match '^#\s+\S' } |
+            Select-Object -First 1
+          if (-not $titleLine) {
+            throw "Release notes must start with a level-one title: $notes"
+          }
+          $title = ($titleLine -replace '^#\s+', '').Trim()
+          if ($title -notmatch ('^v' + [regex]::Escape($version) + '(?:\s|$)')) {
+            throw "Release title must start with v$version: $title"
+          }
 
           git fetch origin master --no-tags
           git merge-base --is-ancestor $env:GITHUB_SHA origin/master
@@ -57,6 +67,7 @@ jobs:
 
           "version=$version" >> $env:GITHUB_OUTPUT
           "notes=$notes" >> $env:GITHUB_OUTPUT
+          "title=$title" >> $env:GITHUB_OUTPUT
 
       - name: Install test and build dependencies
         shell: pwsh
@@ -131,12 +142,13 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TITLE: ${{ steps.release.outputs.title }}
         run: |
           gh release create $env:RELEASE_TAG `
             '${{ steps.assets.outputs.zip }}' `
             '${{ steps.assets.outputs.setup }}' `
             '${{ steps.assets.outputs.checksums }}' `
             --verify-tag `
-            --title "律匠 ${{ steps.release.outputs.version }}" `
+            --title $env:RELEASE_TITLE `
             --notes-file '${{ steps.release.outputs.notes }}' `
             --latest

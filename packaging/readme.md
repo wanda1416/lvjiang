@@ -33,6 +33,8 @@ git log 0.1.1..HEAD --oneline
 ### 第二步：编写发布声明
 
 在 `docs/50-releases/` 目录下创建新版本发布文档（如 `v0.1.2.md`），格式参考已有发布文档。
+文档首个一级标题必须以 `vX.Y.Z` 开头；自动发布会直接使用该行作为 GitHub
+Release 标题，确保发布页面与历史版本维持一致。
 
 **必须包含的章节：**
 - ⚠️ 不兼容变动与升级指引（**放在最前面**；本版本无则明确写「本版本无不兼容变动」）
@@ -121,11 +123,11 @@ git push origin X.Y.Z
 Release 工作流会依次完成：
 
 1. 校验标签严格为 `X.Y.Z`，并与 `pyproject.toml` 版本一致；
-2. 确认 `docs/50-releases/vX.Y.Z.md` 存在，且标签提交属于远端 `master`；
+2. 确认 `docs/50-releases/vX.Y.Z.md` 存在、一级标题以 `vX.Y.Z` 开头，且标签提交属于远端 `master`；
 3. 检查配置 `content_version` 完整性，运行 Ruff、mypy 与全量 pytest；
 4. 执行 `packaging\\package.bat`，并强制检查 ZIP 和 Inno Setup 安装器均已生成；
 5. 生成 `SHA256SUMS.txt`，保存 Actions artifact；
-6. 创建 GitHub Release，使用版本发布文档作为正文并上传三个产物。
+6. 创建 GitHub Release，使用版本发布文档的一级标题和正文，并上传三个产物。
 
 任何一步失败都不会发布 GitHub Release。临时故障可直接重新运行该 workflow；
 需要修改代码时，只能在 Release 尚未发布的前提下删除失败标签，修复并合并后再

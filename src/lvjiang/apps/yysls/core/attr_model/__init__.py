@@ -16,6 +16,13 @@ scope=combat 的部分。
 反解成手填补足——所以来源只建了一半也是可用状态。
 """
 
+from .builtin import (
+    BUILTIN_PREFIX,
+    DIMENSION_JIN,
+    DIMENSION_MIN,
+    DIMENSION_SHI,
+    dimension_effects,
+)
 from .manager import (
     AttrModelManager,
     game_config_caps_lookup,
@@ -61,10 +68,14 @@ __all__ = [
     "AFFIX_SCALAR_FIELDS",
     "ATTR_ATTACK_CATEGORY",
     "ATTR_ATTACK_FIELDS",
+    "BUILTIN_PREFIX",
     "DEFAULT_AFFIX_SPLIT",
     "DIMENSION_CATEGORY",
     "DIMENSION_FIELDS",
+    "DIMENSION_JIN",
     "DIMENSION_LABELS",
+    "DIMENSION_MIN",
+    "DIMENSION_SHI",
     "RESIDUAL_SOURCE_ID",
     "SCOPES",
     "SCOPE_COMBAT",
@@ -81,6 +92,7 @@ __all__ = [
     "UnmodeledSource",
     "attr_attack_fields",
     "diff_against_panel",
+    "dimension_effects",
     "expand_full_affix",
     "game_config_caps_lookup",
     "get_attr_model_manager",

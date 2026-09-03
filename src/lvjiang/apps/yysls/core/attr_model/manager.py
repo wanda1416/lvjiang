@@ -15,6 +15,7 @@ from loguru import logger
 from .....core.config.resolver import ConfigResolver, get_resolver
 from .....i18n import tr
 from ...config import get_game_config
+from .builtin import dimension_effects
 from .models import SOURCE_KINDS, AttrModelError, StatEffect
 from .parsing import parse_source_file
 from .resolver import CapsLookup, ResolveResult, resolve, solve_residual
@@ -150,15 +151,22 @@ class AttrModelManager:
         )
 
     def _select(self, selected: tuple[str, ...] | None) -> list[StatEffect]:
+        """按用户选择挑出条目，并追加恒生效的内建来源
+
+        内建来源（五维转换）是结构性的，不受 selected 影响——用户选的
+        是「上哪几门心法」，不是「要不要让敏转成外功攻击」。
+        """
         if selected is None:
-            return list(self._effects)
-        wanted = set(selected)
-        unknown = wanted - {effect.source_id for effect in self._effects}
-        if unknown:
-            raise AttrModelError(
-                tr("未知的属性来源条目: {ids}").format(ids="、".join(sorted(unknown)))
-            )
-        return [effect for effect in self._effects if effect.source_id in wanted]
+            chosen = list(self._effects)
+        else:
+            wanted = set(selected)
+            unknown = wanted - {effect.source_id for effect in self._effects}
+            if unknown:
+                raise AttrModelError(
+                    tr("未知的属性来源条目: {ids}").format(ids="、".join(sorted(unknown)))
+                )
+            chosen = [e for e in self._effects if e.source_id in wanted]
+        return chosen + dimension_effects()
 
 
 _instance: AttrModelManager | None = None

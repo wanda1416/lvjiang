@@ -85,6 +85,9 @@ class SettingsDialog(QDialog):
         self.setMinimumSize(720, 480)
         self.resize(760, 520)
         self._config = load_user_config()
+        # 构建方案页时可能会把旧版空值/失效值归一化为表单实际显示值，
+        # 此时底部保存按钮尚未创建；先独立记录脏状态，等按钮创建后同步。
+        self._dirty = False
         self._range_spins: dict[str, tuple[QDoubleSpinBox, QDoubleSpinBox]] = {}
         self._custom_rows: list[dict] = []
         self._setup_ui()
@@ -108,7 +111,7 @@ class SettingsDialog(QDialog):
         # 保存默认置灰，参数发生变更后启用；保存后不关闭对话框，可继续修改
         btn_row = QHBoxLayout()
         self._save_btn = QPushButton(tr("保存"))
-        self._save_btn.setEnabled(False)
+        self._save_btn.setEnabled(self._dirty)
         self._save_btn.clicked.connect(self._on_save)
         btn_row.addWidget(self._save_btn)
         btn_row.addStretch()
@@ -125,7 +128,9 @@ class SettingsDialog(QDialog):
 
     def _mark_dirty(self, *_args):
         """任意参数变更后启用保存按钮"""
-        self._save_btn.setEnabled(True)
+        self._dirty = True
+        if hasattr(self, "_save_btn"):
+            self._save_btn.setEnabled(True)
 
     def _refresh_save_button_visibility(self, index: int) -> None:
         """即时保存的网络与隐私页不展示无意义的全局保存按钮。"""
@@ -1139,4 +1144,5 @@ class SettingsDialog(QDialog):
             entry["saved"] = bool(entry["key"].text().strip())
         for entry in self._env_rows:
             entry["saved"] = bool(entry["key"].text().strip())
+        self._dirty = False
         self._save_btn.setEnabled(False)

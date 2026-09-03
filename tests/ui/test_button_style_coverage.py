@@ -6,8 +6,13 @@ import ast
 from pathlib import Path
 
 _SRC = Path(__file__).parents[2] / "src"
+# 由所在容器的样式表统一着色的小按钮：本身就是容器视觉的一部分，套通用
+# 按钮样式会把它变成独立控件，反而破坏容器外观。静态扫描看不到容器规则，
+# 只能在这里登记。
 _INTENTIONAL_CONTAINER_STYLES = {
     ("src/lvjiang/ui/alert_panel.py", "self._close_btn"),
+    # 标签 chip 内的「×」，由 QFrame#profileTagChip QPushButton 规则着色
+    ("src/lvjiang/ui/profile/settings_dialog.py", "remove"),
 }
 
 

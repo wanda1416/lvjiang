@@ -64,7 +64,7 @@ def _over_cap(cap_pct) -> bool:
 
 def _categories() -> tuple[str, tuple[str, ...]]:
     """返回（属攻类归属名, 神力词条归属名元组）"""
-    return tr("属攻类"), (tr("增效类"), tr("武器类"))
+    return "属攻类", ("增效类", "武器类")
 
 
 def validate_equipment(equip: EquipmentData) -> list[IllegalReason]:
@@ -162,7 +162,7 @@ def _validate_slots(slots: list[tuple[int, Affix]],
     type_to_group = gc.get_type_to_group()
     group = type_to_group.get(type_name, "")
     # “武器”是部分 UI 使用的部位显示名，不是实际装备类型。
-    if not group or type_name == tr("武器"):
+    if not group or type_name == "武器":
         reasons.append(IllegalReason(
             CODE_UNKNOWN_EQUIP_TYPE,
             tr("无法识别装备类型：「{type_name}」").format(

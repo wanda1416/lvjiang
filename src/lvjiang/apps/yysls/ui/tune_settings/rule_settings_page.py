@@ -53,6 +53,7 @@ from lvjiang.ui.button_styles import apply_button_style, apply_compact_tool_butt
 from lvjiang.ui.config_origin import layer_style, origin_tooltip
 
 from .....i18n import tr
+from ..domain_labels import domain_label
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -315,8 +316,9 @@ class RuleSettingsPage(QWidget):
         table = self._quality_table
         table.insertRow(row)
         combo = QComboBox()
-        combo.addItems(list(QUALITY_PARTS))
-        combo.setCurrentText(part or QUALITY_PARTS[0])
+        for part_key in QUALITY_PARTS:
+            combo.addItem(domain_label(part_key), part_key)
+        combo.setCurrentIndex(max(combo.findData(part or QUALITY_PARTS[0]), 0))
         combo.currentTextChanged.connect(lambda _t: self._apply_quality())
         table.setCellWidget(row, 0, combo)
         for i, q in enumerate(_QUALITIES, start=1):
@@ -332,7 +334,7 @@ class RuleSettingsPage(QWidget):
         thresholds: dict[str, list[str]] = {}
         for r in range(table.rowCount()):
             combo = table.cellWidget(r, 0)
-            part = combo.currentText().strip() if combo else ""
+            part = str(combo.currentData()).strip() if combo else ""
             if not part:
                 continue
             chosen = [q for i, q in enumerate(_QUALITIES, start=1)

@@ -50,6 +50,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
+from ..domain_labels import domain_label
 from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 
@@ -57,7 +58,7 @@ from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 _ATTRS_REL = "yysls/game_config.yaml"
 
 # 流派属性候选
-_SCHOOL_ATTRS = [tr("鸣金"), tr("裂石"), tr("破竹"), tr("牵丝")]
+_SCHOOL_ATTRS = ["鸣金", "裂石", "破竹", "牵丝"]
 
 
 class SchoolPanel(QWidget):
@@ -336,7 +337,12 @@ class SchoolPanel(QWidget):
         prev_loading = self._loading
         self._loading = True
         arts = self._martial_art_candidates()
-        self._fill_combo(self._combo_attr, _SCHOOL_ATTRS, cfg.get("attr"))
+        self._fill_combo(
+            self._combo_attr,
+            _SCHOOL_ATTRS,
+            cfg.get("attr"),
+            translate_items=True,
+        )
         self._fill_combo(self._combo_main_martial, arts, main.get("martial_art"))
         self._fill_combo(self._combo_sub_martial, arts, sub.get("martial_art"))
         self._sync_derived_weapons()
@@ -358,15 +364,23 @@ class SchoolPanel(QWidget):
             self._value_source_label.setText(tr("请选择方案或基础属性"))
 
     @staticmethod
-    def _fill_combo(combo: QComboBox, candidates: list[str], value: str | None):
+    def _fill_combo(
+        combo: QComboBox,
+        candidates: list[str],
+        value: str | None,
+        *,
+        translate_items: bool = False,
+    ):
         """重建候选并选中当前值；未配置时留空，失效值也保留展示便于改正"""
         combo.clear()
-        combo.addItem("")  # 未配置占位
-        combo.addItems(candidates)
+        combo.addItem("", "")  # 未配置占位
+        for candidate in candidates:
+            label = domain_label(candidate) if translate_items else candidate
+            combo.addItem(label, candidate)
         value = value or ""
         if value and value not in candidates:
-            combo.addItem(value)
-        combo.setCurrentText(value)
+            combo.addItem(value, value)
+        combo.setCurrentIndex(max(combo.findData(value), 0))
         fit_combo_to_contents(combo, minimum=100)
 
     def _on_item_renamed(self, item):
@@ -427,7 +441,7 @@ class SchoolPanel(QWidget):
         if name is None:
             return
         cfg: dict = self._schools().get(name, {})
-        attr = self._combo_attr.currentText()
+        attr = str(self._combo_attr.currentData() or "")
         if attr:
             cfg["attr"] = attr
         for key, combo_m in (

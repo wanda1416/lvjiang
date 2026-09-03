@@ -279,7 +279,7 @@ def _replacement_candidates(
             for to_name in candidates:
                 # 转律不会产出神力词条；神力只能通过调律获得。
                 if game_config.get_affix_category(to_name) in (
-                    tr("增效类"), tr("武器类"),
+                    "增效类", "武器类",
                 ):
                     continue
                 if to_name == from_name:

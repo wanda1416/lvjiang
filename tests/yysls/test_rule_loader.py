@@ -8,6 +8,9 @@ default_rating、tune_config 开关注册表（switches），以及规则内
 + 四个动态词条）的一致性守护。
 """
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -77,6 +80,95 @@ def test_behavior_rule_summary_condenses_all_parts():
     summary = BehaviorRule(parts=list(QUALITY_PARTS)).summary()
     assert summary.startswith("全部 且 ")
     assert "/".join(QUALITY_PARTS) not in summary
+
+
+@pytest.mark.parametrize("all_value", ["全部", "All", "- All -", "all"])
+def test_behavior_rule_all_parts_is_language_independent(all_value):
+    data = _valid_group()
+    data["scan"] = {
+        "rules": [{"action": "recycle", "parts": [all_value]}],
+    }
+
+    group = parse_tuning_group(data)
+
+    assert group.scan.rules[0].parts == list(QUALITY_PARTS)
+
+
+def test_behavior_rule_normalizes_english_part_values():
+    data = _valid_group()
+    data["scan"] = {
+        "rules": [{
+            "action": "recycle",
+            "parts": ["Weapon", "Head Guard", "Wrist Guard"],
+        }],
+    }
+
+    group = parse_tuning_group(data)
+
+    assert group.scan.rules[0].parts == ["武器", "冠胄", "腕甲"]
+
+
+def test_tuning_rule_normalizes_english_part_keys():
+    data = minimal_rule(quality_thresholds={"Weapon": ["gold"]})
+    data["patterns"] = {"Ring": data["patterns"]["环"]}
+
+    rule = parse_tuning_rule(data)
+
+    assert list(rule.patterns) == ["环"]
+    assert rule.quality_thresholds == {"武器": ["gold"]}
+
+
+def test_builtin_groups_load_after_english_i18n_cold_start():
+    """语言必须先于业务模块初始化，模拟真实英文冷启动的导入顺序。"""
+    project_root = Path(__file__).parents[2]
+    env = os.environ.copy()
+    source_root = str(project_root / "src")
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, (
+        source_root,
+        env.get("PYTHONPATH", ""),
+    )))
+    script = """
+from pathlib import Path
+import yaml
+
+from lvjiang.i18n import init_i18n, load_app_i18n
+
+init_i18n("en_US")
+load_app_i18n("yysls")
+
+from lvjiang.apps.yysls.config import (
+    AFFIX_CATEGORY_NAMES,
+    EQUIP_PART_NAMES,
+    get_game_config,
+)
+from lvjiang.apps.yysls import hooks
+from lvjiang.apps.yysls.core.equip_parser.constants import infer_part
+from lvjiang.apps.yysls.core.evaluator.base import Rating
+from lvjiang.apps.yysls.core.tuning_rules import QUALITY_PARTS, parse_tuning_group
+
+assert EQUIP_PART_NAMES == ("武器", "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲")
+assert QUALITY_PARTS == EQUIP_PART_NAMES
+assert AFFIX_CATEGORY_NAMES[0] == "外功类"
+assert hooks.id == "yysls" and hooks.name != "燕云十六声"
+assert infer_part("环") == "环"
+assert Rating.TOP.value == "顶级"
+assert get_game_config().get_type_to_group()["环"] == "ring"
+assert get_game_config().get_group_to_part()["wrist"] == "腕甲"
+for name in ("default.yaml", "aggressive.yaml"):
+    path = Path("config/system/yysls/base_groups") / name
+    parse_tuning_group(yaml.safe_load(path.read_text(encoding="utf-8")))
+"""
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=project_root,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def write_rule(tmp_path: Path, data: dict, name: str = "t1.yaml") -> Path:

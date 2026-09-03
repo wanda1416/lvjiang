@@ -40,6 +40,7 @@ from ...core.combat.combat_attrs import (
     CombatAttributes,
 )
 from ...core.equip_parser.dingyin_parser import is_zhige_dingyin
+from ..domain_labels import domain_label
 from ..events import EQUIPMENT_CHANGED, get_event_hub
 from ..layout_helpers import fit_combo_to_contents
 
@@ -282,9 +283,8 @@ class _SlotGroup(QFrame):
                 return 0, tr("不适用")
             if result.skipped:
                 return 0, tr("跳过")
-            ranks = {tr("垃圾"): 0, tr("一般"): 1,
-                     tr("优秀"): 2, tr("顶级"): 3}
-            return ranks.get(result.rating.value, 0), result.rating.value
+            ranks = {"垃圾": 0, "一般": 1, "优秀": 2, "顶级": 3}
+            return ranks.get(result.rating.value, 0), domain_label(result.rating.value)
         rated_equips = [(rating_of(equip), equip) for equip in equips]
         rated_equips.sort(key=lambda item: item[0][0], reverse=True)
         self.rows: list[_CandidateRow] = []

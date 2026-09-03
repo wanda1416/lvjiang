@@ -26,7 +26,7 @@ TUNING_DOC_DIR = PROJECT_ROOT / "logs" / "tuning"
 _QUALITY_NAMES = {"gold": tr("金色"), "purple": tr("紫色"), "blue": tr("蓝色")}
 
 # 值得调律的评级（与 judge_tuning_worthiness 的 or 语义口径一致）
-WORTH_RATINGS = (tr("顶级"), tr("优秀"))
+WORTH_RATINGS = ("顶级", "优秀")
 
 
 def format_affix(affix: dict) -> str:

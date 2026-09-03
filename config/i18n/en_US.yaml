@@ -1528,6 +1528,33 @@ auto_strings:
   subscene_set_failed: Setting Failed
   subscene_mark_help: Mark the target scene as a reusable subscene in Scene Management first.
   subscene_exit_crop_canvas: Exit Crop Canvas
+  '五维换算已修正，这套基础属性需要重新填写面板反推': 'The five-dimension conversion was corrected; these base attributes must be re-derived from the panel'
+  '{filename} 的 kind 无效: {kind}；可选 {allowed}': '{filename} has an invalid kind: {kind}; allowed: {allowed}'
+  '{label}: 五维词条需在 stats 中显式指定维度，不支持 full_affix': '{label}: dimension affixes must name the dimension in stats; full_affix is not supported'
+  '{label}: 公式引用了未知源字段 {source}': '{label}: formula references unknown source field {source}'
+  '{label}: 未知属性字段 {field}': '{label}: unknown stat field {field}'
+  '{label}: 等级 {level} 没有词条 {category} 的上限配置': '{label}: no cap configured for affix {category} at level {level}'
+  '{label}: 词条 {category} 未登记字段映射': '{label}: affix {category} has no field mapping'
+  '{source} 含未知字段: {keys}': '{source} has unknown fields: {keys}'
+  '{source} 声明了 split 却没有 full_affix': '{source} declares split without full_affix'
+  '{source} 的 full_affix 必须是词条类别名': '{source}: full_affix must be an affix category name'
+  '{source} 的 label 必须是字符串': '{source}: label must be a string'
+  '{source} 的 modeled 必须是布尔值': '{source}: modeled must be a boolean'
+  '{source} 的 scope 只能是 {allowed}': '{source}: scope must be one of {allowed}'
+  '{what} 含未知公式字段: {keys}': '{what} has unknown formula fields: {keys}'
+  '{what} 必须是数值，实际是 {kind}': '{what} must be a number, got {kind}'
+  '{what} 必须是映射，实际是 {kind}': '{what} must be a mapping, got {kind}'
+  '{what} 是映射时必须含 formula': '{what} must contain formula when it is a mapping'
+  '{what} 的 round 必须是整数': '{what}: round must be an integer'
+  '{what} 的 split 必须是两个整数，如 [1, 2]': '{what}: split must be two integers, e.g. [1, 2]'
+  '{what} 缺少 source': '{what} is missing source'
+  '反解目标含未知字段: {field}': 'Back-solve target has an unknown field: {field}'
+  '手填补足': 'Manual remainder'
+  '未知作用域: {scope}': 'Unknown scope: {scope}'
+  '未知来源类别: {kind}': 'Unknown source kind: {kind}'
+  '未知流派属性: {attr}': 'Unknown school attribute: {attr}'
+  '未知的属性来源条目: {ids}': 'Unknown stat source entries: {ids}'
+  '词条拆分比无效: {split}': 'Invalid affix split ratio: {split}'
 task_history:
   task: Task
   title: Task History

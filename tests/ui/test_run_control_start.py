@@ -46,6 +46,9 @@ class _StartStub(RunControlMixin):
     def _backend_ready(self):
         return True
 
+    def _plan_allows_backend(self):
+        return True
+
     def _get_selected_flow_config(self):
         return {
             "id": "missing",

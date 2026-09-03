@@ -25,6 +25,10 @@ LOCK_REASON_PLAN = "plan"
 # 方案下拉的「不使用方案」项，userData 为空串。
 PLAN_CUSTOM_LABEL = tr("- 自定义 -")
 
+# automation_state_changed 的第四态：已连接，但当前方案不支持这种连接模式。
+# 订阅方必须显式处理——它们的 else 分支都会把未知状态当成「就绪」。
+STATE_PLAN_UNSUPPORTED = "plan_unsupported"
+
 def _to_serializable(obj):
     """将包含 to_dict() 对象的列表/字典转为可 JSON 序列化的结构"""
     if isinstance(obj, list):
@@ -1064,6 +1068,25 @@ class RunControlMixin:
             return bool(self._device_ready)
         return self._target_window is not None
 
+    def _plan_allows_backend(self) -> bool:
+        """当前方案是否支持当前连接模式（自定义时永远放行）。"""
+        plan = self._selected_plan()
+        return plan is None or plan.allows(getattr(self, "_backend", None))
+
+    def _backend_label(self) -> str:
+        from ...core.config.plans import PLAN_MODE_ADB
+        return (tr("ADB 模式")
+                if getattr(self, "_backend", None) == PLAN_MODE_ADB
+                else tr("窗口模式"))
+
+    def _notify_plan_unsupported(self) -> None:
+        """左下角状态栏 + 运行日志说明为什么开始执行是灰的。"""
+        plan = self._selected_plan()
+        message = tr("当前方案「{name}」不支持{mode}").format(
+            name=plan.name if plan else "", mode=self._backend_label())
+        self.log_text.append(f"[{tr('错误')}] {message}")
+        self.statusBar().showMessage(message)
+
     # ─── 通用工作流执行 ────────────────────────────────────
 
     def _on_run_workflow(self):
@@ -1080,6 +1103,11 @@ class RunControlMixin:
             else:
                 self.log_text.append(tr("[错误] 请先定位窗口"))
                 self.statusBar().showMessage(tr("未定位窗口 | 请先扫描窗口并点击定位"))
+            return
+
+        # 连接方式确定之后才谈得上方案支不支持。
+        if not self._plan_allows_backend():
+            self._notify_plan_unsupported()
             return
 
         flow_cfg = self._get_selected_flow_config()
@@ -1354,6 +1382,14 @@ class RunControlMixin:
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
             )
+        elif not self._plan_allows_backend():
+            # 只置灰不 setEnabled(False)：禁用的控件收不到鼠标事件，点了就
+            # 没有任何反馈，也就没法在左下角说明原因。
+            state = STATE_PLAN_UNSUPPORTED
+            self.btn_run_workflow.setText(tr("方案不支持"))
+            self.btn_run_workflow.setStyleSheet(
+                "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+            )
         else:
             state = "idle"
             self.btn_run_workflow.setText(f"{tr('开始执行')} ({hk.start})")
@@ -1375,6 +1411,10 @@ class RunControlMixin:
         """开始执行（F9 快捷键转发）按当前左侧 Tab 分发：
         插件 Tab 实现 ``f9_run()`` 则交由其处理，否则走通用工作流。"""
         if self._running:
+            return
+        # F9 与托盘「开始」都走这里；不拦这一层，灰按钮就形同虚设。
+        if not self._plan_allows_backend():
+            self._notify_plan_unsupported()
             return
         tabs = self._left_tabs
         widget = tabs.currentWidget() if tabs is not None else None

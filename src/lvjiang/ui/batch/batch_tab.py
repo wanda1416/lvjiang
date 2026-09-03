@@ -41,6 +41,7 @@ from ...core.batch_config import (
 )
 from ...i18n import tr
 from ..button_styles import apply_button_style, fit_button_width
+from ..main.run_control import STATE_PLAN_UNSUPPORTED
 from ..theme import get_theme_manager
 from .batch_runner import (
     ST_FAILED,
@@ -74,6 +75,9 @@ _STYLE_BTN_STOP = (
 )
 _STYLE_BTN_NOT_READY = (
     "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
+)
+_STYLE_BTN_PLAN_UNSUPPORTED = (
+    "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
 )
 _STYLE_BTN_PAUSE = (
     "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
@@ -869,6 +873,9 @@ class BatchTab(QWidget):
         elif state == "not_ready":
             self._btn_run.setText(tr("未连接"))
             self._btn_run.setStyleSheet(_STYLE_BTN_NOT_READY)
+        elif state == STATE_PLAN_UNSUPPORTED:
+            self._btn_run.setText(tr("方案不支持"))
+            self._btn_run.setStyleSheet(_STYLE_BTN_PLAN_UNSUPPORTED)
         else:
             self._btn_run.setText(f"{tr('开始执行')} ({hk.start})")
             self._btn_run.setStyleSheet(_STYLE_BTN_RUN)

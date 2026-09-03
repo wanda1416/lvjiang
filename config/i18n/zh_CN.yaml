@@ -418,6 +418,10 @@ config:
   delay_page_refresh: Page Refresh Wait
   delay_scroll_settle: Scroll Settle Wait
 auto_strings:
+  ADB 模式: ADB 模式
+  当前方案「{name}」不支持{mode}: 当前方案「{name}」不支持{mode}
+  方案不支持: 方案不支持
+  窗口模式: 窗口模式
   '- 自定义 -': '- 自定义 -'
   '[提示] 上次选中的方案已不存在，已回到自定义': '[提示] 上次选中的方案已不存在，已回到自定义'
   '[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用': '[提示] 方案「{name}」的 {missing} 已不存在，未能全部套用'

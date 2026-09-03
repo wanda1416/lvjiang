@@ -640,7 +640,7 @@ auto_strings:
   profile_core_162: 错误
   profile_core_163: （请选择）
   profile_rules_003: '变动规则:'
-  profile_rules_004: 变动规则存在重复项：{name}（{amount}）
+  profile_rules_004: 变动规则中的来源或用途重复，请把数量合并到同一行：{name}
   profile_rules_005: 变动规则第 {row} 行设置了快捷数量，请填写来源或用途
   profile_rules_006: 如：和鸣抽奖
   profile_rules_007: 如：邮件赠送
@@ -652,6 +652,8 @@ auto_strings:
   profile_rules_013: 快捷规则:{count}项
   profile_rules_014: '用途:'
   profile_rules_015: 输入后按 Enter 添加
+  profile_rules_016: 输入数量后按 Enter 添加
+  profile_rules_017: 变动规则第 {row} 行至少添加一个快捷数量
   profile_core_164: 编辑当前列
   '  未导入图片': '  未导入图片'
   '## 汇总': '## 汇总'

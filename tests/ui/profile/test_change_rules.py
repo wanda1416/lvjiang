@@ -14,6 +14,7 @@ from lvjiang.ui.profile import cell_editing
 from lvjiang.ui.profile.cell_editing import ProfileCellEditingMixin
 from lvjiang.ui.profile.settings_dialog import (
     ProfileDefinitionDialog,
+    _AmountTagInputWidget,
     _ChangeRulesWidget,
     _merge_terms,
     _standalone_terms,
@@ -38,10 +39,20 @@ def test_bound_rule_names_are_implicit_and_only_unbound_terms_become_tags(qtbot)
 
     assert source_tags == ["旧来源"]
     assert use_tags == []
+    assert widget._table.rowCount() == 3
+    use_amounts = widget._table.cellWidget(0, 2)
+    assert isinstance(use_amounts, _AmountTagInputWidget)
+    assert use_amounts.amounts() == [1, 10]
+    amount_input = use_amounts.findChild(QtWidgets.QLineEdit)
+    assert amount_input is not None
+    amount_input.setText("20")
+    qtbot.keyClick(amount_input, Qt.Key.Key_Return)
+    assert use_amounts.amounts() == [1, 10, 20]
     normalized_steps = widget.get_steps()
     assert normalized_steps == [
         StepDef(-1, "和鸣抽奖"),
         StepDef(-10, "和鸣抽奖"),
+        StepDef(-20, "和鸣抽奖"),
         StepDef(1, "限时活动"),
         StepDef(1, "邮件赠送"),
     ]
@@ -49,6 +60,19 @@ def test_bound_rule_names_are_implicit_and_only_unbound_terms_become_tags(qtbot)
         "旧来源", "限时活动", "邮件赠送",
     ]
     assert _merge_terms(use_tags, normalized_steps, positive=False) == ["和鸣抽奖"]
+
+
+def test_change_rule_columns_keep_two_two_six_ratio(qtbot):
+    widget = _ChangeRulesWidget([StepDef(1, "邮件赠送")])
+    qtbot.addWidget(widget)
+    widget.resize(900, 260)
+    widget.show()
+    QtWidgets.QApplication.processEvents()
+
+    widths = [widget._table.columnWidth(column) for column in range(4)]
+    assert abs(widths[0] - widths[1]) <= 1
+    assert abs(widths[2] - widths[0] * 3) <= 3
+    assert widths[3] == 40
 
 
 def test_tag_input_commits_on_enter_and_chip_can_be_removed(qtbot):
@@ -72,9 +96,17 @@ def test_tag_input_commits_on_enter_and_chip_can_be_removed(qtbot):
 def test_change_rules_require_name_for_shortcut_amount(qtbot):
     widget = _ChangeRulesWidget([])
     qtbot.addWidget(widget)
-    widget.add_row(widget._KIND_USE, amount=10)
+    widget.add_row(widget._KIND_USE, amounts=[10])
 
     assert "填写来源或用途" in widget.validation_error()
+
+
+def test_change_rule_requires_at_least_one_amount(qtbot):
+    widget = _ChangeRulesWidget([])
+    qtbot.addWidget(widget)
+    widget.add_row(widget._KIND_SOURCE, name="邮件赠送")
+
+    assert "至少添加一个快捷数量" in widget.validation_error()
 
 
 def test_change_rules_and_sync_targets_are_vertically_resizable(qtbot, monkeypatch):

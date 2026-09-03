@@ -640,7 +640,7 @@ auto_strings:
   profile_core_162: Error
   profile_core_163: (Please select)
   profile_rules_003: 'Change rules:'
-  profile_rules_004: 'Duplicate change rule: {name} ({amount})'
+  profile_rules_004: 'Duplicate source or usage in change rules; merge amounts into one row: {name}'
   profile_rules_005: 'Change rule row {row} has a shortcut amount; enter a source or usage'
   profile_rules_006: 'e.g. Harmony Draw'
   profile_rules_007: 'e.g. Mail Gift'
@@ -652,6 +652,8 @@ auto_strings:
   profile_rules_013: Quick rules:{count}
   profile_rules_014: 'Usage:'
   profile_rules_015: Type and press Enter to add
+  profile_rules_016: Type an amount and press Enter to add
+  profile_rules_017: Change rule row {row} needs at least one shortcut amount
   profile_core_164: Edit Current Column
   '  未导入图片': '  No image imported'
   '## 汇总': '## Summary'

@@ -58,3 +58,54 @@ def _reset_game_config():
     reset_game_config()
     yield
     reset_game_config()
+
+
+class _FakeClipboard:
+    """进程内假剪贴板，只实现生产代码用到的 QClipboard 接口。
+
+    QMimeData 兼作存储，这样 mimeData().hasImage() / hasUrls() 等判断
+    与真实剪贴板行为一致。QClipboard 各方法都可带 mode 参数，一律用
+    *args 吞掉。
+    """
+
+    def __init__(self):
+        from PyQt6.QtCore import QMimeData
+        self._mime = QMimeData()
+
+    def text(self, *args):
+        return self._mime.text()
+
+    def setText(self, text, *args):  # noqa: N802
+        self._mime.setText(text)
+
+    def image(self, *args):
+        from PyQt6.QtGui import QImage
+        data = self._mime.imageData()
+        return data if isinstance(data, QImage) else QImage()
+
+    def setImage(self, image, *args):  # noqa: N802
+        self._mime.setImageData(image)
+
+    def mimeData(self, *args):  # noqa: N802
+        return self._mime
+
+    def setMimeData(self, mime, *args):  # noqa: N802
+        self._mime = mime
+
+    def clear(self, *args):
+        self._mime.clear()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_clipboard(monkeypatch):
+    """每个用例使用独立的进程内剪贴板，禁止测试接触系统剪贴板。
+
+    系统剪贴板是跨进程的全局资源：xdist 并行时多个 worker 抢同一块
+    剪贴板，Windows 上表现为 OleSetClipboard 拿不到锁（COM 0x800401d0），
+    写入静默失败，随后读到的是别的 worker 刚写进去的内容，断言随机失败。
+    顺带避免跑测试时覆盖开发者自己的剪贴板。
+    """
+    from PyQt6.QtWidgets import QApplication
+
+    clipboard = _FakeClipboard()
+    monkeypatch.setattr(QApplication, "clipboard", lambda *args: clipboard)

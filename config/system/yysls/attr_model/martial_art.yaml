@@ -1,4 +1,48 @@
 # 来源类别: martial_art
 # schema 见 core/attr_model/parsing.py
 kind: martial_art
-entries: {}
+entries:
+  九重春色·天赋:
+    modeled: false
+  千香引魂蛊·天赋:
+    modeled: false
+  明川药典·天赋:
+    modeled: false
+  杏游草野·天赋:
+    modeled: false
+  青山执笔·天赋:
+    modeled: false
+  文动霓裳·天赋:
+    modeled: false
+  醉梦游春·天赋:
+    modeled: false
+  断水双诀·天赋:
+    modeled: false
+  泥犁三垢·天赋:
+    modeled: false
+  天志垂象·天赋:
+    modeled: false
+  悬身拳法·天赋:
+    modeled: false
+  千机索天·天赋:
+    modeled: false
+  粟子游尘·天赋:
+    modeled: false
+  粟子行云·天赋:
+    modeled: false
+  八方风雷枪·天赋:
+    modeled: false
+  斩雪刀法·天赋:
+    modeled: false
+  十方破阵·天赋:
+    modeled: false
+  嗟夫刀法·天赋:
+    modeled: false
+  无名剑法·天赋:
+    modeled: false
+  积矩九剑·天赋:
+    modeled: false
+  九曲惊神枪·天赋:
+    modeled: false
+  无名枪法·天赋:
+    modeled: false

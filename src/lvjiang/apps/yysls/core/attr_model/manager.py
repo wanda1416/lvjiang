@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
 from loguru import logger
 
 from .....core.config.resolver import ConfigResolver, get_resolver
@@ -21,6 +22,24 @@ from .parsing import parse_source_file
 from .resolver import CapsLookup, ResolveResult, resolve, solve_residual
 
 _SOURCES_REL_DIR = "yysls/attr_model"
+
+
+def _leading_comments(path: Path) -> str:
+    """取文件开头的注释块。
+
+    写回时用 yaml.dump 重排文档会丢掉注释，而这些文件的头部写着 schema
+    与游戏事实（心法整条词条怎么拆），丢了就没人知道该怎么填。
+    """
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    header: list[str] = []
+    for line in lines:
+        if not line.startswith("#"):
+            break
+        header.append(line)
+    return "\n".join(header)
 
 
 def game_config_caps_lookup() -> CapsLookup:
@@ -51,6 +70,8 @@ class AttrModelManager:
             self._rel_dir = ""
         self._effects: list[StatEffect] = []
         self._files: dict[str, str] = {}   # source_id -> 文件名
+        self._docs: dict[str, dict] = {}   # 文件名 -> 原始文档（UI 编辑用）
+        self._headers: dict[str, str] = {}  # 文件名 -> 文件头注释
         self._errors: dict[str, str] = {}
         self.reload()
 
@@ -61,6 +82,8 @@ class AttrModelManager:
         """重新加载全部来源文件"""
         self._effects.clear()
         self._files.clear()
+        self._docs.clear()
+        self._headers.clear()
         self._errors.clear()
         seen: dict[str, str] = {}
         for name in self._resolver.enumerate_entities(self._rel_dir, "*.yaml"):
@@ -74,6 +97,8 @@ class AttrModelManager:
                 logger.error(f"属性来源 {name} 加载失败，已跳过: {e}")
                 self._errors[Path(name).stem] = str(e)
                 continue
+            self._docs[name] = data
+            self._headers[name] = _leading_comments(path)
             for effect in effects:
                 if effect.source_id in seen:
                     logger.error(
@@ -94,15 +119,86 @@ class AttrModelManager:
         selected = [e for e in self._effects if e.kind in wanted]
         return sorted(selected, key=lambda e: order.get(e.kind, len(order)))
 
-    def unmodeled_count(self) -> int:
-        """尚未填数值的条目数，供 UI 显示建模进度"""
-        return sum(1 for effect in self._effects if not effect.modeled)
+    def pending_count(self) -> int:
+        """仍需人工确认的条目数：既没填数值、也没确认过无贡献"""
+        return sum(1 for effect in self._effects if effect.pending)
+
+    def progress(self, kind: str | None = None) -> tuple[int, int]:
+        """建模进度 ``(已确认, 总数)``。已确认 = 填了数值 + 确认无贡献。"""
+        scoped = [e for e in self._effects if kind is None or e.kind == kind]
+        return sum(1 for e in scoped if not e.pending), len(scoped)
 
     def errors(self) -> dict[str, str]:
         return dict(self._errors)
 
     def source_file(self, source_id: str) -> str | None:
         return self._files.get(source_id)
+
+    def raw_entry(self, source_id: str) -> dict:
+        """条目的原始 YAML 片段（UI 编辑用），未知条目返回空 dict"""
+        filename = self._files.get(source_id)
+        if filename is None:
+            return {}
+        entry = (self._docs.get(filename) or {}).get("entries", {}).get(source_id)
+        return dict(entry) if isinstance(entry, dict) else {}
+
+    # ── 写回 ────────────────────────────────────────────
+
+    def save_entry(self, source_id: str, payload: dict) -> None:
+        """校验并写回单个条目
+
+        整份文件先过一遍解析再落盘：单条看着合法、放进文件却与 kind
+        不符（比如公式引用了别的来源才有的字段）时，早失败好过写坏配置。
+        """
+        filename = self._files.get(source_id)
+        if filename is None:
+            raise AttrModelError(
+                tr("未知的属性来源条目: {ids}").format(ids=source_id)
+            )
+        self._write(filename, {source_id: payload})
+
+    def create_entry(self, kind: str, source_id: str, payload: dict | None = None) -> None:
+        """新增条目。id 重复即拒绝——同名会在加载时被静默跳过。"""
+        if kind not in SOURCE_KINDS:
+            raise AttrModelError(tr("未知来源类别: {kind}").format(kind=kind))
+        source_id = source_id.strip()
+        if not source_id:
+            raise AttrModelError(tr("属性来源条目名不能为空"))
+        if source_id in self._files:
+            raise AttrModelError(
+                tr("属性来源条目已存在: {ids}").format(ids=source_id)
+            )
+        self._write(f"{kind}.yaml", {source_id: payload or {"modeled": False}},
+                    kind=kind)
+
+    def delete_entry(self, source_id: str) -> None:
+        """删除条目"""
+        filename = self._files.get(source_id)
+        if filename is None:
+            raise AttrModelError(
+                tr("未知的属性来源条目: {ids}").format(ids=source_id)
+            )
+        self._write(filename, {source_id: None})
+
+    def _write(self, filename: str, changes: dict, *, kind: str | None = None) -> None:
+        """把改动并进整份文件并落盘。``changes`` 里值为 None 表示删除。"""
+        doc = dict(self._docs.get(filename) or {})
+        if kind is not None:
+            doc.setdefault("kind", kind)
+        entries = dict(doc.get("entries") or {})
+        for source_id, payload in changes.items():
+            if payload is None:
+                entries.pop(source_id, None)
+            else:
+                entries[source_id] = payload
+        doc["entries"] = entries
+        parse_source_file(doc, filename=filename)  # 先校验整份文件
+        body = yaml.dump(doc, allow_unicode=True, sort_keys=False, width=1000)
+        header = self._headers.get(filename, "")
+        self._resolver.write_entity(
+            self._rel(filename), f"{header}\n{body}" if header else body
+        )
+        self.reload()
 
     # ── 求值 ────────────────────────────────────────────
 

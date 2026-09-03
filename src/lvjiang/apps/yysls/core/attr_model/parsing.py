@@ -42,7 +42,10 @@ from .models import (
 )
 
 #: entries 条目内允许的键
-_ENTRY_KEYS = {"label", "scope", "stats", "extra", "full_affix", "split", "modeled"}
+_ENTRY_KEYS = {
+    "label", "scope", "stats", "extra", "full_affix", "split", "modeled",
+    "no_effect",
+}
 
 #: 公式内允许的键
 _FORMULA_KEYS = {"source", "multiplier", "offset", "min", "max", "round"}
@@ -175,8 +178,20 @@ def parse_entry(source_id: str, raw: Any, kind: str) -> StatEffect:
         raise AttrModelError(
             tr("{source} 的 modeled 必须是布尔值").format(source=source_id)
         )
+    no_effect = data.get("no_effect", False)
+    if not isinstance(no_effect, bool):
+        raise AttrModelError(
+            tr("{source} 的 no_effect 必须是布尔值").format(source=source_id)
+        )
+    has_values = bool(stats or extra or full_affix)
+    if no_effect and has_values:
+        raise AttrModelError(
+            tr("{source} 既声明无贡献又填了数值，取哪个无从判断").format(
+                source=source_id
+            )
+        )
     # 什么都没填的条目视作未建模，避免「填了个空壳却当成已完成」
-    if modeled and not stats and not extra and full_affix is None:
+    if modeled and not has_values:
         modeled = False
 
     return StatEffect(
@@ -188,6 +203,7 @@ def parse_entry(source_id: str, raw: Any, kind: str) -> StatEffect:
         full_affix=full_affix,
         extra=extra,
         modeled=modeled,
+        no_effect=no_effect,
     )
 
 

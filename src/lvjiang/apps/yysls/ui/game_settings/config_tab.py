@@ -1,9 +1,10 @@
 """游戏配置 - 主容器
 
-包含八个 Tab 页：
+包含九个 Tab 页：
 - 词组配置（最基础的配置，不依赖任何 tab）
 - 装备配置（基础属性规则 + 武器类型注册）
 - 武学配置（武学名 → 武器 + 属性，流派/玩法的共同前置）
+- 属性来源（装备之外的战斗属性从哪来：心法/武学天赋/套装/突破…）
 - 流派配置
 - 玩法配置（调律方向：增伤/定音要求，从调律规则中拆出的公共定义）
 - 等级配置（按等级区分重置支持与材料要求）
@@ -15,6 +16,7 @@ from PyQt6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
 from .....i18n import tr
 from .affix_caps_panel import AffixCapsPanel
+from .attr_source_panel import AttrSourcePanel
 from .base_attr_panel import BaseAttrPanel
 from .equip_display_panel import EquipDisplayPanel
 from .level_config_panel import LevelConfigPanel
@@ -49,6 +51,10 @@ class GameConfigTab(QWidget):
         # 武学配置面板（流派/玩法的共同前置：武器和属性由武学派生）
         self._martial_art_panel = MartialArtPanel()
         self._tabs.addTab(self._martial_art_panel, tr("武学配置"))
+
+        # 属性来源面板（装备之外的战斗属性：心法/武学天赋/套装/突破…）
+        self._attr_source_panel = AttrSourcePanel()
+        self._tabs.addTab(self._attr_source_panel, tr("属性来源"))
 
         # 流派配置面板
         self._school_panel = SchoolPanel()

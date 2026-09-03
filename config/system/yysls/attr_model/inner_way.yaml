@@ -12,11 +12,8 @@
 # 贡献 0 并计入 UI 的建模进度，缺口由反解兜底。
 kind: inner_way
 entries:
-  # ── 已验证条目（模板） ────────────────────────────────
   易水歌·二重:
-    full_affix: 外功攻击        # 110 级 → 40.5 / 80.9
-
-  # ── 待填 ──────────────────────────────────────────────
+    full_affix: 外功攻击
   易水歌·一重:
     modeled: false
   易水歌·三重:
@@ -26,4 +23,436 @@ entries:
   易水歌·五重:
     modeled: false
   易水歌·六重:
+    modeled: false
+  泣血婆娑·一重:
+    modeled: false
+  泣血婆娑·二重:
+    modeled: false
+  泣血婆娑·三重:
+    modeled: false
+  泣血婆娑·四重:
+    modeled: false
+  泣血婆娑·五重:
+    modeled: false
+  泣血婆娑·六重:
+    modeled: false
+  生龙活虎·一重:
+    modeled: false
+  生龙活虎·二重:
+    modeled: false
+  生龙活虎·三重:
+    modeled: false
+  生龙活虎·四重:
+    modeled: false
+  生龙活虎·五重:
+    modeled: false
+  生龙活虎·六重:
+    modeled: false
+  长生无相·一重:
+    modeled: false
+  长生无相·二重:
+    modeled: false
+  长生无相·三重:
+    modeled: false
+  长生无相·四重:
+    modeled: false
+  长生无相·五重:
+    modeled: false
+  长生无相·六重:
+    modeled: false
+  苦四时·一重:
+    modeled: false
+  苦四时·二重:
+    modeled: false
+  苦四时·三重:
+    modeled: false
+  苦四时·四重:
+    modeled: false
+  苦四时·五重:
+    modeled: false
+  苦四时·六重:
+    modeled: false
+  四时无常·一重:
+    modeled: false
+  四时无常·二重:
+    modeled: false
+  四时无常·三重:
+    modeled: false
+  四时无常·四重:
+    modeled: false
+  四时无常·五重:
+    modeled: false
+  四时无常·六重:
+    modeled: false
+  山月无影·一重:
+    modeled: false
+  山月无影·二重:
+    modeled: false
+  山月无影·三重:
+    modeled: false
+  山月无影·四重:
+    modeled: false
+  山月无影·五重:
+    modeled: false
+  山月无影·六重:
+    modeled: false
+  抗造大法·一重:
+    modeled: false
+  抗造大法·二重:
+    modeled: false
+  抗造大法·三重:
+    modeled: false
+  抗造大法·四重:
+    modeled: false
+  抗造大法·五重:
+    modeled: false
+  抗造大法·六重:
+    modeled: false
+  归燕经·一重:
+    modeled: false
+  归燕经·二重:
+    modeled: false
+  归燕经·三重:
+    modeled: false
+  归燕经·四重:
+    modeled: false
+  归燕经·五重:
+    modeled: false
+  归燕经·六重:
+    modeled: false
+  晚雪间·一重:
+    modeled: false
+  晚雪间·二重:
+    modeled: false
+  晚雪间·三重:
+    modeled: false
+  晚雪间·四重:
+    modeled: false
+  晚雪间·五重:
+    modeled: false
+  晚雪间·六重:
+    modeled: false
+  铁身决·一重:
+    modeled: false
+  铁身决·二重:
+    modeled: false
+  铁身决·三重:
+    modeled: false
+  铁身决·四重:
+    modeled: false
+  铁身决·五重:
+    modeled: false
+  铁身决·六重:
+    modeled: false
+  征人归·一重:
+    modeled: false
+  征人归·二重:
+    modeled: false
+  征人归·三重:
+    modeled: false
+  征人归·四重:
+    modeled: false
+  征人归·五重:
+    modeled: false
+  征人归·六重:
+    modeled: false
+  御风之翼·一重:
+    modeled: false
+  御风之翼·二重:
+    modeled: false
+  御风之翼·三重:
+    modeled: false
+  御风之翼·四重:
+    modeled: false
+  御风之翼·五重:
+    modeled: false
+  御风之翼·六重:
+    modeled: false
+  威猛歌·一重:
+    modeled: false
+  威猛歌·二重:
+    modeled: false
+  威猛歌·三重:
+    modeled: false
+  威猛歌·四重:
+    modeled: false
+  威猛歌·五重:
+    modeled: false
+  威猛歌·六重:
+    modeled: false
+  千山法·一重:
+    modeled: false
+  千山法·二重:
+    modeled: false
+  千山法·三重:
+    modeled: false
+  千山法·四重:
+    modeled: false
+  千山法·五重:
+    modeled: false
+  千山法·六重:
+    modeled: false
+  无名心法·一重:
+    modeled: false
+  无名心法·二重:
+    modeled: false
+  无名心法·三重:
+    modeled: false
+  无名心法·四重:
+    modeled: false
+  无名心法·五重:
+    modeled: false
+  无名心法·六重:
+    modeled: false
+  燎原星火·一重:
+    modeled: false
+  燎原星火·二重:
+    modeled: false
+  燎原星火·三重:
+    modeled: false
+  燎原星火·四重:
+    modeled: false
+  燎原星火·五重:
+    modeled: false
+  燎原星火·六重:
+    modeled: false
+  移经易武·一重:
+    modeled: false
+  移经易武·二重:
+    modeled: false
+  移经易武·三重:
+    modeled: false
+  移经易武·四重:
+    modeled: false
+  移经易武·五重:
+    modeled: false
+  移经易武·六重:
+    modeled: false
+  凝神章·一重:
+    modeled: false
+  凝神章·二重:
+    modeled: false
+  凝神章·三重:
+    modeled: false
+  凝神章·四重:
+    modeled: false
+  凝神章·五重:
+    modeled: false
+  凝神章·六重:
+    modeled: false
+  剑气纵横·一重:
+    modeled: false
+  剑气纵横·二重:
+    modeled: false
+  剑气纵横·三重:
+    modeled: false
+  剑气纵横·四重:
+    modeled: false
+  剑气纵横·五重:
+    modeled: false
+  剑气纵横·六重:
+    modeled: false
+  逐狼心经·一重:
+    modeled: false
+  逐狼心经·二重:
+    modeled: false
+  逐狼心经·三重:
+    modeled: false
+  逐狼心经·四重:
+    modeled: false
+  逐狼心经·五重:
+    modeled: false
+  逐狼心经·六重:
+    modeled: false
+  极乐·一重:
+    modeled: false
+  极乐·二重:
+    modeled: false
+  极乐·三重:
+    modeled: false
+  极乐·四重:
+    modeled: false
+  极乐·五重:
+    modeled: false
+  极乐·六重:
+    modeled: false
+  杏花不见·一重:
+    modeled: false
+  杏花不见·二重:
+    modeled: false
+  杏花不见·三重:
+    modeled: false
+  杏花不见·四重:
+    modeled: false
+  杏花不见·五重:
+    modeled: false
+  杏花不见·六重:
+    modeled: false
+  指玄篇注·一重:
+    modeled: false
+  指玄篇注·二重:
+    modeled: false
+  指玄篇注·三重:
+    modeled: false
+  指玄篇注·四重:
+    modeled: false
+  指玄篇注·五重:
+    modeled: false
+  指玄篇注·六重:
+    modeled: false
+  君臣药·一重:
+    modeled: false
+  君臣药·二重:
+    modeled: false
+  君臣药·三重:
+    modeled: false
+  君臣药·四重:
+    modeled: false
+  君臣药·五重:
+    modeled: false
+  君臣药·六重:
+    modeled: false
+  花上月令·一重:
+    modeled: false
+  花上月令·二重:
+    modeled: false
+  花上月令·三重:
+    modeled: false
+  花上月令·四重:
+    modeled: false
+  花上月令·五重:
+    modeled: false
+  花上月令·六重:
+    modeled: false
+  葫芦飞飞·一重:
+    modeled: false
+  葫芦飞飞·二重:
+    modeled: false
+  葫芦飞飞·三重:
+    modeled: false
+  葫芦飞飞·四重:
+    modeled: false
+  葫芦飞飞·五重:
+    modeled: false
+  葫芦飞飞·六重:
+    modeled: false
+  纵地摘星·一重:
+    modeled: false
+  纵地摘星·二重:
+    modeled: false
+  纵地摘星·三重:
+    modeled: false
+  纵地摘星·四重:
+    modeled: false
+  纵地摘星·五重:
+    modeled: false
+  纵地摘星·六重:
+    modeled: false
+  春雷篇·一重:
+    modeled: false
+  春雷篇·二重:
+    modeled: false
+  春雷篇·三重:
+    modeled: false
+  春雷篇·四重:
+    modeled: false
+  春雷篇·五重:
+    modeled: false
+  春雷篇·六重:
+    modeled: false
+  忘川绝响·一重:
+    modeled: false
+  忘川绝响·二重:
+    modeled: false
+  忘川绝响·三重:
+    modeled: false
+  忘川绝响·四重:
+    modeled: false
+  忘川绝响·五重:
+    modeled: false
+  忘川绝响·六重:
+    modeled: false
+  断石之构·一重:
+    modeled: false
+  断石之构·二重:
+    modeled: false
+  断石之构·三重:
+    modeled: false
+  断石之构·四重:
+    modeled: false
+  断石之构·五重:
+    modeled: false
+  断石之构·六重:
+    modeled: false
+  所恨年年·一重:
+    modeled: false
+  所恨年年·二重:
+    modeled: false
+  所恨年年·三重:
+    modeled: false
+  所恨年年·四重:
+    modeled: false
+  所恨年年·五重:
+    modeled: false
+  所恨年年·六重:
+    modeled: false
+  复仇·一重:
+    modeled: false
+  复仇·二重:
+    modeled: false
+  复仇·三重:
+    modeled: false
+  复仇·四重:
+    modeled: false
+  复仇·五重:
+    modeled: false
+  复仇·六重:
+    modeled: false
+  持其不攻·一重:
+    modeled: false
+  持其不攻·二重:
+    modeled: false
+  持其不攻·三重:
+    modeled: false
+  持其不攻·四重:
+    modeled: false
+  持其不攻·五重:
+    modeled: false
+  持其不攻·六重:
+    modeled: false
+  山河绝韵·一重:
+    modeled: false
+  山河绝韵·二重:
+    modeled: false
+  山河绝韵·三重:
+    modeled: false
+  山河绝韵·四重:
+    modeled: false
+  山河绝韵·五重:
+    modeled: false
+  山河绝韵·六重:
+    modeled: false
+  磐石诀·一重:
+    modeled: false
+  磐石诀·二重:
+    modeled: false
+  磐石诀·三重:
+    modeled: false
+  磐石诀·四重:
+    modeled: false
+  磐石诀·五重:
+    modeled: false
+  磐石诀·六重:
+    modeled: false
+  困兽心经·一重:
+    modeled: false
+  困兽心经·二重:
+    modeled: false
+  困兽心经·三重:
+    modeled: false
+  困兽心经·四重:
+    modeled: false
+  困兽心经·五重:
+    modeled: false
+  困兽心经·六重:
     modeled: false

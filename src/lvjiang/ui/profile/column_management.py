@@ -20,7 +20,12 @@ from lvjiang.core.config import get_session_store
 from lvjiang.ui.button_styles import apply_button_style, fit_button_width
 
 from ...core.profile.models import ALL_MODELS, MODEL_LABELS
-from ...core.profile.schema import get_profile_config
+from ...core.profile.schema import (
+    ProfileSchema,
+    get_profile_config,
+    reload_profile_config,
+    save_profile_config,
+)
 from ...core.profile.store import (
     get_groups,
     insert_overview_column,
@@ -206,10 +211,65 @@ class ProfileColumnMixin:
         else:
             # 数据列索引需要减 1（跳过用户名列）
             data_index = logical_index - 1
+            menu.addAction(
+                tr("编辑当前列"),
+                lambda: self._edit_column_definition(group_name, data_index),
+            )
+            menu.addSeparator()
             menu.addAction(tr("右侧新增列"), lambda: self._add_column(group_name, data_index))
             menu.addAction(tr("删除当前列"), lambda: self._remove_column(group_name, data_index))
 
         menu.exec(h_header.mapToGlobal(pos))
+
+    def _edit_column_definition(self: ProfileTab, group_name: str, data_index: int) -> None:  # type: ignore[misc]
+        """直接编辑当前列对应的 key 定义并立即保存。"""
+        visible_keys = self._visible_columns(group_name)
+        if not (0 <= data_index < len(visible_keys)):
+            return
+
+        key = visible_keys[data_index]
+        config = get_profile_config()
+        key_def = config.get_key(key)
+        model_type = config.get_model_type(key)
+        if key_def is None or not model_type:
+            return
+
+        from .settings_dialog import ProfileDefinitionDialog
+
+        edited = ProfileDefinitionDialog.open_key_editor(
+            self,
+            model_type,
+            key_def,
+            {item.key for item in config.get_all_keys()},
+            lock_key=True,
+        )
+        if edited is None:
+            return
+
+        keys_by_model = {
+            item_model: config.get_keys_by_model(item_model)
+            for item_model in ALL_MODELS
+        }
+        model_keys = keys_by_model[model_type]
+        for index, existing in enumerate(model_keys):
+            if existing.key == key:
+                model_keys[index] = edited
+                break
+        else:
+            return
+
+        try:
+            save_profile_config(ProfileSchema(keys_by_model=keys_by_model))
+            reload_profile_config()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(
+                self,
+                tr("保存失败"),
+                tr("保存 profile.yaml 失败:\n{e}").format(e=exc),
+            )
+            return
+
+        self._build_groups()
 
     def _on_header_double_clicked(self: ProfileTab, logical_index: int, group_name: str):  # type: ignore[misc]
         """表头双击：选择字段"""

@@ -648,6 +648,7 @@ auto_strings:
   profile_core_161: 'Reset Time:'
   profile_core_162: Error
   profile_core_163: (Please select)
+  profile_core_164: Edit Current Column
   '  未导入图片': '  No image imported'
   '## 汇总': '## Summary'
   (可选): (Optional)

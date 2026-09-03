@@ -14,6 +14,10 @@
 
 ## 标准发布流程
 
+默认使用 GitHub Actions 发布。功能与发布准备提交合并进 `master` 后，只需在
+`master` 当前发布提交上创建并推送语义化版本标签；`.github/workflows/release.yml`
+会在隔离的 Windows runner 中完成校验、测试、打包和 GitHub Release 发布。
+
 ### 第一步：对比功能差异
 
 对比当前 master 与上一个发布版本之间的 commit 差异，梳理新增功能、修复、重构等内容。
@@ -22,8 +26,8 @@
 # 查看上一个发布版本的 tag 或 commit
 git log --oneline docs/50-releases/v*.md | Select-Object -First 5
 
-# 对比上一个版本到当前的所有变更（以 v0.1.1 为例）
-git log v0.1.1..HEAD --oneline
+# 对比上一个版本到当前的所有变更（以 0.1.1 为例）
+git log 0.1.1..HEAD --oneline
 ```
 
 ### 第二步：编写发布声明
@@ -92,7 +96,42 @@ git log v0.1.1..HEAD --oneline
 
 > **注意：** `src/lvjiang/_version.py` 由 `package.bat` 打包时自动注入，**无需手动修改**。
 
-### 第四步：打包
+### 第四步：提交并合并发布准备
+
+在打标签之前提交版本号与发布说明，并确保该提交已进入远端 `master`：
+
+```powershell
+git add pyproject.toml uv.lock android/app/build.gradle.kts docs/50-releases/
+git commit -m "chore(release): prepare vX.Y.Z"
+git push
+```
+
+云端打包时，`src/lvjiang/_version.py` 只在临时 runner 中由打包脚本注入，
+不再将生成结果提交回仓库。
+
+### 第五步：推送标签，自动打包发布（推荐）
+
+确保本地位于已经推送的 `master` 发布提交，然后执行：
+
+```powershell
+git tag X.Y.Z
+git push origin X.Y.Z
+```
+
+Release 工作流会依次完成：
+
+1. 校验标签严格为 `X.Y.Z`，并与 `pyproject.toml` 版本一致；
+2. 确认 `docs/50-releases/vX.Y.Z.md` 存在，且标签提交属于远端 `master`；
+3. 检查配置 `content_version` 完整性，运行 Ruff、mypy 与全量 pytest；
+4. 执行 `packaging\\package.bat`，并强制检查 ZIP 和 Inno Setup 安装器均已生成；
+5. 生成 `SHA256SUMS.txt`，保存 Actions artifact；
+6. 创建 GitHub Release，使用版本发布文档作为正文并上传三个产物。
+
+任何一步失败都不会发布 GitHub Release。临时故障可直接重新运行该 workflow；
+需要修改代码时，只能在 Release 尚未发布的前提下删除失败标签，修复并合并后再
+重新创建。已经发布的标签禁止移动，后续修复应递增补丁版本。
+
+### 第六步：本地打包（仅用于排障）
 
 运行打包脚本，生成 Windows 发布包：
 
@@ -112,26 +151,9 @@ packaging\package.bat
 4. 压缩为 zip
 5. 调用 Inno Setup 生成安装包（需安装 [Inno Setup 6](https://jrsoftware.org/isdl.php)）
 
-> **注意：** 如果未安装 Inno Setup，脚本会跳过安装包构建，仅生成 zip。
-
-### 第五步：提交
-
-打包成功后，提交所有发布相关变更：
-
-```powershell
-git add pyproject.toml android/app/build.gradle.kts docs/50-releases/vX.Y.Z.md src/lvjiang/_version.py uv.lock
-git commit -m "chore: bump version to X.Y.Z + 发布文档"
-```
-
-> **注意：** `packaging/package.bat` 打包后会产生以下文件变更，必须一并提交：
-> - `src/lvjiang/_version.py` — 版本号注入（从 pyproject.toml 读取写入）
-> - `uv.lock` — 依赖锁文件可能因 uv run pyinstaller 而更新
-
-### 第六步：推送
-
-```powershell
-git push
-```
+> **注意：** 如果未安装 Inno Setup，本地脚本会跳过安装器构建；GitHub Release
+> 工作流会把安装器缺失视为失败。打包会改写 `src/lvjiang/_version.py`，本地排障
+> 完成后不要把这个生成变更提交到仓库。
 
 ---
 
@@ -156,18 +178,19 @@ git push
 - [ ] **不兼容变动已逐项排查**（对照上表八类），每条都写了「现象 / 原因 / 如何调整」；确认无不兼容时也已明确写出
 - [ ] 已确认本次是否有开发者**明确安排的远端配置下发**：没有则保持所有 `content_version` 原值不动；有则仅核对开发者已在编辑器里显式提升的目标文件。发布 Agent 不得自行提升；会被 `config/local` 遮蔽的内容已在发布说明里提示用户
 - [ ] `python scripts/add_content_version.py --check` 通过（存量/新增文件的版本字段齐全）
-- [ ] `packaging/package.bat` 打包成功
-- [ ] `dist/lvjiang-vX.Y.Z-win64.zip` 已生成
-- [ ] `dist/lvjiang-vX.Y.Z-win64-setup.exe` 已生成
-- [ ] `src/lvjiang/_version.py` 版本号已注入（打包脚本自动完成）
 - [ ] `uv.lock` 变更已纳入提交（如有）
 - [ ] 所有变更已提交并推送
+- [ ] 发布提交已进入远端 `master`
+- [ ] `X.Y.Z` 标签与 `pyproject.toml` 一致并已推送
+- [ ] GitHub Release 工作流中的配置检查、Ruff、mypy 和 pytest 全部通过
+- [ ] 云端 `packaging/package.bat` 打包成功，版本注入校验通过
+- [ ] GitHub Release 已发布，ZIP、安装器和 `SHA256SUMS.txt` 已上传
 
 ---
 
 ## 常见错误
 
 1. **遗漏 Android 版本号**：`android/app/build.gradle.kts` 的 versionName 和 versionCode 必须同步更新
-2. **手动修改 _version.py**：此文件由打包脚本自动注入，手动修改会在下次打包时被覆盖
+2. **手动修改或提交 _version.py**：此文件由云端打包脚本临时注入，不属于发布准备提交
 3. **versionCode 未递增**：Android 设备通过 versionCode 判断是否需要重新解压配置，不递增会导致设备上仍使用旧配置
 4. **未运行 CI**：发布前必须确保 ruff + mypy + pytest 全量通过

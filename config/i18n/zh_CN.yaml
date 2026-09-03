@@ -651,8 +651,6 @@ auto_strings:
   profile_rules_012: 用途（减少）
   profile_rules_013: 快捷规则:{count}项
   profile_rules_014: '用途:'
-  profile_rules_015: 输入后按 Enter 添加
-  profile_rules_016: 输入数量后按 Enter 添加
   profile_rules_017: 变动规则第 {row} 行至少添加一个快捷数量
   profile_core_164: 编辑当前列
   '  未导入图片': '  未导入图片'

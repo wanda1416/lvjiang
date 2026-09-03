@@ -639,8 +639,6 @@ auto_strings:
   profile_core_161: 'Reset Time:'
   profile_core_162: Error
   profile_core_163: (Please select)
-  profile_rules_001: 0 means vocabulary only for custom changes
-  profile_rules_002: Vocabulary only
   profile_rules_003: 'Change rules:'
   profile_rules_004: 'Duplicate change rule: {name} ({amount})'
   profile_rules_005: 'Change rule row {row} has a shortcut amount; enter a source or usage'
@@ -652,6 +650,8 @@ auto_strings:
   profile_rules_011: Add Usage
   profile_rules_012: Usage (Decrease)
   profile_rules_013: Quick rules:{count}
+  profile_rules_014: 'Usage:'
+  profile_rules_015: Type and press Enter to add
   profile_core_164: Edit Current Column
   '  未导入图片': '  No image imported'
   '## 汇总': '## Summary'

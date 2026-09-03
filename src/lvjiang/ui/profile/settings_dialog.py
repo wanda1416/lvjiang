@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -52,6 +53,7 @@ from ...core.profile.models import (
 from ...core.profile.periods import get_profile_period, list_profile_periods
 from ...i18n import tr
 from ..button_styles import apply_button_style, fit_button_width
+from ..widgets import FlowLayout
 
 # 模型 TAB 顺序
 _MODEL_ORDER = [MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN, MODEL_NOTE]
@@ -232,39 +234,127 @@ class _SyncTargetsWidget(QWidget):
         return targets
 
 
-class _ChangeRulesWidget(QWidget):
-    """来源、用途与快捷幅度的结构化编辑器。
+class _TagInputWidget(QFrame):
+    """按 Enter 创建可删除标签的来源/用途词条输入框。"""
 
-    UI 中的幅度始终显示为正数；用途在保存时转换为负数，来源转换为
-    正数。底层仍序列化为现有 ``sources`` / ``uses`` / ``steps``，因此
-    无需迁移 profile.yaml。
-    """
+    def __init__(self, values: list[str], parent=None) -> None:
+        super().__init__(parent)
+        self.setObjectName("profileTagInput")
+        self.setMinimumHeight(38)
+        self.setStyleSheet(
+            "QFrame#profileTagInput { border: 1px solid palette(mid); "
+            "border-radius: 4px; background: palette(base); }"
+            "QFrame#profileTagChip { border: 1px solid palette(mid); "
+            "border-radius: 9px; background: palette(alternate-base); }"
+            "QFrame#profileTagChip QLabel { border: none; background: transparent; }"
+            "QFrame#profileTagChip QPushButton { border: none; background: transparent; "
+            "padding: 0 2px; color: palette(mid); }"
+            "QFrame#profileTagChip QPushButton:hover { color: palette(text); }"
+            "QFrame#profileTagInput QLineEdit { border: none; background: transparent; }"
+        )
+
+        self._values: list[str] = []
+        self._chips: dict[str, QFrame] = {}
+        self._flow = FlowLayout(self, spacing=5)
+        self._flow.setContentsMargins(5, 4, 5, 4)
+
+        self._input = QLineEdit()
+        self._input.setPlaceholderText(tr("输入后按 Enter 添加"))
+        self._input.setMinimumWidth(150)
+        self._input.returnPressed.connect(self._commit_input)
+
+        self._flow.addWidget(self._input)
+        for value in values:
+            self.add_tag(value)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return max(self.minimumHeight(), self._flow.heightForWidth(width))
+
+    def _commit_input(self) -> None:
+        value = self._input.text().strip()
+        if value:
+            self.add_tag(value)
+            self._input.clear()
+
+    def add_tag(self, value: str) -> bool:
+        value = value.strip()
+        if not value or value in self._chips:
+            return False
+
+        chip = QFrame()
+        chip.setObjectName("profileTagChip")
+        chip_layout = QHBoxLayout(chip)
+        chip_layout.setContentsMargins(7, 2, 3, 2)
+        chip_layout.setSpacing(2)
+        chip_layout.addWidget(QLabel(value))
+        remove = QPushButton("×")
+        remove.setFixedSize(18, 18)
+        remove.setToolTip(tr("删除"))
+        remove.clicked.connect(lambda _checked, text=value: self.remove_tag(text))
+        chip_layout.addWidget(remove)
+
+        # 输入框始终位于标签之后。
+        if self._flow.indexOf(self._input) >= 0:
+            self._flow.removeWidget(self._input)
+        self._values.append(value)
+        self._chips[value] = chip
+        self._flow.addWidget(chip)
+        self._flow.addWidget(self._input)
+        self.updateGeometry()
+        return True
+
+    def remove_tag(self, value: str) -> None:
+        chip = self._chips.pop(value, None)
+        if chip is None:
+            return
+        self._values.remove(value)
+        self._flow.removeWidget(chip)
+        chip.deleteLater()
+        self.updateGeometry()
+
+    def tags(self) -> list[str]:
+        return list(self._values)
+
+
+def _standalone_terms(vocabulary: list[str], steps: list[StepDef], *, positive: bool) -> list[str]:
+    """仅返回没有被变动规则隐式提供的独立词条。"""
+    bound = {
+        step.source
+        for step in steps
+        if step.source and ((step.value > 0) if positive else (step.value < 0))
+    }
+    return list(dict.fromkeys(value for value in vocabulary if value not in bound))
+
+
+def _merge_terms(explicit: list[str], steps: list[StepDef], *, positive: bool) -> list[str]:
+    """保存时把规则名称自动并入来源/用途词表。"""
+    result = list(dict.fromkeys(value for value in explicit if value))
+    for step in steps:
+        matches = (step.value > 0) if positive else (step.value < 0)
+        if matches and step.source and step.source not in result:
+            result.append(step.source)
+    return result
+
+
+class _ChangeRulesWidget(QWidget):
+    """只编辑绑定了快捷数量的规则；独立词条由 _TagInputWidget 管理。"""
 
     _KIND_USE = "use"
     _KIND_SOURCE = "source"
 
-    def __init__(
-        self,
-        sources: list[str],
-        uses: list[str],
-        steps: list[StepDef],
-        *,
-        allow_steps: bool = True,
-        parent=None,
-    ) -> None:
+    def __init__(self, steps: list[StepDef], parent=None) -> None:
         super().__init__(parent)
-        self._allow_steps = allow_steps
-
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
         self._table = QTableWidget()
-        self._table.setColumnCount(4 if allow_steps else 3)
-        headers = [tr("类型"), tr("来源/用途")]
-        if allow_steps:
-            headers.append(tr("快捷数量"))
-        headers.append("")
-        self._table.setHorizontalHeaderLabels(headers)
+        self._table.setColumnCount(4)
+        self._table.setHorizontalHeaderLabels(
+            [tr("类型"), tr("来源/用途"), tr("快捷数量"), ""]
+        )
         self._table.setAlternatingRowColors(True)
         self._table.setMinimumHeight(110)
         vertical_header = self._table.verticalHeader()
@@ -275,15 +365,11 @@ class _ChangeRulesWidget(QWidget):
         assert header is not None
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        if allow_steps:
-            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-            self._table.setColumnWidth(2, 120)
-            self._table.setColumnWidth(3, 44)
-        else:
-            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-            self._table.setColumnWidth(2, 44)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         self._table.setColumnWidth(0, 110)
+        self._table.setColumnWidth(2, 120)
+        self._table.setColumnWidth(3, 44)
         layout.addWidget(self._table)
 
         buttons = QHBoxLayout()
@@ -298,43 +384,13 @@ class _ChangeRulesWidget(QWidget):
         buttons.addStretch()
         layout.addLayout(buttons)
 
-        self._load(sources, uses, steps)
+        # 展示顺序与快捷菜单一致：用途在上，来源在下。
+        for step in (s for s in steps if s.value < 0):
+            self.add_row(self._KIND_USE, step.source, abs(step.value))
+        for step in (s for s in steps if s.value > 0):
+            self.add_row(self._KIND_SOURCE, step.source, step.value)
 
-    def _load(self, sources: list[str], uses: list[str], steps: list[StepDef]) -> None:
-        """合并旧配置的独立词表与 steps；用途固定排在来源之前。"""
-        negative = [step for step in steps if step.value < 0]
-        positive = [step for step in steps if step.value > 0]
-
-        self._load_kind(self._KIND_USE, uses, negative)
-        self._load_kind(self._KIND_SOURCE, sources, positive)
-
-    def _load_kind(
-        self,
-        kind: str,
-        vocabulary: list[str],
-        steps: list[StepDef],
-    ) -> None:
-        consumed: set[int] = set()
-        for name in vocabulary:
-            matches = [
-                (index, step)
-                for index, step in enumerate(steps)
-                if index not in consumed and step.source == name
-            ]
-            if matches:
-                for index, step in matches:
-                    consumed.add(index)
-                    self.add_row(kind, name, abs(step.value))
-            else:
-                # 没有固定幅度的词条仍用于“自定义增加/减少”的候选列表。
-                self.add_row(kind, name)
-
-        # step 自带名称但没有登记进词表时也要显示，保存后自动归并。
-        for index, step in enumerate(steps):
-            if index not in consumed:
-                self.add_row(kind, step.source, abs(step.value))
-
-    def add_row(self, kind: str, name: str = "", amount: int = 0) -> None:
+    def add_row(self, kind: str, name: str = "", amount: int = 1) -> None:
         row = self._table.rowCount()
         self._table.setRowCount(row + 1)
 
@@ -352,15 +408,10 @@ class _ChangeRulesWidget(QWidget):
         )
         self._table.setCellWidget(row, 1, name_input)
 
-        remove_column = 2
-        if self._allow_steps:
-            amount_spin = QSpinBox()
-            amount_spin.setRange(0, 999999)
-            amount_spin.setSpecialValueText(tr("仅词条"))
-            amount_spin.setValue(amount)
-            amount_spin.setToolTip(tr("0 表示仅作为自定义增减时的候选词条"))
-            self._table.setCellWidget(row, 2, amount_spin)
-            remove_column = 3
+        amount_spin = QSpinBox()
+        amount_spin.setRange(1, 999999)
+        amount_spin.setValue(max(1, amount))
+        self._table.setCellWidget(row, 2, amount_spin)
 
         remove_button = QPushButton("×")
         remove_button.setFixedWidth(36)
@@ -368,71 +419,60 @@ class _ChangeRulesWidget(QWidget):
         remove_button.clicked.connect(
             lambda _checked, button=remove_button: self._remove_widget_row(button)
         )
-        self._table.setCellWidget(row, remove_column, remove_button)
+        self._table.setCellWidget(row, 3, remove_button)
 
     def _remove_widget_row(self, widget: QWidget) -> None:
-        remove_column = 3 if self._allow_steps else 2
         for row in range(self._table.rowCount()):
-            if self._table.cellWidget(row, remove_column) is widget:
+            if self._table.cellWidget(row, 3) is widget:
                 self._table.removeRow(row)
                 return
 
-    def get_rules(self) -> tuple[list[str], list[str], list[StepDef]]:
-        """返回去重词表与快捷幅度；用途 steps 始终排在来源之前。"""
-        sources: list[str] = []
-        uses: list[str] = []
+    def get_steps(self) -> list[StepDef]:
+        """用途规则在前、来源规则在后返回，方向由类型而非用户输入的符号决定。"""
         use_steps: list[StepDef] = []
         source_steps: list[StepDef] = []
-
         for row in range(self._table.rowCount()):
             kind_combo = self._table.cellWidget(row, 0)
             name_input = self._table.cellWidget(row, 1)
-            if not isinstance(kind_combo, QComboBox) or not isinstance(name_input, QLineEdit):
+            amount_spin = self._table.cellWidget(row, 2)
+            if not (
+                isinstance(kind_combo, QComboBox)
+                and isinstance(name_input, QLineEdit)
+                and isinstance(amount_spin, QSpinBox)
+            ):
                 continue
             kind = kind_combo.currentData()
-            name = name_input.text().strip()
-            vocabulary = uses if kind == self._KIND_USE else sources
-            if name and name not in vocabulary:
-                vocabulary.append(name)
-
-            if not self._allow_steps:
-                continue
-            amount_spin = self._table.cellWidget(row, 2)
-            amount = amount_spin.value() if isinstance(amount_spin, QSpinBox) else 0
-            if amount <= 0:
-                continue
+            amount = amount_spin.value()
             step = StepDef(
                 value=-amount if kind == self._KIND_USE else amount,
-                source=name,
+                source=name_input.text().strip(),
             )
             (use_steps if kind == self._KIND_USE else source_steps).append(step)
-
-        return sources, uses, use_steps + source_steps
+        return use_steps + source_steps
 
     def validation_error(self) -> str:
-        """检查快捷幅度是否已绑定名称、是否存在完全重复的规则。"""
+        """检查每条快捷规则都绑定了名称，且不存在完全重复项。"""
         seen: set[tuple[str, str, int]] = set()
         for row in range(self._table.rowCount()):
             kind_combo = self._table.cellWidget(row, 0)
             name_input = self._table.cellWidget(row, 1)
-            if not isinstance(kind_combo, QComboBox) or not isinstance(name_input, QLineEdit):
+            amount_spin = self._table.cellWidget(row, 2)
+            if not (
+                isinstance(kind_combo, QComboBox)
+                and isinstance(name_input, QLineEdit)
+                and isinstance(amount_spin, QSpinBox)
+            ):
                 continue
             name = name_input.text().strip()
-            amount = 0
-            if self._allow_steps:
-                amount_spin = self._table.cellWidget(row, 2)
-                amount = amount_spin.value() if isinstance(amount_spin, QSpinBox) else 0
-            if amount > 0 and not name:
+            if not name:
                 return tr("变动规则第 {row} 行设置了快捷数量，请填写来源或用途").format(
                     row=row + 1
                 )
-            if not name:
-                continue
-            identity = (str(kind_combo.currentData()), name, amount)
+            identity = (str(kind_combo.currentData()), name, amount_spin.value())
             if identity in seen:
                 return tr("变动规则存在重复项：{name}（{amount}）").format(
                     name=name,
-                    amount=amount if amount > 0 else tr("仅词条"),
+                    amount=amount_spin.value(),
                 )
             seen.add(identity)
         return ""
@@ -897,6 +937,26 @@ class ProfileDefinitionDialog(QDialog):
         widgets["show_cap"] = show_cap_check
         widgets["decimal"] = decimal_check
 
+        existing_steps = (
+            existing.steps
+            if isinstance(existing, (QuotaKeyDef, RegenKeyDef, StockKeyDef))
+            else []
+        )
+        source_tags = _TagInputWidget(
+            _standalone_terms(
+                existing.sources if existing else [], existing_steps, positive=True
+            )
+        )
+        use_tags = _TagInputWidget(
+            _standalone_terms(
+                existing.uses if existing else [], existing_steps, positive=False
+            )
+        )
+        layout.addRow(tr("来源:"), source_tags)
+        layout.addRow(tr("用途:"), use_tags)
+        widgets["source_tags"] = source_tags
+        widgets["use_tags"] = use_tags
+
         if model_type == MODEL_QUOTA:
             kd = existing if isinstance(existing, QuotaKeyDef) else QuotaKeyDef()
             period_combo = QComboBox()
@@ -1049,19 +1109,6 @@ class ProfileDefinitionDialog(QDialog):
             regen_type_combo.currentIndexChanged.connect(_update_reset_time_visibility)
             _update_reset_time_visibility()
 
-        existing_steps = (
-            existing.steps
-            if isinstance(existing, (QuotaKeyDef, RegenKeyDef, StockKeyDef))
-            else []
-        )
-        change_rules_widget = _ChangeRulesWidget(
-            existing.sources if existing else [],
-            existing.uses if existing else [],
-            existing_steps,
-            allow_steps=model_type != MODEL_NOTE,
-        )
-        widgets["change_rules"] = change_rules_widget
-
         # 同步目标动态列表（三种模型通用，下拉排除自身）
         sync_targets_widget = _SyncTargetsWidget(exclude_key_input=key_input)
         if existing and existing.sync_targets:
@@ -1069,27 +1116,33 @@ class ProfileDefinitionDialog(QDialog):
                 sync_targets_widget.add_row(t)
         widgets["sync_targets"] = sync_targets_widget
 
-        # 两块列表可能都很长，使用纵向 splitter 让用户按当前任务分配空间。
-        change_pane = QWidget()
-        change_layout = QFormLayout(change_pane)
-        change_layout.setContentsMargins(0, 0, 0, 0)
-        change_layout.addRow(tr("变动规则:"), change_rules_widget)
+        if model_type != MODEL_NOTE:
+            change_rules_widget = _ChangeRulesWidget(existing_steps)
+            widgets["change_rules"] = change_rules_widget
 
-        sync_pane = QWidget()
-        sync_layout = QFormLayout(sync_pane)
-        sync_layout.setContentsMargins(0, 0, 0, 0)
-        sync_layout.addRow(tr("同步目标:"), sync_targets_widget)
+            # 两块列表可能都很长，使用纵向 splitter 让用户按当前任务分配空间。
+            change_pane = QWidget()
+            change_layout = QFormLayout(change_pane)
+            change_layout.setContentsMargins(0, 0, 0, 0)
+            change_layout.addRow(tr("变动规则:"), change_rules_widget)
 
-        rules_splitter = QSplitter(Qt.Orientation.Vertical)
-        rules_splitter.setChildrenCollapsible(False)
-        rules_splitter.setHandleWidth(7)
-        rules_splitter.addWidget(change_pane)
-        rules_splitter.addWidget(sync_pane)
-        rules_splitter.setStretchFactor(0, 3)
-        rules_splitter.setStretchFactor(1, 2)
-        rules_splitter.setSizes([240, 180])
-        layout.addRow(rules_splitter)
-        widgets["rules_splitter"] = rules_splitter
+            sync_pane = QWidget()
+            sync_layout = QFormLayout(sync_pane)
+            sync_layout.setContentsMargins(0, 0, 0, 0)
+            sync_layout.addRow(tr("同步目标:"), sync_targets_widget)
+
+            rules_splitter = QSplitter(Qt.Orientation.Vertical)
+            rules_splitter.setChildrenCollapsible(False)
+            rules_splitter.setHandleWidth(7)
+            rules_splitter.addWidget(change_pane)
+            rules_splitter.addWidget(sync_pane)
+            rules_splitter.setStretchFactor(0, 3)
+            rules_splitter.setStretchFactor(1, 2)
+            rules_splitter.setSizes([240, 180])
+            layout.addRow(rules_splitter)
+            widgets["rules_splitter"] = rules_splitter
+        else:
+            layout.addRow(tr("同步目标:"), sync_targets_widget)
 
         # 按钮行
         btn_row = QHBoxLayout()
@@ -1132,14 +1185,23 @@ class ProfileDefinitionDialog(QDialog):
                 error_label.setText(tr("Key '{key}' 已存在").format(key=key))
                 return
 
-            # 来源、用途和快捷幅度由同一个结构化编辑器生成，避免三份配置漂移。
-            change_rules = widgets["change_rules"]
-            assert isinstance(change_rules, _ChangeRulesWidget)
-            rules_error = change_rules.validation_error()
-            if rules_error:
-                error_label.setText(rules_error)
-                return
-            sources_list, uses_list, steps_list = change_rules.get_rules()
+            source_input = widgets["source_tags"]
+            use_input = widgets["use_tags"]
+            assert isinstance(source_input, _TagInputWidget)
+            assert isinstance(use_input, _TagInputWidget)
+
+            steps_list: list[StepDef] = []
+            change_rules = widgets.get("change_rules")
+            if isinstance(change_rules, _ChangeRulesWidget):
+                rules_error = change_rules.validation_error()
+                if rules_error:
+                    error_label.setText(rules_error)
+                    return
+                steps_list = change_rules.get_steps()
+
+            # 规则名称隐式并入词表，但不在上方“仅词条”标签区重复展示。
+            sources_list = _merge_terms(source_input.tags(), steps_list, positive=True)
+            uses_list = _merge_terms(use_input.tags(), steps_list, positive=False)
 
             # 收集同步目标（三种模型通用）
             sync_targets_list = widgets["sync_targets"].get_sync_targets()

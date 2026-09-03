@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from types import SimpleNamespace
 
+import PyQt6.QtWidgets as qt_widgets
 import pytest
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem
@@ -10,7 +11,9 @@ from PyQt6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem
 import lvjiang.core.profile as profile_core
 import lvjiang.ui.profile.column_management as column_management
 import lvjiang.ui.profile.tab as profile_tab
+from lvjiang.core.profile.models import MODEL_NOTE, NoteKeyDef
 from lvjiang.ui.profile.column_management import ProfileColumnMixin
+from lvjiang.ui.profile.settings_dialog import ProfileDefinitionDialog
 from lvjiang.ui.profile.tab import ProfileOverviewTable, ProfileTab
 
 
@@ -114,12 +117,16 @@ class _ColumnHost(ProfileColumnMixin):
         self._tables = {"默认": table}
         self._loading = False
         self._reordering = False
+        self.groups_rebuilt = False
 
     def _refresh_group(self, _group_name, _table):
         pass
 
     def _remove_column_width(self, _group_name, _data_idx, _table):
         pass
+
+    def _build_groups(self):
+        self.groups_rebuilt = True
 
 
 def test_reorder_preserves_schema_keys_that_are_temporarily_hidden(qtbot, monkeypatch):
@@ -159,6 +166,110 @@ def test_remove_visible_column_does_not_remove_preceding_hidden_key(qtbot, monke
     host._remove_column("默认", 0)
 
     assert removed == [("默认", "left")]
+
+
+def test_data_column_header_menu_includes_direct_definition_edit(qtbot, monkeypatch):
+    actions: list[str] = []
+
+    class _Menu:
+        def __init__(self, _parent):
+            pass
+
+        def addAction(self, text, _callback=None):  # noqa: N802
+            actions.append(text)
+
+        def addSeparator(self):  # noqa: N802
+            pass
+
+        def exec(self, _pos):
+            pass
+
+    monkeypatch.setattr(qt_widgets, "QMenu", _Menu)
+    table = QTableWidget(0, 3)
+    table.resize(480, 240)
+    table.show()
+    qtbot.addWidget(table)
+    host = _ColumnHost(table)
+    header = table.horizontalHeader()
+    assert header is not None
+    x = header.sectionViewportPosition(1) + 5
+
+    host._on_header_context_menu(QPoint(x, 5), "默认")
+
+    assert actions == ["编辑当前列", "右侧新增列", "删除当前列"]
+
+
+def test_edit_current_column_saves_only_that_definition(qtbot, monkeypatch):
+    original = NoteKeyDef(key="left", label="旧标签")
+    untouched = NoteKeyDef(key="right", label="保持不变")
+    edited = NoteKeyDef(key="left", label="新标签")
+
+    class _EditableSchema:
+        def get_key(self, key):
+            return original if key == "left" else untouched if key == "right" else None
+
+        def get_model_type(self, key):
+            return MODEL_NOTE if key in {"left", "right"} else None
+
+        def get_all_keys(self):
+            return [original, untouched]
+
+        def get_keys_by_model(self, model_type):
+            return [original, untouched] if model_type == MODEL_NOTE else []
+
+    editor_calls = []
+
+    def _edit(parent, model_type, key_def, known_keys, *, lock_key=False):
+        editor_calls.append((parent, model_type, key_def, known_keys, lock_key))
+        return edited
+
+    saved = []
+    reloaded = []
+    monkeypatch.setattr(column_management, "get_profile_config", _EditableSchema)
+    monkeypatch.setattr(ProfileDefinitionDialog, "open_key_editor", _edit)
+    monkeypatch.setattr(column_management, "save_profile_config", saved.append)
+    monkeypatch.setattr(
+        column_management, "reload_profile_config", lambda: reloaded.append(True))
+    table = QTableWidget(0, 3)
+    qtbot.addWidget(table)
+    host = _ColumnHost(table)
+
+    host._edit_column_definition("默认", 0)
+
+    assert editor_calls == [
+        (host, MODEL_NOTE, original, {"left", "right"}, True),
+    ]
+    assert len(saved) == 1
+    assert saved[0].get_keys_by_model(MODEL_NOTE) == [edited, untouched]
+    assert reloaded == [True]
+    assert host.groups_rebuilt
+
+
+def test_direct_key_editor_locks_key_identity(qtbot, monkeypatch):
+    parent = QTableWidget()
+    qtbot.addWidget(parent)
+    read_only = []
+
+    def _inspect_dialog(dialog):
+        key_input = next(
+            widget for widget in dialog.findChildren(qt_widgets.QLineEdit)
+            if widget.text() == "left"
+        )
+        read_only.append(key_input.isReadOnly())
+        return 0
+
+    monkeypatch.setattr(qt_widgets.QDialog, "exec", _inspect_dialog)
+
+    result = ProfileDefinitionDialog.open_key_editor(
+        parent,
+        MODEL_NOTE,
+        NoteKeyDef(key="left", label="标签"),
+        {"left", "right"},
+        lock_key=True,
+    )
+
+    assert result is None
+    assert read_only == [True]
 
 
 def _build_overview_table(qtbot) -> ProfileOverviewTable:

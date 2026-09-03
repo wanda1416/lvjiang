@@ -596,7 +596,8 @@ class ProfileDefinitionDialog(QDialog):
 
     def _add_key(self, model_type: str):
         """新增 key"""
-        kd = self._open_edit_dialog(model_type, None)
+        kd = self.open_key_editor(
+            self, model_type, None, self._defined_key_names())
         if kd is None:
             return
 
@@ -616,7 +617,8 @@ class ProfileDefinitionDialog(QDialog):
         if old_kd is None:
             raise RuntimeError(f"行 {row} 缺少 KeyDef 数据，无法编辑")
 
-        kd = self._open_edit_dialog(model_type, old_kd)
+        kd = self.open_key_editor(
+            self, model_type, old_kd, self._defined_key_names())
         if kd is None:
             return
 
@@ -650,9 +652,28 @@ class ProfileDefinitionDialog(QDialog):
 
     # ─── 编辑对话框 ──────────────────────────────────────────
 
-    def _open_edit_dialog(self, model_type: str, existing: KeyDef | None) -> KeyDef | None:
+    def _defined_key_names(self) -> set[str]:
+        """返回当前总定义窗口中的所有 key。"""
+        result: set[str] = set()
+        for model_type in _MODEL_ORDER:
+            tab = self._tabs[model_type]
+            for row in range(tab.table.rowCount()):
+                item = tab.table.item(row, 0)
+                if item:
+                    result.add(item.text())
+        return result
+
+    @staticmethod
+    def open_key_editor(
+        parent: QWidget,
+        model_type: str,
+        existing: KeyDef | None,
+        known_keys: set[str],
+        *,
+        lock_key: bool = False,
+    ) -> KeyDef | None:
         """打开 key 编辑对话框，返回新的 KeyDef 或 None"""
-        dialog = QDialog(self)
+        dialog = QDialog(parent)
         title = tr("编辑") if existing else tr("新增")
         dialog.setWindowTitle(tr("{title} Key ({model})").format(title=title, model=MODEL_LABELS[model_type]))
         dialog.setMinimumWidth(620)
@@ -662,6 +683,7 @@ class ProfileDefinitionDialog(QDialog):
         # 通用字段
         key_input = QLineEdit(existing.key if existing else "")
         key_input.setPlaceholderText(tr("英文，如 "))
+        key_input.setReadOnly(lock_key)
         layout.addRow("Key:", key_input)
 
         label_input = QLineEdit(existing.label if existing else "")
@@ -903,7 +925,7 @@ class ProfileDefinitionDialog(QDialog):
         # 按钮行
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        btn_ok = QPushButton(tr("确定"))
+        btn_ok = QPushButton(tr("保存") if lock_key else tr("确定"))
         btn_row.addWidget(btn_ok)
         btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(dialog.reject)
@@ -934,13 +956,9 @@ class ProfileDefinitionDialog(QDialog):
                 return
 
             # 检查 key 唯一性（排除自身）
-            all_keys = set()
-            for mt in _MODEL_ORDER:
-                tab = self._tabs[mt]
-                for row in range(tab.table.rowCount()):
-                    item = tab.table.item(row, 0)
-                    if item and item.text() != (existing.key if existing else ""):
-                        all_keys.add(item.text())
+            all_keys = set(known_keys)
+            if existing:
+                all_keys.discard(existing.key)
             if key in all_keys:
                 error_label.setText(tr("Key '{key}' 已存在").format(key=key))
                 return

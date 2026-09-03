@@ -15,37 +15,62 @@ from lvjiang.ui.profile.cell_editing import ProfileCellEditingMixin
 from lvjiang.ui.profile.settings_dialog import (
     ProfileDefinitionDialog,
     _ChangeRulesWidget,
+    _merge_terms,
+    _standalone_terms,
     _SyncTargetsWidget,
+    _TagInputWidget,
 )
 
 
-def test_change_rules_merge_legacy_vocab_and_steps(qtbot):
-    widget = _ChangeRulesWidget(
-        sources=["邮件赠送", "旧来源"],
-        uses=["和鸣抽奖"],
-        steps=[
-            StepDef(1, "限时活动"),
-            StepDef(-1, "和鸣抽奖"),
-            StepDef(1, "邮件赠送"),
-            StepDef(-10, "和鸣抽奖"),
-        ],
+def test_bound_rule_names_are_implicit_and_only_unbound_terms_become_tags(qtbot):
+    steps = [
+        StepDef(1, "限时活动"),
+        StepDef(-1, "和鸣抽奖"),
+        StepDef(1, "邮件赠送"),
+        StepDef(-10, "和鸣抽奖"),
+    ]
+    source_tags = _standalone_terms(
+        ["邮件赠送", "旧来源"], steps, positive=True
     )
+    use_tags = _standalone_terms(["和鸣抽奖"], steps, positive=False)
+    widget = _ChangeRulesWidget(steps)
     qtbot.addWidget(widget)
 
-    sources, uses, steps = widget.get_rules()
-
-    assert uses == ["和鸣抽奖"]
-    assert sources == ["邮件赠送", "旧来源", "限时活动"]
-    assert steps == [
+    assert source_tags == ["旧来源"]
+    assert use_tags == []
+    normalized_steps = widget.get_steps()
+    assert normalized_steps == [
         StepDef(-1, "和鸣抽奖"),
         StepDef(-10, "和鸣抽奖"),
-        StepDef(1, "邮件赠送"),
         StepDef(1, "限时活动"),
+        StepDef(1, "邮件赠送"),
     ]
+    assert _merge_terms(source_tags, normalized_steps, positive=True) == [
+        "旧来源", "限时活动", "邮件赠送",
+    ]
+    assert _merge_terms(use_tags, normalized_steps, positive=False) == ["和鸣抽奖"]
+
+
+def test_tag_input_commits_on_enter_and_chip_can_be_removed(qtbot):
+    widget = _TagInputWidget(["已有词条"])
+    qtbot.addWidget(widget)
+    line_edit = widget.findChild(QtWidgets.QLineEdit)
+    assert line_edit is not None
+
+    line_edit.setText("新词条，允许全角符号")
+    qtbot.keyClick(line_edit, Qt.Key.Key_Return)
+    assert widget.tags() == ["已有词条", "新词条，允许全角符号"]
+
+    remove_buttons = [
+        button for button in widget.findChildren(QtWidgets.QPushButton)
+        if button.text() == "×"
+    ]
+    qtbot.mouseClick(remove_buttons[0], Qt.MouseButton.LeftButton)
+    assert widget.tags() == ["新词条，允许全角符号"]
 
 
 def test_change_rules_require_name_for_shortcut_amount(qtbot):
-    widget = _ChangeRulesWidget([], [], [])
+    widget = _ChangeRulesWidget([])
     qtbot.addWidget(widget)
     widget.add_row(widget._KIND_USE, amount=10)
 

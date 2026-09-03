@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+# gh release create 需要创建 Release 和上传附件；其余权限保持只读。
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: windows-2022
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONIOENCODING: utf-8
+      RELEASE_TAG: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Validate release tag and source
+        id: release
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Release tag must look like 1.2.3: $env:RELEASE_TAG"
+          }
+          $version = python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])"
+          if ($env:RELEASE_TAG -ne $version) {
+            throw "Tag $env:RELEASE_TAG does not match pyproject.toml version $version"
+          }
+          $notes = "docs/50-releases/v$env:RELEASE_TAG.md"
+          if (-not (Test-Path $notes -PathType Leaf)) {
+            throw "Missing release notes: $notes"
+          }
+
+          git fetch origin master --no-tags
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/master
+          if ($LASTEXITCODE -ne 0) {
+            throw "Tagged commit $env:GITHUB_SHA is not contained in origin/master"
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "notes=$notes" >> $env:GITHUB_OUTPUT
+
+      - name: Install test and build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip uv
+          python -m pip install -e ".[dev]"
+
+      - name: Check versioned configuration
+        run: python scripts/add_content_version.py --check
+
+      - name: Lint
+        run: python -m ruff check src tests scripts
+
+      - name: Type check
+        run: python -m mypy
+
+      - name: Test
+        run: python -m pytest tests
+
+      - name: Build Windows packages
+        shell: pwsh
+        run: |
+          cmd /c packaging\package.bat
+          if ($LASTEXITCODE -ne 0) {
+            throw "packaging\\package.bat failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Verify and checksum release assets
+        id: assets
+        shell: pwsh
+        run: |
+          $version = '${{ steps.release.outputs.version }}'
+          $zip = "dist/lvjiang-v$version-win64.zip"
+          $setup = "dist/lvjiang-v$version-win64-setup.exe"
+          $mainExe = "dist/lvjiang/lvjiang.exe"
+          foreach ($path in @($mainExe, $zip, $setup)) {
+            if (-not (Test-Path $path -PathType Leaf)) {
+              throw "Expected package was not generated: $path"
+            }
+            if ((Get-Item $path).Length -le 0) {
+              throw "Generated package is empty: $path"
+            }
+          }
+
+          $injected = Select-String -Path src/lvjiang/_version.py -Pattern ('__version__ = "' + $version + '"') -Quiet
+          if (-not $injected) {
+            throw "packaging did not inject version $version into _version.py"
+          }
+
+          $checksumFile = "dist/SHA256SUMS.txt"
+          $lines = foreach ($path in @($zip, $setup)) {
+            $hash = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $([IO.Path]::GetFileName($path))"
+          }
+          [IO.File]::WriteAllLines((Join-Path $env:GITHUB_WORKSPACE $checksumFile), $lines)
+
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+          "setup=$setup" >> $env:GITHUB_OUTPUT
+          "checksums=$checksumFile" >> $env:GITHUB_OUTPUT
+
+      - name: Retain packages as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lvjiang-${{ steps.release.outputs.version }}-win64
+          path: |
+            ${{ steps.assets.outputs.zip }}
+            ${{ steps.assets.outputs.setup }}
+            ${{ steps.assets.outputs.checksums }}
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:RELEASE_TAG `
+            '${{ steps.assets.outputs.zip }}' `
+            '${{ steps.assets.outputs.setup }}' `
+            '${{ steps.assets.outputs.checksums }}' `
+            --verify-tag `
+            --title "律匠 ${{ steps.release.outputs.version }}" `
+            --notes-file '${{ steps.release.outputs.notes }}' `
+            --latest

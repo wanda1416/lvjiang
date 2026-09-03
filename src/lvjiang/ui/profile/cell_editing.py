@@ -297,15 +297,20 @@ class ProfileCellEditingMixin:
         elif model_type == MODEL_STOCK and isinstance(kd, StockKeyDef):
             kd_steps = kd.steps
 
-        if kd_steps:
-            # 有自定义 steps：只展示用户定义的幅度，标签优先显示来源
-            for step in kd_steps:
-                if step.value > 0:
-                    val_label = f"+{step.value}"
-                elif step.value < 0:
-                    val_label = str(step.value)
-                else:
-                    continue
+        # 快捷用途在上、快捷来源在下；每个非空分组之间才添加分隔线。
+        # increment_only 模式不展示用途，零幅度不构成快捷操作。
+        quick_groups = [
+            [] if kd_increment_only else [step for step in kd_steps if step.value < 0],
+            [step for step in kd_steps if step.value > 0],
+        ]
+        has_quick_actions = False
+        for steps in quick_groups:
+            if not steps:
+                continue
+            if has_quick_actions:
+                menu.addSeparator()
+            for step in steps:
+                val_label = f"+{step.value}" if step.value > 0 else str(step.value)
                 label = f"{step.source}({val_label})" if step.source else val_label
                 action = menu.addAction(label)
                 if action:
@@ -315,46 +320,29 @@ class ProfileCellEditingMixin:
                             is_action=True, source=s.source, expected_entry=expected_entry,
                         )
                     )
+            has_quick_actions = True
+
+        if has_quick_actions:
             menu.addSeparator()
-            # 始终提供自定义输入入口
-            action_inc = menu.addAction(tr("增加..."))
-            if action_inc:
-                action_inc.triggered.connect(
+
+        action_inc = menu.addAction(tr("增加..."))
+        if action_inc:
+            action_inc.triggered.connect(
+                lambda: self._adjust_value_custom(
+                    user_name, model_type, key_str, kd, current_value, direction=1,
+                    expected_entry=expected_entry,
+                )
+            )
+        # 单向增加模式下不提供减少
+        if not kd_increment_only:
+            action_dec = menu.addAction(tr("减少..."))
+            if action_dec:
+                action_dec.triggered.connect(
                     lambda: self._adjust_value_custom(
-                        user_name, model_type, key_str, kd, current_value, direction=1,
+                        user_name, model_type, key_str, kd, current_value, direction=-1,
                         expected_entry=expected_entry,
                     )
                 )
-            # 单向增加模式下不提供减少
-            if not kd_increment_only:
-                action_dec = menu.addAction(tr("减少..."))
-                if action_dec:
-                    action_dec.triggered.connect(
-                        lambda: self._adjust_value_custom(
-                            user_name, model_type, key_str, kd, current_value, direction=-1,
-                            expected_entry=expected_entry,
-                        )
-                    )
-        else:
-            # 无自定义 steps：只提供自定义输入
-            action_inc = menu.addAction(tr("增加..."))
-            if action_inc:
-                action_inc.triggered.connect(
-                    lambda: self._adjust_value_custom(
-                        user_name, model_type, key_str, kd, current_value, direction=1,
-                        expected_entry=expected_entry,
-                    )
-                )
-            # 单向增加模式下不提供减少
-            if not kd_increment_only:
-                action_dec = menu.addAction(tr("减少..."))
-                if action_dec:
-                    action_dec.triggered.connect(
-                        lambda: self._adjust_value_custom(
-                            user_name, model_type, key_str, kd, current_value, direction=-1,
-                            expected_entry=expected_entry,
-                        )
-                    )
 
         # 覆写：直接设定值，不走 sync
         action_override = menu.addAction(tr("覆写..."))

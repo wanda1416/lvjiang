@@ -44,6 +44,12 @@ _STATUS_LABELS = {
 }
 _SOURCE_LABELS = {"single": tr("单独运行"), "batch": tr("批量运行")}
 _SCOPE_LABELS = {"daily": tr("日常"), "dedicated": tr("专用")}
+_LINK_BUTTON_STYLE = (
+    "QPushButton { background: transparent; border: none; "
+    "color: palette(link); padding: 0 2px; }"
+    "QPushButton:hover { text-decoration: underline; }"
+    "QPushButton:pressed { color: palette(highlight); }"
+)
 
 
 class _MultiColumnListWidget(QListWidget):
@@ -89,24 +95,17 @@ class _MultiColumnListWidget(QListWidget):
         self.setMinimumWidth(column_width * self.column_count + chrome_width)
         self._update_grid_size()
 
-    def refresh_column_width(self) -> None:
-        """按当前内容重新计算列宽。"""
-        self._update_grid_size()
-
     def _update_grid_size(self) -> None:
         chrome_width = (self.verticalScrollBar().sizeHint().width()
                         + self.frameWidth() * 2 + self.column_count)
-        available_width = (self.viewport().width()
-                           - self.verticalScrollBar().sizeHint().width()
-                           - self.column_count)
+        available_width = max(1, self.width() - chrome_width)
         equal_column_width = max(1, available_width // self.column_count)
         text_width = self._widest_text_width()
         max_gap = self.fontMetrics().horizontalAdvance("字字字")
         natural_width = text_width + max_gap if text_width else equal_column_width
         width = min(equal_column_width, natural_width)
-        if text_width:
-            self.setMaximumWidth(natural_width * self.column_count
-                                 + chrome_width)
+        used_width = width * self.column_count
+        self.setViewportMargins(0, 0, max(0, available_width - used_width), 0)
         self.setGridSize(QSize(width, self._row_height()))
 
     def resizeEvent(self, event) -> None:  # noqa: N802
@@ -154,27 +153,41 @@ class DailyHistoryDialog(QDialog):
         filters = QGroupBox(tr("筛选条件（用户和任务可多选；不选择表示全部）"))
         grid = QGridLayout(filters)
         self._users = _MultiColumnListWidget(3)
+        self._users.setTextElideMode(Qt.TextElideMode.ElideNone)
         self._users.setSelectionMode(
             QAbstractItemView.SelectionMode.MultiSelection)
         user_header = QHBoxLayout()
-        user_header.addWidget(QLabel(tr("用户")))
-        user_header.addStretch(1)
+        user_header.setSpacing(6)
+        self._users_label = QLabel(tr("用户"))
+        user_header.addWidget(self._users_label)
         self._clear_users_button = QPushButton(tr("清除"))
+        self._clear_users_button.setFlat(True)
+        self._clear_users_button.setCursor(
+            Qt.CursorShape.PointingHandCursor)
+        self._clear_users_button.setStyleSheet(_LINK_BUTTON_STYLE)
         self._clear_users_button.setToolTip(tr("清除已选，改为全部用户"))
         self._clear_users_button.clicked.connect(self._users.clearSelection)
         user_header.addWidget(self._clear_users_button)
+        user_header.addStretch(1)
         grid.addLayout(user_header, 0, 0)
         grid.addWidget(self._users, 1, 0)
         self._tasks = _MultiColumnListWidget(2)
+        self._tasks.setTextElideMode(Qt.TextElideMode.ElideNone)
         self._tasks.setSelectionMode(
             QAbstractItemView.SelectionMode.MultiSelection)
         task_header = QHBoxLayout()
-        task_header.addWidget(QLabel(tr("任务")))
-        task_header.addStretch(1)
+        task_header.setSpacing(6)
+        self._tasks_label = QLabel(tr("任务"))
+        task_header.addWidget(self._tasks_label)
         self._clear_tasks_button = QPushButton(tr("清除"))
+        self._clear_tasks_button.setFlat(True)
+        self._clear_tasks_button.setCursor(
+            Qt.CursorShape.PointingHandCursor)
+        self._clear_tasks_button.setStyleSheet(_LINK_BUTTON_STYLE)
         self._clear_tasks_button.setToolTip(tr("清除已选，改为全部任务"))
         self._clear_tasks_button.clicked.connect(self._tasks.clearSelection)
         task_header.addWidget(self._clear_tasks_button)
+        task_header.addStretch(1)
         grid.addLayout(task_header, 0, 1)
         grid.addWidget(self._tasks, 1, 1)
         dates = self._build_date_controls()
@@ -236,8 +249,6 @@ class DailyHistoryDialog(QDialog):
         self._task_filter_splitter.setStretchFactor(0, 0)
         self._task_filter_splitter.setStretchFactor(1, 1)
         apply_button_style(
-            self._clear_users_button,
-            self._clear_tasks_button,
             self._clear_batch_filter_button,
             self._open_result_button,
             self._open_log_button,
@@ -356,7 +367,7 @@ class DailyHistoryDialog(QDialog):
             item.setToolTip(text)
             item.setData(Qt.ItemDataRole.UserRole, task_id)
             self._tasks.addItem(item)
-        self._tasks.refresh_column_width()
+        self._tasks.fit_text_width()
         for start_widget in (self._start_date, self._batch_start_date):
             start_widget.setDate(_qdate(earliest))
         for end_widget in (self._end_date, self._batch_end_date):

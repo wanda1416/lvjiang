@@ -418,6 +418,14 @@ config:
   delay_page_refresh: Page Refresh Wait
   delay_scroll_settle: Scroll Settle Wait
 auto_strings:
+  从当前组合新建: 从当前组合新建
+  支持模式: 支持模式
+  新方案: 新方案
+  方案「{name}」至少要勾选一种连接模式: 方案「{name}」至少要勾选一种连接模式
+  方案名称不能为空: 方案名称不能为空
+  方案把图库、环境、布局绑成一个整体，并声明支持的连接模式。: 方案把图库、环境、布局绑成一个整体，并声明支持的连接模式。
+  方案设置: 方案设置
+  确定删除方案「{name}」吗？: 确定删除方案「{name}」吗？
   ADB 模式: ADB 模式
   当前方案「{name}」不支持{mode}: 当前方案「{name}」不支持{mode}
   方案不支持: 方案不支持

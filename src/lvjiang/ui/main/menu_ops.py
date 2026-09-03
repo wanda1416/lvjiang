@@ -396,6 +396,8 @@ class MenuOpsMixin:
         dialog = SettingsDialog(self)
         dialog.hotkeys_saved.connect(self._apply_hotkey_settings)
         dialog.font_sizes_saved.connect(self._apply_font_size_settings)
+        # 方案增删改后立刻重建顶部下拉，不用等下次启动
+        dialog.plans_saved.connect(self._refresh_plan_combo)
         if dialog.exec():
             # 保存后重新加载配置；已创建的输入后端延迟参数在下次创建时生效
             active_hotkeys = self._user_config.hotkeys

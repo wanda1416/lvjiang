@@ -1,9 +1,10 @@
 """配置管理对话框（多 Tab）
 
 Tab1 基础配置、Tab2 输入模拟（引擎级点击参数）、Tab3 等待参数（命名等待）、
-Tab4 系统参数（可用工作环境）、Tab5 字体设置、Tab6 热键设置（F7~F12 按键位）。
-Tab1/Tab5/Tab6 写 session.json（settings 节点）；Tab2/Tab3/Tab4 写 app.yaml（input_simulation / delay_params / envs，
-system ← local 合并），保存后以配置文件为准覆盖代码默认值。
+Tab4 方案设置（方案管理 + 可用工作环境）、Tab5 字体设置、Tab6 热键设置（F7~F12 按键位）。
+Tab1/Tab5/Tab6 写 session.json（settings 节点）；Tab2/Tab3/Tab4 的环境列表写 app.yaml
+（input_simulation / delay_params / envs，system ← local 合并），保存后以配置文件为准
+覆盖代码默认值。Tab4 的方案写 session.json 的 plans 节点——方案是机器级运行态，与用户无关。
 Tab5 修改的热键保存后立即重建全局监听并生效。
 """
 
@@ -17,9 +18,11 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
     QFormLayout,
     QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMessageBox,
     QPushButton,
     QRadioButton,
@@ -74,6 +77,7 @@ class SettingsDialog(QDialog):
 
     hotkeys_saved = pyqtSignal(dict)
     font_sizes_saved = pyqtSignal(dict)
+    plans_saved = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -93,7 +97,7 @@ class SettingsDialog(QDialog):
         self._tabs.addTab(self._build_basic_tab(), tr("基础配置"))
         self._tabs.addTab(self._build_input_tab(), tr("输入模拟"))
         self._tabs.addTab(self._build_wait_tab(), tr("等待参数"))
-        self._tabs.addTab(self._build_env_tab(), tr("系统参数"))
+        self._tabs.addTab(self._build_plan_tab(), tr("方案设置"))
         self._tabs.addTab(self._build_font_tab(), tr("字体设置"))
         self._tabs.addTab(self._build_hotkey_tab(), tr("热键设置"))
         self._privacy_tab_index = self._tabs.addTab(
@@ -291,8 +295,233 @@ class SettingsDialog(QDialog):
 
     # ─── Tab4 系统参数（可用目标环境）────────────────────
 
+    def _build_plan_tab(self) -> QWidget:
+        """方案设置 Tab：上半「方案管理」，下半原有的「系统参数」。"""
+        tab = QWidget()
+        vbox = QVBoxLayout(tab)
+
+        plans_box = QGroupBox(tr("方案管理"))
+        plans_box.setLayout(self._build_plan_manager_layout())
+        vbox.addWidget(plans_box, 1)
+
+        env_box = QGroupBox(tr("系统参数"))
+        env_layout = QVBoxLayout(env_box)
+        env_layout.addWidget(self._build_env_tab())
+        vbox.addWidget(env_box)
+        return tab
+
+    # ─── 方案管理 ──────────────────────────────────
+
+    def _build_plan_manager_layout(self) -> QHBoxLayout:
+        """左侧方案列表 + 右侧方案详情。"""
+        from ..core.config.plans import load_plans
+
+        self._plans = load_plans()
+        row = QHBoxLayout()
+
+        left = QVBoxLayout()
+        caption = QLabel(
+            tr("方案把图库、环境、布局绑成一个整体，并声明支持的连接模式。"))
+        caption.setWordWrap(True)
+        left.addWidget(caption)
+        self._plan_list = QListWidget()
+        self._plan_list.currentRowChanged.connect(self._on_plan_row_changed)
+        left.addWidget(self._plan_list, 1)
+        buttons = QHBoxLayout()
+        new_btn = QPushButton(tr("新建"))
+        new_btn.clicked.connect(self._on_new_plan)
+        from_current_btn = QPushButton(tr("从当前组合新建"))
+        from_current_btn.clicked.connect(self._on_new_plan_from_current)
+        self._plan_delete_btn = QPushButton(tr("删除"))
+        self._plan_delete_btn.clicked.connect(self._on_delete_plan)
+        apply_button_style(new_btn, from_current_btn)
+        apply_button_style(self._plan_delete_btn, variant="danger")
+        buttons.addWidget(new_btn)
+        buttons.addWidget(from_current_btn)
+        buttons.addWidget(self._plan_delete_btn)
+        buttons.addStretch()
+        left.addLayout(buttons)
+        row.addLayout(left, 3)
+
+        form = QFormLayout()
+        self._plan_name_edit = QLineEdit()
+        self._plan_name_edit.textChanged.connect(self._on_plan_name_edited)
+        form.addRow(tr("名称") + ":", self._plan_name_edit)
+        self._plan_space_combo = QComboBox()
+        self._plan_space_combo.addItems(self._available_spaces())
+        form.addRow(tr("图库") + ":", self._plan_space_combo)
+        self._plan_env_combo = QComboBox()
+        for key, display in load_available_envs():
+            self._plan_env_combo.addItem(display, key)
+        form.addRow(tr("环境") + ":", self._plan_env_combo)
+        self._plan_layout_combo = QComboBox()
+        self._plan_layout_combo.addItems(self._available_layouts())
+        form.addRow(tr("布局") + ":", self._plan_layout_combo)
+        modes = QHBoxLayout()
+        self._plan_mode_window = QCheckBox(tr("窗口模式"))
+        self._plan_mode_adb = QCheckBox(tr("ADB 模式"))
+        modes.addWidget(self._plan_mode_window)
+        modes.addWidget(self._plan_mode_adb)
+        modes.addStretch()
+        form.addRow(tr("支持模式") + ":", modes)
+        for widget in (self._plan_space_combo, self._plan_env_combo,
+                       self._plan_layout_combo):
+            widget.currentIndexChanged.connect(self._on_plan_field_edited)
+        for box in (self._plan_mode_window, self._plan_mode_adb):
+            box.toggled.connect(self._on_plan_field_edited)
+        row.addLayout(form, 4)
+
+        self._refresh_plan_list()
+        return row
+
+    def _available_spaces(self) -> list[str]:
+        host_db = getattr(self.parent(), "_reference_db", None)
+        if host_db is not None:
+            return list(host_db.get_spaces())
+        from ..core.reference_db import ReferenceDatabase
+        return list(ReferenceDatabase().get_spaces())
+
+    def _available_layouts(self) -> list[str]:
+        host_manager = getattr(self.parent(), "_layout_manager", None)
+        if host_manager is None:
+            from ..core.layout_manager import LayoutConfigManager
+            host_manager = LayoutConfigManager()
+        return list(host_manager.list_layouts())
+
+    def _current_plan(self):
+        row = self._plan_list.currentRow()
+        if 0 <= row < len(self._plans):
+            return self._plans[row]
+        return None
+
+    def _refresh_plan_list(self, select: int = -1) -> None:
+        self._plan_list.blockSignals(True)
+        self._plan_list.clear()
+        for plan in self._plans:
+            self._plan_list.addItem(plan.name)
+        row = select if 0 <= select < len(self._plans) else (
+            0 if self._plans else -1)
+        self._plan_list.setCurrentRow(row)
+        self._plan_list.blockSignals(False)
+        self._load_plan_into_form(self._current_plan())
+
+    def _load_plan_into_form(self, plan) -> None:
+        from ..core.config.plans import PLAN_MODE_ADB, PLAN_MODE_WINDOW
+
+        widgets = (self._plan_name_edit, self._plan_space_combo,
+                   self._plan_env_combo, self._plan_layout_combo,
+                   self._plan_mode_window, self._plan_mode_adb)
+        for widget in widgets:
+            widget.blockSignals(True)
+        enabled = plan is not None
+        for widget in widgets:
+            widget.setEnabled(enabled)
+        self._plan_delete_btn.setEnabled(enabled)
+        self._plan_name_edit.setText(plan.name if plan else "")
+        space_idx = self._plan_space_combo.findText(plan.space) if plan else -1
+        self._plan_space_combo.setCurrentIndex(max(space_idx, 0))
+        env_idx = self._plan_env_combo.findData(plan.env) if plan else -1
+        self._plan_env_combo.setCurrentIndex(max(env_idx, 0))
+        layout_idx = (self._plan_layout_combo.findText(plan.layout)
+                      if plan else -1)
+        self._plan_layout_combo.setCurrentIndex(max(layout_idx, 0))
+        self._plan_mode_window.setChecked(
+            bool(plan) and PLAN_MODE_WINDOW in plan.modes)
+        self._plan_mode_adb.setChecked(
+            bool(plan) and PLAN_MODE_ADB in plan.modes)
+        for widget in widgets:
+            widget.blockSignals(False)
+
+    def _on_plan_row_changed(self, _row: int) -> None:
+        self._load_plan_into_form(self._current_plan())
+
+    def _on_plan_name_edited(self, text: str) -> None:
+        plan = self._current_plan()
+        if plan is None:
+            return
+        plan.name = text
+        item = self._plan_list.currentItem()
+        if item is not None:
+            item.setText(text)
+        self._mark_dirty()
+
+    def _on_plan_field_edited(self, *_args) -> None:
+        from ..core.config.plans import PLAN_MODE_ADB, PLAN_MODE_WINDOW
+
+        plan = self._current_plan()
+        if plan is None:
+            return
+        plan.space = self._plan_space_combo.currentText()
+        plan.env = self._plan_env_combo.currentData() or ""
+        plan.layout = self._plan_layout_combo.currentText()
+        modes = []
+        if self._plan_mode_window.isChecked():
+            modes.append(PLAN_MODE_WINDOW)
+        if self._plan_mode_adb.isChecked():
+            modes.append(PLAN_MODE_ADB)
+        plan.modes = modes
+        self._mark_dirty()
+
+    def _append_plan(self, plan) -> None:
+        self._plans.append(plan)
+        self._refresh_plan_list(select=len(self._plans) - 1)
+        self._plan_name_edit.setFocus()
+        self._plan_name_edit.selectAll()
+        self._mark_dirty()
+
+    def _on_new_plan(self) -> None:
+        from ..core.config.plans import PLAN_MODES, Plan
+        self._append_plan(Plan.create(tr("新方案"), modes=list(PLAN_MODES)))
+
+    def _on_new_plan_from_current(self) -> None:
+        """拿主界面手上那套组合直接建方案——迁移成本最低的一条路。"""
+        from ..core.config.plans import PLAN_MODE_ADB, PLAN_MODE_WINDOW, Plan
+
+        host = self.parent()
+        space_combo = getattr(host, "reference_space_combo", None)
+        env_combo = getattr(host, "_env_combo", None)
+        layout_combo = getattr(host, "layout_combo", None)
+        backend = getattr(host, "_backend", None)
+        modes = [backend] if backend in (PLAN_MODE_WINDOW, PLAN_MODE_ADB) \
+            else [PLAN_MODE_WINDOW, PLAN_MODE_ADB]
+        self._append_plan(Plan.create(
+            tr("新方案"),
+            space=space_combo.currentText() if space_combo else "",
+            env=(env_combo.currentData() or "") if env_combo else "",
+            layout=layout_combo.currentText() if layout_combo else "",
+            modes=modes,
+        ))
+
+    def _on_delete_plan(self) -> None:
+        plan = self._current_plan()
+        if plan is None:
+            return
+        confirmed = QMessageBox.question(
+            self, tr("删除方案"),
+            tr("确定删除方案「{name}」吗？").format(name=plan.name),
+        ) == QMessageBox.StandardButton.Yes
+        if not confirmed:
+            return
+        row = self._plan_list.currentRow()
+        self._plans.remove(plan)
+        self._refresh_plan_list(select=min(row, len(self._plans) - 1))
+        self._mark_dirty()
+
+    def _collect_plans(self) -> list:
+        return list(self._plans)
+
+    def _validate_plans(self) -> str:
+        """返回错误说明；空串表示通过。"""
+        for plan in self._plans:
+            if not plan.name.strip():
+                return tr("方案名称不能为空")
+            if not plan.modes:
+                return tr("方案「{name}」至少要勾选一种连接模式").format(
+                    name=plan.name)
+        return ""
+
     def _build_env_tab(self) -> QWidget:
-        """系统参数 Tab：可用目标环境列表"""
+        """系统参数：可用目标环境列表"""
         tab = QWidget()
         vbox = QVBoxLayout(tab)
 
@@ -849,6 +1078,10 @@ class SettingsDialog(QDialog):
         hotkeys = self._collect_hotkeys()
         if hotkeys is None:
             return
+        plan_error = self._validate_plans()
+        if plan_error:
+            QMessageBox.warning(self, tr("方案设置"), plan_error)
+            return
         settings = {
             "android_capture_method": (
                 "scrcpy" if self._capture_stream_radio.isChecked() else "screencap"),
@@ -878,6 +1111,9 @@ class SettingsDialog(QDialog):
         input_sim["region_jitter_ratio"] = round(self._jitter_spin.value(), 2)
         envs = self._collect_envs()
         save_app_config(input_sim, delay_params, envs)
+        from ..core.config.plans import save_plans
+        save_plans(self._collect_plans())
+        self.plans_saved.emit()
         self.hotkeys_saved.emit(hotkeys)
         self.font_sizes_saved.emit(settings["font_sizes"])
         # 保存后不关闭：置灰保存按钮，当前各行均视为已保存，可继续修改

@@ -118,6 +118,7 @@ class _ColumnHost(ProfileColumnMixin):
         self._loading = False
         self._reordering = False
         self.groups_rebuilt = False
+        self.refresh_count = 0
 
     def _refresh_group(self, _group_name, _table):
         pass
@@ -127,6 +128,9 @@ class _ColumnHost(ProfileColumnMixin):
 
     def _build_groups(self):
         self.groups_rebuilt = True
+
+    def refresh(self):
+        self.refresh_count += 1
 
 
 def test_reorder_preserves_schema_keys_that_are_temporarily_hidden(qtbot, monkeypatch):
@@ -242,7 +246,8 @@ def test_edit_current_column_saves_only_that_definition(qtbot, monkeypatch):
     assert len(saved) == 1
     assert saved[0].get_keys_by_model(MODEL_NOTE) == [edited, untouched]
     assert reloaded == [True]
-    assert host.groups_rebuilt
+    assert host.refresh_count == 1
+    assert not host.groups_rebuilt
 
 
 def test_direct_key_editor_locks_key_identity(qtbot, monkeypatch):

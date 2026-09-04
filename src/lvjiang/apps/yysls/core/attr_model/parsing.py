@@ -48,7 +48,7 @@ from .models import (
 #: entries 条目内允许的键
 _ENTRY_KEYS = {
     "label", "scope", "stats", "extra", "full_affix", "split", "modeled",
-    "no_effect",
+    "no_effect", "group", "tier",
 }
 
 #: 公式内允许的键
@@ -201,6 +201,14 @@ def parse_entry(source_id: str, raw: Any, kind: str) -> StatEffect:
             tr("{source} 声明了 split 却没有 full_affix").format(source=source_id)
         )
 
+    group = data.get("group") or ""
+    if not isinstance(group, str):
+        raise AttrModelError(tr("{source} 的 group 必须是字符串").format(source=source_id))
+    tier = data.get("tier") or 0
+    if isinstance(tier, bool) or not isinstance(tier, int) or tier < 0:
+        raise AttrModelError(
+            tr("{source} 的 tier 必须是非负整数").format(source=source_id))
+
     modeled = data.get("modeled", True)
     if not isinstance(modeled, bool):
         raise AttrModelError(
@@ -232,6 +240,8 @@ def parse_entry(source_id: str, raw: Any, kind: str) -> StatEffect:
         extra=extra,
         modeled=modeled,
         no_effect=no_effect,
+        group=group,
+        tier=tier,
     )
 
 

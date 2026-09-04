@@ -541,3 +541,145 @@ def test_touched_fields_lists_stats_and_extras() -> None:
     effects = [_effect("甲", stats={"min_outer": 1.0}, extra={"剑武学增伤": 0.01})]
 
     assert _resolve(effects).combat.touched_fields() == ["min_outer", "剑武学增伤"]
+
+
+# ── 装配状态与展开 ────────────────────────────────────────
+
+def _loadout_manager(tmp_path):
+    from lvjiang.apps.yysls.core.attr_model import AttrModelManager
+
+    (tmp_path / "inner_way.yaml").write_text(
+        "kind: inner_way\nentries:\n" + "".join(
+            f"  {name}·{tier_name}:\n"
+            f"    group: {name}\n    tier: {tier}\n"
+            f"    stats: {{min_outer: {value}}}\n"
+            for name, base in (("易水歌", 10.0), ("长生无相", 100.0))
+            for tier, (tier_name, value) in enumerate(
+                [(t, base + i) for i, t in enumerate(
+                    ["一重", "二重", "三重", "四重", "五重", "六重"])], start=1)
+        ), encoding="utf-8")
+    (tmp_path / "food.yaml").write_text(
+        "kind: food\nentries:\n"
+        "  八珍玉食:\n    stats: {min_outer: 1000}\n"
+        "  另一种药:\n    stats: {min_outer: 2000}\n", encoding="utf-8")
+    (tmp_path / "base.yaml").write_text(
+        "kind: base\nentries:\n  等级底子:\n    stats: {max_outer: 7.0}\n",
+        encoding="utf-8")
+    return AttrModelManager(tmp_path)
+
+
+def test_selecting_a_tier_applies_every_tier_up_to_it(tmp_path) -> None:
+    """选第 N 重则一重至 N 重全部生效——这是游戏规则，不是逐条勾选。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout, InnerWaySlot
+
+    manager = _loadout_manager(tmp_path)
+    loadout = AttrLoadout(level=110, school="牵丝·玉",
+                          inner_ways=(InnerWaySlot("易水歌", 3),))
+
+    result = manager.resolve_loadout(loadout, school_attr="牵丝")
+
+    # 一重 10 + 二重 11 + 三重 12
+    assert result.combat.attrs.min_outer == pytest.approx(33.0)
+    assert [
+        m.source_id for m in result.combat.modifiers_for("min_outer")
+        if m.kind == "inner_way"
+    ] == ["易水歌·一重", "易水歌·二重", "易水歌·三重"]
+
+
+def test_unequipped_inner_ways_contribute_nothing(tmp_path) -> None:
+    """没装的心法不能算进来。默认全选时 37 门 222 重会一起相加。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout, InnerWaySlot
+
+    manager = _loadout_manager(tmp_path)
+    loadout = AttrLoadout(level=110, school="牵丝·玉",
+                          inner_ways=(InnerWaySlot("易水歌", 1),))
+
+    result = manager.resolve_loadout(loadout, school_attr="牵丝")
+
+    assert result.combat.attrs.min_outer == pytest.approx(10.0)
+
+
+def test_single_choice_sources_take_only_the_selected_one(tmp_path) -> None:
+    """吃食只能吃一种；两种都算等于凭空多出一份。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout
+
+    manager = _loadout_manager(tmp_path)
+    loadout = AttrLoadout(level=110, school="牵丝·玉",
+                          selections={"food": "八珍玉食"})
+
+    result = manager.resolve_loadout(loadout, school_attr="牵丝")
+
+    assert result.combat.attrs.min_outer == pytest.approx(1000.0)
+
+
+def test_always_on_sources_need_no_selection(tmp_path) -> None:
+    """等级底子这类恒生效，不该要求用户去勾。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout
+
+    manager = _loadout_manager(tmp_path)
+    result = manager.resolve_loadout(
+        AttrLoadout(level=110, school="牵丝·玉"), school_attr="牵丝")
+
+    assert result.combat.attrs.max_outer == pytest.approx(7.0)
+    assert result.combat.attrs.min_outer == pytest.approx(0.0)
+
+
+def test_empty_selection_no_longer_means_everything(tmp_path) -> None:
+    """selected=None 曾是「全选」。互斥来源全部相加必然是错的，
+    零值反而一眼能看出没配。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout
+
+    manager = _loadout_manager(tmp_path)
+    implicit = manager.resolve(level=110, school_attr="牵丝")
+    explicit = manager.resolve_loadout(
+        AttrLoadout(level=110, school="牵丝·玉"), school_attr="牵丝")
+
+    assert implicit.combat.attrs.min_outer == pytest.approx(0.0)
+    assert implicit.combat.attrs.max_outer == pytest.approx(
+        explicit.combat.attrs.max_outer)
+
+
+def test_a_slot_rejects_an_out_of_range_tier() -> None:
+    from lvjiang.apps.yysls.core.attr_model import AttrModelError, InnerWaySlot
+
+    with pytest.raises(AttrModelError):
+        InnerWaySlot("易水歌", 7)
+
+
+def test_loadout_rejects_more_slots_than_the_game_allows() -> None:
+    from lvjiang.apps.yysls.core.attr_model import (
+        INNER_WAY_SLOTS,
+        AttrLoadout,
+        AttrModelError,
+        InnerWaySlot,
+    )
+
+    too_many = tuple(
+        InnerWaySlot(f"心法{i}", 1) for i in range(INNER_WAY_SLOTS + 1))
+    with pytest.raises(AttrModelError):
+        AttrLoadout(level=110, school="牵丝·玉", inner_ways=too_many)
+
+
+def test_loadout_rejects_the_same_inner_way_twice() -> None:
+    from lvjiang.apps.yysls.core.attr_model import (
+        AttrLoadout,
+        AttrModelError,
+        InnerWaySlot,
+    )
+
+    with pytest.raises(AttrModelError):
+        AttrLoadout(level=110, school="牵丝·玉", inner_ways=(
+            InnerWaySlot("易水歌", 1), InnerWaySlot("易水歌", 2)))
+
+
+def test_loadout_round_trips_through_a_plain_dict() -> None:
+    """存进 session.json 再读回来必须还是同一份装配。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout, InnerWaySlot
+
+    loadout = AttrLoadout(
+        level=110, school="牵丝·玉",
+        inner_ways=(InnerWaySlot("易水歌", 6), InnerWaySlot("长生无相", 2)),
+        selections={"food": "八珍玉食"},
+    )
+
+    assert AttrLoadout.from_dict(loadout.to_dict()) == loadout

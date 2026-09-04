@@ -17,7 +17,17 @@ from .....core.config.resolver import ConfigResolver, get_resolver
 from .....i18n import tr
 from ...config import get_game_config
 from .builtin import dimension_effects
-from .models import SOURCE_KINDS, AttrModelError, StatEffect
+from .models import (
+    SELECT_ALL,
+    SELECT_DERIVED,
+    SELECT_SINGLE,
+    SELECT_SLOTS,
+    SELECTION_POLICIES,
+    SOURCE_KINDS,
+    AttrLoadout,
+    AttrModelError,
+    StatEffect,
+)
 from .parsing import parse_source_file
 from .resolver import CapsLookup, ResolveResult, resolve, solve_residual
 
@@ -246,14 +256,74 @@ class AttrModelManager:
             caps_lookup=game_config_caps_lookup(),
         )
 
+    # ── 按装配状态展开 ──────────────────────────────────
+
+    def effects_for_loadout(
+        self, loadout: AttrLoadout, *, martial_arts: tuple[str, ...] = ()
+    ) -> list[StatEffect]:
+        """把装配状态展开成参与求值的条目
+
+        游戏规则决定展开方式：心法四个槽、每槽选第 N 重则一重至 N 重
+        同时生效；武学由流派的主副武学决定；套装/武备/神工/吃食各选
+        一项；等级底子与奇物恒生效。
+
+        没有「全选」这条路——互斥来源全部相加必然是错的。
+        """
+        chosen: list[StatEffect] = []
+        tier_by_group = {
+            slot.name: slot.tier for slot in loadout.inner_ways
+        }
+        wanted_arts = set(martial_arts)
+
+        for effect in self._effects:
+            policy = SELECTION_POLICIES.get(effect.kind, SELECT_SINGLE)
+            if policy == SELECT_ALL:
+                chosen.append(effect)
+            elif policy == SELECT_SLOTS:
+                tier = tier_by_group.get(effect.group)
+                # 选第 N 重 → 一重至 N 重全部生效
+                if tier is not None and 0 < effect.tier <= tier:
+                    chosen.append(effect)
+            elif policy == SELECT_DERIVED:
+                if effect.kind == "martial_art" and effect.group in wanted_arts:
+                    chosen.append(effect)
+            elif loadout.selections.get(effect.kind) == effect.source_id:
+                chosen.append(effect)
+
+        return chosen + dimension_effects()
+
+    def resolve_loadout(
+        self,
+        loadout: AttrLoadout,
+        *,
+        school_attr: str,
+        martial_arts: tuple[str, ...] = (),
+        residual: dict[str, float] | None = None,
+    ) -> ResolveResult:
+        """按装配状态求值"""
+        return resolve(
+            self.effects_for_loadout(loadout, martial_arts=martial_arts),
+            level=loadout.level,
+            school_attr=school_attr,
+            caps_lookup=game_config_caps_lookup(),
+            residual=residual,
+        )
+
     def _select(self, selected: tuple[str, ...] | None) -> list[StatEffect]:
-        """按用户选择挑出条目，并追加恒生效的内建来源
+        """按显式条目 id 挑出条目，并追加恒生效的内建来源
 
         内建来源（五维转换）是结构性的，不受 selected 影响——用户选的
         是「上哪几门心法」，不是「要不要让敏转成外功攻击」。
+
+        ``selected=None`` 只保留恒生效的来源（等级底子、奇物、五维），
+        **不再是全选**：互斥来源全部相加必然是错的，而缺省的零值一眼
+        能看出没配。要按角色实际装配求值请用 :meth:`resolve_loadout`。
         """
         if selected is None:
-            chosen = list(self._effects)
+            chosen = [
+                effect for effect in self._effects
+                if SELECTION_POLICIES.get(effect.kind) == SELECT_ALL
+            ]
         else:
             wanted = set(selected)
             unknown = wanted - {effect.source_id for effect in self._effects}

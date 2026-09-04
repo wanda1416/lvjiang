@@ -6,6 +6,13 @@
 - config/system/yysls/game_config.yaml
 """
 
+from .attr_loadout import (
+    delete_derivation,
+    get_derivation,
+    get_loadout,
+    save_derivation,
+    save_loadout,
+)
 from .constants import (
     AFFIX_CATEGORY_NAMES,
     BASE_ATTR_PARTS,
@@ -41,6 +48,12 @@ __all__ = [
     # 游戏配置管理器
     "GameConfigManager",
     "get_game_config",
+    # 属性来源的装配状态与推导上下文
+    "get_loadout",
+    "save_loadout",
+    "get_derivation",
+    "save_derivation",
+    "delete_derivation",
     # 基础属性配置存储（保留 play_style API 名称以兼容已有数据）
     "get_play_styles",
     "save_play_style",

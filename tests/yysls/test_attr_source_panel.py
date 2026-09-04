@@ -111,28 +111,7 @@ def test_the_real_manager_is_untouched_by_the_panel_fixture() -> None:
     """夹具替换的是模块级取用点；真单例不该被测试改到。"""
     assert get_attr_model_manager().errors() == {}
 
-
 # ── 推导对话框 ────────────────────────────────────────────
-
-@pytest.fixture
-def derive(tmp_path, monkeypatch, session_dir):
-    """来源目录与基础属性存储都指到临时目录。"""
-    (tmp_path / "inner_way.yaml").write_text(
-        "kind: inner_way\n"
-        "entries:\n"
-        "  易水歌·二重:\n    full_affix: 外功攻击\n"
-        "  待填·一重:\n    modeled: false\n",
-        encoding="utf-8",
-    )
-    manager = AttrModelManager(tmp_path)
-    import lvjiang.apps.yysls.ui.game_settings.attr_derive_dialog as module
-
-    monkeypatch.setattr(module, "get_attr_model_manager", lambda: manager)
-    from lvjiang.apps.yysls.ui.game_settings.attr_derive_dialog import (
-        AttrDeriveDialog,
-    )
-    return AttrDeriveDialog(), manager
-
 
 @pytest.fixture
 def session_dir(tmp_path, monkeypatch):
@@ -149,49 +128,123 @@ def session_dir(tmp_path, monkeypatch):
     return root
 
 
-def test_only_filled_sources_are_offered(derive) -> None:
-    """未填的条目贡献 0，列出来只会让人以为漏勾了。"""
+@pytest.fixture
+def derive(tmp_path, monkeypatch, session_dir):
+    """来源目录与基础属性存储都指到临时目录。"""
+    (tmp_path / "inner_way.yaml").write_text(
+        "kind: inner_way\nentries:\n"
+        "  易水歌·一重:\n    group: 易水歌\n    tier: 1\n    stats: {min_outer: 10}\n"
+        "  易水歌·二重:\n    group: 易水歌\n    tier: 2\n    stats: {min_outer: 20}\n"
+        "  长生无相·一重:\n    group: 长生无相\n    tier: 1\n    stats: {min_outer: 500}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "food.yaml").write_text(
+        "kind: food\nentries:\n  八珍玉食:\n    stats: {max_outer: 90}\n",
+        encoding="utf-8",
+    )
+    manager = AttrModelManager(tmp_path)
+    import lvjiang.apps.yysls.ui.game_settings.attr_derive_dialog as module
+
+    monkeypatch.setattr(module, "get_attr_model_manager", lambda: manager)
+    from lvjiang.apps.yysls.ui.game_settings.attr_derive_dialog import (
+        AttrDeriveDialog,
+    )
+    return AttrDeriveDialog(), manager
+
+
+def _equip(dialog, slot: int, name: str, tier: int) -> None:
+    name_combo, tier_combo = dialog._slot_rows[slot]
+    name_combo.setCurrentIndex(name_combo.findData(name))
+    tier_combo.setCurrentIndex(tier_combo.findData(tier))
+
+
+def test_martial_arts_come_from_the_school_not_a_picker(derive) -> None:
+    """两门武学由流派的主副武学决定，界面不给选。"""
     dialog, _ = derive
 
-    labels = [
-        dialog._list_sources.item(i).text()
-        for i in range(dialog._list_sources.count())
-    ]
-    assert any("易水歌·二重" in text for text in labels)
-    assert not any("待填·一重" in text for text in labels)
+    assert "由流派决定" in dialog._martial_label.text()
 
 
-def test_derived_value_comes_from_the_affix_caps(derive) -> None:
-    """一整条外功攻击按 1:2 拆开，两者之和回到当前等级的词条满值。"""
+def test_the_dialog_offers_exactly_the_game_s_slot_count(derive) -> None:
+    from lvjiang.apps.yysls.core.attr_model import INNER_WAY_SLOTS
+
+    dialog, _ = derive
+
+    assert len(dialog._slot_rows) == INNER_WAY_SLOTS
+
+
+def test_nothing_equipped_derives_nothing(derive) -> None:
+    """空装配得零值，一眼看得出没配；此前默认全选会把所有心法相加。"""
     dialog, _ = derive
     dialog._combo_level.setCurrentIndex(0)
 
-    rows = {
-        dialog._table.item(r, 0).text(): dialog._table.item(r, 1).text()
-        for r in range(dialog._table.rowCount())
-    }
+    result = dialog._resolve(dialog._loadout())
 
-    assert "最小外功攻击" in rows and "最大外功攻击" in rows
+    assert result.combat.attrs.min_outer == pytest.approx(0.0)
 
 
-def test_saving_writes_a_base_attribute_set(derive) -> None:
-    """推导结果存进现有的基础属性存储，毕业率链路照旧读它。"""
-    from lvjiang.apps.yysls.config import get_play_styles
+def test_equipping_a_tier_accumulates_the_lower_tiers(derive) -> None:
+    dialog, _ = derive
+    dialog._combo_level.setCurrentIndex(0)
+    _equip(dialog, 0, "易水歌", 2)
+
+    result = dialog._resolve(dialog._loadout())
+
+    assert result.combat.attrs.min_outer == pytest.approx(30.0)
+
+
+def test_the_loadout_is_remembered_between_openings(derive, monkeypatch) -> None:
+    """每次重开都要从头配四个槽的话，没人会用第二次。"""
+    from lvjiang.apps.yysls.ui.game_settings.attr_derive_dialog import (
+        AttrDeriveDialog,
+    )
+
+    dialog, _ = derive
+    dialog._combo_level.setCurrentIndex(0)
+    _equip(dialog, 0, "易水歌", 2)
+
+    reopened = AttrDeriveDialog()
+    assert reopened._loadout().inner_ways[0].name == "易水歌"
+    assert reopened._loadout().inner_ways[0].tier == 2
+
+
+def test_saving_records_both_the_snapshot_and_the_loadout(derive) -> None:
+    """只存扁平数值的话，事后没人知道它是怎么推出来的。"""
+    from lvjiang.apps.yysls.config import get_derivation, get_play_styles
+
+    dialog, _ = derive
+    dialog._combo_level.setCurrentIndex(0)
+    _equip(dialog, 0, "易水歌", 2)
+    school = dialog._combo_school.currentText()
+
+    loadout = dialog._loadout()
+    result = dialog._resolve(loadout)
+    from lvjiang.apps.yysls.config import save_derivation, save_play_style
+    save_play_style(school, "推导结果", result.combat_attrs.to_dict())
+    save_derivation(school, "推导结果", loadout.to_dict())
+
+    assert get_play_styles(school)["推导结果"]["min_outer"] == pytest.approx(30.0)
+    assert get_derivation(school, "推导结果")["inner_ways"] == [
+        {"name": "易水歌", "tier": 2}]
+
+
+def test_deleting_a_base_attribute_drops_its_loadout(derive) -> None:
+    """留着旧装配，同名的新配置会读到不属于它的来源。"""
+    from lvjiang.apps.yysls.config import (
+        delete_play_style,
+        get_derivation,
+        save_derivation,
+        save_play_style,
+    )
 
     dialog, _ = derive
     school = dialog._combo_school.currentText()
-    dialog._combo_level.setCurrentIndex(0)
+    save_play_style(school, "临时", {"min_outer": 1.0})
+    save_derivation(school, "临时", {"level": 110, "inner_ways": []})
 
-    result = dialog._manager().resolve(
-        level=dialog._combo_level.get_level(),
-        school_attr=dialog._school_attr(),
-        selected=dialog._selected_ids(),
-    )
-    from lvjiang.apps.yysls.config import save_play_style
-    save_play_style(school, "推导结果", result.combat_attrs.to_dict())
+    delete_play_style(school, "临时")
 
-    stored = get_play_styles(school)["推导结果"]
-    assert stored["min_outer"] > 0
+    assert get_derivation(school, "临时") == {}
 
 
 # ── 修复回归 ──────────────────────────────────────────────
@@ -219,6 +272,7 @@ def test_percent_fields_are_entered_as_percentages_and_stored_as_decimals(
     """内部按小数存（0.046 = 4.6%）。界面直接存输入值的话，
     用户照着游戏面板填 4.6 会被当成 460% 用。"""
     from PyQt6.QtWidgets import QDoubleSpinBox
+
     from lvjiang.apps.yysls.ui.game_settings.attr_source_panel import MODE_VALUE
 
     widget, manager = panel
@@ -239,6 +293,7 @@ def test_percent_fields_are_entered_as_percentages_and_stored_as_decimals(
 
 def test_non_percent_fields_are_stored_verbatim(panel) -> None:
     from PyQt6.QtWidgets import QDoubleSpinBox
+
     from lvjiang.apps.yysls.ui.game_settings.attr_source_panel import MODE_VALUE
 
     widget, manager = panel

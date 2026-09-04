@@ -256,6 +256,27 @@ class AttrModelManager:
             caps_lookup=game_config_caps_lookup(),
         )
 
+    def solve_residual_for_loadout(
+        self,
+        loadout: AttrLoadout,
+        targets: dict[str, float],
+        *,
+        school_attr: str,
+        martial_arts: tuple[str, ...] = (),
+    ) -> dict[str, float]:
+        """按装配状态反解补足，使面板属性等于 targets
+
+        来源没填完时，已建模的走推导、缺口由补足兜底，总量仍等于实测
+        面板。于是模型建到一半也是可用状态。
+        """
+        return solve_residual(
+            self.effects_for_loadout(loadout, martial_arts=martial_arts),
+            targets,
+            level=loadout.level,
+            school_attr=school_attr,
+            caps_lookup=game_config_caps_lookup(),
+        )
+
     # ── 按装配状态展开 ──────────────────────────────────
 
     def effects_for_loadout(

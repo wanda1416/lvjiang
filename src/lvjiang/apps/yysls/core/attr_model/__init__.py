@@ -34,6 +34,7 @@ from .models import (
     AFFIX_SCALAR_FIELDS,
     ATTR_ATTACK_CATEGORY,
     ATTR_ATTACK_FIELDS,
+    COMBAT_NUMERIC_FIELDS,
     DEFAULT_AFFIX_SPLIT,
     DIMENSION_CATEGORY,
     DIMENSION_FIELDS,
@@ -74,9 +75,11 @@ from .resolver import (
     expand_full_affix,
     resolve,
     solve_residual,
+    validate_formula_dependencies,
 )
 
 __all__ = [
+    "COMBAT_NUMERIC_FIELDS",
     "INNER_WAY_SLOTS",
     "INNER_WAY_TIERS",
     "MAX_INNER_WAY_TIER",
@@ -129,5 +132,6 @@ __all__ = [
     "parse_source_file",
     "resolve",
     "solve_residual",
+    "validate_formula_dependencies",
     "split_affix_cap",
 ]

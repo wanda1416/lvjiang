@@ -107,6 +107,37 @@ def expand_full_affix(
     return {low_field: low, high_field: high}
 
 
+def validate_formula_dependencies(effects: list[StatEffect]) -> None:
+    """公式只能引用「不由公式产生」的字段，即拒绝公式链。
+
+    第二趟里公式按条目顺序执行，所以 B 的公式若引用 A 的公式目标，
+    调换两者在 YAML 里的先后就会改变结果——一个没人会察觉的顺序依赖。
+
+    拓扑排序能解，但当前需求下没有任何数据需要公式链；直接禁掉更简单、
+    也更可靠：报错会明确指出是哪两个条目在链，真出现需要时再有意识地
+    引入第三趟，而不是在静默的错误结果上继续填数据。
+
+    五维不受影响：它只由常数写入，是公式的源而不是目标。
+    """
+    targets: dict[str, str] = {}
+    for effect in effects:
+        for name, value in effect.stats.items():
+            if isinstance(value, Formula):
+                targets.setdefault(name, effect.label)
+    for effect in effects:
+        for name, value in effect.stats.items():
+            if not isinstance(value, Formula):
+                continue
+            producer = targets.get(value.source)
+            if producer is not None:
+                raise AttrModelError(
+                    tr("{label} 的 {field} 引用了 {producer} 用公式算出的 {source}；"
+                       "公式不能引用公式的结果").format(
+                        label=effect.label, field=name,
+                        producer=producer, source=value.source)
+                )
+
+
 def _resolve_scope(
     effects: list[StatEffect],
     *,
@@ -256,6 +287,7 @@ def resolve(
         caps_lookup: 词条满值查询
         residual: 反解得到的手填补足，见 :func:`solve_residual`
     """
+    validate_formula_dependencies(effects)
     panel_attrs, panel_modifiers = _resolve_scope(
         effects,
         level=level,

@@ -1615,6 +1615,11 @@ auto_strings:
   '槽 {n}': 'Slot {n}'
   '武学：{arts}（由流派决定，不需选择）': 'Martial arts: {arts} (set by the path, not selectable)'
   '（不选）': '(none)'
+  '{label} 的 {field} 引用了 {producer} 用公式算出的 {source}；公式不能引用公式的结果': '{label}.{field} reads {source}, which {producer} computes with a formula; formulas cannot read formula results'
+  '{n} 个属性靠补足': '{n} stat(s) rely on the gap'
+  '保存时包含未建模补足': 'Include the unmodelled gap when saving'
+  '未建模补足': 'Unmodelled gap'
+  '来源没填完时，缺口由对照面板反解补齐；不勾则只存纯模型值': 'While sources are incomplete the gap is solved from the reference panel; uncheck to save the model value alone'
 task_history:
   task: Task
   title: Task History

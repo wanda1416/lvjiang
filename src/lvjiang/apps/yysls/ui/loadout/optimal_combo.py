@@ -36,6 +36,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
+from ...core.affix_cap import affix_dict_cap_pct
 from ...core.combat.combat_attrs import (
     CombatAttributes,
 )
@@ -188,11 +189,12 @@ def _equip_tooltip(equip: dict) -> str:
         else:
             parts.append(f"{base['name']}: {val}")
     # 普通词条
+    level = equip.get("level")
     for i in range(1, 6):
         affix = equip.get(f"affix_{i}")
         if isinstance(affix, dict) and affix.get("name"):
             val = affix.get("value", "")
-            cap_pct = affix.get("cap_pct")
+            cap_pct = affix_dict_cap_pct(affix, level)
             line = f"{affix['name']}: {val}"
             if cap_pct is not None:
                 line += f" ({cap_pct:.0f}%)"
@@ -203,7 +205,7 @@ def _equip_tooltip(equip: dict) -> str:
         parts.append(tr("&lt;止戈定音&gt;"))
     elif isinstance(dingyin, dict) and dingyin.get("name"):
         val = dingyin.get("value", "")
-        cap_pct = dingyin.get("cap_pct")
+        cap_pct = affix_dict_cap_pct(dingyin, level)
         line = f"{tr('定音')} {dingyin['name']}: {val}"
         if cap_pct is not None:
             line += f" ({cap_pct:.0f}%)"

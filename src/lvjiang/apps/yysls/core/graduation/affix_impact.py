@@ -10,6 +10,7 @@ import copy
 from dataclasses import dataclass
 
 from .....i18n import tr
+from ..affix_cap import affix_cap_ratio
 from ..combat.affix_rules import normal_affix_candidates
 from ..combat.combat_attrs import (
     CombatAttributes,
@@ -205,14 +206,20 @@ def _affix_cap(game_config, level: int, name: str) -> float:
 
 
 def _source_cap_pct(affix: dict, level: int, game_config) -> float:
-    """优先采用扫描记录的满值百分比，否则由当前值和等级上限反推。"""
+    """现算当前值占等级上限的比例。
+
+    换词条后的数值按这个比例折算，所以口径必须跟 ``value`` 一致。装备里
+    的 ``cap_pct`` 是给调律 DSL 快查的派生缓存，可能与 ``value`` 早已脱节
+    （改过数值却没重算），拿它折算会算出错误的收益；仅在查不到上限数据
+    时才退回它兜底。
+    """
+    ratio = affix_cap_ratio(
+        level, str(affix.get("name") or ""), affix.get("value"),
+        game_config=game_config)
+    if ratio is not None:
+        return min(max(ratio, 0.0), 1.0)
     recorded = _number(affix.get("cap_pct"))
-    if recorded > 0:
-        return min(recorded / 100, 1.0)
-    cap = _affix_cap(game_config, level, str(affix.get("name") or ""))
-    if cap <= 0:
-        return 0.0
-    return min(max(_number(affix.get("value")) / cap, 0.0), 1.0)
+    return min(recorded / 100, 1.0) if recorded > 0 else 0.0
 
 
 def _blocked_equipment(

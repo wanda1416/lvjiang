@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 
 from ......i18n import tr
 from ......ui.button_styles import apply_dialog_button_box_style
+from ....core.affix_cap import affix_dict_cap_pct, equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import (
     DINGYIN_NOTICE_KEY,
     is_zhige_dingyin,
@@ -502,17 +503,14 @@ class _SlotCard(QFrame):
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px;")
 
-        level = equip_data.get("level") or "?"
+        equip_level = equip_data.get("level")
+        level = equip_level or "?"
         is_chengyin = equip_data.get("is_chengyin", False)
         tag = " [" + tr("承音") + "]" if is_chengyin else ""
 
         # 词条平均百分比（内联在等级后面，字号跟随 affix_font_size）
         pct_fs = self._affix_fs
-        cap_pcts = []
-        for i in range(1, 6):
-            affix = equip_data.get(f"affix_{i}")
-            if affix and affix.get("name") and affix.get("cap_pct") is not None:
-                cap_pcts.append(affix["cap_pct"])
+        cap_pcts = equip_affix_cap_pcts(equip_data)
         if cap_pcts:
             avg_pct = sum(cap_pcts) / len(cap_pcts)
             pct_color = _affix_value_color(avg_pct)
@@ -536,7 +534,7 @@ class _SlotCard(QFrame):
             affix = equip_data.get(f"affix_{i}")
             if not affix or not affix.get("name"):
                 continue
-            self._add_affix_row(affix)
+            self._add_affix_row(affix, equip_level)
 
         # 定音
         dingyin = equip_data.get("dingyin")
@@ -554,16 +552,16 @@ class _SlotCard(QFrame):
                     (equip_data.get("_extra") or {}).get(DINGYIN_NOTICE_KEY) or ""
                 )
                 self._add_affix_row(
-                    {"name": tr("<止戈定音>")}, tooltip=notice,
+                    {"name": tr("<止戈定音>")}, equip_level, tooltip=notice,
                 )
             else:
                 assert isinstance(dingyin, dict)
-                self._add_affix_row(dingyin)
+                self._add_affix_row(dingyin, equip_level)
 
-    def _add_affix_row(self, affix: dict, *, tooltip: str = ""):
+    def _add_affix_row(self, affix: dict, level=None, *, tooltip: str = ""):
         value = affix.get("value", "")
         unit = affix.get("unit", "")
-        cap_pct = affix.get("cap_pct")
+        cap_pct = affix_dict_cap_pct(affix, level)
 
         if isinstance(value, (int, float)):
             val_str = f"{value}%" if unit == "%" else (
@@ -787,17 +785,14 @@ class _CompactEquipCard(QFrame):
         self.status_tags.set_visible("loadout", is_loadout)
         self.illegal_badge.set_reasons(illegal_reasons_of(equip_data))
 
-        level = equip_data.get("level") or "?"
+        equip_level = equip_data.get("level")
+        level = equip_level or "?"
         is_chengyin = equip_data.get("is_chengyin", False)
         tag = " [" + tr("承音") + "]" if is_chengyin else ""
 
         # 词条平均百分比（内联在等级后面，字号跟随 affix_font_size）
         pct_fs = self._affix_fs
-        cap_pcts = []
-        for i in range(1, 6):
-            affix = equip_data.get(f"affix_{i}")
-            if affix and affix.get("name") and affix.get("cap_pct") is not None:
-                cap_pcts.append(affix["cap_pct"])
+        cap_pcts = equip_affix_cap_pcts(equip_data)
         if cap_pcts:
             avg_pct = sum(cap_pcts) / len(cap_pcts)
             pct_color = _affix_value_color(avg_pct)
@@ -818,7 +813,7 @@ class _CompactEquipCard(QFrame):
 
             value = affix.get("value", "")
             unit = affix.get("unit", "")
-            cap_pct = affix.get("cap_pct")
+            cap_pct = affix_dict_cap_pct(affix, equip_level)
 
             if isinstance(value, (int, float)):
                 val_str = f"{value}%" if unit == "%" else (
@@ -879,7 +874,7 @@ class _CompactEquipCard(QFrame):
             dy_val_str = (
                 f"{dy_value}%" if isinstance(dy_value, (int, float))
                 else str(dy_value))
-            dy_cap_pct = dingyin.get("cap_pct")
+            dy_cap_pct = affix_dict_cap_pct(dingyin, equip_level)
             dy_color = _affix_value_color(dy_cap_pct)
 
             row = QHBoxLayout()

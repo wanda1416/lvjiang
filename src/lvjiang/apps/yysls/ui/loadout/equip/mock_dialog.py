@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 
 from ......i18n import tr
 from ......ui.button_styles import apply_dialog_button_box_style
+from ....core.affix_cap import affix_cap_pct
 
 # 部位 → group_key 映射
 _PART_TO_GROUP = {
@@ -215,7 +216,7 @@ class _AffixRow(QWidget):
         }
         if self._unit:
             result["unit"] = self._unit
-        # 计算 cap_pct
+        # cap_pct 只是给调律 DSL 快查的派生缓存，与 value 同一口径生成
         if self._cap > 0:
             result["cap_pct"] = round(value / self._cap * 100, 1)
         return result
@@ -919,17 +920,24 @@ class MockEquipDialog(QDialog):
         for i, row in enumerate(self._affix_rows, 1):
             affix_data = row.get_data()
             if affix_data:
-                # 根据模式填充数值
-                if mode == _MODE_MAX_CY and "cap_pct" not in affix_data:
+                # 词条行按模式预填过数值了；这里只兜底行内没解析到上限
+                # （cap_pct 算不出来）的情况。承音上限是 round(cap*0.94, 2)，
+                # 落库必须跟游戏显示对齐到 1 位小数——否则同一件装备的手填
+                # 快照和实测快照会因 114.12 / 114.1 生成不同指纹。
+                fill = {_MODE_MAX_CY: "chengyin", _MODE_MAX_VAL: "cap"}.get(mode)
+                if fill and affix_data.get("cap_pct") is None:
                     caps_info = gc.get_affix_caps(level, affix_data["name"])
                     if caps_info:
-                        affix_data["value"] = caps_info["chengyin"]
-                        affix_data["cap_pct"] = 94.0
-                elif mode == _MODE_MAX_VAL and "cap_pct" not in affix_data:
-                    caps_info = gc.get_affix_caps(level, affix_data["name"])
-                    if caps_info:
-                        affix_data["value"] = caps_info["cap"]
-                        affix_data["cap_pct"] = 100.0
+                        affix_data["value"] = round(caps_info[fill], 1)
+                # cap_pct 是派生缓存，凡是写过 value 就无条件重算，
+                # 不能留下 value 已改、cap_pct 还停在旧比例的脏数据。
+                pct = affix_cap_pct(
+                    level, affix_data["name"], affix_data.get("value"),
+                    game_config=gc)
+                if pct is None:
+                    affix_data.pop("cap_pct", None)
+                else:
+                    affix_data["cap_pct"] = pct
                 result[f"affix_{i}"] = affix_data
 
         # 定音
@@ -940,11 +948,11 @@ class MockEquipDialog(QDialog):
                 "name": dingyin_name,
                 "value": dingyin_value,
             }
-            # 计算定音 cap_pct
-            caps_info = gc.get_affix_caps(level, dingyin_name)
-            if caps_info and caps_info.get("cap"):
-                dingyin_data["cap_pct"] = round(
-                    dingyin_value / caps_info["cap"] * 100, 1)
+            # 派生缓存：与 value 同一口径现算
+            pct = affix_cap_pct(
+                level, dingyin_name, dingyin_value, game_config=gc)
+            if pct is not None:
+                dingyin_data["cap_pct"] = pct
             result["dingyin"] = dingyin_data
         else:
             result["dingyin"] = None

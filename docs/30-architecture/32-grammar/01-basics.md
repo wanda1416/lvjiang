@@ -243,7 +243,9 @@ $var = "hello"               # 隐式 eval，效果完全相同
 
 - `$name` 在运行时从 `variables` 字典中查找，找不到返回 `null`
 - 变量名遵循标识符规则：`[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*`
-- 变量作用域为当前工作流文件内，过程调用通过 import/def/call 模块化（见 [07-subworkflows.md](07-subworkflows.md)）
+- 普通变量按过程调用隔离；使用 `global $name` 声明的名称在本次执行的主流程和所有子过程中共享
+- `global` 支持一次声明多个变量：`global $first, $second`；声明已有局部变量会保留并提升其当前值
+- 过程调用通过 import/def/call 模块化（见 [07-subworkflows.md](07-subworkflows.md)）
 
 ## 四、表达式
 

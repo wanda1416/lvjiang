@@ -427,6 +427,7 @@ call $result = proc_name()            # 接收返回值
 |------|----------|--------|------|
 | **session** | 永久（跨执行） | 共享引用 | 角色级持久状态 |
 | **context** | 单次执行 | 共享引用 | 过程间数据传递 |
+| **global 变量** | 单次执行 | 显式声明后共享 | 跨过程共享简单值 |
 | **variables** | 单次执行 | 按 call 隔离 | 过程局部计算 |
 | **output** | 单次执行 | 按 call 隔离 | 返回给上层调度者 |
 
@@ -439,6 +440,10 @@ eval save()                           # 强制落盘
 # context — 跨过程共享
 eval context.key = value
 eval $val = context.key
+
+# global — 显式声明共享变量名
+global $count
+eval $count = 0
 
 # output — 返回结果
 collect $var as "label"               # 写入 output dict

@@ -89,6 +89,7 @@ call find_tune_material($target)  # 传变量值
 
 - 过程内的局部变量不影响调用方
 - 参数作为局部变量注入，过程返回后自动恢复
+- 经 `global $name` 声明的名称不参与隔离，主流程与任意深度的子过程共享其最新值
 - `session` / `context` / `_coord_meta` 共享引用（不隔离）
 
 ```
@@ -98,6 +99,23 @@ call my_proc($x)
 # $x 仍然是 "hello"（过程内的修改不影响调用方）
 # 但 context 的修改会保留
 ```
+
+需要共享简单变量时，可显式声明全局名称：
+
+```
+global $count
+eval $count = 0
+
+def increment()
+    eval $count = $count + 1
+end
+
+call increment()
+# $count == 1
+```
+
+`global` 也可写在子过程中；指令执行后，该名称及其后续写入会对调用方和
+其他子过程可见。其他未被 `global` 声明的变量仍保持原有隔离语义。
 
 ### 返回值绑定
 

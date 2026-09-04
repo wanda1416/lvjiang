@@ -975,6 +975,8 @@ auto_strings:
   复制坐标: Copy Coordinates
   解除引用绑定: Unbind Reference
   失败退出: Exit on Failure
+  声明全局变量: Declare Global Variable
+  声明后可在主流程与所有子过程中共享读写: Shared for reading and writing by the main flow and all subprocedures after declaration
   好的: OK
   如 $x > 0.5 / $v contains "ok" / not $hit: e.g. $x > 0.5 / $v contains "ok" / not $hit
   如 ios: e.g. ios

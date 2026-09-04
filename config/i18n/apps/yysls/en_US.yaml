@@ -61,6 +61,7 @@ yysls:
   配置每个装备等级的等阶名称，用于校验装备名称并识别原始等级；承音不改变等阶名称，无法匹配时原始等级为 0。: Configure tier names to validate equipment names and identify original levels. Chengyin does not change the tier name; unmatched original levels are 0.
   承音后转律: Transfer After Chengyin
   原始等级: Original Level
+  冷却时间: Cooldown Expires At
   该原始等级装备承音后是否仍允许在已转律词条上无限转律: Whether equipment of this original level may infinitely retransfer its transferred affix after Chengyin
   装备名称结构：等阶名称 + 标准名称 | 部位名称: 'Equipment name format: Tier Name + Standard Name | Equipment Part Name'
   输出: Output

@@ -6,7 +6,10 @@ import json
 import pytest
 import yaml
 
-from lvjiang.core.layout_manager import _expand_scene_references
+from lvjiang.core.layout_manager import (
+    _drop_orphan_coords,
+    _expand_scene_references,
+)
 from lvjiang.core.layout_models import Point, Region
 from lvjiang.core.scene_definition import SceneRegistry
 
@@ -302,6 +305,89 @@ def test_point_references_expand_into_the_point_table():
     assert [r.key for r in regions["dst"]] == ["btn"]
     assert points["dst"][0].source_scene == "src"
     assert regions["dst"][0].source_scene == "src"
+
+
+class _Def:
+    def __init__(self, key):
+        self.key = key
+
+
+def _fake_registry(scene_key, region_keys, point_keys, references):
+    """同时喂饱 _drop_orphan_coords（get_scene）与展开（all_scenes）。"""
+    scene = type("S", (), {
+        "regions": [_Def(k) for k in region_keys],
+        "points": [_Def(k) for k in point_keys],
+        "references": references,
+    })()
+    return type("Reg", (), {
+        "all_scenes": lambda self: {scene_key: scene},
+        "get_scene": lambda self, key: scene if key == scene_key else None,
+    })()
+
+
+def test_orphan_coords_are_dropped_so_the_reference_can_expand(monkeypatch):
+    """定义删了、布局坐标没删的残留项会顶掉同名引用的展开。
+
+    game_login_page 的真实事故：cancel 从原生 region 改成引用 general_control
+    之后，布局 JSON 里的旧坐标还留着。它没有 source_scene，保存路径不过滤它，
+    于是每次加载都撞名、引用永远展不开，click 一直点那份再也不会同步的陈旧
+    坐标，而且完全静默。
+    """
+    import lvjiang.core.scene_registry as sr
+
+    regions = {
+        "general_control": [
+            Region(key="cancel", x_ratio=0.05, y_ratio=0.64,
+                   w_ratio=0.10, h_ratio=0.09)],
+        "game_login_page": [
+            Region(key="enter", x_ratio=0.80, y_ratio=0.89,
+                   w_ratio=0.16, h_ratio=0.07),
+            Region(key="cancel", x_ratio=0.50, y_ratio=0.50,
+                   w_ratio=0.10, h_ratio=0.10),   # 孤儿：定义已删
+        ],
+    }
+    points = {"game_login_page": [
+        Point(key="user_2", cx_ratio=0.3, cy_ratio=0.5)]}
+
+    ref = type("R", (), {"scene": "general_control", "entity": "cancel"})()
+    monkeypatch.setattr(sr, "get_registry", lambda: _fake_registry(
+        "game_login_page", ["enter"], ["point_1"], [ref]))
+
+    _drop_orphan_coords(regions, points)
+    _expand_scene_references(regions, points)
+
+    # 孤儿清掉后引用正常展开，坐标取自源场景而不是那份陈旧残留
+    assert [r.key for r in regions["game_login_page"]] == ["enter", "cancel"]
+    got = regions["game_login_page"][1]
+    assert got.source_scene == "general_control" and got.is_reference
+    assert (got.x_ratio, got.y_ratio) == (0.05, 0.64)
+    # 源场景自己那一格不在注册表里（get_scene 认不出）→ 整体跳过，不误删
+    assert [r.key for r in regions["general_control"]] == ["cancel"]
+    assert points["game_login_page"] == []
+
+
+def test_orphan_cleanup_refuses_to_run_without_definitions(monkeypatch):
+    """两道保险：注册表炸了、场景 YAML 没了，都不能清坐标。
+
+    这两种情况下“已定义 key 集合”要么拿不到要么是空的，照清等于把整套布局
+    的坐标抹掉——比留着孤儿糟得多，而且下次保存就永久写死。
+    """
+    import lvjiang.core.scene_registry as sr
+
+    regions = {"s": [Region(key="a", x_ratio=0.1, y_ratio=0.1,
+                            w_ratio=0.1, h_ratio=0.1)]}
+
+    def _boom():
+        raise RuntimeError("registry down")
+
+    monkeypatch.setattr(sr, "get_registry", _boom)
+    _drop_orphan_coords(regions, {})
+    assert [r.key for r in regions["s"]] == ["a"]
+
+    monkeypatch.setattr(sr, "get_registry", lambda: type(
+        "Reg", (), {"get_scene": lambda self, key: None})())
+    _drop_orphan_coords(regions, {})
+    assert [r.key for r in regions["s"]] == ["a"]
 
 
 def test_referenced_entity_shows_the_source_name_not_its_key(

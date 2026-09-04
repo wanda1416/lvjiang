@@ -524,11 +524,49 @@ def load_layout_by_name(name: str) -> Layout | None:
                 regions, points, arrows, panels, scene_key,
             )
 
+    _drop_orphan_coords(regions, points)
     _expand_scene_references(regions, points)
 
     return Layout(name=name, desc=desc, canvas=canvas, regions=regions,
                   points=points, arrows=arrows, panels=panels,
                   crop_canvases=crop_canvases, subscene_refs=subscene_refs)
+
+
+def _drop_orphan_coords(regions: dict, points: dict) -> None:
+    """丢弃布局里没有场景定义支撑的坐标记录（孤儿）。
+
+    删除区域/坐标定义只改场景 YAML（``remove_region_from_scene``），布局 JSON
+    里的坐标不跟着走；保存路径又只过滤带 ``source_scene`` 的引用项，于是这条
+    残留记录会永久留在文件里。它在编辑器列表中根本不显示（列表按场景定义遍
+    历），运行期却照常参与查表，还会把同名跨场景引用的展开顶掉——引用从此
+    指向一份再也不会同步的陈旧坐标，而且完全静默。
+
+    加载期统一清一次，存量自愈，不必手工改 JSON。**必须排在
+    ``_expand_scene_references`` 之前**，否则孤儿仍然挡着展开。
+    """
+    from .scene_registry import get_registry
+
+    try:
+        registry = get_registry()
+    except Exception as exc:  # noqa: BLE001 — 注册表不可用时绝不能清坐标
+        logger.warning(f"孤儿坐标清理跳过（场景注册表不可用）: {exc}")
+        return
+
+    for table, attr in ((regions, "regions"), (points, "points")):
+        for scene_key, items in list(table.items()):
+            scene = registry.get_scene(scene_key)
+            if scene is None:
+                # 场景 YAML 缺失时定义集为空，照清等于抹掉整份坐标。这种布局
+                # 文件整体已是死数据，属于文件级清理的活，这里不碰。
+                continue
+            defined = {d.key for d in getattr(scene, attr)}
+            dropped = [i.key for i in items if i.key not in defined]
+            if not dropped:
+                continue
+            table[scene_key] = [i for i in items if i.key in defined]
+            logger.warning(
+                f"布局中 {scene_key} 有 {len(dropped)} 条坐标已无场景定义，"
+                f"已丢弃: {', '.join(dropped)}")
 
 
 def _expand_scene_references(regions: dict, points: dict) -> None:

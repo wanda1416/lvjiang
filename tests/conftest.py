@@ -109,3 +109,21 @@ def _isolate_clipboard(monkeypatch):
 
     clipboard = _FakeClipboard()
     monkeypatch.setattr(QApplication, "clipboard", lambda *args: clipboard)
+
+
+@pytest.fixture
+def distributed_plans_store(monkeypatch):
+    """把 app.yaml 的 plans 键换成内存里的一份。
+
+    分发方案落在 config/system|local 的 app.yaml 里，测试一旦真写就会被
+    config_write_guard 拦下。需要 distributed=True 的用例都要请求本 fixture。
+    """
+    from lvjiang.core.config import plans as plans_mod
+
+    store: dict = {}
+    monkeypatch.setattr(
+        plans_mod, "_load_distributed_raw", lambda: store.get("plans", []))
+    monkeypatch.setattr(
+        plans_mod, "_save_distributed_raw",
+        lambda items: store.__setitem__("plans", items))
+    return store

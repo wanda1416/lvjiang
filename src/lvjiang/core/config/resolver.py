@@ -948,6 +948,17 @@ def save_app_config(input_sim: dict, delay_params: dict, envs: list | None = Non
     get_resolver().save_merged(_APP_CONFIG_REL, data)
 
 
+def save_app_config_node(key: str, value: object) -> None:
+    """只改 app.yaml 的一个顶层键，其余键原样保留。
+
+    同样是读-改-写全量：save_merged 的入参语义是**完整文档**，直接传
+    ``{key: value}`` 会把其余顶层键判成用户删除。
+    """
+    data = load_app_config()
+    data[key] = value
+    get_resolver().save_merged(_APP_CONFIG_REL, data)
+
+
 def load_available_envs() -> list[tuple[str, str]]:
     """从 app.yaml 读取可用环境列表，返回 [(key, display_name), ...]"""
     app = load_app_config()

@@ -1,7 +1,7 @@
 """配置管理对话框（多 Tab）
 
 Tab1 基础配置、Tab2 输入模拟（引擎级点击参数）、Tab3 等待参数（命名等待）、
-Tab4 方案设置（方案管理 + 可用工作环境）、Tab5 字体设置、Tab6 热键设置（F7~F12 按键位）。
+Tab4 方案设置（连接方案 + 可用工作环境）、Tab5 字体设置、Tab6 热键设置（F7~F12 按键位）。
 Tab1/Tab5/Tab6 写 session.json（settings 节点）；Tab2/Tab3/Tab4 的环境列表写 app.yaml
 （input_simulation / delay_params / envs，system ← local 合并），保存后以配置文件为准
 覆盖代码默认值。Tab4 的方案写 session.json 的 plans 节点——方案是机器级运行态，与用户无关。
@@ -301,11 +301,11 @@ class SettingsDialog(QDialog):
     # ─── Tab4 系统参数（可用目标环境）────────────────────
 
     def _build_plan_tab(self) -> QWidget:
-        """方案设置 Tab：上半「方案管理」，下半原有的「系统参数」。"""
+        """方案设置 Tab：上半「连接方案」，下半原有的「系统参数」。"""
         tab = QWidget()
         vbox = QVBoxLayout(tab)
 
-        plans_box = QGroupBox(tr("方案管理"))
+        plans_box = QGroupBox(tr("连接方案"))
         plans_box.setLayout(self._build_plan_manager_layout())
         vbox.addWidget(plans_box, 1)
 
@@ -315,7 +315,7 @@ class SettingsDialog(QDialog):
         vbox.addWidget(env_box)
         return tab
 
-    # ─── 方案管理 ──────────────────────────────────
+    # ─── 连接方案 ──────────────────────────────────
 
     def _build_plan_manager_layout(self) -> QHBoxLayout:
         """左侧方案列表 + 右侧方案详情。"""
@@ -368,11 +368,21 @@ class SettingsDialog(QDialog):
         modes.addWidget(self._plan_mode_window)
         modes.addWidget(self._plan_mode_adb)
         modes.addStretch()
-        form.addRow(tr("支持模式") + ":", modes)
+        form.addRow(tr("模式") + ":", modes)
+        # 分发：勾上则方案写进 app.yaml 随包发布，否则留在本机 session.json。
+        # 只有开发模式看得到——普通用户既不该改发行配置，也不需要理解这层。
+        self._plan_distribute = QCheckBox(
+            tr("写入 app.yaml，随安装包分发"))
+        self._plan_distribute_label = QLabel(tr("分发") + ":")
+        form.addRow(self._plan_distribute_label, self._plan_distribute)
+        if not self._plan_dev_mode():
+            self._plan_distribute_label.hide()
+            self._plan_distribute.hide()
         for widget in (self._plan_space_combo, self._plan_env_combo,
                        self._plan_layout_combo):
             widget.currentIndexChanged.connect(self._on_plan_field_edited)
-        for box in (self._plan_mode_window, self._plan_mode_adb):
+        for box in (self._plan_mode_window, self._plan_mode_adb,
+                    self._plan_distribute):
             box.toggled.connect(self._on_plan_field_edited)
         row.addLayout(form, 4)
 
@@ -392,6 +402,17 @@ class SettingsDialog(QDialog):
             from ..core.layout_manager import LayoutConfigManager
             host_manager = LayoutConfigManager()
         return list(host_manager.list_layouts())
+
+    @staticmethod
+    def _plan_dev_mode() -> bool:
+        from ..core.config.resolver import get_resolver
+        return get_resolver().is_dev_mode()
+
+    def _plan_is_editable(self, plan) -> bool:
+        """分发方案随安装包下发，普通用户只能看不能改。"""
+        if plan is None:
+            return False
+        return self._plan_dev_mode() or not plan.distributed
 
     def _current_plan(self):
         row = self._plan_list.currentRow()
@@ -415,13 +436,14 @@ class SettingsDialog(QDialog):
 
         widgets = (self._plan_name_edit, self._plan_space_combo,
                    self._plan_env_combo, self._plan_layout_combo,
-                   self._plan_mode_window, self._plan_mode_adb)
+                   self._plan_mode_window, self._plan_mode_adb,
+                   self._plan_distribute)
         for widget in widgets:
             widget.blockSignals(True)
-        enabled = plan is not None
+        editable = self._plan_is_editable(plan)
         for widget in widgets:
-            widget.setEnabled(enabled)
-        self._plan_delete_btn.setEnabled(enabled)
+            widget.setEnabled(editable)
+        self._plan_delete_btn.setEnabled(editable)
         self._plan_name_edit.setText(plan.name if plan else "")
         space_idx = self._plan_space_combo.findText(plan.space) if plan else -1
         self._plan_space_combo.setCurrentIndex(max(space_idx, 0))
@@ -434,12 +456,15 @@ class SettingsDialog(QDialog):
             bool(plan) and PLAN_MODE_WINDOW in plan.modes)
         self._plan_mode_adb.setChecked(
             bool(plan) and PLAN_MODE_ADB in plan.modes)
+        self._plan_distribute.setChecked(bool(plan) and plan.distributed)
         for widget in widgets:
             widget.blockSignals(False)
         # 上面是在 blockSignals 里填的，编辑回调不会触发；而 max(idx, 0) 会把
         # 空值或已失效的值静默显示成第一项。不回写的话表单显示的和方案里存的
         # 就对不上——新建的方案三项全是空串，选中后主界面三个框纹丝不动。
-        if plan is not None and self._write_form_into_plan(plan):
+        # 只读方案例外：它引用的图库/布局在这台机器上可能根本不存在，回退到
+        # 第一项再回写，等于让用户「看一眼」就篡改了随包分发的配置。
+        if editable and self._write_form_into_plan(plan):
             self._mark_dirty()
 
     def _on_plan_row_changed(self, _row: int) -> None:
@@ -447,7 +472,7 @@ class SettingsDialog(QDialog):
 
     def _on_plan_name_edited(self, text: str) -> None:
         plan = self._current_plan()
-        if plan is None:
+        if not self._plan_is_editable(plan):
             return
         plan.name = text
         item = self._plan_list.currentItem()
@@ -472,15 +497,19 @@ class SettingsDialog(QDialog):
             self._plan_env_combo.currentData() or "",
             self._plan_layout_combo.currentText(),
             modes,
+            self._plan_distribute.isChecked(),
         )
-        if (plan.space, plan.env, plan.layout, plan.modes) == updated:
+        current = (plan.space, plan.env, plan.layout, plan.modes,
+                   plan.distributed)
+        if current == updated:
             return False
-        plan.space, plan.env, plan.layout, plan.modes = updated
+        (plan.space, plan.env, plan.layout, plan.modes,
+         plan.distributed) = updated
         return True
 
     def _on_plan_field_edited(self, *_args) -> None:
         plan = self._current_plan()
-        if plan is None:
+        if not self._plan_is_editable(plan):
             return
         self._write_form_into_plan(plan)
         self._mark_dirty()
@@ -517,7 +546,7 @@ class SettingsDialog(QDialog):
 
     def _on_delete_plan(self) -> None:
         plan = self._current_plan()
-        if plan is None:
+        if not self._plan_is_editable(plan):
             return
         confirmed = QMessageBox.question(
             self, tr("删除方案"),

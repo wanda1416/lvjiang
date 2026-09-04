@@ -32,11 +32,16 @@ jobs:
       - name: Type check (mypy)
         run: python -m mypy
 
+      # 并发跑（windows-2022 为 4 核）；pytest-cov 会自行合并各 worker 的覆盖数据。
+      # 代价是 Qt 后台线程类用例必须确定性 join 线程，不能只靠 waitUntil 轮询
+      # UI 状态：满载并发下主线程可能先处理 deleteLater 而工作线程未退出，
+      # 销毁运行中的 QThread 会让整个 worker 进程崩溃。
       - name: Run tests
         id: tests
         continue-on-error: true
         run: >-
           python -m pytest tests
+          -n auto
           --cov=lvjiang
           --cov-branch
           --cov-report=term-missing:skip-covered

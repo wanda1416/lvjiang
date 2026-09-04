@@ -28,6 +28,20 @@ def isolated_env(tmp_path, monkeypatch):
     reset_session_store()
 
 
+def _run_reporter(qtbot, rep):
+    """启动上报线程并等它真正退出，返回 finished_ok 的载荷。
+
+    waitSignal 在 run() 里 emit 的瞬间就返回，那一刻线程还没退出。用例一
+    结束 rep 的最后一个引用消失，PyQt 就地销毁一个仍在运行的 QThread，
+    进程直接崩——并发满载下稳定复现，串行只是靠运气躲过。生产侧不会
+    踩到：那里线程有 parent，还被 self._startup_telemetry_reporter 强引用着。
+    """
+    with qtbot.waitSignal(rep.finished_ok, timeout=3000) as blocker:
+        rep.start()
+    assert rep.wait(5000), "上报线程未在 5s 内退出"
+    return blocker.args[0]
+
+
 class TestBuildJobGatesOnConsent:
     def test_disabled_job_is_empty_and_touches_no_identity(self):
         job = reporter_mod.build_job()
@@ -74,9 +88,7 @@ class TestReporterThreadNeverTouchesSessionStore(object):
 
         rep = reporter_mod.TelemetryReporter(job)
         qtbot.addWidget(rep) if hasattr(rep, "show") else None
-        with qtbot.waitSignal(rep.finished_ok, timeout=3000) as blocker:
-            rep.start()
-        outcome = blocker.args[0]
+        outcome = _run_reporter(qtbot, rep)
         assert not calls_from_worker  # 唯一断言：worker 线程零次触碰 SessionStore
 
         # apply_outcome 在主线程执行，这里才允许写 SessionStore
@@ -92,9 +104,7 @@ class TestResponseBodyNeverActedOn:
         job = reporter_mod.build_job()
         monkeypatch.setattr(reporter_mod, "post_report", lambda envelope: True)
         rep = reporter_mod.TelemetryReporter(job)
-        with qtbot.waitSignal(rep.finished_ok, timeout=3000) as blocker:
-            rep.start()
-        outcome = blocker.args[0]
+        outcome = _run_reporter(qtbot, rep)
         assert outcome.heartbeat_ok is True
 
 
@@ -105,8 +115,6 @@ class TestEmptyJobShortCircuits:
         monkeypatch.setattr(reporter_mod, "post_report", _boom)
         job = reporter_mod.ReportJob(heartbeat=None, batches=())
         rep = reporter_mod.TelemetryReporter(job)
-        with qtbot.waitSignal(rep.finished_ok, timeout=3000) as blocker:
-            rep.start()
-        outcome = blocker.args[0]
+        outcome = _run_reporter(qtbot, rep)
         assert outcome.heartbeat_attempted is False
         assert outcome.sent_batches == ()

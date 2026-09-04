@@ -91,10 +91,11 @@ class GroupQrDialog(QDialog):
         self._status_label.setText(tr("正在获取最新二维码..."))
 
         refresher = group_qrcode.QrCodeRefresher(self)
-        refresher.finished.connect(self._on_refresh_finished)
+        refresher.succeeded.connect(self._on_refresh_finished)
         refresher.error.connect(self._on_refresh_error)
+        # deleteLater 只挂在 QThread.finished（线程真正退出后）上，成功与
+        # 失败两条路都会走到它；挂在 succeeded/error 上等于销毁还在跑的线程。
         refresher.finished.connect(refresher.deleteLater)
-        refresher.error.connect(refresher.deleteLater)
         self._refresher = refresher
         refresher.start()
 

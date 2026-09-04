@@ -75,7 +75,11 @@ def save_qrcode(data: bytes, *, path: Path | None = None) -> None:
 class QrCodeRefresher(QThread):
     """后台下载并保存最新交流群二维码。"""
 
-    finished = pyqtSignal(bytes)  # 下载并写盘成功后的图片二进制
+    # 不能叫 finished：那会遮蔽 QThread.finished，而后者是「线程已真正退出」
+    # 唯一的可靠信号。本类的成功信号在 run() 里 emit，那一刻线程还没退；
+    # 把 deleteLater 挂在它上，主线程就可能先处理延迟删除——销毁一个仍在
+    # 运行的 QThread 会直接让进程崩溃（满载并发下这个竞态稳定复现）。
+    succeeded = pyqtSignal(bytes)  # 下载并写盘成功后的图片二进制
     error = pyqtSignal(str)
 
     def run(self):
@@ -89,7 +93,7 @@ class QrCodeRefresher(QThread):
             logger.exception("[二维码] 刷新失败")
             self.error.emit(f"刷新二维码失败: {exc}")
         else:
-            self.finished.emit(data)
+            self.succeeded.emit(data)
 
 
 __all__ = [

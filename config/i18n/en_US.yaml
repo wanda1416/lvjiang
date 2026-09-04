@@ -419,7 +419,9 @@ config:
   delay_scroll_settle: Scroll Settle Wait
 auto_strings:
   从当前组合新建: New from current
-  支持模式: Supported modes
+  连接方案: Connection Plans
+  分发: Distribute
+  写入 app.yaml，随安装包分发: Write into app.yaml and ship with the installer
   新方案: New plan
   方案「{name}」至少要勾选一种连接模式: 'Plan "{name}" needs at least one connection mode'
   方案名称不能为空: Plan name cannot be empty

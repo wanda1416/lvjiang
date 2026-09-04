@@ -47,6 +47,7 @@ from .resolver import (
     load_available_envs,
     merge_doc,
     save_app_config,
+    save_app_config_node,
 )
 from .session import (
     SessionStore,
@@ -102,6 +103,7 @@ __all__ = [
     "load_env",
     "save_env",
     "load_available_envs",
+    "save_app_config_node",
     "load_user_config",
     # 方案（机器级的图库+环境+布局+连接模式组合）
     "Plan",

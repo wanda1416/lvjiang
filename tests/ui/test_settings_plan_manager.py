@@ -324,3 +324,112 @@ def test_new_from_current_without_a_backend_allows_both(qtbot, monkeypatch):
     dlg._on_new_plan_from_current()
 
     assert dlg._collect_plans()[-1].modes == [PLAN_MODE_WINDOW, PLAN_MODE_ADB]
+
+
+# ─── 连接方案：分发选项与只读约束 ─────────────────────────────
+
+def _dev_dialog(qtbot, monkeypatch, *, dev: bool):
+    monkeypatch.setattr(
+        SettingsDialog, "_plan_dev_mode", staticmethod(lambda: dev))
+    monkeypatch.setattr(
+        "lvjiang.ui.settings_dialog.load_user_config", UserConfig)
+    monkeypatch.setattr(
+        "lvjiang.ui.settings_dialog.save_settings", lambda _values: None)
+    monkeypatch.setattr(
+        "lvjiang.ui.settings_dialog.save_app_config", lambda *_args: None)
+    monkeypatch.setattr(
+        SettingsDialog, "_available_spaces", lambda _self: ["手游", "端游"])
+    monkeypatch.setattr(
+        SettingsDialog, "_available_layouts",
+        lambda _self: ["默认布局", "桌面布局"])
+    dlg = SettingsDialog()
+    qtbot.addWidget(dlg)
+    dlg._collect_custom = lambda: {}
+    dlg._collect_envs = lambda: []
+    return dlg
+
+
+def test_group_box_is_named_connection_plans(dialog):
+    from PyQt6.QtWidgets import QGroupBox
+    titles = [box.title() for box in dialog.findChildren(QGroupBox)]
+
+    assert "连接方案" in titles
+
+
+def test_distribute_row_is_hidden_for_normal_users(qtbot, monkeypatch):
+    dlg = _dev_dialog(qtbot, monkeypatch, dev=False)
+
+    assert dlg._plan_distribute.isHidden()
+    assert dlg._plan_distribute_label.isHidden()
+
+
+def test_distribute_row_is_shown_in_dev_mode(qtbot, monkeypatch):
+    dlg = _dev_dialog(qtbot, monkeypatch, dev=True)
+
+    assert not dlg._plan_distribute.isHidden()
+
+
+def test_dev_can_flip_the_distribute_flag(qtbot, monkeypatch):
+    dlg = _dev_dialog(qtbot, monkeypatch, dev=True)
+    dlg._on_new_plan()
+
+    dlg._plan_distribute.setChecked(True)
+
+    assert dlg._collect_plans()[0].distributed
+
+
+def test_new_plans_are_local_by_default(qtbot, monkeypatch):
+    dlg = _dev_dialog(qtbot, monkeypatch, dev=True)
+    dlg._on_new_plan()
+
+    assert not dlg._plan_distribute.isChecked()
+    assert not dlg._collect_plans()[0].distributed
+
+
+def test_distributed_plan_is_read_only_for_normal_users(qtbot, monkeypatch, distributed_plans_store):
+    save_plans([Plan.create("预置端游", space="端游", env="desktop",
+                            layout="桌面布局", modes=[PLAN_MODE_WINDOW],
+                            distributed=True)])
+    dlg = _dev_dialog(qtbot, monkeypatch, dev=False)
+
+    for widget in (dlg._plan_name_edit, dlg._plan_space_combo,
+                   dlg._plan_env_combo, dlg._plan_layout_combo,
+                   dlg._plan_mode_window, dlg._plan_mode_adb):
+        assert not widget.isEnabled()
+    assert not dlg._plan_delete_btn.isEnabled()
+
+
+def test_distributed_plan_stays_editable_in_dev_mode(qtbot, monkeypatch, distributed_plans_store):
+    save_plans([Plan.create("预置端游", space="端游", env="desktop",
+                            layout="桌面布局", modes=[PLAN_MODE_WINDOW],
+                            distributed=True)])
+    dlg = _dev_dialog(qtbot, monkeypatch, dev=True)
+
+    assert dlg._plan_name_edit.isEnabled()
+    assert dlg._plan_delete_btn.isEnabled()
+
+
+def test_read_only_plan_is_never_rewritten_by_being_viewed(qtbot, monkeypatch, distributed_plans_store):
+    """分发方案引用的布局在这台机器上不存在时，下拉框会回退到第一项。
+
+    对可编辑方案要把回退值写回去（否则表单与存储对不上），但对只读方案
+    写回去就等于「看一眼」改掉了随包分发的配置。
+    """
+    save_plans([Plan.create("预置", space="端游", env="desktop",
+                            layout="这台机器没有的布局",
+                            modes=[PLAN_MODE_WINDOW], distributed=True)])
+    dlg = _dev_dialog(qtbot, monkeypatch, dev=False)
+
+    assert dlg._collect_plans()[0].layout == "这台机器没有的布局"
+    assert not dlg._save_btn.isEnabled()
+
+
+def test_deleting_a_distributed_plan_is_refused_for_normal_users(
+        qtbot, monkeypatch, distributed_plans_store):
+    save_plans([Plan.create("预置", modes=[PLAN_MODE_WINDOW],
+                            distributed=True)])
+    dlg = _dev_dialog(qtbot, monkeypatch, dev=False)
+
+    dlg._on_delete_plan()
+
+    assert len(dlg._collect_plans()) == 1

@@ -897,7 +897,6 @@ auto_strings:
   战斗属性全屏: Combat Attributes Fullscreen
   战斗属性半屏: Combat Attributes Half-Screen
   战斗时间: Combat Time
-  所选主副武学无法匹配任何流派，请重新选择: The selected Main/Off Martial doesn't match any playstyle; please reselect
   所选装备存在词条组合异常，请先校正：{names}: 'The selected equipment has an invalid affix combination; please correct it first: {names}'
   所选装备没有能进一步提高毕业率的合法联合方案。: The selected equipment has no legal joint combination that further raises the graduation rate.
   所选调律规则的实际评级: Actual rating of the selected tuning rule
@@ -1260,6 +1259,7 @@ auto_strings:
   请先点击 '+ 分组' 创建分组: Please click '+ Group' to create a group first
   请先选中要删除的赛季行: Select the season row to delete first
   请先选中要删除的配置行: Select the config row to delete first
+  两门武学组合无法匹配任何流派，请重新选择: The two martial arts do not match any school; please pick again
   请先选择一个流派: Please select a playstyle first
   请先选择一个流派后再确认基础属性识别结果: Select a playstyle first before confirming the base-attribute recognition result
   请先选择属性: Please select an attribute first

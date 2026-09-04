@@ -419,7 +419,9 @@ config:
   delay_scroll_settle: Scroll Settle Wait
 auto_strings:
   从当前组合新建: 从当前组合新建
-  支持模式: 支持模式
+  连接方案: 连接方案
+  分发: 分发
+  写入 app.yaml，随安装包分发: 写入 app.yaml，随安装包分发
   新方案: 新方案
   方案「{name}」至少要勾选一种连接模式: 方案「{name}」至少要勾选一种连接模式
   方案名称不能为空: 方案名称不能为空

@@ -325,3 +325,47 @@ def test_full_affix_dropdown_lists_only_computable_categories(panel) -> None:
     combo = widget._table.cellWidget(0, 2)
     listed = {combo.itemText(i) for i in range(combo.count())}
     assert listed == set(SUPPORTED_FULL_AFFIX_CATEGORIES)
+
+
+# ── 未建模补足 ────────────────────────────────────────────
+
+def test_residual_fills_the_gap_between_model_and_reference(derive) -> None:
+    """来源没填完时，已建模的走推导、缺口由对照反解补齐，
+    两者相加等于实测面板——不必等 222 条心法填完才能用。"""
+    from lvjiang.apps.yysls.config import save_play_style
+
+    dialog, _ = derive
+    school = dialog._combo_school.currentText()
+    save_play_style(school, "实测面板", {"min_outer": 2000.0})
+    dialog._combo_level.setCurrentIndex(0)
+    _equip(dialog, 0, "易水歌", 1)          # 模型只覆盖 10
+    dialog._refresh_reference()
+    dialog._combo_reference.setCurrentIndex(
+        dialog._combo_reference.findData("实测面板"))
+
+    loadout = dialog._loadout()
+    residual = dialog._residual(loadout, dialog._reference_attrs())
+
+    assert residual["min_outer"] == pytest.approx(1990.0)
+    assert dialog._resolve(loadout, residual=residual).panel.attrs.min_outer == (
+        pytest.approx(2000.0))
+
+
+def test_no_reference_means_no_residual(derive) -> None:
+    """没有对照就没有缺口可算，不能凭空补。"""
+    dialog, _ = derive
+    dialog._combo_level.setCurrentIndex(0)
+
+    assert dialog._residual(dialog._loadout(), None) == {}
+
+
+def test_residual_can_be_excluded_from_what_gets_saved(derive) -> None:
+    """勾掉就只存纯模型值——补足是别人的面板，不该被当成模型成果。"""
+    dialog, _ = derive
+    dialog._combo_level.setCurrentIndex(0)
+    _equip(dialog, 0, "易水歌", 1)
+
+    dialog._check_residual.setChecked(False)
+    plain = dialog._resolve(dialog._loadout()).combat_attrs.min_outer
+
+    assert plain == pytest.approx(10.0)

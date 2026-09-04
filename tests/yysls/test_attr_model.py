@@ -683,3 +683,40 @@ def test_loadout_round_trips_through_a_plain_dict() -> None:
     )
 
     assert AttrLoadout.from_dict(loadout.to_dict()) == loadout
+
+
+# ── 公式依赖 ──────────────────────────────────────────────
+
+def test_formula_chains_are_rejected() -> None:
+    """公式引用公式的结果时，结果会随 YAML 里的先后而变。
+
+    与其做拓扑排序，不如直接禁掉——报错会指出是哪两个条目在链，
+    真需要时再有意识地引入第三趟，而不是在静默的错误结果上填数据。
+    """
+    effects = [
+        _effect("甲", kind="martial_art",
+                stats={"min_outer": Formula(source="dim_min", multiplier=2.0)}),
+        _effect("乙", kind="martial_art",
+                stats={"outer_bonus": Formula(source="min_outer", multiplier=0.001)}),
+    ]
+
+    with pytest.raises(AttrModelError, match="公式不能引用公式的结果"):
+        _resolve(effects)
+
+
+def test_formula_reading_a_constant_target_is_fine() -> None:
+    """常数写入的字段可以被公式引用——五维正是这条路。"""
+    effects = [
+        _effect("五维来源", kind="base", stats={"dim_min": 100.0}),
+        _effect("武学", kind="martial_art",
+                stats={"min_outer": Formula(source="dim_min", multiplier=0.9)}),
+    ]
+
+    assert _resolve(effects).combat.attrs.min_outer == pytest.approx(90.0)
+
+
+def test_builtin_dimension_conversion_passes_the_dependency_rule() -> None:
+    """内建的五维转换本身就是三条公式，不能被自己的规则挡住。"""
+    from lvjiang.apps.yysls.core.attr_model import validate_formula_dependencies
+
+    validate_formula_dependencies(list(dimension_effects()))

@@ -12,6 +12,10 @@ N 重则一重至 N 重全部生效），套装/武备/神工/吃食等各选一
 **没有「全部来源」这个选项**——互斥来源一起相加必然是错的，而空装配
 得到的零值一眼能看出没配，比一个似是而非的数安全。
 
+来源没填完时，选中一套对照即可反解出「未建模补足」：已建模的走推导、
+缺口由补足兜底，两者相加等于实测面板。补足可以选择一起保存，于是模型
+建到一半也能产出可用的基础属性，不必等 222 条心法填完。
+
 推导结果通过「存为基础属性」写进现有的基础属性存储，毕业率链路照旧
 读它；同时把这次的装配记进 attr_derivations，事后能查回它是怎么来的，
 数据更新后也能按同一份装配重推。
@@ -21,6 +25,7 @@ from __future__ import annotations
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QFormLayout,
@@ -51,6 +56,7 @@ from ...config import (
     save_play_style,
 )
 from ...core.attr_model import (
+    COMBAT_NUMERIC_FIELDS,
     INNER_WAY_SLOTS,
     INNER_WAY_TIERS,
     SELECT_SINGLE,
@@ -160,12 +166,14 @@ class AttrDeriveDialog(QDialog):
         self._summary.setStyleSheet("color: palette(mid); font-size: 11px;")
         right_layout.addWidget(self._summary)
 
-        self._table = QTableWidget(0, 4)
-        self._table.setHorizontalHeaderLabels(
-            [tr("属性"), tr("推导值"), tr("对照值"), tr("按来源拆分")])
+        self._table = QTableWidget(0, 5)
+        self._table.setHorizontalHeaderLabels([
+            tr("属性"), tr("推导值"), tr("未建模补足"), tr("对照值"),
+            tr("按来源拆分"),
+        ])
         header = self._table.horizontalHeader()
         if header is not None:
-            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         rows_header = self._table.verticalHeader()
         if rows_header is not None:
             rows_header.setVisible(False)
@@ -178,6 +186,12 @@ class AttrDeriveDialog(QDialog):
         layout.addWidget(splitter)
 
         buttons = QHBoxLayout()
+        self._check_residual = QCheckBox(tr("保存时包含未建模补足"))
+        self._check_residual.setChecked(True)
+        self._check_residual.setToolTip(tr(
+            "来源没填完时，缺口由对照面板反解补齐；不勾则只存纯模型值"))
+        self._check_residual.stateChanged.connect(lambda _s: self._on_changed())
+        buttons.addWidget(self._check_residual)
         buttons.addStretch()
         self._btn_save = QPushButton(tr("存为基础属性"))
         self._btn_save.clicked.connect(self._on_save)
@@ -333,9 +347,24 @@ class AttrDeriveDialog(QDialog):
             }
         return reference
 
-    def _resolve(self, loadout: AttrLoadout):
+    def _resolve(self, loadout: AttrLoadout, *, residual=None):
         return self._manager().resolve_loadout(
             loadout,
+            school_attr=self._school_attr(),
+            martial_arts=self._martial_arts(),
+            residual=residual,
+        )
+
+    def _residual(self, loadout: AttrLoadout, reference) -> dict[str, float]:
+        """让面板属性等于对照所需的补足；没选对照就没有补足可算"""
+        if reference is None:
+            return {}
+        targets = {
+            name: float(getattr(reference, name, 0.0))
+            for name in COMBAT_NUMERIC_FIELDS
+        }
+        return self._manager().solve_residual_for_loadout(
+            loadout, targets,
             school_attr=self._school_attr(),
             martial_arts=self._martial_arts(),
         )
@@ -351,12 +380,15 @@ class AttrDeriveDialog(QDialog):
             return
 
         reference = self._reference_attrs()
+        residual = self._residual(loadout, reference)
         differences = (
             diff_against_panel(result, reference) if reference is not None else {}
         )
-        self._fill_table(result, reference)
+        self._fill_table(result, reference, residual)
 
         parts = [tr("参与推导 {n} 项").format(n=len(result.panel.modifiers))]
+        if residual:
+            parts.append(tr("{n} 个属性靠补足").format(n=len(residual)))
         if result.unmodeled:
             parts.append(tr("其中 {n} 项尚未填数值").format(n=len(result.unmodeled)))
         if reference is None:
@@ -385,7 +417,7 @@ class AttrDeriveDialog(QDialog):
             rows.append((name, name, True))
         return rows
 
-    def _fill_table(self, result, reference) -> None:
+    def _fill_table(self, result, reference, residual: dict[str, float]) -> None:
         # 一律走 result.panel：显示的是面板值，拆分就必须是面板明细。
         # 混用战斗明细的话，两栏加不到一起（吃食只在战斗侧有贡献）。
         panel = result.panel
@@ -399,24 +431,30 @@ class AttrDeriveDialog(QDialog):
             self._table.setItem(row, 0, QTableWidgetItem(display))
             self._table.setItem(row, 1, QTableWidgetItem(f"{derived:.4g}"))
 
+            # 补足 = 对照 − 推导，即尚未建模的那部分
+            gap = 0.0 if is_extra else residual.get(name, 0.0)
+            self._table.setItem(
+                row, 2, QTableWidgetItem(f"{gap:+.4g}" if gap else "-"))
+
             if reference is None:
-                self._table.setItem(row, 2, QTableWidgetItem("-"))
+                self._table.setItem(row, 3, QTableWidgetItem("-"))
             else:
                 actual = (
                     reference.extra_attrs.get(name, 0.0) if is_extra
                     else getattr(reference, name, 0.0)
                 )
                 cell = QTableWidgetItem(f"{actual:.4g}")
-                if abs(actual - derived) > _DIFF_EPSILON:
+                # 补足之后仍对不上才算异常——补足本身就是为了抹平缺口
+                if abs(actual - derived - gap) > _DIFF_EPSILON:
                     cell.setForeground(Qt.GlobalColor.red)
-                self._table.setItem(row, 2, cell)
+                self._table.setItem(row, 3, cell)
 
             breakdown = panel.contribution_by_kind(name)
             text = "　".join(
                 f"{tr(SOURCE_KIND_LABELS.get(kind, kind))} {value:+.4g}"
                 for kind, value in breakdown.items() if value
             )
-            self._table.setItem(row, 3, QTableWidgetItem(text))
+            self._table.setItem(row, 4, QTableWidgetItem(text))
 
     # ── 保存 ──
 
@@ -424,8 +462,12 @@ class AttrDeriveDialog(QDialog):
         loadout = self._loadout()
         if not loadout.level:
             return
+        residual = (
+            self._residual(loadout, self._reference_attrs())
+            if self._check_residual.isChecked() else {}
+        )
         try:
-            result = self._resolve(loadout)
+            result = self._resolve(loadout, residual=residual)
         except AttrModelError as exc:
             QMessageBox.warning(self, tr("推导失败"), str(exc))
             return

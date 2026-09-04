@@ -5,8 +5,16 @@
 明细与差异**：面板对不上时，能直接看出是哪一个来源贡献错了，而不是
 只知道总数不对。
 
+界面按游戏里实际能装的东西组织：四个心法槽（每槽一门 + 重数，选第
+N 重则一重至 N 重全部生效），套装/武备/神工/吃食等各选一项。两门
+武学由流派的主副武学决定，不给选；五维转换恒生效。
+
+**没有「全部来源」这个选项**——互斥来源一起相加必然是错的，而空装配
+得到的零值一眼能看出没配，比一个似是而非的数安全。
+
 推导结果通过「存为基础属性」写进现有的基础属性存储，毕业率链路照旧
-读它，不需要为此改动任何既有计算。
+读它；同时把这次的装配记进 attr_derivations，事后能查回它是怎么来的，
+数据更新后也能按同一份装配重推。
 """
 from __future__ import annotations
 
@@ -15,12 +23,12 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QSplitter,
@@ -33,10 +41,24 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
-from ...config import get_game_config, get_play_styles, save_play_style
+from ...config import (
+    get_derivation,
+    get_game_config,
+    get_loadout,
+    get_play_styles,
+    save_derivation,
+    save_loadout,
+    save_play_style,
+)
 from ...core.attr_model import (
+    INNER_WAY_SLOTS,
+    INNER_WAY_TIERS,
+    SELECT_SINGLE,
+    SELECTION_POLICIES,
     SOURCE_KIND_LABELS,
+    AttrLoadout,
     AttrModelError,
+    InnerWaySlot,
     diff_against_panel,
     get_attr_model_manager,
 )
@@ -46,17 +68,22 @@ from .level_combo import LevelCombo
 #: 差异大于该值才算对不上。面板只显示到小数点后一位。
 _DIFF_EPSILON = 0.05
 
+#: 心法槽的空选项
+_EMPTY = ""
+
 
 class AttrDeriveDialog(QDialog):
-    """选来源 → 推导 → 与实测面板比对 → 存为基础属性。"""
+    """配装 → 推导 → 与实测面板比对 → 存为基础属性。"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("基础属性推导"))
-        self.resize(940, 620)
+        self.resize(980, 660)
+        self._loading = False
+        self._slot_rows: list[tuple[QComboBox, QComboBox]] = []
+        self._single_combos: dict[str, QComboBox] = {}
         self._build_ui()
-        self._refresh_sources()
-        self._recompute()
+        self._reload_school()
 
     # ── 构建 ──
 
@@ -67,17 +94,17 @@ class AttrDeriveDialog(QDialog):
         top.addWidget(QLabel(tr("流派")))
         self._combo_school = QComboBox()
         self._combo_school.addItems(list(get_game_config().get_schools()))
-        self._combo_school.currentIndexChanged.connect(self._on_school_changed)
+        self._combo_school.currentIndexChanged.connect(self._reload_school)
         top.addWidget(self._combo_school)
 
         top.addWidget(QLabel(tr("等级")))
         self._combo_level = LevelCombo()
-        self._combo_level.currentIndexChanged.connect(self._recompute)
+        self._combo_level.currentIndexChanged.connect(self._on_changed)
         top.addWidget(self._combo_level)
 
         top.addWidget(QLabel(tr("对照基础属性")))
         self._combo_reference = QComboBox()
-        self._combo_reference.currentIndexChanged.connect(self._recompute)
+        self._combo_reference.currentIndexChanged.connect(self._on_reference_changed)
         top.addWidget(self._combo_reference)
         top.addStretch()
         layout.addLayout(top)
@@ -87,10 +114,42 @@ class AttrDeriveDialog(QDialog):
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(QLabel(tr("参与推导的来源")))
-        self._list_sources = QListWidget()
-        self._list_sources.itemChanged.connect(lambda _item: self._recompute())
-        left_layout.addWidget(self._list_sources)
+
+        self._martial_label = QLabel()
+        self._martial_label.setWordWrap(True)
+        self._martial_label.setStyleSheet("color: palette(mid); font-size: 11px;")
+        left_layout.addWidget(self._martial_label)
+
+        slots_box = QGroupBox(tr("心法（{n} 个槽）").format(n=INNER_WAY_SLOTS))
+        slots_form = QFormLayout(slots_box)
+        for index in range(INNER_WAY_SLOTS):
+            name_combo = QComboBox()
+            tier_combo = QComboBox()
+            tier_combo.addItem(_EMPTY, 0)
+            for tier, label in enumerate(INNER_WAY_TIERS, start=1):
+                tier_combo.addItem(label, tier)
+            name_combo.currentIndexChanged.connect(self._on_changed)
+            tier_combo.currentIndexChanged.connect(self._on_changed)
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.addWidget(name_combo, 3)
+            row_layout.addWidget(tier_combo, 1)
+            slots_form.addRow(tr("槽 {n}").format(n=index + 1), row)
+            self._slot_rows.append((name_combo, tier_combo))
+        left_layout.addWidget(slots_box)
+
+        others_box = QGroupBox(tr("其他来源"))
+        others_form = QFormLayout(others_box)
+        for kind, policy in SELECTION_POLICIES.items():
+            if policy != SELECT_SINGLE:
+                continue
+            combo = QComboBox()
+            combo.currentIndexChanged.connect(self._on_changed)
+            others_form.addRow(tr(SOURCE_KIND_LABELS[kind]), combo)
+            self._single_combos[kind] = combo
+        left_layout.addWidget(others_box)
+        left_layout.addStretch()
         splitter.addWidget(left)
 
         right = QWidget()
@@ -115,7 +174,7 @@ class AttrDeriveDialog(QDialog):
 
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([260, 660])
+        splitter.setSizes([320, 660])
         layout.addWidget(splitter)
 
         buttons = QHBoxLayout()
@@ -130,7 +189,7 @@ class AttrDeriveDialog(QDialog):
         buttons.addWidget(close)
         layout.addLayout(buttons)
 
-    # ── 数据 ──
+    # ── 流派相关 ──
 
     def _manager(self):
         return get_attr_model_manager()
@@ -141,21 +200,43 @@ class AttrDeriveDialog(QDialog):
     def _school_attr(self) -> str:
         return get_game_config().get_school_attr(self._school()) or "通用"
 
-    def _refresh_sources(self) -> None:
-        """列出已填数值的条目。未填的贡献 0，列出来只会让人以为漏勾了。"""
-        self._list_sources.blockSignals(True)
-        self._list_sources.clear()
-        for effect in self._manager().effects():
-            if not effect.modeled:
-                continue
-            item = QListWidgetItem(
-                f"[{tr(SOURCE_KIND_LABELS[effect.kind])}] {effect.label}")
-            item.setData(Qt.ItemDataRole.UserRole, effect.source_id)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Checked)
-            self._list_sources.addItem(item)
-        self._list_sources.blockSignals(False)
+    def _martial_arts(self) -> tuple[str, ...]:
+        """两门武学由流派的主副武学决定，不给用户选"""
+        config = get_game_config().get_schools().get(self._school()) or {}
+        names = [
+            (config.get(side) or {}).get("martial_art")
+            for side in ("main", "sub")
+        ]
+        return tuple(name for name in names if name)
+
+    def _reload_school(self) -> None:
+        self._loading = True
+        arts = self._martial_arts()
+        self._martial_label.setText(
+            tr("武学：{arts}（由流派决定，不需选择）").format(
+                arts=" + ".join(arts) if arts else tr("未配置"))
+        )
+
+        groups = sorted({
+            effect.group for effect in self._manager().effects(("inner_way",))
+            if effect.group
+        })
+        for name_combo, _tier in self._slot_rows:
+            name_combo.clear()
+            name_combo.addItem(_EMPTY, _EMPTY)
+            for group in groups:
+                name_combo.addItem(group, group)
+
+        for kind, combo in self._single_combos.items():
+            combo.clear()
+            combo.addItem(tr("（不选）"), _EMPTY)
+            for effect in self._manager().effects((kind,)):
+                combo.addItem(effect.label, effect.source_id)
+
         self._refresh_reference()
+        self._apply_loadout(AttrLoadout.from_dict(get_loadout(self._school())))
+        self._loading = False
+        self._on_changed()
 
     def _refresh_reference(self) -> None:
         self._combo_reference.blockSignals(True)
@@ -165,13 +246,72 @@ class AttrDeriveDialog(QDialog):
             self._combo_reference.addItem(name, name)
         self._combo_reference.blockSignals(False)
 
-    def _selected_ids(self) -> tuple[str, ...]:
-        chosen: list[str] = []
-        for index in range(self._list_sources.count()):
-            item = self._list_sources.item(index)
-            if item is not None and item.checkState() == Qt.CheckState.Checked:
-                chosen.append(str(item.data(Qt.ItemDataRole.UserRole)))
-        return tuple(chosen)
+    # ── 装配状态 ──
+
+    def _loadout(self) -> AttrLoadout:
+        slots: list[InnerWaySlot] = []
+        used: set[str] = set()
+        for name_combo, tier_combo in self._slot_rows:
+            name = name_combo.currentData() or ""
+            tier = tier_combo.currentData() or 0
+            # 同一门心法装在两个槽是无效配置，后一个槽忽略——否则
+            # AttrLoadout 的重复校验会让整个界面停在报错上。
+            if not name or not tier or name in used:
+                continue
+            used.add(name)
+            slots.append(InnerWaySlot(name=name, tier=int(tier)))
+        selections = {
+            kind: combo.currentData()
+            for kind, combo in self._single_combos.items()
+            if combo.currentData()
+        }
+        return AttrLoadout(
+            level=self._combo_level.get_level() or 0,
+            school=self._school(),
+            inner_ways=tuple(slots),
+            selections=selections,
+        )
+
+    def _apply_loadout(self, loadout: AttrLoadout) -> None:
+        if loadout.level:
+            position = self._combo_level.findText(str(loadout.level))
+            if position >= 0:
+                self._combo_level.setCurrentIndex(position)
+        for index, (name_combo, tier_combo) in enumerate(self._slot_rows):
+            if index < len(loadout.inner_ways):
+                slot = loadout.inner_ways[index]
+                name_combo.setCurrentIndex(max(0, name_combo.findData(slot.name)))
+                tier_combo.setCurrentIndex(max(0, tier_combo.findData(slot.tier)))
+            else:
+                name_combo.setCurrentIndex(0)
+                tier_combo.setCurrentIndex(0)
+        for kind, combo in self._single_combos.items():
+            combo.setCurrentIndex(
+                max(0, combo.findData(loadout.selections.get(kind, _EMPTY))))
+
+    def _on_reference_changed(self) -> None:
+        """选中一套基础属性时，把它当时的装配也调出来。
+
+        没有记录的（多半是抄面板反推的）保持当前装配不动。
+        """
+        if self._loading:
+            return
+        name = self._combo_reference.currentData()
+        stored = get_derivation(self._school(), name) if name else {}
+        if stored:
+            self._loading = True
+            self._apply_loadout(AttrLoadout.from_dict(stored))
+            self._loading = False
+        self._on_changed()
+
+    def _on_changed(self) -> None:
+        if self._loading:
+            return
+        loadout = self._loadout()
+        save_loadout(self._school(), loadout.to_dict())
+        self._recompute(loadout)
+
+    # ── 推导 ──
 
     def _reference_attrs(self) -> CombatAttributes | None:
         name = self._combo_reference.currentData()
@@ -193,22 +333,18 @@ class AttrDeriveDialog(QDialog):
             }
         return reference
 
-    def _on_school_changed(self) -> None:
-        self._refresh_reference()
-        self._recompute()
+    def _resolve(self, loadout: AttrLoadout):
+        return self._manager().resolve_loadout(
+            loadout,
+            school_attr=self._school_attr(),
+            martial_arts=self._martial_arts(),
+        )
 
-    # ── 推导 ──
-
-    def _recompute(self) -> None:
-        level = self._combo_level.get_level()
-        if level is None:
+    def _recompute(self, loadout: AttrLoadout) -> None:
+        if not loadout.level:
             return
         try:
-            result = self._manager().resolve(
-                level=level,
-                school_attr=self._school_attr(),
-                selected=self._selected_ids(),
-            )
+            result = self._resolve(loadout)
         except AttrModelError as exc:
             self._summary.setText(tr("推导失败：{msg}").format(msg=str(exc)))
             self._table.setRowCount(0)
@@ -218,10 +354,11 @@ class AttrDeriveDialog(QDialog):
         differences = (
             diff_against_panel(result, reference) if reference is not None else {}
         )
-        self._fill_table(result, reference, differences)
+        self._fill_table(result, reference)
 
-        done, total = self._manager().progress()
-        parts = [tr("已确认来源 {done}/{total}").format(done=done, total=total)]
+        parts = [tr("参与推导 {n} 项").format(n=len(result.panel.modifiers))]
+        if result.unmodeled:
+            parts.append(tr("其中 {n} 项尚未填数值").format(n=len(result.unmodeled)))
         if reference is None:
             parts.append(tr("未选对照，只显示推导值"))
         elif differences:
@@ -248,7 +385,7 @@ class AttrDeriveDialog(QDialog):
             rows.append((name, name, True))
         return rows
 
-    def _fill_table(self, result, reference, differences: dict) -> None:
+    def _fill_table(self, result, reference) -> None:
         # 一律走 result.panel：显示的是面板值，拆分就必须是面板明细。
         # 混用战斗明细的话，两栏加不到一起（吃食只在战斗侧有贡献）。
         panel = result.panel
@@ -284,15 +421,11 @@ class AttrDeriveDialog(QDialog):
     # ── 保存 ──
 
     def _on_save(self) -> None:
-        level = self._combo_level.get_level()
-        if level is None:
+        loadout = self._loadout()
+        if not loadout.level:
             return
         try:
-            result = self._manager().resolve(
-                level=level,
-                school_attr=self._school_attr(),
-                selected=self._selected_ids(),
-            )
+            result = self._resolve(loadout)
         except AttrModelError as exc:
             QMessageBox.warning(self, tr("推导失败"), str(exc))
             return
@@ -304,9 +437,11 @@ class AttrDeriveDialog(QDialog):
             return
         # 存的是战斗属性全集：吃食一类只在战斗内生效的加成也要计入，
         # 毕业率算的是战斗内表现，而不是角色面板。
-        attrs = result.combat_attrs.to_dict()
         try:
-            save_play_style(self._school(), name.strip(), attrs)
+            save_play_style(self._school(), name.strip(),
+                            result.combat_attrs.to_dict())
+            # 同时记下这次的装配，事后能查回它是怎么来的
+            save_derivation(self._school(), name.strip(), loadout.to_dict())
         except Exception as exc:
             logger.error(f"保存基础属性失败: {exc}")
             QMessageBox.warning(self, tr("保存失败"), str(exc))

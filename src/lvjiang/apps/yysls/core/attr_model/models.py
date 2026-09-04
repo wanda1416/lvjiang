@@ -120,6 +120,42 @@ ATTR_ATTACK_CATEGORY = "属性攻击"
 #: 五维词组名
 DIMENSION_CATEGORY = "五维属性"
 
+#: 心法重数。游戏里固定六重，选第 N 重时一重至 N 重同时生效。
+INNER_WAY_TIERS: tuple[str, ...] = (
+    "一重", "二重", "三重", "四重", "五重", "六重",
+)
+MAX_INNER_WAY_TIER = len(INNER_WAY_TIERS)
+
+#: 同时可装备的心法门数
+INNER_WAY_SLOTS = 4
+
+#: 来源的选择方式。游戏规则决定，不进 YAML。
+#:
+#: - ``slots``  槽位制：心法四个槽，每槽一门 + 一个重数
+#: - ``derived`` 不由用户选：武学由流派的主/副武学决定，五维转换恒生效
+#: - ``single`` 至多选一项
+#: - ``all``    该类别全部条目恒生效
+SELECT_SLOTS = "slots"
+SELECT_DERIVED = "derived"
+SELECT_SINGLE = "single"
+SELECT_ALL = "all"
+
+#: 各来源类别的选择方式。空文件的那几类先按最保守的猜测填，
+#: 填数据时发现不符再改——它是模型结构，不是游戏数值。
+SELECTION_POLICIES: dict[str, str] = {
+    "base": SELECT_ALL,            # 等级底子恒生效
+    "breakthrough": SELECT_SINGLE,  # 当前突破等级只有一个
+    "dimension": SELECT_DERIVED,    # 内建，恒生效
+    "martial_art": SELECT_DERIVED,  # 由流派的主/副武学决定
+    "inner_way": SELECT_SLOTS,      # 四个槽，每槽带重数
+    "gear_set": SELECT_SINGLE,
+    "arsenal": SELECT_SINGLE,
+    "divinecraft": SELECT_SINGLE,
+    "oddity": SELECT_ALL,           # 奇物是已收集的，全部生效
+    "script": SELECT_SINGLE,
+    "food": SELECT_SINGLE,
+}
+
 #: CombatAttributes 的数值字段（不含 extra_attrs）
 COMBAT_NUMERIC_FIELDS: tuple[str, ...] = tuple(
     f.name for f in dataclass_fields(CombatAttributes) if f.name != "extra_attrs"
@@ -208,6 +244,11 @@ class StatEffect:
     label: str
     kind: str
     scope: str = SCOPE_PANEL
+    #: 分组名与档位。心法用它表达「易水歌 的 第 2 重」，选第 N 重时
+    #: 一重至 N 重同时生效。显式存元数据而不是切分中文 id——id 里
+    #: 出现「·」或重数写法不一致时，字符串切分会静默算错。
+    group: str = ""
+    tier: int = 0
     stats: dict[str, float | Formula] = field(default_factory=dict)
     full_affix: FullAffix | None = None
     extra: dict[str, float] = field(default_factory=dict)
@@ -233,6 +274,88 @@ class StatEffect:
             raise AttrModelError(
                 tr("未知作用域: {scope}").format(scope=self.scope)
             )
+
+
+# ─── 装配状态 ────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class InnerWaySlot:
+    """一个心法槽：装了哪门、修到第几重"""
+
+    name: str
+    tier: int
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.tier <= MAX_INNER_WAY_TIER:
+            raise AttrModelError(
+                tr("心法重数只能是 1-{max}：{name} 填了 {tier}").format(
+                    max=MAX_INNER_WAY_TIER, name=self.name, tier=self.tier)
+            )
+
+
+@dataclass(frozen=True)
+class AttrLoadout:
+    """当前角色的装配状态——推导的唯一输入
+
+    对应游戏里实际能装的东西：四个心法槽（每槽一门 + 重数），套装/
+    武备/神工/吃食等各选一项。两门武学由流派的主副武学决定，不在这里
+    选；五维转换恒生效。
+
+    没有「全选」这个状态：互斥来源全部相加必然是错的，而空装配得到
+    的零值一眼就能看出没配，比一个似是而非的数安全。
+    """
+
+    level: int
+    school: str
+    inner_ways: tuple[InnerWaySlot, ...] = ()
+    #: 单选类来源：类别 → 条目 id
+    selections: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if len(self.inner_ways) > INNER_WAY_SLOTS:
+            raise AttrModelError(
+                tr("最多同时装备 {n} 门心法，给了 {got} 门").format(
+                    n=INNER_WAY_SLOTS, got=len(self.inner_ways))
+            )
+        names = [slot.name for slot in self.inner_ways]
+        if len(set(names)) != len(names):
+            raise AttrModelError(tr("同一门心法不能装在多个槽位"))
+        for kind in self.selections:
+            if SELECTION_POLICIES.get(kind) != SELECT_SINGLE:
+                raise AttrModelError(
+                    tr("{kind} 不是单选来源，不能用 selections 指定").format(
+                        kind=kind)
+                )
+
+    def to_dict(self) -> dict:
+        return {
+            "level": self.level,
+            "school": self.school,
+            "inner_ways": [
+                {"name": slot.name, "tier": slot.tier} for slot in self.inner_ways
+            ],
+            "selections": dict(self.selections),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "AttrLoadout":
+        payload = data if isinstance(data, dict) else {}
+        slots: list[InnerWaySlot] = []
+        for raw in payload.get("inner_ways") or []:
+            if not isinstance(raw, dict) or not raw.get("name"):
+                continue
+            slots.append(InnerWaySlot(
+                name=str(raw["name"]), tier=int(raw.get("tier") or 1)))
+        selections = {
+            str(k): str(v)
+            for k, v in (payload.get("selections") or {}).items() if v
+        }
+        return cls(
+            level=int(payload.get("level") or 0),
+            school=str(payload.get("school") or ""),
+            inner_ways=tuple(slots),
+            selections=selections,
+        )
 
 
 # ─── 求值产物 ────────────────────────────────────────────

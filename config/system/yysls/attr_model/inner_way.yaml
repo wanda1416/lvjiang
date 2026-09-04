@@ -14,445 +14,889 @@ kind: inner_way
 entries:
   易水歌·二重:
     full_affix: 外功攻击
+    group: 易水歌
+    tier: 2
   易水歌·一重:
     modeled: false
+    group: 易水歌
+    tier: 1
   易水歌·三重:
     modeled: false
+    group: 易水歌
+    tier: 3
   易水歌·四重:
     modeled: false
+    group: 易水歌
+    tier: 4
   易水歌·五重:
     modeled: false
+    group: 易水歌
+    tier: 5
   易水歌·六重:
     modeled: false
+    group: 易水歌
+    tier: 6
   泣血婆娑·一重:
     modeled: false
+    group: 泣血婆娑
+    tier: 1
   泣血婆娑·二重:
     modeled: false
+    group: 泣血婆娑
+    tier: 2
   泣血婆娑·三重:
     modeled: false
+    group: 泣血婆娑
+    tier: 3
   泣血婆娑·四重:
     modeled: false
+    group: 泣血婆娑
+    tier: 4
   泣血婆娑·五重:
     modeled: false
+    group: 泣血婆娑
+    tier: 5
   泣血婆娑·六重:
     modeled: false
+    group: 泣血婆娑
+    tier: 6
   生龙活虎·一重:
     modeled: false
+    group: 生龙活虎
+    tier: 1
   生龙活虎·二重:
     modeled: false
+    group: 生龙活虎
+    tier: 2
   生龙活虎·三重:
     modeled: false
+    group: 生龙活虎
+    tier: 3
   生龙活虎·四重:
     modeled: false
+    group: 生龙活虎
+    tier: 4
   生龙活虎·五重:
     modeled: false
+    group: 生龙活虎
+    tier: 5
   生龙活虎·六重:
     modeled: false
+    group: 生龙活虎
+    tier: 6
   长生无相·一重:
     modeled: false
+    group: 长生无相
+    tier: 1
   长生无相·二重:
     modeled: false
+    group: 长生无相
+    tier: 2
   长生无相·三重:
     modeled: false
+    group: 长生无相
+    tier: 3
   长生无相·四重:
     modeled: false
+    group: 长生无相
+    tier: 4
   长生无相·五重:
     modeled: false
+    group: 长生无相
+    tier: 5
   长生无相·六重:
     modeled: false
+    group: 长生无相
+    tier: 6
   苦四时·一重:
     modeled: false
+    group: 苦四时
+    tier: 1
   苦四时·二重:
     modeled: false
+    group: 苦四时
+    tier: 2
   苦四时·三重:
     modeled: false
+    group: 苦四时
+    tier: 3
   苦四时·四重:
     modeled: false
+    group: 苦四时
+    tier: 4
   苦四时·五重:
     modeled: false
+    group: 苦四时
+    tier: 5
   苦四时·六重:
     modeled: false
+    group: 苦四时
+    tier: 6
   四时无常·一重:
     modeled: false
+    group: 四时无常
+    tier: 1
   四时无常·二重:
     modeled: false
+    group: 四时无常
+    tier: 2
   四时无常·三重:
     modeled: false
+    group: 四时无常
+    tier: 3
   四时无常·四重:
     modeled: false
+    group: 四时无常
+    tier: 4
   四时无常·五重:
     modeled: false
+    group: 四时无常
+    tier: 5
   四时无常·六重:
     modeled: false
+    group: 四时无常
+    tier: 6
   山月无影·一重:
     modeled: false
+    group: 山月无影
+    tier: 1
   山月无影·二重:
     modeled: false
+    group: 山月无影
+    tier: 2
   山月无影·三重:
     modeled: false
+    group: 山月无影
+    tier: 3
   山月无影·四重:
     modeled: false
+    group: 山月无影
+    tier: 4
   山月无影·五重:
     modeled: false
+    group: 山月无影
+    tier: 5
   山月无影·六重:
     modeled: false
+    group: 山月无影
+    tier: 6
   抗造大法·一重:
     modeled: false
+    group: 抗造大法
+    tier: 1
   抗造大法·二重:
     modeled: false
+    group: 抗造大法
+    tier: 2
   抗造大法·三重:
     modeled: false
+    group: 抗造大法
+    tier: 3
   抗造大法·四重:
     modeled: false
+    group: 抗造大法
+    tier: 4
   抗造大法·五重:
     modeled: false
+    group: 抗造大法
+    tier: 5
   抗造大法·六重:
     modeled: false
+    group: 抗造大法
+    tier: 6
   归燕经·一重:
     modeled: false
+    group: 归燕经
+    tier: 1
   归燕经·二重:
     modeled: false
+    group: 归燕经
+    tier: 2
   归燕经·三重:
     modeled: false
+    group: 归燕经
+    tier: 3
   归燕经·四重:
     modeled: false
+    group: 归燕经
+    tier: 4
   归燕经·五重:
     modeled: false
+    group: 归燕经
+    tier: 5
   归燕经·六重:
     modeled: false
+    group: 归燕经
+    tier: 6
   晚雪间·一重:
     modeled: false
+    group: 晚雪间
+    tier: 1
   晚雪间·二重:
     modeled: false
+    group: 晚雪间
+    tier: 2
   晚雪间·三重:
     modeled: false
+    group: 晚雪间
+    tier: 3
   晚雪间·四重:
     modeled: false
+    group: 晚雪间
+    tier: 4
   晚雪间·五重:
     modeled: false
+    group: 晚雪间
+    tier: 5
   晚雪间·六重:
     modeled: false
+    group: 晚雪间
+    tier: 6
   铁身决·一重:
     modeled: false
+    group: 铁身决
+    tier: 1
   铁身决·二重:
     modeled: false
+    group: 铁身决
+    tier: 2
   铁身决·三重:
     modeled: false
+    group: 铁身决
+    tier: 3
   铁身决·四重:
     modeled: false
+    group: 铁身决
+    tier: 4
   铁身决·五重:
     modeled: false
+    group: 铁身决
+    tier: 5
   铁身决·六重:
     modeled: false
+    group: 铁身决
+    tier: 6
   征人归·一重:
     modeled: false
+    group: 征人归
+    tier: 1
   征人归·二重:
     modeled: false
+    group: 征人归
+    tier: 2
   征人归·三重:
     modeled: false
+    group: 征人归
+    tier: 3
   征人归·四重:
     modeled: false
+    group: 征人归
+    tier: 4
   征人归·五重:
     modeled: false
+    group: 征人归
+    tier: 5
   征人归·六重:
     modeled: false
+    group: 征人归
+    tier: 6
   御风之翼·一重:
     modeled: false
+    group: 御风之翼
+    tier: 1
   御风之翼·二重:
     modeled: false
+    group: 御风之翼
+    tier: 2
   御风之翼·三重:
     modeled: false
+    group: 御风之翼
+    tier: 3
   御风之翼·四重:
     modeled: false
+    group: 御风之翼
+    tier: 4
   御风之翼·五重:
     modeled: false
+    group: 御风之翼
+    tier: 5
   御风之翼·六重:
     modeled: false
+    group: 御风之翼
+    tier: 6
   威猛歌·一重:
     modeled: false
+    group: 威猛歌
+    tier: 1
   威猛歌·二重:
     modeled: false
+    group: 威猛歌
+    tier: 2
   威猛歌·三重:
     modeled: false
+    group: 威猛歌
+    tier: 3
   威猛歌·四重:
     modeled: false
+    group: 威猛歌
+    tier: 4
   威猛歌·五重:
     modeled: false
+    group: 威猛歌
+    tier: 5
   威猛歌·六重:
     modeled: false
+    group: 威猛歌
+    tier: 6
   千山法·一重:
     modeled: false
+    group: 千山法
+    tier: 1
   千山法·二重:
     modeled: false
+    group: 千山法
+    tier: 2
   千山法·三重:
     modeled: false
+    group: 千山法
+    tier: 3
   千山法·四重:
     modeled: false
+    group: 千山法
+    tier: 4
   千山法·五重:
     modeled: false
+    group: 千山法
+    tier: 5
   千山法·六重:
     modeled: false
+    group: 千山法
+    tier: 6
   无名心法·一重:
     modeled: false
+    group: 无名心法
+    tier: 1
   无名心法·二重:
     modeled: false
+    group: 无名心法
+    tier: 2
   无名心法·三重:
     modeled: false
+    group: 无名心法
+    tier: 3
   无名心法·四重:
     modeled: false
+    group: 无名心法
+    tier: 4
   无名心法·五重:
     modeled: false
+    group: 无名心法
+    tier: 5
   无名心法·六重:
     modeled: false
+    group: 无名心法
+    tier: 6
   燎原星火·一重:
     modeled: false
+    group: 燎原星火
+    tier: 1
   燎原星火·二重:
     modeled: false
+    group: 燎原星火
+    tier: 2
   燎原星火·三重:
     modeled: false
+    group: 燎原星火
+    tier: 3
   燎原星火·四重:
     modeled: false
+    group: 燎原星火
+    tier: 4
   燎原星火·五重:
     modeled: false
+    group: 燎原星火
+    tier: 5
   燎原星火·六重:
     modeled: false
+    group: 燎原星火
+    tier: 6
   移经易武·一重:
     modeled: false
+    group: 移经易武
+    tier: 1
   移经易武·二重:
     modeled: false
+    group: 移经易武
+    tier: 2
   移经易武·三重:
     modeled: false
+    group: 移经易武
+    tier: 3
   移经易武·四重:
     modeled: false
+    group: 移经易武
+    tier: 4
   移经易武·五重:
     modeled: false
+    group: 移经易武
+    tier: 5
   移经易武·六重:
     modeled: false
+    group: 移经易武
+    tier: 6
   凝神章·一重:
     modeled: false
+    group: 凝神章
+    tier: 1
   凝神章·二重:
     modeled: false
+    group: 凝神章
+    tier: 2
   凝神章·三重:
     modeled: false
+    group: 凝神章
+    tier: 3
   凝神章·四重:
     modeled: false
+    group: 凝神章
+    tier: 4
   凝神章·五重:
     modeled: false
+    group: 凝神章
+    tier: 5
   凝神章·六重:
     modeled: false
+    group: 凝神章
+    tier: 6
   剑气纵横·一重:
     modeled: false
+    group: 剑气纵横
+    tier: 1
   剑气纵横·二重:
     modeled: false
+    group: 剑气纵横
+    tier: 2
   剑气纵横·三重:
     modeled: false
+    group: 剑气纵横
+    tier: 3
   剑气纵横·四重:
     modeled: false
+    group: 剑气纵横
+    tier: 4
   剑气纵横·五重:
     modeled: false
+    group: 剑气纵横
+    tier: 5
   剑气纵横·六重:
     modeled: false
+    group: 剑气纵横
+    tier: 6
   逐狼心经·一重:
     modeled: false
+    group: 逐狼心经
+    tier: 1
   逐狼心经·二重:
     modeled: false
+    group: 逐狼心经
+    tier: 2
   逐狼心经·三重:
     modeled: false
+    group: 逐狼心经
+    tier: 3
   逐狼心经·四重:
     modeled: false
+    group: 逐狼心经
+    tier: 4
   逐狼心经·五重:
     modeled: false
+    group: 逐狼心经
+    tier: 5
   逐狼心经·六重:
     modeled: false
+    group: 逐狼心经
+    tier: 6
   极乐·一重:
     modeled: false
+    group: 极乐
+    tier: 1
   极乐·二重:
     modeled: false
+    group: 极乐
+    tier: 2
   极乐·三重:
     modeled: false
+    group: 极乐
+    tier: 3
   极乐·四重:
     modeled: false
+    group: 极乐
+    tier: 4
   极乐·五重:
     modeled: false
+    group: 极乐
+    tier: 5
   极乐·六重:
     modeled: false
+    group: 极乐
+    tier: 6
   杏花不见·一重:
     modeled: false
+    group: 杏花不见
+    tier: 1
   杏花不见·二重:
     modeled: false
+    group: 杏花不见
+    tier: 2
   杏花不见·三重:
     modeled: false
+    group: 杏花不见
+    tier: 3
   杏花不见·四重:
     modeled: false
+    group: 杏花不见
+    tier: 4
   杏花不见·五重:
     modeled: false
+    group: 杏花不见
+    tier: 5
   杏花不见·六重:
     modeled: false
+    group: 杏花不见
+    tier: 6
   指玄篇注·一重:
     modeled: false
+    group: 指玄篇注
+    tier: 1
   指玄篇注·二重:
     modeled: false
+    group: 指玄篇注
+    tier: 2
   指玄篇注·三重:
     modeled: false
+    group: 指玄篇注
+    tier: 3
   指玄篇注·四重:
     modeled: false
+    group: 指玄篇注
+    tier: 4
   指玄篇注·五重:
     modeled: false
+    group: 指玄篇注
+    tier: 5
   指玄篇注·六重:
     modeled: false
+    group: 指玄篇注
+    tier: 6
   君臣药·一重:
     modeled: false
+    group: 君臣药
+    tier: 1
   君臣药·二重:
     modeled: false
+    group: 君臣药
+    tier: 2
   君臣药·三重:
     modeled: false
+    group: 君臣药
+    tier: 3
   君臣药·四重:
     modeled: false
+    group: 君臣药
+    tier: 4
   君臣药·五重:
     modeled: false
+    group: 君臣药
+    tier: 5
   君臣药·六重:
     modeled: false
+    group: 君臣药
+    tier: 6
   花上月令·一重:
     modeled: false
+    group: 花上月令
+    tier: 1
   花上月令·二重:
     modeled: false
+    group: 花上月令
+    tier: 2
   花上月令·三重:
     modeled: false
+    group: 花上月令
+    tier: 3
   花上月令·四重:
     modeled: false
+    group: 花上月令
+    tier: 4
   花上月令·五重:
     modeled: false
+    group: 花上月令
+    tier: 5
   花上月令·六重:
     modeled: false
+    group: 花上月令
+    tier: 6
   葫芦飞飞·一重:
     modeled: false
+    group: 葫芦飞飞
+    tier: 1
   葫芦飞飞·二重:
     modeled: false
+    group: 葫芦飞飞
+    tier: 2
   葫芦飞飞·三重:
     modeled: false
+    group: 葫芦飞飞
+    tier: 3
   葫芦飞飞·四重:
     modeled: false
+    group: 葫芦飞飞
+    tier: 4
   葫芦飞飞·五重:
     modeled: false
+    group: 葫芦飞飞
+    tier: 5
   葫芦飞飞·六重:
     modeled: false
+    group: 葫芦飞飞
+    tier: 6
   纵地摘星·一重:
     modeled: false
+    group: 纵地摘星
+    tier: 1
   纵地摘星·二重:
     modeled: false
+    group: 纵地摘星
+    tier: 2
   纵地摘星·三重:
     modeled: false
+    group: 纵地摘星
+    tier: 3
   纵地摘星·四重:
     modeled: false
+    group: 纵地摘星
+    tier: 4
   纵地摘星·五重:
     modeled: false
+    group: 纵地摘星
+    tier: 5
   纵地摘星·六重:
     modeled: false
+    group: 纵地摘星
+    tier: 6
   春雷篇·一重:
     modeled: false
+    group: 春雷篇
+    tier: 1
   春雷篇·二重:
     modeled: false
+    group: 春雷篇
+    tier: 2
   春雷篇·三重:
     modeled: false
+    group: 春雷篇
+    tier: 3
   春雷篇·四重:
     modeled: false
+    group: 春雷篇
+    tier: 4
   春雷篇·五重:
     modeled: false
+    group: 春雷篇
+    tier: 5
   春雷篇·六重:
     modeled: false
+    group: 春雷篇
+    tier: 6
   忘川绝响·一重:
     modeled: false
+    group: 忘川绝响
+    tier: 1
   忘川绝响·二重:
     modeled: false
+    group: 忘川绝响
+    tier: 2
   忘川绝响·三重:
     modeled: false
+    group: 忘川绝响
+    tier: 3
   忘川绝响·四重:
     modeled: false
+    group: 忘川绝响
+    tier: 4
   忘川绝响·五重:
     modeled: false
+    group: 忘川绝响
+    tier: 5
   忘川绝响·六重:
     modeled: false
+    group: 忘川绝响
+    tier: 6
   断石之构·一重:
     modeled: false
+    group: 断石之构
+    tier: 1
   断石之构·二重:
     modeled: false
+    group: 断石之构
+    tier: 2
   断石之构·三重:
     modeled: false
+    group: 断石之构
+    tier: 3
   断石之构·四重:
     modeled: false
+    group: 断石之构
+    tier: 4
   断石之构·五重:
     modeled: false
+    group: 断石之构
+    tier: 5
   断石之构·六重:
     modeled: false
+    group: 断石之构
+    tier: 6
   所恨年年·一重:
     modeled: false
+    group: 所恨年年
+    tier: 1
   所恨年年·二重:
     modeled: false
+    group: 所恨年年
+    tier: 2
   所恨年年·三重:
     modeled: false
+    group: 所恨年年
+    tier: 3
   所恨年年·四重:
     modeled: false
+    group: 所恨年年
+    tier: 4
   所恨年年·五重:
     modeled: false
+    group: 所恨年年
+    tier: 5
   所恨年年·六重:
     modeled: false
+    group: 所恨年年
+    tier: 6
   复仇·一重:
     modeled: false
+    group: 复仇
+    tier: 1
   复仇·二重:
     modeled: false
+    group: 复仇
+    tier: 2
   复仇·三重:
     modeled: false
+    group: 复仇
+    tier: 3
   复仇·四重:
     modeled: false
+    group: 复仇
+    tier: 4
   复仇·五重:
     modeled: false
+    group: 复仇
+    tier: 5
   复仇·六重:
     modeled: false
+    group: 复仇
+    tier: 6
   持其不攻·一重:
     modeled: false
+    group: 持其不攻
+    tier: 1
   持其不攻·二重:
     modeled: false
+    group: 持其不攻
+    tier: 2
   持其不攻·三重:
     modeled: false
+    group: 持其不攻
+    tier: 3
   持其不攻·四重:
     modeled: false
+    group: 持其不攻
+    tier: 4
   持其不攻·五重:
     modeled: false
+    group: 持其不攻
+    tier: 5
   持其不攻·六重:
     modeled: false
+    group: 持其不攻
+    tier: 6
   山河绝韵·一重:
     modeled: false
+    group: 山河绝韵
+    tier: 1
   山河绝韵·二重:
     modeled: false
+    group: 山河绝韵
+    tier: 2
   山河绝韵·三重:
     modeled: false
+    group: 山河绝韵
+    tier: 3
   山河绝韵·四重:
     modeled: false
+    group: 山河绝韵
+    tier: 4
   山河绝韵·五重:
     modeled: false
+    group: 山河绝韵
+    tier: 5
   山河绝韵·六重:
     modeled: false
+    group: 山河绝韵
+    tier: 6
   磐石诀·一重:
     modeled: false
+    group: 磐石诀
+    tier: 1
   磐石诀·二重:
     modeled: false
+    group: 磐石诀
+    tier: 2
   磐石诀·三重:
     modeled: false
+    group: 磐石诀
+    tier: 3
   磐石诀·四重:
     modeled: false
+    group: 磐石诀
+    tier: 4
   磐石诀·五重:
     modeled: false
+    group: 磐石诀
+    tier: 5
   磐石诀·六重:
     modeled: false
+    group: 磐石诀
+    tier: 6
   困兽心经·一重:
     modeled: false
+    group: 困兽心经
+    tier: 1
   困兽心经·二重:
     modeled: false
+    group: 困兽心经
+    tier: 2
   困兽心经·三重:
     modeled: false
+    group: 困兽心经
+    tier: 3
   困兽心经·四重:
     modeled: false
+    group: 困兽心经
+    tier: 4
   困兽心经·五重:
     modeled: false
+    group: 困兽心经
+    tier: 5
   困兽心经·六重:
     modeled: false
+    group: 困兽心经
+    tier: 6

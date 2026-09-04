@@ -10,6 +10,15 @@ from ..equip_parser.dingyin_parser import is_zhige_dingyin
 
 _EPSILON = 1e-6
 _KNOWN_QUALITIES = frozenset({"gold", "purple", "blue", "green"})
+# 同一个真值可能以两种口径落库：游戏只显示 1 位小数（OCR 得到 114.1），
+# 而内部承音上限是 round(cap * 0.94, 2)（手填得到 114.12）。两者的舍入
+# 方向彼此独立，5 条词条里几乎必然有一条反向偏移，用浮点 epsilon 比较
+# 会把同一件装备判成「数值下降」。可比的公共分辨率是显示步长，容差取
+# 半步：喂养带来的真实提升至少 0.1 才在游戏里可见，不会被这个容差吃掉。
+_DISPLAY_STEP = 0.1
+_VALUE_TOL = _DISPLAY_STEP / 2 + _EPSILON
+# 判断哪份快照更新时参考的可选字段；缺失说明该份记录更简略。
+_DETAIL_FIELDS = ("original_level", "created_at", "cooldown_expires_at")
 
 
 @dataclass(frozen=True)
@@ -81,12 +90,31 @@ def _numeric_value(affix: dict) -> float | None:
     return float(value)
 
 
+def _freshness(equip: dict, position: int) -> tuple:
+    """双向兼容时判断哪份快照更「新」。
+
+    cap_pct 是给 DSL 快查用的派生缓存，可能与 value 早已脱节，不作依据。
+    改用可信的元数据：更新时间 > 记录完整度 > 插入顺序。
+    """
+    updated_at = equip.get("updated_at")
+    detail = sum(
+        1 for field in _DETAIL_FIELDS if equip.get(field)
+    )
+    return (str(updated_at or ""), detail, position)
+
+
 def _can_follow(
     old: dict,
     new: dict,
     levels: dict[int, LevelConfig],
 ) -> bool:
-    """new 是否可能是 old 经承音、传律或转律后的版本。"""
+    """new 是否可能是 old 经承音、传律或转律后的版本。
+
+    这里判定的是「不矛盾」而非「确有演进」：同一件装备完全可能被记录成
+    两份数值一致的快照——喂养中途重复录入，或一份手填满承音、一份实测，
+    两者仅因小数位口径不同才生成了不同指纹。要求必须存在可见变化会把这
+    类重复快照永远挡在候选之外，而它们正是最该合并的对象。
+    """
     if not _eligible(old, levels) or not _eligible(new, levels):
         return False
     if old.get("type") != new.get("type"):
@@ -118,11 +146,6 @@ def _can_follow(
     if old_transferred is not None and new_transferred != old_transferred:
         return False
 
-    changed = (
-        old_level != new_level
-        or bool(old.get("is_chengyin")) != bool(new.get("is_chengyin"))
-        or old_transferred != new_transferred
-    )
     for index, (old_affix, new_affix) in enumerate(
         zip(old_affixes, new_affixes, strict=True)
     ):
@@ -139,7 +162,6 @@ def _can_follow(
                 new_cfg = levels[new_level]
                 if not (old_cfg.allow_retransfer and new_cfg.allow_retransfer):
                     return False
-            changed = True
             # 不同词条的数值/上限没有可比性。
             continue
 
@@ -147,19 +169,20 @@ def _can_follow(
         new_value = _numeric_value(new_affix)
         if old_value is None or new_value is None:
             return False
-        if new_value + _EPSILON < old_value:
+        if new_value < old_value - _VALUE_TOL:
             return False
-        if new_value > old_value + _EPSILON:
-            changed = True
 
-    return changed
+    return True
 
 
 def find_chengyin_merge_candidates(
     equipment_items: dict[str, dict],
     level_configs: list[LevelConfig],
 ) -> list[ChengyinMergeCandidate]:
-    """返回所有疑似同件装备对；字典中较晚插入者用于打破双向平局。"""
+    """返回所有疑似同件装备对。
+
+    双向兼容（互为对方的合法后继）时由 :func:`_freshness` 决定保留哪份。
+    """
     levels = {config.level: config for config in level_configs}
     eligible = [
         (position, str(fp), equip)
@@ -180,7 +203,8 @@ def find_chengyin_merge_candidates(
         elif right_to_left and not left_to_right:
             old_fp, new_fp = right_fp, left_fp
             old, new = right_equip, left_equip
-        elif left_pos < right_pos:
+        elif (_freshness(left_equip, left_pos)
+              < _freshness(right_equip, right_pos)):
             old_fp, new_fp = left_fp, right_fp
             old, new = left_equip, right_equip
         else:

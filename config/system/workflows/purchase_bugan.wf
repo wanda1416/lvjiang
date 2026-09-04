@@ -33,7 +33,7 @@
 #      整面板 OCR 扫描 → 逐格判断是否命中购买关键词 → 命中则购买
 #      商品1 处理完后，商品2 上滑 2 行再处理
 #   3. 营生（两端均为 cat_5）：扫描 (1,1) 确认含「营生」后才购买
-#   4. 赛季：shangpin_1 全部 2×4 格各购买一次。类目位置两端不同——
+#   4. 赛季：按当前布局的 shangpin_1 行列各购买一次。类目位置两端不同——
 #      手机端要先在类目列表内翻页，翻完落到 cat_4；PC 端不翻页，就在 cat_6
 #   5. 目前外观拖动存在问题，暂时忽略
 #   6. 完成后返回主页
@@ -117,7 +117,7 @@ else
     log "未勾选购买营生，跳过营生类目"
 end
 
-# ─── 赛季：shangpin_1 全部 2×4 格子买一遍 ───
+# ─── 赛季：shangpin_1 按当前布局的面板行列全部购买 ───
 # 游戏更新后类目栏一屏放不下营生和赛季：
 #   手机端可视类目更少，必须先在类目列表内翻页，翻完赛季落到 cat_4；
 #   PC 端一屏能显示到 cat_6，赛季直接就在 cat_6，不翻页。
@@ -131,8 +131,10 @@ else
 end
 click [bugan_detail].$season_cat after wait @page_refresh
 scan [bugan_detail].[shangpin_1] as $season_grid
-for r in [1, 2]
-    for c in [1, 2, 3, 4]
+eval $season_rows = panel_rows("bugan_detail", "shangpin_1")
+eval $season_cols = panel_cols("bugan_detail", "shangpin_1")
+for r in range(1, $season_rows)
+    for c in range(1, $season_cols)
         eval $cell = $season_grid.$r.$c
         call $reason = buy_block_reason($cell)
         if $reason
@@ -184,12 +186,13 @@ end
 
 # ─── 按关键词购买单个商品面板 ──────────────────────────
 # 整面板 OCR 后逐格判断，命中目标类目则购买
-# 行数从 panel 实际检测结果读取（PC 端可显示 3 行）
+# 行列数从 panel 实际布局读取（PC 端可显示 3×5）
 def buy_panel($panel_key, $keywords)
     scan [bugan_detail].$panel_key as $grid
     eval $rows = panel_rows("bugan_detail", $panel_key)
+    eval $cols = panel_cols("bugan_detail", $panel_key)
     for r in range(1, $rows)
-        for c in [1, 2, 3, 4]
+        for c in range(1, $cols)
             eval $cell = $grid.$r.$c
             call $hit = match_keyword($cell, $keywords)
             if not $hit

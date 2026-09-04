@@ -1,25 +1,26 @@
 #% name: 页面公共动作子过程集合
 
 # 扫描并执行指定动作的通用确认。
-# 两端都先扫描确认按钮，避免页面尚未出现时误操作；click 由布局决定
-# 点击按钮还是按 SPACE。warn_if_missing 区分必现与可选确认；
-# 返回 1 表示已确认，0 表示未扫描到确认按钮。
+# 同时扫描确认和取消：确认按钮可能因高亮、动画等原因暂时 OCR 为空，
+# 只要任一按钮命中即可证明弹窗存在；实际动作始终点击确认区域。
+# click 由布局决定点击按钮还是按 SPACE。warn_if_missing 区分必现与
+# 可选确认；返回 1 表示已确认，0 表示未扫描到确认弹窗。
 def scan_and_confirm($action_name, $warn_if_missing)
-   eval $message = $action_name + "：扫描确认按钮"
+   eval $message = $action_name + "：扫描确认弹窗"
    log info $message
-   eval $confirm_labels = ["确认", "确定"]
-   scan [general_control].[confirm] as $confirm by contains_any $confirm_labels
-   if not $confirm
+   eval $dialog_labels = ["确认", "确定", "取消"]
+   scan [general_control].[confirm, cancel] as $dialog_key by contains_any $dialog_labels
+   if not $dialog_key
       if $warn_if_missing
-         eval $message = $action_name + "：未扫描到确认按钮"
+         eval $message = $action_name + "：未扫描到确认或取消按钮"
          log warn $message
       else
-         eval $message = $action_name + "：未出现可选确认按钮"
+         eval $message = $action_name + "：未出现可选确认弹窗"
          log debug $message
       end
       return 0
    end
-   eval $message = $action_name + "：扫描到确认按钮，执行确认"
+   eval $message = $action_name + "：扫描到确认弹窗，执行确认"
    log info $message
    click [general_control].[confirm] after wait @page_refresh
    return 1

@@ -18,6 +18,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
 
 _NAV_FILE = "subcall/navigation.wf"
 _PAGE_DETECTION_FILE = "subcall/page_detection.wf"
+_PAGE_ACTION_FILE = "subcall/page_action.wf"
 _EQUIPMENT_SCAN_FILE = "subcall/equipment_scan.wf"
 _RECYCLE_ENTRY_FIELDS = [
     "sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4",
@@ -37,6 +38,7 @@ class TuningRouteStrategy(ABC):
         engine = self._require_engine("load_dependencies")
         engine.load_subcalls(_NAV_FILE)
         engine.load_subcalls(_PAGE_DETECTION_FILE)
+        engine.load_subcalls(_PAGE_ACTION_FILE)
         engine.load_subcalls(_EQUIPMENT_SCAN_FILE)
 
     def enter_equip(self) -> bool:
@@ -62,23 +64,15 @@ class TuningRouteStrategy(ABC):
         raise NotImplementedError
 
     def try_confirm_recycle_dialog(self) -> bool:
-        """识别并确认回收专用弹窗，不改变通用页面确认方法的语义。"""
-        values = self._wf.ocr_scene(
-            self._wf.CONTROL_SCENE, ["confirm", "cancel"])
-        confirm = values.get("confirm", "") or ""
-        cancel = values.get("cancel", "") or ""
-        visible = (
-            "确认" in confirm
-            or "确定" in confirm
-            or "取消" in cancel
-        )
-        if not visible:
-            logger.warning(
-                "回收确认弹窗未识别到确认或取消："
-                f"confirm={confirm!r}, cancel={cancel!r}")
-            return False
-        self._wf.click_region(self._wf.CONTROL_SCENE, "confirm")
-        return True
+        """通过公共子过程识别并确认回收弹窗。"""
+        return self.scan_and_confirm("回收装备")
+
+    def scan_and_confirm(self, action_name: str,
+                         warn_if_missing: bool = True) -> bool:
+        """调用统一 DSL 子过程，联合确认/取消区域识别并执行确认。"""
+        result = self._call_subcall(
+            "scan_and_confirm", [action_name, int(warn_if_missing)])
+        return result == 1
 
     def is_in_bag_page(self) -> bool:
         """复用页面状态库判断当前是否已经回到背包页。"""
@@ -97,12 +91,9 @@ class TuningRouteStrategy(ABC):
         """通过当前布局定义的动作打开重置调律弹窗。"""
         self._wf.click_region(self._wf.TUNE_SCENE, "reset_tune")
 
-    def confirm_reset(self, region: str) -> None:
-        """通过当前布局定义的动作确认重置。"""
-        if region == "confirm":
-            self._wf.click_region(self._wf.CONTROL_SCENE, "confirm")
-        else:
-            self._wf.click_region(self._wf.TUNE_SCENE, region)
+    def confirm_reset_entry(self) -> None:
+        """点击调律详情内的首次确认重置入口，不处理通用确认弹窗。"""
+        self._wf.click_region(self._wf.TUNE_SCENE, "reset_confirm")
 
     def _require_engine(self, operation: str) -> SubcallEnginePort:
         engine = self._wf.engine

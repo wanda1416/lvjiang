@@ -25,7 +25,7 @@ EQUIP_DETAIL = "equip_detail"
 CONTROL_SCENE = "general_control"
 
 
-def test_route_dependencies_use_detection_without_generic_page_actions():
+def test_route_dependencies_include_shared_page_actions():
     wf = MagicMock()
     routes = AndroidTuningRouteStrategy(wf)
 
@@ -34,6 +34,7 @@ def test_route_dependencies_use_detection_without_generic_page_actions():
     assert wf.engine.load_subcalls.call_args_list == [
         call("subcall/navigation.wf"),
         call("subcall/page_detection.wf"),
+        call("subcall/page_action.wf"),
         call("subcall/equipment_scan.wf"),
     ]
 
@@ -89,7 +90,7 @@ def test_desktop_opens_recycle_dialog_with_keypress():
 def test_desktop_checks_confirm_after_recycle_keypress():
     wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL, CONTROL_SCENE=CONTROL_SCENE)
     wf.output = {}
-    wf.ocr_scene.return_value = {"confirm": "确认", "cancel": ""}
+    wf.engine.call_subcall.return_value = 1
     routes = DesktopTuningRouteStrategy(wf)
     recycler = TuningRecycler(wf, routes)
     equip = SimpleNamespace(name="测试剑", type="剑", quality="gold")
@@ -97,17 +98,15 @@ def test_desktop_checks_confirm_after_recycle_keypress():
     outcome = recycler.recycle_current(equip, "weapon_detail", "scan", "测试")
 
     assert outcome is RecycleOutcome.RECYCLED
-    wf.ocr_scene.assert_called_once_with(
-        CONTROL_SCENE, ["confirm", "cancel"])
-    wf.click_region.assert_called_once_with(CONTROL_SCENE, "confirm")
-    wf.engine.call_subcall.assert_not_called()
+    wf.engine.call_subcall.assert_called_once_with(
+        "scan_and_confirm", ["回收装备", 1])
 
 
-def test_android_cancel_text_also_proves_recycle_dialog_is_visible():
+def test_android_recycle_delegates_confirmation_to_shared_subcall():
     wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL, CONTROL_SCENE=CONTROL_SCENE)
     wf.output = {}
-    wf.ocr_scene.return_value = {"confirm": "", "cancel": "取消"}
     wf.ocr_scene_by.return_value = "sub_func_2"
+    wf.engine.call_subcall.return_value = 1
     routes = AndroidTuningRouteStrategy(wf)
     recycler = TuningRecycler(wf, routes)
     equip = SimpleNamespace(name="测试剑", type="剑", quality="gold")
@@ -115,19 +114,18 @@ def test_android_cancel_text_also_proves_recycle_dialog_is_visible():
     outcome = recycler.recycle_current(equip, "weapon_detail", "scan", "测试")
 
     assert outcome is RecycleOutcome.RECYCLED
-    wf.ocr_scene.assert_called_once_with(
-        CONTROL_SCENE, ["confirm", "cancel"])
-    assert wf.click_region.call_args_list[-1] == call(
-        CONTROL_SCENE, "confirm")
-    wf.engine.call_subcall.assert_not_called()
+    wf.engine.call_subcall.assert_called_once_with(
+        "scan_and_confirm", ["回收装备", 1])
 
 
 def test_android_missing_both_dialog_labels_means_locked_on_bag_page():
     wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL, CONTROL_SCENE=CONTROL_SCENE)
     wf.output = {}
-    wf.ocr_scene.return_value = {"confirm": "", "cancel": ""}
     wf.ocr_scene_by.return_value = "sub_func_2"
-    wf.engine.call_subcall.return_value = 1
+    wf.engine.call_subcall.side_effect = lambda name, _args=None: {
+        "scan_and_confirm": 0,
+        "is_in_bag_page": 1,
+    }[name]
     routes = AndroidTuningRouteStrategy(wf)
     recycler = TuningRecycler(wf, routes)
     equip = SimpleNamespace(name="测试剑", type="剑", quality="gold")
@@ -136,10 +134,10 @@ def test_android_missing_both_dialog_labels_means_locked_on_bag_page():
         equip, "weapon_detail", "scan", "测试")
 
     assert outcome is RecycleOutcome.LOCKED
-    wf.ocr_scene.assert_called_once_with(
-        CONTROL_SCENE, ["confirm", "cancel"])
-    wf.engine.call_subcall.assert_called_once_with(
-        "is_in_bag_page", None)
+    assert wf.engine.call_subcall.call_args_list == [
+        call("scan_and_confirm", ["回收装备", 1]),
+        call("is_in_bag_page", None),
+    ]
     wf.engine._ui_callback.assert_not_called()
     assert wf.click_region.call_args_list == [
         call(EQUIP_DETAIL, "more_func"),
@@ -151,9 +149,11 @@ def test_android_missing_both_dialog_labels_means_locked_on_bag_page():
 def _run_manual_recycle_choice(choice: str):
     wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL, CONTROL_SCENE=CONTROL_SCENE)
     wf.output = {}
-    wf.ocr_scene.return_value = {"confirm": "", "cancel": ""}
     wf.ocr_scene_by.return_value = "sub_func_2"
-    wf.engine.call_subcall.return_value = 0
+    wf.engine.call_subcall.side_effect = lambda name, _args=None: {
+        "scan_and_confirm": 0,
+        "is_in_bag_page": 0,
+    }[name]
     wf.engine._ui_callback.return_value = choice
     routes = AndroidTuningRouteStrategy(wf)
     recycler = TuningRecycler(wf, routes)
@@ -168,8 +168,6 @@ def test_manual_recycle_choice_records_actual_recycle():
 
     assert outcome is RecycleOutcome.RECYCLED
     assert wf.output["recycled_items"][0]["name"] == "测试剑"
-    wf.ocr_scene.assert_called_once_with(
-        CONTROL_SCENE, ["confirm", "cancel"])
     action, kwargs = wf.engine._ui_callback.call_args
     assert action == ("choose",)
     assert [item["value"] for item in kwargs["choices"]] == [
@@ -199,8 +197,10 @@ def test_manual_end_choice_does_not_guess_equipment_outcome():
 def test_desktop_missing_both_dialog_labels_means_locked():
     wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL, CONTROL_SCENE=CONTROL_SCENE)
     wf.output = {}
-    wf.ocr_scene.return_value = {"confirm": "", "cancel": ""}
-    wf.engine.call_subcall.return_value = 1
+    wf.engine.call_subcall.side_effect = lambda name, _args=None: {
+        "scan_and_confirm": 0,
+        "is_in_bag_page": 1,
+    }[name]
     routes = DesktopTuningRouteStrategy(wf)
     recycler = TuningRecycler(wf, routes)
     equip = SimpleNamespace(name="测试剑", type="剑", quality="gold")
@@ -209,11 +209,11 @@ def test_desktop_missing_both_dialog_labels_means_locked():
         equip, "weapon_detail", "scan", "测试")
 
     assert outcome is RecycleOutcome.LOCKED
-    wf.ocr_scene.assert_called_once_with(
-        CONTROL_SCENE, ["confirm", "cancel"])
     wf.click_region.assert_not_called()
-    wf.engine.call_subcall.assert_called_once_with(
-        "is_in_bag_page", None)
+    assert wf.engine.call_subcall.call_args_list == [
+        call("scan_and_confirm", ["回收装备", 1]),
+        call("is_in_bag_page", None),
+    ]
 
 
 def test_desktop_waits_after_locked_recycle():
@@ -264,36 +264,31 @@ def test_desktop_opens_reset_dialog_through_layout_action():
     wf.press.assert_not_called()
 
 
-def test_android_confirms_reset_by_clicking_each_region():
+def test_android_confirms_reset_entry_only_in_tune_scene():
     wf = MagicMock(TUNE_SCENE="equip_tune_detail", CONTROL_SCENE=CONTROL_SCENE)
     routes = AndroidTuningRouteStrategy(wf)
 
-    routes.confirm_reset("reset_confirm")
-    routes.confirm_reset("confirm")
+    routes.confirm_reset_entry()
 
-    assert wf.click_region.call_args_list == [
-        call("equip_tune_detail", "reset_confirm"),
-        call(CONTROL_SCENE, "confirm"),
-    ]
+    wf.click_region.assert_called_once_with(
+        "equip_tune_detail", "reset_confirm")
     wf.press.assert_not_called()
 
 
-def test_desktop_confirms_both_reset_stages_through_layout_actions():
+def test_desktop_confirms_reset_entry_only_in_tune_scene():
     wf = MagicMock(TUNE_SCENE="equip_tune_detail", CONTROL_SCENE=CONTROL_SCENE)
     routes = DesktopTuningRouteStrategy(wf)
 
-    routes.confirm_reset("reset_confirm")
-    routes.confirm_reset("confirm")
+    routes.confirm_reset_entry()
 
-    assert wf.click_region.call_args_list == [
-        call("equip_tune_detail", "reset_confirm"),
-        call(CONTROL_SCENE, "confirm"),
-    ]
+    wf.click_region.assert_called_once_with(
+        "equip_tune_detail", "reset_confirm")
     wf.press.assert_not_called()
 
 
 def test_desktop_reset_confirms_with_layout_actions_around_secondary_delay():
     wf = MagicMock(TUNE_SCENE="equip_tune_detail", CONTROL_SCENE=CONTROL_SCENE)
+    wf.engine.call_subcall.return_value = 1
 
     def ocr_scene(_scene, fields):
         values = {
@@ -302,6 +297,7 @@ def test_desktop_reset_confirms_with_layout_actions_around_secondary_delay():
             "reset_info": "持有 4",
             "reset_confirm": "确认",
             "confirm": "确认",
+            "cancel": "取消",
         }
         return {key: values[key] for key in fields}
 
@@ -321,9 +317,9 @@ def test_desktop_reset_confirms_with_layout_actions_around_secondary_delay():
     first_confirm = calls.index(
         call.click_region("equip_tune_detail", "reset_confirm"))
     delay = calls.index(call.wait_delay("secondary_confirm"))
-    second_confirm = calls.index(
-        call.click_region(CONTROL_SCENE, "confirm"), first_confirm + 1)
-    assert first_confirm < delay < second_confirm
+    assert first_confirm < delay
+    wf.engine.call_subcall.assert_called_once_with(
+        "scan_and_confirm", ["重置二次确认", 1])
 
 
 def test_navigation_subcall_failure_is_propagated():
@@ -347,11 +343,11 @@ def test_navigation_subcall_success_is_propagated():
 
 
 def test_android_confirms_recycle_by_clicking_region():
-    """安卓侧保持点击确认区域——空格是端游特有的确认方式。"""
+    """安卓回收也经公共确认子过程，具体点击方式由布局负责。"""
     wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL, CONTROL_SCENE=CONTROL_SCENE)
     wf.output = {}
-    wf.ocr_scene.return_value = {"confirm": "确认", "cancel": "取消"}
     wf.ocr_scene_by.return_value = "sub_func_1"
+    wf.engine.call_subcall.return_value = 1
     routes = AndroidTuningRouteStrategy(wf)
     recycler = TuningRecycler(wf, routes)
     equip = SimpleNamespace(name="测试剑", type="剑", quality="gold")
@@ -360,8 +356,8 @@ def test_android_confirms_recycle_by_clicking_region():
 
     assert outcome is RecycleOutcome.RECYCLED
     assert call.press("SPACE", wait=None) not in wf.method_calls
-    wf.click_region.assert_any_call(CONTROL_SCENE, "confirm")
-    wf.engine.call_subcall.assert_not_called()
+    wf.engine.call_subcall.assert_called_once_with(
+        "scan_and_confirm", ["回收装备", 1])
 
 
 def _reset_wf(**ocr_overrides):
@@ -373,10 +369,12 @@ def _reset_wf(**ocr_overrides):
         "reset_info": "持有 4",
         "reset_confirm": "确认",
         "confirm": "确认",
+        "cancel": "取消",
     }
     values.update(ocr_overrides)
     wf.ocr_scene.side_effect = (
         lambda _scene, fields: {key: values[key] for key in fields})
+    wf.engine.call_subcall.return_value = 1
     return wf
 
 
@@ -413,7 +411,8 @@ def test_second_confirm_missing_pauses_for_the_user(monkeypatch):
         "lvjiang.apps.yysls.workflows.implementations.tuning.resetter.pause_user",
         lambda _engine, message: paused.append(message))
 
-    wf = _reset_wf(confirm="")
+    wf = _reset_wf(confirm="", cancel="")
+    wf.engine.call_subcall.side_effect = [0, 0]
     resetter = TuningResetter(wf, DesktopTuningRouteStrategy(wf))
 
     result = resetter.try_reset_tune(
@@ -431,24 +430,8 @@ def test_second_confirm_missing_pauses_for_the_user(monkeypatch):
 
 def test_second_confirm_recovers_after_the_user_intervenes(monkeypatch):
     """人工解锁后复查能读到确认，就继续把重置做完。"""
-    seen = {"n": 0}
-
     wf = _reset_wf()
-    values = {"reset_tune": "重置调律 3/3",
-              "reset_check": "当前装备剩余可重置次数：3",
-              "reset_info": "持有 4", "reset_confirm": "确认"}
-
-    def ocr_scene(_scene, fields):
-        out = {}
-        for key in fields:
-            if key == "confirm":
-                seen["n"] += 1
-                out[key] = "" if seen["n"] == 1 else "确认"
-            else:
-                out[key] = values[key]
-        return out
-
-    wf.ocr_scene.side_effect = ocr_scene
+    wf.engine.call_subcall.side_effect = [0, 1]
     monkeypatch.setattr(
         "lvjiang.apps.yysls.workflows.implementations.tuning.resetter.pause_user",
         lambda _engine, message: None)
@@ -457,7 +440,22 @@ def test_second_confirm_recovers_after_the_user_intervenes(monkeypatch):
     assert resetter.try_reset_tune(
         SimpleNamespace(max_resets=3), resets_used=0, why="测试规则命中",
         min_material_count=2) is True
-    assert call.click_region(CONTROL_SCENE, "confirm") in wf.method_calls
+    assert wf.engine.call_subcall.call_args_list == [
+        call("scan_and_confirm", ["重置二次确认", 1]),
+        call("scan_and_confirm", ["重置二次确认", 1]),
+    ]
+
+
+def test_second_confirm_is_delegated_to_shared_subcall():
+    """二次确认必须走公共过程，不能重新实现单字段 OCR。"""
+    wf = _reset_wf()
+    resetter = TuningResetter(wf, DesktopTuningRouteStrategy(wf))
+
+    assert resetter.try_reset_tune(
+        SimpleNamespace(max_resets=3), resets_used=0, why="测试规则命中",
+        min_material_count=2) is True
+    wf.engine.call_subcall.assert_called_once_with(
+        "scan_and_confirm", ["重置二次确认", 1])
 
 
 def test_reset_success_closes_the_refund_prompt_with_close_btn():
@@ -476,9 +474,11 @@ def test_reset_success_closes_the_refund_prompt_with_close_btn():
         min_material_count=2) is True
 
     calls = wf.method_calls
-    confirm = calls.index(call.click_region(CONTROL_SCENE, "confirm"))
     close = calls.index(call.click_region("equip_tune_detail", "close_btn"))
-    assert confirm < close
+    secondary_delay = calls.index(call.wait_delay("secondary_confirm"))
+    assert secondary_delay < close
+    wf.engine.call_subcall.assert_called_once_with(
+        "scan_and_confirm", ["重置二次确认", 1])
     assert call.click_region(CONTROL_SCENE, "blank_area") not in calls
     assert call.wait_stable("page_refresh") in calls[close + 1:]
 

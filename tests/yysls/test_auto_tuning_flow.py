@@ -172,9 +172,13 @@ class FakeWF(AutoTuningWorkflow):
     def ocr_scene_by(self, scene_key, field_keys, target_value, mode, min_confidence=None):
         # page_action.scan_and_confirm 通过 by contains_any 扫描通用确认区。
         if scene_key == CONTROL_SCENE and "confirm" in field_keys:
-            text = self._ocr_map.get(scene_key, {}).get("confirm", "确认")
             targets = target_value if isinstance(target_value, list) else [target_value]
-            return "confirm" if any(target in text for target in targets) else ""
+            configured = self._ocr_map.get(scene_key, {})
+            for key in field_keys:
+                text = configured.get(key, "确认" if key == "confirm" else "")
+                if any(target in text for target in targets):
+                    return key
+            return ""
         # 导航预检：菜单页检查（is_in_menu_page 用）
         if scene_key == "game_menu_page" and ("baoguo" in field_keys or "peiyang" in field_keys or "wulinlu" in field_keys):
             return "baoguo" if "baoguo" in field_keys else "wulinlu"
@@ -282,6 +286,18 @@ def test_workflow_shares_route_strategy_between_components():
     assert wf.navigator.routes is wf.route_strategy
     assert wf.recycler._routes is wf.route_strategy
     assert wf.resetter._routes is wf.route_strategy
+
+
+def test_shared_confirm_subcall_accepts_cancel_when_confirm_is_unreadable():
+    """公共确认以 confirm/cancel 联合判定，动作仍固定点击 confirm。"""
+    wf = FakeWF()
+    wf._ocr_map[CONTROL_SCENE] = {"confirm": "", "cancel": "取消"}
+
+    result = wf.engine.call_subcall(
+        "scan_and_confirm", ["测试确认", 1])
+
+    assert result == 1
+    assert wf.clicks == [(CONTROL_SCENE, "confirm")]
 
 
 def test_grid_click_uses_aligned_slot_center():

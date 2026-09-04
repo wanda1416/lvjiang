@@ -56,7 +56,7 @@ jobs:
           }
           $title = ($titleLine -replace '^#\s+', '').Trim()
           if ($title -notmatch ('^v' + [regex]::Escape($version) + '(?:\s|$)')) {
-            throw "Release title must start with v$version: $title"
+            throw "Release title must start with v${version}: $title"
           }
 
           git fetch origin master --no-tags

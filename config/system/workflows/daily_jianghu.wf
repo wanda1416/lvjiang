@@ -488,7 +488,7 @@ def do_kanbao()
    # 如果已经完成过任务，可能导致此时已经在主页，所以需要额外判断
    call $in_main_page = is_in_main_page()
    if $in_main_page == 0
-       click [general_action].[back] after wait @step_interval
+       click [general_action].[kanbao_back] after wait @step_interval
    end
 end
 

@@ -72,6 +72,8 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+  view: base
+  to: game_login_page/exit
 - key: baoguo
   name: 包裹
   type: func

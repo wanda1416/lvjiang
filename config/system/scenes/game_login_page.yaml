@@ -4,16 +4,24 @@ name: 登录
 views:
 - key: base
   name: 基底
+- key: accounts
+  name: 切换账号
+  same_layer: false
 - key: users
   name: 切换用户
+  same_layer: false
 - key: roles
   name: 切换角色
+  same_layer: false
 - key: loading
   name: 登录画面
+  same_layer: false
 - key: start
   name: 启动日常
+  same_layer: false
 - key: exit
   name: 退出登录
+  same_layer: false
 regions:
 - key: more_user
   name: 更多用户
@@ -25,12 +33,15 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+  view: base
+  to: /accounts
 - key: switch_user
   name: 切换账号
   type: attr
   is_text: true
-  is_clickable: false
-  view: users
+  is_clickable: true
+  view: accounts
+  to: /users
 - key: tap_user
   name: 选择用户
   type: func
@@ -43,29 +54,21 @@ regions:
   is_text: true
   is_clickable: true
   view: users
-- key: user_2
-  name: 用户2
-  type: func
-  is_text: true
-  is_clickable: true
-  view: users
-- key: user_3
-  name: 用户3
-  type: func
-  is_text: true
-  is_clickable: true
-  view: users
+  to: /base
 - key: switch_role
   name: 选择角色
   type: attr
   is_text: true
-  is_clickable: false
+  is_clickable: true
+  view: base
+  to: /roles
 - key: enter
   name: 进入游戏
   type: func
   is_text: true
   is_clickable: true
   view: roles
+  to: /loading
 - key: close_btn
   name: 关闭按钮
   type: func
@@ -83,12 +86,15 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+  view: base
+  to: /loading
 - key: zllj_btn
   name: 战令领奖
   type: func
   is_text: true
   is_clickable: true
   view: start
+  to: zhanling_detail
 - key: exit_to_desktop
   name: 退至桌面
   type: func
@@ -101,12 +107,7 @@ regions:
   is_text: true
   is_clickable: true
   view: exit
-- key: cancel
-  name: 取消
-  type: func
-  is_text: true
-  is_clickable: true
-  view: exit
+  to: /base
 points:
 - key: point_1
   name: 点1
@@ -131,3 +132,10 @@ panels:
   min_visible: 0.95
   view: users
   calibration: even
+references:
+- scene: general_control
+  entity: cancel
+  view: loading
+- scene: general_control
+  entity: confirm
+  view: loading

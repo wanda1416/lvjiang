@@ -60,8 +60,8 @@ def exit_to_login()
     wait @page_refresh
 
     # 3. 二次确认：检查退出弹窗中是否有「返回登录页面」按钮
-    scan [game_login_page].[back_to_login] as $confirm by contains "返回登录"
-    if $confirm
+    scan [game_login_page].[back_to_login] as $result by contains "返回登录"
+    if $result
         click [game_login_page].[back_to_login]
     else
         eval pause("未找到「返回登录界面」按钮，请手动退出到登录页后点击继续")
@@ -141,10 +141,10 @@ def select_role($role_index, $role, $batch_state)
 
         # 角色在线时会弹二次确认（confirm 区域含「其他角色」），
         # 这种情况下不可能进入角色列表，取消并跳过该条目。
-        scan [general_control].[confirm] as $online by contains "其他角色"
+        scan [game_login_page].[confirm] as $online by contains "其他角色"
         if $online
             log "角色在线，不可登录，跳过"
-            click [general_control].[cancel] after wait @page_refresh
+            click [game_login_page].[cancel] after wait @page_refresh
             eval $batch_state.page_state = 1
             eval $batch_state.role = ""
             return {"status": "skipped", "message": "角色在线", "state": $batch_state}

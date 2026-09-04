@@ -16,6 +16,8 @@
 """
 from __future__ import annotations
 
+from typing import Any
+
 import yaml
 from loguru import logger
 from PyQt6.QtCore import Qt
@@ -50,10 +52,12 @@ from .....i18n import tr
 from ...config import get_game_config
 from ...core.attr_model import (
     DIMENSION_LABELS,
+    PERCENT_FIELDS,
     SCOPE_COMBAT,
     SCOPE_PANEL,
     SOURCE_KIND_LABELS,
     SOURCE_KINDS,
+    SUPPORTED_FULL_AFFIX_CATEGORIES,
     AttrModelError,
     Formula,
     get_attr_model_manager,
@@ -81,6 +85,41 @@ def _stat_choices() -> list[tuple[str, str]]:
     choices = [(display, name) for name, display, _unit, _ in COMBAT_ATTR_FIELDS]
     choices += [(f"五维·{label}", name) for name, label in DIMENSION_LABELS.items()]
     return choices
+
+
+#: 切到「自定义数值」时的默认字段
+_DEFAULT_STAT_FIELD = "min_outer"
+
+
+def _to_internal(field_name: str, shown: float) -> float:
+    """界面值 → 内部值。百分比字段界面填 4.6，内部存 0.046。"""
+    return shown / 100.0 if field_name in PERCENT_FIELDS else shown
+
+
+def _to_shown(field_name: str, internal: float) -> float:
+    """内部值 → 界面值"""
+    return internal * 100.0 if field_name in PERCENT_FIELDS else internal
+
+
+def _first_stat(effect) -> tuple[str | None, float]:
+    """条目的首个常数属性；没有或是公式时返回 (None, 0)"""
+    for name, value in effect.stats.items():
+        if not isinstance(value, Formula):
+            return name, float(value)
+    return None, 0.0
+
+
+def _configure_spin(spin: QDoubleSpinBox, field_name: Any, internal: float) -> None:
+    """按字段单位配置输入框：百分比带 % 后缀且按百分数显示
+
+    没有这一步的话，用户照着游戏面板填 4.6，内部会当成 460% 使用。
+    """
+    name = str(field_name or "")
+    percent = name in PERCENT_FIELDS
+    spin.setSuffix(" %" if percent else "")
+    spin.setDecimals(3 if percent else 5)
+    spin.setRange(-100000.0, 100000.0)
+    spin.setValue(_to_shown(name, internal))
 
 
 class _AdvancedDialog(QDialog):
@@ -347,7 +386,9 @@ class AttrSourcePanel(QWidget):
         index = self._mode_index(effect)
         if index == _COLUMNS.index(MODE_FULL_AFFIX):
             combo = QComboBox()
-            for category in get_game_config().get_all_affix_categories():
+            # 只列求值器真正支持的类别。列全部 15 类会造成
+            # 「可选择、可保存、推导时才报错」，而一个条目报错整次求值全废。
+            for category in SUPPORTED_FULL_AFFIX_CATEGORIES:
                 combo.addItem(category)
             if effect.full_affix is not None:
                 combo.setCurrentText(effect.full_affix.category)
@@ -362,15 +403,12 @@ class AttrSourcePanel(QWidget):
             for display, name in _stat_choices():
                 field.addItem(display, name)
             spin = QDoubleSpinBox()
-            spin.setDecimals(5)
-            spin.setRange(-100000.0, 100000.0)
-            if effect.stats:
-                name, value = next(iter(effect.stats.items()))
-                position = field.findData(name)
+            stored_name, stored_value = _first_stat(effect)
+            if stored_name is not None:
+                position = field.findData(stored_name)
                 if position >= 0:
                     field.setCurrentIndex(position)
-                if not isinstance(value, Formula):
-                    spin.setValue(float(value))
+            _configure_spin(spin, field.currentData(), stored_value)
             field.currentIndexChanged.connect(lambda _i, r=row: self._commit(r))
             spin.valueChanged.connect(lambda _v, r=row: self._commit(r))
             box.addWidget(field)
@@ -416,15 +454,18 @@ class AttrSourcePanel(QWidget):
                 payload["full_affix"] = value_widget.currentText()
             return payload
 
+        # 切到「自定义数值」时给一个可编辑的默认值。此前这里回落到
+        # modeled: false，界面立刻弹回「未填」，这个模式根本进不去。
         if reset_value or value_widget is None:
-            payload["modeled"] = False
+            payload["stats"] = {_DEFAULT_STAT_FIELD: 0.0}
             return payload
         field = value_widget.findChild(QComboBox)
         spin = value_widget.findChild(QDoubleSpinBox)
         if field is None or spin is None:
-            payload["modeled"] = False
+            payload["stats"] = {_DEFAULT_STAT_FIELD: 0.0}
             return payload
-        payload["stats"] = {field.currentData(): spin.value()}
+        name = str(field.currentData())
+        payload["stats"] = {name: _to_internal(name, spin.value())}
         return payload
 
     def _commit(self, row: int, *, reset_value: bool = False) -> None:

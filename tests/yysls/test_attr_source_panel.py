@@ -192,3 +192,81 @@ def test_saving_writes_a_base_attribute_set(derive) -> None:
 
     stored = get_play_styles(school)["推导结果"]
     assert stored["min_outer"] > 0
+
+
+# ── 修复回归 ──────────────────────────────────────────────
+
+def test_switching_to_custom_value_stays_in_custom_value(panel) -> None:
+    """切到「自定义数值」要给出可编辑的默认值。
+
+    此前这里回落到 modeled: false，界面立刻弹回「未填」，这个模式
+    根本进不去——而它正是填数据最主要的路径。
+    """
+    from lvjiang.apps.yysls.ui.game_settings.attr_source_panel import MODE_VALUE
+
+    widget, manager = panel
+    widget._list.setCurrentRow(0)
+
+    widget._table.cellWidget(0, 1).setCurrentIndex(_COLUMNS.index(MODE_VALUE))
+
+    assert "stats" in manager.raw_entry("易水歌·一重")
+    assert widget._table.cellWidget(0, 1).currentText() == MODE_VALUE
+
+
+def test_percent_fields_are_entered_as_percentages_and_stored_as_decimals(
+    panel,
+) -> None:
+    """内部按小数存（0.046 = 4.6%）。界面直接存输入值的话，
+    用户照着游戏面板填 4.6 会被当成 460% 用。"""
+    from PyQt6.QtWidgets import QDoubleSpinBox
+    from lvjiang.apps.yysls.ui.game_settings.attr_source_panel import MODE_VALUE
+
+    widget, manager = panel
+    widget._list.setCurrentRow(0)
+    widget._table.cellWidget(0, 1).setCurrentIndex(_COLUMNS.index(MODE_VALUE))
+
+    field = widget._table.cellWidget(0, 2).findChild(QComboBox)
+    field.setCurrentIndex(field.findData("crit_rate"))
+    spin = widget._table.cellWidget(0, 2).findChild(QDoubleSpinBox)
+    assert spin.suffix().strip() == "%"
+    spin.setValue(4.6)
+
+    assert manager.raw_entry("易水歌·一重")["stats"]["crit_rate"] == pytest.approx(0.046)
+    # 回读要还原成 4.6，不能显示成 0.046
+    assert widget._table.cellWidget(0, 2).findChild(
+        QDoubleSpinBox).value() == pytest.approx(4.6)
+
+
+def test_non_percent_fields_are_stored_verbatim(panel) -> None:
+    from PyQt6.QtWidgets import QDoubleSpinBox
+    from lvjiang.apps.yysls.ui.game_settings.attr_source_panel import MODE_VALUE
+
+    widget, manager = panel
+    widget._list.setCurrentRow(0)
+    widget._table.cellWidget(0, 1).setCurrentIndex(_COLUMNS.index(MODE_VALUE))
+
+    field = widget._table.cellWidget(0, 2).findChild(QComboBox)
+    field.setCurrentIndex(field.findData("min_outer"))
+    widget._table.cellWidget(0, 2).findChild(QDoubleSpinBox).setValue(40.5)
+
+    assert manager.raw_entry("易水歌·一重")["stats"]["min_outer"] == pytest.approx(40.5)
+
+
+def test_full_affix_dropdown_lists_only_computable_categories(panel) -> None:
+    """列出求值器算不了的类别，会造成「可选、可存、推导时才报错」，
+    而一个条目报错整次求值全废。"""
+    from lvjiang.apps.yysls.core.attr_model import (
+        SUPPORTED_FULL_AFFIX_CATEGORIES,
+    )
+    from lvjiang.apps.yysls.ui.game_settings.attr_source_panel import (
+        MODE_FULL_AFFIX,
+    )
+
+    widget, _ = panel
+    widget._list.setCurrentRow(0)
+    widget._table.cellWidget(0, 1).setCurrentIndex(
+        _COLUMNS.index(MODE_FULL_AFFIX))
+
+    combo = widget._table.cellWidget(0, 2)
+    listed = {combo.itemText(i) for i in range(combo.count())}
+    assert listed == set(SUPPORTED_FULL_AFFIX_CATEGORIES)

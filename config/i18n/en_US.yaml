@@ -1616,6 +1616,11 @@ auto_strings:
   '进面板': 'On panel'
   '高级编辑 - {name}': 'Advanced edit - {name}'
   '（不对照）': '(no reference)'
+  '{filename} 顶层含未知字段: {keys}': '{filename} has unknown top-level fields: {keys}'
+  '{source} 的 full_affix 不受支持: {name}；可用 {allowed}': '{source}: full_affix {name} is not supported; available: {allowed}'
+  '{what} 不是已知属性字段': '{what} is not a known stat field'
+  '{what} 的 formula 之外还有多余的键: {keys}': '{what} has keys besides formula: {keys}'
+  '{what} 的 source 不是已知属性字段: {source}': '{what}: source is not a known stat field: {source}'
 task_history:
   task: Task
   title: Task History

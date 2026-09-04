@@ -180,7 +180,7 @@ class LoadoutPanel(QWidget):
         plan_row.addWidget(self._school)
         self._main_art.currentTextChanged.connect(self._configure_arts)
         self._sub_art.currentTextChanged.connect(self._configure_arts)
-        self._playstyle.currentTextChanged.connect(self._configure_arts)
+        self._playstyle.currentTextChanged.connect(self._configure_playstyle)
         root.addLayout(plan_row)
 
         # Row 3: symmetrical public metrics.
@@ -357,13 +357,19 @@ class LoadoutPanel(QWidget):
             self._plans.addItem(plan.name, pid)
         self._plans.setCurrentIndex(self._plans.findData(state.active_plan_id))
         from ...config import get_game_config
-        schools = get_game_config().get_schools()
-        main_arts = [""] + list(dict.fromkeys(
-            (cfg.get("main") or {}).get("martial_art", "") for cfg in schools.values()))
-        sub_arts = [""] + list(dict.fromkeys(
-            (cfg.get("sub") or {}).get("martial_art", "") for cfg in schools.values()))
-        self._set_combo(self._main_art, main_arts, state.active_plan.main_martial_art)
-        self._set_combo(self._sub_art, sub_arts, state.active_plan.sub_martial_art)
+        game_config = get_game_config()
+        schools = game_config.get_schools()
+        # 武学本身没有主副身份。两个位置都必须读取独立武学注册表；流派配置
+        # 只在选定两门武学后用于无序反查流派，不能反过来充当武学数据源。
+        martial_arts = ["", *game_config.get_martial_arts()]
+        self._set_combo(
+            self._main_art, martial_arts,
+            state.active_plan.main_martial_art,
+        )
+        self._set_combo(
+            self._sub_art, martial_arts,
+            state.active_plan.sub_martial_art,
+        )
         self._refresh_playstyles(state)
         school = resolve_school(
             state.active_plan.main_martial_art,
@@ -426,7 +432,12 @@ class LoadoutPanel(QWidget):
         if not self._repo:
             return
         from ...config import get_game_config
-        dialog = PlanCreateDialog(get_game_config().get_schools(), self)
+        game_config = get_game_config()
+        dialog = PlanCreateDialog(
+            game_config.get_schools(),
+            game_config.get_martial_arts(),
+            self,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         self._repo.create_plan(dialog.plan_name, dialog.main_art, dialog.sub_art)
@@ -476,12 +487,22 @@ class LoadoutPanel(QWidget):
             return
         main_art = self._main_art.currentText()
         sub_art = self._sub_art.currentText()
-        # 允许单独绑定，不强制同时设置
+        # 允许临时出现未配对状态。这里只保存武学，不把刷新后暂时为空的玩法
+        # 一并写回，否则 A+B -> A+C -> B+C 这类换位过程会误删原玩法。
         state = self._repo.load()
         self._repo.configure_plan(
             state.active_plan_id,
             main_martial_art=main_art,
             sub_martial_art=sub_art,
+        )
+        self.refresh()
+
+    def _configure_playstyle(self):
+        if self._refreshing or not self._repo:
+            return
+        state = self._repo.load()
+        self._repo.configure_plan(
+            state.active_plan_id,
             playstyle=self._playstyle.currentText(),
         )
         self.refresh()

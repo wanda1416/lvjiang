@@ -49,6 +49,8 @@ def dialog(qtbot, monkeypatch):
 
     dlg = mod.OptimalComboDialog.__new__(mod.OptimalComboDialog)
     dlg._school = "鸣金·虹"
+    dlg._main_martial_art = ""
+    dlg._sub_martial_art = ""
     dlg._level_threshold = 0
     dlg._affix_filter = ""
     dlg._slot_groups = {}
@@ -144,3 +146,32 @@ class TestExcludeMockSwitch:
         dialog._chk_exclude_mock.setChecked(False)
         dialog._on_exclude_mock_toggled(False)
         assert [e["name"] for e in dialog._captured["head"]] == ["模冠"]
+
+
+def test_weapon_candidates_follow_plan_art_order(dialog, monkeypatch):
+    """候选池的主副武器类型来自方案武学，而不是流派配置顺序。"""
+    import lvjiang.apps.yysls.config as game_config_module
+
+    class _GameConfig:
+        @staticmethod
+        def get_martial_art_weapon(name):
+            return {"剑法": "剑", "刀法": "刀"}.get(name, "")
+
+    monkeypatch.setattr(
+        game_config_module, "get_game_config", lambda: _GameConfig())
+    dialog._main_martial_art = "刀法"
+    dialog._sub_martial_art = "剑法"
+    _install_inventory(
+        monkeypatch,
+        equipped={},
+        bag={"weapon": {
+            "sword": _equip("剑", "剑"),
+            "blade": _equip("刀", "刀"),
+        }},
+        mock={},
+    )
+
+    dialog._load_candidates()
+
+    assert [e["name"] for e in dialog._captured["main_weapon"]] == ["刀"]
+    assert [e["name"] for e in dialog._captured["sub_weapon"]] == ["剑"]

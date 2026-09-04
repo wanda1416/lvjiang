@@ -207,7 +207,7 @@ def test_exact_school_resolution():
         "sub": {"martial_art": "副功法"},
     }}
     assert resolve_school("主功法", "副功法", schools) == "流派"
-    assert resolve_school("副功法", "主功法", schools) is None
+    assert resolve_school("副功法", "主功法", schools) == "流派"
 
 
 def test_create_plan_requires_both_martial_arts(tmp_path: Path):

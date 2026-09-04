@@ -205,6 +205,73 @@ def test_plan_switch_restores_independent_combat_selections(
     assert combat._combo_scheme.currentText() == "方案甲"
 
 
+def test_can_temporarily_swap_main_and_sub_arts(
+        qtbot, tmp_path, monkeypatch):
+    """主副武学需要换位时，先改副再改主不应被角色列表拦住。"""
+    import lvjiang.apps.yysls.config as game_config_module
+    import lvjiang.constants
+
+    monkeypatch.setattr(lvjiang.constants, "USERS_DIR", tmp_path)
+    monkeypatch.setattr(
+        lvjiang.constants, "SESSION_PATH", tmp_path / "session.json")
+    schools = {
+        "演示": {
+            "main": {"martial_art": "剑法"},
+            "sub": {"martial_art": "刀法"},
+            "schemes": [],
+        }
+    }
+    real_game_config = game_config_module.get_game_config()
+
+    class _GameConfig:
+        def __getattr__(self, name):
+            return getattr(real_game_config, name)
+
+        def get_schools(self):
+            return schools
+
+        def get_martial_arts(self):
+            # 枪法尚未绑定任何流派，仍必须出现在两个位置的候选中。
+            return {"剑法": {}, "刀法": {}, "枪法": {}}
+
+        def get_playstyles_for_arts(self, arts):
+            return ["演示玩法"] if set(arts) == {"剑法", "刀法"} else []
+
+        def get_graduation_schemes(self, school):
+            return []
+
+    monkeypatch.setattr(game_config_module, "get_game_config", lambda: _GameConfig())
+
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_id = repo.load().active_plan_id
+    repo.configure_plan(
+        plan_id,
+        main_martial_art="剑法",
+        sub_martial_art="刀法",
+        playstyle="演示玩法",
+    )
+
+    host = Host()
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(host)
+    qtbot.addWidget(panel)
+
+    assert panel._main_art.findText("枪法") != -1
+    assert panel._sub_art.findText("枪法") != -1
+
+    panel._sub_art.setCurrentText("枪法")
+    assert panel._main_art.findText("刀法") != -1
+    assert LoadoutRepository("alice", tmp_path).load().active_plan.playstyle == "演示玩法"
+
+    panel._main_art.setCurrentText("刀法")
+    panel._sub_art.setCurrentText("剑法")
+    state = LoadoutRepository("alice", tmp_path).load()
+    assert (state.active_plan.main_martial_art, state.active_plan.sub_martial_art) == (
+        "刀法", "剑法")
+    assert state.active_plan.playstyle == "演示玩法"
+    assert panel._playstyle.currentText() == "演示玩法"
+
+
 def test_legacy_user_dropdown_selection_is_ignored(
         qtbot, tmp_path, monkeypatch):
     """旧版错误共享的下拉选择直接废弃，不能污染当前方案。"""

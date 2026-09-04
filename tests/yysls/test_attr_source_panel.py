@@ -67,7 +67,7 @@ def test_choosing_full_affix_persists_immediately(panel) -> None:
 
 
 def test_marking_no_effect_advances_progress(panel) -> None:
-    """心法六重里大量是触发类效果；确认无贡献要能推进进度。"""
+    """心法六重里大量是触发类效果；确认「无静态属性」要能推进进度。"""
     widget, manager = panel
     widget._list.setCurrentRow(0)
 

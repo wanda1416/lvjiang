@@ -222,7 +222,7 @@ def parse_entry(source_id: str, raw: Any, kind: str) -> StatEffect:
     has_values = bool(stats or extra or full_affix)
     if no_effect and has_values:
         raise AttrModelError(
-            tr("{source} 既声明无贡献又填了数值，取哪个无从判断").format(
+            tr("{source} 既声明无静态属性又填了数值，取哪个无从判断").format(
                 source=source_id
             )
         )

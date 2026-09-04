@@ -130,11 +130,11 @@ class AttrModelManager:
         return sorted(selected, key=lambda e: order.get(e.kind, len(order)))
 
     def pending_count(self) -> int:
-        """仍需人工确认的条目数：既没填数值、也没确认过无贡献"""
+        """仍需人工确认的条目数：既没填数值、也没确认过「无静态属性」"""
         return sum(1 for effect in self._effects if effect.pending)
 
     def progress(self, kind: str | None = None) -> tuple[int, int]:
-        """建模进度 ``(已确认, 总数)``。已确认 = 填了数值 + 确认无贡献。"""
+        """建模进度 ``(已确认, 总数)``。已确认 = 填了数值 + 确认无静态属性。"""
         scoped = [e for e in self._effects if kind is None or e.kind == kind]
         return sum(1 for e in scoped if not e.pending), len(scoped)
 

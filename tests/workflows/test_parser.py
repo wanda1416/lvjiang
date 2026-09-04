@@ -50,6 +50,7 @@ from lvjiang.workflows.grammar import (
     parse_text,
 )
 from lvjiang.workflows.grammar.ast_nodes import PressMode
+from tests.case_matrix import case_matrix
 
 # ─── 现有 .wf 文件验证 ─────────────────────────────────────
 
@@ -153,7 +154,7 @@ def test_click_default_button_is_left():
     assert program.body[0].button == "left"
 
 
-@pytest.mark.parametrize("name", ["left", "right", "middle", "x1", "x2"])
+@case_matrix("name", ["left", "right", "middle", "x1", "x2"])
 def test_click_explicit_button(name):
     """click 支持显式指定鼠标键：left/right/middle/x1/x2"""
     program = parse_text(f"click [scene].[region] {name}")
@@ -419,7 +420,7 @@ def test_eval_tuple_mixed():
 
 # ─── wait stable 指令测试（参数化） ────────────────────────────
 
-@pytest.mark.parametrize("dsl,expected", [
+@case_matrix("dsl,expected", [
     ("wait stable 5",
      {"timeout": 5.0, "threshold": 0.02, "interval": 0.3, "stable_duration": 0.5, "area": None}),
     ("wait stable 3 threshold 0.05",
@@ -659,7 +660,7 @@ def test_legacy_move_syntax_is_rejected():
         parse_text("move (0.5, 0.3)")
 
 
-@pytest.mark.parametrize(
+@case_matrix(
     "source",
     [
         "click (-0.1, 0.5)",
@@ -674,7 +675,7 @@ def test_absolute_coordinates_must_stay_in_unit_range(source):
         parse_text(source)
 
 
-@pytest.mark.parametrize(
+@case_matrix(
     "source",
     [
         "move by (-1.01, 0)",
@@ -974,7 +975,7 @@ def test_env_guard_desugars_to_if_with_constant_string():
     assert all(node.line_no == 1 for node in guard.then_body)
 
 
-@pytest.mark.parametrize("code", [
+@case_matrix("code", [
     'env:$target -> press "F"\n',
     'env:desktop -> press "F"\n',
     'env:"desktop" -> if $ready\n',

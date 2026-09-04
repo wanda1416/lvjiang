@@ -44,6 +44,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 )
 from lvjiang.core.config import versioning
 from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
+from tests.case_matrix import case_matrix
 
 
 def minimal_rule(**overrides) -> dict:
@@ -82,7 +83,7 @@ def test_behavior_rule_summary_condenses_all_parts():
     assert "/".join(QUALITY_PARTS) not in summary
 
 
-@pytest.mark.parametrize("all_value", ["全部", "All", "- All -", "all"])
+@case_matrix("all_value", ["全部", "All", "- All -", "all"])
 def test_behavior_rule_all_parts_is_language_independent(all_value):
     data = _valid_group()
     data["scan"] = {
@@ -508,7 +509,7 @@ class TestValidation:
             parse_tuning_rule(minimal_rule(
                 common_conditions=[{"contains_all": ["劲"]}]))
 
-    @pytest.mark.parametrize("mutate", [
+    @case_matrix("mutate", [
         # 缺少必填字段 key/name
         lambda d: d.pop("key"),
         # 旧版 schema 字段不再支持
@@ -801,7 +802,7 @@ class TestCreateAndDelete:
         assert rule.playstyles == {}
         assert rule.affix_pool == [] and rule.patterns == {}
 
-    @pytest.mark.parametrize("key,name", [
+    @case_matrix("key,name", [
         ("New", "非法大写"),
         ("1abc", "数字开头"),
         ("中文", "非英文"),
@@ -866,7 +867,7 @@ class TestCreateAndDelete:
         mgr.rename_rule("t1", "t1")  # 幂等
         assert (tmp_path / "t1.yaml").exists()
 
-    @pytest.mark.parametrize("old,new", [
+    @case_matrix("old,new", [
         ("nope", "t2"),          # 旧 key 未注册
         ("t1", "BadKey"),        # 新 key 非法
         ("t1", ""),              # 空 key
@@ -990,7 +991,7 @@ class TestTuneConfig:
         data.pop("switches")
         assert parse_tune_config(data).switches == {}
 
-    @pytest.mark.parametrize("mutate", [
+    @case_matrix("mutate", [
         lambda d: d["quality_thresholds"].pop("佩"),           # 缺少部位
         lambda d: d["quality_thresholds"].update({"default": ["gold"]}),  # 未知部位
         lambda d: d["quality_thresholds"].update({"武器": ["legendary"]}),  # 非法品阶
@@ -1008,7 +1009,7 @@ class TestTuneConfig:
         with pytest.raises(RuleValidationError, match="switches"):
             parse_tune_config(data)
 
-    @pytest.mark.parametrize("legacy", ["min_level", "materials", "behavior"])
+    @case_matrix("legacy", ["min_level", "materials", "behavior"])
     def test_legacy_sections_rejected(self, legacy):
         # 0.1 预览版硬拒绝：旧段已迁移至 base_groups/*.yaml
         data = _valid_config()
@@ -1016,7 +1017,7 @@ class TestTuneConfig:
         with pytest.raises(RuleValidationError, match="迁移"):
             parse_tune_config(data)
 
-    @pytest.mark.parametrize("switches", [
+    @case_matrix("switches", [
         {"BadKey": {"name": "非法大写"}},
         {"1abc": {"name": "数字开头"}},
         {"keep_pvp": {"name": ""}},      # name 不能为空
@@ -1084,7 +1085,7 @@ class TestMaterialSettings:
         assert isinstance(m, MaterialSettings)
         assert all(isinstance(r, FoodRule) for r in m.food_rules)
 
-    @pytest.mark.parametrize("materials", [
+    @case_matrix("materials", [
         ["not", "a", "dict"],                          # 段须为 dict
         {"stone_check": "yes"},                        # 子段须为 dict
         {"stone_check": {"min_count": 0}},             # 低于下界
@@ -1186,7 +1187,7 @@ class TestBehaviorSettings:
         with pytest.raises(RuleValidationError, match="behavior"):
             parse_tune_config(data)
 
-    @pytest.mark.parametrize("scan", [
+    @case_matrix("scan", [
         ["not", "a", "dict"],                            # 段须为 dict
         {"entry_min_rating": "good"},                    # 门槛档位非法
         {"judge_scope": "incoming"},                     # 段级语义已废弃
@@ -1244,7 +1245,7 @@ class TestBehaviorSettings:
         with pytest.raises(RuleValidationError):
             parse_tuning_group(data)
 
-    @pytest.mark.parametrize("tune", [
+    @case_matrix("tune", [
         ["not", "a", "dict"],                            # 段须为 dict
         {"judge_rules": []},                             # 段级自选已废弃
         {"rules": [{"action": "skip",
@@ -1524,7 +1525,7 @@ class TestRuleQualityThresholds:
             quality_thresholds={"佩": ["gold", "purple"]}))
         assert rule.quality_thresholds == {"佩": ["gold", "purple"]}
 
-    @pytest.mark.parametrize("thresholds", [
+    @case_matrix("thresholds", [
         {"default": ["gold"]},   # 未知部位
         {"佩": ["legendary"]},   # 非法品阶
     ])
@@ -1573,7 +1574,7 @@ class TestTuningGroupManagerCRUD:
         assert g.scan.rules == []
         assert g.tune.rules == []
 
-    @pytest.mark.parametrize("key,name,match", [
+    @case_matrix("key,name,match", [
         ("BadKey", "非法大写", None),
         ("1abc", "数字开头", None),
         ("default", "重复", "已存在"),
@@ -1597,7 +1598,7 @@ class TestTuningGroupManagerCRUD:
         mgr.save_group("default_copy", raw)
         assert mgr.get_group("default").scan.min_level != 50
 
-    @pytest.mark.parametrize("method,args", [
+    @case_matrix("method,args", [
         ("copy_group", ("nonexistent", "new", "新组")),
         ("delete_group", ("nonexistent",)),
     ])

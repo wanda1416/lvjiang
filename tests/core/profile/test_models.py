@@ -4,6 +4,7 @@
 """
 
 import pytest
+from tests.case_matrix import case_matrix
 
 from lvjiang.core.profile.models import (
     ALL_MODELS,
@@ -293,7 +294,7 @@ class TestParseKeyDef:
 
 
 class TestStepDef:
-    @pytest.mark.parametrize("raw,expected_value,expected_source", [
+    @case_matrix("raw,expected_value,expected_source", [
         (100, 100, ""),
         ({"value": -900, "source": " 导入消耗 "}, -900, "导入消耗"),
     ])
@@ -302,7 +303,7 @@ class TestStepDef:
         assert s.value == expected_value
         assert s.source == expected_source
 
-    @pytest.mark.parametrize("step,expected", [
+    @case_matrix("step,expected", [
         (StepDef(10), 10),
         (StepDef(-900, "导入"), {"value": -900, "source": "导入"}),
     ])
@@ -313,7 +314,7 @@ class TestStepDef:
         steps = parse_steps([1, {"value": 2, "source": "同步"}])
         assert steps == [StepDef(1), StepDef(2, "同步")]
 
-    @pytest.mark.parametrize("input", ["invalid", None])
+    @case_matrix("input", ["invalid", None])
     def test_parse_steps_non_list(self, input):
         assert parse_steps(input) == []
 
@@ -361,7 +362,7 @@ class TestSyncTargetDef:
         t = SyncTargetDef.from_raw(orig)
         assert t is orig
 
-    @pytest.mark.parametrize("kwargs,expected", [
+    @case_matrix("kwargs,expected", [
         ({"key": "stock:credits"}, {"key": "stock:credits"}),
         ({"key": "stock:credits", "ratio": 2.0}, {"key": "stock:credits", "ratio": 2.0}),
         ({"key": "stock:credits", "ratio": 1.0, "source": "导入"}, {"key": "stock:credits", "source": "导入"}),
@@ -377,7 +378,7 @@ class TestSyncTargetDef:
         assert restored.ratio == orig.ratio
         assert restored.source == orig.source
 
-    @pytest.mark.parametrize("raw,expected_dir", [
+    @case_matrix("raw,expected_dir", [
         ({"key": "stock:x", "direction": "neg"}, DIR_NEG),
         ({"key": "stock:x"}, DIR_BOTH),
     ])
@@ -388,7 +389,7 @@ class TestSyncTargetDef:
         with pytest.raises(ValueError, match="无效的同步方向"):
             SyncTargetDef.from_raw({"key": "stock:x", "direction": "sideways"})
 
-    @pytest.mark.parametrize("kwargs,has_direction", [
+    @case_matrix("kwargs,has_direction", [
         ({"key": "stock:x", "direction": DIR_POS}, True),
         ({"key": "stock:x", "direction": DIR_BOTH}, False),
     ])
@@ -409,7 +410,7 @@ class TestSyncTargetDef:
 
 
 class TestParseSyncKey:
-    @pytest.mark.parametrize("input,expected", [
+    @case_matrix("input,expected", [
         ("stock:credits", ("stock", "credits")),
         ("credits", ("", "credits")),
         ("", ("", "")),
@@ -438,7 +439,7 @@ class TestParseSyncTargets:
         assert len(targets) == 2
         assert targets[0].key == "stock:a"
 
-    @pytest.mark.parametrize("input", ["invalid", None])
+    @case_matrix("input", ["invalid", None])
     def test_non_list_returns_empty(self, input):
         assert parse_sync_targets(input) == []
 

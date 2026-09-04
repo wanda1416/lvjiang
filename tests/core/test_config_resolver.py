@@ -12,6 +12,7 @@ from lvjiang.core.config.resolver import (
     compute_diff,
     merge_doc,
 )
+from tests.case_matrix import case_matrix
 
 
 @pytest.fixture
@@ -231,7 +232,7 @@ class TestMergeAndDiff:
         merge_doc(base, overlay)
         assert base == {"a": {"x": 1}}
 
-    @pytest.mark.parametrize("desired", [
+    @case_matrix("desired", [
         {},
         {"a": 1},
         {"a": {"b": {"c": [1, 2]}}, "d": "s"},
@@ -421,7 +422,7 @@ class TestRegistryList:
         diff = compute_diff(base, {"exposed": ["c", "a", "b"]}, self.REG)
         assert diff["exposed"]["__order__"] == ["c", "a", "b"]
 
-    @pytest.mark.parametrize("desired", [
+    @case_matrix("desired", [
         ["a", "b", "c"],          # 不变
         ["a", "b", "c", "mine"],  # 新增
         ["a", "c"],               # 删除

@@ -21,6 +21,7 @@ from lvjiang.core.layout_models import (
     Point,
     Region,
 )
+from tests.case_matrix import case_matrix
 
 
 def _make_layout(name: str = "测试布局") -> Layout:
@@ -79,7 +80,7 @@ class TestSaveLoadRoundtrip:
         with pytest.raises(KeyError):
             Region.from_dict({"key": "broken"})
 
-    @pytest.mark.parametrize("item", [
+    @case_matrix("item", [
         Point("point", 0, 0, disabled=True),
         Panel("panel", 0, 0, 0, 0, disabled=True),
     ])

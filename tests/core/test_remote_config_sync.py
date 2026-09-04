@@ -11,6 +11,7 @@ import json
 import pytest
 
 from lvjiang.core.config import remote, versioning
+from tests.case_matrix import case_matrix
 
 
 def _sha(payload: bytes) -> str:
@@ -92,7 +93,7 @@ class TestParseManifest:
 class TestPathSafety:
     """manifest 是远程内容，绝不能让它决定往哪写盘。"""
 
-    @pytest.mark.parametrize("rel_path", [
+    @case_matrix("rel_path", [
         "../../../etc/passwd",
         "/etc/passwd",
         "scenes/../../escape.yaml",

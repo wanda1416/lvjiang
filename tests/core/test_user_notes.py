@@ -9,6 +9,7 @@ from lvjiang.core.user_notes import (
     MAX_TEXT_LENGTH,
     UserNotesRepository,
 )
+from tests.case_matrix import case_matrix
 
 
 @pytest.fixture
@@ -56,7 +57,7 @@ def test_delete_removes_only_requested_note(repo):
     assert [note.id for note in repo.list_notes()] == [keep.id]
 
 
-@pytest.mark.parametrize("text", ["", "   ", "\n\t"])
+@case_matrix("text", ["", "   ", "\n\t"])
 def test_blank_text_is_rejected_without_creating_file(repo, text):
     with pytest.raises(ValueError, match="不能为空"):
         repo.add(text)

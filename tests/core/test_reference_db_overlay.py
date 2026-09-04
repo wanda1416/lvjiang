@@ -16,6 +16,7 @@ from lvjiang.core.reference_db import (
     MetaFieldDef,
     ReferenceDatabase,
 )
+from tests.case_matrix import case_matrix
 
 
 def _write_yaml(path, doc):
@@ -584,7 +585,7 @@ class TestReferenceSpaces:
         assert db.create_space(DEFAULT_SPACE) is False
         assert not (space_env["local_ref"] / f"{DEFAULT_SPACE}.yaml").exists()
 
-    @pytest.mark.parametrize("bad", ["", "  ", ".隐藏", "a/b", "a\\b", "a:b", "a*b"])
+    @case_matrix("bad", ["", "  ", ".隐藏", "a/b", "a\\b", "a:b", "a*b"])
     def test_create_space_rejects_illegal_name(self, space_env, bad):
         """空间名即文件名：拒空、拒 . 开头、拒路径分隔符"""
         db = ReferenceDatabase(dev_mode=False)

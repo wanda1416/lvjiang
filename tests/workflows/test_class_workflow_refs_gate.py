@@ -11,11 +11,10 @@ import ast
 import importlib
 from pathlib import Path
 
-import pytest
-
 from lvjiang.apps import load_app
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.core.layout_manager import load_layout_by_name
+from tests.case_matrix import case_matrix
 
 # 方法名 → (场景参数位, region/key 参数位, kind)
 _CALLS = {
@@ -108,8 +107,8 @@ def test_class_workflow_gate_has_inputs():
     assert _system_layouts(), "config/system/layouts 下没有布局"
 
 
-@pytest.mark.parametrize("layout_name", _system_layouts())
-@pytest.mark.parametrize(
+@case_matrix("layout_name", _system_layouts())
+@case_matrix(
     ("workflow_id", "cls"),
     _class_workflows(),
     ids=lambda value: value if isinstance(value, str) else value.__name__,

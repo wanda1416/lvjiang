@@ -10,13 +10,12 @@ from __future__ import annotations
 
 from dataclasses import fields
 
-import pytest
-
 from lvjiang.core.config.models import HotkeyConfig, NetworkConfig, UserConfig
+from tests.case_matrix import case_matrix
 
 
 class TestNetworkRoundTrip:
-    @pytest.mark.parametrize("name", [f.name for f in fields(NetworkConfig)])
+    @case_matrix("name", [f.name for f in fields(NetworkConfig)])
     def test_every_field_survives_round_trip(self, name):
         """逐字段参数化：将来加新开关，漏同步会直接红在这里。"""
         flipped = not getattr(NetworkConfig(), name)
@@ -36,7 +35,7 @@ class TestNetworkRoundTrip:
 
 
 class TestHotkeyRoundTrip:
-    @pytest.mark.parametrize("name", [f.name for f in fields(HotkeyConfig)])
+    @case_matrix("name", [f.name for f in fields(HotkeyConfig)])
     def test_every_field_survives_round_trip(self, name):
         config = UserConfig(hotkeys={name: "F7"})
         assert getattr(config.hotkeys, name) == "F7"

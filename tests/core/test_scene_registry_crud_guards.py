@@ -6,6 +6,7 @@ import yaml
 from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
 from lvjiang.core.scene_definition import SceneRegistry
 from lvjiang.core.scene_definition_models import PointDef, RegionDef
+from tests.case_matrix import case_matrix
 
 
 def _registry_with_groups(*keys: str) -> SceneRegistry:
@@ -25,7 +26,7 @@ def test_cannot_delete_last_group():
         registry.delete_group("main")
 
 
-@pytest.mark.parametrize("key", ["BadKey", "1scene", "中文", "bad-key"])
+@case_matrix("key", ["BadKey", "1scene", "中文", "bad-key"])
 def test_create_group_rejects_invalid_key(key):
     registry = _registry_with_groups("main")
 

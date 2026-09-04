@@ -7,6 +7,7 @@ import pytest
 
 from lvjiang.core.config.session import reset_session_store
 from lvjiang.core.user_config import User, UserConfigManager
+from tests.case_matrix import case_matrix
 
 
 @pytest.fixture
@@ -225,14 +226,14 @@ class TestUsernameValidation:
     切分时错位，把有效记录当过期的删掉。
     """
 
-    @pytest.mark.parametrize("name", [
+    @case_matrix("name", [
         "默认用户", "张三", "user_01", "my-account", "A1", "测试User_2",
     ])
     def test_accepts_chinese_and_common_ids(self, name):
         from lvjiang.core.user_config import is_valid_username
         assert is_valid_username(name)
 
-    @pytest.mark.parametrize("name", [
+    @case_matrix("name", [
         "", "../逃逸", "a/b", "a\\b", "含:冒号", "a b", "a.b", "x" * 33, "emoji😀",
     ])
     def test_rejects_unsafe_names(self, name):

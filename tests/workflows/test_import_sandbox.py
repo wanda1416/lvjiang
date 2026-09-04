@@ -11,10 +11,11 @@ import pytest
 
 from lvjiang.workflows.engine.core import _normalize_import_path
 from lvjiang.workflows.errors import WorkflowUserError
+from tests.case_matrix import case_matrix
 
 
 class TestAcceptsRootRelative:
-    @pytest.mark.parametrize(
+    @case_matrix(
         ("raw", "expected"),
         [
             ("subcall/navigation.wf", "subcall/navigation.wf"),
@@ -29,7 +30,7 @@ class TestAcceptsRootRelative:
 
 
 class TestRejectsEscapes:
-    @pytest.mark.parametrize(
+    @case_matrix(
         "raw",
         [
             "/etc/passwd.wf",           # POSIX 绝对
@@ -45,7 +46,7 @@ class TestRejectsEscapes:
         with pytest.raises(WorkflowUserError):
             _normalize_import_path(raw)
 
-    @pytest.mark.parametrize(
+    @case_matrix(
         "raw",
         [
             "C:/evil.wf",

@@ -9,12 +9,12 @@ test_workflow_references.py 用最小假布局覆盖 collect_refs / check_refs �
 config/local 影子文件影响，CI 与开发机结论一致。
 """
 
-import pytest
 
 from lvjiang.core.config import load_user_config
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.core.key_validation import validate_layout_activation_keys
 from lvjiang.workflows.engine import WorkflowEngine
+from tests.case_matrix import case_matrix
 
 
 def _system_wf_files() -> list:
@@ -108,8 +108,8 @@ def test_desktop_layout_has_no_activation_key_conflicts():
     validate_layout_activation_keys(_validator("桌面布局")._layout)
 
 
-@pytest.mark.parametrize("layout_name", _system_layouts())
-@pytest.mark.parametrize(
+@case_matrix("layout_name", _system_layouts())
+@case_matrix(
     "wf_path", _system_wf_files(),
     ids=lambda p: p.relative_to(SYSTEM_CONFIG_DIR / "workflows").as_posix())
 def test_wf_refs_all_bound(wf_path, layout_name):

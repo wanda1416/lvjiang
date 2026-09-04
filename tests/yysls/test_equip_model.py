@@ -4,21 +4,21 @@
 部位为武器时不区分主/副，具体武器类型（剑/枪/扇/...）由 weapon 单独表达。
 """
 
-import pytest
 
 from lvjiang.apps.yysls.core.equip_parser.constants import infer_part
 from lvjiang.apps.yysls.core.equip_parser.models import EquipmentData
+from tests.case_matrix import case_matrix
 
 
 class TestInferPart:
-    @pytest.mark.parametrize("weapon_type", [
+    @case_matrix("weapon_type", [
         "陌刀", "舞绫鼓", "双刀", "绳镖", "横刀", "手甲",
         "剑", "枪", "扇", "伞",
     ])
     def test_all_weapons_merge_into_one_part(self, weapon_type):
         assert infer_part(weapon_type) == "武器"
 
-    @pytest.mark.parametrize("part", [
+    @case_matrix("part", [
         "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲",
     ])
     def test_non_weapon_parts_keep_type(self, part):

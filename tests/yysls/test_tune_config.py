@@ -28,6 +28,7 @@ from lvjiang.apps.yysls.ui.tune_settings.material_config_page import (
     MaterialConfigPage,
 )
 from lvjiang.apps.yysls.ui.tune_settings.rule_panel import RulePanel
+from tests.case_matrix import case_matrix
 
 PROJECT_ROOT = Path(__file__).parents[2]
 RULES_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "tuning_rules"
@@ -310,7 +311,7 @@ class TestBehaviorPages:
 
 
 class TestPanelRoundtrip:
-    @pytest.mark.parametrize("key", ALL_KEYS)
+    @case_matrix("key", ALL_KEYS)
     def test_all_pages_apply_saves_ok(self, qtbot, tmp_manager, key):
         # 未改动任何控件时逐页触发收集：校验须通过且保存成功
         statuses: list[tuple[str, bool]] = []

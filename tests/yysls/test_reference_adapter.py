@@ -13,9 +13,10 @@ from lvjiang.apps.yysls.core.recognizer.reference_adapter import (
 from lvjiang.core.recognizers import ReferenceInfo
 from lvjiang.core.reference_db import ReferenceDatabase
 from lvjiang.workflows import builtins
+from tests.case_matrix import case_matrix
 
 
-@pytest.mark.parametrize(("text", "expected"), [
+@case_matrix(("text", "expected"), [
     ("", None), ("110阶", 110), ("30200", 30200),
     ("1.5万", 15000), ("0/1 1092", 1092),
 ])
@@ -23,7 +24,7 @@ def test_parse_number(text, expected):
     assert parse_number(text) == expected
 
 
-@pytest.mark.parametrize(("count_text", "count", "devoted"), [
+@case_matrix(("count_text", "count", "devoted"), [
     ("", None, None), ("30200", 30200, None),
     ("0/691", 691, 0), ("50/200", 200, 50),
 ])
@@ -77,7 +78,7 @@ def test_unmatched_material_does_not_emit_ocr_warning(monkeypatch):
     assert warnings == []
 
 
-@pytest.mark.parametrize(("level_text", "count_text", "devoted"), [
+@case_matrix(("level_text", "count_text", "devoted"), [
     ("无法识别", "无法识别", None),
     ("", "?/未知", 0),
 ])

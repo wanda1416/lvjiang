@@ -15,6 +15,7 @@ import pytest
 
 from lvjiang.apps.yysls.core.graduation.rotation import parse_rotation
 from lvjiang.constants import DATA_DIR, PROJECT_ROOT
+from tests.case_matrix import case_matrix
 
 _DEFAULT_DIR = DATA_DIR / "excel"
 _SCHEME_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "graduation"
@@ -45,7 +46,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.mark.parametrize(
+@case_matrix(
     "excel,scheme", _PAIRS, ids=[s["school"] for _, s in _PAIRS] or None)
 class TestReconcile:
     def test_total_damage_matches_scheme(self, excel, scheme):

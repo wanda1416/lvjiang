@@ -17,6 +17,7 @@ from lvjiang.apps.yysls.core.evaluator import (
     is_rule_implemented,
     judge_tuning_worthiness,
 )
+from tests.case_matrix import case_matrix
 
 
 def make_equip(equip_type: str, affix_names: list[str],
@@ -47,7 +48,7 @@ def judge_pvp():
 class TestEquipRatings:
     """各部位装备在不同词条组合下的四档评级。"""
 
-    @pytest.mark.parametrize("equip_type,affixes,quality,expected", [
+    @case_matrix("equip_type,affixes,quality,expected", [
         # ── 剑（主武器，需增伤）──
         ("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "劲", "势"], "gold", Rating.TOP),
         ("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "势", "会意率"], "gold", Rating.EXCELLENT),
@@ -234,7 +235,7 @@ class TestTransmuteSimulation:
         assert result.rating == Rating.EXCELLENT
         assert "最小外功攻击 再次转律为 势" in "；".join(result.reasons)
 
-    @pytest.mark.parametrize("name", ["流星云珑", "吴钩霜甲"])
+    @case_matrix("name", ["流星云珑", "吴钩霜甲"])
     def test_native_level_110_chengyin_can_retransfer(self, judge, name):
         """原生 110 级装备承音后仍可在固定槽上无限转律。"""
         equip = self._full_crown()
@@ -249,7 +250,7 @@ class TestTransmuteSimulation:
         assert result.rating == Rating.EXCELLENT
         assert "最小外功攻击 再次转律为 势" in "；".join(result.reasons)
 
-    @pytest.mark.parametrize("allow_retransfer,allow_after", [
+    @case_matrix("allow_retransfer,allow_after", [
         (False, True),
         (True, False),
     ])
@@ -304,7 +305,7 @@ class TestTransmuteSimulation:
         assert result.rating == Rating.JUNK
         assert "再次转律为" not in "；".join(result.reasons)
 
-    @pytest.mark.parametrize("level,is_chengyin", [
+    @case_matrix("level,is_chengyin", [
         (100, False),
         (105, True),
     ])

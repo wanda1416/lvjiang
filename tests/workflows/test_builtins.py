@@ -7,6 +7,7 @@ system 模块（confirm/pause/save/panel_rows）依赖 engine 与 GUI，不纳�
 import pytest
 
 from lvjiang.workflows.builtins import builtin_func, get_function, list_functions
+from tests.case_matrix import case_matrix
 
 
 def _fn(name):
@@ -41,7 +42,7 @@ class TestRegistry:
 # ─── arithmetic ────────────────────────────────────────────
 
 class TestArithmetic:
-    @pytest.mark.parametrize("name,a,b,expected", [
+    @case_matrix("name,a,b,expected", [
         ("add", 2, 3, 5),
         ("add", 3, 0.5, 3.5),
         ("sub", 10, 4, 6),
@@ -64,11 +65,11 @@ class TestArithmetic:
         assert _fn("add")("2", "3") == 5
         assert _fn("add")("2.5", "0.5") == 3.0
 
-    @pytest.mark.parametrize("name", ["div", "mod"])
+    @case_matrix("name", ["div", "mod"])
     def test_divide_by_zero_returns_zero(self, name):
         assert _fn(name)(7, 0) == 0
 
-    @pytest.mark.parametrize("name", [
+    @case_matrix("name", [
         "add", "sub", "mul", "div", "mod",
     ])
     def test_invalid_input_returns_zero(self, name):

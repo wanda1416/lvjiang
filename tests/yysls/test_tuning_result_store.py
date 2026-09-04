@@ -1,6 +1,5 @@
 """自动调律装备总览的旁路结果聚合。"""
 
-import pytest
 
 from lvjiang.apps.yysls.ui.tuning.progress_hub import TuningProgressHub
 from lvjiang.apps.yysls.ui.tuning.result_store import (
@@ -16,6 +15,7 @@ from lvjiang.apps.yysls.ui.tuning.result_store import (
     RESULT_TUNED_RECYCLED,
     TuningResultStore,
 )
+from tests.case_matrix import case_matrix
 
 
 def _start(hub, name="测试装备", equip_type="腕甲"):
@@ -119,7 +119,7 @@ def test_reset_only_equipment_is_still_a_tuning_result(qtbot):
     assert store.results[0].reset_outcome == RESET_COMPLETED
 
 
-@pytest.mark.parametrize(("outcome", "reason"), [
+@case_matrix(("outcome", "reason"), [
     (RESET_COOLDOWN, "冷却期中，跳过该装备"),
     (RESET_MATERIAL_SHORTAGE, "传律石不够，跳过该装备"),
 ])

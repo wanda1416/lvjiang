@@ -19,6 +19,7 @@ from lvjiang.apps.yysls.core.equip_validator import (
     illegal_reasons_of,
 )
 from lvjiang.core.ocr_cleaner import OCRCleaner
+from tests.case_matrix import case_matrix
 
 
 @pytest.fixture(scope="module")
@@ -54,7 +55,7 @@ class TestParseEquipType:
         # OCR 多切出一段脏数据，类型仍从最后一段提取
         assert parser._parse_equip_type("江无浪· | 一杆 | 武器·枪") == ("江无浪", "枪")
 
-    @pytest.mark.parametrize("name,expected", [
+    @case_matrix("name,expected", [
         ("流星云珑", "环"),
         ("玄玉辟邪", "佩"),
         ("雁南飞冠", "冠胄"),
@@ -87,7 +88,7 @@ class TestParseEquipType:
     def test_missing_c_falls_back_to_b(self, parser):
         assert parser._parse_equip_type("雁南飞甲") == ("雁南飞甲", "胸甲")
 
-    @pytest.mark.parametrize("raw,expected_type", [
+    @case_matrix("raw,expected_type", [
         ("吴钩霜甲 | 胸申", "胸甲"),   # "甲"错识别，"胸"单字命中
         ("雁南飞 | 寇胄", "冠胄"),     # "冠"错识别，"胄"单字命中
         ("流星珑 | 环", "环"),
@@ -127,7 +128,7 @@ class TestCooldownExpiry:
             "重置冷却中：3天", now=self.NOW,
         ) == "2026-09-07T04:00:00.000+00:00"
 
-    @pytest.mark.parametrize("raw", ["", "冷却中", "会意率 5%"])
+    @case_matrix("raw", ["", "冷却中", "会意率 5%"])
     def test_unreadable_or_non_cooldown_is_empty(self, parser, raw):
         assert parser._parse_cooldown_expires_at(raw, now=self.NOW) == ""
 
@@ -144,7 +145,7 @@ class TestCooldownExpiry:
 
 
 class TestOriginalLevel:
-    @pytest.mark.parametrize("raw,expected", [
+    @case_matrix("raw,expected", [
         ("流星云珑 | 环", 110),
         ("吴钩霜甲 | 胸甲", 110),
         ("踏雪含光 | 武器·剑", 105),
@@ -211,7 +212,7 @@ class TestParseSingleAffix:
         assert affix.value == 110
         assert affix.unit is None
 
-    @pytest.mark.parametrize("text", [
+    @case_matrix("text", [
         "[转]会心率 5.6%",
         "[转]会心率 5.6%",   # 全角括号清洗后
         "[转1会心率 5.6%",   # 87cb2b3：OCR 将 ] 误识别为 1

@@ -14,6 +14,7 @@ from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
 )
 from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
 from lvjiang.core.ocr_cleaner import OCRCleaner
+from tests.case_matrix import case_matrix
 
 
 @pytest.fixture(scope="module")
@@ -64,7 +65,7 @@ class TestCandidates:
 # ─── 解析 ─────────────────────────────────────────────────
 
 class TestParse:
-    @pytest.mark.parametrize("text,name,value", [
+    @case_matrix("text,name,value", [
         ("外功穿透 +14.2%", "外功穿透", 14.2),
         ("外功抗性+9.6%", "外功抗性", 9.6),
         ("无相穿透 12.8", "无相穿透", 12.8),

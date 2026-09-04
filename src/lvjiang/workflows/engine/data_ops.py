@@ -417,7 +417,7 @@ class _DataOpsMixin:
             self.variables[node.target] = result
             logger.debug(f"eval: {node.target} = {result}")
         else:
-            logger.debug(f"eval: {node.func_name}(...) = {result} (丢弃)")
+            logger.debug(f"eval: {node.func_name}(...) = {result} (返回值未使用)")
 
     def _exec_eval_field_assign(self, node: EvalFieldChainAssign):
         """eval $dict.key = value 或 eval session.key = value — 字段赋值

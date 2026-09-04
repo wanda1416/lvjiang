@@ -8,6 +8,7 @@ def scan_equipment_detail($detail_scene)
     if $detail_scene equals "equip_weapon_detail"
         scan [equip_weapon_detail].[equip_type, equip_level, base_attr, affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu, dingyin, zaoyi, status] as $raw
         if $raw.affix_gong contains "冷却"
+            eval $raw.cooldown_text = $raw.affix_gong
             scan [equip_weapon_detail].[cooldown_affix_gong, cooldown_affix_shang, cooldown_affix_jue, cooldown_affix_zhi, cooldown_affix_yu, cooldown_dingyin] as $cooldown
             call apply_cooldown_affixes($raw, $cooldown)
         end
@@ -17,6 +18,7 @@ def scan_equipment_detail($detail_scene)
     if $detail_scene equals "equip_armor_detail"
         scan [equip_armor_detail].[equip_type, equip_level, base_attr, base_attr_2, affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu, dingyin, zaoyi, status] as $raw
         if $raw.affix_gong contains "冷却"
+            eval $raw.cooldown_text = $raw.affix_gong
             scan [equip_armor_detail].[cooldown_affix_gong, cooldown_affix_shang, cooldown_affix_jue, cooldown_affix_zhi, cooldown_affix_yu, cooldown_dingyin] as $cooldown
             call apply_cooldown_affixes($raw, $cooldown)
         end

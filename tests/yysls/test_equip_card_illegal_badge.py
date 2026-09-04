@@ -238,6 +238,7 @@ def test_equipment_properties_show_source_fp_and_empty_missing_times():
         "来源：扫描",
         "指纹：abc123",
         "原始等级：105",
+        "冷却时间：",
         "创建时间：",
         "更新时间：",
     ]
@@ -248,6 +249,7 @@ def test_equipment_properties_show_mock_and_formatted_times():
     equip.update({
         "_fp": "mock_abc123",
         "original_level": 110,
+        "cooldown_expires_at": "2026-09-03T05:06:07",
         "created_at": "2026-09-01T01:02:03",
         "updated_at": "2026-09-02T04:05:06",
     })
@@ -256,6 +258,7 @@ def test_equipment_properties_show_mock_and_formatted_times():
         "来源：模拟",
         "指纹：mock_abc123",
         "原始等级：110",
+        "冷却时间：2026-09-03 05:06:07",
         "创建时间：2026-09-01 01:02:03",
         "更新时间：2026-09-02 04:05:06",
     ]

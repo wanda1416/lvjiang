@@ -62,6 +62,23 @@ class TestEquipmentDataDimensions:
         assert e.weapon is None
         assert e.category == "unknown"
 
+    def test_cooldown_expiry_roundtrip_and_legacy_default(self):
+        expires_at = "2026-09-07T04:00:00.000+00:00"
+        equip = EquipmentData(type="剑", cooldown_expires_at=expires_at)
+        data = equip.to_dict(include_fp=False)
+        assert data["cooldown_expires_at"] == expires_at
+        assert EquipmentData.from_dict(data).cooldown_expires_at == expires_at
+        data.pop("cooldown_expires_at")
+        assert EquipmentData.from_dict(data).cooldown_expires_at == ""
+
+    def test_cooldown_expiry_never_changes_serialized_fingerprint(self):
+        equip = EquipmentData(type="剑", level=110)
+        initial_fp = equip.to_dict()["_fp"]
+        equip.cooldown_expires_at = "2026-09-07T04:00:00.000+00:00"
+        assert equip.to_dict()["_fp"] == initial_fp
+        equip.cooldown_expires_at = "2026-09-08T20:00:00.000+00:00"
+        assert equip.to_dict()["_fp"] == initial_fp
+
 
 class TestDingyinSerialization:
     def test_roundtrip(self):

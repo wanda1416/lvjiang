@@ -4,6 +4,7 @@
 """
 
 import re
+from datetime import datetime, timedelta, timezone
 
 from loguru import logger
 
@@ -59,6 +60,8 @@ class EquipmentParser:
         equip.level, equip.is_chengyin = self._parse_equip_level(
             raw.get("equip_level", "")
         )
+        equip.cooldown_expires_at = self._parse_cooldown_expires_at(
+            raw.get("cooldown_text", ""))
 
         # base_attr：统一解析，不依赖 category
         equip.base_attr = self._parse_base_attr(raw.get("base_attr", ""))
@@ -235,6 +238,32 @@ class EquipmentParser:
         level = int(m.group(1)) if m else 0
 
         return level, is_chengyin
+
+    @staticmethod
+    def _parse_cooldown_expires_at(
+        raw: str,
+        *,
+        now: datetime | None = None,
+    ) -> str:
+        """将冷却剩余天数/小时数换算为 UTC ISO 到期时间。
+
+        OCR 示例：``条转律冷却中： | 2天16小时``、``重置冷却中：3天``。
+        冷却种类暂不进入模型；无法读出天或小时时保持空值。
+        """
+        if not isinstance(raw, str) or "冷却" not in raw:
+            return ""
+        day_match = re.search(r"(\d+)\s*天", raw)
+        hour_match = re.search(r"(\d+)\s*小时", raw)
+        if day_match is None and hour_match is None:
+            return ""
+        days = int(day_match.group(1)) if day_match else 0
+        hours = int(hour_match.group(1)) if hour_match else 0
+        base = now or datetime.now(timezone.utc)
+        if base.tzinfo is None:
+            base = base.replace(tzinfo=timezone.utc)
+        expires_at = base.astimezone(timezone.utc) + timedelta(
+            days=days, hours=hours)
+        return expires_at.isoformat(timespec="milliseconds")
 
     # ─── base_attr 解析 ────────────────────────────────────
 

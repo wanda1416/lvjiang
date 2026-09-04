@@ -565,9 +565,12 @@ class _DataOpsMixin:
         记录的定义文件目录（_proc_sources 未命中时保持调用方当前值，
         兼容测试直接构造 ProcDef 而不经过 loaded_procs 注册的场景）。
         """
-        saved_vars = dict(self.variables)
+        # 调用前先提交调用方对全局变量的最新写入；子过程从共享全局值
+        # 加形参开始，普通变量仍保持完全隔离。
+        self._sync_global_variables()
+        saved_vars = self.variables
         saved_output = dict(self.output)
-        self.variables = {}  # 子过程从干净变量表开始（作用域隔离）
+        self.variables = dict(self._global_variables)
         self.output = {}  # type: ignore[var-annotated]  # 子过程从空 output 开始
         saved_base_dir = self._base_dir
         proc_source = self._proc_sources.get(proc_def.name)
@@ -585,9 +588,12 @@ class _DataOpsMixin:
             except _ReturnSignal as e:
                 return_value = e.value  # 捕获返回值
         finally:
-            # 捕获子过程的 output，然后恢复调用方的变量、output 与 base_dir
+            # 先提交子过程对全局变量的写入，再恢复调用方局部变量并注入
+            # 全局最新值。即便过程通过 return 或异常退出，全局写入也不丢失。
             callee_output = dict(self.output)
+            self._sync_global_variables()
             self.variables = saved_vars
+            self._apply_global_variables()
             self.output = saved_output
             self._base_dir = saved_base_dir
         return return_value, callee_output

@@ -251,7 +251,7 @@ class WfHighlighter(QSyntaxHighlighter):
     _CONTROL = r"\b(if|else|end|for|in|loop|while|until|break|continue|return|goto|try|catch)\b"
     _COMMANDS = (
         r"\b(click|move|scroll|drag|press|wait|scan|recognize|collect|log|screenshot|"
-        r"eval|default|align|find|import|def|call)\b"
+        r"eval|default|global|align|find|import|def|call)\b"
     )
     _MODIFIERS = r"\b(as|by|where|on|group|hold|rich|full|with|stable|threshold|interval|duration|least)\b"
     _TIMING = r"\b(before|after|around)\b"

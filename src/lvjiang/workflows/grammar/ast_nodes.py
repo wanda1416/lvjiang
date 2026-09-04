@@ -332,6 +332,13 @@ class Continue:
 
 
 @dataclass(frozen=True)
+class Global:
+    """global $name[, $name...] — 声明跨过程共享的变量名。"""
+    names: list[str] = field(default_factory=list)
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
 class Try:
     """try ... catch $err ... end — 异常处理
 

@@ -38,6 +38,7 @@ from ..grammar.ast_nodes import (
     For,
     ForRange,
     FuncCall,
+    Global,
     Goto,
     If,
     Import,
@@ -159,6 +160,9 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._reference_recognizer = ReferenceRecognizer(self._ocr)
         # 执行状态
         self.variables: dict = {}
+        # global 声明按变量名跨 call 共享；普通变量仍由 _run_proc 隔离。
+        self._global_variable_names: set[str] = set()
+        self._global_variables: dict = {}
         self.output: dict = {}
         self.return_value = None  # 顶层 return 值（供场景编辑器显示）
         self._coord_meta: dict[str, dict] = {}
@@ -277,13 +281,17 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         Returns:
             dict: collect 累积结果
         """
-        if initial_variables:
-            self.variables.update(initial_variables)
-
         # context 是临时状态，仅顶层执行时重置
-        # 过程中通过 context 共享引用传递数据
+        # 过程中通过 context/global 共享数据；两者都不得泄漏到下一次执行。
         if _reset_context:
             self.context = {}
+            for name in self._global_variable_names:
+                self.variables.pop(name, None)
+            self._global_variable_names.clear()
+            self._global_variables.clear()
+
+        if initial_variables:
+            self.variables.update(initial_variables)
 
         try:
             # Python 工作流实例
@@ -987,6 +995,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 raise _BreakSignal()
             case Continue():
                 raise _ContinueSignal()
+            case Global():
+                self._exec_global(node)
             case Return():
                 value = self._resolve(node.value) if node.value is not None else None
                 raise _ReturnSignal(value)
@@ -1006,6 +1016,27 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_try(node)
             case _:
                 logger.error(f"未知节点类型: {type(node).__name__}")
+
+    def _exec_global(self, node: Global) -> None:
+        """注册共享变量名，并把当前作用域已有值提升到全局表。"""
+        for name in node.names:
+            self._global_variable_names.add(name)
+            if name in self.variables:
+                self._global_variables[name] = self.variables[name]
+            elif name in self._global_variables:
+                self.variables[name] = self._global_variables[name]
+
+    def _sync_global_variables(self) -> None:
+        """把当前作用域中已声明的全局变量写回共享表。"""
+        for name in self._global_variable_names:
+            if name in self.variables:
+                self._global_variables[name] = self.variables[name]
+
+    def _apply_global_variables(self) -> None:
+        """把共享表的最新值注入当前作用域。"""
+        for name, value in self._global_variables.items():
+            if name in self._global_variable_names:
+                self.variables[name] = value
 
     def _exec_replay_input_trace(self, node: ReplayInputTrace):
         """绕过逐条 DSL 调度，一次交给桌面输入后端实时回放。"""

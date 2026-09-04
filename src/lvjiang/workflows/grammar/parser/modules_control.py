@@ -10,6 +10,7 @@ from ..ast_nodes import (
     For,
     ForRange,
     FuncCall,
+    Global,
     Goto,
     If,
     Import,
@@ -274,6 +275,13 @@ class _ModuleControlMixin:
     def continue_stmt(self, items):
         """continue — 跳过当前迭代"""
         return Continue(line_no=self._line(items))
+
+    def global_stmt(self, items):
+        """global $name[, $name...] — 声明跨过程共享变量。"""
+        return Global(
+            names=[item.name for item in items if isinstance(item, VarRef)],
+            line_no=self._line(items),
+        )
 
     def return_stmt(self, items):
         """return [value] — 返回值可选"""

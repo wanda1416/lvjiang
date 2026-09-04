@@ -1,11 +1,12 @@
 # 数据通道
 
-DSL 工作流有四条独立的数据通道，各自承担不同职责：
+DSL 工作流有五条独立的数据通道，各自承担不同职责：
 
 | 通道 | 生命周期 | 隔离性 | 用途 |
 |------|----------|--------|------|
 | **session** | 永久（跨执行） | 共享引用 | 角色级持久状态 |
 | **context** | 单次执行内 | 共享引用 | 过程间数据传递 |
+| **global 变量** | 单次执行内 | 显式声明后共享 | 跨过程共享简单值 |
 | **variables** | 单次执行内 | **按 call 隔离** | 过程局部计算 |
 | **output** | 单次执行内 | **按 call 隔离** | 返回给上层调度者 |
 
@@ -65,7 +66,31 @@ eval context.bag_fingerprints.$slot_key = $fp
 
 **与 `call $var = proc()` 的区别**：`context` 是共享引用传递，适合传递多个键值对；`call $var = proc()` 是局部变量绑定，语义更清晰，适合单一返回值。
 
-## 三、variables — 局部变量
+## 三、global — 显式共享变量
+
+**生命周期**：单次工作流执行内有效，执行结束即清除。
+
+**隔离性**：名称一旦通过 `global` 声明，主流程和任意调用深度的子过程都
+读写同一个值。未声明的变量仍保持局部隔离。
+
+```dsl
+global $count, $status
+eval $count = 0
+
+def increment()
+    eval $count = $count + 1
+    eval $status = "updated"
+end
+
+call increment()
+# $count == 1，$status == "updated"
+```
+
+声明可以出现在主流程或子过程中。若声明时当前作用域已经有同名变量，当前值
+会被提升并保留；声明本身不会创建默认值。简单共享状态可用 `global`，结构化
+共享数据仍优先使用 `context`，过程输出仍优先使用 `return`。
+
+## 四、variables — 局部变量
 
 **生命周期**：单次工作流执行内有效，**按 call 隔离**。
 
@@ -73,7 +98,7 @@ eval context.bag_fingerprints.$slot_key = $fp
 
 ```python
 # 引擎内部实现
-saved_vars = dict(self.variables)    # 进入前保存
+saved_vars = self.variables          # 保存调用方作用域
 ...
 self.variables = saved_vars          # 退出后恢复
 ```
@@ -105,7 +130,7 @@ call $result = proc() as $output  # 同时接收
 
 **典型用途**：过程内部的临时计算、循环计数器、中间结果暂存。
 
-## 四、output — 返回结果
+## 五、output — 返回结果
 
 **生命周期**：单次工作流执行内有效，**按 call 隔离**。
 
@@ -130,21 +155,21 @@ collect session.equipped as "equipment"
 
 **典型用途**：向调度者报告执行结果（成功/失败、统计数据、采集的数据）。
 
-## 五、选择指南
+## 六、选择指南
 
 ```
 需要跨工作流保留？
 ├── 是 → session
 └── 否 → 需要跨过程传递？
-         ├── 是 → 传递多个键值对？
-         │        ├── 是 → context
+         ├── 是 → 多个过程都要持续读写？
+         │        ├── 是 → 简单命名状态用 global；结构化状态用 context
          │        └── 否 → call $var = proc()
          └── 否 → 需要告诉上层结果？
                   ├── 是 → output（collect）
                   └── 否 → variables（局部计算）
 ```
 
-## 六、完整示例
+## 七、完整示例
 
 ```dsl
 # 主工作流
@@ -189,7 +214,7 @@ def find_material()
 end
 ```
 
-## 七、Profile — 玩家档案（只读数据源）
+## 八、Profile — 玩家档案（只读数据源）
 
 除上述四条通道外，DSL 还可通过内置函数访问 **ProfileDB**（玩家档案数据库），获取角色级的持久化数据。ProfileDB 按三模型组织：
 
@@ -253,10 +278,11 @@ eval $regen_data = $all.regen
 | **自动计算** | 无 | regen key 自动计算实时值 |
 | **典型用途** | 工作流内部状态 | 角色级游戏数据（配额、体力、库存） |
 
-## 八、注意事项
+## 九、注意事项
 
 1. **session 写入时机**：`eval session.key = value` 只修改内存，需要显式 `save()` 或等待正常结束才落盘
 2. **context 非隔离**：子过程对 `context` 的修改会立即影响调用方，注意命名冲突
-3. **variables 隔离**：子过程无法直接修改调用方的局部变量，需要通过 `return` 或 `context` 传递
-4. **output 隔离**：子过程的 `collect` 不会污染调用方的 `output`，需要通过 `as $output` 显式获取
-5. **profile 只读数据源**：profile 函数访问独立数据库，不影响 session/context/variables/output 四通道
+3. **global 名称共享**：声明后同名变量在所有过程里指向同一状态，应避免与过程形参重名
+4. **variables 隔离**：子过程无法直接修改调用方的局部变量，需要通过 `return`、`global` 或 `context` 传递
+5. **output 隔离**：子过程的 `collect` 不会污染调用方的 `output`，需要通过 `as $output` 显式获取
+6. **profile 只读数据源**：profile 函数访问独立数据库，不影响 session/context/global/variables/output 五条通道

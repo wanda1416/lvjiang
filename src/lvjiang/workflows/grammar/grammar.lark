@@ -40,6 +40,7 @@ start: (_NL | statement)*
           | loop_until_stmt
           | break_stmt
           | continue_stmt
+          | global_stmt
           | return_stmt
           | label_stmt
           | goto_stmt
@@ -401,6 +402,8 @@ loop_until_stmt: "loop"i "until"i condition _NL (_NL | statement)* "end"i _NL
 break_stmt: "break"i _NL
 
 continue_stmt: "continue"i _NL
+
+global_stmt: "global"i var_ref ("," var_ref)* _NL
 
 return_stmt: "return"i [literal | arith_expr] _NL
 

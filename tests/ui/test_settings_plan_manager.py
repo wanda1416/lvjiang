@@ -1,4 +1,9 @@
-"""配置管理 →「方案设置」Tab 的方案管理块。"""
+"""配置管理 →「方案设置」Tab 的方案管理块。
+
+app.yaml 的分发层由根 conftest 的 ``distributed_plans_store``（autouse）
+统一挡掉：入库的预置方案会被 SettingsDialog 灌进 _plan_list，本文件大量
+计数类断言全靠它隔离。
+"""
 
 from types import SimpleNamespace
 
@@ -386,7 +391,7 @@ def test_new_plans_are_local_by_default(qtbot, monkeypatch):
     assert not dlg._collect_plans()[0].distributed
 
 
-def test_distributed_plan_is_read_only_for_normal_users(qtbot, monkeypatch, distributed_plans_store):
+def test_distributed_plan_is_read_only_for_normal_users(qtbot, monkeypatch):
     save_plans([Plan.create("预置端游", space="端游", env="desktop",
                             layout="桌面布局", modes=[PLAN_MODE_WINDOW],
                             distributed=True)])
@@ -399,7 +404,7 @@ def test_distributed_plan_is_read_only_for_normal_users(qtbot, monkeypatch, dist
     assert not dlg._plan_delete_btn.isEnabled()
 
 
-def test_distributed_plan_stays_editable_in_dev_mode(qtbot, monkeypatch, distributed_plans_store):
+def test_distributed_plan_stays_editable_in_dev_mode(qtbot, monkeypatch):
     save_plans([Plan.create("预置端游", space="端游", env="desktop",
                             layout="桌面布局", modes=[PLAN_MODE_WINDOW],
                             distributed=True)])
@@ -409,7 +414,7 @@ def test_distributed_plan_stays_editable_in_dev_mode(qtbot, monkeypatch, distrib
     assert dlg._plan_delete_btn.isEnabled()
 
 
-def test_read_only_plan_is_never_rewritten_by_being_viewed(qtbot, monkeypatch, distributed_plans_store):
+def test_read_only_plan_is_never_rewritten_by_being_viewed(qtbot, monkeypatch):
     """分发方案引用的布局在这台机器上不存在时，下拉框会回退到第一项。
 
     对可编辑方案要把回退值写回去（否则表单与存储对不上），但对只读方案
@@ -425,7 +430,7 @@ def test_read_only_plan_is_never_rewritten_by_being_viewed(qtbot, monkeypatch, d
 
 
 def test_deleting_a_distributed_plan_is_refused_for_normal_users(
-        qtbot, monkeypatch, distributed_plans_store):
+        qtbot, monkeypatch):
     save_plans([Plan.create("预置", modes=[PLAN_MODE_WINDOW],
                             distributed=True)])
     dlg = _dev_dialog(qtbot, monkeypatch, dev=False)

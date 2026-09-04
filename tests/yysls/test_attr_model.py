@@ -471,7 +471,7 @@ def test_create_rejects_a_duplicate_id(sources_dir) -> None:
 
 
 def test_confirmed_no_effect_counts_as_done(sources_dir) -> None:
-    """心法六重里大量是触发类效果；确认无贡献要能推进进度，
+    """心法六重里大量是触发类效果；确认「无静态属性」要能推进进度，
     否则永远有一堆查过、确认没有、却仍显示待填的条目。"""
     manager, _ = sources_dir
 

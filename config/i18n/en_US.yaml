@@ -1577,7 +1577,7 @@ auto_strings:
   '- 条目': '- Entry'
   '{label}：已确认 {done}/{total}　全部来源：{all_done}/{all_total}': '{label}: {done}/{total} confirmed　All sources: {all_done}/{all_total}'
   '{school} 推导': '{school} derived'
-  '{source} 既声明无贡献又填了数值，取哪个无从判断': '{source} declares no effect yet also carries values; which one applies is undecidable'
+  '{source} 既声明无静态属性又填了数值，取哪个无从判断': '{source} declares no static stats yet also carries values; which one applies is undecidable'
   '{source} 的 no_effect 必须是布尔值': '{source}: no_effect must be a boolean'
   '「一整条词条」的数值由词组配置的当前等级上限生成，换赛季只改词组配置一处；一条给多个属性或需要公式的，用「高级」编辑': 'Values for "one full affix" come from the affix cap of the current level, so a new season only needs the affix config updated; use Advanced for entries with several stats or a formula'
   '与对照完全一致': 'Matches the reference exactly'

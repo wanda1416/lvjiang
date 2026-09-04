@@ -36,6 +36,7 @@
 default $min_level = 110
 
 import "subcall/navigation.wf"
+import "subcall/equipment_scan.wf"
 
 call $nav_result = nav_main_to_equip()
 if $nav_result < 0
@@ -198,9 +199,9 @@ end
 # 扫描当前格子并解析装备，返回装备字典
 def scan_cell($detail_kind)
     if $detail_kind equals "weapon"
-        scan [equip_weapon_detail] as $raw
+        call $raw = scan_equipment_detail("equip_weapon_detail")
     else
-        scan [equip_armor_detail] as $raw
+        call $raw = scan_equipment_detail("equip_armor_detail")
     end
     return to_equipment($raw)
 end

@@ -34,6 +34,7 @@ def test_route_dependencies_use_detection_without_generic_page_actions():
     assert wf.engine.load_subcalls.call_args_list == [
         call("subcall/navigation.wf"),
         call("subcall/page_detection.wf"),
+        call("subcall/equipment_scan.wf"),
     ]
 
 

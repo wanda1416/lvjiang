@@ -1,0 +1,37 @@
+# 装备详情统一扫描。
+#
+# 调律重置处于冷却期时，游戏会在原「宫」词条位置插入冷却提示，导致五个
+# 词条和定音整体下移。先扫描基础视图；命中冷却提示后，再用冷却视图的六个
+# 专用区域重新截图 OCR，并映射回解析器约定的标准字段。
+
+def scan_equipment_detail($detail_scene)
+    if $detail_scene equals "equip_weapon_detail"
+        scan [equip_weapon_detail].[equip_type, equip_level, base_attr, affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu, dingyin, zaoyi, status] as $raw
+        if $raw.affix_gong contains "冷却"
+            scan [equip_weapon_detail].[cooldown_affix_gong, cooldown_affix_shang, cooldown_affix_jue, cooldown_affix_zhi, cooldown_affix_yu, cooldown_dingyin] as $cooldown
+            call apply_cooldown_affixes($raw, $cooldown)
+        end
+        return $raw
+    end
+
+    if $detail_scene equals "equip_armor_detail"
+        scan [equip_armor_detail].[equip_type, equip_level, base_attr, base_attr_2, affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu, dingyin, zaoyi, status] as $raw
+        if $raw.affix_gong contains "冷却"
+            scan [equip_armor_detail].[cooldown_affix_gong, cooldown_affix_shang, cooldown_affix_jue, cooldown_affix_zhi, cooldown_affix_yu, cooldown_dingyin] as $cooldown
+            call apply_cooldown_affixes($raw, $cooldown)
+        end
+        return $raw
+    end
+
+    log error "不支持的装备详情场景: " + $detail_scene
+    return null
+end
+
+def apply_cooldown_affixes($raw, $cooldown)
+    eval $raw.affix_gong = $cooldown.cooldown_affix_gong
+    eval $raw.affix_shang = $cooldown.cooldown_affix_shang
+    eval $raw.affix_jue = $cooldown.cooldown_affix_jue
+    eval $raw.affix_zhi = $cooldown.cooldown_affix_zhi
+    eval $raw.affix_yu = $cooldown.cooldown_affix_yu
+    eval $raw.dingyin = $cooldown.cooldown_dingyin
+end

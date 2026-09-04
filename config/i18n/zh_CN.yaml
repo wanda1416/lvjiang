@@ -1602,6 +1602,7 @@ auto_strings:
   '{what} 不是已知属性字段': '{what} 不是已知属性字段'
   '{what} 的 formula 之外还有多余的键: {keys}': '{what} 的 formula 之外还有多余的键: {keys}'
   '{what} 的 source 不是已知属性字段: {source}': '{what} 的 source 不是已知属性字段: {source}'
+  '另有 {n} 项仅战斗内生效，不进本表': '另有 {n} 项仅战斗内生效，不进本表'
 task_history:
   task: 任务
   title: 任务历史

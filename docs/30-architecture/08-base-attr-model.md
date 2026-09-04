@@ -80,12 +80,17 @@ entries:
 
 ## 双出口
 
-同一份来源清单求值两次：
+同一份来源清单求值两次，各自成一个 `ScopeResult`（属性值 + 产生它的
+明细绑在同一个对象上）：
 
-- `panel_attrs` 只含 `scope: panel` 的贡献，用于和游戏角色面板对账；
-- `combat_attrs` 含全部贡献，作为毕业率的 `base_attrs`。
+- `result.panel` 只含 `scope: panel` 的贡献，用于和游戏角色面板对账；
+- `result.combat` 含全部贡献，作为毕业率的 `base_attrs`。
 
 差集就是吃食一类只在战斗内生效、不进角色面板的加成。
+
+值和明细绑在一起，是为了让「显示 A 的值、却按 B 的明细拆分」在结构上
+就写不出来——它们分开放的时候，界面显示面板值而 breakdown 汇总了含
+吃食的战斗贡献，两栏加不到一起。
 
 ## 未建模条目与反解
 
@@ -100,9 +105,11 @@ entries:
 
 面板对不上时靠 breakdown 定位，而不是只知道总数不对：
 
-- `ResolveResult.modifiers_for(field)` —— 该字段收到的每一次贡献
+- `ScopeResult.modifiers_for(field)` —— 该字段收到的每一次贡献
   （来源、前值、后值）；
-- `ResolveResult.contribution_by_kind(field)` —— 按来源类别汇总；
+- `ScopeResult.contribution_by_kind(field)` —— 按来源类别汇总；
+- `extra_attrs` 的动态属性（指定武学增效、技能增伤等）同样记明细、
+  同样进 breakdown 与差异比对，`AppliedModifier.is_extra` 标出来；
 - `diff_against_panel(result, panel)` —— 与实测面板逐字段比对，
   只列出不一致的。
 

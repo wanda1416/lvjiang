@@ -1602,6 +1602,7 @@ auto_strings:
   '{what} 不是已知属性字段': '{what} is not a known stat field'
   '{what} 的 formula 之外还有多余的键: {keys}': '{what} has keys besides formula: {keys}'
   '{what} 的 source 不是已知属性字段: {source}': '{what}: source is not a known stat field: {source}'
+  '另有 {n} 项仅战斗内生效，不进本表': '{n} more apply in combat only and are not listed here'
 task_history:
   task: Task
   title: Task History

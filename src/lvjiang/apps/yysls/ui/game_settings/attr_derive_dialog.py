@@ -183,6 +183,14 @@ class AttrDeriveDialog(QDialog):
         for key, value in stored.items():
             if str(key) in known and isinstance(value, (int, float)):
                 setattr(reference, str(key), float(value))
+        # extra_attrs 是嵌套的一层；漏读它，指定武学增效这类动态属性
+        # 就永远显示成「模型有、对照没有」。
+        nested = stored.get("extra_attrs")
+        if isinstance(nested, dict):
+            reference.extra_attrs = {
+                str(k): float(v) for k, v in nested.items()
+                if isinstance(v, (int, float))
+            }
         return reference
 
     def _on_school_changed(self) -> None:
@@ -221,31 +229,52 @@ class AttrDeriveDialog(QDialog):
                          .format(n=len(differences)))
         else:
             parts.append(tr("与对照完全一致"))
+        combat_only = len(result.combat.modifiers) - len(result.panel.modifiers)
+        if combat_only > 0:
+            parts.append(tr("另有 {n} 项仅战斗内生效，不进本表").format(n=combat_only))
         self._summary.setText("　".join(parts))
 
+    def _rows(self, result, reference) -> list[tuple[str, str, bool]]:
+        """(字段名, 显示名, 是否 extra)：模型或对照任一有值就列出来"""
+        rows: list[tuple[str, str, bool]] = []
+        for name, display, _unit, _ in COMBAT_ATTR_FIELDS:
+            if getattr(result.panel_attrs, name, 0.0) or (
+                    reference is not None and getattr(reference, name, 0.0)):
+                rows.append((name, display, False))
+        extra_names = set(result.panel_attrs.extra_attrs)
+        if reference is not None:
+            extra_names |= set(reference.extra_attrs)
+        for name in sorted(extra_names):
+            rows.append((name, name, True))
+        return rows
+
     def _fill_table(self, result, reference, differences: dict) -> None:
-        rows = [
-            (name, display)
-            for name, display, _unit, _ in COMBAT_ATTR_FIELDS
-            if getattr(result.panel_attrs, name, 0.0)
-            or (reference is not None and getattr(reference, name, 0.0))
-        ]
+        # 一律走 result.panel：显示的是面板值，拆分就必须是面板明细。
+        # 混用战斗明细的话，两栏加不到一起（吃食只在战斗侧有贡献）。
+        panel = result.panel
+        rows = self._rows(result, reference)
         self._table.setRowCount(len(rows))
-        for row, (name, display) in enumerate(rows):
-            derived = getattr(result.panel_attrs, name, 0.0)
+        for row, (name, display, is_extra) in enumerate(rows):
+            derived = (
+                panel.attrs.extra_attrs.get(name, 0.0) if is_extra
+                else getattr(panel.attrs, name, 0.0)
+            )
             self._table.setItem(row, 0, QTableWidgetItem(display))
             self._table.setItem(row, 1, QTableWidgetItem(f"{derived:.4g}"))
 
             if reference is None:
                 self._table.setItem(row, 2, QTableWidgetItem("-"))
             else:
-                actual = getattr(reference, name, 0.0)
+                actual = (
+                    reference.extra_attrs.get(name, 0.0) if is_extra
+                    else getattr(reference, name, 0.0)
+                )
                 cell = QTableWidgetItem(f"{actual:.4g}")
                 if abs(actual - derived) > _DIFF_EPSILON:
                     cell.setForeground(Qt.GlobalColor.red)
                 self._table.setItem(row, 2, cell)
 
-            breakdown = result.contribution_by_kind(name)
+            breakdown = panel.contribution_by_kind(name)
             text = "　".join(
                 f"{tr(SOURCE_KIND_LABELS.get(kind, kind))} {value:+.4g}"
                 for kind, value in breakdown.items() if value

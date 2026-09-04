@@ -243,6 +243,10 @@ class AppliedModifier:
 
     面板对不上时，逐条比对本清单即可定位到具体来源，而不是只知道
     总数不对。
+
+    ``is_extra`` 为真时 ``field_name`` 是 extra_attrs 的动态属性名
+    （如「剑武学增伤」），否则是 CombatAttributes 的字段名。两者命名
+    空间天然不重叠，但显式标出来，取用方不必靠猜。
     """
 
     source_id: str
@@ -252,6 +256,7 @@ class AppliedModifier:
     field_name: str
     before: float
     after: float
+    is_extra: bool = False
 
     @property
     def delta(self) -> float:
@@ -267,19 +272,17 @@ class UnmodeledSource:
     kind: str
 
 
-@dataclass
-class ResolveResult:
-    """一次求值的完整产物
+@dataclass(frozen=True)
+class ScopeResult:
+    """一个作用域的求值产物：属性值与产生它的明细
 
-    ``panel_attrs`` 只含 scope=panel 的贡献，用来和游戏角色面板对账；
-    ``combat_attrs`` 含全部贡献，作为毕业率的 base_attrs。两者的差集
-    就是吃食这类只在战斗内生效的部分。
+    值和明细绑在同一个对象上，是为了让「显示 A 的值、却按 B 的明细
+    拆分」在结构上就写不出来——此前两者分开放，界面显示面板值、
+    breakdown 却汇总了含吃食的战斗贡献，两栏加不到一起。
     """
 
-    panel_attrs: Any  # CombatAttributes，避免本模块反向依赖 combat 包
-    combat_attrs: Any
+    attrs: Any  # CombatAttributes，避免本模块反向依赖 combat 包
     modifiers: list[AppliedModifier] = field(default_factory=list)
-    unmodeled: list[UnmodeledSource] = field(default_factory=list)
 
     def modifiers_for(self, field_name: str) -> list[AppliedModifier]:
         """某个字段收到的全部贡献，按求值顺序"""
@@ -291,6 +294,36 @@ class ResolveResult:
         for modifier in self.modifiers_for(field_name):
             totals[modifier.kind] = totals.get(modifier.kind, 0.0) + modifier.delta
         return totals
+
+    def touched_fields(self) -> list[str]:
+        """收到过贡献的字段，按首次出现序；含 extra_attrs 的动态属性"""
+        seen: list[str] = []
+        for modifier in self.modifiers:
+            if modifier.field_name not in seen:
+                seen.append(modifier.field_name)
+        return seen
+
+
+@dataclass
+class ResolveResult:
+    """一次求值的完整产物
+
+    ``panel`` 只含 scope=panel 的贡献，用来和游戏角色面板对账；
+    ``combat`` 含全部贡献，作为毕业率的 base_attrs。两者的差集就是
+    吃食这类只在战斗内生效的部分。
+    """
+
+    panel: ScopeResult
+    combat: ScopeResult
+    unmodeled: list[UnmodeledSource] = field(default_factory=list)
+
+    @property
+    def panel_attrs(self) -> Any:
+        return self.panel.attrs
+
+    @property
+    def combat_attrs(self) -> Any:
+        return self.combat.attrs
 
 
 # ─── 工作字段空间 ────────────────────────────────────────

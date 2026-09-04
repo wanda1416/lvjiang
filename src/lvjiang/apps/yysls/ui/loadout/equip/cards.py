@@ -182,6 +182,7 @@ def _equipment_properties_text(equip: dict) -> str:
         f"{tr('来源')}：{source}",
         f"{tr('指纹')}：{equip.get('_fp') or ''}",
         f"{tr('原始等级')}：{int(equip.get('original_level') or 0)}",
+        f"{tr('冷却时间')}：{_format_equipment_time(equip.get('cooldown_expires_at'))}",
         f"{tr('创建时间')}：{_format_equipment_time(equip.get('created_at'))}",
         f"{tr('更新时间')}：{_format_equipment_time(equip.get('updated_at'))}",
     ))

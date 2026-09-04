@@ -16,6 +16,7 @@
   "type": "剑",
   "level": 110,
   "original_level": 110,
+  "cooldown_expires_at": "2026-09-07T20:00:00.000+00:00",
   "quality": "gold",
   "is_chengyin": true,
   "base_attr": { "name": "外功攻击", "value": [100, 232] },
@@ -73,6 +74,7 @@
 |------|------|------|
 | `level` | int | 装备等阶数字（如 96、100、105、110） |
 | `original_level` | int | 原始等级；仅按名称开头的等阶名称识别，无法匹配为 0 |
+| `cooldown_expires_at` | string | 冷却到期 UTC ISO 时间；无冷却或剩余时长无法识别时为空 |
 | `is_chengyin` | bool | 是否为承音装备 |
 
 `level` 是当前显示等级，可能受承音影响；`original_level` 不得用当前等级或基础
@@ -351,6 +353,7 @@ _fp = MD5(拼接字符串)[:8]   # 取前 8 位十六进制字符
 | `type` | ✓ | 装备类型（如 "剑""环"） |
 | `level` | ✓ | 等级（如 110） |
 | `original_level` | ✗ | 可由名称等阶重新识别，不参与实体指纹 |
+| `cooldown_expires_at` | ✗ | 扫描时变化的冷却状态，绝对不得污染实体指纹 |
 | `quality` | ✓ | 品阶（"gold""purple"） |
 | `is_chengyin` | ✓ | 是否承音（True/False） |
 | `affix_1` ~ `affix_5` | ✓ | 每条词条的 `name:value` |

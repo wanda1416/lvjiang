@@ -339,6 +339,7 @@ def test_equipment_scan_rescans_shifted_fields_when_gong_contains_cooldown():
     assert raw["affix_zhi"] == "最大鸣金攻击 97%"
     assert raw["affix_yu"] == "垃圾词条 59%"
     assert raw["dingyin"] == "定音属性"
+    assert raw["cooldown_text"] == "冷却期：1小时后可重置"
     detail_calls = [call for call in wf.ocr_calls if call[0] == WEAPON_DETAIL]
     assert len(detail_calls) == 2
     assert "cooldown_affix_gong" not in detail_calls[0][1]

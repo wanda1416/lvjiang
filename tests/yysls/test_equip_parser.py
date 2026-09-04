@@ -8,6 +8,8 @@
 - cap_pct 计算与 parse() 整链（品阶推断、级联丢弃 warnings）
 """
 
+from datetime import datetime, timezone
+
 import pytest
 
 from lvjiang.apps.yysls.core.equip_parser.models import EquipmentData
@@ -110,6 +112,35 @@ class TestParseEquipLevel:
 
     def test_chengyin_without_level(self, parser):
         assert parser._parse_equip_level("承音") == (0, True)
+
+
+class TestCooldownExpiry:
+    NOW = datetime(2026, 9, 4, 4, 0, tzinfo=timezone.utc)
+
+    def test_days_and_hours(self, parser):
+        assert parser._parse_cooldown_expires_at(
+            "条转律冷却中： | 2天16小时", now=self.NOW,
+        ) == "2026-09-06T20:00:00.000+00:00"
+
+    def test_days_without_hours(self, parser):
+        assert parser._parse_cooldown_expires_at(
+            "重置冷却中：3天", now=self.NOW,
+        ) == "2026-09-07T04:00:00.000+00:00"
+
+    @pytest.mark.parametrize("raw", ["", "冷却中", "会意率 5%"])
+    def test_unreadable_or_non_cooldown_is_empty(self, parser, raw):
+        assert parser._parse_cooldown_expires_at(raw, now=self.NOW) == ""
+
+    def test_parse_writes_expiry_to_equipment(self, parser, monkeypatch):
+        monkeypatch.setattr(
+            parser, "_parse_cooldown_expires_at",
+            lambda raw: "2026-09-07T04:00:00.000+00:00" if raw else "",
+        )
+        equip = parser.parse({
+            "equip_type": "流星云珑 | 环",
+            "cooldown_text": "转律冷却中：3天",
+        })
+        assert equip.cooldown_expires_at == "2026-09-07T04:00:00.000+00:00"
 
 
 class TestOriginalLevel:

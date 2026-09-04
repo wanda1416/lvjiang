@@ -64,6 +64,7 @@ class EquipmentData:
         "name": "踏雪含光",
         "level": 110,
         "original_level": 105,
+        "cooldown_expires_at": "2026-09-07T20:00:00.000+00:00",
         "quality": null,
         "is_chengyin": true,
         "base_attr": { "name": "外功攻击", "value": [100, 232] },
@@ -79,6 +80,7 @@ class EquipmentData:
     name: str | None = None        # 装备名称
     level: int | None = None
     original_level: int = 0       # 仅按名称中的等阶名称识别；0 表示未知
+    cooldown_expires_at: str = ""  # 冷却到期 UTC ISO 时间；无冷却为空
     quality: str | None = None     # gold/purple/blue/green，OCR 暂无法识别
     is_chengyin: bool = False
     base_attr: EquipAttr | None = None
@@ -119,6 +121,7 @@ class EquipmentData:
             "name": self.name,
             "level": self.level,
             "original_level": self.original_level,
+            "cooldown_expires_at": self.cooldown_expires_at,
             "quality": self.quality,
             "is_chengyin": self.is_chengyin,
             "base_attr": self.base_attr.to_dict() if self.base_attr else None,
@@ -159,6 +162,7 @@ class EquipmentData:
             name=d.get("name"),
             level=d.get("level"),
             original_level=int(original_level or 0),
+            cooldown_expires_at=str(d.get("cooldown_expires_at") or ""),
             quality=d.get("quality"),
             is_chengyin=d.get("is_chengyin", False),
             base_attr=EquipAttr.from_dict(d["base_attr"]) if d.get("base_attr") else None,

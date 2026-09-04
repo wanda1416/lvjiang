@@ -30,6 +30,23 @@ def test_upsert_is_idempotent(tmp_path: Path):
     assert state.equipment_items["real-fp"]["level"] == 111
 
 
+def test_same_fingerprint_rescan_updates_cooldown_expiry(tmp_path: Path):
+    """冷却不参与指纹，但同一装备重扫时必须覆盖其动态到期时间。"""
+    repo = LoadoutRepository("alice", tmp_path)
+    repo.upsert_item({
+        **equip(),
+        "cooldown_expires_at": "2026-09-07T04:00:00.000+00:00",
+    })
+    repo.upsert_item({
+        **equip(),
+        "cooldown_expires_at": "2026-09-08T20:00:00.000+00:00",
+    })
+
+    stored = repo.load().equipment_items["real-fp"]
+    assert stored["cooldown_expires_at"] == (
+        "2026-09-08T20:00:00.000+00:00")
+
+
 def test_new_fp_records_both_times_and_existing_fp_refreshes_update(
     tmp_path: Path, monkeypatch,
 ):

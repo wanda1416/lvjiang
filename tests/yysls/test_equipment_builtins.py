@@ -73,6 +73,26 @@ class TestMakeFingerprint:
         fp_with = _fn("make_fingerprint")(with_affix)
         assert fp_base != fp_with
 
+    def test_cooldown_expiry_is_strictly_excluded_from_fingerprint(self):
+        """冷却是可变运行状态，任何到期时间变化都不得污染装备实体指纹。"""
+        base = {
+            "type": "剑",
+            "level": 110,
+            "quality": "gold",
+            "is_chengyin": False,
+            "affix_1": {"name": "会意率", "value": 5.4},
+        }
+        without_cooldown = _fn("make_fingerprint")(base)
+        first_expiry = _fn("make_fingerprint")({
+            **base,
+            "cooldown_expires_at": "2026-09-07T04:00:00.000+00:00",
+        })
+        changed_expiry = _fn("make_fingerprint")({
+            **base,
+            "cooldown_expires_at": "2026-09-08T20:00:00.000+00:00",
+        })
+        assert without_cooldown == first_expiry == changed_expiry
+
     def test_missing_affix_name_skipped(self):
         """词条无 name 字段时跳过"""
         data = {

@@ -21,6 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ....i18n import tr
+from .affix_cap import affix_cap_ratio
 from .equip_parser.models import Affix, EquipmentData
 
 # extra_data / _extra 中记录异常原因的键
@@ -50,16 +51,25 @@ class IllegalReason:
         return self.message
 
 
-def _over_cap(cap_pct) -> bool:
-    """cap_pct 是否超过 100。
+# 游戏内词条数值只显示到 0.1，OCR 读到的值天然带半步量化误差；
+# 内部承音上限又是 round(cap * 0.94, 2)。允许半步误差，避免把正好顶满
+# 上限的词条误报成超上限。
+_CAP_OVERFLOW_TOL = 0.05 + 1e-6
 
-    历史数据或异常输入里 cap_pct 可能是字符串甚至 None，一律按「判不出来
-    就不算异常」处理——判定器宁可漏报也不能在扫描途中抛异常。
+
+def _over_cap(level, affix: Affix) -> tuple[bool, float | None]:
+    """现算该词条是否超出等级上限，并返回现算百分比。
+
+    不读 ``affix.cap_pct``：那是给调律 DSL 快查的派生缓存，历史数据里
+    可能与 ``value`` 早已脱节。上限数据缺失时返回「判不出来」——判定器
+    宁可漏报也不能凭过期缓存误报。
     """
-    try:
-        return cap_pct is not None and float(cap_pct) > 100
-    except (TypeError, ValueError):
-        return False
+    ratio = affix_cap_ratio(level, affix.name, affix.value)
+    if ratio is None:
+        return False, None
+    pct = round(ratio * 100, 1)
+    cap_value = affix.value / ratio if ratio else 0.0
+    return affix.value > cap_value + _CAP_OVERFLOW_TOL, pct
 
 
 def _categories() -> tuple[str, tuple[str, ...]]:
@@ -74,7 +84,8 @@ def validate_equipment(equip: EquipmentData) -> list[IllegalReason]:
     即槽位号。若数据可能缺中间槽（如模拟装备对话框允许只填第 2 条），
     请改用 :func:`validate_equipment_dict`，它按 ``affix_N`` 键读取槽位号。
     """
-    return _validate_slots(list(enumerate(equip.affixes, 1)), equip.type)
+    return _validate_slots(
+        list(enumerate(equip.affixes, 1)), equip.type, equip.level)
 
 
 #: 组合类判定码——描述「这几条词条能不能凑在一起」。
@@ -130,11 +141,13 @@ def validate_equipment_dict(equip_dict: dict) -> list[IllegalReason]:
             ))
             continue
         slots.append((i, Affix.from_dict({**raw, "name": name})))
-    return malformed + _validate_slots(slots, equip_dict.get("type"))
+    return malformed + _validate_slots(
+        slots, equip_dict.get("type"), equip_dict.get("level"))
 
 
 def _validate_slots(slots: list[tuple[int, Affix]],
-                    equip_type: str | None) -> list[IllegalReason]:
+                    equip_type: str | None,
+                    level: int | None = None) -> list[IllegalReason]:
     """核心判定：slots 为 (槽位号, 词条) 列表，槽位号从 1 开始。
 
     返回全部违规原因（可能多条）；完全合法返回空列表。
@@ -147,8 +160,8 @@ def _validate_slots(slots: list[tuple[int, Affix]],
     3. ``divine_overflow`` —— 神力词条最多 1 条。
     4. ``transferred_divine`` —— 神力词条被标记为转律产出（转律不产神力词条）。
     5. 装备类型、词条池、首词条池、词条部位与武器专属词条均以游戏配置为准。
-    6. ``cap_overflow`` —— 普通词条 ``cap_pct`` 超过 100，即数值高于该等级
-       上限，只可能是 OCR 数值误读或等级识别错误。
+    6. ``cap_overflow`` —— 普通词条数值高于该等级上限（现算，不看
+       ``cap_pct`` 缓存），只可能是 OCR 数值误读或等级识别错误。
 
     首词条（affix_1）不参与 1-4 的组合判定，但必须属于对应部位的首词条池。
     定音完全不参与本函数。
@@ -265,11 +278,12 @@ def _validate_slots(slots: list[tuple[int, Affix]],
 
     # 普通词条数值超上限；定音由独立链路处理，不在这里判断。
     for i, affix in slots:
-        if _over_cap(affix.cap_pct):
+        over, pct = _over_cap(level, affix)
+        if over:
             reasons.append(IllegalReason(
                 CODE_CAP_OVERFLOW,
                 tr("词条 {i}「{name}」数值 {value} 达上限的 {pct}%，超出该等级上限")
-                .format(i=i, name=affix.name, value=affix.value, pct=affix.cap_pct),
+                .format(i=i, name=affix.name, value=affix.value, pct=pct),
             ))
     return reasons
 

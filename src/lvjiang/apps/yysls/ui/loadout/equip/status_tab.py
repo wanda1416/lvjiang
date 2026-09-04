@@ -29,6 +29,7 @@ from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from lvjiang.ui.user_toolbar import add_user_nav_buttons
 
 from ......i18n import tr
+from ....core.affix_cap import equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ...events import EQUIPMENT_CHANGED, get_event_hub
 from ...layout_helpers import fit_combo_to_contents
@@ -665,7 +666,7 @@ class EquipStatusTab(QWidget):
 
         def _level_cap_sum(
             item: tuple[dict, str, str, bool, bool],
-        ) -> tuple[int, int]:
+        ) -> tuple[int, float]:
             equip = item[0]
             level = equip.get("level") or 0
             if isinstance(level, str):
@@ -673,12 +674,7 @@ class EquipStatusTab(QWidget):
                     level = int(level)
                 except (ValueError, TypeError):
                     level = 0
-            cap_sum = 0
-            for i in range(1, 6):
-                affix = equip.get(f"affix_{i}")
-                if affix and affix.get("name") and affix.get("cap_pct") is not None:
-                    cap_sum += affix["cap_pct"]
-            return level, cap_sum
+            return level, sum(equip_affix_cap_pcts(equip))
 
         # 排序 + 武器分组逻辑
         if sort_mode == "level_desc":

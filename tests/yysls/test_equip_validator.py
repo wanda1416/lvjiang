@@ -29,14 +29,20 @@ from lvjiang.apps.yysls.core.equip_validator import (
     validate_equipment_dict,
 )
 
+# 110 级上限（game_config.yaml）：超上限用例按真实数值构造，不靠 cap_pct。
+_CAP_110 = {"最大外功攻击": 121.4, "劲": 76.8}
 
-def _equip(names, *, part="环", caps=None, transferred=(), dingyin=None):
-    """按顺序构造词条；caps 为与 names 等长的 cap_pct 列表（None 表示不设）"""
+
+def _equip(names, *, part="环", values=None, transferred=(), dingyin=None):
+    """按顺序构造词条；values 为与 names 等长的真实数值列表。
+
+    刻意不设 cap_pct：它是给调律 DSL 快查的派生缓存，判定器必须现算，
+    传了也不该被采信。
+    """
     affixes = []
     for i, n in enumerate(names):
         affixes.append(Affix(
-            name=n, value=1.0,
-            cap_pct=(caps[i] if caps else None),
+            name=n, value=(values[i] if values else 1.0),
             is_transferred=(i in transferred),
         ))
     return EquipmentData(type=part, name="测试装备", level=110, quality="gold",
@@ -117,16 +123,37 @@ class TestCountRules:
 
 class TestCapOverflow:
     def test_affix_over_cap_flagged(self):
-        codes = _codes(_equip(["最大外功攻击", "劲"], caps=[100.0, 118.3]))
+        codes = _codes(_equip(
+            ["最大外功攻击", "劲"],
+            values=[_CAP_110["最大外功攻击"], _CAP_110["劲"] * 1.183]))
         assert codes == [CODE_CAP_OVERFLOW]
 
     def test_first_affix_over_cap_also_flagged(self):
         """首词条不受组合类规则约束，但数值超上限同样是异常。"""
-        codes = _codes(_equip(["最大外功攻击", "劲"], caps=[140.0, 90.0]))
+        codes = _codes(_equip(
+            ["最大外功攻击", "劲"],
+            values=[_CAP_110["最大外功攻击"] * 1.4, _CAP_110["劲"] * 0.9]))
         assert codes == [CODE_CAP_OVERFLOW]
 
     def test_exactly_at_cap_is_fine(self):
-        assert _codes(_equip(["最大外功攻击"], caps=[100.0])) == []
+        assert _codes(_equip(
+            ["最大外功攻击"], values=[_CAP_110["最大外功攻击"]])) == []
+
+    def test_display_rounding_at_cap_is_not_overflow(self):
+        """游戏只显示 1 位小数，正好顶满的词条不能因半步误差被误报。"""
+        assert _codes(_equip(
+            ["最大外功攻击"], values=[_CAP_110["最大外功攻击"] + 0.04])) == []
+
+    def test_stale_cap_pct_is_ignored_in_both_directions(self):
+        """cap_pct 与 value 脱节时一律以现算为准。"""
+        over = _equip(["最大外功攻击"],
+                      values=[_CAP_110["最大外功攻击"] * 1.2])
+        over.affixes[0].cap_pct = 90.8      # 陈旧缓存说没超
+        assert _codes(over) == [CODE_CAP_OVERFLOW]
+
+        fine = _equip(["最大外功攻击"], values=[_CAP_110["最大外功攻击"]])
+        fine.affixes[0].cap_pct = 130.0     # 陈旧缓存说超了
+        assert _codes(fine) == []
 
     def test_dingyin_is_not_part_of_equipment_validation(self):
         equip = _equip(["最大外功攻击"],

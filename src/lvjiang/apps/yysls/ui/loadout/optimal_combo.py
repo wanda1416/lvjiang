@@ -382,6 +382,8 @@ class OptimalComboDialog(QDialog):
         level_threshold: int = 0,
         affix_filter: str = "all",
         gongjue: str = "",
+        main_martial_art: str = "",
+        sub_martial_art: str = "",
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -391,6 +393,8 @@ class OptimalComboDialog(QDialog):
         # base_attrs 不含弓玦，弓玦属性按需计算
         self._base_attrs_raw = base_attrs
         self._current_gongjue = gongjue
+        self._main_martial_art = main_martial_art
+        self._sub_martial_art = sub_martial_art
         self._base_attrs = base_attrs + self._compute_gongjue_attrs(gongjue)
         self._level_threshold = level_threshold
         self._affix_filter = affix_filter
@@ -643,9 +647,12 @@ class OptimalComboDialog(QDialog):
         from ...config import get_game_config
         from ...core.evaluator import get_tuning_rules
 
-        school_cfg = get_game_config().get_schools().get(self._school, {})
-        main_weapon = (school_cfg.get("main") or {}).get("weapon", "")
-        sub_weapon = (school_cfg.get("sub") or {}).get("weapon", "")
+        game_config = get_game_config()
+        school_cfg = game_config.get_schools().get(self._school, {})
+        main_weapon = game_config.get_martial_art_weapon(
+            self._main_martial_art)
+        sub_weapon = game_config.get_martial_art_weapon(
+            self._sub_martial_art)
         school_attr = school_cfg.get("attr", "")
 
         for key, rule in get_tuning_rules().items():
@@ -713,8 +720,8 @@ class OptimalComboDialog(QDialog):
         ``bag_items`` 本身就只含真实装备，模拟装备另存于 ``mock_items``，
         所以不并进来的话「排除模拟」这个开关无论勾不勾都没有模拟装备可用。
 
-        武器类型过滤：主武器只保留与流派 main.weapon 同类型的武器，
-        副武器只保留与流派 sub.weapon 同类型的武器。
+        武器类型过滤：两个武器槽分别按照方案当前位置上的武学派生类型，
+        与流派配置中武学的声明顺序无关。
         """
         user_name = self._host.active_user_name()
         if not user_name:
@@ -729,12 +736,11 @@ class OptimalComboDialog(QDialog):
 
         equipped = inv.equipped
 
-        # 读取流派配置的主/副武器类型
+        # 主副槽位取决于方案中两门武学的当前位置，不能使用流派配置的顺序。
         from ...config import get_game_config
         gc = get_game_config()
-        school_cfg = gc.get_schools().get(self._school, {})
-        main_weapon_type = (school_cfg.get("main") or {}).get("weapon", "")
-        sub_weapon_type = (school_cfg.get("sub") or {}).get("weapon", "")
+        main_weapon_type = gc.get_martial_art_weapon(self._main_martial_art)
+        sub_weapon_type = gc.get_martial_art_weapon(self._sub_martial_art)
         logger.debug(
             f"流派 {self._school}: 主武器={main_weapon_type}, 副武器={sub_weapon_type}")
 
@@ -857,7 +863,7 @@ class OptimalComboDialog(QDialog):
         self, slot_key: str, equip: dict,
         main_weapon_type: str, sub_weapon_type: str,
     ) -> bool:
-        """统一应用流派武器、等级和词条筛选。"""
+        """统一应用方案武学派生的武器类型、等级和词条筛选。"""
         required_weapon = (main_weapon_type if slot_key == "main_weapon"
                            else sub_weapon_type if slot_key == "sub_weapon" else "")
         if required_weapon and equip.get("type", "") != required_weapon:

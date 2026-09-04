@@ -697,7 +697,7 @@ class EquipStatusTab(QWidget):
 
         # 武器槽位严格分组：同类型武器归为一组，组内保持排序顺序
         if self._selected_slot in ("main_weapon", "sub_weapon"):
-            weapon_type_for_slot = self._get_school_weapon_type(self._selected_slot)
+            weapon_type_for_slot = self._get_plan_weapon_type(self._selected_slot)
             if weapon_type_for_slot and filter_type == "weapon":
                 same_slot_cards = [c for c in ordered if c[0].get("type") == weapon_type_for_slot]
                 other_cards = [c for c in ordered if c[0].get("type") != weapon_type_for_slot]
@@ -871,11 +871,11 @@ class EquipStatusTab(QWidget):
             logger.error(f"无法找到 {group_key} 对应的槽位")
             return
 
-        # 武器按流派武器类型路由：主副武器不同型时直接生效，
+        # 武器按方案两门武学派生的类型路由：主副武器不同型时直接生效，
         # 与主副武学均不匹配的武器禁止装备（需另建对应流派方案）
         if len(target_slots) > 1:
-            main_type = self._get_school_weapon_type("main_weapon") or ""
-            sub_type = self._get_school_weapon_type("sub_weapon") or ""
+            main_type = self._get_plan_weapon_type("main_weapon") or ""
+            sub_type = self._get_plan_weapon_type("sub_weapon") or ""
             route = _route_weapon_slot(equip_data.get("type", ""), main_type, sub_type)
             if route == "reject":
                 QMessageBox.warning(
@@ -1085,19 +1085,25 @@ class EquipStatusTab(QWidget):
             logger.error(f"编辑模拟装备失败: {e}")
             QMessageBox.critical(self, tr("编辑失败"), str(e))
 
-    def _get_school_weapon_type(self, slot_key: str) -> str | None:
-        """从当前流派配置获取指定武器槽的武器类型（如 '剑'/'枪'。"""
-        from ..combat.attrs_tab import CombatAttrsTab
-        for child in self._host.findChildren(QWidget):
-            if isinstance(child, CombatAttrsTab):
-                school = child._get_current_school()
-                if school:
-                    from ....config import get_game_config
-                    school_cfg = get_game_config().get_schools().get(school, {})
-                    hand = "main" if slot_key == "main_weapon" else "sub"
-                    return (school_cfg.get(hand) or {}).get("weapon")
-                break
-        return None
+    def _get_plan_weapon_type(self, slot_key: str) -> str | None:
+        """由方案对应位置的武学派生武器类型，不读取流派的主副顺序。"""
+        user_name = self._host.active_user_name()
+        if not user_name:
+            return None
+        try:
+            from ....config import get_game_config
+            from ....core.loadout import LoadoutRepository
+
+            plan = LoadoutRepository(user_name).load().active_plan
+            martial_art = (
+                plan.main_martial_art
+                if slot_key == "main_weapon"
+                else plan.sub_martial_art
+            )
+            return get_game_config().get_martial_art_weapon(martial_art) or None
+        except Exception as exc:  # noqa: BLE001 — 路由失败时退回人工选槽
+            logger.debug(f"读取方案武学对应武器失败: {exc}")
+            return None
 
     def _get_current_school(self) -> str:
         """获取当前角色配置的流派名称"""
@@ -1243,12 +1249,18 @@ class EquipStatusTab(QWidget):
                 self, tr("提示"), tr("请先在角色详情页选择流派和毕业率方案"))
             return
 
+        from ....core.loadout import LoadoutRepository
         from ..optimal_combo import OptimalComboDialog
+        plan = LoadoutRepository(
+            self._host.active_user_name()
+        ).load().active_plan
         dlg = OptimalComboDialog(
             self._host, context.school, context.scheme, context.base_attrs,
             level_threshold=self._get_level_threshold(),
             affix_filter=self._get_affix_filter(),
             gongjue=context.gongjue,
+            main_martial_art=plan.main_martial_art,
+            sub_martial_art=plan.sub_martial_art,
             parent=self,
         )
         dlg.exec()

@@ -410,14 +410,19 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             self._save_selection()
 
     def _active_playstyle(self) -> str:
-        """当前备战方案绑定的玩法；取不到就空串（退回旧的满定音语义）。"""
+        """当前武学组合可用的方案玩法；取不到或已失配就返回空串。"""
         user_name = self._host.active_user_name()
         if not user_name:
             return ""
         try:
+            from ....config import get_game_config
             from ....core.loadout import LoadoutRepository
 
-            return LoadoutRepository(user_name).load().active_plan.playstyle
+            plan = LoadoutRepository(user_name).load().active_plan
+            available = get_game_config().get_playstyles_for_arts(
+                [plan.main_martial_art, plan.sub_martial_art]
+            )
+            return plan.playstyle if plan.playstyle in available else ""
         except Exception as exc:  # noqa: BLE001 — 取不到玩法只降级，不影响展示
             logger.debug(f"读取方案玩法失败: {exc}")
             return ""

@@ -1,6 +1,6 @@
 """新建备战方案对话框。
 
-必须同时绑定主武学与副武学，且组合需匹配流派。
+必须同时绑定主武学与副武学，且两者组成的武学集合需匹配流派。
 """
 from __future__ import annotations
 
@@ -21,24 +21,22 @@ from ...core.loadout import resolve_school
 class PlanCreateDialog(QDialog):
     """新建方案对话框：必须同时绑定主武学与副武学，且组合需匹配流派。"""
 
-    def __init__(self, schools: dict, parent=None):
+    def __init__(self, schools: dict, martial_arts, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("新建方案"))
         self._schools = schools
         form = QFormLayout(self)
         self._edit_name = QLineEdit()
         form.addRow(tr("方案名称:"), self._edit_name)
-        main_arts = list(dict.fromkeys(
-            (cfg.get("main") or {}).get("martial_art", "")
-            for cfg in schools.values()))
-        sub_arts = list(dict.fromkeys(
-            (cfg.get("sub") or {}).get("martial_art", "")
-            for cfg in schools.values()))
+        # 候选来自独立武学配置；流派仅负责校验两门武学的无序组合。
+        martial_arts = list(dict.fromkeys(
+            str(name).strip() for name in martial_arts if str(name).strip()
+        ))
         self._combo_main = QComboBox()
-        self._combo_main.addItems([a for a in main_arts if a])
+        self._combo_main.addItems(martial_arts)
         form.addRow(tr("主武学:"), self._combo_main)
         self._combo_sub = QComboBox()
-        self._combo_sub.addItems([a for a in sub_arts if a])
+        self._combo_sub.addItems(martial_arts)
         form.addRow(tr("副武学:"), self._combo_sub)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
@@ -59,7 +57,7 @@ class PlanCreateDialog(QDialog):
         if school is None:
             QMessageBox.warning(
                 self, tr("新建方案"),
-                tr("所选主副武学无法匹配任何流派，请重新选择"))
+                tr("两门武学组合无法匹配任何流派，请重新选择"))
             return
         self.accept()
 

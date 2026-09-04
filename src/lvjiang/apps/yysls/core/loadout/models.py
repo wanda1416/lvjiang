@@ -145,13 +145,19 @@ class LoadoutState:
 
 
 def resolve_school(main_art: str, sub_art: str, schools: dict) -> str | None:
-    """Resolve only an exact main/sub martial-art pair."""
+    """Resolve a school by matching two selected arts as an unordered pair."""
     if not main_art or not sub_art:
+        return None
+    selected_arts = {str(main_art).strip(), str(sub_art).strip()}
+    if len(selected_arts) != 2:
         return None
     for school, config in schools.items():
         main = config.get("main") or {}
         sub = config.get("sub") or {}
-        if (main.get("martial_art") == main_art
-                and sub.get("martial_art") == sub_art):
+        school_arts = {
+            str(main.get("martial_art") or "").strip(),
+            str(sub.get("martial_art") or "").strip(),
+        }
+        if school_arts == selected_arts:
             return school
     return None

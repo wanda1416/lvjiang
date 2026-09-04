@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import pytest
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QComboBox
 
 from lvjiang.apps.yysls.core.attr_model import (
@@ -21,6 +22,14 @@ from lvjiang.apps.yysls.ui.game_settings.attr_source_panel import (
 )
 
 pytestmark = pytest.mark.usefixtures("qapp")
+
+
+def _group_names(widget) -> list[str]:
+    """列表项文本带进度后缀，分组名取自 UserRole"""
+    return [
+        str(widget._list.item(i).data(Qt.ItemDataRole.UserRole))
+        for i in range(widget._list.count())
+    ]
 
 
 @pytest.fixture
@@ -39,7 +48,7 @@ def panel(tmp_path, monkeypatch):
 
     monkeypatch.setattr(module, "get_attr_model_manager", lambda: manager)
     monkeypatch.setattr(module, "invalidate_attr_model_cache", lambda: None)
-    widget = AttrSourcePanel()
+    widget = AttrSourcePanel(("inner_way",))
     return widget, manager
 
 
@@ -47,7 +56,7 @@ def test_entries_are_grouped_by_the_name_before_the_separator(panel) -> None:
     """一屏只显示一门心法的几重，否则 222 行一次铺开没法填。"""
     widget, _ = panel
 
-    groups = [widget._list.item(i).text() for i in range(widget._list.count())]
+    groups = _group_names(widget)
 
     assert groups == ["易水歌", "泣血婆娑"]
 
@@ -57,7 +66,7 @@ def test_choosing_full_affix_persists_immediately(panel) -> None:
     widget, manager = panel
     widget._list.setCurrentRow(0)
 
-    mode = widget._table.cellWidget(0, 1)
+    mode = widget._table.cellWidget(0, 2)
     assert isinstance(mode, QComboBox)
     mode.setCurrentIndex(_COLUMNS.index(MODE_FULL_AFFIX))
 
@@ -71,7 +80,7 @@ def test_marking_no_effect_advances_progress(panel) -> None:
     widget, manager = panel
     widget._list.setCurrentRow(0)
 
-    mode = widget._table.cellWidget(1, 1)
+    mode = widget._table.cellWidget(1, 2)
     mode.setCurrentIndex(_COLUMNS.index(MODE_NO_EFFECT))
 
     assert manager.raw_entry("易水歌·二重").get("no_effect") is True
@@ -83,7 +92,7 @@ def test_search_narrows_the_group_list(panel) -> None:
 
     widget._search.setText("泣血")
 
-    groups = [widget._list.item(i).text() for i in range(widget._list.count())]
+    groups = _group_names(widget)
     assert groups == ["泣血婆娑"]
 
 
@@ -98,12 +107,12 @@ def test_creating_and_deleting_a_group(panel) -> None:
 
     manager.create_entry("inner_way", "长生无相·一重")
     widget._refresh_groups()
-    groups = [widget._list.item(i).text() for i in range(widget._list.count())]
+    groups = _group_names(widget)
     assert "长生无相" in groups
 
     manager.delete_entry("长生无相·一重")
     widget._refresh_groups()
-    groups = [widget._list.item(i).text() for i in range(widget._list.count())]
+    groups = _group_names(widget)
     assert "长生无相" not in groups
 
 
@@ -143,13 +152,13 @@ def derive(tmp_path, monkeypatch, session_dir):
         encoding="utf-8",
     )
     manager = AttrModelManager(tmp_path)
-    import lvjiang.apps.yysls.ui.game_settings.attr_derive_dialog as module
+    import lvjiang.apps.yysls.ui.game_settings.attr_derive_panel as module
 
     monkeypatch.setattr(module, "get_attr_model_manager", lambda: manager)
-    from lvjiang.apps.yysls.ui.game_settings.attr_derive_dialog import (
-        AttrDeriveDialog,
+    from lvjiang.apps.yysls.ui.game_settings.attr_derive_panel import (
+        AttrDerivePanel,
     )
-    return AttrDeriveDialog(), manager
+    return AttrDerivePanel(), manager
 
 
 def _equip(dialog, slot: int, name: str, tier: int) -> None:
@@ -195,15 +204,15 @@ def test_equipping_a_tier_accumulates_the_lower_tiers(derive) -> None:
 
 def test_the_loadout_is_remembered_between_openings(derive, monkeypatch) -> None:
     """每次重开都要从头配四个槽的话，没人会用第二次。"""
-    from lvjiang.apps.yysls.ui.game_settings.attr_derive_dialog import (
-        AttrDeriveDialog,
+    from lvjiang.apps.yysls.ui.game_settings.attr_derive_panel import (
+        AttrDerivePanel,
     )
 
     dialog, _ = derive
     dialog._combo_level.setCurrentIndex(0)
     _equip(dialog, 0, "易水歌", 2)
 
-    reopened = AttrDeriveDialog()
+    reopened = AttrDerivePanel()
     assert reopened._loadout().inner_ways[0].name == "易水歌"
     assert reopened._loadout().inner_ways[0].tier == 2
 
@@ -260,10 +269,10 @@ def test_switching_to_custom_value_stays_in_custom_value(panel) -> None:
     widget, manager = panel
     widget._list.setCurrentRow(0)
 
-    widget._table.cellWidget(0, 1).setCurrentIndex(_COLUMNS.index(MODE_VALUE))
+    widget._table.cellWidget(0, 2).setCurrentIndex(_COLUMNS.index(MODE_VALUE))
 
     assert "stats" in manager.raw_entry("易水歌·一重")
-    assert widget._table.cellWidget(0, 1).currentText() == MODE_VALUE
+    assert widget._table.cellWidget(0, 2).currentText() == MODE_VALUE
 
 
 def test_percent_fields_are_entered_as_percentages_and_stored_as_decimals(
@@ -277,17 +286,17 @@ def test_percent_fields_are_entered_as_percentages_and_stored_as_decimals(
 
     widget, manager = panel
     widget._list.setCurrentRow(0)
-    widget._table.cellWidget(0, 1).setCurrentIndex(_COLUMNS.index(MODE_VALUE))
+    widget._table.cellWidget(0, 2).setCurrentIndex(_COLUMNS.index(MODE_VALUE))
 
-    field = widget._table.cellWidget(0, 2).findChild(QComboBox)
+    field = widget._table.cellWidget(0, 3).findChild(QComboBox)
     field.setCurrentIndex(field.findData("crit_rate"))
-    spin = widget._table.cellWidget(0, 2).findChild(QDoubleSpinBox)
+    spin = widget._table.cellWidget(0, 3).findChild(QDoubleSpinBox)
     assert spin.suffix().strip() == "%"
     spin.setValue(4.6)
 
     assert manager.raw_entry("易水歌·一重")["stats"]["crit_rate"] == pytest.approx(0.046)
     # 回读要还原成 4.6，不能显示成 0.046
-    assert widget._table.cellWidget(0, 2).findChild(
+    assert widget._table.cellWidget(0, 3).findChild(
         QDoubleSpinBox).value() == pytest.approx(4.6)
 
 
@@ -298,11 +307,11 @@ def test_non_percent_fields_are_stored_verbatim(panel) -> None:
 
     widget, manager = panel
     widget._list.setCurrentRow(0)
-    widget._table.cellWidget(0, 1).setCurrentIndex(_COLUMNS.index(MODE_VALUE))
+    widget._table.cellWidget(0, 2).setCurrentIndex(_COLUMNS.index(MODE_VALUE))
 
-    field = widget._table.cellWidget(0, 2).findChild(QComboBox)
+    field = widget._table.cellWidget(0, 3).findChild(QComboBox)
     field.setCurrentIndex(field.findData("min_outer"))
-    widget._table.cellWidget(0, 2).findChild(QDoubleSpinBox).setValue(40.5)
+    widget._table.cellWidget(0, 3).findChild(QDoubleSpinBox).setValue(40.5)
 
     assert manager.raw_entry("易水歌·一重")["stats"]["min_outer"] == pytest.approx(40.5)
 
@@ -319,10 +328,11 @@ def test_full_affix_dropdown_lists_only_computable_categories(panel) -> None:
 
     widget, _ = panel
     widget._list.setCurrentRow(0)
-    widget._table.cellWidget(0, 1).setCurrentIndex(
+    widget._table.cellWidget(0, 2).setCurrentIndex(
         _COLUMNS.index(MODE_FULL_AFFIX))
 
-    combo = widget._table.cellWidget(0, 2)
+    # 取值控件外面裹了一层靠左对齐的容器
+    combo = widget._table.cellWidget(0, 3).findChild(QComboBox)
     listed = {combo.itemText(i) for i in range(combo.count())}
     assert listed == set(SUPPORTED_FULL_AFFIX_CATEGORIES)
 
@@ -369,3 +379,59 @@ def test_residual_can_be_excluded_from_what_gets_saved(derive) -> None:
     plain = dialog._resolve(dialog._loadout()).combat_attrs.min_outer
 
     assert plain == pytest.approx(10.0)
+
+
+# ── 属性配置容器 ──────────────────────────────────────────
+
+def test_every_source_kind_lands_on_exactly_one_page() -> None:
+    """漏掉一类来源就意味着它永远填不了，重复则会出现两个入口。"""
+    from lvjiang.apps.yysls.core.attr_model import SELECT_DERIVED, SELECTION_POLICIES
+    from lvjiang.apps.yysls.ui.game_settings.attr_config_tab import _PAGES
+
+    covered = [kind for _title, kinds in _PAGES for kind in kinds]
+    # 五维转换是内建的，没有可填条目，不需要页面
+    expected = {
+        kind for kind, policy in SELECTION_POLICIES.items()
+        if not (policy == SELECT_DERIVED and kind == "dimension")
+    }
+
+    assert len(covered) == len(set(covered)), "有来源类别出现在多个页面"
+    assert set(covered) == expected
+
+
+def test_tab_titles_carry_progress(qapp, tmp_path, monkeypatch) -> None:
+    """不点进去也要知道哪一页还没填完。"""
+    (tmp_path / "inner_way.yaml").write_text(
+        "kind: inner_way\nentries:\n"
+        "  甲·一重:\n    group: 甲\n    tier: 1\n    stats: {min_outer: 1}\n"
+        "  甲·二重:\n    group: 甲\n    tier: 2\n    modeled: false\n",
+        encoding="utf-8",
+    )
+    manager = AttrModelManager(tmp_path)
+    import lvjiang.apps.yysls.ui.game_settings.attr_derive_panel as derive_module
+    import lvjiang.apps.yysls.ui.game_settings.attr_source_panel as panel_module
+
+    monkeypatch.setattr(panel_module, "get_attr_model_manager", lambda: manager)
+    monkeypatch.setattr(panel_module, "invalidate_attr_model_cache", lambda: None)
+    monkeypatch.setattr(derive_module, "get_attr_model_manager", lambda: manager)
+    from lvjiang.apps.yysls.ui.game_settings.attr_config_tab import AttrConfigTab
+
+    tab = AttrConfigTab()
+
+    assert tab._tabs.tabText(0) == "心法  1/2"
+
+
+def test_empty_pages_show_no_progress_suffix(qapp, tmp_path, monkeypatch) -> None:
+    """一条都没有的类别挂个 0/0 只是噪声。"""
+    manager = AttrModelManager(tmp_path)
+    import lvjiang.apps.yysls.ui.game_settings.attr_derive_panel as derive_module
+    import lvjiang.apps.yysls.ui.game_settings.attr_source_panel as panel_module
+
+    monkeypatch.setattr(panel_module, "get_attr_model_manager", lambda: manager)
+    monkeypatch.setattr(panel_module, "invalidate_attr_model_cache", lambda: None)
+    monkeypatch.setattr(derive_module, "get_attr_model_manager", lambda: manager)
+    from lvjiang.apps.yysls.ui.game_settings.attr_config_tab import AttrConfigTab
+
+    tab = AttrConfigTab()
+
+    assert tab._tabs.tabText(0) == "心法"

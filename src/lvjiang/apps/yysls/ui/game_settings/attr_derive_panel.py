@@ -1,4 +1,4 @@
-"""基础属性推导对话框：由属性来源算出装备之外的战斗属性。
+"""基础属性推导面板：由属性来源算出装备之外的战斗属性。
 
 和「创建基础属性」互补——那边是抄面板再反推，这边是正向推导，两者
 应当得到同一个结果。所以对话框的重点不是算出一个数，而是**逐来源的
@@ -27,7 +27,6 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -67,6 +66,7 @@ from ...core.attr_model import (
     InnerWaySlot,
     diff_against_panel,
     get_attr_model_manager,
+    invalidate_attr_model_cache,
 )
 from ...core.combat.combat_attrs import COMBAT_ATTR_FIELDS, CombatAttributes
 from .level_combo import LevelCombo
@@ -78,13 +78,11 @@ _DIFF_EPSILON = 0.05
 _EMPTY = ""
 
 
-class AttrDeriveDialog(QDialog):
+class AttrDerivePanel(QWidget):
     """配装 → 推导 → 与实测面板比对 → 存为基础属性。"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(tr("基础属性推导"))
-        self.resize(980, 660)
         self._loading = False
         self._slot_rows: list[tuple[QComboBox, QComboBox]] = []
         self._single_combos: dict[str, QComboBox] = {}
@@ -197,13 +195,18 @@ class AttrDeriveDialog(QDialog):
         self._btn_save.clicked.connect(self._on_save)
         apply_button_style(self._btn_save)
         buttons.addWidget(self._btn_save)
-        close = QPushButton(tr("关闭"))
-        apply_button_style(close, variant="neutral")
-        close.clicked.connect(self.reject)
-        buttons.addWidget(close)
         layout.addLayout(buttons)
 
     # ── 流派相关 ──
+
+    def reload(self) -> None:
+        """重读来源后重建界面。
+
+        填数据与推导在同一个窗口里来回切，不重读的话刚填的值不会反映
+        到推导结果上。
+        """
+        invalidate_attr_model_cache()
+        self._reload_school()
 
     def _manager(self):
         return get_attr_model_manager()
@@ -386,7 +389,13 @@ class AttrDeriveDialog(QDialog):
         )
         self._fill_table(result, reference, residual)
 
-        parts = [tr("参与推导 {n} 项").format(n=len(result.panel.modifiers))]
+        # 只数真正有贡献的：空装配时五维转换也会记 6 条 0 值明细，
+        # 报「参与推导 6 项」而表格却是空的，只会让人以为界面坏了。
+        effective = sum(1 for m in result.panel.modifiers if m.delta)
+        if not loadout.inner_ways and not loadout.selections:
+            parts = [tr("尚未配装，先在左侧选心法与其他来源")]
+        else:
+            parts = [tr("参与推导 {n} 项").format(n=effective)]
         if residual:
             parts.append(tr("{n} 个属性靠补足").format(n=len(residual)))
         if result.unmodeled:

@@ -1,7 +1,8 @@
-"""版本号 - 打包时由 package.bat 自动注入
+"""版本号 - 手动维护，打包时由 package.bat 二次覆写
 
-开发环境：此文件内容为 "0.0.0.dev0"，实际版本从 pyproject.toml 读取
-打包后：此文件会被更新为实际版本号
+开发期：进入新版本开发时，手动改成待发布版本号，与 pyproject.toml 保持一致。
+打包时：`packaging/inject_version.py` 以 pyproject.toml 为准再写一次，
+两边不一致会打印警告并以 pyproject.toml 为准。
 """
 
-__version__ = "0.10.1"
+__version__ = "0.10.2"

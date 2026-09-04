@@ -95,21 +95,25 @@ Release 标题，确保发布页面与历史版本维持一致。
 | `pyproject.toml` | `version = "X.Y.Z"` | Python 包版本号 |
 | `android/app/build.gradle.kts` | `versionName = "X.Y.Z"` | Android APK 版本名 |
 | `android/app/build.gradle.kts` | `versionCode = N` | Android 内部版本号（递增整数，改了 config/system 或布局文件必须 +1） |
+| `src/lvjiang/_version.py` | `__version__ = "X.Y.Z"` | 手动改成待发布版本号，与 `pyproject.toml` 一致 |
 
-> **注意：** `src/lvjiang/_version.py` 由 `package.bat` 打包时自动注入，**无需手动修改**。
+> **关于 `_version.py`：** 这个文件手动维护并提交。约定是**进入新版本开发时就把三处
+> 版本号一起改成待发布版本**（`chore: start X.Y.Z development`），这样开发环境、源码
+> 安装和 Android 侧读到的都是真实版本，而不是一个占位值。打包时
+> `packaging/inject_version.py` 仍会以 `pyproject.toml` 为准**二次覆写**一次，作为
+> 手改遗漏的兜底；两边不一致会打印警告，并以 `pyproject.toml` 为准。
 
 ### 第四步：提交并合并发布准备
 
 在打标签之前提交版本号与发布说明，并确保该提交已进入远端 `master`：
 
 ```powershell
-git add pyproject.toml uv.lock android/app/build.gradle.kts docs/50-releases/
+git add pyproject.toml uv.lock android/app/build.gradle.kts src/lvjiang/_version.py docs/50-releases/
 git commit -m "chore(release): prepare vX.Y.Z"
 git push
 ```
 
-云端打包时，`src/lvjiang/_version.py` 只在临时 runner 中由打包脚本注入，
-不再将生成结果提交回仓库。
+如果版本号在开发之初就已经改好，这一步 `_version.py` 不会有变更，属正常情况。
 
 ### 第五步：推送标签，自动打包发布（推荐）
 
@@ -154,8 +158,9 @@ packaging\package.bat
 5. 调用 Inno Setup 生成安装包（需安装 [Inno Setup 6](https://jrsoftware.org/isdl.php)）
 
 > **注意：** 如果未安装 Inno Setup，本地脚本会跳过安装器构建；GitHub Release
-> 工作流会把安装器缺失视为失败。打包会改写 `src/lvjiang/_version.py`，本地排障
-> 完成后不要把这个生成变更提交到仓库。
+> 工作流会把安装器缺失视为失败。打包会按 `pyproject.toml` 覆写
+> `src/lvjiang/_version.py`——版本号已经改对时这是空操作；如果产生了 diff，说明
+> 之前漏改，应当把这个变更一并提交。
 
 ---
 
@@ -174,6 +179,7 @@ packaging\package.bat
 发布前逐项确认：
 
 - [ ] `pyproject.toml` 版本号已更新
+- [ ] `src/lvjiang/_version.py` 版本号已更新（通常在进入本版本开发时就已改好）
 - [ ] `android/app/build.gradle.kts` versionName 已更新
 - [ ] `android/app/build.gradle.kts` versionCode 已递增（如有 config/布局变更）
 - [ ] `docs/50-releases/vX.Y.Z.md` 发布文档已编写
@@ -193,6 +199,7 @@ packaging\package.bat
 ## 常见错误
 
 1. **遗漏 Android 版本号**：`android/app/build.gradle.kts` 的 versionName 和 versionCode 必须同步更新
-2. **手动修改或提交 _version.py**：此文件由云端打包脚本临时注入，不属于发布准备提交
+2. **`_version.py` 与 `pyproject.toml` 不一致**：三处版本号应在进入新版本开发时一起改；
+   打包脚本的二次覆写只是兜底，靠它会让开发期的日志、统计和「关于」对话框显示上一版本号
 3. **versionCode 未递增**：Android 设备通过 versionCode 判断是否需要重新解压配置，不递增会导致设备上仍使用旧配置
 4. **未运行 CI**：发布前必须确保 ruff + mypy + pytest 全量通过

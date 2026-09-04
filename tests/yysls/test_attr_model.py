@@ -292,6 +292,14 @@ def test_empty_entry_counts_as_unmodeled() -> None:
 
 @pytest.mark.parametrize("payload", [
     {"kind": "不存在的类别", "entries": {}},
+    # 「能保存 = 能求值」：以下全部必须在解析期失败，而不是拖到求值期
+    {"kind": "inner_way", "顶层拼错": 1, "entries": {}},
+    {"kind": "inner_way", "entries": {"x": {"stats": {"根本没这个字段": 1.0}}}},
+    {"kind": "inner_way", "entries": {"x": {"full_affix": "气血最大值"}}},
+    {"kind": "martial_art", "entries": {"x": {"stats": {"min_outer": {
+        "formula": {"source": "dim_min"}, "多余的键": 1}}}}},
+    {"kind": "martial_art", "entries": {"x": {"stats": {"min_outer": {
+        "formula": {"source": "不存在的源字段"}}}}}},
     {"kind": "inner_way", "entries": {"x": {"打错的字段": 1}}},
     {"kind": "inner_way", "entries": {"x": {"scope": "既不是面板也不是战斗"}}},
     {"kind": "inner_way", "entries": {"x": {"split": [1, 2]}}},

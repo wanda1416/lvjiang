@@ -25,9 +25,11 @@ panel_attrs 和喂毕业率的 combat_attrs。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from dataclasses import fields as dataclass_fields
 from typing import Any
 
 from .....i18n import tr
+from ..combat.combat_attrs import COMBAT_ATTR_FIELDS, CombatAttributes
 
 # ─── 固定词汇（写死在代码，不进 YAML） ─────────────────────
 
@@ -117,6 +119,32 @@ ATTR_ATTACK_CATEGORY = "属性攻击"
 
 #: 五维词组名
 DIMENSION_CATEGORY = "五维属性"
+
+#: CombatAttributes 的数值字段（不含 extra_attrs）
+COMBAT_NUMERIC_FIELDS: tuple[str, ...] = tuple(
+    f.name for f in dataclass_fields(CombatAttributes) if f.name != "extra_attrs"
+)
+
+#: 求值的工作字段空间：战斗属性 + 五维。五维不是战斗属性，但武学天赋的
+#: 转换公式要读它，所以必须在同一空间里参与求值，投影时丢弃。
+WORKING_FIELDS: tuple[str, ...] = COMBAT_NUMERIC_FIELDS + DIMENSION_FIELDS
+
+#: full_affix 真正支持的词条类别。
+#:
+#: 词组配置里有 15 类词条，但能落到具体属性字段的只有这几类。界面必须
+#: 只列出这些——否则会出现「可选择、可保存、推导时才报错」，而一个条目
+#: 报错会让整次求值失败。
+SUPPORTED_FULL_AFFIX_CATEGORIES: tuple[str, ...] = (
+    (ATTR_ATTACK_CATEGORY,)
+    + tuple(AFFIX_RANGE_FIELDS)
+    + tuple(AFFIX_SCALAR_FIELDS)
+)
+
+#: 百分比字段：内部存小数（0.046 = 4.6%），界面按百分数显示与输入。
+#: 从 COMBAT_ATTR_FIELDS 的单位派生，不另抄一份——抄一份就会漂移。
+PERCENT_FIELDS: frozenset[str] = frozenset(
+    name for name, _display, unit, _range in COMBAT_ATTR_FIELDS if unit == "%"
+)
 
 
 class AttrModelError(Exception):
@@ -266,11 +294,6 @@ class ResolveResult:
 
 
 # ─── 工作字段空间 ────────────────────────────────────────
-
-def working_fields(combat_fields: tuple[str, ...]) -> tuple[str, ...]:
-    """CombatAttributes 数值字段 + 五维，构成求值的工作字段空间"""
-    return tuple(combat_fields) + DIMENSION_FIELDS
-
 
 def attr_attack_fields(school_attr: str) -> tuple[str, str]:
     """流派属性 → (最小属攻字段, 最大属攻字段)"""

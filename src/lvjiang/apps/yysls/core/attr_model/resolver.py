@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-from dataclasses import fields as dataclass_fields
 from typing import Callable
 
 from loguru import logger
@@ -25,8 +24,10 @@ from .models import (
     AFFIX_RANGE_FIELDS,
     AFFIX_SCALAR_FIELDS,
     ATTR_ATTACK_CATEGORY,
+    COMBAT_NUMERIC_FIELDS,
     DIMENSION_CATEGORY,
     SCOPE_PANEL,
+    WORKING_FIELDS,
     AppliedModifier,
     AttrModelError,
     Formula,
@@ -35,7 +36,6 @@ from .models import (
     UnmodeledSource,
     attr_attack_fields,
     split_affix_cap,
-    working_fields,
 )
 
 #: 词条满值查询：(等级, 词条类别) → 满值；查不到返回 None
@@ -50,12 +50,6 @@ _NORMALIZE_DIGITS = 9
 
 #: 反解产生的合成来源标识
 RESIDUAL_SOURCE_ID = "__residual__"
-
-
-def _combat_numeric_fields() -> tuple[str, ...]:
-    return tuple(
-        f.name for f in dataclass_fields(CombatAttributes) if f.name != "extra_attrs"
-    )
 
 
 def _normalize(value: float) -> float:
@@ -122,8 +116,8 @@ def _resolve_scope(
     residual: dict[str, float] | None,
 ) -> tuple[CombatAttributes, list[AppliedModifier]]:
     """单个作用域的两趟求值"""
-    numeric_fields = _combat_numeric_fields()
-    allowed = set(working_fields(numeric_fields))
+    numeric_fields = COMBAT_NUMERIC_FIELDS
+    allowed = set(WORKING_FIELDS)
     working: dict[str, float] = {name: 0.0 for name in allowed}
     extra: dict[str, float] = {}
     modifiers: list[AppliedModifier] = []
@@ -322,7 +316,7 @@ def diff_against_panel(
     :meth:`ResolveResult.contribution_by_kind` 即可定位到出错的来源。
     """
     diff: dict[str, tuple[float, float]] = {}
-    for name in _combat_numeric_fields():
+    for name in COMBAT_NUMERIC_FIELDS:
         modeled = getattr(result.panel_attrs, name)
         actual = getattr(panel, name)
         if abs(modeled - actual) > 1e-6:

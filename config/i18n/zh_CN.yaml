@@ -1597,6 +1597,11 @@ auto_strings:
   '进面板': '进面板'
   '高级编辑 - {name}': '高级编辑 - {name}'
   '（不对照）': '（不对照）'
+  '{filename} 顶层含未知字段: {keys}': '{filename} 顶层含未知字段: {keys}'
+  '{source} 的 full_affix 不受支持: {name}；可用 {allowed}': '{source} 的 full_affix 不受支持: {name}；可用 {allowed}'
+  '{what} 不是已知属性字段': '{what} 不是已知属性字段'
+  '{what} 的 formula 之外还有多余的键: {keys}': '{what} 的 formula 之外还有多余的键: {keys}'
+  '{what} 的 source 不是已知属性字段: {source}': '{what} 的 source 不是已知属性字段: {source}'
 task_history:
   task: 任务
   title: 任务历史

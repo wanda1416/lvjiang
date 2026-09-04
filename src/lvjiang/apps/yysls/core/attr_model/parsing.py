@@ -22,8 +22,10 @@
       尚未测量的条目:
         modeled: false            # 登记但未填，贡献 0，由反解兜底
 
-校验从严：未知字段名、未知词条类别、非法作用域一律解析失败，不静默
-跳过——静默跳过会让面板对账在几十个来源里无从定位。
+校验从严，且**能保存即能求值**：未知属性字段、未知公式源字段、不受
+支持的词条类别、公式外层多余的键、文件顶层多余的键，一律在解析期
+失败。放到求值期才报错的话，界面会提示保存成功，然后整份来源文件
+无法推导——一个条目写错，整次求值全废。
 """
 
 from __future__ import annotations
@@ -35,6 +37,8 @@ from .models import (
     DEFAULT_AFFIX_SPLIT,
     SCOPES,
     SOURCE_KINDS,
+    SUPPORTED_FULL_AFFIX_CATEGORIES,
+    WORKING_FIELDS,
     AttrModelError,
     Formula,
     FullAffix,
@@ -49,6 +53,9 @@ _ENTRY_KEYS = {
 
 #: 公式内允许的键
 _FORMULA_KEYS = {"source", "multiplier", "offset", "min", "max", "round"}
+
+#: 文件顶层允许的键
+_DOCUMENT_KEYS = {"kind", "entries"}
 
 
 def _require_mapping(value: Any, what: str) -> dict:
@@ -85,6 +92,11 @@ def parse_formula(raw: Any, what: str) -> Formula:
     source = data.get("source")
     if not isinstance(source, str) or not source:
         raise AttrModelError(tr("{what} 缺少 source").format(what=what))
+    if source not in WORKING_FIELDS:
+        raise AttrModelError(
+            tr("{what} 的 source 不是已知属性字段: {source}").format(
+                what=what, source=source)
+        )
     ndigits = data.get("round")
     if ndigits is not None and (isinstance(ndigits, bool) or not isinstance(ndigits, int)):
         raise AttrModelError(tr("{what} 的 round 必须是整数").format(what=what))
@@ -144,10 +156,20 @@ def parse_entry(source_id: str, raw: Any, kind: str) -> StatEffect:
     stats: dict[str, float | Formula] = {}
     for name, value in _require_mapping(data.get("stats"), f"{source_id}.stats").items():
         what = f"{source_id}.stats.{name}"
+        if name not in WORKING_FIELDS:
+            raise AttrModelError(
+                tr("{what} 不是已知属性字段").format(what=what)
+            )
         if isinstance(value, dict):
             if "formula" not in value:
                 raise AttrModelError(
                     tr("{what} 是映射时必须含 formula").format(what=what)
+                )
+            extra_keys = set(value) - {"formula"}
+            if extra_keys:
+                raise AttrModelError(
+                    tr("{what} 的 formula 之外还有多余的键: {keys}").format(
+                        what=what, keys="、".join(sorted(extra_keys)))
                 )
             stats[name] = parse_formula(value["formula"], what)
         else:
@@ -163,6 +185,12 @@ def parse_entry(source_id: str, raw: Any, kind: str) -> StatEffect:
         if not isinstance(raw_affix, str) or not raw_affix:
             raise AttrModelError(
                 tr("{source} 的 full_affix 必须是词条类别名").format(source=source_id)
+            )
+        if raw_affix not in SUPPORTED_FULL_AFFIX_CATEGORIES:
+            raise AttrModelError(
+                tr("{source} 的 full_affix 不受支持: {name}；可用 {allowed}").format(
+                    source=source_id, name=raw_affix,
+                    allowed="、".join(SUPPORTED_FULL_AFFIX_CATEGORIES))
             )
         full_affix = FullAffix(
             category=raw_affix,
@@ -210,6 +238,12 @@ def parse_entry(source_id: str, raw: Any, kind: str) -> StatEffect:
 def parse_source_file(data: Any, *, filename: str) -> list[StatEffect]:
     """解析一个来源文件，返回其中的全部条目"""
     payload = _require_mapping(data, filename)
+    unknown = set(payload) - _DOCUMENT_KEYS
+    if unknown:
+        raise AttrModelError(
+            tr("{filename} 顶层含未知字段: {keys}").format(
+                filename=filename, keys="、".join(sorted(unknown)))
+        )
     kind = payload.get("kind")
     if kind not in SOURCE_KINDS:
         raise AttrModelError(

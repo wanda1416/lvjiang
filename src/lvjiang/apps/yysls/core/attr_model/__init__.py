@@ -38,11 +38,14 @@ from .models import (
     DIMENSION_CATEGORY,
     DIMENSION_FIELDS,
     DIMENSION_LABELS,
+    PERCENT_FIELDS,
     SCOPE_COMBAT,
     SCOPE_PANEL,
     SCOPES,
     SOURCE_KIND_LABELS,
     SOURCE_KINDS,
+    SUPPORTED_FULL_AFFIX_CATEGORIES,
+    WORKING_FIELDS,
     AppliedModifier,
     AttrModelError,
     Formula,
@@ -52,7 +55,6 @@ from .models import (
     UnmodeledSource,
     attr_attack_fields,
     split_affix_cap,
-    working_fields,
 )
 from .parsing import parse_entry, parse_formula, parse_source_file
 from .resolver import (
@@ -74,6 +76,9 @@ __all__ = [
     "DIMENSION_FIELDS",
     "DIMENSION_JIN",
     "DIMENSION_LABELS",
+    "PERCENT_FIELDS",
+    "SUPPORTED_FULL_AFFIX_CATEGORIES",
+    "WORKING_FIELDS",
     "DIMENSION_MIN",
     "DIMENSION_SHI",
     "RESIDUAL_SOURCE_ID",
@@ -103,5 +108,4 @@ __all__ = [
     "resolve",
     "solve_residual",
     "split_affix_cap",
-    "working_fields",
 ]

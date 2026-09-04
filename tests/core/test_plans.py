@@ -1,4 +1,8 @@
-"""方案（Plan）核心存储与判定测试。"""
+"""方案（Plan）核心存储与判定测试。
+
+只测 session.json 那一层；app.yaml 的分发层由根 conftest 的
+``distributed_plans_store``（autouse）统一挡掉。
+"""
 from __future__ import annotations
 
 from lvjiang.core.config.plans import (

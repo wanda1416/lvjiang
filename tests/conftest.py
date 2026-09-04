@@ -111,12 +111,22 @@ def _isolate_clipboard(monkeypatch):
     monkeypatch.setattr(QApplication, "clipboard", lambda *args: clipboard)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def distributed_plans_store(monkeypatch):
-    """把 app.yaml 的 plans 键换成内存里的一份。
+    """把 app.yaml 的 plans 键换成内存里的一份，与 session 层对称隔离。
 
-    分发方案落在 config/system|local 的 app.yaml 里，测试一旦真写就会被
-    config_write_guard 拦下。需要 distributed=True 的用例都要请求本 fixture。
+    方案存两层：session.json（已由 _isolate_session_store 隔离）和
+    config/system|local 的 app.yaml 顶层 plans。后者是入库文件，自带三条
+    随包分发的预置方案，于是：
+
+    * load_plans() 把预置方案排在本机方案前面，任何「列表里有几条」的断言
+      都会偏移；
+    * save_plans() 恒写两层，入参与真实分发层不一致就真去写 app.yaml；
+      dev 模式落的是 system 层，被 config_write_guard 拦成失败。
+
+    所以不是「distributed=True 的用例才需要」，凡碰方案的用例都需要——
+    改成 autouse，免得每加一个测试文件就重新踩一次。需要检视内存内容的
+    用例照常按名字请求，拿到的是同一份。
     """
     from lvjiang.core.config import plans as plans_mod
 

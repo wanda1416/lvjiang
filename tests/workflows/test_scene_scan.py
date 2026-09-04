@@ -201,48 +201,118 @@ def test_daily_jianghu_claim_reputation_guard():
         "min": 0,
     }
     assert "default $max_claim_reputation = 1500" in text
-    # 声望只接受非负整数；0 合法，只有提取失败（< 0）才跳过领奖
+    # 声望只接受非负整数；识别失败保留最近有效值，从未成功时才保持 -1
     assert "extract_int($result.haoling_of_week)" in text
     assert "if $value < 0" in text
-    assert "return -1" in text
+    assert "return $haoling_of_week" in text
     # 领奖后全屏奖励弹窗用通用空白区域点击关闭，避免遮挡下一轮页面校验
     claim_def = text[text.index("def claim_reward("):text.index("def claim_reward(") + 500]
     assert "click [general_control].[blank_area]" in claim_def
 
     completed_call = "call $task_completed = is_task_completed($text_result)"
     initial_scan = "scan [activity_jianghu].$label.[label] as $text_result"
-    target_call = "call $hit = is_target_task($task_text, $targets)"
+    target_call = "call $hit = is_target_task($task_text)"
     assert "def is_task_completed($text_result)" in text
     assert text.count(completed_call) == 2  # 处理前与动作后共用同一判定
     assert text.index(initial_scan) < text.index(completed_call)
     assert text.index(completed_call) < text.index(target_call)
     assert "continue" in text[text.index(completed_call):text.index(target_call)]
-    assert "def is_target_task($text, $targets)" in text
+    assert "def is_target_task($text)" in text
     assert "as $hit by contains_any $targets" not in text
 
     # 当周声望「读取即写入」：唯一读取入口是 sync_haoling_of_week，它在识别
     # 成功后直接落盘。若仍由各调用点自行 sync，未领奖 / 已达上限等分支就会
     # 漏写，profile 停留在旧值，与实时值不一致。
     assert "read_haoling_of_week" not in text  # 不得绕过唯一入口
-    assert text.count("call $haoling_of_week = sync_haoling_of_week()") == 1
+    assert text.count("call $haoling_of_week = sync_haoling_of_week()") == 2
     # 起始进入即写入，不依赖后续是否领奖
     assert text.index("call $haoling_of_week = sync_haoling_of_week()") < text.index(
         "for idx in"
     )
     sync_proc = text.index("def sync_haoling_of_week(")
-    sync_body = text[sync_proc:sync_proc + 800]
+    sync_body = text[sync_proc:sync_proc + 1200]
     assert "extract_int($result.haoling_of_week)" in sync_body
     assert "if $value < 0" in sync_body
+    assert "if $value < $haoling_of_week" in sync_body
+    assert 'log warn "当周已领取声望识别到 "' in sync_body
+    assert "return $haoling_of_week" in sync_body
+    assert "haoling_sync_valid" not in text
     assert "call write_haoling_profile($value)" in sync_body
-    assert "return -1" in sync_body  # 识别失败不写 profile
+    assert text.index("return $haoling_of_week", sync_proc) < text.index(
+        "call write_haoling_profile($value)", sync_proc)
 
     claim_proc = text.index("def claim_completed_reward(")
-    limit = text.index("if $current < $maximum", claim_proc)
+    limit = text.index(
+        "if $haoling_of_week < $max_claim_reputation", claim_proc)
     claim = text.index("call claim_reward($label, $idx)", claim_proc)
-    reread = text.index("call $current = sync_haoling_of_week()", claim_proc)
+    reread = text.index(
+        "call $haoling_of_week = sync_haoling_of_week()", claim_proc)
     assert claim_proc < limit < claim < reread
     assert 'eval $model = profile_model("haoling_of_week")' in text
     assert 'eval profile_set("haoling_of_week", $value)' in text
+    assert (
+        "global $max_refresh, $claim_reward, $max_claim_reputation, "
+        "$targets, $haoling_of_week, $mode_checked"
+    ) in text
+    assert "context.claim_reward" not in text
+    assert "context.mode_checked" not in text
+
+
+def test_daily_jianghu_closes_stale_completed_task_overlay():
+    """刷新两次仍是同一 OCR，说明完成后的旧任务浮层没有自动关闭。"""
+    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    text = wf.read_text(encoding="utf-8")
+
+    outer_loop = text[
+        text.index('for idx in ["1", "2", "3", "4", "5", "6"]'):
+        text.index('log "六个任务刷新处理完成"')
+    ]
+    assert "call $refresh_result = refresh_task_until_terminal(" in outer_loop
+    assert 'if $refresh_status equals "completed"' in outer_loop
+    assert "call claim_completed_reward($label, $idx)" in outer_loop
+    assert 'if $refresh_status equals "target"' in outer_loop
+
+    refresh_proc = text[
+        text.index("def refresh_task_until_terminal("):
+        text.index("# 对已经确认完成的任务", text.index(
+            "def refresh_task_until_terminal("))
+    ]
+    assert "if $task_text equals $previous_task_text" in refresh_proc
+    assert "if $same_ocr_count >= 2" in refresh_proc
+    assert 'log warn "任务 "' in refresh_proc
+    assert "click [activity_jianghu].[overlay_back]" in refresh_proc
+    assert 'return {"status": "target"' in refresh_proc
+    assert 'return {"status": "completed"' in refresh_proc
+    assert 'return {"status": "exhausted"' in refresh_proc
+
+
+def test_daily_jianghu_uses_layer_specific_back_regions():
+    """任务浮层/情境逐层返回；基底 back 只用于退出号令页。"""
+    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    text = wf.read_text(encoding="utf-8")
+
+    huanzhuang = text[
+        text.index("def action_huanzhuang("):
+        text.index("def action_heying(")
+    ]
+    assert huanzhuang.count("click [activity_jianghu].[overlay_back]") == 1
+    assert "click [activity_jianghu].[back]" not in huanzhuang
+
+    qingjing = text[
+        text.index("def action_qingjing("):
+        text.index("def action_dongfang(")
+    ]
+    assert qingjing.count("click [activity_jianghu].[qingjing_back]") == 1
+    assert qingjing.count("click [activity_jianghu].[overlay_back]") == 1
+    assert "click [activity_jianghu].[back]" not in qingjing
+    assert qingjing.index(
+        "click [activity_jianghu].[qingjing_back]"
+    ) < qingjing.index(
+        "click [activity_jianghu].[overlay_back]"
+    )
+
+    # 一处是工作流收尾退出号令页，一处是醉意任务主动退出号令页。
+    assert text.count("click [activity_jianghu].[back]") == 2
 
 
 # ─── engine 启动期绑定校验（集成） ────────────────────────

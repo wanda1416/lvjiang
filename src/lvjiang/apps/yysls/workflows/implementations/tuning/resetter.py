@@ -165,11 +165,9 @@ class TuningResetter:
             logger.warning("  未识别到首次重置确认按钮，取消重置")
             self._close_dialog()
             return (RESET_FAILED, tr("重置确认按钮识别失败，跳过该装备"))
-        self._routes.confirm_reset("reset_confirm")
+        self._routes.confirm_reset_entry()
         wf.wait_delay("secondary_confirm")
-        second_confirm = wf.ocr_scene(
-            wf.CONTROL_SCENE, ["confirm"]).get("confirm", "") or ""
-        if not second_confirm:
+        if not self._routes.scan_and_confirm("重置二次确认"):
             # 首次确认点下去之后必然弹二次确认。弹不出来通常不是识别问题，
             # 而是账号开了安全锁需要解锁，机器自己点不出来。此时既不能替用户
             # 猜着取消（取消要先退模态、再退确认重置视图，中途状态不可控），
@@ -184,13 +182,10 @@ class TuningResetter:
                 "常见原因是账号开启了安全锁，需要先手动解锁。"
                 "请处理好现场后点击确定，程序会重新检查一次。",
             )
-            second_confirm = wf.ocr_scene(
-                wf.CONTROL_SCENE, ["confirm"]).get("confirm", "") or ""
-            if not second_confirm:
+            if not self._routes.scan_and_confirm("重置二次确认"):
                 logger.warning("  人工介入后仍未识别到二次确认，跳过该装备")
                 self._close_dialog()
                 return (RESET_FAILED, tr("重置二次确认识别失败，跳过该装备"))
-        self._routes.confirm_reset("confirm")
         wf._emit_operation("reset", "重置已提交，正在读取重置结果")
         wf.wait_stable("page_refresh")
         # 重置提交后：105 级直接回到调律页面；110 级会返还材料，多一层提示要

@@ -32,6 +32,7 @@ from .models import (
     AttrModelError,
     Formula,
     ResolveResult,
+    ScopeResult,
     StatEffect,
     UnmodeledSource,
     attr_attack_fields,
@@ -145,6 +146,29 @@ def _resolve_scope(
             )
         )
 
+    def record_extra(effect: StatEffect, name: str, delta: float) -> None:
+        """extra_attrs 也要留明细。
+
+        指定武学增效、技能增伤这类流派专属属性恰恰最容易填错，而它们
+        此前是唯一没有对账手段的一类：不记明细、不进 breakdown、
+        也不参与差异比对。
+        """
+        before = extra.get(name, 0.0)
+        after = _normalize(before + delta)
+        extra[name] = after
+        modifiers.append(
+            AppliedModifier(
+                source_id=effect.source_id,
+                label=effect.label,
+                kind=effect.kind,
+                scope=effect.scope,
+                field_name=name,
+                before=before,
+                after=after,
+                is_extra=True,
+            )
+        )
+
     # 第一趟：常数与整条词条
     for effect in selected:
         expanded = expand_full_affix(
@@ -163,7 +187,7 @@ def _resolve_scope(
                 )
             record(effect, name, float(stat_value))
         for name, extra_value in effect.extra.items():
-            extra[name] = _normalize(extra.get(name, 0.0) + float(extra_value))
+            record_extra(effect, name, float(extra_value))
 
     # 第二趟：公式。源字段此时已是最终值，与书写顺序无关。
     for effect in selected:
@@ -248,6 +272,8 @@ def resolve(
         include_combat_only=True,
         residual=residual,
     )
+    panel = ScopeResult(attrs=panel_attrs, modifiers=panel_modifiers)
+    combat = ScopeResult(attrs=combat_attrs, modifiers=combat_modifiers)
     unmodeled = [
         UnmodeledSource(effect.source_id, effect.label, effect.kind)
         for effect in effects
@@ -257,12 +283,7 @@ def resolve(
         logger.debug(
             "属性来源未建模条目 {count} 个，缺口由 residual 兜底", count=len(unmodeled)
         )
-    return ResolveResult(
-        panel_attrs=panel_attrs,
-        combat_attrs=combat_attrs,
-        modifiers=combat_modifiers if combat_modifiers else panel_modifiers,
-        unmodeled=unmodeled,
-    )
+    return ResolveResult(panel=panel, combat=combat, unmodeled=unmodeled)
 
 
 def solve_residual(
@@ -312,13 +333,21 @@ def diff_against_panel(
 ) -> dict[str, tuple[float, float]]:
     """模型面板属性与实测面板的逐字段差异
 
-    返回 ``{字段: (模型值, 实测值)}``，只含不一致的字段。配合
-    :meth:`ResolveResult.contribution_by_kind` 即可定位到出错的来源。
+    返回 ``{字段: (模型值, 实测值)}``，只含不一致的字段；extra_attrs
+    的动态属性一并比对，两侧缺哪边都按 0 处理。配合
+    :meth:`ScopeResult.contribution_by_kind` 即可定位到出错的来源。
     """
     diff: dict[str, tuple[float, float]] = {}
     for name in COMBAT_NUMERIC_FIELDS:
         modeled = getattr(result.panel_attrs, name)
         actual = getattr(panel, name)
+        if abs(modeled - actual) > 1e-6:
+            diff[name] = (modeled, actual)
+    modeled_extra = result.panel_attrs.extra_attrs
+    actual_extra = panel.extra_attrs
+    for name in {*modeled_extra, *actual_extra}:
+        modeled = float(modeled_extra.get(name, 0.0))
+        actual = float(actual_extra.get(name, 0.0))
         if abs(modeled - actual) > 1e-6:
             diff[name] = (modeled, actual)
     return diff

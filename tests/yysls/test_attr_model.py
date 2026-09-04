@@ -180,11 +180,11 @@ def test_breakdown_attributes_each_contribution_to_its_source() -> None:
 
     result = _resolve(effects)
 
-    assert result.contribution_by_kind("min_outer") == {
+    assert result.combat.contribution_by_kind("min_outer") == {
         "inner_way": pytest.approx(40.5),
         "gear_set": pytest.approx(78.0),
     }
-    assert [m.source_id for m in result.modifiers_for("min_outer")] == ["心法A", "套装B"]
+    assert [m.source_id for m in result.combat.modifiers_for("min_outer")] == ["心法A", "套装B"]
 
 
 def test_diff_against_panel_lists_only_mismatched_fields() -> None:
@@ -356,7 +356,7 @@ def test_dimension_conversion_is_always_applied_regardless_of_selection() -> Non
 
     result = manager.resolve(level=110, school_attr="牵丝", selected=())
 
-    assert {m.source_id for m in result.modifiers} >= {
+    assert {m.source_id for m in result.combat.modifiers} >= {
         DIMENSION_JIN, DIMENSION_SHI, DIMENSION_MIN
     }
 
@@ -369,7 +369,7 @@ def test_dimension_breakdown_separates_each_dimension() -> None:
     ]
 
     result = _resolve(effects)
-    sources = {m.source_id: m.delta for m in result.modifiers_for("min_outer")}
+    sources = {m.source_id: m.delta for m in result.combat.modifiers_for("min_outer")}
 
     assert sources[DIMENSION_JIN] == pytest.approx(100.0 * JIN_TO_MIN_OUTER)
     assert sources[DIMENSION_MIN] == pytest.approx(100.0 * MIN_TO_MIN_OUTER)
@@ -487,3 +487,57 @@ def test_no_effect_with_values_is_rejected(sources_dir) -> None:
     with pytest.raises(AttrModelError):
         manager.save_entry(
             "甲·二重", {"no_effect": True, "stats": {"crit_rate": 0.01}})
+
+
+# ── 作用域与明细一致性 ────────────────────────────────────
+
+def test_panel_and_combat_keep_their_own_modifiers() -> None:
+    """显示哪个作用域的值，就必须用哪个作用域的明细。
+
+    此前两者共用一份明细且优先取战斗侧，界面显示面板值、breakdown
+    却含吃食，两栏加不到一起。
+    """
+    effects = [
+        _effect("套装", kind="gear_set", stats={"min_outer": 5.0}),
+        _effect("吃食", kind="food", scope=SCOPE_COMBAT, stats={"min_outer": 10.0}),
+    ]
+
+    result = _resolve(effects)
+
+    assert result.panel.attrs.min_outer == pytest.approx(5.0)
+    assert sum(result.panel.contribution_by_kind("min_outer").values()) == pytest.approx(5.0)
+    assert result.combat.attrs.min_outer == pytest.approx(15.0)
+    assert sum(result.combat.contribution_by_kind("min_outer").values()) == pytest.approx(15.0)
+    assert "food" not in result.panel.contribution_by_kind("min_outer")
+
+
+def test_extra_attributes_are_recorded_in_the_breakdown() -> None:
+    """指定武学增效这类动态属性最容易填错，却曾是唯一没有对账手段的一类。"""
+    effects = [
+        _effect("心法A", kind="inner_way", extra={"剑武学增伤": 0.08}),
+        _effect("套装B", kind="gear_set", extra={"剑武学增伤": 0.02}),
+    ]
+
+    result = _resolve(effects)
+
+    assert result.combat.attrs.extra_attrs["剑武学增伤"] == pytest.approx(0.10)
+    assert result.combat.contribution_by_kind("剑武学增伤") == {
+        "inner_way": pytest.approx(0.08),
+        "gear_set": pytest.approx(0.02),
+    }
+    assert all(m.is_extra for m in result.combat.modifiers_for("剑武学增伤"))
+
+
+def test_diff_covers_extra_attributes() -> None:
+    """对照里没有的动态属性也要能看出差异，否则填错了无从发现。"""
+    result = _resolve([_effect("心法A", extra={"剑武学增伤": 0.08})])
+    panel = CombatAttributes()
+
+    assert diff_against_panel(result, panel)["剑武学增伤"] == (
+        pytest.approx(0.08), pytest.approx(0.0))
+
+
+def test_touched_fields_lists_stats_and_extras() -> None:
+    effects = [_effect("甲", stats={"min_outer": 1.0}, extra={"剑武学增伤": 0.01})]
+
+    assert _resolve(effects).combat.touched_fields() == ["min_outer", "剑武学增伤"]

@@ -228,3 +228,72 @@ def test_merge_with_no_time_data_keeps_empty_values(tmp_path):
     merged = repo.load().equipment_items[new_fp]
     assert merged["created_at"] == ""
     assert merged["updated_at"] == ""
+
+
+# ─── 数值口径差异（游戏显示 1 位小数 vs 内部承音上限 2 位小数）───────────
+
+def _cy_pair() -> tuple[dict, dict]:
+    """同一把 110 承音伞的两份快照。
+
+    左边是「一键满承音」手填的，数值取 round(cap * 0.94, 2)；右边是照着
+    游戏界面录的，只有 1 位小数。121.4*0.94=114.116 → 114.12 / 114.1，
+    76.8*0.94=72.192 → 72.19 / 72.2：两条词条的舍入方向恰好相反。
+    """
+    names = ("最大外功攻击", "劲", "最大外功攻击", "最小外功攻击", "敏")
+    filled = _equip(
+        level=110, names=names, transferred=2,
+        values=(114.12, 72.19, 114.12, 114.12, 72.19))
+    scanned = _equip(
+        level=110, names=names, transferred=2,
+        values=(114.1, 72.2, 114.1, 114.1, 72.2))
+    scanned["original_level"] = 105
+    scanned["updated_at"] = "2026-09-04T15:37:14.328+00:00"
+    return filled, scanned
+
+
+def test_opposite_rounding_between_sources_is_not_a_value_drop():
+    filled, scanned = _cy_pair()
+
+    candidates = _find(filled, scanned)
+
+    assert len(candidates) == 1
+    # 双向兼容时保留元数据更全、更新时间更晚的实测快照。
+    assert candidates[0].old_fp == filled["_fp"]
+    assert candidates[0].new_fp == scanned["_fp"]
+
+
+def test_freshness_beats_insertion_order():
+    filled, scanned = _cy_pair()
+
+    assert _find(scanned, filled) == _find(filled, scanned)
+
+
+def test_visible_value_drop_is_still_rejected():
+    """0.1 是游戏里可见的最小差异，容差不能把它抹平。
+
+    数值降低的方向必须被拒，于是这一对只剩「低 → 高」一个合法方向，
+    先录入的高值快照反而被判定为后继版本。
+    """
+    higher = _equip(level=110, values=(114.2, 72.2, 114.1, 114.1, 72.2))
+    lower = _equip(level=110, values=(114.1, 72.2, 114.1, 114.1, 72.2))
+
+    candidates = _find(higher, lower)
+
+    assert len(candidates) == 1
+    assert candidates[0].old_fp == lower["_fp"]
+    assert candidates[0].new_fp == higher["_fp"]
+
+
+def test_intermediate_feeding_state_precedes_full_chengyin_snapshot():
+    """喂到一半的实测快照，应被认作满承音快照的前身。"""
+    names = ("最大外功攻击", "劲", "最大外功攻击", "最小外功攻击", "敏")
+    feeding = _equip(level=110, names=names, transferred=2,
+                     values=(110.2, 72.2, 98.4, 114.1, 72.2))
+    full = _equip(level=110, names=names, transferred=2,
+                  values=(114.12, 72.19, 114.12, 114.12, 72.19))
+
+    candidates = _find(feeding, full)
+
+    assert len(candidates) == 1
+    assert candidates[0].old_fp == feeding["_fp"]
+    assert candidates[0].new_fp == full["_fp"]

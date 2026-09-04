@@ -20,6 +20,7 @@ from lvjiang.core.recognizers import template_locator as tl
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import Find, parse_text
 from lvjiang.workflows.grammar.ast_nodes import Literal
+from tests.case_matrix import case_matrix
 from tests.workflows.conftest import make_engine
 
 # ─── 语法 ───────────────────────────────────────────────
@@ -39,7 +40,7 @@ def test_find_by_image_with_area():
     assert node.by.match_mode == "image"
 
 
-@pytest.mark.parametrize("code", [
+@case_matrix("code", [
     'scan [s].[a] as $v by image "x"\n',
     'scan [s].[p][0][0] as $v by image "x"\n',
     'recognize [s].[a] as $v by image "x"\n',

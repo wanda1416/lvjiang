@@ -14,6 +14,7 @@ from lvjiang.apps.yysls.core.combat.combat_attrs import (
     has_resistance,
 )
 from lvjiang.apps.yysls.ui.loadout.combat.attrs_tab import CombatAttrsTab
+from tests.case_matrix import case_matrix
 
 
 def test_wuxiang_penetration_is_a_fixed_numeric_field() -> None:
@@ -25,7 +26,7 @@ def test_wuxiang_penetration_is_a_fixed_numeric_field() -> None:
     assert "wuxiang_pen" not in attrs.extra_attrs
 
 
-@pytest.mark.parametrize("name", [
+@case_matrix("name", [
     "十方破阵武学技增伤",
     "千机索天重击增伤",
     "明川药典治疗技增疗",
@@ -93,7 +94,7 @@ def _cap(level: int, category: str) -> float:
     return float(entry["cap"])
 
 
-@pytest.mark.parametrize("dimension", ["劲", "势", "敏"])
+@case_matrix("dimension", ["劲", "势", "敏"])
 def test_one_full_dimension_affix_is_worth_exactly_one_affix(dimension: str) -> None:
     """一条满值五维词条产出的各项，按各自词条满值归一后相加应为 1。
 

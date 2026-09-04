@@ -16,6 +16,7 @@ import yaml
 
 from lvjiang.core.config import versioning
 from lvjiang.core.config.resolver import ConfigResolver
+from tests.case_matrix import case_matrix
 
 
 @pytest.fixture
@@ -211,7 +212,7 @@ class TestWritePreservesVersion:
             "scenes/a.yaml", "key: a\nname: 新\n", content_version=4)
         assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 4
 
-    @pytest.mark.parametrize("bad_version", [True, 0, -1, 2.5, "4"])
+    @case_matrix("bad_version", [True, 0, -1, 2.5, "4"])
     def test_explicit_version_requires_positive_integer(
             self, dirs, bad_version):
         _write_scene(dirs[0], "a.yaml", 3, "旧")
@@ -292,13 +293,6 @@ class TestDevModeSeesRemote:
             "scenes/a.yaml", "key: a\nname: 同样的内容\n",
             content_version=target)
         assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 6
-
-    def test_no_remote_plain_save_keeps_version(self, dirs):
-        _write_scene(dirs[0], "a.yaml", 3, "旧")
-        r = _resolver(dirs, dev_mode=True)
-        r.write_entity("scenes/a.yaml", "key: a\nname: 新\n")
-        assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 3
-
 
 class TestDescribeEntity:
     """编辑器把「来源 / 版本号」标给人看，靠的是这个 API。

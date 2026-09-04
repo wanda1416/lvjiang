@@ -14,6 +14,7 @@ from lvjiang.workflows.file_tree import (
     list_directories,
     list_workflow_files,
 )
+from tests.case_matrix import case_matrix
 
 _WF = 'log "x"\n'
 
@@ -148,7 +149,7 @@ class TestEditability:
 
 
 class TestPathHelpers:
-    @pytest.mark.parametrize(
+    @case_matrix(
         ("rel", "name", "parent"),
         [
             ("a.wf", "a.wf", ""),

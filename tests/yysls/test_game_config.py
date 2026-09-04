@@ -17,6 +17,7 @@ from lvjiang.apps.yysls.config import (
     LevelRule,
     get_game_config,
 )
+from tests.case_matrix import case_matrix
 
 
 @pytest.fixture(scope="module")
@@ -27,7 +28,7 @@ def mgr():
 # ─── 词条别名归一 ──────────────────────────────────────────
 
 class TestResolveAffixCategory:
-    @pytest.mark.parametrize("alias,category", [
+    @case_matrix("alias,category", [
         ("最大外功攻击", "外功攻击"),
         ("最大无相攻击", "属性攻击"),
         ("劲", "五维属性"),
@@ -72,7 +73,7 @@ class TestResolveAffixCategory:
         assert not levels[110].allow_retransfer
         assert not levels[110].allow_retransfer_after_chengyin
 
-    @pytest.mark.parametrize("name,expected", [
+    @case_matrix("name,expected", [
         ("流星云珑", 110),
         ("吴钩霜甲", 110),
         ("踏雪含光", 105),
@@ -198,12 +199,12 @@ class TestExternalAffixAliases:
 # ─── 词库类型（普通 / 定音）──────────────────────────────
 
 class TestAffixPool:
-    @pytest.mark.parametrize("name", ["外功增益", "属攻增益", "指定技能增效"])
+    @case_matrix("name", ["外功增益", "属攻增益", "指定技能增效"])
     def test_dingyin_categories(self, mgr, name):
         assert mgr.get_affix_pool(name) == POOL_DINGYIN
         assert mgr.is_dingyin_affix(name)
 
-    @pytest.mark.parametrize("name", ["会心率", "外功攻击", "未知词条"])
+    @case_matrix("name", ["会心率", "外功攻击", "未知词条"])
     def test_normal_by_default(self, mgr, name):
         assert mgr.get_affix_pool(name) == POOL_NORMAL
         assert not mgr.is_dingyin_affix(name)
@@ -227,7 +228,7 @@ class TestAffixPool:
 # ─── 品阶推断 ──────────────────────────────────────────────
 
 class TestInferQuality:
-    @pytest.mark.parametrize("value,expected", [
+    @case_matrix("value,expected", [
         ([100, 232], "gold"),     # 110 阶武器 gold 区间精确匹配
         ([90, 209], "purple"),    # purple 区间精确匹配
         ([80, 186], "blue"),      # blue 区间精确匹配
@@ -393,7 +394,7 @@ class TestAffixCategories:
         first["外功类"].append("污染项")
         assert "污染项" not in mgr.get_affix_categories()["外功类"]
 
-    @pytest.mark.parametrize("affix,category", [
+    @case_matrix("affix,category", [
         ("最大外功攻击", "外功类"),
         ("劲", "外功类"),
         ("势", "外功类"),

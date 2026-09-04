@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
+from tests.case_matrix import case_matrix
 
 
 @pytest.fixture
@@ -572,7 +573,7 @@ def _write_then_render(env, key: str, value: str) -> tuple[str, str]:
 class TestNoteNumericValueTakesCap:
     """填的是数字就按数值语义归一，免得显示出 12.7/20 或 25/20 这种自相矛盾的值。"""
 
-    @pytest.mark.parametrize("raw,expected", [("12.7", "13"), ("12.2", "12"),
+    @case_matrix("raw,expected", [("12.7", "13"), ("12.2", "12"),
                                               ("8", "8"), ("0", "0")])
     def test_numeric_is_rounded(self, note_cap_env, raw, expected):
         stored, _ = _write_then_render(note_cap_env, "hard", raw)
@@ -606,7 +607,7 @@ class TestNoteNonNumericSkipsCap:
         stored, _ = _write_then_render(note_cap_env, "hard", "已完成")
         assert stored == "已完成"
 
-    @pytest.mark.parametrize("raw", ["已完成", "待定", "见群公告"])
+    @case_matrix("raw", ["已完成", "待定", "见群公告"])
     def test_text_does_not_show_cap(self, note_cap_env, raw):
         _, text = _write_then_render(note_cap_env, "hard", raw)
         assert text == raw, "非数字的值不该被挂上 /上限"
@@ -634,7 +635,7 @@ class TestNoteShowCapToggle:
 class TestNoteNumericPredicate:
     """写入侧和展示侧必须用同一套"算不算数字"的判断，否则会存/显不一致。"""
 
-    @pytest.mark.parametrize("raw,expected", [
+    @case_matrix("raw,expected", [
         ("12", 12.0), ("12.7", 12.7), ("-3", -3.0), ("  8  ", 8.0),
         ("已完成", None), ("", None), ("   ", None), ("12个", None), (None, None),
     ])

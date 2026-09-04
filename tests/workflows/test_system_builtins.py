@@ -11,6 +11,7 @@ from lvjiang.core.input_base import InputBackendKind
 from lvjiang.workflows.builtins import get_function
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
+from tests.case_matrix import case_matrix
 from tests.workflows.conftest import make_engine
 
 
@@ -121,7 +122,7 @@ class TestInput:
 
 
 class TestCheckEnv:
-    @pytest.mark.parametrize("allowed", [["android"], "android"])
+    @case_matrix("allowed", [["android"], "android"])
     def test_matching_env_returns_true(self, allowed):
         """允许列表和单个环境名均可匹配当前环境。"""
         engine = MockEngine(run_env="android")
@@ -147,7 +148,7 @@ class TestCheckEnv:
 
 
 class TestInputBackendKind:
-    @pytest.mark.parametrize(
+    @case_matrix(
         ("kind", "send", "post", "device"),
         [
             (InputBackendKind.SEND, True, False, False),
@@ -176,7 +177,7 @@ class TestInputBackendKind:
         assert _fn("is_post")(None) is False
         assert _fn("is_device")(None) is False
 
-    @pytest.mark.parametrize(
+    @case_matrix(
         ("kind", "expected"),
         [
             (InputBackendKind.SEND, 1),
@@ -202,7 +203,7 @@ class TestInputBackendKind:
 class TestIsDeviceInDsl:
     """is_device 作为 DSL 裸条件的行为，以及与 env / is_send 的区别。"""
 
-    @pytest.mark.parametrize(
+    @case_matrix(
         ("kind", "expected"),
         [
             (InputBackendKind.ADB, 1),

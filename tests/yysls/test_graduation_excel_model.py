@@ -23,6 +23,7 @@ from lvjiang.apps.yysls.core.graduation import (
 from lvjiang.apps.yysls.core.graduation.excel_formula import parse_formula
 from lvjiang.apps.yysls.core.graduation.graduation_converter import convert_workbook
 from lvjiang.apps.yysls.core.graduation.graduation_program import ProgramRuntime
+from tests.case_matrix import case_matrix
 
 DATA_DIR = (
     Path(__file__).parents[2] / "config" / "system" / "yysls" / "graduation"
@@ -88,7 +89,7 @@ def test_converter_supports_multiple_skill_affixes_and_shifted_environment() -> 
     }
 
 
-@pytest.mark.parametrize("school", SCHOOLS)
+@case_matrix("school", SCHOOLS)
 def test_converted_model_matches_excel_cached_outputs(school: str) -> None:
     model = _load(school)
     assert model["schema_version"] == 2
@@ -162,7 +163,7 @@ def test_editable_baseline_dps_recalibrates_graduation_rate(
         invalidate_graduation_cache()
 
 
-@pytest.mark.parametrize("school", SCHOOLS)
+@case_matrix("school", SCHOOLS)
 def test_dynamic_inputs_use_canonical_game_affix_names(school: str) -> None:
     model = _load(school)
     game_config = get_game_config()
@@ -221,7 +222,7 @@ def test_v2_records_environment_without_exposing_it_as_inputs() -> None:
     assert "team_buffs" not in input_names
 
 
-@pytest.mark.parametrize("school", SCHOOLS)
+@case_matrix("school", SCHOOLS)
 def test_v2_contains_no_excel_affix_aliases(school: str) -> None:
     raw = (DATA_DIR / f"{school}_基础方案.json").read_text(encoding="utf-8")
     game_config = get_game_config()

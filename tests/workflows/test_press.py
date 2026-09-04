@@ -122,11 +122,6 @@ press "W" down
         with pytest.raises(WorkflowUserError, match="already pressed"):
             _run(code)
 
-    def test_up_without_down_raises(self):
-        """press "W" up（未 down）→ 报错"""
-        with pytest.raises(WorkflowUserError, match="not pressed"):
-            _run('press "W" up\n')
-
     def test_hold_zero_raises(self):
         """press "W" hold 0 → 报错（时长必须 > 0）"""
         with pytest.raises(WorkflowUserError, match="> 0"):

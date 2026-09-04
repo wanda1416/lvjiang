@@ -1,8 +1,6 @@
 """页面切换契约：to: 声明的解析、校验与查询。"""
 from __future__ import annotations
 
-import pytest
-
 from lvjiang.core.scene_definition_models import (
     PointDef,
     RegionDef,
@@ -17,6 +15,7 @@ from lvjiang.core.scene_transitions import (
     parse_target,
     validate_transitions,
 )
+from tests.case_matrix import case_matrix
 
 
 def _scene(key, *, views=(), regions=(), points=(), same_layer=()):
@@ -32,7 +31,7 @@ def _scene(key, *, views=(), regions=(), points=(), same_layer=()):
         regions=list(regions), points=list(points))
 
 
-@pytest.mark.parametrize("raw,expected", [
+@case_matrix("raw,expected", [
     ("equip_tune_detail", ("equip_tune_detail", "")),
     ("equip_tune_detail/result", ("equip_tune_detail", "result")),
     ("/result", ("here", "result")),

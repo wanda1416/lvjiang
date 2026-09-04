@@ -10,6 +10,7 @@ import pytest
 
 from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
 from lvjiang.core.ocr_cleaner import OCRCleaner
+from tests.case_matrix import case_matrix
 
 
 @pytest.fixture(scope="module")
@@ -24,7 +25,7 @@ def reset_cleaner():
 
 
 class TestOCRCleaner:
-    @pytest.mark.parametrize("raw,expected", [
+    @case_matrix("raw,expected", [
         ("猜准率 10.8%", "精准率 10.8%"),
         ("扁武学增伤 8.2%", "扇武学增伤 8.2%"),
         ("经甲", "胫甲"),

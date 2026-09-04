@@ -9,6 +9,7 @@ import pytest
 
 from lvjiang.apps.yysls.core.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.core.evaluator import Rating, get_tuning_judge
+from tests.case_matrix import case_matrix
 
 
 def make_equip(equip_type: str, affix_names: list[str],
@@ -38,7 +39,7 @@ def fire():
 class TestPureRatings:
     """纯奶规则各部位四档评级。"""
 
-    @pytest.mark.parametrize("equip_type,affixes,quality,expected", [
+    @case_matrix("equip_type,affixes,quality,expected", [
         # 主武器扇
         ("扇", ["最大外功攻击", "扇武学增效", "最小外功攻击", "劲", "敏"], "gold", Rating.TOP),
         ("扇", ["最小外功攻击", "扇武学增效", "最大外功攻击", "劲", "会心率"], "gold", Rating.EXCELLENT),
@@ -75,7 +76,7 @@ class TestPureRatings:
 class TestFireRatings:
     """火拳奶规则各部位四档评级。"""
 
-    @pytest.mark.parametrize("equip_type,affixes,quality,expected", [
+    @case_matrix("equip_type,affixes,quality,expected", [
         # 扇（不需增伤）
         ("扇", ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击", "精准率"], "gold", Rating.TOP),
         ("扇", ["最大外功攻击", "最小外功攻击", "敏", "最大无相攻击", "会心率"], "gold", Rating.NORMAL),

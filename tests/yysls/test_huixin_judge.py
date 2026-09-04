@@ -9,6 +9,7 @@ import pytest
 
 from lvjiang.apps.yysls.core.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.core.evaluator import Rating, get_tuning_judge
+from tests.case_matrix import case_matrix
 
 
 def make_equip(equip_type: str, affix_names: list[str],
@@ -85,7 +86,7 @@ class TestBigWeaponRules:
 class TestBigTiers:
     """大外规则各部位四档评级。"""
 
-    @pytest.mark.parametrize("equip_type,affixes,quality,expected", [
+    @case_matrix("equip_type,affixes,quality,expected", [
         # 主武器陌刀
         ("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "势"], "gold", Rating.NORMAL),
         ("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "会心率", "精准率"], "gold", Rating.EXCELLENT),
@@ -118,7 +119,7 @@ class TestBigTiers:
 class TestSmall:
     """小外规则各部位评级。"""
 
-    @pytest.mark.parametrize("equip_type,affixes,quality,expected,skipped", [
+    @case_matrix("equip_type,affixes,quality,expected,skipped", [
         ("陌刀", ["最小外功攻击", "陌刀武学增伤", "最小外功攻击", "敏", "最大无相攻击"], "gold", Rating.TOP, False),
         ("陌刀", ["最小外功攻击", "陌刀武学增伤", "劲", "敏", "最大无相攻击"], "gold", Rating.JUNK, False),
         ("胫甲", ["会心率", "对首领单位增伤", "最小外功攻击", "敏", "最大裂石攻击"], "purple", Rating.TOP, False),

@@ -15,6 +15,7 @@ from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_file, parse_text
 from lvjiang.workflows.metadata import parse_metadata
 from lvjiang.workflows.workflow_references import collect_refs, collect_scene_keys
+from tests.case_matrix import case_matrix
 
 # ─── 搜集单元测试 ─────────────────────────────────────────
 
@@ -543,7 +544,7 @@ def test_disabled_arrow_key_does_not_raise(wf_root):
 
 # 静态检查允许 disabled 绑定存在；只有真正执行到该实例时才报错。
 
-@pytest.mark.parametrize(
+@case_matrix(
     ("statement", "kind", "expected"),
     [
         ("click [game_main_page].[target]", "region", "区域"),

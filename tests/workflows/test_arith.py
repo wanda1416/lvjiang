@@ -4,15 +4,15 @@
 改写为标准 pytest 断言以纳入回归基线。
 """
 
-import pytest
 
 from lvjiang.workflows.grammar import parse_text
+from tests.case_matrix import case_matrix
 from tests.workflows.conftest import make_engine
 
 # ─── 语法解析 ──────────────────────────────────────────────
 
 class TestArithParse:
-    @pytest.mark.parametrize("code", [
+    @case_matrix("code", [
         'eval $x = 1 + 2\n',
         'eval $x = $a + $b * 2\n',
         'eval $x = (1 + 2) * 3\n',
@@ -35,7 +35,7 @@ class TestArithParse:
 
 
 class TestArithEval:
-    @pytest.mark.parametrize("code,variables,expected", [
+    @case_matrix("code,variables,expected", [
         # 基础运算（int+int→int）
         ("eval $x = 1 + 2", {}, 3),
         ("eval $x = 10 - 3", {}, 7),
@@ -61,7 +61,7 @@ class TestArithEval:
             engine._exec_stmt(stmt)
         assert engine.variables.get("x") == expected
 
-    @pytest.mark.parametrize("variables,expected", [
+    @case_matrix("variables,expected", [
         ({"a": 10, "b": 5}, True),
         ({"a": 5, "b": 10}, False),
     ])
@@ -71,7 +71,7 @@ class TestArithEval:
         prog = parse_text('if $a > $b + 1\n    log "yes"\nend\n')
         assert engine._eval_condition(prog.body[0].condition) is expected
 
-    @pytest.mark.parametrize("variables,expected", [
+    @case_matrix("variables,expected", [
         ({"a": 9, "b": 5}, True),
         ({"a": 8, "b": 5}, False),
     ])
@@ -102,7 +102,7 @@ class TestArithEval:
 
 
 class TestStringConcat:
-    @pytest.mark.parametrize("code,variables,expected", [
+    @case_matrix("code,variables,expected", [
         # 字面量拼接
         ('eval $x = "hello" + " world"', {}, "hello world"),
         # 变量 + 字面量

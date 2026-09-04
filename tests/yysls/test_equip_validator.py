@@ -7,8 +7,6 @@
 
 from types import SimpleNamespace
 
-import pytest
-
 from lvjiang.apps.yysls.core.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.core.equip_validator import (
     CODE_ATTACK_OVERFLOW,
@@ -28,6 +26,7 @@ from lvjiang.apps.yysls.core.equip_validator import (
     validate_equipment,
     validate_equipment_dict,
 )
+from tests.case_matrix import case_matrix
 
 # 110 级上限（game_config.yaml）：超上限用例按真实数值构造，不靠 cap_pct。
 _CAP_110 = {"最大外功攻击": 121.4, "劲": 76.8}
@@ -245,7 +244,7 @@ class TestConfiguredLegality:
         }
         assert validate_equipment_dict(d) == []
 
-    @pytest.mark.parametrize("affix", ["bad", {"name": "劲"}, {"value": 1.0}])
+    @case_matrix("affix", ["bad", {"name": "劲"}, {"value": 1.0}])
     def test_malformed_affix(self, affix):
         d = {"type": "环", "affix_1": affix}
         assert CODE_MALFORMED_AFFIX in [
@@ -253,7 +252,7 @@ class TestConfiguredLegality:
 
 
 class TestIllegalReasonsOf:
-    @pytest.mark.parametrize("extra,expected", [
+    @case_matrix("extra,expected", [
         (None, []),
         ({}, []),
         ({ILLEGAL_KEY: []}, []),

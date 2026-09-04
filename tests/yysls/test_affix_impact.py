@@ -17,6 +17,7 @@ from lvjiang.apps.yysls.core.graduation.affix_impact import (
     analyze_affix_impacts,
     analyze_combined_affix_replacements,
 )
+from tests.case_matrix import case_matrix
 
 
 class _LinearCalculator:
@@ -228,7 +229,7 @@ def _replacement(slot: str, index: int = 2) -> AffixReplacementSuggestion:
     )
 
 
-@pytest.mark.parametrize("slots", [
+@case_matrix("slots", [
     ("main_weapon", "ring"),
     ("main_weapon", "ring", "pendant"),
 ])

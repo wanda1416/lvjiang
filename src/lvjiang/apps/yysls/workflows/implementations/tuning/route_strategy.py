@@ -18,6 +18,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
 
 _NAV_FILE = "subcall/navigation.wf"
 _PAGE_DETECTION_FILE = "subcall/page_detection.wf"
+_EQUIPMENT_SCAN_FILE = "subcall/equipment_scan.wf"
 _RECYCLE_ENTRY_FIELDS = [
     "sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4",
 ]
@@ -32,10 +33,11 @@ class TuningRouteStrategy(ABC):
         self._wf = wf
 
     def load_dependencies(self) -> None:
-        """加载导航与回收失败后的页面状态判断，不加载通用页面动作。"""
+        """加载调律流程依赖的导航、页面判断和装备扫描子过程。"""
         engine = self._require_engine("load_dependencies")
         engine.load_subcalls(_NAV_FILE)
         engine.load_subcalls(_PAGE_DETECTION_FILE)
+        engine.load_subcalls(_EQUIPMENT_SCAN_FILE)
 
     def enter_equip(self) -> bool:
         result = self._call_subcall("nav_main_to_equip")

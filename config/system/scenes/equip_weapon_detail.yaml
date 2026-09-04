@@ -1,6 +1,11 @@
 content_version: 1
 key: equip_weapon_detail
 name: 武器
+views:
+- key: base
+  name: 基底
+- key: cooldown
+  name: 冷却
 regions:
 - key: equip_type
   name: 装备类型
@@ -47,6 +52,42 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
+- key: cooldown_affix_gong
+  name: 冷却词条宫
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: cooldown
+- key: cooldown_affix_shang
+  name: 冷却词条商
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: cooldown
+- key: cooldown_affix_jue
+  name: 冷却词条角
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: cooldown
+- key: cooldown_affix_zhi
+  name: 冷却词条徵
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: cooldown
+- key: cooldown_affix_yu
+  name: 冷却词条羽
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: cooldown
+- key: cooldown_dingyin
+  name: 冷却定音
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: cooldown
 - key: zaoyi
   name: 装备造诣
   type: attr

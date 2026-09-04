@@ -14,6 +14,7 @@
 #   通过 write_equipped 逐槽写入备战方案（无 collect 输出）
 
 import "subcall/navigation.wf"
+import "subcall/equipment_scan.wf"
 
 call $nav_result = nav_main_to_equip()
 if $nav_result < 0
@@ -23,7 +24,7 @@ end
 # 武器类（equip_weapon_detail）
 for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
     click [bag_equip_detail].$slot after wait @step_interval
-    scan [equip_weapon_detail] as $scan_result
+    call $scan_result = scan_equipment_detail("equip_weapon_detail")
     eval $equip = to_equipment($scan_result)
     if not $equip.type
         log error "equip_type OCR 失败, slot=" + $slot
@@ -35,7 +36,7 @@ end
 # 防具类（equip_armor_detail）
 for slot in ["head", "chest", "leg", "wrist"]
     click [bag_equip_detail].$slot after wait @step_interval
-    scan [equip_armor_detail] as $scan_result
+    call $scan_result = scan_equipment_detail("equip_armor_detail")
     eval $equip = to_equipment($scan_result)
     if not $equip.type
         log error "equip_type OCR 失败, slot=" + $slot

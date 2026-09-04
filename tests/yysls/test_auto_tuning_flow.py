@@ -116,6 +116,7 @@ class FakeWF(AutoTuningWorkflow):
         # 显式加载导航 subcall（生产路径在 run() 中加载，测试路径在此加载）
         self.navigator.load_dependencies()
         self.clicks: list[tuple[str, str]] = []
+        self.ocr_calls: list[tuple[str, list[str] | None]] = []
         self.scan_reject_calls: list = []
         self.full_calls: list = []
         self._ocr_map: dict[str, dict] = {}
@@ -148,6 +149,7 @@ class FakeWF(AutoTuningWorkflow):
         self.clicks.append((scene_key, field_key))
 
     def ocr_scene(self, scene_key, field_keys=None, min_confidence=None):
+        self.ocr_calls.append((scene_key, field_keys))
         data = dict(self._ocr_map.get(scene_key, {}))
         # 默认值：标准确认弹窗包含「确认」（除非测试显式覆盖）。
         if scene_key == CONTROL_SCENE and "confirm" not in data:
@@ -313,6 +315,38 @@ def _script_equipment_read(monkeypatch, wf, equip):
     }
     monkeypatch.setattr(
         wf, "call_function", lambda name, args, engine=None: dict(equip))
+
+
+def test_equipment_scan_rescans_shifted_fields_when_gong_contains_cooldown():
+    wf = FakeWF()
+    wf._ocr_map[WEAPON_DETAIL] = {
+        "equip_type": "剑·流星·Lv110·金色",
+        "affix_gong": "冷却期：1小时后可重置",
+        "affix_shang": "错位商",
+        "cooldown_affix_gong": "会意率 5%",
+        "cooldown_affix_shang": "最大外功攻击 90%",
+        "cooldown_affix_jue": "最小外功攻击 86%",
+        "cooldown_affix_zhi": "最大鸣金攻击 97%",
+        "cooldown_affix_yu": "垃圾词条 59%",
+        "cooldown_dingyin": "定音属性",
+    }
+
+    raw = wf._scan_equipment_detail(WEAPON_DETAIL)
+
+    assert raw["affix_gong"] == "会意率 5%"
+    assert raw["affix_shang"] == "最大外功攻击 90%"
+    assert raw["affix_jue"] == "最小外功攻击 86%"
+    assert raw["affix_zhi"] == "最大鸣金攻击 97%"
+    assert raw["affix_yu"] == "垃圾词条 59%"
+    assert raw["dingyin"] == "定音属性"
+    detail_calls = [call for call in wf.ocr_calls if call[0] == WEAPON_DETAIL]
+    assert len(detail_calls) == 2
+    assert "cooldown_affix_gong" not in detail_calls[0][1]
+    assert detail_calls[1][1] == [
+        "cooldown_affix_gong", "cooldown_affix_shang",
+        "cooldown_affix_jue", "cooldown_affix_zhi",
+        "cooldown_affix_yu", "cooldown_dingyin",
+    ]
 
 
 def test_desktop_empty_slot_does_not_press_escape(monkeypatch):

@@ -121,13 +121,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     EQUIP_DETAIL = "equip_detail"  # 装备详情通用交互区域（more_func/sub_func_*）
     CONTROL_SCENE = "general_control"  # 标准确认/取消弹窗
 
-    SCAN_FIELDS = [
-        "equip_type", "equip_level", "base_attr",
-        "affix_gong", "affix_shang", "affix_jue",
-        "affix_zhi", "affix_yu",
-        "status",
-    ]
-
     GRID_SCENE = "bag_equip_detail"
     GRID_PANEL = "bag_grid"
 
@@ -593,6 +586,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     # ─── 部位处理 ──────────────────────────────────────────
 
+    def _scan_equipment_detail(self, detail_scene: str) -> dict:
+        """通过共享 DSL 子过程扫描详情，并修正冷却提示造成的词条下移。"""
+        if self.engine is None:
+            raise RuntimeError("自动调律未注入 WorkflowEngine，无法扫描装备详情")
+        raw = self.engine.call_subcall(
+            "scan_equipment_detail", [detail_scene])
+        return raw if isinstance(raw, dict) else {}
+
     def _read_equipped(self, slot: str) -> dict | None:
         """读取当前槽位已装备的装备信息。
 
@@ -606,9 +607,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """
         detail_scene = (self.WEAPON_DETAIL if slot in self.WEAPON_SLOTS
                         else self.ARMOR_DETAIL)
-        fields = self.SCAN_FIELDS + (["base_attr_2"]
-                                     if detail_scene == self.ARMOR_DETAIL else [])
-        raw = self.ocr_scene(detail_scene, fields)
+        raw = self._scan_equipment_detail(detail_scene)
         equip = self.call_function("to_equipment", [raw]) if raw else {}
         state = self._equipment_read_state(equip)
         if state != "empty":
@@ -707,9 +706,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         默认第 1 列（行指纹/滚动校验链路）；列遍历时传入 col 读非首列。"""
         self._click_grid(row, col)
         self.wait_stable("page_refresh")  # 点击装备 → 详情页加载
-        fields = self.SCAN_FIELDS + (["base_attr_2"]
-                                     if detail_scene == self.ARMOR_DETAIL else [])
-        raw = self.ocr_scene(detail_scene, fields)
+        raw = self._scan_equipment_detail(detail_scene)
         equip = self.call_function("to_equipment", [raw]) if raw else {}
         state = self._equipment_read_state(equip)
         if state != "empty":

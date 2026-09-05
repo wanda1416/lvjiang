@@ -356,9 +356,26 @@ window_ops:
   no_adb_device_msg: 'No USB-connected ADB device found.
 
 
-    Scan LAN and try wireless connection?
+    Pick a subnet to scan the LAN (device needs wireless debugging on),
 
-    (Device must have wireless debugging enabled)'
+    or scan local ports to find an emulator.'
+  label_scan_subnet: 'Scan subnet:'
+  subnet_all: All adapters (default)
+  btn_scan_lan_action: Scan LAN
+  btn_scan_local: Local Scan (Emulator)
+  btn_scan_local_running: Scanning local...
+  status_scanning_local: Scanning local emulators...
+  log_scanning_local: '[Scan] Probing local emulator ADB ports...'
+  log_local_no_device: '[Scan] No open emulator ADB port found on this machine'
+  status_no_local_hint: No device found | Make sure the emulator is running
+  local_no_device_msg: 'No open emulator ADB port found on this machine.
+
+
+    Please ensure:
+
+    1. The emulator is running
+
+    2. ADB debugging is enabled in the emulator'
   btn_scan: Scan
   btn_cancel: Cancel
   btn_scanning: Scanning...
@@ -391,7 +408,9 @@ window_ops:
 
     1. Device and PC are on the same LAN
 
-    2. Wireless debugging is enabled (Developer Options)'
+    2. Wireless debugging is enabled (Developer Options)
+
+    3. With multiple adapters, pick the target subnet or use Local Scan'
   status_scanning_lan: Scanning LAN...
   btn_scan_lan: Scan LAN...
   preview_stopped: Preview stopped

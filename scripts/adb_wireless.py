@@ -27,7 +27,8 @@ from lvjiang.core.android.wireless import (  # noqa: E402
     enable_tcpip,
     get_adb_device_info,
     get_device_ip,
-    get_local_subnet,
+    list_ipv4_interfaces,
+    list_scan_subnets,
     resolve_adb,
     scan_lan_for_adb,
 )
@@ -89,12 +90,14 @@ def main():
         print("未发现 USB 连接的设备，将直接扫描局域网。")
         print()
 
-    # ── 阶段 2：局域网扫描 ──
-    subnet = get_local_subnet()
-    if not subnet:
+    # ── 阶段 2：局域网扫描（逐网卡，避免多网卡只扫到虚拟网段）──
+    for iface in list_ipv4_interfaces():
+        print(f"本机网卡: {iface.label}")
+    subnets = list_scan_subnets()
+    if not subnets:
         print("[警告] 无法获取本机局域网地址，跳过局域网扫描。")
-    else:
-        print(f"本机局域网地址段: {subnet}0/24")
+    for subnet in subnets:
+        print(f"\n扫描地址段: {subnet}0/24")
         open_ips = scan_lan_for_adb(subnet, port)
 
         if open_ips:
@@ -117,8 +120,11 @@ def main():
                 else:
                     print(" 失败（端口开放但非 ADB 服务）")
         else:
-            print(f"\n局域网内未发现端口 {port} 开放的设备。")
-            print("提示：设备需先开启无线调试（USB 连接时运行此脚本，或在开发者选项中启用）。")
+            print(f"  {subnet}0/24 内未发现端口 {port} 开放的设备。")
+
+    if not connected_ips:
+        print("\n提示：设备需先开启无线调试（USB 连接时运行此脚本，或在开发者选项中启用）。")
+        print("      模拟器只监听 127.0.0.1，请在 UI 里用「本地扫描」发现。")
 
     # ── 汇总 ──
     print()

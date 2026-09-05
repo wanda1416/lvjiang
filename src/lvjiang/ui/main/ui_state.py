@@ -155,7 +155,9 @@ class UiStateMixin:
         日常页禁止读写。
         """
         sid = getattr(self, '_displayed_script_id', None)
-        if not sid or not self._param_panel or not self._param_panel.isVisible():
+        # 切到批量 Tab 后参数面板不可见，但里面的控件和值仍然有效；批量启动
+        # 前的兜底同步必须允许从这个隐藏面板收集。脚本 scope 在下方另行校验。
+        if not sid or not self._param_panel:
             return
         # 找到对应配置项，临时用 _collect_flow_params 的逻辑从面板搜集值
         target_cfg = next((c for c in self._workflow_configs if c["id"] == sid), None)
@@ -194,6 +196,14 @@ class UiStateMixin:
         target_cfg["_saved_params"] = params
         from ...core.config.wf_configs import update_wf_config
         update_wf_config(sid, params)
+
+    def _persist_param_change(self, *_args):
+        """参数控件变更后立即写回共享配置。
+
+        日常与批量执行共用 ``wf_configs``。如果只在切换脚本或单独运行时
+        保存，用户改完参数直接启动批量时，批量线程会读到上一次的值。
+        """
+        self._save_displayed_params()
 
     def _save_daily_config(self):
         """保存日常页脚本选择；参数由 _save_displayed_params 按脚本字段级落盘
@@ -282,6 +292,7 @@ class UiStateMixin:
                 spin.setObjectName(name)
                 spin.setRange(param_def.get("min", 0), param_def.get("max", 999999))
                 spin.setValue(int(default) if default is not None else 1)
+                spin.valueChanged.connect(self._persist_param_change)
                 self._param_layout.addRow(label + ":", spin)
             elif param_type == "bool":
                 chk = QCheckBox()
@@ -290,6 +301,7 @@ class UiStateMixin:
                     chk.setChecked(default.lower() in ("true", "1", "yes", "on"))
                 else:
                     chk.setChecked(bool(default))
+                chk.toggled.connect(self._persist_param_change)
                 self._param_layout.addRow(label + ":", chk)
             elif param_type == "checkgroup":
                 # 分组复选框：值为 dict {key: bool}，使用 FlowLayout 自动换行
@@ -312,6 +324,7 @@ class UiStateMixin:
                     chk = QCheckBox(opt_label)
                     chk.setObjectName(opt_key)
                     chk.setChecked(bool(saved_dict.get(opt_key, True)))
+                    chk.toggled.connect(self._persist_param_change)
                     flow.addWidget(chk)
                 # 标签独占一行；选项从下一行起使用表单的完整宽度。
                 self._param_layout.addRow(QLabel(label + ":"))
@@ -329,5 +342,6 @@ class UiStateMixin:
                         idx = combo.findData(str(default))
                         if idx >= 0:
                             combo.setCurrentIndex(idx)
+                combo.currentIndexChanged.connect(self._persist_param_change)
                 self._param_layout.addRow(label + ":", combo)
         self._param_panel.setVisible(True)

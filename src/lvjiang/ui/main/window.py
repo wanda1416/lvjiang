@@ -873,6 +873,10 @@ class MainWindow(
 
         enabled_rows: list[tuple[int, dict]] - [(index, row_data), ...]
         """
+        # 批量线程从 wf_configs 读取参数。正常情况下参数控件的 change 信号
+        # 已实时落盘；这里再同步一次，覆盖尚未提交编辑值等入口边界情况。
+        self._save_displayed_params()
+
         if not self._backend_ready():
             if self._backend == "adb":
                 self._log_append(tr("[错误] 请先连接设备"))

@@ -14,6 +14,11 @@
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 
+# 本流程的账号切换按 desktop / android 两套分支写死，没有第三种兜底：
+# 环境取到别的值（含 UI 未选中时的空串）会让两个分支同时落空，
+# 表现为「切号步骤静默不执行」。故在入口直接卡死，不让它跑到后面才出怪事。
+eval check_env(["android", "desktop"])
+
 # 上一条成功进入主页后，先回到角色/账号入口。
 if $batch_state.page_state == 2
     call exit_to_login()
@@ -90,7 +95,7 @@ def switch_account($tail, $role_index, $account, $role, $batch_state)
     else if env("android")
         # 安卓端直接可以选择用户完成账号切换
         click [game_login_page].[switch_user] after wait @page_refresh
-    end 
+    end
 
     click [game_login_page].[tap_user] after wait @page_refresh
 
@@ -133,10 +138,17 @@ end
 def select_role($role_index, $role, $batch_state)
     log "当前下标" + $role_index
 
-    # 可能当前角色已登录，那就不需要再选角色了
-    scan [game_login_page].[current_role] as $found by contains "江鸢倾"
+    # 登录页停留的就是目标角色时，直接点它进游戏，省掉一次角色列表往返。
+    # 判据必须用 $role：写死角色名会让「同账号多角色」的下一条误认已就位，
+    # 静默进错角色还把 batch_state.role 记成目标角色。
+    scan [game_login_page].[current_role] as $found by contains $role
     if $found
-        click [game_login_page].[current_role]
+        click [game_login_page].[current_role] after wait @page_refresh
+        # 这条路径同样会弹「其他角色在线」二次确认，与走角色列表时同一套处理
+        call $online = handle_role_online($batch_state)
+        if $online
+            return {"status": "skipped", "message": "角色在线", "state": $batch_state}
+        end
         goto role_ready
     end
 
@@ -151,12 +163,8 @@ def select_role($role_index, $role, $batch_state)
 
         # 角色在线时会弹二次确认（confirm 区域含「其他角色」），
         # 这种情况下不可能进入角色列表，取消并跳过该条目。
-        scan [game_login_page].[confirm] as $online by contains "其他角色"
+        call $online = handle_role_online($batch_state)
         if $online
-            log "角色在线，不可登录，跳过"
-            click [game_login_page].[cancel] after wait @page_refresh
-            eval $batch_state.page_state = 1
-            eval $batch_state.role = ""
             return {"status": "skipped", "message": "角色在线", "state": $batch_state}
         end
 
@@ -182,6 +190,25 @@ def select_role($role_index, $role, $batch_state)
     eval $batch_state.role = $role
     wait @step_interval
     return {"status": "success", "message": "", "state": $batch_state}
+end
+
+
+# ─── 角色在线二次确认 ──────────────────────────────────────
+# 点「切换角色」和点「当前角色」两条路径都会撞上这个弹窗，故抽成公共过程。
+# 命中时负责取消弹窗并把 batch_state 复位回登录页状态，返回 1；
+# 调用方据此决定是否以 skipped 收尾（return 的字面量留在调用方，
+# 因为两处的 status/message 语义由调用方的上下文决定）。
+
+def handle_role_online($batch_state)
+    scan [game_login_page].[confirm] as $online by contains "其他角色"
+    if $online
+        log "角色在线，不可登录，跳过"
+        click [game_login_page].[cancel] after wait @page_refresh
+        eval $batch_state.page_state = 1
+        eval $batch_state.role = ""
+        return 1
+    end
+    return 0
 end
 
 

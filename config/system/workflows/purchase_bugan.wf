@@ -60,6 +60,7 @@ end
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
+import "subcall/game_profile.wf"
 
 # ─── 导航：从首页到不肝商店视图 ─────────────────────────
 call $nav_result = nav_main_to_menu()

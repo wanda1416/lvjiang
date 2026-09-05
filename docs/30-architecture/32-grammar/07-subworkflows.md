@@ -74,14 +74,20 @@ end
 ## 四、call — 执行调用
 
 ```
-call process_slot(1, 1)           # 传两个参数
-call nav_main_to_equip()          # 无参数
-call find_tune_material($target)  # 传变量值
+call process_slot(1, 1)                    # 传两个参数
+call nav_main_to_equip()                   # 无参数
+call find_tune_material($target)           # 传变量值
+call apply(["a", "b"], {"k": $v})          # 传列表 / 字典字面量
+call toggle(true, null)                    # 传布尔 / null
+call click_area((0.1, 0.2, 0.3, 0.4))      # 传矩形 / 区间元组
 ```
 
 - 调用已定义的过程（本地 def 或 import 引入的 def）
-- 参数支持字面量（字符串、数字）和变量引用
 - 参数按位置绑定到 def 的形参
+- 参数接受与 `eval` 内置函数实参**完全相同**的一套写法：字符串、数字、
+  `true` / `false` / `null`、列表 `[...]`、字典 `{...}`（可嵌套）、
+  `(x, y)` / `(x, y, w, h)` 元组、变量 `$v`、字段访问 `$d.k`。
+  列表/字典内的元素同样可以是变量，在调用方作用域求值后再注入形参
 
 ### 变量隔离
 

@@ -118,6 +118,30 @@ class _ModuleControlMixin:
         """字段访问参数 → FieldAccess"""
         return items[0]
 
+    def call_arg_null(self, items):
+        """null 参数 → Literal(None)"""
+        return Literal(value=None)
+
+    def call_arg_true(self, items):
+        """true 参数 → Literal(True)"""
+        return Literal(value=True)
+
+    def call_arg_false(self, items):
+        """false 参数 → Literal(False)"""
+        return Literal(value=False)
+
+    def call_arg_tuple(self, items):
+        """(x, y) / (x, y, w, h) 参数 → TupleLiteral"""
+        return items[0]  # rect_literal / range_literal 已返回 TupleLiteral
+
+    def call_arg_list_lit(self, items):
+        """[...] 参数 → list[AST节点]（引擎 _resolve 递归求值）"""
+        return items[0]  # list_literal 已返回 list
+
+    def call_arg_dict_lit(self, items):
+        """{...} 参数 → dict[str, AST节点]（引擎 _resolve 递归求值）"""
+        return items[0]  # dict_literal 已返回 dict
+
     # ─── 控制流 ───────────────────────────────────────────
 
     @staticmethod

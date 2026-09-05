@@ -450,6 +450,26 @@ class _ExprMixin:
         """(x, y) / (x, y, w, h) 作为函数参数 → TupleLiteral（引擎求值为 tuple / RectCoordRef）"""
         return items[0]  # rect_literal / range_literal 已返回 TupleLiteral
 
+    def arg_null(self, items):
+        """null 作为函数参数 → Literal(None)"""
+        return Literal(value=None)
+
+    def arg_true(self, items):
+        """true 作为函数参数 → Literal(True)"""
+        return Literal(value=True)
+
+    def arg_false(self, items):
+        """false 作为函数参数 → Literal(False)"""
+        return Literal(value=False)
+
+    def arg_list_lit(self, items):
+        """[...] 作为函数参数 → list[AST节点]（引擎 _resolve 递归求值）"""
+        return items[0]  # list_literal 已返回 list
+
+    def arg_dict_lit(self, items):
+        """{...} 作为函数参数 → dict[str, AST节点]（引擎 _resolve 递归求值）"""
+        return items[0]  # dict_literal 已返回 dict
+
     # ─── 条件表达式 ───────────────────────────────────────
 
     def cond_passthrough(self, items):
@@ -640,8 +660,15 @@ class _ExprMixin:
         return result
 
     def list_literal(self, items):
-        """[item1, item2, ...] → list[Literal | VarRef]"""
-        return [item for item in items if item is not self._MISSING]
+        """[item1, item2, ...] → list[Literal | VarRef]
+
+        空列表 ``[]`` 时 lark 会为可选的 list_item 组填一个占位 ``None``，
+        必须一并滤掉——否则 ``[]`` 求值成 ``[None]``（长度 1 的真值列表），
+        「空列表」判空、for 迭代、传参全部走偏。null 列表项本身是
+        ``Literal(value=None)``，不会被这条误伤。
+        """
+        return [item for item in items
+                if item is not self._MISSING and item is not None]
 
     def list_item_str(self, items):
         """字符串列表项 → Literal"""

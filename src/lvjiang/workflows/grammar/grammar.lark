@@ -320,12 +320,20 @@ func_call: NAME "(" arg_list? ")"
 
 arg_list: arg ("," arg)*
 
+// 内置函数实参。与下面的 call_arg（过程实参）刻意保持同一套分支：
+// 两处曾经各写各的，导致 check_env(["android"]) 这种「文档里就这么写」的调用
+// 在实参位解析不过，只能先 eval 到变量再传，属于纯粹的语法能力漂移。
 ?arg: STRING -> arg_lit
     | number -> arg_num
+    | "null"i -> arg_null
+    | "true"i -> arg_true
+    | "false"i -> arg_false
     | field_access -> arg_field
     | var_ref -> arg_var
     | rect_literal -> arg_tuple
     | range_literal -> arg_tuple
+    | list_literal -> arg_list_lit
+    | dict_literal -> arg_dict_lit
 
 // ─── 模块化：import / def / call proc ─────────────────────
 
@@ -343,10 +351,18 @@ call_proc_stmt: "call"i NAME "(" [call_arg_list] ")" [call_output_clause] _NL
               | "call"i "$" NAME "=" NAME "(" [call_arg_list] ")" [call_output_clause] _NL  -> call_proc_assign_stmt
 call_output_clause: "as"i "$" NAME  -> call_output_as
 call_arg_list: call_arg ("," call_arg)*
+// 过程实参，分支与内置函数的 arg 一一对应（见 arg 处注释）
 ?call_arg: STRING -> call_arg_str
          | number -> call_arg_num
+         | "null"i -> call_arg_null
+         | "true"i -> call_arg_true
+         | "false"i -> call_arg_false
          | field_access -> call_arg_field
          | var_ref -> call_arg_var
+         | rect_literal -> call_arg_tuple
+         | range_literal -> call_arg_tuple
+         | list_literal -> call_arg_list_lit
+         | dict_literal -> call_arg_dict_lit
 
 // ─── 控制流 ───────────────────────────────────────────────
 

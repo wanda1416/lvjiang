@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QSpinBox,
+    QStackedWidget,
     QTableWidget,
     QVBoxLayout,
     QWidget,
@@ -81,12 +82,15 @@ def _rule_to_raw(cfg: LevelConfig) -> dict:
 
 
 class StoneRuleDialog(QDialog):
-    """编辑 gold/purple 的 1-5 词条消耗与累计返还。"""
+    """以宫商角徵羽五行编辑 gold/purple 消耗与累计返还。"""
+
+    _TUNE_NAMES = ("宫", "商", "角", "徵", "羽")
+    _FIELDS = ("tune_cost", "reset_refund", "recycle_refund")
 
     def __init__(self, raw: dict, reset_no_refund: bool, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("律准石规则"))
-        self.resize(680, 440)
+        self.resize(900, 360)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(tr(
             "数值以大律准石计，小律准石按 0.1；"
@@ -101,23 +105,28 @@ class StoneRuleDialog(QDialog):
             quality_row.addWidget(cb)
         quality_row.addStretch()
         layout.addLayout(quality_row)
-        self._table = QTableWidget(10, 5)
+        self._table = QTableWidget(5, 7)
         self._table.setHorizontalHeaderLabels([
-            tr("品阶"), tr("当前/目标词条"), tr("调律消耗"),
-            tr("重置累计返还"), tr("回收累计返还")])
+            tr("音律"),
+            tr("金装区\n调律消耗"), tr("金装区\n重置累计返还"),
+            tr("金装区\n回收累计返还"),
+            tr("紫装区\n调律消耗"), tr("紫装区\n重置累计返还"),
+            tr("紫装区\n回收累计返还")])
         header = self._table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._spins: dict[tuple[str, int, str], QDoubleSpinBox] = {}
-        for q_index, (quality, label) in enumerate(
-                (("gold", tr("金")), ("purple", tr("紫")))):
+        self._cell_stacks: dict[tuple[str, int, str], QStackedWidget] = {}
+        for row, tune_name in enumerate(self._TUNE_NAMES):
+            tune_label = QLabel(tr(tune_name))
+            tune_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._table.setCellWidget(row, 0, tune_label)
+        for q_index, quality in enumerate(("gold", "purple")):
             item = raw.get(quality) or {}
             for affix_count in range(1, 6):
-                row = q_index * 5 + affix_count - 1
-                self._table.setCellWidget(row, 0, QLabel(label))
-                self._table.setCellWidget(row, 1, QLabel(str(affix_count)))
-                for col, key in ((2, "tune_cost"), (3, "reset_refund"),
-                                 (4, "recycle_refund")):
+                row = affix_count - 1
+                for field_index, key in enumerate(self._FIELDS):
+                    col = 1 + q_index * 3 + field_index
                     spin = QDoubleSpinBox()
                     spin.setRange(0, 99999)
                     spin.setDecimals(1)
@@ -125,14 +134,29 @@ class StoneRuleDialog(QDialog):
                     spin.setValue(float((item.get(key) or {}).get(
                         affix_count, (item.get(key) or {}).get(
                             str(affix_count), 0))))
-                    if (affix_count == 1 and key in ("tune_cost", "reset_refund")):
+                    fixed_zero = (
+                        affix_count == 1
+                        and key in ("tune_cost", "reset_refund")
+                    ) or (reset_no_refund and key == "reset_refund")
+                    if fixed_zero:
                         spin.setValue(0)
-                        spin.setEnabled(False)
-                    if reset_no_refund and key == "reset_refund":
-                        spin.setValue(0)
-                        spin.setEnabled(False)
                     self._spins[(quality, affix_count, key)] = spin
-                    self._table.setCellWidget(row, col, spin)
+                    stack = QStackedWidget()
+                    stack.addWidget(spin)
+                    disabled = QWidget()
+                    disabled.setStyleSheet(
+                        "background-color: palette(midlight);")
+                    disabled.setToolTip(tr("该项固定为 0，无需配置"))
+                    stack.addWidget(disabled)
+                    stack.setCurrentIndex(1 if fixed_zero else 0)
+                    stack.setProperty("fixed_zero", fixed_zero)
+                    self._cell_stacks[(quality, affix_count, key)] = stack
+                    self._table.setCellWidget(row, col, stack)
+        for quality, checkbox in self._enabled.items():
+            checkbox.toggled.connect(
+                lambda checked, q=quality: self._set_quality_enabled(
+                    q, checked))
+            self._set_quality_enabled(quality, checkbox.isChecked())
         layout.addWidget(self._table)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
@@ -141,13 +165,21 @@ class StoneRuleDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+    def _set_quality_enabled(self, quality: str, enabled: bool) -> None:
+        """未启用的品阶整区置灰且不显示数字。"""
+        for affix_count in range(1, 6):
+            for key in self._FIELDS:
+                stack = self._cell_stacks[(quality, affix_count, key)]
+                fixed_zero = bool(stack.property("fixed_zero"))
+                stack.setCurrentIndex(0 if enabled and not fixed_zero else 1)
+
     def result_raw(self) -> dict:
         result: dict[str, dict[str, dict[int, float]]] = {}
         for quality, enabled in self._enabled.items():
             if not enabled.isChecked():
                 continue
-            item: dict[str, dict[int, float]] = {key: {} for key in (
-                "tune_cost", "reset_refund", "recycle_refund")}
+            item: dict[str, dict[int, float]] = {
+                key: {} for key in self._FIELDS}
             for affix_count in range(1, 6):
                 for key in item:
                     item[key][affix_count] = round(

@@ -74,7 +74,7 @@ else
         if $is_post
             scroll [role_detail].[detail_1] down 2 interval 0.1
         else
-            drag [role_detail].[detail_1] up 0.5 
+            drag [role_detail].[detail_1] up 0.5
         end
         eval $i = $i + 1
 

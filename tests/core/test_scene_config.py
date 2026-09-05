@@ -190,3 +190,54 @@ def test_dev_save_converts_v1_file_to_v2(tmp_path):
 def test_future_schema_is_rejected():
     with pytest.raises(ValueError, match="当前只支持到 2"):
         normalize_scene_doc({"schema_version": 3, "scenes": {}})
+
+
+def test_create_scene_survives_synchronous_registry_reload(tmp_path):
+    """新场景文件通知先于 manifest 保存时，不得产生临时分组的重复归属。"""
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    _write(system / "scenes.yaml", {
+        "schema_version": 2,
+        "scenes": {
+            "general": {"name": "通用", "items": []},
+            "target": {"name": "目标分组", "items": []},
+        },
+    })
+    resolver = ConfigResolver(
+        system_dir=system, local_dir=local, dev_mode=True)
+    manifest = load_scene_manifest(resolver)
+    registry = SceneRegistry(
+        resolver=resolver,
+        scene_order=manifest.order,
+        group_config=manifest.groups,
+        group_names=manifest.group_names,
+        disabled_scenes=manifest.disabled,
+    )
+
+    def reload_in_place(rel_path: str) -> None:
+        if not rel_path.startswith("scenes/"):
+            return
+        current = load_scene_manifest(resolver)
+        refreshed = SceneRegistry(
+            resolver=resolver,
+            scene_order=current.order,
+            group_config=current.groups,
+            group_names=current.group_names,
+            disabled_scenes=current.disabled,
+        )
+        registry.__dict__.clear()
+        registry.__dict__.update(refreshed.__dict__)
+
+    resolver.add_change_listener(reload_in_place)
+    registry.create_scene("new_scene", "新场景", group_key="target")
+
+    assert registry.all_scene_keys().count("new_scene") == 1
+    assert registry.get_group_scenes("general") == []
+    assert registry.get_group_scenes("target") == ["new_scene"]
+
+    registry.save_group_config()
+    saved = load_scene_manifest(resolver)
+    assert saved.groups == {
+        "general": [],
+        "target": ["new_scene"],
+    }

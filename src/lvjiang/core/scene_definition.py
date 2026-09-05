@@ -432,8 +432,19 @@ class SceneRegistry:
             raise ValueError(f"场景 key 已存在: {key}")
         scene = SceneDef(key=key, name=name)
         self._save_scene_yaml(scene)
+
+        # write_entity 会同步通知 scene_registry 热重载。新文件此时尚未写入
+        # scenes.yaml，重载会把这个“未分组场景”临时归入第一个分组，并把
+        # 当前 SceneRegistry 原位替换。后续若直接 append，场景就会同时出现
+        # 在第一个分组和用户选择的目标分组，最终把非法重复项写回配置。
+        #
+        # 因此这里不能假设 _save_scene_yaml 前后的内存状态相同：先清掉热重载
+        # 产生的临时注册，再按本次创建操作的唯一目标重建归属与顺序。
         self._scenes[key] = scene
+        self._order = [existing for existing in self._order if existing != key]
         self._order.append(key)
+        for scenes in self._group_scenes.values():
+            scenes[:] = [existing for existing in scenes if existing != key]
         # 添加到指定分组（或第一个分组）
         target_group = group_key if group_key and group_key in self._groups else (self._group_order[0] if self._group_order else None)
         if target_group:

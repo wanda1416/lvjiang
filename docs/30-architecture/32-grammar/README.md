@@ -195,6 +195,8 @@ press "KEY"                             # 完整按键（down + up）
 press "KEY" hold <秒数>                 # 按住指定时长
 press "KEY" down                        # 按下保持
 press "KEY" up                          # 释放
+paste "ABC123"                         # PC 剪贴板 + Ctrl+V 文本输入
+paste $redeem_code                      # 粘贴运行时变量
 ```
 
 | 模式 | 语义 | 状态变化 |

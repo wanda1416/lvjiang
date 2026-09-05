@@ -56,17 +56,15 @@ def exit_to_login()
     end
 
     # 2. 菜单 → 退出（两端行为一致）
-    click [game_menu_page].[exit]
-    wait @page_refresh
+    click [game_menu_page].[exit] after wait @page_refresh
 
     # 3. 二次确认：检查退出弹窗中是否有「返回登录页面」按钮
     scan [game_login_page].[back_to_login] as $result by contains "返回登录"
     if $result
-        click [game_login_page].[back_to_login]
+        click [game_login_page].[back_to_login] after wait @secondary_confirm
     else
         eval pause("未找到「返回登录界面」按钮，请手动退出到登录页后点击继续")
     end
-    wait @secondary_confirm
 end
 
 
@@ -79,17 +77,22 @@ def switch_account($tail, $role_index, $account, $role, $batch_state)
     log "当前下标" + $role_index
 
     # 1. 登录页 → 用户切换视图
-    click [game_login_page].[more_user]
-    wait @page_refresh
+    click [game_login_page].[more_user] after wait @page_refresh
+    click [game_login_page].[user_icon] after wait @page_refresh
 
-    click [game_login_page].[users_icon]
-    wait @page_refresh
+    if env("desktop")
+        # PC 端需要登出 后再点击触发 选择账号 登录
+        scan [game_login_page].[switch_user] as $found by contains "登出"
+        if $found
+            click [game_login_page].[switch_user] after wait @page_refresh
+            click [game_login_page].[user_icon] after wait @page_refresh
+        end
+    else if env("android")
+        # 安卓端直接可以选择用户完成账号切换
+        click [game_login_page].[switch_user] after wait @page_refresh
+    end 
 
-    click [game_login_page].[switch_user]
-    wait @page_refresh
-
-    click [game_login_page].[tap_user]
-    wait @page_refresh
+    click [game_login_page].[tap_user] after wait @page_refresh
 
     # 2. 查找目标账号（最多滚动 5 次）
     eval $found_user = ""
@@ -99,7 +102,8 @@ def switch_account($tail, $role_index, $account, $role, $batch_state)
             click $found_user
             goto account_selected
         end
-        drag [game_login_page].[point_2] [game_login_page].[point_1]
+        env:"android" -> drag [game_login_page].[point_2] [game_login_page].[point_1]
+        env:"desktop" -> scroll [game_login_page].[user_list] down 3
         wait @page_refresh
     end
 
@@ -112,8 +116,7 @@ def switch_account($tail, $role_index, $account, $role, $batch_state)
     # 3. 登录 → 回到登录页角色入口
     # 登录要走一次网络鉴权，这里只按标准节奏等一拍，不假设已经就位；
     # 真正的就位判定交给 select_role 的重试校验。
-    click [game_login_page].[login]
-    wait @page_refresh
+    click [game_login_page].[login] after wait @page_refresh
 
     # 已确认目标账号，保留账号状态
     # 下一条同账号任务可以跳过账号切换，直接选角色
@@ -129,6 +132,13 @@ end
 
 def select_role($role_index, $role, $batch_state)
     log "当前下标" + $role_index
+
+    # 可能当前角色已登录，那就不需要再选角色了
+    scan [game_login_page].[current_role] as $found by contains "江鸢倾"
+    if $found
+        click [game_login_page].[current_role]
+        goto role_ready
+    end
 
     # 打开角色选择页。不假设点一次就进去了：登录鉴权、页面加载都可能还没完，
     # 此时盲点下去两次空点都不报错（panel 坐标算不出时是静默 return），
@@ -159,15 +169,12 @@ def select_role($role_index, $role, $batch_state)
     eval pause("无法进入选择角色页面，请手动进入后点击继续")
 
     @role_page_ready
-
     # 选角色（role_list: 1列4行，role_index 1-4 → panel 行 1-4）
-    click [game_login_page].[role_list][$role_index][1]
-    wait @page_refresh
-
+    click [game_login_page].[role_list][$role_index][1] after wait @page_refresh
     # 进入游戏
-    click [game_login_page].[enter]
-    wait 5
+    click [game_login_page].[enter] after wait @secondary_confirm
 
+    @role_ready
     # 等待加载完成并进入主页
     call login_to_main_page()
 
@@ -213,12 +220,11 @@ def login_to_main_page()
         if $zllj
             log "检测到战令领奖入口，先领奖"
             call claim_zhanling_reward()
-            wait 2
         else
             # 没有战令领奖，尝试关闭活动弹窗
             click [game_login_page].[close_btn]
-            wait 2
         end
+        wait @page_refresh
     end
     eval pause("无法确认已登录至主页，请手动检查后点击确定")
 end

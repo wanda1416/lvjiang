@@ -28,7 +28,7 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-- key: users_icon
+- key: user_icon
   name: 用户icon
   type: func
   is_text: false

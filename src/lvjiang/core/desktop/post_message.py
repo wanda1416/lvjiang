@@ -212,3 +212,8 @@ class PostMessageInput(InputBackend):
         flags = KEYEVENTF_KEYUP | (KEYEVENTF_EXTENDEDKEY if is_extended_key(k) else 0)
         logger.debug(f"[PostMessage] key_up: {k} (vk=0x{vk:02X}, scan={scan})")
         post_keyboard_input(self.target_hwnd, vk, scan, flags)
+
+    def paste_text(self, text: str) -> None:
+        """通过系统剪贴板和后台 Ctrl+V 消息粘贴文本。"""
+        from .clipboard import paste_via_clipboard
+        paste_via_clipboard(text, self.key_down, self.key_up)

@@ -17,6 +17,7 @@ start: (_NL | statement)*
           | scroll_stmt
           | drag_stmt
           | press_stmt
+          | paste_stmt
           | wait_stable_stmt
           | wait_stmt
           | scan_stmt
@@ -61,6 +62,11 @@ press_key_chain: press_key ("+" press_key)*
 press_modifier: "hold"i number -> press_hold
               | "down"i        -> press_down
               | "up"i          -> press_up
+
+// paste：通过输入后端粘贴字符串；支持常量、变量、字段、函数和 + 表达式
+// paste "ABC123"
+// paste $redeem_code
+paste_stmt: "paste"i arith_expr wait_clauses? _NL
 
 // align：触发 panel 区域截图 + 图像自对齐，缓存格子坐标
 // 语法：align [scene].[panel]
@@ -378,6 +384,7 @@ env_guard_stmt: "env"i ":" STRING "->" env_guard_action
                  | scroll_stmt
                  | drag_stmt
                  | press_stmt
+                 | paste_stmt
                  | wait_stable_stmt
                  | wait_stmt
                  | scan_stmt

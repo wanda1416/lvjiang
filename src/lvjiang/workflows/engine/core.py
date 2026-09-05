@@ -48,6 +48,7 @@ from ..grammar.ast_nodes import (
     Loop,
     MouseButton,
     Move,
+    Paste,
     Place,
     Press,
     ProcDef,
@@ -950,6 +951,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_drag(node)
             case Press():
                 self._exec_press(node)
+            case Paste():
+                self._exec_paste(node)
             case Wait():
                 self._exec_wait(node)
             case WaitStable():

@@ -398,10 +398,15 @@ class _RecognitionMixin:
                 logger.warning(f"场景 {scene_key} 没有定义可用区域")
                 return ""
 
+        # 未命中时要能回答「那到底读到了什么」。只记 key 列表的话，
+        # 「框标歪了读到别的字」「OCR 把两个字拆成两个框、被 ' | ' 隔开导致
+        # contains 落空」「整个框读了个空」这三种成因在日志里长得一模一样。
+        seen: list[str] = []
         for region in ordered_regions:
             crop = self._crop_region(img, region, canvas)
             if crop is None:
                 logger.debug(f"by OCR: region {region.key} 裁剪为空，跳过")
+                seen.append(f"{region.key}=<裁剪为空>")
                 continue
             ocr_results = self._ocr.recognize(crop)
             if min_confidence is not None:
@@ -410,8 +415,11 @@ class _RecognitionMixin:
             if self._match_text(text, target_value, mode):
                 logger.debug(f"by OCR 命中: [{scene_key}].[{region.key}] text={text!r} mode={mode}")
                 return region.key
+            seen.append(f"{region.key}={text!r}")
 
-        logger.debug(f"by OCR 未命中: [{scene_key}]:{field_keys} mode={mode}")
+        logger.debug(
+            f"by OCR 未命中: [{scene_key}] mode={mode} target={target_value!r} "
+            f"实际读到: {'; '.join(seen) if seen else '<无区域>'}")
         return ""
 
     def recognize_references_by(

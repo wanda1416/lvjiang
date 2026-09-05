@@ -31,7 +31,9 @@ from .models import (
     TuningStoneRule,
 )
 from .play_styles import (
+    FULL_GRADUATION,
     delete_play_style,
+    get_base_attr_profiles,
     get_play_styles,
     rename_play_style,
     save_play_style,
@@ -62,6 +64,8 @@ __all__ = [
     "save_derivation",
     "delete_derivation",
     # 基础属性配置存储（保留 play_style API 名称以兼容已有数据）
+    "FULL_GRADUATION",
+    "get_base_attr_profiles",
     "get_play_styles",
     "save_play_style",
     "delete_play_style",

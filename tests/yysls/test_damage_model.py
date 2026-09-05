@@ -128,6 +128,20 @@ def test_the_shipped_model_matches_its_graduation_scheme() -> None:
         assert manager.mismatched(school) == "", school
 
 
+def test_every_school_with_a_graduation_scheme_has_a_damage_model() -> None:
+    """方案有而系数表没有的流派，伤害建模页会是空的却不报错——加流派时
+    容易漏，让测试盯着。"""
+    from lvjiang.apps.yysls.core.damage import get_damage_model_manager
+
+    root = Path(__file__).resolve().parents[2]
+    schemes = {
+        path.stem.rsplit("_", 1)[0]
+        for path in (root / "config/system/yysls/graduation").glob("*.json")
+    }
+
+    assert schemes and schemes <= set(get_damage_model_manager().schools())
+
+
 def test_the_three_sword_qi_coefficients_come_straight_from_the_workbook() -> None:
     """三道剑气是同一招的 1 : 1.2 : 1.4，`三剑气` 恰好是三者之和——
     整条管线对倍率是线性的，这条关系错了说明抽取抽歪了。"""

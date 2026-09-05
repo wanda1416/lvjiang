@@ -131,3 +131,61 @@ class TestRoundTrip:
 
         node = _session(session_env)["yysls"]
         assert "play_styles" in node and "graduations" in node
+
+
+class TestFullGraduationProfile:
+    """内置的「满级属性」取自毕业率方案，不落盘。"""
+
+    def test_it_is_offered_alongside_saved_profiles(self, session_env):
+        from lvjiang.apps.yysls.config.play_styles import (
+            FULL_GRADUATION,
+            get_base_attr_profiles,
+            save_play_style,
+        )
+
+        save_play_style("破竹·樽", "我的配置", {"min_outer": 1})
+        profiles = get_base_attr_profiles("破竹·樽")
+
+        assert list(profiles)[0] == FULL_GRADUATION
+        assert "我的配置" in profiles
+
+    def test_it_never_reaches_storage(self, session_env):
+        """混进存储就会被「读出来改一个字段再存回去」落盘，从此不跟方案走。"""
+        from lvjiang.apps.yysls.config.play_styles import (
+            FULL_GRADUATION,
+            get_play_styles,
+        )
+
+        assert FULL_GRADUATION not in get_play_styles("破竹·樽")
+
+    def test_its_values_are_the_excel_100_percent_baseline(self, session_env):
+        from lvjiang.apps.yysls.config.play_styles import (
+            FULL_GRADUATION,
+            get_base_attr_profiles,
+        )
+        from lvjiang.apps.yysls.core.graduation import (
+            get_graduation_scheme_combat_attrs,
+        )
+
+        profile = get_base_attr_profiles("鸣金·虹")[FULL_GRADUATION]
+        baseline = get_graduation_scheme_combat_attrs("鸣金·虹", "基础方案")
+
+        assert profile["min_outer"] == baseline.min_outer
+        assert profile["max_outer"] == baseline.max_outer
+
+    def test_the_builtin_name_cannot_be_saved_over_or_deleted(self, session_env):
+        import pytest
+
+        from lvjiang.apps.yysls.config.play_styles import (
+            FULL_GRADUATION,
+            delete_play_style,
+            rename_play_style,
+            save_play_style,
+        )
+
+        with pytest.raises(ValueError):
+            save_play_style("破竹·樽", FULL_GRADUATION, {"min_outer": 1})
+        with pytest.raises(ValueError):
+            delete_play_style("破竹·樽", FULL_GRADUATION)
+        with pytest.raises(ValueError):
+            rename_play_style("破竹·樽", "我的配置", FULL_GRADUATION)

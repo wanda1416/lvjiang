@@ -46,10 +46,10 @@ from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 from ...config import (
+    get_base_attr_profiles,
     get_derivation,
     get_game_config,
     get_loadout,
-    get_play_styles,
     save_derivation,
     save_loadout,
     save_play_style,
@@ -260,7 +260,7 @@ class AttrDerivePanel(QWidget):
         self._combo_reference.blockSignals(True)
         self._combo_reference.clear()
         self._combo_reference.addItem(tr("（不对照）"), "")
-        for name in get_play_styles(self._school()):
+        for name in get_base_attr_profiles(self._school()):
             self._combo_reference.addItem(name, name)
         self._combo_reference.blockSignals(False)
 
@@ -335,7 +335,7 @@ class AttrDerivePanel(QWidget):
         name = self._combo_reference.currentData()
         if not name:
             return None
-        stored = get_play_styles(self._school()).get(name) or {}
+        stored = get_base_attr_profiles(self._school()).get(name) or {}
         known = set(CombatAttributes.__dataclass_fields__)
         reference = CombatAttributes()
         for key, value in stored.items():

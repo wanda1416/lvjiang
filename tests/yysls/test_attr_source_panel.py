@@ -376,6 +376,16 @@ def test_every_combat_attribute_is_listed_even_when_it_is_zero(derive) -> None:
         display for _n, display, _u, _ in COMBAT_ATTR_FIELDS]
 
 
+def test_the_full_graduation_profile_is_offered_as_a_reference(derive) -> None:
+    """满级属性是 Excel 的 100% 毕业基准，拿它作对照就能看出模型还差多少。"""
+    from lvjiang.apps.yysls.config import FULL_GRADUATION
+
+    dialog, _ = derive
+    dialog._refresh_reference()
+
+    assert dialog._combo_reference.findData(FULL_GRADUATION) >= 0
+
+
 def test_no_reference_means_no_residual(derive) -> None:
     """没有对照就没有缺口可算，不能凭空补。"""
     dialog, _ = derive

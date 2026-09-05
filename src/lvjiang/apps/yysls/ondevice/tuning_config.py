@@ -195,7 +195,7 @@ def save_tuning_config(payload: str) -> str:
         raw_switches = raw_switches if isinstance(raw_switches, dict) else {}
         switches = {str(k): bool(v) for k, v in raw_switches.items()}
 
-        # skip_tuning 不进设备端 UI，保留统一存储原值（缺省 False）
+        # 桌面端调试/后台参数不进设备端 UI，update_wf_config 合并时保留原值
         old = get_wf_config("auto_tuning")
 
         # 基础规则组：按注册表校验，非法/缺省回退原值

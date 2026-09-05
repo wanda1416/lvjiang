@@ -49,6 +49,8 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     DEFAULT_TRAVERSAL,
     TRAVERSALS,
+    BagScrollStrategy,
+    create_bag_scroll_strategy,
 )
 from lvjiang.apps.yysls.workflows.implementations.tuning import (
     BehaviorAction,
@@ -149,6 +151,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     _equipment_session: EquipmentSession | None = None
     _history_session = None
     _history_markdown_path: str = ""
+    _bag_scroll_strategy: BagScrollStrategy | None = None
 
     @property
     def run_state(self) -> TuningRunState:
@@ -168,6 +171,22 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if self._route_strategy is None:
             self._route_strategy = create_tuning_route_strategy(self)
         return self._route_strategy
+
+    @property
+    def bag_scroll_strategy(self) -> BagScrollStrategy:
+        """本次运行固定使用的背包滚动手段。"""
+        if self._bag_scroll_strategy is None:
+            run_env = str(getattr(self.engine, "run_env", ""))
+            self._bag_scroll_strategy = create_bag_scroll_strategy(
+                run_env, self.ctx.pc_background_scroll)
+            logger.info(f"背包滚动手段: {self._bag_scroll_strategy.name}")
+        return self._bag_scroll_strategy
+
+    def move_bag(self, direction: str, *, distance: float = 1.0,
+                 hold: float | None = None) -> None:
+        """通过本次运行选定的策略移动背包内容。"""
+        self.bag_scroll_strategy.move(
+            self, direction, distance=distance, hold=hold)
 
     @property
     def judge(self) -> TuningJudge:
@@ -662,16 +681,16 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _scroll_to_row(self, target_row: int) -> None:
         """滚动背包网格使 target_row 出现在可见区第一行
 
-        每次 drag_grid("up") 步进一行。target_row <= 1 时无操作。
+        每次 move_bag("up") 步进一行。target_row <= 1 时无操作。
         """
         if target_row <= 1:
             return
         drags = target_row - 1
-        logger.info(f"滚动定位: 目标行={target_row}, 需拖拽{drags}次")
+        logger.info(f"滚动定位: 目标行={target_row}, 需移动{drags}次")
         for _i in range(drags):
             if self.is_stopped:
                 break
-            self.drag_grid(self.GRID_SCENE, self.GRID_PANEL, "up", hold=0.3)
+            self.move_bag("up", hold=0.3)
             self.wait_stable("scroll_settle")  # 滚动后面板稳定
         self.align_panel(self.GRID_SCENE, self.GRID_PANEL)
 

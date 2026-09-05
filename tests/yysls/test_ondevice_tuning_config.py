@@ -96,10 +96,14 @@ class TestSaveRoundtrip:
         assert switches["keep_danti"]["checked"] is True
         assert switches["keep_wanjia"]["checked"] is True
 
-    def test_skip_tuning_preserved(self, session_path):
-        # skip_tuning 不进设备端 UI，保存不得覆盖已有值
+    def test_desktop_only_parameters_preserved(self, session_path):
+        # 桌面调试/后台参数不进设备端 UI，保存不得覆盖已有值
         session_path.write_text(json.dumps({
-            "wf_configs": {"auto_tuning": {"skip_tuning": True}},
+            "wf_configs": {"auto_tuning": {
+                "skip_tuning": True,
+                "pc_background_scroll": True,
+                "scroll_strategy": "positional",
+            }},
         }), encoding="utf-8")
         import lvjiang.core.config.session as store_mod
         store_mod.reset_session_store()  # 重新加载文件内容
@@ -111,3 +115,5 @@ class TestSaveRoundtrip:
         assert result["ok"] is True
         saved = json.loads(session_path.read_text(encoding="utf-8"))["wf_configs"]["auto_tuning"]
         assert saved["skip_tuning"] is True
+        assert saved["pc_background_scroll"] is True
+        assert saved["scroll_strategy"] == "positional"

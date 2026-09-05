@@ -1,9 +1,8 @@
 """燕云「调律」Tab —— 通过 AppHooks 注入通用 MainWindow 的插件页面。
 
 职责：
-- 调律配置三页 Tab（规则 | 部位 | 更多）与 wf_configs 统一存储持久化：
-  规则 = 调律规则与玩法；部位 = 调律部位选择；
-  更多 = 跳过实际调律 mock + 全部注册开关
+- 调律配置两页 Tab（规则 | 参数）与 wf_configs 统一存储持久化：
+  规则 = 调律规则与玩法；参数 = 部位、全局开关、调律设置与调试参数
 - 「开始调律」按钮三态（运行中 / 未就绪 / 就绪），订阅宿主 automation_state_changed
 - ``f9_run()``：F9 快捷键与按钮共用的启停入口，
   收集配置并通过宿主 ``run_workflow_implementation`` 启动 auto_tuning
@@ -55,14 +54,14 @@ class TuningTab(QWidget):
         self._build_ui()
         self._load_tuning_config()
         host.automation_state_changed.connect(self._on_automation_state)
-        # 基础配置变更时刷新「更多」页开关（新增/删除开关即时生效）
+        # 基础配置变更时刷新「参数」页开关（新增/删除开关即时生效）
         from .....core.config.resolver import get_resolver
         get_resolver().add_change_listener(self._on_base_config_changed)
 
     # ─── UI 构建 ─────────────────────────────────────────────
 
     def _build_ui(self):
-        # 顶部固定「开始调律」+「暂停/恢复」按钮（第一行）+ 下方配置三页 Tab + 底部状态栏
+        # 顶部固定按钮 + 下方配置两页 Tab + 底部状态栏
         tab_layout = QVBoxLayout(self)
         tab_layout.setContentsMargins(8, 8, 8, 8)
         tab_layout.setSpacing(8)
@@ -90,11 +89,10 @@ class TuningTab(QWidget):
             self._host.user_manager)
         tab_layout.addWidget(self._execution_user_selector)
 
-        config_tabs = QTabWidget()
-        config_tabs.addTab(self._build_rules_page(), tr("规则"))
-        config_tabs.addTab(self._build_slots_page(), tr("部位"))
-        config_tabs.addTab(self._build_more_page(), tr("更多"))
-        tab_layout.addWidget(config_tabs)
+        self._config_tabs = QTabWidget()
+        self._config_tabs.addTab(self._build_rules_page(), tr("规则"))
+        self._config_tabs.addTab(self._build_parameters_page(), tr("参数"))
+        tab_layout.addWidget(self._config_tabs)
 
         # 底部状态栏（显示启动失败原因）
         self._status_label = QLabel("")
@@ -219,14 +217,14 @@ class TuningTab(QWidget):
         rb.setChecked(True)
         rb.blockSignals(False)
 
-    def _build_slots_page(self) -> QWidget:
-        """「部位」页：调律部位选择（标题行内嵌全选/取消全选）"""
+    def _build_parameters_page(self) -> QWidget:
+        """「参数」页：部位、全局开关、调律设置与调试参数。"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
 
         slots_header = QHBoxLayout()
-        slots_header.addWidget(QLabel("<b>" + tr("选择调律部位：") + "</b>"))
+        slots_header.addWidget(QLabel("<b>" + tr("调律部位：") + "</b>"))
         slots_header.addStretch()
         btn_select_all = QPushButton(tr("全选"))
         btn_select_all.clicked.connect(lambda: self._set_all_tuning_checks(True))
@@ -257,6 +255,34 @@ class TuningTab(QWidget):
                 self._tuning_checkboxes.append(cb)
             slots_row.addWidget(grp)
         layout.addLayout(slots_row)
+
+        layout.addWidget(QLabel("<b>" + tr("全局开关：") + "</b>"))
+        self._tuning_globals = TuningGlobalsWidget(show_skip_tuning=False)
+        self._tuning_globals.config_changed.connect(self._save_tuning_config)
+        layout.addWidget(self._tuning_globals)
+
+        layout.addWidget(QLabel("<b>" + tr("调律设置：") + "</b>"))
+        self._pc_background_scroll_cb = QCheckBox(
+            tr("PC 端兼容后台模式"))
+        self._pc_background_scroll_cb.setToolTip(tr(
+            "仅在 PC 端生效；关闭时继续使用更精准的拖拽滚动。"))
+        self._pc_background_scroll_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._pc_background_scroll_cb)
+        self._positional_traversal_cb = QCheckBox(
+            tr("启用位置校验遍历策略"))
+        self._positional_traversal_cb.setToolTip(tr(
+            "默认使用去重遍历（dedup）；启用后改用位置校验遍历（positional）。"))
+        self._positional_traversal_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._positional_traversal_cb)
+
+        layout.addWidget(QLabel("<b>" + tr("调试参数：") + "</b>"))
+        self._skip_tuning_cb = QCheckBox(
+            tr("跳过实际调律（仅进出调律页，测试滚动用）"))
+        self._skip_tuning_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._skip_tuning_cb)
 
         # ── 初始跳过 / 指定调律（互斥）────────────────────
         skip_group = QHBoxLayout()
@@ -302,18 +328,6 @@ class TuningTab(QWidget):
         self._sp_target_row.setEnabled(False)
         self._sp_target_col.setEnabled(False)
 
-        layout.addStretch()
-        return self._wrap_scroll(panel)
-
-    def _build_more_page(self) -> QWidget:
-        """「更多」页：跳过实际调律 mock + 全部注册开关"""
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.addWidget(QLabel("<b>" + tr("全局开关与测试选项：") + "</b>"))
-        self._tuning_globals = TuningGlobalsWidget()
-        self._tuning_globals.config_changed.connect(self._save_tuning_config)
-        layout.addWidget(self._tuning_globals)
         layout.addStretch()
         return self._wrap_scroll(panel)
 
@@ -462,6 +476,12 @@ class TuningTab(QWidget):
         rule_map = get_tuning_rules()
         switches = {str(k): bool(v) for k, v in tc.get("switches", {}).items()}
         skip_tuning = bool(tc.get("skip_tuning", False))
+        pc_background_scroll = bool(tc.get("pc_background_scroll", False))
+        scroll_strategy = (
+            "positional"
+            if tc.get("scroll_strategy") == "positional"
+            else ""
+        )
         for rule_key, cfg in enabled.items():
             if not is_rule_implemented(rule_key):
                 host.append_log(f"[警告] 规则「{get_rule_names().get(rule_key, rule_key)}」判定暂未实现，已跳过")
@@ -515,6 +535,8 @@ class TuningTab(QWidget):
                 judge_rule_keys=list(enabled),
                 base_group=base_group,
                 skip_tuning=skip_tuning,
+                pc_background_scroll=pc_background_scroll,
+                scroll_strategy=scroll_strategy,
                 skip_start=skip_start,
                 target_cell=target_cell,
                 min_level=min_level_override,
@@ -585,7 +607,17 @@ class TuningTab(QWidget):
         self._base_group_key = tc.get("base_group", "")
         self._select_base_group_radio(self._base_group_key)
         self._tuning_globals.set_switches(tc.get("switches", {}))
-        self._tuning_globals.set_skip_tuning(bool(tc.get("skip_tuning", False)))
+        self._skip_tuning_cb.blockSignals(True)
+        self._skip_tuning_cb.setChecked(bool(tc.get("skip_tuning", False)))
+        self._skip_tuning_cb.blockSignals(False)
+        self._pc_background_scroll_cb.blockSignals(True)
+        self._pc_background_scroll_cb.setChecked(
+            bool(tc.get("pc_background_scroll", False)))
+        self._pc_background_scroll_cb.blockSignals(False)
+        self._positional_traversal_cb.blockSignals(True)
+        self._positional_traversal_cb.setChecked(
+            tc.get("scroll_strategy") == "positional")
+        self._positional_traversal_cb.blockSignals(False)
         # 最低等级（运行时覆盖基础规则的等级门槛）
         saved_min_level = tc.get("min_level")
         self._min_level_combo.blockSignals(True)
@@ -632,6 +664,9 @@ class TuningTab(QWidget):
             "switches": self._get_tuning_switches(),
             "base_group": self._base_group_key,
             "skip_tuning": self._get_tuning_skip_tuning(),
+            "pc_background_scroll": self._pc_background_scroll_cb.isChecked(),
+            "scroll_strategy": (
+                "positional" if self._positional_traversal_cb.isChecked() else ""),
             "skip_start": skip_start,
             "target_cell": target_cell,
             "min_level": self._min_level_combo.currentData(),
@@ -662,9 +697,9 @@ class TuningTab(QWidget):
         return self._tuning_config.get_config()
 
     def _get_tuning_switches(self) -> dict[str, bool]:
-        """全局开关状态（「更多」页动态复选框）"""
+        """全局开关状态（「参数」页动态复选框）"""
         return self._tuning_globals.get_switches()
 
     def _get_tuning_skip_tuning(self) -> bool:
-        """全局「跳过实际调律」开关（临时测试用，「更多」页）"""
-        return self._tuning_globals.get_skip_tuning()
+        """「跳过实际调律」调试开关。"""
+        return self._skip_tuning_cb.isChecked()

@@ -2183,7 +2183,7 @@ class SkipTargetFakeWF(FakeWF):
         # 脚本化 _read_row 返回
         self._read_row_result: tuple[str, str, dict] = ("", "", {})
 
-    def drag_grid(self, scene, panel, direction, hold=0.3):
+    def drag_grid(self, scene, panel, direction, distance=1.0, hold=0.3):
         self.drags += 1
 
     def align_panel(self, scene, panel):

@@ -88,6 +88,13 @@ def switch_account($tail, $role_index, $account, $role, $batch_state)
     if env("desktop")
         # PC 端需要登出 后再点击触发 选择账号 登录
         scan [game_login_page].[switch_user] as $found by contains "登出"
+        if not $found
+            # 疑似登出太浅无法识别，此时继续识别是否存在 进入游戏，如果不存在那就是没有登出
+            scan [game_login_page].[login] as $login_game by contains "进入游戏"
+            if not $login_game
+                $found = "登出"
+            end
+        end
         if $found
             click [game_login_page].[switch_user] after wait @page_refresh
             click [game_login_page].[user_icon] after wait @page_refresh

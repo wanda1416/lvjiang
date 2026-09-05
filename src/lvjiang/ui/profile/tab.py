@@ -137,6 +137,7 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         self._editing_cap_cell = False
         self._restoring_widths = False
         self._reordering = False
+        self._content_point_size = 0
         self._refresh_timer = _make_debounce_timer(self, self._refresh_when_idle)
         self._setup_ui()
         size = getattr(
@@ -263,7 +264,9 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
 
     def _create_table_for_group(self, group_name: str) -> QTableWidget:
         """为指定分组创建并绑定一个 QTableWidget"""
-        table = ProfileOverviewTable()
+        # 从创建时就归属内容区；自定义字号仍需在下方显式重放，因为 Qt
+        # 重建复杂表格控件时不会可靠地重新解析整棵子控件的字体继承。
+        table = ProfileOverviewTable(self._tab_widget)
         table.setAlternatingRowColors(True)
         table.setShowGrid(True)
         v_header = table.verticalHeader()
@@ -315,6 +318,8 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
             lambda _logical, _old, _new, gn=group_name, t=table: self._on_column_resized(gn, t)
         )
 
+        if self._content_point_size > 0:
+            self._apply_table_font_size(table, self._content_point_size)
         self._refresh_group(group_name, table)
         return table
 
@@ -327,19 +332,26 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         """只调整顶部工具栏下方的分组与表格字号。"""
         if not 8 <= int(point_size) <= 24:
             return
+        self._content_point_size = int(point_size)
         font = QFont(self._tab_widget.font())
-        font.setPointSize(int(point_size))
+        font.setPointSize(self._content_point_size)
         self._tab_widget.setFont(font)
-        for child in self._tab_widget.findChildren(QWidget):
-            child.setFont(font)
         for table in self._tables.values():
-            v_header = table.verticalHeader()
-            if v_header is not None:
-                v_header.setDefaultSectionSize(
-                    max(24, table.fontMetrics().height() + 8)
-                )
+            self._apply_table_font_size(table, self._content_point_size)
         # 表头有显式的粗体 QTableWidgetItem，需在新字体下重建。
         self.refresh()
+
+    @staticmethod
+    def _apply_table_font_size(table: QTableWidget, point_size: int) -> None:
+        """为已有或刚重建的总览表应用内容字号。"""
+        font = QFont(table.font())
+        font.setPointSize(point_size)
+        table.setFont(font)
+        for child in table.findChildren(QWidget):
+            child.setFont(font)
+        v_header = table.verticalHeader()
+        if v_header is not None:
+            v_header.setDefaultSectionSize(max(24, table.fontMetrics().height() + 8))
 
     def _refresh_group(self, group_name: str, table: QTableWidget):
         """刷新指定分组的表格数据"""

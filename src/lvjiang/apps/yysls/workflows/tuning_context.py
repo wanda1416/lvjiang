@@ -33,7 +33,9 @@ class TuningRunContext:
     skip_tuning: bool = False                 # 测试开关：跳过实际调律，仅模拟进出调律页
     pc_background_scroll: bool = False        # PC 后台模式：滚轮替代背包拖拽
     use_stone_cache: bool = True              # 使用律准石消耗/返还账本
+    initial_stone_check_enabled: bool = False  # 是否启用首次 OCR 额外门槛
     initial_stone_min_count: int | None = None  # 首次 OCR 额外校验（大律准石）
+    validate_stone_cache: bool = False        # 每进入 5 件装备校验一次缓存账本
     doc_dir: Path | None = None               # 说明文档输出目录覆盖（供测试）
     history_db_path: Path | None = None        # 历史数据库路径覆盖（供测试）
     scroll_strategy: str = ""                 # 背包遍历策略 key（空=读 session/默认）

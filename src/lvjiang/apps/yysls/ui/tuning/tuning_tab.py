@@ -45,6 +45,16 @@ def _tuning_switch_names(switches: dict[str, bool]) -> list[str]:
     return [names.get(k, k) for k, v in switches.items() if v]
 
 
+class _OptionalPositiveSpinBox(QSpinBox):
+    """以 0 表示未设置，但界面保持空白而不是显示占位文字。"""
+
+    def textFromValue(self, value: int) -> str:  # noqa: N802 - Qt override
+        return "" if value == 0 else super().textFromValue(value)
+
+    def valueFromText(self, text: str | None) -> int:  # noqa: N802 - Qt override
+        return 0 if not text or not text.strip() else super().valueFromText(text)
+
+
 class TuningTab(QWidget):
     """调律 Tab（host 为通用 MainWindow，提供宿主 API 与信号）"""
 
@@ -277,12 +287,18 @@ class TuningTab(QWidget):
             lambda _state: self._save_tuning_config())
         layout.addWidget(self._use_stone_cache_cb)
         initial_stone_row = QHBoxLayout()
-        initial_stone_row.addWidget(QLabel(tr("初始检查大律准石数量大于")))
-        self._initial_stone_min = QSpinBox()
+        self._initial_stone_check_cb = QCheckBox(
+            tr("初始检查大律准石数量大于"))
+        self._initial_stone_check_cb.setToolTip(tr(
+            "启用后，首次识别数量低于设定值时要求人工确认。"))
+        initial_stone_row.addWidget(self._initial_stone_check_cb)
+        self._initial_stone_min = _OptionalPositiveSpinBox()
         self._initial_stone_min.setRange(0, 99999)
-        self._initial_stone_min.setSpecialValueText(tr("不检查"))
+        self._initial_stone_min.setEnabled(False)
         self._initial_stone_min.setToolTip(tr(
-            "留空只建立缓存，不做额外的初始数量校验。"))
+            "首次识别时使用的额外大律准石数量门槛。"))
+        self._initial_stone_check_cb.toggled.connect(
+            self._on_initial_stone_check_toggled)
         self._initial_stone_min.valueChanged.connect(
             lambda _value: self._save_tuning_config())
         initial_stone_row.addWidget(self._initial_stone_min)
@@ -302,6 +318,13 @@ class TuningTab(QWidget):
         self._skip_tuning_cb.stateChanged.connect(
             lambda _state: self._save_tuning_config())
         layout.addWidget(self._skip_tuning_cb)
+        self._validate_stone_cache_cb = QCheckBox(tr("运行时校验缓存"))
+        self._validate_stone_cache_cb.setToolTip(tr(
+            "启用后，每实际进入 5 件装备调律时重新读取律准石；"
+            "有效读数与缓存相差超过 1 个大律准石时记录错误日志。"))
+        self._validate_stone_cache_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._validate_stone_cache_cb)
 
         # ── 初始跳过 / 指定调律（互斥）────────────────────
         skip_group = QHBoxLayout()
@@ -498,8 +521,17 @@ class TuningTab(QWidget):
         pc_background_scroll = bool(tc.get("pc_background_scroll", False))
         use_stone_cache = bool(tc.get("use_stone_cache", True))
         initial_stone_min_count = tc.get("initial_stone_min_count")
+        initial_stone_check_enabled = bool(tc.get(
+            "initial_stone_check_enabled",
+            initial_stone_min_count is not None,
+        ))
         if initial_stone_min_count is not None:
             initial_stone_min_count = int(initial_stone_min_count)
+        elif initial_stone_check_enabled:
+            initial_stone_min_count = 80
+        if not initial_stone_check_enabled:
+            initial_stone_min_count = None
+        validate_stone_cache = bool(tc.get("validate_stone_cache", False))
         scroll_strategy = (
             "positional"
             if tc.get("scroll_strategy") == "positional"
@@ -560,7 +592,9 @@ class TuningTab(QWidget):
                 skip_tuning=skip_tuning,
                 pc_background_scroll=pc_background_scroll,
                 use_stone_cache=use_stone_cache,
+                initial_stone_check_enabled=initial_stone_check_enabled,
                 initial_stone_min_count=initial_stone_min_count,
+                validate_stone_cache=validate_stone_cache,
                 scroll_strategy=scroll_strategy,
                 skip_start=skip_start,
                 target_cell=target_cell,
@@ -643,11 +677,22 @@ class TuningTab(QWidget):
         self._use_stone_cache_cb.setChecked(
             bool(tc.get("use_stone_cache", True)))
         self._use_stone_cache_cb.blockSignals(False)
-        self._initial_stone_min.blockSignals(True)
         initial_stone_min = tc.get("initial_stone_min_count")
+        initial_stone_enabled = bool(tc.get(
+            "initial_stone_check_enabled", initial_stone_min is not None))
+        self._initial_stone_check_cb.blockSignals(True)
+        self._initial_stone_check_cb.setChecked(initial_stone_enabled)
+        self._initial_stone_check_cb.blockSignals(False)
+        self._initial_stone_min.blockSignals(True)
         self._initial_stone_min.setValue(
-            int(initial_stone_min) if initial_stone_min is not None else 0)
+            int(initial_stone_min) if initial_stone_min is not None
+            else (80 if initial_stone_enabled else 0))
         self._initial_stone_min.blockSignals(False)
+        self._initial_stone_min.setEnabled(initial_stone_enabled)
+        self._validate_stone_cache_cb.blockSignals(True)
+        self._validate_stone_cache_cb.setChecked(
+            bool(tc.get("validate_stone_cache", False)))
+        self._validate_stone_cache_cb.blockSignals(False)
         self._positional_traversal_cb.blockSignals(True)
         self._positional_traversal_cb.setChecked(
             tc.get("scroll_strategy") == "positional")
@@ -700,15 +745,27 @@ class TuningTab(QWidget):
             "skip_tuning": self._get_tuning_skip_tuning(),
             "pc_background_scroll": self._pc_background_scroll_cb.isChecked(),
             "use_stone_cache": self._use_stone_cache_cb.isChecked(),
+            "initial_stone_check_enabled": (
+                self._initial_stone_check_cb.isChecked()),
             "initial_stone_min_count": (
                 self._initial_stone_min.value()
-                if self._initial_stone_min.value() > 0 else None),
+                if (self._initial_stone_check_cb.isChecked()
+                    and self._initial_stone_min.value() > 0) else None),
+            "validate_stone_cache": self._validate_stone_cache_cb.isChecked(),
             "scroll_strategy": (
                 "positional" if self._positional_traversal_cb.isChecked() else ""),
             "skip_start": skip_start,
             "target_cell": target_cell,
             "min_level": self._min_level_combo.currentData(),
         })
+
+    def _on_initial_stone_check_toggled(self, checked: bool) -> None:
+        self._initial_stone_min.setEnabled(checked)
+        if checked and self._initial_stone_min.value() == 0:
+            self._initial_stone_min.blockSignals(True)
+            self._initial_stone_min.setValue(80)
+            self._initial_stone_min.blockSignals(False)
+        self._save_tuning_config()
 
     def _set_all_tuning_checks(self, checked: bool):
         for cb in self._tuning_checkboxes:

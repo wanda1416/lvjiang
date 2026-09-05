@@ -60,6 +60,8 @@ class TuningExecutor:
         self._cache_valid = False
         self._cache_volatile = False
         self._food_count_overrides: dict[str, int] = {}
+        self._initial_stock_check_done = False
+        self._entered_tuning_equipment = 0
 
     def reset_state(self):
         """每次 run 开始时重置运行期状态"""
@@ -69,8 +71,19 @@ class TuningExecutor:
         self._cache_valid = False
         self._cache_volatile = False
         self._food_count_overrides = {}
+        self._initial_stock_check_done = False
+        self._entered_tuning_equipment = 0
 
-    def cache_materials(self):
+    def cache_equipment_materials(self) -> None:
+        """记录一次实际进入调律页，并读取本件装备的材料区。"""
+        self._entered_tuning_equipment += 1
+        validate_cache = (
+            self._wf.ctx.validate_stone_cache
+            and self._entered_tuning_equipment % 5 == 0
+        )
+        self.cache_materials(validate_stone_cache=validate_cache)
+
+    def cache_materials(self, *, validate_stone_cache: bool = False):
         """进入调律页或重置后调用：OCR 材料区一次并缓存
 
         缓存大律准石、小律准石和三种狗粮的数值，后续调律轮次
@@ -85,7 +98,12 @@ class TuningExecutor:
         """
         wf = self._wf
         settings = wf.base_group.materials
-        if settings.stone_check_enabled or settings.food_rules:
+        stock = getattr(wf, "stone_stock", None)
+        if (settings.stone_check_enabled or settings.food_rules
+                or (stock is not None and stock.uses_cache and stock.needs_scan)
+                or (not self._initial_stock_check_done
+                    and wf.ctx.initial_stone_check_enabled)
+                or validate_stone_cache):
             raw_infos = wf.recognize_references_info_panel(
                 wf.TUNE_SCENE, wf.MATERIAL_PANEL,
                 group=wf.MATERIAL_GROUP)
@@ -107,7 +125,8 @@ class TuningExecutor:
             counts = {label: self._get_count(info)
                       for label, info in deduped.items()}
             logger.debug(f"材料缓存已刷新: {counts}")
-            self._accept_stone_scan(deduped)
+            self._accept_stone_scan(
+                deduped, validate_cache=validate_stone_cache)
             if self._cache_volatile:
                 logger.debug("材料区存在小律准石，本轮缓存用完即失效")
         else:
@@ -146,7 +165,12 @@ class TuningExecutor:
         if stone_scan_needed or not self._cache_valid:
             self.cache_materials()
 
-    def _accept_stone_scan(self, deduped: dict[str, object]) -> None:
+    def _accept_stone_scan(
+        self,
+        deduped: dict[str, object],
+        *,
+        validate_cache: bool = False,
+    ) -> None:
         """将大/小律准石 OCR 折算后交给库存策略。"""
         stock = getattr(self._wf, "stone_stock", None)
         if stock is None:
@@ -164,31 +188,63 @@ class TuningExecutor:
             )
             units = int(large_count or 0) * 10 + int(small_count or 0)
         if units is None:
-            if stock.needs_initial_check:
+            if not self._initial_stock_check_done:
                 self._handle_initial_stock_check(None)
             return
+        if validate_cache:
+            self._validate_cached_stone_stock(stock, units)
         stock.accept_scan(units)
-        if stock.needs_initial_check:
+        if not self._initial_stock_check_done:
             self._handle_initial_stock_check(units)
 
-    def _handle_initial_stock_check(self, units: int | None) -> None:
-        """缓存策略首次识别的额外校验与人工修正。"""
+    @staticmethod
+    def _validate_cached_stone_stock(stock, scanned_units: int) -> None:
+        """用有效 OCR 读数核对缓存；仅告警，不自动改写账本。"""
+        if (not isinstance(stock, CachedStoneStock)
+                or stock.cache_invalid
+                or stock.stock_units is None
+                or scanned_units <= 0):
+            return
+        difference = abs(scanned_units - stock.stock_units)
+        if difference <= 10:
+            return
+        logger.error(
+            "律准石缓存运行时校验不一致: "
+            f"缓存={format_stone_units(stock.stock_units)}, "
+            f"识别={format_stone_units(scanned_units)}, "
+            f"差值={format_stone_units(difference)}；"
+            "请检查并调整等级配置中的律准石消耗/返还数据"
+        )
+
+    def _mark_initial_stock_check_done(self) -> None:
+        self._initial_stock_check_done = True
         stock = getattr(self._wf, "stone_stock", None)
-        if not isinstance(stock, CachedStoneStock):
+        if isinstance(stock, CachedStoneStock):
+            stock.mark_initial_check_done()
+
+    def _handle_initial_stock_check(self, units: int | None) -> None:
+        """首次识别的硬性安全线与可选额外门槛校验。"""
+        stock = getattr(self._wf, "stone_stock", None)
+        if stock is None:
             return
         settings = self._wf.base_group.materials
         hard_units = (
             settings.stone_min_count * 10
             if settings.stone_check_enabled else None
         )
-        initial = self._wf.ctx.initial_stone_min_count
+        initial = (
+            self._wf.ctx.initial_stone_min_count
+            if self._wf.ctx.initial_stone_check_enabled else None
+        )
         initial_units = initial * 10 if initial is not None else None
-        below_hard = units is None or (
-            hard_units is not None and units < hard_units)
-        below_initial = units is None or (
-            initial_units is not None and units < initial_units)
+        below_hard = stock.uses_cache and (
+            units is None or (
+                hard_units is not None and units < hard_units)
+        )
+        below_initial = initial_units is not None and (
+            units is None or units < initial_units)
         if not below_hard and not below_initial:
-            stock.mark_initial_check_done()
+            self._mark_initial_stock_check_done()
             return
         value = "识别失败" if units is None else format_stone_units(units)
         message = (
@@ -209,7 +265,7 @@ class TuningExecutor:
             return
         if choice == "skip":
             logger.warning("用户跳过初始律准石校验；硬性数量检查仍生效")
-            stock.mark_initial_check_done()
+            self._mark_initial_stock_check_done()
             return
         self._end_for_stone_stock("用户结束调律（初始律准石检查）")
 
@@ -461,7 +517,7 @@ class TuningExecutor:
                 self.round_food_refunded = True  # 标记返还，调用方据此恢复缓存
         return result
 
-    def _validate_tuning_materials(self, infos: dict | None) -> dict | None:
+    def _validate_tuning_materials(self, infos: dict) -> dict:
         """调律流程材料校验：投入必须为 0（仅记录 error，不阻断）
 
         调律时材料通过点击/一键添加投入，识别时投入数量必然为 0。

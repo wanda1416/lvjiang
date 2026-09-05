@@ -34,6 +34,9 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
 )
 from lvjiang.apps.yysls.workflows.implementations.tuning import TuningRecorder
 from lvjiang.apps.yysls.workflows.implementations.tuning import (
+    executor as tuning_executor,
+)
+from lvjiang.apps.yysls.workflows.implementations.tuning import (
     judge as tuning_judge,
 )
 from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
@@ -42,6 +45,9 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
 from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
     AndroidTuningRouteStrategy,
     DesktopTuningRouteStrategy,
+)
+from lvjiang.apps.yysls.workflows.implementations.tuning.stone_stock import (
+    CachedStoneStock,
 )
 from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 from lvjiang.core.config import load_user_config
@@ -701,6 +707,7 @@ def test_initial_skip_does_not_waive_hard_stone_limit():
         stone_insufficient_action="skip"))
     wf = _wf_with(base)
     wf.run_ctx.use_stone_cache = True
+    wf.run_ctx.initial_stone_check_enabled = True
     wf.run_ctx.initial_stone_min_count = 100
     wf._stone_stock_strategy = None
     wf.stone_stock.accept_scan(700)
@@ -719,6 +726,7 @@ def test_initial_manual_stock_is_rechecked():
         stone_insufficient_action="skip"))
     wf = _wf_with(base)
     wf.run_ctx.use_stone_cache = True
+    wf.run_ctx.initial_stone_check_enabled = True
     wf.run_ctx.initial_stone_min_count = 100
     wf._stone_stock_strategy = None
     wf.stone_stock.accept_scan(700)
@@ -730,6 +738,59 @@ def test_initial_manual_stock_is_rechecked():
     assert wf.stone_stock.stock_units == 1200
     assert not wf.stone_stock.needs_initial_check
     assert wf.executor._check_stone_stock(base.materials, None) is True
+
+
+def test_initial_threshold_applies_without_stone_cache():
+    """实时扫描策略也必须执行首次额外门槛。"""
+    base = TuningGroup(materials=MaterialSettings())
+    wf = _wf_with(base)
+    wf.run_ctx.use_stone_cache = False
+    wf.run_ctx.initial_stone_check_enabled = True
+    wf.run_ctx.initial_stone_min_count = 100
+    wf._stone_stock_strategy = None
+    choices = []
+    wf.executor._choose_initial_stock = lambda message: choices.append(message) or "skip"
+
+    wf.executor._handle_initial_stock_check(700)
+
+    assert choices
+    assert "初始检查大律准石数量大于: 100" in choices[0]
+    assert wf.executor._initial_stock_check_done
+
+
+def test_runtime_cache_validation_runs_on_every_fifth_entry(monkeypatch):
+    wf = FakeWF()
+    wf.run_ctx.use_stone_cache = True
+    wf.run_ctx.validate_stone_cache = True
+    calls = []
+    monkeypatch.setattr(
+        wf.executor,
+        "cache_materials",
+        lambda **kwargs: calls.append(kwargs["validate_stone_cache"]),
+    )
+
+    for _ in range(10):
+        wf.executor.cache_equipment_materials()
+
+    assert calls == [False, False, False, False, True] * 2
+
+
+def test_runtime_cache_validation_logs_only_difference_over_one(monkeypatch):
+    stock = CachedStoneStock()
+    stock.accept_scan(800)
+    errors = []
+    monkeypatch.setattr(tuning_executor.logger, "error", errors.append)
+
+    tuning_executor.TuningExecutor._validate_cached_stone_stock(stock, 790)
+    tuning_executor.TuningExecutor._validate_cached_stone_stock(stock, 0)
+    assert errors == []
+
+    tuning_executor.TuningExecutor._validate_cached_stone_stock(stock, 789)
+
+    assert len(errors) == 1
+    assert "缓存=80" in errors[0]
+    assert "识别=78.9" in errors[0]
+    assert "请检查并调整等级配置" in errors[0]
 
 
 def test_stone_check_enough_passes():

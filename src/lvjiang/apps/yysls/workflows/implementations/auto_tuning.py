@@ -1144,7 +1144,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 进入调律页成功，缓存材料区 OCR（后续轮次复用，避免每轮 OCR）
         self._emit_operation("material", "已进入调律页，正在读取材料库存")
         self.executor.abort_reason = ""
-        self.executor.cache_materials()
+        self.executor.cache_equipment_materials()
         initial_material_stop_reason = self.executor.abort_reason
 
         # 结束处理支撑：首词条快照（重置后仅剩首词条）+ 本件重置计数

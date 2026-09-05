@@ -47,14 +47,22 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     assert not tab._pc_background_scroll_cb.isChecked()
     assert not tab._positional_traversal_cb.isChecked()
     assert tab._use_stone_cache_cb.isChecked()
+    assert not tab._initial_stone_check_cb.isChecked()
+    assert not tab._initial_stone_min.isEnabled()
     assert tab._initial_stone_min.value() == 0
+    assert tab._initial_stone_min.text() == ""
+    assert not tab._validate_stone_cache_cb.isChecked()
     tab._pc_background_scroll_cb.setChecked(True)
     tab._positional_traversal_cb.setChecked(True)
+    tab._initial_stone_check_cb.setChecked(True)
     tab._initial_stone_min.setValue(120)
+    tab._validate_stone_cache_cb.setChecked(True)
     assert get_wf_config("auto_tuning")["pc_background_scroll"] is True
     assert get_wf_config("auto_tuning")["scroll_strategy"] == "positional"
     assert get_wf_config("auto_tuning")["use_stone_cache"] is True
+    assert get_wf_config("auto_tuning")["initial_stone_check_enabled"] is True
     assert get_wf_config("auto_tuning")["initial_stone_min_count"] == 120
+    assert get_wf_config("auto_tuning")["validate_stone_cache"] is True
 
     tab._positional_traversal_cb.setChecked(False)
     assert get_wf_config("auto_tuning")["scroll_strategy"] == ""

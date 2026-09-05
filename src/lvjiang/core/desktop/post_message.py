@@ -120,12 +120,16 @@ class PostMessageInput(InputBackend):
         direction: str = "down",
         amount: int = 1,
         poi_name: str = "",
+        *,
+        interval: float | None = None,
     ):
         """后台滚动：PostMessage 向目标窗口发送 WM_MOUSEWHEEL
 
         逐格发送 amount 次独立消息，理由同 SendInputInput.scroll_screen——
         目标窗口收到消息通常只按"是否发生过"响应一次，不会按 wParam 里的
         delta 数值等比例滚动。
+
+        interval 不为 None 时，逐格之间用该固定间隔；否则用默认 20~50ms 随机间隔。
         """
         if not self.target_hwnd:
             logger.error("PostMessage 模式未设置目标窗口句柄")
@@ -142,7 +146,9 @@ class PostMessageInput(InputBackend):
         for i in range(amount):
             postmessage_scroll(self.target_hwnd, cx, cy, delta, activate=self.activate_before_send)
             if i < amount - 1:
-                time.sleep(random.uniform(0.02, 0.05))
+                time.sleep(
+                    interval if interval is not None
+                    else random.uniform(0.02, 0.05))
 
     # ─── 拖拽 ─────────────────────────────────────────────────
 

@@ -83,10 +83,13 @@ class Scroll:
     target: 可选，与 click 完全平行的目标类型。
             指定时先移动光标到目标位置再滚动；省略则在当前位置滚动。
     amount: 滚动格数，int 或 VarRef。默认 1。
+    interval: 可选，逐格滚动之间的固定间隔（秒，float）。None 时用后端
+              默认随机间隔（桌面 20~50ms）。仅对逐格发送的桌面后端生效。
     """
     direction: str
     target: Any = None
     amount: Any = 1
+    interval: Any = None
     line_no: int = 0
 
 

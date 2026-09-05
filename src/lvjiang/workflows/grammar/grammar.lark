@@ -124,9 +124,13 @@ replay_input_trace_stmt: "replay"i "input_trace"i STRING _NL
 // 目标：可选，指定后先移动光标到该位置再滚动；省略则在当前位置滚动
 // 方向：up（向上滚）/ down（向下滚），紧跟目标之后
 // 数量：可选，滚动格数（默认 1），支持数字或变量
+// 间隔：可选，逐格滚动之间的固定间隔（秒），如 interval 0.1；省略则用后端默认随机间隔
 // 目标在前、方向紧随其后、数量收尾——与 drag_stmt 语法形状保持一致
-scroll_stmt: "scroll"i click_target? SCROLL_DIR (number | var_ref)? wait_clauses? _NL
+scroll_stmt: "scroll"i click_target? SCROLL_DIR (number | var_ref)? scroll_interval? wait_clauses? _NL
 SCROLL_DIR: /up/i | /down/i
+
+// 逐格滚动间隔："interval" 关键字 + 秒数（与 wait stable 的 interval 关键字复用同一词）
+scroll_interval: "interval"i number
 
 // drag 支持五种目标：
 //   1. [scene].[panel][row][col] [up|down [n]] — panel cell 级拖拽

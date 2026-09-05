@@ -331,12 +331,13 @@ class _StmtMixin:
         return self._expand_wait_clauses_many(core_items[0], wait_pairs)
 
     def scroll_stmt(self, items):
-        """scroll [目标] up|down [数量] [before|after|around wait ...] — 鼠标滚轮滚动
+        """scroll [目标] up|down [数量] [interval 秒数] [before|after|around wait ...] — 鼠标滚轮滚动
 
         与 click/move/drag 语法风格保持一致：目标（如果存在）紧跟指令关键字，
         方向 up/down 紧随目标出现，数量参数收尾。
         复用 click_target 子规则解析目标（如果存在），
         按 token 类型（而非位置）提取方向，提取数量参数（如果存在）。
+        interval 由 scroll_interval 包裹为 Literal，以便与数量（裸 int/float/VarRef）区分。
         scroll 没有默认延迟，不需要 suppress_defaults。
         """
         wait_pairs, core_items = self._extract_wait_pairs(items)
@@ -344,12 +345,15 @@ class _StmtMixin:
         direction = None
         target = None
         amount = 1
+        interval = None
 
         for item in core_items:
             if isinstance(item, Click):
                 target = item.target
             elif isinstance(item, Token) and item.type == "SCROLL_DIR":
                 direction = str(item).lower()
+            elif isinstance(item, Literal):
+                interval = item.value
             elif isinstance(item, VarRef):
                 amount = item
             elif isinstance(item, (int, float)):
@@ -359,9 +363,15 @@ class _StmtMixin:
             direction=direction,
             target=target,
             amount=amount,
+            interval=interval,
             line_no=self._line(items),
         )
         return self._expand_wait_clauses(scroll_node, wait_pairs)
+
+    def scroll_interval(self, items):
+        """interval <秒数> → Literal(float)。包裹为 Literal 是为了在 scroll_stmt
+        中与裸 int/float 的数量参数区分开（两者同为数值，不能按类型区分）。"""
+        return Literal(value=float(items[0]))
 
     def drag_stmt(self, items):
         """drag 目标 [duration] [hold] [before|after|around wait 参数 ...] — 支持 before/after 任意组合

@@ -8,8 +8,12 @@
 
 from unittest.mock import MagicMock, call
 
+import pytest
+
 from lvjiang.workflows.align import GridAlignment
+from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
+from lvjiang.workflows.grammar.ast_nodes import Scroll
 from tests.workflows.conftest import make_engine
 
 
@@ -208,3 +212,27 @@ class TestDragPanelRefAlignmentCache:
     def test_variable_form_also_invalidates(self):
         left = self._run("drag $s.$p[1][2] down\n", {"s": "sc", "p": "pn"})
         assert left == {}, f"变量写法未失效缓存，残留: {list(left)}"
+
+
+class TestScrollInterval:
+    """scroll 的 interval 参数必须透传到 scroll_screen（逐格固定间隔）。"""
+
+    def test_interval_reaches_backend(self):
+        eng = make_engine()
+        eng._exec_body(parse_text("scroll down 3 interval 0.1\n").body)
+        _args, kwargs = eng._input.scroll_screen.call_args
+        assert kwargs["interval"] == 0.1
+
+    def test_default_interval_is_none(self):
+        """未写 interval 时传 None，后端回退到默认随机间隔。"""
+        eng = make_engine()
+        eng._exec_body(parse_text("scroll down 3\n").body)
+        _args, kwargs = eng._input.scroll_screen.call_args
+        assert kwargs["interval"] is None
+
+    def test_invalid_interval_raises(self):
+        """interval 无法转 float 时报用户错误（运行时变量传入非法值）。"""
+        eng = make_engine()
+        node = Scroll(direction="down", amount=3, interval="abc")
+        with pytest.raises(WorkflowUserError):
+            eng._exec_scroll(node)

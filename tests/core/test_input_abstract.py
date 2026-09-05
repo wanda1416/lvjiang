@@ -33,7 +33,7 @@ class _FakeInput(InputBackend):
     def move_relative(self, delta_x, delta_y, poi_name="", duration=None):
         pass
 
-    def scroll_screen(self, screen_x, screen_y, direction="down", amount=1, poi_name=""):
+    def scroll_screen(self, screen_x, screen_y, direction="down", amount=1, poi_name="", *, interval=None):
         pass
 
     def drag_screen(self, from_x, from_y, to_x, to_y,

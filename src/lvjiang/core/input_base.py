@@ -141,6 +141,8 @@ class InputBackend(ABC):
         direction: str = "down",
         amount: int = 1,
         poi_name: str = "",
+        *,
+        interval: float | None = None,
     ):
         """在指定坐标位置滚动鼠标滚轮
 
@@ -152,6 +154,9 @@ class InputBackend(ABC):
             direction: 滚动方向，"up" 或 "down"
             amount: 滚动格数（默认 1）
             poi_name: 日志标签
+            interval: 逐格滚动之间的固定间隔（秒）。None 时用后端默认
+                随机间隔（桌面 20~50ms）。仅对逐格发送事件的桌面后端
+                （SendInput / PostMessage）生效；ADB / 设备端忽略该参数。
 
         SendInput：MOUSEEVENTF_WHEEL 发送滚轮事件。
         PostMessage：WM_MOUSEWHEEL 向目标窗口投递滚轮消息。

@@ -159,10 +159,13 @@ class AdbInput(InputBackend):
         direction: str = "down",
         amount: int = 1,
         poi_name: str = "",
+        *,
+        interval: float | None = None,
     ):
         """ADB 模拟滚动：用短距离 swipe 模拟鼠标滚轮
 
-        每格对应 100px 的滑动距离，方向由参数决定。
+        每格对应 100px 的滑动距离，方向由参数决定。单次连续 swipe 覆盖全部
+        格数，不存在逐格间隔，故 interval 参数在此后端被忽略（仅为与桌面后端签名一致）。
         """
         dist = 100 * amount
         if direction == "up":

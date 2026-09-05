@@ -307,17 +307,25 @@ class _ActionsMixin:
 
         direction = node.direction  # "up" | "down"
 
+        # 解析 interval（可选，float 秒数或 None）；None 时后端用默认随机间隔
+        interval = node.interval
+        if interval is not None:
+            try:
+                interval = float(interval)
+            except (TypeError, ValueError):
+                raise WorkflowUserError(f"scroll: 无效滚动间隔: {node.interval}") from None
+
         if node.target is None:
             # 无目标：在画布中心滚动（作为默认位置）
             w, h = self._capture.get_capture_size()
             x, y = w // 2, h // 2
-            self._input.scroll_screen(x, y, direction, amount, "canvas_center")
+            self._input.scroll_screen(x, y, direction, amount, "canvas_center", interval=interval)
             return
 
         # 有目标：解析目标坐标（与 _exec_move 完全平行）
         if isinstance(node.target, CoordPoint):
             x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
-            self._input.scroll_screen(x, y, direction, amount, f"coord({node.target.rx},{node.target.ry})")
+            self._input.scroll_screen(x, y, direction, amount, f"coord({node.target.rx},{node.target.ry})", interval=interval)
             return
         if isinstance(node.target, PanelRef):
             x, y = self._panel_ref_to_screen(node.target)
@@ -325,11 +333,12 @@ class _ActionsMixin:
                 self._input.scroll_screen(
                     x, y, direction, amount,
                     f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])",
+                    interval=interval,
                 )
             return
         if isinstance(node.target, SubsceneEntityRef):
             x, y, label = self._subscene_target_to_screen(node.target)
-            self._input.scroll_screen(x, y, direction, amount, label)
+            self._input.scroll_screen(x, y, direction, amount, label, interval=interval)
             return
         if isinstance(node.target, EntityRef):
             if isinstance(node.target.scene, VarRef):
@@ -349,20 +358,20 @@ class _ActionsMixin:
                 FoundRegionCls = _get_found_region_cls()
                 if isinstance(region_val, FoundRegionCls):
                     x, y = self._found_region_to_screen(region_val)
-                    self._input.scroll_screen(x, y, direction, amount, f"find({region_val.text!r})")
+                    self._input.scroll_screen(x, y, direction, amount, f"find({region_val.text!r})", interval=interval)
                     return
                 region_obj = self._find_region_in_coord_meta(region_val)
                 if region_obj is not None:
                     x, y = self._ensure_workflow()._region_to_screen(region_obj, jitter=True)
-                    self._input.scroll_screen(x, y, direction, amount, f"{scene}/{region_val}")
+                    self._input.scroll_screen(x, y, direction, amount, f"{scene}/{region_val}", interval=interval)
                     return
                 # 回退：move_any 逻辑复制（获取坐标后移动 + 滚动）
-                self._resolve_and_scroll_at_entity(str(scene), str(region_val), direction, amount)
+                self._resolve_and_scroll_at_entity(str(scene), str(region_val), direction, amount, interval)
                 return
             else:
                 if entity is None:
                     raise WorkflowUserError("scroll: entity 未指定")
-                self._resolve_and_scroll_at_entity(str(scene), entity, direction, amount)
+                self._resolve_and_scroll_at_entity(str(scene), entity, direction, amount, interval)
                 return
         elif isinstance(node.target, VarRef):
             region_val = self.variables.get(node.target.name)
@@ -372,12 +381,12 @@ class _ActionsMixin:
                 )
             if isinstance(region_val, CoordRef):
                 x, y = self._coord_ref_to_screen(region_val, jitter=True)
-                self._input.scroll_screen(x, y, direction, amount, f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})")
+                self._input.scroll_screen(x, y, direction, amount, f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})", interval=interval)
                 return
             FoundRegionCls = _get_found_region_cls()
             if isinstance(region_val, FoundRegionCls):
                 x, y = self._found_region_to_screen(region_val)
-                self._input.scroll_screen(x, y, direction, amount, f"find({region_val.text!r})")
+                self._input.scroll_screen(x, y, direction, amount, f"find({region_val.text!r})", interval=interval)
                 return
             raise WorkflowUserError(
                 f"scroll ${node.target.name}: 变量值不是可滚动目标类型 "
@@ -389,6 +398,7 @@ class _ActionsMixin:
 
     def _resolve_and_scroll_at_entity(
         self, scene_key: str, key: str, direction: str, amount: int,
+        interval: float | None = None,
     ):
         """回退路径：按 region → point → panel 顺序查找目标坐标，移动光标后滚动。
 
@@ -402,7 +412,7 @@ class _ActionsMixin:
             require_enabled(region, scene_key, "region")
             x, y = wf._region_to_screen(region, jitter=True)
             self._input.move_screen(x, y, f"{scene_key}/{key}")
-            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}")
+            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}", interval=interval)
             return
         # point
         points = self._layout.get_scene_points(scene_key)
@@ -411,7 +421,7 @@ class _ActionsMixin:
             require_enabled(point, scene_key, "point")
             x, y = wf._point_to_screen(point)
             self._input.move_screen(x, y, f"{scene_key}/{key}")
-            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}")
+            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}", interval=interval)
             return
         # panel
         panels = self._layout.get_scene_panels(scene_key)
@@ -422,7 +432,7 @@ class _ActionsMixin:
             cy = panel.y_ratio + panel.h_ratio / 2
             x, y = wf._ratio_to_screen(cx, cy)
             self._input.move_screen(x, y, f"{scene_key}/{key}(panel)")
-            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}(panel)")
+            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}(panel)", interval=interval)
             return
         raise WorkflowUserError(
             f"scroll: 场景 {scene_key} 的 region / point / panel 未绑定坐标: {key}"

@@ -5,4 +5,4 @@
 两边不一致会打印警告并以 pyproject.toml 为准。
 """
 
-__version__ = "0.10.3"
+__version__ = "0.10.4"

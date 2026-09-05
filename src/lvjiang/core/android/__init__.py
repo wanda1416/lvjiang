@@ -23,7 +23,12 @@ from .agent import AgentCapture, AgentClient, AgentError, AgentInput, connect_ag
 from .device import AdbDevice, list_adb_devices
 from .input import AdbInput
 from .scrcpy_capture import AndroidStreamCapture
-from .wireless import scan_and_connect_wireless
+from .wireless import (
+    list_ipv4_interfaces,
+    list_scan_subnets,
+    scan_and_connect_local,
+    scan_and_connect_wireless,
+)
 
 
 def create_input_backend(
@@ -87,4 +92,7 @@ __all__ = [
     "create_input_backend",
     "create_capture_backend",
     "scan_and_connect_wireless",
+    "scan_and_connect_local",
+    "list_ipv4_interfaces",
+    "list_scan_subnets",
 ]

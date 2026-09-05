@@ -356,9 +356,26 @@ window_ops:
   no_adb_device_msg: '未发现 USB 连接的 ADB 设备。
 
 
-    是否扫描局域网并尝试无线连接？
+    可选择网段扫描局域网（设备需已开启无线调试），
 
-    （设备需已开启无线调试）'
+    或直接扫描本机端口以发现模拟器。'
+  label_scan_subnet: '扫描网段：'
+  subnet_all: 全部网卡（默认）
+  btn_scan_lan_action: 扫描局域网
+  btn_scan_local: 本地扫描（模拟器）
+  btn_scan_local_running: 扫描本机...
+  status_scanning_local: 正在扫描本机模拟器...
+  log_scanning_local: '[扫描] 正在探测本机模拟器 ADB 端口...'
+  log_local_no_device: '[扫描] 本机未发现开放的模拟器 ADB 端口'
+  status_no_local_hint: 未发现设备 | 请确认模拟器已启动
+  local_no_device_msg: '本机未发现开放的模拟器 ADB 端口。
+
+
+    请确认：
+
+    1. 模拟器已启动
+
+    2. 模拟器已开启 ADB 调试'
   btn_scan: 扫描
   btn_cancel: 取消
   btn_scanning: 扫描中...
@@ -391,7 +408,9 @@ window_ops:
 
     1. 设备与电脑在同一局域网
 
-    2. 设备已开启无线调试（开发者选项）'
+    2. 设备已开启无线调试（开发者选项）
+
+    3. 多网卡时可在下拉框改选目标网段，或改用本地扫描'
   status_scanning_lan: 正在扫描局域网...
   btn_scan_lan: 扫描局域网...
   preview_stopped: 预览已停止

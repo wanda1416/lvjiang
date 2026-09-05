@@ -143,7 +143,7 @@ def select_role($role_index, $role, $batch_state)
     # 静默进错角色还把 batch_state.role 记成目标角色。
     scan [game_login_page].[current_role] as $found by contains $role
     if $found
-        click [game_login_page].[current_role] after wait @page_refresh
+        click [game_login_page].[current_role] after wait @secondary_confirm
         # 这条路径同样会弹「其他角色在线」二次确认，与走角色列表时同一套处理
         call $online = handle_role_online($batch_state)
         if $online
@@ -158,8 +158,7 @@ def select_role($role_index, $role, $batch_state)
     # 故每点一次等一拍，以「进入游戏」是否出现为判据，最多重试 3 次。
     eval $role_page = 0
     loop 5
-        click [game_login_page].[switch_role]
-        wait @page_refresh
+        click [game_login_page].[switch_role] after wait @secondary_confirm
 
         # 角色在线时会弹二次确认（confirm 区域含「其他角色」），
         # 这种情况下不可能进入角色列表，取消并跳过该条目。
@@ -200,7 +199,7 @@ end
 # 因为两处的 status/message 语义由调用方的上下文决定）。
 
 def handle_role_online($batch_state)
-    scan [game_login_page].[confirm] as $online by contains "其他角色"
+    scan [game_login_page].[online_label] as $online by contains "在线"
     if $online
         log "角色在线，不可登录，跳过"
         click [game_login_page].[cancel] after wait @page_refresh

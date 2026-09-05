@@ -108,6 +108,12 @@ regions:
   is_clickable: true
   view: exit
   to: /base
+- key: online_label
+  name: 在线标记
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: loading
 points:
 - key: point_1
   name: 点1

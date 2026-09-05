@@ -190,8 +190,11 @@ def _check_env(_engine=None, envs=None) -> bool:
     -  True：当前环境在列表中，可继续执行
 
     .wf 用法:
-        check_env(["android"])
+        eval check_env(["android"])
         # 当前环境不是 android 时直接报错，后续语句不会执行
+
+        eval check_env(["android", "desktop"])
+        # 只允许这两种环境；取到空串等其他值一律中止
     """
     from ..engine.signals import WorkflowUserError
 

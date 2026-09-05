@@ -67,6 +67,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning import (
     TuningResetter,
     TuningRouteStrategy,
     TuningRunState,
+    create_stone_stock_strategy,
     create_tuning_route_strategy,
 )
 from lvjiang.apps.yysls.workflows.tuning_context import TuningContextMixin
@@ -152,6 +153,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     _history_session = None
     _history_markdown_path: str = ""
     _bag_scroll_strategy: BagScrollStrategy | None = None
+    _stone_stock_strategy = None
 
     @property
     def run_state(self) -> TuningRunState:
@@ -181,6 +183,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 run_env, self.ctx.pc_background_scroll)
             logger.info(f"背包滚动手段: {self._bag_scroll_strategy.name}")
         return self._bag_scroll_strategy
+
+    @property
+    def stone_stock(self):
+        """本次运行固定的律准石库存策略。"""
+        if self._stone_stock_strategy is None:
+            self._stone_stock_strategy = create_stone_stock_strategy(
+                self.ctx.use_stone_cache)
+        return self._stone_stock_strategy
 
     def move_bag(self, direction: str, *, distance: float = 1.0,
                  hold: float | None = None) -> None:
@@ -287,9 +297,17 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     def _recycle_current(self, equip_data: EquipmentData, detail_scene: str,
                          stage: str, reason: str,
-                         report: dict | None = None) -> RecycleOutcome:
+                         report: dict | None = None,
+                         current_affix_count: int | None = None,
+                         ) -> RecycleOutcome:
         outcome = self.recycler.recycle_current(
             equip_data, detail_scene, stage, reason, report)
+        if outcome is RecycleOutcome.RECYCLED:
+            self.stone_stock.record_recycle(
+                equip_data,
+                current_affix_count
+                if current_affix_count is not None
+                else len(equip_data.affixes))
         if outcome is RecycleOutcome.LOCKED:
             fp = self._make_fingerprint(equip_data.to_dict())
             self.run_state.record_locked(fp)
@@ -369,6 +387,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         try:
             self.executor.reset_state()
+            self._stone_stock_strategy = create_stone_stock_strategy(
+                self.ctx.use_stone_cache)
             self._run_state = TuningRunState()
             self._equipment_session = None
             self._equipment_detail_open = False
@@ -941,6 +961,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return self._make_fingerprint(equip), None
 
         equip_data = EquipmentData.from_dict(equip)
+        self.stone_stock.observe_equipment(equip_data)
         self._equipment_session = EquipmentSession(
             name=name, equipment=equip_data)
         affix_count = int((equip.get("_extra") or {}).get("affix_count", 0))
@@ -1001,6 +1022,16 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self._emit_equip_finish(
                 name, equip_data, affix_count=affix_count,
                 status="invalid_quality", reason="品阶识别失败")
+            return self._make_fingerprint(equip), None
+        if quality == "blue":
+            suffix = (
+                "；律准石缓存已标记失效"
+                if self.stone_stock.cache_invalid else "")
+            logger.warning(
+                f"  [{name}] 蓝色装备不参与实际调律，直接忽略{suffix}")
+            self._emit_equip_finish(
+                name, equip_data, affix_count=affix_count,
+                status="blue_ignored", reason="蓝色装备不支持调律")
             return self._make_fingerprint(equip), None
 
         fp = self._make_fingerprint(equip_data.to_dict())
@@ -1112,7 +1143,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         # 进入调律页成功，缓存材料区 OCR（后续轮次复用，避免每轮 OCR）
         self._emit_operation("material", "已进入调律页，正在读取材料库存")
+        self.executor.abort_reason = ""
         self.executor.cache_materials()
+        initial_material_stop_reason = self.executor.abort_reason
 
         # 结束处理支撑：首词条快照（重置后仅剩首词条）+ 本件重置计数
         tune_cfg = self.base_group.tune
@@ -1125,9 +1158,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         # ── 初始判定（initial_check）：第一次调律前先执行一次结束处理 ──
         # 用于垃圾金装复用：先走结束处理重置清空词条，再开始正常调律
-        skip_tune_loop = False
-        stop_reason = ""
-        if tune_cfg.initial_check and tune_cfg.enabled:
+        skip_tune_loop = bool(initial_material_stop_reason)
+        stop_reason = initial_material_stop_reason
+        if not skip_tune_loop and tune_cfg.initial_check and tune_cfg.enabled:
             logger.info(f"  ═══ [{name}] 初始判定（第一次调律前执行结束处理）═══")
             self._emit_operation(
                 "decision", "执行首次调律前的初始判定",
@@ -1172,6 +1205,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 self.recorder.report_set("stop_reason", stop_reason)
                 self.recorder.doc_note(f"{stop_reason}，结束调律")
                 break
+            self.stone_stock.record_tune(equip_data, affix_count + 1)
             rounds += 1
             affix_count += 1
             # 每轮结果挂在本件 report 下，与装备一一对应
@@ -1269,7 +1303,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             report = self.recorder.current_report
             outcome = self._recycle_current(
                 equip_data, detail_scene, "tune", tune_recycle_reason,
-                report)
+                report, current_affix_count=affix_count)
             if outcome is RecycleOutcome.STOPPED:
                 return self._make_fingerprint(equip_data.to_dict()), outcome
         self.recorder.commit_report("tuned")
@@ -1371,7 +1405,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         if action is BehaviorAction.RESET:
             # 调用重置公共逻辑
             reset_action, why, resets_used = self._execute_reset_action(
-                tune_cfg, equip_data, resets_used, why, prefix=prefix)
+                tune_cfg, equip_data, resets_used, why, prefix=prefix,
+                previous_affix_count=affix_count)
             if reset_action == "continue":
                 # 重置成功，更新装备状态
                 equip_data.affixes = base_affixes[:1]
@@ -1405,7 +1440,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     def _execute_reset_action(
         self, tune_cfg, equip_data: EquipmentData, resets_used: int,
-        why: str, prefix: str = "结束处理"
+        why: str, prefix: str = "结束处理",
+        previous_affix_count: int | None = None,
     ) -> tuple[str, str, int]:
         """执行重置调律的公共逻辑（等级配置检查 + 重置执行）
 
@@ -1456,6 +1492,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             tune_cfg, resets_used, why,
             min_material_count=level_cfg.min_material_count)
         if result is True:
+            self.stone_stock.record_reset(
+                equip_data,
+                previous_affix_count
+                if previous_affix_count is not None
+                else len(equip_data.affixes))
             # 重置成功，重新缓存材料区（重置后材料数量已变化）
             self.executor.cache_materials()
             self._emit_progress("equipment_reset", {

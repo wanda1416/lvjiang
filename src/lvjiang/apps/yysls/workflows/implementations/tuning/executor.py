@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
+
 from loguru import logger
 
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData
@@ -20,6 +22,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
 )
 
 from ......i18n import tr
+from .stone_stock import CachedStoneStock, format_stone_units
 
 # 小律准石在场时让材料缓存按轮失效。**默认关闭。**
 #
@@ -52,7 +55,6 @@ class TuningExecutor:
         self.round_food_reason = ""
         self.round_food_refunded = False  # 本轮狗粮是否被概率返还
         self.materials_exhausted = False
-        self._stone_check_waived = False
         self._tune_ready_waived = False
         self._material_cache: dict | None = None
         self._cache_valid = False
@@ -62,7 +64,6 @@ class TuningExecutor:
     def reset_state(self):
         """每次 run 开始时重置运行期状态"""
         self.materials_exhausted = False
-        self._stone_check_waived = False
         self._tune_ready_waived = False
         self._material_cache = None
         self._cache_valid = False
@@ -106,6 +107,7 @@ class TuningExecutor:
             counts = {label: self._get_count(info)
                       for label, info in deduped.items()}
             logger.debug(f"材料缓存已刷新: {counts}")
+            self._accept_stone_scan(deduped)
             if self._cache_volatile:
                 logger.debug("材料区存在小律准石，本轮缓存用完即失效")
         else:
@@ -135,8 +137,113 @@ class TuningExecutor:
         与 cache_materials 的区别是幂等——缓存仍然有效时什么都不做，
         不会把每轮一次 OCR 的开销重新引回来。
         """
-        if not self._cache_valid:
+        stock = getattr(self._wf, "stone_stock", None)
+        stone_scan_needed = (
+            stock is not None
+            and self._wf.base_group.materials.stone_check_enabled
+            and stock.needs_scan
+        )
+        if stone_scan_needed or not self._cache_valid:
             self.cache_materials()
+
+    def _accept_stone_scan(self, deduped: dict[str, object]) -> None:
+        """将大/小律准石 OCR 折算后交给库存策略。"""
+        stock = getattr(self._wf, "stone_stock", None)
+        if stock is None:
+            return
+        large = deduped.get(STONE_LABEL)
+        small = deduped.get(SMALL_STONE_LABEL)
+        if large is not None and not self._has_recognized_count(large):
+            units = None
+        else:
+            large_count = self._get_count(large) if large is not None else 0
+            small_count = (
+                self._get_count(small)
+                if small is not None and self._has_recognized_count(small)
+                else 0
+            )
+            units = int(large_count or 0) * 10 + int(small_count or 0)
+        if units is None:
+            if stock.needs_initial_check:
+                self._handle_initial_stock_check(None)
+            return
+        stock.accept_scan(units)
+        if stock.needs_initial_check:
+            self._handle_initial_stock_check(units)
+
+    def _handle_initial_stock_check(self, units: int | None) -> None:
+        """缓存策略首次识别的额外校验与人工修正。"""
+        stock = getattr(self._wf, "stone_stock", None)
+        if not isinstance(stock, CachedStoneStock):
+            return
+        settings = self._wf.base_group.materials
+        hard_units = (
+            settings.stone_min_count * 10
+            if settings.stone_check_enabled else None
+        )
+        initial = self._wf.ctx.initial_stone_min_count
+        initial_units = initial * 10 if initial is not None else None
+        below_hard = units is None or (
+            hard_units is not None and units < hard_units)
+        below_initial = units is None or (
+            initial_units is not None and units < initial_units)
+        if not below_hard and not below_initial:
+            stock.mark_initial_check_done()
+            return
+        value = "识别失败" if units is None else format_stone_units(units)
+        message = (
+            f"首次识别律准石为 {value}。\n"
+            f"大律准石数量检查: "
+            f"{settings.stone_min_count if settings.stone_check_enabled else '未启用'}\n"
+            f"初始检查大律准石数量大于: "
+            f"{initial if initial is not None else '未设置'}"
+        )
+        choice = self._choose_initial_stock(message)
+        if choice == "manual":
+            manual = self._input_stock_units()
+            if manual is None:
+                self._end_for_stone_stock("未提供有效的律准石数量")
+                return
+            stock.set_manual(manual)
+            self._handle_initial_stock_check(manual)
+            return
+        if choice == "skip":
+            logger.warning("用户跳过初始律准石校验；硬性数量检查仍生效")
+            stock.mark_initial_check_done()
+            return
+        self._end_for_stone_stock("用户结束调律（初始律准石检查）")
+
+    def _choose_initial_stock(self, message: str) -> str:
+        callback = getattr(self._wf.engine, "_ui_callback", None)
+        if callback is None:
+            return "end"
+        result = callback("choose", message=message, choices=[
+            {"label": tr("手动输入"), "value": "manual", "role": "accept"},
+            {"label": tr("跳过初始检查"), "value": "skip",
+             "role": "destructive"},
+            {"label": tr("结束调律"), "value": "end", "role": "reject"},
+        ], cancel_value="end")
+        return result if result in ("manual", "skip", "end") else "end"
+
+    def _input_stock_units(self) -> int | None:
+        callback = getattr(self._wf.engine, "_ui_callback", None)
+        if callback is None:
+            return None
+        raw = callback("input", prompt=tr(
+            "请输入当前律准石数量（小律准石按 0.1 计）"))
+        try:
+            scaled = Decimal(str(raw).strip()) * 10
+        except (InvalidOperation, ValueError, AttributeError):
+            return None
+        if (not scaled.is_finite() or scaled < 0
+                or scaled != scaled.to_integral_value()):
+            return None
+        return int(scaled)
+
+    def _end_for_stone_stock(self, reason: str) -> None:
+        self.abort_reason = reason
+        self.materials_exhausted = True
+        self._wf.output["stop_reason"] = reason
 
     def invalidate_cache(self):
         """退出调律页、或本轮缓存已不可信时清空缓存"""
@@ -204,20 +311,23 @@ class TuningExecutor:
                 logger.debug(f"狗粮扣减: {food} → {self._food_count_overrides[food]}")
                 return
 
-    def get_material_stock(self) -> dict[str, int]:
+    def get_material_stock(self) -> dict[str, int | float]:
         """当前材料库存快照（供进度对话框显示）
 
         返回 {材料名: 数量} 字典，同名材料去重后取当前有效数量。
-        无缓存时返回空字典。
+        材料坐标缓存已失效时，仍可展示独立律准石账本。
         """
-        if not self._material_cache:
-            return {}
         deduped = self._dedup_by_confidence(self._material_cache)
-        result: dict[str, int] = {}
+        result: dict[str, int | float] = {}
         for label, info in deduped.items():
             count = self._get_count(info)
             if count is not None:
                 result[label] = count
+        strategy = getattr(self._wf, "stone_stock", None)
+        if (strategy is not None and strategy.uses_cache
+                and not strategy.cache_invalid
+                and strategy.stock_units is not None):
+            result[STONE_LABEL] = strategy.stock_units / 10
         return result
 
     def tune_once(self, equip_data: EquipmentData,
@@ -394,50 +504,67 @@ class TuningExecutor:
 
     def _check_stone_stock(self, settings: MaterialSettings,
                            infos: dict | None) -> bool:
-        """大律准石数量检查（材料设置可开关，默认关闭）
-
-        基于调律页材料区识别结果（infos，与逐轮狗粮决策共用同一次
-        识别），取大律准石持有量（count 字段）；
-        低于基准判材料不足，按配置的不足处理执行：skip=跳过该装备
-        （继续遍历）；ask=confirm 弹窗询问，确认继续则本次运行不再
-        检查，拒绝同 abort；abort=置 materials_exhausted 使 is_stopped
-        恒真，全部退出。材料区找不到大律准石视为已耗尽；数量 OCR
-        失败时警告放行（识别波动不误杀整次运行）。
-
-        Returns:
-            True=可继续调律；False=材料不足，本件终止（是否全退
-            由 materials_exhausted 决定）
-        """
-        if not settings.stone_check_enabled or self._stone_check_waived:
+        """永久生效的律准石安全线与本轮实际消耗检查。"""
+        if not settings.stone_check_enabled:
             return True
-        # 同名材料去重：优先保留数量有效的槽
-        deduped = self._dedup_by_confidence(infos)
-        stone = deduped.get(STONE_LABEL)
-        if stone is None:
-            stock = 0  # 材料区无大律准石，视为已耗尽
-        else:
-            raw_count = self._get_count(stone)
-            if raw_count is None:
-                # 数量识别失败 = 该材料是装备而非调律石，视为已耗尽
-                logger.warning("大律准石数量识别失败（实为装备），视为材料不足")
-                stock = 0
+        strategy = self._wf.stone_stock
+        # 直接单测/扩展调用可传入已识别结果；生产路径在
+        # cache_materials 中已吸收，这里的 infos 为同一份数据。
+        if infos is not None:
+            deduped = self._dedup_by_confidence(infos)
+            large = deduped.get(STONE_LABEL)
+            small = deduped.get(SMALL_STONE_LABEL)
+            if large is None:
+                scanned_units = 0
+            elif not self._has_recognized_count(large):
+                scanned_units = None
             else:
-                stock = raw_count
-        if stock >= settings.stone_min_count:
+                scanned_units = int(self._get_count(large) or 0) * 10
+                if small is not None and self._has_recognized_count(small):
+                    scanned_units += int(self._get_count(small) or 0)
+            if scanned_units is not None:
+                strategy.accept_scan(scanned_units)
+        stock_units = strategy.stock_units
+        if stock_units is None:
+            reason = "大律准石数量识别失败，材料不足"
+            return self._handle_hard_stone_failure(reason, settings, 0)
+        hard_units = settings.stone_min_count * 10
+        required = strategy.required_tune_units(
+            self._wf.equipment_session.equipment,
+            len(self._wf.equipment_session.equipment.affixes) + 1,
+        ) if self._wf.equipment_session.equipment is not None else None
+        if stock_units >= hard_units and (
+                required is None or stock_units >= required):
             logger.debug(
-                f"大律准石库存 {stock} >= 基准 {settings.stone_min_count}")
+                f"律准石库存 {format_stone_units(stock_units)} >= "
+                f"安全线 {settings.stone_min_count}")
             return True
-        reason = (f"大律准石 {stock} < 基准 "
-                  f"{settings.stone_min_count}，材料不足")
+        if stock_units < hard_units:
+            reason = (
+                f"大律准石 {format_stone_units(stock_units)} < 安全线 "
+                f"{settings.stone_min_count}，材料不足")
+        else:
+            assert required is not None
+            reason = (
+                f"大律准石 {format_stone_units(stock_units)} < 本轮需要 "
+                f"{format_stone_units(required)}，材料不足")
+        return self._handle_hard_stone_failure(
+            reason, settings, stock_units // 10)
+
+    def _handle_hard_stone_failure(
+        self, reason: str, settings: MaterialSettings, stock: int
+    ) -> bool:
+        """安全线不可豁免；人工输入后必须重新检查。"""
         action = settings.stone_insufficient_action
         if action == "ask":
-            choice = self._confirm_material_insufficient(
-                f"{reason}，请选择：")
-            if choice == "continue":
-                logger.warning(f"{reason}，用户确认继续，本次运行不再检查")
-                self._stone_check_waived = True
-                return True
-            elif choice == "skip":
+            choice = self._confirm_hard_stone_failure(f"{reason}，请选择：")
+            if choice == "manual":
+                manual = self._input_stock_units()
+                if manual is not None:
+                    self._wf.stone_stock.set_manual(manual)
+                    return self._check_stone_stock(settings, None)
+                choice = "end"
+            if choice == "skip":
                 logger.warning(f"{reason}，用户选择跳过该装备")
                 self.abort_reason = f"{reason}，跳过该装备"
                 self._on_materials_insufficient(stock, settings.stone_min_count)
@@ -461,6 +588,18 @@ class TuningExecutor:
         self._wf.output["stop_reason"] = reason
         self._on_materials_insufficient(stock, settings.stone_min_count)
         return False
+
+    def _confirm_hard_stone_failure(self, message: str) -> str:
+        callback = getattr(self._wf.engine, "_ui_callback", None)
+        if callback is None:
+            return "end"
+        result = callback("choose", message=message, choices=[
+            {"label": tr("手动输入"), "value": "manual", "role": "accept"},
+            {"label": tr("跳过当前装备"), "value": "skip",
+             "role": "destructive"},
+            {"label": tr("结束本次调律"), "value": "end", "role": "reject"},
+        ], cancel_value="end")
+        return result if result in ("manual", "skip", "end") else "end"
 
     def _ensure_tune_ready(self, settings: MaterialSettings) -> bool:
         """一键添加后确认「调律」按钮已就绪（文字含「调律」）

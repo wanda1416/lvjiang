@@ -46,10 +46,15 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     assert len(tab._tuning_globals._switch_cbs) == 2
     assert not tab._pc_background_scroll_cb.isChecked()
     assert not tab._positional_traversal_cb.isChecked()
+    assert tab._use_stone_cache_cb.isChecked()
+    assert tab._initial_stone_min.value() == 0
     tab._pc_background_scroll_cb.setChecked(True)
     tab._positional_traversal_cb.setChecked(True)
+    tab._initial_stone_min.setValue(120)
     assert get_wf_config("auto_tuning")["pc_background_scroll"] is True
     assert get_wf_config("auto_tuning")["scroll_strategy"] == "positional"
+    assert get_wf_config("auto_tuning")["use_stone_cache"] is True
+    assert get_wf_config("auto_tuning")["initial_stone_min_count"] == 120
 
     tab._positional_traversal_cb.setChecked(False)
     assert get_wf_config("auto_tuning")["scroll_strategy"] == ""

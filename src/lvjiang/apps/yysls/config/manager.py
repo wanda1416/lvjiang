@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 from datetime import date
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import yaml
@@ -27,7 +28,13 @@ from .constants import (
     WUXUE_CATEGORY,
     normalize_equip_part,
 )
-from .models import AttrRange, LevelConfig, LevelRule, SeasonConfig
+from .models import (
+    AttrRange,
+    LevelConfig,
+    LevelRule,
+    SeasonConfig,
+    TuningStoneRule,
+)
 
 
 def _parse_date(value) -> date | None:
@@ -51,6 +58,59 @@ def _string_list(value) -> list[str]:
         return []
     return list(dict.fromkeys(
         str(item).strip() for item in value if str(item).strip()))
+
+
+def _stone_units(value, where: str) -> int:
+    """配置里的大律准石等价数转为 0.1 枚的整数单位。"""
+    if isinstance(value, bool):
+        raise ValueError(f"{where} 必须是非负数（最多 1 位小数）")
+    try:
+        scaled = Decimal(str(value)) * 10
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError(f"{where} 必须是非负数（最多 1 位小数）") from exc
+    if not scaled.is_finite() or scaled < 0 or scaled != scaled.to_integral_value():
+        raise ValueError(f"{where} 必须是非负数（最多 1 位小数）")
+    return int(scaled)
+
+
+def _stone_map(raw, where: str) -> dict[int, int]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} 必须是字典")
+    result: dict[int, int] = {}
+    for key, value in raw.items():
+        try:
+            affix_count = int(key)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{where} 的词条数必须是 1-5") from exc
+        if affix_count not in range(1, 6):
+            raise ValueError(f"{where} 的词条数必须是 1-5")
+        result[affix_count] = _stone_units(value, f"{where}.{affix_count}")
+    return result
+
+
+def _parse_tuning_stones(raw, where: str) -> dict[str, TuningStoneRule]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{where} 必须是字典")
+    result: dict[str, TuningStoneRule] = {}
+    for quality, item in raw.items():
+        if quality not in ("gold", "purple"):
+            raise ValueError(f"{where} 仅支持 gold/purple，收到 {quality!r}")
+        if not isinstance(item, dict):
+            raise ValueError(f"{where}.{quality} 必须是字典")
+        result[quality] = TuningStoneRule(
+            tune_cost=_stone_map(
+                item.get("tune_cost"), f"{where}.{quality}.tune_cost"),
+            reset_refund=_stone_map(
+                item.get("reset_refund"), f"{where}.{quality}.reset_refund"),
+            recycle_refund=_stone_map(
+                item.get("recycle_refund"),
+                f"{where}.{quality}.recycle_refund"),
+        )
+    return result
 
 
 class GameConfigManager:
@@ -388,6 +448,11 @@ class GameConfigManager:
                 min_material_count=item.get("min_material_count"),
                 judge_resistance=item.get("judge_resistance"),
                 buff_resistance=item.get("buff_resistance"),
+                reset_no_refund=bool(
+                    item.get("reset_no_refund", level <= 105)),
+                tuning_stones=_parse_tuning_stones(
+                    item.get("tuning_stones"),
+                    f"level_configs[{level}].tuning_stones"),
             ))
         # 按等级排序
         self._level_configs.sort(key=lambda c: c.level)

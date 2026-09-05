@@ -1097,26 +1097,44 @@ affix_parts:
 level_configs:
 - level: 91
   allow_reset: false
+  reset_no_refund: true
   allow_chengyin: true
   allow_retransfer: false
   judge_resistance: 45
 - level: 96
   allow_reset: false
+  reset_no_refund: true
   allow_chengyin: true
   allow_retransfer: false
   judge_resistance: 65
 - level: 100
   allow_reset: true
+  reset_no_refund: true
   allow_chengyin: true
   allow_retransfer: false
   min_material_count: 1
   judge_resistance: 85
 - level: 105
   allow_reset: true
+  reset_no_refund: true
   allow_chengyin: true
   allow_retransfer: true
   min_material_count: 2
   judge_resistance: 115
+  tuning_stones:
+    gold:
+      tune_cost:
+        1: 0
+        2: 6
+        3: 12
+        4: 24
+        5: 36
+      recycle_refund:
+        1: 6
+        2: 10.8
+        3: 20.4
+        4: 39.6
+        5: 68.4
 - level: 110
   allow_reset: true
   allow_chengyin: true

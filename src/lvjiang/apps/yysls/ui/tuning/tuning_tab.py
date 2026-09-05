@@ -269,6 +269,25 @@ class TuningTab(QWidget):
         self._pc_background_scroll_cb.stateChanged.connect(
             lambda _state: self._save_tuning_config())
         layout.addWidget(self._pc_background_scroll_cb)
+        self._use_stone_cache_cb = QCheckBox(tr("使用律准石缓存"))
+        self._use_stone_cache_cb.setToolTip(tr(
+            "首次识别后按调律、重置和回收结果记账；"
+            "关闭后每个检查点重新识别。"))
+        self._use_stone_cache_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._use_stone_cache_cb)
+        initial_stone_row = QHBoxLayout()
+        initial_stone_row.addWidget(QLabel(tr("初始检查大律准石数量大于")))
+        self._initial_stone_min = QSpinBox()
+        self._initial_stone_min.setRange(0, 99999)
+        self._initial_stone_min.setSpecialValueText(tr("不检查"))
+        self._initial_stone_min.setToolTip(tr(
+            "留空只建立缓存，不做额外的初始数量校验。"))
+        self._initial_stone_min.valueChanged.connect(
+            lambda _value: self._save_tuning_config())
+        initial_stone_row.addWidget(self._initial_stone_min)
+        initial_stone_row.addStretch()
+        layout.addLayout(initial_stone_row)
         self._positional_traversal_cb = QCheckBox(
             tr("启用位置校验遍历策略"))
         self._positional_traversal_cb.setToolTip(tr(
@@ -477,6 +496,10 @@ class TuningTab(QWidget):
         switches = {str(k): bool(v) for k, v in tc.get("switches", {}).items()}
         skip_tuning = bool(tc.get("skip_tuning", False))
         pc_background_scroll = bool(tc.get("pc_background_scroll", False))
+        use_stone_cache = bool(tc.get("use_stone_cache", True))
+        initial_stone_min_count = tc.get("initial_stone_min_count")
+        if initial_stone_min_count is not None:
+            initial_stone_min_count = int(initial_stone_min_count)
         scroll_strategy = (
             "positional"
             if tc.get("scroll_strategy") == "positional"
@@ -536,6 +559,8 @@ class TuningTab(QWidget):
                 base_group=base_group,
                 skip_tuning=skip_tuning,
                 pc_background_scroll=pc_background_scroll,
+                use_stone_cache=use_stone_cache,
+                initial_stone_min_count=initial_stone_min_count,
                 scroll_strategy=scroll_strategy,
                 skip_start=skip_start,
                 target_cell=target_cell,
@@ -614,6 +639,15 @@ class TuningTab(QWidget):
         self._pc_background_scroll_cb.setChecked(
             bool(tc.get("pc_background_scroll", False)))
         self._pc_background_scroll_cb.blockSignals(False)
+        self._use_stone_cache_cb.blockSignals(True)
+        self._use_stone_cache_cb.setChecked(
+            bool(tc.get("use_stone_cache", True)))
+        self._use_stone_cache_cb.blockSignals(False)
+        self._initial_stone_min.blockSignals(True)
+        initial_stone_min = tc.get("initial_stone_min_count")
+        self._initial_stone_min.setValue(
+            int(initial_stone_min) if initial_stone_min is not None else 0)
+        self._initial_stone_min.blockSignals(False)
         self._positional_traversal_cb.blockSignals(True)
         self._positional_traversal_cb.setChecked(
             tc.get("scroll_strategy") == "positional")
@@ -665,6 +699,10 @@ class TuningTab(QWidget):
             "base_group": self._base_group_key,
             "skip_tuning": self._get_tuning_skip_tuning(),
             "pc_background_scroll": self._pc_background_scroll_cb.isChecked(),
+            "use_stone_cache": self._use_stone_cache_cb.isChecked(),
+            "initial_stone_min_count": (
+                self._initial_stone_min.value()
+                if self._initial_stone_min.value() > 0 else None),
             "scroll_strategy": (
                 "positional" if self._positional_traversal_cb.isChecked() else ""),
             "skip_start": skip_start,

@@ -103,6 +103,8 @@ class TestSaveRoundtrip:
                 "skip_tuning": True,
                 "pc_background_scroll": True,
                 "scroll_strategy": "positional",
+                "use_stone_cache": True,
+                "initial_stone_min_count": 120,
             }},
         }), encoding="utf-8")
         import lvjiang.core.config.session as store_mod
@@ -117,3 +119,5 @@ class TestSaveRoundtrip:
         assert saved["skip_tuning"] is True
         assert saved["pc_background_scroll"] is True
         assert saved["scroll_strategy"] == "positional"
+        assert saved["use_stone_cache"] is True
+        assert saved["initial_stone_min_count"] == 120

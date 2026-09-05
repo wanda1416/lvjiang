@@ -433,7 +433,7 @@ class MaterialSettings:
     命中 + 材料充足）的规则；全部走完无命中 → 不添加。
     """
     stone_check_enabled: bool = False
-    stone_min_count: int = 100
+    stone_min_count: int = 80
     stone_insufficient_action: str = "abort"
     food_rules: list[FoodRule] = field(default_factory=list)
 

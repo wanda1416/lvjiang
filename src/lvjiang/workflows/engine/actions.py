@@ -307,13 +307,20 @@ class _ActionsMixin:
 
         direction = node.direction  # "up" | "down"
 
-        # 解析 interval（可选，float 秒数或 None）；None 时后端用默认随机间隔
+        # 解析 interval（可选，float 秒数或 None）；None 时后端用默认随机间隔。
+        # 非法值（非数值 / 负数）不中断工作流：记 error 后回退成 None 走默认随机间隔，
+        # 因为间隔只影响节奏、不影响滚动是否发生，为它中止整条批量任务不划算。
         interval = node.interval
         if interval is not None:
             try:
                 interval = float(interval)
             except (TypeError, ValueError):
-                raise WorkflowUserError(f"scroll: 无效滚动间隔: {node.interval}") from None
+                logger.error(f"scroll: 无效滚动间隔 {node.interval!r}，按后端默认随机间隔执行")
+                interval = None
+            else:
+                if interval < 0:
+                    logger.error(f"scroll: 滚动间隔不能为负 ({interval})，按后端默认随机间隔执行")
+                    interval = None
 
         if node.target is None:
             # 无目标：在画布中心滚动（作为默认位置）

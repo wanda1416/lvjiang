@@ -8,6 +8,7 @@ game_config 的 affix_caps 上——于是 ``full_affix`` 声明的条目换赛�
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import yaml
@@ -27,6 +28,7 @@ from .models import (
     AttrLoadout,
     AttrModelError,
     StatEffect,
+    martial_art_source_id,
 )
 from .parsing import parse_source_file
 from .resolver import CapsLookup, ResolveResult, resolve, solve_residual
@@ -52,6 +54,11 @@ def _leading_comments(path: Path) -> str:
     return "\n".join(header)
 
 
+def _game_config_martial_arts() -> Iterable[str]:
+    """武学名册。game_config.yaml 的 martial_arts 是本仓库的权威来源。"""
+    return get_game_config().get_martial_arts()
+
+
 def game_config_caps_lookup() -> CapsLookup:
     """把 affix_caps 包装成求值引擎要的满值查询"""
 
@@ -69,15 +76,26 @@ class AttrModelManager:
     :meth:`errors` 取出在 UI 里展示），不静默丢弃。
     """
 
-    def __init__(self, sources_dir: str | Path | None = None):
+    def __init__(
+        self,
+        sources_dir: str | Path | None = None,
+        *,
+        martial_art_roster: Callable[[], Iterable[str]] | None = None,
+    ):
+        #: 武学名册的来源。默认取 game_config，测试可注入。
+        self._martial_art_roster = martial_art_roster
         if sources_dir is None:
             self._resolver = get_resolver()
             self._rel_dir = _SOURCES_REL_DIR
+            if self._martial_art_roster is None:
+                self._martial_art_roster = _game_config_martial_arts
         else:
             # 测试/孤立目录：单层语义（system=local=sources_dir）
             self._resolver = ConfigResolver(
                 system_dir=sources_dir, local_dir=sources_dir, dev_mode=True)
             self._rel_dir = ""
+            # 孤立目录只认给定的文件，不去拉全局的武学注册表——否则
+            # 一个只想验证解析的测试会凭空多出二十几条武学条目。
         self._effects: list[StatEffect] = []
         self._files: dict[str, str] = {}   # source_id -> 文件名
         self._docs: dict[str, dict] = {}   # 文件名 -> 原始文档（UI 编辑用）
@@ -119,6 +137,53 @@ class AttrModelManager:
                 seen[effect.source_id] = name
                 self._files[effect.source_id] = name
                 self._effects.append(effect)
+        if self._martial_art_roster is not None:
+            self._sync_martial_arts()
+
+    def _sync_martial_arts(self) -> None:
+        """武学名册以 game_config.yaml 的 ``martial_arts`` 为准
+
+        武学是本仓库自己维护的权威数据，attr_model 只往上补数值。所以
+        名册不在 martial_art.yaml 里再存一份：存两份就一定会漏同步——
+        游戏出了新武学，属性页看不见；改了名字，旧名字留成填不掉的孤儿
+        条目，进度永远差一条。
+
+        文件因此只是**数值覆盖层**：名册里有、文件里没有的，当场补一条
+        待填；文件里有、名册里没有的，跳过并告警（不删文件，武学配置
+        改回来它就自己回来了）。
+        """
+        assert self._martial_art_roster is not None
+        try:
+            roster = list(self._martial_art_roster())
+        except Exception as e:
+            logger.error(f"读取武学注册表失败，武学来源暂按文件内容处理: {e}")
+            return
+        overlay = {
+            effect.source_id: effect
+            for effect in self._effects
+            if effect.kind == "martial_art"
+        }
+        synced: list[StatEffect] = []
+        for name in roster:
+            source_id = martial_art_source_id(name)
+            effect = overlay.pop(source_id, None)
+            if effect is None:
+                effect = StatEffect(
+                    source_id=source_id, label=source_id,
+                    kind="martial_art", group=name, modeled=False,
+                )
+            synced.append(effect)
+            # 未落盘的条目也要能存：_files 说的是「写回哪个文件」
+            self._files.setdefault(source_id, "martial_art.yaml")
+        for orphan in overlay:
+            logger.warning(
+                f"属性来源 {orphan} 不在武学注册表里，已忽略"
+                f"（如需保留请在武学配置里加回该武学）"
+            )
+            self._files.pop(orphan, None)
+        self._effects = [
+            effect for effect in self._effects if effect.kind != "martial_art"
+        ] + synced
 
     # ── 查询 ────────────────────────────────────────────
 
@@ -169,17 +234,32 @@ class AttrModelManager:
 
     def create_entry(self, kind: str, source_id: str, payload: dict | None = None) -> None:
         """新增条目。id 重复即拒绝——同名会在加载时被静默跳过。"""
+        self.create_entries(kind, {source_id: payload or {"modeled": False}})
+
+    def create_entries(self, kind: str, payloads: dict[str, dict]) -> None:
+        """批量新增，一次落盘
+
+        心法一门六重要一起建，逐条写就是六次「校验整份文件 + 重载」，
+        而且中途某一重撞名的话会留下半门心法——那比直接报错更难收拾。
+        所以先整批查重，再一次写完。
+        """
         if kind not in SOURCE_KINDS:
             raise AttrModelError(tr("未知来源类别: {kind}").format(kind=kind))
-        source_id = source_id.strip()
-        if not source_id:
-            raise AttrModelError(tr("属性来源条目名不能为空"))
-        if source_id in self._files:
+        changes: dict[str, dict] = {}
+        existing: list[str] = []
+        for source_id, payload in payloads.items():
+            source_id = source_id.strip()
+            if not source_id:
+                raise AttrModelError(tr("属性来源条目名不能为空"))
+            if source_id in self._files:
+                existing.append(source_id)
+            changes[source_id] = payload or {"modeled": False}
+        if existing:
             raise AttrModelError(
-                tr("属性来源条目已存在: {ids}").format(ids=source_id)
+                tr("属性来源条目已存在: {ids}").format(ids="、".join(existing))
             )
-        self._write(f"{kind}.yaml", {source_id: payload or {"modeled": False}},
-                    kind=kind)
+        if changes:
+            self._write(f"{kind}.yaml", changes, kind=kind)
 
     def delete_entry(self, source_id: str) -> None:
         """删除条目"""

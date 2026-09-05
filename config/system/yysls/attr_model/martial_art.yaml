@@ -1,48 +1,11 @@
 # 来源类别: martial_art
 # schema 见 core/attr_model/parsing.py
+#
+# 本文件只是**数值覆盖层**，不存武学名册。名册以 game_config.yaml 的
+# martial_arts 为准，加载时按「武学名·天赋」自动补齐待填条目——武学是
+# 本仓库自己维护的权威数据，存两份必然漏同步。
+#
+# 一门武学的整棵天赋树算一个条目：天赋点怎么加由流派与配装决定，本
+# 模型只关心这门武学最终给了多少静态属性。
 kind: martial_art
-entries:
-  九重春色·天赋:
-    modeled: false
-  千香引魂蛊·天赋:
-    modeled: false
-  明川药典·天赋:
-    modeled: false
-  杏游草野·天赋:
-    modeled: false
-  青山执笔·天赋:
-    modeled: false
-  文动霓裳·天赋:
-    modeled: false
-  醉梦游春·天赋:
-    modeled: false
-  断水双诀·天赋:
-    modeled: false
-  泥犁三垢·天赋:
-    modeled: false
-  天志垂象·天赋:
-    modeled: false
-  悬身拳法·天赋:
-    modeled: false
-  千机索天·天赋:
-    modeled: false
-  粟子游尘·天赋:
-    modeled: false
-  粟子行云·天赋:
-    modeled: false
-  八方风雷枪·天赋:
-    modeled: false
-  斩雪刀法·天赋:
-    modeled: false
-  十方破阵·天赋:
-    modeled: false
-  嗟夫刀法·天赋:
-    modeled: false
-  无名剑法·天赋:
-    modeled: false
-  积矩九剑·天赋:
-    modeled: false
-  九曲惊神枪·天赋:
-    modeled: false
-  无名枪法·天赋:
-    modeled: false
+entries: {}

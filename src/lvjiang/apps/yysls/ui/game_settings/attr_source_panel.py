@@ -59,6 +59,8 @@ from .....i18n import tr
 from ...config import get_game_config
 from ...core.attr_model import (
     DIMENSION_LABELS,
+    ENTRY_SEPARATOR,
+    INNER_WAY_TIERS,
     PERCENT_FIELDS,
     SCOPE_COMBAT,
     SCOPE_PANEL,
@@ -82,7 +84,7 @@ MODE_ADVANCED = "高级（多属性/公式）"
 _COLUMNS = (MODE_PENDING, MODE_FULL_AFFIX, MODE_VALUE, MODE_NO_EFFECT)
 
 #: 分组分隔符，与条目 id 的约定一致
-SEPARATOR = "·"
+SEPARATOR = ENTRY_SEPARATOR
 
 
 def _stat_choices() -> list[tuple[str, str]]:
@@ -242,6 +244,17 @@ class AttrSourcePanel(QWidget):
         btns.addWidget(self._btn_add)
         btns.addWidget(self._btn_del)
         left_layout.addLayout(btns)
+        if self._kinds == ("inner_way",):
+            # 心法按「门」增删，六重一起走，按钮上就说清楚
+            self._btn_add.setText(tr("+ 心法"))
+            self._btn_del.setText(tr("- 心法"))
+        if self._kinds == ("martial_art",):
+            # 武学名册以武学配置为准，这里只填数值。开了增删就会有两份
+            # 名册，改一处漏一处。
+            locked = tr("武学名册以「武学配置」为准，在那里增删")
+            for button in (self._btn_add, self._btn_del):
+                button.setEnabled(False)
+                button.setToolTip(locked)
         splitter.addWidget(left)
 
         right = QWidget()
@@ -553,6 +566,9 @@ class AttrSourcePanel(QWidget):
 
     def _on_add(self) -> None:
         kind = self._kinds[0]
+        if kind == "inner_way":
+            self._add_inner_way()
+            return
         name, ok = QInputDialog.getText(
             self, tr("新增条目"),
             tr("条目名（分组用「·」分隔，如 易水歌·二重）："))
@@ -560,6 +576,35 @@ class AttrSourcePanel(QWidget):
             return
         try:
             self._manager().create_entry(kind, name.strip())
+        except Exception as exc:
+            QMessageBox.warning(self, tr("新增失败"), str(exc))
+            return
+        self._refresh_groups()
+
+    def _add_inner_way(self) -> None:
+        """新增一门心法：一次建满六重
+
+        游戏里心法固定六重，一重一重敲六遍不只是麻烦——漏建一重时进度
+        会显示这门已经填完，缺口只能等反解那头露出来。
+        """
+        name, ok = QInputDialog.getText(
+            self, tr("新增心法"), tr("心法名（六重自动建好）："))
+        name = name.strip() if ok else ""
+        if not name:
+            return
+        if SEPARATOR in name:
+            QMessageBox.warning(
+                self, tr("新增失败"),
+                tr("心法名不能含「{sep}」，它是重数的分隔符").format(sep=SEPARATOR))
+            return
+        payloads = {
+            f"{name}{SEPARATOR}{tier}": {
+                "modeled": False, "group": name, "tier": index,
+            }
+            for index, tier in enumerate(INNER_WAY_TIERS, start=1)
+        }
+        try:
+            self._manager().create_entries("inner_way", payloads)
         except Exception as exc:
             QMessageBox.warning(self, tr("新增失败"), str(exc))
             return

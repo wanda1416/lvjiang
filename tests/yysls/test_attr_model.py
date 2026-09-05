@@ -720,3 +720,95 @@ def test_builtin_dimension_conversion_passes_the_dependency_rule() -> None:
     from lvjiang.apps.yysls.core.attr_model import validate_formula_dependencies
 
     validate_formula_dependencies(list(dimension_effects()))
+
+
+# ── 名册来源 ──────────────────────────────────────────────
+
+@pytest.fixture
+def roster_dir(tmp_path):
+    """武学名册由外部注入的目录，模拟 game_config 那份权威数据"""
+    from lvjiang.apps.yysls.core.attr_model import AttrModelManager
+
+    (tmp_path / "martial_art.yaml").write_text(
+        "kind: martial_art\nentries:\n  甲·天赋:\n    stats:\n      crit_rate: 0.01\n",
+        encoding="utf-8",
+    )
+    roster: list[str] = ["甲", "乙"]
+
+    def make() -> AttrModelManager:
+        return AttrModelManager(tmp_path, martial_art_roster=lambda: list(roster))
+
+    return make, roster, tmp_path
+
+
+def test_martial_arts_missing_from_the_file_are_filled_in_from_the_roster(
+    roster_dir,
+) -> None:
+    """名册只存一份：出了新武学，属性页当场多一条待填，不用改配置文件。"""
+    make, _, _ = roster_dir
+
+    manager = make()
+
+    assert [e.source_id for e in manager.effects(("martial_art",))] == [
+        "甲·天赋", "乙·天赋"]
+    assert manager.progress("martial_art") == (1, 2)
+
+
+def test_a_filled_in_martial_art_can_be_saved_without_existing_on_disk(
+    roster_dir,
+) -> None:
+    """名册补出来的条目也要能存——_files 说的是写回哪个文件。"""
+    make, _, path = roster_dir
+    manager = make()
+
+    manager.save_entry("乙·天赋", {"stats": {"crit_rate": 0.02}})
+
+    assert manager.progress("martial_art") == (2, 2)
+    assert "乙·天赋" in (path / "martial_art.yaml").read_text(encoding="utf-8")
+
+
+def test_martial_arts_no_longer_in_the_roster_are_ignored_not_deleted(
+    roster_dir,
+) -> None:
+    """改名/下线的武学不该留成填不掉的孤儿条目，但文件里的数值要留着。"""
+    make, roster, path = roster_dir
+    roster.remove("甲")
+
+    manager = make()
+
+    assert [e.source_id for e in manager.effects(("martial_art",))] == ["乙·天赋"]
+    assert "甲·天赋" in (path / "martial_art.yaml").read_text(encoding="utf-8")
+
+
+def test_inner_ways_can_be_added_as_a_whole_school(sources_dir) -> None:
+    """心法没有权威名册，界面得能自己加；一门一次建满六重。"""
+    from lvjiang.apps.yysls.core.attr_model import (
+        INNER_WAY_TIERS,
+        inner_way_source_ids,
+    )
+
+    manager, _ = sources_dir
+
+    manager.create_entries("inner_way", {
+        source_id: {"modeled": False, "group": "乙", "tier": tier}
+        for tier, source_id in enumerate(inner_way_source_ids("乙"), start=1)
+    })
+
+    added = [e for e in manager.effects(("inner_way",)) if e.group == "乙"]
+    assert len(added) == len(INNER_WAY_TIERS) == 6
+    assert [e.tier for e in added] == [1, 2, 3, 4, 5, 6]
+
+
+def test_a_clashing_id_rejects_the_whole_batch(sources_dir) -> None:
+    """半门心法比直接报错更难收拾：撞名就整批不写。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrModelError
+
+    manager, _ = sources_dir
+
+    with pytest.raises(AttrModelError, match="甲·二重"):
+        manager.create_entries("inner_way", {
+            "甲·二重": {"modeled": False},
+            "丙·一重": {"modeled": False},
+        })
+
+    assert manager.source_file("丙·一重") is None

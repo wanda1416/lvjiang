@@ -1,8 +1,12 @@
 #!/usr/bin/env python
-"""把心法/武学的条目骨架并入 config/system/yysls/attr_model/。
+"""把心法的条目骨架并入 config/system/yysls/attr_model/。
 
 只增不改：已存在的条目原样保留，只补进缺失的行。所以游戏出新心法时
-重跑一次即可，已经填好的数值不会被覆盖。
+重跑一次即可，已经填好的数值不会被覆盖。也可以直接在「属性配置 →
+心法」里按「+ 心法」新增，那边一次也是建满六重。
+
+武学不在此列：名册以 game_config.yaml 的 martial_arts 为准，加载时
+自动补齐，不需要也不应该在这里生成一份。
 
 条目本身不带数值——数值由使用者在「游戏配置 → 属性来源」里填。脚本
 的价值是把几百行的名字和重数先摆好，让补数据只剩「选词条 / 填数字 /
@@ -51,16 +55,6 @@ def _load(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def _martial_arts() -> list[str]:
-    """武学名取自 game_config.yaml，那是本仓库自己的权威来源"""
-    config = _load(ROOT / "config" / "system" / "yysls" / "game_config.yaml")
-    return [
-        item["name"]
-        for item in (config.get("martial_arts") or [])
-        if isinstance(item, dict) and item.get("name")
-    ]
-
-
 def _merge(path: Path, kind: str, wanted: list[str], *, dry_run: bool) -> int:
     data = _load(path)
     if data.get("kind") not in (None, kind):
@@ -99,15 +93,9 @@ def main() -> int:
         for name in names
         for tier in TIERS
     ]
-    martial_art_ids = [f"{name}·天赋" for name in _martial_arts()]
-
     print(f"目标目录：{TARGET_DIR}")
     total = _merge(
         TARGET_DIR / "inner_way.yaml", "inner_way", inner_way_ids,
-        dry_run=args.dry_run,
-    )
-    total += _merge(
-        TARGET_DIR / "martial_art.yaml", "martial_art", martial_art_ids,
         dry_run=args.dry_run,
     )
     if not total:

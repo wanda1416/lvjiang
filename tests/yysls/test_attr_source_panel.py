@@ -435,3 +435,39 @@ def test_empty_pages_show_no_progress_suffix(qapp, tmp_path, monkeypatch) -> Non
     tab = AttrConfigTab()
 
     assert tab._tabs.tabText(0) == "心法"
+
+
+def test_adding_an_inner_way_creates_all_six_tiers(panel, monkeypatch) -> None:
+    """漏建一重时进度会显示这门已经填完，所以按「门」新增而不是按「重」。"""
+    import lvjiang.apps.yysls.ui.game_settings.attr_source_panel as module
+
+    widget, manager = panel
+    monkeypatch.setattr(
+        module.QInputDialog, "getText",
+        staticmethod(lambda *a, **k: ("长生无相", True)))
+
+    widget._on_add()
+
+    added = [e for e in manager.effects(("inner_way",)) if e.group == "长生无相"]
+    assert [e.tier for e in added] == [1, 2, 3, 4, 5, 6]
+    assert "长生无相" in _group_names(widget)
+
+
+def test_the_martial_art_page_does_not_let_you_edit_the_roster(
+    tmp_path, monkeypatch,
+) -> None:
+    """名册在武学配置里，这一页开了增删就是第二份名册。"""
+    import lvjiang.apps.yysls.ui.game_settings.attr_source_panel as module
+
+    (tmp_path / "martial_art.yaml").write_text(
+        "kind: martial_art\nentries:\n  甲·天赋:\n    modeled: false\n",
+        encoding="utf-8",
+    )
+    manager = AttrModelManager(tmp_path)
+    monkeypatch.setattr(module, "get_attr_model_manager", lambda: manager)
+    monkeypatch.setattr(module, "invalidate_attr_model_cache", lambda: None)
+
+    widget = AttrSourcePanel(("martial_art",))
+
+    assert not widget._btn_add.isEnabled()
+    assert not widget._btn_del.isEnabled()

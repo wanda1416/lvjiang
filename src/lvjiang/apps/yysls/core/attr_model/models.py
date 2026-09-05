@@ -120,6 +120,13 @@ ATTR_ATTACK_CATEGORY = "属性攻击"
 #: 五维词组名
 DIMENSION_CATEGORY = "五维属性"
 
+#: 条目 id 的分组分隔符。「易水歌·二重」「无名剑法·天赋」都按它分组。
+ENTRY_SEPARATOR = "·"
+
+#: 武学条目 id 的后缀。一门武学的整棵天赋树算一个条目——天赋点怎么加
+#: 由流派与配装决定，本模型只关心这门武学最终给了多少静态属性。
+MARTIAL_ART_ENTRY_SUFFIX = "天赋"
+
 #: 心法重数。游戏里固定六重，选第 N 重时一重至 N 重同时生效。
 INNER_WAY_TIERS: tuple[str, ...] = (
     "一重", "二重", "三重", "四重", "五重", "六重",
@@ -128,6 +135,16 @@ MAX_INNER_WAY_TIER = len(INNER_WAY_TIERS)
 
 #: 同时可装备的心法门数
 INNER_WAY_SLOTS = 4
+
+
+def martial_art_source_id(name: str) -> str:
+    """武学名 → 属性来源条目 id"""
+    return f"{name}{ENTRY_SEPARATOR}{MARTIAL_ART_ENTRY_SUFFIX}"
+
+
+def inner_way_source_ids(name: str) -> list[str]:
+    """心法名 → 六重的条目 id，重数顺序即 :data:`INNER_WAY_TIERS`"""
+    return [f"{name}{ENTRY_SEPARATOR}{tier}" for tier in INNER_WAY_TIERS]
 
 #: 来源的选择方式。游戏规则决定，不进 YAML。
 #:

@@ -459,8 +459,9 @@ class AgentInput(InputBackend):
         logger.warning("[Agent] move by 指令无效：设备端手势不支持鼠标移动")
 
     def scroll_screen(self, screen_x: int, screen_y: int, direction: str = "down",
-                      amount: int = 1, poi_name: str = ""):
-        """与 AdbInput 同一套换算：每格 100px 的短距离滑动模拟滚轮"""
+                      amount: int = 1, poi_name: str = "", *, interval: float | None = None):
+        """与 AdbInput 同一套换算：每格 100px 的短距离滑动模拟滚轮。
+        单次连续 swipe，interval 参数在此后端被忽略。"""
         dist = 100 * amount
         end_y = screen_y - dist if direction == "up" else screen_y + dist
         label = f"({poi_name})" if poi_name else ""

@@ -141,7 +141,7 @@ def test_move_and_scroll_subscene_targets_execute(monkeypatch):
     engine._input.move_screen.assert_called_once_with(
         321, 654, "parent/card_2/label", duration=0.2)
     engine._input.scroll_screen.assert_called_once_with(
-        321, 654, "down", 3, "parent/card_2/label")
+        321, 654, "down", 3, "parent/card_2/label", interval=None)
 
 
 def test_move_and_scroll_subscene_targets_are_statically_collected():

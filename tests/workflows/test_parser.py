@@ -779,6 +779,49 @@ def test_scroll_with_var_target():
     assert node.amount == 1
 
 
+# ─── scroll interval 测试 ─────────────────────────────
+
+
+def test_scroll_with_interval():
+    """scroll [scene].[region] up 5 interval 0.1 — 逐格固定间隔"""
+    program = parse_text("scroll [scene].[region] up 5 interval 0.1")
+    node = program.body[0]
+    assert isinstance(node, Scroll)
+    assert node.direction == "up"
+    assert isinstance(node.target, EntityRef)
+    assert node.amount == 5
+    assert node.interval == 0.1
+
+
+def test_scroll_interval_without_amount():
+    """scroll down interval 0.2 — 省略数量时仍可指定间隔"""
+    program = parse_text("scroll down interval 0.2")
+    node = program.body[0]
+    assert isinstance(node, Scroll)
+    assert node.direction == "down"
+    assert node.target is None
+    assert node.amount == 1
+    assert node.interval == 0.2
+
+
+def test_scroll_default_interval_is_none():
+    """未写 interval 时默认 None（后端用随机间隔）"""
+    program = parse_text("scroll down 3")
+    assert program.body[0].interval is None
+
+
+def test_scroll_interval_with_wait_clause():
+    """interval 与后缀 wait 子句共存，互不干扰"""
+    program = parse_text(
+        "scroll [scene].[region] down 2 interval 0.05 after wait 0.5")
+    assert len(program.body) == 2
+    assert isinstance(program.body[0], Scroll)
+    assert program.body[0].amount == 2
+    assert program.body[0].interval == 0.05
+    assert isinstance(program.body[1], Wait)
+    assert program.body[1].delay.value == 0.5
+
+
 # ─── scroll wait_clause 测试 ────────────────────────────────────
 
 

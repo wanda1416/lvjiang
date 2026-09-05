@@ -85,6 +85,8 @@ class _GestureInput(InputBackend):
         direction: str = "down",
         amount: int = 1,
         poi_name: str = "",
+        *,
+        interval: float | None = None,
     ):
         """设备端不支持鼠标滚轮，空操作"""
         print(f"[{self.name}] scroll 指令无效：设备端输入后端不支持鼠标滚轮")

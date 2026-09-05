@@ -29,12 +29,14 @@ class _DeviceWorker(QObject):
     notice = pyqtSignal(str)  # 连接过程中的提示（主线程写进日志区）
     error = pyqtSignal(str)
 
-    def __init__(self, task: str, serial: str = "", capture_method: str = "", agent_mode: bool = False):
+    def __init__(self, task: str, serial: str = "", capture_method: str = "",
+                 agent_mode: bool = False, subnets: list | None = None):
         super().__init__()
         self._task = task
         self._serial = serial
         self._capture_method = capture_method
         self._agent_mode = agent_mode
+        self._subnets = subnets  # None = 扫描全部网卡
         self._cancelled = False
 
     def cancel(self):
@@ -47,6 +49,8 @@ class _DeviceWorker(QObject):
                 self._do_scan()
             elif self._task == "wireless_scan":
                 self._do_wireless_scan()
+            elif self._task == "local_scan":
+                self._do_local_scan()
             else:
                 self._do_connect()
         except Exception as e:
@@ -68,7 +72,24 @@ class _DeviceWorker(QObject):
             self.wireless_progress.emit(message, current, total)
 
         try:
-            devices = scan_and_connect_wireless(progress_cb=progress_cb)
+            devices = scan_and_connect_wireless(progress_cb=progress_cb, subnets=self._subnets)
+            if not self._cancelled:
+                self.wireless_finished.emit(devices)
+        except RuntimeError as e:
+            if str(e) != "cancelled":
+                raise
+
+    def _do_local_scan(self):
+        """探测本机开放的 ADB 端口（模拟器）"""
+        from ...core.android import scan_and_connect_local
+
+        def progress_cb(message: str, current: int, total: int):
+            if self._cancelled:
+                raise RuntimeError("cancelled")
+            self.wireless_progress.emit(message, current, total)
+
+        try:
+            devices = scan_and_connect_local(progress_cb=progress_cb)
             if not self._cancelled:
                 self.wireless_finished.emit(devices)
         except RuntimeError as e:
@@ -111,11 +132,17 @@ class _DeviceWorker(QObject):
 
 
 class _WirelessScanDialog(QObject):
-    """局域网扫描对话框：带进度条和状态反馈"""
+    """未发现 ADB 设备时的扫描对话框
+
+    多网卡（VMware/WSL/VPN 虚拟网卡）环境下，只扫一个网段常常扫不到目标设备，
+    因此这里把本机网卡+网段列进下拉框，默认「全部网卡」逐段扫；
+    模拟器只在 127.0.0.1 上监听，另给一个「本地扫描」入口。
+    """
 
     def __init__(self, parent):
         super().__init__(parent)
         from PyQt6.QtWidgets import (
+            QComboBox,
             QDialog,
             QHBoxLayout,
             QLabel,
@@ -125,17 +152,27 @@ class _WirelessScanDialog(QObject):
         )
         self._dialog = QDialog(parent)
         self._dialog.setWindowTitle(tr("未发现 ADB 设备"))
-        self._dialog.setMinimumWidth(400)
+        self._dialog.setMinimumWidth(460)
 
         layout = QVBoxLayout(self._dialog)
 
         # 提示文字
         self._msg_label = QLabel(
             tr("未发现 USB 连接的 ADB 设备。\n\n"
-               "是否扫描局域网并尝试无线连接？\n"
-               "（设备需已开启无线调试）")
+               "可选择网段扫描局域网（设备需已开启无线调试），\n"
+               "或直接扫描本机端口以发现模拟器。")
         )
         layout.addWidget(self._msg_label)
+
+        # 网段选择（多网卡时避免只扫到虚拟网卡那一段）
+        subnet_row = QHBoxLayout()
+        subnet_row.addWidget(QLabel(tr("扫描网段：")))
+        self._subnet_combo = QComboBox()
+        self._subnet_combo.addItem(tr("全部网卡（默认）"), None)
+        for iface in self._list_interfaces():
+            self._subnet_combo.addItem(iface.label, [iface.subnet])
+        subnet_row.addWidget(self._subnet_combo, 1)
+        layout.addLayout(subnet_row)
 
         # 进度条（初始隐藏）
         self._progress_bar = QProgressBar()
@@ -150,32 +187,61 @@ class _WirelessScanDialog(QObject):
 
         # 按钮
         btn_layout = QHBoxLayout()
-        self._scan_btn = QPushButton(tr("扫描"))
+        self._scan_btn = QPushButton(tr("扫描局域网"))
+        self._local_btn = QPushButton(tr("本地扫描（模拟器）"))
         self._cancel_btn = QPushButton(tr("取消"))
         apply_button_style(self._scan_btn)
+        apply_button_style(self._local_btn, variant="neutral")
         apply_button_style(self._cancel_btn, variant="neutral")
-        fit_button_width(self._scan_btn, self._cancel_btn)
+        fit_button_width(self._scan_btn, self._local_btn, self._cancel_btn)
         btn_layout.addStretch()
         btn_layout.addWidget(self._scan_btn)
+        btn_layout.addWidget(self._local_btn)
         btn_layout.addWidget(self._cancel_btn)
         layout.addLayout(btn_layout)
 
         # 信号连接
         self._scan_btn.clicked.connect(self._on_scan_clicked)
+        self._local_btn.clicked.connect(self._on_local_clicked)
         self._cancel_btn.clicked.connect(self._dialog.reject)
 
         # 回调
         self._on_scan_callback = None
 
-    def _on_scan_clicked(self):
-        """点击扫描按钮"""
+    @staticmethod
+    def _list_interfaces() -> list:
+        """枚举本机网卡；失败时下拉框只保留「全部网卡」"""
+        try:
+            from ...core.android import list_ipv4_interfaces
+            return list_ipv4_interfaces()
+        except Exception as e:  # 枚举失败不该挡住扫描
+            logger.warning(f"枚举本机网卡失败: {e}")
+            return []
+
+    def selected_subnets(self) -> list | None:
+        """当前选中的网段前缀列表；None 表示全部网卡"""
+        return self._subnet_combo.currentData()
+
+    def _begin_scan(self, mode: str):
+        """进入扫描中状态并回调上层"""
         self._scan_btn.setEnabled(False)
-        self._scan_btn.setText(tr("扫描中..."))
+        self._local_btn.setEnabled(False)
+        self._subnet_combo.setEnabled(False)
         self._cancel_btn.setEnabled(False)
         self._progress_bar.setVisible(True)
         self._status_label.setVisible(True)
         if self._on_scan_callback:
-            self._on_scan_callback()
+            self._on_scan_callback(mode, self.selected_subnets())
+
+    def _on_scan_clicked(self):
+        """点击「扫描局域网」"""
+        self._scan_btn.setText(tr("扫描中..."))
+        self._begin_scan("lan")
+
+    def _on_local_clicked(self):
+        """点击「本地扫描（模拟器）」"""
+        self._local_btn.setText(tr("扫描中..."))
+        self._begin_scan("local")
 
     def update_progress(self, message: str, current: int, total: int):
         """更新进度"""
@@ -184,7 +250,11 @@ class _WirelessScanDialog(QObject):
         self._status_label.setText(message)
 
     def exec(self, on_scan_callback) -> bool:
-        """显示对话框，返回是否点击了扫描"""
+        """显示对话框，返回是否发起过扫描
+
+        on_scan_callback(mode, subnets)：mode 为 'lan' / 'local'，
+        subnets 为选中的网段前缀列表（None = 全部网卡）。
+        """
         from PyQt6.QtWidgets import QDialog
         self._on_scan_callback = on_scan_callback
         return self._dialog.exec() == QDialog.DialogCode.Accepted
@@ -423,16 +493,30 @@ class WindowOpsMixin:
             self._device_thread.quit()
             self._device_thread.wait(3000)
 
-    def _start_wireless_scan(self):
-        """启动局域网 ADB 扫描（异步）"""
+    def _start_wireless_scan(self, mode: str = "lan", subnets: list | None = None):
+        """启动 ADB 扫描（异步）
+
+        Args:
+            mode: 'lan' 扫描局域网网段，'local' 探测本机模拟器端口
+            subnets: 指定网段前缀列表，None 表示全部网卡（仅 lan 模式有效）
+        """
         self.btn_scan_device.setEnabled(False)
-        self.btn_scan_device.setText(tr("扫描局域网..."))
-        self.statusBar().showMessage(tr("正在扫描局域网..."))
-        self.log_text.append(tr("[扫描] 正在扫描局域网 ADB 设备..."))
+        if mode == "local":
+            self.btn_scan_device.setText(tr("扫描本机..."))
+            self.statusBar().showMessage(tr("正在扫描本机模拟器..."))
+            self.log_text.append(tr("[扫描] 正在探测本机模拟器 ADB 端口..."))
+        else:
+            self.btn_scan_device.setText(tr("扫描局域网..."))
+            self.statusBar().showMessage(tr("正在扫描局域网..."))
+            scope = "全部网卡" if not subnets else "、".join(f"{s}0/24" for s in subnets)
+            self.log_text.append(f"[扫描] 正在扫描局域网 ADB 设备（{scope}）...")
 
         self._wait_device_thread()
         self._device_thread = QThread()
-        self._device_worker = _DeviceWorker(task="wireless_scan")
+        self._device_worker = _DeviceWorker(
+            task="local_scan" if mode == "local" else "wireless_scan",
+            subnets=subnets,
+        )
         self._device_worker.moveToThread(self._device_thread)
         self._device_thread.started.connect(self._device_worker.run)
         self._device_worker.wireless_finished.connect(self._on_wireless_scan_done)
@@ -471,16 +555,30 @@ class WindowOpsMixin:
                 pass  # 对话框已被销毁
 
         if not devices:
-            self.log_text.append(tr("[扫描] 局域网内未发现可连接的 ADB 设备"))
-            self.statusBar().showMessage(tr("未发现设备 | 请确认设备已开启无线调试"))
-            QMessageBox.warning(
-                self,  # type: ignore[arg-type]  # mixin: self is QWidget
-                tr("未发现设备"),
-                tr("局域网内未发现可连接的 ADB 设备。\n\n"
-                   "请确认：\n"
-                   "1. 设备与电脑在同一局域网\n"
-                   "2. 设备已开启无线调试（开发者选项）"),
-            )
+            local_mode = getattr(self._device_worker, "_task", "") == "local_scan"
+            if local_mode:
+                self.log_text.append(tr("[扫描] 本机未发现开放的模拟器 ADB 端口"))
+                self.statusBar().showMessage(tr("未发现设备 | 请确认模拟器已启动"))
+                QMessageBox.warning(
+                    self,  # type: ignore[arg-type]  # mixin: self is QWidget
+                    tr("未发现设备"),
+                    tr("本机未发现开放的模拟器 ADB 端口。\n\n"
+                       "请确认：\n"
+                       "1. 模拟器已启动\n"
+                       "2. 模拟器已开启 ADB 调试"),
+                )
+            else:
+                self.log_text.append(tr("[扫描] 局域网内未发现可连接的 ADB 设备"))
+                self.statusBar().showMessage(tr("未发现设备 | 请确认设备已开启无线调试"))
+                QMessageBox.warning(
+                    self,  # type: ignore[arg-type]  # mixin: self is QWidget
+                    tr("未发现设备"),
+                    tr("局域网内未发现可连接的 ADB 设备。\n\n"
+                       "请确认：\n"
+                       "1. 设备与电脑在同一局域网\n"
+                       "2. 设备已开启无线调试（开发者选项）\n"
+                       "3. 多网卡时可在下拉框改选目标网段，或改用本地扫描"),
+                )
             return
 
         self._scanned_windows = devices
@@ -490,7 +588,7 @@ class WindowOpsMixin:
         self.btn_locate.setEnabled(True)
         self.lbl_window_info.setText(f"已发现 {len(devices)} 台设备，请选择并点击连接")
         self.lbl_window_info.setStyleSheet("color: green;")
-        self.log_text.append(f"[扫描] 局域网发现 {len(devices)} 台设备，请选择并点击连接")
+        self.log_text.append(f"[扫描] 发现 {len(devices)} 台设备，请选择并点击连接")
         self.statusBar().showMessage(f"已发现 {len(devices)} 台设备 | 请选择并点击连接")
 
     def _on_wireless_scan_error(self, error_msg: str):

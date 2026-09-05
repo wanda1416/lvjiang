@@ -22,6 +22,12 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal.positional impor
     PositionalTraversal,
     ScrollState,
 )
+from lvjiang.apps.yysls.workflows.implementations.bag_traversal.scrolling import (
+    BagScrollStrategy,
+    DragBagScroll,
+    WheelBagScroll,
+    create_bag_scroll_strategy,
+)
 
 TRAVERSALS: dict[str, type[BagTraversal]] = {
     "dedup": DedupTraversal,
@@ -34,6 +40,10 @@ __all__ = [
     "DedupTraversal",
     "PositionalTraversal",
     "ScrollState",
+    "BagScrollStrategy",
+    "DragBagScroll",
+    "WheelBagScroll",
+    "create_bag_scroll_strategy",
     "TRAVERSALS",
     "DEFAULT_TRAVERSAL",
 ]

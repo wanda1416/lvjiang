@@ -17,10 +17,48 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     TRAVERSALS,
     BagTraversal,
     DedupTraversal,
+    DragBagScroll,
     PositionalTraversal,
+    WheelBagScroll,
+    create_bag_scroll_strategy,
 )
 
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL
+
+
+class TestBagScrollStrategy:
+    class _WF:
+        GRID_SCENE = "bag_equip_detail"
+        GRID_PANEL = "bag_grid"
+
+        def __init__(self):
+            self.drag_calls = []
+            self.scroll_calls = []
+
+        def drag_grid(self, *args, **kwargs):
+            self.drag_calls.append((args, kwargs))
+
+        def scroll_any(self, *args, **kwargs):
+            self.scroll_calls.append((args, kwargs))
+
+    def test_default_and_android_keep_precise_drag(self):
+        assert isinstance(create_bag_scroll_strategy("desktop", False), DragBagScroll)
+        assert isinstance(create_bag_scroll_strategy("android", True), DragBagScroll)
+
+    def test_desktop_background_mode_uses_wheel(self):
+        assert isinstance(create_bag_scroll_strategy("desktop", True), WheelBagScroll)
+
+    def test_drag_strategy_preserves_distance_and_hold(self):
+        wf = self._WF()
+        DragBagScroll().move(wf, "up", distance=0.25, hold=0.3)
+        assert wf.drag_calls == [(('bag_equip_detail', 'bag_grid', 'up'),
+                                  {'distance': 0.25, 'hold': 0.3})]
+
+    def test_wheel_strategy_maps_content_up_to_scroll_down_one(self):
+        wf = self._WF()
+        WheelBagScroll().move(wf, "up", distance=0.25, hold=0.3)
+        assert wf.scroll_calls == [(('bag_equip_detail', 'bag_grid', 'down'),
+                                    {'amount': 1})]
 
 
 class _Panel:

@@ -101,6 +101,15 @@ yysls:
   当前图库空间缺少_levels_counts_输出字段_无法启动自动调律: Current gallery space missing levels/counts output field, cannot start auto tuning
   打开进度: Open Progress
   指定调律: Specify Tuning
+  参数: Parameters
+  调律部位: 'Tuning Slots:'
+  全局开关: 'Global Switches:'
+  调律设置: 'Tuning Settings:'
+  调试参数: 'Debug Parameters:'
+  PC_端兼容后台模式: PC background compatibility mode
+  启用位置校验遍历策略: Enable positional validation traversal
+  默认使用去重遍历_dedup_启用后改用位置校验遍历_positional: Uses dedup traversal by default; when enabled, switches to positional validation traversal.
+  仅在_PC_端生效_关闭时继续使用更精准的拖拽滚动: Only applies on PC; when off, more precise drag scrolling remains in use.
   更多: More
   未就绪: Not Ready
   流派规则_可多选: 'Playstyle Rules (multi-select):'

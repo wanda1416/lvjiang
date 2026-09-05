@@ -147,8 +147,14 @@ src/lvjiang/apps/yysls/workflows/implementations/bag_traversal/
 ├── __init__.py       # 策略注册（TRAVERSALS）与默认策略（DEFAULT_TRAVERSAL）
 ├── base.py           # BagTraversal 抽象基类
 ├── dedup.py          # DedupTraversal（新，默认）
-└── positional.py     # PositionalTraversal（旧，供回切）
+├── positional.py     # PositionalTraversal（旧，供回切）
+└── scrolling.py      # 背包滚动手段策略（精准拖拽 / 后台滚轮）
 ```
+
+遍历算法与滚动手段是两组正交策略。默认使用 `DragBagScroll`，按网格行高
+执行更精准的拖拽；PC 端开启“兼容后台模式”后使用 `WheelBagScroll`，将每次
+内容向上移动映射为与 DSL `scroll [bag_equip_detail].[bag_grid] down 1`
+完全相同的公共滚轮能力。Android 始终使用拖拽。
 
 ### 4.2 DedupTraversal（默认策略）
 
@@ -166,6 +172,8 @@ src/lvjiang/apps/yysls/workflows/implementations/bag_traversal/
 **适用场景**：当 Dedup 策略因特殊场景（如装备排序变化）表现不佳时，可回切此策略。
 
 **回切方式**：`config/session/yysls/session.json` 的 tuning 节配 `"scroll_strategy": "positional"`。
+桌面“调律 → 参数 → 调律设置”提供同一配置的复选框；默认不勾选（dedup），
+勾选后启用 positional。
 
 ### 4.4 到底检测
 

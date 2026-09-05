@@ -275,6 +275,13 @@ class Press:
 
 
 @dataclass(frozen=True)
+class Paste:
+    """paste 指令：将表达式结果作为字符串粘贴到当前输入目标。"""
+    value: Any
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
 class If:
     condition: Any  # 表达式节点
     then_body: list = field(default_factory=list)

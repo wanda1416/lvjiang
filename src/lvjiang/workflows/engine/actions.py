@@ -30,6 +30,7 @@ from ..grammar import (
     Move,
     PanelGridDrag,
     PanelRef,
+    Paste,
     Place,
     Press,
     Scroll,
@@ -791,6 +792,18 @@ class _ActionsMixin:
                     raise WorkflowUserError(
                         f"Key '{missing[0]}' is not pressed")
                 up_all(keys)
+
+    def _exec_paste(self, node: Paste) -> None:
+        """paste <expr> — 将表达式结果转换为字符串并交给输入后端。"""
+        value = self._resolve(node.value)
+        if value is None:
+            raise WorkflowUserError("paste: 文本变量未定义或值为 null")
+        text = str(value)
+        logger.debug(f"paste: {len(text)} 个字符")
+        try:
+            self._input.paste_text(text)
+        except NotImplementedError as exc:
+            raise WorkflowUserError(str(exc)) from exc
 
     def _exec_wait(self, node: Wait):
         delay = node.delay

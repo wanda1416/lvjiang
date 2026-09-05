@@ -17,6 +17,7 @@ from ..ast_nodes import (
     Move,
     PanelGridDrag,
     PanelRef,
+    Paste,
     Place,
     Press,
     PressMode,
@@ -534,6 +535,13 @@ class _StmtMixin:
     def press_up(self, items):
         """up → (PressMode.UP, None)"""
         return (PressMode.UP, None)
+
+    def paste_stmt(self, items):
+        """paste <expr> [wait ...]，wait 子句按通用规则展开。"""
+        wait_pairs, core_items = self._extract_wait_pairs(items)
+        value = next(item for item in core_items if item is not None)
+        node = Paste(value=value, line_no=self._line(items))
+        return self._expand_wait_clauses(node, wait_pairs)
 
     # ─── align 指令 ─────────────────────────────────────
 

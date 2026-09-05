@@ -454,3 +454,8 @@ class SendInputInput(InputBackend):
             flags |= KEYEVENTF_EXTENDEDKEY
         logger.debug(f"[SendInput] key_up: {k} (vk=0x{vk:02X}, scan={scan})")
         send_keyboard_input(vk, scan, flags)
+
+    def paste_text(self, text: str) -> None:
+        """通过系统剪贴板和 SendInput Ctrl+V 粘贴文本。"""
+        from .clipboard import paste_via_clipboard
+        paste_via_clipboard(text, self.key_down, self.key_up)

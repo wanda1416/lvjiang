@@ -47,6 +47,7 @@ class InputBackend(ABC):
     - drag_screen(from_x, from_y, to_x, to_y, ...)：从起点拖拽到终点
     - key_down(key)：按下按键（仅 keydown，不释放）
     - key_up(key)：释放按键
+    - paste_text(text)：粘贴字符串（支持的桌面后端通过剪贴板 + Ctrl+V）
 
     兼容属性（供 run_control 访问）：
     - background_mode: bool（ADB 恒 True）
@@ -200,6 +201,15 @@ class InputBackend(ABC):
         Backend 不负责状态管理，只负责发送。
         key 参数已经是标准化后的键名。
         """
+
+    def paste_text(self, text: str) -> None:
+        """把字符串粘贴到当前输入目标。
+
+        这是可选能力：桌面后端使用系统剪贴板与 Ctrl+V 实现；不具备
+        文本输入能力的后端保持默认实现并明确报错。
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} 不支持粘贴文本")
 
     @staticmethod
     def _inject_input_sim(instance, input_sim: InputSimConfig | None):

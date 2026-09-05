@@ -14,9 +14,14 @@ android {
         applicationId = "com.lvjiang.app"
         minSdk = 26
         targetSdk = 35
-        // versionCode 同时是配置解压的 stamp（见 App.kt）：改了 config/system 或布局文件
-        // 就要 +1，否则升级后仍走「同版本跳过」分支，设备上还是旧配置。
-        versionCode = 44
+        // versionCode 同时是配置解压的 stamp（见 App.kt）：改了**设备端会读的**
+        // config/system 内容（场景/工作流 .wf/布局/参照图）就要 +1，否则升级后
+        // 仍走「同版本跳过」分支，设备上还是旧配置。
+        //
+        // 只有桌面端读的那几个目录（attr_model / damage_model / graduation）不算：
+        // 它们照样打进 APK，但设备上没有代码读，重解压不改变任何行为。日常按
+        // 发版节奏走即可，别把它当成提交计数器。
+        versionCode = 41
         versionName = "0.10.4"
         // 设备为 arm64（vivo V2415A），Chaquopy 按 ABI 打包 Python 运行时
         ndk { abiFilters += listOf("arm64-v8a") }

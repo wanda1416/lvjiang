@@ -3,7 +3,7 @@
 四种通用数据模型的数据类：
 - quota: 配额（周期任务/限额），周期结束自动清零
 - regen: 再生（恢复状态），按规则回复，有上限
-- stock: 存量（资源计数），纯数字，无颜色告警
+- stock: 库存（资源计数），纯数字，无颜色告警
 - note: 备注（轻量标记），文本存储，不参与数值管线与同步
 
 quota/regen/stock 的 key 可通过 sync_targets 配置触发器同步（跨模型、多目标、倍率、方向限定）。
@@ -348,7 +348,7 @@ class RegenKeyDef(KeyDef):
 
 @dataclass
 class StockKeyDef(KeyDef):
-    """存量数据模型 — 资源计数
+    """库存数据模型 — 资源计数
 
     纯计数器，可设上限（软/硬）。
     soft=True 时上限为软上限（仅提醒），soft=False 时为硬上限。

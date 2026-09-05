@@ -200,7 +200,7 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
             # 不展示上限但达到上限时
             if value >= kd.cap:
                 return str(int(value)), "green_bold"
-        # 存量模型无上限时纯数字
+        # 库存模型无上限时纯数字
         return str(int(value)), ""
 
     if model_type == MODEL_NOTE:

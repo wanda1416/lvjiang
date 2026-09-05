@@ -214,15 +214,16 @@ def find_material()
 end
 ```
 
-## 八、Profile — 玩家档案（只读数据源）
+## 八、Profile — 玩家档案（独立数据源）
 
-除上述四条通道外，DSL 还可通过内置函数访问 **ProfileDB**（玩家档案数据库），获取角色级的持久化数据。ProfileDB 按三模型组织：
+除上述四条通道外，DSL 还可通过内置函数访问 **ProfileDB**（玩家档案数据库），获取角色级的持久化数据。ProfileDB 按四模型组织（中文名与「用户总览」页「数据模型」对话框的分区一致）：
 
-| 模型 | 语义 | 典型 key |
-|------|------|----------|
-| **quota** | 周期配额（跨周期重置） | `niaoniao_of_week`、`bugan_of_week` |
-| **regen** | 再生值（按时间恢复） | `tili`（体力）、`xinli`（心力） |
-| **stock** | 资源存量（只增只减） | `niaoniao`、`tongbao`、`baoqian` |
+| 模型 | 中文名 | 语义 | 典型 key |
+|------|--------|------|----------|
+| **quota** | 配额 | 周期配额（跨周期重置） | `niaoniao_of_week`、`bugan_of_week` |
+| **regen** | 再生 | 再生值（按时间恢复） | `tili`（体力）、`xinli`（心力） |
+| **stock** | 库存 | 资源计数（只增只减） | `niaoniao`、`tongbao`、`baoqian` |
+| **note** | 备注 | 轻量文本标记，不参与数值管线与同步 | 自定义备忘 key |
 
 ### regen 模型两种类型
 
@@ -239,10 +240,10 @@ regen 模型区分两种刷新机制，DSL 函数自动处理：
 
 | 函数 | 签名 | 说明 |
 |------|------|------|
-| `profile_get` | `(key) -> float \| null` | 读取 profile 值，自动识别模型；regen key 返回实时计算值 |
-| `profile_set` | `(key, value) -> float` | 写入 profile 值；realtime regen 自动规范化时间锚点 |
-| `profile_inc` | `(key, delta?) -> float` | 增减 profile 值（delta 默认 1），返回新值 |
-| `profile_model` | `(key) -> str` | 查询 key 所属模型：`"quota"` / `"regen"` / `"stock"` |
+| `profile_get` | `(key) -> float \| str \| null` | 读取 profile 值，自动识别模型；regen key 返回实时计算值，note 返回文本 |
+| `profile_set` | `(key, value) -> float \| str` | 写入 profile 值；realtime regen 自动规范化时间锚点，note 直接写文本 |
+| `profile_inc` | `(key, delta?) -> float` | 增减 profile 值（delta 默认 1），返回新值；note 不支持，仅记警告 |
+| `profile_model` | `(key) -> str` | 查询 key 所属模型：`"quota"` / `"regen"` / `"stock"` / `"note"`；key 未定义返回 `""` |
 | `profile_all` | `() -> dict` | 获取全部 profile 数据，regen 条目返回计算后的当前值 |
 
 ### DSL 用法
@@ -285,4 +286,4 @@ eval $regen_data = $all.regen
 3. **global 名称共享**：声明后同名变量在所有过程里指向同一状态，应避免与过程形参重名
 4. **variables 隔离**：子过程无法直接修改调用方的局部变量，需要通过 `return`、`global` 或 `context` 传递
 5. **output 隔离**：子过程的 `collect` 不会污染调用方的 `output`，需要通过 `as $output` 显式获取
-6. **profile 只读数据源**：profile 函数访问独立数据库，不影响 session/context/global/variables/output 五条通道
+6. **profile 是独立数据源**：profile 函数可读可写（`profile_set` / `profile_inc`），但走的是独立数据库，不经过也不影响 session/context/global/variables/output 五条通道

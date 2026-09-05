@@ -103,6 +103,42 @@ class _ActionMixin:
             f"请在场景布局编辑器中绑定后重试"
         )
 
+    def scroll_any(self, scene_key: str, key: str, direction: str,
+                   amount: int = 1, interval: float | None = None):
+        """在 region / point / panel 上滚动；DSL 与 Python 工作流共用。"""
+        panel_target = False
+        regions = self._layout.get_scene_regions(scene_key)
+        region = next((r for r in regions if r.key == key), None)
+        if region is not None:
+            require_enabled(region, scene_key, "region")
+            x, y = self._region_to_screen(region, jitter=True)
+            label = f"{scene_key}/{key}"
+        else:
+            points = self._layout.get_scene_points(scene_key)
+            point = next((p for p in points if p.key == key), None)
+            if point is not None:
+                require_enabled(point, scene_key, "point")
+                x, y = self._point_to_screen(point)
+                label = f"{scene_key}/{key}"
+            else:
+                panels = self._layout.get_scene_panels(scene_key)
+                panel = next((p for p in panels if p.key == key), None)
+                if panel is None:
+                    raise ValueError(
+                        f"场景 {scene_key} 的 region / point / panel "
+                        f"未绑定坐标: {key}，请在场景布局编辑器中绑定后重试")
+                require_enabled(panel, scene_key, "panel")
+                panel_target = True
+                cx = panel.x_ratio + panel.w_ratio / 2
+                cy = panel.y_ratio + panel.h_ratio / 2
+                x, y = self._ratio_to_screen(cx, cy)
+                label = f"{scene_key}/{key}(panel)"
+        self._input.move_screen(x, y, label)
+        self._input.scroll_screen(
+            x, y, direction, amount, label, interval=interval)
+        if panel_target:
+            self._invalidate_align(scene_key, key)
+
     def move_any(self, scene_key: str, key: str, duration: float | None = None):
         """移动鼠标到 region / point / panel 中心（自动识别，region → point → panel 顺序）"""
         regions = self._layout.get_scene_regions(scene_key)

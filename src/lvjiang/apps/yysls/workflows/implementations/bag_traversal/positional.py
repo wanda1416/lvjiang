@@ -200,7 +200,7 @@ class PositionalTraversal(BagTraversal):
             return ScrollState.BOTTOM, 0
 
         # 大幅步进（1 行）
-        wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", hold=0.3)
+        wf.move_bag("up", hold=0.3)
         wf.wait_stable("scroll_settle")  # 滚动后面板稳定
         alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
         assert alignment_raw is not None, tr("对齐失败：alignment 为 None")
@@ -253,7 +253,7 @@ class PositionalTraversal(BagTraversal):
                         f"({alignment.n_rows}/{panel_rows})，按到底收束："
                         f"nfp={nfp} first_real_row={first_real_row} fps={fps}")
                     return ScrollState.BOTTOM, alignment.n_rows
-                wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up", distance=0.25)
+                wf.move_bag("up", distance=0.25)
                 wf.wait_stable("scroll_settle")  # 补滚后稳定
                 alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
                 assert alignment_raw is not None, tr("补滚后对齐失败")
@@ -273,7 +273,7 @@ class PositionalTraversal(BagTraversal):
                         f"连续3次判定滚多了，不应发生："
                         f"nfp={nfp} first_real_row={first_real_row} fps={fps}"
                     )
-                wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "down", distance=0.25)
+                wf.move_bag("down", distance=0.25)
                 wf.wait_stable("scroll_settle")  # 回滚后稳定
                 alignment = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)  # type: ignore[assignment]
             else:
@@ -318,8 +318,7 @@ class PositionalTraversal(BagTraversal):
                             f"({alignment.n_rows}/{panel_rows})，按到底收束："
                             f"nfp={nfp} first_real_row={first_real_row} fps={fps}")
                         return ScrollState.BOTTOM, alignment.n_rows
-                    wf.drag_grid(wf.GRID_SCENE, wf.GRID_PANEL, "up",
-                                 distance=0.25)
+                    wf.move_bag("up", distance=0.25)
                     wf.wait_stable("scroll_settle")  # 漂移补滚后稳定
                     alignment_raw = wf.align_panel(wf.GRID_SCENE, wf.GRID_PANEL)
                     assert alignment_raw is not None, tr("漂移补滚后对齐失败")

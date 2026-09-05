@@ -407,43 +407,12 @@ class _ActionsMixin:
         self, scene_key: str, key: str, direction: str, amount: int,
         interval: float | None = None,
     ):
-        """回退路径：按 region → point → panel 顺序查找目标坐标，移动光标后滚动。
-
-        与 move_any 逻辑平行，但额外获取坐标用于 scroll_screen。
-        """
-        wf = self._ensure_workflow()
-        # region
-        regions = self._layout.get_scene_regions(scene_key)
-        region = next((r for r in regions if r.key == key), None)
-        if region is not None:
-            require_enabled(region, scene_key, "region")
-            x, y = wf._region_to_screen(region, jitter=True)
-            self._input.move_screen(x, y, f"{scene_key}/{key}")
-            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}", interval=interval)
-            return
-        # point
-        points = self._layout.get_scene_points(scene_key)
-        point = next((p for p in points if p.key == key), None)
-        if point is not None:
-            require_enabled(point, scene_key, "point")
-            x, y = wf._point_to_screen(point)
-            self._input.move_screen(x, y, f"{scene_key}/{key}")
-            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}", interval=interval)
-            return
-        # panel
-        panels = self._layout.get_scene_panels(scene_key)
-        panel = next((p for p in panels if p.key == key), None)
-        if panel is not None:
-            require_enabled(panel, scene_key, "panel")
-            cx = panel.x_ratio + panel.w_ratio / 2
-            cy = panel.y_ratio + panel.h_ratio / 2
-            x, y = wf._ratio_to_screen(cx, cy)
-            self._input.move_screen(x, y, f"{scene_key}/{key}(panel)")
-            self._input.scroll_screen(x, y, direction, amount, f"{scene_key}/{key}(panel)", interval=interval)
-            return
-        raise WorkflowUserError(
-            f"scroll: 场景 {scene_key} 的 region / point / panel 未绑定坐标: {key}"
-        )
+        """按公共工作流原语执行，DSL 与 Python 工作流保持同一语义。"""
+        try:
+            self._ensure_workflow().scroll_any(
+                scene_key, key, direction, amount, interval)
+        except ValueError as exc:
+            raise WorkflowUserError(f"scroll: {exc}") from exc
 
     def _exec_drag(self, node: Drag):
         """drag scene.arrow / scene.panel[row][col] / scene.point1 scene.point2 — 多种拖拽模式。

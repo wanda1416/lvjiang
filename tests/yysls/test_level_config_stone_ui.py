@@ -1,5 +1,8 @@
 """等级配置面板不丢失律准石嵌套规则。"""
 
+from PyQt6.QtWidgets import QDialog
+
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.ui.game_settings.level_config_panel import (
     LevelConfigPanel,
     StoneRuleDialog,
@@ -49,3 +52,36 @@ def test_stone_dialog_uses_five_tune_rows_and_quality_zones(qtbot):
     # 金装可编辑项仍显示原值。
     assert dialog._cell_stacks[("gold", 2, "tune_cost")].currentIndex() == 0
     assert dialog._spins[("gold", 2, "tune_cost")].value() == 6
+
+
+def test_all_levels_have_gold_and_purple_stone_rules():
+    levels = get_game_config().get_level_configs()
+
+    assert levels
+    assert all(set(cfg.tuning_stones) == {"gold", "purple"} for cfg in levels)
+    level_110 = next(cfg for cfg in levels if cfg.level == 110)
+    assert level_110.tuning_stones["gold"].reset_refund == {
+        1: 0, 2: 30, 3: 90, 4: 210, 5: 390}
+    assert level_110.tuning_stones["purple"].tune_cost == {
+        1: 0, 2: 40, 3: 100, 4: 200, 5: 300}
+    assert level_110.tuning_stones["purple"].reset_refund == {
+        1: 0, 2: 20, 3: 70, 4: 170, 5: 320}
+    assert level_110.tuning_stones["purple"].recycle_refund == {
+        1: 30, 2: 62, 3: 142, 4: 302, 5: 542}
+
+
+def test_stone_dialog_auto_saves_and_flushes_last_edit_when_closed(qtbot):
+    dialog = StoneRuleDialog({"purple": {}}, reset_no_refund=False)
+    qtbot.addWidget(dialog)
+    changes = []
+    dialog.rules_changed.connect(changes.append)
+
+    dialog._spins[("purple", 2, "tune_cost")].setValue(4)
+    qtbot.wait(300)
+
+    assert changes[-1]["purple"]["tune_cost"][2] == 4
+
+    dialog._spins[("purple", 3, "tune_cost")].setValue(10)
+    dialog.done(QDialog.DialogCode.Accepted.value)
+
+    assert changes[-1]["purple"]["tune_cost"][3] == 10

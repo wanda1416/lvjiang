@@ -21,7 +21,7 @@ import copy
 from datetime import datetime
 
 from loguru import logger
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -84,6 +84,8 @@ def _rule_to_raw(cfg: LevelConfig) -> dict:
 class StoneRuleDialog(QDialog):
     """以宫商角徵羽五行编辑 gold/purple 消耗与累计返还。"""
 
+    rules_changed = pyqtSignal(dict)
+
     _TUNE_NAMES = ("宫", "商", "角", "徵", "羽")
     _FIELDS = ("tune_cost", "reset_refund", "recycle_refund")
 
@@ -91,6 +93,11 @@ class StoneRuleDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(tr("律准石规则"))
         self.resize(900, 360)
+        self._dirty = False
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(250)
+        self._save_timer.timeout.connect(self._emit_rules_changed)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(tr(
             "数值以大律准石计，小律准石按 0.1；"
@@ -134,6 +141,7 @@ class StoneRuleDialog(QDialog):
                     spin.setValue(float((item.get(key) or {}).get(
                         affix_count, (item.get(key) or {}).get(
                             str(affix_count), 0))))
+                    spin.valueChanged.connect(self._schedule_save)
                     fixed_zero = (
                         affix_count == 1
                         and key in ("tune_cost", "reset_refund")
@@ -156,14 +164,31 @@ class StoneRuleDialog(QDialog):
             checkbox.toggled.connect(
                 lambda checked, q=quality: self._set_quality_enabled(
                     q, checked))
+            checkbox.toggled.connect(self._schedule_save)
             self._set_quality_enabled(quality, checkbox.isChecked())
         layout.addWidget(self._table)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.accept)
         layout.addWidget(buttons)
+
+    def _schedule_save(self, *_args) -> None:
+        self._dirty = True
+        self._save_timer.start()
+
+    def _emit_rules_changed(self) -> None:
+        if not self._dirty:
+            return
+        self._dirty = False
+        self.rules_changed.emit(self.result_raw())
+
+    def done(self, result: int) -> None:
+        """关闭前提交仍在防抖窗口内的最后一次输入。"""
+        for spin in self._spins.values():
+            spin.interpretText()
+        if self._save_timer.isActive():
+            self._save_timer.stop()
+        self._emit_rules_changed()
+        super().done(result)
 
     def _set_quality_enabled(self, quality: str, enabled: bool) -> None:
         """未启用的品阶整区置灰且不显示数字。"""
@@ -406,9 +431,13 @@ class LevelConfigPanel(QWidget):
         dialog = StoneRuleDialog(
             copy.deepcopy(button.property("tuning_stones") or {}),
             bool(reset_cb and reset_cb.isChecked()), self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            button.setProperty("tuning_stones", dialog.result_raw())
-            self._apply()
+        dialog.rules_changed.connect(
+            lambda raw: self._save_stone_rules(button, raw))
+        dialog.exec()
+
+    def _save_stone_rules(self, button: QPushButton, raw: dict) -> None:
+        button.setProperty("tuning_stones", copy.deepcopy(raw))
+        self._apply()
 
     # ── 行增删移动 ──
 

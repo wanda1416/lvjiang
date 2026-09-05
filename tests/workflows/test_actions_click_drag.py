@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, call
 import pytest
 
 from lvjiang.workflows.align import GridAlignment
-from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.grammar.ast_nodes import Scroll
 from tests.workflows.conftest import make_engine
@@ -230,9 +229,13 @@ class TestScrollInterval:
         _args, kwargs = eng._input.scroll_screen.call_args
         assert kwargs["interval"] is None
 
-    def test_invalid_interval_raises(self):
-        """interval 无法转 float 时报用户错误（运行时变量传入非法值）。"""
+    @pytest.mark.parametrize("bad", ["abc", -0.5])
+    def test_invalid_interval_falls_back_to_default(self, bad):
+        """非法 interval 记 error 后按默认随机间隔执行，不中断工作流。
+
+        间隔只影响滚动节奏、不影响滚动是否发生，为它中止整条批量任务不划算。
+        """
         eng = make_engine()
-        node = Scroll(direction="down", amount=3, interval="abc")
-        with pytest.raises(WorkflowUserError):
-            eng._exec_scroll(node)
+        eng._exec_scroll(Scroll(direction="down", amount=3, interval=bad))
+        _args, kwargs = eng._input.scroll_screen.call_args
+        assert kwargs["interval"] is None

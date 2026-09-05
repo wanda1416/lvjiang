@@ -33,7 +33,9 @@ regions:
   type: func
   is_text: true
   is_clickable: true
-  view: shangdian
+  views:
+  - base
+  - shangdian
 - key: cat_4
   name: 类目4
   type: func

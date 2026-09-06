@@ -50,7 +50,6 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
-from ...config import FULL_GRADUATION
 from ..domain_labels import domain_label
 from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
@@ -598,8 +597,8 @@ class SchoolPanel(QWidget):
         self._clear_ps_editor()
         if not school:
             return
-        from ...config import get_base_attr_profiles
-        styles = get_base_attr_profiles(school)
+        from ...config import get_play_styles
+        styles = get_play_styles(school)
         for name in sorted(styles.keys()):
             self._ps_list.addItem(name)
 
@@ -722,20 +721,14 @@ class SchoolPanel(QWidget):
         self._scheme_list.blockSignals(True)
         self._scheme_list.setCurrentRow(-1)
         self._scheme_list.blockSignals(False)
-        from ...config import get_base_attr_profiles, get_game_config
-        styles = get_base_attr_profiles(school)
+        from ...config import get_game_config, get_play_styles
+        styles = get_play_styles(school)
         name = self._ps_list.item(row).text()
         attrs = styles.get(name, {})
         self._clear_ps_editor()
         self._ps_current_name = name
-        # 「满级属性」取自毕业率方案，改了也存不回去——不如不给改，
-        # 免得填完一屏才发现白填。
-        builtin = name == FULL_GRADUATION
         self._value_source_label.setText(
-            tr("基础属性：{name}（内置，取自毕业率方案的 100% 毕业基准）")
-            .format(name=name) if builtin
-            else tr("基础属性：{name}").format(name=name)
-        )
+            tr("基础属性：{name}").format(name=name))
 
         gc = get_game_config()
         school_attr = gc.get_school_attr(school)
@@ -744,7 +737,7 @@ class SchoolPanel(QWidget):
         # 基础属性也进入标准战斗属性模型，再按战斗属性面板结构展示。
         combat_attrs = CombatAttributes.from_dict(attrs)
         card = self._create_standard_attrs_widget(
-            combat_attrs, school_attr, editable=not builtin,
+            combat_attrs, school_attr, editable=True,
         )
         self._ps_scroll_layout.addWidget(card)
         self._ps_scroll_layout.addStretch()
@@ -970,7 +963,7 @@ class SchoolPanel(QWidget):
     def _on_ps_context_menu(self, pos):
         """基础属性列表右键菜单：删除"""
         item = self._ps_list.itemAt(pos)
-        if not item or item.text() == FULL_GRADUATION:
+        if not item:
             return
         menu = QMenu(self)
         del_action = menu.addAction(tr("删除"))

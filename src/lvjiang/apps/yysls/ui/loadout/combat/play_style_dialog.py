@@ -180,8 +180,8 @@ class PlayStyleDialogMixin:
             return
 
         # 检查重名
-        from ....config import get_base_attr_profiles
-        existing = get_base_attr_profiles(school)
+        from ....config import get_play_styles
+        existing = get_play_styles(school)
         if name in existing:
             message = tr("基础属性「{name}」已存在，是否覆盖？").format(
                 name=name

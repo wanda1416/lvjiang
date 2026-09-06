@@ -293,14 +293,14 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
     def _refresh_play_styles(self):
         """刷新基础属性下拉（根据当前选择的流派）。"""
-        from ....config import get_base_attr_profiles
+        from ....config import get_play_styles
 
         school = self._get_current_school()
         self._combo_play_style.blockSignals(True)
         self._combo_play_style.clear()
 
         if school:
-            play_styles = get_base_attr_profiles(school)
+            play_styles = get_play_styles(school)
             for name in play_styles:
                 self._combo_play_style.addItem(name)
 
@@ -934,8 +934,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         if not school:
             return CombatAttributes()
 
-        from ....config import get_base_attr_profiles
-        play_styles = get_base_attr_profiles(school)
+        from ....config import get_play_styles
+        play_styles = get_play_styles(school)
 
         if play_style not in play_styles:
             return CombatAttributes()

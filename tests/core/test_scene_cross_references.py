@@ -424,6 +424,46 @@ def test_referenced_entity_shows_the_source_name_not_its_key(
         "equip_tune_detail", "nope") == "nope"
 
 
+def test_effective_region_defs_include_references_in_target_view(
+        scenes_dir, monkeypatch):
+    """识别等消费者应把引用当作目标场景当前视图中的完整定义。"""
+    import lvjiang.core.scene_registry as scene_registry
+
+    _write(scenes_dir, "shared", {
+        "regions": [
+            {"key": "title", "name": "标题", "type": "attr",
+             "is_text": True},
+            {"key": "slot", "name": "槽位", "type": "slot",
+             "is_text": False},
+        ],
+    })
+    _write(scenes_dir, "target", {
+        "views": [
+            {"key": "base", "name": "基底"},
+            {"key": "detail", "name": "详情"},
+        ],
+        "regions": [
+            {"key": "local", "name": "本地", "type": "attr",
+             "view": "base"},
+        ],
+        "references": [
+            {"scene": "shared", "entity": "title", "view": "base"},
+            {"scene": "shared", "entity": "slot", "view": "detail"},
+        ],
+    })
+    monkeypatch.setattr(scene_registry, "_registry", _registry(scenes_dir))
+
+    all_defs = scene_registry.get_effective_region_defs("target")
+    base_defs = scene_registry.get_effective_region_defs("target", "base")
+    detail_defs = scene_registry.get_effective_region_defs("target", "detail")
+
+    assert [item.key for item in all_defs] == ["local", "title", "slot"]
+    assert [item.key for item in base_defs] == ["local", "title"]
+    assert [item.key for item in detail_defs] == ["slot"]
+    assert detail_defs[0].type == "slot"
+    assert detail_defs[0].views == ["detail"]
+
+
 # ── 编辑器路径 ────────────────────────────────────────────
 
 def test_a_single_reference_can_be_expanded_without_reloading_the_layout():

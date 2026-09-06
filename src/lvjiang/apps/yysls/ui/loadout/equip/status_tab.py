@@ -187,7 +187,7 @@ class EquipStatusTab(QWidget):
         btn_affix_impact.clicked.connect(self._on_affix_impact)
         action_row.addWidget(btn_affix_impact)
 
-        btn_chengyin_merge = QPushButton(tr("承音装备合并"))
+        btn_chengyin_merge = QPushButton(tr("承音装备"))
         btn_chengyin_merge.setToolTip(tr("查找承音或再次转律产生的同件装备历史版本"))
         btn_chengyin_merge.setMinimumWidth(112)
         btn_chengyin_merge.setStyleSheet(_ACTION_BTN_STYLE)
@@ -293,7 +293,7 @@ class EquipStatusTab(QWidget):
         lbl_quality.setStyleSheet(_filter_lbl_style)
         filter_row.addWidget(lbl_quality)
         self._quality_filter = QComboBox()
-        self._quality_filter.addItem(tr("不限"), "all")
+        self._quality_filter.addItem(tr("全部"), "all")
         self._quality_filter.addItem(tr("金装"), "gold")
         self._quality_filter.addItem(tr("紫装"), "purple")
         self._quality_filter.addItem(tr("白装"), "other")

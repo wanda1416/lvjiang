@@ -116,7 +116,7 @@ class CooldownEquipmentDialog(QDialog):
         self.changed = False
         self._tiles: list[_CooldownEquipmentTile] = []
 
-        self.setWindowTitle(tr("冷却装备管理"))
+        self.setWindowTitle(tr("冷却装备"))
         self.resize(1500, 800)
         self.setMinimumSize(1000, 620)
 

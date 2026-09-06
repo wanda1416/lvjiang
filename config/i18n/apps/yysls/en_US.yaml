@@ -62,7 +62,7 @@ yysls:
   承音后转律: Transfer After Chengyin
   原始等级: Original Level
   冷却时间: Cooldown Expires At
-  冷却装备管理: Cooldown Equipment
+  冷却装备: Cooldown Equipment
   用户名: User
   冷却倒计时: Cooldown
   当前没有设置冷却时间的装备: No equipment currently has a cooldown
@@ -948,7 +948,7 @@ auto_strings:
   扫描判定: Scan Judgment
   扫描处置未启用 → 跳过该装备: Scan disposal not enabled -> skip this equipment
   '承音:': 'Chengyin:'
-  承音装备合并: Merge Chengyin Equipment
+  承音装备: Chengyin Equipment
   技能: Skill
   技能轴: Skill Axis
   指定武学增效: Specified Martial Enhancement

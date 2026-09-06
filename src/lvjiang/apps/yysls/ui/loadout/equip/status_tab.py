@@ -32,7 +32,6 @@ from ......i18n import tr
 from ....core.affix_cap import equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ...events import EQUIPMENT_CHANGED, get_event_hub
-from ...layout_helpers import fit_combo_to_contents
 from .cards import _CompactEquipCard, _SlotCard
 from .mock_dialog import MockEquipDialog
 
@@ -68,6 +67,25 @@ _SLOT_LAYOUT = [
 _GROUP_PART_LABELS: dict[str, str] = {}
 
 _GRID_COLS = 4  # 默认值，实际从 settings.equip_display.grid_columns 读取
+
+
+def _fit_filter_combo(combo: QComboBox) -> int:
+    """按最长选项加两个汉字余量固定筛选框宽度。"""
+    combo.ensurePolished()
+    metrics = combo.fontMetrics()
+    width = (
+        max(
+            (metrics.horizontalAdvance(combo.itemText(index))
+             for index in range(combo.count())),
+            default=0,
+        )
+        + metrics.horizontalAdvance("汉汉")
+    )
+    combo.setFixedWidth(width)
+    view = combo.view()
+    assert view is not None
+    view.setMinimumWidth(width)
+    return width
 
 
 def _affix_analysis_dependencies():
@@ -245,7 +263,7 @@ class EquipStatusTab(QWidget):
         self._sort_filter.addItem(tr("等级正序"), "level_asc")
         self._sort_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
-        fit_combo_to_contents(self._sort_filter, minimum=104)
+        _fit_filter_combo(self._sort_filter)
         self._sort_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._sort_filter)
 
@@ -267,7 +285,7 @@ class EquipStatusTab(QWidget):
             self._type_filter.addItem(dn, sk)
         self._type_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
-        fit_combo_to_contents(self._type_filter, minimum=104)
+        _fit_filter_combo(self._type_filter)
         self._type_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._type_filter)
 
@@ -281,7 +299,7 @@ class EquipStatusTab(QWidget):
         self._quality_filter.addItem(tr("白装"), "other")
         self._quality_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
-        fit_combo_to_contents(self._quality_filter, minimum=88)
+        _fit_filter_combo(self._quality_filter)
         self._quality_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._quality_filter)
 
@@ -295,7 +313,7 @@ class EquipStatusTab(QWidget):
             self._level_filter.addItem(tr("≥{level}").format(level=lvl), str(lvl))
         self._level_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
-        fit_combo_to_contents(self._level_filter, minimum=88)
+        _fit_filter_combo(self._level_filter)
         self._level_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._level_filter)
 
@@ -307,7 +325,7 @@ class EquipStatusTab(QWidget):
         self._affix_filter.addItem(tr("已定音"), "dingyin")
         self._affix_filter.addItem(tr("满调律"), "full_tuning")
         self._affix_filter.addItem(tr("未满调律"), "not_full_tuning")
-        fit_combo_to_contents(self._affix_filter, minimum=88)
+        _fit_filter_combo(self._affix_filter)
         self._affix_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._affix_filter)
 
@@ -321,7 +339,7 @@ class EquipStatusTab(QWidget):
         self._source_filter.addItem(tr("模拟"), "mock")
         self._source_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
-        fit_combo_to_contents(self._source_filter, minimum=104)
+        _fit_filter_combo(self._source_filter)
         self._source_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._source_filter)
 
@@ -334,7 +352,7 @@ class EquipStatusTab(QWidget):
         self._status_filter.addItem(tr("未备战"), "unreferenced")
         self._status_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
-        fit_combo_to_contents(self._status_filter, minimum=88)
+        _fit_filter_combo(self._status_filter)
         self._status_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._status_filter)
 

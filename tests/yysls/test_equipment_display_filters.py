@@ -5,7 +5,10 @@ from types import SimpleNamespace
 from PyQt6.QtWidgets import QComboBox
 
 import lvjiang.apps.yysls.config as config_module
-from lvjiang.apps.yysls.ui.loadout.equip.status_tab import EquipStatusTab
+from lvjiang.apps.yysls.ui.loadout.equip.status_tab import (
+    EquipStatusTab,
+    _fit_filter_combo,
+)
 
 
 def _combo(value: str) -> QComboBox:
@@ -28,6 +31,21 @@ def _equip(*, quality: str | None = "gold", affix_count: int = 1) -> dict:
     for index in range(1, affix_count + 1):
         equip[f"affix_{index}"] = {"name": f"词条{index}"}
     return equip
+
+
+def test_filter_combo_width_is_longest_option_plus_two_chinese_chars(qtbot):
+    combo = QComboBox()
+    combo.addItems(["全部", "未满调律"])
+    qtbot.addWidget(combo)
+    metrics = combo.fontMetrics()
+    expected = (
+        metrics.horizontalAdvance("未满调律")
+        + metrics.horizontalAdvance("汉汉")
+    )
+
+    assert _fit_filter_combo(combo) == expected
+    assert combo.minimumWidth() == expected
+    assert combo.maximumWidth() == expected
 
 
 def test_white_quality_means_any_non_gold_non_purple(qtbot):

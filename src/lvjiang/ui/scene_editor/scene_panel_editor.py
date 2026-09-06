@@ -301,7 +301,7 @@ class PanelEditorMixin:
         result = self._show_panel_edit_dialog(None)
         if result is None:
             return
-        panel_def, _ = result
+        panel_def, _target_scene, _rows, _cols = result
         registry = get_registry()
         try:
             registry.add_panel_to_scene(self._scene_key, panel_def)

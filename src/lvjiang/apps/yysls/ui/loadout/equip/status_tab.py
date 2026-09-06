@@ -28,10 +28,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.button_styles import (
-    apply_button_style,
-    apply_compact_tool_button_style,
-)
+from lvjiang.ui.button_styles import apply_button_style
 from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from lvjiang.ui.user_toolbar import add_user_nav_buttons
 
@@ -53,6 +50,13 @@ _ACTION_BTN_STYLE = (
     "color: palette(highlight); border-radius: 4px; padding: 5px 10px; "
     "font-weight: 600; font-size: 12px; }"
     "QPushButton:hover { background: palette(midlight); }"
+)
+
+_FILTER_TOGGLE_STYLE = (
+    "QToolButton { background: transparent; color: palette(button-text); "
+    "border: 1px solid palette(mid); border-radius: 2px; padding: 0; }"
+    "QToolButton:hover { background-color: palette(midlight); }"
+    "QToolButton:pressed { background-color: palette(mid); }"
 )
 
 # 顶部槽位布局（固定 2×4）
@@ -372,9 +376,12 @@ class EquipStatusTab(QWidget):
         filter_row.addWidget(self._advanced_filter_widget)
 
         self._filter_collapse_button = QToolButton()
-        self._filter_collapse_button.setFixedSize(28, 28)
-        self._filter_collapse_button.setIconSize(QSize(16, 16))
-        apply_compact_tool_button_style(self._filter_collapse_button)
+        self._status_filter.ensurePolished()
+        toggle_side = self._status_filter.sizeHint().height()
+        self._filter_collapse_button.setFixedSize(toggle_side, toggle_side)
+        icon_side = max(8, round(toggle_side * 0.4))
+        self._filter_collapse_button.setIconSize(QSize(icon_side, icon_side))
+        self._filter_collapse_button.setStyleSheet(_FILTER_TOGGLE_STYLE)
         self._filter_collapse_button.setToolTip(tr("收起部位至状态筛选"))
         self._filter_collapse_button.clicked.connect(
             self._toggle_advanced_filters)

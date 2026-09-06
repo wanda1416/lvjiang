@@ -6,6 +6,8 @@ views:
   name: 基底
 - key: bugan_view
   name: 不肝视图
+- key: bag
+  name: 背包
 regions:
 - key: bugan_jindu
   name: 不肝进度
@@ -23,3 +25,28 @@ panels:
   name: 其他货币
   min_visible: 0.8
   calibration: even
+references:
+- scene: bag_detail
+  entity: back
+  view: bag
+- scene: bag_detail
+  entity: peiyang
+  view: bag
+- scene: bag_detail
+  entity: item
+  view: bag
+- scene: bag_detail
+  entity: renwu
+  view: bag
+- scene: bag_detail
+  entity: qiandai
+  view: bag
+- scene: bag_detail
+  entity: sub_baoguo
+  view: bag
+- scene: bag_detail
+  entity: zhengli
+  view: bag
+- scene: bag_detail
+  entity: zhizao
+  view: bag

@@ -86,7 +86,9 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-  view: result
+  views:
+  - result
+  - return_good
   to: /base
 - key: reset_tune
   name: 重置调律
@@ -134,3 +136,6 @@ references:
 - scene: general_control
   entity: cancel
   view: reset_confirm
+- scene: general_control
+  entity: blank_area
+  view: return_good

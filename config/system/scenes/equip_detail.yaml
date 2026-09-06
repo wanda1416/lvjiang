@@ -1,6 +1,11 @@
 content_version: 1
 key: equip_detail
 name: 装备
+views:
+- key: base
+  name: 基底
+- key: recycle_confirm
+  name: 回收确认
 regions:
 - key: main_func
   name: 主功能
@@ -37,3 +42,10 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+references:
+- scene: general_control
+  entity: cancel
+  view: recycle_confirm
+- scene: general_control
+  entity: confirm
+  view: recycle_confirm

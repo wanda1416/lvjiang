@@ -6,6 +6,8 @@ views:
   name: 基底
 - key: kuaijie
   name: 快捷道具
+- key: bag
+  name: 背包
 regions:
 - key: main_weapon
   name: 主武器
@@ -81,3 +83,28 @@ panels:
 - key: bag_grid
   name: 背包网格
   min_visible: 0.85
+references:
+- scene: bag_detail
+  entity: back
+  view: bag
+- scene: bag_detail
+  entity: peiyang
+  view: bag
+- scene: bag_detail
+  entity: item
+  view: bag
+- scene: bag_detail
+  entity: renwu
+  view: bag
+- scene: bag_detail
+  entity: qiandai
+  view: bag
+- scene: bag_detail
+  entity: sub_baoguo
+  view: bag
+- scene: bag_detail
+  entity: zhengli
+  view: bag
+- scene: bag_detail
+  entity: zhizao
+  view: bag

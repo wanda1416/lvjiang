@@ -10,6 +10,8 @@ views:
   name: 养成材料
 - key: huodong
   name: 活动道具
+- key: bag
+  name: 背包
 regions:
 - key: item_name
   name: 道具名称
@@ -78,3 +80,28 @@ panels:
 - key: bag_grid
   name: 背包
   min_visible: 0.85
+references:
+- scene: bag_detail
+  entity: back
+  view: bag
+- scene: bag_detail
+  entity: peiyang
+  view: bag
+- scene: bag_detail
+  entity: item
+  view: bag
+- scene: bag_detail
+  entity: renwu
+  view: bag
+- scene: bag_detail
+  entity: qiandai
+  view: bag
+- scene: bag_detail
+  entity: sub_baoguo
+  view: bag
+- scene: bag_detail
+  entity: zhengli
+  view: bag
+- scene: bag_detail
+  entity: zhizao
+  view: bag

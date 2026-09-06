@@ -13,6 +13,13 @@ from .layout_models import CanvasConfig, Region
 from .ocr_cleaner import OCRCleaner
 from .scene_registry import get_effective_region_defs
 
+# RapidOCR 当前检测器会把输入图的短边放大到 736。单独识别几十像素高的
+# region 会因此制造出数千像素宽的中间图。批量画布至少补到这个尺寸，既让
+# 多个 region 共用一次检测，也避免极窄拼图再次触发大倍率放大。
+_BATCH_MIN_SIDE = 736
+_BATCH_MAX_CONTENT_HEIGHT = 1200
+_BATCH_GAP = 16
+
 
 @dataclass
 class OCRResult:
@@ -105,7 +112,7 @@ class OCREngine:
         min_confidence: float | None = None,
     ) -> dict[str, str]:
         """
-        对指定场景的所有区域逐个裁剪 OCR。
+        对指定场景的所有文字区域裁剪后批量 OCR。
 
         跳过 is_text == False 的字段。
 
@@ -132,7 +139,7 @@ class OCREngine:
             if region.is_text
         }
 
-        results: dict[str, str] = {}
+        crops: list[tuple[str, np.ndarray]] = []
         for region in regions:
             if region.key not in text_keys:
                 logger.debug(f"跳过非文字区域: {region.key}")
@@ -144,14 +151,166 @@ class OCREngine:
             x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)
             y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)
 
-            crop = image[y1:y2, x1:x2]
+            crops.append((region.key, image[y1:y2, x1:x2]))
+
+        if not crops:
+            return {}
+        if len(crops) == 1:
+            key, crop = crops[0]
             ocr_results = self.recognize(crop)
             if min_confidence is not None:
-                ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
-            text = " | ".join(r.text for r in ocr_results) if ocr_results else ""
-            results[region.key] = text
+                ocr_results = [
+                    r for r in ocr_results
+                    if r.confidence >= min_confidence
+                ]
+            return {
+                key: " | ".join(r.text for r in ocr_results)
+                if ocr_results else "",
+            }
 
-        return results
+        return self._recognize_region_crops(crops, min_confidence)
+
+    def _recognize_region_crops(
+        self,
+        crops: list[tuple[str, np.ndarray]],
+        min_confidence: float | None = None,
+    ) -> dict[str, str]:
+        """把多个区域纵向拼图后批量 OCR。
+
+        ``scan [scene].[a, b, ...]`` 和整场景 scan 都经由
+        :meth:`ocr_scene_regions` 进入这里。每张拼图只调用一次
+        RapidOCR，再按返回 bbox 与各裁剪区的重叠面积归属。
+
+        场景区域过多时分批，防止拼图过长导致检测器缩放。
+        空裁剪保留空结果，不送入 OCR。
+        """
+        results: dict[str, list[tuple[int, int, int, int, str]]] = {
+            key: [] for key, _crop in crops
+        }
+        valid = [(key, crop) for key, crop in crops if crop.size]
+        if not valid:
+            return {key: "" for key in results}
+
+        batches: list[list[tuple[str, np.ndarray]]] = []
+        current: list[tuple[str, np.ndarray]] = []
+        content_height = 0
+        for item in valid:
+            crop_height = item[1].shape[0]
+            added = crop_height + (_BATCH_GAP if current else 0)
+            if current and content_height + added > _BATCH_MAX_CONTENT_HEIGHT:
+                batches.append(current)
+                current = []
+                content_height = 0
+                added = crop_height
+            current.append(item)
+            content_height += added
+        if current:
+            batches.append(current)
+
+        for batch in batches:
+            content_h = (
+                sum(crop.shape[0] for _key, crop in batch)
+                + _BATCH_GAP * (len(batch) - 1)
+            )
+            content_w = max(crop.shape[1] for _key, crop in batch)
+            sheet_h = max(content_h, _BATCH_MIN_SIDE)
+            sheet_w = max(content_w, _BATCH_MIN_SIDE)
+            sample = batch[0][1]
+            sheet = np.zeros(
+                (sheet_h, sheet_w, *sample.shape[2:]), dtype=sample.dtype)
+
+            placements: list[tuple[str, int, int, int, int]] = []
+            y = 0
+            for key, crop in batch:
+                crop_h, crop_w = crop.shape[:2]
+                sheet[y:y + crop_h, :crop_w] = crop
+                placements.append((key, 0, y, crop_w, y + crop_h))
+                y += crop_h + _BATCH_GAP
+
+            for ocr_result in self.recognize(sheet):
+                if (min_confidence is not None
+                        and ocr_result.confidence < min_confidence):
+                    continue
+                if not ocr_result.bbox:
+                    continue
+                box_x1 = min(point[0] for point in ocr_result.bbox)
+                box_y1 = min(point[1] for point in ocr_result.bbox)
+                box_x2 = max(point[0] for point in ocr_result.bbox)
+                box_y2 = max(point[1] for point in ocr_result.bbox)
+
+                best_key = ""
+                best_overlap = 0
+                best_origin = (0, 0)
+                for key, x1, y1, x2, y2 in placements:
+                    overlap_w = max(0, min(box_x2, x2) - max(box_x1, x1))
+                    overlap_h = max(0, min(box_y2, y2) - max(box_y1, y1))
+                    overlap = overlap_w * overlap_h
+                    if overlap > best_overlap:
+                        best_key = key
+                        best_overlap = overlap
+                        best_origin = (x1, y1)
+                if best_key:
+                    origin_x, origin_y = best_origin
+                    results[best_key].append(
+                        (
+                            box_x1 - origin_x,
+                            box_y1 - origin_y,
+                            box_x2 - origin_x,
+                            box_y2 - origin_y,
+                            ocr_result.text,
+                        )
+                    )
+
+        return {
+            key: self._join_region_lines(items)
+            for key, items in results.items()
+        }
+
+    @staticmethod
+    def _join_region_lines(
+        items: list[tuple[int, int, int, int, str]],
+    ) -> str:
+        """按 bbox 恢复单个 region 内的文本排布。
+
+        拼图后检测器可能把原本一次识别的「属性名+数值」
+        拆成多个 bbox。同行文本按 x 排序并用空格连接，不同行才
+        沿用旧 API 的 `` | `` 分隔，以保持上层解析语义。
+        """
+        if not items:
+            return ""
+
+        lines: list[list[tuple[int, int, int, int, str]]] = []
+        for item in sorted(
+                items, key=lambda value: ((value[1] + value[3]) / 2,
+                                          value[0])):
+            _x1, y1, _x2, y2, _text = item
+            center_y = (y1 + y2) / 2
+            height = max(1, y2 - y1)
+            best_line: list[tuple[int, int, int, int, str]] | None = None
+            best_distance = float("inf")
+            for line in lines:
+                line_center = sum(
+                    (entry[1] + entry[3]) / 2 for entry in line
+                ) / len(line)
+                line_height = max(
+                    1,
+                    sum(entry[3] - entry[1] for entry in line) / len(line),
+                )
+                distance = abs(center_y - line_center)
+                if (distance <= max(height, line_height) * 0.5
+                        and distance < best_distance):
+                    best_line = line
+                    best_distance = distance
+            if best_line is None:
+                lines.append([item])
+            else:
+                best_line.append(item)
+
+        lines.sort(key=lambda line: min(entry[1] for entry in line))
+        return " | ".join(
+            " ".join(entry[4] for entry in sorted(line, key=lambda value: value[0]))
+            for line in lines
+        )
 
     def ocr_single(self, image: np.ndarray, min_confidence: float | None = None) -> str:
         """对单张小图做 OCR，返回清洗后的文本（多条用 | 分隔）"""

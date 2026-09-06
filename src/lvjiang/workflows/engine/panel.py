@@ -280,7 +280,7 @@ class _PanelMixin:
         min_conf = self._resolve_min_confidence(node.where)
         recognizer = self._ensure_workflow().reference_recognizer
         if node.by is not None:
-            # by 优先：rich 不影响短路匹配语义
+            # by 短路匹配返回命中的标签。rich 与 by 已由解析器保证互斥。
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
             info = recognizer.recognize_only(slot_img, group=group)

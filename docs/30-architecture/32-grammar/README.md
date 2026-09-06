@@ -282,6 +282,7 @@ recognize [scene].[s1, s2] as rich $var with func where confidence >= 0.8 on gro
 
 默认 `recognize` 只做参考图匹配，不执行输出区域 OCR；只有 `as rich`
 会读取图库定义的 `level_text`、`count_text` 等输出字段。
+`as rich` 与 `by` 返回类型冲突，不能同时使用；组合时解析器会直接报错。
 
 ### find — 文字坐标定位
 

@@ -1255,14 +1255,6 @@ def test_recognize_rich():
     assert n.rich is False
     print("  recognize [s].[panel][1][2] as $var (plain): OK")
 
-    # rich + by 子句（语法允许，运行时 by 优先）
-    program = parse_text('recognize [s].[f1] as rich $m by equals "text"')
-    n = program.body[0]
-    assert isinstance(n, Recognize)
-    assert n.rich is True
-    assert n.by is not None
-    print("  recognize [s].[f1] as rich $var by equals ...: OK")
-
     # rich + on group + where 子句
     program = parse_text('recognize [s] as rich $m on group "grp" where confidence >= 0.8')
     n = program.body[0]
@@ -1277,6 +1269,23 @@ def test_recognize_rich():
     n = program.body[0]
     assert n.rich is True
     print("  recognize [s] as RICH $var (case insensitive): OK")
+
+
+@pytest.mark.parametrize("source", [
+    'recognize [s].[f1] as rich $m by equals "text"',
+    'recognize [s].[p][1][2] as rich $m by equals "text"',
+    'recognize [parent].[card].[icon] as rich $m by equals "text"',
+])
+def test_recognize_rich_and_by_are_mutually_exclusive(source):
+    """Region、Panel 和子场景均应在解析阶段拒绝 rich + by。"""
+    with pytest.raises(VisitError) as exc_info:
+        parse_text(source)
+
+    message = str(exc_info.value.orig_exc)
+    assert "不能同时使用 'as rich' 和 'by'" in message
+    assert "完整识别信息" in message
+    assert "命中位置" in message
+    assert "第 1 行" in message
 
 
 def test_recognize_rich_no_regression():
@@ -1333,15 +1342,14 @@ def test_recognize_with_clause():
     assert isinstance(n.with_func, Literal)
     assert n.with_func.value == "yysls_rich_parse"
 
-    # rich + with + by + group + where 全组合（with 在末尾）
+    # rich + with + group + where 全组合（with 在末尾）
     program = parse_text(
-        'recognize [s].[f1] as rich $m by equals "x" on group "g" where confidence >= 0.5 with my_func'
+        'recognize [s].[f1] as rich $m on group "g" where confidence >= 0.5 with my_func'
     )
     n = program.body[0]
     assert n.rich is True
     assert n.with_func is not None
     assert n.with_func.value == "my_func"
-    assert n.by is not None
     assert n.group is not None
     assert n.where is not None
 
@@ -1378,13 +1386,12 @@ def test_recognize_group_list_literal():
     n = program.body[0]
     assert isinstance(n.group, VarRef) and n.group.name == "groups"
 
-    # 全组合：by + on group list + where + with
+    # rich + on group list + where + with
     program = parse_text(
-        'recognize [s].[f1] as rich $m by equals "x" on group ["g1", "g2"] where confidence >= 0.5 with my_func'
+        'recognize [s].[f1] as rich $m on group ["g1", "g2"] where confidence >= 0.5 with my_func'
     )
     n = program.body[0]
     assert n.rich is True
-    assert n.by is not None
     assert isinstance(n.group, list) and len(n.group) == 2
     assert n.where is not None
     assert n.with_func is not None

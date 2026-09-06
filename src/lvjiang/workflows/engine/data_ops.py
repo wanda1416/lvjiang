@@ -223,14 +223,14 @@ class _DataOpsMixin:
         panel_key = self._whole_panel_key(scene, field_keys, node.by, "recognize")
         if panel_key is not None:
             if node.by is not None:
-                # 整面板 + by：返回首个命中的行列 {row, col}（by 优先，rich 不影响）
+                # 整面板 + by：返回首个命中的行列 {row, col}。
                 self._recognize_panel_by(scene, panel_key, var_name, node.by, group=group, min_confidence=min_conf)
             else:
                 self._recognize_panel_whole(scene, panel_key, var_name, group=group, min_confidence=min_conf, rich=node.rich, with_func=node.with_func)
             return
 
         if node.by is not None:
-            # ── by 子句：参考图匹配，返回 slot 名 str（by 优先，rich 不影响）──
+            # ── by 子句：参考图匹配，返回 slot 名 str ──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
             result = self._ensure_workflow().recognize_references_by(

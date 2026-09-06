@@ -31,7 +31,7 @@ recognize ... as rich $var [with <func>] [on group "<name>"]
 ```
 
 `recognize` 默认只进行参考图匹配；`as rich` 才会额外执行图库输出区域 OCR。
-`by` 的返回语义优先于 `rich`，二者同时出现时不会执行输出 OCR。
+`as rich` 与 `by` 返回类型冲突，不能同时使用，解析器会直接报错。
 
 **场景引用**（scene / region / panel 均支持两种形式）：
 
@@ -42,15 +42,15 @@ recognize ... as rich $var [with <func>] [on group "<name>"]
 
 ## 返回值总对比表
 
-| 指令 | 目标 | 默认 | `as rich` | `by ...` | `by` + `rich` |
-|------|------|------|-----------|----------|---------------|
-| **scan** | Region | `{key: 文本}` | — | `str`（命中 key） | — |
-| | Panel 整面板 | `{行: {列: 文本}}` | — | `{row, col}` | — |
-| | Panel 单格 | `str` | — | — | — |
-| **recognize** | Region | `{key: 材料名}` | `{key: 富dict}` | `str`（命中 key） | `str`（by 优先） |
-| | Panel 整面板 | `{行: {列: 材料名}}` | `{行: {列: 富dict}}` | `{row, col}` | `{row, col}`（by 优先） |
-| | Panel 单格 | `str` | `dict` | `str` | `str`（by 优先） |
-| **find** | 全画布/区域 | — | — | `FoundRegion` 或 `""` | — |
+| 指令 | 目标 | 默认 | `as rich` | `by ...` |
+|------|------|------|-----------|----------|
+| **scan** | Region | `{key: 文本}` | — | `str`（命中 key） |
+| | Panel 整面板 | `{行: {列: 文本}}` | — | `{row, col}` |
+| | Panel 单格 | `str` | — | — |
+| **recognize** | Region | `{key: 材料名}` | `{key: 富dict}` | `str`（命中 key） |
+| | Panel 整面板 | `{行: {列: 材料名}}` | `{行: {列: 富dict}}` | `{row, col}` |
+| | Panel 单格 | `str` | `dict` | `str` |
+| **find** | 全画布/区域 | — | — | `FoundRegion` 或 `""` |
 
 > `scan` 不支持 `as rich`；`find` 必须带 `by`，没有「无 by」形式。
 

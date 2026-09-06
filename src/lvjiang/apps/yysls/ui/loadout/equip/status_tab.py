@@ -130,6 +130,8 @@ class EquipStatusTab(QWidget):
         self._slot_cards: dict[str, _SlotCard] = {}
         self._setup_ui()
         self._refresh_all()
+        self._load_filter_settings()
+        self._rebuild_grid()
         # graduation_updated 只更新状态行。equipment_changed 由外层
         # LoadoutPanel 统一编排，避免父子同时订阅后重复重建整套装备卡。
         events = get_event_hub(self._host)
@@ -181,13 +183,6 @@ class EquipStatusTab(QWidget):
         btn_create.setStyleSheet(_ACTION_BTN_STYLE)
         btn_create.clicked.connect(self._on_mock_create)
         action_row.addWidget(btn_create)
-
-        btn_clear_real = QPushButton(tr("清空真实装备"))
-        btn_clear_real.setToolTip(tr("删除全部真实装备，保留模拟装备"))
-        btn_clear_real.setMinimumWidth(96)
-        btn_clear_real.setStyleSheet(_ACTION_BTN_STYLE)
-        btn_clear_real.clicked.connect(self._on_clear_real)
-        action_row.addWidget(btn_clear_real)
 
         # 导出数据
         btn_export = QPushButton(tr("导出数据"))
@@ -276,6 +271,20 @@ class EquipStatusTab(QWidget):
         self._type_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._type_filter)
 
+        lbl_quality = QLabel(tr("品阶"))
+        lbl_quality.setStyleSheet(_filter_lbl_style)
+        filter_row.addWidget(lbl_quality)
+        self._quality_filter = QComboBox()
+        self._quality_filter.addItem(tr("不限"), "all")
+        self._quality_filter.addItem(tr("金装"), "gold")
+        self._quality_filter.addItem(tr("紫装"), "purple")
+        self._quality_filter.addItem(tr("白装"), "other")
+        self._quality_filter.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
+        fit_combo_to_contents(self._quality_filter, minimum=88)
+        self._quality_filter.currentIndexChanged.connect(self._on_filter_changed)
+        filter_row.addWidget(self._quality_filter)
+
         lbl_level = QLabel(tr("等级"))
         lbl_level.setStyleSheet(_filter_lbl_style)
         filter_row.addWidget(lbl_level)
@@ -297,6 +306,7 @@ class EquipStatusTab(QWidget):
         self._affix_filter.addItem(tr("全部"), "all")
         self._affix_filter.addItem(tr("已定音"), "dingyin")
         self._affix_filter.addItem(tr("满调律"), "full_tuning")
+        self._affix_filter.addItem(tr("未满调律"), "not_full_tuning")
         fit_combo_to_contents(self._affix_filter, minimum=88)
         self._affix_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._affix_filter)
@@ -315,7 +325,32 @@ class EquipStatusTab(QWidget):
         self._source_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._source_filter)
 
+        lbl_status = QLabel(tr("状态"))
+        lbl_status.setStyleSheet(_filter_lbl_style)
+        filter_row.addWidget(lbl_status)
+        self._status_filter = QComboBox()
+        self._status_filter.addItem(tr("全部"), "all")
+        self._status_filter.addItem(tr("备战中"), "referenced")
+        self._status_filter.addItem(tr("未备战"), "unreferenced")
+        self._status_filter.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
+        fit_combo_to_contents(self._status_filter, minimum=88)
+        self._status_filter.currentIndexChanged.connect(self._on_filter_changed)
+        filter_row.addWidget(self._status_filter)
+
         filter_row.addStretch()
+
+        btn_clear_filtered = QPushButton(tr("清空筛选装备"))
+        btn_clear_filtered.setToolTip(tr("删除当前筛选结果，不含当前穿戴装备"))
+        btn_clear_filtered.setStyleSheet(_ACTION_BTN_STYLE)
+        btn_clear_filtered.clicked.connect(self._on_clear_filtered)
+        filter_row.addWidget(btn_clear_filtered)
+
+        btn_unequip_all = QPushButton(tr("卸载全部装备"))
+        btn_unequip_all.setToolTip(tr("卸载当前备战方案的全部装备"))
+        btn_unequip_all.setStyleSheet(_ACTION_BTN_STYLE)
+        btn_unequip_all.clicked.connect(self._on_unequip_all)
+        filter_row.addWidget(btn_unequip_all)
         info_layout.addLayout(filter_row)
 
         layout.addWidget(self._info_widget)
@@ -376,10 +411,7 @@ class EquipStatusTab(QWidget):
         layout.addWidget(scroll, stretch=1)
 
         # 订阅用户切换
-        self._host.user_changed.connect(lambda _name: self._refresh_all())
-
-        # 加载筛选配置
-        self._load_filter_settings()
+        self._host.user_changed.connect(self._on_user_changed)
 
     def set_embedded_mode(self, embedded: bool = True) -> None:
         """Hide duplicated chrome when hosted by LoadoutPanel."""
@@ -392,6 +424,11 @@ class EquipStatusTab(QWidget):
 
     # ── 筛选 ──
 
+    def _on_user_changed(self, _name: str) -> None:
+        self._refresh_all()
+        self._load_filter_settings()
+        self._rebuild_grid()
+
     def _load_filter_settings(self):
         """从用户级 loadout 存储加载筛选配置并设置下拉框"""
         filters = self._load_user_filter()
@@ -401,6 +438,8 @@ class EquipStatusTab(QWidget):
         self._level_filter.blockSignals(True)
         self._affix_filter.blockSignals(True)
         self._source_filter.blockSignals(True)
+        self._quality_filter.blockSignals(True)
+        self._status_filter.blockSignals(True)
         try:
             # 排序
             sort_idx = self._sort_filter.findData(filters.get("sort", "default"))
@@ -409,10 +448,9 @@ class EquipStatusTab(QWidget):
             type_data = filters.get("type", "all")
             type_idx = self._type_filter.findData(type_data)
             self._type_filter.setCurrentIndex(type_idx if type_idx >= 0 else 0)
-            if type_data != "all":
-                self._selected_slot = type_data
-                for key, card in self._slot_cards.items():
-                    card.set_selected(key == self._selected_slot)
+            self._selected_slot = type_data if type_data != "all" else None
+            for key, card in self._slot_cards.items():
+                card.set_selected(key == self._selected_slot)
             # 等级筛选
             level_idx = self._level_filter.findData(filters.get("level", "all"))
             self._level_filter.setCurrentIndex(level_idx if level_idx >= 0 else 0)
@@ -422,12 +460,24 @@ class EquipStatusTab(QWidget):
             # 来源筛选
             source_idx = self._source_filter.findData(filters.get("source", "all"))
             self._source_filter.setCurrentIndex(source_idx if source_idx >= 0 else 0)
+            # 品阶筛选
+            quality_idx = self._quality_filter.findData(
+                filters.get("quality", "all"))
+            self._quality_filter.setCurrentIndex(
+                quality_idx if quality_idx >= 0 else 0)
+            # 备战方案引用状态筛选
+            status_idx = self._status_filter.findData(
+                filters.get("status", "all"))
+            self._status_filter.setCurrentIndex(
+                status_idx if status_idx >= 0 else 0)
         finally:
             self._sort_filter.blockSignals(False)
             self._type_filter.blockSignals(False)
             self._level_filter.blockSignals(False)
             self._affix_filter.blockSignals(False)
             self._source_filter.blockSignals(False)
+            self._quality_filter.blockSignals(False)
+            self._status_filter.blockSignals(False)
 
     def _save_filter_settings(self):
         """保存筛选配置到用户级 loadout 存储"""
@@ -437,6 +487,8 @@ class EquipStatusTab(QWidget):
             "level": self._level_filter.currentData(),
             "affix": self._affix_filter.currentData(),
             "source": self._source_filter.currentData(),
+            "quality": self._quality_filter.currentData(),
+            "status": self._status_filter.currentData(),
         }
         self._save_user_filter(filters)
 
@@ -469,18 +521,20 @@ class EquipStatusTab(QWidget):
         return int(level_str) if level_str != "all" else 0
 
     def _get_affix_filter(self) -> str:
-        """获取词条筛选类型: all/dingyin/full_tuning"""
+        """获取词条筛选类型。"""
         return self._affix_filter.currentData()
 
     def _reset_filter_for_mock(self):
         """创建/复制模拟装备后，自动切换筛选以便新装备可见。
 
-        将来源切换为「模拟」、清除部位和词条筛选，确保新创建的模拟装备
-        不会被当前筛选条件隐藏。
+        将来源切换为「模拟」，并清除部位、品阶、词条和状态筛选，确保新建
+        装备不会被当前筛选条件隐藏。
         """
         self._source_filter.blockSignals(True)
         self._type_filter.blockSignals(True)
+        self._quality_filter.blockSignals(True)
         self._affix_filter.blockSignals(True)
+        self._status_filter.blockSignals(True)
         try:
             # 来源切换到「模拟」
             mock_idx = self._source_filter.findData("mock")
@@ -497,14 +551,25 @@ class EquipStatusTab(QWidget):
             all_affix_idx = self._affix_filter.findData("all")
             if all_affix_idx >= 0 and self._affix_filter.currentData() != "all":
                 self._affix_filter.setCurrentIndex(all_affix_idx)
+            for combo in (self._quality_filter, self._status_filter):
+                all_idx = combo.findData("all")
+                if all_idx >= 0:
+                    combo.setCurrentIndex(all_idx)
         finally:
             self._source_filter.blockSignals(False)
             self._type_filter.blockSignals(False)
+            self._quality_filter.blockSignals(False)
             self._affix_filter.blockSignals(False)
+            self._status_filter.blockSignals(False)
         self._save_filter_settings()
         self._rebuild_grid()
 
-    def _equip_passes_filter(self, equip: dict) -> bool:
+    def _equip_passes_filter(
+        self,
+        equip: dict,
+        *,
+        is_referenced: bool = False,
+    ) -> bool:
         """检查装备是否通过筛选条件"""
         # 等级筛选
         level_threshold = self._get_level_threshold()
@@ -518,17 +583,41 @@ class EquipStatusTab(QWidget):
             if equip_level < level_threshold:
                 return False
 
+        # 品阶筛选：白装按产品语义兜底为一切非金、非紫装备。
+        quality_filter = self._quality_filter.currentData() or "all"
+        quality = str(equip.get("quality") or "")
+        if quality_filter in ("gold", "purple") and quality != quality_filter:
+            return False
+        if quality_filter == "other" and quality in ("gold", "purple"):
+            return False
+
         # 词条筛选
         affix_filter = self._get_affix_filter()
-        if affix_filter == "all":
-            return True
-        elif affix_filter == "dingyin":
+        if affix_filter == "dingyin":
             # 有定音词条（包含满调律）
             dingyin = equip.get("dingyin")
-            return is_zhige_dingyin(equip) or bool(dingyin and dingyin.get("name"))
+            if not (is_zhige_dingyin(equip)
+                    or bool(dingyin and dingyin.get("name"))):
+                return False
         elif affix_filter == "full_tuning":
             # 满调律：5 条非定音词条（affix_1 到 affix_5 都有）
-            return all(equip.get(f"affix_{i}", {}).get("name") for i in range(1, 6))
+            if not all(equip.get(f"affix_{i}", {}).get("name")
+                       for i in range(1, 6)):
+                return False
+        elif affix_filter == "not_full_tuning":
+            affix_count = sum(
+                bool(equip.get(f"affix_{i}", {}).get("name"))
+                for i in range(1, 6)
+            )
+            if affix_count > 4:
+                return False
+
+        # 状态按是否被任意备战方案引用判断。
+        status_filter = self._status_filter.currentData() or "all"
+        if status_filter == "referenced" and not is_referenced:
+            return False
+        if status_filter == "unreferenced" and is_referenced:
+            return False
         return True
 
     # ── 槽位点击 ──
@@ -552,6 +641,7 @@ class EquipStatusTab(QWidget):
         finally:
             self._type_filter.blockSignals(False)
 
+        self._save_filter_settings()
         self._rebuild_grid()
 
     def _on_slot_unequip(self, slot_key: str):
@@ -602,6 +692,54 @@ class EquipStatusTab(QWidget):
 
     # ── 背包网格 ──
 
+    def _collect_filtered_cards(
+        self,
+    ) -> list[tuple[dict, str, str, bool, bool]]:
+        """返回当前筛选后的未穿戴装备，作为展示与批量删除的唯一口径。"""
+        filter_type = None
+        if self._selected_slot:
+            for _, _, slot_key, _, group_key in _SLOT_LAYOUT:
+                if slot_key == self._selected_slot:
+                    filter_type = group_key
+                    break
+
+        from ....config import get_game_config
+        group_to_part = get_game_config().get_group_to_part()
+        referenced_fps = (
+            self._inv.referenced_plan_fps if self._inv is not None else set())
+        # 当前方案已穿戴装备永远不进入下方列表，也永远不进入筛选删除集合。
+        equipped_fps = (
+            self._inv.active_plan_fps if self._inv is not None else set())
+        source_mode = self._source_filter.currentData() or "all"
+        cards: list[tuple[dict, str, str, bool, bool]] = []
+
+        def append_grouped_items(
+            grouped: dict,
+            *,
+            is_mock: bool,
+        ) -> None:
+            for group_key, items in grouped.items():
+                if filter_type is not None and group_key != filter_type:
+                    continue
+                part_label = group_to_part.get(group_key, group_key)
+                for fp, equip in items.items():
+                    if fp in equipped_fps:
+                        continue
+                    is_referenced = fp in referenced_fps
+                    if not self._equip_passes_filter(
+                        equip, is_referenced=is_referenced,
+                    ):
+                        continue
+                    cards.append((
+                        equip, part_label, group_key, is_mock, is_referenced,
+                    ))
+
+        if source_mode in ("all", "bag"):
+            append_grouped_items(self._bag_items, is_mock=False)
+        if source_mode in ("all", "mock"):
+            append_grouped_items(self._mock_items, is_mock=True)
+        return cards
+
     def _rebuild_grid(self):
         cols = self._display_params.get("grid_columns", _GRID_COLS)
 
@@ -616,50 +754,7 @@ class EquipStatusTab(QWidget):
         for c in range(cols):
             self._grid.setColumnStretch(c, 1)
 
-        # 确定筛选部位
-        filter_type = None
-        if self._selected_slot:
-            for _, _, sk, _, ft in _SLOT_LAYOUT:
-                if sk == self._selected_slot:
-                    filter_type = ft
-                    break
-
-        # 收集装备（bag_items + mock_items）
-        from ....config import get_game_config
-        group_to_part = get_game_config().get_group_to_part()
-        cards: list[tuple[dict, str, str, bool, bool]] = []
-        standby_fps = self._inv.standby_plan_fps if self._inv is not None else set()
-        # 当前方案已穿戴的指纹不再出现在下方未装备区
-        equipped_fps = self._inv.active_plan_fps if self._inv is not None else set()
-        # 来源筛选：all=全部, bag=仅背包, mock=仅模拟
-        source_mode = self._source_filter.currentData() or "all"
-        show_bag = source_mode in ("all", "bag")
-        show_mock = source_mode in ("all", "mock")
-        if show_bag:
-            for group_key, items in self._bag_items.items():
-                if filter_type is not None and group_key != filter_type:
-                    continue
-                part_label = group_to_part.get(group_key, group_key)
-                for _fp, equip in items.items():
-                    if _fp in equipped_fps:
-                        continue
-                    # 应用等级/词条筛选
-                    if not self._equip_passes_filter(equip):
-                        continue
-                    cards.append((equip, part_label, group_key, False, _fp in standby_fps))
-
-        # 合并模拟装备
-        if show_mock:
-            for group_key, items in self._mock_items.items():
-                if filter_type is not None and group_key != filter_type:
-                    continue
-                part_label = group_to_part.get(group_key, group_key)
-                for _fp, equip in items.items():
-                    if _fp in equipped_fps:
-                        continue
-                    if not self._equip_passes_filter(equip):
-                        continue
-                    cards.append((equip, part_label, group_key, True, _fp in standby_fps))
+        cards = self._collect_filtered_cards()
 
         # 排序模式
         sort_mode = self._sort_filter.currentData() or "default"
@@ -694,7 +789,7 @@ class EquipStatusTab(QWidget):
         # 武器槽位严格分组：同类型武器归为一组，组内保持排序顺序
         if self._selected_slot in ("main_weapon", "sub_weapon"):
             weapon_type_for_slot = self._get_plan_weapon_type(self._selected_slot)
-            if weapon_type_for_slot and filter_type == "weapon":
+            if weapon_type_for_slot:
                 same_slot_cards = [c for c in ordered if c[0].get("type") == weapon_type_for_slot]
                 other_cards = [c for c in ordered if c[0].get("type") != weapon_type_for_slot]
             else:
@@ -716,6 +811,7 @@ class EquipStatusTab(QWidget):
             card.edit_requested.connect(self._on_mock_edit_requested)
             card.delete_requested.connect(self._on_delete_requested)
             card.copy_requested.connect(self._on_copy_requested)
+            card.properties_requested.connect(self._on_properties_requested)
             self._grid.addWidget(card, pos // cols, pos % cols)
             pos += 1
 
@@ -733,6 +829,7 @@ class EquipStatusTab(QWidget):
             card.edit_requested.connect(self._on_mock_edit_requested)
             card.delete_requested.connect(self._on_delete_requested)
             card.copy_requested.connect(self._on_copy_requested)
+            card.properties_requested.connect(self._on_properties_requested)
             self._grid.addWidget(card, pos // cols, pos % cols)
             pos += 1
 
@@ -849,6 +946,31 @@ class EquipStatusTab(QWidget):
 
     # ── 装备操作 ──
 
+    def _on_properties_requested(self, equip_data: dict) -> None:
+        """展示装备属性，并把冷却时间变更持久化。"""
+        from .cards import _show_equipment_properties
+
+        def update_cooldown(value: str) -> bool:
+            fp = str(equip_data.get("_fp") or "")
+            if not fp:
+                QMessageBox.warning(
+                    self, tr("修改失败"), tr("装备数据缺少 _fp 字段"))
+                return False
+            inv = self._require_inventory()
+            if inv is None:
+                return False
+            try:
+                inv.set_item_cooldown(fp, value)
+                self._sync_inv(notify=True)
+                return True
+            except Exception as exc:
+                logger.error(f"修改装备冷却时间失败: {exc}")
+                QMessageBox.critical(self, tr("修改失败"), str(exc))
+                return False
+
+        _show_equipment_properties(
+            self.window(), equip_data, cooldown_changed=update_cooldown)
+
     def _on_equip_requested(self, equip_data: dict, group_key: str):
         """处理装备请求：将背包/模拟中的装备穿戴到对应槽位"""
         user_name = self._host.active_user_name()
@@ -952,23 +1074,63 @@ class EquipStatusTab(QWidget):
             logger.error(f"删除失败: {e}")
             QMessageBox.critical(self, tr("删除失败"), str(e))
 
-    def _on_clear_real(self):
-        """UI-owned bulk deletion; mock_ items are always preserved."""
-        user_name = self._host.active_user_name()
-        if not user_name:
+    def _filter_summary(self) -> str:
+        """生成批量删除确认框使用的当前筛选条件。"""
+        return "\n".join((
+            f"{tr('部位')}：{self._type_filter.currentText()}",
+            f"{tr('品阶')}：{self._quality_filter.currentText()}",
+            f"{tr('等级')}：{self._level_filter.currentText()}",
+            f"{tr('词条')}：{self._affix_filter.currentText()}",
+            f"{tr('类型')}：{self._source_filter.currentText()}",
+            f"{tr('状态')}：{self._status_filter.currentText()}",
+        ))
+
+    def _on_clear_filtered(self) -> None:
+        """删除当前筛选结果；当前方案穿戴装备由收集层硬排除。"""
+        inv = self._require_inventory()
+        if inv is None:
+            return
+        fingerprints = {
+            str(equip.get("_fp") or "")
+            for equip, *_rest in self._collect_filtered_cards()
+            if equip.get("_fp")
+        }
+        if not fingerprints:
+            QMessageBox.information(
+                self, tr("提示"), tr("当前筛选条件下没有可清空的未穿戴装备"))
             return
         reply = QMessageBox.question(
             self, tr("确认清空"),
-            tr("确定删除全部真实装备吗？模拟装备会被保留，方案中的相关槽位会置空。"),
+            tr("确定删除当前筛选出的 {count} 件未穿戴装备吗？").format(
+                count=len(fingerprints))
+            + f"\n\n{tr('当前筛选条件')}：\n{self._filter_summary()}"
+            + f"\n\n{tr('此操作不可撤销。')}",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-        from ....core.loadout import LoadoutRepository
-        LoadoutRepository(user_name).delete_all_real()
-        self._refresh_all()
-        get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
+        try:
+            inv.delete_items(fingerprints)
+            self._sync_inv(notify=True)
+            logger.info(f"已清空筛选装备: {len(fingerprints)} 件")
+        except Exception as exc:
+            logger.error(f"清空筛选装备失败: {exc}")
+            QMessageBox.critical(self, tr("删除失败"), str(exc))
+
+    def _on_unequip_all(self) -> None:
+        """卸载当前备战方案中的全部装备，装备本身仍留在共享池。"""
+        inv = self._require_inventory()
+        if inv is None:
+            return
+        try:
+            count = inv.unequip_all()
+            if count:
+                self._sync_inv(notify=True)
+                logger.info(f"已卸载当前方案全部装备: {count} 件")
+        except Exception as exc:
+            logger.error(f"卸载全部装备失败: {exc}")
+            QMessageBox.critical(self, tr("卸载失败"), str(exc))
 
     def _on_chengyin_merge(self):
         """识别候选并在用户确认后原子迁移引用、删除旧快照。"""

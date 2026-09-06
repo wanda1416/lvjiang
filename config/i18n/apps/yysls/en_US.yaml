@@ -62,6 +62,27 @@ yysls:
   承音后转律: Transfer After Chengyin
   原始等级: Original Level
   冷却时间: Cooldown Expires At
+  冷却装备管理: Cooldown Equipment
+  用户名: User
+  冷却倒计时: Cooldown
+  当前没有设置冷却时间的装备: No equipment currently has a cooldown
+  不限: Any
+  白装: Common Equipment
+  未满调律: Not Fully Tuned
+  未备战: Not in Loadout
+  清空筛选装备: Delete Filtered
+  卸载全部装备: Unequip All
+  删除当前筛选结果，不含当前穿戴装备: Delete filtered equipment except currently equipped items
+  卸载当前备战方案的全部装备: Unequip all equipment from the current loadout
+  当前筛选条件下没有可清空的未穿戴装备: No unequipped items match the current filters
+  确定删除当前筛选出的 {count} 件未穿戴装备吗？: Delete the {count} unequipped items matching the current filters?
+  当前筛选条件: Current filters
+  此操作不可撤销。: This action cannot be undone.
+  剩余时间: Time Remaining
+  清除冷却时间: Clear Cooldown
+  重置冷却时间: Reset Cooldown
+  装备冷却时间已到: Equipment cooldown has expired
+  '{days} 天 {hours} 小时 {minutes} 分钟': '{days}d {hours}h {minutes}m'
   该原始等级装备承音后是否仍允许在已转律词条上无限转律: Whether equipment of this original level may infinitely retransfer its transferred affix after Chengyin
   装备名称结构：等阶名称 + 标准名称 | 部位名称: 'Equipment name format: Tier Name + Standard Name | Equipment Part Name'
   输出: Output
@@ -693,7 +714,6 @@ auto_strings:
   创建模拟装备: Create Mock Equipment
   创建装备: Create Equipment
   初始判定: Initial Judgment
-  删除全部真实装备，保留模拟装备: Delete all real equipment, keep mock equipment
   删除左侧旧版本，并把备战方案引用迁移到右侧版本: Delete the old version on the left, and migrate loadout-plan references to the version on the right
   删除当前列: Delete Current Column
   删除方案: Delete Plan
@@ -1095,7 +1115,6 @@ auto_strings:
   测试装备: Test Equipment
   测高: Measure Height
   添加词条名: Add Affix Name
-  清空真实装备: Clear Real Equipment
   游戏账号、角色名、装备名称、装备指纹、截图和日志: Game account, character name, equipment name, equipment fingerprint, screenshots, and logs
   满定音: Full Dingyin
   满承音: Full Chengyin
@@ -1123,7 +1142,6 @@ auto_strings:
   目前识别出 {count} 组疑似同一件装备，请核对左右装备后选择是否合并。: '{count} group(s) suspected to be the same equipment were detected. Review the left/right equipment and decide whether to merge.'
   目标：: 'Target:'
   破竹: Pozhu
-  确定删除全部真实装备吗？模拟装备会被保留，方案中的相关槽位会置空。: Delete all real equipment? Mock equipment will be kept, and the related slots in plans will be cleared.
   确定删除基础属性「{name}」？: Delete base attributes "{name}"?
   确定删除当前方案吗？: Delete the current plan?
   ? '确定删除方案「{name}」？

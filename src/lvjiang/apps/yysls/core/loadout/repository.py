@@ -203,6 +203,20 @@ class LoadoutRepository:
         self.update(mutate)
         return fp
 
+    def set_item_cooldown(self, fp: str, expires_at: str) -> None:
+        """只修改指定装备的冷却到期时间，指纹不变。"""
+        if not isinstance(expires_at, str):
+            raise TypeError("冷却到期时间必须是字符串")
+
+        def mutate(state: LoadoutState) -> None:
+            equip = state.equipment_items.get(fp)
+            if equip is None:
+                raise ValueError(f"装备已不存在: {fp}")
+            equip["cooldown_expires_at"] = expires_at
+            equip[EQUIPMENT_UPDATED_AT] = _now_iso()
+
+        self.update(mutate)
+
     def assign_equipment(self, plan_id: str, slot_key: str, equip: dict) -> str:
         if slot_key not in EQUIPMENT_SLOTS:
             raise ValueError(f"未知装备槽位: {slot_key}")
@@ -227,6 +241,15 @@ class LoadoutRepository:
             if plan_id not in state.plans:
                 raise KeyError(plan_id)
             state.plans[plan_id].equipment[slot_key] = None
+        self.update(mutate)
+
+    def unassign_all(self, plan_id: str) -> None:
+        """原子卸载指定方案的全部装备。"""
+        def mutate(state: LoadoutState) -> None:
+            if plan_id not in state.plans:
+                raise KeyError(plan_id)
+            for slot_key in state.plans[plan_id].equipment:
+                state.plans[plan_id].equipment[slot_key] = None
         self.update(mutate)
 
     def delete_items(self, fingerprints: set[str]) -> None:
@@ -288,17 +311,6 @@ class LoadoutRepository:
             for old in resolved:
                 state.equipment_items.pop(old, None)
 
-        self.update(mutate)
-
-    def delete_all_real(self) -> None:
-        def mutate(state: LoadoutState) -> None:
-            fps = {fp for fp in state.equipment_items if not fp.startswith("mock_")}
-            for fp in fps:
-                state.equipment_items.pop(fp, None)
-            for plan in state.plans.values():
-                for slot, eq_fp in plan.equipment.items():
-                    if eq_fp in fps:
-                        plan.equipment[slot] = None
         self.update(mutate)
 
     def update_equipped_mock(self, plan_id: str, slot_key: str,

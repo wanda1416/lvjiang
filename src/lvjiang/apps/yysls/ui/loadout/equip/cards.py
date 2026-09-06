@@ -4,19 +4,24 @@
 """
 from __future__ import annotations
 
-from datetime import datetime
+from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from functools import partial
+from math import ceil
+from typing import Literal
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPainter, QPaintEvent
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMenu,
     QMessageBox,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -175,52 +180,178 @@ def _format_equipment_time(value) -> str:
     return parsed.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _equipment_properties_text(equip: dict) -> str:
-    """构建所有装备卡片共用的属性文本。"""
+def _parse_cooldown_time(value) -> datetime | None:
+    """解析冷却到期时间，无时区历史值按 UTC 处理。"""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _cooldown_has_expired(value, *, now: datetime | None = None) -> bool:
+    """有合法冷却时间且已到期。"""
+    expires_at = _parse_cooldown_time(value)
+    if expires_at is None:
+        return False
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    return expires_at <= current.astimezone(timezone.utc)
+
+
+def _format_cooldown_remaining(
+    value,
+    *,
+    now: datetime | None = None,
+) -> str:
+    """格式化为天/小时/分钟；不足一分钟向上取整。"""
+    expires_at = _parse_cooldown_time(value)
+    if expires_at is None:
+        return ""
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    seconds = max(
+        0.0,
+        (expires_at - current.astimezone(timezone.utc)).total_seconds(),
+    )
+    total_minutes = ceil(seconds / 60)
+    days, remainder = divmod(total_minutes, 24 * 60)
+    hours, minutes = divmod(remainder, 60)
+    return tr("{days} 天 {hours} 小时 {minutes} 分钟").format(
+        days=days, hours=hours, minutes=minutes)
+
+
+def _equipment_property_rows(equip: dict) -> list[tuple[str, str]]:
+    """构建所有装备卡片共用的属性行。"""
     is_mock = bool((equip.get("_extra") or {}).get("is_mock"))
     source = tr("模拟") if is_mock else tr("扫描")
-    return "\n".join((
-        f"{tr('来源')}：{source}",
-        f"{tr('指纹')}：{equip.get('_fp') or ''}",
-        f"{tr('原始等级')}：{int(equip.get('original_level') or 0)}",
-        f"{tr('冷却时间')}：{_format_equipment_time(equip.get('cooldown_expires_at'))}",
-        f"{tr('创建时间')}：{_format_equipment_time(equip.get('created_at'))}",
-        f"{tr('更新时间')}：{_format_equipment_time(equip.get('updated_at'))}",
-    ))
+    return [
+        (tr("来源"), source),
+        (tr("指纹"), str(equip.get("_fp") or "")),
+        (tr("原始等级"), str(int(equip.get("original_level") or 0))),
+        (tr("冷却时间"), _format_equipment_time(
+            equip.get("cooldown_expires_at"))),
+        (tr("创建时间"), _format_equipment_time(equip.get("created_at"))),
+        (tr("更新时间"), _format_equipment_time(equip.get("updated_at"))),
+    ]
+
+
+def _equipment_properties_text(equip: dict) -> str:
+    """构建所有装备卡片共用的属性文本。"""
+    return "\n".join(f"{name}：{value}" for name, value in
+                     _equipment_property_rows(equip))
 
 
 class _EquipmentPropertiesDialog(QDialog):
     """不触发系统消息提示音的装备属性只读对话框。"""
 
-    def __init__(self, equip: dict, parent: QWidget | None = None):
+    def __init__(
+        self,
+        equip: dict,
+        parent: QWidget | None = None,
+        cooldown_changed: Callable[[str], bool] | None = None,
+    ):
         super().__init__(parent)
+        self._equip = dict(equip)
+        self._cooldown_changed = cooldown_changed
         self.setObjectName("equipmentPropertiesDialog")
         self.setWindowTitle(tr("装备属性"))
-        self.setMinimumWidth(420)
+        self.setMinimumWidth(480)
 
         layout = QVBoxLayout(self)
-        properties = QLabel(_equipment_properties_text(equip))
-        properties.setObjectName("equipmentPropertiesText")
-        properties.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse)
-        properties.setWordWrap(True)
-        layout.addWidget(properties)
+        layout.setSpacing(16)
+        form = QFormLayout()
+        form.setHorizontalSpacing(24)
+        form.setVerticalSpacing(12)
+        self._value_labels: dict[str, QLabel] = {}
+        for name, value in _equipment_property_rows(self._equip):
+            field_name = QLabel(f"{name}：")
+            field_name.setStyleSheet("color: palette(mid); font-weight: 600;")
+            field_value = QLabel(value)
+            field_value.setTextInteractionFlags(
+                Qt.TextInteractionFlag.TextSelectableByMouse)
+            field_value.setWordWrap(True)
+            form.addRow(field_name, field_value)
+            self._value_labels[name] = field_value
+
+            if name == tr("冷却时间"):
+                self._remaining_name = QLabel(f"{tr('剩余时间')}：")
+                self._remaining_name.setStyleSheet(
+                    "color: palette(mid); font-weight: 600;")
+                self._remaining_value = QLabel("")
+                self._remaining_value.setObjectName("cooldownRemainingText")
+                self._remaining_value.setStyleSheet(
+                    "color: #D97706; font-weight: 600;")
+                form.addRow(self._remaining_name, self._remaining_value)
+        layout.addLayout(form)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        clear_cooldown_button = buttons.addButton(
+            tr("清除冷却时间"), QDialogButtonBox.ButtonRole.ActionRole)
+        reset_cooldown_button = buttons.addButton(
+            tr("重置冷却时间"), QDialogButtonBox.ButtonRole.ActionRole)
+        assert clear_cooldown_button is not None
+        assert reset_cooldown_button is not None
+        self._clear_cooldown_button: QPushButton = clear_cooldown_button
+        self._reset_cooldown_button: QPushButton = reset_cooldown_button
         apply_dialog_button_box_style(buttons)
         close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
         if close_button is not None:
             close_button.setText(tr("关闭"))
+        self._clear_cooldown_button.clicked.connect(self._clear_cooldown)
+        self._reset_cooldown_button.clicked.connect(self._reset_cooldown)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        self._countdown_timer = QTimer(self)
+        self._countdown_timer.setInterval(30_000)
+        self._countdown_timer.timeout.connect(self._refresh_cooldown)
+        self._countdown_timer.start()
+        self._refresh_cooldown()
 
-def _show_equipment_properties(parent, equip: dict) -> None:
+    def _set_cooldown(self, value: str) -> None:
+        if (self._cooldown_changed is not None
+                and not self._cooldown_changed(value)):
+            return
+        self._equip["cooldown_expires_at"] = value
+        self._refresh_cooldown()
+
+    def _clear_cooldown(self) -> None:
+        self._set_cooldown("")
+
+    def _reset_cooldown(self) -> None:
+        expires_at = datetime.now(timezone.utc) + timedelta(days=5)
+        self._set_cooldown(expires_at.isoformat(timespec="milliseconds"))
+
+    def _refresh_cooldown(self) -> None:
+        value = self._equip.get("cooldown_expires_at")
+        formatted = _format_equipment_time(value)
+        self._value_labels[tr("冷却时间")].setText(formatted)
+        remaining = _format_cooldown_remaining(value)
+        visible = bool(remaining)
+        self._remaining_name.setVisible(visible)
+        self._remaining_value.setVisible(visible)
+        self._remaining_value.setText(f"（{remaining}）" if remaining else "")
+        self._clear_cooldown_button.setEnabled(bool(_parse_cooldown_time(value)))
+
+
+def _show_equipment_properties(
+    parent,
+    equip: dict,
+    cooldown_changed: Callable[[str], bool] | None = None,
+) -> None:
     try:
         parent.isVisible()
     except (AttributeError, RuntimeError):
         parent = None
-    _EquipmentPropertiesDialog(equip, parent).exec()
+    _EquipmentPropertiesDialog(
+        equip, parent, cooldown_changed=cooldown_changed).exec()
 
 
 class _IllegalBadge(QLabel):
@@ -265,6 +396,24 @@ class _IllegalBadge(QLabel):
         # 故：窗口与原因文本按值取出，排队到事件循环里再弹，不依赖 self 存活。
         QTimer.singleShot(
             0, partial(_show_illegal_reasons, self.window(), list(self._reasons)))
+
+
+class _CooldownBadge(QLabel):
+    """冷却到期提醒「!」。"""
+
+    def __init__(self, parent=None):
+        super().__init__("!", parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFixedSize(16, 16)
+        self.setStyleSheet(
+            "color: #ffffff; background: #D97706; border-radius: 8px;"
+            "font-weight: bold; font-size: 11px;")
+        self.setToolTip(tr("装备冷却时间已到"))
+        self.hide()
+
+    def set_cooldown(self, value) -> None:
+        self.setVisible(_cooldown_has_expired(value))
 
 
 def _make_tag(text: str, bg: str = "#607D8B", parent=None) -> QLabel:
@@ -349,12 +498,14 @@ class _SlotCard(QFrame):
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px;")
         header.addWidget(self.lbl_name, stretch=1)
-        self.illegal_badge = _IllegalBadge()
-        header.addWidget(self.illegal_badge)
         self.status_tags = _StatusTagBar()
         self.status_tags.define("filtered", tr("筛选中"))
         self.status_tags.define("mock", tr("模拟"), "#7E57C2")
         header.addWidget(self.status_tags)
+        self.illegal_badge = _IllegalBadge()
+        header.addWidget(self.illegal_badge)
+        self.cooldown_badge = _CooldownBadge()
+        header.addWidget(self.cooldown_badge)
         layout.addLayout(header)
 
         # 等级行
@@ -467,7 +618,11 @@ class _SlotCard(QFrame):
             if parent:
                 parent._on_copy_requested(self._equip_data, self._equip_data.get("_extra", {}).get("group_key", ""))
         elif action == properties_action:
-            _show_equipment_properties(self.window(), self._equip_data)
+            parent = self.parent()
+            while parent and not isinstance(parent, EquipStatusTab):
+                parent = parent.parent()
+            if parent:
+                parent._on_properties_requested(self._equip_data)
         event.accept()
 
     # ── 数据填充 ──
@@ -477,6 +632,7 @@ class _SlotCard(QFrame):
         self._equip_data = {}
         self.status_tags.set_visible("mock", False)
         self.illegal_badge.set_reasons([])
+        self.cooldown_badge.set_cooldown("")
         self.lbl_name.setText(self._display_name)
         _set_quality(self.lbl_name, "")
         self.lbl_name.setStyleSheet(
@@ -494,6 +650,8 @@ class _SlotCard(QFrame):
             "mock", bool(equip_data.get("_extra", {}).get("is_mock", False)),
         )
         self.illegal_badge.set_reasons(illegal_reasons_of(equip_data))
+        self.cooldown_badge.set_cooldown(
+            equip_data.get("cooldown_expires_at"))
         quality = equip_data.get("quality") or ""
         self._quality_bg = _QUALITY_BG_COLORS.get(quality)
 
@@ -622,9 +780,17 @@ class _CompactEquipCard(QFrame):
     edit_requested = pyqtSignal(dict, str)
     delete_requested = pyqtSignal(dict, str)
     copy_requested = pyqtSignal(dict, str)
+    properties_requested = pyqtSignal(dict)
 
-    def __init__(self, display_params: dict | None = None, parent=None):
+    def __init__(
+        self,
+        display_params: dict | None = None,
+        parent=None,
+        *,
+        context_mode: Literal["full", "properties"] = "full",
+    ):
         super().__init__(parent)
+        self._context_mode = context_mode
         dp = display_params or {}
         self._name_fs = dp.get("name_font_size", 13)
         self._level_fs = dp.get("level_font_size", 12)
@@ -657,12 +823,14 @@ class _CompactEquipCard(QFrame):
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px;")
         name_row.addWidget(self.lbl_name, stretch=1)
-        self.illegal_badge = _IllegalBadge()
-        name_row.addWidget(self.illegal_badge)
         self.status_tags = _StatusTagBar()
         self.status_tags.define("mock", tr("模拟"), "#7E57C2")
         self.status_tags.define("loadout", tr("备战中"), "#00897B")
         name_row.addWidget(self.status_tags)
+        self.illegal_badge = _IllegalBadge()
+        name_row.addWidget(self.illegal_badge)
+        self.cooldown_badge = _CooldownBadge()
+        name_row.addWidget(self.cooldown_badge)
         layout.addLayout(name_row)
 
         self.lbl_level = QLabel()
@@ -733,13 +901,17 @@ class _CompactEquipCard(QFrame):
 
         menu = QMenu(self)
         menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        entries = [(tr("装备"), tr("穿戴到对应槽位"), self.equip_requested)]
-        if is_mock:
+        entries = []
+        if self._context_mode == "full":
             entries.append(
-                (tr("编辑"), tr("编辑模拟装备数据"), self.edit_requested))
-        entries.append((tr("复制"), tr("复制装备数据到创建对话框"),
-                        self.copy_requested))
-        entries.append((tr("删除"), tr("删除此装备"), self.delete_requested))
+                (tr("装备"), tr("穿戴到对应槽位"), self.equip_requested))
+            if is_mock:
+                entries.append(
+                    (tr("编辑"), tr("编辑模拟装备数据"), self.edit_requested))
+            entries.append((tr("复制"), tr("复制装备数据到创建对话框"),
+                            self.copy_requested))
+            entries.append(
+                (tr("删除"), tr("删除此装备"), self.delete_requested))
         for text, tip, signal in entries:
             action = menu.addAction(text)
             action.setToolTip(tip)
@@ -748,7 +920,7 @@ class _CompactEquipCard(QFrame):
         properties_action = menu.addAction(tr("属性"))
         properties_action.setToolTip(tr("查看装备来源、指纹、原始等级和时间"))
         properties_action.triggered.connect(
-            partial(self._show_properties, self.window(), data))
+            partial(self._emit_properties_action, self.properties_requested, data))
         menu.popup(global_pos)
 
     @staticmethod
@@ -757,8 +929,8 @@ class _CompactEquipCard(QFrame):
         signal.emit(data, group)
 
     @staticmethod
-    def _show_properties(parent, data, _checked=False) -> None:
-        _show_equipment_properties(parent, data)
+    def _emit_properties_action(signal, data, _checked=False) -> None:
+        signal.emit(data)
 
     def set_equip(
         self, equip_data: dict, part_label: str,
@@ -784,6 +956,8 @@ class _CompactEquipCard(QFrame):
         )
         self.status_tags.set_visible("loadout", is_loadout)
         self.illegal_badge.set_reasons(illegal_reasons_of(equip_data))
+        self.cooldown_badge.set_cooldown(
+            equip_data.get("cooldown_expires_at"))
 
         equip_level = equip_data.get("level")
         level = equip_level or "?"

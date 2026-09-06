@@ -137,9 +137,9 @@ class LoadoutPanel(QWidget):
         for label, callback in (
             (tr("最优组合"), lambda: self._equipment._on_optimal_combo()),
             (tr("培养建议"), lambda: self._equipment._on_affix_impact()),
+            (tr("冷却装备管理"), self._on_cooldown_equipment),
             (tr("承音装备合并"), lambda: self._equipment._on_chengyin_merge()),
             (tr("创建模拟装备"), lambda: self._equipment._on_mock_create()),
-            (tr("清空真实装备"), lambda: self._equipment._on_clear_real()),
             (tr("导出数据"), lambda: self._equipment._on_export()),
         ):
             button = QPushButton(label)
@@ -201,6 +201,19 @@ class LoadoutPanel(QWidget):
         self._splitter.splitterMoved.connect(self._on_splitter_moved)
         root.addWidget(self._splitter, 1)
         self._set_view_mode(self._view_mode)
+
+    def _on_cooldown_equipment(self) -> None:
+        """汇总所有用户的冷却装备，并在属性窗口中提供维护入口。"""
+        from .equip.cooldown_manager_dialog import CooldownEquipmentDialog
+
+        dialog = CooldownEquipmentDialog(
+            self._host.user_manager.list_users(),
+            self._equipment._display_params,
+            self,
+        )
+        dialog.exec()
+        if dialog.changed:
+            self.refresh()
 
     def _metric(self, parent: QHBoxLayout, name: str, *, yellow: bool) -> QLabel:
         card = QFrame()

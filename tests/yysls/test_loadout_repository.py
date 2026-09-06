@@ -47,6 +47,38 @@ def test_same_fingerprint_rescan_updates_cooldown_expiry(tmp_path: Path):
         "2026-09-08T20:00:00.000+00:00")
 
 
+def test_set_item_cooldown_preserves_fingerprint_and_updates_timestamp(
+    tmp_path: Path, monkeypatch,
+):
+    repo = LoadoutRepository("alice", tmp_path)
+    repo.upsert_item({
+        **equip(),
+        "cooldown_expires_at": "2026-09-07T04:00:00.000+00:00",
+    })
+    monkeypatch.setattr(
+        repository_module, "_now_iso",
+        lambda: "2026-09-06T10:00:00.000+00:00")
+
+    repo.set_item_cooldown(
+        "real-fp", "2026-09-11T10:00:00.000+00:00")
+
+    state = repo.load()
+    assert list(state.equipment_items) == ["real-fp"]
+    stored = state.equipment_items["real-fp"]
+    assert stored["_fp"] == "real-fp"
+    assert stored["cooldown_expires_at"] == (
+        "2026-09-11T10:00:00.000+00:00")
+    assert stored["updated_at"] == "2026-09-06T10:00:00.000+00:00"
+
+
+def test_set_item_cooldown_rejects_missing_equipment(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    repo.load()
+
+    with pytest.raises(ValueError, match="装备已不存在"):
+        repo.set_item_cooldown("missing", "")
+
+
 def test_new_fp_records_both_times_and_existing_fp_refreshes_update(
     tmp_path: Path, monkeypatch,
 ):
@@ -120,12 +152,20 @@ def test_delete_clears_all_plan_references(tmp_path: Path):
     assert all(plan.equipment["ring"] is None for plan in state.plans.values())
 
 
-def test_delete_all_real_preserves_mock(tmp_path: Path):
+def test_unassign_all_only_clears_target_plan(tmp_path: Path):
     repo = LoadoutRepository("alice", tmp_path)
-    repo.upsert_item(equip())
-    repo.upsert_item(equip("mock_x", "剑"))
-    repo.delete_all_real()
-    assert set(repo.load().equipment_items) == {"mock_x"}
+    first = repo.load().active_plan_id
+    repo.assign_equipment(first, "ring", equip("ring-fp"))
+    repo.assign_equipment(first, "head", equip("head-fp", "冠胄"))
+    second = repo.create_plan("second", "主功法", "副功法").id
+    repo.assign_equipment(second, "ring", equip("ring-fp"))
+
+    repo.unassign_all(first)
+
+    state = repo.load()
+    assert all(fp is None for fp in state.plans[first].equipment.values())
+    assert state.plans[second].equipment["ring"] == "ring-fp"
+    assert set(state.equipment_items) == {"ring-fp", "head-fp"}
 
 
 def test_update_equipped_mock_removes_orphan_old_fp(tmp_path: Path):

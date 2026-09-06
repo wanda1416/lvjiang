@@ -43,15 +43,19 @@ class EquipmentInventory:
         return {fp for fp in self._state.active_plan.equipment.values() if fp}
 
     @property
-    def standby_plan_fps(self) -> set[str]:
-        """被其他（非激活）方案引用、但未在当前方案中装备的指纹集合。"""
-        all_fps = {
+    def referenced_plan_fps(self) -> set[str]:
+        """被任意备战方案引用的装备指纹集合。"""
+        return {
             fp
             for plan in self._state.plans.values()
             for fp in plan.equipment.values()
             if fp
         }
-        return all_fps - self.active_plan_fps
+
+    @property
+    def standby_plan_fps(self) -> set[str]:
+        """被其他（非激活）方案引用、但未在当前方案中装备的指纹集合。"""
+        return self.referenced_plan_fps - self.active_plan_fps
 
     def get_equipped(self, slot_key: str) -> dict | None:
         return self.equipped.get(slot_key)
@@ -92,6 +96,20 @@ class EquipmentInventory:
         self._repo.unassign(self._state.active_plan_id, slot_key)
         self.reload()
         return old
+
+    def unequip_all(self) -> int:
+        """卸载当前方案全部装备，返回卸载数量。"""
+        count = len(self.active_plan_fps)
+        if count:
+            self._repo.unassign_all(self._state.active_plan_id)
+            self.reload()
+        return count
+
+    def delete_items(self, fingerprints: set[str]) -> None:
+        """批量删除装备并清理所有方案中的对应引用。"""
+        if fingerprints:
+            self._repo.delete_items(fingerprints)
+            self.reload()
 
     def equip_to_slot(self, slot_key: str, equip: dict, group_key: str) -> dict | None:
         old = self.get_equipped(slot_key)
@@ -149,6 +167,11 @@ class EquipmentInventory:
     def update_mock(self, old_group_key: str, old_fp: str, new_equip: dict,
                     new_group_key: str) -> None:
         self._repo.update_mock(old_fp, new_equip)
+        self.reload()
+
+    def set_item_cooldown(self, fp: str, expires_at: str) -> None:
+        """更新装备冷却到期时间并重载库存。"""
+        self._repo.set_item_cooldown(fp, expires_at)
         self.reload()
 
     def apply_combos(self, combo_equipped: dict[str, dict]) -> None:

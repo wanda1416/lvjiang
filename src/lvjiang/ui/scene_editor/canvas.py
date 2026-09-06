@@ -371,7 +371,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
 
     def delete_selected(self):
         """删除选中区域"""
-        if self._selected_idx >= 0:
+        if (self._selected_idx >= 0
+                and not self._regions[self._selected_idx].is_reference):
             self._regions.pop(self._selected_idx)
             self._selected_idx = -1
             self._field_selected = False
@@ -950,7 +951,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
             painter.drawText(label_rect, Qt.AlignmentFlag.AlignCenter, label)
 
         # 缩放手柄
-        if selected:
+        if selected and not r.is_reference:
             painter.save()
             handles = self._get_handle_positions(r)
             painter.setPen(QPen(QColor(255, 255, 0), 1))

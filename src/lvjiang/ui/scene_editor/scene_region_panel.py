@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -42,6 +41,7 @@ from .entity_edit_form import (
     add_dialog_action_row,
     validate_activation_key_edit,
 )
+from .entity_order_table import EntityOrderTable
 from .scene_select import (
     add_scene_combo_row,
     add_transition_row,
@@ -66,7 +66,7 @@ class RegionPanelMixin:
     def _build_region_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        self._region_table = QTableWidget()
+        self._region_table = EntityOrderTable()
         self._region_table.setColumnCount(9)
         self._region_table.setHorizontalHeaderLabels([
             tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击"),
@@ -79,9 +79,16 @@ class RegionPanelMixin:
         for col in (3, 4, 6):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             header.resizeSection(col, 50)
-        self._region_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self._region_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self._region_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._region_table.setSelectionBehavior(
+            EntityOrderTable.SelectionBehavior.SelectRows)
+        self._region_table.setSelectionMode(
+            EntityOrderTable.SelectionMode.SingleSelection)
+        self._region_table.setEditTriggers(
+            EntityOrderTable.EditTrigger.NoEditTriggers)
+        self._region_table.setToolTip(tr("拖拽名称可调整 YAML 定义顺序"))
+        self._region_table.entity_order_changed.connect(
+            lambda keys: self._on_entity_order_changed(
+                "regions", keys, self._region_table))
         strip_focus_rect(self._region_table)
         vheader = self._region_table.verticalHeader()
         assert vheader is not None
@@ -136,6 +143,7 @@ class RegionPanelMixin:
             if region_def.key not in assigned_keys:
                 name_item.setForeground(Qt.GlobalColor.gray)
             self._region_table.setItem(row, 0, name_item)
+            self._region_table.set_entity_order_key(row, region_def.key)
             # Key
             key_item = QTableWidgetItem(region_def.key)
             if region_def.key not in assigned_keys:

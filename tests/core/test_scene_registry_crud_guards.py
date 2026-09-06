@@ -148,3 +148,65 @@ def test_non_clickable_entities_never_serialize_transitions(tmp_path):
     saved = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert "to" not in saved["regions"][0]
     assert "to" not in saved["points"][0]
+
+
+def test_reorder_scene_entities_persists_visible_subset_in_original_slots(
+    tmp_path,
+):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    scenes = system / "scenes"
+    scenes.mkdir(parents=True)
+    path = scenes / "factory.yaml"
+    path.write_text(
+        yaml.dump({
+            "key": "factory",
+            "name": "系统场景",
+            "regions": [
+                {"key": "base_a", "name": "A", "type": "func"},
+                {"key": "view_b", "name": "B", "type": "func"},
+                {"key": "base_c", "name": "C", "type": "func"},
+                {"key": "view_d", "name": "D", "type": "func"},
+            ],
+        }, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    registry = SceneRegistry(resolver=ConfigResolver(
+        system_dir=system, local_dir=local, dev_mode=True))
+
+    assert registry.reorder_scene_entities(
+        "factory", "regions", ["view_d", "view_b"])
+    assert [r.key for r in registry.get_scene("factory").regions] == [
+        "base_a", "view_d", "base_c", "view_b",
+    ]
+    saved = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert [item["key"] for item in saved["regions"]] == [
+        "base_a", "view_d", "base_c", "view_b",
+    ]
+    assert not registry.reorder_scene_entities(
+        "factory", "regions", ["view_d", "view_b"])
+
+
+def test_reorder_scene_entities_rejects_invalid_requests(tmp_path):
+    system = tmp_path / "system"
+    scenes = system / "scenes"
+    scenes.mkdir(parents=True)
+    (scenes / "factory.yaml").write_text(
+        yaml.dump({
+            "key": "factory", "name": "系统场景",
+            "regions": [
+                {"key": "a", "name": "A", "type": "func"},
+                {"key": "b", "name": "B", "type": "func"},
+            ],
+        }, sort_keys=False),
+        encoding="utf-8",
+    )
+    registry = SceneRegistry(resolver=ConfigResolver(
+        system_dir=system, local_dir=tmp_path / "local", dev_mode=True))
+
+    with pytest.raises(ValueError, match="不支持排序"):
+        registry.reorder_scene_entities("factory", "arrows", ["b", "a"])
+    with pytest.raises(ValueError, match="重复 key"):
+        registry.reorder_scene_entities("factory", "regions", ["a", "a"])
+    with pytest.raises(ValueError, match="未知 key"):
+        registry.reorder_scene_entities("factory", "regions", ["a", "missing"])

@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -24,6 +23,7 @@ from ...core.scene_registry import (
 )
 from ...i18n import tr
 from ..button_styles import apply_button_style, apply_dialog_button_box_style
+from .entity_order_table import EntityOrderTable
 
 
 class SceneReferenceEditorMixin:
@@ -32,15 +32,19 @@ class SceneReferenceEditorMixin:
     def _build_reference_panel(self) -> QWidget:
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        self._reference_table = QTableWidget(0, 3)
+        self._reference_table = EntityOrderTable(0, 3)
         self._reference_table.setHorizontalHeaderLabels(
             [tr("名称"), "Key", tr("子场景")])
         self._reference_table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows)
+            EntityOrderTable.SelectionBehavior.SelectRows)
         self._reference_table.setSelectionMode(
-            QTableWidget.SelectionMode.SingleSelection)
+            EntityOrderTable.SelectionMode.SingleSelection)
         self._reference_table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers)
+            EntityOrderTable.EditTrigger.NoEditTriggers)
+        self._reference_table.setToolTip(tr("拖拽名称可调整 YAML 定义顺序"))
+        self._reference_table.entity_order_changed.connect(
+            lambda keys: self._on_entity_order_changed(
+                "subscene_refs", keys, self._reference_table))
         header = self._reference_table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -81,7 +85,9 @@ class SceneReferenceEditorMixin:
             row = self._reference_table.rowCount()
             self._reference_table.insertRow(row)
             mark = "✓" if ref.key in bound else "○"
-            self._reference_table.setItem(row, 0, QTableWidgetItem(f"{mark} {ref.name}"))
+            self._reference_table.setItem(
+                row, 0, QTableWidgetItem(f"{mark} {ref.name}"))
+            self._reference_table.set_entity_order_key(row, ref.key)
             self._reference_table.setItem(row, 1, QTableWidgetItem(ref.key))
             self._reference_table.setItem(row, 2, QTableWidgetItem(ref.scene))
         self._reference_table.blockSignals(False)

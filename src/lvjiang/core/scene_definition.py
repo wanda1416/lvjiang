@@ -934,6 +934,43 @@ class SceneRegistry:
             raise ValueError(f"面板不存在: {old_key}")
         self._save_scene_yaml(scene)
 
+    def reorder_scene_entities(self, scene_key: str, kind: str,
+                               ordered_keys: list[str]) -> bool:
+        """按 key 重排一种场景实体并写回 YAML。
+
+        ``ordered_keys`` 可以只是当前视图可见的子集；这些实体只在它们原来
+        占据的槽位间换序，未显示的定义保持原槽位。返回是否实际发生变化。
+        """
+        if kind not in {"regions", "points", "panels", "subscene_refs"}:
+            raise ValueError(f"不支持排序的场景实体类型: {kind}")
+        if len(ordered_keys) != len(set(ordered_keys)):
+            raise ValueError("实体排序中存在重复 key")
+
+        scene = self._require_scene(scene_key)
+        entities = list(getattr(scene, kind))
+        existing = {item.key for item in entities}
+        unknown = [key for key in ordered_keys if key not in existing]
+        if unknown:
+            raise ValueError(f"实体排序包含未知 key: {unknown}")
+        if len(ordered_keys) < 2:
+            return False
+
+        selected = set(ordered_keys)
+        replacements = iter(ordered_keys)
+        reordered = [
+            next(replacements) if item.key in selected else item.key
+            for item in entities
+        ]
+        current = [item.key for item in entities]
+        if reordered == current:
+            return False
+
+        by_key = {item.key: item for item in entities}
+        setattr(scene, kind, [by_key[key] for key in reordered])
+        self._save_scene_yaml(scene)
+        logger.info(f"场景 {scene_key} {kind} 定义顺序已更新: {ordered_keys}")
+        return True
+
     def rename_region_key(self, scene_key: str, old_key: str, new_key: str):
         """重命名场景内 region 的 key（region/point/panel 共享命名空间）"""
         scene = self._require_scene(scene_key)

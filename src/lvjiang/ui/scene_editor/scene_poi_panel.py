@@ -46,6 +46,7 @@ from .entity_edit_form import (
     add_dialog_action_row,
     validate_activation_key_edit,
 )
+from .entity_order_table import EntityOrderTable
 from .scene_select import (
     add_scene_combo_row,
     add_transition_row,
@@ -80,7 +81,7 @@ class PoiPanelMixin:
     def _build_point_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        self._point_list = QTableWidget()
+        self._point_list = EntityOrderTable()
         # 列与区域表保持一致：坐标和区域本质都是 area，属性同构
         self._point_list.setColumnCount(9)
         self._point_list.setHorizontalHeaderLabels([
@@ -97,6 +98,10 @@ class PoiPanelMixin:
         self._point_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._point_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._point_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._point_list.setToolTip(tr("拖拽名称可调整 YAML 定义顺序"))
+        self._point_list.entity_order_changed.connect(
+            lambda keys: self._on_entity_order_changed(
+                "points", keys, self._point_list))
         strip_focus_rect(self._point_list)
         vheader = self._point_list.verticalHeader()
         assert vheader is not None
@@ -195,6 +200,7 @@ class PoiPanelMixin:
             if point_def.key not in placed:
                 name_item.setForeground(Qt.GlobalColor.gray)
             self._point_list.setItem(row, 0, name_item)
+            self._point_list.set_entity_order_key(row, point_def.key)
             # Key
             key_item = QTableWidgetItem(point_def.key)
             if point_def.key not in placed:

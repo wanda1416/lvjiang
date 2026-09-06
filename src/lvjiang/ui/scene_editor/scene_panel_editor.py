@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
-    QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -33,6 +32,7 @@ from ...core.scene_registry import (
 from ...i18n import tr
 from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from ..widgets import centered_cell_widget, strip_focus_rect
+from .entity_order_table import EntityOrderTable
 from .scene_select import (
     add_scene_combo_row,
     add_views_checklist_row,
@@ -58,7 +58,7 @@ class PanelEditorMixin:
         """构建面板编辑 Tab 的 UI"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        self._panel_table = QTableWidget()
+        self._panel_table = EntityOrderTable()
         self._panel_table.setColumnCount(6)
         self._panel_table.setHorizontalHeaderLabels(
             [tr("名称"), "Key", tr("比例"), tr("校准模式"), tr("滚动方向"), tr("禁用")]
@@ -74,14 +74,18 @@ class PanelEditorMixin:
         header.resizeSection(4, 60)   # 滚动方向
         header.resizeSection(5, 50)   # 禁用
         self._panel_table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows
+            EntityOrderTable.SelectionBehavior.SelectRows
         )
         self._panel_table.setSelectionMode(
-            QTableWidget.SelectionMode.SingleSelection
+            EntityOrderTable.SelectionMode.SingleSelection
         )
         self._panel_table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers
+            EntityOrderTable.EditTrigger.NoEditTriggers
         )
+        self._panel_table.setToolTip(tr("拖拽名称可调整 YAML 定义顺序"))
+        self._panel_table.entity_order_changed.connect(
+            lambda keys: self._on_entity_order_changed(
+                "panels", keys, self._panel_table))
         strip_focus_rect(self._panel_table)
         vheader = self._panel_table.verticalHeader()
         assert vheader is not None
@@ -140,6 +144,7 @@ class PanelEditorMixin:
             if panel_def.key not in bound_keys:
                 name_item.setForeground(Qt.GlobalColor.gray)
             self._panel_table.setItem(row, 0, name_item)
+            self._panel_table.set_entity_order_key(row, panel_def.key)
             # Key
             key_item = QTableWidgetItem(panel_def.key)
             if panel_def.key not in bound_keys:

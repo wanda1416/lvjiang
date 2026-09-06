@@ -9,8 +9,9 @@ import yaml
 from lvjiang.core.layout_manager import (
     _drop_orphan_coords,
     _expand_scene_references,
+    refresh_scene_references,
 )
-from lvjiang.core.layout_models import Point, Region
+from lvjiang.core.layout_models import Layout, Point, Region
 from lvjiang.core.scene_definition import SceneRegistry
 
 
@@ -471,6 +472,39 @@ def test_expanding_over_an_existing_key_refuses_rather_than_overwrites():
 
     assert expand_one_reference(regions, {}, "dst", "src", "btn") is False
     assert regions["dst"][0].x_ratio == 0.9
+
+
+def test_refresh_references_replaces_stale_projection(monkeypatch):
+    """源场景在编辑器内改坐标后，目标画布不能继续拿加载时的旧克隆。"""
+    import lvjiang.core.scene_registry as sr
+
+    ref = type("R", (), {"scene": "equip_detail", "entity": "status"})()
+    target = type("S", (), {"references": [ref]})()
+    monkeypatch.setattr(sr, "get_registry", lambda: type(
+        "Reg", (), {
+            "all_scenes": lambda self: {"equip_weapon_detail": target},
+        })())
+    layout = Layout(name="测试", regions={
+        "equip_detail": [
+            Region("status", 0.2, 0.3, 0.1, 0.05),
+        ],
+        "equip_weapon_detail": [
+            Region("affix", 0.6, 0.6, 0.2, 0.05),
+            Region(
+                "status", 0.8, 0.8, 0.1, 0.05,
+                source_scene="equip_detail",
+            ),
+        ],
+    })
+
+    affected = refresh_scene_references(layout)
+
+    assert affected == {"equip_weapon_detail"}
+    regions = layout.get_scene_regions("equip_weapon_detail")
+    assert [region.key for region in regions] == ["affix", "status"]
+    status = regions[1]
+    assert (status.x_ratio, status.y_ratio) == (0.2, 0.3)
+    assert status.source_scene == "equip_detail"
 
 
 def test_a_references_view_assignment_can_be_changed(scenes_dir):

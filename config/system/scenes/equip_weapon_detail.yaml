@@ -7,21 +7,6 @@ views:
 - key: cooldown
   name: 冷却
 regions:
-- key: equip_type
-  name: 装备类型
-  type: attr
-  is_text: true
-  is_clickable: false
-- key: equip_level
-  name: 装备等级
-  type: attr
-  is_text: true
-  is_clickable: false
-- key: base_attr
-  name: 基础属性
-  type: attr
-  is_text: true
-  is_clickable: false
 - key: affix_gong
   name: 词条宫
   type: attr
@@ -88,13 +73,14 @@ regions:
   is_text: true
   is_clickable: false
   view: cooldown
-- key: zaoyi
-  name: 装备造诣
-  type: attr
-  is_text: true
-  is_clickable: false
-- key: status
-  name: 装备状态
-  type: attr
-  is_text: true
-  is_clickable: false
+references:
+- scene: equip_detail
+  entity: status
+- scene: equip_detail
+  entity: equip_type
+- scene: equip_detail
+  entity: zaoyi
+- scene: equip_detail
+  entity: equip_level
+- scene: equip_detail
+  entity: base_attr

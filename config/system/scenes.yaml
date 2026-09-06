@@ -9,6 +9,7 @@ scenes:
     - general_control
     - general_action
     - general_chat
+    - general_purchase
   training:
     name: 培养
     items:
@@ -28,6 +29,7 @@ scenes:
     - bag_wallet_detail
     - bugan_detail
     - zhanling_detail
+    - shop_detail
   social:
     name: 社交
     items:

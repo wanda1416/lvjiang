@@ -1,0 +1,34 @@
+content_version: 1
+key: general_purchase
+name: 购买
+regions:
+- key: back
+  name: 返回
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: item_name
+  name: 道具名称
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: add_one
+  name: 添加
+  type: func
+  is_text: false
+  is_clickable: true
+- key: add_max
+  name: 添加全部
+  type: func
+  is_text: false
+  is_clickable: true
+- key: total_price
+  name: 总价
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: buy
+  name: 购买
+  type: func
+  is_text: true
+  is_clickable: true

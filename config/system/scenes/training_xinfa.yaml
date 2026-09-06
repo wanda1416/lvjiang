@@ -59,12 +59,6 @@ regions:
   is_text: false
   is_clickable: true
   view: purchase_confirm
-- key: confirm
-  name: 确认
-  type: func
-  is_text: true
-  is_clickable: true
-  view: purchase_confirm
 - key: count
   name: 书票数量
   type: attr
@@ -108,3 +102,10 @@ regions:
   is_text: true
   is_clickable: false
   view: zhihuan
+references:
+- scene: general_control
+  entity: confirm
+  view: purchase_confirm
+- scene: general_control
+  entity: cancel
+  view: purchase_confirm

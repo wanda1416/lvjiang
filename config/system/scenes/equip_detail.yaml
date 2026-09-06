@@ -4,6 +4,8 @@ name: 装备
 views:
 - key: base
   name: 基底
+- key: func_area
+  name: 功能区
 - key: recycle_confirm
   name: 回收确认
 regions:
@@ -37,36 +39,43 @@ regions:
   type: func
   is_text: true
   is_clickable: true
-- key: sub_func_1
-  name: 次功能1
-  type: func
-  is_text: true
-  is_clickable: true
-- key: sub_func_2
-  name: 次功能2
-  type: func
-  is_text: true
-  is_clickable: true
+  view: func_area
 - key: more_func
   name: 更多功能
   type: func
   is_text: false
   is_clickable: true
+  view: func_area
+- key: sub_func_1
+  name: 次功能1
+  type: func
+  is_text: true
+  is_clickable: true
+  view: func_area
+- key: sub_func_2
+  name: 次功能2
+  type: func
+  is_text: true
+  is_clickable: true
+  view: func_area
 - key: sub_func_3
   name: 次功能3
   type: func
   is_text: true
   is_clickable: true
+  view: func_area
 - key: sub_func_4
   name: 次功能4
   type: func
   is_text: true
   is_clickable: true
+  view: func_area
 - key: func_area
   name: 功能区
   type: func
   is_text: true
   is_clickable: true
+  view: func_area
 references:
 - scene: general_control
   entity: cancel

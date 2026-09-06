@@ -7,6 +7,9 @@ views:
 - key: jingxuan
   name: 精选
   same_layer: false
+- key: jingxuan_daoju
+  name: 精选道具
+  same_layer: false
 regions:
 - key: jingxuan
   name: 精选

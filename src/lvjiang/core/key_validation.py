@@ -42,7 +42,14 @@ def validate_layout_activation_keys(
             definitions = (
                 scene.regions if kind == "区域" else scene.points
             ) if scene else []
-            definition_by_key = {item.key: item for item in definitions}
+            view_by_key = {item.key: item.view for item in definitions}
+            if scene:
+                # 跨场景引用展开后的坐标属于当前场景，但其视图归属由
+                # SceneRefDef 声明；不能因为本地 definitions 中没有它就
+                # 回退到 base，否则会把不同视图的快捷键误判为冲突。
+                view_by_key.update({
+                    ref.entity: ref.view for ref in scene.references
+                })
             for item in items:
                 key_name = getattr(item, "activation_key", "")
                 if not key_name:
@@ -59,8 +66,7 @@ def validate_layout_activation_keys(
                         f"[{scene_key}].[{item.key}] {kind}绑定 {key_name!r}"
                     )
                     continue
-                definition = definition_by_key.get(item.key)
-                view = (getattr(definition, "view", "") or BASE_VIEW_KEY)
+                view = view_by_key.get(item.key) or BASE_VIEW_KEY
                 bindings[(scene_key, view, normalized)].append(
                     f"{kind} [{item.key}]"
                 )

@@ -135,10 +135,25 @@ class LoadoutPanel(QWidget):
             tools.addWidget(btn)
         tools.addStretch()
         for label, callback in (
-            (tr("最优组合"), lambda: self._equipment._on_optimal_combo()),
-            (tr("培养建议"), lambda: self._equipment._on_affix_impact()),
             (tr("冷却装备"), self._on_cooldown_equipment),
             (tr("承音装备"), lambda: self._equipment._on_chengyin_merge()),
+        ):
+            button = QPushButton(label)
+            button.setToolTip(tr("面向全部用户"))
+            button.setStyleSheet(USER_ACTION_BTN_STYLE)
+            button.clicked.connect(callback)
+            tools.addWidget(button)
+
+        scope_separator = QFrame()
+        scope_separator.setFrameShape(QFrame.Shape.NoFrame)
+        scope_separator.setFixedSize(12, 26)
+        scope_separator.setStyleSheet(
+            "border:0;border-left:1px dashed palette(mid);")
+        tools.addWidget(scope_separator)
+
+        for label, callback in (
+            (tr("最优组合"), lambda: self._equipment._on_optimal_combo()),
+            (tr("培养建议"), lambda: self._equipment._on_affix_impact()),
             (tr("模拟装备"), lambda: self._equipment._on_mock_create()),
             (tr("导出数据"), lambda: self._equipment._on_export()),
         ):

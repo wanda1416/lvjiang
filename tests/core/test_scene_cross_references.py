@@ -33,6 +33,9 @@ class _Resolver:
     def resolve_read(self, rel):
         return self.root / rel.split("/", 1)[1]
 
+    def write_entity(self, rel, data, **_kwargs):
+        (self.root / rel.split("/", 1)[1]).write_text(data, encoding="utf-8")
+
 
 @pytest.fixture
 def scenes_dir(tmp_path):
@@ -418,3 +421,163 @@ def test_referenced_entity_shows_the_source_name_not_its_key(
     # 查无此实体仍退回 key，调用方靠它显示"这行的定义丢了"
     assert scene_registry.get_region_name(
         "equip_tune_detail", "nope") == "nope"
+
+
+# ── 编辑器路径 ────────────────────────────────────────────
+
+def test_a_single_reference_can_be_expanded_without_reloading_the_layout():
+    """新加一条引用要能单独展开坐标。
+
+    引用坐标是布局**加载期**展开的，编辑器新加一条时若只能整份重载，
+    画布上还没保存的改动就没了；不展开的话列表里有、画布上没有，看着
+    像加失败了。
+    """
+    from lvjiang.core.layout_manager import expand_one_reference
+
+    regions = {"src": [Region(key="btn", x_ratio=0.1, y_ratio=0.2,
+                              w_ratio=0.3, h_ratio=0.4)]}
+    points = {"src": [Point(key="anchor", cx_ratio=0.5, cy_ratio=0.6)]}
+
+    assert expand_one_reference(regions, points, "dst", "src", "btn")
+    assert expand_one_reference(regions, points, "dst", "src", "anchor")
+
+    assert [r.key for r in regions["dst"]] == ["btn"]
+    assert regions["dst"][0].x_ratio == 0.1
+    assert regions["dst"][0].source_scene == "src"
+    assert [p.key for p in points["dst"]] == ["anchor"]
+
+
+def test_expanding_a_reference_with_no_source_coords_reports_failure():
+    """源场景在本布局里没标坐标就展开不出东西，调用方据此保持「未放置」。"""
+    from lvjiang.core.layout_manager import expand_one_reference
+
+    regions: dict = {"src": []}
+    points: dict = {}
+
+    assert expand_one_reference(regions, points, "dst", "src", "btn") is False
+    assert "dst" not in regions
+
+
+def test_expanding_over_an_existing_key_refuses_rather_than_overwrites():
+    """覆盖等于让运行期点到另一个位置，而且完全静默。"""
+    from lvjiang.core.layout_manager import expand_one_reference
+
+    regions = {
+        "src": [Region(key="btn", x_ratio=0.1, y_ratio=0.1,
+                       w_ratio=0.1, h_ratio=0.1)],
+        "dst": [Region(key="btn", x_ratio=0.9, y_ratio=0.9,
+                       w_ratio=0.1, h_ratio=0.1)],
+    }
+
+    assert expand_one_reference(regions, {}, "dst", "src", "btn") is False
+    assert regions["dst"][0].x_ratio == 0.9
+
+
+def test_a_references_view_assignment_can_be_changed(scenes_dir):
+    """引用的坐标属于源场景，但「在本场景哪些视图下看得见」是本场景的数据。
+
+    改不了的话，加错视图之后只能删掉重加。
+    """
+    _write(scenes_dir, "general_control", {
+        "regions": [{"key": "confirm", "name": "确认", "type": "func"}]})
+    _write(scenes_dir, "equip_tune_detail", {
+        "views": [{"key": "base", "name": "基底"},
+                  {"key": "reset", "name": "重置"}],
+        "references": [{"scene": "general_control", "entity": "confirm",
+                        "view": "base"}]})
+    registry = _registry(scenes_dir)
+
+    registry.update_scene_reference_views(
+        "equip_tune_detail", "general_control", "confirm", ["reset"])
+
+    assert registry.get_scene("equip_tune_detail").references[0].views == ["reset"]
+    # 落盘了才算改成功：重建注册表还应读得到
+    assert _registry(scenes_dir).get_scene(
+        "equip_tune_detail").references[0].views == ["reset"]
+
+
+def test_changing_views_of_a_missing_reference_is_an_error(scenes_dir):
+    _write(scenes_dir, "dst", {})
+    registry = _registry(scenes_dir)
+
+    with pytest.raises(ValueError, match="引用不存在"):
+        registry.update_scene_reference_views("dst", "src", "nope", ["base"])
+
+
+# ── 删除与改名的引用校验 ──────────────────────────────────
+
+@pytest.fixture
+def referenced(scenes_dir):
+    """general_control.confirm 被两个场景引用"""
+    _write(scenes_dir, "general_control", {
+        "regions": [{"key": "confirm", "name": "确认", "type": "func"},
+                    {"key": "solo", "name": "独立", "type": "func"}],
+        "points": [{"key": "anchor", "name": "锚点", "type": "func"}],
+        "panels": [{"key": "grid", "name": "格子", "type": "grid"}]})
+    _write(scenes_dir, "equip_tune_detail", {
+        "name": "调律详情",
+        "references": [{"scene": "general_control", "entity": "confirm"}]})
+    _write(scenes_dir, "bag", {
+        "name": "背包",
+        "references": [{"scene": "general_control", "entity": "confirm"},
+                       {"scene": "general_control", "entity": "anchor"}]})
+    return _registry(scenes_dir)
+
+
+def test_deleting_a_referenced_region_is_refused(referenced) -> None:
+    """源定义没了，引用就成了悬空声明：加载期在内存里被丢掉，那个场景静静
+    少了一个实体，直到某条 .wf 跑到它才炸。"""
+    with pytest.raises(ValueError, match="正被 2 个场景引用"):
+        referenced.remove_region_from_scene("general_control", "confirm")
+
+    assert [r.key for r in referenced.get_scene("general_control").regions] == [
+        "confirm", "solo"]
+
+
+def test_the_refusal_names_the_referring_scenes(referenced) -> None:
+    """光说「有引用」等于让人自己去十几个场景里翻。"""
+    with pytest.raises(ValueError) as exc:
+        referenced.remove_region_from_scene("general_control", "confirm")
+
+    assert "调律详情" in str(exc.value) and "背包" in str(exc.value)
+
+
+def test_points_and_panels_are_guarded_the_same_way(referenced) -> None:
+    with pytest.raises(ValueError, match="正被 1 个场景引用"):
+        referenced.remove_point_from_scene("general_control", "anchor")
+    # panel 没人引用，照常删得掉
+    referenced.remove_panel_from_scene("general_control", "grid")
+    assert referenced.get_scene("general_control").panels == []
+
+
+def test_an_unreferenced_definition_still_deletes(referenced) -> None:
+    referenced.remove_region_from_scene("general_control", "solo")
+
+    assert [r.key for r in referenced.get_scene("general_control").regions] == [
+        "confirm"]
+
+
+def test_renaming_a_key_carries_the_references_along(referenced) -> None:
+    """引用按 (源场景, 实体 key) 定位，改名不跟着走就成了悬空声明。"""
+    referenced.rename_region_key("general_control", "confirm", "ok_btn")
+
+    for key in ("equip_tune_detail", "bag"):
+        entities = [r.entity for r in referenced.get_scene(key).references]
+        assert "ok_btn" in entities and "confirm" not in entities
+
+
+def test_migrating_an_entity_retargets_the_references(referenced) -> None:
+    """搬家不是删除：实体还在，只是换了地址。"""
+    changed = referenced.retarget_references(
+        "general_control", "bag", "confirm", "ok_btn")
+
+    assert sorted(changed) == ["bag", "equip_tune_detail"]
+    ref = referenced.get_scene("equip_tune_detail").references[0]
+    assert (ref.scene, ref.entity) == ("bag", "ok_btn")
+    # 改指之后源场景就删得掉了
+    referenced.remove_region_from_scene("general_control", "confirm")
+
+
+def test_retargeting_to_the_same_address_is_a_no_op(referenced) -> None:
+    assert referenced.retarget_references(
+        "general_control", "general_control", "confirm") == []

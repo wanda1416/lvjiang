@@ -171,6 +171,58 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         elif kind == "subscene_ref" and self.on_subscene_ref_changed:
             self.on_subscene_ref_changed()
 
+    def remove_item(self, kind: str, key: str) -> bool:
+        """从画布移除某 key 的实例（含被视图过滤隐藏的那份）。
+
+        场景定义删掉之后画布若还留着，下一次保存布局会把 ``get_regions()``
+        里的它原样写回去——刚从磁盘删掉的坐标立刻复活，而且看不出来。
+
+        删 point 会连带丢掉以它为端点的 arrow：端点没了的 arrow 既画不出来
+        也跑不了，留着就是下一条残留。
+        """
+        removed = False
+        for bucket in self._lists_by_kind(kind):
+            keep = [item for item in bucket if item.key != key]
+            if len(keep) != len(bucket):
+                bucket[:] = keep
+                removed = True
+        if kind == "point":
+            for bucket in (self._arrows, self._hidden_arrows):
+                keep = [a for a in bucket
+                        if a.from_key != key and a.to_key != key]
+                if len(keep) != len(bucket):
+                    bucket[:] = keep
+                    removed = True
+        if not removed:
+            return False
+        self._selected_idx = -1
+        if kind == "region" and self.on_region_changed:
+            self.on_region_changed()
+        elif kind in ("point", "arrow") and self.on_poi_changed:
+            self.on_poi_changed()
+        elif kind == "panel" and self.on_panel_changed:
+            self.on_panel_changed()
+        self.update()
+        return True
+
+    def _lists_by_kind(self, kind: str) -> list[list]:
+        """该类型的可见与隐藏两份列表。
+
+        分开存是为了视图过滤——删除必须两边都删，只删可见那份的话，切一次
+        视图它又回来了。
+        """
+        if kind == "region":
+            return [self._regions, self._hidden_regions]
+        if kind == "panel":
+            return [self._panels, self._hidden_panels]
+        if kind == "point":
+            return [self._points, self._hidden_points]
+        if kind == "arrow":
+            return [self._arrows, self._hidden_arrows]
+        if kind == "subscene_ref":
+            return [self._subscene_refs, self._hidden_subscene_refs]
+        return []
+
     def get_disabled_keys(self, kind: str) -> set[str]:
         """获取某类型中已标记 disabled 的全部 key"""
         items = self._items_by_kind(kind)

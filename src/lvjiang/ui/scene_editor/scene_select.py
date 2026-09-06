@@ -5,15 +5,17 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QFormLayout,
     QHBoxLayout,
+    QLabel,
     QListWidget,
     QListWidgetItem,
     QMenu,
     QPushButton,
+    QVBoxLayout,
     QWidget,
 )
 
 from ...core.scene_definition import BASE_VIEW_KEY
-from ...core.scene_registry import get_registry, get_scene_views
+from ...core.scene_registry import get_registry, get_scene_views, is_view_visible
 from ...i18n import tr
 from ..button_styles import apply_button_style
 
@@ -175,83 +177,232 @@ def checklist_views_value(checklist: ViewChecklist | None,
 
 # ─── 跨场景 area 引用 ───────────────────────────────────
 
-class SceneAreaReferencePicker(QWidget):
-    """引用来源的分组 → 场景 → area 三级级联选择器。"""
+class SceneAreaReferenceBatchPicker(QWidget):
+    """引用来源：分组 + 场景 + 视图筛选，下方列表多选。
+
+    一次要引十几个 area 是常态（通用控件、公共弹窗），一条一条开对话框
+    不现实。所以筛选与选取分开：上面三个下拉只管**缩小范围**，下面的
+    列表才是选取，勾几个就一次加几个。
+
+    列表里区域和坐标混排——它们本质都是 area，``add_scene_reference``
+    也一视同仁，按类型拆成两处只会让人来回切。
+    """
 
     def __init__(self, current_scene: str, taken_keys: set[str], parent=None):
         super().__init__(parent)
         self._registry = get_registry()
-        self._candidates: dict[str, list] = {}
-        visible_scenes = {
-            scene_key
-            for group_key, _group_name in self._registry.get_groups()
-            for scene_key in self._registry.get_group_scenes(group_key)
-        }
-        for scene_key, scene in self._registry.all_scenes().items():
-            if (scene_key not in visible_scenes or scene_key == current_scene
-                    or scene.is_subscene):
-                continue
-            regions = [region for region in scene.regions
-                       if region.key not in taken_keys]
-            if regions:
-                self._candidates[scene_key] = regions
+        self._taken = taken_keys
+        self._current_scene = current_scene
+        self._scenes = self._collect_scenes()
 
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        filters = QHBoxLayout()
         self.group = QComboBox()
         self.scene = QComboBox()
-        self.area = QComboBox()
+        self.view = QComboBox()
         self.group.setToolTip(tr("分组"))
         self.scene.setToolTip(tr("场景"))
-        self.area.setToolTip(tr("区域"))
-        row = QHBoxLayout(self)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(self.group, 2)
-        row.addWidget(self.scene, 3)
-        row.addWidget(self.area, 3)
+        self.view.setToolTip(tr("视图"))
+        for widget, stretch in ((self.group, 2), (self.scene, 3), (self.view, 2)):
+            filters.addWidget(widget, stretch)
+        layout.addLayout(filters)
+
+        self.items = QListWidget()
+        self.items.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        self.items.setMinimumHeight(220)
+        layout.addWidget(self.items)
+
+        self._summary = QLabel()
+        self._summary.setStyleSheet("color: palette(mid); font-size: 11px;")
+        row = QHBoxLayout()
+        btn_all = QPushButton(tr("全选"))
+        btn_none = QPushButton(tr("全不选"))
+        for button, checked in ((btn_all, True), (btn_none, False)):
+            apply_button_style(button)
+            button.clicked.connect(lambda _c, v=checked: self._set_all(v))
+            row.addWidget(button)
+        row.addWidget(self._summary, 1)
+        layout.addLayout(row)
 
         for group_key, group_name in self._registry.get_groups():
-            if any(scene_key in self._candidates for scene_key in
+            if any(scene_key in self._scenes for scene_key in
                    self._registry.get_group_scenes(group_key)):
                 self.group.addItem(group_name, userData=group_key)
         self.group.currentIndexChanged.connect(self._on_group_changed)
         self.scene.currentIndexChanged.connect(self._on_scene_changed)
+        self.view.currentIndexChanged.connect(self._fill_items)
+        self.items.itemChanged.connect(lambda _item: self._refresh_summary())
         self._on_group_changed(self.group.currentIndex())
+
+    def _collect_scenes(self) -> dict[str, list]:
+        """候选场景 → 可引用的 area 列表（区域在前，坐标在后）。
+
+        同名 key 会与本场景定义抢命名空间，直接不给选——引用项的 key 恒等于
+        源实体 key，改不了。
+        """
+        visible = {
+            scene_key
+            for group_key, _name in self._registry.get_groups()
+            for scene_key in self._registry.get_group_scenes(group_key)
+        }
+        found: dict[str, list] = {}
+        for scene_key, scene in self._registry.all_scenes().items():
+            if (scene_key not in visible or scene_key == self._current_scene
+                    or scene.is_subscene):
+                continue
+            areas = [item for item in (*scene.regions, *scene.points)
+                     if item.key not in self._taken]
+            if areas:
+                found[scene_key] = areas
+        return found
 
     @property
     def has_candidates(self) -> bool:
-        return bool(self._candidates)
+        return bool(self._scenes)
 
     def _on_group_changed(self, _index: int) -> None:
         self.scene.blockSignals(True)
         self.scene.clear()
-        group_key = self.group.currentData()
-        for scene_key in self._registry.get_group_scenes(group_key):
-            if scene_key not in self._candidates:
+        for scene_key in self._registry.get_group_scenes(self.group.currentData()):
+            if scene_key not in self._scenes:
                 continue
             scene = self._registry.get_scene(scene_key)
             if scene is None:
                 continue
             self.scene.addItem(scene.name, userData=scene_key)
-            self.scene.setItemData(
-                self.scene.count() - 1, scene_key,
-                Qt.ItemDataRole.ToolTipRole)
+            self.scene.setItemData(self.scene.count() - 1, scene_key,
+                                   Qt.ItemDataRole.ToolTipRole)
         self.scene.blockSignals(False)
         self._on_scene_changed(self.scene.currentIndex())
 
     def _on_scene_changed(self, _index: int) -> None:
-        self.area.clear()
+        """换场景要重填视图下拉：每个场景有自己的一套视图。"""
+        self.view.blockSignals(True)
+        self.view.clear()
+        self.view.addItem(tr("全部视图"), userData="")
         scene_key = self.scene.currentData()
-        for region in self._candidates.get(scene_key, []):
-            self.area.addItem(region.name, userData=region.key)
-            self.area.setItemData(
-                self.area.count() - 1, region.key,
-                Qt.ItemDataRole.ToolTipRole)
+        views = get_scene_views(scene_key) if scene_key else []
+        for view in views:
+            self.view.addItem(view.name, userData=view.key)
+        self.view.setEnabled(bool(views))
+        self.view.blockSignals(False)
+        self._fill_items()
 
-    def value(self) -> tuple[str, str] | None:
+    def _fill_items(self) -> None:
+        self.items.blockSignals(True)
+        self.items.clear()
         scene_key = self.scene.currentData()
-        entity_key = self.area.currentData()
-        if not scene_key or not entity_key:
-            return None
-        return str(scene_key), str(entity_key)
+        current_view = str(self.view.currentData() or "")
+        for area in self._scenes.get(scene_key, []):
+            if not is_view_visible(area.views, current_view):
+                continue
+            kind = tr("区域") if hasattr(area, "is_clickable") else tr("坐标")
+            item = QListWidgetItem(f"[{kind}] {area.name}　{area.key}")
+            item.setData(Qt.ItemDataRole.UserRole, (scene_key, area.key))
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
+            item.setToolTip(f"{scene_key}.{area.key}")
+            self.items.addItem(item)
+        self.items.blockSignals(False)
+        self._refresh_summary()
+
+    def _set_all(self, checked: bool) -> None:
+        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+        self.items.blockSignals(True)
+        for index in range(self.items.count()):
+            item = self.items.item(index)
+            if item is not None:
+                item.setCheckState(state)
+        self.items.blockSignals(False)
+        self._refresh_summary()
+
+    def _refresh_summary(self) -> None:
+        total = self.items.count()
+        if not total:
+            self._summary.setText(tr("该场景在此视图下没有可引用的 area"))
+            return
+        self._summary.setText(
+            tr("已选 {n}/{total}").format(n=len(self.values()), total=total))
+
+    def values(self) -> list[tuple[str, str]]:
+        """勾选的 (场景 key, 实体 key) 列表，按列表顺序。"""
+        chosen = []
+        for index in range(self.items.count()):
+            item = self.items.item(index)
+            if item is not None and item.checkState() == Qt.CheckState.Checked:
+                scene_key, entity = item.data(Qt.ItemDataRole.UserRole)
+                chosen.append((str(scene_key), str(entity)))
+        return chosen
+
+
+def prompt_scene_area_references(
+    parent, scene_key: str, current_view: str, taken_keys: set[str],
+    *, title: str,
+) -> list[tuple[str, str, list[str]]]:
+    """弹出引用选择对话框，返回 (源场景, 实体, 归属视图) 列表。
+
+    取消或没勾任何一项都返回空列表。归属视图对本次选中的全部条目共用——
+    一次引十几个 area 时它们几乎总是落在同一个视图，逐条问反而更烦；个别
+    要挪的，加完在列表里双击那一行改。
+    """
+    from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox
+
+    from ..button_styles import apply_dialog_button_box_style
+
+    picker = SceneAreaReferenceBatchPicker(scene_key, taken_keys)
+    if not picker.has_candidates:
+        QMessageBox.information(
+            parent, title,
+            tr("没有可引用的 area：一级场景中同名的 key 已被本场景占用。"))
+        return []
+
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(title)
+    dialog.resize(560, 520)
+    form = QFormLayout(dialog)
+    form.addRow(tr("来源:"), picker)
+    view_list = add_views_checklist_row(form, scene_key, [current_view])
+    buttons = QDialogButtonBox(
+        QDialogButtonBox.StandardButton.Ok
+        | QDialogButtonBox.StandardButton.Cancel)
+    apply_dialog_button_box_style(buttons)
+    form.addRow(buttons)
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return []
+    views = checklist_views_value(view_list, current_view)
+    return [(source, entity, list(views)) for source, entity in picker.values()]
+
+
+def prompt_reference_views(parent, scene_key: str,
+                           current: list[str]) -> list[str] | None:
+    """只改归属视图的小对话框；取消返回 None。"""
+    from PyQt6.QtWidgets import QDialog, QDialogButtonBox
+
+    from ..button_styles import apply_dialog_button_box_style
+
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(tr("引用的归属视图"))
+    form = QFormLayout(dialog)
+    note = QLabel(tr("坐标、类型与名字都在源场景，这里只改它在本场景的哪些"
+                      "视图下看得见。"))
+    note.setWordWrap(True)
+    note.setStyleSheet("color: palette(mid); font-size: 11px;")
+    form.addRow(note)
+    checklist = add_views_checklist_row(form, scene_key, list(current))
+    buttons = QDialogButtonBox(
+        QDialogButtonBox.StandardButton.Ok
+        | QDialogButtonBox.StandardButton.Cancel)
+    apply_dialog_button_box_style(buttons)
+    form.addRow(buttons)
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return checklist_views_value(checklist, current[0] if current else "")
 
 
 # ─── 转移目标（页面切换契约） ────────────────────────────

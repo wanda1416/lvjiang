@@ -19,7 +19,10 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.key_names import normalize_key
-from ...core.layout_manager import rename_item_key_across_all_layouts
+from ...core.layout_manager import (
+    delete_item_key_across_all_layouts,
+    rename_item_key_across_all_layouts,
+)
 from ...core.scene_definition import VALID_REGION_TYPES, RegionDef
 from ...core.scene_definition_models import SceneRefDef
 from ...core.scene_registry import (
@@ -40,12 +43,13 @@ from .entity_edit_form import (
     validate_activation_key_edit,
 )
 from .scene_select import (
-    SceneAreaReferencePicker,
     add_scene_combo_row,
     add_transition_row,
     add_views_checklist_row,
     checklist_views_value,
     connect_scene_views_sync,
+    prompt_reference_views,
+    prompt_scene_area_references,
 )
 
 
@@ -175,8 +179,9 @@ class RegionPanelMixin:
     def _append_reference_rows(self, scene, assigned_by_key) -> None:
         """追加跨场景引用行。
 
-        引用项属于源场景，**只读**：不显示禁用复选框、双击不进编辑弹窗，
-        坐标要改得去源场景改。这里只让它在本场景的列表和画布里看得见。
+        引用项的坐标、类型、名字都属于源场景，改不了也不该改：不显示禁用
+        复选框，双击不进区域编辑弹窗。但「在本场景的哪些视图下看得见」是
+        本场景自己的数据，双击走 :meth:`_edit_reference_views` 改。
         """
         for ref in getattr(scene, "references", ()):
             if not is_view_visible(ref.views, self._current_view):
@@ -201,8 +206,12 @@ class RegionPanelMixin:
                 item = QTableWidgetItem(text)
                 if col in (3, 4, 5, 6):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                # 整行置灰，和本场景原生定义一眼区分开
+                # 整行置灰，和本场景原生定义一眼区分开。灰的是「这些字段
+                # 属于源场景」，不是「整行不能动」——双击仍可改归属视图。
                 item.setForeground(Qt.GlobalColor.gray)
+                item.setToolTip(
+                    tr("引用自 {scene}；双击可改它在本场景的归属视图")
+                    .format(scene=get_scene_name(ref.scene)))
                 self._region_table.setItem(row, col, item)
             # 「来源」列显示场景名，源 key 只作 tooltip 与行数据——
             # _selected_reference() 靠这份数据回查引用项，不能拿显示名去匹配。
@@ -239,6 +248,8 @@ class RegionPanelMixin:
         scene = registry.get_scene(self._scene_key)
         key_item = self._region_table.item(row, 1)
         if not scene or key_item is None:
+            return
+        if self._edit_reference_views(row):
             return
         old_def = next((r for r in scene.regions if r.key == key_item.text()), None)
         if old_def is None:
@@ -294,6 +305,10 @@ class RegionPanelMixin:
             self._canvas.set_regions(regions)
         self._canvas.set_item_activation_key(
             "region", new_key, activation_key)
+        # 实体只是搬了家，不是没了：指向它的引用一并改指过去，否则
+        # remove_region_from_scene 的引用校验会把迁移也拦下来。
+        registry.retarget_references(
+            self._scene_key, target_scene, old_key, new_key)
         registry.remove_region_from_scene(self._scene_key, old_key)
         sync_scene_cache(self._scene_key)
         sync_scene_cache(target_scene)
@@ -358,8 +373,21 @@ class RegionPanelMixin:
         except ValueError as e:
             QMessageBox.warning(self, tr("删除失败"), str(e))
             return
+        self._purge_layout_coords("region", region_def.key)
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
+
+    def _purge_layout_coords(self, kind: str, key: str) -> None:
+        """定义删掉之后，把各套布局里的坐标一并清掉。
+
+        只删场景 YAML 的话，坐标会留在每一份布局 JSON 里：加载期的孤儿清理
+        只清内存，没打开过的布局文件里那条记录一直躺着；回头新建一个同 key
+        的实体，旧坐标就被当成它的，位置莫名其妙还完全静默。
+
+        画布也要同步删——不然下一次保存布局会把它原样写回去，等于刚删就复活。
+        """
+        self._canvas.remove_item(kind, key)
+        delete_item_key_across_all_layouts(self._scene_key, kind, key)
 
     # ─── 编辑弹窗 ────────────────────────────────────────
 
@@ -499,6 +527,14 @@ class RegionPanelMixin:
         row = self._region_table.currentRow()
         if row < 0:
             return None
+        return self._reference_at(row)
+
+    def _reference_at(self, row: int):
+        """表格某一行对应的引用项；原生行返回 None。
+
+        「来源」列的 UserRole 存的是源场景 key，不能拿显示名去匹配——同名
+        场景在不同分组里是允许的。
+        """
         source_item = self._region_table.item(row, 8)
         key_item = self._region_table.item(row, 1)
         if source_item is None or key_item is None:
@@ -514,7 +550,7 @@ class RegionPanelMixin:
                      and r.scene == source_key), None)
 
     def _on_add_scene_reference(self):
-        """引用另一个一级场景的区域。
+        """引用另一个一级场景的 area，一次可引多个。
 
         只能引用一级场景：其坐标同属画布归一化，原样可用、零变换。子场景的
         坐标相对外框，搬过来要做变换，是另一回事（见 subscene_refs）。
@@ -528,41 +564,69 @@ class RegionPanelMixin:
                  | {r.key for r in scene.subscene_refs}
                  | {r.key for r in scene.references})
 
-        dialog = QDialog(self)
-        dialog.setWindowTitle(tr("引用区域"))
-        form = QFormLayout(dialog)
-        source = SceneAreaReferencePicker(self._scene_key, taken)
-        if not source.has_candidates:
-            QMessageBox.information(
-                self, tr("引用区域"),
-                tr("没有可引用的区域：一级场景中同名的 key 已被本场景占用。"))
-            return
-        form.addRow(tr("来源:"), source)
-        view_list = add_views_checklist_row(
-            form, self._scene_key, [self._current_view])
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel)
-        apply_dialog_button_box_style(buttons)
-        form.addRow(buttons)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
+        chosen = prompt_scene_area_references(
+            self, self._scene_key, self._current_view, taken,
+            title=tr("引用区域"))
+        if not chosen:
             return
 
-        selected = source.value()
-        if selected is None:
-            return
-        scene_key, entity = selected
-        try:
-            registry.add_scene_reference(self._scene_key, SceneRefDef(
-                scene=scene_key, entity=entity,
-                views=checklist_views_value(view_list, self._current_view)))
-        except ValueError as exc:
-            QMessageBox.warning(self, tr("引用区域"), str(exc))
+        added: list[tuple[str, str]] = []
+        failed: list[str] = []
+        for source_scene, entity, views in chosen:
+            try:
+                registry.add_scene_reference(self._scene_key, SceneRefDef(
+                    scene=source_scene, entity=entity, views=views))
+            except ValueError as exc:
+                # 一条失败不该拖累其余的：批量引用十几条时，为一条同名的
+                # 全部回滚，用户得自己找出是哪条。
+                failed.append(f"{source_scene}.{entity}: {exc}")
+                continue
+            added.append((source_scene, entity))
+        if failed:
+            QMessageBox.warning(
+                self, tr("引用区域"),
+                tr("以下 {n} 条没有加上：\n{detail}").format(
+                    n=len(failed), detail="\n".join(failed)))
+        if not added:
             return
         sync_scene_cache(self._scene_key)
+        self._notify_references_added(added)
         self._refresh_lists()
+
+    def _edit_reference_views(self, row: int) -> bool:
+        """引用行双击：改归属视图。不是引用行返回 False，交回原路。
+
+        引用项的坐标、类型、名字都在源场景，改不了也不该改；但「在本场景的
+        哪些视图下看得见」是本场景自己的数据。原先整行只读，加错视图之后只
+        能删掉重加。
+        """
+        ref = self._reference_at(row)
+        if ref is None:
+            return False
+        views = prompt_reference_views(self, self._scene_key, list(ref.views))
+        if views is None:
+            return True
+        try:
+            get_registry().update_scene_reference_views(
+                self._scene_key, ref.scene, ref.entity, views)
+        except ValueError as exc:
+            QMessageBox.warning(
+                self, tr("引用区域"), str(exc))  # type: ignore[arg-type]
+            return True
+        sync_scene_cache(self._scene_key)
+        self._refresh_lists()
+        return True
+
+    def _notify_references_added(self, added: list[tuple[str, str]]) -> None:
+        """把新引用的坐标补进当前布局。
+
+        引用的坐标是布局**加载期**从源场景展开来的，新加一条不会自己出现在
+        画布上——列表里有、画布上没有，看着就像加失败了。这里补展开这几条，
+        而不是整份布局重载：重载会丢掉画布上还没保存的改动。
+        """
+        callback = getattr(self, "on_scene_references_added", None)
+        if callback:
+            callback(self._scene_key, added)
 
     def _on_remove_scene_reference(self):
         ref = self._selected_reference()

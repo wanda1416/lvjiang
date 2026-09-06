@@ -22,7 +22,10 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.key_names import normalize_key
-from ...core.layout_manager import rename_item_key_across_all_layouts
+from ...core.layout_manager import (
+    delete_item_key_across_all_layouts,
+    rename_item_key_across_all_layouts,
+)
 from ...core.scene_definition import VALID_REGION_TYPES, PointDef
 from ...core.scene_definition_models import SceneRefDef
 from ...core.scene_registry import (
@@ -49,6 +52,7 @@ from .scene_select import (
     add_views_checklist_row,
     checklist_views_value,
     connect_scene_views_sync,
+    prompt_scene_area_references,
 )
 
 _RE_ARROW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -374,6 +378,9 @@ class PoiPanelMixin:
         except ValueError as e:
             QMessageBox.warning(self, tr("删除失败"), str(e))
             return
+        # 连带以它为端点的 arrow：端点没了的 arrow 既画不出来也跑不了
+        self._canvas.remove_item("point", key)
+        delete_item_key_across_all_layouts(self._scene_key, "point", key)
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
 
@@ -471,6 +478,8 @@ class PoiPanelMixin:
             self._canvas.set_arrows(arrows)
         self._canvas.set_item_activation_key(
             "point", new_key, activation_key)
+        registry.retarget_references(
+            self._scene_key, target_scene, old_key, new_key)
         registry.remove_point_from_scene(self._scene_key, old_key)
         sync_scene_cache(self._scene_key)
         sync_scene_cache(target_scene)
@@ -703,47 +712,32 @@ class PoiPanelMixin:
                  | {p.key for p in scene.panels}
                  | {r.key for r in scene.subscene_refs}
                  | {r.key for r in scene.references})
-        candidates: list[tuple[str, str, str]] = []
-        for key, other in registry.all_scenes().items():
-            if key == self._scene_key or other.is_subscene:
+
+        chosen = prompt_scene_area_references(
+            self, self._scene_key, self._current_view, taken,
+            title=tr("引用坐标"))
+        if not chosen:
+            return
+
+        added: list[tuple[str, str]] = []
+        failed: list[str] = []
+        for source_scene, entity, views in chosen:
+            try:
+                registry.add_scene_reference(self._scene_key, SceneRefDef(
+                    scene=source_scene, entity=entity, views=views))
+            except ValueError as exc:
+                failed.append(f"{source_scene}.{entity}: {exc}")
                 continue
-            for pd in other.points:
-                if pd.key in taken:
-                    continue   # 同名会与本场景定义抢 key，直接不给选
-                candidates.append(
-                    (key, pd.key, f"{other.name} ({key}) · {pd.name}"))
-        if not candidates:
-            QMessageBox.information(
+            added.append((source_scene, entity))
+        if failed:
+            QMessageBox.warning(
                 self, tr("引用坐标"),
-                tr("没有可引用的坐标：一级场景中同名的 key 已被本场景占用。"))
-            return
-
-        dialog = QDialog(self)
-        dialog.setWindowTitle(tr("引用坐标"))
-        form = QFormLayout(dialog)
-        combo = QComboBox()
-        for scene_key, entity, label in candidates:
-            combo.addItem(label, userData=(scene_key, entity))
-        form.addRow(tr("来源:"), combo)
-        view_list = add_views_checklist_row(
-            form, self._scene_key, [self._current_view])
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel)
-        apply_dialog_button_box_style(buttons)
-        form.addRow(buttons)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-
-        scene_key, entity = combo.currentData()
-        try:
-            registry.add_scene_reference(self._scene_key, SceneRefDef(
-                scene=scene_key, entity=entity,
-                views=checklist_views_value(view_list, self._current_view)))
-        except ValueError as exc:
-            QMessageBox.warning(self, tr("引用坐标"), str(exc))
+                tr("以下 {n} 条没有加上：\n{detail}").format(
+                    n=len(failed), detail="\n".join(failed)))
+        if not added:
             return
         sync_scene_cache(self._scene_key)
+        callback = getattr(self, "on_scene_references_added", None)
+        if callback:
+            callback(self._scene_key, added)
         self._refresh_lists()

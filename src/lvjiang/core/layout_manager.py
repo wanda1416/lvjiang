@@ -263,6 +263,69 @@ def _rename_layout_item_key(layout_name: str, scene_key: str, kind: str, old_key
         logger.info(f"布局 {layout_name} 场景 {scene_key} 中 {kind} key 重命名: {old_key} -> {new_key}")
 
 
+def delete_item_key_across_all_layouts(
+    scene_key: str, kind: str, key: str,
+) -> list[str]:
+    """遍历所有布局，删除指定场景下某实例的坐标记录，返回改动过的布局名。
+
+    删定义只改场景 YAML，布局 JSON 里的坐标不跟着走。加载期虽有
+    :func:`_drop_orphan_coords` 兜底，但那只清内存：没打开过的布局文件里
+    那条记录会一直躺着，直到有人恰好加载并保存了那套布局。更糟的是**同名
+    重建**——回头新建一个同 key 的实体，旧坐标会直接被当成它的坐标，位置
+    莫名其妙还完全静默。
+
+    删 point 连带删掉以它为端点的 arrow：端点没了的 arrow 既画不出来也跑
+    不了，留着就是下一条残留。
+    """
+    manager = LayoutConfigManager()
+    changed = []
+    for layout_name in manager.list_layouts():
+        if _delete_layout_item_key(layout_name, scene_key, kind, key):
+            changed.append(layout_name)
+    return changed
+
+
+def _delete_layout_item_key(layout_name: str, scene_key: str, kind: str,
+                            key: str) -> bool:
+    """删除单个布局中某场景下指定类型实例的坐标记录"""
+    table = {"region": "regions", "point": "points", "panel": "panels"}.get(kind)
+    if table is None:
+        logger.warning(f"未知的实例类型: {kind}")
+        return False
+    resolver = get_resolver()
+    scene_rel = _scene_rel(layout_name, scene_key)
+    scene_path = resolver.resolve_read(scene_rel)
+    if scene_path is None or not scene_path.exists():
+        return False  # 该布局下没有此场景的文件，跳过
+    try:
+        data = json.loads(scene_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.error(f"加载布局场景文件失败 {scene_path}: {e}")
+        return False
+
+    items = data.get(table, [])
+    kept = [item for item in items if item.get("key") != key]
+    changed = len(kept) != len(items)
+    if changed:
+        data[table] = kept
+    if kind == "point":
+        arrows = data.get("arrows", [])
+        kept_arrows = [
+            a for a in arrows
+            if a.get("from_key") != key and a.get("to_key") != key
+        ]
+        if len(kept_arrows) != len(arrows):
+            data["arrows"] = kept_arrows
+            changed = True
+
+    if changed:
+        resolver.write_entity(
+            scene_rel, json.dumps(data, ensure_ascii=False, indent=2))
+        logger.info(
+            f"布局 {layout_name} 场景 {scene_key} 中已删除 {kind} 坐标: {key}")
+    return changed
+
+
 def rename_view_screenshots(scene_key: str, old_view_key: str, new_view_key: str):
     """重命名所有布局下某视图的截图文件
 
@@ -581,8 +644,6 @@ def _expand_scene_references(regions: dict, points: dict) -> None:
 
     展开项带 ``source_scene`` 标记，编辑器据此锁死、保存路径据此过滤。
     """
-    from dataclasses import replace as _replace
-
     from .scene_registry import get_registry
 
     try:
@@ -593,28 +654,41 @@ def _expand_scene_references(regions: dict, points: dict) -> None:
 
     for scene_key, scene in scenes.items():
         for ref in getattr(scene, "references", ()):
-            for table in (regions, points):
-                source = next(
-                    (item for item in table.get(ref.scene, [])
-                     if item.key == ref.entity), None)
-                if source is None:
-                    continue
-                target = table.setdefault(scene_key, [])
-                if any(item.key == ref.entity for item in target):
-                    # 场景加载期的 key 去重本应拦下同名，走到这里说明配置被
-                    # 绕过了。宁可不展开也不覆盖——覆盖等于让运行期点到另一
-                    # 个位置，而且完全静默。
-                    logger.error(
-                        f"跨场景引用 {scene_key}.{ref.entity} 与本场景已有定义"
-                        f"同名，已跳过展开")
-                else:
-                    target.append(_replace(source, source_scene=ref.scene))
-                break
-            else:
-                # 源场景在当前布局里没给这个实体标坐标，跑到它就会失败。
-                logger.warning(
-                    f"跨场景引用 {scene_key}.{ref.entity} 在本布局中无坐标"
-                    f"（源场景 {ref.scene} 未绑定）")
+            expand_one_reference(
+                regions, points, scene_key, ref.scene, ref.entity)
+
+
+def expand_one_reference(regions: dict, points: dict, scene_key: str,
+                         source_scene: str, entity: str) -> bool:
+    """把一条跨场景引用展开进坐标表，成功返回 True。
+
+    单独拆出来是为了编辑器：新加一条引用之后不必整份布局重载（那会丢掉
+    画布上还没保存的改动），把这一条的坐标补进去即可。
+    """
+    from dataclasses import replace as _replace
+
+    for table in (regions, points):
+        source = next(
+            (item for item in table.get(source_scene, [])
+             if item.key == entity), None)
+        if source is None:
+            continue
+        target = table.setdefault(scene_key, [])
+        if any(item.key == entity for item in target):
+            # 场景加载期的 key 去重本应拦下同名，走到这里说明配置被
+            # 绕过了。宁可不展开也不覆盖——覆盖等于让运行期点到另一
+            # 个位置，而且完全静默。
+            logger.error(
+                f"跨场景引用 {scene_key}.{entity} 与本场景已有定义"
+                f"同名，已跳过展开")
+            return False
+        target.append(_replace(source, source_scene=source_scene))
+        return True
+    # 源场景在当前布局里没给这个实体标坐标，跑到它就会失败。
+    logger.warning(
+        f"跨场景引用 {scene_key}.{entity} 在本布局中无坐标"
+        f"（源场景 {source_scene} 未绑定）")
+    return False
 
 
 # ─── 布局配置管理器 ──────────────────────────────────────

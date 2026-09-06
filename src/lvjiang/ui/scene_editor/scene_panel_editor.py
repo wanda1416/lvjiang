@@ -20,7 +20,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.layout_manager import rename_item_key_across_all_layouts
+from ...core.layout_manager import (
+    delete_item_key_across_all_layouts,
+    rename_item_key_across_all_layouts,
+)
 from ...core.scene_definition import PanelDef
 from ...core.scene_registry import (
     get_registry,
@@ -215,6 +218,8 @@ class PanelEditorMixin:
             except ValueError as e:
                 QMessageBox.warning(self, tr("迁移失败"), str(e))
                 return
+            registry.retarget_references(
+                self._scene_key, target_scene, old_key, new_key)
             registry.remove_panel_from_scene(self._scene_key, old_key)
             sync_scene_cache(self._scene_key)
             sync_scene_cache(target_scene)
@@ -327,6 +332,9 @@ class PanelEditorMixin:
         except ValueError as e:
             QMessageBox.warning(self, tr("删除失败"), str(e))
             return
+        self._canvas.remove_item("panel", panel_def.key)
+        delete_item_key_across_all_layouts(
+            self._scene_key, "panel", panel_def.key)
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
 

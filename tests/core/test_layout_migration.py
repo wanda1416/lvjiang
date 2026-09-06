@@ -136,3 +136,84 @@ class TestMigrateAcrossLayouts:
         remain = layout.get_scene_arrows("src")
         assert remain[0].to_key is None
         assert remain[0].to_cx_ratio == 0.4
+
+
+class TestDeleteAcrossLayouts:
+    """删定义时清掉各套布局里的坐标，避免残留。
+
+    加载期的孤儿清理只清内存：没打开过的布局文件里那条记录会一直躺着，
+    直到有人恰好加载并保存了那套布局。更糟的是同名重建——旧坐标会被当成
+    新实体的坐标，位置莫名其妙还完全静默。
+    """
+
+    @pytest.fixture
+    def manager(self, tmp_path, monkeypatch):
+        import lvjiang.constants as constants
+        import lvjiang.core.config.resolver as cr
+        monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", tmp_path / "system")
+        monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", tmp_path / "local")
+        monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
+        monkeypatch.setattr(layout_manager, "SESSION_CONFIG_DIR", tmp_path)
+        monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
+        monkeypatch.setattr(cr, "_resolver", None)
+        mgr = LayoutConfigManager()
+        for name in ("布局A", "布局B"):
+            mgr.save_layout(_make_layout(name))
+        empty = Layout(name="布局C")
+        empty.set_scene_regions("src", [Region("keep", 0.5, 0.5, 0.1, 0.1)])
+        mgr.save_layout(empty)
+        return mgr
+
+    def _scene_json(self, layout_name: str) -> dict:
+        import json
+
+        from lvjiang.core.config.resolver import get_resolver
+        path = get_resolver().resolve_read(f"layouts/{layout_name}/src.json")
+        assert path is not None
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_a_region_is_removed_from_every_layout(self, manager):
+        from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
+
+        changed = delete_item_key_across_all_layouts("src", "region", "btn")
+
+        assert changed == ["布局A", "布局B"]
+        for name in ("布局A", "布局B"):
+            keys = [r["key"] for r in self._scene_json(name)["regions"]]
+            assert keys == ["keep"]
+
+    def test_deleting_a_point_takes_its_arrows_with_it(self, manager):
+        """端点没了的 arrow 既画不出来也跑不了，留着就是下一条残留。"""
+        from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
+
+        delete_item_key_across_all_layouts("src", "point", "origin")
+
+        data = self._scene_json("布局A")
+        assert [p["key"] for p in data["points"]] == ["stay"]
+        # fwd 的 from_key 与 back 的 to_key 都指向 origin，两条都该走
+        assert data["arrows"] == []
+
+    def test_a_layout_without_that_key_is_left_alone(self, manager):
+        from lvjiang.core.config.resolver import get_resolver
+        from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
+
+        path = get_resolver().resolve_read("layouts/布局C/src.json")
+        assert path is not None
+        before = path.read_text(encoding="utf-8")
+
+        assert "布局C" not in delete_item_key_across_all_layouts(
+            "src", "region", "btn")
+        assert path.read_text(encoding="utf-8") == before
+
+    def test_panels_are_covered_too(self, manager):
+        from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
+
+        delete_item_key_across_all_layouts("src", "panel", "grid")
+
+        assert self._scene_json("布局A")["panels"] == []
+
+    def test_an_unknown_kind_changes_nothing(self, manager):
+        from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
+
+        assert delete_item_key_across_all_layouts("src", "arrow", "fwd") == []
+        assert len(self._scene_json("布局A")["arrows"]) == 2

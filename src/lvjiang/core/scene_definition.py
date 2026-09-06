@@ -778,11 +778,84 @@ class SceneRegistry:
             if not (r.scene == source_scene and r.entity == entity)]
         self._save_scene_yaml(scene)
 
+    def update_scene_reference_views(self, scene_key: str, source_scene: str,
+                                     entity: str, views: list[str]):
+        """改一条引用在**本场景**的归属视图。
+
+        引用项本身是只读的（坐标、类型、名字都在源场景），但「在本场景的
+        哪些视图下看得见」是本场景自己的数据，理应能改——否则加错视图之后
+        只能删掉重加。
+        """
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        for ref in scene.references:
+            if ref.scene == source_scene and ref.entity == entity:
+                ref.views = list(views)
+                break
+        else:
+            raise ValueError(f"引用不存在: {source_scene}.{entity}")
+        self._save_scene_yaml(scene)
+
+    def find_references_to(self, scene_key: str,
+                           entity: str) -> list[str]:
+        """哪些场景引用了 ``scene_key.entity``，返回场景 key 列表。"""
+        return [
+            key for key, scene in self._scenes.items()
+            if any(r.scene == scene_key and r.entity == entity
+                   for r in scene.references)
+        ]
+
+    def _reject_if_referenced(self, scene_key: str, entity: str) -> None:
+        """有别的场景引用它就不许删。
+
+        引用只存 ``(源场景, 实体名)``，坐标运行期从源场景转读。源定义没了，
+        引用就成了悬空声明：加载期会在内存里被丢掉，于是那个场景**静静少
+        了一个实体**，直到某条 .wf 跑到 ``click [场景].[实体]`` 才炸。
+
+        级联删除更糟——用户在 A 场景点了删除，B 场景的定义跟着没了，而他
+        根本不知道 B 引用过它。所以这里拦下来，把引用方报出来，让人自己
+        决定是先去解引用还是不删。
+        """
+        referrers = self.find_references_to(scene_key, entity)
+        if not referrers:
+            return
+        names = "、".join(
+            f"{self._scenes[key].name}({key})" for key in referrers)
+        raise ValueError(
+            f"{entity} 正被 {len(referrers)} 个场景引用，不能删除：{names}。"
+            f"请先在这些场景里移除引用。")
+
+    def retarget_references(self, old_scene: str, new_scene: str,
+                            entity: str, new_entity: str = "") -> list[str]:
+        """源实体搬了家或改了名，把指向它的引用一并改指过去。
+
+        规则是「引用跟着源实体走，源实体没了才拦」。改名和跨场景迁移都不是
+        删除——实体还在，只是换了地址；不改指的话引用就悬空了，而且
+        :meth:`_reject_if_referenced` 会把迁移一起拦下来，拦它没道理。
+
+        返回改动过的场景 key 列表。
+        """
+        target_entity = new_entity or entity
+        if (old_scene, entity) == (new_scene, target_entity):
+            return []
+        changed = []
+        for key in self.find_references_to(old_scene, entity):
+            scene = self._scenes[key]
+            for ref in scene.references:
+                if ref.scene == old_scene and ref.entity == entity:
+                    ref.scene = new_scene
+                    ref.entity = target_entity
+            self._save_scene_yaml(scene)
+            changed.append(key)
+        return changed
+
     def remove_region_from_scene(self, scene_key: str, region_key: str):
         """从场景 YAML 移除 region 定义"""
         scene = self._scenes.get(scene_key)
         if not scene:
             raise ValueError(f"场景不存在: {scene_key}")
+        self._reject_if_referenced(scene_key, region_key)
         scene.regions = [r for r in scene.regions if r.key != region_key]
         self._save_scene_yaml(scene)
 
@@ -813,6 +886,7 @@ class SceneRegistry:
         scene = self._scenes.get(scene_key)
         if not scene:
             raise ValueError(f"场景不存在: {scene_key}")
+        self._reject_if_referenced(scene_key, point_key)
         scene.points = [p for p in scene.points if p.key != point_key]
         self._save_scene_yaml(scene)
 
@@ -843,6 +917,7 @@ class SceneRegistry:
         scene = self._scenes.get(scene_key)
         if not scene:
             raise ValueError(f"场景不存在: {scene_key}")
+        self._reject_if_referenced(scene_key, panel_key)
         scene.panels = [p for p in scene.panels if p.key != panel_key]
         self._save_scene_yaml(scene)
 
@@ -872,6 +947,8 @@ class SceneRegistry:
         self._check_key_unique_excluding(scene, new_key, old_key)
         region.key = new_key
         self._save_scene_yaml(scene)
+        # 引用按 (源场景, 实体 key) 定位，改名不跟着走就成了悬空声明
+        self.retarget_references(scene_key, scene_key, old_key, new_key)
         logger.info(f"场景 {scene_key} region key 重命名: {old_key} -> {new_key}")
 
     def rename_point_key(self, scene_key: str, old_key: str, new_key: str):
@@ -887,6 +964,8 @@ class SceneRegistry:
         self._check_key_unique_excluding(scene, new_key, old_key)
         point.key = new_key
         self._save_scene_yaml(scene)
+        # 引用按 (源场景, 实体 key) 定位，改名不跟着走就成了悬空声明
+        self.retarget_references(scene_key, scene_key, old_key, new_key)
         logger.info(f"场景 {scene_key} point key 重命名: {old_key} -> {new_key}")
 
     def rename_panel_key(self, scene_key: str, old_key: str, new_key: str):
@@ -902,6 +981,8 @@ class SceneRegistry:
         self._check_key_unique_excluding(scene, new_key, old_key)
         panel.key = new_key
         self._save_scene_yaml(scene)
+        # 引用按 (源场景, 实体 key) 定位，改名不跟着走就成了悬空声明
+        self.retarget_references(scene_key, scene_key, old_key, new_key)
         logger.info(f"场景 {scene_key} panel key 重命名: {old_key} -> {new_key}")
 
     # ─── 内部方法 ─────────────────────────────────────────────

@@ -280,6 +280,9 @@ recognize [scene].[s1, s2] as rich $var with yysls_rich_parse
 recognize [scene].[s1, s2] as rich $var with func where confidence >= 0.8 on group "分组"
 ```
 
+默认 `recognize` 只做参考图匹配，不执行输出区域 OCR；只有 `as rich`
+会读取图库定义的 `level_text`、`count_text` 等输出字段。
+
 ### find — 文字坐标定位
 
 ```
@@ -300,7 +303,7 @@ find [scene].[area] as $var by image "extract_icon" where confidence >= 0.85
 | 子句 | 方向 | 适用 |
 |------|------|------|
 | `by <mode> <target>` | 降级：dict → str/位置 | scan / recognize / find |
-| `as rich` | 升级：str → dict | 仅 recognize |
+| `as rich` | 升级：str → dict，并执行输出区域 OCR | 仅 recognize |
 | `with <func>` | 配合 rich | 仅 recognize |
 | `where confidence >= <n>` | 过滤 | scan / recognize / find |
 | `on group "<name>"` | 限定分组 | 仅 recognize |

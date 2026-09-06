@@ -156,7 +156,9 @@ class _RecognitionMixin:
                 result[region.key] = ""
                 continue
 
-            info = self.reference_recognizer.recognize(slot_img, group=group)
+            # plain 只返回参考标签，不读取 meta schema 的输出 OCR 字段。
+            info = self.reference_recognizer.recognize_only(
+                slot_img, group=group)
             if min_confidence is not None and info.confidence < min_confidence:
                 result[region.key] = ""
             else:
@@ -479,7 +481,9 @@ class _RecognitionMixin:
             if crop is None:
                 logger.debug(f"by 参考图识别: region {region.key} 裁剪为空，跳过")
                 continue
-            info = self.reference_recognizer.recognize(crop, group=group)
+            # by 只消费标签和置信度，输出 OCR 字段不会进入返回值。
+            info = self.reference_recognizer.recognize_only(
+                crop, group=group)
             if min_confidence is not None and info.confidence < min_confidence:
                 logger.debug(f"by 参考图识别: region {region.key} 置信度 {info.confidence:.3f} < {min_confidence}，跳过")
                 continue

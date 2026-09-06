@@ -71,6 +71,21 @@ def test_ocr_uses_each_output_schema_crop(tmp_path):
     }
 
 
+def test_recognize_only_skips_output_schema_ocr(tmp_path):
+    recognizer = _recognizer(tmp_path)
+    recognizer._matcher.match.return_value = MatchResult(
+        entry=None, label="参考 A", confidence=0.9, meta={"level": 110},
+    )
+    recognizer._ocr = MagicMock()
+
+    result = recognizer.recognize_only(_image())
+
+    assert result.label == "参考 A"
+    assert result.confidence == 0.9
+    assert result.ocr_texts == {}
+    recognizer._ocr.recognize.assert_not_called()
+
+
 def test_schema_without_output_fields_produces_no_implicit_business_keys(tmp_path):
     recognizer = _recognizer(
         tmp_path, [{"key": "level", "name": "等级", "scope": "input"}],

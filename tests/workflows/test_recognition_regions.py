@@ -4,6 +4,9 @@
 by 子句因此退化成「未命中」、普通 OCR 悄悄少字段，现在一律抛错中断。
 """
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
 
@@ -63,6 +66,7 @@ class _Recognizer(_RecognitionMixin):
         self._layout = _FakeLayout(regions)
         self._ocr = _FakeOCR(texts)
         self._capture = _FakeCapture(_make_img(len(regions)))
+        self.reference_recognizer = MagicMock()
 
 
 def _make_img(n_regions: int):
@@ -126,3 +130,33 @@ def test_ocr_scene_empty_scene_returns_empty():
     """场景整体没绑定且未点名字段时，保持原有的警告 + 空结果语义"""
     rec = _Recognizer([])
     assert rec.ocr_scene("not_bound_scene") == {}
+
+
+# ─── 参考图识别：只有 rich 执行输出 OCR ────────────────
+
+def test_recognize_references_plain_skips_output_ocr():
+    rec = _Recognizer(_regions("slot_0"))
+    rec.reference_recognizer.recognize_only.return_value = SimpleNamespace(
+        label="大律准石", confidence=0.95,
+    )
+
+    result, _ = rec.recognize_references(SCENE, ["slot_0"])
+
+    assert result == {"slot_0": "大律准石"}
+    rec.reference_recognizer.recognize_only.assert_called_once()
+    rec.reference_recognizer.recognize.assert_not_called()
+
+
+def test_recognize_references_by_skips_output_ocr():
+    rec = _Recognizer(_regions("slot_0"))
+    rec.reference_recognizer.recognize_only.return_value = SimpleNamespace(
+        label="大律准石", confidence=0.95,
+    )
+
+    matched = rec.recognize_references_by(
+        SCENE, ["slot_0"], "大律准石", "equals",
+    )
+
+    assert matched == "slot_0"
+    rec.reference_recognizer.recognize_only.assert_called_once()
+    rec.reference_recognizer.recognize.assert_not_called()

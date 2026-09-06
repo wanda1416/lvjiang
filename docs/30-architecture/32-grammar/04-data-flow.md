@@ -30,6 +30,9 @@
 recognize ... as rich $var [with <func>] [on group "<name>"]
 ```
 
+`recognize` 默认只进行参考图匹配；`as rich` 才会额外执行图库输出区域 OCR。
+`by` 的返回语义优先于 `rich`，二者同时出现时不会执行输出 OCR。
+
 **场景引用**（scene / region / panel 均支持两种形式）：
 
 | 形式 | 示例 | 说明 |
@@ -57,7 +60,7 @@ recognize ... as rich $var [with <func>] [on group "<name>"]
 |------|------|------|---------|
 | `by <mode> <target>` | 短路匹配，返回命中 key 或坐标 | **降级**：dict → str/位置 | scan / recognize / find |
 | `by image "<模板名>"` | 模板定位，返回命中矩形 | — | 仅 find |
-| `as rich` | 返回含元数据的富 dict | **升级**：str → dict | 仅 recognize |
+| `as rich` | 返回含元数据和输出 OCR 字段的富 dict | **升级**：str → dict | 仅 recognize |
 | `with <func>` | 指定 rich dict 的转换函数 | 配合 rich 使用 | 仅 recognize |
 | `where confidence >= <n>` | 过滤低置信度结果（阈值 `[0.0, 1.0]`，超出范围输出警告） | **过滤**：不改变类型 | scan / recognize / find |
 | `on group "<name>"` | 限定材料匹配分组 | **过滤**：缩小匹配范围 | 仅 recognize |

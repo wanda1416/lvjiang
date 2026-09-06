@@ -71,14 +71,14 @@ def test_ocr_uses_each_output_schema_crop(tmp_path):
     }
 
 
-def test_recognize_only_skips_output_schema_ocr(tmp_path):
+def test_recognize_can_skip_output_schema_ocr(tmp_path):
     recognizer = _recognizer(tmp_path)
     recognizer._matcher.match.return_value = MatchResult(
         entry=None, label="参考 A", confidence=0.9, meta={"level": 110},
     )
     recognizer._ocr = MagicMock()
 
-    result = recognizer.recognize_only(_image())
+    result = recognizer.recognize(_image(), include_output_ocr=False)
 
     assert result.label == "参考 A"
     assert result.confidence == 0.9

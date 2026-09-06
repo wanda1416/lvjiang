@@ -52,7 +52,10 @@ class ReferenceRecognizer:
         self,
         image: np.ndarray,
         group: str | list[str] | None = None,
+        *,
+        include_output_ocr: bool = True,
     ) -> ReferenceInfo:
+        """匹配参考图，并按需解析 meta schema 定义的输出 OCR。"""
         if image is None or image.size == 0:
             return ReferenceInfo(label="")
         try:
@@ -60,22 +63,11 @@ class ReferenceRecognizer:
         except Exception as exc:  # noqa: BLE001 识别边界不得中断业务流程
             logger.warning(f"参考图匹配失败，按未匹配处理: {exc}")
             return ReferenceInfo(label="")
-        return self._build_info(image, match)
-
-    def recognize_only(
-        self,
-        image: np.ndarray,
-        group: str | list[str] | None = None,
-    ) -> ReferenceInfo:
-        """只做参考图匹配，不执行 meta schema 定义的输出区域 OCR。"""
-        if image is None or image.size == 0:
-            return ReferenceInfo(label="")
-        try:
-            match = self._matcher.match(image, group=group)
-        except Exception as exc:  # noqa: BLE001 识别边界不得中断业务流程
-            logger.warning(f"参考图匹配失败，按未匹配处理: {exc}")
-            return ReferenceInfo(label="")
-        return self._build_info(image, match, ocr_texts={})
+        return self._build_info(
+            image,
+            match,
+            ocr_texts=None if include_output_ocr else {},
+        )
 
     def recognize_top_n(
         self,

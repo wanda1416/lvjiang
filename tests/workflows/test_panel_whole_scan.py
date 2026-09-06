@@ -237,12 +237,13 @@ def test_single_cell_recognize_returns_plain_type(tmp_path):
     ))
     engine = _make_engine()
     workflow = MagicMock()
-    workflow.reference_recognizer.recognize_only.return_value = SimpleNamespace(
+    workflow.reference_recognizer.recognize.return_value = SimpleNamespace(
         label="大律准石")
     engine._workflow = workflow
     output = engine.execute(wf)
     assert output["mat"] == "大律准石"
-    workflow.reference_recognizer.recognize.assert_not_called()
+    assert workflow.reference_recognizer.recognize.call_args.kwargs[
+        "include_output_ocr"] is False
 
 
 def test_whole_panel_recognize_nested_result(tmp_path):
@@ -255,15 +256,20 @@ def test_whole_panel_recognize_nested_result(tmp_path):
     # recognize 走 workflow.reference_recognizer，注入替身
     workflow = MagicMock()
     counter = iter(range(1, 100))
-    workflow.reference_recognizer.recognize_only.side_effect = lambda img, group=None: (
-        SimpleNamespace(label=f"m{next(counter)}"))
+    workflow.reference_recognizer.recognize.side_effect = (
+        lambda img, group=None, include_output_ocr=True:
+        SimpleNamespace(label=f"m{next(counter)}")
+    )
     engine._workflow = workflow
     output = engine.execute(wf)
     assert output["mats"] == {
         "1": {"1": "m1", "2": "m2"},
         "2": {"1": "m3", "2": "m4"},
     }
-    workflow.reference_recognizer.recognize.assert_not_called()
+    assert all(
+        call.kwargs["include_output_ocr"] is False
+        for call in workflow.reference_recognizer.recognize.call_args_list
+    )
 
 
 def test_single_cell_recognize_rich(tmp_path):
@@ -294,7 +300,8 @@ def test_single_cell_recognize_rich(tmp_path):
     assert output["cell"]["group"] == ""
     assert output["cell"]["level_text"] == "110阶"
     assert output["cell"]["count_text"] == "0/691"
-    workflow.reference_recognizer.recognize_only.assert_not_called()
+    assert "include_output_ocr" not in (
+        workflow.reference_recognizer.recognize.call_args.kwargs)
     # 无 with 子句时不应有解析字段
     assert "real_level" not in output["cell"]
     assert "count" not in output["cell"]

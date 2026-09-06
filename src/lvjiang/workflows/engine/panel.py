@@ -283,7 +283,8 @@ class _PanelMixin:
             # by 短路匹配返回命中的标签。rich 与 by 已由解析器保证互斥。
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
-            info = recognizer.recognize_only(slot_img, group=group)
+            info = recognizer.recognize(
+                slot_img, group=group, include_output_ocr=False)
             if min_conf is not None and info.confidence < min_conf:
                 self.variables[var_name] = ""
             else:
@@ -307,7 +308,8 @@ class _PanelMixin:
                     base = transform(base)
                 self.variables[var_name] = base
         else:
-            info = recognizer.recognize_only(slot_img, group=group)
+            info = recognizer.recognize(
+                slot_img, group=group, include_output_ocr=False)
             if min_conf is not None and info.confidence < min_conf:
                 self.variables[var_name] = ""
             else:
@@ -396,7 +398,8 @@ class _PanelMixin:
                 info = (
                     recognizer.recognize(slot_img, group=group)
                     if rich
-                    else recognizer.recognize_only(slot_img, group=group)
+                    else recognizer.recognize(
+                        slot_img, group=group, include_output_ocr=False)
                 )
                 if min_confidence is not None and info.confidence < min_confidence:
                     cell_value = {} if rich else ""
@@ -479,7 +482,8 @@ class _PanelMixin:
                     if slot_img.size == 0:
                         continue
 
-                    info = recognizer.recognize_only(slot_img, group=group)
+                    info = recognizer.recognize(
+                        slot_img, group=group, include_output_ocr=False)
                     if min_conf is not None and info.confidence < min_conf:
                         continue
                     if self._match_text(info.label, target_value, match_mode):
@@ -533,7 +537,8 @@ class _PanelMixin:
                     info = (
                         recognizer.recognize(slot_img, group=group)
                         if node.rich
-                        else recognizer.recognize_only(slot_img, group=group)
+                        else recognizer.recognize(
+                            slot_img, group=group, include_output_ocr=False)
                     )
                     if min_conf is not None and info.confidence < min_conf:
                         cell_value = {} if node.rich else ""
@@ -602,7 +607,8 @@ class _PanelMixin:
             mat_type = ""
             confidence = 0.0
             if slot_img is not None:
-                info = recognizer.recognize_only(slot_img, group=group)
+                info = recognizer.recognize(
+                    slot_img, group=group, include_output_ocr=False)
                 if min_confidence is not None and info.confidence < min_confidence:
                     mat_type = ""
                 else:

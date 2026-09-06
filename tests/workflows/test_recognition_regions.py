@@ -136,20 +136,22 @@ def test_ocr_scene_empty_scene_returns_empty():
 
 def test_recognize_references_plain_skips_output_ocr():
     rec = _Recognizer(_regions("slot_0"))
-    rec.reference_recognizer.recognize_only.return_value = SimpleNamespace(
+    rec.reference_recognizer.recognize.return_value = SimpleNamespace(
         label="大律准石", confidence=0.95,
     )
 
     result, _ = rec.recognize_references(SCENE, ["slot_0"])
 
     assert result == {"slot_0": "大律准石"}
-    rec.reference_recognizer.recognize_only.assert_called_once()
-    rec.reference_recognizer.recognize.assert_not_called()
+    assert rec.reference_recognizer.recognize.call_args.kwargs == {
+        "group": None,
+        "include_output_ocr": False,
+    }
 
 
 def test_recognize_references_by_skips_output_ocr():
     rec = _Recognizer(_regions("slot_0"))
-    rec.reference_recognizer.recognize_only.return_value = SimpleNamespace(
+    rec.reference_recognizer.recognize.return_value = SimpleNamespace(
         label="大律准石", confidence=0.95,
     )
 
@@ -158,5 +160,7 @@ def test_recognize_references_by_skips_output_ocr():
     )
 
     assert matched == "slot_0"
-    rec.reference_recognizer.recognize_only.assert_called_once()
-    rec.reference_recognizer.recognize.assert_not_called()
+    assert rec.reference_recognizer.recognize.call_args.kwargs == {
+        "group": None,
+        "include_output_ocr": False,
+    }

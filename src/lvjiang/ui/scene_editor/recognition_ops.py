@@ -3,7 +3,11 @@
 from loguru import logger
 from PyQt6.QtWidgets import QApplication
 
-from ...core.scene_registry import get_region_defs, get_region_name, get_scene_name
+from ...core.scene_registry import (
+    get_effective_region_defs,
+    get_region_name,
+    get_scene_name,
+)
 from ...i18n import tr
 
 
@@ -169,7 +173,12 @@ class RecognitionOpsMixin:
             return
 
         # 筛选 slot 类型区域
-        slot_keys = {r.key for r in get_region_defs(current_tab.scene_key) if r.type == "slot"}
+        slot_keys = {
+            region.key
+            for region in get_effective_region_defs(
+                current_tab.scene_key, current_tab.current_view)
+            if region.type == "slot"
+        }
         slot_regions = [r for r in regions if r.key in slot_keys]
         if not slot_regions:
             self._status_bar.showMessage(tr("当前场景没有 slot 类型的区域"))

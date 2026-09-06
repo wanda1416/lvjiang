@@ -277,3 +277,66 @@ def _is_device(_engine=None) -> bool:
     if _engine is None:
         return False
     return _backend_kind(_engine).is_device
+
+
+# ─── Android 应用生命周期 ─────────────────────────────────
+
+def _android_apps(_engine):
+    """懒创建控制器；DSL 与 Python 工作流共享公共 Android 实现。"""
+    from ...core.device_app import AndroidAppController
+    from ..engine.signals import WorkflowUserError
+
+    if _engine is None or getattr(_engine, "_android_device", None) is None:
+        raise WorkflowUserError("安卓应用控制仅支持已连接 ADB 设备的 PC 运行模式")
+    controller = getattr(_engine, "_android_app_controller", None)
+    if controller is None:
+        controller = AndroidAppController(
+            _engine._android_device,
+            getattr(_engine, "_android_apps", {}),
+            capture=getattr(_engine, "_capture", None),
+            stop_check=getattr(_engine, "_stop_check", None),
+        )
+        _engine._android_app_controller = controller
+    return controller
+
+
+def _android_call(_engine, operation):
+    from ...core.device_app import AndroidAppError
+    from ..engine.signals import WorkflowUserError
+
+    try:
+        return operation(_android_apps(_engine))
+    except AndroidAppError as exc:
+        raise WorkflowUserError(str(exc)) from exc
+
+
+@builtin_func("android_app_running")
+def _android_app_running(_engine, name: str = "") -> bool:
+    """返回已注册安卓应用的进程是否存在。"""
+    return _android_call(_engine, lambda controller: controller.is_running(name))
+
+
+@builtin_func("android_app_stop")
+def _android_app_stop(_engine, name: str = "", timeout: float = 15) -> bool:
+    """强制停止已注册安卓应用，并等待其进程消失。"""
+    return _android_call(
+        _engine, lambda controller: controller.stop(name, float(timeout)))
+
+
+@builtin_func("android_app_start")
+def _android_app_start(_engine, name: str = "", timeout: float = 30) -> bool:
+    """启动已注册安卓应用，并等待其进程出现。"""
+    return _android_call(
+        _engine, lambda controller: controller.start(name, float(timeout)))
+
+
+@builtin_func("android_wait_stable_frame")
+def _android_wait_stable_frame(
+    _engine, name: str = "", timeout: float = 60, stable_duration: float = 1,
+) -> bool:
+    """等待应用期望方向的截图连续稳定。"""
+    return _android_call(
+        _engine,
+        lambda controller: controller.wait_stable_frame(
+            name, float(timeout), float(stable_duration)),
+    )

@@ -32,6 +32,15 @@ class Program:
 # ─── 语句 ─────────────────────────────────────────────────
 
 @dataclass(frozen=True)
+class AndroidAppAction:
+    """app stop/start：控制配置管理中注册的安卓应用。"""
+
+    action: str             # stop | start
+    name: Any               # Literal | VarRef
+    timeout: Any = None     # Literal(float) | VarRef | None
+    line_no: int = 0
+
+@dataclass(frozen=True)
 class Click:
     target: Any     # EntityRef（静态 [scene].[entity]）| PanelRef（[scene].[panel][row][col]）| VarRef（动态 $var，find 产出坐标）| CoordPoint（画布归一化坐标）
     line_no: int = 0

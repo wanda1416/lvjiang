@@ -115,6 +115,7 @@ def create_engine(
         layout=layout,
         input_sim=user_config.input_sim,
         delay_params=user_config.delay_params,
+        android_apps=user_config.android_apps,
         run_env=load_env(),
         window_left=0,
         window_top=0,

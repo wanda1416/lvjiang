@@ -933,7 +933,12 @@ def load_app_config() -> dict:
         return {}
 
 
-def save_app_config(input_sim: dict, delay_params: dict, envs: list | None = None) -> None:
+def save_app_config(
+    input_sim: dict,
+    delay_params: dict,
+    envs: list | None = None,
+    android_apps: dict | None = None,
+) -> None:
     """保存输入模拟 + 延迟参数 + 环境列表到 app.yaml
 
     读-改-写全量：先取合并视图再改这几个键。save_merged 的入参语义是**完整
@@ -945,6 +950,8 @@ def save_app_config(input_sim: dict, delay_params: dict, envs: list | None = Non
     data["delay_params"] = delay_params
     if envs is not None:
         data["envs"] = envs
+    if android_apps is not None:
+        data["android_apps"] = android_apps
     get_resolver().save_merged(_APP_CONFIG_REL, data)
 
 

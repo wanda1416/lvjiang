@@ -16,7 +16,8 @@ scrcpy 4.1 协议要点（已通过源码 + 实测验证）：
 - tunnel_forward=true：server 用 LocalServerSocket 监听，client 通过 adb forward 连接
 - forward 连接时 server 先发 1 字节 dummy byte（0x00）用于检测连接错误
 - 协议头：1 字节 dummy → 64 字节设备名（UTF-8, 零填充）→ 4 字节 codec ID → 12 字节 session packet
-- 后续 media packet：12 字节帧头（flags + PTS + size）+ H.264 payload
+- 后续 packet：方向/尺寸变化时可再次发送无 payload 的 session packet；
+  media packet 为 12 字节帧头（flags + PTS + size）+ H.264 payload
 """
 
 import random
@@ -98,11 +99,33 @@ class AndroidStreamCapture(CaptureBackend):
         self._running = False
         self._decode_thread: threading.Thread | None = None
         self._size: tuple[int, int] | None = None
+        self._session_size: tuple[int, int] | None = None
+        self._ready_event = threading.Event()
+        self._transitioning = True
+        self._generation = 0
+        self._frame_sequence = 0
+        self._pending_session = True
+        self._codec_config = b""
 
     @property
     def max_fps(self) -> int:
         """帧率上限（供录屏等外部消费方读取）"""
         return self._max_fps
+
+    @property
+    def generation(self) -> int:
+        """成功解码的画面 session 代次；方向/尺寸切换后递增。"""
+        return self._generation
+
+    @property
+    def frame_sequence(self) -> int:
+        """每发布一个新解码帧递增，等待方可据此排除冻结的旧帧。"""
+        return self._frame_sequence
+
+    @property
+    def is_transitioning(self) -> bool:
+        """scrcpy 已通知尺寸变化、但新画面尚未成功解码。"""
+        return self._transitioning
 
     # ─── 生命周期 ─────────────────────────────────────────
 
@@ -118,6 +141,10 @@ class AndroidStreamCapture(CaptureBackend):
 
         try:
             self._running = True
+            self._ready_event.clear()
+            self._transitioning = True
+            self._pending_session = True
+            self._codec_config = b""
             self._scid = random.randint(1, 0x7FFFFFFF)
             self._socket_name = f"scrcpy_{self._scid:08x}"
 
@@ -188,7 +215,7 @@ class AndroidStreamCapture(CaptureBackend):
 
             # 7. 等待首帧
             deadline = time.monotonic() + 5.0
-            while self._latest_frame is None and time.monotonic() < deadline:
+            while not self._ready_event.is_set() and time.monotonic() < deadline:
                 if not self._running:
                     break
                 time.sleep(0.05)
@@ -214,6 +241,8 @@ class AndroidStreamCapture(CaptureBackend):
     def stop(self):
         """停止解码线程 → 关闭 socket → 终止 server → 清理 forward"""
         self._running = False
+        self._ready_event.clear()
+        self._transitioning = True
 
         if self._sock:
             try:
@@ -310,6 +339,28 @@ class AndroidStreamCapture(CaptureBackend):
         while self._size is None and time.monotonic() < deadline:
             time.sleep(0.1)
         return self._size or (0, 0)
+
+    def wait_ready(
+        self, timeout: float = 10.0, *, expected_orientation: str = "any",
+    ) -> bool:
+        """等待当前 session 的首个有效帧，并可校验画面方向。"""
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        orientation = str(expected_orientation or "any").lower()
+        while self._running and time.monotonic() < deadline:
+            if self._ready_event.wait(timeout=min(0.1, max(0.0, deadline - time.monotonic()))):
+                with self._frame_lock:
+                    frame = self._latest_frame
+                    if frame is None:
+                        continue
+                    h, w = frame.shape[:2]
+                if orientation == "landscape" and w <= h:
+                    time.sleep(0.05)
+                    continue
+                if orientation == "portrait" and h <= w:
+                    time.sleep(0.05)
+                    continue
+                return True
+        return False
 
     # ─── 帧回调（UI 订阅）────────────────────────────────
 
@@ -428,10 +479,10 @@ class AndroidStreamCapture(CaptureBackend):
             if session is None:
                 logger.error("[AndroidStream] 读取 session packet 失败")
                 return False
-            # 解析视频宽高（byte 4-7 = width, byte 8-11 = height）
-            vid_w = struct.unpack(">I", session[4:8])[0]
-            vid_h = struct.unpack(">I", session[8:12])[0]
-            logger.debug(f"[AndroidStream] session: {vid_w}x{vid_h}")
+            if not session[0] & 0x80:
+                logger.error("[AndroidStream] 首包不是 session packet")
+                return False
+            self._handle_session_packet(session, initial=True)
 
             return True
 
@@ -449,6 +500,51 @@ class AndroidStreamCapture(CaptureBackend):
                 return None
             buf += chunk
         return buf
+
+    def _handle_session_packet(self, header: bytes, *, initial: bool = False) -> None:
+        """接收 scrcpy 在启动及显示方向变化时发送的无 payload session 包。"""
+        width = struct.unpack(">I", header[4:8])[0]
+        height = struct.unpack(">I", header[8:12])[0]
+        previous = self._session_size
+        self._session_size = (width, height)
+        self._pending_session = True
+        self._codec_config = b""
+        self._transitioning = True
+        self._ready_event.clear()
+        with self._frame_lock:
+            self._latest_frame = None
+        logger.info(
+            f"[AndroidStream] session {'初始化' if initial else '切换'}: "
+            f"{previous or '-'} -> {width}x{height}")
+        if not initial:
+            # Android 方向变化会重建 MediaCodec。PyAV 的旧参考帧不可跨 encoder
+            # session 复用，因此同步丢弃并重建解码上下文。
+            try:
+                import av
+                with self._decoder_lock:
+                    self._decoder = av.CodecContext.create("h264", "r")
+            except Exception as exc:  # noqa: BLE001
+                logger.error(f"[AndroidStream] session 切换后重建解码器失败: {exc}")
+
+    @staticmethod
+    def _pop_stream_packet(buf: bytes):
+        """从缓冲区弹出一个 scrcpy packet；数据不足返回 ``None``。
+
+        返回 ``(kind, header, payload, remaining)``。session 包固定 12 字节且
+        没有 payload；media 包的 payload 长度才由 header[8:12] 声明。
+        """
+        if len(buf) < 12:
+            return None
+        header = buf[:12]
+        if header[0] & 0x80:
+            return "session", header, b"", buf[12:]
+        payload_size = struct.unpack(">I", header[8:12])[0]
+        if len(buf) < 12 + payload_size:
+            return None
+        return (
+            "media", header, buf[12:12 + payload_size],
+            buf[12 + payload_size:],
+        )
 
     # ─── 内部：解码循环 ───────────────────────────────────
 
@@ -487,19 +583,30 @@ class AndroidStreamCapture(CaptureBackend):
 
             buf += data
 
-            # 按 scrcpy 协议解析 media packet
+            # scrcpy 在方向/显示属性变化时会在同一流中再次插入无 payload
+            # session packet，不能将其 byte 8-11 的 height 当成 payload size。
             while len(buf) >= 12:
-                # 解析 12 字节帧头
-                # byte 8-11: payload size (big-endian)
-                payload_size = struct.unpack(">I", buf[8:12])[0]
+                parsed = self._pop_stream_packet(buf)
+                if parsed is None:
+                    break
+                kind, header, h264_data, buf = parsed
+                if kind == "session":
+                    self._handle_session_packet(header)
+                    continue
 
-                # 检查 buffer 是否包含完整 packet
-                if len(buf) < 12 + payload_size:
-                    break  # 等待更多数据
+                pts_flags = struct.unpack(">Q", header[:8])[0]
+                if not h264_data:
+                    logger.warning("[AndroidStream] 忽略空 media packet")
+                    continue
 
-                # 提取 H.264 payload
-                h264_data = buf[12:12 + payload_size]
-                buf = buf[12 + payload_size:]  # 移除已处理的 packet
+                is_config = bool(pts_flags & (1 << 62))
+                if is_config:
+                    # scrcpy 官方客户端对 H.26x 将 codec config 前置到下一帧。
+                    self._codec_config += h264_data
+                    continue
+                if self._codec_config:
+                    h264_data = self._codec_config + h264_data
+                    self._codec_config = b""
 
                 # 解码 H.264 帧（加锁保护 decoder 并发访问）
                 try:
@@ -525,10 +632,25 @@ class AndroidStreamCapture(CaptureBackend):
                         last_frame_time = now
 
                         bgr = self._frame_to_bgr(frame)
+                        h, w = bgr.shape[:2]
+                        target = self._session_size
+                        if target is not None and (w, h) != target:
+                            logger.debug(
+                                f"[AndroidStream] 丢弃旧 session 帧 {w}x{h}，"
+                                f"等待 {target[0]}x{target[1]}")
+                            continue
                         with self._frame_lock:
                             self._latest_frame = bgr
-                        h, w = bgr.shape[:2]
+                            self._frame_sequence += 1
                         self._size = (w, h)
+                        if self._pending_session:
+                            self._pending_session = False
+                            self._generation += 1
+                            self._transitioning = False
+                            self._ready_event.set()
+                            logger.info(
+                                f"[AndroidStream] session 已就绪 generation="
+                                f"{self._generation} frame={w}x{h}")
 
                         if self._on_frame_callback:
                             try:

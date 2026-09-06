@@ -1,0 +1,26 @@
+#% name: 安卓应用重启示例
+#% env: [android]
+#% scope: dedicated
+#% note: |-
+#%   使用前请在「配置管理 → 安卓设置」注册应用名 game。
+#%   示例会强制停止该应用、确认进程消失、重新启动并等待横/竖屏切换后的稳定画面。
+
+default $app_name = "game"
+
+eval check_env(["android"])
+log "准备停止安卓应用: " + $app_name
+app stop $app_name timeout 15
+
+if android_app_running($app_name)
+   log error "应用停止后进程仍然存在"
+   return -1
+end
+log "应用进程已停止"
+
+log "准备启动安卓应用: " + $app_name
+app start $app_name timeout 30
+log "应用进程已启动，等待稳定画面"
+
+eval android_wait_stable_frame($app_name, 90, 1)
+log "已收到应用稳定帧，重启示例完成"
+return 0

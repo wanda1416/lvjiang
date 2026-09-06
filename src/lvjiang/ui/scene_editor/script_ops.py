@@ -184,6 +184,8 @@ class ScriptOpsMixin:
                 layout=layout,
                 input_sim=main_win._user_config.input_sim,
                 delay_params=main_win._user_config.delay_params,
+                android_apps=main_win._user_config.android_apps,
+                android_device=getattr(main_win, "_device", None),
                 run_env=main_win._selected_run_env(),
                 window_left=window_left,
                 window_top=window_top,

@@ -1,11 +1,11 @@
 """配置管理对话框（多 Tab）
 
-Tab1 基础配置、Tab2 输入模拟（引擎级点击参数）、Tab3 等待参数（命名等待）、
-Tab4 方案设置（连接方案 + 可用工作环境）、Tab5 字体设置、Tab6 热键设置（F7~F12 按键位）。
-Tab1/Tab5/Tab6 写 session.json（settings 节点）；Tab2/Tab3/Tab4 的环境列表写 app.yaml
-（input_simulation / delay_params / envs，system ← local 合并），保存后以配置文件为准
-覆盖代码默认值。Tab4 的方案写 session.json 的 plans 节点——方案是机器级运行态，与用户无关。
-Tab5 修改的热键保存后立即重建全局监听并生效。
+Tab1 基础配置、Tab2 安卓设置、Tab3 输入模拟（引擎级点击参数）、Tab4 等待参数（命名等待）、
+Tab5 方案设置（连接方案 + 可用工作环境）、Tab6 字体设置、Tab7 热键设置（F7~F12 按键位）。
+基础配置/字体/热键写 session.json（settings 节点）；安卓设置、输入模拟、等待参数和
+方案设置的环境列表写 app.yaml（android_apps / input_simulation / delay_params / envs，
+system ← local 合并），保存后以配置文件为准覆盖代码默认值。方案本身写 session.json
+的 plans 节点——它是机器级运行态，与用户无关。热键保存后立即重建全局监听并生效。
 """
 
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal
@@ -98,6 +98,7 @@ class SettingsDialog(QDialog):
 
         self._tabs = QTabWidget()
         self._tabs.addTab(self._build_basic_tab(), tr("基础配置"))
+        self._tabs.addTab(self._build_android_tab(), tr("安卓设置"))
         self._tabs.addTab(self._build_input_tab(), tr("输入模拟"))
         self._tabs.addTab(self._build_wait_tab(), tr("等待参数"))
         self._tabs.addTab(self._build_plan_tab(), tr("方案设置"))
@@ -145,6 +146,8 @@ class SettingsDialog(QDialog):
         self._android_input_agent_radio.toggled.connect(self._mark_dirty)
         self._input_combo.currentIndexChanged.connect(self._mark_dirty)
         self._title_edit.textChanged.connect(self._mark_dirty)
+        for entry in self._android_app_rows:
+            self._connect_android_app_row_dirty(entry)
         self._offset_spin.valueChanged.connect(self._mark_dirty)
         self._jitter_spin.valueChanged.connect(self._mark_dirty)
         for lo_spin, hi_spin in self._range_spins.values():
@@ -233,6 +236,93 @@ class SettingsDialog(QDialog):
         form.addRow(tr("默认窗口标题:"), self._title_edit)
 
         return tab
+
+    # ─── 安卓设置（ADB 应用注册表）─────────────────────────
+
+    def _build_android_tab(self) -> QWidget:
+        tab = QWidget()
+        vbox = QVBoxLayout(tab)
+        caption = QLabel(tr(
+            "注册工作流可通过 ADB 停止和启动的安卓应用。应用名供 DSL 引用；"
+            "Activity 留空时自动启动该包的 Launcher 入口。"
+        ))
+        caption.setWordWrap(True)
+        vbox.addWidget(caption)
+
+        self._android_app_grid = QGridLayout()
+        self._android_app_grid.setColumnStretch(0, 2)
+        self._android_app_grid.setColumnStretch(1, 4)
+        self._android_app_grid.setColumnStretch(2, 4)
+        self._android_app_grid.addWidget(QLabel(tr("应用名")), 0, 0)
+        self._android_app_grid.addWidget(QLabel(tr("包名")), 0, 1)
+        self._android_app_grid.addWidget(QLabel(tr("启动 Activity（可选）")), 0, 2)
+        self._android_app_grid.addWidget(QLabel(tr("期望方向")), 0, 3)
+        vbox.addLayout(self._android_app_grid)
+
+        self._android_app_rows: list[dict] = []
+        for name, app in self._config.android_apps.items():
+            self._add_android_app_row(
+                name, app.package, app.activity, app.orientation, saved=True)
+
+        add_row = QHBoxLayout()
+        add_btn = QPushButton(tr("添加应用"))
+        add_btn.clicked.connect(self._on_add_android_app_row)
+        apply_button_style(add_btn)
+        add_row.addWidget(add_btn)
+        add_row.addStretch()
+        vbox.addLayout(add_row)
+        vbox.addStretch()
+        return tab
+
+    def _on_add_android_app_row(self) -> None:
+        entry = self._add_android_app_row()
+        self._connect_android_app_row_dirty(entry)
+        self._mark_dirty()
+
+    def _add_android_app_row(
+        self, name: str = "", package: str = "", activity: str = "",
+        orientation: str = "any", saved: bool = False,
+    ) -> dict:
+        name_edit = QLineEdit(name)
+        name_edit.setPlaceholderText(tr("如 game"))
+        package_edit = QLineEdit(package)
+        package_edit.setPlaceholderText(tr("如 com.example.game"))
+        activity_edit = QLineEdit(activity)
+        activity_edit.setPlaceholderText(tr("留空自动解析 Launcher"))
+        orientation_combo = QComboBox()
+        orientation_combo.addItem(tr("不限"), "any")
+        orientation_combo.addItem(tr("横屏"), "landscape")
+        orientation_combo.addItem(tr("竖屏"), "portrait")
+        index = orientation_combo.findData(orientation)
+        orientation_combo.setCurrentIndex(index if index >= 0 else 0)
+        entry = {
+            "name": name_edit, "package": package_edit,
+            "activity": activity_edit, "orientation": orientation_combo,
+            "saved": saved,
+        }
+        delete_btn = QPushButton(tr("删除"))
+        delete_btn.clicked.connect(lambda: self._remove_android_app_row(entry))
+        apply_button_style(delete_btn, variant="danger")
+        widgets = [name_edit, package_edit, activity_edit, orientation_combo, delete_btn]
+        entry["widgets"] = widgets
+        row = self._android_app_grid.rowCount()
+        for col, widget in enumerate(widgets):
+            self._android_app_grid.addWidget(widget, row, col)
+        self._android_app_rows.append(entry)
+        return entry
+
+    def _connect_android_app_row_dirty(self, entry: dict) -> None:
+        entry["name"].textChanged.connect(self._mark_dirty)
+        entry["package"].textChanged.connect(self._mark_dirty)
+        entry["activity"].textChanged.connect(self._mark_dirty)
+        entry["orientation"].currentIndexChanged.connect(self._mark_dirty)
+
+    def _remove_android_app_row(self, entry: dict) -> None:
+        self._android_app_rows.remove(entry)
+        for widget in entry["widgets"]:
+            self._android_app_grid.removeWidget(widget)
+            widget.deleteLater()
+        self._mark_dirty()
 
     # ─── Tab2 输入模拟（引擎级点击参数）───────────────────
 
@@ -1123,6 +1213,45 @@ class SettingsDialog(QDialog):
             })
         return envs
 
+    def _collect_android_apps(self) -> dict | None:
+        """收集并校验安卓应用注册表。"""
+        import re
+
+        package_re = re.compile(r"^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+$")
+        activity_re = re.compile(r"^[A-Za-z0-9_.$/]+$")
+        apps = {}
+        for entry in self._android_app_rows:
+            name = entry["name"].text().strip()
+            package = entry["package"].text().strip()
+            activity = entry["activity"].text().strip()
+            if not name and not package and not activity:
+                continue
+            if not name:
+                QMessageBox.warning(self, tr("安卓设置"), tr("应用名不能为空"))
+                return None
+            if name in apps:
+                QMessageBox.warning(
+                    self, tr("安卓设置"), tr("应用名重复: {name}").format(name=name))
+                return None
+            if not package_re.fullmatch(package):
+                QMessageBox.warning(
+                    self, tr("安卓设置"),
+                    tr("应用「{name}」的包名格式无效: {package}").format(
+                        name=name, package=package))
+                return None
+            if activity and not activity_re.fullmatch(activity):
+                QMessageBox.warning(
+                    self, tr("安卓设置"),
+                    tr("应用「{name}」的 Activity 格式无效: {activity}").format(
+                        name=name, activity=activity))
+                return None
+            apps[name] = {
+                "package": package,
+                "activity": activity,
+                "orientation": entry["orientation"].currentData(),
+            }
+        return apps
+
     def _on_save(self):
         delay_params = self._collect_custom()
         if delay_params is None:
@@ -1133,6 +1262,9 @@ class SettingsDialog(QDialog):
         plan_error = self._validate_plans()
         if plan_error:
             QMessageBox.warning(self, tr("方案设置"), plan_error)
+            return
+        android_apps = self._collect_android_apps()
+        if android_apps is None:
             return
         settings = {
             "android_capture_method": (
@@ -1162,7 +1294,7 @@ class SettingsDialog(QDialog):
         input_sim["click_random_offset"] = self._offset_spin.value()
         input_sim["region_jitter_ratio"] = round(self._jitter_spin.value(), 2)
         envs = self._collect_envs()
-        save_app_config(input_sim, delay_params, envs)
+        save_app_config(input_sim, delay_params, envs, android_apps)
         from ..core.config.plans import save_plans
         save_plans(self._collect_plans())
         self.plans_saved.emit()
@@ -1173,5 +1305,7 @@ class SettingsDialog(QDialog):
             entry["saved"] = bool(entry["key"].text().strip())
         for entry in self._env_rows:
             entry["saved"] = bool(entry["key"].text().strip())
+        for entry in self._android_app_rows:
+            entry["saved"] = bool(entry["name"].text().strip())
         self._dirty = False
         self._save_btn.setEnabled(False)

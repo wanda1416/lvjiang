@@ -1146,22 +1146,16 @@ class EquipStatusTab(QWidget):
         }
 
     def _on_chengyin_merge(self):
-        """识别候选并在用户确认后原子迁移引用、删除旧快照。"""
-        user_name = self._host.active_user_name()
-        if not user_name:
-            QMessageBox.warning(self, tr("合并失败"), tr("没有激活的用户"))
-            return
+        """汇总全部用户候选，确认后按用户迁移引用并删除旧快照。"""
         from ....config import get_game_config
-        from ....core.loadout import (
-            LoadoutRepository,
-            find_chengyin_merge_candidates,
+        from ....core.loadout import LoadoutRepository
+        from .chengyin_merge_dialog import (
+            ChengyinMergeDialog,
+            load_user_chengyin_candidates,
         )
-        from .chengyin_merge_dialog import ChengyinMergeDialog
 
-        repo = LoadoutRepository(user_name)
-        state = repo.load()
-        candidates = find_chengyin_merge_candidates(
-            state.equipment_items,
+        candidates = load_user_chengyin_candidates(
+            self._host.user_manager.list_users(),
             get_game_config().get_level_configs(),
         )
         dialog = ChengyinMergeDialog(
@@ -1169,8 +1163,10 @@ class EquipStatusTab(QWidget):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         selected = dialog.selected_candidates()
-        replacements: dict[str, str] = {}
-        for candidate in selected:
+        replacements_by_user: dict[str, dict[str, str]] = {}
+        for entry in selected:
+            candidate = entry.candidate
+            replacements = replacements_by_user.setdefault(entry.username, {})
             existing = replacements.get(candidate.old_fp)
             if existing is not None and existing != candidate.new_fp:
                 QMessageBox.warning(
@@ -1179,7 +1175,8 @@ class EquipStatusTab(QWidget):
                 return
             replacements[candidate.old_fp] = candidate.new_fp
         try:
-            repo.merge_items(replacements)
+            for username, replacements in replacements_by_user.items():
+                LoadoutRepository(username).merge_items(replacements)
         except Exception as exc:
             logger.exception("承音装备合并失败")
             QMessageBox.critical(self, tr("合并失败"), str(exc))

@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from PyQt6.QtWidgets import QLabel
+
 from lvjiang.apps.yysls.config.models import LevelConfig
 from lvjiang.apps.yysls.core.equip_parser.models import make_fingerprint
 from lvjiang.apps.yysls.core.loadout import (
     LoadoutRepository,
     find_chengyin_merge_candidates,
+)
+from lvjiang.apps.yysls.ui.loadout.equip.chengyin_merge_dialog import (
+    ChengyinMergeDialog,
+    load_user_chengyin_candidates,
 )
 
 
@@ -297,3 +303,38 @@ def test_intermediate_feeding_state_precedes_full_chengyin_snapshot():
     assert len(candidates) == 1
     assert candidates[0].old_fp == feeding["_fp"]
     assert candidates[0].new_fp == full["_fp"]
+
+
+def test_load_candidates_across_all_users(tmp_path):
+    old = _equip(level=100)
+    new = _equip(level=105, values=(11, 21, 31, 41, 51))
+    for username in ("alice", "bob"):
+        repo = LoadoutRepository(username, tmp_path)
+        repo.upsert_item(old)
+        repo.upsert_item(new)
+
+    entries = load_user_chengyin_candidates(
+        ["alice", "missing", "bob"], _levels(), tmp_path)
+
+    assert [entry.username for entry in entries] == ["alice", "bob"]
+    assert all(entry.candidate.old_fp == old["_fp"] for entry in entries)
+    assert all(entry.candidate.new_fp == new["_fp"] for entry in entries)
+
+
+def test_merge_dialog_displays_username_for_each_candidate(qtbot):
+    from lvjiang.apps.yysls.ui.loadout.equip.chengyin_merge_dialog import (
+        UserChengyinMergeCandidate,
+    )
+
+    old = _equip(level=100)
+    new = _equip(level=105, values=(11, 21, 31, 41, 51))
+    candidate = _find(old, new)[0]
+    dialog = ChengyinMergeDialog(
+        [UserChengyinMergeCandidate("alice", candidate)], {})
+    qtbot.addWidget(dialog)
+
+    assert dialog._pairs[0].entry.username == "alice"
+    assert any(
+        label.text().endswith("：alice")
+        for label in dialog._pairs[0].findChildren(QLabel)
+    )

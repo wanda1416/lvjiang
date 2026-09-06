@@ -658,6 +658,53 @@ def _expand_scene_references(regions: dict, points: dict) -> None:
                 regions, points, scene_key, ref.scene, ref.entity)
 
 
+def refresh_scene_references(
+    layout: Layout,
+    source_scenes: set[str] | None = None,
+) -> set[str]:
+    """用源场景当前坐标重建跨场景引用，返回受影响的目标场景。
+
+    布局加载时引用只展开一次；编辑器随后修改源场景坐标时，目标场景持有的
+    仍是旧克隆。保存前调用本函数，先移除指定源场景的旧投影，再从 Layout
+    当前快照重新展开，使已打开的引用场景无需重进布局管理器即可同步。
+    """
+    from .scene_registry import get_registry
+
+    try:
+        scenes = get_registry().all_scenes()
+    except Exception as exc:  # noqa: BLE001 — 刷新失败不能破坏源布局数据
+        logger.warning(f"跨场景引用刷新跳过（场景注册表不可用）: {exc}")
+        return set()
+
+    affected: set[str] = set()
+    for scene_key, scene in scenes.items():
+        refs = [
+            ref for ref in getattr(scene, "references", ())
+            if source_scenes is None or ref.scene in source_scenes
+        ]
+        if not refs:
+            continue
+        affected.add(scene_key)
+        refreshed_sources = {ref.scene for ref in refs}
+        layout.regions[scene_key] = [
+            item for item in layout.regions.get(scene_key, [])
+            if item.source_scene not in refreshed_sources
+        ]
+        layout.points[scene_key] = [
+            item for item in layout.points.get(scene_key, [])
+            if item.source_scene not in refreshed_sources
+        ]
+        for ref in refs:
+            expand_one_reference(
+                layout.regions,
+                layout.points,
+                scene_key,
+                ref.scene,
+                ref.entity,
+            )
+    return affected
+
+
 def expand_one_reference(regions: dict, points: dict, scene_key: str,
                          source_scene: str, entity: str) -> bool:
     """把一条跨场景引用展开进坐标表，成功返回 True。

@@ -6,8 +6,8 @@ views:
   name: 基底
 - key: confirm
   name: 确认
-- key: fight_android
-  name: 战斗_手游
+- key: fight
+  name: 战斗
 regions:
 - key: confirm
   name: 确认
@@ -83,46 +83,46 @@ points:
   type: func
   is_text: false
   is_clickable: true
-  view: fight_android
+  view: fight
 - key: teshuji
   name: 特殊技
   type: func
   is_text: false
   is_clickable: true
-  view: fight_android
+  view: fight
 - key: qishu
   name: 奇术
   type: func
   is_text: false
   is_clickable: true
-  view: fight_android
+  view: fight
 - key: xieshi
   name: 卸势
   type: func
   is_text: false
   is_clickable: true
-  view: fight_android
+  view: fight
 - key: xuli
   name: 蓄力
   type: func
   is_text: false
   is_clickable: true
-  view: fight_android
+  view: fight
 - key: qingji
   name: 轻击
   type: func
   is_text: false
   is_clickable: true
-  view: fight_android
+  view: fight
 - key: shanbi
   name: 闪避
   type: func
   is_text: false
   is_clickable: true
-  view: fight_android
+  view: fight
 - key: tiaoyue
   name: 跳跃
   type: func
   is_text: false
   is_clickable: true
-  view: fight_android
+  view: fight

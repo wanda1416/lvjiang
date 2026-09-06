@@ -170,6 +170,7 @@ class LayoutOpsMixin:
                     scene_key, tab.get_canvas_config())
         # 父场景画布持有子场景实体的只读投影。Layout 快照更新后必须同步
         # 重建，否则已加载的父页会一直绘制首次进入时的旧坐标。
+        self._refresh_loaded_scene_references()
         self._refresh_loaded_subscene_contents()
 
     def _clone_current_layout(self, name: str) -> Layout | None:

@@ -16,7 +16,11 @@ from PyQt6.QtWidgets import QWidget
 
 from ...core.key_names import normalize_key
 from ...core.layout_models import Arrow, CanvasConfig, Panel, Point, Region, SubsceneRef
-from ...core.scene_registry import get_region_name, get_subscene_ref_def
+from ...core.scene_registry import (
+    get_panel_name,
+    get_region_name,
+    get_subscene_ref_def,
+)
 from ...i18n import tr
 from .canvas_interaction import (
     HANDLE_SIZE,
@@ -970,6 +974,11 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         for i, p in enumerate(self._panels):
             self._draw_panel(painter, p, i == self._panel_selected_idx)
 
+    def _panel_label(self, panel: Panel) -> str:
+        """返回画布网格标签；与区域、坐标点统一显示 scene 名称。"""
+        name = get_panel_name(self._scene_key, panel.key)
+        return f"{name} ({panel.rows}x{panel.cols})"
+
     def _draw_panel(self, painter: QPainter, p: Panel, selected: bool):
         """绘制单个 panel：虚线外框 + 内部网格线 + 标签"""
         # 计算 panel 在 widget 中的矩形
@@ -1010,7 +1019,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
                 painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
 
         # 标签
-        label = f"{p.key} ({p.rows}x{p.cols})"
+        label = self._panel_label(p)
         font = QFont("Microsoft YaHei", 8)
         painter.setFont(font)
         fm = painter.fontMetrics()

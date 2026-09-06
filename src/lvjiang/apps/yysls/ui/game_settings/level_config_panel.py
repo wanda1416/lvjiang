@@ -39,7 +39,11 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import LevelConfig, get_game_config
-from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.button_styles import (
+    apply_button_style,
+    apply_compact_button_style,
+    apply_dialog_button_box_style,
+)
 
 from .....i18n import tr
 from .factory_guard import (
@@ -169,6 +173,7 @@ class StoneRuleDialog(QDialog):
         layout.addWidget(self._table)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.accept)
+        apply_dialog_button_box_style(buttons)
         layout.addWidget(buttons)
 
     def _schedule_save(self, *_args) -> None:
@@ -416,6 +421,7 @@ class LevelConfigPanel(QWidget):
             row, _RESET_NO_REFUND_COL, reset_no_refund_widget)
 
         stone_btn = QPushButton(tr("编辑"))
+        apply_compact_button_style(stone_btn, variant="neutral")
         stone_btn.setProperty("tuning_stones", _rule_to_raw(cfg))
         stone_btn.clicked.connect(
             lambda _checked=False, button=stone_btn:

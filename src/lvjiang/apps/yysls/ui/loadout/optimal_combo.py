@@ -39,6 +39,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.button_styles import (
+    apply_compact_button_style,
+    apply_dialog_button_box_style,
+)
+
 from .....i18n import tr
 from ...core.affix_cap import affix_dict_cap_pct
 from ...core.combat.combat_attrs import (
@@ -93,6 +98,7 @@ class _PlaystylePickerDialog(QDialog):
         row = QHBoxLayout()
         for text, checked in ((tr("全选"), True), (tr("全不选"), False)):
             button = QPushButton(text)
+            apply_compact_button_style(button, variant="neutral")
             button.clicked.connect(lambda _c, v=checked: self._set_all(v))
             row.addWidget(button)
         row.addStretch()
@@ -103,6 +109,7 @@ class _PlaystylePickerDialog(QDialog):
             | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        apply_dialog_button_box_style(buttons)
         layout.addWidget(buttons)
 
     def _set_all(self, checked: bool) -> None:
@@ -604,9 +611,7 @@ class OptimalComboDialog(QDialog):
         self._btn_rotation = QPushButton(tr("技能轴"))
         self._btn_rotation.setToolTip(
             tr("实验性：导入毕业率计算器 Excel，查看竞速轴与伤害来源"))
-        self._btn_rotation.setProperty("tone", "muted")
-        self._btn_rotation.setFlat(True)
-        self._btn_rotation.setStyleSheet("font-size: 12px;")
+        apply_compact_button_style(self._btn_rotation, variant="neutral")
         self._btn_rotation.clicked.connect(self._on_rotation)
         header.addWidget(self._btn_rotation)
         layout.addLayout(header)

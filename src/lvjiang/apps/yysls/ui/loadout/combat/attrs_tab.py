@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -30,6 +31,8 @@ from ......i18n import tr
 from ....core.combat.combat_attrs import (
     COMBAT_ATTR_FIELDS,
     CombatAttributes,
+    JudgmentOutcomeRates,
+    calculate_judgment_outcomes,
     compute_gongjue_attrs,
     format_value,
 )
@@ -63,6 +66,73 @@ _GONGJUE_TYPES = ["", "会意", "精准", "会心"]
 _YELLOW_VALUE_COLOR = "#D97706"
 
 
+class _JudgmentOutcomePopup(QFrame):
+    """最终伤害判定率浮窗；失去焦点后由 Qt 自动关闭。"""
+
+    def __init__(
+        self, rates: JudgmentOutcomeRates, parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent, Qt.WindowType.Popup)
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setMinimumWidth(330)
+        self.setStyleSheet(
+            "QFrame { background: palette(base); border: 1px solid palette(mid); "
+            "border-radius: 5px; }"
+            "QLabel { border: none; }"
+        )
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
+        title = QLabel(tr("最终伤害判定率"))
+        title.setStyleSheet("font-size: 14px; font-weight: 600;")
+        layout.addWidget(title)
+
+        def pct(value: float) -> str:
+            return f"{value:.2%}"
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(6)
+        rows = (
+            (tr("最终会心"),
+             f"{pct(rates.precision)} × {pct(rates.crit_chance)}",
+             rates.crit),
+            (tr("最终会意"), pct(rates.intent_chance), rates.intent),
+            (tr("普伤率"),
+             f"{pct(rates.precision)} × (1 − {pct(rates.intent_chance)}"
+             f" − {pct(rates.crit_chance)})",
+             rates.normal),
+            (tr("擦伤率"),
+             f"(1 − {pct(rates.precision)}) × "
+             f"(1 − {pct(rates.intent_chance)})",
+             rates.scratch),
+        )
+        for row, (name, expression, value) in enumerate(rows):
+            name_label = QLabel(name)
+            name_label.setStyleSheet("font-weight: 600;")
+            expression_label = QLabel(expression)
+            expression_label.setStyleSheet("color: palette(mid);")
+            value_label = QLabel(pct(value))
+            value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+            value_label.setStyleSheet(
+                "font-size: 14px; font-weight: 700; color: palette(highlight);"
+            )
+            grid.addWidget(name_label, row, 0)
+            grid.addWidget(expression_label, row, 1)
+            grid.addWidget(value_label, row, 2)
+        grid.setColumnStretch(1, 1)
+        layout.addLayout(grid)
+
+        note = QLabel(tr(
+            "判定精准、判定会心、判定会意取面板黄字；"
+            "直接会心、直接会意不受抗性。"
+        ))
+        note.setWordWrap(True)
+        note.setStyleSheet("font-size: 11px; color: palette(mid);")
+        layout.addWidget(note)
+
+
 class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin, PlayStyleDialogMixin, QWidget):
     """战斗属性 Tab"""
 
@@ -77,6 +147,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._reload_pending = False
         # _restore_selection 批量回填下拉时抑制刷新，见该方法
         self._restoring = False
+        self._current_combat_attrs = CombatAttributes()
+        self._judgment_popup: _JudgmentOutcomePopup | None = None
 
         self._graduation_generation = 0
         self._pending_graduation: tuple[int, str, str, str, CombatAttributes] | None = None
@@ -598,6 +670,22 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         config = max(configs, key=lambda item: item.level)
         return float(config.judge_resistance or 0), float(config.buff_resistance or 0)
 
+    def _show_judgment_outcomes(self) -> None:
+        """在判定属性卡片旁展示当前四种最终伤害结果。"""
+        judge_resistance, _ = self._current_resistances()
+        rates = calculate_judgment_outcomes(
+            self._current_combat_attrs, judge_resistance,
+        )
+        self._judgment_popup = _JudgmentOutcomePopup(rates, self)
+        self._judgment_popup.adjustSize()
+        anchor = self._judgment_help_button.mapToGlobal(
+            self._judgment_help_button.rect().bottomRight()
+        )
+        self._judgment_popup.move(
+            anchor.x() - self._judgment_popup.width(), anchor.y(),
+        )
+        self._judgment_popup.show()
+
     def _refresh_display(self):
         """刷新属性显示"""
         if self._restoring:
@@ -667,6 +755,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                     target_field = WUXIANG_TO_ATTR_PEN[school_attr]
                     current = getattr(combat_attrs, target_field, 0.0)
                     setattr(combat_attrs, target_field, current + equip_attrs.wuxiang_pen)
+
+        self._current_combat_attrs = combat_attrs
 
         for field_name, _display_name, unit, _ in COMBAT_ATTR_FIELDS:
             value = getattr(combat_attrs, field_name, 0.0)

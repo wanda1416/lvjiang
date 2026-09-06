@@ -18,9 +18,12 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.button_styles import apply_compact_tool_button_style
 
 from ......i18n import tr
 
@@ -48,7 +51,9 @@ class CombatCardsMixin:
     - self._attr_labels: dict[str, QLabel]（属性标签字典）
     """
 
-    def _create_card(self, title: str) -> QFrame:
+    def _create_card(
+        self, title: str, title_action: QWidget | None = None,
+    ) -> QFrame:
         """创建与应用主题一致的中性分组卡片。"""
         card = QFrame()
         card.setObjectName("combatAttrCard")
@@ -62,6 +67,8 @@ class CombatCardsMixin:
         title_layout.setContentsMargins(14, 12, 14, 4)
         title_layout.addWidget(title_label)
         title_layout.addStretch()
+        if title_action is not None:
+            title_layout.addWidget(title_action)
         card_layout.addLayout(title_layout)
         return card
 
@@ -103,7 +110,20 @@ class CombatCardsMixin:
 
     def _add_judgment_card(self, parent_layout: QVBoxLayout):
         """判定属性按相同业务含义排成三行。"""
-        card = self._create_card(tr("判定属性"))
+        self._judgment_help_button = QToolButton()
+        self._judgment_help_button.setText("?")
+        self._judgment_help_button.setFixedSize(18, 18)
+        self._judgment_help_button.setCursor(
+            Qt.CursorShape.PointingHandCursor)
+        self._judgment_help_button.setToolTip(tr("查看最终伤害判定率"))
+        self._judgment_help_button.setAccessibleName(
+            tr("查看最终伤害判定率"))
+        apply_compact_tool_button_style(self._judgment_help_button)
+        self._judgment_help_button.clicked.connect(
+            self._show_judgment_outcomes)
+        card = self._create_card(
+            tr("判定属性"), self._judgment_help_button,
+        )
         rows = (
             (("precision", "精准率", False),),
             (("crit_rate", "会心率", False),

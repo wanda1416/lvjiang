@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.button_styles import apply_compact_button_style
 from lvjiang.ui.user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_buttons
 
 from .....core.config import load_ui_page_state, update_ui_page_state
@@ -169,12 +170,13 @@ class LoadoutPanel(QWidget):
         self._plans = QComboBox()
         self._plans.currentIndexChanged.connect(self._switch_plan)
         plan_row.addWidget(self._plans, 2)
-        for label, callback in (
-            (tr("新建"), self._create_plan),
-            (tr("重命名"), self._rename_plan),
-            (tr("删除"), self._delete_plan),
+        for label, callback, variant in (
+            (tr("新建"), self._create_plan, "action"),
+            (tr("重命名"), self._rename_plan, "neutral"),
+            (tr("删除"), self._delete_plan, "danger"),
         ):
             button = QPushButton(label)
+            apply_compact_button_style(button, variant=variant)
             button.clicked.connect(callback)
             plan_row.addWidget(button)
         plan_row.addSpacing(16)

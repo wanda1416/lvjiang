@@ -8,7 +8,7 @@ from __future__ import annotations
 import copy
 
 from loguru import logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -22,10 +22,16 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QStyle,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
+from lvjiang.ui.button_styles import (
+    apply_button_style,
+    apply_compact_tool_button_style,
+)
 from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from lvjiang.ui.user_toolbar import add_user_nav_buttons
 
@@ -365,8 +371,10 @@ class EquipStatusTab(QWidget):
         advanced_filter_row.addWidget(self._status_filter)
         filter_row.addWidget(self._advanced_filter_widget)
 
-        self._filter_collapse_button = QPushButton("<=")
-        self._filter_collapse_button.setFixedWidth(30)
+        self._filter_collapse_button = QToolButton()
+        self._filter_collapse_button.setFixedSize(28, 28)
+        self._filter_collapse_button.setIconSize(QSize(16, 16))
+        apply_compact_tool_button_style(self._filter_collapse_button)
         self._filter_collapse_button.setToolTip(tr("收起部位至状态筛选"))
         self._filter_collapse_button.clicked.connect(
             self._toggle_advanced_filters)
@@ -397,7 +405,7 @@ class EquipStatusTab(QWidget):
 
         self._btn_batch_copy = QPushButton(tr("批量复制装备"))
         self._btn_batch_copy.setToolTip(tr("批量复制模拟装备到其他用户"))
-        self._btn_batch_copy.setStyleSheet(_ACTION_BTN_STYLE)
+        apply_button_style(self._btn_batch_copy)
         self._btn_batch_copy.clicked.connect(self._enter_batch_copy_mode)
         self._btn_batch_copy.setVisible(False)
         filter_row.addWidget(self._btn_batch_copy)
@@ -410,6 +418,7 @@ class EquipStatusTab(QWidget):
         batch_row.setContentsMargins(0, 0, 0, 0)
         batch_row.setSpacing(8)
         self._btn_batch_select_all = QPushButton(tr("全选"))
+        apply_button_style(self._btn_batch_select_all, variant="neutral")
         self._btn_batch_select_all.clicked.connect(self._select_all_batch_cards)
         batch_row.addWidget(self._btn_batch_select_all)
         self._batch_selected_label = QLabel(
@@ -419,12 +428,14 @@ class EquipStatusTab(QWidget):
         self._btn_copy_targets = QPushButton(tr("复制到…"))
         self._copy_targets_menu = _MultiSelectMenu(self._btn_copy_targets)
         self._btn_copy_targets.setMenu(self._copy_targets_menu)
+        apply_button_style(self._btn_copy_targets, variant="neutral")
         batch_row.addWidget(self._btn_copy_targets)
         self._btn_confirm_batch_copy = QPushButton(tr("确认复制"))
-        self._btn_confirm_batch_copy.setStyleSheet(_ACTION_BTN_STYLE)
+        apply_button_style(self._btn_confirm_batch_copy)
         self._btn_confirm_batch_copy.clicked.connect(self._copy_selected_mocks)
         batch_row.addWidget(self._btn_confirm_batch_copy)
         btn_cancel_batch = QPushButton(tr("退出批量模式"))
+        apply_button_style(btn_cancel_batch, variant="neutral")
         btn_cancel_batch.clicked.connect(self._exit_batch_copy_mode)
         batch_row.addWidget(btn_cancel_batch)
         self._batch_copy_widget.setVisible(False)
@@ -606,10 +617,17 @@ class EquipStatusTab(QWidget):
     def _set_advanced_filters_collapsed(self, collapsed: bool) -> None:
         self._filters_collapsed = collapsed
         self._advanced_filter_widget.setVisible(not collapsed)
-        self._filter_collapse_button.setText("=>" if collapsed else "<=")
-        self._filter_collapse_button.setToolTip(
+        action_text = (
             tr("展开部位至状态筛选") if collapsed
             else tr("收起部位至状态筛选"))
+        icon_type = (
+            QStyle.StandardPixmap.SP_ArrowRight if collapsed
+            else QStyle.StandardPixmap.SP_ArrowLeft)
+        self._filter_collapse_button.setText("")
+        self._filter_collapse_button.setIcon(
+            self._filter_collapse_button.style().standardIcon(icon_type))
+        self._filter_collapse_button.setToolTip(action_text)
+        self._filter_collapse_button.setAccessibleName(action_text)
 
     def _update_source_actions(self) -> None:
         is_mock = (self._source_filter.currentData() or "all") == "mock"

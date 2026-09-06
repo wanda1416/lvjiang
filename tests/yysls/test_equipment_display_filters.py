@@ -210,6 +210,8 @@ def test_advanced_filters_collapse_without_hiding_sort_or_source(qtbot):
     EquipStatusTab._set_advanced_filters_collapsed(tab, True)
 
     assert advanced.isHidden()
-    assert toggle.text() == "=>"
+    assert toggle.text() == ""
+    assert not toggle.icon().isNull()
+    assert toggle.accessibleName() == "展开部位至状态筛选"
     assert not sort.isHidden()
     assert not source.isHidden()

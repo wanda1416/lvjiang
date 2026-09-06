@@ -4,6 +4,7 @@ import pytest
 import yaml
 
 from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
+from lvjiang.core.scene_config import load_scene_manifest
 from lvjiang.core.scene_definition import SceneRegistry
 from lvjiang.core.scene_definition_models import PointDef, RegionDef
 from tests.case_matrix import case_matrix
@@ -64,6 +65,102 @@ def test_user_rename_system_scene_is_rejected_before_write(tmp_path):
     assert scene is not None
     assert scene.key == "factory"
     assert scene.name == "系统场景"
+
+
+def test_rename_scene_survives_in_place_hot_reload(tmp_path):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    scenes = system / "scenes"
+    scenes.mkdir(parents=True)
+    documents = {
+        "before": {"key": "before", "name": "前"},
+        "old": {
+            "key": "old",
+            "name": "旧场景",
+            "regions": [{
+                "key": "shared",
+                "name": "共享区域",
+                "type": "attr",
+                "is_text": True,
+                "is_clickable": False,
+            }],
+        },
+        "after": {"key": "after", "name": "后"},
+        "owner": {
+            "key": "owner",
+            "name": "引用方",
+            "references": [{"scene": "old", "entity": "shared"}],
+        },
+    }
+    for key, document in documents.items():
+        (scenes / f"{key}.yaml").write_text(
+            yaml.dump(document, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+
+    resolver = ConfigResolver(
+        system_dir=system, local_dir=local, dev_mode=True)
+    order = ["before", "old", "after", "owner"]
+    groups = {"main": ["before", "old", "after"], "other": ["owner"]}
+    names = {"main": "主分组", "other": "其他"}
+    (system / "scenes.yaml").write_text(
+        yaml.dump({
+            "schema_version": 2,
+            "scenes": {
+                "main": {
+                    "name": "主分组",
+                    "items": ["before", "old", "after"],
+                    "disabled": ["old"],
+                },
+                "other": {"name": "其他", "items": ["owner"]},
+            },
+        }, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    registry = SceneRegistry(
+        resolver=resolver,
+        scene_order=order,
+        group_config=groups,
+        group_names=names,
+        disabled_scenes={"old"},
+    )
+
+    def reload_in_place(_rel_path: str) -> None:
+        manifest = load_scene_manifest(resolver)
+        refreshed = SceneRegistry(
+            resolver=resolver,
+            scene_order=manifest.order,
+            group_config=manifest.groups,
+            group_names=manifest.group_names,
+            disabled_scenes=manifest.disabled,
+        )
+        registry.__dict__.clear()
+        registry.__dict__.update(refreshed.__dict__)
+
+    resolver.add_change_listener(reload_in_place)
+
+    registry.rename_scene("old", "new", "新场景")
+
+    assert not (scenes / "old.yaml").exists()
+    assert (scenes / "new.yaml").exists()
+    assert registry.get_scene("old") is None
+    assert registry.get_scene("new").name == "新场景"
+    assert registry.all_scene_keys() == ["before", "new", "after", "owner"]
+    assert registry.get_group_scenes("main") == ["before", "after"]
+    assert registry._group_scenes["main"] == ["before", "new", "after"]
+    assert "new" in registry._disabled_scenes
+    owner = registry.get_scene("owner")
+    assert owner.references[0].scene == "new"
+    persisted_owner = yaml.safe_load(
+        (scenes / "owner.yaml").read_text(encoding="utf-8"))
+    assert persisted_owner["references"][0]["scene"] == "new"
+
+    # UI 紧接着保存分组配置，这次写入同样会热重载。
+    registry.save_group_config()
+    manifest = load_scene_manifest(resolver)
+    assert manifest.groups["main"] == ["before", "new", "after"]
+    assert manifest.disabled == {"new"}
+    assert registry._group_scenes["main"] == ["before", "new", "after"]
 
 
 def test_explicit_scene_version_is_written_only_when_saved(tmp_path):

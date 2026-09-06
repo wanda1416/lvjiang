@@ -483,6 +483,17 @@ class SceneRegistry:
             self._resolver.ensure_entity_deletable(f"scenes/{key}.yaml")
         scene = self._scenes[key]
         old_name = scene.name
+        old_order = list(self._order)
+        old_group_scenes = {
+            group_key: list(scene_keys)
+            for group_key, scene_keys in self._group_scenes.items()
+        }
+        was_disabled = key in self._disabled_scenes
+        reference_owners = [
+            owner.key for owner in self._scenes.values()
+            if any(ref.scene == key for ref in owner.subscene_refs)
+            or any(ref.scene == key for ref in owner.references)
+        ]
         scene.key = new_key
         scene.name = new_name
         try:
@@ -494,29 +505,65 @@ class SceneRegistry:
             raise
         # 如果 key 变了，需要删旧建新
         if new_key != key:
-            self._resolver.delete_entity(f"scenes/{key}.yaml")
-            del self._scenes[key]
-            self._scenes[new_key] = scene
-            idx = self._order.index(key)
-            self._order[idx] = new_key
-            # 同步更新分组中的场景 key
-            group = self.get_scene_group(key)
-            if group:
-                scenes_list = self._group_scenes[group]
-                gidx = scenes_list.index(key)
-                scenes_list[gidx] = new_key
-            if key in self._disabled_scenes:
-                self._disabled_scenes.remove(key)
-                self._disabled_scenes.add(new_key)
-            # 引用目标跟随场景 key 重命名。
-            for owner in self._scenes.values():
+            # write_entity 会同步触发 scene_registry 原位热重载。
+            # 上面写入新文件后，self 已可能不再是进入本方法时的
+            # 内存状态，因此不能继续假设旧 key 仍在字典中。
+            # 趁新旧文件都存在时先改完引用，否则删旧文件触发
+            # 的下一次热重载会把悬空的 area 引用丢弃。
+            for owner_key in reference_owners:
+                owner = self._scenes.get(owner_key)
+                if owner is None:
+                    continue
                 changed = False
-                for ref in owner.subscene_refs:
-                    if ref.scene == key:
-                        ref.scene = new_key
+                for subscene_ref in owner.subscene_refs:
+                    if subscene_ref.scene == key:
+                        subscene_ref.scene = new_key
+                        changed = True
+                for scene_ref in owner.references:
+                    if scene_ref.scene == key:
+                        scene_ref.scene = new_key
                         changed = True
                 if changed:
                     self._save_scene_yaml(owner)
+
+            self._resolver.delete_entity(f"scenes/{key}.yaml")
+
+            # 无热重载的独立 SceneRegistry 也要维持内存状态；有热
+            # 重载时 pop 则是幂等空操作。新场景优先使用热重载从
+            # 磁盘读回的对象，没有时才使用上面的 scene。
+            self._scenes.pop(key, None)
+            self._scenes.setdefault(new_key, scene)
+
+            # scenes.yaml 此时仍保留旧 key，热重载会把新 key 暂时
+            # 归到第一分组并放到末尾。用操作前快照恢复原位，
+            # 由调用方紧接着 save_group_config 持久化。
+            renamed_order = [
+                new_key if existing == key else existing
+                for existing in old_order
+            ]
+            self._order = [
+                existing for existing in renamed_order
+                if existing in self._scenes
+            ]
+            for existing in self._scenes:
+                if existing not in self._order:
+                    self._order.append(existing)
+
+            restored_groups: dict[str, list[str]] = {}
+            for group_key, scene_keys in old_group_scenes.items():
+                restored: list[str] = []
+                for existing in scene_keys:
+                    candidate = new_key if existing == key else existing
+                    if (candidate in self._scenes
+                            and candidate not in restored):
+                        restored.append(candidate)
+                restored_groups[group_key] = restored
+            self._group_scenes = restored_groups
+            if was_disabled:
+                self._disabled_scenes.discard(key)
+                self._disabled_scenes.add(new_key)
+            else:
+                self._disabled_scenes.discard(key)
         logger.info(f"已重命名场景: {key} -> {new_key}")
 
     def reorder_scenes(self, new_order: list[str]):

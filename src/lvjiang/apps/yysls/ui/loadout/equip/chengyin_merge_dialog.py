@@ -83,7 +83,7 @@ class ChengyinMergeDialog(QDialog):
     ):
         super().__init__(parent)
         self._pairs: list[_CandidatePair] = []
-        self.setWindowTitle(tr("承音装备合并"))
+        self.setWindowTitle(tr("承音装备"))
         self.resize(1500, 760)
         self.setMinimumSize(1000, 620)
 

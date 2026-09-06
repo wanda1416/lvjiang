@@ -480,18 +480,18 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         kind: str,
         ordered_keys: list[str],
         table: EntityOrderTable,
+        moved_key: str,
     ) -> None:
-        """名称拖拽后立即持久化场景 YAML，并按新顺序刷新右侧列表。"""
-        selected_key = table.entity_key(table.currentRow())
+        """名称拖拽后持久化场景 YAML，并按新顺序刷新右侧列表。"""
         changed = get_registry().reorder_scene_entities(
             self._scene_key, kind, ordered_keys)
         if not changed:
             return
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
-        if selected_key:
+        if moved_key:
             for row in range(table.rowCount()):
-                if table.entity_key(row) == selected_key:
+                if table.entity_key(row) == moved_key:
                     table.selectRow(row)
                     break
 

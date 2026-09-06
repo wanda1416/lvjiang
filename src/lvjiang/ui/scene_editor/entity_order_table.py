@@ -1,6 +1,6 @@
 """支持从名称列拖拽调整场景实体定义顺序的表格。"""
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QDropEvent
 from PyQt6.QtWidgets import QAbstractItemView, QTableWidget
 
@@ -16,7 +16,7 @@ class EntityOrderTable(QTableWidget):
     设置 key，因而不会混入本地定义顺序。
     """
 
-    entity_order_changed = pyqtSignal(list)
+    entity_order_changed = pyqtSignal(list, str)
 
     def __init__(self, rows: int = 0, columns: int = 0, parent=None):
         super().__init__(rows, columns, parent)
@@ -95,4 +95,12 @@ class EntityOrderTable(QTableWidget):
 
         event.setDropAction(Qt.DropAction.MoveAction)
         event.accept()
-        self.entity_order_changed.emit(new_order)
+        moved_key = self.entity_key(source_row)
+        # QAbstractItemView.startDrag() 会在 dropEvent 返回后才执行 MoveAction
+        # 的源单元格清理。若这里同步刷新，随后那次清理会把新表格中的同一行
+        # 再挖空，看起来就是落点一列变白。延迟到下一轮事件循环，等 Qt 收尾
+        # 完成后再由调用方完整刷新表格。
+        QTimer.singleShot(
+            0,
+            lambda: self.entity_order_changed.emit(new_order, moved_key),
+        )

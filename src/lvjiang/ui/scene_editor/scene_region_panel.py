@@ -87,8 +87,8 @@ class RegionPanelMixin:
             EntityOrderTable.EditTrigger.NoEditTriggers)
         self._region_table.setToolTip(tr("拖拽名称可调整 YAML 定义顺序"))
         self._region_table.entity_order_changed.connect(
-            lambda keys: self._on_entity_order_changed(
-                "regions", keys, self._region_table))
+            lambda keys, moved_key: self._on_entity_order_changed(
+                "regions", keys, self._region_table, moved_key))
         strip_focus_rect(self._region_table)
         vheader = self._region_table.verticalHeader()
         assert vheader is not None

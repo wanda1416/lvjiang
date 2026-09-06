@@ -43,8 +43,8 @@ class SceneReferenceEditorMixin:
             EntityOrderTable.EditTrigger.NoEditTriggers)
         self._reference_table.setToolTip(tr("拖拽名称可调整 YAML 定义顺序"))
         self._reference_table.entity_order_changed.connect(
-            lambda keys: self._on_entity_order_changed(
-                "subscene_refs", keys, self._reference_table))
+            lambda keys, moved_key: self._on_entity_order_changed(
+                "subscene_refs", keys, self._reference_table, moved_key))
         header = self._reference_table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)

@@ -100,8 +100,8 @@ class PoiPanelMixin:
         self._point_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._point_list.setToolTip(tr("拖拽名称可调整 YAML 定义顺序"))
         self._point_list.entity_order_changed.connect(
-            lambda keys: self._on_entity_order_changed(
-                "points", keys, self._point_list))
+            lambda keys, moved_key: self._on_entity_order_changed(
+                "points", keys, self._point_list, moved_key))
         strip_focus_rect(self._point_list)
         vheader = self._point_list.verticalHeader()
         assert vheader is not None

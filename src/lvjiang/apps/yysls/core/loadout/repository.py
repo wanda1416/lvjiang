@@ -6,7 +6,7 @@ import os
 import tempfile
 import threading
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -387,3 +387,125 @@ class LoadoutRepository:
                         plan.equipment[slot] = new_fp
         self.update(mutate)
         return new_fp
+
+    def update_real_development(self, old_fp: str, equip: dict) -> str:
+        """原子保存真实装备的转律/承音/培养结果。
+
+        真实装备的指纹会随等级、承音和词条变化；因此必须在
+        同一次仓储更新中写入新指纹、迁移全部方案引用并删除旧版。
+        """
+        from ..equip_parser.models import make_fingerprint
+
+        value = copy.deepcopy(equip)
+        if old_fp.startswith("mock_") or bool(
+            (value.get("_extra") or {}).get("is_mock")):
+            raise ValueError("扫描装备养成不支持模拟装备")
+        new_fp = make_fingerprint(value)
+        if not new_fp:
+            raise ValueError("装备数据无法生成指纹")
+
+        def mutate(state: LoadoutState) -> None:
+            old = state.equipment_items.get(old_fp)
+            if old is None:
+                raise ValueError(f"待养成装备已不存在: {old_fp}")
+            self._validate_real_development(old, value)
+            if any(
+                (old.get(f"affix_{index}") or {}).get("name")
+                != (value.get(f"affix_{index}") or {}).get("name")
+                for index in range(1, 6)
+            ):
+                from ...config import get_game_config
+
+                days = get_game_config().get_equipment_cooldown_days()
+                value["cooldown_expires_at"] = (
+                    datetime.now(timezone.utc) + timedelta(days=days)
+                ).isoformat(timespec="milliseconds")
+            stamped = stamp_equipment_write(
+                value, new_fp, state.equipment_items.get(new_fp))
+            target = state.equipment_items.get(new_fp)
+            stamped[EQUIPMENT_CREATED_AT] = _pick_timestamp(
+                (old.get(EQUIPMENT_CREATED_AT),
+                 target.get(EQUIPMENT_CREATED_AT) if target else None),
+                latest=False,
+            )
+            state.equipment_items[new_fp] = stamped
+            for plan in state.plans.values():
+                for slot, fp in plan.equipment.items():
+                    if fp == old_fp:
+                        plan.equipment[slot] = new_fp
+            if old_fp != new_fp:
+                state.equipment_items.pop(old_fp, None)
+
+        self.update(mutate)
+        return new_fp
+
+    @staticmethod
+    def _validate_real_development(old: dict, new: dict) -> None:
+        """仓储边界的真实装备不可变字段与单向变化校验。"""
+        immutable = (
+            "type", "name", "quality", "original_level",
+            "base_attr", "base_attr_2",
+        )
+        changed = [key for key in immutable if old.get(key) != new.get(key)]
+        if changed:
+            raise ValueError(
+                "扫描装备的既定属性不可修改: " + "、".join(changed))
+        old_level = int(old.get("level") or 0)
+        new_level = int(new.get("level") or 0)
+        if new_level < old_level:
+            raise ValueError("承音后的装备等级不能降低")
+        old_chengyin = bool(old.get("is_chengyin"))
+        new_chengyin = bool(new.get("is_chengyin"))
+        if old_chengyin and not new_chengyin:
+            raise ValueError("承音状态不能撤销")
+        if new_level != old_level:
+            from ...config import get_game_config
+
+            configs = sorted(
+                get_game_config().get_level_configs(),
+                key=lambda item: item.level,
+            )
+            current = next(
+                (item for item in configs if item.level == old_level), None)
+            next_level = next(
+                (item.level for item in configs if item.level > old_level), None)
+            if (old_chengyin or not new_chengyin or current is None
+                    or not current.allow_chengyin or new_level != next_level):
+                raise ValueError("承音只能提升到下一个已配置等级")
+        elif old_chengyin != new_chengyin:
+            raise ValueError("承音必须同时提升装备等级")
+
+        old_dingyin = old.get("dingyin") or {}
+        new_dingyin = new.get("dingyin") or {}
+        if old_dingyin.get("name") != new_dingyin.get("name"):
+            raise ValueError("扫描装备不能新增、删除或更换定音词条")
+        if float(new_dingyin.get("value") or 0) < float(
+                old_dingyin.get("value") or 0):
+            raise ValueError("培养只能提高定音数值")
+
+        changed_names: list[int] = []
+        old_transferred: list[int] = []
+        for index in range(1, 6):
+            before = old.get(f"affix_{index}") or {}
+            after = new.get(f"affix_{index}") or {}
+            before_transferred = bool(before.get("is_transferred"))
+            after_transferred = bool(after.get("is_transferred"))
+            if before_transferred:
+                old_transferred.append(index)
+            if before.get("name") != after.get("name"):
+                changed_names.append(index)
+                if not before.get("name") or not after.get("name"):
+                    raise ValueError("扫描装备不能新增或删除词条")
+                continue
+            if before_transferred != after_transferred:
+                raise ValueError("转律槽位标记不能单独修改")
+            if float(after.get("value") or 0) < float(before.get("value") or 0):
+                raise ValueError("培养只能提高词条数值")
+        if len(changed_names) > 1 or changed_names == [1]:
+            raise ValueError("转律只能修改商角徵羽中的一个词条")
+        if old_transferred and changed_names and changed_names != old_transferred:
+            raise ValueError("再次转律只能修改原固定槽位")
+        if changed_names:
+            changed_affix = new.get(f"affix_{changed_names[0]}") or {}
+            if not changed_affix.get("is_transferred"):
+                raise ValueError("转律后的词条必须标记 is_transferred")

@@ -7,7 +7,9 @@
 """
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -134,6 +136,7 @@ class _AffixRow(QWidget):
         self._affix_names = affix_names
         self._cap = 0.0
         self._unit = ""
+        self._source_data: dict = {}
 
     def _on_name_changed(self, _index: int):
         """词条名改变时更新单位和上限，并根据模式预填数值"""
@@ -216,6 +219,8 @@ class _AffixRow(QWidget):
             "name": name,
             "value": round(value, 1),
         }
+        if self._source_data.get("is_transferred"):
+            result["is_transferred"] = True
         if self._unit:
             result["unit"] = self._unit
         # cap_pct 只是给调律 DSL 快查的派生缓存，与 value 同一口径生成
@@ -225,6 +230,7 @@ class _AffixRow(QWidget):
 
     def set_data(self, data: dict | None):
         """设置词条数据"""
+        self._source_data = copy.deepcopy(data) if isinstance(data, dict) else {}
         if not data:
             self._combo_name.setCurrentIndex(0)
             self._spin_value.setValue(0.0)
@@ -250,28 +256,38 @@ class MockEquipDialog(QDialog):
         super().__init__(parent)
         self._equip_data = equip_data or {}
         self._is_edit = bool(equip_data)
+        self._is_real_development = bool(
+            equip_data
+            and not (equip_data.get("_extra") or {}).get("is_mock", False)
+        )
         self._result_data: dict | None = None
         self._default_school = default_school  # 默认流派，用于右四件定音词条排序
         self._delete_all_mock = delete_all_mock
 
-        self.setWindowTitle(tr("编辑模拟装备") if self._is_edit else tr("模拟装备"))
+        if self._is_real_development:
+            self.setWindowTitle(tr("养成扫描装备"))
+        else:
+            self.setWindowTitle(
+                tr("编辑模拟装备") if self._is_edit else tr("模拟装备"))
         self.setMinimumSize(680, 620)
         self.resize(760, 700)
         self._init_ui()
         if self._is_edit:
             self._load_data()
+        if self._is_real_development:
+            self._configure_real_development()
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 16)
         layout.setSpacing(12)
 
-        context = QLabel(
+        self._context_label = QLabel(
             tr("用于备战方案比较  ·  不会修改真实背包装备")
         )
-        context.setProperty("tone", "muted")
-        context.setStyleSheet("font-size: 12px;")
-        layout.addWidget(context)
+        self._context_label.setProperty("tone", "muted")
+        self._context_label.setStyleSheet("font-size: 12px;")
+        layout.addWidget(self._context_label)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -838,6 +854,181 @@ class MockEquipDialog(QDialog):
             self._spin_dingyin.setValue(dingyin.get("value", 0.0))
             self._update_dingyin_pct()
 
+    def _configure_real_development(self) -> None:
+        """扫描装备只开放转律、承音和词条数值培养。"""
+        self._context_label.setText(tr(
+            "扫描装备的既定属性不可修改  ·  "
+            "仅支持转律、承音和词条数值培养"
+        ))
+        for widget in (
+            self._combo_part,
+            self._combo_weapon_type,
+            self._edit_name,
+            self._combo_level,
+            self._combo_quality,
+            self._btn_dingyin,
+        ):
+            widget.setEnabled(False)
+
+        dingyin = self._equip_data.get("dingyin") or {}
+        has_dingyin = bool(dingyin.get("name"))
+        self._spin_dingyin.setEnabled(has_dingyin)
+        if has_dingyin:
+            self._spin_dingyin.setMinimum(float(dingyin.get("value") or 0.0))
+        else:
+            self._spin_dingyin.setToolTip(tr("此装备没有可培养的定音词条"))
+
+        current_level = int(self._equip_data.get("level") or 0)
+        from ....config import get_game_config
+        configs = sorted(
+            get_game_config().get_level_configs(), key=lambda item: item.level)
+        current_config = next(
+            (item for item in configs if item.level == current_level), None)
+        self._real_next_level = next(
+            (item.level for item in configs if item.level > current_level), None)
+        can_chengyin = bool(
+            not self._equip_data.get("is_chengyin")
+            and current_config
+            and current_config.allow_chengyin
+            and self._real_next_level is not None
+        )
+        self._check_chengyin.setEnabled(can_chengyin)
+        if not can_chengyin:
+            self._check_chengyin.setToolTip(tr(
+                "当前装备不支持继续承音，或没有更高的已配置等级"))
+        self._check_chengyin.toggled.connect(
+            self._on_real_chengyin_toggled)
+
+        transferred = [
+            index for index in range(1, 6)
+            if bool((self._equip_data.get(f"affix_{index}") or {}).get(
+                "is_transferred"))
+        ]
+        fixed_transfer = transferred[0] if len(transferred) == 1 else None
+        for index, row in enumerate(self._affix_rows, 1):
+            old = self._equip_data.get(f"affix_{index}") or {}
+            if not old.get("name"):
+                row._combo_name.setEnabled(False)
+                row._spin_value.setEnabled(False)
+                continue
+            row._spin_value.setMinimum(float(old.get("value") or 0.0))
+            # 宫不可转律；已有转律槽时只能继续修改该固定槽。
+            row._combo_name.setEnabled(
+                index > 1 and (fixed_transfer is None or index == fixed_transfer))
+
+    def _on_real_chengyin_toggled(self, checked: bool) -> None:
+        level = (
+            self._real_next_level if checked
+            else int(self._equip_data.get("level") or 0)
+        )
+        index = self._combo_level.findData(level)
+        if index >= 0:
+            self._combo_level.setCurrentIndex(index)
+
+    def _build_real_development_data(self) -> dict:
+        """以扫描快照为基底，只覆盖允许养成的字段。"""
+        from ....core.affix_cap import affix_cap_pct
+        from ....core.equip_parser.models import make_fingerprint
+
+        result = copy.deepcopy(self._equip_data)
+        result["level"] = self._get_level()
+        result["is_chengyin"] = self._check_chengyin.isChecked()
+        name_changed = False
+        for index, row in enumerate(self._affix_rows, 1):
+            old = self._equip_data.get(f"affix_{index}") or {}
+            affix = row.get_data()
+            if affix is None:
+                result.pop(f"affix_{index}", None)
+                continue
+            if affix.get("name") != old.get("name"):
+                affix["is_transferred"] = True
+                name_changed = True
+            elif old.get("is_transferred"):
+                affix["is_transferred"] = True
+            pct = affix_cap_pct(
+                result["level"], affix.get("name"), affix.get("value"))
+            if pct is None:
+                affix.pop("cap_pct", None)
+            else:
+                affix["cap_pct"] = pct
+            result[f"affix_{index}"] = affix
+
+        old_dingyin = self._equip_data.get("dingyin") or {}
+        if old_dingyin.get("name"):
+            from ....config import get_game_config
+
+            dingyin = copy.deepcopy(old_dingyin)
+            dingyin_value = round(self._spin_dingyin.value(), 1)
+            dingyin["value"] = dingyin_value
+            pct = affix_cap_pct(
+                result["level"], dingyin["name"], dingyin_value,
+                game_config=get_game_config(),
+            )
+            if pct is None:
+                dingyin.pop("cap_pct", None)
+            else:
+                dingyin["cap_pct"] = pct
+            result["dingyin"] = dingyin
+
+        extra = copy.deepcopy(self._equip_data.get("_extra") or {})
+        extra["is_mock"] = False
+        extra["affix_count"] = sum(
+            bool((result.get(f"affix_{index}") or {}).get("name"))
+            for index in range(1, 6)
+        )
+        result["_extra"] = extra
+        if name_changed:
+            from ....config import get_game_config
+
+            cooldown_days = get_game_config().get_equipment_cooldown_days()
+            result["cooldown_expires_at"] = (
+                datetime.now(timezone.utc) + timedelta(days=cooldown_days)
+            ).isoformat(timespec="milliseconds")
+        result["_fp"] = make_fingerprint(result)
+        return result
+
+    def _validate_real_development(self, result: dict) -> str | None:
+        old = self._equip_data
+        changed_names: list[int] = []
+        changed_values = False
+        old_transferred = [
+            index for index in range(1, 6)
+            if bool((old.get(f"affix_{index}") or {}).get("is_transferred"))
+        ]
+        for index in range(1, 6):
+            before = old.get(f"affix_{index}") or {}
+            after = result.get(f"affix_{index}") or {}
+            if before.get("name") != after.get("name"):
+                changed_names.append(index)
+            before_value = float(before.get("value") or 0.0)
+            after_value = float(after.get("value") or 0.0)
+            if before.get("name") == after.get("name") and after_value < before_value:
+                return tr("培养只能提高词条数值，不能降低")
+            changed_values = changed_values or after_value != before_value
+        if len(changed_names) > 1:
+            return tr("一次转律只能修改一个词条")
+        if changed_names and changed_names[0] == 1:
+            return tr("宫为首词条，不能转律")
+        if old_transferred and changed_names:
+            if len(old_transferred) != 1 or changed_names[0] != old_transferred[0]:
+                return tr("已有转律词条时，只能继续转律原固定槽位")
+
+        level_changed = result.get("level") != old.get("level")
+        old_dingyin = old.get("dingyin") or {}
+        new_dingyin = result.get("dingyin") or {}
+        dingyin_changed = (
+            float(new_dingyin.get("value") or 0.0)
+            != float(old_dingyin.get("value") or 0.0)
+        )
+        if level_changed and result.get("level") != self._real_next_level:
+            return tr("承音只能提升到下一个已配置等级")
+        if bool(old.get("is_chengyin")) and not bool(result.get("is_chengyin")):
+            return tr("承音状态不能撤销")
+        if not (changed_names or changed_values or dingyin_changed
+                or level_changed):
+            return tr("未对装备进行任何养成修改")
+        return None
+
     def _update_dingyin_pct(self):
         """更新定音词条的满值和百分比标签"""
         name = self._dingyin_selected
@@ -890,6 +1081,12 @@ class MockEquipDialog(QDialog):
         if result is None:
             return
 
+        if self._is_real_development:
+            error = self._validate_real_development(result)
+            if error:
+                QMessageBox.warning(self, tr("提示"), error)
+                return
+
         error = self._validate_affix_rules(result)
         if error:
             QMessageBox.warning(self, tr("提示"), error)
@@ -917,6 +1114,9 @@ class MockEquipDialog(QDialog):
 
     def _build_equip_data(self) -> dict | None:
         """构建装备数据字典"""
+        if self._is_real_development:
+            return self._build_real_development_data()
+
         from ....config import get_game_config
         gc = get_game_config()
 

@@ -310,10 +310,6 @@ class _EquipmentPropertiesDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-        self._countdown_timer = QTimer(self)
-        self._countdown_timer.setInterval(30_000)
-        self._countdown_timer.timeout.connect(self._refresh_cooldown)
-        self._countdown_timer.start()
         self._refresh_cooldown()
 
     def _set_cooldown(self, value: str) -> None:
@@ -327,7 +323,10 @@ class _EquipmentPropertiesDialog(QDialog):
         self._set_cooldown("")
 
     def _reset_cooldown(self) -> None:
-        expires_at = datetime.now(timezone.utc) + timedelta(days=5)
+        from ....config import get_game_config
+
+        days = get_game_config().get_equipment_cooldown_days()
+        expires_at = datetime.now(timezone.utc) + timedelta(days=days)
         self._set_cooldown(expires_at.isoformat(timespec="milliseconds"))
 
     def _refresh_cooldown(self) -> None:
@@ -583,7 +582,7 @@ class _SlotCard(QFrame):
         super().mousePressEvent(event)
 
     def contextMenuEvent(self, event):
-        """右键菜单：已装备物品可卸载，模拟装备可编辑，所有可复制。"""
+        """右键菜单：已装备物品可卸载、养成或编辑，并可复制。"""
         from .status_tab import EquipStatusTab
         if not getattr(self, '_equip_data', None):
             event.ignore()
@@ -594,8 +593,10 @@ class _SlotCard(QFrame):
         )
         menu = QMenu(self)
         unequip_action = menu.addAction(tr("卸载"))
-        if is_mock:
-            edit_action = menu.addAction(tr("编辑"))
+        edit_action = menu.addAction(tr("编辑") if is_mock else tr("养成"))
+        edit_action.setToolTip(
+            tr("编辑模拟装备数据") if is_mock
+            else tr("记录扫描装备的转律、承音或培养"))
         copy_action = menu.addAction(tr("复制"))
         copy_action.setToolTip(tr("复制装备数据到创建对话框"))
         properties_action = menu.addAction(tr("属性"))
@@ -606,7 +607,7 @@ class _SlotCard(QFrame):
                 parent = parent.parent()
             if parent:
                 parent._on_slot_unequip(self.slot_key)
-        elif is_mock and action == edit_action:
+        elif action == edit_action:
             parent = self.parent()
             while parent and not isinstance(parent, EquipStatusTab):
                 parent = parent.parent()
@@ -773,7 +774,7 @@ class _CompactEquipCard(QFrame):
 
     Signals:
         equip_requested(dict, str): 请求装备到槽位，参数为 (equip_data, group_key)
-        edit_requested(dict, str): 请求编辑模拟装备，参数为 (equip_data, group_key)
+        edit_requested(dict, str): 请求编辑/养成装备，参数为 (equip_data, group_key)
         delete_requested(dict, str): 请求删除装备，参数为 (equip_data, group_key)
     """
 
@@ -947,9 +948,12 @@ class _CompactEquipCard(QFrame):
         if self._context_mode == "full":
             entries.append(
                 (tr("装备"), tr("穿戴到对应槽位"), self.equip_requested))
-            if is_mock:
-                entries.append(
-                    (tr("编辑"), tr("编辑模拟装备数据"), self.edit_requested))
+            entries.append((
+                tr("编辑") if is_mock else tr("养成"),
+                tr("编辑模拟装备数据") if is_mock
+                else tr("记录扫描装备的转律、承音或培养"),
+                self.edit_requested,
+            ))
             entries.append((tr("复制"), tr("复制装备数据到创建对话框"),
                             self.copy_requested))
             entries.append(

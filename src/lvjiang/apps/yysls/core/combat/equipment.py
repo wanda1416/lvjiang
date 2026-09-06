@@ -167,6 +167,12 @@ class EquipmentInventory:
         self._repo.update_mock(old_fp, new_equip)
         self.reload()
 
+    def update_real_development(self, old_fp: str, new_equip: dict) -> str:
+        """保存扫描装备的受限养成，并迁移所有备战方案引用。"""
+        new_fp = self._repo.update_real_development(old_fp, new_equip)
+        self.reload()
+        return new_fp
+
     def set_item_cooldown(self, fp: str, expires_at: str) -> None:
         """更新装备冷却到期时间并重载库存。"""
         self._repo.set_item_cooldown(fp, expires_at)

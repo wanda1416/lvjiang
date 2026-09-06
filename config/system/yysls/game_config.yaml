@@ -1,3 +1,6 @@
+basic_config:
+  equipment_cooldown_days: 5
+
 base_attrs:
   weapon:
     _attr: 外功攻击

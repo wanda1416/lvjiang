@@ -1399,3 +1399,20 @@ auto_strings:
   更新时间: Updated At
   查看装备来源、指纹、原始等级和时间: View equipment source, fingerprint, original level, and timestamps
   装备属性: Equipment Properties
+  选择要复制的模拟装备: Select mock equipment to copy
+  点击选择要复制的装备: Click to select equipment to copy
+  收起部位至状态筛选: Collapse slot-to-status filters
+  展开部位至状态筛选: Expand slot-to-status filters
+  只删除当前筛选出的背包装备，此处不支持删除模拟装备: Delete only filtered inventory equipment; mock equipment is not supported here
+  批量复制装备: Batch Copy Equipment
+  批量复制模拟装备到其他用户: Copy mock equipment to other users in batches
+  已选择 {count} 件: '{count} selected'
+  复制到…: Copy to…
+  退出批量模式: Exit Batch Mode
+  复制到: Copy to
+  确定将 {items} 件模拟装备复制给 {users} 个用户吗？: Copy {items} mock equipment items to {users} users?
+  '{user}：新增 {copied}，已存在 {existing}，冲突 {conflicts}': '{user}: {copied} added, {existing} existing, {conflicts} conflicts'
+  '{user}：复制失败：{error}': '{user}: copy failed: {error}'
+  此处不支持删除模拟装备: Mock equipment deletion is not supported here
+  确认复制: Confirm Copy
+  复制完成: Copy Complete

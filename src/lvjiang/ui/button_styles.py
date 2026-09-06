@@ -36,6 +36,33 @@ DANGER_BUTTON_STYLE = (
     "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
 )
 
+COMPACT_ACTION_BUTTON_STYLE = (
+    "QPushButton { border: 1px solid palette(highlight); "
+    "color: palette(highlight); border-radius: 4px; padding: 2px 7px; "
+    "font-weight: 600; }"
+    "QPushButton:hover { background-color: palette(midlight); }"
+    "QPushButton:pressed, QPushButton:checked { background-color: palette(mid); }"
+    "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
+)
+
+COMPACT_NEUTRAL_BUTTON_STYLE = (
+    "QPushButton { background-color: palette(button); color: palette(button-text); "
+    "border: 1px solid palette(mid); border-radius: 4px; padding: 2px 7px; "
+    "font-weight: 600; }"
+    "QPushButton:hover { background-color: palette(midlight); }"
+    "QPushButton:pressed, QPushButton:checked { background-color: palette(mid); }"
+    "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
+)
+
+COMPACT_DANGER_BUTTON_STYLE = (
+    "QPushButton { background-color: palette(button); color: #c62828; "
+    "border: 1px solid #c62828; border-radius: 4px; padding: 2px 7px; "
+    "font-weight: 600; }"
+    "QPushButton:hover { background-color: rgba(198, 40, 40, 0.12); }"
+    "QPushButton:pressed { background-color: rgba(198, 40, 40, 0.22); }"
+    "QPushButton:disabled { color: palette(mid); border-color: palette(midlight); }"
+)
+
 COMPACT_TOOL_BUTTON_STYLE = (
     "QToolButton { background: transparent; color: palette(button-text); "
     "border: 1px solid palette(mid); border-radius: 10px; padding: 0; "
@@ -66,6 +93,22 @@ def apply_compact_tool_button_style(*buttons: QToolButton | None) -> None:
     for button in buttons:
         if button is not None:
             button.setStyleSheet(COMPACT_TOOL_BUTTON_STYLE)
+
+
+def apply_compact_button_style(
+    *buttons: QPushButton | None,
+    variant: str = "neutral",
+) -> None:
+    """Apply application semantics with reduced padding for dense form rows."""
+    styles = {
+        "action": COMPACT_ACTION_BUTTON_STYLE,
+        "neutral": COMPACT_NEUTRAL_BUTTON_STYLE,
+        "danger": COMPACT_DANGER_BUTTON_STYLE,
+    }
+    style = styles[variant]
+    for button in buttons:
+        if button is not None:
+            button.setStyleSheet(style)
 
 
 def apply_message_box_button_style(box: QMessageBox) -> None:

@@ -209,6 +209,119 @@ class TestCandidateRules:
         assert kept == [good]
 
 
+class TestMultiRuleRating:
+    """多条「规则-玩法」下的候选评级。
+
+    只能选一条规则时能留下的装备极少——一件装备往往只对得上其中一两套
+    练法。所以判定取各条规则给出的**最高**评级。
+    """
+
+    GOOD = {
+        "type": "环", "quality": "gold",
+        "affix_1": {"name": "最小外功攻击", "value": 100},
+        "affix_2": {"name": "全武学增效", "value": 4.9},
+    }
+    JUNK = {
+        "type": "环", "quality": "gold",
+        "affix_1": {"name": "最小外功攻击", "value": 100},
+        "affix_2": {"name": "气血最大值", "value": 1000},
+    }
+
+    def test_rating_rank_orders_the_four_tiers(self) -> None:
+        from lvjiang.apps.yysls.core.graduation.combo_rules import rating_rank
+
+        assert rating_rank("垃圾") < rating_rank("一般") < rating_rank("优秀")
+        assert rating_rank("优秀") < rating_rank("顶级")
+        assert rating_rank("查无此级") == rating_rank("垃圾")
+
+    def test_no_rules_selected_yields_no_conclusion(self) -> None:
+        """不勾选规则时整项不生效，由调用方短路，这里只保证不误判为有结论。"""
+        from lvjiang.apps.yysls.core.graduation.combo_rules import (
+            judge_best_rating,
+        )
+
+        assert judge_best_rating(self.GOOD, []).conclusive is False
+
+    def test_the_highest_rating_across_rules_wins(self) -> None:
+        from lvjiang.apps.yysls.core.graduation.combo_rules import (
+            judge_best_rating,
+            judge_tuning_candidate,
+            rating_rank,
+        )
+
+        pairs = [("huixin_small", "双切"), ("huixin_small", "单切")]
+        verdict = judge_best_rating(self.GOOD, pairs)
+
+        singles = []
+        for rule_key, playstyle in pairs:
+            result = judge_tuning_candidate(self.GOOD, rule_key, playstyle)
+            if result.rating is not None and not result.skipped \
+                    and not result.not_applicable:
+                singles.append(rating_rank(result.rating.value))
+        if singles:
+            assert rating_rank(verdict.rating) == max(singles)
+
+    def test_meets_compares_by_tier_not_by_name(self) -> None:
+        from lvjiang.apps.yysls.core.graduation.combo_rules import (
+            MultiRuleVerdict,
+        )
+
+        verdict = MultiRuleVerdict(rating="优秀", conclusive=True)
+
+        assert verdict.meets("一般") is True
+        assert verdict.meets("优秀") is True
+        assert verdict.meets("顶级") is False
+
+    def test_nothing_conclusive_counts_as_junk(self) -> None:
+        """skipped 的实际含义就是品阶无调律价值或没有词条数据——那正是
+        垃圾胚子。叫「不适用」的话，一大片垃圾会顶着看不出好坏的标签
+        留在候选里。"""
+        from lvjiang.apps.yysls.core.graduation.combo_rules import (
+            MultiRuleVerdict,
+        )
+
+        for verdict in (MultiRuleVerdict(), MultiRuleVerdict(skipped=True)):
+            assert verdict.label == "垃圾"
+            assert verdict.meets("一般") is False
+            assert verdict.meets("顶级") is False
+
+    def test_candidate_rating_is_the_actual_one_not_the_potential(self) -> None:
+        """最优组合只能看装备**现在**是什么，不能看它调满之后能是什么。
+
+        潜力判定会把空词条槽当万能牌填满、还模拟一次转律，一件只有
+        「最小外功攻击」的胚子照样能算出顶级。拿它筛候选的话，搜索会
+        围着一堆一词条装备打转——那些装备现在一点用都没有。
+        """
+        from lvjiang.apps.yysls.core.equip_parser import EquipmentData
+        from lvjiang.apps.yysls.core.evaluator import get_tuning_judge
+        from lvjiang.apps.yysls.core.graduation.combo_rules import (
+            judge_best_rating,
+        )
+
+        blank = {
+            "type": "环", "quality": "gold",
+            "affix_1": {"name": "最小外功攻击", "value": 100},
+        }
+        judge = get_tuning_judge("huixin_small", {"playstyles": ["双切"]})
+        potential = judge.check_tuning_worthiness(EquipmentData.from_dict(blank))
+        assert potential.rating.value == "顶级"      # 潜力确实虚高
+
+        verdict = judge_best_rating(blank, [("huixin_small", "双切")])
+        assert verdict.label == "垃圾"
+        assert verdict.meets("一般") is False
+
+    def test_junk_fails_the_default_requirement(self) -> None:
+        """默认要求「一般」，垃圾装备应当被取消勾选。"""
+        from lvjiang.apps.yysls.core.graduation.combo_rules import (
+            judge_best_rating,
+        )
+
+        verdict = judge_best_rating(self.JUNK, [("huixin_small", "双切")])
+
+        assert verdict.conclusive is True
+        assert verdict.meets("一般") is False
+
+
 class TestApplyComboThroughInventoryApi:
     @staticmethod
     def _inventory(tmp_path):

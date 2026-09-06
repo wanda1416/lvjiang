@@ -22,10 +22,14 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QDialogButtonBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -44,6 +48,98 @@ from ...core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ..domain_labels import domain_label
 from ..events import EQUIPMENT_CHANGED, get_event_hub
 from ..layout_helpers import fit_combo_to_contents
+
+#: 「评级要求」可选档位，由高到低。垃圾不列：要求「至少是垃圾」等于没有要求。
+_MIN_RATING_CHOICES: tuple[str, ...] = ("顶级", "优秀", "一般")
+
+#: 默认要求。一般是「这件装备还能用」的下限，比顶级/优秀都不容易把候选筛空。
+_DEFAULT_MIN_RATING = "一般"
+
+
+class _PlaystylePickerDialog(QDialog):
+    """挑选参与筛选的「调律规则-玩法」组合。
+
+    一件装备往往同时符合好几套玩法，只能选一条规则时能留下的装备极少。
+    所以这里是多选，判定取各条规则给出的**最高**评级。
+
+    本流派命中的玩法排在最前并预先分组：全部规则的玩法加起来有几十条，
+    不排序的话找自己那几条要翻半天。
+    """
+
+    def __init__(self, options: list[tuple[str, str, str, bool]],
+                 selected: set[tuple[str, str]], parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(tr("选择调律玩法"))
+        self.resize(420, 520)
+        layout = QVBoxLayout(self)
+        hint = QLabel(tr("勾选参与候选筛选的玩法；装备只要有一条玩法达标就保留"))
+        hint.setWordWrap(True)
+        hint.setProperty("tone", "muted")
+        layout.addWidget(hint)
+
+        self._list = QListWidget()
+        layout.addWidget(self._list)
+        for rule_key, playstyle, label, matched in options:
+            item = QListWidgetItem(
+                f"{label}　{tr('（本流派）')}" if matched else label)
+            item.setData(Qt.ItemDataRole.UserRole, (rule_key, playstyle))
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(
+                Qt.CheckState.Checked
+                if (rule_key, playstyle) in selected
+                else Qt.CheckState.Unchecked)
+            self._list.addItem(item)
+
+        row = QHBoxLayout()
+        for text, checked in ((tr("全选"), True), (tr("全不选"), False)):
+            button = QPushButton(text)
+            button.clicked.connect(lambda _c, v=checked: self._set_all(v))
+            row.addWidget(button)
+        row.addStretch()
+        layout.addLayout(row)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _set_all(self, checked: bool) -> None:
+        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+        for index in range(self._list.count()):
+            item = self._list.item(index)
+            if item is not None:
+                item.setCheckState(state)
+
+    def values(self) -> list[tuple[str, str]]:
+        chosen = []
+        for index in range(self._list.count()):
+            item = self._list.item(index)
+            if item is not None and item.checkState() == Qt.CheckState.Checked:
+                rule_key, playstyle = item.data(Qt.ItemDataRole.UserRole)
+                chosen.append((str(rule_key), str(playstyle)))
+        return chosen
+
+
+class _ClickableLineEdit(QLineEdit):
+    """只读展示框，点一下就打开选择器。
+
+    多选的结果是一串「规则-玩法」，下拉框装不下也表达不了；用输入框展示、
+    点击弹选择器，既看得见全部选中项，也不必再点一个额外的按钮。
+    """
+
+    clicked = pyqtSignal()
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setReadOnly(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, a0) -> None:  # noqa: N802 — Qt 命名
+        super().mousePressEvent(a0)
+        self.clicked.emit()
+
 
 # 8 个装备槽位的显示顺序与分组映射
 _SLOT_ORDER: list[tuple[str, str, str]] = [
@@ -213,6 +309,43 @@ def _equip_tooltip(equip: dict) -> str:
     return "<br>".join(parts)
 
 
+class _ClickableLabel(QLabel):
+    """点一下就发信号的标签。"""
+
+    clicked = pyqtSignal()
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, ev) -> None:  # noqa: N802 — Qt 命名
+        super().mousePressEvent(ev)
+        self.clicked.emit()
+
+
+class _EquipDetailPopup(QFrame):
+    """装备详情浮窗：点名称弹出，点别处关闭。
+
+    原来挂的是 tooltip，要悬停等系统那 ~700ms 延迟才出来，而这一页正是
+    逐件比对词条的地方，等待成本乘以候选数量。改成单击即出，且不会因为
+    鼠标一动就消失——照着念词条时这点很重要。
+    """
+
+    def __init__(self, html: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent, Qt.WindowType.Popup)
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setStyleSheet(
+            "QFrame { background: palette(base);"
+            " border: 1px solid palette(mid); border-radius: 6px; }"
+        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        body = QLabel(html)
+        body.setTextFormat(Qt.TextFormat.RichText)
+        body.setStyleSheet("font-size: 12px; border: none;")
+        layout.addWidget(body)
+
+
 class _CandidateRow(QWidget):
     """单件候选装备行：勾选框 + 名称 + 评分。"""
 
@@ -234,11 +367,13 @@ class _CandidateRow(QWidget):
         self.checkbox.setChecked(True)
         layout.addWidget(self.checkbox)
 
-        self.label = QLabel()
+        self.label = _ClickableLabel()
         self.label.setTextFormat(Qt.TextFormat.RichText)
         self.label.setText(_equip_label(equip))
-        self.label.setToolTip(_equip_tooltip(equip))
+        self.label.setToolTip(tr("单击查看词条详情"))
+        self.label.clicked.connect(self._show_detail)
         layout.addWidget(self.label, stretch=1)
+        self._popup: _EquipDetailPopup | None = None
 
         self.score_label = QLabel(rating)
         self.score_label.setToolTip(tr("所选调律规则的实际评级"))
@@ -248,6 +383,17 @@ class _CandidateRow(QWidget):
     def set_rating(self, rating: str) -> None:
         self.score_label.setText(rating)
 
+    def _show_detail(self) -> None:
+        """在名称正下方弹出详情浮窗。
+
+        每次重建：装备数据本身不变，但重建比缓存一个跟着滚动跑的窗口简单，
+        而这个窗口一次只可能开一个（Qt.Popup 会自动关掉上一个）。
+        """
+        self._popup = _EquipDetailPopup(_equip_tooltip(self.equip), self)
+        self._popup.move(
+            self.label.mapToGlobal(self.label.rect().bottomLeft()))
+        self._popup.show()
+
 
 class _SlotGroup(QFrame):
     """单槽位候选区：标题 + 候选行列表。"""
@@ -255,7 +401,8 @@ class _SlotGroup(QFrame):
     def __init__(
         self, slot_key: str, display_name: str,
         equips: list[dict], school: str,
-        tuning_rule: str = "", playstyle: str = "",
+        tuning_pairs: list[tuple[str, str]] | None = None,
+        min_rating: str = _DEFAULT_MIN_RATING,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -276,17 +423,20 @@ class _SlotGroup(QFrame):
         header.addWidget(count)
         layout.addLayout(header)
 
-        from ...core.graduation.combo_rules import judge_tuning_candidate
+        from ...core.graduation.combo_rules import (
+            judge_best_rating,
+            rating_rank,
+        )
+        pairs = list(tuning_pairs or [])
+
         def rating_of(equip: dict) -> tuple[int, str]:
-            if not tuning_rule or not playstyle:
+            """(排序档位, 展示文案)。多条玩法取最高评级——一件装备通常
+            只对得上其中一两套练法，取最低档几乎筛不出装备。"""
+            if not pairs:
                 return 0, "-"
-            result = judge_tuning_candidate(equip, tuning_rule, playstyle)
-            if result.not_applicable:
-                return 0, tr("不适用")
-            if result.skipped:
-                return 0, tr("跳过")
-            ranks = {"垃圾": 0, "一般": 1, "优秀": 2, "顶级": 3}
-            return ranks.get(result.rating.value, 0), domain_label(result.rating.value)
+            verdict = judge_best_rating(equip, pairs)
+            return rating_rank(verdict.label), domain_label(verdict.label)
+
         rated_equips = [(rating_of(equip), equip) for equip in equips]
         rated_equips.sort(key=lambda item: item[0][0], reverse=True)
         self.rows: list[_CandidateRow] = []
@@ -510,13 +660,29 @@ class OptimalComboDialog(QDialog):
         tuning_label.setProperty("tone", "muted")
         tuning_label.setToolTip(tr("仅用于辅助筛选候选装备，不参与装备合法性判断"))
         tuning_row.addWidget(tuning_label)
-        self._combo_tuning = QComboBox()
-        self._combo_tuning.addItem(tr("不应用规则"), None)
-        self._combo_tuning.setToolTip(
-            tr("玩法评级只辅助勾选候选，不作为装备合法性规则"))
-        self._combo_tuning.currentIndexChanged.connect(
-            self._on_tuning_changed)
-        tuning_row.addWidget(self._combo_tuning, 1)
+        self._edit_tuning = _ClickableLineEdit()
+        self._edit_tuning.setPlaceholderText(tr("点击选择玩法（不选则不应用规则）"))
+        self._edit_tuning.setToolTip(
+            tr("玩法评级只辅助勾选候选，不作为装备合法性规则；"
+               "多选时按各条规则给出的最高评级判定"))
+        self._edit_tuning.clicked.connect(self._on_pick_playstyles)
+        tuning_row.addWidget(self._edit_tuning, 1)
+
+        rating_label = QLabel(tr("评级要求"))
+        rating_label.setProperty("tone", "muted")
+        rating_label.setToolTip(
+            tr("装备需至少有一条已选玩法给出该级别及以上的评级；不选玩法时不生效"))
+        tuning_row.addWidget(rating_label)
+        self._combo_min_rating = QComboBox()
+        for rating in _MIN_RATING_CHOICES:
+            self._combo_min_rating.addItem(domain_label(rating), rating)
+        index = self._combo_min_rating.findData(_DEFAULT_MIN_RATING)
+        if index >= 0:
+            self._combo_min_rating.setCurrentIndex(index)
+        fit_combo_to_contents(self._combo_min_rating, minimum=88)
+        self._combo_min_rating.currentIndexChanged.connect(
+            lambda _i: self._on_tuning_changed())
+        tuning_row.addWidget(self._combo_min_rating)
         settings_layout.addLayout(tuning_row)
         self._load_tuning_options()
         layout.addWidget(settings)
@@ -641,10 +807,11 @@ class OptimalComboDialog(QDialog):
         self._base_attrs = self._base_attrs_raw + self._compute_gongjue_attrs(gongjue)
 
     def _load_tuning_options(self) -> None:
-        """加载调律规则，填充合并后的下拉框。
+        """收集全部「调律规则-玩法」组合，本流派命中的排在前面。
 
-        每个条目格式："规则名-玩法名"，data 为 (rule_key, playstyle)。
-        只展示匹配当前流派的规则+玩法组合。
+        只列本流派的组合是不够的：同一套装备常常还想按邻近玩法看一眼，
+        而流派匹配用的是「主副武器 + 属性」全等，稍有出入就一条都不剩。
+        所以全部列出，只把命中的排到前面并标注。
         """
         from ...config import get_game_config
         from ...core.evaluator import get_tuning_rules
@@ -657,54 +824,72 @@ class OptimalComboDialog(QDialog):
             self._sub_martial_art)
         school_attr = school_cfg.get("attr", "")
 
+        matched: list[tuple[str, str, str, bool]] = []
+        others: list[tuple[str, str, str, bool]] = []
         for key, rule in get_tuning_rules().items():
-            matching = [
-                name for name, playstyle in rule.playstyles.items()
-                if {playstyle.main.weapon, playstyle.sub.weapon}
-                == {main_weapon, sub_weapon}
-                and playstyle.attr == school_attr
-            ]
-            for name in matching:
-                self._combo_tuning.addItem(
-                    f"{rule.name}-{name}", (key, name))
+            for name, playstyle in rule.playstyles.items():
+                hit = (
+                    {playstyle.main.weapon, playstyle.sub.weapon}
+                    == {main_weapon, sub_weapon}
+                    and playstyle.attr == school_attr
+                )
+                entry = (key, name, f"{rule.name}-{name}", hit)
+                (matched if hit else others).append(entry)
+        self._tuning_options = matched + others
+        # 默认选中本流派命中的那几条：这是绝大多数情况下想要的起点，
+        # 而一条都不选等于不应用规则，等于这个功能默认关着。
+        self._tuning_selection = [
+            (key, name) for key, name, _label, hit in self._tuning_options if hit
+        ]
+        self._refresh_tuning_display()
 
-    def _on_tuning_changed(self, _index: int) -> None:
-        """调律规则切换时，前置过滤装备勾选状态。"""
-        data = self._combo_tuning.currentData()
-        if data is None:
-            # "不应用规则"：全部勾选
+    def _refresh_tuning_display(self) -> None:
+        """把选中的玩法用「/」拼进展示框。"""
+        labels = {
+            (key, name): label
+            for key, name, label, _hit in self._tuning_options
+        }
+        text = " / ".join(
+            labels.get(pair, f"{pair[0]}-{pair[1]}")
+            for pair in self._tuning_selection
+        )
+        self._edit_tuning.setText(text)
+        self._edit_tuning.setToolTip(text or tr("未选择玩法，不应用规则"))
+
+    def _on_pick_playstyles(self) -> None:
+        dialog = _PlaystylePickerDialog(
+            self._tuning_options, set(self._tuning_selection), self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        self._tuning_selection = dialog.values()
+        self._refresh_tuning_display()
+        self._on_tuning_changed()
+
+    def _min_rating(self) -> str:
+        return str(self._combo_min_rating.currentData() or _DEFAULT_MIN_RATING)
+
+    def _on_tuning_changed(self) -> None:
+        """规则或评级要求变化时，前置过滤装备勾选状态。"""
+        from ...core.graduation.combo_rules import judge_best_rating
+
+        pairs = list(self._tuning_selection)
+        if not pairs:
+            # 没选玩法：不应用规则，全部勾选
             for group in self._slot_groups.values():
                 for row in group.rows:
                     row.checkbox.setChecked(True)
                     row.checkbox.setVisible(True)
+                    row.set_rating("-")
             return
-        rule_key, playstyle = data
-        from ...core.graduation.combo_rules import judge_tuning_candidate
+        minimum = self._min_rating()
         for group in self._slot_groups.values():
             for row in group.rows:
-                result = judge_tuning_candidate(
-                    row.equip, rule_key, playstyle)
-                if result.not_applicable:
-                    # 不适用：保持勾选，显示提示
-                    row.checkbox.setChecked(True)
-                    row.checkbox.setVisible(True)
-                    row.set_rating(tr("不适用"))
-                elif result.skipped:
-                    # 跳过：取消勾选
-                    row.checkbox.setChecked(False)
-                    row.checkbox.setVisible(True)
-                    row.set_rating(tr("跳过"))
-                elif result.rating and result.rating.value == tr("垃圾"):
-                    # 垃圾：取消勾选
-                    row.checkbox.setChecked(False)
-                    row.checkbox.setVisible(True)
-                    row.set_rating(tr("垃圾"))
-                else:
-                    # 正常评级：保持勾选
-                    row.checkbox.setChecked(True)
-                    row.checkbox.setVisible(True)
-                    row.set_rating(
-                        result.rating.value if result.rating else "-")
+                verdict = judge_best_rating(row.equip, pairs)
+                # 一条规则都没给出评级 = 垃圾：skipped 的实际含义就是品阶
+                # 无调律价值或没有词条数据，那正是垃圾胚子。
+                row.checkbox.setChecked(verdict.meets(minimum))
+                row.checkbox.setVisible(True)
+                row.set_rating(domain_label(verdict.label))
 
     def _on_exclude_mock_toggled(self, _checked: bool) -> None:
         """「排除模拟」变化后重建候选池。
@@ -828,12 +1013,9 @@ class OptimalComboDialog(QDialog):
                 if fp not in seen:
                     seen.add(fp)
                     unique.append(eq)
-            tuning_data = self._combo_tuning.currentData()
-            rule_key = tuning_data[0] if tuning_data else ""
-            playstyle = tuning_data[1] if tuning_data else ""
             group = _SlotGroup(
                 slot_key, display_name, unique, self._school,
-                rule_key, playstyle,
+                list(self._tuning_selection), self._min_rating(),
             )
             self._slot_groups[slot_key] = group
             total_candidates += len(unique)
@@ -860,6 +1042,9 @@ class OptimalComboDialog(QDialog):
         self._tab_widget.setTabText(
             0, tr("候选装备  {count}").format(count=total_candidates),
         )
+        # 默认就选中了本流派的玩法，勾选状态必须当场按它过一遍——否则
+        # 展示框里写着规则，候选却是全勾的，两边对不上。
+        self._on_tuning_changed()
 
     def _candidate_passes(
         self, slot_key: str, equip: dict,
@@ -948,8 +1133,10 @@ class OptimalComboDialog(QDialog):
             else:
                 configs = gc.get_level_configs()
                 full_level = configs[-1].level if configs else 0
-        tuning_data = self._combo_tuning.currentData()
-        playstyle = tuning_data[1] if tuning_data else ""
+        # 满定音要顶到哪套玩法的目标上：这是单值语义，与候选筛选的多选
+        # 无关，取第一条已选玩法（也就是展示框里最左边那条）。
+        playstyle = (
+            self._tuning_selection[0][1] if self._tuning_selection else "")
         self._worker = _SearchWorker(
             candidates,
             self._school,

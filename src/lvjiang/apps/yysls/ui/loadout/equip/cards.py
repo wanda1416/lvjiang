@@ -13,6 +13,7 @@ from typing import Literal
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPainter, QPaintEvent
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -781,6 +782,7 @@ class _CompactEquipCard(QFrame):
     delete_requested = pyqtSignal(dict, str)
     copy_requested = pyqtSignal(dict, str)
     properties_requested = pyqtSignal(dict)
+    selection_changed = pyqtSignal(str, bool)
 
     def __init__(
         self,
@@ -800,6 +802,8 @@ class _CompactEquipCard(QFrame):
         self._equip_data: dict = {}
         self._group_key: str = ""
         self._quality_bg: str | None = None
+        self._selection_mode = False
+        self._selected = False
 
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self._apply_card_style()
@@ -815,6 +819,11 @@ class _CompactEquipCard(QFrame):
         name_row = QHBoxLayout()
         name_row.setContentsMargins(0, 0, 0, 0)
         name_row.setSpacing(6)
+        self.selection_checkbox = QCheckBox()
+        self.selection_checkbox.setToolTip(tr("选择要复制的模拟装备"))
+        self.selection_checkbox.setVisible(False)
+        self.selection_checkbox.toggled.connect(self._on_selection_toggled)
+        name_row.addWidget(self.selection_checkbox)
         self.lbl_name = _ElidedLabel()
         self.lbl_name.setProperty("equipmentName", True)
         self.lbl_name.setProperty("quality", "")
@@ -858,8 +867,12 @@ class _CompactEquipCard(QFrame):
         layout.addStretch()
 
     def _apply_card_style(self, hovered: bool = False):
-        border = "palette(mid)" if hovered else "palette(midlight)"
-        width = 2 if hovered else 1
+        selected = self._selection_mode and self._selected
+        border = (
+            "palette(highlight)" if selected
+            else "palette(mid)" if hovered else "palette(midlight)"
+        )
+        width = 2 if hovered or selected else 1
         bg = self._quality_bg or "palette(base)"
         self.setStyleSheet(f"""
             _CompactEquipCard {{
@@ -880,11 +893,40 @@ class _CompactEquipCard(QFrame):
 
     def contextMenuEvent(self, event):
         """右键菜单：所有装备卡片均弹出。"""
+        if self._selection_mode:
+            event.ignore()
+            return
         if not self._equip_data:
             event.ignore()
             return
         self._show_context_menu(event.globalPos())
         event.accept()
+
+    def mousePressEvent(self, event):
+        if (self._selection_mode
+                and event.button() == Qt.MouseButton.LeftButton):
+            self.selection_checkbox.toggle()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def set_selection_mode(self, enabled: bool, *, selected: bool = False) -> None:
+        """切换批量选择模式；该模式下卡片只负责选中，不开放普通操作。"""
+        self._selection_mode = enabled
+        self.selection_checkbox.setVisible(enabled)
+        self.selection_checkbox.blockSignals(True)
+        self.selection_checkbox.setChecked(enabled and selected)
+        self.selection_checkbox.blockSignals(False)
+        self._selected = enabled and selected
+        self.setToolTip(tr("点击选择要复制的装备") if enabled else tr("右键菜单"))
+        self._apply_card_style()
+
+    def _on_selection_toggled(self, checked: bool) -> None:
+        self._selected = checked
+        self._apply_card_style()
+        fp = str(self._equip_data.get("_fp") or "")
+        if fp:
+            self.selection_changed.emit(fp, checked)
 
     def _show_context_menu(self, global_pos):
         """显示右键菜单：装备/编辑/复制/删除。

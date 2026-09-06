@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -67,6 +68,18 @@ _SLOT_LAYOUT = [
 _GROUP_PART_LABELS: dict[str, str] = {}
 
 _GRID_COLS = 4  # 默认值，实际从 settings.equip_display.grid_columns 读取
+
+
+class _MultiSelectMenu(QMenu):
+    """点击可勾选项后保持展开，便于一次选择多个目标用户。"""
+
+    def mouseReleaseEvent(self, event):
+        action = self.activeAction()
+        if action is not None and action.isCheckable():
+            action.trigger()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 
 def _fit_filter_combo(combo: QComboBox) -> int:
@@ -145,6 +158,10 @@ class EquipStatusTab(QWidget):
         self._inv = None
         self._display_params: dict = {}
         self._selected_slot: str | None = None
+        self._batch_copy_mode = False
+        self._filters_collapsed = False
+        self._batch_selected_fps: set[str] = set()
+        self._batch_target_users: set[str] = set()
         self._slot_cards: dict[str, _SlotCard] = {}
         self._setup_ui()
         self._refresh_all()
@@ -267,9 +284,14 @@ class EquipStatusTab(QWidget):
         self._sort_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._sort_filter)
 
+        self._advanced_filter_widget = QWidget()
+        advanced_filter_row = QHBoxLayout(self._advanced_filter_widget)
+        advanced_filter_row.setContentsMargins(0, 0, 0, 0)
+        advanced_filter_row.setSpacing(8)
+
         lbl_part = QLabel(tr("部位"))
         lbl_part.setStyleSheet(_filter_lbl_style)
-        filter_row.addWidget(lbl_part)
+        advanced_filter_row.addWidget(lbl_part)
         self._type_filter = QComboBox()
         self._type_filter.addItem(tr("全部"), "all")
         for sk, dn, _ in [
@@ -287,11 +309,11 @@ class EquipStatusTab(QWidget):
             QComboBox.SizeAdjustPolicy.AdjustToContents)
         _fit_filter_combo(self._type_filter)
         self._type_filter.currentIndexChanged.connect(self._on_filter_changed)
-        filter_row.addWidget(self._type_filter)
+        advanced_filter_row.addWidget(self._type_filter)
 
         lbl_quality = QLabel(tr("品阶"))
         lbl_quality.setStyleSheet(_filter_lbl_style)
-        filter_row.addWidget(lbl_quality)
+        advanced_filter_row.addWidget(lbl_quality)
         self._quality_filter = QComboBox()
         self._quality_filter.addItem(tr("全部"), "all")
         self._quality_filter.addItem(tr("金装"), "gold")
@@ -301,11 +323,11 @@ class EquipStatusTab(QWidget):
             QComboBox.SizeAdjustPolicy.AdjustToContents)
         _fit_filter_combo(self._quality_filter)
         self._quality_filter.currentIndexChanged.connect(self._on_filter_changed)
-        filter_row.addWidget(self._quality_filter)
+        advanced_filter_row.addWidget(self._quality_filter)
 
         lbl_level = QLabel(tr("等级"))
         lbl_level.setStyleSheet(_filter_lbl_style)
-        filter_row.addWidget(lbl_level)
+        advanced_filter_row.addWidget(lbl_level)
         self._level_filter = QComboBox()
         self._level_filter.addItem(tr("全部"), "all")
         from lvjiang.apps.yysls.config import get_game_config
@@ -315,11 +337,11 @@ class EquipStatusTab(QWidget):
             QComboBox.SizeAdjustPolicy.AdjustToContents)
         _fit_filter_combo(self._level_filter)
         self._level_filter.currentIndexChanged.connect(self._on_filter_changed)
-        filter_row.addWidget(self._level_filter)
+        advanced_filter_row.addWidget(self._level_filter)
 
         lbl_affix = QLabel(tr("词条"))
         lbl_affix.setStyleSheet(_filter_lbl_style)
-        filter_row.addWidget(lbl_affix)
+        advanced_filter_row.addWidget(lbl_affix)
         self._affix_filter = QComboBox()
         self._affix_filter.addItem(tr("全部"), "all")
         self._affix_filter.addItem(tr("已定音"), "dingyin")
@@ -327,11 +349,11 @@ class EquipStatusTab(QWidget):
         self._affix_filter.addItem(tr("未满调律"), "not_full_tuning")
         _fit_filter_combo(self._affix_filter)
         self._affix_filter.currentIndexChanged.connect(self._on_filter_changed)
-        filter_row.addWidget(self._affix_filter)
+        advanced_filter_row.addWidget(self._affix_filter)
 
         lbl_status = QLabel(tr("状态"))
         lbl_status.setStyleSheet(_filter_lbl_style)
-        filter_row.addWidget(lbl_status)
+        advanced_filter_row.addWidget(lbl_status)
         self._status_filter = QComboBox()
         self._status_filter.addItem(tr("全部"), "all")
         self._status_filter.addItem(tr("备战中"), "referenced")
@@ -340,7 +362,15 @@ class EquipStatusTab(QWidget):
             QComboBox.SizeAdjustPolicy.AdjustToContents)
         _fit_filter_combo(self._status_filter)
         self._status_filter.currentIndexChanged.connect(self._on_filter_changed)
-        filter_row.addWidget(self._status_filter)
+        advanced_filter_row.addWidget(self._status_filter)
+        filter_row.addWidget(self._advanced_filter_widget)
+
+        self._filter_collapse_button = QPushButton("<=")
+        self._filter_collapse_button.setFixedWidth(30)
+        self._filter_collapse_button.setToolTip(tr("收起部位至状态筛选"))
+        self._filter_collapse_button.clicked.connect(
+            self._toggle_advanced_filters)
+        filter_row.addWidget(self._filter_collapse_button)
 
         # 数据来源筛选：全部/背包/模拟
         lbl_source = QLabel(tr("类型"))
@@ -358,13 +388,47 @@ class EquipStatusTab(QWidget):
 
         filter_row.addStretch()
 
-        btn_delete_filtered = QPushButton(tr("删除筛选装备"))
-        btn_delete_filtered.setToolTip(tr(
-            "删除当前筛选结果，不含当前穿戴装备；类型为全部时不含模拟装备"))
-        btn_delete_filtered.setStyleSheet(_ACTION_BTN_STYLE)
-        btn_delete_filtered.clicked.connect(self._on_delete_filtered)
-        filter_row.addWidget(btn_delete_filtered)
-        info_layout.addLayout(filter_row)
+        self._btn_delete_filtered = QPushButton(tr("删除筛选装备"))
+        self._btn_delete_filtered.setToolTip(tr(
+            "只删除当前筛选出的背包装备，此处不支持删除模拟装备"))
+        self._btn_delete_filtered.setStyleSheet(_ACTION_BTN_STYLE)
+        self._btn_delete_filtered.clicked.connect(self._on_delete_filtered)
+        filter_row.addWidget(self._btn_delete_filtered)
+
+        self._btn_batch_copy = QPushButton(tr("批量复制装备"))
+        self._btn_batch_copy.setToolTip(tr("批量复制模拟装备到其他用户"))
+        self._btn_batch_copy.setStyleSheet(_ACTION_BTN_STYLE)
+        self._btn_batch_copy.clicked.connect(self._enter_batch_copy_mode)
+        self._btn_batch_copy.setVisible(False)
+        filter_row.addWidget(self._btn_batch_copy)
+        self._filter_widget = QWidget()
+        self._filter_widget.setLayout(filter_row)
+        info_layout.addWidget(self._filter_widget)
+
+        self._batch_copy_widget = QWidget()
+        batch_row = QHBoxLayout(self._batch_copy_widget)
+        batch_row.setContentsMargins(0, 0, 0, 0)
+        batch_row.setSpacing(8)
+        self._btn_batch_select_all = QPushButton(tr("全选"))
+        self._btn_batch_select_all.clicked.connect(self._select_all_batch_cards)
+        batch_row.addWidget(self._btn_batch_select_all)
+        self._batch_selected_label = QLabel(
+            tr("已选择 {count} 件").format(count=0))
+        batch_row.addWidget(self._batch_selected_label)
+        batch_row.addStretch()
+        self._btn_copy_targets = QPushButton(tr("复制到…"))
+        self._copy_targets_menu = _MultiSelectMenu(self._btn_copy_targets)
+        self._btn_copy_targets.setMenu(self._copy_targets_menu)
+        batch_row.addWidget(self._btn_copy_targets)
+        self._btn_confirm_batch_copy = QPushButton(tr("确认复制"))
+        self._btn_confirm_batch_copy.setStyleSheet(_ACTION_BTN_STYLE)
+        self._btn_confirm_batch_copy.clicked.connect(self._copy_selected_mocks)
+        batch_row.addWidget(self._btn_confirm_batch_copy)
+        btn_cancel_batch = QPushButton(tr("退出批量模式"))
+        btn_cancel_batch.clicked.connect(self._exit_batch_copy_mode)
+        batch_row.addWidget(btn_cancel_batch)
+        self._batch_copy_widget.setVisible(False)
+        info_layout.addWidget(self._batch_copy_widget)
 
         layout.addWidget(self._info_widget)
 
@@ -403,12 +467,12 @@ class EquipStatusTab(QWidget):
         wrapper_layout.addWidget(self._slot_container)
 
         # 分割线 —— 区分可点击槽位区与背包区
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet(
+        self._slot_separator = QFrame()
+        self._slot_separator.setFrameShape(QFrame.Shape.HLine)
+        self._slot_separator.setStyleSheet(
             "background-color: #ccc; max-height: 1px; margin: 4px 8px;")
-        sep.setFixedHeight(1)
-        wrapper_layout.addWidget(sep)
+        self._slot_separator.setFixedHeight(1)
+        wrapper_layout.addWidget(self._slot_separator)
 
         # 背包网格
         self._grid_container = QWidget()
@@ -438,6 +502,7 @@ class EquipStatusTab(QWidget):
     # ── 筛选 ──
 
     def _on_user_changed(self, _name: str) -> None:
+        self._exit_batch_copy_mode(rebuild=False)
         self._refresh_all()
         self._load_filter_settings()
         self._rebuild_grid()
@@ -491,6 +556,9 @@ class EquipStatusTab(QWidget):
             self._source_filter.blockSignals(False)
             self._quality_filter.blockSignals(False)
             self._status_filter.blockSignals(False)
+        self._set_advanced_filters_collapsed(
+            bool(filters.get("filters_collapsed", False)))
+        self._update_source_actions()
 
     def _save_filter_settings(self):
         """保存筛选配置到用户级 loadout 存储"""
@@ -502,6 +570,7 @@ class EquipStatusTab(QWidget):
             "source": self._source_filter.currentData(),
             "quality": self._quality_filter.currentData(),
             "status": self._status_filter.currentData(),
+            "filters_collapsed": self._filters_collapsed,
         }
         self._save_user_filter(filters)
 
@@ -526,7 +595,158 @@ class EquipStatusTab(QWidget):
             for key, card in self._slot_cards.items():
                 card.set_selected(key == self._selected_slot)
         self._save_filter_settings()
+        self._update_source_actions()
         self._rebuild_grid()
+
+    def _toggle_advanced_filters(self) -> None:
+        self._set_advanced_filters_collapsed(
+            not self._filters_collapsed)
+        self._save_filter_settings()
+
+    def _set_advanced_filters_collapsed(self, collapsed: bool) -> None:
+        self._filters_collapsed = collapsed
+        self._advanced_filter_widget.setVisible(not collapsed)
+        self._filter_collapse_button.setText("=>" if collapsed else "<=")
+        self._filter_collapse_button.setToolTip(
+            tr("展开部位至状态筛选") if collapsed
+            else tr("收起部位至状态筛选"))
+
+    def _update_source_actions(self) -> None:
+        is_mock = (self._source_filter.currentData() or "all") == "mock"
+        self._btn_batch_copy.setVisible(is_mock)
+        self._btn_delete_filtered.setVisible(not is_mock)
+
+    def _enter_batch_copy_mode(self) -> None:
+        if (self._source_filter.currentData() or "all") != "mock":
+            return
+        self._batch_copy_mode = True
+        self._batch_selected_fps.clear()
+        self._batch_target_users.clear()
+        self._filter_widget.setVisible(False)
+        self._batch_copy_widget.setVisible(True)
+        self._slot_container.setVisible(False)
+        self._slot_separator.setVisible(False)
+        self._rebuild_copy_targets_menu()
+        self._update_batch_copy_controls()
+        self._rebuild_grid()
+
+    def _exit_batch_copy_mode(self, *, rebuild: bool = True) -> None:
+        if not hasattr(self, "_batch_copy_widget"):
+            return
+        self._batch_copy_mode = False
+        self._batch_selected_fps.clear()
+        self._batch_target_users.clear()
+        self._batch_copy_widget.setVisible(False)
+        self._filter_widget.setVisible(True)
+        self._slot_container.setVisible(True)
+        self._slot_separator.setVisible(True)
+        self._update_source_actions()
+        if rebuild:
+            self._rebuild_grid()
+
+    def _rebuild_copy_targets_menu(self) -> None:
+        self._copy_targets_menu.clear()
+        current = self._host.active_user_name()
+        for username in self._host.user_manager.list_users():
+            if username == current:
+                continue
+            action = self._copy_targets_menu.addAction(username)
+            action.setCheckable(True)
+            action.toggled.connect(
+                lambda checked, name=username: self._toggle_copy_target(
+                    name, checked))
+
+    def _toggle_copy_target(self, username: str, checked: bool) -> None:
+        if checked:
+            self._batch_target_users.add(username)
+        else:
+            self._batch_target_users.discard(username)
+        self._update_batch_copy_controls()
+
+    def _toggle_batch_card(self, fp: str, checked: bool) -> None:
+        if checked:
+            self._batch_selected_fps.add(fp)
+        else:
+            self._batch_selected_fps.discard(fp)
+        self._update_batch_copy_controls()
+
+    def _select_all_batch_cards(self) -> None:
+        visible = {
+            str(equip.get("_fp") or "")
+            for equip, _part, _group, is_mock, _referenced
+            in self._collect_filtered_cards()
+            if is_mock and equip.get("_fp")
+        }
+        self._batch_selected_fps = (
+            set() if visible and visible <= self._batch_selected_fps else visible)
+        self._rebuild_grid()
+        self._update_batch_copy_controls()
+
+    def _update_batch_copy_controls(self) -> None:
+        count = len(self._batch_selected_fps)
+        target_count = len(self._batch_target_users)
+        visible_fps = {
+            str(equip.get("_fp") or "")
+            for equip, _part, _group, is_mock, _referenced
+            in self._collect_filtered_cards()
+            if is_mock and equip.get("_fp")
+        }
+        self._batch_selected_label.setText(
+            tr("已选择 {count} 件").format(count=count))
+        self._btn_batch_select_all.setText(
+            tr("取消全选")
+            if visible_fps and visible_fps <= self._batch_selected_fps
+            else tr("全选"))
+        target_names = "、".join(sorted(self._batch_target_users))
+        self._btn_copy_targets.setText(
+            f"{tr('复制到')}：{target_names}" if target_names else tr("复制到…"))
+        self._btn_copy_targets.setToolTip(target_names)
+        self._btn_confirm_batch_copy.setEnabled(bool(count and target_count))
+
+    def _copy_selected_mocks(self) -> None:
+        if not self._batch_selected_fps or not self._batch_target_users:
+            return
+        source = self._host.active_user_name()
+        reply = QMessageBox.question(
+            self,
+            tr("确认复制"),
+            tr("确定将 {items} 件模拟装备复制给 {users} 个用户吗？").format(
+                items=len(self._batch_selected_fps),
+                users=len(self._batch_target_users),
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            from ....core.loadout import copy_mock_items_to_users
+            results = copy_mock_items_to_users(
+                source,
+                sorted(self._batch_target_users),
+                set(self._batch_selected_fps),
+            )
+        except Exception as exc:
+            logger.exception("批量复制模拟装备失败")
+            QMessageBox.critical(self, tr("复制失败"), str(exc))
+            return
+        lines = []
+        for result in results:
+            if result.error:
+                lines.append(tr("{user}：复制失败：{error}").format(
+                    user=result.target_username, error=result.error))
+            else:
+                lines.append(tr(
+                    "{user}：新增 {copied}，已存在 {existing}，冲突 {conflicts}"
+                ).format(
+                    user=result.target_username,
+                    copied=result.copied,
+                    existing=result.existing,
+                    conflicts=result.conflicts,
+                ))
+        QMessageBox.information(
+            self, tr("复制完成"), "\n".join(lines))
+        self._exit_batch_copy_mode()
 
     def _get_level_threshold(self) -> int:
         """获取等级筛选阈值，0 表示不筛选"""
@@ -575,6 +795,7 @@ class EquipStatusTab(QWidget):
             self._affix_filter.blockSignals(False)
             self._status_filter.blockSignals(False)
         self._save_filter_settings()
+        self._update_source_actions()
         self._rebuild_grid()
 
     def _equip_passes_filter(
@@ -710,7 +931,8 @@ class EquipStatusTab(QWidget):
     ) -> list[tuple[dict, str, str, bool, bool]]:
         """返回当前筛选后的未穿戴装备，作为展示与批量删除的唯一口径。"""
         filter_type = None
-        if self._selected_slot:
+        batch_copy = getattr(self, "_batch_copy_mode", False)
+        if self._selected_slot and not batch_copy:
             for _, _, slot_key, _, group_key in _SLOT_LAYOUT:
                 if slot_key == self._selected_slot:
                     filter_type = group_key
@@ -736,18 +958,19 @@ class EquipStatusTab(QWidget):
                     continue
                 part_label = group_to_part.get(group_key, group_key)
                 for fp, equip in items.items():
-                    if fp in equipped_fps:
+                    if fp in equipped_fps and not batch_copy:
                         continue
                     is_referenced = fp in referenced_fps
-                    if not self._equip_passes_filter(
+                    if (not batch_copy
+                            and not self._equip_passes_filter(
                         equip, is_referenced=is_referenced,
-                    ):
+                    )):
                         continue
                     cards.append((
                         equip, part_label, group_key, is_mock, is_referenced,
                     ))
 
-        if source_mode in ("all", "bag"):
+        if source_mode in ("all", "bag") and not batch_copy:
             append_grouped_items(self._bag_items, is_mock=False)
         if source_mode in ("all", "mock"):
             append_grouped_items(self._mock_items, is_mock=True)
@@ -825,6 +1048,11 @@ class EquipStatusTab(QWidget):
             card.delete_requested.connect(self._on_delete_requested)
             card.copy_requested.connect(self._on_copy_requested)
             card.properties_requested.connect(self._on_properties_requested)
+            if self._batch_copy_mode:
+                fp = str(equip.get("_fp") or "")
+                card.set_selection_mode(
+                    True, selected=fp in self._batch_selected_fps)
+                card.selection_changed.connect(self._toggle_batch_card)
             self._grid.addWidget(card, pos // cols, pos % cols)
             pos += 1
 
@@ -843,6 +1071,11 @@ class EquipStatusTab(QWidget):
             card.delete_requested.connect(self._on_delete_requested)
             card.copy_requested.connect(self._on_copy_requested)
             card.properties_requested.connect(self._on_properties_requested)
+            if self._batch_copy_mode:
+                fp = str(equip.get("_fp") or "")
+                card.set_selection_mode(
+                    True, selected=fp in self._batch_selected_fps)
+                card.selection_changed.connect(self._toggle_batch_card)
             self._grid.addWidget(card, pos // cols, pos % cols)
             pos += 1
 
@@ -1099,10 +1332,7 @@ class EquipStatusTab(QWidget):
         ))
 
     def _deletion_source_summary(self) -> str:
-        source = self._source_filter.currentText()
-        if (self._source_filter.currentData() or "all") == "all":
-            return f"{source}（{tr('不含模拟装备')}）"
-        return source
+        return f"{tr('背包')}（{tr('此处不支持删除模拟装备')}）"
 
     def _on_delete_filtered(self) -> None:
         """删除筛选结果；默认及当前穿戴保护在此处明确收口。"""
@@ -1135,14 +1365,13 @@ class EquipStatusTab(QWidget):
             QMessageBox.critical(self, tr("删除失败"), str(exc))
 
     def _filtered_delete_fingerprints(self) -> set[str]:
-        """筛选删除目标；仅显式选择“模拟”时允许删除模拟装备。"""
-        source_mode = self._source_filter.currentData() or "all"
+        """筛选删除只处理真实背包装备，模拟装备有独立删除入口。"""
         return {
             str(equip.get("_fp") or "")
             for equip, _part, _group, is_mock, _referenced
             in self._collect_filtered_cards()
             if equip.get("_fp")
-            and (is_mock if source_mode == "mock" else not is_mock)
+            and not is_mock
         }
 
     def _on_chengyin_merge(self):

@@ -4,6 +4,7 @@ from .chengyin_merge import (
     ChengyinMergeCandidate,
     find_chengyin_merge_candidates,
 )
+from .mock_copy import MockCopyResult, copy_mock_items_to_users
 from .models import EQUIPMENT_SLOTS, LoadoutPlan, LoadoutState, resolve_school
 from .repository import LoadoutRepository
 
@@ -12,6 +13,8 @@ __all__ = [
     "ChengyinMergeCandidate",
     "LoadoutPlan",
     "LoadoutRepository",
+    "MockCopyResult",
+    "copy_mock_items_to_users",
     "LoadoutState",
     "find_chengyin_merge_candidates",
     "resolve_school",

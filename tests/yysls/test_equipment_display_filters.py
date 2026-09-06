@@ -2,9 +2,12 @@
 
 from types import SimpleNamespace
 
-from PyQt6.QtWidgets import QComboBox
+from PyQt6.QtCore import Qt
+from PyQt6.QtTest import QTest
+from PyQt6.QtWidgets import QComboBox, QPushButton, QWidget
 
 import lvjiang.apps.yysls.config as config_module
+from lvjiang.apps.yysls.ui.loadout.equip.cards import _CompactEquipCard
 from lvjiang.apps.yysls.ui.loadout.equip.status_tab import (
     EquipStatusTab,
     _fit_filter_combo,
@@ -126,7 +129,7 @@ def test_filtered_collection_excludes_current_equipment_and_marks_references(
     ]
 
 
-def test_filtered_delete_excludes_mock_unless_explicitly_selected(qtbot):
+def test_filtered_delete_never_includes_mock_equipment(qtbot):
     source_filter = QComboBox()
     source_filter.addItem("全部", "all")
     source_filter.addItem("模拟", "mock")
@@ -137,10 +140,76 @@ def test_filtered_delete_excludes_mock_unless_explicitly_selected(qtbot):
     ]
     tab = SimpleNamespace(
         _source_filter=source_filter,
-        _collect_filtered_cards=lambda: cards,
+        _collect_filtered_cards=lambda: (
+            cards if source_filter.currentData() == "all" else [cards[1]]),
     )
 
     assert EquipStatusTab._filtered_delete_fingerprints(tab) == {"real"}
 
     source_filter.setCurrentIndex(source_filter.findData("mock"))
-    assert EquipStatusTab._filtered_delete_fingerprints(tab) == {"mock_one"}
+    assert EquipStatusTab._filtered_delete_fingerprints(tab) == set()
+
+
+def test_compact_card_batch_mode_selects_by_click_and_blocks_context(qtbot):
+    card = _CompactEquipCard()
+    card.set_equip(
+        {"_fp": "mock_one", "type": "环", "name": "模拟环"},
+        "环", is_mock=True,
+    )
+    qtbot.addWidget(card)
+    selected: list[tuple[str, bool]] = []
+    card.selection_changed.connect(
+        lambda fp, checked: selected.append((fp, checked)))
+
+    card.set_selection_mode(True)
+    assert not card.selection_checkbox.isHidden()
+    QTest.mouseClick(card, Qt.MouseButton.LeftButton)
+
+    assert card.selection_checkbox.isChecked()
+    assert selected == [("mock_one", True)]
+
+
+def test_source_actions_offer_copy_only_for_mock_type(qtbot):
+    source = QComboBox()
+    source.addItem("全部", "all")
+    source.addItem("模拟", "mock")
+    delete_button = QPushButton()
+    copy_button = QPushButton()
+    for widget in (source, delete_button, copy_button):
+        qtbot.addWidget(widget)
+    tab = SimpleNamespace(
+        _source_filter=source,
+        _btn_delete_filtered=delete_button,
+        _btn_batch_copy=copy_button,
+    )
+
+    EquipStatusTab._update_source_actions(tab)
+    assert not delete_button.isHidden()
+    assert copy_button.isHidden()
+
+    source.setCurrentIndex(source.findData("mock"))
+    EquipStatusTab._update_source_actions(tab)
+    assert delete_button.isHidden()
+    assert not copy_button.isHidden()
+
+
+def test_advanced_filters_collapse_without_hiding_sort_or_source(qtbot):
+    advanced = QWidget()
+    toggle = QPushButton()
+    sort = QComboBox()
+    source = QComboBox()
+    for widget in (advanced, toggle, sort, source):
+        qtbot.addWidget(widget)
+        widget.show()
+    tab = SimpleNamespace(
+        _filters_collapsed=False,
+        _advanced_filter_widget=advanced,
+        _filter_collapse_button=toggle,
+    )
+
+    EquipStatusTab._set_advanced_filters_collapsed(tab, True)
+
+    assert advanced.isHidden()
+    assert toggle.text() == "=>"
+    assert not sort.isHidden()
+    assert not source.isHidden()

@@ -9,6 +9,7 @@ scenes:
     - general_control
     - general_action
     - general_chat
+    - general_purchase
   training:
     name: 培养
     items:

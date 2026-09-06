@@ -16,7 +16,10 @@ regions:
   type: func
   is_text: true
   is_clickable: true
-  view: base
+  views:
+  - base
+  - jingxuan
+  - jingxuan_daoju
   to: /jingxuan
 - key: back
   name: 返回
@@ -26,3 +29,10 @@ regions:
   views:
   - base
   - jingxuan
+panels:
+- key: items
+  name: 购买列表
+  min_visible: 0.95
+  view: jingxuan_daoju
+  calibration: even
+  scroll_direction: none

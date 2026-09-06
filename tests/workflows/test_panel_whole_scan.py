@@ -237,10 +237,13 @@ def test_single_cell_recognize_returns_plain_type(tmp_path):
     ))
     engine = _make_engine()
     workflow = MagicMock()
-    workflow.reference_recognizer.recognize.return_value = SimpleNamespace(label="大律准石")
+    workflow.reference_recognizer.recognize.return_value = SimpleNamespace(
+        label="大律准石")
     engine._workflow = workflow
     output = engine.execute(wf)
     assert output["mat"] == "大律准石"
+    assert workflow.reference_recognizer.recognize.call_args.kwargs[
+        "include_output_ocr"] is False
 
 
 def test_whole_panel_recognize_nested_result(tmp_path):
@@ -253,14 +256,20 @@ def test_whole_panel_recognize_nested_result(tmp_path):
     # recognize 走 workflow.reference_recognizer，注入替身
     workflow = MagicMock()
     counter = iter(range(1, 100))
-    workflow.reference_recognizer.recognize.side_effect = lambda img, group=None: (
-        SimpleNamespace(label=f"m{next(counter)}"))
+    workflow.reference_recognizer.recognize.side_effect = (
+        lambda img, group=None, include_output_ocr=True:
+        SimpleNamespace(label=f"m{next(counter)}")
+    )
     engine._workflow = workflow
     output = engine.execute(wf)
     assert output["mats"] == {
         "1": {"1": "m1", "2": "m2"},
         "2": {"1": "m3", "2": "m4"},
     }
+    assert all(
+        call.kwargs["include_output_ocr"] is False
+        for call in workflow.reference_recognizer.recognize.call_args_list
+    )
 
 
 def test_single_cell_recognize_rich(tmp_path):
@@ -291,6 +300,8 @@ def test_single_cell_recognize_rich(tmp_path):
     assert output["cell"]["group"] == ""
     assert output["cell"]["level_text"] == "110阶"
     assert output["cell"]["count_text"] == "0/691"
+    assert "include_output_ocr" not in (
+        workflow.reference_recognizer.recognize.call_args.kwargs)
     # 无 with 子句时不应有解析字段
     assert "real_level" not in output["cell"]
     assert "count" not in output["cell"]
@@ -395,75 +406,6 @@ def test_region_recognize_rich_e2e(tmp_path):
     assert output["mats"]["slot_1"]["real_level"] == 110
     assert output["mats"]["slot_2"]["type"] == "宋元通宝"
     assert output["mats"]["slot_2"]["real_level"] == 100
-
-
-def test_region_recognize_by_rich_returns_str(tmp_path):
-    """recognize [s].[slot_1, slot_2] as rich $key by equals "大律准石"
-    → by 降级：返回 str（slot_key），不走 rich 路径"""
-    wf = _write_wf(tmp_path, (
-        'recognize [s].[slot_1, slot_2] as rich $key by equals "大律准石"\n'
-        'collect $key\n'
-    ))
-    engine = _make_region_engine()
-    workflow = MagicMock()
-    workflow.recognize_references_by.return_value = "slot_1"
-    engine._workflow = workflow
-    output = engine.execute(wf)
-    # by 降级：返回 str 而非 dict
-    assert output["key"] == "slot_1"
-    assert isinstance(output["key"], str)
-
-
-def test_panel_cell_by_with_rich_returns_str(tmp_path):
-    """recognize [s].[actions][1][1] as rich $cell by equals "大律准石"
-    → by 降级：匹配成功返回 str，不返回 dict"""
-    wf = _write_wf(tmp_path, (
-        'recognize [s].[actions][1][1] as rich $cell by equals "大律准石"\n'
-        'collect $cell\n'
-    ))
-    engine = _make_engine()
-    workflow = MagicMock()
-    workflow.reference_recognizer.recognize.return_value = SimpleNamespace(label="大律准石")
-    engine._workflow = workflow
-    output = engine.execute(wf)
-    # by 降级：即使写了 rich，by 匹配成功仍返回 str
-    assert output["cell"] == "大律准石"
-    assert isinstance(output["cell"], str)
-
-
-def test_panel_cell_by_no_match_with_rich_returns_empty_str(tmp_path):
-    """recognize [s].[actions][1][1] as rich $cell by equals "不存在"
-    → by 降级：匹配失败返回 "" 而非 {}"""
-    wf = _write_wf(tmp_path, (
-        'recognize [s].[actions][1][1] as rich $cell by equals "不存在"\n'
-        'collect $cell\n'
-    ))
-    engine = _make_engine()
-    workflow = MagicMock()
-    workflow.reference_recognizer.recognize.return_value = SimpleNamespace(label="大律准石")
-    engine._workflow = workflow
-    output = engine.execute(wf)
-    # by 降级：匹配失败返回 ""（str），不是 {}（dict）
-    assert output["cell"] == ""
-    assert isinstance(output["cell"], str)
-
-
-def test_panel_whole_by_with_rich_returns_position(tmp_path):
-    """recognize [s].[actions] as rich $pos by equals "m1"
-    → by 降级：返回位置 dict {row, col}，不走 rich 路径"""
-    wf = _write_wf(tmp_path, (
-        'recognize [s].[actions] as rich $pos by equals "m1"\n'
-        'collect $pos\n'
-    ))
-    engine = _make_engine()
-    workflow = MagicMock()
-    counter = iter(range(1, 100))
-    workflow.reference_recognizer.recognize.side_effect = lambda img, group=None: (
-        SimpleNamespace(label=f"m{next(counter)}"))
-    engine._workflow = workflow
-    output = engine.execute(wf)
-    # by 降级：返回位置 dict，value 是 int 而非 enriched dict
-    assert output["pos"] == {"row": 1, "col": 1}
 
 
 # ─── rich + with 子句：内置函数转换 ─────────────────

@@ -228,6 +228,7 @@ class _StmtMixin:
         group = next((i for i in values[1:]
                       if isinstance(i, (Literal, VarRef, list))), None)
         self._reject_image_by(by_clause, "recognize", items)
+        self._reject_recognize_rich_by(rich, by_clause, items)
         return Recognize(scene=ref, target=target, by=by_clause, group=group,
                          where=where_clause, rich=rich, with_func=with_func,
                          line_no=self._line(items))
@@ -818,6 +819,15 @@ class _StmtMixin:
                 f"'by image' 仅 find 语句支持，{verb} 不支持（第 {self._line(items)} 行）"
             )
 
+    def _reject_recognize_rich_by(self, rich: bool, by_clause, items):
+        """recognize 的 rich 与 by 返回类型冲突，不允许组合。"""
+        if rich and by_clause is not None:
+            raise WorkflowUserError(
+                "recognize 不能同时使用 'as rich' 和 'by'："
+                "'as rich' 返回完整识别信息，'by' 返回命中位置"
+                f"（第 {self._line(items)} 行）"
+            )
+
     def scan_stmt(self, items):
         scene_target = items[0]  # tuple: (scene_name, fields_or_var)
         scene_name = scene_target[0]
@@ -896,6 +906,7 @@ class _StmtMixin:
             elif isinstance(item, tuple) and item[0] == "__with_func__":
                 with_func = Literal(value=item[1])
         self._reject_image_by(by_clause, "recognize", items)
+        self._reject_recognize_rich_by(rich, by_clause, items)
         return Recognize(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, group=group_clause, where=where_clause, rich=rich, with_func=with_func, line_no=self._line(items))
 
     def recognize_panel_stmt(self, items):
@@ -924,6 +935,7 @@ class _StmtMixin:
                 with_func = Literal(value=item[1])
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
         self._reject_image_by(by_clause, "recognize", items)
+        self._reject_recognize_rich_by(rich, by_clause, items)
         return Recognize(scene=panel_ref, target=target, by=by_clause, group=group_clause, where=where_clause, rich=rich, with_func=with_func, line_no=self._line(items))
 
     def with_clause(self, items):

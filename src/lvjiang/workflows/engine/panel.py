@@ -280,10 +280,11 @@ class _PanelMixin:
         min_conf = self._resolve_min_confidence(node.where)
         recognizer = self._ensure_workflow().reference_recognizer
         if node.by is not None:
-            # by 优先：rich 不影响短路匹配语义
+            # by 短路匹配返回命中的标签。rich 与 by 已由解析器保证互斥。
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
-            info = recognizer.recognize(slot_img, group=group)
+            info = recognizer.recognize(
+                slot_img, group=group, include_output_ocr=False)
             if min_conf is not None and info.confidence < min_conf:
                 self.variables[var_name] = ""
             else:
@@ -307,7 +308,8 @@ class _PanelMixin:
                     base = transform(base)
                 self.variables[var_name] = base
         else:
-            info = recognizer.recognize(slot_img, group=group)
+            info = recognizer.recognize(
+                slot_img, group=group, include_output_ocr=False)
             if min_conf is not None and info.confidence < min_conf:
                 self.variables[var_name] = ""
             else:
@@ -393,7 +395,12 @@ class _PanelMixin:
             if slot_img is None:
                 cell_value: str | dict = {} if rich else ""
             else:
-                info = recognizer.recognize(slot_img, group=group)
+                info = (
+                    recognizer.recognize(slot_img, group=group)
+                    if rich
+                    else recognizer.recognize(
+                        slot_img, group=group, include_output_ocr=False)
+                )
                 if min_confidence is not None and info.confidence < min_confidence:
                     cell_value = {} if rich else ""
                 elif rich:
@@ -475,7 +482,8 @@ class _PanelMixin:
                     if slot_img.size == 0:
                         continue
 
-                    info = recognizer.recognize(slot_img, group=group)
+                    info = recognizer.recognize(
+                        slot_img, group=group, include_output_ocr=False)
                     if min_conf is not None and info.confidence < min_conf:
                         continue
                     if self._match_text(info.label, target_value, match_mode):
@@ -526,7 +534,12 @@ class _PanelMixin:
                 if slot_img is None:
                     cell_value: str | dict = {} if node.rich else ""
                 else:
-                    info = recognizer.recognize(slot_img, group=group)
+                    info = (
+                        recognizer.recognize(slot_img, group=group)
+                        if node.rich
+                        else recognizer.recognize(
+                            slot_img, group=group, include_output_ocr=False)
+                    )
                     if min_conf is not None and info.confidence < min_conf:
                         cell_value = {} if node.rich else ""
                     elif node.rich:
@@ -594,7 +607,8 @@ class _PanelMixin:
             mat_type = ""
             confidence = 0.0
             if slot_img is not None:
-                info = recognizer.recognize(slot_img, group=group)
+                info = recognizer.recognize(
+                    slot_img, group=group, include_output_ocr=False)
                 if min_confidence is not None and info.confidence < min_confidence:
                     mat_type = ""
                 else:

@@ -458,7 +458,8 @@ class _SlotGroup(QFrame):
 class _ResultCard(QFrame):
     """单条搜索结果卡片。"""
 
-    apply_clicked = pyqtSignal(dict)  # emits equipped dict
+    apply_clicked = pyqtSignal(dict)   # emits equipped dict
+    detail_clicked = pyqtSignal(dict)  # emits equipped dict
 
     def __init__(
         self, rank: int, result: dict[str, Any],
@@ -493,13 +494,24 @@ class _ResultCard(QFrame):
 
         top.addStretch()
 
+        buttons = QVBoxLayout()
+        buttons.setSpacing(4)
         apply_btn = QPushButton(tr("应用此组合"))
         apply_btn.setMinimumHeight(30)
         apply_btn.setStyleSheet(_PRIMARY_BUTTON_STYLE)
         apply_btn.clicked.connect(
             lambda: self.apply_clicked.emit(result.get("equipped", {})),
         )
-        top.addWidget(apply_btn)
+        buttons.addWidget(apply_btn)
+        # 一行装备名看不出这套组合到底是什么，真要判断得看词条
+        detail_btn = QPushButton(tr("查看组合详情"))
+        detail_btn.setMinimumHeight(26)
+        detail_btn.setStyleSheet(_SECONDARY_BUTTON_STYLE)
+        detail_btn.clicked.connect(
+            lambda: self.detail_clicked.emit(result.get("equipped", {})),
+        )
+        buttons.addWidget(detail_btn)
+        top.addLayout(buttons)
         layout.addLayout(top)
 
         # Equipment summary
@@ -668,7 +680,7 @@ class OptimalComboDialog(QDialog):
         self._edit_tuning.clicked.connect(self._on_pick_playstyles)
         tuning_row.addWidget(self._edit_tuning, 1)
 
-        rating_label = QLabel(tr("评级要求"))
+        rating_label = QLabel(tr("评级 ≥"))
         rating_label.setProperty("tone", "muted")
         rating_label.setToolTip(
             tr("装备需至少有一条已选玩法给出该级别及以上的评级；不选玩法时不生效"))
@@ -775,6 +787,31 @@ class OptimalComboDialog(QDialog):
         results_scroll.setWidget(results_container)
         results_layout.addWidget(results_scroll)
         self._tab_widget.addTab(results_tab, tr("最优结果"))
+
+        # Tab 3: 组合详情（4×2 装备卡片，复用穿戴装备那套卡片）
+        detail_tab = QWidget()
+        detail_layout = QVBoxLayout(detail_tab)
+        detail_layout.setContentsMargins(8, 8, 8, 8)
+        detail_layout.setSpacing(6)
+        self._detail_hint = QLabel(tr("在「最优结果」里点某一条的「查看组合详情」"))
+        self._detail_hint.setProperty("tone", "muted")
+        self._detail_hint.setStyleSheet("font-size: 12px;")
+        detail_layout.addWidget(self._detail_hint)
+        detail_grid = QGridLayout()
+        detail_grid.setSpacing(8)
+        self._detail_cards: dict[str, Any] = {}
+        from .equip.cards import _SlotCard
+        for index, (slot_key, display_name, filter_type) in enumerate(_SLOT_ORDER):
+            card = _SlotCard(slot_key, display_name, filter_type)
+            # 这一页只看不点：卡片本身是为「穿戴装备」那边的选中交互做的
+            card.setCursor(Qt.CursorShape.ArrowCursor)
+            detail_grid.addWidget(card, index // 4, index % 4)
+            self._detail_cards[slot_key] = card
+        for column in range(4):
+            detail_grid.setColumnStretch(column, 1)
+        detail_layout.addLayout(detail_grid)
+        detail_layout.addStretch()
+        self._tab_widget.addTab(detail_tab, tr("组合详情"))
 
         layout.addWidget(self._tab_widget, stretch=1)
 
@@ -1208,6 +1245,7 @@ class OptimalComboDialog(QDialog):
         for i, result in enumerate(results):
             card = _ResultCard(i + 1, result, self._slot_labels)
             card.apply_clicked.connect(self._on_apply_result)
+            card.detail_clicked.connect(self._on_show_detail)
             self._results_inner.addWidget(card)
             self._result_cards.append(card)
 
@@ -1223,6 +1261,24 @@ class OptimalComboDialog(QDialog):
         self._progress_label.setVisible(False)
         self._candidate_summary.setText(tr("搜索失败，请检查候选装备后重试。"))
         QMessageBox.critical(self, tr("搜索失败"), message)
+
+    def _on_show_detail(self, equipped: dict) -> None:
+        """把这套组合铺到「组合详情」页并切过去。
+
+        卡片显示的是装备**当前**的真实数值。满承音/满等级那几个开关只是
+        算分时的假设，把假设值摆成装备详情会让人以为装备真是那样。
+        """
+        for slot_key, card in self._detail_cards.items():
+            equip = equipped.get(slot_key)
+            if isinstance(equip, dict) and equip:
+                card.set_equip(equip)
+            else:
+                card.set_empty()
+        filled = sum(1 for eq in equipped.values() if isinstance(eq, dict))
+        self._detail_hint.setText(
+            tr("共 {n} 件，显示的是装备当前的真实数值（不含满承音/满等级等假设）")
+            .format(n=filled))
+        self._tab_widget.setCurrentIndex(2)
 
     def _on_apply_result(self, equipped: dict) -> None:
         """将搜索结果的装备组合写入 session（按槽位合并，不覆盖未参与槽位）。"""

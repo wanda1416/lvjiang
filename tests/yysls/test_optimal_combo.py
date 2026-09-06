@@ -492,10 +492,9 @@ class TestSearchOptimalCombo:
         for i in range(len(results) - 1):
             assert results[i]["rate"] >= results[i + 1]["rate"]
 
-    def test_full_dingyin_uses_selected_playstyle(self) -> None:
-        """组合搜索的满定音与属性面板口径一致，不能只顶满旧定音。"""
-        calc = _get_calculator()
-        equip = {
+    @staticmethod
+    def _dingyin_equip() -> dict:
+        return {
             "name": "测试剑",
             "type": "剑",
             "level": 110,
@@ -504,16 +503,48 @@ class TestSearchOptimalCombo:
             "dingyin": {"name": "无相穿透", "value": 1.0},
         }
 
+    def test_full_dingyin_uses_selected_playstyle(self) -> None:
+        """组合搜索的满定音与属性面板口径一致，不能只顶满旧定音。
+
+        验的是**算分**吃到了变换：满定音会把定音换成该玩法要求的那条再
+        顶满，毕业率因此比不开高。不能再拿 equipped 里的定音去验——那里
+        现在是原始装备（见下一条）。
+        """
+        calc = _get_calculator()
+
+        plain = search_optimal_combo(
+            {"main_weapon": [self._dingyin_equip()]}, calc,
+            CombatAttributes(), use_dominance_pruning=False,
+        )
+        boosted = search_optimal_combo(
+            {"main_weapon": [self._dingyin_equip()]}, calc,
+            CombatAttributes(), use_dominance_pruning=False,
+            full_dingyin=True, playstyle="无名",
+        )
+
+        assert boosted[0]["rate"] > plain[0]["rate"]
+
+    def test_results_carry_the_original_equipment_not_the_simulation(
+        self,
+    ) -> None:
+        """满承音/满等级/满定音只是算分时的假设。
+
+        equipped 是「应用此组合」直接穿上身的东西——把模拟出来的词条写
+        回去，等于凭空改了仓储里的装备数据，而且看不出来。
+        """
+        calc = _get_calculator()
+        equip = self._dingyin_equip()
+
         results = search_optimal_combo(
             {"main_weapon": [equip]}, calc, CombatAttributes(),
             use_dominance_pruning=False,
-            full_dingyin=True,
+            full_dingyin=True, full_chengyin=True, full_level=110,
             playstyle="无名",
         )
 
-        dingyin = results[0]["equipped"]["main_weapon"]["dingyin"]
-        assert dingyin["name"] == "外功穿透"
-        assert dingyin["value"] > 1.0
+        applied = results[0]["equipped"]["main_weapon"]
+        assert applied is equip                       # 原对象，不是副本
+        assert applied["dingyin"] == {"name": "无相穿透", "value": 1.0}
 
     def test_search_result_ge_any_random_combo(self) -> None:
         """The optimal result's rate should be >= rate of any random combination."""

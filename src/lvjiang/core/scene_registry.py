@@ -5,6 +5,8 @@
 已拆分至 layout_models.py。
 """
 
+from dataclasses import replace
+
 from loguru import logger
 
 from ..i18n import tr
@@ -232,6 +234,38 @@ def get_region_defs(scene_key: str) -> list[RegionDef]:
     if not scene:
         return []
     return list(scene.regions)
+
+
+def get_effective_region_defs(
+    scene_key: str,
+    current_view: str = "",
+) -> list[RegionDef]:
+    """返回当前场景可用的区域定义，包括跨场景引用。
+
+    引用实体沿用源场景的类型、文字识别等属性，但视图归属属于目标场景，
+    因而以 ``SceneRefDef.views`` 覆盖源定义。``current_view`` 为空表示“全部”。
+    """
+    scene = _registry.get_scene(scene_key)
+    if scene is None:
+        return []
+    definitions = [
+        region for region in scene.regions
+        if is_view_visible(region.views, current_view)
+    ]
+    for ref in scene.references:
+        if not is_view_visible(ref.views, current_view):
+            continue
+        source = _registry.get_scene(ref.scene)
+        if source is None:
+            continue
+        source_def = next(
+            (region for region in source.regions
+             if region.key == ref.entity),
+            None,
+        )
+        if source_def is not None:
+            definitions.append(replace(source_def, views=list(ref.views)))
+    return definitions
 
 
 def is_subscene(scene_key: str) -> bool:

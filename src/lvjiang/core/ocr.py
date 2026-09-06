@@ -11,7 +11,7 @@ from loguru import logger
 from ..workflows.align import GridAlignment
 from .layout_models import CanvasConfig, Region
 from .ocr_cleaner import OCRCleaner
-from .scene_registry import get_region_defs
+from .scene_registry import get_effective_region_defs
 
 
 @dataclass
@@ -126,7 +126,11 @@ class OCREngine:
         canvas_h = canvas.h_ratio * h
 
         # 获取 is_text 为 True 的区域集合
-        text_keys = {r.key for r in get_region_defs(scene_key) if r.is_text}
+        text_keys = {
+            region.key
+            for region in get_effective_region_defs(scene_key)
+            if region.is_text
+        }
 
         results: dict[str, str] = {}
         for region in regions:

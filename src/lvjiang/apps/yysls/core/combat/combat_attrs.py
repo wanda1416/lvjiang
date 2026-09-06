@@ -843,6 +843,65 @@ def apply_three_rate_resistance(
     return value
 
 
+@dataclass(frozen=True)
+class JudgmentOutcomeRates:
+    """一次攻击的四种互斥判定结果及其计算中间值。"""
+
+    precision: float
+    crit_chance: float
+    intent_chance: float
+    crit: float
+    intent: float
+    normal: float
+    scratch: float
+
+
+def calculate_judgment_outcomes(
+    attrs: CombatAttributes,
+    resistance: float = THREE_RATE_RESISTANCE,
+) -> JudgmentOutcomeRates:
+    """按伤害机制计算最终会心、会意、普伤和擦伤率。
+
+    公式中的判定三率就是面板黄字：这里先按等级抗性从当前白字得到黄字，
+    直接会心/会意则不受抗性影响。正常范围内
+    对应 ``docs/10-game/03-damage-mechanics.md`` 的四条公式；当会心与
+    会意之和溢出时按游戏的会意优先规则压缩会心，保证四种结果仍为
+    互斥且总和为 100%。
+    """
+
+    def probability(value: float) -> float:
+        return min(1.0, max(0.0, value))
+
+    precision = probability(apply_three_rate_resistance(
+        "precision", attrs.precision, resistance,
+    ))
+    intent_chance = probability(
+        apply_three_rate_resistance(
+            "intent_rate", attrs.intent_rate, resistance,
+        ) + attrs.direct_intent
+    )
+    requested_crit = probability(
+        apply_three_rate_resistance(
+            "crit_rate", attrs.crit_rate, resistance,
+        ) + attrs.direct_crit
+    )
+    crit_chance = min(requested_crit, 1.0 - intent_chance)
+
+    crit = precision * crit_chance
+    intent = intent_chance
+    scratch = (1.0 - precision) * (1.0 - intent_chance)
+    normal = precision * (1.0 - intent_chance - crit_chance)
+    return JudgmentOutcomeRates(
+        precision=precision,
+        crit_chance=crit_chance,
+        intent_chance=intent_chance,
+        crit=crit,
+        intent=intent,
+        normal=normal,
+        scratch=scratch,
+    )
+
+
 def apply_bonus_resistance(
     value: float,
     base: float = 0.0,

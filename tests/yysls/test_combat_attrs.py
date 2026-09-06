@@ -10,6 +10,7 @@ from lvjiang.apps.yysls.core.combat.combat_attrs import (
     apply_penetration_resistance,
     apply_three_rate_resistance,
     build_graduation_attrs,
+    calculate_judgment_outcomes,
     convert_five_dims,
     has_resistance,
 )
@@ -77,6 +78,45 @@ def test_build_graduation_attrs_is_the_shared_resistance_boundary() -> None:
         apply_penetration_resistance(14.5, 36, 15))
     assert result.boss_bonus == pytest.approx(
         apply_bonus_resistance(0.095, resistance=15))
+
+
+def test_judgment_outcomes_use_yellow_rates_and_direct_rates() -> None:
+    attrs = CombatAttributes(
+        precision=1.0,
+        crit_rate=1.0,
+        intent_rate=0.4,
+        direct_crit=0.1,
+        direct_intent=0.05,
+    )
+
+    rates = calculate_judgment_outcomes(attrs, resistance=100)
+
+    assert rates.precision == pytest.approx(0.825)
+    assert rates.crit_chance == pytest.approx(0.6)
+    assert rates.intent_chance == pytest.approx(0.25)
+    assert rates.crit == pytest.approx(0.495)
+    assert rates.intent == pytest.approx(0.25)
+    assert rates.normal == pytest.approx(0.12375)
+    assert rates.scratch == pytest.approx(0.13125)
+    assert sum((rates.crit, rates.intent, rates.normal, rates.scratch)) \
+        == pytest.approx(1.0)
+
+
+def test_judgment_outcomes_prioritize_intent_when_rates_overflow() -> None:
+    attrs = CombatAttributes(
+        precision=1.0,
+        crit_rate=0.8,
+        intent_rate=0.4,
+        direct_crit=0.2,
+        direct_intent=0.2,
+    )
+
+    rates = calculate_judgment_outcomes(attrs, resistance=0)
+
+    assert rates.intent == pytest.approx(0.6)
+    assert rates.crit == pytest.approx(0.4)
+    assert rates.normal == pytest.approx(0.0)
+    assert rates.scratch == pytest.approx(0.0)
 
 
 # ── 五维转换 ──────────────────────────────────────────────

@@ -7,6 +7,31 @@ views:
 - key: recycle_confirm
   name: 回收确认
 regions:
+- key: status
+  name: 装备状态
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: equip_type
+  name: 装备类型
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: zaoyi
+  name: 装备造诣
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: equip_level
+  name: 装备等级
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: base_attr
+  name: 基础属性1
+  type: attr
+  is_text: true
+  is_clickable: false
 - key: main_func
   name: 主功能
   type: func

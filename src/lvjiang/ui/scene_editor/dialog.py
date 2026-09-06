@@ -23,6 +23,7 @@ from ...core.layout_manager import (
     expand_one_reference,
     load_scene_screenshot,
     migrate_layout_item,
+    refresh_scene_references,
     save_scene_screenshot,
 )
 from ...core.layout_models import Layout
@@ -489,6 +490,20 @@ class SceneEditorDialog(
         for scene_key, tab in self._tabs.items():
             if get_subscene_ref_defs(scene_key):
                 tab.set_subscene_contents(self._subscene_contents(scene_key))
+
+    def _refresh_loaded_scene_references(self) -> None:
+        """重建跨场景引用，并立即刷新已打开的目标场景画布。"""
+        if self._current_layout is None:
+            return
+        affected = refresh_scene_references(self._current_layout)
+        for scene_key in affected:
+            tab = self._tabs.get(scene_key)
+            if tab is None:
+                continue
+            tab.set_regions(
+                self._current_layout.get_scene_regions(scene_key))
+            tab.set_points(
+                self._current_layout.get_scene_points(scene_key))
 
     def _get_cached_screenshot(self, layout_name: str, scene_key: str, view: str):
         """取截图，命中缓存则直接返回；None（无图）也缓存以免反复读盘"""

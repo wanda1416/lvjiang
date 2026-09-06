@@ -70,11 +70,15 @@ yysls:
   白装: Common Equipment
   未满调律: Not Fully Tuned
   未备战: Not in Loadout
-  清空筛选装备: Delete Filtered
-  卸载全部装备: Unequip All
-  删除当前筛选结果，不含当前穿戴装备: Delete filtered equipment except currently equipped items
-  卸载当前备战方案的全部装备: Unequip all equipment from the current loadout
-  当前筛选条件下没有可清空的未穿戴装备: No unequipped items match the current filters
+  删除筛选装备: Delete Filtered
+  删除当前筛选结果，不含当前穿戴装备；类型为全部时不含模拟装备: Delete filtered equipment except currently equipped items; mock equipment is excluded when Type is All
+  不含模拟装备: excluding mock equipment
+  当前筛选条件下没有可删除的未穿戴装备: No deletable unequipped items match the current filters
+  模拟装备: Mock Equipment
+  删除全部模拟装备: Delete All Mock Equipment
+  确定删除当前用户的全部模拟装备吗？: Delete all mock equipment for the current user?
+  删除完成: Deletion Complete
+  已删除 {count} 件模拟装备。: Deleted {count} mock equipment items.
   确定删除当前筛选出的 {count} 件未穿戴装备吗？: Delete the {count} unequipped items matching the current filters?
   当前筛选条件: Current filters
   此操作不可撤销。: This action cannot be undone.

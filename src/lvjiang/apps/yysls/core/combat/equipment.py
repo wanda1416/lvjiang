@@ -97,19 +97,17 @@ class EquipmentInventory:
         self.reload()
         return old
 
-    def unequip_all(self) -> int:
-        """卸载当前方案全部装备，返回卸载数量。"""
-        count = len(self.active_plan_fps)
-        if count:
-            self._repo.unassign_all(self._state.active_plan_id)
-            self.reload()
-        return count
-
     def delete_items(self, fingerprints: set[str]) -> None:
         """批量删除装备并清理所有方案中的对应引用。"""
         if fingerprints:
             self._repo.delete_items(fingerprints)
             self.reload()
+
+    def delete_all_mock(self) -> int:
+        """删除全部模拟装备并返回删除数量。"""
+        count = self._repo.delete_all_mock()
+        self.reload()
+        return count
 
     def equip_to_slot(self, slot_key: str, equip: dict, group_key: str) -> dict | None:
         old = self.get_equipped(slot_key)

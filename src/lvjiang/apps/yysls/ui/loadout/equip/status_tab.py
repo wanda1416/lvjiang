@@ -195,7 +195,7 @@ class EquipStatusTab(QWidget):
         action_row.addWidget(btn_chengyin_merge)
 
         # 创建装备（原「模拟装备」，去掉菜单直接弹对话框）
-        btn_create = QPushButton(tr("创建模拟装备"))
+        btn_create = QPushButton(tr("模拟装备"))
         btn_create.setToolTip(tr("创建模拟装备"))
         btn_create.setMinimumWidth(96)
         btn_create.setStyleSheet(_ACTION_BTN_STYLE)
@@ -329,6 +329,19 @@ class EquipStatusTab(QWidget):
         self._affix_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._affix_filter)
 
+        lbl_status = QLabel(tr("状态"))
+        lbl_status.setStyleSheet(_filter_lbl_style)
+        filter_row.addWidget(lbl_status)
+        self._status_filter = QComboBox()
+        self._status_filter.addItem(tr("全部"), "all")
+        self._status_filter.addItem(tr("备战中"), "referenced")
+        self._status_filter.addItem(tr("未备战"), "unreferenced")
+        self._status_filter.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
+        _fit_filter_combo(self._status_filter)
+        self._status_filter.currentIndexChanged.connect(self._on_filter_changed)
+        filter_row.addWidget(self._status_filter)
+
         # 数据来源筛选：全部/背包/模拟
         lbl_source = QLabel(tr("类型"))
         lbl_source.setStyleSheet(_filter_lbl_style)
@@ -343,32 +356,14 @@ class EquipStatusTab(QWidget):
         self._source_filter.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._source_filter)
 
-        lbl_status = QLabel(tr("状态"))
-        lbl_status.setStyleSheet(_filter_lbl_style)
-        filter_row.addWidget(lbl_status)
-        self._status_filter = QComboBox()
-        self._status_filter.addItem(tr("全部"), "all")
-        self._status_filter.addItem(tr("备战中"), "referenced")
-        self._status_filter.addItem(tr("未备战"), "unreferenced")
-        self._status_filter.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToContents)
-        _fit_filter_combo(self._status_filter)
-        self._status_filter.currentIndexChanged.connect(self._on_filter_changed)
-        filter_row.addWidget(self._status_filter)
-
         filter_row.addStretch()
 
-        btn_clear_filtered = QPushButton(tr("清空筛选装备"))
-        btn_clear_filtered.setToolTip(tr("删除当前筛选结果，不含当前穿戴装备"))
-        btn_clear_filtered.setStyleSheet(_ACTION_BTN_STYLE)
-        btn_clear_filtered.clicked.connect(self._on_clear_filtered)
-        filter_row.addWidget(btn_clear_filtered)
-
-        btn_unequip_all = QPushButton(tr("卸载全部装备"))
-        btn_unequip_all.setToolTip(tr("卸载当前备战方案的全部装备"))
-        btn_unequip_all.setStyleSheet(_ACTION_BTN_STYLE)
-        btn_unequip_all.clicked.connect(self._on_unequip_all)
-        filter_row.addWidget(btn_unequip_all)
+        btn_delete_filtered = QPushButton(tr("删除筛选装备"))
+        btn_delete_filtered.setToolTip(tr(
+            "删除当前筛选结果，不含当前穿戴装备；类型为全部时不含模拟装备"))
+        btn_delete_filtered.setStyleSheet(_ACTION_BTN_STYLE)
+        btn_delete_filtered.clicked.connect(self._on_delete_filtered)
+        filter_row.addWidget(btn_delete_filtered)
         info_layout.addLayout(filter_row)
 
         layout.addWidget(self._info_widget)
@@ -1099,26 +1094,29 @@ class EquipStatusTab(QWidget):
             f"{tr('品阶')}：{self._quality_filter.currentText()}",
             f"{tr('等级')}：{self._level_filter.currentText()}",
             f"{tr('词条')}：{self._affix_filter.currentText()}",
-            f"{tr('类型')}：{self._source_filter.currentText()}",
             f"{tr('状态')}：{self._status_filter.currentText()}",
+            f"{tr('类型')}：{self._deletion_source_summary()}",
         ))
 
-    def _on_clear_filtered(self) -> None:
-        """删除当前筛选结果；当前方案穿戴装备由收集层硬排除。"""
+    def _deletion_source_summary(self) -> str:
+        source = self._source_filter.currentText()
+        if (self._source_filter.currentData() or "all") == "all":
+            return f"{source}（{tr('不含模拟装备')}）"
+        return source
+
+    def _on_delete_filtered(self) -> None:
+        """删除筛选结果；默认及当前穿戴保护在此处明确收口。"""
         inv = self._require_inventory()
         if inv is None:
             return
-        fingerprints = {
-            str(equip.get("_fp") or "")
-            for equip, *_rest in self._collect_filtered_cards()
-            if equip.get("_fp")
-        }
+        fingerprints = self._filtered_delete_fingerprints()
         if not fingerprints:
             QMessageBox.information(
-                self, tr("提示"), tr("当前筛选条件下没有可清空的未穿戴装备"))
+                self, tr("提示"), tr("当前筛选条件下没有可删除的未穿戴装备"))
             return
+
         reply = QMessageBox.question(
-            self, tr("确认清空"),
+            self, tr("确认删除"),
             tr("确定删除当前筛选出的 {count} 件未穿戴装备吗？").format(
                 count=len(fingerprints))
             + f"\n\n{tr('当前筛选条件')}：\n{self._filter_summary()}"
@@ -1131,24 +1129,21 @@ class EquipStatusTab(QWidget):
         try:
             inv.delete_items(fingerprints)
             self._sync_inv(notify=True)
-            logger.info(f"已清空筛选装备: {len(fingerprints)} 件")
+            logger.info(f"已删除筛选装备: {len(fingerprints)} 件")
         except Exception as exc:
-            logger.error(f"清空筛选装备失败: {exc}")
+            logger.error(f"删除筛选装备失败: {exc}")
             QMessageBox.critical(self, tr("删除失败"), str(exc))
 
-    def _on_unequip_all(self) -> None:
-        """卸载当前备战方案中的全部装备，装备本身仍留在共享池。"""
-        inv = self._require_inventory()
-        if inv is None:
-            return
-        try:
-            count = inv.unequip_all()
-            if count:
-                self._sync_inv(notify=True)
-                logger.info(f"已卸载当前方案全部装备: {count} 件")
-        except Exception as exc:
-            logger.error(f"卸载全部装备失败: {exc}")
-            QMessageBox.critical(self, tr("卸载失败"), str(exc))
+    def _filtered_delete_fingerprints(self) -> set[str]:
+        """筛选删除目标；仅显式选择“模拟”时允许删除模拟装备。"""
+        source_mode = self._source_filter.currentData() or "all"
+        return {
+            str(equip.get("_fp") or "")
+            for equip, _part, _group, is_mock, _referenced
+            in self._collect_filtered_cards()
+            if equip.get("_fp")
+            and (is_mock if source_mode == "mock" else not is_mock)
+        }
 
     def _on_chengyin_merge(self):
         """识别候选并在用户确认后原子迁移引用、删除旧快照。"""
@@ -1297,7 +1292,11 @@ class EquipStatusTab(QWidget):
             QMessageBox.warning(self, tr("创建失败"), tr("没有激活的用户"))
             return
 
-        dialog = MockEquipDialog(parent=self, default_school=self._get_current_school())
+        dialog = MockEquipDialog(
+            parent=self,
+            default_school=self._get_current_school(),
+            delete_all_mock=self._delete_all_mock,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         result = dialog.get_result()
@@ -1320,6 +1319,17 @@ class EquipStatusTab(QWidget):
         except Exception as e:
             logger.error(f"创建模拟装备失败: {e}")
             QMessageBox.critical(self, tr("创建失败"), str(e))
+
+    def _delete_all_mock(self) -> int:
+        """供模拟装备对话框调用：删除当前用户的全部模拟装备。"""
+        inv = self._require_inventory()
+        if inv is None:
+            return 0
+        count = inv.delete_all_mock()
+        if count:
+            self._sync_inv(notify=True)
+            logger.info(f"已删除全部模拟装备: {count} 件")
+        return count
 
     def _on_copy_requested(self, equip_data: dict, group_key: str):
         """复制装备数据到创建装备对话框，名称追加【复制】。"""

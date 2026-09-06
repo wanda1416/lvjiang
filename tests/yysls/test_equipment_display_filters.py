@@ -124,3 +124,23 @@ def test_filtered_collection_excludes_current_equipment_and_marks_references(
         ("standby", True),
         ("free", False),
     ]
+
+
+def test_filtered_delete_excludes_mock_unless_explicitly_selected(qtbot):
+    source_filter = QComboBox()
+    source_filter.addItem("全部", "all")
+    source_filter.addItem("模拟", "mock")
+    qtbot.addWidget(source_filter)
+    cards = [
+        ({"_fp": "real"}, "环", "ring", False, False),
+        ({"_fp": "mock_one"}, "环", "ring", True, False),
+    ]
+    tab = SimpleNamespace(
+        _source_filter=source_filter,
+        _collect_filtered_cards=lambda: cards,
+    )
+
+    assert EquipStatusTab._filtered_delete_fingerprints(tab) == {"real"}
+
+    source_filter.setCurrentIndex(source_filter.findData("mock"))
+    assert EquipStatusTab._filtered_delete_fingerprints(tab) == {"mock_one"}

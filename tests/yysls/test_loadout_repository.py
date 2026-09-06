@@ -152,20 +152,22 @@ def test_delete_clears_all_plan_references(tmp_path: Path):
     assert all(plan.equipment["ring"] is None for plan in state.plans.values())
 
 
-def test_unassign_all_only_clears_target_plan(tmp_path: Path):
+def test_delete_all_mock_preserves_real_and_clears_plan_references(
+    tmp_path: Path,
+):
     repo = LoadoutRepository("alice", tmp_path)
-    first = repo.load().active_plan_id
-    repo.assign_equipment(first, "ring", equip("ring-fp"))
-    repo.assign_equipment(first, "head", equip("head-fp", "冠胄"))
-    second = repo.create_plan("second", "主功法", "副功法").id
-    repo.assign_equipment(second, "ring", equip("ring-fp"))
+    plan_id = repo.load().active_plan_id
+    repo.upsert_item(equip("real-fp"))
+    repo.assign_equipment(plan_id, "ring", equip("mock_ring"))
+    repo.assign_equipment(plan_id, "head", equip("mock_head", "冠胄"))
 
-    repo.unassign_all(first)
+    count = repo.delete_all_mock()
 
     state = repo.load()
-    assert all(fp is None for fp in state.plans[first].equipment.values())
-    assert state.plans[second].equipment["ring"] == "ring-fp"
-    assert set(state.equipment_items) == {"ring-fp", "head-fp"}
+    assert count == 2
+    assert set(state.equipment_items) == {"real-fp"}
+    assert state.active_plan.equipment["ring"] is None
+    assert state.active_plan.equipment["head"] is None
 
 
 def test_update_equipped_mock_removes_orphan_old_fp(tmp_path: Path):

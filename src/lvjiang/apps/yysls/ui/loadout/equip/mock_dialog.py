@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QButtonGroup,
@@ -29,7 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ......i18n import tr
-from ......ui.button_styles import apply_dialog_button_box_style
+from ......ui.button_styles import apply_button_style, apply_dialog_button_box_style
 from ....core.affix_cap import affix_cap_pct
 
 # 部位 → group_key 映射
@@ -243,14 +245,16 @@ class MockEquipDialog(QDialog):
         equip_data: dict | None = None,
         parent=None,
         default_school: str = "",
+        delete_all_mock: Callable[[], int] | None = None,
     ):
         super().__init__(parent)
         self._equip_data = equip_data or {}
         self._is_edit = bool(equip_data)
         self._result_data: dict | None = None
         self._default_school = default_school  # 默认流派，用于右四件定音词条排序
+        self._delete_all_mock = delete_all_mock
 
-        self.setWindowTitle(tr("编辑模拟装备") if self._is_edit else tr("创建模拟装备"))
+        self.setWindowTitle(tr("编辑模拟装备") if self._is_edit else tr("模拟装备"))
         self.setMinimumSize(680, 620)
         self.resize(760, 700)
         self._init_ui()
@@ -467,7 +471,16 @@ class MockEquipDialog(QDialog):
         if cancel_button is not None:
             cancel_button.setText(tr("取消"))
             cancel_button.setMinimumHeight(32)
-        layout.addWidget(buttons)
+        footer = QHBoxLayout()
+        if not self._is_edit and self._delete_all_mock is not None:
+            delete_all_button = QPushButton(tr("删除全部模拟装备"))
+            delete_all_button.setMinimumHeight(32)
+            apply_button_style(delete_all_button, variant="danger")
+            delete_all_button.clicked.connect(self._on_delete_all_mock)
+            footer.addWidget(delete_all_button)
+        footer.addStretch()
+        footer.addWidget(buttons)
+        layout.addLayout(footer)
 
         # 武器类型变化时过滤词条列表
         self._combo_weapon_type.currentIndexChanged.connect(
@@ -475,6 +488,30 @@ class MockEquipDialog(QDialog):
 
         # 初始化定音词条按钮（所有控件创建完毕后刷新）
         self._refresh_dingyin_button()
+
+    def _on_delete_all_mock(self) -> None:
+        if self._delete_all_mock is None:
+            return
+        reply = QMessageBox.question(
+            self,
+            tr("确认删除"),
+            tr("确定删除当前用户的全部模拟装备吗？")
+            + f"\n\n{tr('此操作不可撤销。')}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            count = self._delete_all_mock()
+        except Exception as exc:
+            QMessageBox.critical(self, tr("删除失败"), str(exc))
+            return
+        QMessageBox.information(
+            self,
+            tr("删除完成"),
+            tr("已删除 {count} 件模拟装备。").format(count=count),
+        )
 
     def _get_level(self) -> int:
         """获取当前选择的等级（供 _AffixRow 调用）"""

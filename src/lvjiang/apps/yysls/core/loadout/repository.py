@@ -243,15 +243,6 @@ class LoadoutRepository:
             state.plans[plan_id].equipment[slot_key] = None
         self.update(mutate)
 
-    def unassign_all(self, plan_id: str) -> None:
-        """原子卸载指定方案的全部装备。"""
-        def mutate(state: LoadoutState) -> None:
-            if plan_id not in state.plans:
-                raise KeyError(plan_id)
-            for slot_key in state.plans[plan_id].equipment:
-                state.plans[plan_id].equipment[slot_key] = None
-        self.update(mutate)
-
     def delete_items(self, fingerprints: set[str]) -> None:
         def mutate(state: LoadoutState) -> None:
             for fp in fingerprints:
@@ -261,6 +252,26 @@ class LoadoutRepository:
                     if eq_fp in fingerprints:
                         plan.equipment[slot] = None
         self.update(mutate)
+
+    def delete_all_mock(self) -> int:
+        """删除全部模拟装备并清理所有方案引用，返回删除数量。"""
+        deleted = 0
+
+        def mutate(state: LoadoutState) -> None:
+            nonlocal deleted
+            fingerprints = {
+                fp for fp in state.equipment_items if fp.startswith("mock_")
+            }
+            deleted = len(fingerprints)
+            for fp in fingerprints:
+                state.equipment_items.pop(fp, None)
+            for plan in state.plans.values():
+                for slot, referenced_fp in plan.equipment.items():
+                    if referenced_fp in fingerprints:
+                        plan.equipment[slot] = None
+
+        self.update(mutate)
+        return deleted
 
     def merge_items(self, replacements: dict[str, str]) -> None:
         """原子删除旧快照并把所有备战方案引用迁移到保留版本。"""

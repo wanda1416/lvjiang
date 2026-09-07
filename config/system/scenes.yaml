@@ -6,6 +6,7 @@ scenes:
     - game_main_page
     - game_menu_page
     - game_login_page
+    - game_settings
     - general_control
     - general_action
     - general_chat

@@ -5,8 +5,8 @@ regions:
 - key: back
   name: 返回
   type: attr
-  is_text: true
-  is_clickable: false
+  is_text: false
+  is_clickable: true
 - key: item_name
   name: 道具名称
   type: attr
@@ -27,7 +27,7 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
-- key: buy
+- key: purchase
   name: 购买
   type: func
   is_text: true

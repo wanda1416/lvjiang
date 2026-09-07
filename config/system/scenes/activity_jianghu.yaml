@@ -47,10 +47,11 @@ regions:
   is_text: true
   is_clickable: false
 - key: haoling_label
-  name: 当周号令
+  name: 当周号令标签
   type: attr
   is_text: true
   is_clickable: false
+  view: base
 - key: overlay_back
   name: 浮层返回
   type: func

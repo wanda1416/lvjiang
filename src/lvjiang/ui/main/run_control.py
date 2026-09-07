@@ -113,6 +113,29 @@ class WorkflowWorker(QThread):
             self.result_or_exception = e
 
 
+def _prepare_modeless_dialog(dialog) -> None:
+    """任务交互使用 Qt 窗口，避免原生消息框接管应用的模态/窗口行为。"""
+    from PyQt6.QtWidgets import QMessageBox
+
+    if isinstance(dialog, QMessageBox):
+        dialog.setOption(QMessageBox.Option.DontUseNativeDialog, True)
+    dialog.setModal(False)
+    dialog.setWindowModality(Qt.WindowModality.NonModal)
+    dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+
+
+def _show_modeless_dialog(dialog) -> None:
+    """先抬起可见宿主，再显示提示；Windows 后台宿主不能只留下子弹窗。"""
+    owner = dialog.parentWidget()
+    if owner is not None:
+        owner = owner.window()
+        if owner.isVisible() and not owner.isMinimized():
+            owner.raise_()
+    dialog.show()
+    dialog.raise_()
+    dialog.activateWindow()
+
+
 class _UIHelper(QObject):
     """工作流线程 → 主线程的非模态对话框桥。
 
@@ -164,9 +187,7 @@ class _UIHelper(QObject):
         resolve: Callable[[int], Any],
     ) -> None:
         """Show one task dialog without disabling its parent window."""
-        dialog.setModal(False)
-        dialog.setWindowModality(Qt.WindowModality.NonModal)
-        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        _prepare_modeless_dialog(dialog)
         self._active_dialog = dialog
 
         def finished(code: int) -> None:
@@ -180,9 +201,7 @@ class _UIHelper(QObject):
             self._complete(req, result)
 
         dialog.finished.connect(finished)
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
+        _show_modeless_dialog(dialog)
 
     def _show_non_modal(self, req: dict) -> None:
         action = req["action"]
@@ -338,7 +357,8 @@ class RunControlMixin:
     _batch_tab = None           # 批量执行 Tab（MainWindow._build_left_tabs 构建）
     _run_state = "idle"         # 运行状态：idle / running / paused
     _pause_event: threading.Event | None = None  # 暂停事件：set=运行，clear=暂停阻塞
-    _stop_confirm_pending = False  # 暂停中点结束的二次确认弹窗是否正打开（挡暂停热键竞态）
+    _stop_confirm_pending = False  # 异步停止确认期间防止重复请求及暂停热键抢跑
+    _stop_confirmation_dialog: Any = None
     # 进入方案前暂存的自定义组合 (图库, 环境 key, 布局)；切回自定义时还原
     _custom_context: tuple[str, Any, str] | None = None
 
@@ -763,6 +783,9 @@ class RunControlMixin:
 
     def _end_automation(self, name: str):
         """结束自动化，恢复 UI 状态。由工作流线程实际结束后调用。"""
+        stop_dialog = getattr(self, "_stop_confirmation_dialog", None)
+        if stop_dialog is not None:
+            stop_dialog.reject()
         helper = getattr(self, "_ui_helper", None)
         if helper is not None:
             helper.close_active_dialog()
@@ -830,9 +853,7 @@ class RunControlMixin:
             QMessageBox.StandardButton.Ok,
             self if isinstance(self, QWidget) else None,  # type: ignore[arg-type]
         )
-        box.setModal(False)
-        box.setWindowModality(Qt.WindowModality.NonModal)
-        box.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        _prepare_modeless_dialog(box)
         self._workflow_start_error_dialog = box
         box.finished.connect(
             lambda _code, item=box: setattr(
@@ -840,9 +861,7 @@ class RunControlMixin:
             ) if getattr(self, "_workflow_start_error_dialog", None) is item
             else None
         )
-        box.show()
-        box.raise_()
-        box.activateWindow()
+        _show_modeless_dialog(box)
 
     def _create_ui_callback(self):
         """创建线程安全的任务交互回调。
@@ -870,10 +889,11 @@ class RunControlMixin:
 
         return callback
 
-    def _request_stop(self):
+    def _request_stop(self, *, stop_confirmed: bool = False):
         """统一停止入口（F10 / 结束按钮）。只设标志，不立即改 running。"""
         # 暂停中点结束先二次确认：暂停/结束热键位置接近，容易手误
-        if self._run_state == 'paused' and not self._confirm_stop_while_paused():
+        if self._run_state == 'paused' and not stop_confirmed:
+            self._confirm_stop_while_paused()
             return
         self.log_text.append(tr("[操作] 收到停止请求"))
         logger.info("收到停止请求")
@@ -908,28 +928,37 @@ class RunControlMixin:
             self._overlay.set_color("red")
             self.log_text.append(tr("[操作] 已停止"))
 
-    def _confirm_stop_while_paused(self) -> bool:
-        """暂停中点击结束时弹二次确认，返回是否确认结束。
+    def _confirm_stop_while_paused(self) -> None:
+        """异步确认停止：不启动嵌套事件循环，主界面始终可操作。"""
+        if getattr(self, '_stop_confirm_pending', False):
+            return
+        from PyQt6.QtWidgets import QMessageBox, QWidget
 
-        弹窗期间用 _stop_confirm_pending 挡住暂停热键：QMessageBox.question 是
-        Qt 主线程上的嵌套事件循环，但全局热键回调（pynput 监听线程）会
-        直接同步调用 _on_pause_resume（不走 Qt 信号跨线程队列），不受
-        这个嵌套事件循环阻塞，因此弹窗还开着时按暂停热键仍可能并发抢跑：
-        此时 _run_state 尚未被状态借用改为 'running'，热键会被误判为
-        "暂停中恢复" 而提前唤醒工作流线程——弹窗都没确认，线程却先动了。
-        """
+        box = QMessageBox(
+            QMessageBox.Icon.Question,
+            tr("确认结束"), tr("任务暂停中，是否直接结束？"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            self if isinstance(self, QWidget) else None,  # type: ignore[arg-type]
+        )
+        box.setDefaultButton(QMessageBox.StandardButton.No)
+        _prepare_modeless_dialog(box)
         self._stop_confirm_pending = True
-        try:
-            from PyQt6.QtWidgets import QMessageBox, QWidget
-            reply = QMessageBox.question(
-                self if isinstance(self, QWidget) else None,  # type: ignore[arg-type]
-                tr("确认结束"), tr("任务暂停中，是否直接结束？"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            return reply == QMessageBox.StandardButton.Yes
-        finally:
+        self._stop_confirmation_dialog = box
+        worker = self._current_worker
+
+        def finished(_code: int) -> None:
+            if getattr(self, '_stop_confirmation_dialog', None) is not box:
+                return
+            self._stop_confirmation_dialog = None
             self._stop_confirm_pending = False
+            clicked = box.clickedButton()
+            if (clicked is not None
+                    and box.standardButton(clicked) == QMessageBox.StandardButton.Yes
+                    and self._running and self._current_worker is worker):
+                self._request_stop(stop_confirmed=True)
+
+        box.finished.connect(finished)
+        _show_modeless_dialog(box)
 
     # ─── 暂停/恢复 ────────────────────────────────────────
 

@@ -1000,7 +1000,7 @@ class MainWindow(
             event.ignore()
             return
         if self._running:
-            self._request_stop()
+            self._request_stop(stop_confirmed=True)
         self._close_cleanup_started = True
         if self._tray_icon is not None:
             self._tray_icon.hide()

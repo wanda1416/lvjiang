@@ -77,6 +77,7 @@ class SettingsDialog(QDialog):
 
     hotkeys_saved = pyqtSignal(dict)
     font_sizes_saved = pyqtSignal(dict)
+    android_apps_saved = pyqtSignal(dict)
     plans_saved = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -1300,6 +1301,7 @@ class SettingsDialog(QDialog):
         self.plans_saved.emit()
         self.hotkeys_saved.emit(hotkeys)
         self.font_sizes_saved.emit(settings["font_sizes"])
+        self.android_apps_saved.emit(android_apps)
         # 保存后不关闭：置灰保存按钮，当前各行均视为已保存，可继续修改
         for entry in self._custom_rows:
             entry["saved"] = bool(entry["key"].text().strip())

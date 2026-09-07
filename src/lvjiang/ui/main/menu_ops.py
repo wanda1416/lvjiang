@@ -396,6 +396,7 @@ class MenuOpsMixin:
         dialog = SettingsDialog(self)
         dialog.hotkeys_saved.connect(self._apply_hotkey_settings)
         dialog.font_sizes_saved.connect(self._apply_font_size_settings)
+        dialog.android_apps_saved.connect(self._apply_android_app_settings)
         # 方案增删改后立刻重建顶部下拉，不用等下次启动
         dialog.plans_saved.connect(self._refresh_plan_combo)
         if dialog.exec():
@@ -406,6 +407,19 @@ class MenuOpsMixin:
             # 覆盖切换失败时仍可用的运行期键位。
             self._user_config.hotkeys = active_hotkeys
             self.statusBar().showMessage(tr("配置已保存"), 3000)
+
+    def _apply_android_app_settings(self, values: dict) -> None:
+        """安卓应用注册表保存后立即替换运行期快照，无需重启程序。"""
+        from ...core.config import parse_android_apps
+
+        apps = parse_android_apps(values)
+        self._user_config.android_apps = apps
+        # 正在持有的引擎也可能稍后才执行 app 指令；同步替换并清除绑定旧
+        # 注册表的控制器。新建引擎则会直接使用上面的最新 UserConfig。
+        engine = getattr(self, "_current_engine", None)
+        if engine is not None:
+            engine._android_apps = dict(apps)
+            engine._android_app_controller = None
 
     def _apply_font_size_settings(self, values: dict) -> None:
         """保存字体设置后立即应用到两个用户页面。"""

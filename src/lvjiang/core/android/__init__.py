@@ -23,7 +23,7 @@ from .agent import AgentCapture, AgentClient, AgentError, AgentInput, connect_ag
 from .app_controller import AndroidAppController, AndroidAppError
 from .device import AdbDevice, list_adb_devices
 from .input import AdbInput
-from .scrcpy_capture import AndroidStreamCapture
+from .scrcpy_capture import AndroidStreamCapture, ScrcpyProtocolError
 from .wireless import (
     list_ipv4_interfaces,
     list_scan_subnets,
@@ -87,6 +87,7 @@ __all__ = [
     "AndroidAppController",
     "AndroidAppError",
     "AndroidStreamCapture",
+    "ScrcpyProtocolError",
     "AgentClient",
     "AgentCapture",
     "AgentInput",

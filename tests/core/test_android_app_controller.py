@@ -119,6 +119,8 @@ def test_android_app_statement_delegates_to_shared_controller():
     engine._exec_stmt(parse_text('app stop "game" timeout 12\n').body[0])
 
     assert calls == [("stop", "game", 12.0)]
+
+
 def test_scrcpy_packet_parser_waits_for_incomplete_packets():
     """半包不得消费：header 不足 12 字节、或 payload 未到齐都返回 None。"""
     from lvjiang.core.android.scrcpy_capture import AndroidStreamCapture
@@ -153,6 +155,57 @@ def test_scrcpy_session_packet_resets_readiness_and_target_size():
     assert stream._pending_session is True
     assert stream.is_transitioning is True
     assert stream._ready_event.is_set() is False
+
+
+class FakeSocket:
+    """按字节喂数据的假 socket，只实现 _recv_exact 用到的 recv。"""
+
+    def __init__(self, payload: bytes):
+        self._payload = payload
+
+    def recv(self, size: int) -> bytes:
+        chunk, self._payload = self._payload[:size], self._payload[size:]
+        return chunk
+
+
+def _handshake(session: bytes) -> bytes:
+    """dummy byte + 64 字节设备名 + 4 字节 codec id + 12 字节首包。"""
+    return b"\x00" + b"device".ljust(64, b"\x00") + b"h264" + session
+
+
+def test_protocol_header_rejects_unexpected_first_packet_without_retrying():
+    """首包标志位不符只可能是 server 版本变了，必须抛错而不是返回 False。
+
+    返回 False 会被 start() 当成「server 还没就绪」重试三次，最后只报一句
+    通用的读取失败，用户无从判断是版本问题。
+    """
+    from unittest.mock import MagicMock
+
+    from lvjiang.core.android.scrcpy_capture import (
+        AndroidStreamCapture,
+        ScrcpyProtocolError,
+    )
+
+    stream = AndroidStreamCapture(MagicMock())
+    # 高位未置 1：本客户端不认识的包结构
+    stream._sock = FakeSocket(_handshake(bytes(4) + struct.pack(">II", 1080, 2400)))
+
+    with pytest.raises(ScrcpyProtocolError) as exc_info:
+        stream._read_protocol_header()
+
+    assert "0x00" in str(exc_info.value)
+
+
+def test_protocol_header_accepts_expected_session_packet():
+    from unittest.mock import MagicMock
+
+    from lvjiang.core.android.scrcpy_capture import AndroidStreamCapture
+
+    stream = AndroidStreamCapture(MagicMock())
+    stream._sock = FakeSocket(_handshake(_session(1080, 2400)))
+
+    assert stream._read_protocol_header() is True
+    assert stream._session_size == (1080, 2400)
 
 
 def test_wait_ready_checks_stop_between_short_waits():

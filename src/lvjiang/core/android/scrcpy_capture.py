@@ -33,6 +33,7 @@ import numpy as np
 from loguru import logger
 
 from ...constants import PROJECT_ROOT
+from ...i18n import tr
 from ..capture_base import CaptureBackend
 from ..platforms import SUBPROCESS_NO_WINDOW
 from .device import AdbDevice
@@ -52,6 +53,15 @@ _DUMMY_BYTE_SIZE = 1
 _DEVICE_META_SIZE = 64
 # server 版本（必须与 jar 匹配）
 _SERVER_VERSION = "4.1"
+
+
+class ScrcpyProtocolError(RuntimeError):
+    """server 发来的字节不符合本客户端实现的 scrcpy 协议。
+
+    与「server 还没起来」不同：协议不符重试多少次都是同样的结果，
+    只可能是设备上的 scrcpy-server 版本与 _SERVER_VERSION 对不上。
+    必须立刻中止并把原因原样告诉用户，不能退化成通用的连接失败。
+    """
 
 
 class AndroidStreamCapture(CaptureBackend):
@@ -106,6 +116,12 @@ class AndroidStreamCapture(CaptureBackend):
         self._frame_sequence = 0
         self._pending_session = True
         self._codec_config = b""
+        self._last_error = ""
+
+    @property
+    def last_error(self) -> str:
+        """最近一次 start() 失败的具体原因，供上层直接展示给用户。"""
+        return self._last_error
 
     @property
     def max_fps(self) -> int:
@@ -141,6 +157,7 @@ class AndroidStreamCapture(CaptureBackend):
 
         try:
             self._running = True
+            self._last_error = ""
             self._ready_event.clear()
             self._transitioning = True
             self._pending_session = True
@@ -185,7 +202,18 @@ class AndroidStreamCapture(CaptureBackend):
             # 5. 读协议头（device meta + codec id + session packet）
             # server 可能还没完全就绪，给 3 次重试机会
             for attempt in range(3):
-                if self._read_protocol_header():
+                try:
+                    header_ok = self._read_protocol_header()
+                except ScrcpyProtocolError as exc:
+                    # 协议不符重试无意义，直接中止并保留原因给上层展示
+                    self._last_error = tr(
+                        "scrcpy 协议版本变化，不符合预期："
+                        "客户端按 {version} 实现，{detail}"
+                    ).format(version=_SERVER_VERSION, detail=exc)
+                    logger.error(f"[AndroidStream] {self._last_error}")
+                    self.stop()
+                    return False
+                if header_ok:
                     break
                 if attempt < 2:
                     logger.debug(f"[AndroidStream] 协议头读取失败，重试 ({attempt + 1}/3)")
@@ -480,12 +508,16 @@ class AndroidStreamCapture(CaptureBackend):
                 logger.error("[AndroidStream] 读取 session packet 失败")
                 return False
             if not session[0] & 0x80:
-                logger.error("[AndroidStream] 首包不是 session packet")
-                return False
+                raise ScrcpyProtocolError(
+                    f"首包不是 session packet（期望首字节高位置 1，实际 "
+                    f"0x{session[0]:02x}，前 12 字节 {session.hex()}）"
+                )
             self._handle_session_packet(session, initial=True)
 
             return True
 
+        except ScrcpyProtocolError:
+            raise
         except Exception as e:
             logger.error(f"[AndroidStream] 读取协议头异常: {e}")
             return False

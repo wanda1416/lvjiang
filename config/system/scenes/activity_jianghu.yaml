@@ -1,4 +1,4 @@
-content_version: 1
+content_version: 2
 key: activity_jianghu
 name: 号令
 views:
@@ -34,7 +34,7 @@ regions:
   is_text: false
   is_clickable: true
   view: qingjing
-  to: waiguan_qingjing/editing
+  to: appearance_main/qingjing_editing
 - key: back
   name: 返回
   type: func

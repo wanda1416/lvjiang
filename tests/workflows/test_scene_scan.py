@@ -144,10 +144,8 @@ def test_ref_line_no_matches_source():
 
 # ─── 与旧 required_scenes 等价性验证 ──────────────────────
 
-def test_daily_jianghu_matches_legacy_required_scenes():
-    """daily_jianghu.wf 搜集结果应与原手写 required_scenes 一致
-
-    waiguan_qingjing 为情境动作落地后新增的依赖。
+def test_daily_jianghu_required_scenes():
+    """daily_jianghu.wf 的换装与情境动作复用同一个外观场景。
 
     这里按引擎 _load_and_validate 的方式先合并 import 链的 procs 再搜集，
     断言的才是运行期真正的校验范围。只 parse_file 会漏掉靠子过程引用的
@@ -162,7 +160,7 @@ def test_daily_jianghu_matches_legacy_required_scenes():
         procs.update(parse_file((wf.parent / imported.path).resolve()).procs)
     scenes = collect_scene_keys(program.body, procs)
     assert scenes == {
-        "activity_jianghu", "waiguan_yigui", "waiguan_qingjing",
+        "activity_jianghu", "appearance_main",
         "general_action", "game_menu_page", "game_main_page",
         "general_control", "school_main",
         "bag_detail", "bag_item_detail",
@@ -293,6 +291,12 @@ def test_daily_jianghu_uses_layer_specific_back_regions():
     ]
     assert huanzhuang.count("click [activity_jianghu].[overlay_back]") == 1
     assert "click [activity_jianghu].[back]" not in huanzhuang
+    # 外观共用同一个返回区域，但退出方案页和退出衣柜仍需要两次点击。
+    appearance_back = "click [appearance_main].[back]"
+    assert huanzhuang.count(appearance_back) == 2
+    assert huanzhuang.index(appearance_back) < huanzhuang.rindex(
+        appearance_back
+    ) < huanzhuang.index("click [activity_jianghu].[overlay_back]")
 
     qingjing = text[
         text.index("def action_qingjing("):
@@ -301,6 +305,18 @@ def test_daily_jianghu_uses_layer_specific_back_regions():
     assert qingjing.count("click [activity_jianghu].[qingjing_back]") == 1
     assert qingjing.count("click [activity_jianghu].[overlay_back]") == 1
     assert "click [activity_jianghu].[back]" not in qingjing
+    assert qingjing.count(appearance_back) == 2
+    assert qingjing.index(
+        appearance_back
+    ) < qingjing.index(
+        'scan [appearance_main].[edit_qingjing] as $in_appearance by contains "编辑情境"'
+    ) < qingjing.index(
+        "if $in_appearance"
+    ) < qingjing.rindex(
+        appearance_back
+    ) < qingjing.index(
+        "click [activity_jianghu].[qingjing_back]"
+    )
     assert qingjing.index(
         "click [activity_jianghu].[qingjing_back]"
     ) < qingjing.index(

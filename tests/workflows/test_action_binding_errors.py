@@ -67,6 +67,22 @@ class _FakeInput:
         self.drags.append((x1, y1, x2, y2, tag))
 
 
+class _StubEngine:
+    """最小引擎替身：按键原语统一由 WorkflowEngine 提供，这里只转发。
+
+    真实按键原语还带组合键回滚、热键冲突校验等逻辑，那些由
+    tests/workflows/test_press.py 覆盖；本文件只关心「绑定了
+    activation_key 的区域走按键而不是点击」。
+    """
+
+    def __init__(self, input_backend):
+        self._input = input_backend
+
+    def press_key(self, key: str) -> None:
+        self._input.key_down(key)
+        self._input.key_up(key)
+
+
 class _Actor(_ActionMixin, _CoordMixin):
     """把操作与坐标换算两个 Mixin 拼成可独立实例化的最小对象"""
 
@@ -78,6 +94,8 @@ class _Actor(_ActionMixin, _CoordMixin):
         self._input_sim = input_sim or InputSimConfig()
         self._window_left = 0
         self._window_top = 0
+        # 运行期由 WorkflowEngine._execute_python_workflow 注入
+        self._engine = _StubEngine(self._input)
 
     def _stop_check(self):
         return True
@@ -204,3 +222,18 @@ def test_wait_delay_defined_name_works():
     actor = _Actor(_FakeLayout(),
                    delay_params={"page_refresh": DelayParam(range=(0.0, 0.0))})
     actor.wait_delay("page_refresh")  # _stop_check 恒 True，立即返回
+
+
+def test_press_without_engine_fails_loudly():
+    """按键必须走引擎原语，拿不到引擎是装配错误，不能退回自己发按键。
+
+    退回去等于在 Base 层留第二份按键实现：它绕过组合键状态登记和
+    热键冲突校验，且永远不会在真实运行路径上被执行到。
+    """
+    actor = _Actor(_FakeLayout(regions=[_region("btn_ok")]))
+    actor._engine = None
+
+    with pytest.raises(RuntimeError, match="必须由 WorkflowEngine 执行"):
+        actor.press("SPACE", wait=None)
+
+    assert actor._input.keys == []

@@ -12,6 +12,7 @@ from loguru import logger
 
 from ...core.key_names import normalize_key
 from ..runtime_layout import require_enabled
+from .engine_ref import require_engine
 
 
 class _ActionMixin:
@@ -36,11 +37,7 @@ class _ActionMixin:
         if before != (0, 0):
             time.sleep(random.uniform(*before))
         logger.debug(f"激活: {target} -> press {normalized}")
-        self._input.key_down(normalized)
-        try:
-            time.sleep(random.uniform(0.025, 0.035))
-        finally:
-            self._input.key_up(normalized)
+        require_engine(self, "按键原语").press_key(normalized)
         if after != (0, 0):
             time.sleep(random.uniform(*after))
 
@@ -235,9 +232,7 @@ class _ActionMixin:
                   传 None 表示不等待。
         """
         logger.debug(f"press: {key}")
-        self._input.key_down(key)
-        time.sleep(random.uniform(0.025, 0.035))
-        self._input.key_up(key)
+        require_engine(self, "按键原语").press_key(key)
         if wait is not None:
             self.wait_delay(wait)
 

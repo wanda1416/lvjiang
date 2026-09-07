@@ -5,6 +5,8 @@ panel 没在布局里定义、行列索引不是数值都是脚本 / 布局配�
 网格的终止条件。
 """
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 from loguru import logger
 
@@ -17,15 +19,20 @@ from ..grammar import (
     Scan,
     VarRef,
 )
-from ..grammar.ast_nodes import Align
 from ..runtime_layout import require_enabled
 from .signals import WorkflowUserError
+
+if TYPE_CHECKING:
+    from ..grammar.ast_nodes import Align
 
 
 class _PanelMixin:
     """Panel 对齐与路由：align / panel cell 裁剪与识别 / 坐标换算"""
 
     def _exec_align(self, node: "Align"):
+        self.align_panel(node.scene, node.panel)
+
+    def align_panel(self, scene_key: str, panel_key: str):
         """align [scene].[panel] — 截图 panel 区域 + 运行图像自对齐，缓存 slot 中心
 
         校准模式由 panel.calibration 控制：
@@ -33,8 +40,6 @@ class _PanelMixin:
         - "image"：仅图像检测，失败返回 None
         - "auto"（默认）：先图像检测，失败降级为等分
         """
-        scene_key = node.scene
-        panel_key = node.panel
         panel_obj = self._find_panel_in_layout(scene_key, panel_key)
         if panel_obj is None:
             raise WorkflowUserError(
@@ -52,7 +57,7 @@ class _PanelMixin:
                 f"align: {scene_key}.{panel_key} 等分模式，"
                 f"{alignment.n_rows}×{alignment.n_cols} = {alignment.total_slots} 个 slot"
             )
-            return
+            return alignment
 
         # image / auto 模式：先尝试图像检测
         panel_img = self._capture_panel_image(panel_obj)
@@ -62,25 +67,74 @@ class _PanelMixin:
                 alignment = _make_even_alignment(panel_obj.rows, panel_obj.cols)
                 self._panel_alignments[(scene_key, panel_key)] = alignment
                 logger.warning(f"align: {scene_key}.{panel_key} 截图失败，降级为等分模式")
-            return
+                return alignment
+            return None
 
         fallback = (calibration == "auto")
         alignment = detect_grid(
             panel_img,
             expected_rows=panel_obj.rows,
             expected_cols=panel_obj.cols,
+            min_visible=getattr(panel_obj, "min_visible", 0.95),
             fallback=fallback,
             scroll_direction=getattr(panel_obj, "scroll_direction", "vertical"),
         )
         if alignment is None:
             logger.error(f"align: panel {scene_key}.{panel_key} 未检测到 slot")
-            return
+            return None
         self._panel_alignments[(scene_key, panel_key)] = alignment
         mode = tr("等分降级") if (fallback and alignment.row_span == 0.0) else tr("图像检测")
         logger.info(
             f"align: {scene_key}.{panel_key} 已对齐（{mode}），"
             f"检测到 {alignment.n_rows}×{alignment.n_cols} = {alignment.total_slots} 个 slot 中心"
         )
+        return alignment
+
+    def ensure_panel_aligned(self, scene_key: str, panel_key: str):
+        cache_key = (scene_key, panel_key)
+        if cache_key not in self._panel_alignments:
+            return self.align_panel(scene_key, panel_key)
+        return self._panel_alignments[cache_key]
+
+    def invalidate_panel_alignment(self, scene_key: str, panel_key: str) -> None:
+        self._panel_alignments.pop((scene_key, panel_key), None)
+
+    def click_panel(
+        self, scene_key: str, panel_key: str, row, col, **kw,
+    ) -> bool:
+        """WorkflowEngine 的 panel cell 点击原语（1-based）。"""
+        x, y = self._panel_cell_to_screen(scene_key, panel_key, row, col)
+        if x is None or y is None:
+            return False
+        self._input.click_screen(
+            x, y, f"panel({scene_key}.{panel_key}[{row}][{col}])", **kw)
+        return True
+
+    def _panel_cell_to_screen(
+        self, scene_key: str, panel_key: str, row, col,
+    ) -> tuple[int | None, int | None]:
+        try:
+            row_idx = int(float(row)) - 1
+            col_idx = int(float(col)) - 1
+        except (TypeError, ValueError):
+            raise WorkflowUserError(
+                f"panel 索引非数值: row={row}, col={col}") from None
+        cal = self.ensure_panel_aligned(scene_key, panel_key)
+        if cal is None:
+            logger.error(f"panel 未对齐: {scene_key}.{panel_key}")
+            return None, None
+        panel_obj = self._find_panel_in_layout(scene_key, panel_key)
+        if panel_obj is None:
+            raise WorkflowUserError(
+                f"布局中未定义 panel {scene_key}.{panel_key}，"
+                "请在场景布局编辑器中绑定后重试")
+        if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
+            logger.debug(
+                f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
+                f"对齐结果 {cal.n_rows}×{cal.n_cols}")
+            return None, None
+        cx, cy = cal.slot_center(row_idx, col_idx)
+        return self._panel_ratio_to_screen(panel_obj, cx, cy)
 
     def _panel_ref_to_screen(self, ref: PanelRef) -> tuple[int | None, int | None]:
         """PanelRef → 屏幕绝对坐标
@@ -93,38 +147,8 @@ class _PanelMixin:
         # 解析 row/col（支持 int 字面量或 $var）
         row = self._resolve(ref.row) if isinstance(ref.row, VarRef) else ref.row
         col = self._resolve(ref.col) if isinstance(ref.col, VarRef) else ref.col
-        try:
-            row_idx = int(float(row)) - 1  # DSL 1-based → 0-based
-            col_idx = int(float(col)) - 1
-        except (TypeError, ValueError):
-            raise WorkflowUserError(f"panel 索引非数值: row={row}, col={col}") from None
-
-        # 缓存未命中 → 自动 align
-        cache_key = (scene_key, panel_key)
-        if cache_key not in self._panel_alignments:
-            logger.info(f"panel 缓存未命中，自动 align: {scene_key}.{panel_key}")
-            auto_node = Align(scene=scene_key, panel=panel_key)
-            self._exec_align(auto_node)
-        cal = self._panel_alignments.get(cache_key)
-        if cal is None:
-            logger.error(f"panel 未对齐: {scene_key}.{panel_key}")
-            return None, None
-
-        panel_obj = self._find_panel_in_layout(scene_key, panel_key)
-        if panel_obj is None:
-            raise WorkflowUserError(
-                f"布局中未定义 panel {scene_key}.{panel_key}，"
-                f"请在场景布局编辑器中绑定后重试"
-            )
-
-        # 查表：用对齐结果的行列数做越界检查
-        if not (0 <= row_idx < cal.n_rows and 0 <= col_idx < cal.n_cols):
-            logger.debug(f"panel 索引越界: [{row_idx + 1}][{col_idx + 1}]，"
-                         f"对齐结果 {cal.n_rows}×{cal.n_cols}")
-            return None, None
-
-        cx, cy = cal.slot_center(row_idx, col_idx)  # 相对于 panel 区域
-        return self._panel_ratio_to_screen(panel_obj, cx, cy)
+        return self._panel_cell_to_screen(
+            str(scene_key), str(panel_key), row, col)
 
     def _crop_slot_image(self, ref: PanelRef) -> "tuple[np.ndarray | None, str, int, int]":
         """裁剪 panel cell 图像，返回 (slot_img, slot_key, row_idx, col_idx)
@@ -142,12 +166,7 @@ class _PanelMixin:
         except (TypeError, ValueError):
             raise WorkflowUserError(f"panel 索引非数值: row={row}, col={col}") from None
 
-        # 自动 align
-        cache_key = (scene_key, panel_key)
-        if cache_key not in self._panel_alignments:
-            auto_node = Align(scene=scene_key, panel=panel_key)
-            self._exec_align(auto_node)
-        cal = self._panel_alignments.get(cache_key)
+        cal = self.ensure_panel_aligned(scene_key, panel_key)
         panel_obj = self._find_panel_in_layout(scene_key, panel_key)
         if panel_obj is None:
             raise WorkflowUserError(
@@ -318,10 +337,7 @@ class _PanelMixin:
 
     def _aligned_panel_image(self, scene_key: str, panel_key: str):
         """自动 align 并截取 panel 全图，返回 (panel_img, cal)；失败 (None, None)"""
-        cache_key = (scene_key, panel_key)
-        if cache_key not in self._panel_alignments:
-            self._exec_align(Align(scene=scene_key, panel=panel_key))
-        cal = self._panel_alignments.get(cache_key)
+        cal = self.ensure_panel_aligned(scene_key, panel_key)
         if cal is None:
             logger.error(f"panel 未对齐: {scene_key}.{panel_key}")
             return None, None
@@ -656,6 +672,10 @@ class _PanelMixin:
             require_enabled(panel, scene_key, "panel")
         return panel
 
+    def find_panel(self, scene_key: str, panel_key: str):
+        """WorkflowEngine 的 panel 解析原语。"""
+        return self._find_panel_in_layout(scene_key, panel_key)
+
     def _capture_panel_image(self, panel_obj) -> "np.ndarray | None":
         """截取 panel 区域图像（像素数组），用于校准"""
         full = self._capture.capture()
@@ -684,6 +704,9 @@ class _PanelMixin:
             return None
         return full[y1:y2, x1:x2].copy()
 
+    def capture_panel_image(self, panel_obj) -> "np.ndarray | None":
+        return self._capture_panel_image(panel_obj)
+
     def _panel_ratio_to_screen(
         self, panel_obj, cx_panel: float, cy_panel: float
     ) -> tuple[int, int]:
@@ -711,3 +734,8 @@ class _PanelMixin:
         if (csx, csy) != (sx, sy):
             logger.debug(f"panel 坐标钳位: ({sx:.0f},{sy:.0f}) → ({csx:.0f},{csy:.0f})")
         return int(self._window_left + csx), int(self._window_top + csy)
+
+    def panel_ratio_to_screen(
+        self, panel_obj, cx_panel: float, cy_panel: float,
+    ) -> tuple[int, int]:
+        return self._panel_ratio_to_screen(panel_obj, cx_panel, cy_panel)

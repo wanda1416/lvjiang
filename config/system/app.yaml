@@ -41,6 +41,11 @@ envs:
   name: 安卓
 - key: desktop
   name: 桌面
+android_apps:
+  yyslscn:
+    package: com.netease.yyslscn
+    activity: com.netease.ntunisdk.external.protocol.ProtocolLauncher
+    orientation: landscape
 plans:
 - id: 13626639a4d5427588e1b620e855c3fc
   name: 手游

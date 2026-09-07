@@ -5,7 +5,7 @@
 #%   使用前请在「配置管理 → 安卓设置」注册应用名 game。
 #%   示例会强制停止该应用、确认进程消失、重新启动并等待横/竖屏切换后的稳定画面。
 
-default $app_name = "game"
+default $app_name = "yyslscn"
 
 eval check_env(["android"])
 log "准备停止安卓应用: " + $app_name

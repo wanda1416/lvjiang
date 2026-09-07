@@ -36,8 +36,7 @@ scenes:
     items:
     - school_main
     - baiye_main
-    - waiguan_yigui
-    - waiguan_qingjing
+    - appearance_main
   activity:
     name: 活动
     items:

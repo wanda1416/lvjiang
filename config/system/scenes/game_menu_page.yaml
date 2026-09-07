@@ -1,4 +1,4 @@
-content_version: 1
+content_version: 2
 key: game_menu_page
 name: 菜单
 views:
@@ -114,6 +114,7 @@ regions:
   is_text: true
   is_clickable: true
   view: page_1
+  to: appearance_main
 - key: bugan
   name: 不肝
   type: func

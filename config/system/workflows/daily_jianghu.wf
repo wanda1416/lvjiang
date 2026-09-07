@@ -306,11 +306,11 @@ end
 def action_huanzhuang($label)
    click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait stable @page_refresh least 0.5
-   click [waiguan_yigui].[chuanda] after wait @step_interval
-   click [waiguan_yigui].[fangan_1] after wait @step_interval
-   click [waiguan_yigui].[taoyong] after wait @step_interval
-   click [waiguan_yigui].[back] after wait @step_interval
-   click [waiguan_yigui].[back] after wait stable @page_refresh least 0.5
+   click [appearance_main].[chuanda] after wait @step_interval
+   click [appearance_main].[fangan_1] after wait @step_interval
+   click [appearance_main].[taoyong] after wait @step_interval
+   click [appearance_main].[back] after wait @step_interval
+   click [appearance_main].[back] after wait stable @page_refresh least 0.5
    click [activity_jianghu].[overlay_back] after wait @step_interval
 end
 
@@ -336,7 +336,7 @@ end
 
 # 情境：点击任务 → 弹出情境视图（展开 → 前往编辑情境）
 # → 情境编辑视图（保存 → 取消按钮出现则点一次 → 等 6s）
-# → 编辑页返回情境 → 情境返回任务浮层 → 关闭浮层回到号令基底
+# → 退出编辑（若回到外观情境 tab 则退出外观）→ 号令情境层返回任务浮层 → 关闭浮层
 def action_qingjing($label)
    click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait @step_interval
@@ -345,16 +345,16 @@ def action_qingjing($label)
    end
    click [activity_jianghu].[goto_qingjing] after wait @secondary_confirm
 
-   # 检查是否在衣柜页面（识别到"穿搭"），如果是则导航回情境页面
-   scan [waiguan_yigui].[chuanda] as $in_yigui by contains "穿搭"
+   # 外观入口为衣柜（基底）；若未直达编辑页，切换情境 tab 后进入独立编辑页
+   scan [appearance_main].[chuanda] as $in_yigui by contains "穿搭"
    if $in_yigui
       log "检测到在衣柜页面，导航回情境编辑页面"
-      click [waiguan_qingjing].[qingjing] after wait @step_interval
-      click [waiguan_qingjing].[goto_editing] after wait @secondary_confirm
+      click [appearance_main].[qingjing] after wait @step_interval
+      click [appearance_main].[edit_qingjing] after wait @secondary_confirm
    end
 
    # 保存后弹窗需要渲染时间，先等一下再扫描
-   click [waiguan_qingjing].[save] after wait @secondary_confirm
+   click [appearance_main].[save] after wait @secondary_confirm
    
    # 保存后可能弹出二次确认，识别到取消按钮才点一次
    scan [general_control].[cancel] as $has_cancel by contains "取消"
@@ -368,7 +368,7 @@ def action_qingjing($label)
    loop while $save_i < 10
       eval $save_i = $save_i + 1
       wait @step_interval
-      scan [waiguan_qingjing].[save] as $save_found by contains "保存"
+      scan [appearance_main].[save] as $save_found by contains "保存"
       if $save_found
          break
       end
@@ -377,7 +377,12 @@ def action_qingjing($label)
       eval pause("保存情境失败，请手动处理")
    end
 
-   click [waiguan_qingjing].[back] after wait stable @page_refresh least 0.5
+   click [appearance_main].[back] after wait stable @page_refresh least 0.5
+   # 普通入口会回到外观情境 tab；号令直达可能直接回到号令情境层。
+   scan [appearance_main].[edit_qingjing] as $in_appearance by contains "编辑情境"
+   if $in_appearance
+      click [appearance_main].[back] after wait stable @page_refresh least 0.5
+   end
    click [activity_jianghu].[qingjing_back] after wait @step_interval
    click [activity_jianghu].[overlay_back] after wait @step_interval
 end

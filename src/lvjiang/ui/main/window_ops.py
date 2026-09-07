@@ -125,7 +125,12 @@ class _DeviceWorker(QObject):
         if not started:
             if agent is not None:
                 agent.close()
-            self.error.emit(f"{method} 截图后端不可用")
+            # 后端若给出了具体原因（如 scrcpy 协议版本对不上），原样展示；
+            # 否则只能说"不可用"，用户还得自己翻日志。
+            reason = str(getattr(capture, "last_error", "") or "")
+            self.error.emit(
+                f"{method} {reason}" if reason
+                else tr("{method} 截图后端不可用").format(method=method))
             return
 
         self.connect_finished.emit(device, capture, method, w, h, agent)

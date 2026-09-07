@@ -202,9 +202,10 @@ def test_daily_jianghu_claim_reputation_guard():
         "min": 0,
     }
     assert "default $max_claim_reputation = 1500" in text
-    # 声望只接受非负整数；识别失败保留最近有效值，从未成功时才保持 -1
+    # 声望只接受非负整数；识别失败优先读取当前用户 profile，再保留本轮值
     assert "extract_int($result.haoling_of_week)" in text
     assert "if $value < 0" in text
+    assert 'profile_get("haoling_of_week")' in text
     assert "return $haoling_of_week" in text
     # 领奖后全屏奖励弹窗用通用空白区域点击关闭，避免遮挡下一轮页面校验
     claim_def = text[text.index("def claim_reward("):text.index("def claim_reward(") + 500]
@@ -234,12 +235,20 @@ def test_daily_jianghu_claim_reputation_guard():
     sync_body = text[sync_proc:sync_proc + 1200]
     assert "extract_int($result.haoling_of_week)" in sync_body
     assert "if $value < 0" in sync_body
+    assert 'eval $profile_value = profile_get("haoling_of_week")' in sync_body
+    assert "if $profile_value >= 0" in sync_body
+    assert "if $profile_value < $haoling_of_week" in sync_body
+    assert "return $profile_value" in sync_body
     assert "if $value < $haoling_of_week" in sync_body
     assert 'log warn "当周已领取声望识别到 "' in sync_body
     assert "return $haoling_of_week" in sync_body
     assert "haoling_sync_valid" not in text
     assert "call write_haoling_profile($value)" in sync_body
-    assert text.index("return $haoling_of_week", sync_proc) < text.index(
+    stale_profile_return = text.index("return $haoling_of_week", sync_proc)
+    profile_return = text.index("return $profile_value", stale_profile_return)
+    missing_profile_return = text.index("return $haoling_of_week", profile_return)
+    assert stale_profile_return < profile_return < missing_profile_return
+    assert missing_profile_return < text.index(
         "call write_haoling_profile($value)", sync_proc)
 
     claim_proc = text.index("def claim_completed_reward(")

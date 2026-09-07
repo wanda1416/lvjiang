@@ -61,8 +61,8 @@ if $haoling_ok < 0
    return -1
 end
 
-# 首次进入读取一次：识别到有效值即写入 profile；无效 OCR 保留上次有效值。
-# 若本轮从未识别成功，初始值仍为 -1，领奖入口会据此跳过。
+# 首次进入读取一次：识别到有效值即写入 profile；无效 OCR 优先回退到
+# 当前用户 profile 的同步值。两者都无效时才保留本轮上次有效值。
 # 此后只有领奖会改变该值，故「读取即写入」足以保证实时与存储一致。
 call $haoling_of_week = sync_haoling_of_week()
 
@@ -252,15 +252,24 @@ end
 # 这是当周声望的**唯一读取入口**，读取即写入：只要识别到有效值且有
 # profile 定义就落盘，避免只有实际领奖时才更新，导致未领奖、已达上限
 # 等分支下 profile 停留在旧值（实时与存储不一致）。
-# 返回：本轮最新有效值；识别失败或小于上次值时保留旧值（不写 profile），
-# 后续领奖继续依据这份最近有效值判断。
+# 返回：本轮最新有效值；识别失败时优先读取 profile，profile 也无效或 OCR
+# 小于本轮上次值时保留旧值（不写 profile）。后续领奖继续依据最近有效值判断。
 # OCR 可能带乱码，用 extract_int 提取其中的完整整数；0 是合法值，
 # 只有没有解析出整数时才视为失败。
 def sync_haoling_of_week()
    scan [activity_jianghu].[haoling_of_week] as $result
    eval $value = extract_int($result.haoling_of_week)
    if $value < 0
-      log "当周已领取声望识别失败: " + $result.haoling_of_week + "，保留上次有效值 " + $haoling_of_week
+      eval $profile_value = profile_get("haoling_of_week")
+      if $profile_value >= 0
+         if $profile_value < $haoling_of_week
+            log warn "当周已领取声望 OCR 失败，profile 值 " + $profile_value + " 小于本轮上次有效值 " + $haoling_of_week + "，继续使用本轮值"
+            return $haoling_of_week
+         end
+         log "当周已领取声望识别失败: " + $result.haoling_of_week + "，回退使用 profile 值 " + $profile_value
+         return $profile_value
+      end
+      log "当周已领取声望识别失败: " + $result.haoling_of_week + "，profile 也无有效值，保留本轮上次有效值 " + $haoling_of_week
       return $haoling_of_week
    end
    if $value < $haoling_of_week

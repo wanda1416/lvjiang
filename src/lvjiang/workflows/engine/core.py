@@ -126,11 +126,12 @@ def _normalize_import_path(raw: str) -> str:
 
 class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                      _ControlFlowMixin, _EvalMixin):
-    """DSL v2 工作流运行时
+    """工作流运行时核心。
 
-    直接持有硬件后端，管理 session/context 生命周期。
-    通过 _ensure_workflow() 懒创建 BaseWorkflow 作为游戏操作委托。
-    通过 import/def/call proc 实现模块化过程复用。
+    直接持有输入、截图、布局与运行时缓存，管理 session/context
+    生命周期并提供公共操作原语。DSL 层只负责解析 AST、求值参数并
+    调用这些原语；Python 业务流经 BaseWorkflow 薄门面调用同一组能力。
+    import/def/call proc 是 DSL 适配层提供的模块化编排能力。
     """
 
     def __init__(
@@ -209,7 +210,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         #   action="notify":  message → None
         #   action="input":   prompt  → str | None
         self._ui_callback: Callable | None = None
-        # 游戏操作委托（execute 时懒创建）
+        # Python 工作流门面（execute 时懒创建）
         self._workflow: BaseWorkflow | None = None
         # 按键状态注册表（press 指令用，懒初始化绑定当前 backend）
         self._key_registry: KeyStateRegistry | None = None
@@ -223,11 +224,12 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self.step_mode: bool = False
 
     def _ensure_workflow(self) -> BaseWorkflow:
-        """懒创建 BaseWorkflow 作为游戏操作委托
+        """懒创建 BaseWorkflow Python 门面
 
         注意：Python 工作流执行期间（_execute_python_workflow），self._workflow
-        会被临时设置为注入的工作流实例（如 AutoTuningWorkflow），使 DSL 子过程
-        的游戏操作原语委派到该工作流。执行结束后在 finally 中重置为 None。
+        会被临时设置为注入的工作流实例（如 AutoTuningWorkflow），
+        使 Python 业务流与其调用的 DSL 子过程共用当前 WorkflowEngine。
+        执行结束后在 finally 中重置为 None。
         """
         if self._workflow is None:
             self._workflow = BaseWorkflow(
@@ -243,6 +245,10 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 pause_event=self._pause_event,
                 reference_recognizer=self._reference_recognizer,
             )
+            # BaseWorkflow 是 WorkflowEngine 公共原语的 Python 门面；
+            # 回指当前引擎后，Panel/press 等公共能力不再在
+            # Base 层另起一套实现。
+            self._workflow._engine = self
         return self._workflow
 
     def _debug_before_stmt(self, node) -> None:
@@ -300,6 +306,10 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         # 过程中通过 context/global 共享数据；两者都不得泄漏到下一次执行。
         if _reset_context:
             self.context = {}
+            # Panel 对齐依赖当前画面，只属于单次顶层运行。
+            # DSL 与 Python 业务流共用引擎缓存后，必须在统一
+            # 生命周期边界清理，不能泄漏到下一条工作流。
+            self._panel_alignments.clear()
             for name in self._global_variable_names:
                 self.variables.pop(name, None)
             self._global_variable_names.clear()
@@ -857,8 +867,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         # 注入引擎引用，使工作流内调用的 UI 交互内置函数
         # （confirm/pause/input）能经 _ui_callback 走 Qt 主线程桥
         workflow._engine = self
-        # 工作流实例直接作为游戏操作委托：期间经 call_subcall 执行的
-        # DSL 子过程与工作流本体共用同一套原语（延迟参数/测试替身一致）
+        # 工作流实例作为 Python 门面：期间经 call_subcall 执行的
+        # DSL 子过程与业务流共用当前引擎的原语和运行时状态。
         self._workflow = workflow
         logger.info(f"=== Python 工作流开始: {workflow.__class__.__name__} ===")
         try:

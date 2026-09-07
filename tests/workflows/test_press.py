@@ -10,6 +10,8 @@
 """
 
 
+from unittest.mock import patch
+
 import pytest
 
 from lvjiang.core.input_base import InputBackendKind
@@ -35,6 +37,13 @@ class TestPressMode:
         assert inp.key_up.call_count == 1
         inp.key_down.assert_called_with("M")
         inp.key_up.assert_called_with("M")
+
+    def test_python_workflow_facade_uses_engine_press_primitive(self):
+        eng = make_engine()
+        workflow = eng._ensure_workflow()
+        with patch.object(eng, "press_key") as press_key:
+            workflow.press("escape", wait=None)
+        press_key.assert_called_once_with("escape")
 
     def test_press_normalizes_key(self):
         """press "escape" — 键名标准化（escape → ESC）"""

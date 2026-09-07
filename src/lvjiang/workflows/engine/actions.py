@@ -39,7 +39,7 @@ from ..grammar import (
     Wait,
     WaitStable,
 )
-from ..grammar.ast_nodes import Align, PressMode, TupleLiteral
+from ..grammar.ast_nodes import PressMode, TupleLiteral
 from ..runtime_layout import require_enabled, resolve_subscene_entity
 from .signals import WorkflowUserError
 
@@ -109,9 +109,12 @@ class _ActionsMixin:
             self._input.click_screen(x, y, f"coord({node.target.rx},{node.target.ry})", **kw)
             return
         if isinstance(node.target, PanelRef):
-            x, y = self._panel_ref_to_screen(node.target)
-            if x is not None and y is not None:
-                self._input.click_screen(x, y, f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])", **kw)
+            ref = node.target
+            scene = self._resolve(ref.scene) if isinstance(ref.scene, VarRef) else ref.scene
+            panel = self._resolve(ref.panel) if isinstance(ref.panel, VarRef) else ref.panel
+            row = self._resolve(ref.row) if isinstance(ref.row, VarRef) else ref.row
+            col = self._resolve(ref.col) if isinstance(ref.col, VarRef) else ref.col
+            self.click_panel(str(scene), str(panel), row, col, **kw)
             return
         if isinstance(node.target, SubsceneEntityRef):
             x, y, label = self._subscene_target_to_screen(node.target)
@@ -442,6 +445,61 @@ class _ActionsMixin:
             return
         raise WorkflowUserError(f"drag: 未知目标类型 {type(node.scene).__name__}")
 
+    def drag_grid(
+        self, scene_key: str, panel_key: str, direction: str, *,
+        distance: float = 1.0, hold: float | None = None,
+        duration: float | tuple[float, float] | None = None,
+        **kw,
+    ) -> None:
+        """WorkflowEngine 的 panel/region grid 拖拽原语。"""
+        panel_obj = self._find_panel_in_layout(scene_key, panel_key)
+        if panel_obj is None:
+            regions = self._layout.get_scene_regions(scene_key)
+            area = next((r for r in regions if r.key == panel_key), None)
+            if area is None:
+                raise WorkflowUserError(
+                    f"drag grid: 布局中未定义 panel/region "
+                    f"{scene_key}.{panel_key}")
+            require_enabled(area, scene_key, "region")
+            x, y, w, h, canvas = self._area_center_to_screen(area)
+            vertical = area.h_ratio * canvas.h_ratio * h * distance
+            horizontal = area.w_ratio * canvas.w_ratio * w * distance
+        else:
+            area = panel_obj
+            x, y, w, h, canvas = self._area_center_to_screen(area)
+            cal = self.ensure_panel_aligned(scene_key, panel_key)
+            if cal is None or cal.row_slot <= 0:
+                logger.error(
+                    f"drag grid: align 失败，无法计算拖拽距离: "
+                    f"{scene_key}.{panel_key}")
+                return
+            if direction not in ("up", "down") and cal.col_slot <= 0:
+                logger.error(
+                    f"drag grid: align 列数据无效: {scene_key}.{panel_key}")
+                return
+            vertical = (
+                (cal.row_slot + cal.row_span / 2.0)
+                * area.h_ratio * canvas.h_ratio * h * distance
+            )
+            horizontal = (
+                (cal.col_slot + cal.col_span / 2.0)
+                * area.w_ratio * canvas.w_ratio * w * distance
+            )
+        dx, dy = self._drag_delta(direction, vertical, horizontal)
+        self._input.drag_screen(
+            x, y, x + dx, y + dy,
+            f"grid({scene_key}.{panel_key}) {direction} {distance}",
+            duration=duration, hold=hold, **kw,
+        )
+        if panel_obj is not None:
+            self.invalidate_panel_alignment(scene_key, panel_key)
+            logger.debug(
+                f"drag grid: 已失效对齐缓存: {scene_key}.{panel_key}")
+        else:
+            logger.debug(
+                f"drag grid: region {scene_key}.{panel_key} "
+                f"{direction} {distance}")
+
     def _drag_duration(self, node: Drag):
         return self._resolve_duration(node.duration) if node.duration else None
 
@@ -507,77 +565,13 @@ class _ActionsMixin:
         )
 
     def _drag_panel_grid(self, node: Drag, kw: dict) -> None:
-        """从 panel/region 中心按一个或多个实测格距拖拽。"""
+        """DSL PanelGridDrag AST → WorkflowEngine 拖拽原语。"""
         grid = node.scene
-        panel_obj = self._find_panel_in_layout(grid.scene, grid.panel)
-        if panel_obj is None:
-            regions = self._layout.get_scene_regions(grid.scene)
-            region_obj = next((r for r in regions if r.key == grid.panel), None)
-            if region_obj is None:
-                raise WorkflowUserError(
-                    f"drag grid: 布局中未定义 panel/region {grid.scene}.{grid.panel}"
-                )
-            self._drag_grid_region(node, region_obj, kw)
-            return
-        self._drag_grid_panel(node, panel_obj, kw)
-
-    def _drag_grid_region(self, node: Drag, region_obj, kw: dict) -> None:
-        grid = node.scene
-        require_enabled(region_obj, grid.scene, "region")
-        x, y, w, h, canvas = self._area_center_to_screen(region_obj)
         distance = self._drag_distance(grid.distance, "drag grid")
-        dx, dy = self._drag_delta(
-            grid.direction,
-            region_obj.h_ratio * canvas.h_ratio * h * distance,
-            region_obj.w_ratio * canvas.w_ratio * w * distance,
-        )
-        self._input.drag_screen(
-            x, y, x + dx, y + dy,
-            f"grid({grid.scene}.{grid.panel}) {grid.direction} {distance}",
+        self.drag_grid(
+            grid.scene, grid.panel, grid.direction,
+            distance=distance,
             duration=self._drag_duration(node), hold=node.hold, **kw,
-        )
-        logger.debug(
-            f"drag grid: region {grid.scene}.{grid.panel} "
-            f"{grid.direction} {distance}"
-        )
-
-    def _drag_grid_panel(self, node: Drag, panel_obj, kw: dict) -> None:
-        grid = node.scene
-        x, y, w, h, canvas = self._area_center_to_screen(panel_obj)
-        distance = self._drag_distance(grid.distance, "drag grid")
-        cache_key = (grid.scene, grid.panel)
-        if cache_key not in self._panel_alignments:
-            logger.info(
-                f"drag grid: 缓存未命中，懒加载 align: {grid.scene}.{grid.panel}"
-            )
-            self._exec_align(Align(scene=grid.scene, panel=grid.panel))
-        cal = self._panel_alignments.get(cache_key)
-        if cal is None or cal.row_slot <= 0:
-            logger.error(
-                f"drag grid: align 失败，无法计算拖拽距离: "
-                f"{grid.scene}.{grid.panel}"
-            )
-            return
-        if grid.direction not in ("up", "down") and cal.col_slot <= 0:
-            logger.error(
-                f"drag grid: align 列数据无效: {grid.scene}.{grid.panel}"
-            )
-            return
-        dx, dy = self._drag_delta(
-            grid.direction,
-            (cal.row_slot + cal.row_span / 2.0)
-            * panel_obj.h_ratio * canvas.h_ratio * h * distance,
-            (cal.col_slot + cal.col_span / 2.0)
-            * panel_obj.w_ratio * canvas.w_ratio * w * distance,
-        )
-        self._input.drag_screen(
-            x, y, x + dx, y + dy,
-            f"grid({grid.scene}.{grid.panel}) {grid.direction} {distance}",
-            duration=self._drag_duration(node), hold=node.hold, **kw,
-        )
-        self._panel_alignments.pop(cache_key, None)
-        logger.debug(
-            f"drag grid: 已失效对齐缓存: {grid.scene}.{grid.panel}"
         )
 
     def _drag_panel_ref(self, node: Drag, kw: dict) -> None:
@@ -688,17 +682,36 @@ class _ActionsMixin:
         - DOWN: 按下保持
         - UP: 释放此前按下的键
         """
-        # 懒初始化 KeyStateRegistry（绑定当前 backend）
-        if self._key_registry is None:
-            from .key_state import KeyStateRegistry
-            self._key_registry = KeyStateRegistry(self._input)
-
         keys: list[str] = []
         for item in node.keys or (node.key,):
             key_raw = self._resolve(item)
             if key_raw is None:
                 raise WorkflowUserError("press: 按键变量未定义")
-            keys.append(normalize_key(str(key_raw)))
+            keys.append(str(key_raw))
+        duration = (
+            float(self._resolve(node.duration))
+            if node.mode is PressMode.HOLD else None
+        )
+        self.press_keys(keys, mode=node.mode, duration=duration)
+
+    def press_key(self, key: str) -> None:
+        """WorkflowEngine 的单次按键原语。"""
+        self.press_keys([key])
+
+    def press_keys(
+        self,
+        raw_keys: list[str],
+        *,
+        mode: PressMode = PressMode.PRESS,
+        duration: float | None = None,
+    ) -> None:
+        """执行已解析的按键原语；不依赖 DSL AST。"""
+        # 懒初始化 KeyStateRegistry（绑定当前 backend）
+        if self._key_registry is None:
+            from .key_state import KeyStateRegistry
+            self._key_registry = KeyStateRegistry(self._input)
+
+        keys = [normalize_key(str(key)) for key in raw_keys]
         if len(set(keys)) != len(keys):
             raise WorkflowUserError(f"press 组合键包含重复按键: {' + '.join(keys)}")
 
@@ -750,7 +763,7 @@ class _ActionsMixin:
             if first_error is not None:
                 raise first_error
 
-        match node.mode:
+        match mode:
             case PressMode.PRESS:
                 logger.debug(f"press: {' + '.join(keys)}")
                 pressed = down_all()
@@ -762,8 +775,7 @@ class _ActionsMixin:
                     up_all(pressed)
 
             case PressMode.HOLD:
-                duration = float(self._resolve(node.duration))
-                if duration <= 0:
+                if duration is None or duration <= 0:
                     raise WorkflowUserError(f"press hold 时长必须 > 0，得到 {duration}")
                 logger.debug(f"press: {' + '.join(keys)} hold {duration}s")
                 pressed = down_all()

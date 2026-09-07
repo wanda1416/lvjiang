@@ -6,7 +6,7 @@
 - CoordPoint 对拖拽
 """
 
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -40,6 +40,13 @@ class TestClickCoordPoint:
         eng._exec_body(program.body)
         _args, kwargs = eng._input.click_screen.call_args
         assert kwargs["button"] == "x1"
+
+    def test_python_workflow_facade_uses_engine_panel_click_primitive(self):
+        eng = make_engine()
+        workflow = eng._ensure_workflow()
+        with patch.object(eng, "click_panel", return_value=True) as click_panel:
+            assert workflow.click_panel("bag", "items", 2, 3)
+        click_panel.assert_called_once_with("bag", "items", 2, 3)
 
 
 class TestRawMouseButton:
@@ -131,6 +138,24 @@ class TestDragStructuredTargets:
         args = eng._input.drag_screen.call_args.args
         assert args[:4] == (576, 378, 576, 236)
         assert ("bag", "items") not in eng._panel_alignments
+
+    def test_dsl_panel_grid_adapts_to_engine_primitive(self):
+        eng = make_engine()
+        with patch.object(eng, "drag_grid") as drag_grid:
+            eng._exec_body(parse_text("drag [bag].[items] up 2\n").body)
+        drag_grid.assert_called_once_with(
+            "bag", "items", "up", distance=2.0,
+            duration=None, hold=None,
+        )
+
+    def test_python_workflow_facade_uses_engine_drag_primitive(self):
+        eng = make_engine()
+        workflow = eng._ensure_workflow()
+        with patch.object(eng, "drag_grid") as drag_grid:
+            workflow.drag_grid("bag", "items", "up", distance=2, hold=0.3)
+        drag_grid.assert_called_once_with(
+            "bag", "items", "up", distance=2, hold=0.3,
+        )
 
     def test_region_grid_uses_declared_region_size(self):
         eng = make_engine()

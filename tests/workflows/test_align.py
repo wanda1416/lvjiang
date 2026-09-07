@@ -606,6 +606,37 @@ class TestEngineAlignCalibration:
         cal = mock_engine._panel_alignments.get(("test_scene", "test_panel"))
         assert cal is None
 
+    def test_align_honors_panel_min_visible(self, mock_engine):
+        """WorkflowEngine 原语必须消费布局声明的 min_visible。"""
+        panel = Panel(
+            key="test_panel",
+            x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8,
+            cols=6, rows=5, calibration="image", min_visible=0.85,
+        )
+        mock_engine._layout.set_scene_panels("test_scene", [panel])
+        image = np.ones((100, 100, 3), dtype=np.uint8)
+        expected = _make_even_alignment(5, 6)
+        with (
+            patch.object(mock_engine, "_capture_panel_image", return_value=image),
+            patch("lvjiang.workflows.engine.panel.detect_grid", return_value=expected) as detect,
+        ):
+            result = mock_engine.align_panel("test_scene", "test_panel")
+
+        assert result is expected
+        assert detect.call_args.kwargs["min_visible"] == 0.85
+
+    def test_python_workflow_facade_uses_engine_align_primitive(self, mock_engine):
+        """Python 业务流不再执行独立的 panel 对齐实现。"""
+        expected = _make_even_alignment(5, 6)
+        workflow = mock_engine._ensure_workflow()
+        with patch.object(
+            mock_engine, "align_panel", return_value=expected,
+        ) as align:
+            result = workflow.align_panel("test_scene", "test_panel")
+
+        assert result is expected
+        align.assert_called_once_with("test_scene", "test_panel")
+
 
 class TestPanelScrollDirection:
     """Panel.scroll_direction 字段验证"""

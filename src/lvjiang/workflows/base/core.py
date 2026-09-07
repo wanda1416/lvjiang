@@ -13,7 +13,6 @@ from ...core.input_base import InputBackend
 from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
 from .. import builtins  # noqa: F401  触发内置函数注册
-from ..align import GridAlignment
 from .actions import _ActionMixin
 from .coords import _CoordMixin
 from .panel import _PanelMixin
@@ -71,8 +70,6 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         # 运行时状态
         self.output: dict = {}  # collect 语句写入的输出字典
         self.variables: dict = {}
-        # panel 对齐缓存：(scene_key, panel_key) → GridAlignment
-        self._panel_alignments: dict[tuple[str, str], GridAlignment] = {}
 
     def run(self) -> dict:
         """执行工作流（子类重写）

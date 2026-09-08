@@ -85,11 +85,13 @@ class LoadoutState:
     active_plan_id: str = ""
     plans: dict[str, LoadoutPlan] = field(default_factory=dict)
     equipment_items: dict[str, dict] = field(default_factory=dict)
+    # 兼容旧版筛选值；新 UI 状态写入 session.json，避免与任务数据共用执行锁。
     ui_state: dict[str, dict] = field(default_factory=dict)
 
     @classmethod
     def empty(cls) -> "LoadoutState":
-        plan = LoadoutPlan.create()
+        # 尚未落盘时，各读取者必须看到同一个默认方案 ID，首次编辑才持久化。
+        plan = LoadoutPlan(id="default", name="默认方案")
         return cls(active_plan_id=plan.id, plans={plan.id: plan})
 
     @classmethod

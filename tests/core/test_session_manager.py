@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from lvjiang.core.config.users import SessionManager
+from lvjiang.core.config.users import SessionConflictError, SessionManager
 
 
 @pytest.fixture
@@ -46,9 +46,11 @@ class TestSave:
         assert data["current_user"] == "新用户"
         assert data["level"] == 5
 
-    def test_save_overwrites_existing(self, mgr, tmp_path):
+    def test_save_updates_loaded_field(self, mgr, tmp_path):
         mgr.save("用户", {"v": 1})
-        mgr.save("用户", {"v": 2})
+        session = mgr.load("用户")
+        session["v"] = 2
+        mgr.save("用户", session)
         data = json.loads((tmp_path / "用户.json").read_text(encoding="utf-8"))
         assert data["v"] == 2
 
@@ -60,14 +62,40 @@ class TestSave:
     def test_concurrent_save_keeps_valid_json(self, mgr, tmp_path):
         """并发保存同一用户时，最终文件不能出现半截 JSON。"""
         def save_one(i: int):
-            mgr.save("并发用户", {"current_user": "并发用户", "counter": i})
+            mgr.save("并发用户", {"current_user": "并发用户", f"counter_{i}": i})
 
         with ThreadPoolExecutor(max_workers=8) as executor:
             list(executor.map(save_one, range(50)))
 
         data = json.loads((tmp_path / "并发用户.json").read_text(encoding="utf-8"))
         assert data["current_user"] == "并发用户"
-        assert isinstance(data["counter"], int)
+        assert all(data[f"counter_{i}"] == i for i in range(50))
+
+    def test_disjoint_nested_fields_merge_and_conflicts_are_atomic(self, mgr):
+        mgr.save("用户", {"nested": {"a": 1, "b": 1}})
+        first = mgr.load("用户")
+        second = mgr.load("用户")
+        first["nested"]["a"] = 2
+        second["nested"]["b"] = 2
+        mgr.save("用户", first)
+        mgr.save("用户", second)
+        assert mgr.load("用户")["nested"] == {"a": 2, "b": 2}
+        second["nested"]["a"] = 3
+        second["new"] = "must not commit"
+        with pytest.raises(SessionConflictError, match="nested.a"):
+            mgr.save("用户", second)
+        assert "new" not in mgr.load("用户")
+
+    def test_missing_keys_do_not_delete_and_repeated_save_works(self, mgr):
+        mgr.save("用户", {"keep": 1, "counter": 0})
+        session = mgr.load("用户")
+        del session["keep"]
+        session["counter"] = 1
+        mgr.save("用户", session)
+        session["counter"] = 2
+        mgr.save("用户", session)
+        assert mgr.load("用户")["keep"] == 1
+        assert mgr.load("用户")["counter"] == 2
 
 
 class TestUpdate:

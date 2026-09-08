@@ -12,6 +12,7 @@ import cv2
 from loguru import logger
 
 from ...constants import PROJECT_ROOT
+from ...core.access import user_execution
 from ...core.capture_base import CaptureBackend
 from ...core.config import (
     AndroidAppConfig,
@@ -291,6 +292,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 raise _BreakSignal()
             self._pause_event.wait(timeout=1.0)
 
+    @user_execution
     def execute(self, source, *, initial_variables: dict | None = None,
                 _reset_context: bool = True) -> dict:
         """统一执行入口

@@ -17,7 +17,7 @@
 import re
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QBrush
+from PyQt6.QtGui import QAction, QBrush
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -163,7 +163,12 @@ class TuningRulesDialog(QDialog):
             minimum_width=navigation_width_for_chars(self._nav, 4),
         )
         self._nav.currentRowChanged.connect(self._on_nav_changed)
-        self._nav.itemDoubleClicked.connect(self._on_nav_double_clicked)
+        self._rename_action = QAction(tr("重命名规则"), self._nav)
+        self._rename_action.triggered.connect(
+            lambda: self._on_nav_double_clicked(self._nav.currentItem()))
+        self._nav.addAction(self._rename_action)
+        self._nav.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
+        self._nav.itemDoubleClicked.connect(lambda _item: self._rename_action.trigger())
         left.addWidget(self._nav, 1)
         btn_new = QPushButton(tr("＋ 新增规则"))
         btn_new.setAutoDefault(False)
@@ -355,6 +360,8 @@ class TuningRulesDialog(QDialog):
 
     def _on_nav_double_clicked(self, item):
         """双击规则导航项 → 弹窗修改规则名称（配置页不可改名）"""
+        if item is None:
+            return
         row = self._nav.row(item)
         if row < 6:  # 四张基础规则/行为页 + 分割线 + 流派规则页
             return

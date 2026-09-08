@@ -131,6 +131,11 @@ class UserConfigManager:
 
 
     def delete_user(self, name: str) -> bool:
+        if name not in self._users or len(self._users) == 1:
+            return False
+        return self._delete_user(name)
+
+    def _delete_user(self, name: str) -> bool:
         """删除用户，返回是否成功"""
         if name not in self._users:
             return False
@@ -195,6 +200,7 @@ class UserConfigManager:
         if name not in self._users:
             return False
         self._active_user = name
-        self._save()
+        from .config.session import get_session_store
+        get_session_store().set_active("user", name)
         logger.info(f"已切换到用户: {name}")
         return True

@@ -201,12 +201,10 @@ class ScriptOpsMixin:
             engine.run_username = username
             # context 由 execute() 自动初始化为空 dict
 
-            # 写入临时 .wf 文件（按模式落可写层）
-            temp_wf = get_resolver().write_entity(
-                "workflows/_editor_run.wf", script)
-
-            # 同步执行
-            result = engine.execute(temp_wf)
+            # 每次试运行独立存储，主/只读实例均不会覆盖其他任务的脚本。
+            from ...workflows.runtime_source import runtime_source
+            with runtime_source(script) as temp_wf:
+                result = engine.execute(temp_wf)
             return_value = engine.return_value
 
             # 格式化输出结果到左侧结果区

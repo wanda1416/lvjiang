@@ -72,7 +72,7 @@ from ...core.attr_model import (
     invalidate_attr_model_cache,
 )
 from ...core.combat.combat_attrs import COMBAT_ATTR_FIELDS
-from ..layout_helpers import configure_navigation_list
+from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 
 #: 取值方式
 MODE_PENDING = "未填"
@@ -107,7 +107,7 @@ def _left_aligned(widget: QWidget, *, width: int = 0) -> QWidget:
     半个窗口，既难看也让人以为里面有很多内容。
     """
     if width:
-        widget.setFixedWidth(width)
+        widget.setMinimumWidth(width)
     holder = QWidget()
     box = QHBoxLayout(holder)
     box.setContentsMargins(0, 0, 0, 0)
@@ -155,6 +155,7 @@ def _configure_spin(spin: QDoubleSpinBox, field_name: Any, internal: float) -> N
     spin.setDecimals(3 if percent else 5)
     spin.setRange(-100000.0, 100000.0)
     spin.setValue(_to_shown(name, internal))
+    spin.setMinimumWidth(max(160, spin.sizeHint().width()))
 
 
 class _AdvancedDialog(QDialog):
@@ -225,6 +226,7 @@ class AttrSourcePanel(QWidget):
         left_layout.setContentsMargins(0, 0, 0, 0)
 
         self._search = QLineEdit()
+        self._search.setMinimumWidth(220)
         self._search.setPlaceholderText(tr("搜索"))
         self._search.textChanged.connect(self._refresh_groups)
         left_layout.addWidget(self._search)
@@ -284,6 +286,7 @@ class AttrSourcePanel(QWidget):
         rows_header = self._table.verticalHeader()
         if rows_header is not None:
             rows_header.setVisible(False)
+            rows_header.setMinimumSectionSize(34)
             rows_header.setDefaultSectionSize(34)
         right_layout.addWidget(self._table)
 
@@ -412,7 +415,7 @@ class AttrSourcePanel(QWidget):
 
             mode = QComboBox()
             mode.addItems([tr(text) for text in _COLUMNS] + [tr(MODE_ADVANCED)])
-            mode.setFixedWidth(158)
+            fit_combo_to_contents(mode, minimum=158)
             mode.setCurrentIndex(self._mode_index(effect))
             mode.currentIndexChanged.connect(
                 lambda _index, r=row: self._on_mode_changed(r))
@@ -424,10 +427,24 @@ class AttrSourcePanel(QWidget):
             scope.addItem(tr("进面板"), SCOPE_PANEL)
             scope.addItem(tr("仅战斗内"), SCOPE_COMBAT)
             scope.setCurrentIndex(0 if effect.scope == SCOPE_PANEL else 1)
-            scope.setFixedWidth(108)
+            fit_combo_to_contents(scope, minimum=108)
             scope.currentIndexChanged.connect(
                 lambda _index, r=row: self._commit(r))
             self._table.setCellWidget(row, 4, scope)
+        # 列宽包含嵌入控件的完整尺寸；窄窗口通过表格横向滚动浏览。
+        for column in (0, 1):
+            self._table.resizeColumnToContents(column)
+            self._table.setColumnWidth(
+                column, max(100, self._table.columnWidth(column)))
+        header = self._table.horizontalHeader()
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
+        for column in (2, 3, 4):
+            widths = [max(widget.minimumWidth(), widget.sizeHint().width(),
+                          widget.minimumSizeHint().width())
+                      for row in range(self._table.rowCount())
+                      if (widget := self._table.cellWidget(row, column)) is not None]
+            self._table.setColumnWidth(column, max([120, *widths]) + 16)
+        self._table.resizeRowsToContents()
         self._loading = False
 
     def _mode_index(self, effect) -> int:
@@ -454,7 +471,8 @@ class AttrSourcePanel(QWidget):
                 combo.setCurrentText(effect.full_affix.category)
             combo.currentIndexChanged.connect(
                 lambda _i, r=row: self._commit(r))
-            return _left_aligned(combo, width=200)
+            fit_combo_to_contents(combo, minimum=200)
+            return _left_aligned(combo)
         if index == _COLUMNS.index(MODE_VALUE):
             holder = QWidget()
             box = QHBoxLayout(holder)
@@ -471,8 +489,7 @@ class AttrSourcePanel(QWidget):
             _configure_spin(spin, field.currentData(), stored_value)
             field.currentIndexChanged.connect(lambda _i, r=row: self._commit(r))
             spin.valueChanged.connect(lambda _v, r=row: self._commit(r))
-            field.setFixedWidth(190)
-            spin.setFixedWidth(130)
+            fit_combo_to_contents(field, minimum=190)
             box.addWidget(field)
             box.addWidget(spin)
             box.addStretch()

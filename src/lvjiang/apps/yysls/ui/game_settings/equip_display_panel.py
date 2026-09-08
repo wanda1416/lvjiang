@@ -58,7 +58,7 @@ class EquipDisplayPanel(QWidget):
             spin = QSpinBox()
             spin.setRange(lo, hi)
             spin.setSuffix(suffix)
-            spin.setFixedWidth(100)
+            spin.setMinimumWidth(140)
             self._spinboxes[key] = spin
             form.addRow(label + ":", spin)
 
@@ -67,7 +67,7 @@ class EquipDisplayPanel(QWidget):
         # 保存按钮
         btn_row = QHBoxLayout()
         btn_save = QPushButton(tr("保存"))
-        btn_save.setFixedWidth(80)
+        btn_save.setMinimumWidth(80)
         apply_button_style(btn_save)
         btn_save.clicked.connect(self._save)
         btn_row.addWidget(btn_save)

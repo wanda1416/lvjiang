@@ -4,7 +4,13 @@ from types import SimpleNamespace
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QComboBox, QPushButton, QWidget
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QPushButton,
+    QStyle,
+    QStyleOptionComboBox,
+    QWidget,
+)
 
 import lvjiang.apps.yysls.config as config_module
 from lvjiang.apps.yysls.ui.loadout.equip.cards import _CompactEquipCard
@@ -36,19 +42,22 @@ def _equip(*, quality: str | None = "gold", affix_count: int = 1) -> dict:
     return equip
 
 
-def test_filter_combo_width_is_longest_option_plus_two_chinese_chars(qtbot):
+def test_filter_combo_fits_text_with_style_padding_and_arrow(qtbot):
     combo = QComboBox()
+    combo.setStyleSheet("QComboBox { padding: 8px 16px; font-size: 18px; }")
     combo.addItems(["全部", "未满调律"])
     qtbot.addWidget(combo)
-    metrics = combo.fontMetrics()
-    expected = (
-        metrics.horizontalAdvance("未满调律")
-        + metrics.horizontalAdvance("汉汉")
-    )
+    width = _fit_filter_combo(combo)
+    combo.resize(width, combo.sizeHint().height())
+    option = QStyleOptionComboBox()
+    combo.initStyleOption(option)
+    field = combo.style().subControlRect(
+        QStyle.ComplexControl.CC_ComboBox, option,
+        QStyle.SubControl.SC_ComboBoxEditField, combo)
 
-    assert _fit_filter_combo(combo) == expected
-    assert combo.minimumWidth() == expected
-    assert combo.maximumWidth() == expected
+    assert field.width() >= combo.fontMetrics().horizontalAdvance("未满调律")
+    assert combo.view().minimumWidth() >= width
+    assert combo.maximumWidth() > width  # 父布局仍可按空间拉宽
 
 
 def test_white_quality_means_any_non_gold_non_purple(qtbot):

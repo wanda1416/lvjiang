@@ -109,12 +109,12 @@ class _PartsDialog(QDialog):
 
         btn_row = QHBoxLayout()
         btn_all = QPushButton(tr("全选"))
-        btn_all.setFixedWidth(60)
+        btn_all.setMinimumWidth(60)
         btn_all.clicked.connect(
             lambda: _selectAll(self._checks))
         btn_row.addWidget(btn_all)
         btn_invert = QPushButton(tr("反选"))
-        btn_invert.setFixedWidth(60)
+        btn_invert.setMinimumWidth(60)
         btn_invert.clicked.connect(
             lambda: _invertChecks(self._checks))
         btn_row.addWidget(btn_invert)
@@ -259,7 +259,7 @@ class AffixCapsPanel(QWidget):
         cat_parts_layout.setContentsMargins(8, 4, 8, 4)
         cat_parts_layout.addWidget(QLabel(tr("词条部位")))
         self._cat_parts_btn = QPushButton(tr("全部"))
-        self._cat_parts_btn.setFixedWidth(130)
+        self._cat_parts_btn.setMinimumWidth(130)
         self._cat_parts_btn.clicked.connect(self._pick_category_parts)
         apply_button_style(self._cat_parts_btn, variant="neutral")
         cat_parts_layout.addWidget(self._cat_parts_btn)
@@ -280,17 +280,17 @@ class AffixCapsPanel(QWidget):
         alias_title_row.addWidget(QLabel(tr("词条名称（原始词条名 → 当前类别）")))
         alias_title_row.addStretch()
         self._btn_add_group = QPushButton(tr("+ 分组"))
-        self._btn_add_group.setFixedWidth(60)
+        self._btn_add_group.setMinimumWidth(60)
         self._btn_add_group.clicked.connect(self._add_group)
         self._btn_add_group.setVisible(False)
         alias_title_row.addWidget(self._btn_add_group)
         self._btn_del_group = QPushButton(tr("- 分组"))
-        self._btn_del_group.setFixedWidth(60)
+        self._btn_del_group.setMinimumWidth(60)
         self._btn_del_group.clicked.connect(self._del_group)
         self._btn_del_group.setVisible(False)
         alias_title_row.addWidget(self._btn_del_group)
         self._btn_add_alias = QPushButton(tr("+ 词条名"))
-        self._btn_add_alias.setFixedWidth(70)
+        self._btn_add_alias.setMinimumWidth(70)
         self._btn_add_alias.clicked.connect(self._add_alias)
         alias_title_row.addWidget(self._btn_add_alias)
         apply_button_style(self._btn_add_group, self._btn_add_alias)
@@ -997,7 +997,7 @@ class AffixCapsPanel(QWidget):
         # 外部简称（毕业率 Excel 等外部系统严格按此匹配）
         aliases = self._get_external_aliases(alias)
         alias_btn = QPushButton(" / ".join(aliases) if aliases else tr("别名"))
-        alias_btn.setFixedWidth(150)
+        alias_btn.setMinimumWidth(150)
         alias_btn.clicked.connect(
             lambda _c, a=alias, b=alias_btn: self._edit_external_aliases(a, b))
         apply_button_style(alias_btn, variant="neutral")
@@ -1005,7 +1005,7 @@ class AffixCapsPanel(QWidget):
 
         # 词条部位（点击弹七部位多选；全选展示「全部」；仅普通词组启用）
         parts_btn = QPushButton(self._format_parts(self._get_affix_parts(alias)))
-        parts_btn.setFixedWidth(130)
+        parts_btn.setMinimumWidth(130)
         apply_button_style(parts_btn, variant="neutral")
         if self._is_dingyin():
             # 定音词组：显示分类级部位，但不可单独编辑

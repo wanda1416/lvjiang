@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -68,6 +69,7 @@ from ...core.attr_model import (
     invalidate_attr_model_cache,
 )
 from ...core.combat.combat_attrs import COMBAT_ATTR_FIELDS, CombatAttributes
+from ..layout_helpers import fit_combo_to_contents
 from .level_combo import LevelCombo
 
 #: 差异大于该值才算对不上。面板只显示到小数点后一位。
@@ -154,7 +156,10 @@ class AttrDerivePanel(QWidget):
             self._single_combos[kind] = combo
         left_layout.addWidget(others_box)
         left_layout.addStretch()
-        splitter.addWidget(left)
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setWidget(left)
+        splitter.addWidget(left_scroll)
 
         right = QWidget()
         right_layout = QVBoxLayout(right)
@@ -178,6 +183,7 @@ class AttrDerivePanel(QWidget):
         right_layout.addWidget(self._table)
         splitter.addWidget(right)
 
+        splitter.setChildrenCollapsible(False)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([320, 660])
@@ -252,6 +258,8 @@ class AttrDerivePanel(QWidget):
 
         self._refresh_reference()
         self._apply_loadout(AttrLoadout.from_dict(get_loadout(self._school())))
+        for combo in self.findChildren(QComboBox):
+            fit_combo_to_contents(combo, minimum=max(100, combo.minimumWidth()))
         self._loading = False
         self._on_changed()
 
@@ -261,6 +269,7 @@ class AttrDerivePanel(QWidget):
         self._combo_reference.addItem(tr("（不对照）"), "")
         for name in get_play_styles(self._school()):
             self._combo_reference.addItem(name, name)
+        fit_combo_to_contents(self._combo_reference, minimum=180)
         self._combo_reference.blockSignals(False)
 
     # ── 装配状态 ──

@@ -48,7 +48,7 @@ from ...core.damage import (
     get_damage_model_manager,
     invalidate_damage_model_cache,
 )
-from ..layout_helpers import configure_navigation_list
+from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 
 
 def _status_color(status: str) -> QBrush:
@@ -125,6 +125,7 @@ class DamageModelPanel(QWidget):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         self._search = QLineEdit()
+        self._search.setMinimumWidth(220)
         self._search.setPlaceholderText(tr("搜索技能"))
         self._search.textChanged.connect(self._refresh_skills)
         left_layout.addWidget(self._search)
@@ -202,6 +203,7 @@ class DamageModelPanel(QWidget):
         self._combo_school.blockSignals(True)
         self._combo_school.clear()
         self._combo_school.addItems(self._manager().schools())
+        fit_combo_to_contents(self._combo_school, minimum=160)
         if previous:
             index = self._combo_school.findText(previous)
             if index >= 0:

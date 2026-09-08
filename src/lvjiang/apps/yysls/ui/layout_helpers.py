@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 
 def combo_contents_width(combo: QComboBox, *, minimum: int = 0) -> int:
     """Return a styled width that can display the longest item in full."""
+    combo.ensurePolished()
     text_width = max(
         (combo.fontMetrics().horizontalAdvance(combo.itemText(index))
          for index in range(combo.count())),

@@ -13,6 +13,7 @@
 | [05-config-layering.md](05-config-layering.md) | 配置分层：system/local/session、合并语义、删除白名单 |
 | [06-telemetry.md](06-telemetry.md) | 匿名统计：D1 表结构、写入粒度设计、校验边界、分析查询 |
 | [07-tuning-history.md](07-tuning-history.md) | 调律历史：统一结果模型、版本化 SQLite、历史 UI 与七天补传 |
+| [08-base-attr-model.md](08-base-attr-model.md) | 基础属性来源模型：心法/武学/套装等如何合成装备之外的战斗属性 |
 
 ## 子系统索引
 

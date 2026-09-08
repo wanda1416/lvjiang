@@ -1,0 +1,4 @@
+# 来源类别: food
+# schema 见 core/attr_model/parsing.py
+kind: food
+entries: {}

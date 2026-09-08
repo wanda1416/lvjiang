@@ -1,6 +1,7 @@
 """燕云菜单 —— 通过 AppHooks menu_builders 注入通用 MainWindow 的菜单栏。
 
-「燕云」菜单：游戏配置（F5）、调律配置（F6，内含调律验证入口）。
+「燕云」菜单：游戏配置（F5）、调律配置（F6，内含调律验证入口）、
+属性配置（F7）。
 """
 from __future__ import annotations
 
@@ -23,9 +24,15 @@ def build_menu(host, menubar) -> None:
         dialog = TuningRulesDialog(parent=host)
         dialog.exec()
 
+    def _open_attr_config():
+        from .game_settings import AttrConfigDialog
+        dialog = AttrConfigDialog(parent=host)
+        dialog.exec()
+
     for label, handler, shortcut in [
         (tr("游戏配置"), _open_game_config, "F5"),
         (tr("调律配置"), _open_tuning_rules, "F6"),
+        (tr("属性配置"), _open_attr_config, "F7"),
     ]:
         action = QAction(label, host)
         action.setShortcut(shortcut)

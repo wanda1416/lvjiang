@@ -63,6 +63,8 @@ def delete_play_style(school: str, name: str) -> None:
     """
     def _apply(data: dict) -> dict:
         data.get("play_styles", {}).get(school, {}).pop(name, None)
+        # 推导上下文与基础属性同名同流派，留着会让同名的新配置读到旧装配
+        (data.get("attr_derivations", {}).get(school) or {}).pop(name, None)
         return data
 
     session_node.mutate(_apply)
@@ -81,6 +83,10 @@ def rename_play_style(school: str, old_name: str, new_name: str) -> None:
         school_styles = data.get("play_styles", {}).get(school, {})
         if old_name in school_styles:
             school_styles[new_name] = school_styles.pop(old_name)
+        # 推导上下文按名字索引，不跟着搬就查不回这套是怎么推出来的
+        derivations = data.get("attr_derivations", {}).get(school, {})
+        if old_name in derivations:
+            derivations[new_name] = derivations.pop(old_name)
         return data
 
     session_node.mutate(_apply)

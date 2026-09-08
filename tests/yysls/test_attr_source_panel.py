@@ -361,6 +361,21 @@ def test_residual_fills_the_gap_between_model_and_reference(derive) -> None:
         pytest.approx(2000.0))
 
 
+def test_every_combat_attribute_is_listed_even_when_it_is_zero(derive) -> None:
+    """只列有值的行会让「模型不管这个属性」和「恰好是 0」看起来一样，
+    而这两种情况的处理完全相反。"""
+    from lvjiang.apps.yysls.core.combat.combat_attrs import COMBAT_ATTR_FIELDS
+
+    dialog, _ = derive
+    dialog._combo_level.setCurrentIndex(0)
+    dialog._on_changed()
+
+    listed = [dialog._table.item(r, 0).text()
+              for r in range(dialog._table.rowCount())]
+    assert listed[:len(COMBAT_ATTR_FIELDS)] == [
+        display for _n, display, _u, _ in COMBAT_ATTR_FIELDS]
+
+
 def test_no_reference_means_no_residual(derive) -> None:
     """没有对照就没有缺口可算，不能凭空补。"""
     dialog, _ = derive
@@ -471,3 +486,56 @@ def test_the_martial_art_page_does_not_let_you_edit_the_roster(
 
     assert not widget._btn_add.isEnabled()
     assert not widget._btn_del.isEnabled()
+
+
+# ── 伤害建模页 ────────────────────────────────────────────
+
+@pytest.fixture
+def damage_panel(tmp_path, monkeypatch):
+    """把伤害模型目录指到 tmp_path，避免测试写坏仓库里的配置。"""
+    import yaml
+
+    import lvjiang.apps.yysls.ui.game_settings.damage_model_panel as module
+    from lvjiang.apps.yysls.core.damage import DamageModelManager
+
+    (tmp_path / "鸣金·虹.yaml").write_text(yaml.dump({
+        "school": "鸣金·虹", "scheme": "基础方案",
+        "skills": {
+            "第一道剑气": {"kind": "剑", "outer_ratio": 1.3066, "outer_fixed": 361},
+            "尚未测量": {"kind": "剑"},
+        },
+        "buffs": {"远程笛": {"generic": 0.2}},
+    }, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    manager = DamageModelManager(tmp_path)
+    monkeypatch.setattr(module, "get_damage_model_manager", lambda: manager)
+    monkeypatch.setattr(module, "invalidate_damage_model_cache", lambda: None)
+    return module.DamageModelPanel(), manager
+
+
+def test_the_damage_page_lists_the_skills_of_the_selected_school(
+    damage_panel,
+) -> None:
+    widget, _ = damage_panel
+
+    assert widget._skills == ["第一道剑气", "尚未测量"]
+    assert widget._combo_school.currentText() == "鸣金·虹"
+
+
+def test_selecting_a_skill_shows_its_four_coefficients(damage_panel) -> None:
+    """四个系数是这一页存在的理由——编译程序里读不出来的就是它们。"""
+    widget, _ = damage_panel
+    widget._list.setCurrentRow(0)
+
+    shown = {widget._table.item(r, 0).text(): widget._table.item(r, 1).text()
+             for r in range(widget._table.rowCount())}
+    assert shown["外功倍率"] == "1.3066"
+    assert shown["外攻固伤"] == "361"
+
+
+def test_the_buff_table_keeps_entries_with_no_static_effect(damage_panel) -> None:
+    """表里有它，轴上就可能挂它；缺一行会显得「这个增益没建模」。"""
+    widget, _ = damage_panel
+
+    names = [widget._buffs.item(r, 0).text()
+             for r in range(widget._buffs.rowCount())]
+    assert names == ["远程笛"]

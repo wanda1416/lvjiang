@@ -727,7 +727,8 @@ class SchoolPanel(QWidget):
         attrs = styles.get(name, {})
         self._clear_ps_editor()
         self._ps_current_name = name
-        self._value_source_label.setText(tr("基础属性：{name}").format(name=name))
+        self._value_source_label.setText(
+            tr("基础属性：{name}").format(name=name))
 
         gc = get_game_config()
         school_attr = gc.get_school_attr(school)

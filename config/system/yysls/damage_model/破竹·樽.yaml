@@ -1,0 +1,361 @@
+# 伤害建模: 破竹·樽
+# 由 scripts/extract_damage_model.py 从 破竹樽110阶竞速轴属性毕业率进阶计算器0.4.xlsx 抽取，勿手工重排
+#
+# 只存那份编译程序里读不出来的东西：技能系数与增益。怪物、食物、
+# 固伤加成等环境参数在 graduation/ 的方案 JSON 里，不在这里重复。
+school: 破竹·樽
+scheme: 基础方案
+source:
+  file: 破竹樽110阶竞速轴属性毕业率进阶计算器0.4.xlsx
+  version: '0.4'
+  sha256: c53c782f7d97f4f94c8fa276b0b31a209dd67d413fb56c47c37207436faaef3d
+skills:
+  长鲸吸川(拳甲+浅醉):
+    kind: 拳甲
+    outer_ratio: 1.862784
+    attr_ratio: 2.794176
+  长鲸吸川(拳甲+浓醺):
+    kind: 拳甲
+    outer_ratio: 2.173248
+    attr_ratio: 3.259872
+  拳甲～(浅醉):
+    kind: 拳甲
+    outer_ratio: 1.58662
+    outer_fixed: 439.6
+    attr_ratio: 2.37986
+    attr_fixed: 239.4
+    modifiers:
+      generic: 0.05
+      crit_dmg: 0.3
+  拳甲～破防(浅醉):
+    kind: 拳甲
+    outer_ratio: 1.08472
+    outer_fixed: 302.4
+    attr_ratio: 1.62708
+    attr_fixed: 163.8
+    modifiers:
+      generic: 0.05
+      crit_dmg: 0.3
+  拳甲Q1:
+    kind: 拳甲
+    outer_ratio: 2.64712
+    outer_fixed: 733.6
+    attr_ratio: 3.97068
+    attr_fixed: 798.0
+    modifiers:
+      generic: 0.05
+      crit_dmg: 0.3
+  拳甲Q2:
+    kind: 拳甲
+    outer_ratio: 4.26944
+    outer_fixed: 1181.6
+    attr_ratio: 6.40416
+    attr_fixed: 638.4
+    modifiers:
+      generic: 0.05
+      crit_dmg: 0.3
+  饮龙·酩酊:
+    kind: 拳甲
+    outer_ratio: 7.79674
+    outer_fixed: 2161.6
+    attr_ratio: 11.69518
+    attr_fixed: 1176.0
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.05
+      crit_dmg: 0.3
+  碧血为迎:
+    kind: 双刀
+    outer_ratio: 0.6587
+    outer_fixed: 183.0
+    attr_ratio: 0.9881
+    attr_fixed: 100.0
+  碧血为迎(浅醉):
+    kind: 双刀
+    outer_ratio: 0.79044
+    outer_fixed: 219.6
+    attr_ratio: 1.18572
+    attr_fixed: 120.0
+  碧血为迎·酩酊一段:
+    kind: 双刀
+    outer_ratio: 4.28274
+    outer_fixed: 1184.4
+    attr_ratio: 6.42411
+    attr_fixed: 644.7
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.05
+      crit_dmg: 0.3
+  碧血为迎·酩酊后续:
+    kind: 双刀
+    outer_ratio: 5.71032
+    outer_fixed: 1579.2
+    attr_ratio: 8.56464
+    attr_fixed: 856.8
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.05
+      crit_dmg: 0.3
+  碧血为迎·酩酊尾段:
+    kind: 双刀
+    outer_ratio: 4.28274
+    outer_fixed: 1184.4
+    attr_ratio: 6.42411
+    attr_fixed: 644.7
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.05
+      crit_dmg: 0.3
+  碧血为迎·酩酊:
+    kind: 双刀
+    outer_ratio: 14.2758
+    outer_fixed: 3948.0
+    attr_ratio: 21.41286
+    attr_fixed: 2146.2
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.05
+      crit_dmg: 0.3
+  双刀Q1:
+    kind: 双刀
+    outer_ratio: 1.2672
+    outer_fixed: 351.6
+    attr_ratio: 1.90092
+    attr_fixed: 192.0
+  醉杀:
+    kind: 心法
+  萧呤千浪AOE:
+    kind: 群体奇术
+    outer_ratio: 3.9746
+    outer_fixed: 1008.0
+    attr_ratio: 5.9619
+  萧呤千浪流星:
+    kind: 群体奇术
+    outer_ratio: 1.4904
+    outer_fixed: 378.0
+    attr_ratio: 2.2356
+  衍九矢9hit:
+    kind: 群体奇术
+    outer_ratio: 10.315755
+    outer_fixed: 1992.6
+    attr_ratio: 15.4736325
+  骑龙回马:
+    kind: 单体奇术
+    outer_ratio: 7.1084
+    outer_fixed: 1369.0
+    attr_ratio: 10.6626
+  叶龙骧首(32层+70%HP):
+    kind: 单体奇术
+    outer_ratio: 25.201792
+    outer_fixed: 4869.48
+    attr_ratio: 37.802688
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.47
+  墨洗翰华(打盾):
+    kind: 群体奇术
+    outer_ratio: 23.7726
+    outer_fixed: 4592.0
+    attr_ratio: 35.6589
+  神龙吐火暗灼1hit:
+    kind: 单体奇术
+    outer_ratio: 1.28505
+    outer_fixed: 251.0
+    attr_ratio: 1.927575
+  神龙吐火暗灼2hit:
+    kind: 单体奇术
+    outer_ratio: 3.9863
+    outer_fixed: 778.0
+    attr_ratio: 5.97945
+  神龙吐火暗灼dot:
+    kind: 单体奇术
+    outer_ratio: 0.236
+    outer_fixed: 46.0
+    attr_ratio: 0.354
+  神龙吐火1hit:
+    kind: 单体奇术
+    outer_ratio: 1.3621
+    outer_fixed: 264.0
+    attr_ratio: 2.04315
+  神龙吐火2hit:
+    kind: 单体奇术
+    outer_ratio: 4.2253
+    outer_fixed: 819.0
+    attr_ratio: 6.33795
+  神龙吐火dot:
+    kind: 单体奇术
+    outer_ratio: 0.2958
+    outer_fixed: 57.0
+    attr_ratio: 0.4437
+  太白醉月1-4:
+    kind: 单体奇术
+    outer_ratio: 1.0239
+    outer_fixed: 196.0
+    attr_ratio: 1.53585
+  太白醉月5:
+    kind: 单体奇术
+    outer_ratio: 1.7065
+    outer_fixed: 327.0
+    attr_ratio: 2.55975
+    modifiers:
+      generic: 0.8
+  太白醉月爆燃:
+    kind: 单体奇术
+    outer_ratio: 0.7021
+    outer_fixed: 134.0
+    attr_ratio: 1.05315
+  太白醉月暗灼:
+    kind: 单体奇术
+    outer_ratio: 1.609
+    outer_fixed: 308.0
+    attr_ratio: 2.4135
+  易水歌6重:
+    kind: 心法
+    outer_ratio: 1.0
+    attr_ratio: 1.0
+  衍九矢9hit一段:
+    kind: 群体奇术
+    outer_ratio: 6.87717
+    outer_fixed: 1328.4
+    attr_ratio: 10.315755
+buffs:
+  惧刃(拐):
+    mingjin_pen: 16.0
+    lieshi_pen: 16.0
+    qiansi_pen: 16.0
+    pozhu_pen: 16.0
+  惊神(拐):
+    generic: 0.25
+  烁鼓(拐): {}
+  扶风(拐): {}
+  裁云(拐): {}
+  离猎:
+    outer_dmg: 0.02
+    mingjin_dmg: 0.02
+    lieshi_dmg: 0.02
+    qiansi_dmg: 0.02
+    pozhu_dmg: 0.02
+  步乱: {}
+  无惧:
+    special: 0.05
+  小燕别(0%):
+    outer_pen: 6.0
+    mingjin_pen: 6.0
+    lieshi_pen: 6.0
+    qiansi_pen: 6.0
+    pozhu_pen: 6.0
+  小燕别(10%):
+    outer_pen: 7.0
+    mingjin_pen: 7.0
+    lieshi_pen: 7.0
+    qiansi_pen: 7.0
+    pozhu_pen: 7.0
+  小燕别(20%):
+    outer_pen: 8.0
+    mingjin_pen: 8.0
+    lieshi_pen: 8.0
+    qiansi_pen: 8.0
+    pozhu_pen: 8.0
+  小燕别(30%):
+    outer_pen: 9.0
+    mingjin_pen: 9.0
+    lieshi_pen: 9.0
+    qiansi_pen: 9.0
+    pozhu_pen: 9.0
+  小燕别(40%):
+    outer_pen: 10.0
+    mingjin_pen: 10.0
+    lieshi_pen: 10.0
+    qiansi_pen: 10.0
+    pozhu_pen: 10.0
+  燕别(0%):
+    outer_pen: 12.0
+    mingjin_pen: 12.0
+    lieshi_pen: 12.0
+    qiansi_pen: 12.0
+    pozhu_pen: 12.0
+  燕别(10%):
+    outer_pen: 14.0
+    mingjin_pen: 14.0
+    lieshi_pen: 14.0
+    qiansi_pen: 14.0
+    pozhu_pen: 14.0
+  燕别(20%):
+    outer_pen: 16.0
+    mingjin_pen: 16.0
+    lieshi_pen: 16.0
+    qiansi_pen: 16.0
+    pozhu_pen: 16.0
+  燕别(30%):
+    outer_pen: 18.0
+    mingjin_pen: 18.0
+    lieshi_pen: 18.0
+    qiansi_pen: 18.0
+    pozhu_pen: 18.0
+  燕别(40%):
+    outer_pen: 20.0
+    mingjin_pen: 20.0
+    lieshi_pen: 20.0
+    qiansi_pen: 20.0
+    pozhu_pen: 20.0
+  气竭:
+    special: 0.1
+  近战笛:
+    generic: 0.02
+  阴阳:
+    generic: 0.15
+  进气断石: {}
+  断石5层: {}
+  真气失衡:
+    special: 0.1
+    mingjin_dmg: 0.1
+  醉意增伤:
+    outer_dmg: 0.09
+    pozhu_dmg: 0.09
+  浅醉:
+    crit_dmg: 0.05
+  浓醺:
+    crit_dmg: 0.1
+  沧海帖1层:
+    crit_dmg: 0.01
+  沧海帖2层:
+    crit_dmg: 0.02
+  沧海帖3层:
+    crit_dmg: 0.03
+  沧海帖4层:
+    crit_dmg: 0.04
+  沧海帖5层:
+    crit_dmg: 0.05
+  沧海帖6层:
+    crit_dmg: 0.06
+  沧海帖7层:
+    crit_dmg: 0.07
+  沧海帖8层:
+    crit_dmg: 0.08
+  沧海帖9层:
+    crit_dmg: 0.09
+  沧海帖10层:
+    crit_dmg: 0.1
+  鬼掣帖:
+    crit_dmg: 0.1
+  易水歌1层:
+    generic: 0.01
+    outer_pen: 2.0
+  易水歌2层:
+    generic: 0.02
+    outer_pen: 4.0
+  易水歌3层:
+    generic: 0.03
+    outer_pen: 6.0
+  易水歌4层:
+    generic: 0.04
+    outer_pen: 8.0
+  易水歌5层:
+    generic: 0.05
+    outer_pen: 10.0

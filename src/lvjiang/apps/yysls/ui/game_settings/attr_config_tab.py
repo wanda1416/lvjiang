@@ -4,8 +4,10 @@
 心法一门六重共 222 条，和只有几条的吃食放在同一个列表里翻，找什么都
 要先翻一遍。
 
-Tab 标题带进度（`心法 12/222`），不点进去也知道哪一页还没填完。最后
-一页是推导，配装、比对与保存都在那里，不再是个从别处弹出来的对话框。
+Tab 标题带进度（`心法 12/222`），不点进去也知道哪一页还没填完。倒数
+第二页是推导，配装、比对与保存都在那里，不再是个从别处弹出来的对话框；
+最后一页是伤害建模，即技能系数表与增益表——属性建到最后总要回答「这些
+属性值多少伤害」，那份系数表在毕业率的编译程序里读不出来。
 """
 
 from PyQt6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
@@ -13,6 +15,7 @@ from PyQt6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 from .....i18n import tr
 from .attr_derive_panel import AttrDerivePanel
 from .attr_source_panel import AttrSourcePanel
+from .damage_model_panel import DamageModelPanel
 
 #: (标题, 覆盖的来源类别)。分组依据是填写方式而非游戏菜单：
 #: 心法与武学各自量大且规则不同，独占一页；其余按「角色长出来的」
@@ -47,6 +50,8 @@ class AttrConfigTab(QWidget):
 
         self._derive_panel = AttrDerivePanel()
         self._tabs.addTab(self._derive_panel, tr("基础属性推导"))
+        self._damage_panel = DamageModelPanel()
+        self._tabs.addTab(self._damage_panel, tr("伤害建模"))
         # 切到推导页时重读来源：填数据与推导在同一个窗口里来回切，
         # 不重读的话刚填的值不会反映到推导结果上。
         self._tabs.currentChanged.connect(self._on_tab_changed)
@@ -64,3 +69,5 @@ class AttrConfigTab(QWidget):
     def _on_tab_changed(self, index: int) -> None:
         if self._tabs.widget(index) is self._derive_panel:
             self._derive_panel.reload()
+        elif self._tabs.widget(index) is self._damage_panel:
+            self._damage_panel.reload()

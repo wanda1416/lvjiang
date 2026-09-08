@@ -122,21 +122,10 @@ class PanelDef:
     具体的格子坐标由引擎运行时通过图像自对齐（方差分析 + 黑边检测）计算，
     并缓存在 WorkflowEngine._panel_alignments 中。
     span（间距）由对齐算法自动检测，无需手动指定。
-
-    calibration 校准模式：
-    - "auto"：先图像检测，失败降级为等分（默认值）
-    - "even"：跳过图像检测，直接按 rows/cols 等分
-    - "image"：仅图像检测，失败返回 None
-
-    scroll_direction 滚动方向：
-    - "vertical"：纵向滚动（默认），rows 允许 expected-1
-    - "horizontal"：横向滚动，cols 允许 expected-1
-    - "both"：双向滚动，rows/cols 都允许 expected-1
-    - "none"：固定网格，rows/cols 必须精确匹配
+    可见比例、校准模式和滚动方向也只属于布局 Panel。
     """
     key: str
     name: str
-    min_visible: float = 0.95       # 行计入有效的最小可见比例（0.5-1.0）
     views: list[str] = field(default_factory=list)  # 见 RegionDef.views
 
     @property
@@ -152,8 +141,6 @@ class PanelDef:
     def view(self, value: str) -> None:
         self.views = [value] if value else []
 
-    calibration: str = "auto"       # "auto" | "even" | "image"
-    scroll_direction: str = "vertical"  # "vertical" | "horizontal" | "both" | "none"
 
 
 @dataclass

@@ -59,6 +59,26 @@ def env(tmp_path, monkeypatch):
 
 
 class TestSaveLoadRoundtrip:
+    def test_panel_parameters_survive_scene_rename_and_layout_migration(self, env):
+        manager = LayoutConfigManager()
+        expected = {}
+        for name, rows, mode, visible in (
+                ("desktop", 7, "image", .77), ("mobile", 4, "even", .9)):
+            layout = Layout(name=name)
+            panel = Panel("grid", .1, .2, .6, .7, rows=rows,
+                          calibration=mode, min_visible=visible)
+            layout.set_scene_panels("source", [panel])
+            assert manager.save_layout(layout)
+            expected[name] = panel
+        layout_manager.rename_item_key_across_all_layouts(
+            "source", "panel", "grid", "renamed")
+        manager.migrate_item_across_layouts("source", "target", "panel", "renamed")
+        for name, original in expected.items():
+            loaded = manager.load_layout(name)
+            original.key = "renamed"
+            assert loaded.get_scene_panels("target") == [original]
+            assert loaded.get_scene_panels("source") == []
+
     def test_unbound_disabled_region_omits_meaningless_zero_coordinates(self):
         placeholder = Region(
             "exit_to_desktop", 0, 0, 0, 0, disabled=True)
@@ -247,6 +267,8 @@ class TestAliasLayout:
         # scene 来自根布局
         assert [r.key for r in layout.get_scene_regions("scene_a")] == ["btn", "label"]
         assert [p.key for p in layout.get_scene_panels("scene_b")] == ["grid"]
+        assert set(layout_manager.shared_layout_bindings("根布局")) == {"根布局", "别名布局"}
+        assert set(layout_manager.shared_layout_bindings("别名布局")) == {"根布局", "别名布局"}
 
     def test_alias_extends_missing_target_returns_none(self, env):
         """extends 指向不存在的布局 → None"""

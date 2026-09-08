@@ -65,7 +65,4 @@ regions:
 panels:
 - key: actions
   name: 动作列表
-  min_visible: 0.95
   view: biaoqing
-  calibration: even
-  scroll_direction: none

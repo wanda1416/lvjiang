@@ -3,18 +3,17 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
-    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSpinBox,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -22,6 +21,7 @@ from PyQt6.QtWidgets import (
 from ...core.layout_manager import (
     delete_item_key_across_all_layouts,
     rename_item_key_across_all_layouts,
+    shared_layout_bindings,
 )
 from ...core.scene_definition import PanelDef
 from ...core.scene_registry import (
@@ -33,6 +33,7 @@ from ...i18n import tr
 from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from ..widgets import centered_cell_widget, strip_focus_rect
 from .entity_order_table import EntityOrderTable
+from .panel_binding_form import PanelBindingConfig, PanelBindingForm
 from .scene_select import (
     add_scene_combo_row,
     add_views_checklist_row,
@@ -61,7 +62,7 @@ class PanelEditorMixin:
         self._panel_table = EntityOrderTable()
         self._panel_table.setColumnCount(6)
         self._panel_table.setHorizontalHeaderLabels(
-            [tr("名称"), "Key", tr("比例"), tr("校准模式"), tr("滚动方向"), tr("禁用")]
+            [tr("场景定义"), "Key", tr("布局绑定"), tr("行 × 列"), tr("校准模式"), tr("布局禁用")]
         )
         # 列宽：名称/Key 自适应内容，其余固定窄宽
         header = self._panel_table.horizontalHeader()
@@ -69,10 +70,10 @@ class PanelEditorMixin:
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         for col in (2, 3, 4, 5):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(2, 40)   # 行可见比例
-        header.resizeSection(3, 60)   # 校准模式
-        header.resizeSection(4, 60)   # 滚动方向
-        header.resizeSection(5, 50)   # 禁用
+        header.resizeSection(2, 75)   # 当前布局绑定状态
+        header.resizeSection(3, 65)   # 行列数
+        header.resizeSection(4, 80)   # 校准模式
+        header.resizeSection(5, 75)   # 布局禁用
         self._panel_table.setSelectionBehavior(
             EntityOrderTable.SelectionBehavior.SelectRows
         )
@@ -99,16 +100,19 @@ class PanelEditorMixin:
         layout.addWidget(self._panel_table)
 
         btn_row = QHBoxLayout()
-        self._btn_new_panel = QPushButton(tr("+ 创建网格"))
+        self._btn_new_panel = QPushButton(tr("+ 创建网格定义"))
         self._btn_new_panel.setToolTip(tr("在场景 YAML 中新增 Panel 定义（声明式网格）"))
         self._btn_new_panel.clicked.connect(self._on_new_panel_def)
         btn_row.addWidget(self._btn_new_panel)
-        self._btn_del_panel = QPushButton(tr("删除网格"))
+        self._btn_del_panel = QPushButton(tr("删除网格定义"))
         self._btn_del_panel.setToolTip(tr("从场景 YAML 中删除 Panel 定义"))
         self._btn_del_panel.clicked.connect(self._on_delete_panel_def)
         self._btn_del_panel.setEnabled(False)
         btn_row.addWidget(self._btn_del_panel)
-        self._btn_bind_panel = QPushButton(tr("绑定网格"))
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+        btn_row = QHBoxLayout()
+        self._btn_bind_panel = QPushButton(tr("绑定到当前布局"))
         self._btn_bind_panel.setToolTip(
             tr("在画布上框选一个矩形区域，绑定到选中的 Panel 定义")
         )
@@ -117,6 +121,10 @@ class PanelEditorMixin:
         apply_button_style(self._btn_new_panel)
         apply_button_style(self._btn_bind_panel, variant="neutral")
         apply_button_style(self._btn_del_panel, variant="danger")
+        self._btn_unbind_panel = QPushButton(tr("解除当前布局绑定"))
+        self._btn_unbind_panel.clicked.connect(self._on_unbind_panel)
+        apply_button_style(self._btn_unbind_panel, variant="neutral")
+        btn_row.addWidget(self._btn_unbind_panel)
         btn_row.addStretch()
         layout.addLayout(btn_row)
         return panel
@@ -125,6 +133,9 @@ class PanelEditorMixin:
 
     def _refresh_panel_list(self):
         """刷新面板列表，显示 YAML 定义 + 布局绑定状态"""
+        current = self._panel_table.item(self._panel_table.currentRow(), 1)
+        selected_key = self._canvas.selected_panel_key() or (
+            current.text() if current is not None else None)
         self._panel_table.blockSignals(True)
         self._panel_table.setRowCount(0)
         registry = get_registry()
@@ -132,7 +143,8 @@ class PanelEditorMixin:
         if not scene:
             self._panel_table.blockSignals(False)
             return
-        bound_keys = {p.key for p in self._canvas.get_panels()}
+        bound = {p.key: p for p in self._canvas.get_panels()}
+        bound_keys = {key for key, p in bound.items() if p.w_ratio > 0 and p.h_ratio > 0}
         for panel_def in scene.panels:
             if not is_view_visible(panel_def.views, self._current_view):
                 continue
@@ -150,18 +162,15 @@ class PanelEditorMixin:
             if panel_def.key not in bound_keys:
                 key_item.setForeground(Qt.GlobalColor.gray)
             self._panel_table.setItem(row, 1, key_item)
-            # 行最小可见比例
-            vis_item = QTableWidgetItem(f"{panel_def.min_visible:.2f}")
-            vis_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._panel_table.setItem(row, 2, vis_item)
-            # 校准模式
-            cal_item = QTableWidgetItem(self._CALIBRATION_LABELS.get(panel_def.calibration, panel_def.calibration))
-            cal_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._panel_table.setItem(row, 3, cal_item)
-            # 滚动方向
-            sd_item = QTableWidgetItem(self._SCROLL_LABELS.get(panel_def.scroll_direction, panel_def.scroll_direction))
-            sd_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._panel_table.setItem(row, 4, sd_item)
+            panel = bound.get(panel_def.key)
+            placed = panel_def.key in bound_keys
+            self._panel_table.setItem(row, 2, QTableWidgetItem(
+                tr("已绑定") if placed else tr("未绑定")))
+            self._panel_table.setItem(row, 3, QTableWidgetItem(
+                f"{panel.rows} × {panel.cols}" if placed else "—"))
+            self._panel_table.setItem(row, 4, QTableWidgetItem(
+                self._CALIBRATION_LABELS.get(panel.calibration, panel.calibration)
+                if placed else "—"))
             # 禁用复选框
             disabled_keys = self._canvas.get_disabled_keys("panel")
             cb = QCheckBox()
@@ -170,7 +179,13 @@ class PanelEditorMixin:
                 lambda state, k=panel_def.key: self._on_toggle_panel_disabled(k, "panel", state)
             )
             self._panel_table.setCellWidget(row, 5, centered_cell_widget(cb))
+        for row in range(self._panel_table.rowCount()):
+            if self._panel_table.item(row, 1).text() == selected_key:
+                self._panel_table.selectRow(row)
+                break
         self._panel_table.blockSignals(False)
+        self._btn_del_panel.setEnabled(self._panel_table.currentRow() >= 0)
+        self._btn_unbind_panel.setEnabled(selected_key in bound)
 
     def _on_toggle_panel_disabled(self, key: str, kind: str, state: int):
         """切换某 key 的禁用状态，通过画布回调通知 dialog 标记 dirty"""
@@ -181,6 +196,7 @@ class PanelEditorMixin:
     def _on_panel_table_selection(self, row, col, prev_row, prev_col):
         """表格行选中时更新删除按钮状态 + 同步画布选中"""
         self._btn_del_panel.setEnabled(row >= 0)
+        self._btn_unbind_panel.setEnabled(row >= 0)
         if row < 0:
             return
         # 表格已按视图过滤，row 不再对应 scene.panels 索引，改按 key
@@ -197,88 +213,61 @@ class PanelEditorMixin:
         return None
 
     def _on_edit_panel_from_table(self, row, col):
-        """双击表格行编辑面板属性（场景变更时跨场景迁移）"""
-        registry = get_registry()
-        scene = registry.get_scene(self._scene_key)
         key_item = self._panel_table.item(row, 1)
-        if not scene or key_item is None:
-            return
-        old_def = next((p for p in scene.panels if p.key == key_item.text()), None)
-        if old_def is None:
-            return
-        result = self._show_panel_edit_dialog(old_def)
-        if result is None:
-            return
-        new_def, target_scene, new_rows, new_cols = result
+        if key_item is not None:
+            self._show_panel_properties(key_item.text(), layout_first=col >= 2)
+
+    def _selected_panel_key(self) -> str | None:
+        item = self._panel_table.item(self._panel_table.currentRow(), 1)
+        return item.text() if item is not None else None
+
+    def _save_panel_definition(self, old_def: PanelDef, new_def: PanelDef,
+                               target_scene: str) -> None:
+        """定义立即保存；绑定的物理参数始终原样保留。"""
+        registry = get_registry()
         old_key = old_def.key
         new_key = new_def.key
-        key_changed = new_key != old_key
-
         if target_scene != self._scene_key:
-            # 跨场景迁移：目标场景视图体系不同，归属视图重置为基底
-            new_def.view = ""
-            # 先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
-            try:
-                registry.add_panel_to_scene(target_scene, new_def)
-            except ValueError as e:
-                QMessageBox.warning(self, tr("迁移失败"), str(e))
-                return
-            registry.retarget_references(
+            # 先验证目标命名空间，再修改源定义。
+            target = registry.get_scene(target_scene)
+            if target is None:
+                raise ValueError(tr("目标场景不存在"))
+            registry._check_key_unique(target, new_key)
+            registry.validate_reference_retarget(
                 self._scene_key, target_scene, old_key, new_key)
-            registry.remove_panel_from_scene(self._scene_key, old_key)
-            sync_scene_cache(self._scene_key)
+        if new_key != old_key:
+            registry.rename_panel_key(self._scene_key, old_key, new_key)
+            rename_item_key_across_all_layouts(self._scene_key, "panel", old_key, new_key)
+            panels = self._canvas.get_panels()
+            for panel in panels:
+                if panel.key == old_key:
+                    panel.key = new_key
+            self._canvas.set_panels(panels)
+            self._canvas._notify_panel_changed()
+        if target_scene != self._scene_key:
+            registry.add_panel_to_scene(target_scene, new_def)
+            registry.retarget_references(self._scene_key, target_scene, new_key, new_key)
+            registry.remove_panel_from_scene(self._scene_key, new_key)
             sync_scene_cache(target_scene)
             if self.on_item_migrated:
                 self.on_item_migrated("panel", new_key, self._scene_key, target_scene)
-            # 更新已绑定 Panel 的 rows/cols（布局级配置）
-            panels = self._canvas.get_panels()
-            for p in panels:
-                if p.key == old_key:
-                    p.key = new_key
-                    p.rows, p.cols = new_rows, new_cols
-            self._canvas.set_panels(panels)
-            self._refresh_lists()
-            return
-
-        try:
-            if key_changed:
-                # key 变更：更新场景定义 + 所有布局
-                registry.rename_panel_key(self._scene_key, old_key, new_key)
-                rename_item_key_across_all_layouts(self._scene_key, "panel", old_key, new_key)
-                # 更新其他属性
-                registry.update_panel_in_scene(self._scene_key, new_key, new_def)
-                # 同步画布数据中的 key 和布局级配置
-                panels = self._canvas.get_panels()
-                for p in panels:
-                    if p.key == old_key:
-                        p.key = new_key
-                        p.rows, p.cols = new_rows, new_cols
-                        p.min_visible = new_def.min_visible
-                        p.calibration = new_def.calibration
-                        p.scroll_direction = new_def.scroll_direction
-                self._canvas.set_panels(panels)
-                self._canvas._notify_panel_changed()
-            else:
-                # key 不变：更新其他属性 + 布局级 rows/cols
-                registry.update_panel_in_scene(self._scene_key, old_key, new_def)
-                # 同步到已绑定的布局 Panel
-                panels = self._canvas.get_panels()
-                changed = False
-                for p in panels:
-                    if p.key == old_key:
-                        p.rows, p.cols = new_rows, new_cols
-                        p.min_visible = new_def.min_visible
-                        p.calibration = new_def.calibration
-                        p.scroll_direction = new_def.scroll_direction
-                        changed = True
-                if changed:
-                    self._canvas.set_panels(panels)
-                    self._canvas._notify_panel_changed()
-        except ValueError as e:
-            QMessageBox.warning(self, tr("更新失败"), str(e))
-            return
+        else:
+            registry.update_panel_in_scene(self._scene_key, new_key, new_def)
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
+
+    def _update_panel_binding(self, key: str, config: PanelBindingConfig) -> None:
+        panels = self._canvas.get_panels()
+        for index, panel in enumerate(panels):
+            if panel.key == key:
+                updated = config.create_panel(
+                    key, panel.x_ratio, panel.y_ratio, panel.w_ratio, panel.h_ratio)
+                if updated != panel:
+                    panels[index] = updated
+                    self._canvas.set_panels(panels)
+                    self._canvas._notify_panel_changed()
+                return
+        raise ValueError(tr("当前布局尚未绑定此网格"))
 
     def _on_panel_table_context_menu(self, pos):
         """面板表格右击菜单：Key 列右击自动复制"""
@@ -298,10 +287,10 @@ class PanelEditorMixin:
 
     def _on_new_panel_def(self):
         """创建新面板定义"""
-        result = self._show_panel_edit_dialog(None)
+        result = self._show_panel_definition_dialog(None)
         if result is None:
             return
-        panel_def, _target_scene, _rows, _cols = result
+        panel_def, _target_scene = result
         registry = get_registry()
         try:
             registry.add_panel_to_scene(self._scene_key, panel_def)
@@ -327,7 +316,8 @@ class PanelEditorMixin:
         reply = QMessageBox.question(
             self,
             tr("确认删除"),
-            f"确定要从场景定义中删除面板「{panel_def.name}」({panel_def.key}) 吗？",
+            f"删除网格定义「{panel_def.name}」({panel_def.key})？\n"
+            "将立即删除定义及所有布局中的绑定，不能通过放弃布局修改撤销。",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -344,183 +334,191 @@ class PanelEditorMixin:
         self._refresh_lists()
 
     def _on_bind_panel(self):
-        """绑定面板：选中一个未绑定的 Panel 定义，进入画布框选模式"""
-        registry = get_registry()
-        scene = registry.get_scene(self._scene_key)
-        if not scene or not scene.panels:
-            QMessageBox.information(
-                self, tr("无可用面板"), tr("该场景尚未定义任何 Panel，请先创建面板定义。")
-            )
+        key = self._selected_panel_key()
+        if key is None:
+            QMessageBox.information(self, tr("绑定网格"), tr("请先选择一个网格定义。"))
             return
-        bound_keys = {p.key for p in self._canvas.get_panels()}
-        available = [p for p in scene.panels if p.key not in bound_keys]
-        if not available:
-            QMessageBox.information(
-                self, tr("无可用面板"), tr("该场景所有 Panel 定义都已绑定。")
-            )
-            return
-        # 弹出选择对话框
-        items = [f"{p.name} ({p.key})" for p in available]
-        from PyQt6.QtWidgets import QInputDialog
-        dlg = QInputDialog(self)
-        dlg.setWindowTitle(tr("绑定面板"))
-        dlg.setLabelText(tr("选择要绑定的 Panel："))
-        dlg.setComboBoxItems(items)
-        if not dlg.exec() or not dlg.textValue():
-            return
-        idx = items.index(dlg.textValue())
-        selected_def = available[idx]
-        # 进入画布框选模式
-        self._canvas.begin_place_panel(selected_def)
+        self._bind_panel_key(key)
 
-    # ─── 编辑弹窗 ────────────────────────────────────────
-
-    def _show_panel_edit_dialog(
-        self, panel_def: PanelDef | None
-    ) -> tuple[PanelDef, str, int, int] | None:
-        """弹窗编辑面板属性，返回 (新 PanelDef, 目标场景 key, rows, cols) 或 None（取消）
-
-        仅编辑模式提供场景下拉框；新建时目标场景恒为当前场景。
-        rows/cols 属于布局级配置，从已绑定的 Panel 读取，保存时写回布局。
-        """
-        dialog = QDialog(self)  # type: ignore[arg-type]
-        dialog.setWindowTitle(tr("新建面板") if panel_def is None else tr("编辑面板"))
-        form = QFormLayout(dialog)
-
-        key_edit = QLineEdit()
-        key_edit.setPlaceholderText(tr("英文，如 bag_grid"))
-        if panel_def:
-            key_edit.setText(panel_def.key)
-            # 允许编辑 key，但需要校验唯一性
-        form.addRow("Key:", key_edit)
-
-        name_edit = QLineEdit()
-        name_edit.setPlaceholderText(tr("中文名称，如 背包网格"))
-        if panel_def:
-            name_edit.setText(panel_def.name)
-        form.addRow(tr("名称:"), name_edit)
-
-        # 行数和列数（布局级配置，从已绑定的 Panel 读取）
-        cols_spin = QSpinBox()
-        cols_spin.setRange(1, 20)
-        rows_spin = QSpinBox()
-        rows_spin.setRange(1, 20)
-        # 尝试从已绑定的 Panel 读取 rows/cols
-        bound_panel = self._find_bound_panel(panel_def.key) if panel_def else None
-        if bound_panel:
-            cols_spin.setValue(bound_panel.cols)
-            rows_spin.setValue(bound_panel.rows)
-        else:
-            cols_spin.setValue(6)
-            rows_spin.setValue(3)
-        form.addRow(tr("列数:"), cols_spin)
-        form.addRow(tr("行数:"), rows_spin)
-
-        vis_spin = QDoubleSpinBox()
-        vis_spin.setRange(0.50, 1.00)
-        vis_spin.setSingleStep(0.05)
-        vis_spin.setDecimals(2)
-        vis_spin.setValue(panel_def.min_visible if panel_def else 0.95)
-        vis_spin.setToolTip(
-            "滚动时半截行计入有效行所需的最小可见比例：\n"
-            "0.95 = 基本完整才计入；调低（如 0.55）可减少少检一行，\n"
-            "但必须 > 0.5，否则行中心可能落在面板外导致点击脱靶"
-        )
-        form.addRow(tr("行最小可见比例:"), vis_spin)
-
-        # 校准模式下拉
-        calibration_combo = QComboBox()
-        calibration_combo.addItem(tr("自动模式"), "auto")
-        calibration_combo.addItem(tr("等分网格"), "even")
-        calibration_combo.addItem(tr("图像检测"), "image")
-        calibration_combo.setToolTip(
-            "自动模式: 先图像检测，失败降级为等分\n"
-            "等分网格: 跳过图像检测，直接按行列数等分\n"
-            "图像检测: 仅图像检测，失败返回 None"
-        )
-        if panel_def:
-            idx = calibration_combo.findData(panel_def.calibration)
-            if idx >= 0:
-                calibration_combo.setCurrentIndex(idx)
-        form.addRow(tr("校准模式:"), calibration_combo)
-
-        # 滚动方向下拉
-        scroll_combo = QComboBox()
-        scroll_combo.addItem(tr("纵向滚动"), "vertical")
-        scroll_combo.addItem(tr("横向滚动"), "horizontal")
-        scroll_combo.addItem(tr("双向滚动"), "both")
-        scroll_combo.addItem(tr("固定网格"), "none")
-        scroll_combo.setToolTip(
-            "纵向滚动: rows 允许 expected-1\n"
-            "横向滚动: cols 允许 expected-1\n"
-            "双向滚动: rows/cols 都允许 expected-1\n"
-            "固定网格: rows/cols 必须精确匹配\n\n"
-            "约束：rows=1 时禁止纵向/双向，cols=1 时禁止横向/双向"
-        )
-        if panel_def:
-            idx = scroll_combo.findData(panel_def.scroll_direction)
-            if idx >= 0:
-                scroll_combo.setCurrentIndex(idx)
-        form.addRow(tr("滚动方向:"), scroll_combo)
-
-        # 仅编辑模式可选择归属场景（跨场景迁移）
-        scene_combo = None
-        if panel_def is not None:
-            scene_combo = add_scene_combo_row(form, self._scene_key)
-
-        # 多视图场景可选择归属视图；新建默认落在当前视图
-        view_list = add_views_checklist_row(
-            form, self._scene_key,
-            list(panel_def.views) if panel_def else [self._current_view],
-        )
-
-        # 场景切换时同步更新视图下拉框
-        if scene_combo is not None:
-            connect_scene_views_sync(scene_combo, view_list)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
-        )
-        apply_dialog_button_box_style(buttons)
-        form.addRow(buttons)
-
-        # 实时校验
-        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+    def _bind_panel_key(self, key: str):
         scene = get_registry().get_scene(self._scene_key)
-        # region/point/panel 共享命名空间
-        existing = set()
-        if scene:
-            existing = {r.key for r in scene.regions} | {p.key for p in scene.points} | {p.key for p in scene.panels}
-        # 编辑模式下，排除自身的 key（允许保持不变）
-        old_key = panel_def.key if panel_def else None
-
-        def _validate():
-            k = key_edit.text().strip()
-            # 检查 key 是否被占用（新建时检查全部，编辑时排除自身）
-            if k in existing and k != old_key:
-                ok_btn.setEnabled(False)
-                return
-            ok_btn.setEnabled(bool(k and name_edit.text().strip()))
-
-        key_edit.textChanged.connect(_validate)
-        name_edit.textChanged.connect(_validate)
-        _validate()
-
-        buttons.accepted.connect(dialog.accept)
+        definition = next((p for p in scene.panels if p.key == key), None) if scene else None
+        if definition is None:
+            return
+        panel = self._find_bound_panel(key)
+        if panel is not None and panel.w_ratio > 0 and panel.h_ratio > 0:
+            self._show_panel_properties(key, layout_first=True)
+            return
+        if not self._layout_name:
+            QMessageBox.information(self, tr("绑定网格"), tr("请先选择布局。"))  # type: ignore[arg-type]
+            return
+        if self._canvas.get_image() is None:
+            QMessageBox.information(self, tr("绑定网格"), tr("请先导入或刷新当前场景截图。"))  # type: ignore[arg-type]
+            return
+        dialog = QDialog(self)  # type: ignore[arg-type]
+        dialog.setWindowTitle(tr("绑定到当前布局"))
+        outer = QVBoxLayout(dialog)
+        outer.addWidget(QLabel(self._panel_layout_scope()))
+        outer.addWidget(QLabel(f"{definition.name} ({key})"))
+        binding = PanelBindingForm(panel, dialog)
+        outer.addWidget(binding)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                   QDialogButtonBox.StandardButton.Cancel)
+        next_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        assert next_button is not None
+        next_button.setText(tr("下一步：框选区域"))
+        apply_dialog_button_box_style(buttons)
+        buttons.accepted.connect(lambda: dialog.accept() if binding.validate() else None)
         buttons.rejected.connect(dialog.reject)
+        outer.addWidget(buttons)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._canvas.begin_place_panel(definition, binding.value())
 
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return None
+    def _on_unbind_panel(self):
+        key = self._selected_panel_key()
+        if key is not None:
+            self._canvas.remove_item("panel", key)
 
-        target_scene = (
-            scene_combo.currentData() if scene_combo is not None else self._scene_key
-        )
-        return PanelDef(
-            key=key_edit.text().strip(),
-            name=name_edit.text().strip(),
-            min_visible=round(vis_spin.value(), 2),
-            views=checklist_views_value(view_list, self._current_view),
-            calibration=calibration_combo.currentData(),
-            scroll_direction=scroll_combo.currentData(),
-        ), target_scene, rows_spin.value(), cols_spin.value()
+    def _panel_layout_scope(self) -> str:
+        scope = f"当前布局：{self._layout_name or '未选择'}；修改后需保存布局。"
+        # 根布局和别名的两个编辑入口都要说明共用影响范围。
+        shared = shared_layout_bindings(self._layout_name) if self._layout_name else []
+        if len(shared) > 1:
+            scope += "\n共用此绑定的布局：" + "、".join(shared)
+        return scope
+
+    def _definition_form(self, parent, panel_def):
+        page = QWidget(parent)
+        form = QFormLayout(page)
+        form.addRow(QLabel(tr("场景定义：所有布局共用；保存后立即生效。")))
+        key_edit = QLineEdit(panel_def.key if panel_def else "")
+        name_edit = QLineEdit(panel_def.name if panel_def else "")
+        form.addRow("Key:", key_edit)
+        form.addRow(tr("名称:"), name_edit)
+        scene_combo = add_scene_combo_row(form, self._scene_key) if panel_def else None
+        views = add_views_checklist_row(
+            form, self._scene_key,
+            list(panel_def.views) if panel_def else [self._current_view])
+        if scene_combo is not None:
+            connect_scene_views_sync(scene_combo, views)
+        error = QLabel()
+        error.setStyleSheet("color: #c62828;")
+        form.addRow(error)
+
+        def result():
+            import re
+            key = key_edit.text().strip()
+            name = name_edit.text().strip()
+            target = scene_combo.currentData() if scene_combo else self._scene_key
+            if not re.fullmatch(r"[a-z][a-z0-9_]*", key) or not name:
+                error.setText(tr("请填写名称；Key 以小写字母开头，仅含小写字母、数字、下划线。"))
+                return None
+            registry = get_registry()
+            scene = registry.get_scene(target)
+            try:
+                if scene is None:
+                    raise ValueError(tr("目标场景不存在"))
+                if panel_def and target == self._scene_key:
+                    registry._check_key_unique_excluding(scene, key, panel_def.key)
+                else:
+                    registry._check_key_unique(scene, key)
+            except ValueError as exc:
+                error.setText(str(exc))
+                return None
+            error.clear()
+            return PanelDef(key=key, name=name,
+                            views=checklist_views_value(views, "")), target
+
+        return page, result
+
+    def _show_panel_definition_dialog(self, panel_def):
+        dialog = QDialog(self)  # type: ignore[arg-type]
+        dialog.setWindowTitle(tr("创建网格定义"))
+        outer = QVBoxLayout(dialog)
+        page, get_result = self._definition_form(dialog, panel_def)
+        outer.addWidget(page)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                   QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText(tr("创建定义"))
+        apply_dialog_button_box_style(buttons)
+        result = None
+
+        def accept():
+            nonlocal result
+            result = get_result()
+            if result is not None:
+                dialog.accept()
+
+        buttons.accepted.connect(accept)
+        buttons.rejected.connect(dialog.reject)
+        outer.addWidget(buttons)
+        return result if dialog.exec() == QDialog.DialogCode.Accepted else None
+
+    def _show_panel_properties(self, key: str, layout_first: bool = False):
+        scene = get_registry().get_scene(self._scene_key)
+        definition = next((p for p in scene.panels if p.key == key), None) if scene else None
+        if definition is None:
+            return
+        dialog = QDialog(self)  # type: ignore[arg-type]
+        dialog.setWindowTitle(f"网格属性 — {definition.name}")
+        outer = QVBoxLayout(dialog)
+        tabs = QTabWidget()
+        outer.addWidget(tabs)
+        page, get_definition = self._definition_form(dialog, definition)
+        tabs.addTab(page, tr("场景定义 · 所有布局"))
+        binding_page = QWidget()
+        binding_layout = QVBoxLayout(binding_page)
+        binding_layout.addWidget(QLabel(self._panel_layout_scope()))
+        bound = self._find_bound_panel(key)
+        placed = bound is not None and bound.w_ratio > 0 and bound.h_ratio > 0
+        binding = PanelBindingForm(bound, dialog) if placed else None
+        if binding is not None:
+            binding_layout.addWidget(binding)
+        else:
+            binding_layout.addWidget(QLabel(tr("当前布局尚未绑定此网格。")))
+        tabs.addTab(binding_page, tr("当前布局绑定"))
+        tabs.setCurrentIndex(1 if layout_first else 0)
+        note = QLabel(tr("每次只提交当前页。关闭窗口会放弃未提交的表单内容。"))
+        outer.addWidget(note)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save |
+                                   QDialogButtonBox.StandardButton.Cancel)
+        close_button = buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        assert close_button is not None
+        close_button.setText(tr("关闭"))
+        apply_dialog_button_box_style(buttons)
+        save = buttons.button(QDialogButtonBox.StandardButton.Save)
+
+        def update_label():
+            save.setText(tr("保存场景定义") if tabs.currentIndex() == 0 else
+                         tr("应用到当前布局") if placed else tr("绑定到当前布局"))
+            save.setEnabled(tabs.currentIndex() == 0 or bool(self._layout_name))
+
+        tabs.currentChanged.connect(update_label)
+        update_label()
+
+        def submit():
+            try:
+                if tabs.currentIndex() == 0:
+                    result = get_definition()
+                    if result is None:
+                        return
+                    new_def, target = result
+                    if new_def != definition or target != self._scene_key:
+                        self._save_panel_definition(definition, new_def, target)
+                elif binding is not None:
+                    if not binding.validate():
+                        return
+                    self._update_panel_binding(key, binding.value())
+                else:
+                    dialog.accept()
+                    self._bind_panel_key(key)
+                    return
+            except ValueError as exc:
+                QMessageBox.warning(dialog, tr("保存失败"), str(exc))
+                return
+            dialog.accept()
+
+        buttons.accepted.connect(submit)
+        buttons.rejected.connect(dialog.reject)
+        outer.addWidget(buttons)
+        dialog.exec()

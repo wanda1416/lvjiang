@@ -47,7 +47,7 @@ REGION_COLORS = [
 
 # ─── 画布组件 ────────────────────────────────────────────
 
-class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
+class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
     """可交互的图片画布，支持框选/拖拽/缩放矩形"""
 
     def __init__(self, parent=None):
@@ -101,6 +101,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         # 信号回调
         self.on_region_changed = None  # callable() -> None
         self.on_canvas_changed = None  # callable() -> None
+        self.on_panel_edit_requested = None  # callable(key) -> None
         self.on_panel_changed = None  # callable() -> None
         self.on_subscene_ref_changed = None  # callable() -> None
         self.on_selection_changed = None  # callable() -> None（仅选中态变化，不代表数据修改，不应标记 dirty）
@@ -119,6 +120,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
 
         # Panel 放置模式（框选矩形绑定到 PanelDef）
         self._pending_panel_def = None  # PanelDef | None
+        self._pending_panel_config = None  # PanelBindingConfig | None
         self._panel_drag_start: QPointF | None = None  # widget 坐标
         self._panel_drag_current: QPointF | None = None  # widget 坐标
 
@@ -373,6 +375,12 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
             self._subscene_selected_idx = -1
             self.update()
 
+    def selected_region_key(self) -> str | None:
+        """选中区域的稳定标识；列表排序和重建不应改变操作对象。"""
+        if 0 <= self._selected_idx < len(self._regions):
+            return self._regions[self._selected_idx].key or None
+        return None
+
     def delete_selected(self):
         """删除选中区域"""
         if (self._selected_idx >= 0
@@ -397,6 +405,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
 
     def set_panels(self, panels: list[Panel]):
         """设置面板列表（从布局加载）"""
+        # 加载/切换布局或重新下发数据时，旧的框选草稿不再有效。
+        self.cancel_panel_place()
         self._panels, self._hidden_panels = self._split_by_filter(
             [panel.clone() for panel in panels]
         )
@@ -425,23 +435,32 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         self._panel_selected_idx = -1
         self.update()
 
+    def selected_panel_key(self) -> str | None:
+        if 0 <= self._panel_selected_idx < len(self._panels):
+            return self._panels[self._panel_selected_idx].key
+        return None
+
     def _notify_panel_changed(self):
         """通知面板变化"""
         if self.on_panel_changed:
             self.on_panel_changed()
 
-    def begin_place_panel(self, panel_def):
+    def begin_place_panel(self, panel_def, config):
         """进入面板放置模式：等待用户在画布上框选矩形区域绑定到 PanelDef"""
         self._pending_panel_def = panel_def
+        self._pending_panel_config = config
         self._panel_drag_start = None
         self._panel_drag_current = None
         self.setCursor(Qt.CursorShape.CrossCursor)
         self.setFocus()  # 确保画布获得焦点以接收鼠标事件
+        if self.on_status_message:
+            self.on_status_message("请在画布上框选网格区域；按 Esc 取消，完成后保存布局。")
         self.update()
 
     def cancel_panel_place(self):
         """取消面板放置模式"""
         self._pending_panel_def = None
+        self._pending_panel_config = None
         self._panel_drag_start = None
         self._panel_drag_current = None
         self.setCursor(Qt.CursorShape.ArrowCursor)

@@ -20,6 +20,26 @@ def _write(path, doc):
                     encoding="utf-8")
 
 
+def test_legacy_panel_calibration_fields_are_ignored_and_removed_on_save(tmp_path):
+    system = tmp_path / "system"
+    path = system / "scenes" / "main.yaml"
+    _write(path, {
+        "key": "main", "name": "Main",
+        "panels": [{"key": "grid", "name": "Grid", "rows": 8, "cols": 9,
+                    "min_visible": .76, "calibration": "image",
+                    "scroll_direction": "both"}],
+    })
+    resolver = ConfigResolver(
+        system_dir=system, local_dir=tmp_path / "local", dev_mode=True)
+    registry = SceneRegistry(resolver=resolver)
+    panel = registry.get_scene("main").panels[0]
+    assert vars(panel) == {"key": "grid", "name": "Grid", "views": []}
+    panel.name = "Renamed"
+    registry.update_panel_in_scene("main", "grid", panel)
+    saved = yaml.safe_load(path.read_text())
+    assert saved["panels"] == [{"key": "grid", "name": "Renamed"}]
+
+
 def test_missing_version_is_v1_and_normalizes_to_v2():
     old = {
         "layout_scenes": {"general": ["main", "legacy"]},

@@ -6,13 +6,13 @@ from lvjiang.core.scene_definition import PanelDef
 from lvjiang.ui.scene_editor.scene_panel_editor import PanelEditorMixin
 
 
-def test_new_panel_accepts_full_edit_dialog_result(monkeypatch):
-    """编辑弹窗返回定义、场景、行列四项；新建路径不能按旧的两项解包。"""
+def test_new_panel_creates_only_scene_definition(monkeypatch):
+    """创建定义不接收布局参数，也不创建布局绑定。"""
     panel = PanelDef(key="grid", name="网格")
     host = Mock()
     host._scene_key = "scene"
-    host._show_panel_edit_dialog.return_value = (
-        panel, "scene", 3, 6)
+    host._show_panel_definition_dialog.return_value = (
+        panel, "scene")
     registry = Mock()
     monkeypatch.setattr(
         "lvjiang.ui.scene_editor.scene_panel_editor.get_registry",
@@ -29,3 +29,5 @@ def test_new_panel_accepts_full_edit_dialog_result(monkeypatch):
     registry.add_panel_to_scene.assert_called_once_with("scene", panel)
     sync.assert_called_once_with("scene")
     host._refresh_lists.assert_called_once_with()
+
+    host._canvas.begin_place_panel.assert_not_called()

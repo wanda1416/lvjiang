@@ -82,7 +82,6 @@ regions:
 panels:
 - key: bag_grid
   name: 背包网格
-  min_visible: 0.85
 references:
 - scene: bag_detail
   entity: back

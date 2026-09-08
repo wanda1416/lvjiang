@@ -18,13 +18,8 @@ regions:
 panels:
 - key: money_1
   name: 区域货币
-  min_visible: 0.95
-  calibration: even
-  scroll_direction: none
 - key: money_2
   name: 其他货币
-  min_visible: 0.8
-  calibration: even
 references:
 - scene: bag_detail
   entity: back

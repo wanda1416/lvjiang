@@ -439,6 +439,7 @@ class SceneEditorDialog(
         tab.on_view_changed = self._on_tab_view_changed
         tab.on_scene_type_changed = self._on_scene_type_changed
         tab.on_scene_references_added = self._on_scene_references_added
+        tab.on_scene_reference_removed = self._on_scene_reference_removed
         tab.on_version_pending_changed = self._on_version_pending_changed
         if self._current_layout is not None and not self._applying_layout:
             self._apply_layout_to_tab(scene_key, tab)
@@ -600,6 +601,15 @@ class SceneEditorDialog(
         tab.set_regions(self._current_layout.get_scene_regions(scene_key))
         tab.set_points(self._current_layout.get_scene_points(scene_key))
 
+    def _on_scene_reference_removed(self, scene_key: str, source: str, entity: str):
+        """同步移除内存布局中的引用投影，不重载或保存其他布局数据。"""
+        if self._current_layout is None:
+            return
+        self._current_layout.set_scene_regions(scene_key, [
+            region for region in self._current_layout.get_scene_regions(scene_key)
+            if not (region.key == entity and region.source_scene == source)
+        ])
+
     def _on_item_migrated(self, kind: str, key: str, source: str, target: str):
         """编辑弹窗跨场景迁移后的同步（场景 YAML 已由弹窗侧迁移完成）
 
@@ -639,19 +649,6 @@ class SceneEditorDialog(
                     tab.set_points(temp.get_scene_points(sk))
                     tab.set_arrows(temp.get_scene_arrows(sk))
                     tab.set_panels(temp.get_scene_panels(sk))
-            if migrated and kind == "panel":
-                # 网格参数同步到已迁移的画布 Panel（与同场景编辑行为一致）
-                scene = get_registry().get_scene(target)
-                pdef = next((p for p in scene.panels if p.key == key), None) if scene else None
-                if pdef is not None:
-                    panels = self._current_layout.get_scene_panels(target)
-                    for p in panels:
-                        if p.key == key:
-                            # rows/cols 属于布局级配置，不从 PanelDef 同步
-                            p.min_visible = pdef.min_visible
-                    self._current_layout.set_scene_panels(target, panels)
-                    if dst_tab is not None:
-                        dst_tab.set_panels(panels)
             if dst_tab is not None:
                 dst_tab._refresh_lists()
         self._status_bar.showMessage(

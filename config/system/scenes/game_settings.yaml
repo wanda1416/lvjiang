@@ -112,6 +112,12 @@ regions:
   view: other
   to: /redeem_code
   navigation: open
+- key: redeem_code_label
+  name: 兑换码标签
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: other
 - key: other
   name: 其他
   type: func
@@ -124,6 +130,12 @@ regions:
   name: 输入区
   type: func
   is_text: false
+  is_clickable: true
+  view: redeem_code
+- key: redeem_label
+  name: 兑换文本
+  type: attr
+  is_text: true
   is_clickable: true
   view: redeem_code
 references:

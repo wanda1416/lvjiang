@@ -35,6 +35,12 @@ def _substr(s, *args) -> str:
     return s[start:]
 
 
+@builtin_func("split_lines")
+def _split_lines(s) -> list[str]:
+    """按实际换行拆分文本，兼容 LF、CRLF 和 CR；空行由调用方决定如何处理。"""
+    return str(s).splitlines() if s is not None else []
+
+
 @builtin_func("split")
 def _split(s, *args) -> list:
     """按分隔符拆分为列表

@@ -95,7 +95,7 @@ def test_unknown_metadata_fields_are_ignored():
 #%     min: 1
 #%     widget: slider
 #%   - name: unsupported
-#%     type: text
+#%     type: color_picker
 """
     assert parse_metadata(text) == {
         "name": "示例",
@@ -131,13 +131,50 @@ def test_all_parameter_types_are_accepted():
 #%   - name: slots
 #%     type: checkgroup
 #%     options: [{value: head, label: 头部}]
+#%   - {name: code, type: text, default: "", placeholder: 区分大小写}
 """
     assert [item["type"] for item in parse_metadata(text)["parameters"]] == [
         "number",
         "bool",
         "select",
         "checkgroup",
+        "text",
     ]
+
+
+def test_text_parameter_keeps_default_and_placeholder():
+    text = ('#% parameters:\n'
+            '#%   - {name: code, type: text, default: ABC, placeholder: 兑换码}\n')
+    param = parse_metadata(text)["parameters"][0]
+    assert param["default"] == "ABC"
+    assert param["placeholder"] == "兑换码"
+
+
+@pytest.mark.parametrize("value", ["true", "false"])
+def test_text_parameter_accepts_multiline_boolean(value):
+    param = parse_metadata(
+        f"#% parameters:\n#%   - {{name: codes, type: text, multiline: {value}}}\n"
+    )["parameters"][0]
+    assert param["multiline"] is (value == "true")
+
+
+@pytest.mark.parametrize("value", ['"true"', "1", "null"])
+def test_text_parameter_rejects_invalid_multiline(value):
+    with pytest.raises(WorkflowMetadataError, match="必须是布尔值"):
+        parse_metadata(
+            f"#% parameters:\n#%   - {{name: codes, type: text, multiline: {value}}}\n"
+        )
+
+
+@pytest.mark.parametrize("field", ["default", "placeholder"])
+def test_text_parameter_rejects_non_string(field):
+    """YAML 里漏引号会把 123 解析成整数，注入后拿到的不是字符串。
+
+    等到运行期才发现，游戏已经被点到输入框那一步了，这里当场拦下。
+    """
+    text = f'#% parameters:\n#%   - {{name: code, type: text, {field}: 123}}\n'
+    with pytest.raises(WorkflowMetadataError, match="必须是字符串"):
+        parse_metadata(text)
 
 
 def test_build_flow_config_defaults(tmp_path):

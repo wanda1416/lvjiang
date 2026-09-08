@@ -1,0 +1,118 @@
+#% name: 输入兑换码
+#% env: [android, desktop]
+#% note: |-
+#%   PC 端每行填写一个兑换码，按顺序逐条粘贴，空行忽略。
+#%   安卓端不使用此参数，只处理一次手动输入；也允许自行确认后再点继续。
+#% parameters:
+#%   - name: redeem_code
+#%     label: 兑换码（PC 每行一个）
+#%     type: text
+#%     multiline: true
+#%     default: ""
+#%     placeholder: PC 每行一个兑换码；安卓留空，在游戏内手动输入
+
+# 前置：主页或菜单。每次兑换结束必须回到设置的其他 tab，全部完成再回主页。
+import "subcall/navigation.wf"
+import "subcall/page_detection.wf"
+
+default $redeem_code = ""
+
+# 安卓只处理一次，不拆分或粘贴参数；桌面先清理空行再导航。
+eval $codes = [""]
+if env("desktop")
+    eval $codes = []
+    for line in split_lines($redeem_code)
+        eval $code = trim($line)
+        if not $code is_empty
+            eval append($codes, $code)
+        end
+    end
+    if len($codes) == 0
+        log error "请输入兑换码，每行一个"
+        return -1
+    end
+end
+
+call $nav_result = nav_main_to_menu()
+if $nav_result < 0
+    return -1
+end
+
+click [game_menu_page].[settings] after wait @page_refresh
+
+scan [game_settings].[store] as $in_settings by contains "存储"
+if not $in_settings
+    eval pause("未进入设置页，请手动导航到设置页后点击继续")
+end
+
+# 桌面「其他」位置无法可靠绑定，从存储按 E 右移；安卓直接点击其他。
+if env("desktop")
+    click [game_settings].[store] after wait @step_interval
+    press "E" after wait @page_refresh
+else
+    click [game_settings].[other] after wait @page_refresh
+end
+
+for code in $codes
+    click [game_settings].[redeem_code] after wait @page_refresh
+    scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
+    if not $in_redeem
+        log error "未打开兑换码输入框，未识别到兑换奖励，已中止"
+        return -1
+    end
+
+    if env("desktop")
+        click [game_settings].[input_area] after wait @step_interval
+        paste $code after wait @step_interval
+        # 移除输入框的焦点
+        click [game_settings].[redeem_label] after wait @step_interval
+    else
+        eval pause("请在游戏内输入或粘贴一个兑换码后点击继续；也可自行确认并返回其他页后再继续。多个兑换码请自行逐条操作。")
+    end
+
+    call $closed = finish_redeem()
+    if $closed < 0
+        return -1
+    end
+end
+
+# 其他 tab 与设置基底同层，一次 back 直接返回菜单。
+click [game_settings].[back] after wait @page_refresh
+
+call $in_menu = is_in_menu_page()
+if $in_menu
+    click [game_menu_page].[back] after wait @step_interval
+end
+
+call $in_main = is_in_main_page()
+if not $in_main
+    log warn "兑换码流程已处理，但未回到主页，请手动确认当前页面。"
+    return -1
+end
+
+log "兑换码流程结束。"
+
+def finish_redeem()
+    # 安卓用户可能已自行关闭弹窗；是否仍在兑换窗口只看“兑换奖励”。
+    scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
+    if not $in_redeem
+        return 0
+    end
+
+    click [game_settings].[confirm] after wait @page_refresh
+    scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
+    if not $in_redeem
+        return 0
+    end
+
+    # 已使用的兑换码会使 confirm 无效，标题仍为“兑换奖励”，需取消关闭。
+    log warn "确认后兑换码弹窗仍在，按已兑换或确认无效处理，取消一次。"
+    click [game_settings].[cancel] after wait @page_refresh
+
+    scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
+    loop while $in_redeem
+        eval pause("兑换窗口还在，请手动取消，并检查修复兑换码任务。关闭兑换窗口后点击继续。")
+        scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
+    end
+    return 0
+end

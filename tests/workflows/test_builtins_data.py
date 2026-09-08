@@ -5,6 +5,13 @@
 """
 from tests.workflows.conftest import run
 
+
+def test_split_lines_preserves_blanks_and_supports_common_line_endings():
+    assert run("eval $lines = split_lines($text)", {
+        "text": "A\r\n\r\n B\nC\rD",
+    })["lines"] == ["A", "", " B", "C", "D"]
+    assert run("eval $lines = split_lines($text)", {"text": None})["lines"] == []
+
 # ─── 字典/列表函数 ─────────────────────────────────────────
 
 class TestCollectionFuncs:

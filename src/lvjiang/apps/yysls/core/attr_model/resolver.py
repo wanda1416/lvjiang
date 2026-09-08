@@ -1,8 +1,7 @@
 """基础属性求值引擎
 
-两趟求值：先把全部常数加完，再算公式。这样公式读到的源字段已经是
-最终值，结果与 YAML 里来源的书写顺序无关——否则「敏 → 外功攻击」
-会因为武学天赋恰好排在五维之前而算少。
+先汇入常量和补足，再按字段依赖顺序计算公式。支持五维 → 攻击 →
+天赋增益等无环依赖链，拒绝循环引用；所有上游贡献完成后才读下游。
 
 同一份来源清单求值两次得到双出口：scope=panel 的子集对得上游戏
 角色面板，全集喂毕业率。差集即吃食一类只在战斗内生效的加成。
@@ -43,7 +42,7 @@ from .models import (
 CapsLookup = Callable[[int, str], float | None]
 
 #: 反解迭代上限。加性管线通常一轮即收敛，公式互相依赖时多几轮。
-_MAX_SOLVE_ITERATIONS = 8
+_MAX_SOLVE_ITERATIONS = len(WORKING_FIELDS) + 1
 _SOLVE_TOLERANCE = 1e-9
 
 #: 浮点累加的规整精度，与 graduation 的做法一致，避免 0.1+0.2 噪声
@@ -107,35 +106,40 @@ def expand_full_affix(
     return {low_field: low, high_field: high}
 
 
-def validate_formula_dependencies(effects: list[StatEffect]) -> None:
-    """公式只能引用「不由公式产生」的字段，即拒绝公式链。
-
-    第二趟里公式按条目顺序执行，所以 B 的公式若引用 A 的公式目标，
-    调换两者在 YAML 里的先后就会改变结果——一个没人会察觉的顺序依赖。
-
-    拓扑排序能解，但当前需求下没有任何数据需要公式链；直接禁掉更简单、
-    也更可靠：报错会明确指出是哪两个条目在链，真出现需要时再有意识地
-    引入第三趟，而不是在静默的错误结果上继续填数据。
-
-    五维不受影响：它只由常数写入，是公式的源而不是目标。
-    """
-    targets: dict[str, str] = {}
+def ordered_formulas(effects: list[StatEffect]) -> list[tuple[StatEffect, str, Formula]]:
+    """按字段依赖排序；同一目标的全部贡献完成后，才允许下游读取。"""
+    by_target: dict[str, list[tuple[StatEffect, str, Formula]]] = {}
     for effect in effects:
         for name, value in effect.stats.items():
             if isinstance(value, Formula):
-                targets.setdefault(name, effect.label)
-    for effect in effects:
-        for name, value in effect.stats.items():
-            if not isinstance(value, Formula):
-                continue
-            producer = targets.get(value.source)
-            if producer is not None:
-                raise AttrModelError(
-                    tr("{label} 的 {field} 引用了 {producer} 用公式算出的 {source}；"
-                       "公式不能引用公式的结果").format(
-                        label=effect.label, field=name,
-                        producer=producer, source=value.source)
-                )
+                if name not in WORKING_FIELDS or value.source not in WORKING_FIELDS:
+                    raise AttrModelError(f"{effect.label}: 未知公式字段 {name}/{value.source}")
+                by_target.setdefault(name, []).append((effect, name, value))
+    ordered: list[tuple[StatEffect, str, Formula]] = []
+    visiting: list[str] = []
+    done: set[str] = set()
+
+    def visit(target: str) -> None:
+        if target in done:
+            return
+        if target in visiting:
+            raise AttrModelError("公式循环依赖: " + " → ".join([*visiting, target]))
+        visiting.append(target)
+        for _effect, _name, formula in by_target[target]:
+            if formula.source in by_target:
+                visit(formula.source)
+        visiting.pop()
+        done.add(target)
+        ordered.extend(by_target[target])
+
+    for target in by_target:
+        visit(target)
+    return ordered
+
+
+def validate_formula_dependencies(effects: list[StatEffect]) -> None:
+    """允许无环公式链，禁止自引用及循环依赖。"""
+    ordered_formulas(effects)
 
 
 def _resolve_scope(
@@ -146,8 +150,8 @@ def _resolve_scope(
     caps_lookup: CapsLookup,
     include_combat_only: bool,
     residual: dict[str, float] | None,
-) -> tuple[CombatAttributes, list[AppliedModifier]]:
-    """单个作用域的两趟求值"""
+) -> ScopeResult:
+    """单个作用域：常量/补足 → 依赖公式 → 角色与伤害双投影。"""
     numeric_fields = COMBAT_NUMERIC_FIELDS
     allowed = set(WORKING_FIELDS)
     working: dict[str, float] = {name: 0.0 for name in allowed}
@@ -220,31 +224,14 @@ def _resolve_scope(
         for name, extra_value in effect.extra.items():
             record_extra(effect, name, float(extra_value))
 
-    # 第二趟：公式。源字段此时已是最终值，与书写顺序无关。
-    for effect in selected:
-        for name, stat_value in effect.stats.items():
-            if not isinstance(stat_value, Formula):
-                continue
-            if name not in allowed:
-                raise AttrModelError(
-                    tr("{label}: 未知属性字段 {field}").format(
-                        label=effect.label, field=name
-                    )
-                )
-            if stat_value.source not in allowed:
-                raise AttrModelError(
-                    tr("{label}: 公式引用了未知源字段 {source}").format(
-                        label=effect.label, source=stat_value.source
-                    )
-                )
-            resolved = stat_value.apply(working)
-            if resolved is None:
-                continue
-            record(effect, name, resolved)
-
     # 残差：未建模来源的兜底，等价于用户手填的那部分
     if residual:
         for name, value in residual.items():
+            if name.startswith("extra:"):
+                record_extra(
+                    StatEffect(source_id=RESIDUAL_SOURCE_ID, label=tr("手填补足"),
+                               kind="base"), name[6:], float(value))
+                continue
             if name not in allowed or not value:
                 continue
             before = working[name]
@@ -262,11 +249,17 @@ def _resolve_scope(
                 )
             )
 
+    # 补足与常量均已汇入，再按依赖顺序执行公式。
+    for effect, name, formula in ordered_formulas(selected):
+        formula_value = formula.apply(working)
+        if formula_value is not None:
+            record(effect, name, formula_value)
+
     attrs = CombatAttributes(
         **{name: working[name] for name in numeric_fields},
         extra_attrs=extra,
     )
-    return attrs, modifiers
+    return ScopeResult(attrs=attrs, modifiers=modifiers, values=working)
 
 
 def resolve(
@@ -285,10 +278,11 @@ def resolve(
         school_attr: 流派属性（通用/鸣金/牵丝/裂石/破竹），
             决定属性攻击词条落到哪对字段
         caps_lookup: 词条满值查询
-        residual: 反解得到的手填补足，见 :func:`solve_residual`
+        residual: 反解得到的手填补足；动态字段使用 extra: 前缀，
+            与固定字段隔离。见 :func:`solve_residual`
     """
     validate_formula_dependencies(effects)
-    panel_attrs, panel_modifiers = _resolve_scope(
+    panel = _resolve_scope(
         effects,
         level=level,
         school_attr=school_attr,
@@ -296,7 +290,7 @@ def resolve(
         include_combat_only=False,
         residual=residual,
     )
-    combat_attrs, combat_modifiers = _resolve_scope(
+    combat = _resolve_scope(
         effects,
         level=level,
         school_attr=school_attr,
@@ -304,8 +298,6 @@ def resolve(
         include_combat_only=True,
         residual=residual,
     )
-    panel = ScopeResult(attrs=panel_attrs, modifiers=panel_modifiers)
-    combat = ScopeResult(attrs=combat_attrs, modifiers=combat_modifiers)
     unmodeled = [
         UnmodeledSource(effect.source_id, effect.label, effect.kind)
         for effect in effects
@@ -344,10 +336,11 @@ def solve_residual(
             caps_lookup=caps_lookup,
             include_combat_only=False,
             residual=residual,
-        )[0]
+        )
         largest = 0.0
         for name, target in targets.items():
-            current = getattr(result, name, None)
+            current = (result.attrs.extra_attrs.get(name[6:], 0.0)
+                       if name.startswith("extra:") else result.values.get(name))
             if current is None:
                 raise AttrModelError(
                     tr("反解目标含未知字段: {field}").format(field=name)

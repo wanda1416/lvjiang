@@ -132,3 +132,23 @@ class TestRoundTrip:
         node = _session(session_env)["yysls"]
         assert "play_styles" in node and "graduations" in node
 
+
+
+def test_manual_overwrite_clears_only_its_derivation(session_env):
+    from types import SimpleNamespace
+
+    from lvjiang.apps.yysls.config.attr_loadout import get_derivation
+    from lvjiang.apps.yysls.config.play_styles import save_play_style
+    from lvjiang.apps.yysls.ui.game_settings.attr_derive_panel import AttrDerivePanel
+
+    school = "鸣金·虹"
+    derivation = {"combat_delta": {"max_outer": 20.0}}
+    save_play_style(school, "样本", {"max_outer": 120.0}, derivation=derivation)
+    save_play_style(school, "其他", {"max_outer": 120.0}, derivation=derivation)
+    host = SimpleNamespace(_combo_reference=SimpleNamespace(currentData=lambda: "样本"),
+                           _school=lambda: school)
+    assert AttrDerivePanel._reference_attrs(host).max_outer == 100.0
+    save_play_style(school, "样本", {"max_outer": 100.0})
+    assert get_derivation(school, "样本") == {}
+    assert get_derivation(school, "其他") == derivation
+    assert AttrDerivePanel._reference_attrs(host).max_outer == 100.0

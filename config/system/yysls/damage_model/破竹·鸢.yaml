@@ -99,6 +99,7 @@ skills:
   拳甲R蓄2直伤:
     kind: 拳甲
     charge: true
+    intent_conversion: 1.0
     outer_ratio: 7.9363
     outer_fixed: 2194.0
     attr_ratio: 11.9044
@@ -116,6 +117,7 @@ skills:
   拳甲R蓄4直伤:
     kind: 拳甲
     charge: true
+    intent_conversion: 1.0
     outer_ratio: 16.8107
     outer_fixed: 4647.0
     attr_ratio: 25.2161

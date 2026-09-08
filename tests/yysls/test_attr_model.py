@@ -687,20 +687,24 @@ def test_loadout_round_trips_through_a_plain_dict() -> None:
 
 # ── 公式依赖 ──────────────────────────────────────────────
 
-def test_formula_chains_are_rejected() -> None:
-    """公式引用公式的结果时，结果会随 YAML 里的先后而变。
-
-    与其做拓扑排序，不如直接禁掉——报错会指出是哪两个条目在链，
-    真需要时再有意识地引入第三趟，而不是在静默的错误结果上填数据。
-    """
+def test_formula_chains_are_order_independent() -> None:
     effects = [
+        _effect("基础", kind="base", stats={"dim_min": 100}),
         _effect("甲", kind="martial_art",
                 stats={"min_outer": Formula(source="dim_min", multiplier=2.0)}),
         _effect("乙", kind="martial_art",
                 stats={"outer_bonus": Formula(source="min_outer", multiplier=0.001)}),
     ]
+    for ordered in (effects, list(reversed(effects))):
+        assert _resolve(ordered).combat.attrs.outer_bonus == pytest.approx(0.2)
 
-    with pytest.raises(AttrModelError, match="公式不能引用公式的结果"):
+
+def test_formula_cycles_are_rejected() -> None:
+    effects = [_effect("循环", stats={
+        "min_outer": Formula(source="max_outer"),
+        "max_outer": Formula(source="min_outer"),
+    })]
+    with pytest.raises(AttrModelError, match="循环依赖"):
         _resolve(effects)
 
 
@@ -812,3 +816,32 @@ def test_a_clashing_id_rejects_the_whole_batch(sources_dir) -> None:
         })
 
     assert manager.source_file("丙·一重") is None
+
+
+@pytest.mark.parametrize("category,field,expected", [
+    ("会心率", "crit_rate", 0.14),
+    ("会意率", "intent_rate", 0.07),
+    ("精准率", "precision", 0.124),
+    ("全部武学增效", "all_skill_bonus", 0.049),
+])
+def test_real_full_affix_percent_caps_use_decimal_ratios(category, field, expected):
+    from lvjiang.apps.yysls.core.attr_model.manager import game_config_caps_lookup
+
+    result = resolve(
+        [_effect("百分比满词条", full_affix=FullAffix(category))],
+        level=110, school_attr="鸣金", caps_lookup=game_config_caps_lookup())
+    assert getattr(result.combat_attrs, field) == pytest.approx(expected)
+    assert game_config_caps_lookup()(110, "外功攻击") == pytest.approx(121.4)
+
+
+def test_extra_residual_preserves_unmodeled_and_offsets_modeled_attributes():
+    effects = [_effect("武学", extra={"剑武学增伤": 0.04, "枪武学增伤": 0.03})]
+    residual = solve_residual(
+        effects, {"extra:剑武学增伤": 0.10, "extra:枪武学增伤": 0.0,
+                  "extra:无名剑法蓄力技增伤": 0.32},
+        level=110, school_attr="鸣金", caps_lookup=_caps)
+    result = _resolve(effects, residual=residual)
+    for scope in (result.panel, result.combat):
+        assert scope.attrs.extra_attrs == pytest.approx({
+            "剑武学增伤": 0.10, "枪武学增伤": 0.0, "无名剑法蓄力技增伤": 0.32})
+        assert any(m.is_extra and m.label == "手填补足" for m in scope.modifiers)

@@ -241,7 +241,8 @@ buffs:
     lieshi_dmg: 0.02
     qiansi_dmg: 0.02
     pozhu_dmg: 0.02
-  步乱: {}
+  步乱:
+    settlement_bonus: 0.2
   无惧:
     special: 0.05
   小燕别(0%):

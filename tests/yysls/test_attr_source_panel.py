@@ -539,3 +539,53 @@ def test_the_buff_table_keeps_entries_with_no_static_effect(damage_panel) -> Non
     names = [widget._buffs.item(r, 0).text()
              for r in range(widget._buffs.rowCount())]
     assert names == ["远程笛"]
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_repeated_save_preserves_combat_and_extra_attributes(derive, monkeypatch, legacy):
+    from PyQt6.QtWidgets import QInputDialog, QMessageBox
+
+    from lvjiang.apps.yysls.config import (
+        get_derivation,
+        get_play_styles,
+        save_derivation,
+        save_play_style,
+    )
+    from lvjiang.apps.yysls.core.attr_model import StatEffect, resolve, solve_residual
+
+    dialog, _ = derive
+    dialog._combo_level.setCurrentIndex(0)
+    effects = [
+        StatEffect("base", "基础", "base", stats={"min_outer": 1000}),
+        StatEffect("food", "食物", "food", scope="combat",
+                   stats={"min_outer": 100}, extra={"剑武学增伤": 0.02}),
+    ]
+    def resolve_loadout(loadout, *, residual=None):
+        return resolve(effects, level=110, school_attr="鸣金",
+                       caps_lookup=lambda *_: None, residual=residual)
+    monkeypatch.setattr(dialog, "_resolve", resolve_loadout)
+    monkeypatch.setattr(dialog._manager(), "solve_residual_for_loadout",
+                        lambda loadout, targets, **kwargs: solve_residual(
+                            effects, targets, level=110, school_attr="鸣金",
+                                         caps_lookup=lambda *_: None))
+    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **kw: ("复用", True))
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **kw: None)
+    school = dialog._school()
+    save_play_style(school, "复用", {"min_outer": 1100, "extra_attrs": {"剑武学增伤": 0.12}})
+    derivation = dialog._loadout().to_dict()
+    if not legacy:
+        derivation["combat_delta"] = {"min_outer": 100, "extra_attrs": {"剑武学增伤": 0.02}}
+    save_derivation(school, "复用", derivation)
+    for _ in range(3):
+        dialog._refresh_reference()
+        dialog._combo_reference.setCurrentIndex(dialog._combo_reference.findData("复用"))
+        assert dialog._reference_attrs().min_outer == pytest.approx(1000)
+        dialog._on_save()
+        saved = get_play_styles(school)["复用"]
+        assert saved["min_outer"] == pytest.approx(1100)
+        assert saved["extra_attrs"]["剑武学增伤"] == pytest.approx(0.12)
+    assert get_derivation(school, "复用")["combat_delta"]["min_outer"] == pytest.approx(100)
+    # 新快照不依赖后来变动的来源数据。
+    effects[1].stats["min_outer"] = 200
+    dialog._combo_reference.setCurrentIndex(dialog._combo_reference.findData("复用"))
+    assert dialog._reference_attrs().min_outer == pytest.approx(1000)

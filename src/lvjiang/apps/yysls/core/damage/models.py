@@ -25,12 +25,12 @@ class DamageModelError(ValueError):
     """伤害模型配置有误"""
 
 
-#: 修正字段。技能自带的加成与增益条目共用同一套词汇——它们在 Excel
-#: 里就是同一组列（`武学奇术` 的 B..X 与 `增益` 的 B..W），求值时也走
-#: 同一条加法。分成两套名字只会让人对着表来回翻译。
+#: 修正字段。技能与增益的同名列共用词汇；通用、特殊、结算增伤
+#: 分别保留，不合并不同乘区。此处只记录参考值，不实现求值。
 MODIFIER_FIELDS: dict[str, str] = {
     "generic": "通用增伤",
     "special": "特殊增伤",
+    "settlement_bonus": "结算增伤",
     "min_outer": "最小外功",
     "max_outer": "最大外功",
     "outer_bonus": "外功加成",
@@ -98,6 +98,8 @@ class DamageSkill:
     charge: bool = False
     #: 真气比例。技能造成的伤害里有多少折算成真气回复。
     qi_ratio: float = 0.0
+    #: Excel 的会意转化系数，独立于强制会意开关。
+    intent_conversion: float = 0.0
     modifiers: dict[str, float] = field(default_factory=dict)
     force: dict[str, bool] = field(default_factory=dict)
 

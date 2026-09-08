@@ -9,30 +9,41 @@
 - 最低材料数量：该等级要求的最低材料数量
 - 判定抗性：判定抗性百分比（>= 0）
 - 增益抗性：增益抗性百分比（>= 0）
+- 重置无返还：该等级重置固定返还 0 律准石
+- 律准石规则：按品阶和 1-5 词条配置消耗/累计返还
 
 单表格结构，支持新增/删除/上移/下移。
-数据存于 attributes.yaml 的 level_configs 段。
+数据存于 game_config.yaml 的 level_configs 段。
 修改即时校验写盘，失败时状态栏红字提示。
 """
 
+import copy
 from datetime import datetime
 
 from loguru import logger
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QPushButton,
     QSpinBox,
+    QStackedWidget,
     QTableWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from lvjiang.apps.yysls.config import LevelConfig, get_game_config
-from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.button_styles import (
+    apply_button_style,
+    apply_compact_button_style,
+    apply_dialog_button_box_style,
+)
 
 from .....i18n import tr
 from .factory_guard import (
@@ -52,11 +63,159 @@ _CHENGYIN_RETRANSFER_COL = 5
 _MATERIAL_COL = 6
 _JUDGE_RES_COL = 7
 _BUFF_RES_COL = 8
+_RESET_NO_REFUND_COL = 9
+_STONE_RULE_COL = 10
 _COLS = (
     "#", tr("等级"), tr("支持重置"), tr("支持承音"), tr("无限转律"),
     tr("承音后转律"),
     tr("最低材料数量"), tr("判定抗性(%)"), "增益抗性(%)",
+    tr("重置无返还"), tr("律准石规则"),
 )  # runtime tr()
+
+
+def _rule_to_raw(cfg: LevelConfig) -> dict:
+    result = {}
+    for quality, rule in cfg.tuning_stones.items():
+        result[quality] = {
+            "tune_cost": {k: v / 10 for k, v in rule.tune_cost.items()},
+            "reset_refund": {k: v / 10 for k, v in rule.reset_refund.items()},
+            "recycle_refund": {
+                k: v / 10 for k, v in rule.recycle_refund.items()},
+        }
+    return result
+
+
+class StoneRuleDialog(QDialog):
+    """以宫商角徵羽五行编辑 gold/purple 消耗与累计返还。"""
+
+    rules_changed = pyqtSignal(dict)
+
+    _TUNE_NAMES = ("宫", "商", "角", "徵", "羽")
+    _FIELDS = ("tune_cost", "reset_refund", "recycle_refund")
+
+    def __init__(self, raw: dict, reset_no_refund: bool, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("律准石规则"))
+        self.resize(900, 360)
+        self._dirty = False
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(250)
+        self._save_timer.timeout.connect(self._emit_rules_changed)
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(tr(
+            "数值以大律准石计，小律准石按 0.1；"
+            "重置/回收填当前词条数对应的累计返还。")))
+        quality_row = QHBoxLayout()
+        self._enabled = {}
+        for quality, label in (("gold", tr("启用金装")),
+                               ("purple", tr("启用紫装"))):
+            cb = QCheckBox(label)
+            cb.setChecked(quality in raw)
+            self._enabled[quality] = cb
+            quality_row.addWidget(cb)
+        quality_row.addStretch()
+        layout.addLayout(quality_row)
+        self._table = QTableWidget(5, 7)
+        self._table.setHorizontalHeaderLabels([
+            tr("音律"),
+            tr("金装区\n调律消耗"), tr("金装区\n重置累计返还"),
+            tr("金装区\n回收累计返还"),
+            tr("紫装区\n调律消耗"), tr("紫装区\n重置累计返还"),
+            tr("紫装区\n回收累计返还")])
+        header = self._table.horizontalHeader()
+        assert header is not None
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._spins: dict[tuple[str, int, str], QDoubleSpinBox] = {}
+        self._cell_stacks: dict[tuple[str, int, str], QStackedWidget] = {}
+        for row, tune_name in enumerate(self._TUNE_NAMES):
+            tune_label = QLabel(tr(tune_name))
+            tune_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._table.setCellWidget(row, 0, tune_label)
+        for q_index, quality in enumerate(("gold", "purple")):
+            item = raw.get(quality) or {}
+            for affix_count in range(1, 6):
+                row = affix_count - 1
+                for field_index, key in enumerate(self._FIELDS):
+                    col = 1 + q_index * 3 + field_index
+                    spin = QDoubleSpinBox()
+                    spin.setRange(0, 99999)
+                    spin.setDecimals(1)
+                    spin.setSingleStep(0.1)
+                    spin.setValue(float((item.get(key) or {}).get(
+                        affix_count, (item.get(key) or {}).get(
+                            str(affix_count), 0))))
+                    spin.valueChanged.connect(self._schedule_save)
+                    fixed_zero = (
+                        affix_count == 1
+                        and key in ("tune_cost", "reset_refund")
+                    ) or (reset_no_refund and key == "reset_refund")
+                    if fixed_zero:
+                        spin.setValue(0)
+                    self._spins[(quality, affix_count, key)] = spin
+                    stack = QStackedWidget()
+                    stack.addWidget(spin)
+                    disabled = QWidget()
+                    disabled.setStyleSheet(
+                        "background-color: palette(midlight);")
+                    disabled.setToolTip(tr("该项固定为 0，无需配置"))
+                    stack.addWidget(disabled)
+                    stack.setCurrentIndex(1 if fixed_zero else 0)
+                    stack.setProperty("fixed_zero", fixed_zero)
+                    self._cell_stacks[(quality, affix_count, key)] = stack
+                    self._table.setCellWidget(row, col, stack)
+        for quality, checkbox in self._enabled.items():
+            checkbox.toggled.connect(
+                lambda checked, q=quality: self._set_quality_enabled(
+                    q, checked))
+            checkbox.toggled.connect(self._schedule_save)
+            self._set_quality_enabled(quality, checkbox.isChecked())
+        layout.addWidget(self._table)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.accept)
+        apply_dialog_button_box_style(buttons)
+        layout.addWidget(buttons)
+
+    def _schedule_save(self, *_args) -> None:
+        self._dirty = True
+        self._save_timer.start()
+
+    def _emit_rules_changed(self) -> None:
+        if not self._dirty:
+            return
+        self._dirty = False
+        self.rules_changed.emit(self.result_raw())
+
+    def done(self, result: int) -> None:
+        """关闭前提交仍在防抖窗口内的最后一次输入。"""
+        for spin in self._spins.values():
+            spin.interpretText()
+        if self._save_timer.isActive():
+            self._save_timer.stop()
+        self._emit_rules_changed()
+        super().done(result)
+
+    def _set_quality_enabled(self, quality: str, enabled: bool) -> None:
+        """未启用的品阶整区置灰且不显示数字。"""
+        for affix_count in range(1, 6):
+            for key in self._FIELDS:
+                stack = self._cell_stacks[(quality, affix_count, key)]
+                fixed_zero = bool(stack.property("fixed_zero"))
+                stack.setCurrentIndex(0 if enabled and not fixed_zero else 1)
+
+    def result_raw(self) -> dict:
+        result: dict[str, dict[str, dict[int, float]]] = {}
+        for quality, enabled in self._enabled.items():
+            if not enabled.isChecked():
+                continue
+            item: dict[str, dict[int, float]] = {
+                key: {} for key in self._FIELDS}
+            for affix_count in range(1, 6):
+                for key in item:
+                    item[key][affix_count] = round(
+                        self._spins[(quality, affix_count, key)].value(), 1)
+            result[quality] = item
+        return result
 
 
 class LevelConfigPanel(QWidget):
@@ -248,6 +407,44 @@ class LevelConfigPanel(QWidget):
         buff_spin.valueChanged.connect(lambda _v: self._apply())
         self._table.setCellWidget(row, _BUFF_RES_COL, buff_spin)
 
+        reset_no_refund_cb = QCheckBox()
+        reset_no_refund_cb.setChecked(cfg.reset_no_refund)
+        reset_no_refund_cb.setToolTip(tr(
+            "该等级重置调律不返还律准石，重置返还固定按 0 计。"))
+        reset_no_refund_cb.stateChanged.connect(lambda _s: self._apply())
+        reset_no_refund_widget = QWidget()
+        reset_no_refund_layout = QHBoxLayout(reset_no_refund_widget)
+        reset_no_refund_layout.setContentsMargins(0, 0, 0, 0)
+        reset_no_refund_layout.addWidget(reset_no_refund_cb)
+        reset_no_refund_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._table.setCellWidget(
+            row, _RESET_NO_REFUND_COL, reset_no_refund_widget)
+
+        stone_btn = QPushButton(tr("编辑"))
+        apply_compact_button_style(stone_btn, variant="neutral")
+        stone_btn.setProperty("tuning_stones", _rule_to_raw(cfg))
+        stone_btn.clicked.connect(
+            lambda _checked=False, button=stone_btn:
+            self._edit_stone_rules(button))
+        self._table.setCellWidget(row, _STONE_RULE_COL, stone_btn)
+
+    def _edit_stone_rules(self, button: QPushButton) -> None:
+        row = self._table.indexAt(button.pos()).row()
+        if row < 0:
+            return
+        reset_widget = self._table.cellWidget(row, _RESET_NO_REFUND_COL)
+        reset_cb = reset_widget.findChild(QCheckBox)
+        dialog = StoneRuleDialog(
+            copy.deepcopy(button.property("tuning_stones") or {}),
+            bool(reset_cb and reset_cb.isChecked()), self)
+        dialog.rules_changed.connect(
+            lambda raw: self._save_stone_rules(button, raw))
+        dialog.exec()
+
+    def _save_stone_rules(self, button: QPushButton, raw: dict) -> None:
+        button.setProperty("tuning_stones", copy.deepcopy(raw))
+        self._apply()
+
     # ── 行增删移动 ──
 
     def _on_add_row(self):
@@ -342,6 +539,10 @@ class LevelConfigPanel(QWidget):
         material_spin: QSpinBox = self._table.cellWidget(row, _MATERIAL_COL)
         judge_spin: QSpinBox = self._table.cellWidget(row, _JUDGE_RES_COL)
         buff_spin: QSpinBox = self._table.cellWidget(row, _BUFF_RES_COL)
+        reset_no_refund_widget = self._table.cellWidget(
+            row, _RESET_NO_REFUND_COL)
+        reset_no_refund_cb = reset_no_refund_widget.findChild(QCheckBox)
+        stone_btn: QPushButton = self._table.cellWidget(row, _STONE_RULE_COL)
         # 等级：0 表示未填写（校验时会报错）
         level_val = level_spin.value()
         # 支持重置：checkbox 无法表达 None，用 False 作为默认
@@ -364,6 +565,10 @@ class LevelConfigPanel(QWidget):
             "min_material_count": material_val if material_val > 0 else None,
             "judge_resistance": judge_val if judge_val > 0 else None,
             "buff_resistance": buff_val if buff_val > 0 else None,
+            "reset_no_refund": bool(
+                reset_no_refund_cb and reset_no_refund_cb.isChecked()),
+            "tuning_stones": copy.deepcopy(
+                stone_btn.property("tuning_stones") or {}),
         }
 
     def _set_row_values(self, row: int, values: dict) -> None:
@@ -414,6 +619,16 @@ class LevelConfigPanel(QWidget):
         buff_val = values.get("buff_resistance")
         buff_spin.setValue(buff_val if buff_val is not None else 0)
         buff_spin.blockSignals(False)
+        reset_no_refund_widget = self._table.cellWidget(
+            row, _RESET_NO_REFUND_COL)
+        reset_no_refund_cb = reset_no_refund_widget.findChild(QCheckBox)
+        if reset_no_refund_cb:
+            reset_no_refund_cb.blockSignals(True)
+            reset_no_refund_cb.setChecked(values["reset_no_refund"])
+            reset_no_refund_cb.blockSignals(False)
+        stone_btn: QPushButton = self._table.cellWidget(row, _STONE_RULE_COL)
+        stone_btn.setProperty(
+            "tuning_stones", copy.deepcopy(values.get("tuning_stones") or {}))
 
     # ── 收集 → 校验 → 写盘 → reload ──
 

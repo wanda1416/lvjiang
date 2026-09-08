@@ -8,6 +8,21 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 
+
+@dataclass
+class TuningStoneRule:
+    """单品阶律准石规则。
+
+    数值统一以「0.1 枚大律准石」为内部单位存储。
+    tune_cost 的 key 是即将写入的目标词条序号；
+    reset_refund/recycle_refund 的 key 是操作前的当前词条数。
+    返还值是该装备当前进度的累计返还，不是单轮增量。
+    """
+
+    tune_cost: dict[int, int] = field(default_factory=dict)
+    reset_refund: dict[int, int] = field(default_factory=dict)
+    recycle_refund: dict[int, int] = field(default_factory=dict)
+
 # ─── 等级配置数据结构 ──────────────────────────────────────
 
 @dataclass
@@ -22,6 +37,8 @@ class LevelConfig:
     min_material_count: 该等级要求的最低材料数量（可选，None 表示未设置）
     judge_resistance: 判定抗性百分比（可选，>= 0）
     buff_resistance: 增益抗性百分比（可选，>= 0）
+    reset_no_refund: 该等级重置是否固定不返还律准石
+    tuning_stones: gold/purple 的调律消耗与累计返还规则
     """
     level: int = 0
     allow_reset: bool | None = None
@@ -31,6 +48,8 @@ class LevelConfig:
     min_material_count: int | None = None
     judge_resistance: int | None = None
     buff_resistance: int | None = None
+    reset_no_refund: bool = True
+    tuning_stones: dict[str, TuningStoneRule] = field(default_factory=dict)
 
 
 # ─── 赛季配置数据结构 ──────────────────────────────────────

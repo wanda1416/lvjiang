@@ -6,7 +6,10 @@ Protocol 只描述组件实际使用的最小能力，避免把 AutoTuningWorkfl
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from lvjiang.core.recognizers import ReferenceInfo
 
 
 class SubcallEnginePort(Protocol):
@@ -61,6 +64,9 @@ class RecycleHostPort(Protocol):
     output: dict
 
     @property
+    def stone_stock(self) -> Any: ...
+
+    @property
     def engine(self) -> SubcallEnginePort | None: ...
 
     def wait_stable(self, timeout: float | str) -> Any: ...
@@ -102,6 +108,15 @@ class TuningRoundHostPort(Protocol):
     def base_group(self) -> Any: ...
 
     @property
+    def ctx(self) -> Any: ...
+
+    @property
+    def stone_stock(self) -> Any: ...
+
+    @property
+    def equipment_session(self) -> Any: ...
+
+    @property
     def engine(self) -> Any: ...
 
     output: dict
@@ -111,7 +126,7 @@ class TuningRoundHostPort(Protocol):
         scene_key: str,
         panel_key: str,
         group: str | list[str] | None = None,
-    ) -> dict[tuple[int, int], object]: ...
+    ) -> dict[tuple[int, int], ReferenceInfo]: ...
 
     def ocr_scene(
         self,

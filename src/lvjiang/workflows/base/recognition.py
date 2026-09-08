@@ -4,6 +4,7 @@ import numpy as np
 from loguru import logger
 
 from ...core.layout_models import CanvasConfig, FoundRegion, Region
+from ...core.recognizers import ReferenceInfo
 from ...i18n import tr
 from ..runtime_layout import enabled_regions, require_regions_enabled
 
@@ -261,7 +262,7 @@ class _RecognitionMixin:
         scene_key: str,
         panel_key: str,
         group: str | list[str] | None = None,
-    ) -> dict[tuple[int, int], object]:
+    ) -> dict[tuple[int, int], ReferenceInfo]:
         """Panel grid 模式参考图识别：一次截图，逐 cell 返回识别结果对象
 
         使用 panel grid 裁剪每个 cell，适用于参考对象按网格排列的场景。
@@ -295,7 +296,7 @@ class _RecognitionMixin:
             return {}
 
         # row-major list → (row, col) dict，转为 1-based
-        infos: dict[tuple[int, int], object] = {}
+        infos: dict[tuple[int, int], ReferenceInfo] = {}
         cols = panel_obj.cols
         for idx, (x1, y1, x2, y2) in enumerate(cells_list):
             row, col = idx // cols + 1, idx % cols + 1

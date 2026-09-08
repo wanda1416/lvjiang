@@ -109,9 +109,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         # 先检测手柄（优先级更高）
         if self._selected_idx >= 0:
             r = self._regions[self._selected_idx]
-            handle = self._hit_handle(r, pos)
-            if handle is not None:
-                return self._selected_idx, handle
+            if not r.is_reference:
+                handle = self._hit_handle(r, pos)
+                if handle is not None:
+                    return self._selected_idx, handle
 
         # 再检测矩形（从后往前，后绘制的在上层）
         for i in range(len(self._regions) - 1, -1, -1):
@@ -362,19 +363,19 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if self._field_selected and self._selected_idx >= 0:
             # 右侧字段列表选中：单区域编辑模式
             r = self._regions[self._selected_idx]
-            handle = self._hit_handle(r, pos)
-            if handle is not None:
-                self._drag_mode = DragMode.RESIZING
-                self._drag_handle = handle
-                self._drag_start = pos
-                self._drag_orig = r.clone()
-                self.update()
-                return
             rect = self._region_rect_widget(r)
             if rect.contains(pos):
-                self._drag_mode = DragMode.MOVING
-                self._drag_start = pos
-                self._drag_orig = r.clone()
+                if r.is_reference:
+                    self._drag_mode = DragMode.NONE
+                    self._drag_handle = None
+                    self._drag_orig = None
+                else:
+                    handle = self._hit_handle(r, pos)
+                    self._drag_mode = (DragMode.RESIZING if handle
+                                       else DragMode.MOVING)
+                    self._drag_handle = handle
+                    self._drag_start = pos
+                    self._drag_orig = r.clone()
                 self.update()
                 return
             # 点击空白：退出单区域模式，回到全局模式
@@ -467,6 +468,13 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             # 点击了已有区域
             self._selected_idx = idx
             r = self._regions[idx]
+            if r.is_reference:
+                self._drag_mode = DragMode.NONE
+                self._drag_handle = None
+                self._drag_orig = None
+                self._notify_selection_changed()
+                self.update()
+                return
             if handle is not None:
                 self._drag_mode = DragMode.RESIZING
                 self._drag_handle = handle
@@ -931,6 +939,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if self._field_selected and self._selected_idx >= 0:
             # 单区域编辑模式：只对选中区域响应
             r = self._regions[self._selected_idx]
+            if r.is_reference:
+                self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+                return
             handle = self._hit_handle(r, pos)
             if handle is not None:
                 self.setCursor(QCursor(HANDLE_CURSORS[handle]))
@@ -945,6 +956,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         # 全局调整模式：检测所有区域
         idx, handle = self._hit_test(pos)
         if idx >= 0:
+            if self._regions[idx].is_reference:
+                self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+                return
             if handle is not None:
                 self.setCursor(QCursor(HANDLE_CURSORS[handle]))
                 return
@@ -1026,6 +1040,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def _show_context_menu(self, pos: QPointF):
         """在指定位置显示右键菜单"""
+        if (0 <= self._selected_idx < len(self._regions)
+                and self._regions[self._selected_idx].is_reference):
+            return
         menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
             "QMenu { background-color: palette(base); padding: 4px; }"
@@ -1045,6 +1062,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if self._selected_idx < 0 or self._selected_idx >= len(self._regions):
             return
         src = self._regions[self._selected_idx]
+        if src.is_reference:
+            return
         # 创建新区域，位置相同
         new_region = Region(
             key="",

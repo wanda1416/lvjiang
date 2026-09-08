@@ -14,13 +14,15 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
-    QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-from ...core.layout_manager import rename_item_key_across_all_layouts
+from ...core.layout_manager import (
+    delete_item_key_across_all_layouts,
+    rename_item_key_across_all_layouts,
+)
 from ...core.scene_definition import PanelDef
 from ...core.scene_registry import (
     get_registry,
@@ -30,6 +32,7 @@ from ...core.scene_registry import (
 from ...i18n import tr
 from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from ..widgets import centered_cell_widget, strip_focus_rect
+from .entity_order_table import EntityOrderTable
 from .scene_select import (
     add_scene_combo_row,
     add_views_checklist_row,
@@ -55,7 +58,7 @@ class PanelEditorMixin:
         """构建面板编辑 Tab 的 UI"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        self._panel_table = QTableWidget()
+        self._panel_table = EntityOrderTable()
         self._panel_table.setColumnCount(6)
         self._panel_table.setHorizontalHeaderLabels(
             [tr("名称"), "Key", tr("比例"), tr("校准模式"), tr("滚动方向"), tr("禁用")]
@@ -71,14 +74,18 @@ class PanelEditorMixin:
         header.resizeSection(4, 60)   # 滚动方向
         header.resizeSection(5, 50)   # 禁用
         self._panel_table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows
+            EntityOrderTable.SelectionBehavior.SelectRows
         )
         self._panel_table.setSelectionMode(
-            QTableWidget.SelectionMode.SingleSelection
+            EntityOrderTable.SelectionMode.SingleSelection
         )
         self._panel_table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers
+            EntityOrderTable.EditTrigger.NoEditTriggers
         )
+        self._panel_table.setToolTip(tr("拖拽名称可调整 YAML 定义顺序"))
+        self._panel_table.entity_order_changed.connect(
+            lambda keys, moved_key: self._on_entity_order_changed(
+                "panels", keys, self._panel_table, moved_key))
         strip_focus_rect(self._panel_table)
         vheader = self._panel_table.verticalHeader()
         assert vheader is not None
@@ -137,6 +144,7 @@ class PanelEditorMixin:
             if panel_def.key not in bound_keys:
                 name_item.setForeground(Qt.GlobalColor.gray)
             self._panel_table.setItem(row, 0, name_item)
+            self._panel_table.set_entity_order_key(row, panel_def.key)
             # Key
             key_item = QTableWidgetItem(panel_def.key)
             if panel_def.key not in bound_keys:
@@ -215,6 +223,8 @@ class PanelEditorMixin:
             except ValueError as e:
                 QMessageBox.warning(self, tr("迁移失败"), str(e))
                 return
+            registry.retarget_references(
+                self._scene_key, target_scene, old_key, new_key)
             registry.remove_panel_from_scene(self._scene_key, old_key)
             sync_scene_cache(self._scene_key)
             sync_scene_cache(target_scene)
@@ -291,7 +301,7 @@ class PanelEditorMixin:
         result = self._show_panel_edit_dialog(None)
         if result is None:
             return
-        panel_def, _ = result
+        panel_def, _target_scene, _rows, _cols = result
         registry = get_registry()
         try:
             registry.add_panel_to_scene(self._scene_key, panel_def)
@@ -327,6 +337,9 @@ class PanelEditorMixin:
         except ValueError as e:
             QMessageBox.warning(self, tr("删除失败"), str(e))
             return
+        self._canvas.remove_item("panel", panel_def.key)
+        delete_item_key_across_all_layouts(
+            self._scene_key, "panel", panel_def.key)
         sync_scene_cache(self._scene_key)
         self._refresh_lists()
 

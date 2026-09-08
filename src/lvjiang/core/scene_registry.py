@@ -216,6 +216,16 @@ def get_point_name(scene_key: str, point_key: str) -> str:
     return point_key
 
 
+def get_panel_name(scene_key: str, panel_key: str) -> str:
+    """通过 scene_key + panel_key 查找网格面板中文名。"""
+    scene = _registry.get_scene(scene_key)
+    if scene:
+        for panel in scene.panels:
+            if panel.key == panel_key:
+                return panel.name
+    return panel_key
+
+
 def get_region_defs(scene_key: str) -> list[RegionDef]:
     """获取场景的完整区域定义列表"""
     scene = _registry.get_scene(scene_key)

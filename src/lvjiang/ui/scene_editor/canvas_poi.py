@@ -197,8 +197,12 @@ class CanvasPoiMixin:
 
     def begin_draw_arrow(self, from_point_key: str):
         """进入画箭头模式：以指定 point 为起点"""
-        if self._resolve_point(from_point_key) is None:
+        point = self._resolve_point(from_point_key)
+        if point is None:
             logger.warning(f"起点 point 未放置坐标，无法创建方向: {from_point_key}")
+            return
+        if point.is_reference:
+            logger.warning(f"引用 point 只读，无法创建方向: {from_point_key}")
             return
         self._poi_action = PoiAction.DRAW_ARROW
         self._arrow_from_key = from_point_key
@@ -255,6 +259,9 @@ class CanvasPoiMixin:
 
     def delete_point_by_key(self, key: str) -> bool:
         """删除 point；被 arrow 引用时拒绝并返回 False"""
+        point = self._resolve_point(key)
+        if point is not None and point.is_reference:
+            return False
         if self._point_referenced_by_arrow(key):
             QMessageBox.warning(self.window(), tr("无法删除"),
                                 tr("该坐标被方向引用，请先删除关联的方向。"))
@@ -292,6 +299,9 @@ class CanvasPoiMixin:
         self._selected_arrow_idx = -1
         self.update()
 
+        if self._points[idx].is_reference:
+            return True
+
         menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
             "QMenu { background-color: palette(base); padding: 4px; }"
@@ -312,6 +322,8 @@ class CanvasPoiMixin:
         if not (0 <= self._selected_point_idx < len(self._points)):
             return
         src = self._points[self._selected_point_idx]
+        if src.is_reference:
+            return
         # 已放置集合必须含被视图过滤隐藏的实例，否则其他视图已绑定的点会被当成未绑定
         placed = {p.key for p in self._points + self._hidden_points}
         available = [(k, n) for k, n in self._current_points if k not in placed]
@@ -471,19 +483,22 @@ class CanvasPoiMixin:
 
         # 默认模式：命中 point 的 + 按钮 / 半径手柄 / 圆体，或命中 arrow
         if self._selected_point_idx >= 0:
-            if self._hit_plus_button(pos, self._selected_point_idx):
-                self.begin_draw_arrow(self._points[self._selected_point_idx].key)
-                return True
-            if self._hit_point_handle(pos, self._selected_point_idx):
-                self._poi_drag = PoiDrag.RESIZE_POINT
-                self.update()
-                return True
+            selected = self._points[self._selected_point_idx]
+            if not selected.is_reference:
+                if self._hit_plus_button(pos, self._selected_point_idx):
+                    self.begin_draw_arrow(selected.key)
+                    return True
+                if self._hit_point_handle(pos, self._selected_point_idx):
+                    self._poi_drag = PoiDrag.RESIZE_POINT
+                    self.update()
+                    return True
 
         pidx = self._hit_point(pos)
         if pidx >= 0:
             self._selected_point_idx = pidx
             self._selected_arrow_idx = -1
-            self._poi_drag = PoiDrag.MOVE_POINT
+            self._poi_drag = (PoiDrag.NONE if self._points[pidx].is_reference
+                              else PoiDrag.MOVE_POINT)
             self._poi_drag_moved = False
             # 仅选中，数据未变 → 不能标记 dirty
             self._notify_selection_changed()
@@ -728,7 +743,7 @@ class CanvasPoiMixin:
                 painter.drawText(label_rect, Qt.AlignmentFlag.AlignCenter, name)
                 painter.restore()
 
-            if selected:
+            if selected and not p.is_reference:
                 # 半径手柄
                 painter.save()
                 painter.setPen(QPen(QColor(255, 255, 0), 1))

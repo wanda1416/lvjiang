@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,31 @@ from lvjiang.apps.yysls.core.loadout import LoadoutRepository, resolve_school
 
 def equip(fp="real-fp", type_="环"):
     return {"_fp": fp, "type": type_, "level": 110}
+
+
+def developed_real_equip() -> dict:
+    from lvjiang.apps.yysls.core.equip_parser.models import make_fingerprint
+
+    value = {
+        "type": "环",
+        "name": "踏雪含光",
+        "level": 105,
+        "original_level": 105,
+        "quality": "gold",
+        "is_chengyin": False,
+        "base_attr": {"name": "气血最大值", "value": 1000},
+        "base_attr_2": None,
+        "affix_1": {"name": "最大外功攻击", "value": 80.0},
+        "affix_2": {"name": "劲", "value": 60.0},
+        "affix_3": {"name": "势", "value": 60.0},
+        "affix_4": {"name": "敏", "value": 60.0},
+        "affix_5": {"name": "会心率", "value": 5.0},
+        "dingyin": {"name": "外功穿透", "value": 10.0},
+        "cooldown_expires_at": "",
+        "_extra": {"is_mock": False, "affix_count": 5},
+    }
+    value["_fp"] = make_fingerprint(value)
+    return value
 
 
 def test_default_plan_and_shared_pool(tmp_path: Path):
@@ -241,6 +267,84 @@ def test_noop_mock_edit_preserves_creation_and_refreshes_update(
     item = repo.load().equipment_items[fp]
     assert item["created_at"] == "2026-09-01T01:00:00.000+00:00"
     assert item["updated_at"] == "2026-09-01T02:00:00.000+00:00"
+
+
+def test_real_development_migrates_every_plan_and_resets_transmute_cooldown(
+    tmp_path: Path,
+):
+    repo = LoadoutRepository("alice", tmp_path)
+    first = repo.load().active_plan_id
+    old = developed_real_equip()
+    old_fp = repo.assign_equipment(first, "ring", old)
+    second = repo.create_plan("second", "主功法", "副功法").id
+    repo.assign_equipment(second, "ring", old)
+    created_at = repo.load().equipment_items[old_fp]["created_at"]
+
+    changed = json.loads(json.dumps(old, ensure_ascii=False))
+    changed["affix_2"] = {
+        "name": "精准率", "value": 4.0, "is_transferred": True,
+    }
+    new_fp = repo.update_real_development(old_fp, changed)
+
+    state = repo.load()
+    assert new_fp != old_fp
+    assert old_fp not in state.equipment_items
+    assert all(plan.equipment["ring"] == new_fp for plan in state.plans.values())
+    stored = state.equipment_items[new_fp]
+    assert stored["created_at"] == created_at
+    assert stored["affix_2"]["is_transferred"] is True
+    expires_at = datetime.fromisoformat(stored["cooldown_expires_at"])
+    remaining = expires_at - datetime.now(expires_at.tzinfo)
+    assert timedelta(days=4, hours=23) < remaining <= timedelta(days=5)
+
+
+def test_real_development_can_only_cultivate_existing_transferred_slot(
+    tmp_path: Path,
+):
+    repo = LoadoutRepository("alice", tmp_path)
+    old = developed_real_equip()
+    old["affix_3"]["is_transferred"] = True
+    old_fp = repo.upsert_item(old)
+    cultivated = json.loads(json.dumps(old, ensure_ascii=False))
+    cultivated["affix_3"]["value"] = 61.0
+
+    assert repo.update_real_development(old_fp, cultivated) != old_fp
+
+
+def test_real_development_allows_dingyin_growth_without_changing_fingerprint(
+    tmp_path: Path,
+):
+    repo = LoadoutRepository("alice", tmp_path)
+    old = developed_real_equip()
+    old_fp = repo.upsert_item(old)
+    cultivated = json.loads(json.dumps(old, ensure_ascii=False))
+    cultivated["dingyin"]["value"] = 11.0
+
+    new_fp = repo.update_real_development(old_fp, cultivated)
+
+    assert new_fp == old_fp
+    assert repo.load().equipment_items[old_fp]["dingyin"]["value"] == 11.0
+
+
+@pytest.mark.parametrize("mutate,error", [
+    (lambda item: item.update(name="伪造名称"), "既定属性不可修改"),
+    (lambda item: item["affix_1"].update(name="势"), "商角徵羽"),
+    (lambda item: item["affix_2"].update(value=1.0), "只能提高词条数值"),
+    (lambda item: item["dingyin"].update(value=1.0), "只能提高定音数值"),
+    (lambda item: item.update(dingyin={"name": "会心伤害", "value": 10}),
+     "不能新增、删除或更换定音"),
+])
+def test_real_development_rejects_illegal_changes(
+    tmp_path: Path, mutate, error,
+):
+    repo = LoadoutRepository("alice", tmp_path)
+    old = developed_real_equip()
+    old_fp = repo.upsert_item(old)
+    changed = json.loads(json.dumps(old, ensure_ascii=False))
+    mutate(changed)
+
+    with pytest.raises(ValueError, match=error):
+        repo.update_real_development(old_fp, changed)
 
 
 def test_exact_school_resolution():

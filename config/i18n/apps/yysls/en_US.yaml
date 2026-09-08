@@ -62,6 +62,23 @@ yysls:
   承音后转律: Transfer After Chengyin
   原始等级: Original Level
   冷却时间: Cooldown Expires At
+  养成: Develop
+  养成扫描装备: Develop Scanned Equipment
+  记录扫描装备的转律、承音或培养: Record transmutation, Chengyin, or cultivation
+  扫描装备的既定属性不可修改  ·  仅支持转律、承音和词条数值培养: Fixed properties of scanned equipment are read-only · Only transmutation, Chengyin, and value cultivation are supported
+  此装备没有可培养的定音词条: This equipment has no Dingyin affix to cultivate
+  当前装备不支持继续承音，或没有更高的已配置等级: This equipment cannot be upgraded through Chengyin, or no higher configured level exists
+  培养只能提高词条数值，不能降低: Cultivation can only increase affix values
+  一次转律只能修改一个词条: Only one affix can be transmuted at a time
+  宫为首词条，不能转律: The first affix cannot be transmuted
+  已有转律词条时，只能继续转律原固定槽位: Further transmutation is limited to the existing fixed slot
+  承音只能提升到下一个已配置等级: Chengyin can only upgrade to the next configured level
+  承音状态不能撤销: Chengyin cannot be reverted
+  未对装备进行任何养成修改: No equipment development changes were made
+  装备养成: Equipment Development
+  配置跨等级、跨装备类型共用的游戏规则。: Configure game rules shared across levels and equipment types.
+  '冷却时间:': 'Cooldown:'
+  扫描装备发生转律后，从当前时间起重新计算的冷却天数: Number of cooldown days applied after transmuting scanned equipment
   冷却装备: Cooldown Equipment
   用户名: User
   冷却倒计时: Cooldown

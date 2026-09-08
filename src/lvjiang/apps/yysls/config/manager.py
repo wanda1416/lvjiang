@@ -173,6 +173,8 @@ class GameConfigManager:
         self._schools: dict[str, dict] = {}
         # 等级配置：等级 → LevelConfig（顶层 level_configs）
         self._level_configs: list[LevelConfig] = []
+        # 扫描装备转律后的默认冷却天数（顶层 basic_config）
+        self._equipment_cooldown_days = 5
         # 赛季配置：赛季编号 → SeasonConfig（顶层 season_configs）
         self._season_configs: list[SeasonConfig] = []
         # 基础属性名（从 _attr 字段收集：外功攻击/气血最大值/...）
@@ -223,6 +225,15 @@ class GameConfigManager:
         self._schools.clear()
         self._level_configs.clear()
         self._season_configs.clear()
+
+        raw_basic = data.get("basic_config") or {}
+        cooldown_days = raw_basic.get("equipment_cooldown_days", 5)
+        self._equipment_cooldown_days = (
+            cooldown_days
+            if isinstance(cooldown_days, int) and not isinstance(cooldown_days, bool)
+            and 1 <= cooldown_days <= 365
+            else 5
+        )
 
         # ── weapon_types（支持 dict 列表格式：[{name, wuxue_affix}, ...]）──
         raw_weapon_types = data.get("weapon_types") or []
@@ -903,6 +914,10 @@ class GameConfigManager:
     def get_level_configs(self) -> list[LevelConfig]:
         """等级配置列表（按等级排序的副本）"""
         return list(self._level_configs)
+
+    def get_equipment_cooldown_days(self) -> int:
+        """扫描装备转律后重新计算的冷却天数，缺省为 5 天。"""
+        return self._equipment_cooldown_days
 
     def level_config_for(self, level: int) -> LevelConfig | None:
         """按等级查找配置条目（精确匹配），未找到返回 None"""

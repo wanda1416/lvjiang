@@ -28,6 +28,33 @@ def mgr():
 # ─── 词条别名归一 ──────────────────────────────────────────
 
 class TestResolveAffixCategory:
+    def test_equipment_cooldown_days_defaults_to_five(self, tmp_path):
+        path = tmp_path / "game_config.yaml"
+        path.write_text("level_configs: []\n", encoding="utf-8")
+        assert GameConfigManager(path).get_equipment_cooldown_days() == 5
+
+    def test_equipment_cooldown_days_reads_basic_config(self, tmp_path):
+        path = tmp_path / "game_config.yaml"
+        path.write_text(
+            "basic_config:\n"
+            "  equipment_cooldown_days: 7\n"
+            "level_configs: []\n",
+            encoding="utf-8",
+        )
+        assert GameConfigManager(path).get_equipment_cooldown_days() == 7
+
+    @pytest.mark.parametrize("value", [0, 366, True, "5"])
+    def test_invalid_equipment_cooldown_days_falls_back_to_five(
+            self, tmp_path, value):
+        import yaml
+
+        path = tmp_path / "game_config.yaml"
+        path.write_text(yaml.safe_dump({
+            "basic_config": {"equipment_cooldown_days": value},
+            "level_configs": [],
+        }), encoding="utf-8")
+        assert GameConfigManager(path).get_equipment_cooldown_days() == 5
+
     @case_matrix("alias,category", [
         ("最大外功攻击", "外功攻击"),
         ("最大无相攻击", "属性攻击"),

@@ -923,7 +923,7 @@ class EquipStatusTab(QWidget):
             QMessageBox.critical(self, tr("卸载失败"), str(e))
 
     def _on_slot_edit(self, slot_key: str):
-        """编辑槽位中的模拟装备"""
+        """编辑槽位模拟装备，或记录扫描装备的受限养成。"""
         user_name = self._host.active_user_name()
         if not user_name:
             QMessageBox.warning(self, tr("编辑失败"), tr("没有激活的用户"))
@@ -941,12 +941,17 @@ class EquipStatusTab(QWidget):
         if inv is None:
             return
         try:
-            # 携带旧指纹走「先写新、后清旧」链路，避免遗留同名孤儿装备
             old_fp = equip.get("_fp", "")
-            inv.replace_equipped_mock(slot_key, old_fp, result)
+            is_mock = bool((equip.get("_extra") or {}).get("is_mock"))
+            if is_mock:
+                # 携带旧指纹走「先写新、后清旧」链路，避免遗留孤儿装备。
+                inv.replace_equipped_mock(slot_key, old_fp, result)
+            else:
+                # 真实装备变化会改变指纹，仓储层负责迁移全部方案引用。
+                inv.update_real_development(old_fp, result)
             self._sync_inv(notify=True)
         except Exception as e:
-            logger.error(f"编辑槽位模拟装备失败: {e}")
+            logger.error(f"编辑或养成槽位装备失败: {e}")
             QMessageBox.critical(self, tr("编辑失败"), str(e))
 
     # ── 背包网格 ──
@@ -1069,7 +1074,7 @@ class EquipStatusTab(QWidget):
                 is_mock=is_mock, is_loadout=is_loadout,
             )
             card.equip_requested.connect(self._on_equip_requested)
-            card.edit_requested.connect(self._on_mock_edit_requested)
+            card.edit_requested.connect(self._on_edit_requested)
             card.delete_requested.connect(self._on_delete_requested)
             card.copy_requested.connect(self._on_copy_requested)
             card.properties_requested.connect(self._on_properties_requested)
@@ -1092,7 +1097,7 @@ class EquipStatusTab(QWidget):
                 is_mock=is_mock, is_loadout=is_loadout,
             )
             card.equip_requested.connect(self._on_equip_requested)
-            card.edit_requested.connect(self._on_mock_edit_requested)
+            card.edit_requested.connect(self._on_edit_requested)
             card.delete_requested.connect(self._on_delete_requested)
             card.copy_requested.connect(self._on_copy_requested)
             card.properties_requested.connect(self._on_properties_requested)
@@ -1476,8 +1481,8 @@ class EquipStatusTab(QWidget):
             logger.error(f"删除失败: {e}")
             QMessageBox.critical(self, tr("删除失败"), str(e))
 
-    def _on_mock_edit_requested(self, equip_data: dict, group_key: str):
-        """处理模拟装备编辑请求"""
+    def _on_edit_requested(self, equip_data: dict, group_key: str):
+        """处理模拟装备编辑或扫描装备养成请求。"""
         user_name = self._host.active_user_name()
         if not user_name:
             QMessageBox.warning(self, tr("编辑失败"), tr("没有激活的用户"))
@@ -1491,20 +1496,27 @@ class EquipStatusTab(QWidget):
         if not result:
             return
 
-        # 确定新类型和分组（使用全局映射）
-        from ....config import get_game_config
-        new_type = result.get("type", "")
-        new_group_key = get_game_config().get_type_to_group().get(new_type, group_key)
-
         inv = self._require_inventory()
         if inv is None:
             return
+        is_mock = bool((equip_data.get("_extra") or {}).get("is_mock"))
         try:
-            inv.update_mock(group_key, old_fp, result, new_group_key)
+            if is_mock:
+                from ....config import get_game_config
+                new_type = result.get("type", "")
+                new_group_key = (
+                    get_game_config().get_type_to_group()
+                    .get(new_type, group_key)
+                )
+                inv.update_mock(group_key, old_fp, result, new_group_key)
+            else:
+                inv.update_real_development(old_fp, result)
             self._sync_inv(notify=True)
-            logger.info(f"已编辑模拟装备 {result.get('name', '未知')}")
+            operation = "编辑模拟装备" if is_mock else "养成扫描装备"
+            logger.info(f"已{operation} {result.get('name', '未知')}")
         except Exception as e:
-            logger.error(f"编辑模拟装备失败: {e}")
+            operation = "编辑模拟装备" if is_mock else "养成扫描装备"
+            logger.error(f"{operation}失败: {e}")
             QMessageBox.critical(self, tr("编辑失败"), str(e))
 
     def _get_plan_weapon_type(self, slot_key: str) -> str | None:
@@ -1594,6 +1606,8 @@ class EquipStatusTab(QWidget):
         original_name = copied.get("name", "")
         if not original_name.endswith(tr("【复制】")):
             copied["name"] = original_name + tr("【复制】")
+        copied.setdefault("_extra", {})["is_mock"] = True
+        copied.pop("_fp", None)
 
         dialog = MockEquipDialog(equip_data=copied, parent=self, default_school=self._get_current_school())
         if dialog.exec() != QDialog.DialogCode.Accepted:

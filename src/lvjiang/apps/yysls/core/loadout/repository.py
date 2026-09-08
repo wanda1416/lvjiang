@@ -6,10 +6,11 @@ import os
 import tempfile
 import threading
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from .development_rules import check_real_development
 from .models import (
     EQUIPMENT_CREATED_AT,
     EQUIPMENT_SLOTS,
@@ -385,5 +386,58 @@ class LoadoutRepository:
                 for slot, fp in plan.equipment.items():
                     if fp == old_fp:
                         plan.equipment[slot] = new_fp
+        self.update(mutate)
+        return new_fp
+
+    def update_real_development(self, old_fp: str, equip: dict) -> str:
+        """原子保存真实装备的转律/承音/培养结果。
+
+        真实装备的指纹会随等级、承音和词条变化；因此必须在
+        同一次仓储更新中写入新指纹、迁移全部方案引用并删除旧版。
+        """
+        from ..equip_parser.models import make_fingerprint
+
+        value = copy.deepcopy(equip)
+        if old_fp.startswith("mock_") or bool(
+            (value.get("_extra") or {}).get("is_mock")):
+            raise ValueError("扫描装备养成不支持模拟装备")
+        new_fp = make_fingerprint(value)
+        if not new_fp:
+            raise ValueError("装备数据无法生成指纹")
+
+        def mutate(state: LoadoutState) -> None:
+            old = state.equipment_items.get(old_fp)
+            if old is None:
+                raise ValueError(f"待养成装备已不存在: {old_fp}")
+            reason = check_real_development(old, value)
+            if reason:
+                raise ValueError(reason)
+            if any(
+                (old.get(f"affix_{index}") or {}).get("name")
+                != (value.get(f"affix_{index}") or {}).get("name")
+                for index in range(1, 6)
+            ):
+                from ...config import get_game_config
+
+                days = get_game_config().get_equipment_cooldown_days()
+                value["cooldown_expires_at"] = (
+                    datetime.now(timezone.utc) + timedelta(days=days)
+                ).isoformat(timespec="milliseconds")
+            stamped = stamp_equipment_write(
+                value, new_fp, state.equipment_items.get(new_fp))
+            target = state.equipment_items.get(new_fp)
+            stamped[EQUIPMENT_CREATED_AT] = _pick_timestamp(
+                (old.get(EQUIPMENT_CREATED_AT),
+                 target.get(EQUIPMENT_CREATED_AT) if target else None),
+                latest=False,
+            )
+            state.equipment_items[new_fp] = stamped
+            for plan in state.plans.values():
+                for slot, fp in plan.equipment.items():
+                    if fp == old_fp:
+                        plan.equipment[slot] = new_fp
+            if old_fp != new_fp:
+                state.equipment_items.pop(old_fp, None)
+
         self.update(mutate)
         return new_fp

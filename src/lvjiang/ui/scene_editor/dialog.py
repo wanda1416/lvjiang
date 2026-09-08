@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.layout_manager import (
     LayoutConfigManager,
+    expand_one_reference,
     load_scene_screenshot,
     migrate_layout_item,
     save_scene_screenshot,
@@ -436,6 +437,7 @@ class SceneEditorDialog(
             lambda msg: self._status_bar.showMessage(msg, 5000))
         tab.on_view_changed = self._on_tab_view_changed
         tab.on_scene_type_changed = self._on_scene_type_changed
+        tab.on_scene_references_added = self._on_scene_references_added
         tab.on_version_pending_changed = self._on_version_pending_changed
         if self._current_layout is not None and not self._applying_layout:
             self._apply_layout_to_tab(scene_key, tab)
@@ -551,6 +553,37 @@ class SceneEditorDialog(
         self._update_info_label()
 
     # ─── 跨场景迁移 ────────────────────────────────────
+
+    def _on_scene_references_added(
+        self, scene_key: str, added: list[tuple[str, str]],
+    ) -> None:
+        """把新加的跨场景引用展开进当前布局，并推给画布。
+
+        引用的坐标在布局**加载期**从源场景展开，新加一条不会自己出现——
+        列表里有、画布上没有，看着就像加失败了。这里只补这几条，不整份
+        重载：重载会丢掉画布上还没保存的改动。
+
+        源场景在本布局里没标坐标时展开不出东西（``expand_one_reference``
+        会记一条警告），此时引用行仍以「○ 未放置」示人，与其他未绑定的
+        实体一致。
+        """
+        if self._current_layout is None:
+            return
+        tab = self._tabs.get(scene_key)
+        if tab is not None:
+            # 画布上的改动还没回写 Layout，先取回来，否则下面 set_regions
+            # 会把它们盖掉。
+            self._current_layout.set_scene_regions(scene_key, tab.get_regions())
+            self._current_layout.set_scene_points(scene_key, tab.get_points())
+        changed = False
+        for source_scene, entity in added:
+            changed |= expand_one_reference(
+                self._current_layout.regions, self._current_layout.points,
+                scene_key, source_scene, entity)
+        if not changed or tab is None:
+            return
+        tab.set_regions(self._current_layout.get_scene_regions(scene_key))
+        tab.set_points(self._current_layout.get_scene_points(scene_key))
 
     def _on_item_migrated(self, kind: str, key: str, source: str, target: str):
         """编辑弹窗跨场景迁移后的同步（场景 YAML 已由弹窗侧迁移完成）

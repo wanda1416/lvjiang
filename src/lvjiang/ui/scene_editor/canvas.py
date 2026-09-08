@@ -16,7 +16,11 @@ from PyQt6.QtWidgets import QWidget
 
 from ...core.key_names import normalize_key
 from ...core.layout_models import Arrow, CanvasConfig, Panel, Point, Region, SubsceneRef
-from ...core.scene_registry import get_region_name, get_subscene_ref_def
+from ...core.scene_registry import (
+    get_panel_name,
+    get_region_name,
+    get_subscene_ref_def,
+)
 from ...i18n import tr
 from .canvas_interaction import (
     HANDLE_SIZE,
@@ -171,6 +175,58 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         elif kind == "subscene_ref" and self.on_subscene_ref_changed:
             self.on_subscene_ref_changed()
 
+    def remove_item(self, kind: str, key: str) -> bool:
+        """从画布移除某 key 的实例（含被视图过滤隐藏的那份）。
+
+        场景定义删掉之后画布若还留着，下一次保存布局会把 ``get_regions()``
+        里的它原样写回去——刚从磁盘删掉的坐标立刻复活，而且看不出来。
+
+        删 point 会连带丢掉以它为端点的 arrow：端点没了的 arrow 既画不出来
+        也跑不了，留着就是下一条残留。
+        """
+        removed = False
+        for bucket in self._lists_by_kind(kind):
+            keep = [item for item in bucket if item.key != key]
+            if len(keep) != len(bucket):
+                bucket[:] = keep
+                removed = True
+        if kind == "point":
+            for bucket in (self._arrows, self._hidden_arrows):
+                keep = [a for a in bucket
+                        if a.from_key != key and a.to_key != key]
+                if len(keep) != len(bucket):
+                    bucket[:] = keep
+                    removed = True
+        if not removed:
+            return False
+        self._selected_idx = -1
+        if kind == "region" and self.on_region_changed:
+            self.on_region_changed()
+        elif kind in ("point", "arrow") and self.on_poi_changed:
+            self.on_poi_changed()
+        elif kind == "panel" and self.on_panel_changed:
+            self.on_panel_changed()
+        self.update()
+        return True
+
+    def _lists_by_kind(self, kind: str) -> list[list]:
+        """该类型的可见与隐藏两份列表。
+
+        分开存是为了视图过滤——删除必须两边都删，只删可见那份的话，切一次
+        视图它又回来了。
+        """
+        if kind == "region":
+            return [self._regions, self._hidden_regions]
+        if kind == "panel":
+            return [self._panels, self._hidden_panels]
+        if kind == "point":
+            return [self._points, self._hidden_points]
+        if kind == "arrow":
+            return [self._arrows, self._hidden_arrows]
+        if kind == "subscene_ref":
+            return [self._subscene_refs, self._hidden_subscene_refs]
+        return []
+
     def get_disabled_keys(self, kind: str) -> set[str]:
         """获取某类型中已标记 disabled 的全部 key"""
         items = self._items_by_kind(kind)
@@ -319,7 +375,8 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
 
     def delete_selected(self):
         """删除选中区域"""
-        if self._selected_idx >= 0:
+        if (self._selected_idx >= 0
+                and not self._regions[self._selected_idx].is_reference):
             self._regions.pop(self._selected_idx)
             self._selected_idx = -1
             self._field_selected = False
@@ -898,7 +955,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
             painter.drawText(label_rect, Qt.AlignmentFlag.AlignCenter, label)
 
         # 缩放手柄
-        if selected:
+        if selected and not r.is_reference:
             painter.save()
             handles = self._get_handle_positions(r)
             painter.setPen(QPen(QColor(255, 255, 0), 1))
@@ -916,6 +973,11 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
         """绘制所有 panel（青色虚线矩形 + 网格线 + 标签）"""
         for i, p in enumerate(self._panels):
             self._draw_panel(painter, p, i == self._panel_selected_idx)
+
+    def _panel_label(self, panel: Panel) -> str:
+        """返回画布网格标签；与区域、坐标点统一显示 scene 名称。"""
+        name = get_panel_name(self._scene_key, panel.key)
+        return f"{name} ({panel.rows}x{panel.cols})"
 
     def _draw_panel(self, painter: QPainter, p: Panel, selected: bool):
         """绘制单个 panel：虚线外框 + 内部网格线 + 标签"""
@@ -957,7 +1019,7 @@ class RegionCanvas(QWidget, CanvasInteractionMixin, CanvasPoiMixin):
                 painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
 
         # 标签
-        label = f"{p.key} ({p.rows}x{p.cols})"
+        label = self._panel_label(p)
         font = QFont("Microsoft YaHei", 8)
         painter.setFont(font)
         fm = painter.fontMetrics()

@@ -5,6 +5,7 @@
 """
 
 import re
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -483,6 +484,17 @@ class SceneRegistry:
             self._resolver.ensure_entity_deletable(f"scenes/{key}.yaml")
         scene = self._scenes[key]
         old_name = scene.name
+        old_order = list(self._order)
+        old_group_scenes = {
+            group_key: list(scene_keys)
+            for group_key, scene_keys in self._group_scenes.items()
+        }
+        was_disabled = key in self._disabled_scenes
+        reference_owners = [
+            owner.key for owner in self._scenes.values()
+            if any(ref.scene == key for ref in owner.subscene_refs)
+            or any(ref.scene == key for ref in owner.references)
+        ]
         scene.key = new_key
         scene.name = new_name
         try:
@@ -494,29 +506,65 @@ class SceneRegistry:
             raise
         # 如果 key 变了，需要删旧建新
         if new_key != key:
-            self._resolver.delete_entity(f"scenes/{key}.yaml")
-            del self._scenes[key]
-            self._scenes[new_key] = scene
-            idx = self._order.index(key)
-            self._order[idx] = new_key
-            # 同步更新分组中的场景 key
-            group = self.get_scene_group(key)
-            if group:
-                scenes_list = self._group_scenes[group]
-                gidx = scenes_list.index(key)
-                scenes_list[gidx] = new_key
-            if key in self._disabled_scenes:
-                self._disabled_scenes.remove(key)
-                self._disabled_scenes.add(new_key)
-            # 引用目标跟随场景 key 重命名。
-            for owner in self._scenes.values():
+            # write_entity 会同步触发 scene_registry 原位热重载。
+            # 上面写入新文件后，self 已可能不再是进入本方法时的
+            # 内存状态，因此不能继续假设旧 key 仍在字典中。
+            # 趁新旧文件都存在时先改完引用，否则删旧文件触发
+            # 的下一次热重载会把悬空的 area 引用丢弃。
+            for owner_key in reference_owners:
+                owner = self._scenes.get(owner_key)
+                if owner is None:
+                    continue
                 changed = False
-                for ref in owner.subscene_refs:
-                    if ref.scene == key:
-                        ref.scene = new_key
+                for subscene_ref in owner.subscene_refs:
+                    if subscene_ref.scene == key:
+                        subscene_ref.scene = new_key
+                        changed = True
+                for scene_ref in owner.references:
+                    if scene_ref.scene == key:
+                        scene_ref.scene = new_key
                         changed = True
                 if changed:
                     self._save_scene_yaml(owner)
+
+            self._resolver.delete_entity(f"scenes/{key}.yaml")
+
+            # 无热重载的独立 SceneRegistry 也要维持内存状态；有热
+            # 重载时 pop 则是幂等空操作。新场景优先使用热重载从
+            # 磁盘读回的对象，没有时才使用上面的 scene。
+            self._scenes.pop(key, None)
+            self._scenes.setdefault(new_key, scene)
+
+            # scenes.yaml 此时仍保留旧 key，热重载会把新 key 暂时
+            # 归到第一分组并放到末尾。用操作前快照恢复原位，
+            # 由调用方紧接着 save_group_config 持久化。
+            renamed_order = [
+                new_key if existing == key else existing
+                for existing in old_order
+            ]
+            self._order = [
+                existing for existing in renamed_order
+                if existing in self._scenes
+            ]
+            for existing in self._scenes:
+                if existing not in self._order:
+                    self._order.append(existing)
+
+            restored_groups: dict[str, list[str]] = {}
+            for group_key, scene_keys in old_group_scenes.items():
+                restored: list[str] = []
+                for existing in scene_keys:
+                    candidate = new_key if existing == key else existing
+                    if (candidate in self._scenes
+                            and candidate not in restored):
+                        restored.append(candidate)
+                restored_groups[group_key] = restored
+            self._group_scenes = restored_groups
+            if was_disabled:
+                self._disabled_scenes.discard(key)
+                self._disabled_scenes.add(new_key)
+            else:
+                self._disabled_scenes.discard(key)
         logger.info(f"已重命名场景: {key} -> {new_key}")
 
     def reorder_scenes(self, new_order: list[str]):
@@ -778,11 +826,102 @@ class SceneRegistry:
             if not (r.scene == source_scene and r.entity == entity)]
         self._save_scene_yaml(scene)
 
+    def update_scene_reference_views(self, scene_key: str, source_scene: str,
+                                     entity: str, views: list[str]):
+        """改一条引用在**本场景**的归属视图。
+
+        引用项本身是只读的（坐标、类型、名字都在源场景），但「在本场景的
+        哪些视图下看得见」是本场景自己的数据，理应能改——否则加错视图之后
+        只能删掉重加。
+        """
+        scene = self._scenes.get(scene_key)
+        if not scene:
+            raise ValueError(f"场景不存在: {scene_key}")
+        for ref in scene.references:
+            if ref.scene == source_scene and ref.entity == entity:
+                ref.views = list(views)
+                break
+        else:
+            raise ValueError(f"引用不存在: {source_scene}.{entity}")
+        self._save_scene_yaml(scene)
+
+    def find_references_to(self, scene_key: str,
+                           entity: str) -> list[str]:
+        """哪些场景引用了 ``scene_key.entity``，返回场景 key 列表。"""
+        return [
+            key for key, scene in self._scenes.items()
+            if any(r.scene == scene_key and r.entity == entity
+                   for r in scene.references)
+        ]
+
+    def _reject_if_referenced(self, scene_key: str, entity: str) -> None:
+        """有别的场景引用它就不许删。
+
+        引用只存 ``(源场景, 实体名)``，坐标运行期从源场景转读。源定义没了，
+        引用就成了悬空声明：加载期会在内存里被丢掉，于是那个场景**静静少
+        了一个实体**，直到某条 .wf 跑到 ``click [场景].[实体]`` 才炸。
+
+        级联删除更糟——用户在 A 场景点了删除，B 场景的定义跟着没了，而他
+        根本不知道 B 引用过它。所以这里拦下来，把引用方报出来，让人自己
+        决定是先去解引用还是不删。
+        """
+        referrers = self.find_references_to(scene_key, entity)
+        if not referrers:
+            return
+        names = "、".join(
+            f"{self._scenes[key].name}({key})" for key in referrers)
+        raise ValueError(
+            f"{entity} 正被 {len(referrers)} 个场景引用，不能删除：{names}。"
+            f"请先在这些场景里移除引用。")
+
+    def retarget_references(self, old_scene: str, new_scene: str,
+                            entity: str, new_entity: str = "") -> list[str]:
+        """源实体搬了家或改了名，把指向它的引用一并改指过去。
+
+        规则是「引用跟着源实体走，源实体没了才拦」。改名和跨场景迁移都不是
+        删除——实体还在，只是换了地址；不改指的话引用就悬空了，而且
+        :meth:`_reject_if_referenced` 会把迁移一起拦下来，拦它没道理。
+
+        返回改动过的场景 key 列表。
+        """
+        target_entity = new_entity or entity
+        if (old_scene, entity) == (new_scene, target_entity):
+            return []
+        updates = self._retargeted_scenes(old_scene, new_scene, entity, target_entity)
+        for scene in updates:
+            self._scenes[scene.key] = scene
+            self._save_scene_yaml(scene)
+        return [scene.key for scene in updates]
+
+    def validate_reference_retarget(self, old_scene: str, new_scene: str,
+                                    entity: str, new_entity: str = "") -> None:
+        """迁移 UI 在写入目标定义之前校验所有引用方。"""
+        self._retargeted_scenes(old_scene, new_scene, entity, new_entity or entity)
+
+    def _retargeted_scenes(self, old_scene: str, new_scene: str,
+                          entity: str, target_entity: str) -> list[SceneDef]:
+        """先校验全部引用方，再保留待写快照，避免热重载丢弃尚未更新的引用。"""
+        updates = []
+        for key in self.find_references_to(old_scene, entity):
+            scene = self._scenes[key]
+            if key == new_scene:
+                raise ValueError(f"场景 {key} 不能引用自身")
+            if target_entity != entity:
+                self._check_key_unique_excluding(scene, target_entity, entity)
+            updated = deepcopy(scene)
+            for ref in updated.references:
+                if ref.scene == old_scene and ref.entity == entity:
+                    ref.scene = new_scene
+                    ref.entity = target_entity
+            updates.append(updated)
+        return updates
+
     def remove_region_from_scene(self, scene_key: str, region_key: str):
         """从场景 YAML 移除 region 定义"""
         scene = self._scenes.get(scene_key)
         if not scene:
             raise ValueError(f"场景不存在: {scene_key}")
+        self._reject_if_referenced(scene_key, region_key)
         scene.regions = [r for r in scene.regions if r.key != region_key]
         self._save_scene_yaml(scene)
 
@@ -813,6 +952,7 @@ class SceneRegistry:
         scene = self._scenes.get(scene_key)
         if not scene:
             raise ValueError(f"场景不存在: {scene_key}")
+        self._reject_if_referenced(scene_key, point_key)
         scene.points = [p for p in scene.points if p.key != point_key]
         self._save_scene_yaml(scene)
 
@@ -843,6 +983,7 @@ class SceneRegistry:
         scene = self._scenes.get(scene_key)
         if not scene:
             raise ValueError(f"场景不存在: {scene_key}")
+        self._reject_if_referenced(scene_key, panel_key)
         scene.panels = [p for p in scene.panels if p.key != panel_key]
         self._save_scene_yaml(scene)
 
@@ -859,6 +1000,43 @@ class SceneRegistry:
             raise ValueError(f"面板不存在: {old_key}")
         self._save_scene_yaml(scene)
 
+    def reorder_scene_entities(self, scene_key: str, kind: str,
+                               ordered_keys: list[str]) -> bool:
+        """按 key 重排一种场景实体并写回 YAML。
+
+        ``ordered_keys`` 可以只是当前视图可见的子集；这些实体只在它们原来
+        占据的槽位间换序，未显示的定义保持原槽位。返回是否实际发生变化。
+        """
+        if kind not in {"regions", "points", "panels", "subscene_refs"}:
+            raise ValueError(f"不支持排序的场景实体类型: {kind}")
+        if len(ordered_keys) != len(set(ordered_keys)):
+            raise ValueError("实体排序中存在重复 key")
+
+        scene = self._require_scene(scene_key)
+        entities = list(getattr(scene, kind))
+        existing = {item.key for item in entities}
+        unknown = [key for key in ordered_keys if key not in existing]
+        if unknown:
+            raise ValueError(f"实体排序包含未知 key: {unknown}")
+        if len(ordered_keys) < 2:
+            return False
+
+        selected = set(ordered_keys)
+        replacements = iter(ordered_keys)
+        reordered = [
+            next(replacements) if item.key in selected else item.key
+            for item in entities
+        ]
+        current = [item.key for item in entities]
+        if reordered == current:
+            return False
+
+        by_key = {item.key: item for item in entities}
+        setattr(scene, kind, [by_key[key] for key in reordered])
+        self._save_scene_yaml(scene)
+        logger.info(f"场景 {scene_key} {kind} 定义顺序已更新: {ordered_keys}")
+        return True
+
     def rename_region_key(self, scene_key: str, old_key: str, new_key: str):
         """重命名场景内 region 的 key（region/point/panel 共享命名空间）"""
         scene = self._require_scene(scene_key)
@@ -870,8 +1048,12 @@ class SceneRegistry:
             raise ValueError(f"区域不存在: {old_key}")
         # 校验新 key 唯一性（排除自身）
         self._check_key_unique_excluding(scene, new_key, old_key)
+        updates = self._retargeted_scenes(scene_key, scene_key, old_key, new_key)
         region.key = new_key
         self._save_scene_yaml(scene)
+        for owner in updates:
+            self._scenes[owner.key] = owner
+            self._save_scene_yaml(owner)
         logger.info(f"场景 {scene_key} region key 重命名: {old_key} -> {new_key}")
 
     def rename_point_key(self, scene_key: str, old_key: str, new_key: str):
@@ -885,8 +1067,12 @@ class SceneRegistry:
             raise ValueError(f"坐标点不存在: {old_key}")
         # 校验新 key 唯一性（排除自身）
         self._check_key_unique_excluding(scene, new_key, old_key)
+        updates = self._retargeted_scenes(scene_key, scene_key, old_key, new_key)
         point.key = new_key
         self._save_scene_yaml(scene)
+        for owner in updates:
+            self._scenes[owner.key] = owner
+            self._save_scene_yaml(owner)
         logger.info(f"场景 {scene_key} point key 重命名: {old_key} -> {new_key}")
 
     def rename_panel_key(self, scene_key: str, old_key: str, new_key: str):
@@ -900,8 +1086,12 @@ class SceneRegistry:
             raise ValueError(f"面板不存在: {old_key}")
         # 校验新 key 唯一性（排除自身）
         self._check_key_unique_excluding(scene, new_key, old_key)
+        updates = self._retargeted_scenes(scene_key, scene_key, old_key, new_key)
         panel.key = new_key
         self._save_scene_yaml(scene)
+        for owner in updates:
+            self._scenes[owner.key] = owner
+            self._save_scene_yaml(owner)
         logger.info(f"场景 {scene_key} panel key 重命名: {old_key} -> {new_key}")
 
     # ─── 内部方法 ─────────────────────────────────────────────

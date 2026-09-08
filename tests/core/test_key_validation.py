@@ -34,3 +34,16 @@ def test_same_key_is_allowed_across_different_views():
     )
 
     validate_layout_activation_keys(layout)
+
+
+def test_same_key_is_allowed_across_reference_views():
+    layout = Layout(
+        regions={
+            "equip_tune_detail": [
+                _region("confirm"),
+                _region("blank_area"),
+            ],
+        }
+    )
+
+    validate_layout_activation_keys(layout)

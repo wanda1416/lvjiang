@@ -34,10 +34,12 @@ from ...core.scene_registry import (
     get_scene_views,
     get_view_visible_keys,
     is_subscene,
+    sync_scene_cache,
 )
 from ...i18n import tr
 from ..button_styles import apply_button_style, apply_dialog_button_box_style
 from .canvas import EditMode, RegionCanvas
+from .entity_order_table import EntityOrderTable
 from .scene_panel_editor import PanelEditorMixin
 from .scene_poi_panel import PoiPanelMixin
 from .scene_reference_editor import SceneReferenceEditorMixin
@@ -58,6 +60,10 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self._current_view: str = ""
         self.on_view_changed: Callable[[str, str], None] | None = None
         self.on_scene_type_changed: Callable[[str], None] | None = None
+        # 新增跨场景引用回调：(scene_key, [(源场景, 实体), ...])，由 dialog 注入。
+        # 引用的坐标是布局加载期展开的，新加的那几条得补进当前布局才画得出来。
+        self.on_scene_references_added: (
+            Callable[[str, list[tuple[str, str]]], None] | None) = None
         # 当前布局名，由 dialog 经 set_layout_name 注入（解析布局坐标文件来源用）
         self._layout_name: str = ""
         self._layout_rel_path: str = ""
@@ -468,6 +474,26 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self._refresh_point_list()
         self._refresh_panel_list()
         self._refresh_reference_list()
+
+    def _on_entity_order_changed(
+        self,
+        kind: str,
+        ordered_keys: list[str],
+        table: EntityOrderTable,
+        moved_key: str,
+    ) -> None:
+        """名称拖拽后持久化场景 YAML，并按新顺序刷新右侧列表。"""
+        changed = get_registry().reorder_scene_entities(
+            self._scene_key, kind, ordered_keys)
+        if not changed:
+            return
+        sync_scene_cache(self._scene_key)
+        self._refresh_lists()
+        if moved_key:
+            for row in range(table.rowCount()):
+                if table.entity_key(row) == moved_key:
+                    table.selectRow(row)
+                    break
 
     def _on_panel_changed(self):
         """画布 panel 数据变化时刷新面板列表"""

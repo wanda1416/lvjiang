@@ -869,10 +869,10 @@ class MainWindow(
 
     # ─── 批处理执行 ───────────────────────────────────────
 
-    def run_batch(self, enabled_rows, scripts) -> bool:
+    def run_batch(self, usernames, scripts) -> bool:
         """启动批量执行，返回是否成功
 
-        enabled_rows: list[tuple[int, dict]] - [(index, row_data), ...]
+        usernames: 本次执行的用户名列表，列表顺序就是执行顺序
         """
         # 批量线程从 wf_configs 读取参数。正常情况下参数控件的 change 信号
         # 已实时落盘；这里再同步一次，覆盖尚未提交编辑值等入口边界情况。
@@ -931,7 +931,7 @@ class MainWindow(
             return False
 
         worker = BatchWorker(
-            enabled_rows=enabled_rows,
+            usernames=usernames,
             scripts=scripts,
             config=config,
             ctx=ctx,

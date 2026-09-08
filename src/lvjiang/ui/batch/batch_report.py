@@ -87,13 +87,11 @@ class BatchReport:
         config_name: str,
         scripts: list[tuple[str, str]],   # [(id, name), ...]
         workflows: dict[str, str],         # 生命周期 wf
-        user_column: str = "",
         total_rows: int = 0,
     ):
         self._config_name = config_name
         self._scripts = scripts
         self._workflows = workflows
-        self._user_column = user_column
         self._total_rows = total_rows
 
         self._start_time: datetime | None = None
@@ -182,8 +180,6 @@ class BatchReport:
             lines.append(f"- 总耗时：{_fmt_duration(total_sec)}")
         lines.append(f"- 计划行数：{self._total_rows}")
         lines.append(f"- 实际执行：{len(self._entries)} 行")
-        if self._user_column:
-            lines.append(f"- 用户列：{self._user_column}")
 
         # 脚本列表
         script_names = "、".join(name for _, name in self._scripts)

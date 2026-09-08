@@ -204,6 +204,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         # 整个运行生命周期只依赖此绑定值，绝不再重读全局 active user，
         # 保证运行期间 UI 切换用户不影响数据落盘归属。
         self.run_username: str = ""
+        # 用户资料目录可由批量执行器绑定，供 user_get() 读取同一套快照来源。
+        self.users_dir: Path | None = None
         self._save_callback: Callable | None = None
         # UI 交互回调（UI 层注入，解决工作流线程不能直接弹对话框的问题）
         # 签名: (action, **kwargs) → result

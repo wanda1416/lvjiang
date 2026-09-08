@@ -96,7 +96,7 @@ class BatchWorker(QThread):
         log(str): 日志行（由 host 转发到日志面板）
         finished_all(dict): 全部结束，携带汇总
     """
-    # (run_idx, 条目标签, script_id, 状态)：run_idx 是 enabled_rows 的
+    # (run_idx, 条目标签, script_id, 状态)：run_idx 是用户名序列中的
     # 位置，进度表按它直接定位，不靠标签文本匹配（标签会重名）。
     progress = pyqtSignal(int, str, str, str)
     log = pyqtSignal(str)
@@ -104,7 +104,7 @@ class BatchWorker(QThread):
 
     def __init__(
         self,
-        enabled_rows: list[tuple[int, dict]],
+        usernames: list[str],
         scripts: list[BatchScript],
         config: BatchConfigItem,
         ctx: BatchContext,
@@ -113,7 +113,7 @@ class BatchWorker(QThread):
         parent=None,
     ):
         super().__init__(parent)
-        self._enabled_rows = enabled_rows  # [(index, row_data), ...]
+        self._usernames = list(usernames)
         self._scripts = scripts
         self._config = config
         self._ctx = ctx
@@ -149,14 +149,13 @@ class BatchWorker(QThread):
         batch_run = try_create_batch_run(
             config_name=self._config.name,
             input_snapshot={
-                "rows": [row for _index, row in self._enabled_rows],
+                "usernames": list(self._usernames),
                 "scripts": [
                     {"task_id": item.id, "task_name": item.name,
                      "scope": item.scope}
                     for item in self._scripts
                 ],
                 "workflows": self._config.workflows.to_dict(),
-                "user_column": self._config.user_column,
             },
         )
         batch_run_id = batch_run.batch_run_id if batch_run is not None else ""
@@ -165,14 +164,10 @@ class BatchWorker(QThread):
             "batch_run_id": batch_run_id,
             "entries": {}, "stopped": False, "lifecycle": {},
         }
-        total = len(self._enabled_rows)
-        use_lifecycle = not (
-            total == 1 and self._config.skip_lifecycle_for_single_item
-        )
+        total = len(self._usernames)
+        use_lifecycle = True
         self.log.emit(f"[批量] 开始：{total} 行 × "
                       f"{len(self._scripts)} 脚本")
-        if not use_lifecycle:
-            self.log.emit("[批量] 单条目直通：跳过批量生命周期工作流")
 
         # 初始化报告
         report = BatchReport(
@@ -180,7 +175,6 @@ class BatchWorker(QThread):
             scripts=[(s.id, s.name) for s in self._scripts],
             workflows=(self._config.workflows.to_dict()
                        if use_lifecycle else {}),
-            user_column=self._config.user_column,
             total_rows=total,
         )
         report.start_batch()
@@ -190,7 +184,7 @@ class BatchWorker(QThread):
         if use_lifecycle:
             setup = self._run_stage(
                 "batch_setup", self._config.workflows.batch_setup,
-                -1, -1, {}, batch_state,
+                -1, "", batch_state,
             )
             batch_state = setup.state if setup.state is not None else batch_state
             summary["lifecycle"]["batch_setup"] = setup.status
@@ -198,9 +192,8 @@ class BatchWorker(QThread):
             if not can_run:
                 self._stopped = setup.status == RESULT_STOPPED
                 self.log.emit(self._stage_message(tr("批次初始化"), setup))
-                for run_idx, (_row_idx, row_data) in enumerate(self._enabled_rows):
-                    label = self._format_label(row_data, run_idx)
-                    username = self._get_username_from_row(row_data) or ""
+                for run_idx, username in enumerate(self._usernames):
+                    label = username
                     summary["entries"][label] = {
                         "prepare": ST_SKIPPED,
                         "finish": ST_SKIPPED,
@@ -212,15 +205,14 @@ class BatchWorker(QThread):
                     for script in self._scripts:
                         self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
 
-        for run_idx, (row_idx, row_data) in enumerate(self._enabled_rows):
+        for run_idx, username in enumerate(self._usernames):
             if not can_run:
                 break
             if self._stop_check():
                 self._stopped = True
                 break
 
-            label = self._format_label(row_data, run_idx)
-            username = self._get_username_from_row(row_data) or ""
+            label = username
             if self._execution_lease is not None:
                 self._user_scope.close()
                 self._execution_lease.release()
@@ -245,7 +237,7 @@ class BatchWorker(QThread):
                 # 多条目才需要切换现场；单条目直接使用当前现场执行。
                 prepared = self._run_stage(
                     "prepare_item", self._config.workflows.prepare_item,
-                    run_idx, row_idx, row_data, batch_state,
+                    run_idx, username, batch_state,
                 )
                 batch_state = (prepared.state if prepared.state is not None
                                else batch_state)
@@ -369,7 +361,7 @@ class BatchWorker(QThread):
                 }
                 finished = self._run_stage(
                     "finish_item", self._config.workflows.finish_item,
-                    run_idx, row_idx, row_data, batch_state, item_summary,
+                    run_idx, username, batch_state, item_summary,
                 )
                 batch_state = (finished.state if finished.state is not None
                                else batch_state)
@@ -396,7 +388,7 @@ class BatchWorker(QThread):
         if use_lifecycle and can_run:
             teardown = self._run_stage(
                 "batch_teardown", self._config.workflows.batch_teardown,
-                -1, -1, {}, batch_state,
+                -1, "", batch_state,
                 {"stopped": self._stopped, "entries": summary["entries"]},
             )
             summary["lifecycle"]["batch_teardown"] = teardown.status
@@ -493,33 +485,6 @@ class BatchWorker(QThread):
         text = result.message or result.status
         return f"[批量] {label}: {text}"
 
-    def _format_label(self, row_data: dict, row_idx: int = -1) -> str:
-        """格式化行显示标签（优先使用 user_column）"""
-        if self._config.user_column:
-            val = row_data.get(self._config.user_column, "")
-            if val:
-                return str(val)
-        # fallback: 拼接所有列
-        parts = []
-        for col in self._config.columns:
-            val = row_data.get(col, "")
-            if val:
-                parts.append(str(val))
-        return " / ".join(parts) if parts else f"(行 {row_idx})"
-
-    def _get_username_from_row(self, row_data: dict) -> str | None:
-        """获取该行的用户名（yysls 中为游戏角色名 role）
-
-        根据配置的 user_column 获取用户名（用于 session 绑定）
-        如果未配置 user_column，返回 None（不绑定用户）
-        """
-        if not self._config.user_column:
-            return None
-        if self._config.user_column not in row_data:
-            logger.warning(f"用户名列 {self._config.user_column!r} 不存在于行数据中")
-            return None
-        return row_data[self._config.user_column]
-
     # ─── 内部方法 ───────────────────────────────────────
 
     def _create_engine(self) -> WorkflowEngine:
@@ -550,8 +515,7 @@ class BatchWorker(QThread):
         phase: str,
         wf_name: str,
         run_idx: int,
-        source_idx: int,
-        row_data: dict,
+        username: str,
         batch_state: dict,
         item_result: dict | None = None,
     ) -> BatchStageResult:
@@ -568,23 +532,19 @@ class BatchWorker(QThread):
 
         engine = self._create_engine()
         engine.session = {}
+        engine.run_username = username
+        engine.users_dir = self._session_manager._users_dir
 
         # 每阶段获得独立工作副本；只有返回协议中的 state 会被调用方提交。
         # 控制层不读取 state 内部的任何业务字段。
         working_state = copy.deepcopy(batch_state)
-        enabled_rows_list = [row for _, row in self._enabled_rows]
         variables: dict = {
             "batch_phase": phase,
-            "batch_table": enabled_rows_list,
+            "batch_users": list(self._usernames),
             "batch_index": run_idx,
-            "batch_source_index": source_idx,
-            "batch_row": row_data,
             "batch_state": working_state,
             "batch_item_result": item_result or {},
         }
-        # 展开行数据各列
-        for k, v in row_data.items():
-            variables[k] = v
 
         try:
             engine.execute(wf_path, initial_variables=variables)
@@ -592,7 +552,7 @@ class BatchWorker(QThread):
         except Exception as e:
             logger.error(
                 f"批量阶段失败 ({phase}, "
-                f"{self._format_label(row_data, run_idx)}): {e}")
+                f"{username or 'batch'}): {e}")
             return BatchStageResult(
                 status=RESULT_FAILED,
                 message=f"工作流异常: {e}",

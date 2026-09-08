@@ -44,6 +44,7 @@ def dialog(qtbot, monkeypatch):
     class _StubSlotGroup:
         def __init__(self, slot_key, _display, candidates, *_a, **_k):
             captured[slot_key] = list(candidates)
+            self.rows = []          # 装完候选后要按候选评级过一遍勾选状态
 
     monkeypatch.setattr(mod, "_SlotGroup", _StubSlotGroup)
 
@@ -63,10 +64,14 @@ def dialog(qtbot, monkeypatch):
     qtbot.addWidget(dlg._tab_widget)
     dlg._tab_widget.addTab(QLabel(), "候选装备")
 
+    # 候选评级：不选玩法 = 不应用规则，候选池装配与它无关
+    dlg._tuning_options = []
+    dlg._tuning_selection = []
+
     class _Combo:
         def currentData(self):
-            return None
-    dlg._combo_tuning = _Combo()
+            return "一般"
+    dlg._combo_min_rating = _Combo()
 
     class _Host:
         def active_user_name(self):

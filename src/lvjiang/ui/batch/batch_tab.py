@@ -4,7 +4,7 @@
 仿照调律 Tab 结构：顶部开始/停止按钮 + 三页子 Tab。
 - 进度：执行进度表
 - 脚本：勾选要执行的脚本
-- 配置：选择配置 + 勾选要执行的行
+- 配置：选择配置 + 临时勾选要执行的用户
 """
 
 from __future__ import annotations
@@ -33,11 +33,8 @@ from PyQt6.QtWidgets import (
 
 from ...core.batch_config import (
     BatchConfigItem,
-    config_enabled_flags,
     load_batch_config,
-    load_enabled_rows,
     save_batch_config,
-    save_enabled_rows,
 )
 from ...i18n import tr
 from ..button_styles import apply_button_style, fit_button_width
@@ -446,70 +443,35 @@ class BatchTab(QWidget):
 
         cfg = load_batch_config()
         config = cfg.get_active()
-        if not config or not config.rows:
+        if not config or not config.usernames:
             lbl = QLabel(tr("暂无数据，请通过 工具 → 批量配置 添加"))
             lbl.setStyleSheet("color: palette(mid);")
             self._entry_container.addWidget(lbl)
             return
 
-        # 加载 enabled 状态
-        config_enabled = config_enabled_flags(config)
-
-        for i, row_data in enumerate(config.rows):
-            label = self._format_row_label(config, row_data)
-            cb = QCheckBox(label)
+        for i, username in enumerate(config.usernames):
+            cb = QCheckBox(username)
             cb.setFixedHeight(_batch_list_row_height(cb))
-            cb.setChecked(config_enabled[i])
-            cb.stateChanged.connect(self._on_entry_check_changed)
+            cb.setChecked(True)
             self._entry_container.addWidget(cb)
             self._entry_checkboxes.append((cb, i))
-
-    def _format_row_label(self, config: BatchConfigItem, row_data: dict) -> str:
-        """格式化行显示标签"""
-        parts = []
-        for col in config.columns:
-            val = row_data.get(col, "")
-            if val:
-                parts.append(str(val))
-        return " / ".join(parts) if parts else tr("(空行)")
-
-    def _on_entry_check_changed(self):
-        """行勾选变更 → 保存到 session.json（用户态）"""
-        config = load_batch_config().get_active()
-        if not config:
-            return
-
-        enabled_rows = load_enabled_rows()
-        enabled_list = [False] * len(config.rows)
-        for cb, idx in self._entry_checkboxes:
-            if 0 <= idx < len(enabled_list):
-                enabled_list[idx] = cb.isChecked()
-        # 键统一用 config.name——读侧（config_enabled_flags）就是按它取的。
-        # 这里若改用下拉框文本（即 configs 的 dict key），两者一旦分叉就会
-        # 写进一个没人读的键，表现为「改了不生效、重开就还原」。
-        enabled_rows[config.name] = enabled_list
-        save_enabled_rows(enabled_rows)
 
     def _set_all_entries_checked(self, checked: bool):
         """全选/全不选行"""
         for cb, _ in self._entry_checkboxes:
             cb.setChecked(checked)
-        self._on_entry_check_changed()
 
-    def _get_enabled_rows(self) -> list[tuple[int, dict]]:
-        """获取已启用的行列表：[(index, row_data), ...]"""
+    def _get_enabled_usernames(self) -> list[str]:
+        """按配置顺序返回本次勾选的用户名。"""
         cfg = load_batch_config()
         config = cfg.get_active()
         if not config:
             return []
-
-        config_enabled = config_enabled_flags(config)
-
-        result = []
-        for i, row_data in enumerate(config.rows):
-            if config_enabled[i]:
-                result.append((i, row_data))
-        return result
+        return [
+            config.usernames[index]
+            for checkbox, index in self._entry_checkboxes
+            if checkbox.isChecked() and index < len(config.usernames)
+        ]
 
     # ─── 脚本列表 ─────────────────────────────────────────
 
@@ -743,11 +705,11 @@ class BatchTab(QWidget):
         self._start_batch()
 
     def _start_batch(self):
-        enabled_rows = self._get_enabled_rows()
+        usernames = self._get_enabled_usernames()
         scripts = self._checked_scripts()
 
-        if not enabled_rows:
-            self._host.append_log(tr("[批量] 暂无启用的行，请到「配置」页勾选"))
+        if not usernames:
+            self._host.append_log(tr("[批量] 暂无启用的用户，请到「配置」页勾选"))
             return
         if not scripts:
             self._host.append_log(tr("[批量] 请至少勾选一个脚本"))
@@ -760,14 +722,14 @@ class BatchTab(QWidget):
 
         # 构建进度表
         config = cfg.get_active()
-        self._build_progress_table(enabled_rows, config, scripts)
+        self._build_progress_table(usernames, config, scripts)
         self._set_config_enabled(False)
 
-        ok = self._host.run_batch(enabled_rows, scripts)
+        ok = self._host.run_batch(usernames, scripts)
         if not ok:
             self._set_config_enabled(True)
 
-    def _build_progress_table(self, enabled_rows: list[tuple[int, dict]],
+    def _build_progress_table(self, usernames: list[str],
                               config: BatchConfigItem | None,
                               scripts: list[BatchScript]):
         """初始化进度表：行×脚本 全量行"""
@@ -776,13 +738,8 @@ class BatchTab(QWidget):
         # 所以这个映射是精确的；靠标签文本反查则会在标签重名、或两边标签
         # 算法不一致时把状态刷到别人的行上（甚至一行都刷不到）。
         self._progress_row_index = {}
-        for run_idx, (_idx, row_data) in enumerate(enabled_rows):
-            # 条目只显示 user_column 对应的值
-            if config and config.user_column:
-                label = row_data.get(config.user_column, "")
-            else:
-                label = self._format_row_label(config, row_data) if config else str(row_data)
-            label = str(label)
+        for run_idx, username in enumerate(usernames):
+            label = username
             for script in scripts:
                 row = self._progress_table.rowCount()
                 self._progress_row_index[(run_idx, script.id)] = row

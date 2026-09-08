@@ -12,13 +12,11 @@ def test_batch_workflows_round_trip_new_lifecycle():
     assert BatchWorkflows.from_dict(workflows.to_dict()) == workflows
 
 
-def test_single_item_lifecycle_shortcut_defaults_on_and_round_trips():
+def test_usernames_round_trip():
     legacy = BatchConfigItem.from_dict({"name": "旧配置"})
-    assert legacy.skip_lifecycle_for_single_item is True
-
-    legacy.skip_lifecycle_for_single_item = False
+    legacy.usernames = ["用户B", "用户A"]
     restored = BatchConfigItem.from_dict(legacy.to_dict())
-    assert restored.skip_lifecycle_for_single_item is False
+    assert restored.usernames == ["用户B", "用户A"]
 
 
 # ─── batch 节点是共享的，保存不能整节点覆写 ────────────────
@@ -46,8 +44,7 @@ def _store(monkeypatch, node):
     return store
 
 
-def test_saving_config_keeps_other_keys_in_the_batch_node(monkeypatch):
-    """enabled_rows 及任何后来者都不能被 save_batch_config 抹掉。"""
+def test_saving_config_replaces_obsolete_batch_keys(monkeypatch):
     from lvjiang.core.batch_config import BatchConfig, save_batch_config
 
     store = _store(monkeypatch, {
@@ -57,29 +54,7 @@ def test_saving_config_keeps_other_keys_in_the_batch_node(monkeypatch):
 
     save_batch_config(BatchConfig(active_config="demo", script_ids=["a"]))
 
-    assert store.node["enabled_rows"] == {"demo": [True, False]}
-    assert store.node["future_key"] == {"kept": 1}
+    assert "enabled_rows" not in store.node
+    assert "future_key" not in store.node
     assert store.node["script_ids"] == ["a"]
     assert store.node["active_config"] == "demo"
-
-
-def test_enabled_rows_helpers_round_trip(monkeypatch):
-    from lvjiang.core.batch_config import (
-        config_enabled_flags,
-        load_enabled_rows,
-        save_enabled_rows,
-    )
-
-    store = _store(monkeypatch, {"script_ids": ["a"]})
-    save_enabled_rows({"demo": [True, False]})
-
-    assert load_enabled_rows() == {"demo": [True, False]}
-    # 写勾选状态不能顺手丢掉配置本体。
-    assert store.node["script_ids"] == ["a"]
-
-    config = BatchConfigItem(
-        name="demo", columns=["role"],
-        rows=[{"role": "甲"}, {"role": "乙"}, {"role": "丙"}],
-    )
-    # 数组比行数短：缺失位视为启用。
-    assert config_enabled_flags(config) == [True, False, True]

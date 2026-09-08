@@ -19,6 +19,23 @@ import "subcall/page_detection.wf"
 # 表现为「切号步骤静默不执行」。故在入口直接卡死，不让它跑到后面才出怪事。
 eval check_env(["android", "desktop"])
 
+# 批量层只提供用户名序列和当前下标。账号与角色资料始终从用户管理读取，
+# 不再由批量配置表格复制或注入。
+eval $username = $batch_users.$batch_index
+eval $account = user_get($username, "account")
+eval $role = user_get($username, "role")
+eval $role_index = user_get($username, "role_index")
+eval $tail = user_get($username, "tail")
+if not $account
+    return {"status": "failed", "message": "用户未配置账号名", "state": $batch_state}
+end
+if not $role
+    return {"status": "failed", "message": "用户未配置角色名", "state": $batch_state}
+end
+if not $role_index
+    return {"status": "failed", "message": "用户未配置角色序号", "state": $batch_state}
+end
+
 # 上一条成功进入主页后，先回到角色/账号入口。
 if $batch_state.page_state == 2
     call exit_to_login()

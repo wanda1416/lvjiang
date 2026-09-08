@@ -19,9 +19,9 @@ def make_worker(tmp_path, monkeypatch):
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        [(0, {"user": "alice"}), (1, {"user": "bob"})],
+        ["alice", "bob"],
         [BatchScript("test", "test")],
-        BatchConfigItem(name="test", columns=["user"], user_column="user"),
+        BatchConfigItem(name="test", usernames=["alice", "bob"]),
         BatchContext(None, None, None, None), SessionManager(tmp_path), lambda: False,
     )
     monkeypatch.setattr(worker, "_load_script_params", lambda _: {})
@@ -33,9 +33,9 @@ def test_batch_user_lock_covers_each_stage_and_saved_session(tmp_path, monkeypat
     worker = make_worker(tmp_path, monkeypatch)
     visits = []
 
-    def stage(stage_name, wf, index=-1, row_index=-1, row=None, *args):
+    def stage(stage_name, wf, index=-1, username="", *args):
         if stage_name in ("prepare_item", "finish_item"):
-            user = row["user"]
+            user = username
             with pytest.raises(AccessDeniedError):
                 acquire_user(user, tmp_path)
             other = "bob" if user == "alice" else "alice"

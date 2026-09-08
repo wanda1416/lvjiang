@@ -16,6 +16,18 @@ def _get_username(_engine) -> str:
     return getattr(_engine, "run_username", "") or "default"
 
 
+@builtin_func("user_get")
+def _user_get(_engine, username: str, key: str, *args):
+    """按内部用户名读取用户资料属性；不存在时返回 null。"""
+    if not username or not key:
+        return None
+    from ...core.user_config import get_user_attribute
+
+    return get_user_attribute(
+        str(username), str(key), getattr(_engine, "users_dir", None)
+    )
+
+
 @builtin_func("profile_get")
 def _profile_get(_engine, key: str, *args) -> float | str | None:
     """读取 profile 属性值（自动识别模型类型）

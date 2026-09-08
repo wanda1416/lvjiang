@@ -77,6 +77,9 @@ def _parse_args() -> argparse.Namespace:
         description=tr("通用视觉 RPA 引擎（支持插件扩展）"),
     )
     parser.add_argument(
+        "--read-only", action="store_true", help=tr("共享配置只读，用户业务数据正常保存"),
+    )
+    parser.add_argument(
         "-reg",
         "--register",
         action="append",
@@ -88,6 +91,12 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    import atexit
+
+    from .core.access import close_instance, initialize_instance
+    args = _parse_args()
+    initialize_instance(PROJECT_ROOT, readonly=args.read_only)
+    atexit.register(close_instance)
     _configure_dpi()
     _configure_logging()
 
@@ -97,7 +106,6 @@ def main() -> int:
     from .i18n import init_i18n, load_app_i18n
     init_i18n()
 
-    args = _parse_args()
     logger = logging.getLogger("lvjiang.__main__")
 
     # 崩溃防护：必须在所有 C 扩展（mss 等）加载之前安装

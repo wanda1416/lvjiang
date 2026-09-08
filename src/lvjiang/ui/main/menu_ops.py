@@ -19,7 +19,7 @@ from typing import cast
 from loguru import logger
 from PyQt6 import sip
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QDialog, QMessageBox, QToolButton, QWidget
 
 from lvjiang.apps import get_registry
@@ -136,9 +136,11 @@ class MenuOpsMixin:
         settings_menu.addAction(user_mgmt)
 
         scene_editor = QAction(tr("场景管理"), self)
-        scene_editor.setShortcut("F3")
         scene_editor.triggered.connect(self._open_scene_editor)
         settings_menu.addAction(scene_editor)
+        self._scene_editor_shortcut = QShortcut(QKeySequence("F3"), self)
+        self._scene_editor_shortcut.activated.connect(
+            self._open_scene_editor_shortcut)
 
         reference_mgr = QAction(tr("图库管理"), self)
         reference_mgr.setShortcut("F4")
@@ -277,6 +279,14 @@ class MenuOpsMixin:
             "task_history", lambda: DailyHistoryDialog(self))
 
     def _open_scene_editor(self):
+        from ...core.access import is_readonly
+        if is_readonly():
+            QMessageBox.information(
+                self,
+                tr("无法打开场景管理"),
+                tr("只读实例无法打开场景管理"),
+            )
+            return
         from ..scene_editor import SceneEditorDialog
         self._show_modeless_tool(
             "scene_editor",
@@ -287,6 +297,13 @@ class MenuOpsMixin:
             ),
             lambda _dialog: self._refresh_layout_combo(),
         )
+
+    def _open_scene_editor_shortcut(self):
+        """F3 在只读实例中静默忽略。"""
+        from ...core.access import is_readonly
+        if is_readonly():
+            return
+        self._open_scene_editor()
 
     def _open_reference_manager(self):
         from ..reference import ReferenceManagerDialog

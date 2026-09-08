@@ -153,4 +153,3 @@ class StartupOpsMixin:
         reporter.failed.connect(on_failed)
         reporter.start()
         self._startup_telemetry_reporter = reporter  # 防止被 GC
-

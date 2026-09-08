@@ -49,6 +49,7 @@ import yaml
 from loguru import logger
 
 from ... import constants
+from ..fs_util import atomic_write_bytes, atomic_write_text
 from . import versioning
 
 # 层根目录：ConfigResolver 内部持有，外部经 ConfigResolver API 访问
@@ -709,9 +710,9 @@ class ConfigResolver:
 
         target.parent.mkdir(parents=True, exist_ok=True)
         if isinstance(data, bytes):
-            target.write_bytes(data)
+            atomic_write_bytes(target, data, prefix=".config_")
         else:
-            target.write_text(data, encoding="utf-8")
+            atomic_write_text(target, data, prefix=".config_")
         if tomb.exists():
             tomb.unlink()
         self._notify(rel_path)
@@ -883,7 +884,7 @@ class ConfigResolver:
             if target.exists() and target.read_text(encoding="utf-8") == text:
                 return
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(text, encoding="utf-8")
+            atomic_write_text(target, text, prefix=".config_")
         else:
             base = (deepcopy(base_doc) if base_doc is not None
                     else self._load_yaml(self.system_dir / rel_path))
@@ -899,7 +900,7 @@ class ConfigResolver:
                         and overlay_path.read_text(encoding="utf-8") == text):
                     return
                 overlay_path.parent.mkdir(parents=True, exist_ok=True)
-                overlay_path.write_text(text, encoding="utf-8")
+                atomic_write_text(overlay_path, text, prefix=".config_")
             elif overlay_path.exists():
                 overlay_path.unlink()
             else:

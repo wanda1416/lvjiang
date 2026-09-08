@@ -48,6 +48,59 @@ _ACTIVE_LEGACY_KEYS = {
 # 与用户无关，没有旧顶层键。
 _ACTIVE_KINDS = frozenset(_ACTIVE_LEGACY_KEYS) | {"plan"}
 
+# 只读实例仅隔离会改变“当前实例正在使用什么”的选择状态。未列出的节点和
+# 字段仍按普通 SessionStore 语义持锁、合并并原子落盘。
+#
+# 每个元组表示一棵完整的临时子树。名单必须保持窄小；新增 Session 字段默认
+# 可写，只有确认属于实例私有选择时才允许加入这里。
+READONLY_TRANSIENT_PATHS: frozenset[tuple[str, ...]] = frozenset({
+    ("actives",),
+    ("active_user",),
+    ("active_layout",),
+    ("active_space",),
+    ("settings", "env"),
+    ("daily", "workflow_id"),
+    ("profile", "overview_active_group"),
+    ("ui_state", "main_page"),
+    ("ui_state", "scene_editor"),
+    ("ui_state", "reference_manager"),
+})
+
+_MISSING = object()
+
+
+def _value_at_path(data: dict, path: tuple[str, ...]) -> Any:
+    value: Any = data
+    for key in path:
+        if not isinstance(value, dict) or key not in value:
+            return _MISSING
+        value = value[key]
+    return value
+
+
+def _overlay_path(target: dict, source: dict, path: tuple[str, ...]) -> None:
+    """Copy one transient subtree from source to target, including deletion."""
+    source_value = _value_at_path(source, path)
+    parent: dict = target
+    for key in path[:-1]:
+        child = parent.get(key)
+        if not isinstance(child, dict):
+            if source_value is _MISSING:
+                return
+            child = {}
+            parent[key] = child
+        parent = child
+    leaf = path[-1]
+    if source_value is _MISSING:
+        parent.pop(leaf, None)
+    else:
+        parent[leaf] = deepcopy(source_value)
+
+
+def _overlay_readonly_transients(target: dict, source: dict) -> None:
+    for path in READONLY_TRANSIENT_PATHS:
+        _overlay_path(target, source, path)
+
 
 class LockTimeoutError(Exception):
     """文件锁获取超时"""
@@ -150,9 +203,7 @@ class SessionStore:
             logger.warning(f"{title}\n{message}")
             return False
 
-    def _mutate_disk_with_retry(
-        self, mutator: Callable[[dict], Any]
-    ) -> Any:
+    def _mutate_disk_with_retry(self, mutator: Callable[[dict], Any]) -> Any:
         """在文件锁内对最新磁盘快照执行变更并原子落盘。
 
         - 线程锁串行化同一进程内对 fasteners 锁实例的访问
@@ -161,6 +212,8 @@ class SessionStore:
         - 使用 fasteners 确保 Windows/Unix 兼容
         """
         with self._thread_lock:
+            from ..access import is_readonly
+            readonly = is_readonly()
             for attempt in range(self.MAX_RETRIES):
                 try:
                     # 步骤 1: 获取写锁（短暂）
@@ -172,9 +225,21 @@ class SessionStore:
                         #   - 对最新快照应用本次修改
                         #   - 写入磁盘（原子操作）
                         disk_data = self._read_disk()
-                        result = mutator(disk_data)
-                        self._write_disk_atomic(disk_data)
-                        self._data = disk_data
+                        working = deepcopy(disk_data)
+                        if readonly:
+                            # 本实例的临时选择参与本次内存修改，但不覆盖磁盘值。
+                            _overlay_readonly_transients(working, self._data)
+                        result = mutator(working)
+
+                        persisted = deepcopy(working)
+                        if readonly:
+                            _overlay_readonly_transients(persisted, disk_data)
+                        if persisted != disk_data:
+                            self._write_disk_atomic(persisted)
+
+                        self._data = deepcopy(persisted)
+                        if readonly:
+                            _overlay_readonly_transients(self._data, working)
                     finally:
                         # 步骤 3: 释放锁
                         try:
@@ -260,6 +325,25 @@ class SessionStore:
 
         self._mutate_disk_with_retry(_delete)
 
+    def get_runtime_path(self, node: str, key: str) -> Any:
+        """Read a runtime leaf from the current Session snapshot."""
+        with self._thread_lock:
+            data = self._data.get(node, {})
+            return deepcopy(data.get(key)) if isinstance(data, dict) else None
+
+    def mutate_runtime_path(self, node: str, key: str, fn: Callable) -> Any:
+        """Persist a business-runtime leaf without flushing transient sibling fields."""
+        def mutate(data):
+            parent = data.get(node)
+            if not isinstance(parent, dict):
+                parent = {}
+                data[node] = parent
+            value = fn(deepcopy(parent.get(key)))
+            parent[key] = value
+            return value
+
+        return self._mutate_disk_with_retry(mutate)
+
     # ─── 激活项（actives）─────────────────────────────────
 
     def get_active(self, kind: str, default: Any = None) -> Any:
@@ -294,9 +378,13 @@ class SessionStore:
         self._mutate_disk_with_retry(_set)
 
     def reload(self):
-        """重新读盘，刷新内存态"""
+        """重新读盘；只读实例保留白名单中的本实例临时选择。"""
         with self._thread_lock:
-            self._data = self._read_disk()
+            from ..access import is_readonly
+            disk_data = self._read_disk()
+            if is_readonly():
+                _overlay_readonly_transients(disk_data, self._data)
+            self._data = disk_data
 
 
 # ─── 模块级单例 ──────────────────────────────────────────

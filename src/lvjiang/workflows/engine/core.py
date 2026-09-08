@@ -62,6 +62,7 @@ from ..grammar.ast_nodes import (
     ReplayInputTrace,
     Return,
     Scan,
+    SceneDeclaration,
     Screenshot,
     Scroll,
     Try,
@@ -953,6 +954,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
     def _exec_stmt(self, node):
         """执行单条语句"""
+        if isinstance(node, SceneDeclaration):
+            return
         # 语句边界也检查停止标志，让 F10 在两条语句之间立即生效
         if self._stop_check():
             raise _BreakSignal()

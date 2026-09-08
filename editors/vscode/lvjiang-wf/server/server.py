@@ -107,6 +107,7 @@ server = LanguageServer("lvjiang-wf-server", "v0.1")
 # DSL keywords for typo detection
 # ---------------------------------------------------------------------------
 DSL_KEYWORDS = {
+    "scene", "view", "unknown",
     # Control flow
     "main", "def", "return", "call", "try", "catch",
     # Actions
@@ -283,6 +284,10 @@ def _check_scene_exists(program) -> list[Diagnostic]:
     if registry is None:
         return []
     diagnostics = []
+    from lvjiang.workflows.scene_declarations import validate_scene_declarations
+    for line, message in validate_scene_declarations(program, registry.all_scenes()):
+        diagnostics.append(Diagnostic(range=_line_range(line), message=message,
+                                      severity=DiagnosticSeverity.Warning))
     valid_scenes = set(registry.all_scene_keys())
     refs = collect_refs(program.body, program.procs, source=program.source)
     seen_scenes: set[str] = set()

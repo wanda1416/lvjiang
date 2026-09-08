@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMenu,
@@ -378,7 +379,7 @@ def prompt_scene_area_references(
 
 
 def prompt_reference_views(parent, scene_key: str,
-                           current: list[str]) -> list[str] | None:
+                           current: list[str], ref=None) -> list[str] | None:
     """只改归属视图的小对话框；取消返回 None。"""
     from PyQt6.QtWidgets import QDialog, QDialogButtonBox
 
@@ -387,12 +388,22 @@ def prompt_reference_views(parent, scene_key: str,
     dialog = QDialog(parent)
     dialog.setWindowTitle(tr("引用的归属视图"))
     form = QFormLayout(dialog)
-    note = QLabel(tr("坐标、类型与名字都在源场景，这里只改它在本场景的哪些"
+    note = QLabel(tr("坐标、类型与名字都在源场景，这里可改跳转行为及它在本场景的哪些"
                       "视图下看得见。"))
     note.setWordWrap(True)
     note.setStyleSheet("color: palette(mid); font-size: 11px;")
     form.addRow(note)
     checklist = add_views_checklist_row(form, scene_key, list(current))
+    override = None
+    if ref is not None:
+        from PyQt6.QtWidgets import QCheckBox
+        override = QCheckBox(tr("覆盖引用的跳转行为"))
+        override.setChecked(ref.to is not None or ref.navigation is not None)
+        form.addRow(override)
+        transition = add_transition_row(form, scene_key, ref.to or "", ref.navigation or "")
+        transition.setEnabled(override.isChecked())
+        override.toggled.connect(transition.setEnabled)
+
     buttons = QDialogButtonBox(
         QDialogButtonBox.StandardButton.Ok
         | QDialogButtonBox.StandardButton.Cancel)
@@ -402,6 +413,9 @@ def prompt_reference_views(parent, scene_key: str,
     buttons.rejected.connect(dialog.reject)
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return None
+    if override is not None:
+        ref.to = transition.value() if override.isChecked() else None
+        ref.navigation = transition.navigation_value() if override.isChecked() else None
     return checklist_views_value(checklist, current[0] if current else "")
 
 
@@ -427,8 +441,10 @@ class TransitionPicker(QWidget):
     def __init__(self, current_scene: str, value: str = "", parent=None):
         super().__init__(parent)
         self._current_scene = current_scene
-        row = QHBoxLayout(self)
-        row.setContentsMargins(0, 0, 0, 0)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        row = QHBoxLayout()
+        layout.addLayout(row)
         self._local_views_button = QPushButton(tr("本场景视图"))
         self._local_views_button.setToolTip(
             tr("快速选择当前场景内的目标视图"))
@@ -440,7 +456,13 @@ class TransitionPicker(QWidget):
                                (self._view, 2)):
             row.addWidget(combo, stretch)
 
+        self._available_from = QLineEdit()
+        self._navigation = QComboBox()
+        for label, nav_value in [("未声明行为", ""), ("打开（记录调用方）", "open"), ("页内切换（保留调用方）", "switch"), ("替换当前页面", "replace")]:
+            self._navigation.addItem(tr(label), nav_value)
+        layout.addWidget(self._navigation)
         self._group.addItem(tr("不跳转"), userData=self._NONE)
+        self._group.addItem(tr("调用方"), userData="@caller")
         registry = get_registry()
         for gk, gname in registry.get_groups():
             self._group.addItem(gname, userData=gk)
@@ -486,7 +508,7 @@ class TransitionPicker(QWidget):
         gk = self._group.currentData()
         self._scene.blockSignals(True)
         self._scene.clear()
-        enabled = gk != self._NONE
+        enabled = gk not in (self._NONE, "@caller")
         if enabled:
             registry = get_registry()
             for scene_key in registry.get_group_scenes(gk):
@@ -497,6 +519,7 @@ class TransitionPicker(QWidget):
                                     userData=scene_key)
         self._scene.blockSignals(False)
         self._scene.setEnabled(enabled)
+        self._navigation.setEnabled(enabled)
         self._on_scene_changed(0)
 
     def _on_scene_changed(self, _index: int) -> None:
@@ -517,6 +540,10 @@ class TransitionPicker(QWidget):
 
     def set_value(self, value: str) -> None:
         text = str(value or "").strip()
+        if text == "@caller":
+            self._group.setCurrentIndex(self._group.findData("@caller"))
+            self._on_group_changed(0)
+            return
         if not text:
             self._group.setCurrentIndex(0)
             self._on_group_changed(0)
@@ -539,6 +566,8 @@ class TransitionPicker(QWidget):
             self._view.setCurrentIndex(idx)
 
     def value(self) -> str:
+        if self._group.currentData() == "@caller":
+            return "@caller"
         if self._group.currentData() == self._NONE:
             return ""
         scene_key = self._scene.currentData()
@@ -555,16 +584,28 @@ class TransitionPicker(QWidget):
             return scene_key
         return f"{scene_key}/{view_key}"
 
+    def available_from_value(self) -> list[str]:
+        return [s.strip() for s in self._available_from.text().split(",") if s.strip()] if self.value() not in ("", "@caller") else []
+
+    def navigation_value(self) -> str:
+        return self._navigation.currentData() if self.value() not in ("", "@caller") else ""
+
     def set_transition_enabled(self, enabled: bool) -> None:
         """按实体是否可点击控制跳转；快捷按钮位于父表单，需单独同步。"""
         self.setEnabled(enabled)
+        self._available_from.setEnabled(enabled)
         menu = self._local_views_button.menu()
         self._local_views_button.setEnabled(
             enabled and menu is not None and bool(menu.actions()))
 
 
 def add_transition_row(form: QFormLayout, current_scene: str,
-                       value: str = "") -> TransitionPicker:
+                       value: str = "", navigation: str = "",
+                       available_from: list[str] | None = None) -> TransitionPicker:
     picker = TransitionPicker(current_scene, value)
+    picker._navigation.setCurrentIndex(max(0, picker._navigation.findData(navigation)))
     form.addRow(tr("跳转:"), picker)
+    picker._available_from.setText(", ".join(available_from or []))
+    picker._available_from.setPlaceholderText(tr("留空为本地入口；* 为全局，或逗号分隔场景 key"))
+    form.addRow(tr("入口作用范围:"), picker._available_from)
     return picker

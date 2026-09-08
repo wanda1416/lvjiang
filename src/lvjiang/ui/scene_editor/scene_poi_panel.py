@@ -53,6 +53,7 @@ from .scene_select import (
     add_views_checklist_row,
     checklist_views_value,
     connect_scene_views_sync,
+    prompt_reference_views,
     prompt_scene_area_references,
 )
 
@@ -261,7 +262,7 @@ class PoiPanelMixin:
                 "\u2713" if source_def.is_text else "",
                 "\u2713" if source_def.is_clickable else "",
                 assigned.activation_key if assigned else "",
-                "", source_def.to or "", get_scene_name(ref.scene),
+                "", (source_def.to if ref.to is None else ref.to) or "", get_scene_name(ref.scene),
             ]
             for col, text in enumerate(cells):
                 item = QTableWidgetItem(text)
@@ -414,6 +415,14 @@ class PoiPanelMixin:
         registry = get_registry()
         scene = registry.get_scene(self._scene_key)
         if not scene:
+            return
+        ref = next((r for r in scene.references if r.entity == key), None)
+        if ref is not None:
+            views = prompt_reference_views(self, self._scene_key, list(ref.views), ref=ref)
+            if views is not None:
+                registry.update_scene_reference_views(self._scene_key, ref.scene, ref.entity, views)
+                sync_scene_cache(self._scene_key)
+                self._refresh_lists()
             return
         old_def = next((p for p in scene.points if p.key == key), None)
         if not old_def:
@@ -640,7 +649,9 @@ class PoiPanelMixin:
             list(point_def.views) if point_def else [self._current_view],
         )
         transition = add_transition_row(
-            form, self._scene_key, point_def.to if point_def else "")
+            form, self._scene_key, point_def.to if point_def else "",
+            point_def.navigation if point_def else "",
+            point_def.available_from if point_def else [])
         transition.set_transition_enabled(is_clickable_check.isChecked())
         is_clickable_check.toggled.connect(transition.set_transition_enabled)
 
@@ -702,6 +713,8 @@ class PoiPanelMixin:
             is_clickable=is_clickable_check.isChecked(),
             views=checklist_views_value(view_list, self._current_view),
             to=transition.value() if is_clickable_check.isChecked() else "",
+            navigation=transition.navigation_value() if is_clickable_check.isChecked() else "",
+            available_from=transition.available_from_value() if is_clickable_check.isChecked() else [],
         ), target_scene, normalize_key(activation_key) if activation_key else ""
 
     # ─── 跨场景引用 ──────────────────────────────────────

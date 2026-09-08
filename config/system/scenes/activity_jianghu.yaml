@@ -35,6 +35,7 @@ regions:
   is_clickable: true
   view: qingjing
   to: appearance_main/qingjing_editing
+  navigation: open
 - key: back
   name: 返回
   type: func

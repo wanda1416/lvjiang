@@ -27,6 +27,7 @@ from ..ast_nodes import (
     Recognize,
     ReplayInputTrace,
     Scan,
+    SceneDeclaration,
     Scroll,
     SubsceneEntityRef,
     TupleLiteral,
@@ -45,6 +46,12 @@ class _StmtMixin:
     """程序入口、基础指令（click/drag/wait/scan/recognize）与 align/panel 索引回调"""
 
     # ─── 程序入口 ─────────────────────────────────────────
+
+    def scene_location(self, items):
+        return SceneDeclaration(str(items[0]), str(items[1]) if len(items) > 1 and items[1] is not None else None, self._line(items))
+
+    def scene_unknown(self, items):
+        return SceneDeclaration(line_no=self._line(items))
 
     def start(self, items):
         """过滤掉 None（空行），分离 import / def / body；展平语法糖产生的列表"""

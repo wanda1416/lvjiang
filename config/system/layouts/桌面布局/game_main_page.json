@@ -169,8 +169,16 @@
       "key": "xianshi",
       "x_ratio": 0.10776450059969242,
       "y_ratio": 0.0,
-      "w_ratio": 0.05164235012664553,
+      "w_ratio": 0.07838722167581583,
       "h_ratio": 0.08684979458894326
+    },
+    {
+      "key": "bag",
+      "x_ratio": 0.0,
+      "y_ratio": 0.0,
+      "w_ratio": 0.0,
+      "h_ratio": 0.0,
+      "activation_key": "B"
     }
   ],
   "points": [

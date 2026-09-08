@@ -35,6 +35,10 @@
       "y_ratio": 0.0,
       "w_ratio": 0.34953464322647365,
       "h_ratio": 1.0
+    },
+    {
+      "key": "open_settings",
+      "disabled": true
     }
   ],
   "points": [

@@ -4,62 +4,106 @@ name: 设置
 views:
 - key: base
   name: 基底
+  kind: page
 - key: other
   name: 其他
+  kind: tab
+  owner: /base
 - key: redeem_code
   name: 兑换码
-  same_layer: false
+  kind: modal
+- key: game
+  name: 游戏
+  kind: tab
+  owner: /base
+- key: camera
+  name: 镜头
+  kind: tab
+  owner: /base
+- key: screen
+  name: 画面
+  kind: tab
+  owner: /base
+- key: audio
+  name: 音频
+  kind: tab
+  owner: /base
+- key: social
+  name: 社交
+  kind: tab
+  owner: /base
+- key: building
+  name: 建造
+  kind: tab
+  owner: /base
+- key: store
+  name: 存储
+  kind: tab
+  owner: /base
 regions:
 - key: back
   name: 返回
   type: func
   is_text: false
   is_clickable: true
-  views:
-  - base
-  - other
+  views: [base, game, camera, screen, audio, social, building, store, other]
+  to: "@caller"
 - key: game
   name: 游戏
   type: func
   is_text: true
   is_clickable: true
-  view: base
+  views: [base, game, camera, screen, audio, social, building, store, other]
+  to: /game
+  navigation: switch
 - key: camera
   name: 镜头
   type: func
   is_text: true
   is_clickable: true
-  view: base
+  views: [base, game, camera, screen, audio, social, building, store, other]
+  to: /camera
+  navigation: switch
 - key: screen
   name: 画面
   type: func
   is_text: true
   is_clickable: true
-  view: base
+  views: [base, game, camera, screen, audio, social, building, store, other]
+  to: /screen
+  navigation: switch
 - key: audio
   name: 音频
   type: func
   is_text: true
   is_clickable: true
-  view: base
+  views: [base, game, camera, screen, audio, social, building, store, other]
+  to: /audio
+  navigation: switch
 - key: social
   name: 社交
   type: func
   is_text: true
   is_clickable: true
-  view: base
+  views: [base, game, camera, screen, audio, social, building, store, other]
+  to: /social
+  navigation: switch
 - key: building
   name: 建造
   type: func
   is_text: true
   is_clickable: true
-  view: base
+  views: [base, game, camera, screen, audio, social, building, store, other]
+  to: /building
+  navigation: switch
 - key: store
   name: 存储
   type: func
   is_text: true
   is_clickable: true
-  view: base
+  views: [base, game, camera, screen, audio, social, building, store, other]
+  to: /store
+  navigation: switch
 - key: redeem_code
   name: 兑换码
   type: func
@@ -67,13 +111,15 @@ regions:
   is_clickable: true
   view: other
   to: /redeem_code
+  navigation: open
 - key: other
   name: 其他
   type: func
   is_text: true
   is_clickable: true
-  view: base
+  views: [base, game, camera, screen, audio, social, building, store, other]
   to: /other
+  navigation: switch
 - key: input_area
   name: 输入区
   type: func

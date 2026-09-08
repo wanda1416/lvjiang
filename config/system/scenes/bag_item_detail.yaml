@@ -4,6 +4,8 @@ name: 道具
 views:
 - key: base
   name: 基底
+  kind: tab
+  owner: bag_detail/base
 - key: detail
   name: 道具详情
 - key: yangcheng

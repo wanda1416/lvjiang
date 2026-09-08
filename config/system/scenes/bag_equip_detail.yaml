@@ -4,6 +4,8 @@ name: 装备
 views:
 - key: base
   name: 基底
+  kind: tab
+  owner: bag_detail/base
 - key: kuaijie
   name: 快捷道具
 - key: bag

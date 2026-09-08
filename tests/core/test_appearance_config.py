@@ -32,11 +32,11 @@ def test_appearance_tabs_and_independent_editors(appearance_config):
     assert not {"waiguan_yigui", "waiguan_qingjing"} & set(social)
     scene = registry.get_scene("appearance_main")
     assert scene is not None
-    assert [(v.key, v.name, v.same_layer) for v in scene.views] == [
-        ("base", "衣柜", True),
-        ("qingjing", "情境", True),
-        ("chuanda", "穿搭方案", False),
-        ("qingjing_editing", "情境编辑", False),
+    assert [(v.key, v.name, v.relation) for v in scene.views] == [
+        ("base", "衣柜", "page"),
+        ("qingjing", "情境", "tab"),
+        ("chuanda", "穿搭方案", "page"),
+        ("qingjing_editing", "情境编辑", "page"),
     ]
     visible = {
         v.key: {r.key for r in scene.regions if v.key in (r.views or ["base"])}
@@ -55,7 +55,7 @@ def test_appearance_tabs_and_independent_editors(appearance_config):
     assert regions["chuanda"].to == "/chuanda"
     assert regions["edit_qingjing"].to == "/qingjing_editing"
     # 同位置返回按钮跨视图复用，目标随当前视图和入口上下文变化。
-    assert regions["back"].to == ""
+    assert regions["back"].to == "@caller"
     assert set(regions["back"].views) == {v.key for v in scene.views}
     for source, key, target in [
         ("game_menu_page", "waiguan", "appearance_main"),

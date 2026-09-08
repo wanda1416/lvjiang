@@ -218,7 +218,7 @@ class RegionPanelMixin:
                 "\u2713" if source_def.is_clickable else "",
                 (assigned_by_key[ref.entity].activation_key
                  if placed else ""),
-                "", source_def.to or "", get_scene_name(ref.scene),
+                "", (source_def.to if ref.to is None else ref.to) or "", get_scene_name(ref.scene),
             ]
             for col, text in enumerate(cells):
                 item = QTableWidgetItem(text)
@@ -488,7 +488,9 @@ class RegionPanelMixin:
         )
         # 点击后到达的场景/视图——页面切换契约，只声明不驱动执行
         transition = add_transition_row(
-            form, self._scene_key, region_def.to if region_def else "")
+            form, self._scene_key, region_def.to if region_def else "",
+            region_def.navigation if region_def else "",
+            region_def.available_from if region_def else [])
         transition.set_transition_enabled(is_clickable_check.isChecked())
         is_clickable_check.toggled.connect(transition.set_transition_enabled)
 
@@ -551,6 +553,8 @@ class RegionPanelMixin:
             is_clickable=is_clickable_check.isChecked(),
             views=checklist_views_value(view_list, self._current_view),
             to=transition.value() if is_clickable_check.isChecked() else "",
+            navigation=transition.navigation_value() if is_clickable_check.isChecked() else "",
+            available_from=transition.available_from_value() if is_clickable_check.isChecked() else [],
         ), target_scene, normalize_key(activation_key) if activation_key else ""
 
     # ─── 跨场景引用 ──────────────────────────────────────
@@ -636,7 +640,7 @@ class RegionPanelMixin:
         ref = self._reference_at(row)
         if ref is None:
             return False
-        views = prompt_reference_views(self, self._scene_key, list(ref.views))
+        views = prompt_reference_views(self, self._scene_key, list(ref.views), ref=ref)
         if views is None:
             return True
         try:

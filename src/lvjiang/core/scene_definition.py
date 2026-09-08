@@ -167,7 +167,8 @@ class SceneRegistry:
         for vd in data.get("views", []):
             views.append(ViewDef(
                 key=vd["key"], name=vd.get("name", vd["key"]),
-                same_layer=bool(vd.get("same_layer", True))))
+                same_layer=(vd.get("kind") == "viewport" if vd.get("kind") else bool(vd.get("same_layer", True))),
+                kind=str(vd.get("kind", "")), owner=str(vd.get("owner", ""))))
         view_keys = {v.key for v in views}
         scene_type = str(data.get("type", "scene"))
         if scene_type not in ("scene", "subscene"):
@@ -218,6 +219,8 @@ class SceneRegistry:
                 is_clickable=rd.get("is_clickable", False),
                 views=_views_of(rd),
                 to=str(rd.get("to", "") or ""),
+                navigation=str(rd.get("navigation", "") or ""),
+                available_from=list(rd.get("available_from", [])),
             ))
 
         points = []
@@ -233,6 +236,8 @@ class SceneRegistry:
                 is_clickable=pd.get("is_clickable", True),
                 views=_views_of(pd),
                 to=str(pd.get("to", "") or ""),
+                navigation=str(pd.get("navigation", "") or ""),
+                available_from=list(pd.get("available_from", [])),
             ))
 
         panels = []
@@ -263,7 +268,8 @@ class SceneRegistry:
             if source == key:
                 raise ValueError(f"场景 {key} 不能引用自身")
             references.append(SceneRefDef(
-                scene=str(source), entity=str(entity), views=_views_of(rd)))
+                scene=str(source), entity=str(entity), views=_views_of(rd),
+                to=rd.get("to"), navigation=rd.get("navigation")))
         if scene_type == "subscene" and references:
             raise ValueError(f"子场景 {key} 不能引用其他场景的 area")
 
@@ -676,6 +682,17 @@ class SceneRegistry:
                 if v and v not in renamed:
                     renamed.append(v)
             item.views = renamed
+        from .scene_transitions import parse_target
+        for owner in self._scenes.values():
+            changed = False
+            for obj in (*owner.views, *owner.regions, *owner.points, *owner.references):
+                attr = "owner" if isinstance(obj, ViewDef) else "to"
+                raw = getattr(obj, attr, "")
+                if raw and parse_target(raw, owner.key) == (scene_key, old_key):
+                    setattr(obj, attr, f"/{new_key}" if raw.startswith("/") else f"{scene_key}/{new_key}")
+                    changed = True
+            if changed and owner is not scene:
+                self._save_scene_yaml(owner)
         self._save_scene_yaml(scene)
         logger.info(f"场景 {scene_key} 视图 key 重命名: {old_key} -> {new_key}")
 
@@ -712,6 +729,14 @@ class SceneRegistry:
         ]
         if used:
             raise ValueError(f"视图非空，无法删除: {view_key}（包含 {len(used)} 个定义）")
+        from .scene_transitions import parse_target
+        for owner in self._scenes.values():
+            for obj in (*owner.views, *owner.regions, *owner.points, *owner.references):
+                if obj is next((v for v in scene.views if v.key == view_key), None):
+                    continue
+                raw = getattr(obj, "owner", "") if isinstance(obj, ViewDef) else getattr(obj, "to", "")
+                if raw and parse_target(raw, owner.key) == (scene_key, view_key):
+                    raise ValueError(f"视图仍被引用，无法删除: {owner.key}/{obj.key}")
         scene.views = [v for v in scene.views if v.key != view_key]
         self._save_scene_yaml(scene)
         logger.info(f"场景 {scene_key} 已删除视图: {view_key}")
@@ -1145,6 +1170,8 @@ class SceneRegistry:
                     "is_clickable": r.is_clickable,
                     **_view_fields(r),
                     **({"to": r.to} if r.is_clickable and r.to else {}),
+                    **({"navigation": r.navigation} if r.navigation else {}),
+                    **({"available_from": r.available_from} if r.available_from else {}),
                 }
                 for r in scene.regions
             ]
@@ -1158,6 +1185,8 @@ class SceneRegistry:
                     "is_clickable": p.is_clickable,
                     **_view_fields(p),
                     **({"to": p.to} if p.is_clickable and p.to else {}),
+                    **({"navigation": p.navigation} if p.navigation else {}),
+                    **({"available_from": p.available_from} if p.available_from else {}),
                 }
                 for p in scene.points
             ]
@@ -1178,7 +1207,9 @@ class SceneRegistry:
             ]
         if scene.references:
             data["references"] = [
-                {"scene": r.scene, "entity": r.entity, **_view_fields(r)}
+                {"scene": r.scene, "entity": r.entity, **_view_fields(r),
+                 **({"to": r.to} if r.to is not None else {}),
+                 **({"navigation": r.navigation} if r.navigation is not None else {})}
                 for r in scene.references
             ]
         self._resolver.write_entity(

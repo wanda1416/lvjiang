@@ -18,6 +18,7 @@
 | [03.3-mouse.md](03.3-mouse.md) | 鼠标操作：click、drag、后缀等待子句、隐藏延迟 |
 | [03.4-keyboard.md](03.4-keyboard.md) | 键盘输入：press 四种模式、状态管理和后端机制 |
 | [03.5-key-reference.md](03.5-key-reference.md) | 按键速查：物理键名、字符别名、组合键和平台限制 |
+| [03.6-scene-declarations.md](03.6-scene-declarations.md) | 流程位置声明：scene、view、unknown（仅元数据） |
 | [04-data-flow.md](04-data-flow.md) | 感知指令概览与对比表 |
 | [04.1-scan.md](04.1-scan.md) | scan — OCR 文字扫描 |
 | [04.2-recognize.md](04.2-recognize.md) | recognize — 图像材料识别 |

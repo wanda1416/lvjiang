@@ -30,20 +30,22 @@ class ViewDef:
     """
     key: str
     name: str
-    # 同层视图：与基底处于**同一图层**，只是滚动/翻页后的另一个取景，不是另一个
-    # 页面。菜单的 page_1 / page_2 就是典型。
-    #
-    # 因此同层视图**没有入口、只有跳转**：没有任何按钮“进入”它，你只是把同一页
-    # 滚过去了；但它上面的按钮照样可以跳到别处。死视图检测必须跳过它们，否则
-    # 满屏都是假警报。
-    #
-    # 默认为真：新建视图多半是滚动态，这个默认值不会制造假警报；确实是独立页面
-    # 时再取消勾选，那时才要求它有入口。基底视图不适用（它是场景入口）。
+    # 旧格式兼容：省略 kind 时，非基底 same_layer=True 解释为相对 base 的取景。
     same_layer: bool = True
+    kind: str = ""  # page / viewport / tab / modal；空值兼容旧定义
+    owner: str = ""  # 所属页面或关联视图，支持 scene/view
+
+    @property
+    def relation(self) -> str:
+        return self.kind or ("page" if self.key == BASE_VIEW_KEY or not self.same_layer else "viewport")
 
     def to_dict(self) -> dict:
         d: dict[str, object] = {"key": self.key, "name": self.name}
-        if not self.same_layer:
+        if self.kind:
+            d["kind"] = self.kind
+            if self.owner:
+                d["owner"] = self.owner
+        elif not self.same_layer:
             d["same_layer"] = False
         return d
 
@@ -66,6 +68,8 @@ class RegionDef:
     #   "/result"                   → 停留本场景，切到 result 视图
     # 空 = 不产生页面切换（纯识别区，或原地生效的操作）。
     to: str = ""
+    navigation: str = ""  # open / switch / replace；空值表示未声明
+    available_from: list[str] = field(default_factory=list)  # 全局入口作用范围，* 为所有场景
 
     @property
     def view(self) -> str:
@@ -95,7 +99,9 @@ class PointDef:
     is_text: bool = False           # 是否需要文字识别（OCR）
     is_clickable: bool = True       # 是否可点击
     views: list[str] = field(default_factory=list)  # 见 RegionDef.views
-    to: str = ""                    # 见 RegionDef.to
+    to: str = ""
+    navigation: str = ""  # open / switch / replace；空值表示未声明
+    available_from: list[str] = field(default_factory=list)  # 全局入口作用范围，* 为所有场景
 
     @property
     def view(self) -> str:
@@ -190,6 +196,9 @@ class SceneRefDef:
     entity: str                       # 源实体 key
     views: list[str] = field(default_factory=list)  # 在本场景哪些视图可见
 
+    to: str | None = None  # None 继承；空字符串覆盖为不跳转
+    navigation: str | None = None
+
     @property
     def view(self) -> str:
         """兼容单值读写：读取返回首个归属视图，写入替换为单归属。
@@ -210,6 +219,10 @@ class SceneRefDef:
 
     def to_dict(self) -> dict:
         d: dict = {"scene": self.scene, "entity": self.entity}
+        if self.to is not None:
+            d["to"] = self.to
+        if self.navigation is not None:
+            d["navigation"] = self.navigation
         if self.views:
             d["views"] = list(self.views)
         return d

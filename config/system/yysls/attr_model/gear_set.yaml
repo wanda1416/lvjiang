@@ -1,0 +1,4 @@
+# 来源类别: gear_set
+# schema 见 core/attr_model/parsing.py
+kind: gear_set
+entries: {}

@@ -161,7 +161,7 @@ if $bugan_pos
     click [bag_wallet_detail].[money_2][$bugan_row][$bugan_col] after wait @step_interval
     
     scan [bag_wallet_detail].[bugan_jindu] as $jindu_str
-    call parse_bugan_jindu($jindu_str.bugan_jindu)
+    call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度")
 end
 
 # ─── 返回主界面 ──────────────────────────────────────────

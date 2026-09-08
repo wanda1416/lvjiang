@@ -23,9 +23,11 @@ from .models import (
     MODEL_QUOTA,
     MODEL_REGEN,
     MODEL_STOCK,
+    QuotaKeyDef,
     RegenKeyDef,
     note_numeric_value,
 )
+from .periods import get_period_boundary
 from .regen import (
     compute_realtime_value,
     compute_regen_entry,
@@ -165,6 +167,101 @@ def profile_read_all(username: str) -> dict:
     return data
 
 
+def profile_observe(
+    username: str,
+    key: str,
+    value: float,
+    *,
+    source: str = "OCR 观测",
+) -> dict:
+    """将外部观测值按当前配额周期单调同步到 Profile。
+
+    同一周期内拒绝小于已存值的观测，避免 OCR 脏数据回写；若数据库条目
+    属于上一个周期，则以本周期初始值 0 比较，允许周/月/日重置后的合法
+    归零。返回值适合直接暴露给 DSL。
+    """
+    config = get_profile_config()
+    model_type = config.get_model_type(key)
+    kd = config.get_key(key, model_type=model_type) if model_type else None
+    if model_type != MODEL_QUOTA or not isinstance(kd, QuotaKeyDef):
+        current = profile_read(username, key)
+        return {
+            "accepted": False,
+            "value": current if isinstance(current, (int, float)) else -1,
+            "reason": "undefined" if model_type is None else "not_quota",
+        }
+
+    try:
+        candidate = float(value)
+    except (TypeError, ValueError):
+        return {"accepted": False, "value": -1, "reason": "invalid"}
+    if not math.isfinite(candidate) or candidate < 0:
+        return {"accepted": False, "value": -1, "reason": "invalid"}
+
+    for _ in range(3):
+        entry = db_read_entry(username, MODEL_QUOTA, key)
+        now = datetime.now()
+        boundary = get_period_boundary(
+            kd.period, kd.reset_time, now, getattr(kd, "reset_day", 0)
+        )
+        is_current_period = False
+        if entry:
+            try:
+                is_current_period = datetime.fromisoformat(
+                    entry.get("updated_at", "")
+                ) >= boundary
+            except (TypeError, ValueError):
+                is_current_period = False
+
+        if not is_current_period:
+            reset = db_update_if_current(
+                username,
+                MODEL_QUOTA,
+                key,
+                expected_value=entry.get("value", 0) or 0,
+                expected_updated_at=entry.get("updated_at", ""),
+                expected_entry_exists=bool(entry),
+                new_value=0,
+                change_type="tick",
+                detail="reset:0",
+            )
+            if not reset:
+                continue
+            if candidate == 0:
+                return {"accepted": True, "value": 0.0, "reason": "updated"}
+            # 已原子推进到当前周期；下一轮按普通同周期观测写入并触发同步。
+            continue
+
+        # 走到这里必然是同周期条目：上面的分支要么 return 要么 continue。
+        current = float(entry.get("value", 0) or 0)
+        if candidate < current:
+            return {"accepted": False, "value": current, "reason": "regressed"}
+        if candidate == current:
+            return {"accepted": True, "value": current, "reason": "unchanged"}
+
+        try:
+            written = profile_action(
+                username,
+                key,
+                set_value=candidate,
+                source=source,
+                current_value=current,
+                expected_entry=entry,
+                is_action=True,
+                use_cas=True,
+            )
+        except ProfileWriteConflict:
+            continue
+        return {"accepted": True, "value": written, "reason": "updated"}
+
+    latest = profile_read(username, key)
+    return {
+        "accepted": False,
+        "value": latest if isinstance(latest, (int, float)) else -1,
+        "reason": "conflict",
+    }
+
+
 # ─── 共享写入管线 ─────────────────────────────────────────────
 
 
@@ -276,12 +373,7 @@ def profile_action(
 
     # ── 7. 写入 DB ──
     change_type = "action" if is_action else "override"
-    if (
-        model_type == MODEL_REGEN
-        and is_action
-        and use_cas
-        and expected_entry is not None
-    ):
+    if is_action and use_cas and expected_entry is not None:
         updated = db_update_if_current(
             username, model_type, key,
             expected_value=expected_entry.get("value", 0) or 0,

@@ -34,6 +34,14 @@ def profile_func_env(tmp_path, monkeypatch):
                 "stock": [
                     {"key": "target_stock", "label": "同步目标"},
                 ],
+                "quota": [
+                    {
+                        "key": "weekly_progress",
+                        "label": "每周进度",
+                        "period": "week",
+                        "reset_time": "05:00",
+                    }
+                ],
             },
             allow_unicode=True,
         ),
@@ -87,6 +95,58 @@ def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
     # 容差 2 秒：isoformat(timespec="seconds") 截断小数秒，CI 环境时序不稳定
     assert datetime.now() - timedelta(minutes=4, seconds=2) <= stored_ts
     assert stored_ts <= datetime.now() - timedelta(minutes=3, seconds=58)
+
+
+def test_profile_observe_rejects_regression_in_same_period(profile_func_env):
+    from lvjiang.core.profile.repository import db_read_entry, db_upsert
+    from lvjiang.workflows.builtins.profile import _profile_observe
+
+    db_upsert(profile_func_env.username, "quota", "weekly_progress", 800)
+    engine = SimpleNamespace(run_username=profile_func_env.username)
+
+    result = _profile_observe(engine, "weekly_progress", 80)
+
+    assert result == {"accepted": False, "value": 800.0, "reason": "regressed"}
+    assert db_read_entry(
+        profile_func_env.username, "quota", "weekly_progress"
+    )["value"] == 800
+
+
+def test_profile_observe_accepts_increase_in_same_period(profile_func_env):
+    from lvjiang.core.profile.repository import db_read_entry, db_upsert
+    from lvjiang.workflows.builtins.profile import _profile_observe
+
+    db_upsert(profile_func_env.username, "quota", "weekly_progress", 80)
+    engine = SimpleNamespace(run_username=profile_func_env.username)
+
+    result = _profile_observe(engine, "weekly_progress", 800)
+
+    assert result == {"accepted": True, "value": 800.0, "reason": "updated"}
+    assert db_read_entry(
+        profile_func_env.username, "quota", "weekly_progress"
+    )["value"] == 800
+
+
+def test_profile_observe_accepts_reset_value_after_period_boundary(profile_func_env):
+    from lvjiang.core.profile.repository import db_read_entry, db_upsert
+    from lvjiang.workflows.builtins.profile import _profile_observe
+
+    old_ts = (datetime.now() - timedelta(days=8)).isoformat(timespec="seconds")
+    db_upsert(
+        profile_func_env.username,
+        "quota",
+        "weekly_progress",
+        800,
+        updated_at=old_ts,
+    )
+    engine = SimpleNamespace(run_username=profile_func_env.username)
+
+    result = _profile_observe(engine, "weekly_progress", 0)
+
+    assert result == {"accepted": True, "value": 0.0, "reason": "updated"}
+    entry = db_read_entry(profile_func_env.username, "quota", "weekly_progress")
+    assert entry["value"] == 0
+    assert datetime.fromisoformat(entry["updated_at"]) > datetime.fromisoformat(old_ts)
 
 
 def test_profile_action_can_edit_empty_realtime_regen(profile_func_env):

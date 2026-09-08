@@ -116,6 +116,23 @@ end
         assert run('eval $n = extract_int($text)', {"text": "1,500"})["n"] == -1
         assert run('eval $n = extract_int($text)', {"text": "没有任何数字"})["n"] == -1
 
+    def test_extract_progress(self):
+        """进度提取容忍外围噪声，但必须得到唯一、完整且合法的 a/b。"""
+        cases = {
+            "@0/1500": {"valid": True, "current": 0, "total": 1500},
+            "0 / 1500": {"valid": True, "current": 0, "total": 1500},
+            "●120／1500乱码": {"valid": True, "current": 120, "total": 1500},
+            "@/1500": {"valid": False, "current": -1, "total": -1},
+            "0": {"valid": False, "current": -1, "total": -1},
+            "2000/1500": {"valid": False, "current": -1, "total": -1},
+            "-1/1500": {"valid": False, "current": -1, "total": -1},
+            "1,000/1500": {"valid": False, "current": -1, "total": -1},
+            "1/10 2/20": {"valid": False, "current": -1, "total": -1},
+        }
+        for raw, expected in cases.items():
+            result = run('eval $p = extract_progress($text)', {"text": raw})["p"]
+            assert result == expected
+
     def test_extract_num(self):
         """通用数字提取接受整数和小数，并以 -1 表示失败。"""
         assert run('eval $n = extract_num($text)', {"text": "当周已获取 1234 声望"})["n"] == 1234

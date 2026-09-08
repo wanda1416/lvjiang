@@ -77,7 +77,7 @@ click [game_menu_page].[bugan] after wait @page_refresh
 # ─── 获取本周不肝进度 ──────────────────────────────────
 click [bugan_detail].[bugan_view] after wait @step_interval
 scan [bugan_detail].[bugan_jindu] as $jindu_str
-call parse_bugan_jindu($jindu_str.bugan_jindu)
+call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度")
 
 # 领取不肝进度奖励
 scan [bugan_detail].[purchase] as $found by contains "全部领取"

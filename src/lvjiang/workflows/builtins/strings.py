@@ -137,6 +137,33 @@ def _extract_int(s, *args) -> int:
     return int(match.group(0)) if match else -1
 
 
+@builtin_func("extract_progress")
+def _extract_progress(s, *args) -> dict:
+    """从 OCR 文本中提取唯一的 ``当前值/总量`` 进度对。
+
+    允许进度对前后存在 OCR 噪声、斜杠两侧存在空白，并兼容全角斜杠。
+    只有唯一且满足 ``0 <= current <= total``、``total > 0`` 的候选才算
+    有效；不猜测数字内部的字母乱码，也不从残缺文本中退化提取单个整数。
+    """
+    text = str(s) if s is not None else ""
+    candidates: list[tuple[int, int]] = []
+    pattern = (
+        rf"{_NUMBER_BOUNDARY_LEFT}(\d+)\s*[/／]\s*"
+        rf"(\d+){_NUMBER_BOUNDARY_RIGHT}"
+    )
+    for match in re.finditer(pattern, text):
+        current = int(match.group(1))
+        total = int(match.group(2))
+        if total > 0 and current <= total:
+            candidates.append((current, total))
+
+    if len(candidates) != 1:
+        return {"valid": False, "current": -1, "total": -1}
+
+    current, total = candidates[0]
+    return {"valid": True, "current": current, "total": total}
+
+
 @builtin_func("extract_num")
 def _extract_num(s, *args) -> int | float:
     """从文本中提取第一项非负数（整数或小数）。

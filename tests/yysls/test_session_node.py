@@ -131,3 +131,4 @@ class TestRoundTrip:
 
         node = _session(session_env)["yysls"]
         assert "play_styles" in node and "graduations" in node
+

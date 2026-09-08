@@ -74,6 +74,7 @@ from .level_combo import LevelCombo
 #: 差异大于该值才算对不上。面板只显示到小数点后一位。
 _DIFF_EPSILON = 0.05
 
+
 #: 心法槽的空选项
 _EMPTY = ""
 
@@ -413,17 +414,21 @@ class AttrDerivePanel(QWidget):
         self._summary.setText("　".join(parts))
 
     def _rows(self, result, reference) -> list[tuple[str, str, bool]]:
-        """(字段名, 显示名, 是否 extra)：模型或对照任一有值就列出来"""
-        rows: list[tuple[str, str, bool]] = []
-        for name, display, _unit, _ in COMBAT_ATTR_FIELDS:
-            if getattr(result.panel_attrs, name, 0.0) or (
-                    reference is not None and getattr(reference, name, 0.0)):
-                rows.append((name, display, False))
+        """(字段名, 显示名, 是否 extra)
+
+        战斗属性一个不落地全列，取不到的显示 0——只列有值的行会让「这个
+        属性模型不管」和「这个属性恰好是 0」看起来一模一样，而两者的处理
+        完全相反：前者要去补来源，后者不用管。全 0 的行会调淡，不抢眼。
+
+        extra_attrs 是动态字段（流派专属），没有固定清单，只能有才列。
+        """
+        rows: list[tuple[str, str, bool]] = [
+            (name, display, False) for name, display, _unit, _ in COMBAT_ATTR_FIELDS
+        ]
         extra_names = set(result.panel_attrs.extra_attrs)
         if reference is not None:
             extra_names |= set(reference.extra_attrs)
-        for name in sorted(extra_names):
-            rows.append((name, name, True))
+        rows.extend((name, name, True) for name in sorted(extra_names))
         return rows
 
     def _fill_table(self, result, reference, residual: dict[str, float]) -> None:
@@ -437,7 +442,8 @@ class AttrDerivePanel(QWidget):
                 panel.attrs.extra_attrs.get(name, 0.0) if is_extra
                 else getattr(panel.attrs, name, 0.0)
             )
-            self._table.setItem(row, 0, QTableWidgetItem(display))
+            name_cell = QTableWidgetItem(display)
+            self._table.setItem(row, 0, name_cell)
             self._table.setItem(row, 1, QTableWidgetItem(f"{derived:.4g}"))
 
             # 补足 = 对照 − 推导，即尚未建模的那部分
@@ -445,6 +451,7 @@ class AttrDerivePanel(QWidget):
             self._table.setItem(
                 row, 2, QTableWidgetItem(f"{gap:+.4g}" if gap else "-"))
 
+            actual = 0.0
             if reference is None:
                 self._table.setItem(row, 3, QTableWidgetItem("-"))
             else:
@@ -464,6 +471,15 @@ class AttrDerivePanel(QWidget):
                 for kind, value in breakdown.items() if value
             )
             self._table.setItem(row, 4, QTableWidgetItem(text))
+
+            # 推导、补足、对照三者皆无的行调淡。全列出来是为了让「模型
+            # 不管这个属性」和「这个属性恰好是 0」能分辨，但四十多行里
+            # 真正在动的常常只有十几行，不调淡就没法一眼扫过去。
+            if not derived and not gap and not actual:
+                for column in range(self._table.columnCount()):
+                    item = self._table.item(row, column)
+                    if item is not None:
+                        item.setForeground(Qt.GlobalColor.gray)
 
     # ── 保存 ──
 

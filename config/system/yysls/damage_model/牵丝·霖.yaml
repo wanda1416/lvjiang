@@ -1,0 +1,219 @@
+# 伤害建模: 牵丝·霖
+# 由 scripts/extract_damage_model.py 从 牵丝霖110阶竞速轴属性毕业率进阶计算器1.1.xlsx 抽取，勿手工重排
+#
+# 只存那份编译程序里读不出来的东西：技能系数与增益。怪物、食物、
+# 固伤加成等环境参数在 graduation/ 的方案 JSON 里，不在这里重复。
+school: 牵丝·霖
+scheme: 基础方案
+source:
+  file: 牵丝霖110阶竞速轴属性毕业率进阶计算器1.1.xlsx
+  version: '1.1'
+  sha256: f2de65322df802c9a8ae09dab162c753e98862addae7ef0414e65d0285a93934
+skills:
+  萧呤千浪AOE:
+    kind: 群体奇术
+    outer_ratio: 3.9744
+    outer_fixed: 982.0
+    attr_ratio: 5.9613
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  萧呤千浪流星:
+    kind: 群体奇术
+    outer_ratio: 1.4904
+    outer_fixed: 368.0
+    attr_ratio: 2.2353
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  衍九矢9hit:
+    kind: 群体奇术
+    outer_ratio: 10.314945
+    outer_fixed: 1915.65
+    attr_ratio: 15.4724175
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  骑龙回马:
+    kind: 单体奇术
+    outer_ratio: 7.1074
+    outer_fixed: 1320.0
+    attr_ratio: 10.6596
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  叶龙骧首(32层+60%HP):
+    kind: 单体奇术
+    outer_ratio: 25.200406
+    outer_fixed: 4695.46
+    attr_ratio: 37.800609
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.72
+  墨洗翰华(打盾):
+    kind: 群体奇术
+    outer_ratio: 23.7712
+    outer_fixed: 4418.0
+    attr_ratio: 35.6568
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  神龙吐火暗灼1hit:
+    kind: 单体奇术
+    outer_ratio: 1.2848
+    outer_fixed: 241.5
+    attr_ratio: 1.9272
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  神龙吐火暗灼2hit:
+    kind: 单体奇术
+    outer_ratio: 3.9855
+    outer_fixed: 749.0
+    attr_ratio: 5.97825
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  神龙吐火暗灼dot:
+    kind: 单体奇术
+    outer_ratio: 0.236
+    outer_fixed: 44.0
+    attr_ratio: 0.354
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  神龙吐火1hit:
+    kind: 单体奇术
+    outer_ratio: 1.36185
+    outer_fixed: 254.0
+    attr_ratio: 2.042775
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  神龙吐火2hit:
+    kind: 单体奇术
+    outer_ratio: 4.2245
+    outer_fixed: 788.0
+    attr_ratio: 6.33675
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  神龙吐火dot:
+    kind: 单体奇术
+    outer_ratio: 0.2957
+    outer_fixed: 55.0
+    attr_ratio: 0.44355
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  太白醉月1-4:
+    kind: 单体奇术
+    outer_ratio: 1.0238
+    outer_fixed: 189.0
+    attr_ratio: 1.5357
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  太白醉月5:
+    kind: 单体奇术
+    outer_ratio: 1.7063
+    outer_fixed: 315.0
+    attr_ratio: 2.55945
+    force:
+      force_precision: true
+    modifiers:
+      generic: 1.0
+  太白醉月爆燃:
+    kind: 单体奇术
+    outer_ratio: 0.702
+    outer_fixed: 129.0
+    attr_ratio: 1.053
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  太白醉月暗灼:
+    kind: 单体奇术
+    outer_ratio: 1.6088
+    outer_fixed: 297.0
+    attr_ratio: 2.4132
+    force:
+      force_precision: true
+    modifiers:
+      generic: 0.2
+  易水歌6重:
+    kind: 心法
+    outer_ratio: 1.0
+    attr_ratio: 1.0
+buffs:
+  惧刃(拐):
+    mingjin_pen: 16.0
+    lieshi_pen: 16.0
+    qiansi_pen: 16.0
+    pozhu_pen: 16.0
+  近战笛:
+    generic: 0.02
+  无惧:
+    special: 0.05
+  气竭:
+    special: 0.1
+  真气失衡:
+    special: 0.1
+    mingjin_dmg: 0.1
+  惊神5(拐):
+    generic: 0.25
+  特殊技减防:
+    min_outer: 27.95
+    max_outer: 27.95
+  伞增:
+    generic: 0.24
+  四时之秋:
+    generic: 0.1
+  沧海帖1层:
+    crit_dmg: 0.01
+  沧海帖2层:
+    crit_dmg: 0.02
+  沧海帖3层:
+    crit_dmg: 0.03
+  沧海帖4层:
+    crit_dmg: 0.04
+  沧海帖5层:
+    crit_dmg: 0.05
+  沧海帖6层:
+    crit_dmg: 0.06
+  沧海帖7层:
+    crit_dmg: 0.07
+  沧海帖8层:
+    crit_dmg: 0.08
+  沧海帖9层:
+    crit_dmg: 0.09
+  沧海帖10层:
+    crit_dmg: 0.1
+  易水歌1层:
+    generic: 0.01
+    outer_pen: 2.0
+  易水歌2层:
+    generic: 0.02
+    outer_pen: 4.0
+  易水歌3层:
+    generic: 0.03
+    outer_pen: 6.0
+  易水歌4层:
+    generic: 0.04
+    outer_pen: 8.0
+  易水歌5层:
+    generic: 0.05
+    outer_pen: 10.0

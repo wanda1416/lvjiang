@@ -58,6 +58,35 @@ def parse_delay_params(raw: dict | None) -> dict[str, DelayParam]:
 
 
 @dataclass
+class AndroidAppConfig:
+    """ADB 可控制的安卓应用定义（配置管理「安卓设置」页维护）。"""
+
+    package: str = ""                         # Android applicationId
+    activity: str = ""                        # 可选 component/activity；空则走 Launcher
+    orientation: str = "any"                  # any / landscape / portrait
+
+    def __post_init__(self):
+        self.package = str(self.package or "").strip()
+        self.activity = str(self.activity or "").strip()
+        orientation = str(self.orientation or "any").strip().lower()
+        self.orientation = orientation if orientation in {
+            "any", "landscape", "portrait",
+        } else "any"
+
+
+def parse_android_apps(raw: dict | None) -> dict[str, AndroidAppConfig]:
+    """dict → {应用别名: AndroidAppConfig}。"""
+    if not raw:
+        return {}
+    return {
+        str(key): value if isinstance(value, AndroidAppConfig)
+        else AndroidAppConfig(**value)
+        for key, value in raw.items()
+        if isinstance(value, (dict, AndroidAppConfig))
+    }
+
+
+@dataclass
 class ReferenceGridConfig:
     """参考图批量切割的默认网格参数。"""
     rows: int = 3      # 默认行数（≥ 1）
@@ -177,6 +206,7 @@ class UserConfig:
     reference_grid: ReferenceGridConfig = field(default_factory=ReferenceGridConfig)
     input_sim: InputSimConfig = field(default_factory=InputSimConfig)     # 输入模拟
     delay_params: dict[str, DelayParam] = field(default_factory=dict)     # 命名延迟参数
+    android_apps: dict[str, AndroidAppConfig] = field(default_factory=dict)  # ADB 应用注册表
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)           # 全局热键按键位
     network: NetworkConfig = field(default_factory=NetworkConfig)         # 联网行为开关
     font_sizes: FontSizeConfig = field(default_factory=FontSizeConfig)    # 用户页面内容字号
@@ -199,3 +229,4 @@ class UserConfig:
         if isinstance(self.font_sizes, dict):
             self.font_sizes = _from_known(FontSizeConfig, self.font_sizes)
         self.delay_params = parse_delay_params(self.delay_params)
+        self.android_apps = parse_android_apps(self.android_apps)

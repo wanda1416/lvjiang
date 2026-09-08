@@ -138,6 +138,20 @@ CAT_DATA = tr("数据与输出")
 
 ACTIONS: tuple[Action, ...] = (
     # ── 交互 ──
+    Action("android_app_stop", tr("停止安卓应用"), CAT_INTERACT,
+           "app stop {name}{timeout}",
+           (Slot("name", tr("应用名"), "text", default="game"),
+            Slot("timeout", tr("超时(秒)"), "raw", optional=True,
+                 wrap=" timeout {v}")),
+           doc=tr("强制停止安卓设置中注册的应用，并确认进程消失"),
+           keywords=("app", "android", "adb", "stop")),
+    Action("android_app_start", tr("启动安卓应用"), CAT_INTERACT,
+           "app start {name}{timeout}",
+           (Slot("name", tr("应用名"), "text", default="game"),
+            Slot("timeout", tr("超时(秒)"), "raw", optional=True,
+                 wrap=" timeout {v}")),
+           doc=tr("启动安卓设置中注册的应用，并确认进程出现"),
+           keywords=("app", "android", "adb", "start")),
     Action("click_region", tr("激活区域"), CAT_INTERACT,
            "click {scene}.{region}{wait}",
            (Slot("scene", tr("场景"), "scene"), Slot("region", tr("区域/点"), "region"), _wait_slot()),

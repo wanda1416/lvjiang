@@ -50,6 +50,7 @@ class TestLoadUserConfig:
         assert config.reference_grid.width == 122
         assert config.input_sim.click_random_offset == 3
         assert config.delay_params == {}
+        assert config.android_apps == {}
         assert config.hotkeys.start == "F9"
         assert config.hotkeys.stop == "F10"
         assert config.hotkeys.pause == "F11"
@@ -174,6 +175,24 @@ class TestLoadUserConfig:
         assert config.delay_params["step_interval"].range == (1.0, 1.2)
         assert config.delay_params["my_wait"].label == "自定义等待"
         assert config.delay_params["my_wait"].range == (1.5, 2.5)
+
+    def test_app_yaml_android_apps(self, session_env, monkeypatch):
+        monkeypatch.setattr(
+            "lvjiang.core.config.load_app_config", lambda: {
+                "android_apps": {
+                    "game": {
+                        "package": "com.example.game",
+                        "activity": ".MainActivity",
+                        "orientation": "landscape",
+                    },
+                },
+            })
+
+        config = load_user_config()
+
+        assert config.android_apps["game"].package == "com.example.game"
+        assert config.android_apps["game"].activity == ".MainActivity"
+        assert config.android_apps["game"].orientation == "landscape"
 
 
 class TestSaveSessionNodes:

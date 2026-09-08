@@ -10,6 +10,7 @@ start: (_NL | statement)*
 // ─── 语句分派 ─────────────────────────────────────────────
 
 ?statement: click_stmt
+          | android_app_stmt
           | mouse_button_stmt
           | place_stmt
           | move_stmt
@@ -48,6 +49,13 @@ start: (_NL | statement)*
           | try_stmt
 
 // ─── 基础指令 ─────────────────────────────────────────────
+
+// ADB 安卓应用生命周期。应用名来自「配置管理 → 安卓设置」。
+// app stop "game" timeout 15
+// app start $app_name timeout 30
+android_app_stmt: "app"i ANDROID_APP_ACTION (STRING | var_ref) android_app_timeout? _NL
+android_app_timeout: "timeout"i (number | var_ref)
+ANDROID_APP_ACTION: /stop/i | /start/i
 
 // press：模拟键盘按键
 // press "M"             — 完整按键（down + up）

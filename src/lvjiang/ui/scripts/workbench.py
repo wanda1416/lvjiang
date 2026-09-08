@@ -342,6 +342,8 @@ class DebugPanel(QWidget):
             layout=layout,
             input_sim=main._user_config.input_sim,
             delay_params=main._user_config.delay_params,
+            android_apps=main._user_config.android_apps,
+            android_device=getattr(main, "_device", None),
             run_env=main._selected_run_env(),
             window_left=left, window_top=top,
             stop_check=lambda: self._stop_flag,

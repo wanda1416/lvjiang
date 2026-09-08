@@ -390,7 +390,7 @@ $a + 1 > $b * 2                       # 两侧支持 + - * /
 
 falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 
-## 十、内置函数（72 个）
+## 十、内置函数（76 个）
 
 > 完整签名与说明见 [06-functions.md](06-functions.md)。
 
@@ -402,7 +402,7 @@ falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 | **装备（6）** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` |
 | **背包（3）** | `check_scroll` `notify_scroll` `scroll_advance` |
 | **时间（2）** | `clock` `datetime` |
-| **系统/交互（7）** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` |
+| **系统/交互（11）** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` `android_app_running` `android_app_stop` `android_app_start` `android_wait_stable_frame` |
 | **图色（7）** | `pixel` `bright` `color_ratio` `bright_segs` `color_vec` `find_icons` `find_multi_color` |
 | **玩家档案（5）** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` |
 

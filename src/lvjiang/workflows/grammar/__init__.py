@@ -6,6 +6,7 @@
 
 from .ast_nodes import (
     And,
+    AndroidAppAction,
     ArithOp,
     Break,
     ByClause,
@@ -79,7 +80,7 @@ __all__ = [
     "parse_file", "parse_text",
     "Program",
     "ReplayInputTrace",
-    "Click", "MouseButton", "Place", "Move", "Scroll", "Drag", "Press", "Paste", "Wait", "WaitStable", "Scan", "Recognize", "Collect", "Log", "Screenshot", "Find",
+    "AndroidAppAction", "Click", "MouseButton", "Place", "Move", "Scroll", "Drag", "Press", "Paste", "Wait", "WaitStable", "Scan", "Recognize", "Collect", "Log", "Screenshot", "Find",
     "Import", "ProcDef", "CallProc",
     "If", "For", "ForRange", "Loop", "WhileLoop", "UntilLoop", "Break", "Continue", "Global", "Return", "Label", "Goto", "Try",
     "Eval", "EvalFieldChainAssign", "FuncCall",

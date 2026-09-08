@@ -913,6 +913,8 @@ class MainWindow(
             run_env=self._selected_run_env(),
             input_sim=self._user_config.input_sim,
             delay_params=self._user_config.delay_params,
+            android_apps=self._user_config.android_apps,
+            android_device=getattr(self, "_device", None),
             window_left=window_left,
             window_top=window_top,
             pause_event=getattr(self, '_pause_event', None),

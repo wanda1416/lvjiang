@@ -13,7 +13,12 @@ from loguru import logger
 
 from ...constants import PROJECT_ROOT
 from ...core.capture_base import CaptureBackend
-from ...core.config import DelayParam, InputSimConfig
+from ...core.config import (
+    AndroidAppConfig,
+    DelayParam,
+    InputSimConfig,
+    parse_android_apps,
+)
 from ...core.config.resolver import get_resolver
 from ...core.input_base import InputBackend
 from ...core.input_trace import InputTrace, InputTraceError, load_input_trace
@@ -26,6 +31,7 @@ from ..base import BaseWorkflow
 from ..errors import WorkflowExecutionError
 from ..grammar.ast_nodes import (
     Align,
+    AndroidAppAction,
     Break,
     CallProc,
     Click,
@@ -136,6 +142,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         layout: Layout,
         input_sim: InputSimConfig | None = None,
         delay_params: dict[str, DelayParam] | None = None,
+        android_apps: dict[str, AndroidAppConfig] | None = None,
+        android_device=None,
         run_env: str = "",
         window_left: int = 0,
         window_top: int = 0,
@@ -149,6 +157,12 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._layout = layout
         self._input_sim = input_sim or InputSimConfig()
         self._delay_params = delay_params or {}
+        self._android_apps = parse_android_apps(android_apps)
+        # 现有 ADB 截图/输入后端都持有同一个 AdbDevice；允许宿主显式注入，
+        # 也兼容测试工具和脚本工作台从后端自动发现。
+        self._android_device = android_device or getattr(capture, "_device", None) \
+            or getattr(input_ctrl, "_device", None)
+        self._android_app_controller = None
         # 本次运行使用的环境快照。工作流执行期间只读此内存值，绝不回读
         # session.json，避免 UI 切换或其他进程写配置污染已启动实例。
         self.run_env = str(run_env)
@@ -935,6 +949,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._wait_if_paused()  # 暂停检查
         self._debug_before_stmt(node)
         match node:
+            case AndroidAppAction():
+                self._exec_android_app(node)
             case Click():
                 self._exec_click(node)
             case MouseButton():
@@ -1019,6 +1035,17 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_try(node)
             case _:
                 logger.error(f"未知节点类型: {type(node).__name__}")
+
+    def _exec_android_app(self, node: AndroidAppAction) -> None:
+        """执行 app stop/start，实际能力统一委托给同名内置函数。"""
+        default_timeout = 15.0 if node.action == "stop" else 30.0
+        timeout = self._resolve(node.timeout) if node.timeout is not None else default_timeout
+        call = FuncCall(
+            func_name=f"android_app_{node.action}",
+            func_args=[Literal(self._resolve(node.name)), Literal(timeout)],
+            line_no=node.line_no,
+        )
+        self._call_func(call)
 
     def _exec_global(self, node: Global) -> None:
         """注册共享变量名，并把当前作用域已有值提升到全局表。"""

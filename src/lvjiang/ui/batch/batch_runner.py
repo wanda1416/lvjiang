@@ -72,6 +72,8 @@ class BatchContext:
     run_env: str = ""
     input_sim: object | None = None
     delay_params: dict | None = None
+    android_apps: dict | None = None
+    android_device: object | None = None
     window_left: int = 0
     window_top: int = 0
     pause_event: object = None  # threading.Event | None
@@ -504,6 +506,8 @@ class BatchWorker(QThread):
             run_env=ctx.run_env,
             input_sim=ctx.input_sim,  # type: ignore[arg-type]
             delay_params=ctx.delay_params,
+            android_apps=ctx.android_apps,
+            android_device=ctx.android_device,
             window_left=ctx.window_left,
             window_top=ctx.window_top,
             stop_check=self._stop_check,

@@ -20,6 +20,7 @@ from ..capture_base import CaptureBackend
 from ..input_base import InputBackend
 from .adb_capture import AdbCapture
 from .agent import AgentCapture, AgentClient, AgentError, AgentInput, connect_agent
+from .app_controller import AndroidAppController, AndroidAppError
 from .device import AdbDevice, list_adb_devices
 from .input import AdbInput
 from .scrcpy_capture import AndroidStreamCapture
@@ -83,6 +84,8 @@ __all__ = [
     "list_adb_devices",
     "AdbInput",
     "AdbCapture",
+    "AndroidAppController",
+    "AndroidAppError",
     "AndroidStreamCapture",
     "AgentClient",
     "AgentCapture",

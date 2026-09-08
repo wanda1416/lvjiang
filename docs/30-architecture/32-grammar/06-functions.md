@@ -94,7 +94,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `clock` | `() -> float` | 返回 Unix 时间戳（秒精度 float），可用于计时、超时判断 |
 | `datetime` | `(fmt?) -> str` / `(ts, fmt?) -> str` | 格式化时间：无参默认当前时间，首参为数值则作为时间戳，字符串则作为 strftime 格式 |
 
-### 系统与用户交互（7）
+### 系统与用户交互（11）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -105,6 +105,10 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `save` | `() -> ""` | 强制保存 session 到磁盘 |
 | `panel_rows` | `(scene, panel) -> int` | 返回 panel 实际检测到的行数 |
 | `panel_cols` | `(scene, panel) -> int` | 返回 panel 实际检测到的列数 |
+| `android_app_running` | `(name) -> bool` | 查询已注册安卓应用的进程是否存在 |
+| `android_app_stop` | `(name, timeout=15) -> bool` | 强制停止应用并等待进程消失 |
+| `android_app_start` | `(name, timeout=30) -> bool` | 启动应用并等待进程出现 |
+| `android_wait_stable_frame` | `(name, timeout=60, duration=1) -> bool` | 等待期望方向下的连续稳定帧 |
 
 ### 运行环境与后端（4）
 

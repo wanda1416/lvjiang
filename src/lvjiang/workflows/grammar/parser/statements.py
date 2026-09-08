@@ -5,6 +5,7 @@ from lark import Token
 from ...engine.signals import WorkflowUserError
 from ..ast_nodes import (
     Align,
+    AndroidAppAction,
     ByClause,
     Click,
     CoordPoint,
@@ -126,6 +127,24 @@ class _StmtMixin:
         return before_waits + list(action_nodes) + after_waits
 
     # ─── 基础指令 ─────────────────────────────────────────
+
+    def android_app_timeout(self, items):
+        return ("timeout", items[0])
+
+    def android_app_stmt(self, items):
+        action = str(items[0]).lower()
+        raw_name = items[1]
+        name = raw_name if isinstance(raw_name, VarRef) else Literal(
+            value=self._unquote(str(raw_name)))
+        timeout = None
+        if len(items) > 2 and isinstance(items[2], tuple):
+            raw_timeout = items[2][1]
+            timeout = raw_timeout if isinstance(raw_timeout, VarRef) else Literal(
+                value=float(raw_timeout))
+        return AndroidAppAction(
+            action=action, name=name, timeout=timeout,
+            line_no=self._line(items),
+        )
 
     def _resolve_const_or_var(self, item):
         """解析 const_or_var：bracket_expr | var_ref"""

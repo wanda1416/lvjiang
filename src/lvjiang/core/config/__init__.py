@@ -18,12 +18,14 @@ from typing import Any
 import yaml
 
 from .models import (
+    AndroidAppConfig,
     DelayParam,
     FontSizeConfig,
     HotkeyConfig,
     InputSimConfig,
     ReferenceGridConfig,
     UserConfig,
+    parse_android_apps,
     parse_delay_params,
 )
 from .plans import (
@@ -87,12 +89,14 @@ __all__ = [
     "save_yaml",
     # 数据模型
     "DelayParam",
+    "AndroidAppConfig",
     "FontSizeConfig",
     "HotkeyConfig",
     "InputSimConfig",
     "ReferenceGridConfig",
     "UserConfig",
     "parse_delay_params",
+    "parse_android_apps",
     # 便捷函数
     "load_app_config",
     "save_app_config",
@@ -160,6 +164,9 @@ def load_user_config() -> UserConfig:
     params = app.get("delay_params")
     if isinstance(params, dict):
         data["delay_params"] = params
+    android_apps = app.get("android_apps")
+    if isinstance(android_apps, dict):
+        data["android_apps"] = android_apps
 
     # 忽略未知字段（settings 节点可能含旧版本/其他模块写入的 key）
     known = {f.name for f in fields(UserConfig)}

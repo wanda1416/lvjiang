@@ -1022,6 +1022,9 @@ class RunControlMixin:
             engine._capture = capture
         if input_ctrl is not None:
             engine._input = input_ctrl
+        engine._android_device = getattr(self, "_device", None)
+        # 控制器绑定旧 AdbDevice；重连后必须按需重新创建。
+        engine._android_app_controller = None
         wf = getattr(engine, '_workflow', None)
         if wf is not None:
             if capture is not None:
@@ -1178,6 +1181,8 @@ class RunControlMixin:
             layout=layout,
             input_sim=self._user_config.input_sim,
             delay_params=self._user_config.delay_params,
+            android_apps=self._user_config.android_apps,
+            android_device=getattr(self, "_device", None),
             run_env=current_env,
             window_left=window_left,
             window_top=window_top,
@@ -1494,6 +1499,8 @@ class RunControlMixin:
             layout=layout,
             input_sim=self._user_config.input_sim,
             delay_params=self._user_config.delay_params,
+            android_apps=self._user_config.android_apps,
+            android_device=getattr(self, "_device", None),
             run_env=self._selected_run_env(),
             window_left=window_left,
             window_top=window_top,

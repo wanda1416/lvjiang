@@ -37,6 +37,7 @@ scenes:
     - school_main
     - baiye_main
     - appearance_main
+    - chat_main
   activity:
     name: 活动
     items:

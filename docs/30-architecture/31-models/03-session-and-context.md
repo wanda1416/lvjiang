@@ -138,8 +138,10 @@ config/session/
 ├── profile.db                          ← SQLite：quota/regen/stock/note 四模型的
 │                                          玩家数据（见 02-player-profile.md）
 └── users/
-    ├── 测试用户A.json                 ← SessionManager：DSL `session` 关键字的落点
-    ├── 测试用户B.json                    （见第二节，目前无业务 schema）
+    ├── 测试用户A.json                 ← 用户资料
+    ├── 测试用户A.session.json         ← SessionManager：DSL `session` 关键字的落点
+    ├── 测试用户B.json
+    ├── 测试用户B.session.json
     └── ...
 ```
 
@@ -147,6 +149,16 @@ config/session/
 恰好挨着放：前者是 App 运行态（`SessionStore`，不经 DSL），后者是 DSL
 `session` 关键字读写的用户级 dict（`SessionManager`）。命名相近容易
 误认为同一套，写代码或读代码时按用途区分，不要按文件名猜测归属。
+
+用户目录中的文件按职责分开：
+
+- `users/{username}.json`：用户资料，包括账号名、角色名、角色序号和账号尾号；
+- `users/{username}.session.json`：工作流通过 `session` 关键字维护的持久状态；
+- `users/{username}.notes.json`、`users/{username}.loadouts.json`：各自功能的旁路数据。
+
+旧版本把用户对象放在 `session.json.users`、把工作流状态放在
+`users/{username}.json`，并把用户属性放在批量配置行中。启动时的一次性迁移
+先备份旧 `session.json`，再拆分这些文件，最后写入迁移标记。
 
 ---
 

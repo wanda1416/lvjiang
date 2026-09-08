@@ -273,7 +273,20 @@ class SessionStore:
                     logger.error(f"写入 session.json 失败: {e}")
                     raise
 
+    def mutate_document(self, mutator: Callable[[dict], Any]) -> Any:
+        """在一次文件锁内修改整个 session 文档。
+
+        仅供需要跨多个顶层节点保持原子性的格式迁移使用；普通业务仍应使用
+        节点级 API，避免扩大写入所有权。
+        """
+        return self._mutate_disk_with_retry(mutator)
+
     # ─── 节点读写 ────────────────────────────────────────
+
+    def snapshot(self) -> dict:
+        """返回当前完整文档的深拷贝，供格式迁移判断使用。"""
+        with self._thread_lock:
+            return deepcopy(self._data)
 
     def get_node(self, key: str, default: Any = None) -> Any:
         """读顶层节点（返回深拷贝，调用方改不坏内部态）"""

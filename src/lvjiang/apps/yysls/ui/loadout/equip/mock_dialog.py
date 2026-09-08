@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
 from ......i18n import tr
 from ......ui.button_styles import apply_button_style, apply_dialog_button_box_style
 from ....core.affix_cap import affix_cap_pct
+from ...layout_helpers import fit_combo_to_contents
 
 # 部位 → group_key 映射
 _PART_TO_GROUP = {
@@ -102,12 +103,13 @@ class _AffixRow(QWidget):
         self._combo_name.addItem(tr("（空）"), "")
         for name in affix_names:
             self._combo_name.addItem(name, name)
+        fit_combo_to_contents(self._combo_name, minimum=220)
         self._combo_name.currentIndexChanged.connect(self._on_name_changed)
         layout.addWidget(self._combo_name, 1)
 
         # 数值输入（加宽一个汉字宽度）
         self._spin_value = QDoubleSpinBox()
-        self._spin_value.setFixedWidth(104)
+        self._spin_value.setMinimumWidth(140)
         self._spin_value.setDecimals(1)
         self._spin_value.setRange(0.0, 9999.0)
         self._spin_value.setSingleStep(0.1)
@@ -433,7 +435,7 @@ class MockEquipDialog(QDialog):
         dingyin_layout.addWidget(self._btn_dingyin, 1)
 
         self._spin_dingyin = QDoubleSpinBox()
-        self._spin_dingyin.setFixedWidth(104)
+        self._spin_dingyin.setMinimumWidth(140)
         self._spin_dingyin.setDecimals(1)
         self._spin_dingyin.setRange(0.0, 999.0)
         self._spin_dingyin.valueChanged.connect(self._update_dingyin_pct)
@@ -557,6 +559,7 @@ class MockEquipDialog(QDialog):
         self._combo_weapon_type.clear()
         for wt in get_game_config().get_weapon_types():
             self._combo_weapon_type.addItem(wt, wt)
+        fit_combo_to_contents(self._combo_weapon_type, minimum=140)
 
     def _get_first_affix_names(self) -> list[str]:
         """获取当前部位的首词条候选列表（来自 base_attrs.<part>._first_affixes）"""
@@ -623,6 +626,7 @@ class MockEquipDialog(QDialog):
                     row._combo_name.setCurrentIndex(idx)
                 else:
                     row._combo_name.setCurrentIndex(0)
+            fit_combo_to_contents(row._combo_name, minimum=220)
             row._combo_name.blockSignals(False)
             row._refresh_cap_info()
             row._update_pct()

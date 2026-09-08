@@ -134,13 +134,13 @@ class SchoolPanel(QWidget):
         self._combo_main_martial.setMinimumWidth(100)
         self._edit_main_weapon = QLineEdit()
         self._edit_main_weapon.setReadOnly(True)
-        self._edit_main_weapon.setFixedWidth(100)
+        self._edit_main_weapon.setMinimumWidth(140)
         self._edit_main_weapon.setPlaceholderText(tr("随武学"))
         self._combo_sub_martial = QComboBox()
         self._combo_sub_martial.setMinimumWidth(100)
         self._edit_sub_weapon = QLineEdit()
         self._edit_sub_weapon.setReadOnly(True)
-        self._edit_sub_weapon.setFixedWidth(100)
+        self._edit_sub_weapon.setMinimumWidth(140)
         self._edit_sub_weapon.setPlaceholderText(tr("随武学"))
 
         def _pair(label: str, widget) -> QHBoxLayout:
@@ -805,8 +805,8 @@ class SchoolPanel(QWidget):
                 line_edit = QLineEdit()
                 value_widget: QWidget = line_edit
                 line_edit.setAlignment(Qt.AlignmentFlag.AlignRight)
-                line_edit.setFixedWidth(100)
-                line_edit.setFixedHeight(24)
+                line_edit.setMinimumWidth(140)
+                line_edit.setMinimumHeight(26)
                 line_edit.setValidator(
                     QDoubleValidator(-999999.0, 999999.0, 4, line_edit)
                 )
@@ -1057,7 +1057,7 @@ class _PlayStyleEditDialog(QDialog):
                 spin.setRange(-999999, 999999)
                 spin.setDecimals(4)
                 spin.setSingleStep(0.1)
-                spin.setFixedWidth(100)
+                spin.setMinimumWidth(140)
                 if unit == "%":
                     spin.setSuffix("%")
                 v = attrs.get(field_name, 0)

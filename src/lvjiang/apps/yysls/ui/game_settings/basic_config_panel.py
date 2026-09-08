@@ -41,7 +41,7 @@ class BasicConfigPanel(QWidget):
         self._cooldown_days = QSpinBox()
         self._cooldown_days.setRange(1, 365)
         self._cooldown_days.setSuffix(" " + tr("天"))
-        self._cooldown_days.setFixedWidth(100)
+        self._cooldown_days.setMinimumWidth(140)
         self._cooldown_days.setToolTip(tr(
             "扫描装备发生转律后，从当前时间起重新计算的冷却天数"))
         self._cooldown_days.valueChanged.connect(self._apply)

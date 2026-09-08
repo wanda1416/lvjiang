@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QSplitter,
     QTableWidget,
@@ -23,6 +24,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.button_styles import apply_button_style, apply_dialog_button_box_style
 
 from .....i18n import tr
 from ...core.attr_model.character import CharacterProfileManager, evaluate_profile
@@ -35,6 +38,7 @@ from ...core.attr_model.models import (
     Formula,
 )
 from ...core.combat.combat_attrs import COMBAT_ATTR_FIELDS
+from ..layout_helpers import fit_combo_to_contents
 
 _LABELS = {name: label for name, label, *_ in COMBAT_ATTR_FIELDS} | DIMENSION_LABELS | ROLE_FIELDS
 _KINDS = {"level": "个人等级", "talent": "基础天赋", "oddity": "蹊跷",
@@ -95,8 +99,10 @@ class CharacterProfilePanel(QWidget):
         top.addWidget(QLabel(tr("流派")))
         self._school = QComboBox()
         self._school.addItems(self._manager.schools())
+        fit_combo_to_contents(self._school, minimum=160)
         top.addWidget(self._school)
         self._save_growth = QPushButton(tr("保存成长状态"))
+        apply_button_style(self._save_growth)
         self._save_growth.clicked.connect(self._on_save_growth)
         top.addWidget(self._save_growth)
         top.addStretch()
@@ -117,6 +123,7 @@ class CharacterProfilePanel(QWidget):
         splitter.addWidget(self._detail)
         source_layout.addWidget(splitter)
         edit = QPushButton(tr("编辑所选来源"))
+        apply_button_style(edit)
         edit.clicked.connect(self._edit_source)
         source_layout.addWidget(edit)
         tabs.addTab(source_page, tr("属性来源"))
@@ -124,7 +131,10 @@ class CharacterProfilePanel(QWidget):
         growth_layout = QVBoxLayout(growth_page)
         self._growth_widget = QWidget()
         self._growth_form = QFormLayout(self._growth_widget)
-        growth_layout.addWidget(self._growth_widget)
+        growth_scroll = QScrollArea()
+        growth_scroll.setWidgetResizable(True)
+        growth_scroll.setWidget(self._growth_widget)
+        growth_layout.addWidget(growth_scroll)
         hint = QLabel(tr("未知档位保留为待补；心法和武学填 0 表示未装备。等级累计表只选对应档，不叠加其他等级。"))
         hint.setWordWrap(True)
         growth_layout.addWidget(hint)
@@ -154,8 +164,14 @@ class CharacterProfilePanel(QWidget):
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._equipment.setItem(row, 0, item)
             self._equipment.setItem(row, 1, QTableWidgetItem(""))
+        self._equipment.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.ResizeToContents)
+        self._equipment.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch)
+        self._equipment.horizontalHeader().setMinimumSectionSize(180)
         equipment_layout.addWidget(self._equipment)
         calculate = QPushButton(tr("重新推导"))
+        apply_button_style(calculate)
         calculate.clicked.connect(self._recompute)
         equipment_layout.addWidget(calculate)
         tabs.addTab(equipment_page, tr("装备输入预览"))
@@ -196,6 +212,7 @@ class CharacterProfilePanel(QWidget):
             spin.setRange(-1, 6 if group == "inner_ways" else 99999)
             spin.setSpecialValueText(tr("未知"))
             spin.setValue(-1 if value is None else value)
+            spin.setMinimumWidth(max(160, spin.sizeHint().width()))
             spin.valueChanged.connect(self._recompute)
             self._growth_inputs[group, name] = spin
             self._growth_form.addRow(tr(label), spin)
@@ -314,6 +331,7 @@ class CharacterProfilePanel(QWidget):
         error.setWordWrap(True)
         layout.addWidget(error)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        apply_dialog_button_box_style(buttons)
         layout.addWidget(buttons)
         buttons.rejected.connect(dialog.reject)
         def save():

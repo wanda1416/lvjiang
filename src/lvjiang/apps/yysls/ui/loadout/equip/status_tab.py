@@ -93,22 +93,11 @@ class _MultiSelectMenu(QMenu):
 
 
 def _fit_filter_combo(combo: QComboBox) -> int:
-    """按最长选项加两个汉字余量固定筛选框宽度。"""
-    combo.ensurePolished()
-    metrics = combo.fontMetrics()
-    width = (
-        max(
-            (metrics.horizontalAdvance(combo.itemText(index))
-             for index in range(combo.count())),
-            default=0,
-        )
-        + metrics.horizontalAdvance("汉汉")
-    )
-    combo.setFixedWidth(width)
-    view = combo.view()
-    assert view is not None
-    view.setMinimumWidth(width)
-    return width
+    """按主题边框、箭头和最长选项计算筛选框与弹出列表的宽度。"""
+    from ...layout_helpers import fit_combo_to_contents
+
+    return fit_combo_to_contents(combo)
+
 
 
 def _affix_analysis_dependencies():
@@ -191,7 +180,7 @@ class EquipStatusTab(QWidget):
         action_row = QHBoxLayout(self._action_widget)
         action_row.setContentsMargins(0, 0, 0, 0)
         btn_refresh = QPushButton(tr("刷新"))
-        btn_refresh.setFixedWidth(60)
+        btn_refresh.setMinimumWidth(60)
         btn_refresh.setToolTip(tr("刷新装备"))
         btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self._on_refresh)

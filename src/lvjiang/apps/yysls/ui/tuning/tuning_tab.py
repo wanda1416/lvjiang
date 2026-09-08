@@ -81,16 +81,12 @@ class TuningTab(QWidget):
         btn_layout.setSpacing(8)
         self.btn_run_tuning = QPushButton(f"{tr('开始调律')} ({self._host._user_config.hotkeys.start})")
         self.btn_run_tuning.clicked.connect(self.f9_run)
-        self.btn_run_tuning.setStyleSheet(
-            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-        )
+        apply_button_style(self.btn_run_tuning, variant="action")
         btn_layout.addWidget(self.btn_run_tuning)
 
         self.btn_pause_resume = QPushButton(tr("暂停"))
         self.btn_pause_resume.setEnabled(False)
-        self.btn_pause_resume.setStyleSheet(
-            "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-        )
+        apply_button_style(self.btn_pause_resume, variant="neutral")
         self.btn_pause_resume.clicked.connect(self._on_pause_resume_clicked)
         btn_layout.addWidget(self.btn_pause_resume)
         tab_layout.addLayout(btn_layout)
@@ -379,25 +375,17 @@ class TuningTab(QWidget):
         hk = self._host._user_config.hotkeys
         if state in ("running", "paused"):
             self.btn_run_tuning.setText(f"{tr('结束')} ({hk.stop})")
-            self.btn_run_tuning.setStyleSheet(
-                "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_button_style(self.btn_run_tuning, variant="danger")
         elif state == "not_ready":
             self.btn_run_tuning.setText(tr("未就绪"))
-            self.btn_run_tuning.setStyleSheet(
-                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_button_style(self.btn_run_tuning, variant="neutral")
         elif state == STATE_PLAN_UNSUPPORTED:
-            # 不能落进下面的 else：那里除了变绿还会 mark_done()，会误报完成。
+            # 不能落进下面的 else：那里还会 mark_done()，会误报完成。
             self.btn_run_tuning.setText(tr("方案不支持"))
-            self.btn_run_tuning.setStyleSheet(
-                "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_button_style(self.btn_run_tuning, variant="neutral")
         else:
             self.btn_run_tuning.setText(f"{tr('开始调律')} ({hk.start})")
-            self.btn_run_tuning.setStyleSheet(
-                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_button_style(self.btn_run_tuning, variant="action")
             # 工作流结束：通知调律进度 Tab 标记完成
             engine = getattr(self._host, '_current_engine', None)
             if engine is not None and hasattr(engine, '_progress_hub'):
@@ -408,21 +396,15 @@ class TuningTab(QWidget):
         if state == "running":
             self.btn_pause_resume.setText(f"{tr('暂停')} ({hk.pause})")
             self.btn_pause_resume.setEnabled(True)
-            self.btn_pause_resume.setStyleSheet(
-                "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_button_style(self.btn_pause_resume, variant="neutral")
         elif state == "paused":
             self.btn_pause_resume.setText(f"{tr('恢复')} ({hk.pause})")
             self.btn_pause_resume.setEnabled(True)
-            self.btn_pause_resume.setStyleSheet(
-                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_button_style(self.btn_pause_resume, variant="action")
         else:
             self.btn_pause_resume.setText(tr("暂停"))
             self.btn_pause_resume.setEnabled(False)
-            self.btn_pause_resume.setStyleSheet(
-                "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_button_style(self.btn_pause_resume, variant="neutral")
         # 进度面板的暂停提示：独立于按钮，避免只看右侧面板时误以为卡死
         widget = self._find_progress_widget()
         if widget is not None:

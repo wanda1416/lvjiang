@@ -171,7 +171,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         btn_row = QHBoxLayout(self._toolbar_widget)
         btn_row.setContentsMargins(0, 0, 0, 0)
         btn_refresh = QPushButton(tr("刷新"))
-        btn_refresh.setFixedWidth(60)
+        btn_refresh.setMinimumWidth(60)
         btn_refresh.setToolTip(tr("刷新战斗属性"))
         btn_refresh.setStyleSheet(_REFRESH_BTN_STYLE)
         btn_refresh.clicked.connect(self._on_refresh)

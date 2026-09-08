@@ -1037,7 +1037,7 @@ class TestMaterialSettings:
         # materials 段缺省 → 全部空默认值（无狗粮规则）
         m = parse_tuning_group(_valid_group()).materials
         assert m.stone_check_enabled is False
-        assert m.stone_min_count == 100
+        assert m.stone_min_count == 80
         assert m.stone_insufficient_action == "abort"
         assert m.food_rules == []
 

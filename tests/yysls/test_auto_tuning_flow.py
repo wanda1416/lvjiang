@@ -34,6 +34,9 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
 )
 from lvjiang.apps.yysls.workflows.implementations.tuning import TuningRecorder
 from lvjiang.apps.yysls.workflows.implementations.tuning import (
+    executor as tuning_executor,
+)
+from lvjiang.apps.yysls.workflows.implementations.tuning import (
     judge as tuning_judge,
 )
 from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
@@ -42,6 +45,9 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
 from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
     AndroidTuningRouteStrategy,
     DesktopTuningRouteStrategy,
+)
+from lvjiang.apps.yysls.workflows.implementations.tuning.stone_stock import (
+    CachedStoneStock,
 )
 from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 from lvjiang.core.config import load_user_config
@@ -108,7 +114,8 @@ class FakeWF(AutoTuningWorkflow):
         # 默认注入空基础规则组（行为/材料/等级门槛全默认值），
         # 测试可覆写 run_ctx.base_group 注入定制配置
         self.run_ctx = TuningRunContext(judge_configs={}, judge_rule_keys=[],
-                                        base_group=TuningGroup())
+                                        base_group=TuningGroup(),
+                                        use_stone_cache=False)
         self._stopped = False
         # subcall 桥：真布局供 click_any 解析区域，引擎执行 DSL 导航
         self._layout = _system_layout()
@@ -277,6 +284,21 @@ def test_desktop_route_leaves_detail_without_menu_click():
     wf.navigator.leave_tune()
 
     assert wf.clicks == [(TUNE_SCENE, "back")]
+
+
+def test_blue_equipment_is_ignored_and_invalidates_stone_cache():
+    wf = FakeWF()
+    wf.run_ctx.use_stone_cache = True
+    wf._stone_stock_strategy = None
+    wf.stone_stock.accept_scan(1000)
+
+    result = wf._process_equipment(
+        "蓝色测试剑", _equip(1, quality="blue"), WEAPON_DETAIL)
+
+    assert result
+    assert wf.stone_stock.cache_invalid
+    assert not wf.scan_reject_calls
+    assert (TUNE_SCENE, "tune_btn") not in wf.clicks
 
 
 def test_workflow_shares_route_strategy_between_components():
@@ -678,6 +700,99 @@ def test_stone_check_disabled_passes():
     assert not wf.executor.materials_exhausted
 
 
+def test_initial_skip_does_not_waive_hard_stone_limit():
+    """跳过的只是首次额外校验，默认 80 安全线仍然阻断一键添加。"""
+    base = TuningGroup(materials=MaterialSettings(
+        stone_check_enabled=True, stone_min_count=80,
+        stone_insufficient_action="skip"))
+    wf = _wf_with(base)
+    wf.run_ctx.use_stone_cache = True
+    wf.run_ctx.initial_stone_check_enabled = True
+    wf.run_ctx.initial_stone_min_count = 100
+    wf._stone_stock_strategy = None
+    wf.stone_stock.accept_scan(700)
+    wf.executor._choose_initial_stock = lambda _message: "skip"
+
+    wf.executor._handle_initial_stock_check(700)
+
+    assert not wf.stone_stock.needs_initial_check
+    assert wf.executor._check_stone_stock(base.materials, None) is False
+    assert "安全线 80" in wf.executor.abort_reason
+
+
+def test_initial_manual_stock_is_rechecked():
+    base = TuningGroup(materials=MaterialSettings(
+        stone_check_enabled=True, stone_min_count=80,
+        stone_insufficient_action="skip"))
+    wf = _wf_with(base)
+    wf.run_ctx.use_stone_cache = True
+    wf.run_ctx.initial_stone_check_enabled = True
+    wf.run_ctx.initial_stone_min_count = 100
+    wf._stone_stock_strategy = None
+    wf.stone_stock.accept_scan(700)
+    wf.executor._choose_initial_stock = lambda _message: "manual"
+    wf.executor._input_stock_units = lambda: 1200
+
+    wf.executor._handle_initial_stock_check(700)
+
+    assert wf.stone_stock.stock_units == 1200
+    assert not wf.stone_stock.needs_initial_check
+    assert wf.executor._check_stone_stock(base.materials, None) is True
+
+
+def test_initial_threshold_applies_without_stone_cache():
+    """实时扫描策略也必须执行首次额外门槛。"""
+    base = TuningGroup(materials=MaterialSettings())
+    wf = _wf_with(base)
+    wf.run_ctx.use_stone_cache = False
+    wf.run_ctx.initial_stone_check_enabled = True
+    wf.run_ctx.initial_stone_min_count = 100
+    wf._stone_stock_strategy = None
+    choices = []
+    wf.executor._choose_initial_stock = lambda message: choices.append(message) or "skip"
+
+    wf.executor._handle_initial_stock_check(700)
+
+    assert choices
+    assert "检查大律准石>= 100" in choices[0]
+    assert wf.executor._initial_stock_check_done
+
+
+def test_runtime_cache_validation_runs_on_every_fifth_entry(monkeypatch):
+    wf = FakeWF()
+    wf.run_ctx.use_stone_cache = True
+    wf.run_ctx.validate_stone_cache = True
+    calls = []
+    monkeypatch.setattr(
+        wf.executor,
+        "cache_materials",
+        lambda **kwargs: calls.append(kwargs["validate_stone_cache"]),
+    )
+
+    for _ in range(10):
+        wf.executor.cache_equipment_materials()
+
+    assert calls == [False, False, False, False, True] * 2
+
+
+def test_runtime_cache_validation_logs_only_difference_over_one(monkeypatch):
+    stock = CachedStoneStock()
+    stock.accept_scan(800)
+    errors = []
+    monkeypatch.setattr(tuning_executor.logger, "error", errors.append)
+
+    tuning_executor.TuningExecutor._validate_cached_stone_stock(stock, 790)
+    tuning_executor.TuningExecutor._validate_cached_stone_stock(stock, 0)
+    assert errors == []
+
+    tuning_executor.TuningExecutor._validate_cached_stone_stock(stock, 789)
+
+    assert len(errors) == 1
+    assert "缓存=80" in errors[0]
+    assert "识别=78.9" in errors[0]
+    assert "请检查并调整等级配置" in errors[0]
+
+
 def test_stone_check_enough_passes():
     """库存 ≥ 基准 → 放行；无斜杠样式取 count（×1253）"""
     wf = FakeWF()
@@ -744,21 +859,19 @@ def test_stone_check_skip_action():
     assert hook_calls == [(50, 100)]
 
 
-def test_stone_check_ask_continue():
-    """不足处理 ask + 用户确认 → 放行，本次运行不再检查不再询问"""
+def test_stone_check_ask_manual_value_is_rechecked():
+    """硬性安全线不可豁免；人工修正后重新检查。"""
     wf = FakeWF()
     settings = MaterialSettings(stone_check_enabled=True, stone_min_count=100,
                                 stone_insufficient_action="ask")
     asked = []
-    wf.executor._confirm_material_insufficient = lambda msg: asked.append(msg) or "continue"
+    wf.executor._confirm_hard_stone_failure = \
+        lambda msg: asked.append(msg) or "manual"
+    wf.executor._input_stock_units = lambda: 1200
     infos = {(1, 2): _Stone(count=50)}
     assert wf.executor._check_stone_stock(settings, infos) is True
-    assert wf.executor._stone_check_waived
     assert not wf.executor.materials_exhausted
     assert len(asked) == 1 and "大律准石 50" in asked[0]
-    # 后续轮次直接放行，不再弹窗
-    assert wf.executor._check_stone_stock(settings, infos) is True
-    assert len(asked) == 1
 
 
 def test_stone_check_ask_decline():
@@ -766,11 +879,10 @@ def test_stone_check_ask_decline():
     wf = FakeWF()
     settings = MaterialSettings(stone_check_enabled=True, stone_min_count=100,
                                 stone_insufficient_action="ask")
-    wf.executor._confirm_material_insufficient = lambda msg: "end"
+    wf.executor._confirm_hard_stone_failure = lambda msg: "end"
     assert wf.executor._check_stone_stock(
         settings, {(1, 2): _Stone(count=50)}) is False
     assert wf.executor.materials_exhausted
-    assert not wf.executor._stone_check_waived
     assert "材料不足" in wf.output["stop_reason"]
 
 
@@ -786,8 +898,8 @@ def test_stone_low_aborts_tuning_flow(patch_worth, stone_check_on):
     assert reports[0]["rounds"] == 0
     assert wf.executor.materials_exhausted
     assert wf.output["stop_reason"]
-    # 石头检查与狗粮决策共用同一次识别
-    assert wf.material_info_calls == 1
+    # 本用例关闭律准石缓存：进页扫一次，首个检查点再扫一次。
+    assert wf.material_info_calls == 2
     # 退出路径仍收束：调律页 back 正常点击
     assert (TUNE_SCENE, "back") in wf.clicks
 

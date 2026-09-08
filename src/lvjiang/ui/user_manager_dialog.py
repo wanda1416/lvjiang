@@ -470,7 +470,8 @@ class UserManagerDialog(QDialog):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        if self._user_manager.delete_user(name):
+        deleted = self._user_manager.delete_user(name)
+        if deleted:
             self._refresh_user_list(select_name="")
             logger.info(f"用户已删除: {name}")
         else:

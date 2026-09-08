@@ -14,6 +14,7 @@ from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
 from ...workflows.engine import WorkflowEngine
+from .execution_access import guarded_finish, guarded_launch
 
 _RESULT_LOG_SUPPRESSED_FLOW_IDS = frozenset({"auto_tuning"})
 
@@ -1137,6 +1138,7 @@ class RunControlMixin:
 
     # ─── 通用工作流执行 ────────────────────────────────────
 
+    @guarded_launch(user_selector="_daily_execution_user_selector")
     def _on_run_workflow(self):
         """执行选中的工作流（异步）；运行中点击则作为停止按钮。"""
         # 运行中时该按钮文字为“停止 (F10)”，点击应触发停止而非重复启动
@@ -1185,12 +1187,7 @@ class RunControlMixin:
                     tr("工作流文件不存在: {path}").format(path=wf_file))
                 return
 
-        selector = getattr(self, "_daily_execution_user_selector", None)
-        username = (
-            selector.resolve_username()
-            if selector is not None
-            else self._user_manager.get_active_user_name()
-        )
+        username = self._execution_username_snapshot
         if not username:
             self.log_text.append(tr("[错误] 请选择有效的执行用户"))
             return
@@ -1303,13 +1300,25 @@ class RunControlMixin:
                 username=username or "default", task_id=flow_id,
                 task_name=flow_name, task_scope=task_scope,
                 params=params if params is not None else {}, source="single")
-        worker = WorkflowWorker(flow_id, workflow_fn, task_run=task_run)
+        lease = getattr(self, "_execution_lease", None)
+        def execute_authorized():
+            if lease is None:
+                return workflow_fn()
+            with lease.authorized():
+                return workflow_fn()
+        worker = WorkflowWorker(flow_id, execute_authorized, task_run=task_run)
         worker.finished.connect(self._on_workflow_finished)
         self._current_worker = worker  # type: ignore[assignment]  # 保持引用防止被垃圾回收
         # 在 worker 上附加 flow_name 以便日志显示
         worker._flow_name = flow_name
-        worker.start()
+        try:
+            worker.start()
+        except Exception as exc:
+            self._finish_task_run(worker, status="failed", error_message=str(exc))
+            raise
+        self._execution_started = True
 
+    @guarded_finish
     def _on_workflow_finished(self):
         """线程退出后的工作流完成回调（在主线程执行）。"""
         worker = self.sender()
@@ -1341,7 +1350,6 @@ class RunControlMixin:
                 self._finish_task_run(
                     worker, status="failed", result_path=result_path,
                     error_message=str(result["error"]))
-                self._end_automation(flow_name)
                 return
             interrupted = self._stop_requested
             if interrupted:
@@ -1362,8 +1370,6 @@ class RunControlMixin:
             _log_workflow_result(flow_id, result, interrupted=interrupted)
             if not interrupted:
                 self.log_text.append(f"[完成] {flow_name} 结果已保存")
-
-        self._end_automation(flow_name)
 
     @staticmethod
     def _finish_task_run(worker, **kwargs) -> None:
@@ -1480,6 +1486,7 @@ class RunControlMixin:
 
     # ─── 插件工作流执行 ────────────────────────────────────
 
+    @guarded_launch
     def run_workflow_implementation(
         self,
         impl_name: str,

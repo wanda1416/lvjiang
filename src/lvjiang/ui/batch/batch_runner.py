@@ -17,7 +17,7 @@ from __future__ import annotations
 import copy
 import json
 import traceback
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable
@@ -124,6 +124,27 @@ class BatchWorker(QThread):
     # ─── 主循环 ─────────────────────────────────────────
 
     def run(self):
+        self._execution_lease = None
+        self._user_scope = ExitStack()
+        self._batch_run = None
+        try:
+            self._run_locked()
+        except Exception as exc:
+            logger.exception("批量执行失败")
+            self.log.emit(f"[批量] 执行或保存失败: {exc}")
+            if self._batch_run is not None:
+                try:
+                    self._batch_run.finish(status="failed", error_message=str(exc))
+                except Exception:
+                    logger.exception("批量失败历史收尾失败")
+            self.finished_all.emit({"entries": {}, "stopped": False, "error": str(exc)})
+        finally:
+            self._user_scope.close()
+            if self._execution_lease is not None:
+                self._execution_lease.release()
+                self._execution_lease = None
+
+    def _run_locked(self):
         from ...core.daily_history import try_create_batch_run
         batch_run = try_create_batch_run(
             config_name=self._config.name,
@@ -139,6 +160,7 @@ class BatchWorker(QThread):
             },
         )
         batch_run_id = batch_run.batch_run_id if batch_run is not None else ""
+        self._batch_run = batch_run
         summary: dict = {
             "batch_run_id": batch_run_id,
             "entries": {}, "stopped": False, "lifecycle": {},
@@ -199,6 +221,15 @@ class BatchWorker(QThread):
 
             label = self._format_label(row_data, run_idx)
             username = self._get_username_from_row(row_data) or ""
+            if self._execution_lease is not None:
+                self._user_scope.close()
+                self._execution_lease.release()
+                self._execution_lease = None
+            if username:
+                from ...core.access import acquire_user
+                self._execution_lease = acquire_user(
+                    username, self._session_manager._users_dir)
+                self._user_scope.enter_context(self._execution_lease.authorized())
             self.log.emit(f"[批量] ── [{run_idx + 1}/{total}] {label} ──")
             entry_result: dict = {
                 "prepare": ST_SKIPPED,
@@ -240,7 +271,6 @@ class BatchWorker(QThread):
                 session = {}
 
             # 3. 顺序执行脚本
-            any_success = False
             for script in self._scripts:
                 if self._stop_check():
                     self._stopped = True
@@ -268,6 +298,8 @@ class BatchWorker(QThread):
                                 f"batch_run_id={batch_run_id}, task_id={script.id}")
                         try:
                             result = self._run_script(script, session, username)
+                            if username:
+                                self._session_manager.save(username, session)
                         except Exception:
                             tb = traceback.format_exc()
                             logger.error(
@@ -280,7 +312,6 @@ class BatchWorker(QThread):
                     self.progress.emit(run_idx, label, script.id, ST_SUCCESS)
                     self.log.emit(f"[批量] {label} → {script.name} 完成")
                     report.end_script(ST_SUCCESS, result)
-                    any_success = True
                     try:
                         result_path = self._save_result(
                             username or "unknown", script, result)
@@ -322,10 +353,6 @@ class BatchWorker(QThread):
                     self.progress.emit(run_idx, label, script.id, ST_FAILED)
                     self.log.emit(f"[批量] {label} → {script.name} 失败: {e}")
                     report.end_script(ST_FAILED)
-
-            # 4. session 落盘
-            if any_success and username:
-                self._session_manager.save(username, session)
 
             # 用户中断时，关闭尚未结束的脚本记录
             if self._stopped:

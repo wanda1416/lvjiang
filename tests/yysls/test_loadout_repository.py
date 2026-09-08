@@ -429,3 +429,22 @@ def test_cannot_delete_last_plan(tmp_path: Path):
     repo = LoadoutRepository("alice", tmp_path)
     with pytest.raises(ValueError):
         repo.delete_plan(repo.load().active_plan_id)
+
+
+def test_ui_state_migrates_without_rewriting_task_data(tmp_path):
+    from lvjiang.core.config.session import get_session_store, reset_session_store
+
+    repo = LoadoutRepository("alice", tmp_path)
+    repo.update(lambda state: state.ui_state.update(equip_filter={"type": "ring"}))
+    before = repo.path.read_bytes()
+    assert repo.get_ui_state("equip_filter") == {"type": "ring"}
+    repo.set_ui_state("equip_filter", {})  # explicit reset must not revive legacy values
+    repo.set_ui_state("other_panel", {"collapsed": True})
+    bob = LoadoutRepository("bob", tmp_path)
+    bob.set_ui_state("equip_filter", {"type": "head"})
+    get_session_store().reload()
+    reset_session_store()
+    assert repo.get_ui_state("equip_filter") == {}
+    assert repo.get_ui_state("other_panel") == {"collapsed": True}
+    assert bob.get_ui_state("equip_filter") == {"type": "head"}
+    assert repo.path.read_bytes() == before

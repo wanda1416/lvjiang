@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from fasteners import InterProcessLock
+
 from .development_rules import check_real_development
 from .models import (
     EQUIPMENT_CREATED_AT,
@@ -78,7 +80,7 @@ def _pick_timestamp(values, *, latest: bool) -> str:
 
 
 def _path_lock(path: Path) -> threading.RLock:
-    key = str(path.resolve())
+    key = os.path.normcase(str(path.resolve()))
     with _LOCKS_GUARD:
         return _LOCKS.setdefault(key, threading.RLock())
 
@@ -90,27 +92,34 @@ class LoadoutRepository:
         if users_dir is None:
             from lvjiang.constants import USERS_DIR
             users_dir = USERS_DIR
-        users_dir.mkdir(parents=True, exist_ok=True)
         self.username = username
         self.path = users_dir / f"{username}.loadouts.json"
         self._lock = _path_lock(self.path)
 
     def load(self) -> LoadoutState:
+        """读取独立快照，不因浏览而创建文件或申请执行锁。"""
         with self._lock:
-            if not self.path.exists():
-                state = LoadoutState.empty()
-                self._save(state)
-                return state
-            return LoadoutState.from_dict(json.loads(
-                self.path.read_text(encoding="utf-8")))
+            try:
+                data = self.path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                return LoadoutState.empty()
+            return LoadoutState.from_dict(json.loads(data))
 
     def update(self, mutator: Callable[[LoadoutState], None]) -> LoadoutState:
+        # 只串行化短暂的读改写事务，任务执行期间仍可浏览、编辑用户数据。
         with self._lock:
-            state = self.load()
-            mutator(state)
-            state.revision += 1
-            self._save(state)
-            return copy.deepcopy(state)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            lock = InterProcessLock(str(self.path) + ".lock")
+            if not lock.acquire(blocking=True, timeout=5):
+                raise TimeoutError(f"装备数据写入锁超时: {self.path.name}")
+            try:
+                state = self.load()
+                mutator(state)
+                state.revision += 1
+                self._save(state)
+                return copy.deepcopy(state)
+            finally:
+                lock.release()
 
     def _save(self, state: LoadoutState) -> None:
         payload = json.dumps(state.to_dict(), ensure_ascii=False, indent=2)
@@ -359,16 +368,31 @@ class LoadoutRepository:
     # ── 用户级 UI 状态（筛选等） ──────────────────────────
 
     def get_ui_state(self, key: str) -> dict:
-        """读取用户级 UI 状态节点（如 equip_filter）。"""
-        state = self.load()
-        value = state.ui_state.get(key)
-        return dict(value) if isinstance(value, dict) else {}
+        """优先读界面状态；旧版 loadout 内的筛选值仅作只读回退。"""
+        from lvjiang.core.config import load_ui_page_state
+
+        page = load_ui_page_state(f"loadout_user:{self.username}")
+        if key in page:
+            value = page[key]
+        else:
+            # 不调用 load()：浏览尚无备战文件的用户也不能触发初始化写入。
+            with self._lock:
+                try:
+                    data = json.loads(self.path.read_text(encoding="utf-8"))
+                except FileNotFoundError:
+                    return {}
+            legacy = data.get("ui_state", {}) if isinstance(data, dict) else {}
+            value = legacy.get(key) if isinstance(legacy, dict) else None
+        return copy.deepcopy(value) if isinstance(value, dict) else {}
 
     def set_ui_state(self, key: str, value: dict) -> None:
-        """写入用户级 UI 状态节点。"""
-        def mutate(state: LoadoutState) -> None:
-            state.ui_state[key] = value
-        self.update(mutate)
+        """界面偏好按用户隔离，沿用 SessionStore 的原子写入与只读实例规则。
+
+        筛选、排序等不参与任务执行，不写装备文件，也不申请用户执行锁。
+        """
+        from lvjiang.core.config import update_ui_page_state
+
+        update_ui_page_state(f"loadout_user:{self.username}", {key: value})
 
     def update_mock(self, old_fp: str, equip: dict) -> str:
         from ..equip_parser.models import make_fingerprint

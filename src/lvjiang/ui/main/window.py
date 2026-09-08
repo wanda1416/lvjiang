@@ -663,7 +663,8 @@ class MainWindow(
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
         self.btn_run_workflow = QPushButton(f"{tr('开始执行')} ({self._user_config.hotkeys.start})")
-        self.btn_run_workflow.clicked.connect(self._on_run_workflow)
+        # Explicitly discard clicked(bool); the access wrapper accepts *args.
+        self.btn_run_workflow.clicked.connect(lambda: self._on_run_workflow())
         self.btn_run_workflow.setStyleSheet(
             "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
         )

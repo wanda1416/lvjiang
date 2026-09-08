@@ -526,7 +526,7 @@ class EquipStatusTab(QWidget):
         self._rebuild_grid()
 
     def _load_filter_settings(self):
-        """从用户级 loadout 存储加载筛选配置并设置下拉框"""
+        """按当前用户加载界面筛选状态并设置下拉框"""
         filters = self._load_user_filter()
         # 屏蔽信号，避免初始化时触发 _on_filter_changed
         self._sort_filter.blockSignals(True)
@@ -579,7 +579,7 @@ class EquipStatusTab(QWidget):
         self._update_source_actions()
 
     def _save_filter_settings(self):
-        """保存筛选配置到用户级 loadout 存储"""
+        """按当前用户保存界面筛选状态"""
         filters = {
             "sort": self._sort_filter.currentData(),
             "type": self._type_filter.currentData(),
@@ -593,13 +593,13 @@ class EquipStatusTab(QWidget):
         self._save_user_filter(filters)
 
     def _load_user_filter(self) -> dict:
-        """从当前用户的 loadout 存储读取筛选配置"""
+        """读取当前用户的筛选状态，兼容旧备战文件中的值"""
         if self._inv is not None:
             return self._inv._repo.get_ui_state("equip_filter")
         return {}
 
     def _save_user_filter(self, filters: dict) -> None:
-        """将筛选配置写入当前用户的 loadout 存储"""
+        """保存当前用户的界面偏好，不修改任务使用的装备数据"""
         if self._inv is not None:
             self._inv._repo.set_ui_state("equip_filter", filters)
 

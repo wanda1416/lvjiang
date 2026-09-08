@@ -163,32 +163,24 @@ def set_active_group(name: str) -> None:
 
 def get_alert_history() -> dict[str, str]:
     """获取提醒去重历史 {alert_key: timestamp}"""
-    history = _load().get(_SUB_ALERT_HISTORY, {})
+    history = get_session_store().get_runtime_path(_PROFILE_KEY, _SUB_ALERT_HISTORY)
     return history if isinstance(history, dict) else {}
 
 
 def set_alert_history(history: dict[str, str]) -> None:
     """整体替换提醒历史（多进程安全）"""
-    def _merge(old):
-        data = old if isinstance(old, dict) else {}
-        data[_SUB_ALERT_HISTORY] = history
-        return data
-
-    get_session_store().mutate_node(_PROFILE_KEY, _merge)
+    get_session_store().mutate_runtime_path(
+        _PROFILE_KEY, _SUB_ALERT_HISTORY, lambda _: dict(history))
 
 
 def mark_alert(alert_key: str, timestamp: str) -> None:
     """标记一个提醒已发送（多进程安全）"""
     def _merge(old):
-        data = old if isinstance(old, dict) else {}
-        history = data.get(_SUB_ALERT_HISTORY, {})
-        if not isinstance(history, dict):
-            history = {}
+        history = old if isinstance(old, dict) else {}
         history[alert_key] = timestamp
-        data[_SUB_ALERT_HISTORY] = history
-        return data
+        return history
 
-    get_session_store().mutate_node(_PROFILE_KEY, _merge)
+    get_session_store().mutate_runtime_path(_PROFILE_KEY, _SUB_ALERT_HISTORY, _merge)
 
 
 def is_alert_marked(alert_key: str) -> bool:
@@ -199,14 +191,8 @@ def is_alert_marked(alert_key: str) -> bool:
 def unmark_alert(alert_key: str) -> None:
     """移除一个提醒标记（条件不满足时调用，允许下次重新触发）（多进程安全）"""
     def _merge(old):
-        data = old if isinstance(old, dict) else {}
-        history = data.get(_SUB_ALERT_HISTORY, {})
-        if not isinstance(history, dict):
-            return data  # 无需修改
-        if alert_key in history:
-            del history[alert_key]
-            data[_SUB_ALERT_HISTORY] = history
-        return data
+        history = old if isinstance(old, dict) else {}
+        history.pop(alert_key, None)
+        return history
 
-    get_session_store().mutate_node(_PROFILE_KEY, _merge)
-
+    get_session_store().mutate_runtime_path(_PROFILE_KEY, _SUB_ALERT_HISTORY, _merge)

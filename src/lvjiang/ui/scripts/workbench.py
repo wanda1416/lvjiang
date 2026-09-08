@@ -6,8 +6,8 @@
    所以画布上取到的归一化坐标就是 DSL 直接能用的画布坐标。点=取点/取色、拖=取区域，
    三个「插入」按钮把 ``(x, y)`` / ``"#rrggbb"`` / ``(x, y, w, h)`` 写进编辑器光标处。
 
-2. **运行**：把编辑器文本写到 ``workflows/_editor_run.wf``（与场景编辑器试运行同一个
-   临时文件，import 相对路径因此可用），在 WorkflowWorker 线程里跑 WorkflowEngine。
+2. **运行**：每次使用独立临时脚本，在 WorkflowWorker 线程里跑 WorkflowEngine；
+   import 仍按配置中的工作流层解析，不覆盖其他实例的测试脚本。
    引擎的 ``statement_hook`` 每条语句前回传 (行号, 变量快照)，面板高亮当前行、刷新变量表；
    ``step_mode`` 让引擎在每条语句前停住等 pause_event——「单步」set 一次走一条，
    「继续」关掉 step_mode 再 set，「暂停」只打开 step_mode（下一条语句就停），
@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import threading
-from pathlib import Path
 from typing import Callable
 
 from loguru import logger
@@ -38,7 +37,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.config.resolver import get_resolver
 from ...i18n import tr
 from ..button_styles import apply_button_style
 from ..ocr.pick_canvas import PickCanvas
@@ -373,7 +371,6 @@ class DebugPanel(QWidget):
         from ..main.run_control import WorkflowWorker
 
         try:
-            path: Path = get_resolver().write_entity(EDITOR_RUN_REL, text if text.endswith("\n") else text + "\n")
             engine = self._build_engine()
         except Exception as e:  # noqa: BLE001
             self.lbl_run.setText(f"{tr('启动失败')}: {e}")
@@ -388,7 +385,12 @@ class DebugPanel(QWidget):
         self._sink_id = logger.add(
             _LogSink(self._bridge), level="INFO", format="{time:HH:mm:ss} | {level:<5} | {message}")
         self._editor.set_locked(True)
-        worker = WorkflowWorker("_editor_run", lambda: engine.execute(path))
+        def run():
+            from ...workflows.runtime_source import runtime_source
+            with runtime_source(text) as path:
+                return engine.execute(path)
+
+        worker = WorkflowWorker("_editor_run", run)
         worker.finished.connect(self._on_worker_finished)
         self._worker = worker
         self.lbl_run.setText(tr("单步模式：在第一条语句前停住") if step else tr("运行中…"))

@@ -15,12 +15,14 @@ regions:
   is_text: true
   is_clickable: true
   view: confirm
+  to: "@caller"
 - key: cancel
   name: 取消
   type: func
   is_text: true
   is_clickable: true
   view: confirm
+  to: "@caller"
 - key: close_item
   name: 关闭提示
   type: func
@@ -37,6 +39,14 @@ regions:
   is_text: false
   is_clickable: false
   view: confirm
+- key: open_settings
+  name: 打开设置
+  type: func
+  is_text: false
+  is_clickable: true
+  to: game_settings
+  navigation: open
+  available_from: ["*"]
 points:
 - key: material_slot_1
   name: 材料格1

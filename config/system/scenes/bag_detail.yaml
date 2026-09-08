@@ -7,18 +7,21 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+  to: "@caller"
 - key: peiyang
   name: 培养
   type: func
   is_text: false
   is_clickable: true
   to: bag_equip_detail
+  navigation: switch
 - key: item
   name: 道具
   type: func
   is_text: false
   is_clickable: true
   to: bag_item_detail
+  navigation: switch
 - key: renwu
   name: 任务
   type: func
@@ -30,6 +33,7 @@ regions:
   is_text: false
   is_clickable: true
   to: bag_wallet_detail
+  navigation: switch
 - key: sub_baoguo
   name: 子包裹
   type: attr

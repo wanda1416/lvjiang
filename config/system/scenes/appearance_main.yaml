@@ -4,14 +4,17 @@ name: 外观
 views:
 - key: base
   name: 衣柜
+  kind: page
 - key: qingjing
   name: 情境
+  kind: tab
+  owner: /base
 - key: chuanda
   name: 穿搭方案
-  same_layer: false
+  kind: page
 - key: qingjing_editing
   name: 情境编辑
-  same_layer: false
+  kind: page
 regions:
 - key: back
   name: 返回
@@ -23,6 +26,7 @@ regions:
   - qingjing
   - chuanda
   - qingjing_editing
+  to: "@caller"
 - key: yigui
   name: 衣柜
   type: func
@@ -32,6 +36,7 @@ regions:
   - base
   - qingjing
   to: /base
+  navigation: switch
 - key: qingjing
   name: 情境
   type: func
@@ -41,6 +46,7 @@ regions:
   - base
   - qingjing
   to: /qingjing
+  navigation: switch
 - key: chuanda
   name: 穿搭方案
   type: func
@@ -48,6 +54,7 @@ regions:
   is_clickable: true
   view: base
   to: /chuanda
+  navigation: open
 - key: edit_qingjing
   name: 编辑情境
   type: func
@@ -55,6 +62,7 @@ regions:
   is_clickable: true
   view: qingjing
   to: /qingjing_editing
+  navigation: open
 - key: fangan_1
   name: 方案1
   type: func

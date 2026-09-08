@@ -105,5 +105,19 @@
       "import \"${1:path/to/file.wf}\""
     ],
     "description": "导入外部工作流文件"
+  },
+  "当前场景声明": {
+    "prefix": "scene",
+    "body": [
+      "scene [${1:scene_key}]${2: view [base]}"
+    ],
+    "description": "声明此处预期场景；不检测页面，不改变运行状态"
+  },
+  "场景未知声明": {
+    "prefix": "scene unknown",
+    "body": [
+      "scene unknown"
+    ],
+    "description": "声明当前场景未知"
   }
 }

@@ -4,6 +4,8 @@ name: 钱袋
 views:
 - key: base
   name: 基底
+  kind: tab
+  owner: bag_detail/base
 - key: bugan_view
   name: 不肝视图
 - key: bag

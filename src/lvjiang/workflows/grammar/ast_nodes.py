@@ -29,6 +29,14 @@ class Program:
     source: str = "<text>"
 
 
+@dataclass(frozen=True)
+class SceneDeclaration:
+    """流程位置声明；不检测页面、不改变运行时状态。"""
+    scene: str | None = None
+    view: str | None = None
+    line_no: int = 0
+
+
 # ─── 语句 ─────────────────────────────────────────────────
 
 @dataclass(frozen=True)

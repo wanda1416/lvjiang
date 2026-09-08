@@ -64,6 +64,7 @@ regions:
   is_clickable: true
   view: base
   to: game_settings
+  navigation: open
 - key: fankui
   name: 反馈
   type: func
@@ -83,6 +84,7 @@ regions:
   is_clickable: true
   view: page_1
   to: bag_detail
+  navigation: open
 - key: peiyang
   name: 培养
   type: func
@@ -115,6 +117,7 @@ regions:
   is_clickable: true
   view: page_1
   to: appearance_main
+  navigation: open
 - key: bugan
   name: 不肝
   type: func

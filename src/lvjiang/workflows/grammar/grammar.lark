@@ -9,7 +9,8 @@ start: (_NL | statement)*
 
 // ─── 语句分派 ─────────────────────────────────────────────
 
-?statement: click_stmt
+?statement: scene_stmt
+          | click_stmt
           | android_app_stmt
           | mouse_button_stmt
           | place_stmt
@@ -47,6 +48,9 @@ start: (_NL | statement)*
           | label_stmt
           | goto_stmt
           | try_stmt
+
+scene_stmt: "scene"i bracket_expr ["view"i bracket_expr] _NL -> scene_location
+          | "scene"i "unknown"i _NL -> scene_unknown
 
 // ─── 基础指令 ─────────────────────────────────────────────
 

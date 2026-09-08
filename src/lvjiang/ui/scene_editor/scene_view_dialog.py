@@ -4,7 +4,7 @@ import re
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -77,11 +77,23 @@ class ViewManagerDialog(QDialog):
         self._list.currentRowChanged.connect(self._refresh_contract)
         layout.addWidget(self._list, 1)
 
-        self._cb_same_layer = QCheckBox(tr("同层视图（与基底同一图层，如滚动后的另一屏）"))
-        self._cb_same_layer.setToolTip(
-            tr("同层视图没有入口，只有跳转；取消勾选表示它是独立页面，需要声明入口"))
-        self._cb_same_layer.toggled.connect(self._on_toggle_same_layer)
-        layout.addWidget(self._cb_same_layer)
+        relation_row = QHBoxLayout()
+        self._relation = QComboBox()
+        for label, key in [("独立页面", "page"), ("同页取景", "viewport"),
+                           ("TAB 内容", "tab"), ("弹层", "modal")]:
+            self._relation.addItem(tr(label), key)
+        self._owner = QComboBox()
+        self._owner.addItem(tr("无关联视图"), "")
+        for sk, scene in self._registry.all_scenes().items():
+            for view in scene.views:
+                self._owner.addItem(f"{scene.name} / {view.name}",
+                                    f"/{view.key}" if sk == self._scene_key else f"{sk}/{view.key}")
+        save_relation = QPushButton(tr("保存关系"))
+        save_relation.clicked.connect(self._save_relation)
+        relation_row.addWidget(self._relation)
+        relation_row.addWidget(self._owner, 1)
+        relation_row.addWidget(save_relation)
+        layout.addLayout(relation_row)
 
         # 页面切换契约：选中视图由哪些按钮进入、又能转向哪里。
         # 只读展示——契约是逐步补全的声明，不驱动执行。
@@ -178,6 +190,14 @@ class ViewManagerDialog(QDialog):
             target.addWidget(label)
 
     def _refresh(self):
+        self._owner.clear()
+        self._owner.addItem(tr("无关联视图"), "")
+        for sk, scene in self._registry.all_scenes().items():
+            for view in scene.views:
+                self._owner.addItem(f"{scene.name} / {view.name}",
+                                    f"/{view.key}" if sk == self._scene_key else f"{sk}/{view.key}")
+            if not scene.views and not scene.is_subscene:
+                self._owner.addItem(f"{scene.name} / 基底", f"{sk}/base")
         selected = self._selected_view_key()
         self._list.clear()
         views = self._registry.get_scene_views(self._scene_key)
@@ -187,7 +207,9 @@ class ViewManagerDialog(QDialog):
             self._list.addItem(item)
         for v in views:
             label = f"{v.name}  ({v.key})"
-            if v.key != BASE_VIEW_KEY and getattr(v, "same_layer", False):
+            if v.kind:
+                label += "  · " + {"page": "页面", "tab": "TAB", "viewport": "取景", "modal": "弹层"}.get(v.kind, v.kind)
+            elif v.key != BASE_VIEW_KEY and v.same_layer:
                 label += tr("  · 同层")
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, v.key)
@@ -213,11 +235,9 @@ class ViewManagerDialog(QDialog):
         view_key = self._selected_view_key()
         if not view_key:
             self._contract.setVisible(False)
-            self._cb_same_layer.setVisible(False)
             return
         self._contract.setVisible(True)
         is_base = view_key == BASE_VIEW_KEY
-        self._cb_same_layer.setVisible(not is_base)
         scenes = self._registry.all_scenes()
         entries = entries_of_view(scenes, self._scene_key, view_key)
         exits = exits_of_view(scenes, self._scene_key, view_key)
@@ -242,33 +262,41 @@ class ViewManagerDialog(QDialog):
 
         def _entry_line(t) -> tuple[str, str]:
             text = (f"{_scene_view_name(t.from_scene, t.from_view)} · "
-                    f"{_entity_name(t.from_scene, t.entity)}")
+                    f"{_entity_name(t.definition_scene or t.from_scene, t.entity)}")
             source = t.from_scene + (f"/{t.from_view}" if t.from_view else "")
             return text, f"{source} [{t.entity}]"
 
         def _exit_line(t) -> tuple[str, str]:
-            text = (f"{_entity_name(t.from_scene, t.entity)} → "
-                    f"{_scene_view_name(t.to_scene, t.to_view)}")
+            text = (f"{_entity_name(t.definition_scene or t.from_scene, t.entity)} → "
+                    f"{'调用方（本次打开来源）' if t.is_return else _scene_view_name(t.to_scene, t.to_view)}")
             target = t.to_scene + (f"/{t.to_view}" if t.to_view else "")
             return text, f"[{t.entity}] → {target}"
 
         view = next((v for v in self._registry.get_scene_views(self._scene_key)
                      if v.key == view_key), None)
         same_layer = bool(view is not None and not is_base
-                          and getattr(view, "same_layer", False))
-        self._cb_same_layer.blockSignals(True)
-        self._cb_same_layer.setChecked(same_layer)
-        self._cb_same_layer.blockSignals(False)
+                          and view.relation == "viewport")
+        if view is not None:
+            self._relation.setCurrentIndex(max(0, self._relation.findData(view.relation)))
+            owner = view.owner or ("/base" if not view.kind and same_layer else "")
+            self._owner.setCurrentIndex(max(0, self._owner.findData(owner)))
         if entries:
             entry_lines = [_entry_line(t) for t in entries]
         elif view_key == BASE_VIEW_KEY:
             entry_lines = [(tr("基底视图是场景入口"), "")]
         elif same_layer:
             # 同层视图只是同一图层滚过去的另一个取景，本就没有“进入”这回事。
-            entry_lines = [(tr("同层视图与基底处于同一图层，无入口"), "")]
+            entry_lines = [(tr("同页取景，共享关联页面的调用方；可通过滚动或翻页到达"), "")]
         else:
             entry_lines = [(
-                tr("无入口（死视图：补 to: 声明，或改标为同层视图）"), "")]
+                tr("未声明入口，请补充按钮、快捷键或其他进入方式"), "")]
+        if view is not None:
+            from ...core.scene_transitions import page_owner
+            owner = page_owner(scenes, self._scene_key, view_key)
+            description = ("共享页面调用方：" + _scene_view_name(*owner)
+                           if view.relation in ("tab", "viewport") and owner
+                           else "打开时记录实际来源；返回调用方结束本次页面上下文")
+            entry_lines.append((tr(description), ""))
         exit_lines = ([_exit_line(t) for t in exits] if exits
                       else [(tr("未声明"), "")])
         self._replace_contract_lines(self._entry_lines, entry_lines)
@@ -477,17 +505,22 @@ class ViewManagerDialog(QDialog):
         if idx >= 0:
             self._list.setCurrentRow(idx)
 
-    def _on_toggle_same_layer(self, checked: bool):
-        """切换选中视图的同层属性并落盘。"""
-        view_key = self._selected_view_key()
-        if not view_key or view_key == BASE_VIEW_KEY:
+    def _save_relation(self):
+        key = self._selected_view_key()
+        view = next((v for v in self._registry.get_scene_views(self._scene_key) if v.key == key), None)
+        if view is None:
             return
-        views = self._registry.get_scene_views(self._scene_key)
-        view = next((v for v in views if v.key == view_key), None)
-        if view is None or view.same_layer == checked:
+        from ...core.scene_transitions import validate_view_relations
+        old = (view.kind, view.owner, view.same_layer)
+        view.kind = self._relation.currentData()
+        view.owner = self._owner.currentData() or ""
+        view.same_layer = view.kind == "viewport"
+        problems = [p for p in validate_view_relations(self._registry.all_scenes())
+                    if p.startswith(f"{self._scene_key}/{key} ")]
+        if problems:
+            view.kind, view.owner, view.same_layer = old
+            QMessageBox.warning(self, tr("视图关系无效"), "\n".join(problems))
             return
-        view.same_layer = checked
         self._registry.save_scene_views(self._scene_key)
         self._changed = True
-        # 列表行文本带「· 同层」后缀，只刷契约区会让它停在勾选前的状态。
         self._refresh()

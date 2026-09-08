@@ -12,6 +12,9 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+  views:
+  - base
+  - activity
 - key: goto_baiye
   name: 返回驻地
   type: func

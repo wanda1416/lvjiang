@@ -36,6 +36,12 @@ regions:
   views:
   - base
   - shangdian
+- key: liebiao
+  name: 类目列表
+  type: func
+  is_text: true
+  is_clickable: false
+  view: shangdian
 - key: cat_4
   name: 类目4
   type: func
@@ -47,12 +53,6 @@ regions:
   type: func
   is_text: false
   is_clickable: true
-  view: shangdian
-- key: liebiao
-  name: 类目列表
-  type: func
-  is_text: true
-  is_clickable: false
   view: shangdian
 - key: bugan_jindu
   name: 不肝进度

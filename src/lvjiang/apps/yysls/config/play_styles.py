@@ -37,17 +37,23 @@ def get_play_styles(school: str) -> dict[str, dict]:
     return dict(all_styles.get(school) or {})
 
 
-def save_play_style(school: str, name: str, attrs: dict) -> None:
+def save_play_style(school: str, name: str, attrs: dict, *,
+                    derivation: dict | None = None) -> None:
     """保存一套基础属性。
 
     Args:
         school: 流派名称
         name: 基础属性名称
         attrs: 属性字典 {field_name: value}
+        derivation: 同次推导上下文；手动保存时清除旧上下文。
     """
     def _apply(data: dict) -> dict:
         all_styles = data.setdefault("play_styles", {})
         all_styles.setdefault(school, {})[name] = attrs
+        if derivation is None:
+            (data.get("attr_derivations", {}).get(school) or {}).pop(name, None)
+        else:
+            data.setdefault("attr_derivations", {}).setdefault(school, {})[name] = derivation
         return data
 
     session_node.mutate(_apply)

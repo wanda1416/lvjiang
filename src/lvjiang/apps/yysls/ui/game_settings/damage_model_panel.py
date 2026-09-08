@@ -74,7 +74,7 @@ class _SkillDialog(QDialog):
         self.resize(560, 460)
         layout = QVBoxLayout(self)
         hint = QLabel(tr(
-            "系数：{ratios}；另可写 kind / charge / qi_ratio / modifiers / force"
+            "系数：{ratios}；另可写 kind / charge / qi_ratio / intent_conversion / modifiers / force"
         ).format(ratios=" ".join(RATIO_FIELDS)))
         hint.setWordWrap(True)
         hint.setStyleSheet("color: palette(mid); font-size: 11px;")
@@ -276,6 +276,7 @@ class DamageModelPanel(QWidget):
         ]
         rows.append((tr("蓄力技定音"), tr("是") if skill.charge else tr("否")))
         rows.append((tr("真气比例"), f"{skill.qi_ratio:.6g}"))
+        rows.append((tr("会意转化"), f"{skill.intent_conversion:.6g}"))
         for name, value in skill.modifiers.items():
             rows.append((tr(MODIFIER_FIELDS[name]), f"{value:+.6g}"))
         for name, enabled in skill.force.items():
@@ -316,6 +317,8 @@ class DamageModelPanel(QWidget):
             payload["kind"] = skill.kind
         if skill.charge:
             payload["charge"] = True
+        if skill.intent_conversion:
+            payload["intent_conversion"] = skill.intent_conversion
         if skill.qi_ratio:
             payload["qi_ratio"] = skill.qi_ratio
         for field_name in RATIO_FIELDS:

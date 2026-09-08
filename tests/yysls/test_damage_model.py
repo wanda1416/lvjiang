@@ -156,3 +156,57 @@ def test_the_three_sword_qi_coefficients_come_straight_from_the_workbook() -> No
     assert skills["第三道剑气"]["outer_ratio"] == pytest.approx(first * 1.4, abs=5e-4)
     assert skills["三剑气"]["outer_ratio"] == pytest.approx(
         sum(skills[f"第{n}道剑气"]["outer_ratio"] for n in "一二三"))
+
+
+@pytest.fixture
+def extractor():
+    import runpy
+    return runpy.run_path(str(Path(__file__).resolve().parents[2] / "scripts/extract_damage_model.py"))
+
+
+def test_extractor_rejects_unknown_active_mechanics(extractor):
+    import openpyxl
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "增益"
+    sheet.append([None, "通用增伤", "新机制"])
+    sheet.append(["测试增益", 0.1, 0.2])
+    with pytest.raises(extractor["ExtractError"], match="新机制"):
+        extractor["_buffs"](book, book)
+    sheet.cell(2, 3).value = 0
+    assert extractor["_buffs"](book, book) == {"测试增益": {"generic": 0.1}}
+
+
+def test_all_shipped_models_match_excel_extraction(extractor):
+    import openpyxl
+    root = Path(__file__).resolve().parents[2]
+    for path in sorted((root / "config/system/yysls/damage_model").glob("*.yaml")):
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        excel = root / "data/excel" / doc["source"]["file"]
+        book = openpyxl.load_workbook(excel, data_only=False)
+        cached = openpyxl.load_workbook(excel, data_only=True)
+        try:
+            assert doc["skills"] == extractor["_skills"](book, cached), path.name
+            assert doc["buffs"] == extractor["_buffs"](book, cached), path.name
+            model = parse_model(doc, filename=path.name)
+            if model.school == "破竹·樽":
+                assert next(b for b in model.buffs if b.name == "步乱").modifiers["settlement_bonus"] == 0.2
+            if model.school == "破竹·鸢":
+                for name in ("拳甲R蓄2直伤", "拳甲R蓄4直伤"):
+                    assert model.skill(name).intent_conversion == 1.0
+        finally:
+            book.close()
+            cached.close()
+
+
+def test_conversion_survives_skill_edit_and_reload(models_dir):
+    from lvjiang.apps.yysls.ui.game_settings.damage_model_panel import DamageModelPanel
+    manager, _ = models_dir
+    manager.save_skill("鸣金·虹", "尚未测量", {
+        "outer_ratio": 2, "intent_conversion": 1,
+        "modifiers": {"settlement_bonus": 0.2}})
+    payload = DamageModelPanel._raw_skill(None, manager.model("鸣金·虹"), "尚未测量")
+    manager.save_skill("鸣金·虹", "尚未测量", payload)
+    skill = manager.model("鸣金·虹").skill("尚未测量")
+    assert skill.intent_conversion == 1
+    assert skill.modifiers["settlement_bonus"] == 0.2

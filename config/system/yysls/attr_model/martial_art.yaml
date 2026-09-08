@@ -7,5 +7,53 @@
 #
 # 一门武学的整棵天赋树算一个条目：天赋点怎么加由流派与配装决定，本
 # 模型只关心这门武学最终给了多少静态属性。
+#
+# 无名两门的数据回写自 profiles/鸣金·虹.yaml（2026-09-07 用户实测，19重）。
+# 势/鸣金/会意的转换保留公式，不能把实例中已封顶的观测值写成常数。
+# 条件增伤、技能规则和共享强化声明仍在角色资料中，不混入静态属性。
 kind: martial_art
-entries: {}
+entries:
+  无名剑法·天赋:
+    group: 无名剑法
+    label: 无名剑法·天赋（19重）
+    stats:
+      max_outer:
+        formula:
+          source: dim_shi
+          multiplier: 0.26406926406926406
+          min: 0
+          max: 122
+      min_mingjin: 153
+      max_mingjin: 306
+      mingjin_pen:
+        formula:
+          source: max_mingjin
+          multiplier: 0.0335946248600224
+          min: 0
+          max: 30
+  无名枪法·天赋:
+    group: 无名枪法
+    label: 无名枪法·天赋（19重）
+    stats:
+      stamina_max:
+        # 固定10 + clamp(会意率 * 50 - 5, 0, 10)。
+        formula:
+          source: intent_rate
+          multiplier: 50
+          offset: 5
+          min: 10
+          max: 20
+      intent_rate:
+        formula:
+          source: dim_shi
+          multiplier: 0.00015151515151515154
+          min: 0
+          max: 0.07
+      min_mingjin: 153
+      max_mingjin: 306
+      mingjin_bonus:
+        formula:
+          source: max_mingjin
+          multiplier: 0.00016797312430011198
+          min: 0
+          max: 0.15

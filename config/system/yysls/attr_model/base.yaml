@@ -1,4 +1,21 @@
 # 来源类别: base
-# schema 见 core/attr_model/parsing.py
+# 当前已知基础快照：个人等级23级五维各242，基础天赋估计各41。
+# 来自鸣金·虹角色实例；不代表任意等级/天赋进度，其他角色应按实际修改。
+# 这里只补原始五维，外功/会心/会意由内建转换统一计算，不能重复填写。
+# 天赋详细来源仍待补，41是估计值；体/御转换系数未知，不推测。
 kind: base
-entries: {}
+entries:
+  个人等级·23级五维累计:
+    stats:
+      dim_jin: 242
+      dim_shi: 242
+      dim_min: 242
+      dim_ti: 242
+      dim_yu: 242
+  基础天赋·已知五维估计:
+    stats:
+      dim_jin: 41
+      dim_shi: 41
+      dim_min: 41
+      dim_ti: 41
+      dim_yu: 41

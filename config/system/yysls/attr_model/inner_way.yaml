@@ -10,6 +10,12 @@
 #
 # 不符合该规律的重数直接写 stats 常数；未测量的条目留 modeled: false，
 # 贡献 0 并计入 UI 的建模进度，缺口由反解兜底。
+#
+# 无名心法、千山法、威猛歌、凝神章的已知数据回写自 profiles/鸣金·虹.yaml。
+# 二重为用户提供的单人模式23级显示值，直接记录 stats，不套用装备满词条，
+# 也不随这里的装备等级 level 外推；五重按已知固定增益记录。
+# 无名心法一/三/四/六重仅有触发或技能机制，确认无静态属性；声明保留在
+# 角色资料中。其余三门未提供的重数继续待填，不以「无静态属性」代替未知。
 kind: inner_way
 entries:
   易水歌·二重:
@@ -329,9 +335,11 @@ entries:
     group: 威猛歌
     tier: 1
   威猛歌·二重:
-    modeled: false
     group: 威猛歌
     tier: 2
+    label: 威猛歌·二重（单人模式23级）
+    stats:
+      intent_rate: 0.063
   威猛歌·三重:
     modeled: false
     group: 威猛歌
@@ -341,9 +349,10 @@ entries:
     group: 威猛歌
     tier: 4
   威猛歌·五重:
-    modeled: false
     group: 威猛歌
     tier: 5
+    stats:
+      intent_dmg: 0.052
   威猛歌·六重:
     modeled: false
     group: 威猛歌
@@ -353,9 +362,12 @@ entries:
     group: 千山法
     tier: 1
   千山法·二重:
-    modeled: false
     group: 千山法
     tier: 2
+    label: 千山法·二重（单人模式23级）
+    stats:
+      min_mingjin: 20.7
+      max_mingjin: 41.3
   千山法·三重:
     modeled: false
     group: 千山法
@@ -365,35 +377,39 @@ entries:
     group: 千山法
     tier: 4
   千山法·五重:
-    modeled: false
     group: 千山法
     tier: 5
+    stats:
+      mingjin_pen: 6
   千山法·六重:
     modeled: false
     group: 千山法
     tier: 6
   无名心法·一重:
-    modeled: false
+    no_effect: true
     group: 无名心法
     tier: 1
   无名心法·二重:
-    modeled: false
     group: 无名心法
     tier: 2
+    label: 无名心法·二重（单人模式23级）
+    stats:
+      max_outer: 121.3
   无名心法·三重:
-    modeled: false
+    no_effect: true
     group: 无名心法
     tier: 3
   无名心法·四重:
-    modeled: false
+    no_effect: true
     group: 无名心法
     tier: 4
   无名心法·五重:
-    modeled: false
     group: 无名心法
     tier: 5
+    stats:
+      direct_intent: 0.023
   无名心法·六重:
-    modeled: false
+    no_effect: true
     group: 无名心法
     tier: 6
   燎原星火·一重:
@@ -449,9 +465,12 @@ entries:
     group: 凝神章
     tier: 1
   凝神章·二重:
-    modeled: false
     group: 凝神章
     tier: 2
+    label: 凝神章·二重（单人模式23级）
+    stats:
+      min_outer: 36.4
+      max_outer: 72.8
   凝神章·三重:
     modeled: false
     group: 凝神章
@@ -461,9 +480,10 @@ entries:
     group: 凝神章
     tier: 4
   凝神章·五重:
-    modeled: false
     group: 凝神章
     tier: 5
+    stats:
+      outer_pen: 5.1
   凝神章·六重:
     modeled: false
     group: 凝神章

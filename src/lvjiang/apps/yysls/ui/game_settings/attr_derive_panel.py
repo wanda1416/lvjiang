@@ -50,7 +50,6 @@ from ...config import (
     get_game_config,
     get_loadout,
     get_play_styles,
-    save_derivation,
     save_loadout,
     save_play_style,
 )
@@ -349,6 +348,18 @@ class AttrDerivePanel(QWidget):
                 str(k): float(v) for k, v in nested.items()
                 if isinstance(v, (int, float))
             }
+        # 推导保存的是战斗值；对照和补足使用面板值。保存时记录差集，
+        # 避免来源数据更新或改装后，用新加成反减旧快照。
+        derivation = get_derivation(self._school(), name)
+        if derivation:
+            delta_data = derivation.get("combat_delta")
+            if isinstance(delta_data, dict):
+                delta = CombatAttributes.from_dict(delta_data)
+            else:
+                # 兼容旧记录：按当时装配重建差集；后续保存即携带快照。
+                original = self._resolve(AttrLoadout.from_dict(derivation))
+                delta = original.combat_attrs - original.panel_attrs
+            reference = reference - delta
         return reference
 
     def _resolve(self, loadout: AttrLoadout, *, residual=None):
@@ -367,6 +378,9 @@ class AttrDerivePanel(QWidget):
             name: float(getattr(reference, name, 0.0))
             for name in COMBAT_NUMERIC_FIELDS
         }
+        modeled = self._resolve(loadout).panel_attrs.extra_attrs
+        targets.update({f"extra:{name}": reference.extra_attrs.get(name, 0.0)
+                        for name in set(modeled) | set(reference.extra_attrs)})
         return self._manager().solve_residual_for_loadout(
             loadout, targets,
             school_attr=self._school_attr(),
@@ -378,13 +392,13 @@ class AttrDerivePanel(QWidget):
             return
         try:
             result = self._resolve(loadout)
+            reference = self._reference_attrs()
+            residual = self._residual(loadout, reference)
         except AttrModelError as exc:
             self._summary.setText(tr("推导失败：{msg}").format(msg=str(exc)))
             self._table.setRowCount(0)
             return
 
-        reference = self._reference_attrs()
-        residual = self._residual(loadout, reference)
         differences = (
             diff_against_panel(result, reference) if reference is not None else {}
         )
@@ -447,7 +461,7 @@ class AttrDerivePanel(QWidget):
             self._table.setItem(row, 1, QTableWidgetItem(f"{derived:.4g}"))
 
             # 补足 = 对照 − 推导，即尚未建模的那部分
-            gap = 0.0 if is_extra else residual.get(name, 0.0)
+            gap = residual.get(f"extra:{name}" if is_extra else name, 0.0)
             self._table.setItem(
                 row, 2, QTableWidgetItem(f"{gap:+.4g}" if gap else "-"))
 
@@ -487,11 +501,11 @@ class AttrDerivePanel(QWidget):
         loadout = self._loadout()
         if not loadout.level:
             return
-        residual = (
-            self._residual(loadout, self._reference_attrs())
-            if self._check_residual.isChecked() else {}
-        )
         try:
+            residual = (
+                self._residual(loadout, self._reference_attrs())
+                if self._check_residual.isChecked() else {}
+            )
             result = self._resolve(loadout, residual=residual)
         except AttrModelError as exc:
             QMessageBox.warning(self, tr("推导失败"), str(exc))
@@ -505,10 +519,12 @@ class AttrDerivePanel(QWidget):
         # 存的是战斗属性全集：吃食一类只在战斗内生效的加成也要计入，
         # 毕业率算的是战斗内表现，而不是角色面板。
         try:
-            save_play_style(self._school(), name.strip(),
-                            result.combat_attrs.to_dict())
             # 同时记下这次的装配，事后能查回它是怎么来的
-            save_derivation(self._school(), name.strip(), loadout.to_dict())
+            derivation = loadout.to_dict()
+            derivation["combat_delta"] = (
+                result.combat_attrs - result.panel_attrs).to_dict()
+            save_play_style(self._school(), name.strip(),
+                            result.combat_attrs.to_dict(), derivation=derivation)
         except Exception as exc:
             logger.error(f"保存基础属性失败: {exc}")
             QMessageBox.warning(self, tr("保存失败"), str(exc))

@@ -64,7 +64,10 @@ def game_config_caps_lookup() -> CapsLookup:
 
     def lookup(level: int, category: str) -> float | None:
         entry = get_game_config().get_affix_caps(level, category)
-        return None if entry is None else float(entry["cap"])
+        if entry is None:
+            return None
+        cap = float(entry["cap"])
+        return cap / 100 if entry.get("unit") == "%" else cap
 
     return lookup
 

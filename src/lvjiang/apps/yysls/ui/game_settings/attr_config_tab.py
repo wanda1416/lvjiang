@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 from .....i18n import tr
 from .attr_derive_panel import AttrDerivePanel
 from .attr_source_panel import AttrSourcePanel
+from .character_profile_panel import CharacterProfilePanel
 from .damage_model_panel import DamageModelPanel
 
 #: (标题, 覆盖的来源类别)。分组依据是填写方式而非游戏菜单：
@@ -48,6 +49,8 @@ class AttrConfigTab(QWidget):
             self._panels.append((index, tr(title), panel))
             panel.progress_changed.connect(self._refresh_titles)
 
+        self._character_panel = CharacterProfilePanel()
+        self._tabs.addTab(self._character_panel, tr("角色属性表"))
         self._derive_panel = AttrDerivePanel()
         self._tabs.addTab(self._derive_panel, tr("基础属性推导"))
         self._damage_panel = DamageModelPanel()
@@ -69,5 +72,7 @@ class AttrConfigTab(QWidget):
     def _on_tab_changed(self, index: int) -> None:
         if self._tabs.widget(index) is self._derive_panel:
             self._derive_panel.reload()
+        elif self._tabs.widget(index) is self._character_panel:
+            self._character_panel.reload()
         elif self._tabs.widget(index) is self._damage_panel:
             self._damage_panel.reload()

@@ -5,7 +5,7 @@
 不改动任何既有模块。
 
 分层：models（领域模型 + 固定词汇）← parsing（YAML 解析校验）←
-resolver（两趟求值 + breakdown + 反解）← manager（加载缓存 + 单例），
+resolver（依赖求值 + breakdown + 反解）← manager（加载缓存 + 单例），
 外部一律经本 __init__ 导入。
 
 双出口：``panel_attrs`` 对得上游戏角色面板（排除吃食一类只在战斗内

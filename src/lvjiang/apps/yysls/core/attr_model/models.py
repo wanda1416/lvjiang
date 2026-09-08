@@ -9,7 +9,7 @@
 工作字段空间（WORKING_FIELDS）是 CombatAttributes 的超集，额外含五维
 （dim_*）。五维本身不是战斗属性，但武学天赋的转换公式要读它（例如
 「外功攻击 = 敏 × 系数，上限 73.9」），所以必须在同一空间里参与求值，
-最后投影回 CombatAttributes 时丢弃。
+完整字段保留在 ScopeResult.values，伤害字段另外投影到 CombatAttributes。
 
 取值三形态：
 - 常数：``{ crit_dmg: 0.046 }``
@@ -62,7 +62,7 @@ SOURCE_KIND_LABELS: dict[str, str] = {
     "food": "吃食",
 }
 
-#: 五维工作字段（不属于 CombatAttributes，求值结束后丢弃）
+#: 五维工作字段（不属于 CombatAttributes，保留在 ScopeResult.values）
 DIMENSION_FIELDS: tuple[str, ...] = (
     "dim_jin",  # 劲
     "dim_shi",  # 势
@@ -179,8 +179,14 @@ COMBAT_NUMERIC_FIELDS: tuple[str, ...] = tuple(
 )
 
 #: 求值的工作字段空间：战斗属性 + 五维。五维不是战斗属性，但武学天赋的
-#: 转换公式要读它，所以必须在同一空间里参与求值，投影时丢弃。
-WORKING_FIELDS: tuple[str, ...] = COMBAT_NUMERIC_FIELDS + DIMENSION_FIELDS
+#: 转换公式要读它；完整角色结果保留这些值，伤害出口不携带五维。
+# 完整角色属性保留于 ScopeResult.values；伤害出口仍投影到 CombatAttributes。
+ROLE_FIELDS: dict[str, str] = {
+    "health_max": "气血最大值", "outer_defense": "外功防御",
+    "stamina_max": "耐力上限", "stamina_regen": "耐力回复速度加成",
+    "qi_damage_bonus": "真气伤害加成", "mastery": "属性总造诣",
+}
+WORKING_FIELDS: tuple[str, ...] = COMBAT_NUMERIC_FIELDS + DIMENSION_FIELDS + tuple(ROLE_FIELDS)
 
 #: full_affix 真正支持的词条类别。
 #:
@@ -429,6 +435,7 @@ class ScopeResult:
 
     attrs: Any  # CombatAttributes，避免本模块反向依赖 combat 包
     modifiers: list[AppliedModifier] = field(default_factory=list)
+    values: dict[str, float] = field(default_factory=dict)
 
     def modifiers_for(self, field_name: str) -> list[AppliedModifier]:
         """某个字段收到的全部贡献，按求值顺序"""

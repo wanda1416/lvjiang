@@ -1,0 +1,623 @@
+# 内置鸣金·虹角色属性来源；未知值使用 null / pending，禁止以零代替。
+schema_version: 1
+school: 鸣金·虹
+provenance: 用户于 2026-09-07 提供的游戏内属性与天赋文本，内置随版本发布；不是毕业率 Excel 基线。
+notes: 不含武器及其他装备。基础天赋仅有五维各约 +41 的估计总量，详细来源待补；七张地图蹊跷详细数据待补。23级数值按用户提供的直接贡献记录，五维转换另列明细；体/御到气血/防御的系数未提供，不推测。条件、技能与共享伤害机制仅声明，未接入求值。
+growth:
+  character_level: 23
+  solo_level: 23
+  martial_arts:
+    无名剑法: 19
+    无名枪法: 19
+  inner_ways:
+    无名心法: 6
+    千山法: 6
+    威猛歌: 6
+    凝神章: 6
+  oddities:
+    清河: null
+    开封: null
+    河西: null
+    不见山: null
+    开封皇宫: null
+    青州: null
+    江南: null
+observations:
+  dim_shi: 646
+  max_outer: 5832.5
+  max_mingjin: 1222.6
+  intent_rate: 0.998
+sources:
+  个人等级·23级累计:
+    kind: level
+    label: 个人等级·23级累计
+    status: complete
+    notes: 23级累计总量，不与其他等级累计快照相加。全五维 +242 表示每一维各 +242。
+    basis:
+      character_level: 23
+      snapshot: true
+    static:
+      stats:
+        health_max: 26200
+        min_outer: 102
+        max_outer: 204
+        outer_defense: 51
+        precision: 0.256
+        mastery: 4951
+        dim_jin: 242
+        dim_shi: 242
+        dim_min: 242
+        dim_ti: 242
+        dim_yu: 242
+  基础天赋·已知五维估计:
+    kind: talent
+    label: 基础天赋·已知五维估计
+    status: partial
+    notes: 用户估计已点约41个五维+1天赋，每一点使五维各+1。此处只计这41点；与等级242合计各约283。会心率、会意率、会心/会意伤害、精准率、最小/最大外功和无相、气血、外功防御等详细数据均待补，不视为0或完成。
+    static:
+      stats:
+        dim_jin: 41
+        dim_shi: 41
+        dim_min: 41
+        dim_ti: 41
+        dim_yu: 41
+  蹊跷·清河:
+    kind: oddity
+    label: 蹊跷·清河
+    status: pending
+    notes: 收集进度和具体数值待录入。已知可能增加最小/最大外功及无相攻击、气血和外功防御等；不加会心、会意、精准。
+    basis:
+      map: 清河
+      progress: null
+  蹊跷·开封:
+    kind: oddity
+    label: 蹊跷·开封
+    status: pending
+    notes: 收集进度和具体数值待录入。已知可能增加最小/最大外功及无相攻击、气血和外功防御等；不加会心、会意、精准。
+    basis:
+      map: 开封
+      progress: null
+  蹊跷·河西:
+    kind: oddity
+    label: 蹊跷·河西
+    status: pending
+    notes: 收集进度和具体数值待录入。已知可能增加最小/最大外功及无相攻击、气血和外功防御等；不加会心、会意、精准。
+    basis:
+      map: 河西
+      progress: null
+  蹊跷·不见山:
+    kind: oddity
+    label: 蹊跷·不见山
+    status: pending
+    notes: 收集进度和具体数值待录入。已知可能增加最小/最大外功及无相攻击、气血和外功防御等；不加会心、会意、精准。
+    basis:
+      map: 不见山
+      progress: null
+  蹊跷·开封皇宫:
+    kind: oddity
+    label: 蹊跷·开封皇宫
+    status: pending
+    notes: 收集进度和具体数值待录入。已知可能增加最小/最大外功及无相攻击、气血和外功防御等；不加会心、会意、精准。
+    basis:
+      map: 开封皇宫
+      progress: null
+  蹊跷·青州:
+    kind: oddity
+    label: 蹊跷·青州
+    status: pending
+    notes: 收集进度和具体数值待录入。已知可能增加最小/最大外功及无相攻击、气血和外功防御等；不加会心、会意、精准。
+    basis:
+      map: 青州
+      progress: null
+  蹊跷·江南:
+    kind: oddity
+    label: 蹊跷·江南
+    status: pending
+    notes: 收集进度和具体数值待录入。已知可能增加最小/最大外功及无相攻击、气血和外功防御等；不加会心、会意、精准。
+    basis:
+      map: 江南
+      progress: null
+  五维·体御转换资料:
+    kind: talent
+    label: 五维·体御转换资料
+    status: pending
+    notes: 体、御已保留原值；气血与外功防御转换系数尚未录入。
+  无名剑法·外功攻击提升:
+    kind: martial_art
+    label: 无名剑法·外功攻击提升
+    status: complete
+    notes: 19重：势达到462时封顶122；按所给上限/阈值线性比例建模，保留未取整精度。观测势646，游戏显示已提升122.0。
+    basis:
+      martial_art: 无名剑法
+      martial_tier: 19
+      snapshot: true
+    static:
+      stats:
+        max_outer:
+          formula:
+            source: dim_shi
+            multiplier: 0.26406926406926406
+            offset: 0
+            min: 0
+            max: 122
+  无名剑法·鸣金属性提升:
+    kind: martial_art
+    label: 无名剑法·鸣金属性提升
+    status: complete
+    notes: 最大鸣金893时穿透封顶30；观测最大鸣金1222.6。与枪法各自的153–306按独立来源记录；明确不叠加的共享强化另列。
+    basis:
+      martial_art: 无名剑法
+      martial_tier: 19
+      snapshot: true
+    static:
+      stats:
+        min_mingjin: 153
+        max_mingjin: 306
+        mingjin_pen:
+          formula:
+            source: max_mingjin
+            multiplier: 0.0335946248600224
+            offset: 0
+            min: 0
+            max: 30
+  无名剑法·真气博弈强化:
+    kind: martial_art
+    label: 无名剑法·真气博弈强化
+    status: complete
+    basis:
+      martial_art: 无名剑法
+      martial_tier: 19
+      snapshot: true
+    declarations:
+    - id: qi_damage
+      type: damage_bonus
+      target: 无名剑法.真气伤害
+      value: 0.1
+    - id: qi_pvp
+      type: damage_bonus
+      target: 剑气.真气伤害
+      value:
+        formula:
+          source: max_outer
+          multiplier: 0.0002
+          offset: 0
+          min: 0
+          max: 0.2
+      condition:
+        field: target.kind
+        op: eq
+        value: player
+      description: 每100点最大外功提升2%，1000点封顶20%。
+    - id: hp_pve
+      type: damage_bonus
+      target: 剑气.气血伤害
+      value:
+        formula:
+          source: max_outer
+          multiplier: 0.0002
+          offset: 0
+          min: 0
+          max: 0.2
+      condition:
+        field: target.kind
+        op: eq
+        value: non_player
+  无名剑法·剑气会意强化:
+    kind: martial_art
+    label: 无名剑法·剑气会意强化
+    status: complete
+    basis:
+      martial_art: 无名剑法
+      martial_tier: 19
+      snapshot: true
+    declarations:
+    - id: intent_bonus
+      type: damage_bonus
+      target: 剑气.会意伤害
+      value:
+        formula:
+          source: max_outer
+          multiplier: 0.00011999999999999999
+          offset: 0
+          min: 0
+          max: 0.18
+      condition:
+        any:
+        - field: target.qi_ratio
+          op: le
+          value: 0.4
+        - field: target.qi_unbalanced
+          op: eq
+          value: true
+      description: 真气≤40%（含气竭）或真气失衡；1500点最大外功封顶18%。
+  无名枪法·耐力上限增加:
+    kind: martial_art
+    label: 无名枪法·耐力上限增加
+    status: complete
+    notes: 固定+10与基于会意率追加的上限是两项，额外部分另列。
+    basis:
+      martial_art: 无名枪法
+      martial_tier: 19
+      snapshot: true
+    static:
+      stats:
+        stamina_max: 10
+    declarations:
+    - id: low_stamina_regen
+      type: stat_bonus
+      target: self.stamina_regen
+      value: 0.2
+      condition:
+        field: self.stamina_ratio
+        op: lt
+        value: 0.3
+  无名枪法·耐力上限转换:
+    kind: martial_art
+    label: 无名枪法·耐力上限转换
+    status: complete
+    notes: 会意率超过10%的部分每2%增加1点，30%时额外封顶10。按比例计算，阶梯取整规则未提供。
+    basis:
+      martial_art: 无名枪法
+      martial_tier: 19
+      snapshot: true
+    static:
+      stats:
+        stamina_max:
+          formula:
+            source: intent_rate
+            multiplier: 50
+            offset: -5
+            min: 0
+            max: 10
+  无名枪法·会意率提升:
+    kind: martial_art
+    label: 无名枪法·会意率提升
+    status: complete
+    notes: 势462时封顶7%；基于原始面板属性计算，不读取抗性后的伤害判定概率。
+    basis:
+      martial_art: 无名枪法
+      martial_tier: 19
+      snapshot: true
+    static:
+      stats:
+        intent_rate:
+          formula:
+            source: dim_shi
+            multiplier: 0.00015151515151515154
+            offset: 0
+            min: 0
+            max: 0.07
+  无名枪法·会意伤害提升:
+    kind: martial_art
+    label: 无名枪法·会意伤害提升
+    status: complete
+    basis:
+      martial_art: 无名枪法
+      martial_tier: 19
+      snapshot: true
+    declarations:
+    - id: intent_bonus
+      type: damage_bonus
+      target: self.intent_dmg
+      value:
+        formula:
+          source: intent_rate
+          multiplier: 0.6
+          offset: 0
+          min: 0
+          max: 0.18
+      condition:
+        any:
+        - field: self.buff
+          op: contains
+          value: 长风
+        - field: self.stamina_ratio
+          op: lt
+          value: 0.6
+      description: 拥有长风或耐力<60%，会意率30%时封顶18%。
+  无名枪法·鸣金属性提升:
+    kind: martial_art
+    label: 无名枪法·鸣金属性提升
+    status: complete
+    notes: 最大鸣金893时伤害加成封顶15%；与剑法各自的153–306按独立来源记录。
+    basis:
+      martial_art: 无名枪法
+      martial_tier: 19
+      snapshot: true
+    static:
+      stats:
+        min_mingjin: 153
+        max_mingjin: 306
+        mingjin_bonus:
+          formula:
+            source: max_mingjin
+            multiplier: 0.00016797312430011198
+            offset: 0
+            min: 0
+            max: 0.15
+  无名剑法·共享强化:
+    kind: martial_art
+    label: 无名剑法·共享强化
+    status: complete
+    basis:
+      martial_art: 无名剑法
+      martial_tier: 19
+      snapshot: true
+    declarations:
+    - id: attribute_damage
+      type: attack_scaling
+      target: 全部招式.属性攻击
+      value: true
+      description: 全部招式可基于属性攻击造成伤害。
+      shared_key: 无名武学.属性攻击伤害
+    - id: mingjin_damage
+      type: damage_bonus
+      target: 鸣金攻击伤害
+      value: 0.5
+      shared_key: 无名武学.鸣金伤害50
+    - id: added_outer
+      type: attack_scaling
+      target: 当前武学.外功附加攻击
+      value: 0.5
+      description: 两门武学共享且不叠加；作用于当前武学所有技能附加攻击。
+      shared_key: 无名武学.外功附加攻击50
+    - id: added_attribute
+      type: attack_scaling
+      target: 当前武学.属性附加攻击
+      value: 0.5
+      shared_key: 无名武学.属性附加攻击50
+  无名枪法·共享强化:
+    kind: martial_art
+    label: 无名枪法·共享强化
+    status: complete
+    basis:
+      martial_art: 无名枪法
+      martial_tier: 19
+      snapshot: true
+    declarations:
+    - id: attribute_damage
+      type: attack_scaling
+      target: 全部招式.属性攻击
+      value: true
+      description: 全部招式可基于属性攻击造成伤害。
+      shared_key: 无名武学.属性攻击伤害
+    - id: mingjin_damage
+      type: damage_bonus
+      target: 鸣金攻击伤害
+      value: 0.5
+      shared_key: 无名武学.鸣金伤害50
+    - id: added_outer
+      type: attack_scaling
+      target: 当前武学.外功附加攻击
+      value: 0.5
+      description: 两门武学共享且不叠加；作用于当前武学所有技能附加攻击。
+      shared_key: 无名武学.外功附加攻击50
+    - id: added_attribute
+      type: attack_scaling
+      target: 当前武学.属性附加攻击
+      value: 0.5
+      shared_key: 无名武学.属性附加攻击50
+  无名心法·2重属性:
+    kind: inner_way
+    label: 无名心法·2重属性
+    status: complete
+    notes: 单人模式23级的游戏显示值；不套用装备满词条。
+    basis:
+      inner_way: 无名心法
+      inner_tier: 2
+      solo_level: 23
+    static:
+      stats:
+        max_outer: 121.3
+  无名心法·5重属性:
+    kind: inner_way
+    label: 无名心法·5重属性
+    status: complete
+    notes: 单人模式23级的游戏显示值；不套用装备满词条。
+    basis:
+      inner_way: 无名心法
+      inner_tier: 5
+    static:
+      stats:
+        direct_intent: 0.023
+  千山法·2重属性:
+    kind: inner_way
+    label: 千山法·2重属性
+    status: complete
+    notes: 单人模式23级的游戏显示值；不套用装备满词条。
+    basis:
+      inner_way: 千山法
+      inner_tier: 2
+      solo_level: 23
+    static:
+      stats:
+        min_mingjin: 20.7
+        max_mingjin: 41.3
+  千山法·5重属性:
+    kind: inner_way
+    label: 千山法·5重属性
+    status: complete
+    notes: 单人模式23级的游戏显示值；不套用装备满词条。
+    basis:
+      inner_way: 千山法
+      inner_tier: 5
+    static:
+      stats:
+        mingjin_pen: 6
+  千山法·基础增益待录入:
+    kind: inner_way
+    label: 千山法·基础增益待录入
+    status: pending
+    notes: 只提供了二、五重属性增益；其余重数的机制未提供，不标为无效果。
+    basis:
+      inner_way: 千山法
+      inner_tier: 1
+  威猛歌·2重属性:
+    kind: inner_way
+    label: 威猛歌·2重属性
+    status: complete
+    notes: 单人模式23级的游戏显示值；不套用装备满词条。
+    basis:
+      inner_way: 威猛歌
+      inner_tier: 2
+      solo_level: 23
+    static:
+      stats:
+        intent_rate: 0.063
+  威猛歌·5重属性:
+    kind: inner_way
+    label: 威猛歌·5重属性
+    status: complete
+    notes: 单人模式23级的游戏显示值；不套用装备满词条。
+    basis:
+      inner_way: 威猛歌
+      inner_tier: 5
+    static:
+      stats:
+        intent_dmg: 0.052
+  威猛歌·基础增益待录入:
+    kind: inner_way
+    label: 威猛歌·基础增益待录入
+    status: pending
+    notes: 只提供了二、五重属性增益；其余重数的机制未提供，不标为无效果。
+    basis:
+      inner_way: 威猛歌
+      inner_tier: 1
+  凝神章·2重属性:
+    kind: inner_way
+    label: 凝神章·2重属性
+    status: complete
+    notes: 单人模式23级的游戏显示值；不套用装备满词条。赛季特殊搭配，替换通用易水歌，按当前实际装备记录。
+    basis:
+      inner_way: 凝神章
+      inner_tier: 2
+      solo_level: 23
+    static:
+      stats:
+        min_outer: 36.4
+        max_outer: 72.8
+  凝神章·5重属性:
+    kind: inner_way
+    label: 凝神章·5重属性
+    status: complete
+    notes: 单人模式23级的游戏显示值；不套用装备满词条。赛季特殊搭配，替换通用易水歌，按当前实际装备记录。
+    basis:
+      inner_way: 凝神章
+      inner_tier: 5
+    static:
+      stats:
+        outer_pen: 5.1
+  凝神章·基础增益待录入:
+    kind: inner_way
+    label: 凝神章·基础增益待录入
+    status: pending
+    notes: 只提供了二、五重属性增益；其余重数的机制未提供，不标为无效果。
+    basis:
+      inner_way: 凝神章
+      inner_tier: 1
+  无名心法·一重基础增益:
+    kind: inner_way
+    label: 无名心法·一重基础增益
+    status: complete
+    basis:
+      inner_way: 无名心法
+      inner_tier: 1
+    declarations:
+    - id: charge_without_shield
+      type: skill_rule
+      target: 多道剑气.蓄力条件
+      value: 无需真气护盾
+      condition:
+        any:
+        - field: self.in_combat
+          op: eq
+          value: false
+        - recent_event:
+            name: 退亦有方剑气释放
+            seconds: 5
+  无名心法·三重基础增益:
+    kind: inner_way
+    label: 无名心法·三重基础增益
+    status: complete
+    basis:
+      inner_way: 无名心法
+      inner_tier: 3
+    declarations:
+    - id: no_abrasion
+      type: force_outcome
+      target: 多道剑气
+      value: 不会擦伤
+      condition:
+        field: target.exhausted
+        op: eq
+        value: true
+    - id: third_intent
+      type: force_outcome
+      target: 第三道剑气
+      value: 必定会意
+      condition:
+        all:
+        - field: target.exhausted
+          op: eq
+          value: true
+        - field: target.kind
+          op: eq
+          value: non_player
+  无名心法·四重基础增益:
+    kind: inner_way
+    label: 无名心法·四重基础增益
+    status: complete
+    basis:
+      inner_way: 无名心法
+      inner_tier: 4
+    declarations:
+    - id: repeat_charge
+      type: skill_rule
+      target: 多道剑气
+      value: 可以继续蓄力发射
+      condition:
+        field: event
+        op: eq
+        value: 多道剑气释放
+      duration: 5
+  无名心法·六重基础增益:
+    kind: inner_way
+    label: 无名心法·六重基础增益
+    status: complete
+    basis:
+      inner_way: 无名心法
+      inner_tier: 6
+    declarations:
+    - id: qi_surge_stamina
+      type: resource
+      target: self.stamina
+      value: 20
+      condition:
+        field: event
+        op: eq
+        value: 获得气涌
+      description: 发射多道剑气后获得气涌时，立即回复20耐力；触发间隔由气涌机制决定。
+    - id: qi_surge_cast
+      type: skill_rule
+      target: 多道剑气
+      value: 无需蓄力再释放一次并移除气涌
+      condition:
+        field: self.buff
+        op: contains
+        value: 气涌
+      duration: 5
+    - id: qi_surge_interval
+      type: cooldown
+      target: 气涌
+      value: 20
+      description: 初始触发间隔20秒。
+    - id: qi_surge_reduction
+      type: cooldown
+      target: 气涌
+      value: -1
+      condition:
+        field: event
+        op: eq
+        value: 每道剑气首次命中首领
+      description: 每道剑气首次命中首领使间隔减少1秒，每次间隔最多减少8秒。
+      max_reduction: 8

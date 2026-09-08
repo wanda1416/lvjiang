@@ -45,7 +45,7 @@ from .models import (
 )
 
 #: 技能条目允许的键
-_SKILL_KEYS = set(RATIO_FIELDS) | {"kind", "charge", "qi_ratio", "modifiers", "force"}
+_SKILL_KEYS = set(RATIO_FIELDS) | {"kind", "charge", "qi_ratio", "intent_conversion", "modifiers", "force"}
 
 #: 文件顶层允许的键
 _DOCUMENT_KEYS = {"school", "scheme", "source", "skills", "buffs"}
@@ -112,6 +112,8 @@ def parse_skill(name: str, raw: Any) -> DamageSkill:
         kind=kind,
         charge=_flag(data.get("charge", False), f"{name}.charge"),
         qi_ratio=_number(data.get("qi_ratio", 0.0), f"{name}.qi_ratio"),
+        intent_conversion=_number(data.get("intent_conversion", 0.0),
+                                  f"{name}.intent_conversion"),
         modifiers=_parse_modifiers(data.get("modifiers"), f"{name}.modifiers"),
         force=force,
         **{

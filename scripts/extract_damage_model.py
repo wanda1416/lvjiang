@@ -34,9 +34,10 @@ SCHEME_DIR = ROOT / "config" / "system" / "yysls" / "graduation"
 TARGET_DIR = ROOT / "config" / "system" / "yysls" / "damage_model"
 
 #: `武学奇术` / `增益` 两张表的表头名 → 配置字段。两张表用同一套词汇，
-#: 因为它们在求值里走的就是同一条加法。
+#: 同名列共用词汇，不同增伤乘区分别保留。
 MODIFIERS = {
     "通用增伤": "generic", "特殊增伤": "special",
+    "结算增伤": "settlement_bonus",
     "最小外功": "min_outer", "最大外功": "max_outer",
     "外功加成": "outer_bonus", "外功穿透": "outer_pen",
     "外攻伤害加成": "outer_dmg", "属性攻击加成": "attr_bonus",
@@ -47,6 +48,7 @@ MODIFIERS = {
     "会心率": "crit_rate", "会心伤害": "crit_dmg",
     "会意率": "intent_rate", "会意伤害": "intent_dmg",
     "直接会心率": "direct_crit", "直接会意率": "direct_intent",
+    "直接会心": "direct_crit", "直接会意": "direct_intent",
 }
 RATIOS = {
     "外功倍率": "outer_ratio", "外攻固伤": "outer_fixed",
@@ -88,6 +90,22 @@ def _number(value) -> float:
     return round(float(value), 10) if isinstance(value, (int, float)) else 0.0
 
 
+def _validate_columns(sheet, cached, headers: dict[str, int], known: set[str]) -> None:
+    """未知列出现有效数据时停止，不能将未理解的机制抽成无加成。"""
+    for label, column in headers.items():
+        if column == 1 or label in known:
+            continue
+        for row in range(2, sheet.max_row + 1):
+            name = str(sheet.cell(row, 1).value or "").strip()
+            if not name or name == "N/a":
+                continue
+            value = _value(sheet, cached, row, column)
+            if value not in (None, "", 0):
+                raise ExtractError(
+                    f"{sheet.title}!{sheet.cell(row, column).coordinate} "
+                    f"未支持的有效字段 {label}: {value}")
+
+
 def _modifiers(sheet, cached, row: int, headers: dict[str, int]) -> dict[str, float]:
     out = {}
     for label, field in MODIFIERS.items():
@@ -100,6 +118,9 @@ def _modifiers(sheet, cached, row: int, headers: dict[str, int]) -> dict[str, fl
 def _skills(book, cached_book) -> dict[str, dict]:
     sheet, cached = book["武学奇术"], cached_book["武学奇术"]
     headers = _headers(sheet)
+    _validate_columns(sheet, cached, headers,
+                      set(MODIFIERS) | set(RATIOS) | set(FORCE)
+                      | {"类型", "定音加成", "真气比例", "会意转化"})
     missing = set(RATIOS) - set(headers)
     if missing:
         raise ExtractError(f"武学奇术 缺少列: {'、'.join(sorted(missing))}")
@@ -117,6 +138,9 @@ def _skills(book, cached_book) -> dict[str, dict]:
         qi = _number(_value(sheet, cached, row, headers.get("真气比例")))
         if qi:
             entry["qi_ratio"] = qi
+        conversion = _number(_value(sheet, cached, row, headers.get("会意转化")))
+        if conversion:
+            entry["intent_conversion"] = conversion
         for label, field in RATIOS.items():
             value = _number(_value(sheet, cached, row, headers[label]))
             if value:
@@ -138,6 +162,7 @@ def _skills(book, cached_book) -> dict[str, dict]:
 def _buffs(book, cached_book) -> dict[str, dict]:
     sheet, cached = book["增益"], cached_book["增益"]
     headers = _headers(sheet)
+    _validate_columns(sheet, cached, headers, set(MODIFIERS))
     buffs: dict[str, dict] = {}
     for row in range(2, sheet.max_row + 1):
         name = str(sheet.cell(row, 1).value or "").strip()

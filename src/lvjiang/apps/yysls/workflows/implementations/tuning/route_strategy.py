@@ -53,7 +53,7 @@ class TuningRouteStrategy(ABC):
         result = self._call_subcall("nav_equip_to_tune")
         return self._subcall_succeeded(result)
 
-    def leave_tune_detail(self) -> None:
+    def leave_tune_detail(self, *, for_recycle: bool = False) -> None:
         """离开调律页，并将装备详情页恢复到可继续操作的状态。"""
         self._wf.click_region(self._wf.TUNE_SCENE, "back")
         self._wf.wait_stable("page_refresh")
@@ -115,8 +115,15 @@ class TuningRouteStrategy(ABC):
 class AndroidTuningRouteStrategy(TuningRouteStrategy):
     env = "android"
 
-    def leave_tune_detail(self) -> None:
-        super().leave_tune_detail()
+    def __init__(self, wf: RouteHostPort):
+        super().__init__(wf)
+        self._recycle_menu_ready = False
+
+    def leave_tune_detail(self, *, for_recycle: bool = False) -> None:
+        super().leave_tune_detail(for_recycle=for_recycle)
+        self._recycle_menu_ready = for_recycle
+        if for_recycle:
+            return
         # Android 通过「更多」进入调律，返回后弹窗仍保持展开。
         self._wf.click_region(self._wf.EQUIP_DETAIL, "more_func")
         self._wf.wait_delay("step_interval")
@@ -124,8 +131,10 @@ class AndroidTuningRouteStrategy(TuningRouteStrategy):
     def open_recycle_dialog(self) -> bool:
         # 经「更多」弹窗 → 子菜单「回收」
         wf = self._wf
-        wf.click_region(wf.EQUIP_DETAIL, "more_func")
-        wf.wait_stable("page_refresh")
+        if not self._recycle_menu_ready:
+            wf.click_region(wf.EQUIP_DETAIL, "more_func")
+            wf.wait_stable("page_refresh")
+        self._recycle_menu_ready = False
         # "回收" 是要在游戏截屏 OCR 结果里找的按钮文字，恒为中文，
         # 不能过 tr()（英文界面下会拿翻译后的英文去匹配中文截屏，
         # 永远匹配不上，回收功能会在英文界面下完全失效）。

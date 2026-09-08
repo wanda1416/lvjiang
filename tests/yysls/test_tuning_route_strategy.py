@@ -54,6 +54,39 @@ def test_android_opens_recycle_dialog():
     assert wf.wait_stable.call_count == 2
 
 
+def test_android_reuses_menu_after_tuning_and_consumes_ready_state():
+    wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL, TUNE_SCENE="tune")
+    wf.ocr_scene_by.return_value = "sub_func_2"
+    routes = AndroidTuningRouteStrategy(wf)
+
+    routes.leave_tune_detail(for_recycle=True)
+    assert routes.open_recycle_dialog() is True
+    assert wf.click_region.call_args_list == [
+        call("tune", "back"),
+        call(EQUIP_DETAIL, "sub_func_2"),
+    ]
+    # 下一件直接回收仍须展开菜单，不能沿用上一件的状态。
+    wf.click_region.reset_mock()
+    assert routes.open_recycle_dialog() is True
+    assert wf.click_region.call_args_list == [
+        call(EQUIP_DETAIL, "more_func"),
+        call(EQUIP_DETAIL, "sub_func_2"),
+    ]
+
+
+def test_android_missing_recycle_after_tuning_closes_existing_menu():
+    wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL, TUNE_SCENE="tune")
+    wf.ocr_scene_by.return_value = ""
+    routes = AndroidTuningRouteStrategy(wf)
+
+    routes.leave_tune_detail(for_recycle=True)
+    assert routes.open_recycle_dialog() is False
+    assert wf.click_region.call_args_list == [
+        call("tune", "back"),
+        call(EQUIP_DETAIL, "more_func"),
+    ]
+
+
 def test_android_closes_menu_when_recycle_entry_missing():
     wf = MagicMock(EQUIP_DETAIL=EQUIP_DETAIL, CONTROL_SCENE=CONTROL_SCENE)
     wf.ocr_scene_by.return_value = ""

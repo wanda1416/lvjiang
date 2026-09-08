@@ -61,7 +61,8 @@ class TuningRecycler:
         """回收当前详情页选中的装备
 
         回收入口路径按环境不同，见 TuningRouteStrategy.open_recycle_dialog。
-        进入时背包详情页无弹窗；Android 未找到回收入口时收起
+        进入时位于背包详情页；Android 从调律返回可复用展开的更多菜单。
+        Android 未找到回收入口时收起
         弹窗返回 UNAVAILABLE（装备保留原地）。桌面端直接按 X，
         再由确认弹窗识别结果判定。成功后背包刷新、后续装备前移补位。
         确认弹窗同时读取「确认」与「取消」，任一按钮命中即说明弹窗正常，

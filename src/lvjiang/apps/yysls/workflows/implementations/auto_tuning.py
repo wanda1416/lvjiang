@@ -1281,7 +1281,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 返回背包浏览页，并由环境策略恢复装备详情页的可操作状态。
         self.executor.invalidate_cache()  # 退出调律页，清空材料缓存
         self._emit_operation("finish", "正在返回背包并完成当前装备收尾")
-        self.navigator.leave_tune()
+        self.navigator.leave_tune(
+            for_recycle=bool(tune_recycle_reason) and not self.is_stopped)
 
         judgement = self.judge.final_judge(equip_data)
         self.recorder.report_set("rounds", rounds)

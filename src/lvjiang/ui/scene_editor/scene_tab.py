@@ -64,6 +64,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         # 引用的坐标是布局加载期展开的，新加的那几条得补进当前布局才画得出来。
         self.on_scene_references_added: (
             Callable[[str, list[tuple[str, str]]], None] | None) = None
+        self.on_scene_reference_removed: Callable[[str, str, str], None] | None = None
         # 当前布局名，由 dialog 经 set_layout_name 注入（解析布局坐标文件来源用）
         self._layout_name: str = ""
         self._layout_rel_path: str = ""
@@ -113,6 +114,8 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self._refresh_reference_list()
         self._canvas.on_region_changed = self._refresh_region_list
         self._canvas.on_poi_changed = self._on_poi_changed
+        self._canvas.on_panel_edit_requested = (
+            lambda key: self._show_panel_properties(key, layout_first=True))
         self._canvas.on_panel_changed = self._on_panel_changed
         self._canvas.on_subscene_ref_changed = self._on_subscene_ref_changed
         # 选中态变化只刷新列表高亮，不走 dialog 的 dirty 链路

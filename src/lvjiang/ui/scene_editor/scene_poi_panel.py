@@ -121,7 +121,6 @@ class PoiPanelMixin:
         self._btn_add_point_ref.setToolTip(
             tr("引用其他一级场景已定义的坐标；坐标属于源场景，本场景只读"))
         self._btn_add_point_ref.clicked.connect(self._on_add_point_reference)
-        btn_row.addWidget(self._btn_add_point_ref)
         self._btn_del_point = QPushButton(tr("删除坐标"))
         self._btn_del_point.setToolTip(tr("从场景 YAML 中删除坐标点定义（meta 数据）"))
         self._btn_del_point.clicked.connect(self._on_delete_point_def)
@@ -130,6 +129,7 @@ class PoiPanelMixin:
         self._btn_bind_point.setToolTip(tr("在画布上放置一个坐标点（绑定到 YAML 定义）"))
         self._btn_bind_point.clicked.connect(self._on_new_point)
         btn_row.addWidget(self._btn_bind_point)
+        btn_row.addWidget(self._btn_add_point_ref)
         apply_button_style(self._btn_new_point_def)
         apply_button_style(self._btn_add_point_ref, variant="neutral")
         apply_button_style(self._btn_bind_point, variant="neutral")
@@ -463,6 +463,8 @@ class PoiPanelMixin:
         new_def.view = ""
         # 先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
         try:
+            registry.validate_reference_retarget(
+                self._scene_key, target_scene, old_key, new_key)
             registry.add_point_to_scene(target_scene, new_def)
         except ValueError as e:
             QMessageBox.warning(self, tr("迁移失败"), str(e))

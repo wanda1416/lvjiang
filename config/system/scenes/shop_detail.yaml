@@ -32,7 +32,4 @@ regions:
 panels:
 - key: items
   name: 购买列表
-  min_visible: 0.95
   view: jingxuan_daoju
-  calibration: even
-  scroll_direction: none

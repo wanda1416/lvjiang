@@ -130,14 +130,10 @@ points:
 panels:
 - key: role_list
   name: 角色列表
-  min_visible: 0.95
   view: roles
-  calibration: even
 - key: user_list
   name: 用户列表
-  min_visible: 0.95
   view: users
-  calibration: even
 references:
 - scene: general_control
   entity: cancel

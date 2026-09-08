@@ -454,6 +454,20 @@ def scene_layout_rel(name: str, scene_key: str) -> str:
     return scene_layout_rels(name, (scene_key,))[scene_key]
 
 
+def shared_layout_bindings(name: str) -> list[str]:
+    """返回与指定布局共用场景绑定的布局名（包括根布局和别名）。"""
+    doc = get_resolver().load_merged(_LAYOUTS_YAML_REL).get("layouts", {})
+    current = _resolve_layout_entry(doc, name)
+    if current is None:
+        return []
+    names = []
+    for candidate in doc:
+        resolved = _resolve_layout_entry(doc, candidate)
+        if resolved is not None and resolved[1] == current[1]:
+            names.append(candidate)
+    return names
+
+
 def scene_layout_rels(name: str,
                       scene_keys: Iterable[str]) -> dict[str, str]:
     """批量返回布局场景路径，只解析一次 ``layouts.yaml``。

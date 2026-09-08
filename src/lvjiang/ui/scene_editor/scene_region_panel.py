@@ -122,6 +122,9 @@ class RegionPanelMixin:
 
     def _refresh_region_list(self):
         """刷新区域表格，显示 name(key)、类型、含文本、可点击"""
+        current = self._region_table.item(self._region_table.currentRow(), 1)
+        selected_key = self._canvas.selected_region_key() or (
+            current.text() if current is not None else None)
         self._region_table.blockSignals(True)
         self._region_table.setRowCount(0)
         registry = get_registry()
@@ -182,7 +185,14 @@ class RegionPanelMixin:
             self._region_table.setItem(row, 8, QTableWidgetItem(""))
 
         self._append_reference_rows(scene, assigned_by_key)
+        # 重建时恢复实体身份，而不是让 Qt 在焦点返回时选择第一行。
+        for row in range(self._region_table.rowCount()):
+            item = self._region_table.item(row, 1)
+            if item is not None and item.text() == selected_key:
+                self._region_table.selectRow(row)
+                break
         self._region_table.blockSignals(False)
+        self._update_region_delete_button()
 
     def _append_reference_rows(self, scene, assigned_by_key) -> None:
         """追加跨场景引用行。
@@ -234,9 +244,18 @@ class RegionPanelMixin:
 
     # ─── 事件处理 ────────────────────────────────────────
 
+    def _update_region_delete_button(self):
+        """区分本地定义删除与跨场景引用解除。"""
+        is_reference = self._selected_reference() is not None
+        self._btn_del_region.setText(tr("解除引用") if is_reference else tr("删除区域"))
+        self._btn_del_region.setToolTip(
+            tr("移除当前场景的引用，保留源场景定义和布局坐标")
+            if is_reference else tr("删除区域定义及所有布局中的对应绑定"))
+        self._btn_del_region.setEnabled(self._region_table.currentRow() >= 0)
+
     def _on_region_table_selection(self, row, col, prev_row, prev_col):
         """表格行选中时更新删除按钮状态"""
-        self._btn_del_region.setEnabled(row >= 0)
+        self._update_region_delete_button()
         # 同步画布选中（表格已按视图过滤，row 不再对应 scene.regions 索引，改按 key 查）
         if row < 0:
             return
@@ -249,6 +268,7 @@ class RegionPanelMixin:
             if r.key == key:
                 self._canvas.select_region(i)
                 return
+        self._canvas.clear_field_selection()
 
     def _on_edit_region_from_table(self, row, col):
         """双击表格行编辑区域（场景变更时跨场景迁移）"""
@@ -299,6 +319,8 @@ class RegionPanelMixin:
         new_def.view = ""
         # 先加到目标场景（key 冲突则中止，YAML 未动），再从当前场景移除
         try:
+            registry.validate_reference_retarget(
+                self._scene_key, target_scene, old_key, new_key)
             registry.add_region_to_scene(target_scene, new_def)
         except ValueError as e:
             QMessageBox.warning(self, tr("迁移失败"), str(e))
@@ -357,7 +379,10 @@ class RegionPanelMixin:
         self._refresh_lists()
 
     def _on_delete_region(self):
-        """删除区域定义"""
+        """本地行删除定义，引用行解除当前场景的引用。"""
+        if self._selected_reference() is not None:
+            self._on_remove_scene_reference()
+            return
         row = self._region_table.currentRow()
         if row < 0:
             return
@@ -641,12 +666,27 @@ class RegionPanelMixin:
         if ref is None:
             return
         if QMessageBox.question(
-            self, tr("移除引用"),
-            tr("确定移除对 {scene}.{entity} 的引用吗？源场景的定义不受影响。")
+            self, tr("解除引用"),
+            tr("确定解除当前场景对 {scene}.{entity} 的引用吗？源场景的定义和布局坐标不受影响。")
                 .format(scene=ref.scene, entity=ref.entity),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:
             return
         registry = get_registry()
-        registry.remove_scene_reference(self._scene_key, ref.scene, ref.entity)
+        try:
+            registry.remove_scene_reference(self._scene_key, ref.scene, ref.entity)
+        except ValueError as exc:
+            QMessageBox.warning(self, tr("解除引用失败"), str(exc))
+            return
+        # 只移除加载期展开的引用投影，保留本地未保存坐标和隐藏视图内容。
+        # 不使用删除布局坐标的路径，也不把已保存的定义修改标成布局 dirty。
+        self._canvas.set_regions([
+            region for region in self._canvas.get_regions()
+            if not (region.key == ref.entity and region.source_scene == ref.scene)
+        ])
+        callback = getattr(self, "on_scene_reference_removed", None)
+        if callback is not None:
+            callback(self._scene_key, ref.scene, ref.entity)
         sync_scene_cache(self._scene_key)
         self._refresh_lists()

@@ -19,6 +19,24 @@ def test_sync_before_save_rebuilds_scene_references():
     host._refresh_loaded_subscene_contents.assert_called_once_with()
 
 
+def test_unlink_removes_only_target_projection_from_in_memory_layout():
+    native = Region("native", .8, .2, .1, .1)
+    source = Region("shared", .2, .3, .1, .1)
+    projection = source.clone()
+    projection.source_scene = "source"
+    other = Region("other", .4, .5, .1, .1, source_scene="source")
+    host = Mock()
+    host._current_layout = Layout(name="test", regions={
+        "source": [source], "current": [native, projection, other],
+        "another": [projection.clone()],
+    })
+    SceneEditorDialog._on_scene_reference_removed(host, "current", "source", "shared")
+    assert host._current_layout.get_scene_regions("current") == [native, other]
+    assert host._current_layout.get_scene_regions("source") == [source]
+    assert host._current_layout.get_scene_regions("another") == [projection]
+    host._mark_scene_dirty.assert_not_called()
+
+
 def test_rebuilt_reference_is_pushed_to_loaded_target_tab(monkeypatch):
     refreshed = Region(
         "status", 0.2, 0.3, 0.1, 0.05,

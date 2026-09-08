@@ -126,9 +126,6 @@ regions:
 panels:
 - key: materials
   name: 材料格
-  min_visible: 0.95
-  calibration: even
-  scroll_direction: none
 references:
 - scene: general_control
   entity: confirm

@@ -240,10 +240,7 @@ class SceneRegistry:
             panels.append(PanelDef(
                 key=pd["key"],
                 name=pd.get("name", pd["key"]),
-                min_visible=float(pd.get("min_visible", 0.95)),
                 views=_views_of(pd),
-                calibration=str(pd.get("calibration", "auto")),
-                scroll_direction=str(pd.get("scroll_direction", "vertical")),
             ))
 
         subscene_refs = []
@@ -1169,10 +1166,7 @@ class SceneRegistry:
                 {
                     "key": p.key,
                     "name": p.name,
-                    "min_visible": p.min_visible,
                     **_view_fields(p),
-                    **({"calibration": p.calibration} if p.calibration != "auto" else {}),
-                    **({"scroll_direction": p.scroll_direction} if p.scroll_direction != "vertical" else {}),
                 }
                 for p in scene.panels
             ]

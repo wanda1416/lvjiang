@@ -66,8 +66,6 @@ panels:                         # 可寻址容器（默认 type=grid）
   - key: panel_key
     name: 面板名称
     type: grid                  # grid（默认，可省略） / regions（规划中）
-    rows: 3
-    cols: 6
 ```
 
 ### Subscene — 可复用场景
@@ -209,7 +207,13 @@ panels:
 
 ### grid 型 Panel
 
-当前唯一实现的类型。Panel 定义 `rows`/`cols` 后，内部每个格子通过 `[r][c]` 二维索引寻址（从 1 开始计数）。首次访问时自动触发图像自对齐（`align`），缓存各格子中心坐标。
+场景 `PanelDef` 只保存 `key`、`name`、`views`。布局 `Panel` 保存矩形坐标、
+`rows`、`cols`、`min_visible`、`calibration`、`scroll_direction`、`disabled`。
+行列、可见比例、校准模式和滚动方向均按布局独立配置；运行时只读取布局值。
+旧场景 YAML 中的校准字段兼容忽略，保存定义时清理；已绑定布局 JSON 原样保留。
+
+
+当前唯一实现的类型。布局 Panel 配置 `rows`/`cols` 后，内部每个格子通过 `[r][c]` 二维索引寻址（从 1 开始计数）。首次访问时自动触发图像自对齐（`align`），缓存各格子中心坐标。
 
 DSL 中的使用：
 
@@ -237,7 +241,7 @@ Layout 内部包含四个独立层次：
 |------|------|----------|
 | **Area-Coord 绑定** | 位置 | 每个 Area（Point / Region）在屏幕上的归一化坐标 |
 | **Area-Action 绑定** | 激活方式 | 可选 `activation_key`；为空时默认点击坐标 |
-| **Panel-Coord 绑定** | 位置 | 每个 Panel 在屏幕上的归一化坐标（grid 型还包含校准缓存） |
+| **Panel-Coord 绑定** | 位置 | 每个 Panel 的归一化坐标、行列数及校准参数；校准缓存仅存在于运行时 |
 | **Action → Arrow** | 行为 | 基于 Area 的拖拽动作（from → to） |
 
 ### Area-Coord 绑定

@@ -69,8 +69,25 @@ HANDLE_CURSORS = {
 class CanvasInteractionMixin(CanvasCoordMixin):
     """交互逻辑混入类 - 需要主类提供状态属性和绘制方法"""
 
+    def mouseDoubleClickEvent(self, event: QMouseEvent | None):
+        if event is None:
+            return
+        if (event.button() == Qt.MouseButton.LeftButton
+                and self._edit_mode == EditMode.REGION
+                and self._pending_panel_def is None
+                and self._pending_subscene_ref_def is None):
+            index, _handle = self._hit_panel_test(event.position())
+            if index >= 0 and self.on_panel_edit_requested:
+                self._panel_edit_mode = None
+                self._panel_edit_orig = None
+                self.on_panel_edit_requested(self._panels[index].key)
+                event.accept()
+                return
+        super().mouseDoubleClickEvent(event)  # type: ignore[misc]
+
     # 以下属性由主类提供
     _regions: list[Region]
+    _panel_edit_mode: DragMode | None
     _selected_idx: int
     _field_selected: bool
     _drag_mode: DragMode | None
@@ -309,7 +326,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     # ─── 鼠标事件 ────────────────────────────────────────
 
-    def mousePressEvent(self, event: QMouseEvent):
+    def mousePressEvent(self, event: QMouseEvent | None):
+        if event is None:
+            return
         if event.button() == Qt.MouseButton.RightButton:
             pos = event.position()
             # 引用绘制在面板之上，右键命中优先级与左键保持一致。
@@ -498,7 +517,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         # 刚开始框选，尚未产生有效数据（释放时才绑定字段），不标记 dirty
         self.update()
 
-    def mouseMoveEvent(self, event: QMouseEvent):
+    def mouseMoveEvent(self, event: QMouseEvent | None):
+        if event is None:
+            return
         pos = event.position()
 
         if self._subscene_drag_start is not None:
@@ -642,7 +663,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             # 更新鼠标光标
             self._update_cursor(pos)
 
-    def mouseReleaseEvent(self, event: QMouseEvent):
+    def mouseReleaseEvent(self, event: QMouseEvent | None):
+        if event is None:
+            return
         if event.button() == Qt.MouseButton.RightButton:
             if self._panning:
                 self._panning = False
@@ -702,16 +725,11 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             h = abs(cy1 - cy0)
             # 矩形太小则忽略
             if w >= 0.01 and h >= 0.01:
-                from ...core.layout_models import Panel
                 pd = self._pending_panel_def
-                panel = Panel(
-                    key=pd.key,
-                    x_ratio=x, y_ratio=y, w_ratio=w, h_ratio=h,
-                    # rows/cols 属于布局级配置，使用 Panel 默认值
-                    min_visible=getattr(pd, "min_visible", 0.95),
-                    calibration=getattr(pd, "calibration", "auto"),
-                    scroll_direction=getattr(pd, "scroll_direction", "vertical"),
-                )
+                panel = self._pending_panel_config.create_panel(pd.key, x, y, w, h)
+                # 禁用占位不是已绑定实例；完成框选时替换，避免同 key 重复。
+                self._panels = [p for p in self._panels if p.key != pd.key]
+                self._hidden_panels = [p for p in self._hidden_panels if p.key != pd.key]
                 self._panels.append(panel)
                 self._panel_selected_idx = len(self._panels) - 1
                 self._notify_panel_changed()
@@ -785,8 +803,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         self._drag_orig = None
         self.update()
 
-    def wheelEvent(self, event: QWheelEvent):
+    def wheelEvent(self, event: QWheelEvent | None):
         """鼠标滚轮缩放，以鼠标位置为锚点"""
+        if event is None:
+            return
         if not self._pixmap:
             return
         delta = event.angleDelta().y()
@@ -1040,6 +1060,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def _show_context_menu(self, pos: QPointF):
         """在指定位置显示右键菜单"""
+        target_key = self.selected_region_key()
+        if target_key is None:
+            return
         if (0 <= self._selected_idx < len(self._regions)
                 and self._regions[self._selected_idx].is_reference):
             return
@@ -1052,6 +1075,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         copy_action = menu.addAction(tr("复制"))
         delete_action = menu.addAction(tr("删除"))
         action = menu.exec(self.mapToGlobal(pos.toPoint()))
+        if action not in (copy_action, delete_action):
+            return
+        # QMenu.exec 有嵌套事件循环：期间的列表刷新/焦点变化可能改掉索引。
+        # 操作始终定位打开菜单时的实体；若已被移除，就不操作其他区域。
+        target_index = next(
+            (i for i, region in enumerate(self._regions) if region.key == target_key), -1)
+        if target_index < 0:
+            return
+        self._selected_idx = target_index
+        self._notify_selection_changed()
         if action == copy_action:
             self._copy_selected_region()
         elif action == delete_action:
@@ -1078,12 +1111,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if new_idx < len(self._regions) and self._regions[new_idx].key:
             self._selected_idx = new_idx
             self._field_selected = True
+            self._notify_selection_changed()
             self.update()
 
     # ─── Panel 右键菜单 ─────────────────────────────────
 
     def _show_panel_context_menu(self, pos: QPointF):
         """在指定位置显示 Panel 右键菜单"""
+        target_key = self.selected_panel_key()
+        if target_key is None:
+            return
         menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
             "QMenu { background-color: palette(base); padding: 4px; }"
@@ -1091,10 +1128,18 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             "QMenu::item:selected { background-color: #ddd; }"
         )
         copy_action = menu.addAction(tr("复制 DSL 引用"))
-        delete_action = menu.addAction(tr("删除面板"))
+        edit_action = menu.addAction(tr("编辑当前布局绑定"))
+        delete_action = menu.addAction(tr("解除当前布局绑定"))
         action = menu.exec(self.mapToGlobal(pos.toPoint()))
+        if action not in (copy_action, edit_action, delete_action):
+            return
+        self.select_panel_by_key(target_key)
+        if self.selected_panel_key() is None:
+            return
         if action == copy_action:
             self._copy_panel_key()
+        elif action == edit_action and self.on_panel_edit_requested:
+            self.on_panel_edit_requested(self._panels[self._panel_selected_idx].key)
         elif action == delete_action:
             self._delete_selected_panel()
 

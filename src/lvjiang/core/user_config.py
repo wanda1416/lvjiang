@@ -1,202 +1,238 @@
-"""用户配置管理 - 多用户支持"""
+"""用户目录与用户资料持久化。
 
+``session.json`` 只保存用户名顺序；每个用户的资料保存在
+``users/{username}.json``，工作流 Session 另存为 ``{username}.session.json``。
+"""
+from __future__ import annotations
+
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 
 from loguru import logger
 
 from ..i18n import tr
+from .fs_util import atomic_write_text
 
-#: 合法用户名：中文 + 常见 ID 命名（字母数字下划线连字符），1~32 字。
-#:
-#: 用户名会**直接当文件名**用（``users/{name}.json``，见 config/users.py），
-#: 也会拼进 profile 告警去重的复合键（``{user}:{key}:...``，见
-#: profile_engine._clean_old_alerts）。不校验的话：``../x`` 能写出 users
-#: 目录之外，``a/b`` 会凭空建子目录，含 ``:`` 的名字在 Windows 上直接存不了、
-#: 还会让告警键按 ``:`` 切分时错位、把有效记录当成过期的删掉。
-#:
-#: 校验放在这一层而不是只放 UI：``create_user`` 是产生用户名的唯一入口，
-#: 挡在这里才对所有调用方（含将来的脚本/设备端）都成立。
 _VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
+USER_DOCUMENT_TYPE = "lvjiang.user"
+USER_SCHEMA_VERSION = 1
+USER_ATTRIBUTE_KEYS = ("account", "role", "role_index", "tail")
 
 
 def is_valid_username(name: str) -> bool:
-    """用户名是否合法（见 :data:`_VALID_USERNAME` 的理由）。"""
     return bool(name) and bool(_VALID_USERNAME.fullmatch(name))
 
-# ─── 数据类 ──────────────────────────────────────────────
+
+def _users_dir() -> Path:
+    from ..constants import USERS_DIR
+    return USERS_DIR
+
 
 @dataclass
 class User:
-    """用户数据 — 核心标识，仅用于产出归档与 session 隔离。"""
+    """应用用户身份及其业务资料。``name`` 是稳定的内部用户名。"""
+
     name: str
-    created_at: str = ""      # ISO 格式时间戳
-    avatar: str = ""          # config/session/avatars 下的安全文件名
+    created_at: str = ""
+    avatar: str = ""
+    attributes: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
-            "name": self.name,
+            "document_type": USER_DOCUMENT_TYPE,
+            "schema_version": USER_SCHEMA_VERSION,
+            "username": self.name,
             "created_at": self.created_at,
             "avatar": self.avatar,
+            "attributes": {
+                key: str(value)
+                for key, value in self.attributes.items()
+                if key and value is not None
+            },
         }
 
     @staticmethod
-    def from_dict(d: dict) -> "User":
+    def from_dict(data: dict, *, fallback_name: str = "") -> "User":
         from .user_avatars import is_safe_avatar_filename
 
-        raw_avatar = d.get("avatar", "")
-        avatar = raw_avatar if is_safe_avatar_filename(raw_avatar) else ""
+        raw_avatar = data.get("avatar", "")
+        raw_attributes = data.get("attributes", {})
+        attributes = (
+            {str(k): str(v) for k, v in raw_attributes.items() if k}
+            if isinstance(raw_attributes, dict) else {}
+        )
+        name = str(data.get("username") or data.get("name") or fallback_name)
         return User(
-            name=d.get("name", ""),
-            created_at=d.get("created_at", ""),
-            avatar=avatar,
+            name=name,
+            created_at=str(data.get("created_at", "")),
+            avatar=raw_avatar if is_safe_avatar_filename(raw_avatar) else "",
+            attributes=attributes,
         )
 
 
-# ─── 管理器 ──────────────────────────────────────────────
+def user_metadata_path(username: str, users_dir: Path | None = None) -> Path:
+    return (users_dir or _users_dir()) / f"{username}.json"
+
+
+def load_user_metadata(username: str, users_dir: Path | None = None) -> User | None:
+    path = user_metadata_path(username, users_dir)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("用户资料必须是 JSON 对象")
+        if data.get("document_type") != USER_DOCUMENT_TYPE:
+            raise ValueError("文件不是用户资料")
+        user = User.from_dict(data, fallback_name=username)
+        if user.name != username:
+            raise ValueError("用户资料中的用户名与文件名不一致")
+        return user
+    except Exception as exc:
+        logger.error(f"加载用户资料失败: {path}: {exc}")
+        return None
+
+
+def save_user_metadata(user: User, users_dir: Path | None = None) -> None:
+    path = user_metadata_path(user.name, users_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(
+        path,
+        json.dumps(user.to_dict(), ensure_ascii=False, indent=2),
+        prefix=f".{user.name}_metadata_",
+    )
+
+
+def get_user_attribute(username: str, key: str, users_dir: Path | None = None):
+    user = load_user_metadata(username, users_dir)
+    return user.attributes.get(key) if user is not None else None
+
 
 class UserConfigManager:
-    """用户管理：增删查改 + 当前用户切换"""
+    """用户增删查改、顺序维护与当前用户切换。"""
 
-    def __init__(self):
+    def __init__(self, users_dir: Path | None = None):
+        self._users_dir = users_dir or _users_dir()
+        self._users_dir.mkdir(parents=True, exist_ok=True)
         self._users: dict[str, User] = {}
-        self._active_user: str = ""
+        self._active_user = ""
         self._load()
 
-    def _load(self):
-        """从 session.json 加载用户相关字段（经 SessionStore 统一入口）"""
+    def _load(self) -> None:
         from .config.session import get_session_store
+
         store = get_session_store()
         users_raw = store.get_node("users", [])
         if isinstance(users_raw, list):
-            for u_data in users_raw:
-                if isinstance(u_data, dict):
-                    user = User.from_dict(u_data)
-                    self._users[user.name] = user
+            for value in users_raw:
+                if not isinstance(value, str) or not is_valid_username(value):
+                    continue
+                user = load_user_metadata(value, self._users_dir)
+                if user is None:
+                    user = User(name=value, created_at=datetime.now().isoformat())
+                    save_user_metadata(user, self._users_dir)
+                self._users[value] = user
+
         active = store.get_active("user", "")
         self._active_user = active if isinstance(active, str) else ""
         if self._active_user and self._active_user not in self._users:
             self._active_user = ""
-
-        # 如果没有用户，创建默认用户
         if not self._users:
             self._create_default_user()
 
-    def _save(self):
-        """保存用户字段到 session.json（原子操作，经 SessionStore）
-
-        ⚠️ 使用 mutate_node 确保并发安全
-        """
+    def _save_order(self) -> None:
         from .config.session import get_session_store
+
         store = get_session_store()
-        # 原子化保存用户列表
-        store.mutate_node("users", lambda _: [u.to_dict() for u in self._users.values()])
-        # 原子化保存当前用户
+        store.mutate_node("users", lambda _: list(self._users))
         store.set_active("user", self._active_user)
 
-    def _create_default_user(self):
-        """创建默认用户"""
-        default = User(
-            name=tr("默认用户"),
-            created_at=datetime.now().isoformat(),
-        )
-        self._users[default.name] = default
-        self._active_user = default.name
-        self._save()
+    def _save_user(self, user: User) -> None:
+        save_user_metadata(user, self._users_dir)
+
+    def _create_default_user(self) -> None:
+        user = User(name=tr("默认用户"), created_at=datetime.now().isoformat())
+        self._users[user.name] = user
+        self._active_user = user.name
+        self._save_user(user)
+        self._save_order()
         logger.info("已创建默认用户")
 
-    # ─── 用户 CRUD ──────────────────────────────────────
-
     def list_users(self) -> list[str]:
-        """返回所有用户名列表"""
-        return list(self._users.keys())
+        return list(self._users)
 
     def get_user(self, name: str) -> User | None:
-        """获取指定用户"""
         return self._users.get(name)
 
     def create_user(self, name: str) -> bool:
-        """创建新用户，返回是否成功（名字非法或重名都返回 False）"""
         if not is_valid_username(name) or name in self._users:
             return False
-        user = User(
-            name=name,
-            created_at=datetime.now().isoformat(),
-        )
+        user = User(name=name, created_at=datetime.now().isoformat())
+        self._save_user(user)
         self._users[name] = user
-        self._save()
+        self._save_order()
         logger.info(f"用户已创建: {name}")
         return True
-
 
     def delete_user(self, name: str) -> bool:
         if name not in self._users or len(self._users) == 1:
             return False
-        return self._delete_user(name)
-
-    def _delete_user(self, name: str) -> bool:
-        """删除用户，返回是否成功"""
-        if name not in self._users:
-            return False
-        # 不能删除最后一个用户
-        if len(self._users) == 1:
-            logger.warning("不能删除最后一个用户")
-            return False
-
         del self._users[name]
-
-        # 如果删除的是激活用户，切换到第一个
         if self._active_user == name:
             self._active_user = next(iter(self._users))
-
-        self._save()
-        try:
-            from .user_notes import delete_user_notes
-
-            delete_user_notes(name)
-        except Exception as exc:  # 用户删除已落盘，清理失败不应伪装成删除失败
-            logger.warning(f"清理用户 {name} 的便利贴失败: {exc}")
+        self._save_order()
+        for suffix in (".json", ".session.json", ".notes.json", ".loadouts.json"):
+            try:
+                (self._users_dir / f"{name}{suffix}").unlink(missing_ok=True)
+            except OSError as exc:
+                logger.warning(f"清理用户 {name} 文件失败: {exc}")
         logger.info(f"用户已删除: {name}")
         return True
 
     def reorder_users(self, names: list[str]) -> bool:
-        """按给定顺序重排用户，names 必须与现有用户完全一致"""
         if len(names) != len(self._users) or set(names) != set(self._users):
             return False
         self._users = {name: self._users[name] for name in names}
-        self._save()
+        self._save_order()
         logger.info(f"用户顺序已更新: {names}")
         return True
 
-    def set_user_avatar(self, name: str, filename: str) -> bool:
-        """Set a user's avatar basename; an empty string removes the reference."""
-        from .user_avatars import is_safe_avatar_filename
-
+    def update_user_attributes(self, name: str, attributes: dict[str, str]) -> bool:
         user = self._users.get(name)
         if user is None:
             return False
-        if filename and not is_safe_avatar_filename(filename):
+        previous = dict(user.attributes)
+        user.attributes.update({str(k): str(v).strip() for k, v in attributes.items()})
+        try:
+            self._save_user(user)
+        except Exception:
+            user.attributes = previous
+            raise
+        return True
+
+    def set_user_avatar(self, name: str, filename: str) -> bool:
+        from .user_avatars import is_safe_avatar_filename
+
+        user = self._users.get(name)
+        if user is None or (filename and not is_safe_avatar_filename(filename)):
             return False
         previous = user.avatar
         user.avatar = filename
         try:
-            self._save()
+            self._save_user(user)
         except Exception:
             user.avatar = previous
             raise
         logger.info(f"用户头像已更新: {name}")
         return True
 
-    # ─── 激活用户 ────────────────────────────────────────
-
     def get_active_user_name(self) -> str:
-        """获取当前激活用户名"""
         return self._active_user
 
-
     def set_active_user(self, name: str) -> bool:
-        """切换激活用户"""
         if name not in self._users:
             return False
         self._active_user = name

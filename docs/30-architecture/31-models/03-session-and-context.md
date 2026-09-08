@@ -29,7 +29,7 @@
 ## 二、Session：机制已就位，尚无业务 schema
 
 `session` 由 UI 层经 `SessionManager.load(username)` 从
-`config/session/users/{username}.json` 读入，赋给 `engine.session`
+`config/session/users/{username}.session.json` 读入，赋给 `engine.session`
 （见第五节）。未初始化的用户只有一个默认字段：
 
 ```json
@@ -51,7 +51,7 @@
 | App/UI 层持久状态（当前用户、当前布局、日常脚本参数、窗口位置…） | `config/session/session.json`（`SessionStore` 节点） | 不经 DSL；Python 层经 `core.config.session.get_session_store()` 读写，见 [05-config-layering.md §四](../05-config-layering.md#四用户偏好不进配置层) |
 
 `session` DSL 关键字与上面两套都**不是**同一个存储——它读写的是
-`users/{username}.json` 这一份独立文件，目前处于"机制通了、没人用"的状态。
+`users/{username}.session.json` 这一份独立文件，目前处于"机制通了、没人用"的状态。
 若确实需要"跨次运行持久、按用户隔离、DSL 里直接读写"的数据，且不适合归入
 `profile_action()` 的 quota/regen/stock/note 四模型，这里仍是可用的落点；
 新增前建议确认 `core.profile` 的模型确实覆盖不了这个场景。
@@ -123,7 +123,7 @@ eval save()
 
 `save()` 为内置函数，经 `engine._save_callback`（UI 层注入，绑定到
 `SessionManager.save()`）把当前 `engine.session` 立即写回
-`users/{username}.json`。没有注入回调时（如脚本工作台单独测试）静默跳过
+`users/{username}.session.json`。没有注入回调时（如脚本工作台单独测试）静默跳过
 并记 warning，不报错中断。
 
 ---
@@ -143,7 +143,7 @@ config/session/
     └── ...
 ```
 
-`session.json` 与 `users/{username}.json` 是两套完全独立的机制，仅仅
+`session.json` 与 `users/{username}.session.json` 是两套完全独立的机制，仅仅
 恰好挨着放：前者是 App 运行态（`SessionStore`，不经 DSL），后者是 DSL
 `session` 关键字读写的用户级 dict（`SessionManager`）。命名相近容易
 误认为同一套，写代码或读代码时按用途区分，不要按文件名猜测归属。

@@ -449,12 +449,21 @@ def search_optimal_combo(
     baseline = calculator.baseline_dps()
 
     # -- Phase 0: apply hypothetical caps if requested --
+    #
+    # 变换出来的是副本，只用于算分。结果里的 equipped 必须换回**原始**
+    # 装备：那是给「应用此组合」穿上身的东西，写回模拟出来的词条等于
+    # 凭空改了仓储里的装备数据。
+    #
+    # 剪枝与 Top-K 会打乱顺序，按下标对不回去，所以按对象身份建映射。
+    # 变换后的列表被 candidates 一直持有到函数结束，id 在此期间稳定。
+    origin_by_id: dict[int, dict] = {}
     if full_chengyin or full_dingyin or full_level > 0:
         for slot_key in list(candidates):
-            candidates[slot_key] = [
+            originals = list(candidates[slot_key])
+            transformed = [
                 e for _k, e in sorted(
                     apply_hypothetical_caps(
-                        {i: e for i, e in enumerate(candidates[slot_key])},
+                        {i: e for i, e in enumerate(originals)},
                         full_chengyin=full_chengyin,
                         full_dingyin=full_dingyin,
                         full_level=full_level,
@@ -462,6 +471,10 @@ def search_optimal_combo(
                     ).items()
                 )
             ]
+            for original, simulated in zip(originals, transformed, strict=True):
+                if simulated is not original:
+                    origin_by_id[id(simulated)] = original
+            candidates[slot_key] = transformed
 
     # -- Phase 1: pre-compute deltas --
     slot_keys = [k for k in SLOT_KEYS if k in candidates and candidates[k]]
@@ -588,7 +601,9 @@ def search_optimal_combo(
     for rate, combo_indices, dps in board.top(5):
         equipped: dict[str, dict] = {}
         for si, idx in enumerate(combo_indices):
-            equipped[active_slots[si]] = slot_equip_arrays[si][idx]
+            chosen = slot_equip_arrays[si][idx]
+            # 换回原始装备：模拟只是为了算分，穿上身的必须是真装备
+            equipped[active_slots[si]] = origin_by_id.get(id(chosen), chosen)
         results.append({
             "rate": rate,
             "dps": dps,

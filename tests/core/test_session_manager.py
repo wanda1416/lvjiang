@@ -1,6 +1,6 @@
 """SessionManager 测试
 
-覆盖 users/{username}.json 的 load/save/save_fn。
+覆盖 users/{username}.session.json 的 load/save/save_fn。
 """
 
 import json
@@ -20,7 +20,7 @@ def mgr(tmp_path):
 class TestLoad:
     def test_load_existing_file(self, mgr, tmp_path):
         data = {"current_user": "张三", "score": 100}
-        (tmp_path / "张三.json").write_text(
+        (tmp_path / "张三.session.json").write_text(
             json.dumps(data, ensure_ascii=False), encoding="utf-8"
         )
         result = mgr.load("张三")
@@ -32,7 +32,7 @@ class TestLoad:
         assert result == {"current_user": "不存在"}
 
     def test_load_corrupted_json_returns_default(self, mgr, tmp_path):
-        (tmp_path / "损坏.json").write_text("{invalid json!!", encoding="utf-8")
+        (tmp_path / "损坏.session.json").write_text("{invalid json!!", encoding="utf-8")
         result = mgr.load("损坏")
         assert result == {"current_user": "损坏"}
 
@@ -40,7 +40,7 @@ class TestLoad:
 class TestSave:
     def test_save_creates_file(self, mgr, tmp_path):
         mgr.save("新用户", {"current_user": "新用户", "level": 5})
-        path = tmp_path / "新用户.json"
+        path = tmp_path / "新用户.session.json"
         assert path.exists()
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["current_user"] == "新用户"
@@ -51,12 +51,12 @@ class TestSave:
         session = mgr.load("用户")
         session["v"] = 2
         mgr.save("用户", session)
-        data = json.loads((tmp_path / "用户.json").read_text(encoding="utf-8"))
+        data = json.loads((tmp_path / "用户.session.json").read_text(encoding="utf-8"))
         assert data["v"] == 2
 
     def test_save_preserves_chinese(self, mgr, tmp_path):
         mgr.save("中文用户", {"name": "测试中文"})
-        content = (tmp_path / "中文用户.json").read_text(encoding="utf-8")
+        content = (tmp_path / "中文用户.session.json").read_text(encoding="utf-8")
         assert "中文" in content  # ensure_ascii=False
 
     def test_concurrent_save_keeps_valid_json(self, mgr, tmp_path):
@@ -67,7 +67,7 @@ class TestSave:
         with ThreadPoolExecutor(max_workers=8) as executor:
             list(executor.map(save_one, range(50)))
 
-        data = json.loads((tmp_path / "并发用户.json").read_text(encoding="utf-8"))
+        data = json.loads((tmp_path / "并发用户.session.json").read_text(encoding="utf-8"))
         assert data["current_user"] == "并发用户"
         assert all(data[f"counter_{i}"] == i for i in range(50))
 
@@ -108,7 +108,7 @@ class TestUpdate:
         result = mgr.update("用户", mutate)
         assert result["a"] == 1
         assert result["b"] == 2
-        saved = json.loads((tmp_path / "用户.json").read_text(encoding="utf-8"))
+        saved = json.loads((tmp_path / "用户.session.json").read_text(encoding="utf-8"))
         assert saved == result
 
     def test_update_raises_on_mutator_error(self, mgr):
@@ -132,7 +132,7 @@ class TestSaveFn:
         fn = mgr.save_fn("用户", session)
         session["counter"] = 42
         fn()
-        data = json.loads((tmp_path / "用户.json").read_text(encoding="utf-8"))
+        data = json.loads((tmp_path / "用户.session.json").read_text(encoding="utf-8"))
         assert data["counter"] == 42
 
     def test_save_fn_captures_reference(self, mgr, tmp_path):
@@ -141,5 +141,5 @@ class TestSaveFn:
         fn = mgr.save_fn("用户", session)
         session["val"] = "updated"
         fn()
-        data = json.loads((tmp_path / "用户.json").read_text(encoding="utf-8"))
+        data = json.loads((tmp_path / "用户.session.json").read_text(encoding="utf-8"))
         assert data["val"] == "updated"

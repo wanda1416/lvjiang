@@ -12,7 +12,7 @@ DSL 工作流有五条独立的数据通道，各自承担不同职责：
 
 ## 一、session — 持久状态
 
-**生命周期**：跨工作流执行保留，由 `SessionManager` 管理，存储于 `users/{username}.json`。
+**生命周期**：跨工作流执行保留，由 `SessionManager` 管理，存储于 `users/{username}.session.json`。
 
 **注入时机**：UI 层在创建引擎时从磁盘加载，注入到 `engine.session`。
 
@@ -274,7 +274,7 @@ eval $regen_data = $all.regen
 | | session | profile |
 |---|---|---|
 | **数据来源** | 工作流运行时写入 | 用户手动 / UI 同步 / 引擎 tick |
-| **存储位置** | `users/{username}.json` | `profile.db`（SQLite） |
+| **存储位置** | `users/{username}.session.json` | `profile.db`（SQLite） |
 | **访问方式** | `session.key` 直接访问 | `profile_get("key")` 函数调用 |
 | **自动计算** | 无 | regen key 自动计算实时值 |
 | **典型用途** | 工作流内部状态 | 角色级游戏数据（配额、体力、库存） |

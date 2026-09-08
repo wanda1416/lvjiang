@@ -1,6 +1,6 @@
 """用户 Session 持久化管理器
 
-负责从 users/{username}.json 加载/保存 session 数据。
+负责从 users/{username}.session.json 加载/保存 session 数据。
 UI 层在 Engine 创建后注入 session，并在正常结束时调用 save。
 """
 
@@ -100,7 +100,7 @@ class SessionManager:
         Returns:
             dict: session 数据（至少包含 current_user 字段）
         """
-        path = self._users_dir / f"{username}.json"
+        path = self._users_dir / f"{username}.session.json"
         try:
             return SessionSnapshot(self._load(username, path), self._users_dir)
         except Exception as e:
@@ -115,7 +115,7 @@ class SessionManager:
             username: 用户名
             session: session 数据
         """
-        path = self._users_dir / f"{username}.json"
+        path = self._users_dir / f"{username}.session.json"
         with _SAVE_LOCK, _locked_file(path):
             disk = self._load(username, path)
             baseline = session.baseline if isinstance(session, SessionSnapshot) else {}
@@ -134,7 +134,7 @@ class SessionManager:
 
         失败时抛出异常，调用方应自行 try/except 处理。
         """
-        path = self._users_dir / f"{username}.json"
+        path = self._users_dir / f"{username}.session.json"
         with _SAVE_LOCK, _locked_file(path):
             session = self._load(username, path)
             mutator(session)

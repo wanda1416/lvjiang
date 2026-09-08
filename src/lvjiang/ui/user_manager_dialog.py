@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -284,6 +285,36 @@ class UserManagerDialog(QDialog):
         info_layout.addLayout(avatar_panel)
         layout.addWidget(info_card)
 
+        attr_card = QFrame()
+        attr_card.setObjectName("detailCard")
+        attr_card.setStyleSheet(_STYLE_CARD)
+        attr_layout = QVBoxLayout(attr_card)
+        attr_layout.setContentsMargins(20, 16, 20, 16)
+        attr_layout.setSpacing(10)
+        attr_layout.addWidget(self._section_title(tr("用户属性")))
+        attr_form = QFormLayout()
+        attr_form.setHorizontalSpacing(24)
+        attr_form.setVerticalSpacing(10)
+        self._attribute_edits: dict[str, QLineEdit] = {}
+        for key, label in (
+            ("account", tr("账号名")),
+            ("role", tr("角色名")),
+            ("role_index", tr("角色序号")),
+            ("tail", tr("账号尾号")),
+        ):
+            edit = QLineEdit()
+            self._attribute_edits[key] = edit
+            attr_form.addRow(self._field_label(label), edit)
+        attr_layout.addLayout(attr_form)
+        attr_actions = QHBoxLayout()
+        attr_actions.addStretch()
+        self._btn_save_attributes = QPushButton(tr("保存属性"))
+        self._btn_save_attributes.setStyleSheet(_STYLE_BTN_PRIMARY)
+        self._btn_save_attributes.clicked.connect(self._save_attributes)
+        attr_actions.addWidget(self._btn_save_attributes)
+        attr_layout.addLayout(attr_actions)
+        layout.addWidget(attr_card)
+
         # ─── 数据统计卡片（预留） ───
         stats_card = QFrame()
         stats_card.setObjectName("detailCard")
@@ -384,6 +415,10 @@ class UserManagerDialog(QDialog):
         self._lbl_name.setText(user.name)
         self._lbl_created.setText(_format_iso_time(user.created_at))
         self._avatar.set_avatar(user.name, user.avatar)
+        for key, edit in self._attribute_edits.items():
+            edit.setText(user.attributes.get(key, ""))
+            edit.setEnabled(True)
+        self._btn_save_attributes.setEnabled(True)
 
     def _clear_detail(self):
         """清空详情显示"""
@@ -392,6 +427,10 @@ class UserManagerDialog(QDialog):
         self._lbl_name.setText("-")
         self._lbl_created.setText("-")
         self._avatar.set_avatar("", "")
+        for edit in self._attribute_edits.values():
+            edit.clear()
+            edit.setEnabled(False)
+        self._btn_save_attributes.setEnabled(False)
 
     def _current_user_name(self) -> str | None:
         """当前选中的用户名"""
@@ -401,6 +440,14 @@ class UserManagerDialog(QDialog):
         return item.data(Qt.ItemDataRole.UserRole)
 
     # ─── 操作 ────────────────────────────────────────────
+
+    def _save_attributes(self) -> None:
+        name = self._current_user_name()
+        if not name:
+            return
+        values = {key: edit.text().strip() for key, edit in self._attribute_edits.items()}
+        if self._user_manager.update_user_attributes(name, values):
+            logger.info(f"用户属性已更新: {name}")
 
     def _open_avatar_editor(self):
         name = self._current_user_name()

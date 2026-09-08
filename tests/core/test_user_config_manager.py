@@ -16,6 +16,7 @@ def session_env(tmp_path, monkeypatch):
     from lvjiang import constants
     session_path = tmp_path / "session.json"
     monkeypatch.setattr(constants, "SESSION_PATH", session_path)
+    monkeypatch.setattr(constants, "USERS_DIR", tmp_path / "users")
     reset_session_store()
     yield session_path
     reset_session_store()
@@ -28,11 +29,16 @@ class TestUser:
         u = User(name="张三", created_at="2026-01-01T00:00:00")
         d = u.to_dict()
         assert d == {
-            "name": "张三", "created_at": "2026-01-01T00:00:00", "avatar": "",
+            "document_type": "lvjiang.user",
+            "schema_version": 1,
+            "username": "张三",
+            "created_at": "2026-01-01T00:00:00",
+            "avatar": "",
+            "attributes": {},
         }
 
     def test_from_dict(self):
-        u = User.from_dict({"name": "李四", "created_at": "2026-06-15"})
+        u = User.from_dict({"username": "李四", "created_at": "2026-06-15"})
         assert u.name == "李四"
         assert u.created_at == "2026-06-15"
         assert u.avatar == ""
@@ -60,10 +66,7 @@ class TestUserConfigManagerInit:
     def test_loads_existing_users_from_session(self, session_env):
         import json
         session_env.write_text(json.dumps({
-            "users": [
-                {"name": "用户A", "created_at": "2026-01-01"},
-                {"name": "用户B", "created_at": "2026-02-01"},
-            ],
+            "users": ["用户A", "用户B"],
             "active_user": "用户B",
         }), encoding="utf-8")
         reset_session_store()
@@ -74,7 +77,7 @@ class TestUserConfigManagerInit:
     def test_active_user_reset_if_not_found(self, session_env):
         import json
         session_env.write_text(json.dumps({
-            "users": [{"name": "用户A", "created_at": ""}],
+            "users": ["用户A"],
             "active_user": "不存在的用户",
         }), encoding="utf-8")
         reset_session_store()
@@ -196,10 +199,13 @@ class TestUserConfigManagerCRUD:
 
     def test_invalid_avatar_from_disk_falls_back_to_empty(self, session_env):
         import json
-        session_env.write_text(json.dumps({
-            "users": [{
-                "name": "用户A", "created_at": "", "avatar": "../escape.png",
-            }],
+        session_env.write_text(json.dumps({"users": ["用户A"]}), encoding="utf-8")
+        users_dir = session_env.parent / "users"
+        users_dir.mkdir()
+        (users_dir / "用户A.json").write_text(json.dumps({
+            "document_type": "lvjiang.user", "schema_version": 1,
+            "username": "用户A", "created_at": "", "avatar": "../escape.png",
+            "attributes": {},
         }), encoding="utf-8")
         reset_session_store()
 
@@ -211,12 +217,29 @@ class TestUserConfigManagerCRUD:
         mgr = UserConfigManager()
         name = mgr.get_active_user_name()
         monkeypatch.setattr(
-            mgr, "_save", lambda: (_ for _ in ()).throw(OSError("disk full")))
+            mgr, "_save_user", lambda _: (_ for _ in ()).throw(OSError("disk full")))
 
         with pytest.raises(OSError, match="disk full"):
             mgr.set_user_avatar(name, "avatar_0123456789abcdef.png")
 
         assert mgr.get_user(name).avatar == ""
+
+    def test_attributes_are_stored_in_user_file(self, session_env):
+        import json
+
+        mgr = UserConfigManager()
+        name = mgr.get_active_user_name()
+        assert mgr.update_user_attributes(name, {
+            "account": "账号A", "role": "角色A", "role_index": "2", "tail": "1234",
+        })
+        data = json.loads((session_env.parent / "users" / f"{name}.json").read_text(
+            encoding="utf-8"
+        ))
+        assert data["attributes"] == {
+            "account": "账号A", "role": "角色A", "role_index": "2", "tail": "1234",
+        }
+        session = json.loads(session_env.read_text(encoding="utf-8"))
+        assert session["users"] == [name]
 
 
 class TestUsernameValidation:

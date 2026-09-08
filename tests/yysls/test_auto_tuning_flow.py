@@ -1439,12 +1439,15 @@ def test_behavior_rating_logs_winning_rule_names(monkeypatch):
                for msg in messages)
 
 
-def test_tune_recycles_after_hit(monkeypatch):
+@pytest.mark.parametrize("action, expected_rounds", [
+    ("recycle", 1), ("tune_full_recycle", 3),
+])
+def test_tune_recycles_after_hit(monkeypatch, action, expected_rounds):
     """结束处理回收：首轮规则命中 recycle → back 回背包页后回收"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_WORTHY))
     base = _behavior_base(tune=TuneBehavior(enabled=True,
-                                            rules=_RECYCLE_ALL))
+                                            rules=[BehaviorRule(action=action)]))
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
@@ -1453,9 +1456,13 @@ def test_tune_recycles_after_hit(monkeypatch):
                                              cap_pct=50), WEAPON_DETAIL)
 
     assert fp == ""
+    # 返回后直接点击已展开菜单的回收，无需收起再展开。
+    back_index = wf.clicks.index((TUNE_SCENE, "back"))
+    assert wf.clicks[back_index + 1] == (EQUIP_DETAIL, "sub_func_1")
+    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 1
     reports = wf.output["tuning_reports"]
     assert reports[0]["status"] == "tuned"
-    assert reports[0]["rounds"] == 1         # 首轮即命中，结束循环
+    assert reports[0]["rounds"] == expected_rounds
     assert reports[0]["recycled"] is True
     items = wf.output["recycled_items"]
     assert len(items) == 1 and items[0]["stage"] == "tune"

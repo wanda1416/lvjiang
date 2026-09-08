@@ -18,6 +18,8 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QLabel,
+    QLineEdit,
+    QPlainTextEdit,
     QSizePolicy,
     QSpinBox,
     QWidget,
@@ -169,7 +171,13 @@ class UiStateMixin:
         if not target_cfg.get("parameters"):
             return
         params = {}
-        from PyQt6.QtWidgets import QCheckBox, QComboBox, QSpinBox, QWidget
+        from PyQt6.QtWidgets import (
+            QCheckBox,
+            QComboBox,
+            QLineEdit,
+            QSpinBox,
+            QWidget,
+        )
         for param_def in target_cfg.get("parameters", []):
             name = param_def["name"]
             # checkgroup：从容器内收集各复选框状态为 dict
@@ -193,6 +201,14 @@ class UiStateMixin:
             if widget is not None:
                 data = widget.currentData()
                 params[name] = data if data is not None else widget.currentText()
+                continue
+            widget = self._param_panel.findChild(QLineEdit, name)
+            if widget is not None:
+                params[name] = widget.text()
+                continue
+            multiline = self._param_panel.findChild(QPlainTextEdit, name)
+            if multiline is not None:
+                params[name] = multiline.toPlainText()
         target_cfg["_saved_params"] = params
         from ...core.config.wf_configs import update_wf_config
         update_wf_config(sid, params)
@@ -303,6 +319,29 @@ class UiStateMixin:
                     chk.setChecked(bool(default))
                 chk.toggled.connect(self._persist_param_change)
                 self._param_layout.addRow(label + ":", chk)
+            elif param_type == "text":
+                edit: QLineEdit | QPlainTextEdit
+                if param_def.get("multiline", False):
+                    edit = QPlainTextEdit()
+                    edit.setMaximumHeight(120)
+                    edit.setPlainText(str(default) if default is not None else "")
+                else:
+                    edit = QLineEdit()
+                    edit.setText(str(default) if default is not None else "")
+                edit.setObjectName(name)
+                placeholder = param_def.get("placeholder", "")
+                if placeholder:
+                    edit.setPlaceholderText(placeholder)
+                # 与其余控件一致用即时信号：批量执行读的是 wf_configs 而不是
+                # 控件，若等到失焦才落盘，用户敲完直接点批量启动就会跑上一次
+                # 的值（见 _persist_param_change 的说明）。
+                edit.textChanged.connect(self._persist_param_change)
+                if isinstance(edit, QPlainTextEdit):
+                    # 多行输入从标签下一行起占满表单宽度。
+                    self._param_layout.addRow(QLabel(label + ":"))
+                    self._param_layout.addRow(edit)
+                else:
+                    self._param_layout.addRow(label + ":", edit)
             elif param_type == "checkgroup":
                 # 分组复选框：值为 dict {key: bool}，使用 FlowLayout 自动换行
                 container = _FlowContainer()

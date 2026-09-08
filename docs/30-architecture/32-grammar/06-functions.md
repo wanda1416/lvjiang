@@ -61,6 +61,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `concat` | `(*args) -> str` | 拼接所有参数为字符串 |
 | `substr` | `(str, start, end?) -> str` | 子串，start/end 为索引（闭区间），end 缺省到末尾，支持负数索引 |
 | `split` | `(str, sep) -> list` | 按分隔符拆分，返回列表 |
+| `split_lines` | `(str) -> list` | 按实际换行拆分，支持 LF/CRLF/CR，保留中间空行；null 返回空列表 |
 | `replace` | `(str, old, new) -> str` | 替换所有匹配 |
 | `match` | `(str, regex) -> bool` | 正则匹配（Python `re.search`），非法正则返回 False |
 | `trim` | `(str) -> str` | 去除两端空白 |

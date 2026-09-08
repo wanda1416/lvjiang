@@ -490,7 +490,14 @@ class RunControlMixin:
         panel = self._param_panel
         if panel is None:
             return params
-        from PyQt6.QtWidgets import QCheckBox, QComboBox, QSpinBox, QWidget
+        from PyQt6.QtWidgets import (
+            QCheckBox,
+            QComboBox,
+            QLineEdit,
+            QPlainTextEdit,
+            QSpinBox,
+            QWidget,
+        )
         for param_def in flow_cfg.get("parameters", []):
             name = param_def["name"]
             # checkgroup：从容器内收集各复选框状态为 dict
@@ -517,6 +524,15 @@ class RunControlMixin:
             if widget is not None:
                 data = widget.currentData()
                 params[name] = data if data is not None else widget.currentText()
+                continue
+            # 最后找 QLineEdit（text 参数，原样传字符串）
+            widget = panel.findChild(QLineEdit, name)
+            if widget is not None:
+                params[name] = widget.text()
+                continue
+            multiline = panel.findChild(QPlainTextEdit, name)
+            if multiline is not None:
+                params[name] = multiline.toPlainText()
         return params
 
     # ─── 用户选择器 ────────────────────────────────────────

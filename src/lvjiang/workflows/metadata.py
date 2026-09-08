@@ -19,7 +19,7 @@ _TOP_LEVEL_FIELDS = {
     "hidden",
     "required_scenes",
 }
-_PARAMETER_TYPES = {"select", "number", "bool", "checkgroup"}
+_PARAMETER_TYPES = {"select", "number", "bool", "checkgroup", "text"}
 _PARAMETER_NAME = re.compile(
     r"^[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*$",
 )
@@ -29,6 +29,7 @@ _TYPE_PARAMETER_FIELDS = {
     "number": {"min", "max"},
     "bool": set(),
     "checkgroup": {"options"},
+    "text": {"placeholder", "multiline"},
 }
 
 
@@ -138,6 +139,14 @@ def _validate_parameter(parameter: Any, index: int) -> dict | None:
         default = parameter.get("default")
         if default is not None and not minimum <= default <= maximum:
             raise _error(f"{path}.default", "必须位于 min 与 max 之间")
+    elif param_type == "text":
+        if "multiline" in parameter and not isinstance(parameter["multiline"], bool):
+            raise _error(f"{path}.multiline", "必须是布尔值")
+        # 自由文本没有可枚举的取值，只能约束类型：写成数字或布尔多半是
+        # YAML 里漏了引号，当场报出来比运行时拿到 True 当兑换码强。
+        for field in ("default", "placeholder"):
+            if field in parameter and not isinstance(parameter[field], str):
+                raise _error(f"{path}.{field}", "必须是字符串")
     elif "default" in parameter:
         default = parameter["default"]
         bool_strings = {"true", "false", "1", "0", "yes", "no", "on", "off"}

@@ -202,10 +202,10 @@ def test_daily_jianghu_claim_reputation_guard():
         "min": 0,
     }
     assert "default $max_claim_reputation = 1500" in text
-    # 声望只接受非负整数；识别失败保留最近有效值，从未成功时才保持 -1
-    assert "extract_int($result.haoling_of_week)" in text
-    assert "if $value < 0" in text
-    assert "return $haoling_of_week" in text
+    # 声望必须解析完整 a/b，并与不肝进度共用防回写过程。
+    assert 'import "subcall/game_profile.wf"' in text
+    assert "sync_weekly_progress($result.haoling_of_week" in text
+    assert "extract_int($result.haoling_of_week)" not in text
     # 领奖后全屏奖励弹窗用通用空白区域点击关闭，避免遮挡下一轮页面校验
     claim_def = text[text.index("def claim_reward("):text.index("def claim_reward(") + 500]
     assert "click [general_control].[blank_area]" in claim_def
@@ -231,16 +231,13 @@ def test_daily_jianghu_claim_reputation_guard():
         "for idx in"
     )
     sync_proc = text.index("def sync_haoling_of_week(")
-    sync_body = text[sync_proc:sync_proc + 1200]
-    assert "extract_int($result.haoling_of_week)" in sync_body
-    assert "if $value < 0" in sync_body
-    assert "if $value < $haoling_of_week" in sync_body
-    assert 'log warn "当周已领取声望识别到 "' in sync_body
-    assert "return $haoling_of_week" in sync_body
-    assert "haoling_sync_valid" not in text
-    assert "call write_haoling_profile($value)" in sync_body
-    assert text.index("return $haoling_of_week", sync_proc) < text.index(
-        "call write_haoling_profile($value)", sync_proc)
+    sync_body = text[sync_proc:sync_proc + 500]
+    assert "scan [activity_jianghu].[haoling_of_week] as $result" in sync_body
+    assert (
+        'sync_weekly_progress($result.haoling_of_week, "haoling_of_week", '
+        '$haoling_of_week, "当周获取号令")'
+    ) in sync_body
+    assert "write_haoling_profile" not in text
 
     claim_proc = text.index("def claim_completed_reward(")
     limit = text.index(
@@ -249,8 +246,6 @@ def test_daily_jianghu_claim_reputation_guard():
     reread = text.index(
         "call $haoling_of_week = sync_haoling_of_week()", claim_proc)
     assert claim_proc < limit < claim < reread
-    assert 'eval $model = profile_model("haoling_of_week")' in text
-    assert 'eval profile_set("haoling_of_week", $value)' in text
     assert (
         "global $max_refresh, $claim_reward, $max_claim_reputation, "
         "$targets, $haoling_of_week, $mode_checked"

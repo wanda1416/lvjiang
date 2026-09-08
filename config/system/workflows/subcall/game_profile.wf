@@ -5,7 +5,8 @@
 #
 # 包含过程：
 #   check_profile($keys)   — 批量校验 profile key 已定义，未定义则阻塞提醒
-#   parse_bugan_jindu($raw) — 解析不肝进度 OCR 文本并写入 profile
+#   sync_weekly_progress($raw, $key, $last, $label)
+#       — 解析 a/b 周进度并按本周期单调规则同步 profile
 
 # ─── 批量校验 profile key ─────────────────────────────────
 # 参数：$keys — key 列表（如 ["tongbao", "bugan"]）
@@ -24,31 +25,54 @@ def check_profile($keys)
     return 0
 end
 
-# ─── 解析不肝进度 ────────────────────────────────────────
-# 参数：$raw — scan 得到的 bugan_jindu 原始文本
-# 返回：0 成功，-1 失败
-# 写入：profile bugan_of_week
-def parse_bugan_jindu($raw)
-    if $raw contains "|"
-        log error "不肝进度 OCR 异常，识别到噪声数据: " + $raw
-        return -1
+# ─── 解析并同步每周进度 ──────────────────────────────────
+# 参数：
+#   $raw   — 仅包含进度区域的 OCR 原文，例如 "@0/1500"
+#   $key   — 对应的 quota profile key
+#   $last  — 本轮上次有效值；首次读取传 -1
+#   $label — 日志名称
+# 返回：最终采用的进度；OCR 与 profile 均无有效值时返回 $last
+def sync_weekly_progress($raw, $key, $last, $label)
+    eval $progress = extract_progress($raw)
+    if not $progress.valid
+        eval $profile_value = profile_get($key)
+        if $profile_value >= 0
+            if $profile_value < $last
+                log warn $label + " OCR 解析失败: " + $raw + "，profile 值 " + $profile_value + " 小于本轮上次有效值 " + $last + "，继续使用本轮值"
+                return $last
+            end
+            log warn $label + " OCR 解析失败: " + $raw + "，回退使用 profile 值 " + $profile_value
+            return $profile_value
+        end
+        log error $label + " OCR 解析失败: " + $raw + "，profile 也无有效值，保留本轮上次有效值 " + $last
+        return $last
     end
 
-    eval $parts = split($raw, "/")
-    eval $current = $parts[0]
-    eval $total = $parts[1]
-
-    if $current < 0
-        log "不肝进度异常：当前值 " + $current + " 小于 0"
-        return -1
+    eval $current = $progress.current
+    if $current < $last
+        log warn $label + "识别到 " + $current + "/" + $progress.total + "，小于本轮上次有效值 " + $last + "，判定为脏数据并放弃同步"
+        return $last
     end
 
-    if $current > $total
-        log "不肝进度解析错误：" + $current + " > " + $total
-        return -1
+    eval $model = profile_model($key)
+    if not $model
+        log $label + ": " + $current + "/" + $progress.total + "；profile 未定义 " + $key + "，跳过写入"
+        return $current
     end
 
-    eval profile_set("bugan_of_week", $current)
-    log "本周不肝进度: " + $current + "/" + $total
-    return 0
+    eval $observed = profile_observe($key, $current)
+    if $observed.accepted
+        log $label + ": " + $observed.value + "/" + $progress.total
+        return $observed.value
+    end
+    if $observed.reason equals "regressed"
+        if $observed.value < $last
+            return $last
+        end
+        log warn $label + "识别值 " + $current + " 小于当前周期 profile 值 " + $observed.value + "，判定为脏数据并放弃回写"
+        return $observed.value
+    end
+
+    log error $label + "同步 profile 失败，原因: " + $observed.reason + "，保留本轮上次有效值 " + $last
+    return $last
 end

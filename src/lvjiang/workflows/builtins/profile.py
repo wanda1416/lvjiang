@@ -85,6 +85,24 @@ def _profile_set(_engine, key: str, value, *args) -> float | str:
     return profile_action(username, key, set_value=value_num, source=tr("DSL 写入"))
 
 
+@builtin_func("profile_observe")
+def _profile_observe(_engine, key: str, value, *args) -> dict:
+    """按当前配额周期同步外部观测值，同周期内拒绝较小值。
+
+    返回 ``{accepted, value, reason}``；仅支持 quota，未定义或其他模型不会
+    被写入。周期边界由 Profile key 自身的 period/reset 配置决定。
+    """
+    if not key:
+        return {"accepted": False, "value": -1, "reason": "undefined"}
+
+    from ...core.profile.service import profile_observe
+
+    username = _get_username(_engine)
+    return profile_observe(
+        username, key, value, source=tr("DSL OCR 观测")
+    )
+
+
 @builtin_func("profile_inc")
 def _profile_inc(_engine, key: str, delta=1, *args) -> float:
     """增减 profile 属性值（自动识别模型类型）

@@ -60,8 +60,8 @@ class TestUser:
 class TestUserConfigManagerInit:
     def test_creates_default_user_when_empty(self, session_env):
         mgr = UserConfigManager()
-        assert mgr.list_users() == ["默认用户"]
-        assert mgr.get_active_user_name() == "默认用户"
+        assert mgr.list_users() == ["default"]
+        assert mgr.get_active_user_name() == "default"
 
     def test_loads_existing_users_from_session(self, session_env):
         import json
@@ -137,8 +137,8 @@ class TestUserConfigManagerCRUD:
     def test_delete_last_user_rejected(self, session_env):
         mgr = UserConfigManager()
         # 默认只有一个用户
-        assert mgr.delete_user("默认用户") is False
-        assert "默认用户" in mgr.list_users()
+        assert mgr.delete_user("default") is False
+        assert "default" in mgr.list_users()
 
     def test_delete_active_user_switches(self, session_env):
         mgr = UserConfigManager()
@@ -227,25 +227,24 @@ class TestUserConfigManagerCRUD:
 
         assert mgr.get_user(name).avatar == ""
 
-    def test_corrupt_metadata_is_never_overwritten(self, session_env):
+    def test_corrupt_metadata_is_rebuilt_so_startup_can_continue(self, session_env):
         import json
-
-        from lvjiang.core.user_config import UserMetadataError
 
         users_dir = session_env.parent / "users"
         users_dir.mkdir(exist_ok=True)
         path = users_dir / "用户A.json"
-        damaged = "{ damaged user data"
-        path.write_text(damaged, encoding="utf-8")
+        path.write_text("{ damaged user data", encoding="utf-8")
         session_env.write_text(json.dumps({
             "users": ["用户A"],
             "migrations": {"user_storage_v1": True},
         }), encoding="utf-8")
         reset_session_store()
 
-        with pytest.raises(UserMetadataError, match="拒绝覆盖"):
-            UserConfigManager()
-        assert path.read_text(encoding="utf-8") == damaged
+        manager = UserConfigManager()
+        assert manager.list_users() == ["用户A"]
+        rebuilt = json.loads(path.read_text(encoding="utf-8"))
+        assert rebuilt["username"] == "用户A"
+        assert rebuilt["attributes"] == {}
 
     def test_disjoint_updates_from_two_managers_merge(self, session_env):
         first = UserConfigManager()
@@ -286,13 +285,13 @@ class TestUserConfigManagerCRUD:
         mgr.create_user("待删除")
         save_batch_config(BatchConfig(
             configs={"日常": BatchConfigItem(
-                name="日常", usernames=["默认用户", "待删除"]
+                name="日常", usernames=["default", "待删除"]
             )},
             active_config="日常",
         ))
 
         assert mgr.delete_user("待删除")
-        assert load_batch_config().configs["日常"].usernames == ["默认用户"]
+        assert load_batch_config().configs["日常"].usernames == ["default"]
 
     def test_attributes_are_stored_in_user_file(self, session_env):
         import json

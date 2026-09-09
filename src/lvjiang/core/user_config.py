@@ -16,17 +16,12 @@ from pathlib import Path
 from fasteners import InterProcessLock
 from loguru import logger
 
-from ..i18n import tr
 from .fs_util import atomic_write_text
 
 _VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
 USER_DOCUMENT_TYPE = "lvjiang.user"
 USER_SCHEMA_VERSION = 1
 _METADATA_SAVE_LOCK = threading.RLock()
-
-
-class UserMetadataError(ValueError):
-    """用户资料存在但无法安全读取。"""
 
 
 class UserMetadataConflictError(RuntimeError):
@@ -117,7 +112,7 @@ def load_user_metadata(username: str, users_dir: Path | None = None) -> User | N
         return user
     except Exception as exc:
         logger.error(f"加载用户资料失败: {path}: {exc}")
-        raise UserMetadataError(f"用户资料损坏，已拒绝覆盖: {path.name}") from exc
+        return None
 
 
 def save_user_metadata(user: User, users_dir: Path | None = None) -> None:
@@ -203,7 +198,7 @@ class UserConfigManager:
         save_user_metadata(user, self._users_dir)
 
     def _create_default_user(self) -> None:
-        user = User(name=tr("默认用户"), created_at=datetime.now().isoformat())
+        user = User(name="default", created_at=datetime.now().isoformat())
         self._users[user.name] = user
         self._active_user = user.name
         self._save_user(user)

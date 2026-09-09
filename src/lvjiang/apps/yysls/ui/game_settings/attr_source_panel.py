@@ -437,6 +437,7 @@ class AttrSourcePanel(QWidget):
             self._table.setColumnWidth(
                 column, max(100, self._table.columnWidth(column)))
         header = self._table.horizontalHeader()
+        assert header is not None
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
         for column in (2, 3, 4):
             widths = [max(widget.minimumWidth(), widget.sizeHint().width(),

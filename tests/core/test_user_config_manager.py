@@ -235,8 +235,8 @@ class TestUserConfigManagerCRUD:
         path = users_dir / "用户A.json"
         path.write_text("{ damaged user data", encoding="utf-8")
         session_env.write_text(json.dumps({
+            "version": 2,
             "users": ["用户A"],
-            "migrations": {"user_storage_v1": True},
         }), encoding="utf-8")
         reset_session_store()
 

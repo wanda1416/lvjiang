@@ -36,6 +36,9 @@ from loguru import logger
 
 from ..fs_util import atomic_write_text
 
+DEFAULT_SESSION_VERSION = 1
+CURRENT_SESSION_VERSION = 2
+
 # 旧顶层 active_* 键 → actives 子键。只有历史上真正写过顶层键的三项在此，
 # 新增的 kind 不要伪造 legacy key，加进 _ACTIVE_KINDS 即可。
 _ACTIVE_LEGACY_KEYS = {

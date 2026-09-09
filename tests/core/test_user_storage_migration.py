@@ -60,8 +60,9 @@ def test_legacy_users_sessions_and_batch_rows_migrate_once(tmp_path, monkeypatch
     assert migrated["batch"]["configs"]["日常"]["usernames"] == ["内部A"]
     assert "rows" not in migrated["batch"]["configs"]["日常"]
     assert "enabled_rows" not in migrated["batch"]
-    assert migrated["migrations"]["user_storage_v1"] is True
-    assert (tmp_path / "session.pre-user_storage_v1.json").exists()
+    assert migrated["version"] == 2
+    assert "migrations" not in migrated
+    assert (tmp_path / "session.pre-v2.json").exists()
 
     # 再次加载不得覆盖用户后来维护的资料或 Session。
     metadata = json.loads((users_dir / "内部A.json").read_text(encoding="utf-8"))
@@ -100,7 +101,7 @@ def test_role_column_legacy_config_uses_role_as_username(tmp_path, monkeypatch):
     reset_session_store()
 
 
-def test_preloaded_second_store_observes_disk_marker_and_never_reruns(tmp_path):
+def test_preloaded_second_store_observes_disk_version_and_never_reruns(tmp_path):
     from lvjiang.core.config.session import SessionStore
     from lvjiang.core.config.user_storage_migration import migrate_user_storage
 
@@ -131,15 +132,15 @@ def test_preloaded_second_store_observes_disk_marker_and_never_reruns(tmp_path):
     ]
 
 
-def test_existing_marker_never_moves_user_files(tmp_path, monkeypatch):
+def test_version_two_never_moves_user_files(tmp_path, monkeypatch):
     from lvjiang.core.config.session import SessionStore
     from lvjiang.core.config.user_storage_migration import migrate_user_storage
 
     session_path = tmp_path / "session.json"
     users_dir = tmp_path / "users"
     _write_json(session_path, {
+        "version": 2,
         "users": ["alice"],
-        "migrations": {"user_storage_v1": True},
     })
     source = users_dir / "alice.json"
     _write_json(source, {"current_user": "alice", "sentinel": "untouched"})
@@ -151,3 +152,22 @@ def test_existing_marker_never_moves_user_files(tmp_path, monkeypatch):
     assert migrate_user_storage(SessionStore(session_path), users_dir) is False
     assert json.loads(source.read_text(encoding="utf-8"))["sentinel"] == "untouched"
     assert not (users_dir / "alice.session.json").exists()
+
+
+def test_legacy_migration_marker_does_not_suppress_version_migration(tmp_path):
+    from lvjiang.core.config.session import SessionStore
+    from lvjiang.core.config.user_storage_migration import migrate_user_storage
+
+    session_path = tmp_path / "session.json"
+    users_dir = tmp_path / "users"
+    _write_json(session_path, {
+        "version": 1,
+        "users": [{"name": "alice"}],
+        "migrations": {"user_storage_v1": True},
+    })
+
+    assert migrate_user_storage(SessionStore(session_path), users_dir) is True
+    migrated = json.loads(session_path.read_text(encoding="utf-8"))
+    assert migrated["version"] == 2
+    assert migrated["users"] == ["alice"]
+    assert "migrations" not in migrated

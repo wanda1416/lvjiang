@@ -75,3 +75,30 @@ def test_busy_user_never_reaches_prepare_and_reports_failure(tmp_path, monkeypat
         assert "error" in result[-1]
     finally:
         lease.release()
+
+
+def test_task_engine_uses_session_manager_users_dir(tmp_path, monkeypatch, qapp):
+    worker = make_worker(tmp_path, monkeypatch)
+
+    class Engine:
+        users_dir = None
+        session = None
+        run_username = ""
+        _save_callback = None
+
+        def execute(self, workflow, initial_variables=None):
+            assert self.users_dir == tmp_path
+            return {}
+
+    monkeypatch.setattr(worker, "_create_engine", Engine)
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.resolve_workflow_path",
+        lambda wf_file, script_id: (tmp_path / "test.wf", True),
+    )
+
+    worker._run_script(
+        BatchScript("test", "test", wf_file="test.wf"),
+        {},
+        "alice",
+        params={},
+    )

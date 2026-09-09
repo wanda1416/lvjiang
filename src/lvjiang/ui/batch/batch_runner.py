@@ -575,6 +575,7 @@ class BatchWorker(QThread):
         engine = self._create_engine()
         engine.session = session
         engine.run_username = username or ""
+        engine.users_dir = self._session_manager._users_dir
         if username:
             engine._save_callback = self._session_manager.save_fn(username, session)
 

@@ -6,7 +6,6 @@
 - 多进程安全：文件锁（fasteners）保护跨进程的并发写入（自动处理 Windows/Unix）
 - 写即落盘：每次变更立即原子落盘（tmp + os.replace），杜绝半截文件
 - 写锁最小化：仅在磁盘写入时持有锁（6-14ms），不阻塞读操作
-- 失败重试：写入失败时询问用户是否重试（最多3次）
 
 节点语义：session.json 顶层 key 即节点（ui_state / daily / settings /
 actives 等），各调用方只操作自己的节点。
@@ -17,16 +16,13 @@ load_ui_page_state / update_ui_page_state。
 
 ⚠️ 多进程约束：
    1. 只在写入瞬间申请文件锁（不全程持有）
-   2. 锁超时时询问用户是否重试
-   3. 所有写入都支持 3 次重试机制
-   4. 设置 UI 回调 set_ui_callback() 以显示失败提示
-   5. fasteners 库自动处理跨平台锁定（Windows/Linux/macOS）
+   2. 文件锁只尝试一次，失败直接交给调用方处理
+   3. fasteners 库自动处理跨平台锁定（Windows/Linux/macOS）
 """
 from __future__ import annotations
 
 import json
 import threading
-import time
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable
@@ -105,11 +101,6 @@ def _overlay_readonly_transients(target: dict, source: dict) -> None:
         _overlay_path(target, source, path)
 
 
-class LockTimeoutError(Exception):
-    """文件锁获取超时"""
-    pass
-
-
 class SessionStore:
     """session.json 唯一读写入口
 
@@ -119,27 +110,16 @@ class SessionStore:
     多进程安全：
     - 使用文件锁（fasteners）保护写入（跨平台：Windows/Unix/macOS）
     - 锁仅在磁盘I/O时持有（6-14ms）
-    - 写入失败时询问用户重试
     """
 
     LOCK_TIMEOUT = 5  # 文件锁超时秒数
-    MAX_RETRIES = 3   # 最大重试次数
 
     def __init__(self, path: Path | str | None = None):
         self._path_override = Path(path) if path else None
         self._thread_lock = threading.RLock()  # 单进程内线程安全
         self._data: dict = self._read_disk()  # 构造时立即加载
-        self._ui_callback: Callable | None = None  # UI反馈回调
         # fasteners 跨平台文件锁（自动处理 Windows/Unix 差异）
         self._file_lock = InterProcessLock(str(self.path) + ".lock")
-
-    def set_ui_callback(self, callback: Callable) -> None:
-        """设置 UI 回调，用于用户交互（失败提示/重试确认）
-
-        callback(action: str, *args) -> bool
-            action="confirm": 返回 True 表示用户选择重试
-        """
-        self._ui_callback = callback
 
     # ─── 路径与加载 ──────────────────────────────────────
 
@@ -161,120 +141,53 @@ class SessionStore:
             logger.error(f"session.json 解析失败，按空配置处理: {path}: {e}")
             return {}
 
-    def _acquire_write_lock(self, timeout: float = LOCK_TIMEOUT) -> Any:
+    def _acquire_write_lock(self, timeout: float = LOCK_TIMEOUT) -> None:
         """【关键】获取写锁（跨平台），超时则抛异常
 
         fasteners 自动处理 Windows/Unix 差异
         """
-        try:
-            # 尝试获取写锁（带超时）
-            acquired = self._file_lock.acquire(blocking=True, timeout=timeout)
-            if not acquired:
-                raise LockTimeoutError(
-                    f"无法在 {timeout}s 内获取写锁（另一个进程在写入）"
-                )
-            return self._file_lock
-        except Exception as e:
-            if isinstance(e, LockTimeoutError):
-                raise
-            raise LockTimeoutError(f"获取文件锁失败: {e}") from e
+        acquired = self._file_lock.acquire(blocking=True, timeout=timeout)
+        if not acquired:
+            raise TimeoutError(f"无法在 {timeout}s 内获取 session.json 写锁")
 
     def _write_disk_atomic(self, data: dict) -> None:
         """【关键】原子写入磁盘（必须在持有锁的情况下调用）
 
         tmp 文件 + os.replace，确保不会产生半截文件
         """
-        try:
-            text = json.dumps(data, ensure_ascii=False, indent=2)
-            atomic_write_text(self.path, text, prefix=".session_")
-        except Exception as e:
-            raise IOError(f"写入磁盘失败: {e}") from e
+        text = json.dumps(data, ensure_ascii=False, indent=2)
+        atomic_write_text(self.path, text, prefix=".session_")
 
-    def _ask_user_retry(self, title: str, message: str) -> bool:
-        """询问用户是否重试写入
-
-        返回 True: 用户选择重试
-        返回 False: 用户选择取消或无 UI
-        """
-        if self._ui_callback:
-            try:
-                return bool(self._ui_callback("confirm", title, message))
-            except Exception as e:
-                logger.warning(f"UI 回调异常: {e}")
-                return False
-        else:
-            logger.warning(f"{title}\n{message}")
-            return False
-
-    def _mutate_disk_with_retry(self, mutator: Callable[[dict], Any]) -> Any:
+    def _mutate_disk(self, mutator: Callable[[dict], Any]) -> Any:
         """在文件锁内对最新磁盘快照执行变更并原子落盘。
 
         - 线程锁串行化同一进程内对 fasteners 锁实例的访问
         - 文件锁内重新读取磁盘，避免其他进程的同节点更新被陈旧缓存覆盖
-        - 失败时询问用户重试（最多3次）
         - 使用 fasteners 确保 Windows/Unix 兼容
         """
         with self._thread_lock:
             from ..access import is_readonly
             readonly = is_readonly()
-            for attempt in range(self.MAX_RETRIES):
-                try:
-                    # 步骤 1: 获取写锁（短暂）
-                    self._acquire_write_lock(self.LOCK_TIMEOUT)
+            self._acquire_write_lock(self.LOCK_TIMEOUT)
+            try:
+                disk_data = self._read_disk()
+                working = deepcopy(disk_data)
+                if readonly:
+                    _overlay_readonly_transients(working, self._data)
+                result = mutator(working)
 
-                    try:
-                        # 步骤 2: 持有锁期间进行操作
-                        #   - 再次读磁盘（防止被其他进程修改后的中间状态）
-                        #   - 对最新快照应用本次修改
-                        #   - 写入磁盘（原子操作）
-                        disk_data = self._read_disk()
-                        working = deepcopy(disk_data)
-                        if readonly:
-                            # 本实例的临时选择参与本次内存修改，但不覆盖磁盘值。
-                            _overlay_readonly_transients(working, self._data)
-                        result = mutator(working)
+                persisted = deepcopy(working)
+                if readonly:
+                    _overlay_readonly_transients(persisted, disk_data)
+                if persisted != disk_data:
+                    self._write_disk_atomic(persisted)
 
-                        persisted = deepcopy(working)
-                        if readonly:
-                            _overlay_readonly_transients(persisted, disk_data)
-                        if persisted != disk_data:
-                            self._write_disk_atomic(persisted)
-
-                        self._data = deepcopy(persisted)
-                        if readonly:
-                            _overlay_readonly_transients(self._data, working)
-                    finally:
-                        # 步骤 3: 释放锁
-                        try:
-                            self._file_lock.release()
-                        except Exception:  # noqa: BLE001 清理失败不遮蔽原异常
-                            pass
-                    return result
-
-                except LockTimeoutError as e:
-                    # 锁超时 → 询问用户
-                    if attempt < self.MAX_RETRIES - 1:
-                        if self._ask_user_retry(
-                            "写入超时",
-                            f"session.json 写入超时（第 {attempt+1} 次尝试失败）。\n"
-                            f"另一个进程正在修改数据。是否重试？\n"
-                            f"错误: {e}"
-                        ):
-                            time.sleep(0.5 * (attempt + 1))  # 退避
-                            continue
-                        raise IOError("用户取消写入") from e
-                    else:
-                        raise IOError(
-                            f"多次写入失败（已尝试 {self.MAX_RETRIES} 次）。\n"
-                            f"请检查：\n"
-                            f"  1. 磁盘空间是否充足\n"
-                            f"  2. 文件权限是否正确\n"
-                            f"  3. 是否有其他进程长期锁定文件"
-                        ) from e
-
-                except IOError as e:
-                    logger.error(f"写入 session.json 失败: {e}")
-                    raise
+                self._data = deepcopy(persisted)
+                if readonly:
+                    _overlay_readonly_transients(self._data, working)
+                return result
+            finally:
+                self._file_lock.release()
 
     def mutate_document(self, mutator: Callable[[dict], Any]) -> Any:
         """在一次文件锁内修改整个 session 文档。
@@ -282,7 +195,7 @@ class SessionStore:
         仅供需要跨多个顶层节点保持原子性的格式迁移使用；普通业务仍应使用
         节点级 API，避免扩大写入所有权。
         """
-        return self._mutate_disk_with_retry(mutator)
+        return self._mutate_disk(mutator)
 
     # ─── 节点读写 ────────────────────────────────────────
 
@@ -298,11 +211,11 @@ class SessionStore:
             return deepcopy(value) if value is not None else default
 
     def set_node(self, key: str, value: Any):
-        """整节点替换并落盘（带多进程文件锁 + 重试）"""
+        """整节点替换并落盘。"""
         def _set(data: dict) -> None:
             data[key] = deepcopy(value)
 
-        self._mutate_disk_with_retry(_set)
+        self._mutate_disk(_set)
 
     def update_node(self, key: str, patch: dict):
         """dict 节点一级浅合并并落盘（多组件分写同一节点用）
@@ -316,7 +229,7 @@ class SessionStore:
             node.update(patch)
             data[key] = node
 
-        self._mutate_disk_with_retry(_update)
+        self._mutate_disk(_update)
 
     def mutate_node(self, key: str, fn: Callable[[Any], Any]) -> Any:
         """锁内原子读-改-写：fn(旧值) 的返回值作为新节点并落盘
@@ -329,7 +242,7 @@ class SessionStore:
             data[key] = new_value
             return new_value
 
-        return self._mutate_disk_with_retry(_mutate)
+        return self._mutate_disk(_mutate)
 
     def delete_node(self, key: str):
         """删除顶层节点并落盘（不存在时静默）
@@ -339,7 +252,7 @@ class SessionStore:
         def _delete(data: dict) -> None:
             data.pop(key, None)
 
-        self._mutate_disk_with_retry(_delete)
+        self._mutate_disk(_delete)
 
     def get_runtime_path(self, node: str, key: str) -> Any:
         """Read a runtime leaf from the current Session snapshot."""
@@ -358,7 +271,7 @@ class SessionStore:
             parent[key] = value
             return value
 
-        return self._mutate_disk_with_retry(mutate)
+        return self._mutate_disk(mutate)
 
     # ─── 激活项（actives）─────────────────────────────────
 
@@ -391,7 +304,7 @@ class SessionStore:
             for legacy_key in _ACTIVE_LEGACY_KEYS.values():
                 data.pop(legacy_key, None)
 
-        self._mutate_disk_with_retry(_set)
+        self._mutate_disk(_set)
 
     def reload(self):
         """重新读盘；只读实例保留白名单中的本实例临时选择。"""

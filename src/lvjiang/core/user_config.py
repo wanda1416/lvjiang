@@ -157,10 +157,6 @@ class UserConfigManager:
     def __init__(self, users_dir: Path | None = None):
         self._users_dir = users_dir or _users_dir()
         self._users_dir.mkdir(parents=True, exist_ok=True)
-        from .config.session import get_session_store
-        from .config.user_storage_migration import migrate_user_storage
-
-        migrate_user_storage(get_session_store(), self._users_dir)
         self._users: dict[str, User] = {}
         self._active_user = ""
         self._load()

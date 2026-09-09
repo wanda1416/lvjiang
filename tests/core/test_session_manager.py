@@ -18,6 +18,11 @@ def mgr(tmp_path):
 
 
 class TestLoad:
+    def test_rejects_unsafe_username_before_building_path(self, mgr, tmp_path):
+        with pytest.raises(ValueError, match="非法用户名"):
+            mgr.load("../escape")
+        assert not (tmp_path.parent / "escape.session.json").exists()
+
     def test_load_existing_file(self, mgr, tmp_path):
         data = {"current_user": "张三", "score": 100}
         (tmp_path / "张三.session.json").write_text(

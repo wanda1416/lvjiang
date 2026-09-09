@@ -56,6 +56,9 @@ end
 log "目标账号：" + $account
 
 if not $batch_state.account equals $account
+    if not $tail
+        return {"status": "failed", "message": "用户未配置账号尾号", "state": $batch_state}
+    end
     log "需要切换账号: " + $account
     call switch_account($tail, $role_index, $account, $role, $batch_state)
 end

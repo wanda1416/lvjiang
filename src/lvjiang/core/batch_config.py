@@ -44,11 +44,14 @@ class BatchConfigItem:
 
     @staticmethod
     def from_dict(data: dict) -> "BatchConfigItem":
+        from .user_config import is_valid_username
+
         usernames = data.get("usernames", [])
         return BatchConfigItem(
             name=str(data.get("name", "")),
             usernames=list(dict.fromkeys(
-                str(value) for value in usernames if isinstance(value, str) and value
+                str(value) for value in usernames
+                if isinstance(value, str) and is_valid_username(value)
             )),
             workflows=BatchWorkflows.from_dict(data.get("workflows", {})),
         )
@@ -107,3 +110,22 @@ def save_batch_config(config: BatchConfig) -> None:
     get_session_store().mutate_node("batch", lambda _: config.to_dict())
     total = sum(len(item.usernames) for item in config.configs.values())
     logger.info(f"批处理配置已保存: {len(config.configs)} 个配置, {total} 个用户")
+
+
+def remove_username_from_batch_configs(username: str) -> None:
+    """从所有批量配置中移除已删除用户，保留其他批量节点内容。"""
+    from .config.session import get_session_store
+
+    def remove(raw):
+        if not isinstance(raw, dict):
+            return raw
+        config = BatchConfig.from_dict(raw)
+        changed = False
+        for item in config.configs.values():
+            filtered = [value for value in item.usernames if value != username]
+            if filtered != item.usernames:
+                item.usernames = filtered
+                changed = True
+        return config.to_dict() if changed else raw
+
+    get_session_store().mutate_node("batch", remove)

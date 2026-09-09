@@ -11,15 +11,17 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QFrame,
     QHBoxLayout,
+    QHeaderView,
     QInputDialog,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -135,8 +137,8 @@ class UserManagerDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle(tr("用户管理"))
-        self.setMinimumSize(720, 480)
-        self.resize(760, 520)
+        self.setMinimumSize(864, 576)
+        self.resize(912, 624)
 
         self._user_manager = user_manager
         self._screenshot_callback = screenshot_callback
@@ -292,21 +294,33 @@ class UserManagerDialog(QDialog):
         attr_layout.setContentsMargins(20, 16, 20, 16)
         attr_layout.setSpacing(10)
         attr_layout.addWidget(self._section_title(tr("用户属性")))
-        attr_form = QFormLayout()
-        attr_form.setHorizontalSpacing(24)
-        attr_form.setVerticalSpacing(10)
-        self._attribute_edits: dict[str, QLineEdit] = {}
-        for key, label in (
-            ("account", tr("账号名")),
-            ("role", tr("角色名")),
-            ("role_index", tr("角色序号")),
-            ("tail", tr("账号尾号")),
-        ):
-            edit = QLineEdit()
-            self._attribute_edits[key] = edit
-            attr_form.addRow(self._field_label(label), edit)
-        attr_layout.addLayout(attr_form)
+        self._attribute_table = QTableWidget(0, 2)
+        self._attribute_table.setHorizontalHeaderLabels(["Key", "Value"])
+        self._attribute_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self._attribute_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+        )
+        attr_header = self._attribute_table.horizontalHeader()
+        assert attr_header is not None
+        attr_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        attr_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self._attribute_table.setColumnWidth(0, 180)
+        attr_vertical_header = self._attribute_table.verticalHeader()
+        assert attr_vertical_header is not None
+        attr_vertical_header.setVisible(False)
+        attr_layout.addWidget(self._attribute_table)
         attr_actions = QHBoxLayout()
+        self._btn_add_attribute = QPushButton(tr("新增属性"))
+        self._btn_delete_attribute = QPushButton(tr("删除属性"))
+        self._btn_add_attribute.clicked.connect(self._add_attribute)
+        self._btn_delete_attribute.clicked.connect(self._delete_attributes)
+        self._btn_add_attribute.setStyleSheet(_STYLE_BTN_GHOST)
+        self._btn_delete_attribute.setStyleSheet(_STYLE_BTN_DANGER)
+        attr_actions.addWidget(self._btn_add_attribute)
+        attr_actions.addWidget(self._btn_delete_attribute)
         attr_actions.addStretch()
         self._btn_save_attributes = QPushButton(tr("保存属性"))
         self._btn_save_attributes.setStyleSheet(_STYLE_BTN_PRIMARY)
@@ -314,6 +328,7 @@ class UserManagerDialog(QDialog):
         attr_actions.addWidget(self._btn_save_attributes)
         attr_layout.addLayout(attr_actions)
         layout.addWidget(attr_card)
+        self._attribute_baseline: dict[str, str] = {}
 
         # ─── 数据统计卡片（预留） ───
         stats_card = QFrame()
@@ -415,9 +430,10 @@ class UserManagerDialog(QDialog):
         self._lbl_name.setText(user.name)
         self._lbl_created.setText(_format_iso_time(user.created_at))
         self._avatar.set_avatar(user.name, user.avatar)
-        for key, edit in self._attribute_edits.items():
-            edit.setText(user.attributes.get(key, ""))
-            edit.setEnabled(True)
+        self._load_attributes(user.attributes)
+        self._attribute_table.setEnabled(True)
+        self._btn_add_attribute.setEnabled(True)
+        self._btn_delete_attribute.setEnabled(True)
         self._btn_save_attributes.setEnabled(True)
 
     def _clear_detail(self):
@@ -427,9 +443,11 @@ class UserManagerDialog(QDialog):
         self._lbl_name.setText("-")
         self._lbl_created.setText("-")
         self._avatar.set_avatar("", "")
-        for edit in self._attribute_edits.values():
-            edit.clear()
-            edit.setEnabled(False)
+        self._attribute_table.setRowCount(0)
+        self._attribute_table.setEnabled(False)
+        self._attribute_baseline = {}
+        self._btn_add_attribute.setEnabled(False)
+        self._btn_delete_attribute.setEnabled(False)
         self._btn_save_attributes.setEnabled(False)
 
     def _current_user_name(self) -> str | None:
@@ -441,12 +459,67 @@ class UserManagerDialog(QDialog):
 
     # ─── 操作 ────────────────────────────────────────────
 
+    def _load_attributes(self, attributes: dict[str, str]) -> None:
+        self._attribute_table.setRowCount(0)
+        for key, value in attributes.items():
+            row = self._attribute_table.rowCount()
+            self._attribute_table.insertRow(row)
+            self._attribute_table.setItem(row, 0, QTableWidgetItem(key))
+            self._attribute_table.setItem(row, 1, QTableWidgetItem(value))
+        self._attribute_baseline = dict(attributes)
+
+    def _add_attribute(self) -> None:
+        row = self._attribute_table.rowCount()
+        self._attribute_table.insertRow(row)
+        key_item = QTableWidgetItem("")
+        self._attribute_table.setItem(row, 0, key_item)
+        self._attribute_table.setItem(row, 1, QTableWidgetItem(""))
+        self._attribute_table.setCurrentCell(row, 0)
+        self._attribute_table.editItem(key_item)
+
+    def _delete_attributes(self) -> None:
+        rows = sorted({index.row() for index in self._attribute_table.selectedIndexes()},
+                      reverse=True)
+        for row in rows:
+            self._attribute_table.removeRow(row)
+
+    def _read_attributes(self) -> dict[str, str] | None:
+        attributes: dict[str, str] = {}
+        for row in range(self._attribute_table.rowCount()):
+            key_item = self._attribute_table.item(row, 0)
+            value_item = self._attribute_table.item(row, 1)
+            key = key_item.text().strip() if key_item else ""
+            value = value_item.text() if value_item else ""
+            if not key and not value:
+                continue
+            if not key:
+                QMessageBox.warning(self, tr("保存失败"), tr("属性 Key 不能为空"))
+                return None
+            if key in attributes:
+                QMessageBox.warning(
+                    self, tr("保存失败"), tr("属性 Key 不能重复：{key}").format(key=key)
+                )
+                return None
+            attributes[key] = value
+        return attributes
+
     def _save_attributes(self) -> None:
         name = self._current_user_name()
         if not name:
             return
-        values = {key: edit.text().strip() for key, edit in self._attribute_edits.items()}
-        if self._user_manager.update_user_attributes(name, values):
+        values = self._read_attributes()
+        if values is None:
+            return
+        from ..core.user_config import UserMetadataConflictError
+        try:
+            saved = self._user_manager.replace_user_attributes(
+                name, values, self._attribute_baseline
+            )
+        except UserMetadataConflictError as exc:
+            QMessageBox.warning(self, tr("保存失败"), str(exc))
+            return
+        if saved:
+            self._attribute_baseline = dict(values)
             logger.info(f"用户属性已更新: {name}")
 
     def _open_avatar_editor(self):

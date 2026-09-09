@@ -7,10 +7,13 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from fasteners import InterProcessLock
 from loguru import logger
 
 from ..i18n import tr
@@ -19,7 +22,15 @@ from .fs_util import atomic_write_text
 _VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
 USER_DOCUMENT_TYPE = "lvjiang.user"
 USER_SCHEMA_VERSION = 1
-USER_ATTRIBUTE_KEYS = ("account", "role", "role_index", "tail")
+_METADATA_SAVE_LOCK = threading.RLock()
+
+
+class UserMetadataError(ValueError):
+    """用户资料存在但无法安全读取。"""
+
+
+class UserMetadataConflictError(RuntimeError):
+    """用户资料中的同一属性被另一个实例同时修改。"""
 
 
 def is_valid_username(name: str) -> bool:
@@ -74,7 +85,20 @@ class User:
 
 
 def user_metadata_path(username: str, users_dir: Path | None = None) -> Path:
+    if not is_valid_username(username):
+        raise ValueError(f"非法用户名: {username!r}")
     return (users_dir or _users_dir()) / f"{username}.json"
+
+
+@contextmanager
+def _locked_metadata(path: Path):
+    lock = InterProcessLock(str(path) + ".lock")
+    if not lock.acquire(blocking=True, timeout=5):
+        raise TimeoutError(f"用户资料写入锁超时: {path.name}")
+    try:
+        yield
+    finally:
+        lock.release()
 
 
 def load_user_metadata(username: str, users_dir: Path | None = None) -> User | None:
@@ -93,17 +117,38 @@ def load_user_metadata(username: str, users_dir: Path | None = None) -> User | N
         return user
     except Exception as exc:
         logger.error(f"加载用户资料失败: {path}: {exc}")
-        return None
+        raise UserMetadataError(f"用户资料损坏，已拒绝覆盖: {path.name}") from exc
 
 
 def save_user_metadata(user: User, users_dir: Path | None = None) -> None:
     path = user_metadata_path(user.name, users_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_text(
-        path,
-        json.dumps(user.to_dict(), ensure_ascii=False, indent=2),
-        prefix=f".{user.name}_metadata_",
-    )
+    with _METADATA_SAVE_LOCK, _locked_metadata(path):
+        atomic_write_text(
+            path,
+            json.dumps(user.to_dict(), ensure_ascii=False, indent=2),
+            prefix=f".{user.name}_metadata_",
+        )
+
+
+def mutate_user_metadata(
+    username: str,
+    mutator,
+    users_dir: Path | None = None,
+) -> User:
+    """锁内读取最新资料并只提交 mutator 所做的修改。"""
+    path = user_metadata_path(username, users_dir)
+    with _METADATA_SAVE_LOCK, _locked_metadata(path):
+        user = load_user_metadata(username, users_dir)
+        if user is None:
+            raise FileNotFoundError(f"用户资料不存在: {username}")
+        mutator(user)
+        atomic_write_text(
+            path,
+            json.dumps(user.to_dict(), ensure_ascii=False, indent=2),
+            prefix=f".{username}_metadata_",
+        )
+        return user
 
 
 def get_user_attribute(username: str, key: str, users_dir: Path | None = None):
@@ -188,6 +233,8 @@ class UserConfigManager:
         if self._active_user == name:
             self._active_user = next(iter(self._users))
         self._save_order()
+        from .batch_config import remove_username_from_batch_configs
+        remove_username_from_batch_configs(name)
         for suffix in (".json", ".session.json", ".notes.json", ".loadouts.json"):
             try:
                 (self._users_dir / f"{name}{suffix}").unlink(missing_ok=True)
@@ -208,13 +255,40 @@ class UserConfigManager:
         user = self._users.get(name)
         if user is None:
             return False
-        previous = dict(user.attributes)
-        user.attributes.update({str(k): str(v).strip() for k, v in attributes.items()})
-        try:
-            self._save_user(user)
-        except Exception:
-            user.attributes = previous
-            raise
+        values = {str(k): str(v).strip() for k, v in attributes.items()}
+        updated = mutate_user_metadata(
+            name, lambda latest: latest.attributes.update(values), self._users_dir
+        )
+        self._users[name] = updated
+        return True
+
+    def replace_user_attributes(
+        self,
+        name: str,
+        attributes: dict[str, str],
+        baseline: dict[str, str],
+    ) -> bool:
+        """保存通用属性编辑结果，并合并其他实例对不同 key 的修改。"""
+        if name not in self._users:
+            return False
+        desired = {str(key): str(value) for key, value in attributes.items()}
+        original = {str(key): str(value) for key, value in baseline.items()}
+
+        def apply(latest: User) -> None:
+            for key in set(original) | set(desired):
+                before = original.get(key)
+                after = desired.get(key)
+                if before == after:
+                    continue
+                current = latest.attributes.get(key)
+                if current != before and current != after:
+                    raise UserMetadataConflictError(f"用户属性保存冲突: {key}")
+                if key in desired:
+                    latest.attributes[key] = desired[key]
+                else:
+                    latest.attributes.pop(key, None)
+
+        self._users[name] = mutate_user_metadata(name, apply, self._users_dir)
         return True
 
     def set_user_avatar(self, name: str, filename: str) -> bool:
@@ -223,13 +297,10 @@ class UserConfigManager:
         user = self._users.get(name)
         if user is None or (filename and not is_safe_avatar_filename(filename)):
             return False
-        previous = user.avatar
-        user.avatar = filename
-        try:
-            self._save_user(user)
-        except Exception:
-            user.avatar = previous
-            raise
+        updated = mutate_user_metadata(
+            name, lambda latest: setattr(latest, "avatar", filename), self._users_dir
+        )
+        self._users[name] = updated
         logger.info(f"用户头像已更新: {name}")
         return True
 

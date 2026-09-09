@@ -86,7 +86,8 @@ def test_navigation_roundtrip_and_view_reference_rename(tmp_path):
                  'references': [{'scene': 'source', 'entity': 'open', 'to': '', 'navigation': ''}]},
     }
     for key, doc in docs.items():
-        (directory / f'{key}.yaml').write_text(yaml.safe_dump(doc, allow_unicode=True))
+        (directory / f'{key}.yaml').write_text(
+            yaml.safe_dump(doc, allow_unicode=True), encoding='utf-8')
     resolver = ConfigResolver(system_dir=system, local_dir=tmp_path / 'local', dev_mode=True)
     registry = SceneRegistry(resolver=resolver)
     for key in docs:

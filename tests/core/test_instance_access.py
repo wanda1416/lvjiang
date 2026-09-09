@@ -18,7 +18,7 @@ def child(code, root):
                PYTHONPATH=str(Path(__file__).resolve().parents[2] / "src"))
     result = subprocess.run(
         [sys.executable, "-c", code], env=env, capture_output=True,
-        text=True, timeout=20,
+        text=True, encoding="utf-8", timeout=20,
     )
     assert result.returncode == 0, result.stderr
     return result.stdout.strip()

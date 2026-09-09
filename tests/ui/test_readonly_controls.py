@@ -56,7 +56,11 @@ def test_attribute_source_editors_are_not_instance_disabled(
     from lvjiang.apps.yysls.ui.game_settings import attr_source_panel as module
 
     path = tmp_path / "inner_way.yaml"
-    path.write_text("kind: inner_way\nentries:\n  A·一重: {modeled: false}\n  B·一重: {modeled: false}\n")
+    path.write_text(
+        "kind: inner_way\nentries:\n"
+        "  A·一重: {modeled: false}\n  B·一重: {modeled: false}\n",
+        encoding="utf-8",
+    )
     before = path.read_bytes()
     manager = AttrModelManager(tmp_path)
     monkeypatch.setattr(module, "get_attr_model_manager", lambda: manager)

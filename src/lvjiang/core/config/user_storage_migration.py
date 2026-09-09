@@ -173,10 +173,20 @@ def migrate_user_storage(store, users_dir: Path) -> bool:
     if not lock.acquire(blocking=True, timeout=15):
         raise TimeoutError("等待用户数据迁移锁超时")
     try:
+        # SessionStore 可能在等待迁移锁前已经构造，缓存仍是迁移前快照。
+        # 必须在锁内刷新并以磁盘标记为准，标记存在时绝不再次迁移。
+        store.reload()
         document = store.snapshot()
         migrations = document.get("migrations", {})
         if isinstance(migrations, dict) and migrations.get(MIGRATION_KEY):
             return False
+
+        # 首次迁移会移动用户 Session 并重写全局目录，只能由持有实例锁的
+        # 可写实例执行。并发启动的只读实例会先等待上面的迁移锁；若主实例
+        # 已完成迁移，会在标记检查处直接退出。
+        from ..access import is_readonly
+        if is_readonly():
+            raise RuntimeError("用户数据尚未迁移，请先关闭其他实例并重新启动")
 
         backup = store.path.with_name(f"{store.path.stem}.pre-{MIGRATION_KEY}.json")
         if store.path.exists() and not backup.exists():

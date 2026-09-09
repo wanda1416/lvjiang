@@ -214,15 +214,85 @@ class TestUserConfigManagerCRUD:
     def test_avatar_update_rolls_back_in_memory_when_save_fails(
         self, session_env, monkeypatch,
     ):
+        import lvjiang.core.user_config as user_config
+
         mgr = UserConfigManager()
         name = mgr.get_active_user_name()
         monkeypatch.setattr(
-            mgr, "_save_user", lambda _: (_ for _ in ()).throw(OSError("disk full")))
+            user_config, "mutate_user_metadata",
+            lambda *_args: (_ for _ in ()).throw(OSError("disk full")))
 
         with pytest.raises(OSError, match="disk full"):
             mgr.set_user_avatar(name, "avatar_0123456789abcdef.png")
 
         assert mgr.get_user(name).avatar == ""
+
+    def test_corrupt_metadata_is_never_overwritten(self, session_env):
+        import json
+
+        from lvjiang.core.user_config import UserMetadataError
+
+        users_dir = session_env.parent / "users"
+        users_dir.mkdir(exist_ok=True)
+        path = users_dir / "用户A.json"
+        damaged = "{ damaged user data"
+        path.write_text(damaged, encoding="utf-8")
+        session_env.write_text(json.dumps({
+            "users": ["用户A"],
+            "migrations": {"user_storage_v1": True},
+        }), encoding="utf-8")
+        reset_session_store()
+
+        with pytest.raises(UserMetadataError, match="拒绝覆盖"):
+            UserConfigManager()
+        assert path.read_text(encoding="utf-8") == damaged
+
+    def test_disjoint_updates_from_two_managers_merge(self, session_env):
+        first = UserConfigManager()
+        name = first.get_active_user_name()
+        first.update_user_attributes(name, {"role": "原角色"})
+        second = UserConfigManager()
+
+        first.update_user_attributes(name, {"role": "新角色"})
+        second.set_user_avatar(name, "avatar_0123456789abcdef.png")
+
+        reset_session_store()
+        loaded = UserConfigManager().get_user(name)
+        assert loaded.attributes["role"] == "新角色"
+        assert loaded.avatar == "avatar_0123456789abcdef.png"
+
+    def test_generic_attribute_editor_can_add_change_and_delete_keys(self, session_env):
+        mgr = UserConfigManager()
+        name = mgr.get_active_user_name()
+        mgr.update_user_attributes(name, {"custom_a": "1", "custom_b": "2"})
+        baseline = dict(mgr.get_user(name).attributes)
+
+        assert mgr.replace_user_attributes(
+            name, {"custom_a": "changed", "new_key": "任意值"}, baseline
+        )
+        assert mgr.get_user(name).attributes == {
+            "custom_a": "changed", "new_key": "任意值",
+        }
+
+    def test_delete_user_removes_it_from_batch_configs(self, session_env):
+        from lvjiang.core.batch_config import (
+            BatchConfig,
+            BatchConfigItem,
+            load_batch_config,
+            save_batch_config,
+        )
+
+        mgr = UserConfigManager()
+        mgr.create_user("待删除")
+        save_batch_config(BatchConfig(
+            configs={"日常": BatchConfigItem(
+                name="日常", usernames=["默认用户", "待删除"]
+            )},
+            active_config="日常",
+        ))
+
+        assert mgr.delete_user("待删除")
+        assert load_batch_config().configs["日常"].usernames == ["默认用户"]
 
     def test_attributes_are_stored_in_user_file(self, session_env):
         import json

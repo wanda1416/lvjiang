@@ -78,6 +78,13 @@ class SessionManager:
     def _default_session(self, username: str) -> dict:
         return {"current_user": username}
 
+    @staticmethod
+    def _validate_username(username: str) -> None:
+        from ..user_config import is_valid_username
+
+        if not is_valid_username(username):
+            raise ValueError(f"非法用户名: {username!r}")
+
     def _load(self, username: str, path: Path) -> dict:
         if not path.exists():
             return self._default_session(username)
@@ -100,6 +107,7 @@ class SessionManager:
         Returns:
             dict: session 数据（至少包含 current_user 字段）
         """
+        self._validate_username(username)
         path = self._users_dir / f"{username}.session.json"
         try:
             return SessionSnapshot(self._load(username, path), self._users_dir)
@@ -115,6 +123,7 @@ class SessionManager:
             username: 用户名
             session: session 数据
         """
+        self._validate_username(username)
         path = self._users_dir / f"{username}.session.json"
         with _SAVE_LOCK, _locked_file(path):
             disk = self._load(username, path)
@@ -134,6 +143,7 @@ class SessionManager:
 
         失败时抛出异常，调用方应自行 try/except 处理。
         """
+        self._validate_username(username)
         path = self._users_dir / f"{username}.session.json"
         with _SAVE_LOCK, _locked_file(path):
             session = self._load(username, path)

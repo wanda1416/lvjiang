@@ -15,10 +15,25 @@
 
 ## 已有日志
 
+### 2026-09
+
+| 日期 | 文件 | 主题 |
+|------|------|------|
+| 2026-09-05 | [2026-09-05-pc-account-switch-scroll-interval-background-tuning-v0103-v0104.md](2026-09/2026-09-05-pc-account-switch-scroll-interval-background-tuning-v0103-v0104.md) | 批量 PC 端账号切换 + 登录页场景重整 + DSL scroll interval 与实参字面量 + 布局孤儿坐标清理 + PC 后台调律滚轮策略 + v0.10.3/v0.10.4 发布 |
+| 2026-09-04 | [2026-09-04-equip-cooldown-global-vars-cap-pct-v0102.md](2026-09/2026-09-04-equip-cooldown-global-vars-cap-pct-v0102.md) | 装备冷却识别与到期时间 + DSL 全局变量 + 通用确认弹窗联合判定 + cap_pct 收口为派生缓存 + 方案分发到 app.yaml + v0.10.2 发布 |
+| 2026-09-03 | [2026-09-03-connection-plans-profile-rules-attr-coefficients-v0101.md](2026-09/2026-09-03-connection-plans-profile-rules-attr-coefficients-v0101.md) | 机器级连接方案 + Profile 快捷规则可视化 + 五维换算系数修正（数据正确性事故）+ 任务历史筛选交互 + v0.10.1 发布 |
+| 2026-09-02 | [2026-09-02-tuning-history-scene-contract-playstyle-v0100.md](2026-09/2026-09-02-tuning-history-scene-contract-playstyle-v0100.md) | 调律历史结构化持久化 + 场景 schema v2 与页面跳转契约 + 武学/流派/玩法三层拆分 + 用户头像与执行用户 + 自动调律安全性重做 + v0.10.0 发布 |
+
 ### 2026-08
 
 | 日期 | 文件 | 主题 |
 |------|------|------|
+| 2026-08-30 | [2026-08-30-subscene-references-config-version-v090.md](2026-08/2026-08-30-subscene-references-config-version-v090.md) | 可复用引用场景与三段式访问 + DSL 单行环境分支 + 配置版本显式治理 + 出厂图库按平台命名 + PC 自动调律页面生命周期 + v0.9.0 发布 |
+| 2026-08-29 | [2026-08-29-import-sandbox-background-focus-file-tree.md](2026-08/2026-08-29-import-sandbox-background-focus-file-tree.md) | import 根相对与沙盒封闭 + 后台模式不再抢焦点 + 工作流文件树合并视图 + Profile 升格为主引擎共享模块 + 江湖号令 PC 端可用 |
+| 2026-08-28 | [2026-08-28-write-discipline-batch-order-v080.md](2026-08/2026-08-28-write-discipline-batch-order-v080.md) | 写盘纪律（画布拖拽死区 + OCR 清洗规则显式保存）+ 批量「可见顺序即执行顺序」+ 调律规则安全缺陷 + note 模型上限生效 + v0.8.0 发布 |
+| 2026-08-27 | [2026-08-27-remote-config-core-decoupling-i18n-gate.md](2026-08/2026-08-27-remote-config-core-decoupling-i18n-gate.md) | config/remote 在线下发 + content_version 仲裁 + core 与插件解耦 + i18n 遮蔽事故与一致性门禁 + 静态校验只查可达过程 + session.json 结构梳理 |
+| 2026-08-26 | [2026-08-26-ui-domain-refactor-telemetry-per-equip-stats-client-v070.md](2026-08/2026-08-26-ui-domain-refactor-telemetry-per-equip-stats-client-v070.md) | ui/ 按业务域重构 + main_window 拆分 + 遥测事件粒度改为「一件装备一条」+ stats-client 本地统计控制台 + 最小化到系统托盘 + v0.7.0/v0.7.1 发布 |
+| 2026-08-25 | [2026-08-25-telemetry-macro-recorder-gallery-v060.md](2026-08/2026-08-25-telemetry-macro-recorder-gallery-v060.md) | 匿名使用统计与调律数据回收（从 0 到 1）+ 宏录制补完 + 图库空间目录化 + 技能轴查看器 + Qt 生命周期崩溃根治 + v0.6.0 发布 |
 | 2026-08-24 | [2026-08-24-macros-workflows-announcement-hotkeys-v052-v053.md](2026-08/2026-08-24-macros-workflows-announcement-hotkeys-v052-v053.md) | 宏录制系统完善 + workflows 语义统一 + 远程公告中心 + F7-F12 可配置热键 + core 原子写入收拢 + v0.5.2/v0.5.3 发布 |
 | 2026-08-23 | [2026-08-23-screen-calibration.md](2026-08/2026-08-23-screen-calibration.md) | 屏幕标定：app 内用参照图 + 几组地标对齐本机布局画布；设备端 ScreenMap；macOS 出包；代理通道实机验证 |
 | 2026-08-22 | [2026-08-22-device-agent-channel.md](2026-08/2026-08-22-device-agent-channel.md) | 设备端代理通道：PC 经律匠 app 用无障碍截图 + 手势，替代 adb shell input |

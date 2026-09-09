@@ -1,7 +1,7 @@
 """Readonly UI restrictions are confined to the scene-manager entry."""
 
 import pytest
-from PyQt6.QtWidgets import QComboBox, QMessageBox
+from PyQt6.QtWidgets import QComboBox, QMainWindow
 
 from lvjiang.core import access
 from lvjiang.core.config import resolver as resolver_module
@@ -12,57 +12,26 @@ def readonly(monkeypatch):
     monkeypatch.setattr(access, "_readonly", True)
 
 
-def test_scene_manager_menu_is_blocked_with_message(readonly, monkeypatch):
-    from types import SimpleNamespace
-
+@pytest.mark.parametrize("is_readonly", [False, True])
+def test_scene_manager_action_keeps_f3_and_follows_instance_access(
+        qtbot, monkeypatch, is_readonly):
     from lvjiang.ui.main.menu_ops import MenuOpsMixin
 
-    messages = []
-    monkeypatch.setattr(
-        QMessageBox,
-        "information",
-        lambda _parent, title, message: messages.append((title, message)),
-    )
-    host = SimpleNamespace(
-        _show_modeless_tool=lambda *_args, **_kwargs: pytest.fail(
-            "readonly menu entry must not construct the scene manager")
-    )
+    class Host(MenuOpsMixin, QMainWindow):
+        def _open_batch_config(self):
+            pass
 
-    MenuOpsMixin._open_scene_editor(host)
+        def _check_update(self):
+            pass
 
-    assert messages == [("无法打开场景管理", "只读实例无法打开场景管理")]
-
-
-def test_scene_manager_f3_is_silent_in_readonly_instance(readonly, monkeypatch):
-    from types import SimpleNamespace
-
-    from lvjiang.ui.main.menu_ops import MenuOpsMixin
-
-    calls = []
-    monkeypatch.setattr(
-        QMessageBox,
-        "information",
-        lambda *_args: pytest.fail("F3 must not show a message"),
-    )
-    host = SimpleNamespace(_open_scene_editor=lambda: calls.append(True))
-
-    MenuOpsMixin._open_scene_editor_shortcut(host)
-
-    assert calls == []
-
-
-def test_scene_manager_f3_opens_in_writable_instance(monkeypatch):
-    from types import SimpleNamespace
-
-    from lvjiang.ui.main.menu_ops import MenuOpsMixin
-
-    monkeypatch.setattr(access, "_readonly", False)
-    calls = []
-    host = SimpleNamespace(_open_scene_editor=lambda: calls.append(True))
-
-    MenuOpsMixin._open_scene_editor_shortcut(host)
-
-    assert calls == [True]
+    monkeypatch.setattr(access, "_readonly", is_readonly)
+    host = Host()
+    qtbot.addWidget(host)
+    host._setup_menu()
+    action = next(action for action in host.menuBar().actions()[0].menu().actions()
+                  if action.text() == "场景管理")
+    assert action.shortcut().toString() == "F3"
+    assert action.isEnabled() is not is_readonly
 
 
 def test_script_editor_write_controls_are_not_instance_disabled(

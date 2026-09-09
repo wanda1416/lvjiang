@@ -200,5 +200,10 @@ class BatchConfigDialog(QDialog):
 
     def _on_save(self) -> None:
         self._save_current_config()
-        save_batch_config(self._cfg)
+        # 对话框打开期间，批量页仍可能通过 F9 更新脚本选择和顺序。
+        # 这里只保存本对话框编辑的配置，保留最新的 script_ids。
+        latest = load_batch_config()
+        latest.configs = self._cfg.configs
+        latest.active_config = self._cfg.active_config
+        save_batch_config(latest)
         self.accept()

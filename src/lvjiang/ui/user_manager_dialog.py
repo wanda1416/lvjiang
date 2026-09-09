@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 from loguru import logger
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -104,17 +103,6 @@ QFrame#detailCard {
     border-radius: 8px;
 }
 """
-
-_STYLE_BADGE_ACTIVE = f"""
-QLabel {{
-    background: {_ACCENT};
-    color: white;
-    border-radius: 9px;
-    padding: 2px 10px;
-    font-size: 11px;
-}}
-"""
-
 
 def _format_iso_time(iso_str: str) -> str:
     """ISO 时间戳转易读格式"""
@@ -222,29 +210,6 @@ class UserManagerDialog(QDialog):
         layout.setContentsMargins(0, 0, 4, 0)
         layout.setSpacing(12)
 
-        # ─── 头部：用户名 + 当前标记 + 操作 ───
-        header_card = QFrame()
-        header_card.setObjectName("detailCard")
-        header_card.setStyleSheet(_STYLE_CARD)
-        header_layout = QHBoxLayout(header_card)
-        header_layout.setContentsMargins(20, 16, 20, 16)
-
-        self._lbl_title = QLabel("-")
-        title_font = QFont()
-        title_font.setPointSize(15)
-        title_font.setBold(True)
-        self._lbl_title.setFont(title_font)
-        header_layout.addWidget(self._lbl_title)
-
-        self._badge_active = QLabel(tr("当前用户"))
-        self._badge_active.setStyleSheet(_STYLE_BADGE_ACTIVE)
-        self._badge_active.setVisible(False)
-        header_layout.addWidget(self._badge_active)
-
-        header_layout.addStretch()
-
-        layout.addWidget(header_card)
-
         # ─── 基本信息卡片 ───
         info_card = QFrame()
         info_card.setObjectName("detailCard")
@@ -330,23 +295,6 @@ class UserManagerDialog(QDialog):
         layout.addWidget(attr_card)
         self._attribute_baseline: dict[str, str] = {}
 
-        # ─── 数据统计卡片（预留） ───
-        stats_card = QFrame()
-        stats_card.setObjectName("detailCard")
-        stats_card.setStyleSheet(_STYLE_CARD)
-        stats_layout = QVBoxLayout(stats_card)
-        stats_layout.setContentsMargins(20, 16, 20, 16)
-        stats_layout.setSpacing(10)
-
-        stats_layout.addWidget(self._section_title(tr("数据统计")))
-
-        # 占位文案保持中性：这是通用用户管理对话框，具体展示什么数据由插件决定
-        self._lbl_stats = QLabel(tr("数据展示功能开发中..."))
-        self._lbl_stats.setStyleSheet("color: palette(mid); font-style: italic;")
-        stats_layout.addWidget(self._lbl_stats)
-
-        layout.addWidget(stats_card)
-
         layout.addStretch()
 
         scroll.setWidget(container)
@@ -425,8 +373,6 @@ class UserManagerDialog(QDialog):
         self._btn_delete.setEnabled(not is_active)
 
         # 显示详情
-        self._lbl_title.setText(user.name)
-        self._badge_active.setVisible(is_active)
         self._lbl_name.setText(user.name)
         self._lbl_created.setText(_format_iso_time(user.created_at))
         self._avatar.set_avatar(user.name, user.avatar)
@@ -438,8 +384,6 @@ class UserManagerDialog(QDialog):
 
     def _clear_detail(self):
         """清空详情显示"""
-        self._lbl_title.setText("-")
-        self._badge_active.setVisible(False)
         self._lbl_name.setText("-")
         self._lbl_created.setText("-")
         self._avatar.set_avatar("", "")

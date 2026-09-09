@@ -127,8 +127,6 @@ user_manager:
   section_basic: Basic Info
   label_username: Username
   label_created_at: Created
-  section_stats: Statistics
-  data_display_wip: Data display is under development...
   new_user_title: New User
   input_username_prompt: 'Enter username:'
   user_created: 'User created: {name}'

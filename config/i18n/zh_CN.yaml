@@ -127,8 +127,6 @@ user_manager:
   section_basic: 基本信息
   label_username: 用户名
   label_created_at: 创建时间
-  section_stats: 数据统计
-  data_display_wip: 数据展示功能开发中...
   new_user_title: 新建用户
   input_username_prompt: 请输入用户名：
   user_created: '用户已创建: {name}'

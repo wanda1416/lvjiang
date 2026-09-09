@@ -154,7 +154,8 @@ def test_user_edit_uses_local_override_and_keeps_bundled_data(manager, profile):
     assert manager.load(profile.school).raw == raw
     # 用户层编辑不会写回版本内置文件。
     path = manager.resolver.system_dir / REL_DIR / "鸣金·虹.yaml"
-    assert yaml.safe_load(path.read_text())["sources"]["基础天赋·已知五维估计"]["static"]["stats"]["dim_jin"] == 41
+    bundled = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert bundled["sources"]["基础天赋·已知五维估计"]["static"]["stats"]["dim_jin"] == 41
 
 
 def test_observed_thresholds_match_supplied_game_descriptions(profile):

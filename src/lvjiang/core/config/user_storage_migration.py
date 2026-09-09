@@ -12,8 +12,8 @@ from fasteners import InterProcessLock
 from loguru import logger
 
 from ..fs_util import atomic_write_text
+from .session import CURRENT_SESSION_VERSION, DEFAULT_SESSION_VERSION
 
-MIGRATION_KEY = "user_storage_v1"
 _VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
 
 
@@ -167,28 +167,31 @@ def _write_metadata(users_dir: Path, order: list[str], metadata: dict[str, dict]
 
 
 def migrate_user_storage(store, users_dir: Path) -> bool:
-    """执行一次迁移；已完成或另一进程已经完成时返回 False。"""
+    """将低于 v2 的 session 数据升级到 v2。"""
     users_dir.mkdir(parents=True, exist_ok=True)
-    lock = InterProcessLock(str(users_dir / ".user-storage-v1.migration.lock"))
+    lock = InterProcessLock(str(users_dir / ".session-v2.migration.lock"))
     if not lock.acquire(blocking=True, timeout=15):
         raise TimeoutError("等待用户数据迁移锁超时")
     try:
         # SessionStore 可能在等待迁移锁前已经构造，缓存仍是迁移前快照。
-        # 必须在锁内刷新并以磁盘标记为准，标记存在时绝不再次迁移。
+        # 必须在锁内刷新，并只以磁盘中的顶层版本号判断是否迁移。
         store.reload()
         document = store.snapshot()
-        migrations = document.get("migrations", {})
-        if isinstance(migrations, dict) and migrations.get(MIGRATION_KEY):
+        version = document.get("version", DEFAULT_SESSION_VERSION)
+        version = version if type(version) is int else DEFAULT_SESSION_VERSION
+        if version >= CURRENT_SESSION_VERSION:
             return False
 
         # 首次迁移会移动用户 Session 并重写全局目录，只能由持有实例锁的
         # 可写实例执行。并发启动的只读实例会先等待上面的迁移锁；若主实例
-        # 已完成迁移，会在标记检查处直接退出。
+        # 已完成迁移，会在版本检查处直接退出。
         from ..access import is_readonly
         if is_readonly():
             raise RuntimeError("用户数据尚未迁移，请先关闭其他实例并重新启动")
 
-        backup = store.path.with_name(f"{store.path.stem}.pre-{MIGRATION_KEY}.json")
+        backup = store.path.with_name(
+            f"{store.path.stem}.pre-v{CURRENT_SESSION_VERSION}.json"
+        )
         if store.path.exists() and not backup.exists():
             atomic_write_text(
                 backup, store.path.read_text(encoding="utf-8"),
@@ -203,10 +206,8 @@ def migrate_user_storage(store, users_dir: Path) -> bool:
         def commit(latest: dict) -> None:
             latest["users"] = order
             latest["batch"] = converted_batch
-            marker = latest.get("migrations")
-            marker = dict(marker) if isinstance(marker, dict) else {}
-            marker[MIGRATION_KEY] = True
-            latest["migrations"] = marker
+            latest["version"] = CURRENT_SESSION_VERSION
+            latest.pop("migrations", None)
 
         store.mutate_document(commit)
         logger.info(f"用户数据迁移完成: {len(order)} 个用户")

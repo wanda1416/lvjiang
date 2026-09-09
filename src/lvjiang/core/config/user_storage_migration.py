@@ -8,7 +8,6 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
-from fasteners import InterProcessLock
 from loguru import logger
 
 from ..fs_util import atomic_write_text
@@ -169,48 +168,37 @@ def _write_metadata(users_dir: Path, order: list[str], metadata: dict[str, dict]
 def migrate_user_storage(store, users_dir: Path) -> bool:
     """将低于 v2 的 session 数据升级到 v2。"""
     users_dir.mkdir(parents=True, exist_ok=True)
-    lock = InterProcessLock(str(users_dir / ".session-v2.migration.lock"))
-    if not lock.acquire(blocking=True, timeout=15):
-        raise TimeoutError("等待用户数据迁移锁超时")
-    try:
-        # SessionStore 可能在等待迁移锁前已经构造，缓存仍是迁移前快照。
-        # 必须在锁内刷新，并只以磁盘中的顶层版本号判断是否迁移。
-        store.reload()
-        document = store.snapshot()
-        version = document.get("version", DEFAULT_SESSION_VERSION)
-        version = version if type(version) is int else DEFAULT_SESSION_VERSION
-        if version >= CURRENT_SESSION_VERSION:
-            return False
+    store.reload()
+    document = store.snapshot()
+    version = document.get("version", DEFAULT_SESSION_VERSION)
+    version = version if type(version) is int else DEFAULT_SESSION_VERSION
+    if version >= CURRENT_SESSION_VERSION:
+        return False
 
-        # 首次迁移会移动用户 Session 并重写全局目录，只能由持有实例锁的
-        # 可写实例执行。并发启动的只读实例会先等待上面的迁移锁；若主实例
-        # 已完成迁移，会在版本检查处直接退出。
-        from ..access import is_readonly
-        if is_readonly():
-            raise RuntimeError("用户数据尚未迁移，请先关闭其他实例并重新启动")
+    from ..access import is_readonly
+    if is_readonly():
+        raise RuntimeError("用户数据尚未迁移，请先启动主实例完成升级")
 
-        backup = store.path.with_name(
-            f"{store.path.stem}.pre-v{CURRENT_SESSION_VERSION}.json"
+    backup = store.path.with_name(
+        f"{store.path.stem}.pre-v{CURRENT_SESSION_VERSION}.json"
+    )
+    if store.path.exists() and not backup.exists():
+        atomic_write_text(
+            backup, store.path.read_text(encoding="utf-8"),
+            prefix=f".{store.path.stem}_migration_backup_",
         )
-        if store.path.exists() and not backup.exists():
-            atomic_write_text(
-                backup, store.path.read_text(encoding="utf-8"),
-                prefix=f".{store.path.stem}_migration_backup_",
-            )
 
-        order, metadata = _legacy_users(document)
-        converted_batch = _convert_batch(document, order, metadata)
-        _move_legacy_sessions(users_dir, order)
-        _write_metadata(users_dir, order, metadata)
+    order, metadata = _legacy_users(document)
+    converted_batch = _convert_batch(document, order, metadata)
+    _move_legacy_sessions(users_dir, order)
+    _write_metadata(users_dir, order, metadata)
 
-        def commit(latest: dict) -> None:
-            latest["users"] = order
-            latest["batch"] = converted_batch
-            latest["version"] = CURRENT_SESSION_VERSION
-            latest.pop("migrations", None)
+    def commit(latest: dict) -> None:
+        latest["users"] = order
+        latest["batch"] = converted_batch
+        latest["version"] = CURRENT_SESSION_VERSION
+        latest.pop("migrations", None)
 
-        store.mutate_document(commit)
-        logger.info(f"用户数据迁移完成: {len(order)} 个用户")
-        return True
-    finally:
-        lock.release()
+    store.mutate_document(commit)
+    logger.info(f"用户数据迁移完成: {len(order)} 个用户")
+    return True

@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from lvjiang.core.config.users import SessionConflictError, SessionManager
+from lvjiang.core.config.users import SessionManager
 
 
 @pytest.fixture
@@ -74,9 +74,12 @@ class TestSave:
 
         data = json.loads((tmp_path / "并发用户.session.json").read_text(encoding="utf-8"))
         assert data["current_user"] == "并发用户"
-        assert all(data[f"counter_{i}"] == i for i in range(50))
+        counters = {key: value for key, value in data.items() if key.startswith("counter_")}
+        assert len(counters) == 1
+        key, value = next(iter(counters.items()))
+        assert value == int(key.removeprefix("counter_"))
 
-    def test_disjoint_nested_fields_merge_and_conflicts_are_atomic(self, mgr):
+    def test_save_replaces_complete_session(self, mgr):
         mgr.save("用户", {"nested": {"a": 1, "b": 1}})
         first = mgr.load("用户")
         second = mgr.load("用户")
@@ -84,14 +87,9 @@ class TestSave:
         second["nested"]["b"] = 2
         mgr.save("用户", first)
         mgr.save("用户", second)
-        assert mgr.load("用户")["nested"] == {"a": 2, "b": 2}
-        second["nested"]["a"] = 3
-        second["new"] = "must not commit"
-        with pytest.raises(SessionConflictError, match="nested.a"):
-            mgr.save("用户", second)
-        assert "new" not in mgr.load("用户")
+        assert mgr.load("用户")["nested"] == {"a": 1, "b": 2}
 
-    def test_missing_keys_do_not_delete_and_repeated_save_works(self, mgr):
+    def test_missing_keys_are_deleted_and_repeated_save_works(self, mgr):
         mgr.save("用户", {"keep": 1, "counter": 0})
         session = mgr.load("用户")
         del session["keep"]
@@ -99,8 +97,9 @@ class TestSave:
         mgr.save("用户", session)
         session["counter"] = 2
         mgr.save("用户", session)
-        assert mgr.load("用户")["keep"] == 1
-        assert mgr.load("用户")["counter"] == 2
+        saved = mgr.load("用户")
+        assert "keep" not in saved
+        assert saved["counter"] == 2
 
 
 class TestUpdate:

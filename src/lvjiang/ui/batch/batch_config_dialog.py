@@ -30,12 +30,12 @@ from ..button_styles import apply_button_style
 
 
 class BatchConfigDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, user_manager: UserConfigManager, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("批量配置"))
         self.setMinimumSize(620, 520)
         self._cfg = load_batch_config()
-        self._users = UserConfigManager()
+        self._users = user_manager
         self._current_name = ""
         self._setup_ui()
         self._refresh_config_list()

@@ -7,7 +7,6 @@ UI 层在 Engine 创建后注入 session，并在正常结束时调用 save。
 import json
 import threading
 from contextlib import contextmanager
-from copy import deepcopy
 from pathlib import Path
 from typing import Callable
 
@@ -17,20 +16,14 @@ from loguru import logger
 from ..fs_util import atomic_write_text
 
 
-class SessionConflictError(RuntimeError):
-    """The persisted value changed since this session was loaded."""
-
-
 class SessionSnapshot(dict):
-    """A JSON-compatible session carrying its own optimistic baseline."""
+    """JSON-compatible session carrying the directory used by execution locks."""
 
     def __init__(self, data, users_dir: Path | None = None):
         super().__init__(data)
-        self.baseline = deepcopy(data)
         self.users_dir = users_dir
 
 
-_MISSING = object()
 _SAVE_LOCK = threading.RLock()
 
 
@@ -43,26 +36,6 @@ def _locked_file(path: Path):
         yield
     finally:
         lock.release()
-
-
-def _merge_changes(base: dict, current: dict, disk: dict, path: str = "") -> dict:
-    result = deepcopy(disk)
-    for key, value in current.items():
-        before = base.get(key, _MISSING)
-        latest = disk.get(key, _MISSING)
-        field = f"{path}.{key}" if path else key
-        if before == value:
-            continue
-        if isinstance(value, dict) and isinstance(before, dict) and isinstance(latest, dict):
-            result[key] = _merge_changes(before, value, latest, field)
-        elif isinstance(value, dict) and before is _MISSING and isinstance(latest, dict):
-            result[key] = _merge_changes({}, value, latest, field)
-        elif latest == before or latest == value:
-            result[key] = deepcopy(value)
-        else:
-            raise SessionConflictError(f"Session 保存冲突: {field}")
-    # Missing keys are not implicit deletes. Explicit deletion uses update().
-    return result
 
 
 class SessionManager:
@@ -99,7 +72,7 @@ class SessionManager:
         atomic_write_text(path, payload, prefix=f".{path.stem}_")
 
     def load(self, username: str) -> dict:
-        """从 users/{username}.json 加载 session
+        """从 users/{username}.session.json 加载 session
 
         Args:
             username: 用户名
@@ -117,7 +90,7 @@ class SessionManager:
         return SessionSnapshot(self._default_session(username), self._users_dir)
 
     def save(self, username: str, session: dict):
-        """保存 session 到 users/{username}.json
+        """保存 session 到 users/{username}.session.json
 
         Args:
             username: 用户名
@@ -126,20 +99,13 @@ class SessionManager:
         self._validate_username(username)
         path = self._users_dir / f"{username}.session.json"
         with _SAVE_LOCK, _locked_file(path):
-            disk = self._load(username, path)
-            baseline = session.baseline if isinstance(session, SessionSnapshot) else {}
-            merged = _merge_changes(baseline, session, disk)
-            self._save(path, merged)
-            if isinstance(session, SessionSnapshot):
-                # Do not replace the running dictionary or invalidate nested references.
-                session.baseline = deepcopy(dict(session))
+            self._save(path, dict(session))
         logger.debug(f"已保存 session: {username}")
 
     def update(self, username: str, mutator: Callable[[dict], None]) -> dict:
         """read-modify-write。
 
-        用于多个入口可能同时修改同一用户 session 的场景。mutator 只修改
-        自己负责的节点，可降低旧快照整文件覆盖风险。
+        用于需要基于磁盘最新值修改同一用户 session 的入口。
 
         失败时抛出异常，调用方应自行 try/except 处理。
         """
@@ -164,13 +130,4 @@ class SessionManager:
         Returns:
             Callable: 无参保存函数
         """
-        if isinstance(session_ref, SessionSnapshot):
-            return lambda: self.save(username, session_ref)
-        snapshot = SessionSnapshot({})
-
-        def persist():
-            snapshot.clear()
-            snapshot.update(session_ref)
-            self.save(username, snapshot)
-
-        return persist
+        return lambda: self.save(username, session_ref)

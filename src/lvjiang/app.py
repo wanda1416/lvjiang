@@ -129,6 +129,19 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     # 全局屏蔽下拉框/数字输入框的滚轮改值（防滑动页面时误改）
     install_wheel_guard(_app)
 
+    # 数据格式升级是应用启动步骤，只执行一次。UserConfigManager 只负责
+    # 读取当前格式，避免每个窗口构造管理器时重复触发迁移。
+    from .constants import USERS_DIR
+    from .core.config import get_session_store
+    from .core.config.user_storage_migration import migrate_user_storage
+    try:
+        migrate_user_storage(get_session_store(), USERS_DIR)
+    except RuntimeError as exc:
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.warning(None, "无法启动", str(exc))
+        _dispose_qt_objects()
+        return 1
+
     _window = MainWindow()
     from .core.access import is_readonly
     if is_readonly():

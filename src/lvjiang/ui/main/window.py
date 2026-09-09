@@ -335,9 +335,6 @@ class MainWindow(
         self._hotkey_listener = start_global_hotkeys(
             self._main_global_hotkey_bindings())
 
-        # 注册 SessionStore 的 UI 回调，用于多进程文件锁失败时显示重试对话框
-        self._setup_session_ui_callback()
-
         logger.info("主窗口已初始化")
 
     def _main_global_hotkey_bindings(self):
@@ -352,26 +349,6 @@ class MainWindow(
             hotkey_pynput_token(hk.stop): self._on_global_f10,
             hotkey_pynput_token(hk.pause): self._on_global_pause,
         }
-
-    # ─── SessionStore UI 回调 ──────────────────────────────────────
-
-    def _setup_session_ui_callback(self):
-        """为 SessionStore 注册 UI 回调，用于显示多进程锁失败的重试对话框"""
-        from ...core.config import get_session_store
-
-        def show_confirm_dialog(title: str, message: str) -> bool:
-            """显示确认对话框，返回用户是否选择重试"""
-            reply = QMessageBox.warning(
-                self,
-                title,
-                message,
-                QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Cancel
-            )
-            return reply == QMessageBox.StandardButton.Retry
-
-        get_session_store().set_ui_callback(lambda cmd, *args:
-            show_confirm_dialog(*args) if cmd == "confirm" else None
-        )
 
     # ─── 热键回调 ────────────────────────────────────────────
 
@@ -956,7 +933,7 @@ class MainWindow(
     def _open_batch_config(self):
         """工具菜单 → 批量配置：打开配置对话框"""
         from ..batch import BatchConfigDialog
-        dlg = BatchConfigDialog(self)
+        dlg = BatchConfigDialog(self._user_manager, self)
         if dlg.exec():
             # 保存后刷新批量 Tab 的条目概览和脚本勾选
             self._batch_tab.refresh_config()

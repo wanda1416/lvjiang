@@ -45,6 +45,9 @@ def test_legacy_users_sessions_and_batch_rows_migrate_once(tmp_path, monkeypatch
     _write_json(users_dir / "内部A.json", {"current_user": "内部A", "score": 7})
     reset_session_store()
 
+    from lvjiang.core.config import get_session_store
+    from lvjiang.core.config.user_storage_migration import migrate_user_storage
+    migrate_user_storage(get_session_store(), users_dir)
     manager = UserConfigManager()
     assert manager.list_users() == ["内部A", "角色B"]
     assert manager.get_user("内部A").attributes == {
@@ -93,6 +96,9 @@ def test_role_column_legacy_config_uses_role_as_username(tmp_path, monkeypatch):
     })
     reset_session_store()
 
+    from lvjiang.core.config import get_session_store
+    from lvjiang.core.config.user_storage_migration import migrate_user_storage
+    migrate_user_storage(get_session_store(), tmp_path / "users")
     manager = UserConfigManager()
     assert manager.list_users() == ["蔡元君"]
     assert manager.get_user("蔡元君").attributes["role"] == "蔡元君"

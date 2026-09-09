@@ -22,15 +22,11 @@ def test_save_preserves_script_ids_changed_while_dialog_is_open(monkeypatch, qtb
         lambda: stale,
     )
     monkeypatch.setattr(
-        "lvjiang.ui.batch.batch_config_dialog.UserConfigManager",
-        lambda: _Users(),
-    )
-    monkeypatch.setattr(
         "lvjiang.ui.batch.batch_config_dialog.save_batch_config",
         saved.append,
     )
 
-    dialog = BatchConfigDialog()
+    dialog = BatchConfigDialog(_Users())
     qtbot.addWidget(dialog)
     dialog._cfg.configs["新配置"] = BatchConfigItem(name="新配置")
     dialog._cfg.active_config = "新配置"

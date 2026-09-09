@@ -145,7 +145,7 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
     assert users.load("alice")["equipment"]["plan"] == "new"
 
 
-def test_session_cas_across_processes_preserves_other_fields(tmp_path):
+def test_user_session_last_full_save_wins_across_processes(tmp_path):
     users = SessionManager(tmp_path / "config/session/users")
     snapshot = users.load("alice")
     child("""
@@ -157,7 +157,7 @@ store.save('alice', data)
 """, tmp_path)
     snapshot["mine"] = 7
     users.save("alice", snapshot)
-    assert users.load("alice") == {"current_user": "alice", "other": 42, "mine": 7}
+    assert users.load("alice") == {"current_user": "alice", "mine": 7}
 
 
 def test_readonly_history_write_does_not_flush_temporary_settings(tmp_path, monkeypatch):

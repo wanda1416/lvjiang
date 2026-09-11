@@ -52,20 +52,23 @@ class _EvalMixin:
         """递归求值条件表达式 AST 节点"""
         match node:
             case Contains():
-                left = self._eval_var_or_field(node.left)
+                left = self._resolve(node.left)
                 right = self._resolve(node.right)
-                return self._str_or_empty(right) in left if left else False
+                return (
+                    self._str_or_empty(right) in self._str_or_empty(left)
+                    if left else False
+                )
             case Equals():
-                left = self._eval_var_or_field(node.left)
+                left = self._resolve(node.left)
                 right = self._resolve(node.right)
-                return left == self._str_or_empty(right)
+                return self._str_or_empty(left) == self._str_or_empty(right)
             case InList():
-                left = self._eval_var_or_field(node.left)
+                left = self._resolve(node.left)
                 right = [self._str_or_empty(self._resolve(item)) for item in node.right]
-                return left in right if left else False
+                return self._str_or_empty(left) in right if left else False
             case IsEmpty():
-                left = self._eval_var_or_field(node.expr)
-                return not left or left.strip() == ""
+                left = self._resolve(node.expr)
+                return not left or (isinstance(left, str) and left.strip() == "")
             case GreaterThan():
                 num_left = self._resolve_arith(node.left)
                 num_right = self._resolve_arith(node.right)
@@ -113,8 +116,8 @@ class _EvalMixin:
                 val = self._call_func(node)
                 return bool(val)
             case _:
-                logger.error(f"未知条件节点: {type(node).__name__}")
-                return False
+                # 普通表达式在布尔上下文中按其运行时值判断。
+                return bool(self._resolve(node))
 
     @staticmethod
     def _to_number(val):
@@ -255,6 +258,10 @@ class _EvalMixin:
                 return self._eval_arith(node)
             case FuncCall():
                 return self._call_func(node)
+            case (Contains() | Equals() | InList() | IsEmpty()
+                  | GreaterThan() | LessThan() | GreaterEqual() | LessEqual()
+                  | NotEqual() | NumericEqual() | Not() | And() | Or()):
+                return self._eval_condition(node)
             case EntityRef():
                 return self._resolve_entity_ref(node)
             case SubsceneEntityRef():

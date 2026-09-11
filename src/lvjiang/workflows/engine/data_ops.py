@@ -127,27 +127,38 @@ class _DataOpsMixin:
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
         min_conf = self._resolve_min_confidence(node.where)
 
+        if node.by is not None and node.by.match_mode == "image":
+            self._scan_regions_by_image(
+                scene, field_keys, var_name, min_confidence=min_conf)
+            return
+
         # 单一 key 指向 panel → 整面板逐格 OCR（$var.[行].[列] 取值）
         panel_key = self._whole_panel_key(scene, field_keys, node.by, "scan")
         if panel_key is not None:
             if node.by is not None:
                 # 整面板 + by：返回首个命中的行列 {row, col}
-                self._scan_panel_by(scene, panel_key, var_name, node.by, min_confidence=min_conf)
+                self._scan_panel_by(scene, panel_key, var_name, node.by, min_confidence=min_conf, cleaning_group=node.cleaning_group)
             else:
-                self._scan_panel_whole(scene, panel_key, var_name, min_confidence=min_conf)
+                self._scan_panel_whole(scene, panel_key, var_name, min_confidence=min_conf, cleaning_group=node.cleaning_group)
             return
 
         if node.by is not None:
             # ── by 子句：短路 OCR，返回字段名 str ──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
+            kwargs = {"min_confidence": min_conf}
+            if node.cleaning_group is not None:
+                kwargs["cleaning_group"] = node.cleaning_group
             result = self._ensure_workflow().ocr_scene_by(
                 scene, field_keys or [], target_value, by_clause.match_mode,
-                min_confidence=min_conf,
-            )
+                **kwargs)
             self.variables[var_name] = result  # str（命中字段名或 ""）
         else:
-            result = self._ensure_workflow().ocr_scene(scene, field_keys, min_confidence=min_conf)
+            kwargs = {"min_confidence": min_conf}
+            if node.cleaning_group is not None:
+                kwargs["cleaning_group"] = node.cleaning_group
+            result = self._ensure_workflow().ocr_scene(
+                scene, field_keys, **kwargs)
             self.variables[var_name] = result  # dict
             # 存 region 元数据，供 click [scene].$key 解析坐标
             regions = self._layout.get_scene_regions(scene)
@@ -168,16 +179,71 @@ class _DataOpsMixin:
         var_name = node.target.name if isinstance(node.target, VarRef) else str(node.target)
         min_conf = self._resolve_min_confidence(node.where)
         workflow = self._ensure_workflow()
-        if node.by is not None:
+        if node.by is not None and node.by.match_mode == "image":
+            if region.template is None:
+                raise WorkflowUserError(
+                    f"区域 [{target_scene}].[{entity}] 未绑定模板")
+            try:
+                self.variables[var_name] = workflow.match_region_templates(
+                    [region], min_score=min_conf, scene_key=target_scene)
+            except ValueError as exc:
+                raise WorkflowUserError(str(exc)) from exc
+            self._coord_meta[var_name] = {entity: region}
+        elif node.by is not None:
             target = self._resolve(node.by.target)
+            kwargs = {
+                "min_confidence": min_conf,
+                "regions_override": [region],
+            }
+            if node.cleaning_group is not None:
+                kwargs["cleaning_group"] = node.cleaning_group
             self.variables[var_name] = workflow.ocr_scene_by(
                 target_scene, [entity], target, node.by.match_mode,
-                min_confidence=min_conf, regions_override=[region])
+                **kwargs)
         else:
+            kwargs = {
+                "min_confidence": min_conf,
+                "regions_override": [region],
+            }
+            if node.cleaning_group is not None:
+                kwargs["cleaning_group"] = node.cleaning_group
             self.variables[var_name] = workflow.ocr_scene(
-                target_scene, [entity], min_confidence=min_conf,
-                regions_override=[region])
+                target_scene, [entity], **kwargs)
             self._coord_meta[var_name] = {entity: region}
+
+    def _scan_regions_by_image(
+        self, scene: str, field_keys: list[str] | None, var_name: str,
+        *, min_confidence: float | None,
+    ) -> None:
+        """执行 Region 布局绑定模板匹配；Panel 不参与。"""
+        all_regions = self._layout.get_scene_regions(scene)
+        if field_keys:
+            by_key = {r.key: r for r in all_regions}
+            regions = []
+            for key in field_keys:
+                region = by_key.get(key)
+                if region is None:
+                    if self._find_panel_in_layout(scene, key) is not None:
+                        raise WorkflowUserError(
+                            f"scan by image 不支持 Panel: [{scene}].[{key}]")
+                    raise WorkflowUserError(
+                        f"scan by image: 区域 [{scene}].[{key}] 未绑定坐标")
+                require_enabled(region, scene, "region")
+                if region.template is None:
+                    raise WorkflowUserError(
+                        f"区域 [{scene}].[{key}] 未绑定模板")
+                regions.append(region)
+        else:
+            # 整场景形式只检查启用且声明了模板绑定的 Region。
+            regions = [r for r in enabled_regions(all_regions)
+                       if r.template is not None]
+        try:
+            result = self._ensure_workflow().match_region_templates(
+                regions, min_score=min_confidence, scene_key=scene)
+        except ValueError as exc:
+            raise WorkflowUserError(str(exc)) from exc
+        self.variables[var_name] = result
+        self._coord_meta[var_name] = {r.key: r for r in regions}
 
     def _exec_recognize(self, node: Recognize):
         """执行 recognize：匹配场景字段，并可经 ``with`` 转换 rich 结果。"""
@@ -286,7 +352,7 @@ class _DataOpsMixin:
             self._coord_meta[var_name] = region_map
 
     def _exec_collect(self, node: Collect):
-        """collect $var | field_access | literal [as "label" | as $alias_var] — 将值存入输出 dict"""
+        """collect <expression> [as "label" | as $alias_var] — 将值存入输出 dict"""
         if isinstance(node.source, VarRef):
             var_name = node.source.name
             if var_name not in self.variables:
@@ -308,8 +374,8 @@ class _DataOpsMixin:
             value = node.source.value
             default_key = "value"
         else:
-            logger.warning(f"collect: 不支持的源类型 {type(node.source).__name__}")
-            return
+            value = self._resolve(node.source)
+            default_key = "value"
         # 解析 key：优先 alias_var（动态），其次 alias（静态），最后 default_key
         if node.alias_var:
             key = self.variables.get(node.alias_var.name, default_key)
@@ -383,8 +449,7 @@ class _DataOpsMixin:
         # 默认值赋值：default $var = value — 仅当变量未从外部传入时才赋值
         if node.func_name == "__default__":
             if node.target is not None and node.target not in self.variables:
-                lit_value = node.func_args[0].value
-                default_val = self._resolve_literal(lit_value)  # 递归解析 dict/list 内变量
+                default_val = self._resolve(node.func_args[0])
                 self.variables[node.target] = default_val
                 logger.debug(f"default: {node.target} = {default_val!r}")
             return
@@ -610,7 +675,6 @@ class _DataOpsMixin:
         # 解析 by 子句（必填）：匹配模式 + 搜索目标
         by_clause: ByClause = node.by
         match_mode = by_clause.match_mode
-        match_target = self._resolve(by_clause.target)
         min_conf = self._resolve_min_confidence(node.where)
 
         # 解析搜索区域（支持 region 和 panel）
@@ -652,13 +716,43 @@ class _DataOpsMixin:
 
         # 执行搜索：by image → 模板定位；其余 → OCR 文字搜索
         if match_mode == "image":
+            (match_target, binding_score,
+             record_w, record_h) = self._resolve_find_image_target(
+                by_clause.target)
             result = self._ensure_workflow().find_image_in_region(
-                str(match_target), search_region, min_score=min_conf,
+                match_target, search_region,
+                min_score=binding_score if min_conf is None else min_conf,
+                record_w=record_w, record_h=record_h,
             )
         else:
+            match_target = self._resolve(by_clause.target)
             result = self._ensure_workflow().find_text_in_region(
                 match_target, match_mode, search_region,
-                min_confidence=min_conf,
+                min_confidence=min_conf, cleaning_group=node.cleaning_group,
             )
         # 结果存入变量：FoundRegion（找到）或 ""（未找到，falsy）
         self.variables[node.var_name] = result
+
+    def _resolve_find_image_target(
+        self, target,
+    ) -> tuple[str, float | None, int, int]:
+        """解析 find 模板来源；Region 即便 disabled 也可作为纯模板载体。"""
+        if not isinstance(target, EntityRef):
+            return str(self._resolve(target)), None, 0, 0
+        scene = target.scene
+        key = target.entity
+        region = next(
+            (item for item in self._layout.get_scene_regions(scene)
+             if item.key == key),
+            None,
+        )
+        if region is None:
+            raise WorkflowUserError(
+                f"find: 模板来源 Region [{scene}].[{key}] 在当前布局未绑定")
+        if region.template is None:
+            raise WorkflowUserError(
+                f"find: 模板来源 Region [{scene}].[{key}] 未绑定模板")
+        return (
+            region.template.name, region.template.min_score,
+            region.template.record_w, region.template.record_h,
+        )

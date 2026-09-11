@@ -6,7 +6,7 @@
 
 | 指令 | 识别方式 | 返回值 | 典型用途 |
 |------|---------|--------|---------|
-| **scan** | OCR 文字识别 | `{key: 文本}` 或命中 key | 读按钮文字、读装备词条 |
+| **scan** | OCR 文字识别 / Region 绑定模板 | `{key: 文本}` 或命中 key | 读文字、判断纯图标按钮 |
 | **recognize** | ORB 图像匹配 | `{key: 材料名}` 或命中 key | 识别材料类型、道具种类 |
 | **find** | OCR 文字定位 / 模板定位（`by image`） | `FoundRegion`（坐标对象） | 找到文字或图标后直接点击 |
 
@@ -59,7 +59,9 @@ recognize ... as rich $var [with <func>] [on group "<name>"]
 | 子句 | 作用 | 方向 | 适用指令 |
 |------|------|------|---------|
 | `by <mode> <target>` | 短路匹配，返回命中 key 或坐标 | **降级**：dict → str/位置 | scan / recognize / find |
-| `by image "<模板名>"` | 模板定位，返回命中矩形 | — | 仅 find |
+| `by image` | 用布局绑定模板短路匹配，返回 Region key | dict → str | 仅 scan Region |
+| `by image [scene].[region]` | 从当前布局读取模板绑定，在 A 指定范围或全画布定位 | — | 仅 find |
+| `by image "<模板名>"` | 显式模板定位，返回命中矩形 | — | 仅 find |
 | `as rich` | 返回含元数据和输出 OCR 字段的富 dict | **升级**：str → dict | 仅 recognize |
 | `with <func>` | 指定 rich dict 的转换函数 | 配合 rich 使用 | 仅 recognize |
 | `where confidence >= <n>` | 过滤低置信度结果（阈值 `[0.0, 1.0]`，超出范围输出警告） | **过滤**：不改变类型 | scan / recognize / find |
@@ -119,3 +121,4 @@ click $target
 - [04.1-scan.md](04.1-scan.md) — scan 完整语法、返回值、修饰子句
 - [04.2-recognize.md](04.2-recognize.md) — recognize 完整语法、返回值、rich/with
 - [04.3-find.md](04.3-find.md) — find 完整语法、FoundRegion、搜索区域
+- [04.4-image-template.md](04.4-image-template.md) — scan / find 的 `by image` 模板匹配

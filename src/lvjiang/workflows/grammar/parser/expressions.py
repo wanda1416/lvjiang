@@ -39,22 +39,7 @@ class _ExprMixin:
     """by 子句、collect/log、eval 赋值全组、算术、字典、条件表达式、
     field_access/keyword_ref 链与通用原子回调"""
 
-    # 哨兵值：用于区分“列表/字典中的 null 字面量”和“回调无返回值”
-    _MISSING = object()
-
     # ─── null / bool 字面量 ────────────────────────────────
-
-    def null_literal(self, items):
-        """null → Python None"""
-        return None
-
-    def true_literal(self, items):
-        """true → Python True"""
-        return True
-
-    def false_literal(self, items):
-        """false → Python False"""
-        return False
 
     # ─── by 子句（短路 / 全量识别）───────────────────────────────
 
@@ -74,6 +59,19 @@ class _ExprMixin:
             target = Literal(value=self._unquote(str(target_node)))
         return ByClause(match_mode=match_mode, target=target, full=full)
 
+    def by_image_clause(self, items):
+        """by image [模板名/Region 引用]：scan 省略目标。"""
+        if not items:
+            return ByClause(match_mode="image")
+        target_node = items[0]
+        target = (target_node if isinstance(target_node, (VarRef, EntityRef))
+                  else Literal(value=self._unquote(str(target_node))))
+        return ByClause(match_mode="image", target=target)
+
+    def image_region_ref(self, items):
+        """[scene].[region] → 只作为模板绑定来源，不解析其坐标。"""
+        return EntityRef(scene=str(items[0]), entity=str(items[1]))
+
     def match_equals(self, _):
         return "equals"
 
@@ -86,8 +84,6 @@ class _ExprMixin:
     def match_contains_any(self, _):
         return "contains_any"
 
-    def match_image(self, _):
-        return "image"
 
     def group_clause(self, items):
         """on group "分组名" / $var / ["a", "b"] → Literal | VarRef | list"""
@@ -130,25 +126,18 @@ class _ExprMixin:
         return str(item)  # bracket_expr
 
     def collect_stmt(self, items):
-        source = items[0]  # var_ref → VarRef, field_access → FieldAccess, literal → float/str/Token
+        source = self._normalize_expr(items[0])
         alias = None
         alias_var = None
-        # 将字面量包装为 Literal AST 节点
-        if isinstance(source, (float, int, str)) and not isinstance(source, (VarRef, FieldAccess)):
-            # 处理字符串 Token（需要 unquote）
-            if isinstance(source, Token) and source.type == 'STRING':
-                source = Literal(value=self._unquote(str(source)))
-            else:
-                source = Literal(value=source)
         if len(items) > 1:
             # collect_as_clause 返回 str 或 VarRef
             alias_item = items[1]
             if isinstance(alias_item, VarRef):
                 alias_var = alias_item  # 动态 alias
-            elif isinstance(alias_item, str):
-                alias = alias_item
             elif isinstance(alias_item, Token):
                 alias = self._unquote(str(alias_item))
+            elif isinstance(alias_item, str):
+                alias = alias_item
         return Collect(source=source, alias=alias, alias_var=alias_var, line_no=self._line(items))
 
     def collect_as_clause(self, items):
@@ -183,124 +172,68 @@ class _ExprMixin:
         """screenshot: 截取当前画面并保存"""
         return Screenshot(line_no=self._line(items))
 
-    def eval_assign_func(self, items):
-        """eval $var = func($arg...)"""
-        tokens = [i for i in items if isinstance(i, Token)]
-        names = [str(t) for t in tokens]
-        lists = [i for i in items if isinstance(i, list)]
-        func_args = lists[0] if lists else []
-        # names[0] = 赋值目标变量名, names[1] = 函数名
-        return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
-
-    def eval_assign_lit(self, items):
-        """eval $var = "string" | 123 | -1.5 | {} | {"k": v} | [list] | (min, max)"""
-        tokens = [i for i in items if isinstance(i, Token)]
-        target_name = str(tokens[0])  # $ 后面的 NAME
-        lit_value = items[1]
-        # 字典快捷路径（空字典和非空字典统一处理）
-        if isinstance(lit_value, dict):
-            return Eval(func_name="__dict__", func_args=[lit_value], target=target_name, line_no=self._line(items))
-        # 列表快捷路径
-        if isinstance(lit_value, list):
-            return Eval(func_name="__list__", func_args=lit_value, target=target_name, line_no=self._line(items))
-        # 元组路径：TupleLiteral（支持混合数字和变量）
-        if isinstance(lit_value, TupleLiteral):
-            return Eval(func_name="__tuple__", func_args=lit_value.elements, target=target_name, line_no=self._line(items))
-        # 向后兼容：旧式 Python tuple
-        if isinstance(lit_value, tuple):
-            return Eval(func_name="__range__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
-        if isinstance(lit_value, Token):
-            lit_value = self._unquote(str(lit_value))
-        # 用 Eval 节点承载字面量赋值：func_name="__literal__"，func_args=[Literal(value)]
-        return Eval(func_name="__literal__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
-
-    def eval_assign_arith(self, items):
-        """eval $var = arith_expr — 算术表达式赋值（含运算符或裸值）"""
-        tokens = [i for i in items if isinstance(i, Token)]
-        target_name = str(tokens[0])
-        expr = items[1]
-        # ArithOp → 算术运算
-        if isinstance(expr, ArithOp):
-            return Eval(func_name="__arith__", func_args=[expr], target=target_name, line_no=self._line(items))
-        # float/int（来自 number）→ 字面量赋值
-        if isinstance(expr, (int, float)):
-            return Eval(func_name="__literal__", func_args=[Literal(value=expr)], target=target_name, line_no=self._line(items))
-        # Literal（来自 string_atom 裸字符串）→ 字面量赋值
-        if isinstance(expr, Literal):
-            return Eval(func_name="__literal__", func_args=[expr], target=target_name, line_no=self._line(items))
-        # VarRef / FieldAccess / FuncCall → 表达式赋值
-        return Eval(func_name="__expr__", func_args=[expr], target=target_name, line_no=self._line(items))
-
-    def eval_discard(self, items):
-        """eval func($arg...) — 丢弃返回值"""
-        tokens = [i for i in items if isinstance(i, Token)]
-        names = [str(t) for t in tokens]
-        lists = [i for i in items if isinstance(i, list)]
-        func_args = lists[0] if lists else []
-        return Eval(func_name=names[0], func_args=func_args, target=None, line_no=self._line(items))
+    def eval_discard_expr(self, items):
+        """eval func(...) — 对统一表达式中的函数调用求值并丢弃结果。"""
+        call = items[0]
+        return Eval(
+            func_name=call.func_name,
+            func_args=call.func_args,
+            target=None,
+            line_no=self._line(items),
+        )
 
     def eval_assign_expr(self, items):
-        """eval $var = field_access | var_ref — 表达式赋值"""
+        """eval $var = expression — 统一赋值入口。"""
         tokens = [i for i in items if isinstance(i, Token)]
         target_name = str(tokens[0])
-        expr = items[1]  # FieldAccess or VarRef
-        return Eval(func_name="__expr__", func_args=[expr], target=target_name, line_no=self._line(items))
+        return self._build_assignment(target_name, items[1], items)
 
     def eval_field_assign(self, items):
         """eval $dict.key = value 或 eval $dict.key1.key2 = value — 字段赋值"""
-        # items: field_access, eval_rhs
+        # items: field_access, expression
         target = items[0]  # FieldAccess
-        value = items[1]   # eval_rhs result
+        value = items[1]
         return EvalFieldChainAssign(target=target, value=value, line_no=self._line(items))
 
     # ─── 隐式 eval（省略 eval 关键字）─────────────────────
 
-    def implicit_eval_assign_func(self, items):
-        """$var = func($arg...) — 隐式函数调用赋值"""
-        tokens = [i for i in items if isinstance(i, Token)]
-        names = [str(t) for t in tokens]
-        lists = [i for i in items if isinstance(i, list)]
-        func_args = lists[0] if lists else []
-        return Eval(func_name=names[1], func_args=func_args, target=names[0], line_no=self._line(items))
-
-    def implicit_eval_assign_lit(self, items):
-        """$var = "string" | 123 | {} | {"k": v} | [list] | (min, max) — 隐式字面量赋值"""
-        tokens = [i for i in items if isinstance(i, Token)]
-        target_name = str(tokens[0])
-        lit_value = items[1]
-        if isinstance(lit_value, dict):
-            return Eval(func_name="__dict__", func_args=[lit_value], target=target_name, line_no=self._line(items))
-        if isinstance(lit_value, list):
-            return Eval(func_name="__list__", func_args=lit_value, target=target_name, line_no=self._line(items))
-        # 元组路径：TupleLiteral（支持混合数字和变量）
-        if isinstance(lit_value, TupleLiteral):
-            return Eval(func_name="__tuple__", func_args=lit_value.elements, target=target_name, line_no=self._line(items))
-        # 向后兼容：旧式 Python tuple
-        if isinstance(lit_value, tuple):
-            return Eval(func_name="__range__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
-        if isinstance(lit_value, Token):
-            lit_value = self._unquote(str(lit_value))
-        return Eval(func_name="__literal__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
-
-    def implicit_eval_assign_arith(self, items):
-        """$var = arith_expr — 隐式算术表达式赋值"""
-        tokens = [i for i in items if isinstance(i, Token)]
-        target_name = str(tokens[0])
-        expr = items[1]
-        if isinstance(expr, ArithOp):
-            return Eval(func_name="__arith__", func_args=[expr], target=target_name, line_no=self._line(items))
-        if isinstance(expr, (int, float)):
-            return Eval(func_name="__literal__", func_args=[Literal(value=expr)], target=target_name, line_no=self._line(items))
-        if isinstance(expr, Literal):
-            return Eval(func_name="__literal__", func_args=[expr], target=target_name, line_no=self._line(items))
-        return Eval(func_name="__expr__", func_args=[expr], target=target_name, line_no=self._line(items))
-
     def implicit_eval_assign_expr(self, items):
-        """$var = field_access | $other — 隐式表达式赋值"""
+        """$var = expression — 与显式 eval 共用同一 AST 构造。"""
         tokens = [i for i in items if isinstance(i, Token)]
         target_name = str(tokens[0])
-        expr = items[1]
-        return Eval(func_name="__expr__", func_args=[expr], target=target_name, line_no=self._line(items))
+        return self._build_assignment(target_name, items[1], items)
+
+    def _build_assignment(self, target_name, expr, items):
+        """从统一 expression 构造兼容的 Eval AST。"""
+        expr = self._normalize_expr(expr)
+        line_no = self._line(items)
+        if isinstance(expr, FuncCall):
+            return Eval(
+                func_name=expr.func_name, func_args=expr.func_args,
+                target=target_name, line_no=line_no)
+        if isinstance(expr, dict):
+            return Eval(
+                func_name="__dict__", func_args=[expr],
+                target=target_name, line_no=line_no)
+        if isinstance(expr, list):
+            return Eval(
+                func_name="__list__", func_args=expr,
+                target=target_name, line_no=line_no)
+        if isinstance(expr, TupleLiteral):
+            return Eval(
+                func_name="__tuple__", func_args=expr.elements,
+                target=target_name, line_no=line_no)
+        if isinstance(expr, ArithOp):
+            return Eval(
+                func_name="__arith__", func_args=[expr],
+                target=target_name, line_no=line_no)
+        if isinstance(expr, Literal):
+            return Eval(
+                func_name="__literal__", func_args=[expr],
+                target=target_name, line_no=line_no)
+        return Eval(
+            func_name="__expr__", func_args=[expr],
+            target=target_name, line_no=line_no)
 
     def implicit_eval_field_assign(self, items):
         """$dict.key = value — 隐式字段赋值"""
@@ -309,41 +242,13 @@ class _ExprMixin:
         return EvalFieldChainAssign(target=target, value=value, line_no=self._line(items))
 
     def default_stmt(self, items):
-        """default $var = literal — 仅当变量未设置时赋默认值"""
+        """default $var = expression — 仅当变量未设置时求值。"""
         tokens = [i for i in items if isinstance(i, Token)]
         target_name = str(tokens[0])
-        lit_value = items[1]
-        if isinstance(lit_value, Token):
-            lit_value = self._unquote(str(lit_value))
-        # 统一用 __default__，引擎根据值的类型处理
-        return Eval(func_name="__default__", func_args=[Literal(value=lit_value)], target=target_name, line_no=self._line(items))
-
-    def eval_rhs_func(self, items):
-        """eval_rhs: NAME ( arg_list? ) → FuncCall"""
-        tokens = [i for i in items if isinstance(i, Token)]
-        func_name = str(tokens[0])
-        lists = [i for i in items if isinstance(i, list)]
-        func_args = lists[0] if lists else []
-        return FuncCall(func_name=func_name, func_args=func_args, line_no=self._line(items))
-
-    def eval_rhs_lit(self, items):
-        """eval_rhs: literal → Literal | dict | list | null | bool"""
-        val = items[0]
-        if isinstance(val, dict):
-            return val  # 字典（空或非空）
-        if isinstance(val, Token):
-            return Literal(value=self._unquote(str(val)))
-        if val is None or isinstance(val, bool):
-            return Literal(value=val)  # null / true / false
-        return val  # number (float)
-
-    def eval_rhs_field(self, items):
-        """eval_rhs: field_access → FieldAccess"""
-        return items[0]
-
-    def eval_rhs_arith(self, items):
-        """eval_rhs: arith_expr → 透传算术表达式节点"""
-        return items[0]
+        expr = self._normalize_expr(items[1])
+        return Eval(
+            func_name="__default__", func_args=[expr],
+            target=target_name, line_no=self._line(items))
 
     # ─── 算术表达式 ─────────────────────────────────────
 
@@ -368,6 +273,15 @@ class _ExprMixin:
         """STRING → Literal（算术表达式中的字符串字面量，去引号）"""
         return Literal(value=self._unquote(str(items[0])))
 
+    def null_atom(self, _items):
+        return Literal(value=None)
+
+    def true_atom(self, _items):
+        return Literal(value=True)
+
+    def false_atom(self, _items):
+        return Literal(value=False)
+
     def func_call(self, items):
         """func_name(arg_list?) → FuncCall"""
         tokens = [i for i in items if isinstance(i, Token)]
@@ -375,10 +289,6 @@ class _ExprMixin:
         lists = [i for i in items if isinstance(i, list)]
         func_args = lists[0] if lists else []
         return FuncCall(func_name=func_name, func_args=func_args, line_no=self._line(items))
-
-    def empty_dict(self, items):
-        """{} → 空字典（兼容旧规则，已由 dict_literal 替代）"""
-        return {}
 
     # ─── 字典字面量 ─────────────────────────────────────
 
@@ -391,89 +301,15 @@ class _ExprMixin:
         return result
 
     def dict_pair(self, items):
-        """STRING ":" dict_value → (key_str, value_node)"""
+        """STRING ":" expression → (key_str, expression_node)"""
         key = self._unquote(str(items[0]))
-        value = items[1]
+        value = self._normalize_expr(items[1])
         return (key, value)
 
-    def dict_val_str(self, items):
-        """字典值：字符串 → Literal"""
-        return Literal(value=self._unquote(str(items[0])))
-
-    def dict_val_num(self, items):
-        """字典值：数字 → Literal"""
-        return Literal(value=items[0])
-
-    def dict_val_null(self, items):
-        """字典值：null → Literal(None)"""
-        return Literal(value=None)
-
-    def dict_val_true(self, items):
-        """字典值：true → Literal(True)"""
-        return Literal(value=True)
-
-    def dict_val_false(self, items):
-        """字典值：false → Literal(False)"""
-        return Literal(value=False)
-
-    def dict_val_var(self, items):
-        """字典值：变量引用 → VarRef"""
-        return items[0]  # var_ref 已返回 VarRef
-
-    def dict_val_dict(self, items):
-        """字典值：嵌套字典 → dict[str, AST节点]"""
-        return items[0]  # dict_literal 已返回 dict
-
-    def dict_val_list(self, items):
-        """字典值：列表 → list[AST节点]"""
-        return items[0]  # list_literal 已返回 list
-
     def arg_list(self, items):
-        return list(items)
-
-    def arg_lit(self, items):
-        return Literal(value=self._unquote(str(items[0])))
-
-    def arg_num(self, items):
-        """number 作为函数参数 → float"""
-        return items[0]  # number 已返回 float
-
-    def arg_var(self, items):
-        """var_ref 作为函数参数 → VarRef"""
-        return items[0]  # var_ref 已返回 VarRef
-
-    def arg_field(self, items):
-        """field_access 作为函数参数 → FieldAccess"""
-        return items[0]  # field_access 已返回 FieldAccess
-
-    def arg_tuple(self, items):
-        """(x, y) / (x, y, w, h) 作为函数参数 → TupleLiteral（引擎求值为 tuple / RectCoordRef）"""
-        return items[0]  # rect_literal / range_literal 已返回 TupleLiteral
-
-    def arg_null(self, items):
-        """null 作为函数参数 → Literal(None)"""
-        return Literal(value=None)
-
-    def arg_true(self, items):
-        """true 作为函数参数 → Literal(True)"""
-        return Literal(value=True)
-
-    def arg_false(self, items):
-        """false 作为函数参数 → Literal(False)"""
-        return Literal(value=False)
-
-    def arg_list_lit(self, items):
-        """[...] 作为函数参数 → list[AST节点]（引擎 _resolve 递归求值）"""
-        return items[0]  # list_literal 已返回 list
-
-    def arg_dict_lit(self, items):
-        """{...} 作为函数参数 → dict[str, AST节点]（引擎 _resolve 递归求值）"""
-        return items[0]  # dict_literal 已返回 dict
+        return [self._normalize_expr(item) for item in items]
 
     # ─── 条件表达式 ───────────────────────────────────────
-
-    def cond_passthrough(self, items):
-        return items[0]
 
     def or_op(self, items):
         return Or(left=items[0], right=items[1], line_no=self._line(items))
@@ -485,14 +321,12 @@ class _ExprMixin:
         return Not(operand=items[0], line_no=self._line(items))
 
     def contains_op(self, items):
-        field_access, text_node = items
-        right = text_node if isinstance(text_node, VarRef) else Literal(value=self._unquote(str(text_node)))
-        return Contains(left=field_access, right=right, line_no=self._line(items))
+        left, right = items
+        return Contains(left=left, right=right, line_no=self._line(items))
 
     def equals_op(self, items):
-        field_access, text_node = items
-        right = text_node if isinstance(text_node, VarRef) else Literal(value=self._unquote(str(text_node)))
-        return Equals(left=field_access, right=right, line_no=self._line(items))
+        left, right = items
+        return Equals(left=left, right=right, line_no=self._line(items))
 
     def in_op(self, items):
         field_access, list_literal = items
@@ -500,14 +334,6 @@ class _ExprMixin:
 
     def is_empty_op(self, items):
         return IsEmpty(expr=items[0], line_no=self._line(items))
-
-    def var_cond(self, items):
-        """条件中的 $var → VarRef（truthy 检查）"""
-        return items[0]
-
-    def func_cond(self, items):
-        """条件中的 func_call → FuncCall（truthy 检查）"""
-        return items[0]
 
     def field_base(self, items):
         """$var.field → FieldAccess(root=VarRef, field_name)"""
@@ -667,40 +493,7 @@ class _ExprMixin:
         「空列表」判空、for 迭代、传参全部走偏。null 列表项本身是
         ``Literal(value=None)``，不会被这条误伤。
         """
-        return [item for item in items
-                if item is not self._MISSING and item is not None]
-
-    def list_item_str(self, items):
-        """字符串列表项 → Literal"""
-        return Literal(value=self._unquote(str(items[0])))
-
-    def list_item_num(self, items):
-        """数字列表项 → Literal"""
-        return Literal(value=items[0])
-
-    def list_item_null(self, items):
-        """null 列表项 → Literal(None)"""
-        return Literal(value=None)
-
-    def list_item_true(self, items):
-        """true 列表项 → Literal(True)"""
-        return Literal(value=True)
-
-    def list_item_false(self, items):
-        """false 列表项 → Literal(False)"""
-        return Literal(value=False)
-
-    def list_item_var(self, items):
-        """变量列表项 → VarRef"""
-        return items[0]  # var_ref 已返回 VarRef
-
-    def list_item_dict(self, items):
-        """列表项：嵌套字典 → dict[str, AST节点]"""
-        return items[0]  # dict_literal 已返回 dict
-
-    def list_item_list(self, items):
-        """列表项：嵌套列表 → list[AST节点]"""
-        return items[0]  # list_literal 已返回 list
+        return [self._normalize_expr(item) for item in items if item is not None]
 
     def field_list(self, items):
         """.[f1, f2, ...] → list[Literal]"""

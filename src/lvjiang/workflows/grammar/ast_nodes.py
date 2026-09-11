@@ -173,6 +173,7 @@ class Scan:
     region_var: Any = None  # VarRef | None（动态 region，如 [scene].$var）
     by: Any = None  # ByClause | None（by 子句：有则返回字段名 str，无则返回 dict）
     where: Any = None  # WhereClause | None（where 子句：识别结果过滤）
+    cleaning_group: str | None = None  # with "key" 指定 OCR 清洗组
     line_no: int = 0
 
 
@@ -205,6 +206,7 @@ class Find:
     search_scene: Any = None    # str | VarRef | None（搜索场景名）
     search_region: Any = None   # str | VarRef | None（搜索区域名）
     where: Any = None           # WhereClause | None（where 子句：识别结果过滤）
+    cleaning_group: str | None = None  # with "key" 指定 OCR 清洗组
     line_no: int = 0
 
 
@@ -218,7 +220,7 @@ class ByClause:
         - "equals_any"    精确匹配列表任一元素（target 必须为 list）
         - "contains_any"  子串匹配列表任一元素（target 必须为 list）
     target:
-        Literal（字符串常量）或 VarRef（运行时变量，求值后须匹配 match_mode 要求类型）
+        Literal（字符串常量）、VarRef，或 image 模式的 EntityRef 模板绑定来源
     full:
         False（默认）= 短路匹配，首个命中即返回
         True = 全量匹配，取最高置信度的命中项（仅 recognize 支持）
@@ -228,7 +230,7 @@ class ByClause:
     - full=True: 遍历全部字段，取置信度最高的命中项；全部未命中返回 ""。
     """
     match_mode: str
-    target: Any     # Literal | VarRef
+    target: Any = None  # Literal | VarRef；scan 的无参 by image 为 None
     full: bool = False
 
 
@@ -309,7 +311,7 @@ class If:
 @dataclass(frozen=True)
 class For:
     var: str                    # 循环变量名（裸字符串）
-    iterable: Any               # list[Literal]（静态列表）| VarRef（动态列表变量）
+    iterable: Any               # 求值结果为 list 的表达式
     body: list = field(default_factory=list)
     line_no: int = 0
 
@@ -326,7 +328,7 @@ class ForRange:
 
 @dataclass(frozen=True)
 class Loop:
-    count: Any      # int | str(NAME) | VarRef
+    count: Any      # 数值表达式 | str（兼容裸 NAME 变量）
     body: list = field(default_factory=list)
     line_no: int = 0
 
@@ -382,7 +384,7 @@ class Try:
 @dataclass(frozen=True)
 class Return:
     """return [value] — 返回值可选"""
-    value: Any = None  # 返回值表达式（arith_expr 节点），None 表示无返回值
+    value: Any = None  # 普通值、算术或条件表达式；None 表示无返回值
     line_no: int = 0
 
 

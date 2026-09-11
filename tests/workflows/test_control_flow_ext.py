@@ -7,9 +7,11 @@ import pytest
 from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.grammar.ast_nodes import (
+    And,
     Continue,
     For,
     If,
+    Or,
     Try,
     UntilLoop,
     WhileLoop,
@@ -289,6 +291,44 @@ call $r2 = check(0)
         v = run(code)
         assert v["r1"] is True
         assert v["r2"] is False
+
+    def test_return_logical_expression(self):
+        """return 支持 or/and/not 条件表达式并返回真正的 bool。"""
+        code = '''def any_enabled($a, $b, $c)
+    return $a or $b or $c
+end
+def allowed($count, $disabled)
+    return $count > 0 and not $disabled
+end
+call $none = any_enabled(false, false, false)
+call $some = any_enabled(false, true, false)
+call $yes = allowed(1, false)
+call $no = allowed(1, true)
+'''
+        program = parse_text(code)
+        any_return = program.procs["any_enabled"].body[0].value
+        allowed_return = program.procs["allowed"].body[0].value
+        assert isinstance(any_return, Or)
+        assert isinstance(allowed_return, And)
+
+        values = run(code)
+        assert values["none"] is False
+        assert values["some"] is True
+        assert values["yes"] is True
+        assert values["no"] is False
+
+    def test_return_or_short_circuits(self):
+        """左侧为真时不求值 or 的右侧。"""
+        code = '''def choose($enabled)
+    return $enabled or explode()
+end
+'''
+        engine = make_engine()
+        program = parse_text(code)
+        engine._procs = dict(program.procs)
+        engine._call_func = lambda _node: pytest.fail("or 右侧不应被求值")
+
+        assert engine.call_subcall("choose", [True]) is True
 
     def test_return_null(self):
         """return null 返回 None"""

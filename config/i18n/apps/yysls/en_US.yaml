@@ -78,7 +78,10 @@ yysls:
   装备养成: Equipment Development
   配置跨等级、跨装备类型共用的游戏规则。: Configure game rules shared across levels and equipment types.
   '冷却时间:': 'Cooldown:'
-  扫描装备发生转律后，从当前时间起重新计算的冷却天数: Number of cooldown days applied after transmuting scanned equipment
+  扫描装备发生转律后的冷却天数: Number of cooldown days applied after transmuting scanned equipment
+  冷却到期后累计一次: Carry Over One Expired Reset
+  '逾期进度:': 'Expired Progress:'
+  逾期时间会抵扣下一轮冷却，最多保留一次可重置次数: Overdue time reduces the next cooldown, with at most one reset carried over
   冷却装备: Cooldown Equipment
   用户名: User
   冷却倒计时: Cooldown

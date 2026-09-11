@@ -1,7 +1,7 @@
 """燕云「调律」Tab —— 通过 AppHooks 注入通用 MainWindow 的插件页面。
 
 职责：
-- 调律配置两页 Tab（规则 | 参数）与 wf_configs 统一存储持久化：
+- 调律配置两页 Tab（规则 | 参数）按执行用户独立持久化：
   规则 = 调律规则与玩法；参数 = 部位、全局开关、调律设置与调试参数
 - 「开始调律」按钮三态（运行中 / 未就绪 / 就绪），订阅宿主 automation_state_changed
 - ``f9_run()``：F9 快捷键与按钮共用的启停入口，
@@ -31,7 +31,11 @@ from .....i18n import tr
 from .....ui.button_styles import apply_button_style, fit_button_width
 from .....ui.execution_user_selector import ExecutionUserSelector
 from .....ui.main.run_control import STATE_PLAN_UNSUPPORTED
-from ...config.tune_slots import DEFAULT_SLOTS, LOCKED_SLOTS, SLOT_GROUPS
+from ...config.auto_tuning_config import (
+    load_user_auto_tuning_config,
+    save_user_auto_tuning_config,
+)
+from ...config.tune_slots import LOCKED_SLOTS, SLOT_GROUPS
 from .config_widget import TuningConfigWidget, TuningGlobalsWidget
 
 _STYLE_BTN_RUN = (
@@ -82,7 +86,11 @@ class TuningTab(QWidget):
     def __init__(self, host, parent=None):
         super().__init__(parent)
         self._host = host
+        self._loading_tuning_config = False
         self._build_ui()
+        self._execution_user_selector.resolved_user_changed.connect(
+            self._on_execution_user_changed)
+        host.user_changed.connect(self._on_active_user_changed)
         self._load_tuning_config()
         host.automation_state_changed.connect(self._on_automation_state)
         # 基础配置变更时刷新「参数」页开关（新增/删除开关即时生效）
@@ -444,6 +452,18 @@ class TuningTab(QWidget):
         elif rel_path.startswith("yysls/base_groups/"):
             self._refresh_base_group_radios()
 
+    def _on_execution_user_changed(self, username: str) -> None:
+        """固定执行用户改变时，切换到该用户的调律配置。"""
+        self._load_tuning_config(username)
+
+    def _on_active_user_changed(self, username: str) -> None:
+        """跟随当前用户时，主用户切换同步刷新调律配置。"""
+        if self._execution_user_selector.combo.currentData() is None:
+            self._load_tuning_config(username)
+
+    def _users_dir(self):
+        return getattr(self._host.user_manager, "users_dir", None)
+
     # ─── 启停入口（F9 快捷键 / 按钮点击共用）───────────────────
 
     @staticmethod
@@ -492,9 +512,9 @@ class TuningTab(QWidget):
             self._show_status_error(msg)
             return
 
-        # ── 从统一存储读取配置 ──
-        from .....core.config.wf_configs import get_wf_config
-        tc = get_wf_config("auto_tuning")
+        # 启动快照与上方执行用户绑定，运行中不再重新读取配置。
+        tc = load_user_auto_tuning_config(
+            execution_username, self._users_dir())
 
         selected_slots = tc.get("selected_slots") or []
         if not selected_slots:
@@ -585,6 +605,7 @@ class TuningTab(QWidget):
 
         def configure(wf_instance, engine):
             from ...workflows.tuning_context import TuningRunContext
+            engine.workflow_config_snapshot = dict(tc)
             wf_instance.run_ctx = TuningRunContext(
                 selected_slots=selected_slots,
                 rule_judges=rule_judges,
@@ -652,95 +673,107 @@ class TuningTab(QWidget):
                 return w
         return None
 
-    # ─── 调律配置持久化（wf_configs["auto_tuning"]）──────────
+    # ─── 调律配置持久化（users/{username}.json）──────────────
 
-    def _load_tuning_config(self):
-        from .....core.config.wf_configs import get_wf_config
-        tc = get_wf_config("auto_tuning")
-        selected = tc.get("selected_slots") or list(DEFAULT_SLOTS)
-        rules_cfg = tc.get("rules") or {"huiyi_general": {"enabled": True}}
-        for cb in self._tuning_checkboxes:
-            cb.blockSignals(True)
-            # 禁用项（副武器）不随会话配置回选
-            cb.setChecked(cb.isEnabled() and cb.objectName() in selected)
-            cb.blockSignals(False)
-        self._tuning_config.set_config(rules_cfg)
-        # 基础规则单选（无持久值时选第一个可用组）
-        self._base_group_key = tc.get("base_group", "")
-        self._select_base_group_radio(self._base_group_key)
-        self._tuning_globals.set_switches(tc.get("switches", {}))
-        self._skip_tuning_cb.blockSignals(True)
-        self._skip_tuning_cb.setChecked(bool(tc.get("skip_tuning", False)))
-        self._skip_tuning_cb.blockSignals(False)
-        self._pc_background_scroll_cb.blockSignals(True)
-        self._pc_background_scroll_cb.setChecked(
-            bool(tc.get("pc_background_scroll", False)))
-        self._pc_background_scroll_cb.blockSignals(False)
-        self._use_stone_cache_cb.blockSignals(True)
-        self._use_stone_cache_cb.setChecked(
-            bool(tc.get("use_stone_cache", True)))
-        self._use_stone_cache_cb.blockSignals(False)
-        initial_stone_min = tc.get("initial_stone_min_count")
-        initial_stone_enabled = bool(tc.get(
-            "initial_stone_check_enabled", initial_stone_min is not None))
-        self._initial_stone_check_cb.blockSignals(True)
-        self._initial_stone_check_cb.setChecked(initial_stone_enabled)
-        self._initial_stone_check_cb.blockSignals(False)
-        self._initial_stone_min.blockSignals(True)
-        self._initial_stone_min.setValue(
-            int(initial_stone_min) if initial_stone_min is not None
-            else (80 if initial_stone_enabled else 0))
-        self._initial_stone_min.blockSignals(False)
-        self._initial_stone_min.setEnabled(initial_stone_enabled)
-        self._validate_stone_cache_cb.blockSignals(True)
-        self._validate_stone_cache_cb.setChecked(
-            bool(tc.get("validate_stone_cache", False)))
-        self._validate_stone_cache_cb.blockSignals(False)
-        self._positional_traversal_cb.blockSignals(True)
-        self._positional_traversal_cb.setChecked(
-            tc.get("scroll_strategy") == "positional")
-        self._positional_traversal_cb.blockSignals(False)
-        # 最低等级（运行时覆盖基础规则的等级门槛）
-        saved_min_level = tc.get("min_level")
-        self._min_level_combo.blockSignals(True)
-        if saved_min_level is not None:
-            idx = self._min_level_combo.findData(int(saved_min_level))
-            if idx >= 0:
-                self._min_level_combo.setCurrentIndex(idx)
+    def _load_tuning_config(self, username: str | None = None):
+        username = username or self._execution_user_selector.resolve_username()
+        tc = (
+            load_user_auto_tuning_config(username, self._users_dir())
+            if username else {}
+        )
+        self._loading_tuning_config = True
+        selected = tc.get("selected_slots") or []
+        rules_cfg = tc.get("rules") or {}
+        try:
+            for cb in self._tuning_checkboxes:
+                cb.blockSignals(True)
+                # 禁用项（副武器）不随用户配置回选
+                cb.setChecked(cb.isEnabled() and cb.objectName() in selected)
+                cb.blockSignals(False)
+            self._tuning_config.set_config(rules_cfg)
+            self._base_group_key = tc.get("base_group", "default")
+            self._select_base_group_radio(self._base_group_key)
+            self._tuning_globals.set_switches(tc.get("switches", {}))
+            self._skip_tuning_cb.blockSignals(True)
+            self._skip_tuning_cb.setChecked(bool(tc.get("skip_tuning", False)))
+            self._skip_tuning_cb.blockSignals(False)
+            self._pc_background_scroll_cb.blockSignals(True)
+            self._pc_background_scroll_cb.setChecked(
+                bool(tc.get("pc_background_scroll", False)))
+            self._pc_background_scroll_cb.blockSignals(False)
+            self._use_stone_cache_cb.blockSignals(True)
+            self._use_stone_cache_cb.setChecked(
+                bool(tc.get("use_stone_cache", True)))
+            self._use_stone_cache_cb.blockSignals(False)
+            initial_stone_min = tc.get("initial_stone_min_count")
+            initial_stone_enabled = bool(tc.get(
+                "initial_stone_check_enabled", initial_stone_min is not None))
+            self._initial_stone_check_cb.blockSignals(True)
+            self._initial_stone_check_cb.setChecked(initial_stone_enabled)
+            self._initial_stone_check_cb.blockSignals(False)
+            self._initial_stone_min.blockSignals(True)
+            self._initial_stone_min.setValue(
+                int(initial_stone_min) if initial_stone_min is not None
+                else (80 if initial_stone_enabled else 0))
+            self._initial_stone_min.blockSignals(False)
+            self._initial_stone_min.setEnabled(initial_stone_enabled)
+            self._validate_stone_cache_cb.blockSignals(True)
+            self._validate_stone_cache_cb.setChecked(
+                bool(tc.get("validate_stone_cache", False)))
+            self._validate_stone_cache_cb.blockSignals(False)
+            self._positional_traversal_cb.blockSignals(True)
+            self._positional_traversal_cb.setChecked(
+                tc.get("scroll_strategy") == "positional")
+            self._positional_traversal_cb.blockSignals(False)
+            # 最低等级（运行时覆盖基础规则的等级门槛）
+            saved_min_level = tc.get("min_level")
+            self._min_level_combo.blockSignals(True)
+            if saved_min_level is not None:
+                idx = self._min_level_combo.findData(int(saved_min_level))
+                if idx >= 0:
+                    self._min_level_combo.setCurrentIndex(idx)
+                else:
+                    self._min_level_combo.setCurrentIndex(0)  # 回退到「默认」
             else:
-                self._min_level_combo.setCurrentIndex(0)  # 回退到「默认」
-        else:
-            self._min_level_combo.setCurrentIndex(0)  # 「默认」
-        self._min_level_combo.blockSignals(False)
-        # 初始跳过 / 指定调律
-        for key, cb, sp_row, sp_col in (
-            ("skip_start", self._cb_skip, self._sp_skip_row, self._sp_skip_col),
-            ("target_cell", self._cb_target, self._sp_target_row, self._sp_target_col),
-        ):
-            val = tc.get(key)
-            cb.blockSignals(True)
-            sp_row.blockSignals(True)
-            sp_col.blockSignals(True)
-            if isinstance(val, (list, tuple)) and len(val) == 2:
-                cb.setChecked(True)
-                sp_row.setValue(int(val[0]))
-                sp_col.setValue(int(val[1]))
-            else:
-                cb.setChecked(False)
-            cb.blockSignals(False)
-            sp_row.blockSignals(False)
-            sp_col.blockSignals(False)
-        self._on_skip_target_toggled()
+                self._min_level_combo.setCurrentIndex(0)  # 「默认」
+            self._min_level_combo.blockSignals(False)
+            # 初始跳过 / 指定调律
+            for key, cb, sp_row, sp_col in (
+                ("skip_start", self._cb_skip,
+                 self._sp_skip_row, self._sp_skip_col),
+                ("target_cell", self._cb_target,
+                 self._sp_target_row, self._sp_target_col),
+            ):
+                val = tc.get(key)
+                cb.blockSignals(True)
+                sp_row.blockSignals(True)
+                sp_col.blockSignals(True)
+                if isinstance(val, (list, tuple)) and len(val) == 2:
+                    cb.setChecked(True)
+                    sp_row.setValue(int(val[0]))
+                    sp_col.setValue(int(val[1]))
+                else:
+                    cb.setChecked(False)
+                cb.blockSignals(False)
+                sp_row.blockSignals(False)
+                sp_col.blockSignals(False)
+            self._on_skip_target_toggled()
+        finally:
+            self._loading_tuning_config = False
 
     def _save_tuning_config(self):
-        from .....core.config.wf_configs import update_wf_config
+        if self._loading_tuning_config:
+            return
+        username = self._execution_user_selector.resolve_username()
+        if not username:
+            return
         skip_start = None
         if self._cb_skip.isChecked():
             skip_start = [self._sp_skip_row.value(), self._sp_skip_col.value()]
         target_cell = None
         if self._cb_target.isChecked():
             target_cell = [self._sp_target_row.value(), self._sp_target_col.value()]
-        update_wf_config("auto_tuning", {
+        save_user_auto_tuning_config(username, {
             "selected_slots": self._get_tuning_selected_slots(),
             "rules": self._get_tuning_rule_config(),
             "switches": self._get_tuning_switches(),
@@ -760,7 +793,7 @@ class TuningTab(QWidget):
             "skip_start": skip_start,
             "target_cell": target_cell,
             "min_level": self._min_level_combo.currentData(),
-        })
+        }, self._users_dir())
 
     def _on_initial_stone_check_toggled(self, checked: bool) -> None:
         self._initial_stone_min.setEnabled(checked)

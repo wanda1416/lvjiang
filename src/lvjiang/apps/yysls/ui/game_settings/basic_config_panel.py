@@ -5,6 +5,7 @@ from datetime import datetime
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QFormLayout,
     QGroupBox,
     QLabel,
@@ -43,9 +44,14 @@ class BasicConfigPanel(QWidget):
         self._cooldown_days.setSuffix(" " + tr("天"))
         self._cooldown_days.setMinimumWidth(140)
         self._cooldown_days.setToolTip(tr(
-            "扫描装备发生转律后，从当前时间起重新计算的冷却天数"))
+            "扫描装备发生转律后的冷却天数"))
         self._cooldown_days.valueChanged.connect(self._apply)
         form.addRow(tr("冷却时间:"), self._cooldown_days)
+        self._cooldown_carryover = QCheckBox(tr("冷却到期后累计一次"))
+        self._cooldown_carryover.setToolTip(tr(
+            "逾期时间会抵扣下一轮冷却，最多保留一次可重置次数"))
+        self._cooldown_carryover.toggled.connect(self._apply)
+        form.addRow(tr("逾期进度:"), self._cooldown_carryover)
         layout.addWidget(box)
 
         self._status_label = QLabel()
@@ -55,14 +61,18 @@ class BasicConfigPanel(QWidget):
     def _load(self) -> None:
         self._cooldown_days.setValue(
             get_game_config().get_equipment_cooldown_days())
+        self._cooldown_carryover.setChecked(
+            get_game_config().is_equipment_cooldown_carryover_enabled())
 
-    def _apply(self, _value: int) -> None:
+    def _apply(self, _value: int | bool) -> None:
         if self._loading:
             return
         manager = get_game_config()
         data = manager.get_raw()
         basic = dict(data.get("basic_config") or {})
         basic["equipment_cooldown_days"] = self._cooldown_days.value()
+        basic["equipment_cooldown_carryover"] = (
+            self._cooldown_carryover.isChecked())
         data["basic_config"] = basic
         try:
             manager.save(data)

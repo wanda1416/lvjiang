@@ -298,6 +298,25 @@ def test_real_development_migrates_every_plan_and_resets_transmute_cooldown(
     assert timedelta(days=4, hours=23) < remaining <= timedelta(days=5)
 
 
+def test_real_development_carries_expired_cooldown_progress(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    old = developed_real_equip()
+    previous = datetime.now().astimezone() - timedelta(days=1)
+    old["cooldown_expires_at"] = previous.isoformat()
+    old_fp = repo.upsert_item(old)
+    changed = json.loads(json.dumps(old, ensure_ascii=False))
+    changed["affix_2"] = {
+        "name": "精准率", "value": 4.0, "is_transferred": True,
+    }
+
+    new_fp = repo.update_real_development(old_fp, changed)
+
+    stored = repo.load().equipment_items[new_fp]
+    expires_at = datetime.fromisoformat(stored["cooldown_expires_at"])
+    assert abs(expires_at.timestamp() - (
+        previous + timedelta(days=5)).timestamp()) < 1
+
+
 def test_real_development_can_only_cultivate_existing_transferred_slot(
     tmp_path: Path,
 ):

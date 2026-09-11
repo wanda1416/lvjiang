@@ -2,8 +2,8 @@
 
 Kotlin 侧不写死任何规则/玩法/部位清单：get_tuning_config() 把可配置项
 （规则注册表 + 开关注册表 + 部位常量）与当前保存值合并后一次性返回，
-Activity 只负责按 JSON 渲染表单；save_tuning_config() 校验后写入统一存储
-wf_configs["auto_tuning"] —— 与桌面调律 Tab 同一落点，
+Activity 只负责按 JSON 渲染表单；save_tuning_config() 校验后写入当前用户的
+``workflow_params.auto_tuning`` —— 与桌面调律 Tab 同一落点，
 auto_tuning._ensure_judge_config() 的回退路径直接消费，工作流零改动。
 
 与 task_runner 相同的跨语言约定：对外函数返回 JSON 文本、自己吞异常。
@@ -35,7 +35,10 @@ def get_tuning_config() -> str:
 
         ensure_loaded(("yysls",))
 
-        from ....core.config.wf_configs import get_wf_config
+        from ..config.auto_tuning_config import (
+            active_username,
+            load_user_auto_tuning_config,
+        )
         from ..config.tune_slots import (
             DEFAULT_SLOTS,
             LOCKED_SLOTS,
@@ -47,7 +50,8 @@ def get_tuning_config() -> str:
             get_tuning_group_manager,
         )
 
-        tc = get_wf_config("auto_tuning")
+        username = active_username()
+        tc = load_user_auto_tuning_config(username)
 
         # 基础规则组：单选，无持久值时取第一个可用
         group_key = tc.get("base_group", "")
@@ -61,9 +65,8 @@ def get_tuning_config() -> str:
             for key, group in get_tuning_group_manager().get_groups().items()
         ]
 
-        # 规则：无保存值时缺省与桌面一致（仅 huiyi_general 启用，玩法全勾）
-        saved_rules: dict = tc.get("rules") or {
-            "huiyi_general": {"enabled": True}}
+        # 新用户的规则全部不选，必须由用户明确选择后才能启动。
+        saved_rules: dict = tc.get("rules") or {}
         rules = []
         for key, rule in get_tuning_rules().items():
             cfg = saved_rules.get(key, {})
@@ -137,7 +140,11 @@ def save_tuning_config(payload: str) -> str:
 
         ensure_loaded(("yysls",))
 
-        from ....core.config.wf_configs import get_wf_config, update_wf_config
+        from ..config.auto_tuning_config import (
+            active_username,
+            load_user_auto_tuning_config,
+            save_user_auto_tuning_config,
+        )
         from ..config.tune_slots import LOCKED_SLOTS, SLOT_LABELS
         from ..core.evaluator import get_tuning_rules
         from ..core.tuning_rules import (
@@ -195,8 +202,9 @@ def save_tuning_config(payload: str) -> str:
         raw_switches = raw_switches if isinstance(raw_switches, dict) else {}
         switches = {str(k): bool(v) for k, v in raw_switches.items()}
 
-        # 桌面端调试/后台参数不进设备端 UI，update_wf_config 合并时保留原值
-        old = get_wf_config("auto_tuning")
+        # 桌面端调试/后台参数不进设备端 UI，保存时保留该用户的原值。
+        username = active_username()
+        old = load_user_auto_tuning_config(username)
 
         # 基础规则组：按注册表校验，非法/缺省回退原值
         raw_group = data.get("base_group")
@@ -205,7 +213,8 @@ def save_tuning_config(payload: str) -> str:
             base_group = raw_group
         else:
             base_group = old.get("base_group", "")
-        update_wf_config("auto_tuning", {
+        save_user_auto_tuning_config(username, {
+            **old,
             "selected_slots": selected_slots,
             "rules": rules_cfg,
             "switches": switches,

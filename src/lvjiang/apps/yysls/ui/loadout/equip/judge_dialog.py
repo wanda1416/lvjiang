@@ -2,8 +2,8 @@
 
 装备调律配置对话框顶部按钮入口：纯手工构造装备验证判定器，
 改规则后可立即验证。
-左侧为调律规则配置（TuningConfigWidget，初值取自 wf_configs 调律配置，
-改动不回写 session）；右侧手选 部位 + 品阶 + 词条 1-5（数值默认
+左侧为调律规则配置（TuningConfigWidget，初值取自当前用户调律配置，
+改动不回写用户资料）；右侧手选 部位 + 品阶 + 词条 1-5（数值默认
 承音 94%），点「判定」输出调律潜力结论，词条满 5 条时追加各启用
 规则的完整定级。词条名一律为 attributes.yaml 标准字段。
 """
@@ -394,9 +394,12 @@ class EquipJudgeTestDialog(QDialog):
 
     @staticmethod
     def _load_session_tuning() -> tuple[dict, dict]:
-        """读取调律 Tab 已保存的规则配置与全局开关作为初值（统一存储）"""
-        from ......core.config.wf_configs import get_wf_config
-        tc = get_wf_config("auto_tuning")
+        """读取当前用户保存的规则配置与全局开关作为初值。"""
+        from ....config.auto_tuning_config import (
+            active_username,
+            load_user_auto_tuning_config,
+        )
+        tc = load_user_auto_tuning_config(active_username())
         return tc.get("rules", {}), tc.get("switches", {})
 
     def _on_judge(self):
@@ -467,8 +470,12 @@ class EquipJudgeTestDialog(QDialog):
             return
 
         # 加载基础规则组
-        from ......core.config.wf_configs import get_wf_config
-        group_key = get_wf_config("auto_tuning").get("base_group", "default")
+        from ....config.auto_tuning_config import (
+            active_username,
+            load_user_auto_tuning_config,
+        )
+        group_key = load_user_auto_tuning_config(
+            active_username()).get("base_group", "default")
         group = get_tuning_group(group_key)
         if group is None:
             self.result_text.setPlainText(tr("基础规则组 {key} 不存在").format(key=repr(group_key)))

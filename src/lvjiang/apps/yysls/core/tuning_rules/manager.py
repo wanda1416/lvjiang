@@ -339,24 +339,15 @@ class TuningRuleManager:
 
     def _read_tune_config_raw(self) -> dict:
         """读取 tune_config.yaml 原始 dict"""
-        path = self._resolver.resolve_read(_CONFIG_REL_PATH)
-        if path is None:
-            return {}
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                return yaml.safe_load(f) or {}
+            return self._resolver.load_merged(_CONFIG_REL_PATH)
         except Exception as e:
             logger.error(f"tune_config.yaml 读取失败: {e}")
             return {}
 
     def _write_tune_config_raw(self, data: dict) -> None:
         """写回 tune_config.yaml 并通知 TuneConfigManager 刷新"""
-        path = self._resolver.resolve_read(_CONFIG_REL_PATH)
-        if path is None:
-            logger.error("tune_config.yaml 不存在，无法写入")
-            return
-        with open(path, "w", encoding="utf-8") as f:
-            yaml.dump(data, f, allow_unicode=True, sort_keys=False)
+        self._resolver.save_merged(_CONFIG_REL_PATH, data)
         # 通知 TuneConfigManager 单例刷新，避免缓存过期
         if _tune_config_manager is not None:
             _tune_config_manager.reload()
@@ -471,15 +462,9 @@ class TuningGroupManager:
 
     def _write_base_rules(self, keys: list[str]) -> None:
         """更新 tune_config.yaml 的 base_rules 数组"""
-        path = self._resolver.resolve_read(_CONFIG_REL_PATH)
-        if path is None:
-            logger.error("tune_config.yaml 不存在，无法更新 base_rules")
-            return
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+        data = self._resolver.load_merged(_CONFIG_REL_PATH)
         data["base_rules"] = keys
-        with open(path, "w", encoding="utf-8") as f:
-            yaml.dump(data, f, allow_unicode=True, sort_keys=False)
+        self._resolver.save_merged(_CONFIG_REL_PATH, data)
 
     def reload(self) -> None:
         """按 base_rules 声明顺序重新加载规则组"""

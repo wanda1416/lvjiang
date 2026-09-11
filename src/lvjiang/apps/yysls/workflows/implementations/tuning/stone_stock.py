@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from loguru import logger
 
@@ -94,66 +95,91 @@ class EntryScanStoneStock(StoneStockStrategy):
         self._stock_units = units
 
 
+@dataclass
+class _CachedLevelStock:
+    stock_units: int | None = None
+    initialized: bool = False
+    initial_check_done: bool = False
+    cache_invalid: bool = False
+    invalid_reason: str = ""
+
+
 class CachedStoneStock(StoneStockStrategy):
-    """基于已知操作消耗/累计返还的运行期库存账本。"""
+    """按装备等级隔离的运行期律准石库存账本。"""
 
     uses_cache = True
 
     def __init__(self) -> None:
         self.reset()
 
+    def _pool(self) -> _CachedLevelStock:
+        return self._level_pools.setdefault(
+            self._active_level, _CachedLevelStock())
+
+    def _select_equipment_level(self, equip: EquipmentData) -> None:
+        level = int(equip.level or 0)
+        if level != self._active_level:
+            self._active_level = level
+            logger.debug(f"切换律准石缓存池: level={level}")
+
     @property
     def needs_scan(self) -> bool:
-        return not self._initialized or self._cache_invalid
+        pool = self._pool()
+        return not pool.initialized or pool.cache_invalid
 
     @property
     def needs_initial_check(self) -> bool:
-        return not self._initial_check_done and not self._cache_invalid
+        pool = self._pool()
+        return not pool.initial_check_done and not pool.cache_invalid
 
     @property
     def stock_units(self) -> int | None:
-        return self._stock_units
+        return self._pool().stock_units
 
     @property
     def cache_invalid(self) -> bool:
-        return self._cache_invalid
+        return self._pool().cache_invalid
 
     @property
     def invalid_reason(self) -> str:
-        return self._invalid_reason
+        return self._pool().invalid_reason
 
     def reset(self) -> None:
-        self._stock_units: int | None = None
-        self._initialized = False
-        self._initial_check_done = False
-        self._cache_invalid = False
-        self._invalid_reason = ""
+        self._level_pools: dict[int, _CachedLevelStock] = {}
+        self._active_level = 0
 
     def accept_scan(self, units: int | None) -> None:
-        if not self._initialized or self._cache_invalid:
-            self._stock_units = units
-            self._initialized = units is not None
+        pool = self._pool()
+        if not pool.initialized or pool.cache_invalid:
+            pool.stock_units = units
+            pool.initialized = units is not None
 
     def set_manual(self, units: int) -> None:
-        self._stock_units = units
-        self._initialized = True
+        pool = self._pool()
+        pool.stock_units = units
+        pool.initialized = True
 
     def mark_initial_check_done(self) -> None:
-        self._initial_check_done = True
+        self._pool().initial_check_done = True
 
     def invalidate(self, reason: str) -> None:
-        if not self._cache_invalid:
-            logger.error(f"律准石 cache_invalid: {reason}")
-        self._cache_invalid = True
-        self._invalid_reason = reason
+        pool = self._pool()
+        if not pool.cache_invalid:
+            logger.error(
+                f"律准石 cache_invalid: level={self._active_level}, {reason}")
+        pool.cache_invalid = True
+        pool.invalid_reason = reason
 
     def observe_equipment(self, equip: EquipmentData) -> None:
+        self._select_equipment_level(equip)
         if equip.quality == "blue":
             self.invalidate("遇到不支持缓存记账的蓝色装备")
 
     def _delta(self, equip: EquipmentData, operation: str,
                affix_count: int) -> int | None:
-        if not self._initialized or self._cache_invalid:
+        self._select_equipment_level(equip)
+        pool = self._pool()
+        if not pool.initialized or pool.cache_invalid:
             return None
         if equip.quality == "blue":
             self.invalidate("遇到不支持缓存记账的蓝色装备")
@@ -190,15 +216,17 @@ class CachedStoneStock(StoneStockStrategy):
         return mapping[affix_count]
 
     def _apply(self, delta: int, message: str) -> None:
-        assert self._stock_units is not None
-        updated = self._stock_units + delta
+        pool = self._pool()
+        assert pool.stock_units is not None
+        updated = pool.stock_units + delta
         if updated < 0:
             self.invalidate(
                 f"库存扣减后为负数: {format_stone_units(updated)}")
             return
-        self._stock_units = updated
+        pool.stock_units = updated
         logger.info(
-            f"律准石缓存 {message}: {format_stone_units(updated)}")
+            f"律准石缓存 level={self._active_level} {message}: "
+            f"{format_stone_units(updated)}")
 
     def record_tune(self, equip: EquipmentData, target_affix: int) -> None:
         cost = self._delta(equip, "tune", target_affix)

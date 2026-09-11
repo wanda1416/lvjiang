@@ -93,6 +93,26 @@ def test_properties_dialog_spaces_fields_and_updates_cooldown(qtbot):
     assert not dialog._clear_cooldown_button.isEnabled()
 
 
+def test_properties_dialog_carries_expired_cooldown_progress(qtbot):
+    changes: list[str] = []
+    previous = datetime.now(timezone.utc) - timedelta(days=1)
+    dialog = _EquipmentPropertiesDialog(
+        {
+            "_fp": "fp",
+            "original_level": 110,
+            "cooldown_expires_at": previous.isoformat(),
+        },
+        cooldown_changed=lambda value: changes.append(value) or True,
+    )
+    qtbot.addWidget(dialog)
+
+    dialog._reset_cooldown_button.click()
+
+    reset_value = datetime.fromisoformat(changes[-1])
+    assert abs(reset_value.timestamp() - (
+        previous + timedelta(days=5)).timestamp()) < 1
+
+
 def test_cooldown_manager_collects_all_users_and_sorts_ascending(tmp_path):
     alice = LoadoutRepository("alice", tmp_path)
     bob = LoadoutRepository("bob", tmp_path)

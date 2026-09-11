@@ -1,7 +1,7 @@
 """基础规则组管理页（base_groups/ 目录）
 
 规则组 CRUD 与切换入口：
-- 当前规则下拉：切换即激活（持久化到 session，并通知三个行为页重载）；
+- 当前规则下拉：切换编辑目标，并通知三个行为页重载；
 - 规则组列表：规则组名 / 等级门槛 / 调律门槛 / 规则说明 概览；
 - 新增（key+名称对话框，key 走 _KEY_RE，空白组）/
   复制（需选中，独立副本）/ 删除（需选中，default 禁删）；
@@ -146,7 +146,7 @@ class BaseRuleGroupPage(QWidget):
         self._combo = QComboBox()
         self._combo.setToolTip(
             tr("切换后扫描处理/材料处理/结束处理页同步对准该组，"
-               "调律任务启动时以此为准"))
+               "不会修改用户在自动调律页选择的规则组"))
         self._combo.currentIndexChanged.connect(self._on_combo_changed)
         combo_row.addWidget(self._combo)
         combo_row.addStretch()
@@ -273,12 +273,6 @@ class BaseRuleGroupPage(QWidget):
         if not key or key == self._group_key:
             return
         self._group_key = key
-        # 持久化到统一存储（调律任务启动时的回退依据）
-        try:
-            from lvjiang.core.config.wf_configs import update_wf_config
-            update_wf_config("auto_tuning", {"base_group": key})
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"基础规则组选择持久化失败: {e}")
         self._loading = True
         self._refresh()
         self._load()

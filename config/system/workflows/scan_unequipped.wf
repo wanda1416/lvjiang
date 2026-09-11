@@ -137,7 +137,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
                         call $equip = scan_cell($detail_kind)
                         # type 为空 → equip_type OCR 失败，结束本行
                         if not $equip.type
-                            log error "    [" + $r + "," + $c + "] equip_type OCR 失败，结束本行"
+                            log warn "    [" + $r + "," + $c + "] equip_type OCR 失败，结束本行"
                             break
                         end
                         # 桌面端详情功能区会遮挡下一行首格，关闭后再继续；Android 无此遮挡。

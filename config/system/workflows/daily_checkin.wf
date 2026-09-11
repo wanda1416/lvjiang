@@ -41,10 +41,10 @@ log "每日签到流程结束。"
 # ─── 朝夕共赏 ──────────────────────────────────────────
 # 在活动列表中查找朝夕共赏 → 进入 → 签到 → 退回菜单页
 def checkin_zhaoxi()
-   # 最多滚动 2 次，加上初始位置共 3 次查找机会
+   # 最多滚动 5 次
    $found = ""
    wait @step_interval
-   loop 4
+   loop 5
       find [activity_main].[liebiao] as $found by contains "朝夕"
       if $found
          log "定位到朝夕共赏，准备领奖。"

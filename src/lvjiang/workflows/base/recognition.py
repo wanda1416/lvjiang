@@ -90,7 +90,7 @@ class _RecognitionMixin:
                 logger.warning(f"场景 {scene_key} 没有定义可用区域")
                 return {}
 
-        kwargs = {"min_confidence": min_confidence}
+        kwargs: dict[str, object] = {"min_confidence": min_confidence}
         if cleaning_group is not None:
             kwargs["cleaning_group"] = cleaning_group
         result = self._ocr.ocr_scene_regions(

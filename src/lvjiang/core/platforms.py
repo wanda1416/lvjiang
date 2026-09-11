@@ -73,6 +73,10 @@ def start_global_hotkeys(hotkeys: dict[str, Callable]) -> "GlobalHotKeys | None"
     - macOS 需「输入监控/辅助功能」权限，未授权时返回 None，
       由调用方降级为窗口内热键
     """
+    from .access import is_readonly
+    if is_readonly():
+        logger.info("只读实例无权注册全局热键")
+        return None
     if IS_MACOS:
         # macOS 上 pynput GlobalHotKeys 使用 CGEventTap + libffi，
         # 事件回调深度递归（500+ 层 ffi_call_int），

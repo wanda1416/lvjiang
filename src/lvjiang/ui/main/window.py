@@ -335,9 +335,7 @@ class MainWindow(
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
         # 启动全局热键（内部先安装 pynput 防护补丁）；
         # macOS 未授权时返回 None，降级为窗口内热键（keyPressEvent 使用当前配置）
-        from ...core.platforms import start_global_hotkeys
-        self._hotkey_listener = start_global_hotkeys(
-            self._main_global_hotkey_bindings())
+        self._hotkey_listener = self._start_main_global_hotkeys()
 
         logger.info("主窗口已初始化")
 
@@ -353,6 +351,15 @@ class MainWindow(
             hotkey_pynput_token(hk.stop): self._on_global_f10,
             hotkey_pynput_token(hk.pause): self._on_global_pause,
         }
+
+    def _start_main_global_hotkeys(self):
+        """主实例注册系统热键；只读实例完全不创建全局监听器。"""
+        from ...core.access import is_readonly
+        if is_readonly():
+            logger.info("只读实例不注册全局热键")
+            return None
+        from ...core.platforms import start_global_hotkeys
+        return start_global_hotkeys(self._main_global_hotkey_bindings())
 
     # ─── 热键回调 ────────────────────────────────────────────
 
@@ -620,8 +627,9 @@ class MainWindow(
 
         # === 底部状态栏 ===
         hk = self._user_config.hotkeys
-        self.statusBar().showMessage(
-            f"{tr('就绪')} | {hk.start} {tr('开始')} | {hk.pause} {tr('暂停')} | {hk.stop} {tr('结束')}")
+        self.statusBar().showMessage(self._hotkey_status(
+            tr("就绪"), (hk.start, tr("开始")),
+            (hk.pause, tr("暂停")), (hk.stop, tr("结束"))))
         self.adjustSize()
         self.setMinimumHeight(self.height())
         self._migrate_ui_state()
@@ -643,7 +651,8 @@ class MainWindow(
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
-        self.btn_run_workflow = QPushButton(f"{tr('开始执行')} ({self._user_config.hotkeys.start})")
+        self.btn_run_workflow = QPushButton(self._hotkey_label(
+            tr("开始执行"), self._user_config.hotkeys.start))
         # Explicitly discard clicked(bool); the access wrapper accepts *args.
         self.btn_run_workflow.clicked.connect(lambda: self._on_run_workflow())
         self.btn_run_workflow.setStyleSheet(
@@ -954,6 +963,10 @@ class MainWindow(
 
     def keyPressEvent(self, event: QKeyEvent):  # type: ignore[override]
         # macOS 无全局热键时的窗口内兜底；按键位跟随「热键设置」配置。
+        from ...core.access import is_readonly
+        if is_readonly():
+            super().keyPressEvent(event)
+            return
         hk = self._user_config.hotkeys
         key = event.key()
         if key == getattr(Qt.Key, f"Key_{hk.start}", None):
@@ -967,6 +980,16 @@ class MainWindow(
             self._request_stop()
         else:
             super().keyPressEvent(event)
+
+    @staticmethod
+    def _hotkey_label(label: str, key: str) -> str:
+        from ..hotkeys import hotkey_label
+        return hotkey_label(label, key)
+
+    @staticmethod
+    def _hotkey_status(base: str, *items: tuple[str, str]) -> str:
+        from ..hotkeys import hotkey_status
+        return hotkey_status(base, *items)
 
     def closeEvent(self, event):
         # QApplication 退出或重复 close() 可能再次投递关闭事件。资源清理只

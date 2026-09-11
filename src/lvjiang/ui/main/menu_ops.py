@@ -220,6 +220,10 @@ class MenuOpsMixin:
         menubar.setCornerWidget(
             self._theme_button, Qt.Corner.TopRightCorner
         )
+        if is_readonly():
+            # 只读实例只响应显式 UI 操作，插件追加的 QAction 快捷键也一并清除。
+            for action in self.findChildren(QAction):
+                action.setShortcut("")
 
     def _update_theme_button(self, theme: str) -> None:
         """更新图标和辅助文本，描述按钮点击后的目标主题。"""
@@ -439,11 +443,18 @@ class MenuOpsMixin:
     def _apply_hotkey_settings(self, values: dict) -> None:
         """保存热键后替换全局监听并刷新相关界面文案。"""
         from ...core.config import HotkeyConfig
-        from ...core.platforms import start_global_hotkeys
 
         hotkeys = HotkeyConfig(**values)
         if hotkeys == self._user_config.hotkeys:
             return
+        from ...core.access import is_readonly
+        if is_readonly():
+            self._user_config.hotkeys = hotkeys
+            self._refresh_run_button()
+            self._refresh_pause_button()
+            return
+
+        from ...core.platforms import start_global_hotkeys
         old_hotkeys = self._user_config.hotkeys
         old_listener = self._hotkey_listener
 

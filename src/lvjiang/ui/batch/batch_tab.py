@@ -150,7 +150,9 @@ class BatchTab(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
-        self._btn_run = QPushButton(f"{tr('开始执行')} ({self._host._user_config.hotkeys.start})")
+        from ..hotkeys import hotkey_label
+        self._btn_run = QPushButton(hotkey_label(
+            tr("开始执行"), self._host._user_config.hotkeys.start))
         self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
         self._btn_run.clicked.connect(self._on_run_clicked)
         btn_layout.addWidget(self._btn_run)
@@ -1086,9 +1088,10 @@ class BatchTab(QWidget):
         self._host.request_pause_resume()
 
     def _refresh_run_button(self, state: str):
+        from ..hotkeys import hotkey_label
         hk = self._host._user_config.hotkeys
         if state in ("running", "paused"):
-            self._btn_run.setText(f"{tr('结束')} ({hk.stop})")
+            self._btn_run.setText(hotkey_label(tr("结束"), hk.stop))
             self._btn_run.setStyleSheet(_STYLE_BTN_STOP)
         elif state == "not_ready":
             self._btn_run.setText(tr("未连接"))
@@ -1097,15 +1100,15 @@ class BatchTab(QWidget):
             self._btn_run.setText(tr("方案不支持"))
             self._btn_run.setStyleSheet(_STYLE_BTN_PLAN_UNSUPPORTED)
         else:
-            self._btn_run.setText(f"{tr('开始执行')} ({hk.start})")
+            self._btn_run.setText(hotkey_label(tr("开始执行"), hk.start))
             self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
         # 刷新暂停/恢复按钮
         if state == "running":
-            self._btn_pause_resume.setText(f"{tr('暂停')} ({hk.pause})")
+            self._btn_pause_resume.setText(hotkey_label(tr("暂停"), hk.pause))
             self._btn_pause_resume.setEnabled(True)
             self._btn_pause_resume.setStyleSheet(_STYLE_BTN_PAUSE)
         elif state == "paused":
-            self._btn_pause_resume.setText(f"{tr('恢复')} ({hk.pause})")
+            self._btn_pause_resume.setText(hotkey_label(tr("恢复"), hk.pause))
             self._btn_pause_resume.setEnabled(True)
             self._btn_pause_resume.setStyleSheet(_STYLE_BTN_RESUME)
         else:

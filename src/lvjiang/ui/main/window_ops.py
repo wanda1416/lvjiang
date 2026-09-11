@@ -696,8 +696,9 @@ class WindowOpsMixin:
         self.lbl_window_info.setStyleSheet("color: green;")
         self.log_text.append(f"[连接成功] {combo_data['serial']} ({w}x{h}) [{method_label}]")
         hk = self._user_config.hotkeys
-        self.statusBar().showMessage(
-            f"已连接设备 {combo_data['serial']} | {hk.start} {tr('开始')} | {hk.stop} {tr('停止')}")
+        self.statusBar().showMessage(self._hotkey_status(
+            f"已连接设备 {combo_data['serial']}",
+            (hk.start, tr("开始")), (hk.stop, tr("停止"))))
         self.btn_locate.setText(tr("断连"))
         self.btn_locate.setEnabled(True)
         self._set_connected_ui(True)

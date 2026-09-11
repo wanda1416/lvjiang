@@ -1,0 +1,8 @@
+# 批量条目收尾：每个用户执行完成后统一退出到游戏登录页。
+
+import "subcall/login.wf"
+
+call exit_to_login()
+eval $batch_state.page_state = 1
+eval $batch_state.role = ""
+return {"status": "success", "message": "", "state": $batch_state}

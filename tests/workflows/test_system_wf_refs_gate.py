@@ -46,6 +46,18 @@ def _system_layouts() -> list[str]:
 _VALIDATOR_CACHE: dict[str, WorkflowEngine] = {}
 
 
+def _layout_env(layout_name: str) -> str:
+    """布局对应的运行环境；脚本的 env 声明和引擎的 run_env 都按它取值。"""
+    return "desktop" if layout_name == "桌面布局" else "android"
+
+
+def _declared_envs(wf_path) -> list[str]:
+    """脚本 `#% env` 声明的运行环境；空列表表示不限制。"""
+    from lvjiang.workflows.metadata import parse_metadata_file
+
+    return list(parse_metadata_file(wf_path).get("env") or [])
+
+
 def _validator(layout_name: str) -> WorkflowEngine:
     """装配「只校验」的引擎：后端全为 None，validate_only 不触碰它们
 
@@ -64,7 +76,7 @@ def _validator(layout_name: str) -> WorkflowEngine:
         layout=layout,
         input_sim=user_config.input_sim,
         delay_params=user_config.delay_params,
-        run_env="desktop" if layout_name == "桌面布局" else "android",
+        run_env=_layout_env(layout_name),
         window_left=0, window_top=0,
     )
     _VALIDATOR_CACHE[layout_name] = engine
@@ -117,5 +129,28 @@ def test_wf_refs_all_bound(wf_path, layout_name):
     """每个系统 .wf 引用的场景/区域/坐标点/方向/面板都已在该布局绑定
 
     失败信息即 format_problems 的清单（含文件名:行号），直接照着补绑即可。
+
+    只校验脚本自己声明支持的环境：`#% env: [android]` 的脚本不该因为桌面布局
+    没标定对应场景而报错 —— 那不是漏绑，是这个平台还没支持。未声明 env 的
+    脚本（子过程库、批量生命周期）不限制环境，仍然按全部布局校验。
     """
+    declared = _declared_envs(wf_path)
+    if declared and _layout_env(layout_name) not in declared:
+        return
     _validator(layout_name).validate_only(wf_path)
+
+
+def test_declared_envs_are_real_platform_keys():
+    """`#% env` 写错平台名会让脚本在所有布局上被静默跳过，门禁等于空转。
+
+    所以声明值必须落在布局实际覆盖的环境集合内 —— `[Android]`、`[pc]`
+    这类拼写在这里就会被挡下，而不是等到某天发现门禁从没校验过它。
+    """
+    known = {_layout_env(name) for name in _system_layouts()}
+    assert known, "没有布局，无法判定合法环境名"
+    for path in _system_wf_files():
+        unknown = set(_declared_envs(path)) - known
+        assert not unknown, (
+            f"{path.relative_to(SYSTEM_CONFIG_DIR / 'workflows')} "
+            f"声明了未知运行环境: {sorted(unknown)}"
+        )

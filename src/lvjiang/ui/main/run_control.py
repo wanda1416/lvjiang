@@ -554,6 +554,10 @@ class RunControlMixin:
         from ..execution_user_selector import ExecutionUserSelector
         for selector in self.findChildren(ExecutionUserSelector):
             selector.refresh_users()
+        if hasattr(self, "_daily_execution_user_selector"):
+            self._on_daily_execution_user_changed(
+                self._daily_execution_user_selector.resolve_username()
+            )
 
     def _on_user_changed(self, index: int):
         """用户选择器切换"""
@@ -566,6 +570,12 @@ class RunControlMixin:
             # 其 session 落盘归属不受此处切换影响
             self._user_manager.set_active_user(name)
             logger.info(f"已切换到用户: {name}")
+            # “跟随当前用户”的执行选择器不会发生下拉索引变化，因此不会
+            # 自己发出 resolved_user_changed；这里显式切换参数展示上下文。
+            if hasattr(self, "_daily_execution_user_selector"):
+                self._on_daily_execution_user_changed(
+                    self._daily_execution_user_selector.resolve_username()
+                )
         # 通知插件页面刷新其用户相关状态。
         self.user_changed.emit(self._user_manager.get_active_user_name() or "")
 
@@ -1233,17 +1243,24 @@ class RunControlMixin:
         )
         # session/context 初始化：启动时快照执行用户，全程只依赖此绑定值
         self._bind_engine_user(engine, username)
+        from ...core.config.wf_configs import get_wf_config
+        engine.workflow_config_snapshot = get_wf_config(flow_id)
         engine._ui_callback = self._create_ui_callback()
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
-        flow_params = self._collect_flow_params()
-        # 专用脚本的参数面板由日常页隐藏，执行时从 wf_configs 加载
-        if not flow_params and flow_cfg.get("scope", "daily") != "daily":
-            from ...core.config.wf_configs import get_wf_config
-            flow_params = get_wf_config(flow_cfg["id"]) or {}
-        # 执行前持久化当前参数，确保下次启动恢复最新值
+        # 执行前先提交面板，再从统一解析器生成该用户的参数快照。
         if hasattr(self, '_save_displayed_params'):
             self._save_displayed_params()
+        if flow_cfg.get("scope", "daily") == "daily":
+            from ...core.task_params import resolve_task_params
+            flow_params, _parameter_source = resolve_task_params(
+                flow_id, username, flow_cfg.get("parameters", []),
+                self._session_manager._users_dir,
+            )
+        else:
+            # 专用脚本的参数面板由日常页隐藏，仍由专属配置页管理。
+            from ...core.config.wf_configs import get_wf_config
+            flow_params = get_wf_config(flow_cfg["id"]) or {}
         if hasattr(self, '_save_daily_config'):
             self._save_daily_config()
 
@@ -1560,6 +1577,8 @@ class RunControlMixin:
             pause_event=self._pause_event,
         )
         self._bind_engine_user(engine, username)
+        from ...core.config.wf_configs import get_wf_config
+        engine.workflow_config_snapshot = get_wf_config(impl_name)
         engine._ui_callback = self._create_ui_callback()
         self._current_engine = engine  # type: ignore[assignment]
         from ...workflows.implementations import get_workflow_class
@@ -1599,6 +1618,11 @@ class RunControlMixin:
         """Bind all user-scoped runtime data to the launch-time user snapshot."""
         engine.session = self._session_manager.load(username)
         engine.run_username = username
+        from ...core.user_config import load_user_metadata
+        user = load_user_metadata(username, self._session_manager._users_dir)
+        engine.user_attributes_snapshot = {
+            username: dict(user.attributes) if user is not None else {}
+        }
         # context 由 execute() 自动初始化为空 dict。
         engine._save_callback = self._session_manager.save_fn(
             username, engine.session)

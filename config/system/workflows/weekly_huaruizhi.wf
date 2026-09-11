@@ -1,0 +1,161 @@
+#% name: 周常花蕊织速刷
+#% env: [android]
+#% note: |-
+#%   同游 → 止戈 → 渡尘墟，用「单排-AI」托管对战刷花蕊织。
+#%   成功开始对战后任务立即结束；批量执行可通过条目收尾工作流关闭客户端。
+#%   桌面布局尚未标定同游场景，当前仅支持安卓端。
+#% parameters:
+#%   - name: nav_from_main
+#%     label: 从主页自动导航
+#%     type: bool
+#%     default: true
+
+# 速刷花蕊织，通过人机 AI 进行，大概 20分钟后自动完成
+#
+# 流程结构：
+#   1. 导航：主页 → 菜单 → 同游 → 止戈 → 止戈项目网格中定位「渡尘墟」并进入
+#   2. 匹配模式切到「单排」，再切到「单排-AI」（托管，全程无需操作）
+#   3. 首次进入若停在战备页，连点两次开始并确认战备
+#   4. 点击开始匹配后立即结束任务
+#
+# 参数：
+#   nav_from_main       — 是否从主页开始导航。关掉表示已经手动停在渡尘墟页面，
+#                         直接从选模式开始
+# 限制：
+#   仅安卓端。tongyou_main 目前只有默认布局有坐标，桌面布局标定后再放开 env。
+
+import "subcall/navigation.wf"
+import "subcall/page_detection.wf"
+import "subcall/page_action.wf"
+import "subcall/game_profile.wf"
+
+default $nav_from_main = true
+
+# ─── 导航：主页 → 渡尘墟 ────────────────────────────────
+if $nav_from_main
+    call $nav_result = nav_main_to_duchenxu()
+    if $nav_result.status < 0
+        return -1
+    end
+    if $nav_result.huaruizhi_of_week >= 3000
+        log "本周花蕊织进度已满，跳过开局对战"
+        return 0
+    end
+end
+
+# ─── 切换匹配模式：单排 → 单排-AI ───────────────────────
+find [tongyou_main].[zhige_menu] as $area by contains "单排"
+if $area
+   click $area after wait @step_interval
+else
+   log "找不到单排模式"
+   return -1
+end
+find [tongyou_main].[zhige_menu] as $area by contains "单排-AI"
+if $area
+    click $area after wait @step_interval
+else
+   log "无法切换AI模式"
+   return -1
+end
+
+# ─── 战备确认 ──────────────────────────────────────────
+# 首次进入渡尘墟会先停在战备页（按钮文案是「战备」而不是「开始匹配」），
+# 需要点进去确认一次；已经配好的账号直接是开始匹配，跳过这段。
+scan [tongyou_main].[zhige_start] as $str
+if $str contains "战备"
+    click [tongyou_main].[zhige_start] after wait @page_refresh
+    click [tongyou_main].[zhige_start] after wait @page_refresh
+    call scan_and_confirm("确认战备", 0)
+end
+
+# ─── 开始匹配并挂机等待 ────────────────────────────────
+click [tongyou_main].[zhige_start] after wait @page_refresh
+log "AI 对战已开始，任务结束"
+wait (10,15)
+return 0
+
+# ─── nav_main_to_duchenxu ──────────────────────────────
+# 主页 → 菜单 → 同游 → 止戈 → 渡尘墟
+# 前置：在主页或菜单页
+# 后置：在渡尘墟页面（tongyou_main 的 zhige）
+# 返回：0 成功；-1 任一环节没到位（已 pause 提示手动介入过）
+def nav_main_to_duchenxu()
+    call $nav_result = nav_main_to_menu()
+    if $nav_result < 0
+        return {"status": -1, "huaruizhi_of_week": -1}
+    end
+
+    # 菜单 → 同游。同游在菜单第一页，和不肝、和鸣同屏，不需要翻页
+    scan [game_menu_page].[tongyou] as $entry by contains "同游"
+    if not $entry
+        eval pause("未找到「同游」入口，请确认当前在菜单页后点击继续")
+    end
+    click [game_menu_page].[tongyou] after wait @page_refresh
+    scene [tongyou_main] view [base]
+
+    # 同游 → 止戈
+    scan [tongyou_main].[zhige] as $zhige_entry by contains "止戈"
+    if not $zhige_entry
+        eval pause("未进入同游页，请手动导航到同游后点击继续")
+    end
+    click [tongyou_main].[zhige] after wait @page_refresh
+    scene [tongyou_main] view [zhige]
+
+    # 止戈项目 3×3 网格里定位「渡尘墟」
+    call $found = enter_zhige_item("渡尘墟")
+    if $found < 0
+        return {"status": -1, "huaruizhi_of_week": -1}
+    end
+    click [tongyou_main].[huaruizhi_total] after wait @page_refresh
+    scan [tongyou_main].[huaruizhi_of_week] as $progress
+    call $huaruizhi_of_week = sync_weekly_progress($progress.huaruizhi_of_week, "huaruizhi_of_week", -1, "本周花蕊织进度")
+    return {"status": 0, "huaruizhi_of_week": $huaruizhi_of_week}
+end
+
+# ─── find_zhige_cell ───────────────────────────────────
+# 在止戈项目网格的识别结果里按文字定位格子（纯数据，不碰画面）
+# 命中返回 {"row": r, "col": c}，找不到返回空字典（falsy）。
+# 逐格 contains 而不是整屏 find：止戈项目卡片自带副标题和进度文字，
+# 整屏找「渡尘墟」可能命中卡片外的说明文案，点过去就不是入口了。
+def find_zhige_cell($grid, $rows, $cols, $item_name)
+    for r in range(1, $rows)
+        for c in range(1, $cols)
+            eval $cell = $grid.$r.$c
+            if $cell contains $item_name
+                return {"row": $r, "col": $c}
+            end
+        end
+    end
+    return {}
+end
+
+# ─── enter_zhige_item ──────────────────────────────────
+# 在止戈项目网格中按文字找到对应玩法并点进去
+# zhige_items 是 3×3 定格网格（scroll_direction: none），一屏放得下全部项目，
+# 所以整面板 OCR 一次逐格比对即可，不需要翻页重扫。
+# 行列数取 panel_rows/panel_cols 的实测值，游戏加项目时不用改脚本。
+# 前置：在止戈页（tongyou_main 的 zhige 视图）
+# 返回：0 已点进目标玩法；-1 网格里没有该项目
+def enter_zhige_item($item_name)
+    scan [tongyou_main].[zhige_items] as $grid
+    eval $rows = panel_rows("tongyou_main", "zhige_items")
+    eval $cols = panel_cols("tongyou_main", "zhige_items")
+    call $pos = find_zhige_cell($grid, $rows, $cols, $item_name)
+    if not $pos
+        log "止戈项目网格中找不到「" + $item_name + "」"
+        return -1
+    end
+
+    # 面板索引只接受整数或变量，不接受字段访问，先取出来
+    eval $row = $pos.row
+    eval $col = $pos.col
+    log "止戈项目 行" + $row + "列" + $col + " 命中「" + $item_name + "」"
+    click [tongyou_main].[zhige_items][$row][$col] after wait @page_refresh
+    # 进到玩法页后按钮区才有文案，用它确认确实换页了
+    scan [tongyou_main].[zhige_start] as $start_check
+    if not $start_check
+        eval pause("未进入「" + $item_name + "」页面，请手动导航后点击继续")
+    end
+    return 0
+end

@@ -154,6 +154,15 @@ def _reset_engine_state(engine) -> None:
     engine.variables = {}
     engine.output = {}
     engine.context = {}
+    engine.workflow_config_snapshot = None
+
+    # 设备端没有执行用户下拉，每次任务启动都绑定 session 中的当前用户。
+    from ... import constants
+    from ..config.session import get_session_store
+
+    username = get_session_store().get_active("user", "")
+    engine.run_username = username if isinstance(username, str) else ""
+    engine.users_dir = constants.USERS_DIR
 
 
 # ── 对外接口（返回 JSON 文本） ─────────────────────────────

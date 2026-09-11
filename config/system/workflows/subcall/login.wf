@@ -1,0 +1,289 @@
+# 登录页切换账号、选择角色及退出登录的公共过程。
+
+import "subcall/navigation.wf"
+import "subcall/page_detection.wf"
+
+def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait)
+    eval check_env(["android", "desktop"])
+    eval $account = user_get($username, "account")
+    eval $role = user_get($username, "role")
+    eval $role_index = user_get($username, "role_index")
+    eval $tail = user_get($username, "tail")
+    if not $account
+        return {"status": "failed", "message": "用户未配置账号名", "state": $batch_state}
+    end
+    if not $role
+        return {"status": "failed", "message": "用户未配置角色名", "state": $batch_state}
+    end
+    if not $role_index
+        return {"status": "failed", "message": "用户未配置角色序号", "state": $batch_state}
+    end
+
+    call $in_login_page = is_in_login_page()
+    if not $in_login_page
+        eval pause("当前不在登录页，请切换到登录页后点击继续")
+    end
+
+    log "目标账号：" + $account
+    if not $batch_state.account equals $account
+        if not $tail
+            return {"status": "failed", "message": "用户未配置账号尾号", "state": $batch_state}
+        end
+        log "需要切换账号: " + $account
+        call switch_account($tail, $role_index, $account, $role, $batch_state)
+    end
+
+    log "切换角色: " + $role
+    call $result = select_role($role_index, $role, $batch_state, $skip_online_role, $online_role_max_wait)
+    return $result
+end
+
+
+# ─── 登录页确认 ────────────────────────────────────────────
+
+def is_in_login_page()
+    scan [game_login_page].[switch_role] as $login_check by contains "选择角色"
+    if $login_check
+        return 1
+    end
+    wait 5
+    scan [game_login_page].[switch_role] as $login_check by contains "选择角色"
+    if $login_check
+        return 1
+    end
+    return 0
+end
+
+
+# ─── 主页 → 退出 → 回到登录页 ──────────────────────────────
+# 流程：主页进菜单 → 菜单点退出 → 二次确认弹窗点「登录」→ 回到登录页
+
+def exit_to_login()
+    # 1. 主页 → 菜单
+    # 走标准导航并自带到位校验；click 由布局选择点菜单或按 ESC。
+    call $in_menu = nav_main_to_menu()
+    if $in_menu < 0
+        log "未能进入菜单页，退出流程可能落空"
+    end
+
+    # 2. 菜单 → 退出（两端行为一致）
+    click [game_menu_page].[exit] after wait @page_refresh
+
+    # 3. 二次确认：检查退出弹窗中是否有「返回登录页面」按钮
+    scan [game_login_page].[back_to_login] as $result by contains "返回登录"
+    if $result
+        click [game_login_page].[back_to_login] after wait @secondary_confirm
+    else
+        eval pause("未找到「返回登录界面」按钮，请手动退出到登录页后点击继续")
+    end
+end
+
+
+# ─── 账号切换 ──────────────────────────────────────────────
+# 登录页 → 选账号 → 登录 → 回到登录页角色入口（page_state=1）
+# 不包含选角色，由调用方决定是否接着调用 select_role
+
+def switch_account($tail, $role_index, $account, $role, $batch_state)
+    log "当前匹配" + $tail
+    log "当前下标" + $role_index
+
+    # 1. 登录页 → 用户切换视图
+    click [game_login_page].[more_user] after wait @page_refresh
+    click [game_login_page].[user_icon] after wait @page_refresh
+
+    if env("desktop")
+        # PC 端需要登出 后再点击触发 选择账号 登录
+        scan [game_login_page].[switch_user] as $found by contains "登出"
+        if not $found
+            # 疑似登出太浅无法识别，此时继续识别是否存在 进入游戏，如果不存在那就是没有登出
+            scan [game_login_page].[login] as $login_game by contains "进入游戏"
+            if not $login_game
+                $found = "登出"
+            end
+        end
+        if $found
+            click [game_login_page].[switch_user] after wait @page_refresh
+            click [game_login_page].[user_icon] after wait @page_refresh
+        end
+    else if env("android")
+        # 安卓端直接可以选择用户完成账号切换
+        click [game_login_page].[switch_user] after wait @page_refresh
+    end
+
+    click [game_login_page].[tap_user] after wait @page_refresh
+
+    # 2. 查找目标账号（最多滚动 5 次）
+    eval $found_user = ""
+    loop 5
+        find [game_login_page].[user_list] as $found_user by contains $tail
+        if $found_user
+            click $found_user
+            break
+        end
+        env:"android" -> drag [game_login_page].[point_2] [game_login_page].[point_1]
+        env:"desktop" -> scroll [game_login_page].[user_list] down 3
+        wait @page_refresh
+    end
+
+    # 找不到 → 暂停手动处理
+    if not $found_user
+        eval pause("未找到账号，请手动选定账号后点击 继续")
+    end
+    wait @page_refresh
+
+    # 3. 登录 → 回到登录页角色入口
+    # 登录要走一次网络鉴权，这里只按标准节奏等一拍，不假设已经就位；
+    # 真正的就位判定交给 select_role 的重试校验。
+    click [game_login_page].[login] after wait @page_refresh
+
+    # 已确认目标账号，保留账号状态
+    # 下一条同账号任务可以跳过账号切换，直接选角色
+    eval $batch_state.account = $account
+    eval $batch_state.role = ""
+    eval $batch_state.page_state = 1
+
+    return {"status": "account_ready", "message": "", "state": $batch_state}
+end
+
+
+# ─── 选角色 + 进入游戏 ─────────────────────────────────────
+
+def select_role($role_index, $role, $batch_state, $skip_online_role, $online_role_max_wait)
+    log "当前下标" + $role_index
+    eval $online_deadline = clock() + to_num($online_role_max_wait)
+
+    # 打开角色选择页。不假设点一次就进去了：登录鉴权、页面加载都可能还没完，
+    # 此时盲点下去两次空点都不报错（panel 坐标算不出时是静默 return），
+    # 错误要拖到 login_to_main_page 才以「无法确认已登录至主页」暴露，对不上因。
+    # 故每点一次等一拍，以「进入游戏」是否出现为判据，最多重试 5 次。
+    # 这 5 次只计「没进去角色列表」的重试；等角色下线由子过程按期限自己收敛。
+    # 两个上界不能共用一个计数器，否则等待会把重试次数吃光。
+    eval $role_page = 0
+    loop 5
+        click [game_login_page].[switch_role] after wait @secondary_confirm
+
+        # 角色在线时会弹二次确认（confirm 区域含「其他角色」），
+        # 这种情况下不可能进入角色列表。
+        call $online = wait_until_role_offline($batch_state, $skip_online_role, $online_deadline)
+        if $online
+            return {"status": "skipped", "message": "角色在线", "state": $batch_state}
+        end
+
+        call $role_page = is_in_role_select_page()
+        if $role_page
+            break
+        end
+        log "未进入选择角色页面，重试"
+    end
+    if not $role_page
+        eval pause("无法进入选择角色页面，请手动进入后点击继续")
+    end
+
+    # 选角色（role_list: 1列4行，role_index 1-4 → panel 行 1-4）
+    click [game_login_page].[role_list][$role_index][1] after wait @page_refresh
+    # 进入游戏
+    click [game_login_page].[enter] after wait @secondary_confirm
+
+    # 等待加载完成并进入主页
+    call login_to_main_page()
+
+    eval $batch_state.page_state = 2
+    eval $batch_state.role = $role
+    wait @step_interval
+    return {"status": "success", "message": "", "state": $batch_state}
+end
+
+
+# ─── 等待角色下线 ──────────────────────────────────────────
+# 点「切换角色」可能撞上「其他角色在线」弹窗。弹窗必须取消——留着会挡住
+# 后续任何页面判定。等待模式下由本过程自己重试到期限：取消弹窗、等一会儿、
+# 重新点回「切换角色」再查；不重新点就永远读不到提示已经消失。
+# 放弃时把 batch_state 复位回登录页状态并返回 1，调用方据此以 skipped 收尾
+# （status/message 的措辞由调用方上下文决定）。返回 0 表示角色可登录。
+
+def wait_until_role_offline($batch_state, $skip_online_role, $online_deadline)
+    loop while 1 == 1
+        scan [game_login_page].[online_label] as $online by contains "在线"
+        if not $online
+            return 0
+        end
+        click [game_login_page].[cancel] after wait @page_refresh
+        if $skip_online_role
+            log "角色在线，不可登录，跳过"
+        else if clock() < $online_deadline
+            log "角色仍在线，30 秒后重试登录"
+            wait 30
+            click [game_login_page].[switch_role] after wait @secondary_confirm
+            continue
+        else
+            log "角色在线等待超时，跳过"
+        end
+        eval $batch_state.page_state = 1
+        eval $batch_state.role = ""
+        return 1
+    end
+end
+
+
+# ─── 登录加载到主页 ────────────────────────────────────────
+# 等待加载条消失 → 检测主页元素 → 处理战令领奖/关闭弹窗
+
+def login_to_main_page()
+    # 等待加载完成：检测 loading 区域的「加载」文字
+    # 有「加载」→ 继续等；消失后再等 5 秒视为登录完成
+    eval $loading_done = 0
+    loop 10
+        scan [game_login_page].[loading] as $load_text by contains "加载"
+        if not $load_text
+            eval $loading_done = 1
+            break
+        end
+        wait 3
+    end
+    if not $loading_done
+        eval pause("等待加载超时，请手动检查后点击确定")
+    end
+    wait 5
+
+    # 等待主页加载完成：检测主界面入口按钮
+    # 能读到 → 登录完成；否则先检查战令领奖，再尝试关闭活动弹窗
+    loop 8
+        call $in_main = is_in_main_page()
+        if $in_main
+            log "主页加载完成"
+            # 检查是否有战令领奖入口
+            call claim_zhanling_reward()
+            return
+        end
+
+        # 未检测到主页，先检查战令领奖
+        scan [game_login_page].[zllj_btn] as $zllj by contains "前往领奖"
+        if $zllj
+            log "检测到战令领奖入口，先领奖"
+            call claim_zhanling_reward()
+        else
+            # 没有战令领奖，尝试关闭活动弹窗
+            click [game_login_page].[close_btn]
+        end
+        wait @page_refresh
+    end
+    eval pause("无法确认已登录至主页，请手动检查后点击确定")
+end
+
+
+# ─── 战令领奖 ──────────────────────────────────────────────
+# 检测战令领奖入口，有则进入领取并返回
+
+def claim_zhanling_reward()
+    scan [game_login_page].[zllj_btn] as $zllj by contains "前往领奖"
+    if $zllj
+        log "进入战令领奖页面"
+        click [game_login_page].[zllj_btn] after wait @step_interval
+        scan [zhanling_detail].[claim_all] as $claim by contains "一键领取"
+        if $claim
+            log "点击一键领取"
+            click [zhanling_detail].[claim_all] after wait @step_interval
+        end
+        click [zhanling_detail].[back] after wait @step_interval
+    end
+end

@@ -1,0 +1,7 @@
+# 花蕊织轮次调度的条目收尾：开局后立即关闭客户端，让对战留在服务端运行。
+
+eval check_env(["android"])
+app stop "yyslscn" timeout 15
+eval $batch_state.page_state = 0
+eval $batch_state.role = ""
+return {"status": "success", "message": "", "state": $batch_state}

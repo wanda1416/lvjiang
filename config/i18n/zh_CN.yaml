@@ -271,6 +271,7 @@ ocr_dialog:
   title: 图像识别
   tab_ocr: 图像识别
   tab_cleaning_rules: 清洗规则
+  tab_recognition_config: 识别配置
   btn_upload: 上传图片
   btn_refresh: 刷新截图
   tooltip_refresh: 从设备获取最新截图
@@ -299,6 +300,21 @@ ocr_dialog:
   placeholder_test_output: 清洗结果...
   btn_test: 测试
   status_rules_saved: 清洗规则已保存
+  recognition_config_hint: '区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。
+
+    这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。'
+  group_region_batch: 区域批量识别
+  label_min_canvas_side: 画布最小边长：
+  tooltip_min_canvas_side: 拼图画布宽、高的最小值。过小会使窄区域被 OCR 检测器大幅放大。
+  label_max_content_height: 单批内容最大高度：
+  tooltip_max_content_height: 一批区域内容允许的最大总高度，超过后拆分为下一批识别。
+  label_region_gap: 区域间隔：
+  tooltip_region_gap: 相邻文字区域在拼图中的间隔。
+  status_recognition_config_saved: 识别配置已保存
+  status_recognition_config_discarded: 已放弃未保存的识别配置修改
+  unsaved_ocr_config: 'OCR 配置有未保存的修改，关闭将丢失这些修改。
+
+    是否先保存？'
   no_clipboard_image: 剪贴板中没有图片
   cannot_read_clipboard: 无法读取剪贴板图片
   select_image_title: 选择图片
@@ -1102,10 +1118,11 @@ auto_strings:
   打日志: 打日志
   执行切割: 执行切割
   执行顺序: 执行顺序
-  批次初始化: 批次初始化
-  批次初始化 wf：: 批次初始化 wf：
+  批次准备: 批次准备
+  条目准备: 条目准备
+  条目收尾: 条目收尾
+  批量设置: 批量设置
   批次收尾: 批次收尾
-  批次收尾 wf：: 批次收尾 wf：
   批量任务运行过程中不可修改环境和布局: 批量任务运行过程中不可修改环境和布局
   '批量分组:': '批量分组:'
   批量执行: 批量执行
@@ -1676,3 +1693,18 @@ task_history:
   clear_batch: 返回全部任务
   select_batch: 选择一条批量记录查看输入快照
   select_task: 选择一条记录查看输入参数和文件路径
+  当前配置组：: 当前配置组：
+  参数: 参数
+  执行轮数：: 执行轮数：
+  可见任务：: 可见任务：
+  可见用户：: 可见用户：
+  <b>选择执行脚本：</b>: <b>选择执行脚本：</b>
+  <b>选择执行用户：</b>: <b>选择执行用户：</b>
+  执行顺序由批量配置中的任务顺序决定: 执行顺序由批量配置中的任务顺序决定
+  执行顺序由批量配置中的用户顺序决定: 执行顺序由批量配置中的用户顺序决定
+  拖动任务可调整批量执行顺序: 拖动任务可调整批量执行顺序
+  拖动用户可调整批量执行顺序: 拖动用户可调整批量执行顺序
+  全局任务参数: 全局任务参数
+  '[批量] 暂无启用的用户，请到「用户」页勾选': '[批量] 暂无启用的用户，请到「用户」页勾选'
+  重命名: 重命名
+  重命名配置: 重命名配置

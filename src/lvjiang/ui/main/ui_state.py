@@ -144,11 +144,17 @@ class UiStateMixin:
         """脚本下拉切换：先保存旧脚本参数，重建参数面板，再保存新状态"""
         # 面板仍显示旧脚本控件，用 _displayed_script_id 定位旧配置
         self._save_displayed_params()
-        self._rebuild_param_panel()
-        # 更新追踪为当前脚本
         flow_cfg = self._get_selected_flow_config()
         self._displayed_script_id = flow_cfg["id"] if flow_cfg else None
+        self._rebuild_param_panel()
         self._save_daily_config()
+
+    def _on_daily_execution_user_changed(self, _username: str) -> None:
+        """切换执行用户时保存旧参数上下文，再加载新用户的生效参数。"""
+        if not hasattr(self, "_workflow_configs"):
+            return
+        self._save_displayed_params()
+        self._rebuild_param_panel()
 
     def _save_displayed_params(self):
         """将当前参数面板的值写入 _displayed_script_id 对应的配置项
@@ -209,9 +215,22 @@ class UiStateMixin:
             multiline = self._param_panel.findChild(QPlainTextEdit, name)
             if multiline is not None:
                 params[name] = multiline.toPlainText()
-        target_cfg["_saved_params"] = params
-        from ...core.config.wf_configs import update_wf_config
-        update_wf_config(sid, params)
+        if getattr(self, "_displayed_param_is_user_override", False):
+            username = getattr(self, "_displayed_param_username", "")
+            if username:
+                # 用户管理对话框可能已删除当前展示用户，随后才刷新主窗口。
+                # 此时旧面板没有可写回的归属，不能重新创建或写入已删除用户。
+                user_manager = getattr(self, "_user_manager", None)
+                if (user_manager is not None
+                        and username not in user_manager.list_users()):
+                    return
+                from ...core.user_config import set_user_workflow_params
+                set_user_workflow_params(
+                    username, sid, params, self._user_manager._users_dir)
+        else:
+            target_cfg["_saved_params"] = params
+            from ...core.config.wf_configs import update_wf_config
+            update_wf_config(sid, params)
 
     def _persist_param_change(self, *_args):
         """参数控件变更后立即写回共享配置。
@@ -243,24 +262,12 @@ class UiStateMixin:
     def _restore_daily_config(self):
         """启动时恢复日常页脚本选择与参数"""
         from ...core.config import get_session_store
-        from ...core.config.wf_configs import get_wf_config
 
         # 加载 combo 时 block 了信号，参数面板始终为空，必须手动构建
         daily = get_session_store().get_node("daily", {})
         if not isinstance(daily, dict):
             daily = {}
         workflow_id = daily.get("workflow_id")
-
-        # 从统一存储读取各脚本参数；仅对 scope=daily 的脚本生效
-        # 专用脚本的参数由专属页面管理，日常页禁止读写
-        for cfg in self._workflow_configs:
-            if cfg.get("scope", "daily") != "daily":
-                continue
-            if not cfg.get("parameters"):
-                continue
-            saved = get_wf_config(cfg["id"])
-            if saved:
-                cfg["_saved_params"] = saved
 
         # 选中上次使用的脚本
         if workflow_id:
@@ -287,6 +294,9 @@ class UiStateMixin:
         note = str(flow_cfg.get("note") or "").strip() if flow_cfg else ""
         self._workflow_note_label.setText(f"{tr('说明')}：{note}" if note else "")
         self._workflow_note_label.setVisible(bool(note))
+        independent = getattr(self, "_independent_params_checkbox", None)
+        if independent is not None:
+            independent.setVisible(False)
         # ⚠️ 专用脚本不画参数面板
         if flow_cfg and flow_cfg.get("scope", "daily") != "daily":
             self._param_panel.setVisible(False)
@@ -295,7 +305,26 @@ class UiStateMixin:
         if not params:
             self._param_panel.setVisible(False)
             return
-        saved = flow_cfg.get("_saved_params", {}) if flow_cfg else {}
+        selector = getattr(self, "_daily_execution_user_selector", None)
+        username = selector.resolve_username() if selector is not None else ""
+        user_manager = getattr(self, "_user_manager", None)
+        users_dir = getattr(user_manager, "_users_dir", None)
+        from ...core.task_params import resolve_task_params
+        saved, source = resolve_task_params(
+            str(flow_cfg["id"]), username, params, users_dir)
+        self._displayed_param_username = username
+        self._displayed_param_is_user_override = source == "user"
+        set_title = getattr(self._param_panel, "setTitle", None)
+        if callable(set_title):
+            set_title(
+                tr("参数设置（{name}独立）").format(name=username)
+                if source == "user" else tr("参数设置（共享）"))
+        if selector is not None and independent is not None:
+            independent.blockSignals(True)
+            independent.setEnabled(bool(username))
+            independent.setChecked(source == "user")
+            independent.blockSignals(False)
+            independent.setVisible(True)
         for param_def in params:
             name = param_def["name"]
             label = param_def.get("label", name)
@@ -384,3 +413,21 @@ class UiStateMixin:
                 combo.currentIndexChanged.connect(self._persist_param_change)
                 self._param_layout.addRow(label + ":", combo)
         self._param_panel.setVisible(True)
+
+    def _on_independent_params_toggled(self, enabled: bool) -> None:
+        """在共享参数与当前用户的独立参数之间切换。"""
+        flow_cfg = self._get_selected_flow_config()
+        username = self._daily_execution_user_selector.resolve_username()
+        if not flow_cfg or not username:
+            return
+        workflow_id = str(flow_cfg["id"])
+        if enabled:
+            from ...core.user_config import set_user_workflow_params
+            set_user_workflow_params(
+                username, workflow_id, self._collect_flow_params(),
+                self._user_manager._users_dir)
+        else:
+            from ...core.user_config import delete_user_workflow_params
+            delete_user_workflow_params(
+                username, workflow_id, self._user_manager._users_dir)
+        self._rebuild_param_panel()

@@ -40,6 +40,7 @@ CONFIG_DIR = PROJECT_ROOT / "config"
 # 纯运行态（会话/用户/产出/截图，.gitignore）
 SESSION_CONFIG_DIR = CONFIG_DIR / "session"
 SESSION_PATH = SESSION_CONFIG_DIR / "session.json"
+BATCH_CONFIG_PATH = SESSION_CONFIG_DIR / "batch.json"
 USERS_DIR = SESSION_CONFIG_DIR / "users"
 AVATARS_DIR = SESSION_CONFIG_DIR / "avatars"
 OUTPUT_DIR = SESSION_CONFIG_DIR / "output"

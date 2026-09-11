@@ -2,6 +2,7 @@
 
 Tab 1: 图像识别 - 粘贴截图，支持 OCR 文字识别和参考图匹配
 Tab 2: 清洗规则 - 管理 OCR 文本通用清洗规则
+Tab 3: 识别配置 - 管理 OCR 识别过程参数
 """
 
 import numpy as np
@@ -13,12 +14,15 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
+    QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -29,13 +33,18 @@ from PyQt6.QtWidgets import (
 )
 
 from ...core.ocr_cleaner import OCRCleaner
+from ...core.ocr_config import (
+    RegionBatchConfig,
+    load_region_batch_config,
+    save_region_batch_config,
+)
 from ...i18n import tr
 from ..button_styles import apply_button_style
 from .canvas import OCRBox, OCRCanvas
 
 
 class OCRDialog(QDialog):
-    """图像识别对话框：图像识别 + 清洗规则管理"""
+    """图像识别对话框：识别测试、清洗规则与识别配置。"""
 
     def __init__(self, parent=None, refresh_callback=None):
         """
@@ -63,6 +72,10 @@ class OCRDialog(QDialog):
         # Tab 2: 清洗规则
         self._rules_tab = self._create_rules_tab()
         self._tabs.addTab(self._rules_tab, tr("清洗规则"))
+
+        # Tab 3: 识别配置
+        self._config_tab = self._create_recognition_config_tab()
+        self._tabs.addTab(self._config_tab, tr("识别配置"))
 
     # ─── Tab 1: 图像识别 ────────────────────────────────────
 
@@ -170,6 +183,107 @@ class OCRDialog(QDialog):
 
         return widget
 
+    # ─── Tab 3: 识别配置 ────────────────────────────────────
+
+    def _create_recognition_config_tab(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        layout.addWidget(QLabel(tr(
+            "区域批量识别会把多个文字区域拼成一张画布，只调用一次 OCR。\n"
+            "这些参数用于控制拼图尺寸；保存后从下一次识别开始生效。"
+        )))
+
+        group = QGroupBox(tr("区域批量识别"))
+        form = QFormLayout(group)
+
+        self._min_canvas_side = QSpinBox()
+        self._min_canvas_side.setObjectName("ocr_min_canvas_side")
+        self._min_canvas_side.setRange(1, 4096)
+        self._min_canvas_side.setSuffix(" px")
+        self._min_canvas_side.setToolTip(tr(
+            "拼图画布宽、高的最小值。过小会使窄区域被 OCR 检测器大幅放大。"
+        ))
+        form.addRow(tr("画布最小边长："), self._min_canvas_side)
+
+        self._max_content_height = QSpinBox()
+        self._max_content_height.setObjectName("ocr_max_content_height")
+        self._max_content_height.setRange(1, 10000)
+        self._max_content_height.setSuffix(" px")
+        self._max_content_height.setToolTip(tr(
+            "一批区域内容允许的最大总高度，超过后拆分为下一批识别。"
+        ))
+        form.addRow(tr("单批内容最大高度："), self._max_content_height)
+
+        self._region_gap = QSpinBox()
+        self._region_gap.setObjectName("ocr_region_gap")
+        self._region_gap.setRange(0, 512)
+        self._region_gap.setSuffix(" px")
+        self._region_gap.setToolTip(tr("相邻文字区域在拼图中的间隔。"))
+        form.addRow(tr("区域间隔："), self._region_gap)
+
+        layout.addWidget(group)
+        layout.addStretch()
+
+        self._config_status_label = QLabel("")
+        self._config_status_label.setStyleSheet("color: gray;")
+        layout.addWidget(self._config_status_label)
+
+        save_row = QHBoxLayout()
+        save_row.addStretch()
+        self._btn_save_config = QPushButton(tr("保存"))
+        self._btn_save_config.clicked.connect(self._on_save_recognition_config)
+        save_row.addWidget(self._btn_save_config)
+        self._btn_cancel_config = QPushButton(tr("取消"))
+        self._btn_cancel_config.clicked.connect(self._on_cancel_recognition_config)
+        save_row.addWidget(self._btn_cancel_config)
+        layout.addLayout(save_row)
+        apply_button_style(self._btn_save_config)
+        apply_button_style(self._btn_cancel_config, variant="neutral")
+
+        for spinbox in (
+            self._min_canvas_side,
+            self._max_content_height,
+            self._region_gap,
+        ):
+            spinbox.valueChanged.connect(self._mark_config_dirty)
+        self._refresh_recognition_config()
+        self._set_config_dirty(False)
+        return widget
+
+    def _refresh_recognition_config(self) -> None:
+        config = load_region_batch_config()
+        controls = (
+            (self._min_canvas_side, config.min_canvas_side),
+            (self._max_content_height, config.max_content_height),
+            (self._region_gap, config.gap),
+        )
+        for spinbox, value in controls:
+            spinbox.blockSignals(True)
+            spinbox.setValue(value)
+            spinbox.blockSignals(False)
+
+    def _set_config_dirty(self, dirty: bool) -> None:
+        self._config_dirty = dirty
+        self._btn_save_config.setEnabled(dirty)
+
+    def _mark_config_dirty(self, *_args) -> None:
+        self._set_config_dirty(True)
+
+    def _on_save_recognition_config(self) -> None:
+        save_region_batch_config(RegionBatchConfig(
+            min_canvas_side=self._min_canvas_side.value(),
+            max_content_height=self._max_content_height.value(),
+            gap=self._region_gap.value(),
+        ))
+        self._set_config_dirty(False)
+        self._config_status_label.setText(tr("识别配置已保存"))
+
+    def _on_cancel_recognition_config(self) -> None:
+        self._refresh_recognition_config()
+        self._set_config_dirty(False)
+        self._config_status_label.setText(tr("已放弃未保存的识别配置修改"))
+
     # ─── Tab 2: 清洗规则 ────────────────────────────────────
 
     def _create_rules_tab(self) -> QWidget:
@@ -177,9 +291,35 @@ class OCRDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         layout.addWidget(QLabel(
-            tr("通用清洗规则：所有 OCR 识别出的文字都会经过这些规则处理。\n"
-               "改完点「保存」后生效，无需重启；未保存的修改可以用「取消」丢弃。")
+            tr("清洗规则只在 scan/find 的 with 声明或 Python OCR 调用显式选择后生效。\n"
+               "改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。")
         ))
+
+        group_row = QHBoxLayout()
+        group_row.addWidget(QLabel(tr("清洗组：")))
+        self._cleaning_group_combo = QComboBox()
+        self._cleaning_group_combo.setMinimumWidth(240)
+        cleaner = OCRCleaner()
+        for key, config in cleaner.get_groups().items():
+            self._cleaning_group_combo.addItem(
+                str(config.get("label") or key), key)
+        self._cleaning_group_combo.currentIndexChanged.connect(
+            self._on_cleaning_group_changed)
+        group_row.addWidget(self._cleaning_group_combo)
+        self._btn_add_cleaning_group = QPushButton(tr("创建规则组"))
+        self._btn_add_cleaning_group.clicked.connect(
+            self._on_add_cleaning_group)
+        group_row.addWidget(self._btn_add_cleaning_group)
+        self._btn_rename_cleaning_group = QPushButton(tr("重命名规则组"))
+        self._btn_rename_cleaning_group.clicked.connect(
+            self._on_rename_cleaning_group)
+        group_row.addWidget(self._btn_rename_cleaning_group)
+        self._btn_delete_cleaning_group = QPushButton(tr("删除规则组"))
+        self._btn_delete_cleaning_group.clicked.connect(
+            self._on_delete_cleaning_group)
+        group_row.addWidget(self._btn_delete_cleaning_group)
+        group_row.addStretch()
+        layout.addLayout(group_row)
 
         # ── 文本替换规则 ──
         repl_group = QGroupBox(tr("文本替换（精确匹配）"))
@@ -268,24 +408,27 @@ class OCRDialog(QDialog):
 
         layout.addWidget(test_group)
 
-        # ── 底部：保存 / 取消 ──
+        # ── 底部：保存 / 撤销 ──
         save_row = QHBoxLayout()
         save_row.addStretch()
         self._btn_save_rules = QPushButton(tr("保存"))
         self._btn_save_rules.clicked.connect(self._on_save_rules)
         save_row.addWidget(self._btn_save_rules)
-        self._btn_cancel_rules = QPushButton(tr("取消"))
+        self._btn_cancel_rules = QPushButton(tr("撤销"))
         self._btn_cancel_rules.clicked.connect(self._on_cancel_rules)
         save_row.addWidget(self._btn_cancel_rules)
         layout.addLayout(save_row)
 
         apply_button_style(
+            self._btn_add_cleaning_group,
+            self._btn_rename_cleaning_group,
             self._btn_add_repl,
             self._btn_add_pattern,
             self._btn_test,
             self._btn_save_rules,
         )
         apply_button_style(
+            self._btn_delete_cleaning_group,
             self._btn_del_repl,
             self._btn_del_pattern,
             variant="danger",
@@ -311,18 +454,19 @@ class OCRDialog(QDialog):
         而 config/local 在 .gitignore 里，用户 git diff 什么也看不到。
         """
         cleaner = OCRCleaner()
+        group = self._current_cleaning_group()
         self._repl_table.blockSignals(True)
         self._pattern_table.blockSignals(True)
         try:
             # 文本替换
-            repls = cleaner.get_replacements()
+            repls = cleaner.get_replacements(group)
             self._repl_table.setRowCount(len(repls))
             for i, (wrong, correct) in enumerate(repls.items()):
                 self._repl_table.setItem(i, 0, QTableWidgetItem(wrong))
                 self._repl_table.setItem(i, 1, QTableWidgetItem(correct))
 
             # 正则替换
-            patterns = cleaner.get_patterns()
+            patterns = cleaner.get_patterns(group)
             self._pattern_table.setRowCount(len(patterns))
             for i, (pattern, replacement) in enumerate(patterns.items()):
                 self._pattern_table.setItem(i, 0, QTableWidgetItem(pattern))
@@ -332,6 +476,98 @@ class OCRDialog(QDialog):
             self._pattern_table.blockSignals(False)
 
     # ─── 清洗规则：脏标记与存取 ──────────────────────────────
+
+    def _current_cleaning_group(self) -> str:
+        combo = getattr(self, "_cleaning_group_combo", None)
+        return str(combo.currentData()) if combo is not None else "equip"
+
+    def _select_cleaning_group(self, key: str) -> None:
+        index = self._cleaning_group_combo.findData(key)
+        if index >= 0:
+            self._cleaning_group_combo.setCurrentIndex(index)
+            self._last_cleaning_group_index = index
+
+    def _on_add_cleaning_group(self) -> None:
+        if getattr(self, "_rules_dirty", False):
+            self._status_label.setText(tr("请先保存或取消当前清洗组的修改"))
+            return
+        label, ok = QInputDialog.getText(
+            self, tr("创建规则组"), tr("规则组名称："))
+        if not ok or not label.strip():
+            return
+        key, ok = QInputDialog.getText(
+            self, tr("创建规则组"),
+            tr("规则组 key（用于 with 声明）："))
+        if not ok or not key.strip():
+            return
+        try:
+            OCRCleaner().add_group(key, label)
+        except ValueError as exc:
+            self._status_label.setText(str(exc))
+            return
+        self._cleaning_group_combo.addItem(label.strip(), key.strip())
+        self._select_cleaning_group(key.strip())
+        self._refresh_rules_tables()
+        self._status_label.setText(tr("规则组已创建"))
+
+    def _on_rename_cleaning_group(self) -> None:
+        if getattr(self, "_rules_dirty", False):
+            self._status_label.setText(tr("请先保存或取消当前清洗组的修改"))
+            return
+        key = self._current_cleaning_group()
+        current = self._cleaning_group_combo.currentText()
+        label, ok = QInputDialog.getText(
+            self, tr("重命名规则组"), tr("规则组名称："), text=current)
+        if not ok or not label.strip():
+            return
+        try:
+            OCRCleaner().rename_group(key, label)
+        except ValueError as exc:
+            self._status_label.setText(str(exc))
+            return
+        self._cleaning_group_combo.setItemText(
+            self._cleaning_group_combo.currentIndex(), label.strip())
+        self._status_label.setText(tr("规则组已重命名"))
+
+    def _on_delete_cleaning_group(self) -> None:
+        if getattr(self, "_rules_dirty", False):
+            self._status_label.setText(tr("请先保存或取消当前清洗组的修改"))
+            return
+        key = self._current_cleaning_group()
+        label = self._cleaning_group_combo.currentText()
+        reply = QMessageBox.question(
+            self, tr("删除规则组"),
+            tr("确定删除规则组「{name}」吗？引用它的工作流将无法执行。")
+            .format(name=label),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        OCRCleaner().delete_group(key)
+        self._cleaning_group_combo.blockSignals(True)
+        self._cleaning_group_combo.removeItem(
+            self._cleaning_group_combo.currentIndex())
+        self._cleaning_group_combo.blockSignals(False)
+        if self._cleaning_group_combo.count():
+            self._last_cleaning_group_index = \
+                self._cleaning_group_combo.currentIndex()
+            self._refresh_rules_tables()
+        else:
+            self._repl_table.setRowCount(0)
+            self._pattern_table.setRowCount(0)
+        self._status_label.setText(tr("规则组已删除"))
+
+    def _on_cleaning_group_changed(self, _index: int) -> None:
+        if getattr(self, "_rules_dirty", False):
+            self._cleaning_group_combo.blockSignals(True)
+            self._cleaning_group_combo.setCurrentIndex(
+                getattr(self, "_last_cleaning_group_index", 0))
+            self._cleaning_group_combo.blockSignals(False)
+            self._status_label.setText(tr("请先保存或取消当前清洗组的修改"))
+            return
+        self._last_cleaning_group_index = self._cleaning_group_combo.currentIndex()
+        self._refresh_rules_tables()
 
     def _set_rules_dirty(self, dirty: bool):
         """更新未保存标记：没有改动时「保存」置灰，避免空保存又写一份影子"""
@@ -380,8 +616,9 @@ class OCRDialog(QDialog):
         if patterns is None:
             return False
         cleaner = OCRCleaner()
-        cleaner.set_replacements(self._collect_repl_rules())
-        cleaner.set_patterns(patterns)
+        cleaner.set_rules(
+            self._collect_repl_rules(), patterns,
+            group=self._current_cleaning_group())
         self._set_rules_dirty(False)
         self._status_label.setText(tr("清洗规则已保存"))
         return True
@@ -392,28 +629,34 @@ class OCRDialog(QDialog):
         self._set_rules_dirty(False)
         self._status_label.setText(tr("已放弃未保存的清洗规则修改"))
 
-    def _confirm_discard_rules(self) -> bool:
-        """关闭前拦一道未保存修改。True = 可以继续关闭"""
-        if not getattr(self, "_rules_dirty", False):
+    def _confirm_discard_changes(self) -> bool:
+        """关闭前处理清洗规则和识别配置的未保存修改。"""
+        rules_dirty = getattr(self, "_rules_dirty", False)
+        config_dirty = getattr(self, "_config_dirty", False)
+        if not rules_dirty and not config_dirty:
             return True
         reply = QMessageBox.question(
             self, tr("未保存的修改"),
-            tr("清洗规则有未保存的修改，关闭将丢失这些修改。\n是否先保存？"),
+            tr("OCR 配置有未保存的修改，关闭将丢失这些修改。\n是否先保存？"),
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
             | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Save,
         )
         if reply == QMessageBox.StandardButton.Save:
-            return self._on_save_rules()
+            if rules_dirty and not self._on_save_rules():
+                return False
+            if config_dirty:
+                self._on_save_recognition_config()
+            return True
         return reply == QMessageBox.StandardButton.Discard
 
     def reject(self):
-        """关闭对话框（X / Esc）前检查未保存的清洗规则修改
+        """关闭对话框（X / Esc）前检查未保存的 OCR 配置修改。
 
         QDialog.closeEvent 会走 reject()，覆盖它即可同时拦住 X 与 Esc。
         """
-        if not self._confirm_discard_rules():
+        if not self._confirm_discard_changes():
             return
         super().reject()
 
@@ -478,7 +721,7 @@ class OCRDialog(QDialog):
     def _on_test_clean(self):
         """测试清洗效果"""
         text = self._test_input.toPlainText()
-        cleaned = OCRCleaner().clean(text)
+        cleaned = OCRCleaner().clean(text, self._current_cleaning_group())
         self._test_output.setPlainText(cleaned)
 
     # ─── 图像识别操作 ────────────────────────────────────────

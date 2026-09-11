@@ -1,6 +1,6 @@
-"""OCR 引擎封装 - RapidOCR (ONNX Runtime) 封装，懒加载
+"""OCR 引擎封装 - RapidOCR (ONNX Runtime) 封装，懒加载。
 
-所有 OCR 输出均经过通用清洗规则处理（config/system/ocr_rules.yaml）。
+调用方可按需传入 ``cleaning_group``；未指定时只去除首尾空白。
 """
 
 from dataclasses import dataclass
@@ -11,14 +11,8 @@ from loguru import logger
 from ..workflows.align import GridAlignment
 from .layout_models import CanvasConfig, Region
 from .ocr_cleaner import OCRCleaner
+from .ocr_config import load_region_batch_config
 from .scene_registry import get_effective_region_defs
-
-# RapidOCR 当前检测器会把输入图的短边放大到 736。单独识别几十像素高的
-# region 会因此制造出数千像素宽的中间图。批量画布至少补到这个尺寸，既让
-# 多个 region 共用一次检测，也避免极窄拼图再次触发大倍率放大。
-_BATCH_MIN_SIDE = 736
-_BATCH_MAX_CONTENT_HEIGHT = 1200
-_BATCH_GAP = 16
 
 
 @dataclass
@@ -58,19 +52,21 @@ class OCREngine:
             self._available = False
         return self._available
 
-    def recognize(self, image: np.ndarray) -> list[OCRResult]:
+    def recognize(self, image: np.ndarray,
+                  cleaning_group: str | None = None) -> list[OCRResult]:
         """
         对整张图做 OCR
         image: BGR 格式的 numpy 数组
         返回: list[OCRResult]
         """
+        OCRCleaner().validate_group(cleaning_group)
         if not self._ensure_loaded():
             return []
         try:
             # 图像预处理：提升 OCR 准确率
             processed = self._preprocess_for_ocr(image)
             result, _ = self._ocr(processed)
-            return self._parse_result(result)
+            return self._parse_result(result, cleaning_group)
         except Exception as e:
             logger.error(f"OCR 识别失败: {e}")
             return []
@@ -85,7 +81,7 @@ class OCREngine:
         return image
 
     @staticmethod
-    def _parse_result(result) -> list[OCRResult]:
+    def _parse_result(result, cleaning_group: str | None = None) -> list[OCRResult]:
         """将 RapidOCR 原始结果解析为 OCRResult 列表
 
         RapidOCR 返回: list of [bbox, text, confidence]
@@ -99,7 +95,7 @@ class OCREngine:
         parsed = []
         for bbox_raw, text, conf in result:
             bbox = [(int(p[0]), int(p[1])) for p in bbox_raw]
-            cleaned_text = cleaner.clean(text)
+            cleaned_text = cleaner.clean(text, cleaning_group)
             parsed.append(OCRResult(text=cleaned_text, confidence=float(conf), bbox=bbox))
         return parsed
 
@@ -110,6 +106,7 @@ class OCREngine:
         regions: list[Region],
         scene_key: str,
         min_confidence: float | None = None,
+        cleaning_group: str | None = None,
     ) -> dict[str, str]:
         """
         对指定场景的所有文字区域裁剪后批量 OCR。
@@ -126,6 +123,7 @@ class OCREngine:
         Returns:
             dict[region.key, ocr_text]
         """
+        OCRCleaner().validate_group(cleaning_group)
         h, w = image.shape[:2]
         canvas_x = canvas.x_ratio * w
         canvas_y = canvas.y_ratio * h
@@ -157,7 +155,9 @@ class OCREngine:
             return {}
         if len(crops) == 1:
             key, crop = crops[0]
-            ocr_results = self.recognize(crop)
+            ocr_results = (self.recognize(
+                crop, cleaning_group=cleaning_group)
+                if cleaning_group else self.recognize(crop))
             if min_confidence is not None:
                 ocr_results = [
                     r for r in ocr_results
@@ -168,12 +168,14 @@ class OCREngine:
                 if ocr_results else "",
             }
 
-        return self._recognize_region_crops(crops, min_confidence)
+        return self._recognize_region_crops(
+            crops, min_confidence, cleaning_group=cleaning_group)
 
     def _recognize_region_crops(
         self,
         crops: list[tuple[str, np.ndarray]],
         min_confidence: float | None = None,
+        cleaning_group: str | None = None,
     ) -> dict[str, str]:
         """把多个区域纵向拼图后批量 OCR。
 
@@ -187,6 +189,7 @@ class OCREngine:
         results: dict[str, list[tuple[int, int, int, int, str]]] = {
             key: [] for key, _crop in crops
         }
+        region_batch = load_region_batch_config()
         valid = [(key, crop) for key, crop in crops if crop.size]
         if not valid:
             return {key: "" for key in results}
@@ -196,8 +199,9 @@ class OCREngine:
         content_height = 0
         for item in valid:
             crop_height = item[1].shape[0]
-            added = crop_height + (_BATCH_GAP if current else 0)
-            if current and content_height + added > _BATCH_MAX_CONTENT_HEIGHT:
+            added = crop_height + (region_batch.gap if current else 0)
+            if (current and content_height + added
+                    > region_batch.max_content_height):
                 batches.append(current)
                 current = []
                 content_height = 0
@@ -210,11 +214,11 @@ class OCREngine:
         for batch in batches:
             content_h = (
                 sum(crop.shape[0] for _key, crop in batch)
-                + _BATCH_GAP * (len(batch) - 1)
+                + region_batch.gap * (len(batch) - 1)
             )
             content_w = max(crop.shape[1] for _key, crop in batch)
-            sheet_h = max(content_h, _BATCH_MIN_SIDE)
-            sheet_w = max(content_w, _BATCH_MIN_SIDE)
+            sheet_h = max(content_h, region_batch.min_canvas_side)
+            sheet_w = max(content_w, region_batch.min_canvas_side)
             sample = batch[0][1]
             sheet = np.zeros(
                 (sheet_h, sheet_w, *sample.shape[2:]), dtype=sample.dtype)
@@ -225,9 +229,12 @@ class OCREngine:
                 crop_h, crop_w = crop.shape[:2]
                 sheet[y:y + crop_h, :crop_w] = crop
                 placements.append((key, 0, y, crop_w, y + crop_h))
-                y += crop_h + _BATCH_GAP
+                y += crop_h + region_batch.gap
 
-            for ocr_result in self.recognize(sheet):
+            batch_results = (self.recognize(
+                sheet, cleaning_group=cleaning_group)
+                if cleaning_group else self.recognize(sheet))
+            for ocr_result in batch_results:
                 if (min_confidence is not None
                         and ocr_result.confidence < min_confidence):
                     continue
@@ -312,9 +319,13 @@ class OCREngine:
             for line in lines
         )
 
-    def ocr_single(self, image: np.ndarray, min_confidence: float | None = None) -> str:
+    def ocr_single(self, image: np.ndarray, min_confidence: float | None = None,
+                   cleaning_group: str | None = None) -> str:
         """对单张小图做 OCR，返回清洗后的文本（多条用 | 分隔）"""
-        ocr_results = self.recognize(image)
+        OCRCleaner().validate_group(cleaning_group)
+        ocr_results = (self.recognize(
+            image, cleaning_group=cleaning_group)
+            if cleaning_group else self.recognize(image))
         if min_confidence is not None:
             ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
         return " | ".join(r.text for r in ocr_results) if ocr_results else ""

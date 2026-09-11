@@ -1,0 +1,24 @@
+content_version: 2
+recognition:
+  region_batch:
+    min_canvas_side: 736
+    max_content_height: 1200
+    gap: 16
+normalization:
+  groups:
+    equip:
+      label: 装备词条
+      replacements:
+        猜准率: 精准率
+        扁武学: 扇武学
+        经甲: 胫甲
+        腔甲: 胫甲
+        背仓: 背包
+        缚祷: 缚袴
+        率丝: 牵丝
+      patterns:
+        '[【［]': '['
+        '[】］]': ']'
+        （: (
+        ）: )
+        '[荐存·]': ''

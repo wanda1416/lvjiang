@@ -375,11 +375,26 @@ class EquipmentParser:
         ]
         KEY_NAMES = ["宫", "商", "角", "徵", "羽"]
 
+        texts = [raw.get(key, "").strip() for key in AFFIX_KEYS]
+        parsed = [self._parse_single_affix(text) if text else None for text in texts]
+        missing: list[str] = []
+        for i, affix in enumerate(parsed):
+            if affix is None:
+                missing.append(f"{KEY_NAMES[i]}({AFFIX_KEYS[i]})")
+            elif missing:
+                logger.error(
+                    "装备词条识别顺序异常：前序词条 {} 未能解析，"
+                    "后续词条 {}({}) 可解析；装备={!r}，原始词条={!r}",
+                    "、".join(missing), KEY_NAMES[i], AFFIX_KEYS[i],
+                    raw.get("equip_type", ""), dict(zip(AFFIX_KEYS, texts, strict=True)),
+                )
+                break
+
         affixes: list[Affix] = []
         warnings: list[str] = []
 
         for i, (key, cn_name) in enumerate(zip(AFFIX_KEYS, KEY_NAMES, strict=False)):
-            text = raw.get(key, "").strip()
+            text = texts[i]
 
             if not text:
                 if i == 0:
@@ -397,7 +412,7 @@ class EquipmentParser:
                     # 第 5 条为空 → 正常
                     break
 
-            affix = self._parse_single_affix(text)
+            affix = parsed[i]
             if affix is None:
                 warnings.append(f"词条{cn_name}({key}) 无法解析: {text!r}")
                 # 套装信息等非词条内容，跳过但不中断

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
 
 from ..i18n import tr
@@ -14,6 +15,8 @@ class ExecutionUserSelector(QWidget):
     writes to session/config storage, so every application start defaults to
     ``follow current user``.
     """
+
+    resolved_user_changed = pyqtSignal(str)
 
     def __init__(self, user_manager, parent=None):
         super().__init__(parent)
@@ -29,6 +32,9 @@ class ExecutionUserSelector(QWidget):
             QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.combo.setMinimumContentsLength(12)
         layout.addWidget(self.combo, stretch=1)
+        self.combo.currentIndexChanged.connect(
+            lambda _index: self.resolved_user_changed.emit(self.resolve_username())
+        )
         self.refresh_users()
 
     def refresh_users(self) -> None:

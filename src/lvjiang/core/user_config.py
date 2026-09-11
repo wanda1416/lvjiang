@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from fasteners import InterProcessLock
 from loguru import logger
@@ -20,7 +21,7 @@ from .fs_util import atomic_write_text
 
 _VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
 USER_DOCUMENT_TYPE = "lvjiang.user"
-USER_SCHEMA_VERSION = 1
+USER_SCHEMA_VERSION = 2
 _METADATA_SAVE_LOCK = threading.RLock()
 
 
@@ -45,6 +46,7 @@ class User:
     created_at: str = ""
     avatar: str = ""
     attributes: dict[str, str] = field(default_factory=dict)
+    workflow_params: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -58,6 +60,11 @@ class User:
                 for key, value in self.attributes.items()
                 if key and value is not None
             },
+            "workflow_params": {
+                str(workflow_id): dict(params)
+                for workflow_id, params in self.workflow_params.items()
+                if workflow_id and isinstance(params, dict)
+            },
         }
 
     @staticmethod
@@ -66,6 +73,7 @@ class User:
 
         raw_avatar = data.get("avatar", "")
         raw_attributes = data.get("attributes", {})
+        raw_workflow_params = data.get("workflow_params", {})
         attributes = (
             {str(k): str(v) for k, v in raw_attributes.items() if k}
             if isinstance(raw_attributes, dict) else {}
@@ -76,6 +84,12 @@ class User:
             created_at=str(data.get("created_at", "")),
             avatar=raw_avatar if is_safe_avatar_filename(raw_avatar) else "",
             attributes=attributes,
+            workflow_params=(
+                {str(wf_id): dict(params)
+                 for wf_id, params in raw_workflow_params.items()
+                 if wf_id and isinstance(params, dict)}
+                if isinstance(raw_workflow_params, dict) else {}
+            ),
         )
 
 
@@ -149,6 +163,40 @@ def mutate_user_metadata(
 def get_user_attribute(username: str, key: str, users_dir: Path | None = None):
     user = load_user_metadata(username, users_dir)
     return user.attributes.get(key) if user is not None else None
+
+
+def get_user_workflow_params(
+    username: str, workflow_id: str, users_dir: Path | None = None,
+) -> dict[str, Any] | None:
+    """读取用户对单个任务的独立参数；None 表示继续使用共享参数。"""
+    user = load_user_metadata(username, users_dir)
+    if user is None or workflow_id not in user.workflow_params:
+        return None
+    return dict(user.workflow_params[workflow_id])
+
+
+def set_user_workflow_params(
+    username: str, workflow_id: str, params: dict[str, Any],
+    users_dir: Path | None = None,
+) -> None:
+    """原子替换一个用户与任务组合的独立参数。"""
+    values = dict(params)
+    mutate_user_metadata(
+        username,
+        lambda user: user.workflow_params.__setitem__(workflow_id, values),
+        users_dir,
+    )
+
+
+def delete_user_workflow_params(
+    username: str, workflow_id: str, users_dir: Path | None = None,
+) -> None:
+    """删除独立参数，使该用户与任务组合恢复使用共享参数。"""
+    mutate_user_metadata(
+        username,
+        lambda user: user.workflow_params.pop(workflow_id, None),
+        users_dir,
+    )
 
 
 class UserConfigManager:
@@ -297,6 +345,11 @@ class UserConfigManager:
 
     def get_active_user_name(self) -> str:
         return self._active_user
+
+    @property
+    def users_dir(self) -> Path:
+        """用户资料目录，供用户级业务配置绑定到同一存储实例。"""
+        return self._users_dir
 
     def set_active_user(self, name: str) -> bool:
         if name not in self._users:

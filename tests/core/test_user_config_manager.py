@@ -30,11 +30,12 @@ class TestUser:
         d = u.to_dict()
         assert d == {
             "document_type": "lvjiang.user",
-            "schema_version": 1,
+            "schema_version": 2,
             "username": "张三",
             "created_at": "2026-01-01T00:00:00",
             "avatar": "",
             "attributes": {},
+            "workflow_params": {},
         }
 
     def test_from_dict(self):

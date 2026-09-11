@@ -3,32 +3,56 @@
 #% note: |-
 #%   请准备好'黄泉酿'并收藏
 #% parameters:
-#%   - name: max_refresh
-#%     label: 单任务最大刷新次数
-#%     type: number
-#%     default: 50
-#%     min: 1
 #%   - name: claim_reward
 #%     label: 领取奖励
 #%     type: bool
 #%     default: false
+#%   - name: max_refresh
+#%     label: 任务最多刷新
+#%     type: number
+#%     default: 50
+#%     min: 15
 #%   - name: max_claim_reputation
 #%     label: 最大领取声望
 #%     type: number
 #%     default: 1500
 #%     min: 0
+#%   - name: do_heying
+#%     label: 合影
+#%     type: bool
+#%     default: true
+#%   - name: do_huanzhuang
+#%     label: 换装
+#%     type: bool
+#%     default: true
+#%   - name: do_qingjing
+#%     label: 情境
+#%     type: bool
+#%     default: true
+#%   - name: do_kanbao
+#%     label: 看报
+#%     type: bool
+#%     default: true
+#%   - name: do_yinjiu
+#%     label: 饮酒
+#%     type: bool
+#%     default: true
+#%   - name: do_juezhanglin
+#%     label: 觉障林
+#%     type: bool
+#%     default: true
 #
 # 江湖号令任务刷新流程
 #
 # 流程结构：
 #   0. 起始定位：通过公共页面判断确认在活动页，否则先导航
-#   for 遍历 6 组 label_N / btn_N
+#   for 遍历 6 组 card_N
 #      0. 再次校验仍在号令页；不在则阻塞弹窗提示用户手动
 #         处理（前一个任务卡住退出时可能漏回号令页，需及时拦截，
 #         避免后续任务在错误页面上继续乱点）
-#      1. 识别 label_N 文本是否命中目标任务列表（contains_any 短路匹配）
+#      1. 识别卡片文字是否命中用户勾选的任务
 #      2. 命中 → 读取任务文本，分发执行对应动作
-#      3. 未命中 → 点击 btn_N 刷新，等待后重新识别，直到命中或达到刷新上限
+#      3. 未命中 → 点击卡片刷新按钮，等待后重新识别，直到命中或达到刷新上限
 #   4. 收尾：若仍在活动页，退回游戏首页
 #
 # 参数：
@@ -36,24 +60,39 @@
 #   claim_reward — 是否领取奖励，默认 false
 #   max_claim_reputation — 最大领取声望，默认 1500；仅当任务确实完成且
 #                          当周已领取声望小于该值时才领奖
+#   do_heying / do_huanzhuang / do_qingjing — 是否执行合影、换装、情境
+#   do_kanbao / do_yinjiu / do_juezhanglin — 是否执行看报、饮酒、觉障林
 
-default $max_refresh = 50
 default $claim_reward = false
+default $max_refresh = 50
 default $max_claim_reputation = 1500
+default $do_heying = true
+default $do_huanzhuang = true
+default $do_qingjing = true
+default $do_kanbao = true
+default $do_yinjiu = true
+default $do_juezhanglin = true
 
 # 各任务过程共享运行配置与跨任务状态；当前任务的 idx / label / task_text
 # 仍显式传递，避免子过程依赖隐藏的当前任务上下文。
-global $max_refresh, $claim_reward, $max_claim_reputation, $targets, $haoling_of_week, $mode_checked
+global $claim_reward, $max_refresh, $max_claim_reputation, $haoling_of_week, $mode_checked
+global $do_heying, $do_huanzhuang, $do_qingjing, $do_kanbao, $do_yinjiu, $do_juezhanglin
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 import "subcall/page_action.wf"
 import "subcall/game_profile.wf"
 
-# 目标任务关键词列表
-eval $targets = ["合影", "换装", "情境", "东方", "醉意", "觉障林"]
 eval $haoling_of_week = -1
 eval $mode_checked = false
+
+# 六项都未勾选时没有执行诉求，直接退出；只要勾选任一项，候选匹配仍按
+# 完整六类目标进行，用户开关只影响命中后的动作与领奖。
+call $has_task = has_selected_task()
+if not $has_task
+   log "未选择要执行的江湖号令任务，跳过流程"
+   return 0
+end
 
 # 起始定位：用户可能在江湖号令活动页点 F9，也可能停在游戏首页
 # 读不到「号令」标题即视为在首页，先自动导航进活动页（auto_nav=1）
@@ -119,25 +158,17 @@ for idx in ["1", "2", "3", "4", "5", "6"]
 
    # 命中目标任务 → 读取任务文本，分发执行对应动作
    if $hit
+      call $should_execute = should_execute_task($task_text)
+      if not $should_execute
+         log "任务 " + $idx + "（" + $label + "）属于固定目标，但用户未勾选执行，保留任务并跳过动作与领奖"
+         continue
+      end
       log "任务 " + $idx + "（" + $label + "）执行前：" + $task_text
 
-      if $task_text contains "换装"
-         call action_huanzhuang($label)
-      end
-      if $task_text contains "合影"
-         call action_heying($label, $idx)
-      end
-      if $task_text contains "情境"
-         call action_qingjing($label)
-      end
-      if $task_text contains "东方"
-         call action_dongfang($label, $idx)
-      end
-      if $task_text contains "醉意"
-         call $action_result = action_zuiyi($label, $idx)
-      end
-      if $task_text contains "觉障林"
-         call action_juezhanglin($label)
+      call $skip_reward_check = execute_target_task($task_text, $label, $idx)
+      if $skip_reward_check
+         log "任务 " + $idx + " 未完成，跳过领奖检测"
+         continue
       end
 
       # 领取奖励（勾选时）：先确认任务文字已经消失。完成后的卡片会变成
@@ -180,15 +211,83 @@ def is_task_completed($text_result)
    return 0
 end
 
-# 判断任务文字是否包含任一目标关键词。传入已扫描出的文字，避免为了
-# contains_any 再次 OCR 同一张卡片。
+# 仅用于六项全关时快速退出，不参与目标候选判定。
+def has_selected_task()
+   return $do_heying or $do_huanzhuang or $do_qingjing or $do_kanbao or $do_yinjiu or $do_juezhanglin
+end
+
+# targets 领域约束：六类任务关键词由游戏文案保证互斥，一张任务卡片只会
+# 命中其中一个关键词，不存在多个目标关键词同时命中的正交情况。
+# 界面使用用户熟悉的“看报”和“饮酒”，OCR 仍分别匹配“东方”和“醉意”。
+# 六类是否属于目标是游戏领域事实，不受用户执行开关影响。
 def is_target_task($text)
-   for target in $targets
-      if $text contains $target
-         return 1
-      end
+   if $text contains "合影"
+      return 1
+   end
+   if $text contains "换装"
+      return 1
+   end
+   if $text contains "情境"
+      return 1
+   end
+   if $text contains "东方"
+      return 1
+   end
+   if $text contains "醉意"
+      return 1
+   end
+   if $text contains "觉障林"
+      return 1
    end
    return 0
+end
+
+# 用户开关只控制已匹配目标是否执行；关闭时保留该任务，不执行动作和领奖。
+def should_execute_task($text)
+   if $text contains "合影"
+      return $do_heying
+   end
+   if $text contains "换装"
+      return $do_huanzhuang
+   end
+   if $text contains "情境"
+      return $do_qingjing
+   end
+   if $text contains "东方"
+      return $do_kanbao
+   end
+   if $text contains "醉意"
+      return $do_yinjiu
+   end
+   if $text contains "觉障林"
+      return $do_juezhanglin
+   end
+   return 0
+end
+
+# 按 OCR 任务文字分发动作。返回 1 表示动作明确无法完成，主流程应跳过
+# 领奖检测；当前仅饮酒未找到黄泉酿时返回 1。
+def execute_target_task($task_text, $label, $idx)
+   eval $skip_reward_check = 0
+   if $task_text contains "换装"
+      call action_huanzhuang($label)
+   end
+   if $task_text contains "合影"
+      call action_heying($label, $idx)
+   end
+   if $task_text contains "情境"
+      call action_qingjing($label)
+   end
+   if $task_text contains "东方"
+      call action_kanbao($label, $idx)
+   end
+   if $task_text contains "醉意"
+      call $skip_reward_check = action_yinjiu($label, $idx)
+   end
+   if $task_text contains "觉障林"
+      call action_juezhanglin($label)
+   end
+   return $skip_reward_check
 end
 
 # 刷新非目标任务，直到出现一种终态：
@@ -301,6 +400,17 @@ end
 # 每个 def 接收命中任务的卡片引用 key（如 "card_1"），
 # 从江湖号令页面出发执行对应活动，完成后需回到本页面。
 
+# 合影、看报、饮酒都会落在游戏首页：非末个任务或需要领奖时返回号令页；
+# 末个任务且无需领奖时保持在首页。调用位置和导航时机由各动作自行决定。
+def finish_external_task($idx, $task_name)
+   if $idx equals "6" and not $claim_reward
+      log "末个任务" + $task_name + "完成且无需领奖，留在桌面"
+   else
+      call back_to_haoling()
+   end
+   return 0
+end
+
 # 换装：点击任务 → 浮层前往 → 外观衣柜（穿搭方案 → 方案1 → 套用方案）
 # → 衣柜返回任务浮层 → 关闭浮层回到号令基底
 def action_huanzhuang($label)
@@ -326,16 +436,12 @@ def action_heying($label, $idx)
    click [general_action].[back] after wait @step_interval
    call scan_and_confirm("退出拍照", 0)
 
-   # 拍照结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
-   if $idx equals "6" and not $claim_reward
-      log "末个任务合影完成且无需领奖，留在桌面"
-   else
-      call back_to_haoling()
-   end
+   # 拍照结束落在桌面，按任务位置和领奖配置决定是否返回号令页。
+   call finish_external_task($idx, "合影")
 end
 
 # 情境：点击任务 → 弹出情境视图（展开 → 前往编辑情境）
-# → 情境编辑视图（保存 → 取消按钮出现则点一次 → 等 6s）
+# → 情境编辑视图（保存 → 取消按钮出现则点一次 → 轮询等待保存完成）
 # → 退出编辑（若回到外观情境 tab 则退出外观）→ 号令情境层返回任务浮层 → 关闭浮层
 def action_qingjing($label)
    click [activity_jianghu].$label.[label] after wait @step_interval
@@ -387,11 +493,11 @@ def action_qingjing($label)
    click [activity_jianghu].[overlay_back] after wait @step_interval
 end
 
-# 东方第一枝（看报）：点击任务 → 前往 → 立刻进入表情动作视图
+# 看报（任务文字“东方第一枝”）：点击任务 → 前往 → 立刻进入表情动作视图
 # → 整面板扫描 actions 定位「看报」格子并点击 → 等 5s 弹出报纸阅读视图
 # → 点第一个选择 → 连点两次返回回到游戏首页（桌面），看报结束后主动返回号令页；
 # 末个任务仅在需要领奖时才返回，否则留在桌面
-def action_dongfang($label, $idx)
+def action_kanbao($label, $idx)
    click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait @step_interval
 
@@ -432,23 +538,19 @@ def action_dongfang($label, $idx)
    if $in_main
        log "仍在主页，看报动作可能未解锁，跳过看报操作"
    else
-       call do_kanbao()
+       call perform_kanbao()
    end
    # 端游处于动作列表必须 ESC 关闭才能结束，暂时不做判断，除非后续此处大量报错
    env:"desktop" -> press "ESC" after wait @step_interval
 
-   # 看报结束落在桌面：非末个任务必须返回；末个任务仅领奖时返回
-   if $idx equals "6" and not $claim_reward
-      log "末个任务看报完成且无需领奖，留在桌面"
-   else
-      call back_to_haoling()
-   end
+   # 看报结束落在桌面，按任务位置和领奖配置决定是否返回号令页。
+   call finish_external_task($idx, "看报")
 end
 
 # ─── 看报操作 ─────────────────────────────────────────────
 # 前提：已进入表情动作视图（不在主页）
 # 点第一个选择 → 返回 → 处理确认弹窗 → 检查是否已回到主页
-def do_kanbao()
+def perform_kanbao()
    click [general_action].[choose_1] after wait stable @page_refresh least 0.5
    click [general_control].[blank_area] after wait stable @page_refresh least 0.5
 
@@ -467,7 +569,7 @@ def do_kanbao()
 end
 
 # 饮酒（醉意）：号令 → 退回首页 → 菜单 → 包裹 → 道具 - 普通道具 → 找黄泉酿食用 → 退回首页 → 返回号令
-def action_zuiyi($label, $idx)
+def action_yinjiu($label, $idx)
    # ── 从江湖号令退回首页 ──
    click [activity_jianghu].[back] after wait stable @page_refresh least 0.5
    click [school_main].[back] after wait stable @page_refresh least 0.5
@@ -476,7 +578,8 @@ def action_zuiyi($label, $idx)
    # ── 首页 → 菜单 → 包裹 → 道具 - 普通道具 ──
    call $nav_result = nav_main_to_item()
    if $nav_result < 0
-      return -1
+      # 保持既有导航失败处理：仅“没找到黄泉酿”会跳过领奖检测。
+      return 0
    end
 
    # ── 在背包网格中寻找黄泉酿 ──
@@ -486,12 +589,12 @@ def action_zuiyi($label, $idx)
       where confidence >= 0.65
 
    if $result
-      eval $zuiyi_r = $result.row
-      eval $zuiyi_c = $result.col
-      log "找到黄泉酿：row=" + $zuiyi_r + ", col=" + $zuiyi_c
+      eval $yinjiu_r = $result.row
+      eval $yinjiu_c = $result.col
+      log "找到黄泉酿：row=" + $yinjiu_r + ", col=" + $yinjiu_c
 
       # 点击黄泉酿所在格子，打开道具详情
-      click [bag_item_detail].[bag_grid][$zuiyi_r][$zuiyi_c] after wait stable @page_refresh least 0.5
+      click [bag_item_detail].[bag_grid][$yinjiu_r][$yinjiu_c] after wait stable @page_refresh least 0.5
       
       if env("android")
          # 在详情面板中寻找「食用」按钮
@@ -517,11 +620,11 @@ def action_zuiyi($label, $idx)
    # ── 关闭背包，退回首页 ──
    call nav_back_to_main()
 
-   if $idx equals "6" and not $claim_reward
-      log "末个任务醉意完成且无需领奖，留在桌面"
-   else
-      call back_to_haoling()
+   call finish_external_task($idx, "醉意")
+   if not $result
+      return 1
    end
+   return 0
 end
 
 # 觉障林：动作暂未实现
@@ -578,7 +681,7 @@ def back_to_haoling()
    # 首次打开菜单时检查游戏模式，识别到单人则切到多人模式；
    # 切换后会回到游戏主页，需重新打开菜单；未切换则仍在菜单页，
    # 无需再次导航。mode_checked 是本次执行内的全局标记，下次运行会重置。
-   if not $mode_checked
+   if $do_heying and not $mode_checked
       eval $mode_checked = true
       call switch_to_multi_mode()
       # 切换后落在游戏主页，重新打开菜单继续导航

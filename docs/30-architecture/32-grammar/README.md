@@ -22,7 +22,8 @@
 | [04-data-flow.md](04-data-flow.md) | 感知指令概览与对比表 |
 | [04.1-scan.md](04.1-scan.md) | scan — OCR 文字扫描 |
 | [04.2-recognize.md](04.2-recognize.md) | recognize — 图像材料识别 |
-| [04.3-find.md](04.3-find.md) | find — 文字坐标定位 / 模板定位（by image） |
+| [04.3-find.md](04.3-find.md) | find — 文字与模板坐标定位 |
+| [04.4-image-template.md](04.4-image-template.md) | `by image` — scan / find 模板匹配完整语义 |
 | [05-control-flow.md](05-control-flow.md) | 控制流概览与指令总表 |
 | [05.1-loops-branches.md](05.1-loops-branches.md) | 分支与循环：if、for、loop、break、continue |
 | [05.2-flow-jumps.md](05.2-flow-jumps.md) | 异常与跳转：try/catch、return、label/goto |
@@ -245,7 +246,7 @@ log concat("a", $var)                   # 函数返回值
 
 ## 七、感知指令
 
-> 详细返回值与修饰子句见 [04-data-flow.md](04-data-flow.md) / [04-1](04.1-scan.md) / [04-2](04.2-recognize.md) / [04-3](04.3-find.md)。
+> 详细返回值与修饰子句见 [04-data-flow.md](04-data-flow.md) / [04-1](04.1-scan.md) / [04-2](04.2-recognize.md) / [04-3](04.3-find.md) / [04-4](04.4-image-template.md)。
 
 ### scan — OCR 文字扫描
 
@@ -258,6 +259,7 @@ scan [scene].[panel][r][c] as $var                      # 单格 → str
 # 带 by（短路匹配 → str 或 {row, col}）
 scan [scene].[r1, r2] as $var by contains "文本"
 scan [scene].[r1, r2] as $var by equals_any $list
+scan [scene].[r1, r2] as $var by image                    # 用布局中的 Region 模板绑定
 
 # 带 where（置信度过滤）
 scan [scene].[r1, r2] as $var where confidence >= 0.8
@@ -295,9 +297,13 @@ find $scene.$region as $var by contains_any $list       # 动态区域
 # 带 where
 find as $var by contains "文字" where confidence >= 0.8
 
-# 模板定位（仅 find）：config/system/templates/<name>.png，where 作匹配分门槛
+# 显式模板定位：config/system/templates/<name>.png，where 作匹配分门槛
 find as $var by image "extract_icon"
 find [scene].[area] as $var by image "extract_icon" where confidence >= 0.85
+
+# 按当前布局的 Region 模板绑定定位；前面的 area 是搜索范围，后面的 back 是模板来源
+find as $var by image [game_menu_page].[back]
+find [scene].[area] as $var by image [game_menu_page].[back]
 ```
 
 ### 修饰子句速查
@@ -310,7 +316,9 @@ find [scene].[area] as $var by image "extract_icon" where confidence >= 0.85
 | `where confidence >= <n>` | 过滤 | scan / recognize / find |
 | `on group "<name>"` | 限定分组 | 仅 recognize |
 
-by 模式：`equals "文本"` / `contains "文本"` / `equals_any $list` / `contains_any $list` / `image "模板名"`（仅 find）
+by 模式：`equals "文本"` / `contains "文本"` / `equals_any $list` / `contains_any $list`；
+`scan` Region 另支持无 target 的 `by image`；`find` 支持
+`by image [scene].[region]`（推荐）及兼容形式 `by image "模板名"`。
 
 ### 与 click 的配合
 

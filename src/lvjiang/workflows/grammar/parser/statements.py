@@ -237,8 +237,13 @@ class _StmtMixin:
         target = items[3]
         by_clause = next((i for i in items[4:] if isinstance(i, ByClause)), None)
         where_clause = next((i for i in items[4:] if isinstance(i, WhereClause)), None)
-        self._reject_image_by(by_clause, "scan", items)
+        cleaning_group = next((i[1] for i in items[4:]
+                               if isinstance(i, tuple) and i[0] == "__cleaning_group__"), None)
+        self._validate_scan_image_by(by_clause, items)
+        if by_clause is not None and by_clause.match_mode == "image" and cleaning_group:
+            raise WorkflowUserError("scan by image 不支持 OCR 清洗组")
         return Scan(scene=ref, target=target, by=by_clause, where=where_clause,
+                    cleaning_group=cleaning_group,
                     line_no=self._line(items))
 
     def recognize_subscene_stmt(self, items):
@@ -591,7 +596,14 @@ class _StmtMixin:
             raise WorkflowUserError(
                 f"'full by' 仅 recognize 语句支持，find 不支持（第 {self._line(items)} 行）"
             )
-        where_clause = items[3] if len(items) > 3 else None  # WhereClause | None
+        if by_clause.match_mode == "image" and by_clause.target is None:
+            raise WorkflowUserError(
+                f"find 的 'by image' 必须指定模板名或 Region 引用（第 {self._line(items)} 行）")
+        where_clause = next((i for i in items[3:] if isinstance(i, WhereClause)), None)
+        cleaning_group = next((i[1] for i in items[3:]
+                               if isinstance(i, tuple) and i[0] == "__cleaning_group__"), None)
+        if by_clause.match_mode == "image" and cleaning_group is not None:
+            raise WorkflowUserError("find by image 不支持 OCR 清洗组")
         # 解析搜索区域（与 scan 一致）
         search_region = None
         if len(scene_target) > 1 and scene_target[1] is not None:
@@ -606,6 +618,7 @@ class _StmtMixin:
             var_name=var_name, by=by_clause,
             search_scene=scene_name, search_region=search_region,
             where=where_clause,
+            cleaning_group=cleaning_group,
             line_no=self._line(items),
         )
 
@@ -618,11 +631,19 @@ class _StmtMixin:
             raise WorkflowUserError(
                 f"'full by' 仅 recognize 语句支持，find 不支持（第 {self._line(items)} 行）"
             )
-        where_clause = items[2] if len(items) > 2 else None  # WhereClause | None
+        if by_clause.match_mode == "image" and by_clause.target is None:
+            raise WorkflowUserError(
+                f"find 的 'by image' 必须指定模板名或 Region 引用（第 {self._line(items)} 行）")
+        where_clause = next((i for i in items[2:] if isinstance(i, WhereClause)), None)
+        cleaning_group = next((i[1] for i in items[2:]
+                               if isinstance(i, tuple) and i[0] == "__cleaning_group__"), None)
+        if by_clause.match_mode == "image" and cleaning_group is not None:
+            raise WorkflowUserError("find by image 不支持 OCR 清洗组")
         return Find(
             var_name=var_name, by=by_clause,
             search_scene=None, search_region=None,
             where=where_clause,
+            cleaning_group=cleaning_group,
             line_no=self._line(items),
         )
 
@@ -644,46 +665,21 @@ class _StmtMixin:
         """
         return items[0]  # var_ref 已返回 VarRef
 
-    # ─── recognize 专用 panel 索引（额外支持范围 [start...end]）─────
+    # ─── scan / recognize 共用 panel 索引 ─────────────────
 
-    def recognize_panel_index_int(self, items):
-        """recognize panel 数字索引：[2] → int"""
+    def vision_panel_index_int(self, items):
+        """视觉操作 panel 数字索引：[2] → int"""
         return int(str(items[0]))
 
-    def recognize_panel_index_var(self, items):
-        """recognize panel 变量索引：[$var] → VarRef"""
+    def vision_panel_index_var(self, items):
+        """视觉操作 panel 变量索引：[$var] → VarRef"""
         return items[0]
 
-    def recognize_panel_index_range(self, items):
-        """recognize panel 范围索引：[1...3] → tuple(start, end)
-
-        items 包含 [recognize_range_endpoint, RANGE_OP, recognize_range_endpoint]，
-        RANGE_OP 是命名终端会传入，取 items[0] 和 items[2]。
-        """
+    def vision_panel_index_range(self, items):
+        """视觉操作 panel 范围索引：[1...3] → tuple(start, end)"""
         return (items[0], items[2])
 
-    def recognize_range_endpoint(self, items):
-        """范围端点：INT → int | var_ref → VarRef"""
-        val = items[0]
-        if isinstance(val, VarRef):
-            return val
-        return int(str(val))
-
-    # ─── scan 专用 panel 索引（额外支持范围 [start...end]）───────
-
-    def scan_panel_index_int(self, items):
-        """scan panel 数字索引：[2] → int"""
-        return int(str(items[0]))
-
-    def scan_panel_index_var(self, items):
-        """scan panel 变量索引：[$var] → VarRef"""
-        return items[0]
-
-    def scan_panel_index_range(self, items):
-        """scan panel 范围索引：[1...3] → tuple(start, end)"""
-        return (items[0], items[2])
-
-    def scan_range_endpoint(self, items):
+    def vision_range_endpoint(self, items):
         """范围端点：INT → int | var_ref → VarRef"""
         val = items[0]
         if isinstance(val, VarRef):
@@ -738,9 +734,9 @@ class _StmtMixin:
         return Wait(delay=arg, line_no=self._line(items))
 
     def _build_tuple_literal(self, items):
-        """将 tuple_elem 列表转为 TupleLiteral（元素已是 VarRef / Literal）"""
-        # tuple_elem 规则已保证元素为 VarRef | Literal，此处直接透传
-        return TupleLiteral(elements=list(items))
+        """将表达式列表转为 TupleLiteral。"""
+        return TupleLiteral(
+            elements=[self._normalize_expr(item) for item in items])
 
     def wait_range(self, items):
         """(min, max) → TupleLiteral，支持混合数字和变量"""
@@ -839,10 +835,20 @@ class _StmtMixin:
         return self._build_tuple_literal(items)
 
     def _reject_image_by(self, by_clause, verb: str, items):
-        """by image 只属于 find；scan/recognize 是文字/参考图识别。"""
+        """recognize/panel 不接受固定 UI 模板匹配。"""
         if by_clause is not None and by_clause.match_mode == "image":
             raise WorkflowUserError(
-                f"'by image' 仅 find 语句支持，{verb} 不支持（第 {self._line(items)} 行）"
+                f"'by image' 仅普通 Region scan 与 find 支持，{verb} 不支持"
+                f"（第 {self._line(items)} 行）"
+            )
+
+    def _validate_scan_image_by(self, by_clause, items):
+        """scan 的 by image 使用布局绑定模板，禁止再写显式模板名。"""
+        if (by_clause is not None and by_clause.match_mode == "image"
+                and by_clause.target is not None):
+            raise WorkflowUserError(
+                "scan 的 'by image' 不接受模板名；模板应绑定在当前布局的 Region 上"
+                f"（第 {self._line(items)} 行）"
             )
 
     def _reject_recognize_rich_by(self, rich: bool, by_clause, items):
@@ -869,6 +875,7 @@ class _StmtMixin:
                 region_var = second  # 动态 region
         by_clause = None
         where_clause = None
+        cleaning_group = None
         for item in items[2:]:
             if isinstance(item, ByClause):
                 by_clause = item
@@ -878,8 +885,12 @@ class _StmtMixin:
                     )
             elif isinstance(item, WhereClause):
                 where_clause = item
-        self._reject_image_by(by_clause, "scan", items)
-        return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, where=where_clause, line_no=self._line(items))
+            elif isinstance(item, tuple) and item[0] == "__cleaning_group__":
+                cleaning_group = item[1]
+        self._validate_scan_image_by(by_clause, items)
+        if by_clause is not None and by_clause.match_mode == "image" and cleaning_group:
+            raise WorkflowUserError("scan by image 不支持 OCR 清洗组")
+        return Scan(scene=scene, fields=fields, target=target, region_var=region_var, by=by_clause, where=where_clause, cleaning_group=cleaning_group, line_no=self._line(items))
 
     def scan_panel_stmt(self, items):
         """scan [scene].[panel][row][col] as $var [by ...] [where ...]"""
@@ -890,14 +901,17 @@ class _StmtMixin:
         target = items[4]  # var_ref → VarRef
         by_clause = None
         where_clause = None
+        cleaning_group = None
         for item in items[5:]:
             if isinstance(item, ByClause):
                 by_clause = item
             elif isinstance(item, WhereClause):
                 where_clause = item
+            elif isinstance(item, tuple) and item[0] == "__cleaning_group__":
+                cleaning_group = item[1]
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
         self._reject_image_by(by_clause, "scan", items)
-        return Scan(scene=panel_ref, target=target, by=by_clause, where=where_clause, line_no=self._line(items))
+        return Scan(scene=panel_ref, target=target, by=by_clause, where=where_clause, cleaning_group=cleaning_group, line_no=self._line(items))
 
     def recognize_stmt(self, items):
         """recognize [scene].[f1, f2, ...] as [rich] $var [by ...] [group ...] [where ...] [with ...]"""
@@ -967,3 +981,6 @@ class _StmtMixin:
     def with_clause(self, items):
         """with <func_name> — 指定 rich 模式的 dict->dict 转换函数"""
         return ("__with_func__", str(items[0]))
+
+    def cleaning_clause(self, items):
+        return ("__cleaning_group__", self._unquote(str(items[0])))

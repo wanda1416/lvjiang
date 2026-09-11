@@ -206,6 +206,10 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self.run_username: str = ""
         # 用户资料目录可由批量执行器绑定，供 user_get() 读取同一套快照来源。
         self.users_dir: Path | None = None
+        # 启动时冻结的用户属性；user_get() 优先读取此快照。
+        self.user_attributes_snapshot: dict[str, dict[str, str]] | None = None
+        # 专用实现需要的完整工作流配置，同样在启动时冻结。
+        self.workflow_config_snapshot: dict | None = None
         self._save_callback: Callable | None = None
         # UI 交互回调（UI 层注入，解决工作流线程不能直接弹对话框的问题）
         # 签名: (action, **kwargs) → result
@@ -753,7 +757,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         """
         refs = collect_refs(program.body, self._procs,
                            proc_sources=self._proc_sources, source=program.source,
-                           reachable_only=reachable_only)
+                           reachable_only=reachable_only, run_env=self.run_env)
         problems = check_refs(refs, self._layout)
         if problems:
             raise WorkflowUserError(format_problems(problems))

@@ -19,6 +19,7 @@ from lvjiang.workflows.grammar import (
     Eval,
     EvalFieldChainAssign,
     FieldAccess,
+    Find,
     For,
     FuncCall,
     Goto,
@@ -1326,6 +1327,20 @@ def test_recognize_with_clause():
     assert n.with_func is not None
     assert isinstance(n.with_func, Literal)
     assert n.with_func.value == "yysls_rich_parse"
+
+
+def test_scan_and_find_with_cleaning_group():
+    scan = parse_text(
+        'scan [s].[f1, f2] as $raw where confidence >= 0.5 with "equip"'
+    ).body[0]
+    assert isinstance(scan, Scan)
+    assert scan.cleaning_group == "equip"
+
+    found = parse_text(
+        'find [s].[f1] as $hit by contains "会心率" with "equip"'
+    ).body[0]
+    assert isinstance(found, Find)
+    assert found.cleaning_group == "equip"
 
     # 无 with 时 with_func 为 None
     program = parse_text("recognize [s].[f1] as rich $mats")

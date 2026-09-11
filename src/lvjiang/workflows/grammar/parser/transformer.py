@@ -64,3 +64,14 @@ class _DSLTransformer(_StmtMixin, _ExprMixin, _ModuleControlMixin, Transformer):
                 s = s[1:-1]
             return Literal(value=s)
         return node
+
+    @classmethod
+    def _normalize_expr(cls, node):
+        """把 grammar 直出的标量统一包装为 Literal，AST 节点原样透传。"""
+        if isinstance(node, Literal):
+            return node
+        if isinstance(node, Token):
+            return Literal(value=cls._unquote(str(node)))
+        if node is None or isinstance(node, (bool, int, float, str)):
+            return Literal(value=node)
+        return node

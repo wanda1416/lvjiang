@@ -218,14 +218,18 @@ class _PanelMixin:
             # by 子句：短路匹配，返回是否命中
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
-            ocr_results = self._ocr.recognize(slot_img)
+            ocr_results = (self._ocr.recognize(
+                slot_img, cleaning_group=node.cleaning_group)
+                if node.cleaning_group else self._ocr.recognize(slot_img))
             if min_conf is not None:
                 ocr_results = [r for r in ocr_results if r.confidence >= min_conf]
             text = " ".join(r.text for r in ocr_results).strip()
             matched = self._match_text(text, target_value, by_clause.match_mode)
             self.variables[var_name] = text if matched else ""
         else:
-            ocr_results = self._ocr.recognize(slot_img)
+            ocr_results = (self._ocr.recognize(
+                slot_img, cleaning_group=node.cleaning_group)
+                if node.cleaning_group else self._ocr.recognize(slot_img))
             if min_conf is not None:
                 ocr_results = [r for r in ocr_results if r.confidence >= min_conf]
             text = " ".join(r.text for r in ocr_results).strip()
@@ -275,7 +279,9 @@ class _PanelMixin:
                 if slot_img is None:
                     result.setdefault(str(r_1based), {})[str(c_1based)] = ""
                     continue
-                ocr_results = self._ocr.recognize(slot_img)
+                ocr_results = (self._ocr.recognize(
+                    slot_img, cleaning_group=node.cleaning_group)
+                    if node.cleaning_group else self._ocr.recognize(slot_img))
                 if min_conf is not None:
                     ocr_results = [r for r in ocr_results if r.confidence >= min_conf]
                 text = " ".join(t.text for t in ocr_results).strip()
@@ -366,7 +372,7 @@ class _PanelMixin:
                 slot_img = panel_img[y1:y2, x1:x2]
                 yield r, c, (slot_img if slot_img.size else None)
 
-    def _scan_panel_whole(self, scene_key: str, panel_key: str, var_name: str, min_confidence: float | None = None):
+    def _scan_panel_whole(self, scene_key: str, panel_key: str, var_name: str, min_confidence: float | None = None, cleaning_group: str | None = None):
         """scan [scene].[panel] as $var [where ...] — 整面板逐格 OCR
 
         结果为行列嵌套 dict（key 为 1-based 字符串）：$var.[1].[2] 取 1 行 2 列文本。
@@ -380,7 +386,9 @@ class _PanelMixin:
         for r, c, slot_img in self._iter_slot_images(panel_img, cal):
             text = ""
             if slot_img is not None:
-                ocr_results = self._ocr.recognize(slot_img)
+                ocr_results = (self._ocr.recognize(
+                    slot_img, cleaning_group=cleaning_group)
+                    if cleaning_group else self._ocr.recognize(slot_img))
                 if min_confidence is not None:
                     ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
                 text = " ".join(t.text for t in ocr_results).strip()
@@ -574,7 +582,7 @@ class _PanelMixin:
             f"[{row_start}...{row_end}][{col_start}...{col_end}] => {result}"
         )
 
-    def _scan_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None, min_confidence: float | None = None):
+    def _scan_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None, min_confidence: float | None = None, cleaning_group: str | None = None):
         """scan [scene].[panel] as $var by ... [where ...] — 整面板 OCR + by 短路匹配
 
         返回首个命中的行列位置 {"row": 行号, "col": 列号}，未命中返回空 dict {}。
@@ -589,7 +597,9 @@ class _PanelMixin:
         for r, c, slot_img in self._iter_slot_images(panel_img, cal):
             text = ""
             if slot_img is not None:
-                ocr_results = self._ocr.recognize(slot_img)
+                ocr_results = (self._ocr.recognize(
+                    slot_img, cleaning_group=cleaning_group)
+                    if cleaning_group else self._ocr.recognize(slot_img))
                 if min_confidence is not None:
                     ocr_results = [o for o in ocr_results if o.confidence >= min_confidence]
                 text = " ".join(t.text for t in ocr_results).strip()

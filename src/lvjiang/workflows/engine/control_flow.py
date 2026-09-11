@@ -2,7 +2,7 @@
 
 from loguru import logger
 
-from ..grammar import For, ForRange, FuncCall, If, Loop, UntilLoop, VarRef, WhileLoop
+from ..grammar import For, ForRange, If, Loop, UntilLoop, WhileLoop
 from ..grammar.ast_nodes import Try
 from .signals import WorkflowUserError, _BreakSignal, _ContinueSignal
 
@@ -20,26 +20,12 @@ class _ControlFlowMixin:
             self._exec_body(node.else_body)
 
     def _exec_for(self, node: For):
-        # 解析迭代列表：支持静态列表、动态变量和函数调用
-        if isinstance(node.iterable, VarRef):
-            # 动态迭代：for $x in $list_var
-            raw = self.variables.get(node.iterable.name)
-            if raw is None:
-                logger.error(f"for: 变量 ${node.iterable.name} 未定义")
-                return
-            if not isinstance(raw, list):
-                logger.error(f"for: ${node.iterable.name} 不是列表类型，无法迭代")
-                return
-            items = raw
-        elif isinstance(node.iterable, FuncCall):
-            # 函数调用迭代：for i in range(1, 100)
-            items = self._call_func(node.iterable)
-            if not isinstance(items, list):
-                logger.error(f"for: 函数 {node.iterable.func_name}() 返回值不是列表类型")
-                return
-        else:
-            # 静态迭代：for $x in [a, b, c]
-            items = [self._resolve(item) for item in node.iterable]
+        items = self._resolve(node.iterable)
+        if not isinstance(items, list):
+            logger.error(
+                f"for: 迭代表达式结果不是列表类型: "
+                f"{type(items).__name__}")
+            return
         logger.debug(f"for {node.var} in {items}")
 
         for value in items:
@@ -84,17 +70,16 @@ class _ControlFlowMixin:
                 continue
 
     def _exec_loop(self, node: Loop):
-        # 解析循环次数
-        if isinstance(node.count, int):
-            count = node.count
-        elif isinstance(node.count, VarRef):
-            # 变量引用：loop $execute_times
-            val = self.variables.get(node.count.name)
-            count = int(val) if val is not None else 0
+        if isinstance(node.count, str):
+            # 兼容旧式裸 NAME 变量：loop execute_times
+            value = self.variables.get(node.count)
         else:
-            # 字符串（NAME）
-            val = self.variables.get(str(node.count))
-            count = int(val) if val is not None else 0
+            value = self._resolve(node.count)
+        try:
+            count = int(value) if value is not None else 0
+        except (TypeError, ValueError):
+            logger.error(f"loop: 计数表达式结果非数值: {value!r}")
+            return
 
         logger.debug(f"loop {count}")
         for _ in range(count):

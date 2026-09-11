@@ -2,7 +2,7 @@
 
 `default` 走 `_resolve_literal`，它原来只拆 VarRef / FieldAccess，漏了
 `Literal`。而 dict/list 字面量的**标量**元素在解析阶段就被包成了 `Literal`
-节点（grammar 的 dict_val_* / list_item_* 规则），于是
+节点，于是
 
     default $d = {"a": true, "b": false}
 

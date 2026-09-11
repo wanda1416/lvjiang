@@ -100,47 +100,7 @@ class _ModuleControlMixin:
 
     def call_arg_list(self, items):
         """参数列表 → list"""
-        return list(items)
-
-    def call_arg_str(self, items):
-        """字符串参数 → Literal"""
-        return Literal(value=self._unquote(str(items[0])))
-
-    def call_arg_num(self, items):
-        """数字参数 → float"""
-        return items[0]
-
-    def call_arg_var(self, items):
-        """变量参数 → VarRef"""
-        return items[0]
-
-    def call_arg_field(self, items):
-        """字段访问参数 → FieldAccess"""
-        return items[0]
-
-    def call_arg_null(self, items):
-        """null 参数 → Literal(None)"""
-        return Literal(value=None)
-
-    def call_arg_true(self, items):
-        """true 参数 → Literal(True)"""
-        return Literal(value=True)
-
-    def call_arg_false(self, items):
-        """false 参数 → Literal(False)"""
-        return Literal(value=False)
-
-    def call_arg_tuple(self, items):
-        """(x, y) / (x, y, w, h) 参数 → TupleLiteral"""
-        return items[0]  # rect_literal / range_literal 已返回 TupleLiteral
-
-    def call_arg_list_lit(self, items):
-        """[...] 参数 → list[AST节点]（引擎 _resolve 递归求值）"""
-        return items[0]  # list_literal 已返回 list
-
-    def call_arg_dict_lit(self, items):
-        """{...} 参数 → dict[str, AST节点]（引擎 _resolve 递归求值）"""
-        return items[0]  # dict_literal 已返回 dict
+        return [self._normalize_expr(item) for item in items]
 
     # ─── 控制流 ───────────────────────────────────────────
 
@@ -233,29 +193,13 @@ class _ModuleControlMixin:
 
     def for_stmt(self, items):
         var_name = str(items[0])
-        iterable = items[1]  # for_iter → list[Literal] | VarRef | FuncCall | ForRange
+        iterable = items[1]
         body = self._flatten_body(items[2:])
         # 若 for_iter 返回 ForRange，直接设置 body 并返回
         if isinstance(iterable, ForRange):
             return ForRange(var=var_name, start=iterable.start, end=iterable.end,
                            body=body, line_no=self._line(items))
         return For(var=var_name, iterable=iterable, body=body, line_no=self._line(items))
-
-    def for_iter_static(self, items):
-        """for_iter: list_literal → list[Literal | VarRef]"""
-        return items[0]  # list_literal 已返回 list
-
-    def for_iter_var(self, items):
-        """for_iter: var_ref → VarRef"""
-        return items[0]  # var_ref 已返回 VarRef
-
-    def for_iter_func(self, items):
-        """for_iter: func_call → FuncCall（如 range(1, 100)）"""
-        return items[0]  # func_call 已返回 FuncCall
-
-    def for_iter_range(self, items):
-        """for_iter: for_range → ForRange（如 [1...100]）"""
-        return items[0]  # for_range 已返回 ForRange
 
     def for_range(self, items):
         """[start...end] 闭区间范围迭代"""
@@ -264,10 +208,6 @@ class _ModuleControlMixin:
         endpoints = [i for i in items if not isinstance(i, Token) or i.type != 'RANGE_OP']
         return ForRange(var="", start=endpoints[0], end=endpoints[1], line_no=self._line(items))
 
-    def for_range_endpoint(self, items):
-        """范围端点：数字或变量引用"""
-        return items[0]  # number 返回 float，var_ref 返回 VarRef
-
     def loop_count_stmt(self, items):
         count_val = items[0]
         if isinstance(count_val, (int, float)):
@@ -275,9 +215,9 @@ class _ModuleControlMixin:
         elif isinstance(count_val, VarRef):
             count = count_val  # 变量引用，运行时解析
         elif isinstance(count_val, Token):
-            count = int(str(count_val))
-        else:
             count = str(count_val)
+        else:
+            count = count_val
         body = self._flatten_body(items[1:])
         return Loop(count=count, body=body, line_no=self._line(items))
 

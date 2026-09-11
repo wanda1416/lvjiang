@@ -43,6 +43,34 @@ class TestResolveAffixCategory:
         )
         assert GameConfigManager(path).get_equipment_cooldown_days() == 7
 
+    def test_equipment_cooldown_carryover_defaults_to_enabled(self, tmp_path):
+        path = tmp_path / "game_config.yaml"
+        path.write_text("level_configs: []\n", encoding="utf-8")
+        assert GameConfigManager(
+            path).is_equipment_cooldown_carryover_enabled()
+
+    def test_equipment_cooldown_carryover_can_be_disabled(self, tmp_path):
+        path = tmp_path / "game_config.yaml"
+        path.write_text(
+            "basic_config:\n"
+            "  equipment_cooldown_carryover: false\n"
+            "level_configs: []\n",
+            encoding="utf-8",
+        )
+        assert not GameConfigManager(
+            path).is_equipment_cooldown_carryover_enabled()
+
+    def test_invalid_cooldown_carryover_falls_back_to_enabled(self, tmp_path):
+        path = tmp_path / "game_config.yaml"
+        path.write_text(
+            "basic_config:\n"
+            "  equipment_cooldown_carryover: 'false'\n"
+            "level_configs: []\n",
+            encoding="utf-8",
+        )
+        assert GameConfigManager(
+            path).is_equipment_cooldown_carryover_enabled()
+
     @pytest.mark.parametrize("value", [0, 366, True, "5"])
     def test_invalid_equipment_cooldown_days_falls_back_to_five(
             self, tmp_path, value):

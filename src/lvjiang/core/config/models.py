@@ -34,7 +34,10 @@ class InputSimConfig:
     after_click_wait: tuple[float, float] = (0.1, 0.2)    # 点击后延迟范围
     mouse_move_duration: tuple[float, float] = (0.3, 0.6) # 鼠标移动时长范围
     click_random_offset: int = 3                           # 坐标随机偏移像素
-    region_jitter_ratio: float = 0.25                      # 区域中心(0.5)左右偏移比例，必须 [0, 0.5)
+    # 未单独标定 click_rect 时，落点框从区域中心向四边延伸的比例。
+    # 0.25 → 落点框为区域中间的一半。配置名为兼容存量配置而保留，实际的
+    # 默认框统一由 layout_models.effective_click_rect 派生。
+    region_jitter_ratio: float = 0.25
 
     def __post_init__(self):
         self.before_click_wait = _pair(self.before_click_wait)

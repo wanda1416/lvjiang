@@ -314,9 +314,21 @@ class TestStateTransition:
 
 
 def test_versioned_dirs_registered_for_core():
-    """core 自己的两类必须在注册表里，否则整个下发机制形同虚设。"""
+    """core 自己的配置必须在注册表里，否则整个下发机制形同虚设。"""
     assert "scenes" in versioning.VERSIONED_DIRS
     assert "layouts" in versioning.VERSIONED_DIRS
+    assert versioning.spec_for("ocr.yaml") is not None
+
+
+def test_yysls_online_config_paths_are_registered():
+    from lvjiang.apps import load_config_policies
+
+    load_config_policies()
+    assert versioning.spec_for("yysls/game_config.yaml") is not None
+    assert versioning.spec_for("yysls/tune_config.yaml") is not None
+    graduation = versioning.spec_for(
+        "yysls/graduation/鸣金·虹_基础方案.json")
+    assert graduation is not None and graduation.allow_remote_new
 
 
 # ─── Review 回归：以下每条对应一个真实缺陷 ─────────────────

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """给参与 remote 下发的实体配置文件补 ``content_version`` 顶层字段。
 
-哪些目录参与由 `lvjiang.core.config.versioning` 的注册表决定（core 声明
-scenes/layouts，插件经 config_policy_modules 声明自己的，如燕云的
-yysls/tuning_rules），本脚本不自己维护一份清单——两处清单迟早会不一致。
+哪些目录和单文件参与由 `lvjiang.core.config.versioning` 的注册表决定（core
+声明 scenes/layouts/ocr.yaml，插件经 config_policy_modules 声明自己的），本脚本不
+自己维护一份清单——两处清单迟早会不一致。
 
 **幂等**：已有 ``content_version`` 的文件原样跳过，所以新增了配置文件之后
 可以直接重跑一遍补齐。用 ``--check`` 只报告不写盘（CI 用）。
@@ -31,8 +31,7 @@ from lvjiang.core.config.versioning import (  # noqa: E402
     iter_versioned_files,
 )
 
-# 插件私有目录（燕云 yysls/tuning_rules）是插件自己注册的，不 import 就不在
-# 注册表里，会被这个脚本静默漏掉
+# 插件私有配置是插件自己注册的，不 import 就不在注册表里，会被本脚本漏掉。
 load_config_policies()
 
 _INITIAL_VERSION = 1

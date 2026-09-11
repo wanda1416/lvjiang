@@ -336,6 +336,7 @@ def _compile_v2(
         reference["dps"] / reference["graduation_rate"]
     )
     return {
+        "content_version": 1,
         "schema_version": 2,
         "school": school,
         "source": workbook_model["model"]["source"],

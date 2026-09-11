@@ -175,6 +175,8 @@ class GameConfigManager:
         self._level_configs: list[LevelConfig] = []
         # 扫描装备转律后的默认冷却天数（顶层 basic_config）
         self._equipment_cooldown_days = 5
+        # 冷却到期后是否保留一次逾期进度（顶层 basic_config）
+        self._equipment_cooldown_carryover = True
         # 赛季配置：赛季编号 → SeasonConfig（顶层 season_configs）
         self._season_configs: list[SeasonConfig] = []
         # 基础属性名（从 _attr 字段收集：外功攻击/气血最大值/...）
@@ -233,6 +235,13 @@ class GameConfigManager:
             if isinstance(cooldown_days, int) and not isinstance(cooldown_days, bool)
             and 1 <= cooldown_days <= 365
             else 5
+        )
+        cooldown_carryover = raw_basic.get(
+            "equipment_cooldown_carryover", True)
+        self._equipment_cooldown_carryover = (
+            cooldown_carryover
+            if isinstance(cooldown_carryover, bool)
+            else True
         )
 
         # ── weapon_types（支持 dict 列表格式：[{name, wuxue_affix}, ...]）──
@@ -918,6 +927,10 @@ class GameConfigManager:
     def get_equipment_cooldown_days(self) -> int:
         """扫描装备转律后重新计算的冷却天数，缺省为 5 天。"""
         return self._equipment_cooldown_days
+
+    def is_equipment_cooldown_carryover_enabled(self) -> bool:
+        """冷却到期后是否向下一轮结转逾期进度，缺省开启。"""
+        return self._equipment_cooldown_carryover
 
     def level_config_for(self, level: int) -> LevelConfig | None:
         """按等级查找配置条目（精确匹配），未找到返回 None"""

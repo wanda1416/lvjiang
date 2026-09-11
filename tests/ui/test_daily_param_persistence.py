@@ -1,5 +1,6 @@
 """日常页参数修改与批量任务共享配置的回归测试。"""
 
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -13,10 +14,17 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.core.config.session import reset_session_store
 from lvjiang.core.config.wf_configs import get_wf_config
+from lvjiang.core.user_config import UserConfigManager, get_user_workflow_params
+from lvjiang.ui.execution_user_selector import ExecutionUserSelector
+from lvjiang.ui.main.run_control import RunControlMixin
 from lvjiang.ui.main.ui_state import UiStateMixin
 
 
 class _DailyHarness(QWidget, UiStateMixin):
+    user_changed = pyqtSignal(str)
+    _collect_flow_params = RunControlMixin._collect_flow_params
+    _on_user_changed = RunControlMixin._on_user_changed
+
     def __init__(self, config):
         super().__init__()
         self._workflow_configs = [config]
@@ -24,6 +32,10 @@ class _DailyHarness(QWidget, UiStateMixin):
         self._param_panel = QWidget(self)
         self._param_layout = QFormLayout(self._param_panel)
         self._workflow_note_label = QLabel(self)
+        self._independent_params_checkbox = QCheckBox(self)
+        self._independent_params_checkbox.setObjectName("user_independent_params")
+        self._independent_params_checkbox.toggled.connect(
+            self._on_independent_params_toggled)
 
     def _get_selected_flow_config(self):
         return self._workflow_configs[0]
@@ -33,6 +45,25 @@ def test_daily_parameter_changes_are_persisted_immediately(qtbot, tmp_path, monk
     import lvjiang.constants as constants_mod
 
     monkeypatch.setattr(constants_mod, "SESSION_PATH", tmp_path / "session.json")
+    reset_session_store()
+    config = {
+        "id": "redeem_code", "scope": "daily",
+        "parameters": [{
+            "name": "code", "type": "text", "multiline": True,
+            "default": "", "placeholder": "每行一个兑换码",
+        }],
+    }
+    panel = _DailyHarness(config)
+    qtbot.addWidget(panel)
+    panel._rebuild_param_panel()
+    edit = panel._param_panel.findChild(QPlainTextEdit, "code")
+    assert edit.placeholderText() == "每行一个兑换码"
+    value = "ABC\n\n DEF "
+    edit.setPlainText(value)
+    assert get_wf_config("redeem_code") == {"code": value}
+    assert RunControlMixin._collect_flow_params(panel) == {"code": value}
+    panel._rebuild_param_panel()
+    assert panel._param_panel.findChild(QPlainTextEdit, "code").toPlainText() == value
     reset_session_store()
     config = {
         "id": "daily_task",
@@ -141,23 +172,93 @@ def test_multiline_parameter_persists_collects_and_restores(qtbot, tmp_path, mon
 
     monkeypatch.setattr(constants_mod, "SESSION_PATH", tmp_path / "session.json")
     reset_session_store()
-    config = {
-        "id": "redeem_code", "scope": "daily",
-        "parameters": [{
-            "name": "code", "type": "text", "multiline": True,
-            "default": "", "placeholder": "每行一个兑换码",
-        }],
-    }
-    panel = _DailyHarness(config)
+
+
+def test_daily_user_override_is_saved_separately(qtbot, tmp_path, monkeypatch):
+    import lvjiang.constants as constants_mod
+
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", tmp_path / "session.json")
+    monkeypatch.setattr(constants_mod, "USERS_DIR", tmp_path / "users")
+    reset_session_store()
+    panel = _DailyHarness({
+        "id": "daily_task", "scope": "daily",
+        "parameters": [{"name": "count", "type": "number", "default": 1}],
+    })
+    panel._user_manager = UserConfigManager()
+    panel._daily_execution_user_selector = ExecutionUserSelector(panel._user_manager)
     qtbot.addWidget(panel)
+    qtbot.addWidget(panel._daily_execution_user_selector)
     panel._rebuild_param_panel()
-    edit = panel._param_panel.findChild(QPlainTextEdit, "code")
-    assert edit.placeholderText() == "每行一个兑换码"
-    value = "ABC\n\n DEF "
-    edit.setPlainText(value)
-    assert get_wf_config("redeem_code") == {"code": value}
-    from lvjiang.ui.main.run_control import RunControlMixin
-    assert RunControlMixin._collect_flow_params(panel) == {"code": value}
+
+    panel._independent_params_checkbox.setChecked(True)
+    panel._param_panel.findChild(QSpinBox, "count").setValue(9)
+
+    username = panel._user_manager.get_active_user_name()
+    assert get_user_workflow_params(
+        username, "daily_task", tmp_path / "users") == {"count": "9"}
+    assert get_wf_config("daily_task") == {}
+    reset_session_store()
+
+
+def test_follow_current_user_reloads_parameter_context(qtbot, tmp_path, monkeypatch):
+    import lvjiang.constants as constants_mod
+
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", tmp_path / "session.json")
+    monkeypatch.setattr(constants_mod, "USERS_DIR", tmp_path / "users")
+    reset_session_store()
+    panel = _DailyHarness({
+        "id": "follow_user_task", "scope": "daily",
+        "parameters": [{"name": "count", "type": "number", "default": 1}],
+    })
+    panel._user_manager = UserConfigManager()
+    first_user = panel._user_manager.get_active_user_name()
+    assert panel._user_manager.create_user("bob")
+    panel._daily_execution_user_selector = ExecutionUserSelector(panel._user_manager)
+    panel.user_combo = QComboBox(panel)
+    panel.user_combo.addItems(panel._user_manager.list_users())
+    panel.user_combo.currentIndexChanged.connect(panel._on_user_changed)
+    qtbot.addWidget(panel)
+    qtbot.addWidget(panel._daily_execution_user_selector)
     panel._rebuild_param_panel()
-    assert panel._param_panel.findChild(QPlainTextEdit, "code").toPlainText() == value
+
+    panel._independent_params_checkbox.setChecked(True)
+    panel._param_panel.findChild(QSpinBox, "count").setValue(7)
+    panel.user_combo.setCurrentText("bob")
+
+    assert panel._displayed_param_username == "bob"
+    assert panel._param_panel.findChild(QSpinBox, "count").value() == 1
+    assert get_user_workflow_params(
+        first_user, "follow_user_task", tmp_path / "users") == {"count": "7"}
+    reset_session_store()
+
+
+def test_deleted_override_user_is_not_written_during_refresh(
+    qtbot, tmp_path, monkeypatch,
+):
+    import lvjiang.constants as constants_mod
+
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", tmp_path / "session.json")
+    monkeypatch.setattr(constants_mod, "USERS_DIR", tmp_path / "users")
+    reset_session_store()
+    panel = _DailyHarness({
+        "id": "deleted_user_task", "scope": "daily",
+        "parameters": [{"name": "count", "type": "number", "default": 1}],
+    })
+    panel._user_manager = UserConfigManager()
+    deleted_user = panel._user_manager.get_active_user_name()
+    assert panel._user_manager.create_user("bob")
+    panel._daily_execution_user_selector = ExecutionUserSelector(panel._user_manager)
+    qtbot.addWidget(panel)
+    qtbot.addWidget(panel._daily_execution_user_selector)
+    panel._rebuild_param_panel()
+    panel._independent_params_checkbox.setChecked(True)
+    panel._param_panel.findChild(QSpinBox, "count").setValue(7)
+
+    assert panel._user_manager.delete_user(deleted_user)
+    panel._daily_execution_user_selector.refresh_users()
+    panel._on_daily_execution_user_changed(
+        panel._daily_execution_user_selector.resolve_username())
+
+    assert panel._displayed_param_username == "bob"
+    assert not (tmp_path / "users" / f"{deleted_user}.json").exists()
     reset_session_store()

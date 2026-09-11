@@ -3,7 +3,7 @@ key: game_login_page
 name: 登录
 views:
 - key: base
-  name: 基底
+  name: 登录主页
 - key: accounts
   name: 切换账号
   same_layer: false
@@ -22,6 +22,10 @@ views:
 - key: exit
   name: 退出登录
   same_layer: false
+- key: init
+  name: 启动页面
+  kind: page
+  owner: /base
 regions:
 - key: more_user
   name: 更多用户
@@ -114,6 +118,14 @@ regions:
   is_text: true
   is_clickable: false
   view: loading
+- key: back
+  name: 返回
+  type: func
+  is_text: false
+  is_clickable: true
+  view: init
+  to: /base
+  navigation: replace
 points:
 - key: point_1
   name: 点1

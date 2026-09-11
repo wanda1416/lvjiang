@@ -14,6 +14,19 @@
       "y_ratio": 0.0642592310007404,
       "w_ratio": 0.06276284319633807,
       "h_ratio": 0.14504025182570707
+    },
+    {
+      "key": "finish_logo",
+      "x_ratio": 0.0,
+      "y_ratio": 0.0,
+      "w_ratio": 0.07183990267866751,
+      "h_ratio": 0.151562408340288,
+      "template": {
+        "name": "默认布局/jianghu_card/finish_logo",
+        "min_score": 0.8,
+        "record_w": 766,
+        "record_h": 319
+      }
     }
   ],
   "crop_canvas": {

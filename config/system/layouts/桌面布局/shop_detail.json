@@ -1,0 +1,33 @@
+{
+  "content_version": 1,
+  "regions": [
+    {
+      "key": "jingxuan",
+      "x_ratio": 0.1941472146689067,
+      "y_ratio": 0.022483701791734065,
+      "w_ratio": 0.05577758124089524,
+      "h_ratio": 0.06991425163377188
+    },
+    {
+      "key": "back",
+      "x_ratio": 0.942563524422555,
+      "y_ratio": 0.04522246376487135,
+      "w_ratio": 0.028223456107893008,
+      "h_ratio": 0.04096952090450104
+    }
+  ],
+  "panels": [
+    {
+      "key": "items",
+      "x_ratio": 0.10063320912042502,
+      "y_ratio": 0.19641166980401514,
+      "w_ratio": 0.8528019388282171,
+      "h_ratio": 0.6796061306800327,
+      "cols": 5,
+      "rows": 1,
+      "min_visible": 0.95,
+      "calibration": "even",
+      "scroll_direction": "none"
+    }
+  ]
+}

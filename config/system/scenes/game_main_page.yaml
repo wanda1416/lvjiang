@@ -159,6 +159,13 @@ regions:
   is_clickable: true
   to: bag_detail
   navigation: open
+- key: settings
+  name: 设置
+  type: func
+  is_text: false
+  is_clickable: true
+  to: game_settings
+  navigation: open
 points:
 - key: origin
   name: 起点

@@ -3,7 +3,7 @@
   "regions": [
     {
       "key": "confirm",
-      "x_ratio": 0.4974629579183558,
+      "x_ratio": 0.49588090577766525,
       "y_ratio": 0.5646918449172396,
       "w_ratio": 0.07676308191604947,
       "h_ratio": 0.03296885581778353,
@@ -11,18 +11,15 @@
     },
     {
       "key": "cancel",
-      "x_ratio": 0.43164394594492084,
+      "x_ratio": 0.4191178238616158,
       "y_ratio": 0.5646918449172396,
-      "w_ratio": 0.062266475660102905,
+      "w_ratio": 0.07676308191604947,
       "h_ratio": 0.03296885581778353,
       "activation_key": "ESC"
     },
     {
       "key": "close_item",
-      "x_ratio": 0.752566729186992,
-      "y_ratio": 0.24409822592041572,
-      "w_ratio": 0.029102356558401654,
-      "h_ratio": 0.06035727169596469
+      "disabled": true
     },
     {
       "key": "blank_area",
@@ -40,12 +37,18 @@
       "h_ratio": 1.0
     },
     {
-      "key": "open_settings",
-      "activation_key": "/",
-      "x_ratio": 0.0,
-      "y_ratio": 0.0,
-      "w_ratio": 0.0,
-      "h_ratio": 0.0
+      "key": "back",
+      "x_ratio": 0.950467420454789,
+      "y_ratio": 0.03535202173679893,
+      "w_ratio": 0.029003695861105072,
+      "h_ratio": 0.03998099791879769,
+      "activation_key": "ESC",
+      "template": {
+        "name": "桌面布局/general_control/back",
+        "min_score": 0.6,
+        "record_w": 1936,
+        "record_h": 1088
+      }
     }
   ],
   "points": [

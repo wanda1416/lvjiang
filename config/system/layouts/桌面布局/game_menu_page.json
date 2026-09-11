@@ -2,14 +2,6 @@
   "content_version": 1,
   "regions": [
     {
-      "key": "back",
-      "x_ratio": 0.9515547201258024,
-      "y_ratio": 0.03525295454395456,
-      "w_ratio": 0.024071233996879937,
-      "h_ratio": 0.04761525643083102,
-      "activation_key": "ESC"
-    },
-    {
       "key": "yanji",
       "x_ratio": 0.9559106190547417,
       "y_ratio": 0.15448144761580748,

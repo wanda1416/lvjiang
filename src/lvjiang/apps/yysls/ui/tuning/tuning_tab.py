@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style, fit_button_width
 from .....ui.execution_user_selector import ExecutionUserSelector
+from .....ui.hotkeys import hotkey_label
 from .....ui.main.run_control import STATE_PLAN_UNSUPPORTED
 from ...config.auto_tuning_config import (
     load_user_auto_tuning_config,
@@ -108,7 +109,8 @@ class TuningTab(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
-        self.btn_run_tuning = QPushButton(f"{tr('开始调律')} ({self._host._user_config.hotkeys.start})")
+        self.btn_run_tuning = QPushButton(hotkey_label(
+            tr("开始调律"), self._host._user_config.hotkeys.start))
         self.btn_run_tuning.clicked.connect(self.f9_run)
         self.btn_run_tuning.setStyleSheet(_STYLE_BTN_RUN)
         btn_layout.addWidget(self.btn_run_tuning)
@@ -403,7 +405,7 @@ class TuningTab(QWidget):
     def _on_automation_state(self, state: str):
         hk = self._host._user_config.hotkeys
         if state in ("running", "paused"):
-            self.btn_run_tuning.setText(f"{tr('结束')} ({hk.stop})")
+            self.btn_run_tuning.setText(hotkey_label(tr("结束"), hk.stop))
             self.btn_run_tuning.setStyleSheet(_STYLE_BTN_STOP)
         elif state == "not_ready":
             self.btn_run_tuning.setText(tr("未就绪"))
@@ -413,7 +415,7 @@ class TuningTab(QWidget):
             self.btn_run_tuning.setText(tr("方案不支持"))
             self.btn_run_tuning.setStyleSheet(_STYLE_BTN_DISABLED)
         else:
-            self.btn_run_tuning.setText(f"{tr('开始调律')} ({hk.start})")
+            self.btn_run_tuning.setText(hotkey_label(tr("开始调律"), hk.start))
             self.btn_run_tuning.setStyleSheet(_STYLE_BTN_RUN)
             # 工作流结束：通知调律进度 Tab 标记完成
             engine = getattr(self._host, '_current_engine', None)
@@ -423,11 +425,11 @@ class TuningTab(QWidget):
                     widget.mark_done()
         # 刷新暂停/恢复按钮
         if state == "running":
-            self.btn_pause_resume.setText(f"{tr('暂停')} ({hk.pause})")
+            self.btn_pause_resume.setText(hotkey_label(tr("暂停"), hk.pause))
             self.btn_pause_resume.setEnabled(True)
             self.btn_pause_resume.setStyleSheet(_STYLE_BTN_PAUSE)
         elif state == "paused":
-            self.btn_pause_resume.setText(f"{tr('恢复')} ({hk.pause})")
+            self.btn_pause_resume.setText(hotkey_label(tr("恢复"), hk.pause))
             self.btn_pause_resume.setEnabled(True)
             self.btn_pause_resume.setStyleSheet(_STYLE_BTN_RUN)
         else:

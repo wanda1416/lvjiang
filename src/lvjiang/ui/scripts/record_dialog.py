@@ -77,6 +77,9 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         """对话框打开后才注册系统全局录制热键。"""
         if self._f12_hotkey_listener is not None:
             return
+        from ...core.access import is_readonly
+        if is_readonly():
+            return
         from ...core.platforms import hotkey_pynput_token, start_global_hotkeys
         try:
             self._f12_hotkey_listener = start_global_hotkeys({
@@ -109,6 +112,10 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         super().done(result)
 
     def keyPressEvent(self, event):  # type: ignore[override]
+        from ...core.access import is_readonly
+        if is_readonly():
+            super().keyPressEvent(event)
+            return
         if event.key() == getattr(Qt.Key, f"Key_{self._record_key}", None):
             # 全局 listener 已激活时，Qt 也可能收到同一次按键；
             # 只保留一个切换入口，避免开始后立即又停止。
@@ -125,7 +132,12 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         record_key = self._record_key
 
         btn_row = QHBoxLayout()
-        self.btn_record = QPushButton(f"{tr('● 录制脚本')} ({record_key})")
+        from ...core.access import is_readonly
+        hotkeys_enabled = not is_readonly()
+        record_label = tr("● 录制脚本")
+        if hotkeys_enabled:
+            record_label = f"{record_label} ({record_key})"
+        self.btn_record = QPushButton(record_label)
         self.btn_record.setStyleSheet(_STYLE_IDLE)
         self.btn_record.clicked.connect(self.toggle_recording)
         btn_row.addWidget(self.btn_record)
@@ -170,7 +182,10 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         mode_row.addStretch()
         layout.addLayout(mode_row)
 
-        self.lbl_status = QLabel(f"{tr('待机 | 点击「录制脚本」或按')} {record_key} {tr('开始')}")
+        idle_text = tr("待机 | 点击「录制脚本」")
+        if hotkeys_enabled:
+            idle_text = f"{tr('待机 | 点击「录制脚本」或按')} {record_key} {tr('开始')}"
+        self.lbl_status = QLabel(idle_text)
         self.lbl_status.setStyleSheet("color: palette(mid);")
         layout.addWidget(self.lbl_status)
 
@@ -179,10 +194,12 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         self.text_edit = QTextEdit()
         self.text_edit.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;")
-        self.text_edit.setPlaceholderText(
-            tr("录制结果将显示在这里（画布归一化坐标，可保存为 .wf）\n"
-               "低精度生成可编辑指令；高精度保存原始输入轨迹，") +
-            f"{reserved} {tr('不会被录制')}")
+        placeholder = tr(
+            "录制结果将显示在这里（画布归一化坐标，可保存为 .wf）\n"
+            "低精度生成可编辑指令；高精度保存原始输入轨迹")
+        if hotkeys_enabled:
+            placeholder += f"，{reserved} {tr('不会被录制')}"
+        self.text_edit.setPlaceholderText(placeholder)
         self.text_edit.textChanged.connect(self._on_text_changed)
         layout.addWidget(self.text_edit)
 
@@ -235,6 +252,7 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             w["left"], w["top"], w["width"], w["height"])
         from ...core.macro_recorder import MacroRecorder
         hk = main._user_config.hotkeys
+        from ...core.access import is_readonly
         try:
             self._recorder = MacroRecorder(
                 target_window=w, capture=main._capture, layout=layout,
@@ -251,11 +269,12 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             logger.error(f"录制启动失败: {e}")
             return
         if self.precision == "high":
-            self.lbl_status.setText(
-                f"{tr('高精度录制中…原始输入写入统一时间线，')}{hk.record} {tr('或点击停止')}")
+            status = tr("高精度录制中…原始输入写入统一时间线")
         else:
-            self.lbl_status.setText(
-                f"{tr('低精度录制中…连续移动将合并，')}{hk.record} {tr('或点击停止')}")
+            status = tr("低精度录制中…连续移动将合并")
+        if not is_readonly():
+            status += f"，{hk.record} {tr('或点击停止')}"
+        self.lbl_status.setText(status)
         self._refresh_buttons()
 
     def _stop_recording(self):
@@ -286,12 +305,15 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         recording = self.is_recording
         has_text = bool(self.text_edit.toPlainText().strip())
         record_key = self._record_key
+        from ...core.access import is_readonly
         if recording:
-            self.btn_record.setText(f"{tr('■ 停止录制')} ({record_key})")
+            label = tr("■ 停止录制")
             self.btn_record.setStyleSheet(_STYLE_RECORDING)
         else:
-            self.btn_record.setText(f"{tr('● 录制脚本')} ({record_key})")
+            label = tr("● 录制脚本")
             self.btn_record.setStyleSheet(_STYLE_IDLE)
+        self.btn_record.setText(
+            label if is_readonly() else f"{label} ({record_key})")
         self.btn_record.setEnabled(not self._main._running)
         self.btn_save.setEnabled(not recording and has_text)
         self.btn_copy.setEnabled(

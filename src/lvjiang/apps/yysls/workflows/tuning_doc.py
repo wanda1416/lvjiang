@@ -159,9 +159,13 @@ class TuningDocWriter:
         """运行结束：结束时间、正常/中断、实际调律件数与总轮数"""
         now = datetime.now().strftime("%H:%M:%S")
         if interrupted:
-            from ....core.config import load_user_config
-            stop_key = load_user_config().hotkeys.stop
-            state = f"{tr('用户中断')}（{stop_key}）"
+            from ....core.access import is_readonly
+            if is_readonly():
+                state = tr("用户中断")
+            else:
+                from ....core.config import load_user_config
+                stop_key = load_user_config().hotkeys.stop
+                state = f"{tr('用户中断')}（{stop_key}）"
         else:
             state = tr("正常完成")
         self._write()

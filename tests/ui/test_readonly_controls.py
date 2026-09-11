@@ -1,6 +1,10 @@
-"""Readonly UI restrictions are confined to the scene-manager entry."""
+"""只读实例仅限制场景管理入口和系统级全局热键。"""
+
+from types import SimpleNamespace
 
 import pytest
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QComboBox, QMainWindow
 
 from lvjiang.core import access
@@ -30,8 +34,71 @@ def test_scene_manager_action_keeps_f3_and_follows_instance_access(
     host._setup_menu()
     action = next(action for action in host.menuBar().actions()[0].menu().actions()
                   if action.text() == "场景管理")
-    assert action.shortcut().toString() == "F3"
+    assert action.shortcut().toString() == ("" if is_readonly else "F3")
     assert action.isEnabled() is not is_readonly
+
+    shortcuts = [
+        action.shortcut().toString()
+        for action in host.menuBar().findChildren(type(action))
+    ]
+    if is_readonly:
+        assert not any(shortcuts)
+
+
+def test_readonly_hotkey_labels_hide_key_names(readonly):
+    from lvjiang.ui.main.window import MainWindow
+
+    assert MainWindow._hotkey_label("结束", "F10") == "结束"
+    assert MainWindow._hotkey_status(
+        "运行中", ("F10", "结束"), ("F11", "暂停")) == "运行中"
+
+
+def test_readonly_main_window_ignores_application_hotkeys(qtbot, readonly):
+    from lvjiang.core.config import HotkeyConfig
+    from lvjiang.ui.main.window import MainWindow
+
+    class Host(MainWindow):
+        def __init__(self):
+            QMainWindow.__init__(self)
+            self._user_config = SimpleNamespace(hotkeys=HotkeyConfig())
+            self._hotkey_listener = None
+            self.calls = []
+
+        def _request_stop(self, *args, **kwargs):
+            self.calls.append("stop")
+
+    host = Host()
+    qtbot.addWidget(host)
+    event = QKeyEvent(
+        QEvent.Type.KeyPress, Qt.Key.Key_F10,
+        Qt.KeyboardModifier.NoModifier)
+    host.keyPressEvent(event)
+    assert host.calls == []
+
+
+def test_readonly_record_dialog_ignores_application_hotkey(qtbot, readonly):
+    from lvjiang.core.config import HotkeyConfig
+    from lvjiang.ui.scripts.record_dialog import ScriptRecordDialog
+
+    class Dialog(ScriptRecordDialog):
+        def __init__(self):
+            from PyQt6.QtWidgets import QDialog
+            QDialog.__init__(self)
+            self._main = SimpleNamespace(
+                _user_config=SimpleNamespace(hotkeys=HotkeyConfig()))
+            self._f12_hotkey_listener = None
+            self.calls = []
+
+        def toggle_recording(self):
+            self.calls.append("record")
+
+    dialog = Dialog()
+    qtbot.addWidget(dialog)
+    event = QKeyEvent(
+        QEvent.Type.KeyPress, Qt.Key.Key_F12,
+        Qt.KeyboardModifier.NoModifier)
+    dialog.keyPressEvent(event)
+    assert dialog.calls == []
 
 
 def test_script_editor_write_controls_are_not_instance_disabled(
@@ -48,6 +115,45 @@ def test_script_editor_write_controls_are_not_instance_disabled(
     for button in (widget.btn_new, widget.btn_save, widget.btn_save_as, widget.btn_delete):
         button.setEnabled(True)
         assert button.isEnabled()
+
+
+def test_readonly_instance_does_not_start_main_global_hotkeys(
+        readonly, monkeypatch):
+    from lvjiang.core import platforms
+    from lvjiang.ui.main.window import MainWindow
+
+    calls = []
+    monkeypatch.setattr(
+        platforms, "start_global_hotkeys", lambda bindings: calls.append(bindings))
+    host = SimpleNamespace(_main_global_hotkey_bindings=lambda: {"<f9>": object()})
+
+    assert MainWindow._start_main_global_hotkeys(host) is None
+    assert calls == []
+
+
+def test_global_hotkey_factory_rejects_readonly_instance(readonly):
+    from lvjiang.core.platforms import start_global_hotkeys
+
+    assert start_global_hotkeys({"<f9>": lambda: None}) is None
+
+
+def test_readonly_record_dialog_does_not_start_global_hotkey(
+        readonly, monkeypatch):
+    from lvjiang.core import platforms
+    from lvjiang.ui.scripts.record_dialog import ScriptRecordDialog
+
+    calls = []
+    monkeypatch.setattr(
+        platforms, "start_global_hotkeys", lambda bindings: calls.append(bindings))
+    dialog = SimpleNamespace(
+        _f12_hotkey_listener=None,
+        _record_key="F12",
+        f12_pressed=SimpleNamespace(emit=lambda: None),
+    )
+
+    ScriptRecordDialog._start_f12_hotkey(dialog)
+    assert dialog._f12_hotkey_listener is None
+    assert calls == []
 
 
 def test_attribute_source_editors_are_not_instance_disabled(

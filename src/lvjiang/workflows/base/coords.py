@@ -7,7 +7,7 @@
 import math
 import random
 
-from ...core.layout_models import Point, Region
+from ...core.layout_models import Point, Region, effective_click_rect
 from ...i18n import tr
 
 
@@ -22,7 +22,11 @@ class _CoordMixin:
         return size
 
     def _region_to_screen(self, region: Region, jitter: bool = True) -> tuple[int, int]:
-        """区域坐标 → 屏幕坐标"""
+        """区域坐标 → 屏幕坐标（落点取自区域的 click_rect，见 effective_click_rect）
+
+        jitter 只决定「框内随机取点」还是「取框中心」；点在区域的哪一块由
+        click_rect 决定。两者正交，不再像旧实现那样挤在一个开关里。
+        """
         w, h = self._capture_size()
         canvas = self._layout.get_canvas()
 
@@ -31,16 +35,21 @@ class _CoordMixin:
         canvas_w = canvas.w_ratio * w
         canvas_h = canvas.h_ratio * h
 
-        cx = canvas_x + (region.x_ratio + region.w_ratio / 2) * canvas_w
-        cy = canvas_y + (region.y_ratio + region.h_ratio / 2) * canvas_h
+        rx, ry, rw, rh = effective_click_rect(
+            region, self._input_sim.region_jitter_ratio)
+        # 相对区域 → 画布归一化
+        x0 = region.x_ratio + rx * region.w_ratio
+        y0 = region.y_ratio + ry * region.h_ratio
+        bw = rw * region.w_ratio
+        bh = rh * region.h_ratio
 
         if jitter:
-            jitter_ratio = self._input_sim.region_jitter_ratio
-            region_w = region.w_ratio * canvas_w
-            region_h = region.h_ratio * canvas_h
-            cx += region_w * random.uniform(-jitter_ratio, jitter_ratio)
-            cy += region_h * random.uniform(-jitter_ratio, jitter_ratio)
+            fx, fy = random.uniform(0, bw), random.uniform(0, bh)
+        else:
+            fx, fy = bw / 2, bh / 2
 
+        cx = canvas_x + (x0 + fx) * canvas_w
+        cy = canvas_y + (y0 + fy) * canvas_h
         return int(self._window_left + cx), int(self._window_top + cy)
 
     def _point_to_screen(self, point: Point) -> tuple[int, int]:

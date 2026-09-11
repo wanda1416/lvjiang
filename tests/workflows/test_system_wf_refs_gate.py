@@ -64,6 +64,7 @@ def _validator(layout_name: str) -> WorkflowEngine:
         layout=layout,
         input_sim=user_config.input_sim,
         delay_params=user_config.delay_params,
+        run_env="desktop" if layout_name == "桌面布局" else "android",
         window_left=0, window_top=0,
     )
     _VALIDATOR_CACHE[layout_name] = engine

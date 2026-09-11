@@ -29,6 +29,7 @@ from ..button_styles import (
     apply_dialog_button_box_style,
     fit_button_width,
 )
+from ..reference.combo_sizing import set_combo_minimum_character_capacity
 
 _RE_VIEW_KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -80,7 +81,7 @@ class ViewManagerDialog(QDialog):
         relation_row = QHBoxLayout()
         self._relation = QComboBox()
         for label, key in [("独立页面", "page"), ("同页取景", "viewport"),
-                           ("TAB 内容", "tab"), ("弹层", "modal")]:
+                           ("页内标签", "tab"), ("浮层窗口", "modal")]:
             self._relation.addItem(tr(label), key)
         self._owner = QComboBox()
         self._owner.addItem(tr("无关联视图"), "")
@@ -88,12 +89,16 @@ class ViewManagerDialog(QDialog):
             for view in scene.views:
                 self._owner.addItem(f"{scene.name} / {view.name}",
                                     f"/{view.key}" if sk == self._scene_key else f"{sk}/{view.key}")
-        save_relation = QPushButton(tr("保存关系"))
-        save_relation.clicked.connect(self._save_relation)
+        self._btn_save_relation = QPushButton(tr("保存关系"))
+        self._btn_save_relation.clicked.connect(self._save_relation)
+        apply_button_style(self._btn_save_relation)
         relation_row.addWidget(self._relation)
         relation_row.addWidget(self._owner, 1)
-        relation_row.addWidget(save_relation)
+        relation_row.addWidget(self._btn_save_relation)
         layout.addLayout(relation_row)
+        # 加入对话框后再按最终字体和样式测量，保证本体及弹出列表均能
+        # 完整展示四个汉字。
+        set_combo_minimum_character_capacity(self._relation, 4)
 
         # 页面切换契约：选中视图由哪些按钮进入、又能转向哪里。
         # 只读展示——契约是逐步补全的声明，不驱动执行。

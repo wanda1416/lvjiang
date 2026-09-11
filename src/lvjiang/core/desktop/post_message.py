@@ -56,7 +56,8 @@ class PostMessageInput(InputBackend):
     # ─── 点击 ─────────────────────────────────────────────────
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
-                     *, pre_delay=None, post_delay=None, button: str = "left"):
+                     *, pre_delay=None, post_delay=None, button: str = "left",
+                     random_offset: bool = True):
         """后台点击：PostMessage 向目标窗口发送鼠标事件，不移动光标
 
         当前只实现了左键投递（postmessage_click 底层硬编码
@@ -68,8 +69,9 @@ class PostMessageInput(InputBackend):
         if button != "left":
             logger.warning(f"PostMessage 模式暂不支持 {button} 键，按左键处理")
 
-        offset_x = random.randint(-self.click_random_offset, self.click_random_offset)
-        offset_y = random.randint(-self.click_random_offset, self.click_random_offset)
+        radius = self.click_random_offset if random_offset else 0
+        offset_x = random.randint(-radius, radius)
+        offset_y = random.randint(-radius, radius)
         sx, sy = screen_x + offset_x, screen_y + offset_y
 
         _pre = pre_delay if pre_delay is not None else self.before_click_wait

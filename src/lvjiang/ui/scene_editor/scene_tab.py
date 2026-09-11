@@ -26,6 +26,7 @@ from ...core.layout_models import (
     Panel,
     Point,
     Region,
+    TemplateBinding,
 )
 from ...core.scene_registry import (
     get_registry,
@@ -72,7 +73,11 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         # 切换/关闭选择 Discard 时控件随 Tab 状态一起丢弃。
         self._pending_scene_version: int | None = None
         self._pending_layout_version: int | None = None
+        # 模板图片在用户保存布局前只驻留内存，关闭/切换布局不会留下孤儿文件。
+        self._pending_templates: dict[str, tuple[np.ndarray, int, int]] = {}
+        self._pending_template_deletes: set[str] = set()
         self.on_version_pending_changed: Callable[[str], None] | None = None
+        self.on_click_rect_mode_changed: Callable[[bool], None] | None = None
 
         self._splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -120,6 +125,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self._canvas.on_subscene_ref_changed = self._on_subscene_ref_changed
         # 选中态变化只刷新列表高亮，不走 dialog 的 dirty 链路
         self._canvas.on_selection_changed = self._on_selection_changed
+        self._canvas.on_template_crop_ready = self._on_template_crop_ready
 
     # ─── 面板构建 ────────────────────────────────────────
 
@@ -235,9 +241,109 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         """由 dialog 在应用布局时注入——布局坐标文件的来源要按布局名解析"""
         if layout_name != self._layout_name:
             self._pending_layout_version = None
+            self._pending_templates.clear()
+            self._pending_template_deletes.clear()
         self._layout_name = layout_name
         self._layout_rel_path = rel_path or ""
         self._refresh_version_info()
+
+    def _template_name(self, region_key: str) -> str:
+        """生成根布局/场景/Region 的稳定模板逻辑名。"""
+        parts = self._layout_rel_path.replace("\\", "/").split("/")
+        storage_layout = parts[1] if len(parts) >= 3 else self._layout_name
+        return f"{storage_layout}/{self._scene_key}/{region_key}"
+
+    def _on_template_crop_ready(
+        self, region_key: str, image: np.ndarray, record_w: int, record_h: int,
+    ) -> None:
+        from ...core.recognizers.template_locator import validate_template_image
+        try:
+            validate_template_image(image)
+        except ValueError as exc:
+            self._canvas._notify_status(str(exc))
+            return
+        name = self._template_name(region_key)
+        binding = TemplateBinding(
+            name, self._template_score.value(), record_w, record_h)
+        self._pending_templates[name] = (image.copy(), record_w, record_h)
+        self._pending_template_deletes.discard(name)
+        if self._canvas.set_selected_template(binding, force_changed=True):
+            self._refresh_template_controls()
+            self._canvas._notify_status(
+                tr("模板已截取并暂存；保存布局后写入配置"))
+            self.test_selected_template()
+
+    def discard_pending_template(self, name: str) -> None:
+        self._pending_templates.pop(name, None)
+
+    def is_template_write_pending(self, name: str) -> bool:
+        return name in self._pending_templates
+
+    def schedule_template_delete(self, name: str) -> None:
+        """随下次布局保存删除绑定对应的可写模板图片。"""
+        self._pending_templates.pop(name, None)
+        self._pending_template_deletes.add(name)
+
+    def write_pending_templates(self) -> None:
+        from ...core.recognizers.template_locator import write_template
+        for name, (image, _record_w, _record_h) in self._pending_templates.items():
+            write_template(name, image)
+
+    def clear_pending_templates(self) -> None:
+        self._pending_templates.clear()
+        self._pending_template_deletes.clear()
+
+    def clear_pending_template_writes(self) -> None:
+        self._pending_templates.clear()
+
+    def delete_pending_templates(self) -> None:
+        from ...core.recognizers.template_locator import delete_template
+        for name in tuple(self._pending_template_deletes):
+            delete_template(name)
+            self._pending_template_deletes.discard(name)
+
+    def test_selected_template(self) -> None:
+        """用当前截图测试选中 Region，显示实际最高分与阈值。"""
+        from ...core.recognizers.template_locator import (
+            get_template_store,
+            locate_in_region,
+            template_from_image,
+        )
+        region = self._canvas.selected_region()
+        frame = self._canvas._original_image
+        if region is None or region.template is None or frame is None:
+            self._canvas._notify_status(tr("请先选择已绑定模板且有截图的区域"))
+            return
+        binding = region.template
+        pending = self._pending_templates.get(binding.name)
+        try:
+            if pending is not None:
+                image, record_w, record_h = pending
+                template = template_from_image(
+                    binding.name, image, record_w, record_h)
+            else:
+                loaded = get_template_store().get(binding.name)
+                if loaded is None:
+                    raise ValueError(f"模板文件不存在: {binding.name}.png")
+                from ...core.recognizers.template_locator import with_record_size
+                template = with_record_size(
+                    loaded, binding.record_w, binding.record_h)
+            hit = locate_in_region(
+                frame, template, self._canvas.get_canvas_config(), region, 0.0)
+        except ValueError as exc:
+            self._canvas.show_template_test_result(False)
+            self._canvas._notify_status(str(exc))
+            return
+        score = hit.score if hit is not None else 0.0
+        passed = hit is not None and score >= binding.min_score
+        self._canvas.show_template_test_result(passed)
+        self._canvas._notify_status(
+            tr("模板测试：{state}，分数 {score:.3f}，阈值 {threshold:.2f}，缩放 {scale:.2f}")
+            .format(
+                state=tr("通过") if passed else tr("未通过"), score=score,
+                threshold=binding.min_score,
+                scale=hit.scale if hit is not None else 0.0,
+            ))
 
     def _configure_version_link(self, label: QLabel, kind: str) -> None:
         label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
@@ -463,6 +569,17 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
 
     def set_region_mode(self):
         self._canvas.set_region_mode()
+
+    def set_click_rect_mode(self):
+        self._canvas.set_click_rect_mode()
+
+    def set_click_rect_button_checked(self, checked: bool):
+        button = self._btn_click_rect_mode
+        button.blockSignals(True)
+        button.setChecked(checked)
+        button.setText(
+            tr("退出点击标定") if checked else tr("标定点击区域"))
+        button.blockSignals(False)
 
     # ─── 列表刷新 ────────────────────────────────────────
 

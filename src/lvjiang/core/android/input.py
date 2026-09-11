@@ -110,15 +110,17 @@ class AdbInput(InputBackend):
     # ─── 点击 ─────────────────────────────────────────────────
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
-                     *, pre_delay=None, post_delay=None, button: str = "left"):
+                     *, pre_delay=None, post_delay=None, button: str = "left",
+                     random_offset: bool = True):
         """点击设备坐标（带随机偏移 + before/after 延迟）
 
         触屏没有鼠标键概念，非 left 时按普通点击处理并记警告。
         """
         if button != "left":
             logger.warning(f"ADB 触屏输入不支持 {button} 键，按普通点击处理")
-        offset_x = random.randint(-self.click_random_offset, self.click_random_offset)
-        offset_y = random.randint(-self.click_random_offset, self.click_random_offset)
+        radius = self.click_random_offset if random_offset else 0
+        offset_x = random.randint(-radius, radius)
+        offset_y = random.randint(-radius, radius)
         sx = screen_x + offset_x
         sy = screen_y + offset_y
 

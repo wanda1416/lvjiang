@@ -57,7 +57,7 @@ class InputBackend(ABC):
     - before_click_wait / after_click_wait：点击前后延迟范围
     - mouse_move_duration：鼠标/触摸移动时长范围
     - click_random_offset：坐标随机偏移像素
-    - region_jitter_ratio：区域中心抖动比例
+    - region_jitter_ratio：未标定 Region 的默认点击范围半径比例
     """
 
     kind = InputBackendKind.UNKNOWN
@@ -77,7 +77,8 @@ class InputBackend(ABC):
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
                      *, pre_delay: tuple[float, float] | None = None,
                         post_delay: tuple[float, float] | None = None,
-                        button: str = "left"):
+                        button: str = "left",
+                        random_offset: bool = True):
         """点击指定坐标（带随机偏移 + before/after 延迟）
 
         Args:
@@ -85,6 +86,8 @@ class InputBackend(ABC):
             post_delay: 点击后延迟范围。None=使用默认 after_click_wait，(0,0)=不延迟。
             button: 鼠标键，left/right/middle/x1/x2。触屏类后端（ADB/设备端）
                 没有非左键的概念，非 left 时忽略该参数、按普通点击处理并记警告。
+            random_offset: 是否在坐标上叠加后端像素偏移。显式
+                click_rect 已经定义最终安全范围，调用时应关闭。
         """
 
     def mouse_button(self, button: str, pressed: bool) -> None:

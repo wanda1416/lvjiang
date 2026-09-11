@@ -102,15 +102,16 @@ references:
   is_clickable: true
   to: game_settings
   navigation: open
-  available_from: ["*"]
+  available_from: ["*"]        # 示例；当前系统配置中没有全局入口实例
 ```
 
 `available_from` 是场景 key 列表；空表示本地入口，`*` 表示全部一级场景。
 全局边以实际来源视图建立声明上下文，保留 `definition_scene` 以定位真正的控件定义。
 不为目标场景自身扩展入口，也不向子场景扩展。此处只描述页面范围，未建模输入焦点等运行时条件。
 
-按键与禁用状态仍属于布局：桌面 `general_control.open_settings` 绑定 `/`，默认布局禁用；
-桌面 `game_main_page.bag` 绑定 `B`，默认布局禁用。快捷键专用区域几何尺寸为零，不代表新增可点击位置。
+按键与禁用状态仍属于布局：桌面 `game_main_page.settings` 绑定 `/`、`game_main_page.bag` 绑定 `B`，
+默认布局两者都禁用。快捷键专用区域几何尺寸为零，不代表新增可点击位置——
+主页没有物理入口，设置的可点击入口只在 `game_menu_page.settings` 上。
 这些配置不会安装全局键盘监听器或改变现有工作流。
 
 静态关系查询未按布局过滤，展示的是各布局的关系合集；执行可用性仍以布局绑定和 `disabled` 为准。

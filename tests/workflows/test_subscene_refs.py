@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from lvjiang.core.layout_models import Region
+from lvjiang.core.layout_models import Region, SubsceneRef, TemplateBinding
 from lvjiang.workflows.engine import actions, data_ops
 from lvjiang.workflows.grammar import (
     Click,
@@ -9,6 +9,7 @@ from lvjiang.workflows.grammar import (
     SubsceneEntityRef,
     parse_text,
 )
+from lvjiang.workflows.runtime_layout import resolve_subscene_entity
 from lvjiang.workflows.static_check import check_refs
 from lvjiang.workflows.workflow_references import collect_refs
 
@@ -142,6 +143,30 @@ def test_move_and_scroll_subscene_targets_execute(monkeypatch):
         321, 654, "parent/card_2/label", duration=0.2)
     engine._input.scroll_screen.assert_called_once_with(
         321, 654, "down", 3, "parent/card_2/label", interval=None)
+
+
+def test_subscene_region_keeps_relative_click_rect(monkeypatch):
+    """父场景只变换 Region 外框；相对自身的点击框应原样保留。"""
+    monkeypatch.setattr(
+        "lvjiang.workflows.runtime_layout.resolve_subscene_target_scene",
+        lambda parent, reference: "child",
+    )
+    layout = MagicMock()
+    layout.get_scene_subscene_refs.return_value = [
+        SubsceneRef("card", 0.2, 0.3, 0.5, 0.4)
+    ]
+    layout.get_scene_regions.return_value = [
+        Region(
+            "label", 0.1, 0.2, 0.3, 0.4,
+            click_rect=(0.0, 0.0, 1.0, 0.5),
+            template=TemplateBinding("layout/child/label", 0.9),
+        )
+    ]
+
+    result = resolve_subscene_entity(layout, "parent", "card", "label")
+
+    assert result.click_rect == (0.0, 0.0, 1.0, 0.5)
+    assert result.template == TemplateBinding("layout/child/label", 0.9)
 
 
 def test_move_and_scroll_subscene_targets_are_statically_collected():

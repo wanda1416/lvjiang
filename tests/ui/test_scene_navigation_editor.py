@@ -1,7 +1,10 @@
 import pytest
+from PyQt6.QtCore import QRect
+from PyQt6.QtWidgets import QStyle, QStyleOptionComboBox
 
 from lvjiang.core.scene_definition import SceneRegistry
 from lvjiang.core.scene_definition_models import SceneDef, ViewDef
+from lvjiang.ui.button_styles import ACTION_BUTTON_STYLE
 
 pytestmark = pytest.mark.usefixtures('qapp')
 
@@ -60,3 +63,37 @@ def test_view_manager_saves_explicit_owner(monkeypatch):
     dialog._save_relation()
     assert registry.get_scene('test').views[1].relation == 'viewport'
     assert saved == ['test']
+
+
+def test_view_manager_relation_controls_are_readable_and_styled(monkeypatch):
+    from lvjiang.ui.scene_editor import scene_view_dialog
+
+    registry = SceneRegistry()
+    registry._scenes['test'] = SceneDef('test', '测试', views=[
+        ViewDef('base', '页面', kind='page')])
+    registry._order.append('test')
+    monkeypatch.setattr(scene_view_dialog, 'get_registry', lambda: registry)
+
+    dialog = scene_view_dialog.ViewManagerDialog('test')
+    combo = dialog._relation
+    assert [combo.itemText(i) for i in range(combo.count())] == [
+        '独立页面', '同页取景', '页内标签', '浮层窗口']
+
+    option = QStyleOptionComboBox()
+    option.initFrom(combo)
+    option.rect = QRect(0, 0, combo.minimumWidth(), combo.sizeHint().height())
+    content_rect = combo.style().subControlRect(
+        QStyle.ComplexControl.CC_ComboBox,
+        option,
+        QStyle.SubControl.SC_ComboBoxEditField,
+        combo,
+    )
+    widest_text = max(
+        combo.fontMetrics().horizontalAdvance(combo.itemText(i))
+        for i in range(combo.count())
+    )
+    assert content_rect.width() >= widest_text
+    popup = combo.view()
+    assert popup is not None
+    assert popup.minimumWidth() >= combo.minimumWidth() + 12
+    assert dialog._btn_save_relation.styleSheet() == ACTION_BUTTON_STYLE

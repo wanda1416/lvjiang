@@ -79,12 +79,14 @@ class SendInputInput(InputBackend):
     # ─── 点击 ─────────────────────────────────────────────────
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
-                     *, pre_delay=None, post_delay=None, button: str = "left"):
+                     *, pre_delay=None, post_delay=None, button: str = "left",
+                     random_offset: bool = True):
         """点击屏幕坐标（带鼠标移动时长 + 点击后延迟）"""
         self._activate_target()
         self._move_to(screen_x, screen_y)
         self._click(screen_x, screen_y, poi_name, pre_delay=pre_delay,
-                     post_delay=post_delay, button=button)
+                     post_delay=post_delay, button=button,
+                     random_offset=random_offset)
 
     def mouse_button(self, button: str, pressed: bool) -> None:
         """发送单个物理鼠标键事件，不移动指针、不附加随机延迟。"""
@@ -363,10 +365,12 @@ class SendInputInput(InputBackend):
         smooth_move_to(x, y, duration)
 
     def _click(self, x: int, y: int, poi_name: str = "",
-               *, pre_delay=None, post_delay=None, button: str = "left"):
+               *, pre_delay=None, post_delay=None, button: str = "left",
+               random_offset: bool = True):
         """点击指定坐标（加入随机偏移和延迟模拟人类）"""
-        offset_x = random.randint(-self.click_random_offset, self.click_random_offset)
-        offset_y = random.randint(-self.click_random_offset, self.click_random_offset)
+        radius = self.click_random_offset if random_offset else 0
+        offset_x = random.randint(-radius, radius)
+        offset_y = random.randint(-radius, radius)
         actual_x = x + offset_x
         actual_y = y + offset_y
 

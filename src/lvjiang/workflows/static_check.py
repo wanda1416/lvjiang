@@ -26,8 +26,8 @@ class RefProblem:
 def _bound_keys(layout, scene: str) -> dict[str, set[str]]:
     """取某场景在当前布局已绑定的各类 key
 
-    disabled 实例仍在列表中，其 key 自然包含在对应集合内，
-    静态检查视为已绑定（不报错）。
+    disabled 实例仍在列表中，其 key 自然包含在对应集合内。它表示维护者已明确
+    判定当前布局不支持该实体，因此静态检查视为已处理，也不继续要求模板等绑定。
     """
     return {
         "region": {r.key for r in layout.get_scene_regions(scene)},
@@ -47,6 +47,20 @@ def _check_arrow_ends(layout, scene: str, arrow_key: str, points: set[str]) -> s
     if arrow.to_key and arrow.to_key not in points:
         return f"方向「{arrow_key}」的终点坐标点未绑定: {arrow.to_key}"
     return None
+
+
+def _is_disabled(layout, scene: str, key: str) -> bool:
+    """An explicit unavailable binding satisfies every static binding requirement."""
+    entities = (
+        *layout.get_scene_regions(scene),
+        *layout.get_scene_points(scene),
+        *layout.get_scene_arrows(scene),
+        *layout.get_scene_panels(scene),
+    )
+    return any(
+        item.key == key and getattr(item, "disabled", False)
+        for item in entities
+    )
 
 
 def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
@@ -84,15 +98,26 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
             if not any(i.key == ref.reference for i in instances):
                 problems.append(RefProblem(ref, tr("子场景引用未绑定坐标")))
                 continue
+            instance = next(i for i in instances if i.key == ref.reference)
+            if getattr(instance, "disabled", False):
+                continue
             if ref.key is None:
                 continue
             child_keys = {r.key for r in layout.get_scene_regions(ref_def.scene)}
-            if ref.kind != "scan":
+            if ref.kind not in ("scan", "template_scan"):
                 child_keys |= {p.key for p in layout.get_scene_points(ref_def.scene)}
                 child_keys |= {p.key for p in layout.get_scene_panels(ref_def.scene)}
             if ref.key not in child_keys:
                 problems.append(RefProblem(
                     ref, f"子场景「{ref_def.scene}」的区域未绑定"))
+            elif ref.kind == "template_scan":
+                child = next((r for r in layout.get_scene_regions(ref_def.scene)
+                              if r.key == ref.key), None)
+                if child is not None and child.disabled:
+                    continue
+                reason = _template_problem(child)
+                if reason:
+                    problems.append(RefProblem(ref, reason))
             continue
         bound = cache.setdefault(ref.scene, _bound_keys(layout, ref.scene))
         if not any(bound.values()):
@@ -113,6 +138,8 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
         elif ref.kind == "scan":
             # 单 key scan/recognize：区域或面板任一绑定即可（运行时据此分派）
             ok = ref.key in bound["region"] or ref.key in bound["panel"]
+        elif ref.kind in ("template_scan", "template_source"):
+            ok = ref.key in bound["region"]
         elif ref.kind == "point":
             ok = ref.key in bound["point"]
         else:
@@ -121,12 +148,36 @@ def check_refs(refs: list[RefUse], layout) -> list[RefProblem]:
             label = KIND_LABELS.get(ref.kind, ref.kind)
             problems.append(RefProblem(ref, f"{label}未绑定"))
             continue
+        if _is_disabled(layout, ref.scene, ref.key):
+            continue
+        if ref.kind in ("template_scan", "template_source"):
+            region = next((r for r in layout.get_scene_regions(ref.scene)
+                           if r.key == ref.key), None)
+            reason = _template_problem(region)
+            if reason:
+                problems.append(RefProblem(ref, reason))
+                continue
         # 检查 arrow 端点
         if ref.kind in ("arrow", "drag_target") and ref.key in bound["arrow"]:
             reason = _check_arrow_ends(layout, ref.scene, ref.key, bound["point"])
             if reason:
                 problems.append(RefProblem(ref, reason))
     return problems
+
+
+def _template_problem(region) -> str | None:
+    """模板 scan 的布局绑定与文件门禁。"""
+    binding = getattr(region, "template", None) if region is not None else None
+    if binding is None:
+        return tr("区域未绑定模板")
+    from ..core.recognizers.template_locator import get_template_store
+    try:
+        template = get_template_store().get(binding.name)
+    except ValueError as exc:
+        return str(exc)
+    if template is None:
+        return f"模板文件不存在: {binding.name}.png"
+    return None
 
 
 def _where(ref: RefUse) -> str:

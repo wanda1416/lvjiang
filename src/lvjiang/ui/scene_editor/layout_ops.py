@@ -35,7 +35,7 @@ class LayoutOpsMixin:
 
     依赖主类提供:
         _manager, _current_layout, _tabs, _layout_combo, _status_bar,
-        _btn_save, _btn_save_as, _btn_delete, _dirty_scenes,
+        _btn_save, _btn_discard, _btn_save_as, _btn_delete, _dirty_scenes,
         _set_dirty(), _mark_all_scenes_clean(), _get_dirty_scene_names(),
         _apply_layout_to_tabs(), _clear_all_tabs(), _update_ui_state(),
         _refresh_loaded_subscene_contents()
@@ -93,6 +93,7 @@ class LayoutOpsMixin:
         active = self._manager.get_active_layout_name()
         has_layout = self._current_layout is not None
         self._btn_save.setEnabled(has_layout)
+        self._btn_discard.setEnabled(has_layout and bool(self._dirty_scenes))
         self._btn_save_as.setEnabled(has_layout)
         is_active = has_layout and self._current_layout.name == active
         is_system = bool(
@@ -288,6 +289,15 @@ class LayoutOpsMixin:
         self._sync_loaded_tabs_to_current_layout()
         if not self._validate_layout_keys_for_save(self._current_layout):
             return
+        try:
+            for tab in self._tabs.values():
+                tab.write_pending_templates()
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(
+                self, tr("保存布局失败"),
+                tr("模板文件写入失败，布局尚未保存：{error}").format(
+                    error=exc))
+            return
         # 增量写盘：只写变更的场景文件。
         #
         # 恒传集合，**不能在没有脏场景时传 None** —— save_layout 的 None 是
@@ -349,6 +359,20 @@ class LayoutOpsMixin:
                 f"共 {total_r} 个区域 / {total_p} 个坐标 / {total_a} 个方向 / {total_pn} 个面板"
             )
         self._mark_all_scenes_clean()
+        template_delete_errors = []
+        for tab in self._tabs.values():
+            try:
+                tab.delete_pending_templates()
+            except (OSError, ValueError) as exc:
+                template_delete_errors.append(str(exc))
+        for tab in self._tabs.values():
+            tab.clear_pending_template_writes()
+        if template_delete_errors:
+            QMessageBox.warning(
+                self, tr("模板截图删除失败"),
+                tr("布局已保存，但以下模板截图未能删除：\n{errors}").format(
+                    errors="\n".join(template_delete_errors)),
+            )
         # 显式版本提升随保存落盘，标识要跟着刷新。
         for tab in self._tabs.values():
             tab._refresh_version_info()
@@ -356,6 +380,52 @@ class LayoutOpsMixin:
             f"布局已保存: {name} ({saved_info}), "
             f"{total_r} 区域 / {total_p} 坐标 / {total_a} 方向 / {total_pn} 面板"
         )
+
+    def _on_discard_layout_changes(self):
+        """丢弃当前布局的全部未保存改动并重新载入磁盘快照。"""
+        if self._current_layout is None:
+            self._status_bar.showMessage(tr("没有已加载的布局"))
+            return
+        if not self._dirty_scenes:
+            self._status_bar.showMessage(tr("当前布局没有未保存的改动"))
+            return
+
+        name = self._current_layout.name
+        dirty_names = self._get_dirty_scene_names()
+        detail = (
+            tr("\n\n当前有如下场景发生变更：{names}").format(
+                names=dirty_names)
+            if dirty_names else ""
+        )
+        reply = QMessageBox.question(
+            self, tr("放弃未保存改动"),  # type: ignore[arg-type]
+            tr("确定恢复布局「{name}」最近一次保存的状态吗？"
+               "\n所有未保存的布局标定、模板截取和版本调整都会丢失。"
+               ).format(name=name) + detail,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # 先读取持久化快照；加载失败时保留当前内存数据与待写模板，避免
+        # “放弃”操作反而造成无法恢复的数据丢失。
+        layout = self._manager.load_layout(name)
+        if layout is None:
+            QMessageBox.warning(
+                self, tr("放弃改动失败"),
+                tr("无法重新加载布局「{name}」，当前改动仍保留。")
+                .format(name=name),
+            )
+            return
+        for tab in self._tabs.values():
+            tab.clear_pending_templates()
+            tab.clear_pending_versions()
+        self._current_layout = layout
+        self._apply_layout_to_tabs()
+        self._update_ui_state()
+        self._status_bar.showMessage(
+            tr("已放弃布局「{name}」的全部未保存改动").format(name=name))
 
     def _on_save_as_layout(self):
         """另存为：输入新名称，可选继承当前布局（创建别名）"""

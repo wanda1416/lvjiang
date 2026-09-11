@@ -62,7 +62,13 @@ class _ActionMixin:
 
         screen_x, screen_y = self._region_to_screen(region, jitter)
         logger.debug(f"点击: {scene_key}/{field_key} -> 屏幕({screen_x},{screen_y})")
-        self._input.click_screen(screen_x, screen_y, f"{scene_key}/{field_key}", **kw)
+        if region.click_rect is None:
+            self._input.click_screen(
+                screen_x, screen_y, f"{scene_key}/{field_key}", **kw)
+        else:
+            self._input.click_screen(
+                screen_x, screen_y, f"{scene_key}/{field_key}",
+                random_offset=False, **kw)
 
     def click_at(self, x: int, y: int, **kw):
         """点击屏幕绝对坐标"""

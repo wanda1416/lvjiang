@@ -6,9 +6,11 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -67,10 +69,10 @@ class RegionPanelMixin:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         self._region_table = EntityOrderTable()
-        self._region_table.setColumnCount(9)
+        self._region_table.setColumnCount(10)
         self._region_table.setHorizontalHeaderLabels([
             tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击"),
-            tr("按键"), tr("禁用"), tr("跳转"), tr("来源"),
+            tr("按键"), tr("禁用"), tr("跳转"), tr("来源"), tr("模板"),
         ])
         # 列宽：名称/Key/类型/按键自适应内容，布尔状态列固定窄宽
         header = self._region_table.horizontalHeader()
@@ -111,11 +113,51 @@ class RegionPanelMixin:
         self._btn_add_ref = QPushButton(tr("+ 引用区域"))
         self._btn_add_ref.clicked.connect(self._on_add_scene_reference)
         btn_row.addWidget(self._btn_add_ref)
+        self._btn_click_rect_mode = QPushButton(tr("标定点击区域"))
+        self._btn_click_rect_mode.setCheckable(True)
+        self._btn_click_rect_mode.clicked.connect(
+            self._on_click_rect_mode_clicked)
+        self._btn_click_rect_mode.setToolTip(
+            tr("当前布局内，在 Region 中框定点击落点范围"))
+        btn_row.addWidget(self._btn_click_rect_mode)
         apply_button_style(self._btn_new_region)
         apply_button_style(self._btn_del_region, variant="danger")
         apply_button_style(self._btn_add_ref, variant="neutral")
+        apply_button_style(self._btn_click_rect_mode, variant="neutral")
         btn_row.addStretch()
         layout.addLayout(btn_row)
+
+        template_row = QHBoxLayout()
+        self._btn_capture_template = QPushButton(tr("截取模版"))
+        self._btn_capture_template.clicked.connect(
+            self._on_capture_region_template)
+        template_row.addWidget(self._btn_capture_template)
+        self._btn_crop_template = QPushButton(tr("部分截取"))
+        self._btn_crop_template.clicked.connect(self._on_crop_template)
+        template_row.addWidget(self._btn_crop_template)
+        self._btn_test_template = QPushButton(tr("测试匹配"))
+        self._btn_test_template.clicked.connect(self._on_test_template)
+        template_row.addWidget(self._btn_test_template)
+        self._btn_unbind_template = QPushButton(tr("解除绑定"))
+        self._btn_unbind_template.clicked.connect(self._on_unbind_template)
+        template_row.addWidget(self._btn_unbind_template)
+        self._template_score = QDoubleSpinBox()
+        self._template_score.setRange(0.0, 1.0)
+        self._template_score.setDecimals(2)
+        self._template_score.setSingleStep(0.01)
+        self._template_score.setValue(0.8)
+        self._template_score.setPrefix(tr("阈值 "))
+        self._template_score.editingFinished.connect(
+            self._on_template_score_changed)
+        template_row.addWidget(self._template_score)
+        self._template_status = QLabel(tr("未绑定"))
+        template_row.addWidget(self._template_status)
+        template_row.addStretch()
+        for button in (self._btn_capture_template, self._btn_crop_template,
+                       self._btn_test_template, self._btn_unbind_template):
+            apply_button_style(button, variant="neutral")
+        layout.addLayout(template_row)
+        self._refresh_template_controls()
         return panel
 
     # ─── 列表刷新 ────────────────────────────────────────
@@ -183,6 +225,9 @@ class RegionPanelMixin:
                 row, 7, QTableWidgetItem(region_def.to or ""))
             # 来源：原生留空
             self._region_table.setItem(row, 8, QTableWidgetItem(""))
+            self._region_table.setItem(
+                row, 9, QTableWidgetItem(
+                    "✓" if assigned_region and assigned_region.template else ""))
 
         self._append_reference_rows(scene, assigned_by_key)
         # 重建时恢复实体身份，而不是让 Qt 在焦点返回时选择第一行。
@@ -193,6 +238,7 @@ class RegionPanelMixin:
                 break
         self._region_table.blockSignals(False)
         self._update_region_delete_button()
+        self._refresh_template_controls()
 
     def _append_reference_rows(self, scene, assigned_by_key) -> None:
         """追加跨场景引用行。
@@ -219,6 +265,7 @@ class RegionPanelMixin:
                 (assigned_by_key[ref.entity].activation_key
                  if placed else ""),
                 "", (source_def.to if ref.to is None else ref.to) or "", get_scene_name(ref.scene),
+                "✓" if placed and assigned_by_key[ref.entity].template else "",
             ]
             for col, text in enumerate(cells):
                 item = QTableWidgetItem(text)
@@ -267,8 +314,83 @@ class RegionPanelMixin:
         for i, r in enumerate(self._canvas.get_visible_regions()):
             if r.key == key:
                 self._canvas.select_region(i)
+                self._refresh_template_controls()
                 return
         self._canvas.clear_field_selection()
+        self._refresh_template_controls()
+
+    def _refresh_template_controls(self):
+        """按当前画布选择刷新模板绑定状态。"""
+        if not hasattr(self, "_template_status"):
+            return
+        region = self._canvas.selected_region()
+        editable = bool(region is not None and not region.is_reference)
+        binding = region.template if region is not None else None
+        pending = bool(
+            binding
+            and getattr(self, "is_template_write_pending", lambda _name: False)(
+                binding.name))
+        self._template_status.setText(
+            tr("已绑定（待保存）") if pending
+            else tr("已绑定") if binding
+            else tr("未绑定"))
+        self._template_score.blockSignals(True)
+        self._template_score.setValue(binding.min_score if binding else 0.8)
+        self._template_score.blockSignals(False)
+        self._template_score.setEnabled(editable and binding is not None)
+        self._btn_capture_template.setEnabled(editable)
+        self._btn_crop_template.setEnabled(editable)
+        self._btn_test_template.setEnabled(binding is not None)
+        self._btn_unbind_template.setEnabled(editable and binding is not None)
+
+    def _on_capture_region_template(self):
+        self._canvas.capture_selected_region_template()
+
+    def _on_click_rect_mode_clicked(self, checked: bool):
+        callback = getattr(self, "on_click_rect_mode_changed", None)
+        if callback:
+            callback(checked)
+        elif checked:
+            self.set_click_rect_mode()
+            self.set_click_rect_button_checked(True)
+        else:
+            self.set_region_mode()
+            self.set_click_rect_button_checked(False)
+
+    def _on_crop_template(self):
+        self._canvas.begin_template_crop()
+
+    def _on_test_template(self):
+        callback = getattr(self, "test_selected_template", None)
+        if callback:
+            callback()
+
+    def _on_unbind_template(self):
+        region = self._canvas.selected_region()
+        if region is None or region.template is None:
+            return
+        reply = QMessageBox.question(
+            self, tr("删除模板绑定"),
+            tr("保存布局后将同时删除该绑定对应的模板截图。确定继续吗？"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        schedule = getattr(self, "schedule_template_delete", None)
+        if schedule:
+            schedule(region.template.name)
+        self._canvas.set_selected_template(None)
+        self._refresh_template_controls()
+
+    def _on_template_score_changed(self):
+        region = self._canvas.selected_region()
+        if region is None or region.template is None:
+            return
+        from ...core.layout_models import TemplateBinding
+        self._canvas.set_selected_template(TemplateBinding(
+            region.template.name, self._template_score.value(),
+            region.template.record_w, region.template.record_h))
+        self._refresh_template_controls()
 
     def _on_edit_region_from_table(self, row, col):
         """双击表格行编辑区域（场景变更时跨场景迁移）"""
@@ -401,6 +523,14 @@ class RegionPanelMixin:
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
+        bound = next(
+            (r for r in self._canvas.get_regions() if r.key == region_def.key),
+            None,
+        )
+        if bound is not None and bound.template is not None:
+            schedule = getattr(self, "schedule_template_delete", None)
+            if schedule:
+                schedule(bound.template.name)
         try:
             registry.remove_region_from_scene(self._scene_key, region_def.key)
         except ValueError as e:

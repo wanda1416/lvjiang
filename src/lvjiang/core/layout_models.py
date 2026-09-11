@@ -7,7 +7,9 @@
 「布局 JSON 中保存的具体坐标值」，由 layout_manager 加载并供引擎运行时使用。
 """
 
+import math
 from dataclasses import asdict, dataclass, field, replace
+from pathlib import PurePosixPath
 
 from .coord_types import CircleCoordRef, RectCoordRef
 from .key_names import normalize_key
@@ -59,6 +61,86 @@ class FoundRegion:
         return RectCoordRef(cx=cx, cy=cy, w=self.w_ratio, h=self.h_ratio)
 
 
+#: click_rect 边界比较的容差。归一化坐标经过 UI 拖拽和 JSON 往返后
+#: 会有末位浮点误差，x + w 落在 1.0000000000000002 上不该判成越界。
+_RECT_EPS = 1e-6
+
+
+@dataclass(frozen=True)
+class TemplateBinding:
+    """Region 在当前布局中绑定的固定 UI 模板。"""
+
+    name: str
+    min_score: float = 0.8
+    record_w: int = 0
+    record_h: int = 0
+
+    def __post_init__(self):
+        name = self.name.strip()
+        if name.endswith(".png"):
+            name = name[:-4]
+        path = PurePosixPath(name)
+        if (not name or "\\" in name or path.is_absolute()
+                or any(part in ("", ".", "..") for part in path.parts)):
+            raise ValueError(f"非法模板名: {self.name!r}")
+        score = float(self.min_score)
+        if not math.isfinite(score) or not 0 <= score <= 1:
+            raise ValueError(f"模板匹配阈值必须在 [0, 1] 内: {self.min_score!r}")
+        record_w = int(self.record_w)
+        record_h = int(self.record_h)
+        if record_w < 0 or record_h < 0 or bool(record_w) != bool(record_h):
+            raise ValueError("模板录制画布宽高必须同时为正数或同时为 0")
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "min_score", score)
+        object.__setattr__(self, "record_w", record_w)
+        object.__setattr__(self, "record_h", record_h)
+
+    def to_dict(self) -> dict:
+        result = {"name": self.name, "min_score": self.min_score}
+        if self.record_w > 0:
+            result["record_w"] = self.record_w
+            result["record_h"] = self.record_h
+        return result
+
+    @staticmethod
+    def from_dict(value) -> "TemplateBinding":
+        if isinstance(value, str):
+            return TemplateBinding(value)
+        if not isinstance(value, dict):
+            raise ValueError("Region.template 必须是对象或模板名字符串")
+        return TemplateBinding(
+            name=value.get("name", ""),
+            min_score=value.get("min_score", 0.8),
+            record_w=value.get("record_w", 0),
+            record_h=value.get("record_h", 0),
+        )
+
+
+def _validate_click_rect(
+    key: str, value,
+) -> tuple[float, float, float, float]:
+    """校验并规范化 click_rect：必须是区域内的非空子集。
+
+    越界直接抛错而不是钳回去——静默钳制会让人以为标定生效了，实际点在别处。
+    """
+    try:
+        x, y, w, h = (float(v) for v in value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"区域 {key!r} 的 click_rect 必须是 4 个数值"
+        ) from exc
+    if (not all(math.isfinite(v) for v in (x, y, w, h))
+            or x < -_RECT_EPS or y < -_RECT_EPS or w <= 0 or h <= 0
+            or x + w > 1 + _RECT_EPS or y + h > 1 + _RECT_EPS):
+        raise ValueError(
+            f"区域 {key!r} 的 click_rect 必须是本区域的子集（0~1 相对坐标），"
+            f"got {(x, y, w, h)}"
+        )
+    x = min(max(x, 0.0), 1.0)
+    y = min(max(y, 0.0), 1.0)
+    return (x, y, min(w, 1.0 - x), min(h, 1.0 - y))
+
+
 @dataclass
 class Region:
     """单个区域实例（归一化坐标）
@@ -74,15 +156,34 @@ class Region:
     h_ratio: float
     disabled: bool = False
     activation_key: str = ""
+    # 点击落点框，**相对本区域**的归一化坐标 (x, y, w, h)；None = 用全局默认
+    # （见 effective_click_rect）。
+    #
+    # 必须是本区域的子集。区域矩形的范围就是 OCR 识别范围，落点框越界会让
+    # area 不再是一块自洽的屏幕元素，退化成一个能任意向外指的锚点，布局的
+    # 可读性和可校验性都没了。识别框画大一点无害，所以正确画法是 area 画到
+    # 足够覆盖整个元素，再用子集框收紧点击位置。
+    #
+    # 用相对坐标而不是画布绝对坐标，正是因为相对坐标**表达不出越界**——非法
+    # 状态在数据模型层就不可构造；附带的好处是区域移动/缩放时落点框自动跟随。
+    click_rect: tuple[float, float, float, float] | None = None
+    # 当前布局下的固定 UI 模板；与 OCR、click_rect 相互独立。
+    template: TemplateBinding | None = None
     # 跨场景引用来源；非空表示这一项不属于本场景，是加载时从 source_scene
-    # 转读进来的。**绝不能写回布局 JSON**——写回就把引用烘死成拷贝，源场景
-    # 再改坐标也不同步，正好毁掉这个特性的全部意义。to_dict 无条件剔除，
-    # 保存路径另有一道过滤，两处都不能少。
+    # 转读进来的。完整实体不能写回目标场景；目标场景只单独保存 x/y 位置。
     source_scene: str = ""
+    position_overridden: bool = False
+    source_x_ratio: float | None = None
+    source_y_ratio: float | None = None
 
     def __post_init__(self):
         if self.activation_key:
             self.activation_key = normalize_key(self.activation_key)
+        if self.click_rect is not None:
+            self.click_rect = _validate_click_rect(self.key, self.click_rect)
+        if self.template is not None and not isinstance(
+                self.template, TemplateBinding):
+            self.template = TemplateBinding.from_dict(self.template)
 
     @property
     def is_reference(self) -> bool:
@@ -91,6 +192,17 @@ class Region:
     def to_dict(self) -> dict:
         d = asdict(self)
         d.pop("source_scene", None)
+        d.pop("position_overridden", None)
+        d.pop("source_x_ratio", None)
+        d.pop("source_y_ratio", None)
+        if self.click_rect is None:
+            d.pop("click_rect", None)
+        else:
+            d["click_rect"] = list(self.click_rect)
+        if self.template is None:
+            d.pop("template", None)
+        else:
+            d["template"] = self.template.to_dict()
         if self.disabled and not any((
                 self.x_ratio, self.y_ratio, self.w_ratio, self.h_ratio)):
             for key in ("x_ratio", "y_ratio", "w_ratio", "h_ratio"):
@@ -122,7 +234,36 @@ class Region:
             h_ratio=d.get("h_ratio", 0.0) if disabled else d["h_ratio"],
             disabled=disabled,
             activation_key=d.get("activation_key", ""),
+            click_rect=(tuple(d["click_rect"])  # type: ignore[arg-type]
+                        if d.get("click_rect") else None),
+            template=(TemplateBinding.from_dict(d["template"])
+                      if d.get("template") else None),
+            source_scene=d.get("source_scene", ""),
+            position_overridden=bool(d.get("position_overridden", False)),
+            source_x_ratio=d.get("source_x_ratio"),
+            source_y_ratio=d.get("source_y_ratio"),
         )
+
+
+def effective_click_rect(
+    region: "Region", jitter_ratio: float,
+) -> tuple[float, float, float, float]:
+    """区域的落点框（相对区域的归一化坐标 x, y, w, h）。
+
+    显式标定的 ``click_rect`` 原样返回，**不再叠加抖动收缩**——既然已经精确
+    指定了可点范围，再往中间收一半就是拿猜测覆盖真实信息。
+
+    未标定时由 ``region_jitter_ratio`` 派生一个居中框：那个参数的本质就是
+    「没单独标定时默认的点击框占区域多大」，顶着"抖动"的名字干的是保守收缩
+    的活。两条路径在这里统一，引擎侧只剩一条取点逻辑。
+
+    ratio=0.25（默认）派生出 (0.25, 0.25, 0.5, 0.5)，框内均匀取点与旧实现的
+    「中心 + w×uniform(-0.25, 0.25)」是同一个分布，存量布局落点逐位不变。
+    """
+    if region.click_rect is not None:
+        return region.click_rect
+    r = min(max(float(jitter_ratio), 0.0), 0.5)
+    return (0.5 - r, 0.5 - r, 2 * r, 2 * r)
 
 
 @dataclass
@@ -135,6 +276,9 @@ class Point:
     disabled: bool = False
     activation_key: str = ""
     source_scene: str = ""   # 见 Region.source_scene
+    position_overridden: bool = False
+    source_x_ratio: float | None = None
+    source_y_ratio: float | None = None
 
     def __post_init__(self):
         if self.activation_key:
@@ -147,6 +291,9 @@ class Point:
     def to_dict(self) -> dict:
         d = asdict(self)
         d.pop("source_scene", None)
+        d.pop("position_overridden", None)
+        d.pop("source_x_ratio", None)
+        d.pop("source_y_ratio", None)
         if (self.disabled and self.cx_ratio == 0 and self.cy_ratio == 0
                 and self.r_ratio == 0.015):
             for key in ("cx_ratio", "cy_ratio", "r_ratio"):
@@ -175,6 +322,10 @@ class Point:
             r_ratio=d.get("r_ratio", 0.015),
             disabled=disabled,
             activation_key=d.get("activation_key", ""),
+            source_scene=d.get("source_scene", ""),
+            position_overridden=bool(d.get("position_overridden", False)),
+            source_x_ratio=d.get("source_x_ratio"),
+            source_y_ratio=d.get("source_y_ratio"),
         )
 
 
@@ -467,10 +618,26 @@ class Layout:
         for sk in scene_keys:
             entry: dict = {}
             regions = self.regions.get(sk) or []
-            entry["regions"] = [r.to_dict() for r in regions]
+            entry["regions"] = [
+                r.to_dict() | ({
+                    "source_scene": r.source_scene,
+                    "position_overridden": r.position_overridden,
+                    "source_x_ratio": r.source_x_ratio,
+                    "source_y_ratio": r.source_y_ratio,
+                } if r.source_scene else {})
+                for r in regions
+            ]
             pts = self.points.get(sk) or []
             if pts:
-                entry["points"] = [p.to_dict() for p in pts]
+                entry["points"] = [
+                    p.to_dict() | ({
+                        "source_scene": p.source_scene,
+                        "position_overridden": p.position_overridden,
+                        "source_x_ratio": p.source_x_ratio,
+                        "source_y_ratio": p.source_y_ratio,
+                    } if p.source_scene else {})
+                    for p in pts
+                ]
             arrs = self.arrows.get(sk) or []
             if arrs:
                 entry["arrows"] = [a.to_dict() for a in arrs]

@@ -4,19 +4,18 @@
 - ReferenceMatcher 是**分类器**：给一块已裁好的区域，回答"它最像图库里哪一条"
 - 本模块是**定位器**：给整帧 + 一张模板，回答"模板出现在哪、多像"
 
-分辨率自适应沿用 Airtest 的做法：模板随 sidecar ``<name>.json``
-记录录制时的画布宽 ``recordW``，运行时按 ``当前画布宽 / recordW`` 先缩放模板
-再匹配，并在基准比例 ±10% 各试一次兜底。声明分辨率自动缩放这套在业界没人
+分辨率自适应沿用 Airtest 的做法：Region 的布局模板绑定记录录制画布宽，
+运行时按 ``当前画布宽 / record_w`` 先缩放模板，再在基准比例 ±10% 各试一次
+兜底。声明分辨率自动缩放这套在业界没人
 信（用户都在手写比例换算），所以这里不猜，只按录制尺寸换算。
 
-模板文件：``config/system/templates/<name>.png``（+ 可选 ``<name>.json``），
-走 ConfigResolver 的 system/local 双层，用户可在 local 覆盖。
+模板文件只有 ``config/system/templates/<name>.png``，走 ConfigResolver 的
+system/local 双层，用户可在 local 覆盖。
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import cv2
 import numpy as np
@@ -28,6 +27,72 @@ TEMPLATES_REL_DIR = "templates"
 #: 匹配分数默认门槛（TM_CCOEFF_NORMED，0–1）。与按键精灵系的 SAD 相似度（0–100）
 #: 不是同一尺度，那类脚本里的 sim=85 不能直接搬；0.8 是 CCOEFF_NORMED 下的常用起点。
 DEFAULT_MIN_SCORE = 0.8
+
+
+def normalize_template_name(name: str) -> str:
+    """规范模板逻辑名并拒绝越出 templates/ 的路径。"""
+    value = str(name).strip()
+    if value.endswith(".png"):
+        value = value[:-4]
+    path = PurePosixPath(value)
+    if (not value or "\\" in value or path.is_absolute()
+            or any(part in ("", ".", "..") for part in path.parts)):
+        raise ValueError(f"非法模板名: {name!r}")
+    return path.as_posix()
+
+
+def validate_template_image(image: np.ndarray) -> None:
+    """拒绝无法可靠用于相关匹配的模板图。"""
+    if not isinstance(image, np.ndarray) or image.ndim not in (2, 3):
+        raise ValueError("模板必须是灰度、BGR 或 BGRA 图像")
+    h, w = image.shape[:2]
+    if w < 4 or h < 4:
+        raise ValueError("模板尺寸不能小于 4×4 像素")
+    gray = _to_gray(image)
+    if float(gray.std()) < 1.0:
+        raise ValueError("模板近似纯色，无法可靠匹配；请框入更多图形边缘")
+
+
+def template_from_image(name: str, image: np.ndarray,
+                        record_w: int = 0, record_h: int = 0) -> Template:
+    """从编辑器内存裁剪构造可立即测试的模板。"""
+    base = normalize_template_name(name)
+    validate_template_image(image)
+    return Template(base, _to_gray(image), int(record_w), int(record_h))
+
+
+def write_template(name: str, image: np.ndarray) -> Path:
+    """按配置分层写 PNG；录制画布尺寸属于布局的 Region 绑定。"""
+    tpl = template_from_image(name, image)
+    base = tpl.name
+    ok, encoded = cv2.imencode(".png", image)
+    if not ok:
+        raise ValueError("模板 PNG 编码失败")
+    from ..config.resolver import get_resolver
+    resolver = get_resolver()
+    return resolver.write_entity(
+        f"{TEMPLATES_REL_DIR}/{base}.png", encoded.tobytes())
+
+
+def delete_template(name: str) -> bool:
+    """删除当前身份可写层的模板 PNG；不越权删除系统下发内容。"""
+    base = normalize_template_name(name)
+    rel_path = f"{TEMPLATES_REL_DIR}/{base}.png"
+    from ..config.resolver import get_resolver
+    resolver = get_resolver()
+    if resolver.is_dev_mode():
+        existed = (resolver.system_dir / rel_path).is_file()
+        resolver.delete_entity(rel_path)
+        return existed
+
+    local = resolver.local_dir / rel_path
+    if not local.is_file():
+        return False
+    if resolver.is_system_entity(rel_path):
+        resolver.revert_entity_to_system(rel_path)
+    else:
+        resolver.delete_entity(rel_path)
+    return True
 
 
 @dataclass(frozen=True)
@@ -44,6 +109,16 @@ class Template:
     @property
     def h(self) -> int:
         return int(self.gray.shape[0])
+
+
+def with_record_size(
+    template: Template, record_w: int, record_h: int,
+) -> Template:
+    """把布局绑定保存的录制画布尺寸应用到已加载 PNG。"""
+    if record_w <= 0 or record_h <= 0:
+        return template
+    return Template(
+        template.name, template.gray, int(record_w), int(record_h))
 
 
 @dataclass(frozen=True)
@@ -63,15 +138,15 @@ class TemplateStore:
     ``base_dir`` 给定时直接从该目录读（测试/离线用）；否则走 ConfigResolver
     的 ``templates/`` 相对路径，local 覆盖 system。
 
-    缓存按文件失效：每次 ``get`` 先 stat 一下 png / sidecar json，路径或 mtime 变了就重载，
+    缓存按文件失效：每次 ``get`` 先 stat 一下 PNG，路径或 mtime 变了就重载，
     文件没了就丢缓存。脚本工作台里边调边截新模板、替换旧图，不用重启也不用手动
     ``invalidate``；代价是每次查找多两次 stat，相对模板匹配本身可以忽略。
     """
 
     def __init__(self, base_dir: Path | str | None = None):
         self._base_dir = Path(base_dir) if base_dir else None
-        #: name → (文件签名, 模板)；签名 = (png 路径, png mtime, json 路径, json mtime)
-        self._cache: dict[str, tuple[tuple[str, int, str, int], Template]] = {}
+        #: name → (文件签名, 模板)；签名 = (png 路径, png mtime)
+        self._cache: dict[str, tuple[tuple[str, int], Template]] = {}
 
     def _resolve(self, rel: str) -> Path | None:
         if self._base_dir is not None:
@@ -80,21 +155,19 @@ class TemplateStore:
         from ..config.resolver import get_resolver
         return get_resolver().resolve_read(f"{TEMPLATES_REL_DIR}/{rel}")
 
-    def _signature(self, base: str) -> tuple[str, int, str, int] | None:
-        """当前磁盘上该模板的 (png, mtime, json, mtime)；png 不存在返回 None"""
+    def _signature(self, base: str) -> tuple[str, int] | None:
+        """当前磁盘上该模板的 (png, mtime)；PNG 不存在返回 None。"""
         png = self._resolve(f"{base}.png")
         if png is None:
             return None
-        meta = self._resolve(f"{base}.json")
         try:
             png_m = Path(png).stat().st_mtime_ns
-            meta_m = Path(meta).stat().st_mtime_ns if meta is not None else 0
         except OSError:
             return None
-        return (str(png), png_m, str(meta) if meta is not None else "", meta_m)
+        return (str(png), png_m)
 
     def get(self, name: str) -> Template | None:
-        base = name[:-4] if name.endswith(".png") else name
+        base = normalize_template_name(name)
         sig = self._signature(base)
         if sig is None:
             self._cache.pop(base, None)
@@ -103,7 +176,7 @@ class TemplateStore:
         cached = self._cache.get(base)
         if cached is not None and cached[0] == sig:
             return cached[1]
-        tpl = self._load(base, Path(sig[0]), Path(sig[2]) if sig[2] else None)
+        tpl = self._load(base, Path(sig[0]))
         if tpl is None:
             self._cache.pop(base, None)
             return None
@@ -113,22 +186,18 @@ class TemplateStore:
     def invalidate(self) -> None:
         self._cache.clear()
 
-    def _load(self, base: str, png: Path, meta: Path | None) -> Template | None:
+    def _load(self, base: str, png: Path) -> Template | None:
         data = np.fromfile(str(png), dtype=np.uint8)  # 路径含中文时 cv2.imread 在 Windows 上会失败
         img = cv2.imdecode(data, cv2.IMREAD_UNCHANGED)
         if img is None:
             logger.warning(f"模板解码失败: {png}")
             return None
-        gray = _to_gray(img)
-        record_w = record_h = 0
-        if meta is not None:
-            try:
-                o = json.loads(Path(meta).read_text(encoding="utf-8"))
-                record_w = int(o.get("recordW", 0) or 0)
-                record_h = int(o.get("recordH", 0) or 0)
-            except (OSError, ValueError) as e:
-                logger.warning(f"模板 sidecar 读取失败 {meta}: {e}")
-        return Template(name=base, gray=gray, record_w=record_w, record_h=record_h)
+        try:
+            validate_template_image(img)
+        except ValueError as exc:
+            logger.warning(f"模板无效 {png}: {exc}")
+            return None
+        return Template(name=base, gray=_to_gray(img))
 
 
 def _to_gray(img: np.ndarray) -> np.ndarray:
@@ -196,6 +265,30 @@ def locate(
     if abs(best.scale - 1.0) > 0.03:
         logger.debug(f"模板 {tpl.name} 自适配 scale={best.scale:.2f} score={best.score:.3f}")
     return best
+
+
+def locate_in_region(
+    frame_bgr: np.ndarray,
+    tpl: Template,
+    canvas,
+    region,
+    min_score: float = DEFAULT_MIN_SCORE,
+) -> Located | None:
+    """在布局 Region 内定位模板；搜索范围不会越出 Region。"""
+    h, w = frame_bgr.shape[:2]
+    canvas_x = canvas.x_ratio * w
+    canvas_y = canvas.y_ratio * h
+    canvas_w = canvas.w_ratio * w
+    canvas_h = canvas.h_ratio * h
+    x1 = int(canvas_x + region.x_ratio * canvas_w)
+    y1 = int(canvas_y + region.y_ratio * canvas_h)
+    x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w) - 1
+    y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h) - 1
+    return locate(
+        frame_bgr, tpl, x1, y1, x2, y2,
+        scales=adaptive_scales(int(canvas_w), tpl.record_w),
+        min_score=min_score,
+    )
 
 
 _STORE: TemplateStore | None = None

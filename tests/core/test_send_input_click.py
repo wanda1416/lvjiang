@@ -37,6 +37,16 @@ def test_click_screen_defaults_to_left_button(monkeypatch):
     assert events == [(_MOUSEEVENTF_LEFTDOWN, 0), (_MOUSEEVENTF_LEFTUP, 0)]
 
 
+def test_click_screen_can_disable_random_offset(monkeypatch):
+    backend, _events = _make_backend(monkeypatch)
+    backend.click_random_offset = 10
+    monkeypatch.setattr(send_input_module.random, "randint", lambda _lo, hi: hi)
+
+    backend.click_screen(10, 20, "safe-region", random_offset=False)
+
+    send_input_module._user32.SetCursorPos.assert_called_once_with(10, 20)
+
+
 def test_click_screen_right_button(monkeypatch):
     backend, events = _make_backend(monkeypatch)
     backend.click_screen(10, 10, "test", button="right")

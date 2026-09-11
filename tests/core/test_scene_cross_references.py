@@ -163,11 +163,12 @@ def test_expansion_copies_coordinates_verbatim_and_marks_the_source():
         src.x_ratio, src.y_ratio, src.w_ratio, src.h_ratio)
     assert got.activation_key == "SPACE"
     assert got.source_scene == "general_control"
+    assert (got.source_x_ratio, got.source_y_ratio) == (0.4, 0.5)
     assert got.is_reference and not src.is_reference
 
 
-def test_reference_never_serializes_back_into_the_layout():
-    """写回就把引用烘死成拷贝，源场景改坐标不再同步——两道闸都要在。"""
+def test_reference_entity_never_serializes_as_a_native_layout_item():
+    """引用实体本身不写入目标场景；目标场景只能另存位置覆盖。"""
     ref = Region(key="confirm", x_ratio=0.4, y_ratio=0.5, w_ratio=0.1,
                  h_ratio=0.05, source_scene="general_control")
     assert "source_scene" not in ref.to_dict()
@@ -208,12 +209,8 @@ def test_dsl_addressing_works_without_touching_the_action_layer():
     assert found.source_scene == "general_control"
 
 
-def test_save_layout_never_writes_references_to_disk(tmp_path, monkeypatch):
-    """真正走 save_layout：引用项不能落进本场景的布局 JSON。
-
-    写回就把引用烘死成拷贝，源场景再改坐标也不同步——正好毁掉这个特性的
-    全部意义，而且完全静默（保存一次配置就污染了，看起来一切正常）。
-    """
+def test_save_layout_writes_only_referenced_item_position(tmp_path, monkeypatch):
+    """目标场景只保存引用位置，尺寸和其他属性继续来自源场景。"""
     import lvjiang.constants as constants
     import lvjiang.core.config.resolver as cr
     from lvjiang.core import layout_manager
@@ -233,14 +230,28 @@ def test_save_layout_never_writes_references_to_disk(tmp_path, monkeypatch):
                                w_ratio=0.06, h_ratio=0.07),
                         Region(key="confirm", x_ratio=0.4, y_ratio=0.5,
                                w_ratio=0.1, h_ratio=0.05,
-                               source_scene="general_control"),
+                               source_scene="general_control",
+                               position_overridden=True),
                     ]})
-    assert LayoutConfigManager().save_layout(layout)
+    manager = LayoutConfigManager()
+    assert manager.save_layout(layout)
 
     written = json.loads(next(
         tmp_path.rglob("equip_tune_detail.json")).read_text(encoding="utf-8"))
     assert [r["key"] for r in written["regions"]] == ["close_btn"]
     assert "source_scene" not in json.dumps(written)
+    assert written["reference_positions"] == [{
+        "scene": "general_control",
+        "entity": "confirm",
+        "x_ratio": 0.4,
+        "y_ratio": 0.5,
+    }]
+
+    layout.regions["equip_tune_detail"][1].position_overridden = False
+    assert manager.save_layout(layout)
+    written = json.loads(next(
+        tmp_path.rglob("equip_tune_detail.json")).read_text(encoding="utf-8"))
+    assert "reference_positions" not in written
 
 
 
@@ -545,6 +556,60 @@ def test_refresh_references_replaces_stale_projection(monkeypatch):
     status = regions[1]
     assert (status.x_ratio, status.y_ratio) == (0.2, 0.3)
     assert status.source_scene == "equip_detail"
+
+
+def test_refresh_reference_keeps_target_position_and_updates_source_size(
+        monkeypatch):
+    """拖动只覆盖 x/y；源区域尺寸变化仍应传到目标场景。"""
+    import lvjiang.core.scene_registry as sr
+
+    ref = type("R", (), {"scene": "source", "entity": "back"})()
+    target = type("S", (), {"references": [ref]})()
+    monkeypatch.setattr(sr, "get_registry", lambda: type(
+        "Reg", (), {"all_scenes": lambda self: {"target": target}})())
+    layout = Layout(regions={
+        "source": [Region("back", 0.1, 0.2, 0.2, 0.1)],
+        "target": [Region(
+            "back", 0.7, 0.8, 0.2, 0.1,
+            source_scene="source", position_overridden=True,
+        )],
+    })
+
+    layout.regions["source"][0].w_ratio = 0.3
+    layout.regions["source"][0].h_ratio = 0.15
+    refresh_scene_references(layout)
+
+    moved = layout.regions["target"][0]
+    assert (moved.x_ratio, moved.y_ratio) == (0.7, 0.8)
+    assert (moved.w_ratio, moved.h_ratio) == (0.3, 0.15)
+    assert moved.position_overridden
+
+
+def test_expansion_applies_target_position_to_region_and_point(monkeypatch):
+    import lvjiang.core.scene_registry as sr
+
+    refs = [
+        type("R", (), {"scene": "source", "entity": "back"})(),
+        type("R", (), {"scene": "source", "entity": "anchor"})(),
+    ]
+    target = type("S", (), {"references": refs})()
+    monkeypatch.setattr(sr, "get_registry", lambda: type(
+        "Reg", (), {"all_scenes": lambda self: {"target": target}})())
+    regions = {"source": [Region("back", 0.1, 0.2, 0.2, 0.1)]}
+    points = {"source": [Point("anchor", 0.3, 0.4)]}
+
+    _expand_scene_references(regions, points, {
+        ("target", "source", "back"): (0.6, 0.7),
+        ("target", "source", "anchor"): (0.8, 0.9),
+    })
+
+    moved_region = regions["target"][0]
+    moved_point = points["target"][0]
+    assert (moved_region.x_ratio, moved_region.y_ratio) == (0.6, 0.7)
+    assert (moved_region.w_ratio, moved_region.h_ratio) == (0.2, 0.1)
+    assert (moved_point.cx_ratio, moved_point.cy_ratio) == (0.8, 0.9)
+    assert moved_region.position_overridden
+    assert moved_point.position_overridden
 
 
 def test_a_references_view_assignment_can_be_changed(scenes_dir):

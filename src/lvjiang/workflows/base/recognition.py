@@ -62,7 +62,8 @@ class _RecognitionMixin:
 
     def ocr_scene(self, scene_key: str, field_keys: list[str] | None = None,
                   min_confidence: float | None = None,
-                  regions_override: list[Region] | None = None) -> dict[str, str]:
+                  regions_override: list[Region] | None = None,
+                  cleaning_group: str | None = None) -> dict[str, str]:
         """对指定场景执行截图 + OCR
 
         Args:
@@ -89,7 +90,11 @@ class _RecognitionMixin:
                 logger.warning(f"场景 {scene_key} 没有定义可用区域")
                 return {}
 
-        result = self._ocr.ocr_scene_regions(img, canvas, regions, scene_key, min_confidence=min_confidence)
+        kwargs = {"min_confidence": min_confidence}
+        if cleaning_group is not None:
+            kwargs["cleaning_group"] = cleaning_group
+        result = self._ocr.ocr_scene_regions(
+            img, canvas, regions, scene_key, **kwargs)
         fields_display = field_keys if field_keys else [r.key for r in regions]
         logger.debug(f"OCR [{scene_key}]:{fields_display} => {result}")
         return result
@@ -366,6 +371,7 @@ class _RecognitionMixin:
         mode: str,
         min_confidence: float | None = None,
         regions_override: list[Region] | None = None,
+        cleaning_group: str | None = None,
     ) -> str:
         """短路 OCR：一次截图，逐字段识别，首个命中即返回字段名
 
@@ -411,7 +417,9 @@ class _RecognitionMixin:
                 logger.debug(f"by OCR: region {region.key} 裁剪为空，跳过")
                 seen.append(f"{region.key}=<裁剪为空>")
                 continue
-            ocr_results = self._ocr.recognize(crop)
+            ocr_results = (self._ocr.recognize(
+                crop, cleaning_group=cleaning_group)
+                if cleaning_group else self._ocr.recognize(crop))
             if min_confidence is not None:
                 ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
             text = " | ".join(r.text for r in ocr_results) if ocr_results else ""
@@ -514,6 +522,7 @@ class _RecognitionMixin:
         mode: str,
         search_region: Region | None = None,
         min_confidence: float | None = None,
+        cleaning_group: str | None = None,
     ) -> FoundRegion | str:
         """在指定区域或全画布搜索目标文字，返回文字的画布归一化坐标区域
 
@@ -559,7 +568,9 @@ class _RecognitionMixin:
             crop_x2, crop_y2 = int(canvas_px_x + canvas_px_w), int(canvas_px_y + canvas_px_h)
             crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
 
-        ocr_results = self._ocr.recognize(crop)
+        ocr_results = (self._ocr.recognize(
+            crop, cleaning_group=cleaning_group)
+            if cleaning_group else self._ocr.recognize(crop))
         if not ocr_results:
             logger.debug("find: OCR 无结果")
             return ""
@@ -615,10 +626,12 @@ class _RecognitionMixin:
         template_name: str,
         search_region: Region | None = None,
         min_score: float | None = None,
+        record_w: int = 0,
+        record_h: int = 0,
     ) -> FoundRegion | str:
         """在指定区域或全画布做模板定位，返回命中区域（画布归一化）或 ""
 
-        模板来自 config/system/templates/<name>.png（+ sidecar recordW 做分辨率自适应）。
+        模板来自 config/system/templates/<name>.png；布局绑定可提供录制画布尺寸。
         min_score 为 None 时用 DEFAULT_MIN_SCORE。
         """
         from ...core.recognizers.template_locator import (
@@ -626,11 +639,13 @@ class _RecognitionMixin:
             adaptive_scales,
             get_template_store,
             locate,
+            with_record_size,
         )
 
         tpl = get_template_store().get(template_name)
         if tpl is None:
             raise ValueError(tr("find: 模板 {name} 不存在（config/system/templates/）").format(name=template_name))
+        tpl = with_record_size(tpl, record_w, record_h)
 
         img = self._capture.capture()
         if img is None:
@@ -673,3 +688,57 @@ class _RecognitionMixin:
             f"center=({found.center_ratios()[0]:.3f},{found.center_ratios()[1]:.3f})"
         )
         return found
+
+    def match_region_templates(
+        self,
+        regions: list[Region],
+        min_score: float | None = None,
+        *,
+        scene_key: str = "",
+    ) -> str:
+        """按顺序匹配各 Region 的布局模板，返回首个命中的 key 或空串。
+
+        一次调用只截一帧；每张模板的搜索范围严格限制在自己的 Region 内。
+        ``min_score`` 非空时覆盖各绑定保存的默认阈值。
+        """
+        from ...core.recognizers.template_locator import (
+            get_template_store,
+            locate_in_region,
+            with_record_size,
+        )
+
+        for region in regions:
+            if region.template is None:
+                raise ValueError(
+                    f"区域 [{scene_key}].[{region.key}] 未绑定模板")
+        if not regions:
+            return ""
+
+        img = self._capture.capture()
+        if img is None:
+            self._log_capture_failed(
+                "scan by image", scene_key, [r.key for r in regions])
+            return ""
+
+        canvas = self._layout.get_canvas()
+        store = get_template_store()
+
+        for region in regions:
+            binding = region.template
+            assert binding is not None
+            tpl = store.get(binding.name)
+            if tpl is None:
+                raise ValueError(
+                    f"区域 [{scene_key}].[{region.key}] 的模板不存在: "
+                    f"{binding.name}.png")
+            tpl = with_record_size(
+                tpl, binding.record_w, binding.record_h)
+            threshold = binding.min_score if min_score is None else float(min_score)
+            hit = locate_in_region(img, tpl, canvas, region, threshold)
+            if hit is not None:
+                logger.info(
+                    f"scan by image 命中: scene={scene_key} region={region.key} "
+                    f"template={binding.name} score={hit.score:.3f} "
+                    f"scale={hit.scale:.2f}")
+                return region.key
+        return ""

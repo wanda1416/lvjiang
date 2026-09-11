@@ -2,7 +2,13 @@
 
 from PyQt6.QtCore import QPointF, QRectF
 
-from ...core.layout_models import CanvasConfig, Point, Region, SubsceneRef
+from ...core.layout_models import (
+    CanvasConfig,
+    Point,
+    Region,
+    SubsceneRef,
+    effective_click_rect,
+)
 
 
 class CanvasCoordMixin:
@@ -74,6 +80,30 @@ class CanvasCoordMixin:
         tl = self._norm_to_widget(sx, sy)
         br = self._norm_to_widget(sw, sh)
         return QRectF(tl, br)
+
+    # ─── 点击落点框坐标 ─────────────────────────────
+
+    def _click_rect_canvas(self, r: Region, jitter_ratio: float) -> QRectF:
+        """区域的落点框 → 画布内归一化矩形。
+
+        未标定 click_rect 时返回由 jitter_ratio 派生的默认框，画布上因此能
+        用同一套代码画"已标定"和"默认"两种情况。
+        """
+        rx, ry, rw, rh = effective_click_rect(r, jitter_ratio)
+        return QRectF(
+            r.x_ratio + rx * r.w_ratio,
+            r.y_ratio + ry * r.h_ratio,
+            rw * r.w_ratio,
+            rh * r.h_ratio,
+        )
+
+    def _click_rect_widget(self, r: Region, jitter_ratio: float) -> QRectF:
+        """区域的落点框 → widget 坐标矩形"""
+        n = self._click_rect_canvas(r, jitter_ratio)
+        sx, sy = self._canvas_to_screenshot_norm(n.x(), n.y())
+        ex, ey = self._canvas_to_screenshot_norm(
+            n.x() + n.width(), n.y() + n.height())
+        return QRectF(self._norm_to_widget(sx, sy), self._norm_to_widget(ex, ey))
 
     # ─── 画布坐标转换 ───────────────────────────────
 

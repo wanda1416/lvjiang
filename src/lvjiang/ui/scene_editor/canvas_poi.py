@@ -299,19 +299,38 @@ class CanvasPoiMixin:
         self._selected_arrow_idx = -1
         self.update()
 
-        if self._points[idx].is_reference:
-            return True
-
         menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
             "QMenu { background-color: palette(base); padding: 4px; }"
             "QMenu::item { padding: 4px 16px; }"
             "QMenu::item:selected { background-color: #ddd; }"
         )
-        copy_action = menu.addAction(tr("复制"))
-        del_action = menu.addAction(tr("删除"))
+        point = self._points[idx]
+        restore_action = None
+        copy_action = None
+        del_action = None
+        if point.is_reference:
+            restore_action = menu.addAction(tr("还原位置"))
+            restore_action.setEnabled(
+                point.position_overridden
+                and point.source_x_ratio is not None
+                and point.source_y_ratio is not None)
+        else:
+            copy_action = menu.addAction(tr("复制"))
+            del_action = menu.addAction(tr("删除"))
         action = menu.exec(self.mapToGlobal(pos.toPoint()))
-        if action == copy_action:
+        if action is None:
+            return True
+        if restore_action is not None and action == restore_action:
+            point = self._points[idx]
+            if (point.source_x_ratio is not None
+                    and point.source_y_ratio is not None):
+                point.cx_ratio = point.source_x_ratio
+                point.cy_ratio = point.source_y_ratio
+                point.position_overridden = False
+                self._notify_poi_changed()
+                self.update()
+        elif action == copy_action:
             self._copy_selected_point()
         elif action == del_action:
             self.delete_point_by_key(self._points[idx].key)
@@ -497,8 +516,7 @@ class CanvasPoiMixin:
         if pidx >= 0:
             self._selected_point_idx = pidx
             self._selected_arrow_idx = -1
-            self._poi_drag = (PoiDrag.NONE if self._points[pidx].is_reference
-                              else PoiDrag.MOVE_POINT)
+            self._poi_drag = PoiDrag.MOVE_POINT
             self._poi_drag_moved = False
             # 仅选中，数据未变 → 不能标记 dirty
             self._notify_selection_changed()
@@ -569,6 +587,8 @@ class CanvasPoiMixin:
             cx, cy = self._widget_to_canvas_norm(pos)
             p = self._points[self._selected_point_idx]
             p.cx_ratio, p.cy_ratio = cx, cy
+            if p.is_reference:
+                p.position_overridden = True
             # Shift 按下时禁用吸附
             if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
                 self._snap_lines_x = []

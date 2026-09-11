@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from lvjiang.core.layout_models import Region
 from lvjiang.workflows.align import GridAlignment
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.grammar.ast_nodes import Scroll
@@ -78,12 +79,7 @@ class TestClickSceneRegion:
         """click [scene].[region] 语法执行"""
         eng = make_engine()
         # 设置 layout mock 返回 region
-        region = MagicMock()
-        region.key = "btn_ok"
-        region.x_ratio = 0.25
-        region.y_ratio = 0.25
-        region.w_ratio = 0.5
-        region.h_ratio = 0.5
+        region = Region("btn_ok", 0.25, 0.25, 0.5, 0.5)
         eng._layout.get_scene_regions.return_value = [region]
 
         code = "click [test_scene].[btn_ok]\n"
@@ -188,12 +184,7 @@ class TestForLoopWithClick:
     def test_for_loop_click(self):
         """for 循环内点击正常执行"""
         eng = make_engine()
-        region = MagicMock()
-        region.key = "item"
-        region.x_ratio = 0.5
-        region.y_ratio = 0.5
-        region.w_ratio = 0.1
-        region.h_ratio = 0.1
+        region = Region("item", 0.5, 0.5, 0.1, 0.1)
         eng._layout.get_scene_regions.return_value = [region]
 
         code = '''for i in [1, 2, 3]

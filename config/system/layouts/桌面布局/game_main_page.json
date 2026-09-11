@@ -179,6 +179,14 @@
       "w_ratio": 0.0,
       "h_ratio": 0.0,
       "activation_key": "B"
+    },
+    {
+      "key": "settings",
+      "x_ratio": 0.0,
+      "y_ratio": 0.0,
+      "w_ratio": 0.0,
+      "h_ratio": 0.0,
+      "activation_key": "SLASH"
     }
   ],
   "points": [

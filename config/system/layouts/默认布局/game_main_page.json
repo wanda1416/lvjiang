@@ -179,6 +179,10 @@
     {
       "key": "bag",
       "disabled": true
+    },
+    {
+      "key": "settings",
+      "disabled": true
     }
   ],
   "points": [

@@ -17,10 +17,16 @@
     },
     {
       "key": "close_item",
-      "x_ratio": 0.752566729186992,
-      "y_ratio": 0.24409822592041572,
-      "w_ratio": 0.029102356558401654,
-      "h_ratio": 0.06035727169596469
+      "x_ratio": 0.7564195460771755,
+      "y_ratio": 0.24984371182994622,
+      "w_ratio": 0.022300681070705597,
+      "h_ratio": 0.048852466168580994,
+      "template": {
+        "name": "默认布局/general_control/close_item",
+        "min_score": 0.6,
+        "record_w": 2800,
+        "record_h": 1260
+      }
     },
     {
       "key": "blank_area",
@@ -37,8 +43,17 @@
       "h_ratio": 1.0
     },
     {
-      "key": "open_settings",
-      "disabled": true
+      "key": "back",
+      "x_ratio": 0.9225690595025903,
+      "y_ratio": 0.04531102443227911,
+      "w_ratio": 0.02743842364532012,
+      "h_ratio": 0.04827586206896552,
+      "template": {
+        "name": "默认布局/general_control/back",
+        "min_score": 0.6,
+        "record_w": 2800,
+        "record_h": 1260
+      }
     }
   ],
   "points": [

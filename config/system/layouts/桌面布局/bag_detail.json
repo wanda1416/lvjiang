@@ -3,11 +3,17 @@
   "regions": [
     {
       "key": "back",
-      "x_ratio": 0.9376971128817637,
-      "y_ratio": 0.03120928033203248,
-      "w_ratio": 0.031023784901758056,
-      "h_ratio": 0.06204756980351603,
-      "activation_key": "ESC"
+      "x_ratio": 0.9419007751662158,
+      "y_ratio": 0.045695737844530314,
+      "w_ratio": 0.028953086018932428,
+      "h_ratio": 0.04060398366916556,
+      "activation_key": "ESC",
+      "template": {
+        "name": "桌面布局/bag_detail/back",
+        "min_score": 0.6,
+        "record_w": 1936,
+        "record_h": 1088
+      }
     },
     {
       "key": "peiyang",

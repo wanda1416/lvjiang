@@ -13,3 +13,8 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: finish_logo
+  name: 完成标记
+  type: attr
+  is_text: false
+  is_clickable: false

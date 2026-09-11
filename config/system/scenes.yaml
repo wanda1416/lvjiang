@@ -21,6 +21,7 @@ scenes:
     - training_main
     - training_xinfa
     - role_detail
+    - tongyou_main
   resource:
     name: 物资
     items:

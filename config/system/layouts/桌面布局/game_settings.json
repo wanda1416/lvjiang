@@ -90,5 +90,19 @@
       "w_ratio": 0.1274738524574235,
       "h_ratio": 0.10163659284461574
     }
+  ],
+  "reference_positions": [
+    {
+      "scene": "general_control",
+      "entity": "confirm",
+      "x_ratio": 0.4958482576692578,
+      "y_ratio": 0.6335349375534095
+    },
+    {
+      "scene": "general_control",
+      "entity": "cancel",
+      "x_ratio": 0.4190851757532083,
+      "y_ratio": 0.6335349375534095
+    }
   ]
 }

@@ -1,4 +1,13 @@
-from lvjiang.core.batch_config import BatchConfigItem, BatchWorkflows
+import json
+
+from lvjiang.core.batch_config import (
+    BATCH_DOCUMENT_TYPE,
+    BatchConfig,
+    BatchConfigItem,
+    BatchConfigStore,
+    BatchWorkflows,
+    lifecycle_parameter_definitions,
+)
 
 
 def test_batch_workflows_round_trip_new_lifecycle():
@@ -8,53 +17,64 @@ def test_batch_workflows_round_trip_new_lifecycle():
         finish_item="batch/finish_item.wf",
         batch_teardown="batch/teardown.wf",
     )
-
     assert BatchWorkflows.from_dict(workflows.to_dict()) == workflows
 
 
-def test_usernames_round_trip():
-    legacy = BatchConfigItem.from_dict({"name": "旧配置"})
-    legacy.usernames = ["用户B", "用户A"]
-    restored = BatchConfigItem.from_dict(legacy.to_dict())
-    assert restored.usernames == ["用户B", "用户A"]
-
-
-# ─── batch 节点是共享的，保存不能整节点覆写 ────────────────
-
-
-class _Store:
-    """最小 SessionStore 替身：只关心 batch 节点的读改写。"""
-
-    def __init__(self, node):
-        self.node = node
-
-    def get_node(self, _name, default=None):
-        return self.node if self.node is not None else default
-
-    def mutate_node(self, _name, merge):
-        self.node = merge(self.node)
-        return self.node
-
-
-def _store(monkeypatch, node):
-    store = _Store(node)
-    monkeypatch.setattr(
-        "lvjiang.core.config.session.get_session_store", lambda: store
+def test_group_round_trip_uses_visibility_order_for_selection(tmp_path):
+    path = tmp_path / "batch.json"
+    group = BatchConfigItem(
+        name="日常",
+        task_ids=["b", "a"],
+        usernames=["用户B", "用户A"],
+        selected_task_ids=["a", "b"],
+        selected_usernames=["用户A", "用户B"],
+        rounds=3,
+        workflow_params={
+            "prepare_item": {"skip_online_role": False,
+                             "online_role_max_wait": 300},
+        },
     )
-    return store
+    BatchConfigStore(path).save(BatchConfig({"日常": group}, "日常"))
+
+    restored = BatchConfigStore(path).load().configs["日常"]
+    assert restored.task_ids == ["b", "a"]
+    assert restored.usernames == ["用户B", "用户A"]
+    assert restored.selected_task_ids == ["b", "a"]
+    assert restored.selected_usernames == ["用户B", "用户A"]
+    assert restored.rounds == 3
+    assert restored.workflow_params == group.workflow_params
 
 
-def test_saving_config_replaces_obsolete_batch_keys(monkeypatch):
-    from lvjiang.core.batch_config import BatchConfig, save_batch_config
+def test_group_rounds_default_and_normalize():
+    assert BatchConfigItem.from_dict("默认", {}).rounds == 1
+    assert BatchConfigItem.from_dict("过小", {"rounds": 0}).rounds == 1
+    assert BatchConfigItem.from_dict("过大", {"rounds": 1000}).rounds == 999
+    assert BatchConfigItem.from_dict("非法", {"rounds": "2"}).rounds == 1
 
-    store = _store(monkeypatch, {
-        "enabled_rows": {"demo": [True, False]},
-        "future_key": {"kept": 1},
-    })
 
-    save_batch_config(BatchConfig(active_config="demo", script_ids=["a"]))
+def test_old_session_batch_shape_is_not_accepted(tmp_path):
+    path = tmp_path / "batch.json"
+    path.write_text(json.dumps({
+        "configs": {"旧配置": {"usernames": ["用户A"]}},
+        "active_config": "旧配置",
+        "script_ids": ["old-task"],
+    }), encoding="utf-8")
 
-    assert "enabled_rows" not in store.node
-    assert "future_key" not in store.node
-    assert store.node["script_ids"] == ["a"]
-    assert store.node["active_config"] == "demo"
+    assert BatchConfigStore(path).load() == BatchConfig()
+
+
+def test_saved_document_has_own_type_and_version(tmp_path):
+    path = tmp_path / "batch.json"
+    BatchConfigStore(path).save(BatchConfig())
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    assert raw["document_type"] == BATCH_DOCUMENT_TYPE
+    assert raw["version"] == 1
+
+
+def test_lifecycle_parameter_definitions_reads_workflow_metadata():
+    definitions = lifecycle_parameter_definitions(BatchWorkflows(
+        prepare_item="batch/prepare_item.wf",
+    ))
+    assert [item["name"] for item in definitions["prepare_item"]] == [
+        "skip_online_role", "online_role_max_wait",
+    ]

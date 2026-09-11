@@ -1,0 +1,51 @@
+#% parameters:
+#%   - name: skip_online_role
+#%     label: 角色在线跳过
+#%     type: bool
+#%     default: true
+#%   - name: online_role_max_wait
+#%     label: 角色在线最大等待时间（秒）
+#%     type: number
+#%     default: 600
+#%     min: 0
+#%     max: 3600
+# 花蕊织轮次调度的条目准备：确保客户端在登录页，再复用公共登录过程进入当前用户。
+#
+# 进度已满的用户直接跳过，连客户端都不启动。
+# 先识别是否已经在登录页：
+#   已在登录页 → 直接复用公共登录流程；
+#   不在登录页 → 若客户端仍在运行则先结束，再启动客户端并从启动页回到登录页。
+
+import "subcall/login.wf"
+
+eval check_env(["android"])
+
+eval $huaruizhi_of_week = profile_get("huaruizhi_of_week")
+if $huaruizhi_of_week >= 3000
+    return {"status": "skipped", "message": "本周花蕊织进度已满", "state": $batch_state}
+end
+
+call $in_login_page = is_in_login_page()
+if not $in_login_page
+    if android_app_running("yyslscn")
+        app stop "yyslscn"
+    end
+    app start "yyslscn" timeout 30
+    scene [game_login_page] view [init]
+    # 登录页背景动画常驻，等不到稳定帧，只能轮询启动页的返回按钮。
+    loop 60
+        scan [game_login_page].[back] as $startup_back by image
+        if $startup_back
+            click [game_login_page].[back] after wait @page_refresh
+            goto login_page_ready
+        end
+        wait @page_refresh
+    end
+    eval pause("未检测到游戏启动页返回按钮，请手动回到登录页后点击继续")
+end
+
+@login_page_ready
+
+eval $username = $batch_users.$batch_index
+call $result = prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait)
+return $result

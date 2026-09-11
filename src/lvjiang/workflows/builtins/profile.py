@@ -21,6 +21,10 @@ def _user_get(_engine, username: str, key: str, *args):
     """按内部用户名读取用户资料属性；不存在时返回 null。"""
     if not username or not key:
         return None
+    snapshot = getattr(_engine, "user_attributes_snapshot", None)
+    if isinstance(snapshot, dict) and str(username) in snapshot:
+        attributes = snapshot[str(username)]
+        return attributes.get(str(key)) if isinstance(attributes, dict) else None
     from ...core.user_config import get_user_attribute
 
     return get_user_attribute(

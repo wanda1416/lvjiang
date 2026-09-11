@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import threading
+from copy import deepcopy
 
 from loguru import logger
 from PyQt6.QtCore import QEvent, QObject, QSize, Qt, pyqtSignal
@@ -303,6 +304,9 @@ class MainWindow(
         self._user_config = load_user_config()
         self._backend = None
         self._cleanup_callbacks: list = []  # 插件注册的关闭时清理回调
+        # 左侧批量页早于右侧日志页构建；脚本配置告警可能在此期间产生。
+        self._log_buffer: list[tuple[int, str]] = []
+        self._log_min_level = 20
 
         # ── OCR / 输入 ──
         from ...core.ocr import OCREngine
@@ -659,6 +663,9 @@ class MainWindow(
         from ..execution_user_selector import ExecutionUserSelector
         self._daily_execution_user_selector = ExecutionUserSelector(
             self._user_manager)
+        self._daily_execution_user_selector.resolved_user_changed.connect(
+            self._on_daily_execution_user_changed
+        )
         daily_layout.addWidget(self._daily_execution_user_selector)
 
         wf_group = QGroupBox(tr("脚本"))
@@ -679,6 +686,15 @@ class MainWindow(
         wf_layout.addWidget(self.btn_load_workflow)
         wf_layout.addStretch(1)
         daily_layout.addWidget(wf_group)
+
+        self._independent_params_checkbox = QCheckBox(
+            tr("为当前用户使用独立参数"))
+        self._independent_params_checkbox.setObjectName(
+            "user_independent_params")
+        self._independent_params_checkbox.setVisible(False)
+        self._independent_params_checkbox.toggled.connect(
+            self._on_independent_params_toggled)
+        daily_layout.addWidget(self._independent_params_checkbox)
 
         self._workflow_note_label = _create_workflow_note_label()
         daily_layout.addWidget(self._workflow_note_label)
@@ -705,9 +721,6 @@ class MainWindow(
 
     def _build_right_tabs(self):
         """构建内置右侧 Tab，再按注册顺序追加插件 Tab。"""
-        self._log_buffer: list[tuple[int, str]] = []  # (level, text)
-        self._log_min_level = 20  # INFO=20, DEBUG=10
-
         # 日志面板容器：日志文本 + 底部级别过滤栏
         log_container = QWidget()
         log_layout = QVBoxLayout(log_container)
@@ -717,6 +730,9 @@ class MainWindow(
         self.log_text = TrimmedLogEdit()
         self.log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 12px;")
         log_layout.addWidget(self.log_text, 1)
+        for level, text in self._log_buffer:
+            if level >= self._log_min_level:
+                self.log_text.append(text)
 
         # 底部级别过滤栏
         filter_bar = QHBoxLayout()
@@ -820,7 +836,7 @@ class MainWindow(
         else:
             level = logging.INFO
         self._log_buffer.append((level, text))
-        if level >= self._log_min_level:
+        if level >= self._log_min_level and hasattr(self, "log_text"):
             self.log_text.append(text)
 
     def _on_log_level_changed(self):
@@ -851,10 +867,6 @@ class MainWindow(
 
         usernames: 本次执行的用户名列表，列表顺序就是执行顺序
         """
-        # 批量线程从 wf_configs 读取参数。正常情况下参数控件的 change 信号
-        # 已实时落盘；这里再同步一次，覆盖尚未提交编辑值等入口边界情况。
-        self._save_displayed_params()
-
         if not self._backend_ready():
             if self._backend == "adb":
                 self._log_append(tr("[错误] 请先连接设备"))
@@ -889,9 +901,9 @@ class MainWindow(
             input_ctrl=self._input,
             layout=layout,
             run_env=self._selected_run_env(),
-            input_sim=self._user_config.input_sim,
-            delay_params=self._user_config.delay_params,
-            android_apps=self._user_config.android_apps,
+            input_sim=deepcopy(self._user_config.input_sim),
+            delay_params=deepcopy(self._user_config.delay_params),
+            android_apps=deepcopy(self._user_config.android_apps),
             android_device=getattr(self, "_device", None),
             window_left=window_left,
             window_top=window_top,
@@ -915,6 +927,7 @@ class MainWindow(
             session_manager=self._session_manager,
             stop_check=self._is_stopped,
         )
+        self._batch_tab.apply_task_plan(worker.task_plan_snapshot())
 
         # 信号连接：进度 → batch_tab，日志 → log_text
         # （批量层显式传递用户，不再联动主页面用户下拉）
@@ -934,9 +947,8 @@ class MainWindow(
         """工具菜单 → 批量配置：打开配置对话框"""
         from ..batch import BatchConfigDialog
         dlg = BatchConfigDialog(self._user_manager, self)
-        if dlg.exec():
-            # 保存后刷新批量 Tab 的条目概览和脚本勾选
-            self._batch_tab.refresh_config()
+        dlg.saved.connect(self._batch_tab.refresh_config)
+        dlg.exec()
 
     # ─── 快捷键 + 关闭 ───────────────────────────────────────
 

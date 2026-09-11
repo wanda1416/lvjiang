@@ -1,15 +1,16 @@
-"""批量执行 Tab — 进度 / 脚本 / 配置 三页子 Tab
+"""批量执行 Tab — 脚本 / 用户 / 进度 / 参数四页子 Tab
 
 挂载于主窗口左侧 Tab「批量」。
-仿照调律 Tab 结构：顶部开始/停止按钮 + 三页子 Tab。
+仿照调律 Tab 结构：顶部开始/停止按钮 + 四页子 Tab。
 - 进度：执行进度表
 - 脚本：勾选要执行的脚本
-- 配置：选择配置 + 临时勾选要执行的用户
+- 用户：勾选当前配置组实际执行的用户
 """
 
 from __future__ import annotations
 
-from typing import cast
+import json
+from typing import Any, cast
 
 from loguru import logger
 from PyQt6.QtCore import QEvent, QSize, Qt, QTimer
@@ -17,11 +18,17 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
+    QFormLayout,
+    QFrame,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
+    QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -33,6 +40,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.batch_config import (
     BatchConfigItem,
+    lifecycle_parameter_definitions,
     load_batch_config,
     save_batch_config,
 )
@@ -47,6 +55,7 @@ from .batch_runner import (
     ST_SKIPPED,
     ST_SUCCESS,
     BatchScript,
+    PlannedTask,
 )
 
 
@@ -117,15 +126,17 @@ class BatchTab(QWidget):
         self._running = False
         self._progress_column_resize_guard = False
         self._progress_row_index: dict[tuple[int, str], int] = {}
+        self._progress_row_context: dict[int, tuple[int, str]] = {}
+        self._progress_task_plan: dict[tuple[int, str], PlannedTask] = {}
+        self._params_popup: QFrame | None = None
         self._setup_ui()
 
         # 宿主状态信号
         host.automation_state_changed.connect(self._on_automation_state)
         get_theme_manager().theme_changed.connect(self._refresh_status_colors)
 
-        self._refresh_script_list()
         self._refresh_config_combo()
-        self._refresh_entry_list()
+        self._refresh_group_contents()
         QTimer.singleShot(0, self._set_initial_column_widths)
 
     # ─── UI 构建 ─────────────────────────────────────────
@@ -151,12 +162,58 @@ class BatchTab(QWidget):
         btn_layout.addWidget(self._btn_pause_resume)
         layout.addLayout(btn_layout)
 
-        # ── 三页子 Tab ──
+        config_row = QHBoxLayout()
+        config_row.addWidget(QLabel(tr("当前配置组：")))
+        self._config_combo = QComboBox()
+        self._config_combo.setMinimumWidth(150)
+        self._config_combo.currentIndexChanged.connect(self._on_config_changed)
+        config_row.addWidget(self._config_combo, stretch=1)
+        layout.addLayout(config_row)
+
+        # ── 四页子 Tab ──
         self._sub_tabs = QTabWidget()
         self._sub_tabs.addTab(self._build_script_page(), tr("脚本"))
-        self._sub_tabs.addTab(self._build_config_page(), tr("配置"))
+        self._sub_tabs.addTab(self._build_config_page(), tr("用户"))
         self._sub_tabs.addTab(self._build_progress_page(), tr("进度"))
+        self._sub_tabs.addTab(self._build_params_page(), tr("参数"))
         layout.addWidget(self._sub_tabs)
+
+    def _build_params_page(self) -> QWidget:
+        """参数页：保存当前配置组的执行参数。"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(8, 8, 8, 8)
+        summary_group = QGroupBox(tr("批量设置"))
+        summary_form = QFormLayout(summary_group)
+        self._rounds_spin = QSpinBox()
+        self._rounds_spin.setRange(1, 999)
+        self._rounds_spin.setValue(1)
+        self._rounds_spin.valueChanged.connect(self._persist_rounds)
+        summary_form.addRow(tr("执行轮数："), self._rounds_spin)
+        self._workflow_labels: dict[str, QLabel] = {}
+        for key, label in (
+            ("batch_setup", tr("批次准备") + "："),
+            ("prepare_item", tr("条目准备") + "："),
+            ("finish_item", tr("条目收尾") + "："),
+            ("batch_teardown", tr("批次收尾") + "："),
+        ):
+            value = QLabel()
+            value.setTextInteractionFlags(
+                Qt.TextInteractionFlag.TextSelectableByMouse)
+            value.setWordWrap(True)
+            self._workflow_labels[key] = value
+            summary_form.addRow(label, value)
+        layout.addWidget(summary_group)
+
+        self._workflow_params_panel = QWidget()
+        self._workflow_params_layout = QVBoxLayout(self._workflow_params_panel)
+        self._workflow_params_layout.setContentsMargins(0, 0, 0, 0)
+        self._workflow_param_groups: list[QGroupBox] = []
+        self._workflow_param_widgets: dict[tuple[str, str], QWidget] = {}
+        self._workflow_param_types: dict[tuple[str, str], str] = {}
+        layout.addWidget(self._workflow_params_panel)
+        layout.addStretch()
+        return widget
 
     def _build_progress_page(self) -> QWidget:
         """进度页：执行进度表"""
@@ -183,6 +240,7 @@ class BatchTab(QWidget):
         self._progress_table.setEditTriggers(
             QTableWidget.EditTrigger.NoEditTriggers
         )
+        self._progress_table.cellClicked.connect(self._on_progress_cell_clicked)
         vheader = self._progress_table.verticalHeader()
         assert vheader is not None
         vheader.setVisible(False)
@@ -195,23 +253,24 @@ class BatchTab(QWidget):
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        title_row = QHBoxLayout()
-        title_row.addStretch()
-        self._btn_script_up = QPushButton(tr("↑ 上移"))
-        self._btn_script_up.setFixedWidth(72)
-        self._btn_script_up.clicked.connect(lambda: self._move_selected_script(-1))
-        title_row.addWidget(self._btn_script_up)
-        self._btn_script_down = QPushButton(tr("↓ 下移"))
-        self._btn_script_down.setFixedWidth(72)
-        self._btn_script_down.clicked.connect(lambda: self._move_selected_script(1))
-        title_row.addWidget(self._btn_script_down)
+        actions = QHBoxLayout()
+        script_label = QLabel(tr("<b>选择执行脚本：</b>"))
+        script_label.setToolTip(tr("执行顺序由批量配置中的任务顺序决定"))
+        actions.addWidget(script_label)
+        actions.addStretch()
+        self._btn_script_all = QPushButton(tr("全选"))
+        self._btn_script_none = QPushButton(tr("全不选"))
+        self._btn_script_all.clicked.connect(
+            lambda: self._set_all_scripts_checked(True))
+        self._btn_script_none.clicked.connect(
+            lambda: self._set_all_scripts_checked(False))
         apply_button_style(
-            self._btn_script_up, self._btn_script_down, variant="neutral"
+            self._btn_script_all, self._btn_script_none,
+            variant="neutral",
         )
-        fit_button_width(
-            self._btn_script_up, self._btn_script_down, minimum=72
-        )
-        layout.addLayout(title_row)
+        for button in (self._btn_script_all, self._btn_script_none):
+            actions.addWidget(button)
+        layout.addLayout(actions)
 
         self._script_list = QTreeWidget()
         self._script_list.setColumnCount(2)
@@ -228,6 +287,8 @@ class BatchTab(QWidget):
         self._script_list.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
+        self._script_list.setToolTip(
+            tr("执行顺序由批量配置中的任务顺序决定"))
         header = self._script_list.header()
         assert header is not None
         header.setMinimumHeight(32)
@@ -238,9 +299,6 @@ class BatchTab(QWidget):
             1, _four_cjk_column_width(self._script_list)
         )
         self._script_list.itemChanged.connect(self._on_script_item_changed)
-        self._script_list.currentItemChanged.connect(
-            lambda *_: self._update_script_move_buttons()
-        )
         layout.addWidget(self._script_list, stretch=1)
 
         self._script_order: list[str] = []
@@ -248,7 +306,6 @@ class BatchTab(QWidget):
         self._missing_script_ids: list[tuple[int, str]] = []
         self._script_configs_by_id: dict[str, dict] = {}
         self._updating_script_list = False
-        self._update_script_move_buttons()
         return widget
 
     def _set_initial_column_widths(self) -> None:
@@ -347,34 +404,31 @@ class BatchTab(QWidget):
         return super().eventFilter(watched, event)
 
     def _build_config_page(self) -> QWidget:
-        """配置页：选择配置 + 勾选要执行的行"""
+        """用户页：勾选当前配置组实际执行的用户。"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        # 配置选择行
-        config_row = QHBoxLayout()
-        config_row.addWidget(QLabel(tr("当前配置：")))
-        self._config_combo = QComboBox()
-        self._config_combo.setMinimumWidth(150)
-        self._config_combo.currentIndexChanged.connect(self._on_config_changed)
-        config_row.addWidget(self._config_combo, stretch=1)
-        layout.addLayout(config_row)
-
         # 全选/全不选行
         select_row = QHBoxLayout()
-        select_row.addWidget(QLabel(tr("<b>选择要执行的行：</b>")))
+        user_label = QLabel(tr("<b>选择执行用户：</b>"))
+        user_label.setToolTip(tr("执行顺序由批量配置中的用户顺序决定"))
+        select_row.addWidget(user_label)
         select_row.addStretch()
-        btn_all = QPushButton(tr("全选"))
-        btn_all.setFixedWidth(60)
-        btn_all.clicked.connect(lambda: self._set_all_entries_checked(True))
-        select_row.addWidget(btn_all)
-        btn_none = QPushButton(tr("全不选"))
-        btn_none.setFixedWidth(60)
-        btn_none.clicked.connect(lambda: self._set_all_entries_checked(False))
-        select_row.addWidget(btn_none)
-        apply_button_style(btn_all, btn_none, variant="neutral")
-        fit_button_width(btn_all, btn_none, minimum=60)
+        self._btn_user_all = QPushButton(tr("全选"))
+        self._btn_user_all.setFixedWidth(60)
+        self._btn_user_all.clicked.connect(
+            lambda: self._set_all_entries_checked(True))
+        select_row.addWidget(self._btn_user_all)
+        self._btn_user_none = QPushButton(tr("全不选"))
+        self._btn_user_none.setFixedWidth(60)
+        self._btn_user_none.clicked.connect(
+            lambda: self._set_all_entries_checked(False))
+        select_row.addWidget(self._btn_user_none)
+        apply_button_style(
+            self._btn_user_all, self._btn_user_none, variant="neutral")
+        fit_button_width(
+            self._btn_user_all, self._btn_user_none, minimum=60)
         layout.addLayout(select_row)
 
         # 行勾选列表（放在 scroll 中）
@@ -386,7 +440,7 @@ class BatchTab(QWidget):
         scroll_layout = QVBoxLayout(scroll_widget)
         scroll_layout.setContentsMargins(0, 0, 0, 0)
 
-        self._entry_checkboxes: list[tuple[QCheckBox, int]] = []  # (checkbox, row_index)
+        self._entry_checkboxes: list[tuple[QCheckBox, str]] = []
         self._entry_container = QVBoxLayout()
         self._entry_container.setSpacing(0)
         scroll_layout.addLayout(self._entry_container)
@@ -394,7 +448,6 @@ class BatchTab(QWidget):
 
         scroll.setWidget(scroll_widget)
         layout.addWidget(scroll, stretch=1)
-
         return widget
 
     # ─── 配置选择 ─────────────────────────────────────────
@@ -421,7 +474,157 @@ class BatchTab(QWidget):
         cfg = load_batch_config()
         cfg.active_config = name
         save_batch_config(cfg)
+        self._refresh_group_contents()
+
+    def _refresh_group_contents(self) -> None:
+        self._refresh_script_list()
         self._refresh_entry_list()
+        self._refresh_params()
+
+    def _refresh_params(self) -> None:
+        cfg = load_batch_config()
+        item = cfg.configs.get(self._current_config_name()) or cfg.get_active()
+        self._rounds_spin.blockSignals(True)
+        self._rounds_spin.setValue(item.rounds if item is not None else 1)
+        self._rounds_spin.blockSignals(False)
+        for key, label in self._workflow_labels.items():
+            path = getattr(item.workflows, key) if item is not None else ""
+            label.setText(path or tr("未配置"))
+        self._rebuild_workflow_params(item)
+
+    def _rebuild_workflow_params(self, item: BatchConfigItem | None) -> None:
+        while self._workflow_params_layout.count():
+            layout_item = self._workflow_params_layout.takeAt(0)
+            old_widget = layout_item.widget() if layout_item is not None else None
+            if old_widget is not None:
+                old_widget.deleteLater()
+        self._workflow_param_groups.clear()
+        self._workflow_param_widgets.clear()
+        self._workflow_param_types.clear()
+        if item is None:
+            self._workflow_params_panel.setVisible(False)
+            return
+
+        phase_labels = {
+            "batch_setup": tr("批次准备"),
+            "prepare_item": tr("条目准备"),
+            "finish_item": tr("条目收尾"),
+            "batch_teardown": tr("批次收尾"),
+        }
+        definitions = lifecycle_parameter_definitions(item.workflows)
+        for phase, params in definitions.items():
+            if not params:
+                continue
+            group = QGroupBox(phase_labels[phase])
+            form = QFormLayout(group)
+            self._workflow_param_groups.append(group)
+            saved = item.workflow_params.get(phase, {})
+            for definition in params:
+                name = str(definition["name"])
+                label = str(definition.get("label") or name)
+                value = saved.get(name, definition.get("default"))
+                param_type = definition.get("type", "select")
+                widget: QWidget
+                if param_type == "bool":
+                    checkbox = QCheckBox()
+                    checkbox.setChecked(
+                        value.lower() in ("true", "1", "yes", "on")
+                        if isinstance(value, str) else bool(value))
+                    checkbox.toggled.connect(self._persist_workflow_params)
+                    widget = checkbox
+                elif param_type == "number":
+                    spin = QSpinBox()
+                    spin.setRange(
+                        int(definition.get("min", 0)),
+                        int(definition.get("max", 999999)),
+                    )
+                    spin.setValue(int(value) if value is not None else 0)
+                    spin.valueChanged.connect(self._persist_workflow_params)
+                    widget = spin
+                elif param_type == "select":
+                    combo = QComboBox()
+                    for option in definition.get("options", []):
+                        if isinstance(option, dict):
+                            combo.addItem(str(option.get("label", option["value"])),
+                                          option["value"])
+                        else:
+                            combo.addItem(str(option), str(option))
+                    selected = combo.findData(value)
+                    if selected >= 0:
+                        combo.setCurrentIndex(selected)
+                    combo.currentIndexChanged.connect(self._persist_workflow_params)
+                    widget = combo
+                elif param_type == "checkgroup":
+                    container = QWidget()
+                    options_layout = QHBoxLayout(container)
+                    options_layout.setContentsMargins(0, 0, 0, 0)
+                    selected_values = value if isinstance(value, dict) else {}
+                    for option in definition.get("options", []):
+                        if isinstance(option, dict):
+                            option_name = str(option["value"])
+                            option_label = str(option.get("label", option_name))
+                        else:
+                            option_name = option_label = str(option)
+                        checkbox = QCheckBox(option_label)
+                        checkbox.setObjectName(option_name)
+                        checkbox.setChecked(bool(selected_values.get(option_name, True)))
+                        checkbox.toggled.connect(self._persist_workflow_params)
+                        options_layout.addWidget(checkbox)
+                    options_layout.addStretch()
+                    widget = container
+                else:
+                    edit = QPlainTextEdit() if definition.get("multiline") else QLineEdit()
+                    if isinstance(edit, QPlainTextEdit):
+                        edit.setMaximumHeight(100)
+                        edit.setPlainText(str(value or ""))
+                        edit.textChanged.connect(self._persist_workflow_params)
+                    else:
+                        edit.setText(str(value or ""))
+                        edit.textChanged.connect(self._persist_workflow_params)
+                    widget = edit
+                widget.setObjectName(name)
+                self._workflow_param_widgets[(phase, name)] = widget
+                self._workflow_param_types[(phase, name)] = str(param_type)
+                form.addRow(f"{label}：", widget)
+            self._workflow_params_layout.addWidget(group)
+        self._workflow_params_panel.setVisible(bool(self._workflow_param_groups))
+
+    def _persist_workflow_params(self, *_args) -> None:
+        values: dict[str, dict] = {}
+        for key, widget in self._workflow_param_widgets.items():
+            phase, name = key
+            param_type = self._workflow_param_types[key]
+            value: Any
+            if isinstance(widget, QCheckBox):
+                value = widget.isChecked()
+            elif isinstance(widget, QSpinBox):
+                value = widget.value()
+            elif isinstance(widget, QComboBox):
+                value = widget.currentData()
+            elif isinstance(widget, QPlainTextEdit):
+                value = widget.toPlainText()
+            elif param_type == "checkgroup":
+                value = {
+                    checkbox.objectName(): checkbox.isChecked()
+                    for checkbox in widget.findChildren(QCheckBox)
+                }
+            else:
+                value = cast(QLineEdit, widget).text()
+            values.setdefault(phase, {})[name] = value
+        cfg = load_batch_config()
+        item = cfg.configs.get(self._current_config_name())
+        if item is None:
+            return
+        item.workflow_params = values
+        save_batch_config(cfg)
+
+    def _persist_rounds(self, rounds: int) -> None:
+        cfg = load_batch_config()
+        item = cfg.configs.get(self._current_config_name())
+        if item is None:
+            return
+        item.rounds = rounds
+        save_batch_config(cfg)
 
     def _current_config_name(self) -> str:
         """获取当前选中的配置名"""
@@ -433,7 +636,7 @@ class BatchTab(QWidget):
     # ─── 行列表 ──────────────────────────────────────────
 
     def _refresh_entry_list(self):
-        """刷新配置页的行勾选列表"""
+        """刷新用户页的勾选列表。"""
         # 清空旧控件
         while self._entry_container.count():
             item = self._entry_container.takeAt(0)
@@ -449,29 +652,45 @@ class BatchTab(QWidget):
             self._entry_container.addWidget(lbl)
             return
 
-        for i, username in enumerate(config.usernames):
+        selected = set(config.selected_usernames)
+        for username in config.usernames:
             cb = QCheckBox(username)
             cb.setFixedHeight(_batch_list_row_height(cb))
-            cb.setChecked(True)
+            cb.setToolTip(tr("执行顺序由批量配置中的用户顺序决定"))
+            cb.setChecked(username in selected)
+            cb.toggled.connect(self._persist_user_selection)
             self._entry_container.addWidget(cb)
-            self._entry_checkboxes.append((cb, i))
+            self._entry_checkboxes.append((cb, username))
 
     def _set_all_entries_checked(self, checked: bool):
         """全选/全不选行"""
-        for cb, _ in self._entry_checkboxes:
+        for cb, _username in self._entry_checkboxes:
+            cb.blockSignals(True)
             cb.setChecked(checked)
+            cb.blockSignals(False)
+        self._persist_user_selection()
+
+    def _persist_user_selection(self, *_args) -> None:
+        name = self._current_config_name()
+        selected = [
+            username for checkbox, username in self._entry_checkboxes
+            if checkbox.isChecked()
+        ]
+        cfg = load_batch_config()
+        item = cfg.configs.get(name)
+        if item is None:
+            return
+        item.selected_usernames = selected
+        save_batch_config(cfg)
 
     def _get_enabled_usernames(self) -> list[str]:
         """按配置顺序返回本次勾选的用户名。"""
         cfg = load_batch_config()
-        config = cfg.get_active()
+        config = cfg.configs.get(self._current_config_name())
         if not config:
             return []
-        return [
-            config.usernames[index]
-            for checkbox, index in self._entry_checkboxes
-            if checkbox.isChecked() and index < len(config.usernames)
-        ]
+        return [username for checkbox, username in self._entry_checkboxes
+                if checkbox.isChecked()]
 
     # ─── 脚本列表 ─────────────────────────────────────────
 
@@ -481,31 +700,43 @@ class BatchTab(QWidget):
 
         if checked_ids is None:
             cfg = load_batch_config()
-            checked_ids = list(cfg.script_ids)
+            group = cfg.configs.get(self._current_config_name()) or cfg.get_active()
+            checked_ids = list(group.selected_task_ids) if group is not None else []
 
         self._updating_script_list = True
         self._script_list.clear()
         try:
-            configs = [
+            discovered = [
                 cfg for cfg in list_exposed_scripts()
                 if cfg.get("batchable", True)
             ]
         except Exception:
-            configs = []
+            discovered = []
+        discovered_by_id = {cfg["id"]: cfg for cfg in discovered}
+        batch_cfg = load_batch_config()
+        group = batch_cfg.configs.get(self._current_config_name()) or batch_cfg.get_active()
+        visible_ids = list(group.task_ids) if group is not None else []
+        visible = set(visible_ids)
+        display_ids = list(visible_ids)
+        configs = [
+            discovered_by_id[task_id] for task_id in display_ids
+            if task_id in discovered_by_id
+        ]
         self._script_configs_by_id = {cfg["id"]: cfg for cfg in configs}
-        self._script_candidate_order = [cfg["id"] for cfg in configs]
-        self._script_order = []
+        self._script_candidate_order = [
+            task_id for task_id in display_ids if task_id in self._script_configs_by_id
+        ]
+        checked = set(checked_ids)
+        self._script_order = [
+            task_id for task_id in self._script_candidate_order if task_id in checked
+        ]
         # 勾选过、但此刻发现不到的脚本（被删、取消暴露、改成 dedicated、
         # 挪进 standalone/…）。它们不参与本次执行，但必须原位留在
-        # script_ids 里：顺手抹掉的话，脚本一恢复暴露，用户排好的顺序和
+        # selected_task_ids 里：顺手抹掉的话，脚本一恢复暴露，用户的
         # 勾选就再也回不来了，而且全程没有任何提示。
         self._missing_script_ids = []
         for index, script_id in enumerate(checked_ids):
-            if script_id in self._script_order:
-                continue
-            if script_id in self._script_configs_by_id:
-                self._script_order.append(script_id)
-            else:
+            if script_id in visible and script_id not in self._script_configs_by_id:
                 self._missing_script_ids.append((index, script_id))
         self._warn_missing_scripts()
 
@@ -515,18 +746,16 @@ class BatchTab(QWidget):
             item = QTreeWidgetItem([script_cfg["name"], ""])
             item.setData(0, Qt.ItemDataRole.UserRole, script_cfg)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            checked = script_cfg["id"] in checked_ids
+            is_checked = script_cfg["id"] in checked_ids
             item.setCheckState(
-                0, Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+                0, Qt.CheckState.Checked if is_checked else Qt.CheckState.Unchecked
             )
             item.setSizeHint(0, QSize(0, row_height))
             item.setSizeHint(1, QSize(0, row_height))
             item.setTextAlignment(1, Qt.AlignmentFlag.AlignCenter)
             self._script_list.addTopLevelItem(item)
         self._updating_script_list = False
-        self._reorder_script_rows()
         self._refresh_script_order_column()
-        self._update_script_move_buttons()
 
     def _script_id(self, item: QTreeWidgetItem | None) -> str:
         """返回脚本行绑定的 ID。"""
@@ -536,66 +765,37 @@ class BatchTab(QWidget):
         return cfg.get("id", "") if isinstance(cfg, dict) else ""
 
     def _on_script_item_changed(self, item: QTreeWidgetItem, column: int):
-        """勾选变化后追加/移除执行顺序，并立即连续编号。"""
+        """勾选变化后按配置组顺序更新实际执行项。"""
         if self._updating_script_list or column != 0:
             return
         script_id = self._script_id(item)
         if not script_id:
             return
         if item.checkState(0) == Qt.CheckState.Checked:
-            if script_id not in self._script_order:
-                self._script_order.append(script_id)
-        elif script_id in self._script_order:
-            self._script_order.remove(script_id)
-        self._reorder_script_rows()
+            selected = {*self._script_order, script_id}
+        else:
+            selected = set(self._script_order) - {script_id}
+        self._script_order = [
+            candidate for candidate in self._script_candidate_order
+            if candidate in selected
+        ]
         self._refresh_script_order_column()
         self._persist_script_order()
-        self._update_script_move_buttons()
 
-    def _reorder_script_rows(self):
-        """按执行顺序重排可见行：已勾选的在前，未勾选的按候选顺序在后。
-
-        可见行顺序就是执行顺序。少了这一步，「上移/下移」只会改动第二列
-        那个窄到看不见的序号，行本身纹丝不动——用户既以为按钮坏了，也无从
-        用肉眼校验自己排出来的顺序。
-        """
-        items_by_id: dict[str, QTreeWidgetItem] = {}
-        for index in range(self._script_list.topLevelItemCount()):
-            item = self._script_list.topLevelItem(index)
-            items_by_id[self._script_id(item)] = item
-        # 只排真正有行的 id：跳过一个缺行的 id 会让后续 target_index 整体
-        # 偏移一格，把「目标位之前均已就位」这个前提打破，反而排乱。
-        ordered_ids = [
-            script_id
-            for script_id in (
-                list(self._script_order) + self._script_candidate_order
-            )
-            if script_id in items_by_id
-        ]
-        ordered_ids = list(dict.fromkeys(ordered_ids))
-        current_id = self._script_id(self._script_list.currentItem())
-
+    def _set_all_scripts_checked(self, checked: bool) -> None:
         self._updating_script_list = True
         try:
-            for target_index, script_id in enumerate(ordered_ids):
-                item = items_by_id.get(script_id)
+            for index in range(self._script_list.topLevelItemCount()):
+                item = self._script_list.topLevelItem(index)
                 if item is None:
                     continue
-                # 目标位之前均已就位，所以当前位不会小于目标位。
-                current_index = self._script_list.indexOfTopLevelItem(item)
-                if current_index != target_index:
-                    self._script_list.insertTopLevelItem(
-                        target_index,
-                        self._script_list.takeTopLevelItem(current_index),
-                    )
+                item.setCheckState(
+                    0, Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
         finally:
             self._updating_script_list = False
-
-        # takeTopLevelItem 会清掉当前行，重排后需要把选中态放回原脚本，
-        # 否则连点两次「上移」第二次会因为没有选中项而静默失败。
-        moved = items_by_id.get(current_id)
-        if moved is not None:
-            self._script_list.setCurrentItem(moved)
+        self._script_order = list(self._script_candidate_order) if checked else []
+        self._refresh_script_order_column()
+        self._persist_script_order()
 
     def _refresh_script_order_column(self):
         """第二列仅为已勾选脚本显示连续的 1..N。"""
@@ -631,40 +831,13 @@ class BatchTab(QWidget):
         return merged
 
     def _persist_script_order(self):
-        """立即保存勾选项及其执行顺序。"""
+        """立即保存当前配置组的实际任务勾选。"""
         cfg = load_batch_config()
-        cfg.script_ids = self._merged_script_ids()
+        item = cfg.configs.get(self._current_config_name())
+        if item is None:
+            return
+        item.selected_task_ids = self._merged_script_ids()
         save_batch_config(cfg)
-
-    def _move_selected_script(self, delta: int):
-        """调整当前已勾选脚本的执行顺序。"""
-        script_id = self._script_id(self._script_list.currentItem())
-        if script_id not in self._script_order:
-            return
-        old_index = self._script_order.index(script_id)
-        new_index = old_index + delta
-        if new_index < 0 or new_index >= len(self._script_order):
-            return
-        self._script_order[old_index], self._script_order[new_index] = (
-            self._script_order[new_index], self._script_order[old_index]
-        )
-        self._reorder_script_rows()
-        self._refresh_script_order_column()
-        self._persist_script_order()
-        self._update_script_move_buttons()
-
-    def _update_script_move_buttons(self):
-        """仅在所选脚本可移动时启用顺序按钮。"""
-        script_id = self._script_id(self._script_list.currentItem())
-        try:
-            index = self._script_order.index(script_id)
-        except ValueError:
-            index = -1
-        editable = self._script_list.isEnabled()
-        self._btn_script_up.setEnabled(editable and index > 0)
-        self._btn_script_down.setEnabled(
-            editable and 0 <= index < len(self._script_order) - 1
-        )
 
     def _checked_script_ids(self) -> list[str]:
         """获取勾选的脚本 ID 列表"""
@@ -673,7 +846,7 @@ class BatchTab(QWidget):
     def _checked_scripts(self) -> list[BatchScript]:
         """获取勾选的脚本 BatchScript 列表
 
-        ⚠️ 不读取参数：脚本参数由批量执行引擎在执行时从 wf_configs 加载。
+        只携带参数定义；配置组与用户参数值由批量启动计划统一解析。
         """
         scripts: list[BatchScript] = []
         for script_id in self._script_order:
@@ -686,6 +859,7 @@ class BatchTab(QWidget):
                 wf_file=cfg.get("wf_file", ""),
                 class_name=cfg.get("class", ""),
                 scope=cfg.get("scope", "daily"),
+                parameters=list(cfg.get("parameters") or []),
             ))
         return scripts
 
@@ -709,19 +883,16 @@ class BatchTab(QWidget):
         scripts = self._checked_scripts()
 
         if not usernames:
-            self._host.append_log(tr("[批量] 暂无启用的用户，请到「配置」页勾选"))
+            self._host.append_log(tr("[批量] 暂无启用的用户，请到「用户」页勾选"))
             return
         if not scripts:
             self._host.append_log(tr("[批量] 请至少勾选一个脚本"))
             return
 
-        # 保存脚本勾选到 batch_config
         cfg = load_batch_config()
-        cfg.script_ids = self._merged_script_ids()
-        save_batch_config(cfg)
 
         # 构建进度表
-        config = cfg.get_active()
+        config = cfg.configs.get(self._current_config_name())
         self._build_progress_table(usernames, config, scripts)
         self._set_config_enabled(False)
 
@@ -738,11 +909,14 @@ class BatchTab(QWidget):
         # 所以这个映射是精确的；靠标签文本反查则会在标签重名、或两边标签
         # 算法不一致时把状态刷到别人的行上（甚至一行都刷不到）。
         self._progress_row_index = {}
+        self._progress_row_context = {}
+        self._progress_task_plan = {}
         for run_idx, username in enumerate(usernames):
             label = username
             for script in scripts:
                 row = self._progress_table.rowCount()
                 self._progress_row_index[(run_idx, script.id)] = row
+                self._progress_row_context[row] = (run_idx, script.id)
                 self._progress_table.insertRow(row)
                 label_item = QTableWidgetItem(label)
                 label_item.setToolTip(label)
@@ -757,6 +931,96 @@ class BatchTab(QWidget):
                 self._progress_table.setItem(row, 2, status_item)
         # Rows may make the vertical scrollbar appear, changing viewport width.
         QTimer.singleShot(0, self._set_progress_column_widths)
+
+    def apply_task_plan(
+        self, plan: dict[tuple[int, str], PlannedTask],
+    ) -> None:
+        """绑定本轮执行快照，并标记使用用户独立参数的组合。"""
+        self._progress_task_plan = plan
+        for key, planned in plan.items():
+            row = self._progress_row_index.get(key)
+            if row is None:
+                continue
+            item = self._progress_table.item(row, 1)
+            if item is None:
+                continue
+            prefix = "* " if planned.parameter_source == "user" else ""
+            item.setText(prefix + planned.script.name)
+            item.setToolTip(
+                (tr("* 表示当前用户使用独立参数\n")
+                 if planned.parameter_source == "user" else "")
+                + tr("点击查看本轮任务参数"))
+
+    @staticmethod
+    def _format_param_value(value) -> str:
+        if isinstance(value, bool):
+            return tr("是") if value else tr("否")
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, ensure_ascii=False)
+        return str(value)
+
+    def _on_progress_cell_clicked(self, row: int, column: int) -> None:
+        """点击脚本名称时显示当前用户与任务的参数快照。"""
+        if column != 1:
+            return
+        key = self._progress_row_context.get(row)
+        planned = self._progress_task_plan.get(key) if key is not None else None
+        if planned is None:
+            return
+        if self._params_popup is not None:
+            self._params_popup.close()
+
+        popup = QFrame(self, Qt.WindowType.Popup)
+        popup.setFrameShape(QFrame.Shape.StyledPanel)
+        popup.setMinimumWidth(300)
+        popup.setMaximumWidth(480)
+        outer = QVBoxLayout(popup)
+        outer.setContentsMargins(12, 10, 12, 10)
+        outer.setSpacing(8)
+        outer.addWidget(QLabel(f"<b>{planned.script.name}</b>"))
+        source = (tr("用户独立参数") if planned.parameter_source == "user"
+                  else tr("全局任务参数"))
+        detail = QLabel(
+            tr("执行用户：{username}\n参数来源：{source}").format(
+                username=planned.username, source=source))
+        detail.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        outer.addWidget(detail)
+
+        body = QWidget()
+        form = QFormLayout(body)
+        form.setContentsMargins(0, 0, 0, 0)
+        definitions = {
+            str(item.get("name")): str(item.get("label") or item.get("name"))
+            for item in (planned.script.parameters or [])
+            if isinstance(item, dict) and item.get("name")
+        }
+        if planned.params:
+            for name, value in planned.params.items():
+                value_label = QLabel(self._format_param_value(value))
+                value_label.setWordWrap(True)
+                value_label.setTextInteractionFlags(
+                    Qt.TextInteractionFlag.TextSelectableByMouse)
+                form.addRow(definitions.get(name, name) + "：", value_label)
+        else:
+            form.addRow(QLabel(tr("该任务没有可配置参数")))
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setMaximumHeight(260)
+        scroll.setWidget(body)
+        outer.addWidget(scroll)
+
+        item = self._progress_table.item(row, column)
+        if item is None:
+            return
+        rect = self._progress_table.visualItemRect(item)
+        viewport = cast(QWidget, self._progress_table.viewport())
+        position = viewport.mapToGlobal(rect.bottomLeft())
+        popup.adjustSize()
+        popup.move(position)
+        popup.show()
+        self._params_popup = popup
 
     def update_progress(self, run_idx: int, entry_label: str,
                         script_id: str, status: str):
@@ -795,8 +1059,7 @@ class BatchTab(QWidget):
     def refresh_config(self):
         """外部配置变更后调用，刷新配置 + 脚本 + 行列表"""
         self._refresh_config_combo()
-        self._refresh_script_list()
-        self._refresh_entry_list()
+        self._refresh_group_contents()
 
     def refresh_scripts(self):
         """脚本发现/暴露层变更后调用，只刷新脚本候选列表。
@@ -851,9 +1114,14 @@ class BatchTab(QWidget):
             self._btn_pause_resume.setStyleSheet(_STYLE_BTN_DISABLED)
 
     def _set_config_enabled(self, enabled: bool):
-        """运行期间锁定脚本页和配置页"""
+        """运行期间锁定配置组、脚本、用户和参数。"""
         self._script_list.setEnabled(enabled)
-        self._update_script_move_buttons()
+        self._btn_script_all.setEnabled(enabled)
+        self._btn_script_none.setEnabled(enabled)
         self._config_combo.setEnabled(enabled)
-        for cb, _ in self._entry_checkboxes:
+        self._btn_user_all.setEnabled(enabled)
+        self._btn_user_none.setEnabled(enabled)
+        self._rounds_spin.setEnabled(enabled)
+        self._workflow_params_panel.setEnabled(enabled)
+        for cb, _username in self._entry_checkboxes:
             cb.setEnabled(enabled)

@@ -42,6 +42,9 @@ def _isolate_session_store(tmp_path, monkeypatch):
     monkeypatch.setattr(
         constants, "SESSION_PATH", tmp_path / "session" / "session.json",
     )
+    monkeypatch.setattr(
+        constants, "BATCH_CONFIG_PATH", tmp_path / "session" / "batch.json",
+    )
     reset_session_store()
     yield
     reset_session_store()

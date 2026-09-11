@@ -271,6 +271,7 @@ ocr_dialog:
   title: Image Recognition
   tab_ocr: Image Recognition
   tab_cleaning_rules: Cleaning Rules
+  tab_recognition_config: Recognition Settings
   btn_upload: Upload Image
   btn_refresh: Refresh Capture
   tooltip_refresh: Get latest capture from device
@@ -299,6 +300,21 @@ ocr_dialog:
   placeholder_test_output: Cleaning result...
   btn_test: Test
   status_rules_saved: Cleaning rules saved
+  recognition_config_hint: 'Batch region recognition combines multiple text regions into one canvas and runs OCR once.
+
+    These settings control the composite image size and apply from the next recognition run after saving.'
+  group_region_batch: Batch Region Recognition
+  label_min_canvas_side: 'Minimum canvas side:'
+  tooltip_min_canvas_side: The minimum width and height of the composite canvas. A smaller value can cause the OCR detector to enlarge narrow regions excessively.
+  label_max_content_height: 'Maximum content height per batch:'
+  tooltip_max_content_height: The maximum total content height in one batch. Additional regions are moved to the next batch.
+  label_region_gap: 'Region gap:'
+  tooltip_region_gap: Spacing between adjacent text regions in the composite image.
+  status_recognition_config_saved: Recognition settings saved
+  status_recognition_config_discarded: Discarded unsaved recognition setting changes
+  unsaved_ocr_config: 'The OCR settings have unsaved changes; closing will discard them.
+
+    Save first?'
   no_clipboard_image: No image in clipboard
   cannot_read_clipboard: Cannot read clipboard image
   select_image_title: Select Image
@@ -1102,10 +1118,11 @@ auto_strings:
   打日志: Write Log
   执行切割: Execute Split
   执行顺序: Execution Order
-  批次初始化: Batch Init
-  批次初始化 wf：: 'Batch Init wf:'
+  批次准备: Batch Init
+  条目准备: Item preparation
+  条目收尾: Item cleanup
+  批量设置: Batch settings
   批次收尾: Batch Wrap-up
-  批次收尾 wf：: 'Batch Wrap-up wf:'
   批量任务运行过程中不可修改环境和布局: Environment and layout cannot be changed while a batch task is running
   '批量分组:': 'Batch Group:'
   批量执行: Batch Run
@@ -1676,3 +1693,18 @@ task_history:
   clear_batch: Back to All Tasks
   select_batch: Select a batch run to view its input snapshot
   select_task: Select a task run to view its input parameters and file paths
+  当前配置组：: 'Current group:'
+  参数: Parameters
+  执行轮数：: 'Execution rounds:'
+  可见任务：: 'Visible tasks:'
+  可见用户：: 'Visible users:'
+  <b>选择执行脚本：</b>: '<b>Select scripts:</b>'
+  <b>选择执行用户：</b>: '<b>Select users:</b>'
+  执行顺序由批量配置中的任务顺序决定: Execution order follows the task order in Batch Configuration
+  执行顺序由批量配置中的用户顺序决定: Execution order follows the user order in Batch Configuration
+  拖动任务可调整批量执行顺序: Drag tasks to change the batch execution order
+  拖动用户可调整批量执行顺序: Drag users to change the batch execution order
+  全局任务参数: Global task parameters
+  '[批量] 暂无启用的用户，请到「用户」页勾选': '[Batch] No enabled users; select users on the User tab'
+  重命名: Rename
+  重命名配置: Rename Configuration

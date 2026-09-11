@@ -27,10 +27,9 @@
 
 ## 哪些目录参与
 
-core 只声明自己的（`scenes/`、`layouts/`）。插件私有目录由插件经
-`AppHooks.config_policy_modules` 自行注册（燕云的 `yysls/tuning_rules/` 见
-`apps/yysls/config/merge_policy.py`）——core.config 不认识任何插件领域词汇，
-理由同 `resolver.REGISTRY_LIST_PATHS`。
+core 只声明自己的（`scenes/`、`layouts/`）。插件私有目录和单文件由插件经
+`AppHooks.config_policy_modules` 自行注册——core.config 不认识任何插件领域
+词汇，理由同 `resolver.REGISTRY_LIST_PATHS`。
 """
 from __future__ import annotations
 
@@ -73,6 +72,8 @@ class VersionedDir:
 
 #: rel_dir → VersionedDir。core 只放自己的；插件经 register_versioned_dir 注册。
 VERSIONED_DIRS: dict[str, VersionedDir] = {}
+#: 不适合用目录 glob 表达的单文件配置。键是相对配置层根的完整路径。
+VERSIONED_FILES: dict[str, VersionedDir] = {}
 
 
 def register_versioned_dir(rel_dir: str, pattern: str, *, depth: int = 1,
@@ -86,9 +87,17 @@ def register_versioned_dir(rel_dir: str, pattern: str, *, depth: int = 1,
         allow_remote_new=allow_remote_new)
 
 
+def register_versioned_file(rel_path: str) -> None:
+    """声明一个参与 remote 下发的聚合配置文件。"""
+    path = Path(rel_path)
+    VERSIONED_FILES[rel_path] = VersionedDir(
+        rel_dir=path.parent.as_posix(), pattern=path.name, depth=1)
+
+
 # core 自己的两类：跨插件通用，不属于任何游戏领域
 register_versioned_dir("scenes", "*.yaml", depth=1)
 register_versioned_dir("layouts", "*.json", depth=2)
+register_versioned_file("ocr.yaml")
 
 
 def spec_for(rel_path: str) -> VersionedDir | None:
@@ -97,6 +106,9 @@ def spec_for(rel_path: str) -> VersionedDir | None:
     按 rel_dir 前缀 + 层数 + 扩展名三者同时匹配——只匹配前缀会把
     ``layouts.yaml``（聚合注册表文件，不带版本）也算进 ``layouts/``。
     """
+    exact = VERSIONED_FILES.get(rel_path)
+    if exact is not None:
+        return exact
     parts = rel_path.split("/")
     for spec in VERSIONED_DIRS.values():
         prefix = spec.rel_dir.split("/")
@@ -224,11 +236,18 @@ def iter_versioned_files(layer_root: Path) -> Iterator[Path]:
 
     供 `scripts/add_content_version.py` 补齐存量文件、以及测试做全量校验。
     """
+    yielded: set[Path] = set()
+    for rel_path in VERSIONED_FILES:
+        path = layer_root / rel_path
+        if path.is_file():
+            yielded.add(path)
+            yield path
     for spec in VERSIONED_DIRS.values():
         base = layer_root / spec.rel_dir
         if not base.is_dir():
             continue
         glob = "/".join(["*"] * (spec.depth - 1) + [spec.pattern])
         for path in sorted(base.glob(glob)):
-            if path.is_file() and not path.name.startswith("_"):
+            if (path.is_file() and path not in yielded
+                    and not path.name.startswith("_")):
                 yield path

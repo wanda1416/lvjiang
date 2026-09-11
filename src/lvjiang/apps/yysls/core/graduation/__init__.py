@@ -5,11 +5,11 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
 
+from .....core.config.resolver import get_resolver
 from ...config.graduation_session import (
     get_baseline_dps as _get_session_baseline,
 )
@@ -21,9 +21,7 @@ from ..combat.combat_attrs import (
 )
 from .graduation_program import ProgramRuntime
 
-_DATA_DIR = (
-    Path(__file__).parents[6] / "config" / "system" / "yysls" / "graduation"
-)
+_DATA_REL_DIR = "yysls/graduation"
 _ALL_SCHOOLS = {
     "鸣金·虹", "鸣金·影", "裂石·威", "裂石·钧", "牵丝·玉",
     "牵丝·霖", "牵丝·翊", "破竹·尘", "破竹·风", "破竹·鸢", "破竹·樽",
@@ -72,7 +70,10 @@ class GenericCalculator(GraduationCalculator):
     @staticmethod
     @lru_cache(maxsize=len(_ALL_SCHOOLS))
     def _load_data(school_name: str, scheme_name: str) -> dict[str, Any]:
-        path = _DATA_DIR / f"{school_name}_{scheme_name}.json"
+        rel_path = f"{_DATA_REL_DIR}/{school_name}_{scheme_name}.json"
+        path = get_resolver().resolve_read(rel_path)
+        if path is None:
+            raise FileNotFoundError(rel_path)
         with path.open("r", encoding="utf-8") as stream:
             return json.load(stream)
 

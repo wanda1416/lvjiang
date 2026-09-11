@@ -8,9 +8,13 @@
     lvjiang.github.io/lvjiang/config/
       config.json                       ← 本脚本生成
       remote/
+        ocr.yaml
         scenes/xxx.yaml
         layouts/桌面布局/xxx.json
+        yysls/game_config.yaml
+        yysls/tune_config.yaml
         yysls/tuning_rules/xxx.yaml
+        yysls/graduation/xxx.json
 
 用法：
 

@@ -15,7 +15,10 @@ from ....core.config.resolver import (
     register_protected_list_paths,
     register_registry_list_paths,
 )
-from ....core.config.versioning import register_versioned_dir
+from ....core.config.versioning import (
+    register_versioned_dir,
+    register_versioned_file,
+)
 
 # tune_config.yaml 的 base_rules：可增长的基础规则组登记表，不是枚举设定
 # ——local 若存下完整列表，系统新增的规则组就永远进不到合并视图。
@@ -29,6 +32,11 @@ register_protected_list_paths("yysls/game_config.yaml", {
     "season_configs": "season_number",
 })
 
+# 两份聚合业务配置也允许在线更新。读取时 remote 作为系统基底，用户已有的
+# local diff 继续叠加在它上面，因此不会覆盖用户自己的设置。
+register_versioned_file("yysls/game_config.yaml")
+register_versioned_file("yysls/tune_config.yaml")
+
 # 调律规则参与 remote 在线下发（带 content_version、可被远程更新）。
 #
 # allow_remote_new=True 是这三类里唯一的例外：规则管理器对「未在
@@ -37,4 +45,9 @@ register_protected_list_paths("yysls/game_config.yaml", {
 # 生效，不用等发版——这正是在线下发最有价值的场景。scenes/layouts 则
 # 相反：新增文件要在 scenes.yaml 注册表里登记才有意义，而注册表走发版。
 register_versioned_dir("yysls/tuning_rules", "*.yaml", depth=1,
+                       allow_remote_new=True)
+
+# game_config.yaml 的 schools.*.schemes 负责登记方案名，因此可以随同远程
+# game_config 下发全新方案文件。
+register_versioned_dir("yysls/graduation", "*.json", depth=1,
                        allow_remote_new=True)

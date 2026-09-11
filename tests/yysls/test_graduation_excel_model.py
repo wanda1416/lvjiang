@@ -92,6 +92,8 @@ def test_converter_supports_multiple_skill_affixes_and_shifted_environment() -> 
 @case_matrix("school", SCHOOLS)
 def test_converted_model_matches_excel_cached_outputs(school: str) -> None:
     model = _load(school)
+    assert next(iter(model)) == "content_version"
+    assert model["content_version"] == 1
     assert model["schema_version"] == 2
     assert model["source"]["sha256"]
     assert "sheets" not in model
@@ -140,7 +142,12 @@ def test_editable_baseline_dps_recalibrates_graduation_rate(
 
     source = DATA_DIR / "鸣金·虹_基础方案.json"
     shutil.copy(source, tmp_path / source.name)
-    monkeypatch.setattr(graduation, "_DATA_DIR", tmp_path)
+    monkeypatch.setattr(
+        graduation, "get_resolver",
+        lambda: type("Resolver", (), {
+            "resolve_read": lambda self, rel_path: tmp_path / Path(rel_path).name,
+        })(),
+    )
     # 基准 DPS 覆盖值现存于 session.json 的 yysls 节点（见 config/session_node）；
     # 把 session 目录整体指到 tmp_path 并重置单例，避免污染真实 session。
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path)
@@ -159,6 +166,38 @@ def test_editable_baseline_dps_recalibrates_graduation_rate(
         result = calibrated.calculate(attrs)
         assert result.dps == pytest.approx(dps)
         assert result.graduation_rate == pytest.approx(0.5)
+    finally:
+        invalidate_graduation_cache()
+
+
+def test_runtime_loads_newer_remote_graduation_scheme(
+        tmp_path, monkeypatch) -> None:
+    import lvjiang.apps.yysls.core.graduation as graduation
+    from lvjiang.apps import load_config_policies
+    from lvjiang.core.config.resolver import ConfigResolver
+
+    load_config_policies()
+    rel_path = "yysls/graduation/鸣金·虹_基础方案.json"
+    for layer, version, marker in (
+        ("system", 1, "system"),
+        ("remote", 2, "remote"),
+    ):
+        path = tmp_path / layer / rel_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "content_version": version,
+            "marker": marker,
+        }), encoding="utf-8")
+    resolver = ConfigResolver(
+        system_dir=tmp_path / "system",
+        local_dir=tmp_path / "local",
+        remote_dir=tmp_path / "remote",
+    )
+    monkeypatch.setattr(graduation, "get_resolver", lambda: resolver)
+    invalidate_graduation_cache()
+    try:
+        assert graduation.GenericCalculator._load_data(
+            "鸣金·虹", "基础方案")["marker"] == "remote"
     finally:
         invalidate_graduation_cache()
 

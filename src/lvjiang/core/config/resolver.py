@@ -848,8 +848,13 @@ class ConfigResolver:
         return self._load_yaml(self.local_dir / rel_path)
 
     def load_merged(self, rel_path: str) -> dict:
-        """聚合读：system 文档 ← local diff 深合并"""
-        base = self._load_yaml(self.system_dir / rel_path)
+        """聚合读：system/remote 有效基底 ← local diff 深合并。"""
+        base_path = (
+            self.remote_dir / rel_path
+            if self.remote_supersedes(rel_path)
+            else self.system_dir / rel_path
+        )
+        base = self._load_yaml(base_path)
         overlay_path = self.local_dir / rel_path
         if not overlay_path.exists():
             return base
@@ -879,6 +884,9 @@ class ConfigResolver:
         if self.is_dev_mode():
             target = self.system_dir / rel_path
             text = _dump(full_doc)
+            if versioning.spec_for(rel_path) is not None:
+                text = versioning.preserve_version_for_write(
+                    rel_path, text, target if target.exists() else None)
             # 内容没变就不落盘：反复重写只会刷 mtime，还会把整份文件卷进
             # git diff（布局那批 JSON 就这么产生过一次上千行的无意义改动）。
             if target.exists() and target.read_text(encoding="utf-8") == text:
@@ -887,7 +895,10 @@ class ConfigResolver:
             atomic_write_text(target, text, prefix=".config_")
         else:
             base = (deepcopy(base_doc) if base_doc is not None
-                    else self._load_yaml(self.system_dir / rel_path))
+                    else self._load_yaml(
+                        self.remote_dir / rel_path
+                        if self.remote_supersedes(rel_path)
+                        else self.system_dir / rel_path))
             diff = compute_diff(
                 base, full_doc, (registry if registry is not None
                                  else REGISTRY_LIST_PATHS.get(rel_path, ())),

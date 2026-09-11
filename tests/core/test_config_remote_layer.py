@@ -114,6 +114,30 @@ class TestLocalStillWins:
         (dirs[1] / "scenes" / "a.yaml.deleted").touch()
         assert _resolver(dirs).resolve_read("scenes/a.yaml") is None
 
+    def test_local_diff_is_applied_on_top_of_remote_aggregate(
+            self, dirs, monkeypatch):
+        rel_path = "yysls/game_config.yaml"
+        monkeypatch.setitem(
+            versioning.VERSIONED_FILES,
+            rel_path,
+            versioning.VersionedDir(
+                "yysls", "game_config.yaml", 1, allow_remote_new=False),
+        )
+        for root, data in (
+            (dirs[0], {"content_version": 1, "source": "system", "value": 1}),
+            (dirs[2], {"content_version": 2, "source": "remote", "value": 2}),
+            (dirs[1], {"value": 3}),
+        ):
+            path = root / rel_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+        merged = _resolver(dirs).load_merged(rel_path)
+
+        assert merged["content_version"] == 2
+        assert merged["source"] == "remote"
+        assert merged["value"] == 3
+
 
 # ─── 远程新增文件 ────────────────────────────────────────
 

@@ -42,7 +42,7 @@
 | `app.yaml` | `input_simulation` / `delay_params` / `envs` | `load_app_config()` |
 | `scenes.yaml` | `schema_version: 2` / `scenes` | `core/scene_config.py`、`scene_registry.py`、`scene_definition.py` |
 | `layouts.yaml` | `layouts` | `core/layout_manager.py`、`screen_calib.py` |
-| `ocr_rules.yaml` | `replacements` / `patterns` | `core/ocr_cleaner.py` |
+| `ocr.yaml` | OCR 识别参数与文本规范化规则 | `core/ocr_config.py` / `core/ocr_cleaner.py` |
 | `yysls/game_config.yaml` | `base_attrs` / `affix_caps` / `schools` / `weapon_types` 等 9 项 | `apps/yysls/config/manager.py` |
 | `yysls/tune_config.yaml` | `base_rules` / `tuning_rules` / `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
 
@@ -332,17 +332,26 @@ remote 生效 ⟺ remote.content_version > system.content_version
 
 同合并策略，core 只声明自己的，插件声明自己的：
 
-| 目录 | 层数 | 允许远程新增 | 声明方 |
-|------|------|--------------|--------|
-| `scenes/*.yaml` | 1 | ❌ | core |
-| `layouts/{布局}/{场景}.json` | 2 | ❌ | core |
-| `yysls/tuning_rules/*.yaml` | 1 | ✅ | 插件 |
+| 路径 | 允许远程新增 | 声明方 |
+|------|--------------|--------|
+| `scenes/*.yaml` | ❌ | core |
+| `layouts/{布局}/{场景}.json` | ❌ | core |
+| `ocr.yaml` | ❌ | core |
+| `yysls/game_config.yaml` | ❌ | 插件 |
+| `yysls/tune_config.yaml` | ❌ | 插件 |
+| `yysls/tuning_rules/*.yaml` | ✅ | 插件 |
+| `yysls/graduation/*.json` | ✅ | 插件 |
 
 **`allow_remote_new` 的不对称是有意的**：新场景/新布局要在 `scenes.yaml`
 注册表里登记才有意义，而注册表本身走发版（改它通常伴随代码改动），远程凭空
 多一个场景文件是死的，只会让编辑器列表里冒出用不了的条目。调律规则相反——
 规则管理器对"未在 `tune_config.tuning_rules` 里声明的规则"是追加到末尾而非
-报错，所以远程下发一条全新规则能直接生效，这正是在线下发最有价值的场景。
+报错，所以远程下发一条全新规则能直接生效。毕业方案由可同步的
+`game_config.yaml` 登记方案名，因此两者同时下发时也允许新增方案文件。
+
+`ocr.yaml`、`game_config.yaml` 与 `tune_config.yaml` 是聚合配置：生效的
+remote 文件替代 system 成为合并基底，用户已有的 local diff 继续叠加在
+上面。
 
 顶层的 `scenes.yaml`/`layouts.yaml` **不参与**：那是注册表，改动伴随代码，
 走发版。参与的只有它们名下的实体文件。
@@ -494,8 +503,8 @@ QMessageBox，非主线程弹原生模态框是未定义行为）。所以 `buil
 - **设备端（Android）**：`versionCode` 兼着"配置解压 stamp"
   （见 `android/app/build.gradle.kts` 注释），与整目录解压那套怎么共存要
   单独设计，当前只做桌面端。
-- 其余配置（`app.yaml`、`ocr_rules.yaml`、`workflows/`、`references/`、
-  `graduation/`）暂不参与，机制已就位，需要时按上表加一行注册即可。
+- 其余配置（`app.yaml`、`workflows/`、`references/`）暂不参与，机制已就位，
+  需要时按上表加一行注册即可。
 
 ---
 

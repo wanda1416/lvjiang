@@ -14,8 +14,13 @@ from lvjiang.core.config.users import SessionManager
 
 
 def child(code, root):
-    env = dict(os.environ, LVJIANG_ROOT=str(root),
-               PYTHONPATH=str(Path(__file__).resolve().parents[2] / "src"))
+    env = dict(
+        os.environ,
+        LVJIANG_ROOT=str(root),
+        PYTHONPATH=str(Path(__file__).resolve().parents[2] / "src"),
+        PYTHONUTF8="1",
+        PYTHONIOENCODING="utf-8",
+    )
     result = subprocess.run(
         [sys.executable, "-c", code], env=env, capture_output=True,
         text=True, encoding="utf-8", timeout=20,

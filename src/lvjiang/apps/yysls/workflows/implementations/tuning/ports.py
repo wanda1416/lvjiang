@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
+    from lvjiang.core.layout_models import Region
     from lvjiang.core.recognizers import ReferenceInfo
 
 
@@ -52,6 +53,7 @@ class RouteHostPort(Protocol):
         scene_key: str,
         field_keys: list[str] | None = None,
         min_confidence: float | None = None,
+        regions_override: list[Region] | None = None,
         cleaning_group: str | None = None,
     ) -> dict[str, str]: ...
 
@@ -87,6 +89,7 @@ class ResetHostPort(Protocol):
         scene_key: str,
         field_keys: list[str] | None = None,
         min_confidence: float | None = None,
+        regions_override: list[Region] | None = None,
         cleaning_group: str | None = None,
     ) -> dict[str, str]: ...
 
@@ -135,6 +138,7 @@ class TuningRoundHostPort(Protocol):
         scene_key: str,
         field_keys: list[str] | None = None,
         min_confidence: float | None = None,
+        regions_override: list[Region] | None = None,
         cleaning_group: str | None = None,
     ) -> dict[str, str]: ...
 

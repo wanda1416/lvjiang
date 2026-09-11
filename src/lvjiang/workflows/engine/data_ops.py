@@ -146,7 +146,7 @@ class _DataOpsMixin:
             # ── by 子句：短路 OCR，返回字段名 str ──
             by_clause: ByClause = node.by
             target_value = self._resolve(by_clause.target)
-            kwargs = {"min_confidence": min_conf}
+            kwargs: dict[str, Any] = {"min_confidence": min_conf}
             if node.cleaning_group is not None:
                 kwargs["cleaning_group"] = node.cleaning_group
             result = self._ensure_workflow().ocr_scene_by(
@@ -191,7 +191,7 @@ class _DataOpsMixin:
             self._coord_meta[var_name] = {entity: region}
         elif node.by is not None:
             target = self._resolve(node.by.target)
-            kwargs = {
+            kwargs: dict[str, Any] = {
                 "min_confidence": min_conf,
                 "regions_override": [region],
             }

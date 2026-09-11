@@ -1,0 +1,101 @@
+#% name: 无名木桩测伤
+#% env: [desktop]
+#% note: |-
+#%   开始前切换至枪，确保角色面向目标并处于攻击范围。
+#%   并且将滚轮切武器绑定小键盘 8，否则无法切武器。
+#%   默认使用 Q = 武学技，E 卸势，不可更改。
+#%   奇术 2 对应阴阳迷踪步，3 对应萧吟千浪，可以修改。
+#%   如果需要追求极限，最好自行修改每个环节按键时间和等待。
+#% parameters:
+#%   - name: key_yy
+#%     label: 阴阳迷踪步
+#%     type: select
+#%     default: "2"
+#%     options: ["1", "2", "3", "4"]
+#%   - name: key_dz
+#%     label: 萧吟千浪
+#%     type: select
+#%     default: "3"
+#%     options: ["1", "2", "3", "4"]
+
+default $key_yy = "2"
+default $key_dz = "3"
+
+press $key_yy hold 0.06 after wait 0.15
+press "Q" after wait 0.09
+press "E" hold 0.08 after wait 0.3
+press $key_dz hold 0.11 after wait 0.74
+press "E" hold 0.05 after wait 0.11
+press "NUM8" hold 0.09 after wait 0.1
+# 第一道剑气
+press "R" hold 1.44 after wait 0.75
+# 点剑
+log info "第一次点剑+瞬发剑气"
+# 这里改成 0.27 经常容易挂不上 buff
+press "Q" hold 0.05 after wait 0.28
+press "R" hold 0.05 after wait 0.78
+# 三道剑气
+press "R" hold 1.465 after wait 0.795
+# 这里比较极限，经常容易出现提前，可以考虑改 1.47
+press "R" hold 1.47 after wait 0.8
+press "R" hold 1.47 after wait 0.8
+# 枪 Q
+log info "第一次枪Q"
+press "NUM8" hold 0.08 after wait 0.07
+press "Q" after wait 0.11
+press "E" hold 0.05 after wait 0.11
+press "NUM8" hold 0.08 after wait 0.09
+press "R" hold 1.465 after wait 0.8
+press "R" hold 1.465 after wait 0.8
+# 二次点剑
+log info "第二次点剑+瞬发剑气"
+# press "Q" hold 0.05 after wait 0.27
+press "Q" hold 0.05 after wait 0.28
+press "R" hold 0.05 after wait 0.78 
+# 三道剑气
+press "R" hold 1.465 after wait 0.8 
+press "R" hold 1.465 after wait 0.8 
+press "R" hold 1.47 after wait 0.8 
+# 枪Q回耐
+press "NUM8" hold 0.08 after wait 0.07
+press "Q" hold 0.1 after wait 0.24
+press "E" hold 0.05 after wait 0.11
+press "NUM8" hold 0.08 after wait 0.09
+press "R" hold 1.465 after wait 0.8
+press "R" hold 1.47 after wait 0.8
+# 第三次瞬发
+log info "第三次瞬发剑气"
+press "R" hold 0.05 after wait 0.78
+# 三道剑气
+press "R" hold 1.47 after wait 0.8
+press "R" hold 1.465 after wait 0.8
+press "R" hold 1.47 after wait 0.8
+# 枪Q
+press "NUM8" hold 0.08 after wait 0.07
+press "Q" hold 0.1 after wait 0.24
+press "E" hold 0.1 after wait 0.11
+press "NUM8" hold 0.08 after wait 0.09
+press "R" hold 1.47 after wait 0.8
+press "R" hold 1.47 after wait 0.8
+# 吹笛拉距离
+press $key_dz hold 0.1 after wait 0.1
+press "S" hold 2.2 after wait 0.95
+# 第四次瞬发剑气
+log info "第三次点剑"
+press "Q" hold 0.11 after wait 0.23
+log info "第四次瞬发剑气"
+press "R" hold 0.05 after wait 0.78
+# 继续蓄力
+press "R" hold 1.47 after wait 0.8
+press "NUM8" hold 0.08 after wait 0.07
+press "Q" after wait 0.09
+press "E" hold 0.07 after wait 0.11
+press "NUM8" hold 0.08 after wait 0.09
+press "R" hold 1.465 after wait 0.8
+press "R" hold 1.47 after wait 0.8
+log info "第五次瞬发剑气"
+press "R" hold 0.05 after wait 0.78
+press "R" hold 1.465 after wait 0.8
+press "R" hold 1.47 after wait 0.8
+# 最后一次剑气，打不出来就是延迟问题
+press "R" hold 1.47

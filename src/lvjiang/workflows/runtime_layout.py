@@ -55,6 +55,9 @@ def resolve_subscene_entity(layout, parent_scene: str, reference_key: str,
             y_ratio=instance.y_ratio + child.y_ratio * instance.h_ratio,
             w_ratio=child.w_ratio * instance.w_ratio,
             h_ratio=child.h_ratio * instance.h_ratio,
+            # click_rect 是相对 Region 自身的坐标，父场景变换后仍可原样复用。
+            click_rect=child.click_rect,
+            template=child.template,
         )
     point = next((p for p in layout.get_scene_points(target_scene)
                   if p.key == entity_key), None)

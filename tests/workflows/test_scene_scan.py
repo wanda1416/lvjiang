@@ -14,6 +14,7 @@ from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
 from lvjiang.workflows.grammar import parse_file, parse_text
 from lvjiang.workflows.metadata import parse_metadata
+from lvjiang.workflows.static_check import check_refs
 from lvjiang.workflows.workflow_references import collect_refs, collect_scene_keys
 from tests.case_matrix import case_matrix
 
@@ -51,6 +52,37 @@ def test_collect_from_nested_bodies():
         'end\n'
     )
     assert _collect(text) == {"scene_loop", "scene_then", "scene_else"}
+
+
+def test_collect_refs_prunes_known_environment_branches():
+    program = parse_text(
+        'if env("android")\n'
+        '    click [mobile].[btn]\n'
+        'else if env("desktop")\n'
+        '    click [pc].[btn]\n'
+        'end\n'
+    )
+
+    android = collect_refs(program.body, program.procs, run_env="android")
+    desktop = collect_refs(program.body, program.procs, run_env="desktop")
+    unknown = collect_refs(program.body, program.procs)
+
+    assert {ref.scene for ref in android} == {"mobile"}
+    assert {ref.scene for ref in desktop} == {"pc"}
+    assert {ref.scene for ref in unknown} == {"mobile", "pc"}
+
+
+def test_disabled_region_satisfies_template_static_check():
+    refs = _refs('scan [popup].[close] as $hit by image\n')
+    layout = MagicMock()
+    layout.get_scene_regions.return_value = [SimpleNamespace(
+        key="close", disabled=True, template=None)]
+    layout.get_scene_points.return_value = []
+    layout.get_scene_arrows.return_value = []
+    layout.get_scene_panels.return_value = []
+    layout.get_scene_subscene_refs.return_value = []
+
+    assert check_refs(refs, layout) == []
 
 
 def test_collect_from_try_and_while_bodies():
@@ -245,11 +277,131 @@ def test_daily_jianghu_claim_reputation_guard():
         "call $haoling_of_week = sync_haoling_of_week()", claim_proc)
     assert claim_proc < limit < claim < reread
     assert (
-        "global $max_refresh, $claim_reward, $max_claim_reputation, "
-        "$targets, $haoling_of_week, $mode_checked"
+        "global $claim_reward, $max_refresh, $max_claim_reputation, "
+        "$haoling_of_week, $mode_checked"
     ) in text
     assert "context.claim_reward" not in text
     assert "context.mode_checked" not in text
+
+
+def test_daily_jianghu_exposes_independent_user_facing_task_toggles():
+    """六项任务独立勾选；界面名称与内部 OCR 关键词明确解耦。"""
+    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    text = wf.read_text(encoding="utf-8")
+    parameters = parse_metadata(text)["parameters"]
+    task_parameters = parameters[-6:]
+
+    assert [item["name"] for item in task_parameters] == [
+        "do_heying", "do_huanzhuang", "do_qingjing",
+        "do_kanbao", "do_yinjiu", "do_juezhanglin",
+    ]
+    assert [item["label"] for item in task_parameters] == [
+        "合影", "换装", "情境", "看报", "饮酒", "觉障林",
+    ]
+    assert all(
+        item["type"] == "bool" and item["default"] is True
+        for item in task_parameters
+    )
+    assert not any(item["name"] == "targets" for item in parameters)
+    assert "def has_selected_task()" in text
+    assert "未选择要执行的江湖号令任务，跳过流程" in text
+    assert (
+        "return $do_heying or $do_huanzhuang or $do_qingjing or "
+        "$do_kanbao or $do_yinjiu or $do_juezhanglin"
+    ) in text
+
+    target_proc = text[
+        text.index("def is_target_task($text)"):
+        text.index("def should_execute_task($text)")
+    ]
+    assert '$do_' not in target_proc
+    assert 'if $text contains "东方"' in target_proc
+    assert 'if $text contains "醉意"' in target_proc
+
+    execute_gate = text[
+        text.index("def should_execute_task($text)"):
+        text.index("def execute_target_task(")
+    ]
+    assert 'return $do_kanbao' in execute_gate
+    assert 'return $do_yinjiu' in execute_gate
+
+    outer_loop = text[
+        text.index('for idx in ["1", "2", "3", "4", "5", "6"]'):
+        text.index('log "六个任务刷新处理完成"')
+    ]
+    gate = outer_loop.index(
+        "call $should_execute = should_execute_task($task_text)")
+    dispatch = outer_loop.index(
+        "call $skip_reward_check = execute_target_task($task_text, $label, $idx)")
+    assert gate < dispatch
+    assert "continue" in outer_loop[gate:dispatch]
+
+    navigation_proc = text[text.index("def back_to_haoling()") :]
+    assert "if $do_heying and not $mode_checked" in navigation_proc
+    assert "if not $mode_checked" not in navigation_proc
+
+
+def test_daily_jianghu_keeps_dispatch_and_external_finish_order():
+    """机械提取过程后，动作顺序与三种外部任务的返回时机保持不变。"""
+    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    text = wf.read_text(encoding="utf-8")
+    dispatch = text[
+        text.index("def execute_target_task("):
+        text.index("def refresh_task_until_terminal(")
+    ]
+    calls = [
+        'if $task_text contains "换装"',
+        "call action_huanzhuang($label)",
+        'if $task_text contains "合影"',
+        "call action_heying($label, $idx)",
+        'if $task_text contains "情境"',
+        "call action_qingjing($label)",
+        'if $task_text contains "东方"',
+        "call action_kanbao($label, $idx)",
+        'if $task_text contains "醉意"',
+        "call $skip_reward_check = action_yinjiu($label, $idx)",
+        'if $task_text contains "觉障林"',
+        "call action_juezhanglin($label)",
+    ]
+    positions = [dispatch.index(statement) for statement in calls]
+    assert positions == sorted(positions)
+
+    finish = text[
+        text.index("def finish_external_task("):
+        text.index("def action_huanzhuang(")
+    ]
+    assert 'if $idx equals "6" and not $claim_reward' in finish
+    assert "call back_to_haoling()" in finish
+    assert text.count('call finish_external_task($idx, "合影")') == 1
+    assert text.count('call finish_external_task($idx, "看报")') == 1
+    assert text.count('call finish_external_task($idx, "醉意")') == 1
+
+
+def test_daily_jianghu_missing_drink_skips_reward_check_after_cleanup():
+    """未找到黄泉酿时先正常收尾，再跳过任务完成扫描与领奖。"""
+    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    text = wf.read_text(encoding="utf-8")
+    outer_loop = text[
+        text.index('for idx in ["1", "2", "3", "4", "5", "6"]'):
+        text.index('log "六个任务刷新处理完成"')
+    ]
+    dispatch = outer_loop.index(
+        "call $skip_reward_check = execute_target_task($task_text, $label, $idx)")
+    skip = outer_loop.index("if $skip_reward_check", dispatch)
+    post_action_scan = outer_loop.index(
+        "scan [activity_jianghu].$label.[label] as $text_result", skip)
+    assert "continue" in outer_loop[skip:post_action_scan]
+
+    drink = text[
+        text.index("def action_yinjiu("):
+        text.index("def action_juezhanglin(")
+    ]
+    missing = drink.index('log "找不到黄泉酿"')
+    cleanup = drink.index("call nav_back_to_main()", missing)
+    finish = drink.index('call finish_external_task($idx, "醉意")', cleanup)
+    skip_result = drink.index("return 1", finish)
+    assert missing < cleanup < finish < skip_result
+    assert "# targets 领域约束" in text
 
 
 def test_daily_jianghu_closes_stale_completed_task_overlay():
@@ -300,7 +452,7 @@ def test_daily_jianghu_uses_layer_specific_back_regions():
 
     qingjing = text[
         text.index("def action_qingjing("):
-        text.index("def action_dongfang(")
+        text.index("def action_kanbao(")
     ]
     assert qingjing.count("click [activity_jianghu].[qingjing_back]") == 1
     assert qingjing.count("click [activity_jianghu].[overlay_back]") == 1

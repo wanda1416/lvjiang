@@ -1,12 +1,11 @@
 """find … by image 模板定位测试
 
-1. 语法：by image 解析为 match_mode="image"；scan/recognize 拒绝
+1. 语法：find 显式模板定位；scan 无参 image 匹配布局绑定；recognize 拒绝
 2. 定位器：合成帧里贴模板 → 命中坐标；录制分辨率不同 → 自适配缩放命中
 3. 引擎：find 产出 FoundRegion（画布归一化，可 click）；where 作分数门槛；未命中 ""
 """
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -15,11 +14,11 @@ import cv2
 import numpy as np
 import pytest
 
-from lvjiang.core.layout_models import FoundRegion, Region
+from lvjiang.core.layout_models import FoundRegion, Region, TemplateBinding
 from lvjiang.core.recognizers import template_locator as tl
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import Find, parse_text
-from lvjiang.workflows.grammar.ast_nodes import Literal
+from lvjiang.workflows.grammar.ast_nodes import EntityRef, Literal
 from tests.case_matrix import case_matrix
 from tests.workflows.conftest import make_engine
 
@@ -40,6 +39,21 @@ def test_find_by_image_with_area():
     assert node.by.match_mode == "image"
 
 
+def test_find_by_image_with_region_binding_parses():
+    node = parse_text(
+        "find [popup].[body] as $icon "
+        "by image [game_menu_page].[back]\n"
+    ).body[0]
+    assert node.search_scene == "popup" and node.search_region == "body"
+    assert node.by.target == EntityRef("game_menu_page", "back")
+
+
+def test_scan_by_image_uses_bound_template_syntax():
+    node = parse_text('scan [s].[a, b] as $hit by image\n').body[0]
+    assert node.by.match_mode == "image"
+    assert node.by.target is None
+
+
 @case_matrix("code", [
     'scan [s].[a] as $v by image "x"\n',
     'scan [s].[p][0][0] as $v by image "x"\n',
@@ -54,6 +68,12 @@ def test_scan_recognize_reject_by_image(code):
         parse_text(code)
     err = ei.value.orig_exc if isinstance(ei.value, VisitError) else ei.value
     assert isinstance(err, WorkflowUserError) and "by image" in str(err)
+
+
+def test_find_rejects_missing_template_name():
+    from lark.exceptions import VisitError
+    with pytest.raises(VisitError, match="by image"):
+        parse_text('find as $v by image\n')
 
 
 # ─── 定位器 ─────────────────────────────────────────────
@@ -75,10 +95,8 @@ def _frame_with_icon(icon: np.ndarray, at=(300, 120), size=(640, 360)) -> np.nda
     return frame
 
 
-def _store(tmp_path: Path, name: str, icon: np.ndarray, record_w: int | None = None) -> tl.TemplateStore:
+def _store(tmp_path: Path, name: str, icon: np.ndarray) -> tl.TemplateStore:
     cv2.imwrite(str(tmp_path / f"{name}.png"), icon)
-    if record_w:
-        (tmp_path / f"{name}.json").write_text(json.dumps({"recordW": record_w, "recordH": 0}))
     return tl.TemplateStore(tmp_path)
 
 
@@ -108,7 +126,7 @@ def test_locate_scale_adaptation(tmp_path):
     icon40 = _icon(40)
     icon80 = cv2.resize(icon40, (80, 80), interpolation=cv2.INTER_LINEAR)
     frame = _frame_with_icon(icon40, at=(300, 120))
-    tpl = _store(tmp_path, "big", icon80, record_w=1280).get("big")
+    tpl = tl.template_from_image("big", icon80, record_w=1280, record_h=720)
     assert tpl.record_w == 1280
     scales = tl.adaptive_scales(640, tpl.record_w)
     assert 0.5 in scales and 1.0 in scales
@@ -132,7 +150,7 @@ def _touch(path: Path, offset_s: int) -> None:
 
 
 def test_store_tracks_files_without_restart(tmp_path):
-    """工作台边调边加模板：新增 / 替换 / 加 sidecar / 删除 都不需要 invalidate"""
+    """工作台边调边加模板：新增、替换和删除都不需要 invalidate。"""
     store = tl.TemplateStore(tmp_path)
     assert store.get("nope") is None
     assert store.get("late") is None          # 此时文件不存在
@@ -146,11 +164,6 @@ def test_store_tracks_files_without_restart(tmp_path):
     _touch(png, 2)
     tpl2 = store.get("late")
     assert tpl2 is not tpl and tpl2.w == 30
-    # 后补 sidecar → 重载并读到录制尺寸
-    (tmp_path / "late.json").write_text('{"recordW": 2400, "recordH": 1080}', encoding="utf-8")
-    tpl3 = store.get("late")
-    assert tpl3 is not tpl2 and tpl3.record_w == 2400
-    assert store.get("late") is tpl3
     # 删除 → None，下次再出现又能找到
     png.unlink()
     assert store.get("late") is None
@@ -207,6 +220,79 @@ def test_engine_find_image_full_canvas(synthetic_store):
     assert hit.w_ratio == pytest.approx(40 / 640) and hit.h_ratio == pytest.approx(40 / 360)
 
 
+def test_engine_find_image_uses_disabled_region_template_binding(synthetic_store):
+    """模板来源 Region 可禁用：它只提供当前布局的模板名和默认阈值。"""
+    frame = _frame_with_icon(synthetic_store, at=(300, 120), size=(640, 360))
+    eng = _engine_with(frame)
+    carrier = Region(
+        "back", 0.0, 0.0, 0.0, 0.0, disabled=True,
+        template=TemplateBinding("ico", 0.95, 640, 360),
+    )
+    eng._layout.get_scene_regions.return_value = [carrier]
+
+    hit = _run(
+        eng,
+        "find as $hit by image [game_menu_page].[back]\n",
+    )["hit"]
+
+    assert isinstance(hit, FoundRegion)
+    assert hit.text == "ico"
+
+
+def test_engine_find_region_binding_uses_layout_record_size(
+    tmp_path, monkeypatch,
+):
+    icon40 = _icon(40)
+    icon80 = cv2.resize(icon40, (80, 80), interpolation=cv2.INTER_LINEAR)
+    monkeypatch.setattr(tl, "_STORE", _store(tmp_path, "big", icon80))
+    eng = _engine_with(_frame_with_icon(icon40, at=(300, 120)))
+    eng._layout.get_scene_regions.return_value = [
+        Region(
+            "back", 0, 0, 0, 0, disabled=True,
+            template=TemplateBinding("big", 0.8, 1280, 720),
+        ),
+    ]
+
+    hit = _run(
+        eng, "find as $hit by image [game_menu_page].[back]\n")['hit']
+
+    assert isinstance(hit, FoundRegion)
+    assert hit.w_ratio == pytest.approx(40 / 640)
+
+
+def test_engine_find_image_region_binding_requires_template(synthetic_store):
+    eng = _engine_with(_frame_with_icon(synthetic_store))
+    eng._layout.get_scene_regions.return_value = [
+        Region("back", 0.0, 0.0, 0.0, 0.0, disabled=True),
+    ]
+
+    with pytest.raises(WorkflowUserError, match="模板来源.*未绑定模板"):
+        _run(eng, "find as $hit by image [game_menu_page].[back]\n")
+
+
+def test_find_region_binding_threshold_and_where_override(synthetic_store):
+    frame = _frame_with_icon(synthetic_store, at=(300, 120), size=(640, 360))
+    frame[120:160, 300:340] = cv2.GaussianBlur(
+        frame[120:160, 300:340], (5, 5), 1.5)
+    eng = _engine_with(frame)
+    eng._layout.get_scene_regions.return_value = [
+        Region(
+            "back", 0.0, 0.0, 0.0, 0.0, disabled=True,
+            template=TemplateBinding("ico", 0.999),
+        ),
+    ]
+
+    values = _run(
+        eng,
+        "find as $default by image [game_menu_page].[back]\n"
+        "find as $override by image [game_menu_page].[back] "
+        "where confidence >= 0.8\n",
+    )
+
+    assert values["default"] == ""
+    assert isinstance(values["override"], FoundRegion)
+
+
 def test_engine_find_image_canvas_offset(synthetic_store):
     """画布是截图右下 50%：命中坐标要相对画布归一化"""
     frame = _frame_with_icon(synthetic_store, at=(400, 200), size=(640, 360))
@@ -256,3 +342,53 @@ def test_engine_find_image_then_click(synthetic_store):
     x, y = eng._input.click_screen.call_args.args[:2]
     # 命中中心 (319.5, 139.5) → 截图像素
     assert abs(x - 319.5) <= 1 and abs(y - 139.5) <= 1, (x, y)
+
+
+def test_scan_by_image_returns_bound_region_key(synthetic_store):
+    frame = _frame_with_icon(synthetic_store, at=(300, 120), size=(640, 360))
+    eng = _engine_with(frame)
+    regions = [
+        Region("wrong", 0.0, 0.0, 0.4, 1.0,
+               template=TemplateBinding("ico")),
+        Region("right", 0.4, 0.0, 0.6, 1.0,
+               template=TemplateBinding("ico")),
+    ]
+    eng._layout.get_scene_regions.return_value = regions
+
+    values = _run(eng, 'scan [s].[wrong, right] as $hit by image\n')
+
+    assert values["hit"] == "right"
+    assert eng._coord_meta["hit"] == {"wrong": regions[0], "right": regions[1]}
+    eng._capture.capture.assert_called_once()
+
+
+def test_scan_by_image_requires_binding_for_explicit_region(synthetic_store):
+    eng = _engine_with(_frame_with_icon(synthetic_store))
+    eng._layout.get_scene_regions.return_value = [
+        Region("plain", 0.0, 0.0, 1.0, 1.0)]
+
+    with pytest.raises(WorkflowUserError, match="未绑定模板"):
+        _run(eng, 'scan [s].[plain] as $hit by image\n')
+
+
+def test_whole_scene_image_scan_skips_unbound_regions(synthetic_store):
+    frame = _frame_with_icon(synthetic_store, at=(300, 120), size=(640, 360))
+    eng = _engine_with(frame)
+    eng._layout.get_scene_regions.return_value = [
+        Region("plain", 0.0, 0.0, 1.0, 1.0),
+        Region("logo", 0.4, 0.0, 0.6, 1.0,
+               template=TemplateBinding("ico")),
+    ]
+
+    assert _run(eng, 'scan [s] as $hit by image\n')["hit"] == "logo"
+
+
+def test_bound_template_search_never_escapes_region(synthetic_store):
+    frame = _frame_with_icon(synthetic_store, at=(300, 120), size=(640, 360))
+    eng = _engine_with(frame)
+    eng._layout.get_scene_regions.return_value = [
+        Region("left", 0.0, 0.0, 0.4, 1.0,
+               template=TemplateBinding("ico")),
+    ]
+
+    assert _run(eng, 'scan [s].[left] as $hit by image\n')["hit"] == ""

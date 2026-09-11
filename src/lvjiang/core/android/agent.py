@@ -429,12 +429,14 @@ class AgentInput(InputBackend):
     # ─── 点击 ─────────────────────────────────────────────
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
-                     *, pre_delay=None, post_delay=None, button: str = "left"):
+                     *, pre_delay=None, post_delay=None, button: str = "left",
+                     random_offset: bool = True):
         """触屏没有鼠标键概念，非 left 时按普通点击处理并记警告。"""
         if button != "left":
             logger.warning(f"[Agent] 设备端手势不支持 {button} 键，按普通点击处理")
-        sx = screen_x + random.randint(-self.click_random_offset, self.click_random_offset)
-        sy = screen_y + random.randint(-self.click_random_offset, self.click_random_offset)
+        radius = self.click_random_offset if random_offset else 0
+        sx = screen_x + random.randint(-radius, radius)
+        sy = screen_y + random.randint(-radius, radius)
         _pre = pre_delay if pre_delay is not None else self.before_click_wait
         time.sleep(random.uniform(*_pre))
         label = f"({poi_name})" if poi_name else ""

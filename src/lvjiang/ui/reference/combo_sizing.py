@@ -14,8 +14,16 @@ def set_combo_minimum_character_capacity(
     reserves room for the frame, padding, and drop-down arrow. Check the
     style's actual edit-field rectangle and grow the widget by any shortfall.
     """
+    combo.ensurePolished()
     metrics = combo.fontMetrics()
-    text_width = metrics.horizontalAdvance("汉" * character_count)
+    text_width = max(
+        metrics.horizontalAdvance("汉" * character_count),
+        max(
+            (metrics.horizontalAdvance(combo.itemText(index))
+             for index in range(combo.count())),
+            default=0,
+        ),
+    )
     option = QStyleOptionComboBox()
     option.initFrom(combo)
     option.editable = combo.isEditable()
@@ -41,5 +49,8 @@ def set_combo_minimum_character_capacity(
     combo.setMinimumWidth(width)
     view = combo.view()
     assert view is not None
-    view.setMinimumWidth(width)
+    view.ensurePolished()
+    # 弹出列表没有下拉箭头，但列表项及外框仍需要左右留白。若直接复用
+    # 控件宽度，在较大字体或平台样式下四个汉字会被压缩/省略。
+    view.setMinimumWidth(width + 12)
     return width

@@ -107,7 +107,9 @@ absolute_h = child.h * reference.h
 
 ### Region — 矩形区域
 
-Region 是有面积的矩形区域，用于 OCR 识别、材料识别或点击目标。
+Region 是有面积的矩形区域，用于 OCR 识别、材料识别或点击目标。Region 外框
+始终是完整的识别范围；布局实例可用 `click_rect` 在该外框内部进一步限定落点
+范围，但不能把点击范围延伸到 Region 之外。
 
 #### type — 字段类型
 
@@ -131,7 +133,7 @@ Region 是有面积的矩形区域，用于 OCR 识别、材料识别或点击�
 | 值 | 含义 | 常见搭配 |
 |----|------|----------|
 | `false`（默认） | 该区域不会被点击，仅用于读取数据 | `attr` 字段 |
-| `true` | 工作流可通过 `click [scene].[region]` 点击该区域中心 | `slot`、`func` 字段 |
+| `true` | 工作流可通过 `click [scene].[region]` 点击该区域的落点范围 | `slot`、`func` 字段 |
 
 #### 属性组合速查
 
@@ -240,7 +242,7 @@ Layout 内部包含四个独立层次：
 | 层次 | 职责 | 数据内容 |
 |------|------|----------|
 | **Area-Coord 绑定** | 位置 | 每个 Area（Point / Region）在屏幕上的归一化坐标 |
-| **Area-Action 绑定** | 激活方式 | 可选 `activation_key`；为空时默认点击坐标 |
+| **Area-Action 绑定** | 激活方式 | 可选 `activation_key`；Region 还可绑定 `click_rect` |
 | **Panel-Coord 绑定** | 位置 | 每个 Panel 的归一化坐标、行列数及校准参数；校准缓存仅存在于运行时 |
 | **Action → Arrow** | 行为 | 基于 Area 的拖拽动作（from → to） |
 
@@ -250,6 +252,33 @@ Layout 内部包含四个独立层次：
 
 - **Region** 的坐标：`(x_ratio, y_ratio, w_ratio, h_ratio)` — 画布内归一化矩形
 - **Point** 的坐标：`(cx_ratio, cy_ratio, r_ratio)` — 中心 + 半径，画布内归一化
+
+Region 可额外保存 `click_rect: [x, y, w, h]`。四个值是**相对 Region 自身**
+的归一化坐标，且必须完整包含在 `[0, 1] × [0, 1]` 内。显式标定后直接在该框
+内取点，不再套用全局 `region_jitter_ratio`；未标定时才由该全局参数派生居中的
+默认框。Point 不支持 `click_rect`。
+
+Region 还可绑定当前布局专用的模板：
+
+```json
+"template": {
+  "name": "default/game_main/close",
+  "min_score": 0.8,
+  "record_w": 2400,
+  "record_h": 1080
+}
+```
+
+`name` 是 `templates/` 下不带 `.png` 的安全相对路径，`min_score` 必须在
+`0..1` 内；`record_w` / `record_h` 是截取模板时的布局画布尺寸，用于跨分辨率
+缩放。它们全部存在 Layout JSON 而不是 Scene YAML，因此同一语义
+Region 可在不同布局绑定不同图片。模板只用于判断该 Region 是否命中，
+搜索范围不超出 Region；它不改变 OCR 外框或 `click_rect`。Point 不支持模板绑定。
+
+Region 也可以作为纯模板载体：在每套布局中保留 `template` 绑定并设置
+`disabled: true`，即可禁止通过该 Region 点击或扫描，同时让
+`find ... by image [scene].[region]` 读取对应布局的模板并在别处或全画布定位。
+模板来源 Region 的自身坐标不作为 find 搜索范围。
 
 Region / Point 实例还可设置可选的 `activation_key`。它属于 Layout，而不属于
 Scene：同一个语义实体在手游布局中可保持默认坐标点击，在桌面布局中可绑定
@@ -331,7 +360,7 @@ DSL 中通过 `drag [equip_tune_detail].[tune_drag]` 执行拖拽。
   "scenes": {
     "scene_key": {
       "regions": [
-        { "key": "region_key", "x_ratio": 0.1, "y_ratio": 0.2, "w_ratio": 0.3, "h_ratio": 0.1, "activation_key": "SPACE" }
+        { "key": "region_key", "x_ratio": 0.1, "y_ratio": 0.2, "w_ratio": 0.3, "h_ratio": 0.1, "click_rect": [0.1, 0.0, 0.8, 0.5], "template": { "name": "default/scene_key/region_key", "min_score": 0.8, "record_w": 2400, "record_h": 1080 } }
       ],
       "points": [
         { "key": "point_key", "cx_ratio": 0.5, "cy_ratio": 0.7, "r_ratio": 0.015 }

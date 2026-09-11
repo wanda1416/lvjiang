@@ -118,6 +118,20 @@ def test_click_region_bound_still_clicks():
     actor = _Actor(_FakeLayout(regions=[_region("btn_ok")]))
     actor.click_region(SCENE, "btn_ok")
     assert len(actor._input.clicks) == 1
+    assert "random_offset" not in actor._input.clicks[0][3]
+
+
+def test_explicit_click_rect_disables_backend_pixel_offset():
+    region = Region(
+        key="btn_ok", x_ratio=0.0, y_ratio=0.0,
+        w_ratio=0.5, h_ratio=0.5,
+        click_rect=(0.0, 0.0, 0.1, 0.1),
+    )
+    actor = _Actor(_FakeLayout(regions=[region]))
+
+    actor.click_region(SCENE, "btn_ok")
+
+    assert actor._input.clicks[0][3]["random_offset"] is False
 
 
 def test_click_region_with_activation_key_presses_instead_of_clicking():

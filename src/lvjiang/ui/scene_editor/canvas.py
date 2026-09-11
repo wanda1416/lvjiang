@@ -1,6 +1,7 @@
 """画布组件 - 可交互的图片画布，支持框选/拖拽/缩放矩形"""
 
 import numpy as np
+from loguru import logger
 from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer
 from PyQt6.QtGui import (
     QBrush,
@@ -43,6 +44,12 @@ REGION_COLORS = [
     QColor(255, 87, 197, 60),   # 粉
     QColor(157, 255, 87, 60),   # 黄绿
 ]
+
+#: 已标定点击落点框的描边色（橙），与区域配色明显区分
+CLICK_RECT_COLOR = QColor(255, 140, 0)
+#: 由全局比例派生的默认落点框（灰虚线），仅作参照
+CLICK_RECT_DEFAULT_COLOR = QColor(190, 190, 190, 200)
+TEMPLATE_CROP_COLOR = QColor(190, 90, 255)
 
 
 # ─── 画布组件 ────────────────────────────────────────────
@@ -106,6 +113,7 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         self.on_subscene_ref_changed = None  # callable() -> None
         self.on_selection_changed = None  # callable() -> None（仅选中态变化，不代表数据修改，不应标记 dirty）
         self.on_status_message = None  # callable(str) -> None（面向用户的提示，显示到对话框状态栏）
+        self.on_template_crop_ready = None  # callable(region_key, image, record_w, record_h)
 
         # 当前场景的区域列表（由外部通过 set_regions 设置）
         self._current_regions: list[tuple[str, str]] = []
@@ -141,6 +149,21 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         self._subscene_edit_handle: HandlePos | None = None
         self._subscene_edit_start = QPointF()
         self._subscene_edit_orig: SubsceneRef | None = None
+
+        # 点击区域标定模式的交互状态
+        self._click_drag_mode = None  # DragMode
+        self._click_drag_handle: HandlePos | None = None
+        self._click_drag_start = QPointF()
+        self._click_drag_orig: Region | None = None
+        # 未标定 click_rect 的区域，默认落点框占区域的比例（画布预览用）
+        self._jitter_ratio = 0.25
+
+        # 模板裁剪是一次性覆盖交互，不改变当前 Region/点击框编辑模式。
+        self._template_crop_idx = -1
+        self._template_crop_start: QPointF | None = None
+        self._template_crop_current: QPointF | None = None
+        self._template_test_result: tuple[int, bool] | None = None
+        self._template_test_token = 0
 
         # 画布编辑模式的交互状态
         self._canvas_drag_mode = None  # DragMode
@@ -318,6 +341,8 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         )
         self._selected_idx = -1
         self._field_selected = False
+        self.cancel_template_crop()
+        self._template_test_result = None
         self.update()
 
     def get_regions(self) -> list[Region]:
@@ -639,6 +664,7 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
     def set_canvas_mode(self):
         """切换到画布编辑模式"""
         self._edit_mode = EditMode.CANVAS
+        self._reset_click_drag()
         self._selected_idx = -1
         self._field_selected = False
         self.update()
@@ -646,7 +672,165 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
     def set_region_mode(self):
         """切换到区域编辑模式"""
         self._edit_mode = EditMode.REGION
+        self._reset_click_drag()
         self.update()
+
+    def set_click_rect_mode(self):
+        """切换到点击区域标定模式（区域锁定，只编辑落点框）"""
+        self._edit_mode = EditMode.CLICK_RECT
+        self._field_selected = False
+        self._reset_click_drag()
+        self._refresh_jitter_ratio()
+        self.update()
+
+    def _refresh_jitter_ratio(self):
+        """从配置读取默认落点框比例，供画布预览。
+
+        只在进入标定模式时读一次：设置改了重新进模式即可，不值得为它在
+        每帧绘制里做一次配置解析。
+        """
+        try:
+            from ...core.config import load_user_config
+            self._jitter_ratio = load_user_config().input_sim.region_jitter_ratio
+        except Exception as exc:  # 配置读不出来不该拦住标定
+            logger.warning(f"读取默认点击范围失败，按 0.25 预览: {exc}")
+            self._jitter_ratio = 0.25
+
+    def clear_selected_click_rect(self):
+        """清除选中区域的点击标定，回到全局默认落点框"""
+        if not (0 <= self._selected_idx < len(self._regions)):
+            return
+        r = self._regions[self._selected_idx]
+        if r.is_reference or r.click_rect is None:
+            return
+        r.click_rect = None
+        self._notify_changed()
+        self.update()
+
+    def selected_region(self) -> Region | None:
+        if 0 <= self._selected_idx < len(self._regions):
+            return self._regions[self._selected_idx].clone()
+        return None
+
+    def set_selected_template(self, binding, *, force_changed: bool = False) -> bool:
+        """更新当前 Region 的模板绑定；引用投影保持只读。"""
+        if not (0 <= self._selected_idx < len(self._regions)):
+            return False
+        region = self._regions[self._selected_idx]
+        if region.is_reference:
+            return False
+        if region.template == binding:
+            if force_changed:
+                self._notify_changed()
+            return True
+        region.template = binding
+        self._notify_changed()
+        self.update()
+        return True
+
+    def begin_template_crop(self) -> bool:
+        """进入一次性模板框选；仅允许在当前本地 Region 内操作。"""
+        if self._original_image is None:
+            self._notify_status(tr("当前场景没有截图，无法截取模板"))
+            return False
+        if not (0 <= self._selected_idx < len(self._regions)):
+            self._notify_status(tr("请先选中一个已绑定坐标的区域"))
+            return False
+        region = self._regions[self._selected_idx]
+        if region.is_reference or region.w_ratio <= 0 or region.h_ratio <= 0:
+            self._notify_status(tr("引用区域只读，请回到源场景截取模板"))
+            return False
+        self._template_crop_idx = self._selected_idx
+        self._template_crop_start = None
+        self._template_crop_current = None
+        self.setCursor(Qt.CursorShape.CrossCursor)
+        self.setFocus()
+        self._notify_status(tr("请在选中区域内部拖拽选择截取部分；Esc 取消"))
+        self.update()
+        return True
+
+    def capture_selected_region_template(self) -> bool:
+        """直接截取完整 Region；click_rect 不参与模板裁剪。"""
+        if self._original_image is None:
+            self._notify_status(tr("当前场景没有截图，无法截取模板"))
+            return False
+        if not (0 <= self._selected_idx < len(self._regions)):
+            self._notify_status(tr("请先选中一个已绑定坐标的区域"))
+            return False
+        region = self._regions[self._selected_idx]
+        if region.is_reference or region.w_ratio <= 0 or region.h_ratio <= 0:
+            self._notify_status(tr("引用区域只读，请回到源场景截取模板"))
+            return False
+        return self._emit_template_crop(region, 0.0, 0.0, 1.0, 1.0)
+
+    def cancel_template_crop(self):
+        self._template_crop_idx = -1
+        self._template_crop_start = None
+        self._template_crop_current = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self.update()
+
+    def show_template_test_result(self, passed: bool) -> None:
+        """短暂高亮当前 Region 的模板测试结果。"""
+        if not (0 <= self._selected_idx < len(self._regions)):
+            return
+        self._template_test_result = (self._selected_idx, passed)
+        self._template_test_token += 1
+        token = self._template_test_token
+
+        def clear():
+            if token == self._template_test_token:
+                self._template_test_result = None
+                self.update()
+
+        QTimer.singleShot(1800, clear)
+        self.update()
+
+    def _finish_template_crop(self) -> None:
+        if (self._template_crop_idx < 0 or self._template_crop_start is None
+                or self._template_crop_current is None
+                or self._original_image is None):
+            return
+        region = self._regions[self._template_crop_idx]
+        x0, y0 = self._pos_in_region(
+            region, *self._canvas_pos(self._template_crop_start))
+        x1, y1 = self._pos_in_region(
+            region, *self._canvas_pos(self._template_crop_current))
+        rx, ry = min(x0, x1), min(y0, y1)
+        rw, rh = abs(x1 - x0), abs(y1 - y0)
+        if self._emit_template_crop(region, rx, ry, rw, rh):
+            self.cancel_template_crop()
+
+    def _emit_template_crop(
+        self, region: Region, rx: float, ry: float, rw: float, rh: float,
+    ) -> bool:
+        """按 Region 内相对矩形裁剪原图并交给编辑器；与 click_rect 无关。"""
+        if self._original_image is None:
+            return False
+        left = region.x_ratio + rx * region.w_ratio
+        top = region.y_ratio + ry * region.h_ratio
+        right = left + rw * region.w_ratio
+        bottom = top + rh * region.h_ratio
+        sx0, sy0 = self._canvas_to_screenshot_norm(left, top)
+        sx1, sy1 = self._canvas_to_screenshot_norm(right, bottom)
+        height, width = self._original_image.shape[:2]
+        px0 = min(max(int(sx0 * width), 0), width)
+        py0 = min(max(int(sy0 * height), 0), height)
+        px1 = min(max(int(round(sx1 * width)), 0), width)
+        py1 = min(max(int(round(sy1 * height)), 0), height)
+        if px1 - px0 < 4 or py1 - py0 < 4:
+            self._template_crop_start = None
+            self._template_crop_current = None
+            self._notify_status(tr("模板至少需要 4×4 像素，请重新框选"))
+            self.update()
+            return False
+        crop = self._original_image[py0:py1, px0:px1].copy()
+        record_w = max(1, int(round(width * self._canvas_config.w_ratio)))
+        record_h = max(1, int(round(height * self._canvas_config.h_ratio)))
+        callback = self.on_template_crop_ready
+        if callback:
+            callback(region.key, crop, record_w, record_h)
+        return True
 
     @property
     def edit_mode(self) -> EditMode:
@@ -807,6 +991,30 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
             painter.setBrush(QColor(80, 220, 255, 35))
             painter.drawRect(preview)
 
+        if (self._template_crop_idx >= 0
+                and self._template_crop_start is not None
+                and self._template_crop_current is not None):
+            preview = QRectF(
+                self._template_crop_start,
+                self._template_crop_current,
+            ).normalized()
+            target = self._region_rect_widget(
+                self._regions[self._template_crop_idx])
+            preview = preview.intersected(target)
+            painter.setPen(QPen(TEMPLATE_CROP_COLOR, 2, Qt.PenStyle.DashLine))
+            painter.setBrush(QColor(190, 90, 255, 35))
+            painter.drawRect(preview)
+
+        if self._template_test_result is not None:
+            index, passed = self._template_test_result
+            if 0 <= index < len(self._regions):
+                painter.setPen(QPen(
+                    QColor(60, 220, 100) if passed else QColor(255, 70, 70),
+                    4,
+                ))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRect(self._region_rect_widget(self._regions[index]))
+
         painter.end()
 
     def _draw_subscene_refs(self, painter: QPainter):
@@ -823,11 +1031,15 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
                     y_ratio=ref.y_ratio + child.y_ratio * ref.h_ratio,
                     w_ratio=child.w_ratio * ref.w_ratio,
                     h_ratio=child.h_ratio * ref.h_ratio,
+                    click_rect=child.click_rect,
                 )
                 child_rect = self._region_rect_widget(virtual)
                 painter.setPen(QPen(QColor(120, 220, 255, 170), 1))
                 painter.setBrush(QColor(80, 180, 230, 25))
                 painter.drawRect(child_rect)
+                # 子场景内部区域虽只读，显式点击框仍是布局信息的一部分。
+                if child.click_rect is not None:
+                    self._draw_click_rect(painter, virtual, False)
             for child in content.get("panels", []):
                 virtual = Region(
                     key=child.key,
@@ -973,8 +1185,9 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
             painter.setPen(QColor(255, 255, 255))
             painter.drawText(label_rect, Qt.AlignmentFlag.AlignCenter, label)
 
-        # 缩放手柄
-        if selected and not r.is_reference:
+        # 缩放手柄（标定模式下区域锁定，不给手柄免得误以为能拖）
+        if (selected and not r.is_reference
+                and self._edit_mode != EditMode.CLICK_RECT):
             painter.save()
             handles = self._get_handle_positions(r)
             painter.setPen(QPen(QColor(255, 255, 0), 1))
@@ -987,6 +1200,63 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
                     )
                 )
             painter.restore()
+
+        self._draw_click_rect(painter, r, selected)
+
+    def _draw_click_rect(self, painter: QPainter, r: Region, selected: bool):
+        """绘制区域的点击落点框。
+
+        只画携带信息的那一份：**已标定**的落点框始终画（画布静止时多出来的
+        墨水恰好只出现在做过特殊标定的区域上，一眼能扫出哪几个被调过）；
+        由全局比例派生的默认框对每个区域都长得一样、携带零信息，平时不画，
+        只给当前选中区域画参照虚线。
+        """
+        if r.w_ratio <= 0 or r.h_ratio <= 0:
+            return
+        explicit = r.click_rect is not None
+        calibrating = self._edit_mode == EditMode.CLICK_RECT
+        if not explicit and not selected:
+            return
+
+        rect = self._click_rect_widget(r, self._jitter_ratio)
+        if rect.width() < 1 or rect.height() < 1:
+            return
+
+        painter.save()
+        if explicit:
+            color = CLICK_RECT_COLOR
+            pen = QPen(color, 2 if (selected and calibrating) else 1)
+            pen.setStyle(Qt.PenStyle.SolidLine)
+        else:
+            color = CLICK_RECT_DEFAULT_COLOR
+            pen = QPen(color, 1)
+            pen.setStyle(Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(rect)
+
+        # 中心十字：无抖动时的落点
+        cx, cy = rect.center().x(), rect.center().y()
+        arm = 4.0
+        painter.drawLine(QPointF(cx - arm, cy), QPointF(cx + arm, cy))
+        painter.drawLine(QPointF(cx, cy - arm), QPointF(cx, cy + arm))
+
+        # 标定模式下给选中区域的落点框配手柄
+        if calibrating and selected and not r.is_reference:
+            painter.setPen(QPen(CLICK_RECT_COLOR, 1))
+            painter.setBrush(QBrush(CLICK_RECT_COLOR))
+            hcx, hcy = rect.center().x(), rect.center().y()
+            for center in (
+                rect.topLeft(), QPointF(hcx, rect.top()), rect.topRight(),
+                QPointF(rect.right(), hcy), rect.bottomRight(),
+                QPointF(hcx, rect.bottom()), rect.bottomLeft(),
+                QPointF(rect.left(), hcy),
+            ):
+                painter.drawRect(QRectF(
+                    center.x() - HANDLE_SIZE, center.y() - HANDLE_SIZE,
+                    HANDLE_SIZE * 2, HANDLE_SIZE * 2,
+                ))
+        painter.restore()
 
     def _draw_panels(self, painter: QPainter):
         """绘制所有 panel（青色虚线矩形 + 网格线 + 标签）"""

@@ -349,9 +349,10 @@ class SettingsDialog(QDialog):
         self._jitter_spin.setDecimals(2)
         self._jitter_spin.setValue(sim.region_jitter_ratio)
         self._jitter_spin.setFixedWidth(_SPIN_WIDTH)
-        form.addRow(tr("区域中心偏移比例:"), self._spin_with_tip(
+        form.addRow(tr("默认点击范围半径:"), self._spin_with_tip(
             self._jitter_spin,
-            tr("区域内点击点相对中心的随机偏移比例（必须小于 0.5，防止偏出区域）")))
+            tr("未单独标定点击区域时，落点框从区域中心向四边延伸的比例。"
+               "0.25 = 落点覆盖区域中间的一半；必须小于 0.5")))
 
         return tab
 

@@ -55,6 +55,10 @@ class RecognitionOpsMixin:
 
     # ─── OCR 文字识别 ────────────────────────────────────
 
+    def _get_ocr_cleaning_group(self) -> str | None:
+        combo = getattr(self, "_combo_ocr_group", None)
+        return combo.currentData() if combo is not None else None
+
     def _on_recognize(self):
         """对当前 Tab 场景的区域或面板做 OCR 文字识别（根据激活的列表自动分发）"""
         current_tab = self._tabs.get(self._current_scene_key)
@@ -87,7 +91,10 @@ class RecognitionOpsMixin:
         engine = OCREngine()
         canvas = current_tab.get_canvas_config()
 
-        results = engine.ocr_scene_regions(image, canvas, regions, current_tab.scene_key)
+        group = self._get_ocr_cleaning_group()
+        kwargs = {"cleaning_group": group} if group else {}
+        results = engine.ocr_scene_regions(
+            image, canvas, regions, current_tab.scene_key, **kwargs)
 
         # 展示结果（按场景定义顺序，仅显示 is_text=True 的区域）
         self._result_text.clear()
@@ -135,7 +142,9 @@ class RecognitionOpsMixin:
             self._result_text.append(f"[{panel.key}] {panel.rows}×{panel.cols} = {len(cells)} 个 cell")
             for i, (x1, y1, x2, y2) in enumerate(cells):
                 crop = image[y1:y2, x1:x2]
-                text = engine.ocr_single(crop)
+                group = self._get_ocr_cleaning_group()
+                text = (engine.ocr_single(crop, cleaning_group=group)
+                        if group else engine.ocr_single(crop))
                 row = i // panel.cols + 1
                 col = i % panel.cols + 1
                 if text:

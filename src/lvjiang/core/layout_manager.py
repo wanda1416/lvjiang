@@ -572,6 +572,7 @@ def load_layout_by_name(name: str) -> Layout | None:
     panels: dict[str, list[Panel]] = {}
     crop_canvases: dict[str, CanvasConfig] = {}
     subscene_refs: dict[str, list[SubsceneRef]] = {}
+    reference_positions: dict[tuple[str, str, str], tuple[float, float]] = {}
 
     for scene_key in scene_keys:
         path = resolver.resolve_read(_scene_rel(scene_dir_name, scene_key))
@@ -594,6 +595,14 @@ def load_layout_by_name(name: str) -> Layout | None:
             crop_canvases[scene_key] = CanvasConfig.from_dict(data["crop_canvas"])
         if "subscene_refs" in data:
             subscene_refs[scene_key] = [SubsceneRef.from_dict(r) for r in data["subscene_refs"]]
+        for position in data.get("reference_positions", []):
+            if not isinstance(position, dict):
+                continue
+            source = position.get("scene")
+            entity = position.get("entity")
+            if source and entity:
+                reference_positions[(scene_key, str(source), str(entity))] = (
+                    float(position["x_ratio"]), float(position["y_ratio"]))
         # 向后兼容：旧格式 disabled 段迁移到实例属性
         if "disabled" in data and isinstance(data["disabled"], dict):
             _apply_legacy_disabled(
@@ -602,7 +611,7 @@ def load_layout_by_name(name: str) -> Layout | None:
             )
 
     _drop_orphan_coords(regions, points)
-    _expand_scene_references(regions, points)
+    _expand_scene_references(regions, points, reference_positions)
 
     return Layout(name=name, desc=desc, canvas=canvas, regions=regions,
                   points=points, arrows=arrows, panels=panels,
@@ -646,7 +655,13 @@ def _drop_orphan_coords(regions: dict, points: dict) -> None:
                 f"已丢弃: {', '.join(dropped)}")
 
 
-def _expand_scene_references(regions: dict, points: dict) -> None:
+def _expand_scene_references(
+    regions: dict,
+    points: dict,
+    reference_positions: (
+        dict[tuple[str, str, str], tuple[float, float]] | None
+    ) = None,
+) -> None:
     """把场景声明的跨场景 area 引用展开进本场景的坐标表。
 
     只允许引用一级场景，其实体坐标本就是画布归一化，**原样搬过来即可，
@@ -656,7 +671,8 @@ def _expand_scene_references(regions: dict, points: dict) -> None:
     仍是纯字典查表，``click [equip_tune_detail].[confirm]`` 自然就通了，
     click_region / click_any / _validate_refs_bound 一行都不用改。
 
-    展开项带 ``source_scene`` 标记，编辑器据此锁死、保存路径据此过滤。
+    展开项带 ``source_scene`` 标记。编辑器只允许移动，并把目标场景的位置
+    单独保存为 ``reference_positions``；完整实体仍由保存路径过滤。
     """
     from .scene_registry import get_registry
 
@@ -669,7 +685,9 @@ def _expand_scene_references(regions: dict, points: dict) -> None:
     for scene_key, scene in scenes.items():
         for ref in getattr(scene, "references", ()):
             expand_one_reference(
-                regions, points, scene_key, ref.scene, ref.entity)
+                regions, points, scene_key, ref.scene, ref.entity,
+                position=(reference_positions or {}).get(
+                    (scene_key, ref.scene, ref.entity)))
 
 
 def refresh_scene_references(
@@ -699,6 +717,17 @@ def refresh_scene_references(
         if not refs:
             continue
         affected.add(scene_key)
+        positions = {
+            (item.source_scene, item.key): (
+                (item.x_ratio, item.y_ratio)
+                if hasattr(item, "x_ratio")
+                else (item.cx_ratio, item.cy_ratio))
+            for item in (
+                *layout.regions.get(scene_key, []),
+                *layout.points.get(scene_key, []),
+            )
+            if item.source_scene and item.position_overridden
+        }
         refreshed_sources = {ref.scene for ref in refs}
         layout.regions[scene_key] = [
             item for item in layout.regions.get(scene_key, [])
@@ -715,12 +744,14 @@ def refresh_scene_references(
                 scene_key,
                 ref.scene,
                 ref.entity,
+                position=positions.get((ref.scene, ref.entity)),
             )
     return affected
 
 
 def expand_one_reference(regions: dict, points: dict, scene_key: str,
-                         source_scene: str, entity: str) -> bool:
+                         source_scene: str, entity: str,
+                         position: tuple[float, float] | None = None) -> bool:
     """把一条跨场景引用展开进坐标表，成功返回 True。
 
     单独拆出来是为了编辑器：新加一条引用之后不必整份布局重载（那会丢掉
@@ -743,7 +774,23 @@ def expand_one_reference(regions: dict, points: dict, scene_key: str,
                 f"跨场景引用 {scene_key}.{entity} 与本场景已有定义"
                 f"同名，已跳过展开")
             return False
-        target.append(_replace(source, source_scene=source_scene))
+        expanded = _replace(
+            source,
+            source_scene=source_scene,
+            position_overridden=position is not None,
+            source_x_ratio=(
+                source.x_ratio if hasattr(source, "x_ratio")
+                else source.cx_ratio),
+            source_y_ratio=(
+                source.y_ratio if hasattr(source, "y_ratio")
+                else source.cy_ratio),
+        )
+        if position is not None:
+            if hasattr(expanded, "x_ratio"):
+                expanded.x_ratio, expanded.y_ratio = position
+            else:
+                expanded.cx_ratio, expanded.cy_ratio = position
+        target.append(expanded)
         return True
     # 源场景在当前布局里没给这个实体标坐标，跑到它就会失败。
     logger.warning(
@@ -955,6 +1002,22 @@ class LayoutConfigManager:
             refs = layout.subscene_refs.get(sk) or []
             if refs:
                 entry["subscene_refs"] = [r.to_dict() for r in refs]
+            positions = []
+            for item in (*layout.regions.get(sk, []), *layout.points.get(sk, [])):
+                if not (item.source_scene and item.position_overridden):
+                    continue
+                if hasattr(item, "x_ratio"):
+                    x_ratio, y_ratio = item.x_ratio, item.y_ratio
+                else:
+                    x_ratio, y_ratio = item.cx_ratio, item.cy_ratio
+                positions.append({
+                    "scene": item.source_scene,
+                    "entity": item.key,
+                    "x_ratio": x_ratio,
+                    "y_ratio": y_ratio,
+                })
+            if positions:
+                entry["reference_positions"] = positions
             resolver.write_entity(
                 _scene_rel(scene_dir_name, sk),
                 json.dumps(entry, ensure_ascii=False, indent=2),

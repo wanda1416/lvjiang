@@ -8,7 +8,12 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QCursor, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QInputDialog, QMenu
 
-from ...core.layout_models import CanvasConfig, Region, SubsceneRef
+from ...core.layout_models import (
+    CanvasConfig,
+    Region,
+    SubsceneRef,
+    effective_click_rect,
+)
 from ...i18n import tr
 from .canvas_coords import CanvasCoordMixin
 
@@ -24,6 +29,7 @@ class DragMode(Enum):
 class EditMode(Enum):
     REGION = auto()        # 区域编辑模式（默认）
     CANVAS = auto()        # 画布编辑模式（移动/缩放画布框）
+    CLICK_RECT = auto()    # 点击区域标定模式（在选中区域内框定落点范围）
 
 
 class HandlePos(Enum):
@@ -52,6 +58,25 @@ SNAP_PIXELS = 6  # 吸附像素阈值（widget 像素）
 #: 取 4 px 而不是 Qt 默认的 startDragDistance()（10 px）：后者是给"从控件里
 #: 拽出一个拖放"用的，对画布上的直接拖动来说太大，会把有意的小幅微调也吃掉。
 DRAG_DEAD_ZONE_PX = 4
+
+#: 落点框相对区域的最小边长。低于它的框在高分屏上只剩一两个像素，
+#: 点起来和写死坐标没区别，还容易在缩放布局后错位。
+MIN_CLICK_RECT_RATIO = 0.05
+
+
+def clamp_click_rect(
+    x: float, y: float, w: float, h: float,
+) -> tuple[float, float, float, float]:
+    """把落点框钳进区域内（相对坐标 0~1），并保证不小于最小边长。
+
+    区域矩形的范围就是 OCR 识别范围，落点框必须是它的子集——所以钳制放在
+    交互层，用户怎么拖都构造不出越界的值，模型层的校验只是最后一道兜底。
+    """
+    w = min(max(w, MIN_CLICK_RECT_RATIO), 1.0)
+    h = min(max(h, MIN_CLICK_RECT_RATIO), 1.0)
+    x = min(max(x, 0.0), 1.0 - w)
+    y = min(max(y, 0.0), 1.0 - h)
+    return (x, y, w, h)
 
 # 手柄光标映射
 HANDLE_CURSORS = {
@@ -105,6 +130,11 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     _canvas_drag_handle: HandlePos | None
     _canvas_drag_start: QPointF
     _canvas_drag_orig: CanvasConfig | None
+    _click_drag_mode: DragMode | None
+    _click_drag_handle: HandlePos | None
+    _click_drag_start: QPointF
+    _click_drag_orig: Region | None
+    _jitter_ratio: float
     _panel_drag_start: QPointF | None
     _panel_drag_current: QPointF | None
     _subscene_drag_start: QPointF | None
@@ -113,6 +143,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     _subscene_edit_orig: SubsceneRef | None
     on_region_changed: Callable | None
     on_canvas_changed: Callable | None
+    _template_crop_idx: int
+    _template_crop_start: QPointF | None
+    _template_crop_current: QPointF | None
 
     # ─── 命中检测 ────────────────────────────────────────
 
@@ -170,6 +203,29 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             HandlePos.BOTTOM_LEFT:  rect.bottomLeft(),
             HandlePos.LEFT:         QPointF(rect.left(), cy),
         }
+
+    def _hit_click_rect_handle(self, r: Region, pos: QPointF) -> HandlePos | None:
+        """检测是否命中落点框的缩放手柄"""
+        rect = self._click_rect_widget(r, self._jitter_ratio)
+        cx, cy = rect.center().x(), rect.center().y()
+        handles = {
+            HandlePos.TOP_LEFT:     rect.topLeft(),
+            HandlePos.TOP:          QPointF(cx, rect.top()),
+            HandlePos.TOP_RIGHT:    rect.topRight(),
+            HandlePos.RIGHT:        QPointF(rect.right(), cy),
+            HandlePos.BOTTOM_RIGHT: rect.bottomRight(),
+            HandlePos.BOTTOM:       QPointF(cx, rect.bottom()),
+            HandlePos.BOTTOM_LEFT:  rect.bottomLeft(),
+            HandlePos.LEFT:         QPointF(rect.left(), cy),
+        }
+        for hpos, center in handles.items():
+            hr = QRectF(
+                center.x() - HANDLE_SIZE, center.y() - HANDLE_SIZE,
+                HANDLE_SIZE * 2, HANDLE_SIZE * 2,
+            )
+            if hr.contains(pos):
+                return hpos
+        return None
 
     def _hit_canvas_handle(self, pos: QPointF) -> HandlePos | None:
         """检测是否命中画布框的缩放手柄"""
@@ -365,6 +421,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         pos = event.position()
         self._press_pos = pos
 
+        if self._template_crop_idx >= 0:
+            region = self._regions[self._template_crop_idx]
+            if not self._region_rect_widget(region).contains(pos):
+                self._notify_status("模板只能在当前 Region 内框选")
+                return
+            self._template_crop_start = pos
+            self._template_crop_current = pos
+            self.update()
+            return
+
         # ── Panel 放置模式优先介入 ──
         if self._pending_subscene_ref_def is not None:
             self._subscene_drag_start = pos
@@ -378,6 +444,11 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self.update()
             return
 
+        # ── 点击区域标定模式：只操作落点框，区域本身锁定 ──
+        if self._edit_mode == EditMode.CLICK_RECT:
+            self._click_rect_press(pos)
+            return
+
         # 单区域编辑模式下跳过 panel/POI 命中测试，直接聚焦 region
         if self._field_selected and self._selected_idx >= 0:
             # 右侧字段列表选中：单区域编辑模式
@@ -385,9 +456,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             rect = self._region_rect_widget(r)
             if rect.contains(pos):
                 if r.is_reference:
-                    self._drag_mode = DragMode.NONE
+                    self._drag_mode = DragMode.MOVING
                     self._drag_handle = None
-                    self._drag_orig = None
+                    self._drag_start = pos
+                    self._drag_orig = r.clone()
                 else:
                     handle = self._hit_handle(r, pos)
                     self._drag_mode = (DragMode.RESIZING if handle
@@ -488,13 +560,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self._selected_idx = idx
             r = self._regions[idx]
             if r.is_reference:
-                self._drag_mode = DragMode.NONE
+                self._drag_mode = DragMode.MOVING
                 self._drag_handle = None
-                self._drag_orig = None
-                self._notify_selection_changed()
-                self.update()
-                return
-            if handle is not None:
+            elif handle is not None:
                 self._drag_mode = DragMode.RESIZING
                 self._drag_handle = handle
             else:
@@ -521,6 +589,12 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if event is None:
             return
         pos = event.position()
+
+        if self._template_crop_idx >= 0:
+            if self._template_crop_start is not None:
+                self._template_crop_current = pos
+                self.update()
+            return
 
         if self._subscene_drag_start is not None:
             self._subscene_drag_current = pos
@@ -597,6 +671,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             return
 
         # ── POI（point/arrow）优先介入 ──
+        if self._edit_mode == EditMode.CLICK_RECT:
+            self._click_rect_move(pos)
+            return
+
         if self._edit_mode == EditMode.REGION and self._poi_handle_move(event):
             return
 
@@ -644,6 +722,8 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             assert self._drag_orig is not None
             r.x_ratio = max(0, min(1 - r.w_ratio, self._drag_orig.x_ratio + dx_n))
             r.y_ratio = max(0, min(1 - r.h_ratio, self._drag_orig.y_ratio + dy_n))
+            if r.is_reference:
+                r.position_overridden = True
             # Shift 按下时禁用吸附
             if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
                 self._snap_lines_x = []
@@ -676,6 +756,12 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             return
         # 本次按下已结束，死区判定随之失效（下面各分支都不再用它）
         self._press_pos = None
+
+        if self._template_crop_idx >= 0:
+            if self._template_crop_start is not None:
+                self._template_crop_current = event.position()
+                self._finish_template_crop()
+            return
 
         if self._subscene_drag_start is not None and self._pending_subscene_ref_def is not None:
             sx0, sy0 = self._widget_to_norm(self._subscene_drag_start)
@@ -757,6 +843,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self.update()
             return
 
+        if self._edit_mode == EditMode.CLICK_RECT:
+            self._click_rect_release()
+            return
+
         # ── POI（point/arrow）优先介入 ──
         if self._edit_mode == EditMode.REGION and self._poi_handle_release(event):
             return
@@ -819,7 +909,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         self.update()
 
     def keyPressEvent(self, event):
+        if (self._edit_mode == EditMode.CLICK_RECT
+                and event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace)):
+            # 标定模式下 Delete 的语义是"清除标定"，不能顺手删掉区域
+            self.clear_selected_click_rect()
+            return
         if event.key() == Qt.Key.Key_Escape:
+            if self._template_crop_idx >= 0:
+                self.cancel_template_crop()
+                self._notify_status("已取消模板截取")
+                return
             # 取消 panel 放置模式
             if self._pending_panel_def is not None:
                 self.cancel_panel_place()
@@ -960,7 +1059,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             # 单区域编辑模式：只对选中区域响应
             r = self._regions[self._selected_idx]
             if r.is_reference:
-                self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+                if self._region_rect_widget(r).contains(pos):
+                    self.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
+                else:
+                    self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
                 return
             handle = self._hit_handle(r, pos)
             if handle is not None:
@@ -977,7 +1079,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         idx, handle = self._hit_test(pos)
         if idx >= 0:
             if self._regions[idx].is_reference:
-                self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+                self.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
                 return
             if handle is not None:
                 self.setCursor(QCursor(HANDLE_CURSORS[handle]))
@@ -1063,19 +1165,31 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         target_key = self.selected_region_key()
         if target_key is None:
             return
-        if (0 <= self._selected_idx < len(self._regions)
-                and self._regions[self._selected_idx].is_reference):
-            return
+        region = self._regions[self._selected_idx]
         menu = QMenu(self)  # type: ignore[call-overload]
         menu.setStyleSheet(
             "QMenu { background-color: palette(base); padding: 4px; }"
             "QMenu::item { padding: 4px 16px; }"
             "QMenu::item:selected { background-color: #ddd; }"
         )
-        copy_action = menu.addAction(tr("复制"))
-        delete_action = menu.addAction(tr("删除"))
+        restore_action = None
+        copy_action = None
+        delete_action = None
+        if region.is_reference:
+            restore_action = menu.addAction(tr("还原位置"))
+            restore_action.setEnabled(
+                region.position_overridden
+                and region.source_x_ratio is not None
+                and region.source_y_ratio is not None)
+        else:
+            copy_action = menu.addAction(tr("复制"))
+            delete_action = menu.addAction(tr("删除"))
+        clear_click_action = None
+        if not region.is_reference and region.click_rect is not None:
+            clear_click_action = menu.addAction(tr("清除点击区域"))
         action = menu.exec(self.mapToGlobal(pos.toPoint()))
-        if action not in (copy_action, delete_action):
+        if action is None or action not in (
+                restore_action, copy_action, delete_action, clear_click_action):
             return
         # QMenu.exec 有嵌套事件循环：期间的列表刷新/焦点变化可能改掉索引。
         # 操作始终定位打开菜单时的实体；若已被移除，就不操作其他区域。
@@ -1085,10 +1199,21 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             return
         self._selected_idx = target_index
         self._notify_selection_changed()
-        if action == copy_action:
+        if restore_action is not None and action == restore_action:
+            region = self._regions[target_index]
+            if (region.source_x_ratio is not None
+                    and region.source_y_ratio is not None):
+                region.x_ratio = region.source_x_ratio
+                region.y_ratio = region.source_y_ratio
+                region.position_overridden = False
+                self._notify_changed()
+                self.update()
+        elif action == copy_action:
             self._copy_selected_region()
         elif action == delete_action:
             self.delete_selected()
+        elif action is clear_click_action:
+            self.clear_selected_click_rect()
 
     def _copy_selected_region(self):
         """复制选中区域：创建相同大小的新区域，提示绑定新字段，并选中新区域"""
@@ -1203,6 +1328,134 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         self._subscene_selected_idx = -1
         self._notify_subscene_ref_changed()
         self.update()
+
+    # ─── 点击区域（click_rect）标定 ──────────────────────
+
+    def _click_rect_target(self) -> Region | None:
+        """当前可标定的区域；引用区域的坐标属于源场景，这里不许改"""
+        if 0 <= self._selected_idx < len(self._regions):
+            r = self._regions[self._selected_idx]
+            if not r.is_reference and r.w_ratio > 0 and r.h_ratio > 0:
+                return r
+        return None
+
+    def _canvas_pos(self, pos: QPointF) -> tuple[float, float]:
+        """widget 坐标 → 画布内归一化坐标"""
+        sx, sy = self._widget_to_norm(pos)
+        return self._screenshot_to_canvas_norm(sx, sy)
+
+    @staticmethod
+    def _pos_in_region(r: Region, cx: float, cy: float) -> tuple[float, float]:
+        """画布归一化坐标 → 相对区域的比例（钳在 0~1，越界在这里就被截住）"""
+        fx = (cx - r.x_ratio) / r.w_ratio if r.w_ratio > 0 else 0.0
+        fy = (cy - r.y_ratio) / r.h_ratio if r.h_ratio > 0 else 0.0
+        return min(max(fx, 0.0), 1.0), min(max(fy, 0.0), 1.0)
+
+    def _click_rect_press(self, pos: QPointF):
+        r = self._click_rect_target()
+        if r is not None:
+            handle = self._hit_click_rect_handle(r, pos)
+            if handle is not None:
+                self._begin_click_drag(DragMode.RESIZING, handle, pos, r)
+                return
+            if self._click_rect_widget(r, self._jitter_ratio).contains(pos):
+                self._begin_click_drag(DragMode.MOVING, None, pos, r)
+                return
+            if self._region_rect_widget(r).contains(pos):
+                # 选中区域内的空白处：重新框一个落点框
+                self._begin_click_drag(DragMode.DRAWING, None, pos, r)
+                return
+        # 落在别处：改选区域（标定模式下不新建、不移动区域）
+        idx, _handle = self._hit_test(pos)
+        self._selected_idx = idx
+        self._field_selected = False
+        self._reset_click_drag()
+        self._notify_selection_changed()
+        self.update()
+
+    def _begin_click_drag(
+        self, mode: DragMode, handle: HandlePos | None,
+        pos: QPointF, r: Region,
+    ):
+        self._click_drag_mode = mode
+        self._click_drag_handle = handle
+        self._click_drag_start = pos
+        self._click_drag_orig = r.clone()
+        self.update()
+
+    def _reset_click_drag(self):
+        self._click_drag_mode = DragMode.NONE
+        self._click_drag_handle = None
+        self._click_drag_orig = None
+
+    def _click_rect_move(self, pos: QPointF):
+        if self._click_drag_mode in (None, DragMode.NONE):
+            self._update_click_rect_cursor(pos)
+            return
+        if not self._beyond_dead_zone(pos):
+            return  # 死区内：点击时的手抖不改数据
+        r = self._click_rect_target()
+        orig = self._click_drag_orig
+        if r is None or orig is None:
+            return
+        if self._click_drag_mode == DragMode.DRAWING:
+            x0, y0 = self._pos_in_region(r, *self._canvas_pos(self._click_drag_start))
+            x1, y1 = self._pos_in_region(r, *self._canvas_pos(pos))
+            r.click_rect = clamp_click_rect(
+                min(x0, x1), min(y0, y1), abs(x1 - x0), abs(y1 - y0))
+        elif self._click_drag_mode == DragMode.MOVING:
+            ox, oy, ow, oh = effective_click_rect(orig, self._jitter_ratio)
+            dx_n, dy_n = self._widget_delta_to_canvas_norm(
+                self._click_drag_start, pos)
+            fx = dx_n / r.w_ratio if r.w_ratio > 0 else 0.0
+            fy = dy_n / r.h_ratio if r.h_ratio > 0 else 0.0
+            r.click_rect = clamp_click_rect(ox + fx, oy + fy, ow, oh)
+        elif self._click_drag_mode == DragMode.RESIZING:
+            r.click_rect = self._resized_click_rect(r, orig, pos)
+        self.update()
+
+    def _resized_click_rect(
+        self, r: Region, orig: Region, pos: QPointF,
+    ) -> tuple[float, float, float, float]:
+        ox, oy, ow, oh = effective_click_rect(orig, self._jitter_ratio)
+        nx, ny = self._pos_in_region(r, *self._canvas_pos(pos))
+        h = self._click_drag_handle
+        x1, y1, x2, y2 = ox, oy, ox + ow, oy + oh
+        m = MIN_CLICK_RECT_RATIO
+        if h in (HandlePos.LEFT, HandlePos.TOP_LEFT, HandlePos.BOTTOM_LEFT):
+            x1 = min(nx, x2 - m)
+        if h in (HandlePos.RIGHT, HandlePos.TOP_RIGHT, HandlePos.BOTTOM_RIGHT):
+            x2 = max(nx, x1 + m)
+        if h in (HandlePos.TOP, HandlePos.TOP_LEFT, HandlePos.TOP_RIGHT):
+            y1 = min(ny, y2 - m)
+        if h in (HandlePos.BOTTOM, HandlePos.BOTTOM_LEFT, HandlePos.BOTTOM_RIGHT):
+            y2 = max(ny, y1 + m)
+        return clamp_click_rect(x1, y1, x2 - x1, y2 - y1)
+
+    def _click_rect_release(self):
+        orig = self._click_drag_orig
+        if self._click_drag_mode not in (None, DragMode.NONE) and orig is not None:
+            r = self._click_rect_target()
+            # 与拖拽前备份比对：纯点击选中（几何未变）不算数据变更
+            if r is not None and r.to_dict() != orig.to_dict():
+                self._notify_changed()
+        self._reset_click_drag()
+        self.update()
+
+    def _update_click_rect_cursor(self, pos: QPointF):
+        r = self._click_rect_target()
+        if r is not None:
+            handle = self._hit_click_rect_handle(r, pos)
+            if handle is not None:
+                self.setCursor(QCursor(HANDLE_CURSORS[handle]))
+                return
+            if self._click_rect_widget(r, self._jitter_ratio).contains(pos):
+                self.setCursor(QCursor(Qt.CursorShape.SizeAllCursor))
+                return
+            if self._region_rect_widget(r).contains(pos):
+                self.setCursor(QCursor(Qt.CursorShape.CrossCursor))
+                return
+        self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
     # ─── 拖拽死区 ────────────────────────────────────────
 

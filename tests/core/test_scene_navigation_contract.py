@@ -113,7 +113,7 @@ def test_system_navigation_and_desktop_shortcuts():
     for name in ('桌面布局', '默认布局'):
         layout = layout_manager.load_layout_by_name(name)
         validate_layout_activation_keys(layout, {'game_main_page', 'general_control'})
-        setting = next(r for r in layout.get_scene_regions('general_control') if r.key == 'open_settings')
+        setting = next(r for r in layout.get_scene_regions('game_main_page') if r.key == 'settings')
         bag = next(r for r in layout.get_scene_regions('game_main_page') if r.key == 'bag')
         if name == '桌面布局':
             assert setting.activation_key == 'SLASH' and bag.activation_key == 'B'

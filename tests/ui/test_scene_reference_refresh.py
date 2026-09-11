@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock
 
-from lvjiang.core.layout_models import Layout, Region
+from lvjiang.core.layout_models import Layout, Point, Region
 from lvjiang.ui.scene_editor.dialog import SceneEditorDialog
 from lvjiang.ui.scene_editor.layout_ops import LayoutOpsMixin
 
@@ -25,15 +25,21 @@ def test_unlink_removes_only_target_projection_from_in_memory_layout():
     projection = source.clone()
     projection.source_scene = "source"
     other = Region("other", .4, .5, .1, .1, source_scene="source")
+    point = Point("anchor", .4, .5, source_scene="source")
     host = Mock()
     host._current_layout = Layout(name="test", regions={
         "source": [source], "current": [native, projection, other],
         "another": [projection.clone()],
-    })
+    }, points={"current": [point]})
     SceneEditorDialog._on_scene_reference_removed(host, "current", "source", "shared")
     assert host._current_layout.get_scene_regions("current") == [native, other]
     assert host._current_layout.get_scene_regions("source") == [source]
     assert host._current_layout.get_scene_regions("another") == [projection]
+    assert host._current_layout.get_scene_points("current") == [point]
+
+    SceneEditorDialog._on_scene_reference_removed(
+        host, "current", "source", "anchor")
+    assert host._current_layout.get_scene_points("current") == []
     host._mark_scene_dirty.assert_not_called()
 
 

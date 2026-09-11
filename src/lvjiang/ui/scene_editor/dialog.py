@@ -110,6 +110,7 @@ class SceneEditorDialog(
         self._loaded_scenes: set[str] = set()
         self._scene_layout_paths: dict[str, str] = {}
         self._applying_layout = False
+        self._click_rect_mode = False
 
         self._setup_ui()
         get_theme_manager().theme_changed.connect(self._update_info_label)
@@ -200,6 +201,12 @@ class SceneEditorDialog(
         self._btn_save.clicked.connect(self._on_save_layout)
         top_bar.addWidget(self._btn_save)
 
+        self._btn_discard = QPushButton(tr("放弃改动"))
+        self._btn_discard.clicked.connect(self._on_discard_layout_changes)
+        self._btn_discard.setEnabled(False)
+        self._btn_discard.setToolTip(tr("恢复当前布局最近一次保存的状态"))
+        top_bar.addWidget(self._btn_discard)
+
         self._btn_new = QPushButton(tr("新建"))
         self._btn_new.clicked.connect(self._on_new_layout)
         top_bar.addWidget(self._btn_new)
@@ -246,6 +253,7 @@ class SceneEditorDialog(
             self._btn_new_scene,
         )
         apply_button_style(
+            self._btn_discard,
             self._btn_refresh,
             self._btn_canvas_mode,
             variant="neutral",
@@ -305,7 +313,16 @@ class SceneEditorDialog(
         self._btn_recognize = QPushButton(tr("识别全部字段"))
         self._btn_recognize.clicked.connect(self._on_recognize)
         btn_row.addWidget(self._btn_recognize)
-        self._btn_recognize_ref = QPushButton(tr("识别全部参考图"))
+        self._combo_ocr_group = QComboBox()
+        self._combo_ocr_group.addItem(tr("不清洗"), None)
+        from ...core.ocr_cleaner import OCRCleaner
+        for key, config in OCRCleaner().get_groups().items():
+            self._combo_ocr_group.addItem(str(config.get("label") or key), key)
+        self._combo_ocr_group.setToolTip(tr("OCR 清洗组"))
+        self._combo_ocr_group.setMinimumWidth(180)
+        self._combo_ocr_group.setMaximumWidth(260)
+        btn_row.addWidget(self._combo_ocr_group)
+        self._btn_recognize_ref = QPushButton(tr("识别参考图"))
         self._btn_recognize_ref.clicked.connect(self._on_recognize_references)
         btn_row.addWidget(self._btn_recognize_ref)
         apply_button_style(self._btn_recognize, self._btn_recognize_ref)
@@ -318,6 +335,7 @@ class SceneEditorDialog(
             self._combo_ref_group,
             _REFERENCE_GROUP_COMBO_CHARACTER_CAPACITY,
         )
+        self._combo_ref_group.setMaximumWidth(120)
         btn_row.addWidget(self._combo_ref_group)
         from PyQt6.QtWidgets import QCheckBox
         self._chk_live_image = QCheckBox(tr("使用实时图像"))
@@ -441,6 +459,7 @@ class SceneEditorDialog(
         tab.on_scene_references_added = self._on_scene_references_added
         tab.on_scene_reference_removed = self._on_scene_reference_removed
         tab.on_version_pending_changed = self._on_version_pending_changed
+        tab.on_click_rect_mode_changed = self._on_toggle_click_rect_mode
         if self._current_layout is not None and not self._applying_layout:
             self._apply_layout_to_tab(scene_key, tab)
 
@@ -465,8 +484,11 @@ class SceneEditorDialog(
         )
         if self._btn_canvas_mode.isChecked():
             tab.set_canvas_mode()
+        elif self._click_rect_mode:
+            tab.set_click_rect_mode()
         else:
             tab.set_region_mode()
+        tab.set_click_rect_button_checked(self._click_rect_mode)
         tab._refresh_region_list()
         tab._refresh_point_list()
         tab._refresh_arrow_list()
@@ -609,6 +631,10 @@ class SceneEditorDialog(
             region for region in self._current_layout.get_scene_regions(scene_key)
             if not (region.key == entity and region.source_scene == source)
         ])
+        self._current_layout.set_scene_points(scene_key, [
+            point for point in self._current_layout.get_scene_points(scene_key)
+            if not (point.key == entity and point.source_scene == source)
+        ])
 
     def _on_item_migrated(self, kind: str, key: str, source: str, target: str):
         """编辑弹窗跨场景迁移后的同步（场景 YAML 已由弹窗侧迁移完成）
@@ -710,6 +736,8 @@ class SceneEditorDialog(
 
     def _on_toggle_canvas_mode(self, checked: bool):
         """切换画布编辑模式，同步到所有 Tab"""
+        if checked and self._click_rect_mode:
+            self._set_click_rect_mode(False)
         for tab in self._tabs.values():
             if checked:
                 tab.set_canvas_mode()
@@ -720,6 +748,28 @@ class SceneEditorDialog(
             self._status_bar.showMessage(tr("画布编辑模式：拖拽/缩放黄色画布框以排除窗口边框"))
         else:
             self._status_bar.showMessage(tr("已退出画布编辑模式"))
+
+    def _on_toggle_click_rect_mode(self, checked: bool):
+        """切换点击区域标定模式，同步到所有 Tab"""
+        if checked and self._btn_canvas_mode.isChecked():
+            self._btn_canvas_mode.setChecked(False)
+            self._update_canvas_button_text()
+        self._set_click_rect_mode(checked)
+        if checked:
+            self._status_bar.showMessage(
+                tr("点击标定模式：选中区域后在其内部拖拽框定落点范围，"
+                   "Delete 清除标定回到默认"))
+        else:
+            self._status_bar.showMessage(tr("已退出点击标定模式"))
+
+    def _set_click_rect_mode(self, checked: bool):
+        self._click_rect_mode = checked
+        for tab in self._tabs.values():
+            tab.set_click_rect_button_checked(checked)
+            if checked:
+                tab.set_click_rect_mode()
+            else:
+                tab.set_region_mode()
 
     def _update_canvas_button_text(self):
         crop = is_subscene(self._get_current_scene_key())
@@ -782,11 +832,13 @@ class SceneEditorDialog(
             self._dirty_scenes.discard(scene_key)
             self._update_scene_tab_title(scene_key, dirty=False)
             self._dirty_label.setVisible(bool(self._dirty_scenes))
+            self._btn_discard.setEnabled(bool(self._dirty_scenes))
             return
         if scene_key in self._dirty_scenes:
             return
         self._dirty_scenes.add(scene_key)
         self._dirty_label.setVisible(True)
+        self._btn_discard.setEnabled(True)
         self._update_scene_tab_title(scene_key, dirty=True)
 
     def _on_version_pending_changed(self, scene_key: str):
@@ -805,6 +857,7 @@ class SceneEditorDialog(
         self._data_dirty_scenes.clear()
         self._dirty_scenes.clear()
         self._dirty_label.setVisible(False)
+        self._btn_discard.setEnabled(False)
 
     def _set_dirty(self, dirty: bool):
         """兼容层：True = 标记所有场景 dirty，False = 清除全部 dirty"""

@@ -24,10 +24,12 @@ from .grammar.ast_nodes import (
     Find,
     For,
     ForRange,
+    FuncCall,
     If,
     Literal,
     Loop,
     Move,
+    Not,
     PanelGridDrag,
     PanelRef,
     ProcDef,
@@ -52,6 +54,8 @@ KIND_LABELS = {
     "panel": tr("面板"),
     "region": tr("区域"),
     "scan": tr("区域/面板"),
+    "template_scan": tr("模板区域"),
+    "template_source": tr("模板来源区域"),
     "point": tr("坐标点"),
     "stable_area": tr("区域"),
     "expr_ref": tr("区域/坐标点/面板"),
@@ -113,7 +117,21 @@ def _collect_from_expr(node, acc: list[RefUse], line: int) -> None:
     # 其他节点类型（VarRef/Literal/FieldAccess/FuncCall）不含 EntityRef，无需递归
 
 
-def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
+def _static_env_condition(condition, run_env: str) -> bool | None:
+    """Evaluate the small environment-only condition subset used by workflows."""
+    if not run_env:
+        return None
+    if (isinstance(condition, FuncCall) and condition.func_name == "env"
+            and len(condition.func_args) == 1):
+        name = _static_key(condition.func_args[0])
+        return run_env == name if name is not None else None
+    if isinstance(condition, Not):
+        value = _static_env_condition(condition.operand, run_env)
+        return None if value is None else not value
+    return None
+
+
+def _collect_from_stmt(stmt, acc: list[RefUse], run_env: str = "") -> None:
     """从单条语句（含其携带的引用与嵌套体）收集引用"""
     line = getattr(stmt, "line_no", 0)
 
@@ -159,19 +177,24 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
                 _add(acc, ref.scene, ref.entity, "point", line)
     elif isinstance(stmt, (Scan, Recognize)):
         scene_ref = stmt.scene
+        template_scan = (
+            isinstance(stmt, Scan) and stmt.by is not None
+            and stmt.by.match_mode == "image")
+        ref_kind = "template_scan" if template_scan else "scan"
         if isinstance(scene_ref, PanelRef):
             _add(acc, scene_ref.scene, scene_ref.panel, "panel", line)
         elif isinstance(scene_ref, EntityRef):
             # fields 为识别的区域 key 列表；无 fields（或动态 region）时为整场景识别
             if stmt.fields:
                 # 单一 key 运行时可能分派为整面板识别，放宽为 区域/面板
-                kind = "scan" if len(stmt.fields) == 1 else "region"
+                kind = ref_kind if template_scan or len(stmt.fields) == 1 else "region"
                 for field in stmt.fields:
                     _add(acc, scene_ref.scene, field, kind, line)
             else:
-                _add(acc, scene_ref.scene, None, "region", line)
+                _add(acc, scene_ref.scene, None,
+                     "template_scan" if template_scan else "region", line)
         elif isinstance(scene_ref, SubsceneEntityRef):
-            _add_subscene(acc, scene_ref, "scan", line)
+            _add_subscene(acc, scene_ref, ref_kind, line)
     elif isinstance(stmt, Find):
         # find 指令的搜索区域（若有）需要校验绑定
         # 支持 region 和 panel（两者对 find 等价，都提供矩形裁剪区域）
@@ -182,6 +205,10 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
             elif isinstance(stmt.search_scene, str):
                 # 静态场景 + 动态区域：只校验场景
                 _add(acc, stmt.search_scene, None, "scan", line)
+        if (stmt.by.match_mode == "image"
+                and isinstance(stmt.by.target, EntityRef)):
+            _add(acc, stmt.by.target.scene, stmt.by.target.entity,
+                 "template_source", line)
     elif isinstance(stmt, (Align, PanelGridDrag)):
         # scene / panel 均为裸字符串
         _add(acc, stmt.scene, stmt.panel, "panel", line)
@@ -200,21 +227,27 @@ def _collect_from_stmt(stmt, acc: list[RefUse]) -> None:
 
     # 嵌套体递归
     if isinstance(stmt, If):
-        _collect_from_body(stmt.then_body, acc)
-        _collect_from_body(stmt.else_body, acc)
+        env_result = _static_env_condition(stmt.condition, run_env)
+        if env_result is True:
+            _collect_from_body(stmt.then_body, acc, run_env)
+        elif env_result is False:
+            _collect_from_body(stmt.else_body, acc, run_env)
+        else:
+            _collect_from_body(stmt.then_body, acc, run_env)
+            _collect_from_body(stmt.else_body, acc, run_env)
     elif isinstance(stmt, (For, ForRange, Loop, WhileLoop, UntilLoop)):
-        _collect_from_body(stmt.body, acc)
+        _collect_from_body(stmt.body, acc, run_env)
     elif isinstance(stmt, Try):
-        _collect_from_body(stmt.body, acc)
-        _collect_from_body(stmt.catch_body, acc)
+        _collect_from_body(stmt.body, acc, run_env)
+        _collect_from_body(stmt.catch_body, acc, run_env)
 
 
-def _collect_from_body(body, acc: list[RefUse]) -> None:
+def _collect_from_body(body, acc: list[RefUse], run_env: str = "") -> None:
     for stmt in body or []:
-        _collect_from_stmt(stmt, acc)
+        _collect_from_stmt(stmt, acc, run_env)
 
 
-def _called_procs(body, acc: set[str]) -> None:
+def _called_procs(body, acc: set[str], run_env: str = "") -> None:
     """收集语句体里直接 ``call`` 到的过程名（含嵌套体）。
 
     ``CallProc.name`` 恒为静态字符串，DSL 没有按变量名调用过程的语法，
@@ -224,16 +257,22 @@ def _called_procs(body, acc: set[str]) -> None:
         if isinstance(stmt, CallProc):
             acc.add(stmt.name)
         if isinstance(stmt, If):
-            _called_procs(stmt.then_body, acc)
-            _called_procs(stmt.else_body, acc)
+            env_result = _static_env_condition(stmt.condition, run_env)
+            if env_result is True:
+                _called_procs(stmt.then_body, acc, run_env)
+            elif env_result is False:
+                _called_procs(stmt.else_body, acc, run_env)
+            else:
+                _called_procs(stmt.then_body, acc, run_env)
+                _called_procs(stmt.else_body, acc, run_env)
         elif isinstance(stmt, (For, ForRange, Loop, WhileLoop, UntilLoop)):
-            _called_procs(stmt.body, acc)
+            _called_procs(stmt.body, acc, run_env)
         elif isinstance(stmt, Try):
-            _called_procs(stmt.body, acc)
-            _called_procs(stmt.catch_body, acc)
+            _called_procs(stmt.body, acc, run_env)
+            _called_procs(stmt.catch_body, acc, run_env)
 
 
-def reachable_procs(body: list, procs: dict) -> set[str]:
+def reachable_procs(body: list, procs: dict, run_env: str = "") -> set[str]:
     """从顶层语句出发，沿 ``call`` 传递闭包求出**会被执行到**的过程名。
 
     import 是整文件平铺：``import "subcall/navigation.wf"`` 会把该文件（及它
@@ -246,7 +285,7 @@ def reachable_procs(body: list, procs: dict) -> set[str]:
     那属于另一类错误，有单独的检查负责报。
     """
     pending: set[str] = set()
-    _called_procs(body, pending)
+    _called_procs(body, pending, run_env)
     seen: set[str] = set()
     while pending:
         name = pending.pop()
@@ -256,13 +295,14 @@ def reachable_procs(body: list, procs: dict) -> set[str]:
         proc = (procs or {}).get(name)
         if isinstance(proc, ProcDef):
             nested: set[str] = set()
-            _called_procs(proc.body, nested)
+            _called_procs(proc.body, nested, run_env)
             pending |= nested - seen
     return seen
 
 
 def collect_refs(body: list, procs: dict, proc_sources: dict | None = None,
-                 source: str = "", reachable_only: bool = True) -> list[RefUse]:
+                 source: str = "", reachable_only: bool = True,
+                 run_env: str = "") -> list[RefUse]:
     """收集程序主体与过程体的静态配置引用。
 
     ``reachable_only`` 决定范围，两种用途要的不是同一个东西：
@@ -284,22 +324,24 @@ def collect_refs(body: list, procs: dict, proc_sources: dict | None = None,
         proc_sources: 过程名 -> 所在文件，缺失时回退到 source
         source: 顶层语句所在文件
         reachable_only: 见上
+        run_env: 已知运行平台；传入 android/desktop 时裁剪对应 env() 分支，
+            空字符串表示环境未知并保守检查所有分支
 
     Returns:
         引用列表，按出现顺序、同 (scene, key, kind, 行号, 文件) 去重
     """
     acc: list[RefUse] = []
     main: list[RefUse] = []
-    _collect_from_body(body, main)
+    _collect_from_body(body, main, run_env)
     acc.extend(replace(ref, source=source) for ref in main)
-    names = (reachable_procs(body, procs) if reachable_only
+    names = (reachable_procs(body, procs, run_env) if reachable_only
              else list((procs or {}).keys()))
     for name in names:
         proc = (procs or {}).get(name)
         if not isinstance(proc, ProcDef):
             continue
         sub: list[RefUse] = []
-        _collect_from_body(proc.body, sub)
+        _collect_from_body(proc.body, sub, run_env)
         proc_source = (proc_sources or {}).get(name, source)
         acc.extend(replace(ref, source=proc_source) for ref in sub)
 

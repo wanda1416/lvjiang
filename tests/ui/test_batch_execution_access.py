@@ -10,6 +10,7 @@ from lvjiang.core.user_config import User, save_user_metadata, set_user_workflow
 from lvjiang.ui.batch.batch_report import BatchReport
 from lvjiang.ui.batch.batch_runner import (
     ST_PENDING,
+    ST_SKIPPED,
     BatchContext,
     BatchScript,
     BatchStageResult,
@@ -104,20 +105,34 @@ def test_batch_user_lock_covers_each_stage_and_saved_session(tmp_path, monkeypat
         lease.release()
 
 
-def test_busy_user_never_reaches_prepare_and_reports_failure(tmp_path, monkeypatch, qapp):
+def test_busy_user_is_skipped_without_failing_the_batch(tmp_path, monkeypatch, qapp):
     worker = make_worker(tmp_path, monkeypatch)
     stages = []
+    executed = []
+    logs = []
     monkeypatch.setattr(worker, "_run_stage", lambda stage, *args, **kwargs: (
         stages.append(stage) or BatchStageResult(state={})))
+    monkeypatch.setattr(
+        worker, "_run_script",
+        lambda script, session, username, **kwargs: executed.append(username) or {},
+    )
+    worker.log.connect(logs.append)
     result = []
     worker.finished_all.connect(result.append)
     lease = acquire_user("alice", tmp_path)
     try:
         worker.run()
-        assert stages == ["batch_setup"]
-        assert "error" in result[-1]
     finally:
         lease.release()
+
+    assert executed == ["bob"]
+    assert stages == ["batch_setup", "prepare_item", "finish_item",
+                      "batch_teardown"]
+    assert any("alice 跳过" in message and "正在执行任务" in message
+               for message in logs)
+    assert result[-1]["entries"]["alice"]["prepare"] == ST_SKIPPED
+    assert result[-1]["entries"]["alice"]["finish"] == ST_SKIPPED
+    assert "error" not in result[-1]
 
 
 def test_skipped_prepare_does_not_run_scripts_or_finish(tmp_path, monkeypatch, qapp):

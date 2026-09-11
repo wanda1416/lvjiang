@@ -894,6 +894,15 @@ class RunControlMixin:
         )
         _show_modeless_dialog(box)
 
+    def _show_user_execution_busy(self, message: str) -> None:
+        """日常任务选择的用户正被其他进程执行时给出明确提示。"""
+        from PyQt6.QtWidgets import QMessageBox, QWidget
+
+        QMessageBox.warning(
+            self if isinstance(self, QWidget) else None,  # type: ignore[arg-type]
+            tr("用户正在执行任务"), message,
+        )
+
     def _create_ui_callback(self):
         """创建线程安全的任务交互回调。
 

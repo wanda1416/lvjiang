@@ -35,7 +35,7 @@ def reset_cleaner():
 
 def clean(text: str) -> str:
     """模拟 OCR 引擎清洗"""
-    return OCRCleaner().clean(text)
+    return OCRCleaner().clean(text, "equip")
 
 
 # ─── equip_type 解析 ──────────────────────────────────────
@@ -314,6 +314,38 @@ class TestParseFullChain:
         equip = parser.parse(_weapon_raw(affix_gong="", affix_shang=""))
         assert equip.affixes == []
         assert any("完全失败" in w for w in equip.warnings)
+
+    @pytest.mark.parametrize("missing_text", ["", "69.2"])
+    def test_valid_yu_after_unreadable_zhi_logs_error(
+        self, parser, monkeypatch, missing_text,
+    ):
+        errors = []
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.core.equip_parser.parser.logger.error",
+            lambda message, *args: errors.append(message.format(*args)),
+        )
+        equip = parser.parse(_weapon_raw(
+            affix_jue="精准率 +12.4%", affix_zhi=missing_text,
+            affix_yu="最小破竹攻击 68.6",
+        ))
+        assert len(equip.affixes) == 3  # 保持级联丢弃行为
+        assert len(errors) == 1
+        assert "徵(affix_zhi)" in errors[0]
+        assert "羽(affix_yu)" in errors[0]
+        assert "最小破竹攻击 68.6" in errors[0]
+        assert "踏雪含光" in errors[0]
+
+    @pytest.mark.parametrize("tail", ["", "套装4/4", "无法识别"])
+    def test_missing_tail_without_later_valid_affix_has_no_error(
+        self, parser, monkeypatch, tail,
+    ):
+        errors = []
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.core.equip_parser.parser.logger.error",
+            lambda message, *args: errors.append(message.format(*args)),
+        )
+        parser._parse_affixes(_weapon_raw(affix_yu=tail))
+        assert errors == []
 
     def test_yu_empty_is_normal(self, parser):
         # 前 4 条齐全、第 5 条为空 → 正常结束无 warning

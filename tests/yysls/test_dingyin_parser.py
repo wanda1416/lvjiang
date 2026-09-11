@@ -35,7 +35,7 @@ def reset_cleaner():
 
 def clean(text: str) -> str:
     """模拟 OCR 引擎清洗"""
-    return OCRCleaner().clean(text)
+    return OCRCleaner().clean(text, "equip")
 
 
 # ─── 候选词条池 ────────────────────────────────────────────

@@ -133,7 +133,7 @@ lvjiang/
 │   │   ├── app.yaml           # 应用配置
 │   │   ├── layouts.yaml       # 布局索引
 │   │   ├── scenes.yaml        # 场景索引
-│   │   └── ocr_rules.yaml     # OCR 规则配置
+│   │   └── ocr.yaml           # OCR 识别与文本规范化配置
 │   ├── local/                 # 用户覆盖配置（已 .gitignore）
 │   └── session/               # 运行时会话数据
 ├── data/                      # 材料模板图、scrcpy-server 等资源

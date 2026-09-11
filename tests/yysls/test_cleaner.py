@@ -31,22 +31,27 @@ class TestOCRCleaner:
         ("经甲", "胫甲"),
     ])
     def test_ocr_replacements(self, raw, expected):
-        assert OCRCleaner().clean(raw) == expected
+        assert OCRCleaner().clean(raw, "equip") == expected
 
     def test_noise_jian_removed_everywhere(self):
         # "荐" 无论出现几次、在什么位置都删除
-        assert OCRCleaner().clean("荐会心率荐 5%荐") == "会心率 5%"
+        assert OCRCleaner().clean("荐会心率荐 5%荐", "equip") == "会心率 5%"
+
+    def test_cun_is_only_removed_in_equipment_group(self):
+        assert OCRCleaner().clean("保存") == "保存"
+        assert OCRCleaner().clean("保存", "equip") == "保"
 
     def test_chinese_brackets_to_english(self):
-        assert OCRCleaner().clean("【转】最大攻击") == "[转]最大攻击"
-        assert OCRCleaner().clean("会心率（%）") == "会心率(%)"
+        assert OCRCleaner().clean("【转】最大攻击", "equip") == "[转]最大攻击"
+        assert OCRCleaner().clean("会心率（%）", "equip") == "会心率(%)"
 
     def test_strip_whitespace(self):
-        assert OCRCleaner().clean("  会心率 5%  ") == "会心率 5%"
+        assert OCRCleaner().clean("  会心率 5%  ", "equip") == "会心率 5%"
+        assert OCRCleaner().clean("保存") == "保存"
 
     def test_empty(self):
         assert OCRCleaner().clean("") == ""
-        assert OCRCleaner().clean("荐") == ""
+        assert OCRCleaner().clean("荐", "equip") == ""
 
 
 class TestParserDelegation:
@@ -54,7 +59,7 @@ class TestParserDelegation:
 
     def _clean_then_parse(self, parser, raw: str):
         """模拟 OCR 引擎流程：先清洗再传入 parser"""
-        cleaned = OCRCleaner().clean(raw)
+        cleaned = OCRCleaner().clean(raw, "equip")
         return parser._parse_single_affix(cleaned)
 
     def test_bianwuxue_corrected_to_shan(self, parser):

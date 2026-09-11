@@ -25,3 +25,39 @@ def scan_and_confirm($action_name, $warn_if_missing)
    click [general_control].[confirm] after wait @page_refresh
    return 1
 end
+
+# 扫描并取消通用确认弹窗。判据与 scan_and_confirm 同源（确认/取消任一命中
+# 即证明弹窗存在），但动作是点击取消。用于"顺带弹出、本流程不接受"的询问，
+# 例如领奖后追问是否再去领另一份奖励。
+# click 由布局决定点击按钮还是按 ESC。返回 1 表示已取消，0 表示没有弹窗。
+def scan_and_cancel($action_name)
+   eval $dialog_labels = ["确认", "确定", "取消"]
+   scan [general_control].[confirm, cancel] as $dialog_key by contains_any $dialog_labels
+   if not $dialog_key
+      eval $message = $action_name + "：未出现询问弹窗"
+      log debug $message
+      return 0
+   end
+   eval $message = $action_name + "：出现询问弹窗，执行取消"
+   log info $message
+   click [general_control].[cancel] after wait @page_refresh
+   return 1
+end
+
+# 安卓端购买后可能连续保留多个物品说明浮窗。逐个匹配关闭按钮并点击，
+# 每次等待界面刷新后继续检查，直到所有浮窗都已关闭。
+def close_item_prompts()
+   if not env("android")
+      return 0
+   end
+   eval $closed_count = 0
+   loop while 1 == 1
+      scan [general_control].[close_item] as $close_item by image
+      if not $close_item
+         break
+      end
+      click [general_control].[close_item] after wait @step_interval
+      eval $closed_count = $closed_count + 1
+   end
+   return $closed_count
+end

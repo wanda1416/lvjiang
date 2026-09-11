@@ -61,6 +61,7 @@ end
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 import "subcall/game_profile.wf"
+import "subcall/page_action.wf"
 
 # ─── 导航：从首页到不肝商店视图 ─────────────────────────
 call $nav_result = nav_main_to_menu()
@@ -83,7 +84,10 @@ call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_wee
 scan [bugan_detail].[purchase] as $found by contains "全部领取"
 if $found
     click [bugan_detail].[purchase] after wait @step_interval
-    click [general_control].[blank_area] after wait @step_interval
+    # 关掉领奖展示后才会追问是否再去领另一份奖励（标准确认/取消弹窗），
+    # 本流程不接受。没有弹窗时 scan_and_cancel 直接返回 0，不影响后续步骤。
+    click [general_control].[blank_area] after wait @page_refresh
+    call scan_and_cancel("领取不肝奖励")
     log "领取本周不肝奖励"
 end
 
@@ -99,6 +103,7 @@ if env("android")
     call buy_panel("shangpin_1", $buy_keywords)
     drag [bugan_detail].[shangpin_1] up 2 after wait @step_interval
     call buy_panel("shangpin_2", $buy_keywords)
+    call close_item_prompts()
 else if env("desktop")
     # PC 端可以展示 3行，直接买全部即可
     call buy_panel("shangpin_1", $buy_keywords)
@@ -111,6 +116,7 @@ if $buy_shengsheng
     scan [bugan_detail].[shangpin_1][1][1] as $shengsheng_cell
     if $shengsheng_cell contains "营生"
        call buy_cell("shangpin_1", 1, 1)
+       call close_item_prompts()
     else
        log "营生 (1,1) 未命中，跳过购买"
     end
@@ -145,6 +151,7 @@ for r in range(1, $season_rows)
         call buy_cell("shangpin_1", $r, $c)
     end
 end
+call close_item_prompts()
 
 # ─── 返回主页 ──────────────────────────────────────────
 click [bugan_detail].[back] after wait @step_interval

@@ -6,12 +6,13 @@ import os
 import tempfile
 import threading
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 from fasteners import InterProcessLock
 
+from ..equipment_cooldown import next_cooldown_expiry
 from .development_rules import check_real_development
 from .models import (
     EQUIPMENT_CREATED_AT,
@@ -443,10 +444,14 @@ class LoadoutRepository:
             ):
                 from ...config import get_game_config
 
-                days = get_game_config().get_equipment_cooldown_days()
-                value["cooldown_expires_at"] = (
-                    datetime.now(timezone.utc) + timedelta(days=days)
-                ).isoformat(timespec="milliseconds")
+                game_config = get_game_config()
+                carryover = (
+                    game_config.is_equipment_cooldown_carryover_enabled())
+                value["cooldown_expires_at"] = next_cooldown_expiry(
+                    old.get("cooldown_expires_at"),
+                    days=game_config.get_equipment_cooldown_days(),
+                    carryover=carryover,
+                )
             stamped = stamp_equipment_write(
                 value, new_fp, state.equipment_items.get(new_fp))
             target = state.equipment_items.get(new_fp)

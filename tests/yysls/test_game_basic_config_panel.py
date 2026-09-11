@@ -11,6 +11,9 @@ class _FakeGameConfig:
     def get_equipment_cooldown_days(self) -> int:
         return 5
 
+    def is_equipment_cooldown_carryover_enabled(self) -> bool:
+        return True
+
     def get_raw(self) -> dict:
         return {"level_configs": []}
 
@@ -30,13 +33,19 @@ def test_basic_config_cooldown_defaults_to_five_and_auto_saves(
     qtbot.addWidget(panel)
 
     assert panel._cooldown_days.value() == 5
+    assert panel._cooldown_carryover.isChecked()
     assert manager.saved is None
 
     panel._cooldown_days.setValue(7)
 
     assert manager.saved is not None
     assert manager.saved["basic_config"]["equipment_cooldown_days"] == 7
+    assert manager.saved["basic_config"]["equipment_cooldown_carryover"] is True
     assert "已保存并生效" in panel._status_label.text()
+
+    panel._cooldown_carryover.setChecked(False)
+
+    assert manager.saved["basic_config"]["equipment_cooldown_carryover"] is False
 
 
 def test_basic_config_is_the_first_game_config_tab(qtbot):

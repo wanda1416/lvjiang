@@ -28,8 +28,10 @@ def _rule_level() -> LevelConfig:
     )
 
 
-def _equip(affixes: int, quality: str = "gold") -> EquipmentData:
-    return EquipmentData(level=105, quality=quality,
+def _equip(
+    affixes: int, quality: str = "gold", level: int = 105,
+) -> EquipmentData:
+    return EquipmentData(level=level, quality=quality,
                          affixes=[SimpleNamespace()] * affixes)
 
 
@@ -48,6 +50,7 @@ def test_cache_uses_target_affix_and_cumulative_refund(monkeypatch):
     manager = SimpleNamespace(level_config_for=lambda _level: _rule_level())
     monkeypatch.setattr(mod, "get_game_config", lambda: manager)
     stock = CachedStoneStock()
+    stock.observe_equipment(_equip(3))
     stock.accept_scan(1000)
 
     # 已有 3 条时调律写第 4 条，不是按累计轮数。
@@ -59,6 +62,35 @@ def test_cache_uses_target_affix_and_cumulative_refund(monkeypatch):
     assert stock.stock_units == 700
     # 未调律装备也按当前 1 词条的累计值返还。
     stock.record_recycle(_equip(1), current_affix_count=1)
+    assert stock.stock_units == 760
+
+
+def test_cached_stock_is_isolated_by_equipment_level(monkeypatch):
+    import lvjiang.apps.yysls.workflows.implementations.tuning.stone_stock as mod
+
+    manager = SimpleNamespace(level_config_for=lambda _level: _rule_level())
+    monkeypatch.setattr(mod, "get_game_config", lambda: manager)
+    stock = CachedStoneStock()
+    level_110 = _equip(3, level=110)
+    level_105 = _equip(3, level=105)
+
+    stock.observe_equipment(level_110)
+    stock.accept_scan(1000)
+    stock.record_tune(level_110, target_affix=4)
+    assert stock.stock_units == 760
+    stock.mark_initial_check_done()
+
+    stock.observe_equipment(level_105)
+    assert stock.needs_scan
+    assert stock.needs_initial_check
+    assert stock.stock_units is None
+    stock.accept_scan(500)
+    stock.record_tune(level_105, target_affix=4)
+    assert stock.stock_units == 260
+
+    stock.observe_equipment(level_110)
+    assert not stock.needs_scan
+    assert not stock.needs_initial_check
     assert stock.stock_units == 760
 
 

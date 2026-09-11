@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -35,6 +34,7 @@ from PyQt6.QtWidgets import (
 from ......i18n import tr
 from ......ui.button_styles import apply_button_style, apply_dialog_button_box_style
 from ....core.affix_cap import affix_cap_pct
+from ....core.equipment_cooldown import next_cooldown_expiry
 from ...layout_helpers import fit_combo_to_contents
 
 # 部位 → group_key 映射
@@ -987,10 +987,12 @@ class MockEquipDialog(QDialog):
         )
         result["_extra"] = extra
         if name_changed:
-            cooldown_days = game_config.get_equipment_cooldown_days()
-            result["cooldown_expires_at"] = (
-                datetime.now(timezone.utc) + timedelta(days=cooldown_days)
-            ).isoformat(timespec="milliseconds")
+            result["cooldown_expires_at"] = next_cooldown_expiry(
+                self._equip_data.get("cooldown_expires_at"),
+                days=game_config.get_equipment_cooldown_days(),
+                carryover=(
+                    game_config.is_equipment_cooldown_carryover_enabled()),
+            )
         result["_fp"] = make_fingerprint(result)
         return result
 

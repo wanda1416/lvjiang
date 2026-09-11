@@ -308,10 +308,20 @@ def test_dispatch_injected_positional(stub_session, spy_traversals):
     assert spy_traversals == ["positional"]
 
 
-def test_dispatch_session_config(stub_session, spy_traversals):
-    """无注入时从 wf_configs["auto_tuning"].scroll_strategy 读取"""
+def test_dispatch_ignores_legacy_session_config(stub_session, spy_traversals):
+    """旧 session 自动调律配置废弃，不得再影响执行。"""
     stub_session.set_node("wf_configs", {"auto_tuning": {"scroll_strategy": "positional"}})
     DispatchFakeWF()._traverse_bag(WEAPON_DETAIL)
+    assert spy_traversals == ["dedup"]
+
+
+def test_dispatch_user_config_snapshot(stub_session, spy_traversals):
+    from types import SimpleNamespace
+
+    wf = DispatchFakeWF()
+    wf._engine = SimpleNamespace(
+        workflow_config_snapshot={"scroll_strategy": "positional"})
+    wf._traverse_bag(WEAPON_DETAIL)
     assert spy_traversals == ["positional"]
 
 

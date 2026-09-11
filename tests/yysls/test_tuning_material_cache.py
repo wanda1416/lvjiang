@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from lvjiang.apps.yysls.core.recognizer.reference_adapter import TuningMaterial
 from lvjiang.apps.yysls.core.tuning_rules import (
     SMALL_STONE_LABEL,
@@ -41,6 +43,8 @@ class _Wf:
 
     def __init__(self, panels: list[dict]):
         self.base_group = _Group()
+        self.equipment_session = SimpleNamespace(
+            equipment=SimpleNamespace(level=0))
         self._panels = list(panels)
         self.recognize_calls = 0
 
@@ -99,6 +103,33 @@ class TestVolatility:
 
 
 class TestCacheLifetime:
+    def test_material_and_food_caches_are_isolated_by_level(self):
+        ex, wf = _executor([_WITHOUT_SMALL])
+
+        wf.equipment_session.equipment.level = 110
+        ex._activate_material_level()
+        ex._material_cache = _WITHOUT_SMALL
+        ex._cache_valid = True
+        ex._food_count_overrides = {"紫狗粮": 80}
+        ex._initial_stock_check_done = True
+
+        wf.equipment_session.equipment.level = 105
+        ex._activate_material_level()
+        assert ex._material_cache is None
+        assert ex._cache_valid is False
+        assert ex._food_count_overrides == {}
+        assert ex._initial_stock_check_done is False
+        ex._material_cache = _WITH_SMALL
+        ex._cache_valid = True
+        ex._food_count_overrides = {"紫狗粮": 20}
+
+        wf.equipment_session.equipment.level = 110
+        ex._activate_material_level()
+        assert ex._material_cache is _WITHOUT_SMALL
+        assert ex._cache_valid is True
+        assert ex._food_count_overrides == {"紫狗粮": 80}
+        assert ex._initial_stock_check_done is True
+
     def test_ensure_is_idempotent_while_valid(self):
         ex, wf = _executor([_WITHOUT_SMALL])
         ex._material_cache = _WITHOUT_SMALL

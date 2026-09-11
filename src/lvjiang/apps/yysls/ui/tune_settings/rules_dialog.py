@@ -44,7 +44,6 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tuning_rule_manager,
 )
 from lvjiang.apps.yysls.ui.layout_helpers import fit_combo_to_contents
-from lvjiang.core.config.wf_configs import get_wf_config
 from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
@@ -143,8 +142,13 @@ class TuningRulesDialog(QDialog):
         self._config_manager.reload()
         self._group_manager.reload()
         self._manager.reload()
-        # 初始规则组：session 持久值，组不存在取第一个可用
-        group_key = get_wf_config("auto_tuning").get("base_group", "")
+        # 初始规则组跟随当前用户的自动调律配置。
+        from ...config.auto_tuning_config import (
+            active_username,
+            load_user_auto_tuning_config,
+        )
+        group_key = load_user_auto_tuning_config(
+            active_username()).get("base_group", "default")
         if self._group_manager.get_group(group_key) is None:
             groups = self._group_manager.get_groups()
             group_key = next(iter(groups), "")

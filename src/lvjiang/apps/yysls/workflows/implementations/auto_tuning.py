@@ -21,10 +21,8 @@
 背包滚动遍历抽象为策略类（bag_traversal：dedup 滑动窗口去重 /
 positional 位置对齐三向校验），_traverse_bag 按配置调度，默认 dedup。
 
-⚠️ 警告：禁止擅自软降级或吞异常
-本工作流的所有配置缺失/无效场景必须抛异常中断，不得静默回落
-到“合理默认值”。配置错误应当立即暴露给用户修正，而不是用
-猜测的默认值继续运行导致调律结果不可预期。涉及方法：
+新用户使用明确的默认参数，但不默认勾选任何规则。用户配置中的无效
+值必须抛异常中断，避免在不可预期的条件下继续调律。涉及方法：
 _traverse_bag、_ensure_base_group、_ensure_judge_config、
 _resolve_selected_slots。
 """
@@ -105,10 +103,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     LOG_PARTIAL_OUTPUT_ON_FAILURE = False
 
     # 脚本元数据（供发现层暴露到日常下拉与设备端悬浮面板）。
-    # 暂不定义 PARAMETERS：本流程的配置面（部位多选 + 每规则玩法多选 + 全局开关）
-    # 超出现有 select/number 参数 schema 的表达力，设备端先按内置默认配置运行
-    # （全部部位 + 全部规则默认判定，见 _ensure_judge_config 的回退），
-    # 细粒度配置仍只在桌面调律 Tab 经 run_ctx 注入。
+    # 暂不定义 PARAMETERS：本流程由专用配置页管理，并强制按用户独立存储。
     DISPLAY_NAME = "自动调律"
     # 专用脚本：日常 Tab 不画其参数面板，由专属配置页自行管理
     SCOPE = "dedicated"
@@ -133,6 +128,20 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     MATERIAL_PANEL = "materials"  # 材料区 panel key（7 列 1 行 grid）
     MATERIAL_GROUP = "调律材料"
     MAX_AFFIX = 5
+
+    def _workflow_config(self) -> dict:
+        """读取启动快照；设备端等入口按执行用户读取独立配置。"""
+        snapshot = getattr(self.engine, "workflow_config_snapshot", None)
+        if isinstance(snapshot, dict):
+            return snapshot
+        from lvjiang.apps.yysls.config.auto_tuning_config import (
+            active_username,
+            load_user_auto_tuning_config,
+        )
+
+        username = getattr(self.engine, "run_username", "") or active_username()
+        return load_user_auto_tuning_config(
+            username, getattr(self.engine, "users_dir", None))
 
     # 部位 key → 中文名（与 hub 共享，避免重复定义）
     _SLOT_NAMES = SLOT_LABELS
@@ -830,8 +839,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """
         key = self.ctx.scroll_strategy or ""
         if not key:
-            from lvjiang.core.config.wf_configs import get_wf_config
-            key = get_wf_config("auto_tuning").get("scroll_strategy", "")
+            key = self._workflow_config().get("scroll_strategy", "")
         if key and key not in TRAVERSALS:
             raise ValueError(f"未知遍历策略 '{key}'，请检查配置")
         if not key:
@@ -1676,15 +1684,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _ensure_base_group(self):
         """保证 ctx.base_group 可用。
 
-        优先用启动时注入的规则组；未注入时回退读统一存储
-        wf_configs["auto_tuning"].base_group；读不到或无效则抛异常。
+        优先用启动时注入的规则组；未注入时读取执行用户配置中的
+        base_group；读不到或无效则抛异常。
         """
         group = self.ctx.base_group
         if group is not None:
             return group
-        # 回退读统一存储的 base_group（日常 Tab 启动时 ctx 未注入）
-        from lvjiang.core.config.wf_configs import get_wf_config
-        group_key = get_wf_config("auto_tuning").get("base_group", "")
+        # 设备端启动时 ctx 未注入，回退读取执行用户配置。
+        group_key = self._workflow_config().get("base_group", "")
         if not group_key:
             raise ValueError(tr("未配置基础规则组，请在调律页选择基础规则组"))
         from lvjiang.apps.yysls.core.tuning_rules import get_tuning_group
@@ -1697,14 +1704,13 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     def _ensure_judge_config(self):
         """保证 ctx.judge_configs/judge_rule_keys 可用。
 
-        优先用 run_control 注入的实时 UI 配置；未注入时回退读统一存储
-        wf_configs["auto_tuning"] 的 rules + switches；读不到则抛异常。
+        优先用 run_control 注入的启动快照；未注入时读取执行用户配置中的
+        rules + switches；读不到则抛异常。
         """
         ctx = self.ctx
         if ctx.judge_configs is not None or ctx.judge_rule_keys is not None:
             return
-        from lvjiang.core.config.wf_configs import get_wf_config
-        tc = get_wf_config("auto_tuning")
+        tc = self._workflow_config()
         rules = tc.get("rules", {})
         if not rules:
             raise ValueError(tr("未配置调律规则，请在调律页选择至少一个规则"))
@@ -1719,12 +1725,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     def _resolve_selected_slots(self) -> list[str]:
         """调律部位：优先 UI 注入的 ctx.selected_slots；设备端经 task_runner
-        启动时 ctx 未注入（selected_slots=None），回退读统一存储
-        wf_configs["auto_tuning"].selected_slots；读不到则抛异常。"""
+        启动时 ctx 未注入（selected_slots=None），回退读取执行用户配置；
+        读不到则抛异常。"""
         selected = self.ctx.selected_slots
         if selected is None:
-            from lvjiang.core.config.wf_configs import get_wf_config
-            raw = get_wf_config("auto_tuning").get("selected_slots")
+            raw = self._workflow_config().get("selected_slots")
             if not isinstance(raw, list) or not raw:
                 raise ValueError(tr("未配置调律部位，请在调律页选择至少一个部位"))
             valid = set(self.WEAPON_SLOTS) | set(self.ARMOR_SLOTS)

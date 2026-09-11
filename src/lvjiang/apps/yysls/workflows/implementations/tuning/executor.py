@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 
 from loguru import logger
@@ -37,6 +38,16 @@ from .stone_stock import CachedStoneStock, format_stone_units
 INVALIDATE_CACHE_ON_SMALL_STONE = False
 
 
+@dataclass
+class _LevelMaterialCache:
+    materials: dict | None = None
+    valid: bool = False
+    volatile: bool = False
+    food_count_overrides: dict[str, int] = field(default_factory=dict)
+    initial_stock_check_done: bool = False
+    entered_tuning_equipment: int = 0
+
+
 class TuningExecutor:
     """调律执行：单轮调律、材料检查、狗粮决策、就绪确认
 
@@ -44,7 +55,7 @@ class TuningExecutor:
     - abort_reason: tune_once 返回 None 时的原因文案
     - round_food / round_food_reason: 本轮狗粮决策结果
     - materials_exhausted: 大律准石低于基准，全部退出
-    - _material_cache: 材料区 OCR 缓存（进入调律页/重置后刷新）
+    - _material_caches: 按装备等级隔离的材料区 OCR 与狗粮数量缓存
     - _cache_valid / _cache_volatile: 缓存是否可用、是否只能用一轮
     """
 
@@ -56,6 +67,8 @@ class TuningExecutor:
         self.round_food_refunded = False  # 本轮狗粮是否被概率返还
         self.materials_exhausted = False
         self._tune_ready_waived = False
+        self._material_caches: dict[int, _LevelMaterialCache] = {}
+        self._active_material_level = 0
         self._material_cache: dict | None = None
         self._cache_valid = False
         self._cache_volatile = False
@@ -63,10 +76,76 @@ class TuningExecutor:
         self._initial_stock_check_done = False
         self._entered_tuning_equipment = 0
 
+    def _material_level(self) -> int:
+        session = getattr(self._wf, "equipment_session", None)
+        equip = getattr(session, "equipment", None)
+        return int(getattr(equip, "level", 0) or 0)
+
+    def _activate_material_level(self) -> _LevelMaterialCache:
+        level = self._material_level()
+        if level != self._active_material_level:
+            self._active_material_level = level
+            logger.debug(f"切换材料缓存池: level={level}")
+        return self._material_caches.setdefault(level, _LevelMaterialCache())
+
+    def _material_state(self) -> _LevelMaterialCache:
+        return self._material_caches.setdefault(
+            self._active_material_level, _LevelMaterialCache())
+
+    @property
+    def _material_cache(self) -> dict | None:
+        return self._material_state().materials
+
+    @_material_cache.setter
+    def _material_cache(self, value: dict | None) -> None:
+        self._material_state().materials = value
+
+    @property
+    def _cache_valid(self) -> bool:
+        return self._material_state().valid
+
+    @_cache_valid.setter
+    def _cache_valid(self, value: bool) -> None:
+        self._material_state().valid = value
+
+    @property
+    def _cache_volatile(self) -> bool:
+        return self._material_state().volatile
+
+    @_cache_volatile.setter
+    def _cache_volatile(self, value: bool) -> None:
+        self._material_state().volatile = value
+
+    @property
+    def _food_count_overrides(self) -> dict[str, int]:
+        return self._material_state().food_count_overrides
+
+    @_food_count_overrides.setter
+    def _food_count_overrides(self, value: dict[str, int]) -> None:
+        self._material_state().food_count_overrides = value
+
+    @property
+    def _initial_stock_check_done(self) -> bool:
+        return self._material_state().initial_stock_check_done
+
+    @_initial_stock_check_done.setter
+    def _initial_stock_check_done(self, value: bool) -> None:
+        self._material_state().initial_stock_check_done = value
+
+    @property
+    def _entered_tuning_equipment(self) -> int:
+        return self._material_state().entered_tuning_equipment
+
+    @_entered_tuning_equipment.setter
+    def _entered_tuning_equipment(self, value: int) -> None:
+        self._material_state().entered_tuning_equipment = value
+
     def reset_state(self):
         """每次 run 开始时重置运行期状态"""
         self.materials_exhausted = False
         self._tune_ready_waived = False
+        self._material_caches = {}
+        self._active_material_level = 0
         self._material_cache = None
         self._cache_valid = False
         self._cache_volatile = False
@@ -76,6 +155,7 @@ class TuningExecutor:
 
     def cache_equipment_materials(self) -> None:
         """记录一次实际进入调律页，并读取本件装备的材料区。"""
+        self._activate_material_level()
         self._entered_tuning_equipment += 1
         validate_cache = (
             self._wf.ctx.validate_stone_cache
@@ -96,6 +176,7 @@ class TuningExecutor:
         因此这种情况下本轮用完即失效，下一轮添加前必须重新识别；只有
         材料区没有小律准石时，本轮识别才可以作为下一轮的缓存。
         """
+        self._activate_material_level()
         wf = self._wf
         settings = wf.base_group.materials
         stock = getattr(wf, "stone_stock", None)
@@ -156,6 +237,7 @@ class TuningExecutor:
         与 cache_materials 的区别是幂等——缓存仍然有效时什么都不做，
         不会把每轮一次 OCR 的开销重新引回来。
         """
+        self._activate_material_level()
         stock = getattr(self._wf, "stone_stock", None)
         stone_scan_needed = (
             stock is not None
@@ -488,7 +570,9 @@ class TuningExecutor:
         wf.wait_delay("step_interval")
         wf.wait_stable("page_refresh")  # 调律结果出现
 
-        result = wf.ocr_scene(wf.RESULT_SCENE, ["tune_affix", "tune_tip"])
+        result = wf.ocr_scene(
+            wf.RESULT_SCENE, ["tune_affix", "tune_tip"],
+            cleaning_group="equip")
         logger.info(f"调律结果: {result}")
         wf.click_region(wf.RESULT_SCENE, "close_btn")
         wf.wait_delay("step_interval")

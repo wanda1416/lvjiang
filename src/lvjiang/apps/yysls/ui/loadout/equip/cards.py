@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from functools import partial
 from math import ceil
 from typing import Literal
@@ -35,6 +35,7 @@ from ....core.equip_parser.dingyin_parser import (
     is_zhige_dingyin,
 )
 from ....core.equip_validator import illegal_reasons_of
+from ....core.equipment_cooldown import next_cooldown_expiry
 
 
 class _ElidedLabel(QLabel):
@@ -325,9 +326,12 @@ class _EquipmentPropertiesDialog(QDialog):
     def _reset_cooldown(self) -> None:
         from ....config import get_game_config
 
-        days = get_game_config().get_equipment_cooldown_days()
-        expires_at = datetime.now(timezone.utc) + timedelta(days=days)
-        self._set_cooldown(expires_at.isoformat(timespec="milliseconds"))
+        game_config = get_game_config()
+        self._set_cooldown(next_cooldown_expiry(
+            self._equip.get("cooldown_expires_at"),
+            days=game_config.get_equipment_cooldown_days(),
+            carryover=game_config.is_equipment_cooldown_carryover_enabled(),
+        ))
 
     def _refresh_cooldown(self) -> None:
         value = self._equip.get("cooldown_expires_at")

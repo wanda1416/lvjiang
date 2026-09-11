@@ -155,7 +155,8 @@ class FakeWF(AutoTuningWorkflow):
     def click_region(self, scene_key, field_key, jitter: bool = True, **kw):
         self.clicks.append((scene_key, field_key))
 
-    def ocr_scene(self, scene_key, field_keys=None, min_confidence=None):
+    def ocr_scene(self, scene_key, field_keys=None, min_confidence=None,
+                  cleaning_group=None):
         self.ocr_calls.append((scene_key, field_keys))
         data = dict(self._ocr_map.get(scene_key, {}))
         # 默认值：标准确认弹窗包含「确认」（除非测试显式覆盖）。
@@ -2243,11 +2244,10 @@ class TestTuningDocIntegration:
 
 
 class TestResolveSelectedSlots:
-    """调律部位解析：设备端（ctx 未注入）回退读插件会话
+    """调律部位解析：ctx 未注入时读取用户级启动配置。
 
     设备端经 task_runner 启动 auto_tuning 时 run_ctx 为默认实例
-    （selected_slots=None）；部位必须从插件会话 tuning.selected_slots
-    回退读取，否则配置页保存的部位不生效（恒按全部 8 部位）。
+    （selected_slots=None）；部位从绑定用户的配置读取。
     """
 
     @pytest.fixture
@@ -2264,26 +2264,36 @@ class TestResolveSelectedSlots:
         wf.run_ctx = TuningRunContext()  # selected_slots=None，模拟设备端未注入
         return wf
 
-    def test_device_reads_session(self, session):
-        session.set_node("wf_configs", {"auto_tuning": {"selected_slots": ["ring", "head"]}})
-        assert self._device_wf()._resolve_selected_slots() == ["ring", "head"]
-
-    def test_empty_session_raises(self, session):
-        """未配置调律部位时抛异常，不默认全部部位"""
+    def test_device_reads_user_config_snapshot(self, session):
         wf = self._device_wf()
-        with pytest.raises(ValueError, match="未配置调律部位"):
-            wf._resolve_selected_slots()
+        wf.engine.workflow_config_snapshot = {
+            "selected_slots": ["ring", "head"]}
+        assert wf._resolve_selected_slots() == ["ring", "head"]
 
-    def test_injected_ctx_ignores_session(self, session):
+    def test_unconfigured_user_uses_default_slots(self, session):
+        from lvjiang.apps.yysls.config.tune_slots import DEFAULT_SLOTS
+
+        assert self._device_wf()._resolve_selected_slots() == list(DEFAULT_SLOTS)
+        assert "sub_weapon" not in DEFAULT_SLOTS
+
+    def test_injected_ctx_ignores_saved_config(self, session):
         session.set_node("wf_configs", {"auto_tuning": {"selected_slots": ["ring"]}})
         wf = self._device_wf()
         wf.run_ctx = TuningRunContext(selected_slots=["main_weapon"])  # UI 已注入
         assert wf._resolve_selected_slots() == ["main_weapon"]
 
     def test_unknown_slot_keys_dropped(self, session):
-        session.set_node("wf_configs",
-                         {"auto_tuning": {"selected_slots": ["ring", "bogus"]}})
-        assert self._device_wf()._resolve_selected_slots() == ["ring"]
+        wf = self._device_wf()
+        wf.engine.workflow_config_snapshot = {
+            "selected_slots": ["ring", "bogus"]}
+        assert wf._resolve_selected_slots() == ["ring"]
+
+    def test_legacy_session_config_is_ignored(self, session):
+        session.set_node("wf_configs", {
+            "auto_tuning": {"selected_slots": ["ring"]}})
+        from lvjiang.apps.yysls.config.tune_slots import DEFAULT_SLOTS
+
+        assert self._device_wf()._resolve_selected_slots() == list(DEFAULT_SLOTS)
 
 
 # ─── 滚动定位 / 指定调律 / 初始跳过 ─────────────────────
@@ -2438,21 +2448,23 @@ class TestBaseGroupFallback:
         result = wf._ensure_base_group()
         assert result is custom
 
-    def test_no_config_raises(self, session):
-        """未配置基础规则组时抛异常，不默认空 TuningGroup"""
+    def test_no_config_uses_default_group(self, session, monkeypatch):
+        group = TuningGroup(key="default", name="默认组")
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.core.tuning_rules.get_tuning_group",
+            lambda key: group if key == "default" else None)
         wf = FakeWF()
         wf.run_ctx.base_group = None
-        with pytest.raises(ValueError, match="未配置基础规则组"):
-            wf._ensure_base_group()
+        assert wf._ensure_base_group() is group
 
-    def test_reads_wf_configs_and_caches(self, session, monkeypatch):
-        """回退读 wf_configs 并缓存在 ctx"""
+    def test_reads_user_snapshot_and_caches(self, session, monkeypatch):
+        """回退读用户启动快照并缓存在 ctx。"""
         group = TuningGroup(key="test_grp", name="测试组")
         monkeypatch.setattr(
             "lvjiang.apps.yysls.core.tuning_rules.get_tuning_group",
             lambda key: group if key == "test_grp" else None)
-        session.set_node("wf_configs", {"auto_tuning": {"base_group": "test_grp"}})
         wf = FakeWF()
+        wf.engine.workflow_config_snapshot = {"base_group": "test_grp"}
         wf.run_ctx.base_group = None
         result1 = wf._ensure_base_group()
         result2 = wf._ensure_base_group()

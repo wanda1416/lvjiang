@@ -52,6 +52,7 @@ class RouteHostPort(Protocol):
         scene_key: str,
         field_keys: list[str] | None = None,
         min_confidence: float | None = None,
+        cleaning_group: str | None = None,
     ) -> dict[str, str]: ...
 
     def press(self, key: str, wait: str | None = "step_interval") -> Any: ...
@@ -86,6 +87,7 @@ class ResetHostPort(Protocol):
         scene_key: str,
         field_keys: list[str] | None = None,
         min_confidence: float | None = None,
+        cleaning_group: str | None = None,
     ) -> dict[str, str]: ...
 
     def click_region(self, scene_key: str, field_key: str, **kwargs) -> Any: ...
@@ -133,6 +135,7 @@ class TuningRoundHostPort(Protocol):
         scene_key: str,
         field_keys: list[str] | None = None,
         min_confidence: float | None = None,
+        cleaning_group: str | None = None,
     ) -> dict[str, str]: ...
 
     def click_region(self, scene_key: str, field_key: str, **kwargs) -> Any: ...

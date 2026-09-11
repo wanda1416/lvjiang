@@ -302,9 +302,27 @@ class BatchWorker(QThread):
                 self._execution_lease.release()
                 self._execution_lease = None
             if username:
-                from ...core.access import acquire_user
-                self._execution_lease = acquire_user(
-                    username, self._session_manager._users_dir)
+                from ...core.access import AccessDeniedError, acquire_user
+                try:
+                    self._execution_lease = acquire_user(
+                        username, self._session_manager._users_dir)
+                except AccessDeniedError as exc:
+                    entry_result = {
+                        "prepare": ST_SKIPPED,
+                        "finish": ST_SKIPPED,
+                        "scripts": {
+                            script.id: ST_SKIPPED for script in self._scripts
+                        },
+                    }
+                    summary["entries"][label] = entry_result
+                    report.start_entry(label, username)
+                    report.record_prepare(ST_SKIPPED)
+                    report.end_entry()
+                    for script in self._scripts:
+                        self.progress.emit(
+                            run_idx, label, script.id, ST_SKIPPED)
+                    self.log.emit(f"[批量] {label} 跳过: {exc}")
+                    continue
                 self._user_scope.enter_context(self._execution_lease.authorized())
             self.log.emit(f"[批量] ── [{visit_index + 1}/{total}] {label} ──")
             entry_result: dict = {

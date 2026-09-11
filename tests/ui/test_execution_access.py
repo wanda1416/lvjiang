@@ -14,6 +14,7 @@ class Harness:
         self._user_manager = SimpleNamespace(get_active_user_name=lambda: username)
         self._running = False
         self.messages = []
+        self.busy_messages = []
         self.log_text = SimpleNamespace(append=self.messages.append)
         self.history = []
 
@@ -25,6 +26,9 @@ class Harness:
 
     def _finish_task_run(self, worker, **kwargs):
         self.history.append(kwargs)
+
+    def _show_user_execution_busy(self, message):
+        self.busy_messages.append(message)
 
     @guarded_launch
     def launch(self, *, execution_username=None, abort=False, fail=False):
@@ -56,6 +60,7 @@ def test_lease_is_held_through_final_save_and_released_on_failure(tmp_path, fail
     second.launch()
     assert not second._running
     assert second.messages
+    assert second.busy_messages == ["用户「alice」正在执行任务，请稍后重试"]
     other = Harness(tmp_path, "bob")
     other.launch()
     assert other._running

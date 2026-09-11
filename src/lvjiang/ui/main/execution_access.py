@@ -2,7 +2,7 @@
 from contextlib import nullcontext
 from functools import wraps
 
-from ...core.access import acquire_user
+from ...core.access import AccessDeniedError, acquire_user
 
 
 def guarded_launch(method=None, *, user_selector: str | None = None):
@@ -20,6 +20,12 @@ def guarded_launch(method=None, *, user_selector: str | None = None):
                         else self._user_manager.get_active_user_name())
         try:
             lease = acquire_user(username, self._session_manager._users_dir)
+        except AccessDeniedError as exc:
+            self.log_text.append(f"[拒绝] {exc}")
+            show_busy = getattr(self, "_show_user_execution_busy", None)
+            if callable(show_busy):
+                show_busy(str(exc))
+            return None
         except Exception as exc:
             self.log_text.append(f"[拒绝] {exc}")
             return None

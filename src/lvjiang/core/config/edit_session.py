@@ -103,6 +103,20 @@ class ConfigEditSession:
                 rel_path, text, content_version=content_version)
         self._baseline_entities = current
 
+    def reset(self) -> None:
+        """丢弃未提交内容，并从真实配置重新建立编辑基线。"""
+        if self._closed:
+            raise RuntimeError("配置编辑会话已经关闭")
+        for root in (
+            self.resolver.system_dir,
+            self.resolver.local_dir,
+            self.resolver.remote_dir,
+        ):
+            shutil.rmtree(root)
+            root.mkdir(parents=True)
+        self._materialize()
+        self._baseline_entities = self._entity_snapshot()
+
     def close(self) -> None:
         if self._closed:
             return

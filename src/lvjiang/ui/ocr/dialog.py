@@ -234,7 +234,7 @@ class OCRDialog(QDialog):
         self._btn_save_config = QPushButton(tr("保存"))
         self._btn_save_config.clicked.connect(self._on_save_recognition_config)
         save_row.addWidget(self._btn_save_config)
-        self._btn_cancel_config = QPushButton(tr("取消"))
+        self._btn_cancel_config = QPushButton(tr("撤销"))
         self._btn_cancel_config.clicked.connect(self._on_cancel_recognition_config)
         save_row.addWidget(self._btn_cancel_config)
         layout.addLayout(save_row)
@@ -266,6 +266,7 @@ class OCRDialog(QDialog):
     def _set_config_dirty(self, dirty: bool) -> None:
         self._config_dirty = dirty
         self._btn_save_config.setEnabled(dirty)
+        self._btn_cancel_config.setEnabled(dirty)
 
     def _mark_config_dirty(self, *_args) -> None:
         self._set_config_dirty(True)
@@ -280,9 +281,20 @@ class OCRDialog(QDialog):
         self._config_status_label.setText(tr("识别配置已保存"))
 
     def _on_cancel_recognition_config(self) -> None:
+        if not self._config_dirty:
+            return
+        answer = QMessageBox.question(
+            self,
+            tr("撤销识别配置"),
+            tr("确定撤销本次所有未保存的识别配置更改吗？"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
         self._refresh_recognition_config()
         self._set_config_dirty(False)
-        self._config_status_label.setText(tr("已放弃未保存的识别配置修改"))
+        self._config_status_label.setText(tr("已撤销未保存的识别配置修改"))
 
     # ─── Tab 2: 清洗规则 ────────────────────────────────────
 
@@ -574,6 +586,7 @@ class OCRDialog(QDialog):
         self._rules_dirty = dirty
         if hasattr(self, "_btn_save_rules"):
             self._btn_save_rules.setEnabled(dirty)
+            self._btn_cancel_rules.setEnabled(dirty)
 
     def _mark_rules_dirty(self, *_args):
         """表格任一处被用户改动 → 只记脏，不写盘"""
@@ -625,31 +638,35 @@ class OCRDialog(QDialog):
 
     def _on_cancel_rules(self):
         """丢弃未保存的修改，重新从已保存的配置载入"""
+        if not self._rules_dirty:
+            return
+        answer = QMessageBox.question(
+            self,
+            tr("撤销清洗规则"),
+            tr("确定撤销本次所有未保存的清洗规则更改吗？"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
         self._refresh_rules_tables()
         self._set_rules_dirty(False)
-        self._status_label.setText(tr("已放弃未保存的清洗规则修改"))
+        self._status_label.setText(tr("已撤销未保存的清洗规则修改"))
 
     def _confirm_discard_changes(self) -> bool:
-        """关闭前处理清洗规则和识别配置的未保存修改。"""
+        """关闭前确认是否放弃清洗规则和识别配置的未保存修改。"""
         rules_dirty = getattr(self, "_rules_dirty", False)
         config_dirty = getattr(self, "_config_dirty", False)
         if not rules_dirty and not config_dirty:
             return True
         reply = QMessageBox.question(
-            self, tr("未保存的修改"),
-            tr("OCR 配置有未保存的修改，关闭将丢失这些修改。\n是否先保存？"),
-            QMessageBox.StandardButton.Save
-            | QMessageBox.StandardButton.Discard
-            | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Save,
+            self,
+            tr("未保存的更改"),
+            tr("图像识别配置有未保存的更改，确定退出并放弃这些更改吗？"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if reply == QMessageBox.StandardButton.Save:
-            if rules_dirty and not self._on_save_rules():
-                return False
-            if config_dirty:
-                self._on_save_recognition_config()
-            return True
-        return reply == QMessageBox.StandardButton.Discard
+        return reply == QMessageBox.StandardButton.Yes
 
     def reject(self):
         """关闭对话框（X / Esc）前检查未保存的 OCR 配置修改。

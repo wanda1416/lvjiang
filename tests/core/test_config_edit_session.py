@@ -57,3 +57,24 @@ def test_close_discards_staged_changes(tmp_path):
     session.close()
 
     assert source.load_merged("config.yaml") == {"value": 1}
+
+
+def test_reset_discards_changes_and_keeps_session_editable(tmp_path):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    system.mkdir()
+    local.mkdir()
+    (system / "config.yaml").write_text("value: 1\n", encoding="utf-8")
+    source = ConfigResolver(
+        system_dir=system, local_dir=local, dev_mode=True)
+    session = ConfigEditSession(
+        source, merged_paths=("config.yaml",), entity_dirs=())
+
+    session.resolver.save_merged("config.yaml", {"value": 9})
+    session.reset()
+    assert session.resolver.load_merged("config.yaml") == {"value": 1}
+
+    session.resolver.save_merged("config.yaml", {"value": 2})
+    session.commit()
+    assert source.load_merged("config.yaml") == {"value": 2}
+    session.close()

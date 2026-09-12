@@ -38,31 +38,41 @@ def _dialog(monkeypatch, qtbot):
 def test_changes_stay_in_memory_until_bottom_save(monkeypatch, qtbot):
     dialog, manager = _dialog(monkeypatch, qtbot)
     save = dialog._buttons.button(QDialogButtonBox.StandardButton.Save)
+    discard = dialog._buttons.button(QDialogButtonBox.StandardButton.Discard)
     assert not save.isEnabled()
+    assert not discard.isEnabled()
 
     panel = dialog._tab._basic_config_panel
     panel._cooldown_days.setValue(panel._cooldown_days.value() + 1)
 
     assert save.isEnabled()
+    assert discard.isEnabled()
     assert manager.saved == []
     save.click()
     assert len(manager.saved) == 1
     assert not save.isEnabled()
+    assert not discard.isEnabled()
 
 
-def test_exit_button_confirms_before_discarding_changes(monkeypatch, qtbot):
+def test_discard_restores_values_without_exiting(monkeypatch, qtbot):
     dialog, _manager = _dialog(monkeypatch, qtbot)
     dialog.show()
-    dialog._mark_dirty()
+    panel = dialog._tab._basic_config_panel
+    original = panel._cooldown_days.value()
+    panel._cooldown_days.setValue(original + 1)
+    discard = dialog._buttons.button(QDialogButtonBox.StandardButton.Discard)
     answers = iter((QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes))
     monkeypatch.setattr(QMessageBox, "question", lambda *_a, **_kw: next(answers))
 
-    dialog.reject()
+    discard.click()
     assert dialog.isVisible()
     assert dialog._dirty
 
-    dialog.reject()
-    assert not dialog.isVisible()
+    discard.click()
+    assert dialog.isVisible()
+    assert not dialog._dirty
+    assert not discard.isEnabled()
+    assert dialog._tab._basic_config_panel._cooldown_days.value() == original
 
 
 def test_title_bar_close_uses_same_unsaved_confirmation(monkeypatch, qtbot):

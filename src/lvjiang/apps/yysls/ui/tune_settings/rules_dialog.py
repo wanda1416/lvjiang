@@ -219,8 +219,9 @@ class TuningRulesDialog(QDialog):
         self._discard_button = self._buttons.button(
             QDialogButtonBox.StandardButton.Discard)
         self._discard_button.setText(tr("撤销"))
+        self._discard_button.setEnabled(False)
         self._buttons.accepted.connect(self._save_changes)
-        self._discard_button.clicked.connect(self.reject)
+        self._discard_button.clicked.connect(self._discard_changes)
         apply_dialog_button_box_style(self._buttons)
         bottom.addWidget(self._buttons)
         layout.addLayout(bottom)
@@ -246,8 +247,9 @@ class TuningRulesDialog(QDialog):
         self._tune_page = TuneBehaviorPage(
             self._group_manager, group_key, self._set_status)
         self._stack.addWidget(self._tune_page)
-        self._stack.addWidget(PlaystyleConfigPage(
-            self._config_manager, self._set_status))
+        self._playstyle_page = PlaystyleConfigPage(
+            self._config_manager, self._set_status)
+        self._stack.addWidget(self._playstyle_page)
         # 规则组切换后三个行为页同步重载
         self._base_page.set_switch_callback(self._on_group_switched)
         # 扫描处理页保存后通知基础规则页刷新展示（门槛值同步）
@@ -473,6 +475,7 @@ class TuningRulesDialog(QDialog):
         self._dirty = True
         self._has_error = is_error is True
         self._save_button.setEnabled(not self._has_error)
+        self._discard_button.setEnabled(True)
 
     def _reload_managers(self) -> None:
         self._config_manager.reload()
@@ -498,12 +501,13 @@ class TuningRulesDialog(QDialog):
         self._dirty = False
         self._has_error = False
         self._save_button.setEnabled(False)
+        self._discard_button.setEnabled(False)
         self._status_label.setStyleSheet("color: #2e7d32;")
         self._status_label.setText(tr("调律配置已保存并生效"))
 
-    def _confirm_discard(self) -> bool:
-        if not self._dirty or not self.isVisible():
-            return True
+    def _discard_changes(self) -> None:
+        if not self._dirty:
+            return
         answer = QMessageBox.question(
             self,
             tr("撤销调律配置"),
@@ -511,17 +515,71 @@ class TuningRulesDialog(QDialog):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        self._initializing = True
+        try:
+            self._edit_session.reset()
+            self._reload_managers()
+            self._base_page.refresh()
+            group_key = self._base_page.current_group_key()
+            self._on_group_switched(group_key)
+
+            old_playstyle = self._playstyle_page
+            self._playstyle_page = PlaystyleConfigPage(
+                self._config_manager, self._set_status)
+            self._stack.removeWidget(old_playstyle)
+            self._stack.insertWidget(4, self._playstyle_page)
+            old_playstyle.deleteLater()
+
+            while self._stack.count() > 5:
+                page = self._stack.widget(5)
+                self._stack.removeWidget(page)
+                page.deleteLater()
+            while self._nav.count() > 6:
+                self._nav.takeItem(6)
+            self._disabled_rule_keys.clear()
+            tuning_rules = self._config_manager.get().tuning_rules
+            self._disabled_rule_keys = {
+                key for key, enabled in tuning_rules.items() if not enabled}
+            for key, rule in self._manager.get_rules().items():
+                self._add_rule_page(key, rule.name)
+            for key, name in self._manager.get_all_rule_keys_and_names():
+                if key not in self._manager.get_rules():
+                    placeholder = self._add_rule_page(key, name)
+                    self._apply_disabled_nav_style(placeholder, True)
+            self._nav.setCurrentRow(0)
+        finally:
+            self._initializing = False
+        self._dirty = False
+        self._has_error = False
+        self._save_button.setEnabled(False)
+        self._discard_button.setEnabled(False)
+        self._status_label.setStyleSheet("color: #2e7d32;")
+        self._status_label.setText(tr("已撤销未保存的调律配置更改"))
+
+    def _confirm_exit(self) -> bool:
+        if not self._dirty or not self.isVisible():
+            return True
+        answer = QMessageBox.question(
+            self,
+            tr("未保存的更改"),
+            tr("调律配置有未保存的更改，确定退出并放弃这些更改吗？"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
         return answer == QMessageBox.StandardButton.Yes
 
     def reject(self) -> None:
-        if not self._confirm_discard():
+        if not self._confirm_exit():
             return
         self._edit_session.close()
         self._dirty = False
         super().reject()
 
     def closeEvent(self, event) -> None:
-        if not self._confirm_discard():
+        if not self._confirm_exit():
             event.ignore()
             return
         self._edit_session.close()

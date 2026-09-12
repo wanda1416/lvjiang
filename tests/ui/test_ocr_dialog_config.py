@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import yaml
-from PyQt6.QtWidgets import QSpinBox
+from PyQt6.QtWidgets import QMessageBox, QSpinBox
 
 from lvjiang.core.config import resolver as resolver_module
 from lvjiang.core.config.resolver import ConfigResolver
@@ -53,12 +53,57 @@ def test_recognition_config_is_third_tab_and_can_be_saved(
     assert dialog._btn_rename_cleaning_group.text() == "重命名规则组"
     assert dialog._btn_delete_cleaning_group.text() == "删除规则组"
     assert dialog._btn_cancel_rules.text() == "撤销"
+    assert dialog._btn_cancel_config.text() == "撤销"
+    assert not dialog._btn_cancel_rules.isEnabled()
+    assert not dialog._btn_cancel_config.isEnabled()
 
     gap = dialog.findChild(QSpinBox, "ocr_region_gap")
     assert gap is not None and gap.value() == 16
     gap.setValue(28)
     assert dialog._btn_save_config.isEnabled()
+    assert dialog._btn_cancel_config.isEnabled()
     dialog._btn_save_config.click()
 
     assert load_region_batch_config().gap == 28
     assert not dialog._btn_save_config.isEnabled()
+    assert not dialog._btn_cancel_config.isEnabled()
+
+
+def test_recognition_config_discard_confirms_and_does_not_close(
+    qtbot, monkeypatch, tmp_path,
+):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    _write(system / "ocr.yaml", {
+        "content_version": 1,
+        "recognition": {"region_batch": {
+            "min_canvas_side": 736,
+            "max_content_height": 1200,
+            "gap": 16,
+        }},
+        "normalization": {"replacements": {}, "patterns": {}},
+    })
+    monkeypatch.setattr(
+        resolver_module,
+        "_resolver",
+        ConfigResolver(
+            system, local, dev_mode=False, remote_dir=tmp_path / "remote"
+        ),
+    )
+    monkeypatch.setattr(OCRCleaner, "_instance", None)
+    monkeypatch.setattr(OCRDialog, "_load_groups", lambda _self: None)
+    dialog = OCRDialog()
+    qtbot.addWidget(dialog)
+    dialog.show()
+    dialog._region_gap.setValue(28)
+    answers = iter((QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes))
+    monkeypatch.setattr(QMessageBox, "question", lambda *_a, **_kw: next(answers))
+
+    dialog._btn_cancel_config.click()
+    assert dialog._region_gap.value() == 28
+    assert dialog.isVisible()
+
+    dialog._btn_cancel_config.click()
+    assert dialog._region_gap.value() == 16
+    assert dialog.isVisible()
+    assert not dialog._btn_cancel_config.isEnabled()

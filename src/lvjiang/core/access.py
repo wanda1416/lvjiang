@@ -91,7 +91,7 @@ def user_lease(username: str, users_dir: Path | None = None) -> Lease:
     # User names are immutable storage keys in the current user model.
     identity = os.path.normcase(str((users_dir / f"{username}.json").resolve()))
     key = hashlib.sha256(identity.encode()).hexdigest()
-    return Lease(users_dir / ".locks" / f"{key}.execution.lock")
+    return Lease(users_dir / ".lock" / f"{key}.execution.lock")
 
 
 def acquire_user(username: str, users_dir: Path | None = None) -> Lease:

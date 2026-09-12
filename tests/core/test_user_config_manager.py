@@ -118,18 +118,38 @@ class TestUserConfigManagerCRUD:
         assert mgr.delete_user("待删除") is True
         assert "待删除" not in mgr.list_users()
 
-    def test_delete_user_removes_sticky_notes(self, session_env, tmp_path, monkeypatch):
+    def test_delete_user_preserves_data_and_same_name_restores_it(
+        self, session_env, tmp_path, monkeypatch,
+    ):
         from lvjiang import constants
         from lvjiang.core.user_notes import UserNotesRepository
 
         monkeypatch.setattr(constants, "USERS_DIR", tmp_path)
         mgr = UserConfigManager()
         mgr.create_user("待删除")
+        mgr.update_user_attributes("待删除", {"account": "保留账号"})
         repo = UserNotesRepository("待删除")
         repo.add("私人备忘")
+        session_file = tmp_path / "待删除.session.json"
+        loadouts_file = tmp_path / "待删除.loadouts.json"
+        session_file.write_text('{"score": 42}', encoding="utf-8")
+        loadouts_file.write_text('{"revision": 7}', encoding="utf-8")
 
         assert mgr.delete_user("待删除") is True
-        assert not repo.path.exists()
+        assert repo.path.exists()
+        assert (tmp_path / "待删除.json").exists()
+        assert session_file.read_text(encoding="utf-8") == '{"score": 42}'
+        assert loadouts_file.read_text(encoding="utf-8") == '{"revision": 7}'
+
+        assert mgr.create_user("待删除") is True
+        assert mgr.get_user("待删除").attributes == {"account": "保留账号"}
+        assert [note.text for note in repo.list_notes()] == ["私人备忘"]
+
+    def test_user_metadata_lock_is_kept_in_hidden_lock_directory(self, session_env):
+        UserConfigManager()
+
+        assert (session_env.parent / "users/.lock/default.json.lock").exists()
+        assert not (session_env.parent / "users/default.json.lock").exists()
 
     def test_delete_user_not_found(self, session_env):
         mgr = UserConfigManager()

@@ -47,6 +47,8 @@ class TestSave:
         mgr.save("新用户", {"current_user": "新用户", "level": 5})
         path = tmp_path / "新用户.session.json"
         assert path.exists()
+        assert (tmp_path / ".lock/新用户.session.json.lock").exists()
+        assert not (tmp_path / "新用户.session.json.lock").exists()
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["current_user"] == "新用户"
         assert data["level"] == 5

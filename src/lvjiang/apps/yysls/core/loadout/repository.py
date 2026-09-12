@@ -12,6 +12,8 @@ from uuid import uuid4
 
 from fasteners import InterProcessLock
 
+from lvjiang.core.user_file_locks import user_file_lock_path
+
 from ..equipment_cooldown import next_cooldown_expiry
 from .development_rules import check_real_development
 from .models import (
@@ -110,7 +112,7 @@ class LoadoutRepository:
         # 只串行化短暂的读改写事务，任务执行期间仍可浏览、编辑用户数据。
         with self._lock:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            lock = InterProcessLock(str(self.path) + ".lock")
+            lock = InterProcessLock(str(user_file_lock_path(self.path)))
             if not lock.acquire(blocking=True, timeout=5):
                 raise TimeoutError(f"装备数据写入锁超时: {self.path.name}")
             try:

@@ -45,6 +45,8 @@ def test_default_plan_and_shared_pool(tmp_path: Path):
     state = repo.load()
     assert state.active_plan.equipment["ring"] == "real-fp"
     assert state.resolved_equipment()["ring"]["type"] == "环"
+    assert (tmp_path / ".lock/alice.loadouts.json.lock").exists()
+    assert not (tmp_path / "alice.loadouts.json.lock").exists()
 
 
 def test_upsert_is_idempotent(tmp_path: Path):

@@ -132,9 +132,15 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     # 数据格式升级是应用启动步骤，只执行一次。UserConfigManager 只负责
     # 读取当前格式，避免每个窗口构造管理器时重复触发迁移。
     from .constants import USERS_DIR
+    from .core.access import is_readonly
     from .core.config import get_session_store
     from .core.config.user_storage_migration import migrate_user_storage
+    from .core.user_file_locks import collect_legacy_user_file_locks
     try:
+        if not is_readonly():
+            moved_locks = collect_legacy_user_file_locks(USERS_DIR)
+            if moved_locks:
+                logger.info("[app] 已收拢 %d 个旧用户锁文件", moved_locks)
         migrate_user_storage(get_session_store(), USERS_DIR)
     except RuntimeError as exc:
         from PyQt6.QtWidgets import QMessageBox
@@ -143,7 +149,6 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
         return 1
 
     _window = MainWindow()
-    from .core.access import is_readonly
     if is_readonly():
         from PyQt6.QtWidgets import QLabel
         notice = "只读实例：无法打开场景管理；当前选择仅在本实例生效"

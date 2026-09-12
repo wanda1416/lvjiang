@@ -255,10 +255,13 @@ def test_deleted_override_user_is_not_written_during_refresh(
     panel._param_panel.findChild(QSpinBox, "count").setValue(7)
 
     assert panel._user_manager.delete_user(deleted_user)
+    preserved = (tmp_path / "users" / f"{deleted_user}.json").read_text(
+        encoding="utf-8")
     panel._daily_execution_user_selector.refresh_users()
     panel._on_daily_execution_user_changed(
         panel._daily_execution_user_selector.resolve_username())
 
     assert panel._displayed_param_username == "bob"
-    assert not (tmp_path / "users" / f"{deleted_user}.json").exists()
+    assert (tmp_path / "users" / f"{deleted_user}.json").read_text(
+        encoding="utf-8") == preserved
     reset_session_store()

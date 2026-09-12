@@ -114,9 +114,11 @@ class TestDialog:
         assert save.text() == "保存"
         assert discard.text() == "撤销"
         assert not save.isEnabled()
+        assert not discard.isEnabled()
 
         dialog._set_status("有未保存的更改", False)
         assert save.isEnabled()
+        assert discard.isEnabled()
         dialog.show()
         monkeypatch.setattr(
             QMessageBox,
@@ -125,6 +127,7 @@ class TestDialog:
         )
         discard.click()
         assert dialog.isVisible()
+        assert dialog._dirty
 
         monkeypatch.setattr(
             QMessageBox,
@@ -132,7 +135,10 @@ class TestDialog:
             lambda *_a, **_kw: QMessageBox.StandardButton.Yes,
         )
         discard.click()
-        assert not dialog.isVisible()
+        assert dialog.isVisible()
+        assert not dialog._dirty
+        assert not save.isEnabled()
+        assert not discard.isEnabled()
         # 规则项名称随真实规则文件 name 字段（可被用户改名）
         # 规则顺序由 tune_config.yaml 的 tuning_rules 段控制
         first_rule = next(iter(get_tuning_rules().values()))

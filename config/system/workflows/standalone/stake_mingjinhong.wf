@@ -27,7 +27,7 @@ press "E" hold 0.08 after wait 0.3
 press $key_dz hold 0.11 after wait 0.74
 press "E" hold 0.05 after wait 0.11
 press "NUM8" hold 0.09 after wait 0.1
-# 第一道剑气
+# 第一道剑气，wait 开始计时
 press "R" hold 1.44 after wait 0.75
 # 点剑
 log info "第一次点剑+瞬发剑气"
@@ -35,7 +35,7 @@ log info "第一次点剑+瞬发剑气"
 press "Q" hold 0.05 after wait 0.28
 press "R" hold 0.05 after wait 0.78
 # 三道剑气
-press "R" hold 1.465 after wait 0.795
+press "R" hold 1.468 after wait 0.795
 # 这里比较极限，经常容易出现提前，可以考虑改 1.47
 press "R" hold 1.47 after wait 0.8
 press "R" hold 1.47 after wait 0.8
@@ -45,30 +45,30 @@ press "NUM8" hold 0.08 after wait 0.07
 press "Q" after wait 0.11
 press "E" hold 0.05 after wait 0.11
 press "NUM8" hold 0.08 after wait 0.09
-press "R" hold 1.465 after wait 0.8
-press "R" hold 1.465 after wait 0.8
+press "R" hold 1.468 after wait 0.8
+press "R" hold 1.468 after wait 0.8
 # 二次点剑
 log info "第二次点剑+瞬发剑气"
 # press "Q" hold 0.05 after wait 0.27
 press "Q" hold 0.05 after wait 0.28
 press "R" hold 0.05 after wait 0.78 
 # 三道剑气
-press "R" hold 1.465 after wait 0.8 
-press "R" hold 1.465 after wait 0.8 
+press "R" hold 1.468 after wait 0.8 
+press "R" hold 1.468 after wait 0.8 
 press "R" hold 1.47 after wait 0.8 
 # 枪Q回耐
 press "NUM8" hold 0.08 after wait 0.07
 press "Q" hold 0.1 after wait 0.24
 press "E" hold 0.05 after wait 0.11
 press "NUM8" hold 0.08 after wait 0.09
-press "R" hold 1.465 after wait 0.8
+press "R" hold 1.468 after wait 0.8
 press "R" hold 1.47 after wait 0.8
 # 第三次瞬发
 log info "第三次瞬发剑气"
 press "R" hold 0.05 after wait 0.78
 # 三道剑气
 press "R" hold 1.47 after wait 0.8
-press "R" hold 1.465 after wait 0.8
+press "R" hold 1.468 after wait 0.8
 press "R" hold 1.47 after wait 0.8
 # 枪Q
 press "NUM8" hold 0.08 after wait 0.07
@@ -91,11 +91,11 @@ press "NUM8" hold 0.08 after wait 0.07
 press "Q" after wait 0.09
 press "E" hold 0.07 after wait 0.11
 press "NUM8" hold 0.08 after wait 0.09
-press "R" hold 1.465 after wait 0.8
+press "R" hold 1.468 after wait 0.8
 press "R" hold 1.47 after wait 0.8
 log info "第五次瞬发剑气"
 press "R" hold 0.05 after wait 0.78
-press "R" hold 1.465 after wait 0.8
+press "R" hold 1.468 after wait 0.8
 press "R" hold 1.47 after wait 0.8
 # 最后一次剑气，打不出来就是延迟问题
 press "R" hold 1.47

@@ -50,7 +50,7 @@ def test_start_uses_launcher_when_activity_is_empty():
 
 
 def test_unknown_app_reports_configuration_entry():
-    with pytest.raises(AndroidAppError, match="安卓设置"):
+    with pytest.raises(AndroidAppError, match="应用注册"):
         _controller().stop("missing")
 
 
@@ -113,12 +113,27 @@ def test_android_app_statement_delegates_to_shared_controller():
         "stop": lambda self, name, timeout: calls.append(("stop", name, timeout)),
     })()
     engine = make_engine()
-    engine._android_device = object()
-    engine._android_app_controller = controller
+    engine._app_controller = controller
 
     engine._exec_stmt(parse_text('app stop "game" timeout 12\n').body[0])
 
     assert calls == [("stop", "game", 12.0)]
+
+
+def test_app_is_running_dispatches_by_registered_target_not_env(monkeypatch):
+    from lvjiang.core.app_controller import AppController
+
+    apps = {
+        "phone": AndroidAppConfig(package="com.example.game"),
+        "desktop": AndroidAppConfig(
+            platform="pc", executable=r"C:\\Game\\game.exe"),
+    }
+    controller = AppController(apps, device=FakeDevice())
+    monkeypatch.setattr(
+        controller._windows, "is_running", lambda name: name == "desktop")
+
+    assert controller.is_running("phone") is True
+    assert controller.is_running("desktop") is True
 
 
 def test_scrcpy_packet_parser_waits_for_incomplete_packets():

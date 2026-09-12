@@ -27,7 +27,7 @@ end
 
 call $in_login_page = is_in_login_page()
 if not $in_login_page
-    if android_app_running("yyslscn")
+    if app_is_running("yyslscn")
         app stop "yyslscn"
     end
     app start "yyslscn" timeout 30

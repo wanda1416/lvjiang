@@ -279,7 +279,53 @@ def _is_device(_engine=None) -> bool:
     return _backend_kind(_engine).is_device
 
 
-# ─── Android 应用生命周期 ─────────────────────────────────
+# ─── 注册应用生命周期 ─────────────────────────────────────
+
+def _apps(_engine):
+    """按注册项平台懒创建统一控制器；绝不依据 run_env 分派。"""
+    from ...core.app_controller import AppController
+    from ..engine.signals import WorkflowUserError
+
+    if _engine is None:
+        raise WorkflowUserError("应用控制需要工作流运行上下文")
+    controller = getattr(_engine, "_app_controller", None)
+    if controller is None:
+        controller = AppController(
+            getattr(_engine, "_android_apps", {}),
+            device=getattr(_engine, "_android_device", None),
+            capture=getattr(_engine, "_capture", None),
+            stop_check=getattr(_engine, "_stop_check", None),
+        )
+        _engine._app_controller = controller
+    return controller
+
+
+def _app_call(_engine, operation):
+    from ...core.app_controller import AppControlError
+    from ..engine.signals import WorkflowUserError
+
+    try:
+        return operation(_apps(_engine))
+    except AppControlError as exc:
+        raise WorkflowUserError(str(exc)) from exc
+
+
+@builtin_func("app_is_running")
+def _app_is_running(_engine, name: str = "") -> bool:
+    """按目标应用注册的平台检查运行状态，与工作流 env 无关。"""
+    return _app_call(_engine, lambda controller: controller.is_running(name))
+
+
+@builtin_func("app_stop")
+def _app_stop(_engine, name: str = "", timeout: float = 15) -> bool:
+    return _app_call(
+        _engine, lambda controller: controller.stop(name, float(timeout)))
+
+
+@builtin_func("app_start")
+def _app_start(_engine, name: str = "", timeout: float = 30) -> bool:
+    return _app_call(
+        _engine, lambda controller: controller.start(name, float(timeout)))
 
 def _android_apps(_engine):
     """懒创建控制器；DSL 与 Python 工作流共享公共 Android 实现。"""
@@ -310,24 +356,14 @@ def _android_call(_engine, operation):
         raise WorkflowUserError(str(exc)) from exc
 
 
-@builtin_func("android_app_running")
-def _android_app_running(_engine, name: str = "") -> bool:
-    """返回已注册安卓应用的进程是否存在。"""
-    return _android_call(_engine, lambda controller: controller.is_running(name))
-
-
 @builtin_func("android_app_stop")
 def _android_app_stop(_engine, name: str = "", timeout: float = 15) -> bool:
-    """强制停止已注册安卓应用，并等待其进程消失。"""
-    return _android_call(
-        _engine, lambda controller: controller.stop(name, float(timeout)))
+    return _app_stop(_engine, name, timeout)
 
 
 @builtin_func("android_app_start")
 def _android_app_start(_engine, name: str = "", timeout: float = 30) -> bool:
-    """启动已注册安卓应用，并等待其进程出现。"""
-    return _android_call(
-        _engine, lambda controller: controller.start(name, float(timeout)))
+    return _app_start(_engine, name, timeout)
 
 
 @builtin_func("android_wait_stable_frame")

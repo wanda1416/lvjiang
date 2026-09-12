@@ -166,6 +166,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._android_device = android_device or getattr(capture, "_device", None) \
             or getattr(input_ctrl, "_device", None)
         self._android_app_controller = None
+        self._app_controller = None
         # 本次运行使用的环境快照。工作流执行期间只读此内存值，绝不回读
         # session.json，避免 UI 切换或其他进程写配置污染已启动实例。
         self.run_env = str(run_env)
@@ -1062,7 +1063,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         default_timeout = 15.0 if node.action == "stop" else 30.0
         timeout = self._resolve(node.timeout) if node.timeout is not None else default_timeout
         call = FuncCall(
-            func_name=f"android_app_{node.action}",
+            func_name=f"app_{node.action}",
             func_args=[Literal(self._resolve(node.name)), Literal(timeout)],
             line_no=node.line_no,
         )

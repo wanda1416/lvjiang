@@ -1,9 +1,9 @@
 """配置管理对话框（多 Tab）
 
-Tab1 基础配置、Tab2 安卓设置、Tab3 输入模拟（引擎级点击参数）、Tab4 等待参数（命名等待）、
+Tab1 基础配置、Tab2 应用注册、Tab3 输入模拟（引擎级点击参数）、Tab4 等待参数（命名等待）、
 Tab5 方案设置（连接方案 + 可用工作环境）、Tab6 字体设置、Tab7 热键设置（F7~F12 按键位）。
-基础配置/字体/热键写 session.json（settings 节点）；安卓设置、输入模拟、等待参数和
-方案设置的环境列表写 app.yaml（android_apps / input_simulation / delay_params / envs，
+基础配置/字体/热键写 session.json（settings 节点）；应用注册、输入模拟、等待参数和
+方案设置的环境列表写 app.yaml（apps / input_simulation / delay_params / envs，
 system ← local 合并），保存后以配置文件为准覆盖代码默认值。方案本身写 session.json
 的 plans 节点——它是机器级运行态，与用户无关。热键保存后立即重建全局监听并生效。
 """
@@ -99,7 +99,7 @@ class SettingsDialog(QDialog):
 
         self._tabs = QTabWidget()
         self._tabs.addTab(self._build_basic_tab(), tr("基础配置"))
-        self._tabs.addTab(self._build_android_tab(), tr("安卓设置"))
+        self._tabs.addTab(self._build_android_tab(), tr("应用注册"))
         self._tabs.addTab(self._build_input_tab(), tr("输入模拟"))
         self._tabs.addTab(self._build_wait_tab(), tr("等待参数"))
         self._tabs.addTab(self._build_plan_tab(), tr("方案设置"))
@@ -238,32 +238,35 @@ class SettingsDialog(QDialog):
 
         return tab
 
-    # ─── 安卓设置（ADB 应用注册表）─────────────────────────
+    # ─── 应用注册（ADB / PC）──────────────────────────────
 
     def _build_android_tab(self) -> QWidget:
         tab = QWidget()
         vbox = QVBoxLayout(tab)
         caption = QLabel(tr(
-            "注册工作流可通过 ADB 停止和启动的安卓应用。应用名供 DSL 引用；"
-            "Activity 留空时自动启动该包的 Launcher 入口。"
+            "注册工作流可停止和启动的 Android 或 PC 应用。应用类型决定控制后端，"
+            "与工作流环境无关；PC 窗口身份在窗口模式定位后自动记录。"
         ))
         caption.setWordWrap(True)
         vbox.addWidget(caption)
 
         self._android_app_grid = QGridLayout()
         self._android_app_grid.setColumnStretch(0, 2)
-        self._android_app_grid.setColumnStretch(1, 4)
         self._android_app_grid.setColumnStretch(2, 4)
+        self._android_app_grid.setColumnStretch(3, 4)
         self._android_app_grid.addWidget(QLabel(tr("应用名")), 0, 0)
-        self._android_app_grid.addWidget(QLabel(tr("包名")), 0, 1)
-        self._android_app_grid.addWidget(QLabel(tr("启动 Activity（可选）")), 0, 2)
-        self._android_app_grid.addWidget(QLabel(tr("期望方向")), 0, 3)
+        self._android_app_grid.addWidget(QLabel(tr("类型")), 0, 1)
+        self._android_app_grid.addWidget(QLabel(tr("包名 / 可执行文件")), 0, 2)
+        self._android_app_grid.addWidget(QLabel(tr("Activity / 窗口标题")), 0, 3)
+        self._android_app_grid.addWidget(QLabel(tr("期望方向")), 0, 4)
         vbox.addLayout(self._android_app_grid)
 
         self._android_app_rows: list[dict] = []
         for name, app in self._config.android_apps.items():
             self._add_android_app_row(
-                name, app.package, app.activity, app.orientation, saved=True)
+                name, app.package or app.executable,
+                app.activity or app.window_title, app.orientation,
+                platform=app.platform, saved=True)
 
         add_row = QHBoxLayout()
         add_btn = QPushButton(tr("添加应用"))
@@ -282,14 +285,19 @@ class SettingsDialog(QDialog):
 
     def _add_android_app_row(
         self, name: str = "", package: str = "", activity: str = "",
-        orientation: str = "any", saved: bool = False,
+        orientation: str = "any", platform: str = "android",
+        saved: bool = False,
     ) -> dict:
         name_edit = QLineEdit(name)
         name_edit.setPlaceholderText(tr("如 game"))
+        platform_combo = QComboBox()
+        platform_combo.addItem("Android / ADB", "android")
+        platform_combo.addItem("PC / Windows", "pc")
+        platform_combo.setCurrentIndex(1 if platform == "pc" else 0)
         package_edit = QLineEdit(package)
-        package_edit.setPlaceholderText(tr("如 com.example.game"))
+        package_edit.setPlaceholderText(tr("包名或 exe 完整路径"))
         activity_edit = QLineEdit(activity)
-        activity_edit.setPlaceholderText(tr("留空自动解析 Launcher"))
+        activity_edit.setPlaceholderText(tr("Activity 或窗口标题特征"))
         orientation_combo = QComboBox()
         orientation_combo.addItem(tr("不限"), "any")
         orientation_combo.addItem(tr("横屏"), "landscape")
@@ -297,23 +305,39 @@ class SettingsDialog(QDialog):
         index = orientation_combo.findData(orientation)
         orientation_combo.setCurrentIndex(index if index >= 0 else 0)
         entry = {
-            "name": name_edit, "package": package_edit,
+            "name": name_edit, "platform": platform_combo, "package": package_edit,
             "activity": activity_edit, "orientation": orientation_combo,
             "saved": saved,
         }
         delete_btn = QPushButton(tr("删除"))
         delete_btn.clicked.connect(lambda: self._remove_android_app_row(entry))
         apply_button_style(delete_btn, variant="danger")
-        widgets = [name_edit, package_edit, activity_edit, orientation_combo, delete_btn]
+        widgets = [name_edit, platform_combo, package_edit, activity_edit,
+                   orientation_combo, delete_btn]
         entry["widgets"] = widgets
         row = self._android_app_grid.rowCount()
         for col, widget in enumerate(widgets):
             self._android_app_grid.addWidget(widget, row, col)
         self._android_app_rows.append(entry)
+        self._update_app_row_mode(entry)
         return entry
+
+    @staticmethod
+    def _update_app_row_mode(entry: dict) -> None:
+        is_android = entry["platform"].currentData() == "android"
+        entry["orientation"].setEnabled(is_android)
+        entry["package"].setPlaceholderText(
+            tr("如 com.example.game") if is_android
+            else tr("可留空，首次窗口定位时自动绑定"))
+        entry["activity"].setPlaceholderText(
+            tr("留空自动解析 Launcher") if is_android
+            else tr("可选，用于重新发现窗口"))
 
     def _connect_android_app_row_dirty(self, entry: dict) -> None:
         entry["name"].textChanged.connect(self._mark_dirty)
+        entry["platform"].currentIndexChanged.connect(
+            lambda: self._update_app_row_mode(entry))
+        entry["platform"].currentIndexChanged.connect(self._mark_dirty)
         entry["package"].textChanged.connect(self._mark_dirty)
         entry["activity"].textChanged.connect(self._mark_dirty)
         entry["orientation"].currentIndexChanged.connect(self._mark_dirty)
@@ -1226,32 +1250,40 @@ class SettingsDialog(QDialog):
             name = entry["name"].text().strip()
             package = entry["package"].text().strip()
             activity = entry["activity"].text().strip()
+            platform = entry["platform"].currentData()
             if not name and not package and not activity:
                 continue
             if not name:
-                QMessageBox.warning(self, tr("安卓设置"), tr("应用名不能为空"))
+                QMessageBox.warning(self, tr("应用注册"), tr("应用名不能为空"))
                 return None
             if name in apps:
                 QMessageBox.warning(
-                    self, tr("安卓设置"), tr("应用名重复: {name}").format(name=name))
+                    self, tr("应用注册"), tr("应用名重复: {name}").format(name=name))
                 return None
-            if not package_re.fullmatch(package):
+            if platform == "android" and not package_re.fullmatch(package):
                 QMessageBox.warning(
-                    self, tr("安卓设置"),
+                    self, tr("应用注册"),
                     tr("应用「{name}」的包名格式无效: {package}").format(
                         name=name, package=package))
                 return None
-            if activity and not activity_re.fullmatch(activity):
+            if platform == "android" and activity and not activity_re.fullmatch(activity):
                 QMessageBox.warning(
-                    self, tr("安卓设置"),
+                    self, tr("应用注册"),
                     tr("应用「{name}」的 Activity 格式无效: {activity}").format(
                         name=name, activity=activity))
                 return None
-            apps[name] = {
-                "package": package,
-                "activity": activity,
-                "orientation": entry["orientation"].currentData(),
-            }
+            apps[name] = {"platform": platform}
+            if platform == "android":
+                apps[name].update({
+                    "package": package,
+                    "activity": activity,
+                    "orientation": entry["orientation"].currentData(),
+                })
+            else:
+                apps[name].update({
+                    "executable": package,
+                    "window_title": activity,
+                })
         return apps
 
     def _on_save(self):

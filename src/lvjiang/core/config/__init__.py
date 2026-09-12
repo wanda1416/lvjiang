@@ -164,9 +164,15 @@ def load_user_config() -> UserConfig:
     params = app.get("delay_params")
     if isinstance(params, dict):
         data["delay_params"] = params
-    android_apps = app.get("android_apps")
-    if isinstance(android_apps, dict):
-        data["android_apps"] = android_apps
+    # 0.11.1 以前使用 android_apps；升级后与新 apps 合并，避免 system 已有
+    # apps 键时遮掉用户 local 层尚未来得及迁移的旧注册项。
+    legacy_apps = app.get("android_apps")
+    registered_apps = app.get("apps")
+    if isinstance(legacy_apps, dict) or isinstance(registered_apps, dict):
+        data["android_apps"] = {
+            **(legacy_apps if isinstance(legacy_apps, dict) else {}),
+            **(registered_apps if isinstance(registered_apps, dict) else {}),
+        }
 
     # 忽略未知字段（settings 节点可能含旧版本/其他模块写入的 key）
     known = {f.name for f in fields(UserConfig)}

@@ -41,7 +41,7 @@ class SceneDeclaration:
 
 @dataclass(frozen=True)
 class AndroidAppAction:
-    """app stop/start：控制配置管理中注册的安卓应用。"""
+    """app stop/start：按注册项平台控制 Android 或 PC 应用。"""
 
     action: str             # stop | start
     name: Any               # Literal | VarRef

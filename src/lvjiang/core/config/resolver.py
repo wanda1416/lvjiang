@@ -963,7 +963,9 @@ def save_app_config(
     if envs is not None:
         data["envs"] = envs
     if android_apps is not None:
-        data["android_apps"] = android_apps
+        data["apps"] = android_apps
+        # 保存一次即完成旧键迁移。
+        data.pop("android_apps", None)
     get_resolver().save_merged(_APP_CONFIG_REL, data)
 
 

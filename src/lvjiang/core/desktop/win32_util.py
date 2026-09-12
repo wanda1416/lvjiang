@@ -470,6 +470,20 @@ def list_visible_windows() -> list[dict]:
     _self_pid = os.getpid()
     _pid_buf = ctypes.c_ulong()
 
+    def _process_path(pid: int) -> str:
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return ""
+        try:
+            size = ctypes.c_ulong(32768)
+            buf = ctypes.create_unicode_buffer(size.value)
+            if ctypes.windll.kernel32.QueryFullProcessImageNameW(
+                    handle, 0, buf, ctypes.byref(size)):
+                return buf.value
+            return ""
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
+
     @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
     def _callback(hwnd, lParam):
         if not _user32.IsWindowVisible(hwnd):
@@ -507,6 +521,8 @@ def list_visible_windows() -> list[dict]:
                 results.append({
                     "title": title,
                     "hwnd": hwnd,
+                    "pid": int(_pid_buf.value),
+                    "executable": _process_path(int(_pid_buf.value)),
                     "left": rect.left,
                     "top": rect.top,
                     "width": w,

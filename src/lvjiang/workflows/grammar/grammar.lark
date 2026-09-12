@@ -54,7 +54,7 @@ scene_stmt: "scene"i bracket_expr ["view"i bracket_expr] _NL -> scene_location
 
 // ─── 基础指令 ─────────────────────────────────────────────
 
-// ADB 安卓应用生命周期。应用名来自「配置管理 → 安卓设置」。
+// 注册应用生命周期。具体由应用项 platform 选择 Android/PC 控制器。
 // app stop "game" timeout 15
 // app start $app_name timeout 30
 android_app_stmt: "app"i ANDROID_APP_ACTION (STRING | var_ref) android_app_timeout? _NL

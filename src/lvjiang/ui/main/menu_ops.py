@@ -426,6 +426,7 @@ class MenuOpsMixin:
         if engine is not None:
             engine._android_apps = dict(apps)
             engine._android_app_controller = None
+            engine._app_controller = None
 
     def _apply_font_size_settings(self, values: dict) -> None:
         """保存字体设置后立即应用到两个用户页面。"""

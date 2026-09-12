@@ -48,10 +48,10 @@ class _Device:
             self.calls.append((name, *args))
             if name == "profile_get":
                 return self.weekly_progress
-            if name == "android_app_running":
+            if name == "app_is_running":
                 return self.app_running
-            if name in ("android_app_start", "android_app_stop"):
-                self.app_running = name == "android_app_start"
+            if name in ("app_start", "app_stop"):
+                self.app_running = name == "app_start"
                 return True
             if name == "pause":
                 return None
@@ -72,7 +72,7 @@ class _Device:
     def names(self) -> list:
         """只保留会改变现场的动作，忽略 log/日志类调用。"""
         watched = {
-            "android_app_running", "android_app_start", "android_app_stop",
+            "app_is_running", "app_start", "app_stop",
             "profile_get", "pause", "click", "scan_image",
         }
         return [call[0] for call in self.calls if call[0] in watched]
@@ -135,7 +135,7 @@ def test_stopped_client_is_started_then_returned_to_login_page():
 
     assert result["status"] == "success"
     assert device.names() == [
-        "profile_get", "android_app_running", "android_app_start",
+        "profile_get", "app_is_running", "app_start",
         "scan_image", "click",
     ]
     assert ("click", "game_login_page", "back") in device.calls
@@ -148,8 +148,8 @@ def test_running_client_outside_login_page_is_restarted():
 
     assert result["status"] == "success"
     assert device.names() == [
-        "profile_get", "android_app_running", "android_app_stop",
-        "android_app_start", "scan_image", "click",
+        "profile_get", "app_is_running", "app_stop",
+        "app_start", "scan_image", "click",
     ]
 
 

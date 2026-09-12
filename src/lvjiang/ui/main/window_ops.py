@@ -836,6 +836,8 @@ class WindowOpsMixin:
             return
         self._refresh_window_rect(w)
         self._target_window = w
+        from ...core.app_controller import record_connected_window
+        record_connected_window(w)
 
         ratio = self._get_window_dpi_ratio(w["hwnd"])
         logger.info(

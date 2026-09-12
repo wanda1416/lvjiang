@@ -62,15 +62,24 @@ def parse_delay_params(raw: dict | None) -> dict[str, DelayParam]:
 
 @dataclass
 class AndroidAppConfig:
-    """ADB 可控制的安卓应用定义（配置管理「安卓设置」页维护）。"""
+    """可控制的应用定义；类名保留用于兼容既有调用方。"""
 
     package: str = ""                         # Android applicationId
     activity: str = ""                        # 可选 component/activity；空则走 Launcher
     orientation: str = "any"                  # any / landscape / portrait
+    platform: str = "android"                 # android / pc
+    executable: str = ""                      # PC 可执行文件路径
+    arguments: list[str] = field(default_factory=list)
+    window_title: str = ""                    # PC 顶层窗口标题特征
 
     def __post_init__(self):
         self.package = str(self.package or "").strip()
         self.activity = str(self.activity or "").strip()
+        platform = str(self.platform or "android").strip().lower()
+        self.platform = platform if platform in {"android", "pc"} else "android"
+        self.executable = str(self.executable or "").strip()
+        self.arguments = [str(value) for value in (self.arguments or [])]
+        self.window_title = str(self.window_title or "").strip()
         orientation = str(self.orientation or "any").strip().lower()
         self.orientation = orientation if orientation in {
             "any", "landscape", "portrait",
@@ -209,7 +218,7 @@ class UserConfig:
     reference_grid: ReferenceGridConfig = field(default_factory=ReferenceGridConfig)
     input_sim: InputSimConfig = field(default_factory=InputSimConfig)     # 输入模拟
     delay_params: dict[str, DelayParam] = field(default_factory=dict)     # 命名延迟参数
-    android_apps: dict[str, AndroidAppConfig] = field(default_factory=dict)  # ADB 应用注册表
+    android_apps: dict[str, AndroidAppConfig] = field(default_factory=dict)  # 应用注册表（兼容字段名）
     hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)           # 全局热键按键位
     network: NetworkConfig = field(default_factory=NetworkConfig)         # 联网行为开关
     font_sizes: FontSizeConfig = field(default_factory=FontSizeConfig)    # 用户页面内容字号

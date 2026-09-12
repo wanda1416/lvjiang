@@ -40,7 +40,7 @@ class AndroidAppController:
         alias = str(name or "").strip()
         app = self.apps.get(alias)
         if app is None:
-            raise AndroidAppError(f"未注册安卓应用: {alias!r}，请先在配置管理→安卓设置中添加")
+            raise AndroidAppError(f"未注册安卓应用: {alias!r}，请先在配置管理→应用注册中添加")
         if not _PACKAGE_RE.fullmatch(app.package):
             raise AndroidAppError(f"安卓应用 {alias!r} 的包名无效: {app.package!r}")
         if app.activity and not _ACTIVITY_RE.fullmatch(app.activity):

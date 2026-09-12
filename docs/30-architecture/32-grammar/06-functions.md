@@ -106,9 +106,9 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `save` | `() -> ""` | 强制保存 session 到磁盘 |
 | `panel_rows` | `(scene, panel) -> int` | 返回 panel 实际检测到的行数 |
 | `panel_cols` | `(scene, panel) -> int` | 返回 panel 实际检测到的列数 |
-| `android_app_running` | `(name) -> bool` | 查询已注册安卓应用的进程是否存在 |
-| `android_app_stop` | `(name, timeout=15) -> bool` | 强制停止应用并等待进程消失 |
-| `android_app_start` | `(name, timeout=30) -> bool` | 启动应用并等待进程出现 |
+| `app_is_running` | `(name) -> bool` | 按注册目标类型查询应用是否运行 |
+| `app_stop` | `(name, timeout=15) -> bool` | 停止应用并等待进程消失 |
+| `app_start` | `(name, timeout=30) -> bool` | 启动应用并等待进程出现 |
 | `android_wait_stable_frame` | `(name, timeout=60, duration=1) -> bool` | 等待期望方向下的连续稳定帧 |
 
 ### 运行环境与后端（4）

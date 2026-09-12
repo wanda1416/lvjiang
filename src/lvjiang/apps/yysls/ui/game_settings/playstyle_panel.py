@@ -41,7 +41,7 @@ _UNIT_REQUIREMENTS = ("不需要", "首领", "玩家")
 class PlaystylePanel(QWidget):
     """左侧玩法名，右侧属性 / 两个武学 / 增伤要求 / 输出与防御定音。"""
 
-    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
+    def __init__(self, parent=None, *, data: dict | None = None, on_changed=None):
         super().__init__(parent)
         self._loading = False
         self._data: dict = data if data is not None else {}

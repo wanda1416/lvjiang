@@ -21,7 +21,7 @@ from ...config import get_game_config
 class BasicConfigPanel(QWidget):
     """不依赖等级、装备类型等维度的全局游戏参数。"""
 
-    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
+    def __init__(self, parent=None, *, data: dict | None = None, on_changed=None):
         super().__init__(parent)
         self._data = data
         self._on_changed = on_changed

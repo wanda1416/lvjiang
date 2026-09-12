@@ -61,7 +61,7 @@ _COLS = ("#", tr("赛季编号"), tr("赛季名称"), tr("开始日期"), tr("�
 class SeasonConfigPanel(QWidget):
     """赛季配置面板（表格形式）"""
 
-    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
+    def __init__(self, parent=None, *, data: dict | None = None, on_changed=None):
         super().__init__(parent)
         self._data = data
         self._on_changed = on_changed

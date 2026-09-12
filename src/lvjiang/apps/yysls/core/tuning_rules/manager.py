@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable
 from pathlib import Path
 
 import yaml
@@ -39,8 +40,14 @@ class TuningRuleManager:
     原始数据访问（UI 编辑用）、创建/删除与保存 + reload。
     """
 
-    def __init__(self, rules_dir: str | Path | None = None):
-        if rules_dir is None:
+    def __init__(self, rules_dir: str | Path | None = None, *,
+                 resolver: ConfigResolver | None = None,
+                 tune_config_getter: Callable[[], TuneConfig] | None = None):
+        self._tune_config_getter = tune_config_getter
+        if resolver is not None:
+            self._resolver = resolver
+            self._rel_dir = _RULES_REL_DIR
+        elif rules_dir is None:
             self._resolver = get_resolver()
             self._rel_dir = _RULES_REL_DIR
         else:
@@ -137,11 +144,13 @@ class TuningRuleManager:
             logger.error(f"tune_config.yaml tuning_rules 读取失败: {e}")
             return {}
 
-    @staticmethod
-    def _switch_keys() -> set[str] | None:
+    def _switch_keys(self) -> set[str] | None:
         """已注册开关 key 全集（tune_config 加载失败时 None = 跳过校验）"""
         try:
-            return set(get_tune_config().switches)
+            config = (self._tune_config_getter()
+                      if self._tune_config_getter is not None
+                      else get_tune_config())
+            return set(config.switches)
         except Exception as e:
             logger.error(f"tune_config 加载失败，跳过 when 开关校验: {e}")
             return None
@@ -422,8 +431,12 @@ class TuningGroupManager:
     提供原始数据访问（UI 编辑用）、新增/复制/删除与保存 + reload。
     """
 
-    def __init__(self, groups_dir: str | Path | None = None):
-        if groups_dir is None:
+    def __init__(self, groups_dir: str | Path | None = None, *,
+                 resolver: ConfigResolver | None = None):
+        if resolver is not None:
+            self._resolver = resolver
+            self._rel_dir = _GROUPS_REL_DIR
+        elif groups_dir is None:
             self._resolver = get_resolver()
             self._rel_dir = _GROUPS_REL_DIR
         else:
@@ -641,9 +654,12 @@ class TuneConfigManager:
     原始数据访问（UI 编辑用）与保存 + reload。
     """
 
-    def __init__(self, path: str | Path | None = None):
+    def __init__(self, path: str | Path | None = None, *,
+                 resolver: ConfigResolver | None = None):
         # path 非空（测试/孤立文件）时直读直写；否则走聚合键值接口
         self._path = Path(path) if path is not None else None
+        self._resolver = resolver or get_resolver()
+        self._rule_manager: TuningRuleManager | None = None
         self._config = TuneConfig()
         self._raw: dict = {}
         self.reload()
@@ -653,7 +669,7 @@ class TuneConfigManager:
             with open(self._path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
         else:
-            data = get_resolver().load_merged(_CONFIG_REL_PATH)
+            data = self._resolver.load_merged(_CONFIG_REL_PATH)
         self._raw = data
         self._config = parse_tune_config(data)
 
@@ -677,7 +693,8 @@ class TuneConfigManager:
         """
         config = parse_tune_config(data)
         referenced: set[str] = set()
-        for rule in get_tuning_rule_manager().get_rules().values():
+        rule_manager = self._rule_manager or get_tuning_rule_manager()
+        for rule in rule_manager.get_rules().values():
             referenced |= rule.referenced_switches()
         removed = sorted(referenced - set(config.switches))
         if removed:
@@ -688,10 +705,14 @@ class TuneConfigManager:
             with open(self._path, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, allow_unicode=True, sort_keys=False)
         else:
-            get_resolver().save_merged(_CONFIG_REL_PATH, data)
+            self._resolver.save_merged(_CONFIG_REL_PATH, data)
         self.reload()
         # 开关集变更后重新校验全部规则的 when 引用
-        get_tuning_rule_manager().reload()
+        rule_manager.reload()
+
+    def set_rule_manager(self, manager: TuningRuleManager) -> None:
+        """绑定同一编辑会话内的规则管理器，避免校验读取全局缓存。"""
+        self._rule_manager = manager
 
 
 _tune_config_manager: TuneConfigManager | None = None

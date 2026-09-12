@@ -15,9 +15,6 @@
 """
 
 import re
-import shutil
-import tempfile
-from pathlib import Path
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QBrush
@@ -41,12 +38,15 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.core.tuning_rules import (
     RuleValidationError,
-    get_tune_config,
+    TuneConfigManager,
+    TuningGroupManager,
+    TuningRuleManager,
     get_tune_config_manager,
     get_tuning_group_manager,
     get_tuning_rule_manager,
 )
 from lvjiang.apps.yysls.ui.layout_helpers import fit_combo_to_contents
+from lvjiang.core.config.edit_session import ConfigEditSession
 from lvjiang.core.config.resolver import get_resolver
 from lvjiang.ui.button_styles import (
     apply_button_style,
@@ -67,100 +67,6 @@ from .rule_panel import RulePanel, add_nav_separator
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
-
-_EDIT_PATHS = (
-    "yysls/tune_config.yaml",
-    "yysls/base_groups",
-    "yysls/tuning_rules",
-)
-
-
-class _TuningConfigTransaction:
-    """把调律编辑临时重定向到配置根目录副本，保存时再统一写回。"""
-
-    def __init__(self):
-        self._resolver = get_resolver()
-        self._system_dir = self._resolver._system_dir
-        self._local_dir = self._resolver._local_dir
-        self._tmp: tempfile.TemporaryDirectory | None = None
-        self._start()
-
-    def _start(self) -> None:
-        self._tmp = tempfile.TemporaryDirectory(prefix="lvjiang-tuning-edit-")
-        root = Path(self._tmp.name)
-        system = root / "system"
-        local = root / "local"
-        shutil.copytree(self._resolver.system_dir, system)
-        if self._resolver.local_dir.exists():
-            shutil.copytree(self._resolver.local_dir, local)
-        else:
-            local.mkdir(parents=True)
-        self._resolver._system_dir = system
-        self._resolver._local_dir = local
-
-    def _restore_roots(self) -> tuple[Path, Path]:
-        staged_system = self._resolver.system_dir
-        staged_local = self._resolver.local_dir
-        self._resolver._system_dir = self._system_dir
-        self._resolver._local_dir = self._local_dir
-        return staged_system, staged_local
-
-    @staticmethod
-    def _sync_path(source: Path, target: Path) -> list[str]:
-        changed: list[str] = []
-        if source.is_dir():
-            source_files = {p.relative_to(source) for p in source.rglob("*") if p.is_file()}
-            target_files = ({p.relative_to(target) for p in target.rglob("*") if p.is_file()}
-                            if target.is_dir() else set())
-            for rel in sorted(target_files - source_files):
-                (target / rel).unlink()
-                changed.append(rel.as_posix())
-            for rel in sorted(source_files):
-                src = source / rel
-                dst = target / rel
-                if not dst.exists() or src.read_bytes() != dst.read_bytes():
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(src, dst)
-                    changed.append(rel.as_posix())
-        elif source.is_file():
-            if not target.exists() or source.read_bytes() != target.read_bytes():
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source, target)
-                changed.append("")
-        elif target.exists():
-            target.unlink()
-            changed.append("")
-        return changed
-
-    def commit(self) -> None:
-        if self._tmp is None:
-            return
-        tmp = self._tmp
-        staged_system, staged_local = self._restore_roots()
-        staged_root = staged_system if self._resolver.is_dev_mode() else staged_local
-        target_root = self._resolver.system_dir if self._resolver.is_dev_mode() else self._resolver.local_dir
-        notifications: list[str] = []
-        for rel_path in _EDIT_PATHS:
-            suffixes = self._sync_path(staged_root / rel_path, target_root / rel_path)
-            if not suffixes:
-                continue
-            if (staged_root / rel_path).is_dir() or (target_root / rel_path).is_dir():
-                notifications.extend(
-                    f"{rel_path}/{suffix}" for suffix in suffixes if suffix)
-            else:
-                notifications.append(rel_path)
-        tmp.cleanup()
-        self._tmp = None
-        for rel_path in notifications:
-            self._resolver._notify(rel_path)
-
-    def rollback(self) -> None:
-        if self._tmp is None:
-            return
-        self._restore_roots()
-        self._tmp.cleanup()
-        self._tmp = None
-
 
 class _RulePagePlaceholder(QWidget):
     """规则页占位符；自带 key/name，不依赖导航位置反查数据。"""
@@ -219,7 +125,11 @@ class TuningRulesDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._transaction = _TuningConfigTransaction()
+        self._edit_session = ConfigEditSession(
+            get_resolver(),
+            merged_paths=("yysls/tune_config.yaml",),
+            entity_dirs=("yysls/base_groups", "yysls/tuning_rules"),
+        )
         self._dirty = False
         self._has_error = False
         self._initializing = True
@@ -235,14 +145,14 @@ class TuningRulesDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        self._config_manager = get_tune_config_manager()
-        self._group_manager = get_tuning_group_manager()
-        self._manager = get_tuning_rule_manager()
-        # 三个 manager 都是进程级单例。每次打开重读一次：
-        # 每个 YAML 会先 stat，未变则用 resolver 中的解析缓存。
-        self._config_manager.reload()
-        self._group_manager.reload()
-        self._manager.reload()
+        edit_resolver = self._edit_session.resolver
+        self._config_manager = TuneConfigManager(resolver=edit_resolver)
+        self._manager = TuningRuleManager(
+            resolver=edit_resolver,
+            tune_config_getter=self._config_manager.get,
+        )
+        self._group_manager = TuningGroupManager(resolver=edit_resolver)
+        self._config_manager.set_rule_manager(self._manager)
         # 初始规则组跟随当前用户的自动调律配置。
         from ...config.auto_tuning_config import (
             active_username,
@@ -351,7 +261,7 @@ class TuningRulesDialog(QDialog):
         # 加载全部规则（含禁用），禁用规则导航文字置灰
         self._disabled_rule_keys: set[str] = set()
         try:
-            tuning_rules = get_tune_config().tuning_rules
+            tuning_rules = self._config_manager.get().tuning_rules
             self._disabled_rule_keys = {
                 k for k, v in tuning_rules.items() if not v}
         except Exception:
@@ -569,12 +479,19 @@ class TuningRulesDialog(QDialog):
         self._group_manager.reload()
         self._manager.reload()
 
+    @staticmethod
+    def _reload_runtime_managers() -> None:
+        """提交后刷新真实配置单例，使运行期立即看到新数据。"""
+        get_tune_config_manager().reload()
+        get_tuning_group_manager().reload()
+        get_tuning_rule_manager().reload()
+
     def _save_changes(self) -> None:
         if not self._dirty or self._has_error:
             return
         try:
-            self._transaction.commit()
-            self._reload_managers()
+            self._edit_session.commit()
+            self._reload_runtime_managers()
         except Exception as exc:  # noqa: BLE001 - 提交失败必须留在对话框
             QMessageBox.warning(self, tr("保存失败"), str(exc))
             return
@@ -583,9 +500,6 @@ class TuningRulesDialog(QDialog):
         self._save_button.setEnabled(False)
         self._status_label.setStyleSheet("color: #2e7d32;")
         self._status_label.setText(tr("调律配置已保存并生效"))
-        # 保存后继续编辑时开启一份以最新磁盘状态为基线的新暂存区。
-        self._transaction = _TuningConfigTransaction()
-        self._reload_managers()
 
     def _confirm_discard(self) -> bool:
         if not self._dirty or not self.isVisible():
@@ -602,8 +516,7 @@ class TuningRulesDialog(QDialog):
     def reject(self) -> None:
         if not self._confirm_discard():
             return
-        self._transaction.rollback()
-        self._reload_managers()
+        self._edit_session.close()
         self._dirty = False
         super().reject()
 
@@ -611,7 +524,6 @@ class TuningRulesDialog(QDialog):
         if not self._confirm_discard():
             event.ignore()
             return
-        self._transaction.rollback()
-        self._reload_managers()
+        self._edit_session.close()
         self._dirty = False
         super().closeEvent(event)

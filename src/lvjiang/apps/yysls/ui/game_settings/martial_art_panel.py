@@ -35,7 +35,7 @@ _ATTRS = ["鸣金", "裂石", "破竹", "牵丝"]
 class MartialArtPanel(QWidget):
     """左侧武学列表，右侧武器 + 属性。"""
 
-    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
+    def __init__(self, parent=None, *, data: dict | None = None, on_changed=None):
         super().__init__(parent)
         self._loading = False
         self._data: dict = data if data is not None else {}

@@ -224,7 +224,7 @@ class LevelConfigPanel(QWidget):
     # 等级配置保存后发出信号，通知其他面板刷新 LevelCombo
     level_configs_saved = pyqtSignal()
 
-    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
+    def __init__(self, parent=None, *, data: dict | None = None, on_changed=None):
         super().__init__(parent)
         self._data = data
         self._on_changed = on_changed

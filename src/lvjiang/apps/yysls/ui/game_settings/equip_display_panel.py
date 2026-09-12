@@ -29,7 +29,7 @@ _PARAM_DEFS = [
 class EquipDisplayPanel(QWidget):
     """装备展示参数设置面板"""
 
-    def __init__(self, on_changed=None, parent=None):
+    def __init__(self, parent=None, *, on_changed=None):
         super().__init__(parent)
         self._on_changed = on_changed
         self._loading = True

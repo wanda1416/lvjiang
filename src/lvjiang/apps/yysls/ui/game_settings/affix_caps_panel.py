@@ -144,7 +144,7 @@ class _PartsDialog(QDialog):
 class AffixCapsPanel(QWidget):
     """词条属性上限面板"""
 
-    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
+    def __init__(self, parent=None, *, data: dict | None = None, on_changed=None):
         super().__init__(parent)
         self._data: dict = data if data is not None else {}
         self._external_data = data is not None

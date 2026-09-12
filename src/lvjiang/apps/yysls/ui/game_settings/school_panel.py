@@ -64,7 +64,7 @@ _SCHOOL_ATTRS = ["鸣金", "裂石", "破竹", "牵丝"]
 class SchoolPanel(QWidget):
     """流派配置面板（左：流派列表；右：配置表单）"""
 
-    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
+    def __init__(self, parent=None, *, data: dict | None = None, on_changed=None):
         super().__init__(parent)
         self._data: dict = data if data is not None else {}
         self._external_data = data is not None

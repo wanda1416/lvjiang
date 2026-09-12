@@ -265,7 +265,7 @@ class _NameListEditor(QWidget):
 class BaseAttrPanel(QWidget):
     """基础属性规则面板"""
 
-    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
+    def __init__(self, parent=None, *, data: dict | None = None, on_changed=None):
         super().__init__(parent)
         self._data: dict = data if data is not None else {}
         self._external_data = data is not None

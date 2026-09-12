@@ -201,8 +201,13 @@ class ScriptOpsMixin:
             engine.run_username = username
             # context 由 execute() 自动初始化为空 dict
 
-            # 每次试运行独立存储，主/只读实例均不会覆盖其他任务的脚本。
-            from ...workflows.runtime_source import runtime_source
+            # 固定文件保留最近一次运行的草稿，独立临时文件则保证并发执行
+            # 期间不会因下一次运行覆盖源码。
+            from ...workflows.runtime_source import (
+                runtime_source,
+                save_editor_snapshot,
+            )
+            save_editor_snapshot(script)
             with runtime_source(script) as temp_wf:
                 result = engine.execute(temp_wf)
             return_value = engine.return_value

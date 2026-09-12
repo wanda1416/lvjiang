@@ -18,6 +18,7 @@ from fasteners import InterProcessLock
 from loguru import logger
 
 from .fs_util import atomic_write_text
+from .user_file_locks import user_file_lock_path
 
 _VALID_USERNAME = re.compile(r"^[\w一-鿿-]{1,32}$")
 USER_DOCUMENT_TYPE = "lvjiang.user"
@@ -101,7 +102,7 @@ def user_metadata_path(username: str, users_dir: Path | None = None) -> Path:
 
 @contextmanager
 def _locked_metadata(path: Path):
-    lock = InterProcessLock(str(path) + ".lock")
+    lock = InterProcessLock(str(user_file_lock_path(path)))
     if not lock.acquire(blocking=True, timeout=5):
         raise TimeoutError(f"用户资料写入锁超时: {path.name}")
     try:
@@ -258,11 +259,14 @@ class UserConfigManager:
     def create_user(self, name: str) -> bool:
         if not is_valid_username(name) or name in self._users:
             return False
-        user = User(name=name, created_at=datetime.now().isoformat())
-        self._save_user(user)
+        user = load_user_metadata(name, self._users_dir)
+        restored = user is not None
+        if user is None:
+            user = User(name=name, created_at=datetime.now().isoformat())
+            self._save_user(user)
         self._users[name] = user
         self._save_order()
-        logger.info(f"用户已创建: {name}")
+        logger.info(f"用户已{'恢复' if restored else '创建'}: {name}")
         return True
 
     def delete_user(self, name: str) -> bool:
@@ -274,12 +278,7 @@ class UserConfigManager:
         self._save_order()
         from .batch_config import remove_username_from_batch_configs
         remove_username_from_batch_configs(name)
-        for suffix in (".json", ".session.json", ".notes.json", ".loadouts.json"):
-            try:
-                (self._users_dir / f"{name}{suffix}").unlink(missing_ok=True)
-            except OSError as exc:
-                logger.warning(f"清理用户 {name} 文件失败: {exc}")
-        logger.info(f"用户已删除: {name}")
+        logger.info(f"用户已从列表移除，数据文件已保留: {name}")
         return True
 
     def reorder_users(self, names: list[str]) -> bool:

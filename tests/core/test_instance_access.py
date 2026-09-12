@@ -49,6 +49,7 @@ close_instance()
 def test_same_user_rejected_other_user_allowed_and_lock_file_can_remain(tmp_path):
     users = tmp_path / "config/session/users"
     lease = access.acquire_user("alice", users)
+    assert Path(lease.key).parent == (users / ".lock").resolve()
     code = """
 from lvjiang.core.access import acquire_user, AccessDeniedError
 try:

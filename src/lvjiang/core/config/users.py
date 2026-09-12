@@ -14,6 +14,7 @@ from fasteners import InterProcessLock
 from loguru import logger
 
 from ..fs_util import atomic_write_text
+from ..user_file_locks import user_file_lock_path
 
 
 class SessionSnapshot(dict):
@@ -29,7 +30,7 @@ _SAVE_LOCK = threading.RLock()
 
 @contextmanager
 def _locked_file(path: Path):
-    lock = InterProcessLock(str(path) + ".lock")
+    lock = InterProcessLock(str(user_file_lock_path(path)))
     if not lock.acquire(blocking=True, timeout=5):
         raise TimeoutError(f"用户 Session 写入锁超时: {path.name}")
     try:

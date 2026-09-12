@@ -34,6 +34,8 @@ def test_add_persists_newest_first_and_preserves_chinese(repo):
     data = json.loads(repo.path.read_text(encoding="utf-8"))
     assert data["schema_version"] == 1
     assert data["revision"] == 2
+    assert (repo.path.parent / ".lock/测试用户.notes.json.lock").exists()
+    assert not repo.path.with_suffix(".json.lock").exists()
 
 
 def test_update_keeps_position_and_created_time(repo):

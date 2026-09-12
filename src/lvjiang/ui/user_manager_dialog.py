@@ -527,8 +527,8 @@ class UserManagerDialog(QDialog):
         reply = QMessageBox.question(
             self, tr("确认删除"),
             tr("确定要删除用户「{name}」吗？\n"
-               "该用户的关联数据将被清除；已保存头像仍保留在头像库中。"
-               "此操作不可恢复。").format(name=name),
+               "用户将从当前列表和批量配置中移除，关联数据文件会保留；"
+               "以后添加同名用户即可恢复。").format(name=name),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:

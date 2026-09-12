@@ -19,6 +19,7 @@ from uuid import uuid4
 from fasteners import InterProcessLock
 
 from .fs_util import atomic_write_text
+from .user_file_locks import user_file_lock_path
 
 SCHEMA_VERSION = 1
 MAX_NOTES = 200
@@ -101,7 +102,7 @@ class UserNotesRepository:
             users_dir = USERS_DIR
         self.username = username
         self.path = users_dir / f"{username}.notes.json"
-        self._lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        self._lock_path = user_file_lock_path(self.path)
         self._thread_lock = _thread_lock(self.path)
 
     @staticmethod

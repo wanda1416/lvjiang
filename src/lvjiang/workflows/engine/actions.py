@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 import time
 from typing import TYPE_CHECKING
@@ -674,7 +675,7 @@ class _ActionsMixin:
         logger.debug(f"drag region: {scene}.{key} up (default)")
 
     def _exec_press(self, node: Press):
-        """press "KEY" [hold N | down | up] — 模拟键盘按键
+        """press "KEY" [hold N|范围|变量 | down | up] — 模拟键盘按键
 
         四种模式：
         - PRESS: 一次完整按键（down + up）
@@ -689,10 +690,52 @@ class _ActionsMixin:
                 raise WorkflowUserError("press: 按键变量未定义")
             keys.append(str(key_raw))
         duration = (
-            float(self._resolve(node.duration))
+            self._resolve_press_hold_duration(node.duration)
             if node.mode is PressMode.HOLD else None
         )
         self.press_keys(keys, mode=node.mode, duration=duration)
+
+    def _resolve_press_hold_duration(self, value) -> float:
+        """解析固定或区间 hold；区间字面量与 tuple 变量共用同一校验。"""
+        resolved = self._resolve(value)
+        if isinstance(resolved, tuple):
+            if len(resolved) != 2:
+                raise WorkflowUserError(
+                    "press hold 区间必须正好包含两个数值，"
+                    f"实际得到: {resolved!r}")
+            lo_raw, hi_raw = resolved
+            if (isinstance(lo_raw, bool) or isinstance(hi_raw, bool)
+                    or not isinstance(lo_raw, (int, float))
+                    or not isinstance(hi_raw, (int, float))):
+                raise WorkflowUserError(
+                    "press hold 区间元素必须是数值，"
+                    f"实际得到: {resolved!r}")
+            lo, hi = float(lo_raw), float(hi_raw)
+            if not math.isfinite(lo) or not math.isfinite(hi):
+                raise WorkflowUserError(
+                    f"press hold 区间端点必须是有限数值，实际得到: ({lo}, {hi})")
+            if lo <= 0 or hi <= 0:
+                raise WorkflowUserError(
+                    f"press hold 区间端点必须 > 0，实际得到: ({lo}, {hi})")
+            if lo > hi:
+                raise WorkflowUserError(
+                    f"press hold 区间下限不能大于上限，实际得到: ({lo}, {hi})")
+            duration = random.uniform(lo, hi)
+            logger.debug(
+                f"press hold 随机区间 ({lo}, {hi}) → {duration:.4f}s")
+            return duration
+
+        if isinstance(resolved, bool) or not isinstance(resolved, (int, float)):
+            raise WorkflowUserError(
+                "press hold 时长必须是数值或二元数值 tuple，"
+                f"实际得到: {resolved!r}")
+        duration = float(resolved)
+        if not math.isfinite(duration):
+            raise WorkflowUserError(
+                f"press hold 时长必须是有限数值，得到 {duration}")
+        if duration <= 0:
+            raise WorkflowUserError(f"press hold 时长必须 > 0，得到 {duration}")
+        return duration
 
     def press_key(self, key: str) -> None:
         """WorkflowEngine 的单次按键原语。"""

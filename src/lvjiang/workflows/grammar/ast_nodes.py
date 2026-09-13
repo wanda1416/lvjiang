@@ -282,13 +282,15 @@ class Press:
 
     四种模式：
     - PRESS: press "M" — 一次完整按键（down + up）
-    - HOLD: press "W" hold 2.0 — 按住指定时长后释放
+    - HOLD: press "W" hold 2.0 / hold (1.8, 2.2) — 按住后释放
     - DOWN: press "SHIFT" down — 按下保持
     - UP: press "SHIFT" up — 释放此前按下的键
     """
     key: Any          # str（常量）| VarRef（变量）
     mode: PressMode = PressMode.PRESS
-    duration: Any = None  # None | float | VarRef（hold 模式必须有且 > 0）
+    # hold 模式：float | VarRef | TupleLiteral；运行时解析结果必须为正数或
+    # 两个递增正数构成的 tuple。
+    duration: Any = None
     line_no: int = 0
     keys: tuple[Any, ...] = ()  # 组合键；置后以兼容 Press(key, mode, ...) 调用
 

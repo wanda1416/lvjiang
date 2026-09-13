@@ -1111,6 +1111,29 @@ def test_press_hold_after_wait():
     assert program.body[0].duration == 2.0
 
 
+def test_press_hold_direct_range():
+    program = parse_text('press "E" hold (0.058, 0.063)')
+
+    node = program.body[0]
+    assert isinstance(node, Press)
+    assert node.mode == PressMode.HOLD
+    assert isinstance(node.duration, TupleLiteral)
+    assert [item.value for item in node.duration.elements] == [0.058, 0.063]
+
+
+def test_press_hold_tuple_variable():
+    program = parse_text(
+        'eval $hold_range = (0.058, 0.063)\n'
+        'press "E" hold $hold_range\n'
+    )
+
+    node = program.body[1]
+    assert isinstance(node, Press)
+    assert node.mode == PressMode.HOLD
+    assert isinstance(node.duration, VarRef)
+    assert node.duration.name == "hold_range"
+
+
 def test_press_down_before_wait():
     """press "KEY" down before wait -> [Wait, Press(down)]"""
     program = parse_text('press "CTRL" down before wait 0.2')

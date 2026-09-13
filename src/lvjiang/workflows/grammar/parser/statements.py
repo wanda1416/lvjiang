@@ -557,8 +557,11 @@ class _StmtMixin:
         return self._expand_wait_clauses(press_node, wait_pairs)
 
     def press_hold(self, items):
-        """hold <number> → (PressMode.HOLD, duration)"""
-        return (PressMode.HOLD, float(items[0]))
+        """hold <number|range|var> → (PressMode.HOLD, duration)"""
+        value = items[0]
+        if isinstance(value, (int, float)):
+            value = float(value)
+        return (PressMode.HOLD, value)
 
     def press_down(self, items):
         """down → (PressMode.DOWN, None)"""

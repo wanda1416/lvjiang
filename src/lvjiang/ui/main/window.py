@@ -48,7 +48,7 @@ from ...core.layout_manager import LayoutConfigManager
 from ...core.reference_db import ReferenceDatabase
 from ...core.user_config import UserConfigManager
 from ...i18n import tr
-from ..button_styles import apply_button_style
+from ..button_styles import apply_button_style, apply_compact_button_style
 from ..overlay import BorderOverlay
 from ..widgets import TrimmedLogEdit
 from .capture_ops import CaptureOpsMixin
@@ -697,13 +697,27 @@ class MainWindow(
         daily_layout.addWidget(wf_group)
 
         self._independent_params_checkbox = QCheckBox(
-            tr("为当前用户使用独立参数"))
+            tr("使用独立参数"))
         self._independent_params_checkbox.setObjectName(
             "user_independent_params")
         self._independent_params_checkbox.setVisible(False)
         self._independent_params_checkbox.toggled.connect(
             self._on_independent_params_toggled)
-        daily_layout.addWidget(self._independent_params_checkbox)
+        params_scope_row = QHBoxLayout()
+        params_scope_row.setContentsMargins(0, 0, 0, 0)
+        params_scope_row.setSpacing(8)
+        params_scope_row.addWidget(self._independent_params_checkbox)
+        self._all_user_params_button = QPushButton(tr("全部用户参数"))
+        self._all_user_params_button.setObjectName("all_user_params")
+        self._all_user_params_button.setFixedHeight(24)
+        apply_compact_button_style(
+            self._all_user_params_button, variant="neutral")
+        self._all_user_params_button.setVisible(False)
+        self._all_user_params_button.clicked.connect(
+            self._on_show_all_user_params)
+        params_scope_row.addWidget(self._all_user_params_button)
+        params_scope_row.addStretch(1)
+        daily_layout.addLayout(params_scope_row)
 
         self._workflow_note_label = _create_workflow_note_label()
         daily_layout.addWidget(self._workflow_note_label)

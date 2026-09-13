@@ -2,10 +2,11 @@
 
 import copy
 
-from PyQt6.QtWidgets import QDialogButtonBox, QMessageBox
+from PyQt6.QtWidgets import QDialogButtonBox, QLabel, QMessageBox
 
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.ui.game_settings.config_dialog import GameConfigDialog
+from lvjiang.core.config.resolver import EntityOrigin
 
 
 class _ManagerSpy:
@@ -41,6 +42,10 @@ def test_changes_stay_in_memory_until_bottom_save(monkeypatch, qtbot):
     discard = dialog._buttons.button(QDialogButtonBox.StandardButton.Discard)
     assert not save.isEnabled()
     assert not discard.isEnabled()
+
+    version = dialog.findChild(QLabel, "game_config_version")
+    assert version is not None
+    assert "当前生效" in version.toolTip()
 
     panel = dialog._tab._basic_config_panel
     panel._cooldown_days.setValue(panel._cooldown_days.value() + 1)
@@ -87,3 +92,30 @@ def test_title_bar_close_uses_same_unsaved_confirmation(monkeypatch, qtbot):
 
     assert not dialog.close()
     assert dialog.isVisible()
+
+
+def test_version_label_reports_remote_and_layer_distribution(monkeypatch, qtbot):
+    class Resolver:
+        @staticmethod
+        def describe_entity(_path):
+            return EntityOrigin("remote", 3)
+
+        @staticmethod
+        def list_entity_origins(_path):
+            return (
+                EntityOrigin("local", None),
+                EntityOrigin("remote", 3),
+                EntityOrigin("system", 1),
+            )
+
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.ui.game_settings.config_dialog.get_resolver",
+        lambda: Resolver(),
+    )
+    dialog, _manager = _dialog(monkeypatch, qtbot)
+    version = dialog.findChild(QLabel, "game_config_version")
+
+    assert version.text() == "v3"
+    assert "当前生效：远程 · v3" in version.toolTip()
+    assert "本地 · -" in version.toolTip()
+    assert "系统 · v1" in version.toolTip()

@@ -42,6 +42,7 @@ class TuningRuleManager:
 
     def __init__(self, rules_dir: str | Path | None = None, *,
                  resolver: ConfigResolver | None = None,
+                 origin_resolver: ConfigResolver | None = None,
                  tune_config_getter: Callable[[], TuneConfig] | None = None):
         self._tune_config_getter = tune_config_getter
         if resolver is not None:
@@ -55,6 +56,9 @@ class TuningRuleManager:
             self._resolver = ConfigResolver(
                 system_dir=rules_dir, local_dir=rules_dir, dev_mode=True)
             self._rel_dir = ""
+        # 隔离编辑会话会把当前有效基底物化到临时 system，以便编辑后立即
+        # 预览；版本来源展示不能因此把真实 remote 误标成 system。
+        self._origin_resolver = origin_resolver or self._resolver
         self._rules: dict[str, TuningRule] = {}
         self._raw: dict[str, dict] = {}
         self._files: dict[str, str] = {}   # key -> 文件名
@@ -174,11 +178,11 @@ class TuningRuleManager:
 
     def describe_rule_version(self, key: str):
         """返回规则实体来源与版本，供配置页展示。"""
-        return self._resolver.describe_entity(self.rule_rel_path(key))
+        return self._origin_resolver.describe_entity(self.rule_rel_path(key))
 
     def list_rule_versions(self, key: str):
         """返回规则在本地、远程、系统各层现存的版本。"""
-        return self._resolver.list_entity_origins(self.rule_rel_path(key))
+        return self._origin_resolver.list_entity_origins(self.rule_rel_path(key))
 
     def system_save_override(self, key: str):
         """开发模式写 system 后仍由其他层生效时，返回该来源。

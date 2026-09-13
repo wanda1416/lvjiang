@@ -4,12 +4,23 @@
 """
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QVBoxLayout
+from PyQt6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QVBoxLayout,
+)
 
+from .....core.config.resolver import get_resolver
 from .....i18n import tr
 from .....ui.button_styles import apply_dialog_button_box_style
+from .....ui.config_origin import layer_style, origin_tooltip
 from ...config import get_game_config
 from .config_tab import GameConfigTab
+
+_CONFIG_REL_PATH = "yysls/game_config.yaml"
 
 
 class GameConfigDialog(QDialog):
@@ -53,7 +64,28 @@ class GameConfigDialog(QDialog):
         self._buttons.accepted.connect(self._save)
         self._discard_button.clicked.connect(self._discard_changes)
         apply_dialog_button_box_style(self._buttons)
-        self._layout.addWidget(self._buttons)
+
+        bottom = QHBoxLayout()
+        self._version_title = QLabel(tr("游戏配置版本："))
+        self._version_value = QLabel()
+        self._version_value.setObjectName("game_config_version")
+        bottom.addWidget(self._version_title)
+        bottom.addWidget(self._version_value)
+        bottom.addStretch(1)
+        bottom.addWidget(self._buttons)
+        self._layout.addLayout(bottom)
+        self._refresh_version_info()
+
+    def _refresh_version_info(self) -> None:
+        resolver = get_resolver()
+        current = resolver.describe_entity(_CONFIG_REL_PATH)
+        available = resolver.list_entity_origins(_CONFIG_REL_PATH)
+        self._version_value.setText(
+            "-" if current.version is None else f"v{current.version}")
+        self._version_value.setStyleSheet(layer_style(current.layer))
+        tip = origin_tooltip(current, available)
+        self._version_title.setToolTip(tip)
+        self._version_value.setToolTip(tip)
 
     def _mark_dirty(self) -> None:
         self._dirty = True
@@ -70,6 +102,7 @@ class GameConfigDialog(QDialog):
         self._dirty = False
         self._save_button.setEnabled(False)
         self._discard_button.setEnabled(False)
+        self._refresh_version_info()
 
     def _discard_changes(self) -> None:
         if not self._dirty:
@@ -94,6 +127,7 @@ class GameConfigDialog(QDialog):
         self._dirty = False
         self._save_button.setEnabled(False)
         self._discard_button.setEnabled(False)
+        self._refresh_version_info()
 
     def _confirm_discard(self) -> bool:
         if not self._dirty:

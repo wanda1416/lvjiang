@@ -63,7 +63,9 @@ ANDROID_APP_ACTION: /stop/i | /start/i
 
 // press：模拟键盘按键
 // press "M"             — 完整按键（down + up）
-// press "W" hold 2.0    — 按住 2 秒后释放
+// press "W" hold 2.0    — 固定按住 2 秒后释放
+// press "W" hold (0.05, 0.08) — 在区间内随机选择按住时长
+// press "W" hold $range — 数值变量或二元 tuple 变量
 // press "SHIFT" down    — 按下保持
 // press "SHIFT" up      — 释放
 // press $key            — 按键名来自变量（值按字符串处理）
@@ -71,9 +73,10 @@ ANDROID_APP_ACTION: /stop/i | /start/i
 press_stmt: "press"i press_key_chain press_modifier? wait_clauses? _NL
 press_key_chain: press_key ("+" press_key)*
 ?press_key: STRING | var_ref
-press_modifier: "hold"i number -> press_hold
+press_modifier: "hold"i press_hold_value -> press_hold
               | "down"i        -> press_down
               | "up"i          -> press_up
+?press_hold_value: number | var_ref | wait_range
 
 // paste：通过输入后端粘贴字符串；支持常量、变量、字段、函数和 + 表达式
 // paste "ABC123"

@@ -17,6 +17,7 @@ import pytest
 from lvjiang.core.input_base import InputBackendKind
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
+from lvjiang.workflows.grammar.ast_nodes import PressMode
 from tests.workflows.conftest import make_engine
 
 
@@ -57,6 +58,37 @@ class TestPressMode:
         assert inp.key_down.call_count == 1
         assert inp.key_up.call_count == 1
         inp.key_down.assert_called_with("W")
+
+    def test_hold_direct_range_uses_uniform_value(self):
+        eng = make_engine()
+        program = parse_text('press "E" hold (0.058, 0.063)\n')
+
+        with patch(
+            "lvjiang.workflows.engine.actions.random.uniform",
+            return_value=0.061,
+        ) as uniform, patch.object(eng, "press_keys") as press_keys:
+            eng._exec_body(program.body)
+
+        uniform.assert_called_once_with(0.058, 0.063)
+        press_keys.assert_called_once_with(
+            ["E"], mode=PressMode.HOLD, duration=0.061,
+        )
+
+    def test_hold_tuple_variable_uses_uniform_value(self):
+        eng = make_engine()
+        program = parse_text(
+            'eval $hold_range = (0.058, 0.063)\n'
+            'press "E" hold $hold_range\n'
+        )
+
+        with patch(
+            "lvjiang.workflows.engine.actions.random.uniform",
+            return_value=0.06,
+        ) as uniform, patch.object(eng, "press_keys") as press_keys:
+            eng._exec_body(program.body)
+
+        uniform.assert_called_once_with(0.058, 0.063)
+        assert press_keys.call_args.kwargs["duration"] == 0.06
 
     def test_down(self):
         """press "SHIFT" down — 仅按下"""
@@ -140,6 +172,21 @@ press "W" down
         """press "W" hold -1 → 报错"""
         with pytest.raises(WorkflowUserError, match="> 0"):
             _run('press "W" hold -1\n')
+
+    @pytest.mark.parametrize(
+        ("value", "message"),
+        [
+            ("(0, 0.1)", "端点必须 > 0"),
+            ("(0.2, 0.1)", "下限不能大于上限"),
+        ],
+    )
+    def test_hold_invalid_direct_range_raises(self, value, message):
+        with pytest.raises(WorkflowUserError, match=message):
+            _run(f'press "W" hold {value}\n')
+
+    def test_hold_undefined_variable_raises_user_error(self):
+        with pytest.raises(WorkflowUserError, match="数值或二元数值 tuple"):
+            _run('press "W" hold $missing\n')
 
     def test_validate_only_rejects_invalid_literal_before_execution(
         self, wf_root,

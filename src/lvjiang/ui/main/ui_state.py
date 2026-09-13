@@ -297,6 +297,9 @@ class UiStateMixin:
         independent = getattr(self, "_independent_params_checkbox", None)
         if independent is not None:
             independent.setVisible(False)
+        all_user_params = getattr(self, "_all_user_params_button", None)
+        if all_user_params is not None:
+            all_user_params.setVisible(False)
         # ⚠️ 专用脚本不画参数面板
         if flow_cfg and flow_cfg.get("scope", "daily") != "daily":
             self._param_panel.setVisible(False)
@@ -325,6 +328,8 @@ class UiStateMixin:
             independent.setChecked(source == "user")
             independent.blockSignals(False)
             independent.setVisible(True)
+        if all_user_params is not None:
+            all_user_params.setVisible(True)
         for param_def in params:
             name = param_def["name"]
             label = param_def.get("label", name)
@@ -431,3 +436,19 @@ class UiStateMixin:
             delete_user_workflow_params(
                 username, workflow_id, self._user_manager._users_dir)
         self._rebuild_param_panel()
+
+    def _on_show_all_user_params(self) -> None:
+        """查看各用户对日常任务最终生效的参数与来源。"""
+        flow_cfg = self._get_selected_flow_config()
+        if not flow_cfg:
+            return
+        self._save_displayed_params()
+        from ..all_user_params_dialog import AllUserParamsDialog
+        dialog = AllUserParamsDialog(
+            self._workflow_configs,
+            self._user_manager.list_users(),
+            self._user_manager._users_dir,
+            str(flow_cfg["id"]),
+            self,
+        )
+        dialog.exec()

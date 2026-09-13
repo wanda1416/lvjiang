@@ -23,7 +23,7 @@ _PARAMETER_TYPES = {"select", "number", "bool", "checkgroup", "text"}
 _PARAMETER_NAME = re.compile(
     r"^[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*$",
 )
-_COMMON_PARAMETER_FIELDS = {"name", "label", "type", "default"}
+_COMMON_PARAMETER_FIELDS = {"name", "label", "type", "default", "env"}
 _TYPE_PARAMETER_FIELDS = {
     "select": {"options"},
     "number": {"min", "max"},
@@ -88,6 +88,8 @@ def _validate_parameter(parameter: Any, index: int) -> dict | None:
         raise _error(f"{path}.name", "不是合法的 DSL 变量名")
     if "label" in parameter and not isinstance(parameter["label"], str):
         raise _error(f"{path}.label", "必须是字符串")
+    if "env" in parameter:
+        _validate_string_list(parameter["env"], f"{path}.env")
 
     param_type = parameter.get("type", "select")
     if not isinstance(param_type, str):

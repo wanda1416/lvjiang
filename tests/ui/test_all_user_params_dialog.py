@@ -72,3 +72,32 @@ def test_dialog_shows_effective_source_and_switches_tasks(
     assert pages.widget(0).findChild(QLabel, "parameter_source").property("source") == "global"
     assert pages.widget(0).findChild(QLabel, "parameter_value_code").text() == "D"
     reset_session_store()
+
+
+def test_dialog_only_shows_parameters_for_current_env(qtbot, tmp_path, monkeypatch):
+    import lvjiang.constants as constants
+
+    monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
+    monkeypatch.setattr(constants, "USERS_DIR", tmp_path / "users")
+    reset_session_store()
+    manager = UserConfigManager()
+    configs = [{
+        "id": "dual", "name": "双端任务", "scope": "daily",
+        "parameters": [
+            {"name": "common", "type": "text", "default": "C"},
+            {"name": "pc", "type": "text", "default": "P", "env": ["desktop"]},
+            {"name": "phone", "type": "text", "default": "A", "env": ["android"]},
+        ],
+    }]
+
+    dialog = AllUserParamsDialog(
+        configs, manager.list_users(), manager.users_dir, "dual",
+        current_env="android",
+    )
+    qtbot.addWidget(dialog)
+    page = dialog.findChild(QStackedWidget).widget(0)
+
+    assert page.findChild(QLabel, "parameter_value_common").text() == "C"
+    assert page.findChild(QLabel, "parameter_value_phone").text() == "A"
+    assert page.findChild(QLabel, "parameter_value_pc") is None
+    reset_session_store()

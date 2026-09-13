@@ -614,9 +614,15 @@ class RunControlMixin:
         """
         if index < 0:
             return
+        # 环境切换后参数定义可能改变；先提交旧面板里的可见字段，再按新环境
+        # 重建。保存逻辑只更新找到的控件，不会覆盖另一环境的隐藏参数。
+        if hasattr(self, "_save_displayed_params"):
+            self._save_displayed_params()
         from ...core.config import save_env
         save_env(self._env_combo.itemData(index))
         self._load_workflow_configs()
+        if hasattr(self, "_rebuild_param_panel"):
+            self._rebuild_param_panel()
 
     def navigate_user(self, delta: int) -> None:
         """按 delta 偏移切换当前用户（-1 上一个 / +1 下一个）。

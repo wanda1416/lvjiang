@@ -121,6 +121,7 @@ def test_android_app_statement_delegates_to_shared_controller():
 
 
 def test_app_is_running_dispatches_by_registered_target_not_env(monkeypatch):
+    from lvjiang.core import app_controller as app_module
     from lvjiang.core.app_controller import AppController
 
     apps = {
@@ -132,8 +133,33 @@ def test_app_is_running_dispatches_by_registered_target_not_env(monkeypatch):
     monkeypatch.setattr(
         controller._windows, "is_running", lambda name: name == "desktop")
 
+    monkeypatch.setattr(app_module, "_active_connection_platform", "android")
     assert controller.is_running("phone") is True
+    monkeypatch.setattr(app_module, "_active_connection_platform", "pc")
     assert controller.is_running("desktop") is True
+
+
+def test_connected_android_app_information_is_discovered():
+    from lvjiang.core.app_controller import (
+        get_active_connected_app_info,
+        get_connected_app_info,
+        record_connected_android,
+    )
+
+    class Device:
+        serial = "127.0.0.1:5555"
+
+        def shell(self, *args, timeout=5):
+            assert args == ("dumpsys", "activity", "activities")
+            return "mResumedActivity: ActivityRecord{1 u0 com.example.game/.MainActivity t1}"
+
+    info = record_connected_android(Device(), width=1920, height=1080)
+
+    assert info["package"] == "com.example.game"
+    assert info["activity"] == ".MainActivity"
+    assert info["orientation"] == "landscape"
+    assert get_connected_app_info("android") == info
+    assert get_active_connected_app_info() == info
 
 
 def test_scrcpy_packet_parser_waits_for_incomplete_packets():

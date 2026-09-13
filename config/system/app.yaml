@@ -43,14 +43,13 @@ envs:
   name: 桌面
 apps:
   yyslscn:
-    platform: android
-    package: com.netease.yyslscn
-    activity: com.netease.ntunisdk.external.protocol.ProtocolLauncher
-    orientation: landscape
-  yyslpc:
-    platform: pc
-    executable: ''
-    window_title: ''
+    android:
+      package: com.netease.yyslscn
+      activity: com.netease.ntunisdk.external.protocol.ProtocolLauncher
+      orientation: landscape
+    windows:
+      executable: ''
+      window_title: ''
 plans:
 - id: 13626639a4d5427588e1b620e855c3fc
   name: 手游

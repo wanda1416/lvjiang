@@ -194,6 +194,32 @@ class TestLoadUserConfig:
         assert config.android_apps["game"].activity == ".MainActivity"
         assert config.android_apps["game"].orientation == "landscape"
 
+    def test_app_registry_supports_android_and_windows_bindings(
+            self, session_env, monkeypatch):
+        monkeypatch.setattr(
+            "lvjiang.core.config.load_app_config", lambda: {
+                "apps": {
+                    "game": {
+                        "android": {
+                            "package": "com.example.game",
+                            "activity": ".MainActivity",
+                            "orientation": "landscape",
+                        },
+                        "windows": {
+                            "executable": r"C:\\Games\\game.exe",
+                            "window_title": "Example Game",
+                        },
+                    },
+                },
+            })
+
+        app = load_user_config().android_apps["game"]
+
+        assert app.package == "com.example.game"
+        assert app.executable == r"C:\\Games\\game.exe"
+        assert app.window_title == "Example Game"
+        assert app.platform == "both"
+
 
 class TestSaveSessionNodes:
     def test_save_settings_preserves_other_fields(self, session_env):

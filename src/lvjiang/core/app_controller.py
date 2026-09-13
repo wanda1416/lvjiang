@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -19,12 +20,72 @@ class AppControlError(RuntimeError):
 
 
 _observed_window: dict | None = None
+_connected_apps: dict[str, dict] = {}
+_connected_apps_lock = threading.Lock()
+_active_connection_platform = ""
 
 
 def record_connected_window(window: dict) -> None:
     """记录最近一次窗口模式定位到的真实窗口身份与位置。"""
-    global _observed_window
+    global _observed_window, _active_connection_platform
     _observed_window = dict(window)
+    _active_connection_platform = "pc"
+    with _connected_apps_lock:
+        _connected_apps["pc"] = {
+            "platform": "pc",
+            "executable": str(window.get("executable") or ""),
+            "window_title": str(window.get("title") or ""),
+            "hwnd": int(window.get("hwnd") or 0),
+            "pid": int(window.get("pid") or 0),
+            "left": window.get("left"),
+            "top": window.get("top"),
+            "width": window.get("width"),
+            "height": window.get("height"),
+        }
+
+
+def record_connected_android(device, *, width: int = 0, height: int = 0) -> dict:
+    """查询并记录 ADB 设备当前前台应用。"""
+    global _active_connection_platform
+    import re
+
+    output = device.shell("dumpsys", "activity", "activities", timeout=5.0)
+    match = re.search(
+        r"mResumedActivity[^\n]*?\s([A-Za-z0-9_.]+)/([A-Za-z0-9_.$]+)",
+        output,
+    )
+    if match is None:
+        output = device.shell("dumpsys", "window", "windows", timeout=5.0)
+        match = re.search(
+            r"mCurrentFocus[^\n]*?\s([A-Za-z0-9_.]+)/([A-Za-z0-9_.$]+)",
+            output,
+        )
+    info = {
+        "platform": "android",
+        "package": match.group(1) if match else "",
+        "activity": match.group(2) if match else "",
+        "orientation": (
+            "landscape" if width > height else "portrait" if height > width else "any"),
+        "serial": str(getattr(device, "serial", "") or ""),
+    }
+    with _connected_apps_lock:
+        _connected_apps["android"] = info
+        _active_connection_platform = "android"
+    return dict(info)
+
+
+def get_connected_app_info(platform: str) -> dict | None:
+    """返回最近一次真实连接自动采集的信息副本。"""
+    with _connected_apps_lock:
+        value = _connected_apps.get(str(platform or "").lower())
+        return dict(value) if value is not None else None
+
+
+def get_active_connected_app_info() -> dict | None:
+    """返回当前实际连接目标的信息，不使用工作流 env 推断。"""
+    with _connected_apps_lock:
+        value = _connected_apps.get(_active_connection_platform)
+        return dict(value) if value is not None else None
 
 
 class WindowsAppController:
@@ -38,8 +99,6 @@ class WindowsAppController:
         app = self.apps.get(str(name or "").strip())
         if app is None:
             raise AppControlError(f"未注册应用: {name!r}")
-        if app.platform != "pc":
-            raise AppControlError(f"应用 {name!r} 不是 PC 应用")
         return app
 
     @staticmethod
@@ -59,7 +118,8 @@ class WindowsAppController:
 
     def _find(self, app: AndroidAppConfig) -> dict | None:
         observed = _observed_window
-        pc_apps = [item for item in self.apps.values() if item.platform == "pc"]
+        pc_apps = [item for item in self.apps.values()
+                   if item.platform in {"pc", "both"}]
         if observed is not None and (
                 self._matches(app, observed)
                 or (len(pc_apps) == 1
@@ -191,7 +251,7 @@ class WindowsAppController:
 
 
 class AppController:
-    """只根据注册项 platform 分派，不读取工作流 env。"""
+    """根据实际连接目标选择同一应用的 Android/Windows 绑定。"""
 
     def __init__(self, apps: dict[str, AndroidAppConfig], *, device=None,
                  capture=None, stop_check: Callable[[], bool] | None = None):
@@ -205,7 +265,17 @@ class AppController:
         app = self.apps.get(str(name or "").strip())
         if app is None:
             raise AppControlError(f"未注册应用: {name!r}")
-        if app.platform == "pc":
+        platform = _active_connection_platform
+        if platform == "pc":
+            return self._windows
+        if platform == "android":
+            if self._android is None:
+                raise AppControlError(
+                    f"控制 Android 应用 {name!r} 前必须连接 ADB 设备")
+            return self._android
+        has_android = bool(app.package)
+        has_windows = bool(app.executable or app.window_title)
+        if has_windows and not has_android:
             return self._windows
         if self._android is None:
             raise AppControlError(f"控制 Android 应用 {name!r} 前必须连接 ADB 设备")
@@ -230,4 +300,8 @@ class AppController:
             raise AppControlError(str(exc)) from exc
 
 
-__all__ = ["AppController", "AppControlError", "record_connected_window"]
+__all__ = [
+    "AppController", "AppControlError", "get_active_connected_app_info",
+    "get_connected_app_info",
+    "record_connected_android", "record_connected_window",
+]

@@ -29,101 +29,101 @@ default $qishu_yy = "qishu_2"
 default $qishu_dz = "qishu_3"
 
 click [general_control].$qishu_yy hold 0.06 after wait 0.15
-click [general_control].[wuxueji] hold 0.1 after wait 0.09
-click [general_control].[xieshi] hold 0.08 after wait 0.3
-click [general_control].$qishu_dz hold 0.11 after wait 0.74
-click [general_control].[xieshi] hold 0.06 after wait 0.11
-click [general_control].[switch] hold 0.09 after wait 0.1
+click [general_control].[wuxueji] hold 0.1 after wait 0.3
+click [general_control].[xieshi] hold 0.1 after wait 0.3
+click [general_control].$qishu_dz hold 0.12 after wait 0.8
+click [general_control].[xieshi] hold 0.06 after wait 0.3
+click [general_control].[switch] hold 0.1 after wait 0.2
 
 # 第一道剑气，wait 开始计时
-click [general_control].[xuli] hold 1.44 after wait 0.75
+click [general_control].[xuli] hold 1.52 after wait 0.8
 
 # 点剑
 log info "第一次点剑+瞬发剑气"
 # 这里改成 0.27 经常容易挂不上 buff
-click [general_control].[wuxueji] hold 0.06 after wait 0.28
-click [general_control].[xuli] hold 0.06 after wait 0.78
+click [general_control].[wuxueji] hold 0.06  after wait 0.28
+click [general_control].[xuli] hold 0.06 after wait 0.8
 
 # 三道剑气
-click [general_control].[xuli] hold 1.468 after wait 0.795
-# 这里比较极限，经常容易出现提前，可以考虑改 1.47
-click [general_control].[xuli] hold 1.47 after wait 0.8
-click [general_control].[xuli] hold 1.47 after wait 0.8
+click [general_control].[xuli] hold 1.525 after wait 0.8
+
+click [general_control].[xuli] hold 1.52 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
 
 log info "第一次枪Q"
 call qiang_wuxueji(0)
 
-click [general_control].[xuli] hold 1.468 after wait 0.8
-click [general_control].[xuli] hold 1.47 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
 
 # 二次点剑
 log info "第二次点剑+瞬发剑气"
-click [general_control].[wuxueji] hold 0.06 after wait 0.28
-click [general_control].[xuli] hold 0.06 after wait 0.78
+click [general_control].[wuxueji] hold 0.06 after wait 0.3
+click [general_control].[xuli] hold 0.06 after wait 0.8
 
 # 三道剑气
-click [general_control].[xuli] hold 1.468 after wait 0.8
-click [general_control].[xuli] hold 1.468 after wait 0.8
-click [general_control].[xuli] hold 1.47 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
 
 # 枪Q 挂 buff，这里容易出现切剑没切回来
 log info "第二次枪Q，挂 buff"
 call qiang_wuxueji(1)
 
-click [general_control].[xuli] hold 1.468 after wait 0.8
-click [general_control].[xuli] hold 1.47 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
 
 # 第三次瞬发
 log info "第三次瞬发剑气"
-click [general_control].[xuli] hold 0.06 after wait 0.78
+click [general_control].[xuli] hold 0.06 after wait 0.8
 
 # 三道剑气
-click [general_control].[xuli] hold 1.47 after wait 0.8
-click [general_control].[xuli] hold 1.468 after wait 0.8
-click [general_control].[xuli] hold 1.47 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
 
 # 枪Q
 log info "第三次枪Q，挂 buff"
 call qiang_wuxueji(1)
 
-click [general_control].[xuli] hold 1.47 after wait 0.8
-click [general_control].[xuli] hold 1.47 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
 
 # 吹笛拉距离：0.1 秒推到后退方向，再保持 2.1 秒，总时长 2.2 秒
-click [general_control].$qishu_dz hold 0.1 after wait 0.1
+click [general_control].$qishu_dz hold 0.12 after wait 0.1
 drag [general_control].[backward] 0.1 hold 2.1 after wait 0.95
 
 # 第四次瞬发剑气
 log info "第三次点剑+第四次瞬发剑气"
 click [general_control].[wuxueji] hold 0.06 after wait 0.28
-click [general_control].[xuli] hold 0.06 after wait 0.78
+click [general_control].[xuli] hold 0.06 after wait 0.8
 # 继续蓄力
-click [general_control].[xuli] hold 1.47 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
 
 log info "第四次枪Q"
 call qiang_wuxueji(0)
 
-click [general_control].[xuli] hold 1.468 after wait 0.8
-click [general_control].[xuli] hold 1.47 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
 
 log info "第五次瞬发剑气"
-click [general_control].[xuli] hold 0.06 after wait 0.78
-click [general_control].[xuli] hold 1.468 after wait 0.8
-click [general_control].[xuli] hold 1.47 after wait 0.8
+click [general_control].[xuli] hold 0.06 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
+click [general_control].[xuli] hold 1.52 after wait 0.8
 # 最后一次剑气，打不出来就是延迟问题
-click [general_control].[xuli] hold 1.47
+click [general_control].[xuli] hold 1.52
 
 def qiang_wuxueji($buff)
     # 切枪 → 武学技 → 卸势 → 切回剑；挂 buff 时为武学技留更长等待
     if $buff
         click [general_control].[switch] hold 0.08 after wait 0.07
-        click [general_control].[wuxueji] hold 0.08 after wait 0.24
-        click [general_control].[xieshi] hold 0.06 after wait 0.12
-        click [general_control].[switch] hold 0.08 after wait 0.09
+        click [general_control].[wuxueji] hold 0.12 after wait 0.3
+        click [general_control].[xieshi] hold 0.08 after wait 0.12
+        click [general_control].[switch] hold 0.08 after wait 0.3
     else
         click [general_control].[switch] hold 0.08 after wait 0.07
-        click [general_control].[wuxueji] hold 0.06 after wait 0.11
-        click [general_control].[xieshi] hold 0.06 after wait 0.11
-        click [general_control].[switch] hold 0.08 after wait 0.09
+        click [general_control].[wuxueji] hold 0.08 after wait 0.16
+        click [general_control].[xieshi] hold 0.08 after wait 0.11
+        click [general_control].[switch] hold 0.08 after wait 0.3
     end
 end

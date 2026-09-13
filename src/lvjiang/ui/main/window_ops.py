@@ -677,6 +677,14 @@ class WindowOpsMixin:
         self._capture = capture
         self._device = device
         self._device_ready = True
+        try:
+            from ...core.app_controller import record_connected_android
+            app_info = record_connected_android(device, width=w, height=h)
+            if app_info.get("package"):
+                self.log_text.append(
+                    f"[应用识别] {app_info['package']}/{app_info['activity']}")
+        except Exception as exc:  # noqa: BLE001 - 连接不应因前台应用探测失败而失败
+            logger.warning(f"ADB 当前应用信息获取失败: {exc}")
 
         self._adb_conn_bridge = _AdbConnSignalBridge()
         self._adb_conn_bridge.adb_lost.connect(self._on_adb_connection_lost)

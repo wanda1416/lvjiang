@@ -76,7 +76,7 @@ class AndroidAppConfig:
         self.package = str(self.package or "").strip()
         self.activity = str(self.activity or "").strip()
         platform = str(self.platform or "android").strip().lower()
-        self.platform = platform if platform in {"android", "pc"} else "android"
+        self.platform = platform if platform in {"android", "pc", "both"} else "android"
         self.executable = str(self.executable or "").strip()
         self.arguments = [str(value) for value in (self.arguments or [])]
         self.window_title = str(self.window_title or "").strip()
@@ -90,12 +90,29 @@ def parse_android_apps(raw: dict | None) -> dict[str, AndroidAppConfig]:
     """dict → {应用别名: AndroidAppConfig}。"""
     if not raw:
         return {}
-    return {
-        str(key): value if isinstance(value, AndroidAppConfig)
-        else AndroidAppConfig(**value)
-        for key, value in raw.items()
-        if isinstance(value, (dict, AndroidAppConfig))
-    }
+    result: dict[str, AndroidAppConfig] = {}
+    for key, value in raw.items():
+        if isinstance(value, AndroidAppConfig):
+            result[str(key)] = value
+            continue
+        if not isinstance(value, dict):
+            continue
+        raw_android = value.get("android")
+        raw_windows = value.get("windows")
+        android: dict = raw_android if isinstance(raw_android, dict) else {}
+        windows: dict = raw_windows if isinstance(raw_windows, dict) else {}
+        if android or windows:
+            value = {
+                "package": android.get("package", ""),
+                "activity": android.get("activity", ""),
+                "orientation": android.get("orientation", "any"),
+                "executable": windows.get("executable", ""),
+                "arguments": windows.get("arguments", []),
+                "window_title": windows.get("window_title", ""),
+                "platform": "both",
+            }
+        result[str(key)] = AndroidAppConfig(**value)
+    return result
 
 
 @dataclass

@@ -21,8 +21,8 @@ android {
         // 只有桌面端读的那几个目录（attr_model / damage_model / graduation）不算：
         // 它们照样打进 APK，但设备上没有代码读，重解压不改变任何行为。日常按
         // 发版节奏走即可，别把它当成提交计数器。
-        versionCode = 43
-        versionName = "0.11.1"
+        versionCode = 44
+        versionName = "0.11.2"
         // 设备为 arm64（vivo V2415A），Chaquopy 按 ABI 打包 Python 运行时
         ndk { abiFilters += listOf("arm64-v8a") }
     }

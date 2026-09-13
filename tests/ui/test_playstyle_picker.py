@@ -119,9 +119,17 @@ def test_combo_detail_tab_shows_the_current_equipment() -> None:
 
     equip = {"name": "测试剑", "type": "剑", "level": 110, "quality": "gold",
              "dingyin": {"name": "无相穿透", "value": 1.0}}
-    OptimalComboDialog._on_show_detail(dlg, {"main_weapon": equip})
+    OptimalComboDialog._on_show_detail(dlg, {
+        "equipped": {"main_weapon": equip},
+        "assumptions": {"main_weapon": ["同等级承音假设"]},
+        "gongjue": "会意",
+    })
 
     assert "测试剑" in dlg._detail_cards["main_weapon"].lbl_name.text()
+    assert dlg._detail_cards["main_weapon"]._equip_data is equip
+    assert "同等级承音假设" in (
+        dlg._detail_cards["main_weapon"].hypothesis_label.text())
+    assert "会意" in dlg._detail_hint.text()
     # 组合里没有的槽位显示空卡，而不是留着上一次的内容
     assert "冠胄" == dlg._detail_cards["head"].lbl_name.text()
     assert dlg._tab_widget.currentIndex() == 2

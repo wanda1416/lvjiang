@@ -1699,6 +1699,7 @@ class EquipStatusTab(QWidget):
             level_threshold=self._get_level_threshold(),
             affix_filter=self._get_affix_filter(),
             gongjue=context.gongjue,
+            playstyle=plan.playstyle,
             main_martial_art=plan.main_martial_art,
             sub_martial_art=plan.sub_martial_art,
             parent=self,

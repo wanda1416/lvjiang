@@ -10,6 +10,8 @@ via a generator, keeping only the Top-R results by graduation rate.
 """
 from __future__ import annotations
 
+import copy
+from dataclasses import dataclass
 from dataclasses import fields as dataclass_fields
 from typing import Any, Callable
 
@@ -41,6 +43,128 @@ SLOT_KEYS: list[str] = [
     "main_weapon", "sub_weapon", "head", "chest",
     "ring", "pendant", "leg", "wrist",
 ]
+
+
+@dataclass(frozen=True)
+class CandidateVariant:
+    """只读来源装备及其专用于计算的虚拟版本。"""
+
+    original: dict
+    virtual: dict
+    assumptions: tuple[str, ...] = ()
+
+
+def _normal_affix_values(equip: dict) -> tuple[tuple[str, Any], ...]:
+    return tuple(
+        (str(affix.get("name") or ""), affix.get("value"))
+        for index in range(1, 6)
+        if isinstance((affix := equip.get(f"affix_{index}")), dict)
+        and affix.get("name")
+    )
+
+
+def _apply_overlay_assumptions(
+    variant: CandidateVariant,
+    *,
+    full_chengyin: bool,
+    full_dingyin: bool,
+    full_level: int,
+    playstyle: str,
+) -> CandidateVariant:
+    """依次覆盖虚拟装备，并只记录实际发生的变化。"""
+    virtual = variant.virtual
+    assumptions = list(variant.assumptions)
+
+    if full_level > 0:
+        before_level = virtual.get("level")
+        virtual = apply_hypothetical_caps(
+            {"slot": virtual}, full_level=full_level,
+        )["slot"]
+        if virtual.get("level") != before_level:
+            assumptions.append("满等级假设")
+
+    if full_chengyin:
+        before_affixes = _normal_affix_values(virtual)
+        virtual = apply_hypothetical_caps(
+            {"slot": virtual}, full_chengyin=True,
+        )["slot"]
+        if _normal_affix_values(virtual) != before_affixes:
+            assumptions.append("满承音假设")
+
+    if full_dingyin:
+        before_dingyin = copy.deepcopy(virtual.get("dingyin"))
+        virtual = apply_hypothetical_caps(
+            {"slot": virtual}, full_dingyin=True, playstyle=playstyle,
+        )["slot"]
+        if virtual.get("dingyin") != before_dingyin:
+            assumptions.append("满定音假设")
+
+    return CandidateVariant(variant.original, virtual, tuple(assumptions))
+
+
+def build_candidate_variants(
+    candidates: dict[str, list[dict]],
+    *,
+    season_chengyin: bool = False,
+    season_level: int = 0,
+    full_chengyin: bool = False,
+    full_dingyin: bool = False,
+    full_level: int = 0,
+    playstyle: str = "",
+) -> dict[str, list[CandidateVariant]]:
+    """构建只用于计算的虚拟候选，绝不改写来源装备。
+
+    每件原装备无条件深拷贝。开启赛季同等级承音时，符合条件的原生装备
+    额外派生一个承音分支；该分支只拉满普通词条，定音仍由 ``full_dingyin``
+    独立决定。
+    """
+    from ...config import get_game_config
+
+    gc = get_game_config()
+    level_cfg = gc.level_config_for(season_level) if season_level > 0 else None
+    allow_season_chengyin = bool(level_cfg and level_cfg.allow_chengyin)
+    result: dict[str, list[CandidateVariant]] = {}
+
+    for slot_key, equips in candidates.items():
+        variants: list[CandidateVariant] = []
+        for original in equips:
+            if not isinstance(original, dict):
+                continue
+
+            # 基础分支也必须虚拟化，原装备不能进入任何计算变换链路。
+            variants.append(CandidateVariant(original, copy.deepcopy(original)))
+
+            try:
+                level = int(original.get("level") or 0)
+            except (TypeError, ValueError):
+                level = 0
+            if (season_chengyin and allow_season_chengyin
+                    and level == season_level
+                    and not bool(original.get("is_chengyin"))):
+                virtual = copy.deepcopy(original)
+                virtual["is_chengyin"] = True
+                for index in range(1, 6):
+                    affix = virtual.get(f"affix_{index}")
+                    if not isinstance(affix, dict) or not affix.get("name"):
+                        continue
+                    caps = gc.get_affix_caps(season_level, affix["name"])
+                    if caps:
+                        affix["value"] = caps["chengyin"]
+                variants.append(CandidateVariant(
+                    original, virtual, ("同等级承音假设",),
+                ))
+
+        result[slot_key] = [
+            _apply_overlay_assumptions(
+                variant,
+                full_chengyin=full_chengyin,
+                full_dingyin=full_dingyin,
+                full_level=full_level,
+                playstyle=playstyle,
+            )
+            for variant in variants
+        ]
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -405,6 +529,8 @@ def search_optimal_combo(
     use_dominance_pruning: bool = True,
     max_per_slot: int = 0,  # 0 = no limit
     cancel_flag: Callable[[], bool] | None = None,
+    season_chengyin: bool = False,
+    season_level: int = 0,
     full_chengyin: bool = False,
     full_dingyin: bool = False,
     full_level: int = 0,
@@ -436,8 +562,8 @@ def search_optimal_combo(
 
     Returns
     -------
-    List of up to 5 result dicts, each containing:
-    ``rate``, ``dps``, ``total_damage``, ``equipped`` (per-slot equip dicts).
+    List of up to 5 result dicts, each containing ``rate``, ``dps``,
+    ``total_damage``, original ``equipped`` and per-slot ``assumptions``.
     """
     # 立即反馈，避免 UI 看起来卡住
     if progress_counter:
@@ -448,41 +574,37 @@ def search_optimal_combo(
     input_specs = program["inputs"]
     baseline = calculator.baseline_dps()
 
-    # -- Phase 0: apply hypothetical caps if requested --
-    #
-    # 变换出来的是副本，只用于算分。结果里的 equipped 必须换回**原始**
-    # 装备：那是给「应用此组合」穿上身的东西，写回模拟出来的词条等于
-    # 凭空改了仓储里的装备数据。
-    #
-    # 剪枝与 Top-K 会打乱顺序，按下标对不回去，所以按对象身份建映射。
-    # 变换后的列表被 candidates 一直持有到函数结束，id 在此期间稳定。
-    origin_by_id: dict[int, dict] = {}
-    if full_chengyin or full_dingyin or full_level > 0:
-        for slot_key in list(candidates):
-            originals = list(candidates[slot_key])
-            transformed = [
-                e for _k, e in sorted(
-                    apply_hypothetical_caps(
-                        {i: e for i, e in enumerate(originals)},
-                        full_chengyin=full_chengyin,
-                        full_dingyin=full_dingyin,
-                        full_level=full_level,
-                        playstyle=playstyle,
-                    ).items()
-                )
-            ]
-            for original, simulated in zip(originals, transformed, strict=True):
-                if simulated is not original:
-                    origin_by_id[id(simulated)] = original
-            candidates[slot_key] = transformed
+    # -- Phase 0: build virtual candidates --
+    # 所有候选一律深拷贝后计算。赛季承音保留原分支并额外创建承音分支；
+    # 其余假设只覆盖虚拟分支。原始装备从不进入属性变换函数。
+    variants = build_candidate_variants(
+        candidates,
+        season_chengyin=season_chengyin,
+        season_level=season_level,
+        full_chengyin=full_chengyin,
+        full_dingyin=full_dingyin,
+        full_level=full_level,
+        playstyle=playstyle,
+    )
+    variant_by_virtual_id = {
+        id(variant.virtual): variant
+        for slot_variants in variants.values()
+        for variant in slot_variants
+    }
+    virtual_candidates = {
+        slot_key: [variant.virtual for variant in slot_variants]
+        for slot_key, slot_variants in variants.items()
+    }
 
     # -- Phase 1: pre-compute deltas --
-    slot_keys = [k for k in SLOT_KEYS if k in candidates and candidates[k]]
+    slot_keys = [
+        k for k in SLOT_KEYS if k in virtual_candidates and virtual_candidates[k]
+    ]
     graduation_context = GraduationAttrContext.from_school(calculator._school)
     field_index = _build_field_index_map(input_specs)
 
     slot_deltas = compute_slot_deltas(
-        {k: candidates[k] for k in slot_keys},
+        {k: virtual_candidates[k] for k in slot_keys},
         input_specs,
         # We need a base_attr_lookup — extract from calculator context
         _make_base_attr_lookup(),
@@ -600,15 +722,20 @@ def search_optimal_combo(
     results: list[dict[str, Any]] = []
     for rate, combo_indices, dps in board.top(5):
         equipped: dict[str, dict] = {}
+        assumptions: dict[str, list[str]] = {}
         for si, idx in enumerate(combo_indices):
             chosen = slot_equip_arrays[si][idx]
-            # 换回原始装备：模拟只是为了算分，穿上身的必须是真装备
-            equipped[active_slots[si]] = origin_by_id.get(id(chosen), chosen)
+            variant = variant_by_virtual_id[id(chosen)]
+            slot_key = active_slots[si]
+            equipped[slot_key] = variant.original
+            if variant.assumptions:
+                assumptions[slot_key] = list(variant.assumptions)
         results.append({
             "rate": rate,
             "dps": dps,
             "total_damage": dps * calculator.combat_time(),
             "equipped": equipped,
+            "assumptions": assumptions,
         })
 
     # ✅ 输出缓存统计信息

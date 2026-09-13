@@ -492,6 +492,13 @@ class _SlotCard(QFrame):
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(3)
 
+        self.hypothesis_label = QLabel("")
+        self.hypothesis_label.setWordWrap(True)
+        self.hypothesis_label.setStyleSheet(
+            "font-size: 10px; color: #B26A00; font-weight: 700;")
+        self.hypothesis_label.setVisible(False)
+        layout.addWidget(self.hypothesis_label)
+
         # 槽位名 + 标签序列
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
@@ -634,6 +641,7 @@ class _SlotCard(QFrame):
     # ── 数据填充 ──
 
     def set_empty(self):
+        self.set_hypotheses([])
         self._quality_bg = None
         self._equip_data = {}
         self.status_tags.set_visible("mock", False)
@@ -651,6 +659,7 @@ class _SlotCard(QFrame):
             self._apply_style(_SLOT_STYLE_EMPTY)
 
     def set_equip(self, equip_data: dict):
+        self.set_hypotheses([])
         self._equip_data = equip_data
         self.status_tags.set_visible(
             "mock", bool(equip_data.get("_extra", {}).get("is_mock", False)),
@@ -721,6 +730,13 @@ class _SlotCard(QFrame):
             else:
                 assert isinstance(dingyin, dict)
                 self._add_affix_row(dingyin, equip_level)
+
+    def set_hypotheses(self, assumptions) -> None:
+        """显示计算假设；装备数据本身始终保持原始值。"""
+        labels = [str(value) for value in (assumptions or ()) if str(value)]
+        self.hypothesis_label.setText(
+            tr("计算假设：") + "、".join(labels) if labels else "")
+        self.hypothesis_label.setVisible(bool(labels))
 
     def _add_affix_row(self, affix: dict, level=None, *, tooltip: str = ""):
         value = affix.get("value", "")

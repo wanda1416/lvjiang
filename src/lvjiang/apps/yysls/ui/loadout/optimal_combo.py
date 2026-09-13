@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -148,6 +149,18 @@ class _ClickableLineEdit(QLineEdit):
         self.clicked.emit()
 
 
+class _MultiSelectMenu(QMenu):
+    """勾选后保持展开，便于一次选择多种弓玦套装。"""
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802 — Qt 命名
+        action = self.activeAction()
+        if action is not None and action.isCheckable():
+            action.trigger()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+
 # 8 个装备槽位的显示顺序与分组映射
 _SLOT_ORDER: list[tuple[str, str, str]] = [
     # (slot_key, display_name, bag_filter_type)
@@ -195,6 +208,49 @@ class _SearchSignals(QObject):
     error = pyqtSignal(str)
 
 
+class _ScenarioProgress:
+    """把单套弓玦的搜索进度折算到多场景总进度。"""
+
+    def __init__(self, worker, name: str, index: int, count: int,
+                 completed: int) -> None:
+        self._worker = worker
+        self._name = name or tr("无")
+        self._index = index
+        self._count = count
+        self._completed = completed
+        self._evaluated = 0
+        self._total = 0
+
+    @property
+    def evaluated(self) -> int:
+        return self._evaluated
+
+    @evaluated.setter
+    def evaluated(self, value: int) -> None:
+        self._evaluated = value
+        self._worker.evaluated = self._completed + value
+
+    @property
+    def total(self) -> int:
+        return self._total
+
+    @total.setter
+    def total(self, value: int) -> None:
+        self._total = value
+        remaining = self._count - self._index + 1
+        self._worker.total = self._completed + value * remaining
+
+    @property
+    def message(self) -> str:
+        return self._worker.message
+
+    @message.setter
+    def message(self, value: str) -> None:
+        prefix = tr("弓玦 {name}（{index}/{total}）").format(
+            name=self._name, index=self._index, total=self._count)
+        self._worker.message = f"{prefix}　{value}"
+
+
 class _SearchWorker(QRunnable):
     """后台搜索线程。"""
 
@@ -203,8 +259,10 @@ class _SearchWorker(QRunnable):
         candidates: dict[str, list[dict]],
         school: str,
         scheme: str,
-        base_attrs: CombatAttributes,
+        scenarios: list[tuple[str, CombatAttributes]],
         use_dominance_pruning: bool,
+        season_chengyin: bool = False,
+        season_level: int = 0,
         full_chengyin: bool = False,
         full_dingyin: bool = False,
         full_level: int = 0,
@@ -214,8 +272,10 @@ class _SearchWorker(QRunnable):
         self.candidates = candidates
         self.school = school
         self.scheme = scheme
-        self.base_attrs = base_attrs
+        self.scenarios = scenarios
         self.use_dominance_pruning = use_dominance_pruning
+        self.season_chengyin = season_chengyin
+        self.season_level = season_level
         self.full_chengyin = full_chengyin
         self.full_dingyin = full_dingyin
         self.full_level = full_level
@@ -240,18 +300,33 @@ class _SearchWorker(QRunnable):
                 self.signals.error.emit(tr("未找到对应流派的毕业率方案"))
                 return
 
-            results = search_optimal_combo(
-                self.candidates,
-                calc,
-                self.base_attrs,
-                use_dominance_pruning=self.use_dominance_pruning,
-                cancel_flag=self._cancel_event.is_set,
-                full_chengyin=self.full_chengyin,
-                full_dingyin=self.full_dingyin,
-                full_level=self.full_level,
-                playstyle=self.playstyle,
-                progress_counter=self,
-            )
+            results: list[dict[str, Any]] = []
+            scenario_count = len(self.scenarios)
+            completed = 0
+            for index, (gongjue, base_attrs) in enumerate(self.scenarios, 1):
+                if self._cancel_event.is_set():
+                    break
+                progress = _ScenarioProgress(
+                    self, gongjue, index, scenario_count, completed,
+                )
+                scenario_results = search_optimal_combo(
+                    self.candidates,
+                    calc,
+                    base_attrs,
+                    use_dominance_pruning=self.use_dominance_pruning,
+                    cancel_flag=self._cancel_event.is_set,
+                    season_chengyin=self.season_chengyin,
+                    season_level=self.season_level,
+                    full_chengyin=self.full_chengyin,
+                    full_dingyin=self.full_dingyin,
+                    full_level=self.full_level,
+                    playstyle=self.playstyle,
+                    progress_counter=progress,
+                )
+                completed += progress.evaluated
+                for result in scenario_results:
+                    result["gongjue"] = gongjue
+                results.extend(scenario_results)
             self.signals.finished.emit(results)
         except Exception as exc:
             logger.error(f"最优组合搜索失败: {exc}")
@@ -466,7 +541,7 @@ class _ResultCard(QFrame):
     """单条搜索结果卡片。"""
 
     apply_clicked = pyqtSignal(dict)   # emits equipped dict
-    detail_clicked = pyqtSignal(dict)  # emits equipped dict
+    detail_clicked = pyqtSignal(dict)  # emits complete result metadata
 
     def __init__(
         self, rank: int, result: dict[str, Any],
@@ -499,6 +574,12 @@ class _ResultCard(QFrame):
         dps_label.setStyleSheet("font-size: 13px; color: palette(mid);")
         top.addWidget(dps_label)
 
+        gongjue = str(result.get("gongjue") or tr("无"))
+        gongjue_label = QLabel(
+            tr("弓玦套装：{name}").format(name=gongjue))
+        gongjue_label.setStyleSheet("font-size: 12px; color: palette(mid);")
+        top.addWidget(gongjue_label)
+
         top.addStretch()
 
         buttons = QVBoxLayout()
@@ -515,7 +596,7 @@ class _ResultCard(QFrame):
         detail_btn.setMinimumHeight(26)
         detail_btn.setStyleSheet(_SECONDARY_BUTTON_STYLE)
         detail_btn.clicked.connect(
-            lambda: self.detail_clicked.emit(result.get("equipped", {})),
+            lambda: self.detail_clicked.emit(result),
         )
         buttons.addWidget(detail_btn)
         top.addLayout(buttons)
@@ -536,6 +617,20 @@ class _ResultCard(QFrame):
         summary.setWordWrap(True)
         layout.addWidget(summary)
 
+        assumptions = result.get("assumptions", {})
+        assumption_parts = []
+        if isinstance(assumptions, dict):
+            for slot_key, labels in assumptions.items():
+                if labels:
+                    assumption_parts.append(
+                        f"{slot_labels.get(slot_key, slot_key)}：{'、'.join(labels)}")
+        if assumption_parts:
+            assumption_summary = QLabel("　".join(assumption_parts))
+            assumption_summary.setWordWrap(True)
+            assumption_summary.setStyleSheet(
+                "font-size: 12px; color: #B26A00; font-weight: 600;")
+            layout.addWidget(assumption_summary)
+
 
 # ---------------------------------------------------------------------------
 # Main dialog
@@ -553,6 +648,7 @@ class OptimalComboDialog(QDialog):
         level_threshold: int = 0,
         affix_filter: str = "all",
         gongjue: str = "",
+        playstyle: str = "",
         main_martial_art: str = "",
         sub_martial_art: str = "",
         parent: QWidget | None = None,
@@ -564,9 +660,9 @@ class OptimalComboDialog(QDialog):
         # base_attrs 不含弓玦，弓玦属性按需计算
         self._base_attrs_raw = base_attrs
         self._current_gongjue = gongjue
+        self._playstyle = playstyle
         self._main_martial_art = main_martial_art
         self._sub_martial_art = sub_martial_art
-        self._base_attrs = base_attrs + self._compute_gongjue_attrs(gongjue)
         self._level_threshold = level_threshold
         self._affix_filter = affix_filter
         self._worker: _SearchWorker | None = None
@@ -616,80 +712,42 @@ class OptimalComboDialog(QDialog):
         header.addWidget(self._btn_rotation)
         layout.addLayout(header)
 
-        settings = QFrame()
-        settings.setProperty("surface", "card")
-        settings_layout = QVBoxLayout(settings)
-        settings_layout.setContentsMargins(14, 11, 14, 11)
-        settings_layout.setSpacing(9)
-        settings_title = QLabel(tr("搜索设置"))
-        settings_title.setStyleSheet("font-size: 14px; font-weight: 700;")
-        settings_layout.addWidget(settings_title)
+        filter_settings = QFrame()
+        filter_settings.setProperty("surface", "card")
+        filter_layout = QVBoxLayout(filter_settings)
+        filter_layout.setContentsMargins(14, 10, 14, 10)
+        filter_layout.setSpacing(8)
+        filter_title = QLabel(tr("筛选设置"))
+        filter_title.setStyleSheet("font-size: 14px; font-weight: 700;")
+        filter_layout.addWidget(filter_title)
 
-        options = QHBoxLayout()
-        options.setSpacing(14)
-        self._chk_pruning = QCheckBox(tr("智能筛选"))
-        self._chk_pruning.setChecked(True)
-        self._chk_pruning.setToolTip(
-            tr("自动淘汰被其他候选完全压制的装备，缩减搜索空间"))
-        options.addWidget(self._chk_pruning)
-        self._chk_exclude_mock = QCheckBox(tr("排除模拟"))
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(9)
+        self._chk_exclude_mock = QCheckBox(tr("排除模拟装备"))
         self._chk_exclude_mock.setChecked(True)
         self._chk_exclude_mock.setToolTip(
             tr("搜索时排除模拟装备，仅使用真实背包和已穿戴装备"))
         # 其余选项都在开始搜索时才读，唯独本项决定候选池内容，
         # 必须当场重建——否则改了也只在下次打开对话框才生效。
         self._chk_exclude_mock.toggled.connect(self._on_exclude_mock_toggled)
-        options.addWidget(self._chk_exclude_mock)
-        self._chk_full_chengyin = QCheckBox(tr("满承音"))
-        self._chk_full_chengyin.setToolTip(
-            tr("将承音装备的词条数值视为承音上限参与计算"))
-        options.addWidget(self._chk_full_chengyin)
-        self._chk_full_dingyin = QCheckBox(tr("满定音"))
-        self._chk_full_dingyin.setToolTip(
-            tr("将定音词条数值视为上限（100%）参与计算"))
-        options.addWidget(self._chk_full_dingyin)
-        self._chk_full_level = QCheckBox(tr("满等级"))
-        self._chk_full_level.setToolTip(
-            tr("将低于最高等级的装备视为最高等级参与计算"))
-        options.addWidget(self._chk_full_level)
-        options.addStretch()
-        settings_layout.addLayout(options)
-
-        tuning_row = QHBoxLayout()
-        tuning_row.setSpacing(8)
-        gongjue_label = QLabel(tr("弓玦套装"))
-        gongjue_label.setProperty("tone", "muted")
-        tuning_row.addWidget(gongjue_label)
-        self._combo_gongjue = QComboBox()
-        self._combo_gongjue.addItem(tr("无"), "")
-        for gj_type in ["会意", "精准", "会心"]:
-            self._combo_gongjue.addItem(gj_type, gj_type)
-        fit_combo_to_contents(self._combo_gongjue, minimum=112)
-        # 设置默认选中
-        idx = self._combo_gongjue.findData(self._current_gongjue)
-        if idx >= 0:
-            self._combo_gongjue.setCurrentIndex(idx)
-        self._combo_gongjue.currentIndexChanged.connect(
-            self._on_gongjue_changed)
-        tuning_row.addWidget(self._combo_gongjue)
-        tuning_row.addSpacing(16)
+        filter_row.addWidget(self._chk_exclude_mock)
         tuning_label = QLabel(tr("候选评级"))
         tuning_label.setProperty("tone", "muted")
         tuning_label.setToolTip(tr("仅用于辅助筛选候选装备，不参与装备合法性判断"))
-        tuning_row.addWidget(tuning_label)
+        filter_row.addWidget(tuning_label)
         self._edit_tuning = _ClickableLineEdit()
         self._edit_tuning.setPlaceholderText(tr("点击选择玩法（不选则不应用规则）"))
         self._edit_tuning.setToolTip(
             tr("玩法评级只辅助勾选候选，不作为装备合法性规则；"
                "多选时按各条规则给出的最高评级判定"))
         self._edit_tuning.clicked.connect(self._on_pick_playstyles)
-        tuning_row.addWidget(self._edit_tuning, 1)
+        filter_row.addWidget(self._edit_tuning, 1)
 
         rating_label = QLabel(tr("评级 ≥"))
         rating_label.setProperty("tone", "muted")
         rating_label.setToolTip(
             tr("装备需至少有一条已选玩法给出该级别及以上的评级；不选玩法时不生效"))
-        tuning_row.addWidget(rating_label)
+        filter_row.addWidget(rating_label)
         self._combo_min_rating = QComboBox()
         for rating in _MIN_RATING_CHOICES:
             self._combo_min_rating.addItem(domain_label(rating), rating)
@@ -699,10 +757,71 @@ class OptimalComboDialog(QDialog):
         fit_combo_to_contents(self._combo_min_rating, minimum=88)
         self._combo_min_rating.currentIndexChanged.connect(
             lambda _i: self._on_tuning_changed())
-        tuning_row.addWidget(self._combo_min_rating)
-        settings_layout.addLayout(tuning_row)
+        filter_row.addWidget(self._combo_min_rating)
+        filter_layout.addLayout(filter_row)
         self._load_tuning_options()
-        layout.addWidget(settings)
+        layout.addWidget(filter_settings)
+
+        compute_settings = QFrame()
+        compute_settings.setProperty("surface", "card")
+        compute_layout = QVBoxLayout(compute_settings)
+        compute_layout.setContentsMargins(14, 10, 14, 10)
+        compute_layout.setSpacing(8)
+        compute_title = QLabel(tr("计算设置"))
+        compute_title.setStyleSheet("font-size: 14px; font-weight: 700;")
+        compute_layout.addWidget(compute_title)
+
+        compute_row = QHBoxLayout()
+        compute_row.setSpacing(14)
+        self._chk_pruning = QCheckBox(tr("智能分析"))
+        self._chk_pruning.setChecked(True)
+        self._chk_pruning.setToolTip(
+            tr("自动淘汰被其他候选完全压制的装备，缩减搜索空间"))
+        compute_row.addWidget(self._chk_pruning)
+        self._chk_season_chengyin = QCheckBox(tr("赛季装备假设承音"))
+        self._chk_season_chengyin.setToolTip(tr(
+            "为本赛季等级的原生装备额外创建同等级承音分支；"
+            "只将普通词条拉到承音上限，定音保持原值"))
+        compute_row.addWidget(self._chk_season_chengyin)
+
+        gongjue_label = QLabel(tr("弓玦套装"))
+        gongjue_label.setProperty("tone", "muted")
+        compute_row.addWidget(gongjue_label)
+        self._btn_gongjue = QPushButton()
+        self._gongjue_menu = _MultiSelectMenu(self._btn_gongjue)
+        self._gongjue_actions = {}
+        for gongjue_type in ("会意", "精准", "会心"):
+            action = self._gongjue_menu.addAction(gongjue_type)
+            assert action is not None
+            action.setCheckable(True)
+            action.setChecked(gongjue_type == self._current_gongjue)
+            action.toggled.connect(self._refresh_gongjue_text)
+            self._gongjue_actions[gongjue_type] = action
+        self._btn_gongjue.setMenu(self._gongjue_menu)
+        self._btn_gongjue.setMinimumWidth(132)
+        apply_compact_button_style(self._btn_gongjue, variant="neutral")
+        self._refresh_gongjue_text()
+        compute_row.addWidget(self._btn_gongjue)
+        compute_row.addStretch()
+        compute_layout.addLayout(compute_row)
+
+        assumption_row = QHBoxLayout()
+        assumption_row.setSpacing(14)
+        self._chk_full_chengyin = QCheckBox(tr("满承音"))
+        self._chk_full_chengyin.setToolTip(
+            tr("将承音装备的普通词条数值视为承音上限参与计算"))
+        assumption_row.addWidget(self._chk_full_chengyin)
+        self._chk_full_dingyin = QCheckBox(tr("满定音"))
+        self._chk_full_dingyin.setToolTip(
+            tr("按当前备战方案玩法将定音视为目标满值参与计算"))
+        assumption_row.addWidget(self._chk_full_dingyin)
+        self._chk_full_level = QCheckBox(tr("满等级"))
+        self._chk_full_level.setToolTip(
+            tr("将低于最高等级的装备视为最高等级参与计算"))
+        assumption_row.addWidget(self._chk_full_level)
+        assumption_row.addStretch()
+        compute_layout.addLayout(assumption_row)
+        layout.addWidget(compute_settings)
 
         status_card = QFrame()
         status_card.setProperty("status", "info")
@@ -807,7 +926,10 @@ class OptimalComboDialog(QDialog):
         self._detail_cards: dict[str, Any] = {}
         from .equip.cards import _SlotCard
         for index, (slot_key, display_name, filter_type) in enumerate(_SLOT_ORDER):
-            card = _SlotCard(slot_key, display_name, filter_type)
+            card = _SlotCard(
+                slot_key, display_name, filter_type,
+                display_params={"card_min_height": 180},
+            )
             # 这一页只看不点：卡片本身是为「穿戴装备」那边的选中交互做的
             card.setCursor(Qt.CursorShape.ArrowCursor)
             detail_grid.addWidget(card, index // 4, index % 4)
@@ -840,13 +962,16 @@ class OptimalComboDialog(QDialog):
             logger.error(f"计算弓玦属性失败: {e}")
             return CombatAttributes()
 
-    def _on_gongjue_changed(self, _index: int) -> None:
-        """弓玦切换后重算基础属性。"""
-        gongjue = self._combo_gongjue.currentData()
-        if not isinstance(gongjue, str):
-            gongjue = ""
-        self._current_gongjue = gongjue
-        self._base_attrs = self._base_attrs_raw + self._compute_gongjue_attrs(gongjue)
+    def _selected_gongjues(self) -> list[str]:
+        """返回选中的弓玦场景；全不选表示按无弓玦计算。"""
+        return [
+            name for name, action in self._gongjue_actions.items()
+            if action.isChecked()
+        ]
+
+    def _refresh_gongjue_text(self, _checked: bool = False) -> None:
+        selected = self._selected_gongjues()
+        self._btn_gongjue.setText(" / ".join(selected) if selected else tr("无"))
 
     def _load_tuning_options(self) -> None:
         """收集全部「调律规则-玩法」组合，本流派命中的排在前面。
@@ -1137,11 +1262,13 @@ class OptimalComboDialog(QDialog):
                 tr("以下部位没有候选装备：") + "、".join(missing))
             return
 
+        gongjues = self._selected_gongjues() or [""]
+        total *= len(gongjues)
+
         # UI state
         self._btn_search.setVisible(False)
         self._btn_cancel.setVisible(True)
-        # 候选池正在被搜索，不允许中途换池
-        self._chk_exclude_mock.setEnabled(False)
+        self._set_search_controls_enabled(False)
         self._progress.setVisible(True)
         self._progress_label.setVisible(True)
         self._progress.setMaximum(max(total, 1))
@@ -1165,30 +1292,36 @@ class OptimalComboDialog(QDialog):
         self._result_cards.clear()
 
         # Launch worker
-        full_level = 0
-        if self._chk_full_level.isChecked():
-            from ...config import get_game_config
-            gc = get_game_config()
-            season = gc.current_season()
-            if season and season.equip_level:
-                full_level = season.equip_level
-            else:
-                configs = gc.get_level_configs()
-                full_level = configs[-1].level if configs else 0
-        # 满定音要顶到哪套玩法的目标上：这是单值语义，与候选筛选的多选
-        # 无关，取第一条已选玩法（也就是展示框里最左边那条）。
-        playstyle = (
-            self._tuning_selection[0][1] if self._tuning_selection else "")
+        from ...config import get_game_config
+        gc = get_game_config()
+        season = gc.current_season()
+        season_level = (
+            int(season.equip_level)
+            if season is not None and season.equip_level else 0
+        )
+        configs = gc.get_level_configs()
+        full_target_level = (
+            season_level or (configs[-1].level if configs else 0)
+        )
+        full_level = (
+            full_target_level if self._chk_full_level.isChecked() else 0
+        )
+        scenarios = [
+            (name, self._base_attrs_raw + self._compute_gongjue_attrs(name))
+            for name in gongjues
+        ]
         self._worker = _SearchWorker(
             candidates,
             self._school,
             self._scheme,
-            self._base_attrs,
+            scenarios,
             self._chk_pruning.isChecked(),
+            season_chengyin=self._chk_season_chengyin.isChecked(),
+            season_level=season_level,
             full_chengyin=self._chk_full_chengyin.isChecked(),
             full_dingyin=self._chk_full_dingyin.isChecked(),
             full_level=full_level,
-            playstyle=playstyle,
+            playstyle=self._playstyle,
         )
         # 使用 QueuedConnection 确保 slot 在 UI 线程执行
         # （signal 从后台线程 emit，但 _SearchSignals 的线程亲和性是 UI 线程）
@@ -1207,6 +1340,23 @@ class OptimalComboDialog(QDialog):
     def _on_cancel(self) -> None:
         if self._worker:
             self._worker.cancel()
+
+    def _set_search_controls_enabled(self, enabled: bool) -> None:
+        """搜索期间冻结条件快照，防止界面与后台参数错位。"""
+        for control in (
+            self._chk_exclude_mock,
+            self._edit_tuning,
+            self._combo_min_rating,
+            self._chk_pruning,
+            self._chk_season_chengyin,
+            self._btn_gongjue,
+            self._chk_full_chengyin,
+            self._chk_full_dingyin,
+            self._chk_full_level,
+        ):
+            control.setEnabled(enabled)
+        for group in self._slot_groups.values():
+            group.setEnabled(enabled)
 
     def _poll_progress(self) -> None:
         """定时轮询 worker 的进度计数器。"""
@@ -1227,7 +1377,7 @@ class OptimalComboDialog(QDialog):
             self._progress_timer.stop()
         self._btn_search.setVisible(True)
         self._btn_cancel.setVisible(False)
-        self._chk_exclude_mock.setEnabled(True)
+        self._set_search_controls_enabled(True)
         self._progress.setVisible(False)
         self._progress_label.setVisible(False)
         self._candidate_summary.setText(
@@ -1247,8 +1397,11 @@ class OptimalComboDialog(QDialog):
             1, tr("最优结果") + f"  (Top {len(results)})")
         self._tab_widget.setCurrentIndex(1)
 
-        for i, result in enumerate(results):
-            card = _ResultCard(i + 1, result, self._slot_labels)
+        ranks: dict[str, int] = {}
+        for result in results:
+            gongjue = str(result.get("gongjue") or "")
+            ranks[gongjue] = ranks.get(gongjue, 0) + 1
+            card = _ResultCard(ranks[gongjue], result, self._slot_labels)
             card.apply_clicked.connect(self._on_apply_result)
             card.detail_clicked.connect(self._on_show_detail)
             self._results_inner.addWidget(card)
@@ -1261,28 +1414,37 @@ class OptimalComboDialog(QDialog):
             self._progress_timer.stop()
         self._btn_search.setVisible(True)
         self._btn_cancel.setVisible(False)
-        self._chk_exclude_mock.setEnabled(True)
+        self._set_search_controls_enabled(True)
         self._progress.setVisible(False)
         self._progress_label.setVisible(False)
         self._candidate_summary.setText(tr("搜索失败，请检查候选装备后重试。"))
         QMessageBox.critical(self, tr("搜索失败"), message)
 
-    def _on_show_detail(self, equipped: dict) -> None:
+    def _on_show_detail(self, result: dict) -> None:
         """把这套组合铺到「组合详情」页并切过去。
 
-        卡片显示的是装备**当前**的真实数值。满承音/满等级那几个开关只是
-        算分时的假设，把假设值摆成装备详情会让人以为装备真是那样。
+        卡片只显示原始装备；虚拟计算装备绝不进入展示层。为了兼容直接调用
+        本方法的旧代码，不带结果元数据时将参数本身视为 equipped。
         """
+        equipped = result.get("equipped", result)
+        assumptions = result.get("assumptions", {})
+        if not isinstance(equipped, dict):
+            equipped = {}
+        if not isinstance(assumptions, dict):
+            assumptions = {}
         for slot_key, card in self._detail_cards.items():
             equip = equipped.get(slot_key)
             if isinstance(equip, dict) and equip:
                 card.set_equip(equip)
+                card.set_hypotheses(assumptions.get(slot_key, []))
             else:
                 card.set_empty()
         filled = sum(1 for eq in equipped.values() if isinstance(eq, dict))
+        gongjue = str(result.get("gongjue") or tr("无"))
         self._detail_hint.setText(
-            tr("共 {n} 件，显示的是装备当前的真实数值（不含满承音/满等级等假设）")
-            .format(n=filled))
+            tr("弓玦套装：{gongjue}　共 {n} 件；卡片显示原始装备数值，"
+               "计算假设标注在卡片顶部")
+            .format(gongjue=gongjue, n=filled))
         self._tab_widget.setCurrentIndex(2)
 
     def _on_apply_result(self, equipped: dict) -> None:

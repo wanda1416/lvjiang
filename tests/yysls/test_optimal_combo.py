@@ -29,6 +29,7 @@ from lvjiang.apps.yysls.core.graduation.optimal_combo import (
     _dominates,
     _generate_combos,
     _score_vector,
+    build_candidate_variants,
     compute_slot_deltas,
     prune_dominated,
     search_optimal_combo,
@@ -545,6 +546,111 @@ class TestSearchOptimalCombo:
         applied = results[0]["equipped"]["main_weapon"]
         assert applied is equip                       # 原对象，不是副本
         assert applied["dingyin"] == {"name": "无相穿透", "value": 1.0}
+
+    def test_every_candidate_is_virtual_even_without_assumptions(self) -> None:
+        equip = self._dingyin_equip()
+
+        variants = build_candidate_variants({"main_weapon": [equip]})
+
+        variant = variants["main_weapon"][0]
+        assert variant.original is equip
+        assert variant.virtual is not equip
+        assert variant.virtual == equip
+        assert variant.assumptions == ()
+
+    def test_season_chengyin_adds_branch_without_touching_dingyin(self) -> None:
+        from lvjiang.apps.yysls.config import get_game_config
+
+        equip = self._dingyin_equip() | {
+            "is_chengyin": False,
+            "affix_1": {"name": "最小外功攻击", "value": 1.0},
+        }
+        original = {
+            **equip,
+            "affix_1": dict(equip["affix_1"]),
+            "dingyin": dict(equip["dingyin"]),
+        }
+
+        variants = build_candidate_variants(
+            {"main_weapon": [equip]},
+            season_chengyin=True,
+            season_level=110,
+        )["main_weapon"]
+
+        assert len(variants) == 2
+        branch = variants[1]
+        caps = get_game_config().get_affix_caps(110, "最小外功攻击")
+        assert caps is not None
+        assert branch.original is equip
+        assert branch.virtual["is_chengyin"] is True
+        assert branch.virtual["affix_1"]["value"] == caps["chengyin"]
+        assert branch.virtual["dingyin"] == equip["dingyin"]
+        assert branch.assumptions == ("同等级承音假设",)
+        assert equip == original
+
+    def test_season_chengyin_result_returns_original_and_assumption(self) -> None:
+        calc = _get_calculator()
+        equip = self._dingyin_equip() | {
+            "is_chengyin": False,
+            "affix_1": {"name": "最小外功攻击", "value": 1.0},
+        }
+
+        results = search_optimal_combo(
+            {"main_weapon": [equip]}, calc, CombatAttributes(),
+            use_dominance_pruning=False,
+            season_chengyin=True,
+            season_level=110,
+        )
+
+        assert results[0]["equipped"]["main_weapon"] is equip
+        assert results[0]["assumptions"]["main_weapon"] == ["同等级承音假设"]
+        assert equip["affix_1"]["value"] == 1.0
+
+    def test_full_dingyin_is_independent_from_season_chengyin(self) -> None:
+        equip = self._dingyin_equip() | {
+            "is_chengyin": False,
+            "affix_1": {"name": "会心率", "value": 1.0},
+        }
+
+        variants = build_candidate_variants(
+            {"main_weapon": [equip]},
+            season_chengyin=True,
+            season_level=110,
+            full_dingyin=True,
+            playstyle="无名",
+        )["main_weapon"]
+
+        branch = variants[1]
+        assert branch.virtual["dingyin"] != equip["dingyin"]
+        assert branch.assumptions == ("同等级承音假设", "满定音假设")
+        assert equip["dingyin"] == {"name": "无相穿透", "value": 1.0}
+
+    def test_already_full_values_do_not_create_assumption_labels(self) -> None:
+        from lvjiang.apps.yysls.config import get_game_config
+
+        gc = get_game_config()
+        target = gc.get_playstyle_dingyin("无名", "剑")
+        affix_caps = gc.get_affix_caps(110, "会心率")
+        dingyin_caps = gc.get_affix_caps(110, target)
+        assert affix_caps is not None and dingyin_caps is not None
+        equip = self._dingyin_equip() | {
+            "is_chengyin": True,
+            "affix_1": {
+                "name": "会心率", "value": affix_caps["chengyin"],
+            },
+            "dingyin": {"name": target, "value": dingyin_caps["cap"]},
+        }
+
+        variant = build_candidate_variants(
+            {"main_weapon": [equip]},
+            full_chengyin=True,
+            full_dingyin=True,
+            playstyle="无名",
+        )["main_weapon"][0]
+
+        assert variant.assumptions == ()
+        assert variant.original is equip
+        assert variant.virtual is not equip
 
     def test_search_result_ge_any_random_combo(self) -> None:
         """The optimal result's rate should be >= rate of any random combination."""

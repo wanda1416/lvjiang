@@ -4,14 +4,14 @@ name: 控制
 views:
 - key: base
   name: 基底
-- key: confirm
-  name: 确认
 - key: fight
   name: 战斗
-- key: blank
-  name: 弹窗
 - key: move
   name: 移动
+- key: confirm
+  name: 确认
+- key: blank
+  name: 弹窗
 regions:
 - key: confirm
   name: 确认
@@ -52,6 +52,12 @@ regions:
   is_clickable: true
   view: base
   to: '@caller'
+- key: swith
+  name: 切换武器
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
 points:
 - key: material_slot_1
   name: 材料格1
@@ -195,3 +201,9 @@ points:
   is_text: false
   is_clickable: true
   view: move
+- key: bow
+  name: 弓箭
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight

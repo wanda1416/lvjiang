@@ -430,6 +430,7 @@ class AgentInput(InputBackend):
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
                      *, pre_delay=None, post_delay=None, button: str = "left",
+                     hold: float | None = None,
                      random_offset: bool = True):
         """触屏没有鼠标键概念，非 left 时按普通点击处理并记警告。"""
         if button != "left":
@@ -440,8 +441,17 @@ class AgentInput(InputBackend):
         _pre = pre_delay if pre_delay is not None else self.before_click_wait
         time.sleep(random.uniform(*_pre))
         label = f"({poi_name})" if poi_name else ""
-        logger.debug(f"[Agent] 点击 {label}: ({sx},{sy})")
-        self._call("tap", "点击", x=int(sx), y=int(sy))
+        if hold is None:
+            logger.debug(f"[Agent] 点击 {label}: ({sx},{sy})")
+            self._call("tap", "点击", x=int(sx), y=int(sy))
+        else:
+            duration_ms = max(1, int(hold * 1000))
+            logger.debug(
+                f"[Agent] 长按 {label}: ({sx},{sy}) {duration_ms}ms")
+            self._call(
+                "long_press", "长按", x=int(sx), y=int(sy),
+                duration_ms=duration_ms,
+            )
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
 

@@ -160,6 +160,19 @@ def test_explicit_right_click_ignores_activation_key():
     assert actor._input.clicks[0][3] == {"button": "right"}
 
 
+def test_click_hold_ignores_activation_key_and_uses_pointer():
+    region = Region(
+        key="btn_ok", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
+        activation_key="SPACE",
+    )
+    actor = _Actor(_FakeLayout(regions=[region]))
+
+    actor.click_region(SCENE, "btn_ok", hold=1.4)
+
+    assert actor._input.keys == []
+    assert actor._input.clicks[0][3] == {"hold": 1.4}
+
+
 def test_click_any_unbound_raises():
     """region 和 point 都查不到才报错"""
     actor = _Actor(_FakeLayout(regions=[_region("btn_ok")],

@@ -78,6 +78,7 @@ class InputBackend(ABC):
                      *, pre_delay: tuple[float, float] | None = None,
                         post_delay: tuple[float, float] | None = None,
                         button: str = "left",
+                        hold: float | None = None,
                         random_offset: bool = True):
         """点击指定坐标（带随机偏移 + before/after 延迟）
 
@@ -86,6 +87,7 @@ class InputBackend(ABC):
             post_delay: 点击后延迟范围。None=使用默认 after_click_wait，(0,0)=不延迟。
             button: 鼠标键，left/right/middle/x1/x2。触屏类后端（ADB/设备端）
                 没有非左键的概念，非 left 时忽略该参数、按普通点击处理并记警告。
+            hold: 按下后延迟多少秒再释放；None 表示普通点击。
             random_offset: 是否在坐标上叠加后端像素偏移。显式
                 click_rect 已经定义最终安全范围，调用时应关闭。
         """

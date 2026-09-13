@@ -342,6 +342,7 @@ def test_agent_input_dispatch(fake, monkeypatch):
     assert inp.background_mode is True and inp.target_hwnd is None
 
     inp.click_screen(10, 20, "btn")
+    inp.click_screen(10, 20, "btn", hold=1.4)
     inp.drag_screen(1, 2, 3, 4)                       # 无 hold → swipe 200ms
     inp.drag_screen(1, 2, 3, 4, hold=0.5)             # hold → hold_move 200+500
     inp.drag_screen(1, 2, 3, 4, duration=1.0)         # 固定时长
@@ -355,6 +356,7 @@ def test_agent_input_dispatch(fake, monkeypatch):
 
     assert _ops(srv) == [
         {"op": "tap", "x": 10, "y": 20},
+        {"op": "long_press", "x": 10, "y": 20, "duration_ms": 1400},
         {"op": "swipe", "x1": 1, "y1": 2, "x2": 3, "y2": 4, "duration_ms": 200},
         {"op": "hold_move", "x1": 1, "y1": 2, "x2": 3, "y2": 4, "move_ms": 200, "hold_ms": 500},
         {"op": "swipe", "x1": 1, "y1": 2, "x2": 3, "y2": 4, "duration_ms": 1000},

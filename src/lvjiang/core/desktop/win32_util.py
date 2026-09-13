@@ -353,7 +353,13 @@ def activate_window(hwnd: int, restore: bool = True) -> bool:
     return True
 
 
-def postmessage_click(hwnd: int, client_x: int, client_y: int, activate: bool = False):
+def postmessage_click(
+    hwnd: int,
+    client_x: int,
+    client_y: int,
+    activate: bool = False,
+    hold: float | None = None,
+):
     """通过 PostMessage 向窗口发送一次点击（不移动光标）
 
     activate=True 时先瞬时激活目标窗口再投递，适配 SDL 类窗口
@@ -368,7 +374,7 @@ def postmessage_click(hwnd: int, client_x: int, client_y: int, activate: bool = 
     _user32.PostMessageW(target, _WM_MOUSEMOVE, 0, lparam)
     time.sleep(0.03)
     _user32.PostMessageW(target, _WM_LBUTTONDOWN, _MK_LBUTTON, lparam)
-    time.sleep(0.05)
+    time.sleep(0.05 if hold is None else hold)
     _user32.PostMessageW(target, _WM_LBUTTONUP, 0, lparam)
 
 

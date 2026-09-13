@@ -9,7 +9,14 @@ from pathlib import Path
 
 import pytest
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QComboBox, QHeaderView, QPushButton
+from PyQt6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QDialogButtonBox,
+    QHeaderView,
+    QMessageBox,
+    QPushButton,
+)
 
 from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
 from lvjiang.apps.yysls.core.tuning_rules import (
@@ -98,6 +105,34 @@ class TestDialog:
         # 规则页初始只占位，首次进入才构造 RulePanel。
         assert not isinstance(dialog._stack.widget(5), RulePanel)
         assert not dialog.findChildren(RulePanel)
+
+    def test_bottom_save_and_confirmed_discard(self, qtbot, monkeypatch):
+        dialog = TuningRulesDialog()
+        qtbot.addWidget(dialog)
+        save = dialog._buttons.button(QDialogButtonBox.StandardButton.Save)
+        discard = dialog._buttons.button(QDialogButtonBox.StandardButton.Discard)
+        assert save.text() == "保存"
+        assert discard.text() == "撤销"
+        assert not save.isEnabled()
+
+        dialog._set_status("有未保存的更改", False)
+        assert save.isEnabled()
+        dialog.show()
+        monkeypatch.setattr(
+            QMessageBox,
+            "question",
+            lambda *_a, **_kw: QMessageBox.StandardButton.No,
+        )
+        discard.click()
+        assert dialog.isVisible()
+
+        monkeypatch.setattr(
+            QMessageBox,
+            "question",
+            lambda *_a, **_kw: QMessageBox.StandardButton.Yes,
+        )
+        discard.click()
+        assert not dialog.isVisible()
         # 规则项名称随真实规则文件 name 字段（可被用户改名）
         # 规则顺序由 tune_config.yaml 的 tuning_rules 段控制
         first_rule = next(iter(get_tuning_rules().values()))

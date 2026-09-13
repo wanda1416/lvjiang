@@ -265,9 +265,11 @@ class _NameListEditor(QWidget):
 class BaseAttrPanel(QWidget):
     """基础属性规则面板"""
 
-    def __init__(self, parent=None):
+    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
         super().__init__(parent)
-        self._data: dict = {}  # 完整配置数据
+        self._data: dict = data if data is not None else {}
+        self._external_data = data is not None
+        self._on_changed = on_changed
         self._current_part: str | None = None
         self._current_series: str | None = None
         self._saving = False  # 防止递归保存
@@ -466,12 +468,13 @@ class BaseAttrPanel(QWidget):
 
     def _load_data(self):
         """从 YAML 加载数据"""
-        from lvjiang.core.config.resolver import get_resolver
-        try:
-            self._data = get_resolver().load_merged(_ATTRS_REL)
-        except Exception as e:
-            logger.error(f"加载配置失败: {e}")
-            self._data = {"base_attrs": {}, "affix_caps": {}}
+        if not self._external_data:
+            from lvjiang.core.config.resolver import get_resolver
+            try:
+                self._data = get_resolver().load_merged(_ATTRS_REL)
+            except Exception as e:
+                logger.error(f"加载配置失败: {e}")
+                self._data = {"base_attrs": {}, "affix_caps": {}}
         if not self._data:
             self._data = {"base_attrs": {}, "affix_caps": {}}
 
@@ -1163,6 +1166,9 @@ class BaseAttrPanel(QWidget):
 
     def _save_data(self):
         """保存数据到 YAML"""
+        if self._on_changed is not None:
+            self._on_changed()
+            return
         from lvjiang.core.config.resolver import get_resolver
         try:
             get_resolver().save_merged(_ATTRS_REL, self._data)

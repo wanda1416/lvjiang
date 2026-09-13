@@ -8,16 +8,11 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFormLayout,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
-    QMessageBox,
-    QPushButton,
     QSpinBox,
     QVBoxLayout,
     QWidget,
 )
-
-from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
 
@@ -34,11 +29,14 @@ _PARAM_DEFS = [
 class EquipDisplayPanel(QWidget):
     """装备展示参数设置面板"""
 
-    def __init__(self, parent=None):
+    def __init__(self, on_changed=None, parent=None):
         super().__init__(parent)
+        self._on_changed = on_changed
+        self._loading = True
         self._spinboxes: dict[str, QSpinBox] = {}
         self._init_ui()
         self._load()
+        self._loading = False
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -60,19 +58,10 @@ class EquipDisplayPanel(QWidget):
             spin.setSuffix(suffix)
             spin.setMinimumWidth(140)
             self._spinboxes[key] = spin
+            spin.valueChanged.connect(self._changed)
             form.addRow(label + ":", spin)
 
         layout.addWidget(box)
-
-        # 保存按钮
-        btn_row = QHBoxLayout()
-        btn_save = QPushButton(tr("保存"))
-        btn_save.setMinimumWidth(80)
-        apply_button_style(btn_save)
-        btn_save.clicked.connect(self._save)
-        btn_row.addWidget(btn_save)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
 
         layout.addStretch()
 
@@ -82,11 +71,11 @@ class EquipDisplayPanel(QWidget):
         for key, spin in self._spinboxes.items():
             spin.setValue(int(params.get(key, spin.minimum())))
 
-    def _save(self):
+    def _changed(self, _value: int) -> None:
+        if not self._loading and self._on_changed is not None:
+            self._on_changed()
+
+    def save(self) -> None:
         from ...config.equip_display import save_equip_display
         params = {key: spin.value() for key, spin in self._spinboxes.items()}
-        try:
-            save_equip_display(params)
-            QMessageBox.information(self, tr("保存成功"), tr("装备展示参数已保存"))
-        except Exception as e:
-            QMessageBox.warning(self, tr("保存失败"), str(e))
+        save_equip_display(params)

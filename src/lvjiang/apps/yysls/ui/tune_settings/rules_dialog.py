@@ -11,10 +11,13 @@
 - 各规则：单规则编辑面板（RulePanel，内部含 7 项二级导航）；
   双击规则导航项弹窗修改规则名称（配置页项不可改名）。
 左侧导航下方为「＋ 新增规则 / 装备调律验证」入口。
-底部状态栏显示校验错误（红色）/ 最后保存时间。自动保存，无手动保存按钮。
+底部状态栏显示校验错误；右下角统一保存或撤销本次编辑。
 """
 
 import re
+import shutil
+import tempfile
+from pathlib import Path
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QBrush
@@ -44,6 +47,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tuning_rule_manager,
 )
 from lvjiang.apps.yysls.ui.layout_helpers import fit_combo_to_contents
+from lvjiang.core.config.resolver import get_resolver
 from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
@@ -63,6 +67,99 @@ from .rule_panel import RulePanel, add_nav_separator
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+_EDIT_PATHS = (
+    "yysls/tune_config.yaml",
+    "yysls/base_groups",
+    "yysls/tuning_rules",
+)
+
+
+class _TuningConfigTransaction:
+    """把调律编辑临时重定向到配置根目录副本，保存时再统一写回。"""
+
+    def __init__(self):
+        self._resolver = get_resolver()
+        self._system_dir = self._resolver._system_dir
+        self._local_dir = self._resolver._local_dir
+        self._tmp: tempfile.TemporaryDirectory | None = None
+        self._start()
+
+    def _start(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="lvjiang-tuning-edit-")
+        root = Path(self._tmp.name)
+        system = root / "system"
+        local = root / "local"
+        shutil.copytree(self._resolver.system_dir, system)
+        if self._resolver.local_dir.exists():
+            shutil.copytree(self._resolver.local_dir, local)
+        else:
+            local.mkdir(parents=True)
+        self._resolver._system_dir = system
+        self._resolver._local_dir = local
+
+    def _restore_roots(self) -> tuple[Path, Path]:
+        staged_system = self._resolver.system_dir
+        staged_local = self._resolver.local_dir
+        self._resolver._system_dir = self._system_dir
+        self._resolver._local_dir = self._local_dir
+        return staged_system, staged_local
+
+    @staticmethod
+    def _sync_path(source: Path, target: Path) -> list[str]:
+        changed: list[str] = []
+        if source.is_dir():
+            source_files = {p.relative_to(source) for p in source.rglob("*") if p.is_file()}
+            target_files = ({p.relative_to(target) for p in target.rglob("*") if p.is_file()}
+                            if target.is_dir() else set())
+            for rel in sorted(target_files - source_files):
+                (target / rel).unlink()
+                changed.append(rel.as_posix())
+            for rel in sorted(source_files):
+                src = source / rel
+                dst = target / rel
+                if not dst.exists() or src.read_bytes() != dst.read_bytes():
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dst)
+                    changed.append(rel.as_posix())
+        elif source.is_file():
+            if not target.exists() or source.read_bytes() != target.read_bytes():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+                changed.append("")
+        elif target.exists():
+            target.unlink()
+            changed.append("")
+        return changed
+
+    def commit(self) -> None:
+        if self._tmp is None:
+            return
+        tmp = self._tmp
+        staged_system, staged_local = self._restore_roots()
+        staged_root = staged_system if self._resolver.is_dev_mode() else staged_local
+        target_root = self._resolver.system_dir if self._resolver.is_dev_mode() else self._resolver.local_dir
+        notifications: list[str] = []
+        for rel_path in _EDIT_PATHS:
+            suffixes = self._sync_path(staged_root / rel_path, target_root / rel_path)
+            if not suffixes:
+                continue
+            if (staged_root / rel_path).is_dir() or (target_root / rel_path).is_dir():
+                notifications.extend(
+                    f"{rel_path}/{suffix}" for suffix in suffixes if suffix)
+            else:
+                notifications.append(rel_path)
+        tmp.cleanup()
+        self._tmp = None
+        for rel_path in notifications:
+            self._resolver._notify(rel_path)
+
+    def rollback(self) -> None:
+        if self._tmp is None:
+            return
+        self._restore_roots()
+        self._tmp.cleanup()
+        self._tmp = None
 
 
 class _RulePagePlaceholder(QWidget):
@@ -122,6 +219,10 @@ class TuningRulesDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._transaction = _TuningConfigTransaction()
+        self._dirty = False
+        self._has_error = False
+        self._initializing = True
         self.setWindowTitle(tr("调律配置"))
         self.setMinimumSize(900, 700)
         self.resize(1200, 800)
@@ -195,8 +296,24 @@ class TuningRulesDialog(QDialog):
         self._main_splitter.setSizes([first_level_width, 1200 - first_level_width])
         layout.addWidget(self._main_splitter, 1)
 
-        self._status_label = QLabel(tr("规则变更即校验，校验通过自动保存并生效"))
-        layout.addWidget(self._status_label)
+        bottom = QHBoxLayout()
+        self._status_label = QLabel(tr("修改暂存于当前对话框，点击保存后生效"))
+        bottom.addWidget(self._status_label, 1)
+        self._buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Discard)
+        self._save_button = self._buttons.button(
+            QDialogButtonBox.StandardButton.Save)
+        self._save_button.setText(tr("保存"))
+        self._save_button.setEnabled(False)
+        self._discard_button = self._buttons.button(
+            QDialogButtonBox.StandardButton.Discard)
+        self._discard_button.setText(tr("撤销"))
+        self._buttons.accepted.connect(self._save_changes)
+        self._discard_button.clicked.connect(self.reject)
+        apply_dialog_button_box_style(self._buttons)
+        bottom.addWidget(self._buttons)
+        layout.addLayout(bottom)
 
         # 一级节点：基础规则 → 扫描处理 → 材料处理 → 结束处理 →
         # 分割线 → 流派规则 → 各规则（导航含分割线：行 0-3 = 栈页 0-3，
@@ -246,6 +363,7 @@ class TuningRulesDialog(QDialog):
                 placeholder = self._add_rule_page(key, name)
                 self._apply_disabled_nav_style(placeholder, True)
         self._nav.setCurrentRow(0)
+        self._initializing = False
 
     # ── 规则页增删 ──
 
@@ -440,3 +558,60 @@ class TuningRulesDialog(QDialog):
             color = "#c62828" if is_error else "#2e7d32"
         self._status_label.setStyleSheet(f"color: {color};")
         self._status_label.setText(text)
+        if self._initializing:
+            return
+        self._dirty = True
+        self._has_error = is_error is True
+        self._save_button.setEnabled(not self._has_error)
+
+    def _reload_managers(self) -> None:
+        self._config_manager.reload()
+        self._group_manager.reload()
+        self._manager.reload()
+
+    def _save_changes(self) -> None:
+        if not self._dirty or self._has_error:
+            return
+        try:
+            self._transaction.commit()
+            self._reload_managers()
+        except Exception as exc:  # noqa: BLE001 - 提交失败必须留在对话框
+            QMessageBox.warning(self, tr("保存失败"), str(exc))
+            return
+        self._dirty = False
+        self._has_error = False
+        self._save_button.setEnabled(False)
+        self._status_label.setStyleSheet("color: #2e7d32;")
+        self._status_label.setText(tr("调律配置已保存并生效"))
+        # 保存后继续编辑时开启一份以最新磁盘状态为基线的新暂存区。
+        self._transaction = _TuningConfigTransaction()
+        self._reload_managers()
+
+    def _confirm_discard(self) -> bool:
+        if not self._dirty or not self.isVisible():
+            return True
+        answer = QMessageBox.question(
+            self,
+            tr("撤销调律配置"),
+            tr("确定撤销本次所有未保存的调律配置更改吗？"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return answer == QMessageBox.StandardButton.Yes
+
+    def reject(self) -> None:
+        if not self._confirm_discard():
+            return
+        self._transaction.rollback()
+        self._reload_managers()
+        self._dirty = False
+        super().reject()
+
+    def closeEvent(self, event) -> None:
+        if not self._confirm_discard():
+            event.ignore()
+            return
+        self._transaction.rollback()
+        self._reload_managers()
+        self._dirty = False
+        super().closeEvent(event)

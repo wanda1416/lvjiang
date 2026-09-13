@@ -56,7 +56,7 @@
       }
     },
     {
-      "key": "swith",
+      "key": "switch",
       "x_ratio": 0.8703109977709226,
       "y_ratio": 0.13545780674678143,
       "w_ratio": 0.06342332683548502,
@@ -116,15 +116,13 @@
       "key": "wuxueji",
       "cx_ratio": 0.741630406632852,
       "cy_ratio": 0.7365224975345408,
-      "r_ratio": 0.04994632908086091,
-      "activation_key": "R"
+      "r_ratio": 0.04994632908086091
     },
     {
       "key": "teshuji",
       "cx_ratio": 0.7315789017982278,
       "cy_ratio": 0.8941931616070767,
-      "r_ratio": 0.04994632908086091,
-      "activation_key": "GRAVE"
+      "r_ratio": 0.04994632908086091
     },
     {
       "key": "qishu",
@@ -136,8 +134,7 @@
       "key": "xieshi",
       "cx_ratio": 0.8469033458787816,
       "cy_ratio": 0.5331494886820636,
-      "r_ratio": 0.04994632908086091,
-      "activation_key": "E"
+      "r_ratio": 0.04994632908086091
     },
     {
       "key": "xuli",
@@ -155,15 +152,13 @@
       "key": "shanbi",
       "cx_ratio": 0.8255440680938901,
       "cy_ratio": 0.9107659661678098,
-      "r_ratio": 0.04994632908086091,
-      "activation_key": "SHIFT"
+      "r_ratio": 0.04994632908086091
     },
     {
       "key": "tiaoyue",
       "cx_ratio": 0.9207377315276837,
       "cy_ratio": 0.7097358694753265,
-      "r_ratio": 0.04994632908086091,
-      "activation_key": "SPACE"
+      "r_ratio": 0.04994632908086091
     },
     {
       "key": "qishu_1",

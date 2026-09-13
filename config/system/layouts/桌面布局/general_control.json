@@ -49,6 +49,14 @@
         "record_w": 1936,
         "record_h": 1088
       }
+    },
+    {
+      "key": "switch",
+      "x_ratio": 0.0,
+      "y_ratio": 0.0,
+      "w_ratio": 0.0,
+      "h_ratio": 0.0,
+      "activation_key": "NUM8"
     }
   ],
   "points": [
@@ -105,14 +113,14 @@
       "cx_ratio": 0.741630406632852,
       "cy_ratio": 0.7365224975345408,
       "r_ratio": 0.04994632908086091,
-      "disabled": true
+      "activation_key": "R"
     },
     {
       "key": "teshuji",
       "cx_ratio": 0.7315789017982278,
       "cy_ratio": 0.8941931616070767,
       "r_ratio": 0.04994632908086091,
-      "disabled": true
+      "activation_key": "GRAVE"
     },
     {
       "key": "qishu",
@@ -126,7 +134,7 @@
       "cx_ratio": 0.8469033458787816,
       "cy_ratio": 0.5331494886820636,
       "r_ratio": 0.04994632908086091,
-      "disabled": true
+      "activation_key": "E"
     },
     {
       "key": "xuli",
@@ -147,14 +155,14 @@
       "cx_ratio": 0.8255440680938901,
       "cy_ratio": 0.9107659661678098,
       "r_ratio": 0.04994632908086091,
-      "disabled": true
+      "activation_key": "SHIFT"
     },
     {
       "key": "tiaoyue",
       "cx_ratio": 0.9207377315276837,
       "cy_ratio": 0.7097358694753265,
       "r_ratio": 0.04994632908086091,
-      "disabled": true
+      "activation_key": "SPACE"
     },
     {
       "key": "origin",

@@ -52,7 +52,7 @@ regions:
   is_clickable: true
   view: base
   to: '@caller'
-- key: swith
+- key: switch
   name: 切换武器
   type: func
   is_text: false

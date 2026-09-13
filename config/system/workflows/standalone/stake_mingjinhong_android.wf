@@ -33,7 +33,7 @@ click [general_control].[wuxueji] hold 0.1 after wait 0.09
 click [general_control].[xieshi] hold 0.08 after wait 0.3
 click [general_control].$qishu_dz hold 0.11 after wait 0.74
 click [general_control].[xieshi] hold 0.06 after wait 0.11
-click [general_control].[teshuji] hold 0.09 after wait 0.1
+click [general_control].[switch] hold 0.09 after wait 0.1
 
 # 第一道剑气，wait 开始计时
 click [general_control].[xuli] hold 1.44 after wait 0.75
@@ -116,14 +116,14 @@ click [general_control].[xuli] hold 1.47
 def qiang_wuxueji($buff)
     # 切枪 → 武学技 → 卸势 → 切回剑；挂 buff 时为武学技留更长等待
     if $buff
-        click [general_control].[teshuji] hold 0.08 after wait 0.07
+        click [general_control].[switch] hold 0.08 after wait 0.07
         click [general_control].[wuxueji] hold 0.08 after wait 0.24
         click [general_control].[xieshi] hold 0.06 after wait 0.12
-        click [general_control].[teshuji] hold 0.08 after wait 0.09
+        click [general_control].[switch] hold 0.08 after wait 0.09
     else
-        click [general_control].[teshuji] hold 0.08 after wait 0.07
+        click [general_control].[switch] hold 0.08 after wait 0.07
         click [general_control].[wuxueji] hold 0.06 after wait 0.11
         click [general_control].[xieshi] hold 0.06 after wait 0.11
-        click [general_control].[teshuji] hold 0.08 after wait 0.09
+        click [general_control].[switch] hold 0.08 after wait 0.09
     end
 end

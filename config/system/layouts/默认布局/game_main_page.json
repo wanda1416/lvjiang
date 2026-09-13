@@ -184,59 +184,5 @@
       "key": "settings",
       "disabled": true
     }
-  ],
-  "points": [
-    {
-      "key": "origin",
-      "cx_ratio": 0.23213290581151572,
-      "cy_ratio": 0.7222814819294713,
-      "r_ratio": 0.015
-    },
-    {
-      "key": "forward",
-      "cx_ratio": 0.23213290581151572,
-      "cy_ratio": 0.6052748406237812,
-      "r_ratio": 0.015
-    },
-    {
-      "key": "backward",
-      "cx_ratio": 0.23213290581151572,
-      "cy_ratio": 0.8387506191810966,
-      "r_ratio": 0.015
-    },
-    {
-      "key": "turn_left",
-      "cx_ratio": 0.18067865308840528,
-      "cy_ratio": 0.7222814819294713,
-      "r_ratio": 0.015
-    },
-    {
-      "key": "turn_right",
-      "cx_ratio": 0.28216610321448937,
-      "cy_ratio": 0.7222814819294713,
-      "r_ratio": 0.015
-    }
-  ],
-  "arrows": [
-    {
-      "key": "forward",
-      "from_key": "origin",
-      "to_key": "forward"
-    },
-    {
-      "key": "backward",
-      "from_key": "origin",
-      "to_key": "backward"
-    },
-    {
-      "key": "turn_right",
-      "from_key": "origin",
-      "to_key": "turn_right"
-    },
-    {
-      "key": "turn_left",
-      "from_key": "origin",
-      "to_key": "turn_left"
-    }
   ]
 }

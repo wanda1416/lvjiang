@@ -10,6 +10,8 @@ views:
   name: 战斗
 - key: blank
   name: 弹窗
+- key: move
+  name: 移动
 regions:
 - key: confirm
   name: 确认
@@ -163,3 +165,33 @@ points:
   is_text: false
   is_clickable: true
   view: fight
+- key: origin
+  name: 起点
+  type: func
+  is_text: false
+  is_clickable: true
+  view: move
+- key: forward
+  name: 前进
+  type: func
+  is_text: false
+  is_clickable: true
+  view: move
+- key: backward
+  name: 后退
+  type: func
+  is_text: false
+  is_clickable: true
+  view: move
+- key: turn_left
+  name: 向左
+  type: func
+  is_text: false
+  is_clickable: true
+  view: move
+- key: turn_right
+  name: 向右
+  type: func
+  is_text: false
+  is_clickable: true
+  view: move

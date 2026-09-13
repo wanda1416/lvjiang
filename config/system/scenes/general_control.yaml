@@ -139,3 +139,27 @@ points:
   is_text: false
   is_clickable: true
   view: fight
+- key: qishu_1
+  name: 奇术1
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
+- key: qishu_2
+  name: 奇术2
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
+- key: qishu_3
+  name: 奇术3
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight
+- key: qishu_4
+  name: 奇术4
+  type: func
+  is_text: false
+  is_clickable: true
+  view: fight

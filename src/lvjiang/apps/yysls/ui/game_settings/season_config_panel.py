@@ -61,8 +61,10 @@ _COLS = ("#", tr("赛季编号"), tr("赛季名称"), tr("开始日期"), tr("�
 class SeasonConfigPanel(QWidget):
     """赛季配置面板（表格形式）"""
 
-    def __init__(self, parent=None):
+    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
         super().__init__(parent)
+        self._data = data
+        self._on_changed = on_changed
         self._loading = True
         self._init_ui()
         self._load_data()
@@ -419,8 +421,12 @@ class SeasonConfigPanel(QWidget):
             return
 
         manager = get_game_config()
-        data = manager.get_raw()
+        data = self._data if self._data is not None else manager.get_raw()
         data["season_configs"] = self._configs_raw()
+        if self._on_changed is not None:
+            self._on_changed()
+            self._set_status("有未保存的更改", False)
+            return
         try:
             manager.save(data)
         except Exception as e:

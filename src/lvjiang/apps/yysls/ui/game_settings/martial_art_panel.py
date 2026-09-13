@@ -35,10 +35,12 @@ _ATTRS = ["鸣金", "裂石", "破竹", "牵丝"]
 class MartialArtPanel(QWidget):
     """左侧武学列表，右侧武器 + 属性。"""
 
-    def __init__(self, parent=None):
+    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
         super().__init__(parent)
         self._loading = False
-        self._data: dict = {}
+        self._data: dict = data if data is not None else {}
+        self._external_data = data is not None
+        self._on_changed = on_changed
         self._build_ui()
         self._load_data()
 
@@ -98,12 +100,13 @@ class MartialArtPanel(QWidget):
     # ── 数据 ──
 
     def _load_data(self) -> None:
-        from lvjiang.core.config.resolver import get_resolver
-        try:
-            self._data = get_resolver().load_merged(_ATTRS_REL)
-        except Exception as exc:  # noqa: BLE001
-            logger.error(f"加载配置失败: {exc}")
-            self._data = {}
+        if not self._external_data:
+            from lvjiang.core.config.resolver import get_resolver
+            try:
+                self._data = get_resolver().load_merged(_ATTRS_REL)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(f"加载配置失败: {exc}")
+                self._data = {}
         self._reload()
 
     def _entries(self) -> list[dict]:
@@ -111,6 +114,9 @@ class MartialArtPanel(QWidget):
                 if isinstance(e, dict) and e.get("name")]
 
     def _save_data(self) -> None:
+        if self._on_changed is not None:
+            self._on_changed()
+            return
         from lvjiang.core.config.resolver import get_resolver
         try:
             get_resolver().save_merged(_ATTRS_REL, self._data)

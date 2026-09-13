@@ -12,6 +12,8 @@
 - 字体设置（卡片字号、高度、网格列数等外观参数）
 """
 
+from collections.abc import Callable
+
 from PyQt6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
 from .....i18n import tr
@@ -29,8 +31,14 @@ from .season_config_panel import SeasonConfigPanel
 class GameConfigTab(QWidget):
     """游戏配置主面板"""
 
-    def __init__(self, parent=None):
+    def __init__(self, data: dict | None = None,
+                 on_changed: Callable[[], None] | None = None, parent=None):
         super().__init__(parent)
+        if data is None:
+            from ...config import get_game_config
+            data = get_game_config().get_raw()
+        self._data = data
+        self._on_changed = on_changed
         self._init_ui()
 
     def _init_ui(self):
@@ -41,39 +49,39 @@ class GameConfigTab(QWidget):
         self._tabs = QTabWidget()
 
         # 基础配置面板（跨等级、装备类型的全局规则）
-        self._basic_config_panel = BasicConfigPanel()
+        self._basic_config_panel = BasicConfigPanel(self._data, self._on_changed)
         self._tabs.addTab(self._basic_config_panel, tr("基础配置"))
 
         # 词组配置面板（最基础，不依赖任何 tab）
-        self._affix_panel = AffixCapsPanel()
+        self._affix_panel = AffixCapsPanel(self._data, self._on_changed)
         self._tabs.addTab(self._affix_panel, tr("词组配置"))
 
         # 装备配置面板（基础属性 + 武器类型）
-        self._base_panel = BaseAttrPanel()
+        self._base_panel = BaseAttrPanel(self._data, self._on_changed)
         self._tabs.addTab(self._base_panel, tr("装备配置"))
 
         # 武学配置面板（流派/玩法的共同前置：武器和属性由武学派生）
-        self._martial_art_panel = MartialArtPanel()
+        self._martial_art_panel = MartialArtPanel(self._data, self._on_changed)
         self._tabs.addTab(self._martial_art_panel, tr("武学配置"))
 
         # 流派配置面板
-        self._school_panel = SchoolPanel()
+        self._school_panel = SchoolPanel(self._data, self._on_changed)
         self._tabs.addTab(self._school_panel, tr("流派配置"))
 
         # 玩法配置面板（决定调律方向：要什么增伤、定什么音）
-        self._playstyle_panel = PlaystylePanel()
+        self._playstyle_panel = PlaystylePanel(self._data, self._on_changed)
         self._tabs.addTab(self._playstyle_panel, tr("玩法配置"))
 
         # 等级配置面板（按等级区分重置支持与材料要求）
-        self._level_panel = LevelConfigPanel()
+        self._level_panel = LevelConfigPanel(self._data, self._on_changed)
         self._tabs.addTab(self._level_panel, tr("等级配置"))
 
         # 赛季配置面板（管理游戏赛季时间与装备等级）
-        self._season_panel = SeasonConfigPanel()
+        self._season_panel = SeasonConfigPanel(self._data, self._on_changed)
         self._tabs.addTab(self._season_panel, tr("赛季配置"))
 
         # 字体设置面板（卡片字号、高度、网格列数）
-        self._equip_display_panel = EquipDisplayPanel()
+        self._equip_display_panel = EquipDisplayPanel(self._on_changed)
         self._tabs.addTab(self._equip_display_panel, tr("字体设置"))
 
         # 等级配置保存后，刷新其他面板中的 LevelCombo
@@ -86,6 +94,10 @@ class GameConfigTab(QWidget):
         self._affix_panel.refresh_level_combos()
         self._base_panel.refresh_level_combos()
         self._season_panel.refresh_level_combos()
+
+    def save_auxiliary_config(self) -> None:
+        """保存不属于 game_config.yaml、但位于本对话框中的设置。"""
+        self._equip_display_panel.save()
 
     def select_school_base_attr(self, school: str, base_attr: str) -> None:
         """切换到流派配置，并定位指定基础属性。"""

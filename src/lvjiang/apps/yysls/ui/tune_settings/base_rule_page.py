@@ -6,7 +6,7 @@
 - 新增（key+名称对话框，key 走 _KEY_RE，空白组）/
   复制（需选中，独立副本）/ 删除（需选中，default 禁删）；
 - 等级门槛（min_level）与调律门槛（scan.entry_min_rating）
-  编辑当前组，沿用「变更即校验即保存」模式：控件变更即重建
+  编辑当前组，沿用「变更即校验即暂存」模式：控件变更即重建
   raw dict → 校验 → 通过才写盘并 reload，失败时状态栏红字提示。
   `_build()` 以管理器最新 raw 为底、只替换本页负责的键，
   与行为三页/材料配置页各管各段互不覆盖。
@@ -279,9 +279,6 @@ class BaseRuleGroupPage(QWidget):
         self._loading = False
         if self._switch_cb is not None:
             self._switch_cb(key)
-        group = self._manager.get_group(key)
-        name = group.name if group else key
-        self._status_cb(tr("已切换到基础规则组「{name}」").format(name=name), False)
 
     # ── CRUD ──
 

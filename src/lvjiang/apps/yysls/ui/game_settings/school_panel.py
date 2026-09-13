@@ -64,9 +64,11 @@ _SCHOOL_ATTRS = ["鸣金", "裂石", "破竹", "牵丝"]
 class SchoolPanel(QWidget):
     """流派配置面板（左：流派列表；右：配置表单）"""
 
-    def __init__(self, parent=None):
+    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
         super().__init__(parent)
-        self._data: dict = {}  # 完整配置数据
+        self._data: dict = data if data is not None else {}
+        self._external_data = data is not None
+        self._on_changed = on_changed
         self._names: list[str] = []  # 列表行 → 流派名（重命名时对照旧名）
         self._loading = False  # 防止刷新控件时触发保存
         self._init_ui()
@@ -248,12 +250,13 @@ class SchoolPanel(QWidget):
 
     def _load_data(self):
         """从 YAML 加载数据并刷新列表与表单"""
-        from lvjiang.core.config.resolver import get_resolver
-        try:
-            self._data = get_resolver().load_merged(_ATTRS_REL)
-        except Exception as e:
-            logger.error(f"加载配置失败: {e}")
-            self._data = {}
+        if not self._external_data:
+            from lvjiang.core.config.resolver import get_resolver
+            try:
+                self._data = get_resolver().load_merged(_ATTRS_REL)
+            except Exception as e:
+                logger.error(f"加载配置失败: {e}")
+                self._data = {}
         self._refresh_list()
 
     def _schools(self) -> dict[str, dict]:
@@ -466,6 +469,9 @@ class SchoolPanel(QWidget):
 
     def _save_data(self):
         """保存数据到 YAML 并刷新 GameConfigManager 单例"""
+        if self._on_changed is not None:
+            self._on_changed()
+            return
         from lvjiang.core.config.resolver import get_resolver
         try:
             get_resolver().save_merged(_ATTRS_REL, self._data)

@@ -21,8 +21,10 @@ from ...config import get_game_config
 class BasicConfigPanel(QWidget):
     """不依赖等级、装备类型等维度的全局游戏参数。"""
 
-    def __init__(self, parent=None):
+    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
         super().__init__(parent)
+        self._data = data
+        self._on_changed = on_changed
         self._loading = True
         self._init_ui()
         self._load()
@@ -59,21 +61,30 @@ class BasicConfigPanel(QWidget):
         layout.addStretch()
 
     def _load(self) -> None:
-        self._cooldown_days.setValue(
-            get_game_config().get_equipment_cooldown_days())
-        self._cooldown_carryover.setChecked(
-            get_game_config().is_equipment_cooldown_carryover_enabled())
+        basic = (self._data or {}).get("basic_config", {})
+        manager = get_game_config()
+        self._cooldown_days.setValue(int(basic.get(
+            "equipment_cooldown_days",
+            manager.get_equipment_cooldown_days())))
+        self._cooldown_carryover.setChecked(bool(basic.get(
+            "equipment_cooldown_carryover",
+            manager.is_equipment_cooldown_carryover_enabled())))
 
     def _apply(self, _value: int | bool) -> None:
         if self._loading:
             return
         manager = get_game_config()
-        data = manager.get_raw()
+        data = self._data if self._data is not None else manager.get_raw()
         basic = dict(data.get("basic_config") or {})
         basic["equipment_cooldown_days"] = self._cooldown_days.value()
         basic["equipment_cooldown_carryover"] = (
             self._cooldown_carryover.isChecked())
         data["basic_config"] = basic
+        if self._on_changed is not None:
+            self._on_changed()
+            self._status_label.setStyleSheet("")
+            self._status_label.setText(tr("有未保存的更改"))
+            return
         try:
             manager.save(data)
         except Exception as exc:  # noqa: BLE001 - 保存错误直接展示给用户

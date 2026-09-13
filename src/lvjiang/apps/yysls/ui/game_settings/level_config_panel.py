@@ -224,8 +224,10 @@ class LevelConfigPanel(QWidget):
     # 等级配置保存后发出信号，通知其他面板刷新 LevelCombo
     level_configs_saved = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(self, data: dict | None = None, on_changed=None, parent=None):
         super().__init__(parent)
+        self._data = data
+        self._on_changed = on_changed
         self._loading = True
         self._init_ui()
         self._load_data()
@@ -646,8 +648,12 @@ class LevelConfigPanel(QWidget):
         if self._loading:
             return
         manager = get_game_config()
-        data = manager.get_raw()
+        data = self._data if self._data is not None else manager.get_raw()
         data["level_configs"] = self._configs_raw()
+        if self._on_changed is not None:
+            self._on_changed()
+            self._set_status("有未保存的更改", False)
+            return
         try:
             manager.save(data)
         except Exception as e:

@@ -52,6 +52,7 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.config_origin import layer_style, origin_tooltip
 
 from .....i18n import tr
 from ..layout_helpers import (
@@ -67,6 +68,7 @@ from .rule_panel import RulePanel, add_nav_separator
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+_CONFIG_REL_PATH = "yysls/tune_config.yaml"
 
 class _RulePagePlaceholder(QWidget):
     """规则页占位符；自带 key/name，不依赖导航位置反查数据。"""
@@ -125,8 +127,9 @@ class TuningRulesDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        source_resolver = get_resolver()
         self._edit_session = ConfigEditSession(
-            get_resolver(),
+            source_resolver,
             merged_paths=("yysls/tune_config.yaml",),
             entity_dirs=("yysls/base_groups", "yysls/tuning_rules"),
         )
@@ -145,10 +148,21 @@ class TuningRulesDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
+        version_row = QHBoxLayout()
+        version_row.addStretch(1)
+        self._config_version_title = QLabel(tr("调律配置版本："))
+        self._config_version_value = QLabel()
+        self._config_version_value.setObjectName("tune_config_version")
+        version_row.addWidget(self._config_version_title)
+        version_row.addWidget(self._config_version_value)
+        layout.addLayout(version_row)
+        self._refresh_config_version_info()
+
         edit_resolver = self._edit_session.resolver
         self._config_manager = TuneConfigManager(resolver=edit_resolver)
         self._manager = TuningRuleManager(
             resolver=edit_resolver,
+            origin_resolver=source_resolver,
             tune_config_getter=self._config_manager.get,
         )
         self._group_manager = TuningGroupManager(resolver=edit_resolver)
@@ -504,6 +518,7 @@ class TuningRulesDialog(QDialog):
         self._discard_button.setEnabled(False)
         self._status_label.setStyleSheet("color: #2e7d32;")
         self._status_label.setText(tr("调律配置已保存并生效"))
+        self._refresh_config_version_info()
 
     def _discard_changes(self) -> None:
         if not self._dirty:
@@ -558,6 +573,18 @@ class TuningRulesDialog(QDialog):
         self._discard_button.setEnabled(False)
         self._status_label.setStyleSheet("color: #2e7d32;")
         self._status_label.setText(tr("已撤销未保存的调律配置更改"))
+        self._refresh_config_version_info()
+
+    def _refresh_config_version_info(self) -> None:
+        resolver = get_resolver()
+        current = resolver.describe_entity(_CONFIG_REL_PATH)
+        available = resolver.list_entity_origins(_CONFIG_REL_PATH)
+        self._config_version_value.setText(
+            "-" if current.version is None else f"v{current.version}")
+        self._config_version_value.setStyleSheet(layer_style(current.layer))
+        tip = origin_tooltip(current, available)
+        self._config_version_title.setToolTip(tip)
+        self._config_version_value.setToolTip(tip)
 
     def _confirm_exit(self) -> bool:
         if not self._dirty or not self.isVisible():

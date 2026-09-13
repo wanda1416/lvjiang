@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialogButtonBox,
     QHeaderView,
+    QLabel,
     QMessageBox,
     QPushButton,
 )
@@ -35,6 +36,7 @@ from lvjiang.apps.yysls.ui.tune_settings.material_config_page import (
     MaterialConfigPage,
 )
 from lvjiang.apps.yysls.ui.tune_settings.rule_panel import RulePanel
+from lvjiang.core.config.resolver import EntityOrigin
 from tests.case_matrix import case_matrix
 
 PROJECT_ROOT = Path(__file__).parents[2]
@@ -101,6 +103,9 @@ class TestDialog:
         # 分割线项不可选中
         assert not dialog._nav.item(4).flags()
         assert dialog._nav.item(5).text() == "流派规则"
+        version = dialog.findChild(QLabel, "tune_config_version")
+        assert version is not None
+        assert "当前生效" in version.toolTip()
         assert dialog._nav.property("navigation") is True
         # 规则页初始只占位，首次进入才构造 RulePanel。
         assert not isinstance(dialog._stack.widget(5), RulePanel)
@@ -150,6 +155,7 @@ class TestDialog:
         assert dialog._stack.currentIndex() == 5
         rule_panel = dialog._stack.widget(5)
         assert isinstance(rule_panel, RulePanel)
+
         assert len(dialog.findChildren(RulePanel)) == 1
         assert rule_panel._nav.property("navigation") is True
         dialog.show()
@@ -171,6 +177,34 @@ class TestDialog:
         # 基础规则 + 三大处理页的规则组选择必须完整显示中文名称。
         for combo in [dialog._base_page._combo, *dialog._group_dropdowns]:
             _assert_combo_text_fits(combo, 200)
+
+    def test_config_version_label_reports_remote_distribution(
+            self, qtbot, monkeypatch):
+        dialog = TuningRulesDialog()
+        qtbot.addWidget(dialog)
+
+        class Resolver:
+            @staticmethod
+            def describe_entity(_path):
+                return EntityOrigin("remote", 4)
+
+            @staticmethod
+            def list_entity_origins(_path):
+                return (
+                    EntityOrigin("remote", 4),
+                    EntityOrigin("system", 2),
+                )
+
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.ui.tune_settings.rules_dialog.get_resolver",
+            lambda: Resolver(),
+        )
+        dialog._refresh_config_version_info()
+        version = dialog.findChild(QLabel, "tune_config_version")
+
+        assert version.text() == "v4"
+        assert "当前生效：远程 · v4" in version.toolTip()
+        assert "系统 · v2" in version.toolTip()
 
     def test_lazy_placeholder_tracks_add_rename_delete(
             self, qtbot, monkeypatch):

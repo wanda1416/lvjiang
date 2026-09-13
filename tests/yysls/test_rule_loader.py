@@ -766,6 +766,70 @@ class TestSaveAndRaw:
         mgr.reload()
         assert mgr.system_save_override("t1") is None
 
+    def test_version_display_can_use_real_layers_during_isolated_edit(
+            self, tmp_path, monkeypatch):
+        monkeypatch.setitem(
+            versioning.VERSIONED_DIRS,
+            "yysls/tuning_rules",
+            versioning.VersionedDir(
+                "yysls/tuning_rules", "*.yaml", 1, allow_remote_new=True),
+        )
+        system, local, remote = (
+            tmp_path / name for name in ("system", "local", "remote"))
+        for root, version, name in (
+            (system, 1, "系统规则"),
+            (remote, 3, "远程规则"),
+        ):
+            directory = root / "yysls" / "tuning_rules"
+            directory.mkdir(parents=True)
+            (directory / "t1.yaml").write_text(
+                yaml.dump(
+                    {"content_version": version, **minimal_rule(name=name)},
+                    allow_unicode=True,
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+        local.mkdir()
+        real = ConfigResolver(
+            system_dir=system,
+            local_dir=local,
+            remote_dir=remote,
+            dev_mode=True,
+        )
+        edit_root = tmp_path / "edit"
+        edit_system = edit_root / "system"
+        edit_local = edit_root / "local"
+        edit_rule_dir = edit_system / "yysls" / "tuning_rules"
+        edit_rule_dir.mkdir(parents=True)
+        edit_local.mkdir(parents=True)
+        edit = ConfigResolver(
+            system_dir=edit_system,
+            local_dir=edit_local,
+            dev_mode=True,
+        )
+        (edit_rule_dir / "t1.yaml").write_text(
+            yaml.dump(
+                {"content_version": 3, **minimal_rule(name="编辑副本")},
+                allow_unicode=True,
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        mgr = TuningRuleManager(
+            resolver=edit,
+            origin_resolver=real,
+        )
+
+        current = mgr.describe_rule_version("t1")
+        available = mgr.list_rule_versions("t1")
+
+        assert (current.layer, current.version) == ("remote", 3)
+        assert [(item.layer, item.version) for item in available] == [
+            ("remote", 3),
+            ("system", 1),
+        ]
+
 
 # ─── 创建与删除 ────────────────────────────────────────────
 

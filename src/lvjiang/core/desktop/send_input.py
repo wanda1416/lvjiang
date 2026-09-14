@@ -306,20 +306,21 @@ class SendInputInput(InputBackend):
         按键/鼠标键会在暂停后继续按原计划触发一段时间。到达 deadline
         正常返回 False。
         """
+        interrupted_by_pause = False
+
         def interrupted() -> bool:
-            return stop_check() or (
+            nonlocal interrupted_by_pause
+            if stop_check():
+                return True
+            interrupted_by_pause = bool(
                 pause_event is not None and not pause_event.is_set())
+            return interrupted_by_pause
 
         completed = precise_wait_until(
             deadline_ns,
             stop_check=interrupted,
         )
-        return bool(
-            not completed
-            and not stop_check()
-            and pause_event is not None
-            and not pause_event.is_set()
-        )
+        return not completed and interrupted_by_pause
 
     def scroll_screen(
         self,

@@ -49,8 +49,6 @@ def precise_wait_until(
             # sleep no longer than the actual remaining duration.
             available_ns = remaining_ns - spin_tail_ns
             _sleep(min(_FINE_SLICE_SECONDS, available_ns / NS_PER_SECOND))
-        elif spin_tail_ns <= 0:
-            _sleep(remaining_ns / NS_PER_SECOND)
         # Otherwise intentionally spin for the final precision tail.
 
 

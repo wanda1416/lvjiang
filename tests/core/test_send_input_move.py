@@ -209,6 +209,28 @@ def test_wait_trace_deadline_reaches_deadline_when_running():
     assert interrupted is False
 
 
+def test_wait_trace_deadline_remembers_pause_across_immediate_resume(
+    monkeypatch,
+):
+    """暂停触发退出后即使马上恢复，也不能误报 deadline 已到。"""
+    pause_event = threading.Event()  # clear = 暂停
+
+    def wait_until(_deadline, *, stop_check):
+        assert stop_check() is True
+        pause_event.set()  # 模拟检查返回后紧接着恢复
+        return False
+
+    monkeypatch.setattr(send_input_module, "precise_wait_until", wait_until)
+
+    interrupted = SendInputInput._wait_trace_deadline(
+        time.perf_counter_ns() + 1_000_000_000,
+        stop_check=lambda: False,
+        pause_event=pause_event,
+    )
+
+    assert interrupted is True
+
+
 def test_trace_replay_defers_events_while_paused(monkeypatch):
     """暂停中收到的长间隔事件不会提前触发，只在 stop 后才安全退出。"""
     backend = SendInputInput()

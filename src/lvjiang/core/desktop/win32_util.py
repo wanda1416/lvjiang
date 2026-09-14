@@ -306,7 +306,6 @@ def activate_window(hwnd: int, restore: bool = True) -> bool:
     restore=True 时投递完成后把焦点还原给原前台窗口，尽量不影响
     用户正在使用的窗口（后台跑）。
     """
-    import time
     # 记录原前台窗口（用于还原）
     _user32.GetForegroundWindow.restype = ctypes.c_void_p
     prev = _user32.GetForegroundWindow() or 0

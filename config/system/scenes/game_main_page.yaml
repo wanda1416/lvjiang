@@ -86,6 +86,8 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+  view: base
+  to: chat_main
 - key: north
   name: 正北方
   type: attr

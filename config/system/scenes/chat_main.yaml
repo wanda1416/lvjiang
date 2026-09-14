@@ -1,3 +1,8 @@
 content_version: 1
 key: chat_main
 name: 聊天
+views:
+- key: base
+  name: 频道
+- key: private
+  name: 私聊

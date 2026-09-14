@@ -58,13 +58,13 @@ class ViewManagerDialog(QDialog):
         self._list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         self._list.setMinimumHeight(240)
         # 默认行高下几条视图会挤成一片文字，读不出「这是几条独立视图」。
-        # 拉开行距 + 加厚行内边距 + 给每行描边，让每个视图各占一块。
-        self._list.setSpacing(6)
+        # 适度拉开行距 + 行内边距 + 描边，让每个视图各占一块。
+        self._list.setSpacing(4)
         self._list.setStyleSheet(
             "QListWidget { outline: none; }"
             "QListWidget::item {"
-            "  min-height: 34px;"
-            "  padding: 8px 10px;"
+            "  min-height: 18px;"
+            "  padding: 4px 10px;"
             "  border: 1px solid palette(mid);"
             "  border-radius: 4px;"
             "}"
@@ -399,6 +399,10 @@ class ViewManagerDialog(QDialog):
         form = QFormLayout(dialog)
         key_edit = QLineEdit(old_key)
         key_edit.setPlaceholderText(tr("小写字母开头，仅含小写字母/数字/下划线"))
+        # 基底视图 key 是保留值，禁止修改——直接置灰，一眼看出不可编辑
+        if old_key == BASE_VIEW_KEY:
+            key_edit.setEnabled(False)
+            key_edit.setToolTip(tr("基底视图的 key 是保留值，不可重命名"))
         form.addRow(tr("视图 Key:"), key_edit)
         error_label = QLabel()
         error_label.setStyleSheet("color: #c62828;")

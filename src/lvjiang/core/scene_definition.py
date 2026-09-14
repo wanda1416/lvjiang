@@ -657,6 +657,8 @@ class SceneRegistry:
     def rename_scene_view_key(self, scene_key: str, old_key: str, new_key: str, new_name: str):
         """重命名视图 key 和名称（需同步更新所有引用的 region/point/panel）"""
         scene = self._require_scene(scene_key)
+        if old_key == BASE_VIEW_KEY and new_key != BASE_VIEW_KEY:
+            raise ValueError("基底视图的 key 是保留值，不可重命名")
         if old_key == new_key:
             # key 不变，只改名称
             self.rename_scene_view(scene_key, old_key, new_name)

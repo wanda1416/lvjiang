@@ -10,6 +10,21 @@ from .config.wf_configs import get_wf_config
 from .user_config import get_user_workflow_params
 
 
+def parameters_for_env(
+    parameter_defs: list[dict], run_env: str,
+) -> list[dict]:
+    """返回当前环境应展示的参数定义。
+
+    参数未声明 ``env``（或声明空列表）时对全部环境可见；声明后只在列表
+    包含当前环境时可见。此筛选只约束 UI 展示，不裁剪运行时参数快照。
+    """
+    return [
+        item for item in parameter_defs
+        if isinstance(item, dict)
+        and (not item.get("env") or run_env in item["env"])
+    ]
+
+
 def parameter_defaults(parameter_defs: list[dict]) -> dict[str, Any]:
     return {
         str(item["name"]): deepcopy(item.get("default"))

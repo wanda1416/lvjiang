@@ -2,6 +2,7 @@
 
 import pytest
 
+from lvjiang.core.task_params import parameters_for_env
 from lvjiang.workflows.metadata import (
     METADATA_WARNING,
     WorkflowMetadataError,
@@ -52,6 +53,28 @@ def test_parse_options_value_label_pairs():
     assert p0["options"][1] == {"value": "紫色狗粮", "label": "紫色狗粮"}
     # 简单字符串列表 options 也支持
     assert m["parameters"][1]["options"] == ["1", "2", "3"]
+
+
+def test_parameter_env_is_validated_and_filters_only_declared_parameters():
+    text = """\
+#% parameters:
+#%   - {name: common, type: text}
+#%   - {name: desktop_key, type: text, env: [desktop]}
+#%   - {name: android_area, type: text, env: [android]}
+"""
+    definitions = parse_metadata(text)["parameters"]
+
+    assert definitions[1]["env"] == ["desktop"]
+    assert [item["name"] for item in parameters_for_env(
+        definitions, "desktop")] == ["common", "desktop_key"]
+    assert [item["name"] for item in parameters_for_env(
+        definitions, "android")] == ["common", "android_area"]
+
+
+def test_parameter_env_must_be_a_string_list():
+    text = "#% parameters:\n#%   - {name: key, type: text, env: desktop}\n"
+    with pytest.raises(WorkflowMetadataError, match="parameters\\[0\\]\\.env"):
+        parse_metadata(text)
 
 
 def test_first_non_metadata_line_ends_metadata():

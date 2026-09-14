@@ -1,0 +1,133 @@
+#% id: stake_pozhuchen
+#% name: 破竹尘木桩测伤
+#% runnable: true
+#% env: [desktop]
+#% note: |-
+#%   破竹尘新赛季完美84伞木桩轴，需要开局切绳镖面向木桩约5米并且锁定视角。
+#%   PC 端：将滚轮切武器绑定小键盘 8；默认使用 Q = 武学技、E = 卸势、` = 特殊技。
+#% parameters:
+#%   - name: key_dz
+#%     label: 萧吟千浪
+#%     env: [desktop]
+#%     type: select
+#%     default: "4"
+#%     options: ["1", "2", "3", "4", "7", "8", "9", "0"]
+
+default $key_dz = "4"
+
+press "Q" hold 0.094 after wait 0.063
+press "Q" hold 0.078 after wait 0.047
+press "Q" down after wait 0.093
+press "E" down after wait 0.047
+press "Q" up after wait 0.156
+press "E" up after wait 0.844
+
+press "W" down after wait 0.344
+press "R" hold 0.156 after wait 0.703
+press "W" up after wait 1
+
+press "E" hold 0.172 after wait 0.485
+press $key_dz hold 0.156 after wait 0.984
+press "E" hold 0.125 after wait 0.204
+press "R" hold 0.125 after wait 0.063
+press "R" hold 0.109 after wait 0.063
+press "R" hold 0.093 after wait 0.063
+press "R" hold 0.109 after wait 0.047
+press "R" hold 0.110 after wait 0.031
+press "R" hold 0.094 after wait 0.046
+press "R" hold 0.094 after wait 0.047
+press "R" hold 0.094 after wait 0.047
+press "R" hold 0.156 after wait 0.062
+
+press "S" down after wait 0.282
+press "SHIFT" hold 0.281 after wait 0.578
+press "NUM8" after wait 0.109
+press "S" up after wait 0.063
+
+press "Q" hold 0.109 after wait 0.547
+press "Q" hold 0.110 after wait 0.828
+press "Q" hold 0.125 after wait 0.953
+press "Q" hold 0.109 after wait 0.860
+press "Q" hold 0.140 after wait 0.672
+press "Q" hold 0.125 after wait 0.938
+press "Q" hold 0.125 after wait 0.828
+press "Q" hold 0.125 after wait 0.703
+press "Q" hold 0.125 after wait 0.922
+press "Q" hold 0.125 after wait 0.906
+press "Q" hold 0.141 after wait 0.656
+press "Q" hold 0.125 after wait 0.906
+press "Q" hold 0.125 after wait 0.859
+press "Q" hold 0.157 after wait 0.562
+press "Q" hold 0.125 after wait 0.250
+
+press "GRAVE" hold 0.125 after wait 3.05
+press "GRAVE" hold 0.156 after wait 0.5
+
+press "NUM8" hold 0.11 after wait 0.062
+
+press "GRAVE" hold 0.094 after wait 0.078
+press "GRAVE" hold 0.094 after wait 0.375
+
+press "NUM8" after wait 0.016
+
+press "R" hold 0.093 after wait 0.813
+press "R" hold 0.14 after wait 0.094
+press "R" hold 0.094 after wait 0.078
+press "R" hold 0.078 after wait 0.063
+press "R" hold 0.109 after wait 0.938
+
+press "Q" hold 0.109 after wait 0.062
+press "Q" hold 0.125 after wait 0.469
+press "Q" hold 0.110 after wait 0.812
+press "Q" hold 0.125 after wait 0.969
+press "Q" hold 0.140 after wait 0.766
+press "Q" hold 0.141 after wait 0.718
+press "Q" hold 0.125 after wait 0.860
+press "Q" hold 0.125 after wait 0.890
+press "Q" hold 0.141 after wait 0.719
+press "Q" hold 0.125 after wait 0.906
+press "Q" hold 0.125 after wait 0.828
+press "Q" hold 0.110 after wait 0.718
+press "Q" hold 0.125 after wait 0.922
+press "Q" hold 0.125 after wait 0.813
+press "Q" hold 0.140 after wait 0.625
+press "Q" hold 0.141 after wait 0.391
+
+press "GRAVE" hold 0.14 after wait 3.01
+press "GRAVE" hold 0.125 after wait 0.609
+
+press "NUM8" hold 0.11 after wait 0.078
+
+press "GRAVE" hold 0.094 after wait 0.078
+press "GRAVE" hold 0.109 after wait 0.485
+
+press "NUM8" after wait 0.094
+
+press "R" hold 0.14 after wait 1.157
+press $key_dz hold 0.156 after wait 1
+press "E" hold 0.141 after wait 0.234
+
+press "Q" hold 0.141 after wait 0.609
+press "Q" hold 0.109 after wait 0.750
+press "Q" hold 0.110 after wait 0.953
+press "Q" hold 0.140 after wait 0.797
+press "Q" hold 0.125 after wait 0.735
+press "Q" hold 0.140 after wait 0.891
+press "Q" hold 0.141 after wait 0.796
+press "Q" hold 0.157 after wait 0.703
+press "Q" hold 0.140 after wait 0.954
+press "Q" hold 0.140 after wait 0.797
+press "Q" hold 0.125 after wait 0.688
+press "Q" hold 0.125 after wait 0.937
+press "Q" hold 0.141 after wait 0.859
+press "Q" hold 0.125 after wait 0.641
+press "Q" hold 0.125 after wait 0.297
+
+press "NUM8" after wait 0.141
+
+press "GRAVE" hold 0.093 after wait 0.079
+press "GRAVE" hold 0.093 after wait 0.407
+
+press "NUM8" after wait 0.094
+
+press "GRAVE" hold 0.11 after wait 4.515

@@ -324,7 +324,16 @@ def _download_entry(entry: RemoteEntry, timeout: float) -> bytes:
         raise RemoteConfigError(
             f"sha256 不匹配（期望 {entry.sha256[:12]}…，实得 {digest[:12]}…）: "
             f"{entry.rel_path}")
-    text = payload.decode("utf-8")
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise RemoteConfigError(f"文件不是有效的 UTF-8: {entry.rel_path}") from exc
+    spec = versioning.spec_for(entry.rel_path)
+    if spec is not None and spec.remote_mode == "append_only":
+        if entry.content_version != 0:
+            raise RemoteConfigError(
+                f"只新增文件的 content_version 必须为 0: {entry.rel_path}")
+        return payload
     actual = versioning.version_from_text(text, Path(entry.rel_path).suffix)
     if actual != entry.content_version:
         # manifest 说的版本号和文件里写的对不上，说明作者发布时漏了一步。
@@ -367,6 +376,22 @@ def sync_to_dir(manifest: RemoteManifest, remote_dir: Path, *,
     skipped: list[str] = []
     for entry in entries:
         target = remote_dir / entry.rel_path
+        spec = versioning.spec_for(entry.rel_path)
+        if spec is not None and spec.remote_mode == "append_only" \
+                and entry.content_version != 0:
+            logger.warning(
+                f"[在线配置] 只新增文件的 content_version 必须为 0，已跳过: "
+                f"{entry.rel_path}")
+            skipped.append(entry.rel_path)
+            continue
+        if spec is not None and spec.remote_mode == "append_only" and target.is_file():
+            existing_sha = hashlib.sha256(target.read_bytes()).hexdigest()
+            if existing_sha != entry.sha256:
+                logger.warning(
+                    f"[在线配置] 只新增文件禁止覆盖，已保留现有内容: "
+                    f"{entry.rel_path}")
+                skipped.append(entry.rel_path)
+            continue
         local_version = versioning.read_version(target)
         if local_version is not None and local_version >= entry.content_version:
             # 已是该版本或**更新**，不下载。

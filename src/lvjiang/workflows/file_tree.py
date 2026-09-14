@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from ..core.config.resolver import (
     LAYER_LOCAL,
+    LAYER_REMOTE,
     LAYER_SYSTEM,
     get_resolver,
 )
@@ -42,6 +43,7 @@ class WorkflowFile:
     rel_path: str          # 相对 workflows 根的 posix 路径
     layer: str             # 实际生效的层：local / system
     overrides_system: bool  # local 覆盖了同名系统文件
+    overrides_remote: bool = False  # local 覆盖了同名远程新增文件
 
     @property
     def name(self) -> str:
@@ -55,6 +57,10 @@ class WorkflowFile:
     @property
     def is_system(self) -> bool:
         return self.layer == LAYER_SYSTEM
+
+    @property
+    def is_remote(self) -> bool:
+        return self.layer == LAYER_REMOTE
 
     @property
     def editable(self) -> bool:
@@ -84,6 +90,11 @@ def list_workflow_files() -> list[WorkflowFile]:
             overrides_system=(
                 origin.layer == LAYER_LOCAL
                 and (resolver.system_dir / WORKFLOWS_DIR / rel).is_file()
+            ),
+            overrides_remote=(
+                origin.layer == LAYER_LOCAL
+                and (resolver.remote_dir / WORKFLOWS_DIR / rel).is_file()
+                and not (resolver.system_dir / WORKFLOWS_DIR / rel).is_file()
             ),
         ))
     return files

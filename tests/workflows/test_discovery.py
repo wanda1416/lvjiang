@@ -3,11 +3,14 @@
 覆盖 discover_scripts / list_exposed_scripts 的核心逻辑。
 """
 
+from types import SimpleNamespace
+
 from lvjiang.workflows.discovery import (
     _discover_class_scripts,
     _discover_wf_scripts,
     discover_scripts,
     list_exposed_scripts,
+    script_display_name,
 )
 from lvjiang.workflows.metadata import METADATA_WARNING
 
@@ -79,6 +82,49 @@ class TestDiscoverWfScripts:
         assert result["fengshajiusi"]["wf_file"] == (
             "standalone/fengshajiusi.wf")
         assert result["fengshajiusi"]["batchable"] is False
+
+    def test_remote_source_is_preserved_for_forced_display_marker(
+            self, tmp_path, monkeypatch):
+        wf_file = tmp_path / "workflows" / "remote_test.wf"
+        wf_file.parent.mkdir(parents=True)
+        wf_file.write_text("#% name: 实验脚本\n", encoding="utf-8")
+        fake_resolver = type("R", (), {
+            "enumerate_entities": lambda self, d, p: (
+                ["remote_test.wf"] if d == "workflows" else []),
+            "resolve_read": lambda self, rel: wf_file,
+            "describe_entity": lambda self, rel: SimpleNamespace(layer="remote"),
+        })()
+        monkeypatch.setattr(
+            "lvjiang.workflows.discovery.get_resolver", lambda: fake_resolver)
+        config = _discover_wf_scripts()["remote_test"]
+        assert config["is_remote"] is True
+        assert script_display_name(config) == "[远程] 实验脚本"
+        assert script_display_name({**config, "name": "自定义名"}) == (
+            "[远程] 自定义名")
+
+    def test_remote_script_cannot_take_existing_id_from_other_directory(
+            self, tmp_path, monkeypatch):
+        remote = tmp_path / "remote" / "workflows" / "same.wf"
+        system = tmp_path / "system" / "workflows" / "standalone" / "same.wf"
+        for path, label in ((remote, "远程"), (system, "系统")):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"#% name: {label}\n", encoding="utf-8")
+        paths = {
+            "workflows/same.wf": remote,
+            "workflows/standalone/same.wf": system,
+        }
+        fake_resolver = type("R", (), {
+            "enumerate_entities": lambda self, d, p: (
+                ["same.wf"] if d in {"workflows", "workflows/standalone"} else []),
+            "resolve_read": lambda self, rel: paths[rel],
+            "describe_entity": lambda self, rel: SimpleNamespace(
+                layer="remote" if rel == "workflows/same.wf" else "system"),
+        })()
+        monkeypatch.setattr(
+            "lvjiang.workflows.discovery.get_resolver", lambda: fake_resolver)
+        config = _discover_wf_scripts()["same"]
+        assert config["name"] == "系统"
+        assert config["is_remote"] is False
 
     def test_bad_metadata_warns_only_its_own_script(self, tmp_path, monkeypatch):
         """一个 wf 元数据错误不能中断发现，也不能影响另一个 wf。"""

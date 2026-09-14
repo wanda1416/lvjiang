@@ -30,7 +30,7 @@ def layers(tmp_path, monkeypatch):
         resolver_mod, "_resolver",
         resolver_mod.ConfigResolver(
             system_dir=tmp_path / "system", local_dir=tmp_path / "local",
-            dev_mode=False),
+            remote_dir=tmp_path / "remote", dev_mode=False),
     )
     return system, local
 
@@ -93,6 +93,24 @@ class TestMergedView:
 
         assert [f.rel_path for f in files] == ["mine/deep/x.wf"]
         assert list_directories(files) == ["mine", "mine/deep"]
+
+    def test_remote_can_add_a_directory_and_is_marked(self, layers, tmp_path):
+        remote = tmp_path / "remote" / "workflows"
+        _write(remote, "experiments/new.wf")
+        f = _by_path(list_workflow_files())["experiments/new.wf"]
+        assert f.is_remote
+        assert not f.editable
+        assert list_directories([f]) == ["experiments"]
+
+    def test_local_copy_is_marked_as_overriding_remote(self, layers, tmp_path):
+        _, local = layers
+        remote = tmp_path / "remote" / "workflows"
+        _write(remote, "new.wf")
+        _write(local, "new.wf")
+        f = _by_path(list_workflow_files())["new.wf"]
+        assert f.layer == "local"
+        assert f.overrides_remote
+        assert not f.overrides_system
 
     def test_shows_everything_including_underscore_files(self, layers):
         """树不做任何过滤：磁盘上有什么就显示什么。

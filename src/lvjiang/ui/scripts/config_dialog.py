@@ -34,7 +34,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...i18n import tr
-from ...workflows.discovery import discover_scripts
+from ...workflows.discovery import discover_scripts, script_display_name
 from ...workflows.policy import WorkflowDiscoveryPolicy as Policy
 from ...workflows.preferences import load_preferences, save_preferences
 from ..button_styles import apply_button_style
@@ -53,6 +53,7 @@ class ScriptConfigDialog(QDialog):
 
     # 脚本性质选项
     SCOPE_LABELS = {"daily": tr("日常"), "dedicated": tr("专用")}
+    REMOTE_PREFIX = "[远程] "
 
     def __init__(self, main_window):
         super().__init__(main_window)
@@ -152,7 +153,8 @@ class ScriptConfigDialog(QDialog):
         expose_item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
         self._table.setItem(row, self.COL_EXPOSE, expose_item)
 
-        name_item = QTableWidgetItem(display)
+        display_cfg = {**script, "name": display}
+        name_item = QTableWidgetItem(script_display_name(display_cfg))
         name_item.setData(Qt.ItemDataRole.UserRole, sid)  # 行标识：脚本 id
         self._table.setItem(row, self.COL_NAME, name_item)
 
@@ -174,7 +176,11 @@ class ScriptConfigDialog(QDialog):
         )
         self._table.setCellWidget(row, self.COL_SCOPE, scope_combo)
 
-        source = f".wf: {script['wf_file']}" if script.get("wf_file") else f"内置类: {script['class']}"
+        if script.get("wf_file"):
+            prefix = "[远程] " if script.get("is_remote") else ""
+            source = f"{prefix}.wf: {script['wf_file']}"
+        else:
+            source = f"内置类: {script['class']}"
         source_item = QTableWidgetItem(source)
         source_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
         self._table.setItem(row, self.COL_SOURCE, source_item)
@@ -214,12 +220,20 @@ class ScriptConfigDialog(QDialog):
         name_item = self._table.item(row, self.COL_NAME)
         expose_item = self._table.item(row, self.COL_EXPOSE)
         scope_combo: QComboBox = self._table.cellWidget(row, self.COL_SCOPE)
+        sid = str(name_item.data(Qt.ItemDataRole.UserRole))
         return (
-            str(name_item.data(Qt.ItemDataRole.UserRole)),
+            sid,
             expose_item.checkState() == Qt.CheckState.Checked,
-            name_item.text(),
+            self._raw_display(name_item.text(), sid),
             str(scope_combo.currentData() or "daily"),
         )
+
+    def _raw_display(self, text: str, sid: str) -> str:
+        """展示前缀不是用户改名的一部分，保存/换行时必须剥离。"""
+        if (self._scripts.get(sid) or {}).get("is_remote") \
+                and text.startswith(self.REMOTE_PREFIX):
+            return text[len(self.REMOTE_PREFIX):]
+        return text
 
     def _restore_row(
         self, row: int, state: tuple[str, bool, str, str],
@@ -260,7 +274,8 @@ class ScriptConfigDialog(QDialog):
             if checked != default_visible:
                 visible[sid] = checked      # 与作者声明的默认值相反才记
 
-            display = (name_item.text() or "").strip()
+            display = self._raw_display(
+                name_item.text() or "", str(sid)).strip()
             if display and display != self._base_names.get(sid, ""):
                 names[sid] = display
 

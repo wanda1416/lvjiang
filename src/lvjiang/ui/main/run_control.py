@@ -383,7 +383,7 @@ class RunControlMixin:
         暴露哪些脚本、顺序、以及可选的显示名覆盖。暴露层逻辑与设备端
         悬浮面板共用 ``list_exposed_scripts()``。
         """
-        from ...workflows.discovery import list_exposed_scripts
+        from ...workflows.discovery import list_exposed_scripts, script_display_name
 
         # 环境切换只会改变“不支持”提示，不应把用户选中的日常任务重置
         # 为第一项。清空 combo 前先按稳定 id 留住当前选择。
@@ -405,7 +405,7 @@ class RunControlMixin:
         self.workflow_combo.blockSignals(True)
         self.workflow_combo.clear()
         for cfg in self._workflow_configs:
-            full_display_name = cfg["name"]
+            full_display_name = script_display_name(cfg)
             # env 限制检查：若脚本声明了 env 且当前环境不在列表中，追加提示
             env_list = cfg.get("env") or []
             if env_list and current_env not in env_list:

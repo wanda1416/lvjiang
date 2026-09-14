@@ -696,6 +696,15 @@ class MainWindow(
         wf_layout.addStretch(1)
         daily_layout.addWidget(wf_group)
 
+        self._remote_workflow_warning = QLabel(tr(
+            "[警告] 本脚本由远程推送加载，请确认来源可靠并且强烈建议自行检查脚本或者运行时观察行为！"))
+        self._remote_workflow_warning.setObjectName("remote_workflow_warning")
+        self._remote_workflow_warning.setWordWrap(True)
+        self._remote_workflow_warning.setStyleSheet(
+            "color: #c62828; font-weight: 600;")
+        self._remote_workflow_warning.setVisible(False)
+        daily_layout.addWidget(self._remote_workflow_warning)
+
         self._independent_params_checkbox = QCheckBox(
             tr("使用独立参数"))
         self._independent_params_checkbox.setObjectName(

@@ -86,14 +86,33 @@ class TestRemoteVersionGate:
         r = _resolver(dirs)
         assert _read_marker(r.resolve_read("scenes/a.yaml")) == "系统"
 
-    def test_unregistered_path_never_uses_remote(self, dirs):
-        """没在 versioning 注册的路径（如 workflows/*.wf）不参与在线下发。"""
+    def test_append_only_workflow_never_overrides_system(self, dirs):
+        """WF 没有内容版本，远程只能新增，绝不覆盖 system。"""
         (dirs[0] / "workflows").mkdir()
         (dirs[0] / "workflows" / "a.wf").write_text("system", encoding="utf-8")
         (dirs[2] / "workflows").mkdir()
         (dirs[2] / "workflows" / "a.wf").write_text("remote", encoding="utf-8")
         r = _resolver(dirs)
         assert r.resolve_read("workflows/a.wf").read_text(encoding="utf-8") == "system"
+
+    def test_append_only_workflow_can_be_added_and_enumerated(self, dirs):
+        path = dirs[2] / "workflows" / "experiments" / "new.wf"
+        path.parent.mkdir(parents=True)
+        path.write_text('log "remote"\n', encoding="utf-8")
+        r = _resolver(dirs)
+        assert r.resolve_read("workflows/experiments/new.wf") == path
+        assert r.enumerate_entity_tree("workflows", "*.wf") == [
+            "experiments/new.wf"]
+
+    def test_local_workflow_shadows_remote_addition(self, dirs):
+        remote = dirs[2] / "workflows" / "new.wf"
+        local = dirs[1] / "workflows" / "new.wf"
+        for path, text in ((remote, "remote"), (local, "local")):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        r = _resolver(dirs)
+        assert r.resolve_read("workflows/new.wf") == local
+        assert r.describe_entity("workflows/new.wf").layer == "local"
 
 
 # ─── local 恒为最高优先级 ─────────────────────────────────

@@ -9,6 +9,7 @@ import hashlib
 import json
 
 import pytest
+from scripts.build_remote_config_manifest import build_manifest
 
 from lvjiang.core.config import remote, versioning
 from tests.case_matrix import case_matrix
@@ -20,6 +21,10 @@ def _sha(payload: bytes) -> str:
 
 def _scene_bytes(version: int, marker: str = "x") -> bytes:
     return f"content_version: {version}\nkey: a\nname: {marker}\n".encode("utf-8")
+
+
+def _wf_bytes(marker: str = "remote") -> bytes:
+    return f'#% name: {marker}\nlog "{marker}"\n'.encode("utf-8")
 
 
 def _entry(rel_path: str, payload: bytes, version: int, **kw) -> dict:
@@ -106,21 +111,37 @@ class TestPathSafety:
 
     def test_rejects_unregistered_dir(self):
         """没参与在线下发的目录，远程往那儿放文件没有正当理由。"""
-        assert not remote.is_safe_rel_path("workflows/evil.wf")
+        assert remote.is_safe_rel_path("workflows/experimental.wf")
         assert not remote.is_safe_rel_path("app.yaml")
 
     def test_accepts_registered_paths(self):
         assert remote.is_safe_rel_path("scenes/a.yaml")
         assert remote.is_safe_rel_path("layouts/android/a.json")
+        assert remote.is_safe_rel_path("workflows/standalone/a.wf")
 
     def test_unsafe_entry_filtered_out_of_applicable(self):
         payload = _scene_bytes(2)
         manifest = remote.parse_manifest(_manifest([
             _entry("scenes/a.yaml", payload, 2),
-            _entry("workflows/evil.wf", payload, 2),
+            _entry("unknown/evil.wf", payload, 2),
         ]))
         applicable = remote.applicable_entries(manifest, app_version="0.7.1")
         assert [e.rel_path for e in applicable] == ["scenes/a.yaml"]
+
+
+def test_manifest_builder_marks_workflow_as_unversioned_append_only(tmp_path):
+    path = tmp_path / "remote" / "workflows" / "experimental.wf"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(_wf_bytes())
+    manifest = build_manifest(
+        tmp_path, base_url="https://example.com/config", config_version=1,
+        updated_at="")
+    assert manifest["files"] == [{
+        "rel_path": "workflows/experimental.wf",
+        "url": "https://example.com/config/remote/workflows/experimental.wf",
+        "sha256": _sha(_wf_bytes()),
+        "content_version": 0,
+    }]
 
 
 # ─── 客户端版本区间 ──────────────────────────────────────
@@ -165,6 +186,34 @@ class TestSyncToDir:
         result = self._run(tmp_path, fake_net, [entry])
         assert result.updated == ("scenes/a.yaml",)
         assert (tmp_path / "remote" / "scenes" / "a.yaml").read_bytes() == payload
+
+    def test_downloads_unversioned_append_only_workflow(self, tmp_path, fake_net):
+        payload = _wf_bytes()
+        entry = _entry("workflows/experimental.wf", payload, 0)
+        fake_net[entry["url"]] = payload
+        result = self._run(tmp_path, fake_net, [entry])
+        assert result.updated == ("workflows/experimental.wf",)
+        assert (tmp_path / "remote" / entry["rel_path"]).read_bytes() == payload
+
+    def test_append_only_workflow_refuses_changed_content(self, tmp_path, fake_net):
+        old = _wf_bytes("old")
+        new = _wf_bytes("new")
+        target = tmp_path / "remote" / "workflows" / "experimental.wf"
+        target.parent.mkdir(parents=True)
+        target.write_bytes(old)
+        entry = _entry("workflows/experimental.wf", new, 0)
+        fake_net[entry["url"]] = new
+        result = self._run(tmp_path, fake_net, [entry])
+        assert result.skipped == ("workflows/experimental.wf",)
+        assert target.read_bytes() == old
+
+    def test_append_only_workflow_requires_zero_manifest_version(
+            self, tmp_path, fake_net):
+        payload = _wf_bytes()
+        entry = _entry("workflows/experimental.wf", payload, 1)
+        fake_net[entry["url"]] = payload
+        result = self._run(tmp_path, fake_net, [entry])
+        assert result.skipped == ("workflows/experimental.wf",)
 
     def test_sha256_mismatch_rejected(self, tmp_path, fake_net):
         payload = _scene_bytes(2)

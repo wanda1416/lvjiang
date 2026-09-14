@@ -297,6 +297,9 @@ class UiStateMixin:
         while self._param_layout.rowCount() > 0:
             self._param_layout.removeRow(0)
         flow_cfg = self._get_selected_flow_config()
+        remote_warning = getattr(self, "_remote_workflow_warning", None)
+        if remote_warning is not None:
+            remote_warning.setVisible(bool(flow_cfg and flow_cfg.get("is_remote")))
         note = str(flow_cfg.get("note") or "").strip() if flow_cfg else ""
         self._workflow_note_label.setText(f"{tr('说明')}：{note}" if note else "")
         self._workflow_note_label.setVisible(bool(note))

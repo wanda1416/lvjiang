@@ -70,9 +70,10 @@ class AllUserParamsDialog(QDialog):
         task_row.addWidget(QLabel(tr("任务")))
         self._task_combo = QComboBox()
         self._task_combo.setObjectName("all_user_params_task")
+        from ..workflows.discovery import script_display_name
         for config in self._configs:
             self._task_combo.addItem(
-                str(config.get("name") or config.get("id") or ""),
+                script_display_name(config),
                 str(config.get("id") or ""),
             )
         initial_index = self._task_combo.findData(initial_workflow_id)

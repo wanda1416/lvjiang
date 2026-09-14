@@ -13,7 +13,7 @@ from pathlib import Path
 
 from lvjiang.apps import load_app
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
-from lvjiang.core.layout_manager import load_layout_by_name
+from lvjiang.core.layout_manager import load_layout_by_key
 from tests.case_matrix import case_matrix
 
 # 方法名 → (场景参数位, region/key 参数位, kind)
@@ -120,7 +120,7 @@ def test_class_workflow_refs_all_bound(workflow_id, cls, layout_name):
     refs = _collect(path, cls)
     assert refs, f"{workflow_id} 没有抽取到任何静态坐标引用，门禁可能已失效"
 
-    layout = load_layout_by_name(layout_name)
+    layout = load_layout_by_key(layout_name)
     assert layout is not None, f"布局加载失败: {layout_name}"
 
     problems: list[str] = []

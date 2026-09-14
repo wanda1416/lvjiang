@@ -41,7 +41,7 @@
 |------|--------|-----------|
 | `app.yaml` | `input_simulation` / `delay_params` / `envs` | `load_app_config()` |
 | `scenes.yaml` | `schema_version: 2` / `scenes` | `core/scene_config.py`、`scene_registry.py`、`scene_definition.py` |
-| `layouts.yaml` | `layouts` | `core/layout_manager.py`、`screen_calib.py` |
+| `layouts.yaml` | `schema_version: 2` / `layouts` | `core/layout_manager.py`、`screen_calib.py` |
 | `ocr.yaml` | OCR 识别参数与文本规范化规则 | `core/ocr_config.py` / `core/ocr_cleaner.py` |
 | `yysls/game_config.yaml` | `base_attrs` / `affix_caps` / `schools` / `weapon_types` 等 9 项 | `apps/yysls/config/manager.py` |
 | `yysls/tune_config.yaml` | `base_rules` / `tuning_rules` / `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
@@ -64,6 +64,24 @@ scenes:
 缺少 `schema_version`（或显式为 1）的旧 `layout_scenes + group_names` 文档按
 v1 读取。system 与 local 必须各自转换为 v2 后再合并，不能先把两种 schema
 深合并；旧文件在兼容读取时不落盘，下一次真正保存场景结构时统一写成 v2。
+
+`layouts.yaml` 也使用 schema v2，但不提供旧格式兼容或自动迁移：
+
+```yaml
+schema_version: 2
+layouts:
+  android:
+    name: 安卓布局
+    canvas: {x_ratio: 0.0, y_ratio: 0.0, w_ratio: 1.0, h_ratio: 1.0}
+  android_cast:
+    name: 投屏布局
+    extends: android
+    canvas: {x_ratio: 0.0, y_ratio: 0.04, w_ratio: 1.0, h_ratio: 0.92}
+```
+
+`layouts` 下的 key 是不可变的存储标识，同时用于
+`layouts/{key}/`、`templates/{key}/`、会话激活值和运行方案；`name` 只用于
+UI 展示。key 和 name 都必须全局唯一，另存为不允许覆盖已有 key。
 
 ### 例外：telemetry/ 不是覆盖层镜像
 
@@ -372,7 +390,7 @@ https://wanda1416.github.io/lvjiang/config/config.json
   "updated_at": "2026-08-27T00:00:00Z",
   "files": [
     {
-      "rel_path": "layouts/桌面布局/game_login_page.json",
+      "rel_path": "layouts/desktop/game_login_page.json",
       "url": "https://wanda1416.github.io/lvjiang/config/remote/layouts/%E6%A1%8C%E9%9D%A2%E5%B8%83%E5%B1%80/game_login_page.json",
       "sha256": "…",
       "content_version": 3,

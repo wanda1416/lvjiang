@@ -8,7 +8,7 @@
       "w_ratio": 0.03451648351648351,
       "h_ratio": 0.059670329670329675,
       "template": {
-        "name": "默认布局/bag_detail/back",
+        "name": "android/bag_detail/back",
         "min_score": 0.6,
         "record_w": 2800,
         "record_h": 1260

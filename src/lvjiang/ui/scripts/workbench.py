@@ -242,7 +242,7 @@ class DebugPanel(QWidget):
         lm = getattr(main, "_layout_manager", None)
         if lm is not None:
             try:
-                layout = lm.load_layout(lm.get_active_layout_name())
+                layout = lm.load_layout(lm.get_active_layout_key())
                 canvas = layout.get_canvas() if layout else None
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"读取布局画布失败，按整帧显示: {e}")
@@ -324,7 +324,7 @@ class DebugPanel(QWidget):
 
         main = self._main
         lm = main._layout_manager
-        layout = lm.load_layout(main.layout_combo.currentText())
+        layout = lm.load_layout(main.layout_combo.currentData())
         if not layout:
             raise RuntimeError(tr("无法加载当前布局"))
         if getattr(main, "_backend", "windows") == "adb":

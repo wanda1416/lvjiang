@@ -2,9 +2,9 @@
 
 覆盖：
 - save_layout → load_layout roundtrip（canvas + regions/points/arrows/panels）
-- list_layouts 名册枚举
+- list_layout_keys 名册枚举
 - delete_layout（开发模式直删 + 用户模式墓碑）
-- load_layout_by_name 模块级函数
+- load_layout_by_key module_layout函数
 """
 
 import json
@@ -12,7 +12,7 @@ import json
 import pytest
 
 from lvjiang.core import layout_manager
-from lvjiang.core.layout_manager import LayoutConfigManager, load_layout_by_name
+from lvjiang.core.layout_manager import LayoutConfigManager, load_layout_by_key
 from lvjiang.core.layout_models import (
     Arrow,
     CanvasConfig,
@@ -24,8 +24,8 @@ from lvjiang.core.layout_models import (
 from tests.case_matrix import case_matrix
 
 
-def _make_layout(name: str = "测试布局") -> Layout:
-    layout = Layout(name=name)
+def _make_layout(name: str = "test_layout") -> Layout:
+    layout = Layout(key=name, name=name)
     layout.canvas = CanvasConfig(x_ratio=0.1, y_ratio=0.2, w_ratio=0.8, h_ratio=0.9)
     layout.set_scene_regions("scene_a", [
         Region("btn", 0.1, 0.2, 0.3, 0.4, activation_key="space"),
@@ -64,7 +64,7 @@ class TestSaveLoadRoundtrip:
         expected = {}
         for name, rows, mode, visible in (
                 ("desktop", 7, "image", .77), ("mobile", 4, "even", .9)):
-            layout = Layout(name=name)
+            layout = Layout(key=name, name=name)
             panel = Panel("grid", .1, .2, .6, .7, rows=rows,
                           calibration=mode, min_visible=visible)
             layout.set_scene_panels("source", [panel])
@@ -113,9 +113,9 @@ class TestSaveLoadRoundtrip:
         original = _make_layout()
         mgr.save_layout(original)
 
-        loaded = mgr.load_layout("测试布局")
+        loaded = mgr.load_layout("test_layout")
         assert loaded is not None
-        assert loaded.name == "测试布局"
+        assert loaded.name == "test_layout"
         # canvas
         assert loaded.canvas.x_ratio == pytest.approx(0.1)
         assert loaded.canvas.y_ratio == pytest.approx(0.2)
@@ -142,7 +142,7 @@ class TestSaveLoadRoundtrip:
     def test_scene_files_created_on_disk(self, env):
         mgr = LayoutConfigManager()
         mgr.save_layout(_make_layout())
-        scene_dir = env / "system" / "layouts" / "测试布局"
+        scene_dir = env / "system" / "layouts" / "test_layout"
         assert scene_dir.is_dir()
         assert (scene_dir / "scene_a.json").exists()
         assert (scene_dir / "scene_b.json").exists()
@@ -154,8 +154,8 @@ class TestSaveLoadRoundtrip:
         assert yaml_path.exists()
         import yaml
         doc = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-        assert "测试布局" in doc["layouts"]
-        assert doc["layouts"]["测试布局"]["canvas"]["w_ratio"] == pytest.approx(0.8)
+        assert "test_layout" in doc["layouts"]
+        assert doc["layouts"]["test_layout"]["canvas"]["w_ratio"] == pytest.approx(0.8)
 
     def test_rejects_invalid_activation_key_before_writing(self, env):
         mgr = LayoutConfigManager()
@@ -165,7 +165,7 @@ class TestSaveLoadRoundtrip:
 
         assert mgr.save_layout(layout) is False
         assert not (env / "system" / "layouts.yaml").exists()
-        assert not (env / "system" / "layouts" / "测试布局").exists()
+        assert not (env / "system" / "layouts" / "test_layout").exists()
 
     def test_rejects_non_string_activation_key_before_writing(self, env):
         mgr = LayoutConfigManager()
@@ -179,66 +179,88 @@ class TestSaveLoadRoundtrip:
 class TestListLayouts:
     def test_list_from_yaml(self, env):
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("布局X"))
-        mgr.save_layout(_make_layout("布局Y"))
-        names = mgr.list_layouts()
-        assert names == ["布局X", "布局Y"]
+        mgr.save_layout(_make_layout("layout_x"))
+        mgr.save_layout(_make_layout("layout_y"))
+        names = mgr.list_layout_keys()
+        assert names == ["layout_x", "layout_y"]
 
     def test_empty_when_no_layouts(self, env):
         mgr = LayoutConfigManager()
-        assert mgr.list_layouts() == []
+        assert mgr.list_layout_keys() == []
+
+    def test_display_name_is_separate_and_both_identities_are_unique(self, env):
+        mgr = LayoutConfigManager()
+        assert mgr.save_layout(Layout(key="mobile", name="我的手机布局"))
+
+        loaded = mgr.load_layout("mobile")
+        assert loaded is not None
+        assert loaded.key == "mobile"
+        assert loaded.name == "我的手机布局"
+        assert mgr.list_layout_entries()[0].name == "我的手机布局"
+        with pytest.raises(ValueError, match="key 已存在"):
+            mgr.validate_new_identity("mobile", "其他名称")
+        with pytest.raises(ValueError, match="布局名称已存在"):
+            mgr.validate_new_identity("mobile_copy", "我的手机布局")
+
+    def test_stale_active_layout_falls_back_to_first_valid_key(self, env):
+        mgr = LayoutConfigManager()
+        assert mgr.save_layout(_make_layout("android"))
+        assert mgr.save_layout(_make_layout("desktop"))
+        mgr.set_active_layout("默认布局")
+
+        assert mgr.get_active_layout_key() == "android"
 
 
 class TestDeleteLayout:
     def test_dev_mode_deletes_dir_and_yaml(self, env):
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("待删"))
-        assert "待删" in mgr.list_layouts()
+        mgr.save_layout(_make_layout("delete_me"))
+        assert "delete_me" in mgr.list_layout_keys()
 
-        result = mgr.delete_layout("待删")
+        result = mgr.delete_layout("delete_me")
         assert result is True
-        assert "待删" not in mgr.list_layouts()
-        assert mgr.load_layout("待删") is None
+        assert "delete_me" not in mgr.list_layout_keys()
+        assert mgr.load_layout("delete_me") is None
         # 目录已清
-        assert not (env / "system" / "layouts" / "待删").exists()
+        assert not (env / "system" / "layouts" / "delete_me").exists()
 
     def test_delete_nonexistent_returns_false(self, env):
         mgr = LayoutConfigManager()
-        assert mgr.delete_layout("不存在") is False
+        assert mgr.delete_layout("missing") is False
 
     def test_user_mode_refuses_system_layout(self, env, monkeypatch):
-        """系统布局属于 system 内容，用户模式下不可删除——不想用就别选它。"""
+        """system_layout属于 system 内容，用户模式下不可删除——不想用就别选它。"""
         import lvjiang.core.config.resolver as cr
 
         # 先在开发模式写 system
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("系统布局"))
+        mgr.save_layout(_make_layout("system_layout"))
 
         # 切换到用户模式
         monkeypatch.setenv("LVJIANG_DEV_MODE", "0")
         monkeypatch.setattr(cr, "_resolver", None)
         mgr2 = LayoutConfigManager()
 
-        assert mgr2.delete_layout("系统布局") is False
-        assert "系统布局" in mgr2.list_layouts()
-        assert not (env / "local" / "layouts" / "系统布局"
+        assert mgr2.delete_layout("system_layout") is False
+        assert "system_layout" in mgr2.list_layout_keys()
+        assert not (env / "local" / "layouts" / "system_layout"
                     / "scene_a.json.deleted").exists()
 
 class TestModuleLevelLoad:
-    def test_load_layout_by_name(self, env):
+    def test_load_layout_by_key(self, env):
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("模块级"))
-        layout = load_layout_by_name("模块级")
+        mgr.save_layout(_make_layout("module_layout"))
+        layout = load_layout_by_key("module_layout")
         assert layout is not None
-        assert layout.name == "模块级"
+        assert layout.name == "module_layout"
         assert [r.key for r in layout.get_scene_regions("scene_a")] == ["btn", "label"]
 
     def test_load_nonexistent_returns_none(self, env):
-        assert load_layout_by_name("不存在") is None
+        assert load_layout_by_key("missing") is None
 
 
 class TestAliasLayout:
-    """布局别名（extends）测试：scene 复用根布局，仅 canvas 独立"""
+    """布局别名（extends）测试：scene 复用root_layout，仅 canvas 独立"""
 
     @staticmethod
     def _add_alias_entry(env, alias: str, root: str, canvas: dict):
@@ -246,61 +268,65 @@ class TestAliasLayout:
         import yaml
         yaml_path = env / "system" / "layouts.yaml"
         doc = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-        doc["layouts"][alias] = {"extends": root, "canvas": canvas}
+        doc["layouts"][alias] = {
+            "name": alias,
+            "extends": root,
+            "canvas": canvas,
+        }
         yaml_path.write_text(
             yaml.safe_dump(doc, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
     def test_alias_loads_scenes_from_root(self, env):
         """别名加载：scene 来自根目录，canvas 取自身，name 为别名"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         self._add_alias_entry(
-            env, "别名布局", "根布局",
+            env, "alias_layout", "root_layout",
             {"x_ratio": 0.0, "y_ratio": 0.0, "w_ratio": 0.5, "h_ratio": 0.6})
 
-        layout = load_layout_by_name("别名布局")
+        layout = load_layout_by_key("alias_layout")
         assert layout is not None
-        assert layout.name == "别名布局"
+        assert layout.name == "alias_layout"
         # canvas 为自身条目值
         assert layout.canvas.w_ratio == pytest.approx(0.5)
         assert layout.canvas.h_ratio == pytest.approx(0.6)
-        # scene 来自根布局
+        # scene 来自root_layout
         assert [r.key for r in layout.get_scene_regions("scene_a")] == ["btn", "label"]
         assert [p.key for p in layout.get_scene_panels("scene_b")] == ["grid"]
-        assert set(layout_manager.shared_layout_bindings("根布局")) == {"根布局", "别名布局"}
-        assert set(layout_manager.shared_layout_bindings("别名布局")) == {"根布局", "别名布局"}
+        assert set(layout_manager.shared_layout_bindings("root_layout")) == {"root_layout", "alias_layout"}
+        assert set(layout_manager.shared_layout_bindings("alias_layout")) == {"root_layout", "alias_layout"}
 
     def test_alias_extends_missing_target_returns_none(self, env):
-        """extends 指向不存在的布局 → None"""
+        """extends 指向missing的布局 → None"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         self._add_alias_entry(
-            env, "坏别名", "不存在的根", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
-        assert load_layout_by_name("坏别名") is None
+            env, "bad_alias", "missing_root", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
+        with pytest.raises(ValueError, match="extends 目标不存在"):
+            load_layout_by_key("bad_alias")
 
     def test_alias_multi_level_inheritance_returns_none(self, env):
         """extends 指向另一个带 extends 的布局（多级继承）→ None"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         self._add_alias_entry(
-            env, "一级别名", "根布局", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
+            env, "alias_one", "root_layout", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
         self._add_alias_entry(
-            env, "二级别名", "一级别名", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
-        # 一级别名正常加载
-        assert load_layout_by_name("一级别名") is not None
-        # 二级别名被禁止
-        assert load_layout_by_name("二级别名") is None
+            env, "alias_two", "alias_one", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
+        # 整份 v2 清单必须合法，多级继承会在解析期直接拒绝。
+        with pytest.raises(ValueError, match="禁止多级继承"):
+            load_layout_by_key("alias_one")
 
     def test_alias_save_preserves_extends_and_writes_root_dir(self, env):
         """save_layout 别名：yaml 保留 extends + 更新 canvas；scene 写根目录"""
         import yaml
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         self._add_alias_entry(
-            env, "别名布局", "根布局", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
+            env, "alias_layout", "root_layout", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
 
         # 加载别名 → 修改 → 保存
-        layout = load_layout_by_name("别名布局")
+        layout = load_layout_by_key("alias_layout")
         layout.canvas = CanvasConfig(x_ratio=0.2, y_ratio=0.3, w_ratio=0.7, h_ratio=0.8)
         layout.set_scene_regions("scene_a", [Region("newbtn", 0.1, 0.1, 0.2, 0.2)])
         mgr.save_layout(layout)
@@ -308,29 +334,29 @@ class TestAliasLayout:
         # yaml 条目保留 extends + canvas 已更新
         doc = yaml.safe_load(
             (env / "system" / "layouts.yaml").read_text(encoding="utf-8"))
-        alias_entry = doc["layouts"]["别名布局"]
-        assert alias_entry["extends"] == "根布局"
+        alias_entry = doc["layouts"]["alias_layout"]
+        assert alias_entry["extends"] == "root_layout"
         assert alias_entry["canvas"]["w_ratio"] == pytest.approx(0.7)
 
-        # scene 写入根布局目录，别名目录不存在
-        assert (env / "system" / "layouts" / "根布局" / "scene_a.json").exists()
-        assert not (env / "system" / "layouts" / "别名布局").exists()
-        # 根布局重新加载后包含新 region（单一事实源）
-        root = load_layout_by_name("根布局")
+        # scene 写入root_layout目录，别名目录missing
+        assert (env / "system" / "layouts" / "root_layout" / "scene_a.json").exists()
+        assert not (env / "system" / "layouts" / "alias_layout").exists()
+        # root_layout重新加载后包含新 region（单一事实源）
+        root = load_layout_by_key("root_layout")
         assert [r.key for r in root.get_scene_regions("scene_a")] == ["newbtn"]
 
     def test_alias_delete_only_removes_yaml_entry(self, env):
-        """delete_layout 别名：仅移除 yaml 条目，根布局文件不受影响"""
+        """delete_layout 别名：仅移除 yaml 条目，root_layout文件不受影响"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         self._add_alias_entry(
-            env, "别名布局", "根布局", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
+            env, "alias_layout", "root_layout", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
 
-        result = mgr.delete_layout("别名布局")
+        result = mgr.delete_layout("alias_layout")
         assert result is True
-        assert "别名布局" not in mgr.list_layouts()
-        # 根布局完好
-        root = load_layout_by_name("根布局")
+        assert "alias_layout" not in mgr.list_layout_keys()
+        # root_layout完好
+        root = load_layout_by_key("root_layout")
         assert root is not None
         assert [r.key for r in root.get_scene_regions("scene_a")] == ["btn", "label"]
 
@@ -339,145 +365,153 @@ class TestAliasLayout:
         import lvjiang.core.config.resolver as cr
 
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         self._add_alias_entry(
-            env, "系统别名", "根布局",
+            env, "system_alias", "root_layout",
             {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1},
         )
         monkeypatch.setenv("LVJIANG_DEV_MODE", "0")
         monkeypatch.setattr(cr, "_resolver", None)
         user_mgr = LayoutConfigManager()
 
-        assert user_mgr.is_system_layout("系统别名")
-        assert user_mgr.delete_layout("系统别名") is False
-        assert "系统别名" in user_mgr.list_layouts()
+        assert user_mgr.is_system_layout("system_alias")
+        assert user_mgr.delete_layout("system_alias") is False
+        assert "system_alias" in user_mgr.list_layout_keys()
         assert not (env / "local" / "layouts.yaml").exists()
 
     def test_new_layout_rejects_existing_alias_name(self, env):
-        """new_layout 撞名别名 → ValueError，根布局不被清空"""
+        """new_layout 撞名别名 → ValueError，root_layout不被清空"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         self._add_alias_entry(
-            env, "别名布局", "根布局", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
+            env, "alias_layout", "root_layout", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
 
         with pytest.raises(ValueError):
-            mgr.new_layout("别名布局")
-        # 根布局数据完好
-        root = load_layout_by_name("根布局")
+            mgr.new_layout("alias_layout", "alias_layout")
+        # root_layout数据完好
+        root = load_layout_by_key("root_layout")
         assert [r.key for r in root.get_scene_regions("scene_a")] == ["btn", "label"]
 
     def test_new_layout_rejects_existing_root_name(self, env):
         """new_layout 撞名普通布局 → ValueError"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         with pytest.raises(ValueError):
-            mgr.new_layout("根布局")
+            mgr.new_layout("root_layout", "root_layout")
 
     def test_delete_root_referenced_by_alias_rejected(self, env):
-        """删除被别名引用的根布局 → 拒绝，别名不悬空"""
+        """删除被别名引用的root_layout → 拒绝，别名不悬空"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         self._add_alias_entry(
-            env, "别名布局", "根布局", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
+            env, "alias_layout", "root_layout", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
 
-        result = mgr.delete_layout("根布局")
+        result = mgr.delete_layout("root_layout")
         assert result is False
-        # 根布局与别名均可正常加载
-        assert load_layout_by_name("根布局") is not None
-        assert load_layout_by_name("别名布局") is not None
+        # root_layout与别名均可正常加载
+        assert load_layout_by_key("root_layout") is not None
+        assert load_layout_by_key("alias_layout") is not None
 
     def test_save_layout_rejects_invalid_extends(self, env):
         """save_layout 对非法 extends（多级继承）拒绝写盘"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         self._add_alias_entry(
-            env, "一级别名", "根布局", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
+            env, "alias_one", "root_layout", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
         self._add_alias_entry(
-            env, "二级别名", "一级别名", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
+            env, "alias_two", "alias_one", {"x_ratio": 0, "y_ratio": 0, "w_ratio": 1, "h_ratio": 1})
 
         # 直接构造内存布局尝试保存非法别名
-        bad = _make_layout("二级别名")
-        mgr.save_layout(bad)
-        # 非法条目未被写入 scene（一级别名目录不存在）
-        assert not (env / "system" / "layouts" / "一级别名").exists()
-        assert not (env / "system" / "layouts" / "二级别名").exists()
+        bad = _make_layout("alias_two")
+        with pytest.raises(ValueError, match="禁止多级继承"):
+            mgr.save_layout(bad)
+        # 非法条目未被写入 scene（alias_one目录missing）
+        assert not (env / "system" / "layouts" / "alias_one").exists()
+        assert not (env / "system" / "layouts" / "alias_two").exists()
 
     def test_create_alias_layout(self, env):
-        """create_alias_layout：创建别名布局，仅 yaml 条目，无 scene 文件"""
+        """create_alias_layout：创建alias_layout，仅 yaml 条目，无 scene 文件"""
         mgr = LayoutConfigManager()
-        root = _make_layout("根布局")
+        root = _make_layout("root_layout")
         mgr.save_layout(root)
 
         canvas = CanvasConfig(x_ratio=0.1, y_ratio=0.2, w_ratio=0.8, h_ratio=0.9)
-        alias = mgr.create_alias_layout("别名布局", "根布局", canvas)
+        alias = mgr.create_alias_layout(
+            "alias_layout", "alias_layout", "root_layout", canvas)
 
         assert alias is not None
-        assert alias.name == "别名布局"
+        assert alias.name == "alias_layout"
         # canvas 为自身配置
         assert alias.canvas.w_ratio == pytest.approx(0.8)
-        # scene 来自根布局
+        # scene 来自root_layout
         assert [r.key for r in alias.get_scene_regions("scene_a")] == ["btn", "label"]
-        # 别名目录不存在
-        assert not (env / "system" / "layouts" / "别名布局").exists()
+        # 别名目录missing
+        assert not (env / "system" / "layouts" / "alias_layout").exists()
         # yaml 条目正确
         import yaml
         doc = yaml.safe_load((env / "system" / "layouts.yaml").read_text(encoding="utf-8"))
-        assert doc["layouts"]["别名布局"]["extends"] == "根布局"
+        assert doc["layouts"]["alias_layout"]["extends"] == "root_layout"
 
     def test_create_alias_layout_rejects_existing_name(self, env):
         """create_alias_layout：撞名已存在布局 → None"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
-        mgr.save_layout(_make_layout("已有布局"))
+        mgr.save_layout(_make_layout("root_layout"))
+        mgr.save_layout(_make_layout("existing_layout"))
         canvas = CanvasConfig()
-        assert mgr.create_alias_layout("已有布局", "根布局", canvas) is None
+        assert mgr.create_alias_layout(
+            "existing_layout", "existing_layout", "root_layout", canvas,
+        ) is None
 
     def test_create_alias_layout_rejects_alias_target(self, env):
         """create_alias_layout：继承目标是别名 → None（禁止多级）"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
-        mgr.create_alias_layout("一级别名", "根布局", CanvasConfig())
+        mgr.save_layout(_make_layout("root_layout"))
+        mgr.create_alias_layout(
+            "alias_one", "alias_one", "root_layout", CanvasConfig())
         canvas = CanvasConfig()
-        assert mgr.create_alias_layout("二级别名", "一级别名", canvas) is None
+        assert mgr.create_alias_layout(
+            "alias_two", "alias_two", "alias_one", canvas,
+        ) is None
 
 
 class TestSceneLayoutRel:
     """UI 靠这个路径解析场景坐标文件的来源层（system/remote/local）。
 
-    别名布局（带 extends）的 scene 文件实际存放在**根布局**目录下，照别名
-    名字拼路径会指向一个不存在的目录——调用方拿到的是"这个文件没有"的空
-    结果而不自知：场景编辑器的来源标识就因此在继承布局下少显示了一半。
+    alias_layout（带 extends）的 scene 文件实际存放在**root_layout**目录下，照别名
+    名字拼路径会指向一个missing的目录——调用方拿到的是"这个文件没有"的空
+    结果而不自知：场景编辑器的来源标识就因此在android_cast下少显示了一半。
     """
 
     def test_root_layout_uses_its_own_dir(self, env):
         from lvjiang.core.layout_manager import scene_layout_rel
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
-        assert scene_layout_rel("根布局", "scene_a") == "layouts/根布局/scene_a.json"
+        mgr.save_layout(_make_layout("root_layout"))
+        assert scene_layout_rel("root_layout", "scene_a") == "layouts/root_layout/scene_a.json"
 
     def test_alias_layout_points_at_root_dir(self, env):
         from lvjiang.core.layout_manager import scene_layout_rel
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         TestAliasLayout._add_alias_entry(
-            env, "别名布局", "根布局",
+            env, "alias_layout", "root_layout",
             {"x_ratio": 0.0, "y_ratio": 0.0, "w_ratio": 0.5, "h_ratio": 0.6})
-        rel = scene_layout_rel("别名布局", "scene_a")
-        assert rel == "layouts/根布局/scene_a.json"
+        rel = scene_layout_rel("alias_layout", "scene_a")
+        assert rel == "layouts/root_layout/scene_a.json"
         # 而且这个路径确实存在——空结果正是原来的 bug
         assert (env / "system" / rel).exists()
 
     def test_unknown_layout_falls_back_to_its_own_name(self, env):
-        """布局不存在时不该抛异常，退回按名字拼（调用方自会得到空来源）。"""
+        """布局missing时不该抛异常，退回按名字拼（调用方自会得到空来源）。"""
         from lvjiang.core.layout_manager import scene_layout_rel
-        assert scene_layout_rel("没有的布局", "scene_a") == "layouts/没有的布局/scene_a.json"
+        assert scene_layout_rel("unknown_layout", "scene_a") == \
+            "layouts/unknown_layout/scene_a.json"
 
     def test_batch_paths_parse_layout_registry_once(self, env, monkeypatch):
         from lvjiang.core.config.resolver import get_resolver
         from lvjiang.core.layout_manager import scene_layout_rels
 
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"))
+        mgr.save_layout(_make_layout("root_layout"))
         resolver = get_resolver()
         original = resolver.load_merged
         calls = []
@@ -487,9 +521,9 @@ class TestSceneLayoutRel:
             return original(rel_path)
 
         monkeypatch.setattr(resolver, "load_merged", counted)
-        assert scene_layout_rels("根布局", ("scene_a", "scene_b")) == {
-            "scene_a": "layouts/根布局/scene_a.json",
-            "scene_b": "layouts/根布局/scene_b.json",
+        assert scene_layout_rels("root_layout", ("scene_a", "scene_b")) == {
+            "scene_a": "layouts/root_layout/scene_a.json",
+            "scene_b": "layouts/root_layout/scene_b.json",
         }
         assert calls == ["layouts.yaml"]
 
@@ -502,18 +536,18 @@ class TestSaveLayoutScope:
     而实体文件是整文件影子，等于一次点击把整个布局永久冻在本地。
     """
 
-    def _saved_scene_files(self, env, name="根布局") -> set[str]:
+    def _saved_scene_files(self, env, name="root_layout") -> set[str]:
         d = env / "system" / "layouts" / name
         return {p.name for p in d.glob("*.json")} if d.is_dir() else set()
 
     def test_empty_set_writes_no_scene(self, env):
         mgr = LayoutConfigManager()
-        layout = _make_layout("根布局")
+        layout = _make_layout("root_layout")
         mgr.save_layout(layout)                      # 先全量落一次
         before = self._saved_scene_files(env)
         assert before, "预期首次保存会写出场景文件"
 
-        for path in (env / "system" / "layouts" / "根布局").glob("*.json"):
+        for path in (env / "system" / "layouts" / "root_layout").glob("*.json"):
             path.unlink()
         mgr.save_layout(layout, changed_scenes=set())
         assert self._saved_scene_files(env) == set()
@@ -521,23 +555,23 @@ class TestSaveLayoutScope:
     def test_none_still_means_full_write(self, env):
         """新建/另存为依赖 None 的全量语义，不能一起改掉。"""
         mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("根布局"), changed_scenes=None)
+        mgr.save_layout(_make_layout("root_layout"), changed_scenes=None)
         assert self._saved_scene_files(env)
 
     def test_subset_writes_only_that_scene(self, env):
         mgr = LayoutConfigManager()
-        layout = _make_layout("根布局")
+        layout = _make_layout("root_layout")
         mgr.save_layout(layout)
-        for path in (env / "system" / "layouts" / "根布局").glob("*.json"):
+        for path in (env / "system" / "layouts" / "root_layout").glob("*.json"):
             path.unlink()
         mgr.save_layout(layout, changed_scenes={"scene_a"})
         assert self._saved_scene_files(env) == {"scene_a.json"}
 
     def test_explicit_version_alone_writes_selected_scene(self, env):
         mgr = LayoutConfigManager()
-        layout = _make_layout("根布局")
+        layout = _make_layout("root_layout")
         mgr.save_layout(layout)
-        scene_dir = env / "system" / "layouts" / "根布局"
+        scene_dir = env / "system" / "layouts" / "root_layout"
         for path in scene_dir.glob("*.json"):
             path.unlink()
 

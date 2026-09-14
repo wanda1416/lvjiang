@@ -216,13 +216,13 @@ class TestWritePreservesVersion:
 
     def test_json_entity_keeps_version_and_format(self, dirs):
         """layouts/{布局}/{场景}.json 是 depth=2 的版本化实体。"""
-        path = dirs[0] / "layouts" / "默认布局" / "s.json"
+        path = dirs[0] / "layouts" / "android" / "s.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps({"content_version": 2, "regions": [{"key": "a"}]},
                        ensure_ascii=False, indent=2), encoding="utf-8")
         r = _resolver(dirs, dev_mode=True)
-        r.write_entity("layouts/默认布局/s.json",
+        r.write_entity("layouts/android/s.json",
                        json.dumps({"regions": [{"key": "b"}]},
                                   ensure_ascii=False, indent=2))
         data = json.loads(path.read_text(encoding="utf-8"))

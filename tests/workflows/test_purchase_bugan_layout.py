@@ -5,7 +5,7 @@ from pathlib import Path
 
 _ROOT = Path(__file__).parents[2]
 _DESKTOP_LAYOUT = (
-    _ROOT / "config" / "system" / "layouts" / "桌面布局" / "bugan_detail.json"
+    _ROOT / "config" / "system" / "layouts" / "desktop" / "bugan_detail.json"
 )
 _WORKFLOW = _ROOT / "config" / "system" / "workflows" / "purchase_bugan.wf"
 

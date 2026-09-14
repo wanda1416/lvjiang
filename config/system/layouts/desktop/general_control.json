@@ -44,7 +44,7 @@
       "h_ratio": 0.03998099791879769,
       "activation_key": "ESC",
       "template": {
-        "name": "桌面布局/general_control/back",
+        "name": "desktop/general_control/back",
         "min_score": 0.6,
         "record_w": 1936,
         "record_h": 1088

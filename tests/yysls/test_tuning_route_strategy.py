@@ -495,7 +495,7 @@ def test_reset_success_closes_the_refund_prompt_with_close_btn():
     """重置提交后用 close_btn 关掉可能存在的材料返还提示，不碰 blank_area。
 
     110 级会返还材料、多一层提示要关掉；105 级直接回调律页。close_btn 是一块
-    安全的空关闭区（桌面布局绑定 SPACE），有提示就关掉、没提示也无副作用，
+    安全的空关闭区（desktop绑定 SPACE），有提示就关掉、没提示也无副作用，
     所以不按等级分支。而 general_control.blank_area 在自动调律的弹窗上可能与
     按钮叠加，点下去会误触，调律流程里它只作识别区。
     """

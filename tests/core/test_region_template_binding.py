@@ -22,12 +22,12 @@ def test_template_binding_roundtrip_and_optional_omission():
     region = Region(
         "logo", 0.1, 0.2, 0.3, 0.4,
         template=TemplateBinding(
-            "默认布局/general_control/logo", 0.87, 2400, 1080),
+            "android/general_control/logo", 0.87, 2400, 1080),
     )
     data = region.to_dict()
 
     assert data["template"] == {
-        "name": "默认布局/general_control/logo",
+        "name": "android/general_control/logo",
         "min_score": 0.87,
         "record_w": 2400,
         "record_h": 1080,

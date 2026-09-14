@@ -416,7 +416,7 @@ def save_reference_grid(grid: dict[str, Any]) -> None:
 def load_env() -> str:
     """读取当前工作环境（session.json 的 settings.env 节点）
 
-    无配置时取 app.yaml envs 列表第一项，保证与默认布局对应。
+    无配置时取 app.yaml envs 列表第一项，保证与默认连接方案对应。
     """
     value = load_settings().get("env")
     if isinstance(value, str) and value:

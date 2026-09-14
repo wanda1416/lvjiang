@@ -49,18 +49,20 @@ def _create_ocr() -> OCREngine:
 
 
 def _default_layout_name() -> str:
-    """默认布局名：session 的 active_layout → layouts.yaml 名册第一个
+    """默认布局 key：session 的 active_layout → layouts.yaml 名册第一个
 
     Raises:
         RuntimeError: 无任何可用布局时
     """
+    from ..layout_config import load_layout_entries
+    keys = list(load_layout_entries())
     name = get_session_store().get_active("layout", "")
     if name:
+        if name not in keys:
+            raise RuntimeError(tr("当前 active_layout 不存在：{name}").format(name=name))
         return name
-    merged = get_resolver().load_merged("layouts.yaml")
-    names = sorted(merged.get("layouts", {}).keys())
-    if names:
-        return names[0]
+    if keys:
+        return keys[0]
     raise RuntimeError(tr("没有可用布局：session 未指定 active_layout 且 layouts.yaml 名册为空"))
 
 
@@ -73,11 +75,11 @@ def _load_layout(name: str) -> Layout:
     Returns:
         Layout 实例
     """
-    from ..layout_manager import load_layout_by_name
-    layout = load_layout_by_name(name)
+    from ..layout_manager import load_layout_by_key
+    layout = load_layout_by_key(name)
     if layout is None:
         logger.warning(f"布局不存在: {name}，使用空布局")
-        return Layout(name=name)
+        return Layout(key=name, name=name)
     return layout
 
 

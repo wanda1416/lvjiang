@@ -4,8 +4,8 @@ from loguru import logger
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
+    QFormLayout,
     QHBoxLayout,
-    QInputDialog,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -19,6 +19,7 @@ from ...core.config.resolver import (
     get_resolver,
 )
 from ...core.key_validation import validate_layout_activation_keys
+from ...core.layout_config import load_layout_doc
 from ...core.layout_manager import (
     copy_screenshots,
     delete_screenshots,
@@ -43,24 +44,42 @@ class LayoutOpsMixin:
 
     # ─── 名称校验 ─────────────────────────────────────────
 
-    def _validate_layout_name(self, name: str) -> bool:
-        """校验布局名称是否合法（不含文件系统禁用字符）"""
-        invalid_chars = r'\/:*?"<>|'
-        for ch in invalid_chars:
-            if ch in name:
-                QMessageBox.warning(
-                    self, tr("名称不合法"),  # type: ignore[arg-type]
-                    f"布局名称不能包含字符: {ch}\n"
-                    f"禁用字符: \\ / : * ? \" < > |",
-                )
-                return False
-        if name.startswith(' ') or name.startswith('.'):
+    def _prompt_layout_identity(self, title: str) -> tuple[str, str] | None:
+        """输入稳定布局 key 和展示名称。"""
+        dialog = QDialog(self)  # type: ignore[arg-type]
+        dialog.setWindowTitle(title)
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        key_input = QLineEdit()
+        key_input.setPlaceholderText("desktop_custom")
+        key_input.setToolTip(tr("以小写字母开头，仅支持小写字母、数字和下划线，创建后不可修改"))
+        name_input = QLineEdit()
+        name_input.setPlaceholderText(tr("例如：我的投屏布局"))
+        form.addRow(tr("布局 key"), key_input)
+        form.addRow(tr("布局名称"), name_input)
+        layout.addLayout(form)
+        buttons = QHBoxLayout()
+        ok_button = QPushButton(tr("确定"))
+        cancel_button = QPushButton(tr("取消"))
+        apply_button_style(ok_button)
+        apply_button_style(cancel_button, variant="neutral")
+        fit_button_width(ok_button, cancel_button)
+        buttons.addStretch()
+        buttons.addWidget(ok_button)
+        buttons.addWidget(cancel_button)
+        layout.addLayout(buttons)
+        ok_button.clicked.connect(dialog.accept)
+        cancel_button.clicked.connect(dialog.reject)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        key, name = key_input.text().strip(), name_input.text().strip()
+        if not key or not name:
             QMessageBox.warning(
-                self, tr("名称不合法"),  # type: ignore[arg-type]
-                tr("布局名称不能以空格或点开头"),
+                self, tr("输入不完整"),  # type: ignore[arg-type]
+                tr("布局 key 和布局名称都不能为空"),
             )
-            return False
-        return True
+            return None
+        return key, name
 
     def _validate_layout_keys_for_save(self, layout: Layout) -> bool:
         """保存前向用户展示具体的非法按键绑定。"""
@@ -78,11 +97,12 @@ class LayoutOpsMixin:
 
     def _refresh_combo(self):
         """刷新下拉框，保持当前选中"""
-        current = self._layout_combo.currentText()
+        current = self._layout_combo.currentData()
         self._layout_combo.blockSignals(True)
         self._layout_combo.clear()
-        self._layout_combo.addItems(self._manager.list_layouts())
-        idx = self._layout_combo.findText(current)
+        for entry in self._manager.list_layout_entries():
+            self._layout_combo.addItem(entry.name, entry.key)
+        idx = self._layout_combo.findData(current)
         if idx >= 0:
             self._layout_combo.setCurrentIndex(idx)
         self._layout_combo.blockSignals(False)
@@ -90,16 +110,16 @@ class LayoutOpsMixin:
     def _update_ui_state(self):
         """统一刷新所有 UI 状态：下拉框、按钮可用性、继承标识"""
         self._refresh_combo()
-        active = self._manager.get_active_layout_name()
+        active = self._manager.get_active_layout_key()
         has_layout = self._current_layout is not None
         self._btn_save.setEnabled(has_layout)
         self._btn_discard.setEnabled(has_layout and bool(self._dirty_scenes))
         self._btn_save_as.setEnabled(has_layout)
-        is_active = has_layout and self._current_layout.name == active
+        is_active = has_layout and self._current_layout.key == active
         is_system = bool(
             has_layout
             and not get_resolver().is_dev_mode()
-            and self._manager.is_system_layout(self._current_layout.name)
+            and self._manager.is_system_layout(self._current_layout.key)
         )
         can_delete = has_layout and not is_active and not is_system
         self._btn_delete.setEnabled(can_delete)
@@ -112,14 +132,15 @@ class LayoutOpsMixin:
 
         # 更新继承标识
         if hasattr(self, "_inherit_label"):
-            if has_layout and self._manager.is_alias_layout(self._current_layout.name):
+            if has_layout and self._manager.is_alias_layout(self._current_layout.key):
                 # 获取父布局名称
                 resolver = get_resolver()
-                merged = resolver.load_merged("layouts.yaml")
-                entry = merged.get("layouts", {}).get(self._current_layout.name) or {}
+                merged = load_layout_doc(resolver)
+                entry = merged.get("layouts", {}).get(self._current_layout.key) or {}
                 parent = entry.get("extends", "")
                 if parent:
-                    self._inherit_label.setText(f"布局继承自：{parent}")
+                    self._inherit_label.setText(
+                        f"布局继承自：{self._manager.get_layout_name(parent)}")
                     self._inherit_label.show()
                 else:
                     self._inherit_label.hide()
@@ -174,14 +195,13 @@ class LayoutOpsMixin:
         self._refresh_loaded_scene_references()
         self._refresh_loaded_subscene_contents()
 
-    def _clone_current_layout(self, name: str) -> Layout | None:
+    def _clone_current_layout(self, key: str, name: str) -> Layout | None:
         """克隆当前完整布局；未访问场景继续来自内存中的 Layout 快照。"""
         if self._current_layout is None:
             return None
         self._sync_loaded_tabs_to_current_layout()
-        clone = Layout.from_dict(name, self._current_layout.to_dict())
+        clone = Layout.from_dict(key, self._current_layout.to_dict(), name=name)
         clone.desc = self._current_layout.desc
-        clone.name = name
         return clone
 
     def _confirm_discard_changes(self, action: str) -> bool:
@@ -210,20 +230,21 @@ class LayoutOpsMixin:
 
     def _on_combo_changed(self, index: int):
         """下拉框切换时加载对应布局到画布（不激活），切换前检查未保存修改"""
+        key = self._layout_combo.currentData()
         name = self._layout_combo.currentText()
-        if not name:
+        if not key:
             return
         if (self._current_layout is not None
-                and name != self._current_layout.name
+                and key != self._current_layout.key
                 and not self._confirm_discard_changes(f"切换到布局「{name}」")):
             # 取消：回退下拉框到当前布局，不触发重入
             self._layout_combo.blockSignals(True)
-            idx = self._layout_combo.findText(self._current_layout.name)
+            idx = self._layout_combo.findData(self._current_layout.key)
             if idx >= 0:
                 self._layout_combo.setCurrentIndex(idx)
             self._layout_combo.blockSignals(False)
             return
-        layout = self._manager.load_layout(name)
+        layout = self._manager.load_layout(key)
         if layout is None:
             return
         self._current_layout = layout
@@ -234,16 +255,20 @@ class LayoutOpsMixin:
     def _auto_load_active(self):
         """启动时自动加载激活布局"""
         self._refresh_combo()
-        name = self._manager.get_active_layout_name()
-        if name:
-            idx = self._layout_combo.findText(name)
-            if idx >= 0:
-                # 下面会显式加载一次；这里若放行 currentIndexChanged，非首项
-                # 的激活布局会先经 _on_combo_changed 加载一遍，再重复加载。
-                self._layout_combo.blockSignals(True)
-                self._layout_combo.setCurrentIndex(idx)
-                self._layout_combo.blockSignals(False)
-            layout = self._manager.load_layout(name)
+        key = self._manager.get_active_layout_key()
+        idx = self._layout_combo.findData(key) if key else -1
+        # 防御失效的 session 选择或配置刷新竞态：下拉已有有效布局时，
+        # 首次打开必须真正加载一项，不能只在界面上看似选中了第一项。
+        if idx < 0 and self._layout_combo.count():
+            idx = 0
+            key = self._layout_combo.itemData(idx)
+        if idx >= 0 and key:
+            # 下面会显式加载一次；这里若放行 currentIndexChanged，非首项
+            # 的激活布局会先经 _on_combo_changed 加载一遍，再重复加载。
+            self._layout_combo.blockSignals(True)
+            self._layout_combo.setCurrentIndex(idx)
+            self._layout_combo.blockSignals(False)
+            layout = self._manager.load_layout(key)
             if layout:
                 self._current_layout = layout
                 self._apply_layout_to_tabs()
@@ -255,26 +280,22 @@ class LayoutOpsMixin:
         """新建空布局并切换到画布（不自动激活），先检查未保存修改"""
         if not self._confirm_discard_changes(tr("新建布局")):
             return
-        name, ok = QInputDialog.getText(self, tr("新建布局"), tr("请输入布局名称："))
-        if not ok or not name:
+        identity = self._prompt_layout_identity(tr("新建布局"))
+        if identity is None:
             return
-        name = name.strip()
-        if not name:
-            return
-        if not self._validate_layout_name(name):
-            return
-        prev_active = self._manager.get_active_layout_name()
+        key, name = identity
+        prev_active = self._manager.get_active_layout_key()
         try:
-            layout = self._manager.new_layout(name)
+            layout = self._manager.new_layout(key, name)
         except ValueError as e:
             QMessageBox.warning(self, tr("新建失败"), str(e))
             return
-        if prev_active and prev_active != name:
+        if prev_active and prev_active != key:
             self._manager.set_active_layout(prev_active)
         self._current_layout = layout
         self._apply_layout_to_tabs()
         self._refresh_combo()
-        idx = self._layout_combo.findText(name)
+        idx = self._layout_combo.findData(key)
         if idx >= 0:
             self._layout_combo.setCurrentIndex(idx)
         self._update_ui_state()
@@ -285,6 +306,7 @@ class LayoutOpsMixin:
         if self._current_layout is None:
             self._status_bar.showMessage(tr("没有已加载的布局"))
             return
+        key = self._current_layout.key
         name = self._current_layout.name
         self._sync_loaded_tabs_to_current_layout()
         if not self._validate_layout_keys_for_save(self._current_layout):
@@ -337,7 +359,7 @@ class LayoutOpsMixin:
         version_count = len(layout_versions) + len(scene_versions)
         if version_count:
             saved_info += tr("，提升 {count} 项版本").format(count=version_count)
-        overrides = self._system_save_overrides(name, changed)
+        overrides = self._system_save_overrides(key, changed)
         if overrides:
             local_scenes = [key for key, origin in overrides.items()
                             if origin.layer == LAYER_LOCAL]
@@ -390,6 +412,7 @@ class LayoutOpsMixin:
             self._status_bar.showMessage(tr("当前布局没有未保存的改动"))
             return
 
+        key = self._current_layout.key
         name = self._current_layout.name
         dirty_names = self._get_dirty_scene_names()
         detail = (
@@ -410,7 +433,7 @@ class LayoutOpsMixin:
 
         # 先读取持久化快照；加载失败时保留当前内存数据与待写模板，避免
         # “放弃”操作反而造成无法恢复的数据丢失。
-        layout = self._manager.load_layout(name)
+        layout = self._manager.load_layout(key)
         if layout is None:
             QMessageBox.warning(
                 self, tr("放弃改动失败"),
@@ -428,26 +451,31 @@ class LayoutOpsMixin:
             tr("已放弃布局「{name}」的全部未保存改动").format(name=name))
 
     def _on_save_as_layout(self):
-        """另存为：输入新名称，可选继承当前布局（创建别名）"""
+        """另存为新 key 和新名称，可选继承当前布局。"""
         if self._current_layout is None:
             self._status_bar.showMessage(tr("没有已加载的布局"))
             return
         # 别名布局禁止另存为
-        if self._manager.is_alias_layout(self._current_layout.name):
+        if self._manager.is_alias_layout(self._current_layout.key):
             QMessageBox.warning(
                 self, tr("另存为失败"),
                 tr("别名布局禁止另存为，请使用原布局另存或者新建布局。"),
             )
             return
 
-        # 自定义对话框：名称 + 继承复选框
+        # 自定义对话框：key + 名称 + 继承复选框
         dialog = QDialog(self)
         dialog.setWindowTitle(tr("另存为"))
         layout = QVBoxLayout(dialog)
-
+        form = QFormLayout()
+        key_input = QLineEdit()
+        key_input.setPlaceholderText("desktop_custom")
+        key_input.setToolTip(tr("以小写字母开头，仅支持小写字母、数字和下划线，创建后不可修改"))
         name_input = QLineEdit()
-        name_input.setPlaceholderText(tr("请输入布局名称"))
-        layout.addWidget(name_input)
+        name_input.setPlaceholderText(tr("例如：我的投屏布局"))
+        form.addRow(tr("布局 key"), key_input)
+        form.addRow(tr("布局名称"), name_input)
+        layout.addLayout(form)
 
         inherit_checkbox = QCheckBox(f"继承自当前布局「{self._current_layout.name}」")
         inherit_checkbox.setToolTip(
@@ -472,31 +500,21 @@ class LayoutOpsMixin:
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
+        key = key_input.text().strip()
         name = name_input.text().strip()
-        if not name:
+        if not key or not name:
+            QMessageBox.warning(
+                self, tr("输入不完整"),
+                tr("布局 key 和布局名称都不能为空"),
+            )
             return
-        if not self._validate_layout_name(name):
+        try:
+            self._manager.validate_new_identity(key, name)
+        except ValueError as exc:
+            QMessageBox.warning(self, tr("另存为失败"), str(exc))
             return
 
         inherit = inherit_checkbox.isChecked()
-        existing = self._manager.list_layouts()
-
-        if name in existing:
-            # 别名布局不可被另存为覆盖（会把场景写入根布局目录，破坏继承语义）
-            if self._manager.is_alias_layout(name):
-                QMessageBox.warning(
-                    self, tr("另存为失败"),
-                    f"布局「{name}」是别名布局（继承自根布局），不可被另存为覆盖。\n"
-                    f"请使用其他名称。",
-                )
-                return
-            reply = QMessageBox.question(
-                self, tr("确认覆盖"),
-                f"布局「{name}」已存在，是否覆盖？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
 
         if inherit:
             # 创建别名布局
@@ -506,32 +524,36 @@ class LayoutOpsMixin:
                 if current_tab is not None
                 else self._current_layout.get_canvas()
             )
-            extends_name = self._current_layout.name
+            extends_key = self._current_layout.key
+            extends_display_name = self._current_layout.name
             # 如果当前是别名，继承目标必须是根布局
-            if self._manager.is_alias_layout(extends_name):
+            if self._manager.is_alias_layout(extends_key):
                 QMessageBox.warning(
                     self, tr("继承失败"),
-                    f"当前布局「{extends_name}」是别名布局，不能作为继承目标。\n"
+                    f"当前布局「{self._current_layout.name}」是别名布局，不能作为继承目标。\n"
                     f"请切换到根布局后再试。",
                 )
                 return
-            new_layout = self._manager.create_alias_layout(name, extends_name, canvas)
+            new_layout = self._manager.create_alias_layout(
+                key, name, extends_key, canvas)
             if new_layout is None:
                 QMessageBox.warning(self, tr("创建失败"), tr("别名布局创建失败，请检查日志。"))
                 return
             self._current_layout = new_layout
             self._refresh_combo()
-            idx = self._layout_combo.findText(name)
+            idx = self._layout_combo.findData(key)
             if idx >= 0:
                 self._layout_combo.setCurrentIndex(idx)
             self._update_ui_state()
-            self._status_bar.showMessage(f"已创建别名布局「{name}」（继承自「{extends_name}」）")
-            logger.info(f"别名布局已创建: {name} (extends {extends_name})")
+            self._status_bar.showMessage(
+                f"已创建别名布局「{name}」（继承自「{extends_display_name}」）")
+            logger.info(
+                f"别名布局已创建: {name} ({key}, extends {extends_key})")
         else:
             # 正常另存为：独立副本
             # 未访问过的场景没有 SceneTab，但完整数据始终保留在当前 Layout。
             # 从它克隆，不能只复制已创建的控件，否则另存为会静默丢场景。
-            temp = self._clone_current_layout(name)
+            temp = self._clone_current_layout(key, name)
             if temp is None:
                 return
             if not self._validate_layout_keys_for_save(temp):
@@ -539,10 +561,10 @@ class LayoutOpsMixin:
             if not self._manager.save_layout(temp):
                 QMessageBox.warning(self, tr("另存为失败"), tr("布局写入失败，请检查日志。"))
                 return
-            copy_screenshots(self._current_layout.name, name)
+            copy_screenshots(self._current_layout.key, key)
             self._current_layout = temp
             self._refresh_combo()
-            idx = self._layout_combo.findText(name)
+            idx = self._layout_combo.findData(key)
             if idx >= 0:
                 self._layout_combo.setCurrentIndex(idx)
             self._update_ui_state()
@@ -555,9 +577,10 @@ class LayoutOpsMixin:
         """删除当前下拉框选中的布局（激活的不可删除）"""
         if self._current_layout is None:
             return
-        active = self._manager.get_active_layout_name()
+        active = self._manager.get_active_layout_key()
+        key = self._current_layout.key
         name = self._current_layout.name
-        if name == active:
+        if key == active:
             self._status_bar.showMessage(tr("激活布局不可删除"))
             return
         reply = QMessageBox.question(
@@ -567,8 +590,8 @@ class LayoutOpsMixin:
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
-        if self._manager.delete_layout(name):
-            delete_screenshots(name)
+        if self._manager.delete_layout(key):
+            delete_screenshots(key)
             self._current_layout = None
             self._clear_all_tabs()
             if active:
@@ -578,12 +601,14 @@ class LayoutOpsMixin:
                     self._apply_layout_to_tabs()
             self._layout_combo.blockSignals(True)
             self._refresh_combo()
-            idx = self._layout_combo.findText(active) if active else -1
+            idx = self._layout_combo.findData(active) if active else -1
             if idx >= 0:
                 self._layout_combo.setCurrentIndex(idx)
             self._layout_combo.blockSignals(False)
             self._update_ui_state()
-            self._status_bar.showMessage(f"已删除布局「{name}」，已切换到默认布局")
+            active_name = self._manager.get_layout_name(active) if active else ""
+            self._status_bar.showMessage(
+                f"已删除布局「{name}」，已切换到「{active_name}」")
         else:
             self._status_bar.showMessage(
                 f"删除失败：布局「{name}」不存在或被别名布局引用")

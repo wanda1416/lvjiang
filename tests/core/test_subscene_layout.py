@@ -4,7 +4,7 @@ from lvjiang.core.layout_models import CanvasConfig, Layout, Region, SubsceneRef
 
 
 def test_subscene_layout_round_trip_keeps_crop_and_instances():
-    layout = Layout(name="desktop")
+    layout = Layout(key="desktop", name="desktop")
     layout.set_scene_crop_canvas(
         "card", CanvasConfig(0.1, 0.2, 0.3, 0.4))
     layout.set_scene_subscene_refs(
@@ -26,7 +26,7 @@ def test_subscene_coordinate_composition(monkeypatch):
     from lvjiang.core.scene_definition_models import SubsceneRefDef
     from lvjiang.workflows.runtime_layout import resolve_subscene_region
 
-    layout = Layout(name="desktop")
+    layout = Layout(key="desktop", name="desktop")
     layout.set_scene_subscene_refs(
         "parent", [SubsceneRef("card1", 0.2, 0.3, 0.4, 0.5)])
     layout.set_scene_regions(

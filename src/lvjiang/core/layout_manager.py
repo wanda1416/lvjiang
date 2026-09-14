@@ -2,7 +2,7 @@
 
 存储结构（目录化）：
 - layouts.yaml          名册 + canvas 内联（聚合键值，local diff 合并）
-- layouts/{name}/{scene_key}.json  每场景独立文件（实体影子 + 墓碑）
+- layouts/{key}/{scene_key}.json   每场景独立文件（实体影子 + 墓碑）
 
 布局别名（extends）：条目带 `extends: 根布局名` 时，scene 全部复用根布局
 目录，仅 canvas 独立；别名自身不产生任何 scene 文件。
@@ -22,6 +22,14 @@ from ..i18n import tr
 from .config.resolver import get_resolver
 from .config.session import get_session_store
 from .key_validation import validate_layout_activation_keys
+from .layout_config import (
+    LayoutEntry,
+    load_layout_doc,
+    load_layout_entries,
+    parse_layout_entries,
+    save_layout_doc,
+    validate_layout_key,
+)
 from .layout_models import CanvasConfig, Layout
 from .scene_registry import (
     get_panel_defs,
@@ -36,8 +44,8 @@ SCREENSHOTS_DIR = SESSION_CONFIG_DIR / "screenshots"
 
 
 def _safe_name(name: str) -> str:
-    """将名称转为文件系统安全的字符串"""
-    return "".join(c if c.isalnum() or c in "-_ " else "_" for c in name)
+    """校验并返回可直接作为目录名的稳定布局 key。"""
+    return validate_layout_key(name)
 
 
 def layout_screenshots_dir(layout_name: str) -> Path:
@@ -170,7 +178,7 @@ def rename_scene_across_all_layouts(old_key: str, new_key: str):
     if old_key == new_key:
         return
     manager = LayoutConfigManager()
-    for layout_name in manager.list_layouts():
+    for layout_name in manager.list_layout_keys():
         rename_layout_scene_key(layout_name, old_key, new_key)
     rename_scene_screenshots(old_key, new_key)
 
@@ -179,7 +187,7 @@ def delete_scene_across_all_layouts(scene_key: str):
     """彻底删除所有布局中的场景 JSON 及该场景的全部视图截图。"""
     resolver = get_resolver()
     manager = LayoutConfigManager()
-    for layout_name in manager.list_layouts():
+    for layout_name in manager.list_layout_keys():
         resolver.delete_entity(_scene_rel(layout_name, scene_key))
     if SCREENSHOTS_DIR.exists():
         for layout_dir in SCREENSHOTS_DIR.iterdir():
@@ -207,7 +215,7 @@ def rename_item_key_across_all_layouts(scene_key: str, kind: str, old_key: str, 
     if old_key == new_key:
         return
     manager = LayoutConfigManager()
-    for layout_name in manager.list_layouts():
+    for layout_name in manager.list_layout_keys():
         _rename_layout_item_key(layout_name, scene_key, kind, old_key, new_key)
 
 
@@ -279,7 +287,7 @@ def delete_item_key_across_all_layouts(
     """
     manager = LayoutConfigManager()
     changed = []
-    for layout_name in manager.list_layouts():
+    for layout_name in manager.list_layout_keys():
         if _delete_layout_item_key(layout_name, scene_key, kind, key):
             changed.append(layout_name)
     return changed
@@ -456,7 +464,7 @@ def scene_layout_rel(name: str, scene_key: str) -> str:
 
 def shared_layout_bindings(name: str) -> list[str]:
     """返回与指定布局共用场景绑定的布局名（包括根布局和别名）。"""
-    doc = get_resolver().load_merged(_LAYOUTS_YAML_REL).get("layouts", {})
+    doc = load_layout_doc().get("layouts", {})
     current = _resolve_layout_entry(doc, name)
     if current is None:
         return []
@@ -476,7 +484,7 @@ def scene_layout_rels(name: str,
     :func:`scene_layout_rel` 会为每个场景重复解析同一份 YAML；这个批量入口
     保留完全相同的别名布局语义，同时把解析成本固定为一次。
     """
-    doc = get_resolver().load_merged(_LAYOUTS_YAML_REL).get("layouts", {})
+    doc = load_layout_doc().get("layouts", {})
     resolved = _resolve_layout_entry(doc, name)
     scene_dir_name = resolved[1] if resolved else name
     return {
@@ -506,8 +514,10 @@ def _enumerate_scene_files(name: str) -> list[str]:
     return alive
 
 
-def _resolve_layout_entry(layouts_doc: dict, name: str) -> tuple[dict, str, str] | None:
-    """解析布局条目，返回 (canvas_dict, scene 目录所属布局名, desc)
+def _resolve_layout_entry(
+    layouts_doc: dict, name: str,
+) -> tuple[dict, str, str, str] | None:
+    """解析布局条目，返回 (canvas, scene 目录 key, 显示名, desc)。
 
     支持别名布局：条目带 extends 时，scene 文件目录指向根布局。
     严格约束：extends 只能指向根布局（目标自身不得再带 extends）。
@@ -515,21 +525,24 @@ def _resolve_layout_entry(layouts_doc: dict, name: str) -> tuple[dict, str, str]
     Returns:
         None 表示条目无效（extends 目标不存在或多级继承）
     """
-    entry = layouts_doc.get(name) or {}
+    entry = layouts_doc.get(name)
+    if not isinstance(entry, dict):
+        return None
     extends = entry.get("extends")
+    display_name = entry["name"]
     desc = entry.get("desc", "")
     if not extends:
-        return entry.get("canvas", {}), name, desc
+        return entry.get("canvas", {}), name, display_name, desc
     if extends not in layouts_doc:
         logger.error(f"布局 [{name}] 的 extends 目标不存在: {extends}")
         return None
     if (layouts_doc.get(extends) or {}).get("extends"):
         logger.error(f"布局 [{name}] 的 extends 只能指向根布局，禁止多级继承: {extends}")
         return None
-    return entry.get("canvas", {}), extends, desc
+    return entry.get("canvas", {}), extends, display_name, desc
 
 
-def load_layout_by_name(name: str) -> Layout | None:
+def load_layout_by_key(name: str) -> Layout | None:
     """模块级布局加载（无 session 依赖，供 workflow_runner 使用）
 
     从 layouts.yaml 读 canvas，从 layouts/{name}/ 目录逐场景加载。
@@ -545,21 +558,14 @@ def load_layout_by_name(name: str) -> Layout | None:
     )
 
     resolver = get_resolver()
-    merged = resolver.load_merged(_LAYOUTS_YAML_REL)
+    merged = load_layout_doc(resolver)
     layouts_doc = merged.get("layouts", {})
 
     resolved = _resolve_layout_entry(layouts_doc, name)
     if resolved is None:
         return None
-    canvas_dict, scene_dir_name, desc = resolved
-
-    if name not in layouts_doc:
-        # 回退：目录存在但 yaml 未登记（兼容迁移中间态）
-        scene_keys = _enumerate_scene_files(name)
-        if not scene_keys:
-            return None
-    else:
-        scene_keys = _enumerate_scene_files(scene_dir_name)
+    canvas_dict, scene_dir_name, display_name, desc = resolved
+    scene_keys = _enumerate_scene_files(scene_dir_name)
 
     # canvas（始终取自身条目）
     from .layout_models import CanvasConfig
@@ -613,7 +619,8 @@ def load_layout_by_name(name: str) -> Layout | None:
     _drop_orphan_coords(regions, points)
     _expand_scene_references(regions, points, reference_positions)
 
-    return Layout(name=name, desc=desc, canvas=canvas, regions=regions,
+    return Layout(key=name, name=display_name, desc=desc, canvas=canvas,
+                  regions=regions,
                   points=points, arrows=arrows, panels=panels,
                   crop_canvases=crop_canvases, subscene_refs=subscene_refs)
 
@@ -804,7 +811,8 @@ def expand_one_reference(regions: dict, points: dict, scene_key: str,
 class LayoutConfigManager:
     """管理布局配置的持久化
 
-    布局存储为目录结构：layouts.yaml（名册+canvas）+ layouts/{name}/{scene}.json；
+    布局存储为目录结构：layouts.yaml（key/name 名册+canvas）+
+    layouts/{key}/{scene}.json；
     读写经 ConfigResolver（开发→system，用户→local 影子）；
     session.json 只在 actives.layout 记录激活布局。
     """
@@ -830,55 +838,57 @@ class LayoutConfigManager:
 
     # ─── 布局 CRUD ──────────────────────────────────────
 
-    def list_layouts(self) -> list[str]:
-        """返回布局列表（layouts.yaml 名册派生，排序）"""
-        resolver = get_resolver()
-        merged = resolver.load_merged(_LAYOUTS_YAML_REL)
-        layouts = merged.get("layouts", {})
-        # yaml 存在时以名册为准（即使为空）；仅当 yaml 完全不存在时回退目录枚举
-        yaml_exists = (
-            (resolver.system_dir / _LAYOUTS_YAML_REL).exists()
-            or (resolver.local_dir / _LAYOUTS_YAML_REL).exists()
-        )
-        if yaml_exists:
-            return list(layouts.keys())  # 保持 YAML 定义顺序，不排序
-        # 回退：枚举目录（兼容迁移前）
-        names: set[str] = set()
-        for root in (resolver.system_dir, resolver.local_dir):
-            base = root / "layouts"
-            if not base.is_dir():
-                continue
-            for p in base.iterdir():
-                if p.is_dir() and not p.name.startswith("_"):
-                    names.add(p.name)
-        return sorted(names)
+    def list_layout_keys(self) -> list[str]:
+        """返回稳定布局 key，顺序与 ``layouts.yaml`` 一致。"""
+        return list(load_layout_entries())
 
-    def new_layout(self, name: str) -> Layout:
+    def list_layout_entries(self) -> list[LayoutEntry]:
+        return list(load_layout_entries().values())
+
+    def get_layout_name(self, key: str) -> str:
+        entry = load_layout_entries().get(key)
+        return entry.name if entry is not None else key
+
+    def new_layout(self, key: str, name: str) -> Layout:
         """创建空布局（所有场景初始为空 regions）
 
         Raises:
             ValueError: 布局名已存在（含别名）时。新建撞名别名会把空场景
                 全量写入根布局目录，造成根布局数据被清空，必须拒绝。
         """
-        if name in self.list_layouts():
-            raise ValueError(f"布局已存在，无法新建: {name}")
+        key = validate_layout_key(key)
+        name = name.strip()
+        self.validate_new_identity(key, name)
         from .scene_registry import SCENE_REGIONS
-        layout = Layout(name=name)
+        layout = Layout(key=key, name=name)
         for scene_key in SCENE_REGIONS:
             layout.regions[scene_key] = []
         self.save_layout(layout)
-        self.set_active_layout(name)
-        logger.info(f"布局已新建: {name}")
+        self.set_active_layout(key)
+        logger.info(f"布局已新建: {name} ({key})")
         return layout
+
+    def validate_new_identity(self, key: str, name: str) -> None:
+        key = validate_layout_key(key)
+        name = name.strip()
+        entries = load_layout_entries()
+        if key in entries:
+            raise ValueError(f"布局 key 已存在: {key}")
+        if not name:
+            raise ValueError("布局名称不能为空")
+        if any(entry.name == name for entry in entries.values()):
+            raise ValueError(f"布局名称已存在: {name}")
 
     def is_alias_layout(self, name: str) -> bool:
         """判断布局是否为别名（yaml 条目带 extends）"""
         resolver = get_resolver()
-        merged = resolver.load_merged(_LAYOUTS_YAML_REL)
+        merged = load_layout_doc(resolver)
         entry = merged.get("layouts", {}).get(name) or {}
         return bool(entry.get("extends"))
 
-    def create_alias_layout(self, name: str, extends_name: str, canvas: CanvasConfig) -> Layout | None:
+    def create_alias_layout(
+        self, key: str, name: str, extends_name: str, canvas: CanvasConfig,
+    ) -> Layout | None:
         """创建别名布局：仅 yaml 条目（extends + canvas），无 scene 文件
 
         Args:
@@ -889,10 +899,14 @@ class LayoutConfigManager:
         Returns:
             创建的 Layout 对象，失败时返回 None
         """
-        if name in self.list_layouts():
-            logger.error(f"布局已存在，无法创建别名: {name}")
+        try:
+            key = validate_layout_key(key)
+            name = name.strip()
+            self.validate_new_identity(key, name)
+        except ValueError as exc:
+            logger.error(str(exc))
             return None
-        if extends_name not in self.list_layouts():
+        if extends_name not in self.list_layout_keys():
             logger.error(f"继承目标不存在: {extends_name}")
             return None
         if self.is_alias_layout(extends_name):
@@ -901,19 +915,24 @@ class LayoutConfigManager:
 
         # 写入 yaml 条目
         resolver = get_resolver()
-        merged = resolver.load_merged(_LAYOUTS_YAML_REL)
+        merged = load_layout_doc(resolver)
         layouts_doc = merged.setdefault("layouts", {})
-        layouts_doc[name] = {"extends": extends_name, "canvas": canvas.to_dict()}
-        resolver.save_merged(_LAYOUTS_YAML_REL, merged)
+        layouts_doc[key] = {
+            "name": name,
+            "extends": extends_name,
+            "canvas": canvas.to_dict(),
+        }
+        save_layout_doc(merged, resolver)
 
         # 加载并返回（scene 从根布局读取）
-        layout = self.load_layout(name)
+        layout = self.load_layout(key)
         if layout:
-            logger.info(f"别名布局已创建: {name} (extends {extends_name})")
+            logger.info(
+                f"别名布局已创建: {name} ({key}, extends {extends_name})")
         return layout
 
     def load_layout(self, name: str) -> "Layout | None":
-        layout = load_layout_by_name(name)
+        layout = load_layout_by_key(name)
         if layout is None:
             logger.warning(f"布局不存在: {name}")
         else:
@@ -947,17 +966,27 @@ class LayoutConfigManager:
         resolver = get_resolver()
 
         # 1. 校验 extends 合法性（与加载侧对称：目标缺失/多级继承拒绝写盘）
-        merged = resolver.load_merged(_LAYOUTS_YAML_REL)
+        merged = load_layout_doc(resolver)
         layouts_doc = merged.setdefault("layouts", {})
-        resolved = _resolve_layout_entry(layouts_doc, layout.name)
-        if resolved is None:
-            logger.error(f"布局 [{layout.name}] 的 extends 条目非法，拒绝保存")
-            return False
-        _, scene_dir_name, _ = resolved
+        existing = layouts_doc.get(layout.key) or {}
+        if not existing:
+            try:
+                validate_layout_key(layout.key)
+                self.validate_new_identity(layout.key, layout.name)
+            except ValueError as exc:
+                logger.error(str(exc))
+                return False
+            scene_dir_name = layout.key
+        else:
+            resolved = _resolve_layout_entry(layouts_doc, layout.key)
+            if resolved is None:
+                logger.error(f"布局 [{layout.key}] 的 extends 条目非法，拒绝保存")
+                return False
+            _, scene_dir_name, _, _ = resolved
 
         # 2. 更新 layouts.yaml 中的条目（别名布局保留 extends）
-        existing = layouts_doc.get(layout.name) or {}
         entry_out: dict = {}
+        entry_out["name"] = layout.name
         if existing.get("extends"):
             entry_out["extends"] = existing["extends"]
         # 保留 desc 字段（如果有）
@@ -966,8 +995,12 @@ class LayoutConfigManager:
         elif existing.get("desc"):
             entry_out["desc"] = existing["desc"]
         entry_out["canvas"] = layout.canvas.to_dict()
-        layouts_doc[layout.name] = entry_out
-        resolver.save_merged(_LAYOUTS_YAML_REL, merged)
+        layouts_doc[layout.key] = entry_out
+        try:
+            save_layout_doc(merged, resolver)
+        except ValueError as exc:
+            logger.error(f"布局清单无效，拒绝保存：{exc}")
+            return False
 
         # 3. 写场景 JSON 文件（增量或全量）；别名布局落到根布局目录
         all_scene_keys = (set(layout.regions) | set(layout.points) | set(layout.arrows)
@@ -1024,7 +1057,7 @@ class LayoutConfigManager:
                 content_version=versions.get(sk),
             )
         mode = f"增量 {len(scene_keys)}/{len(all_scene_keys)} 场景" if changed_scenes is not None else tr("全量")
-        logger.info(f"布局已保存: {layout.name} ({mode})")
+        logger.info(f"布局已保存: {layout.name} ({layout.key}, {mode})")
         return True
 
     @staticmethod
@@ -1036,13 +1069,14 @@ class LayoutConfigManager:
         """
         resolver = get_resolver()
         system_doc = resolver.load_system(_LAYOUTS_YAML_REL)
-        layouts = system_doc.get("layouts", {})
-        return isinstance(layouts, dict) and name in layouts
+        if not system_doc:
+            return False
+        return name in parse_layout_entries(system_doc)
 
     def delete_layout(self, name: str) -> bool:
         resolver = get_resolver()
         # 确认布局存在
-        merged = resolver.load_merged(_LAYOUTS_YAML_REL)
+        merged = load_layout_doc(resolver)
         layouts_doc = merged.get("layouts", {})
         scene_keys = _enumerate_scene_files(name)
         if name not in layouts_doc and not scene_keys:
@@ -1066,7 +1100,7 @@ class LayoutConfigManager:
         # 从 layouts.yaml 移除条目
         if name in layouts_doc:
             del layouts_doc[name]
-            resolver.save_merged(_LAYOUTS_YAML_REL, merged)
+            save_layout_doc(merged, resolver)
 
         # 开发模式额外清理空目录
         if resolver.is_dev_mode():
@@ -1088,7 +1122,7 @@ class LayoutConfigManager:
             实际发生改动并已写盘的布局名称列表
         """
         changed = []
-        for name in self.list_layouts():
+        for name in self.list_layout_keys():
             layout = self.load_layout(name)
             if layout is None:
                 continue
@@ -1102,16 +1136,24 @@ class LayoutConfigManager:
 
     # ─── 激活布局 ────────────────────────────────────────
 
-    def get_active_layout_name(self) -> str:
+    def get_active_layout_key(self) -> str:
         self._reload_config()
         name = self._config.get("active_layout", "")
-        # 未指定时自动回退到第一个可用布局
-        if not name:
-            layouts = self.list_layouts()
-            if layouts:
-                name = layouts[0]
-                logger.info(f"未指定 active_layout，自动使用: {name}")
-        return name
+        layouts = self.list_layout_keys()
+        if isinstance(name, str) and name in layouts:
+            return name
+        # 未指定或 session 中仍引用已删除/改名的布局时，回退到首个有效
+        # key。schema v2 放弃旧布局数据兼容，但失效的会话选中态不能让
+        # 场景编辑器看似选中了首项、实际却没有加载任何布局。
+        if layouts:
+            fallback = layouts[0]
+            if name:
+                logger.warning(
+                    f"active_layout 不存在: {name}，自动使用: {fallback}")
+            else:
+                logger.info(f"未指定 active_layout，自动使用: {fallback}")
+            return fallback
+        return ""
 
     def set_active_layout(self, name: str):
         self._config["active_layout"] = name

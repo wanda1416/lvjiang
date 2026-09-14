@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ...core.layout_config import load_layout_entries
 from ...core.layout_manager import (
     delete_item_key_across_all_layouts,
     rename_item_key_across_all_layouts,
@@ -380,11 +381,14 @@ class PanelEditorMixin:
             self._canvas.remove_item("panel", key)
 
     def _panel_layout_scope(self) -> str:
-        scope = f"当前布局：{self._layout_name or '未选择'}；修改后需保存布局。"
+        display_name = getattr(self, "_layout_display_name", "") or self._layout_name
+        scope = f"当前布局：{display_name or '未选择'}；修改后需保存布局。"
         # 根布局和别名的两个编辑入口都要说明共用影响范围。
         shared = shared_layout_bindings(self._layout_name) if self._layout_name else []
         if len(shared) > 1:
-            scope += "\n共用此绑定的布局：" + "、".join(shared)
+            entries = load_layout_entries()
+            names = [entries[key].name if key in entries else key for key in shared]
+            scope += "\n共用此绑定的布局：" + "、".join(names)
         return scope
 
     def _definition_form(self, parent, panel_def):

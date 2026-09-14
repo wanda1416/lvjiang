@@ -556,6 +556,7 @@ def _apply_legacy_disabled(
 @dataclass
 class Layout:
     """一个布局：包含画布配置 + 所有场景的区域定义"""
+    key: str = ""
     name: str = ""
     desc: str = ""  # 描述性文本（来自 layouts.yaml，仅展示用）
     canvas: CanvasConfig = field(default_factory=CanvasConfig)
@@ -656,7 +657,7 @@ class Layout:
         }
 
     @staticmethod
-    def from_dict(name: str, d: dict) -> "Layout":
+    def from_dict(key: str, d: dict, *, name: str = "") -> "Layout":
         # 解析 canvas
         canvas = CanvasConfig()
         if "canvas" in d and isinstance(d["canvas"], dict):
@@ -694,6 +695,6 @@ class Layout:
             for scene_key, scene_data in scenes_data.items():
                 if isinstance(scene_data, dict):
                     _parse_scene_entry(scene_key, scene_data)
-        return Layout(name=name, canvas=canvas, regions=regions,
+        return Layout(key=key, name=name, canvas=canvas, regions=regions,
                       points=points, arrows=arrows, panels=panels,
                       crop_canvases=crop_canvases, subscene_refs=subscene_refs)

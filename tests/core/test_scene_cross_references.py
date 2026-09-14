@@ -224,7 +224,7 @@ def test_save_layout_writes_only_referenced_item_position(tmp_path, monkeypatch)
     monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
     monkeypatch.setattr(cr, "_resolver", None)
 
-    layout = Layout(name="布局A", canvas=CanvasConfig(),
+    layout = Layout(key="layout_a", name="布局 A", canvas=CanvasConfig(),
                     regions={"equip_tune_detail": [
                         Region(key="close_btn", x_ratio=0.7, y_ratio=0.7,
                                w_ratio=0.06, h_ratio=0.07),

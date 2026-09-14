@@ -240,7 +240,7 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         if not w:
             self.lbl_status.setText(tr("请先在主窗口扫描并定位窗口"))
             return
-        layout_name = main._layout_manager.get_active_layout_name()
+        layout_name = main._layout_manager.get_active_layout_key()
         layout = main._layout_manager.load_layout(layout_name)
         if not layout:
             self.lbl_status.setText(tr("无法加载布局: {layout_name}").format(layout_name=layout_name))

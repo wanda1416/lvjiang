@@ -520,7 +520,8 @@ class SettingsDialog(QDialog):
             self._plan_env_combo.addItem(display, key)
         form.addRow(tr("环境") + ":", self._plan_env_combo)
         self._plan_layout_combo = QComboBox()
-        self._plan_layout_combo.addItems(self._available_layouts())
+        for entry in self._available_layouts():
+            self._plan_layout_combo.addItem(entry.name, entry.key)
         form.addRow(tr("布局") + ":", self._plan_layout_combo)
         modes = QHBoxLayout()
         self._plan_mode_window = QCheckBox(tr("窗口模式"))
@@ -556,12 +557,12 @@ class SettingsDialog(QDialog):
         from ..core.reference_db import ReferenceDatabase
         return list(ReferenceDatabase().get_spaces())
 
-    def _available_layouts(self) -> list[str]:
+    def _available_layouts(self):
         host_manager = getattr(self.parent(), "_layout_manager", None)
         if host_manager is None:
             from ..core.layout_manager import LayoutConfigManager
             host_manager = LayoutConfigManager()
-        return list(host_manager.list_layouts())
+        return host_manager.list_layout_entries()
 
     @staticmethod
     def _plan_dev_mode() -> bool:
@@ -609,7 +610,7 @@ class SettingsDialog(QDialog):
         self._plan_space_combo.setCurrentIndex(max(space_idx, 0))
         env_idx = self._plan_env_combo.findData(plan.env) if plan else -1
         self._plan_env_combo.setCurrentIndex(max(env_idx, 0))
-        layout_idx = (self._plan_layout_combo.findText(plan.layout)
+        layout_idx = (self._plan_layout_combo.findData(plan.layout)
                       if plan else -1)
         self._plan_layout_combo.setCurrentIndex(max(layout_idx, 0))
         self._plan_mode_window.setChecked(
@@ -655,7 +656,7 @@ class SettingsDialog(QDialog):
         updated = (
             self._plan_space_combo.currentText(),
             self._plan_env_combo.currentData() or "",
-            self._plan_layout_combo.currentText(),
+            self._plan_layout_combo.currentData() or "",
             modes,
             self._plan_distribute.isChecked(),
         )
@@ -700,7 +701,7 @@ class SettingsDialog(QDialog):
             tr("新方案"),
             space=space_combo.currentText() if space_combo else "",
             env=(env_combo.currentData() or "") if env_combo else "",
-            layout=layout_combo.currentText() if layout_combo else "",
+            layout=(layout_combo.currentData() or "") if layout_combo else "",
             modes=modes,
         ))
 

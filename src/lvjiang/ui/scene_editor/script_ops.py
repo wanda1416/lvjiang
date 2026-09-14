@@ -167,14 +167,14 @@ class ScriptOpsMixin:
         try:
             # 构建 WorkflowEngine
             from ...workflows.engine import WorkflowEngine
-            layout_name = self._current_layout.name if self._current_layout else ""
-            if not layout_name:
+            layout_key = self._current_layout.key if self._current_layout else ""
+            if not layout_key:
                 self._result_text.setPlainText(tr("[错误] 没有已加载的布局"))
                 return
 
-            layout = main_win._layout_manager.load_layout(layout_name)
+            layout = main_win._layout_manager.load_layout(layout_key)
             if not layout:
-                self._result_text.setPlainText(f"[错误] 无法加载布局: {layout_name}")
+                self._result_text.setPlainText(f"[错误] 无法加载布局: {layout_key}")
                 return
 
             engine = WorkflowEngine(

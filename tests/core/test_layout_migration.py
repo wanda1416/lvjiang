@@ -13,7 +13,7 @@ from lvjiang.core.layout_models import Arrow, Layout, Panel, Point, Region
 
 
 def _make_layout(name: str = "test") -> Layout:
-    layout = Layout(name=name)
+    layout = Layout(key=name, name=name)
     layout.set_scene_regions("src", [
         Region("btn", 0.1, 0.2, 0.3, 0.4),
         Region("keep", 0.5, 0.5, 0.1, 0.1),
@@ -102,36 +102,36 @@ class TestMigrateAcrossLayouts:
         import lvjiang.core.config.resolver as cr
         monkeypatch.setattr(cr, "_resolver", None)
         mgr = LayoutConfigManager()
-        for name in ("布局A", "布局B"):
+        for name in ("layout_a", "layout_b"):
             mgr.save_layout(_make_layout(name))
         # 无关布局：不含待迁移 key
-        empty = Layout(name="布局C")
+        empty = Layout(key="layout_c", name="layout_c")
         empty.set_scene_regions("src", [Region("keep", 0.5, 0.5, 0.1, 0.1)])
         mgr.save_layout(empty)
         return mgr
 
     def test_all_layouts_migrated(self, manager):
         changed = manager.migrate_item_across_layouts("src", "dst", "region", "btn")
-        assert changed == ["布局A", "布局B"]
-        for name in ("布局A", "布局B"):
+        assert changed == ["layout_a", "layout_b"]
+        for name in ("layout_a", "layout_b"):
             layout = manager.load_layout(name)
             assert [r.key for r in layout.get_scene_regions("src")] == ["keep"]
             assert [r.key for r in layout.get_scene_regions("dst")] == ["btn"]
 
     def test_unrelated_layout_untouched(self, manager):
         from lvjiang.core.config.resolver import get_resolver
-        # 读取布局C 场景文件的当前内容
-        path = get_resolver().resolve_read("layouts/布局C/src.json")
+        # 读取layout_c 场景文件的当前内容
+        path = get_resolver().resolve_read("layouts/layout_c/src.json")
         assert path is not None
         before = path.read_text(encoding="utf-8")
         manager.migrate_item_across_layouts("src", "dst", "region", "btn")
         assert path.read_text(encoding="utf-8") == before
-        layout = manager.load_layout("布局C")
+        layout = manager.load_layout("layout_c")
         assert [r.key for r in layout.get_scene_regions("src")] == ["keep"]
 
     def test_point_migration_persists_arrows(self, manager):
         manager.migrate_item_across_layouts("src", "dst", "point", "origin")
-        layout = manager.load_layout("布局A")
+        layout = manager.load_layout("layout_a")
         assert [a.key for a in layout.get_scene_arrows("dst")] == ["fwd"]
         remain = layout.get_scene_arrows("src")
         assert remain[0].to_key is None
@@ -157,9 +157,9 @@ class TestDeleteAcrossLayouts:
         monkeypatch.setenv("LVJIANG_DEV_MODE", "1")
         monkeypatch.setattr(cr, "_resolver", None)
         mgr = LayoutConfigManager()
-        for name in ("布局A", "布局B"):
+        for name in ("layout_a", "layout_b"):
             mgr.save_layout(_make_layout(name))
-        empty = Layout(name="布局C")
+        empty = Layout(key="layout_c", name="layout_c")
         empty.set_scene_regions("src", [Region("keep", 0.5, 0.5, 0.1, 0.1)])
         mgr.save_layout(empty)
         return mgr
@@ -177,8 +177,8 @@ class TestDeleteAcrossLayouts:
 
         changed = delete_item_key_across_all_layouts("src", "region", "btn")
 
-        assert changed == ["布局A", "布局B"]
-        for name in ("布局A", "布局B"):
+        assert changed == ["layout_a", "layout_b"]
+        for name in ("layout_a", "layout_b"):
             keys = [r["key"] for r in self._scene_json(name)["regions"]]
             assert keys == ["keep"]
 
@@ -188,7 +188,7 @@ class TestDeleteAcrossLayouts:
 
         delete_item_key_across_all_layouts("src", "point", "origin")
 
-        data = self._scene_json("布局A")
+        data = self._scene_json("layout_a")
         assert [p["key"] for p in data["points"]] == ["stay"]
         # fwd 的 from_key 与 back 的 to_key 都指向 origin，两条都该走
         assert data["arrows"] == []
@@ -197,11 +197,11 @@ class TestDeleteAcrossLayouts:
         from lvjiang.core.config.resolver import get_resolver
         from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
 
-        path = get_resolver().resolve_read("layouts/布局C/src.json")
+        path = get_resolver().resolve_read("layouts/layout_c/src.json")
         assert path is not None
         before = path.read_text(encoding="utf-8")
 
-        assert "布局C" not in delete_item_key_across_all_layouts(
+        assert "layout_c" not in delete_item_key_across_all_layouts(
             "src", "region", "btn")
         assert path.read_text(encoding="utf-8") == before
 
@@ -210,10 +210,10 @@ class TestDeleteAcrossLayouts:
 
         delete_item_key_across_all_layouts("src", "panel", "grid")
 
-        assert self._scene_json("布局A")["panels"] == []
+        assert self._scene_json("layout_a")["panels"] == []
 
     def test_an_unknown_kind_changes_nothing(self, manager):
         from lvjiang.core.layout_manager import delete_item_key_across_all_layouts
 
         assert delete_item_key_across_all_layouts("src", "arrow", "fwd") == []
-        assert len(self._scene_json("布局A")["arrows"]) == 2
+        assert len(self._scene_json("layout_a")["arrows"]) == 2

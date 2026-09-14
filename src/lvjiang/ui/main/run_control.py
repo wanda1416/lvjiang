@@ -643,10 +643,10 @@ class RunControlMixin:
         """刷新布局选择器下拉列表"""
         self.layout_combo.blockSignals(True)
         self.layout_combo.clear()
-        layouts = self._layout_manager.list_layouts()
-        active = self._layout_manager.get_active_layout_name()
-        self.layout_combo.addItems(layouts)
-        idx = self.layout_combo.findText(active)
+        active = self._layout_manager.get_active_layout_key()
+        for entry in self._layout_manager.list_layout_entries():
+            self.layout_combo.addItem(entry.name, entry.key)
+        idx = self.layout_combo.findData(active)
         if idx >= 0:
             self.layout_combo.setCurrentIndex(idx)
         self.layout_combo.blockSignals(False)
@@ -656,18 +656,18 @@ class RunControlMixin:
         """布局选择器切换"""
         if index < 0:
             return
-        name = self.layout_combo.currentText()
-        if name and name != self._layout_manager.get_active_layout_name():
-            self._layout_manager.set_active_layout(name)
-            logger.info(f"已切换到布局: {name}")
+        key = self.layout_combo.currentData()
+        if key and key != self._layout_manager.get_active_layout_key():
+            self._layout_manager.set_active_layout(key)
+            logger.info(f"已切换到布局: {self.layout_combo.currentText()} ({key})")
         self._update_layout_desc_label()
 
     def _update_layout_desc_label(self):
         """更新布局描述标签"""
-        name = self.layout_combo.currentText()
+        key = self.layout_combo.currentData()
         desc = ""
-        if name:
-            layout = self._layout_manager.load_layout(name)
+        if key:
+            layout = self._layout_manager.load_layout(key)
             if layout:
                 desc = layout.desc
         self.layout_desc_label.setText(desc)
@@ -757,7 +757,7 @@ class RunControlMixin:
             else:
                 missing.append(tr("环境"))
         if plan.layout:
-            idx = self.layout_combo.findText(plan.layout)
+            idx = self.layout_combo.findData(plan.layout)
             if idx >= 0:
                 self.layout_combo.setCurrentIndex(idx)
             else:
@@ -771,7 +771,7 @@ class RunControlMixin:
         self._custom_context = (
             self.reference_space_combo.currentText(),
             self._env_combo.currentData(),
-            self.layout_combo.currentText(),
+            self.layout_combo.currentData(),
         )
 
     def _release_plan_context(self) -> None:
@@ -787,7 +787,7 @@ class RunControlMixin:
             idx = self._env_combo.findData(env)
             if idx >= 0:
                 self._env_combo.setCurrentIndex(idx)
-            idx = self.layout_combo.findText(layout)
+            idx = self.layout_combo.findData(layout)
             if idx >= 0:
                 self.layout_combo.setCurrentIndex(idx)
         self._refresh_run_button()
@@ -1227,7 +1227,7 @@ class RunControlMixin:
         if not self._begin_automation(flow_name):
             return
 
-        layout_name = self.layout_combo.currentText()
+        layout_name = self.layout_combo.currentData()
         layout = self._layout_manager.load_layout(layout_name)
 
         if not layout:
@@ -1568,7 +1568,7 @@ class RunControlMixin:
         if not self._begin_automation(flow_name):
             return
 
-        layout_name = self.layout_combo.currentText()
+        layout_name = self.layout_combo.currentData()
         layout = self._layout_manager.load_layout(layout_name)
         if not layout:
             self.log_text.append(f"[错误] 无法加载布局: {layout_name}")

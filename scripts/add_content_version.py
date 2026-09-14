@@ -11,7 +11,7 @@
     python scripts/add_content_version.py            # 补齐
     python scripts/add_content_version.py --check    # 只检查
 
-写盘时逐文件保持原有行尾（``config/system/layouts/桌面布局/*.json`` 是
+写盘时逐文件保持原有行尾（``config/system/layouts/desktop/*.json`` 是
 CRLF，其余是 LF）与末尾换行的有无——否则会把整批文件刷成一个巨大的
 无意义 diff（master 的 740c6a6 就是这么来的）。
 """

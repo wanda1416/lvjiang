@@ -28,7 +28,7 @@ def _plan(name: str, **kwargs) -> Plan:
 
 
 def test_save_and_load_round_trip():
-    plan = _plan("端游", space="端游", env="desktop", layout="桌面布局",
+    plan = _plan("端游", space="端游", env="desktop", layout="desktop",
                  modes=[PLAN_MODE_WINDOW])
 
     save_plans([plan])

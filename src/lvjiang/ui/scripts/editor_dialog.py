@@ -780,7 +780,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         if lm is None:
             return []
         try:
-            layout = lm.load_layout(lm.get_active_layout_name())
+            layout = lm.load_layout(lm.get_active_layout_key())
         except Exception as e:  # noqa: BLE001
             return [tr("无法加载当前布局做引用校验: {e}").format(e=e)]
         if not layout:

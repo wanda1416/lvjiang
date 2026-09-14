@@ -900,7 +900,7 @@ class MainWindow(
         if not self._begin_automation(tr("批量执行")):
             return False
 
-        layout_name = self.layout_combo.currentText()
+        layout_name = self.layout_combo.currentData()
         layout = self._layout_manager.load_layout(layout_name)
         if not layout:
             self._log_append(f"[错误] 无法加载布局: {layout_name}")

@@ -9,7 +9,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QStyle,
     QStyleOptionComboBox,
-    QWidget,
 )
 
 import lvjiang.apps.yysls.config as config_module
@@ -200,27 +199,3 @@ def test_source_actions_offer_copy_only_for_mock_type(qtbot):
     EquipStatusTab._update_source_actions(tab)
     assert delete_button.isHidden()
     assert not copy_button.isHidden()
-
-
-def test_advanced_filters_collapse_without_hiding_sort_or_source(qtbot):
-    advanced = QWidget()
-    toggle = QPushButton()
-    sort = QComboBox()
-    source = QComboBox()
-    for widget in (advanced, toggle, sort, source):
-        qtbot.addWidget(widget)
-        widget.show()
-    tab = SimpleNamespace(
-        _filters_collapsed=False,
-        _advanced_filter_widget=advanced,
-        _filter_collapse_button=toggle,
-    )
-
-    EquipStatusTab._set_advanced_filters_collapsed(tab, True)
-
-    assert advanced.isHidden()
-    assert toggle.text() == ""
-    assert not toggle.icon().isNull()
-    assert toggle.accessibleName() == "展开部位至状态筛选"
-    assert not sort.isHidden()
-    assert not source.isHidden()

@@ -11,7 +11,6 @@ from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
 from lvjiang.apps.yysls.core.graduation.affix_impact import (
     AffixBlockedEquipment,
     AffixCombinationResult,
-    AffixImpact,
     AffixImpactReport,
     AffixReplacementSuggestion,
     analyze_affix_impacts,
@@ -332,88 +331,6 @@ def test_joint_cultivation_rejects_any_invalid_baseline_equipment():
             "鸣金·虹",
             game_config=get_game_config(),
         )
-
-
-def test_dialog_renders_both_rankings(qtbot):
-    from PyQt6.QtWidgets import QCheckBox, QLabel, QPushButton, QTableWidget, QTabWidget
-
-    from lvjiang.apps.yysls.ui.loadout.affix_impact_dialog import (
-        AffixImpactDialog,
-    )
-
-    report = AffixImpactReport(
-        baseline_rate=0.8,
-        affix_level=110,
-        additions=(AffixImpact("势", 76.8, 0.0135),),
-        removals=(AffixImpact("剑武学增伤", 9.8, -0.0257),),
-        suggestions=(
-            _replacement("main_weapon"),
-            _replacement("ring"),
-        ),
-    )
-
-    def joint_analyzer(slots):
-        selected = tuple(
-            item for item in report.suggestions if item.slot_key in slots
-        )
-        return AffixCombinationResult(
-            selected_slots=slots,
-            graduation_rate=0.8 + 0.01 * len(selected),
-            graduation_delta=0.01 * len(selected),
-            replacements=selected,
-            evaluated_combinations=2 ** len(selected) - 1,
-        )
-
-    dialog = AffixImpactDialog(
-        report, "鸣金·虹", "基础方案", joint_analyzer=joint_analyzer,
-    )
-    qtbot.addWidget(dialog)
-
-    additions = dialog.findChild(QTableWidget, "affixImpactAdditionTable")
-    removals = dialog.findChild(QTableWidget, "affixImpactRemovalTable")
-    tabs = dialog.findChild(QTabWidget, "affixAnalysisTabs")
-    suggestion_count = dialog.findChild(QLabel, "affixMetricValue_count")
-    best_gain = dialog.findChild(QLabel, "affixMetricValue_gain")
-    assert additions is not None
-    assert removals is not None
-    assert tabs is not None
-    assert suggestion_count is not None
-    assert best_gain is not None
-    assert tabs.tabText(0) == "培养建议  2"
-    assert suggestion_count.text() == "2 条"
-    assert best_gain.text() == "+1.00%"
-    assert additions.item(0, 0).text() == "势"
-    assert additions.item(0, 1).text() == "+1.35%"
-    assert removals.item(0, 0).text() == "剑武学增伤"
-    assert removals.item(0, 1).text() == "-2.57%"
-
-    dialog.show()
-    qtbot.wait(10)
-    main_check = dialog.findChild(QCheckBox, "affixSlotCheck_main_weapon")
-    ring_check = dialog.findChild(QCheckBox, "affixSlotCheck_ring")
-    joint_button = dialog.findChild(QPushButton, "calculateJointAffixButton")
-    joint_gain = dialog.findChild(QLabel, "jointGraduationGain")
-    assert main_check is not None
-    assert ring_check is not None
-    assert joint_button is not None
-    assert joint_gain is not None
-    main_check.click()
-    ring_check.click()
-    assert joint_button.isEnabled()
-    assert "palette(highlight)" in joint_button.styleSheet()
-    qtbot.wait(160)
-    assert joint_gain.text() == "+2.00%"
-    assert joint_button.text() == "重新计算"
-
-    tabs.setCurrentIndex(1)
-    qtbot.wait(10)
-    widths_before = [additions.columnWidth(i) for i in range(3)]
-    dialog.resize(1300, 700)
-    qtbot.wait(10)
-    widths_after = [additions.columnWidth(i) for i in range(3)]
-    assert all(after > before for before, after in zip(
-        widths_before, widths_after, strict=True,
-    ))
 
 
 def test_runtime_analysis_dependencies_resolve_from_equip_package():

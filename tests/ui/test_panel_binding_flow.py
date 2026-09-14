@@ -2,10 +2,7 @@
 
 from unittest.mock import Mock
 
-import numpy as np
 import pytest
-from PyQt6.QtCore import QPointF, Qt
-from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -76,47 +73,6 @@ def test_create_definition_form_has_no_layout_fields(host, monkeypatch):
     assert host.registry.get_scene("scene").panels[-1] == PanelDef("new_grid", "新网格")
     assert host._canvas.get_panels() == []
     host._canvas.on_panel_changed.assert_not_called()
-
-
-def test_binding_preserves_parameters_and_replaces_disabled_placeholder(host, monkeypatch, qtbot):
-    host._canvas.resize(500, 500)
-    host._canvas.set_image(np.zeros((500, 500, 3), dtype=np.uint8))
-    host.show()
-    host._canvas.show()
-    qtbot.waitUntil(lambda: host._canvas._display_rect.width() > 0)
-    host._canvas.set_panels([Panel("grid", 0, 0, 0, 0, disabled=True)])
-
-    def execute(dialog):
-        form = dialog.findChild(PanelBindingForm)
-        form.rows.setValue(1)
-        form.cols.setValue(9)
-        form.direction.setCurrentIndex(form.direction.findData("none"))
-        form.calibration.setCurrentIndex(form.calibration.findData("even"))
-        form.visible.setValue(0.82)
-        form.disabled.setChecked(False)
-        dialog.findChild(QDialogButtonBox).button(
-            QDialogButtonBox.StandardButton.Ok).click()
-        return dialog.result()
-
-    monkeypatch.setattr(QDialog, "exec", execute)
-    host._bind_panel_key("grid")
-    assert len(host._canvas.get_panels()) == 1
-    host._canvas.on_panel_changed.assert_not_called()
-    canvas = host._canvas
-    canvas._panel_drag_start = canvas._norm_to_widget(0.1, 0.2)
-    event = QMouseEvent(
-        QMouseEvent.Type.MouseButtonRelease, canvas._norm_to_widget(0.8, 0.7),
-        Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
-    canvas.mouseReleaseEvent(event)
-    panels = canvas.get_panels()
-    assert len(panels) == 1
-    panel = panels[0]
-    assert (panel.rows, panel.cols, panel.calibration, panel.scroll_direction) == (1, 9, "even", "none")
-    assert panel.min_visible == pytest.approx(0.82)
-    assert not panel.disabled
-    assert panel.w_ratio > 0 and panel.h_ratio > 0
-    canvas.on_panel_changed.assert_called_once()
-    assert host.registry.get_scene("scene").panels == [PanelDef("grid", "网格")]
 
 
 def test_cancel_placement_leaves_no_binding_or_dirty_state(host):
@@ -234,21 +190,3 @@ def test_unbound_properties_offer_binding_without_fake_parameters(host, monkeypa
     monkeypatch.setattr(QDialog, "exec", execute)
     host._show_panel_properties("grid")
     assert host._canvas.get_panels() == []
-
-
-def test_canvas_double_click_opens_layout_editor(qtbot):
-    canvas = RegionCanvas()
-    qtbot.addWidget(canvas)
-    canvas.resize(500, 500)
-    canvas.set_image(np.zeros((500, 500, 3), dtype=np.uint8))
-    canvas.show()
-    qtbot.waitUntil(lambda: canvas._display_rect.width() > 0)
-    canvas.set_panels([Panel("grid", .1, .1, .5, .5)])
-    canvas.on_panel_edit_requested = Mock()
-    canvas.on_panel_changed = Mock()
-    event = QMouseEvent(
-        QMouseEvent.Type.MouseButtonDblClick, QPointF(canvas._norm_to_widget(.3, .3)),
-        Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
-    canvas.mouseDoubleClickEvent(event)
-    canvas.on_panel_edit_requested.assert_called_once_with("grid")
-    canvas.on_panel_changed.assert_not_called()

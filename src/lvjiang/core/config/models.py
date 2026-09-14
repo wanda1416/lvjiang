@@ -147,7 +147,7 @@ class HotkeyConfig:
     start: str = "F9"    # 开始执行工作流
     pause: str = "F11"   # 暂停 / 恢复
     stop: str = "F10"    # 停止 / 结束
-    record: str = "F12"  # 脚本录制；仅在录制对话框打开期间临时全局注册
+    record: str = "F12"  # 脚本录制；仅在脚本编辑工作台打开期间临时全局注册
 
     def __post_init__(self):
         defaults = {"start": "F9", "pause": "F11", "stop": "F10", "record": "F12"}

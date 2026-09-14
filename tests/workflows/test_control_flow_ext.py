@@ -74,6 +74,17 @@ env:"desktop" -> eval $hit = $hit + 10
 
         assert make_engine(run_env="desktop").execute(wf) == {}
 
+    def test_static_validation_does_not_guess_runtime_environment(self, tmp_path):
+        wf = tmp_path / "desktop_only.wf"
+        wf.write_text(
+            "#% env: [desktop]\nlog \"validate without running\"\n",
+            encoding="utf-8",
+        )
+
+        # 编辑器和 CI 的静态校验没有本次执行环境，不应把空值
+        # 或校验器所用环境当成用户真正要运行的环境。
+        make_engine(run_env="").validate_only(wf)
+
 
 # ─── continue ─────────────────────────────────────────────
 

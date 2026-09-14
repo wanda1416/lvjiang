@@ -876,7 +876,7 @@ class SettingsDialog(QDialog):
                 row = QHBoxLayout()
                 row.addWidget(combo)
                 row.addWidget(self._tip_button(tr(
-                    "该热键只在「脚本录制」对话框打开期间临时全局注册，"
+                    "该热键只在「脚本编辑」工作台打开期间临时全局注册，"
                     "对话框关闭后立即注销；其余三个热键在软件运行期间始终生效。")))
                 row.addStretch()
                 form.addRow(f"{label}:", row)

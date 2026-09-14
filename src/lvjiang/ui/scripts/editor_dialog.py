@@ -37,7 +37,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from loguru import logger
-from PyQt6.QtCore import QRegularExpression, QSize, Qt
+from PyQt6.QtCore import QEvent, QRegularExpression, QSize, Qt
 from PyQt6.QtGui import (
     QColor,
     QFont,
@@ -57,6 +57,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QSplitter,
     QStyle,
     QTabWidget,
@@ -304,6 +305,9 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self._dir_items: dict[str, QTreeWidgetItem] = {}
         self._current: ScriptEntry | None = None
         self._dirty = False
+        self._metadata_checked_text: str | None = None
+        self._pending_trace = None
+        self._recording_active = False
         self._changed_any = False   # 本次会话有无落盘变更（关闭后主窗口据此刷新）
         self.setWindowTitle(tr("脚本编辑"))
         self.setMinimumSize(960, 640)
@@ -315,7 +319,9 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
     def _setup_ui(self):
         root = QVBoxLayout(self)
 
-        btn_row = QHBoxLayout()
+        self.editor_toolbar = QWidget()
+        btn_row = QHBoxLayout(self.editor_toolbar)
+        btn_row.setContentsMargins(0, 0, 0, 0)
         self.btn_new = QPushButton(tr("新建"))
         self.btn_new.clicked.connect(self._on_new)
         self.btn_save = QPushButton(tr("保存"))
@@ -335,12 +341,25 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         apply_button_style(self.btn_delete, variant="danger")
         for b in (self.btn_new, self.btn_save, self.btn_save_as, self.btn_delete, self.btn_check):
             btn_row.addWidget(b)
-        btn_row.addStretch()
         self.lbl_layer = QLabel("")
+        # 文件信息紧跟最后一个动作按钮，左边界不随路径长度变化。
+        # Ignored 让标签只使用按钮之后的剩余空间；长路径在自己的区域内裁切，
+        # 不会反向挤动左侧按钮。
+        self.lbl_layer.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.lbl_layer.setMinimumWidth(0)
+        self.lbl_layer.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.lbl_layer.setStyleSheet("color: palette(mid);")
-        btn_row.addWidget(self.lbl_layer)
-        root.addLayout(btn_row)
+        btn_row.addWidget(self.lbl_layer, 1)
 
+        self.workspace_tabs = QTabWidget()
+        edit_page = QWidget()
+        edit_layout = QVBoxLayout(edit_page)
+        edit_layout.setContentsMargins(8, 8, 8, 8)
+        # 编辑动作属于“脚本编辑”页，而不是整个工作台。工具栏放在页内，
+        # 主 Tab 始终位于它上方，切到配置页时不会产生按钮作用域不明的问题。
+        edit_layout.addWidget(self.editor_toolbar)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
@@ -373,6 +392,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.editor.setPlaceholderText(tr("左侧选择脚本，或点「新建」"))
         self.editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.editor.textChanged.connect(self._on_text_changed)
+        self.editor.installEventFilter(self)
         self._highlighter = WfHighlighter(self.editor.document())
         self.lbl_metadata = QLabel("")
         self.lbl_metadata.setObjectName("workflow_metadata_error")
@@ -384,7 +404,14 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             "border-radius: 3px; padding: 7px; font-weight: 600;")
         self.lbl_metadata.setVisible(False)
         rl.addWidget(self.lbl_metadata)
-        rl.addWidget(self.editor)
+        from .metadata_panel import MetadataPanel
+        self.metadata_panel = MetadataPanel(self)
+        self.metadata_panel.text_applied.connect(self._apply_metadata_text)
+        self.code_tabs = QTabWidget()
+        self.code_tabs.addTab(self.editor, tr("代码"))
+        self.code_tabs.addTab(self.metadata_panel, tr("元数据"))
+        self.code_tabs.currentChanged.connect(self._on_code_tab_changed)
+        rl.addWidget(self.code_tabs)
         self.lbl_status = QLabel("")
         self.lbl_status.setWordWrap(True)
         self.lbl_status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -393,18 +420,38 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         splitter.addWidget(right)
 
         from .action_palette import ActionPalette, default_providers
+        from .record_dialog import ScriptRecordDialog
         from .workbench import DebugPanel
         self.debug = DebugPanel(self._main, self)
         self.palette = ActionPalette(default_providers(self._main, self.debug))
         self.palette.insert_requested.connect(self.insert_statement)
         tabs = QTabWidget()
         tabs.addTab(self.palette, tr("指令"))
+        self.record = ScriptRecordDialog(self._main, editor_host=self)
+        tabs.addTab(self.record, tr("录制"))
         tabs.addTab(self.debug, tr("调试"))
         self.side_tabs = tabs
         splitter.addWidget(tabs)
-        splitter.setStretchFactor(1, 3)
-        splitter.setStretchFactor(2, 2)
-        root.addWidget(splitter, 1)   # 纵向多余空间全给编辑区，别平分给工具条
+        # 右侧辅助工具默认给 320px，但不把它写成最小宽度。
+        # Ignored 让 splitter 不受调试画布等子控件的 sizeHint 限制；
+        # 同时禁止折叠，因此可连续缩到极窄，但不会突然吸附为 0 消失。
+        tabs.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        splitter.setCollapsible(2, False)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 0)
+        splitter.setSizes([220, 640, 320])
+        self.main_splitter = splitter
+        edit_layout.addWidget(splitter, 1)
+        self.workspace_tabs.addTab(edit_page, tr("脚本编辑"))
+
+        from .config_dialog import ScriptConfigDialog
+        self.config_panel = ScriptConfigDialog(self._main, embedded=True)
+        self.config_panel.preferences_saved.connect(self._preferences_saved)
+        self.workspace_tabs.addTab(self.config_panel, tr("脚本配置"))
+        self.workspace_tabs.currentChanged.connect(self._on_workspace_tab_changed)
+        root.addWidget(self.workspace_tabs, 1)
 
         self._refresh_buttons()
 
@@ -613,6 +660,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.editor.blockSignals(False)
         self._refresh_metadata_warning()
         self._dirty = False
+        self._pending_trace = None
         self._apply_read_only(entry)
         self._set_status(
             "" if entry is None or self._is_editable(entry)
@@ -620,6 +668,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
                   if entry.file.is_remote else
                   tr("系统脚本只读——右键「复制到本地以修改」后才能编辑")))
         self._refresh_buttons()
+        self._sync_metadata_panel()
 
     def _apply_read_only(self, entry: ScriptEntry | None):
         """系统脚本置灰编辑区，并把来源写进状态标签"""
@@ -627,6 +676,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.editor.setReadOnly(entry is not None and not editable)
         if entry is None:
             self.lbl_layer.setText("")
+            self.lbl_layer.setToolTip("")
             return
         if entry.file.is_remote:
             origin = tr("远程（只读）")
@@ -637,17 +687,63 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
                 origin = tr("本地覆盖远程")
             else:
                 origin = tr("本地覆盖系统") if entry.file.overrides_system else tr("本地")
-        self.lbl_layer.setText(f"{origin} · {entry.path}")
+        label = f"{origin} · {entry.path}"
+        self.lbl_layer.setText(label)
+        self.lbl_layer.setToolTip(label)
 
     # ─── 状态 ──────────────────────────────────────────
 
     def _on_text_changed(self):
         self._dirty = True
-        self._refresh_metadata_warning()
         self._refresh_buttons()
 
+    def eventFilter(self, watched, event):  # noqa: N802 - Qt override
+        # 元数据解析需要扫描整份脚本，不能挂在 textChanged 上。
+        # 用户离开代码编辑区时再更新警告，连续输入期间只标记已修改。
+        if watched is self.editor and event.type() == QEvent.Type.FocusOut:
+            self._refresh_metadata_warning()
+        return super().eventFilter(watched, event)
+
+    def _on_code_tab_changed(self, index: int) -> None:
+        if self.code_tabs.widget(index) is self.metadata_panel:
+            self._sync_metadata_panel()
+
+    def _sync_metadata_panel(self) -> None:
+        entry = self._current
+        editable = entry is not None and self._is_editable(entry)
+        self.metadata_panel.load_text(
+            self.editor.toPlainText(), editable=editable,
+            fallback_id=entry.id if entry else "",
+        )
+
+    def _apply_metadata_text(self, text: str) -> None:
+        cursor = self.editor.textCursor()
+        self.editor.setPlainText(text)
+        cursor.setPosition(min(cursor.position(), len(text)))
+        self.editor.setTextCursor(cursor)
+        self._refresh_metadata_warning()
+        self.code_tabs.setCurrentWidget(self.editor)
+
+    def _preferences_saved(self) -> None:
+        self._changed_any = True
+        if self._main is not None:
+            reload_configs = getattr(self._main, "_load_workflow_configs", None)
+            if callable(reload_configs):
+                reload_configs()
+
+    def _on_workspace_tab_changed(self, index: int) -> None:
+        editing = self.workspace_tabs.widget(index) is not self.config_panel
+        if not editing and not self.config_panel.dirty:
+            self.config_panel._load()
+
     def _refresh_metadata_warning(self) -> None:
-        problem = metadata_error(self.editor.toPlainText())
+        text = self.editor.toPlainText()
+        # 点保存会先让编辑器失去焦点，两条路径可能紧接着到达。
+        # 同一份内容只解析一次，避免一次操作重复扫描整个文档。
+        if text == self._metadata_checked_text:
+            return
+        problem = metadata_error(text)
+        self._metadata_checked_text = text
         if problem:
             self.lbl_metadata.setText(
                 tr("⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n")
@@ -665,7 +761,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.btn_save.setEnabled(self._dirty and (editable or (cur is None and has_text)))
         self.btn_save_as.setEnabled(has_text)
         # 系统脚本属于 system 内容，用户模式下不可删除——不想在日常页看到
-        # 请在「工具 → 脚本配置」取消勾选。
+        # 请在本工作台的「脚本配置」页取消勾选。
         shadow = (cur is not None and editable
                   and (cur.file.overrides_system or cur.file.overrides_remote)
                   and not get_resolver().is_dev_mode())
@@ -693,12 +789,16 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.lbl_status.setStyleSheet(
             "color: #c62828; padding: 4px;" if error else "color: #2e7d32; padding: 4px;")
 
-    def _confirm_discard(self) -> bool:
-        if not self._dirty:
+    def _confirm_discard(self, *, include_config: bool = False) -> bool:
+        config_dirty = bool(
+            include_config and getattr(self, "config_panel", None)
+            and self.config_panel.dirty
+        )
+        if not self._dirty and not config_dirty:
             return True
         ret = QMessageBox.question(
             self, tr("放弃修改？"),
-            tr("当前脚本有未保存的修改，放弃？"),
+            tr("脚本或脚本配置有未保存的修改，放弃？"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -797,11 +897,34 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def _save_to(self, rel: str):
         text = self.editor.toPlainText()
+        # 保存是用户明确触发的校验边界；同时兼容程序化保存时
+        # 编辑器未实际收到 FocusOut 的情况。
+        self._refresh_metadata_warning()
         if not text.endswith("\n"):
             text += "\n"
-        path = self._write(rel, text)
-        if path is None:
-            return
+        if self._pending_trace is not None:
+            from ...core.input_trace import save_input_trace_bundle
+            resolver = get_resolver()
+            target = resolver.write_dir("workflows") / rel
+            try:
+                path, trace_path, final_text = save_input_trace_bundle(
+                    target, text, self._pending_trace,
+                    workflows_root=resolver.write_dir("workflows"),
+                )
+            except Exception as e:  # noqa: BLE001
+                QMessageBox.warning(self, tr("保存失败"), str(e))
+                return
+            logger.info(f"高精度脚本已写入: {path} + {trace_path}")
+            text = final_text
+            self.editor.blockSignals(True)
+            self.editor.setPlainText(final_text.rstrip("\n"))
+            self.editor.blockSignals(False)
+            self._pending_trace = None
+        else:
+            written = self._write(rel, text)
+            if written is None:
+                return
+            path = written
         self._changed_any = True
         self._dirty = False
         self._current = None
@@ -866,6 +989,40 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             self._set_status("\n".join(problems), error=True)
         else:
             self._set_status(tr("语法检查通过（保存后会再做布局引用校验）"))
+
+    # ─── 录制面板用的编辑器接口 ───────────────────────
+
+    def can_accept_recording(self) -> bool:
+        cur = self._current
+        return bool(
+            cur is not None and self._is_editable(cur)
+            and self._pending_trace is None
+            and not self.editor.isReadOnly()
+        )
+
+    def begin_recording(self) -> None:
+        self._recording_active = True
+        self.tree.setEnabled(False)
+        self.editor.setReadOnly(True)
+        self.workspace_tabs.setTabEnabled(1, False)
+        for button in (self.btn_new, self.btn_save, self.btn_save_as, self.btn_delete):
+            button.setEnabled(False)
+
+    def end_recording(self) -> None:
+        self._recording_active = False
+        self.tree.setEnabled(True)
+        self.workspace_tabs.setTabEnabled(1, True)
+        self._apply_read_only(self._current)
+        self._refresh_buttons()
+
+    def accept_recording(self, dsl: str, trace) -> bool:
+        if not self.can_accept_recording():
+            return False
+        self.insert_statement(dsl.rstrip())
+        self._pending_trace = trace
+        self._dirty = True
+        self._refresh_buttons()
+        return True
 
     # ─── 调试面板用的编辑器接口 ─────────────────────────
 
@@ -936,14 +1093,20 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         return self._changed_any
 
     def closeEvent(self, event):  # noqa: N802 — Qt 虚函数
-        if not self._confirm_discard():
+        if self.record.is_recording:
+            self.record._stop_recording()
+        if not self._confirm_discard(include_config=True):
             event.ignore()
             return
+        self.record.stop_f12_hotkey()
         self.debug.shutdown()
         super().closeEvent(event)
 
     def reject(self):
-        if not self._confirm_discard():
+        if self.record.is_recording:
+            self.record._stop_recording()
+        if not self._confirm_discard(include_config=True):
             return
+        self.record.stop_f12_hotkey()
         self.debug.shutdown()
         super().reject()

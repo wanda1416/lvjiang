@@ -110,12 +110,12 @@ def test_system_navigation_and_desktop_shortcuts():
 
     scenes = get_registry().all_scenes()
     assert not validate_transitions(scenes)
-    for name in ('桌面布局', '默认布局'):
-        layout = layout_manager.load_layout_by_name(name)
+    for name in ('desktop', 'android'):
+        layout = layout_manager.load_layout_by_key(name)
         validate_layout_activation_keys(layout, {'game_main_page', 'general_control'})
         setting = next(r for r in layout.get_scene_regions('game_main_page') if r.key == 'settings')
         bag = next(r for r in layout.get_scene_regions('game_main_page') if r.key == 'bag')
-        if name == '桌面布局':
+        if name == 'desktop':
             assert setting.activation_key == 'SLASH' and bag.activation_key == 'B'
         else:
             assert setting.disabled and bag.disabled

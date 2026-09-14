@@ -625,7 +625,7 @@ class SceneOpsMixin:
             rename_scene_across_all_layouts(scene_key, new_key)
             # 重新加载当前布局以刷新 scene key 映射
             if self._current_layout:
-                reloaded = self._manager.load_layout(self._current_layout.name)
+                reloaded = self._manager.load_layout(self._current_layout.key)
                 if reloaded:
                     self._current_layout = reloaded
         reload_scene_registry()

@@ -349,30 +349,24 @@ DSL 中通过 `drag [equip_tune_detail].[tune_drag]` 执行拖拽。
 
 ### 实例数据
 
-布局 JSON 存储上述数据（`config/local/layouts/{布局名}.json`）：
+布局清单由 `layouts.yaml` schema v2 维护：key 是稳定存储标识，
+`name` 是可读展示名；每个场景的实例数据分开存在
+`config/{system|local}/layouts/{layout_key}/{scene_key}.json`：
 
 ```json
 {
-  "canvas": {
-    "x_ratio": 0.0, "y_ratio": 0.0,
-    "w_ratio": 1.0, "h_ratio": 1.0
-  },
-  "scenes": {
-    "scene_key": {
-      "regions": [
-        { "key": "region_key", "x_ratio": 0.1, "y_ratio": 0.2, "w_ratio": 0.3, "h_ratio": 0.1, "click_rect": [0.1, 0.0, 0.8, 0.5], "template": { "name": "default/scene_key/region_key", "min_score": 0.8, "record_w": 2400, "record_h": 1080 } }
-      ],
-      "points": [
-        { "key": "point_key", "cx_ratio": 0.5, "cy_ratio": 0.7, "r_ratio": 0.015 }
-      ],
-      "panels": [
-        { "key": "panel_key", "x_ratio": 0.1, "y_ratio": 0.3, "w_ratio": 0.8, "h_ratio": 0.4 }
-      ],
-      "arrows": [
-        { "key": "arrow_key", "from_key": "point_a", "to_key": "point_b" }
-      ]
-    }
-  }
+  "regions": [
+    { "key": "region_key", "x_ratio": 0.1, "y_ratio": 0.2, "w_ratio": 0.3, "h_ratio": 0.1 }
+  ],
+  "points": [
+    { "key": "point_key", "cx_ratio": 0.5, "cy_ratio": 0.7, "r_ratio": 0.015 }
+  ],
+  "panels": [
+    { "key": "panel_key", "x_ratio": 0.1, "y_ratio": 0.3, "w_ratio": 0.8, "h_ratio": 0.4 }
+  ],
+  "arrows": [
+    { "key": "arrow_key", "from_key": "point_a", "to_key": "point_b" }
+  ]
 }
 ```
 
@@ -383,18 +377,18 @@ DSL 中通过 `drag [equip_tune_detail].[tune_drag]` 执行拖拽。
 ```
 config/
 ├── system/
-│   └── scenes/                    # Scene YAML 定义（逻辑结构）
-│       ├── bag_equip_detail.yaml
-│       ├── equip_weapon_detail.yaml
-│       └── ...
-└── local/
-    ├── layouts/                   # Layout JSON（物理绑定）
-    │   ├── 默认布局.json
-    │   └── 投屏布局.json
-    └── screenshots/               # 场景截图（编辑器参考底图）
-        ├── 默认布局/
-        │   ├── bag_equip_detail.png
-        │   └── ...
-        └── 投屏布局/
-            └── ...
+│   ├── layouts.yaml              # schema v2 布局清单、展示名和画布
+│   ├── scenes/                   # Scene YAML 定义（逻辑结构）
+│   ├── layouts/
+│   │   ├── android/               # layout key
+│   │   │   ├── bag_equip_detail.json
+│   │   │   └── ...
+│   │   └── desktop/
+│   └── templates/
+│       ├── android/
+│       └── desktop/
+└── local/                         # 同样按 layout key 覆盖
+    ├── layouts.yaml
+    ├── layouts/
+    └── templates/
 ```

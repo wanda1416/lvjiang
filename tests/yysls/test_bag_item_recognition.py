@@ -3,7 +3,7 @@
 使用真实截图验证通用 ReferenceRecognizer 与 yysls 字段解析。
 验证内容：材料名称 + 等级（忽略数量）。
 
-截图来源：config/session/screenshots/默认布局/bag_item_detail__bag_detail.png
+截图来源：config/session/screenshots/android/bag_item_detail__bag_detail.png
 标准结果：人工标注的 30 个格子（5 行 × 6 列）
 
 注意：依赖 RapidOCR（ONNX Runtime），CI 环境可能不支持，仅本地运行。
@@ -101,11 +101,11 @@ def screenshot():
 
 @pytest.fixture(scope="module")
 def layout():
-    """加载默认布局的 bag_item_detail 场景区域"""
-    from lvjiang.core.layout_manager import load_layout_by_name
-    layout = load_layout_by_name("默认布局")
+    """加载android的 bag_item_detail 场景区域"""
+    from lvjiang.core.layout_manager import load_layout_by_key
+    layout = load_layout_by_key("android")
     if layout is None:
-        pytest.skip("默认布局不存在")
+        pytest.skip("android不存在")
     return layout
 
 

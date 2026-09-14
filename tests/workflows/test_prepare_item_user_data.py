@@ -4,7 +4,7 @@
 子串——文本断言锁的是代码长什么样，改个等待秒数、换个写法就误报，却拦不住
 真正的行为回归（`wait_until_role_offline` 忘了点取消、返回码写反）。
 
-OCR 与点击通过替换 BaseWorkflow 上的两个方法注入：布局取真实的默认布局，
+OCR 与点击通过替换 BaseWorkflow 上的两个方法注入：布局取真实的android，
 所以区域 key 拼错同样会在这里炸出来。
 """
 
@@ -15,7 +15,7 @@ import pytest
 
 from lvjiang.core.config import load_user_config
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
-from lvjiang.core.layout_manager import load_layout_by_name
+from lvjiang.core.layout_manager import load_layout_by_key
 from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine
 
@@ -62,9 +62,9 @@ class _Screen:
 
 
 def _engine():
-    """真实默认布局 + 真实等待参数；`wait @page_refresh` 比对的就是后者。"""
+    """真实android + 真实等待参数；`wait @page_refresh` 比对的就是后者。"""
     return make_engine(
-        layout=load_layout_by_name("默认布局"),
+        layout=load_layout_by_key("android"),
         delay_params=load_user_config().delay_params,
         run_env="android",
     )

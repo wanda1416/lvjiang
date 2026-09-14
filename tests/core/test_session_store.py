@@ -31,17 +31,17 @@ class TestNodeOps:
         assert store.get_node("ui_state", {}) == {}
 
     def test_set_get_roundtrip(self, store):
-        store.set_node("active_layout", "默认布局")
-        assert store.get_node("active_layout") == "默认布局"
+        store.set_node("active_layout", "android")
+        assert store.get_node("active_layout") == "android"
 
     def test_node_isolation(self, store):
         """不同节点独立读写，互不覆盖"""
         store.set_node("ui_state", {"window_size": [800, 600]})
         store.set_node("daily", {"script": "a.wf"})
-        store.set_node("active_layout", "默认布局")
+        store.set_node("active_layout", "android")
         assert store.get_node("ui_state") == {"window_size": [800, 600]}
         assert store.get_node("daily") == {"script": "a.wf"}
-        assert store.get_node("active_layout") == "默认布局"
+        assert store.get_node("active_layout") == "android"
 
     def test_set_persists_to_disk(self, store):
         store.set_node("settings", {"adb": True})

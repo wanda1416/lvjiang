@@ -55,20 +55,20 @@ plans:
   name: 手游
   space: 手游
   env: android
-  layout: 默认布局
+  layout: android
   modes:
   - adb
 - id: 5deb7222def5486bb5431fd3b541a950
   name: 端游
   space: 端游
   env: desktop
-  layout: 桌面布局
+  layout: desktop
   modes:
   - windows
 - id: f29e8e838d2a40d8b22aa48627a1c14f
   name: 手游投屏
   space: 手游
   env: android
-  layout: 继承布局
+  layout: android_cast
   modes:
   - windows

@@ -7,7 +7,7 @@ import pytest
 from loguru import logger
 
 from lvjiang.core.config import load_user_config
-from lvjiang.core.layout_manager import load_layout_by_name
+from lvjiang.core.layout_manager import load_layout_by_key
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.metadata import parse_metadata
 
@@ -33,7 +33,7 @@ class RedeemGame:
         config = load_user_config()
         self.engine = WorkflowEngine(
             capture=MagicMock(), ocr=MagicMock(), input_ctrl=MagicMock(),
-            layout=load_layout_by_name("桌面布局" if platform == "desktop" else "默认布局"),
+            layout=load_layout_by_key("desktop" if platform == "desktop" else "android"),
             input_sim=config.input_sim, delay_params=config.delay_params, run_env=platform,
         )
         self.engine.variables = {"redeem_code": codes}

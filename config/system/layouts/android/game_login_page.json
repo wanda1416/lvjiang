@@ -103,7 +103,7 @@
       "w_ratio": 0.03047715777063431,
       "h_ratio": 0.05254682374247287,
       "template": {
-        "name": "默认布局/game_login_page/back",
+        "name": "android/game_login_page/back",
         "min_score": 0.8,
         "record_w": 2800,
         "record_h": 1260

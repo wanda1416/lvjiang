@@ -66,8 +66,9 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self.on_scene_references_added: (
             Callable[[str, list[tuple[str, str]]], None] | None) = None
         self.on_scene_reference_removed: Callable[[str, str, str], None] | None = None
-        # 当前布局名，由 dialog 经 set_layout_name 注入（解析布局坐标文件来源用）
+        # 当前布局 key，由 dialog 注入（解析存储路径用）
         self._layout_name: str = ""
+        self._layout_display_name: str = ""
         self._layout_rel_path: str = ""
         # 版本提升是编辑状态，不在点击链接时写盘。dialog 保存成功后统一清除；
         # 切换/关闭选择 Discard 时控件随 Tab 状态一起丢弃。
@@ -237,13 +238,15 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
             self.on_scene_type_changed(self._scene_key)
 
     def set_layout_name(self, layout_name: str,
-                        rel_path: str | None = None):
-        """由 dialog 在应用布局时注入——布局坐标文件的来源要按布局名解析"""
+                        rel_path: str | None = None, *,
+                        display_name: str = ""):
+        """由 dialog 注入布局 key、坐标文件来源和展示名。"""
         if layout_name != self._layout_name:
             self._pending_layout_version = None
             self._pending_templates.clear()
             self._pending_template_deletes.clear()
         self._layout_name = layout_name
+        self._layout_display_name = display_name or layout_name
         self._layout_rel_path = rel_path or ""
         self._refresh_version_info()
 

@@ -16,7 +16,7 @@ def _session_plans() -> list:
 
 def test_distributed_plan_goes_to_app_yaml_only(distributed_plans_store):
     plan = Plan.create("预置端游", space="端游", env="desktop",
-                       layout="桌面布局", modes=[PLAN_MODE_WINDOW],
+                       layout="desktop", modes=[PLAN_MODE_WINDOW],
                        distributed=True)
 
     save_plans([plan])

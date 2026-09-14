@@ -33,7 +33,7 @@ def _system_wf_files() -> list:
 
 
 def _system_layouts() -> list[str]:
-    """系统布局名册（目录化结构：layouts/{name}/ 目录）"""
+    """拥有独立场景文件的系统布局 key。"""
     layouts_dir = SYSTEM_CONFIG_DIR / "layouts"
     if not layouts_dir.is_dir():
         return []
@@ -48,7 +48,7 @@ _VALIDATOR_CACHE: dict[str, WorkflowEngine] = {}
 
 def _layout_env(layout_name: str) -> str:
     """布局对应的运行环境；脚本的 env 声明和引擎的 run_env 都按它取值。"""
-    return "desktop" if layout_name == "桌面布局" else "android"
+    return "desktop" if layout_name == "desktop" else "android"
 
 
 def _declared_envs(wf_path) -> list[str]:
@@ -67,8 +67,8 @@ def _validator(layout_name: str) -> WorkflowEngine:
     """
     if layout_name in _VALIDATOR_CACHE:
         return _VALIDATOR_CACHE[layout_name]
-    from lvjiang.core.layout_manager import load_layout_by_name
-    layout = load_layout_by_name(layout_name)
+    from lvjiang.core.layout_manager import load_layout_by_key
+    layout = load_layout_by_key(layout_name)
     assert layout is not None, f"布局加载失败: {layout_name}"
     user_config = load_user_config()
     engine = WorkflowEngine(
@@ -91,7 +91,7 @@ def test_system_layouts_and_workflows_exist():
 
 def test_desktop_layout_has_required_activation_bindings():
     """统一 DSL 后，桌面布局必须把等价实体准确绑定到对应按键。"""
-    layout = _validator("桌面布局")._layout
+    layout = _validator("desktop")._layout
     expected = {
         ("general_control", "confirm"): "SPACE",
         ("equip_tune_detail", "reset_tune"): "R",
@@ -118,7 +118,7 @@ def test_desktop_layout_has_required_activation_bindings():
 
 def test_desktop_layout_has_no_activation_key_conflicts():
     """桌面布局同一场景视图内，一个按键只能表示一个动作。"""
-    validate_layout_activation_keys(_validator("桌面布局")._layout)
+    validate_layout_activation_keys(_validator("desktop")._layout)
 
 
 @case_matrix("layout_name", _system_layouts())

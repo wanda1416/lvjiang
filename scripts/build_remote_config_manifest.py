@@ -10,7 +10,7 @@
       remote/
         ocr.yaml
         scenes/xxx.yaml
-        layouts/桌面布局/xxx.json
+        layouts/desktop/xxx.json
         yysls/game_config.yaml
         yysls/tune_config.yaml
         yysls/tuning_rules/xxx.yaml

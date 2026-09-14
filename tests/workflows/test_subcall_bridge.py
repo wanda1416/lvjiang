@@ -8,7 +8,7 @@ import pytest
 
 from lvjiang.core.config import load_user_config
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
-from lvjiang.core.layout_manager import load_layout_by_name
+from lvjiang.core.layout_manager import load_layout_by_key
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import Return
@@ -81,7 +81,7 @@ def test_real_nav_subcalls_loadable():
     navigator.py 生产路径用的就是这些相对路径，此用例保证路径与
     静态校验口径（命名等待/布局引用）不漂移。
     """
-    layout = load_layout_by_name("默认布局")
+    layout = load_layout_by_key("android")
     assert layout is not None
     eng = make_engine(layout=layout,
                       delay_params=load_user_config().delay_params)

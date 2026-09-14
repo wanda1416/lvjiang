@@ -424,11 +424,12 @@ class SceneEditorDialog(
         """
         if self._current_layout is None:
             return
+        layout_key = self._current_layout.key
         layout_name = self._current_layout.name
         self._loaded_scenes = set()  # 布局变更，所有底图待重新加载
         from ...core.layout_manager import scene_layout_rels
         scene_keys = get_registry().all_scene_keys()
-        self._scene_layout_paths = scene_layout_rels(layout_name, scene_keys)
+        self._scene_layout_paths = scene_layout_rels(layout_key, scene_keys)
         self._applying_layout = True
         try:
             self._ensure_scene_tab_loaded(self._get_current_scene_key())
@@ -480,8 +481,9 @@ class SceneEditorDialog(
             if is_subscene(scene_key)
             else self._current_layout.get_canvas())
         tab.set_layout_name(
-            self._current_layout.name,
+            self._current_layout.key,
             self._scene_layout_paths.get(scene_key),
+            display_name=self._current_layout.name,
         )
         if self._btn_canvas_mode.isChecked():
             tab.set_canvas_mode()
@@ -543,7 +545,8 @@ class SceneEditorDialog(
         tab = self._tabs.get(scene_key)
         if tab is None or scene_key in self._loaded_scenes:
             return
-        img = self._get_cached_screenshot(self._current_layout.name, scene_key, tab.current_view)
+        img = self._get_cached_screenshot(
+            self._current_layout.key, scene_key, tab.current_view)
         if img is not None:
             tab.canvas.set_image(img)
             if is_subscene(scene_key):
@@ -584,7 +587,7 @@ class SceneEditorDialog(
         tab = self._tabs.get(scene_key)
         if tab is None:
             return
-        img = self._get_cached_screenshot(self._current_layout.name, scene_key, view)
+        img = self._get_cached_screenshot(self._current_layout.key, scene_key, view)
         if img is not None:
             tab.canvas.set_image(img)
         else:
@@ -647,7 +650,11 @@ class SceneEditorDialog(
         src_tab = self._tabs.get(source)
         dst_tab = self._tabs.get(target)
         if self._current_layout is not None:
-            temp = Layout.from_dict("", self._current_layout.to_dict())
+            temp = Layout.from_dict(
+                self._current_layout.key,
+                self._current_layout.to_dict(),
+                name=self._current_layout.name,
+            )
             for sk, tab in ((source, src_tab), (target, dst_tab)):
                 if tab is None:
                     continue
@@ -698,7 +705,7 @@ class SceneEditorDialog(
         new_image, error_msg = result if isinstance(result, tuple) else (result, None)
         if new_image is not None:
             scene_key = self._current_scene_key
-            layout_name = self._current_layout.name
+            layout_name = self._current_layout.key
             current_tab = self._tabs.get(scene_key)
             view = current_tab.current_view if current_tab else ""
             current_image = load_scene_screenshot(layout_name, scene_key, view)

@@ -27,7 +27,7 @@ class _RefreshHarness:
 
     def __init__(self, image):
         self._refresh_callback = lambda: (image, None)
-        self._current_layout = SimpleNamespace(name="默认布局")
+        self._current_layout = SimpleNamespace(key="android", name="安卓布局")
         self._current_scene_key = "game_main_page"
         self._status_bar = _StatusBar()
         self._tabs = {
@@ -103,7 +103,7 @@ def test_refresh_same_size_does_not_prompt(monkeypatch):
 
     assert len(saved) == 1
     assert harness._tabs["game_main_page"].canvas.image is new_image
-    assert harness._img_cache[("默认布局", "game_main_page", "base")] is new_image
+    assert harness._img_cache[("android", "game_main_page", "base")] is new_image
 
 
 def test_refresh_saves_mismatched_screenshot_after_confirmation(monkeypatch):

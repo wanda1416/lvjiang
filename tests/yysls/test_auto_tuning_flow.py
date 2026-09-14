@@ -51,7 +51,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.stone_stock import (
 )
 from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 from lvjiang.core.config import load_user_config
-from lvjiang.core.layout_manager import load_layout_by_name
+from lvjiang.core.layout_manager import load_layout_by_key
 from lvjiang.workflows.engine import WorkflowEngine
 
 WEAPON_DETAIL = AutoTuningWorkflow.WEAPON_DETAIL
@@ -80,8 +80,8 @@ _DELAY_CACHE = None
 def _system_layout():
     global _LAYOUT_CACHE
     if _LAYOUT_CACHE is None:
-        _LAYOUT_CACHE = load_layout_by_name("默认布局")
-    assert _LAYOUT_CACHE is not None, "默认布局加载失败"
+        _LAYOUT_CACHE = load_layout_by_key("android")
+    assert _LAYOUT_CACHE is not None, "android加载失败"
     return _LAYOUT_CACHE
 
 

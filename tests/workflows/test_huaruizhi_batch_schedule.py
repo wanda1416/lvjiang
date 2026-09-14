@@ -13,7 +13,7 @@ import pytest
 
 from lvjiang.core.config import load_user_config
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
-from lvjiang.core.layout_manager import load_layout_by_name
+from lvjiang.core.layout_manager import load_layout_by_key
 from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.metadata import parse_metadata_file
@@ -82,7 +82,7 @@ def _run_prepare(device: _Device) -> dict:
     """执行 prepare_huaruizhi.wf 的主流程，返回它的返回协议字典。"""
     program = parse_text(_PREPARE.read_text(encoding="utf-8"))
     engine = make_engine(
-        layout=load_layout_by_name("默认布局"),
+        layout=load_layout_by_key("android"),
         delay_params=load_user_config().delay_params,
         run_env="android",
     )

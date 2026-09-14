@@ -92,8 +92,8 @@ def test_appearance_bindings_and_all_workflow_references(appearance_config):
                 assert ref.key in expected_keys, (path, ref)
                 refs.append(ref)
     assert refs
-    for name in ("默认布局", "桌面布局", "继承布局"):
-        layout = layout_manager.load_layout_by_name(name)
+    for name in ("android", "desktop", "android_cast"):
+        layout = layout_manager.load_layout_by_key(name)
         assert layout is not None
         regions = layout.get_scene_regions("appearance_main")
         bound = {r.key: r for r in regions}
@@ -101,12 +101,12 @@ def test_appearance_bindings_and_all_workflow_references(appearance_config):
         assert set(bound) == expected_keys
         assert not {"waiguan_yigui", "waiguan_qingjing"} & set(layout.regions)
         assert all(ref.key in bound for ref in refs)
-        if name == "桌面布局":
+        if name == "desktop":
             assert bound["back"].activation_key == "ESC"
             for key in ("save", "edit_qingjing", "taoyong"):
                 assert bound[key].activation_key == "SPACE"
     # 实际存储文件也必须一对一绑定，不只依赖加载器可能做的去重。
-    for name in ("默认布局", "桌面布局"):
+    for name in ("android", "desktop"):
         path = SYSTEM_CONFIG_DIR / "layouts" / name / "appearance_main.json"
         data = json.loads(path.read_text(encoding="utf-8"))
         keys = [r["key"] for r in data["regions"]]

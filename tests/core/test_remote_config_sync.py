@@ -111,7 +111,7 @@ class TestPathSafety:
 
     def test_accepts_registered_paths(self):
         assert remote.is_safe_rel_path("scenes/a.yaml")
-        assert remote.is_safe_rel_path("layouts/默认布局/a.json")
+        assert remote.is_safe_rel_path("layouts/android/a.json")
 
     def test_unsafe_entry_filtered_out_of_applicable(self):
         payload = _scene_bytes(2)
@@ -227,7 +227,7 @@ class TestSyncToDir:
         assert not stale.exists()
 
     def test_empty_dirs_pruned(self, tmp_path, fake_net):
-        stale = tmp_path / "remote" / "layouts" / "默认布局" / "a.json"
+        stale = tmp_path / "remote" / "layouts" / "android" / "a.json"
         stale.parent.mkdir(parents=True)
         stale.write_text(json.dumps({"content_version": 1}), encoding="utf-8")
         self._run(tmp_path, fake_net, [])

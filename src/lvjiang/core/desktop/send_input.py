@@ -296,10 +296,10 @@ class SendInputInput(InputBackend):
         stop_check: Callable[[], bool],
         pause_event: threading.Event | None = None,
     ) -> bool:
-        """粗粒度休眠后短暂自旋，以绝对时钟达到亚 10ms 调度。
+        """分段休眠后短暂自旋，以绝对时钟达到亚 10ms 调度。
 
-        单次 sleep 上限 50ms：长间隔事件之间的等待可达数秒，不能一次
-        睡掉整个区间，否则 stop_check / pause_event 在此期间形同虚设。
+        公共计时器以 5ms/1ms 分片检查中断：长间隔事件之间的等待可达
+        数秒，不能一次睡掉整个区间，否则 stop_check / pause_event 在此期间形同虚设。
         pause_event 变为 clear 时提前返回 True（"被暂停打断"），调用方
         据此回到暂停阻塞分支、用最新累计暂停时长重新算 deadline 再继续
         等——不这样处理的话，暂停请求会被这里的长等待吞掉，held 的
@@ -319,6 +319,9 @@ class SendInputInput(InputBackend):
         completed = precise_wait_until(
             deadline_ns,
             stop_check=interrupted,
+            # 录制轨迹可达 125Hz 甚至更高；沿用旧实现的 200us 尾段，
+            # 避免默认 2ms 自旋在密集事件流中显著占用单核。
+            spin_tail_ns=200_000,
         )
         return not completed and interrupted_by_pause
 

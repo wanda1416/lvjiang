@@ -80,12 +80,14 @@ class SendInputInput(InputBackend):
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
                      *, pre_delay=None, post_delay=None, button: str = "left",
+                     hold: float | None = None,
                      random_offset: bool = True):
         """点击屏幕坐标（带鼠标移动时长 + 点击后延迟）"""
         self._activate_target()
         self._move_to(screen_x, screen_y)
         self._click(screen_x, screen_y, poi_name, pre_delay=pre_delay,
                      post_delay=post_delay, button=button,
+                     hold=hold,
                      random_offset=random_offset)
 
     def mouse_button(self, button: str, pressed: bool) -> None:
@@ -366,6 +368,7 @@ class SendInputInput(InputBackend):
 
     def _click(self, x: int, y: int, poi_name: str = "",
                *, pre_delay=None, post_delay=None, button: str = "left",
+               hold: float | None = None,
                random_offset: bool = True):
         """点击指定坐标（加入随机偏移和延迟模拟人类）"""
         radius = self.click_random_offset if random_offset else 0
@@ -382,10 +385,14 @@ class SendInputInput(InputBackend):
             button, _MOUSE_BUTTON_EVENTS["left"])
         logger.debug(
             f"点击 {label}: ({actual_x}, {actual_y}) [偏移: {offset_x:+d}, {offset_y:+d}] "
-            f"按键={button}")
+            f"按键={button}" + (f" hold={hold}s" if hold is not None else ""))
         _user32.SetCursorPos(actual_x, actual_y)
         send_mouse_event(down_flag, mouse_data=mouse_data)
-        send_mouse_event(up_flag, mouse_data=mouse_data)
+        try:
+            if hold is not None:
+                time.sleep(hold)
+        finally:
+            send_mouse_event(up_flag, mouse_data=mouse_data)
 
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))

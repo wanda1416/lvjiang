@@ -42,8 +42,12 @@ class _GestureInput(InputBackend):
     def _swipe(self, x1: int, y1: int, x2: int, y2: int, duration_ms: int) -> None:
         raise NotImplementedError
 
+    def _long_press(self, x: int, y: int, duration_ms: int) -> None:
+        self._swipe(x, y, x, y, duration_ms)
+
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
                      *, pre_delay=None, post_delay=None, button: str = "left",
+                     hold: float | None = None,
                      random_offset: bool = True):
         """点击设备坐标（带随机偏移 + before/after 延迟）
 
@@ -58,8 +62,13 @@ class _GestureInput(InputBackend):
         _pre = pre_delay if pre_delay is not None else self.before_click_wait
         time.sleep(random.uniform(*_pre))
         label = f"({poi_name})" if poi_name else ""
-        print(f"[{self.name}] 点击 {label}: ({sx},{sy})")
-        self._tap(sx, sy)
+        if hold is None:
+            print(f"[{self.name}] 点击 {label}: ({sx},{sy})")
+            self._tap(sx, sy)
+        else:
+            duration_ms = max(1, int(hold * 1000))
+            print(f"[{self.name}] 长按 {label}: ({sx},{sy}) {duration_ms}ms")
+            self._long_press(sx, sy, duration_ms)
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
 
@@ -172,6 +181,10 @@ class A11yInput(_GestureInput):
     def _swipe(self, x1: int, y1: int, x2: int, y2: int, duration_ms: int) -> None:
         if not a11y.swipe(x1, y1, x2, y2, duration_ms):
             print(f"[{self.name}] 拖拽未成功（无障碍开关未开？）")
+
+    def _long_press(self, x: int, y: int, duration_ms: int) -> None:
+        if not a11y.long_press(x, y, duration_ms):
+            print(f"[{self.name}] 长按未成功（无障碍开关未开？）")
 
     def _drag(self, x1: int, y1: int, x2: int, y2: int, move_ms: int, hold_ms: int) -> None:
         """带 hold 时走两段 stroke 真正停住；无 hold 退化为普通 swipe"""

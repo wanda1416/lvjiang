@@ -106,8 +106,8 @@ find_stmt: "find"i scene_target "as"i var_ref by_clause where_clause? cleaning_c
 // transformer 根据 row/col 是否存在分派为 EntityRef 或 PanelRef。
 //
 // 鼠标键可选，紧跟目标之后（与 scroll 的方向紧随目标同一风格），
-// 省略时默认左键，不影响任何既有脚本。
-click_stmt: "click"i click_target CLICK_BUTTON? wait_clauses? _NL
+// 省略时默认左键。hold 支持固定秒数、区间字面量或 tuple 变量。
+click_stmt: "click"i click_target CLICK_BUTTON? click_hold? wait_clauses? _NL
 click_target: const_or_var "." const_or_var panel_index panel_index -> click_panel_target
             | const_or_var "." const_or_var "." const_or_var       -> click_subscene_target
             | const_or_var "." const_or_var                          -> click_scene_target
@@ -119,6 +119,8 @@ click_target: const_or_var "." const_or_var panel_index panel_index -> click_pan
 // x1/x2 的别名——Windows 默认把 X1 映射到"后退"、X2 映射到"前进"，
 // 但鼠标驱动可自定义，不是绝对规则，写脚本时按实测行为选。
 CLICK_BUTTON: /left/i | /right/i | /middle/i | /x1/i | /x2/i | /back/i | /forward/i
+
+click_hold: "hold"i press_hold_value
 
 // 鼠标键原始事件。坐标由前置 place/move 决定；录制器用它保留多个输入
 // 同时按下时的真实 down/up 时间线。

@@ -111,6 +111,7 @@ class AdbInput(InputBackend):
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
                      *, pre_delay=None, post_delay=None, button: str = "left",
+                     hold: float | None = None,
                      random_offset: bool = True):
         """点击设备坐标（带随机偏移 + before/after 延迟）
 
@@ -131,8 +132,21 @@ class AdbInput(InputBackend):
         time.sleep(random.uniform(*_pre))
 
         label = f"({poi_name})" if poi_name else ""
-        logger.debug(f"[ADB] 点击 {label}: 截图({sx},{sy}) → 设备({actual_x},{actual_y})")
-        self._device.shell("input", "tap", str(actual_x), str(actual_y))
+        if hold is None:
+            logger.debug(
+                f"[ADB] 点击 {label}: 截图({sx},{sy}) → "
+                f"设备({actual_x},{actual_y})")
+            self._device.shell("input", "tap", str(actual_x), str(actual_y))
+        else:
+            duration_ms = max(1, int(hold * 1000))
+            logger.debug(
+                f"[ADB] 长按 {label}: 截图({sx},{sy}) → "
+                f"设备({actual_x},{actual_y}) {duration_ms}ms")
+            self._device.shell(
+                "input", "swipe",
+                str(actual_x), str(actual_y), str(actual_x), str(actual_y),
+                str(duration_ms),
+            )
 
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))

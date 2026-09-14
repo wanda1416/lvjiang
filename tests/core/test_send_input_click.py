@@ -53,6 +53,17 @@ def test_click_screen_right_button(monkeypatch):
     assert events == [(_MOUSEEVENTF_RIGHTDOWN, 0), (_MOUSEEVENTF_RIGHTUP, 0)]
 
 
+def test_click_screen_holds_selected_button_before_release(monkeypatch):
+    backend, events = _make_backend(monkeypatch)
+    sleeps = []
+    monkeypatch.setattr(send_input_module.time, "sleep", sleeps.append)
+
+    backend.click_screen(10, 10, "test", button="right", hold=1.4)
+
+    assert events == [(_MOUSEEVENTF_RIGHTDOWN, 0), (_MOUSEEVENTF_RIGHTUP, 0)]
+    assert 1.4 in sleeps
+
+
 def test_click_screen_middle_button(monkeypatch):
     backend, events = _make_backend(monkeypatch)
     backend.click_screen(10, 10, "test", button="middle")

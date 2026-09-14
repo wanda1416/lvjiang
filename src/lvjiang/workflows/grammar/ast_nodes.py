@@ -54,6 +54,7 @@ class Click:
     line_no: int = 0
     suppress_defaults: bool = False  # 显式 wait_clause 时抑制默认 before/after_click_wait
     button: str = "left"  # 鼠标键：left/right/middle/x1/x2，省略默认左键
+    hold: Any = None  # Literal/VarRef/TupleLiteral；None 表示普通点击
 
 
 @dataclass(frozen=True)

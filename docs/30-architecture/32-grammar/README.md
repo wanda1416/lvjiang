@@ -119,6 +119,8 @@ Panel   → 可寻址网格容器（[r][c] 二维索引，r/c 从 1 开始）
 
 ```
 click [scene].[region]                  # 按布局激活：默认点击中心，也可绑定按键
+click [scene].[region] hold 1.4         # 按住 1.4 秒后释放（触屏长按/鼠标长按）
+click [scene].[region] hold (1.3, 1.5)  # 在区间内随机选择按住时长
 click [scene].$var                      # 动态区域
 click [scene].[panel][r][c]             # Panel 格子中心
 click [scene].[panel]                   # Panel 中心

@@ -55,7 +55,8 @@ class _ActionMixin:
         # 非左键是明确的鼠标操作，不应用语义激活绑定。
         activation_key = getattr(region, "activation_key", "")
         if (isinstance(activation_key, str) and activation_key
-                and kw.get("button", "left") == "left"):
+                and kw.get("button", "left") == "left"
+                and kw.get("hold") is None):
             self._activate_bound_key(
                 activation_key, f"{scene_key}/{field_key}", **kw)
             return
@@ -188,7 +189,8 @@ class _ActionMixin:
         require_enabled(point, scene_key, "point")
         activation_key = getattr(point, "activation_key", "")
         if (isinstance(activation_key, str) and activation_key
-                and kw.get("button", "left") == "left"):
+                and kw.get("button", "left") == "left"
+                and kw.get("hold") is None):
             self._activate_bound_key(
                 activation_key, f"{scene_key}/{point_key}", **kw)
             return

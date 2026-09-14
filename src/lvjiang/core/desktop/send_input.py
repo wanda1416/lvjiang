@@ -16,6 +16,7 @@ from loguru import logger
 from ...core.config import InputSimConfig
 from ...core.input_trace import InputTrace
 from ...core.key_names import normalize_key
+from ...core.timing import NS_PER_SECOND, precise_wait, precise_wait_until
 from ..input_base import InputBackend, InputBackendKind
 from .win32_keyboard import (
     KEYEVENTF_EXTENDEDKEY,
@@ -169,11 +170,16 @@ class SendInputInput(InputBackend):
         steps = max(int(duration / 0.01), 1)
         dx_steps = self._distribute(dx, steps)
         dy_steps = self._distribute(dy, steps)
-        delay = duration / steps if duration > 0 else 0
-        for step_dx, step_dy in zip(dx_steps, dy_steps, strict=True):
+        start_ns = time.perf_counter_ns()
+        duration_ns = max(0, int(duration * NS_PER_SECOND))
+        for index, (step_dx, step_dy) in enumerate(
+            zip(dx_steps, dy_steps, strict=True), start=1,
+        ):
             send_mouse_event(_MOUSEEVENTF_MOVE, step_dx, step_dy)
-            if delay:
-                time.sleep(delay)
+            precise_wait_until(
+                start_ns + duration_ns * index // steps,
+                spin_tail_ns=0,
+            )
 
     def replay_input_trace(
         self,
@@ -300,18 +306,20 @@ class SendInputInput(InputBackend):
         按键/鼠标键会在暂停后继续按原计划触发一段时间。到达 deadline
         正常返回 False。
         """
-        while not stop_check():
-            if pause_event is not None and not pause_event.is_set():
-                return True
-            remaining_ns = deadline_ns - time.perf_counter_ns()
-            if remaining_ns <= 0:
-                return False
-            if remaining_ns > 2_000_000:
-                sleep_s = min((remaining_ns - 1_000_000) / 1_000_000_000, 0.05)
-                time.sleep(sleep_s)
-            elif remaining_ns > 200_000:
-                time.sleep(0)
-        return False
+        def interrupted() -> bool:
+            return stop_check() or (
+                pause_event is not None and not pause_event.is_set())
+
+        completed = precise_wait_until(
+            deadline_ns,
+            stop_check=interrupted,
+        )
+        return bool(
+            not completed
+            and not stop_check()
+            and pause_event is not None
+            and not pause_event.is_set()
+        )
 
     def scroll_screen(
         self,
@@ -341,7 +349,7 @@ class SendInputInput(InputBackend):
         for i in range(amount):
             send_mouse_wheel_event(delta)
             if i < amount - 1:
-                time.sleep(
+                precise_wait(
                     interval if interval is not None
                     else random.uniform(0.02, 0.05))
         label = f"({poi_name})" if poi_name else ""
@@ -378,7 +386,7 @@ class SendInputInput(InputBackend):
         actual_y = y + offset_y
 
         _pre = pre_delay if pre_delay is not None else self.before_click_wait
-        time.sleep(random.uniform(*_pre))
+        precise_wait(random.uniform(*_pre))
 
         label = f"({poi_name})" if poi_name else ""
         down_flag, up_flag, mouse_data = _MOUSE_BUTTON_EVENTS.get(
@@ -390,12 +398,12 @@ class SendInputInput(InputBackend):
         send_mouse_event(down_flag, mouse_data=mouse_data)
         try:
             if hold is not None:
-                time.sleep(hold)
+                precise_wait(hold)
         finally:
             send_mouse_event(up_flag, mouse_data=mouse_data)
 
         _post = post_delay if post_delay is not None else self.after_click_wait
-        time.sleep(random.uniform(*_post))
+        precise_wait(random.uniform(*_post))
 
     # ─── 拖拽 ─────────────────────────────────────────────────
 
@@ -419,7 +427,7 @@ class SendInputInput(InputBackend):
         self._activate_target()
         self._move_to(from_x, from_y)
         _pre = pre_delay if pre_delay is not None else self.before_click_wait
-        time.sleep(random.uniform(*_pre))
+        precise_wait(random.uniform(*_pre))
         if duration is None:
             move_dur = random.uniform(*self.mouse_move_duration)
         elif isinstance(duration, tuple):
@@ -428,15 +436,16 @@ class SendInputInput(InputBackend):
             move_dur = float(duration)
         hold_info = f" + hold {hold}s" if hold else ""
         logger.debug(f"拖拽 {poi_name}: ({from_x},{from_y}) -> ({to_x},{to_y}) [{move_dur:.2f}s]{hold_info}")
-        smooth_move_to(from_x, from_y, move_dur)
         send_mouse_event(_MOUSEEVENTF_LEFTDOWN)
-        smooth_move_to(to_x, to_y, move_dur)
-        if hold is not None and hold > 0:
-            logger.debug(f"按住 {hold}s")
-            time.sleep(float(hold))
-        send_mouse_event(_MOUSEEVENTF_LEFTUP)
+        try:
+            smooth_move_to(to_x, to_y, move_dur)
+            if hold is not None and hold > 0:
+                logger.debug(f"按住 {hold}s")
+                precise_wait(float(hold))
+        finally:
+            send_mouse_event(_MOUSEEVENTF_LEFTUP)
         _post = post_delay if post_delay is not None else self.after_click_wait
-        time.sleep(random.uniform(*_post))
+        precise_wait(random.uniform(*_post))
 
     # ─── 键盘 ─────────────────────────────────────────────────
 

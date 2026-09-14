@@ -21,7 +21,8 @@ def _make_scroll_backend(monkeypatch):
         lambda delta: wheels.append(delta))
     sleeps = []
     monkeypatch.setattr(
-        send_input_module.time, "sleep", lambda s: sleeps.append(s))
+        send_input_module, "precise_wait",
+        lambda seconds: sleeps.append(seconds) or True)
     return backend, wheels, sleeps
 
 

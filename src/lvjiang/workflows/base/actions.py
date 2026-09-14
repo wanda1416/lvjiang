@@ -11,8 +11,8 @@ import time
 from loguru import logger
 
 from ...core.key_names import normalize_key
+from ...core.timing import precise_wait
 from ..runtime_layout import require_enabled
-from ..timing import precise_wait
 from .engine_ref import require_engine
 
 
@@ -36,11 +36,11 @@ class _ActionMixin:
         before = self._input.before_click_wait if pre_delay is None else pre_delay
         after = self._input.after_click_wait if post_delay is None else post_delay
         if before != (0, 0):
-            time.sleep(random.uniform(*before))
+            precise_wait(random.uniform(*before))
         logger.debug(f"激活: {target} -> press {normalized}")
         require_engine(self, "按键原语").press_key(normalized)
         if after != (0, 0):
-            time.sleep(random.uniform(*after))
+            precise_wait(random.uniform(*after))
 
     def click_region(self, scene_key: str, field_key: str, jitter: bool = True, **kw):
         """激活区域：默认点击中心，布局绑定 activation_key 时改为按键。"""

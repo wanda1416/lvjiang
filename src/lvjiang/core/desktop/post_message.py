@@ -11,6 +11,7 @@ from loguru import logger
 
 from ...core.config import InputSimConfig
 from ...core.key_names import normalize_key
+from ...core.timing import NS_PER_SECOND, precise_wait, precise_wait_until
 from ..input_base import InputBackend, InputBackendKind
 from .win32_keyboard import (
     KEYEVENTF_EXTENDEDKEY,
@@ -52,6 +53,9 @@ class PostMessageInput(InputBackend):
         # 真正需要它的只有 SDL 类窗口（scrcpy 投屏窗等）：那类窗口不在前台
         # 就不把 PostMessage 转成事件。这种目标可以显式把本属性设回 True。
         self.activate_before_send = False
+        # PostMessage 没有可查询的“窗口内虚拟鼠标位置”，只能记录本后端
+        # 最近一次投递的位置，供后续 move duration 构造连续轨迹。
+        self._last_client_pos: tuple[int, int] | None = None
 
     # ─── 点击 ─────────────────────────────────────────────────
 
@@ -76,7 +80,7 @@ class PostMessageInput(InputBackend):
         sx, sy = screen_x + offset_x, screen_y + offset_y
 
         _pre = pre_delay if pre_delay is not None else self.before_click_wait
-        time.sleep(random.uniform(*_pre))
+        precise_wait(random.uniform(*_pre))
 
         cx, cy = screen_to_client_logical(self.target_hwnd, sx, sy)
         label = f"({poi_name})" if poi_name else ""
@@ -86,9 +90,10 @@ class PostMessageInput(InputBackend):
             activate=self.activate_before_send,
             hold=hold,
         )
+        self._last_client_pos = (cx, cy)
 
         _post = post_delay if post_delay is not None else self.after_click_wait
-        time.sleep(random.uniform(*_post))
+        precise_wait(random.uniform(*_post))
 
     def place_screen(self, screen_x: int, screen_y: int, poi_name: str = ""):
         """后台放置与移动到目标均表现为一次绝对 WM_MOUSEMOVE。"""
@@ -109,7 +114,36 @@ class PostMessageInput(InputBackend):
         cx, cy = screen_to_client_logical(self.target_hwnd, screen_x, screen_y)
         label = f"({poi_name})" if poi_name else ""
         logger.debug(f"[后台] 移动 {label}: 屏幕({screen_x},{screen_y}) -> 客户区({cx},{cy})")
-        postmessage_move(self.target_hwnd, cx, cy, activate=self.activate_before_send)
+        move_dur = max(0.0, float(duration)) if duration is not None else 0.0
+        start = self._last_client_pos
+        if move_dur <= 0:
+            postmessage_move(
+                self.target_hwnd, cx, cy,
+                activate=self.activate_before_send)
+        elif start is None:
+            # 第一次后台移动没有可靠起点；仍兑现 duration 的时间预算，
+            # 在截止点投递终点，后续移动即可使用已记录的位置插值。
+            precise_wait(move_dur)
+            postmessage_move(
+                self.target_hwnd, cx, cy,
+                activate=self.activate_before_send)
+        else:
+            sx, sy = start
+            steps = max(int(move_dur / 0.01), 1)
+            start_ns = time.perf_counter_ns()
+            duration_ns = int(move_dur * NS_PER_SECOND)
+            for index in range(1, steps + 1):
+                ratio = index / steps
+                px = round(sx + (cx - sx) * ratio)
+                py = round(sy + (cy - sy) * ratio)
+                postmessage_move(
+                    self.target_hwnd, px, py,
+                    activate=self.activate_before_send)
+                precise_wait_until(
+                    start_ns + duration_ns * index // steps,
+                    spin_tail_ns=0,
+                )
+        self._last_client_pos = (cx, cy)
 
     def move_relative(
         self,
@@ -143,6 +177,7 @@ class PostMessageInput(InputBackend):
             return
 
         cx, cy = screen_to_client_logical(self.target_hwnd, screen_x, screen_y)
+        self._last_client_pos = (cx, cy)
         sign = 1 if direction == "up" else -1
         delta = sign * _WHEEL_DELTA
         label = f"({poi_name})" if poi_name else ""
@@ -153,7 +188,7 @@ class PostMessageInput(InputBackend):
         for i in range(amount):
             postmessage_scroll(self.target_hwnd, cx, cy, delta, activate=self.activate_before_send)
             if i < amount - 1:
-                time.sleep(
+                precise_wait(
                     interval if interval is not None
                     else random.uniform(0.02, 0.05))
 
@@ -183,18 +218,23 @@ class PostMessageInput(InputBackend):
             move_dur = float(duration)
 
         _pre = pre_delay if pre_delay is not None else self.before_click_wait
-        time.sleep(random.uniform(*_pre))
+        precise_wait(random.uniform(*_pre))
 
         fx, fy = screen_to_client_logical(self.target_hwnd, from_x, from_y)
         tx, ty = screen_to_client_logical(self.target_hwnd, to_x, to_y)
-        steps = max(int(move_dur / 0.02), 5)
-
         logger.debug(f"[后台] 拖拽 {poi_name}: ({from_x},{from_y})->({to_x},{to_y}) "
-                     f"客户区: ({fx},{fy})->({tx},{ty}) [{move_dur:.2f}s]")
-        postmessage_drag(self.target_hwnd, fx, fy, tx, ty, steps=steps, activate=self.activate_before_send)
+                     f"客户区: ({fx},{fy})->({tx},{ty}) [{move_dur:.2f}s]"
+                     + (f" hold {hold}s" if hold else ""))
+        postmessage_drag(
+            self.target_hwnd, fx, fy, tx, ty,
+            duration=move_dur,
+            hold=hold,
+            activate=self.activate_before_send,
+        )
+        self._last_client_pos = (tx, ty)
 
         _post = post_delay if post_delay is not None else self.after_click_wait
-        time.sleep(random.uniform(*_post))
+        precise_wait(random.uniform(*_post))
 
     # ─── 键盘 ─────────────────────────────────────────────────
 

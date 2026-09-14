@@ -209,11 +209,11 @@ class RuleSettingsPage(QWidget):
         # （实测 14 个玩法跨文件零差异），玩法因此没有唯一归属。
         # 只列本规则**已引用**的玩法。把全部玩法铺出来让人勾选，规则一多就
         # 分不清哪些是这条规则真正在用的。
-        self._playstyle_table = QTableWidget(0, 6)
+        self._playstyle_table = QTableWidget(0, 7)
         self._playstyle_table.setHorizontalHeaderLabels(
             [tr("名字"), tr("主武器"), tr("主增伤词条"), tr("副武器"),
-             tr("属性"), tr("绑定开关")])
-        for col, width in enumerate((90, 90, 150, 90, 90, 120)):
+             tr("副增伤词条"), tr("属性"), tr("绑定开关")])
+        for col, width in enumerate((90, 90, 150, 90, 150, 90, 120)):
             self._playstyle_table.setColumnWidth(col, width)
         # 定义列只读（改定义去玩法配置），只有绑定开关是本规则自己的事
         self._playstyle_table.setEditTriggers(
@@ -374,7 +374,8 @@ class RuleSettingsPage(QWidget):
             self._playstyle_table.insertRow(row)
             for col, text in enumerate((
                 name, cfg.get("main_weapon", ""), cfg.get("main_damage", ""),
-                cfg.get("sub_weapon", ""), cfg.get("attr", ""),
+                cfg.get("sub_weapon", ""), cfg.get("sub_damage", ""),
+                cfg.get("attr", ""),
             )):
                 item = QTableWidgetItem(str(text))
                 if col:
@@ -387,7 +388,7 @@ class RuleSettingsPage(QWidget):
             combo.setCurrentText(str(switches.get(name) or ""))
             combo.currentTextChanged.connect(
                 lambda _t: self._apply_playstyles())
-            self._playstyle_table.setCellWidget(row, 5, combo)
+            self._playstyle_table.setCellWidget(row, 6, combo)
         self._playstyle_table.blockSignals(False)
 
         thresholds = d.get("quality_thresholds") or {}
@@ -499,7 +500,7 @@ class RuleSettingsPage(QWidget):
             if not name:
                 continue
             names.append(name)
-            combo = self._playstyle_table.cellWidget(i, 5)
+            combo = self._playstyle_table.cellWidget(i, 6)
             bound = combo.currentText().strip() if combo else ""
             if bound:
                 switches[name] = bound

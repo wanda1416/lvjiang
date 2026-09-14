@@ -1159,8 +1159,9 @@ class RunControlMixin:
         if input_ctrl is not None:
             engine._input = input_ctrl
         engine._android_device = getattr(self, "_device", None)
-        # 控制器绑定旧 AdbDevice；重连后必须按需重新创建。
+        # 两种应用控制器都绑定旧 AdbDevice；重连后必须按需重新创建。
         engine._android_app_controller = None
+        engine._app_controller = None
         wf = getattr(engine, '_workflow', None)
         if wf is not None:
             if capture is not None:

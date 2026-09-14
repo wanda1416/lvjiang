@@ -4,6 +4,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -121,6 +122,13 @@ class BatchConfigDialog(QDialog):
             row, combo = self._create_wf_selector()
             self._selectors[key] = combo
             wf_form.addRow(label, row)
+        self._skip_single_lifecycle = QCheckBox(
+            tr("单用户执行时跳过上述生命周期工作流")
+        )
+        self._skip_single_lifecycle.setToolTip(
+            tr("实际只选择一个用户时，直接执行任务，不运行四个生命周期 wf；执行多轮同样生效")
+        )
+        wf_form.addRow("", self._skip_single_lifecycle)
         layout.addLayout(wf_form)
 
         buttons = QHBoxLayout()
@@ -222,6 +230,8 @@ class BatchConfigDialog(QDialog):
             self._user_list.addItem(row)
         for key, combo in self._selectors.items():
             combo.setCurrentText(getattr(item.workflows, key))
+        self._skip_single_lifecycle.setChecked(
+            item.skip_lifecycle_for_single_item)
 
     def _clear_editor(self) -> None:
         self._current_name = ""
@@ -229,6 +239,7 @@ class BatchConfigDialog(QDialog):
         self._user_list.clear()
         for combo in self._selectors.values():
             combo.setCurrentText("")
+        self._skip_single_lifecycle.setChecked(True)
 
     def _save_current_config(self) -> None:
         item = self._cfg.configs.get(self._current_name)
@@ -262,6 +273,8 @@ class BatchConfigDialog(QDialog):
         item.workflows = BatchWorkflows(**{
             key: combo.currentText().strip() for key, combo in self._selectors.items()
         })
+        item.skip_lifecycle_for_single_item = (
+            self._skip_single_lifecycle.isChecked())
 
     def _on_config_selected(self, index: int) -> None:
         if index < 0:

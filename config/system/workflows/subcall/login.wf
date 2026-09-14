@@ -55,6 +55,40 @@ def is_in_login_page()
 end
 
 
+# ─── 恢复到登录页 ───────────────────────────
+# 已在登录页时不做任何事；其他现场通过重启客户端恢复确定的登录起点。
+# 登录页背景动画常驻，不等稳定帧，只轮询启动页的返回按钮。
+
+def ensure_login_page_by_restart($app_id)
+    eval check_env(["android"])
+    call $in_login_page = is_in_login_page()
+    if $in_login_page
+        return 1
+    end
+
+    if app_is_running($app_id)
+        app stop $app_id
+    end
+    app start $app_id timeout 30
+    scene [game_login_page] view [init]
+
+    eval $login_page_ready = 0
+    loop 60
+        scan [game_login_page].[back] as $startup_back by image
+        if $startup_back
+            click [game_login_page].[back] after wait @page_refresh
+            eval $login_page_ready = 1
+            break
+        end
+        wait @page_refresh
+    end
+    if not $login_page_ready
+        eval pause("未检测到游戏启动页返回按钮，请手动回到登录页后点击继续")
+    end
+    return 1
+end
+
+
 # ─── 主页 → 退出 → 回到登录页 ──────────────────────────────
 # 流程：主页进菜单 → 菜单点退出 → 二次确认弹窗点「登录」→ 回到登录页
 

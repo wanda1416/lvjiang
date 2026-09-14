@@ -39,6 +39,7 @@ def test_save_preserves_main_page_selection_order(monkeypatch, qtbot):
     dialog.saved.connect(lambda: saved_signals.append(True))
     monkeypatch.setattr(
         "lvjiang.ui.batch.batch_config_dialog.load_batch_config", lambda: latest)
+    dialog._skip_single_lifecycle.setChecked(False)
     dialog._on_save()
 
     group = saved[0].configs["日常"]
@@ -46,6 +47,7 @@ def test_save_preserves_main_page_selection_order(monkeypatch, qtbot):
     assert group.selected_usernames == []
     assert group.rounds == 4
     assert group.workflow_params == {"prepare_item": {"wait": 30}}
+    assert group.skip_lifecycle_for_single_item is False
     assert accepted == []
     assert saved_signals == [True]
     assert dialog._cfg is saved[0]

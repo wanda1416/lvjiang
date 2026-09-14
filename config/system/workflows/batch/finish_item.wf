@@ -1,8 +1,20 @@
-# 批量条目收尾：每个用户执行完成后统一退出到游戏登录页。
+#% parameters:
+#%   - name: stop_app
+#%     label: 结束时直接停止应用
+#%     type: bool
+#%     default: false
+# 批量条目收尾：默认退出当前角色并回到登录页。
+# 对业务已转到服务端运行的任务，可选择直接停止应用。
 
 import "subcall/login.wf"
 
-call exit_to_login()
-eval $batch_state.page_state = 1
+if $stop_app
+    eval check_env(["android"])
+    app stop "yyslscn" timeout 15
+    eval $batch_state.page_state = 0
+else
+    call exit_to_login()
+    eval $batch_state.page_state = 1
+end
 eval $batch_state.role = ""
 return {"status": "success", "message": "", "state": $batch_state}

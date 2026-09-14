@@ -20,6 +20,18 @@ def test_batch_workflows_round_trip_new_lifecycle():
     assert BatchWorkflows.from_dict(workflows.to_dict()) == workflows
 
 
+def test_legacy_huaruizhi_finish_is_migrated_with_stop_parameter():
+    assert BatchWorkflows.from_dict({
+        "finish_item": "batch/finish_huaruizhi.wf",
+    }).finish_item == "batch/finish_item.wf"
+
+    item = BatchConfigItem.from_dict("legacy", {
+        "workflows": {"finish_item": "batch/finish_huaruizhi.wf"},
+    })
+    assert item.workflows.finish_item == "batch/finish_item.wf"
+    assert item.workflow_params["finish_item"]["stop_app"] is True
+
+
 def test_group_round_trip_uses_visibility_order_for_selection(tmp_path):
     path = tmp_path / "batch.json"
     group = BatchConfigItem(
@@ -33,6 +45,7 @@ def test_group_round_trip_uses_visibility_order_for_selection(tmp_path):
             "prepare_item": {"skip_online_role": False,
                              "online_role_max_wait": 300},
         },
+        skip_lifecycle_for_single_item=False,
     )
     BatchConfigStore(path).save(BatchConfig({"日常": group}, "日常"))
 
@@ -43,6 +56,7 @@ def test_group_round_trip_uses_visibility_order_for_selection(tmp_path):
     assert restored.selected_usernames == ["用户B", "用户A"]
     assert restored.rounds == 3
     assert restored.workflow_params == group.workflow_params
+    assert restored.skip_lifecycle_for_single_item is False
 
 
 def test_group_rounds_default_and_normalize():
@@ -50,6 +64,17 @@ def test_group_rounds_default_and_normalize():
     assert BatchConfigItem.from_dict("过小", {"rounds": 0}).rounds == 1
     assert BatchConfigItem.from_dict("过大", {"rounds": 1000}).rounds == 999
     assert BatchConfigItem.from_dict("非法", {"rounds": "2"}).rounds == 1
+
+
+def test_single_user_lifecycle_skip_defaults_true_and_rejects_invalid_value():
+    assert BatchConfigItem.from_dict(
+        "默认", {}).skip_lifecycle_for_single_item is True
+    assert BatchConfigItem.from_dict(
+        "关闭", {"skip_lifecycle_for_single_item": False}
+    ).skip_lifecycle_for_single_item is False
+    assert BatchConfigItem.from_dict(
+        "非法", {"skip_lifecycle_for_single_item": "false"}
+    ).skip_lifecycle_for_single_item is True
 
 
 def test_old_session_batch_shape_is_not_accepted(tmp_path):
@@ -74,7 +99,14 @@ def test_saved_document_has_own_type_and_version(tmp_path):
 def test_lifecycle_parameter_definitions_reads_workflow_metadata():
     definitions = lifecycle_parameter_definitions(BatchWorkflows(
         prepare_item="batch/prepare_item.wf",
+        finish_item="batch/finish_item.wf",
     ))
     assert [item["name"] for item in definitions["prepare_item"]] == [
         "skip_online_role", "online_role_max_wait",
     ]
+    assert definitions["finish_item"] == [{
+        "name": "stop_app",
+        "label": "结束时直接停止应用",
+        "type": "bool",
+        "default": False,
+    }]

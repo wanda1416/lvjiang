@@ -73,6 +73,81 @@ def test_batch_repeats_complete_user_sequence_by_round(tmp_path, monkeypatch, qa
     ]
 
 
+def test_single_user_direct_mode_skips_lifecycle_across_rounds(
+    tmp_path, monkeypatch, qapp,
+):
+    import lvjiang.core.daily_history as history
+
+    monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
+    monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
+    monkeypatch.setattr(BatchReport, "write", lambda self: None)
+    worker = BatchWorker(
+        ["alice"],
+        [BatchScript("test", "test")],
+        BatchConfigItem(
+            name="test", usernames=["alice"], rounds=2,
+            skip_lifecycle_for_single_item=True,
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: False,
+    )
+    stages = []
+    scripts = []
+    logs = []
+    monkeypatch.setattr(
+        worker, "_run_stage",
+        lambda stage, *args, **kwargs: (
+            stages.append(stage) or BatchStageResult(state={})),
+    )
+    monkeypatch.setattr(
+        worker, "_run_script",
+        lambda script, session, username, **kwargs: (
+            scripts.append(username) or {}),
+    )
+    monkeypatch.setattr(worker, "_save_result", lambda *args: None)
+    worker.log.connect(logs.append)
+
+    worker.run()
+
+    assert stages == []
+    assert scripts == ["alice", "alice"]
+    assert "[批量] 单用户直通：跳过批量生命周期工作流" in logs
+
+
+def test_single_user_can_force_lifecycle(tmp_path, monkeypatch, qapp):
+    import lvjiang.core.daily_history as history
+
+    monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
+    monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
+    monkeypatch.setattr(BatchReport, "write", lambda self: None)
+    worker = BatchWorker(
+        ["alice"],
+        [BatchScript("test", "test")],
+        BatchConfigItem(
+            name="test", usernames=["alice"],
+            skip_lifecycle_for_single_item=False,
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: False,
+    )
+    stages = []
+    monkeypatch.setattr(
+        worker, "_run_stage",
+        lambda stage, *args, **kwargs: (
+            stages.append(stage) or BatchStageResult(state={})),
+    )
+    monkeypatch.setattr(worker, "_run_script", lambda *args, **kwargs: {})
+    monkeypatch.setattr(worker, "_save_result", lambda *args: None)
+
+    worker.run()
+
+    assert stages == [
+        "batch_setup", "prepare_item", "finish_item", "batch_teardown",
+    ]
+
+
 def test_batch_user_lock_covers_each_stage_and_saved_session(tmp_path, monkeypatch, qapp):
     worker = make_worker(tmp_path, monkeypatch)
     visits = []

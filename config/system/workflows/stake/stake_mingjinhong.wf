@@ -121,7 +121,7 @@ press "R" hold 1.47 after wait 0.8
 
 # 吹笛拉距离
 press $key_dz hold 0.1 after wait 0.1
-press "S" hold 2.15 after wait 0.95
+press "S" hold 2.18 after wait 0.95
 
 # 第四次瞬发剑气
 log info "第三次点剑+第四次瞬发剑气"
@@ -147,7 +147,7 @@ def qiang_wuxueji($buff)
     # 按键低于 50ms 很容易被忽略，保守起见直接 60ms，并且挂 buff 时更长一些
     if $buff
         press "NUM8" hold 0.08 after wait 0.07
-        press "Q"    hold 0.08 after wait 0.24
+        press "Q"    hold 0.10 after wait 0.24
         press "E"    hold 0.06 after wait 0.12
         press "NUM8" hold 0.08 after wait 0.09
     else

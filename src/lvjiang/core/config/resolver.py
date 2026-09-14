@@ -473,12 +473,23 @@ class ConfigResolver:
         remote = self.remote_dir / rel_path
         if not remote.exists():
             return False
+        system = self.system_dir / rel_path
+        if spec.remote_mode == "append_only":
+            # 无内容版本的实体只允许补充：永远不能覆盖随包 system 文件。
+            if system.exists():
+                token = (rel_path, -1)
+                if token not in self._logged_supersedes:
+                    self._logged_supersedes.add(token)
+                    logger.warning(
+                        f"remote 只新增文件与 system 冲突，已忽略: {rel_path}")
+                return False
+            self._log_supersede(rel_path, None, 0)
+            return True
         remote_version = versioning.read_version(remote)
         if remote_version is None:
             logger.warning(f"remote 配置缺 content_version，已忽略: {rel_path}")
             return False
 
-        system = self.system_dir / rel_path
         if not system.exists():
             # 系统没有这个文件 = 远程新增。只有明确允许的目录才接受，
             # 否则远程凭空多出的场景/布局是死的（没在 scenes.yaml 登记）。
@@ -516,7 +527,9 @@ class ConfigResolver:
             return
         self._logged_supersedes.add(token)
         origin = "系统无此文件" if system_version is None else f"系统 v{system_version}"
-        logger.info(f"[在线配置] 生效：{rel_path}（{origin} → 远程 v{remote_version}）")
+        remote_label = ("远程新增" if remote_version == 0
+                        else f"远程 v{remote_version}")
+        logger.info(f"[在线配置] 生效：{rel_path}（{origin} → {remote_label}）")
 
     def resolve_read(self, rel_path: str) -> Path | None:
         """实体读解析：local 影子 → remote（版本更新才生效）→ system
@@ -632,7 +645,7 @@ class ConfigResolver:
                 results.append(f"{sub}/{name}" if sub else name)
             # 子目录同样取并集：local 可以新建 system 没有的目录
             child_names: set[str] = set()
-            for root in (self.system_dir, self.local_dir):
+            for root in (self.system_dir, self.local_dir, self.remote_dir):
                 base = root / full
                 if not base.is_dir():
                     continue
@@ -653,7 +666,8 @@ class ConfigResolver:
         system 与已下载 remote 取较大值，避免作者基于在线热修继续编辑时生成
         同号异内容。只允许参与在线下发的实体路径调用。
         """
-        if versioning.spec_for(rel_path) is None:
+        spec = versioning.spec_for(rel_path)
+        if spec is None or spec.remote_mode != "content":
             raise ValueError(f"实体不参与版本管理: {rel_path}")
         versions = [
             versioning.read_version(self.system_dir / rel_path) or 0,
@@ -679,8 +693,9 @@ class ConfigResolver:
         """
         root = self.system_dir if self.is_dev_mode() else self.local_dir
         target = root / rel_path
-        if isinstance(data, str) and self.is_dev_mode() \
-                and versioning.spec_for(rel_path) is not None:
+        spec = versioning.spec_for(rel_path)
+        if (isinstance(data, str) and self.is_dev_mode()
+                and spec is not None and spec.remote_mode == "content"):
             if content_version is None:
                 data = versioning.preserve_version_for_write(
                     rel_path, data, target)

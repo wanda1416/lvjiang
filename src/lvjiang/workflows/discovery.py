@@ -41,11 +41,22 @@ def _discover_wf_scripts() -> dict[str, dict]:
             script_id = p.stem
             if Policy.is_internal(script_id):
                 continue
-            if script_id in result:
-                logger.warning(
-                    f"脚本 id 重复，忽略 {wf_file}: {script_id}")
-                continue
             meta, warning = metadata_for_script_config(p)
+            describe = getattr(resolver, "describe_entity", None)
+            origin = (describe(f"workflows/{wf_file}")
+                      if callable(describe) else None)
+            source_layer = getattr(origin, "layer", "system")
+            existing = result.get(script_id)
+            if existing is not None:
+                # 远程“只新增”也约束逻辑 ID：不同目录同 stem 时，远程脚本
+                # 不能抢占已经随包或由用户创建的脚本。
+                if existing.get("is_remote") and source_layer != "remote":
+                    logger.warning(
+                        f"脚本 id 重复，本地/系统脚本替代远程脚本: {script_id}")
+                else:
+                    logger.warning(
+                        f"脚本 id 重复，忽略 {wf_file}: {script_id}")
+                    continue
             result[script_id] = {
                 "id": script_id,
                 "name": meta.get("name") or script_id,
@@ -57,6 +68,8 @@ def _discover_wf_scripts() -> dict[str, dict]:
                 "batchable": Policy.is_batchable(subdir),
                 "scope": meta.get("scope") or "daily",
                 "hidden": Policy.hidden_by_default(meta),
+                "source_layer": source_layer,
+                "is_remote": source_layer == "remote",
             }
     return result
 
@@ -83,8 +96,16 @@ def _discover_class_scripts() -> dict[str, dict]:
             "scope": getattr(cls, "SCOPE", None) or "daily",
             "hidden": bool(getattr(cls, Policy.HIDDEN_CLASS_ATTR, False)),
             "batchable": True,
+            "source_layer": "class",
+            "is_remote": False,
         }
     return result
+
+
+def script_display_name(config: dict) -> str:
+    """返回面向用户的脚本名；远程来源标记不可被显示名偏好移除。"""
+    name = str(config.get("name") or config.get("id") or "")
+    return f"[远程] {name}" if config.get("is_remote") else name
 
 
 def discover_scripts() -> list[dict]:

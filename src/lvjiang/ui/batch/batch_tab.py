@@ -698,7 +698,7 @@ class BatchTab(QWidget):
 
     def _refresh_script_list(self, checked_ids: list[str] | None = None):
         """刷新脚本勾选列表（数据源与日常下拉一致）"""
-        from ...workflows.discovery import list_exposed_scripts
+        from ...workflows.discovery import list_exposed_scripts, script_display_name
 
         if checked_ids is None:
             cfg = load_batch_config()
@@ -745,7 +745,7 @@ class BatchTab(QWidget):
         # 脚本与配置两页使用同一行高，避免树控件按字体最小高度挤成一团。
         row_height = _batch_list_row_height(self._script_list)
         for script_cfg in configs:
-            item = QTreeWidgetItem([script_cfg["name"], ""])
+            item = QTreeWidgetItem([script_display_name(script_cfg), ""])
             item.setData(0, Qt.ItemDataRole.UserRole, script_cfg)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             is_checked = script_cfg["id"] in checked_ids
@@ -851,13 +851,14 @@ class BatchTab(QWidget):
         只携带参数定义；配置组与用户参数值由批量启动计划统一解析。
         """
         scripts: list[BatchScript] = []
+        from ...workflows.discovery import script_display_name
         for script_id in self._script_order:
             cfg = self._script_configs_by_id.get(script_id)
             if cfg is None:
                 continue
             scripts.append(BatchScript(
                 id=cfg["id"],
-                name=cfg["name"],
+                name=script_display_name(cfg),
                 wf_file=cfg.get("wf_file", ""),
                 class_name=cfg.get("class", ""),
                 scope=cfg.get("scope", "daily"),

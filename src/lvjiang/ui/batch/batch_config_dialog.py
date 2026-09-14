@@ -194,7 +194,7 @@ class BatchConfigDialog(QDialog):
         if item is None:
             self._clear_editor()
             return
-        from ...workflows.discovery import list_exposed_scripts
+        from ...workflows.discovery import list_exposed_scripts, script_display_name
 
         try:
             scripts = [cfg for cfg in list_exposed_scripts() if cfg.get("batchable", True)]
@@ -209,7 +209,7 @@ class BatchConfigDialog(QDialog):
         self._task_list.clear()
         for task_id in ordered_task_ids:
             cfg = scripts_by_id.get(task_id)
-            label = str(cfg.get("name", task_id)) if cfg is not None else task_id
+            label = script_display_name(cfg) if cfg is not None else task_id
             row = QListWidgetItem(label)
             row.setData(Qt.ItemDataRole.UserRole, task_id)
             row.setFlags(row.flags() | Qt.ItemFlag.ItemIsUserCheckable)

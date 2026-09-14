@@ -175,7 +175,7 @@ def list_tasks() -> str:
         JSON 文本 ``{"ok": bool, "tasks": [{"id","name","source"}], "error": str}``
     """
     try:
-        from ...workflows.discovery import list_exposed_scripts
+        from ...workflows.discovery import list_exposed_scripts, script_display_name
         from .plugins import ensure_loaded
 
         # 插件必须先加载：class 来源的脚本（auto_tuning 等）依赖
@@ -190,7 +190,7 @@ def list_tasks() -> str:
         tasks = [
             {
                 "id": item["id"],
-                "name": item["name"],
+                "name": script_display_name(item),
                 "source": "class" if item.get("class") else "wf",
             }
             for item in items

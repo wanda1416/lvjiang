@@ -37,6 +37,8 @@ class _DailyHarness(QWidget, UiStateMixin):
         self._param_panel = QWidget(self)
         self._param_layout = QFormLayout(self._param_panel)
         self._workflow_note_label = QLabel(self)
+        self._remote_workflow_warning = QLabel(self)
+        self._remote_workflow_warning.setVisible(False)
         self._independent_params_checkbox = QCheckBox(self)
         self._independent_params_checkbox.setObjectName("user_independent_params")
         self._independent_params_checkbox.toggled.connect(
@@ -47,6 +49,21 @@ class _DailyHarness(QWidget, UiStateMixin):
 
     def _selected_run_env(self):
         return self.run_env
+
+
+def test_remote_warning_is_visible_even_without_parameters(qtbot):
+    panel = _DailyHarness({
+        "id": "remote_test", "scope": "daily", "parameters": [],
+        "is_remote": True,
+    })
+    qtbot.addWidget(panel)
+    panel._rebuild_param_panel()
+    assert panel._remote_workflow_warning.isVisibleTo(panel)
+    assert not panel._param_panel.isVisible()
+
+    panel._workflow_configs[0]["is_remote"] = False
+    panel._rebuild_param_panel()
+    assert not panel._remote_workflow_warning.isVisible()
 
 
 def test_parameter_panel_filters_by_env_and_preserves_hidden_values(

@@ -67,16 +67,17 @@ class TestRejectsEscapes:
             _normalize_import_path(raw)
 
 
-def test_workflows_must_not_be_remotely_deliverable():
-    """workflows 不得进在线下发注册表——那等于远程代码执行。
+def test_remote_workflows_are_explicitly_append_only():
+    """远程 WF 是有意开放的可执行内容，只能新增且必须保持来源警告。
 
-    scenes / layouts / tuning_rules 是数据，下发只改识别与判定；`.wf` 会被
-    引擎执行，下发它意味着远程可以让本机跑任意脚本。现在它「碰巧没注册」，
-    这条把它变成显式约束。
+    路径沙盒仍限制 import 范围；内容信任则由 append_only、不覆盖 system、
+    SHA 不可变和界面强制 `[远程]` 警告共同表达，不能退化成普通版本覆盖。
     """
     from lvjiang.core.config import versioning
 
     for path in ("workflows/daily.wf", "workflows/subcall/nav.wf",
                  "workflows/batch/prepare_item.wf"):
-        assert versioning.spec_for(path) is None, (
-            f"{path} 进入了下发注册表——.wf 可执行，下发即 RCE")
+        spec = versioning.spec_for(path)
+        assert spec is not None
+        assert spec.remote_mode == "append_only"
+        assert spec.allow_remote_new is True

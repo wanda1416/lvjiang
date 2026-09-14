@@ -429,7 +429,8 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             (dir_items[parent_dir].addChild(node) if parent_dir
              else self.tree.addTopLevelItem(node))
         for e in self._entries:
-            item = QTreeWidgetItem([e.name])
+            visible_name = f"[远程] {e.name}" if e.file.is_remote else e.name
+            item = QTreeWidgetItem([visible_name])
             item.setIcon(0, self._icon_file)
             item.setData(0, Qt.ItemDataRole.UserRole, e.rel_path)
             item.setToolTip(0, f"{e.rel_path}\n{e.layer}: {e.path}")
@@ -514,10 +515,12 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         if not self._is_editable(entry):
             menu.addAction(tr("复制到本地以修改")).triggered.connect(
                 lambda: self._copy_to_local(entry))
-        elif entry.file.overrides_system and not get_resolver().is_dev_mode():
+        elif (entry.file.overrides_system or entry.file.overrides_remote) \
+                and not get_resolver().is_dev_mode():
             # 覆盖了系统的影子：能还原，但不能删（删了这个实体就没了，
             # 而系统内容不允许用户删除）
-            menu.addAction(tr("还原为系统")).triggered.connect(
+            target = tr("远程") if entry.file.overrides_remote else tr("系统")
+            menu.addAction(tr("还原为{target}").format(target=target)).triggered.connect(
                 lambda: self._revert_to_system(entry))
         else:
             menu.addAction(tr("删除")).triggered.connect(self._on_delete)
@@ -526,7 +529,8 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
     @staticmethod
     def _is_editable(entry: ScriptEntry) -> bool:
         """开发模式直接写 system，用户模式只有 local 那份能改"""
-        return entry.file.editable or get_resolver().is_dev_mode()
+        return (entry.file.editable
+                or (entry.file.is_system and get_resolver().is_dev_mode()))
 
     def _copy_to_local(self, entry: ScriptEntry):
         """把系统脚本原样复制成 local 影子，之后才允许编辑
@@ -558,10 +562,11 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def _revert_to_system(self, entry: ScriptEntry):
         """丢掉 local 影子，回到系统那一份——「复制到本地」的反向操作"""
+        target = tr("远程") if entry.file.overrides_remote else tr("系统")
         ret = QMessageBox.question(
-            self, tr("还原为系统"),
-            tr("丢弃 {name} 的本地修改，恢复系统版本？此操作不可恢复。")
-            .format(name=entry.rel_path),
+            self, tr("还原为{target}").format(target=target),
+            tr("丢弃 {name} 的本地修改，恢复{target}版本？此操作不可恢复。")
+            .format(name=entry.rel_path, target=target),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -573,13 +578,13 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         except OSError as e:
             QMessageBox.warning(self, tr("还原失败"), str(e))
             return
-        logger.info(f"脚本已还原为系统: {rel}")
+        logger.info(f"脚本已还原为{target}: {rel}")
         self._changed_any = True
         self._dirty = False
         self._current = None
         self._reload_list(select_id=rel)
         self._load_entry(self._entry(rel))
-        self._set_status(tr("已还原为系统版本"))
+        self._set_status(tr("已还原为{target}版本").format(target=target))
 
     def _load_entry(self, entry: ScriptEntry | None):
         self._current = entry
@@ -597,7 +602,9 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self._apply_read_only(entry)
         self._set_status(
             "" if entry is None or self._is_editable(entry)
-            else tr("系统脚本只读——右键「复制到本地以修改」后才能编辑"))
+            else (tr("远程脚本只读——右键「复制到本地以修改」后才能编辑")
+                  if entry.file.is_remote else
+                  tr("系统脚本只读——右键「复制到本地以修改」后才能编辑")))
         self._refresh_buttons()
 
     def _apply_read_only(self, entry: ScriptEntry | None):
@@ -607,10 +614,15 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         if entry is None:
             self.lbl_layer.setText("")
             return
-        if entry.file.is_system:
+        if entry.file.is_remote:
+            origin = tr("远程（只读）")
+        elif entry.file.is_system:
             origin = tr("系统") if editable else tr("系统（只读）")
         else:
-            origin = tr("本地覆盖系统") if entry.file.overrides_system else tr("本地")
+            if entry.file.overrides_remote:
+                origin = tr("本地覆盖远程")
+            else:
+                origin = tr("本地覆盖系统") if entry.file.overrides_system else tr("本地")
         self.lbl_layer.setText(f"{origin} · {entry.path}")
 
     # ─── 状态 ──────────────────────────────────────────
@@ -628,13 +640,18 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.btn_save_as.setEnabled(has_text)
         # 系统脚本属于 system 内容，用户模式下不可删除——不想在日常页看到
         # 请在「工具 → 脚本配置」取消勾选。
-        shadow = (cur is not None and editable and cur.file.overrides_system
+        shadow = (cur is not None and editable
+                  and (cur.file.overrides_system or cur.file.overrides_remote)
                   and not get_resolver().is_dev_mode())
         can_delete = editable and not shadow
         if cur is None or can_delete:
             hint = ""
         elif shadow:
-            hint = tr("这是系统脚本的本地副本，删不掉；右键「还原为系统」可丢弃本地修改")
+            target = tr("远程") if cur.file.overrides_remote else tr("系统")
+            hint = tr("这是{target}脚本的本地副本，删不掉；右键还原可丢弃本地修改").format(
+                target=target)
+        elif cur.file.is_remote:
+            hint = tr("远程脚本不可直接修改或删除；可右键复制为本地副本后检查和修改")
         else:
             hint = tr("系统脚本不可删除；不想展示请在「脚本配置」取消勾选")
         self.btn_delete.setEnabled(can_delete)

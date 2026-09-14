@@ -52,7 +52,7 @@ class VersionedDir:
         rel_dir: 相对 config 层根的目录（如 ``"layouts"``）
         pattern: 文件名 glob（如 ``"*.json"``）
         depth: rel_dir 之下的层数——``scenes/a.yaml`` 是 1，
-            ``layouts/{布局}/{场景}.json`` 是 2
+            ``layouts/{布局}/{场景}.json`` 是 2；0 表示任意正深度
         allow_remote_new: remote 是否可以下发 system 里**不存在**的新文件。
 
             默认 False：新场景/新布局要在 `scenes.yaml` 注册表里登记才有意义，
@@ -68,6 +68,9 @@ class VersionedDir:
     pattern: str
     depth: int = 1
     allow_remote_new: bool = False
+    #: ``content``：文件内 content_version 仲裁；``append_only``：无文件内
+    #: 版本，只允许远程补充 system 不存在的新实体，已下载内容不可改写。
+    remote_mode: str = "content"
 
 
 #: rel_dir → VersionedDir。core 只放自己的；插件经 register_versioned_dir 注册。
@@ -77,14 +80,17 @@ VERSIONED_FILES: dict[str, VersionedDir] = {}
 
 
 def register_versioned_dir(rel_dir: str, pattern: str, *, depth: int = 1,
-                           allow_remote_new: bool = False) -> None:
+                           allow_remote_new: bool = False,
+                           remote_mode: str = "content") -> None:
     """声明一类参与 remote 下发 / content_version 自动维护的实体文件。
 
     插件在自己的配置策略模块顶层调用（见模块文档「哪些目录参与」）。
     """
+    if remote_mode not in {"content", "append_only"}:
+        raise ValueError(f"未知 remote_mode: {remote_mode}")
     VERSIONED_DIRS[rel_dir] = VersionedDir(
         rel_dir=rel_dir, pattern=pattern, depth=depth,
-        allow_remote_new=allow_remote_new)
+        allow_remote_new=allow_remote_new, remote_mode=remote_mode)
 
 
 def register_versioned_file(rel_path: str) -> None:
@@ -97,6 +103,9 @@ def register_versioned_file(rel_path: str) -> None:
 # core 自己的两类：跨插件通用，不属于任何游戏领域
 register_versioned_dir("scenes", "*.yaml", depth=1)
 register_versioned_dir("layouts", "*.json", depth=2)
+register_versioned_dir(
+    "workflows", "*.wf", depth=0, allow_remote_new=True,
+    remote_mode="append_only")
 register_versioned_file("ocr.yaml")
 
 
@@ -114,7 +123,8 @@ def spec_for(rel_path: str) -> VersionedDir | None:
         prefix = spec.rel_dir.split("/")
         if parts[:len(prefix)] != prefix:
             continue
-        if len(parts) - len(prefix) != spec.depth:
+        child_depth = len(parts) - len(prefix)
+        if child_depth < 1 or (spec.depth and child_depth != spec.depth):
             continue
         if Path(rel_path).match(spec.pattern):
             return spec
@@ -243,6 +253,8 @@ def iter_versioned_files(layer_root: Path) -> Iterator[Path]:
             yielded.add(path)
             yield path
     for spec in VERSIONED_DIRS.values():
+        if spec.remote_mode != "content":
+            continue
         base = layer_root / spec.rel_dir
         if not base.is_dir():
             continue

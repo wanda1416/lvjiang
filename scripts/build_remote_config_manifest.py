@@ -72,8 +72,10 @@ def build_manifest(root: Path, *, base_url: str, config_version: int,
             continue
 
         payload = path.read_bytes()
-        version = versioning.version_from_text(
-            payload.decode("utf-8"), path.suffix)
+        spec = versioning.spec_for(rel_path)
+        version = (0 if spec is not None and spec.remote_mode == "append_only"
+                   else versioning.version_from_text(
+                       payload.decode("utf-8"), path.suffix))
         if version is None:
             print(f"跳过（缺 content_version）: {rel_path}", file=sys.stderr)
             continue

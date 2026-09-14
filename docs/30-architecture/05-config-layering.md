@@ -359,6 +359,7 @@ remote 生效 ⟺ remote.content_version > system.content_version
 | `yysls/tune_config.yaml` | ❌ | 插件 |
 | `yysls/tuning_rules/*.yaml` | ✅ | 插件 |
 | `yysls/graduation/*.json` | ✅ | 插件 |
+| `workflows/**/*.wf` | ✅（仅新增） | core |
 
 **`allow_remote_new` 的不对称是有意的**：新场景/新布局要在 `scenes.yaml`
 注册表里登记才有意义，而注册表本身走发版（改它通常伴随代码改动），远程凭空
@@ -373,6 +374,18 @@ remote 文件替代 system 成为合并基底，用户已有的 local diff 继�
 
 顶层的 `scenes.yaml`/`layouts.yaml` **不参与**：那是注册表，改动伴随代码，
 走发版。参与的只有它们名下的实体文件。
+
+#### WF 的无版本只新增模式
+
+WF 文件没有 `content_version`，不能使用“远端版本严格大于系统版本”的覆盖
+仲裁。`workflows/**/*.wf` 因此使用 `append_only` 策略，manifest 中固定写
+`content_version: 0`：system 同路径存在时远程永不生效；local 同路径存在时
+仍由 local 优先；已经下载的远程 WF 若 SHA256 发生变化，客户端拒绝覆盖并
+保留旧内容。修订实验脚本必须换文件名/脚本 ID，撤回则从全量 manifest 删除。
+
+实际生效的远程脚本在桌面端和设备端各脚本列表强制带 `[远程]`，日常页同时
+显示不可由脚本元数据隐藏的来源警告。脚本编辑器将其视为只读内容；需要修改
+时必须先复制为本地副本。
 
 ### manifest 与四道闸门
 
@@ -417,6 +430,9 @@ https://wanda1416.github.io/lvjiang/config/config.json
 4. **路径合法性**：拒绝 `..`、绝对路径、盘符、反斜杠，且只接受
    `versioning` 注册表里声明过的目录——manifest 是远程内容，不能让它决定
    往哪写盘
+
+其中 WF 的 `content_version: 0` 是只新增模式标记，不代表 WF 内容版本；
+下载后以 SHA256 判断是否为同一份不可变内容。
 
 ### 撤回
 

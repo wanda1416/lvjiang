@@ -42,6 +42,36 @@ class TestClickCoordPoint:
         _args, kwargs = eng._input.click_screen.call_args
         assert kwargs["button"] == "x1"
 
+    def test_click_hold_reaches_backend(self):
+        eng = make_engine()
+        eng._exec_body(parse_text("click (0.5, 0.5) hold 1.4\n").body)
+
+        assert eng._input.click_screen.call_args.kwargs["hold"] == 1.4
+
+    def test_click_hold_range_and_tuple_variable(self, monkeypatch):
+        eng = make_engine()
+        monkeypatch.setattr(
+            "lvjiang.workflows.engine.actions.random.uniform",
+            lambda lo, hi: (lo + hi) / 2,
+        )
+        eng.variables["hold_range"] = (1.2, 1.4)
+        eng._exec_body(parse_text(
+            "click (0.5, 0.5) hold (1.0, 1.2)\n"
+            "click (0.5, 0.5) hold $hold_range\n"
+        ).body)
+
+        calls = eng._input.click_screen.call_args_list
+        assert calls[0].kwargs["hold"] == pytest.approx(1.1)
+        assert calls[1].kwargs["hold"] == pytest.approx(1.3)
+
+    def test_click_hold_rejects_invalid_duration(self):
+        eng = make_engine()
+        eng.variables["hold_time"] = 0
+
+        with pytest.raises(Exception, match="click hold 时长必须 > 0"):
+            eng._exec_body(parse_text(
+                "click (0.5, 0.5) hold $hold_time\n").body)
+
     def test_python_workflow_facade_uses_engine_panel_click_primitive(self):
         eng = make_engine()
         workflow = eng._ensure_workflow()

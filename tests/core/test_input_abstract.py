@@ -120,3 +120,31 @@ def test_adb_factory_returns_input_backend():
 
     backend = create_input_backend(device=_FakeDevice())
     assert isinstance(backend, InputBackend)
+
+
+def test_adb_click_hold_uses_stationary_swipe(monkeypatch):
+    from lvjiang.core.android.input import AdbInput
+
+    class _FakeDevice:
+        def __init__(self):
+            self.calls = []
+
+        def shell(self, *args, **_kwargs):
+            self.calls.append(args)
+            return ""
+
+    device = _FakeDevice()
+    backend = AdbInput(
+        device=device,
+        input_sim=InputSimConfig(
+            click_random_offset=0,
+            before_click_wait=(0, 0),
+            after_click_wait=(0, 0),
+        ),
+    )
+    monkeypatch.setattr("lvjiang.core.android.input.time.sleep", lambda _s: None)
+
+    backend.click_screen(10, 20, hold=1.4)
+
+    assert device.calls == [
+        ("input", "swipe", "10", "20", "10", "20", "1400")]

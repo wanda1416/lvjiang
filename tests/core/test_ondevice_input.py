@@ -17,7 +17,7 @@ def calls(monkeypatch):
     """记录对 a11y / shell 桥的调用；time.sleep 置空，前后延迟不真等"""
     log: list[tuple] = []
     monkeypatch.setattr(dev_input.time, "sleep", lambda *_: None)
-    for name in ("tap", "swipe", "hold_move", "back", "home"):
+    for name in ("tap", "swipe", "long_press", "hold_move", "back", "home"):
         monkeypatch.setattr(a11y, name, lambda *a, _n=name: log.append((_n, *a)) or True)
     for name in ("tap", "swipe"):
         monkeypatch.setattr(shell, name, lambda *a, _n=name: log.append(("shell." + _n, *a)) or "")
@@ -37,6 +37,12 @@ def test_a11y_drag_without_hold_is_plain_swipe(calls):
     inp = dev_input.A11yInput(_cfg())
     inp.drag_screen(10, 20, 110, 220, duration=0.5)
     assert calls == [("swipe", 10, 20, 110, 220, 500)]
+
+
+def test_a11y_click_hold_uses_long_press(calls):
+    inp = dev_input.A11yInput(_cfg())
+    inp.click_screen(10, 20, hold=1.4)
+    assert calls == [("long_press", 10, 20, 1400)]
 
 
 def test_a11y_drag_with_hold_uses_two_stroke_hold_move(calls):
@@ -88,6 +94,12 @@ def test_shell_drag_hold_merges_into_swipe_duration(calls):
     inp = dev_input.ShellInput(_cfg())
     inp.drag_screen(10, 20, 110, 220, duration=0.3, hold=2.0)
     assert calls == [("shell.swipe", 10, 20, 110, 220, 2300)]
+
+
+def test_shell_click_hold_uses_stationary_swipe(calls):
+    inp = dev_input.ShellInput(_cfg())
+    inp.click_screen(10, 20, hold=1.4)
+    assert calls == [("shell.swipe", 10, 20, 10, 20, 1400)]
 
 
 def test_shell_esc_home_keyevents(calls):

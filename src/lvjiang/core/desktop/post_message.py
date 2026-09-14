@@ -57,6 +57,7 @@ class PostMessageInput(InputBackend):
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
                      *, pre_delay=None, post_delay=None, button: str = "left",
+                     hold: float | None = None,
                      random_offset: bool = True):
         """后台点击：PostMessage 向目标窗口发送鼠标事件，不移动光标
 
@@ -80,7 +81,11 @@ class PostMessageInput(InputBackend):
         cx, cy = screen_to_client_logical(self.target_hwnd, sx, sy)
         label = f"({poi_name})" if poi_name else ""
         logger.debug(f"[后台] 点击 {label}: 屏幕({sx},{sy}) -> 客户区({cx},{cy}) [偏移: {offset_x:+d}, {offset_y:+d}]")
-        postmessage_click(self.target_hwnd, cx, cy, activate=self.activate_before_send)
+        postmessage_click(
+            self.target_hwnd, cx, cy,
+            activate=self.activate_before_send,
+            hold=hold,
+        )
 
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))

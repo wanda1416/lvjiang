@@ -168,7 +168,7 @@ class _StmtMixin:
         )
 
     def click_stmt(self, items):
-        """click 目标 [left|right|middle|x1|x2|back|forward]? [before|after|around wait 参数 ...]
+        """click 目标 [鼠标键] [hold 时长] [before|after|around wait 参数 ...]
 
         鼠标键可选，省略时默认左键（click_node 已由 click_*_target 按此
         默认构造）；显式指定时按 token 类型（而非位置）提取，与
@@ -180,20 +180,32 @@ class _StmtMixin:
         wait_pairs, core_items = self._extract_wait_pairs(items[1:])
 
         button = click_node.button
+        hold = click_node.hold
         for item in core_items:
             if isinstance(item, Token) and item.type == "CLICK_BUTTON":
                 raw = str(item).lower()
                 button = _CLICK_BUTTON_ALIASES.get(raw, raw)
+            elif (isinstance(item, tuple) and len(item) == 2
+                  and item[0] == "click_hold"):
+                hold = item[1]
 
-        if not wait_pairs and button == click_node.button:
+        if not wait_pairs and button == click_node.button and hold is None:
             return click_node
 
         # 显式指定按键和/或 wait_clause → 重建节点；wait_clause 存在时抑制默认延迟
         click_node = Click(target=click_node.target, line_no=click_node.line_no,
-                          suppress_defaults=bool(wait_pairs), button=button)
+                          suppress_defaults=bool(wait_pairs), button=button,
+                          hold=hold)
         if not wait_pairs:
             return click_node
         return self._expand_wait_clauses(click_node, wait_pairs)
+
+    def click_hold(self, items):
+        """hold <number|range|var>，保留表达式供运行时解析。"""
+        value = items[0]
+        if isinstance(value, (int, float)):
+            value = float(value)
+        return ("click_hold", value)
 
     def mouse_button_stmt(self, items):
         """mouse left|right|middle|x1|x2 down|up — 原始鼠标键事件。"""

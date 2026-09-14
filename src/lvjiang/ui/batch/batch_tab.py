@@ -46,7 +46,11 @@ from ...core.batch_config import (
 )
 from ...i18n import tr
 from ..button_styles import apply_button_style, fit_button_width
-from ..main.run_control import STATE_PLAN_UNSUPPORTED
+from ..main.run_control import (
+    STATE_PAUSING,
+    STATE_PLAN_UNSUPPORTED,
+    STATE_STOPPING,
+)
 from ..theme import get_theme_manager
 from .batch_runner import (
     ST_FAILED,
@@ -79,6 +83,9 @@ _STYLE_BTN_RUN = (
 _STYLE_BTN_STOP = (
     "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
 )
+_STYLE_BTN_STOPPING = (
+    "background-color: #ef9a9a; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+)
 _STYLE_BTN_NOT_READY = (
     "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
 )
@@ -87,6 +94,9 @@ _STYLE_BTN_PLAN_UNSUPPORTED = (
 )
 _STYLE_BTN_PAUSE = (
     "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+)
+_STYLE_BTN_PAUSING = (
+    "background-color: #FFB74D; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
 )
 _STYLE_BTN_RESUME = (
     "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
@@ -1080,9 +1090,10 @@ class BatchTab(QWidget):
 
     def _on_automation_state(self, state: str):
         """宿主自动化状态变化 → 刷新按钮"""
-        self._running = state in ("running", "paused")
+        active_states = ("running", STATE_PAUSING, "paused", STATE_STOPPING)
+        self._running = state in active_states
         self._refresh_run_button(state)
-        if state in ("running", "paused"):
+        if state in active_states:
             self._set_config_enabled(False)
         else:
             self._set_config_enabled(True)
@@ -1094,23 +1105,35 @@ class BatchTab(QWidget):
     def _refresh_run_button(self, state: str):
         from ..hotkeys import hotkey_label
         hk = self._host._user_config.hotkeys
-        if state in ("running", "paused"):
+        if state == STATE_STOPPING:
+            self._btn_run.setText(tr("结束中"))
+            self._btn_run.setEnabled(False)
+            self._btn_run.setStyleSheet(_STYLE_BTN_STOPPING)
+        elif state in ("running", STATE_PAUSING, "paused"):
             self._btn_run.setText(hotkey_label(tr("结束"), hk.stop))
+            self._btn_run.setEnabled(True)
             self._btn_run.setStyleSheet(_STYLE_BTN_STOP)
         elif state == "not_ready":
             self._btn_run.setText(tr("未连接"))
+            self._btn_run.setEnabled(True)
             self._btn_run.setStyleSheet(_STYLE_BTN_NOT_READY)
         elif state == STATE_PLAN_UNSUPPORTED:
             self._btn_run.setText(tr("方案不支持"))
+            self._btn_run.setEnabled(True)
             self._btn_run.setStyleSheet(_STYLE_BTN_PLAN_UNSUPPORTED)
         else:
             self._btn_run.setText(hotkey_label(tr("开始执行"), hk.start))
+            self._btn_run.setEnabled(True)
             self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
         # 刷新暂停/恢复按钮
         if state == "running":
             self._btn_pause_resume.setText(hotkey_label(tr("暂停"), hk.pause))
             self._btn_pause_resume.setEnabled(True)
             self._btn_pause_resume.setStyleSheet(_STYLE_BTN_PAUSE)
+        elif state == STATE_PAUSING:
+            self._btn_pause_resume.setText(tr("暂停中"))
+            self._btn_pause_resume.setEnabled(False)
+            self._btn_pause_resume.setStyleSheet(_STYLE_BTN_PAUSING)
         elif state == "paused":
             self._btn_pause_resume.setText(hotkey_label(tr("恢复"), hk.pause))
             self._btn_pause_resume.setEnabled(True)

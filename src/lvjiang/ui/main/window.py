@@ -265,8 +265,9 @@ class MainWindow(
     f9_pressed = pyqtSignal()
     f10_pressed = pyqtSignal()
     pause_pressed = pyqtSignal()
+    _pause_acknowledged = pyqtSignal()
     _scrcpy_frame_ready = pyqtSignal(object)
-    # 宿主信号：自动化状态（"running" / "paused" / "not_ready" / "idle"）与用户切换
+    # 宿主信号：自动化状态（含暂停中/结束中过渡态）与用户切换
     automation_state_changed = pyqtSignal(str)
     user_changed = pyqtSignal(str)
     # app 业务事件统一走带命名空间的 AppEvent 信封。
@@ -332,6 +333,7 @@ class MainWindow(
         self.f9_pressed.connect(self._on_f9_start)
         self.f10_pressed.connect(self._request_stop)
         self.pause_pressed.connect(self._on_pause_resume)
+        self._pause_acknowledged.connect(self._on_pause_acknowledged)
         self._scrcpy_frame_ready.connect(self._on_scrcpy_frame_ui)
         # 启动全局热键（内部先安装 pynput 防护补丁）；
         # macOS 未授权时返回 None，降级为窗口内热键（keyPressEvent 使用当前配置）

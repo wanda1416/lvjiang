@@ -36,17 +36,22 @@ affix_pool:
 - 对玩家单位增效
 common_conditions:
   junk_conditions:
-  - count_min:
-      symbols:
-      - 最小本属攻击
-      - 最小外属攻击
-      min: 2
+  - - count_min:
+        symbols:
+        - 最小本属攻击
+        - 最小外属攻击
+        min: 2
+    - count_min:
+        symbols:
+        - 精准率
+        - 会心率
+        min: 1
   normal_conditions:
   - count_min:
       symbols:
       - 最小本属攻击
       - 最小外属攻击
-      min: 1
+      min: 2
   - count_max:
       symbols:
       - 最小外功攻击

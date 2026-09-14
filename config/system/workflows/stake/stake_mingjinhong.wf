@@ -66,7 +66,7 @@ press "E" hold 0.06 after wait 0.11
 press "NUM8" hold 0.09 after wait 0.1
 
 # 第一道剑气，wait 开始计时
-press "R" hold 1.44 after wait 0.75
+press "R" hold 1.45 after wait 0.75
 
 # 点剑
 log info "第一次点剑+瞬发剑气"
@@ -121,7 +121,7 @@ press "R" hold 1.47 after wait 0.8
 
 # 吹笛拉距离
 press $key_dz hold 0.1 after wait 0.1
-press "S" hold 2.2 after wait 0.95
+press "S" hold 2.15 after wait 0.95
 
 # 第四次瞬发剑气
 log info "第三次点剑+第四次瞬发剑气"

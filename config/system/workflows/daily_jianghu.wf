@@ -1,4 +1,6 @@
 #% name: 每日江湖号令
+#% runnable: true
+#% batchable: true
 #% env: [android, desktop]
 #% note: |-
 #%   请准备好'黄泉酿'并收藏

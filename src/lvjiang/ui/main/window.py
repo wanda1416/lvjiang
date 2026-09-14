@@ -906,6 +906,17 @@ class MainWindow(
                 self._log_append(tr("[错误] 请先定位窗口"))
             return False
 
+        from ...workflows.discovery import script_supports_env
+        run_env = self._selected_run_env()
+        unsupported = [
+            script.name for script in scripts
+            if not script_supports_env({"env": script.env or []}, run_env)
+        ]
+        if unsupported:
+            self._log_append(
+                tr("[错误] 当前环境不支持以下脚本：") + "、".join(unsupported))
+            return False
+
         if not self._begin_automation(tr("批量执行")):
             return False
 
@@ -932,7 +943,7 @@ class MainWindow(
             ocr=self._ocr,
             input_ctrl=self._input,
             layout=layout,
-            run_env=self._selected_run_env(),
+            run_env=run_env,
             input_sim=deepcopy(self._user_config.input_sim),
             delay_params=deepcopy(self._user_config.delay_params),
             android_apps=deepcopy(self._user_config.android_apps),

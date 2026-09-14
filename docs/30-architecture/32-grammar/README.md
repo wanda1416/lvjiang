@@ -138,7 +138,7 @@ drag [scene].[arrow] 0.5                # 指定时长
 drag [scene].[arrow] 0.5 hold 0.2       # 拖拽后按住
 
 # Panel/Region 翻页
-drag [scene].[panel][r][c] down [n]     # 下翻 n 行（默认 1）
+drag [scene].[panel][r][c] down <n>     # 下翻 n 行（默认 1）
 drag [scene].[panel][r][c] up $var      # 上翻 $var 行
 drag [scene].[panel][r][c] left/right   # 左/右翻
 
@@ -146,6 +146,58 @@ drag [scene].[panel][r][c] left/right   # 左/右翻
 drag [s1].[p1] [s2].[p2]               # 两点间拖拽
 drag (rx1, ry1) (rx2, ry2)             # 坐标模式
 ```
+
+### move / place — 鼠标移动
+
+```
+place (0.52, 0.38)                      # 直接放置光标，不产生移动过程
+move to (0.8, 0.5) duration 0.3         # 移动到目标（目标语法与 click 一致）
+move to [inventory].[slot3]             # 目标也可以是场景引用 / panel / $var
+move by (-0.2, 0) duration 0.4          # 相对位移，分量 ∈ [-1, 1]
+move (0.5, 0.5) by (0.2, 0) duration 0.3  # 显式起点 = place + move by
+```
+
+`place`/`move` 没有默认前后延迟，但同样支持 `before`/`after`/`around` 等待子句。
+详见 [03.3-mouse.md](03.3-mouse.md#二move--鼠标移动)。
+
+### mouse — 鼠标键原始事件
+
+```
+place (0.52, 0.38)
+mouse left down                         # button: left/right/middle/x1/x2/back/forward
+wait 0.12
+mouse left up
+```
+
+保留多个输入交叠时的真实 down/up 时间线，仅桌面 SendInput 后端执行。
+
+### scroll — 鼠标滚轮
+
+```
+scroll up <n>                           # 在画布中心向上滚动 n 格（默认 1）
+scroll down 3                           # 方向后紧跟数量
+scroll [scene].[region] up <n>          # 先移动光标到目标再滚动
+scroll [scene].[panel][r][c] down <n>   # 移动到格子中心后滚动
+scroll [scene].[region] up 5 interval 0.1  # 逐格固定间隔（默认 20~50ms 随机）
+```
+
+### replay — 高精度输入轨迹回放
+
+```
+replay input_trace "lvtrace/7f02c8c43d7a.lvtrace"
+```
+
+轨迹相对当前 `.wf` 文件解析，由专用实时回放器一次执行，不逐事件进入 DSL 调度。
+
+### app — 应用生命周期
+
+```
+app stop "game" timeout 15              # 停止并等待进程消失
+app start "game" timeout 30             # 启动并等待进程出现
+```
+
+`game` 是「配置管理 → 应用注册」中的应用名，控制器按当前实际连接目标选择
+Android/PC 绑定，不依据工作流环境。详见 [06.2-system-interaction.md](06.2-system-interaction.md)。
 
 ### wait — 等待
 
@@ -201,6 +253,7 @@ press "KEY" hold (<最小>, <最大>)       # 区间内随机选择时长
 press "KEY" hold $var                   # 数值或二元 tuple 变量
 press "KEY" down                        # 按下保持
 press "KEY" up                          # 释放
+press "CTRL" + "C"                      # 单条组合键（左到右按下、右到左释放）
 paste "ABC123"                         # PC 剪贴板 + Ctrl+V 文本输入
 paste $redeem_code                      # 粘贴运行时变量
 ```
@@ -212,7 +265,15 @@ paste $redeem_code                      # 粘贴运行时变量
 | DOWN | 按下保持 | 键留在 registry |
 | UP | 释放 | 键从 registry 移除 |
 
-键名不区分大小写，支持别名（Escape→ESC, Control→CTRL）。组合键用 down/up 构造：
+键名不区分大小写，支持别名（Escape→ESC, Control→CTRL）。单条组合键用 `+` 连接：
+
+```
+press "CTRL" + "C"                      # 左到右按下、右到左释放
+press "CTRL" + "SHIFT" + "S"
+press "CTRL" + "A" hold 0.5             # 组合键同样支持 hold / down / up
+```
+
+需要在组合键之间穿插其他语句时，才改用 down/up 显式时序：
 
 ```
 press "CTRL" down
@@ -250,7 +311,7 @@ log concat("a", $var)                   # 函数返回值
 
 ## 七、感知指令
 
-> 详细返回值与修饰子句见 [04-data-flow.md](04-data-flow.md) / [04-1](04.1-scan.md) / [04-2](04.2-recognize.md) / [04-3](04.3-find.md) / [04-4](04.4-image-template.md)。
+> 详细返回值与修饰子句见 [04-data-flow.md](04-data-flow.md) / [04.1-scan.md](04.1-scan.md) / [04.2-recognize.md](04.2-recognize.md) / [04.3-find.md](04.3-find.md) / [04.4-image-template.md](04.4-image-template.md)。
 
 ### scan — OCR 文字扫描
 
@@ -317,12 +378,18 @@ find [scene].[area] as $var by image [game_menu_page].[back]
 | `by <mode> <target>` | 降级：dict → str/位置 | scan / recognize / find |
 | `as rich` | 升级：str → dict，并执行输出区域 OCR | 仅 recognize |
 | `with <func>` | 配合 rich | 仅 recognize |
+| `with "<清洗组>"` | OCR 结果清洗分组 | scan / find |
 | `where confidence >= <n>` | 过滤 | scan / recognize / find |
 | `on group "<name>"` | 限定分组 | 仅 recognize |
 
 by 模式：`equals "文本"` / `contains "文本"` / `equals_any $list` / `contains_any $list`；
 `scan` Region 另支持无 target 的 `by image`；`find` 支持
 `by image [scene].[region]`（推荐）及兼容形式 `by image "模板名"`。
+
+`with "<清洗组>"` 是 `scan` / `find` 的 OCR 结果清洗子句，与 `recognize` 的
+`with <func>` 是两个不同的东西（前者接字符串，后者接函数名）：
+它按配置中的清洗组对识别文本做后处理，不能与 `by image` 同时使用。
+详见 [04.1-scan.md](04.1-scan.md#清洗子句) / [04.3-find.md](04.3-find.md#清洗子句)。
 
 ### 与 click 的配合
 
@@ -346,9 +413,10 @@ else
     ...
 end
 
-# 枚举循环
-for $var in [a, b, c] ... end
-for $var in $list ... end
+# 枚举循环（循环变量名不带 $）
+for item in ["a", "b", "c"] ... end   # 静态列表（元素必须是完整表达式，裸标识符非法）
+for item in $list ... end             # 列表变量
+for i in [1...$n] ... end             # 整数范围（闭区间，端点可为表达式）
 
 # 计数循环
 loop <N> ... end                      # N 为数字或 $var
@@ -376,6 +444,10 @@ return <value>                        # 返回值给调用方
 # 标签跳转
 @label_name                           # 定义标签
 goto label_name                       # 跳转到标签
+
+# 环境单行守卫（-> 后只能跟一条非块语句）
+env:"desktop" -> press "F"            # 等价于 if env("desktop") ... end
+env:"android" -> click [game_main_page].[menu] after wait @page_refresh
 ```
 
 ## 九、条件表达式
@@ -403,21 +475,26 @@ $a + 1 > $b * 2                       # 两侧支持 + - * /
 
 falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 
-## 十、内置函数（76 个）
+## 十、内置函数（84 个）
 
-> 完整签名与说明见 [06-functions.md](06-functions.md)。
+> 完整签名与说明见 [06-functions.md](06-functions.md)。数量为 core 67 + yysls 插件 17，可
+> 用 `list_functions()` 复核。
 
 | 类别 | 函数 |
 |------|------|
 | **基础运算（8）** | `add` `sub` `mul` `div` `mod` `min` `max` `abs` |
 | **字典/列表（12）** | `len` `keys` `values` `has_key` `del_key` `remove` `slice` `range` `count_nonempty` `contains` `find_key` `append` |
-| **字符串（9）** | `concat` `substr` `split` `replace` `match` `trim` `upper` `lower` `to_num` |
-| **装备（6）** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` |
-| **背包（3）** | `check_scroll` `notify_scroll` `scroll_advance` |
+| **字符串（13）** | `concat` `substr` `split` `split_lines` `replace` `match` `trim` `upper` `lower` `to_num` `extract_int` `extract_num` `extract_progress` |
+| **装备（7）** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` `yysls_rich_parse` |
+| **背包遍历（3）** | `check_scroll` `notify_scroll` `scroll_advance` |
+| **背包游标（3）** | `bag_cursor_init` `bag_cursor_visit` `bag_cursor_finish_window` |
+| **入库与角色属性（4）** | `write_bag_item` `write_equipped` `to_role_base_attrs` `open_base_attr_form` |
 | **时间（2）** | `clock` `datetime` |
-| **系统/交互（11）** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` `app_is_running` `app_stop` `app_start` `android_wait_stable_frame` |
+| **用户交互与系统（7）** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` |
+| **应用生命周期（6）** | `app_is_running` `app_stop` `app_start` `android_app_stop` `android_app_start` `android_wait_stable_frame` |
+| **运行环境与后端（5）** | `env` `check_env` `is_send` `is_post` `is_device` |
 | **图色（7）** | `pixel` `bright` `color_ratio` `bright_segs` `color_vec` `find_icons` `find_multi_color` |
-| **玩家档案（5）** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` |
+| **玩家档案（7）** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` `profile_observe` `user_get` |
 
 ## 十一、模块化
 
@@ -469,4 +546,27 @@ collect $var as "label"               # 写入 output dict
 call proc() as $output                # 接收子过程 output
 ```
 
-> Profile（玩家档案）通过 `profile_get` / `profile_set` / `profile_inc` 函数访问，独立于四通道。详见 [09-data-channels.md](09-data-channels.md)。
+> Profile（玩家档案）通过 `profile_get` / `profile_set` / `profile_inc` 函数访问，独立于上述五通道。详见 [09-data-channels.md](09-data-channels.md)。
+
+## 十三、解析期校验与实现对应
+
+权威文法在 `src/lvjiang/workflows/grammar/grammar.lark`，转写器在 `parser/`
+（`statements.py` / `expressions.py` / `modules_control.py`），本文档与它对齐。
+
+**解析期**（不等到执行）就会报错的约束：
+
+| 约束 | 说明 |
+|------|------|
+| 引用位置不允许字符串 | 场景/区域名必须是 `[name]` 或 `$var`；`drag [scene]."arrow"` 直接报错 |
+| 坐标归一化范围 | `click` / `place` / `move` / `drag` 的绝对坐标必须 ∈ [0, 1]，`move by` 的分量 ∈ [-1, 1] |
+| `full by` 仅 recognize | `scan` / `find` 写 `full by` 报错 |
+| `by image` 可用面 | 只有 `scan` Region（无 target）与 `find`（必须带 target）支持；`recognize` 完全不支持 |
+| `by image` 与清洗组互斥 | `by image` 不能与 `with "<清洗组>"` 同时写 |
+| `as rich` 与 `by` 互斥 | recognize 两种返回语义冲突，组合即报错 |
+| `env:"..." ->` 守卫 | 环境名必须是非空常量字符串，`->` 后必须恰有一条非块语句 |
+
+**执行期**才校验的项：`with <func>` 必须与 `as rich` 搭配、panel 行列越界（越界写空串）、
+命名延迟 `@name` 是否存在、press 键名是否在 VK 映射表内。
+
+静态引用（场景 / 区域 / 坐标点 / 方向 / 面板 / 模板）由工作流预检一次性比对当前布局，
+详见 [33-engine/02-static-check.md](../33-engine/02-static-check.md)。

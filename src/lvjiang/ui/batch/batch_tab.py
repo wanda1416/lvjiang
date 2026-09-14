@@ -708,9 +708,11 @@ class BatchTab(QWidget):
         self._updating_script_list = True
         self._script_list.clear()
         try:
+            run_env_getter = getattr(self._host, "_selected_run_env", None)
+            run_env = run_env_getter() if callable(run_env_getter) else None
             discovered = [
-                cfg for cfg in list_exposed_scripts()
-                if cfg.get("batchable", True)
+                cfg for cfg in list_exposed_scripts(run_env)
+                if cfg.get("batchable", False)
             ]
         except Exception:
             discovered = []
@@ -863,6 +865,7 @@ class BatchTab(QWidget):
                 class_name=cfg.get("class", ""),
                 scope=cfg.get("scope", "daily"),
                 parameters=list(cfg.get("parameters") or []),
+                env=list(cfg.get("env") or []),
             ))
         return scripts
 

@@ -11,8 +11,8 @@
 - **系统只读**：用户模式下 system 文件不可改名/删除（``SystemContentProtected``）。
   想改必须先复制到 local——复制之后该文件就脱离系统更新了，这个代价要让
   用户看得见，所以 :class:`WorkflowFile` 显式区分 ``overrides_system``。
-- **不做墓碑**：用户不能删系统脚本。要让它不出现，用的是「展示勾选」那套
-  暴露机制，不是从磁盘上抹掉。
+- **不做隐藏标记**：用户不能删系统脚本。要让它不出现，用的是「展示勾选」
+  那套暴露机制，不是从磁盘上抹掉。
 
 树**不做任何过滤**：磁盘上有什么就显示什么，``_`` 前缀的编辑器临时文件与
 录制产物也在内——它们同样是用户可能要打开的文件，藏起来只会让人找不到自己
@@ -83,7 +83,7 @@ def list_workflow_files() -> list[WorkflowFile]:
             WORKFLOWS_DIR, _PATTERN, include_internal=True):
         origin = resolver.describe_entity(f"{WORKFLOWS_DIR}/{rel}")
         if not origin.layer:
-            continue          # 被墓碑遮住或读不到，不进树
+            continue          # 三层都读不到，不进树
         files.append(WorkflowFile(
             rel_path=rel,
             layer=origin.layer,

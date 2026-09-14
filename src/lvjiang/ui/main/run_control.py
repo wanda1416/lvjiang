@@ -393,25 +393,20 @@ class RunControlMixin:
         self._workflow_configs: list[dict] = []
         self._loaded_flow_index: int | None = None   # 临时加载的外部工作流在列表中的位置
 
+        current_env = self._selected_run_env()
         try:
-            self._workflow_configs = list_exposed_scripts()
+            # env 是脚本级启动契约：不匹配的脚本不是“可选但
+            # 不能跑”，而是根本不进入当前环境的候选集。
+            self._workflow_configs = list_exposed_scripts(current_env)
         except Exception as e:
             logger.error(f"发现脚本失败: {e}")
             return
-
-        current_env = self._selected_run_env()
 
         # 填充下拉列表（block 信号，避免 addItem 逐条触发 _on_workflow_combo_changed）
         self.workflow_combo.blockSignals(True)
         self.workflow_combo.clear()
         for cfg in self._workflow_configs:
             full_display_name = script_display_name(cfg)
-            # env 限制检查：若脚本声明了 env 且当前环境不在列表中，追加提示
-            env_list = cfg.get("env") or []
-            if env_list and current_env not in env_list:
-                full_display_name = (
-                    f"{full_display_name} ({tr('环境不支持')})"
-                )
             # 放完整名字：窄的时候 Qt 自己按可用宽度省略（CE_ComboBoxLabel
             # 会 elide），分栏拉宽后就能完整显示。预先截断成定长会让「拉宽」
             # 永远看不到更多内容。

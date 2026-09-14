@@ -6,7 +6,7 @@
 |----|------|------|--------|
 | system | `config/system/` | 系统默认，开发者提供的初始内容 | ✅ |
 | remote | `config/remote/` | 在线下发层：只对实体文件生效，且只在版本更新时顶替 system（见第七节） | ❌ |
-| local | `config/local/` | 用户覆盖层：影子文件 + 键级 diff + 墓碑 | ❌ |
+| local | `config/local/` | 用户覆盖层：影子文件 + 键级 diff | ❌ |
 | session | `config/session/` | 纯运行态，不经 resolver（见 `core.config.session`） | ❌ |
 
 **读**：`local > remote（版本更新才生效）> system`，两种模式一致。
@@ -20,8 +20,9 @@
 
 ### 实体文件（一物一文件）
 
-整文件影子 + 墓碑：local 存在同名文件即整个顶掉 system；删除靠
-`local/<相对路径>.deleted` 空标记文件。
+整文件影子：local 存在同名文件即整个顶掉 system。用户自建的
+local 文件可直接删除；system/remote 预置文件不允许用户删除，也不再使用
+`.deleted` 墓碑隐藏。
 
 | 位置 | 内容 |
 |------|------|
@@ -182,8 +183,9 @@ base_rules:
 未声明的删除会被拦下并记 warning。
 
 实体文件同样受保护：用户模式下对 system 层实体调 `delete_entity` 会抛
-`SystemContentProtected`，不再落墓碑。**已存在的旧墓碑仍然生效**，
-避免升级后突然冒出用户当初隐藏掉的脚本。
+`SystemContentProtected`。用户可以通过停用、取消展示、切换到自建内容或复制到
+local 改造来获得所需行为，不允许删除系统预置文件。历史 `.deleted`
+文件不再参与解析，可直接清理。
 
 参考图库（`reference_db.py`，自带一套条目级 diff）同样拒绝删除系统条目：
 想要一套自己的图请**新建图库空间**，而不是把系统图去掉。

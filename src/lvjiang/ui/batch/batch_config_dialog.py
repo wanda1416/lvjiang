@@ -164,17 +164,31 @@ class BatchConfigDialog(QDialog):
                 item.setCheckState(state)
 
     def _browse_wf(self, combo: QComboBox) -> None:
+        from pathlib import Path
+
         from ...core.config import get_resolver
-        root = get_resolver().system_dir / "workflows"
+        resolver = get_resolver()
+        root = resolver.system_dir / "workflows"
         path, _ = QFileDialog.getOpenFileName(
             self, tr("选择工作流文件"), str(root), tr("工作流文件 (*.wf)"))
-        if path:
-            from pathlib import Path
+        if not path:
+            return
+        # 槽位存的是「相对 workflows 根」的路径，执行侧拿它拼
+        # workflows/{value} 再 resolve_read。三层根目录都可能被选中，逐个
+        # 试；都不匹配就拒绝——存下绝对路径的话拼进去必然解析失败。
+        chosen = Path(path).resolve()
+        for layer_root in (resolver.local_dir, resolver.remote_dir,
+                           resolver.system_dir):
+            base = (layer_root / "workflows").resolve()
             try:
-                value = str(Path(path).relative_to(root)).replace("\\", "/")
+                value = chosen.relative_to(base).as_posix()
             except ValueError:
-                value = path
+                continue
             combo.setCurrentText(value)
+            return
+        QMessageBox.warning(
+            self, tr("选择工作流文件"),
+            tr("请选择 workflows 目录下的 .wf 文件"))
 
     def _refresh_config_list(self) -> None:
         self._config_combo.blockSignals(True)
@@ -196,8 +210,13 @@ class BatchConfigDialog(QDialog):
             return
         from ...workflows.discovery import list_exposed_scripts, script_display_name
 
+        run_env_getter = getattr(self.parent(), "_selected_run_env", None)
+        run_env = run_env_getter() if callable(run_env_getter) else None
         try:
-            scripts = [cfg for cfg in list_exposed_scripts() if cfg.get("batchable", True)]
+            scripts = [
+                cfg for cfg in list_exposed_scripts(run_env)
+                if cfg.get("batchable", False)
+            ]
         except Exception:
             scripts = []
         scripts_by_id = {str(cfg["id"]): cfg for cfg in scripts}

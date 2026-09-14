@@ -1,4 +1,6 @@
 #% name: 扫描备战装备
+#% runnable: true
+#% batchable: true
 #% env: [android, desktop]
 #
 # 装备分析工作流

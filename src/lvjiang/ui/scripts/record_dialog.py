@@ -335,6 +335,24 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
 
     # ─── 保存 / 复制 / 清除 ───────────────────────────────
 
+    @staticmethod
+    def _with_script_traits(text: str, path: str) -> str:
+        """录制产物没有 front-matter，补上「可运行」声明
+
+        未声明 ``runnable`` 的 .wf 不会被发现层注册——用户录完保存，脚本会
+        静默地从日常列表里消失。这里按文件名补一份最小声明。
+        """
+        from ...workflows.metadata import parse_metadata
+        try:
+            meta = parse_metadata(text)
+        except Exception:  # noqa: BLE001 元数据有问题交给发现层告警
+            return text
+        if "runnable" in meta or "batchable" in meta:
+            return text
+        name = Path(path).stem
+        return (f"#% name: {name}\n#% runnable: true\n"
+                f"#% batchable: true\n\n{text}")
+
     def _on_save(self):
         """保存当前文本为 .wf 文件（默认目录为当前模式的可写 workflows 目录）"""
         default_path = str(get_resolver().write_dir("workflows") / "recorded.wf")
@@ -344,7 +362,8 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         if not path:
             return
         try:
-            text = self.text_edit.toPlainText()
+            text = self._with_script_traits(
+                self.text_edit.toPlainText(), path)
             if self._pending_trace is not None:
                 from ...core.input_trace import (
                     TRACE_PLACEHOLDER,

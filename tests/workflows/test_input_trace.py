@@ -102,6 +102,7 @@ def test_validate_rejects_input_trace_path_traversal_outside_workflow_tree(
     class _Resolver:
         system_dir = workflows_root
         local_dir = workflows_root
+        remote_dir = wf_root / "remote_root"
 
     monkeypatch.setattr(resolver_module, "get_resolver", lambda: _Resolver())
     import lvjiang.workflows.engine.core as engine_core

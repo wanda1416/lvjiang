@@ -7,7 +7,7 @@
 | 指令 | 语法 | 说明 | 详见 |
 |---|---|---|---|
 | if | `if <cond> ... [else ...] end` | 条件分支，可嵌套 | [05.1](05.1-loops-branches.md#一if--else--条件分支) |
-| for | `for $var in [a, b, c] ... end` 或 `for $var in $list ... end` | 枚举循环，迭代静态列表或列表变量 | [05.1](05.1-loops-branches.md#二for--枚举循环) |
+| for | `for $var in ["a", "b"] ... end` / `for $var in $list ... end` / `for $var in [1...$n] ... end` | 枚举循环，迭代静态列表、列表变量或整数范围 | [05.1](05.1-loops-branches.md#二for--枚举循环) |
 | loop | `loop <N> ... end` | 计数循环，N 为正整数或变量引用 | [05.1](05.1-loops-branches.md#loop-n--计数循环) |
 | loop while | `loop while <cond> ... end` | 条件循环，每轮前求值，truthy 则执行 | [05.1](05.1-loops-branches.md#loop-while--条件为真时循环) |
 | loop until | `loop until <cond> ... end` | 条件循环，先执行再求值，truthy 则退出（至少执行一次） | [05.1](05.1-loops-branches.md#loop-until--条件为真时退出至少执行一次) |

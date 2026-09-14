@@ -4,7 +4,7 @@
 - config/system  系统默认（进 git，用户模式下只读）
 - config/remote  在线下发层（不进 git，见 core.config.remote）：只对实体
   文件生效，且只在 content_version 严格新于 system 时才顶替 system
-- config/local   用户覆盖层：影子文件 + 键级 diff + 墓碑（目录结构镜像 system）
+- config/local   用户覆盖层：影子文件 + 键级 diff（目录结构镜像 system）
 - config/session 纯运行态（不经本模块，见 core.config.session.SessionStore）
 
 读语义（两模式一致）：local > remote（版本更新才生效）> system。
@@ -16,8 +16,7 @@
 两档合并语义：
 - 实体文件（一物一文件：scenes/*.yaml、workflows/*.wf、
   layouts/{name}/{scene}.json、yysls/tuning_rules/*.yaml、
-  references/**/*.png）→ 整文件影子 + 墓碑
-  （local/<rel>.deleted 空标记文件）
+  references/**/*.png）→ 整文件影子（local 有就完全顶掉，不做内容合并）
 - 聚合键值文件（scenes.yaml、layouts.yaml、
   yysls/game_config.yaml、yysls/tune_config.yaml）→ 键级 diff 深合并；
   dict 递归、列表与标量整键替换；
@@ -64,8 +63,6 @@ REMOTE_STAGE_DIR = constants.CONFIG_DIR / "remote.staging"
 
 # 聚合 diff 中的删除键标记
 DELETED_KEY = "__deleted__"
-# 墓碑文件后缀
-TOMBSTONE_SUFFIX = ".deleted"
 
 #: 实体来源层标识（见 ConfigResolver.describe_entity）。展示用的中文标签留给
 #: UI 层做 i18n，core 只给稳定的 key。
@@ -78,7 +75,7 @@ LAYER_SYSTEM = "system"
 class EntityOrigin:
     """某个实体文件实际生效的来源层与内容版本。
 
-    ``layer`` 为空串表示该实体不存在（或被墓碑遮住）；``version`` 为 None
+    ``layer`` 为空串表示该实体不存在（三层都没有）；``version`` 为 None
     表示这一层的文件没有 content_version（未参与在线下发的类型都是如此）。
     """
 
@@ -448,10 +445,7 @@ class ConfigResolver:
             except Exception as e:  # noqa: BLE001 监听器异常不阻断写入方
                 logger.warning(f"配置变更监听器异常: {e}")
 
-    # ─── 实体文件（整文件影子 + 墓碑）──────────────────────
-
-    def _tombstone(self, rel_path: str) -> Path:
-        return self.local_dir / (rel_path + TOMBSTONE_SUFFIX)
+    # ─── 实体文件（整文件影子）───────────────────────────
 
     def remote_supersedes(self, rel_path: str) -> bool:
         """remote 层该文件是否该顶替 system —— 版本更新才算数。
@@ -534,11 +528,8 @@ class ConfigResolver:
     def resolve_read(self, rel_path: str) -> Path | None:
         """实体读解析：local 影子 → remote（版本更新才生效）→ system
 
-        墓碑返回 None。local 恒为最高优先级——用户自己改过的东西，
-        任何在线下发都不该盖掉。
+        local 恒为最高优先级——用户自己改过的东西，任何在线下发都不该盖掉。
         """
-        if self._tombstone(rel_path).exists():
-            return None
         local = self.local_dir / rel_path
         if local.exists():
             return local
@@ -584,7 +575,7 @@ class ConfigResolver:
 
     def enumerate_entities(self, rel_dir: str, pattern: str, *,
                            include_internal: bool = False) -> list[str]:
-        """枚举实体文件名：system ∪ local ∪ remote 并集，剔除墓碑，跳过 _ 前缀
+        """枚举实体文件名：system ∪ local ∪ remote 并集，跳过 _ 前缀
 
         ``include_internal=True`` 时保留 ``_`` 前缀文件。发现层要跳过它们
         （编辑器临时运行、录制产物不该注册成脚本），但文件树是「磁盘上有
@@ -617,9 +608,7 @@ class ConfigResolver:
                 rel = f"{rel_dir}/{p.name}" if rel_dir else p.name
                 if self.remote_supersedes(rel):
                     names.add(p.name)
-        alive = [n for n in sorted(names)
-                 if not self._tombstone(f"{rel_dir}/{n}" if rel_dir else n).exists()]
-        return alive
+        return sorted(names)
 
     def enumerate_entity_tree(self, rel_dir: str, pattern: str, *,
                               include_internal: bool = False) -> list[str]:
@@ -629,7 +618,7 @@ class ConfigResolver:
         且返回裸文件名，够用于「某个目录下有哪些场景/布局」，但文件树要展示
         ``subcall/`` ``batch/`` 这些子目录，需要带路径的全集。
 
-        合并、遮蔽、墓碑、``_`` 前缀跳过的规则与单层版本完全一致——刻意复用
+        合并、遮蔽、``_`` 前缀跳过的规则与单层版本完全一致——刻意复用
         它逐目录调用，避免两套枚举对「哪些文件算数」给出不同答案。
         """
         results: list[str] = []
@@ -678,7 +667,7 @@ class ConfigResolver:
     def write_entity(self, rel_path: str, data: str | bytes, *,
                      force: bool = False,
                      content_version: int | None = None) -> Path:
-        """按模式写实体文件（开发→system，用户→local 影子并清同名墓碑）
+        """按模式写实体文件（开发→system，用户→local 影子）
 
         开发模式写 system 且该路径参与在线下发（见 core.config.versioning）
         时，普通保存保留当前 content_version，新文件从 v1 起步。编辑器只有
@@ -709,8 +698,7 @@ class ConfigResolver:
         elif content_version is not None:
             raise PermissionError("只有开发模式的版本化实体可以提升版本")
 
-        tomb = self._tombstone(rel_path)
-        if not force and not tomb.exists() and self._write_is_noop(rel_path, target, data):
+        if not force and self._write_is_noop(rel_path, target, data):
             # 内容与「不写的话会读到的那一份」完全一致 —— 不落盘。
             #
             # 用户模式下这一步尤其要紧：照写会给一个其实没改过的文件生成
@@ -718,9 +706,6 @@ class ConfigResolver:
             # system/remote，不合并），于是这个文件从此收不到任何系统更新
             # 与在线下发。场景编辑器里"什么都没改、随手点一下保存"就会
             # 把整个布局的场景全冻住，代价与操作的随意程度完全不匹配。
-            #
-            # 有墓碑时不能走这条：那说明该实体当前被隐藏着，必须真写一次
-            # 才能连带把墓碑清掉。
             return target
 
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -728,8 +713,6 @@ class ConfigResolver:
             atomic_write_bytes(target, data, prefix=".config_")
         else:
             atomic_write_text(target, data, prefix=".config_")
-        if tomb.exists():
-            tomb.unlink()
         self._notify(rel_path)
         return target
 

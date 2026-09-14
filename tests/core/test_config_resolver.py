@@ -81,15 +81,6 @@ class TestEntity:
         assert r.resolve_read("scenes/a.yaml") == system / "scenes" / "a.yaml"
         assert r.resolve_read("scenes/missing.yaml") is None
 
-    def test_tombstone_hides_system_file(self, dirs):
-        system, local = dirs
-        (system / "scenes").mkdir()
-        (system / "scenes" / "a.yaml").write_text("x", encoding="utf-8")
-        (local / "scenes").mkdir()
-        (local / "scenes" / "a.yaml.deleted").touch()
-        r = _user(dirs)
-        assert r.resolve_read("scenes/a.yaml") is None
-
     def test_enumerate_union_and_skip_underscore(self, dirs):
         system, local = dirs
         (system / "workflows").mkdir()
@@ -101,16 +92,6 @@ class TestEntity:
         r = _user(dirs)
         assert r.enumerate_entities("workflows", "*.wf") == ["a.wf", "b.wf"]
 
-    def test_enumerate_excludes_tombstoned(self, dirs):
-        system, local = dirs
-        (system / "workflows").mkdir()
-        (system / "workflows" / "a.wf").write_text("", encoding="utf-8")
-        (system / "workflows" / "b.wf").write_text("", encoding="utf-8")
-        (local / "workflows").mkdir()
-        (local / "workflows" / "b.wf.deleted").touch()
-        r = _user(dirs)
-        assert r.enumerate_entities("workflows", "*.wf") == ["a.wf"]
-
     def test_write_entity_routes_by_mode(self, dirs):
         system, local = dirs
         _dev(dirs).write_entity("layouts/x.json", "{}")
@@ -118,15 +99,6 @@ class TestEntity:
         _user(dirs).write_entity("layouts/y.json", "{}")
         assert (local / "layouts" / "y.json").exists()
         assert not (system / "layouts" / "y.json").exists()
-
-    def test_write_entity_clears_tombstone(self, dirs):
-        system, local = dirs
-        (local / "layouts").mkdir()
-        tomb = local / "layouts" / "x.json.deleted"
-        tomb.touch()
-        _user(dirs).write_entity("layouts/x.json", "{}")
-        assert not tomb.exists()
-        assert (local / "layouts" / "x.json").exists()
 
     def test_write_entity_bytes(self, dirs):
         _, local = dirs
@@ -170,7 +142,7 @@ class TestEntity:
         assert r.is_system_entity("scenes/a.yaml")
         assert not r.is_system_entity("scenes/mine.yaml")
 
-    def test_delete_entity_user_local_only_no_tombstone(self, dirs):
+    def test_delete_entity_user_local_only(self, dirs):
         _, local = dirs
         (local / "scenes").mkdir()
         (local / "scenes" / "mine.yaml").write_text("x", encoding="utf-8")
@@ -737,19 +709,6 @@ class TestWriteIsMinimal:
         before = target.stat().st_mtime_ns
         r.write_entity("scenes/a.yaml", "key: a\n")
         assert target.stat().st_mtime_ns == before
-
-    def test_tombstoned_entity_is_still_written(self, dirs):
-        """有墓碑说明该实体正被隐藏，必须真写一次才能连带清掉墓碑。"""
-        system, local = dirs
-        (system / "scenes").mkdir()
-        (system / "scenes" / "a.yaml").write_text("key: a\n", encoding="utf-8")
-        (local / "scenes").mkdir()
-        (local / "scenes" / "a.yaml.deleted").touch()
-        r = _user(dirs)
-        assert r.resolve_read("scenes/a.yaml") is None
-        r.write_entity("scenes/a.yaml", "key: a\n")
-        assert not (local / "scenes" / "a.yaml.deleted").exists()
-        assert r.resolve_read("scenes/a.yaml") is not None
 
     def test_crlf_on_disk_still_detected_as_noop(self, dirs):
         """盘上 CRLF、入参 LF 时也要认出是空操作。

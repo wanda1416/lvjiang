@@ -1,4 +1,6 @@
 #% name: 输入兑换码
+#% runnable: true
+#% batchable: true
 #% env: [android, desktop]
 #% note: |-
 #%   PC 端每行填写一个兑换码，按顺序逐条粘贴，空行忽略。

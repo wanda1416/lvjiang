@@ -4,7 +4,7 @@
 """
 import pytest
 
-from lvjiang.workflows.engine.signals import _ReturnSignal
+from lvjiang.workflows.engine.signals import WorkflowUserError, _ReturnSignal
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.grammar.ast_nodes import (
     And,
@@ -61,6 +61,18 @@ env:"desktop" -> eval $hit = $hit + 10
         engine._exec_body(program.body)
 
         assert engine.variables["hit"] == 1.0
+
+    def test_front_matter_env_is_an_engine_guard(self, tmp_path):
+        wf = tmp_path / "desktop_only.wf"
+        wf.write_text(
+            "#% env: [desktop]\nlog \"should not run\"\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(WorkflowUserError, match="check_env"):
+            make_engine(run_env="android").execute(wf)
+
+        assert make_engine(run_env="desktop").execute(wf) == {}
 
 
 # ─── continue ─────────────────────────────────────────────

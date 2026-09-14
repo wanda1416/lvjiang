@@ -200,6 +200,49 @@ class TestInputBackendKind:
         assert engine.variables["hit"] == expected
 
 
+class TestAppControllerTarget:
+    @case_matrix(
+        ("kind", "expected"),
+        [
+            (InputBackendKind.ADB, "android"),
+            (InputBackendKind.AGENT, "android"),
+            (InputBackendKind.A11Y, "android"),
+            (InputBackendKind.SHELL, "android"),
+            (InputBackendKind.SEND, "pc"),
+            (InputBackendKind.POST, "pc"),
+        ],
+    )
+    def test_controller_target_comes_from_input_backend(
+        self, monkeypatch, kind, expected,
+    ):
+        from lvjiang.core import app_controller as app_module
+        from lvjiang.workflows.builtins.system import _apps
+
+        captured = {}
+
+        class Controller:
+            def __init__(self, *args, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(app_module, "AppController", Controller)
+        engine = make_engine()
+        engine._input.kind = kind
+
+        assert isinstance(_apps(engine), Controller)
+        assert captured["target_platform"] == expected
+
+    def test_unknown_backend_does_not_guess_from_env_or_connection(self, monkeypatch):
+        from lvjiang.core import app_controller as app_module
+        from lvjiang.workflows.builtins.system import _apps
+
+        monkeypatch.setattr(app_module, "_active_connection_platform", "android")
+        engine = make_engine(run_env="android")
+        engine._input.kind = InputBackendKind.UNKNOWN
+
+        with pytest.raises(WorkflowUserError, match="输入后端类型未知"):
+            _apps(engine)
+
+
 class TestIsDeviceInDsl:
     """is_device 作为 DSL 裸条件的行为，以及与 env / is_send 的区别。"""
 

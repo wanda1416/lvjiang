@@ -282,7 +282,7 @@ def _is_device(_engine=None) -> bool:
 # ─── 注册应用生命周期 ─────────────────────────────────────
 
 def _apps(_engine):
-    """按注册项平台懒创建统一控制器；绝不依据 run_env 分派。"""
+    """按当前输入后端懒创建统一控制器；绝不依据 run_env 分派。"""
     from ...core.app_controller import AppController
     from ..engine.signals import WorkflowUserError
 
@@ -290,11 +290,20 @@ def _apps(_engine):
         raise WorkflowUserError("应用控制需要工作流运行上下文")
     controller = getattr(_engine, "_app_controller", None)
     if controller is None:
+        backend_kind = _backend_kind(_engine)
+        if backend_kind.is_device:
+            target_platform = "android"
+        elif backend_kind in {InputBackendKind.SEND, InputBackendKind.POST}:
+            target_platform = "pc"
+        else:
+            raise WorkflowUserError(
+                "当前输入后端类型未知，无法确定应用控制目标")
         controller = AppController(
             getattr(_engine, "_android_apps", {}),
             device=getattr(_engine, "_android_device", None),
             capture=getattr(_engine, "_capture", None),
             stop_check=getattr(_engine, "_stop_check", None),
+            target_platform=target_platform,
         )
         _engine._app_controller = controller
     return controller

@@ -29,8 +29,8 @@ def record_connected_window(window: dict) -> None:
     """记录最近一次窗口模式定位到的真实窗口身份与位置。"""
     global _observed_window, _active_connection_platform
     _observed_window = dict(window)
-    _active_connection_platform = "pc"
     with _connected_apps_lock:
+        _active_connection_platform = "pc"
         _connected_apps["pc"] = {
             "platform": "pc",
             "executable": str(window.get("executable") or ""),
@@ -254,8 +254,13 @@ class AppController:
     """根据实际连接目标选择同一应用的 Android/Windows 绑定。"""
 
     def __init__(self, apps: dict[str, AndroidAppConfig], *, device=None,
-                 capture=None, stop_check: Callable[[], bool] | None = None):
+                 capture=None, stop_check: Callable[[], bool] | None = None,
+                 target_platform: str):
         self.apps = apps
+        platform = str(target_platform or "").strip().lower()
+        if platform not in {"android", "pc"}:
+            raise AppControlError(f"无法识别应用控制目标: {target_platform!r}")
+        self._target_platform = platform
         self._android = (AndroidAppController(
             device, apps, capture=capture, stop_check=stop_check)
             if device is not None else None)
@@ -265,7 +270,8 @@ class AppController:
         app = self.apps.get(str(name or "").strip())
         if app is None:
             raise AppControlError(f"未注册应用: {name!r}")
-        platform = _active_connection_platform
+        platform = self._target_platform
+        logger.debug(f"[App] {name}: 当前控制目标={platform}")
         if platform == "pc":
             return self._windows
         if platform == "android":

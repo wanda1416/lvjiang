@@ -120,7 +120,7 @@ def test_android_app_statement_delegates_to_shared_controller():
     assert calls == [("stop", "game", 12.0)]
 
 
-def test_app_is_running_dispatches_by_registered_target_not_env(monkeypatch):
+def test_app_is_running_dispatches_by_engine_target_not_global_connection(monkeypatch):
     from lvjiang.core import app_controller as app_module
     from lvjiang.core.app_controller import AppController
 
@@ -129,14 +129,26 @@ def test_app_is_running_dispatches_by_registered_target_not_env(monkeypatch):
         "desktop": AndroidAppConfig(
             platform="pc", executable=r"C:\\Game\\game.exe"),
     }
-    controller = AppController(apps, device=FakeDevice())
+    android = AppController(
+        apps, device=FakeDevice(), target_platform="android")
+    desktop = AppController(apps, target_platform="pc")
     monkeypatch.setattr(
-        controller._windows, "is_running", lambda name: name == "desktop")
+        desktop._windows, "is_running", lambda name: name == "desktop")
 
-    monkeypatch.setattr(app_module, "_active_connection_platform", "android")
-    assert controller.is_running("phone") is True
+    # 后续 UI 连接变化不能改变已经创建的工作流控制目标。
     monkeypatch.setattr(app_module, "_active_connection_platform", "pc")
-    assert controller.is_running("desktop") is True
+    assert android.is_running("phone") is True
+    assert android.stop("phone") is True
+    assert ("am", "force-stop", "com.example.game") in android._android.device.calls
+    monkeypatch.setattr(app_module, "_active_connection_platform", "android")
+    assert desktop.is_running("desktop") is True
+
+
+def test_app_controller_rejects_unknown_target_platform():
+    from lvjiang.core.app_controller import AppControlError, AppController
+
+    with pytest.raises(AppControlError, match="无法识别应用控制目标"):
+        AppController({}, target_platform="")
 
 
 def test_connected_android_app_information_is_discovered():

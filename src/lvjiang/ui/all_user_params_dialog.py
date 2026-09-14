@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.task_params import resolve_task_params
+from ..core.task_params import parameters_for_env, resolve_task_params
 from ..i18n import tr
 from .button_styles import apply_compact_button_style, apply_dialog_button_box_style
 
@@ -48,6 +48,8 @@ class AllUserParamsDialog(QDialog):
         users_dir: Path | None,
         initial_workflow_id: str,
         parent=None,
+        *,
+        current_env: str = "",
     ):
         super().__init__(parent)
         self.setWindowTitle(tr("全部用户参数"))
@@ -55,6 +57,7 @@ class AllUserParamsDialog(QDialog):
         self.resize(720, 520)
         self._users = list(usernames)
         self._users_dir = users_dir
+        self._current_env = current_env
         self._configs = [
             cfg for cfg in workflow_configs
             if cfg.get("scope", "daily") == "daily"
@@ -155,7 +158,8 @@ class AllUserParamsDialog(QDialog):
         if config is None:
             return
         workflow_id = str(config.get("id") or "")
-        definitions = config.get("parameters", [])
+        definitions = parameters_for_env(
+            config.get("parameters", []), self._current_env)
         for username in self._users:
             values, source = resolve_task_params(
                 workflow_id, username, definitions, self._users_dir)

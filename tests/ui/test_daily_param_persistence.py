@@ -13,8 +13,12 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.config.session import reset_session_store
-from lvjiang.core.config.wf_configs import get_wf_config
-from lvjiang.core.user_config import UserConfigManager, get_user_workflow_params
+from lvjiang.core.config.wf_configs import get_wf_config, set_wf_config
+from lvjiang.core.user_config import (
+    UserConfigManager,
+    get_user_workflow_params,
+    set_user_workflow_params,
+)
 from lvjiang.ui.execution_user_selector import ExecutionUserSelector
 from lvjiang.ui.main.run_control import RunControlMixin
 from lvjiang.ui.main.ui_state import UiStateMixin
@@ -28,6 +32,7 @@ class _DailyHarness(QWidget, UiStateMixin):
     def __init__(self, config):
         super().__init__()
         self._workflow_configs = [config]
+        self.run_env = "desktop"
         self._displayed_script_id = config["id"]
         self._param_panel = QWidget(self)
         self._param_layout = QFormLayout(self._param_panel)
@@ -39,6 +44,79 @@ class _DailyHarness(QWidget, UiStateMixin):
 
     def _get_selected_flow_config(self):
         return self._workflow_configs[0]
+
+    def _selected_run_env(self):
+        return self.run_env
+
+
+def test_parameter_panel_filters_by_env_and_preserves_hidden_values(
+    qtbot, tmp_path, monkeypatch,
+):
+    import lvjiang.constants as constants_mod
+
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", tmp_path / "session.json")
+    reset_session_store()
+    config = {
+        "id": "dual_env", "scope": "daily",
+        "parameters": [
+            {"name": "common", "type": "text", "default": "c"},
+            {"name": "pc", "type": "text", "default": "p", "env": ["desktop"]},
+            {"name": "phone", "type": "text", "default": "a", "env": ["android"]},
+        ],
+    }
+    set_wf_config("dual_env", {"common": "C", "pc": "P", "phone": "A"})
+    panel = _DailyHarness(config)
+    qtbot.addWidget(panel)
+
+    panel._rebuild_param_panel()
+    assert panel._param_panel.findChild(QLineEdit, "common") is not None
+    assert panel._param_panel.findChild(QLineEdit, "pc") is not None
+    assert panel._param_panel.findChild(QLineEdit, "phone") is None
+    panel._param_panel.findChild(QLineEdit, "pc").setText("PC")
+    assert get_wf_config("dual_env") == {
+        "common": "C", "pc": "PC", "phone": "A",
+    }
+
+    panel.run_env = "android"
+    panel._rebuild_param_panel()
+    assert panel._param_panel.findChild(QLineEdit, "pc") is None
+    assert panel._param_panel.findChild(QLineEdit, "phone").text() == "A"
+    reset_session_store()
+
+
+def test_user_parameter_save_preserves_other_environment(
+    qtbot, tmp_path, monkeypatch,
+):
+    import lvjiang.constants as constants_mod
+
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", tmp_path / "session.json")
+    monkeypatch.setattr(constants_mod, "USERS_DIR", tmp_path / "users")
+    reset_session_store()
+    config = {
+        "id": "dual_user", "scope": "daily",
+        "parameters": [
+            {"name": "pc", "type": "text", "env": ["desktop"]},
+            {"name": "phone", "type": "text", "env": ["android"]},
+        ],
+    }
+    panel = _DailyHarness(config)
+    panel._user_manager = UserConfigManager()
+    panel._daily_execution_user_selector = ExecutionUserSelector(panel._user_manager)
+    username = panel._user_manager.get_active_user_name()
+    set_user_workflow_params(
+        username, "dual_user", {"pc": "P", "phone": "A"},
+        panel._user_manager.users_dir,
+    )
+    qtbot.addWidget(panel)
+    qtbot.addWidget(panel._daily_execution_user_selector)
+
+    panel._rebuild_param_panel()
+    panel._param_panel.findChild(QLineEdit, "pc").setText("PC")
+
+    assert get_user_workflow_params(
+        username, "dual_user", panel._user_manager.users_dir,
+    ) == {"pc": "PC", "phone": "A"}
+    reset_session_store()
 
 
 def test_daily_parameter_changes_are_persisted_immediately(qtbot, tmp_path, monkeypatch):

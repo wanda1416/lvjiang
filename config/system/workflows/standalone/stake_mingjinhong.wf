@@ -9,16 +9,19 @@
 #% parameters:
 #%   - name: key_yy
 #%     label: 阴阳迷踪步
+#%     env: [desktop]
 #%     type: select
 #%     default: "2"
 #%     options: ["1", "2", "3", "4", "7", "8", "9", "0"]
 #%   - name: key_dz
 #%     label: 萧吟千浪
+#%     env: [desktop]
 #%     type: select
 #%     default: "3"
 #%     options: ["1", "2", "3", "4", "7", "8", "9", "0"]
 #%   - name: qishu_yy
-#%     label: 阴阳迷踪步（安卓）
+#%     label: 阴阳迷踪步
+#%     env: [android]
 #%     type: select
 #%     default: qishu_2
 #%     options:
@@ -27,7 +30,8 @@
 #%       - { value: qishu_3, label: "3" }
 #%       - { value: qishu_4, label: "4" }
 #%   - name: qishu_dz
-#%     label: 萧吟千浪（安卓）
+#%     label: 萧吟千浪
+#%     env: [android]
 #%     type: select
 #%     default: qishu_3
 #%     options:

@@ -224,9 +224,15 @@ class UiStateMixin:
                 if (user_manager is not None
                         and username not in user_manager.list_users()):
                     return
-                from ...core.user_config import set_user_workflow_params
+                from ...core.user_config import (
+                    get_user_workflow_params,
+                    set_user_workflow_params,
+                )
+                existing = get_user_workflow_params(
+                    username, sid, self._user_manager._users_dir) or {}
                 set_user_workflow_params(
-                    username, sid, params, self._user_manager._users_dir)
+                    username, sid, {**existing, **params},
+                    self._user_manager._users_dir)
         else:
             target_cfg["_saved_params"] = params
             from ...core.config.wf_configs import update_wf_config
@@ -304,7 +310,11 @@ class UiStateMixin:
         if flow_cfg and flow_cfg.get("scope", "daily") != "daily":
             self._param_panel.setVisible(False)
             return
-        params = flow_cfg.get("parameters", []) if flow_cfg else []
+        from ...core.task_params import parameters_for_env
+        params = parameters_for_env(
+            flow_cfg.get("parameters", []) if flow_cfg else [],
+            self._selected_run_env(),
+        )
         if not params:
             self._param_panel.setVisible(False)
             return
@@ -450,5 +460,6 @@ class UiStateMixin:
             self._user_manager._users_dir,
             str(flow_cfg["id"]),
             self,
+            current_env=self._selected_run_env(),
         )
         dialog.exec()

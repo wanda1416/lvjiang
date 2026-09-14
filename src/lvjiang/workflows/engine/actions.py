@@ -42,6 +42,7 @@ from ..grammar import (
 )
 from ..grammar.ast_nodes import PressMode, TupleLiteral
 from ..runtime_layout import require_enabled, resolve_subscene_entity
+from ..timing import precise_wait
 from .signals import WorkflowUserError
 
 # FoundRegion 延迟导入，避免循环依赖
@@ -833,15 +834,14 @@ class _ActionsMixin:
                 logger.debug(f"press: {' + '.join(keys)} hold {duration}s")
                 pressed = down_all()
                 try:
-                    # 可中断等待：暂停阻塞不触发 finally，停止抛 _BreakSignal 触发 finally
-                    deadline = time.monotonic() + duration
-                    while time.monotonic() < deadline:
-                        self._wait_if_paused()
-                        if self._stop_check():
-                            from .signals import _BreakSignal
-                            raise _BreakSignal()
-                        remaining = deadline - time.monotonic()
-                        time.sleep(min(0.05, max(0.0, remaining)))
+                    completed = precise_wait(
+                        duration,
+                        stop_check=self._stop_check,
+                        pause_check=self._wait_if_paused,
+                    )
+                    if not completed:
+                        from .signals import _BreakSignal
+                        raise _BreakSignal()
                 finally:
                     up_all(pressed)
 

@@ -12,6 +12,7 @@ from loguru import logger
 
 from ...core.key_names import normalize_key
 from ..runtime_layout import require_enabled
+from ..timing import precise_wait
 from .engine_ref import require_engine
 
 
@@ -262,19 +263,18 @@ class _ActionMixin:
         self.wait_seconds(actual)
 
     def wait_seconds(self, seconds: float):
-        """固定等待（可被停止请求打断）
-
-        用 50ms 轮询代替 time.sleep 阻塞，期间持续检查停止标志，
-        使 F10 / 停止按钮能在等待期间立即生效，而不是等整段 sleep 结束。
-        """
+        """高精度固定等待（可被暂停或停止请求打断）。"""
         logger.debug(f"等待 {seconds}s")
-        deadline = time.monotonic() + max(0.0, seconds)
-        while time.monotonic() < deadline:
-            if self._stop_check():
-                logger.info("等待期间收到停止请求，提前结束")
-                return
-            remaining = deadline - time.monotonic()
-            time.sleep(min(0.05, max(0.0, remaining)))
+        completed = precise_wait(
+            seconds,
+            stop_check=self._stop_check,
+            # _ActionMixin is also used by a few lightweight adapters that do
+            # not inherit BaseWorkflow.  They still get precise, stoppable
+            # waits without being forced to implement pause support.
+            pause_check=getattr(self, "_wait_if_paused", None),
+        )
+        if not completed:
+            logger.info("等待期间收到停止请求，提前结束")
 
     def wait_stable(self, timeout: float | str, threshold: float = 0.02,
                     interval: float = 0.3, stable_duration: float = 0.5,

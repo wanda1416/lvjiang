@@ -156,7 +156,9 @@ def _pynput_key_to_dsl_name(key) -> str | None:
     进脚本。
     """
     if sys.platform == "win32":
-        numpad_name = _WINDOWS_NUMPAD_VK_NAMES.get(getattr(key, "vk", None))
+        virtual_key = getattr(key, "vk", None)
+        numpad_name = (_WINDOWS_NUMPAD_VK_NAMES.get(virtual_key)
+                       if isinstance(virtual_key, int) else None)
         if numpad_name is not None:
             return numpad_name
     char = getattr(key, "char", None)

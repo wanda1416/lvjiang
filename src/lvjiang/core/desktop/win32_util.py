@@ -6,9 +6,12 @@
 
 import ctypes
 import sys
+import time
 from ctypes import wintypes
 
 from loguru import logger
+
+from ..timing import NS_PER_SECOND, precise_wait, precise_wait_until
 
 # ─── SendInput 基础设施 ────────────────────────────────────────
 
@@ -124,9 +127,10 @@ def send_mouse_wheel_event(delta: int):
 
 
 def smooth_move_to(x: int, y: int, duration: float):
-    """平滑移动鼠标到指定位置（分步 SetCursorPos）"""
-    import time
+    """按绝对时间轴平滑移动鼠标，避免逐步等待累计漂移。"""
     steps = max(int(duration / 0.01), 1)
+    start_ns = time.perf_counter_ns()
+    duration_ns = max(0, int(duration * NS_PER_SECOND))
     point = wintypes.POINT()
     _user32.GetCursorPos(ctypes.byref(point))
     sx, sy = point.x, point.y
@@ -135,7 +139,10 @@ def smooth_move_to(x: int, y: int, duration: float):
         cx = int(sx + (x - sx) * ratio)
         cy = int(sy + (y - sy) * ratio)
         _user32.SetCursorPos(cx, cy)
-        time.sleep(duration / steps)
+        precise_wait_until(
+            start_ns + duration_ns * i // steps,
+            spin_tail_ns=0,
+        )
 
 
 def make_lparam(x: int, y: int) -> int:
@@ -366,15 +373,14 @@ def postmessage_click(
     （scrcpy 等）——这类窗口只有处于前台/焦点才处理鼠标消息。
     投递完成后自动还原原前台窗口焦点。
     """
-    import time
     if activate:
         activate_window(hwnd)
     target = resolve_message_target(hwnd, client_x, client_y)
     lparam = make_lparam(client_x, client_y)
     _user32.PostMessageW(target, _WM_MOUSEMOVE, 0, lparam)
-    time.sleep(0.03)
+    precise_wait(0.03)
     _user32.PostMessageW(target, _WM_LBUTTONDOWN, _MK_LBUTTON, lparam)
-    time.sleep(0.05 if hold is None else hold)
+    precise_wait(0.05 if hold is None else hold)
     _user32.PostMessageW(target, _WM_LBUTTONUP, 0, lparam)
 
 
@@ -418,7 +424,9 @@ def postmessage_drag(
     y1: int,
     x2: int,
     y2: int,
-    steps: int = 20,
+    duration: float = 0.4,
+    hold: float | None = None,
+    steps: int | None = None,
     activate: bool = False,
 ):
     """通过 PostMessage 向窗口发送拖拽（不移动光标）
@@ -432,27 +440,41 @@ def postmessage_drag(
     按下窗口自动解析为起点命中点处的实际子窗口（投屏窗口），
     整个拖拽过程统一投递给该子窗口。
     """
-    import time
     if activate:
         activate_window(hwnd)
     target = resolve_message_target(hwnd, x1, y1)
     # 移动到起点
     _user32.PostMessageW(target, _WM_MOUSEMOVE, 0, make_lparam(x1, y1))
-    time.sleep(0.03)
+    precise_wait(0.03)
     # 命中测试：同步确认起点在客户区内（DefWindowProc 返回 HTCLIENT）
     _user32.SendMessageW(target, _WM_NCHITTEST, 0, make_lparam(x1, y1))
     # 按下
     _user32.PostMessageW(target, _WM_LBUTTONDOWN, _MK_LBUTTON, make_lparam(x1, y1))
-    time.sleep(0.05)
-    # 逐步移动
-    for i in range(1, steps + 1):
-        ratio = i / steps
-        cx = int(x1 + (x2 - x1) * ratio)
-        cy = int(y1 + (y2 - y1) * ratio)
-        _user32.PostMessageW(target, _WM_MOUSEMOVE, _MK_LBUTTON, make_lparam(cx, cy))
-        time.sleep(0.02)
-    # 终点松开
-    _user32.PostMessageW(target, _WM_LBUTTONUP, 0, make_lparam(x2, y2))
+    try:
+        precise_wait(0.05)
+        # 逐步移动
+        duration = max(0.0, float(duration))
+        if steps is None:
+            steps = max(int(duration / 0.02), 5)
+        else:
+            steps = max(int(steps), 1)
+        start_ns = time.perf_counter_ns()
+        duration_ns = int(duration * NS_PER_SECOND)
+        for i in range(1, steps + 1):
+            ratio = i / steps
+            cx = int(x1 + (x2 - x1) * ratio)
+            cy = int(y1 + (y2 - y1) * ratio)
+            _user32.PostMessageW(
+                target, _WM_MOUSEMOVE, _MK_LBUTTON, make_lparam(cx, cy))
+            precise_wait_until(
+                start_ns + duration_ns * i // steps,
+                spin_tail_ns=0,
+            )
+        if hold is not None and hold > 0:
+            precise_wait(float(hold))
+    finally:
+        # 异常也不能把目标窗口留在鼠标按下状态。
+        _user32.PostMessageW(target, _WM_LBUTTONUP, 0, make_lparam(x2, y2))
 
 
 # ─── 窗口枚举 ─────────────────────────────────────────────────

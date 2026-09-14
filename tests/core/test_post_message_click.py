@@ -21,7 +21,7 @@ def test_backend_forwards_hold_to_postmessage(monkeypatch):
     monkeypatch.setattr(post_module, "postmessage_click", send)
     monkeypatch.setattr(
         post_module, "screen_to_client_logical", lambda _hwnd, x, y: (x, y))
-    monkeypatch.setattr(post_module.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(post_module, "precise_wait", lambda _s: True)
 
     backend.click_screen(10, 20, hold=1.4)
 
@@ -35,7 +35,9 @@ def test_win32_postmessage_holds_between_down_and_up(monkeypatch):
     monkeypatch.setattr(
         win32_util, "resolve_message_target", lambda hwnd, _x, _y: hwnd)
     monkeypatch.setattr(win32_util, "make_lparam", lambda _x, _y: 99)
-    monkeypatch.setattr("time.sleep", sleeps.append)
+    monkeypatch.setattr(
+        win32_util, "precise_wait",
+        lambda seconds: sleeps.append(seconds) or True)
 
     win32_util.postmessage_click(123, 10, 20, hold=1.4)
 

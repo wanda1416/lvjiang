@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import math
 import random
-import time
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -21,6 +20,7 @@ if TYPE_CHECKING:
 
 from ...core.coord_types import CircleCoordRef, CoordRef, RectCoordRef
 from ...core.key_names import normalize_key
+from ...core.timing import precise_wait
 from ...i18n import tr
 from ..grammar import (
     Click,
@@ -42,7 +42,6 @@ from ..grammar import (
 )
 from ..grammar.ast_nodes import PressMode, TupleLiteral
 from ..runtime_layout import require_enabled, resolve_subscene_entity
-from ..timing import precise_wait
 from .signals import WorkflowUserError
 
 # FoundRegion 延迟导入，避免循环依赖
@@ -824,7 +823,7 @@ class _ActionsMixin:
                 try:
                     # down/up 之间留短暂随机间隔，确保 Windows/目标应用识别为
                     # 一次有效按键（零间隔时部分应用会忽略，认为从未真正按下）
-                    time.sleep(random.uniform(0.025, 0.035))
+                    precise_wait(random.uniform(0.025, 0.035))
                 finally:
                     up_all(pressed)
 

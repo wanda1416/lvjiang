@@ -23,7 +23,7 @@ def _make_backend(monkeypatch):
     monkeypatch.setattr(backend, "_activate_target", MagicMock())
     monkeypatch.setattr(backend, "_move_to", MagicMock())
     monkeypatch.setattr(send_input_module, "_user32", MagicMock())
-    monkeypatch.setattr(send_input_module.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(send_input_module, "precise_wait", lambda _s: True)
     events = []
     monkeypatch.setattr(
         send_input_module, "send_mouse_event",
@@ -56,7 +56,9 @@ def test_click_screen_right_button(monkeypatch):
 def test_click_screen_holds_selected_button_before_release(monkeypatch):
     backend, events = _make_backend(monkeypatch)
     sleeps = []
-    monkeypatch.setattr(send_input_module.time, "sleep", sleeps.append)
+    monkeypatch.setattr(
+        send_input_module, "precise_wait",
+        lambda seconds: sleeps.append(seconds) or True)
 
     backend.click_screen(10, 10, "test", button="right", hold=1.4)
 

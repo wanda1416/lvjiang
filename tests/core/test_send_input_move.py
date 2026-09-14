@@ -56,13 +56,34 @@ def test_relative_steps_preserve_exact_requested_vector(monkeypatch):
         "send_mouse_event",
         lambda _flags, dx, dy: events.append((dx, dy)),
     )
-    monkeypatch.setattr(send_input_module.time, "sleep", lambda _delay: None)
+    monkeypatch.setattr(
+        send_input_module, "precise_wait_until", lambda *_a, **_k: True)
 
     backend._send_relative_steps(17, -9, 0.04)
 
     assert len(events) == 4
     assert sum(dx for dx, _ in events) == 17
     assert sum(dy for _, dy in events) == -9
+
+
+def test_drag_duration_only_applies_to_pressed_movement(monkeypatch):
+    backend = SendInputInput()
+    monkeypatch.setattr(backend, "_activate_target", MagicMock())
+    monkeypatch.setattr(backend, "_move_to", MagicMock())
+    monkeypatch.setattr(send_input_module, "precise_wait", lambda _s: True)
+    moves = MagicMock()
+    monkeypatch.setattr(send_input_module, "smooth_move_to", moves)
+    monkeypatch.setattr(send_input_module, "send_mouse_event", MagicMock())
+
+    backend.drag_screen(
+        10, 20, 30, 40,
+        duration=0.25,
+        pre_delay=(0, 0),
+        post_delay=(0, 0),
+    )
+
+    backend._move_to.assert_called_once_with(10, 20)
+    moves.assert_called_once_with(30, 40, 0.25)
 
 
 def test_trace_replay_preserves_order_and_scaled_cumulative_path(monkeypatch):

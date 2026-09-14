@@ -1,6 +1,6 @@
 """Tests for the shared high-precision workflow wait primitive."""
 
-from lvjiang.workflows.timing import precise_wait
+from lvjiang.core.timing import precise_wait, precise_wait_until
 
 
 class _FakeTimer:
@@ -66,3 +66,16 @@ def test_precise_wait_checks_pause_and_can_stop_early():
 def test_precise_wait_zero_duration_still_honours_stop():
     assert not precise_wait(0, stop_check=lambda: True)
 
+
+def test_precise_wait_until_can_disable_spin_for_dense_timelines():
+    timer = _FakeTimer(clock_step_ns=10_000)
+
+    assert precise_wait_until(
+        3_000_000,
+        spin_tail_ns=0,
+        _clock_ns=timer.clock_ns,
+        _sleep=timer.sleep,
+    )
+
+    assert timer.sleeps
+    assert timer.now_ns >= 3_000_000

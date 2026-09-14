@@ -146,9 +146,10 @@ def test_scan_unequipped_uses_window_protocol_and_correct_detail_scenes():
     assert "bag_cursor_visit($fp)" in text
     assert "bag_cursor_finish_window($rows, $rows)" in text
     assert 'panel_rows("bag_equip_detail", "bag_grid")' in text
-    assert 'call scan_slot_bag("ring", "ring", "weapon", $min_level)' in text
+    assert ('call scan_slot_bag("ring", "ring", "weapon", $min_level, '
+            '$min_affix_count)') in text
     assert ('call scan_slot_bag("pendant", "pendant", "weapon", '
-            '$min_level)') in text
+            '$min_level, $min_affix_count)') in text
     assert "bag_cursor_next" not in text
 
 
@@ -204,8 +205,35 @@ def test_min_level_is_explicit_proc_parameter():
     root = Path(__file__).resolve().parents[2]
     text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
-    assert "def scan_slot_bag($slot, $group, $detail_kind, $min_level)" in text
+    assert ("def scan_slot_bag($slot, $group, $detail_kind, $min_level, "
+            "$min_affix_count)") in text
     calls = [line.strip() for line in text.splitlines()
              if line.strip().startswith("call scan_slot_bag(")]
     assert len(calls) == 7
-    assert all(line.endswith(", $min_level)") for line in calls)
+    assert all(line.endswith(", $min_level, $min_affix_count)") for line in calls)
+
+
+def test_min_affix_count_filters_only_persistence_not_scan_dedup():
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
+        encoding="utf-8")
+
+    assert "default $min_affix_count = 0" in text
+    assert text.count(
+        "$equip._extra.affix_count >= $min_affix_count") == 2
+    assert text.count("eval $filtered_count = $filtered_count + 1") == 2
+
+    # 两个入库分支都必须先登记指纹。即使被过滤，装备仍参与空格残影判断，
+    # 不能因为“不写入”破坏遍历的去重与终止协议。
+    offsets = []
+    start = 0
+    while True:
+        write_at = text.find("eval write_bag_item($group, $equip)", start)
+        if write_at < 0:
+            break
+        offsets.append(write_at)
+        seen_at = text.rfind("eval $items.$fp = $equip", 0, write_at)
+        condition_at = text.rfind("if $min_affix_count <= 0", 0, write_at)
+        assert seen_at < condition_at < write_at
+        start = write_at + 1
+    assert len(offsets) == 2

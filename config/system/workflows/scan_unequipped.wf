@@ -26,6 +26,12 @@
 #%     label: 装备最小等级
 #%     type: number
 #%     default: 110
+#%   - name: min_affix_count
+#%     label: 最少词条数
+#%     type: number
+#%     default: 0
+#%     min: 0
+#%     max: 5
 
 # 对应槽位背包装备全量扫描。
 # 主副武器共用武器背包，只通过 main_weapon 扫描一次；环、佩使用
@@ -34,8 +40,11 @@
 # 公共装备池的装备 key。已读行只读第一列锚点，不再重复
 # 点击和 OCR 第 2～6 列。背包装备按等级倒序排列，首次读到低于
 # min_level 的装备后立即结束当前槽位扫描。
+# min_affix_count=0 表示不过滤；1～5 表示词条不足的装备仍参与扫描去重，
+# 但不写入装备库。定音不计入普通词条数量。
 
 default $min_level = 110
+default $min_affix_count = 0
 
 import "subcall/navigation.wf"
 import "subcall/equipment_scan.wf"
@@ -46,25 +55,25 @@ if $nav_result < 0
 end
 
 if $slots.weapon
-    call scan_slot_bag("main_weapon", "weapon", "weapon", $min_level)
+    call scan_slot_bag("main_weapon", "weapon", "weapon", $min_level, $min_affix_count)
 end
 if $slots.ring
-    call scan_slot_bag("ring", "ring", "weapon", $min_level)
+    call scan_slot_bag("ring", "ring", "weapon", $min_level, $min_affix_count)
 end
 if $slots.pendant
-    call scan_slot_bag("pendant", "pendant", "weapon", $min_level)
+    call scan_slot_bag("pendant", "pendant", "weapon", $min_level, $min_affix_count)
 end
 if $slots.head
-    call scan_slot_bag("head", "head", "armor", $min_level)
+    call scan_slot_bag("head", "head", "armor", $min_level, $min_affix_count)
 end
 if $slots.chest
-    call scan_slot_bag("chest", "chest", "armor", $min_level)
+    call scan_slot_bag("chest", "chest", "armor", $min_level, $min_affix_count)
 end
 if $slots.leg
-    call scan_slot_bag("leg", "leg", "armor", $min_level)
+    call scan_slot_bag("leg", "leg", "armor", $min_level, $min_affix_count)
 end
 if $slots.wrist
-    call scan_slot_bag("wrist", "wrist", "armor", $min_level)
+    call scan_slot_bag("wrist", "wrist", "armor", $min_level, $min_affix_count)
 end
 
 call $nav_result = nav_back_to_main()
@@ -73,14 +82,15 @@ if $nav_result < 0
 end
 
 
-def scan_slot_bag($slot, $group, $detail_kind, $min_level)
-    log "═══ 开始扫描部位: " + $group + " (detail=" + $detail_kind + ", min_level=" + $min_level + ") ═══"
+def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
+    log "═══ 开始扫描部位: " + $group + " (detail=" + $detail_kind + ", min_level=" + $min_level + ", min_affix_count=" + $min_affix_count + ") ═══"
     # 点击穿戴槽位会把右侧背包过滤到对应部位并回到该列表顶部。
     click [bag_equip_detail].$slot after wait @step_interval
     eval bag_cursor_init()
     eval $items = {}
     eval $signal = ""
     eval $total_count = 0
+    eval $filtered_count = 0
     eval $window_idx = 0
     call $slot_equip = scan_cell($detail_kind)
     eval $slot_type = $slot_equip.type
@@ -130,8 +140,13 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
                     end
                 else
                     eval $items.$fp = $equip
-                    eval write_bag_item($group, $equip)
-                    eval $total_count = $total_count + 1
+                    if $min_affix_count <= 0 or $equip._extra.affix_count >= $min_affix_count
+                        eval write_bag_item($group, $equip)
+                        eval $total_count = $total_count + 1
+                    else
+                        eval $filtered_count = $filtered_count + 1
+                        log "  [" + $r + ",1] 词条 " + $equip._extra.affix_count + " < " + $min_affix_count + "，不写入"
+                    end
 
                     eval $c = 2
                     loop while $c <= $cols
@@ -167,8 +182,13 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
                             end
                         end
                         eval $items.$fp = $equip
-                        eval write_bag_item($group, $equip)
-                        eval $total_count = $total_count + 1
+                        if $min_affix_count <= 0 or $equip._extra.affix_count >= $min_affix_count
+                            eval write_bag_item($group, $equip)
+                            eval $total_count = $total_count + 1
+                        else
+                            eval $filtered_count = $filtered_count + 1
+                            log "    [" + $r + "," + $c + "] 词条 " + $equip._extra.affix_count + " < " + $min_affix_count + "，不写入"
+                        end
                         eval $c = $c + 1
                     end
                 end
@@ -195,7 +215,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level)
         wait stable @scroll_settle
     end
 
-    log "═══ 部位 " + $group + " 扫描完成，共 " + $total_count + " 件 ═══"
+    log "═══ 部位 " + $group + " 扫描完成，写入 " + $total_count + " 件，过滤 " + $filtered_count + " 件 ═══"
 end
 
 # 扫描当前格子并解析装备，返回装备字典

@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QStatusBar,
@@ -700,6 +701,33 @@ class SceneEditorDialog(
             layout_name = self._current_layout.name
             current_tab = self._tabs.get(scene_key)
             view = current_tab.current_view if current_tab else ""
+            current_image = load_scene_screenshot(layout_name, scene_key, view)
+            if (
+                current_image is not None
+                and current_image.shape[:2] != new_image.shape[:2]
+            ):
+                old_height, old_width = current_image.shape[:2]
+                new_height, new_width = new_image.shape[:2]
+                reply = QMessageBox.question(
+                    self,
+                    tr("截图尺寸不匹配"),
+                    tr(
+                        "当前截图大小不匹配，是否确认截图？\n\n"
+                        "当前截图：{old_width} × {old_height}\n"
+                        "新截图：{new_width} × {new_height}"
+                    ).format(
+                        old_width=old_width,
+                        old_height=old_height,
+                        new_width=new_width,
+                        new_height=new_height,
+                    ),
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if reply != QMessageBox.StandardButton.Yes:
+                    self._status_bar.showMessage(tr("已取消刷新截图"))
+                    return
             save_scene_screenshot(layout_name, scene_key, new_image, view)
             self._img_cache[(layout_name, scene_key, view)] = new_image
             self._loaded_scenes.add(scene_key)

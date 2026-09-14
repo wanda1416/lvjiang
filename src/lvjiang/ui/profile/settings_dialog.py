@@ -171,7 +171,9 @@ class _SyncTargetsWidget(QWidget):
 
         # 倍率
         ratio_spin = QDoubleSpinBox()
-        ratio_spin.setRange(-999.0, 999.0)
+        # 数据模型和同步引擎都允许任意负数/小数倍率，这里不应
+        # 额外用 UI 的人为上限截断如 -3000 这样的合法配置。
+        ratio_spin.setRange(float("-inf"), float("inf"))
         ratio_spin.setDecimals(2)
         ratio_spin.setSingleStep(0.5)
         ratio_spin.setValue(target.ratio if target else 1.0)
@@ -330,8 +332,16 @@ class _TagInputWidget(QFrame):
 class _AmountTagInputWidget(_TagInputWidget):
     """一行内可录入多个正整数快捷数量。"""
 
+    _COMPACT_HEIGHT = 36
+
     def __init__(self, amounts: list[int], parent=None) -> None:
         super().__init__([str(amount) for amount in amounts if amount > 0], parent)
+        # 普通词条输入框独占表单行，52px 的高度合理；快捷数量
+        # 却是嵌在表格单元格内，复用该高度会把每条规则撑到近两行。
+        self.setFixedHeight(self._COMPACT_HEIGHT)
+        self._row.setContentsMargins(4, 1, 4, 1)
+        # 数量较多时仍可横向滚动；窄滚动条避免在紧凑行内挤压输入框。
+        self._scroll.setStyleSheet("QScrollBar:horizontal { height: 7px; }")
         self._input.setValidator(QIntValidator(1, 999999, self._input))
         self._input.setMinimumWidth(170)
 

@@ -26,9 +26,45 @@ LOCK_REASON_PLAN = "plan"
 # 方案下拉的「不使用方案」项，userData 为空串。
 PLAN_CUSTOM_LABEL = tr("- 自定义 -")
 
-# automation_state_changed 的第四态：已连接，但当前方案不支持这种连接模式。
-# 订阅方必须显式处理——它们的 else 分支都会把未知状态当成「就绪」。
+# automation_state_changed 的非常规状态。订阅方必须显式处理——
+# 它们的 else 分支都会把未知状态当成「就绪」。
 STATE_PLAN_UNSUPPORTED = "plan_unsupported"
+STATE_PAUSING = "pausing"
+STATE_STOPPING = "stopping"
+
+
+class _AcknowledgedPauseEvent(threading.Event):
+    """首次被工作线程观察为 clear 时通知 UI 已到达暂停临界点。"""
+
+    def __init__(self, acknowledged: Callable[[], None]):
+        super().__init__()
+        self._acknowledged = acknowledged
+        self._ack_lock = threading.Lock()
+        self._ack_sent = False
+
+    def clear(self) -> None:
+        with self._ack_lock:
+            self._ack_sent = False
+        super().clear()
+
+    def _ack_if_paused(self) -> None:
+        if super().is_set():
+            return
+        with self._ack_lock:
+            if self._ack_sent:
+                return
+            self._ack_sent = True
+        self._acknowledged()
+
+    def is_set(self) -> bool:
+        value = super().is_set()
+        if not value:
+            self._ack_if_paused()
+        return value
+
+    def wait(self, timeout: float | None = None) -> bool:
+        self._ack_if_paused()
+        return super().wait(timeout)
 
 def _to_serializable(obj):
     """将包含 to_dict() 对象的列表/字典转为可 JSON 序列化的结构"""
@@ -356,7 +392,7 @@ class RunControlMixin:
     _param_panel = None         # 参数面板（MainWindow._setup_ui 构建）
     _left_tabs = None           # 左侧页签（MainWindow._setup_ui 构建）
     _batch_tab = None           # 批量执行 Tab（MainWindow._build_left_tabs 构建）
-    _run_state = "idle"         # 运行状态：idle / running / paused
+    _run_state = "idle"         # idle / running / pausing / paused / stopping
     _pause_event: threading.Event | None = None  # 暂停事件：set=运行，clear=暂停阻塞
     _stop_confirm_pending = False  # 异步停止确认期间防止重复请求及暂停热键抢跑
     _stop_confirmation_dialog: Any = None
@@ -803,7 +839,9 @@ class RunControlMixin:
         self._stop_requested = False
         self._run_state = "running"
         # 暂停事件：set=运行，clear=暂停阻塞
-        self._pause_event = threading.Event()
+        signal = getattr(self, "_pause_acknowledged", None)
+        notify = signal.emit if signal is not None else self._on_pause_acknowledged
+        self._pause_event = _AcknowledgedPauseEvent(notify)
         self._pause_event.set()  # 初始为运行状态
         self._refresh_run_button()
         self._refresh_pause_button()
@@ -931,23 +969,30 @@ class RunControlMixin:
         return callback
 
     def _request_stop(self, *, stop_confirmed: bool = False):
-        """统一停止入口（F10 / 结束按钮）。只设标志，不立即改 running。"""
+        """统一停止入口：立即进入结束中，再等工作线程收尾。"""
         # 暂停中点结束先二次确认：暂停/结束热键位置接近，容易手误
         if self._run_state == 'paused' and not stop_confirmed:
             self._confirm_stop_while_paused()
             return
-        self.log_text.append(tr("[操作] 收到停止请求"))
-        logger.info("收到停止请求")
         if not self._running:
             self.log_text.append(tr("[提示] 当前没有正在运行的自动化"))
             return
+        if self._run_state == STATE_STOPPING:
+            return
+        was_paused = self._run_state in ('paused', STATE_PAUSING)
+        self._stop_requested = True
+        self._run_state = STATE_STOPPING
+        # 先刷按钮再做日志、唤醒和对话框收尾，避免日志控件重排等
+        # 工作让用户产生「没点到」的感觉。
+        self._refresh_run_button()
+        self._refresh_pause_button()
         # 若处于暂停状态，唤醒工作流线程以便响应停止
-        if self._run_state == 'paused':
+        if was_paused:
             pause_event = getattr(self, '_pause_event', None)
             if pause_event is not None:
                 pause_event.set()
-            self._run_state = 'running'  # 避免停止窗口期内暂停热键误恢复
-        self._stop_requested = True
+        self.log_text.append(tr("[操作] 收到停止请求"))
+        logger.info("收到停止请求")
         # 若工作流正阻塞在交互对话框上，主动关闭以便停止生效
         helper = self._ui_helper
         if helper is not None:
@@ -1019,21 +1064,33 @@ class RunControlMixin:
         """暂停执行：阻塞工作流线程，保留调用栈"""
         if getattr(self, '_run_state', 'idle') != 'running':
             return
-        self._run_state = 'paused'
+        self._run_state = STATE_PAUSING
         pause_event = getattr(self, '_pause_event', None)
         if pause_event is not None:
             pause_event.clear()  # 阻塞工作流线程
         self._refresh_pause_button()
-        self._refresh_run_button()  # 广播 "paused" 状态给插件 Tab
-        # 请求已发出，但工作流线程可能仍在执行一个不可中断的原子操作
-        # （如调律重置二次确认），未必已经真正阻塞，故用「暂停中」而非
-        # 「已暂停」这种确定性措辞。
+        self._refresh_run_button()  # 广播 "pausing" 状态给其他入口
+        # 请求已发出，但要等工作线程第一次观察到 clear，才进入 paused。
         hk = self._user_config.hotkeys
         paused_status = self._hotkey_status(
             tr("暂停中..."), (hk.pause, tr("恢复")), (hk.stop, tr("结束")))
         self.log_text.append(f"{tr('[操作] ')}{paused_status}")
         self.statusBar().showMessage(paused_status)
         logger.info("工作流暂停中")
+
+    def _on_pause_acknowledged(self) -> None:
+        """主线程槽：工作流已走到暂停检查点，正式进入 paused。"""
+        if getattr(self, '_run_state', 'idle') != STATE_PAUSING:
+            return
+        self._run_state = 'paused'
+        self._refresh_pause_button()
+        self._refresh_run_button()
+        hk = self._user_config.hotkeys
+        paused_status = self._hotkey_status(
+            tr("已暂停"), (hk.pause, tr("恢复")), (hk.stop, tr("结束")))
+        self.log_text.append(f"{tr('[操作] ')}{paused_status}")
+        self.statusBar().showMessage(paused_status)
+        logger.info("工作流已暂停")
 
     def _resume_execution(self):
         """恢复执行：唤醒工作流线程，从暂停点继续"""
@@ -1063,6 +1120,12 @@ class RunControlMixin:
             btn.setEnabled(True)
             btn.setStyleSheet(
                 "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+            )
+        elif run_state == STATE_PAUSING:
+            btn.setText(tr("暂停中"))
+            btn.setEnabled(False)
+            btn.setStyleSheet(
+                "background-color: #FFB74D; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         elif run_state == 'paused':
             btn.setText(self._hotkey_label(tr("恢复"), hk.pause))
@@ -1459,14 +1522,23 @@ class RunControlMixin:
         """根据运行状态和定位状态刷新运行按钮，并广播状态给插件页面。"""
         run_state = getattr(self, '_run_state', 'idle')
         hk = self._user_config.hotkeys
-        if self._running:
+        if run_state == STATE_STOPPING:
+            state = STATE_STOPPING
+            self.btn_run_workflow.setText(tr("结束中"))
+            self.btn_run_workflow.setEnabled(False)
+            self.btn_run_workflow.setStyleSheet(
+                "background-color: #ef9a9a; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
+            )
+        elif self._running:
             state = run_state  # running 或 paused
+            self.btn_run_workflow.setEnabled(True)
             self.btn_run_workflow.setText(self._hotkey_label(tr("结束"), hk.stop))
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         elif not self._backend_ready():
             state = "not_ready"
+            self.btn_run_workflow.setEnabled(True)
             label = tr("未连接") if self._backend == "adb" else tr("未定位")
             self.btn_run_workflow.setText(label)
             self.btn_run_workflow.setStyleSheet(
@@ -1476,12 +1548,14 @@ class RunControlMixin:
             # 只置灰不 setEnabled(False)：禁用的控件收不到鼠标事件，点了就
             # 没有任何反馈，也就没法在左下角说明原因。
             state = STATE_PLAN_UNSUPPORTED
+            self.btn_run_workflow.setEnabled(True)
             self.btn_run_workflow.setText(tr("方案不支持"))
             self.btn_run_workflow.setStyleSheet(
                 "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
             )
         else:
             state = "idle"
+            self.btn_run_workflow.setEnabled(True)
             self.btn_run_workflow.setText(self._hotkey_label(
                 tr("开始执行"), hk.start))
             self.btn_run_workflow.setStyleSheet(

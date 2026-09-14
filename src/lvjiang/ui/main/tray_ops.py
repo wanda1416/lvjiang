@@ -20,6 +20,8 @@ from ...i18n import tr
 _TRAY_ICON_COLORS = {
     "idle": "#4CAF50",
     "running": "#f44336",
+    "stopping": "#ef9a9a",
+    "pausing": "#FFB74D",
     "paused": "#FFC107",
 }
 
@@ -41,11 +43,11 @@ def _make_tray_icon(state: str) -> QIcon:
     painter.drawRoundedRect(rect, 14, 14)
     painter.setBrush(QColor("white"))
     cx, cy = rect.center().x(), rect.center().y()
-    if state == "paused":
+    if state in ("pausing", "paused"):
         bar_w, bar_h, gap = 8, 26, 8
         painter.drawRoundedRect(cx - gap - bar_w, cy - bar_h // 2, bar_w, bar_h, 2, 2)
         painter.drawRoundedRect(cx + gap, cy - bar_h // 2, bar_w, bar_h, 2, 2)
-    elif state != "running":  # idle / not_ready：统一显示"运行前"播放三角
+    elif state not in ("running", "stopping"):  # 运行前统一显示播放三角
         triangle = QPolygonF([
             QPointF(cx - 10, cy - 14),
             QPointF(cx - 10, cy + 14),
@@ -112,20 +114,33 @@ class TrayOpsMixin:
         """随 automation_state_changed 广播刷新托盘图标/菜单可用性。"""
         if self._tray_icon is None:
             return
-        icon_state = state if state in ("running", "paused") else "idle"
+        from .run_control import (
+            STATE_PAUSING,
+            STATE_PLAN_UNSUPPORTED,
+            STATE_STOPPING,
+        )
+        active_states = ("running", STATE_PAUSING, "paused", STATE_STOPPING)
+        icon_state = state if state in active_states else "idle"
         self._tray_icon.setIcon(_make_tray_icon(icon_state))
-        from .run_control import STATE_PLAN_UNSUPPORTED
         status_text = {
             "running": tr("运行中"),
+            STATE_PAUSING: tr("暂停中"),
             "paused": tr("已暂停"),
+            STATE_STOPPING: tr("结束中"),
             "not_ready": tr("未就绪"),
             STATE_PLAN_UNSUPPORTED: tr("方案不支持"),
         }.get(state, tr("空闲"))
         self._tray_icon.setToolTip(f"{self.windowTitle()} - {status_text}")
-        running_or_paused = state in ("running", "paused")
         # 方案不支持时托盘的「开始」也得灰掉，否则等于给灰按钮开了后门。
         self._tray_action_start.setEnabled(
-            not running_or_paused and state != STATE_PLAN_UNSUPPORTED)
-        self._tray_action_pause.setEnabled(running_or_paused)
-        self._tray_action_pause.setText(tr("恢复") if state == "paused" else tr("暂停"))
-        self._tray_action_stop.setEnabled(running_or_paused)
+            state not in active_states and state != STATE_PLAN_UNSUPPORTED)
+        self._tray_action_pause.setEnabled(state in ("running", "paused"))
+        if state == STATE_PAUSING:
+            self._tray_action_pause.setText(tr("暂停中"))
+        else:
+            self._tray_action_pause.setText(
+                tr("恢复") if state == "paused" else tr("暂停"))
+        self._tray_action_stop.setText(
+            tr("结束中") if state == STATE_STOPPING else tr("结束"))
+        self._tray_action_stop.setEnabled(
+            state in ("running", STATE_PAUSING, "paused"))

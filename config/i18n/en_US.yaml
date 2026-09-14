@@ -1095,7 +1095,20 @@ auto_strings:
   : 'Recorded output appears here (canvas-normalized coordinates, savable as .wf)
 
     Low precision produces editable commands; high precision saves a raw input trace,'
+  ? '录制结果将显示在这里（画布归一化坐标）
+
+    停止录制后将自动插入当前脚本'
+  : 'Recorded output appears here (canvas-normalized coordinates)
+
+    The result is inserted into the current script when recording stops'
+  录制结果将显示在这里（画布归一化坐标，可保存为 .wf）: Recorded output appears here (canvas-normalized coordinates, savable as .wf)
   录制鼠标移动: Record Mouse Movement
+  录制精度：: 'Recording precision:'
+  低精度: Low precision
+  高精度: High precision
+  生成可读、可直接编辑的 WF DSL。录制停止时会合并能够安全合并的按键按下、按住、释放和后续等待；连续鼠标移动及短等待按约 100ms 粒度归并。适合普通界面操作和后续手工调整，不适合要求逐个原始输入事件精确回放的游戏视角。: Generates readable, directly editable WF DSL. On stop, safely mergeable key-down, hold, key-up, and following-wait events are combined; continuous mouse movement and short waits are grouped at roughly 100 ms granularity. Best for ordinary UI automation and later manual editing, not for game-camera input requiring event-level replay fidelity.
+  记录键盘、鼠标按钮、滚轮以及可选鼠标移动的原始时间线。保存脚本时会同时生成 workflows/lvtrace 下的配套轨迹文件，回放时序更接近录制过程，适合游戏视角等高时序场景。脚本依赖配套轨迹文件，不能只复制 WF 文本进行迁移。: Records the raw timeline of keyboard input, mouse buttons, wheel events, and optional pointer movement. Saving also creates a companion trace under workflows/lvtrace for timing closer to the original recording. This is suitable for timing-sensitive game-camera actions; the WF text cannot be moved without its companion trace file.
+  开启后记录鼠标移动轨迹；关闭时只忽略单纯移动，点击、按住、拖拽和滚轮仍会正常录制。普通界面通常无需开启；需要还原游戏视角转动或其他连续移动时再开启。: When enabled, pointer movement is recorded. When disabled, only standalone movement is ignored; clicks, holds, drags, and wheel events are still captured. It is usually unnecessary for ordinary UI actions, but should be enabled for game-camera rotation or other continuous movement.
   形如 [scene].[region]: 'Format: [scene].[region]'
   形如 [scene].[region]，留空全画布: 'Format: [scene].[region]; leave empty for the full canvas'
   待执行: Pending

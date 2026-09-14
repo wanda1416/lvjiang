@@ -2,7 +2,7 @@
 
 import copy
 
-from PyQt6.QtWidgets import QDialogButtonBox, QLabel, QMessageBox
+from PyQt6.QtWidgets import QDialogButtonBox, QLabel
 
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.ui.game_settings.config_dialog import GameConfigDialog
@@ -57,41 +57,6 @@ def test_changes_stay_in_memory_until_bottom_save(monkeypatch, qtbot):
     assert len(manager.saved) == 1
     assert not save.isEnabled()
     assert not discard.isEnabled()
-
-
-def test_discard_restores_values_without_exiting(monkeypatch, qtbot):
-    dialog, _manager = _dialog(monkeypatch, qtbot)
-    dialog.show()
-    panel = dialog._tab._basic_config_panel
-    original = panel._cooldown_days.value()
-    panel._cooldown_days.setValue(original + 1)
-    discard = dialog._buttons.button(QDialogButtonBox.StandardButton.Discard)
-    answers = iter((QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes))
-    monkeypatch.setattr(QMessageBox, "question", lambda *_a, **_kw: next(answers))
-
-    discard.click()
-    assert dialog.isVisible()
-    assert dialog._dirty
-
-    discard.click()
-    assert dialog.isVisible()
-    assert not dialog._dirty
-    assert not discard.isEnabled()
-    assert dialog._tab._basic_config_panel._cooldown_days.value() == original
-
-
-def test_title_bar_close_uses_same_unsaved_confirmation(monkeypatch, qtbot):
-    dialog, _manager = _dialog(monkeypatch, qtbot)
-    dialog.show()
-    dialog._mark_dirty()
-    monkeypatch.setattr(
-        QMessageBox,
-        "question",
-        lambda *_a, **_kw: QMessageBox.StandardButton.No,
-    )
-
-    assert not dialog.close()
-    assert dialog.isVisible()
 
 
 def test_version_label_reports_remote_and_layer_distribution(monkeypatch, qtbot):

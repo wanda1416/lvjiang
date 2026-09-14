@@ -1,6 +1,6 @@
 """脚本配置对话框 - 管理日常页暴露哪些脚本、顺序、显示名、脚本性质
 
-从「工具 → 脚本配置」打开。
+作为「工具 → 脚本编辑」工作台中的配置页使用；独立对话框外壳仅供兼容。
 
 脚本本体（.wf 文件 + 内置类实现）由发现层 ``discover_scripts()`` 自动扫描，
 本对话框只负责「暴露」：勾选是否在日常下拉展示、调整顺序、覆盖显示名、
@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 from loguru import logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -55,9 +55,16 @@ class ScriptConfigDialog(QDialog):
     SCOPE_LABELS = {"daily": tr("日常"), "dedicated": tr("专用")}
     REMOTE_PREFIX = "[远程] "
 
-    def __init__(self, main_window):
+    preferences_saved = pyqtSignal()
+
+    def __init__(self, main_window, *, embedded: bool = False):
         super().__init__(main_window)
         self._main = main_window
+        self._embedded = embedded
+        self._loading = False
+        self._dirty = False
+        if embedded:
+            self.setWindowFlags(Qt.WindowType.Widget)
         self.setWindowTitle(tr("脚本配置"))
         self.setMinimumSize(640, 480)
         # id -> 发现层原始显示名（用于判断是否需要写 overrides）
@@ -104,8 +111,8 @@ class ScriptConfigDialog(QDialog):
         btn_bar.addStretch()
         self._btn_save = QPushButton(tr("保存"))
         self._btn_save.clicked.connect(self._on_save)
-        self._btn_cancel = QPushButton(tr("取消"))
-        self._btn_cancel.clicked.connect(self.reject)
+        self._btn_cancel = QPushButton(tr("撤销") if self._embedded else tr("取消"))
+        self._btn_cancel.clicked.connect(self._on_undo if self._embedded else self.reject)
         apply_button_style(self._btn_save)
         apply_button_style(
             self._btn_up,
@@ -116,9 +123,12 @@ class ScriptConfigDialog(QDialog):
         btn_bar.addWidget(self._btn_save)
         btn_bar.addWidget(self._btn_cancel)
         layout.addLayout(btn_bar)
+        self._table.itemChanged.connect(self._mark_dirty)
+        self._refresh_buttons()
 
     # ─── 数据加载 ────────────────────────────────────────
     def _load(self):
+        self._loading = True
         scripts = {s["id"]: s for s in discover_scripts()}
         self._scripts = scripts
         self._base_names = {sid: s["name"] for sid, s in scripts.items()}
@@ -142,6 +152,9 @@ class ScriptConfigDialog(QDialog):
                 row, cfg, checked=checked,
                 display=prefs.names.get(sid) or cfg["name"],
                 scope=scope)
+        self._loading = False
+        self._dirty = False
+        self._refresh_buttons()
 
     def _fill_row(self, row: int, script: dict, checked: bool, display: str,
                   scope: str = "daily"):
@@ -174,6 +187,7 @@ class ScriptConfigDialog(QDialog):
                 else Qt.CheckState.Unchecked
             )
         )
+        scope_combo.currentIndexChanged.connect(self._mark_dirty)
         self._table.setCellWidget(row, self.COL_SCOPE, scope_combo)
 
         if script.get("wf_file"):
@@ -205,6 +219,24 @@ class ScriptConfigDialog(QDialog):
         # 逐行取出各列内容重建，交换 row 与 target
         self._swap_rows(row, target)
         self._table.setCurrentCell(target, self.COL_NAME)
+        self._mark_dirty()
+
+    def _mark_dirty(self, *_args) -> None:
+        if self._loading:
+            return
+        self._dirty = True
+        self._refresh_buttons()
+
+    def _refresh_buttons(self) -> None:
+        if not hasattr(self, "_btn_save"):
+            return
+        if self._embedded:
+            self._btn_save.setEnabled(self._dirty)
+            self._btn_cancel.setEnabled(self._dirty)
+
+    def _on_undo(self) -> None:
+        if self._dirty:
+            self._load()
 
     def _swap_rows(self, a: int, b: int):
         # QTableWidget 拥有 setCellWidget() 放入的控件。不能把现有 QComboBox
@@ -286,4 +318,12 @@ class ScriptConfigDialog(QDialog):
         logger.info(
             f"日常脚本偏好已保存：{len(order)} 项，"
             f"可见性覆盖 {len(visible)}，改名 {len(names)}，性质覆盖 {len(scopes)}")
-        self.accept()
+        self._dirty = False
+        self._refresh_buttons()
+        self.preferences_saved.emit()
+        if not self._embedded:
+            self.accept()
+
+    @property
+    def dirty(self) -> bool:
+        return self._dirty

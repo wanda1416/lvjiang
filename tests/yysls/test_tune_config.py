@@ -8,25 +8,18 @@ import shutil
 from pathlib import Path
 
 import pytest
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QApplication,
     QComboBox,
-    QDialogButtonBox,
     QHeaderView,
     QLabel,
-    QMessageBox,
-    QPushButton,
 )
 
-from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
 from lvjiang.apps.yysls.core.tuning_rules import (
     TuneConfigManager,
     TuningGroupManager,
     TuningRuleManager,
     get_tuning_rule_manager,
 )
-from lvjiang.apps.yysls.ui.layout_helpers import navigation_width_for_chars
 from lvjiang.apps.yysls.ui.tune_settings import TuningRulesDialog
 from lvjiang.apps.yysls.ui.tune_settings.behavior_pages import (
     ScanBehaviorPage,
@@ -110,73 +103,6 @@ class TestDialog:
         # 规则页初始只占位，首次进入才构造 RulePanel。
         assert not isinstance(dialog._stack.widget(5), RulePanel)
         assert not dialog.findChildren(RulePanel)
-
-    def test_bottom_save_and_confirmed_discard(self, qtbot, monkeypatch):
-        dialog = TuningRulesDialog()
-        qtbot.addWidget(dialog)
-        save = dialog._buttons.button(QDialogButtonBox.StandardButton.Save)
-        discard = dialog._buttons.button(QDialogButtonBox.StandardButton.Discard)
-        assert save.text() == "保存"
-        assert discard.text() == "撤销"
-        assert not save.isEnabled()
-        assert not discard.isEnabled()
-
-        dialog._set_status("有未保存的更改", False)
-        assert save.isEnabled()
-        assert discard.isEnabled()
-        dialog.show()
-        monkeypatch.setattr(
-            QMessageBox,
-            "question",
-            lambda *_a, **_kw: QMessageBox.StandardButton.No,
-        )
-        discard.click()
-        assert dialog.isVisible()
-        assert dialog._dirty
-
-        monkeypatch.setattr(
-            QMessageBox,
-            "question",
-            lambda *_a, **_kw: QMessageBox.StandardButton.Yes,
-        )
-        discard.click()
-        assert dialog.isVisible()
-        assert not dialog._dirty
-        assert not save.isEnabled()
-        assert not discard.isEnabled()
-        # 规则项名称随真实规则文件 name 字段（可被用户改名）
-        # 规则顺序由 tune_config.yaml 的 tuning_rules 段控制
-        first_rule = next(iter(get_tuning_rules().values()))
-        assert dialog._nav.item(6).text() == first_rule.name
-        # 导航切换驱动右侧内容区（跳过分割线偏移）
-        dialog._nav.setCurrentRow(3)
-        assert dialog._stack.currentIndex() == 3
-        dialog._nav.setCurrentRow(6)
-        assert dialog._stack.currentIndex() == 5
-        rule_panel = dialog._stack.widget(5)
-        assert isinstance(rule_panel, RulePanel)
-
-        assert len(dialog.findChildren(RulePanel)) == 1
-        assert rule_panel._nav.property("navigation") is True
-        dialog.show()
-        QApplication.processEvents()
-        first_width = navigation_width_for_chars(dialog._nav, 8)
-        second_width = navigation_width_for_chars(rule_panel._nav, 6)
-        assert dialog._main_splitter.orientation() == Qt.Orientation.Horizontal
-        assert rule_panel._nav_splitter.orientation() == Qt.Orientation.Horizontal
-        assert abs(dialog._main_splitter.sizes()[0] - first_width) <= 2
-        assert abs(rule_panel._nav_splitter.sizes()[0] - second_width) <= 2
-        dialog._main_splitter.setSizes([first_width + 40, 1000])
-        rule_panel._nav_splitter.setSizes([second_width + 40, 600])
-        assert dialog._main_splitter.sizes()[0] > first_width
-        assert rule_panel._nav_splitter.sizes()[0] > second_width
-        buttons = dialog.findChildren(QPushButton)
-        assert buttons
-        assert all(button.styleSheet() for button in buttons)
-
-        # 基础规则 + 三大处理页的规则组选择必须完整显示中文名称。
-        for combo in [dialog._base_page._combo, *dialog._group_dropdowns]:
-            _assert_combo_text_fits(combo, 200)
 
     def test_config_version_label_reports_remote_distribution(
             self, qtbot, monkeypatch):

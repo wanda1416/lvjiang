@@ -365,10 +365,21 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         ——预检更严只会「报了但其实不会炸」，反过来才是事故。这样库函数
         （如 page_detection.wf 里那些 is_in_*_page）的 key 拼错、布局漏绑
         仍能被 CI 门禁发现，而用户执行某个脚本时不会被无关页面挡住。
-        """
-        self._load_and_validate(Path(wf_path).resolve(), reachable_only=False)
 
-    def _load_and_validate(self, resolved: Path, *, reachable_only: bool = True):
+        ``#% env`` 在这里只校验声明本身，不与 ``run_env`` 比对：
+        编辑器和 CI 并没有「本次真实执行环境」。真正执行时仍在
+        ``_load_and_validate`` 的引擎边界强制环境契约。
+        """
+        self._load_and_validate(
+            Path(wf_path).resolve(), reachable_only=False, enforce_run_env=False)
+
+    def _load_and_validate(
+        self,
+        resolved: Path,
+        *,
+        reachable_only: bool = True,
+        enforce_run_env: bool = True,
+    ):
         """解析 .wf（含 import 链与 def 注册）并跑两道静态校验，返回 program
 
         _execute_dsl 与 validate_only 共用此方法：两者对「什么算合法脚本」的
@@ -385,7 +396,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         except WorkflowMetadataError as exc:
             raise WorkflowUserError(str(exc)) from exc
         allowed_envs = metadata.get("env") or []
-        if allowed_envs and self.run_env not in allowed_envs:
+        if enforce_run_env and allowed_envs and self.run_env not in allowed_envs:
             raise WorkflowUserError(
                 f"check_env: 当前环境 {self.run_env!r} "
                 f"不在允许列表 {allowed_envs} 中，工作流中止")

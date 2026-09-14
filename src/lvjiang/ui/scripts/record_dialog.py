@@ -1,6 +1,6 @@
-"""脚本录制对话框 - 低精度 WF / 高精度 lvtrace 录制与保存
+"""脚本编辑工作台内的录制面板（兼容独立容器）。
 
-只能由用户从「工具 → 脚本录制」打开。对话框可见期间临时注册
+工作台可见期间临时注册
 系统全局录制热键（默认 F12，可在配置管理→热键设置里改），用于开始/停止
 录制；对话框关闭后立即注销。低精度实时生成可编辑 DSL；高精度在内存中
 保存统一输入时间线，保存 WF 时自动写入 workflows/lvtrace 配套文件。
@@ -51,27 +51,42 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
     line_captured = pyqtSignal(str)
     f12_pressed = pyqtSignal()
 
-    def __init__(self, main_window):
+    def __init__(self, main_window, *, editor_host=None):
         super().__init__(main_window)
         self._main = main_window
+        self._editor_host = editor_host
+        self._embedded = editor_host is not None
+        if self._embedded:
+            self.setWindowFlags(Qt.WindowType.Widget)
         self._recorder = None
         self._pending_trace = None
         self._saved_trace_ref = ""
         self._f12_hotkey_listener = None
         self._preserved = False   # 已保存/复制过（防误关丢失）
         self.setWindowTitle(tr("脚本录制"))
-        self.setMinimumSize(560, 520)
+        # 独立对话框需要足够的初始空间；嵌入脚本工作台时则必须由
+        # 外层 splitter 分配宽度，否则这里的 560px 会撑宽整个辅助栏。
+        if not self._embedded:
+            self.setMinimumSize(560, 520)
         self._setup_ui()
         self.line_captured.connect(self._append_line)
         self.f12_pressed.connect(self.toggle_recording)
         self._refresh_buttons()
+        if self._embedded:
+            self.btn_save.hide()
+            self.btn_copy.hide()
+            self.btn_clear.setText(tr("清除预览"))
+            self.btn_clear.setToolTip(tr("录制结果已经插入代码；这里只清除预览以便再次录制"))
+            self.text_edit.setReadOnly(True)
 
     # ─── F12 热键生命周期 ───────────────────────────────
 
     @property
     def _record_key(self) -> str:
         """当前配置的录制热键（默认 F12），来自「配置管理 → 热键设置」。"""
-        return self._main._user_config.hotkeys.record
+        user_config = getattr(self._main, "_user_config", None)
+        hotkeys = getattr(user_config, "hotkeys", None)
+        return str(getattr(hotkeys, "record", "F12"))
 
     def _start_f12_hotkey(self):
         """对话框打开后才注册系统全局录制热键。"""
@@ -156,31 +171,50 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
-        mode_row = QHBoxLayout()
-        lbl_precision = QLabel(tr("录制精度"))
-        lbl_precision.setStyleSheet("font-size: 14px; font-weight: bold;")
-        mode_row.addWidget(lbl_precision)
-        self.radio_precision_low = QRadioButton(tr("低精度（普通界面，可编辑 WF）"))
-        self.radio_precision_low.setToolTip(
-            tr("按 100ms 粒度合并连续移动和短等待，生成可编辑 DSL 指令")
+        precision_row = QHBoxLayout()
+        lbl_precision = QLabel(tr("录制精度："))
+        precision_row.addWidget(lbl_precision)
+        self.radio_precision_low = QRadioButton(tr("低精度"))
+        low_tip = tr(
+            "生成可读、可直接编辑的 WF DSL。录制停止时会合并能够安全合并的"
+            "按键按下、按住、释放和后续等待；连续鼠标移动及短等待按约 100ms"
+            "粒度归并。适合普通界面操作和后续手工调整，不适合要求逐个原始"
+            "输入事件精确回放的游戏视角。"
         )
+        self.radio_precision_low.setToolTip(low_tip)
         self.radio_precision_low.setChecked(True)
-        self.radio_precision_high = QRadioButton(tr("高精度（游戏视角，原始轨迹）"))
-        self.radio_precision_high.setToolTip(
-            tr("保存 workflows/lvtrace 配套文件，忠实还原原始输入"))
+        self.radio_precision_high = QRadioButton(tr("高精度"))
+        high_tip = tr(
+            "记录键盘、鼠标按钮、滚轮以及可选鼠标移动的原始时间线。保存脚本"
+            "时会同时生成 workflows/lvtrace 下的配套轨迹文件，回放时序更接近"
+            "录制过程，适合游戏视角等高时序场景。脚本依赖配套轨迹文件，不能"
+            "只复制 WF 文本进行迁移。"
+        )
+        self.radio_precision_high.setToolTip(high_tip)
         self._precision_group = QButtonGroup(self)
         self._precision_group.addButton(self.radio_precision_low)
         self._precision_group.addButton(self.radio_precision_high)
-        mode_row.addWidget(self.radio_precision_low)
-        mode_row.addWidget(self.radio_precision_high)
-        self.check_mouse_movement = QCheckBox(tr("录制鼠标移动"))
-        self.check_mouse_movement.setToolTip(
-            tr("关闭时过滤鼠标视角移动，点击、拖拽和滚轮仍会录制")
+        precision_row.addWidget(self.radio_precision_low)
+        precision_row.addWidget(self.radio_precision_high)
+        precision_row.addStretch()
+        layout.addLayout(precision_row)
+
+        mouse_row = QHBoxLayout()
+        mouse_tip = tr(
+            "开启后记录鼠标移动轨迹；关闭时只忽略单纯移动，点击、按住、拖拽"
+            "和滚轮仍会正常录制。普通界面通常无需开启；需要还原游戏视角转动"
+            "或其他连续移动时再开启。"
         )
+        lbl_mouse_movement = QLabel(tr("录制鼠标移动"))
+        lbl_mouse_movement.setToolTip(mouse_tip)
+        mouse_row.addWidget(lbl_mouse_movement)
+        self.check_mouse_movement = QCheckBox()
+        self.check_mouse_movement.setAccessibleName(tr("录制鼠标移动"))
+        self.check_mouse_movement.setToolTip(mouse_tip)
         self.check_mouse_movement.setChecked(False)
-        mode_row.addWidget(self.check_mouse_movement)
-        mode_row.addStretch()
-        layout.addLayout(mode_row)
+        mouse_row.addWidget(self.check_mouse_movement)
+        mouse_row.addStretch()
+        layout.addLayout(mouse_row)
 
         idle_text = tr("待机 | 点击「录制脚本」")
         if hotkeys_enabled:
@@ -189,14 +223,18 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         self.lbl_status.setStyleSheet("color: palette(mid);")
         layout.addWidget(self.lbl_status)
 
-        hk = self._main._user_config.hotkeys
-        reserved = f"{hk.start}/{hk.pause}/{hk.stop}/{hk.record}"
+        hk = getattr(getattr(self._main, "_user_config", None), "hotkeys", None)
+        reserved = "/".join(str(getattr(hk, key, default)) for key, default in (
+            ("start", "F9"), ("pause", "F10"), ("stop", "F11"), ("record", "F12")
+        ))
         self.text_edit = QTextEdit()
         self.text_edit.setStyleSheet(
             "font-family: Consolas, monospace; font-size: 13px;")
         placeholder = tr(
-            "录制结果将显示在这里（画布归一化坐标，可保存为 .wf）\n"
-            "低精度生成可编辑指令；高精度保存原始输入轨迹")
+            "录制结果将显示在这里（画布归一化坐标）\n"
+            "停止录制后将自动插入当前脚本"
+            if self._embedded else
+            "录制结果将显示在这里（画布归一化坐标，可保存为 .wf）")
         if hotkeys_enabled:
             placeholder += f"，{reserved} {tr('不会被录制')}"
         self.text_edit.setPlaceholderText(placeholder)
@@ -229,6 +267,10 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
                 tr("已有未清除的录制内容，请清除后再次点击「录制脚本」，"
                    "避免覆盖丢失。"))
             return
+        if self._editor_host is not None \
+                and not self._editor_host.can_accept_recording():
+            self.lbl_status.setText(tr("请先选择或新建一个可编辑脚本，并保存已有高精度录制"))
+            return
         main = self._main
         if main._running:
             self.lbl_status.setText(tr("工作流运行中，无法录制"))
@@ -253,6 +295,8 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         from ...core.macro_recorder import MacroRecorder
         hk = main._user_config.hotkeys
         from ...core.access import is_readonly
+        if self._editor_host is not None:
+            self._editor_host.begin_recording()
         try:
             self._recorder = MacroRecorder(
                 target_window=w, capture=main._capture, layout=layout,
@@ -265,6 +309,8 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             self._recorder.start()
         except Exception as e:
             self._recorder = None
+            if self._editor_host is not None:
+                self._editor_host.end_recording()
             self.lbl_status.setText(tr("启动失败: {e}").format(e=e))
             logger.error(f"录制启动失败: {e}")
             return
@@ -281,7 +327,11 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         recorder = self._recorder
         self._recorder = None
         if recorder is not None:
-            dsl = recorder.stop()
+            try:
+                dsl = recorder.stop()
+            finally:
+                if self._editor_host is not None:
+                    self._editor_host.end_recording()
             self._pending_trace = (
                 recorder.build_input_trace()
                 if recorder.precision == "high" and dsl.strip() else None
@@ -290,7 +340,14 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             if dsl.strip():
                 # 全文兜底刷新，防实时追加漏行
                 self.text_edit.setPlainText(dsl)
-                self.lbl_status.setText(tr("录制结束，可编辑后保存为 .wf"))
+                if self._editor_host is not None:
+                    if self._editor_host.accept_recording(dsl, self._pending_trace):
+                        self._preserved = True
+                        self.lbl_status.setText(tr("录制结束，已插入当前脚本；请保存脚本"))
+                    else:
+                        self.lbl_status.setText(tr("录制结束，但未能插入当前脚本"))
+                else:
+                    self.lbl_status.setText(tr("录制结束，可编辑后保存为 .wf"))
             else:
                 self.lbl_status.setText(tr("录制结束，未捕获到有效操作"))
         self._refresh_buttons()
@@ -314,7 +371,9 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             self.btn_record.setStyleSheet(_STYLE_IDLE)
         self.btn_record.setText(
             label if is_readonly() else f"{label} ({record_key})")
-        self.btn_record.setEnabled(not self._main._running)
+        self.btn_record.setEnabled(
+            self._main is not None and not getattr(self._main, "_running", False)
+        )
         self.btn_save.setEnabled(not recording and has_text)
         self.btn_copy.setEnabled(
             not recording and has_text and self._pending_trace is None)
@@ -326,7 +385,7 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         self.radio_precision_low.setEnabled(not recording)
         self.radio_precision_high.setEnabled(not recording)
         self.check_mouse_movement.setEnabled(not recording)
-        self.text_edit.setReadOnly(recording)
+        self.text_edit.setReadOnly(recording or self._embedded)
 
     def _on_text_changed(self):
         """文本变化后，之前的保存/复制视为失效"""

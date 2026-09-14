@@ -154,17 +154,9 @@ class MenuOpsMixin:
         ocr_action.triggered.connect(self._open_ocr_dialog)
         tools_menu.addAction(ocr_action)
 
-        script_record = QAction(tr("脚本录制"), self)
-        script_record.triggered.connect(self._open_script_record)
-        tools_menu.addAction(script_record)
-
         script_editor = QAction(tr("脚本编辑"), self)
         script_editor.triggered.connect(self._open_script_editor)
         tools_menu.addAction(script_editor)
-
-        script_config = QAction(tr("脚本配置"), self)
-        script_config.triggered.connect(self._open_script_config)
-        tools_menu.addAction(script_config)
 
         batch_settings = QAction(tr("批量配置"), self)
         batch_settings.triggered.connect(self._open_batch_config)
@@ -249,17 +241,8 @@ class MenuOpsMixin:
         dialog = OCRDialog(self, refresh_callback=self._refresh_capture)
         dialog.exec()
 
-    def _open_script_record(self):
-        """仅通过用户菜单操作打开脚本录制对话框。"""
-        from ..scripts import ScriptRecordDialog
-        self._show_modeless_tool(
-            "script_record",
-            lambda: ScriptRecordDialog(self),
-            lambda dialog: dialog.stop_f12_hotkey(),
-        )
-
     def _open_script_editor(self):
-        """打开脚本编辑对话框；有新建/保存/删除时刷新日常页脚本下拉。"""
+        """打开统一脚本工作台；编辑、录制、元数据和配置都从这里进入。"""
         from ..scripts import ScriptEditorDialog
         self._show_modeless_tool(
             "script_editor",
@@ -268,13 +251,6 @@ class MenuOpsMixin:
                 self._load_workflow_configs() if dialog.changed else None
             ),
         )
-
-    def _open_script_config(self):
-        """打开脚本配置对话框；保存后刷新日常页脚本下拉。"""
-        from ..scripts import ScriptConfigDialog
-        dialog = ScriptConfigDialog(self)
-        if dialog.exec():
-            self._load_workflow_configs()
 
     def _open_task_history(self):
         """打开日常与专用任务共用的历史查询窗口。"""

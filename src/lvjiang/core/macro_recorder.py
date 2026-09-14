@@ -15,6 +15,7 @@ wait 语句行。产物即合法 .wf 脚本，可直接剪切复用，回放完�
 同层，UI 侧只有 ui.scripts.record_dialog 调用它。
 """
 
+import re
 import sys
 import threading
 import time
@@ -72,6 +73,19 @@ _SPECIAL_KEY_NAMES: dict[str, str] = {
     **{f"f{i}": f"F{i}" for i in range(1, 13)},
 }
 
+# pynput 的 Windows 键盘后端会把小键盘数字和运算键作为带 ``vk`` 的
+# KeyCode 上报。NumLock 开启时它们还可能同时带有 char；所以必须在字符
+# 分支之前按 VK 识别，否则 NUMPAD8 会被误记成主键盘 8，或在 char 为空时
+# 被当作未知键直接丢弃。
+_WINDOWS_NUMPAD_VK_NAMES: dict[int, str] = {
+    **{0x60 + digit: f"NUMPAD{digit}" for digit in range(10)},
+    0x6A: "NUMPAD_MULTIPLY",
+    0x6B: "NUMPAD_ADD",
+    0x6D: "NUMPAD_SUBTRACT",
+    0x6E: "NUMPAD_DECIMAL",
+    0x6F: "NUMPAD_DIVIDE",
+}
+
 
 def _format_number(value: float, digits: int = 3) -> str:
     """以固定最大精度输出 DSL 数字，同时去掉无意义的末尾 0。"""
@@ -79,13 +93,72 @@ def _format_number(value: float, digits: int = 3) -> str:
     return "0" if text in {"", "-0"} else text
 
 
+_RECORDED_PRESS_RE = re.compile(
+    r'^press "(?P<key>[A-Z0-9_]+)" (?P<state>down|up)$')
+_RECORDED_WAIT_RE = re.compile(r"^wait (?P<duration>[0-9]+(?:\.[0-9]+)?)$")
+
+
+def _recorded_wait(line: str) -> tuple[str, float] | None:
+    """解析录制器自产的数值 wait，保留原文本精度。"""
+    match = _RECORDED_WAIT_RE.fullmatch(line)
+    if match is None:
+        return None
+    text = match.group("duration")
+    return text, float(text)
+
+
+def _compact_low_precision_lines(lines: list[str]) -> list[str]:
+    """无损压缩低精度键盘时间线。
+
+    只有同一按键的 down / wait / up 三行严格相邻时，才说明按住期间
+    没有发生其他动作，可以合并为 hold。紧随 press 的数值 wait 则可
+    作为 after wait 后缀；鼠标原始 down/up 不支持等待后缀，保持原样。
+    """
+    compacted: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        press = _RECORDED_PRESS_RE.fullmatch(line)
+        consumed = 1
+
+        if press is not None and press.group("state") == "down" and index + 2 < len(lines):
+            hold_wait = _recorded_wait(lines[index + 1])
+            release = _RECORDED_PRESS_RE.fullmatch(lines[index + 2])
+            if (
+                hold_wait is not None
+                and hold_wait[1] > 0
+                and release is not None
+                and release.group("state") == "up"
+                and release.group("key") == press.group("key")
+            ):
+                line = (
+                    f'press "{press.group("key")}" hold {hold_wait[0]}')
+                consumed = 3
+
+        next_index = index + consumed
+        if line.startswith('press "') and next_index < len(lines):
+            after_wait = _recorded_wait(lines[next_index])
+            if after_wait is not None and after_wait[1] > 0:
+                line += f" after wait {after_wait[0]}"
+                consumed += 1
+
+        compacted.append(line)
+        index += consumed
+    return compacted
+
+
 def _pynput_key_to_dsl_name(key) -> str | None:
     """pynput 按键对象 → 本项目 press 语句标准键名，无法识别返回 None
 
-    普通字符键（KeyCode.char）直接转大写；特殊键（Key 枚举）查表；
-    查不到/无法识别的键（如某些多媒体键）直接丢弃，不强行拼一个
-    normalize_key() 校验不过的名字进脚本。
+    Windows 小键盘优先按 KeyCode.vk 区分；普通字符键（KeyCode.char）
+    直接转大写；特殊键（Key 枚举）查表。查不到/无法识别的键（如某些
+    多媒体键）直接丢弃，不强行拼一个 normalize_key() 校验不过的名字
+    进脚本。
     """
+    if sys.platform == "win32":
+        numpad_name = _WINDOWS_NUMPAD_VK_NAMES.get(getattr(key, "vk", None))
+        if numpad_name is not None:
+            return numpad_name
     char = getattr(key, "char", None)
     if char:
         physical = CHARACTER_TO_KEY_NAME.get(char)
@@ -221,6 +294,7 @@ class MacroRecorder:
             if self.precision == PRECISION_LOW:
                 self._flush_raw_frame()
                 self._maybe_emit_wait(time.monotonic())
+                self._lines = _compact_low_precision_lines(self._lines)
         if self._raw_listener is not None:
             self._raw_listener.stop()
             self._raw_listener = None

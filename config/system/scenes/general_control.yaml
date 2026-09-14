@@ -4,10 +4,10 @@ name: 控制
 views:
 - key: base
   name: 基底
-- key: fight
-  name: 战斗
 - key: move
   name: 移动
+- key: fight
+  name: 战斗
 - key: confirm
   name: 确认
 - key: blank

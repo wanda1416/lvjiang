@@ -1,0 +1,8 @@
+content_version: 1
+key: activity_jianghuyi
+name: 江湖弈
+views:
+- key: base
+  name: 基底
+- key: game_end
+  name: 棋局结束

@@ -17,6 +17,9 @@ BATCH_CONFIG_VERSION = 1
 _WORKFLOW_PHASES = (
     "batch_setup", "prepare_item", "finish_item", "batch_teardown",
 )
+_LEGACY_WORKFLOW_PATHS = {
+    "batch/finish_huaruizhi.wf": "batch/finish_item.wf",
+}
 
 
 @dataclass
@@ -38,7 +41,8 @@ class BatchWorkflows:
     def from_dict(data: object) -> "BatchWorkflows":
         source = data if isinstance(data, dict) else {}
         return BatchWorkflows(**{
-            key: str(source.get(key, ""))
+            key: _LEGACY_WORKFLOW_PATHS.get(
+                str(source.get(key, "")), str(source.get(key, "")))
             for key in ("batch_setup", "prepare_item", "finish_item", "batch_teardown")
         })
 
@@ -61,6 +65,8 @@ class BatchConfigItem:
     rounds: int = 1
     workflows: BatchWorkflows = field(default_factory=BatchWorkflows)
     workflow_params: dict[str, dict] = field(default_factory=dict)
+    # 保留历史字段名以兼容已有 batch.json；当前“条目”就是选中的用户。
+    skip_lifecycle_for_single_item: bool = True
 
     def normalize(self) -> None:
         from .user_config import is_valid_username
@@ -96,11 +102,24 @@ class BatchConfigItem:
             "rounds": self.rounds,
             "workflows": self.workflows.to_dict(),
             "workflow_params": self.workflow_params,
+            "skip_lifecycle_for_single_item": self.skip_lifecycle_for_single_item,
         }
 
     @staticmethod
     def from_dict(name: str, data: object) -> "BatchConfigItem":
         source = data if isinstance(data, dict) else {}
+        raw_workflows = source.get("workflows")
+        workflow_source = (
+            raw_workflows if isinstance(raw_workflows, dict) else {}
+        )
+        workflow_params = (
+            dict(source.get("workflow_params", {}))
+            if isinstance(source.get("workflow_params"), dict) else {}
+        )
+        if workflow_source.get("finish_item") == "batch/finish_huaruizhi.wf":
+            finish_params = dict(workflow_params.get("finish_item", {}))
+            finish_params["stop_app"] = True
+            workflow_params["finish_item"] = finish_params
         item = BatchConfigItem(
             name=name,
             task_ids=_unique_strings(source.get("task_ids")),
@@ -108,10 +127,14 @@ class BatchConfigItem:
             selected_task_ids=_unique_strings(source.get("selected_task_ids")),
             selected_usernames=_unique_strings(source.get("selected_usernames")),
             rounds=source.get("rounds", 1),
-            workflows=BatchWorkflows.from_dict(source.get("workflows")),
-            workflow_params=(dict(source.get("workflow_params", {}))
-                             if isinstance(source.get("workflow_params"), dict)
-                             else {}),
+            workflows=BatchWorkflows.from_dict(workflow_source),
+            workflow_params=workflow_params,
+            skip_lifecycle_for_single_item=(
+                source.get("skip_lifecycle_for_single_item", True)
+                if isinstance(
+                    source.get("skip_lifecycle_for_single_item", True), bool)
+                else True
+            ),
         )
         item.normalize()
         return item

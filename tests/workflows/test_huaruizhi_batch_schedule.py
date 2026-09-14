@@ -1,6 +1,7 @@
 """花蕊织轮次调度生命周期工作流的行为回归。
 
-条目准备要在四种现场下做出不同动作，这里逐个回放：进度已满直接跳过、
+条目准备与 login.wf 的公共登录页恢复过程要在四种现场下做出不同动作：
+进度已满直接跳过、
 已经在登录页就直接登录、进程不在时启动、进程仍在但不在登录页时重启。
 
 启动后不等稳定帧——登录页背景动画常驻，根本不存在稳定帧，只能轮询
@@ -21,7 +22,8 @@ from tests.workflows.conftest import make_engine
 
 _BATCH_DIR: Path = SYSTEM_CONFIG_DIR / "workflows" / "batch"
 _PREPARE = _BATCH_DIR / "prepare_huaruizhi.wf"
-_FINISH = _BATCH_DIR / "finish_huaruizhi.wf"
+_LOGIN = SYSTEM_CONFIG_DIR / "workflows" / "subcall" / "login.wf"
+_FINISH = _BATCH_DIR / "finish_item.wf"
 
 # 真实过程要连设备，替换成只记账的桩：登录本身由 login.wf 的用例覆盖。
 _STUB_PREPARE_USER = (
@@ -29,6 +31,13 @@ _STUB_PREPARE_USER = (
     '    return {"status": "success", "message": "", "state": $state}\n'
     'end\n'
 )
+_STUB_EXIT_TO_LOGIN = (
+    'def exit_to_login()\n'
+    '    eval mark_exit()\n'
+    'end\n'
+)
+
+
 class _Device:
     """记录对客户端进程和画面的全部动作。"""
 
@@ -53,7 +62,7 @@ class _Device:
             if name in ("app_start", "app_stop"):
                 self.app_running = name == "app_start"
                 return True
-            if name == "pause":
+            if name in ("mark_exit", "pause"):
                 return None
             return passthrough(name, args, engine=engine)
 
@@ -88,6 +97,9 @@ def _run_prepare(device: _Device) -> dict:
     )
     device.install(engine)
     engine._procs = dict(program.procs)
+    login_program = parse_text(_LOGIN.read_text(encoding="utf-8"))
+    engine._procs["ensure_login_page_by_restart"] = dict(
+        login_program.procs)["ensure_login_page_by_restart"]
     engine._procs["prepare_user"] = parse_text(_STUB_PREPARE_USER).procs[
         "prepare_user"]
     login_page_result = 1 if device.in_login_page else 0
@@ -107,6 +119,26 @@ def _run_prepare(device: _Device) -> dict:
     except _ReturnSignal as signal:
         return signal.value
     raise AssertionError("条目准备必须返回批量生命周期协议字典")
+
+
+def _run_finish(device: _Device, *, stop_app: bool) -> dict:
+    """执行 finish_item.wf，用桩记录默认退出分支。"""
+    program = parse_text(_FINISH.read_text(encoding="utf-8"))
+    engine = make_engine(
+        layout=load_layout_by_key("android"),
+        delay_params=load_user_config().delay_params,
+        run_env="android",
+    )
+    device.install(engine)
+    engine._procs = dict(program.procs)
+    engine._procs["exit_to_login"] = parse_text(
+        _STUB_EXIT_TO_LOGIN).procs["exit_to_login"]
+    engine.variables = {"batch_state": {}, "stop_app": stop_app}
+    try:
+        engine._exec_body(program.body)
+    except _ReturnSignal as signal:
+        return signal.value
+    raise AssertionError("条目收尾必须返回批量生命周期协议字典")
 
 
 def test_full_weekly_progress_skips_without_touching_the_client():
@@ -161,6 +193,26 @@ def test_startup_back_button_never_appears_falls_back_to_manual():
 
     assert "pause" in device.names()
     assert ("click", "game_login_page", "back") not in device.calls
+
+
+def test_finish_item_defaults_to_exit_to_login():
+    device = _Device(app_running=True, weekly_progress=0)
+    result = _run_finish(device, stop_app=False)
+
+    assert ("mark_exit",) in device.calls
+    assert "app_stop" not in device.names()
+    assert result["state"]["page_state"] == 1
+    assert result["state"]["role"] == ""
+
+
+def test_finish_item_can_stop_app_instead_of_exiting():
+    device = _Device(app_running=True, weekly_progress=0)
+    result = _run_finish(device, stop_app=True)
+
+    assert ("mark_exit",) not in device.calls
+    assert device.names() == ["app_stop"]
+    assert result["state"]["page_state"] == 0
+    assert result["state"]["role"] == ""
 
 
 @pytest.mark.parametrize("path", [_PREPARE, _FINISH])

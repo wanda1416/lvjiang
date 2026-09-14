@@ -210,6 +210,8 @@ class BatchWorker(QThread):
                 "rounds": self._config.rounds,
                 "workflows": self._config.workflows.to_dict(),
                 "workflow_params": copy.deepcopy(self._lifecycle_params),
+                "skip_lifecycle_for_single_item": (
+                    self._config.skip_lifecycle_for_single_item),
             },
         )
         batch_run_id = batch_run.batch_run_id if batch_run is not None else ""
@@ -225,12 +227,17 @@ class BatchWorker(QThread):
             for run_idx, username in enumerate(self._usernames)
         ]
         total = len(visits)
-        use_lifecycle = True
+        use_lifecycle = not (
+            len(self._usernames) == 1
+            and self._config.skip_lifecycle_for_single_item
+        )
         self.log.emit(f"[批量] 开始：{len(self._usernames)} 用户 × "
                       f"{len(self._scripts)} 脚本 × {rounds} 轮")
         self.log.emit("[批量] 执行用户：" + "、".join(self._usernames))
         self.log.emit("[批量] 执行任务：" + "、".join(
             script.name for script in self._scripts))
+        if not use_lifecycle:
+            self.log.emit("[批量] 单用户直通：跳过批量生命周期工作流")
         for run_idx, username in enumerate(self._usernames):
             for script in self._scripts:
                 planned = self._task_plan[(run_idx, script.id)]

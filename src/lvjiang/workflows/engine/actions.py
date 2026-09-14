@@ -823,7 +823,14 @@ class _ActionsMixin:
                 try:
                     # down/up 之间留短暂随机间隔，确保 Windows/目标应用识别为
                     # 一次有效按键（零间隔时部分应用会忽略，认为从未真正按下）
-                    precise_wait(random.uniform(0.025, 0.035))
+                    completed = precise_wait(
+                        random.uniform(0.025, 0.035),
+                        stop_check=self._stop_check,
+                        pause_check=self._wait_if_paused,
+                    )
+                    if not completed:
+                        from .signals import _BreakSignal
+                        raise _BreakSignal()
                 finally:
                     up_all(pressed)
 

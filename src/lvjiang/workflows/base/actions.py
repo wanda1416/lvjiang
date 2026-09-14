@@ -19,6 +19,17 @@ from .engine_ref import require_engine
 class _ActionMixin:
     """点击、拖拽与等待原语"""
 
+    def _wait_action_delay(self, seconds: float) -> None:
+        """等待动作内部延迟，并保持工作流暂停/停止语义。"""
+        completed = precise_wait(
+            seconds,
+            stop_check=self._stop_check,
+            pause_check=getattr(self, "_wait_if_paused", None),
+        )
+        if not completed:
+            from ..engine.signals import _BreakSignal
+            raise _BreakSignal()
+
     # ─── 点击操作 ──────────────────────────────────────────
 
     def _activate_bound_key(self, key: str, target: str, **kw) -> None:
@@ -36,11 +47,11 @@ class _ActionMixin:
         before = self._input.before_click_wait if pre_delay is None else pre_delay
         after = self._input.after_click_wait if post_delay is None else post_delay
         if before != (0, 0):
-            precise_wait(random.uniform(*before))
+            self._wait_action_delay(random.uniform(*before))
         logger.debug(f"激活: {target} -> press {normalized}")
         require_engine(self, "按键原语").press_key(normalized)
         if after != (0, 0):
-            precise_wait(random.uniform(*after))
+            self._wait_action_delay(random.uniform(*after))
 
     def click_region(self, scene_key: str, field_key: str, jitter: bool = True, **kw):
         """激活区域：默认点击中心，布局绑定 activation_key 时改为按键。"""

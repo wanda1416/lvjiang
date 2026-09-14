@@ -215,7 +215,8 @@ def test_wait_trace_deadline_remembers_pause_across_immediate_resume(
     """暂停触发退出后即使马上恢复，也不能误报 deadline 已到。"""
     pause_event = threading.Event()  # clear = 暂停
 
-    def wait_until(_deadline, *, stop_check):
+    def wait_until(_deadline, *, stop_check, spin_tail_ns):
+        assert spin_tail_ns == 200_000
         assert stop_check() is True
         pause_event.set()  # 模拟检查返回后紧接着恢复
         return False

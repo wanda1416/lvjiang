@@ -36,7 +36,7 @@ def test_switch_column_is_editable_and_belongs_to_the_rule(page):
     可以绑不同开关，甚至不绑。"""
     table = page._playstyle_table
     row = _names(page).index("九剑")
-    combo = table.cellWidget(row, 5)
+    combo = table.cellWidget(row, 6)
     assert combo is not None
     assert combo.currentText() == "keep_wanjia"
 
@@ -47,6 +47,23 @@ def test_switch_column_is_editable_and_belongs_to_the_rule(page):
 
     combo.setCurrentText("")
     assert page._data.get("playstyle_switches", {}) == {}
+
+
+def test_sub_weapon_damage_affix_is_displayed(qtbot):
+    """副武器增伤与主武器增伤同等展示，不能被属性列覆盖掉。"""
+    page = RuleSettingsPage(
+        {"key": "demo", "name": "测试", "playstyles": ["双切"]},
+        on_changed=lambda: None,
+    )
+    qtbot.addWidget(page)
+    table = page._playstyle_table
+
+    assert table.columnCount() == 7
+    assert table.horizontalHeaderItem(4).text() == "副增伤词条"
+    assert table.item(0, 3).text() == "陌刀"
+    assert table.item(0, 4).text() == "陌刀武学增伤"
+    assert table.item(0, 5).text() == "裂石"
+    assert table.cellWidget(0, 6) is not None
 
 
 def test_adding_a_reference_offers_only_unreferenced_ones(page, monkeypatch):

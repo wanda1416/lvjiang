@@ -1,4 +1,6 @@
 #% name: 无名木桩测伤
+#% id: stake_mingjinhong
+#% runnable: true
 #% env: [desktop, android]
 #% note: |-
 #%   开始前切换至枪，确保角色面向目标并处于攻击范围。

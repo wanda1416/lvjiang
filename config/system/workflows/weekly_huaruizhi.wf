@@ -1,4 +1,6 @@
 #% name: 周常花蕊织速刷
+#% runnable: true
+#% batchable: true
 #% env: [android]
 #% note: |-
 #%   同游 → 止戈 → 渡尘墟，用「单排-AI」托管对战刷花蕊织。

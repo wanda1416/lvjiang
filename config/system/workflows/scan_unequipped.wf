@@ -1,4 +1,6 @@
 #% name: 扫描全部装备
+#% runnable: true
+#% batchable: true
 #% env: [android, desktop]
 #% parameters:
 #%   - name: slots

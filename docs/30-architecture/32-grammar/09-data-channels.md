@@ -216,7 +216,7 @@ end
 
 ## 八、Profile — 玩家档案（独立数据源）
 
-除上述四条通道外，DSL 还可通过内置函数访问 **ProfileDB**（玩家档案数据库），获取角色级的持久化数据。ProfileDB 按四模型组织（中文名与「用户总览」页「数据模型」对话框的分区一致）：
+除上述五条通道外，DSL 还可通过内置函数访问 **ProfileDB**（玩家档案数据库），获取角色级的持久化数据。ProfileDB 按四模型组织（中文名与「用户总览」页「数据模型」对话框的分区一致）：
 
 | 模型 | 中文名 | 语义 | 典型 key |
 |------|--------|------|----------|
@@ -245,6 +245,8 @@ regen 模型区分两种刷新机制，DSL 函数自动处理：
 | `profile_inc` | `(key, delta?) -> float` | 增减 profile 值（delta 默认 1），返回新值；note 不支持，仅记警告 |
 | `profile_model` | `(key) -> str` | 查询 key 所属模型：`"quota"` / `"regen"` / `"stock"` / `"note"`；key 未定义返回 `""` |
 | `profile_all` | `() -> dict` | 获取全部 profile 数据，regen 条目返回计算后的当前值 |
+| `profile_observe` | `(key, value) -> dict` | 上报外部观测值（仅 quota 模型），同周期内拒绝更小的值；返回 `{accepted, value, reason}` |
+| `user_get` | `(username, key) -> any \| null` | 按「内部用户名」读取用户资料属性（内存快照优先），取不到返回 `null` |
 
 ### DSL 用法
 

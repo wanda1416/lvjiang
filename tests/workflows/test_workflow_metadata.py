@@ -7,6 +7,8 @@ from lvjiang.workflows.metadata import (
     METADATA_WARNING,
     WorkflowMetadataError,
     build_flow_config,
+    metadata_error,
+    metadata_for_script_config,
     parse_metadata,
 )
 
@@ -15,7 +17,8 @@ SAMPLE = """\
 #% note: |-
 #%   请先打开装备页面。
 #%   确认无弹窗后执行。
-#% required_scenes: [game_main_page, equip_tune_detail]
+#% runnable: true
+#% batchable: true
 #% parameters:
 #%   - name: target_material
 #%     label: 目标材料
@@ -40,8 +43,35 @@ def test_parse_basic_fields():
     m = parse_metadata(SAMPLE)
     assert m["name"] == "单件装备调律"
     assert m["note"] == "请先打开装备页面。\n确认无弹窗后执行。"
-    assert m["required_scenes"] == ["game_main_page", "equip_tune_detail"]
+    assert m["runnable"] is True
+    assert m["batchable"] is True
     assert len(m["parameters"]) == 2
+
+
+def test_script_id_accepts_unicode_letters():
+    assert parse_metadata("#% id: 好友送礼\n")["id"] == "好友送礼"
+    assert parse_metadata("#% id: Équipement_2\n")["id"] == "Équipement_2"
+
+
+@pytest.mark.parametrize("script_id", ["2fast", "_internal", "bad-id", "好友-送礼"])
+def test_script_id_still_rejects_non_identifier_shapes(script_id):
+    with pytest.raises(WorkflowMetadataError, match="Unicode 字母"):
+        parse_metadata(f"#% id: {script_id}\n")
+
+
+def test_runnable_defaults_to_false():
+    """未声明 runnable / batchable 的 .wf 不注册为脚本"""
+    m = parse_metadata("#% name: 内部过程库\n")
+    assert "runnable" not in m
+    assert "batchable" not in m
+
+
+def test_script_traits_batchable_implies_runnable():
+    from lvjiang.workflows.metadata import script_traits
+    assert script_traits({})["runnable"] is False
+    assert script_traits({"batchable": True})["runnable"] is True
+    assert script_traits({"batchable": True})["batchable"] is True
+    assert script_traits({})["scope"] == "daily"
 
 
 def test_parse_options_value_label_pairs():
@@ -106,6 +136,45 @@ def test_malformed_yaml_raises():
     text = "#% name: [unclosed\n#%   bad: : :\n"
     with pytest.raises(WorkflowMetadataError, match="YAML 解析失败"):
         parse_metadata(text)
+
+
+def test_metadata_error_returns_editor_message():
+    assert "YAML" in metadata_error("#% name: [unclosed\n")
+    assert metadata_error("#% runnable: true\n") == ""
+
+
+def test_script_id_is_a_plain_identifier():
+    for value in ("weekly/a", "a-b", "_private", "../escape"):
+        with pytest.raises(WorkflowMetadataError, match="id"):
+            parse_metadata(f"#% id: {value}\n")
+    assert parse_metadata("#% id: weekly_a\n")["id"] == "weekly_a"
+    assert parse_metadata("#% id: 中文\n")["id"] == "中文"
+
+
+def test_checkgroup_numeric_default_key_is_a_metadata_error():
+    text = """\
+#% parameters:
+#%   - name: choices
+#%     type: checkgroup
+#%     options: [a]
+#%     default:
+#%       1: true
+"""
+    with pytest.raises(WorkflowMetadataError, match="选项键"):
+        parse_metadata(text)
+
+
+def test_invalid_utf8_file_is_isolated(tmp_path, monkeypatch):
+    path = tmp_path / "broken.wf"
+    path.write_bytes(b"\xff\xfe")
+    errors = []
+    monkeypatch.setattr("lvjiang.workflows.metadata.logger.error", errors.append)
+
+    metadata, warning = metadata_for_script_config(path)
+
+    assert metadata == {}
+    assert warning == METADATA_WARNING
+    assert any("UTF-8" in message for message in errors)
 
 
 def test_unknown_metadata_fields_are_ignored():
@@ -209,7 +278,7 @@ def test_build_flow_config_defaults(tmp_path):
     assert cfg["name"] == "[外部] demo_flow.wf"
     assert cfg["note"] == ""
     assert cfg["wf_file"] == str(wf)
-    assert cfg["required_scenes"] == []
+    assert cfg["runnable"] is True
     assert cfg["parameters"] == []
 
 
@@ -219,7 +288,6 @@ def test_build_flow_config_with_metadata(tmp_path):
     cfg = build_flow_config(wf)
     assert cfg["name"] == "单件装备调律"
     assert cfg["note"] == "请先打开装备页面。\n确认无弹窗后执行。"
-    assert cfg["required_scenes"] == ["game_main_page", "equip_tune_detail"]
     assert len(cfg["parameters"]) == 2
     assert cfg["wf_file"] == str(wf)
 

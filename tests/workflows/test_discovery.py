@@ -1,6 +1,7 @@
 """脚本发现层测试
 
-覆盖 discover_scripts / list_exposed_scripts 的核心逻辑。
+覆盖 discover_scripts / list_exposed_scripts 的核心逻辑，重点是「是否注册
+由 front-matter 决定」与「同 id 的来源优先级」。
 """
 
 from types import SimpleNamespace
@@ -15,142 +16,216 @@ from lvjiang.workflows.discovery import (
 from lvjiang.workflows.metadata import METADATA_WARNING
 
 
+def _fake_resolver(files, layers=None):
+    """构造发现层需要的假 resolver
+
+    Args:
+        files: ``{workflows 内相对路径: Path}``，模拟合并视图的全树
+        layers: ``{workflows 内相对路径: 层名}``，缺省 system
+    """
+    layers = layers or {}
+
+    class R:
+        def enumerate_entity_tree(self, rel_dir, pattern, *,
+                                  include_internal=False):
+            return sorted(files)
+
+        def resolve_read(self, rel):
+            return files.get(rel.split("workflows/", 1)[-1])
+
+        def describe_entity(self, rel):
+            key = rel.split("workflows/", 1)[-1]
+            return SimpleNamespace(layer=layers.get(key, "system"))
+
+    return R()
+
+
+def _patch_resolver(monkeypatch, files, layers=None):
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.get_resolver",
+        lambda: _fake_resolver(files, layers),
+    )
+
+
+def _write(tmp_path, rel, text):
+    path = tmp_path / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
 class TestDiscoverWfScripts:
-    def test_empty_when_no_workflows(self, tmp_path, monkeypatch):
-        """无 .wf 文件时返回空 dict"""
-        fake_resolver = type("R", (), {
-            "enumerate_entities": lambda self, d, p: [],
-        })()
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver",
-            lambda: fake_resolver,
-        )
-        result = _discover_wf_scripts()
-        assert result == {}
+    def test_empty_when_no_workflows(self, monkeypatch):
+        _patch_resolver(monkeypatch, {})
+        assert _discover_wf_scripts() == {}
 
     def test_discovers_wf_files(self, tmp_path, monkeypatch):
         """扫描到 .wf 文件并解析元数据"""
-        wf_dir = tmp_path / "workflows"
-        wf_dir.mkdir()
-        wf_file = wf_dir / "test_flow.wf"
-        wf_file.write_text(
+        wf = _write(
+            tmp_path, "test_flow.wf",
             "#% name: 测试流程\n"
+            "#% runnable: true\n"
+            "#% batchable: true\n"
             "#% note: 运行前请确认页面。\n"
             "#% parameters:\n"
             "#%   - name: target\n"
-            "#%     options: [default]\n",
-            encoding="utf-8",
-        )
+            "#%     options: [default]\n")
+        _patch_resolver(monkeypatch, {"test_flow.wf": wf})
 
-        fake_resolver = type("R", (), {
-            "enumerate_entities": lambda self, d, p: (
-                ["test_flow.wf"] if d == "workflows" else []),
-            "resolve_read": lambda self, rel: wf_file,
-        })()
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver",
-            lambda: fake_resolver,
-        )
         result = _discover_wf_scripts()
         assert "test_flow" in result
         assert result["test_flow"]["name"] == "测试流程"
         assert result["test_flow"]["note"] == "运行前请确认页面。"
         assert result["test_flow"]["wf_file"] == "test_flow.wf"
+        assert result["test_flow"]["batchable"] is True
         assert len(result["test_flow"]["parameters"]) == 1
 
-    def test_discovers_standalone_subdirectory(self, tmp_path, monkeypatch):
-        """standalone 下脚本以文件 stem 注册，并保留相对路径。"""
-        wf_file = tmp_path / "workflows" / "standalone" / "fengshajiusi.wf"
-        wf_file.parent.mkdir(parents=True)
-        wf_file.write_text("#% name: 风沙酒肆\n", encoding="utf-8")
-
-        fake_resolver = type("R", (), {
-            "enumerate_entities": lambda self, d, p: (
-                ["fengshajiusi.wf"]
-                if d == "workflows/standalone" else []
-            ),
-            "resolve_read": lambda self, rel: wf_file,
-        })()
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver",
-            lambda: fake_resolver,
+    def test_unicode_filename_is_a_valid_default_id(self, tmp_path, monkeypatch):
+        wf = _write(
+            tmp_path, "好友送礼.wf",
+            "#% name: 好友送礼\n#% runnable: true\n",
         )
+        _patch_resolver(monkeypatch, {"好友送礼.wf": wf})
 
         result = _discover_wf_scripts()
 
-        assert result["fengshajiusi"]["name"] == "风沙酒肆"
-        assert result["fengshajiusi"]["wf_file"] == (
-            "standalone/fengshajiusi.wf")
+        assert result["好友送礼"]["wf_file"] == "好友送礼.wf"
+
+    def test_not_registered_without_runnable(self, tmp_path, monkeypatch):
+        """未声明 runnable 的 .wf 不注册（过程库、生命周期钩子、归档）"""
+        wf = _write(tmp_path, "subcall/navigation.wf", "#% name: 导航子过程\n")
+        _patch_resolver(monkeypatch, {"subcall/navigation.wf": wf})
+        assert _discover_wf_scripts() == {}
+
+    def test_batchable_implies_runnable(self, tmp_path, monkeypatch):
+        """只写 batchable 也算有入口"""
+        wf = _write(tmp_path, "a.wf", "#% batchable: true\n")
+        _patch_resolver(monkeypatch, {"a.wf": wf})
+        result = _discover_wf_scripts()
+        assert result["a"]["runnable"] is True
+        assert result["a"]["batchable"] is True
+
+    def test_standalone_declared_batchable_false(self, tmp_path, monkeypatch):
+        wf = _write(tmp_path, "standalone/fengshajiusi.wf",
+                    "#% id: fengshajiusi\n#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"standalone/fengshajiusi.wf": wf})
+
+        result = _discover_wf_scripts()
+        assert result["fengshajiusi"]["wf_file"] == "standalone/fengshajiusi.wf"
         assert result["fengshajiusi"]["batchable"] is False
+
+    def test_recursive_scan_any_depth(self, tmp_path, monkeypatch):
+        """任意深度的子目录都参与发现，目录本身不表达语义"""
+        files = {}
+        for rel, name in (("weekly/a.wf", "周常A"), ("gather/deep/b.wf", "采集B")):
+            files[rel] = _write(tmp_path, rel, f"#% name: {name}\n#% runnable: true\n")
+        _patch_resolver(monkeypatch, files)
+
+        result = _discover_wf_scripts()
+        assert set(result) == {"a", "b"}
+        assert result["a"]["name"] == "周常A"
+
+    def test_explicit_id_wins(self, tmp_path, monkeypatch):
+        wf = _write(tmp_path, "weekly/a.wf",
+                    "#% id: weekly_a\n#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"weekly/a.wf": wf})
+        assert set(_discover_wf_scripts()) == {"weekly_a"}
+
+    def test_skips_underscore_paths(self, tmp_path, monkeypatch):
+        wf = _write(tmp_path, "_editor_run.wf", "#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"_editor_run.wf": wf})
+        assert _discover_wf_scripts() == {}
 
     def test_remote_source_is_preserved_for_forced_display_marker(
             self, tmp_path, monkeypatch):
-        wf_file = tmp_path / "workflows" / "remote_test.wf"
-        wf_file.parent.mkdir(parents=True)
-        wf_file.write_text("#% name: 实验脚本\n", encoding="utf-8")
-        fake_resolver = type("R", (), {
-            "enumerate_entities": lambda self, d, p: (
-                ["remote_test.wf"] if d == "workflows" else []),
-            "resolve_read": lambda self, rel: wf_file,
-            "describe_entity": lambda self, rel: SimpleNamespace(layer="remote"),
-        })()
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver", lambda: fake_resolver)
+        wf = _write(tmp_path, "remote_test.wf",
+                    "#% name: 实验脚本\n#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"remote_test.wf": wf},
+                        {"remote_test.wf": "remote"})
         config = _discover_wf_scripts()["remote_test"]
         assert config["is_remote"] is True
         assert script_display_name(config) == "[远程] 实验脚本"
         assert script_display_name({**config, "name": "自定义名"}) == (
             "[远程] 自定义名")
 
-    def test_remote_script_cannot_take_existing_id_from_other_directory(
+    def test_bad_metadata_logs_error_and_skips_only_its_own_script(
             self, tmp_path, monkeypatch):
-        remote = tmp_path / "remote" / "workflows" / "same.wf"
-        system = tmp_path / "system" / "workflows" / "standalone" / "same.wf"
-        for path, label in ((remote, "远程"), (system, "系统")):
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(f"#% name: {label}\n", encoding="utf-8")
-        paths = {
-            "workflows/same.wf": remote,
-            "workflows/standalone/same.wf": system,
-        }
-        fake_resolver = type("R", (), {
-            "enumerate_entities": lambda self, d, p: (
-                ["same.wf"] if d in {"workflows", "workflows/standalone"} else []),
-            "resolve_read": lambda self, rel: paths[rel],
-            "describe_entity": lambda self, rel: SimpleNamespace(
-                layer="remote" if rel == "workflows/same.wf" else "system"),
-        })()
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver", lambda: fake_resolver)
-        config = _discover_wf_scripts()["same"]
-        assert config["name"] == "系统"
-        assert config["is_remote"] is False
-
-    def test_bad_metadata_warns_only_its_own_script(self, tmp_path, monkeypatch):
         """一个 wf 元数据错误不能中断发现，也不能影响另一个 wf。"""
-        bad = tmp_path / "bad.wf"
-        good = tmp_path / "good.wf"
-        bad.write_text("#% name: [unclosed\nlog \"bad meta\"\n", encoding="utf-8")
-        good.write_text("#% name: 正常脚本\nlog \"ok\"\n", encoding="utf-8")
-        paths = {"workflows/bad.wf": bad, "workflows/good.wf": good}
-        fake_resolver = type("R", (), {
-            "enumerate_entities": lambda self, d, p: (
-                ["bad.wf", "good.wf"] if d == "workflows" else []
-            ),
-            "resolve_read": lambda self, rel: paths[rel],
-        })()
+        bad = _write(tmp_path, "bad.wf",
+                     "#% name: [unclosed\nlog \"bad meta\"\n")
+        good = _write(tmp_path, "good.wf",
+                      "#% name: 正常脚本\n#% runnable: true\nlog \"ok\"\n")
+        _patch_resolver(monkeypatch,
+                        {"bad.wf": bad, "good.wf": good})
+        errors = []
         monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver",
-            lambda: fake_resolver,
-        )
+            "lvjiang.workflows.metadata.logger.error", errors.append)
 
         result = _discover_wf_scripts()
 
-        assert set(result) == {"bad", "good"}
-        assert result["bad"]["note"] == METADATA_WARNING
-        assert result["bad"]["parameters"] == []
+        # 元数据坏掉时 runnable 无从得知，按未声明处理 → 不注册
+        assert set(result) == {"good"}
         assert result["good"]["name"] == "正常脚本"
         assert result["good"]["note"] == ""
+        assert any(METADATA_WARNING in message for message in errors)
+
+    def test_unexpected_parser_failure_is_isolated(
+            self, tmp_path, monkeypatch):
+        bad = _write(tmp_path, "bad.wf", "#% runnable: true\n")
+        good = _write(tmp_path, "good.wf", "#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"bad.wf": bad, "good.wf": good})
+
+        def parse_one(path):
+            if path == bad:
+                raise RuntimeError("broken parser")
+            return {"runnable": True}, ""
+
+        monkeypatch.setattr(
+            "lvjiang.workflows.discovery.metadata_for_script_config", parse_one)
+        errors = []
+        monkeypatch.setattr(
+            "lvjiang.workflows.discovery.logger.error", errors.append)
+
+        assert set(_discover_wf_scripts()) == {"good"}
+        assert any("broken parser" in message for message in errors)
+
+
+class TestSourcePriority:
+    def test_local_beats_system(self, tmp_path, monkeypatch):
+        local = _write(tmp_path, "local/same.wf",
+                       "#% name: 本地\n#% runnable: true\n")
+        system = _write(tmp_path, "system/same.wf",
+                        "#% name: 系统\n#% runnable: true\n")
+        files = {"same.wf": local}
+        layers = {"same.wf": "local"}
+        # system 侧同名文件靠 describe_entity 区分即可，这里只验胜者是 local
+        _patch_resolver(monkeypatch, files, layers)
+        assert _discover_wf_scripts()["same"]["name"] == "本地"
+        assert _discover_wf_scripts()["same"]["source_layer"] == "local"
+        assert system.exists()  # 仅确保构造过，未参与本断言
+
+    def test_system_beats_remote(self, tmp_path, monkeypatch):
+        """远程只新增，同 id 时不能抢占随包脚本"""
+        system = _write(tmp_path, "system/same.wf",
+                        "#% name: 系统\n#% runnable: true\n")
+        remote = _write(tmp_path, "remote/same.wf",
+                        "#% name: 远程\n#% runnable: true\n")
+        # 两个候选都以 same 为 id：用不同的相对路径模拟不同层
+        files = {"same.wf": system, "vendor/same.wf": remote}
+        layers = {"same.wf": "system", "vendor/same.wf": "remote"}
+        _patch_resolver(monkeypatch, files, layers)
+
+        result = _discover_wf_scripts()
+        assert result["same"]["name"] == "系统"
+        assert result["same"]["is_remote"] is False
+
+    def test_remote_wins_when_alone(self, tmp_path, monkeypatch):
+        remote = _write(tmp_path, "remote/new.wf",
+                        "#% name: 远程新增\n#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"new.wf": remote}, {"new.wf": "remote"})
+        config = _discover_wf_scripts()["new"]
+        assert config["name"] == "远程新增"
+        assert config["is_remote"] is True
 
 
 class TestDiscoverClassScripts:
@@ -172,6 +247,7 @@ class TestDiscoverClassScripts:
         assert "test_builtin" in result
         assert result["test_builtin"]["name"] == "测试内置"
         assert result["test_builtin"]["class"] == "test_builtin"
+        assert result["test_builtin"]["runnable"] is True
         assert len(result["test_builtin"]["parameters"]) == 1
 
     def test_skips_failed_import(self, monkeypatch):
@@ -195,56 +271,43 @@ class TestDiscoverClassScripts:
         assert "bad" not in result
 
 
-class TestDiscoverScripts:
-    def test_class_overrides_wf(self, tmp_path, monkeypatch):
-        """同 id 时 class 覆盖 .wf"""
-        wf_dir = tmp_path / "workflows"
-        wf_dir.mkdir()
-        wf_file = wf_dir / "shared.wf"
-        wf_file.write_text("#% name: WF版本\n", encoding="utf-8")
+def _stub_class(monkeypatch, names):
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.implementations.list_workflows",
+        lambda: names,
+    )
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.implementations.get_workflow_class",
+        lambda name: type("W", (), {"DISPLAY_NAME": name, "PARAMETERS": []}),
+    )
 
-        fake_resolver = type("R", (), {
-            "enumerate_entities": lambda self, d, p: (
-                ["shared.wf"] if d == "workflows" else []),
-            "resolve_read": lambda self, rel: wf_file,
-        })()
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver",
-            lambda: fake_resolver,
-        )
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.implementations.list_workflows",
-            lambda: ["shared"],
-        )
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.implementations.get_workflow_class",
-            lambda name: type("W", (), {"DISPLAY_NAME": "Class版本", "PARAMETERS": []}),
-        )
+
+class TestDiscoverScripts:
+    def test_class_beats_system_wf(self, tmp_path, monkeypatch):
+        wf = _write(tmp_path, "shared.wf", "#% name: WF版本\n#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"shared.wf": wf})
+        _stub_class(monkeypatch, ["shared"])
+
         result = discover_scripts()
         assert len(result) == 1
-        assert result[0]["id"] == "shared"
-        assert result[0]["name"] == "Class版本"
+        assert result[0]["name"] == "shared"      # class 的 DISPLAY_NAME
         assert result[0]["class"] == "shared"
 
-    def test_returns_sorted_by_id(self, tmp_path, monkeypatch):
-        """结果按 id 排序"""
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver",
-            lambda: type("R", (), {
-                "enumerate_entities": lambda self, d, p: [],
-            })(),
-        )
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.implementations.list_workflows",
-            lambda: ["z_flow", "a_flow", "m_flow"],
-        )
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.implementations.get_workflow_class",
-            lambda name: type("W", (), {"DISPLAY_NAME": name, "PARAMETERS": []}),
-        )
+    def test_local_beats_class(self, tmp_path, monkeypatch):
+        wf = _write(tmp_path, "shared.wf", "#% name: 本地版本\n#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"shared.wf": wf}, {"shared.wf": "local"})
+        _stub_class(monkeypatch, ["shared"])
+
         result = discover_scripts()
-        ids = [r["id"] for r in result]
-        assert ids == ["a_flow", "m_flow", "z_flow"]
+        assert result[0]["name"] == "本地版本"
+        assert result[0]["source_layer"] == "local"
+
+    def test_returns_sorted_by_id(self, monkeypatch):
+        """结果按 id 排序"""
+        _patch_resolver(monkeypatch, {})
+        _stub_class(monkeypatch, ["z_flow", "a_flow", "m_flow"])
+        assert [r["id"] for r in discover_scripts()] == [
+            "a_flow", "m_flow", "z_flow"]
 
 
 def _stub_prefs(monkeypatch, *, order=None, visible=None, names=None, scopes=None):
@@ -258,66 +321,55 @@ def _stub_prefs(monkeypatch, *, order=None, visible=None, names=None, scopes=Non
 
 
 class TestListExposedScripts:
-    def test_no_preference_shows_all(self, tmp_path, monkeypatch):
+    def test_no_preference_shows_all(self, monkeypatch):
         """没有任何偏好时展示全部（作者未声明 hidden）"""
         _stub_prefs(monkeypatch)
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver",
-            lambda: type("R", (), {
-                "enumerate_entities": lambda self, d, p: [],
-                "load_merged": lambda self, rel: {},
-            })(),
-        )
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.implementations.list_workflows",
-            lambda: ["flow_a", "flow_b"],
-        )
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.implementations.get_workflow_class",
-            lambda name: type("W", (), {"DISPLAY_NAME": name, "PARAMETERS": []}),
-        )
-        result = list_exposed_scripts()
-        assert len(result) == 2
+        _patch_resolver(monkeypatch, {})
+        _stub_class(monkeypatch, ["flow_a", "flow_b"])
+        assert len(list_exposed_scripts()) == 2
 
-    def test_user_preference_filters_and_orders(self, tmp_path, monkeypatch):
+    def test_user_preference_filters_and_orders(self, monkeypatch):
         """用户偏好可隐藏脚本并指定顺序"""
         _stub_prefs(monkeypatch, order=["flow_b"], visible={"flow_a": False})
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver",
-            lambda: type("R", (), {
-                "enumerate_entities": lambda self, d, p: [],
-                "load_merged": lambda self, rel: {},
-            })(),
-        )
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.implementations.list_workflows",
-            lambda: ["flow_a", "flow_b"],
-        )
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.implementations.get_workflow_class",
-            lambda name: type("W", (), {"DISPLAY_NAME": name, "PARAMETERS": []}),
-        )
+        _patch_resolver(monkeypatch, {})
+        _stub_class(monkeypatch, ["flow_a", "flow_b"])
         result = list_exposed_scripts()
         assert len(result) == 1
         assert result[0]["id"] == "flow_b"
 
-    def test_user_preference_rename(self, tmp_path, monkeypatch):
+    def test_user_preference_rename(self, monkeypatch):
         """用户偏好可改显示名"""
         _stub_prefs(monkeypatch, names={"flow_a": "显示名称"})
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.get_resolver",
-            lambda: type("R", (), {
-                "enumerate_entities": lambda self, d, p: [],
-                "load_merged": lambda self, rel: {},
-            })(),
+        _patch_resolver(monkeypatch, {})
+        _stub_class(monkeypatch, ["flow_a"])
+        assert list_exposed_scripts()[0]["name"] == "显示名称"
+
+    def test_environment_mismatch_is_hidden(self, tmp_path, monkeypatch):
+        desktop = _write(
+            tmp_path, "desktop_only.wf",
+            "#% runnable: true\n#% env: [desktop]\n",
         )
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.implementations.list_workflows",
-            lambda: ["flow_a"],
-        )
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.implementations.get_workflow_class",
-            lambda name: type("W", (), {"DISPLAY_NAME": "原名", "PARAMETERS": []}),
-        )
-        result = list_exposed_scripts()
-        assert result[0]["name"] == "显示名称"
+        common = _write(tmp_path, "common.wf", "#% runnable: true\n")
+        _patch_resolver(monkeypatch, {
+            "desktop_only.wf": desktop,
+            "common.wf": common,
+        })
+        _stub_class(monkeypatch, [])
+        _stub_prefs(monkeypatch)
+
+        assert [cfg["id"] for cfg in list_exposed_scripts("android")] == [
+            "common"]
+        assert [cfg["id"] for cfg in list_exposed_scripts("desktop")] == [
+            "common", "desktop_only"]
+
+    def test_hidden_script_needs_user_opt_in(self, tmp_path, monkeypatch):
+        wf = _write(tmp_path, "hidden.wf",
+                    "#% name: 半成品\n#% runnable: true\n#% hidden: true\n")
+        _patch_resolver(monkeypatch, {"hidden.wf": wf})
+        _stub_class(monkeypatch, [])
+
+        _stub_prefs(monkeypatch)
+        assert list_exposed_scripts() == []
+
+        _stub_prefs(monkeypatch, visible={"hidden": True})
+        assert [c["id"] for c in list_exposed_scripts()] == ["hidden"]

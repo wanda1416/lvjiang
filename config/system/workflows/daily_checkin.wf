@@ -1,4 +1,6 @@
 #% name: 每日自动签到
+#% runnable: true
+#% batchable: true
 #% env: [android, desktop]
 
 # 每日自动签到流程

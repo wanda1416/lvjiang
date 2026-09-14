@@ -1350,8 +1350,8 @@ auto_strings:
   开启后会补传最近 {days} 天内尚未上报的相关历史数据；关闭期间的记录仍保存在本地。: Enabling telemetry uploads related, unreported history from the last {days} days; records created while disabled remain stored locally.
   脚本 id 不能为空: Script id cannot be empty
   脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）: Script id cannot start with _ (the discovery layer treats it as a temp file and skips it)
-  脚本 id 只能用字母、数字、下划线，且以字母开头: Script id may only use letters, digits, and underscores, and must start with a letter
-  '脚本 id（文件名，字母/数字/下划线）:': 'Script id (filename, letters/digits/underscore):'
+  脚本 id 只能用 Unicode 字母、数字、下划线，且以字母开头: Script id may only use Unicode letters, digits, and underscores, and must start with a letter
+  '脚本 id（文件名，Unicode 字母/数字/下划线）:': 'Script id (filename, Unicode letters/digits/underscore):'
   脚本 {rel} 已存在，覆盖？: Script {rel} already exists. Overwrite?
   脚本为空: Script Is Empty
   脚本候选: Script Candidates

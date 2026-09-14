@@ -1,4 +1,6 @@
 #% name: 太极炸鱼
+#% runnable: true
+#% batchable: true
 #% env: [android, desktop]
 #% note: |-
 #%   PC 端必须关闭后台模式后运行；技能按键无法通过后台模式发送。

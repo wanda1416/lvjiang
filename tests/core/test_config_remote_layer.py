@@ -126,13 +126,6 @@ class TestLocalStillWins:
         r = _resolver(dirs)
         assert _read_marker(r.resolve_read("scenes/a.yaml")) == "用户改的"
 
-    def test_tombstone_still_hides_everything(self, dirs):
-        _write_scene(dirs[0], "a.yaml", 1)
-        _write_scene(dirs[2], "a.yaml", 99)
-        (dirs[1] / "scenes").mkdir(parents=True, exist_ok=True)
-        (dirs[1] / "scenes" / "a.yaml.deleted").touch()
-        assert _resolver(dirs).resolve_read("scenes/a.yaml") is None
-
     def test_local_diff_is_applied_on_top_of_remote_aggregate(
             self, dirs, monkeypatch):
         rel_path = "yysls/game_config.yaml"

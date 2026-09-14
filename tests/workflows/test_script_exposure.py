@@ -97,9 +97,21 @@ class TestPolicy:
         assert Policy.is_internal("_recorded")
         assert not Policy.is_internal("scan_wallet")
 
-    def test_batchable_by_dir(self):
-        assert Policy.is_batchable("")
-        assert not Policy.is_batchable("standalone")
+    def test_source_priority(self):
+        """local > class > system > remote；未登记的来源排最后"""
+        assert (Policy.rank("local") < Policy.rank("class")
+                < Policy.rank("system") < Policy.rank("remote"))
+        assert Policy.rank("unknown") > Policy.rank("remote")
+
+    def test_default_id_keeps_path_prefix(self):
+        """顶层默认 id 等于旧版 stem，子目录脚本带上目录前缀"""
+        assert Policy.default_id_for("scan_wallet.wf") == "scan_wallet"
+        assert Policy.default_id_for("weekly/x.wf") == "x"
+
+    def test_internal_any_path_segment(self):
+        assert Policy.is_internal("_recorded.wf")
+        assert Policy.is_internal("subcall/_draft/x.wf")
+        assert not Policy.is_internal("subcall/navigation.wf")
 
     def test_hidden_meta(self):
         assert Policy.hidden_by_default({"hidden": True})

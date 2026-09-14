@@ -3,7 +3,7 @@
 ## 目录
 
 - [一、装备分析（if/else + 顺序执行）](#一装备分析ifelse--顺序执行)
-- [二、调律决策树骨架（loop + if + goto + break）](#二调律决策树骨架loop--if--goto--break)
+- [二、调律决策树骨架（loop + if + goto + return）](#二调律决策树骨架loop--if--goto--return)
 - [三、批量调律（for + list + call）](#三批量调律for--list--call)
 - [四、重试 + 兜底 + 字典聚合（新语法协同）](#四重试--兜底--字典聚合新语法协同)
 - [五、异常重试 + 用户介入（try/catch + confirm + pause）](#五异常重试--用户介入trycatch--confirm--pause)
@@ -28,7 +28,7 @@ collect $sub_weapon
 # ... 其他部位类似
 ```
 
-## 二、调律决策树骨架（loop + if + goto + break）
+## 二、调律决策树骨架（loop + if + goto + return）
 
 ```
 @tune_start
@@ -52,7 +52,7 @@ if $tune_result.result contains "失败"
 end
 
 log "未知结果，停止"
-break
+return
 
 @tune_done
 click [equip_tune_detail].[close_btn]
@@ -114,7 +114,7 @@ end
 
 # 遍历结果
 for k in keys($counts)
-    log concat(k, ": ", $counts.$k)
+    log concat($k, ": ", $counts.$k)
 end
 
 @fallback_handler

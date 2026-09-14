@@ -58,6 +58,7 @@ class BatchScript:
     class_name: str = ""    # Python 类实现（与 wf_file 二选一）
     scope: str = "daily"    # 任务定义性质；daily / dedicated 都进入历史
     parameters: list[dict] | None = None  # 仅参数定义，不携带任何参数值
+    env: list[str] | None = None  # 脚本级可运行环境，启动前二次校验
 
 
 @dataclass(frozen=True)

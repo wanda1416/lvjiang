@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 import yaml
@@ -209,6 +210,19 @@ def test_dsl_addressing_works_without_touching_the_action_layer():
     assert found.source_scene == "general_control"
 
 
+def _read_only_match(root: Path, filename: str) -> dict:
+    """读出 root 下唯一名为 filename 的文件内容。
+
+    不能写 ``next(root.rglob(filename))``：``rglob`` 底层是 ``os.scandir``，
+    ``next`` 取到第一项就丢弃生成器，目录句柄要等 GC 才关，届时报
+    ``ResourceWarning: unclosed scandir iterator``。用 ``sorted`` 让生成器
+    走完，顺带断言匹配唯一。
+    """
+    matches = sorted(root.rglob(filename))
+    assert len(matches) == 1, f"期望唯一 {filename}，实得 {matches}"
+    return json.loads(matches[0].read_text(encoding="utf-8"))
+
+
 def test_save_layout_writes_only_referenced_item_position(tmp_path, monkeypatch):
     """目标场景只保存引用位置，尺寸和其他属性继续来自源场景。"""
     import lvjiang.constants as constants
@@ -236,8 +250,7 @@ def test_save_layout_writes_only_referenced_item_position(tmp_path, monkeypatch)
     manager = LayoutConfigManager()
     assert manager.save_layout(layout)
 
-    written = json.loads(next(
-        tmp_path.rglob("equip_tune_detail.json")).read_text(encoding="utf-8"))
+    written = _read_only_match(tmp_path, "equip_tune_detail.json")
     assert [r["key"] for r in written["regions"]] == ["close_btn"]
     assert "source_scene" not in json.dumps(written)
     assert written["reference_positions"] == [{
@@ -249,8 +262,7 @@ def test_save_layout_writes_only_referenced_item_position(tmp_path, monkeypatch)
 
     layout.regions["equip_tune_detail"][1].position_overridden = False
     assert manager.save_layout(layout)
-    written = json.loads(next(
-        tmp_path.rglob("equip_tune_detail.json")).read_text(encoding="utf-8"))
+    written = _read_only_match(tmp_path, "equip_tune_detail.json")
     assert "reference_positions" not in written
 
 

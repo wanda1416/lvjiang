@@ -1,4 +1,6 @@
+#% id: scan_role_base_attr
 #% name: 扫描基础属性
+#% runnable: true
 #% env: [android, desktop]
 #% parameters:
 #%   - name: scroll_count

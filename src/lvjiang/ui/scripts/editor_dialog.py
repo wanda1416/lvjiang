@@ -24,7 +24,8 @@ system 目录。
 复制之后想反悔，右键「还原为系统」丢掉本地那份——没有这条回头路，
 「复制到本地」就是单行道：改坏了既删不掉（系统内容受保护）也回不去。
 
-新建脚本会被发现层自动扫到并默认展示在日常页，无需额外登记。
+新建脚本由模板带上 ``runnable`` / ``batchable``，因此建好即可在日常页看到
+（未声明这两个字段的 .wf 不会被发现层注册）。
 **新建**的脚本 id 不允许 ``_`` 前缀（发现层把 ``_*.wf`` 当临时文件跳过，
 建出来也跑不了）；但这只约束新建，树上照旧展示磁盘上的每一个 ``.wf``，
 包括录制产物与 ``_editor_run.wf`` 这类临时文件——它们同样是用户要打开的东西。
@@ -32,7 +33,6 @@ system 目录。
 """
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -75,13 +75,10 @@ from ...workflows.file_tree import (
     list_directories,
     list_workflow_files,
 )
+from ...workflows.metadata import SCRIPT_ID_RE, metadata_error
 from ..button_styles import apply_button_style
 from ..dialog_guards import EscapeCloseConfirmationMixin
 from ..theme import get_theme_manager
-
-#: 脚本 id = 文件名 stem；``_`` 前缀被发现层视为临时文件，不允许
-_SCRIPT_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
-
 
 # ─── 纯逻辑（可离线测试）────────────────────────────────
 
@@ -122,8 +119,8 @@ def validate_script_id(sid: str) -> str | None:
         return tr("脚本 id 不能为空")
     if sid.startswith("_"):
         return tr("脚本 id 不能以 _ 开头（发现层会把它当临时文件跳过）")
-    if not _SCRIPT_ID_RE.match(sid):
-        return tr("脚本 id 只能用字母、数字、下划线，且以字母开头")
+    if SCRIPT_ID_RE.fullmatch(sid) is None:
+        return tr("脚本 id 只能用 Unicode 字母、数字、下划线，且以字母开头")
     return None
 
 
@@ -159,10 +156,16 @@ def list_script_files() -> list[ScriptEntry]:
 
 
 def new_script_text(name: str, env: tuple[str, ...] = ("android", "desktop")) -> str:
-    """新建脚本模板：front-matter + 带注释的骨架"""
+    """新建脚本模板：front-matter + 带注释的骨架
+
+    必须带 ``runnable`` / ``batchable``：发现层对未声明的 .wf 一律不注册，
+    新建的脚本会立刻出现在日常列表里，全靠模板里这两行。
+    """
     env_list = ", ".join(env)
     return (
         f"#% name: {name}\n"
+        f"#% runnable: true\n"
+        f"#% batchable: true\n"
         f"#% env: [{env_list}]\n"
         "\n"
         "# 在这里写工作流。常用指令：\n"
@@ -371,6 +374,16 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.editor.textChanged.connect(self._on_text_changed)
         self._highlighter = WfHighlighter(self.editor.document())
+        self.lbl_metadata = QLabel("")
+        self.lbl_metadata.setObjectName("workflow_metadata_error")
+        self.lbl_metadata.setWordWrap(True)
+        self.lbl_metadata.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.lbl_metadata.setStyleSheet(
+            "color: #b71c1c; background: #ffebee; border: 1px solid #ef9a9a; "
+            "border-radius: 3px; padding: 7px; font-weight: 600;")
+        self.lbl_metadata.setVisible(False)
+        rl.addWidget(self.lbl_metadata)
         rl.addWidget(self.editor)
         self.lbl_status = QLabel("")
         self.lbl_status.setWordWrap(True)
@@ -594,10 +607,11 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         else:
             try:
                 self.editor.setPlainText(entry.path.read_text(encoding="utf-8"))
-            except OSError as e:
+            except (OSError, UnicodeError) as e:
                 self.editor.setPlainText("")
                 self._set_status(tr("读取失败: {e}").format(e=e), error=True)
         self.editor.blockSignals(False)
+        self._refresh_metadata_warning()
         self._dirty = False
         self._apply_read_only(entry)
         self._set_status(
@@ -629,7 +643,19 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def _on_text_changed(self):
         self._dirty = True
+        self._refresh_metadata_warning()
         self._refresh_buttons()
+
+    def _refresh_metadata_warning(self) -> None:
+        problem = metadata_error(self.editor.toPlainText())
+        if problem:
+            self.lbl_metadata.setText(
+                tr("⚠ 脚本元数据无法识别，该脚本不会出现在运行列表中：\n")
+                + problem)
+            self.lbl_metadata.setVisible(True)
+        else:
+            self.lbl_metadata.clear()
+            self.lbl_metadata.setVisible(False)
 
     def _refresh_buttons(self):
         cur = self._current
@@ -687,7 +713,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
     def _ask_script_id(self, title: str, default: str = "") -> str | None:
         """问一个 id，返回 workflows 内相对路径（含 .wf）；取消返回 None"""
         parent = self._target_dir()
-        prompt = tr("脚本 id（文件名，字母/数字/下划线）:")
+        prompt = tr("脚本 id（文件名，Unicode 字母/数字/下划线）:")
         if parent:
             prompt += f"\n{parent}/"
         while True:
@@ -833,7 +859,9 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self._set_status(tr("已删除 {rel}").format(rel=rel))
 
     def _on_check(self):
-        problems = check_syntax(self.editor.toPlainText())
+        text = self.editor.toPlainText()
+        meta_problem = metadata_error(text)
+        problems = ([meta_problem] if meta_problem else []) + check_syntax(text)
         if problems:
             self._set_status("\n".join(problems), error=True)
         else:

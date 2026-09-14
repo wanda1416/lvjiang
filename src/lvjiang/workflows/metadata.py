@@ -10,15 +10,25 @@ import yaml
 from loguru import logger
 
 _META_LINE = re.compile(r"^\s*#%\s?(.*)$")
+#: 只收**有消费点**的字段。目录已不再表达脚本语义；
+#: 作者排序、停用、版本门槛这类没有当前需求的字段一律不收——
+#: 加了不读的字段迟早会烂。
 _TOP_LEVEL_FIELDS = {
+    "id",
     "name",
     "note",
     "env",
     "parameters",
     "scope",
     "hidden",
-    "required_scenes",
+    "runnable",
+    "batchable",
 }
+#: 脚本 id 是稳定逻辑标识，不是路径。首字符必须是 Unicode 字母，
+#: 后续允许 Unicode 字母、数字和下划线；中文脚本名属于合法 id。
+#: ``[^\W\d_]`` 是 Python ``re`` 下的“Unicode 单词字符，但不是数字或
+#: 下划线”，比手写 CJK 区段完整，也不会退化成只接受 ASCII。
+SCRIPT_ID_RE = re.compile(r"^[^\W\d_]\w*$", re.UNICODE)
 _PARAMETER_TYPES = {"select", "number", "bool", "checkgroup", "text"}
 _PARAMETER_NAME = re.compile(
     r"^[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*$",
@@ -119,6 +129,8 @@ def _validate_parameter(parameter: Any, index: int) -> dict | None:
         if param_type == "checkgroup" and default is not None:
             if not isinstance(default, dict):
                 raise _error(f"{path}.default", "必须是 {选项值: 布尔值} 映射")
+            if any(not isinstance(key, str) for key in default):
+                raise _error(f"{path}.default", "所有选项键都必须是字符串")
             unknown_defaults = set(default) - option_values
             if unknown_defaults:
                 raise _error(
@@ -171,13 +183,18 @@ def _validate_metadata(data: Any) -> dict:
             raise _error(field, "必须是字符串")
     if "name" in normalized and not normalized["name"].strip():
         raise _error("name", "必须是非空字符串")
-    for field in ("env", "required_scenes"):
-        if field in normalized:
-            _validate_string_list(normalized[field], field)
+    if "env" in normalized:
+        _validate_string_list(normalized["env"], "env")
+    if "id" in normalized and (
+            not isinstance(normalized["id"], str)
+            or SCRIPT_ID_RE.fullmatch(normalized["id"]) is None):
+        raise _error(
+            "id", "只能使用 Unicode 字母、数字和下划线，且必须以字母开头")
     if "scope" in normalized and normalized["scope"] not in {"daily", "dedicated"}:
         raise _error("scope", "必须是 daily 或 dedicated")
-    if "hidden" in normalized and not isinstance(normalized["hidden"], bool):
-        raise _error("hidden", "必须是布尔值")
+    for field in ("hidden", "runnable", "batchable"):
+        if field in normalized and not isinstance(normalized[field], bool):
+            raise _error(field, "必须是布尔值")
 
     parameters = normalized.get("parameters", [])
     if not isinstance(parameters, list):
@@ -222,6 +239,8 @@ def parse_metadata_file(path: str | Path) -> dict:
     source = Path(path)
     try:
         return parse_metadata(source.read_text(encoding="utf-8"))
+    except UnicodeError as exc:
+        raise WorkflowMetadataError(f"{source}: 文件不是有效的 UTF-8") from exc
     except OSError as exc:
         logger.warning(f"读取工作流文件失败: {exc}")
         return {}
@@ -237,9 +256,38 @@ def metadata_for_script_config(path: str | Path) -> tuple[dict, str]:
     """
     try:
         return parse_metadata_file(path), ""
-    except WorkflowMetadataError as exc:
-        logger.warning(f"{METADATA_WARNING} {exc}")
+    except Exception as exc:  # noqa: BLE001 — 单个用户/remote WF 不得拖垮发现全集
+        logger.error(f"{METADATA_WARNING} {type(exc).__name__}: {exc}")
         return {}, METADATA_WARNING
+
+
+def metadata_error(text: str) -> str:
+    """返回可展示的 front-matter 错误；空字符串表示通过。"""
+    try:
+        parse_metadata(text)
+    except Exception as exc:  # noqa: BLE001 — 编辑器必须把问题显示出来
+        return f"{type(exc).__name__}: {exc}"
+    return ""
+
+
+def script_traits(meta: dict) -> dict:
+    """取出「性质」类字段并套用默认值。
+
+    **未声明即不可注册、不可批量**：发现层递归扫描 workflows 全树，被
+    import 的过程库、批量生命周期钩子、归档文件都和正式脚本混在同一棵树
+    里，只有作者显式声明 ``runnable`` / ``batchable`` 的才注册为脚本。反
+    过来写默认值 true，任何漏写元数据的内部文件都会冒到用户的日常列表里。
+
+    ``batchable`` 隐含 ``runnable``——能排进批量的必然有独立入口，作者不
+    需要为同一个脚本写两行。
+    """
+    return {
+        "runnable": bool(meta.get("runnable", False))
+        or bool(meta.get("batchable", False)),
+        "batchable": bool(meta.get("batchable", False)),
+        "hidden": bool(meta.get("hidden", False)),
+        "scope": meta.get("scope") or "daily",
+    }
 
 
 def build_flow_config(path: str | Path) -> dict:
@@ -251,7 +299,9 @@ def build_flow_config(path: str | Path) -> dict:
         "name": meta.get("name") or f"[外部] {source.name}",
         "note": warning or meta.get("note") or "",
         "wf_file": str(source),
-        "required_scenes": meta.get("required_scenes") or [],
+        "runnable": True,      # 用户显式加载的文件就是要跑的
+        "batchable": False,    # 临时项不参与批量编排
+        "scope": meta.get("scope") or "daily",
         "parameters": meta.get("parameters") or [],
         "env": meta.get("env") or [],
     }

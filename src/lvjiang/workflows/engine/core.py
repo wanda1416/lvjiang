@@ -376,13 +376,28 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         """
         self._base_dir = resolved.parent
         self._wf_rel_dir = self._workflows_rel_dir(resolved)
+        # ``#% env`` 不只是 UI 筛选标签，也是与脚本内
+        # ``eval check_env([...])`` 等价的启动契约。引擎边界再校验
+        # 一次，防止外部加载、缓存候选或其他调用方绕过 UI。
+        from ..metadata import WorkflowMetadataError, parse_metadata_file
+        try:
+            metadata = parse_metadata_file(resolved)
+        except WorkflowMetadataError as exc:
+            raise WorkflowUserError(str(exc)) from exc
+        allowed_envs = metadata.get("env") or []
+        if allowed_envs and self.run_env not in allowed_envs:
+            raise WorkflowUserError(
+                f"check_env: 当前环境 {self.run_env!r} "
+                f"不在允许列表 {allowed_envs} 中，工作流中止")
         program = parse_file(resolved)
 
         # 解析 import 图：同一物理文件在本次加载中只处理一次，
         # 同名过程若来自不同文件则报错，不让 import 顺序暗中决定行为。
         loaded_procs: dict[str, ProcDef] = {}
         loaded_sources: dict[str, str] = {}
-        root_key = str(resolved)
+        # 必须规范化：下面的 imp_resolved 走的是 .resolve()，根文件若用未
+        # 规范化的路径，自引用或 A→B→A 的环就检测不到，会一路递归到爆栈。
+        root_key = str(Path(resolved).resolve())
         self._resolve_imports(
             program,
             import_stack=[root_key],
@@ -455,13 +470,14 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
     @staticmethod
     def _workflows_root_for(base_dir: Path) -> Path | None:
-        """base_dir 所属的 workflows 根目录（system/local 二选一）
+        """base_dir 所属的 workflows 根目录（local/remote/system 三选一）
 
         未命中已知根（测试用任意目录、编辑器临时文件）时返回 None。
         """
         resolver = get_resolver()
         resolved_base = base_dir.resolve()
-        for root in (resolver.system_dir, resolver.local_dir):
+        for root in (resolver.system_dir, resolver.local_dir,
+                     resolver.remote_dir):
             candidate = (root / "workflows").resolve()
             try:
                 resolved_base.relative_to(candidate)
@@ -650,11 +666,12 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
     def _workflows_rel_dir(path: Path) -> str | None:
         """计算 wf 文件所在目录相对 workflows 根的 posix 路径
 
-        命中 system/local 任一层的 workflows 目录时返回相对目录
+        命中 local/remote/system 任一层的 workflows 目录时返回相对目录
         （顶层为 ""），否则 None（编辑器临时文件、外部绝对路径执行）。
         """
         resolver = get_resolver()
-        for root in (resolver.system_dir, resolver.local_dir):
+        for root in (resolver.system_dir, resolver.local_dir,
+                     resolver.remote_dir):
             try:
                 rel = path.resolve().relative_to((root / "workflows").resolve())
             except (ValueError, OSError):
@@ -707,7 +724,8 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             if resolved is None:
                 raise WorkflowUserError(
                     f"import 找不到文件: {rel}"
-                    f"（在 config/local 与 config/system 的 workflows/ 下均未找到）")
+                    f"（config/local、config/remote、config/system 的 "
+                    f"workflows/ 下都没有它）")
             imp_path = Path(resolved)
             imp_resolved = str(imp_path.resolve())
 

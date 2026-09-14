@@ -64,8 +64,19 @@ eval $dict = {
 | 字典 | `{"k": v, ...}` | `{}`, `{"a": "b", "count": 3, "ref": $var}` |
 | 列表 | `[item, ...]` | `["a", "b"]`, `[1, null, true]` |
 | 泛化元组 | `(min, max)` | `(1, 2)`, `(0.5, 1.5)`, `($a, $b)`, `(1, $b)` |
+| 矩形 | `(x, y, w, h)` | `(0.1, 0.2, 0.3, 0.4)` |
 
 字典 key 限定为字符串，value 支持字符串、数字、bool、null、变量引用、嵌套字典、列表。列表元素同理。
+
+> **括号内的元素个数决定语义**：2 个元素是泛化元组（随机区间 / 坐标对），4 个元素是
+> 画布归一化矩形 `(x, y, w, h)`，求值为 `RectCoordRef`，可 `click`，也可作为
+> `color_ratio` / `find_icons` 等图色函数的坐标入参。矩形的典型来源是脚本工作台画布上
+> 框选出的区域：
+>
+> ```
+> $box = (0.1, 0.2, 0.3, 0.4)
+> eval $ratio = color_ratio($box, "#aaaaaa", "#ffffff")
+> ```
 
 ### 类型系统
 
@@ -207,7 +218,7 @@ $list[0]                 # 静态索引（数字）
 | eval 元组 | `eval $var = (1, 2)` | 泛化元组赋值（支持 `($a, $b)` 混合引用） |
 | default | `default $var = <literal>` | 仅当变量未从外部传入时赋值 |
 | scan | `scan scene as $var` | OCR 扫描结果存入 `$var`（dict） |
-| for 循环 | `for item in [a, b, c]` | 每次迭代 `$item` 绑定当前值 |
+| for 循环 | `for item in ["a", "b", "c"]` | 每次迭代 `$item` 绑定当前值 |
 | call 返回值 | `call $v = proc()` | 从子过程调用中接收返回值 |
 
 **隐式 eval**：任何没有指令关键字开头的语句，解析器自动视为 `eval`。以下两行完全等价：

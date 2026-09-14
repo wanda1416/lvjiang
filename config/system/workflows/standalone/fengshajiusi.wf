@@ -1,4 +1,6 @@
+#% id: fengshajiusi
 #% name: 风沙酒肆
+#% runnable: true
 #% env: [android]
 #% note: |-
 #%   请确认靠近从拾香，出现与其对话的按钮

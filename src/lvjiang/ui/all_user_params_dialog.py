@@ -58,9 +58,11 @@ class AllUserParamsDialog(QDialog):
         self._users = list(usernames)
         self._users_dir = users_dir
         self._current_env = current_env
+        from ..workflows.discovery import script_supports_env
         self._configs = [
             cfg for cfg in workflow_configs
             if cfg.get("scope", "daily") == "daily"
+            and script_supports_env(cfg, current_env)
         ]
 
         layout = QVBoxLayout(self)

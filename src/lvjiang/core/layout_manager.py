@@ -2,7 +2,7 @@
 
 存储结构（目录化）：
 - layouts.yaml          名册 + canvas 内联（聚合键值，local diff 合并）
-- layouts/{key}/{scene_key}.json   每场景独立文件（实体影子 + 墓碑）
+- layouts/{key}/{scene_key}.json   每场景独立文件（实体影子，整文件覆盖）
 
 布局别名（extends）：条目带 `extends: 根布局名` 时，scene 全部复用根布局
 目录，仅 canvas 独立；别名自身不产生任何 scene 文件。
@@ -494,7 +494,7 @@ def scene_layout_rels(name: str,
 
 
 def _enumerate_scene_files(name: str) -> list[str]:
-    """枚举布局目录下所有场景 JSON 文件名（system ∪ local 并集，墓碑剔除）
+    """枚举布局目录下所有场景 JSON 文件名（system ∪ local 并集）
 
     Returns:
         排序后的 scene_key 列表（不含 .json 后缀）
@@ -509,9 +509,7 @@ def _enumerate_scene_files(name: str) -> list[str]:
         for p in base.glob("*.json"):
             if p.is_file() and not p.name.startswith("_"):
                 names.add(p.stem)
-    alive = [n for n in sorted(names)
-             if not (resolver.local_dir / f"{rel_dir}/{n}.json.deleted").exists()]
-    return alive
+    return sorted(names)
 
 
 def _resolve_layout_entry(

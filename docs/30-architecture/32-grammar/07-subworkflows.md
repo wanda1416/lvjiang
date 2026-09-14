@@ -7,7 +7,7 @@
 - [三、def — 定义子过程](#三def--定义子过程)
 - [四、call — 执行调用](#四call--执行调用)
   - [变量隔离](#变量隔离)
-  - [返回值传递](#返回值传递)
+  - [返回值绑定](#返回值绑定)
 - [五、完整示例](#五完整示例)
 
 ## 一、概述
@@ -162,8 +162,8 @@ end
 ```
 # 子过程返回字典，一次性传递多个结果
 def scan_equip_info()
-    scan [equip].[name_area] as $name by exact
-    scan [equip].[score_area] as $score by exact
+    scan [equip].[name_area] as $name by equals "装备名"
+    scan [equip].[score_area] as $score by equals "评分"
     return {"name": $name, "score": $score}
 end
 

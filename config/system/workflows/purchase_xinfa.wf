@@ -1,4 +1,6 @@
 #% name: 自动购买心法
+#% runnable: true
+#% batchable: true
 #% env: [android, desktop]
 #% parameters:
 #%   - name: open_bag_xinfa

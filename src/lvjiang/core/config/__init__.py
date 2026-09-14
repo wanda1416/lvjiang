@@ -2,7 +2,7 @@
 
 两类数据、两个入口：
 - 元数据（config/system + config/local）→ ConfigResolver
-  双层合并读、按模式路由写（开发→system，用户→local 影子/diff/墓碑）
+  双层合并读、按模式路由写（开发→system，用户→local 影子/diff）
 - 运行态（config/session/session.json）→ SessionStore
   全量内存缓存 + 线程锁 + 写即原子落盘，节点级 get/set
 
@@ -41,7 +41,6 @@ from .plans import (
 )
 from .resolver import (
     DELETED_KEY,
-    TOMBSTONE_SUFFIX,
     ConfigResolver,
     compute_diff,
     get_resolver,
@@ -75,7 +74,6 @@ from .wf_configs import (
 __all__ = [
     # 基础设施
     "DELETED_KEY",
-    "TOMBSTONE_SUFFIX",
     "ConfigResolver",
     "compute_diff",
     "get_resolver",

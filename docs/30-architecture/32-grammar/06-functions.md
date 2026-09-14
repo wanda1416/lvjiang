@@ -7,22 +7,23 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | 文件 | 内容 |
 |------|------|
 | [06.1-basic-functions.md](06.1-basic-functions.md) | 基础函数：算术运算、字典/列表操作、字符串处理 |
-| [06.2-system-interaction.md](06.2-system-interaction.md) | 系统与交互函数：用户交互（confirm/pause/notify/input）、系统函数（save/panel）、玩家档案（profile） |
-| [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数：装备处理、背包遍历、玩家档案、综合示例 |
+| [06.2-system-interaction.md](06.2-system-interaction.md) | 用户交互、系统、应用生命周期、运行环境与后端、玩家档案 |
+| [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数：装备处理、背包遍历与游标、装备入库、基础属性表单 |
 | [06.4-vision-functions.md](06.4-vision-functions.md) | 图色函数：取色、色占比、亮段、色心方位、同色图标、多点找色 |
 
 ---
 
 ## 速查表
 
-共 72 个内置函数（含 yysls 插件注册的），下表按功能分为 10 类。
+共 **84 个**内置函数（core 67 个 + yysls 插件 17 个），按功能分为 13 类。
 
-> 表中当前收录 63 个。以下 9 个已注册但尚未收录，待补：
-> `check_env`、`yysls_rich_parse`、`to_role_base_attrs`、`open_base_attr_form`、
-> `write_bag_item`、`write_equipped`、`bag_cursor_init`、`bag_cursor_visit`、
-> `bag_cursor_finish_window`。
-> 核对方式：`list_functions()`（需先导入 `apps.yysls.workflows.builtins`
-> 各模块，否则只看得到 core 的 50 个）。
+> 本节列表与注册表一致，核对方式：
+>
+> ```python
+> from lvjiang.workflows import builtins as b
+> import lvjiang.apps.yysls.workflows.builtins  # 触发插件注册
+> print(sorted(b.list_functions()))           # → 84 个
+> ```
 
 ### 基础运算（8）
 
@@ -54,7 +55,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `find_key` | `(dict, str) -> str` | 查找 value 包含指定文本的 key，找不到返回 `""` |
 | `append` | `(list, val) / (dict, key, val) -> ""` | 向列表追加或向字典写入（副作用操作） |
 
-### 字符串处理（9）
+### 字符串处理（13）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -68,8 +69,11 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `upper` | `(str) -> str` | 转大写 |
 | `lower` | `(str) -> str` | 转小写 |
 | `to_num` | `(str) -> int \| float` | 字符串转数字，含小数点→float，否则→int，失败返回 0 |
+| `extract_int` | `(str) -> int` | 提取文本中第一项非负整数，找不到返回 `-1` |
+| `extract_num` | `(str) -> int \| float` | 提取文本中第一项非负数（可含小数点），找不到返回 `-1` |
+| `extract_progress` | `(str) -> dict` | 提取 `当前/总量` 进度对，返回 `{valid, current, total}` |
 
-### 装备处理（6）
+### 装备处理（7）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -79,6 +83,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `chengyin_cap` | `(name, level) -> float` | 查询承音词条数值上限（上限的 94%） |
 | `is_good_equip` | `(dict) -> bool` | 判定装备是否值得保留（高价值词条 ≥ 2） |
 | `evaluate` | `(dict) -> dict` | 使用流派规则评估装备，返回评级结果字典 |
+| `yysls_rich_parse` | `(dict) -> dict` | `as rich` 的转换函数：解析 `level_text`/`count_text` 并删除原字段 |
 
 ### 背包遍历（3）
 
@@ -88,6 +93,23 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `notify_scroll` | `(col, row, fingerprint) -> ""` | 记录已处理装备指纹到滚动管理器 |
 | `scroll_advance` | `() -> ""` | 校验通过后推进状态，移除已滚出的行指纹 |
 
+### 背包扫描游标（3）
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `bag_cursor_init` | `() -> ""` | 初始化背包扫描游标（写入 `context._bag_cursor`），会覆盖既有游标 |
+| `bag_cursor_visit` | `(fingerprint) -> str` | 登记行首锚点，返回 `"new"` / `"skip"` / `"end"` |
+| `bag_cursor_finish_window` | `(visible_rows, expected_rows) -> str` | 提交一个窗口，返回 `"scroll"`（继续滚动）或 `"end"`（到底） |
+
+### 装备入库与角色属性（4）
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `write_bag_item` | `(group_key, dict) -> str` | 把一件背包装备写入用户装备库，返回指纹；类型与分组不匹配时报错 |
+| `write_equipped` | `(slot_key, dict) -> str` | 把装备写入「当前生效方案」的指定槽位，返回指纹 |
+| `to_role_base_attrs` | `(dict) -> dict` | 解析角色详情页 OCR 原始数据为基础属性字典 |
+| `open_base_attr_form` | `(dict) -> null` | 弹出「创建基础属性」面板并预填数值，不阻塞工作流 |
+
 ### 时间（2）
 
 | 函数 | 签名 | 说明 |
@@ -95,29 +117,41 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `clock` | `() -> float` | 返回 Unix 时间戳（秒精度 float），可用于计时、超时判断 |
 | `datetime` | `(fmt?) -> str` / `(ts, fmt?) -> str` | 格式化时间：无参默认当前时间，首参为数值则作为时间戳，字符串则作为 strftime 格式 |
 
-### 系统与用户交互（11）
+### 用户交互与系统（7）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `confirm` | `(str) -> bool` | 弹出确认对话框（是/否） |
 | `pause` | `(str?) -> ""` | 暂停执行直到用户点击确定 |
-| `notify` | `(str) -> ""` | 非阻塞通知（5 秒自动关闭） |
+| `notify` | `(str) -> ""` | 非阻塞通知（5 秒自动关闭），同时写入告警面板 |
 | `input` | `(str) -> str \| null` | 弹出输入对话框，取消返回 null |
 | `save` | `() -> ""` | 强制保存 session 到磁盘 |
 | `panel_rows` | `(scene, panel) -> int` | 返回 panel 实际检测到的行数 |
 | `panel_cols` | `(scene, panel) -> int` | 返回 panel 实际检测到的列数 |
-| `app_is_running` | `(name) -> bool` | 按注册目标类型查询应用是否运行 |
-| `app_stop` | `(name, timeout=15) -> bool` | 停止应用并等待进程消失 |
-| `app_start` | `(name, timeout=30) -> bool` | 启动应用并等待进程出现 |
-| `android_wait_stable_frame` | `(name, timeout=60, duration=1) -> bool` | 等待期望方向下的连续稳定帧 |
 
-### 运行环境与后端（4）
-
-三者回答的是**不同层面**的问题，不能互相替代：
+### 应用生命周期（6）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `env` | `() -> str` / `(str) -> bool` | **配置的工作环境**（`desktop` / `android`），由 UI 下拉框决定；回答「该按哪套导航策略走」 |
+| `app_is_running` | `(name) -> bool` | 按注册目标类型查询应用是否运行 |
+| `app_stop` | `(name, timeout=15) -> bool` | 停止应用并等待进程消失 |
+| `app_start` | `(name, timeout=30) -> bool` | 启动应用并等待进程出现 |
+| `android_app_stop` | `(name, timeout=15) -> bool` | `app_stop` 的等价别名（保留给历史脚本） |
+| `android_app_start` | `(name, timeout=30) -> bool` | `app_start` 的等价别名（保留给历史脚本） |
+| `android_wait_stable_frame` | `(name, timeout=60, duration=1) -> bool` | 等待期望方向下的连续稳定帧（仅 Android 应用） |
+
+> 应用名是「配置管理 → 应用注册」中的注册项，控制器按当前实际连接目标选择
+> Android/PC 绑定，不依据工作流环境。指令形式 `app stop "game" timeout 15` 等价于
+> `eval app_stop("game", 15)`。
+
+### 运行环境与后端（5）
+
+这五个函数回答的是**不同层面**的问题，不能互相替代：
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `env` | `() -> str` / `(str) -> bool` | **配置的工作环境**（`desktop` / `android`），由 UI 下拉框决定 |
+| `check_env` | `(str \| list) -> bool` | 校验当前环境是否在允许列表内，不在则抛出 `WorkflowUserError` 中止工作流 |
 | `is_send` | `() -> bool` | 窗口模式且用 SendInput 注入（移动真实光标，需前台） |
 | `is_post` | `() -> bool` | 窗口模式且用 PostMessage 注入（不移动光标，不抢焦点） |
 | `is_device` | `() -> bool` | **指令实际打给设备端**（ADB / Agent / 无障碍 / Shell） |
@@ -125,6 +159,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 - `is_send` / `is_post` / `is_device` **互斥**，且设备端后端一律归 `is_device`；后端未知时三者都为假。
 - `env()` 与 `is_device()` 正交：桌面环境下也可能挂着 ADB 后端（PC 连手机跑），此时 `env("desktop")` 与 `is_device()` 同时为真。
 - 需要「只有窗口模式才成立」的前提时用 `is_device()` 取反——按键、光标位置、前台焦点这些概念在设备端不存在。
+- `env()` 是**查询**，`check_env()` 是**断言**：前者用于分支，后者用于在脚本开头一次性拒绝不该跑的环境。
 
 ```
 if is_device()
@@ -144,14 +179,17 @@ end
 | `find_icons` | `(rect, channel, c_min, margin1, margin2?, o_max?, min_area?, min_bbox?, c_max?) -> [FoundRegion]` | 同色连通块（可 click），按面积降序 |
 | `find_multi_color` | `(rect, "#anchor", [[dx, dy, "#c"], …], tol?) -> FoundRegion \| ""` | 多点找色 |
 
-> 坐标入参是 `$ref = [scene].[region]` 的求值结果或 find 产出；距离类参数按画布高比例。详见 [06.4-vision-functions.md](06.4-vision-functions.md)。
+> 坐标入参是 `$ref = [scene].[region]` 的求值结果、4 元矩形字面量或 find 产出；
+> 距离类参数按画布高比例。详见 [06.4-vision-functions.md](06.4-vision-functions.md)。
 
-### 玩家档案（5）
+### 玩家档案（7）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
-| `profile_get` | `(key) -> float \| null` | 读取 profile 值，自动识别模型；regen key 返回实时计算值 |
-| `profile_set` | `(key, value) -> float` | 写入 profile 值；realtime regen 自动规范化时间锚点 |
-| `profile_inc` | `(key, delta?) -> float` | 增减 profile 值（delta 默认 1），返回新值 |
-| `profile_model` | `(key) -> str` | 查询 key 所属模型：`"quota"` / `"regen"` / `"stock"` |
+| `profile_get` | `(key) -> float \| str \| null` | 读取 profile 值，自动识别模型；regen key 返回实时计算值 |
+| `profile_set` | `(key, value) -> float \| str` | 写入 profile 值；realtime regen 自动规范化时间锚点 |
+| `profile_inc` | `(key, delta?) -> float` | 增减 profile 值（delta 默认 1），返回新值；note 模型不支持 |
+| `profile_model` | `(key) -> str` | 查询 key 所属模型：`"quota"` / `"regen"` / `"stock"` / `"note"`；未定义返回 `""` |
 | `profile_all` | `() -> dict` | 获取全部 profile 数据，regen 条目返回计算后的当前值 |
+| `profile_observe` | `(key, value) -> dict` | 上报外部观测值（仅 quota 模型），同周期内拒绝更小的值 |
+| `user_get` | `(username, key) -> any \| null` | 按内部用户名读取用户资料属性，取不到返回 null |

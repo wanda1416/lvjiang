@@ -2,6 +2,7 @@
 
 import yaml
 
+from lvjiang.core.config import edit_session as edit_session_module
 from lvjiang.core.config import versioning
 from lvjiang.core.config.edit_session import ConfigEditSession
 from lvjiang.core.config.resolver import ConfigResolver
@@ -58,6 +59,39 @@ def test_close_discards_staged_changes(tmp_path):
     session.close()
 
     assert source.load_merged("config.yaml") == {"value": 1}
+
+
+def test_windows_session_commit_does_not_expand_crlf_twice(
+        tmp_path, monkeypatch):
+    """Windows 工作副本已有 CRLF，提交前必须还原为逻辑换行。"""
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    entity = system / "demo/entities/item.yaml"
+    entity.parent.mkdir(parents=True)
+    local.mkdir()
+    entity.write_bytes(b"key: item\r\nvalue: 1\r\n")
+    source = ConfigResolver(
+        system_dir=system, local_dir=local, dev_mode=True)
+    session = ConfigEditSession(
+        source, merged_paths=(), entity_dirs=("demo/entities",))
+    draft = session.resolver.resolve_read("demo/entities/item.yaml")
+    assert draft is not None
+    draft.write_bytes(b"key: item\r\nvalue: 2\r\n")
+
+    written: list[str] = []
+    original_write = source.write_entity
+
+    def capture_write(rel_path, data, **kwargs):
+        written.append(data)
+        return original_write(rel_path, data, **kwargs)
+
+    monkeypatch.setattr(edit_session_module.os, "linesep", "\r\n")
+    monkeypatch.setattr(source, "write_entity", capture_write)
+    session.commit()
+
+    assert written == ["key: item\nvalue: 2\n"]
+    assert "\r\r\n" not in entity.read_bytes().decode("utf-8")
+    session.close()
 
 
 def test_reset_discards_changes_and_keeps_session_editable(tmp_path):

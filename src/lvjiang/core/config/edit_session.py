@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -110,6 +111,13 @@ class ConfigEditSession:
             if self._baseline_entities.get(rel_path) == payload:
                 continue
             text = payload.decode("utf-8")
+            if os.linesep == "\r\n":
+                # 临时 resolver 也使用文本模式写文件：Windows 上工作副本
+                # 因而已经是 CRLF。若把这段原样交给真实 resolver，它的
+                # 文本模式会再次把每个 \n 扩成 CRLF，形成 \r\r\n，表现为
+                # YAML 每行之间多出一个空行。真实写入前还原为逻辑换行，
+                # 最终落盘时只做一次平台换行转换。
+                text = text.replace("\r\n", "\n").replace("\r", "\n")
             content_version = None
             if self._source.is_dev_mode() and versioning.spec_for(rel_path):
                 # 会话的 system 基底可能是正在生效的 remote 新版本。普通

@@ -183,7 +183,8 @@ class TestSmallDynamic:
     """非武器部位具体属攻双重身份参与动态词条匹配：
     attr=裂石 时 最小裂石→最小本属攻击、其余最小属攻→最小
     外属攻击、最大异属→最大外属攻击（池外）；规则级 common
-    条件：小属攻共 2 条判垃圾、1 条判一般。"""
+    条件：双小属攻且带会心/精准判垃圾，双小属攻但不带
+    会心/精准判一般；单小属攻不再单独降档。"""
 
     @pytest.fixture
     def small_lieshi(self):
@@ -206,20 +207,25 @@ class TestSmallDynamic:
         e = make_equip("环", ["最小外功攻击", "全武学增效", "敏", "敏", "敏"])
         assert small_lieshi.judge(e).rating == Rating.NORMAL
 
-    def test_ring_one_foreign_small_attr_normal(self, small_lieshi):
-        # 1 条 最小破竹攻击（→最小外属攻击）→ 一般
+    def test_ring_one_foreign_small_attr_excellent(self, small_lieshi):
+        # 单条最小外属攻击不再触发通用一般条件
         e = make_equip("环", ["最小外功攻击", "全武学增效", "最小外功攻击", "最小破竹攻击", "会心率"])
-        assert small_lieshi.judge(e).rating == Rating.NORMAL
+        assert small_lieshi.judge(e).rating == Rating.EXCELLENT
 
-    def test_ring_one_own_small_attr_normal(self, small_lieshi):
-        # 1 条 最小裂石攻击（→最小本属攻击）→ 一般
+    def test_ring_one_own_small_attr_excellent(self, small_lieshi):
+        # 单条最小本属攻击不再触发通用一般条件
         e = make_equip("环", ["最小外功攻击", "全武学增效", "最小外功攻击", "最小裂石攻击", "会心率"])
-        assert small_lieshi.judge(e).rating == Rating.NORMAL
+        assert small_lieshi.judge(e).rating == Rating.EXCELLENT
 
-    def test_ring_two_small_attrs_junk(self, small_lieshi):
-        # 最小本属 + 最小外属 共 2 条 → 垃圾
+    def test_ring_two_small_attrs_with_critical_junk(self, small_lieshi):
+        # 双小属攻并带会心/精准 → 垃圾
         e = make_equip("环", ["最小外功攻击", "全武学增效", "最小裂石攻击", "最小破竹攻击", "会心率"])
         assert small_lieshi.judge(e).rating == Rating.JUNK
+
+    def test_ring_two_small_attrs_without_critical_normal(self, small_lieshi):
+        # 双小属攻但没有会心/精准：不命中垃圾组，命中一般组
+        e = make_equip("环", ["最小外功攻击", "全武学增效", "最小裂石攻击", "最小破竹攻击", "敏"])
+        assert small_lieshi.judge(e).rating == Rating.NORMAL
 
     def test_ring_big_foreign_attr_junk(self, small_lieshi):
         # 最大牵丝攻击（→最大外属攻击，池外）→ 垃圾

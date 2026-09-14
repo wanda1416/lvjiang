@@ -217,6 +217,32 @@ class TestBuiltinRules:
                 for pattern in rule.patterns.values():
                     assert pattern.first
 
+    def test_huixin_small_common_condition_policy(self):
+        """会心小外的通用垃圾/一般判定保持当前业务口径。"""
+        raw = get_tuning_rule_manager().get_raw("huixin_small")
+        assert raw["common_conditions"] == {
+            "junk_conditions": [[
+                {"count_min": {
+                    "symbols": ["最小本属攻击", "最小外属攻击"],
+                    "min": 2,
+                }},
+                {"count_min": {
+                    "symbols": ["精准率", "会心率"],
+                    "min": 1,
+                }},
+            ]],
+            "normal_conditions": [
+                {"count_min": {
+                    "symbols": ["最小本属攻击", "最小外属攻击"],
+                    "min": 2,
+                }},
+                {"count_max": {
+                    "symbols": ["最小外功攻击"],
+                    "max": 0,
+                }},
+            ],
+        }
+
     def test_jewelry_requires_all_martial_bonus_except_heal_fire(self):
         """环与佩共用「环」规则；只有治疗火拳允许没有全武学增效。"""
         for key, rule in get_tuning_rules().items():

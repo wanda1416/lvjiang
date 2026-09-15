@@ -1163,11 +1163,11 @@ def test_press_hold_direct_range():
 
 
 def test_click_hold_fixed_range_and_variable():
-    fixed = parse_text("click [general_control].[xuli] hold 1.4").body[0]
+    fixed = parse_text("click [general_combat].[xuli] hold 1.4").body[0]
     ranged = parse_text(
-        "click [general_control].[xuli] hold (1.35, 1.45)").body[0]
+        "click [general_combat].[xuli] hold (1.35, 1.45)").body[0]
     variable = parse_text(
-        "click [general_control].[xuli] right hold $hold_time").body[0]
+        "click [general_combat].[xuli] right hold $hold_time").body[0]
 
     assert isinstance(fixed, Click)
     assert fixed.hold == 1.4

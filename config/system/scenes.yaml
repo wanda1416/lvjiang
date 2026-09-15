@@ -7,8 +7,9 @@ scenes:
     - game_menu_page
     - game_login_page
     - game_settings
-    - general_control
+    - general_combat
     - general_move
+    - general_control
     - general_action
     - general_chat
     - general_purchase

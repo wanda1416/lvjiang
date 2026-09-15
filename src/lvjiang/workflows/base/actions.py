@@ -36,7 +36,7 @@ class _ActionMixin:
         """以按键激活实体，同时保持 click 的默认/显式前后等待语义。
 
         ``hold`` 转成 ``press <key> hold``：跨端脚本写
-        ``click [general_control].[xuli] hold 1.4``，在安卓端是触屏长按，
+        ``click [general_combat].[xuli] hold 1.4``，在安卓端是触屏长按，
         在绑了 R 的桌面布局上就是 ``press R hold 1.4``——两端语义一致，
         不会退化成在图标坐标上按住鼠标。
         """

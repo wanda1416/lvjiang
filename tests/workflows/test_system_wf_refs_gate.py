@@ -94,6 +94,18 @@ def test_desktop_layout_has_required_activation_bindings():
     layout = _validator("desktop")._layout
     expected = {
         ("general_control", "confirm"): "SPACE",
+        ("general_combat", "switch"): "NUMPAD8",
+        ("general_combat", "wuxueji"): "Q",
+        ("general_combat", "teshuji"): "GRAVE",
+        ("general_combat", "xieshi"): "E",
+        ("general_combat", "xuli"): "R",
+        ("general_combat", "shanbi"): "SHIFT",
+        ("general_combat", "tiaoyue"): "SPACE",
+        ("general_combat", "qishu_1"): "1",
+        ("general_combat", "qishu_2"): "2",
+        ("general_combat", "qishu_3"): "3",
+        ("general_combat", "qishu_4"): "4",
+        ("general_combat", "bow"): "NUMPAD2",
         ("equip_tune_detail", "reset_tune"): "R",
         ("equip_tune_detail", "reset_confirm"): "SPACE",
         ("general_action", "camera_shot"): "SPACE",
@@ -107,7 +119,11 @@ def test_desktop_layout_has_required_activation_bindings():
     }
     for (scene_key, entity_key), activation_key in expected.items():
         entity = next(
-            item for item in layout.get_scene_regions(scene_key)
+            item
+            for item in (
+                layout.get_scene_regions(scene_key)
+                + layout.get_scene_points(scene_key)
+            )
             if item.key == entity_key
         )
         assert entity.activation_key == activation_key, (

@@ -1,6 +1,6 @@
 # 场景实现定义
 
-本文档定义当前九个场景的具体字段实现。语义模型见 [34-scene/01-scene-layout-definition.md](../34-scene/01-scene-layout-definition.md)。
+本文档记录当前核心场景的具体字段实现。语义模型见 [34-scene/01-scene-layout-definition.md](../34-scene/01-scene-layout-definition.md)。
 
 ---
 
@@ -13,8 +13,10 @@
 | `equip_weapon_detail` | 装备武器详情 | 识别武器的基础信息和词条分布 |
 | `equip_armor_detail` | 装备防具详情 | 识别防具的基础信息和词条分布 |
 | `equip_tune_detail` | 调律 | 调律页词条与材料格，`result` 视图为调律结果弹窗 |
-| `game_main_page` | 游戏主页 | 主界面功能按钮 + 移动坐标点 |
+| `game_main_page` | 游戏主页 | 主界面功能按钮与 HUD 入口 |
 | `game_menu_page` | 游戏菜单 | 菜单页功能按钮 |
+| `general_combat` | 战斗 | 战斗技能及武器切换 |
+| `general_move` | 移动 | 角色移动与镜头转向 |
 | `general_control` | 通用控制 | 跨场景复用的预定义坐标点 |
 
 ---
@@ -143,6 +145,16 @@
 
 ---
 
+## 战斗 (general_combat)
+
+**游戏内位置**：任意可操作角色的战斗画面
+
+独立单视图场景，集中声明武器切换、武学技、特殊技、奇术、卸势、蓄力、
+轻击、闪避、跳跃与弓箭。Android 布局提供触控位置，桌面布局为同一批实体
+绑定键盘按键，使工作流统一通过 `[general_combat].[动作]` 调用。
+
+---
+
 ## 移动 (general_move)
 
 **游戏内位置**：任意局内画面，左屏虚拟摇杆与右屏视角拖动区
@@ -184,9 +196,10 @@
 
 ## 通用控制 (general_control)
 
-**游戏内位置**：跨场景复用的通用坐标点
+**游戏内位置**：跨场景复用的通用控件和坐标点
 
-该场景无 `regions`，仅声明跨场景复用的坐标点。
+战斗与移动已分别拆到 `general_combat`、`general_move`。本场景只保留确认、
+取消、返回等跨页面控件，以及材料格、背包格、菜单滚动等通用锚点。
 
 | 字段 Key | 字段名称 | 说明 |
 |----------|----------|------|

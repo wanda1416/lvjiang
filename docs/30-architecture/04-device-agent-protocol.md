@@ -63,7 +63,7 @@ PC 端 ADB 模式原先只有两条路控制手机：`adb shell input tap/swipe`
 | `tap` | `x`,`y`,`duration_ms`(50) | — |
 | `long_press` | `x`,`y`,`duration_ms`(800) | — |
 | `swipe` | `x1`,`y1`,`x2`,`y2`,`duration_ms`(300) | — |
-| `hold_move` | `x1`,`y1`,`x2`,`y2`,`move_ms`,`hold_ms` | a11y 两段 stroke 真正停住；shell 只能把 hold 合并进 swipe 时长 |
+| `hold_move` | `x1`,`y1`,`x2`,`y2`,`move_ms`,`hold_ms` | a11y 两段 stroke 真正停住；shell 通道把 hold 合并进 swipe 时长（匀速插值，推满只在结尾生效） |
 | `key` | `name:"BACK"/"HOME"` 或 `keycode:int` | BACK/HOME 无障碍用 `performGlobalAction`；其它 keycode 只有 Shizuku 能发（`auto` 下自动转 shell，没 Shizuku 报错不静默降级） |
 | `shell` | `cmd:[...]` | Shizuku 执行，stdout 作二进制负载 |
 | `calib_get` | — | `key`（机型_WxH）、`screen{w,h,rotation}`、`calib{sx,ox,sy,oy}`、`identity`、`stored`、`overlay{w,h}\|null` |

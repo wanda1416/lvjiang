@@ -1,7 +1,7 @@
 """候选评级的玩法多选器。
 
 只能选一条规则时，能留下的装备极少——一件装备往往只对得上其中一两套
-练法。这里验的是「本流派排在前面、能多选、全选/全不选覆盖整张表」。
+练法。这里验的是「三层相关性排序、多选、全选/全不选覆盖整张表」。
 """
 from __future__ import annotations
 
@@ -11,41 +11,67 @@ from PyQt6.QtCore import Qt
 from lvjiang.apps.yysls.ui.loadout.optimal_combo import (
     _MIN_RATING_CHOICES,
     _ClickableLineEdit,
+    _playstyle_match_scope,
     _PlaystylePickerDialog,
 )
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
 _OPTIONS = [
-    ("huixin_small", "双切", "会心小-双切", True),
-    ("huixin_small", "单切", "会心小-单切", True),
-    ("jingzhun", "远程", "精准-远程", False),
+    ("heal_pure", "纯奶", "治疗纯奶-纯奶", "plan"),
+    ("heal_fire", "火拳", "治疗火拳-火拳", "school"),
+    ("huixin_yuyu", "飞天玉", "玉玉大王-飞天玉", "attr"),
+    ("jingzhun", "远程", "精准-远程", ""),
 ]
 
 
-def test_the_current_schools_playstyles_are_marked(qtbot=None) -> None:
-    """几十条玩法混在一起，不标出来找自己那几条要翻半天。"""
+def test_related_playstyles_are_marked_in_three_levels(qtbot=None) -> None:
     dialog = _PlaystylePickerDialog(_OPTIONS, set())
 
     labels = [dialog._list.item(i).text() for i in range(dialog._list.count())]
-    assert "（本流派）" in labels[0]
-    assert "（本流派）" not in labels[2]
+    assert "（本方案）" in labels[0]
+    assert "（本流派）" in labels[1]
+    assert "（本属性）" in labels[2]
+    assert "（本" not in labels[3]
 
 
 def test_preselected_pairs_come_back_checked() -> None:
     dialog = _PlaystylePickerDialog(
-        _OPTIONS, {("huixin_small", "单切")})
+        _OPTIONS, {("heal_fire", "火拳")})
 
-    assert dialog.values() == [("huixin_small", "单切")]
+    assert dialog.values() == [("heal_fire", "火拳")]
 
 
 def test_select_all_and_none_cover_every_row() -> None:
     dialog = _PlaystylePickerDialog(_OPTIONS, set())
 
     dialog._set_all(True)
-    assert len(dialog.values()) == 3
+    assert len(dialog.values()) == 4
     dialog._set_all(False)
     assert dialog.values() == []
+
+
+def test_playstyle_scope_uses_registered_school_and_attr_not_weapon_guess() -> None:
+    current = {
+        "current_playstyle": "纯奶",
+        "current_school": "牵丝·霖",
+        "current_attr": "牵丝",
+    }
+    assert _playstyle_match_scope(
+        "纯奶", {"school": "牵丝·霖", "attr": "牵丝"}, **current,
+    ) == "plan"
+    assert _playstyle_match_scope(
+        "火拳", {"school": "牵丝·霖", "attr": "牵丝"}, **current,
+    ) == "school"
+    assert _playstyle_match_scope(
+        "飞天玉", {"school": "牵丝·玉", "attr": "牵丝"}, **current,
+    ) == "attr"
+    assert _playstyle_match_scope(
+        "翊翊", {"school": "牵丝·翊", "attr": "牵丝"}, **current,
+    ) == "attr"
+    assert _playstyle_match_scope(
+        "纯唐", {"school": "裂石·钧", "attr": "裂石"}, **current,
+    ) == ""
 
 
 def test_junk_is_never_offered_as_a_requirement() -> None:

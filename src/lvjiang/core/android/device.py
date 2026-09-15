@@ -36,7 +36,11 @@ def _resolve_adb_path() -> str:
     return "adb"
 
 
-def list_adb_devices(adb_path: str | None = None) -> list[dict]:
+def list_adb_devices(
+    adb_path: str | None = None,
+    *,
+    cancel_check: Callable[[], bool] | None = None,
+) -> list[dict]:
     """列出已连接（device 状态）的设备
 
     Returns:
@@ -44,10 +48,29 @@ def list_adb_devices(adb_path: str | None = None) -> list[dict]:
     """
     adb = adb_path or _resolve_adb_path()
     try:
-        out = subprocess.run(
+        process = subprocess.Popen(
             [adb, "devices", "-l"],
-            capture_output=True, text=True, timeout=10, **SUBPROCESS_NO_WINDOW,
-        ).stdout
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            **SUBPROCESS_NO_WINDOW,
+        )
+        deadline = time.monotonic() + 10.0
+        while process.poll() is None:
+            if cancel_check is not None and cancel_check():
+                process.terminate()
+                try:
+                    process.communicate(timeout=0.5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate()
+                return []
+            if time.monotonic() >= deadline:
+                process.kill()
+                process.communicate()
+                raise subprocess.TimeoutExpired([adb, "devices", "-l"], 10)
+            time.sleep(0.05)
+        out, _stderr = process.communicate()
     except Exception as e:
         logger.error(f"adb devices 执行失败: {e}")
         return []

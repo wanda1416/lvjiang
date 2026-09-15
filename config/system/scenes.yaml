@@ -8,6 +8,7 @@ scenes:
     - game_login_page
     - game_settings
     - general_control
+    - general_move
     - general_action
     - general_chat
     - general_purchase

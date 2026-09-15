@@ -4,7 +4,7 @@
 #%     type: bool
 #%     default: true
 #%   - name: online_role_max_wait
-#%     label: 角色在线最大等待时间（秒）
+#%     label: 在线等待时间（秒）
 #%     type: number
 #%     default: 600
 #%     min: 0

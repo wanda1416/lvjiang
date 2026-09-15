@@ -46,7 +46,10 @@ _KEY_TO_ANDROID_KEYCODE: dict[str, int] = {
     "NUMPAD_DECIMAL": 158,
     "NUMPAD_ENTER": 160,
     # 特殊键
-    "ESC": 111,
+    # ESC 统一表示「系统返回」：Agent 走 performGlobalAction(BACK)，设备端 shell
+    # 发 keyevent 4，这里同样发 BACK（4）而不是 KEYCODE_ESCAPE（111）——后者
+    # 多数手游根本不处理，三条路径必须语义一致。
+    "ESC": 4,
     "ENTER": 66,
     "SPACE": 62,
     "TAB": 61,
@@ -320,13 +323,13 @@ class AdbInput(InputBackend):
         return code
 
     def key_down(self, key: str) -> None:
-        """按下按键（adb input keyevent 不区分 down/up，发送一次即可）"""
+        """按下按键：adb input keyevent 是一次完整的按下+抬起，在这里发。"""
         code = self._key_to_keycode(key)
         logger.debug(f"[ADB] key_down: {key} → keycode {code}")
         self._device.shell("input", "keyevent", str(code))
 
     def key_up(self, key: str) -> None:
-        """释放按键（adb input keyevent 不区分 down/up，发送一次即可）"""
-        code = self._key_to_keycode(key)
-        logger.debug(f"[ADB] key_up: {key} → keycode {code}")
-        self._device.shell("input", "keyevent", str(code))
+        """释放按键：keyevent 已经包含抬起，这里只校验键名，不能再发一次——
+        否则 press "ESC"（down + up）会变成两次 BACK。与 AgentInput / 设备端
+        后端的语义一致。"""
+        self._key_to_keycode(key)

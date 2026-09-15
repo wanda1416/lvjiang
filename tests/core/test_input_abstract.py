@@ -189,3 +189,19 @@ def test_adb_drag_hold_uses_motionevent_sequence(monkeypatch):
     # 无 hold 仍是一次 swipe，不走 motionevent
     backend.drag_screen(1, 2, 3, 4, duration=0.5)
     assert device.calls[-1] == ("input", "swipe", "1", "2", "3", "4", "500")
+
+
+def test_adb_press_sends_keyevent_once(monkeypatch):
+    """keyevent 自带抬起：KeyStateRegistry 的 down + up 只能落成一次 keyevent，
+    否则 press "ESC" 会变成两次 BACK。"""
+    from lvjiang.workflows.engine.key_state import KeyStateRegistry
+
+    device = _FakeAdbDevice(sdk=29)
+    backend = _adb_backend(device, monkeypatch)
+    reg = KeyStateRegistry(backend)
+
+    reg.key_down("ESC")
+    reg.key_up("ESC")
+
+    assert device.calls == [("input", "keyevent", "4")]
+

@@ -751,6 +751,10 @@ class _ActionsMixin:
         """WorkflowEngine 的单次按键原语。"""
         self.press_keys([key])
 
+    def press_key_hold(self, key: str, duration: float) -> None:
+        """按住单键 ``duration`` 秒后释放（``click ... hold`` 命中按键绑定时使用）。"""
+        self.press_keys([key], mode=PressMode.HOLD, duration=duration)
+
     def press_keys(
         self,
         raw_keys: list[str],

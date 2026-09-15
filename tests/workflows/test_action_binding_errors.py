@@ -82,6 +82,9 @@ class _StubEngine:
         self._input.key_down(key)
         self._input.key_up(key)
 
+    def press_key_hold(self, key: str, duration: float) -> None:
+        self._input.keys.append(("hold", key, duration))
+
 
 class _Actor(_ActionMixin, _CoordMixin):
     """把操作与坐标换算两个 Mixin 拼成可独立实例化的最小对象"""
@@ -160,12 +163,23 @@ def test_explicit_right_click_ignores_activation_key():
     assert actor._input.clicks[0][3] == {"button": "right"}
 
 
-def test_click_hold_ignores_activation_key_and_uses_pointer():
+def test_click_hold_with_activation_key_becomes_press_hold():
+    """跨端脚本的 ``click [xuli] hold 1.4`` 在绑了 R 的桌面布局上等价于
+    ``press R hold 1.4``，不能退化成在图标坐标上按住鼠标。"""
     region = Region(
         key="btn_ok", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
-        activation_key="SPACE",
+        activation_key="r",
     )
     actor = _Actor(_FakeLayout(regions=[region]))
+
+    actor.click_region(SCENE, "btn_ok", hold=1.4)
+
+    assert actor._input.clicks == []
+    assert actor._input.keys == [("hold", "R", 1.4)]
+
+
+def test_click_hold_without_activation_key_uses_pointer():
+    actor = _Actor(_FakeLayout(regions=[_region("btn_ok")]))
 
     actor.click_region(SCENE, "btn_ok", hold=1.4)
 

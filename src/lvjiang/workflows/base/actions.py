@@ -33,10 +33,17 @@ class _ActionMixin:
     # ─── 点击操作 ──────────────────────────────────────────
 
     def _activate_bound_key(self, key: str, target: str, **kw) -> None:
-        """以按键激活实体，同时保持 click 的默认/显式前后等待语义。"""
+        """以按键激活实体，同时保持 click 的默认/显式前后等待语义。
+
+        ``hold`` 转成 ``press <key> hold``：跨端脚本写
+        ``click [general_control].[xuli] hold 1.4``，在安卓端是触屏长按，
+        在绑了 R 的桌面布局上就是 ``press R hold 1.4``——两端语义一致，
+        不会退化成在图标坐标上按住鼠标。
+        """
         pre_delay = kw.pop("pre_delay", None)
         post_delay = kw.pop("post_delay", None)
         button = kw.pop("button", "left")
+        hold = kw.pop("hold", None)
         if kw:
             unknown = ", ".join(sorted(kw))
             raise TypeError(f"按键激活不支持参数: {unknown}")
@@ -48,8 +55,13 @@ class _ActionMixin:
         after = self._input.after_click_wait if post_delay is None else post_delay
         if before != (0, 0):
             self._wait_action_delay(random.uniform(*before))
-        logger.debug(f"激活: {target} -> press {normalized}")
-        require_engine(self, "按键原语").press_key(normalized)
+        engine = require_engine(self, "按键原语")
+        if hold is None:
+            logger.debug(f"激活: {target} -> press {normalized}")
+            engine.press_key(normalized)
+        else:
+            logger.debug(f"激活: {target} -> press {normalized} hold {hold}s")
+            engine.press_key_hold(normalized, float(hold))
         if after != (0, 0):
             self._wait_action_delay(random.uniform(*after))
 
@@ -64,11 +76,10 @@ class _ActionMixin:
             )
         require_enabled(region, scene_key, "region")
 
-        # 非左键是明确的鼠标操作，不应用语义激活绑定。
+        # 非左键是明确的鼠标操作，不应用语义激活绑定；hold 则转为按键长按。
         activation_key = getattr(region, "activation_key", "")
         if (isinstance(activation_key, str) and activation_key
-                and kw.get("button", "left") == "left"
-                and kw.get("hold") is None):
+                and kw.get("button", "left") == "left"):
             self._activate_bound_key(
                 activation_key, f"{scene_key}/{field_key}", **kw)
             return
@@ -201,8 +212,7 @@ class _ActionMixin:
         require_enabled(point, scene_key, "point")
         activation_key = getattr(point, "activation_key", "")
         if (isinstance(activation_key, str) and activation_key
-                and kw.get("button", "left") == "left"
-                and kw.get("hold") is None):
+                and kw.get("button", "left") == "left"):
             self._activate_bound_key(
                 activation_key, f"{scene_key}/{point_key}", **kw)
             return

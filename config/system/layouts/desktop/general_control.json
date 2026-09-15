@@ -113,7 +113,7 @@
       "cx_ratio": 0.741630406632852,
       "cy_ratio": 0.7365224975345408,
       "r_ratio": 0.04994632908086091,
-      "activation_key": "R"
+      "activation_key": "Q"
     },
     {
       "key": "teshuji",
@@ -141,7 +141,7 @@
       "cx_ratio": 0.9142188650212498,
       "cy_ratio": 0.5014182675374658,
       "r_ratio": 0.04994632908086091,
-      "disabled": true
+      "activation_key": "R"
     },
     {
       "key": "qingji",

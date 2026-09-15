@@ -253,10 +253,9 @@ def list_scan_subnets() -> list[str]:
 def probe_port(ip: str, port: int, timeout: float = 0.3) -> bool:
     """探测 IP:port 是否可达（TCP connect）"""
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(timeout)
-        s.connect((ip, port))
-        s.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout)
+            sock.connect((ip, port))
         return True
     except Exception:
         return False
@@ -267,6 +266,7 @@ def scan_lan_for_adb(
     port: int,
     max_workers: int = 50,
     progress_cb: Callable[[str, int, int], None] | None = None,
+    cancel_check: Callable[[], bool] | None = None,
 ) -> list[str]:
     """扫描局域网子网，返回端口开放的所有 IP
 
@@ -284,9 +284,15 @@ def scan_lan_for_adb(
     found: list[str] = []
     completed = 0
     logger.info(f"正在扫描 {subnet}0/24 的 {port} 端口 ...")
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+    pool = ThreadPoolExecutor(max_workers=max_workers)
+    cancelled = False
+    futures = {}
+    try:
         futures = {pool.submit(probe_port, ip, port): ip for ip in candidates}
         for future in as_completed(futures):
+            if cancel_check is not None and cancel_check():
+                cancelled = True
+                break
             completed += 1
             ip = futures[future]
             if future.result():
@@ -297,6 +303,11 @@ def scan_lan_for_adb(
             elif progress_cb and completed % 10 == 0:
                 # 每 10 个 IP 更新一次进度
                 progress_cb(f"正在扫描 {ip}...", completed, total)
+    finally:
+        if cancelled:
+            for future in futures:
+                future.cancel()
+        pool.shutdown(wait=not cancelled, cancel_futures=cancelled)
     return sorted(found, key=lambda ip: int(ip.split(".")[-1]))
 
 
@@ -377,6 +388,7 @@ def _connect_targets(
     progress_cb: Callable[[str, int, int], None] | None = None,
     base: int = 0,
     total: int | None = None,
+    cancel_check: Callable[[], bool] | None = None,
 ) -> list[dict]:
     """对一批 (ip, port) 依次 adb connect，返回连上的设备信息
 
@@ -386,13 +398,18 @@ def _connect_targets(
     total = total if total is not None else base + len(targets)
     devices: list[dict] = []
     for i, (ip, port) in enumerate(targets, 1):
+        if cancel_check is not None and cancel_check():
+            break
         current = base + i
         if progress_cb:
             progress_cb(f"正在连接 {ip}:{port}...", current, total)
         if not connect_wireless(adb, ip, port):
             logger.debug(f"{ip}:{port} 连接失败（端口开放但非 ADB 服务）")
             continue
-        time.sleep(0.5)
+        for _ in range(10):
+            if cancel_check is not None and cancel_check():
+                return devices
+            time.sleep(0.05)
         info = get_adb_device_info(adb, ip, port)
         if info:
             devices.append(info)
@@ -412,6 +429,7 @@ def scan_and_connect_wireless(
     port: int = 5555,
     progress_cb: Callable[[str, int, int], None] | None = None,
     subnets: list[str] | None = None,
+    cancel_check: Callable[[], bool] | None = None,
 ) -> list[dict]:
     """扫描局域网并尝试连接所有发现的 ADB 设备
 
@@ -442,6 +460,8 @@ def scan_and_connect_wireless(
     scan_total = per_subnet * len(targets_subnets)
     open_targets: list[tuple[str, int]] = []
     for idx, subnet in enumerate(targets_subnets):
+        if cancel_check is not None and cancel_check():
+            return []
         offset = per_subnet * idx
         if progress_cb:
             progress_cb(f"正在扫描 {subnet}0/24 ...", offset, scan_total)
@@ -450,8 +470,15 @@ def scan_and_connect_wireless(
             if progress_cb:
                 progress_cb(message, _offset + current, scan_total)
 
-        for ip in scan_lan_for_adb(subnet, port, progress_cb=sub_progress if progress_cb else None):
+        for ip in scan_lan_for_adb(
+            subnet,
+            port,
+            progress_cb=sub_progress if progress_cb else None,
+            cancel_check=cancel_check,
+        ):
             open_targets.append((ip, port))
+        if cancel_check is not None and cancel_check():
+            return []
 
     if not open_targets:
         logger.info(f"局域网内未发现端口 {port} 开放的设备")
@@ -461,12 +488,14 @@ def scan_and_connect_wireless(
     return _connect_targets(
         adb, open_targets, progress_cb,
         base=scan_total, total=scan_total + len(open_targets),
+        cancel_check=cancel_check,
     )
 
 
 def scan_and_connect_local(
     ports: tuple[int, ...] | list[int] | None = None,
     progress_cb: Callable[[str, int, int], None] | None = None,
+    cancel_check: Callable[[], bool] | None = None,
 ) -> list[dict]:
     """扫描本机开放的 ADB 端口并连接（用于发现模拟器）
 
@@ -487,6 +516,8 @@ def scan_and_connect_local(
     open_targets: list[tuple[str, int]] = []
     logger.info(f"正在探测本机 {total} 个常见模拟器 ADB 端口 ...")
     for i, p in enumerate(port_list, 1):
+        if cancel_check is not None and cancel_check():
+            return []
         if progress_cb:
             progress_cb(f"正在探测 {ip}:{p}...", i, total)
         if probe_port(ip, p, timeout=0.2):
@@ -502,6 +533,7 @@ def scan_and_connect_local(
     return _connect_targets(
         adb, open_targets, progress_cb,
         base=total, total=total + len(open_targets),
+        cancel_check=cancel_check,
     )
 
 

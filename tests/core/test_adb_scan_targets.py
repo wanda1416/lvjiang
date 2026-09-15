@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 
+from lvjiang.core.android import device as device_module
 from lvjiang.core.android import wireless as w
 
 IPCONFIG_OUT = """
@@ -160,3 +161,89 @@ def test_local_scan_finds_emulator_ports(monkeypatch, _stub_connect):
 def test_local_scan_returns_empty_when_nothing_open(monkeypatch, _stub_connect):
     monkeypatch.setattr(w, "probe_port", lambda *a, **k: False)
     assert w.scan_and_connect_local(ports=[5555]) == []
+
+
+def test_wireless_scan_stops_before_next_subnet_when_cancelled(
+    monkeypatch, _stub_connect,
+):
+    monkeypatch.setattr(w, "list_scan_subnets", lambda: ["192.168.1.", "10.0.0."])
+    scanned: list[str] = []
+    cancelled = False
+
+    def fake_scan(subnet, port, **kwargs):
+        nonlocal cancelled
+        scanned.append(subnet)
+        cancelled = True
+        return []
+
+    monkeypatch.setattr(w, "scan_lan_for_adb", fake_scan)
+
+    assert w.scan_and_connect_wireless(
+        cancel_check=lambda: cancelled,
+    ) == []
+    assert scanned == ["192.168.1."]
+
+
+def test_local_scan_stops_between_ports_when_cancelled(monkeypatch, _stub_connect):
+    probed: list[int] = []
+    cancelled = False
+
+    def fake_probe(ip, port, timeout=0.3):
+        nonlocal cancelled
+        probed.append(port)
+        cancelled = True
+        return False
+
+    monkeypatch.setattr(w, "probe_port", fake_probe)
+
+    assert w.scan_and_connect_local(
+        ports=[5555, 7555],
+        cancel_check=lambda: cancelled,
+    ) == []
+    assert probed == [5555]
+
+
+def test_lan_scan_cancellation_does_not_report_partial_results(monkeypatch):
+    cancelled = False
+
+    def fake_probe(ip, port, timeout=0.3):
+        nonlocal cancelled
+        cancelled = True
+        return ip.endswith(".1")
+
+    monkeypatch.setattr(w, "probe_port", fake_probe)
+
+    assert w.scan_lan_for_adb(
+        "192.168.1.",
+        5555,
+        max_workers=1,
+        cancel_check=lambda: cancelled,
+    ) == []
+
+
+def test_usb_adb_scan_terminates_process_when_cancelled(monkeypatch):
+    class Process:
+        returncode = None
+        terminated = False
+
+        def poll(self):
+            return self.returncode
+
+        def terminate(self):
+            self.terminated = True
+            self.returncode = 1
+
+        def kill(self):
+            self.returncode = 1
+
+        def communicate(self, timeout=None):
+            return "", ""
+
+    process = Process()
+    monkeypatch.setattr(device_module.subprocess, "Popen", lambda *a, **k: process)
+
+    assert device_module.list_adb_devices(
+        "adb",
+        cancel_check=lambda: True,
+    ) == []
+    assert process.terminated is True

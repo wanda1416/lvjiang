@@ -15,6 +15,7 @@
 | [07-tuning-history.md](07-tuning-history.md) | 调律历史：统一结果模型、版本化 SQLite、历史 UI 与七天补传 |
 | [08-base-attr-model.md](08-base-attr-model.md) | 基础属性来源模型：心法/武学/套装等如何合成装备之外的战斗属性 |
 | [09-io-backends.md](09-io-backends.md) | 截图与输入后端矩阵：PC 前台/后台、Android a11y/Shizuku/ADB、scrcpy、设备端各路径的能力、精度与限制 |
+| [10-maps.md](10-maps.md) | 地图定义与地图管理：世界系 POI、自带 HUD 场景、小地图朝向解析、地图管理对话框 |
 
 ## 子系统索引
 

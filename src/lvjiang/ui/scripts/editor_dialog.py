@@ -42,6 +42,8 @@ from PyQt6.QtGui import (
     QColor,
     QFont,
     QIcon,
+    QPainter,
+    QPixmap,
     QSyntaxHighlighter,
     QTextCharFormat,
     QTextCursor,
@@ -375,6 +377,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.tree.setStyleSheet(
             "QTreeWidget::item { padding: 5px 4px; }")
         self._icon_dir, self._icon_file = self._tree_icons()
+        self._icon_id_conflict = self._id_conflict_icon()
         self.tree.currentItemChanged.connect(self._on_select)
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._on_tree_menu)
@@ -464,6 +467,25 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
                 style.standardIcon(QStyle.StandardPixmap.SP_FileIcon))
 
     @staticmethod
+    def _id_conflict_icon() -> QIcon:
+        """脚本 id 冲突专用的红色感叹号图标。"""
+        pixmap = QPixmap(18, 18)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#d32f2f"))
+        painter.drawEllipse(1, 1, 16, 16)
+        font = painter.font()
+        font.setBold(True)
+        font.setPixelSize(13)
+        painter.setFont(font)
+        painter.setPen(Qt.GlobalColor.white)
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "!")
+        painter.end()
+        return QIcon(pixmap)
+
+    @staticmethod
     def _is_mac() -> bool:
         import sys
         return sys.platform == "darwin"
@@ -472,7 +494,13 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def _reload_list(self, select_id: str | None = None):
         """重建目录树。``select_id`` 是 workflows 内相对路径（含 .wf）"""
+        from ...workflows.discovery import discover_scripts, last_discovery_problems
+
         self._entries = list_script_files()
+        # 树不过滤，但要把元数据错误和 id 冲突标出来——否则用户在主界面
+        # 找不到脚本，或不知道同 id 的哪一份正在生效。
+        discover_scripts()
+        problems = {item.wf_file: item for item in last_discovery_problems()}
         expanded = self._expanded_dirs()        # 重建会丢展开状态，先记下来
         was_blocked = self.tree.blockSignals(True)
         self.tree.clear()
@@ -490,10 +518,28 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
              else self.tree.addTopLevelItem(node))
         for e in self._entries:
             visible_name = f"[远程] {e.name}" if e.file.is_remote else e.name
+            tooltip = f"{e.rel_path}\n{e.layer}: {e.path}"
+            problem = problems.get(e.rel_path)
+            if problem:
+                if problem.code != "duplicate_id":
+                    visible_name = f"⚠ {visible_name}"
+                tooltip += "\n" + tr("脚本问题：{reason}").format(
+                    reason=problem.message)
             item = QTreeWidgetItem([visible_name])
-            item.setIcon(0, self._icon_file)
+            item.setIcon(
+                0,
+                self._icon_id_conflict
+                if problem and problem.code == "duplicate_id"
+                else self._icon_file,
+            )
             item.setData(0, Qt.ItemDataRole.UserRole, e.rel_path)
-            item.setToolTip(0, f"{e.rel_path}\n{e.layer}: {e.path}")
+            item.setToolTip(0, tooltip)
+            if problem:
+                item.setForeground(
+                    0, QColor(
+                        get_theme_manager().tokens.danger
+                        if problem.code == "duplicate_id"
+                        else get_theme_manager().tokens.warning))
             (dir_items[e.parent].addChild(item) if e.parent
              else self.tree.addTopLevelItem(item))
             self._file_items[e.rel_path] = item
@@ -607,7 +653,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         if ret != QMessageBox.StandardButton.Yes:
             return
         try:
-            text = entry.path.read_text(encoding="utf-8")
+            text = entry.path.read_text(encoding="utf-8-sig")
         except OSError as e:
             QMessageBox.warning(self, tr("复制失败"), str(e))
             return
@@ -653,7 +699,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             self.editor.setPlainText("")
         else:
             try:
-                self.editor.setPlainText(entry.path.read_text(encoding="utf-8"))
+                self.editor.setPlainText(entry.path.read_text(encoding="utf-8-sig"))
             except (OSError, UnicodeError) as e:
                 self.editor.setPlainText("")
                 self._set_status(tr("读取失败: {e}").format(e=e), error=True)

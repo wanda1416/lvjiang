@@ -59,6 +59,33 @@ def _validate_string_list(value: Any, path: str) -> None:
         raise _error(path, "必须是字符串列表")
 
 
+def known_envs() -> list[str]:
+    """配置层提供的可用环境 key。
+
+    与 UI 环境控件共用 :func:`load_available_envs`，包括配置缺失时的桌面
+    回退，避免编辑器能选择的值和元数据校验接受的值不一致。
+    """
+    from ..core.config.resolver import load_available_envs
+
+    return [key for key, _display in load_available_envs()]
+
+
+def _validate_env_list(value: Any, path: str) -> None:
+    """``env`` 必须是系统参数里存在的环境：拼错一个字母的脚本会在所有环境
+    都不显示且无法启动，必须在解析期就报出来。"""
+    _validate_string_list(value, path)
+    allowed = known_envs()
+    if not allowed:
+        return
+    unknown = [item for item in value if item not in allowed]
+    if unknown:
+        raise _error(
+            path,
+            f"包含未知环境 {', '.join(unknown)}；"
+            f"系统参数中定义的环境只有 {', '.join(allowed)}",
+        )
+
+
 def _validate_options(
     value: Any, path: str, *, label_required: bool,
 ) -> list[Any]:
@@ -99,7 +126,7 @@ def _validate_parameter(parameter: Any, index: int) -> dict | None:
     if "label" in parameter and not isinstance(parameter["label"], str):
         raise _error(f"{path}.label", "必须是字符串")
     if "env" in parameter:
-        _validate_string_list(parameter["env"], f"{path}.env")
+        _validate_env_list(parameter["env"], f"{path}.env")
 
     param_type = parameter.get("type", "select")
     if not isinstance(param_type, str):
@@ -184,7 +211,7 @@ def _validate_metadata(data: Any) -> dict:
     if "name" in normalized and not normalized["name"].strip():
         raise _error("name", "必须是非空字符串")
     if "env" in normalized:
-        _validate_string_list(normalized["env"], "env")
+        _validate_env_list(normalized["env"], "env")
     if "id" in normalized and (
             not isinstance(normalized["id"], str)
             or SCRIPT_ID_RE.fullmatch(normalized["id"]) is None):
@@ -238,7 +265,7 @@ def parse_metadata_file(path: str | Path) -> dict:
     """读取 ``.wf`` 文件并解析其文件头元数据。"""
     source = Path(path)
     try:
-        return parse_metadata(source.read_text(encoding="utf-8"))
+        return parse_metadata(source.read_text(encoding="utf-8-sig"))
     except UnicodeError as exc:
         raise WorkflowMetadataError(f"{source}: 文件不是有效的 UTF-8") from exc
     except OSError as exc:

@@ -71,6 +71,16 @@ def test_workflow_parser():
     print(f"  全部 {len(wf_files)} 个文件解析成功")
 
 
+def test_parse_file_tolerates_utf8_bom(tmp_path):
+    """Windows 编辑器常带 BOM；不能在第 1 行第 1 列报 No terminal matches。"""
+    path = tmp_path / "bom.wf"
+    path.write_bytes("\ufeff#% runnable: true\nwait 1\n".encode("utf-8"))
+
+    program = parse_file(path)
+
+    assert len(program.body) == 1
+
+
 # ─── click 指令测试 ─────────────────────────────────────────
 
 def test_click_scene_ref():

@@ -419,7 +419,11 @@ class RunControlMixin:
         暴露哪些脚本、顺序、以及可选的显示名覆盖。暴露层逻辑与设备端
         悬浮面板共用 ``list_exposed_scripts()``。
         """
-        from ...workflows.discovery import list_exposed_scripts, script_display_name
+        from ...workflows.discovery import (
+            last_discovery_problems,
+            list_exposed_scripts,
+            script_display_name,
+        )
 
         # 环境切换只会改变“不支持”提示，不应把用户选中的日常任务重置
         # 为第一项。清空 combo 前先按稳定 id 留住当前选择。
@@ -436,7 +440,11 @@ class RunControlMixin:
             self._workflow_configs = list_exposed_scripts(current_env)
         except Exception as e:
             logger.error(f"发现脚本失败: {e}")
+            # 发现结果已经不可用，上一次成功刷新留下的告警同样不能继续
+            # 冒充当前状态。
+            self._show_ignored_scripts([])
             return
+        self._show_ignored_scripts(last_discovery_problems())
 
         # 填充下拉列表（block 信号，避免 addItem 逐条触发 _on_workflow_combo_changed）
         self.workflow_combo.blockSignals(True)
@@ -468,6 +476,23 @@ class RunControlMixin:
             self._batch_tab.refresh_scripts()
 
         logger.info(f"已加载 {len(self._workflow_configs)} 个脚本配置")
+
+    def _show_ignored_scripts(self, problems) -> None:
+        """把发现层忽略的 .wf 及原因显示在脚本下拉框下方。"""
+        label = getattr(self, "_ignored_scripts_warning", None)
+        if label is None:
+            return
+        if not problems:
+            label.setVisible(False)
+            label.setText("")
+            return
+        lines = [
+            tr("[警告] 以下 {n} 个脚本文件存在问题，请在脚本编辑器中修正：")
+            .format(n=len(problems))
+        ]
+        lines += [f"• {item.wf_file}：{item.message}" for item in problems]
+        label.setText("\n".join(lines))
+        label.setVisible(True)
 
     def _on_load_workflow(self):
         """加载任意 .wf 文件为临时工作流项（非常驻，打开新文件会覆盖）
@@ -1157,6 +1182,9 @@ class RunControlMixin:
         if capture is not None:
             engine._capture = capture
         if input_ctrl is not None:
+            # execute() 只给执行开始时的后端注入一次；ADB 重连替换实例后
+            # 必须重新挂载，否则新后端的长按无法观察本轮停止状态。
+            input_ctrl.stop_check = engine._stop_check
             engine._input = input_ctrl
         engine._android_device = getattr(self, "_device", None)
         # 两种应用控制器都绑定旧 AdbDevice；重连后必须按需重新创建。

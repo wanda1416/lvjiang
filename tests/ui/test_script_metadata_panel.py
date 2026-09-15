@@ -93,6 +93,36 @@ def test_workbench_actions_belong_to_editor_tab(qtbot, tmp_path, monkeypatch):
     assert 0 < tools_width <= 10
 
 
+def test_editor_marks_all_duplicate_id_files_with_error_icon(
+        qtbot, tmp_path, monkeypatch):
+    from PyQt6.QtGui import QColor
+
+    from lvjiang.core.config import resolver as resolver_module
+    from lvjiang.ui.scripts.editor_dialog import ScriptEditorDialog
+    from lvjiang.ui.theme import get_theme_manager
+
+    resolver = resolver_module.ConfigResolver(
+        tmp_path / "system", tmp_path / "local", dev_mode=True,
+    )
+    monkeypatch.setattr(resolver_module, "_resolver", resolver)
+    for rel in ("a.wf", "nested/b.wf"):
+        resolver.write_entity(
+            f"workflows/{rel}",
+            "#% id: duplicate\n#% runnable: true\n\nlog \"demo\"\n",
+        )
+
+    widget = ScriptEditorDialog()
+    qtbot.addWidget(widget)
+
+    expected_color = QColor(get_theme_manager().tokens.danger)
+    for rel in ("a.wf", "nested/b.wf"):
+        item = widget._file_items[rel]
+        assert not item.icon(0).isNull()
+        assert item.icon(0).cacheKey() == widget._icon_id_conflict.cacheKey()
+        assert item.foreground(0).color() == expected_color
+        assert "脚本 id 'duplicate' 冲突" in item.toolTip(0)
+
+
 def test_editor_defers_metadata_parse_until_focus_out(qtbot, tmp_path, monkeypatch):
     from PyQt6.QtCore import QEvent
     from PyQt6.QtGui import QFocusEvent
@@ -131,3 +161,56 @@ def test_editor_defers_metadata_parse_until_focus_out(qtbot, tmp_path, monkeypat
     assert parsed == [widget.editor.toPlainText()]
     # 避免 qtbot 回收对话框时因本用例制造的未保存状态弹确认框。
     widget._dirty = False
+
+
+def test_metadata_panel_env_choices_come_from_app_config(qtbot, monkeypatch):
+    """运行环境不是写死的 Android/Windows，而是系统参数 app.yaml 的 envs。"""
+    from lvjiang.ui.scripts import metadata_panel as panel_module
+
+    monkeypatch.setattr(
+        panel_module, "load_available_envs",
+        lambda: [("android", "安卓"), ("desktop", "桌面"), ("ios", "iOS")],
+    )
+    monkeypatch.setattr(
+        "lvjiang.workflows.metadata.known_envs",
+        lambda: ["android", "desktop", "ios"],
+    )
+    panel = panel_module.MetadataPanel()
+    qtbot.addWidget(panel)
+
+    assert [c.text() for c in panel._env_checks.values()] == ["安卓", "桌面", "iOS"]
+    assert [
+        panel._env_row.itemAt(index).widget().text()
+        for index in range(len(panel._env_checks))
+    ] == ["安卓", "桌面", "iOS"]
+
+    panel.load_text("#% runnable: true\n#% env: [ios, android]\n", editable=True)
+    assert panel._selected_env() == ["android", "ios"]
+
+    panel._env_checks["desktop"].setChecked(True)
+    panel._env_checks["android"].setChecked(False)
+    applied: list[str] = []
+    panel.text_applied.connect(applied.append)
+    panel._apply()
+
+    assert parse_metadata(applied[0])["env"] == ["desktop", "ios"]
+
+
+def test_metadata_panel_keeps_env_missing_from_app_config(qtbot, monkeypatch):
+    """脚本声明了系统参数里没有的环境：要显示出来，不能在“应用”时悄悄丢掉。"""
+    from lvjiang.ui.scripts import metadata_panel as panel_module
+
+    monkeypatch.setattr(
+        panel_module, "load_available_envs", lambda: [("desktop", "桌面")])
+    monkeypatch.setattr("lvjiang.workflows.metadata.known_envs", lambda: [])
+    panel = panel_module.MetadataPanel()
+    qtbot.addWidget(panel)
+
+    panel.load_text("#% runnable: true\n#% env: [android]\n", editable=True)
+
+    assert set(panel._env_checks) == {"desktop", "android"}
+    assert "系统参数中未定义" in panel._env_checks["android"].text()
+    applied: list[str] = []
+    panel.text_applied.connect(applied.append)
+    panel._apply()
+    assert parse_metadata(applied[0])["env"] == ["android"]

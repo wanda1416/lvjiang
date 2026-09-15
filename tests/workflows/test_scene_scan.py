@@ -745,7 +745,7 @@ def test_runtime_access_to_disabled_layout_item_raises(
     engine = _make_engine(bound_scenes=set(), **kwargs)
     with pytest.raises(
         WorkflowUserError,
-        match=rf"{expected}.*\[game_main_page\]\.\[target\].*已禁用",
+        match=rf"{expected}.*\[game_main_page\]\.\[target\].*未绑定布局坐标",
     ):
         engine.execute(wf)
 

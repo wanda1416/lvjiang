@@ -74,8 +74,6 @@ class _ActionMixin:
                 f"场景 {scene_key} 的区域未绑定坐标: {field_key}，"
                 f"请在场景布局编辑器中绑定后重试"
             )
-        require_enabled(region, scene_key, "region")
-
         # 非左键是明确的鼠标操作，不应用语义激活绑定；hold 则转为按键长按。
         activation_key = getattr(region, "activation_key", "")
         if (isinstance(activation_key, str) and activation_key
@@ -84,6 +82,7 @@ class _ActionMixin:
                 activation_key, f"{scene_key}/{field_key}", **kw)
             return
 
+        require_enabled(region, scene_key, "region")
         screen_x, screen_y = self._region_to_screen(region, jitter)
         logger.debug(f"点击: {scene_key}/{field_key} -> 屏幕({screen_x},{screen_y})")
         if region.click_rect is None:
@@ -209,13 +208,13 @@ class _ActionMixin:
         point = next((p for p in points if p.key == point_key), None)
         if point is None:
             raise ValueError(f"场景 {scene_key} 的坐标点未绑定: {point_key}")
-        require_enabled(point, scene_key, "point")
         activation_key = getattr(point, "activation_key", "")
         if (isinstance(activation_key, str) and activation_key
                 and kw.get("button", "left") == "left"):
             self._activate_bound_key(
                 activation_key, f"{scene_key}/{point_key}", **kw)
             return
+        require_enabled(point, scene_key, "point")
         screen_x, screen_y = self._point_to_screen(point)
         logger.debug(f"点击 point: {scene_key}/{point_key} -> 屏幕({screen_x},{screen_y})")
         self._input.click_screen(screen_x, screen_y, f"{scene_key}/{point_key}", **kw)

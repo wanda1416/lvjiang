@@ -3,10 +3,7 @@
   "regions": [
     {
       "key": "switch",
-      "x_ratio": 0.0,
-      "y_ratio": 0.0,
-      "w_ratio": 0.0,
-      "h_ratio": 0.0,
+      "disabled": true,
       "activation_key": "NUMPAD8"
     }
   ],

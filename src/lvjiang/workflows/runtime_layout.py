@@ -107,7 +107,8 @@ def require_enabled(item: T, scene_key: str, kind: str) -> T:
         kind_name = _KIND_NAMES.get(kind, kind)
         key = getattr(item, "key", "?")
         raise WorkflowUserError(
-            f"当前布局中的{kind_name} [{scene_key}].[{key}] 已禁用，无法在运行时访问"
+            f"当前布局中的{kind_name} [{scene_key}].[{key}] 未绑定布局坐标，"
+            "无法执行需要几何位置的操作"
         )
     return item
 

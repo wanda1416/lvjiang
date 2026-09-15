@@ -11,6 +11,7 @@ from lvjiang.core.config import DelayParam, InputSimConfig
 from lvjiang.core.layout_models import Arrow, CanvasConfig, Point, Region
 from lvjiang.workflows.base.actions import _ActionMixin
 from lvjiang.workflows.base.coords import _CoordMixin
+from lvjiang.workflows.errors import WorkflowUserError
 
 SCENE = "activity_jianghu"
 
@@ -150,6 +151,33 @@ def test_click_region_with_activation_key_presses_instead_of_clicking():
     assert actor._input.keys == [("down", "SPACE"), ("up", "SPACE")]
 
 
+def test_disabled_region_with_activation_key_still_presses():
+    region = Region(
+        key="btn_ok", x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0,
+        activation_key="B", disabled=True, has_position=False,
+    )
+    actor = _Actor(_FakeLayout(regions=[region]), capture_size=(0, 0))
+
+    actor.click_region(SCENE, "btn_ok", pre_delay=(0, 0), post_delay=(0, 0))
+
+    assert actor._input.clicks == []
+    assert actor._input.keys == [("down", "B"), ("up", "B")]
+
+
+def test_disabled_region_without_activation_key_rejects_click():
+    region = Region(
+        key="btn_ok", x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0,
+        disabled=True, has_position=False,
+    )
+    actor = _Actor(_FakeLayout(regions=[region]))
+
+    with pytest.raises(WorkflowUserError, match="未绑定布局坐标"):
+        actor.click_region(SCENE, "btn_ok")
+
+    assert actor._input.clicks == []
+    assert actor._input.keys == []
+
+
 def test_explicit_right_click_ignores_activation_key():
     region = Region(
         key="btn_ok", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
@@ -202,6 +230,19 @@ def test_click_point_unbound_raises():
     actor = _Actor(_FakeLayout())
     with pytest.raises(ValueError, match="p1"):
         actor.click_point(SCENE, "p1")
+
+
+def test_disabled_point_with_activation_key_still_presses():
+    point = Point(
+        key="p1", cx_ratio=0, cy_ratio=0,
+        activation_key="SPACE", disabled=True, has_position=False,
+    )
+    actor = _Actor(_FakeLayout(points=[point]), capture_size=(0, 0))
+
+    actor.click_point(SCENE, "p1", pre_delay=(0, 0), post_delay=(0, 0))
+
+    assert actor._input.clicks == []
+    assert actor._input.keys == [("down", "SPACE"), ("up", "SPACE")]
 
 
 def test_click_region_without_capture_size_raises():

@@ -46,7 +46,7 @@ def add_activation_key_row(
     if enabled:
         edit.setToolTip(tr("仅作用于当前布局；click 将改为按下该按键"))
     else:
-        edit.setToolTip(tr("请先在当前布局中放置该实体，再设置激活按键"))
+        edit.setToolTip(tr("请先在当前布局中放置该实体，或将其标记为禁用后设置按键"))
     form.addRow(tr("按键:"), edit)
     return edit
 

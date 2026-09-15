@@ -20,6 +20,7 @@ from lvjiang.core.layout_models import (
     Panel,
     Point,
     Region,
+    SubsceneRef,
 )
 from tests.case_matrix import case_matrix
 
@@ -81,7 +82,8 @@ class TestSaveLoadRoundtrip:
 
     def test_unbound_disabled_region_omits_meaningless_zero_coordinates(self):
         placeholder = Region(
-            "exit_to_desktop", 0, 0, 0, 0, disabled=True)
+            "exit_to_desktop", 0, 0, 0, 0,
+            disabled=True, has_position=False)
 
         compact = placeholder.to_dict()
 
@@ -96,17 +98,64 @@ class TestSaveLoadRoundtrip:
         assert saved["x_ratio"] == pytest.approx(0.1)
         assert Region.from_dict(saved) == placed
 
+    def test_activation_only_region_has_safe_numbers_without_canvas_geometry(self):
+        compact = {"key": "bag", "activation_key": "B", "disabled": True}
+
+        region = Region.from_dict(compact)
+
+        assert region.has_position is False
+        assert (region.x_ratio, region.y_ratio, region.w_ratio, region.h_ratio) == (
+            0.0, 0.0, 0.0, 0.0,
+        )
+        assert region.to_dict() == compact
+
+    def test_activation_only_point_has_safe_numbers_without_canvas_geometry(self):
+        compact = {
+            "key": "confirm", "activation_key": "SPACE", "disabled": True,
+        }
+
+        point = Point.from_dict(compact)
+
+        assert point.has_position is False
+        assert (point.cx_ratio, point.cy_ratio, point.r_ratio) == (0.0, 0.0, 0.015)
+        assert point.to_dict() == compact
+
     def test_enabled_region_still_requires_coordinates(self):
         with pytest.raises(KeyError):
             Region.from_dict({"key": "broken"})
 
     @case_matrix("item", [
-        Point("point", 0, 0, disabled=True),
-        Panel("panel", 0, 0, 0, 0, disabled=True),
+        Point("point", 0, 0, disabled=True, has_position=False),
+        Panel("panel", 0, 0, 0, 0, disabled=True, has_position=False),
+        SubsceneRef(
+            "subscene", 0, 0, 0, 0,
+            disabled=True, has_position=False,
+        ),
+        Arrow("arrow", from_key="", disabled=True),
     ])
     def test_other_unbound_disabled_items_are_compact(self, item):
         assert item.to_dict() == {"key": item.key, "disabled": True}
         assert type(item).from_dict(item.to_dict()) == item
+
+    def test_disabled_point_at_real_zero_coordinate_keeps_position(self):
+        point = Point("corner", 0, 0, disabled=True)
+
+        saved = point.to_dict()
+
+        assert saved["cx_ratio"] == 0
+        assert saved["cy_ratio"] == 0
+        assert Point.from_dict(saved) == point
+
+    @case_matrix("item", [
+        Panel("panel", 0, 0, 0.4, 0.5, disabled=True),
+        SubsceneRef("subscene", 0, 0, 0.4, 0.5, disabled=True),
+    ])
+    def test_disabled_rect_at_real_zero_coordinate_keeps_position(self, item):
+        saved = item.to_dict()
+
+        assert saved["x_ratio"] == 0
+        assert saved["y_ratio"] == 0
+        assert type(item).from_dict(saved) == item
 
     def test_roundtrip_preserves_all_data(self, env):
         mgr = LayoutConfigManager()

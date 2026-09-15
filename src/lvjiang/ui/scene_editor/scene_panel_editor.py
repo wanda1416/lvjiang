@@ -63,7 +63,7 @@ class PanelEditorMixin:
         self._panel_table = EntityOrderTable()
         self._panel_table.setColumnCount(6)
         self._panel_table.setHorizontalHeaderLabels(
-            [tr("场景定义"), "Key", tr("布局绑定"), tr("行 × 列"), tr("校准模式"), tr("布局禁用")]
+            [tr("场景定义"), "Key", tr("布局绑定"), tr("行 × 列"), tr("校准模式"), tr("无布局")]
         )
         # 列宽：名称/Key 自适应内容，其余固定窄宽
         header = self._panel_table.horizontalHeader()
@@ -74,7 +74,7 @@ class PanelEditorMixin:
         header.resizeSection(2, 75)   # 当前布局绑定状态
         header.resizeSection(3, 65)   # 行列数
         header.resizeSection(4, 80)   # 校准模式
-        header.resizeSection(5, 75)   # 布局禁用
+        header.resizeSection(5, 75)   # 当前布局不使用坐标
         self._panel_table.setSelectionBehavior(
             EntityOrderTable.SelectionBehavior.SelectRows
         )

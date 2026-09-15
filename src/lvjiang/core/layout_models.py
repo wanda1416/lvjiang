@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass, field, replace
 from pathlib import PurePosixPath
 
 from .coord_types import CircleCoordRef, RectCoordRef
-from .key_names import normalize_key
+from .key_names import normalize_pressable
 
 
 @dataclass
@@ -178,7 +178,7 @@ class Region:
 
     def __post_init__(self):
         if self.activation_key:
-            self.activation_key = normalize_key(self.activation_key)
+            self.activation_key = normalize_pressable(self.activation_key)
         if self.click_rect is not None:
             self.click_rect = _validate_click_rect(self.key, self.click_rect)
         if self.template is not None and not isinstance(
@@ -282,7 +282,7 @@ class Point:
 
     def __post_init__(self):
         if self.activation_key:
-            self.activation_key = normalize_key(self.activation_key)
+            self.activation_key = normalize_pressable(self.activation_key)
 
     @property
     def is_reference(self) -> bool:

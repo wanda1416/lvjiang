@@ -8,7 +8,12 @@ from lvjiang.core.desktop.win32_keyboard import (
     _make_key_lparam,
     post_keyboard_input,
 )
-from lvjiang.core.key_names import KNOWN_KEY_NAMES, normalize_key
+from lvjiang.core.key_names import (
+    KNOWN_KEY_NAMES,
+    mouse_button_from_pressable,
+    normalize_key,
+    normalize_pressable,
+)
 
 
 def test_keydown_lparam_has_scan_without_release_bits():
@@ -41,6 +46,13 @@ def test_punctuation_character_aliases_use_physical_keys():
 def test_left_and_right_shift_remain_distinct():
     assert normalize_key("LSHIFT") == "LSHIFT"
     assert normalize_key("RSHIFT") == "RSHIFT"
+
+
+def test_normalize_pressable_accepts_mouse_buttons():
+    assert normalize_pressable("mouse_left") == "MOUSE_LEFT"
+    assert normalize_pressable("MOUSE_BACK") == "MOUSE_X1"
+    assert mouse_button_from_pressable("MOUSE_FORWARD") == "x2"
+    assert mouse_button_from_pressable("Q") is None
 
 
 def test_extended_postmessage_key_is_not_misclassified_as_system_key(monkeypatch):

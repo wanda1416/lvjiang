@@ -10,7 +10,7 @@ import time
 
 from loguru import logger
 
-from ...core.key_names import normalize_key
+from ...core.key_names import normalize_pressable
 from ...core.timing import precise_wait
 from ..runtime_layout import require_enabled
 from .engine_ref import require_engine
@@ -50,7 +50,7 @@ class _ActionMixin:
         if button != "left":
             raise ValueError(f"按键激活仅支持默认左键语义，收到 mouse button={button!r}")
 
-        normalized = normalize_key(key)
+        normalized = normalize_pressable(key)
         before = self._input.before_click_wait if pre_delay is None else pre_delay
         after = self._input.after_click_wait if post_delay is None else post_delay
         if before != (0, 0):

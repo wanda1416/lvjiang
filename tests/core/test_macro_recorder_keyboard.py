@@ -100,12 +100,15 @@ def test_low_precision_does_not_collapse_an_interleaved_key():
     parse_text("\n".join(compacted))
 
 
-def test_low_precision_keeps_wait_after_raw_mouse_event():
+def test_low_precision_compacts_raw_mouse_event_as_press_hold():
     lines = [
         "place (0.5, 0.5)",
-        "mouse left down",
+        'press "MOUSE_LEFT" down',
         "wait 0.2",
-        "mouse left up",
+        'press "MOUSE_LEFT" up',
     ]
 
-    assert macro_recorder._compact_low_precision_lines(lines) == lines
+    assert macro_recorder._compact_low_precision_lines(lines) == [
+        "place (0.5, 0.5)",
+        'press "MOUSE_LEFT" hold 0.2',
+    ]

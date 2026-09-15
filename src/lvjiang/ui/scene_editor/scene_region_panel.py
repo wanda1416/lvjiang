@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.key_names import normalize_key
+from ...core.key_names import normalize_pressable
 from ...core.layout_manager import (
     delete_item_key_across_all_layouts,
     rename_item_key_across_all_layouts,
@@ -658,7 +658,7 @@ class RegionPanelMixin:
 
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
-        activation_edit.textChanged.connect(_validate)
+        activation_edit.currentTextChanged.connect(_validate)
         _validate()
 
         def _accept():
@@ -674,7 +674,7 @@ class RegionPanelMixin:
         target_scene = (
             scene_combo.currentData() if scene_combo is not None else self._scene_key
         )
-        activation_key = activation_edit.text().strip()
+        activation_key = activation_edit.currentText().strip()
         return RegionDef(
             key=key_edit.text().strip(),
             name=name_edit.text().strip(),
@@ -685,7 +685,7 @@ class RegionPanelMixin:
             to=transition.value() if is_clickable_check.isChecked() else "",
             navigation=transition.navigation_value() if is_clickable_check.isChecked() else "",
             available_from=transition.available_from_value() if is_clickable_check.isChecked() else [],
-        ), target_scene, normalize_key(activation_key) if activation_key else ""
+        ), target_scene, normalize_pressable(activation_key) if activation_key else ""
 
     # ─── 跨场景引用 ──────────────────────────────────────
 

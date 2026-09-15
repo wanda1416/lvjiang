@@ -12,7 +12,6 @@ start: (_NL | statement)*
 ?statement: scene_stmt
           | click_stmt
           | android_app_stmt
-          | mouse_button_stmt
           | place_stmt
           | move_stmt
           | replay_input_trace_stmt
@@ -61,7 +60,7 @@ android_app_stmt: "app"i ANDROID_APP_ACTION (STRING | var_ref) android_app_timeo
 android_app_timeout: "timeout"i (number | var_ref)
 ANDROID_APP_ACTION: /stop/i | /start/i
 
-// press：模拟键盘按键
+// press：模拟键盘键或鼠标按钮
 // press "M"             — 完整按键（down + up）
 // press "W" hold 2.0    — 固定按住 2 秒后释放
 // press "W" hold (0.05, 0.08) — 在区间内随机选择按住时长
@@ -70,6 +69,7 @@ ANDROID_APP_ACTION: /stop/i | /start/i
 // press "SHIFT" up      — 释放
 // press $key            — 按键名来自变量（值按字符串处理）
 // press "CTRL" + "C"   — 组合键，从左到右按下、从右到左释放
+// press "MOUSE_LEFT" hold 0.2 — 在当前指针位置按住鼠标左键
 press_stmt: "press"i press_key_chain press_modifier? wait_clauses? _NL
 press_key_chain: press_key ("+" press_key)*
 ?press_key: STRING | var_ref
@@ -121,11 +121,6 @@ click_target: const_or_var "." const_or_var panel_index panel_index -> click_pan
 CLICK_BUTTON: /left/i | /right/i | /middle/i | /x1/i | /x2/i | /back/i | /forward/i
 
 click_hold: "hold"i press_hold_value
-
-// 鼠标键原始事件。坐标由前置 place/move 决定；录制器用它保留多个输入
-// 同时按下时的真实 down/up 时间线。
-mouse_button_stmt: "mouse"i CLICK_BUTTON MOUSE_BUTTON_STATE _NL
-MOUSE_BUTTON_STATE: /down/i | /up/i
 
 // place：将鼠标直接放到画布归一化坐标，不产生移动过程。
 // 它是 move 的辅助原语，不承担 scene/region 等业务目标解析。
@@ -353,7 +348,6 @@ call_arg_list: expression ("," expression)*
 env_guard_stmt: "env"i ":" STRING "->" env_guard_action
 
 ?env_guard_action: click_stmt
-                 | mouse_button_stmt
                  | place_stmt
                  | move_stmt
                  | replay_input_trace_stmt

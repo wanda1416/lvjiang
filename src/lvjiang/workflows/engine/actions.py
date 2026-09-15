@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from .key_state import KeyStateRegistry
 
 from ...core.coord_types import CircleCoordRef, CoordRef, RectCoordRef
-from ...core.key_names import normalize_key
+from ...core.key_names import normalize_pressable
 from ...core.timing import precise_wait
 from ...i18n import tr
 from ..grammar import (
@@ -62,7 +62,6 @@ class _ActionsMixin:
     """
 
     _key_registry: "KeyStateRegistry | None"
-    _pressed_mouse_buttons: set[str]
 
     def _subscene_target_to_screen(
         self, target: SubsceneEntityRef,
@@ -84,16 +83,6 @@ class _ActionsMixin:
                 item.x_ratio + item.w_ratio / 2,
                 item.y_ratio + item.h_ratio / 2)
         return x, y, f"{scene}/{reference}/{entity}"
-
-    def _exec_mouse_button(self, node):
-        """mouse BUTTON down|up — 在当前光标位置发送原始鼠标键事件。"""
-        state = "down" if node.pressed else "up"
-        logger.debug(f"mouse: {node.button} {state}")
-        self._input.mouse_button(node.button, node.pressed)
-        if node.pressed:
-            self._pressed_mouse_buttons.add(node.button)
-        else:
-            self._pressed_mouse_buttons.discard(node.button)
 
     def _exec_click(self, node: Click):
         """click scene.coord / scene.panel[row][col] — scene 和 coord 都可以是常量或变量。
@@ -681,7 +670,7 @@ class _ActionsMixin:
         logger.debug(f"drag region: {scene}.{key} up (default)")
 
     def _exec_press(self, node: Press):
-        """press "KEY" [hold N|范围|变量 | down | up] — 模拟键盘按键
+        """press "KEY" [hold N|范围|变量 | down | up] — 模拟键盘键或鼠标按钮
 
         四种模式：
         - PRESS: 一次完整按键（down + up）
@@ -768,7 +757,7 @@ class _ActionsMixin:
             from .key_state import KeyStateRegistry
             self._key_registry = KeyStateRegistry(self._input)
 
-        keys = [normalize_key(str(key)) for key in raw_keys]
+        keys = [normalize_pressable(str(key)) for key in raw_keys]
         if len(set(keys)) != len(keys):
             raise WorkflowUserError(f"press 组合键包含重复按键: {' + '.join(keys)}")
 

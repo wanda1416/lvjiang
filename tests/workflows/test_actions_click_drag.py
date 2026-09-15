@@ -9,6 +9,7 @@
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+from lark.exceptions import UnexpectedInput
 
 from lvjiang.core.layout_models import Region
 from lvjiang.workflows.align import GridAlignment
@@ -80,10 +81,11 @@ class TestClickCoordPoint:
         click_panel.assert_called_once_with("bag", "items", 2, 3)
 
 
-class TestRawMouseButton:
+class TestPressMouseButton:
     def test_down_up_reach_backend_in_order(self):
         eng = make_engine()
-        program = parse_text("mouse x1 down\nmouse x1 up\n")
+        program = parse_text(
+            'press "MOUSE_X1" down\npress "MOUSE_X1" up\n')
 
         eng._exec_body(program.body)
 
@@ -91,17 +93,22 @@ class TestRawMouseButton:
             call("x1", True),
             call("x1", False),
         ]
-        assert eng._pressed_mouse_buttons == set()
+        assert not eng._key_registry.is_pressed("MOUSE_X1")
 
     def test_back_forward_aliases_are_normalized(self):
         eng = make_engine()
-        program = parse_text("mouse back down\nmouse back up\n")
+        program = parse_text(
+            'press "MOUSE_BACK" down\npress "MOUSE_BACK" up\n')
 
         eng._exec_body(program.body)
 
         assert [call.args[0] for call in eng._input.mouse_button.call_args_list] == [
             "x1", "x1",
         ]
+
+    def test_removed_mouse_instruction_is_rejected(self):
+        with pytest.raises(UnexpectedInput):
+            parse_text("mouse left down\n")
 
 
 class TestClickSceneRegion:

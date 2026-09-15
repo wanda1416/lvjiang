@@ -15,7 +15,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
-from ...core.key_names import normalize_key
+from ...core.key_names import normalize_pressable
 from ...core.layout_models import Arrow, CanvasConfig, Panel, Point, Region, SubsceneRef
 from ...core.scene_registry import (
     get_panel_name,
@@ -271,7 +271,7 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         item = self._find_item_by_kind(kind, key)
         if item is None:
             return False
-        normalized = normalize_key(value) if value else ""
+        normalized = normalize_pressable(value) if value else ""
         if item.activation_key == normalized:
             return True
         item.activation_key = normalized

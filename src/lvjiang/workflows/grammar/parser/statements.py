@@ -14,7 +14,6 @@ from ..ast_nodes import (
     Find,
     Import,
     Literal,
-    MouseButton,
     Move,
     PanelGridDrag,
     PanelRef,
@@ -206,17 +205,6 @@ class _StmtMixin:
         if isinstance(value, (int, float)):
             value = float(value)
         return ("click_hold", value)
-
-    def mouse_button_stmt(self, items):
-        """mouse left|right|middle|x1|x2 down|up — 原始鼠标键事件。"""
-        raw_button = str(items[0]).lower()
-        button = _CLICK_BUTTON_ALIASES.get(raw_button, raw_button)
-        pressed = str(items[1]).lower() == "down"
-        return MouseButton(
-            button=button,
-            pressed=pressed,
-            line_no=self._line(items),
-        )
 
     def click_panel_target(self, items):
         """click [scene].[panel][row][col] — panel 三级索引

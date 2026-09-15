@@ -598,7 +598,7 @@ class MacroRecorder:
         rx, ry = self._screen_to_canvas_ratio(sx, sy)
         self._emit_line(f"place ({rx}, {ry})")
         state = "down" if pressed else "up"
-        self._emit_line(f"mouse {button_name} {state}")
+        self._emit_line(f'press "MOUSE_{button_name.upper()}" {state}')
         self._last_action_time = event_time
 
     def _raw_delta_to_canvas_ratio(self, dx: int, dy: int) -> tuple[float, float]:

@@ -58,15 +58,6 @@ class Click:
 
 
 @dataclass(frozen=True)
-class MouseButton:
-    """鼠标键原始事件，不合并 down/up，也不隐式移动光标。"""
-
-    button: str
-    pressed: bool
-    line_no: int = 0
-
-
-@dataclass(frozen=True)
 class Place:
     """place 指令：直接设置鼠标位置，不产生移动过程。"""
     target: Any
@@ -279,13 +270,15 @@ class PressMode(Enum):
 
 @dataclass(frozen=True)
 class Press:
-    """press 指令：模拟键盘按键
+    """press 指令：模拟键盘键或桌面鼠标按钮
 
     四种模式：
     - PRESS: press "M" — 一次完整按键（down + up）
     - HOLD: press "W" hold 2.0 / hold (1.8, 2.2) — 按住后释放
     - DOWN: press "SHIFT" down — 按下保持
     - UP: press "SHIFT" up — 释放此前按下的键
+
+    鼠标按钮使用 MOUSE_LEFT/MOUSE_RIGHT/MOUSE_MIDDLE/MOUSE_X1/MOUSE_X2。
     """
     key: Any          # str（常量）| VarRef（变量）
     mode: PressMode = PressMode.PRESS

@@ -251,6 +251,22 @@ def test_drag_arrow_absolute_target_works():
     assert len(actor._input.drags) == 1
 
 
+def test_drag_arrow_scale_and_exact_share_drag_between():
+    """arrow 与 A to B 走同一实现：scale 沿向量放大，exact 关掉两端抖动。"""
+    layout = _FakeLayout(
+        points=[Point(key="c", cx_ratio=0.2, cy_ratio=0.5, r_ratio=0.05),
+                Point(key="fwd", cx_ratio=0.2, cy_ratio=0.4, r_ratio=0.05)],
+        arrows=[Arrow(key="fwd", from_key="c", to_key="fwd")],
+    )
+    actor = _Actor(layout)   # capture 1000×500
+
+    actor.drag_arrow(SCENE, "fwd", scale=2, exact=True)
+    assert actor._input.drags[-1][:4] == (200, 250, 200, 150)   # 0.5→0.3 × 500
+
+    actor.drag_arrow(SCENE, "fwd", scale=6, exact=True)    # 0.5 - 0.6 → 截断到 0
+    assert actor._input.drags[-1][:4] == (200, 250, 200, 0)
+
+
 # ─── 等待：未定义的命名参数不再当成「不等待」 ──────────────────
 
 def test_wait_delay_unknown_name_raises():

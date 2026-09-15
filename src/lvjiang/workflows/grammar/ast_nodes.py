@@ -116,6 +116,8 @@ class Drag:
     distance: Any = 1.0            # 拖拽距离：float | VarRef（支持整数、浮点数如 0.5、变量引用）
     line_no: int = 0
     suppress_defaults: bool = False  # 显式 wait_clause 时抑制默认 before/after_click_wait
+    scale: Any = None       # Literal | VarRef | None：起点→终点向量的放大倍数（仅 arrow / 两点形态）
+    exact: bool = False     # True 时起点与终点都不做半径内随机抖动
 
 
 @dataclass(frozen=True)

@@ -134,8 +134,9 @@ click [scene].[region] after wait stable 5  # 点击后等待稳定
 ```
 # Arrow 拖拽
 drag [scene].[arrow]                    # 执行 Arrow 定义的拖拽
-drag [scene].[arrow] 0.5                # 指定时长
-drag [scene].[arrow] 0.5 hold 0.2       # 拖拽后按住
+drag [scene].[arrow] duration 0.5                # 指定时长
+drag [scene].[arrow] duration 0.5 hold 0.2       # 拖拽后按住
+drag [scene].[arrow] scale 2 exact               # 向量放大 2 倍，两端不抖动
 
 # Panel/Region 翻页
 drag [scene].[panel][r][c] down <n>     # 下翻 n 行（默认 1）
@@ -143,8 +144,8 @@ drag [scene].[panel][r][c] up $var      # 上翻 $var 行
 drag [scene].[panel][r][c] left/right   # 左/右翻
 
 # 点对拖拽
-drag [s1].[p1] [s2].[p2]               # 两点间拖拽
-drag (rx1, ry1) (rx2, ry2)             # 坐标模式
+drag [s1].[p1] to [s2].[p2]               # 两点间拖拽
+drag (rx1, ry1) to (rx2, ry2)          # 坐标模式
 ```
 
 ### move / place — 鼠标移动

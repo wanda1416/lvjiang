@@ -447,11 +447,19 @@ class _EvalMixin:
         return str(node)
 
     def _resolve_duration(self, node) -> float | tuple[float, float]:
-        """解析拖拽时长：Literal → float，list[Literal] → tuple"""
+        """解析拖拽时长：Literal → float，list[Literal] → tuple，VarRef → 数值或二元 tuple"""
         if isinstance(node, list):
             return (float(node[0].value), float(node[1].value))
         if isinstance(node, Literal):
             return float(node.value)
+        if isinstance(node, VarRef):
+            value = self.variables.get(node.name)
+            if isinstance(value, tuple) and len(value) == 2:
+                return (float(value[0]), float(value[1]))
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise WorkflowUserError(
+                    f"drag duration ${node.name} 不是数值或二元区间: {value!r}")
+            return float(value)
         return float(node)
 
     def _coord_ratio_to_screen(self, rx: float, ry: float) -> tuple[int, int]:

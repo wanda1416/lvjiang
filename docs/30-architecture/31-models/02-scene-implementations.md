@@ -170,7 +170,7 @@
 ### Arrows
 
 每个方向点各有一条同名 arrow，从对应中心指向该点：
-`drag [general_move].[move_backward] 0.1 hold 2.1` 即"推杆后退并保持 2.1 秒"。
+`drag [general_move].[move_backward] duration 0.1 hold 2.1 exact` 即"0.1 秒推杆到位、后退并保持 2.1 秒"；`scale 0.5` 可半推（走路），方向类拖拽建议带 `exact` 关掉抖动。
 
 ---
 

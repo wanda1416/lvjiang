@@ -415,25 +415,36 @@ class _StmtMixin:
         wait_pairs, core_items = self._extract_wait_pairs(items)
 
         drag_node = core_items[0]  # 已由 drag_*_target 构造为 Drag
-        duration = None
-        hold = None
+        # 各修饰子句返回带标签的二元组，按标签而不是按值类型分派；重复即报错
+        modifiers: dict[str, object] = {}
         for item in core_items[1:]:
-            if isinstance(item, Literal):
-                duration = item
-            elif isinstance(item, list):
-                duration = item
-            elif isinstance(item, float):
-                hold = item
+            if not (isinstance(item, tuple) and len(item) == 2):
+                continue
+            tag, value = item
+            if tag in modifiers:
+                raise WorkflowUserError(
+                    f"drag: {tag.removeprefix('drag_')} 子句重复（第 {drag_node.line_no} 行）")
+            modifiers[tag] = value
+        scale = modifiers.get("drag_scale")
+        exact = bool(modifiers.get("drag_exact", False))
+        vector_form = (
+            drag_node.direction is None
+            and isinstance(drag_node.scene, (EntityRef, type(None))))
+        if (scale is not None or exact) and not vector_form:
+            raise WorkflowUserError(
+                "drag: scale / exact 只适用于 arrow 与 A to B 两点形态，"
+                f"panel/region 翻页拖拽不支持（第 {drag_node.line_no} 行）")
         # 显式 wait_clause → 抑制默认延迟
         suppress = len(wait_pairs) > 0
         result = Drag(
             scene=drag_node.scene, arrow=drag_node.arrow,
-            duration=duration, hold=hold,
+            duration=modifiers.get("drag_duration"), hold=modifiers.get("drag_hold"),
             from_point=drag_node.from_point, to_point=drag_node.to_point,
             from_scene_ref=drag_node.from_scene_ref, to_scene_ref=drag_node.to_scene_ref,
             direction=drag_node.direction, distance=drag_node.distance,
             line_no=drag_node.line_no,
             suppress_defaults=suppress,
+            scale=scale, exact=exact,
         )
         return self._expand_wait_clauses(result, wait_pairs)
 
@@ -490,7 +501,7 @@ class _StmtMixin:
         return Drag(scene=scene_ref, arrow=scene_ref, line_no=self._line(items))
 
     def drag_point_pair_target(self, items):
-        """drag [scene].[point_1] [scene].[point_2] — 两个命名点之间拖拽"""
+        """drag [scene].[point_1] to [scene].[point_2] — 两个命名点之间拖拽"""
         from_scene = self._resolve_const_or_var(items[0])
         from_point = self._resolve_const_or_var(items[1])
         to_scene = self._resolve_const_or_var(items[2])
@@ -501,7 +512,7 @@ class _StmtMixin:
                     line_no=self._line(items))
 
     def drag_coord_target(self, items):
-        """drag (rx1, ry1) (rx2, ry2) — 两个画布归一化坐标点"""
+        """drag (rx1, ry1) to (rx2, ry2) — 两个画布归一化坐标点"""
         from_point, to_point = items  # 两个 CoordPoint
         self._validate_coord_point(
             from_point, relative=False, command="drag 起点")
@@ -510,14 +521,28 @@ class _StmtMixin:
         return Drag(scene=None, arrow=None, from_point=from_point, to_point=to_point, line_no=0)
 
     def drag_duration(self, items):
+        """duration <number|[min, max]|$var>，保留表达式供运行时解析。"""
         item = items[0]
-        if isinstance(item, list):
-            return item[:2]
-        return Literal(value=float(item))
+        if isinstance(item, VarRef):
+            value = item
+        elif isinstance(item, list):
+            # bracket_list 的元素是原始 token 字面量，这里统一收成数值
+            value = [Literal(value=float(getattr(x, "value", x))) for x in item[:2]]
+        else:
+            value = Literal(value=float(item))
+        return ("drag_duration", value)
 
     def drag_hold(self, items):
         """hold <seconds> → float"""
-        return float(items[0])
+        return ("drag_hold", float(items[0]))
+
+    def drag_scale(self, items):
+        """scale <number|$var>，保留表达式供运行时解析。"""
+        item = items[0]
+        return ("drag_scale", item if isinstance(item, VarRef) else Literal(value=float(item)))
+
+    def drag_exact(self, items):
+        return ("drag_exact", True)
 
     # ─── press 指令 ─────────────────────────────────────
 

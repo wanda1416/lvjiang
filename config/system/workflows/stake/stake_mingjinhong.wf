@@ -225,7 +225,7 @@ click [general_control].[xuli] hold 1.52 after wait 0.8
 
 # 吹笛拉距离：0.1 秒推到后退方向，再保持 2.1 秒，总时长 2.2 秒
 click [general_control].$qishu_dz hold 0.12 after wait 0.1
-drag [general_move].[move_backward] 0.1 hold 2.1 after wait 0.95
+drag [general_move].[move_backward] duration 0.1 hold 2.1 exact after wait 0.95
 
 # 第四次瞬发剑气
 log info "第三次点剑+第四次瞬发剑气"

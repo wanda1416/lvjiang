@@ -62,17 +62,35 @@ _MIN_RATING_CHOICES: tuple[str, ...] = ("顶级", "优秀", "一般")
 _DEFAULT_MIN_RATING = "一般"
 
 
+def _playstyle_match_scope(
+    name: str,
+    config: dict,
+    *,
+    current_playstyle: str,
+    current_school: str,
+    current_attr: str,
+) -> str:
+    """返回玩法相对当前方案的最精确层级，空串表示仅作其他候选。"""
+    if current_playstyle and name == current_playstyle:
+        return "plan"
+    if current_school and config.get("school") == current_school:
+        return "school"
+    if current_attr and config.get("attr") == current_attr:
+        return "attr"
+    return ""
+
+
 class _PlaystylePickerDialog(QDialog):
     """挑选参与筛选的「调律规则-玩法」组合。
 
     一件装备往往同时符合好几套玩法，只能选一条规则时能留下的装备极少。
     所以这里是多选，判定取各条规则给出的**最高**评级。
 
-    本流派命中的玩法排在最前并预先分组：全部规则的玩法加起来有几十条，
-    不排序的话找自己那几条要翻半天。
+    本方案、本流派、本属性依次排在最前：全部规则的玩法加起来有几十条，
+    不分层的话找相关玩法要翻半天。
     """
 
-    def __init__(self, options: list[tuple[str, str, str, bool]],
+    def __init__(self, options: list[tuple[str, str, str, str]],
                  selected: set[tuple[str, str]], parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle(tr("选择调律玩法"))
@@ -85,9 +103,15 @@ class _PlaystylePickerDialog(QDialog):
 
         self._list = QListWidget()
         layout.addWidget(self._list)
-        for rule_key, playstyle, label, matched in options:
+        scope_labels = {
+            "plan": tr("（本方案）"),
+            "school": tr("（本流派）"),
+            "attr": tr("（本属性）"),
+        }
+        for rule_key, playstyle, label, scope in options:
+            scope_label = scope_labels.get(scope, "")
             item = QListWidgetItem(
-                f"{label}　{tr('（本流派）')}" if matched else label)
+                f"{label}　{scope_label}" if scope_label else label)
             item.setData(Qt.ItemDataRole.UserRole, (rule_key, playstyle))
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(
@@ -974,39 +998,43 @@ class OptimalComboDialog(QDialog):
         self._btn_gongjue.setText(" / ".join(selected) if selected else tr("无"))
 
     def _load_tuning_options(self) -> None:
-        """收集全部「调律规则-玩法」组合，本流派命中的排在前面。
+        """收集全部规则玩法，按本方案、本流派、本属性分层排序。
 
-        只列本流派的组合是不够的：同一套装备常常还想按邻近玩法看一眼，
-        而流派匹配用的是「主副武器 + 属性」全等，稍有出入就一条都不剩。
-        所以全部列出，只把命中的排到前面并标注。
+        三层相关玩法全部默认参与候选评级；其他玩法仍然列出，供用户手动
+        扩大范围。层级直接使用公共玩法注册表中的完整 school/attr，不能再用
+        武器集合猜测，否则主副武器相反的牵丝·霖和牵丝·玉会被混为一类。
         """
         from ...config import get_game_config
         from ...core.evaluator import get_tuning_rules
 
         game_config = get_game_config()
         school_cfg = game_config.get_schools().get(self._school, {})
-        main_weapon = game_config.get_martial_art_weapon(
-            self._main_martial_art)
-        sub_weapon = game_config.get_martial_art_weapon(
-            self._sub_martial_art)
         school_attr = school_cfg.get("attr", "")
+        registry = game_config.get_playstyles()
 
-        matched: list[tuple[str, str, str, bool]] = []
-        others: list[tuple[str, str, str, bool]] = []
+        groups: dict[str, list[tuple[str, str, str, str]]] = {
+            "plan": [], "school": [], "attr": [], "": [],
+        }
         for key, rule in get_tuning_rules().items():
-            for name, playstyle in rule.playstyles.items():
-                hit = (
-                    {playstyle.main.weapon, playstyle.sub.weapon}
-                    == {main_weapon, sub_weapon}
-                    and playstyle.attr == school_attr
+            for name in rule.playstyles:
+                scope = _playstyle_match_scope(
+                    name, registry.get(name, {}),
+                    current_playstyle=self._playstyle,
+                    current_school=self._school,
+                    current_attr=school_attr,
                 )
-                entry = (key, name, f"{rule.name}-{name}", hit)
-                (matched if hit else others).append(entry)
-        self._tuning_options = matched + others
-        # 默认选中本流派命中的那几条：这是绝大多数情况下想要的起点，
-        # 而一条都不选等于不应用规则，等于这个功能默认关着。
+                groups[scope].append(
+                    (key, name, f"{rule.name}-{name}", scope))
+        self._tuning_options = [
+            entry
+            for scope in ("plan", "school", "attr", "")
+            for entry in groups[scope]
+        ]
+        # 三层相关玩法全部默认勾选，其他属性玩法只展示、由用户按需选择。
         self._tuning_selection = [
-            (key, name) for key, name, _label, hit in self._tuning_options if hit
+            (key, name)
+            for key, name, _label, scope in self._tuning_options
+            if scope
         ]
         self._refresh_tuning_display()
 

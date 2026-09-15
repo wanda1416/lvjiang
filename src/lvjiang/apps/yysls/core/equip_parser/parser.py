@@ -382,7 +382,7 @@ class EquipmentParser:
             if affix is None:
                 missing.append(f"{KEY_NAMES[i]}({AFFIX_KEYS[i]})")
             elif missing:
-                logger.error(
+                logger.warning(
                     "装备词条识别顺序异常：前序词条 {} 未能解析，"
                     "后续词条 {}({}) 可解析；装备={!r}，原始词条={!r}",
                     "、".join(missing), KEY_NAMES[i], AFFIX_KEYS[i],

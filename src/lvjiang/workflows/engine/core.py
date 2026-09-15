@@ -327,6 +327,10 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
         if initial_variables:
             self.variables.update(initial_variables)
+        # 桌面后端的 hold 等待需要能响应停止；输入后端由 run_control 注入，
+        # 引擎每次执行都把当前 stop_check 挂上去，重连换后端也不会漏。
+        if self._input is not None:
+            self._input.stop_check = self._stop_check
 
         try:
             # Python 工作流实例

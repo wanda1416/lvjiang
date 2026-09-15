@@ -129,9 +129,12 @@ def test_adb_click_hold_uses_stationary_swipe(monkeypatch):
         def __init__(self):
             self.calls = []
 
-        def shell(self, *args, **_kwargs):
+        def shell(self, *args, **kwargs):
             self.calls.append(args)
+            self.timeouts.append(kwargs.get("timeout"))
             return ""
+
+        timeouts: list = []
 
     device = _FakeDevice()
     backend = AdbInput(
@@ -145,6 +148,13 @@ def test_adb_click_hold_uses_stationary_swipe(monkeypatch):
     monkeypatch.setattr("lvjiang.core.android.input.time.sleep", lambda _s: None)
 
     backend.click_screen(10, 20, hold=1.4)
+    backend.click_screen(10, 20, hold=20)
+    backend.drag_screen(1, 2, 3, 4, duration=1.0, hold=30)
 
     assert device.calls == [
-        ("input", "swipe", "10", "20", "10", "20", "1400")]
+        ("input", "swipe", "10", "20", "10", "20", "1400"),
+        ("input", "swipe", "10", "20", "10", "20", "20000"),
+        ("input", "swipe", "1", "2", "3", "4", "31000"),
+    ]
+    # input swipe 阻塞整个手势时长；超时必须撑过手势，否则 shell() 重试会重放手势
+    assert device.timeouts == [15.0, 25.0, 36.0]

@@ -7,6 +7,7 @@
 import ctypes
 import sys
 import time
+from collections.abc import Callable
 from ctypes import wintypes
 
 from loguru import logger
@@ -365,6 +366,7 @@ def postmessage_click(
     client_y: int,
     activate: bool = False,
     hold: float | None = None,
+    stop_check: Callable[[], bool] | None = None,
 ):
     """通过 PostMessage 向窗口发送一次点击（不移动光标）
 
@@ -379,8 +381,13 @@ def postmessage_click(
     _user32.PostMessageW(target, _WM_MOUSEMOVE, 0, lparam)
     precise_wait(0.03)
     _user32.PostMessageW(target, _WM_LBUTTONDOWN, _MK_LBUTTON, lparam)
-    precise_wait(0.05 if hold is None else hold)
-    _user32.PostMessageW(target, _WM_LBUTTONUP, 0, lparam)
+    try:
+        if hold is None:
+            precise_wait(0.05)
+        else:
+            precise_wait(hold, stop_check=stop_check)
+    finally:
+        _user32.PostMessageW(target, _WM_LBUTTONUP, 0, lparam)
 
 
 def postmessage_move(hwnd: int, client_x: int, client_y: int, activate: bool = False):
@@ -427,6 +434,7 @@ def postmessage_drag(
     hold: float | None = None,
     steps: int | None = None,
     activate: bool = False,
+    stop_check: Callable[[], bool] | None = None,
 ):
     """通过 PostMessage 向窗口发送拖拽（不移动光标）
 
@@ -470,7 +478,7 @@ def postmessage_drag(
                 spin_tail_ns=0,
             )
         if hold is not None and hold > 0:
-            precise_wait(float(hold))
+            precise_wait(float(hold), stop_check=stop_check)
     finally:
         # 异常也不能把目标窗口留在鼠标按下状态。
         _user32.PostMessageW(target, _WM_LBUTTONUP, 0, make_lparam(x2, y2))

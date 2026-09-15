@@ -402,7 +402,7 @@ class SendInputInput(InputBackend):
         send_mouse_event(down_flag, mouse_data=mouse_data)
         try:
             if hold is not None:
-                precise_wait(hold)
+                precise_wait(hold, stop_check=self.stop_check)
         finally:
             send_mouse_event(up_flag, mouse_data=mouse_data)
 
@@ -445,7 +445,7 @@ class SendInputInput(InputBackend):
             smooth_move_to(to_x, to_y, move_dur)
             if hold is not None and hold > 0:
                 logger.debug(f"按住 {hold}s")
-                precise_wait(float(hold))
+                precise_wait(float(hold), stop_check=self.stop_check)
         finally:
             send_mouse_event(_MOUSEEVENTF_LEFTUP)
         _post = post_delay if post_delay is not None else self.after_click_wait

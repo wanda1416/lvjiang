@@ -107,6 +107,15 @@ class AdbInput(InputBackend):
         """截图坐标 → 设备坐标（截图已对齐设备方向，直通）"""
         return x, y
 
+    @staticmethod
+    def _swipe_timeout(duration_ms: int) -> float:
+        """``input swipe`` 会阻塞整个 duration；超时必须撑过手势本身。
+
+        默认 15s 超时对 ``click ... hold 20`` 不够：``shell()`` 超时后会重试，
+        设备端会把同一个长按/拖拽再执行一遍。
+        """
+        return max(15.0, duration_ms / 1000 + 5.0)
+
     # ─── 点击 ─────────────────────────────────────────────────
 
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",
@@ -146,6 +155,7 @@ class AdbInput(InputBackend):
                 "input", "swipe",
                 str(actual_x), str(actual_y), str(actual_x), str(actual_y),
                 str(duration_ms),
+                timeout=self._swipe_timeout(duration_ms),
             )
 
         _post = post_delay if post_delay is not None else self.after_click_wait
@@ -246,6 +256,7 @@ class AdbInput(InputBackend):
         self._device.shell(
             "input", "swipe",
             str(fx), str(fy), str(tx), str(ty), str(duration_ms),
+            timeout=self._swipe_timeout(duration_ms),
         )
 
         _post = post_delay if post_delay is not None else self.after_click_wait

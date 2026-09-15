@@ -285,3 +285,15 @@ class TestScrollInterval:
         eng._exec_scroll(Scroll(direction="down", amount=3, interval=bad))
         _args, kwargs = eng._input.scroll_screen.call_args
         assert kwargs["interval"] is None
+
+
+def test_execute_injects_stop_check_into_input_backend(tmp_path):
+    """桌面后端 hold 等待靠引擎注入的 stop_check 提前释放，每次执行都要挂上。"""
+    stop = lambda: False  # noqa: E731
+    eng = make_engine(stop_check=stop)
+    wf = tmp_path / "noop.wf"
+    wf.write_text("wait 0\n", encoding="utf-8")
+
+    eng.execute(wf)
+
+    assert eng._input.stop_check is stop

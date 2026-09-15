@@ -28,6 +28,7 @@ class _DeviceWorker(QObject):
     connect_finished = pyqtSignal(object, object, str, int, int, object)  # device, capture, method, w, h, agent
     notice = pyqtSignal(str)  # 连接过程中的提示（主线程写进日志区）
     error = pyqtSignal(str)
+    finished = pyqtSignal()
 
     def __init__(self, task: str, serial: str = "", capture_method: str = "",
                  agent_mode: bool = False, subnets: list | None = None):
@@ -43,6 +44,9 @@ class _DeviceWorker(QObject):
         """取消后台任务"""
         self._cancelled = True
 
+    def is_cancelled(self) -> bool:
+        return self._cancelled
+
     def run(self):
         try:
             if self._task == "scan":
@@ -56,10 +60,12 @@ class _DeviceWorker(QObject):
         except Exception as e:
             if not self._cancelled:
                 self.error.emit(str(e))
+        finally:
+            self.finished.emit()
 
     def _do_scan(self):
         from ...core.android import list_adb_devices
-        devices = list_adb_devices()
+        devices = list_adb_devices(cancel_check=self.is_cancelled)
         if not self._cancelled:
             self.scan_finished.emit(devices)
 
@@ -67,34 +73,29 @@ class _DeviceWorker(QObject):
         from ...core.android import scan_and_connect_wireless
 
         def progress_cb(message: str, current: int, total: int):
-            if self._cancelled:
-                raise RuntimeError("cancelled")
             self.wireless_progress.emit(message, current, total)
 
-        try:
-            devices = scan_and_connect_wireless(progress_cb=progress_cb, subnets=self._subnets)
-            if not self._cancelled:
-                self.wireless_finished.emit(devices)
-        except RuntimeError as e:
-            if str(e) != "cancelled":
-                raise
+        devices = scan_and_connect_wireless(
+            progress_cb=progress_cb,
+            subnets=self._subnets,
+            cancel_check=self.is_cancelled,
+        )
+        if not self._cancelled:
+            self.wireless_finished.emit(devices)
 
     def _do_local_scan(self):
         """探测本机开放的 ADB 端口（模拟器）"""
         from ...core.android import scan_and_connect_local
 
         def progress_cb(message: str, current: int, total: int):
-            if self._cancelled:
-                raise RuntimeError("cancelled")
             self.wireless_progress.emit(message, current, total)
 
-        try:
-            devices = scan_and_connect_local(progress_cb=progress_cb)
-            if not self._cancelled:
-                self.wireless_finished.emit(devices)
-        except RuntimeError as e:
-            if str(e) != "cancelled":
-                raise
+        devices = scan_and_connect_local(
+            progress_cb=progress_cb,
+            cancel_check=self.is_cancelled,
+        )
+        if not self._cancelled:
+            self.wireless_finished.emit(devices)
 
     def _on_progress(self, message: str, current: int, total: int):
         """进度回调（后台线程），通过信号发送到主线程"""
@@ -212,6 +213,7 @@ class _WirelessScanDialog(QObject):
 
         # 回调
         self._on_scan_callback = None
+        self._scan_started = False
 
     @staticmethod
     def _list_interfaces() -> list:
@@ -232,9 +234,11 @@ class _WirelessScanDialog(QObject):
         self._scan_btn.setEnabled(False)
         self._local_btn.setEnabled(False)
         self._subnet_combo.setEnabled(False)
-        self._cancel_btn.setEnabled(False)
+        self._cancel_btn.setText(tr("取消扫描"))
+        self._cancel_btn.setEnabled(True)
         self._progress_bar.setVisible(True)
         self._status_label.setVisible(True)
+        self._scan_started = True
         if self._on_scan_callback:
             self._on_scan_callback(mode, self.selected_subnets())
 
@@ -263,6 +267,10 @@ class _WirelessScanDialog(QObject):
         from PyQt6.QtWidgets import QDialog
         self._on_scan_callback = on_scan_callback
         return self._dialog.exec() == QDialog.DialogCode.Accepted
+
+    @property
+    def scan_started(self) -> bool:
+        return self._scan_started
 
     def accept(self):
         """接受对话框（扫描完成）"""
@@ -387,6 +395,9 @@ class WindowOpsMixin:
 
     def _on_scan_devices(self):
         """扫描已连接（device 状态）的设备，填充下拉框（切换到 ADB 设备模式）"""
+        if self._device_scan_running():
+            self._cancel_device_scan()
+            return
         if self._running:
             self.log_text.append(tr("[提示] 请先停止当前任务，再重新扫描设备"))
             return
@@ -425,8 +436,9 @@ class WindowOpsMixin:
 
         self._device_ready = False
         self.btn_locate.setEnabled(False)
-        self.btn_scan_device.setEnabled(False)
-        self.btn_scan_device.setText(tr("扫描中..."))
+        self.btn_scan_window.setEnabled(False)
+        self.btn_scan_device.setEnabled(True)
+        self.btn_scan_device.setText(tr("取消扫描"))
         self.lbl_window_info.setText(tr("未连接设备"))
         self.lbl_window_info.setStyleSheet("color: gray;")
         self.statusBar().showMessage(tr("正在扫描设备..."))
@@ -440,12 +452,12 @@ class WindowOpsMixin:
         self._device_thread.started.connect(self._device_worker.run)
         self._device_worker.scan_finished.connect(self._on_scan_devices_done)
         self._device_worker.error.connect(self._on_scan_devices_error)
-        self._device_worker.scan_finished.connect(self._device_thread.quit)
-        self._device_worker.error.connect(self._device_thread.quit)
+        self._bind_device_worker_lifecycle(self._device_worker, self._device_thread)
         self._device_thread.start()
 
     def _on_scan_devices_done(self, devices: list):
         """扫描完成回调（主线程）"""
+        self.btn_scan_window.setEnabled(True)
         self.btn_scan_device.setEnabled(True)
         self.btn_scan_device.setText(tr("扫描设备"))
         self._scanned_windows = devices
@@ -478,19 +490,56 @@ class WindowOpsMixin:
         """显示局域网扫描对话框"""
         result = self._wireless_dialog.exec(on_scan_callback=self._start_wireless_scan)
         if not result:
-            # 用户取消 — 停止后台线程，防止过期回调更新 UI
-            self._cancel_wireless_scan()
+            if self._wireless_dialog.scan_started:
+                # 线程退出后再恢复按钮，避免紧接着启动新扫描而阻塞 UI。
+                self._cancel_wireless_scan()
+            else:
+                self.btn_scan_device.setEnabled(True)
+                self.btn_scan_device.setText(tr("扫描设备"))
+                self.statusBar().showMessage(tr("已取消扫描"))
+
+    def _cancel_wireless_scan(self):
+        """请求取消无线扫描；实际退出由工作线程协作完成。"""
+        self._cancel_device_scan()
+
+    def _device_scan_running(self) -> bool:
+        worker = getattr(self, "_device_worker", None)
+        thread = getattr(self, "_device_thread", None)
+        return bool(
+            worker is not None
+            and getattr(worker, "_task", "") in {
+                "scan", "wireless_scan", "local_scan",
+            }
+            and thread is not None
+            and thread.isRunning()
+        )
+
+    def _cancel_device_scan(self):
+        """立即反馈取消状态，不在 UI 主线程等待扫描线程。"""
+        worker = getattr(self, "_device_worker", None)
+        if worker is None or not self._device_scan_running():
+            self.btn_scan_device.setEnabled(True)
+            self.btn_scan_device.setText(tr("扫描设备"))
+            return
+        worker.cancel()
+        self.btn_scan_device.setEnabled(False)
+        self.btn_scan_device.setText(tr("取消中..."))
+        self.statusBar().showMessage(tr("正在取消扫描..."))
+
+    def _bind_device_worker_lifecycle(self, worker, thread):
+        """保证成功、失败和取消三条路径最终都能退出 QThread。"""
+        worker.finished.connect(thread.quit)
+        thread.finished.connect(
+            lambda worker=worker: self._on_device_worker_finished(worker))
+
+    def _on_device_worker_finished(self, worker):
+        if worker is not getattr(self, "_device_worker", None):
+            return
+        if worker.is_cancelled():
+            self.btn_scan_window.setEnabled(True)
             self.btn_scan_device.setEnabled(True)
             self.btn_scan_device.setText(tr("扫描设备"))
             self.statusBar().showMessage(tr("已取消扫描"))
-
-    def _cancel_wireless_scan(self):
-        """取消无线扫描并等待线程结束"""
-        if hasattr(self, '_device_worker') and self._device_worker:
-            self._device_worker.cancel()
-        if hasattr(self, '_device_thread') and self._device_thread and self._device_thread.isRunning():
-            self._device_thread.quit()
-            self._device_thread.wait(5000)  # 等待线程结束，最多 5 秒
 
     def _wait_device_thread(self):
         """等待可能存在的旧设备线程退出"""
@@ -506,6 +555,7 @@ class WindowOpsMixin:
             subnets: 指定网段前缀列表，None 表示全部网卡（仅 lan 模式有效）
         """
         self.btn_scan_device.setEnabled(False)
+        self.btn_scan_window.setEnabled(False)
         if mode == "local":
             self.btn_scan_device.setText(tr("扫描本机..."))
             self.statusBar().showMessage(tr("正在扫描本机模拟器..."))
@@ -527,8 +577,7 @@ class WindowOpsMixin:
         self._device_worker.wireless_finished.connect(self._on_wireless_scan_done)
         self._device_worker.wireless_progress.connect(self._on_wireless_scan_progress)
         self._device_worker.error.connect(self._on_wireless_scan_error)
-        self._device_worker.wireless_finished.connect(self._device_thread.quit)
-        self._device_worker.error.connect(self._device_thread.quit)
+        self._bind_device_worker_lifecycle(self._device_worker, self._device_thread)
         self._device_thread.start()
 
     def _on_wireless_scan_progress(self, message: str, current: int, total: int):
@@ -544,10 +593,12 @@ class WindowOpsMixin:
     def _on_wireless_scan_done(self, devices: list):
         """局域网扫描完成回调（主线程）"""
         # 如果任务被取消，不处理结果
-        if hasattr(self, '_device_worker') and self._device_worker and self._device_worker._cancelled:
+        if (hasattr(self, '_device_worker') and self._device_worker
+                and self._device_worker.is_cancelled()):
             return
 
         from PyQt6.QtWidgets import QMessageBox
+        self.btn_scan_window.setEnabled(True)
         self.btn_scan_device.setEnabled(True)
         self.btn_scan_device.setText(tr("扫描设备"))
         self.window_combo.clear()
@@ -598,6 +649,7 @@ class WindowOpsMixin:
 
     def _on_wireless_scan_error(self, error_msg: str):
         """局域网扫描失败回调（主线程）"""
+        self.btn_scan_window.setEnabled(True)
         self.btn_scan_device.setEnabled(True)
         self.btn_scan_device.setText(tr("扫描设备"))
         # 关闭对话框（可能已关闭）
@@ -612,6 +664,7 @@ class WindowOpsMixin:
 
     def _on_scan_devices_error(self, error_msg: str):
         """扫描失败回调（主线程）"""
+        self.btn_scan_window.setEnabled(True)
         self.btn_scan_device.setEnabled(True)
         self.btn_scan_device.setText(tr("扫描设备"))
         logger.error(f"扫描设备失败: {error_msg}")
@@ -648,8 +701,7 @@ class WindowOpsMixin:
             lambda device, capture, method, w, h, agent: self._on_connect_done(d, device, capture, method, w, h, agent)
         )
         self._device_worker.error.connect(self._on_connect_error)
-        self._device_worker.connect_finished.connect(self._device_thread.quit)
-        self._device_worker.error.connect(self._device_thread.quit)
+        self._bind_device_worker_lifecycle(self._device_worker, self._device_thread)
         self._device_thread.start()
 
     def _on_connect_done(self, combo_data, device, capture, capture_method, w, h, agent=None):

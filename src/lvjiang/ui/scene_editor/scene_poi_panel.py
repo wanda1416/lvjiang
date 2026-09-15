@@ -302,6 +302,7 @@ class PoiPanelMixin:
             )
             self._arrow_list.setCellWidget(row, 2, centered_cell_widget(cb))
         self._arrow_list.blockSignals(False)
+        self._refresh_entity_tab_titles()
 
     def _on_toggle_poi_disabled(self, key: str, kind: str, state: int):
         """切换某 key 的禁用状态，通过画布回调通知 dialog 标记 dirty"""

@@ -91,6 +91,7 @@ class SceneReferenceEditorMixin:
             self._reference_table.setItem(row, 1, QTableWidgetItem(ref.key))
             self._reference_table.setItem(row, 2, QTableWidgetItem(ref.scene))
         self._reference_table.blockSignals(False)
+        self._refresh_entity_tab_titles()
 
     def _on_reference_selection(self, row, _col, _prev_row, _prev_col):
         if row < 0:

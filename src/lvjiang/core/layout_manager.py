@@ -10,6 +10,7 @@
 """
 
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Iterable
@@ -53,29 +54,36 @@ def layout_screenshots_dir(layout_name: str) -> Path:
     return SCREENSHOTS_DIR / _safe_name(layout_name)
 
 
-def scene_screenshot_name(scene_key: str, view: str = "") -> str:
+def scene_screenshot_name(scene_key: str, view: str = "", index: int = 1) -> str:
     """截图文件名：基底视图沿用场景名，其余视图加 __视图 key 后缀
 
     同一场景的多个视图（同一页面的不同滚动态）各自一张底图，
     否则无法在正确的背景上标定坐标。
+
+    index >= 2 时追加 __N 后缀，index=1 无额外后缀（向后兼容）。
+    视图 key 必须以小写字母开头，纯数字后缀不会与视图名冲突。
     """
     from .scene_definition_models import BASE_VIEW_KEY
     if not view or view == BASE_VIEW_KEY:
-        return f"{scene_key}.png"
-    return f"{scene_key}__{view}.png"
+        base = scene_key
+    else:
+        base = f"{scene_key}__{view}"
+    if index <= 1:
+        return f"{base}.png"
+    return f"{base}__{index}.png"
 
 
 # ─── 截图管理 ────────────────────────────────────────────
 
 def load_scene_screenshot(
-    layout_name: str, scene_key: str, view: str = ""
+    layout_name: str, scene_key: str, view: str = "", index: int = 1,
 ) -> np.ndarray | None:
-    """读取布局下某场景（可选视图）的截图，不存在返回 None（支持中文路径）
+    """读取布局下某场景（可选视图、截图序号）的截图，不存在返回 None（支持中文路径）
 
     别名布局使用自己的截图目录（按布局名），不重定向到父布局，
     避免截图操作污染父布局。
     """
-    path = layout_screenshots_dir(layout_name) / scene_screenshot_name(scene_key, view)
+    path = layout_screenshots_dir(layout_name) / scene_screenshot_name(scene_key, view, index)
     if not path.exists():
         return None
     try:
@@ -94,16 +102,17 @@ def load_scene_screenshot(
 
 
 def save_scene_screenshot(
-    layout_name: str, scene_key: str, image: np.ndarray, view: str = ""
+    layout_name: str, scene_key: str, image: np.ndarray,
+    view: str = "", index: int = 1,
 ):
-    """保存场景（可选视图）截图（支持中文路径）
+    """保存场景（可选视图、截图序号）截图（支持中文路径）
 
     image: BGR numpy 数组（项目内部统一使用 BGR）
     """
     import cv2
     d = layout_screenshots_dir(layout_name)
     d.mkdir(parents=True, exist_ok=True)
-    path = d / scene_screenshot_name(scene_key, view)
+    path = d / scene_screenshot_name(scene_key, view, index)
     # image 已是 BGR，cv2.imencode 期望 BGR，无需翻转
     success, buf = cv2.imencode('.png', image)
     if success:
@@ -156,6 +165,144 @@ def rename_scene_screenshots(old_key: str, new_key: str):
             new_name = f"{new_key}{suffix}.png"
             png.rename(layout_dir / new_name)
             logger.info(f"截图已重命名: {png.name} -> {new_name}")
+
+
+# ─── 多截图管理 ──────────────────────────────────────────
+
+_SCREENSHOT_META_FILENAME = "_screenshot_meta.json"
+
+
+def _screenshot_meta_path(layout_name: str) -> Path:
+    return layout_screenshots_dir(layout_name) / _SCREENSHOT_META_FILENAME
+
+
+def _load_screenshot_meta(layout_name: str) -> dict:
+    p = _screenshot_meta_path(layout_name)
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_screenshot_meta(layout_name: str, meta: dict) -> None:
+    p = _screenshot_meta_path(layout_name)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _screenshot_base_stem(scene_key: str, view: str) -> str:
+    """Return the filename stem shared by all screenshots of (scene, view)."""
+    from .scene_definition_models import BASE_VIEW_KEY
+    if not view or view == BASE_VIEW_KEY:
+        return scene_key
+    return f"{scene_key}__{view}"
+
+
+def list_scene_screenshots(
+    layout_name: str, scene_key: str, view: str = "",
+) -> list[int]:
+    """Return sorted screenshot indices for (scene, view) under *layout_name*.
+
+    Scans the screenshot directory with a regex that matches:
+      {base_stem}.png          -> index 1
+      {base_stem}__<N>.png     -> index N  (N >= 2)
+    """
+    d = layout_screenshots_dir(layout_name)
+    if not d.exists():
+        return []
+    stem = _screenshot_base_stem(scene_key, view)
+    pattern = re.compile(re.escape(stem) + r"(?:__(\d+))?\.png$")
+    indices: list[int] = []
+    for f in d.iterdir():
+        m = pattern.match(f.name)
+        if m:
+            indices.append(int(m.group(1)) if m.group(1) else 1)
+    return sorted(indices)
+
+
+def get_active_screenshot_index(
+    layout_name: str, scene_key: str, view: str = "",
+) -> int:
+    """Read the active screenshot index from meta, with fallback.
+
+    If the recorded index has no backing file, falls back to the first
+    available screenshot (or 1 when none exist).
+    """
+    meta = _load_screenshot_meta(layout_name)
+    active = (
+        meta.get("active", {})
+        .get(scene_key, {})
+        .get(view or "", 1)
+    )
+    indices = list_scene_screenshots(layout_name, scene_key, view)
+    if not indices:
+        return 1
+    if active in indices:
+        return active
+    return indices[0]
+
+
+def set_active_screenshot_index(
+    layout_name: str, scene_key: str, view: str, index: int,
+) -> None:
+    meta = _load_screenshot_meta(layout_name)
+    meta.setdefault("active", {}).setdefault(scene_key, {})[view or ""] = index
+    _save_screenshot_meta(layout_name, meta)
+
+
+def delete_scene_screenshot(
+    layout_name: str, scene_key: str, view: str, index: int,
+) -> None:
+    """Delete one screenshot and re-index the rest so no gap remains."""
+    d = layout_screenshots_dir(layout_name)
+    victim = d / scene_screenshot_name(scene_key, view, index)
+    if victim.exists():
+        victim.unlink()
+        logger.info(f"截图已删除: {victim.name}")
+
+    # Re-index: shift every file with index > deleted down by 1
+    indices = list_scene_screenshots(layout_name, scene_key, view)
+    for old_idx in sorted(i for i in indices if i > index):
+        old_path = d / scene_screenshot_name(scene_key, view, old_idx)
+        new_path = d / scene_screenshot_name(scene_key, view, old_idx - 1)
+        if old_path.exists():
+            old_path.rename(new_path)
+
+    # Fix active pointer
+    meta = _load_screenshot_meta(layout_name)
+    cur = meta.get("active", {}).get(scene_key, {}).get(view or "", 1)
+    if cur >= index:
+        new_active = max(1, cur - 1)
+        set_active_screenshot_index(layout_name, scene_key, view, new_active)
+
+
+def reindex_scene_screenshots(
+    layout_name: str, scene_key: str, view: str,
+    old_index: int, new_index: int,
+) -> None:
+    """Swap two screenshot indices (used by move-up / move-down)."""
+    if old_index == new_index:
+        return
+    d = layout_screenshots_dir(layout_name)
+    path_a = d / scene_screenshot_name(scene_key, view, old_index)
+    path_b = d / scene_screenshot_name(scene_key, view, new_index)
+    if not path_a.exists() or not path_b.exists():
+        return
+    # Three-way swap via temp file
+    tmp = d / f"_swap_tmp_{old_index}_{new_index}.png"
+    path_a.rename(tmp)
+    path_b.rename(path_a)
+    tmp.rename(path_b)
+
+    # Swap active pointer if it referenced either index
+    meta = _load_screenshot_meta(layout_name)
+    cur = meta.get("active", {}).get(scene_key, {}).get(view or "", 1)
+    if cur == old_index:
+        set_active_screenshot_index(layout_name, scene_key, view, new_index)
+    elif cur == new_index:
+        set_active_screenshot_index(layout_name, scene_key, view, old_index)
 
 
 def rename_layout_scene_key(layout_name: str, old_key: str, new_key: str):
@@ -335,34 +482,32 @@ def _delete_layout_item_key(layout_name: str, scene_key: str, kind: str,
 
 
 def rename_view_screenshots(scene_key: str, old_view_key: str, new_view_key: str):
-    """重命名所有布局下某视图的截图文件
+    """重命名所有布局下某视图的截图文件（含多截图 __N 后缀）
 
     截图命名规则：
-    - 基底视图 (view="" 或 view="base"): {scene_key}.png
-    - 其他视图: {scene_key}__{view_key}.png
+    - 基底视图 (view="" 或 view="base"): {scene_key}.png / {scene_key}__N.png
+    - 其他视图: {scene_key}__{view_key}.png / {scene_key}__{view_key}__N.png
     """
     if old_view_key == new_view_key:
         return
-    from .scene_definition_models import BASE_VIEW_KEY
     screenshots_base = SCREENSHOTS_DIR
     if not screenshots_base.exists():
         return
+    old_stem = _screenshot_base_stem(scene_key, old_view_key)
+    new_stem = _screenshot_base_stem(scene_key, new_view_key)
+    pattern = re.compile(re.escape(old_stem) + r"(__\d+)?\.png$")
     for layout_dir in screenshots_base.iterdir():
         if not layout_dir.is_dir():
             continue
-        # 确定旧文件名和新文件名
-        if old_view_key == BASE_VIEW_KEY or old_view_key == "":
-            old_name = f"{scene_key}.png"
-        else:
-            old_name = f"{scene_key}__{old_view_key}.png"
-        if new_view_key == BASE_VIEW_KEY or new_view_key == "":
-            new_name = f"{scene_key}.png"
-        else:
-            new_name = f"{scene_key}__{new_view_key}.png"
-        old_path = layout_dir / old_name
-        if old_path.exists() and old_name != new_name:
-            old_path.rename(layout_dir / new_name)
-            logger.info(f"视图截图已重命名: {old_name} -> {new_name}")
+        for png in list(layout_dir.iterdir()):
+            m = pattern.match(png.name)
+            if not m:
+                continue
+            suffix = m.group(1) or ""  # "" or "__N"
+            new_name = f"{new_stem}{suffix}.png"
+            if new_name != png.name:
+                png.rename(layout_dir / new_name)
+                logger.info(f"视图截图已重命名: {png.name} -> {new_name}")
 
 
 # ─── 跨场景迁移 ──────────────────────────────────────────

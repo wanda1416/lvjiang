@@ -21,6 +21,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ...core.layout_manager import (
+    get_active_screenshot_index,
+    list_scene_screenshots,
+    set_active_screenshot_index,
+)
 from ...core.layout_models import (
     Arrow,
     CanvasConfig,
@@ -91,6 +96,9 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self._current_view: str = ""
         self.on_view_changed: Callable[[str, str], None] | None = None
         self.on_scene_type_changed: Callable[[str], None] | None = None
+        # 当前截图序号（多截图模式）；截图切换回调：(scene_key, view, index)
+        self._current_screenshot_index: int = 1
+        self.on_screenshot_changed: Callable[[str, str, int], None] | None = None
         # 新增跨场景引用回调：(scene_key, [(源场景, 实体), ...])，由 dialog 注入。
         # 引用的坐标是布局加载期展开的，新加的那几条得补进当前布局才画得出来。
         self.on_scene_references_added: (
@@ -198,6 +206,26 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         bar.addWidget(self._btn_manage_views)
         bar.addSpacing(12)
 
+        # ── 截图选择器 ──
+        self._screenshot_label = QLabel(tr("截图"))
+        self._screenshot_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Fixed,
+        )
+        bar.addWidget(self._screenshot_label)
+        self._screenshot_combo = QComboBox()
+        self._screenshot_combo.setMinimumWidth(80)
+        self._screenshot_combo.currentIndexChanged.connect(
+            self._on_screenshot_combo_changed)
+        bar.addWidget(self._screenshot_combo)
+        self._btn_manage_screenshots = QPushButton(tr("管理"))
+        self._btn_manage_screenshots.setToolTip(tr("管理当前视图的多张截图"))
+        self._btn_manage_screenshots.clicked.connect(
+            self._on_manage_screenshots)
+        apply_button_style(self._btn_manage_screenshots, variant="neutral")
+        bar.addWidget(self._btn_manage_screenshots)
+        bar.addSpacing(12)
+
         self._scene_version_title = QLabel(tr("场景版本："))
         self._scene_version_value = QLabel()
         self._scene_version_link = QLabel()
@@ -233,11 +261,15 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         bar.addStretch()
 
         self._refresh_view_combo()
+        self._refresh_screenshot_combo()
         return bar
 
     def _refresh_scene_type_ui(self):
         subscene = is_subscene(self._scene_key)
-        for widget in (self._view_label, self._view_combo, self._btn_manage_views):
+        for widget in (
+                self._view_label, self._view_combo, self._btn_manage_views,
+                self._screenshot_label, self._screenshot_combo,
+                self._btn_manage_screenshots):
             widget.setVisible(not subscene)
         if hasattr(self, "_right_tabs"):
             self._right_tabs.setTabEnabled(4, not subscene)
@@ -290,6 +322,10 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self._layout_name = layout_name
         self._layout_display_name = display_name or layout_name
         self._layout_rel_path = rel_path or ""
+        # 工具栏在 SceneTab 构造时先于布局绑定创建；当时 layout_name 为空，
+        # 截图下拉框会保持空白。布局注入后必须用真实存储路径重新构建，
+        # 与随后独立加载到画布上的活动截图保持一致。
+        self._refresh_screenshot_combo()
         self._refresh_version_info()
 
     def _template_name(self, region_key: str) -> str:
@@ -534,6 +570,63 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         if getattr(dlg, "_changed", False):
             self._refresh_view_combo()
             self._on_view_combo_changed(0)
+
+    # ─── 截图选择 ──────────────────────────────────────────
+
+    @property
+    def current_screenshot_index(self) -> int:
+        return self._current_screenshot_index
+
+    def _refresh_screenshot_combo(self):
+        """Rebuild the screenshot combo for the current (scene, view)."""
+        combo = self._screenshot_combo
+        combo.blockSignals(True)
+        combo.clear()
+        if not self._layout_name:
+            combo.setEnabled(False)
+            combo.blockSignals(False)
+            return
+        indices = list_scene_screenshots(
+            self._layout_name, self._scene_key, self._current_view)
+        for i in indices:
+            combo.addItem(f"截图 {i}", userData=i)
+        if indices:
+            active = get_active_screenshot_index(
+                self._layout_name, self._scene_key, self._current_view)
+            idx = combo.findData(active)
+            combo.setCurrentIndex(idx if idx >= 0 else 0)
+            self._current_screenshot_index = combo.currentData() or 1
+        else:
+            self._current_screenshot_index = 1
+        combo.setEnabled(len(indices) > 1)
+        combo.blockSignals(False)
+
+    def _on_screenshot_combo_changed(self, _idx: int):
+        self._current_screenshot_index = (
+            self._screenshot_combo.currentData() or 1)
+        if self._layout_name:
+            set_active_screenshot_index(
+                self._layout_name, self._scene_key,
+                self._current_view, self._current_screenshot_index)
+        if self.on_screenshot_changed:
+            self.on_screenshot_changed(
+                self._scene_key, self._current_view,
+                self._current_screenshot_index)
+
+    def _on_manage_screenshots(self):
+        if not self._layout_name:
+            return
+        from .screenshot_dialog import ScreenshotManagerDialog
+        dlg = ScreenshotManagerDialog(
+            self._layout_name, self._scene_key,
+            self._current_view, self)
+        dlg.exec()
+        if getattr(dlg, "_changed", False):
+            self._refresh_screenshot_combo()
+            if self.on_screenshot_changed:
+                self.on_screenshot_changed(
+                    self._scene_key, self._current_view,
+                    self._current_screenshot_index)
 
     # ─── 属性 ────────────────────────────────────────────
 

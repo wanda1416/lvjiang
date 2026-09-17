@@ -14,6 +14,12 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
+- key: lock
+  name: 装备锁定
+  type: attr
+  is_text: false
+  is_clickable: true
+  view: base
 - key: equip_type
   name: 装备类型
   type: attr

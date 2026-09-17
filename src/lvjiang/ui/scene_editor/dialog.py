@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -22,10 +23,13 @@ from PyQt6.QtWidgets import (
 from ...core.layout_manager import (
     LayoutConfigManager,
     expand_one_reference,
+    get_active_screenshot_index,
+    list_scene_screenshots,
     load_scene_screenshot,
     migrate_layout_item,
     refresh_scene_references,
     save_scene_screenshot,
+    set_active_screenshot_index,
 )
 from ...core.layout_models import Layout
 from ...core.scene_registry import (
@@ -105,9 +109,9 @@ class SceneEditorDialog(
         self._current_layout: Layout | None = None
         self._dirty_scenes: set[str] = set()  # 当前布局中已变更的场景 key 集合
         self._data_dirty_scenes: set[str] = set()  # 真正改过布局数据的场景
-        # 截图懒加载：(layout_name, scene_key, view) -> ndarray|None 缓存；
+        # 截图懒加载：(layout_name, scene_key, view, screenshot_index) -> ndarray|None 缓存；
         # _loaded_scenes 记录当前布局下已上屏底图的场景，布局切换时重置
-        self._img_cache: dict[tuple[str, str, str], object] = {}
+        self._img_cache: dict[tuple[str, str, str, int], object] = {}
         self._loaded_scenes: set[str] = set()
         self._scene_layout_paths: dict[str, str] = {}
         self._applying_layout = False
@@ -220,9 +224,25 @@ class SceneEditorDialog(
         self._btn_delete.clicked.connect(self._on_delete_layout)
         top_bar.addWidget(self._btn_delete)
 
+        # ── 分裂按钮：刷新截图 | + ──
+        _split_widget = QWidget()
+        _split_lay = QHBoxLayout(_split_widget)
+        _split_lay.setContentsMargins(0, 0, 0, 0)
+        _split_lay.setSpacing(0)
         self._btn_refresh = QPushButton(tr("刷新截图"))
+        self._btn_refresh.setToolTip(tr("截取新图并覆盖当前活动截图"))
         self._btn_refresh.clicked.connect(self._on_refresh_image)
-        top_bar.addWidget(self._btn_refresh)
+        _split_lay.addWidget(self._btn_refresh)
+        _sep = QFrame()
+        _sep.setFrameShape(QFrame.Shape.VLine)
+        _sep.setStyleSheet("color: palette(mid);")
+        _split_lay.addWidget(_sep)
+        self._btn_add_screenshot = QPushButton("+")
+        self._btn_add_screenshot.setFixedWidth(28)
+        self._btn_add_screenshot.setToolTip(tr("截取新图并追加为新的截图"))
+        self._btn_add_screenshot.clicked.connect(self._on_add_screenshot)
+        _split_lay.addWidget(self._btn_add_screenshot)
+        top_bar.addWidget(_split_widget)
 
         top_bar.addSpacing(20)
 
@@ -256,6 +276,7 @@ class SceneEditorDialog(
         apply_button_style(
             self._btn_discard,
             self._btn_refresh,
+            self._btn_add_screenshot,
             self._btn_canvas_mode,
             variant="neutral",
         )
@@ -457,6 +478,7 @@ class SceneEditorDialog(
         tab.canvas.on_status_message = (
             lambda msg: self._status_bar.showMessage(msg, 5000))
         tab.on_view_changed = self._on_tab_view_changed
+        tab.on_screenshot_changed = self._on_tab_screenshot_changed
         tab.on_scene_type_changed = self._on_scene_type_changed
         tab.on_scene_references_added = self._on_scene_references_added
         tab.on_scene_reference_removed = self._on_scene_reference_removed
@@ -531,11 +553,15 @@ class SceneEditorDialog(
             tab.set_points(
                 self._current_layout.get_scene_points(scene_key))
 
-    def _get_cached_screenshot(self, layout_name: str, scene_key: str, view: str):
+    def _get_cached_screenshot(
+        self, layout_name: str, scene_key: str, view: str,
+        screenshot_index: int = 1,
+    ):
         """取截图，命中缓存则直接返回；None（无图）也缓存以免反复读盘"""
-        cache_key = (layout_name, scene_key, view)
+        cache_key = (layout_name, scene_key, view, screenshot_index)
         if cache_key not in self._img_cache:
-            self._img_cache[cache_key] = load_scene_screenshot(layout_name, scene_key, view)
+            self._img_cache[cache_key] = load_scene_screenshot(
+                layout_name, scene_key, view, screenshot_index)
         return self._img_cache[cache_key]
 
     def _ensure_tab_image(self, scene_key: str):
@@ -545,8 +571,10 @@ class SceneEditorDialog(
         tab = self._tabs.get(scene_key)
         if tab is None or scene_key in self._loaded_scenes:
             return
-        img = self._get_cached_screenshot(
-            self._current_layout.key, scene_key, tab.current_view)
+        layout_key = self._current_layout.key
+        view = tab.current_view
+        idx = get_active_screenshot_index(layout_key, scene_key, view)
+        img = self._get_cached_screenshot(layout_key, scene_key, view, idx)
         if img is not None:
             tab.canvas.set_image(img)
             if is_subscene(scene_key):
@@ -581,13 +609,33 @@ class SceneEditorDialog(
             tab.set_subscene_refs([])
 
     def _on_tab_view_changed(self, scene_key: str, view: str):
-        """某 Tab 切换视图：换上该视图的底图（走缓存）"""
+        """某 Tab 切换视图：换上该视图的底图（走缓存）+ 刷新截图选择器"""
         if self._current_layout is None:
             return
         tab = self._tabs.get(scene_key)
         if tab is None:
             return
-        img = self._get_cached_screenshot(self._current_layout.key, scene_key, view)
+        tab._refresh_screenshot_combo()
+        layout_key = self._current_layout.key
+        idx = get_active_screenshot_index(layout_key, scene_key, view)
+        img = self._get_cached_screenshot(layout_key, scene_key, view, idx)
+        if img is not None:
+            tab.canvas.set_image(img)
+        else:
+            tab.canvas.clear_image()
+        self._update_info_label()
+
+    def _on_tab_screenshot_changed(
+        self, scene_key: str, view: str, index: int,
+    ):
+        """Tab 切换截图：加载对应截图到画布"""
+        if self._current_layout is None:
+            return
+        tab = self._tabs.get(scene_key)
+        if tab is None:
+            return
+        img = self._get_cached_screenshot(
+            self._current_layout.key, scene_key, view, index)
         if img is not None:
             tab.canvas.set_image(img)
         else:
@@ -693,58 +741,99 @@ class SceneEditorDialog(
 
     # ─── 刷新截图 ────────────────────────────────────────
 
-    def _on_refresh_image(self):
-        """刷新当前场景的截图（调用外部回调获取新截图，保存到磁盘）"""
+    def _capture_new_image(self):
+        """Shared helper: grab a new frame via the refresh callback.
+
+        Returns (image, error_msg). image is None on failure.
+        """
         if self._refresh_callback is None:
-            self._status_bar.showMessage(tr("无截图源，请先在主窗口定位窗口"))
-            return
+            return None, tr("无截图源，请先在主窗口定位窗口")
         if self._current_layout is None:
-            self._status_bar.showMessage(tr("没有已加载的布局"))
-            return
+            return None, tr("没有已加载的布局")
         result = self._refresh_callback()
-        new_image, error_msg = result if isinstance(result, tuple) else (result, None)
-        if new_image is not None:
-            scene_key = self._current_scene_key
-            layout_name = self._current_layout.key
-            current_tab = self._tabs.get(scene_key)
-            view = current_tab.current_view if current_tab else ""
-            current_image = load_scene_screenshot(layout_name, scene_key, view)
-            if (
-                current_image is not None
-                and current_image.shape[:2] != new_image.shape[:2]
-            ):
-                old_height, old_width = current_image.shape[:2]
-                new_height, new_width = new_image.shape[:2]
-                reply = QMessageBox.question(
-                    self,
-                    tr("截图尺寸不匹配"),
-                    tr(
-                        "当前截图大小不匹配，是否确认截图？\n\n"
-                        "当前截图：{old_width} × {old_height}\n"
-                        "新截图：{new_width} × {new_height}"
-                    ).format(
-                        old_width=old_width,
-                        old_height=old_height,
-                        new_width=new_width,
-                        new_height=new_height,
-                    ),
-                    QMessageBox.StandardButton.Yes
-                    | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No,
-                )
-                if reply != QMessageBox.StandardButton.Yes:
-                    self._status_bar.showMessage(tr("已取消刷新截图"))
-                    return
-            save_scene_screenshot(layout_name, scene_key, new_image, view)
-            self._img_cache[(layout_name, scene_key, view)] = new_image
-            self._loaded_scenes.add(scene_key)
-            if current_tab:
-                current_tab.canvas.set_image(new_image)
-            scene_name = get_scene_name(scene_key)
-            self._status_bar.showMessage(f"已保存「{scene_name}」场景截图")
-            self._update_info_label()
-        else:
+        new_image, error_msg = (
+            result if isinstance(result, tuple) else (result, None))
+        if new_image is None:
+            return None, error_msg or tr("截图失败")
+        return new_image, None
+
+    def _on_refresh_image(self):
+        """刷新当前场景的活动截图（覆盖当前选中的截图序号）"""
+        new_image, error_msg = self._capture_new_image()
+        if new_image is None:
             self._status_bar.showMessage(error_msg or tr("刷新截图失败"))
+            return
+        scene_key = self._current_scene_key
+        layout_name = self._current_layout.key
+        current_tab = self._tabs.get(scene_key)
+        view = current_tab.current_view if current_tab else ""
+        active_idx = (
+            current_tab.current_screenshot_index if current_tab else 1)
+        current_image = load_scene_screenshot(
+            layout_name, scene_key, view, active_idx)
+        if (
+            current_image is not None
+            and current_image.shape[:2] != new_image.shape[:2]
+        ):
+            old_height, old_width = current_image.shape[:2]
+            new_height, new_width = new_image.shape[:2]
+            reply = QMessageBox.question(
+                self,
+                tr("截图尺寸不匹配"),
+                tr(
+                    "当前截图大小不匹配，是否确认截图？\n\n"
+                    "当前截图：{old_width} × {old_height}\n"
+                    "新截图：{new_width} × {new_height}"
+                ).format(
+                    old_width=old_width,
+                    old_height=old_height,
+                    new_width=new_width,
+                    new_height=new_height,
+                ),
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                self._status_bar.showMessage(tr("已取消刷新截图"))
+                return
+        save_scene_screenshot(
+            layout_name, scene_key, new_image, view, active_idx)
+        self._img_cache[
+            (layout_name, scene_key, view, active_idx)] = new_image
+        self._loaded_scenes.add(scene_key)
+        if current_tab:
+            current_tab.canvas.set_image(new_image)
+        scene_name = get_scene_name(scene_key)
+        self._status_bar.showMessage(f"已保存「{scene_name}」场景截图")
+        self._update_info_label()
+
+    def _on_add_screenshot(self):
+        """追加新截图到当前 (scene, view) 的截图集"""
+        new_image, error_msg = self._capture_new_image()
+        if new_image is None:
+            self._status_bar.showMessage(error_msg or tr("追加截图失败"))
+            return
+        scene_key = self._current_scene_key
+        layout_name = self._current_layout.key
+        current_tab = self._tabs.get(scene_key)
+        view = current_tab.current_view if current_tab else ""
+        indices = list_scene_screenshots(layout_name, scene_key, view)
+        next_index = max(indices) + 1 if indices else 1
+        save_scene_screenshot(
+            layout_name, scene_key, new_image, view, next_index)
+        set_active_screenshot_index(
+            layout_name, scene_key, view, next_index)
+        self._img_cache[
+            (layout_name, scene_key, view, next_index)] = new_image
+        self._loaded_scenes.add(scene_key)
+        if current_tab:
+            current_tab._refresh_screenshot_combo()
+            current_tab.canvas.set_image(new_image)
+        scene_name = get_scene_name(scene_key)
+        self._status_bar.showMessage(
+            f"已追加「{scene_name}」截图 {next_index}")
+        self._update_info_label()
 
     def _refresh_ref_group_combo(self):
         """刷新参考图分组下拉：保留当前选中（如有），重新加载图库分组"""
@@ -950,12 +1039,21 @@ class SceneEditorDialog(
         canvas_w = max(1, round(cfg.w_ratio * img_w))
         canvas_h = max(1, round(cfg.h_ratio * img_h))
 
+        # 多截图时显示序号（如 "2/3"）
+        ss_label = "截图"
+        if self._current_layout is not None:
+            indices = list_scene_screenshots(
+                self._current_layout.key, tab.scene_key, tab.current_view)
+            if len(indices) > 1:
+                cur = tab.current_screenshot_index
+                ss_label = f"截图 {cur}/{len(indices)}"
+
         ss_txt = f"{img_w}×{img_h} ({self._fmt_ratio(img_w, img_h)})"
         cv_txt = f"{canvas_w}×{canvas_h} ({self._fmt_ratio(canvas_w, canvas_h)})"
 
         muted = get_theme_manager().tokens.text_muted
         self._info_label.setText(
-            f'<span style="color:{muted};">截图</span> '
+            f'<span style="color:{muted};">{ss_label}</span> '
             f'<b style="color:#4da6ff;">{ss_txt}</b>'
             f'<span style="color:{muted};"> │ </span>'
             f'<span style="color:{muted};">画布</span> '

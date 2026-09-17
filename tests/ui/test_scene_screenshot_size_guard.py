@@ -24,6 +24,7 @@ class _Canvas:
 
 class _RefreshHarness:
     _on_refresh_image = SceneEditorDialog._on_refresh_image
+    _capture_new_image = SceneEditorDialog._capture_new_image
 
     def __init__(self, image):
         self._refresh_callback = lambda: (image, None)
@@ -32,7 +33,8 @@ class _RefreshHarness:
         self._status_bar = _StatusBar()
         self._tabs = {
             self._current_scene_key: SimpleNamespace(
-                current_view="base", canvas=_Canvas())
+                current_view="base", canvas=_Canvas(),
+                current_screenshot_index=1)
         }
         self._img_cache = {}
         self._loaded_scenes = set()
@@ -103,7 +105,7 @@ def test_refresh_same_size_does_not_prompt(monkeypatch):
 
     assert len(saved) == 1
     assert harness._tabs["game_main_page"].canvas.image is new_image
-    assert harness._img_cache[("android", "game_main_page", "base")] is new_image
+    assert harness._img_cache[("android", "game_main_page", "base", 1)] is new_image
 
 
 def test_refresh_saves_mismatched_screenshot_after_confirmation(monkeypatch):

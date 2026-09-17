@@ -55,9 +55,9 @@ def test_save_routes_sections_to_their_owner_files(tmp_path):
     save_game_config(data, resolver)
 
     basic = yaml.safe_load(
-        (resolver.system_dir / "yysls/game_config/basic.yaml").read_text())
+        (resolver.system_dir / "yysls/game_config/basic.yaml").read_text(encoding="utf-8"))
     equipment = yaml.safe_load(
-        (resolver.system_dir / "yysls/game_config/equipment.yaml").read_text())
+        (resolver.system_dir / "yysls/game_config/equipment.yaml").read_text(encoding="utf-8"))
     assert basic["basic_config"]["equipment_cooldown_days"] == 9
     assert "weapon_types" not in basic
     assert equipment["weapon_types"][0]["name"] == "测试武器"

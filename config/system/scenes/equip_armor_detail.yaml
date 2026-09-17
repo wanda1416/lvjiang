@@ -17,6 +17,7 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
+  view: base
 - key: affix_shang
   name: 词条商
   type: attr
@@ -42,6 +43,12 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
+- key: cooldown_tips
+  name: 冷却提示
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: cooldown
 - key: cooldown_affix_gong
   name: 冷却词条宫
   type: attr
@@ -89,3 +96,6 @@ references:
   entity: equip_level
 - scene: equip_detail
   entity: base_attr
+- scene: equip_detail
+  entity: lock
+  view: base

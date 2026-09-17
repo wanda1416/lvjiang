@@ -664,10 +664,28 @@ class ConfigResolver:
         ]
         return max(versions) + 1
 
+    def _layer_root(self, layer: str | None, default: Path) -> Path:
+        """把显式指定的层解析成根目录。
+
+        只有开发模式可以指定层（system 或 local）；用户模式只允许 local
+        ——它本来就只能写 local，显式说一遍不是开口子。
+        """
+        if layer is None:
+            return default
+        if layer == LAYER_LOCAL:
+            return self.local_dir
+        if layer == LAYER_SYSTEM and self.is_dev_mode():
+            return self.system_dir
+        raise PermissionError(f"当前模式不允许写入 {layer} 层")
+
     def write_entity(self, rel_path: str, data: str | bytes, *,
                      force: bool = False,
-                     content_version: int | None = None) -> Path:
+                     content_version: int | None = None,
+                     layer: str | None = None) -> Path:
         """按模式写实体文件（开发→system，用户→local 影子）
+
+        ``layer`` 显式指定目标层：开发者可以把自己的私有规则组之类放进
+        local 而不写进随包的 system（见 :meth:`_layer_root`）。
 
         开发模式写 system 且该路径参与在线下发（见 core.config.versioning）
         时，普通保存保留当前 content_version，新文件从 v1 起步。编辑器只有
@@ -680,10 +698,12 @@ class ConfigResolver:
         （脚本编辑器的「复制到本地以修改」）。这种场景内容本来就与系统一致，
         不强制的话一个字节都不会落盘，用户点完发现还是不能编辑。
         """
-        root = self.system_dir if self.is_dev_mode() else self.local_dir
+        root = self._layer_root(
+            layer, self.system_dir if self.is_dev_mode() else self.local_dir)
         target = root / rel_path
+        writing_system = root == self.system_dir
         spec = versioning.spec_for(rel_path)
-        if (isinstance(data, str) and self.is_dev_mode()
+        if (isinstance(data, str) and writing_system
                 and spec is not None and spec.remote_mode == "content"):
             if content_version is None:
                 data = versioning.preserve_version_for_write(
@@ -773,14 +793,22 @@ class ConfigResolver:
                 f"{rel_path} 由系统配置提供，用户模式下不可删除或重命名；"
                 f"如需停用请使用启用开关/展示勾选")
 
-    def delete_entity(self, rel_path: str):
+    def delete_entity(self, rel_path: str, *, layer: str | None = None):
         """按模式删实体：开发→直删 system；用户→只删自己的 local 影子
 
         用户模式下若 system 存在同名文件，抛 :class:`SystemContentProtected`：
         系统内容不允许用户删除。想让它不出现请走激活机制（调律规则的启用
         开关、脚本的展示勾选），需要真删就切到开发模式。
+
+        ``layer`` 显式指定要删哪一层的文件（规则同 :meth:`write_entity`）。
         """
-        if self.is_dev_mode():
+        if layer is not None:
+            target = self._layer_root(layer, self.system_dir) / rel_path
+            if not self.is_dev_mode():
+                self.ensure_entity_deletable(rel_path)
+            if target.exists():
+                target.unlink()
+        elif self.is_dev_mode():
             target = self.system_dir / rel_path
             if target.exists():
                 target.unlink()

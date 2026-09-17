@@ -33,8 +33,8 @@
 | 威威大王(beta) | 无 | 无 |
 | 玉玉大王(beta) | 无 | 无 |
 
-规则清单与启用状态以 `config/system/yysls/tune_config.yaml` 的 `tuning_rules` 段为准，
-规则本体位于 `config/system/yysls/tuning_rules/*.yaml`。
+规则本体位于 `config/system/yysls/tuning_rules/*.yaml`：目录里有哪些文件就是哪些
+规则，展示/判定顺序由各文件的 `order` 声明，`disabled: true` 表示停用。
 
 | 流派 | 玩法 | 主武器需要的词条 |
 |------|------|------------------|
@@ -221,5 +221,6 @@
 未勾选对应流派（裂石或牵丝）时，不必出现玩法选项。
 各流派、玩法所需的武学增效见本文「流派与玩法配置」。
 
-`huixin_modao`（威威大王）和 `huixin_yuyu`（玉玉大王）目前为 beta 规则，已在
-`tune_config.yaml` 中启用但尚无专属文档，判定口径以各自的 YAML 为准。
+`huixin_modao`（威威大王）和 `huixin_yuyu`（玉玉大王）目前为 beta 规则，默认启用
+但尚无专属文档，判定口径以各自的 YAML 为准。裂石·威 只由威威大王判定，会心大外
+的玩法列表不再包含它。

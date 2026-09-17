@@ -200,14 +200,15 @@ class TestBuiltinRules:
         # 规则数量随文件增加，不硬编码列表
         assert len(list(mgr.get_rules())) >= 5
 
-    def test_order_matches_tune_config(self):
-        """规则顺序与 tune_config.yaml tuning_rules 声明顺序一致"""
+    def test_order_follows_rule_files(self):
+        """规则顺序由各文件的 order 声明：升序、同序按 key；预置规则 10–70。"""
         rules = get_tuning_rules()
-        from lvjiang.apps.yysls.core.tuning_rules import get_tune_config
-        tuning_rules = get_tune_config().tuning_rules
-        declared = [k for k in tuning_rules if k in rules]
-        undeclared = sorted(k for k in rules if k not in tuning_rules)
-        assert list(rules.keys()) == declared + undeclared
+        orders = [rule.order for rule in rules.values()]
+        assert orders == sorted(orders)
+        assert list(rules) == sorted(rules, key=lambda k: (rules[k].order, k))
+        assert [rules[k].order for k in (
+            "huiyi_general", "huixin_small", "huixin_big", "heal_pure",
+            "heal_fire", "huixin_yuyu", "huixin_modao")] == [10, 20, 30, 40, 50, 60, 70]
 
     def test_required_fields_present(self):
         for rule in get_tuning_rules().values():
@@ -317,7 +318,6 @@ class TestBuiltinRules:
             ("huixin_small", "樽樽"): "破竹·樽",
             ("huixin_big", "纯唐"): "裂石·钧",
             ("huixin_big", "双切"): "裂石·钧",
-            ("huixin_big", "威威"): "裂石·威",
             ("huixin_big", "鸢鸢"): "破竹·鸢",
             ("huixin_big", "双刀"): "破竹·风",
             ("huixin_big", "尘尘"): "破竹·尘",
@@ -1040,7 +1040,6 @@ def _valid_config() -> dict:
     thresholds = {p: ["gold"] for p in QUALITY_PARTS}
     thresholds["冠胄"] = ["gold", "purple"]
     return {
-        "base_rules": ["default"],
         "quality_thresholds": thresholds,
         "switches": {"keep_pvp": {"name": "保留PVP装备"}},
     }
@@ -1049,8 +1048,6 @@ def _valid_config() -> dict:
 class TestTuneConfig:
     def test_builtin_config_loaded(self):
         config = get_tune_config()
-        # base_rules 非空
-        assert "default" in config.base_rules
         # 品阶门槛锁死为固定 7 个标准部位
         assert list(config.quality_thresholds) == list(QUALITY_PARTS)
         # 开关注册表含 keep_danti（保留单体奇术增）

@@ -1,6 +1,7 @@
 content_version: 1
 key: heal_pure
 name: 治疗纯奶
+order: 40
 default_rating: excellent
 playstyles:
 - 纯奶

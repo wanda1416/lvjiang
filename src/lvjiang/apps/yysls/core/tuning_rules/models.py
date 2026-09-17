@@ -150,6 +150,11 @@ def dynamic_affix_map(attr: str) -> dict[str, str]:
 
 # ─── 规则数据结构 ──────────────────────────────────────────
 
+#: 规则 / 基础规则组 ``order`` 的默认值。新建一律写 10，预置项按 10、20…
+#: 声明，方便之后手动插 11、15 之类的中间值。
+DEFAULT_ORDER = 10
+
+
 @dataclass
 class Condition:
     """条件原语（条件组内 AND）
@@ -280,13 +285,13 @@ class CommonConditions:
 class TuningRule:
     """单条调律规则（一个 YAML 文件，对应 UI 一个 Tab）
 
-    order 字段已废弃：规则顺序由 tune_config.yaml 的 tuning_rules 段控制。
-    保留字段仅为向后兼容，不再参与排序。
+    规则的存在性由目录决定，顺序与启停由文件自己声明：``order`` 越小越靠前
+    （同序按 key），``disabled: true`` 的规则不进入判定与 UI 主列表。
     """
     key: str
     name: str
-    # 已废弃：规则顺序现由 tune_config.tuning_rules 控制，此字段不再使用
-    order: int = 100
+    order: int = DEFAULT_ORDER
+    disabled: bool = False
     playstyles: dict[str, Playstyle] = field(default_factory=dict)
     transmute_priority: list[str] = field(default_factory=list)
     affix_pool: list[str] = field(default_factory=list)
@@ -758,11 +763,13 @@ class TuningGroup:
 
     承载单次调律运行的策略基线：材料设置 + 行为配置
     （扫描/结束处理）。激进/保守等账号策略差异体现在不同规则组，
-    启动时经 TuningRunContext 注入工作流。
+    启动时经 TuningRunContext 注入工作流。存在性由目录决定，展示顺序由
+    ``order`` 声明。
     """
     key: str = "default"
     name: str = tr("基础规则")
     description: str = ""
+    order: int = DEFAULT_ORDER
     materials: MaterialSettings = field(default_factory=MaterialSettings)
     scan: ScanBehavior = field(default_factory=ScanBehavior)
     tune: TuneBehavior = field(default_factory=TuneBehavior)
@@ -770,18 +777,16 @@ class TuningGroup:
 
 @dataclass
 class TuneConfig:
-    """全局调律配置（品阶门槛 + 开关注册表 + 基础规则组声明，tune_config.yaml）
+    """全局调律配置（tune_config.yaml）：只剩品阶门槛与开关注册表。
 
-    base_rules: 基础规则组 key 列表，顺序即 UI 展示顺序。
+    规则与基础规则组的存在性由各自目录决定，顺序（``order``）与启停
+    （``disabled``）写在各自的 YAML 里，不再在这里声明。
+
     quality_thresholds: 品阶门槛，部位 → 允许品阶列表。
     switches: 开关注册表，key → 显示名。
-    tuning_rules: 流派规则启用状态与顺序，key → 是否启用；
-        dict 插入序即规则展示/判定顺序（替代原 TuningRule.order）。
     """
-    base_rules: list[str] = field(default_factory=list)
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
     switches: dict[str, str] = field(default_factory=dict)
-    tuning_rules: dict[str, bool] = field(default_factory=dict)
 
     def quality_ok(self, part: str, quality: str | None,
                    overrides: dict[str, list[str]] | None = None) -> bool:

@@ -42,10 +42,35 @@ def _to_equipment(raw_data: dict) -> dict:
     parser = get_equipment_parser()
 
     try:
-        return parser.parse(raw_data).to_dict()
+        equip = parser.parse(raw_data)
+        equip.lock_status = raw_data.get("lock_status") or None
+        return equip.to_dict()
     except Exception as e:
         logger.warning(f"to_equipment: 解析失败: {e}")
         return {}
+
+
+@builtin_func("equipment_lock_status")
+def _equipment_lock_status(_engine=None, ref=None) -> str:
+    """从引擎最近一张截图识别装备锁定状态。
+
+    本函数不主动截图，必须紧跟在装备详情 scan 之后调用。
+    无最近帧、区域缺失或状态不确定时返回空字符串，不中断装备扫描。
+    """
+    try:
+        from lvjiang.workflows.builtins.vision import last_frame_region
+
+        from ...core.equip_parser.lock_state import classify_lock_status
+
+        crop = last_frame_region(_engine, ref, "equipment_lock_status")
+        status = classify_lock_status(crop)
+        logger.debug(
+            f"装备锁定状态: frame_seq="
+            f"{getattr(_engine, 'last_capture_seq', 0)}, result={status or 'unknown'}")
+        return status or ""
+    except Exception as exc:  # 附加状态不得拖垮装备主扫描流程
+        logger.debug(f"装备锁定状态识别失败，按空值处理: {exc}")
+        return ""
 
 
 # ─── 指纹 ───────────────────────────────────────────────

@@ -94,7 +94,7 @@ class SearchProblem:
         equipment: 当前装备（已含真实词条），策略不得修改它。
         candidates: 去重后的合法候选词条名，顺序可作为默认分支顺序。
         missing: 还要补几条。0 表示装备已满，只需评估当前状态。
-        baseline: 比较基准（方案当前毕业率）。
+        baseline: 比较基准（方案在满等级、满承音、满定音下的极限毕业率）。
         operator: ``gt`` / ``gte``。
         complete: ``(equipment, names) -> dict | None``，把 names 补进空位并做
             合法性校验；非法返回 None。

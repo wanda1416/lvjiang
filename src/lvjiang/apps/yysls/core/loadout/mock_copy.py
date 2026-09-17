@@ -12,6 +12,7 @@ from .repository import LoadoutRepository, stamp_equipment_write
 
 _STORAGE_FIELDS = {
     "_fp", EQUIPMENT_CREATED_AT, EQUIPMENT_UPDATED_AT, "cooldown_expires_at",
+    "cooldown_kind", "cooldown_state",
 }
 
 

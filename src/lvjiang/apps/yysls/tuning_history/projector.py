@@ -68,6 +68,8 @@ class TuningResultProjector:
             self.was_modified = True
             self.reset_attempted = True
             self.reset_outcome = RESET_COMPLETED
+            # 促成本次重置的智能意见已被消费，不得覆盖重置后继续调律的终态结论
+            self.smart_opinion = ""
         elif event == "round_prepared" and self.current:
             self._prepare_round(dict(args[0] or {}))
         elif event == "tune_round_completed" and self.current:
@@ -229,6 +231,11 @@ class TuningResultProjector:
             telemetry_final_rating=str(
                 info.get("telemetry_final_rating") or ""),
             resets=int(info.get("resets") or 0),
+            lock_status=str(started.get("lock_status") or ""),
+            cooldown_kind=str(started.get("cooldown_kind") or ""),
+            cooldown_state=str(started.get("cooldown_state") or ""),
+            cooldown_expires_at=str(
+                started.get("cooldown_expires_at") or ""),
         )
         self._clear_current()
         return item
@@ -265,12 +272,21 @@ class TuningResultProjector:
             telemetry_stop_reason="reset_completed",
             telemetry_final_rating=str(info.get("before_rating") or ""),
             resets=int(info.get("resets_used") or 0),
+            lock_status=str(started.get("lock_status") or ""),
+            cooldown_kind=str(started.get("cooldown_kind") or ""),
+            cooldown_state=str(started.get("cooldown_state") or ""),
+            cooldown_expires_at=str(
+                started.get("cooldown_expires_at") or ""),
         )
 
         after = deepcopy(started)
         after.pop("_scanned_at", None)
         after["name"] = f"{base_name}（重置后）"
         after["affixes"] = deepcopy(info.get("after_affixes") or [])
+        # 重置已完成，原来的“重置冷却完成”状态随装备重置一并消费。
+        after["cooldown_kind"] = ""
+        after["cooldown_state"] = ""
+        after["cooldown_expires_at"] = ""
         self._start(after)
         # 新装备已经处于调律页，不等待下一次 material/tuning 事件再标记。
         self.tuning_started_at = now

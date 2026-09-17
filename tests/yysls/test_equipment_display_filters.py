@@ -6,13 +6,18 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
     QComboBox,
+    QGridLayout,
     QPushButton,
     QStyle,
     QStyleOptionComboBox,
+    QWidget,
 )
 
 import lvjiang.apps.yysls.config as config_module
-from lvjiang.apps.yysls.ui.loadout.equip.cards import _CompactEquipCard
+from lvjiang.apps.yysls.ui.loadout.equip.cards import (
+    _CompactEquipCard,
+    _SlotCard,
+)
 from lvjiang.apps.yysls.ui.loadout.equip.status_tab import (
     EquipStatusTab,
     _FilteredDeleteDialog,
@@ -166,19 +171,24 @@ def test_filtered_delete_dialog_defaults_to_protecting_loadout_items(qtbot):
     dialog = _FilteredDeleteDialog(
         "类型：背包", {"active", "standby", "free"},
         {"active", "standby"}, parent,
+        locked_fingerprints={"standby", "free"},
     )
     qtbot.addWidget(dialog)
 
     assert dialog.preserve_referenced
-    assert dialog.effective_delete_count == 1
-    assert dialog._delete_button.isEnabled()
+    assert dialog.preserve_locked
+    assert dialog.effective_delete_count == 0
+    assert not dialog._delete_button.isEnabled()
     assert not dialog._reference_warning.isVisible()
     if base_size > 0:
         assert dialog.font().pointSizeF() == base_size + 2
 
     dialog._preserve_checkbox.setChecked(False)
-    assert dialog.effective_delete_count == 3
+    assert dialog.effective_delete_count == 1
     assert "2" in dialog._reference_warning.text()
+
+    dialog._preserve_locked_checkbox.setChecked(False)
+    assert dialog.effective_delete_count == 3
 
 
 def test_filtered_delete_dialog_disables_delete_when_everything_is_protected(
@@ -209,6 +219,96 @@ def test_compact_card_batch_mode_selects_by_click_and_blocks_context(qtbot):
 
     assert card.selection_checkbox.isChecked()
     assert selected == [("mock_one", True)]
+
+
+def test_single_item_metadata_updates_cards_without_rebuilding_grid(qtbot):
+    container = QWidget()
+    grid = QGridLayout(container)
+    compact_data = {"_fp": "same", "type": "环", "name": "背包环"}
+    slot_data = {"_fp": "same", "type": "环", "name": "穿戴环"}
+    compact = _CompactEquipCard()
+    compact.set_equip(compact_data, "环", "ring")
+    slot = _SlotCard("ring", "环", "ring")
+    slot.set_equip(slot_data)
+    grid.addWidget(compact, 0, 0)
+    qtbot.addWidget(container)
+    qtbot.addWidget(slot)
+    tab = SimpleNamespace(
+        _equipped={"ring": slot_data},
+        _bag_items={"ring": {"same": compact_data}},
+        _mock_items={},
+        _slot_cards={"ring": slot},
+        _grid=grid,
+    )
+
+    EquipStatusTab._update_item_metadata(
+        tab, "same", "lock_status", "locked")
+
+    assert slot_data["lock_status"] == "locked"
+    assert compact_data["lock_status"] == "locked"
+    assert not slot.lock_badge.isHidden()
+    assert not compact.lock_badge.isHidden()
+    assert grid.itemAt(0).widget() is compact
+
+
+def test_lock_request_only_updates_one_item_without_full_sync():
+    persisted: list[tuple[str, bool]] = []
+    patched: list[tuple[str, str, str]] = []
+    inventory = SimpleNamespace(
+        set_item_lock_status=lambda fp, locked: persisted.append((fp, locked)))
+    tab = SimpleNamespace(
+        _require_inventory=lambda: inventory,
+        _update_item_metadata=lambda fp, key, value: patched.append(
+            (fp, key, value)),
+        _sync_inv=lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("单字段修改不应全量同步")),
+    )
+
+    EquipStatusTab._on_lock_requested(
+        tab, {"_fp": "ring-fp", "name": "环"}, False)
+
+    assert persisted == [("ring-fp", False)]
+    assert patched == [("ring-fp", "lock_status", "unlock")]
+
+
+def test_cooldown_change_syncs_kind_and_state_in_memory(monkeypatch):
+    """清除冷却要连 kind/state 一起同步到内存副本，否则卡片继续显示「冷却完成」。"""
+    from lvjiang.apps.yysls.ui.loadout.equip import cards
+
+    persisted: list[tuple[str, str]] = []
+    patched: list[tuple[str, str, str]] = []
+    inventory = SimpleNamespace(
+        set_item_cooldown=lambda fp, value: persisted.append((fp, value)))
+    tab = SimpleNamespace(
+        window=lambda: None,
+        _require_inventory=lambda: inventory,
+        _update_item_metadata=lambda fp, key, value: patched.append(
+            (fp, key, value)),
+    )
+    captured: dict = {}
+    monkeypatch.setattr(
+        cards, "_show_equipment_properties",
+        lambda parent, equip, cooldown_changed=None: captured.update(
+            callback=cooldown_changed))
+    equip = {"_fp": "ring-fp", "cooldown_kind": "reset",
+             "cooldown_state": "completed", "cooldown_expires_at": ""}
+
+    EquipStatusTab._on_properties_requested(tab, equip)
+    assert captured["callback"]("") is True
+    assert persisted == [("ring-fp", "")]
+    assert patched == [
+        ("ring-fp", "cooldown_expires_at", ""),
+        ("ring-fp", "cooldown_kind", ""),
+        ("ring-fp", "cooldown_state", ""),
+    ]
+
+    patched.clear()
+    assert captured["callback"]("2026-09-10T00:00:00+00:00") is True
+    assert patched == [
+        ("ring-fp", "cooldown_expires_at", "2026-09-10T00:00:00+00:00"),
+        ("ring-fp", "cooldown_kind", "reset"),
+        ("ring-fp", "cooldown_state", "cooling"),
+    ]
 
 
 def test_source_actions_offer_copy_only_for_mock_type(qtbot):

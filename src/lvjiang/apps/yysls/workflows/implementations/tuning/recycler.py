@@ -86,8 +86,14 @@ class TuningRecycler:
         """回收确认弹窗处理（android/desktop 共用）"""
         if not self._routes.try_confirm_recycle_dialog():
             if self._routes.is_in_bag_page():
-                logger.warning("  未识别到回收弹窗的确认或取消按钮，"
-                               "当前已在背包页，判定装备锁定并保留")
+                if getattr(equip_data, "lock_status", None) == "unlock":
+                    label = equip_data.name or equip_data.type
+                    logger.error(
+                        "  装备回收失败，判定为已锁定，但是装备扫描结果为"
+                        f"未锁定：{label}")
+                else:
+                    logger.warning("  未识别到回收弹窗的确认或取消按钮，"
+                                   "当前已在背包页，判定装备锁定并保留")
                 self._routes.close_recycle_entry_on_lock()
                 return RecycleOutcome.LOCKED
             logger.error("  未识别到回收弹窗的确认或取消按钮，"

@@ -93,12 +93,16 @@ class TuningJudge:
         return judge_equipment_potential(equip_data, None, use_keys)
 
     def rating_provider(self, equip_data: EquipmentData,
-                        incoming: dict | None = None) -> RatingProvider:
+                        incoming: dict | None = None, *,
+                        incoming_first_affix_only: bool = False,
+                        ) -> RatingProvider:
         """构造行为表的评级提供者（同一装备当前词条状态内缓存）
 
         各规则按自身判定语义懒算评级（缓存键 (scope, keys,
         仅首词条)）；incoming 为已有的传入规则判定结果，作种子
-        避免重复跑（基于全词条，仅首词条时不可复用）。
+        避免重复跑。种子必须落在与其口径一致的缓存键上：门槛按
+        "仅首词条"判定得到的结果只能复用给同样声明仅首词条的规则，
+        否则全词条规则会拿到偏高的评级。
         first_affix_only 时只注入首词条（其余槽视作空槽由潜力
         判定自由填充），避免回收掉非首词条已成垃圾但可重置
         调律的装备。无任何适用规则（部位/品阶不在任何判定
@@ -106,7 +110,8 @@ class TuningJudge:
         """
         cache: dict[tuple, str] = {}
         if incoming is not None:
-            cache[("incoming", (), False)] = (
+            seed_fao = incoming_first_affix_only and len(equip_data.affixes) > 1
+            cache[("incoming", (), seed_fao)] = (
                 self.expect_key(incoming) or "junk")
         label = equip_data.name or equip_data.type
 
@@ -152,6 +157,8 @@ class TuningJudge:
         config: ScanBehavior,
         equip_data: EquipmentData,
         incoming: dict,
+        *,
+        incoming_first_affix_only: bool = False,
     ) -> BehaviorDecision:
         """纯扫描行为决策；不执行回收、导航或 UI 通知。"""
         part, quality, cap_pct = self.recycle_inputs(equip_data)
@@ -159,7 +166,9 @@ class TuningJudge:
             part,
             quality,
             cap_pct,
-            self.rating_provider(equip_data, incoming),
+            self.rating_provider(
+                equip_data, incoming,
+                incoming_first_affix_only=incoming_first_affix_only),
             [affix.name for affix in equip_data.affixes],
         )
         return BehaviorDecision.from_raw(action, reason)

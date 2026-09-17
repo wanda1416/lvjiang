@@ -120,13 +120,47 @@ class TestCooldownExpiry:
 
     def test_days_and_hours(self, parser):
         assert parser._parse_cooldown_expires_at(
-            "条转律冷却中： | 2天16小时", now=self.NOW,
-        ) == "2026-09-06T20:00:00.000+00:00"
+            "重置调律冷却中：4天16小时", now=self.NOW,
+        ) == "2026-09-08T20:00:00.000+00:00"
 
-    def test_days_without_hours(self, parser):
+    def test_hours_and_minutes(self, parser):
+        """不足一天时文案带「分」，分钟必须计入，否则到期早 59 分钟。"""
+        assert parser._parse_cooldown_expires_at(
+            "词条转律冷却中：5小时59分", now=self.NOW,
+        ) == "2026-09-04T09:59:00.000+00:00"
+
+    def test_minutes_only(self, parser):
+        assert parser._parse_cooldown_expires_at(
+            "词条转律冷却中：30分", now=self.NOW,
+        ) == "2026-09-04T04:30:00.000+00:00"
+
+    def test_ocr_fragment_days_without_hours(self, parser):
+        """OCR 漏字及漏读小时的容错样例，不代表额外的游戏文案。"""
         assert parser._parse_cooldown_expires_at(
             "重置冷却中：3天", now=self.NOW,
         ) == "2026-09-07T04:00:00.000+00:00"
+
+    @case_matrix("raw,expected", [
+        ("重置调律冷却中：4天16小时", ("reset", "cooling")),
+        ("词条转律冷却中：5小时59分", ("transmute", "cooling")),
+        ("词条转律冷却完成", ("transmute", "completed")),
+        ("重置调律冷却完成", ("reset", "completed")),
+    ])
+    def test_cooldown_kind_and_state(self, parser, raw, expected):
+        """游戏仅有两类操作 × 两个阶段，倒计时不包含「后完成」。"""
+        kind, state, expires_at = parser._parse_cooldown(raw, now=self.NOW)
+        assert (kind, state) == expected
+        if state == "completed":
+            assert expires_at == ""
+
+    @case_matrix("raw,expected", [
+        ("调律冷却完成", ("unknown", "completed", "")),
+        ("冷却中", ("unknown", "cooling", "")),
+        ("会意率 5%", ("", "", "")),
+    ])
+    def test_ocr_fragment_or_non_cooldown_state(self, parser, raw, expected):
+        """类型缺字的 OCR 结果保留 unknown；非冷却文字不生成状态。"""
+        assert parser._parse_cooldown(raw, now=self.NOW) == expected
 
     @case_matrix("raw", ["", "冷却中", "会意率 5%"])
     def test_unreadable_or_non_cooldown_is_empty(self, parser, raw):
@@ -135,13 +169,15 @@ class TestCooldownExpiry:
     def test_parse_writes_expiry_to_equipment(self, parser, monkeypatch):
         monkeypatch.setattr(
             parser, "_parse_cooldown_expires_at",
-            lambda raw: "2026-09-07T04:00:00.000+00:00" if raw else "",
+            lambda raw: "2026-09-08T20:00:00.000+00:00" if raw else "",
         )
         equip = parser.parse({
             "equip_type": "流星云珑 | 环",
-            "cooldown_text": "转律冷却中：3天",
+            "cooldown_text": "重置调律冷却中：4天16小时",
         })
-        assert equip.cooldown_expires_at == "2026-09-07T04:00:00.000+00:00"
+        assert equip.cooldown_expires_at == "2026-09-08T20:00:00.000+00:00"
+        assert equip.cooldown_kind == "reset"
+        assert equip.cooldown_state == "cooling"
 
 
 class TestOriginalLevel:

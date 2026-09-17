@@ -118,8 +118,21 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX idx_telemetry_pending ON telemetry_deliveries(state, eligible_at)")
 
 
+def _migrate_v2(conn: sqlite3.Connection) -> None:
+    """记录扫描时的锁定/冷却状态，供历史详情还原决策依据。"""
+    conn.execute(
+        "ALTER TABLE tuning_equipment ADD COLUMN lock_status TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        "ALTER TABLE tuning_equipment ADD COLUMN cooldown_kind TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        "ALTER TABLE tuning_equipment ADD COLUMN cooldown_state TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        "ALTER TABLE tuning_equipment ADD COLUMN cooldown_expires_at TEXT NOT NULL DEFAULT ''")
+
+
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial tuning history schema", _migrate_v1),
+    (2, "track equipment lock and cooldown state", _migrate_v2),
 ]
 CURRENT_VERSION = MIGRATIONS[-1][0]
 
@@ -196,8 +209,10 @@ class TuningHistoryRepository:
                     final_rating, rounds, result, reason, reset_outcome,
                     raw_status, scanned_at, tuning_started_at, finished_at,
                     round_details_json, tuning_mode,
-                    telemetry_stop_reason, telemetry_final_rating, resets
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    telemetry_stop_reason, telemetry_final_rating, resets,
+                    lock_status, cooldown_kind, cooldown_state,
+                    cooldown_expires_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(run_id, sequence_id) DO UPDATE SET
                     slot_key=excluded.slot_key, name=excluded.name,
                     equip_type=excluded.equip_type, level=excluded.level,
@@ -215,7 +230,11 @@ class TuningHistoryRepository:
                     tuning_mode=excluded.tuning_mode,
                     telemetry_stop_reason=excluded.telemetry_stop_reason,
                     telemetry_final_rating=excluded.telemetry_final_rating,
-                    resets=excluded.resets
+                    resets=excluded.resets,
+                    lock_status=excluded.lock_status,
+                    cooldown_kind=excluded.cooldown_kind,
+                    cooldown_state=excluded.cooldown_state,
+                    cooldown_expires_at=excluded.cooldown_expires_at
             """, (
                 run_id, item.equipment_id, item.slot_key, item.name, item.type,
                 item.level, item.quality, _json(item.initial_affixes),
@@ -224,7 +243,8 @@ class TuningHistoryRepository:
                 item.scanned_at, item.tuning_started_at, item.finished_at,
                 _json(item.round_details), item.tuning_mode,
                 item.telemetry_stop_reason, item.telemetry_final_rating,
-                item.resets,
+                item.resets, item.lock_status, item.cooldown_kind,
+                item.cooldown_state, item.cooldown_expires_at,
             ))
             row = conn.execute(
                 "SELECT id FROM tuning_equipment WHERE run_id=? AND sequence_id=?",
@@ -432,4 +452,8 @@ class TuningHistoryRepository:
             telemetry_stop_reason=row["telemetry_stop_reason"],
             telemetry_final_rating=row["telemetry_final_rating"],
             resets=int(row["resets"]),
+            lock_status=row["lock_status"],
+            cooldown_kind=row["cooldown_kind"],
+            cooldown_state=row["cooldown_state"],
+            cooldown_expires_at=row["cooldown_expires_at"],
         )

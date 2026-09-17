@@ -18,7 +18,10 @@ _KNOWN_QUALITIES = frozenset({"gold", "purple", "blue", "green"})
 _DISPLAY_STEP = 0.1
 _VALUE_TOL = _DISPLAY_STEP / 2 + _EPSILON
 # 判断哪份快照更新时参考的可选字段；缺失说明该份记录更简略。
-_DETAIL_FIELDS = ("original_level", "created_at", "cooldown_expires_at")
+_DETAIL_FIELDS = (
+    "original_level", "created_at", "cooldown_expires_at",
+    "cooldown_kind", "cooldown_state",
+)
 
 
 @dataclass(frozen=True)

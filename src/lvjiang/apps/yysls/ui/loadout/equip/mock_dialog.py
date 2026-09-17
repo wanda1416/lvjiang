@@ -993,6 +993,8 @@ class MockEquipDialog(QDialog):
                 carryover=(
                     game_config.is_equipment_cooldown_carryover_enabled()),
             )
+            result["cooldown_kind"] = "transmute"
+            result["cooldown_state"] = "cooling"
         result["_fp"] = make_fingerprint(result)
         return result
 

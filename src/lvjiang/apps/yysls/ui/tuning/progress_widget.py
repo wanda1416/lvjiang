@@ -208,10 +208,10 @@ class TuningProgressWidget(QWidget):
 
         self._smart_group = QGroupBox(tr("智能调律"))
         self._smart_group.setToolTip(tr(
-            "方案上限：穿戴方案按满等级、满承音、满定音假设计算；\n"
-            "当前：备战方案当前八件毕业率；\n"
-            "七件：排除当前部位后的毕业率；\n"
-            "候选上限：当前装备按承音上限补满词条的最大可能毕业率。"))
+            "方案极限：原穿戴方案按满等级、满承音、满定音计算；\n"
+            "当前实值：备战方案当前八件的实际毕业率，仅供参考；\n"
+            "七件极限：排除当前部位后，其余装备按三项全满计算；\n"
+            "候选极限：替换当前装备后，整套方案按三项全满计算。"))
         smart_layout = QVBoxLayout(self._smart_group)
         self._smart_summary_label = QLabel(tr("等待分析..."))
         self._smart_summary_label.setWordWrap(True)
@@ -378,6 +378,9 @@ class TuningProgressWidget(QWidget):
             "below_level": tr("等级不足，部位结束"),
             "invalid_quality": tr("品阶识别异常"),
             "locked": tr("已锁定，跳过"),
+            "reset_cooling": tr("重置冷却中，等待冷却完成"),
+            "transmute_protected": tr("词条转律保护，跳过"),
+            "cooldown_unknown": tr("冷却类型不明，跳过"),
             "already_full": tr("满词条，扫描完成"),
             "no_tune_entry": tr("未找到调律入口"),
             # 武库装备：不属于处理范围，只承担边界语义。缺这两条会落到
@@ -385,6 +388,8 @@ class TuningProgressWidget(QWidget):
             "wuku_skip": tr("武库装备，跳过"),
             "wuku_bottom": tr("武库装备，到达部位边界"),
             "skip_tuning": tr("测试模式跳过调律"),
+            "blue_ignored": tr("蓝色装备，忽略"),
+            "below_level_skip": tr("等级不足，跳过（同类型）"),
         }
         is_reset_before = status == "reset_before"
         self._previous_group.setTitle(
@@ -404,7 +409,8 @@ class TuningProgressWidget(QWidget):
             tr("等级 {level} | {quality} | {rounds} 轮 | {rating} | {status}").format(
                 level=level if level is not None else "-",
                 quality=quality_cn, rounds=rounds,
-                rating=tr(rating_cn), status=status_labels.get(status, status)))
+                rating=tr(rating_cn),
+                status=status_labels.get(status, tr("已保留"))))
 
         lines = list(self._current_events)
         final_affixes = finish.get("final_affixes", [])
@@ -487,10 +493,10 @@ class TuningProgressWidget(QWidget):
         if status in {"missing", "invalid", "incomplete", "not_applicable"}:
             return heading + f"<br>判定：{reason or '智能调律不启用'}"
         rates = (
-            f"方案上限：{self._format_rate(item.get('plan_maximum_rate'))}"
-            f"　当前：{self._format_rate(item.get('baseline_rate'))}<br>"
-            f"七件：{self._format_rate(item.get('without_slot_rate'))}"
-            f"　候选上限：{self._format_rate(item.get('maximum_rate'))}"
+            f"方案极限：{self._format_rate(item.get('plan_maximum_rate'))}"
+            f"　当前实值：{self._format_rate(item.get('baseline_rate'))}<br>"
+            f"七件极限：{self._format_rate(item.get('without_slot_rate'))}"
+            f"　候选极限：{self._format_rate(item.get('maximum_rate'))}"
         )
         decision = {
             "improves": "存在提升，继续调律",
@@ -533,7 +539,7 @@ class TuningProgressWidget(QWidget):
             "navigation": tr("页面导航"),
             "material": tr("材料准备"),
             "tuning": tr("执行调律"),
-            "decision": tr("结束处理"),
+            "decision": tr("调律处理"),
             "smart_decision": tr("智能调律"),
             "reset": tr("重置调律"),
             "finish": tr("收尾处理"),
@@ -553,7 +559,7 @@ class TuningProgressWidget(QWidget):
         self._record_event(event)
 
     def _on_smart_tuning_updated(self, info: dict):
-        """展示独立的智能调律分析，不挤占基础结束处理状态。"""
+        """展示独立的智能调律分析，不挤占基础调律处理状态。"""
         enabled = bool(info.get("enabled"))
         self._smart_group.setVisible(enabled)
         if not enabled:
@@ -595,9 +601,25 @@ class TuningProgressWidget(QWidget):
         level = info.get("level", 0)
         quality_cn = {"gold": tr("金色"), "purple": tr("紫色"), "blue": tr("蓝色")}.get(
             quality, quality)
+        state_parts = []
+        if info.get("lock_status") == "locked":
+            state_parts.append(tr("已锁定"))
+        cooldown_kind = info.get("cooldown_kind", "")
+        cooldown_state = info.get("cooldown_state", "")
+        if cooldown_kind:
+            kind_cn = {
+                "reset": tr("重置调律"),
+                "transmute": tr("词条转律"),
+                "unknown": tr("未知调律"),
+            }.get(cooldown_kind, cooldown_kind)
+            state_cn = (tr("冷却完成") if cooldown_state == "completed"
+                        else tr("冷却中"))
+            state_parts.append(f"{kind_cn}{state_cn}")
+        state_suffix = " | " + "、".join(state_parts) if state_parts else ""
         self._equip_info_label.setText(
             tr("等级 {level} | {quality} | 词条 {count}/5").format(
-                level=level, quality=quality_cn, count=len(info.get('affixes', []))))
+                level=level, quality=quality_cn, count=len(info.get('affixes', [])))
+            + state_suffix)
         affixes = info.get("affixes", [])
         self._affix_current_label.setText(
             self._format_affix_lines(affixes, len(affixes)))
@@ -634,6 +656,8 @@ class TuningProgressWidget(QWidget):
             self._smart_summary_label.setText(tr("等待当前装备分析..."))
             self._smart_plans_label.setText("")
         self._record_event(f"读取：{name}，初始词条 {len(affixes)}/5")
+        if state_parts:
+            self._record_event("装备状态：" + "、".join(state_parts))
 
     def _on_equipment_assessed(self, info: dict):
         expect = info.get("expect_rating", "")
@@ -686,7 +710,7 @@ class TuningProgressWidget(QWidget):
         round_no = info.get("round_no", self._round_count)
         self._round_label.setText(tr("轮次：{n}").format(n=round_no))
         self._operation_label.setText(
-            tr("当前阶段：结束处理 — 第 {n} 轮完成，正在匹配处理规则").format(n=round_no))
+            tr("当前阶段：调律处理 — 第 {n} 轮完成，正在匹配处理规则").format(n=round_no))
         affixes = info.get("current_affixes", [])
         affix_count = info.get("affix_count", len(affixes))
         self._affix_current_label.setText(
@@ -749,6 +773,9 @@ class TuningProgressWidget(QWidget):
             "below_level": tr("等级不足，当前部位结束"),
             "invalid_quality": tr("品阶识别异常"),
             "locked": tr("已锁定，跳过"),
+            "reset_cooling": tr("重置冷却中，等待冷却完成"),
+            "transmute_protected": tr("词条转律保护，跳过"),
+            "cooldown_unknown": tr("冷却类型不明，跳过"),
             "already_full": tr("满词条，已完成扫描处理"),
             "no_tune_entry": tr("未找到调律入口"),
             "skip_tuning": tr("测试模式跳过调律"),
@@ -756,6 +783,8 @@ class TuningProgressWidget(QWidget):
             # 而武库装备既没被保留也没被处理。
             "wuku_skip": tr("武库装备，跳过"),
             "wuku_bottom": tr("武库装备，到达部位边界"),
+            "blue_ignored": tr("蓝色装备，忽略"),
+            "below_level_skip": tr("等级不足，跳过（同类型）"),
         }.get(status, tr("已保留"))
         reason = info.get("reason", "")
         if reason:
@@ -790,6 +819,9 @@ class TuningProgressWidget(QWidget):
             "kept": tr("保留"),
             "force_tune": tr("强制调律"),
             "tune_full_recycle": tr("调满后回收"),
+            "protected": tr("保护跳过"),
+            "deferred": tr("等待冷却"),
+            "locked": tr("锁定跳过"),
         }
         action_cn = action_labels.get(action, action)
         self._scan_decision_label.setText(

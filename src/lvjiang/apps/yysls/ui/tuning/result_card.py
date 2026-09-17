@@ -175,6 +175,26 @@ class TuningResultCard(QFrame):
         self.info_label.setStyleSheet("font-size: 11px; color: palette(mid); border: none;")
         layout.addWidget(self.info_label)
 
+        state_parts: list[str] = []
+        if result.lock_status == "locked":
+            state_parts.append(tr("已锁定"))
+        if result.cooldown_kind:
+            kind = {
+                "reset": tr("重置调律"),
+                "transmute": tr("词条转律"),
+                "unknown": tr("未知调律"),
+            }.get(result.cooldown_kind, result.cooldown_kind)
+            state = (tr("冷却完成")
+                     if result.cooldown_state == "completed" else tr("冷却中"))
+            state_parts.append(f"{kind}{state}")
+        if state_parts:
+            equipment_state = QLabel(
+                tr("装备状态：") + "、".join(state_parts))
+            equipment_state.setWordWrap(True)
+            equipment_state.setStyleSheet(
+                "font-size: 11px; font-weight: bold; color: #8A5A00; border: none;")
+            layout.addWidget(equipment_state)
+
         self.reset_label: QLabel | None = None
         if result.reset_outcome:
             reset_text = _RESET_LABELS.get(

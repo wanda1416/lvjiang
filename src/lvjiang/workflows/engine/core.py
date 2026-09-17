@@ -29,6 +29,7 @@ from ...core.ocr import OCREngine
 from ...core.recognizers import ReferenceRecognizer
 from ..align import GridAlignment
 from ..base import BaseWorkflow
+from ..capture_snapshot import CaptureSnapshotMixin
 from ..errors import WorkflowExecutionError
 from ..grammar.ast_nodes import (
     Align,
@@ -125,7 +126,7 @@ def _normalize_import_path(raw: str) -> str:
     return rel
 
 
-class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
+class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsMixin,
                      _ControlFlowMixin, _EvalMixin):
     """工作流运行时核心。
 
@@ -176,6 +177,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._pause_event = pause_event
         # 引擎生命周期服务：DSL 委托与 Python 类工作流共享图库匹配缓存。
         self._reference_recognizer = ReferenceRecognizer(self._ocr)
+        self._init_capture_snapshot()
         # 执行状态
         self.variables: dict = {}
         # global 声明按变量名跨 call 共享；普通变量仍由 _run_proc 隔离。
@@ -312,6 +314,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         # 过程中通过 context/global 共享数据；两者都不得泄漏到下一次执行。
         if _reset_context:
             self.context = {}
+            self.clear_capture_snapshot()
             # Panel 对齐依赖当前画面，只属于单次顶层运行。
             # DSL 与 Python 业务流共用引擎缓存后，必须在统一
             # 生命周期边界清理，不能泄漏到下一条工作流。
@@ -1138,7 +1141,7 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
     def _exec_screenshot(self):
         """截取当前画面并保存到 logs/image/"""
-        img = self._capture.capture()
+        img = self.capture_frame(source="screenshot")
         if img is None:
             logger.warning("screenshot: 截图失败")
             return

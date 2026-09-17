@@ -479,19 +479,19 @@ class MaterialSettings:
         return FoodDecision("none", "", tr("无狗粮规则命中 → 不添加"))
 
 
-# ─── 行为配置（状态机三行为点：扫描处理 / 材料处理 / 结束处理）──
+# ─── 行为配置（状态机三行为点：扫描处理 / 材料处理 / 调律处理）──
 
-# 行为动作（结束处理 tune 的四个动作）：
-# - continue: 继续调律或跳过（未满继续，词条满后结束保留）
+# 行为动作（调律处理 tune 的四个动作）：
+# - continue: 继续调律或锁定（未满继续，词条满后结束并可锁定）
 # - reset: 重置装备（清空首词条以外全部词条后继续，冷却期限制每件限一次）
 # - recycle: 回收装备
 # - skip: 跳过该装备（结束保留在背包）
 # - tune_full_recycle: 调满后回收（命中后直通调满并回收）
 # 扫描处理 scan 有 recycle / skip / tune_full_recycle 三个动作
-# 行为动作（结束处理 tune 的四个动作 + 扫描处理新增的调满后回收）
+# 行为动作（调律处理 tune 的四个动作 + 扫描处理新增的调满后回收）
 BEHAVIOR_ACTIONS = ("continue", "reset", "recycle", "skip", "tune_full_recycle")
 BEHAVIOR_ACTION_LABELS = {
-    "continue": tr("继续调律或跳过"),   # 词条满时结束保留
+    "continue": tr("继续调律或锁定"),   # 词条满时结束保留并可锁定
     "reset": tr("重置装备"),
     "recycle": tr("回收装备"),
     "skip": tr("跳过该装备"),
@@ -503,15 +503,15 @@ BEHAVIOR_STAGE_ACTIONS = {
     "scan": ("recycle", "skip", "tune_full_recycle", "tune_this"),
     "tune": ("continue", "reset", "recycle", "skip", "tune_full_recycle"),
 }
-BEHAVIOR_STAGE_LABELS = {"scan": "扫描处理", "tune": "结束处理"}
+BEHAVIOR_STAGE_LABELS = {"scan": "扫描处理", "tune": "调律处理"}
 # 动作说明（供 UI tooltip 显示）
 BEHAVIOR_ACTION_TOOLTIPS = {
-    "continue": "继续调律或跳过：词条未满时继续，词条满后结束调律并保留装备，不执行后续规则",
+    "continue": "继续调律或锁定：词条未满时继续，词条满后结束并按设置锁定装备，不执行后续规则",
     "reset": "重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）",
     "recycle": "回收装备：分解为材料",
     "skip": "跳过该装备：结束保留在背包",
     "tune_full_recycle": tr("调满后回收：命中后不再做规则判定，跳过狗粮，调满5词条后回收"),
-    "tune_this": tr("强制调律：无视进入门槛，强制进入调律页（配合结束处理「启用初始判定」实现调废装备重置复用）"),
+    "tune_this": tr("强制调律：无视进入门槛，强制进入调律流程"),
 }
 # 判定语义：预期评级识别用哪个流派规则集；affix=自选词条
 #（不跑潜力判定，判定结果列存词条名，按装备词条名匹配）
@@ -684,6 +684,7 @@ class ScanBehavior:
     min_level: 等级门槛 —— 低于该等级的装备直接跳过
     entry_min_rating: 调律门槛 —— 传入规则预期评级 ≥ 该档即进入
     调律（固定用传入规则判定，调律目标就是运行期所选流派）；
+    entry_first_affix_only: 调律门槛只用首词条临时候选判定；
     rules: 不进调律装备的处置表（首条命中；无命中=跳过该装备），
     评级判定语义与仅注入首词条均逐规则声明（BehaviorRule）。
     max_consecutive_recycles: 回收补位循环上限
@@ -691,6 +692,7 @@ class ScanBehavior:
     enabled: bool = True
     min_level: int = 100
     entry_min_rating: str = "excellent"
+    entry_first_affix_only: bool = True
     max_consecutive_recycles: int = 50
     rules: list[BehaviorRule] = field(default_factory=list)
 
@@ -714,12 +716,13 @@ class ScanBehavior:
 
 @dataclass
 class TuneBehavior:
-    """结束处理（每轮调律结束后的行为点）
+    """调律处理（进入调律前与每轮调律后的行为点）
 
     每轮 decide 时评级按各规则自身判定语义懒取；词条满为边界
-    条件：full=True 时 continue 动作自动转为 skip，并以该规则
+    条件：full=True 时 continue 动作自动转为 lock/skip，并以该规则
     作为最终命中结果，不再继续匹配后续规则。
-    无命中默认：未满=继续调律、满=跳过该装备；未启用同默认。
+    无命中默认：未满=继续调律；满时按 lock_qualified 决定锁定或
+    跳过；未启用同默认。
     max_resets: 单件装备重置次数上限（按钮文本携带剩余次数另作
     硬门，不超过游戏硬限 MAX_TUNE_RESETS）；
     reset_exhausted_action: 规则命中重置但重置**确定且永久**不可用时的
@@ -731,27 +734,32 @@ class TuneBehavior:
     rules: list[BehaviorRule] = field(default_factory=list)
     max_resets: int = MAX_TUNE_RESETS
     reset_exhausted_action: str = "skip"
-    initial_check: bool = False
+    lock_qualified: bool = True
 
     def decide(self, part: str | None, quality: str | None,
                cap_pct: float | None, rating_of: RatingProvider,
                full: bool,
                affix_names: list[str] | None = None) -> tuple[str, str]:
-        """返回 (动作, 决策说明)；无命中默认未满=continue、满=skip"""
-        default = (("skip", tr("词条已满，无行为规则命中 → 跳过该装备"))
+        """返回 (动作, 决策说明)；满词条可能返回内部动作 lock。"""
+        default = ((("lock" if self.lock_qualified else "skip"),
+                    tr("词条已满，无行为规则命中 → 结束并锁定装备")
+                    if self.lock_qualified else
+                    tr("词条已满，无行为规则命中 → 跳过该装备"))
                    if full else ("continue", tr("无行为规则命中 → 继续调律")))
         if not self.enabled:
             return default
-        # continue 规则即使词条已满也必须命中，并在下方转为 skip，
+        # continue 规则即使词条已满也必须命中，并在下方转为 lock/skip，
         # 从而终止后续规则判定并保留装备。
         hit = _first_hit(self.rules, part, quality, cap_pct, rating_of,
                          affix_names)
         if hit:
             idx, rule = hit
-            # continue 动作在词条满时自动转为 skip
-            action = ("skip" if full and rule.action == "continue"
+            # continue 动作在词条满时按自动锁定开关转为 lock/skip
+            action = (("lock" if self.lock_qualified else "skip")
+                      if full and rule.action == "continue"
                       else rule.action)
-            label = BEHAVIOR_ACTION_LABELS.get(action, action)
+            label = (tr("锁定合格装备") if action == "lock"
+                     else BEHAVIOR_ACTION_LABELS.get(action, action))
             return action, (
                 f"规则{idx}（{rule.summary()}）命中 → {label}")
         return default
@@ -762,7 +770,7 @@ class TuningGroup:
     """基础规则组（base_groups/ 下一个 YAML 文件，可多套切换）
 
     承载单次调律运行的策略基线：材料设置 + 行为配置
-    （扫描/结束处理）。激进/保守等账号策略差异体现在不同规则组，
+    （扫描/调律处理）。激进/保守等账号策略差异体现在不同规则组，
     启动时经 TuningRunContext 注入工作流。存在性由目录决定，展示顺序由
     ``order`` 声明。
     """
@@ -786,7 +794,7 @@ class SmartTuningEvaluation:
 
 @dataclass
 class SmartTuningFailureAction:
-    """判定为无法提升后的二次结束处理。"""
+    """判定为无法提升后的二次调律处理。"""
 
     enabled: bool = True
     action: str = "skip"

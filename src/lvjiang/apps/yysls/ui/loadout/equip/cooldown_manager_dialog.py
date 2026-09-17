@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QFrame,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
     QMessageBox,
     QScrollArea,
@@ -22,7 +23,11 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.i18n import tr
-from lvjiang.ui.button_styles import apply_dialog_button_box_style
+from lvjiang.ui.button_styles import (
+    apply_compact_button_style,
+    apply_dialog_button_box_style,
+)
+from lvjiang.ui.widgets import MultiSelectButton
 
 from ....core.loadout import LoadoutRepository
 from .cards import (
@@ -39,7 +44,7 @@ _COLUMN_COUNT = 6
 class _CooldownEquipmentEntry:
     username: str
     equip: dict
-    expires_at: datetime
+    expires_at: datetime | None
 
 
 def _load_cooldown_entries(
@@ -56,12 +61,16 @@ def _load_cooldown_entries(
             for equip in repo.load().equipment_items.values():
                 expires_at = _parse_cooldown_time(
                     equip.get("cooldown_expires_at"))
-                if expires_at is not None:
+                if (expires_at is not None
+                        or equip.get("cooldown_state") == "completed"):
                     entries.append(_CooldownEquipmentEntry(
                         username, equip, expires_at))
         except Exception:
             logger.exception(f"读取用户 {username} 的冷却装备失败")
-    return sorted(entries, key=lambda entry: entry.expires_at)
+    return sorted(entries, key=lambda entry: (
+        entry.expires_at is not None,
+        entry.expires_at or datetime.min,
+    ))
 
 
 class _CooldownEquipmentTile(QWidget):
@@ -86,6 +95,8 @@ class _CooldownEquipmentTile(QWidget):
 
         remaining = _format_cooldown_remaining(
             entry.equip.get("cooldown_expires_at"))
+        if entry.equip.get("cooldown_state") == "completed":
+            remaining = tr("已完成")
         countdown = QLabel(f"{tr('冷却倒计时')}：{remaining}")
         countdown.setStyleSheet("color:#D97706;font-weight:600;")
         layout.addWidget(countdown)
@@ -124,6 +135,25 @@ class CooldownEquipmentDialog(QDialog):
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(10)
 
+        # 顶部：用户过滤（默认全部；可多选；全选时显示「全部用户」）
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(8)
+        filter_label = QLabel(tr("用户"))
+        filter_label.setProperty("tone", "muted")
+        filter_row.addWidget(filter_label)
+        self._user_filter = MultiSelectButton(
+            [(name, name) for name in self._usernames],
+            all_label=tr("全部用户"), none_label=tr("未选择用户"))
+        self._user_filter.setMinimumWidth(160)
+        apply_compact_button_style(self._user_filter, variant="neutral")
+        self._user_filter.selection_changed.connect(self._rebuild)
+        filter_row.addWidget(self._user_filter)
+        self._count_label = QLabel("")
+        self._count_label.setProperty("tone", "muted")
+        filter_row.addWidget(self._count_label)
+        filter_row.addStretch()
+        root.addLayout(filter_row)
+
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -137,7 +167,17 @@ class CooldownEquipmentDialog(QDialog):
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons)
 
+        self._entries: list[_CooldownEquipmentEntry] = []
+        self._reload()
+
+    def _reload(self) -> None:
+        """重新读取全部用户的冷却装备，再按当前用户过滤重建网格。"""
+        self._entries = _load_cooldown_entries(self._usernames, self._users_dir)
         self._rebuild()
+
+    def _visible_entries(self) -> list[_CooldownEquipmentEntry]:
+        selected = set(self._user_filter.selected_keys())
+        return [entry for entry in self._entries if entry.username in selected]
 
     def _rebuild(self) -> None:
         content = QWidget()
@@ -146,17 +186,24 @@ class CooldownEquipmentDialog(QDialog):
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(12)
         self._tiles = []
-        entries = _load_cooldown_entries(self._usernames, self._users_dir)
+        entries = self._visible_entries()
+        self._count_label.setText(
+            tr("{shown} / {total} 件").format(
+                shown=len(entries), total=len(self._entries)))
         for index, entry in enumerate(entries):
             tile = _CooldownEquipmentTile(entry, self._display_params)
             tile.card.properties_requested.connect(
                 partial(self._show_properties, entry))
+            tile.card.lock_requested.connect(
+                partial(self._set_lock_status, entry, tile.card))
             self._tiles.append(tile)
             grid.addWidget(tile, index // _COLUMN_COUNT, index % _COLUMN_COUNT)
         for column in range(_COLUMN_COUNT):
             grid.setColumnStretch(column, 1)
         if not entries:
-            empty = QLabel(tr("当前没有设置冷却时间的装备"))
+            empty = QLabel(
+                tr("当前没有设置冷却时间的装备") if not self._entries
+                else tr("所选用户没有冷却装备"))
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             empty.setStyleSheet(
                 "color:palette(mid);font-size:14px;padding:48px;")
@@ -194,7 +241,33 @@ class CooldownEquipmentDialog(QDialog):
         _show_equipment_properties(
             self, entry.equip, cooldown_changed=update_cooldown)
         if changed:
-            self._rebuild()
+            self._reload()
+
+    def _set_lock_status(
+        self,
+        entry: _CooldownEquipmentEntry,
+        card: _CompactEquipCard,
+        _equip: dict,
+        locked: bool,
+    ) -> None:
+        fp = str(entry.equip.get("_fp") or "")
+        if not fp:
+            QMessageBox.warning(
+                self, tr("修改失败"), tr("装备数据缺少 _fp 字段"))
+            return
+        try:
+            LoadoutRepository(
+                entry.username, self._users_dir,
+            ).set_item_lock_status(fp, locked)
+        except Exception as exc:
+            logger.exception(
+                f"修改用户 {entry.username} 的装备锁定状态失败")
+            QMessageBox.critical(self, tr("修改失败"), str(exc))
+            return
+        value = "locked" if locked else "unlock"
+        entry.equip["lock_status"] = value
+        card.update_lock_status(value)
+        self.changed = True
 
 
 __all__ = ["CooldownEquipmentDialog"]

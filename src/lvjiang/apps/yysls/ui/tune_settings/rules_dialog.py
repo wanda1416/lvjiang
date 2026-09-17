@@ -7,8 +7,8 @@
   （BaseRuleGroupPage），切换后三个行为页同步对准该组；
 - 扫描处理：进调律前的进入门槛与处置表（ScanBehaviorPage）；
 - 材料处理：每轮调律开始前的律准石检查与狗粮规则（MaterialConfigPage）；
-- 结束处理：每轮调律结束后的行为表与重置设置（TuneBehaviorPage）；
-- 智能调律：结束处理的公共扩展，配置备战方案范围、毕业率比较与独立失败动作，
+- 调律处理：进入调律前及每轮结束后的行为表与重置设置（TuneBehaviorPage）；
+- 智能调律：调律处理的公共扩展，配置备战方案范围、毕业率比较与独立失败动作，
   不随基础规则组切换；
 - 流派规则：品阶门槛与开关设定（PlaystyleConfigPage，全局不随组切换）；
 - 各规则：单规则编辑面板（RulePanel，内部含 7 项二级导航）；
@@ -269,7 +269,7 @@ class TuningRulesDialog(QDialog):
             (tr("基础规则"), self._base_page),
             (tr("扫描处理"), self._scan_page),
             (tr("材料处理"), self._material_page),
-            (tr("结束处理"), self._tune_page),
+            (tr("调律处理"), self._tune_page),
         ):
             self._add_page_nav(title, page)
         self._add_page_nav(tr("智能调律"), self._smart_page)

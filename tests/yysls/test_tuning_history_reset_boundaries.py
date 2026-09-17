@@ -18,6 +18,7 @@ def _projector_after_successful_reset():
     projector.consume("equipment_started", {
         "name": "流星甲", "type": "胸甲", "level": 110,
         "quality": "gold", "affixes": [{"name": "会心率"}],
+        "cooldown_kind": "reset", "cooldown_state": "completed",
     })
     projector.consume("operation_updated", {
         "phase": "material", "message": "已进入调律页",
@@ -63,6 +64,8 @@ def test_successful_reset_splits_before_and_after_cooldown_results():
     assert before.round_details[0]["food_reason"] == "预期优秀，添加金狗粮"
     assert before.round_details[0]["completed"] is True
     assert before.telemetry_stop_reason == "reset_completed"
+    assert before.cooldown_kind == "reset"
+    assert before.cooldown_state == "completed"
 
     projector.consume("tune_round_completed", {
         "round_no": 2, "new_affix_data": {"name": "会意率"},
@@ -85,6 +88,8 @@ def test_successful_reset_splits_before_and_after_cooldown_results():
     assert after.rounds == 1  # 不重复计算重置前的一轮
     assert after.result == RESULT_RESET
     assert after.reset_outcome == RESET_COOLDOWN
+    assert after.cooldown_kind == ""
+    assert after.cooldown_state == ""
 
 
 def test_post_reset_exhaustion_recycle_is_a_recycle_terminal_result():

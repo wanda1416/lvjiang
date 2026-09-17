@@ -60,8 +60,13 @@ class EquipmentParser:
         equip.level, equip.is_chengyin = self._parse_equip_level(
             raw.get("equip_level", "")
         )
+        cooldown_text = raw.get("cooldown_text", "")
+        (equip.cooldown_kind, equip.cooldown_state,
+         _parsed_expiry) = self._parse_cooldown(cooldown_text)
+        # 到期时间保留独立兼容入口，既方便调用方单测固定当前时刻，也兼容
+        # 旧扩展只覆写该方法的用法。
         equip.cooldown_expires_at = self._parse_cooldown_expires_at(
-            raw.get("cooldown_text", ""))
+            cooldown_text)
 
         # base_attr：统一解析，不依赖 category
         equip.base_attr = self._parse_base_attr(raw.get("base_attr", ""))
@@ -240,30 +245,60 @@ class EquipmentParser:
         return level, is_chengyin
 
     @staticmethod
-    def _parse_cooldown_expires_at(
+    def _parse_cooldown(
         raw: str,
         *,
         now: datetime | None = None,
-    ) -> str:
-        """将冷却剩余天数/小时数换算为 UTC ISO 到期时间。
+    ) -> tuple[str, str, str]:
+        """解析冷却类型、状态，并将剩余时间换算为 UTC ISO 时间。
 
-        OCR 示例：``条转律冷却中： | 2天16小时``、``重置冷却中：3天``。
-        冷却种类暂不进入模型；无法读出天或小时时保持空值。
+        游戏冷却提示仅有以下四类文案（倒计时数值随剩余时间变化）：
+        - ``重置调律冷却中：4天16小时``
+        - ``词条转律冷却中：5小时59分``
+        - ``词条转律冷却完成``
+        - ``重置调律冷却完成``
+
+        冷却中的倒计时没有「后完成」后缀；「完成」只出现在完成态。
+        OCR 缺字或分段属于识别容错，不是额外的游戏文案。类型无法可靠
+        识别时保留 unknown，供自动调律按保护侧跳过；完成态没有剩余
+        时间，仍通过 kind/state 完整保留其业务语义。
         """
         if not isinstance(raw, str) or "冷却" not in raw:
-            return ""
+            return "", "", ""
+        if "转律" in raw:
+            kind = "transmute"
+        elif "重置" in raw:
+            kind = "reset"
+        else:
+            kind = "unknown"
+        state = "completed" if "完成" in raw else "cooling"
         day_match = re.search(r"(\d+)\s*天", raw)
         hour_match = re.search(r"(\d+)\s*小时", raw)
-        if day_match is None and hour_match is None:
-            return ""
+        # 「X天X小时」是确定会出现的粒度；「X分」只在剩余不足一天时
+        # 才可能出现，可有可无，出现了就不能丢——否则到期时间最多早 59 分钟，
+        # 自动调律会提前判「冷却完成」去续调。
+        minute_match = re.search(r"(\d+)\s*分", raw)
+        if day_match is None and hour_match is None and minute_match is None:
+            return kind, state, ""
         days = int(day_match.group(1)) if day_match else 0
         hours = int(hour_match.group(1)) if hour_match else 0
+        minutes = int(minute_match.group(1)) if minute_match else 0
         base = now or datetime.now(timezone.utc)
         if base.tzinfo is None:
             base = base.replace(tzinfo=timezone.utc)
         expires_at = base.astimezone(timezone.utc) + timedelta(
-            days=days, hours=hours)
-        return expires_at.isoformat(timespec="milliseconds")
+            days=days, hours=hours, minutes=minutes)
+        return kind, state, expires_at.isoformat(timespec="milliseconds")
+
+    @classmethod
+    def _parse_cooldown_expires_at(
+        cls,
+        raw: str,
+        *,
+        now: datetime | None = None,
+    ) -> str:
+        """兼容旧调用点：只返回冷却到期时间。"""
+        return cls._parse_cooldown(raw, now=now)[2]
 
     # ─── base_attr 解析 ────────────────────────────────────
 

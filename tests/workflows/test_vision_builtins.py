@@ -16,6 +16,7 @@ import pytest
 from lvjiang.core.coord_types import CircleCoordRef, RectCoordRef
 from lvjiang.core.layout_models import FoundRegion, Region
 from lvjiang.workflows.builtins import get_function
+from lvjiang.workflows.builtins.vision import last_frame_region
 from tests.workflows.conftest import make_engine
 
 
@@ -85,6 +86,31 @@ def test_region_to_coord_ref_roundtrip():
     eng = _engine_with(frame)
     ref = Region(key="tl", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5).to_coord_ref()
     assert _call("color_ratio", eng, ref, "#c80000", 0) == pytest.approx(1.0)
+
+
+def test_last_frame_region_reuses_capture_without_new_screenshot():
+    frame = _frame(w=200, h=100)
+    frame[20:40, 50:90] = _bgr((220, 30, 20))
+    eng = _engine_with(frame)
+    ref = RectCoordRef(cx=0.35, cy=0.3, w=0.2, h=0.2)
+
+    assert eng.capture_frame(source="test") is frame
+    crop = last_frame_region(eng, ref, "test_last_frame")
+
+    assert crop is not None
+    assert crop.shape[:2] == (20, 40)
+    assert eng._capture.capture.call_count == 1
+    assert eng.last_capture_seq == 1
+
+
+def test_failed_capture_invalidates_previous_frame():
+    frame = _frame()
+    eng = _engine_with(frame)
+    eng.capture_frame(source="first")
+    eng._capture.capture.return_value = None
+
+    assert eng.capture_frame(source="failed") is None
+    assert eng.get_last_capture_frame() is None
 
 
 # ─── 画布裁剪 ───────────────────────────────────────────

@@ -216,7 +216,7 @@ class LoadoutRepository:
         self.update(mutate)
         return fp
 
-    def set_item_cooldown(self, fp: str, expires_at: str) -> None:
+    def set_item_cooldown(self, fp: str, expires_at: str) -> LoadoutState:
         """只修改指定装备的冷却到期时间，指纹不变。"""
         if not isinstance(expires_at, str):
             raise TypeError("冷却到期时间必须是字符串")
@@ -226,9 +226,31 @@ class LoadoutRepository:
             if equip is None:
                 raise ValueError(f"装备已不存在: {fp}")
             equip["cooldown_expires_at"] = expires_at
+            # 手动改到期时间不改变冷却类型：扫描出的"重置调律"不能因修正
+            # 时间而变成"词条转律"；只有原本没有类型时才默认按转律记。
+            if expires_at:
+                equip["cooldown_kind"] = equip.get("cooldown_kind") or "transmute"
+                equip["cooldown_state"] = "cooling"
+            else:
+                equip["cooldown_kind"] = ""
+                equip["cooldown_state"] = ""
             equip[EQUIPMENT_UPDATED_AT] = _now_iso()
 
-        self.update(mutate)
+        return self.update(mutate)
+
+    def set_item_lock_status(self, fp: str, locked: bool) -> LoadoutState:
+        """只修改指定装备的锁定状态，指纹不变。"""
+        if not isinstance(locked, bool):
+            raise TypeError("锁定状态必须是布尔值")
+
+        def mutate(state: LoadoutState) -> None:
+            equip = state.equipment_items.get(fp)
+            if equip is None:
+                raise ValueError(f"装备已不存在: {fp}")
+            equip["lock_status"] = "locked" if locked else "unlock"
+            equip[EQUIPMENT_UPDATED_AT] = _now_iso()
+
+        return self.update(mutate)
 
     def assign_equipment(self, plan_id: str, slot_key: str, equip: dict) -> str:
         if slot_key not in EQUIPMENT_SLOTS:
@@ -261,8 +283,9 @@ class LoadoutRepository:
         fingerprints: set[str],
         *,
         preserve_referenced: bool = False,
+        preserve_locked: bool = False,
     ) -> set[str]:
-        """删除装备，按需原子保护所有现存备战方案正在引用的装备。
+        """删除装备，按需原子保护备战引用或已锁定装备。
 
         保护集合必须在持有仓储写锁后重新计算，不能依赖确认对话框打开时的
         UI 快照；否则任务或其他页面在确认期间新建的引用仍可能被误删。
@@ -281,6 +304,12 @@ class LoadoutRepository:
                     if fp
                 }
                 requested.difference_update(referenced)
+            if preserve_locked:
+                requested = {
+                    fp for fp in requested
+                    if (state.equipment_items.get(fp) or {}).get(
+                        "lock_status") != "locked"
+                }
             deleted = requested & state.equipment_items.keys()
             for fp in deleted:
                 state.equipment_items.pop(fp, None)
@@ -479,6 +508,8 @@ class LoadoutRepository:
                     days=game_config.get_equipment_cooldown_days(),
                     carryover=carryover,
                 )
+                value["cooldown_kind"] = "transmute"
+                value["cooldown_state"] = "cooling"
             stamped = stamp_equipment_write(
                 value, new_fp, state.equipment_items.get(new_fp))
             target = state.equipment_items.get(new_fp)

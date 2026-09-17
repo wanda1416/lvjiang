@@ -84,7 +84,7 @@ class TestDialog:
         dialog = TuningRulesDialog()
         qtbot.addWidget(dialog)
         # 左侧导航：基础规则 + 扫描 + 材料 + 结束 + 智能调律 + ─ + 流派规则 + 各规则
-        # 智能调律是结束处理的公共扩展，两者之间不加分割线；导航项与栈页的映射显式维护
+        # 智能调律是调律处理的公共扩展，两者之间不加分割线；导航项与栈页的映射显式维护
         # 对话框加载全部规则（含禁用），与 get_tuning_rules()（仅启用）不同
         n_rules = len(get_tuning_rule_manager().get_all_rule_keys_and_names())
         assert dialog._nav.count() == n_rules + 7
@@ -92,7 +92,7 @@ class TestDialog:
         assert dialog._nav.item(0).text() == "基础规则"
         assert dialog._nav.item(1).text() == "扫描处理"
         assert dialog._nav.item(2).text() == "材料处理"
-        assert dialog._nav.item(3).text() == "结束处理"
+        assert dialog._nav.item(3).text() == "调律处理"
         assert dialog._nav.item(4).text() == "智能调律"
         # 智能调律之后才与流派规则区分
         assert not dialog._nav.item(5).flags()
@@ -200,6 +200,8 @@ class TestBehaviorPages:
         group = tmp_group_manager.get_group("default")
         original_entry = group.scan.entry_min_rating
         assert page._entry_combo.currentData() == original_entry
+        assert (page._entry_first_affix_cb.isChecked()
+                == group.scan.entry_first_affix_only)
 
         # 变更到不同于当前值的选项
         new_entry = "excellent" if original_entry != "excellent" else "top"
@@ -210,6 +212,12 @@ class TestBehaviorPages:
         # 处置表其他字段不受影响
         assert after.scan.enabled == group.scan.enabled
         assert after.scan.rules == group.scan.rules
+
+        page._entry_first_affix_cb.setChecked(
+            not group.scan.entry_first_affix_only)
+        saved = tmp_group_manager.get_group("default").scan
+        assert (saved.entry_first_affix_only
+                is not group.scan.entry_first_affix_only)
 
     def test_scan_page_roundtrip(self, qtbot, tmp_group_manager):
         statuses: list[tuple[str, bool]] = []
@@ -261,15 +269,18 @@ class TestBehaviorPages:
         assert page._resets_spin.value() == tune.max_resets
         assert (page._exhausted_combo.currentData()
                 == tune.reset_exhausted_action)
+        assert page._lock_qualified_cb.isChecked() == tune.lock_qualified
 
         # 启用 + 上限调整 → 保存生效，且不覆盖 scan 子段
         scan_before = tmp_group_manager.get_raw("default")["scan"]
         page._enabled_cb.setChecked(True)
         page._resets_spin.setValue(1)
+        page._lock_qualified_cb.setChecked(not tune.lock_qualified)
         assert statuses and not statuses[-1][1], statuses[-1][0]
         saved = tmp_group_manager.get_group("default").tune
         assert saved.enabled is True
         assert saved.max_resets == 1
+        assert saved.lock_qualified is not tune.lock_qualified
         assert tmp_group_manager.get_raw("default")["scan"] == scan_before
 
     def test_scan_scope_switch_resets_ratings_domain(self, qtbot,

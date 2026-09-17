@@ -16,6 +16,21 @@ def _fn(name):
     return fn
 
 
+def test_to_equipment_carries_only_valid_lock_status():
+    raw = {
+        "equip_type": "踏雪含光 | 武器·剑",
+        "equip_level": "110阶",
+        "base_attr": "外功攻击 100~232",
+        "affix_gong": "最大外功攻击 +121.4",
+        "lock_status": "locked",
+    }
+    locked = _fn("to_equipment")(raw)
+    assert locked["lock_status"] == "locked"
+
+    unknown = _fn("to_equipment")({**raw, "lock_status": "unexpected"})
+    assert "lock_status" not in unknown
+
+
 class TestMakeFingerprint:
     def test_basic_fingerprint(self):
         """正常装备数据生成指纹"""
@@ -92,6 +107,19 @@ class TestMakeFingerprint:
             "cooldown_expires_at": "2026-09-08T20:00:00.000+00:00",
         })
         assert without_cooldown == first_expiry == changed_expiry
+
+    def test_lock_status_is_strictly_excluded_from_fingerprint(self):
+        base = {
+            "type": "剑",
+            "level": 110,
+            "quality": "gold",
+            "is_chengyin": False,
+            "affix_1": {"name": "会意率", "value": 5.4},
+        }
+        missing = _fn("make_fingerprint")(base)
+        locked = _fn("make_fingerprint")({**base, "lock_status": "locked"})
+        unlocked = _fn("make_fingerprint")({**base, "lock_status": "unlock"})
+        assert missing == locked == unlocked
 
     def test_missing_affix_name_skipped(self):
         """词条无 name 字段时跳过"""

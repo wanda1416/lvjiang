@@ -32,6 +32,7 @@ class TuningRunContext:
     judge_rule_keys: list[str] | None = None  # 参与判定的规则 key 顺序
     skip_tuning: bool = False                 # 测试开关：跳过实际调律，仅模拟进出调律页
     pc_background_scroll: bool = False        # PC 后台模式：滚轮替代背包拖拽
+    skip_locked_equipment: bool = True        # 锁定装备不进入调律/回收流程
     use_stone_cache: bool = True              # 使用律准石消耗/返还账本
     initial_stone_check_enabled: bool = False  # 是否启用首次 OCR 额外门槛
     initial_stone_min_count: int | None = None  # 首次 OCR 额外校验（大律准石）

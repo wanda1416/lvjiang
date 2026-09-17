@@ -156,7 +156,7 @@ class BaseRuleGroupPage(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(
-            "<b>" + tr("基础规则") + "</b>（" + tr("等级门槛 + 调律门槛 + 扫描/材料/结束处理，"
+            "<b>" + tr("基础规则") + "</b>（" + tr("等级门槛 + 调律门槛 + 扫描/材料/调律处理，"
             "一组一套可切换；流派规则全局不受影响") + "）"))
 
         # 当前规则（切换即激活）
@@ -164,7 +164,7 @@ class BaseRuleGroupPage(QWidget):
         combo_row.addWidget(QLabel("<b>" + tr("当前规则") + "</b>"))
         self._combo = QComboBox()
         self._combo.setToolTip(
-            tr("切换后扫描处理/材料处理/结束处理页同步对准该组，"
+            tr("切换后扫描处理/材料处理/调律处理页同步对准该组，"
                "不会修改用户在自动调律页选择的规则组"))
         self._combo.currentIndexChanged.connect(self._on_combo_changed)
         combo_row.addWidget(self._combo)

@@ -6,10 +6,11 @@ from loguru import logger
 from ...core.layout_models import CanvasConfig, FoundRegion, Region
 from ...core.recognizers import ReferenceInfo
 from ...i18n import tr
+from ..capture_snapshot import CaptureSnapshotMixin
 from ..runtime_layout import enabled_regions, require_regions_enabled
 
 
-class _RecognitionMixin:
+class _RecognitionMixin(CaptureSnapshotMixin):
     """截图与识别能力（OCR / 参考图匹配 / by 短路）"""
 
     # ─── 区域解析 ──────────────────────────────────────────
@@ -74,7 +75,7 @@ class _RecognitionMixin:
         Returns:
             {field_key: ocr_text, ...}
         """
-        img = self._capture.capture()
+        img = self.capture_frame(source="ocr_scene")
         if img is None:
             self._log_capture_failed("ocr_scene", scene_key, field_keys)
             return {}
@@ -122,7 +123,7 @@ class _RecognitionMixin:
             result: {slot_key: label, ...}  空槽为 ""
             region_map: {slot_key: Region, ...}  供 coord_meta 存储
         """
-        img = self._capture.capture()
+        img = self.capture_frame(source="recognize_references")
         if img is None:
             self._log_capture_failed("scan panel", scene_key, slot_keys)
             return {}, {}
@@ -207,7 +208,7 @@ class _RecognitionMixin:
             if transform is None:
                 raise ValueError(f"未知内置函数: {func_name}")
 
-        img = self._capture.capture()
+        img = self.capture_frame(source="recognize_references_info")
         if img is None:
             self._log_capture_failed("scan panel", scene_key, slot_keys)
             return {}, {}
@@ -284,7 +285,7 @@ class _RecognitionMixin:
         Returns:
             {(row, col): ReferenceInfo, ...}，row/col 均为 1-based
         """
-        img = self._capture.capture()
+        img = self.capture_frame(source="recognize_panel")
         if img is None:
             self._log_capture_failed("recognize panel", scene_key, [panel_key])
             return {}
@@ -390,7 +391,7 @@ class _RecognitionMixin:
         """
         self._validate_by_target(target_value, mode)
 
-        img = self._capture.capture()
+        img = self.capture_frame(source="ocr_scene_by")
         if img is None:
             self._log_capture_failed("scan by", scene_key, field_keys)
             return ""
@@ -465,7 +466,7 @@ class _RecognitionMixin:
         """
         self._validate_by_target(target_value, mode)
 
-        img = self._capture.capture()
+        img = self.capture_frame(source="recognize_scene_by")
         if img is None:
             self._log_capture_failed("scan by", scene_key, field_keys)
             return ""
@@ -538,7 +539,7 @@ class _RecognitionMixin:
         """
         self._validate_by_target(target_value, mode)
 
-        img = self._capture.capture()
+        img = self.capture_frame(source="find_text")
         if img is None:
             self._log_capture_failed("find")
             return ""
@@ -647,7 +648,7 @@ class _RecognitionMixin:
             raise ValueError(tr("find: 模板 {name} 不存在（config/system/templates/）").format(name=template_name))
         tpl = with_record_size(tpl, record_w, record_h)
 
-        img = self._capture.capture()
+        img = self.capture_frame(source="find_image")
         if img is None:
             self._log_capture_failed("find")
             return ""
@@ -714,7 +715,7 @@ class _RecognitionMixin:
         if not regions:
             return ""
 
-        img = self._capture.capture()
+        img = self.capture_frame(source="recognize_rich")
         if img is None:
             self._log_capture_failed(
                 "scan by image", scene_key, [r.key for r in regions])

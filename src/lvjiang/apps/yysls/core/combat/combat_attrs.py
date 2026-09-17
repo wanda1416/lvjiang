@@ -714,9 +714,8 @@ class GraduationAttrContext:
         from ...config import get_game_config
 
         gc = get_game_config()
-        configs = gc.get_level_configs()
-        if configs:
-            level_cfg = max(configs, key=lambda item: item.level)
+        level_cfg = gc.level_config_for(gc.current_equip_level())
+        if level_cfg is not None:
             judge_resistance = float(level_cfg.judge_resistance or 0)
             buff_resistance = float(level_cfg.buff_resistance or 0)
         else:

@@ -1874,18 +1874,13 @@ class EquipStatusTab(QWidget):
             game_config = get_game_config()
             base_attrs = context.base_attrs
             if context.gongjue:
-                season = game_config.current_season()
-                levels = game_config.get_level_configs()
-                equip_level = (
-                    int(season.equip_level)
-                    if season is not None and season.equip_level
-                    else max((int(item.level) for item in levels), default=0)
-                )
-                base_attrs = base_attrs + compute_gongjue_attrs(
-                    context.gongjue,
-                    equip_level,
-                    game_config.get_affix_caps,
-                )
+                equip_level = game_config.current_equip_level()
+                if equip_level:
+                    base_attrs = base_attrs + compute_gongjue_attrs(
+                        context.gongjue,
+                        equip_level,
+                        game_config.get_affix_caps,
+                    )
 
             equipped = EquipmentInventory(user_name).equipped
             if not equipped:

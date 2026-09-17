@@ -93,6 +93,10 @@ class GameConfigDialog(QDialog):
         self._discard_button.setEnabled(True)
 
     def _save(self) -> None:
+        error = self._tab.validate()
+        if error:
+            QMessageBox.warning(self, tr("保存失败"), error)
+            return
         try:
             get_game_config().save(self._data)
             self._tab.save_auxiliary_config()

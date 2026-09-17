@@ -22,7 +22,7 @@ from .constants import (
     WUXUE_CATEGORY,
     normalize_equip_part,
 )
-from .manager import GameConfigManager, get_game_config
+from .manager import GameConfigManager, get_game_config, validate_season_configs
 from .models import (
     AttrRange,
     LevelConfig,
@@ -55,6 +55,7 @@ __all__ = [
     # 游戏配置管理器
     "GameConfigManager",
     "get_game_config",
+    "validate_season_configs",
     # 属性来源的装配状态与推导上下文
     "get_loadout",
     "save_loadout",

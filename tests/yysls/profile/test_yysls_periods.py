@@ -14,10 +14,11 @@ def _season():
 
 
 def test_season_boundary_comes_from_yysls_game_config(monkeypatch):
+    season = _season()
     monkeypatch.setattr(
         periods,
         "get_game_config",
-        lambda: SimpleNamespace(get_season_configs=lambda: [_season()]),
+        lambda: SimpleNamespace(season_at=lambda _now: season),
     )
     result = periods.resolve_season_boundary(
         "05:00", datetime(2026, 8, 20, 12), 0
@@ -26,15 +27,35 @@ def test_season_boundary_comes_from_yysls_game_config(monkeypatch):
 
 
 def test_half_season_boundary_uses_second_half_start(monkeypatch):
+    season = _season()
     monkeypatch.setattr(
         periods,
         "get_game_config",
-        lambda: SimpleNamespace(get_season_configs=lambda: [_season()]),
+        lambda: SimpleNamespace(season_at=lambda _now: season),
     )
     result = periods.resolve_half_season_boundary(
         "05:00", datetime(2026, 8, 20, 12), 0
     )
     assert result == datetime(2026, 8, 16, 5)
+
+
+def test_half_season_boundary_switches_at_five(monkeypatch):
+    season = _season()
+    monkeypatch.setattr(
+        periods,
+        "get_game_config",
+        lambda: SimpleNamespace(season_at=lambda _now: season),
+    )
+
+    before = periods.resolve_half_season_boundary(
+        "05:00", datetime(2026, 8, 16, 4, 59, 59), 0,
+    )
+    after = periods.resolve_half_season_boundary(
+        "05:00", datetime(2026, 8, 16, 5, 0, 0), 0,
+    )
+
+    assert before == datetime(2026, 8, 1, 5)
+    assert after == datetime(2026, 8, 16, 5)
 
 
 def test_registered_season_labels_are_translated_by_app_catalog():

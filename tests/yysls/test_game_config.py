@@ -5,6 +5,8 @@
 数值断言与 config/system/yysls/attributes.yaml 保持一致。
 """
 
+from datetime import date, datetime, timedelta
+
 import pytest
 
 from lvjiang.apps.yysls.config import (
@@ -16,6 +18,7 @@ from lvjiang.apps.yysls.config import (
     GameConfigManager,
     LevelRule,
     get_game_config,
+    validate_season_configs,
 )
 from tests.case_matrix import case_matrix
 
@@ -28,6 +31,87 @@ def mgr():
 # ─── 词条别名归一 ──────────────────────────────────────────
 
 class TestResolveAffixCategory:
+    def test_adjacent_seasons_must_share_boundary_date(self):
+        base = [
+            {
+                "season_number": 1,
+                "start_date": "2026-01-01",
+                "end_date": "2026-03-01",
+            },
+            {
+                "season_number": 2,
+                "start_date": "2026-03-01",
+                "end_date": "2026-06-01",
+            },
+        ]
+        validate_season_configs(base)
+
+        for invalid_start in ("2026-02-28", "2026-03-02"):
+            invalid = [dict(item) for item in base]
+            invalid[1]["start_date"] = invalid_start
+            with pytest.raises(ValueError, match="相邻赛季日期必须衔接"):
+                validate_season_configs(invalid)
+
+    def test_current_equip_level_ignores_future_season(self, tmp_path):
+        path = tmp_path / "game_config.yaml"
+        today = date.today()
+        path.write_text(
+            "level_configs:\n"
+            "- level: 105\n"
+            "season_configs:\n"
+            "- season_number: 1\n"
+            f"  start_date: '{today - timedelta(days=30)}'\n"
+            f"  end_date: '{today + timedelta(days=30)}'\n"
+            "  equip_level: 110\n"
+            "- season_number: 99\n"
+            f"  start_date: '{today + timedelta(days=31)}'\n"
+            f"  end_date: '{today + timedelta(days=90)}'\n"
+            "  equip_level: 999\n",
+            encoding="utf-8",
+        )
+
+        assert GameConfigManager(path).current_equip_level() == 110
+
+    def test_current_equip_level_does_not_fall_back_to_future_config(
+            self, tmp_path):
+        path = tmp_path / "game_config.yaml"
+        tomorrow = date.today() + timedelta(days=1)
+        path.write_text(
+            "level_configs:\n"
+            "- level: 999\n"
+            "season_configs:\n"
+            "- season_number: 99\n"
+            f"  start_date: '{tomorrow}'\n"
+            f"  end_date: '{tomorrow + timedelta(days=90)}'\n"
+            "  equip_level: 999\n",
+            encoding="utf-8",
+        )
+
+        assert GameConfigManager(path).current_season() is None
+        assert GameConfigManager(path).current_equip_level() == 0
+
+    def test_season_switches_at_five_on_overlapping_boundary(self, tmp_path):
+        path = tmp_path / "game_config.yaml"
+        path.write_text(
+            "season_configs:\n"
+            "- season_number: 1\n"
+            "  start_date: '2026-01-01'\n"
+            "  end_date: '2026-03-01'\n"
+            "  equip_level: 110\n"
+            "- season_number: 2\n"
+            "  start_date: '2026-03-01'\n"
+            "  end_date: '2026-06-01'\n"
+            "  equip_level: 115\n",
+            encoding="utf-8",
+        )
+        manager = GameConfigManager(path)
+
+        before = manager.season_at(datetime(2026, 3, 1, 4, 59, 59))
+        after = manager.season_at(datetime(2026, 3, 1, 5, 0, 0))
+
+        assert before is not None and before.season_number == 1
+        assert after is not None and after.season_number == 2
+
     def test_equipment_cooldown_days_defaults_to_five(self, tmp_path):
         path = tmp_path / "game_config.yaml"
         path.write_text("level_configs: []\n", encoding="utf-8")

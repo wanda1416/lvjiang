@@ -57,7 +57,7 @@ def test_resistance_functions_accept_level_config_values() -> None:
     assert apply_penetration_resistance(12, 36, 20) == pytest.approx(46)
 
 
-def test_combat_panel_uses_highest_level_resistances() -> None:
+def test_combat_panel_uses_active_season_resistances() -> None:
     assert CombatAttrsTab._current_resistances() == (145.0, 15.0)
 
 

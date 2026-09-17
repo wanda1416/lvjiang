@@ -974,10 +974,7 @@ class OptimalComboDialog(QDialog):
             from ...config import get_game_config
             from ...core.combat.combat_attrs import compute_gongjue_attrs
             gc = get_game_config()
-            seasons = gc.get_season_configs()
-            if not seasons:
-                return CombatAttributes()
-            equip_level = seasons[-1].equip_level
+            equip_level = gc.current_equip_level()
             if not equip_level:
                 return CombatAttributes()
             return compute_gongjue_attrs(
@@ -1322,17 +1319,9 @@ class OptimalComboDialog(QDialog):
         # Launch worker
         from ...config import get_game_config
         gc = get_game_config()
-        season = gc.current_season()
-        season_level = (
-            int(season.equip_level)
-            if season is not None and season.equip_level else 0
-        )
-        configs = gc.get_level_configs()
-        full_target_level = (
-            season_level or (configs[-1].level if configs else 0)
-        )
+        season_level = gc.current_equip_level()
         full_level = (
-            full_target_level if self._chk_full_level.isChecked() else 0
+            season_level if self._chk_full_level.isChecked() else 0
         )
         scenarios = [
             (name, self._base_attrs_raw + self._compute_gongjue_attrs(name))

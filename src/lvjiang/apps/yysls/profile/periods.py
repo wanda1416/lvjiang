@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 from lvjiang.core.profile.periods import parse_reset_time, register_profile_period
 
-from ..config.manager import get_game_config
+from ..config.manager import SEASON_SWITCH_HOUR, get_game_config
 
 
 def _season_boundary(
@@ -17,20 +17,23 @@ def _season_boundary(
     half: bool,
 ) -> datetime:
     hour, minute = parse_reset_time(reset_time)
-    today = now.date()
-    for season in get_game_config().get_season_configs():
-        if not season.start_date or not season.end_date:
-            continue
-        if not season.start_date <= today <= season.end_date:
-            continue
-        boundary = season.start_date
-        if half and season.first_half_end_date and today > season.first_half_end_date:
-            boundary = season.first_half_end_date + timedelta(days=1)
-        return datetime.combine(boundary, datetime.min.time()).replace(
-            hour=hour,
-            minute=minute,
-        )
-    raise ValueError(f"当前日期 {today} 不在任何赛季范围内")
+    season = get_game_config().season_at(now)
+    if season is None:
+        raise ValueError(f"当前时间 {now} 不在任何赛季范围内")
+    boundary = season.start_date
+    if boundary is None:
+        raise ValueError(f"赛季 {season.season_number} 缺少开始日期")
+    if half and season.first_half_end_date:
+        second_half_start = season.first_half_end_date + timedelta(days=1)
+        switch_at = datetime.combine(
+            second_half_start, datetime.min.time(),
+        ).replace(hour=SEASON_SWITCH_HOUR)
+        if now >= switch_at:
+            boundary = second_half_start
+    return datetime.combine(boundary, datetime.min.time()).replace(
+        hour=hour,
+        minute=minute,
+    )
 
 
 def resolve_season_boundary(

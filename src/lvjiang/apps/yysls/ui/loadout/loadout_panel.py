@@ -4,6 +4,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QRectF, QSize, QTimer
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QFrame,
@@ -200,14 +201,26 @@ class LoadoutPanel(QWidget):
         self._playstyle.currentTextChanged.connect(self._configure_playstyle)
         root.addLayout(plan_row)
 
-        # Row 3: symmetrical public metrics.
+        # Row 3: always-visible assumptions + public metrics.
+        # Keep the whole row at 2:1:1 — assumptions occupy the left half,
+        # DPS and graduation rate split the right half equally.
         metrics = QHBoxLayout()
-        self._metric_dps = self._metric(metrics, tr("DPS"), yellow=False)
-        self._metric_rate = self._metric(metrics, tr("毕业率"), yellow=True)
+        self._metrics_layout = metrics
+        self._assumption_card = QFrame()
+        self._assumption_card.setStyleSheet(_METRIC_CARD)
+        self._assumption_layout = QHBoxLayout(self._assumption_card)
+        self._assumption_layout.setContentsMargins(16, 8, 16, 8)
+        self._assumption_layout.setSpacing(16)
+        metrics.addWidget(self._assumption_card, 2)
+        self._metric_dps = self._metric(
+            metrics, tr("DPS"), yellow=False, stretch=1)
+        self._metric_rate = self._metric(
+            metrics, tr("毕业率"), yellow=True, stretch=1)
         root.addLayout(metrics)
 
         self._splitter = QSplitter()
         self._left_shell = self._make_combat_shell()
+        self._attach_assumption_controls()
         self._right_shell = self._make_equipment_shell()
         self._splitter.addWidget(self._left_shell)
         self._splitter.addWidget(self._right_shell)
@@ -232,7 +245,9 @@ class LoadoutPanel(QWidget):
         if dialog.changed:
             self.refresh()
 
-    def _metric(self, parent: QHBoxLayout, name: str, *, yellow: bool) -> QLabel:
+    def _metric(
+        self, parent: QHBoxLayout, name: str, *, yellow: bool, stretch: int,
+    ) -> QLabel:
         card = QFrame()
         card.setStyleSheet(_METRIC_CARD)
         row = QHBoxLayout(card)
@@ -246,8 +261,20 @@ class LoadoutPanel(QWidget):
         row.addWidget(label)
         row.addStretch()
         row.addWidget(value)
-        parent.addWidget(card, 1)
+        parent.addWidget(card, stretch)
         return value
+
+    def _attach_assumption_controls(self) -> None:
+        """Move combat assumptions into the always-visible summary row."""
+        combat = self._character._combat_attrs_tab
+        controls: tuple[QCheckBox, ...] = (
+            combat._chk_full_level,
+            combat._chk_full_chengyin,
+            combat._chk_full_dingyin,
+        )
+        for control in controls:
+            self._assumption_layout.addWidget(control)
+        self._assumption_layout.addStretch()
 
     def _make_combat_shell(self) -> QWidget:
         shell = QWidget()

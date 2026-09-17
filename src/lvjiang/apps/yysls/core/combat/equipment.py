@@ -97,11 +97,19 @@ class EquipmentInventory:
         self.reload()
         return old
 
-    def delete_items(self, fingerprints: set[str]) -> None:
-        """批量删除装备并清理所有方案中的对应引用。"""
+    def delete_items(
+        self,
+        fingerprints: set[str],
+        *,
+        preserve_referenced: bool = False,
+    ) -> set[str]:
+        """批量删除装备，并可保护任意备战方案正在引用的装备。"""
+        deleted: set[str] = set()
         if fingerprints:
-            self._repo.delete_items(fingerprints)
+            deleted = self._repo.delete_items(
+                fingerprints, preserve_referenced=preserve_referenced)
             self.reload()
+        return deleted
 
     def delete_all_mock(self) -> int:
         """删除全部模拟装备并返回删除数量。"""

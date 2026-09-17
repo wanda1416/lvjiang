@@ -15,6 +15,7 @@ import lvjiang.apps.yysls.config as config_module
 from lvjiang.apps.yysls.ui.loadout.equip.cards import _CompactEquipCard
 from lvjiang.apps.yysls.ui.loadout.equip.status_tab import (
     EquipStatusTab,
+    _FilteredDeleteDialog,
     _fit_filter_combo,
 )
 
@@ -156,6 +157,39 @@ def test_filtered_delete_never_includes_mock_equipment(qtbot):
 
     source_filter.setCurrentIndex(source_filter.findData("mock"))
     assert EquipStatusTab._filtered_delete_fingerprints(tab) == set()
+
+
+def test_filtered_delete_dialog_defaults_to_protecting_loadout_items(qtbot):
+    parent = QPushButton()
+    qtbot.addWidget(parent)
+    base_size = parent.font().pointSizeF()
+    dialog = _FilteredDeleteDialog(
+        "类型：背包", {"active", "standby", "free"},
+        {"active", "standby"}, parent,
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog.preserve_referenced
+    assert dialog.effective_delete_count == 1
+    assert dialog._delete_button.isEnabled()
+    assert not dialog._reference_warning.isVisible()
+    if base_size > 0:
+        assert dialog.font().pointSizeF() == base_size + 2
+
+    dialog._preserve_checkbox.setChecked(False)
+    assert dialog.effective_delete_count == 3
+    assert "2" in dialog._reference_warning.text()
+
+
+def test_filtered_delete_dialog_disables_delete_when_everything_is_protected(
+    qtbot,
+):
+    dialog = _FilteredDeleteDialog(
+        "类型：背包", {"standby"}, {"standby"})
+    qtbot.addWidget(dialog)
+
+    assert dialog.effective_delete_count == 0
+    assert not dialog._delete_button.isEnabled()
 
 
 def test_compact_card_batch_mode_selects_by_click_and_blocks_context(qtbot):

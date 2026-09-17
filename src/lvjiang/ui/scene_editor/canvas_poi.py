@@ -82,7 +82,12 @@ class CanvasPoiMixin:
 
     def _init_poi_state(self):
         self._points = []
+        # 无画布坐标的点：仅 disabled 占位或纯 activation_key 绑定。它们不能
+        # 进入绘制、命中检测或方向端点计算，否则会显示成真实 (0, 0) 点。
+        self._nonvisual_points = []
         self._arrows = []
+        # 与 point 一样，只有 disabled 状态而没有端点的方向不能参与绘制。
+        self._unbound_disabled_arrows = []
         # 被视图过滤隐藏的实例（数据仍保留，get_* 时一并返回）
         self._hidden_points = []
         self._hidden_arrows = []
@@ -110,8 +115,12 @@ class CanvasPoiMixin:
         self._current_points = list(points)
 
     def set_points(self, points: list):
+        cloned = [point.clone() for point in points]
+        self._nonvisual_points = [
+            point for point in cloned if not point.has_position
+        ]
         self._points, self._hidden_points = self._split_by_filter(
-            [point.clone() for point in points]
+            [point for point in cloned if point.has_position]
         )
         self._selected_point_idx = -1
         self.update()
@@ -120,12 +129,20 @@ class CanvasPoiMixin:
         """全部坐标点（含被视图过滤隐藏的，保存布局时不能写丢）"""
         return [
             point.clone()
-            for point in self._points + self._hidden_points
+            for point in (
+                self._points
+                + self._hidden_points
+                + self._nonvisual_points
+            )
         ]
 
     def set_arrows(self, arrows: list):
+        cloned = [arrow.clone() for arrow in arrows]
+        self._unbound_disabled_arrows = [
+            arrow for arrow in cloned if arrow.is_unbound_disabled
+        ]
         self._arrows, self._hidden_arrows = self._split_arrows(
-            [arrow.clone() for arrow in arrows]
+            [arrow for arrow in cloned if not arrow.is_unbound_disabled]
         )
         self._selected_arrow_idx = -1
         self.update()
@@ -134,7 +151,11 @@ class CanvasPoiMixin:
         """全部方向（含被视图过滤隐藏的）"""
         return [
             arrow.clone()
-            for arrow in self._arrows + self._hidden_arrows
+            for arrow in (
+                self._arrows
+                + self._hidden_arrows
+                + self._unbound_disabled_arrows
+            )
         ]
 
     def get_visible_arrows(self) -> list:
@@ -484,9 +505,17 @@ class CanvasPoiMixin:
         # 落点模式：单击放置 point
         if self._poi_action == PoiAction.PLACE_POINT:
             cx, cy = self._widget_to_canvas_norm(pos)
+            placeholder = next(
+                (point for point in self._nonvisual_points
+                 if point.key == self._pending_point_key),
+                None,
+            )
+            if placeholder is not None:
+                self._nonvisual_points.remove(placeholder)
             self._points.append(Point(
                 key=self._pending_point_key,
                 cx_ratio=cx, cy_ratio=cy, r_ratio=self._pending_point_r,
+                disabled=placeholder is not None,
             ))
             self._selected_point_idx = len(self._points) - 1
             self._selected_arrow_idx = -1

@@ -7,13 +7,13 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QWidget,
 )
 
-from ...core.key_names import normalize_key
+from ...core.key_names import normalize_pressable
 from ...i18n import tr
+from ..pressable_combo import PressableSelector
 
 
 def add_attribute_row(
@@ -36,15 +36,17 @@ def add_activation_key_row(
     activation_key: str,
     *,
     enabled: bool,
-) -> QLineEdit:
-    """添加布局级激活按键输入；空值表示使用默认坐标点击。"""
-    edit = QLineEdit(activation_key)
-    edit.setPlaceholderText(tr("留空则点击坐标，如 SPACE / ESC / R"))
+) -> PressableSelector:
+    """添加可自由输入、按功能分组选择的布局级激活按键控件。"""
+    edit = PressableSelector(activation_key)
+    line_edit = edit.lineEdit()
+    if line_edit is not None:
+        line_edit.setPlaceholderText(tr("留空则点击坐标；可输入或下拉选择"))
     edit.setEnabled(enabled)
     if enabled:
         edit.setToolTip(tr("仅作用于当前布局；click 将改为按下该按键"))
     else:
-        edit.setToolTip(tr("请先在当前布局中放置该实体，再设置激活按键"))
+        edit.setToolTip(tr("请先在当前布局中放置该实体，或将其标记为禁用后设置按键"))
     form.addRow(tr("按键:"), edit)
     return edit
 
@@ -78,12 +80,14 @@ def add_dialog_action_row(
     return error_label
 
 
-def validate_activation_key_edit(edit: QLineEdit, error_label: QLabel) -> bool:
+def validate_activation_key_edit(
+    edit: PressableSelector, error_label: QLabel,
+) -> bool:
     """提交时校验按键输入，并用固定的简短文案提示。"""
-    activation = edit.text().strip()
+    activation = edit.currentText().strip()
     if activation:
         try:
-            normalize_key(activation)
+            normalize_pressable(activation)
         except ValueError:
             error_label.setText(f"未知按键名：{activation}")
             return False

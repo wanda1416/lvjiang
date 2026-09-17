@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.key_names import normalize_key
+from ...core.key_names import normalize_pressable
 from ...core.layout_manager import (
     delete_item_key_across_all_layouts,
     rename_item_key_across_all_layouts,
@@ -72,15 +72,17 @@ class RegionPanelMixin:
         self._region_table.setColumnCount(10)
         self._region_table.setHorizontalHeaderLabels([
             tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击"),
-            tr("按键"), tr("禁用"), tr("跳转"), tr("来源"), tr("模板"),
+            tr("按键"), tr("无布局"), tr("跳转"), tr("来源"), tr("模板"),
         ])
         # 列宽：名称/Key/类型/按键自适应内容，布尔状态列固定窄宽
         header = self._region_table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        for col in (3, 4, 6):
+        for col in (3, 4):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             header.resizeSection(col, 50)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+        header.resizeSection(6, 68)
         self._region_table.setSelectionBehavior(
             EntityOrderTable.SelectionBehavior.SelectRows)
         self._region_table.setSelectionMode(
@@ -164,6 +166,8 @@ class RegionPanelMixin:
 
     def _refresh_region_list(self):
         """刷新区域表格，显示 name(key)、类型、含文本、可点击"""
+        scroll_bar = self._region_table.verticalScrollBar()
+        scroll_value = scroll_bar.value()
         current = self._region_table.item(self._region_table.currentRow(), 1)
         selected_key = self._canvas.selected_region_key() or (
             current.text() if current is not None else None)
@@ -175,7 +179,9 @@ class RegionPanelMixin:
             self._region_table.blockSignals(False)
             return
         assigned = self._canvas.get_regions()
-        assigned_by_key = {r.key: r for r in assigned}
+        assigned_by_key = {
+            r.key: r for r in assigned if not r.is_unbound_disabled
+        }
         assigned_keys = set(assigned_by_key)
         for region_def in scene.regions:
             if not is_view_visible(region_def.views, self._current_view):
@@ -216,6 +222,7 @@ class RegionPanelMixin:
             disabled_keys = self._canvas.get_disabled_keys("region")
             cb = QCheckBox()
             cb.setChecked(region_def.key in disabled_keys)
+            cb.setToolTip(tr("当前布局不使用坐标；仍可在编辑属性中设置按键绑定"))
             cb.stateChanged.connect(
                 lambda state, k=region_def.key: self._on_toggle_disabled(k, "region", state)
             )
@@ -237,6 +244,9 @@ class RegionPanelMixin:
                 self._region_table.selectRow(row)
                 break
         self._region_table.blockSignals(False)
+        # setRowCount(0) 会把滚动条强制归零；实体数量未变的属性刷新不应让
+        # 用户从尾部跳回首行。放在恢复选中行之后，保留原来的精确视口。
+        scroll_bar.setValue(min(scroll_value, scroll_bar.maximum()))
         self._update_region_delete_button()
         self._refresh_template_controls()
 
@@ -286,7 +296,14 @@ class RegionPanelMixin:
             source_item.setToolTip(ref.scene)
 
     def _on_toggle_disabled(self, key: str, kind: str, state: int):
-        """切换某 key 的禁用状态，标记场景 dirty"""
+        """切换某 key 是否使用当前布局坐标，并标记布局 dirty。"""
+        # 单元格里的 QCheckBox 不会自动把所在行设为 currentRow。先锁定操作
+        # 对象，随后同步触发的列表重建才能按该 key 恢复，而不是恢复旧的首行。
+        for row in range(self._region_table.rowCount()):
+            item = self._region_table.item(row, 1)
+            if item is not None and item.text() == key:
+                self._region_table.setCurrentCell(row, 1)
+                break
         self._canvas.set_item_disabled(kind, key, bool(state))
 
     # ─── 事件处理 ────────────────────────────────────────
@@ -596,13 +613,20 @@ class RegionPanelMixin:
 
         placed = bool(
             region_def
-            and any(r.key == region_def.key for r in self._canvas.get_regions())
+            and any(
+                r.key == region_def.key and not r.is_unbound_disabled
+                for r in self._canvas.get_regions()
+            )
+        )
+        disabled = bool(
+            region_def
+            and region_def.key in self._canvas.get_disabled_keys("region")
         )
         activation_edit = add_activation_key_row(
             form,
             self._canvas.get_item_activation_key(
                 "region", region_def.key) if region_def else "",
-            enabled=placed,
+            enabled=placed or disabled,
         )
         add_definition_separator(form)
 
@@ -658,7 +682,7 @@ class RegionPanelMixin:
 
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
-        activation_edit.textChanged.connect(_validate)
+        activation_edit.currentTextChanged.connect(_validate)
         _validate()
 
         def _accept():
@@ -674,7 +698,7 @@ class RegionPanelMixin:
         target_scene = (
             scene_combo.currentData() if scene_combo is not None else self._scene_key
         )
-        activation_key = activation_edit.text().strip()
+        activation_key = activation_edit.currentText().strip()
         return RegionDef(
             key=key_edit.text().strip(),
             name=name_edit.text().strip(),
@@ -685,7 +709,7 @@ class RegionPanelMixin:
             to=transition.value() if is_clickable_check.isChecked() else "",
             navigation=transition.navigation_value() if is_clickable_check.isChecked() else "",
             available_from=transition.available_from_value() if is_clickable_check.isChecked() else [],
-        ), target_scene, normalize_key(activation_key) if activation_key else ""
+        ), target_scene, normalize_pressable(activation_key) if activation_key else ""
 
     # ─── 跨场景引用 ──────────────────────────────────────
 

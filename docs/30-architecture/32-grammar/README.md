@@ -16,7 +16,7 @@
 | [03.1-basic-commands.md](03.1-basic-commands.md) | 基础指令：collect、eval、default、call、log |
 | [03.2-interaction.md](03.2-interaction.md) | 时间与辅助：wait、wait stable、align、screenshot |
 | [03.3-mouse.md](03.3-mouse.md) | 鼠标操作：click、drag、后缀等待子句、隐藏延迟 |
-| [03.4-keyboard.md](03.4-keyboard.md) | 键盘输入：press 四种模式、状态管理和后端机制 |
+| [03.4-keyboard.md](03.4-keyboard.md) | 按压输入：press、键盘与鼠标按钮、状态管理和后端机制 |
 | [03.5-key-reference.md](03.5-key-reference.md) | 按键速查：物理键名、字符别名、组合键和平台限制 |
 | [03.6-scene-declarations.md](03.6-scene-declarations.md) | 流程位置声明：scene、view、unknown（仅元数据） |
 | [04-data-flow.md](04-data-flow.md) | 感知指令概览与对比表 |
@@ -134,8 +134,9 @@ click [scene].[region] after wait stable 5  # 点击后等待稳定
 ```
 # Arrow 拖拽
 drag [scene].[arrow]                    # 执行 Arrow 定义的拖拽
-drag [scene].[arrow] 0.5                # 指定时长
-drag [scene].[arrow] 0.5 hold 0.2       # 拖拽后按住
+drag [scene].[arrow] duration 0.5                # 指定时长
+drag [scene].[arrow] duration 0.5 hold 0.2       # 拖拽后按住
+drag [scene].[arrow] scale 2 exact               # 向量放大 2 倍，两端不抖动
 
 # Panel/Region 翻页
 drag [scene].[panel][r][c] down <n>     # 下翻 n 行（默认 1）
@@ -143,8 +144,8 @@ drag [scene].[panel][r][c] up $var      # 上翻 $var 行
 drag [scene].[panel][r][c] left/right   # 左/右翻
 
 # 点对拖拽
-drag [s1].[p1] [s2].[p2]               # 两点间拖拽
-drag (rx1, ry1) (rx2, ry2)             # 坐标模式
+drag [s1].[p1] to [s2].[p2]               # 两点间拖拽
+drag (rx1, ry1) to (rx2, ry2)          # 坐标模式
 ```
 
 ### move / place — 鼠标移动
@@ -159,17 +160,6 @@ move (0.5, 0.5) by (0.2, 0) duration 0.3  # 显式起点 = place + move by
 
 `place`/`move` 没有默认前后延迟，但同样支持 `before`/`after`/`around` 等待子句。
 详见 [03.3-mouse.md](03.3-mouse.md#二move--鼠标移动)。
-
-### mouse — 鼠标键原始事件
-
-```
-place (0.52, 0.38)
-mouse left down                         # button: left/right/middle/x1/x2/back/forward
-wait 0.12
-mouse left up
-```
-
-保留多个输入交叠时的真实 down/up 时间线，仅桌面 SendInput 后端执行。
 
 ### scroll — 鼠标滚轮
 
@@ -244,7 +234,7 @@ align [scene].[panel]                   # 手动触发面板自对齐
 screenshot                              # 截图保存到 logs/image/
 ```
 
-### press — 键盘输入
+### press — 键盘与鼠标按钮输入
 
 ```
 press "KEY"                             # 完整按键（down + up）
@@ -254,6 +244,8 @@ press "KEY" hold $var                   # 数值或二元 tuple 变量
 press "KEY" down                        # 按下保持
 press "KEY" up                          # 释放
 press "CTRL" + "C"                      # 单条组合键（左到右按下、右到左释放）
+press "MOUSE_LEFT"                      # 当前指针位置单击左键
+press "MOUSE_RIGHT" hold 0.5            # 当前指针位置按住右键
 paste "ABC123"                         # PC 剪贴板 + Ctrl+V 文本输入
 paste $redeem_code                      # 粘贴运行时变量
 ```

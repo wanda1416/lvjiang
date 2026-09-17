@@ -123,18 +123,42 @@ def test_adb_factory_returns_input_backend():
 
 
 def test_adb_click_hold_uses_stationary_swipe(monkeypatch):
+    device = _FakeAdbDevice(sdk=28)
+    backend = _adb_backend(device, monkeypatch)
+
+    backend.click_screen(10, 20, hold=1.4)
+    backend.click_screen(10, 20, hold=20)
+    backend.drag_screen(1, 2, 3, 4, duration=1.0, hold=30)   # Android 9：只能合并 swipe
+
+    assert device.calls == [
+        ("input", "swipe", "10", "20", "10", "20", "1400"),
+        ("input", "swipe", "10", "20", "10", "20", "20000"),
+        ("input", "swipe", "1", "2", "3", "4", "31000"),
+    ]
+    # input swipe 阻塞整个手势时长；超时必须撑过手势，否则 shell() 重试会重放手势
+    assert device.timeouts == [15.0, 25.0, 36.0]
+
+
+class _FakeAdbDevice:
+    def __init__(self, sdk: int):
+        self.calls = []
+        self.timeouts: list = []
+        self._sdk = sdk
+
+    def shell(self, *args, **kwargs):
+        self.calls.append(args)
+        self.timeouts.append(kwargs.get("timeout"))
+        return ""
+
+    def get_sdk(self) -> int:
+        return self._sdk
+
+
+def _adb_backend(device, monkeypatch):
     from lvjiang.core.android.input import AdbInput
 
-    class _FakeDevice:
-        def __init__(self):
-            self.calls = []
-
-        def shell(self, *args, **_kwargs):
-            self.calls.append(args)
-            return ""
-
-    device = _FakeDevice()
-    backend = AdbInput(
+    monkeypatch.setattr("lvjiang.core.android.input.time.sleep", lambda _s: None)
+    return AdbInput(
         device=device,
         input_sim=InputSimConfig(
             click_random_offset=0,
@@ -142,9 +166,42 @@ def test_adb_click_hold_uses_stationary_swipe(monkeypatch):
             after_click_wait=(0, 0),
         ),
     )
-    monkeypatch.setattr("lvjiang.core.android.input.time.sleep", lambda _s: None)
 
-    backend.click_screen(10, 20, hold=1.4)
 
-    assert device.calls == [
-        ("input", "swipe", "10", "20", "10", "20", "1400")]
+def test_adb_drag_hold_uses_motionevent_sequence(monkeypatch):
+    """Android 10+：hold 不能合并进 swipe（匀速插值到最后一刻才推满），
+    改为 DOWN → 分步 MOVE → sleep → UP 一条 shell 完成"推到位再停住"。"""
+    device = _FakeAdbDevice(sdk=29)
+    backend = _adb_backend(device, monkeypatch)
+
+    backend.drag_screen(646, 921, 647, 462, duration=0.3, hold=5.0)
+
+    assert device.calls == [(
+        "input motionevent DOWN 646 921; "
+        "input motionevent MOVE 646 768; "
+        "input motionevent MOVE 647 615; "
+        "input motionevent MOVE 647 462; "
+        "sleep 5.000; "
+        "input motionevent UP 647 462",
+    )]
+    assert device.timeouts == [15.0]
+
+    # 无 hold 仍是一次 swipe，不走 motionevent
+    backend.drag_screen(1, 2, 3, 4, duration=0.5)
+    assert device.calls[-1] == ("input", "swipe", "1", "2", "3", "4", "500")
+
+
+def test_adb_press_sends_keyevent_once(monkeypatch):
+    """keyevent 自带抬起：KeyStateRegistry 的 down + up 只能落成一次 keyevent，
+    否则 press "ESC" 会变成两次 BACK。"""
+    from lvjiang.workflows.engine.key_state import KeyStateRegistry
+
+    device = _FakeAdbDevice(sdk=29)
+    backend = _adb_backend(device, monkeypatch)
+    reg = KeyStateRegistry(backend)
+
+    reg.key_down("ESC")
+    reg.key_up("ESC")
+
+    assert device.calls == [("input", "keyevent", "4")]
+

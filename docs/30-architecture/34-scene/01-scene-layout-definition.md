@@ -157,21 +157,21 @@ Point 与 Region 共享相同的 type/is_text/is_clickable 属性体系（含义
 | `is_clickable` | `true` | 默认可点击 |
 
 ```yaml
-# game_main_page.yaml 片段
+# general_move.yaml 片段
 points:
-  - key: origin
-    name: 起点
+  - key: move_center
+    name: 移动中心
     type: func
     is_text: false
     is_clickable: true
-  - key: forward
+  - key: move_forward
     name: 前进
     type: func
     is_text: false
     is_clickable: true
 ```
 
-DSL 中通过 `click [game_main_page].[origin]` 点击坐标点中心（带半径内随机偏移，拟人化落点）。
+DSL 中通过 `click [general_move].[move_forward]` 点击坐标点中心（带半径内随机偏移，拟人化落点）。
 
 ---
 

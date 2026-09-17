@@ -7,9 +7,11 @@ from lvjiang.workflows.metadata import (
     METADATA_WARNING,
     WorkflowMetadataError,
     build_flow_config,
+    known_envs,
     metadata_error,
     metadata_for_script_config,
     parse_metadata,
+    parse_metadata_file,
 )
 
 SAMPLE = """\
@@ -105,6 +107,48 @@ def test_parameter_env_must_be_a_string_list():
     text = "#% parameters:\n#%   - {name: key, type: text, env: desktop}\n"
     with pytest.raises(WorkflowMetadataError, match="parameters\\[0\\]\\.env"):
         parse_metadata(text)
+
+
+@pytest.mark.parametrize("text, path", [
+    ("#% env: [andriod]\n", "env"),
+    ("#% parameters:\n#%   - {name: key, type: text, env: [pc]}\n",
+     "parameters\\[0\\]\\.env"),
+])
+def test_env_must_use_environments_declared_in_app_config(text, path, monkeypatch):
+    monkeypatch.setattr(
+        "lvjiang.workflows.metadata.known_envs", lambda: ["android", "desktop"])
+    with pytest.raises(WorkflowMetadataError, match=f"{path}.*未知环境.*android, desktop"):
+        parse_metadata(text)
+
+
+def test_env_accepts_custom_environment_from_app_config(monkeypatch):
+    """环境列表来自系统参数 app.yaml 的 envs，不是代码常量。"""
+    monkeypatch.setattr(
+        "lvjiang.workflows.metadata.known_envs", lambda: ["android", "desktop", "ios"])
+
+    assert parse_metadata("#% env: [ios]\n") == {"env": ["ios"]}
+
+
+def test_known_envs_reads_app_config(monkeypatch):
+    monkeypatch.setattr(
+        "lvjiang.core.config.resolver.load_available_envs",
+        lambda: [("android", "安卓"), ("desktop", "桌面"), ("ios", "ios")])
+
+    assert known_envs() == ["android", "desktop", "ios"]
+
+
+def test_env_skips_value_check_when_app_config_unavailable(monkeypatch):
+    monkeypatch.setattr("lvjiang.workflows.metadata.known_envs", lambda: [])
+
+    assert parse_metadata("#% env: [anything]\n") == {"env": ["anything"]}
+
+
+def test_bom_prefixed_file_still_parses(tmp_path):
+    """Windows 记事本默认带 BOM；BOM 文件不能因为首行不匹配 ``#%`` 而静默消失。"""
+    path = tmp_path / "bom.wf"
+    path.write_bytes("\ufeff#% name: x\n#% runnable: true\nwait 1\n".encode("utf-8"))
+
+    assert parse_metadata_file(path) == {"name": "x", "runnable": True}
 
 
 def test_first_non_metadata_line_ends_metadata():

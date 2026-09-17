@@ -96,6 +96,16 @@ def _format_number(value: float, digits: int = 3) -> str:
 _RECORDED_PRESS_RE = re.compile(
     r'^press "(?P<key>[A-Z0-9_]+)" (?P<state>down|up)$')
 _RECORDED_WAIT_RE = re.compile(r"^wait (?P<duration>[0-9]+(?:\.[0-9]+)?)$")
+_RECORDED_PLACE_RE = re.compile(
+    r"^place \((?P<x>-?[0-9]+(?:\.[0-9]+)?), (?P<y>-?[0-9]+(?:\.[0-9]+)?)\)$")
+_MOUSE_BUTTON_SUFFIX = {
+    "MOUSE_LEFT": "", "MOUSE_RIGHT": " right", "MOUSE_MIDDLE": " middle",
+    "MOUSE_X1": " x1", "MOUSE_X2": " x2",
+}
+#: 按下与抬起落点相距不超过这个画布比例视为原地点击，否则是拖拽
+_CLICK_DRAG_RATIO = 0.01
+#: 短于这个时长的按住只是普通点击，不写 hold（后端点击本身就有几十毫秒）
+_CLICK_HOLD_MIN_S = 0.2
 
 
 def _recorded_wait(line: str) -> tuple[str, float] | None:
@@ -107,13 +117,83 @@ def _recorded_wait(line: str) -> tuple[str, float] | None:
     return text, float(text)
 
 
-def _compact_low_precision_lines(lines: list[str]) -> list[str]:
+def _fold_mouse_clicks(lines: list[str]) -> list[str]:
+    """不录鼠标移动时，把 ``place + 原始鼠标键 down/up`` 折成 click / drag。
+
+    没有移动轨迹，``place`` 只是点击落点的载体，单独留在脚本里没有意义；
+    按下与抬起相邻且中间没有别的动作时：
+
+    - 两次落点几乎重合 → ``click (x, y) [button] [hold t]``
+    - 落点不同（左键）  → ``drag (x1, y1) to (x2, y2) duration t``
+
+    中间夹了其他动作（组合操作）的序列保持原样。
+    """
+    folded: list[str] = []
+    index = 0
+    while index < len(lines):
+        place = _RECORDED_PLACE_RE.fullmatch(lines[index])
+        press = (_RECORDED_PRESS_RE.fullmatch(lines[index + 1])
+                 if place is not None and index + 1 < len(lines) else None)
+        if (place is None or press is None or press.group("state") != "down"
+                or press.group("key") not in _MOUSE_BUTTON_SUFFIX):
+            folded.append(lines[index])
+            index += 1
+            continue
+
+        cursor = index + 2
+        hold_text, hold_s = "0", 0.0
+        wait = _recorded_wait(lines[cursor]) if cursor < len(lines) else None
+        if wait is not None:
+            hold_text, hold_s = wait
+            cursor += 1
+        end_place = _RECORDED_PLACE_RE.fullmatch(lines[cursor]) if cursor < len(lines) else None
+        if end_place is not None:
+            cursor += 1
+        release = _RECORDED_PRESS_RE.fullmatch(lines[cursor]) if cursor < len(lines) else None
+        if (release is None or release.group("state") != "up"
+                or release.group("key") != press.group("key")):
+            folded.append(lines[index])
+            index += 1
+            continue
+
+        start_text = (place.group("x"), place.group("y"))
+        end_text = ((end_place.group("x"), end_place.group("y"))
+                    if end_place is not None else start_text)
+        x1, y1 = float(start_text[0]), float(start_text[1])
+        x2, y2 = float(end_text[0]), float(end_text[1])
+        button = press.group("key")
+        moved = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5 > _CLICK_DRAG_RATIO
+        if moved and button == "MOUSE_LEFT":
+            line = (f"drag ({start_text[0]}, {start_text[1]}) to "
+                    f"({end_text[0]}, {end_text[1]})")
+            if hold_s > 0:
+                line += f" duration {hold_text}"
+        elif moved:
+            # 非左键拖拽 DSL 表达不了，保持原始事件
+            folded.append(lines[index])
+            index += 1
+            continue
+        else:
+            line = f"click ({start_text[0]}, {start_text[1]}){_MOUSE_BUTTON_SUFFIX[button]}"
+            if hold_s >= _CLICK_HOLD_MIN_S:
+                line += f" hold {hold_text}"
+        folded.append(line)
+        index = cursor + 1
+    return folded
+
+
+def _compact_low_precision_lines(
+    lines: list[str], *, mouse_movement: bool = True,
+) -> list[str]:
     """无损压缩低精度键盘时间线。
 
     只有同一按键的 down / wait / up 三行严格相邻时，才说明按住期间
-    没有发生其他动作，可以合并为 hold。紧随 press 的数值 wait 则可
-    作为 after wait 后缀；鼠标原始 down/up 不支持等待后缀，保持原样。
+    没有发生其他动作，可以合并为 hold。紧随 press / click / drag 的数值
+    wait 则作为 after wait 后缀。``mouse_movement=False`` 时先把
+    ``place + 鼠标键 down/up`` 折成 click / drag（见 :func:`_fold_mouse_clicks`）。
     """
+    if not mouse_movement:
+        lines = _fold_mouse_clicks(lines)
     compacted: list[str] = []
     index = 0
     while index < len(lines):
@@ -136,7 +216,8 @@ def _compact_low_precision_lines(lines: list[str]) -> list[str]:
                 consumed = 3
 
         next_index = index + consumed
-        if line.startswith('press "') and next_index < len(lines):
+        if (line.startswith(('press "', "click (", "drag ("))
+                and next_index < len(lines)):
             after_wait = _recorded_wait(lines[next_index])
             if after_wait is not None and after_wait[1] > 0:
                 line += f" after wait {after_wait[0]}"
@@ -296,7 +377,8 @@ class MacroRecorder:
             if self.precision == PRECISION_LOW:
                 self._flush_raw_frame()
                 self._maybe_emit_wait(time.monotonic())
-                self._lines = _compact_low_precision_lines(self._lines)
+                self._lines = _compact_low_precision_lines(
+                    self._lines, mouse_movement=self.record_mouse_movement)
         if self._raw_listener is not None:
             self._raw_listener.stop()
             self._raw_listener = None
@@ -598,7 +680,7 @@ class MacroRecorder:
         rx, ry = self._screen_to_canvas_ratio(sx, sy)
         self._emit_line(f"place ({rx}, {ry})")
         state = "down" if pressed else "up"
-        self._emit_line(f"mouse {button_name} {state}")
+        self._emit_line(f'press "MOUSE_{button_name.upper()}" {state}')
         self._last_action_time = event_time
 
     def _raw_delta_to_canvas_ratio(self, dx: int, dy: int) -> tuple[float, float]:

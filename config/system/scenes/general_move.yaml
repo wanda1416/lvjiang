@@ -1,0 +1,55 @@
+content_version: 1
+key: general_move
+name: 移动
+regions: []
+points:
+- key: move_center
+  name: 移动中心
+  type: func
+  is_text: false
+  is_clickable: true
+- key: move_forward
+  name: 前进
+  type: func
+  is_text: false
+  is_clickable: true
+- key: move_backward
+  name: 后退
+  type: func
+  is_text: false
+  is_clickable: true
+- key: move_left
+  name: 左移
+  type: func
+  is_text: false
+  is_clickable: true
+- key: move_right
+  name: 右移
+  type: func
+  is_text: false
+  is_clickable: true
+- key: look_center
+  name: 视角中心
+  type: func
+  is_text: false
+  is_clickable: true
+- key: look_up
+  name: 抬头
+  type: func
+  is_text: false
+  is_clickable: true
+- key: look_down
+  name: 低头
+  type: func
+  is_text: false
+  is_clickable: true
+- key: look_left
+  name: 左转视角
+  type: func
+  is_text: false
+  is_clickable: true
+- key: look_right
+  name: 右转视角
+  type: func
+  is_text: false
+  is_clickable: true

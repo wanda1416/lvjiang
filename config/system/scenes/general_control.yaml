@@ -4,10 +4,6 @@ name: 控制
 views:
 - key: base
   name: 基底
-- key: move
-  name: 移动
-- key: fight
-  name: 战斗
 - key: confirm
   name: 确认
 - key: blank
@@ -52,12 +48,6 @@ regions:
   is_clickable: true
   view: base
   to: '@caller'
-- key: switch
-  name: 切换武器
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
 points:
 - key: material_slot_1
   name: 材料格1
@@ -99,111 +89,3 @@ points:
   type: func
   is_text: false
   is_clickable: true
-- key: wuxueji
-  name: 武学技
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: teshuji
-  name: 特殊技
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: qishu
-  name: 奇术
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: xieshi
-  name: 卸势
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: xuli
-  name: 蓄力
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: qingji
-  name: 轻击
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: shanbi
-  name: 闪避
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: tiaoyue
-  name: 跳跃
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: qishu_1
-  name: 奇术1
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: qishu_2
-  name: 奇术2
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: qishu_3
-  name: 奇术3
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: qishu_4
-  name: 奇术4
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight
-- key: origin
-  name: 起点
-  type: func
-  is_text: false
-  is_clickable: true
-  view: move
-- key: forward
-  name: 前进
-  type: func
-  is_text: false
-  is_clickable: true
-  view: move
-- key: backward
-  name: 后退
-  type: func
-  is_text: false
-  is_clickable: true
-  view: move
-- key: turn_left
-  name: 向左
-  type: func
-  is_text: false
-  is_clickable: true
-  view: move
-- key: turn_right
-  name: 向右
-  type: func
-  is_text: false
-  is_clickable: true
-  view: move
-- key: bow
-  name: 弓箭
-  type: func
-  is_text: false
-  is_clickable: true
-  view: fight

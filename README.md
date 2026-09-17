@@ -9,7 +9,7 @@
 > **当前状态**：支持直接操作游戏 PC 端窗口，也支持通过 **手机投屏**、**Android 模拟器** 或 **ADB** 操作安卓端。直接操作端游窗口时，请以管理员身份启动律匠。
 
 <p align="left">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-blue">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-blue">
   <img alt="GUI" src="https://img.shields.io/badge/GUI-PyQt6-41CD52">
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078D6">
   <img alt="License" src="https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-0099cc">
@@ -151,7 +151,7 @@ lvjiang/
 ## 🔧 环境要求
 
 - **操作系统**：Windows（桌面投屏模式依赖 Win32 API）或 macOS 11+（ADB 模式）
-- **Python**：3.10 及以上
+- **Python**：3.11 及以上（3.11+ 才有 Windows 高精度 `time.sleep`，木桩测伤等精确计时依赖它）
 - **游戏侧**：手机端《燕云十六声》，并满足以下任一连接方式：
   - **投屏模式**：PC 端存在可截屏、且支持鼠标点击转发到手机的投屏窗口（以 vivo 自带投屏为参考，不绑定特定品牌）
   - **ADB 模式**：手机开启 USB / 无线调试，PC 端可通过 ADB 连接（可选启用 scrcpy 视频流）

@@ -53,7 +53,6 @@ from ..grammar.ast_nodes import (
     Literal,
     Log,
     Loop,
-    MouseButton,
     Move,
     Paste,
     Place,
@@ -223,9 +222,6 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
         self._workflow: BaseWorkflow | None = None
         # 按键状态注册表（press 指令用，懒初始化绑定当前 backend）
         self._key_registry: KeyStateRegistry | None = None
-        # 原始 mouse down/up 的状态；工作流任何方式退出都必须释放，避免把
-        # 物理鼠标键留在按下状态。
-        self._pressed_mouse_buttons: set[str] = set()
         # 调试钩子（脚本工作台注入）：每条语句执行前回调 (line_no, variables 快照)。
         # step_mode=True 时每条语句前把 pause_event 清掉再等——即"单步"：
         # UI 每 set 一次事件，引擎只往前走一条。两者都在工作流线程里触发。
@@ -327,6 +323,10 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
 
         if initial_variables:
             self.variables.update(initial_variables)
+        # 桌面后端的 hold 等待需要能响应停止；输入后端由 run_control 注入，
+        # 引擎每次执行都把当前 stop_check 挂上去，重连换后端也不会漏。
+        if self._input is not None:
+            self._input.stop_check = self._stop_check
 
         try:
             # Python 工作流实例
@@ -342,12 +342,6 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
             # 所有退出路径统一释放按键（正常/异常/取消/超时）
             if self._key_registry:
                 self._key_registry.release_all()
-            for button in tuple(self._pressed_mouse_buttons):
-                try:
-                    self._input.mouse_button(button, False)
-                except Exception:  # noqa: BLE001 - 清理一个键失败不能阻塞其他键
-                    logger.exception(f"释放鼠标键 {button} 失败")
-            self._pressed_mouse_buttons.clear()
 
     def validate_only(self, wf_path: Path | str) -> None:
         """只解析与静态校验 .wf，不执行任何动作
@@ -1004,8 +998,6 @@ class WorkflowEngine(_ActionsMixin, _PanelMixin, _DataOpsMixin,
                 self._exec_android_app(node)
             case Click():
                 self._exec_click(node)
-            case MouseButton():
-                self._exec_mouse_button(node)
             case Place():
                 self._exec_place(node)
             case Move():

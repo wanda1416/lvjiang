@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass, field, replace
 from pathlib import PurePosixPath
 
 from .coord_types import CircleCoordRef, RectCoordRef
-from .key_names import normalize_key
+from .key_names import normalize_pressable
 
 
 @dataclass
@@ -147,7 +147,8 @@ class Region:
 
     存储布局级位置和可选激活动作，名称等元信息通过 key 从场景定义
     (RegionDef) 获取。
-    disabled 标记该区域在当前布局中不可用，静态检查时视为已绑定。
+    disabled 表示当前布局不使用几何坐标；若 activation_key 非空，click
+    仍可走按键通道。静态检查时该实体仍视为已声明。
     """
     key: str
     x_ratio: float
@@ -175,10 +176,12 @@ class Region:
     position_overridden: bool = False
     source_x_ratio: float | None = None
     source_y_ratio: float | None = None
+    # False 表示布局只保存了 ``key + disabled``，从未绑定过矩形。
+    has_position: bool = True
 
     def __post_init__(self):
         if self.activation_key:
-            self.activation_key = normalize_key(self.activation_key)
+            self.activation_key = normalize_pressable(self.activation_key)
         if self.click_rect is not None:
             self.click_rect = _validate_click_rect(self.key, self.click_rect)
         if self.template is not None and not isinstance(
@@ -189,12 +192,18 @@ class Region:
     def is_reference(self) -> bool:
         return bool(self.source_scene)
 
+    @property
+    def is_unbound_disabled(self) -> bool:
+        """Whether this is a disabled-only entry without a canvas rectangle."""
+        return self.disabled and not self.has_position and not self.activation_key
+
     def to_dict(self) -> dict:
         d = asdict(self)
         d.pop("source_scene", None)
         d.pop("position_overridden", None)
         d.pop("source_x_ratio", None)
         d.pop("source_y_ratio", None)
+        d.pop("has_position", None)
         if self.click_rect is None:
             d.pop("click_rect", None)
         else:
@@ -203,8 +212,7 @@ class Region:
             d.pop("template", None)
         else:
             d["template"] = self.template.to_dict()
-        if self.disabled and not any((
-                self.x_ratio, self.y_ratio, self.w_ratio, self.h_ratio)):
+        if not self.has_position:
             for key in ("x_ratio", "y_ratio", "w_ratio", "h_ratio"):
                 d.pop(key, None)
         if not d.get("disabled"):
@@ -226,14 +234,23 @@ class Region:
     @staticmethod
     def from_dict(d: dict) -> "Region":
         disabled = bool(d.get("disabled", False))
+        activation_key = d.get("activation_key", "")
+        has_position = all(
+            key in d for key in ("x_ratio", "y_ratio", "w_ratio", "h_ratio")
+        )
+        coordinate_optional = disabled or bool(activation_key)
         return Region(
             key=d["key"],
-            x_ratio=d.get("x_ratio", 0.0) if disabled else d["x_ratio"],
-            y_ratio=d.get("y_ratio", 0.0) if disabled else d["y_ratio"],
-            w_ratio=d.get("w_ratio", 0.0) if disabled else d["w_ratio"],
-            h_ratio=d.get("h_ratio", 0.0) if disabled else d["h_ratio"],
+            x_ratio=(d.get("x_ratio", 0.0)
+                     if coordinate_optional else d["x_ratio"]),
+            y_ratio=(d.get("y_ratio", 0.0)
+                     if coordinate_optional else d["y_ratio"]),
+            w_ratio=(d.get("w_ratio", 0.0)
+                     if coordinate_optional else d["w_ratio"]),
+            h_ratio=(d.get("h_ratio", 0.0)
+                     if coordinate_optional else d["h_ratio"]),
             disabled=disabled,
-            activation_key=d.get("activation_key", ""),
+            activation_key=activation_key,
             click_rect=(tuple(d["click_rect"])  # type: ignore[arg-type]
                         if d.get("click_rect") else None),
             template=(TemplateBinding.from_dict(d["template"])
@@ -242,6 +259,7 @@ class Region:
             position_overridden=bool(d.get("position_overridden", False)),
             source_x_ratio=d.get("source_x_ratio"),
             source_y_ratio=d.get("source_y_ratio"),
+            has_position=has_position,
         )
 
 
@@ -279,14 +297,22 @@ class Point:
     position_overridden: bool = False
     source_x_ratio: float | None = None
     source_y_ratio: float | None = None
+    # False 表示布局只保存了 ``key + disabled``，从未绑定过坐标。
+    # 不能用 (0, 0) 猜测：画布左上角本身也是合法的真实坐标。
+    has_position: bool = True
 
     def __post_init__(self):
         if self.activation_key:
-            self.activation_key = normalize_key(self.activation_key)
+            self.activation_key = normalize_pressable(self.activation_key)
 
     @property
     def is_reference(self) -> bool:
         return bool(self.source_scene)
+
+    @property
+    def is_unbound_disabled(self) -> bool:
+        """Whether this is a disabled-only entry without a canvas position."""
+        return self.disabled and not self.has_position and not self.activation_key
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -294,8 +320,8 @@ class Point:
         d.pop("position_overridden", None)
         d.pop("source_x_ratio", None)
         d.pop("source_y_ratio", None)
-        if (self.disabled and self.cx_ratio == 0 and self.cy_ratio == 0
-                and self.r_ratio == 0.015):
+        d.pop("has_position", None)
+        if not self.has_position:
             for key in ("cx_ratio", "cy_ratio", "r_ratio"):
                 d.pop(key, None)
         if not d.get("disabled"):
@@ -315,17 +341,23 @@ class Point:
     @staticmethod
     def from_dict(d: dict) -> "Point":
         disabled = bool(d.get("disabled", False))
+        activation_key = d.get("activation_key", "")
+        has_position = "cx_ratio" in d and "cy_ratio" in d
+        coordinate_optional = disabled or bool(activation_key)
         return Point(
             key=d["key"],
-            cx_ratio=d.get("cx_ratio", 0.0) if disabled else d["cx_ratio"],
-            cy_ratio=d.get("cy_ratio", 0.0) if disabled else d["cy_ratio"],
+            cx_ratio=(d.get("cx_ratio", 0.0)
+                      if coordinate_optional else d["cx_ratio"]),
+            cy_ratio=(d.get("cy_ratio", 0.0)
+                      if coordinate_optional else d["cy_ratio"]),
             r_ratio=d.get("r_ratio", 0.015),
             disabled=disabled,
-            activation_key=d.get("activation_key", ""),
+            activation_key=activation_key,
             source_scene=d.get("source_scene", ""),
             position_overridden=bool(d.get("position_overridden", False)),
             source_x_ratio=d.get("source_x_ratio"),
             source_y_ratio=d.get("source_y_ratio"),
+            has_position=has_position,
         )
 
 
@@ -345,7 +377,14 @@ class Arrow:
     to_cy_ratio: float | None = None
     disabled: bool = False
 
+    @property
+    def is_unbound_disabled(self) -> bool:
+        """Whether this is a disabled-only entry without either endpoint."""
+        return self.disabled and not self.from_key
+
     def to_dict(self) -> dict:
+        if self.is_unbound_disabled:
+            return {"key": self.key, "disabled": True}
         d: dict = {"key": self.key, "from_key": self.from_key}
         if self.to_key is not None:
             d["to_key"] = self.to_key
@@ -361,13 +400,14 @@ class Arrow:
 
     @staticmethod
     def from_dict(d: dict) -> "Arrow":
+        disabled = bool(d.get("disabled", False))
         return Arrow(
             key=d["key"],
-            from_key=d["from_key"],
+            from_key=d.get("from_key", "") if disabled else d["from_key"],
             to_key=d.get("to_key"),
             to_cx_ratio=d.get("to_cx_ratio"),
             to_cy_ratio=d.get("to_cy_ratio"),
-            disabled=d.get("disabled", False),
+            disabled=disabled,
         )
 
 
@@ -404,6 +444,8 @@ class Panel:
     calibration: str = "auto"  # "image" | "even" | "auto"
     scroll_direction: str = "vertical"  # "vertical" | "horizontal" | "both" | "none"
     disabled: bool = False
+    # False 表示布局只保存了 ``key + disabled``，从未绑定过矩形。
+    has_position: bool = True
 
     _VALID_SCROLL_DIRECTIONS = ("vertical", "horizontal", "both", "none")
 
@@ -422,10 +464,15 @@ class Panel:
                 f"cols=1 时 scroll_direction 不能为 {self.scroll_direction!r}（无内容可横向滚动）"
             )
 
+    @property
+    def is_unbound_disabled(self) -> bool:
+        """Whether this is a disabled-only entry without a panel rectangle."""
+        return self.disabled and not self.has_position
+
     def to_dict(self) -> dict:
         d = asdict(self)
-        if self.disabled and not any((
-                self.x_ratio, self.y_ratio, self.w_ratio, self.h_ratio)):
+        d.pop("has_position", None)
+        if self.is_unbound_disabled:
             for key in ("x_ratio", "y_ratio", "w_ratio", "h_ratio"):
                 d.pop(key, None)
             defaults = {
@@ -452,6 +499,9 @@ class Panel:
     @staticmethod
     def from_dict(d: dict) -> "Panel":
         disabled = bool(d.get("disabled", False))
+        has_position = all(
+            key in d for key in ("x_ratio", "y_ratio", "w_ratio", "h_ratio")
+        )
         return Panel(
             key=d["key"],
             x_ratio=d.get("x_ratio", 0.0) if disabled else d["x_ratio"],
@@ -464,6 +514,7 @@ class Panel:
             calibration=str(d.get("calibration", "auto")),
             scroll_direction=str(d.get("scroll_direction", "vertical")),
             disabled=disabled,
+            has_position=has_position,
         )
 
 
@@ -476,9 +527,19 @@ class SubsceneRef:
     w_ratio: float
     h_ratio: float
     disabled: bool = False
+    # 通常引用只能先框选后产生；保留该状态可安全读取历史/手写的禁用占位。
+    has_position: bool = True
+
+    @property
+    def is_unbound_disabled(self) -> bool:
+        return self.disabled and not self.has_position
 
     def to_dict(self) -> dict:
         d = asdict(self)
+        d.pop("has_position", None)
+        if self.is_unbound_disabled:
+            for key in ("x_ratio", "y_ratio", "w_ratio", "h_ratio"):
+                d.pop(key, None)
         if not self.disabled:
             d.pop("disabled", None)
         return d
@@ -496,13 +557,18 @@ class SubsceneRef:
 
     @staticmethod
     def from_dict(d: dict) -> "SubsceneRef":
+        disabled = bool(d.get("disabled", False))
+        has_position = all(
+            key in d for key in ("x_ratio", "y_ratio", "w_ratio", "h_ratio")
+        )
         return SubsceneRef(
             key=d["key"],
-            x_ratio=d["x_ratio"],
-            y_ratio=d["y_ratio"],
-            w_ratio=d["w_ratio"],
-            h_ratio=d["h_ratio"],
-            disabled=d.get("disabled", False),
+            x_ratio=d.get("x_ratio", 0.0) if disabled else d["x_ratio"],
+            y_ratio=d.get("y_ratio", 0.0) if disabled else d["y_ratio"],
+            w_ratio=d.get("w_ratio", 0.0) if disabled else d["w_ratio"],
+            h_ratio=d.get("h_ratio", 0.0) if disabled else d["h_ratio"],
+            disabled=disabled,
+            has_position=has_position,
         )
 
 
@@ -529,14 +595,28 @@ def _apply_legacy_disabled(
                 if item.key in key_set:
                     item.disabled = True
             for key in key_set - {i.key for i in ritems}:
-                ritems.append(Region(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True))
+                ritems.append(Region(
+                    key=key,
+                    x_ratio=0,
+                    y_ratio=0,
+                    w_ratio=0,
+                    h_ratio=0,
+                    disabled=True,
+                    has_position=False,
+                ))
         elif kind == "point":
             pitems = points.setdefault(scene_key, [])
             for pi in pitems:
                 if pi.key in key_set:
                     pi.disabled = True
             for key in key_set - {i.key for i in pitems}:
-                pitems.append(Point(key=key, cx_ratio=0, cy_ratio=0, disabled=True))
+                pitems.append(Point(
+                    key=key,
+                    cx_ratio=0,
+                    cy_ratio=0,
+                    disabled=True,
+                    has_position=False,
+                ))
         elif kind == "arrow":
             aitems = arrows.setdefault(scene_key, [])
             for ai in aitems:
@@ -550,7 +630,15 @@ def _apply_legacy_disabled(
                 if ni.key in key_set:
                     ni.disabled = True
             for key in key_set - {i.key for i in pnitems}:
-                pnitems.append(Panel(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True))
+                pnitems.append(Panel(
+                    key=key,
+                    x_ratio=0,
+                    y_ratio=0,
+                    w_ratio=0,
+                    h_ratio=0,
+                    disabled=True,
+                    has_position=False,
+                ))
 
 
 @dataclass

@@ -25,7 +25,7 @@ click (0.771393, 0.552778) before wait 5.083
 click (0.743822, 0.539920) before wait 6.914
 
 # 原始方向：(457.0996, 969) → (580, 636)，手指向右上滑动。
-drag (0.163250, 0.769048) (0.207143, 0.504762) 0.450 before wait 25.860
+drag (0.163250, 0.769048) to (0.207143, 0.504762) duration 0.450 before wait 25.860
 
 click (0.734179, 0.467539) before wait 0.717
 click (0.722179, 0.238651) before wait 13.991
@@ -57,7 +57,7 @@ wait 0.500
 
 def fengshajiusi_round()
     # 原始方向：(785, 954) → (854, 775)，手指向右上滑动。
-    drag (0.280357, 0.757143) (0.305000, 0.615079) 0.400 before wait 0.500
+    drag (0.280357, 0.757143) to (0.305000, 0.615079) duration 0.400 before wait 0.500
 
     click (0.697822, 0.482222) before wait 0.892
     click (0.672143, 0.253968) before wait 14.762 after wait 5.000

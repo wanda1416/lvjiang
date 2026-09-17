@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.key_names import normalize_key
+from ...core.key_names import normalize_pressable
 from ...core.layout_manager import (
     delete_item_key_across_all_layouts,
     rename_item_key_across_all_layouts,
@@ -87,15 +87,17 @@ class PoiPanelMixin:
         self._point_list.setColumnCount(9)
         self._point_list.setHorizontalHeaderLabels([
             tr("名称"), "Key", tr("类型"), tr("含文本"), tr("可点击"),
-            tr("按键"), tr("禁用"), tr("跳转"), tr("来源"),
+            tr("按键"), tr("无布局"), tr("跳转"), tr("来源"),
         ])
         # 列宽：名称/Key 自适应内容，布尔状态列固定窄宽
         header = self._point_list.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        for col in (3, 4, 6):
+        for col in (3, 4):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             header.resizeSection(col, 50)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+        header.resizeSection(6, 68)
         self._point_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._point_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._point_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -144,13 +146,14 @@ class PoiPanelMixin:
         layout = QVBoxLayout(panel)
         self._arrow_list = QTableWidget()
         self._arrow_list.setColumnCount(3)
-        self._arrow_list.setHorizontalHeaderLabels(["Key", tr("方向"), tr("禁用")])
+        self._arrow_list.setHorizontalHeaderLabels(
+            ["Key", tr("方向"), tr("无布局")])
         header = self._arrow_list.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(2, 50)
+        header.resizeSection(2, 68)
         self._arrow_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._arrow_list.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._arrow_list.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -189,7 +192,10 @@ class PoiPanelMixin:
         if not scene:
             self._point_list.blockSignals(False)
             return
-        placed = {p.key for p in self._canvas.get_points()}
+        placed = {
+            p.key for p in self._canvas.get_points()
+            if not p.is_unbound_disabled
+        }
         for point_def in scene.points:
             if not is_view_visible(point_def.views, self._current_view):
                 continue
@@ -221,11 +227,15 @@ class PoiPanelMixin:
             disabled_keys = self._canvas.get_disabled_keys("point")
             cb = QCheckBox()
             cb.setChecked(point_def.key in disabled_keys)
+            cb.setToolTip(tr("当前布局不使用坐标；仍可在编辑属性中设置按键绑定"))
             cb.stateChanged.connect(
                 lambda state, k=point_def.key: self._on_toggle_poi_disabled(k, "point", state)
             )
             # 当前布局绑定的激活按键；空值代表使用默认坐标点击
-            placed_by_key = {p.key: p for p in self._canvas.get_points()}
+            placed_by_key = {
+                p.key: p for p in self._canvas.get_points()
+                if not p.is_unbound_disabled
+            }
             assigned = placed_by_key.get(point_def.key)
             key_item = QTableWidgetItem(
                 assigned.activation_key if assigned else "")
@@ -245,7 +255,10 @@ class PoiPanelMixin:
         引用项属于源场景，**只读**：不显示禁用复选框、不进编辑弹窗，坐标要改
         得去源场景改。这里只让它在本场景的列表和画布里看得见。
         """
-        placed_by_key = {p.key: p for p in self._canvas.get_points()}
+        placed_by_key = {
+            p.key: p for p in self._canvas.get_points()
+            if not p.is_unbound_disabled
+        }
         for ref in getattr(scene, "references", ()):
             if not is_view_visible(ref.views, self._current_view):
                 continue
@@ -302,9 +315,10 @@ class PoiPanelMixin:
             )
             self._arrow_list.setCellWidget(row, 2, centered_cell_widget(cb))
         self._arrow_list.blockSignals(False)
+        self._refresh_entity_tab_titles()
 
     def _on_toggle_poi_disabled(self, key: str, kind: str, state: int):
-        """切换某 key 的禁用状态，通过画布回调通知 dialog 标记 dirty"""
+        """切换某 key 是否使用当前布局坐标，并通知 dialog 标记 dirty。"""
         self._canvas.set_item_disabled(kind, key, bool(state))
 
     def _on_poi_changed(self):
@@ -323,9 +337,15 @@ class PoiPanelMixin:
         if key_item is None:
             return
         key = key_item.text()
-        placed = {p.key for p in self._canvas.get_points()}
+        placed = {
+            p.key for p in self._canvas.get_points()
+            if not p.is_unbound_disabled
+        }
         if key in placed:
             self._canvas.select_point_by_key(key)
+        elif key in self._canvas.get_disabled_keys("point"):
+            # 纯 disabled 条目没有坐标，不应因为选中列表行就进入落点模式。
+            self._canvas.clear_poi_selection()
         else:
             pd = get_point_def(self._scene_key, key)
             name = pd.name if pd else key
@@ -628,13 +648,20 @@ class PoiPanelMixin:
 
         placed = bool(
             point_def
-            and any(p.key == point_def.key for p in self._canvas.get_points())
+            and any(
+                p.key == point_def.key and not p.is_unbound_disabled
+                for p in self._canvas.get_points()
+            )
+        )
+        disabled = bool(
+            point_def
+            and point_def.key in self._canvas.get_disabled_keys("point")
         )
         activation_edit = add_activation_key_row(
             form,
             self._canvas.get_item_activation_key(
                 "point", point_def.key) if point_def else "",
-            enabled=placed,
+            enabled=placed or disabled,
         )
         add_definition_separator(form)
 
@@ -688,7 +715,7 @@ class PoiPanelMixin:
             ok_btn.setEnabled(bool(k and name_edit.text().strip()))
         key_edit.textChanged.connect(_validate)
         name_edit.textChanged.connect(_validate)
-        activation_edit.textChanged.connect(_validate)
+        activation_edit.currentTextChanged.connect(_validate)
         _validate()
 
         def _accept():
@@ -704,7 +731,7 @@ class PoiPanelMixin:
         target_scene = (
             scene_combo.currentData() if scene_combo is not None else self._scene_key
         )
-        activation_key = activation_edit.text().strip()
+        activation_key = activation_edit.currentText().strip()
         return PointDef(
             key=key_edit.text().strip(),
             name=name_edit.text().strip(),
@@ -715,7 +742,7 @@ class PoiPanelMixin:
             to=transition.value() if is_clickable_check.isChecked() else "",
             navigation=transition.navigation_value() if is_clickable_check.isChecked() else "",
             available_from=transition.available_from_value() if is_clickable_check.isChecked() else [],
-        ), target_scene, normalize_key(activation_key) if activation_key else ""
+        ), target_scene, normalize_pressable(activation_key) if activation_key else ""
 
     # ─── 跨场景引用 ──────────────────────────────────────
 

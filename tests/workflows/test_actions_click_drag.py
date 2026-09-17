@@ -9,6 +9,7 @@
 from unittest.mock import MagicMock, call, patch
 
 import pytest
+from lark.exceptions import UnexpectedInput
 
 from lvjiang.core.layout_models import Region
 from lvjiang.workflows.align import GridAlignment
@@ -80,10 +81,11 @@ class TestClickCoordPoint:
         click_panel.assert_called_once_with("bag", "items", 2, 3)
 
 
-class TestRawMouseButton:
+class TestPressMouseButton:
     def test_down_up_reach_backend_in_order(self):
         eng = make_engine()
-        program = parse_text("mouse x1 down\nmouse x1 up\n")
+        program = parse_text(
+            'press "MOUSE_X1" down\npress "MOUSE_X1" up\n')
 
         eng._exec_body(program.body)
 
@@ -91,17 +93,22 @@ class TestRawMouseButton:
             call("x1", True),
             call("x1", False),
         ]
-        assert eng._pressed_mouse_buttons == set()
+        assert not eng._key_registry.is_pressed("MOUSE_X1")
 
     def test_back_forward_aliases_are_normalized(self):
         eng = make_engine()
-        program = parse_text("mouse back down\nmouse back up\n")
+        program = parse_text(
+            'press "MOUSE_BACK" down\npress "MOUSE_BACK" up\n')
 
         eng._exec_body(program.body)
 
         assert [call.args[0] for call in eng._input.mouse_button.call_args_list] == [
             "x1", "x1",
         ]
+
+    def test_removed_mouse_instruction_is_rejected(self):
+        with pytest.raises(UnexpectedInput):
+            parse_text("mouse left down\n")
 
 
 class TestClickSceneRegion:
@@ -121,11 +128,99 @@ class TestClickSceneRegion:
 class TestDragCoordPoint:
     def test_drag_coord_pair_executes(self):
         """drag 坐标对拖拽正常执行"""
-        code = "drag (0.5, 0.8) (0.5, 0.2)\n"
+        code = "drag (0.5, 0.8) to (0.5, 0.2)\n"
         eng = make_engine()
         program = parse_text(code)
         eng._exec_body(program.body)
         assert eng._input.drag_screen.called
+
+    def test_drag_duration_forms_reach_backend(self):
+        """duration 固定值 / 区间 / 变量（数值或二元 tuple）都透传到后端。"""
+        eng = make_engine()
+        eng.variables["t"] = 0.25
+        eng.variables["r"] = (0.3, 0.8)
+        eng._exec_body(parse_text(
+            "drag (0.5, 0.8) to (0.5, 0.2) duration 0.4 hold 1.5\n"
+            "drag (0.5, 0.8) to (0.5, 0.2) duration [0.3, 0.8]\n"
+            "drag (0.5, 0.8) to (0.5, 0.2) duration $t\n"
+            "drag (0.5, 0.8) to (0.5, 0.2) duration $r\n"
+        ).body)
+
+        calls = eng._input.drag_screen.call_args_list
+        assert calls[0].kwargs["duration"] == 0.4 and calls[0].kwargs["hold"] == 1.5
+        assert calls[1].kwargs["duration"] == (0.3, 0.8)
+        assert calls[2].kwargs["duration"] == 0.25
+        assert calls[3].kwargs["duration"] == (0.3, 0.8)
+
+    def test_drag_exact_scale_extends_vector_from_start(self):
+        """scale 沿起点→终点向量放大；exact 时两端都不抖动，坐标可精确断言。"""
+        eng = make_engine()
+        eng.variables["k"] = 0.5
+        eng._exec_body(parse_text(
+            "drag (0.2, 0.5) to (0.3, 0.5) scale 2 exact\n"
+            "drag (0.2, 0.5) to (0.2, 0.3) scale $k exact\n"
+        ).body)
+
+        calls = eng._input.drag_screen.call_args_list
+        assert calls[0].args[:4] == (384, 540, 768, 540)   # 0.2→0.4 × 1920
+        assert calls[1].args[:4] == (384, 540, 384, 432)   # 0.5→0.4 × 1080
+
+    def test_drag_jitters_both_ends_by_default(self, monkeypatch):
+        """默认两端抖动：把随机固定到半径最远处，起点终点都应偏离圆心。"""
+        eng = make_engine()
+        monkeypatch.setattr(
+            "lvjiang.workflows.base.coords.random.uniform", lambda lo, hi: hi)
+        eng._exec_body(parse_text("drag (0.2, 0.5) to (0.4, 0.5)\n").body)
+
+        x1, y1, x2, y2 = eng._input.drag_screen.call_args.args[:4]
+        assert (x1, y1) != (384, 540) and (x2, y2) != (768, 540)
+        # 偏移量 = 默认半径 0.015 × min(1920, 1080)，两端一致
+        assert (x1 - 384, y1 - 540) == (x2 - 768, y2 - 540)
+
+    def test_drag_scale_clamps_endpoint_to_canvas(self):
+        """放大后越界按画布边缘截断，不报错：推到边缘就是推满。"""
+        eng = make_engine()
+        eng._exec_body(parse_text(
+            "drag (0.2, 0.5) to (0.9, 0.5) scale 2 exact\n"     # x 1.6 → 1.0
+            "drag (0.5, 0.3) to (0.5, 0.1) scale 3 exact\n"     # y -0.3 → 0.0
+        ).body)
+
+        calls = eng._input.drag_screen.call_args_list
+        assert calls[0].args[:4] == (384, 540, 1920, 540)
+        assert calls[1].args[:4] == (960, 324, 960, 0)
+
+    def test_drag_scale_clamps_after_endpoint_jitter(self, monkeypatch):
+        """scale 把圆心推到边缘后，默认随机抖动也不能让最终落点越界。"""
+        eng = make_engine()
+        monkeypatch.setattr(
+            "lvjiang.workflows.base.coords.random.uniform", lambda lo, hi: hi)
+
+        eng._exec_body(parse_text(
+            "drag (0.2, 0.5) to (0.9, 0.5) scale 2\n"
+        ).body)
+
+        _x1, _y1, x2, y2 = eng._input.drag_screen.call_args.args[:4]
+        assert (x2, y2) == (1920, 540)
+
+    def test_drag_scale_variable_must_be_positive_number(self):
+        eng = make_engine()
+        eng.variables["k"] = 0
+        with pytest.raises(Exception, match="drag scale 必须是 > 0"):
+            eng._exec_body(parse_text(
+                "drag (0.2, 0.5) to (0.4, 0.5) scale $k\n").body)
+
+    def test_drag_scale_rejected_for_region_default_drag(self):
+        eng = make_engine()
+        eng._layout.get_scene_arrows.return_value = []
+        with pytest.raises(Exception, match="不是 arrow"):
+            eng._exec_body(parse_text("drag [s].[list] scale 2\n").body)
+
+    def test_drag_duration_variable_must_be_numeric(self):
+        eng = make_engine()
+        eng.variables["t"] = "fast"
+        with pytest.raises(Exception, match="drag duration \\$t"):
+            eng._exec_body(parse_text(
+                "drag (0.5, 0.8) to (0.5, 0.2) duration $t\n").body)
 
 
 class TestDragStructuredTargets:
@@ -285,3 +380,15 @@ class TestScrollInterval:
         eng._exec_scroll(Scroll(direction="down", amount=3, interval=bad))
         _args, kwargs = eng._input.scroll_screen.call_args
         assert kwargs["interval"] is None
+
+
+def test_execute_injects_stop_check_into_input_backend(tmp_path):
+    """桌面后端 hold 等待靠引擎注入的 stop_check 提前释放，每次执行都要挂上。"""
+    stop = lambda: False  # noqa: E731
+    eng = make_engine(stop_check=stop)
+    wf = tmp_path / "noop.wf"
+    wf.write_text("wait 0\n", encoding="utf-8")
+
+    eng.execute(wf)
+
+    assert eng._input.stop_check is stop

@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "lvjiang"
 version = "0.12.2"
 description = "通用视觉 RPA 引擎（支持插件扩展，燕云十六声装备调律工具）"
-requires-python = ">=3.10,<3.13"  # RapidOCR 1.4.4 要求 Python <3.13；开发/发布使用 3.12
+requires-python = ">=3.11,<3.13"  # RapidOCR 1.4.4 要求 Python <3.13；3.11+ 才有 Windows 高精度 sleep（core.timing 依赖）；开发/发布使用 3.12
 dependencies = [
     "PyQt6>=6.6,<6.8; sys_platform == 'darwin'",  # 6.8+ 需 macOS 13+
     "PyQt6>=6.6; sys_platform != 'darwin'",
@@ -88,9 +88,9 @@ ignore_missing_imports = true
 # 「只在 3.13 存在的 stdlib 参数」——Android 侧 Chaquopy 固定 3.10，
 # 这类调用在那里是运行期 TypeError，本地却全绿（见 versioning 的
 # read_text(newline=)）。
-# 取 3.12 与 CI 对齐：真正的下限是 3.10，但 numpy 自带的 .pyi 要求
-# >=3.12，钉 3.10 会卡在 numpy 存根上检查不下去。3.12 已能挡住
-# 3.13-only 的 API；3.10/3.11 特有的差异仍需靠 CI 与实机覆盖。
+# 取 3.12 与桌面 CI 对齐；Android 嵌入源码的兼容下限仍是 3.10，但 numpy
+# 自带的 .pyi 要求 >=3.12，钉 3.10 会卡在 numpy 存根上检查不下去。
+# 3.12 已能挡住 3.13-only API；3.10/3.11 差异仍需靠 APK 构建与实机覆盖。
 python_version = "3.12"
 # attr-defined/has-type：Mixin 拆分架构下宿主属性在组装类才存在，
 # 单文件视角必然报未定义，属架构噪音；待 Protocol 声明宿主接口后再启用

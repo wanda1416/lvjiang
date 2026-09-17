@@ -19,7 +19,8 @@ if TYPE_CHECKING:
     from .key_state import KeyStateRegistry
 
 from ...core.coord_types import CircleCoordRef, CoordRef, RectCoordRef
-from ...core.key_names import normalize_key
+from ...core.key_names import normalize_pressable
+from ...core.layout_models import Point as _LayoutPoint
 from ...core.timing import precise_wait
 from ...i18n import tr
 from ..grammar import (
@@ -55,6 +56,9 @@ def _get_found_region_cls():
     return _FoundRegion
 
 
+#: 坐标对拖拽没有自带半径，抖动半径沿用布局 Point 的默认 r_ratio
+_COORD_DRAG_JITTER_RATIO: float = _LayoutPoint(key="", cx_ratio=0.0, cy_ratio=0.0).r_ratio
+
 class _ActionsMixin:
     """基础指令执行：_exec_click / _exec_move / _exec_drag / _exec_press / _exec_wait
 
@@ -62,7 +66,6 @@ class _ActionsMixin:
     """
 
     _key_registry: "KeyStateRegistry | None"
-    _pressed_mouse_buttons: set[str]
 
     def _subscene_target_to_screen(
         self, target: SubsceneEntityRef,
@@ -84,16 +87,6 @@ class _ActionsMixin:
                 item.x_ratio + item.w_ratio / 2,
                 item.y_ratio + item.h_ratio / 2)
         return x, y, f"{scene}/{reference}/{entity}"
-
-    def _exec_mouse_button(self, node):
-        """mouse BUTTON down|up — 在当前光标位置发送原始鼠标键事件。"""
-        state = "down" if node.pressed else "up"
-        logger.debug(f"mouse: {node.button} {state}")
-        self._input.mouse_button(node.button, node.pressed)
-        if node.pressed:
-            self._pressed_mouse_buttons.add(node.button)
-        else:
-            self._pressed_mouse_buttons.discard(node.button)
 
     def _exec_click(self, node: Click):
         """click scene.coord / scene.panel[row][col] — scene 和 coord 都可以是常量或变量。
@@ -549,26 +542,48 @@ class _ActionsMixin:
         y = int((canvas.y_ratio + cy * canvas.h_ratio) * h + self._window_top)
         return x, y, w, h, canvas
 
+    def _drag_scale(self, node: Drag) -> float:
+        """解析 scale 子句：Literal / VarRef → 正数，缺省 1.0。"""
+        if node.scale is None:
+            return 1.0
+        value = self._resolve(node.scale)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise WorkflowUserError(f"drag scale 必须是数值，实际得到: {value!r}")
+        if not math.isfinite(value) or value <= 0:
+            raise WorkflowUserError(f"drag scale 必须是 > 0 的有限数值，得到 {value}")
+        return float(value)
+
+    def _drag_vector(self, node: Drag, from_cx, from_cy, from_r, to_cx, to_cy, to_r,
+                     label: str, kw: dict) -> None:
+        """arrow / A to B 共用的向量拖拽出口，把 scale/exact 交给 Base 层统一实现。"""
+        try:
+            self._ensure_workflow().drag_between(
+                from_cx, from_cy, from_r, to_cx, to_cy, to_r, label,
+                scale=self._drag_scale(node), exact=node.exact,
+                duration=self._drag_duration(node), hold=node.hold, **kw,
+            )
+        except ValueError as exc:
+            raise WorkflowUserError(str(exc)) from exc
+
     def _drag_coord_pair(self, node: Drag, kw: dict) -> None:
         start = node.from_point
         end = node.to_point
-        x1, y1 = self._coord_ratio_to_screen(start.rx, start.ry)
-        x2, y2 = self._coord_ratio_to_screen(end.rx, end.ry)
-        self._input.drag_screen(
-            x1, y1, x2, y2,
-            f"coord({start.rx},{start.ry})->({end.rx},{end.ry})",
-            duration=self._drag_duration(node), hold=node.hold, **kw,
+        # 坐标对没有自带半径，抖动半径沿用 Point 的默认值
+        self._drag_vector(
+            node, start.rx, start.ry, _COORD_DRAG_JITTER_RATIO,
+            end.rx, end.ry, _COORD_DRAG_JITTER_RATIO,
+            f"coord({start.rx},{start.ry})->({end.rx},{end.ry})", kw,
         )
 
     def _drag_scene_ref_pair(self, node: Drag, kw: dict) -> None:
         start = node.from_scene_ref
         end = node.to_scene_ref
-        x1, y1 = self._resolve_point_ref_to_screen(start, tr("起点"))
-        x2, y2 = self._resolve_point_ref_to_screen(end, tr("终点"))
-        self._input.drag_screen(
-            x1, y1, x2, y2,
-            f"point({start.scene}.{start.entity})->({end.scene}.{end.entity})",
-            duration=self._drag_duration(node), hold=node.hold, **kw,
+        from_point = self._resolve_point_ref(start, tr("起点"))
+        to_point = self._resolve_point_ref(end, tr("终点"))
+        self._drag_vector(
+            node, from_point.cx_ratio, from_point.cy_ratio, from_point.r_ratio,
+            to_point.cx_ratio, to_point.cy_ratio, to_point.r_ratio,
+            f"point({start.scene}.{start.entity})->({end.scene}.{end.entity})", kw,
         )
 
     def _drag_panel_grid(self, node: Drag, kw: dict) -> None:
@@ -642,10 +657,18 @@ class _ActionsMixin:
         scene_text, key_text = str(scene), str(key)
         arrows = self._layout.get_scene_arrows(scene_text)
         if next((a for a in arrows if a.key == key_text), None) is not None:
-            self._ensure_workflow().drag_arrow(
-                scene_text, key_text, duration=duration, hold=node.hold, **kw,
-            )
+            try:
+                self._ensure_workflow().drag_arrow(
+                    scene_text, key_text, duration=duration, hold=node.hold,
+                    scale=self._drag_scale(node), exact=node.exact, **kw,
+                )
+            except ValueError as exc:
+                raise WorkflowUserError(str(exc)) from exc
             return
+        if node.scale is not None or node.exact:
+            raise WorkflowUserError(
+                f"drag: scale / exact 只适用于 arrow 与 A to B 两点形态，"
+                f"{scene_text}.{key_text} 不是 arrow")
         regions = self._layout.get_scene_regions(scene_text)
         region = next((r for r in regions if r.key == key_text), None)
         if region is not None:
@@ -681,7 +704,7 @@ class _ActionsMixin:
         logger.debug(f"drag region: {scene}.{key} up (default)")
 
     def _exec_press(self, node: Press):
-        """press "KEY" [hold N|范围|变量 | down | up] — 模拟键盘按键
+        """press "KEY" [hold N|范围|变量 | down | up] — 模拟键盘键或鼠标按钮
 
         四种模式：
         - PRESS: 一次完整按键（down + up）
@@ -751,6 +774,10 @@ class _ActionsMixin:
         """WorkflowEngine 的单次按键原语。"""
         self.press_keys([key])
 
+    def press_key_hold(self, key: str, duration: float) -> None:
+        """按住单键 ``duration`` 秒后释放（``click ... hold`` 命中按键绑定时使用）。"""
+        self.press_keys([key], mode=PressMode.HOLD, duration=duration)
+
     def press_keys(
         self,
         raw_keys: list[str],
@@ -764,7 +791,7 @@ class _ActionsMixin:
             from .key_state import KeyStateRegistry
             self._key_registry = KeyStateRegistry(self._input)
 
-        keys = [normalize_key(str(key)) for key in raw_keys]
+        keys = [normalize_pressable(str(key)) for key in raw_keys]
         if len(set(keys)) != len(keys):
             raise WorkflowUserError(f"press 组合键包含重复按键: {' + '.join(keys)}")
 
@@ -1059,10 +1086,10 @@ class _ActionsMixin:
 
         return int(self._window_left + cx), int(self._window_top + cy)
 
-    def _resolve_point_ref_to_screen(self, scene_ref: EntityRef, label: str = "") -> tuple[int, int]:
-        """EntityRef(scene=场景名, entity=点名) → 屏幕坐标
+    def _resolve_point_ref(self, scene_ref: EntityRef, label: str = ""):
+        """EntityRef(scene=场景名, entity=点名) → 布局中的 Point
 
-        用于 drag 点对模式：查找布局中定义的 Point 并转换为屏幕坐标。
+        用于 drag ``A to B`` 点对模式；坐标换算与抖动交给 drag_between。
         """
         # 解析场景名（支持 VarRef）
         if isinstance(scene_ref.scene, VarRef):
@@ -1092,9 +1119,7 @@ class _ActionsMixin:
                 f"drag {label}: 场景 [{scene}] 的坐标点未绑定: {point_key}"
             )
         require_enabled(point, str(scene), "point")
-
-        # Point → 屏幕坐标（带半径内随机偏移）
-        return self._ensure_workflow()._point_to_screen(point)
+        return point
 
     def _coord_ref_to_screen(self, coord_ref: CoordRef, jitter: bool = True) -> tuple[int, int]:
         """CoordRef → 屏幕绝对坐标（可选抖动）

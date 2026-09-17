@@ -107,8 +107,9 @@ if (!buildPythonExe.exists()) {
 chaquopy {
     defaultConfig {
         // 3.10 而非 3.11：Chaquopy 包仓库中 opencv-python 与 shapely 的最高 Android wheel
-        // 均止于 cp310，而这两者是 OCR 链路的硬依赖。仓库 requires-python 为 >=3.10，
-        // 且现有代码未使用 3.11+ 语法，故降级无需改动任何 Python 源码。
+        // 均止于 cp310，而这两者是 OCR 链路的硬依赖。桌面发行包声明 Python >=3.11
+        // 是为了 Windows 高精度 sleep；APK 不通过 pip 安装本项目，而是由 Chaquopy
+        // 直接打包 src，因此设备端会加载的源码仍须保持 Python 3.10 兼容。
         version = "3.10"
         buildPython(buildPythonExe.absolutePath)
         // OCR 链路依赖。rapidocr_onnxruntime 本体是纯 Python 包，直接从 PyPI 装即可

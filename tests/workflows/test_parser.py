@@ -71,6 +71,16 @@ def test_workflow_parser():
     print(f"  全部 {len(wf_files)} 个文件解析成功")
 
 
+def test_parse_file_tolerates_utf8_bom(tmp_path):
+    """Windows 编辑器常带 BOM；不能在第 1 行第 1 列报 No terminal matches。"""
+    path = tmp_path / "bom.wf"
+    path.write_bytes("\ufeff#% runnable: true\nwait 1\n".encode("utf-8"))
+
+    program = parse_file(path)
+
+    assert len(program.body) == 1
+
+
 # ─── click 指令测试 ─────────────────────────────────────────
 
 def test_click_scene_ref():
@@ -231,27 +241,58 @@ def test_drag_const_or_var():
     print("  drag $scene.$arrow: OK")
 
     # drag with duration
-    program = parse_text("drag [scene].[arrow] 0.5")
+    program = parse_text("drag [scene].[arrow] duration 0.5")
     n = program.body[0]
     assert isinstance(n, Drag)
     assert isinstance(n.duration, Literal)
     assert n.duration.value == 0.5
-    print("  drag [scene].[arrow] 0.5: OK")
+    print("  drag [scene].[arrow] duration 0.5: OK")
 
     # drag with hold
-    program = parse_text("drag [scene].[arrow] 0.5 hold 0.2")
+    program = parse_text("drag [scene].[arrow] duration 0.5 hold 0.2")
     n = program.body[0]
     assert isinstance(n, Drag)
     assert n.hold == 0.2
-    print("  drag [scene].[arrow] 0.5 hold 0.2: OK")
+    print("  drag [scene].[arrow] duration 0.5 hold 0.2: OK")
+
+    # duration 区间与变量
+    n = parse_text("drag [scene].[arrow] duration [0.3, 0.8]").body[0]
+    assert [item.value for item in n.duration] == [0.3, 0.8]
+    n = parse_text("drag [scene].[arrow] duration $t").body[0]
+    assert isinstance(n.duration, VarRef) and n.duration.name == "t"
+
+    # scale / exact 修饰子句：任意顺序，各至多一次
+    n = parse_text("drag [scene].[arrow] exact scale 2 duration 0.1 hold 1").body[0]
+    assert n.scale.value == 2.0 and n.exact is True
+    assert n.duration.value == 0.1 and n.hold == 1.0
+    n = parse_text("drag [s].[p1] to [s].[p2] scale $k").body[0]
+    assert isinstance(n.scale, VarRef) and n.scale.name == "k" and n.exact is False
+    with pytest.raises(VisitError, match="scale 子句重复"):
+        parse_text("drag [scene].[arrow] scale 2 scale 3")
+    with pytest.raises(VisitError, match="只适用于 arrow"):
+        parse_text("drag [scene].[panel] up 2 scale 2")
+    with pytest.raises(VisitError, match="只适用于 arrow"):
+        parse_text("drag [scene].[panel][1][1] down exact")
+
+    # 两点形态必须写 to：并排两个点不接受
+    with pytest.raises(LarkError):
+        parse_text("drag [s].[p1] [s].[p2]")
+    with pytest.raises(LarkError):
+        parse_text("drag (0.1, 0.1) (0.2, 0.2)")
+
+    # 裸数字不再是时长：必须带 duration 关键字
+    with pytest.raises(LarkError):
+        parse_text("drag [scene].[arrow] 0.5")
+    with pytest.raises(LarkError):
+        parse_text("drag [scene].[arrow] 0.5 hold 0.2")
 
 
 def test_drag_point_pair():
-    """drag [scene].[point_1] [scene].[point_2] — 两个命名点之间拖拽"""
+    """drag [scene].[point_1] to [scene].[point_2] — 两个命名点之间拖拽"""
     print("\n=== 测试 drag 点对模式 ===")
 
     # 静态场景名 + 静态点名
-    program = parse_text("drag [game_login_page].[point_1] [game_login_page].[point_2]")
+    program = parse_text("drag [game_login_page].[point_1] to [game_login_page].[point_2]")
     n = program.body[0]
     assert isinstance(n, Drag)
     assert n.from_scene_ref is not None
@@ -260,10 +301,10 @@ def test_drag_point_pair():
     assert n.from_scene_ref.entity == "point_1"
     assert n.to_scene_ref.scene == "game_login_page"
     assert n.to_scene_ref.entity == "point_2"
-    print("  drag [scene].[p1] [scene].[p2]: OK")
+    print("  drag [scene].[p1] to [scene].[p2]: OK")
 
     # 跨场景点对
-    program = parse_text("drag [scene_a].[pt1] [scene_b].[pt2]")
+    program = parse_text("drag [scene_a].[pt1] to [scene_b].[pt2]")
     n = program.body[0]
     assert isinstance(n, Drag)
     assert n.from_scene_ref.scene == "scene_a"
@@ -273,7 +314,7 @@ def test_drag_point_pair():
     print("  drag 跨场景点对: OK")
 
     # 动态变量场景名和点名
-    program = parse_text("drag $scene.$from_pt $scene.$to_pt")
+    program = parse_text("drag $scene.$from_pt to $scene.$to_pt")
     n = program.body[0]
     assert isinstance(n, Drag)
     assert isinstance(n.from_scene_ref.scene, VarRef)
@@ -282,10 +323,10 @@ def test_drag_point_pair():
     assert n.from_scene_ref.entity.name == "from_pt"
     assert isinstance(n.to_scene_ref.scene, VarRef)
     assert isinstance(n.to_scene_ref.entity, VarRef)
-    print("  drag $scene.$from_pt $scene.$to_pt: OK")
+    print("  drag $scene.$from_pt to $scene.$to_pt: OK")
 
     # 带 duration 和 hold
-    program = parse_text("drag [s].[p1] [s].[p2] 0.5 hold 0.2")
+    program = parse_text("drag [s].[p1] to [s].[p2] duration 0.5 hold 0.2")
     n = program.body[0]
     assert isinstance(n, Drag)
     assert n.from_scene_ref is not None
@@ -296,7 +337,7 @@ def test_drag_point_pair():
     print("  drag 点对带 duration + hold: OK")
 
     # 带 wait 子句
-    program = parse_text("drag [s].[p1] [s].[p2] after wait @step_interval")
+    program = parse_text("drag [s].[p1] to [s].[p2] after wait @step_interval")
     assert len(program.body) == 2
     assert isinstance(program.body[0], Drag)
     assert isinstance(program.body[1], Wait)
@@ -668,7 +709,7 @@ def test_legacy_move_syntax_is_rejected():
         "place (0.5, 1.1)",
         "move to (1.01, 0.5)",
         "move (0.5, -0.1) by (0.2, 0)",
-        "drag (0.1, 0.1) (1.2, 0.2) 0.1",
+        "drag (0.1, 0.1) to (1.2, 0.2) duration 0.1",
     ],
 )
 def test_absolute_coordinates_must_stay_in_unit_range(source):
@@ -913,8 +954,8 @@ def test_drag_around_wait():
 
 
 def test_drag_with_duration_after_wait():
-    """drag ... 0.5 after wait -> [Drag(duration), Wait]"""
-    program = parse_text("drag [scene].[panel] 0.5 after wait @step_interval")
+    """drag ... duration 0.5 after wait -> [Drag(duration), Wait]"""
+    program = parse_text("drag [scene].[panel] duration 0.5 after wait @step_interval")
     assert len(program.body) == 2
     assert isinstance(program.body[0], Drag)
     assert isinstance(program.body[1], Wait)
@@ -1122,11 +1163,11 @@ def test_press_hold_direct_range():
 
 
 def test_click_hold_fixed_range_and_variable():
-    fixed = parse_text("click [general_control].[xuli] hold 1.4").body[0]
+    fixed = parse_text("click [general_combat].[xuli] hold 1.4").body[0]
     ranged = parse_text(
-        "click [general_control].[xuli] hold (1.35, 1.45)").body[0]
+        "click [general_combat].[xuli] hold (1.35, 1.45)").body[0]
     variable = parse_text(
-        "click [general_control].[xuli] right hold $hold_time").body[0]
+        "click [general_combat].[xuli] right hold $hold_time").body[0]
 
     assert isinstance(fixed, Click)
     assert fixed.hold == 1.4

@@ -661,13 +661,13 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
     @staticmethod
     def _current_resistances() -> tuple[float, float]:
-        """读取等级配置中最高等级的判定抗性与增益抗性。"""
+        """读取当前生效赛季等级的判定抗性与增益抗性。"""
         from ....config import get_game_config
 
-        configs = get_game_config().get_level_configs()
-        if not configs:
+        gc = get_game_config()
+        config = gc.level_config_for(gc.current_equip_level())
+        if config is None:
             return 0.0, 0.0
-        config = max(configs, key=lambda item: item.level)
         return float(config.judge_resistance or 0), float(config.buff_resistance or 0)
 
     def _show_judgment_outcomes(self) -> None:
@@ -1100,12 +1100,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         if not self._chk_full_level.isChecked():
             return 0
         from ....config import get_game_config
-        season = get_game_config().current_season()
-        if season and season.equip_level:
-            return season.equip_level
-        # 兑底：无赛季配置时取等级配置最高项
-        configs = get_game_config().get_level_configs()
-        return configs[-1].level if configs else 0
+        return get_game_config().current_equip_level()
 
     def _compute_gongjue_attrs(self) -> CombatAttributes:
         """计算弓玦属性：当前赛季最大等级三率词条上限的一半"""
@@ -1116,11 +1111,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         try:
             from ....config import get_game_config
             gc = get_game_config()
-            # 获取当前赛季装备等级
-            seasons = gc.get_season_configs()
-            if not seasons:
-                return CombatAttributes()
-            equip_level = seasons[-1].equip_level
+            equip_level = gc.current_equip_level()
             if not equip_level:
                 return CombatAttributes()
             return compute_gongjue_attrs(gongjue_type, equip_level, gc.get_affix_caps)

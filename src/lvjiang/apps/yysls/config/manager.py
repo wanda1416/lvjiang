@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import copy
-from datetime import date
+from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -49,6 +49,55 @@ def _parse_date(value) -> date | None:
         except ValueError:
             return None
     return None
+
+
+SEASON_SWITCH_HOUR = 5
+_SEASON_SWITCH_TIME = time(SEASON_SWITCH_HOUR, 0)
+
+
+def validate_season_configs(raw_seasons) -> None:
+    """校验赛季时间线；相邻赛季必须在同一天 05:00 无缝切换。"""
+    if raw_seasons is None:
+        return
+    if not isinstance(raw_seasons, list):
+        raise ValueError(tr("赛季配置必须是列表"))
+
+    seasons: list[tuple[int, date, date]] = []
+    seen_numbers: set[int] = set()
+    for index, item in enumerate(raw_seasons, 1):
+        if not isinstance(item, dict):
+            raise ValueError(tr("第 {row} 条赛季配置格式不正确").format(row=index))
+        number = item.get("season_number")
+        if not isinstance(number, int) or number <= 0:
+            raise ValueError(tr("第 {row} 条赛季编号不合法").format(row=index))
+        if number in seen_numbers:
+            raise ValueError(tr("赛季编号不可重复：{number}").format(number=number))
+        seen_numbers.add(number)
+
+        start = _parse_date(item.get("start_date"))
+        end = _parse_date(item.get("end_date"))
+        if start is None or end is None:
+            raise ValueError(tr("赛季 {number} 必须填写开始和结束日期").format(
+                number=number,
+            ))
+        if start >= end:
+            raise ValueError(tr("赛季 {number} 的结束日期必须晚于开始日期").format(
+                number=number,
+            ))
+        seasons.append((number, start, end))
+
+    seasons.sort(key=lambda item: item[0])
+    for previous, following in zip(seasons, seasons[1:], strict=False):
+        previous_number, _previous_start, previous_end = previous
+        following_number, following_start, _following_end = following
+        if previous_end != following_start:
+            raise ValueError(tr(
+                "相邻赛季日期必须衔接：赛季 {previous} 的结束日期必须等于"
+                "赛季 {following} 的开始日期（05:00 切换）"
+            ).format(
+                previous=previous_number,
+                following=following_number,
+            ))
 
 
 def _string_list(value) -> list[str]:
@@ -952,17 +1001,40 @@ class GameConfigManager:
                 return cfg
         return None
 
+    def season_at(self, moment: datetime) -> SeasonConfig | None:
+        """返回指定本地时间生效的赛季。
+
+        燕云赛季固定在 05:00 切换。配置约定旧赛季 ``end_date`` 与
+        新赛季 ``start_date`` 为同一天，因此生效区间为
+        ``[start_date 05:00, end_date 05:00)``。
+        """
+        for cfg in self._season_configs:
+            if not cfg.start_date or not cfg.end_date:
+                continue
+            start = datetime.combine(cfg.start_date, _SEASON_SWITCH_TIME)
+            end = datetime.combine(cfg.end_date, _SEASON_SWITCH_TIME)
+            if start <= moment < end:
+                return cfg
+        return None
+
     def current_season(self) -> SeasonConfig | None:
-        """获取当前赛季（根据当前日期在 start_date 和 end_date 之间判断）
+        """获取当前本地时间生效的赛季。
 
         无匹配返回 None。
         """
-        today = date.today()
-        for cfg in self._season_configs:
-            if cfg.start_date and cfg.end_date:
-                if cfg.start_date <= today <= cfg.end_date:
-                    return cfg
-        return None
+        return self.season_at(datetime.now())
+
+    def current_equip_level(self) -> int:
+        """返回当前生效赛季的装备等级；无生效赛季时返回 0。
+
+        不能用 ``season_configs[-1]`` 代替当前赛季：本地或远端配置可能
+        提前加入下一赛季，此时列表最后一项尚未生效。赛季时间未生效时，
+        该赛季必须视为不存在，不能回退到最高等级配置。
+        """
+        season = self.current_season()
+        if season is not None and season.equip_level:
+            return int(season.equip_level)
+        return 0
 
     # ── 原始数据访问与保存（UI 编辑用） ────────────────────────
 
@@ -975,6 +1047,7 @@ class GameConfigManager:
         # 简单校验：确保是 dict 且有 level_configs
         if not isinstance(data, dict):
             raise ValueError(tr("数据必须是 dict"))
+        validate_season_configs(data.get("season_configs"))
         # 写盘
         if self._path is not None:
             self._path.parent.mkdir(parents=True, exist_ok=True)

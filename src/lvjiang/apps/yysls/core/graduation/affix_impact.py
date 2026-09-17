@@ -140,11 +140,7 @@ def _effective_equipped(equipped: dict, game_config) -> dict:
 
 
 def _current_affix_level(game_config) -> int:
-    season = game_config.current_season()
-    if season is not None and season.equip_level:
-        return int(season.equip_level)
-    levels = game_config.get_level_configs()
-    return max((int(item.level) for item in levels), default=0)
+    return game_config.current_equip_level()
 
 
 def _candidate_names(game_config) -> list[str]:

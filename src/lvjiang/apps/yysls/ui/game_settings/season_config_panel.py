@@ -29,7 +29,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.apps.yysls.config import SeasonConfig, get_game_config
+from lvjiang.apps.yysls.config import (
+    SeasonConfig,
+    get_game_config,
+    validate_season_configs,
+)
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
@@ -375,22 +379,19 @@ class SeasonConfigPanel(QWidget):
             if not name_edit.text().strip():
                 return f"第 {row + 1} 行赛季名称不能为空"
 
-        # 检查时间重叠
-        seasons = []
-        for row in range(self._table.rowCount()):
-            values = self._row_values(row)
-            if values["start_date"] and values["end_date"]:
-                seasons.append((values["season_number"], values["start_date"], values["end_date"]))
-
-        seasons.sort(key=lambda x: x[1])
-        for i in range(len(seasons) - 1):
-            _, _, end1 = seasons[i]
-            _, start2, _ = seasons[i + 1]
-            # 允许同一天（赛季结束于凌晨 5 点，新赛季可于同日开始）
-            if end1 > start2:
-                return f"赛季 {seasons[i][0]} 和 {seasons[i+1][0]} 时间重叠"
+        try:
+            validate_season_configs([
+                self._row_values(row)
+                for row in range(self._table.rowCount())
+            ])
+        except ValueError as exc:
+            return str(exc)
 
         return None
+
+    def validate(self) -> str | None:
+        """供整个游戏配置对话框保存前执行最终校验。"""
+        return self._validate()
 
     # ── 收集 → 校验 → 写盘 → reload ──
 

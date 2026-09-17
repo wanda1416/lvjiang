@@ -108,6 +108,13 @@ class GameConfigTab(QWidget):
         """保存不属于 game_config.yaml、但位于本对话框中的设置。"""
         self._equip_display_panel.save()
 
+    def validate(self) -> str | None:
+        """保存整个游戏配置前验证仍停留在控件中的编辑值。"""
+        error = self._season_panel.validate()
+        if error:
+            self._tabs.setCurrentWidget(self._season_panel)
+        return error
+
     def select_school_base_attr(self, school: str, base_attr: str) -> None:
         """切换到流派配置，并定位指定基础属性。"""
         self._tabs.setCurrentWidget(self._school_panel)

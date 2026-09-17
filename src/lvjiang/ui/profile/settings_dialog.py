@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from loguru import logger
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFontMetrics, QIntValidator
+from PyQt6.QtGui import QFontMetrics, QIntValidator, QKeyEvent
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -133,6 +133,7 @@ class _SyncTargetsWidget(QWidget):
 
         btn_add = QPushButton("+ " + tr("添加同步目标"))
         btn_add.setFixedWidth(120)
+        btn_add.setAutoDefault(False)
         apply_button_style(btn_add)
         btn_add.clicked.connect(lambda: self.add_row())
         layout.addWidget(btn_add)
@@ -197,6 +198,7 @@ class _SyncTargetsWidget(QWidget):
         btn_remove = QPushButton("×")
         # 36 而不是 30：套上带边框+内边距的统一样式后 30 会把「×」挤掉
         btn_remove.setFixedWidth(36)
+        btn_remove.setAutoDefault(False)
         apply_button_style(btn_remove, variant="danger")
         btn_remove.clicked.connect(
             lambda _checked, b=btn_remove: self._remove_row(self._row_of_widget(b))
@@ -278,11 +280,22 @@ class _TagInputWidget(QFrame):
 
         self._input = QLineEdit()
         self._input.setMinimumWidth(150)
-        self._input.returnPressed.connect(self._commit_input)
+        self._input.installEventFilter(self)
 
         self._row.addWidget(self._input)
         for value in values:
             self.add_tag(value)
+
+    def eventFilter(self, watched, event):  # type: ignore[override]
+        """Enter 只提交标签，不触发所在对话框的默认按钮。"""
+        if (
+            watched is self._input
+            and isinstance(event, QKeyEvent)
+            and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+        ):
+            self._commit_input()
+            return True
+        return super().eventFilter(watched, event)
 
     def _commit_input(self) -> None:
         value = self._input.text().strip()
@@ -303,6 +316,9 @@ class _TagInputWidget(QFrame):
         chip_layout.addWidget(QLabel(value))
         remove = QPushButton("×")
         remove.setFixedSize(18, 18)
+        # QDialog 会把 autoDefault 按钮视为 Enter 的候选默认按钮。
+        # 否则用户在输入框按 Enter 新增标签时，会同时点击第一个“×”。
+        remove.setAutoDefault(False)
         remove.setToolTip(tr("删除"))
         remove.clicked.connect(lambda _checked, text=value: self.remove_tag(text))
         chip_layout.addWidget(remove)
@@ -425,6 +441,8 @@ class _ChangeRulesWidget(QWidget):
         buttons = QHBoxLayout()
         add_use = QPushButton("+ " + tr("添加用途"))
         add_source = QPushButton("+ " + tr("添加来源"))
+        add_use.setAutoDefault(False)
+        add_source.setAutoDefault(False)
         apply_button_style(add_use, add_source)
         fit_button_width(add_use, add_source, minimum=96)
         add_use.clicked.connect(lambda: self.add_row(self._KIND_USE))
@@ -476,6 +494,7 @@ class _ChangeRulesWidget(QWidget):
 
         remove_button = QPushButton("×")
         remove_button.setFixedWidth(36)
+        remove_button.setAutoDefault(False)
         apply_button_style(remove_button, variant="danger")
         remove_button.clicked.connect(
             lambda _checked, button=remove_button: self._remove_widget_row(button)

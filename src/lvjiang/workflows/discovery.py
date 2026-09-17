@@ -21,6 +21,7 @@ batchable, scope, hidden, source_layer, is_remote}``。
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from loguru import logger
@@ -33,12 +34,42 @@ from .policy import WorkflowDiscoveryPolicy as Policy
 from .preferences import load_preferences, migrate_legacy_workflows_yaml
 
 
-def _merge_candidate(bucket: dict[str, dict], candidate: dict) -> None:
+@dataclass(frozen=True)
+class DiscoveryProblem:
+    """一个需要用户在脚本编辑器中处理的 ``.wf`` 问题。
+
+    发现层逐文件隔离故障，绝不让一个坏文件拖垮全集；但"被忽略"不能只
+    留在日志里——用户在外部编辑器改坏一行 YAML，看到的现象就是脚本从
+    列表里消失了。id 冲突时入口会保留其中一份，但所有冲突文件仍必须醒目
+    标记。这里把原因和类型带回 UI（编辑器树、主界面提示）。
+    """
+
+    wf_file: str   # 相对 workflows 根的 posix 路径
+    message: str
+    code: str = ""
+
+
+#: 最近一次 ``discover_scripts()`` 记录的问题；UI 在刷新列表后读取。
+_last_problems: list[DiscoveryProblem] = []
+
+
+def last_discovery_problems() -> list[DiscoveryProblem]:
+    """最近一次脚本发现中存在问题的文件及原因（按路径排序）。"""
+    return sorted(_last_problems, key=lambda item: item.wf_file)
+
+
+def _merge_candidate(
+    bucket: dict[str, dict], candidate: dict,
+    problems: list[DiscoveryProblem] | None = None,
+) -> None:
     """把候选并入 ``{id: config}``；同 id 时按来源优先级仲裁。
 
     必须有一个稳定的优先级而不是"先扫到先赢"：扫描顺序取决于目录遍历，
     同一个 id 在本地和远程各有一份时，靠遍历顺序决定谁生效意味着行为会
     随着加一个无关文件而翻转。
+
+    **同层**同 id 没有更高优先级可仲裁时稳定保留先注册者。所有冲突均写
+    ERROR 日志；涉及的 ``.wf`` 全部记为问题，供编辑器显示红色冲突标记。
     """
     script_id = candidate["id"]
     existing = bucket.get(script_id)
@@ -49,21 +80,41 @@ def _merge_candidate(bucket: dict[str, dict], candidate: dict) -> None:
     new_rank = Policy.rank(candidate["source_layer"])
     old_rank = Policy.rank(existing["source_layer"])
     if new_rank < old_rank:
+        selected, ignored = candidate, existing
         bucket[script_id] = candidate
-        return
-    loser = candidate["wf_file"] or candidate["class"]
-    if new_rank > old_rank:
-        logger.warning(
-            f"脚本 id 重复，已忽略 {loser}"
-            f"（{candidate['source_layer']} 层不敌 {existing['source_layer']} 层）"
-            f": {script_id}")
     else:
-        logger.warning(f"脚本 id 重复，已忽略 {loser}: {script_id}")
+        # 同层冲突稳定保留先注册者；低优先级候选同样不能覆盖高优先级项。
+        selected, ignored = existing, candidate
+
+    selected_name = selected["wf_file"] or selected["class"]
+    ignored_name = ignored["wf_file"] or ignored["class"]
+    logger.error(
+        f"脚本 id 已注册，冲突项已忽略: {script_id!r}；"
+        f"生效={selected_name}（{selected['source_layer']}），"
+        f"忽略={ignored_name}（{ignored['source_layer']}）")
+    if problems is not None:
+        message = (
+            f"脚本 id {script_id!r} 冲突；日常等入口只保留一份，"
+            f"请在 #% id 中声明不同的 id")
+        known = {(item.wf_file, item.code) for item in problems}
+        for config in (existing, candidate):
+            wf_file = config.get("wf_file")
+            if wf_file and (wf_file, "duplicate_id") not in known:
+                problems.append(DiscoveryProblem(
+                    wf_file, message, code="duplicate_id"))
+                known.add((wf_file, "duplicate_id"))
 
 
-def _discover_wf_scripts() -> dict[str, dict]:
-    """递归扫描 workflows 全树，返回已注册脚本的 {id: config}。"""
+def _discover_wf_scripts(
+    problems: list[DiscoveryProblem] | None = None,
+) -> dict[str, dict]:
+    """递归扫描 workflows 全树，返回已注册脚本的 {id: config}。
+
+    被忽略的文件连同原因追加到 ``problems``（传 None 时只写日志）。
+    """
     result: dict[str, dict] = {}
+    if problems is None:
+        problems = []
     resolver = get_resolver()
     for rel in resolver.enumerate_entity_tree(WORKFLOWS_DIR, "*.wf"):
         if Policy.is_internal(rel):
@@ -77,15 +128,23 @@ def _discover_wf_scripts() -> dict[str, dict]:
             logger.error(
                 f"解析工作流元数据失败，已忽略该文件: {rel} "
                 f"({type(exc).__name__}: {exc})")
+            problems.append(DiscoveryProblem(rel, f"{type(exc).__name__}: {exc}"))
+            continue
+        if warning:
+            # metadata_for_script_config 已把具体错误写进日志；这里只需要
+            # 让 UI 知道"这个文件因元数据错误没注册"。
+            problems.append(DiscoveryProblem(rel, warning))
             continue
         traits = script_traits(meta)
         if not traits["runnable"]:
             continue
         script_id = meta.get("id") or Policy.default_id_for(rel)
         if SCRIPT_ID_RE.fullmatch(str(script_id)) is None:
-            logger.error(
-                f"脚本 id 不合法，已忽略 {rel}: {script_id!r}；"
+            message = (
+                f"脚本 id 不合法: {script_id!r}；"
                 "只允许 Unicode 字母、数字和下划线，且以字母开头")
+            logger.error(f"{message}，已忽略 {rel}")
+            problems.append(DiscoveryProblem(rel, message))
             continue
         origin = resolver.describe_entity(f"{WORKFLOWS_DIR}/{rel}")
         source_layer = origin.layer or "system"
@@ -103,7 +162,7 @@ def _discover_wf_scripts() -> dict[str, dict]:
             "hidden": traits["hidden"],
             "source_layer": source_layer,
             "is_remote": source_layer == "remote",
-        })
+        }, problems)
     return result
 
 
@@ -149,10 +208,12 @@ def discover_scripts() -> list[dict]:
         脚本配置列表，每项 shape 见模块文档。按 id 排序，保证结果稳定
         （展示顺序由 list_exposed_scripts 决定）。
     """
-    merged = _discover_wf_scripts()
+    problems: list[DiscoveryProblem] = []
+    merged = _discover_wf_scripts(problems)
     for cfg in _discover_class_scripts().values():
         # 同 id 时 class 与 .wf 之间同样走优先级仲裁，不再无条件覆盖
-        _merge_candidate(merged, cfg)
+        _merge_candidate(merged, cfg, problems)
+    _last_problems[:] = problems
     return [merged[k] for k in sorted(merged)]
 
 

@@ -88,7 +88,7 @@ def _preprocess_line_continuation(text: str) -> str:
 def parse_file(path: Path | str) -> Program:
     """解析 .wf 文件，返回 Program AST 节点"""
     path = Path(path)
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8-sig")
     return parse_text(text, source=str(path))
 
 

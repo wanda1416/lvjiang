@@ -42,8 +42,8 @@ eval $loop_count = 0
 
 @zhayu
 if env("android")
-   click [general_control].[qingji] after wait @step_interval
-   click [general_control].[qishu]
+   click [general_combat].[qingji] after wait @step_interval
+   click [general_combat].[qishu]
 else if env("desktop")
    press $skill_key after wait @step_interval
 end

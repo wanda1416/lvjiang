@@ -46,6 +46,17 @@ KNOWN_KEY_NAMES = frozenset({
     "NUMLOCK", "SCROLLLOCK", "PRINTSCREEN", "PAUSE",
 })
 
+MOUSE_BUTTON_NAMES = frozenset({
+    "MOUSE_LEFT", "MOUSE_RIGHT", "MOUSE_MIDDLE", "MOUSE_X1", "MOUSE_X2",
+})
+
+MOUSE_BUTTON_ALIASES: dict[str, str] = {
+    "MOUSE_BACK": "MOUSE_X1",
+    "MOUSE_FORWARD": "MOUSE_X2",
+}
+
+KNOWN_PRESS_NAMES = KNOWN_KEY_NAMES | MOUSE_BUTTON_NAMES
+
 
 # pynput 对字符键给出按当前 Shift 状态翻译后的字符。录制器必须把两层
 # 字符都还原成同一个物理键，否则 Shift+` 得到的 "~" 会被丢弃。
@@ -73,3 +84,20 @@ def normalize_key(name: str) -> str:
             f"未知按键名: {name!r}，标准化为 {resolved!r}，不在已知按键列表中"
         )
     return resolved
+
+
+def normalize_pressable(name: str) -> str:
+    """标准化 ``press`` 可操作的键盘键或鼠标按钮名称。"""
+    upper = name.strip().upper()
+    mouse_name = MOUSE_BUTTON_ALIASES.get(upper, upper)
+    if mouse_name in MOUSE_BUTTON_NAMES:
+        return mouse_name
+    return normalize_key(name)
+
+
+def mouse_button_from_pressable(name: str) -> str | None:
+    """返回标准 press 名对应的后端鼠标按钮名；键盘键返回 ``None``。"""
+    normalized = normalize_pressable(name)
+    if normalized.startswith("MOUSE_"):
+        return normalized.removeprefix("MOUSE_").lower()
+    return None

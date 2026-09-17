@@ -11,6 +11,7 @@ from lvjiang.core.config import DelayParam, InputSimConfig
 from lvjiang.core.layout_models import Arrow, CanvasConfig, Point, Region
 from lvjiang.workflows.base.actions import _ActionMixin
 from lvjiang.workflows.base.coords import _CoordMixin
+from lvjiang.workflows.errors import WorkflowUserError
 
 SCENE = "activity_jianghu"
 
@@ -82,6 +83,9 @@ class _StubEngine:
         self._input.key_down(key)
         self._input.key_up(key)
 
+    def press_key_hold(self, key: str, duration: float) -> None:
+        self._input.keys.append(("hold", key, duration))
+
 
 class _Actor(_ActionMixin, _CoordMixin):
     """把操作与坐标换算两个 Mixin 拼成可独立实例化的最小对象"""
@@ -147,6 +151,33 @@ def test_click_region_with_activation_key_presses_instead_of_clicking():
     assert actor._input.keys == [("down", "SPACE"), ("up", "SPACE")]
 
 
+def test_disabled_region_with_activation_key_still_presses():
+    region = Region(
+        key="btn_ok", x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0,
+        activation_key="B", disabled=True, has_position=False,
+    )
+    actor = _Actor(_FakeLayout(regions=[region]), capture_size=(0, 0))
+
+    actor.click_region(SCENE, "btn_ok", pre_delay=(0, 0), post_delay=(0, 0))
+
+    assert actor._input.clicks == []
+    assert actor._input.keys == [("down", "B"), ("up", "B")]
+
+
+def test_disabled_region_without_activation_key_rejects_click():
+    region = Region(
+        key="btn_ok", x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0,
+        disabled=True, has_position=False,
+    )
+    actor = _Actor(_FakeLayout(regions=[region]))
+
+    with pytest.raises(WorkflowUserError, match="未绑定布局坐标"):
+        actor.click_region(SCENE, "btn_ok")
+
+    assert actor._input.clicks == []
+    assert actor._input.keys == []
+
+
 def test_explicit_right_click_ignores_activation_key():
     region = Region(
         key="btn_ok", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
@@ -160,12 +191,23 @@ def test_explicit_right_click_ignores_activation_key():
     assert actor._input.clicks[0][3] == {"button": "right"}
 
 
-def test_click_hold_ignores_activation_key_and_uses_pointer():
+def test_click_hold_with_activation_key_becomes_press_hold():
+    """跨端脚本的 ``click [xuli] hold 1.4`` 在绑了 R 的桌面布局上等价于
+    ``press R hold 1.4``，不能退化成在图标坐标上按住鼠标。"""
     region = Region(
         key="btn_ok", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
-        activation_key="SPACE",
+        activation_key="r",
     )
     actor = _Actor(_FakeLayout(regions=[region]))
+
+    actor.click_region(SCENE, "btn_ok", hold=1.4)
+
+    assert actor._input.clicks == []
+    assert actor._input.keys == [("hold", "R", 1.4)]
+
+
+def test_click_hold_without_activation_key_uses_pointer():
+    actor = _Actor(_FakeLayout(regions=[_region("btn_ok")]))
 
     actor.click_region(SCENE, "btn_ok", hold=1.4)
 
@@ -188,6 +230,19 @@ def test_click_point_unbound_raises():
     actor = _Actor(_FakeLayout())
     with pytest.raises(ValueError, match="p1"):
         actor.click_point(SCENE, "p1")
+
+
+def test_disabled_point_with_activation_key_still_presses():
+    point = Point(
+        key="p1", cx_ratio=0, cy_ratio=0,
+        activation_key="SPACE", disabled=True, has_position=False,
+    )
+    actor = _Actor(_FakeLayout(points=[point]), capture_size=(0, 0))
+
+    actor.click_point(SCENE, "p1", pre_delay=(0, 0), post_delay=(0, 0))
+
+    assert actor._input.clicks == []
+    assert actor._input.keys == [("down", "SPACE"), ("up", "SPACE")]
 
 
 def test_click_region_without_capture_size_raises():
@@ -235,6 +290,22 @@ def test_drag_arrow_absolute_target_works():
     actor = _Actor(layout)
     actor.drag_arrow(SCENE, "scroll_down")
     assert len(actor._input.drags) == 1
+
+
+def test_drag_arrow_scale_and_exact_share_drag_between():
+    """arrow 与 A to B 走同一实现：scale 沿向量放大，exact 关掉两端抖动。"""
+    layout = _FakeLayout(
+        points=[Point(key="c", cx_ratio=0.2, cy_ratio=0.5, r_ratio=0.05),
+                Point(key="fwd", cx_ratio=0.2, cy_ratio=0.4, r_ratio=0.05)],
+        arrows=[Arrow(key="fwd", from_key="c", to_key="fwd")],
+    )
+    actor = _Actor(layout)   # capture 1000×500
+
+    actor.drag_arrow(SCENE, "fwd", scale=2, exact=True)
+    assert actor._input.drags[-1][:4] == (200, 250, 200, 150)   # 0.5→0.3 × 500
+
+    actor.drag_arrow(SCENE, "fwd", scale=6, exact=True)    # 0.5 - 0.6 → 截断到 0
+    assert actor._input.drags[-1][:4] == (200, 250, 200, 0)
 
 
 # ─── 等待：未定义的命名参数不再当成「不等待」 ──────────────────

@@ -1,9 +1,9 @@
-"""单个场景的编辑 Tab：左侧画布 + 右侧四 Tab（区域 / 坐标 / 方向 / 面板）"""
+"""单个场景的编辑 Tab：左侧画布 + 右侧实体分类 Tab。"""
 
 from collections.abc import Callable
 
 import numpy as np
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSplitter,
+    QTabBar,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -29,6 +30,8 @@ from ...core.layout_models import (
     TemplateBinding,
 )
 from ...core.scene_registry import (
+    get_point_def,
+    get_region_def,
     get_registry,
     get_scene_point_pairs,
     get_scene_regions,
@@ -48,9 +51,36 @@ from .scene_region_panel import RegionPanelMixin
 from .scene_view_dialog import ViewManagerDialog
 
 
+class _UniformWidthTabBar(QTabBar):
+    """Keep scene entity tabs equally wide, including two-digit counts."""
+
+    def __init__(self, labels: tuple[str, ...], parent=None):
+        super().__init__(parent)
+        count_sample_width = max(
+            self.fontMetrics().horizontalAdvance(f"{label}(99)")
+            for label in labels
+        )
+        self._uniform_width = count_sample_width + 24
+        self.setExpanding(False)
+
+    @property
+    def uniform_width(self) -> int:
+        return self._uniform_width
+
+    def tabSizeHint(self, index: int) -> QSize:  # noqa: N802 - Qt API
+        hint = super().tabSizeHint(index)
+        hint.setWidth(self._uniform_width)
+        return hint
+
+    def minimumTabSizeHint(self, index: int) -> QSize:  # noqa: N802 - Qt API
+        hint = super().minimumTabSizeHint(index)
+        hint.setWidth(self._uniform_width)
+        return hint
+
+
 class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
                SceneReferenceEditorMixin, QWidget):
-    """单个场景的编辑 Tab：左侧画布 + 右侧四 Tab（区域列表 / 坐标列表 / 方向列表 / 面板列表）"""
+    """单个场景的编辑 Tab：左侧画布 + 右侧实体分类列表。"""
 
     def __init__(self, scene_key: str, image: np.ndarray | None = None, parent=None):
         super().__init__(parent)
@@ -98,16 +128,28 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         left_layout.addWidget(self._canvas)
         self._splitter.addWidget(left)
 
-        # 右侧五列布局组件
+        # 右侧五个实体分类 Tab
+        self._right_tab_labels = (
+            tr("区域"), tr("坐标"), tr("方向"), tr("网格"), tr("引用"),
+        )
         self._right_tabs = QTabWidget()
-        self._right_tabs.addTab(self._build_region_panel(), tr("区域"))
-        self._right_tabs.addTab(self._build_point_panel(), tr("坐标"))
-        self._right_tabs.addTab(self._build_arrow_panel(), tr("方向"))
-        self._right_tabs.addTab(self._build_panel_panel(), tr("网格"))
-        self._right_tabs.addTab(self._build_reference_panel(), tr("引用"))
+        tab_bar = _UniformWidthTabBar(self._right_tab_labels, self._right_tabs)
+        self._right_tabs.setTabBar(tab_bar)
+        self._right_tabs.addTab(
+            self._build_region_panel(), self._right_tab_labels[0])
+        self._right_tabs.addTab(
+            self._build_point_panel(), self._right_tab_labels[1])
+        self._right_tabs.addTab(
+            self._build_arrow_panel(), self._right_tab_labels[2])
+        self._right_tabs.addTab(
+            self._build_panel_panel(), self._right_tab_labels[3])
+        self._right_tabs.addTab(
+            self._build_reference_panel(), self._right_tab_labels[4])
+        self._refresh_entity_tab_titles()
         self._refresh_scene_type_ui()
         self._splitter.addWidget(self._right_tabs)
-        self._splitter.setSizes([650, 250])
+        right_width = tab_bar.uniform_width * len(self._right_tab_labels) + 8
+        self._splitter.setSizes([650, right_width])
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -586,6 +628,33 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
 
     # ─── 列表刷新 ────────────────────────────────────────
 
+    def _refresh_entity_tab_titles(self) -> None:
+        """Refresh all entity totals; region/point counts include references."""
+        scene = get_registry().get_scene(self._scene_key)
+        region_count = len(scene.regions) if scene else 0
+        point_count = len(scene.points) if scene else 0
+        if scene:
+            region_count += sum(
+                get_region_def(ref.scene, ref.entity) is not None
+                for ref in scene.references
+            )
+            point_count += sum(
+                get_point_def(ref.scene, ref.entity) is not None
+                for ref in scene.references
+            )
+
+        counts = (
+            region_count,
+            point_count,
+            len(self._canvas.get_arrows()),
+            len(scene.panels) if scene else 0,
+            len(scene.subscene_refs) if scene else 0,
+        )
+        for index, count in enumerate(counts):
+            label = self._right_tab_labels[index]
+            self._right_tabs.setTabText(
+                index, f"{label}({count})" if count else label)
+
     def _refresh_lists(self):
         """刷新区域和坐标列表（场景定义变化后调用）"""
         self._canvas.set_current_regions(get_scene_regions(self._scene_key))
@@ -597,6 +666,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         self._refresh_point_list()
         self._refresh_panel_list()
         self._refresh_reference_list()
+        self._refresh_entity_tab_titles()
 
     def _on_entity_order_changed(
         self,

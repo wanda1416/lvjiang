@@ -7,9 +7,11 @@
 from types import SimpleNamespace
 
 from lvjiang.workflows.discovery import (
+    DiscoveryProblem,
     _discover_class_scripts,
     _discover_wf_scripts,
     discover_scripts,
+    last_discovery_problems,
     list_exposed_scripts,
     script_display_name,
 )
@@ -188,6 +190,80 @@ class TestDiscoverWfScripts:
 
         assert set(_discover_wf_scripts()) == {"good"}
         assert any("broken parser" in message for message in errors)
+
+
+class TestDiscoveryProblems:
+    """被忽略的文件必须带原因回到 UI，不能只留在日志里。"""
+
+    def test_metadata_error_is_reported(self, tmp_path, monkeypatch):
+        bad = _write(tmp_path, "bad.wf", "#% name: [\n#% runnable: true\n")
+        good = _write(tmp_path, "good.wf", "#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"bad.wf": bad, "good.wf": good})
+        monkeypatch.setattr("lvjiang.workflows.discovery.logger.error", lambda *_: None)
+        monkeypatch.setattr("lvjiang.workflows.metadata.logger.error", lambda *_: None)
+
+        assert [cfg["id"] for cfg in discover_scripts()] == ["good"]
+        problems = last_discovery_problems()
+        assert [item.wf_file for item in problems] == ["bad.wf"]
+        assert problems[0].message == METADATA_WARNING
+
+    def test_invalid_id_is_reported(self, tmp_path, monkeypatch):
+        wf = _write(tmp_path, "2024-scan.wf", "#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"2024-scan.wf": wf})
+        monkeypatch.setattr("lvjiang.workflows.discovery.logger.error", lambda *_: None)
+
+        assert discover_scripts() == []
+        assert last_discovery_problems() == [
+            DiscoveryProblem("2024-scan.wf", "脚本 id 不合法: '2024-scan'；"
+                             "只允许 Unicode 字母、数字和下划线，且以字母开头")]
+
+    def test_same_layer_duplicate_id_keeps_first_and_marks_all(
+            self, tmp_path, monkeypatch):
+        """同层同 id 稳定保留第一个，但所有冲突文件都必须标记。"""
+        a = _write(tmp_path, "a/foo.wf", "#% name: A\n#% runnable: true\n")
+        b = _write(tmp_path, "b/foo.wf", "#% name: B\n#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"a/foo.wf": a, "b/foo.wf": b})
+        errors = []
+        monkeypatch.setattr("lvjiang.workflows.discovery.logger.error", errors.append)
+
+        result = discover_scripts()
+        assert [item["wf_file"] for item in result] == ["a/foo.wf"]
+        assert [item.wf_file for item in last_discovery_problems()] == [
+            "a/foo.wf", "b/foo.wf"]
+        assert all("'foo'" in item.message for item in last_discovery_problems())
+        assert all(item.code == "duplicate_id"
+                   for item in last_discovery_problems())
+        assert any("脚本 id 已注册" in message for message in errors)
+
+    def test_three_same_layer_duplicates_still_keep_only_first(
+            self, tmp_path, monkeypatch):
+        files = {
+            rel: _write(
+                tmp_path, rel,
+                f"#% id: shared\n#% name: {rel}\n#% runnable: true\n",
+            )
+            for rel in ("a.wf", "b.wf", "c.wf")
+        }
+        _patch_resolver(monkeypatch, files)
+        monkeypatch.setattr(
+            "lvjiang.workflows.discovery.logger.error", lambda *_: None)
+
+        result = discover_scripts()
+
+        assert [item["wf_file"] for item in result] == ["a.wf"]
+        assert [item.wf_file for item in last_discovery_problems()] == [
+            "a.wf", "b.wf", "c.wf"]
+
+    def test_problems_reset_between_runs(self, tmp_path, monkeypatch):
+        wf = _write(tmp_path, "2024-scan.wf", "#% runnable: true\n")
+        _patch_resolver(monkeypatch, {"2024-scan.wf": wf})
+        monkeypatch.setattr("lvjiang.workflows.discovery.logger.error", lambda *_: None)
+        discover_scripts()
+        assert last_discovery_problems()
+
+        _patch_resolver(monkeypatch, {})
+        discover_scripts()
+        assert last_discovery_problems() == []
 
 
 class TestSourcePriority:

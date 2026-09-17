@@ -1,0 +1,117 @@
+{
+  "content_version": 1,
+  "regions": [],
+  "points": [
+    {
+      "key": "move_center",
+      "cx_ratio": 0.23213290581151572,
+      "cy_ratio": 0.7222814819294713,
+      "r_ratio": 0.015
+    },
+    {
+      "key": "move_forward",
+      "cx_ratio": 0.23213290581151572,
+      "cy_ratio": 0.6052748406237812,
+      "r_ratio": 0.015,
+      "activation_key": "W"
+    },
+    {
+      "key": "move_backward",
+      "cx_ratio": 0.23213290581151572,
+      "cy_ratio": 0.8392881232351613,
+      "r_ratio": 0.015,
+      "activation_key": "S"
+    },
+    {
+      "key": "move_left",
+      "cx_ratio": 0.16631667007706508,
+      "cy_ratio": 0.7222814819294713,
+      "r_ratio": 0.015,
+      "activation_key": "A"
+    },
+    {
+      "key": "move_right",
+      "cx_ratio": 0.29794914154596636,
+      "cy_ratio": 0.7222814819294713,
+      "r_ratio": 0.015,
+      "activation_key": "D"
+    },
+    {
+      "key": "look_center",
+      "cx_ratio": 0.6878599544492889,
+      "cy_ratio": 0.3224429141931477,
+      "r_ratio": 0.015,
+      "disabled": true
+    },
+    {
+      "key": "look_up",
+      "cx_ratio": 0.6878599544492889,
+      "cy_ratio": 0.20543627288745764,
+      "r_ratio": 0.015,
+      "disabled": true
+    },
+    {
+      "key": "look_down",
+      "cx_ratio": 0.6878599544492889,
+      "cy_ratio": 0.43944955549883774,
+      "r_ratio": 0.015,
+      "disabled": true
+    },
+    {
+      "key": "look_left",
+      "cx_ratio": 0.6220437187148383,
+      "cy_ratio": 0.3224429141931477,
+      "r_ratio": 0.015,
+      "disabled": true
+    },
+    {
+      "key": "look_right",
+      "cx_ratio": 0.7536761901837395,
+      "cy_ratio": 0.3224429141931477,
+      "r_ratio": 0.015,
+      "disabled": true
+    }
+  ],
+  "arrows": [
+    {
+      "key": "move_forward",
+      "from_key": "move_center",
+      "to_key": "move_forward"
+    },
+    {
+      "key": "move_backward",
+      "from_key": "move_center",
+      "to_key": "move_backward"
+    },
+    {
+      "key": "move_left",
+      "from_key": "move_center",
+      "to_key": "move_left"
+    },
+    {
+      "key": "move_right",
+      "from_key": "move_center",
+      "to_key": "move_right"
+    },
+    {
+      "key": "look_up",
+      "from_key": "look_center",
+      "to_key": "look_up"
+    },
+    {
+      "key": "look_down",
+      "from_key": "look_center",
+      "to_key": "look_down"
+    },
+    {
+      "key": "look_left",
+      "from_key": "look_center",
+      "to_key": "look_left"
+    },
+    {
+      "key": "look_right",
+      "from_key": "look_center",
+      "to_key": "look_right"
+    }
+  ]
+}

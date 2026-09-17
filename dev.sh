@@ -37,14 +37,14 @@ find_python() {
     fi
     
     # Fall back to system Python (version check)
-    for py in python3.13 python3.12 python3.11 python3.10 python3; do
+    for py in python3.12 python3.11 python3; do
         if command -v "$py" &>/dev/null; then
             local ver
             ver=$("$py" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
             local major minor
             major=$(echo "$ver" | cut -d. -f1)
             minor=$(echo "$ver" | cut -d. -f2)
-            if [[ "$major" -ge 3 && "$minor" -ge 10 ]]; then
+            if [[ "$major" -eq 3 && "$minor" -ge 11 && "$minor" -lt 13 ]]; then
                 warn "No .venv found, using system Python $ver"
                 warn "Consider installing uv and running: uv venv && uv pip install -e '.[dev]'"
                 echo "$py"
@@ -53,7 +53,7 @@ find_python() {
         fi
     done
     
-    error "Python 3.10+ not found. Please install:"
+    error "Python 3.11 or 3.12 not found. Please install:"
     error "  1. Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh"
     error "  2. Create venv: uv venv --python 3.12"
     error "  3. Install deps: uv pip install -e '.[dev]'"

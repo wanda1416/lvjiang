@@ -89,6 +89,7 @@ class PostMessageInput(InputBackend):
             self.target_hwnd, cx, cy,
             activate=self.activate_before_send,
             hold=hold,
+            stop_check=self.stop_check,
         )
         self._last_client_pos = (cx, cy)
 
@@ -230,6 +231,7 @@ class PostMessageInput(InputBackend):
             duration=move_dur,
             hold=hold,
             activate=self.activate_before_send,
+            stop_check=self.stop_check,
         )
         self._last_client_pos = (tx, ty)
 

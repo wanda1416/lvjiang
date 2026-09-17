@@ -23,7 +23,7 @@ def _make_backend(monkeypatch):
     monkeypatch.setattr(backend, "_activate_target", MagicMock())
     monkeypatch.setattr(backend, "_move_to", MagicMock())
     monkeypatch.setattr(send_input_module, "_user32", MagicMock())
-    monkeypatch.setattr(send_input_module, "precise_wait", lambda _s: True)
+    monkeypatch.setattr(send_input_module, "precise_wait", lambda _s, **_kw: True)
     events = []
     monkeypatch.setattr(
         send_input_module, "send_mouse_event",
@@ -58,12 +58,27 @@ def test_click_screen_holds_selected_button_before_release(monkeypatch):
     sleeps = []
     monkeypatch.setattr(
         send_input_module, "precise_wait",
-        lambda seconds: sleeps.append(seconds) or True)
+        lambda seconds, **_kw: sleeps.append(seconds) or True)
 
     backend.click_screen(10, 10, "test", button="right", hold=1.4)
 
     assert events == [(_MOUSEEVENTF_RIGHTDOWN, 0), (_MOUSEEVENTF_RIGHTUP, 0)]
     assert 1.4 in sleeps
+
+
+def test_click_screen_hold_releases_button_when_stopped(monkeypatch):
+    """引擎注入的 stop_check 在 hold 期间生效：停止后立即抬起，不留按下状态。"""
+    backend, events = _make_backend(monkeypatch)
+    seen = []
+    monkeypatch.setattr(
+        send_input_module, "precise_wait",
+        lambda seconds, stop_check=None: seen.append((seconds, stop_check)) or False)
+    backend.stop_check = lambda: True
+
+    backend.click_screen(10, 10, "test", hold=30)
+
+    assert (30, backend.stop_check) in seen
+    assert events == [(_MOUSEEVENTF_LEFTDOWN, 0), (_MOUSEEVENTF_LEFTUP, 0)]
 
 
 def test_click_screen_middle_button(monkeypatch):

@@ -12,7 +12,6 @@ start: (_NL | statement)*
 ?statement: scene_stmt
           | click_stmt
           | android_app_stmt
-          | mouse_button_stmt
           | place_stmt
           | move_stmt
           | replay_input_trace_stmt
@@ -61,7 +60,7 @@ android_app_stmt: "app"i ANDROID_APP_ACTION (STRING | var_ref) android_app_timeo
 android_app_timeout: "timeout"i (number | var_ref)
 ANDROID_APP_ACTION: /stop/i | /start/i
 
-// press：模拟键盘按键
+// press：模拟键盘键或鼠标按钮
 // press "M"             — 完整按键（down + up）
 // press "W" hold 2.0    — 固定按住 2 秒后释放
 // press "W" hold (0.05, 0.08) — 在区间内随机选择按住时长
@@ -70,6 +69,7 @@ ANDROID_APP_ACTION: /stop/i | /start/i
 // press "SHIFT" up      — 释放
 // press $key            — 按键名来自变量（值按字符串处理）
 // press "CTRL" + "C"   — 组合键，从左到右按下、从右到左释放
+// press "MOUSE_LEFT" hold 0.2 — 在当前指针位置按住鼠标左键
 press_stmt: "press"i press_key_chain press_modifier? wait_clauses? _NL
 press_key_chain: press_key ("+" press_key)*
 ?press_key: STRING | var_ref
@@ -122,11 +122,6 @@ CLICK_BUTTON: /left/i | /right/i | /middle/i | /x1/i | /x2/i | /back/i | /forwar
 
 click_hold: "hold"i press_hold_value
 
-// 鼠标键原始事件。坐标由前置 place/move 决定；录制器用它保留多个输入
-// 同时按下时的真实 down/up 时间线。
-mouse_button_stmt: "mouse"i CLICK_BUTTON MOUSE_BUTTON_STATE _NL
-MOUSE_BUTTON_STATE: /down/i | /up/i
-
 // place：将鼠标直接放到画布归一化坐标，不产生移动过程。
 // 它是 move 的辅助原语，不承担 scene/region 等业务目标解析。
 place_stmt: "place"i coord_point wait_clauses? _NL
@@ -158,21 +153,29 @@ scroll_interval: "interval"i number
 // drag 支持五种目标：
 //   1. [scene].[panel][row][col] [up|down [n]] — panel cell 级拖拽
 //   2. [scene].[panel] up|down|left|right [n]  — panel grid 级拖拽（中心起拖）
-//   3. [scene].[point_1] [scene].[point_2]      — 两个命名点之间拖拽
+//   3. [scene].[point_1] to [scene].[point_2]   — 两个命名点之间拖拽
 //   4. scene.arrow — scene.arrow 引用
-//   5. (rx1, ry1) (rx2, ry2) — 两坐标点
-drag_stmt: "drag"i drag_target drag_duration? drag_hold? wait_clauses? _NL
+//   5. (rx1, ry1) to (rx2, ry2) — 两坐标点
+// 两点形态必须写 to（与 move ... to 对齐），两个并排的点难以分辨谁是起点。
+// 修饰子句任意顺序、各至多一次：
+//   scale <n|$var>   起点→终点向量按倍数放大/缩小（仅 arrow / 两点形态）
+//   duration ...     中间过程时长
+//   hold <秒>        到达终点后按住
+//   exact            起点与终点都不做半径内随机抖动（默认两端都抖动）
+drag_stmt: "drag"i drag_target drag_modifier* wait_clauses? _NL
+?drag_modifier: drag_scale | drag_duration | drag_hold | drag_exact
+drag_scale: "scale"i (number | var_ref)
+drag_exact: "exact"i
 drag_target: const_or_var "." const_or_var panel_index panel_index drag_direction? -> drag_panel_target
            | const_or_var "." const_or_var drag_direction                       -> drag_grid_target
-           | const_or_var "." const_or_var const_or_var "." const_or_var        -> drag_point_pair_target
+           | const_or_var "." const_or_var "to"i const_or_var "." const_or_var  -> drag_point_pair_target
            | const_or_var "." const_or_var                                      -> drag_scene_target
-           | coord_point coord_point                                            -> drag_coord_target
+           | coord_point "to"i coord_point                                      -> drag_coord_target
 
 // panel 拖拽方向：up/down/left/right + 可选距离（默认 1，支持数值或变量）
 // up/down 按行计算，left/right 按列计算
 // 距离支持整数、浮点数（如 0.5 表示半行）、变量引用
-// 使用 DRAG_DIST 终端避免与 drag_duration 的 number 冲突
-// 优先级 .2 确保在 drag_direction 上下文中优先匹配
+// 使用 DRAG_DIST 终端并给 .2 优先级，确保在 drag_direction 上下文中优先匹配
 drag_direction: DRAG_DIR DRAG_DIST?
 DRAG_DIR: /up/i | /down/i | /left/i | /right/i
 DRAG_DIST.2: /[0-9]+(\.[0-9]+)?/ | /\$[a-zA-Z_][a-zA-Z0-9_]*/
@@ -189,7 +192,10 @@ coord_point: "(" number "," number ")"
 ?const_or_var: bracket_expr    // [name] — 括号常量（配置引用）
             | var_ref           // $var — 变量引用
 
-drag_duration: number | bracket_list
+// 中间过程：从起点滑到终点的时长，必须带 duration 关键字（与 move ... duration 对齐），
+// 固定秒数、[min, max] 随机区间或变量；hold 是到达终点后按住的时长。
+//   drag [general_move].[move_backward] duration 0.1 hold 2.1
+drag_duration: "duration"i (number | bracket_list | var_ref)
 
 drag_hold: "hold"i number
 
@@ -353,7 +359,6 @@ call_arg_list: expression ("," expression)*
 env_guard_stmt: "env"i ":" STRING "->" env_guard_action
 
 ?env_guard_action: click_stmt
-                 | mouse_button_stmt
                  | place_stmt
                  | move_stmt
                  | replay_input_trace_stmt

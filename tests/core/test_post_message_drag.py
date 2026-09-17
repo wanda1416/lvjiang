@@ -22,7 +22,7 @@ def test_backend_forwards_drag_duration_and_hold(monkeypatch):
         post_module, "screen_to_client_logical",
         lambda _hwnd, x, y: (x, y),
     )
-    monkeypatch.setattr(post_module, "precise_wait", lambda _s: True)
+    monkeypatch.setattr(post_module, "precise_wait", lambda _s, **_kw: True)
 
     backend.drag_screen(10, 20, 30, 40, duration=0.3, hold=1.4)
 
@@ -31,6 +31,7 @@ def test_backend_forwards_drag_duration_and_hold(monkeypatch):
         duration=0.3,
         hold=1.4,
         activate=False,
+        stop_check=None,
     )
 
 
@@ -74,7 +75,7 @@ def test_win32_drag_uses_absolute_movement_deadlines_and_holds(monkeypatch):
     monkeypatch.setattr(win32_util.time, "perf_counter_ns", lambda: 1_000)
     monkeypatch.setattr(
         win32_util, "precise_wait",
-        lambda seconds: waits.append(seconds) or True)
+        lambda seconds, **_kw: waits.append(seconds) or True)
     monkeypatch.setattr(
         win32_util, "precise_wait_until",
         lambda deadline, *, spin_tail_ns: (

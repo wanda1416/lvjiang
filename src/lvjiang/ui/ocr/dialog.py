@@ -503,15 +503,20 @@ class OCRDialog(QDialog):
         if getattr(self, "_rules_dirty", False):
             self._status_label.setText(tr("请先保存或取消当前清洗组的修改"))
             return
-        label, ok = QInputDialog.getText(
-            self, tr("创建规则组"), tr("规则组名称："))
-        if not ok or not label.strip():
-            return
-        key, ok = QInputDialog.getText(
+        from ..form_dialog import FormField, ask_form
+
+        values = ask_form(
             self, tr("创建规则组"),
-            tr("规则组 key（用于 with 声明）："))
-        if not ok or not key.strip():
+            [
+                FormField("label", tr("规则组名称"),
+                          validator=lambda v: tr("名称不能为空") if not v else None),
+                FormField("key", tr("规则组 key（用于 with 声明）"),
+                          validator=lambda v: tr("key 不能为空") if not v else None),
+            ],
+        )
+        if values is None:
             return
+        label, key = values["label"], values["key"]
         try:
             OCRCleaner().add_group(key, label)
         except ValueError as exc:

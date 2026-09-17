@@ -129,6 +129,11 @@ class AgentClient:
         return self._device
 
     @property
+    def timeout(self) -> float:
+        """单次请求的默认等待时长（秒）。"""
+        return self._timeout
+
+    @property
     def connected(self) -> bool:
         return self._sock is not None
 
@@ -418,10 +423,26 @@ class AgentInput(InputBackend):
     def client(self) -> AgentClient:
         return self._client
 
-    def _call(self, op: str, what: str, **params: Any) -> None:
-        """下发输入；失败必须传播，不能让工作流误以为动作已经执行。"""
+    #: 手势 RPC 超时 = 手势自身时长 + 这段余量。默认 15s 超时对
+    #: ``click ... hold 20`` 这类长手势不够：客户端超时后 call() 会重连并
+    #: 原样重发，设备端会把同一个长按/推住再执行一遍。
+    _GESTURE_TIMEOUT_MARGIN = 5.0
+
+    def _call(self, op: str, what: str, *, gesture_ms: int = 0,
+              **params: Any) -> None:
+        """下发输入；失败必须传播，不能让工作流误以为动作已经执行。
+
+        ``gesture_ms`` 为手势在设备端阻塞的总时长，用来把 RPC 超时撑到
+        手势结束之后。
+        """
+        timeout = None
+        if gesture_ms > 0:
+            timeout = max(
+                self._client.timeout,
+                gesture_ms / 1000 + self._GESTURE_TIMEOUT_MARGIN,
+            )
         try:
-            self._client.call(op, **params)
+            self._client.call(op, timeout=timeout, **params)
         except AgentError as e:
             logger.warning(f"[Agent] {what}未成功: {e}")
             raise
@@ -450,7 +471,7 @@ class AgentInput(InputBackend):
                 f"[Agent] 长按 {label}: ({sx},{sy}) {duration_ms}ms")
             self._call(
                 "long_press", "长按", x=int(sx), y=int(sy),
-                duration_ms=duration_ms,
+                duration_ms=duration_ms, gesture_ms=duration_ms,
             )
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
@@ -501,9 +522,11 @@ class AgentInput(InputBackend):
         logger.debug(f"[Agent] 拖拽 {poi_name}: ({from_x},{from_y})->({to_x},{to_y}) {move_ms}ms{hold_info}")
         coords = dict(x1=int(from_x), y1=int(from_y), x2=int(to_x), y2=int(to_y))
         if hold_ms > 0:
-            self._call("hold_move", "推住", move_ms=move_ms, hold_ms=hold_ms, **coords)
+            self._call("hold_move", "推住", move_ms=move_ms, hold_ms=hold_ms,
+                       gesture_ms=move_ms + hold_ms, **coords)
         else:
-            self._call("swipe", "拖拽", duration_ms=move_ms, **coords)
+            self._call("swipe", "拖拽", duration_ms=move_ms,
+                       gesture_ms=move_ms, **coords)
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
 

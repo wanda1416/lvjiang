@@ -816,6 +816,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 # 禁用占位不是已绑定实例；完成框选时替换，避免同 key 重复。
                 self._panels = [p for p in self._panels if p.key != pd.key]
                 self._hidden_panels = [p for p in self._hidden_panels if p.key != pd.key]
+                self._unbound_disabled_panels = [
+                    p for p in self._unbound_disabled_panels if p.key != pd.key
+                ]
                 self._panels.append(panel)
                 self._panel_selected_idx = len(self._panels) - 1
                 self._notify_panel_changed()
@@ -1112,6 +1115,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             r.key for r in (self._regions + self._hidden_regions)
             if r is not new_region and r.key
         }
+        assigned.update(r.key for r in self._nonvisual_regions)
         # 候选仅限当前视图可见的字段（即 _visible_keys，基底不叠加）：
         # 选定视图时不应允许绑定其他视图的字段（_visible_keys 为 None = 看全部）
         available = [

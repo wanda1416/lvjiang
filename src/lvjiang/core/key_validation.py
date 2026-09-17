@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from .key_names import KNOWN_KEY_NAMES, normalize_key
+from .key_names import KNOWN_PRESS_NAMES, normalize_pressable
 from .layout_models import Layout
 
 # 对外提供只读合法键名库；别名仍由 normalize_key 统一收敛。
-VALID_KEY_NAMES = KNOWN_KEY_NAMES
+VALID_KEY_NAMES = KNOWN_PRESS_NAMES
 
 
 def validate_key_name(name: str) -> str:
-    """校验并返回标准键名；非法键名抛出 ``ValueError``。"""
-    return normalize_key(name)
+    """校验并返回标准 press 名；非法键名抛出 ``ValueError``。"""
+    return normalize_pressable(name)
 
 
 def validate_layout_activation_keys(

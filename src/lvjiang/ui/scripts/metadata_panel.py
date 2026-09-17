@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ...core.config.resolver import load_available_envs
 from ...i18n import tr
 from ...workflows.metadata import parse_metadata
 from ..button_styles import apply_button_style
@@ -77,13 +78,16 @@ class MetadataPanel(QWidget):
         form.addRow(tr("说明"), self.edit_note)
         form.addRow(tr("脚本性质"), self.combo_scope)
 
-        env_row = QHBoxLayout()
-        self.check_android = QCheckBox("Android")
-        self.check_desktop = QCheckBox("Windows")
-        env_row.addWidget(self.check_android)
-        env_row.addWidget(self.check_desktop)
-        env_row.addStretch()
-        form.addRow(tr("运行环境"), env_row)
+        # 环境不是常量：来自系统参数 app.yaml 的 envs，与主界面环境下拉框
+        # 同源。env 是列表（脚本可同时声明多个环境），所以用复选框组而不是
+        # 单选下拉框。
+        self._env_row = QHBoxLayout()
+        self._env_checks: dict[str, QCheckBox] = {}
+        # stretch 先加入，后续无论构造期还是加载未知环境，都统一插在它前面。
+        self._env_row.addStretch()
+        for key, display in load_available_envs():
+            self._add_env_check(key, display)
+        form.addRow(tr("运行环境"), self._env_row)
 
         traits = QHBoxLayout()
         self.check_runnable = QCheckBox(tr("可独立运行"))
@@ -121,6 +125,26 @@ class MetadataPanel(QWidget):
         actions.addWidget(self.btn_apply)
         root.addLayout(actions)
 
+    def _add_env_check(self, key: str, display: str) -> QCheckBox:
+        check = QCheckBox(display)
+        check.setToolTip(key)
+        self._env_checks[key] = check
+        index = max(self._env_row.count() - 1, 0)
+        self._env_row.insertWidget(index, check)
+        return check
+
+    def _set_env(self, env: list[str]) -> None:
+        """按脚本声明勾选环境。声明了系统参数里没有的环境时也要显示出来，
+        否则“应用到代码”会把它悄悄丢掉。"""
+        for key in env:
+            if key not in self._env_checks:
+                self._add_env_check(key, f"{key}（系统参数中未定义）")
+        for key, check in self._env_checks.items():
+            check.setChecked(key in env)
+
+    def _selected_env(self) -> list[str]:
+        return [key for key, check in self._env_checks.items() if check.isChecked()]
+
     def load_text(self, text: str, *, editable: bool, fallback_id: str = "") -> None:
         self._text = text
         self._editable = editable
@@ -137,9 +161,7 @@ class MetadataPanel(QWidget):
         self.combo_scope.setCurrentIndex(
             max(self.combo_scope.findData(meta.get("scope") or "daily"), 0)
         )
-        env = meta.get("env") or []
-        self.check_android.setChecked("android" in env)
-        self.check_desktop.setChecked("desktop" in env)
+        self._set_env(list(meta.get("env") or []))
         self.check_runnable.setChecked(bool(meta.get("runnable", False)))
         self.check_batchable.setChecked(bool(meta.get("batchable", False)))
         self.check_hidden.setChecked(bool(meta.get("hidden", False)))
@@ -152,7 +174,7 @@ class MetadataPanel(QWidget):
     def _set_enabled(self, enabled: bool) -> None:
         for widget in (
             self.edit_name, self.edit_note, self.combo_scope,
-            self.check_android, self.check_desktop, self.check_runnable,
+            *self._env_checks.values(), self.check_runnable,
             self.check_batchable, self.check_hidden, self.edit_parameters,
             self.btn_apply,
         ):
@@ -178,11 +200,7 @@ class MetadataPanel(QWidget):
             if self.edit_note.text().strip():
                 metadata["note"] = self.edit_note.text().strip()
             metadata["scope"] = self.combo_scope.currentData() or "daily"
-            env = []
-            if self.check_android.isChecked():
-                env.append("android")
-            if self.check_desktop.isChecked():
-                env.append("desktop")
+            env = self._selected_env()
             if env:
                 metadata["env"] = env
             metadata["runnable"] = self.check_runnable.isChecked()

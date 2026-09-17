@@ -61,11 +61,13 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         self._recorder = None
         self._pending_trace = None
         self._saved_trace_ref = ""
+        self._target_id = ""
+        self._transferred = False
         self._f12_hotkey_listener = None
         self._preserved = False   # 已保存/复制过（防误关丢失）
         self.setWindowTitle(tr("脚本录制"))
-        # 独立对话框需要足够的初始空间；嵌入脚本工作台时则必须由
-        # 外层 splitter 分配宽度，否则这里的 560px 会撑宽整个辅助栏。
+        # 独立对话框需要足够的初始空间；嵌入工作台时作为
+        # 中央页签使用，尺寸由编辑区统一分配。
         if not self._embedded:
             self.setMinimumSize(560, 520)
         self._setup_ui()
@@ -73,11 +75,12 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         self.f12_pressed.connect(self.toggle_recording)
         self._refresh_buttons()
         if self._embedded:
+            # 嵌入脚本工作台：录制结果只落在这里，什么时候进代码由用户决定。
+            # 文件保存交给编辑器自己的“保存”，这里不再另存 .wf。
             self.btn_save.hide()
-            self.btn_copy.hide()
-            self.btn_clear.setText(tr("清除预览"))
-            self.btn_clear.setToolTip(tr("录制结果已经插入代码；这里只清除预览以便再次录制"))
-            self.text_edit.setReadOnly(True)
+            self.btn_insert.show()
+            self.btn_copy.setText(tr("复制录制结果"))
+            self.btn_clear.setText(tr("清除录制结果"))
 
     # ─── F12 热键生命周期 ───────────────────────────────
 
@@ -146,7 +149,7 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         layout = QVBoxLayout(self)
         record_key = self._record_key
 
-        btn_row = QHBoxLayout()
+        control_row = QHBoxLayout()
         from ...core.access import is_readonly
         hotkeys_enabled = not is_readonly()
         record_label = tr("● 录制脚本")
@@ -155,21 +158,32 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         self.btn_record = QPushButton(record_label)
         self.btn_record.setStyleSheet(_STYLE_IDLE)
         self.btn_record.clicked.connect(self.toggle_recording)
-        btn_row.addWidget(self.btn_record)
+        control_row.addWidget(self.btn_record)
+
+        idle_text = tr("待机 | 点击「录制脚本」")
+        if hotkeys_enabled:
+            idle_text = f"{tr('待机 | 点击「录制脚本」或按')} {record_key} {tr('开始')}"
+        self.lbl_status = QLabel(idle_text)
+        self.lbl_status.setWordWrap(True)
+        self.lbl_status.setStyleSheet("color: palette(mid);")
+        control_row.addWidget(self.lbl_status, 1)
+        layout.addLayout(control_row)
+
+        # 结果动作紧贴结果区，不再和录制开关挤在一行。
         self.btn_save = QPushButton(tr("保存"))
         self.btn_save.setStyleSheet(_STYLE_ACTION)
         self.btn_save.clicked.connect(self._on_save)
-        btn_row.addWidget(self.btn_save)
+        self.btn_insert = QPushButton(tr("写入编辑区域"))
+        self.btn_insert.setStyleSheet(_STYLE_ACTION)
+        self.btn_insert.setToolTip(tr("把录制结果按语句插入代码编辑器的光标处"))
+        self.btn_insert.clicked.connect(self._on_insert)
+        self.btn_insert.hide()   # 只在嵌入脚本工作台时可见
         self.btn_copy = QPushButton(tr("复制"))
         self.btn_copy.setStyleSheet(_STYLE_ACTION)
         self.btn_copy.clicked.connect(self._on_copy)
-        btn_row.addWidget(self.btn_copy)
         self.btn_clear = QPushButton(tr("清除"))
         self.btn_clear.setStyleSheet(_STYLE_ACTION)
         self.btn_clear.clicked.connect(self._on_clear)
-        btn_row.addWidget(self.btn_clear)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
 
         precision_row = QHBoxLayout()
         lbl_precision = QLabel(tr("录制精度："))
@@ -216,12 +230,14 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         mouse_row.addStretch()
         layout.addLayout(mouse_row)
 
-        idle_text = tr("待机 | 点击「录制脚本」")
-        if hotkeys_enabled:
-            idle_text = f"{tr('待机 | 点击「录制脚本」或按')} {record_key} {tr('开始')}"
-        self.lbl_status = QLabel(idle_text)
-        self.lbl_status.setStyleSheet("color: palette(mid);")
-        layout.addWidget(self.lbl_status)
+        result_row = QHBoxLayout()
+        result_row.addWidget(QLabel(tr("录制结果")))
+        result_row.addStretch()
+        result_row.addWidget(self.btn_save)
+        result_row.addWidget(self.btn_insert)
+        result_row.addWidget(self.btn_copy)
+        result_row.addWidget(self.btn_clear)
+        layout.addLayout(result_row)
 
         hk = getattr(getattr(self._main, "_user_config", None), "hotkeys", None)
         reserved = "/".join(str(getattr(hk, key, default)) for key, default in (
@@ -232,7 +248,7 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             "font-family: Consolas, monospace; font-size: 13px;")
         placeholder = tr(
             "录制结果将显示在这里（画布归一化坐标）\n"
-            "停止录制后将自动插入当前脚本"
+            "停止录制后可先在此修改，再「写入编辑区域」或「复制录制结果」"
             if self._embedded else
             "录制结果将显示在这里（画布归一化坐标，可保存为 .wf）")
         if hotkeys_enabled:
@@ -295,6 +311,11 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         from ...core.macro_recorder import MacroRecorder
         hk = main._user_config.hotkeys
         from ...core.access import is_readonly
+        self._target_id = (
+            self._editor_host.recording_target_id()
+            if self._editor_host is not None else ""
+        )
+        self._transferred = False
         if self._editor_host is not None:
             self._editor_host.begin_recording()
         try:
@@ -340,12 +361,10 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             if dsl.strip():
                 # 全文兜底刷新，防实时追加漏行
                 self.text_edit.setPlainText(dsl)
-                if self._editor_host is not None:
-                    if self._editor_host.accept_recording(dsl, self._pending_trace):
-                        self._preserved = True
-                        self.lbl_status.setText(tr("录制结束，已插入当前脚本；请保存脚本"))
-                    else:
-                        self.lbl_status.setText(tr("录制结束，但未能插入当前脚本"))
+                self._preserved = False
+                if self._embedded:
+                    self.lbl_status.setText(
+                        tr("录制结束，可修改结果后「写入编辑区域」或「复制录制结果」"))
                 else:
                     self.lbl_status.setText(tr("录制结束，可编辑后保存为 .wf"))
             else:
@@ -375,6 +394,19 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             self._main is not None and not getattr(self._main, "_running", False)
         )
         self.btn_save.setEnabled(not recording and has_text)
+        can_insert = (
+            not recording and has_text and self._editor_host is not None
+            and not self._transferred
+            and self._editor_host.can_accept_recording(self._target_id))
+        self.btn_insert.setEnabled(can_insert)
+        if self._transferred:
+            self.btn_insert.setToolTip(
+                tr("这份录制结果已写入编辑区域；清除后可开始新录制"))
+        elif self._embedded and has_text and not recording and not can_insert:
+            self.btn_insert.setToolTip(
+                tr("当前脚本不可编辑（系统脚本请先复制到本地），或已带有高精度轨迹"))
+        else:
+            self.btn_insert.setToolTip(tr("把录制结果按语句插入代码编辑器的光标处"))
         self.btn_copy.setEnabled(
             not recording and has_text and self._pending_trace is None)
         self.btn_copy.setToolTip(
@@ -385,7 +417,9 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         self.radio_precision_low.setEnabled(not recording)
         self.radio_precision_high.setEnabled(not recording)
         self.check_mouse_movement.setEnabled(not recording)
-        self.text_edit.setReadOnly(recording or self._embedded)
+        # 录制中只读；停止后可修改，但一旦写入编辑区就锁定，
+        # 避免相同结果被连续写入多次。
+        self.text_edit.setReadOnly(recording or self._transferred)
 
     def _on_text_changed(self):
         """文本变化后，之前的保存/复制视为失效"""
@@ -454,6 +488,32 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             logger.error(f"保存录制 DSL 失败: {e}")
             QMessageBox.warning(self, tr("保存失败"), str(e))
 
+    def _on_insert(self):
+        """把录制结果按语句插入编辑器光标处（嵌入模式）。
+
+        高精度录制连同轨迹一起交给编辑器：编辑器保存脚本时才落地
+        lvtrace 文件，这里只是把所有权移交过去。
+        """
+        if self._editor_host is None:
+            return
+        if self._transferred:
+            self.lbl_status.setText(tr("这份录制结果已写入，请清除后重新录制"))
+            return
+        text = self.text_edit.toPlainText().rstrip()
+        if not text.strip():
+            return
+        if self._editor_host.accept_recording(
+                text, self._pending_trace, self._target_id):
+            self._preserved = True
+            self._transferred = True
+            if self._pending_trace is not None:
+                # 轨迹只能属于一份脚本，移交后本地不再持有
+                self._pending_trace = None
+            self.lbl_status.setText(tr("已写入编辑区域；请在编辑器中保存脚本"))
+        else:
+            self.lbl_status.setText(tr("未能写入：当前脚本不可编辑或已带有高精度轨迹"))
+        self._refresh_buttons()
+
     def _on_copy(self):
         """复制当前文本到系统剪贴板"""
         QApplication.clipboard().setText(self.text_edit.toPlainText())
@@ -461,8 +521,8 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
         self.lbl_status.setText(tr("已复制到剪贴板"))
 
     def _on_clear(self):
-        """清除文本区（非空时先确认）"""
-        if self.text_edit.toPlainText().strip():
+        """清除文本区；只有内容还没写入/复制/保存过时才确认，免得每次多点一下"""
+        if self.text_edit.toPlainText().strip() and not self._preserved:
             reply = QMessageBox.question(
                 self, tr("清除"), tr("确定清除已录制的 DSL 内容吗？"),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -470,13 +530,51 @@ class ScriptRecordDialog(EscapeCloseConfirmationMixin, QDialog):
             )
             if reply != QMessageBox.StandardButton.Yes:
                 return
+        self._reset_result()
+
+    def _reset_result(self) -> None:
+        """无提示地重置录制暂存；调用方负责完成必要的确认。"""
         self.text_edit.clear()
         self._pending_trace = None
         self._saved_trace_ref = ""
+        self._target_id = ""
+        self._transferred = False
         self._preserved = False
         self.lbl_status.setText(tr("已清除"))
+        self._refresh_buttons()
+
+    @property
+    def has_pending_result(self) -> bool:
+        """是否有尚未交给目标脚本的录制结果。"""
+        return bool(self.text_edit.toPlainText().strip()) and not self._transferred
+
+    def confirm_script_change(self, next_target_id: str) -> bool:
+        """录制结果绑定开始时的脚本；切换前必须明确放弃。"""
+        if not self.has_pending_result or next_target_id == self._target_id:
+            return True
+        return self.confirm_abandon_result()
+
+    def confirm_abandon_result(self) -> bool:
+        """删除或替换目标脚本前，确认放弃未写入的录制结果。"""
+        if not self.has_pending_result:
+            return True
+        reply = QMessageBox.question(
+            self, tr("放弃录制结果？"),
+            tr("录制结果尚未写入开始录制时的脚本。\n"
+               "切换脚本将清除这份录制结果，是否继续？"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return False
+        self._reset_result()
+        return True
 
     # ─── 关闭保护 ─────────────────────────────────────────
+
+    def _escape_needs_confirmation(self) -> bool:
+        return self.is_recording or (
+            bool(self.text_edit.toPlainText().strip()) and not self._preserved)
 
     def _confirm_discard(self) -> bool:
         """未保存/复制且有内容时弹确认，返回是否允许关闭"""

@@ -10,7 +10,7 @@ import time
 
 from loguru import logger
 
-from ...core.key_names import normalize_key
+from ...core.key_names import normalize_pressable
 from ...core.timing import precise_wait
 from ..runtime_layout import require_enabled
 from .engine_ref import require_engine
@@ -33,23 +33,35 @@ class _ActionMixin:
     # ─── 点击操作 ──────────────────────────────────────────
 
     def _activate_bound_key(self, key: str, target: str, **kw) -> None:
-        """以按键激活实体，同时保持 click 的默认/显式前后等待语义。"""
+        """以按键激活实体，同时保持 click 的默认/显式前后等待语义。
+
+        ``hold`` 转成 ``press <key> hold``：跨端脚本写
+        ``click [general_combat].[xuli] hold 1.4``，在安卓端是触屏长按，
+        在绑了 R 的桌面布局上就是 ``press R hold 1.4``——两端语义一致，
+        不会退化成在图标坐标上按住鼠标。
+        """
         pre_delay = kw.pop("pre_delay", None)
         post_delay = kw.pop("post_delay", None)
         button = kw.pop("button", "left")
+        hold = kw.pop("hold", None)
         if kw:
             unknown = ", ".join(sorted(kw))
             raise TypeError(f"按键激活不支持参数: {unknown}")
         if button != "left":
             raise ValueError(f"按键激活仅支持默认左键语义，收到 mouse button={button!r}")
 
-        normalized = normalize_key(key)
+        normalized = normalize_pressable(key)
         before = self._input.before_click_wait if pre_delay is None else pre_delay
         after = self._input.after_click_wait if post_delay is None else post_delay
         if before != (0, 0):
             self._wait_action_delay(random.uniform(*before))
-        logger.debug(f"激活: {target} -> press {normalized}")
-        require_engine(self, "按键原语").press_key(normalized)
+        engine = require_engine(self, "按键原语")
+        if hold is None:
+            logger.debug(f"激活: {target} -> press {normalized}")
+            engine.press_key(normalized)
+        else:
+            logger.debug(f"激活: {target} -> press {normalized} hold {hold}s")
+            engine.press_key_hold(normalized, float(hold))
         if after != (0, 0):
             self._wait_action_delay(random.uniform(*after))
 
@@ -62,17 +74,15 @@ class _ActionMixin:
                 f"场景 {scene_key} 的区域未绑定坐标: {field_key}，"
                 f"请在场景布局编辑器中绑定后重试"
             )
-        require_enabled(region, scene_key, "region")
-
-        # 非左键是明确的鼠标操作，不应用语义激活绑定。
+        # 非左键是明确的鼠标操作，不应用语义激活绑定；hold 则转为按键长按。
         activation_key = getattr(region, "activation_key", "")
         if (isinstance(activation_key, str) and activation_key
-                and kw.get("button", "left") == "left"
-                and kw.get("hold") is None):
+                and kw.get("button", "left") == "left"):
             self._activate_bound_key(
                 activation_key, f"{scene_key}/{field_key}", **kw)
             return
 
+        require_enabled(region, scene_key, "region")
         screen_x, screen_y = self._region_to_screen(region, jitter)
         logger.debug(f"点击: {scene_key}/{field_key} -> 屏幕({screen_x},{screen_y})")
         if region.click_rect is None:
@@ -198,24 +208,77 @@ class _ActionMixin:
         point = next((p for p in points if p.key == point_key), None)
         if point is None:
             raise ValueError(f"场景 {scene_key} 的坐标点未绑定: {point_key}")
-        require_enabled(point, scene_key, "point")
         activation_key = getattr(point, "activation_key", "")
         if (isinstance(activation_key, str) and activation_key
-                and kw.get("button", "left") == "left"
-                and kw.get("hold") is None):
+                and kw.get("button", "left") == "left"):
             self._activate_bound_key(
                 activation_key, f"{scene_key}/{point_key}", **kw)
             return
+        require_enabled(point, scene_key, "point")
         screen_x, screen_y = self._point_to_screen(point)
         logger.debug(f"点击 point: {scene_key}/{point_key} -> 屏幕({screen_x},{screen_y})")
         self._input.click_screen(screen_x, screen_y, f"{scene_key}/{point_key}", **kw)
 
-    def drag_arrow(self, scene_key: str, arrow_key: str, duration: float | tuple[float, float] | None = None, hold: float | None = None, **kw):
+    def drag_between(
+        self,
+        from_cx: float, from_cy: float, from_r: float,
+        to_cx: float, to_cy: float, to_r: float,
+        label: str,
+        *,
+        scale: float = 1.0,
+        exact: bool = False,
+        duration: float | tuple[float, float] | None = None,
+        hold: float | None = None,
+        **kw,
+    ) -> None:
+        """两点之间拖拽的唯一实现：arrow、``A to B`` 点对与坐标对都收敛到这里。
+
+        ``scale`` 把起点→终点向量按倍数放大/缩小后再取终点；``exact`` 关掉两端
+        的半径内随机抖动。默认两端都抖动——拖拽本来就不可能作为精确依据，
+        方向类拖拽（摇杆、视角）要精确时显式写 ``exact``。
+        """
+        if scale <= 0:
+            raise ValueError(f"drag scale 必须 > 0，得到 {scale}")
+        end_cx = from_cx + (to_cx - from_cx) * scale
+        end_cy = from_cy + (to_cy - from_cy) * scale
+        # 放大后越界按画布边缘截断：拖拽本就不精确，推到边缘就是"推满"，
+        # 报错只会让 scale 在靠边的摇杆/视角区上没法用。
+        clamped_cx = min(max(end_cx, 0.0), 1.0)
+        clamped_cy = min(max(end_cy, 0.0), 1.0)
+        if (clamped_cx, clamped_cy) != (end_cx, end_cy):
+            logger.debug(
+                f"拖拽 {label}: scale {scale} 后终点 ({end_cx:.3f}, {end_cy:.3f}) "
+                f"超出画布，截断到 ({clamped_cx:.3f}, {clamped_cy:.3f})")
+            end_cx, end_cy = clamped_cx, clamped_cy
+        fx, fy = self._ratio_point_to_screen(
+            from_cx, from_cy, from_r,
+            jitter=not exact, clamp_to_canvas=True,
+        )
+        tx, ty = self._ratio_point_to_screen(
+            end_cx, end_cy, to_r,
+            jitter=not exact, clamp_to_canvas=True,
+        )
+        extras = "".join((
+            f" scale {scale}" if scale != 1.0 else "",
+            " exact" if exact else "",
+            f" hold {hold}s" if hold else "",
+        ))
+        logger.debug(f"拖拽 {label}: ({fx},{fy})->({tx},{ty}){extras}")
+        self._input.drag_screen(fx, fy, tx, ty, label, duration=duration, hold=hold, **kw)
+
+    def drag_arrow(
+        self, scene_key: str, arrow_key: str,
+        duration: float | tuple[float, float] | None = None,
+        hold: float | None = None,
+        *, scale: float = 1.0, exact: bool = False, **kw,
+    ):
         """执行 arrow 定义的拖拽
 
         Args:
             duration: 拖拽移动时长（秒）。单值固定，二元组则范围内随机。None 使用默认值。
             hold: 到达目标后按住不放的时长（秒）。None 表示不按住。
+            scale: 起点→终点向量的放大倍数。
+            exact: 两端都不抖动。
         """
         arrows = self._layout.get_scene_arrows(scene_key)
         arrow = next((a for a in arrows if a.key == arrow_key), None)
@@ -227,19 +290,20 @@ class _ActionMixin:
         if from_point is None:
             raise ValueError(f"方向 {arrow_key} 的起点坐标点未定义: {arrow.from_key}")
         require_enabled(from_point, scene_key, "point")
-        # 终点：吸附态动态查 point，绝对态直接用坐标
+        # 终点：吸附态动态查 point，绝对态直接用坐标（抖动半径沿用起点的）
         if arrow.to_key is not None:
             to_point = next((p for p in points if p.key == arrow.to_key), None)
             if to_point is None:
                 raise ValueError(f"方向 {arrow_key} 的终点坐标点未定义: {arrow.to_key}")
             require_enabled(to_point, scene_key, "point")
-            to_cx, to_cy = to_point.cx_ratio, to_point.cy_ratio
+            to_cx, to_cy, to_r = to_point.cx_ratio, to_point.cy_ratio, to_point.r_ratio
         else:
-            to_cx, to_cy = arrow.to_cx_ratio, arrow.to_cy_ratio
-        fx, fy = self._point_to_screen(from_point)
-        tx, ty = self._ratio_to_screen(to_cx, to_cy)
-        logger.debug(f"拖拽 arrow: {scene_key}/{arrow_key} ({fx},{fy})->({tx},{ty})" + (f" hold {hold}s" if hold else ""))
-        self._input.drag_screen(fx, fy, tx, ty, f"{scene_key}/{arrow_key}", duration=duration, hold=hold, **kw)
+            to_cx, to_cy, to_r = arrow.to_cx_ratio, arrow.to_cy_ratio, from_point.r_ratio
+        self.drag_between(
+            from_point.cx_ratio, from_point.cy_ratio, from_point.r_ratio,
+            to_cx, to_cy, to_r, f"{scene_key}/{arrow_key}",
+            scale=scale, exact=exact, duration=duration, hold=hold, **kw,
+        )
 
     # ─── 键盘 ──────────────────────────────────────────────
 

@@ -47,3 +47,11 @@ def test_same_key_is_allowed_across_reference_views():
     )
 
     validate_layout_activation_keys(layout)
+
+
+def test_mouse_button_is_valid_layout_activation():
+    region = _region("purchase")
+    region.activation_key = "MOUSE_LEFT"
+    layout = Layout(regions={"training_xinfa": [region]})
+
+    validate_layout_activation_keys(layout)

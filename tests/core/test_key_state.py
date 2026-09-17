@@ -8,7 +8,7 @@
 - release_all 单键失败不阻塞其他键
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 
@@ -48,6 +48,15 @@ class TestBasicFlow:
         assert not reg.is_pressed("W")
         reg.key_up("SHIFT")
         assert not reg.is_pressed("SHIFT")
+
+    def test_mouse_button_uses_same_registry(self):
+        reg, backend = _make_registry()
+        reg.key_down("MOUSE_LEFT")
+        reg.key_up("MOUSE_LEFT")
+        assert backend.mouse_button.call_args_list == [
+            call("left", True),
+            call("left", False),
+        ]
 
 
 class TestStrictValidation:

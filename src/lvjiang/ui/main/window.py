@@ -707,6 +707,15 @@ class MainWindow(
         self._remote_workflow_warning.setVisible(False)
         daily_layout.addWidget(self._remote_workflow_warning)
 
+        # 元数据出错的 .wf 不会注册成脚本；不提示的话用户看到的现象就是
+        # "脚本没了"，只能翻日志。
+        self._ignored_scripts_warning = QLabel()
+        self._ignored_scripts_warning.setObjectName("ignored_scripts_warning")
+        self._ignored_scripts_warning.setWordWrap(True)
+        self._ignored_scripts_warning.setProperty("status", "warning")
+        self._ignored_scripts_warning.setVisible(False)
+        daily_layout.addWidget(self._ignored_scripts_warning)
+
         self._independent_params_checkbox = QCheckBox(
             tr("使用独立参数"))
         self._independent_params_checkbox.setObjectName(

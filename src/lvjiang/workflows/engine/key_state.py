@@ -1,4 +1,4 @@
-"""按键状态注册表 — DSL press 指令的统一状态管理
+"""按压状态注册表 — DSL press 指令的统一状态管理
 
 设计原则：
 - 状态唯一来源：DSL 层面的 KeyStateRegistry，而非各 InputBackend
@@ -10,6 +10,7 @@
 from loguru import logger
 
 from ...core.input_base import InputBackend
+from ...core.key_names import mouse_button_from_pressable
 from .signals import WorkflowUserError
 
 
@@ -32,7 +33,11 @@ class KeyStateRegistry:
         """
         if key in self._pressed:
             raise WorkflowUserError(f"Key '{key}' is already pressed")
-        self._backend.key_down(key)
+        button = mouse_button_from_pressable(key)
+        if button is None:
+            self._backend.key_down(key)
+        else:
+            self._backend.mouse_button(button, True)
         self._pressed.add(key)
 
     def key_up(self, key: str) -> None:
@@ -43,7 +48,11 @@ class KeyStateRegistry:
         """
         if key not in self._pressed:
             raise WorkflowUserError(f"Key '{key}' is not pressed")
-        self._backend.key_up(key)
+        button = mouse_button_from_pressable(key)
+        if button is None:
+            self._backend.key_up(key)
+        else:
+            self._backend.mouse_button(button, False)
         self._pressed.discard(key)
 
     def release_all(self) -> None:
@@ -56,7 +65,11 @@ class KeyStateRegistry:
         logger.debug(f"release_all: 释放 {len(self._pressed)} 个按键: {sorted(self._pressed)}")
         for key in list(self._pressed):
             try:
-                self._backend.key_up(key)
+                button = mouse_button_from_pressable(key)
+                if button is None:
+                    self._backend.key_up(key)
+                else:
+                    self._backend.mouse_button(button, False)
             except Exception:
                 logger.exception(f"release_all: 释放 {key} 失败")
             finally:

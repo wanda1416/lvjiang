@@ -15,7 +15,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
-from ...core.key_names import normalize_key
+from ...core.key_names import normalize_pressable
 from ...core.layout_models import Arrow, CanvasConfig, Panel, Point, Region, SubsceneRef
 from ...core.scene_registry import (
     get_panel_name,
@@ -79,6 +79,9 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
 
         # 区域列表（归一化坐标 0.0~1.0）
         self._regions: list[Region] = []
+        # 无画布矩形的区域：禁用占位或纯 activation_key 绑定。保留数据，
+        # 但绝不能进入绘制、命中检测和几何编辑列表。
+        self._nonvisual_regions: list[Region] = []
         self._selected_idx: int = -1  # 当前选中区域索引
         self._field_selected: bool = False  # 是否由右侧字段列表选中（单区域编辑模式）
 
@@ -87,7 +90,9 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         self._visible_keys: set[str] | None = None
         self._hidden_regions: list[Region] = []
         self._hidden_panels: list[Panel] = []
+        self._unbound_disabled_panels: list[Panel] = []
         self._hidden_subscene_refs: list[SubsceneRef] = []
+        self._unbound_disabled_subscene_refs: list[SubsceneRef] = []
 
         # 交互状态
         self._drag_mode: DragMode | None = None
@@ -184,6 +189,23 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
     def set_item_disabled(self, kind: str, key: str, disabled: bool):
         """设置某类型某 key 实例的 disabled 属性，并触发 dirty 回调"""
         target = self._find_item_by_kind(kind, key)
+        placeholder_bucket = (
+            self._nonvisual_regions if kind == "region"
+            else self._nonvisual_points if kind == "point"
+            else self._unbound_disabled_arrows if kind == "arrow"
+            else self._unbound_disabled_panels if kind == "panel"
+            else self._unbound_disabled_subscene_refs
+            if kind == "subscene_ref"
+            else None
+        )
+        if (not disabled and target is not None
+                and placeholder_bucket is not None
+                and getattr(target, "is_unbound_disabled", False)
+                and any(item is target for item in placeholder_bucket)):
+            # 取消未绑定实体的禁用状态，应恢复成“未设置坐标”，而不是把
+            # disabled=False 的零坐标占位塞回布局。
+            placeholder_bucket.remove(target)
+            target = None
         if target is None and disabled:
             # 为无实例的 key 创建占位，保证 disabled 状态可持久化
             target = self._create_placeholder(kind, key)
@@ -241,15 +263,35 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         视图它又回来了。
         """
         if kind == "region":
-            return [self._regions, self._hidden_regions]
+            return [
+                self._regions,
+                self._hidden_regions,
+                self._nonvisual_regions,
+            ]
         if kind == "panel":
-            return [self._panels, self._hidden_panels]
+            return [
+                self._panels,
+                self._hidden_panels,
+                self._unbound_disabled_panels,
+            ]
         if kind == "point":
-            return [self._points, self._hidden_points]
+            return [
+                self._points,
+                self._hidden_points,
+                self._nonvisual_points,
+            ]
         if kind == "arrow":
-            return [self._arrows, self._hidden_arrows]
+            return [
+                self._arrows,
+                self._hidden_arrows,
+                self._unbound_disabled_arrows,
+            ]
         if kind == "subscene_ref":
-            return [self._subscene_refs, self._hidden_subscene_refs]
+            return [
+                self._subscene_refs,
+                self._hidden_subscene_refs,
+                self._unbound_disabled_subscene_refs,
+            ]
         return []
 
     def get_disabled_keys(self, kind: str) -> set[str]:
@@ -271,10 +313,17 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         item = self._find_item_by_kind(kind, key)
         if item is None:
             return False
-        normalized = normalize_key(value) if value else ""
+        normalized = normalize_pressable(value) if value else ""
         if item.activation_key == normalized:
             return True
         item.activation_key = normalized
+        if (kind == "region" and not normalized and not item.disabled
+                and item in self._nonvisual_regions):
+            # 纯按键绑定清空按键后已不再承载任何布局信息。
+            self._nonvisual_regions.remove(item)
+        elif (kind == "point" and not normalized and not item.disabled
+              and item in self._nonvisual_points):
+            self._nonvisual_points.remove(item)
         if kind == "region":
             self._notify_changed()
         else:
@@ -284,15 +333,35 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
     def _items_by_kind(self, kind: str) -> list:
         """按类型取实例列表（含隐藏项）"""
         if kind == "region":
-            return self._regions + self._hidden_regions
+            return (
+                self._regions
+                + self._hidden_regions
+                + self._nonvisual_regions
+            )
         if kind == "panel":
-            return self._panels + self._hidden_panels
+            return (
+                self._panels
+                + self._hidden_panels
+                + self._unbound_disabled_panels
+            )
         if kind == "point":
-            return self._points + self._hidden_points
+            return (
+                self._points
+                + self._hidden_points
+                + self._nonvisual_points
+            )
         if kind == "arrow":
-            return self._arrows + self._hidden_arrows
+            return (
+                self._arrows
+                + self._hidden_arrows
+                + self._unbound_disabled_arrows
+            )
         if kind == "subscene_ref":
-            return self._subscene_refs + self._hidden_subscene_refs
+            return (
+                self._subscene_refs
+                + self._hidden_subscene_refs
+                + self._unbound_disabled_subscene_refs
+            )
         return []
 
     def _find_item_by_kind(self, kind: str, key: str):
@@ -306,29 +375,49 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
     def _create_placeholder(kind: str, key: str):
         """创建零坐标占位实例（用于 disabled 但无画布实例的 key）"""
         if kind == "region":
-            return Region(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True)
+            return Region(
+                key=key,
+                x_ratio=0,
+                y_ratio=0,
+                w_ratio=0,
+                h_ratio=0,
+                disabled=True,
+                has_position=False,
+            )
         if kind == "point":
-            return Point(key=key, cx_ratio=0, cy_ratio=0, disabled=True)
+            return Point(
+                key=key,
+                cx_ratio=0,
+                cy_ratio=0,
+                disabled=True,
+                has_position=False,
+            )
         if kind == "arrow":
             return Arrow(key=key, from_key="", disabled=True)
         if kind == "panel":
-            return Panel(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True)
+            return Panel(
+                key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0,
+                disabled=True, has_position=False,
+            )
         if kind == "subscene_ref":
-            return SubsceneRef(key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0, disabled=True)
+            return SubsceneRef(
+                key=key, x_ratio=0, y_ratio=0, w_ratio=0, h_ratio=0,
+                disabled=True, has_position=False,
+            )
         raise ValueError(f"unknown kind: {kind}")
 
     def _append_to_kind(self, kind: str, item):
         """将占位实例追加到对应列表"""
         if kind == "region":
-            self._regions.append(item)
+            self._nonvisual_regions.append(item)
         elif kind == "point":
-            self._points.append(item)
+            self._nonvisual_points.append(item)
         elif kind == "arrow":
-            self._arrows.append(item)
+            self._unbound_disabled_arrows.append(item)
         elif kind == "panel":
-            self._panels.append(item)
+            self._unbound_disabled_panels.append(item)
         elif kind == "subscene_ref":
-            self._subscene_refs.append(item)
+            self._unbound_disabled_subscene_refs.append(item)
 
     def set_current_regions(self, regions: list[tuple[str, str]]):
         """设置当前场景的区域列表（由对话框调用）"""
@@ -336,8 +425,12 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
 
     def set_regions(self, regions: list[Region]):
         """设置区域列表（从预设加载）"""
+        cloned = [region.clone() for region in regions]
+        self._nonvisual_regions = [
+            region for region in cloned if not region.has_position
+        ]
         self._regions, self._hidden_regions = self._split_by_filter(
-            [region.clone() for region in regions]
+            [region for region in cloned if region.has_position]
         )
         self._selected_idx = -1
         self._field_selected = False
@@ -349,7 +442,11 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         """获取全部区域列表（含被视图过滤隐藏的，保存布局时不能写丢）"""
         return [
             region.clone()
-            for region in self._regions + self._hidden_regions
+            for region in (
+                self._regions
+                + self._hidden_regions
+                + self._nonvisual_regions
+            )
             if region.key
         ]
 
@@ -432,8 +529,12 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         """设置面板列表（从布局加载）"""
         # 加载/切换布局或重新下发数据时，旧的框选草稿不再有效。
         self.cancel_panel_place()
+        cloned = [panel.clone() for panel in panels]
+        self._unbound_disabled_panels = [
+            panel for panel in cloned if panel.is_unbound_disabled
+        ]
         self._panels, self._hidden_panels = self._split_by_filter(
-            [panel.clone() for panel in panels]
+            [panel for panel in cloned if not panel.is_unbound_disabled]
         )
         self._panel_selected_idx = -1
         self.update()
@@ -441,7 +542,11 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
     def get_panels(self) -> list[Panel]:
         """获取全部面板列表（含被视图过滤隐藏的）"""
         return [panel.clone()
-                for panel in self._panels + self._hidden_panels]
+                for panel in (
+                    self._panels
+                    + self._hidden_panels
+                    + self._unbound_disabled_panels
+                )]
 
     def get_visible_panels(self) -> list[Panel]:
         """获取当前视图下可见的面板列表（识别/OCR 只应作用于可见面板）"""
@@ -589,14 +694,24 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
     # ─── 子场景引用管理 ─────────────────────────────────
 
     def set_subscene_refs(self, refs: list[SubsceneRef]):
+        cloned = [ref.clone() for ref in refs]
+        self._unbound_disabled_subscene_refs = [
+            ref for ref in cloned if ref.is_unbound_disabled
+        ]
         self._subscene_refs, self._hidden_subscene_refs = self._split_by_filter(
-            [ref.clone() for ref in refs])
+            [ref for ref in cloned if not ref.is_unbound_disabled])
         self._subscene_selected_idx = -1
         self.update()
 
     def get_subscene_refs(self) -> list[SubsceneRef]:
-        return [ref.clone()
-                for ref in self._subscene_refs + self._hidden_subscene_refs]
+        return [
+            ref.clone()
+            for ref in (
+                self._subscene_refs
+                + self._hidden_subscene_refs
+                + self._unbound_disabled_subscene_refs
+            )
+        ]
 
     def set_subscene_contents(self, contents: dict[str, dict[str, list]]):
         self._subscene_contents = contents

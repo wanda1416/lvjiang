@@ -34,8 +34,9 @@ def test_saved_android_apps_update_main_and_existing_engine():
 
 def test_adb_reconnect_rebuilds_both_application_controllers():
     capture = object()
-    input_ctrl = object()
+    input_ctrl = SimpleNamespace(stop_check=None)
     device = object()
+    stop_check = lambda: False  # noqa: E731
     engine = SimpleNamespace(
         _capture=object(),
         _input=object(),
@@ -43,6 +44,7 @@ def test_adb_reconnect_rebuilds_both_application_controllers():
         _android_app_controller=object(),
         _app_controller=object(),
         _workflow=None,
+        _stop_check=stop_check,
     )
     host = SimpleNamespace(
         _current_engine=engine,
@@ -55,6 +57,7 @@ def test_adb_reconnect_rebuilds_both_application_controllers():
 
     assert engine._capture is capture
     assert engine._input is input_ctrl
+    assert input_ctrl.stop_check is stop_check
     assert engine._android_device is device
     assert engine._android_app_controller is None
     assert engine._app_controller is None

@@ -70,7 +70,7 @@ def test_drag_duration_only_applies_to_pressed_movement(monkeypatch):
     backend = SendInputInput()
     monkeypatch.setattr(backend, "_activate_target", MagicMock())
     monkeypatch.setattr(backend, "_move_to", MagicMock())
-    monkeypatch.setattr(send_input_module, "precise_wait", lambda _s: True)
+    monkeypatch.setattr(send_input_module, "precise_wait", lambda _s, **_kw: True)
     moves = MagicMock()
     monkeypatch.setattr(send_input_module, "smooth_move_to", moves)
     monkeypatch.setattr(send_input_module, "send_mouse_event", MagicMock())

@@ -52,23 +52,44 @@ class _CoordMixin:
         cy = canvas_y + (y0 + fy) * canvas_h
         return int(self._window_left + cx), int(self._window_top + cy)
 
-    def _point_to_screen(self, point: Point) -> tuple[int, int]:
-        """point 中心 → 屏幕坐标（带半径内随机偏移）"""
+    def _point_to_screen(self, point: Point, jitter: bool = True) -> tuple[int, int]:
+        """point 中心 → 屏幕坐标（默认带半径内随机偏移）"""
+        return self._ratio_point_to_screen(
+            point.cx_ratio, point.cy_ratio, point.r_ratio, jitter=jitter)
+
+    def _ratio_point_to_screen(
+        self,
+        cx_ratio: float,
+        cy_ratio: float,
+        r_ratio: float,
+        *,
+        jitter: bool = True,
+        clamp_to_canvas: bool = False,
+    ) -> tuple[int, int]:
+        """画布归一化圆心 + 半径 → 屏幕坐标。
+
+        ``jitter`` 时在半径内随机取点；``clamp_to_canvas`` 在抖动完成后把
+        最终落点限制到画布边界，供不允许越界的拖拽路径使用。
+        """
         w, h = self._capture_size()
         canvas = self._layout.get_canvas()
         canvas_x = canvas.x_ratio * w
         canvas_y = canvas.y_ratio * h
         canvas_w = canvas.w_ratio * w
         canvas_h = canvas.h_ratio * h
-        cx = canvas_x + point.cx_ratio * canvas_w
-        cy = canvas_y + point.cy_ratio * canvas_h
-        # 半径内随机偏移
-        r = point.r_ratio * min(canvas_w, canvas_h)
-        angle = random.uniform(0, 2 * math.pi)
-        dist = random.uniform(0, r)
-        cx += dist * math.cos(angle)
-        cy += dist * math.sin(angle)
-        return int(self._window_left + cx), int(self._window_top + cy)
+        cx = canvas_x + cx_ratio * canvas_w
+        cy = canvas_y + cy_ratio * canvas_h
+        if jitter:
+            r = r_ratio * min(canvas_w, canvas_h)
+            angle = random.uniform(0, 2 * math.pi)
+            dist = random.uniform(0, r)
+            cx += dist * math.cos(angle)
+            cy += dist * math.sin(angle)
+        if clamp_to_canvas:
+            cx = min(max(cx, canvas_x), canvas_x + canvas_w)
+            cy = min(max(cy, canvas_y), canvas_y + canvas_h)
+        # 四舍五入而不是截断：0.2 + 0.1×2 这类浮点误差不该把像素拉偏 1
+        return round(self._window_left + cx), round(self._window_top + cy)
 
     def _ratio_to_screen(self, cx_ratio: float, cy_ratio: float) -> tuple[int, int]:
         """画布内归一化坐标 → 屏幕坐标"""

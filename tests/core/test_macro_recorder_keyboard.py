@@ -100,12 +100,75 @@ def test_low_precision_does_not_collapse_an_interleaved_key():
     parse_text("\n".join(compacted))
 
 
-def test_low_precision_keeps_wait_after_raw_mouse_event():
+def test_low_precision_compacts_raw_mouse_event_as_press_hold():
     lines = [
         "place (0.5, 0.5)",
-        "mouse left down",
+        'press "MOUSE_LEFT" down',
         "wait 0.2",
-        "mouse left up",
+        'press "MOUSE_LEFT" up',
     ]
 
-    assert macro_recorder._compact_low_precision_lines(lines) == lines
+    assert macro_recorder._compact_low_precision_lines(lines) == [
+        "place (0.5, 0.5)",
+        'press "MOUSE_LEFT" hold 0.2',
+    ]
+
+
+def test_without_mouse_movement_place_and_button_events_fold_into_click():
+    """不录鼠标移动时 place 没有意义：落点进 click，短按不写 hold，长按写 hold，
+    位移大的左键折成 drag，尾随 wait 变 after wait。"""
+    lines = [
+        "place (0.5, 0.5)",
+        'press "MOUSE_LEFT" down',
+        "wait 0.08",
+        "place (0.502, 0.501)",
+        'press "MOUSE_LEFT" up',
+        "wait 0.6",
+        "place (0.3, 0.3)",
+        'press "MOUSE_RIGHT" down',
+        "wait 0.45",
+        "place (0.3, 0.3)",
+        'press "MOUSE_RIGHT" up',
+        "place (0.2, 0.8)",
+        'press "MOUSE_LEFT" down',
+        "wait 0.35",
+        "place (0.2, 0.4)",
+        'press "MOUSE_LEFT" up',
+        "wait 1",
+    ]
+
+    compacted = macro_recorder._compact_low_precision_lines(lines, mouse_movement=False)
+
+    assert compacted == [
+        "click (0.5, 0.5) after wait 0.6",
+        "click (0.3, 0.3) right hold 0.45",
+        "drag (0.2, 0.8) to (0.2, 0.4) duration 0.35 after wait 1",
+    ]
+    parse_text("\n".join(compacted))
+
+
+def test_without_mouse_movement_interleaved_sequence_is_kept_raw():
+    lines = [
+        "place (0.5, 0.5)",
+        'press "MOUSE_LEFT" down',
+        "wait 0.1",
+        'press "SHIFT" down',
+        "wait 0.1",
+        "place (0.5, 0.5)",
+        'press "MOUSE_LEFT" up',
+        'press "SHIFT" up',
+    ]
+
+    compacted = macro_recorder._compact_low_precision_lines(lines, mouse_movement=False)
+
+    assert compacted[0] == "place (0.5, 0.5)"
+    assert 'press "MOUSE_LEFT" down after wait 0.1' in compacted
+    parse_text("\n".join(compacted))
+
+
+def test_with_mouse_movement_place_is_preserved():
+    lines = ["place (0.5, 0.5)", 'press "MOUSE_LEFT" down', "wait 0.2", 'press "MOUSE_LEFT" up']
+
+    assert macro_recorder._compact_low_precision_lines(lines, mouse_movement=True)[0] == (
+        "place (0.5, 0.5)")
+

@@ -10,6 +10,7 @@
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from enum import Enum
 
 from ..core.config import InputSimConfig
@@ -72,6 +73,12 @@ class InputBackend(ABC):
     # ─── 兼容属性 ────────────────────────────────────────────────
     background_mode: bool
     target_hwnd: int | None
+
+    #: 停止请求查询，由 WorkflowEngine 在执行前注入。桌面后端在
+    #: ``hold`` 期间据此提前释放鼠标键：``click ... hold 30`` 不能让
+    #: 停止按钮等 30 秒，也不能把鼠标键留在按下状态。
+    #: None 表示不可中断（非引擎驱动的调用）。
+    stop_check: "Callable[[], bool] | None" = None
 
     @abstractmethod
     def click_screen(self, screen_x: int, screen_y: int, poi_name: str = "",

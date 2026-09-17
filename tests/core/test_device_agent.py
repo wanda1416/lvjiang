@@ -368,6 +368,31 @@ def test_agent_input_dispatch(fake, monkeypatch):
     client.close()
 
 
+def test_agent_input_long_gestures_extend_rpc_timeout(fake, monkeypatch):
+    """长按/推住的 RPC 超时必须撑过手势本身，否则超时重连会把手势重放一遍。"""
+    monkeypatch.setattr(agent_mod.time, "sleep", lambda *_: None)
+    srv, dev = fake(_ok_handler())
+    client = AgentClient(dev)
+    assert client.connect()
+    timeouts: list[float | None] = []
+    real_call = client.call
+
+    def spy(op, timeout=None, **params):
+        timeouts.append(timeout)
+        return real_call(op, timeout=timeout, **params)
+
+    monkeypatch.setattr(client, "call", spy)
+    inp = AgentInput(client, _cfg())
+
+    inp.click_screen(10, 20, "btn")                    # tap：默认超时
+    inp.click_screen(10, 20, "btn", hold=1.4)          # 短手势：不低于默认超时
+    inp.click_screen(10, 20, "btn", hold=20)           # 长按 20s
+    inp.drag_screen(1, 2, 3, 4, duration=1.0, hold=30)  # 推住 31s
+
+    assert timeouts == [None, 15.0, 25.0, 36.0]
+    client.close()
+
+
 def test_agent_input_failure_is_propagated(fake, monkeypatch):
     monkeypatch.setattr(agent_mod.time, "sleep", lambda *_: None)
     srv, dev = fake(_ok_handler(lambda req: ({"ok": False, "error": "手势被取消"}, b"")))

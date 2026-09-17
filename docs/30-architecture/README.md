@@ -14,6 +14,7 @@
 | [06-telemetry.md](06-telemetry.md) | 匿名统计：D1 表结构、写入粒度设计、校验边界、分析查询 |
 | [07-tuning-history.md](07-tuning-history.md) | 调律历史：统一结果模型、版本化 SQLite、历史 UI 与七天补传 |
 | [08-base-attr-model.md](08-base-attr-model.md) | 基础属性来源模型：心法/武学/套装等如何合成装备之外的战斗属性 |
+| [09-io-backends.md](09-io-backends.md) | 截图与输入后端矩阵：PC 前台/后台、Android a11y/Shizuku/ADB、scrcpy、设备端各路径的能力、精度与限制 |
 
 ## 子系统索引
 
@@ -28,7 +29,7 @@
 
 ## 待补充
 
-- `layers/` — 各层详细说明（capture、ocr、input、detector、rules-engine、inventory、workflow）
+- `layers/` — 各层详细说明（ocr、detector、rules-engine、inventory、workflow；capture/input 见 09）
 - `data-flow/` — 各工作流的数据流图
 - `interfaces/` — 接口契约
 - `extensibility/` — 扩展性设计（添加新流派、新部位、新工作流）

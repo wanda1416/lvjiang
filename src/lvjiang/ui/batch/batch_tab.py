@@ -52,6 +52,7 @@ from ..main.run_control import (
     STATE_STOPPING,
 )
 from ..theme import get_theme_manager
+from ..widgets import add_top_aligned_row
 from .batch_runner import (
     ST_FAILED,
     ST_PENDING,
@@ -214,7 +215,7 @@ class BatchTab(QWidget):
                 Qt.TextInteractionFlag.TextSelectableByMouse)
             value.setWordWrap(True)
             self._workflow_labels[key] = value
-            summary_form.addRow(label, value)
+            add_top_aligned_row(summary_form, label, value)
         layout.addWidget(summary_group)
 
         self._workflow_params_panel = QWidget()
@@ -1016,7 +1017,8 @@ class BatchTab(QWidget):
                 value_label.setWordWrap(True)
                 value_label.setTextInteractionFlags(
                     Qt.TextInteractionFlag.TextSelectableByMouse)
-                form.addRow(definitions.get(name, name) + "：", value_label)
+                add_top_aligned_row(
+                    form, definitions.get(name, name) + "：", value_label)
         else:
             form.addRow(QLabel(tr("该任务没有可配置参数")))
         scroll = QScrollArea()

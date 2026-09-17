@@ -6,7 +6,9 @@ from PyQt6.QtWidgets import (
     QAbstractSpinBox,
     QApplication,
     QComboBox,
+    QFormLayout,
     QHBoxLayout,
+    QLabel,
     QLayout,
     QTextEdit,
     QWidget,
@@ -89,6 +91,18 @@ def centered_cell_widget(widget: QWidget) -> QWidget:
     layout.setContentsMargins(0, 0, 0, 0)
     layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignCenter)
     return container
+
+
+def add_top_aligned_row(form: QFormLayout, label_text: str, field: QWidget) -> QLabel:
+    """向表单加一行键值，键标签顶对齐。
+
+    QFormLayout 给多行字段配的标签单元格可达 7/4 行高，而 QLabel 默认垂直
+    居中，键会落到值的第一行下方；键标签自身顶对齐后二者首行齐平。
+    """
+    label = QLabel(label_text)
+    label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+    form.addRow(label, field)
+    return label
 
 
 class TrimmedLogEdit(QTextEdit):

@@ -133,8 +133,22 @@ end
             "0": {"valid": False, "current": -1, "total": -1},
             "2000/1500": {"valid": False, "current": -1, "total": -1},
             "-1/1500": {"valid": False, "current": -1, "total": -1},
-            "1,000/1500": {"valid": False, "current": -1, "total": -1},
             "1/10 2/20": {"valid": False, "current": -1, "total": -1},
+        }
+        for raw, expected in cases.items():
+            result = run('eval $p = extract_progress($text)', {"text": raw})["p"]
+            assert result == expected
+
+    def test_extract_progress_thousands_separator(self):
+        """游戏 UI 的千分位逗号（如体力 1,950/2,500）是合法进度对。"""
+        cases = {
+            "1,950/2,500": {"valid": True, "current": 1950, "total": 2500},
+            "700/2,500": {"valid": True, "current": 700, "total": 2500},
+            "1,000/1500": {"valid": True, "current": 1000, "total": 1500},
+            "1，950/2，500": {"valid": True, "current": 1950, "total": 2500},
+            # 不满足每三位一组的逗号仍视为噪声分隔符
+            "1,00/1500": {"valid": False, "current": -1, "total": -1},
+            "12,34/5678": {"valid": False, "current": -1, "total": -1},
         }
         for raw, expected in cases.items():
             result = run('eval $p = extract_progress($text)', {"text": raw})["p"]

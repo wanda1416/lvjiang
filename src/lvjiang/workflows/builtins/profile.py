@@ -178,6 +178,81 @@ def _profile_model(_engine, key: str, *args) -> str:
     return config.get_model_type(key) or ""
 
 
+@builtin_func("profile_declare")
+def _profile_declare(
+    _engine, model_type: str, key: str, definition, *args,
+) -> dict:
+    """声明工作流依赖的 profile key，未定义时按 definition 创建
+
+    幂等导入：key 已存在（任意模型）不修改，仅返回 created=False；
+    创建后立即刷新配置单例，同一工作流后续 profile_get / profile_set /
+    profile_model 可直接使用。definition 校验失败不抛异常，返回 ok=False，
+    工作流功能退化为「key 未定义」现状，不阻断执行。
+
+    .wf 用法（建议放在工作流开头，一次性声明全部依赖）:
+        eval profile_declare("quota", "nn_bugan_of_week",
+            {"label": "不肝", "cap": 1, "increment_only": true})
+        eval profile_declare("stock", "changmingyu", {"label": "长鸣玉"})
+    """
+    model_type = str(model_type or "").strip()
+    key = str(key or "").strip()
+    if not model_type or not key:
+        return {"ok": False, "created": False, "key": key,
+                "reason": "model/key 参数为空"}
+    if not isinstance(definition, dict):
+        return {"ok": False, "created": False, "key": key,
+                "reason": "definition 必须是字典"}
+
+    from ...core.profile.models import parse_key_def
+    from ...core.profile.schema import (
+        get_profile_config,
+        reload_profile_config,
+        save_profile_config,
+    )
+
+    schema = get_profile_config()
+    existing_model = schema.get_model_type(key)
+    if existing_model:
+        if existing_model != model_type:
+            logger.warning(
+                f"profile_declare: '{key}' 已定义为 {existing_model} 模型，"
+                f"与声明的 {model_type} 不一致，保留现有定义不修改")
+        return {"ok": True, "created": False, "key": key,
+                "reason": "already_defined"}
+
+    try:
+        key_def = parse_key_def(model_type, {"key": key, **definition})
+    except Exception as exc:  # noqa: BLE001 - 声明失败不阻断工作流
+        logger.warning(
+            f"profile_declare: '{key}' 定义无效（{model_type}）: {exc}")
+        return {"ok": False, "created": False, "key": key,
+                "reason": f"invalid_definition: {exc}"}
+
+    schema.keys_by_model.setdefault(model_type, []).append(key_def)
+    try:
+        save_profile_config(schema)
+        reload_profile_config()
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"profile_declare: 保存 profile.yaml 失败（{key}）: {exc}")
+        # schema 是全局单例，上面的 append 已污染内存；从磁盘重建，避免
+        # 「内存已定义、磁盘无」的不一致延续到后续 profile_model/profile_set
+        # （进程重启后 key 又消失）。重建也失败时仅记日志，保持返回契约不抛异常。
+        try:
+            reload_profile_config()
+        except Exception as reload_exc:  # noqa: BLE001
+            logger.error(
+                f"profile_declare: 回滚内存配置失败，运行期配置可能脏: "
+                f"{reload_exc}")
+        return {"ok": False, "created": False, "key": key,
+                "reason": f"save_failed: {exc}"}
+
+    label = getattr(key_def, "label", "") or key
+    logger.info(
+        f"profile_declare: 已创建 {model_type}:{key}（{label}），"
+        "来源工作流依赖声明")
+    return {"ok": True, "created": True, "key": key, "reason": ""}
+
+
 @builtin_func("profile_all")
 def _profile_all(_engine, *args) -> dict:
     """获取当前用户的全部 profile 数据

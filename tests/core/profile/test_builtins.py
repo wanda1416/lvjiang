@@ -193,3 +193,99 @@ def test_realtime_sync_uses_semantic_delta_not_stored_integer_delta(profile_func
     assert new_value == pytest.approx(80.5, abs=0.02)
     assert applied_delta == pytest.approx(-20, abs=0.02)
     assert target["value"] == 1000
+
+
+def test_profile_declare_creates_missing_key_and_takes_effect(profile_func_env):
+    from lvjiang.core.profile.schema import get_profile_config
+    from lvjiang.workflows.builtins.profile import _profile_declare, _profile_model
+
+    engine = SimpleNamespace(run_username=profile_func_env.username)
+
+    result = _profile_declare(
+        engine, "quota", "nn_bugan_of_week",
+        {"label": "不肝", "cap": 1, "increment_only": True,
+         "sources": ["不肝商店"]},
+    )
+
+    assert result["ok"] is True
+    assert result["created"] is True
+    # 单例已刷新：后续 DSL 内置函数立即可见
+    assert _profile_model(engine, "nn_bugan_of_week") == "quota"
+    kd = get_profile_config().get_key("nn_bugan_of_week")
+    assert kd is not None and kd.label == "不肝"
+    # 定义落盘到 profile.yaml
+    saved = yaml.safe_load(
+        profile_func_env.session_dir.joinpath("profile.yaml").read_text(
+            encoding="utf-8"))
+    declared = [k for k in saved["quota"] if k["key"] == "nn_bugan_of_week"]
+    assert declared and declared[0]["cap"] == 1
+
+
+def test_profile_declare_keeps_existing_definition(profile_func_env):
+    from lvjiang.core.profile.schema import get_profile_config
+    from lvjiang.workflows.builtins.profile import _profile_declare
+
+    engine = SimpleNamespace(run_username=profile_func_env.username)
+
+    # target_stock 已在 fixture 的 profile.yaml 中定义为 stock
+    result = _profile_declare(
+        engine, "stock", "target_stock", {"label": "被覆盖的名字"})
+
+    assert result["ok"] is True
+    assert result["created"] is False
+    assert result["reason"] == "already_defined"
+    kd = get_profile_config().get_key("target_stock")
+    assert kd.label == "同步目标"
+
+    # 声明模型与已有定义冲突时同样不修改
+    conflict = _profile_declare(
+        engine, "quota", "target_stock", {"label": "冲突"})
+    assert conflict["created"] is False
+    assert get_profile_config().get_model_type("target_stock") == "stock"
+
+
+def test_profile_declare_invalid_input_returns_error_not_raise(profile_func_env):
+    from lvjiang.workflows.builtins.profile import _profile_declare
+
+    engine = SimpleNamespace(run_username=profile_func_env.username)
+
+    bad_model = _profile_declare(
+        engine, "unknown_model", "some_key", {"label": "x"})
+    assert bad_model["ok"] is False
+    assert "invalid_definition" in bad_model["reason"]
+
+    bad_def = _profile_declare(
+        engine, "quota", "another_key", "not-a-dict")
+    assert bad_def["ok"] is False
+
+    empty_key = _profile_declare(engine, "quota", "", {"label": "x"})
+    assert empty_key["ok"] is False
+
+    # 失败的声明不应留下半成品定义
+    from lvjiang.core.profile.schema import get_profile_config
+    assert get_profile_config().get_key("another_key") is None
+
+
+def test_profile_declare_rolls_back_memory_on_save_failure(
+        profile_func_env, monkeypatch):
+    """保存失败时必须回滚内存单例，避免「内存已定义、磁盘无」的脏状态。"""
+    import lvjiang.core.profile.schema as profile_schema
+    from lvjiang.core.profile.schema import get_profile_config
+    from lvjiang.workflows.builtins.profile import _profile_declare, _profile_model
+
+    def _boom(_schema):
+        raise OSError("disk full (simulated)")
+
+    monkeypatch.setattr(profile_schema, "save_profile_config", _boom)
+    engine = SimpleNamespace(run_username=profile_func_env.username)
+
+    result = _profile_declare(
+        engine, "quota", "rollback_key", {"label": "回滚"})
+
+    assert result["ok"] is False
+    assert "save_failed" in result["reason"]
+    # 内存单例已从磁盘重建：key 不可见，与磁盘状态一致
+    assert get_profile_config().get_key("rollback_key") is None
+    assert _profile_model(engine, "rollback_key") == ""
+    # 其余既有定义不受影响
+    assert _profile_model(engine, "weekly_progress") == "quota"

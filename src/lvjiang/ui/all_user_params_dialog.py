@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 from ..core.task_params import parameters_for_env, resolve_task_params
 from ..i18n import tr
 from .button_styles import apply_compact_button_style, apply_dialog_button_box_style
+from .widgets import add_top_aligned_row
 
 
 def _format_value(value) -> str:
@@ -226,7 +227,8 @@ class AllUserParamsDialog(QDialog):
                 value_label.setWordWrap(True)
                 value_label.setTextInteractionFlags(
                     Qt.TextInteractionFlag.TextSelectableByMouse)
-                form.addRow(labels.get(name, name) + "：", value_label)
+                add_top_aligned_row(
+                    form, labels.get(name, name) + "：", value_label)
         else:
             form.addRow(QLabel(tr("该任务没有可配置参数")))
 

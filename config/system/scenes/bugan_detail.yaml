@@ -5,7 +5,13 @@ views:
 - key: base
   name: 基底
 - key: shangdian
-  name: 不肝商店
+  name: 商店
+  kind: page
+  owner: /base
+- key: yangcheng
+  name: 商店_养成
+  kind: tab
+  owner: /shangdian
 regions:
 - key: back
   name: 返回
@@ -17,17 +23,27 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+  views:
+  - base
+  - shangdian
+  - yangcheng
 - key: shop
   name: 商店
   type: func
   is_text: true
   is_clickable: true
+  views:
+  - base
+  - shangdian
+  - yangcheng
 - key: add_all
   name: 添加全部
   type: func
   is_text: false
   is_clickable: true
-  view: shangdian
+  views:
+  - shangdian
+  - yangcheng
 - key: purchase
   name: 购买
   type: func
@@ -36,20 +52,21 @@ regions:
   views:
   - base
   - shangdian
+  - yangcheng
 - key: liebiao
   name: 类目列表
   type: func
   is_text: true
   is_clickable: false
   view: shangdian
-- key: cat_4
-  name: 类目4
+- key: cat_2
+  name: 类目2
   type: func
   is_text: false
   is_clickable: true
   view: shangdian
-- key: cat_5
-  name: 类目5
+- key: cat_3
+  name: 类目3
   type: func
   is_text: false
   is_clickable: true
@@ -64,16 +81,44 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: cat_4
+  name: 类目4
+  type: func
+  is_text: false
+  is_clickable: true
+  view: shangdian
+- key: cat_5
+  name: 类目5
+  type: func
+  is_text: false
+  is_clickable: true
+  view: shangdian
 - key: cat_6
   name: 类目6
   type: func
   is_text: false
   is_clickable: true
   view: shangdian
+- key: cat_7
+  name: 类目7
+  type: func
+  is_text: false
+  is_clickable: true
+  view: shangdian
+- key: current_tili
+  name: 当前体力
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: yangcheng
 panels:
 - key: shangpin_1
   name: 商品列表1
-  view: shangdian
+  views:
+  - shangdian
+  - yangcheng
 - key: shangpin_2
   name: 商品列表2
-  view: shangdian
+  views:
+  - shangdian
+  - yangcheng

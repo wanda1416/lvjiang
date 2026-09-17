@@ -33,3 +33,38 @@ def test_purchase_loops_use_layout_panel_dimensions():
     assert "for r in range(1, $rows)" in buy_panel
     assert "for c in range(1, $cols)" in buy_panel
     assert "for c in [1, 2, 3, 4]" not in source
+
+
+def _extract_def(source: str, name: str) -> str:
+    head = f"def {name}("
+    body = source.partition(head)[2].partition("\nend")[0]
+    return head + body + "\nend\n"
+
+
+def test_waiguan_cell_match_runs_in_engine():
+    """外观格子判定必须在引擎中真实可执行（回归：not(...) 括号写法曾被
+    解析为函数调用，运行期报「未知内置函数: not」中断批量任务）。"""
+    from tests.workflows.conftest import run
+
+    source = _WORKFLOW.read_text(encoding="utf-8")
+    def_src = _extract_def(source, "is_niaoniao_bind")
+    code = def_src + '''call $hit = is_niaoniao_bind($cell)
+if not $hit
+    eval $result = "skip"
+else
+    eval $result = "buy"
+end
+'''
+    # 命中：真实 OCR 曾把袅误识为枭，含「音+绑」仍应命中
+    assert run(code, {"cell": "枭袅之音·绑 200"})["result"] == "buy"
+    assert run(code, {"cell": "袅袅之音·绑 200"})["result"] == "buy"
+    # 不含「绑」或不含「音」：已购/未上架/绕梁之音均跳过
+    assert run(code, {"cell": "袅袅之音 200"})["result"] == "skip"
+    assert run(code, {"cell": "绕梁之音·时 100"})["result"] == "skip"
+    assert run(code, {"cell": ""})["result"] == "skip"
+
+
+def test_workflow_has_no_parenthesized_not_condition():
+    """DSL 条件不支持括号分组：not(...) 会被解析成函数调用直接报错。"""
+    source = _WORKFLOW.read_text(encoding="utf-8")
+    assert "not (" not in source

@@ -148,18 +148,21 @@ def _extract_progress(s, *args) -> dict:
     """从 OCR 文本中提取唯一的 ``当前值/总量`` 进度对。
 
     允许进度对前后存在 OCR 噪声、斜杠两侧存在空白，并兼容全角斜杠。
-    只有唯一且满足 ``0 <= current <= total``、``total > 0`` 的候选才算
-    有效；不猜测数字内部的字母乱码，也不从残缺文本中退化提取单个整数。
+    两侧数字支持千分位逗号（半角/全角，如 ``1,950/2,500``）；不满足
+    每三位一组的逗号仍视为噪声分隔符，不参与提取。只有唯一且满足
+    ``0 <= current <= total``、``total > 0`` 的候选才算有效；不猜测数字
+    内部的字母乱码，也不从残缺文本中退化提取单个整数。
     """
     text = str(s) if s is not None else ""
     candidates: list[tuple[int, int]] = []
+    number = r"(?:\d{1,3}(?:[,，]\d{3})+|\d+)"
     pattern = (
-        rf"{_NUMBER_BOUNDARY_LEFT}(\d+)\s*[/／]\s*"
-        rf"(\d+){_NUMBER_BOUNDARY_RIGHT}"
+        rf"{_NUMBER_BOUNDARY_LEFT}({number})\s*[/／]\s*"
+        rf"({number}){_NUMBER_BOUNDARY_RIGHT}"
     )
     for match in re.finditer(pattern, text):
-        current = int(match.group(1))
-        total = int(match.group(2))
+        current = int(match.group(1).replace(",", "").replace("，", ""))
+        total = int(match.group(2).replace(",", "").replace("，", ""))
         if total > 0 and current <= total:
             candidates.append((current, total))
 

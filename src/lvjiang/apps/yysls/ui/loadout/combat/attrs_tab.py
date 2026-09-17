@@ -275,19 +275,16 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             tr("将已装备的承音装备词条数值视为承音上限参与计算"))
         self._chk_full_chengyin.stateChanged.connect(self._refresh_display)
         self._chk_full_chengyin.stateChanged.connect(lambda _: self._save_selection())
-        display_options_layout.addWidget(self._chk_full_chengyin)
         self._chk_full_dingyin = QCheckBox(tr("满定音"))
         self._chk_full_dingyin.setToolTip(
             tr("将已装备的定音词条数值视为上限（100%）参与计算"))
         self._chk_full_dingyin.stateChanged.connect(self._refresh_display)
         self._chk_full_dingyin.stateChanged.connect(lambda _: self._save_selection())
-        display_options_layout.addWidget(self._chk_full_dingyin)
         self._chk_full_level = QCheckBox(tr("满等级"))
         self._chk_full_level.setToolTip(
             tr("将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定"))
         self._chk_full_level.stateChanged.connect(self._refresh_display)
         self._chk_full_level.stateChanged.connect(lambda _: self._save_selection())
-        display_options_layout.addWidget(self._chk_full_level)
         display_options_layout.addStretch()
         layout.addWidget(display_options_group)
 

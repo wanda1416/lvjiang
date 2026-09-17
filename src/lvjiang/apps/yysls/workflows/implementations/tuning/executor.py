@@ -799,7 +799,7 @@ class TuningExecutor:
         except Exception:
             pass
         if wf.engine is None or wf.engine._ui_callback is None:
-            logger.warning("无 UI 回调，材料不足对话框无法弹出，按结束处理")
+            logger.warning("无 UI 回调，材料不足对话框无法弹出，结束当前任务")
             return "end"
         result = wf.engine._ui_callback("choose", message=message, choices=[
             {"label": tr("继续调律"), "value": "continue", "role": "accept"},

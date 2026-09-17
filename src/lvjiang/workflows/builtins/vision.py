@@ -30,13 +30,8 @@ from ._registry import builtin_func
 
 # ─── 画布与坐标换算 ─────────────────────────────────────
 
-def _canvas_frame(engine) -> np.ndarray:
-    """截一帧并裁到布局画布；拿不到帧直接抛错（坐标全错，不能静默）"""
-    if engine is None:
-        raise ValueError(tr("图色函数需要在工作流引擎中调用"))
-    img = engine._capture.capture()
-    if img is None:
-        raise ValueError(tr("图色函数：截图失败"))
+def _crop_canvas(engine, img: np.ndarray) -> np.ndarray:
+    """把完整截图裁到当前布局画布。"""
     canvas = engine._layout.get_canvas()
     h, w = img.shape[:2]
     x1 = int(canvas.x_ratio * w)
@@ -47,6 +42,40 @@ def _canvas_frame(engine) -> np.ndarray:
     if crop.size == 0:
         raise ValueError(tr("图色函数：画布裁剪为空（检查布局 canvas 配置）"))
     return crop
+
+
+def _canvas_frame(engine) -> np.ndarray:
+    """截一帧并裁到布局画布；拿不到帧直接抛错（坐标全错，不能静默）"""
+    if engine is None:
+        raise ValueError(tr("图色函数需要在工作流引擎中调用"))
+    img = engine.capture_frame(source="color_builtin")
+    if img is None:
+        raise ValueError(tr("图色函数：截图失败"))
+    return _crop_canvas(engine, img)
+
+
+def last_frame_region(engine, ref: Any, what: str) -> np.ndarray | None:
+    """从引擎最近一帧裁剪布局区域，不触发新截图。
+
+    这是领域内置函数的 Python 级能力，不把 numpy 图像放进
+    DSL 变量。无最近帧时返回 None，由调用方选择空值语义。
+    """
+    if engine is None:
+        return None
+    img = engine.get_last_capture_frame()
+    if img is None:
+        return None
+    frame = _crop_canvas(engine, img)
+    x1, y1, x2, y2 = _rect_px(frame, ref, what)
+    h, w = frame.shape[:2]
+    x1 = min(max(x1, 0), w - 1)
+    x2 = min(max(x2, 0), w - 1)
+    y1 = min(max(y1, 0), h - 1)
+    y2 = min(max(y2, 0), h - 1)
+    if x2 < x1 or y2 < y1:
+        return None
+    crop = frame[y1:y2 + 1, x1:x2 + 1]
+    return crop if crop.size else None
 
 
 def _as_rect(ref: Any, what: str) -> tuple[float, float, float, float]:

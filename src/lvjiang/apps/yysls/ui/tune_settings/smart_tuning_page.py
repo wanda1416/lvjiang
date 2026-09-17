@@ -45,7 +45,7 @@ class SmartTuningPage(QWidget):
         title = QLabel("<b>" + tr("智能调律") + "</b>")
         layout.addWidget(title)
         description = QLabel(tr(
-            "仅在现有结束处理决定继续调律后执行。系统会基于"
+            "仅在现有调律处理决定继续调律后执行。系统会基于"
             "备战方案和承音上限推演当前装备的最大可能毕业率；"
             "计算失败或结果不可靠时始终放行。"))
         description.setWordWrap(True)
@@ -87,7 +87,7 @@ class SmartTuningPage(QWidget):
         self._operator.setMinimumWidth(110)
         self._operator.currentIndexChanged.connect(self._changed)
         operator_row.addWidget(self._operator)
-        operator_row.addWidget(QLabel(tr("当前方案穿戴装备")))
+        operator_row.addWidget(QLabel(tr("当前方案三满极限")))
         operator_row.addSpacing(16)
         operator_row.addWidget(QLabel(tr("毕业率精度")))
         self._precision = QComboBox()

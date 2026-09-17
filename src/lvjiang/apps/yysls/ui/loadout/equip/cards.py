@@ -10,8 +10,8 @@ from functools import partial
 from math import ceil
 from typing import Literal
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QPainter, QPaintEvent
+from PyQt6.QtCore import QRectF, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QPainter, QPaintEvent, QPen
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -229,13 +230,72 @@ def _format_cooldown_remaining(
         days=days, hours=hours, minutes=minutes)
 
 
+def _format_card_cooldown(
+    equip: dict,
+    *,
+    now: datetime | None = None,
+) -> str:
+    """生成装备卡片底部的冷却摘要；只在卡片刷新时计算。"""
+    kind = str(equip.get("cooldown_kind") or "")
+    state = str(equip.get("cooldown_state") or "")
+    expires_at = equip.get("cooldown_expires_at")
+    if not (kind or state or _parse_cooldown_time(expires_at)):
+        return ""
+
+    kind_label = {
+        "reset": tr("重置调律"),
+        "transmute": tr("词条转律"),
+        "unknown": tr("调律"),
+    }.get(kind, tr("调律"))
+    if state == "completed" or _cooldown_has_expired(expires_at, now=now):
+        return f"{kind_label}{tr('冷却完成')}"
+
+    if state == "cooling" or _parse_cooldown_time(expires_at):
+        remaining = _format_cooldown_remaining(expires_at, now=now)
+        suffix = f"：{remaining}" if remaining else ""
+        return f"{kind_label}{tr('冷却中')}{suffix}"
+    return ""
+
+
+def _refresh_card_cooldown(label: QLabel, equip: dict) -> None:
+    text = _format_card_cooldown(equip)
+    label.setText(text)
+    label.setVisible(bool(text))
+
+
+def _preserve_card_content_height(container: QWidget) -> None:
+    """保持内容自然行高；卡片不足时让尾部由父控件裁切。"""
+    container.setMinimumHeight(0)
+    layout = container.layout()
+    if layout is not None:
+        layout.invalidate()
+        layout.activate()
+    container.setMinimumHeight(container.sizeHint().height())
+
+
 def _equipment_property_rows(equip: dict) -> list[tuple[str, str]]:
     """构建所有装备卡片共用的属性行。"""
     is_mock = bool((equip.get("_extra") or {}).get("is_mock"))
     source = tr("模拟") if is_mock else tr("扫描")
+    lock_status = {
+        "locked": tr("已锁定"),
+        "unlock": tr("未锁定"),
+    }.get(str(equip.get("lock_status") or ""), "")
+    cooldown_kind = {
+        "reset": tr("重置调律"),
+        "transmute": tr("词条转律"),
+        "unknown": tr("未知"),
+    }.get(str(equip.get("cooldown_kind") or ""), "")
+    cooldown_state = {
+        "cooling": tr("冷却中"),
+        "completed": tr("冷却完成"),
+    }.get(str(equip.get("cooldown_state") or ""), "")
     return [
         (tr("来源"), source),
         (tr("指纹"), str(equip.get("_fp") or "")),
+        (tr("状态"), lock_status),
+        (tr("冷却类型"), cooldown_kind),
+        (tr("冷却状态"), cooldown_state),
         (tr("原始等级"), str(int(equip.get("original_level") or 0))),
         (tr("冷却时间"), _format_equipment_time(
             equip.get("cooldown_expires_at"))),
@@ -318,6 +378,10 @@ class _EquipmentPropertiesDialog(QDialog):
                 and not self._cooldown_changed(value)):
             return
         self._equip["cooldown_expires_at"] = value
+        # 与仓储一致：改时间不改已有冷却类型，仅空类型时默认转律
+        self._equip["cooldown_kind"] = (
+            (self._equip.get("cooldown_kind") or "transmute") if value else "")
+        self._equip["cooldown_state"] = "cooling" if value else ""
         self._refresh_cooldown()
 
     def _clear_cooldown(self) -> None:
@@ -342,7 +406,12 @@ class _EquipmentPropertiesDialog(QDialog):
         self._remaining_name.setVisible(visible)
         self._remaining_value.setVisible(visible)
         self._remaining_value.setText(f"（{remaining}）" if remaining else "")
-        self._clear_cooldown_button.setEnabled(bool(_parse_cooldown_time(value)))
+        # 冷却完成态没有到期时间但仍带 kind/state，冷却管理器会把它列出来；
+        # 只看时间会让它「看得见、清不掉」，只剩重置一条路反而再加一轮冷却。
+        self._clear_cooldown_button.setEnabled(bool(
+            _parse_cooldown_time(value)
+            or self._equip.get("cooldown_kind")
+            or self._equip.get("cooldown_state")))
 
 
 def _show_equipment_properties(
@@ -402,22 +471,55 @@ class _IllegalBadge(QLabel):
             0, partial(_show_illegal_reasons, self.window(), list(self._reasons)))
 
 
-class _CooldownBadge(QLabel):
-    """冷却到期提醒「!」。"""
+class _LockBadge(QWidget):
+    """卡片右上角的小型锁形角标。"""
+
+    _TOP = 6
+    _RIGHT = 8
 
     def __init__(self, parent=None):
-        super().__init__("!", parent)
+        super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setFixedSize(16, 16)
-        self.setStyleSheet(
-            "color: #ffffff; background: #D97706; border-radius: 8px;"
-            "font-weight: bold; font-size: 11px;")
-        self.setToolTip(tr("装备冷却时间已到"))
+        self.setFixedSize(18, 18)
+        self.setToolTip(tr("装备已锁定"))
+        self.setAccessibleName(tr("装备已锁定"))
         self.hide()
 
-    def set_cooldown(self, value) -> None:
-        self.setVisible(_cooldown_has_expired(value))
+    def paintEvent(self, event: QPaintEvent | None):  # type: ignore[override]
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        # 图标不依赖字体或 Emoji，在不同 DPI/主题下始终是同一个锁形。
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#B45353"))
+        painter.drawEllipse(QRectF(0.5, 0.5, 17.0, 17.0))
+
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor("#FFFFFF"), 1.6))
+        painter.drawArc(QRectF(5.0, 3.2, 8.0, 9.0), 0, 180 * 16)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#FFFFFF"))
+        painter.drawRoundedRect(QRectF(4.1, 8.0, 9.8, 7.0), 1.5, 1.5)
+        painter.end()
+
+    @property
+    def reserved_width(self) -> int:
+        return self.width() + 4
+
+    def reposition(self) -> None:
+        parent = self.parentWidget()
+        if parent is not None:
+            self.move(
+                max(0, parent.width() - self.width() - self._RIGHT),
+                self._TOP,
+            )
+            self.raise_()
+
+    def set_locked(self, locked: bool) -> None:
+        self.setVisible(locked)
+        if locked:
+            self.reposition()
 
 
 def _make_tag(text: str, bg: str = "#607D8B", parent=None) -> QLabel:
@@ -488,6 +590,8 @@ class _SlotCard(QFrame):
         self._quality_bg: str | None = None
         self._apply_style(_SLOT_STYLE_EMPTY)
 
+        self.lock_badge = _LockBadge(self)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(3)
@@ -496,12 +600,15 @@ class _SlotCard(QFrame):
         self.hypothesis_label.setWordWrap(True)
         self.hypothesis_label.setStyleSheet(
             "font-size: 10px; color: #B26A00; font-weight: 700;")
+        self.hypothesis_label.setContentsMargins(
+            0, 0, self.lock_badge.reserved_width, 0)
         self.hypothesis_label.setVisible(False)
         layout.addWidget(self.hypothesis_label)
 
         # 槽位名 + 标签序列
         header = QHBoxLayout()
-        header.setContentsMargins(0, 0, 0, 0)
+        header.setContentsMargins(
+            0, 0, self.lock_badge.reserved_width, 0)
         header.setSpacing(6)
         self.lbl_name = _ElidedLabel(display_name)
         self.lbl_name.setProperty("equipmentName", True)
@@ -510,13 +617,11 @@ class _SlotCard(QFrame):
             f"font-weight: bold; font-size: {self._name_fs}px;")
         header.addWidget(self.lbl_name, stretch=1)
         self.status_tags = _StatusTagBar()
-        self.status_tags.define("filtered", tr("筛选中"))
+        self.status_tags.define("filtered", tr("筛选"))
         self.status_tags.define("mock", tr("模拟"), "#7E57C2")
         header.addWidget(self.status_tags)
         self.illegal_badge = _IllegalBadge()
         header.addWidget(self.illegal_badge)
-        self.cooldown_badge = _CooldownBadge()
-        header.addWidget(self.cooldown_badge)
         layout.addLayout(header)
 
         # 等级行
@@ -537,6 +642,16 @@ class _SlotCard(QFrame):
         self.affix_layout = QVBoxLayout(self.affix_container)
         self.affix_layout.setContentsMargins(0, 0, 0, 0)
         self.affix_layout.setSpacing(2)
+        self.affix_container.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        self.cooldown_label = _ElidedLabel("")
+        self.cooldown_label.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.cooldown_label.setStyleSheet(
+            f"font-size: {self._affix_fs}px; color: #D97706; "
+            "font-weight: 600;")
+        self.cooldown_label.hide()
+        self.affix_layout.addWidget(self.cooldown_label)
         layout.addWidget(self.affix_container)
 
         layout.addStretch()
@@ -554,6 +669,10 @@ class _SlotCard(QFrame):
         else:
             border = "#b0a080" if self._quality_bg else "palette(midlight)"
             self._apply_style(_slot_style_normal(bg, border))
+
+    def resizeEvent(self, event):  # type: ignore[override]
+        super().resizeEvent(event)
+        self.lock_badge.reposition()
 
     def is_selected(self) -> bool:
         return self._selected
@@ -610,6 +729,9 @@ class _SlotCard(QFrame):
             else tr("记录扫描装备的转律、承音或培养"))
         copy_action = menu.addAction(tr("复制"))
         copy_action.setToolTip(tr("复制装备数据到创建对话框"))
+        locked = self._equip_data.get("lock_status") == "locked"
+        lock_action = menu.addAction(tr("解锁") if locked else tr("锁定"))
+        lock_action.setToolTip(tr("解锁此装备") if locked else tr("锁定此装备"))
         properties_action = menu.addAction(tr("属性"))
         action = menu.exec(event.globalPos())
         if action == unequip_action:
@@ -630,6 +752,12 @@ class _SlotCard(QFrame):
                 parent = parent.parent()
             if parent:
                 parent._on_copy_requested(self._equip_data, self._equip_data.get("_extra", {}).get("group_key", ""))
+        elif action == lock_action:
+            parent = self.parent()
+            while parent and not isinstance(parent, EquipStatusTab):
+                parent = parent.parent()
+            if parent:
+                parent._on_lock_requested(self._equip_data, not locked)
         elif action == properties_action:
             parent = self.parent()
             while parent and not isinstance(parent, EquipStatusTab):
@@ -644,9 +772,9 @@ class _SlotCard(QFrame):
         self.set_hypotheses([])
         self._quality_bg = None
         self._equip_data = {}
+        self.lock_badge.set_locked(False)
         self.status_tags.set_visible("mock", False)
         self.illegal_badge.set_reasons([])
-        self.cooldown_badge.set_cooldown("")
         self.lbl_name.setText(self._display_name)
         _set_quality(self.lbl_name, "")
         self.lbl_name.setStyleSheet(
@@ -655,18 +783,19 @@ class _SlotCard(QFrame):
         self.lbl_info.setStyleSheet(
             f"font-size: {self._level_fs}px; color: palette(mid);")
         self._clear_affixes()
+        self._finish_affixes({})
         if not self._selected:
             self._apply_style(_SLOT_STYLE_EMPTY)
 
     def set_equip(self, equip_data: dict):
         self.set_hypotheses([])
         self._equip_data = equip_data
+        self.lock_badge.set_locked(
+            equip_data.get("lock_status") == "locked")
         self.status_tags.set_visible(
             "mock", bool(equip_data.get("_extra", {}).get("is_mock", False)),
         )
         self.illegal_badge.set_reasons(illegal_reasons_of(equip_data))
-        self.cooldown_badge.set_cooldown(
-            equip_data.get("cooldown_expires_at"))
         quality = equip_data.get("quality") or ""
         self._quality_bg = _QUALITY_BG_COLORS.get(quality)
 
@@ -693,6 +822,7 @@ class _SlotCard(QFrame):
         else:
             self.lbl_info.setTextFormat(Qt.TextFormat.PlainText)
             self.lbl_info.setText(f"Lv{level}{tag}")
+
         self.lbl_info.setStyleSheet(
             f"font-size: {self._level_fs}px; color: palette(mid); font-weight: bold;")
 
@@ -730,6 +860,22 @@ class _SlotCard(QFrame):
             else:
                 assert isinstance(dingyin, dict)
                 self._add_affix_row(dingyin, equip_level)
+        self._finish_affixes(equip_data)
+
+    def update_lock_status(self, value: str) -> None:
+        """原地更新单卡锁定状态，不重建卡片。"""
+        self._equip_data["lock_status"] = value
+        self.lock_badge.set_locked(value == "locked")
+
+    def update_cooldown(self, value: str) -> None:
+        """原地更新单卡冷却状态，不重建卡片。"""
+        self._equip_data["cooldown_expires_at"] = value
+        self._equip_data["cooldown_kind"] = (
+            (self._equip_data.get("cooldown_kind") or "transmute")
+            if value else "")
+        self._equip_data["cooldown_state"] = "cooling" if value else ""
+        _refresh_card_cooldown(self.cooldown_label, self._equip_data)
+        _preserve_card_content_height(self.affix_container)
 
     def set_hypotheses(self, assumptions) -> None:
         """显示计算假设；装备数据本身始终保持原始值。"""
@@ -773,10 +919,14 @@ class _SlotCard(QFrame):
         self.affix_layout.addLayout(row)
 
     def _clear_affixes(self):
+        self.affix_container.setMinimumHeight(0)
         while self.affix_layout.count() > 0:
             item = self.affix_layout.takeAt(0)
             if item.widget():
-                item.widget().deleteLater()
+                if item.widget() is self.cooldown_label:
+                    self.cooldown_label.hide()
+                else:
+                    item.widget().deleteLater()
             elif item.layout():
                 sub = item.layout()
                 while sub.count() > 0:
@@ -784,6 +934,11 @@ class _SlotCard(QFrame):
                     if child.widget():
                         child.widget().deleteLater()
                 sub.deleteLater()
+
+    def _finish_affixes(self, equip_data: dict) -> None:
+        _refresh_card_cooldown(self.cooldown_label, equip_data)
+        self.affix_layout.addWidget(self.cooldown_label)
+        _preserve_card_content_height(self.affix_container)
 
 
 # ── 底部：背包装备卡片 ──────────────────────────────
@@ -802,6 +957,7 @@ class _CompactEquipCard(QFrame):
     edit_requested = pyqtSignal(dict, str)
     delete_requested = pyqtSignal(dict, str)
     copy_requested = pyqtSignal(dict, str)
+    lock_requested = pyqtSignal(dict, bool)
     properties_requested = pyqtSignal(dict)
     selection_changed = pyqtSignal(str, bool)
 
@@ -832,13 +988,16 @@ class _CompactEquipCard(QFrame):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip(tr("右键菜单"))
 
+        self.lock_badge = _LockBadge(self)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(3)
 
         # 装备名 + 标签序列
         name_row = QHBoxLayout()
-        name_row.setContentsMargins(0, 0, 0, 0)
+        name_row.setContentsMargins(
+            0, 0, self.lock_badge.reserved_width, 0)
         name_row.setSpacing(6)
         self.selection_checkbox = QCheckBox()
         self.selection_checkbox.setToolTip(tr("选择要复制的模拟装备"))
@@ -855,12 +1014,10 @@ class _CompactEquipCard(QFrame):
         name_row.addWidget(self.lbl_name, stretch=1)
         self.status_tags = _StatusTagBar()
         self.status_tags.define("mock", tr("模拟"), "#7E57C2")
-        self.status_tags.define("loadout", tr("备战中"), "#00897B")
+        self.status_tags.define("loadout", tr("备战"), "#00897B")
         name_row.addWidget(self.status_tags)
         self.illegal_badge = _IllegalBadge()
         name_row.addWidget(self.illegal_badge)
-        self.cooldown_badge = _CooldownBadge()
-        name_row.addWidget(self.cooldown_badge)
         layout.addLayout(name_row)
 
         self.lbl_level = QLabel()
@@ -883,9 +1040,23 @@ class _CompactEquipCard(QFrame):
         self.affix_layout = QVBoxLayout(self.affix_container)
         self.affix_layout.setContentsMargins(0, 0, 0, 0)
         self.affix_layout.setSpacing(2)
+        self.affix_container.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        self.cooldown_label = _ElidedLabel("")
+        self.cooldown_label.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.cooldown_label.setStyleSheet(
+            f"font-size: {self._affix_fs}px; color: #D97706; "
+            "font-weight: 600;")
+        self.cooldown_label.hide()
+        self.affix_layout.addWidget(self.cooldown_label)
         layout.addWidget(self.affix_container)
 
         layout.addStretch()
+
+    def resizeEvent(self, event):  # type: ignore[override]
+        super().resizeEvent(event)
+        self.lock_badge.reposition()
 
     def _apply_card_style(self, hovered: bool = False):
         selected = self._selection_mode and self._selected
@@ -983,6 +1154,17 @@ class _CompactEquipCard(QFrame):
             action.setToolTip(tip)
             action.triggered.connect(
                 partial(self._emit_menu_action, signal, data, group))
+        locked = data.get("lock_status") == "locked"
+        lock_action = menu.addAction(
+            tr("解锁") if locked else tr("锁定"))
+        lock_action.setToolTip(
+            tr("解锁此装备") if locked else tr("锁定此装备"))
+        lock_action.triggered.connect(partial(
+            self._emit_lock_action,
+            self.lock_requested,
+            data,
+            not locked,
+        ))
         properties_action = menu.addAction(tr("属性"))
         properties_action.setToolTip(tr("查看装备来源、指纹、原始等级和时间"))
         properties_action.triggered.connect(
@@ -998,6 +1180,10 @@ class _CompactEquipCard(QFrame):
     def _emit_properties_action(signal, data, _checked=False) -> None:
         signal.emit(data)
 
+    @staticmethod
+    def _emit_lock_action(signal, data, locked, _checked=False) -> None:
+        signal.emit(data, locked)
+
     def set_equip(
         self, equip_data: dict, part_label: str,
         group_key: str = "", is_mock: bool = False,
@@ -1006,6 +1192,8 @@ class _CompactEquipCard(QFrame):
         # 存储装备数据和分组 key（用于右键菜单）
         self._equip_data = equip_data
         self._group_key = group_key
+        self.lock_badge.set_locked(
+            equip_data.get("lock_status") == "locked")
 
         quality = equip_data.get("quality") or ""
         self._quality_bg = _QUALITY_BG_COLORS.get(quality)
@@ -1022,8 +1210,6 @@ class _CompactEquipCard(QFrame):
         )
         self.status_tags.set_visible("loadout", is_loadout)
         self.illegal_badge.set_reasons(illegal_reasons_of(equip_data))
-        self.cooldown_badge.set_cooldown(
-            equip_data.get("cooldown_expires_at"))
 
         equip_level = equip_data.get("level")
         level = equip_level or "?"
@@ -1042,6 +1228,7 @@ class _CompactEquipCard(QFrame):
         else:
             self.lbl_level.setTextFormat(Qt.TextFormat.PlainText)
             self.lbl_level.setText(f"Lv{level}{tag}")
+
         self.lbl_level.setStyleSheet(
             f"font-size: {self._level_fs}px; color: palette(mid); font-weight: bold;")
 
@@ -1107,37 +1294,56 @@ class _CompactEquipCard(QFrame):
                     f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
                 row.addWidget(lbl_name, stretch=1)
                 self.affix_layout.addLayout(row)
-                return
+            else:
+                assert isinstance(dingyin, dict)
+                dy_value = dingyin.get("value", "")
+                dy_val_str = (
+                    f"{dy_value}%" if isinstance(dy_value, (int, float))
+                    else str(dy_value))
+                dy_cap_pct = affix_dict_cap_pct(dingyin, equip_level)
+                dy_color = _affix_value_color(dy_cap_pct)
 
-            assert isinstance(dingyin, dict)
-            dy_value = dingyin.get("value", "")
-            dy_val_str = (
-                f"{dy_value}%" if isinstance(dy_value, (int, float))
-                else str(dy_value))
-            dy_cap_pct = affix_dict_cap_pct(dingyin, equip_level)
-            dy_color = _affix_value_color(dy_cap_pct)
+                row = QHBoxLayout()
+                row.setContentsMargins(0, 0, 0, 0)
+                row.setSpacing(2)
 
-            row = QHBoxLayout()
-            row.setContentsMargins(0, 0, 0, 0)
-            row.setSpacing(2)
+                lbl_name = _ElidedLabel(dingyin["name"])
+                lbl_name.setStyleSheet(
+                    f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
+                row.addWidget(lbl_name, stretch=1)
 
-            lbl_name = _ElidedLabel(dingyin["name"])
-            lbl_name.setStyleSheet(
-                f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
-            row.addWidget(lbl_name, stretch=1)
+                lbl_val = QLabel(dy_val_str)
+                lbl_val.setStyleSheet(
+                    f"font-size: {self._affix_fs}px; color: {dy_color}; font-weight: bold;")
+                row.addWidget(lbl_val, alignment=Qt.AlignmentFlag.AlignRight)
 
-            lbl_val = QLabel(dy_val_str)
-            lbl_val.setStyleSheet(
-                f"font-size: {self._affix_fs}px; color: {dy_color}; font-weight: bold;")
-            row.addWidget(lbl_val, alignment=Qt.AlignmentFlag.AlignRight)
+                self.affix_layout.addLayout(row)
+        self._finish_affixes(equip_data)
 
-            self.affix_layout.addLayout(row)
+    def update_lock_status(self, value: str) -> None:
+        """原地更新单卡锁定状态，不重建卡片。"""
+        self._equip_data["lock_status"] = value
+        self.lock_badge.set_locked(value == "locked")
+
+    def update_cooldown(self, value: str) -> None:
+        """原地更新单卡冷却状态，不重建卡片。"""
+        self._equip_data["cooldown_expires_at"] = value
+        self._equip_data["cooldown_kind"] = (
+            (self._equip_data.get("cooldown_kind") or "transmute")
+            if value else "")
+        self._equip_data["cooldown_state"] = "cooling" if value else ""
+        _refresh_card_cooldown(self.cooldown_label, self._equip_data)
+        _preserve_card_content_height(self.affix_container)
 
     def _clear_affixes(self):
+        self.affix_container.setMinimumHeight(0)
         while self.affix_layout.count() > 0:
             item = self.affix_layout.takeAt(0)
             if item.widget():
-                item.widget().deleteLater()
+                if item.widget() is self.cooldown_label:
+                    self.cooldown_label.hide()
+                else:
+                    item.widget().deleteLater()
             elif item.layout():
                 sub = item.layout()
                 while sub.count() > 0:
@@ -1145,3 +1351,8 @@ class _CompactEquipCard(QFrame):
                     if child.widget():
                         child.widget().deleteLater()
                 sub.deleteLater()
+
+    def _finish_affixes(self, equip_data: dict) -> None:
+        _refresh_card_cooldown(self.cooldown_label, equip_data)
+        self.affix_layout.addWidget(self.cooldown_label)
+        _preserve_card_content_height(self.affix_container)

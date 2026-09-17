@@ -401,7 +401,7 @@ class _ActionMixin:
                 logger.debug("wait stable: 收到停止请求，提前结束")
                 return
 
-            img = self._capture.capture()
+            img = self.capture_frame(source="wait_stable")
             if img is None:
                 _sleep(interval)
                 continue

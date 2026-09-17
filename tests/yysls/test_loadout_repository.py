@@ -99,12 +99,48 @@ def test_set_item_cooldown_preserves_fingerprint_and_updates_timestamp(
     assert stored["updated_at"] == "2026-09-06T10:00:00.000+00:00"
 
 
+def test_set_item_cooldown_keeps_existing_cooldown_kind(tmp_path: Path):
+    """手动修正到期时间不能把扫描出的"重置调律"改写成"词条转律"。"""
+    repo = LoadoutRepository("alice", tmp_path)
+    repo.upsert_item({
+        **equip(),
+        "cooldown_kind": "reset", "cooldown_state": "cooling",
+        "cooldown_expires_at": "2026-09-07T04:00:00.000+00:00",
+    })
+
+    repo.set_item_cooldown("real-fp", "2026-09-11T10:00:00.000+00:00")
+    stored = repo.load().equipment_items["real-fp"]
+    assert stored["cooldown_kind"] == "reset"
+    assert stored["cooldown_state"] == "cooling"
+
+    repo.set_item_cooldown("real-fp", "")
+    stored = repo.load().equipment_items["real-fp"]
+    assert stored["cooldown_kind"] == "" and stored["cooldown_state"] == ""
+
+    # 原本没有类型：手动补时间默认按转律记
+    repo.set_item_cooldown("real-fp", "2026-09-12T10:00:00.000+00:00")
+    assert repo.load().equipment_items["real-fp"]["cooldown_kind"] == "transmute"
+
+
 def test_set_item_cooldown_rejects_missing_equipment(tmp_path: Path):
     repo = LoadoutRepository("alice", tmp_path)
     repo.load()
 
     with pytest.raises(ValueError, match="装备已不存在"):
         repo.set_item_cooldown("missing", "")
+
+
+def test_set_item_lock_status_preserves_fingerprint(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    repo.upsert_item(equip())
+
+    repo.set_item_lock_status("real-fp", True)
+    assert repo.load().equipment_items["real-fp"]["lock_status"] == "locked"
+
+    repo.set_item_lock_status("real-fp", False)
+    state = repo.load()
+    assert set(state.equipment_items) == {"real-fp"}
+    assert state.equipment_items["real-fp"]["lock_status"] == "unlock"
 
 
 def test_new_fp_records_both_times_and_existing_fp_refreshes_update(
@@ -196,6 +232,19 @@ def test_delete_can_preserve_references_from_every_plan(tmp_path: Path):
     assert set(state.equipment_items) == {"active", "standby"}
     assert state.plans[first].equipment["ring"] == "active"
     assert state.plans[second].equipment["ring"] == "standby"
+
+
+def test_delete_can_preserve_locked_items_atomically(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    repo.upsert_item({**equip("locked"), "lock_status": "locked"})
+    repo.upsert_item({**equip("unlocked"), "lock_status": "unlock"})
+    repo.upsert_item(equip("unknown"))
+
+    deleted = repo.delete_items(
+        {"locked", "unlocked", "unknown"}, preserve_locked=True)
+
+    assert deleted == {"unlocked", "unknown"}
+    assert set(repo.load().equipment_items) == {"locked"}
 
 
 def test_delete_all_mock_preserves_real_and_clears_plan_references(

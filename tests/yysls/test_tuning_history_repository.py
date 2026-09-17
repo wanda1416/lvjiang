@@ -36,6 +36,8 @@ def _item(seq: int, *, tuning_started_at="2026-09-01T01:01:00+00:00"):
         tuning_started_at=tuning_started_at,
         finished_at="2026-09-01T01:02:00+00:00",
         round_details=({"round_no": 1},),
+        lock_status="locked", cooldown_kind="reset",
+        cooldown_state="completed",
     )
 
 
@@ -65,6 +67,9 @@ def test_results_round_trip_preserves_processing_order(tmp_path):
     assert [item.equipment_id for item in results] == [1, 2]
     assert results[0].initial_affixes[0]["name"] == "会心率"
     assert results[0].round_details[0]["round_no"] == 1
+    assert results[0].lock_status == "locked"
+    assert results[0].cooldown_kind == "reset"
+    assert results[0].cooldown_state == "completed"
 
 
 def test_only_recent_unreported_telemetry_is_selected(tmp_path):

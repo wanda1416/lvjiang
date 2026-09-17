@@ -12,6 +12,13 @@ yysls:
   '确定删除 {time} 的调律任务及其全部装备详情吗？未上报的统计记录也会删除；此操作无法撤销。': 'Delete the tuning run at {time} and all its equipment details? Unreported telemetry records will also be deleted. This cannot be undone.'
   开始时间: Started
   状态: Status
+  已锁定: Locked
+  装备已锁定: Equipment locked
+  未锁定: Unlocked
+  锁定: Lock
+  解锁: Unlock
+  锁定此装备: Lock this equipment
+  解锁此装备: Unlock this equipment
   用户: User
   处理结果: Results
   总轮次: Rounds
@@ -602,6 +609,10 @@ yysls:
   历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}: Runs {runs} · Processed {total} · Tuned {tuned} · Recycled {recycled} · Skipped {skipped} · Reset {reset} · Anomalies {anomaly}
   全部评级: All ratings
   绑定开关: Binding Switch
+  全部用户: All users
+  未选择用户: No user selected
+  所选用户没有冷却装备: The selected users have no cooling equipment
+  '{shown} / {total} 件': '{shown} / {total} items'
 config:
   wf_scan_equipped: Equipment Analysis
   wf_scan_unequipped: Full Equipment Scan
@@ -843,6 +854,7 @@ auto_strings:
   增益效果: Bonus Effects
   处理中: Processing
   处置未启用，保留: Disposal not enabled; keep
+  备战: Loadout
   备战中: Preparing Loadout
   备战方案: Loadout Plan
   备注: Note
@@ -1207,6 +1219,7 @@ auto_strings:
   等级字号: Level Font Size
   等级正序: Level Ascending
   等级门槛 + 调律门槛 + 扫描/材料/结束处理，一组一套可切换；流派规则全局不受影响: Level threshold + tuning threshold + scan/material/end processing, one set per switchable group; playstyle rules are unaffected globally
+  筛选: Filter
   筛选中: Filtering
   精准率: Accuracy Rate
   系统规则不可删除或修改 key；不使用时请取消启用: System rules cannot be deleted or have their key changed; disable them instead of deleting
@@ -1432,6 +1445,9 @@ auto_strings:
   确定删除当前筛选出的背包装备吗？: Delete the filtered inventory equipment?
   保留备战中的装备: Keep equipment used by loadouts
   保留当前用户任意现存备战方案正在引用的装备: Keep equipment referenced by any existing loadout for the current user
+  保留已锁定的装备: Keep locked equipment
+  保留已标记为锁定的装备: Keep equipment marked as locked
+  筛选命中 {matched} 件；备战保护 {referenced} 件；锁定保护 {locked} 件；实际将删除 {deleted} 件: 'Matched: {matched}; protected by loadouts: {referenced}; locked: {locked}; to delete: {deleted}'
   筛选命中 {matched} 件；备战保护 {protected} 件；实际将删除 {deleted} 件: 'Matched: {matched}; protected by loadouts: {protected}; to delete: {deleted}'
   警告：{count} 件装备将从相关备战方案中移除。: 'Warning: {count} equipment item(s) will be removed from related loadouts.'
   批量复制装备: Batch Copy Equipment

@@ -26,10 +26,10 @@ _FOOD_INDEX = dict(zip(FOOD_LABELS, ("gold", "purple", "rainbow"), strict=True))
 # 绝不能原样上传——那等于在事件通道上开一个任意文本字段。这里只收敛成
 # 七个稳定 key，映射由调用方在退出点显式给出。
 _STOP_REASON_CHOICES = (
-    "decided_recycle",       # 结束处理判定回收
-    "decided_keep",          # 结束处理判定保留（action=skip）
+    "decided_recycle",       # 调律处理判定回收
+    "decided_keep",          # 调律处理判定保留（action=skip/lock）
     "tune_full_recycle",     # 调满后回收模式
-    "judged_before_tuning",  # 初始判定即不进调律循环
+    "judged_before_tuning",  # 首次调律处理即不进调律循环
     "cannot_continue",       # 律准石/材料不足等 executor.abort_reason
     "user_stopped",          # 用户按停止键
     "reset_completed",       # 成功重置；重置后状态作为新的调律事件

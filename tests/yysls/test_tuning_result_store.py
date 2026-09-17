@@ -141,6 +141,29 @@ def test_smart_continue_is_not_a_terminal_history_opinion(qtbot):
     assert store.results[0].reason == "正常结束"
 
 
+def test_smart_reset_opinion_does_not_outlive_the_reset(qtbot):
+    """智能调律促成重置后装备继续调律，终态原因应是后续的真实结论。"""
+    hub = TuningProgressHub()
+    store = TuningResultStore(hub)
+    hub.slot_entered.emit("ring", "环")
+    _start(hub, "重置后继续环", "环")
+    hub.smart_tuning_updated.emit({
+        "enabled": True, "state": "final", "final_action": "reset",
+        "opinion": "智能调律：无法提升，处理结果：重置装备。",
+    })
+    hub.equipment_reset.emit({
+        "name": "重置后继续环", "before_affixes": [], "after_affixes": [],
+        "resets_used": 1,
+    })
+    hub.equipment_finished.emit({
+        "name": "重置后继续环", "rounds": 3, "status": "done",
+        "reason": "词条已满，无行为规则命中 → 结束并锁定装备",
+        "final_affixes": [],
+    })
+
+    assert store.results[0].reason == "词条已满，无行为规则命中 → 结束并锁定装备"
+
+
 def test_progress_widget_shows_ordered_smart_plan_details(qtbot):
     hub = TuningProgressHub()
     widget = TuningProgressWidget(hub)
@@ -168,9 +191,9 @@ def test_progress_widget_shows_ordered_smart_plan_details(qtbot):
     assert widget._smart_group.isVisibleTo(widget)
     text = widget._smart_plans_label.text()
     assert text.index("无名PVE") < text.index("火拳奶")
-    assert "方案上限：99.00%" in text
-    assert "七件：81.00%" in text
-    assert "候选上限：94.50%" in text
+    assert "方案极限：99.00%" in text
+    assert "七件极限：81.00%" in text
+    assert "候选极限：94.50%" in text
     assert "备战方案不完整" in text
 
 

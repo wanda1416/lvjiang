@@ -5,7 +5,7 @@
 - 扫描处理（behavior.scan）：进调律前，传入规则预期 ≥ 进入门槛
   即进调律；未达门槛按处置表决定回收/保留（_on_scan_reject）；
 - 材料处理（materials）：每轮调律开始前的律准石检查与狗粮决策；
-- 结束处理（behavior.tune）：每轮调律结束后按预期评级决策
+- 调律处理（behavior.tune）：进入调律前及每轮调律结束后按预期评级决策
   继续调律/重置调律/回收/结束保留，词条满为边界条件（continue
   不可选，无命中默认结束保留）；背包读到已满装备走扫描处理
   同一路径（tune_full_recycle 视为直接回收）。
@@ -29,7 +29,9 @@ _resolve_selected_slots。
 
 import hashlib
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
+from datetime import datetime
+from typing import Any
 
 from loguru import logger
 
@@ -54,6 +56,7 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
 )
 from lvjiang.apps.yysls.workflows.implementations.tuning import (
     BehaviorAction,
+    BehaviorDecision,
     EquipmentProcessingResult,
     EquipmentSession,
     RecycleOutcome,
@@ -75,6 +78,17 @@ from lvjiang.apps.yysls.workflows.tuning_doc import TuningDocWriter
 from lvjiang.workflows.base import BaseWorkflow
 
 from .....i18n import tr
+
+
+def _format_local_time(value: str) -> str:
+    """仓储里的 UTC ISO 到期时间转本地「年-月-日 时:分」，供用户可见的原因文案。"""
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return value
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone()
+    return parsed.strftime("%Y-%m-%d %H:%M")
 
 
 def _best_rating(judgement: dict | None) -> str | None:
@@ -298,7 +312,28 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             "affixes": [a.to_dict() for a in equip_data.affixes],
             "expect_rating": "",
             "target_affixes": sorted(target_names),
+            "lock_status": equip_data.lock_status,
+            "cooldown_kind": equip_data.cooldown_kind,
+            "cooldown_state": equip_data.cooldown_state,
+            "cooldown_expires_at": equip_data.cooldown_expires_at,
         })
+
+    def _finish_protected_equipment(
+        self, name: str, equip_data: EquipmentData, affix_count: int, *,
+        status: str, action: str, reason: str,
+    ) -> tuple[str, None]:
+        """记录保护性跳过；不得进入评级、导航、重置或回收。"""
+        fp = self._make_fingerprint(equip_data.to_dict())
+        logger.info(f"  [{name}] {reason}")
+        self._emit_progress("scan_decision", {
+            "name": name, "action": action, "reason": reason,
+            "cooldown_kind": equip_data.cooldown_kind,
+            "cooldown_state": equip_data.cooldown_state,
+        })
+        self._emit_equip_finish(
+            name, equip_data, affix_count=affix_count,
+            status=status, reason=reason)
+        return fp, None
 
     def _emit_assessment(self, potential: dict, expect: str | None,
                          stage: str = "scan") -> None:
@@ -312,7 +347,15 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                          stage: str, reason: str,
                          report: dict | None = None,
                          current_affix_count: int | None = None,
-                         ) -> RecycleOutcome:
+                         ) -> RecycleOutcome | None:
+        # 详情扫描已经明确识别为锁定时，不再执行必然失败的回收动作。
+        # 返回 None 使详情页仍按普通保留装备路径关闭；不能返回 LOCKED，
+        # 后者表示“尝试回收后已经离开详情页”，会改变后续页面流转。
+        if equip_data.lock_status == "locked":
+            fp = self._make_fingerprint(equip_data.to_dict())
+            self.run_state.record_locked(fp)
+            logger.info(f"  装备 {fp} 标记为锁定，跳过回收")
+            return None
         outcome = self.recycler.recycle_current(
             equip_data, detail_scene, stage, reason, report)
         if outcome is RecycleOutcome.RECYCLED:
@@ -340,7 +383,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         super().is_stopped 放在前面求值：它内部会先过暂停检查点
         （_wait_if_paused），若放在 or 后面，一旦材料耗尽，短路求值会
-        跳过暂停阻塞——用户此时按暂停热键会被静默吞掉，直接当结束处理。
+        跳过暂停阻塞——用户此时按暂停热键会被静默吞掉，直接当结束信号。
         """
         return (
             super().is_stopped
@@ -1050,6 +1093,35 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return self._make_fingerprint(equip), None
 
         fp = self._make_fingerprint(equip_data.to_dict())
+        if (self.ctx.skip_locked_equipment
+                and equip_data.lock_status == "locked"):
+            return self._finish_protected_equipment(
+                name, equip_data, affix_count,
+                status="locked", action="protected",
+                reason="装备已锁定，按当前设置跳过自动调律")
+
+        cooldown_kind = equip_data.cooldown_kind
+        cooldown_state = equip_data.cooldown_state
+        if cooldown_kind == "transmute":
+            state_label = "冷却完成" if cooldown_state == "completed" else "冷却中"
+            return self._finish_protected_equipment(
+                name, equip_data, affix_count,
+                status="transmute_protected", action="protected",
+                reason=f"词条转律{state_label}，保留用户转律意图，跳过自动调律")
+        if cooldown_kind == "unknown":
+            return self._finish_protected_equipment(
+                name, equip_data, affix_count,
+                status="cooldown_unknown", action="protected",
+                reason="识别到类型不明的调律冷却状态，保守跳过自动调律")
+        if cooldown_kind == "reset" and cooldown_state == "cooling":
+            suffix = (
+                f"（至 {_format_local_time(equip_data.cooldown_expires_at)}）"
+                if equip_data.cooldown_expires_at else "")
+            return self._finish_protected_equipment(
+                name, equip_data, affix_count,
+                status="reset_cooling", action="deferred",
+                reason=f"重置调律冷却中{suffix}，等待冷却完成后续调")
+
         if fp and self.run_state.is_locked(fp):
             logger.info(f"  [{name}] 本次运行已确认锁定，跳过重复回收")
             self._emit_equip_finish(
@@ -1061,40 +1133,25 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             f"quality={equip.get('quality')} affix_count={affix_count}")
         self.recorder.start_report(name, equip, affix_count)
 
-        # A. 词条已满 → 终局判定 + 扫描处理（已满不进调律，
-        #    走 scan 行为点决定回收/保留）；未处理过，不收集 report
-        if affix_count >= self.MAX_AFFIX:
-            logger.info(f"  [{name}] 词条已满（{affix_count}），仅做终局判定")
-            judgement = self.judge.final_judge(equip_data)
-            final_rating = self.judge.expect_key(judgement) or ""
-            self._emit_assessment(judgement, final_rating)
-            self.recorder.report_set("status", "already_full")
-            self.recorder.report_set("final_judgement", judgement)
-            outcome = self._on_scan_reject(
-                equip_data, judgement, detail_scene, already_full=True)
-            # 词条已满，计算实际评级用于进度显示
-            if outcome is RecycleOutcome.RECYCLED:
-                self._emit_equip_finish(name, equip_data, affix_count=affix_count,
-                                        status="recycled",
-                                        final_rating=final_rating)
-                self.recorder.discard_report()
-                return "", outcome
-            self._emit_equip_finish(name, equip_data, affix_count=affix_count,
-                                    final_rating=final_rating,
-                                    status="already_full")
-            self.recorder.discard_report()
-            return self._make_fingerprint(equip_data.to_dict()), outcome
-
-        # B. 进入决策（scan 行为点）：传入规则预期评级 ≥ 进入门槛
+        # B. 进入决策（scan 行为点）：可选只用首词条的
+        #    临时候选判定门槛。该副本只服务准入，不改写扫描结果。
         #    → 进调律；未达门槛按扫描处置表决定回收/保留。
         #    未处理过，不收集 report，也不写说明文档
         scan_cfg = self.base_group.scan
-        potential = judge_equipment_potential(
-            equip_data, self.ctx.judge_configs, self.ctx.judge_rule_keys)
-        _, logs = summarize_potential(potential)
-        expect = self.judge.expect_key(potential)
+        entry_equip = equip_data
+        if scan_cfg.entry_first_affix_only and len(equip_data.affixes) > 1:
+            entry_equip = replace(
+                equip_data, affixes=equip_data.affixes[:1],
+                extra_data={**equip_data.extra_data, "affix_count": 1})
+            logger.info(
+                f"  [{name}] 调律门槛仅识别首词条，"
+                f"临时忽略其他 {len(equip_data.affixes) - 1} 条")
+        entry_potential = judge_equipment_potential(
+            entry_equip, self.ctx.judge_configs, self.ctx.judge_rule_keys)
+        _, logs = summarize_potential(entry_potential)
+        expect = self.judge.expect_key(entry_potential)
         self.equipment_session.expected_rating = expect
-        self._emit_assessment(potential, expect)
+        self._emit_assessment(entry_potential, expect)
         for line in logs:
             logger.info(f"  潜力判定 | {line}")
         self.recorder.report_set("worthiness", logs)
@@ -1109,8 +1166,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                                             scan_cfg.entry_min_rating)
             logger.info(f"  [{name}] 预期评级未达进入门槛"
                         f"（≥{entry_label}），不进调律")
-            outcome = self._on_scan_reject(equip_data, potential,
-                                            detail_scene)
+            outcome = self._on_scan_reject(
+                equip_data, entry_potential, detail_scene,
+                already_full=affix_count >= self.MAX_AFFIX,
+                incoming_first_affix_only=entry_equip is not equip_data)
             if outcome is RecycleOutcome.RECYCLED:
                 self._emit_equip_finish(name, equip_data, affix_count=affix_count,
                                         status="recycled")
@@ -1126,9 +1185,61 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 self.recorder.discard_report()
                 return self._make_fingerprint(equip_data.to_dict()), outcome
 
-        # C. 值得 → 实际调律；说明文档开装备节（只写命中的规则）
+        # C. 通过准入后，立即用完整实际装备执行首次调律处理。
+        #    skip/recycle 可在装备详情页直接收束；其他动作进入
+        #    调律页后消费这一份已经得出的决策，不重复判定。
+        actual_potential = (entry_potential if entry_equip is equip_data else
+                            judge_equipment_potential(
+                                equip_data, self.ctx.judge_configs,
+                                self.ctx.judge_rule_keys))
+        actual_expect = self.judge.expect_key(actual_potential)
+        self.equipment_session.expected_rating = actual_expect
+        self._emit_assessment(actual_potential, actual_expect, stage="tune")
+        tune_cfg = self.base_group.tune
+        if self.equipment_session.tune_full_recycle:
+            initial_decision = BehaviorDecision(
+                BehaviorAction.TUNE_FULL_RECYCLE,
+                "扫描处理已命中调满后回收")
+        else:
+            initial_decision = self.judge.decide_end(
+                tune_cfg, equip_data, actual_potential,
+                full=affix_count >= self.MAX_AFFIX)
+        logger.info(f"  [首次调律处理] {initial_decision.reason}")
+        self._emit_operation(
+            "decision", f"首次调律处理命中：{initial_decision.action.value}",
+            reason=initial_decision.reason,
+            action=initial_decision.action.value,
+            affix_count=affix_count, resets=0)
+        if initial_decision.action in (BehaviorAction.SKIP, BehaviorAction.LOCK):
+            if initial_decision.action is BehaviorAction.LOCK:
+                logger.info(
+                    f"  [{name}] 本次尚未发生实际调律，不执行自动锁定")
+            self._emit_equip_finish(
+                name, equip_data, affix_count=affix_count,
+                status="already_full" if affix_count >= self.MAX_AFFIX else "done",
+                reason=f"首次调律处理：{initial_decision.reason}",
+                final_rating=(actual_expect or "")
+                if affix_count >= self.MAX_AFFIX else "")
+            self.recorder.discard_report()
+            return self._make_fingerprint(equip_data.to_dict()), None
+        if (initial_decision.action is BehaviorAction.RECYCLE
+                or (initial_decision.action is BehaviorAction.TUNE_FULL_RECYCLE
+                    and affix_count >= self.MAX_AFFIX)):
+            reason = f"首次调律处理：{initial_decision.reason}"
+            outcome = self._recycle_current(
+                equip_data, detail_scene, "tune", reason,
+                current_affix_count=affix_count)
+            self._emit_equip_finish(
+                name, equip_data, affix_count=affix_count,
+                status=("recycled" if outcome is RecycleOutcome.RECYCLED
+                        else "done"), reason=reason)
+            self.recorder.discard_report()
+            return ("" if outcome is RecycleOutcome.RECYCLED else
+                    self._make_fingerprint(equip_data.to_dict())), outcome
+
+        # D. 需要实际调律/重置 → 打开调律页。
         self.recorder.doc_start_equipment(equip)
-        self.recorder.doc_worthiness_matched(potential)
+        self.recorder.doc_worthiness_matched(entry_potential)
         self._emit_operation("navigation", "装备符合进入条件，正在打开调律页")
         if not self.navigator.nav_to_tune():
             logger.info(f"  [{name}] 未找到调律入口，跳过")
@@ -1162,48 +1273,42 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self.executor.cache_equipment_materials()
         initial_material_stop_reason = self.executor.abort_reason
 
-        # 结束处理支撑：首词条快照（重置后仅剩首词条）+ 本件重置计数
-        tune_cfg = self.base_group.tune
+        # 调律处理支撑：首词条快照（重置后仅剩首词条）+ 本件重置计数
         base_affixes = list(equip_data.affixes)
         resets_used = 0
         tune_recycle_reason = ""
+        qualified_lock_reason = ""
         # 结构化历史会话已在 material 阶段标记本件进入调律；逐轮与终态
         # 均通过统一进度事件归档，匿名统计再从最近七天历史做白名单投影。
         stop_key = "completed"
 
-        # ── 初始判定（initial_check）：第一次调律前先执行一次结束处理 ──
-        # 用于垃圾金装复用：先走结束处理重置清空词条，再开始正常调律
+        # 首次调律处理已在装备详情页纯判定；这里只消费
+        # 已缓存决策中必须在调律页执行的动作（如重置）。
         skip_tune_loop = bool(initial_material_stop_reason)
         stop_reason = initial_material_stop_reason
-        if not skip_tune_loop and tune_cfg.initial_check and tune_cfg.enabled:
-            logger.info(f"  ═══ [{name}] 初始判定（第一次调律前执行结束处理）═══")
-            self._emit_operation(
-                "decision", "执行首次调律前的初始判定",
-                affix_count=affix_count, resets=resets_used)
-            action, why, resets_used, affix_count = self._execute_end_processing(
+        if not skip_tune_loop:
+            action, why, resets_used, affix_count = self._execute_tuning_processing(
                 tune_cfg, equip_data, affix_count, resets_used, base_affixes,
-                potential=potential, is_initial_check=True)
-            self.recorder.doc_note(f"初始判定：{why}")
+                potential=actual_potential, is_initial=True,
+                pre_decision=initial_decision, decision_emitted=True)
+            self.recorder.doc_note(f"首次调律处理：{why}")
             if action == "continue":
-                # 放行或重置成功，进入正常调律循环
                 if resets_used > 0:
                     self.recorder.report_set("resets", resets_used)
             else:
-                # skip 或 recycle → 结束调律循环
                 skip_tune_loop = True
                 if action == "recycle":
-                    tune_recycle_reason = f"初始判定：{why}"
-                stop_reason = f"初始判定：{why}"
+                    tune_recycle_reason = f"首次调律处理：{why}"
+                stop_reason = f"首次调律处理：{why}"
                 stop_key = "judged_before_tuning"
                 self.recorder.report_set("stop_reason", stop_reason)
 
-        # 智能调律是现有结束处理后的二次判定。未启用初始判定时，
-        # 它仍在第一次真实调律前单独执行。
+        # 智能调律是调律处理放行后的二次判定。
         if not skip_tune_loop and not self.equipment_session.tune_full_recycle:
             smart_resets_before = resets_used
             action, why, resets_used, affix_count = self._execute_smart_processing(
                 tune_cfg, equip_data, affix_count, resets_used, base_affixes,
-                checkpoint="初始判定")
+                checkpoint="首次调律处理")
             if action != "continue":
                 skip_tune_loop = True
                 if action == "recycle":
@@ -1288,10 +1393,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             # 扣减本轮狗粮缓存：返还时不消耗（不变），否则 -1
             if not self.executor.round_food_refunded:
                 self.executor.decrement_food(self.executor.round_food)
-            # 结束处理（tune 行为点）：调用公共结束处理逻辑
-            action, why, resets_used, affix_count = self._execute_end_processing(
+            # 调律处理（tune 行为点）
+            action, why, resets_used, affix_count = self._execute_tuning_processing(
                 tune_cfg, equip_data, affix_count, resets_used, base_affixes,
-                is_initial_check=False,
+                is_initial=False,
                 pre_incoming=incoming, pre_expect=new_expect)
             if action == "continue":
                 smart_active = bool(
@@ -1320,8 +1425,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             # 回收延到 back 回背包页后执行；skip = 结束保留
             if action == "recycle":
                 tune_recycle_reason = why
+            elif action == "lock" and rounds > 0:
+                qualified_lock_reason = why
             stop_key = {"recycle": "decided_recycle",
                         "skip": "decided_keep",
+                        "lock": "decided_keep",
                         "tune_full_recycle": "tune_full_recycle"}.get(
                             action, "completed")
             stop_reason = why
@@ -1332,8 +1440,33 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 返回背包浏览页，并由环境策略恢复装备详情页的可操作状态。
         self.executor.invalidate_cache()  # 退出调律页，清空材料缓存
         self._emit_operation("finish", "正在返回背包并完成当前装备收尾")
+        # Android 的 for_recycle=True 会保留“更多”菜单，供回收入口复用。
+        # 已识别为锁定时不会真正回收，必须走普通退出路径收起菜单。
+        will_recycle = (
+            bool(tune_recycle_reason)
+            and not self.is_stopped
+            and equip_data.lock_status != "locked"
+        )
         self.navigator.leave_tune(
-            for_recycle=bool(tune_recycle_reason) and not self.is_stopped)
+            for_recycle=will_recycle)
+
+        # 锁定是布尔切换动作，必须幂等：只对本次至少调律过一轮、
+        # 调律处理明确要求锁定且扫描状态为 unlock 的装备点击。
+        # 即使用户关闭了“跳过锁定装备”，已锁定也绝不二次点击。
+        if qualified_lock_reason and rounds > 0:
+            if equip_data.lock_status == "unlock":
+                logger.info(
+                    f"  [{name}] 调律合格，返回装备详情页后执行锁定")
+                self.navigator.lock_current_equipment()
+                equip_data.lock_status = "locked"
+                self._emit_operation(
+                    "finish", "合格装备已锁定",
+                    reason=qualified_lock_reason, action="lock")
+            elif equip_data.lock_status == "locked":
+                logger.info(f"  [{name}] 装备已锁定，不重复点击锁定开关")
+            else:
+                logger.warning(
+                    f"  [{name}] 锁定状态未识别，为避免误解锁已跳过自动锁定")
 
         judgement = self.judge.final_judge(equip_data)
         self.recorder.report_set("rounds", rounds)
@@ -1387,16 +1520,18 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return "", outcome
         return self._make_fingerprint(equip_data.to_dict()), outcome
 
-    # ─── 结束处理公共逻辑（初始判定 + 每轮结束共用）──────────
+    # ─── 调律处理公共逻辑（首次 + 每轮结束共用）──────────
 
-    def _execute_end_processing(
+    def _execute_tuning_processing(
         self, tune_cfg, equip_data: EquipmentData, affix_count: int,
         resets_used: int, base_affixes: list, potential: dict | None = None,
-        is_initial_check: bool = False,
+        is_initial: bool = False,
         pre_incoming: dict | None = None,
         pre_expect: str | None = None,
+        pre_decision: BehaviorDecision | None = None,
+        decision_emitted: bool = False,
     ) -> tuple[str, str, int, int]:
-        """执行结束处理逻辑（初始判定或每轮结束后调用）
+        """执行调律处理逻辑（首次或每轮结束后调用）
 
         Args:
             tune_cfg: 调律行为配置
@@ -1404,8 +1539,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             affix_count: 当前词条数
             resets_used: 当前已重置次数
             base_affixes: 首词条快照（重置后仅剩首词条）
-            potential: 初始判定时使用的潜力数据（仅初始判定需要）
-            is_initial_check: 是否为初始判定模式
+            potential: 首次处理使用的完整装备潜力数据
+            is_initial: 是否为进入调律前的首次处理
+            pre_decision: 在装备详情页已经得出的首次决策
 
         Returns:
             (action, why, new_resets_used, new_affix_count):
@@ -1416,11 +1552,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             - new_resets_used: 更新后的重置次数
             - new_affix_count: 更新后的词条数（重置后为1）
         """
-        prefix = "初始判定" if is_initial_check else "结束处理"
+        prefix = "首次调律处理" if is_initial else "调律处理"
         full = affix_count >= self.MAX_AFFIX
 
         # 调满后回收模式：跳过规则判定，调满即回收
-        if self.equipment_session.tune_full_recycle and not is_initial_check:
+        if self.equipment_session.tune_full_recycle and not is_initial:
             if full:
                 why = "调满后回收模式：词条已满，执行回收"
                 logger.info(f"  [{prefix}] {why}")
@@ -1430,8 +1566,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 logger.info(f"  [{prefix}] {why}")
                 return "continue", why, resets_used, affix_count
 
-        # 刷新预期评级（结束处理时更新，初始判定时使用传入的 potential）
-        if is_initial_check:
+        # 刷新预期评级（首次处理使用详情页已经计算的完整装备结果）
+        if is_initial:
             incoming = potential
         elif pre_incoming is not None:
             # 使用调用方预计算的结果（避免 tune_round_completed 信号前已跑过的判定重复执行）
@@ -1442,16 +1578,20 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 self.judge.refresh_expectation(equip_data)
 
         # 纯策略层只返回动作和值对象；本方法负责执行副作用。
-        decision = self.judge.decide_end(
+        decision = pre_decision or self.judge.decide_end(
             tune_cfg, equip_data, incoming, full=full)
         action, why = decision.action, decision.reason
-        logger.info(f"  [{prefix}] {why}")
-        self._emit_operation(
-            "decision", f"{prefix}命中：{action}", reason=why,
-            action=action, affix_count=affix_count, resets=resets_used)
+        if not decision_emitted:
+            logger.info(f"  [{prefix}] {why}")
+            self._emit_operation(
+                "decision", f"{prefix}命中：{action}", reason=why,
+                action=action, affix_count=affix_count, resets=resets_used)
 
         # 处理各动作
         if action is BehaviorAction.CONTINUE:
+            return action.value, why, resets_used, affix_count
+
+        if action is BehaviorAction.LOCK:
             return action.value, why, resets_used, affix_count
 
         if action is BehaviorAction.RESET:
@@ -1473,7 +1613,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return reset_action, why, resets_used, affix_count
 
         if action is BehaviorAction.TUNE_FULL_RECYCLE:
-            # 结束处理命中后进入与扫描处理相同的直通模式：后续轮次
+            # 调律处理命中后进入与扫描处理相同的直通模式：后续轮次
             # 不再做规则判定/狗粮决策，调满后回到背包执行回收。
             self.equipment_session.mode = TuningMode.TUNE_FULL_RECYCLE
             self._emit_progress("scan_decision", {
@@ -1488,7 +1628,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # recycle 或 skip → 直接返回
         return action.value, why, resets_used, affix_count
 
-    # ─── 智能调律（现有结束处理后的二次处理）───
+    # ─── 智能调律（现有调律处理后的二次处理）───
 
     def _prepare_smart_tuning(self) -> None:
         """按本次运行用户和玩法快照初始化智能调律。"""
@@ -1610,10 +1750,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 f"  [智能调律/{checkpoint}] 备战方案「"
                 f"{item.get('plan_name')}」（{item.get('rule_name')}/"
                 f"{item.get('playstyle')}）："
-                f"方案上限={self._smart_rate_text(item.get('plan_maximum_rate'))}，"
-                f"当前={self._smart_rate_text(item.get('baseline_rate'))}，"
-                f"七件={self._smart_rate_text(item.get('without_slot_rate'))}，"
-                f"候选上限={self._smart_rate_text(item.get('maximum_rate'))}，"
+                f"方案极限={self._smart_rate_text(item.get('plan_maximum_rate'))}，"
+                f"当前实值={self._smart_rate_text(item.get('baseline_rate'))}，"
+                f"七件极限={self._smart_rate_text(item.get('without_slot_rate'))}，"
+                f"候选极限={self._smart_rate_text(item.get('maximum_rate'))}，"
                 f"判定={status_labels.get(status, status or '-')}，"
                 f"说明={item.get('reason') or '-'}")
 
@@ -1627,8 +1767,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             details.append(
                 f"备战方案「{item.get('plan_name')}」分析最大极限毕业率 "
                 f"{self._smart_rate_text(item.get('maximum_rate'))}，"
-                f"低于或等于当前方案 "
-                f"{self._smart_rate_text(item.get('baseline_rate'))}")
+                f"低于或等于原方案极限 "
+                f"{self._smart_rate_text(item.get('plan_maximum_rate'))}")
         analysis = "；".join(details) or "分析确定所有适用方案无法提升"
         return f"智能调律：{analysis}，处理结果：{action_label}。"
 
@@ -1653,7 +1793,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         resets_used: int, base_affixes: list, *, checkpoint: str,
         _allow_reset: bool = True,
     ) -> tuple[str, str, int, int]:
-        """在当前结束处理已放行后执行智能判定及可选动作。"""
+        """在当前调律处理已放行后执行智能判定及可选动作。"""
         evaluator = self._smart_evaluator
         if evaluator is None or not evaluator.active:
             return "continue", "智能调律未启用或本轮不可用", resets_used, affix_count
@@ -1675,7 +1815,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         plan_summary = "；".join(
             f"{item.plan_name}: {item.reason}"
             for item in result.plans)
-        decision_record = {
+        decision_record: dict[str, Any] = {
             "checkpoint": checkpoint,
             "status": result.status.value,
             "reason": result.reason,
@@ -1770,7 +1910,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     def _execute_reset_action(
         self, tune_cfg, equip_data: EquipmentData, resets_used: int,
-        why: str, prefix: str = "结束处理",
+        why: str, prefix: str = "调律处理",
         previous_affix_count: int | None = None,
     ) -> tuple[str, str, int]:
         """执行重置调律的公共逻辑（等级配置检查 + 重置执行）
@@ -1780,7 +1920,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             equip_data: 装备数据
             resets_used: 当前已重置次数
             why: 触发重置的原因
-            prefix: 日志前缀（"初始判定" 或 "结束处理"）
+            prefix: 日志前缀（"首次调律处理"、"调律处理"或"智能调律"）
 
         Returns:
             (action, why, new_resets_used):
@@ -1872,7 +2012,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
     def _on_scan_reject(self, equip_data: EquipmentData, potential: dict,
                         detail_scene: str | None = None,
-                        already_full: bool = False) -> RecycleOutcome | None:
+                        already_full: bool = False,
+                        incoming_first_affix_only: bool = False,
+                        ) -> RecycleOutcome | None:
         """扫描阶段处置（scan 行为点）。
 
         两种入口：
@@ -1899,15 +2041,22 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self._emit_progress("scan_decision", {
                 "name": label, "action": "kept", "reason": "处置未启用，保留"})
             return None
-        decision = self.judge.decide_scan(cfg, equip_data, potential)
+        # potential 若来自"仅首词条"门槛判定，只能复用给同口径规则
+        decision = self.judge.decide_scan(
+            cfg, equip_data, potential,
+            incoming_first_affix_only=incoming_first_affix_only)
         action, why = decision.action, decision.reason
         if action is BehaviorAction.TUNE_FULL_RECYCLE:
             if already_full:
                 # 已满装备无需再调，“调满后回收”意图等价于直接回收
                 logger.info(f"  [扫描处理] {label} {why}（已满，直接回收）")
                 self._emit_progress("scan_decision", {
-                    "name": label, "action": "recycled",
-                    "reason": f"{why}（已满，直接回收）"})
+                    "name": label,
+                    "action": ("locked" if equip_data.lock_status == "locked"
+                               else "recycled"),
+                    "reason": ("装备标记为锁定，跳过回收"
+                               if equip_data.lock_status == "locked"
+                               else f"{why}（已满，直接回收）")})
                 return self._recycle_current(
                     equip_data, detail_scene, "scan", why)
             # 未满：设置标记，继续走调律流程
@@ -1919,7 +2068,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return None
         if action is BehaviorAction.TUNE_THIS:
             # 强制调律：无视进入门槛，强制进入调律页
-            # 配合结束处理「启用初始判定」实现调废装备重置复用
+            # 强制调律装备仍统一执行首次调律处理
             logger.info(f"  [扫描处理] {label} {why}（强制调律模式）")
             self.equipment_session.mode = TuningMode.FORCE_TUNE
             self._emit_progress("scan_decision", {
@@ -1932,7 +2081,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 "name": label, "action": "kept", "reason": why})
             return None
         self._emit_progress("scan_decision", {
-            "name": label, "action": "recycled", "reason": why})
+            "name": label,
+            "action": ("locked" if equip_data.lock_status == "locked"
+                       else "recycled"),
+            "reason": ("装备标记为锁定，跳过回收"
+                       if equip_data.lock_status == "locked" else why)})
         return self._recycle_current(equip_data, detail_scene,
                                      "scan", why)
 

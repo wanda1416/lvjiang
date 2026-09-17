@@ -57,6 +57,14 @@ class EquipmentInventory:
         """被其他（非激活）方案引用、但未在当前方案中装备的指纹集合。"""
         return self.referenced_plan_fps - self.active_plan_fps
 
+    @property
+    def locked_item_fps(self) -> set[str]:
+        """当前装备池中已锁定装备的指纹集合。"""
+        return {
+            fp for fp, equip in self._state.equipment_items.items()
+            if equip.get("lock_status") == "locked"
+        }
+
     def get_equipped(self, slot_key: str) -> dict | None:
         return self.equipped.get(slot_key)
 
@@ -102,12 +110,16 @@ class EquipmentInventory:
         fingerprints: set[str],
         *,
         preserve_referenced: bool = False,
+        preserve_locked: bool = False,
     ) -> set[str]:
-        """批量删除装备，并可保护任意备战方案正在引用的装备。"""
+        """批量删除装备，并可保护备战引用或已锁定装备。"""
         deleted: set[str] = set()
         if fingerprints:
             deleted = self._repo.delete_items(
-                fingerprints, preserve_referenced=preserve_referenced)
+                fingerprints,
+                preserve_referenced=preserve_referenced,
+                preserve_locked=preserve_locked,
+            )
             self.reload()
         return deleted
 
@@ -182,9 +194,12 @@ class EquipmentInventory:
         return new_fp
 
     def set_item_cooldown(self, fp: str, expires_at: str) -> None:
-        """更新装备冷却到期时间并重载库存。"""
-        self._repo.set_item_cooldown(fp, expires_at)
-        self.reload()
+        """更新装备冷却到期时间，不重新审计全部装备。"""
+        self._state = self._repo.set_item_cooldown(fp, expires_at)
+
+    def set_item_lock_status(self, fp: str, locked: bool) -> None:
+        """更新装备锁定状态，不重新审计全部装备。"""
+        self._state = self._repo.set_item_lock_status(fp, locked)
 
     def apply_combos(self, combo_equipped: dict[str, dict]) -> None:
         plan_id = self._state.active_plan_id

@@ -71,11 +71,46 @@ class TestEquipmentDataDimensions:
         data.pop("cooldown_expires_at")
         assert EquipmentData.from_dict(data).cooldown_expires_at == ""
 
+    def test_cooldown_semantics_roundtrip_without_affecting_fingerprint(self):
+        equip = EquipmentData(type="剑", level=110)
+        initial_fp = equip.to_dict()["_fp"]
+        equip.cooldown_kind = "reset"
+        equip.cooldown_state = "completed"
+        data = equip.to_dict()
+
+        restored = EquipmentData.from_dict(data)
+        assert restored.cooldown_kind == "reset"
+        assert restored.cooldown_state == "completed"
+        assert data["_fp"] == initial_fp
+
     def test_cooldown_expiry_never_changes_serialized_fingerprint(self):
         equip = EquipmentData(type="剑", level=110)
         initial_fp = equip.to_dict()["_fp"]
         equip.cooldown_expires_at = "2026-09-07T04:00:00.000+00:00"
         assert equip.to_dict()["_fp"] == initial_fp
+
+    def test_lock_status_roundtrip_legacy_and_fingerprint(self):
+        equip = EquipmentData(type="剑", level=110)
+        initial_fp = equip.to_dict()["_fp"]
+
+        equip.lock_status = "locked"
+        locked = equip.to_dict()
+        assert locked["lock_status"] == "locked"
+        assert locked["_fp"] == initial_fp
+        assert EquipmentData.from_dict(locked).lock_status == "locked"
+
+        equip.lock_status = "unlock"
+        unlocked = equip.to_dict()
+        assert unlocked["lock_status"] == "unlock"
+        assert unlocked["_fp"] == initial_fp
+        assert EquipmentData.from_dict(unlocked).lock_status == "unlock"
+
+        legacy = dict(unlocked)
+        legacy.pop("lock_status")
+        assert EquipmentData.from_dict(legacy).lock_status is None
+
+        equip.lock_status = "unexpected"
+        assert "lock_status" not in equip.to_dict(include_fp=False)
         equip.cooldown_expires_at = "2026-09-08T20:00:00.000+00:00"
         assert equip.to_dict()["_fp"] == initial_fp
 

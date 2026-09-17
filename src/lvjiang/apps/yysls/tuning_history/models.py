@@ -54,6 +54,10 @@ class TuningEquipmentResult:
     telemetry_stop_reason: str = ""
     telemetry_final_rating: str = ""
     resets: int = 0
+    lock_status: str = ""
+    cooldown_kind: str = ""
+    cooldown_state: str = ""
+    cooldown_expires_at: str = ""
 
     @property
     def entered_tuning(self) -> bool:

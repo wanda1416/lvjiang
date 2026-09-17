@@ -1,7 +1,7 @@
 """可复用 UI 控件"""
 
-from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, QSize, Qt
-from PyQt6.QtGui import QTextCursor, QWheelEvent
+from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QTextCursor, QWheelEvent
 from PyQt6.QtWidgets import (
     QAbstractSpinBox,
     QApplication,
@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLayout,
+    QMenu,
+    QPushButton,
     QTextEdit,
     QWidget,
 )
@@ -214,3 +216,112 @@ class FlowLayout(QLayout):
             line_height = max(line_height, item_size.height())
 
         return y + line_height - rect.y()
+
+
+class MultiSelectMenu(QMenu):
+    """勾选后保持展开的菜单，便于一次勾选多项。"""
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802 — Qt 命名
+        action = self.activeAction()
+        if action is not None and action.isCheckable():
+            action.trigger()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+
+class MultiSelectButton(QPushButton):
+    """带下拉多选菜单的按钮：首项「全部」一键全选/清空，按钮文字汇总当前选择。
+
+    ``options`` 为 ``(key, label)`` 列表；默认全选。``selected_keys()`` 返回
+    仍按 ``options`` 顺序排列的已选 key。全选时按钮显示 ``all_label``，
+    一项未选显示 ``none_label``，其余列出前几项标签。
+    """
+
+    selection_changed = pyqtSignal()
+
+    def __init__(
+        self,
+        options: list[tuple[str, str]],
+        *,
+        all_label: str,
+        none_label: str = "",
+        max_shown: int = 3,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._options = list(options)
+        self._all_label = all_label
+        self._none_label = none_label or all_label
+        self._max_shown = max_shown
+        self._syncing = False
+
+        self._menu = MultiSelectMenu(self)
+        self._all_action = QAction(all_label, self._menu)
+        self._all_action.setCheckable(True)
+        self._all_action.setChecked(True)
+        self._all_action.toggled.connect(self._on_all_toggled)
+        self._menu.addAction(self._all_action)
+        self._menu.addSeparator()
+        self._actions: dict[str, QAction] = {}
+        for key, label in self._options:
+            action = QAction(label, self._menu)
+            action.setCheckable(True)
+            action.setChecked(True)
+            action.toggled.connect(self._on_item_toggled)
+            self._menu.addAction(action)
+            self._actions[key] = action
+        self.setMenu(self._menu)
+        self._refresh_text()
+
+    # ── 状态 ──
+
+    def selected_keys(self) -> list[str]:
+        return [key for key, _label in self._options
+                if self._actions[key].isChecked()]
+
+    def all_selected(self) -> bool:
+        return all(action.isChecked() for action in self._actions.values())
+
+    def set_selected(self, keys) -> None:
+        wanted = set(keys)
+        self._syncing = True
+        try:
+            for key, action in self._actions.items():
+                action.setChecked(key in wanted)
+            self._all_action.setChecked(self.all_selected())
+        finally:
+            self._syncing = False
+        self._refresh_text()
+        self.selection_changed.emit()
+
+    # ── 内部 ──
+
+    def _on_all_toggled(self, checked: bool) -> None:
+        if self._syncing:
+            return
+        self.set_selected(self._actions if checked else ())
+
+    def _on_item_toggled(self, _checked: bool) -> None:
+        if self._syncing:
+            return
+        self._syncing = True
+        try:
+            self._all_action.setChecked(self.all_selected())
+        finally:
+            self._syncing = False
+        self._refresh_text()
+        self.selection_changed.emit()
+
+    def _refresh_text(self) -> None:
+        selected = self.selected_keys()
+        if not self._options or len(selected) == len(self._options):
+            text = self._all_label
+        elif not selected:
+            text = self._none_label
+        else:
+            labels = [label for key, label in self._options if key in selected]
+            text = "、".join(labels[:self._max_shown])
+            if len(labels) > self._max_shown:
+                text += f" +{len(labels) - self._max_shown}"
+        self.setText(text)

@@ -113,12 +113,15 @@ class _FilteredDeleteDialog(QDialog):
         candidate_fingerprints: set[str],
         referenced_fingerprints: set[str],
         parent=None,
+        *,
+        locked_fingerprints: set[str] | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(tr("确认删除"))
         self.setMinimumWidth(520)
         self._candidates = set(candidate_fingerprints)
         self._referenced = self._candidates & set(referenced_fingerprints)
+        self._locked = self._candidates & set(locked_fingerprints or ())
 
         # 仅放大本确认框，保持应用全局字号和其他页面不变。
         font = self.font()
@@ -158,6 +161,13 @@ class _FilteredDeleteDialog(QDialog):
         self._preserve_checkbox.toggled.connect(self._update_summary)
         layout.addWidget(self._preserve_checkbox)
 
+        self._preserve_locked_checkbox = QCheckBox(tr("保留已锁定的装备"))
+        self._preserve_locked_checkbox.setChecked(True)
+        self._preserve_locked_checkbox.setToolTip(tr(
+            "保留已标记为锁定的装备"))
+        self._preserve_locked_checkbox.toggled.connect(self._update_summary)
+        layout.addWidget(self._preserve_locked_checkbox)
+
         self._stats_label = QLabel()
         self._stats_label.setWordWrap(True)
         layout.addWidget(self._stats_label)
@@ -194,18 +204,28 @@ class _FilteredDeleteDialog(QDialog):
         return self._preserve_checkbox.isChecked()
 
     @property
+    def preserve_locked(self) -> bool:
+        return self._preserve_locked_checkbox.isChecked()
+
+    @property
     def effective_delete_count(self) -> int:
+        remaining = set(self._candidates)
         if self.preserve_referenced:
-            return len(self._candidates - self._referenced)
-        return len(self._candidates)
+            remaining.difference_update(self._referenced)
+        if self.preserve_locked:
+            remaining.difference_update(self._locked)
+        return len(remaining)
 
     def _update_summary(self) -> None:
-        protected = len(self._referenced) if self.preserve_referenced else 0
+        referenced = len(self._referenced) if self.preserve_referenced else 0
+        locked = len(self._locked) if self.preserve_locked else 0
         self._stats_label.setText(tr(
-            "筛选命中 {matched} 件；备战保护 {protected} 件；"
+            "筛选命中 {matched} 件；备战保护 {referenced} 件；"
+            "锁定保护 {locked} 件；"
             "实际将删除 {deleted} 件").format(
                 matched=len(self._candidates),
-                protected=protected,
+                referenced=referenced,
+                locked=locked,
                 deleted=self.effective_delete_count,
             ))
         exposed = len(self._referenced)
@@ -1186,6 +1206,7 @@ class EquipStatusTab(QWidget):
             card.edit_requested.connect(self._on_edit_requested)
             card.delete_requested.connect(self._on_delete_requested)
             card.copy_requested.connect(self._on_copy_requested)
+            card.lock_requested.connect(self._on_lock_requested)
             card.properties_requested.connect(self._on_properties_requested)
             if self._batch_copy_mode:
                 fp = str(equip.get("_fp") or "")
@@ -1209,6 +1230,7 @@ class EquipStatusTab(QWidget):
             card.edit_requested.connect(self._on_edit_requested)
             card.delete_requested.connect(self._on_delete_requested)
             card.copy_requested.connect(self._on_copy_requested)
+            card.lock_requested.connect(self._on_lock_requested)
             card.properties_requested.connect(self._on_properties_requested)
             if self._batch_copy_mode:
                 fp = str(equip.get("_fp") or "")
@@ -1303,6 +1325,40 @@ class EquipStatusTab(QWidget):
         if notify:
             get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
 
+    def _update_item_metadata(self, fp: str, key: str, value: str) -> None:
+        """原地同步不影响指纹和属性的单装备字段。"""
+        seen: set[int] = set()
+
+        def update_mapping(items) -> None:
+            for equip in items:
+                if str(equip.get("_fp") or "") != fp:
+                    continue
+                identity = id(equip)
+                if identity not in seen:
+                    equip[key] = value
+                    seen.add(identity)
+
+        update_mapping(self._equipped.values())
+        for grouped in (self._bag_items, self._mock_items):
+            for items in grouped.values():
+                update_mapping(items.values())
+
+        def update_card(card) -> None:
+            data = getattr(card, "_equip_data", {})
+            if str(data.get("_fp") or "") != fp:
+                return
+            if key == "lock_status":
+                card.update_lock_status(value)
+            elif key == "cooldown_expires_at":
+                card.update_cooldown(value)
+
+        for card in self._slot_cards.values():
+            update_card(card)
+        for index in range(self._grid.count()):
+            card = self._grid.itemAt(index).widget()
+            if isinstance(card, _CompactEquipCard):
+                update_card(card)
+
     def _require_inventory(self):
         """返回已加载的装备库存；不可用时给出统一提示。"""
         if self._inv is None:
@@ -1346,7 +1402,17 @@ class EquipStatusTab(QWidget):
                 return False
             try:
                 inv.set_item_cooldown(fp, value)
-                self._sync_inv(notify=True)
+                self._update_item_metadata(fp, "cooldown_expires_at", value)
+                # 与仓储 set_item_cooldown 同步 kind/state，否则背包/模拟里
+                # 同指纹的其他副本仍残留「冷却完成」，卡片文案要到重载才消失
+                if value:
+                    self._update_item_metadata(
+                        fp, "cooldown_kind",
+                        str(equip_data.get("cooldown_kind") or "transmute"))
+                    self._update_item_metadata(fp, "cooldown_state", "cooling")
+                else:
+                    self._update_item_metadata(fp, "cooldown_kind", "")
+                    self._update_item_metadata(fp, "cooldown_state", "")
                 return True
             except Exception as exc:
                 logger.error(f"修改装备冷却时间失败: {exc}")
@@ -1355,6 +1421,29 @@ class EquipStatusTab(QWidget):
 
         _show_equipment_properties(
             self.window(), equip_data, cooldown_changed=update_cooldown)
+
+    def _on_lock_requested(self, equip_data: dict, locked: bool) -> None:
+        """在不改变装备指纹的前提下修改锁定状态。"""
+        fp = str(equip_data.get("_fp") or "")
+        if not fp:
+            QMessageBox.warning(
+                self, tr("修改失败"), tr("装备数据缺少 _fp 字段"))
+            return
+        inv = self._require_inventory()
+        if inv is None:
+            return
+        try:
+            inv.set_item_lock_status(fp, locked)
+            self._update_item_metadata(
+                fp, "lock_status", "locked" if locked else "unlock")
+            logger.info(
+                "已{}装备: {}",
+                "锁定" if locked else "解锁",
+                equip_data.get("name") or fp,
+            )
+        except Exception as exc:
+            logger.error(f"修改装备锁定状态失败: {exc}")
+            QMessageBox.critical(self, tr("修改失败"), str(exc))
 
     def _on_equip_requested(self, equip_data: dict, group_key: str):
         """处理装备请求：将背包/模拟中的装备穿戴到对应槽位"""
@@ -1487,6 +1576,7 @@ class EquipStatusTab(QWidget):
         referenced = inv.referenced_plan_fps
         dialog = _FilteredDeleteDialog(
             self._filter_summary(), fingerprints, referenced, self,
+            locked_fingerprints=inv.locked_item_fps,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -1494,6 +1584,7 @@ class EquipStatusTab(QWidget):
             deleted = inv.delete_items(
                 fingerprints,
                 preserve_referenced=dialog.preserve_referenced,
+                preserve_locked=dialog.preserve_locked,
             )
             self._sync_inv(notify=True)
             logger.info(

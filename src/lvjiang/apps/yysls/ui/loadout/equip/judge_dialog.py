@@ -602,15 +602,13 @@ class EquipJudgeTestDialog(QDialog):
                 f"R{rnd} +{new_affix.name} 狗粮:{food_tag}"
                 f" 评:{expect_label}")
 
-            # 结束处理
-            if group.tune.enabled:
-                action, why = group.tune.decide(
-                    equip_part, equip_quality,
-                    float(cap_pct) if cap_pct is not None else None,
-                    rating_of, full, [a.name for a in equip.affixes])
-            else:
-                action = "skip" if full else "continue"
-                why = tr("结束处理未启用")
+            # 调律处理
+            # TuneBehavior 自身负责“行为表停用”的默认语义，也包含
+            # 满词条合格装备的锁定开关；验证器必须与真实流程共用它。
+            action, why = group.tune.decide(
+                equip_part, equip_quality,
+                float(cap_pct) if cap_pct is not None else None,
+                rating_of, full, [a.name for a in equip.affixes])
 
             if action == "continue":
                 if full:
@@ -625,6 +623,9 @@ class EquipJudgeTestDialog(QDialog):
             elif action == "skip":
                 log.append(f"  {why} → 跳过")
                 break
+            elif action == "lock":
+                log.append(f"  {why} → 锁定")
+                break
             elif action == "tune_full_recycle":
                 log.append(f"  {why} → 调满后回收")
                 full_recycle = True
@@ -636,7 +637,7 @@ class EquipJudgeTestDialog(QDialog):
         # 直接写死的中文（非 tr()），这里比对也要用裸中文，否则英文界面下
         # 永远匹配不上，会多打印一行多余的「调律结束」分隔线。
         if not full_recycle and affix_count < _AFFIX_ROWS and not log[-1].endswith(
-                ("保留", "重置", "回收", "跳过")):
+                ("保留", "重置", "回收", "跳过", "锁定")):
             log.append(f"── 调律结束（{affix_count}/{_AFFIX_ROWS}）──")
 
         self.result_text.setPlainText("\n".join(log))

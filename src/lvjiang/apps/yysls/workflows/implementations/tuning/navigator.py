@@ -57,6 +57,10 @@ class TuningNavigator:
         """离开调律页，并恢复装备详情页的环境相关 UI 状态。"""
         self._routes.leave_tune_detail(for_recycle=for_recycle)
 
+    def lock_current_equipment(self) -> None:
+        """锁定当前详情页装备；不负责判断当前锁定状态。"""
+        self._routes.lock_current_equipment()
+
     def collect_new_affix(self, equip_data: EquipmentData, text: str) -> str:
         """把调律结果的新词条补充进装备数据，供下一轮判定使用
 

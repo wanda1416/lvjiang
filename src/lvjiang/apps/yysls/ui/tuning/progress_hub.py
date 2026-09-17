@@ -35,7 +35,8 @@ class TuningProgressHub(QObject):
     # ─── 装备处理开始（OCR 解析完成，评级可能尚未完成）────
     equipment_started = pyqtSignal(object)
     # dict: {name, type, level, quality, affixes: list[dict],
-    #        expect_rating, target_affixes: list[str]}
+    #        expect_rating, target_affixes: list[str], lock_status,
+    #        cooldown_kind, cooldown_state, cooldown_expires_at}
     # expect_rating: 固定为空串；实际评级由随后异步发出的
     # equipment_assessed 提供。
 
@@ -77,7 +78,8 @@ class TuningProgressHub(QObject):
     # ─── 扫描处理决策（评级未达门槛 / 词条已满）──────────
     scan_decision = pyqtSignal(object)
     # dict: {name, action, reason}
-    # action: "recycled" | "kept" | "force_tune" | "tune_full_recycle"
+    # action: "recycled" | "kept" | "force_tune" | "tune_full_recycle" |
+    #         "protected" | "deferred"
 
     # ─── 装备处理结束 ────────────────────────────────────
     equipment_finished = pyqtSignal(object)

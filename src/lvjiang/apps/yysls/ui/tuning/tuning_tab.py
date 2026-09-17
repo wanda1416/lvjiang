@@ -306,6 +306,14 @@ class TuningTab(QWidget):
         self._pc_background_scroll_cb.stateChanged.connect(
             lambda _state: self._save_tuning_config())
         layout.addWidget(self._pc_background_scroll_cb)
+        self._skip_locked_equipment_cb = QCheckBox(
+            tr("跳过锁定装备调律"))
+        self._skip_locked_equipment_cb.setToolTip(tr(
+            "启用后，扫描到已锁定装备时直接保留，不进入调律、重置或回收流程。"))
+        self._skip_locked_equipment_cb.setChecked(True)
+        self._skip_locked_equipment_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._skip_locked_equipment_cb)
         self._use_stone_cache_cb = QCheckBox(tr("使用律准石缓存"))
         self._use_stone_cache_cb.setToolTip(tr(
             "首次识别后按调律、重置和回收结果记账；"
@@ -572,6 +580,7 @@ class TuningTab(QWidget):
         switches = {str(k): bool(v) for k, v in tc.get("switches", {}).items()}
         skip_tuning = bool(tc.get("skip_tuning", False))
         pc_background_scroll = bool(tc.get("pc_background_scroll", False))
+        skip_locked_equipment = bool(tc.get("skip_locked_equipment", True))
         use_stone_cache = bool(tc.get("use_stone_cache", True))
         initial_stone_min_count = tc.get("initial_stone_min_count")
         initial_stone_check_enabled = bool(tc.get(
@@ -645,6 +654,7 @@ class TuningTab(QWidget):
                 base_group=base_group,
                 skip_tuning=skip_tuning,
                 pc_background_scroll=pc_background_scroll,
+                skip_locked_equipment=skip_locked_equipment,
                 use_stone_cache=use_stone_cache,
                 initial_stone_check_enabled=initial_stone_check_enabled,
                 initial_stone_min_count=initial_stone_min_count,
@@ -733,6 +743,10 @@ class TuningTab(QWidget):
             self._pc_background_scroll_cb.setChecked(
                 bool(tc.get("pc_background_scroll", False)))
             self._pc_background_scroll_cb.blockSignals(False)
+            self._skip_locked_equipment_cb.blockSignals(True)
+            self._skip_locked_equipment_cb.setChecked(
+                bool(tc.get("skip_locked_equipment", True)))
+            self._skip_locked_equipment_cb.blockSignals(False)
             self._use_stone_cache_cb.blockSignals(True)
             self._use_stone_cache_cb.setChecked(
                 bool(tc.get("use_stone_cache", True)))
@@ -817,6 +831,8 @@ class TuningTab(QWidget):
             "base_group": self._base_group_key,
             "skip_tuning": self._get_tuning_skip_tuning(),
             "pc_background_scroll": self._pc_background_scroll_cb.isChecked(),
+            "skip_locked_equipment": (
+                self._skip_locked_equipment_cb.isChecked()),
             "use_stone_cache": self._use_stone_cache_cb.isChecked(),
             "initial_stone_check_enabled": (
                 self._initial_stone_check_cb.isChecked()),

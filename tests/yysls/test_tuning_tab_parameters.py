@@ -74,6 +74,7 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     assert not sub_weapon.isChecked()
     assert not sub_weapon.isEnabled()
     assert not tab._pc_background_scroll_cb.isChecked()
+    assert tab._skip_locked_equipment_cb.isChecked()
     assert not tab._positional_traversal_cb.isChecked()
     assert tab._use_stone_cache_cb.isChecked()
     assert not tab._initial_stone_check_cb.isChecked()
@@ -86,6 +87,7 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     assert tab._smart_tuning_cb.isEnabled()
     tab._smart_tuning_cb.setChecked(True)
     tab._pc_background_scroll_cb.setChecked(True)
+    tab._skip_locked_equipment_cb.setChecked(False)
     tab._positional_traversal_cb.setChecked(True)
     tab._initial_stone_check_cb.setChecked(True)
     tab._initial_stone_min.setValue(120)
@@ -93,6 +95,7 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     saved = get_user_workflow_params("测试用户", "auto_tuning", users_dir)
     assert saved is not None
     assert saved["pc_background_scroll"] is True
+    assert saved["skip_locked_equipment"] is False
     assert saved["scroll_strategy"] == "positional"
     assert saved["use_stone_cache"] is True
     assert saved["initial_stone_check_enabled"] is True

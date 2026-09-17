@@ -25,6 +25,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
     "base_group": "default",
     "skip_tuning": False,
     "pc_background_scroll": False,
+    "skip_locked_equipment": True,
     "use_stone_cache": True,
     "initial_stone_check_enabled": False,
     "initial_stone_min_count": None,

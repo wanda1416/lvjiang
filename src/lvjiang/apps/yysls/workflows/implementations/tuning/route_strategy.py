@@ -87,6 +87,11 @@ class TuningRouteStrategy(ABC):
         """关闭当前装备详情；移动端无需额外动作。"""
         return None
 
+    def lock_current_equipment(self) -> None:
+        """在装备详情页点击锁定开关。调用方必须先确认未锁定。"""
+        self._wf.click_region(self._wf.EQUIP_DETAIL, "lock")
+        self._wf.wait_delay("step_interval")
+
     def open_reset_dialog(self) -> None:
         """通过当前布局定义的动作打开重置调律弹窗。"""
         self._wf.click_region(self._wf.TUNE_SCENE, "reset_tune")

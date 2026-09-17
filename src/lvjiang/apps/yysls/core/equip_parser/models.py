@@ -9,6 +9,8 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass, field
 
+from .lock_state import normalize_lock_status
+
 
 @dataclass
 class EquipAttr:
@@ -64,6 +66,8 @@ class EquipmentData:
         "name": "踏雪含光",
         "level": 110,
         "original_level": 105,
+        "cooldown_kind": "reset",
+        "cooldown_state": "cooling",
         "cooldown_expires_at": "2026-09-07T20:00:00.000+00:00",
         "quality": null,
         "is_chengyin": true,
@@ -80,9 +84,12 @@ class EquipmentData:
     name: str | None = None        # 装备名称
     level: int | None = None
     original_level: int = 0       # 仅按名称中的等阶名称识别；0 表示未知
+    cooldown_kind: str = ""       # reset / transmute / unknown；空表示无冷却标记
+    cooldown_state: str = ""      # cooling / completed；空表示无冷却标记
     cooldown_expires_at: str = ""  # 冷却到期 UTC ISO 时间；无冷却为空
     quality: str | None = None     # gold/purple/blue/green，OCR 暂无法识别
     is_chengyin: bool = False
+    lock_status: str | None = None  # locked / unlock；None 表示未识别或历史数据
     base_attr: EquipAttr | None = None
     base_attr_2: EquipAttr | None = None
     affixes: list[Affix] = field(default_factory=list)
@@ -121,12 +128,18 @@ class EquipmentData:
             "name": self.name,
             "level": self.level,
             "original_level": self.original_level,
+            "cooldown_kind": self.cooldown_kind,
+            "cooldown_state": self.cooldown_state,
             "cooldown_expires_at": self.cooldown_expires_at,
             "quality": self.quality,
             "is_chengyin": self.is_chengyin,
             "base_attr": self.base_attr.to_dict() if self.base_attr else None,
             "base_attr_2": self.base_attr_2.to_dict() if self.base_attr_2 else None,
         }
+        if self.lock_status:
+            lock_status = normalize_lock_status(self.lock_status)
+            if lock_status:
+                d["lock_status"] = lock_status
         for i, affix in enumerate(self.affixes, 1):
             d[f"affix_{i}"] = affix.to_dict()
             # 记录转律词条位置供 DSL 快速定位
@@ -162,9 +175,12 @@ class EquipmentData:
             name=d.get("name"),
             level=d.get("level"),
             original_level=int(original_level or 0),
+            cooldown_kind=str(d.get("cooldown_kind") or ""),
+            cooldown_state=str(d.get("cooldown_state") or ""),
             cooldown_expires_at=str(d.get("cooldown_expires_at") or ""),
             quality=d.get("quality"),
             is_chengyin=d.get("is_chengyin", False),
+            lock_status=normalize_lock_status(d.get("lock_status")),
             base_attr=EquipAttr.from_dict(d["base_attr"]) if d.get("base_attr") else None,
             base_attr_2=EquipAttr.from_dict(d["base_attr_2"]) if d.get("base_attr_2") else None,
             affixes=affixes,

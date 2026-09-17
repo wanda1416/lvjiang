@@ -15,6 +15,7 @@ class BehaviorAction(str, Enum):
     SKIP = "skip"
     TUNE_FULL_RECYCLE = "tune_full_recycle"
     TUNE_THIS = "tune_this"
+    LOCK = "lock"
 
     def __str__(self) -> str:
         return self.value

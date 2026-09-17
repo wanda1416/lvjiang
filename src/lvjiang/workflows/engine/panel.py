@@ -688,7 +688,7 @@ class _PanelMixin:
 
     def _capture_panel_image(self, panel_obj) -> "np.ndarray | None":
         """截取 panel 区域图像（像素数组），用于校准"""
-        full = self._capture.capture()
+        full = self.capture_frame(source="panel")
         if full is None:
             return None
         w_cap, h_cap = self._capture.get_capture_size()

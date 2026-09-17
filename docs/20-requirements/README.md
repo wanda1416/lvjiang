@@ -15,7 +15,7 @@
 | [05-tuning-management.md](05-tuning-management.md) | 调律管理：实时总览、版本化历史、七天匿名补传 | ✅ 已实现 |
 | [06-task-history.md](06-task-history.md) | 任务历史：单任务/批量两级 ID、参数与产出查询、独立日志 | ✅ 已实现 |
 | [07-in-match-navigation.md](07-in-match-navigation.md) | 局内地图目标闭环导航与撤离：渡尘墟、觉障林等玩法通用 | 部分实现（控制面、地图管理、朝向识别已落地） |
-| [08-smart-tuning.md](08-smart-tuning.md) | 智能调律：结合备战方案毕业率的二次结束处理与剩余词条推演 | 需求设计中 |
+| [08-smart-tuning.md](08-smart-tuning.md) | 智能调律：结合备战方案毕业率的二次调律处理与剩余词条推演 | 第一版已实现 |
 
 ## 子需求
 

@@ -762,6 +762,8 @@ def _parse_scan(raw, where: str) -> ScanBehavior:
         enabled=bool(raw.get("enabled", True)),
         min_level=min_level,
         entry_min_rating=entry,
+        entry_first_affix_only=bool(
+            raw.get("entry_first_affix_only", True)),
         max_consecutive_recycles=mcr,
         rules=_parse_behavior_rules(raw.get("rules"), f"{where}.rules",
                                     "scan"),
@@ -769,8 +771,8 @@ def _parse_scan(raw, where: str) -> ScanBehavior:
 
 
 def _parse_tune(raw, where: str) -> TuneBehavior:
-    """结束处理解析：{enabled, rules, max_resets,
-    reset_exhausted_action}；缺省段取 TuneBehavior 默认值"""
+    """调律处理解析：{enabled, rules, max_resets,
+    reset_exhausted_action, lock_qualified}；缺省段取 TuneBehavior 默认值"""
     if raw is None:
         return TuneBehavior()
     if not isinstance(raw, dict):
@@ -794,7 +796,7 @@ def _parse_tune(raw, where: str) -> TuneBehavior:
                                     "tune"),
         max_resets=max_resets,
         reset_exhausted_action=exhausted,
-        initial_check=bool(raw.get("initial_check", False)),
+        lock_qualified=bool(raw.get("lock_qualified", True)),
     )
 
 

@@ -19,7 +19,12 @@ from .panel import _PanelMixin
 from .recognition import _RecognitionMixin
 
 
-class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
+class BaseWorkflow(
+    _RecognitionMixin,
+    _ActionMixin,
+    _CoordMixin,
+    _PanelMixin,
+):
     """工作流基类
 
     运行时状态：
@@ -66,6 +71,7 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         # 暂停事件（由 UI 层注入）：set=运行，clear=暂停阻塞
         self._pause_event = pause_event
         self._reference_recognizer = reference_recognizer
+        self._init_capture_snapshot()
 
         # 运行时状态
         self.output: dict = {}  # collect 语句写入的输出字典
@@ -83,6 +89,7 @@ class BaseWorkflow(_RecognitionMixin, _ActionMixin, _CoordMixin, _PanelMixin):
         """重置运行时状态（在 run 开始前调用）"""
         self.output = {}
         self.variables = {}
+        self.clear_capture_snapshot()
         if self._reference_recognizer is not None:
             self._reference_recognizer.reload()
 

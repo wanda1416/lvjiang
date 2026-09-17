@@ -65,7 +65,6 @@ class EquipmentSession:
     def tune_full_recycle(self) -> bool:
         return self.mode is TuningMode.TUNE_FULL_RECYCLE
 
-
 @dataclass
 class TuningRunState:
     """一次自动调律运行中跨装备共享的业务状态。"""

@@ -1,11 +1,11 @@
-"""调律配置对话框 —— 行为处理页（扫描处理 / 结束处理）
+"""调律配置对话框 —— 行为处理页（扫描处理 / 调律处理）
 
 状态机行为点配置（基础规则组 behavior 段），每页一张有序条件规则表
 （自上而下首条命中即生效）：
 - 扫描处理（ScanBehaviorPage，behavior.scan）：进调律前，
   传入规则预期评级 ≥ 进入门槛即进入调律；未达门槛的装备按
   处置表决定回收/保留（无命中 = 保留）；
-- 结束处理（TuneBehaviorPage，behavior.tune）：每轮调律结束后
+- 调律处理（TuneBehaviorPage，behavior.tune）：进入调律前和每轮调律结束后
   按预期评级决策 继续调律/重置调律/回收/结束保留（词条满为
   边界条件：继续调律不可达，无命中默认结束保留；未满默认
   继续调律）；另有单件重置次数上限 + 次数用尽转处置动作。
@@ -80,7 +80,7 @@ from lvjiang.ui.button_styles import (
 from .....i18n import tr
 from ..domain_labels import domain_label
 
-# 品阶候选（从高到低，最高档 = 不限；扫描/结束处理共用）
+# 品阶候选（从高到低，最高档 = 不限；扫描/调律处理共用）
 _QUALITY_KEYS = ("gold", "gold_only", "purple_only", "purple", "blue")
 _QUALITY_LABELS = {
     "gold": tr("- 不限 -"),
@@ -863,6 +863,15 @@ class ScanBehaviorPage(_BehaviorPageBase):
         self._entry_combo.setToolTip(tr("预期评级 ≥ 该档即进入调律（固定用传入规则判定）"))
         self._entry_combo.currentIndexChanged.connect(lambda _i: self._apply())
         threshold_row.addWidget(self._entry_combo)
+        threshold_row.addSpacing(half_line)
+        self._entry_first_affix_cb = QCheckBox(tr("仅识别首词条"))
+        self._entry_first_affix_cb.setToolTip(
+            tr("只在调律门槛判定时忽略已有的其他词条，"
+               "以首词条胚子的最大潜力决定是否进入调律流程。\n"
+               "不会改写装备；进入后的调律处理仍使用完整实际词条。"))
+        self._entry_first_affix_cb.stateChanged.connect(
+            lambda _s: self._apply())
+        threshold_row.addWidget(self._entry_first_affix_cb)
         threshold_row.addStretch()
         layout.addLayout(threshold_row)
 
@@ -895,6 +904,7 @@ class ScanBehaviorPage(_BehaviorPageBase):
         self._min_level_combo.set_level(stage.min_level)
         idx = self._entry_combo.findData(stage.entry_min_rating)
         self._entry_combo.setCurrentIndex(max(idx, 0))
+        self._entry_first_affix_cb.setChecked(stage.entry_first_affix_only)
         self._max_recycle_spin.setValue(stage.max_consecutive_recycles)
         self._enabled_cb.setChecked(stage.enabled)
 
@@ -903,21 +913,22 @@ class ScanBehaviorPage(_BehaviorPageBase):
             "enabled": self._enabled_cb.isChecked(),
             "min_level": self._min_level_combo.get_level() or 100,
             "entry_min_rating": self._entry_combo.currentData(),
+            "entry_first_affix_only": self._entry_first_affix_cb.isChecked(),
             "max_consecutive_recycles": self._max_recycle_spin.value(),
             "rules": self._rules_raw(),
         }
 
 
 class TuneBehaviorPage(_BehaviorPageBase):
-    """结束处理编辑页（只负责 behavior.tune 子段）"""
+    """调律处理编辑页（只负责 behavior.tune 子段）"""
 
     STAGE = "tune"
 
     def _init_head(self, layout: QVBoxLayout):
         layout.addWidget(QLabel(
-            "<b>" + tr("结束处理") + "</b>（" + tr("每轮调律结束后的行为点）：按预期评级决策"
+            "<b>" + tr("调律处理") + "</b>（" + tr("进入调律前与每轮调律后的行为点）：按完整装备预期评级决策"
             "（首条命中）。无命中默认：未满 = 继续调律、词条满 = "
-            "结束保留；材料不足/用户中断属阻断，不触发") + "）"))
+            "结束并按设置锁定；材料不足/用户中断属阻断，不触发") + "）"))
         half_line = self.fontMetrics().height() // 2
 
         head = QHBoxLayout()
@@ -947,26 +958,23 @@ class TuneBehaviorPage(_BehaviorPageBase):
         head.addStretch()
         layout.addLayout(head)
 
-        # 初始判定复选框
-        init_row = QHBoxLayout()
-        self._initial_check_cb = QCheckBox(tr("启用初始判定"))
-        self._initial_check_cb.setToolTip(
-            tr("勾选后，对每件装备进行第一次调律前会先执行一次结束处理判定。\n"
-               "用于支持本身已经是废品的装备先重置，再开始正常调律。"))
-        self._initial_check_cb.stateChanged.connect(lambda _s: self._apply())
-        init_row.addWidget(self._initial_check_cb)
-        init_row.addWidget(QLabel(
-            "<font color='gray'>" + tr("对装备进行第一次调律前执行一次结束处理，"
-            "用于支持装备直接重置") + "</font>"))
-        init_row.addStretch()
-        layout.addLayout(init_row)
+        lock_row = QHBoxLayout()
+        self._lock_qualified_cb = QCheckBox(tr("锁定合格装备"))
+        self._lock_qualified_cb.setToolTip(
+            tr("装备至少完成一轮调律后，若词条已满且无规则命中，\n"
+               "或命中“继续调律或锁定”，返回装备详情页后自动锁定。\n"
+               "已锁定装备不会再点击，避免误解锁。"))
+        self._lock_qualified_cb.stateChanged.connect(lambda _s: self._apply())
+        lock_row.addWidget(self._lock_qualified_cb)
+        lock_row.addStretch()
+        layout.addLayout(lock_row)
 
     def _load_stage(self, stage) -> None:
         self._enabled_cb.setChecked(stage.enabled)
         self._resets_spin.setValue(stage.max_resets)
         idx = self._exhausted_combo.findData(stage.reset_exhausted_action)
         self._exhausted_combo.setCurrentIndex(max(idx, 0))
-        self._initial_check_cb.setChecked(stage.initial_check)
+        self._lock_qualified_cb.setChecked(stage.lock_qualified)
 
     def _stage_raw(self) -> dict:
         return {
@@ -974,5 +982,5 @@ class TuneBehaviorPage(_BehaviorPageBase):
             "rules": self._rules_raw(),
             "max_resets": self._resets_spin.value(),
             "reset_exhausted_action": self._exhausted_combo.currentData(),
-            "initial_check": self._initial_check_cb.isChecked(),
+            "lock_qualified": self._lock_qualified_cb.isChecked(),
         }

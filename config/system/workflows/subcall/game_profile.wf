@@ -7,6 +7,11 @@
 #   check_profile($keys)   — 批量校验 profile key 已定义，未定义则阻塞提醒
 #   sync_weekly_progress($raw, $key, $last, $label)
 #       — 解析 a/b 周进度并按本周期单调规则同步 profile
+#
+# 依赖某个 profile key 的工作流建议在开头用内置函数 profile_declare 声明
+# （幂等导入，仅创建缺失定义），声明成功后 check_profile 只作兑底断言：
+#   eval profile_declare("quota", "xxx_of_week",
+#       {"label": "标签", "cap": 1, "increment_only": true})
 
 # ─── 批量校验 profile key ─────────────────────────────────
 # 参数：$keys — key 列表（如 ["tongbao", "bugan"]）

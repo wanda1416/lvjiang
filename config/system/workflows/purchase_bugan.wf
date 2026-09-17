@@ -1,4 +1,4 @@
-#% name: 自动购买不肝
+#% name: 自动购买不肝商店
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]
@@ -29,15 +29,32 @@
 
 # 自动购买不肝商店商品
 #
+# 类目栏映射（cat_N 指当前屏幕上的第 N 个类目位，不是固定类目）：
+#   不肝商店类目栏共七列，顺序固定：
+#     1 战斗养成  2 装备宝匣  3 金装兑换  4 逐战商店
+#     5 营生养成  6 赛季追赶  7 外观兑换
+#   安卓端一屏 5 列：类目 1-5 直接对应 cat_1-cat_5；访问类目 6/7 需在
+#     liebiao 区域内滚动一次，滚动后映射 cat_4→类目6(赛季)、cat_5→类目7(外观)
+#   PC 端一屏 6.5 列：类目 1-6 完整可见对应 cat_1-cat_6；类目 7(外观)只露出
+#     半列，需在类目栏滚动一次 0.5 对齐后点击（cat_7 布局直接按滚动后位置描述）
+#
 # 流程结构：
 #   1. 导航：首页 → 菜单 → 不肝 → 切换到不肝商店视图
-#   2. 战斗养成（默认类目）：依次处理两个商品面板（各 2 行 × 4 列），
-#      整面板 OCR 扫描 → 逐格判断是否命中购买关键词 → 命中则购买
-#      商品1 处理完后，商品2 上滑 2 行再处理
-#   3. 营生（两端均为 cat_5）：扫描 (1,1) 确认含「营生」后才购买
-#   4. 赛季：按当前布局的 shangpin_1 行列各购买一次。类目位置两端不同——
-#      手机端要先在类目列表内翻页，翻完落到 cat_4；PC 端不翻页，就在 cat_6
-#   5. 目前外观拖动存在问题，暂时忽略
+#   2. 战斗养成（类目1，进店默认选中）：进店先同步当前体力到 profile；
+#      依次处理两个商品面板（各 2 行 × 4 列），整面板 OCR 扫描 → 逐格判断
+#      是否命中购买关键词 → 命中则购买；商品1 处理完后，商品2 上滑 2 行再处理；
+#      购买了宝钱会消耗体力，买过就再同步一次最新值
+#   3. 营生（类目5）：两端均在 cat_5，滚动前就能点到；扫描 (1,1) 确认含
+#      「营生」后才购买
+#   4. 赛季（类目6）：按当前布局的 shangpin_1 行列各购买一次。类目位置两端不同——
+#      手机端可视 5 列，要在类目列表内滚动一次，滚动后赛季落到 cat_4（映射 4→6）；
+#      PC 端一屏能显示到 cat_6，赛季直接就在 cat_6，不滚动
+#   5. 外观（类目7）：只买 (1,1) 的袅袅之音——先过 profile 前置检查
+#      （waiguan_profile_skip：nn_bugan_of_week=1 已购标记、changmingyu<200
+#      资金不足，命中即整段跳过）；再按两端定位——安卓沿用赛季的滚动直接点
+#      cat_5（映射 5→7），PC 端在类目栏滚动一次 0.5 对齐后点 cat_7。购买资格：
+#      (1,1) 同含「音」与「绑」且本周不肝进度 ≥ 20000（purchase 按钮文案不能作为
+#      判定依据）；买后回写 nn_bugan_of_week=1（key 存在定义才写）
 #   6. 完成后返回主页
 #
 # 购买动作统一为：点击格子 → 全部添加 → 购买
@@ -59,6 +76,14 @@ eval $buy_keyword_keys = keys($buy_keywords)
 if not $buy_keyword_keys contains "振玉"
     eval $buy_keywords.振玉 = true
 end
+
+# ─── profile 依赖声明（幂等导入：仅创建缺失定义，已有定义不修改） ───
+# 外观兑换依赖的 key：本周已购标记（quota 默认周周期，cap=1 自动清零）
+# 与长鸣玉库存；体力为 regen 模型，同步观察值后由引擎按周期推算回复。
+# 已在 profile.yaml 定义的机器上本段是 no-op。
+eval profile_declare("quota", "nn_bugan_of_week", {"label": "不肝", "cap": 1, "increment_only": true, "sources": ["不肝商店"]})
+eval profile_declare("stock", "changmingyu", {"label": "长鸣玉"})
+eval profile_declare("regen", "tili", {"label": "体力", "cap": 2500, "regen_type": "boundary", "regen_amount": 450})
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
@@ -100,19 +125,28 @@ if not $nav_check
     eval pause("未进入商店购买区域，请确认当前在不肝商店后点击继续")
 end
 
+# 战斗养成第一栏会展示当前体力（如 1,950/2,500），进店先同步一次
+call sync_current_tili()
+
 if env("android")
     # ─── 战斗养成：依次购买两个商品面板 ─────────────────────
-    call buy_panel("shangpin_1", $buy_keywords)
+    call $baoqian_1 = buy_panel("shangpin_1", $buy_keywords)
     drag [bugan_detail].[shangpin_1] up 2 after wait @step_interval
-    call buy_panel("shangpin_2", $buy_keywords)
+    call $baoqian_2 = buy_panel("shangpin_2", $buy_keywords)
     call close_item_prompts()
+    eval $bought_baoqian = $baoqian_1 + $baoqian_2
 else if env("desktop")
     # PC 端可以展示 3行，直接买全部即可
-    call buy_panel("shangpin_1", $buy_keywords)
+    call $bought_baoqian = buy_panel("shangpin_1", $buy_keywords)
 end
 
-# ─── 营生：只买第一格（先确认格子内容是营生） ────────────
-# 两端都在 cat_5，翻页前就能点到
+# 购买宝钱会消耗体力，买过就再同步一次最新值
+if $bought_baoqian
+    call sync_current_tili()
+end
+
+# ─── 营生（类目5）：只买第一格（先确认格子内容是营生） ────
+# 两端都在 cat_5，滚动前就能点到
 if $buy_shengsheng
     click [bugan_detail].[cat_5] after wait @page_refresh
     scan [bugan_detail].[shangpin_1][1][1] as $shengsheng_cell
@@ -126,12 +160,12 @@ else
     log "未勾选购买营生，跳过营生类目"
 end
 
-# ─── 赛季：shangpin_1 按当前布局的面板行列全部购买 ───
-# 游戏更新后类目栏一屏放不下营生和赛季：
-#   手机端可视类目更少，必须先在类目列表内翻页，翻完赛季落到 cat_4；
-#   PC 端一屏能显示到 cat_6，赛季直接就在 cat_6，不翻页。
-# 翻页只能在 liebiao 区域内做——在商品区拖会翻成商品列表滚动。
-# 翻页与是否购买营生无关，所以放在上面的 if 之外：不买营生也要能到赛季。
+# ─── 赛季（类目6）：shangpin_1 按当前布局的面板行列全部购买 ───
+# 类目栏一屏放不下七列（见顶部映射表）：
+#   手机端可视 5 列，必须先在类目列表内滚动一次，滚动后赛季落到 cat_4（映射 4→6）；
+#   PC 端一屏显示 6.5 列，赛季直接就在 cat_6，不滚动（滚动会挤进半列外观，对不齐）。
+# 滚动只能在 liebiao 区域内做——在商品区拖会翻成商品列表滚动。
+# 滚动与是否购买营生无关，所以放在上面的 if 之外：不买营生也要能到赛季。
 if env("android")
     drag [bugan_detail].[liebiao] up 0.5 after wait @page_refresh
     eval $season_cat = "cat_4"
@@ -154,6 +188,44 @@ for r in range(1, $season_rows)
     end
 end
 call close_item_prompts()
+
+# ─── 外观（类目7）：只买 (1,1) 的袅袅之音 ──────────────
+# 先过 profile 前置检查（waiguan_profile_skip）：本周已购标记或长命玉
+# 不足时整段跳过，不切类目不滚动。安卓端赛季段已在类目栏滚动过一次，
+# 沿用滚动结果直接点 cat_5（映射 5→7）；PC 端第 7 列只露出半列，需在类目栏
+# 滚动一次 0.5 对齐后再点 cat_7。购买资格：(1,1) 同时含「音」与「绑」
+# 且本周不肝进度（$bugan_of_week，前面已同步）≥ 20000；purchase 按钮文案
+# 不稳定，不能作为判定依据。OCR 会把袅误识为枭（袅袅之音→枭袅之音），
+# 所以不匹配「袅」；「音+绑」的组合既容错 OCR 误字，又不会与绕梁之音
+# 混淆。购买完成后回写 nn_bugan_of_week=1（key 存在定义才写），配合
+# weekly 周期自动重置实现每周只买一次。
+call $waiguan_skip = waiguan_profile_skip()
+if not $waiguan_skip
+    if env("android")
+        eval $waiguan_cat = "cat_5"
+    else
+        drag [bugan_detail].[liebiao] up 0.5 after wait @page_refresh
+        eval $waiguan_cat = "cat_7"
+    end
+    click [bugan_detail].$waiguan_cat after wait @page_refresh
+    scan [bugan_detail].[shangpin_1][1][1] as $waiguan_cell
+    # 注意：DSL 条件不支持括号分组（not(...) 会被解析成函数调用直接报错），
+    # 双子串判定封装在 is_niaoniao_bind 里逐条判断
+    call $is_nn = is_niaoniao_bind($waiguan_cell)
+    if not $is_nn
+        log "外观 (1,1) 未命中袅袅之音·绑（已购买过或未上架），跳过"
+    else if $bugan_of_week < 20000
+        log "本周不肝进度 " + $bugan_of_week + " < 20000，不满足外观兑换条件，跳过"
+    else
+        call buy_cell("shangpin_1", 1, 1)
+        log "购买外观兑换：袅袅之音"
+        eval $nn_model = profile_model("nn_bugan_of_week")
+        if $nn_model
+            eval profile_set("nn_bugan_of_week", 1)
+            log "已写入 nn_bugan_of_week=1（本周已购标记）"
+        end
+    end
+end
 
 # ─── 返回主页 ──────────────────────────────────────────
 click [bugan_detail].[back] after wait @step_interval
@@ -194,10 +266,29 @@ def buy_cell($panel_key, $r, $c)
     click [bugan_detail].[purchase] after wait @step_interval
 end
 
+# ─── 同步当前体力到 profile ──────────────────────────
+# 体力只在战斗养成第一栏展示，格式同进度对（支持千分位，如 1,950/2,500）。
+# tili 是 regen 模型：profile_set 写入观察值与时间戳，之后的回复由引擎
+# 按周期规则推算，不适用 quota 的 sync_weekly_progress 单调语义。
+# 识别失败只记日志不阻断；返回 0。
+def sync_current_tili()
+    scan [bugan_detail].[current_tili] as $tili_scan
+    eval $tili_progress = extract_progress($tili_scan.current_tili)
+    if $tili_progress.valid
+        eval profile_set("tili", $tili_progress.current)
+        log "当前体力: " + $tili_progress.current + "/" + $tili_progress.total
+    else
+        log "当前体力识别失败: '" + $tili_scan.current_tili + "'，跳过同步"
+    end
+    return 0
+end
+
 # ─── 按关键词购买单个商品面板 ──────────────────────────
 # 整面板 OCR 后逐格判断，命中目标类目则购买
 # 行列数从 panel 实际布局读取（PC 端可显示 3×5）
+# 返回：是否购买了宝钱（1/0）——宝钱会消耗体力，主流程据此再同步一次
 def buy_panel($panel_key, $keywords)
+    eval $bought_baoqian = 0
     scan [bugan_detail].$panel_key as $grid
     eval $rows = panel_rows("bugan_detail", $panel_key)
     eval $cols = panel_cols("bugan_detail", $panel_key)
@@ -215,6 +306,50 @@ def buy_panel($panel_key, $keywords)
             end
             log "命中商品 [" + $panel_key + "] 行" + $r + "列" + $c + " (" + $hit + "): " + $cell
             call buy_cell($panel_key, $r, $c)
+            # 注意：DSL 的 == 是数值比较，字符串必须用 equals（否则恒 False）
+            if $hit equals "宝钱"
+                eval $bought_baoqian = 1
+            end
         end
     end
+    return $bought_baoqian
+end
+
+# ─── 判断格子是否为袅袅之音·绑 ────────────────────────
+# 同时含「音」与「绑」：OCR 会把袅误识为枭（袅袅之音→枭袅之音），
+# 所以不匹配「袅」；「音+绑」既容错误字又与绕梁之音区分。
+# 返回：1 是，0 否
+def is_niaoniao_bind($text)
+    if not $text contains "音"
+        return 0
+    end
+    if not $text contains "绑"
+        return 0
+    end
+    return 1
+end
+
+# ─── 外观兑换 profile 前置检查 ──────────────────────────
+# nn_bugan_of_week = 1 表示本周袅袅之音已购买过；
+# changmingyu < 200 表示长命玉不足一次兑换门槛。
+# key 未在 profile 定义时不拦截（无信息，交给后续格子/按钮检查兑底）。
+# 返回：1 应跳过，0 可继续
+def waiguan_profile_skip()
+    eval $model = profile_model("nn_bugan_of_week")
+    if $model
+        eval $flag = profile_get("nn_bugan_of_week")
+        if $flag == 1
+            log "profile nn_bugan_of_week=1，袅袅之音本周已购买，跳过外观兑换"
+            return 1
+        end
+    end
+    eval $model = profile_model("changmingyu")
+    if $model
+        eval $stock = profile_get("changmingyu")
+        if $stock < 200
+            log "profile changmingyu=" + $stock + "，不足 200，资金不足跳过外观兑换"
+            return 1
+        end
+    end
+    return 0
 end

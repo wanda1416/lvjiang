@@ -30,7 +30,7 @@ from .....i18n import tr
 from ...config import get_game_config
 from ..layout_helpers import config_field_card, configure_navigation_list
 
-_ATTRS_REL = "yysls/game_config.yaml"
+_ATTRS_REL = "yysls/game_config"
 _GENERIC = "通用"
 _CUSTOM_SCHOOL = ""
 _ALL_SKILL_REQUIREMENTS = ("需要", "不需要")
@@ -155,9 +155,9 @@ class PlaystylePanel(QWidget):
 
     def _load_data(self) -> None:
         if not self._external_data:
-            from lvjiang.core.config.resolver import get_resolver
             try:
-                self._data = get_resolver().load_merged(_ATTRS_REL)
+                from ...config.game_config_files import load_game_config
+                self._data = load_game_config()
             except Exception as exc:  # noqa: BLE001
                 logger.error(f"加载配置失败: {exc}")
                 self._data = {}
@@ -171,9 +171,9 @@ class PlaystylePanel(QWidget):
         if self._on_changed is not None:
             self._on_changed()
             return
-        from lvjiang.core.config.resolver import get_resolver
         try:
-            get_resolver().save_merged(_ATTRS_REL, self._data)
+            from ...config.game_config_files import save_game_config
+            save_game_config(self._data)
             get_game_config().reload()
         except Exception as exc:  # noqa: BLE001
             logger.error(f"保存配置失败: {exc}")

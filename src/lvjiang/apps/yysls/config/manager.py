@@ -1,9 +1,9 @@
 """游戏配置管理器
 
-从 game_config.yaml 加载全部规则，提供品阶推断、词条上限查询、
+从 game_config/ 七份配置加载全部规则，提供品阶推断、词条上限查询、
 词条名映射、流派注册表等功能。
 
-数据来源：config/system/yysls/game_config.yaml
+数据来源：config/system/yysls/game_config/ 下的七份领域配置。
 """
 
 from __future__ import annotations
@@ -165,7 +165,7 @@ def _parse_tuning_stones(raw, where: str) -> dict[str, TuningStoneRule]:
 class GameConfigManager:
     """属性规则管理器
 
-    从 game_config.yaml 加载全部规则，提供：
+    从 game_config/ 七份配置加载全部规则，提供：
     - 品阶推断（base_attrs）
     - 词条上限查询（affix_caps）
     - 词条名映射（真实词条 → 配置类别）
@@ -245,8 +245,8 @@ class GameConfigManager:
             with open(self._path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
         else:
-            from lvjiang.core.config.resolver import get_resolver
-            data = get_resolver().load_merged("yysls/game_config.yaml")
+            from .game_config_files import load_game_config
+            data = load_game_config()
         self._raw = data
 
         # 重置全部规则（_load 会在 UI 保存后重复调用，避免残留旧映射）
@@ -342,8 +342,8 @@ class GameConfigManager:
                 "output_dingyin": str(entry.get("output_dingyin") or "").strip(),
                 "defense_dingyin": str(
                     entry.get("defense_dingyin") or "").strip(),
-                # 玩法说明元数据：只供配置/展示，不参与评级、
-                # 自动调律或毕业率计算。缺省值只用于兼容旧配置。
+                # 玩法神力要求：评级仍由规则决定；智能调律据此固定填入
+                # 当前部位的必需词条。缺省值用于兼容旧配置。
                 "all_skill_requirement": str(entry.get(
                     "all_skill_requirement") or "需要").strip(),
                 "qishu_requirement": str(entry.get(
@@ -549,7 +549,7 @@ class GameConfigManager:
 
     @property
     def base_attr_names(self) -> list[str]:
-        """所有合法基础属性名（从 game_config.yaml 的 _attr 字段收集）
+        """所有合法基础属性名（从 game_config/equipment.yaml 的 _attr 字段收集）
 
         如 ['外功攻击', '最小外功攻击', '最大外功攻击', '气血最大值']
         """
@@ -1054,8 +1054,8 @@ class GameConfigManager:
             with open(self._path, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, allow_unicode=True, sort_keys=False)
         else:
-            from lvjiang.core.config.resolver import get_resolver
-            get_resolver().save_merged("yysls/game_config.yaml", data)
+            from .game_config_files import save_game_config
+            save_game_config(data)
         # 重新加载
         self._load()
 

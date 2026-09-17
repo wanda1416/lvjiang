@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """导出燕云十六声部位/词条的规范枚举到 JSON。
 
-单一真源仍是 `config/system/yysls/game_config.yaml` + 解析它的
+单一真源仍是 `config/system/yysls/game_config/` + 解析它的
 `lvjiang.apps.yysls.config.ConfigManager` / `telemetry/vocab.py`——这个
 脚本不重新实现那套派生逻辑（别名归并、定音/普通词条池划分等），只是把
 已经算好的结果落一份地，给不方便依赖完整 `lvjiang` 包的工具读
@@ -12,7 +12,7 @@
 stats-client 私有的构建产物，不经 `ConfigResolver` 的 system/local 合并，
 放进配置分层目录只会让人误以为它参与合并、可以被 local 覆盖。
 
-``game_config.yaml`` 改了以后（新增词条、新武器类型……）重新跑一遍：
+游戏配置改了以后（新增词条、新武器类型……）重新跑一遍：
 
     python scripts/export_yysls_vocab.py
 
@@ -78,7 +78,7 @@ def build_vocab() -> dict:
     part_labels = _part_labels()
     return {
         "_generated_by": "scripts/export_yysls_vocab.py",
-        "_source": "config/system/yysls/game_config.yaml",
+        "_source": "config/system/yysls/game_config/",
         "parts": list(vocab.part_choices()),
         "part_labels": part_labels,
         "qualities": list(vocab.quality_choices()),

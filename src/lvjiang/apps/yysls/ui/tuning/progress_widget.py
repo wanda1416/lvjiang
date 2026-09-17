@@ -5,11 +5,13 @@
 - 当前装备信息（名称、类型、等级、品阶）
 - 词条进度（当前 / 目标）
 - 调律状态（轮次、预期评级、最终评级、最近结果）
+- 智能调律（各备战方案上限、七件基线、候选上限与决策）
 
 hub 可在构造时为空，工作流启动后通过 reconnect() 绑定。
 """
 from __future__ import annotations
 
+from html import escape
 from typing import TYPE_CHECKING
 
 from PyQt6.QtWidgets import (
@@ -203,6 +205,25 @@ class TuningProgressWidget(QWidget):
         status_layout.addWidget(self._material_label)
         status_layout.addWidget(self._status_msg_label)
         current_layout.addWidget(status_group)
+
+        self._smart_group = QGroupBox(tr("智能调律"))
+        self._smart_group.setToolTip(tr(
+            "方案上限：穿戴方案按满等级、满承音、满定音假设计算；\n"
+            "当前：备战方案当前八件毕业率；\n"
+            "七件：排除当前部位后的毕业率；\n"
+            "候选上限：当前装备按承音上限补满词条的最大可能毕业率。"))
+        smart_layout = QVBoxLayout(self._smart_group)
+        self._smart_summary_label = QLabel(tr("等待分析..."))
+        self._smart_summary_label.setWordWrap(True)
+        self._smart_summary_label.setStyleSheet(
+            "font-size: 12px; font-weight: bold;")
+        smart_layout.addWidget(self._smart_summary_label)
+        self._smart_plans_label = QLabel("")
+        self._smart_plans_label.setWordWrap(True)
+        self._smart_plans_label.setStyleSheet("font-size: 11px;")
+        smart_layout.addWidget(self._smart_plans_label)
+        self._smart_group.setVisible(False)
+        current_layout.addWidget(self._smart_group)
         current_layout.addStretch()
 
         self._previous_group = QGroupBox(tr("上一件装备"))
@@ -234,6 +255,7 @@ class TuningProgressWidget(QWidget):
         self._hub.round_prepared.connect(self._on_round_prepared)
         self._hub.tune_round_completed.connect(self._on_tune_round_completed)
         self._hub.operation_updated.connect(self._on_operation_updated)
+        self._hub.smart_tuning_updated.connect(self._on_smart_tuning_updated)
         self._hub.equipment_reset.connect(self._on_equipment_reset)
         self._hub.equipment_finished.connect(self._on_equipment_finished)
         self._hub.batch_progress.connect(self._on_batch_progress)
@@ -251,6 +273,8 @@ class TuningProgressWidget(QWidget):
             self._hub.round_prepared.disconnect(self._on_round_prepared)
             self._hub.tune_round_completed.disconnect(self._on_tune_round_completed)
             self._hub.operation_updated.disconnect(self._on_operation_updated)
+            self._hub.smart_tuning_updated.disconnect(
+                self._on_smart_tuning_updated)
             self._hub.equipment_reset.disconnect(self._on_equipment_reset)
             self._hub.equipment_finished.disconnect(self._on_equipment_finished)
             self._hub.batch_progress.disconnect(self._on_batch_progress)
@@ -291,6 +315,9 @@ class TuningProgressWidget(QWidget):
         self._status_msg_label.setVisible(False)
         self._scan_decision_label.setVisible(False)
         self._material_label.setVisible(False)
+        self._smart_group.setVisible(False)
+        self._smart_summary_label.setText(tr("等待分析..."))
+        self._smart_plans_label.setText("")
         self._previous_name_label.setText(tr("暂无已完成装备"))
         self._previous_group.setTitle(tr("上一件装备"))
         self._previous_info_label.setText("")
@@ -434,8 +461,46 @@ class TuningProgressWidget(QWidget):
         self._scan_decision_label.setVisible(False)
         self._status_msg_label.setVisible(False)
         self._material_label.setVisible(False)
+        if self._smart_group.isVisible():
+            self._smart_summary_label.setText(tr("等待下一件装备..."))
+            self._smart_plans_label.setText("")
 
     # ─── 格式化 ───────────────────────────────────────────────
+
+    @staticmethod
+    def _format_rate(value) -> str:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "-"
+        return f"{value * 100:.2f}%"
+
+    def _format_smart_plan(self, item: dict) -> str:
+        name = escape(str(item.get("plan_name") or "未命名方案"))
+        rule = escape(str(item.get("rule_name") or ""))
+        playstyle = escape(str(item.get("playstyle") or ""))
+        subtitle = " / ".join(value for value in (rule, playstyle) if value)
+        heading = f"<b>备战方案：{name}</b>"
+        if subtitle:
+            heading += f" <span style='color:#888'>({subtitle})</span>"
+        status = str(item.get("status") or "")
+        raw_reason = str(item.get("reason") or "")
+        reason = escape(raw_reason)
+        if status in {"missing", "invalid", "incomplete", "not_applicable"}:
+            return heading + f"<br>判定：{reason or '智能调律不启用'}"
+        rates = (
+            f"方案上限：{self._format_rate(item.get('plan_maximum_rate'))}"
+            f"　当前：{self._format_rate(item.get('baseline_rate'))}<br>"
+            f"七件：{self._format_rate(item.get('without_slot_rate'))}"
+            f"　候选上限：{self._format_rate(item.get('maximum_rate'))}"
+        )
+        decision = {
+            "improves": "存在提升，继续调律",
+            "no_improvement": "无法提升",
+            "unknown": "无法确定，放行",
+            "ready": "等待当前装备分析",
+        }.get(status, raw_reason or status)
+        if raw_reason and status not in {"improves", "no_improvement"}:
+            decision = raw_reason
+        return heading + "<br>" + rates + f"<br>判定：{escape(decision)}"
 
     @staticmethod
     def _format_affix_lines(affixes: list[dict], count: int | None = None,
@@ -469,6 +534,7 @@ class TuningProgressWidget(QWidget):
             "material": tr("材料准备"),
             "tuning": tr("执行调律"),
             "decision": tr("结束处理"),
+            "smart_decision": tr("智能调律"),
             "reset": tr("重置调律"),
             "finish": tr("收尾处理"),
         }
@@ -485,6 +551,33 @@ class TuningProgressWidget(QWidget):
         if reason and reason != message:
             event += f"｜{reason}"
         self._record_event(event)
+
+    def _on_smart_tuning_updated(self, info: dict):
+        """展示独立的智能调律分析，不挤占基础结束处理状态。"""
+        enabled = bool(info.get("enabled"))
+        self._smart_group.setVisible(enabled)
+        if not enabled:
+            self._smart_plans_label.setText("")
+            return
+        state = str(info.get("state") or "")
+        message = str(info.get("message") or "")
+        checkpoint = str(info.get("checkpoint") or "")
+        if state == "analyzing":
+            summary = "正在分析"
+        elif state == "final":
+            summary = f"处理：{info.get('final_action_label') or message}"
+        else:
+            summary = message or "等待当前装备分析..."
+        if checkpoint:
+            summary += f" · {checkpoint}"
+        self._smart_summary_label.setText(escape(summary))
+        plans = info.get("plans") or []
+        self._smart_plans_label.setText(
+            "<br><br>".join(self._format_smart_plan(dict(item))
+                              for item in plans))
+        opinion = str(info.get("opinion") or "").strip()
+        if opinion:
+            self._record_event(opinion)
 
     def _on_slot_entered(self, slot_key: str, slot_name: str):
         self._batch_label.setText(tr("正在处理：{name}").format(name=slot_name))
@@ -537,6 +630,9 @@ class TuningProgressWidget(QWidget):
         self._material_label.setVisible(False)
         self._status_msg_label.setVisible(False)
         self._rule_ratings_label.setText(tr("等待评级..."))
+        if self._smart_group.isVisible():
+            self._smart_summary_label.setText(tr("等待当前装备分析..."))
+            self._smart_plans_label.setText("")
         self._record_event(f"读取：{name}，初始词条 {len(affixes)}/5")
 
     def _on_equipment_assessed(self, info: dict):

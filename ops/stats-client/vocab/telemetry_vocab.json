@@ -1,6 +1,6 @@
 {
   "_generated_by": "scripts/export_yysls_vocab.py",
-  "_source": "config/system/yysls/game_config.yaml",
+  "_source": "config/system/yysls/game_config/",
   "parts": [
     "weapon",
     "ring",

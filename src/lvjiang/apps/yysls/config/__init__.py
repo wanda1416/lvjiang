@@ -3,7 +3,7 @@
 统一管理燕云游戏配置。
 
 数据来源：
-- config/system/yysls/game_config.yaml
+- config/system/yysls/game_config/（七份领域配置）
 """
 
 from .attr_loadout import (

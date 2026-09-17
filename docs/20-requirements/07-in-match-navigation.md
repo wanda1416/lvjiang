@@ -231,7 +231,7 @@ look_turn(delta_deg) / look_pitch(delta_deg)           # v1 不进主循环
 | 层 | 承载 | 编辑入口 |
 |---|---|---|
 | 界面场景 + 布局 | 屏幕系：`map_{key}` HUD 场景的 `minimap` / `minimap_center` / `open_map` / `full_map` / `close_map`；`general_move` 的移动与视角实体 | 场景编辑器 |
-| 地图（`maps/{key}.yaml` + `base.png`） | 世界系：底图归一化坐标下的 POI、导航模式、朝向检测器参数、对 HUD 场景实体 key 的引用 | 地图管理 |
+| 地图（`maps/{key}/map.yaml` + `base.png`） | 世界系：底图归一化坐标下的 POI、导航模式、朝向检测器参数、对 HUD 场景实体 key 的引用 | 地图管理 |
 | 布局级行动绑定（待做） | 摇杆/视角/按键如何映射到 locomotion 原语 | 地图管理内的"行动绑定"区块（布局级，切换地图不变） |
 
 地图管理**不做区域标定**，所有屏幕坐标只有场景编辑器一个入口；"标定 HUD…"

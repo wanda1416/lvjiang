@@ -6,7 +6,7 @@
 
 每张地图对应四类文件（均在 system/local/remote 三层内，规则同其它实体）：
 
-    maps/{key}.yaml                  地图定义（本模块读写）
+    maps/{key}/map.yaml              地图定义（本模块读写）
     maps/{key}/base.png              底图
     scenes/map_{key}.yaml            该地图专属 HUD 场景（创建地图时自动生成）
     layouts/{layout}/map_{key}.json  各布局坐标（场景编辑器标定，本模块不碰）
@@ -50,7 +50,7 @@ DEFAULT_POI_KIND = "poi"
 
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
-register_versioned_dir(MAPS_DIR, "*.yaml", depth=1)
+register_versioned_dir(MAPS_DIR, "map.yaml", depth=2)
 
 #: HUD 场景的固定实体集：(视图, 类别, key, 名称, 可点击)。
 #: - ``minimap``：小地图可视区域，箭头解析的搜索窗口
@@ -305,7 +305,8 @@ def hud_scene_key_for(map_key: str) -> str:
 
 
 def map_rel_path(map_key: str) -> str:
-    return f"{MAPS_DIR}/{map_key}.yaml"
+    validate_map_key(map_key)
+    return f"{MAPS_DIR}/{map_key}/map.yaml"
 
 
 def base_image_rel_path(map_key: str, image_name: str = BASE_IMAGE_NAME) -> str:
@@ -350,10 +351,12 @@ class MapManager:
     # ─── 读取 ──────────────────────────────────────────────
 
     def list_keys(self) -> list[str]:
-        return [
-            name[:-len(".yaml")]
-            for name in self._resolver.enumerate_entities(MAPS_DIR, "*.yaml")
-        ]
+        keys = []
+        for rel_path in self._resolver.enumerate_entity_tree(MAPS_DIR, "map.yaml"):
+            parts = Path(rel_path).parts
+            if len(parts) == 2 and parts[1] == "map.yaml":
+                keys.append(parts[0])
+        return keys
 
     def list_maps(self) -> list[MapDef]:
         result: list[MapDef] = []

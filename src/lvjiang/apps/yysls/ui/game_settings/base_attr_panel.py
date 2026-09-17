@@ -45,7 +45,7 @@ from .factory_guard import deletable, factory_list_values
 from .level_combo import LevelCombo
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
-_ATTRS_REL = "yysls/game_config.yaml"
+_ATTRS_REL = "yysls/game_config"
 
 # 部位显示名称（顺序由 BASE_ATTR_PARTS 决定）
 _PART_NAMES = {
@@ -469,9 +469,9 @@ class BaseAttrPanel(QWidget):
     def _load_data(self):
         """从 YAML 加载数据"""
         if not self._external_data:
-            from lvjiang.core.config.resolver import get_resolver
             try:
-                self._data = get_resolver().load_merged(_ATTRS_REL)
+                from ...config.game_config_files import load_game_config
+                self._data = load_game_config()
             except Exception as e:
                 logger.error(f"加载配置失败: {e}")
                 self._data = {"base_attrs": {}, "affix_caps": {}}
@@ -1169,9 +1169,9 @@ class BaseAttrPanel(QWidget):
         if self._on_changed is not None:
             self._on_changed()
             return
-        from lvjiang.core.config.resolver import get_resolver
         try:
-            get_resolver().save_merged(_ATTRS_REL, self._data)
+            from ...config.game_config_files import save_game_config
+            save_game_config(self._data)
             logger.debug(f"配置已保存: {_ATTRS_REL}")
             # 刷新 GameConfigManager 单例
             from lvjiang.apps.yysls.config import get_game_config

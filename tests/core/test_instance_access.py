@@ -1,6 +1,7 @@
 """Real process contention and readonly configuration persistence boundaries."""
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -247,10 +248,9 @@ def test_execution_does_not_lock_equipment_ui_or_profile(tmp_path, monkeypatch, 
 def test_equipment_transactions_from_another_process_preserve_latest_items(tmp_path):
     from lvjiang.apps.yysls.core.loadout.repository import LoadoutRepository
 
-    config_source = Path(__file__).resolve().parents[2] / "config/system/yysls/game_config.yaml"
-    config_target = tmp_path / "config/system/yysls/game_config.yaml"
-    config_target.parent.mkdir(parents=True)
-    config_target.write_bytes(config_source.read_bytes())
+    config_source = Path(__file__).resolve().parents[2] / "config/system/yysls/game_config"
+    config_target = tmp_path / "config/system/yysls/game_config"
+    shutil.copytree(config_source, config_target)
     users = tmp_path / "config/session/users"
     repo = LoadoutRepository("alice", users)
     repo.upsert_item({"_fp": "first", "type": "环"})

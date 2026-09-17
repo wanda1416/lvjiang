@@ -19,7 +19,7 @@
 | 文档层 | 配置/代码 |
 |--------|-----------|
 | 评价规格 | `config/system/yysls/tuning_rules/*.yaml`（规则本体）、`config/system/yysls/tune_config.yaml`（启用与顺序） |
-| 词条标准名 | `config/system/yysls/game_config.yaml` 的 `affix_caps` |
+| 词条标准名 | `config/system/yysls/game_config/affixes.yaml` 的 `affix_caps` |
 | 材料与扫描处置 | `config/system/yysls/base_groups/*.yaml` |
 
 修改规格时必须同步：[10-tuning-rules/](10-tuning-rules/README.md) 下的文档、对应 YAML、以及相关测试。

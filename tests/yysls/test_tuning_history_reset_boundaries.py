@@ -104,6 +104,30 @@ def test_post_reset_exhaustion_recycle_is_a_recycle_terminal_result():
     assert after.reset_outcome == RESET_EXHAUSTED_RECYCLED
 
 
+def test_smart_reset_opinion_is_kept_on_the_pre_reset_history_item():
+    projector = TuningResultProjector(split_resets=True)
+    projector.consume("slot_entered", "ring", "环")
+    projector.consume("equipment_started", {
+        "name": "智能重置环", "type": "环", "level": 110,
+        "quality": "gold", "affixes": [{"name": "会心率"}],
+    })
+    opinion = (
+        "智能调律：分析最大极限毕业率 94.50%，"
+        "低于备战方案，处理结果：重置。")
+    projector.consume("smart_tuning_updated", {
+        "final_action": "reset", "opinion": opinion,
+    })
+
+    before = projector.consume("equipment_reset", {
+        "name": "智能重置环", "type": "环", "level": 110,
+        "quality": "gold", "before_affixes": [{"name": "会心率"}],
+        "after_affixes": [{"name": "会心率"}],
+    })
+
+    assert before is not None
+    assert before.reason == opinion
+
+
 def test_stopped_food_decision_is_kept_without_counting_a_round():
     projector = TuningResultProjector()
     projector.consume("slot_entered", "ring", "环")

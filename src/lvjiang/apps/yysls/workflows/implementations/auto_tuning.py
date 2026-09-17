@@ -29,6 +29,7 @@ _resolve_selected_slots。
 
 import hashlib
 import json
+from dataclasses import asdict
 
 from loguru import logger
 
@@ -40,6 +41,7 @@ from lvjiang.apps.yysls.core.evaluator import (
     summarize_potential,
 )
 from lvjiang.apps.yysls.core.tuning_rules import (
+    BEHAVIOR_ACTION_LABELS,
     RATING_LABELS,
     RATING_RANK,
     get_tune_config,
@@ -163,6 +165,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     _history_markdown_path: str = ""
     _bag_scroll_strategy: BagScrollStrategy | None = None
     _stone_stock_strategy = None
+    _smart_evaluator = None
+    _smart_config = None
 
     @property
     def run_state(self) -> TuningRunState:
@@ -403,6 +407,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self._equipment_detail_open = False
             self._ensure_judge_config()
             group = self._ensure_base_group()
+            self._prepare_smart_tuning()
             self.recorder.reset()  # 重置所有记录状态
             # 各槽位已装备装备信息（进入时读取）；值为 None 表示类型
             # 未解析出来，该部位退化为按部位终止语义（见 _read_equipped）
@@ -547,6 +552,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 "base_group_name": group.name,
                 "min_level": self.ctx.min_level,
                 "skip_tuning": self.ctx.skip_tuning,
+                "smart_tuning": asdict(
+                    self._smart_config or get_tune_config().smart_tuning),
             }
             from lvjiang.apps.yysls.telemetry import vocab
             config["game_config_customized"] = vocab.game_config_customized()
@@ -1190,6 +1197,25 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 stop_key = "judged_before_tuning"
                 self.recorder.report_set("stop_reason", stop_reason)
 
+        # 智能调律是现有结束处理后的二次判定。未启用初始判定时，
+        # 它仍在第一次真实调律前单独执行。
+        if not skip_tune_loop and not self.equipment_session.tune_full_recycle:
+            smart_resets_before = resets_used
+            action, why, resets_used, affix_count = self._execute_smart_processing(
+                tune_cfg, equip_data, affix_count, resets_used, base_affixes,
+                checkpoint="初始判定")
+            if action != "continue":
+                skip_tune_loop = True
+                if action == "recycle":
+                    tune_recycle_reason = why
+                stop_reason = why
+                stop_key = "smart_no_improvement"
+                self.recorder.report_set("stop_reason", why)
+            elif resets_used > smart_resets_before:
+                self.recorder.report_set("resets", resets_used)
+                self.recorder.doc_note(
+                    f"智能调律重置（第 {resets_used} 次）：{why}")
+
         rounds = 0
         stop_reason = stop_reason or ""
         last_food_reason = ""
@@ -1268,6 +1294,23 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 is_initial_check=False,
                 pre_incoming=incoming, pre_expect=new_expect)
             if action == "continue":
+                smart_active = bool(
+                    self._smart_evaluator is not None
+                    and self._smart_evaluator.active)
+                action, smart_why, resets_used, affix_count = \
+                    self._execute_smart_processing(
+                        tune_cfg, equip_data, affix_count, resets_used,
+                        base_affixes, checkpoint=f"第 {rounds} 轮")
+                if smart_active:
+                    why = smart_why
+                if action != "continue":
+                    if action == "recycle":
+                        tune_recycle_reason = why
+                    stop_key = "smart_no_improvement"
+                    stop_reason = why
+                    self.recorder.report_set("stop_reason", why)
+                    self.recorder.doc_round_decision(why)
+                    break
                 # 放行或重置成功，继续调律循环
                 if resets_used > 0:
                     self.recorder.report_set("resets", resets_used)
@@ -1444,6 +1487,284 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         # recycle 或 skip → 直接返回
         return action.value, why, resets_used, affix_count
+
+    # ─── 智能调律（现有结束处理后的二次处理）───
+
+    def _prepare_smart_tuning(self) -> None:
+        """按本次运行用户和玩法快照初始化智能调律。"""
+        self._smart_evaluator = None
+        self._emit_progress("smart_tuning_updated", {"enabled": False})
+        config = get_tune_config().smart_tuning
+        self._smart_config = config
+        user_enabled = self.ctx.smart_tuning_enabled
+        if user_enabled is None:
+            user_enabled = bool(
+                self._workflow_config().get("smart_tuning_enabled", False))
+        if not config.enabled:
+            if user_enabled:
+                logger.info("智能调律公共总开关未启用，本轮不执行智能判定")
+            return
+        if not user_enabled:
+            logger.info("当前用户未二次启用智能调律，本轮不执行智能判定")
+            return
+        if not config.evaluation.enabled:
+            return
+        try:
+            from lvjiang.apps.yysls.core.graduation.smart_tuning import (
+                SmartTuningEvaluator,
+            )
+            username = (getattr(self.engine, "run_username", "") or "")
+            users_dir = getattr(self.engine, "users_dir", None)
+            self._smart_evaluator = SmartTuningEvaluator(
+                config,
+                username=username,
+                incoming_rule_configs=self.ctx.judge_configs,
+                users_dir=users_dir,
+                # is_stopped 同时是暂停检查点；长组合搜索期间仍能
+                # 响应暂停与结束，不会等整件装备算完才生效。
+                stop_check=lambda: self.is_stopped,
+            )
+            if not self._smart_evaluator.active:
+                logger.warning(
+                    "智能调律本轮已放行："
+                    f"{self._smart_evaluator.disabled_reason}")
+            else:
+                logger.info("智能调律已启用，备战方案快照加载完成")
+            self._emit_progress("smart_tuning_updated", {
+                "enabled": True,
+                "state": "initial",
+                "message": (self._smart_evaluator.disabled_reason
+                            or "备战方案快照已加载"),
+                "plans": list(self._smart_evaluator.plan_infos),
+            })
+        except Exception:  # noqa: BLE001 - 初始化失败不能阻断调律
+            logger.exception("智能调律初始化失败，本轮已放行")
+            self._smart_evaluator = None
+            self._emit_progress("smart_tuning_updated", {
+                "enabled": True,
+                "state": "initial",
+                "message": "初始化失败，智能调律不启用",
+                "plans": [],
+            })
+
+    @staticmethod
+    def _smart_plan_payload(item) -> dict:
+        return {
+            "plan_id": item.plan_id,
+            "plan_name": item.plan_name,
+            "rule_name": item.rule_name,
+            "playstyle": item.playstyle,
+            "status": item.status.value,
+            "plan_maximum_rate": item.plan_maximum_rate,
+            "baseline_rate": item.baseline_rate,
+            "without_slot_rate": item.without_slot_rate,
+            "maximum_rate": item.maximum_rate,
+            "reason": item.reason,
+            "evaluated_combinations": item.evaluated_combinations,
+        }
+
+    def _smart_display_plans(self, evaluator, result) -> list[dict]:
+        """保留初始化时的不完整/无效方案，并按原顺序覆盖实际评估结果。"""
+        evaluated: dict[tuple[str, str, str], list[dict]] = {}
+        for item in result.plans:
+            payload = self._smart_plan_payload(item)
+            key = (item.plan_id, item.rule_name, item.playstyle)
+            evaluated.setdefault(key, []).append(payload)
+        rows: list[dict] = []
+        for info in evaluator.plan_infos:
+            row = dict(info)
+            key = (
+                str(row.get("plan_id") or ""),
+                str(row.get("rule_name") or ""),
+                str(row.get("playstyle") or ""),
+            )
+            matches = evaluated.get(key)
+            if row.get("status") == "ready" and matches:
+                rows.append(matches.pop(0))
+            else:
+                rows.append(row)
+        for matches in evaluated.values():
+            rows.extend(matches)
+        return rows
+
+    @staticmethod
+    def _smart_rate_text(value) -> str:
+        return (f"{value * 100:.2f}%"
+                if isinstance(value, (int, float)) and not isinstance(value, bool)
+                else "-")
+
+    def _log_smart_plan_details(self, plans: list[dict], checkpoint: str) -> None:
+        status_labels = {
+            "ready": "等待分析",
+            "improves": "存在提升",
+            "no_improvement": "确定无法提升",
+            "unknown": "无法确定，放行",
+            "not_applicable": "不适用",
+            "missing": "无备战方案",
+            "incomplete": "备战方案不完整",
+            "invalid": "方案无效",
+        }
+        for item in plans:
+            status = str(item.get("status") or "")
+            logger.debug(
+                f"  [智能调律/{checkpoint}] 备战方案「"
+                f"{item.get('plan_name')}」（{item.get('rule_name')}/"
+                f"{item.get('playstyle')}）："
+                f"方案上限={self._smart_rate_text(item.get('plan_maximum_rate'))}，"
+                f"当前={self._smart_rate_text(item.get('baseline_rate'))}，"
+                f"七件={self._smart_rate_text(item.get('without_slot_rate'))}，"
+                f"候选上限={self._smart_rate_text(item.get('maximum_rate'))}，"
+                f"判定={status_labels.get(status, status or '-')}，"
+                f"说明={item.get('reason') or '-'}")
+
+    def _smart_terminal_opinion(
+        self, plans: list[dict], action_label: str,
+    ) -> str:
+        details = []
+        for item in plans:
+            if item.get("status") != "no_improvement":
+                continue
+            details.append(
+                f"备战方案「{item.get('plan_name')}」分析最大极限毕业率 "
+                f"{self._smart_rate_text(item.get('maximum_rate'))}，"
+                f"低于或等于当前方案 "
+                f"{self._smart_rate_text(item.get('baseline_rate'))}")
+        analysis = "；".join(details) or "分析确定所有适用方案无法提升"
+        return f"智能调律：{analysis}，处理结果：{action_label}。"
+
+    def _emit_smart_final(
+        self, plans: list[dict], checkpoint: str, action: str,
+    ) -> None:
+        label = BEHAVIOR_ACTION_LABELS.get(action, action)
+        opinion = self._smart_terminal_opinion(plans, label)
+        self._emit_progress("smart_tuning_updated", {
+            "enabled": True,
+            "state": "final",
+            "message": opinion,
+            "checkpoint": checkpoint,
+            "plans": plans,
+            "final_action": action,
+            "final_action_label": label,
+            "opinion": opinion,
+        })
+
+    def _execute_smart_processing(
+        self, tune_cfg, equip_data: EquipmentData, affix_count: int,
+        resets_used: int, base_affixes: list, *, checkpoint: str,
+        _allow_reset: bool = True,
+    ) -> tuple[str, str, int, int]:
+        """在当前结束处理已放行后执行智能判定及可选动作。"""
+        evaluator = self._smart_evaluator
+        if evaluator is None or not evaluator.active:
+            return "continue", "智能调律未启用或本轮不可用", resets_used, affix_count
+        if self.equipment_session.tune_full_recycle:
+            return "continue", "调满后回收模式跳过智能调律", resets_used, affix_count
+
+        from lvjiang.apps.yysls.core.graduation.smart_tuning import (
+            SmartTuningStatus,
+        )
+        slot = str(getattr(self, "_current_slot", "") or "")
+        self._emit_progress("smart_tuning_updated", {
+            "enabled": True,
+            "state": "analyzing",
+            "message": "正在推演当前装备的最大可能毕业率",
+            "checkpoint": checkpoint,
+            "plans": list(evaluator.plan_infos),
+        })
+        result = evaluator.evaluate(slot, equip_data.to_dict(include_fp=False))
+        plan_summary = "；".join(
+            f"{item.plan_name}: {item.reason}"
+            for item in result.plans)
+        decision_record = {
+            "checkpoint": checkpoint,
+            "status": result.status.value,
+            "reason": result.reason,
+            "plans": self._smart_display_plans(evaluator, result),
+        }
+        self._log_smart_plan_details(decision_record["plans"], checkpoint)
+        self.recorder.report_append("smart_tuning_decisions", decision_record)
+        self._emit_operation(
+            "smart_decision", result.reason,
+            smart_status=result.status.value, checkpoint=checkpoint,
+            plans=decision_record["plans"], affix_count=affix_count,
+            resets=resets_used)
+        self.recorder.doc_note(
+            f"智能调律（{checkpoint}）：{result.reason}")
+        self._emit_progress("smart_tuning_updated", {
+            "enabled": True,
+            "state": "evaluated",
+            "message": result.reason,
+            "checkpoint": checkpoint,
+            "plans": decision_record["plans"],
+        })
+        if result.status is SmartTuningStatus.UNKNOWN:
+            logger.warning(
+                f"  [智能调律/{checkpoint}] {result.reason}"
+                + (f"（{plan_summary}）" if plan_summary else ""))
+            return "continue", result.reason, resets_used, affix_count
+        if result.status is SmartTuningStatus.IMPROVES:
+            logger.info(f"  [智能调律/{checkpoint}] {result.reason} → 继续调律")
+            return "continue", result.reason, resets_used, affix_count
+
+        config = evaluator.config.failure_action
+        why = f"智能调律：{result.reason}"
+        logger.info(f"  [智能调律/{checkpoint}] {why}")
+        if not config.enabled:
+            logger.info("  [智能调律] 处理动作未启用，仅记录并放行")
+            return "continue", why, resets_used, affix_count
+
+        action = config.action
+        label = BEHAVIOR_ACTION_LABELS.get(action, action)
+        why = f"{why} → {label}"
+        if action == "continue":
+            return "continue", why, resets_used, affix_count
+        if action == "reset":
+            if not _allow_reset:
+                fallback = tune_cfg.reset_exhausted_action
+                fallback_label = BEHAVIOR_ACTION_LABELS.get(fallback, fallback)
+                self._emit_smart_final(
+                    decision_record["plans"], checkpoint, fallback)
+                return (
+                    fallback,
+                    f"{why}（重置后仍无法提升，转{fallback_label}）",
+                    resets_used,
+                    affix_count,
+                )
+            self._emit_smart_final(
+                decision_record["plans"], checkpoint, "reset")
+            reset_action, reset_why, resets_used = self._execute_reset_action(
+                tune_cfg, equip_data, resets_used, why,
+                prefix="智能调律", previous_affix_count=affix_count)
+            if reset_action == "continue":
+                equip_data.affixes = base_affixes[:1]
+                equip_data.extra_data["affix_count"] = 1
+                incoming, self.equipment_session.expected_rating = \
+                    self.judge.refresh_expectation(equip_data)
+                self._emit_assessment(
+                    incoming, self.equipment_session.expected_rating,
+                    stage="smart")
+                # 重置本身也是断点：立即以首词条状态重算。
+                # 若仍无提升可能，直接走基础规则组的重置耗尽
+                # 处置，不对同一首词条反复执行无意义重置。
+                post_action, post_why, resets_used, post_count = \
+                    self._execute_smart_processing(
+                        tune_cfg, equip_data, 1, resets_used, base_affixes,
+                        checkpoint=f"{checkpoint}/重置后",
+                        _allow_reset=False)
+                if post_action == "continue":
+                    return post_action, reset_why, resets_used, post_count
+                return post_action, post_why, resets_used, post_count
+            self._emit_smart_final(
+                decision_record["plans"], checkpoint, reset_action)
+            return reset_action, reset_why, resets_used, affix_count
+        if action == "tune_full_recycle":
+            self.equipment_session.mode = TuningMode.TUNE_FULL_RECYCLE
+            self._emit_smart_final(
+                decision_record["plans"], checkpoint, action)
+            return "continue", why, resets_used, affix_count
+        self._emit_smart_final(
+            decision_record["plans"], checkpoint, action)
+        return action, why, resets_used, affix_count
 
     # ─── 重置调律公共逻辑（等级配置检查 + 重置执行）──────────
 

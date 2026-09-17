@@ -55,7 +55,7 @@ from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
-_ATTRS_REL = "yysls/game_config.yaml"
+_ATTRS_REL = "yysls/game_config"
 
 # 流派属性候选
 _SCHOOL_ATTRS = ["鸣金", "裂石", "破竹", "牵丝"]
@@ -251,9 +251,9 @@ class SchoolPanel(QWidget):
     def _load_data(self):
         """从 YAML 加载数据并刷新列表与表单"""
         if not self._external_data:
-            from lvjiang.core.config.resolver import get_resolver
             try:
-                self._data = get_resolver().load_merged(_ATTRS_REL)
+                from ...config.game_config_files import load_game_config
+                self._data = load_game_config()
             except Exception as e:
                 logger.error(f"加载配置失败: {e}")
                 self._data = {}
@@ -472,9 +472,9 @@ class SchoolPanel(QWidget):
         if self._on_changed is not None:
             self._on_changed()
             return
-        from lvjiang.core.config.resolver import get_resolver
         try:
-            get_resolver().save_merged(_ATTRS_REL, self._data)
+            from ...config.game_config_files import save_game_config
+            save_game_config(self._data)
             logger.debug(f"配置已保存: {_ATTRS_REL}")
             from lvjiang.apps.yysls.config import get_game_config
             get_game_config()._load()

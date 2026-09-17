@@ -124,10 +124,10 @@ def normalize_active_rule(rule_keys: list[str] | None) -> str:
 
 
 def game_config_customized() -> bool:
-    """用户是否在 local 层覆盖过 game_config.yaml——覆盖后 cap_pct 口径
+    """用户是否在 local 层覆盖过任一游戏配置——覆盖后 cap_pct 口径
     可能失真，让服务端能筛掉这部分样本。"""
-    from ....core.config.resolver import get_resolver
-    return (get_resolver().local_dir / "yysls" / "game_config.yaml").exists()
+    from ..config.game_config_files import game_config_is_customized
+    return game_config_is_customized()
 
 
 def current_season_number() -> int | None:

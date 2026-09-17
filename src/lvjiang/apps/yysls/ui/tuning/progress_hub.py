@@ -61,6 +61,12 @@ class TuningProgressHub(QObject):
     # reset_outcome: completed/cooldown/exhausted/exhausted_recycled/
     #                material_shortage/failed
 
+    # ─── 智能调律分析（仅本轮实际启用时展示）──────────
+    smart_tuning_updated = pyqtSignal(object)
+    # dict: {enabled, state, message, checkpoint, plans: list[dict],
+    #        final_action?, final_action_label?, opinion?}
+    # state: initial/analyzing/evaluated/final
+
     # ─── 重置边界：重置前归档为上一件，重置后作为新当前装备 ──
     equipment_reset = pyqtSignal(object)
     # dict: {name, type, level, quality, before_affixes, after_affixes,

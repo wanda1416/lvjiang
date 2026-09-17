@@ -18,7 +18,7 @@ from lvjiang.apps.yysls.ui.game_settings.factory_guard import (
     factory_list_values,
 )
 
-ATTRS_FILE = Path("config/system/yysls/game_config.yaml")
+ATTRS_FILE = Path("config/system/yysls/game_config")
 
 
 @pytest.fixture
@@ -30,9 +30,8 @@ def isolated_config(tmp_path, monkeypatch):
     否则测试会把脏数据写进真实系统配置。
     """
     import lvjiang.core.config.resolver as cr
-    dst = tmp_path / "system" / "yysls" / "game_config.yaml"
-    dst.parent.mkdir(parents=True)
-    shutil.copy(ATTRS_FILE, dst)
+    dst = tmp_path / "system" / "yysls" / "game_config"
+    shutil.copytree(ATTRS_FILE, dst)
     monkeypatch.setattr(cr, "SYSTEM_CONFIG_DIR", tmp_path / "system")
     monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", tmp_path / "local")
     monkeypatch.setattr(cr, "_resolver", None)

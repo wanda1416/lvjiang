@@ -86,7 +86,8 @@ def _school_arts(root: Path, username: str) -> tuple[str, str]:
         return "", ""
     import yaml
     config = yaml.safe_load(
-        (root / "config/system/yysls/game_config.yaml").read_text(encoding="utf-8"))
+        (root / "config/system/yysls/game_config/schools.yaml")
+        .read_text(encoding="utf-8"))
     school_config = (config.get("schools") or {}).get(school, {})
     return (
         str((school_config.get("main") or {}).get("martial_art") or ""),

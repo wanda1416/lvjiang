@@ -90,6 +90,7 @@ class TuningResultStore(QObject):
             (self._hub.equipment_started, self._on_equipment_started),
             (self._hub.scan_decision, self._on_scan_decision),
             (self._hub.operation_updated, self._on_operation_updated),
+            (self._hub.smart_tuning_updated, self._on_smart_tuning_updated),
             (self._hub.equipment_reset, self._on_equipment_reset),
             (self._hub.round_prepared, self._on_round_prepared),
             (self._hub.tune_round_completed, self._on_tune_round_completed),
@@ -124,6 +125,9 @@ class TuningResultStore(QObject):
 
     def _on_operation_updated(self, info: dict) -> None:
         self._consume("operation_updated", info)
+
+    def _on_smart_tuning_updated(self, info: dict) -> None:
+        self._consume("smart_tuning_updated", info)
 
     def _on_equipment_reset(self, info: dict) -> None:
         self._consume("equipment_reset", info)

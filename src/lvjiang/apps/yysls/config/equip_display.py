@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from lvjiang.core.config.session import load_settings, save_settings
-
 DEFAULTS: dict[str, Any] = {
     "name_font_size": 13,
     "level_font_size": 12,
@@ -16,7 +14,9 @@ DEFAULTS: dict[str, Any] = {
 
 
 def load_equip_display() -> dict[str, Any]:
-    value = load_settings().get("equip_display")
+    from .manager import get_game_config
+
+    value = get_game_config().get_raw().get("equip_display")
     merged = dict(DEFAULTS)
     if isinstance(value, dict):
         merged.update(value)
@@ -24,4 +24,9 @@ def load_equip_display() -> dict[str, Any]:
 
 
 def save_equip_display(params: dict[str, Any]) -> None:
-    save_settings({"equip_display": params})
+    from .manager import get_game_config
+
+    manager = get_game_config()
+    data = manager.get_raw()
+    data["equip_display"] = dict(params)
+    manager.save(data)

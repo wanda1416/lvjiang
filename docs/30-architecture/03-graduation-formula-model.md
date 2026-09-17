@@ -52,7 +52,7 @@ v2 schema 包含以下顶层字段：`schema_version`、`school`、`source`、`b
 ## 词条简称
 
 Excel 中的“全武增”“首领增”“拳甲增”“蓄力技定音”等简称不在毕业率
-模块维护映射。唯一权威来源是 `game_config.yaml` 顶层的 `affix_aliases`，也可在
+模块维护映射。唯一权威来源是 `game_config/affixes.yaml` 顶层的 `affix_aliases`，也可在
 “游戏配置 → 词组配置”中对每个具体词条编辑多个别名。
 
 转换阶段严格通过词组配置将 Excel 简称解析成一个或多个精准词条名，并以

@@ -683,7 +683,7 @@ auto_strings:
   仅金色: Gold Only
   仅金装: Gold Equipment Only
   仅首词条: First Affix Only
-  仅黄字: Yellow Text Only
+  仅展示黄字三率和增效: Show Effective Rates and Bonuses Only
   以下是理论敏感度，不代表游戏中可以单独获得或失去一条词条。新增按 Lv{level} 普通词条满值，扣除按当前装备实际值计算。: The following is theoretical sensitivity; it doesn't mean you can gain or lose a single affix in-game. Additions are computed at the Lv{level} normal-affix cap; deductions use the equipment's actual current value.
   以下装备存在词条组合异常，已排除培养计算；请先校正：: 'The following equipment has an invalid affix combination and has been excluded from the graduation calculation; please correct it first:'
   以下部位没有候选装备：: 'No candidate equipment for the following slots:'
@@ -1041,7 +1041,8 @@ auto_strings:
   无限转律: Unlimited Transfer
   无障碍服务未连接，请先在设置里开启: Accessibility Service not connected; enable it in Settings first
   旧版本: Old Version
-  显示选项: Display Options
+  展示白字和黄字三率和增效: Show Base and Effective Rates and Bonuses
+  右键切换白字和黄字三率及增效的显示方式: Right-click to switch rate and bonus display
   智能筛选: Smart Filter
   暂无已完成装备: No Completed Equipment Yet
   暂无数据: No Data

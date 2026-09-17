@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -149,6 +150,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._restoring = False
         self._current_combat_attrs = CombatAttributes()
         self._judgment_popup: _JudgmentOutcomePopup | None = None
+        self._resistance_only = False
 
         self._graduation_generation = 0
         self._pending_graduation: tuple[int, str, str, str, CombatAttributes] | None = None
@@ -259,17 +261,6 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         config_row_layout.addWidget(select_group, 1)
         layout.addWidget(self._config_row)
 
-        # ── 显示选项（独立区域） ──
-        display_options_group = QGroupBox(tr("显示选项"))
-        display_options_layout = QHBoxLayout(display_options_group)
-        display_options_layout.setContentsMargins(14, 8, 14, 8)
-        self._chk_resistance_only = QCheckBox(tr("仅黄字"))
-        self._chk_resistance_only.setToolTip(
-            tr("勾选后，判定属性和增益效果直接展示抗性后数值，节省空间")
-        )
-        self._chk_resistance_only.stateChanged.connect(self._refresh_display)
-        self._chk_resistance_only.stateChanged.connect(lambda _: self._save_selection())
-        display_options_layout.addWidget(self._chk_resistance_only)
         self._chk_full_chengyin = QCheckBox(tr("满承音"))
         self._chk_full_chengyin.setToolTip(
             tr("将已装备的承音装备词条数值视为承音上限参与计算"))
@@ -285,9 +276,6 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             tr("将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定"))
         self._chk_full_level.stateChanged.connect(self._refresh_display)
         self._chk_full_level.stateChanged.connect(lambda _: self._save_selection())
-        display_options_layout.addStretch()
-        layout.addWidget(display_options_group)
-
         # DPS / 毕业率已由顶部公共区域展示
 
         # ── 属性展示区（主题一致的中性数据卡片） ──
@@ -314,6 +302,12 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
         # ── 判定属性卡片 ──
         self._judgment_card = self._add_judgment_card(tmp)
+        self._judgment_card.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self._judgment_card.customContextMenuRequested.connect(
+            self._show_judgment_display_menu)
+        self._judgment_card.setToolTip(
+            tr("右键切换白字和黄字三率及增效的显示方式"))
         grid.addWidget(self._judgment_card, 1, 0)
 
         # ── 增益效果（含动态专项增益） ──
@@ -548,10 +542,10 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         except Exception as e:
             logger.debug(f"保存备战方案战斗配置失败: {e}")
 
-        # 复选框只控制页面展示/计算假设，继续按用户保存；下拉框不再写到
-        # 用户级，避免不同备战方案互相覆盖。
+        # 右键显示模式与假设复选框继续按用户保存；下拉框不再写到用户级，
+        # 避免不同备战方案互相覆盖。
         selection = {
-            "resistance_only": self._chk_resistance_only.isChecked(),
+            "resistance_only": self._resistance_only,
             "full_chengyin": self._chk_full_chengyin.isChecked(),
             "full_dingyin": self._chk_full_dingyin.isChecked(),
             "full_level": self._chk_full_level.isChecked(),
@@ -638,8 +632,9 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                 if idx >= 0:
                     self._combo_scheme.setCurrentIndex(idx)
 
-            # 恢复仅展示抗性结果
-            self._chk_resistance_only.setChecked(resistance_only)
+            # 恢复右键菜单控制的黄字展示模式。加载结束统一刷新，不在这里
+            # 触发额外计算或保存。
+            self._resistance_only = bool(resistance_only)
 
             # 恢复满承音/满定音/满等级
             self._chk_full_chengyin.setChecked(
@@ -682,6 +677,27 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             anchor.x() - self._judgment_popup.width(), anchor.y(),
         )
         self._judgment_popup.show()
+
+    def _show_judgment_display_menu(self, position) -> None:
+        """右键判定属性卡片，切换三率及增效的白字/黄字显示。"""
+        menu = QMenu(self._judgment_card)
+        if self._resistance_only:
+            label = tr("展示白字和黄字三率和增效")
+        else:
+            label = tr("仅展示黄字三率和增效")
+        toggle_action = menu.addAction(label)
+        selected = menu.exec(self._judgment_card.mapToGlobal(position))
+        if selected == toggle_action:
+            self._set_resistance_only(not self._resistance_only)
+
+    def _set_resistance_only(self, enabled: bool) -> None:
+        """应用黄字显示偏好；增益效果与判定属性使用同一状态。"""
+        enabled = bool(enabled)
+        if self._resistance_only == enabled:
+            return
+        self._resistance_only = enabled
+        self._refresh_display()
+        self._save_selection()
 
     def _refresh_display(self):
         """刷新属性显示"""
@@ -925,7 +941,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
     ) -> None:
         """按游戏的白字 (黄字) 语义显示原始值与抗性后数值。
 
-        当勾选"仅展示抗性结果"时，直接展示黄字（抗性后数值）。
+        处于“仅展示黄字”模式时，直接展示抗性后数值。
         force_decimal: 强制保留两位小数（用于穿透类）。
         """
         if force_decimal:
@@ -934,7 +950,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         else:
             original_text = format_value(original, unit)
             effective_text = format_value(effective, unit)
-        if self._chk_resistance_only.isChecked():
+        if self._resistance_only:
             # 仅展示抗性结果（黄字）
             label.setText(
                 f"<span style='color:{_YELLOW_VALUE_COLOR};'>"

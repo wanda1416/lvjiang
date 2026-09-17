@@ -776,8 +776,37 @@ class TuningGroup:
 
 
 @dataclass
+class SmartTuningEvaluation:
+    """智能调律的毕业率判定。"""
+
+    enabled: bool = True
+    operator: str = "gt"
+    precision: float = 0.001
+
+
+@dataclass
+class SmartTuningFailureAction:
+    """判定为无法提升后的二次结束处理。"""
+
+    enabled: bool = True
+    action: str = "skip"
+
+
+@dataclass
+class SmartTuningConfig:
+    """全局智能调律配置。"""
+
+    enabled: bool = True
+    plan_scope: str = "incoming"
+    evaluation: SmartTuningEvaluation = field(
+        default_factory=SmartTuningEvaluation)
+    failure_action: SmartTuningFailureAction = field(
+        default_factory=SmartTuningFailureAction)
+
+
+@dataclass
 class TuneConfig:
-    """全局调律配置（tune_config.yaml）：只剩品阶门槛与开关注册表。
+    """全局调律配置（tune_config.yaml）。
 
     规则与基础规则组的存在性由各自目录决定，顺序（``order``）与启停
     （``disabled``）写在各自的 YAML 里，不再在这里声明。
@@ -787,6 +816,7 @@ class TuneConfig:
     """
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
     switches: dict[str, str] = field(default_factory=dict)
+    smart_tuning: SmartTuningConfig = field(default_factory=SmartTuningConfig)
 
     def quality_ok(self, part: str, quality: str | None,
                    overrides: dict[str, list[str]] | None = None) -> bool:

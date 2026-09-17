@@ -45,6 +45,7 @@ class TuningResultProjector:
         self.reset_attempted = False
         self.reset_outcome = ""
         self.reset_reason = ""
+        self.smart_opinion = ""
         self.tuning_started_at = ""
         self.round_details: list[dict] = []
         self.after_reset = False
@@ -59,6 +60,8 @@ class TuningResultProjector:
             self.decision = deepcopy(args[0] or {})
         elif event == "operation_updated":
             self._operation(dict(args[0] or {}))
+        elif event == "smart_tuning_updated" and self.current:
+            self._smart_tuning(dict(args[0] or {}))
         elif event == "equipment_reset" and self.current:
             if self._split_resets:
                 return self._split_on_reset(dict(args[0] or {}))
@@ -82,6 +85,7 @@ class TuningResultProjector:
         self.reset_attempted = False
         self.reset_outcome = ""
         self.reset_reason = ""
+        self.smart_opinion = ""
         self.tuning_started_at = ""
         self.round_details = []
         self.after_reset = False
@@ -127,6 +131,15 @@ class TuningResultProjector:
                 self.round_details[index] = {**existing, **detail}
                 return
         self.round_details.append(detail)
+
+    def _smart_tuning(self, info: dict) -> None:
+        """只将智能调律的最终处理意见写入装备历史。"""
+        action = str(info.get("final_action") or "").strip()
+        if not action or action == "continue":
+            return
+        opinion = str(info.get("opinion") or "").strip()
+        if opinion:
+            self.smart_opinion = opinion
 
     def _complete_round(self, info: dict) -> None:
         detail = deepcopy(info)
@@ -184,7 +197,8 @@ class TuningResultProjector:
                 RESULT_RESET: "重置未执行",
             }[result]
         reason = str(
-            info.get("reason") or self.decision.get("reason") or default_reason
+            self.smart_opinion or info.get("reason")
+            or self.decision.get("reason") or default_reason
         ).strip()
         initial = deepcopy(started.get("affixes") or [])
         final = deepcopy(info.get("final_affixes") or initial)
@@ -240,7 +254,7 @@ class TuningResultProjector:
             final_rating=str(info.get("before_rating") or ""),
             rounds=self._completed_round_count(),
             result=RESULT_RESET,
-            reason=self.reset_reason or "执行重置调律",
+            reason=self.smart_opinion or self.reset_reason or "执行重置调律",
             reset_outcome=RESET_COMPLETED,
             raw_status="reset",
             scanned_at=str(started.get("_scanned_at") or ""),
@@ -274,6 +288,7 @@ class TuningResultProjector:
         self.reset_attempted = False
         self.reset_outcome = ""
         self.reset_reason = ""
+        self.smart_opinion = ""
         self.tuning_started_at = ""
         self.round_details = []
         self.after_reset = False

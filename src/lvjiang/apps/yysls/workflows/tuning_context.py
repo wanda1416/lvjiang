@@ -43,6 +43,7 @@ class TuningRunContext:
     target_cell: tuple[int, int] | None = None   # 指定调律 (row, col)；None=不指定
     base_group: TuningGroup | None = None        # 基础规则组（None=回退 session）
     min_level: int | None = None                 # 最低等级覆盖（None=跟随基础规则 scan.min_level）
+    smart_tuning_enabled: bool | None = None     # 用户级二次启用；None=从用户配置读取
 
 
 class TuningContextMixin:

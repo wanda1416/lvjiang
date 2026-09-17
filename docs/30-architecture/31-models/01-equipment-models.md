@@ -393,7 +393,7 @@ make_fingerprint(equip_dict, is_mock=True)      # "mock_015850f8"
 单独培养定音会原位更新；其他参与指纹的变化通过 `update_real_development()` 原子写入
 新指纹、迁移全部方案引用并删除旧指纹。
 
-转律是唯一会重置冷却的养成行为。冷却天数来自 `game_config.yaml` 的
+转律是唯一会重置冷却的养成行为。冷却天数来自 `game_config/basic.yaml` 的
 `basic_config.equipment_cooldown_days`，缺省为 5。
 
 ### 6.5 库存时间元数据

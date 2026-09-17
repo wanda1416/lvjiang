@@ -1,0 +1,112 @@
+content_version: 1
+schools:
+  鸣金·虹:
+    schemes:
+    - 基础方案
+    attr: 鸣金
+    main:
+      weapon: 剑
+      martial_art: 无名剑法
+    sub:
+      weapon: 枪
+      martial_art: 无名枪法
+  鸣金·影:
+    schemes:
+    - 基础方案
+    attr: 鸣金
+    main:
+      weapon: 剑
+      martial_art: 积矩九剑
+    sub:
+      weapon: 枪
+      martial_art: 九曲惊神枪
+  裂石·威:
+    schemes:
+    - 基础方案
+    attr: 裂石
+    main:
+      weapon: 陌刀
+      martial_art: 嗟夫刀法
+    sub:
+      weapon: 枪
+      martial_art: 八方风雷枪
+  裂石·钧:
+    schemes:
+    - 基础方案
+    attr: 裂石
+    main:
+      weapon: 横刀
+      martial_art: 斩雪刀法
+    sub:
+      weapon: 陌刀
+      martial_art: 十方破阵
+  牵丝·玉:
+    schemes:
+    - 基础方案
+    attr: 牵丝
+    main:
+      weapon: 伞
+      martial_art: 九重春色
+    sub:
+      weapon: 扇
+      martial_art: 青山执笔
+  牵丝·霖:
+    schemes:
+    - 基础方案
+    attr: 牵丝
+    main:
+      weapon: 扇
+      martial_art: 明川药典
+    sub:
+      weapon: 伞
+      martial_art: 千香引魂蛊
+  牵丝·翊:
+    schemes:
+    - 基础方案
+    attr: 牵丝
+    main:
+      martial_art: 文动霓裳
+      weapon: 舞绫鼓
+    sub:
+      martial_art: 杏游草野
+      weapon: 扇
+  破竹·风:
+    schemes:
+    - 基础方案
+    attr: 破竹
+    main:
+      weapon: 双刀
+      martial_art: 泥犁三垢
+    sub:
+      weapon: 绳镖
+      martial_art: 粟子游尘
+  破竹·尘:
+    schemes:
+    - 基础方案
+    attr: 破竹
+    main:
+      weapon: 伞
+      martial_art: 醉梦游春
+    sub:
+      weapon: 绳镖
+      martial_art: 粟子行云
+  破竹·鸢:
+    schemes:
+    - 基础方案
+    attr: 破竹
+    main:
+      weapon: 手甲
+      martial_art: 天志垂象
+    sub:
+      weapon: 绳镖
+      martial_art: 千机索天
+  破竹·樽:
+    schemes:
+    - 基础方案
+    attr: 破竹
+    main:
+      weapon: 手甲
+      martial_art: 悬身拳法
+    sub:
+      weapon: 双刀
+      martial_art: 断水双诀

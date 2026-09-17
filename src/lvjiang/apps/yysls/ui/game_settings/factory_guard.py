@@ -13,9 +13,10 @@ from __future__ import annotations
 from lvjiang.core.config.resolver import get_resolver
 
 from .....i18n import tr
+from ...config.game_config_files import GAME_CONFIG_DIR, system_game_config_section
 
 #: 燕云游戏配置（聚合文件）相对路径
-GAME_CONFIG_REL = "yysls/game_config.yaml"
+GAME_CONFIG_REL = GAME_CONFIG_DIR
 
 #: 停用替代方案的提示语（有激活机制的场景）
 DISABLE_HINT = tr("系统配置不可删除。如不需要，请改用停用/取消勾选。")
@@ -30,7 +31,10 @@ def is_user_mode() -> bool:
 
 def factory_dict_keys(rel_path: str, *path: str) -> set[str]:
     """系统文档中某个 dict 节点的键集合；节点不存在返回空集"""
-    node: object = get_resolver().load_system(rel_path)
+    if rel_path == GAME_CONFIG_REL and path:
+        node: object = system_game_config_section(path[0])
+    else:
+        node = get_resolver().load_system(rel_path)
     for key in path:
         if not isinstance(node, dict):
             return set()
@@ -43,7 +47,10 @@ def factory_list_values(rel_path: str, *path: str, field: str | None = None) -> 
 
     field 非空时取每项的该字段（如 weapon_types 取 name），否则取元素本身。
     """
-    node: object = get_resolver().load_system(rel_path)
+    if rel_path == GAME_CONFIG_REL and path:
+        node: object = system_game_config_section(path[0])
+    else:
+        node = get_resolver().load_system(rel_path)
     for key in path:
         if not isinstance(node, dict):
             return set()

@@ -13,7 +13,7 @@
 ## 一张地图的四类文件
 
 ```
-maps/{key}.yaml                  地图定义（世界系：POI、导航模式、检测器、UI 引用）
+maps/{key}/map.yaml              地图定义（世界系：POI、导航模式、检测器、UI 引用）
 maps/{key}/base.png              底图（二进制资产，摘要写入地图定义）
 scenes/map_{key}.yaml            该地图专属 HUD 场景（创建时自动生成，分组"地图"）
 layouts/{layout}/map_{key}.json  各布局坐标（场景编辑器标定；地图管理不碰坐标）
@@ -92,7 +92,7 @@ POI 坐标是**底图归一化坐标**。`kind` 只是标签（`exit` / `spawn` 
 
 | 功能 | 落到 |
 |---|---|
-| 新建 / 复制到本地 / 删除 | `maps/{key}.yaml` + `scenes/map_{key}.yaml` + `scenes.yaml` 分组 |
+| 新建 / 复制到本地 / 删除 | `maps/{key}/map.yaml` + `scenes/map_{key}.yaml` + `scenes.yaml` 分组 |
 | 导入底图（文件 / 从当前画面截取） | `maps/{key}/base.png`；截取时按当前布局的 `full_map` 裁剪，未标定用整帧并提示 |
 | POI 标注 | 画布点击新增、点击标记选中、表格改 key/kind/name/x/y |
 | HUD 场景绑定 | 下拉选场景与实体 key；"标定 HUD…"拉起场景编辑器定位到该场景 |

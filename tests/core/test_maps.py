@@ -62,7 +62,8 @@ def test_create_writes_definition_and_hud_scene(tmp_path):
     assert map_def.key == "duchenxu" and map_def.layer == "system"
     assert map_def.ui.scene == "map_duchenxu"
     assert manager.list_keys() == ["duchenxu"]
-    saved = yaml.safe_load((tmp_path / "system/maps/duchenxu.yaml").read_text("utf-8"))
+    saved = yaml.safe_load(
+        (tmp_path / "system/maps/duchenxu/map.yaml").read_text("utf-8"))
     assert saved["content_version"] == 1          # 开发模式新文件从 v1 起步
     assert saved["navigation"] == {"mode": "closed_loop"}
 
@@ -176,7 +177,7 @@ def test_user_mode_cannot_delete_system_map_but_can_copy_to_local(tmp_path):
     copied = user.copy_to_local("duchenxu")
 
     assert copied.layer == "local"
-    assert (tmp_path / "local/maps/duchenxu.yaml").exists()
+    assert (tmp_path / "local/maps/duchenxu/map.yaml").exists()
     assert (tmp_path / "local/maps/duchenxu/base.png").read_bytes() == b"img"
 
 
@@ -188,7 +189,7 @@ def test_copy_to_local_writes_local_even_in_dev_mode(tmp_path):
     copied = manager.copy_to_local("duchenxu")
 
     assert copied.layer == "local"
-    assert (tmp_path / "local/maps/duchenxu.yaml").is_file()
+    assert (tmp_path / "local/maps/duchenxu/map.yaml").is_file()
     assert (tmp_path / "local/maps/duchenxu/base.png").read_bytes() == b"img"
 
 

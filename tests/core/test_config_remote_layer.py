@@ -128,12 +128,13 @@ class TestLocalStillWins:
 
     def test_local_diff_is_applied_on_top_of_remote_aggregate(
             self, dirs, monkeypatch):
-        rel_path = "yysls/game_config.yaml"
+        rel_path = "yysls/game_config/equipment.yaml"
         monkeypatch.setitem(
             versioning.VERSIONED_FILES,
             rel_path,
             versioning.VersionedDir(
-                "yysls", "game_config.yaml", 1, allow_remote_new=False),
+                "yysls/game_config", "equipment.yaml", 1,
+                allow_remote_new=False),
         )
         for root, data in (
             (dirs[0], {"content_version": 1, "source": "system", "value": 1}),

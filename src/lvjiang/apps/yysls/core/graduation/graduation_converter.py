@@ -19,7 +19,7 @@ from .excel_formula import FormulaError, FormulaModel, parse_formula
 from .graduation_program import ProgramCompiler, ProgramRuntime
 
 GRADUATION_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "graduation"
-GAME_CONFIG_PATH = PROJECT_ROOT / "config" / "system" / "yysls" / "game_config.yaml"
+GAME_CONFIG_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "game_config"
 
 INPUTS = {
     "min_outer": "期望!B2", "max_outer": "期望!C2",
@@ -99,7 +99,13 @@ def _version(filename: str) -> str:
 def _affix_input_names(
     workbook, school: str, inputs: dict[str, str],
 ) -> dict[str, list[str]]:
-    config = yaml.safe_load(GAME_CONFIG_PATH.read_text(encoding="utf-8"))
+    config: dict[str, Any] = {}
+    for filename in ("affixes.yaml", "equipment.yaml", "schools.yaml"):
+        document = yaml.safe_load(
+            (GAME_CONFIG_DIR / filename).read_text(encoding="utf-8"),
+        ) or {}
+        document.pop("content_version", None)
+        config.update(document)
     named_inputs = {
         "all_skill_bonus", "boss_bonus", "weapon_bonus_primary",
         "weapon_bonus_secondary", "single_qs_bonus", "group_qs_bonus",

@@ -2,6 +2,7 @@
 
 
 from lvjiang.apps.yysls.ui.tuning.progress_hub import TuningProgressHub
+from lvjiang.apps.yysls.ui.tuning.progress_widget import TuningProgressWidget
 from lvjiang.apps.yysls.ui.tuning.result_store import (
     RESET_COMPLETED,
     RESET_COOLDOWN,
@@ -101,6 +102,76 @@ def test_clear_resets_ids_for_a_new_run(qtbot):
     assert len(store.results) == 1
     assert store.results[0].equipment_id == 1
     assert store.results[0].name == "新环"
+
+
+def test_terminal_smart_tuning_opinion_is_used_as_history_reason(qtbot):
+    hub = TuningProgressHub()
+    store = TuningResultStore(hub)
+    hub.slot_entered.emit("ring", "环")
+    _start(hub, "智能跳过环", "环")
+    opinion = (
+        "智能调律：分析最大极限毕业率 94.50%，"
+        "低于备战方案，处理结果：跳过。")
+    hub.smart_tuning_updated.emit({
+        "enabled": True, "state": "final", "final_action": "skip",
+        "opinion": opinion,
+    })
+    hub.equipment_finished.emit({
+        "name": "智能跳过环", "rounds": 0, "status": "done",
+        "reason": "普通结束原因", "final_affixes": [],
+    })
+
+    assert store.results[0].reason == opinion
+
+
+def test_smart_continue_is_not_a_terminal_history_opinion(qtbot):
+    hub = TuningProgressHub()
+    store = TuningResultStore(hub)
+    hub.slot_entered.emit("ring", "环")
+    _start(hub, "继续调律环", "环")
+    hub.smart_tuning_updated.emit({
+        "enabled": True, "state": "evaluated", "final_action": "continue",
+        "opinion": "不应写入",
+    })
+    hub.equipment_finished.emit({
+        "name": "继续调律环", "rounds": 0, "status": "done",
+        "reason": "正常结束", "final_affixes": [],
+    })
+
+    assert store.results[0].reason == "正常结束"
+
+
+def test_progress_widget_shows_ordered_smart_plan_details(qtbot):
+    hub = TuningProgressHub()
+    widget = TuningProgressWidget(hub)
+    qtbot.addWidget(widget)
+    widget.reset_state()
+    hub.smart_tuning_updated.emit({
+        "enabled": True,
+        "state": "evaluated",
+        "message": "所有方案确定无法提升",
+        "plans": [
+            {
+                "plan_name": "无名PVE", "rule_name": "会意", "playstyle": "纯唐",
+                "status": "no_improvement", "plan_maximum_rate": 0.99,
+                "baseline_rate": 0.95, "without_slot_rate": 0.81,
+                "maximum_rate": 0.945, "reason": "穷尽后无提升",
+            },
+            {
+                "plan_name": "火拳奶", "rule_name": "奶", "playstyle": "纯奶",
+                "status": "incomplete",
+                "reason": "备战方案不完整（7/8），智能调律不启用",
+            },
+        ],
+    })
+
+    assert widget._smart_group.isVisibleTo(widget)
+    text = widget._smart_plans_label.text()
+    assert text.index("无名PVE") < text.index("火拳奶")
+    assert "方案上限：99.00%" in text
+    assert "七件：81.00%" in text
+    assert "候选上限：94.50%" in text
+    assert "备战方案不完整" in text
 
 
 def test_reset_only_equipment_is_still_a_tuning_result(qtbot):
@@ -225,4 +296,3 @@ def test_unreadable_reset_count_reaches_the_equipment_card(qtbot):
     assert card.reset_label.text().startswith("异常：")
     assert card.reset_label.property("anomaly") is True
     assert "#D32F2F" in card.reset_label.styleSheet()
-

@@ -53,7 +53,7 @@ entries:
         formula: { source: dim_min, multiplier: 0.2639, max: 73.9 }
 ```
 
-`full_affix` 的数值不写在配置里，由 `game_config.yaml` 的
+`full_affix` 的数值不写在配置里，由 `game_config/affixes.yaml` 的
 `affix_caps[等级]` 生成。游戏事实：心法给出的一整条词条按 **1 : 2**
 拆成最小 / 最大，两者之和等于该等级该词条满值。已在两个独立数据点
 验证：
@@ -190,7 +190,7 @@ entries:
 | 来源 | 名册 | 界面 |
 |---|---|---|
 | 心法 | 配置文件本身 | 可增删。「+ 心法」输入门名，一次建满六重 |
-| 武学 | `game_config.yaml` 的 `martial_arts` | 增删按钮禁用，去武学配置改 |
+| 武学 | `game_config/martial_arts.yaml` 的 `martial_arts` | 增删按钮禁用，去武学配置改 |
 
 心法没有权威来源——社区心法表覆盖不全，国际服未放出的流派得自己
 补，所以名册就是配置本身，界面必须能增删。新增按「门」而不是按
@@ -198,7 +198,7 @@ entries:
 `scripts/gen_attr_model_entries.py` 做的是同一件事的批量版，只增不改，
 已填的数值不会被覆盖。
 
-武学相反，`game_config.yaml` 的 `martial_arts` 就是本仓库自己维护的
+武学相反，`game_config/martial_arts.yaml` 的 `martial_arts` 就是本仓库自己维护的
 权威数据。所以 `martial_art.yaml` 只是**数值覆盖层**（`entries` 常年
 为空也正常），名册在加载时按「武学名·天赋」补齐：名册里有、文件里
 没有的当场补一条待填；文件里有、名册里没有的跳过并告警，文件不动，
@@ -322,7 +322,7 @@ selections:                 # 单选类来源
 - 心法 222 条（37 门 × 6 重），来自社区心法表；国际服尚未放出的
   五个流派（裂石·钧 / 牵丝·翊 / 破竹·尘 / 破竹·鸢 / 破竹·樽）需要
   在界面里自行新增；
-- 武学 22 条，加载时从 `game_config.yaml` 的 `martial_arts` 补齐，不
+- 武学 22 条，加载时从 `game_config/martial_arts.yaml` 的 `martial_arts` 补齐，不
   落盘；
 - 其余来源（等级底子 / 突破 / 套装 / 武备 / 神工 / 奇物 / 秘籍 /
   吃食）为空，按需新增。

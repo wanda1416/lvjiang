@@ -67,15 +67,62 @@ class TestRulesFromDirectory:
         assert "disabled" not in _read(tmp_path / "system/yysls/tuning_rules/huixin_big.yaml")
         assert "huixin_big" in manager.get_rules()
 
-    def test_user_mode_disable_creates_local_shadow(self, tmp_path):
+    def test_user_mode_disable_writes_a_stub_and_enable_removes_it(self, tmp_path):
+        """没改过的系统规则：停用只在 local 放一个 key + disabled 的桩，正文仍来自
+        system；重新启用 = 删桩。用户一眼就知道这个 local 文件可以直接删。"""
         resolver = _layered(tmp_path, dev_mode=False)
         manager = TuningRuleManager(resolver=resolver)
 
         manager.set_rule_enabled("huixin_big", False)
 
-        shadow = tmp_path / "local/yysls/tuning_rules/huixin_big.yaml"
-        assert shadow.exists() and _read(shadow)["disabled"] is True
+        stub = tmp_path / "local/yysls/tuning_rules/huixin_big.yaml"
+        assert _read(stub) == {"key": "huixin_big", "disabled": True}
         assert "huixin_big" not in manager.get_rules()
+        assert manager.is_rule_local_stub("huixin_big")
+        # 导航仍能拿到规则名（正文来自 system）
+        assert dict(manager.get_all_rule_keys_and_names())["huixin_big"] == "会心大外"
+        # 来源展示的是生效的正文（系统），不是桩
+        assert manager.describe_rule_version("huixin_big").layer == "system"
+
+        # 系统正文更新后，停用中的规则跟着变（桩不冻结内容）
+        system_file = tmp_path / "system/yysls/tuning_rules/huixin_big.yaml"
+        data = _read(system_file)
+        data["name"] = "会心大外 v2"
+        system_file.write_text(yaml.safe_dump(data, allow_unicode=True), "utf-8")
+        manager.reload()
+        assert dict(manager.get_all_rule_keys_and_names())["huixin_big"] == "会心大外 v2"
+
+        manager.set_rule_enabled("huixin_big", True)
+        assert not stub.exists()
+        assert "huixin_big" in manager.get_rules()
+        assert not manager.is_rule_local_stub("huixin_big")
+
+    def test_user_mode_disable_keeps_full_shadow_when_rule_was_edited(self, tmp_path):
+        resolver = _layered(tmp_path, dev_mode=False)
+        manager = TuningRuleManager(resolver=resolver)
+        raw = manager.get_raw("huixin_big")
+        raw["name"] = "我改过的大外"
+        manager.save_rule("huixin_big", raw)             # 完整 local 影子
+
+        manager.set_rule_enabled("huixin_big", False)
+
+        shadow = _read(tmp_path / "local/yysls/tuning_rules/huixin_big.yaml")
+        assert shadow["disabled"] is True and shadow["name"] == "我改过的大外"
+        assert not manager.is_rule_local_stub("huixin_big")
+
+        manager.set_rule_enabled("huixin_big", True)
+        shadow = _read(tmp_path / "local/yysls/tuning_rules/huixin_big.yaml")
+        assert "disabled" not in shadow and shadow["name"] == "我改过的大外"
+
+    def test_deleting_the_stub_by_hand_re_enables(self, tmp_path):
+        resolver = _layered(tmp_path, dev_mode=False)
+        manager = TuningRuleManager(resolver=resolver)
+        manager.set_rule_enabled("heal_pure", False)
+        (tmp_path / "local/yysls/tuning_rules/heal_pure.yaml").unlink()
+
+        manager.reload()
+
+        assert "heal_pure" in manager.get_rules()
 
     def test_create_rule_writes_default_order_and_no_declaration(self, tmp_path):
         resolver = _layered(tmp_path, dev_mode=True)
@@ -115,7 +162,9 @@ class TestLegacyMigration:
         manager = TuningRuleManager(resolver=resolver)
 
         assert "heal_pure" not in manager.get_rules()
-        assert _read(tmp_path / "local/yysls/tuning_rules/heal_pure.yaml")["disabled"] is True
+        # 用户模式迁移写的是桩，不是整份影子
+        assert _read(tmp_path / "local/yysls/tuning_rules/heal_pure.yaml") == {
+            "key": "heal_pure", "disabled": True}
         # local diff 里的旧声明被清掉；system 文件原样
         assert "tuning_rules" not in (_read(local_cfg) if local_cfg.exists() else {})
         assert "tuning_rules" not in _read(tmp_path / "system/yysls/tune_config.yaml")

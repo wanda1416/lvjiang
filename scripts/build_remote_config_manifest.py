@@ -11,7 +11,7 @@
         ocr.yaml
         scenes/xxx.yaml
         layouts/desktop/xxx.json
-        yysls/game_config.yaml
+        yysls/game_config/equipment.yaml
         yysls/tune_config.yaml
         yysls/tuning_rules/xxx.yaml
         yysls/graduation/xxx.json

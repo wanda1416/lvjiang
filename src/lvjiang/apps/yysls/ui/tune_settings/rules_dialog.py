@@ -1,12 +1,15 @@
 """装备调律配置对话框
 
-左侧一级导航（基础规则组 + 状态机三行为点 ｜ 流派规则 + 各规则）
+左侧一级导航（基础规则组 + 状态机三行为点 + 智能调律 ｜
+流派规则 + 各规则）
 + 右侧内容区（QStackedWidget）：
 - 基础规则：规则组切换/新增/复制/删除 + 等级/调律门槛
   （BaseRuleGroupPage），切换后三个行为页同步对准该组；
 - 扫描处理：进调律前的进入门槛与处置表（ScanBehaviorPage）；
 - 材料处理：每轮调律开始前的律准石检查与狗粮规则（MaterialConfigPage）；
 - 结束处理：每轮调律结束后的行为表与重置设置（TuneBehaviorPage）；
+- 智能调律：结束处理的公共扩展，配置备战方案范围、毕业率比较与独立失败动作，
+  不随基础规则组切换；
 - 流派规则：品阶门槛与开关设定（PlaystyleConfigPage，全局不随组切换）；
 - 各规则：单规则编辑面板（RulePanel，内部含 7 项二级导航）；
   双击规则导航项弹窗修改规则名称（配置页项不可改名）。
@@ -65,10 +68,13 @@ from .behavior_pages import ScanBehaviorPage, TuneBehaviorPage
 from .material_config_page import MaterialConfigPage
 from .playstyle_config_page import PlaystyleConfigPage
 from .rule_panel import RulePanel, add_nav_separator
+from .smart_tuning_page import SmartTuningPage
 
 # 规则 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _CONFIG_REL_PATH = "yysls/tune_config.yaml"
+_NAV_KIND_ROLE = Qt.ItemDataRole.UserRole
+_NAV_VALUE_ROLE = Qt.ItemDataRole.UserRole + 1
 
 class _RulePagePlaceholder(QWidget):
     """规则页占位符；自带 key/name，不依赖导航位置反查数据。"""
@@ -240,15 +246,7 @@ class TuningRulesDialog(QDialog):
         bottom.addWidget(self._buttons)
         layout.addLayout(bottom)
 
-        # 一级节点：基础规则 → 扫描处理 → 材料处理 → 结束处理 →
-        # 分割线 → 流派规则 → 各规则（导航含分割线：行 0-3 = 栈页 0-3，
-        # 行 ≥5 = 栈页 - 1）
-        self._nav.addItem(tr("基础规则"))
-        self._nav.addItem(tr("扫描处理"))
-        self._nav.addItem(tr("材料处理"))
-        self._nav.addItem(tr("结束处理"))
-        add_nav_separator(self._nav)
-        self._nav.addItem(tr("流派规则"))
+        # 导航项不再依赖行号偏移；页类型与栈索引显式存在 item data。
         self._base_page = BaseRuleGroupPage(
             self._group_manager, group_key, self._set_status)
         self._stack.addWidget(self._base_page)
@@ -261,9 +259,22 @@ class TuningRulesDialog(QDialog):
         self._tune_page = TuneBehaviorPage(
             self._group_manager, group_key, self._set_status)
         self._stack.addWidget(self._tune_page)
+        self._smart_page = SmartTuningPage(
+            self._config_manager, self._set_status)
+        self._stack.addWidget(self._smart_page)
         self._playstyle_page = PlaystyleConfigPage(
             self._config_manager, self._set_status)
         self._stack.addWidget(self._playstyle_page)
+        for title, page in (
+            (tr("基础规则"), self._base_page),
+            (tr("扫描处理"), self._scan_page),
+            (tr("材料处理"), self._material_page),
+            (tr("结束处理"), self._tune_page),
+        ):
+            self._add_page_nav(title, page)
+        self._add_page_nav(tr("智能调律"), self._smart_page)
+        add_nav_separator(self._nav)
+        self._add_page_nav(tr("流派规则"), self._playstyle_page)
         # 规则组切换后三个行为页同步重载
         self._base_page.set_switch_callback(self._on_group_switched)
         # 扫描处理页保存后通知基础规则页刷新展示（门槛值同步）
@@ -289,11 +300,26 @@ class TuningRulesDialog(QDialog):
 
     # ── 规则页增删 ──
 
+    def _add_page_nav(self, title: str, page: QWidget) -> None:
+        self._nav.addItem(title)
+        item = self._nav.item(self._nav.count() - 1)
+        item.setData(_NAV_KIND_ROLE, "page")
+        item.setData(_NAV_VALUE_ROLE, self._stack.indexOf(page))
+
     def _add_rule_page(self, key: str, name: str) -> QWidget:
         placeholder = _RulePagePlaceholder(key, name)
         self._stack.addWidget(placeholder)
         self._nav.addItem(name)
+        item = self._nav.item(self._nav.count() - 1)
+        item.setData(_NAV_KIND_ROLE, "rule")
+        item.setData(_NAV_VALUE_ROLE, key)
         return placeholder
+
+    def _rule_stack_index(self, key: str) -> int:
+        for index in range(self._stack.count()):
+            if getattr(self._stack.widget(index), "rule_key", "") == key:
+                return index
+        return -1
 
     def _materialize_rule_page(self, index: int) -> RulePanel:
         current = self._stack.widget(index)
@@ -327,9 +353,10 @@ class TuningRulesDialog(QDialog):
             self._disabled_rule_keys.add(key)
         else:
             self._disabled_rule_keys.discard(key)
-        for i in range(6, self._nav.count()):
-            if (self._stack.widget(i - 1) is panel):
-                item = self._nav.item(i)
+        for i in range(self._nav.count()):
+            item = self._nav.item(i)
+            if (item.data(_NAV_KIND_ROLE) == "rule"
+                    and item.data(_NAV_VALUE_ROLE) == key):
                 if disabled:
                     item.setForeground(QBrush(Qt.GlobalColor.gray))
                 else:
@@ -341,9 +368,16 @@ class TuningRulesDialog(QDialog):
         item = self._nav.item(row)
         if row < 0 or item is None or not item.flags():
             return  # 分割线项不响应
-        index = row if row <= 3 else row - 1
-        if index >= 5:
+        kind = item.data(_NAV_KIND_ROLE)
+        if kind == "page":
+            index = int(item.data(_NAV_VALUE_ROLE))
+        elif kind == "rule":
+            index = self._rule_stack_index(str(item.data(_NAV_VALUE_ROLE) or ""))
+            if index < 0:
+                return
             self._materialize_rule_page(index)
+        else:
+            return
         self._stack.setCurrentIndex(index)
 
     def _on_group_switched(self, group_key: str):
@@ -406,10 +440,12 @@ class TuningRulesDialog(QDialog):
         """双击规则导航项 → 弹窗修改规则名称（配置页不可改名）"""
         if item is None:
             return
-        row = self._nav.row(item)
-        if row < 6:  # 四张基础规则/行为页 + 分割线 + 流派规则页
+        if item.data(_NAV_KIND_ROLE) != "rule":
             return
-        panel = self._materialize_rule_page(row - 1)
+        index = self._rule_stack_index(str(item.data(_NAV_VALUE_ROLE) or ""))
+        if index < 0:
+            return
+        panel = self._materialize_rule_page(index)
         old_name = panel.rule_name
         new_name, ok = QInputDialog.getText(
             self, tr("重命名规则"), tr("规则名称："), text=old_name)
@@ -441,23 +477,29 @@ class TuningRulesDialog(QDialog):
         except (RuleValidationError, PermissionError) as e:
             QMessageBox.warning(self, tr("删除规则"), str(e))
             return
-        for i in range(5, self._stack.count()):
+        for i in range(self._stack.count()):
             panel = self._stack.widget(i)
             if getattr(panel, "rule_key", "") == key:
                 self._stack.removeWidget(panel)
                 panel.deleteLater()
-                self._nav.takeItem(i + 1)  # 导航含分割线，行号 +1
+                break
+        for i in range(self._nav.count()):
+            item = self._nav.item(i)
+            if (item.data(_NAV_KIND_ROLE) == "rule"
+                    and item.data(_NAV_VALUE_ROLE) == key):
+                self._nav.takeItem(i)
                 break
         self._nav.setCurrentRow(0)
         self._set_status(tr("已删除规则 {key}").format(key=key), False)
 
     def _rename_rule(self, old_key: str, new_key: str, new_name: str):
         """更新对应导航项的标题文本（由 panel 在 key/name 变更时回调）"""
-        for i in range(5, self._stack.count()):
-            panel = self._stack.widget(i)
-            if getattr(panel, "rule_key", "") == new_key:
-                item = self._nav.item(i + 1)  # 含分割线偏移
+        for i in range(self._nav.count()):
+            item = self._nav.item(i)
+            if (item.data(_NAV_KIND_ROLE) == "rule"
+                    and item.data(_NAV_VALUE_ROLE) in (old_key, new_key)):
                 item.setText(new_name)
+                item.setData(_NAV_VALUE_ROLE, new_key)
                 # 重命名后保持禁用灰色样式
                 if new_key in self._disabled_rule_keys:
                     item.setForeground(QBrush(Qt.GlobalColor.gray))
@@ -541,15 +583,35 @@ class TuningRulesDialog(QDialog):
             self._playstyle_page = PlaystyleConfigPage(
                 self._config_manager, self._set_status)
             self._stack.removeWidget(old_playstyle)
-            self._stack.insertWidget(4, self._playstyle_page)
+            self._stack.insertWidget(5, self._playstyle_page)
             old_playstyle.deleteLater()
 
-            while self._stack.count() > 5:
-                page = self._stack.widget(5)
-                self._stack.removeWidget(page)
-                page.deleteLater()
-            while self._nav.count() > 6:
-                self._nav.takeItem(6)
+            old_smart = self._smart_page
+            self._smart_page = SmartTuningPage(
+                self._config_manager, self._set_status)
+            self._stack.removeWidget(old_smart)
+            self._stack.insertWidget(4, self._smart_page)
+            old_smart.deleteLater()
+
+            for i in range(self._nav.count()):
+                item = self._nav.item(i)
+                if item.data(_NAV_KIND_ROLE) != "page":
+                    continue
+                value = item.data(_NAV_VALUE_ROLE)
+                if value == 4:
+                    item.setData(_NAV_VALUE_ROLE, self._stack.indexOf(self._smart_page))
+                elif value == 5:
+                    item.setData(_NAV_VALUE_ROLE, self._stack.indexOf(self._playstyle_page))
+
+            for index in reversed(range(self._stack.count())):
+                page = self._stack.widget(index)
+                if getattr(page, "rule_key", ""):
+                    self._stack.removeWidget(page)
+                    page.deleteLater()
+            for index in reversed(range(self._nav.count())):
+                item = self._nav.item(index)
+                if item.data(_NAV_KIND_ROLE) == "rule":
+                    self._nav.takeItem(index)
             self._disabled_rule_keys = {
                 key for key, _name in self._manager.get_all_rule_keys_and_names()
                 if not self._manager.is_rule_enabled(key)}

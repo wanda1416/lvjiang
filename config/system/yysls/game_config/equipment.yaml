@@ -1,0 +1,265 @@
+content_version: 1
+base_attrs:
+  weapon:
+    _attr: 外功攻击
+    _range: true
+    110:
+      gold:
+        min: 100
+        max: 232
+      purple:
+        min: 90
+        max: 209
+      blue:
+        min: 80
+        max: 186
+    105:
+      gold:
+        min: 87
+        max: 203
+      purple:
+        min: 79
+        max: 183
+      blue:
+        min: 70
+        max: 162
+    100:
+      gold:
+        min: 75
+        max: 175
+      purple:
+        min: 68
+        max: 158
+      blue:
+        min: 60
+        max: 140
+    96:
+      gold:
+        min: 65
+        max: 151
+      purple:
+        min: 59
+        max: 136
+      blue:
+        min: 52
+        max: 121
+    _first_affixes:
+    - 最大外功攻击
+    - 最小外功攻击
+    - 势
+    - 敏
+    - 最大无相攻击
+    - 最小无相攻击
+  ring:
+    _name_suffixes:
+    - 云珑
+    _type_aliases:
+    - 环
+    _attr: 最小外功攻击
+    110:
+      gold: 133
+      purple: 120
+      blue: 106
+    105:
+      gold: 116
+      purple: 105
+      blue: 93
+    100:
+      gold: 100
+      purple: 90
+      blue: 80
+    96:
+      gold: 86
+      purple: 78
+      blue: 69
+    _first_affixes:
+    - 最大外功攻击
+    - 最小外功攻击
+  pendant:
+    _name_suffixes:
+    - 辟邪
+    _type_aliases:
+    - 佩
+    _attr: 最大外功攻击
+    110:
+      gold: 199
+      purple: 179
+      blue: 159
+    105:
+      gold: 174
+      purple: 157
+      blue: 139
+    100:
+      gold: 150
+      purple: 135
+      blue: 120
+    96:
+      gold: 129
+      purple: 116
+      blue: 104
+    _first_affixes:
+    - 最大外功攻击
+    - 最小外功攻击
+  head:
+    _name_suffixes:
+    - 冠
+    _type_aliases:
+    - 冠胄
+    - 冠
+    - 胄
+    _attr: 气血最大值
+    110:
+      gold: 9723
+      purple: 8750
+      blue: 7778
+    105:
+      gold: 8225
+      purple: 7402
+      blue: 6580
+    100:
+      gold: 6879
+      purple: 6192
+      blue: 5504
+    96:
+      gold: 5774
+      purple: 5196
+      blue: 4619
+    _first_affixes:
+    - 精准率
+    - 会心率
+    - 会意率
+    - 外功防御
+    - 气血最大值
+  chest:
+    _name_suffixes:
+    - 甲
+    _type_aliases:
+    - 胸甲
+    - 胸
+    _attr: 气血最大值
+    110:
+      gold: 19445
+      purple: 17500
+      blue: 15556
+    105:
+      gold: 16449
+      purple: 14804
+      blue: 13160
+    100:
+      gold: 13758
+      purple: 12383
+      blue: 11007
+    96:
+      gold: 11547
+      purple: 10392
+      blue: 9238
+    _first_affixes:
+    - 精准率
+    - 会心率
+    - 会意率
+    - 外功防御
+    - 气血最大值
+  leg:
+    _name_suffixes:
+    - 缚袴
+    - 缚
+    _type_aliases:
+    - 胫甲
+    _follow: head
+    _first_affixes:
+    - 劲
+    - 精准率
+    - 会心率
+    - 会意率
+    - 体
+    - 外功防御
+    - 气血最大值
+  wrist:
+    _name_suffixes:
+    - 披膊
+    _type_aliases:
+    - 腕甲
+    _follow: head
+    _first_affixes:
+    - 劲
+    - 精准率
+    - 会心率
+    - 会意率
+    - 体
+    - 外功防御
+    - 气血最大值
+equipment_name_series:
+  output:
+    110: 流星
+    105: 踏雪
+    100: 绝尘
+    96: 惊沙
+    91: 飞将
+  armor:
+    110: 吴钩
+    105: 雁南飞
+    100: 万仞山
+    96: 陇上
+    91: 夜征人
+weapon_types:
+- name: 剑
+  wuxue_affix: 剑武学增伤
+  name_suffixes:
+  - 含光
+  type_aliases:
+  - 剑
+- name: 枪
+  wuxue_affix: 枪武学增伤
+  name_suffixes:
+  - 羽林
+  type_aliases:
+  - 枪
+- name: 伞
+  wuxue_affix: 伞武学增效
+  type_aliases:
+  - 伞
+  name_suffixes:
+  - 云伞
+- name: 扇
+  wuxue_affix: 扇武学增效
+  type_aliases:
+  - 扇
+  name_suffixes:
+  - 画扇
+- name: 陌刀
+  wuxue_affix: 陌刀武学增伤
+  type_aliases:
+  - 陌刀
+  name_suffixes:
+  - 碎刃
+- name: 双刀
+  wuxue_affix: 双刀武学增伤
+  type_aliases:
+  - 双刀
+  name_suffixes:
+  - 双鲤
+- name: 绳镖
+  wuxue_affix: 绳镖武学增伤
+  type_aliases:
+  - 绳镖
+  name_suffixes:
+  - 鸣镖
+- name: 横刀
+  wuxue_affix: 横刀武学增伤
+  type_aliases:
+  - 横刀
+  name_suffixes:
+  - 断水
+- name: 手甲
+  wuxue_affix: 手甲武学增伤
+  type_aliases:
+  - 手甲
+  name_suffixes:
+  - 动岳
+- name: 舞绫鼓
+  wuxue_affix: 舞绫鼓武学增伤
+  type_aliases:
+  - 舞绫鼓
+  - 鼓
+  name_suffixes:
+  - 凌波

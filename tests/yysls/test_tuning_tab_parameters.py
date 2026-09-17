@@ -53,7 +53,17 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
         for label in tab._config_tabs.widget(1).findChildren(QLabel)
     }
     assert {"<b>调律部位：</b>", "<b>全局开关：</b>",
-            "<b>调律设置：</b>", "<b>调试参数：</b>"} <= labels
+            "<b>调律设置：</b>", "<b>调试参数：</b>",
+            "<b>智能调律：</b>"} <= labels
+
+    # 与其他参数分组一致：标题和复选框分别占据顶层布局的一行。
+    parameter_layout = tab._smart_tuning_cb.parentWidget().layout()
+    smart_label = next(
+        label for label in tab._smart_tuning_cb.parentWidget().findChildren(QLabel)
+        if label.text() == "<b>智能调律：</b>")
+    assert parameter_layout.indexOf(smart_label) >= 0
+    assert parameter_layout.indexOf(tab._smart_tuning_cb) == (
+        parameter_layout.indexOf(smart_label) + 1)
 
     assert len(tab._tuning_globals._switch_cbs) == 2
     assert not any(
@@ -71,6 +81,10 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     assert tab._initial_stone_min.value() == 0
     assert tab._initial_stone_min.text() == ""
     assert not tab._validate_stone_cache_cb.isChecked()
+    # 公共能力默认启用，但用户级二次确认仍默认关闭。
+    assert not tab._smart_tuning_cb.isChecked()
+    assert tab._smart_tuning_cb.isEnabled()
+    tab._smart_tuning_cb.setChecked(True)
     tab._pc_background_scroll_cb.setChecked(True)
     tab._positional_traversal_cb.setChecked(True)
     tab._initial_stone_check_cb.setChecked(True)
@@ -84,6 +98,7 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     assert saved["initial_stone_check_enabled"] is True
     assert saved["initial_stone_min_count"] == 120
     assert saved["validate_stone_cache"] is True
+    assert saved["smart_tuning_enabled"] is True
 
     tab._positional_traversal_cb.setChecked(False)
     saved = get_user_workflow_params("测试用户", "auto_tuning", users_dir)

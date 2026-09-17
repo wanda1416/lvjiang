@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 from loguru import logger
 
-from lvjiang.core.config.resolver import ConfigResolver, get_resolver
+from lvjiang.core.config.resolver import LAYER_LOCAL, ConfigResolver, get_resolver
 
 from .....i18n import tr
 from .models import (
@@ -28,6 +28,10 @@ from .parsing import (
 
 # 规则目录相对 config 层根的路径
 _RULES_REL_DIR = "yysls/tuning_rules"
+#: 「停用桩」：用户模式停用系统规则时，local 只写这几个键（disabled 加上
+#: 身份/版本元数据），规则内容仍来自 system/remote。用户看一眼文件就知道
+#: 删掉它等于重新启用，且不会丢自己的修改——因为本来就没有修改。
+_STUB_KEYS = frozenset({"key", "disabled", "content_version"})
 _GROUPS_REL_DIR = "yysls/base_groups"
 _CONFIG_REL_PATH = "yysls/tune_config.yaml"
 
@@ -66,6 +70,7 @@ class TuningRuleManager:
         self._all_names: dict[str, str] = {}  # 含禁用规则，供 UI 导航
         self._all_raw: dict[str, dict] = {}   # 含禁用规则的原始 dict
         self._all_files: dict[str, str] = {}  # 含禁用规则的文件名
+        self._stubs: set[str] = set()         # local 只是停用桩的规则 key
         self._errors: dict[str, str] = {}
         self.reload()
 
@@ -98,12 +103,13 @@ class TuningRuleManager:
         self._migrate_legacy_declarations()
         switch_keys = self._switch_keys()
         loaded: dict[str, TuningRule] = {}
+        self._stubs.clear()
         for name in self._resolver.enumerate_entities(self._rel_dir, "*.yaml"):
             path = self._resolver.resolve_read(self._rel(name))
             if path is None:
                 continue
             try:
-                data = self._resolver._load_yaml(path)
+                data, is_stub = self._load_rule_data(name, path)
                 rule = parse_tuning_rule(data, switch_keys)
             except Exception as e:
                 logger.error(f"调律规则 {name} 加载失败，已跳过: {e}")
@@ -115,6 +121,8 @@ class TuningRuleManager:
             self._all_names[rule.key] = rule.name
             self._all_raw[rule.key] = data
             self._all_files[rule.key] = name
+            if is_stub:
+                self._stubs.add(rule.key)
             if rule.disabled:
                 continue
             loaded[rule.key] = rule
@@ -153,11 +161,17 @@ class TuningRuleManager:
                     raw = self._resolver._load_yaml(path)
                 except Exception:  # noqa: BLE001
                     continue
-                if not raw.get("disabled"):
+                if raw.get("disabled"):
+                    continue
+                if self._stub_applicable(rel):
+                    payload = {"key": key, "disabled": True}
+                else:
                     raw["disabled"] = True
-                    self._resolver.write_entity(
-                        rel, yaml.dump(raw, allow_unicode=True, sort_keys=False))
-                    logger.info(f"已把旧 tuning_rules 启停声明迁入规则文件: {key} → disabled")
+                    payload = raw
+                self._resolver.write_entity(
+                    rel, yaml.dump(payload, allow_unicode=True, sort_keys=False),
+                    force=True)
+                logger.info(f"已把旧 tuning_rules 启停声明迁入规则文件: {key} → disabled")
         data.pop("tuning_rules", None)
         data.pop("base_rules", None)
         try:
@@ -167,6 +181,35 @@ class TuningRuleManager:
             logger.warning(f"移除 tune_config 旧声明失败: {e}")
         if _tune_config_manager is not None:
             _tune_config_manager.reload()
+
+    def _base_path(self, rel: str):
+        """越过 local 影子，取 remote/system 里实际的规则内容路径。"""
+        if self._resolver.remote_supersedes(rel):
+            return self._resolver.remote_dir / rel
+        system = self._resolver.system_dir / rel
+        return system if system.exists() else None
+
+    def _load_rule_data(self, name: str, path) -> tuple[dict, bool]:
+        """读一份规则；local 是停用桩时把 disabled 叠到 base 内容上。
+
+        返回 ``(data, is_stub)``。桩的判定：local 文件的键全部落在
+        ``_STUB_KEYS`` 内，且 remote/system 有这条规则的正文。
+        """
+        rel = self._rel(name)
+        data = self._resolver._load_yaml(path) or {}
+        if (self._resolver.system_dir != self._resolver.local_dir
+                and Path(path) == self._resolver.local_dir / rel
+                and set(data) <= _STUB_KEYS):
+            base_path = self._base_path(rel)
+            if base_path is not None:
+                base = self._resolver._load_yaml(base_path) or {}
+                base["disabled"] = bool(data.get("disabled", False))
+                return base, True
+        return data, False
+
+    def is_rule_local_stub(self, key: str) -> bool:
+        """local 里只有停用桩、正文仍来自系统/远程。"""
+        return key in self._stubs
 
     def _switch_keys(self) -> set[str] | None:
         """已注册开关 key 全集（tune_config 加载失败时 None = 跳过校验）"""
@@ -202,8 +245,16 @@ class TuningRuleManager:
         return True if raw is None else not bool(raw.get("disabled", False))
 
     def describe_rule_version(self, key: str):
-        """返回规则实体来源与版本，供配置页展示。"""
-        return self._origin_resolver.describe_entity(self.rule_rel_path(key))
+        """返回规则实体来源与版本，供配置页展示。
+
+        local 只是停用桩时，生效的正文仍是系统/远程那一份，展示它而不是桩。
+        """
+        rel = self.rule_rel_path(key)
+        if key in self._stubs:
+            for origin in self._origin_resolver.list_entity_origins(rel):
+                if origin.layer != LAYER_LOCAL:
+                    return origin
+        return self._origin_resolver.describe_entity(rel)
 
     def list_rule_versions(self, key: str):
         """返回规则在本地、远程、系统各层现存的版本。"""
@@ -363,22 +414,46 @@ class TuningRuleManager:
     def set_rule_enabled(self, key: str, enabled: bool) -> None:
         """设置规则启用状态：写规则文件自己的 ``disabled`` 字段。
 
-        用户模式下这会为系统规则生成一份 local 影子（整文件覆盖），此后该
-        规则不再跟随系统/远程更新，直到用户还原为系统版本。
+        用户模式停用一条没改过的系统/远程规则时，local 只写一个停用桩
+        （``key`` + ``disabled: true``），正文继续跟随系统更新；重新启用就是
+        删掉这个桩。local 已有完整影子（用户改过内容）时才在影子里改字段。
         """
         raw = self._all_raw.get(key)
         if raw is None:
             raise RuleValidationError(f"规则不存在: {key}")
+        rel = self.rule_rel_path(key)
+        if self._stub_applicable(rel):
+            if enabled:
+                self._resolver.revert_entity_to_system(rel)
+            else:
+                self._resolver.write_entity(
+                    rel, yaml.dump({"key": key, "disabled": True},
+                                   allow_unicode=True, sort_keys=False),
+                    force=True)
+            self.reload()
+            return
         data = copy.deepcopy(raw)
         if enabled:
             data.pop("disabled", None)
         else:
             data["disabled"] = True
         self._resolver.write_entity(
-            self.rule_rel_path(key),
-            yaml.dump(data, allow_unicode=True, sort_keys=False),
-        )
+            rel, yaml.dump(data, allow_unicode=True, sort_keys=False))
         self.reload()
+
+    def _stub_applicable(self, rel: str) -> bool:
+        """用户模式、正文在系统/远程、local 要么没有要么只是桩 → 走桩逻辑。"""
+        if self._resolver.is_dev_mode():
+            return False
+        if self._base_path(rel) is None:
+            return False
+        local = self._resolver.local_dir / rel
+        if not local.exists():
+            return True
+        try:
+            return set(self._resolver._load_yaml(local) or {}) <= _STUB_KEYS
+        except Exception:  # noqa: BLE001 — 读不出来就按完整影子处理
+            return False
 
     def get_all_rule_keys_and_names(self) -> list[tuple[str, str]]:
         """全部规则 key + 名称（含禁用），供对话框导航使用"""
@@ -650,7 +725,7 @@ def get_tuning_group(key: str) -> TuningGroup | None:
 class TuneConfigManager:
     """全局调律配置管理器（单文件 tune_config.yaml）
 
-    承载 base_rules + 品阶门槛 + 开关注册表；提供加载、校验、
+    承载品阶门槛、开关注册表与智能调律公共配置；提供加载、校验、
     原始数据访问（UI 编辑用）与保存 + reload。
     """
 
@@ -727,7 +802,7 @@ def get_tune_config_manager() -> TuneConfigManager:
 
 
 def get_tune_config() -> TuneConfig:
-    """获取全局调律配置（品阶门槛 + 开关注册表）"""
+    """获取全局调律配置。"""
     return get_tune_config_manager().get()
 
 

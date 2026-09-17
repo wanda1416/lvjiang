@@ -373,7 +373,8 @@ def test_yysls_online_config_paths_are_registered():
     from lvjiang.apps import load_config_policies
 
     load_config_policies()
-    assert versioning.spec_for("yysls/game_config.yaml") is not None
+    assert versioning.spec_for("yysls/game_config/basic.yaml") is not None
+    assert versioning.spec_for("yysls/game_config/playstyles.yaml") is not None
     assert versioning.spec_for("yysls/tune_config.yaml") is not None
     graduation = versioning.spec_for(
         "yysls/graduation/鸣金·虹_基础方案.json")

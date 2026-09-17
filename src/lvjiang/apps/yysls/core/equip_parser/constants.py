@@ -1,7 +1,7 @@
 """装备领域常量定义
 
 部位分类、武器类型枚举、词条名称枚举等。
-武器类型、词条名称均从 attributes.yaml 动态读取（模块加载时快照，
+武器类型、词条名称均从游戏配置动态读取（模块加载时快照，
 UI 新增武器后需重启方可参与识别）。
 配置文件缺失或格式错误时直接抛异常，不做静默回退。
 """
@@ -23,10 +23,10 @@ def _load_config() -> tuple[list[str], list[str], set[str]]:
     经 ConfigResolver 读 system←local 合并视图（用户模式 local 覆盖生效）；
     配置缺失或关键字段为空时直接抛异常。
     """
-    from lvjiang.core.config import get_resolver
+    from ...config.game_config_files import load_game_config
 
-    rel = "yysls/game_config.yaml"
-    data = get_resolver().load_merged(rel)
+    rel = "yysls/game_config/"
+    data = load_game_config()
 
     # ── weapon_types ──
     raw_weapon_types = data.get("weapon_types")

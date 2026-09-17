@@ -44,8 +44,20 @@ local 文件可直接删除；system/remote 预置文件不允许用户删除，
 | `scenes.yaml` | `schema_version: 2` / `scenes` | `core/scene_config.py`、`scene_registry.py`、`scene_definition.py` |
 | `layouts.yaml` | `schema_version: 2` / `layouts` | `core/layout_manager.py`、`screen_calib.py` |
 | `ocr.yaml` | OCR 识别参数与文本规范化规则 | `core/ocr_config.py` / `core/ocr_cleaner.py` |
-| `yysls/game_config.yaml` | `base_attrs` / `affix_caps` / `schools` / `weapon_types` 等 9 项 | `apps/yysls/config/manager.py` |
+| `yysls/game_config/*.yaml` | 七份领域配置，业务层读取时合并为统一视图 | `apps/yysls/config/game_config_files.py`、`manager.py` |
 | `yysls/tune_config.yaml` | `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
+
+游戏配置固定为同一目录下七个文件，不再增加子目录：
+
+| 文件 | 内容 |
+|------|------|
+| `basic.yaml` | 基础配置、字体/装备卡片展示配置 |
+| `levels_and_seasons.yaml` | 等级、赛季 |
+| `affixes.yaml` | 词组、别名、词条上限与可用部位 |
+| `equipment.yaml` | 装备基础属性、命名系列、武器类型 |
+| `martial_arts.yaml` | 武学 |
+| `schools.yaml` | 流派 |
+| `playstyles.yaml` | 玩法 |
 
 `scenes.yaml` 的当前结构版本为 2，与 `layouts.yaml` 一样使用单一领域顶层键：
 
@@ -185,7 +197,7 @@ scenes:
 
 | 想停用 | 正确做法 |
 |--------|----------|
-| 某条调律规则 | 规则文件里 `disabled: true`（用户模式下会生成该规则的 local 影子，此后不再跟随系统更新，还原为系统版本即恢复） |
+| 某条调律规则 | 规则文件里 `disabled: true`。用户模式停用没改过的系统规则时，local 只写一个**停用桩** `{key, disabled: true}`，正文继续跟随系统/远程更新；重新启用 = 删掉这个桩（手动删文件也行）。只有用户已经改过内容（完整 local 影子）时才在影子里改字段 |
 | 某个系统布局 | 不选它即可（布局按需切换） |
 | 某张系统参考图 | 新建图库空间，放自己的图 |
 | 某个脚本不在日常页显示 | 脚本配置里取消勾选（存 session，见下） |
@@ -220,9 +232,9 @@ local 改造来获得所需行为，不允许删除系统预置文件。历史 `
 
 | 文件 | 路径 | 身份字段 | 声明方 |
 |------|------|----------|--------|
-| `yysls/game_config.yaml` | `weapon_types` | `name` | 插件 |
-| `yysls/game_config.yaml` | `level_configs` | `level` | 插件 |
-| `yysls/game_config.yaml` | `season_configs` | `season_number` | 插件 |
+| `yysls/game_config/equipment.yaml` | `weapon_types` | `name` | 插件 |
+| `yysls/game_config/levels_and_seasons.yaml` | `level_configs` | `level` | 插件 |
+| `yysls/game_config/levels_and_seasons.yaml` | `season_configs` | `season_number` | 插件 |
 
 新赛季、新装备等增量内容用户可以自己加条目，不需要删任何系统设定。
 
@@ -300,9 +312,11 @@ from ....core.config.resolver import (
 )
 
 register_registry_list_paths("yysls/tune_config.yaml", ("base_rules",))
-register_protected_list_paths("yysls/game_config.yaml", {
-    "weapon_types": "name", "level_configs": "level",
-    "season_configs": "season_number",
+register_protected_list_paths("yysls/game_config/equipment.yaml", {
+    "weapon_types": "name",
+})
+register_protected_list_paths("yysls/game_config/levels_and_seasons.yaml", {
+    "level_configs": "level", "season_configs": "season_number",
 })
 ```
 
@@ -373,7 +387,7 @@ remote 生效 ⟺ remote.content_version > system.content_version
 | `scenes/*.yaml` | ❌ | core |
 | `layouts/{布局}/{场景}.json` | ❌ | core |
 | `ocr.yaml` | ❌ | core |
-| `yysls/game_config.yaml` | ❌ | 插件 |
+| `yysls/game_config/*.yaml` | ❌ | 插件 |
 | `yysls/tune_config.yaml` | ❌ | 插件 |
 | `yysls/tuning_rules/*.yaml` | ✅ | 插件 |
 | `yysls/base_groups/*.yaml` | ✅ | 插件 |
@@ -385,9 +399,9 @@ remote 生效 ⟺ remote.content_version > system.content_version
 多一个场景文件是死的，只会让编辑器列表里冒出用不了的条目。调律规则和基础
 规则组相反——存在性就是目录里有没有这个文件，所以远程下发一条全新规则或
 一套新规则组能直接生效。毕业方案由可同步的
-`game_config.yaml` 登记方案名，因此两者同时下发时也允许新增方案文件。
+`game_config/schools.yaml` 登记方案名，因此两者同时下发时也允许新增方案文件。
 
-`ocr.yaml`、`game_config.yaml` 与 `tune_config.yaml` 是聚合配置：生效的
+`ocr.yaml`、`game_config/*.yaml` 与 `tune_config.yaml` 是聚合配置：生效的
 remote 文件替代 system 成为合并基底，用户已有的 local diff 继续叠加在
 上面。
 

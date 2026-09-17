@@ -563,6 +563,7 @@ panels:
 
 | 文档 | 内容 |
 |------|------|
+| [08-smart-tuning.md](08-smart-tuning.md) | 基于备战方案毕业率、挂接在现有结束处理之后的智能调律扩展 |
 | [../10-game/10-tuning-rules/README.md](../10-game/10-tuning-rules/README.md) | 调律评价规格：装备分级、流派词条要求、顶级判定 |
 | [../10-game/04-tuning-mechanics.md](../10-game/04-tuning-mechanics.md) | 调律相关文档的边界与索引 |
 | [../10-game/01-equipment-system.md](../10-game/01-equipment-system.md) | 装备系统介绍 |

@@ -83,19 +83,20 @@ class TestDialog:
     def test_dialog_nav(self, qtbot):
         dialog = TuningRulesDialog()
         qtbot.addWidget(dialog)
-        # 左侧导航：基础规则 + 扫描处理 + 材料处理 + 结束处理 + 分割线 + 流派规则 + 各规则
-        # StackedWidget 不含分割线（行 0-3 = 栈页 0-3，行 ≥5 = 栈页 - 1）
+        # 左侧导航：基础规则 + 扫描 + 材料 + 结束 + 智能调律 + ─ + 流派规则 + 各规则
+        # 智能调律是结束处理的公共扩展，两者之间不加分割线；导航项与栈页的映射显式维护
         # 对话框加载全部规则（含禁用），与 get_tuning_rules()（仅启用）不同
         n_rules = len(get_tuning_rule_manager().get_all_rule_keys_and_names())
-        assert dialog._nav.count() == n_rules + 6
-        assert dialog._stack.count() == n_rules + 5
+        assert dialog._nav.count() == n_rules + 7
+        assert dialog._stack.count() == n_rules + 6
         assert dialog._nav.item(0).text() == "基础规则"
         assert dialog._nav.item(1).text() == "扫描处理"
         assert dialog._nav.item(2).text() == "材料处理"
         assert dialog._nav.item(3).text() == "结束处理"
-        # 分割线项不可选中
-        assert not dialog._nav.item(4).flags()
-        assert dialog._nav.item(5).text() == "流派规则"
+        assert dialog._nav.item(4).text() == "智能调律"
+        # 智能调律之后才与流派规则区分
+        assert not dialog._nav.item(5).flags()
+        assert dialog._nav.item(6).text() == "流派规则"
         version = dialog.findChild(QLabel, "tune_config_version")
         assert version is not None
         assert "当前生效" in version.toolTip()

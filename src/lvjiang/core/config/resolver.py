@@ -18,7 +18,7 @@
   layouts/{name}/{scene}.json、yysls/tuning_rules/*.yaml、
   references/**/*.png）→ 整文件影子（local 有就完全顶掉，不做内容合并）
 - 聚合键值文件（scenes.yaml、layouts.yaml、
-  yysls/game_config.yaml、yysls/tune_config.yaml）→ 键级 diff 深合并；
+  yysls/game_config/*.yaml、yysls/tune_config.yaml）→ 键级 diff 深合并；
   dict 递归、列表与标量整键替换；
   每层 dict 支持 "__deleted__": [key, ...] 删除键
 
@@ -152,7 +152,7 @@ DELETABLE_PATHS: dict[str, tuple[str, ...]] = {}
 #: （纯标量列表）。
 #:
 #: **core.config 不认识任何插件领域词汇**：core 目前没有自己的受保护列表，
-#: 保持空表。插件私有配置文件（如燕云 `yysls/game_config.yaml` 的
+#: 保持空表。插件私有配置文件（如燕云 `yysls/game_config/*.yaml` 的
 #: `weapon_types`/`level_configs`/`season_configs`）经
 #: :func:`register_protected_list_paths` 由插件自己声明，理由同上。
 PROTECTED_LIST_PATHS: dict[str, dict[str, str | None]] = {}

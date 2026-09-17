@@ -23,3 +23,13 @@ switches:
     name: 保留单体奇术增
   keep_wanjia:
     name: 保留对玩家增效
+smart_tuning:
+  enabled: true
+  plan_scope: incoming
+  evaluation:
+    enabled: true
+    operator: gt
+    precision: 0.001
+  failure_action:
+    enabled: true
+    action: skip

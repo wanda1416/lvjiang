@@ -12,7 +12,9 @@ SPEC.loader.exec_module(MODULE)
 def test_build_loadout_merges_stores_and_infers_slot_type(tmp_path):
     config = tmp_path / "config/system/yysls"
     config.mkdir(parents=True)
-    (config / "game_config.yaml").write_text("schools: {}\n", encoding="utf-8")
+    game_config = config / "game_config"
+    game_config.mkdir()
+    (game_config / "schools.yaml").write_text("schools: {}\n", encoding="utf-8")
     session = tmp_path / "config/session"
     session.mkdir(parents=True)
     (session / "session.json").write_text("{}", encoding="utf-8")
@@ -30,7 +32,9 @@ def test_build_loadout_merges_stores_and_infers_slot_type(tmp_path):
 def test_migrate_is_idempotently_skipped_for_nonempty_target(tmp_path):
     config = tmp_path / "config/system/yysls"
     config.mkdir(parents=True)
-    (config / "game_config.yaml").write_text("schools: {}\n", encoding="utf-8")
+    game_config = config / "game_config"
+    game_config.mkdir()
+    (game_config / "schools.yaml").write_text("schools: {}\n", encoding="utf-8")
     session = tmp_path / "config/session"
     users = session / "users"
     users.mkdir(parents=True)

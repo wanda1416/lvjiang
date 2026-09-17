@@ -18,9 +18,8 @@ from .....i18n import tr
 from .....ui.button_styles import apply_dialog_button_box_style
 from .....ui.config_origin import layer_style, origin_tooltip
 from ...config import get_game_config
+from ...config.game_config_files import GAME_CONFIG_FILES
 from .config_tab import GameConfigTab
-
-_CONFIG_REL_PATH = "yysls/game_config.yaml"
 
 
 class GameConfigDialog(QDialog):
@@ -78,12 +77,24 @@ class GameConfigDialog(QDialog):
 
     def _refresh_version_info(self) -> None:
         resolver = get_resolver()
-        current = resolver.describe_entity(_CONFIG_REL_PATH)
-        available = resolver.list_entity_origins(_CONFIG_REL_PATH)
+        entries = []
+        for rel_path in GAME_CONFIG_FILES:
+            current = resolver.describe_entity(rel_path)
+            entries.append((rel_path, current))
+        versions = {item.version for _, item in entries}
+        layers = {item.layer for _, item in entries}
+        version = next(iter(versions)) if len(versions) == 1 else None
         self._version_value.setText(
-            "-" if current.version is None else f"v{current.version}")
-        self._version_value.setStyleSheet(layer_style(current.layer))
-        tip = origin_tooltip(current, available)
+            "混合" if len(versions) > 1 else
+            ("-" if version is None else f"v{version}"))
+        self._version_value.setStyleSheet(
+            layer_style(next(iter(layers))) if len(layers) == 1 else "")
+        tips = []
+        for rel_path, current in entries:
+            name = rel_path.rsplit("/", 1)[-1]
+            available = resolver.list_entity_origins(rel_path)
+            tips.append(f"{name}\n{origin_tooltip(current, available)}")
+        tip = "\n\n".join(tips)
         self._version_title.setToolTip(tip)
         self._version_value.setToolTip(tip)
 

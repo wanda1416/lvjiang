@@ -397,8 +397,35 @@ class TuningTab(QWidget):
         self._sp_target_row.setEnabled(False)
         self._sp_target_col.setEnabled(False)
 
+        layout.addWidget(QLabel("<b>" + tr("智能调律：") + "</b>"))
+        self._smart_tuning_cb = QCheckBox(tr("启用智能调律"))
+        self._smart_tuning_cb.setToolTip(tr(
+            "这是当前用户的二次确认开关。只有调律配置中的公共智能调律开关"
+            "也已启用时才会生效；运行前请为相关备战方案扫描完整的八件穿戴装备。"))
+        self._smart_tuning_cb.stateChanged.connect(
+            lambda _state: self._save_tuning_config())
+        layout.addWidget(self._smart_tuning_cb)
+        self._sync_smart_tuning_availability()
+
         layout.addStretch()
         return self._wrap_scroll(panel)
+
+    def _sync_smart_tuning_availability(self) -> None:
+        """公共配置是能力总开关，用户复选框只负责二次确认。"""
+        try:
+            from ...core.tuning_rules import get_tune_config
+            globally_enabled = get_tune_config().smart_tuning.enabled
+        except Exception:  # noqa: BLE001 - 配置异常由配置页负责提示
+            globally_enabled = False
+        self._smart_tuning_cb.setEnabled(globally_enabled)
+        if globally_enabled:
+            self._smart_tuning_cb.setToolTip(tr(
+                "为当前执行用户启用智能调律。运行前请为相关备战方案扫描完整的"
+                "八件穿戴装备。"))
+        else:
+            self._smart_tuning_cb.setToolTip(tr(
+                "请先在调律配置 → 智能调律中启用公共总开关。"
+                "当前用户的选择会保留，但运行时不会生效。"))
 
     # ─── 按钮状态（订阅宿主 automation_state_changed）──────────
 
@@ -451,6 +478,7 @@ class TuningTab(QWidget):
         """配置变更监听回调：tune_config/规则组变化时刷新对应控件"""
         if rel_path == "yysls/tune_config.yaml":
             self._tuning_globals.refresh_switches()
+            self._sync_smart_tuning_availability()
         elif rel_path.startswith("yysls/base_groups/"):
             self._refresh_base_group_radios()
 
@@ -625,6 +653,8 @@ class TuningTab(QWidget):
                 skip_start=skip_start,
                 target_cell=target_cell,
                 min_level=min_level_override,
+                smart_tuning_enabled=bool(
+                    tc.get("smart_tuning_enabled", False)),
             )
             # 创建调律进度信号桥（右侧进度 Tab 由 _find_progress_widget 查找并连接）
             if engine is not None:
@@ -727,6 +757,11 @@ class TuningTab(QWidget):
             self._positional_traversal_cb.setChecked(
                 tc.get("scroll_strategy") == "positional")
             self._positional_traversal_cb.blockSignals(False)
+            self._smart_tuning_cb.blockSignals(True)
+            self._smart_tuning_cb.setChecked(
+                bool(tc.get("smart_tuning_enabled", False)))
+            self._smart_tuning_cb.blockSignals(False)
+            self._sync_smart_tuning_availability()
             # 最低等级（运行时覆盖基础规则的等级门槛）
             saved_min_level = tc.get("min_level")
             self._min_level_combo.blockSignals(True)
@@ -795,6 +830,7 @@ class TuningTab(QWidget):
             "skip_start": skip_start,
             "target_cell": target_cell,
             "min_level": self._min_level_combo.currentData(),
+            "smart_tuning_enabled": self._smart_tuning_cb.isChecked(),
         }, self._users_dir())
 
     def _on_initial_stone_check_toggled(self, checked: bool) -> None:

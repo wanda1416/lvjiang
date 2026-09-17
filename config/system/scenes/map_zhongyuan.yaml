@@ -1,0 +1,37 @@
+content_version: 1
+key: map_zhongyuan
+name: 中原地图
+views:
+- key: base
+  name: 基底
+- key: full
+  name: 大地图
+regions:
+- key: minimap
+  name: 小地图
+  type: func
+  is_text: false
+  is_clickable: false
+- key: open_map
+  name: 打开地图
+  type: func
+  is_text: false
+  is_clickable: true
+- key: full_map
+  name: 大地图
+  type: func
+  is_text: false
+  is_clickable: false
+  view: full
+- key: close_map
+  name: 关闭地图
+  type: func
+  is_text: false
+  is_clickable: true
+  view: full
+points:
+- key: minimap_center
+  name: 小地图中心
+  type: func
+  is_text: false
+  is_clickable: false

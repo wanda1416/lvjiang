@@ -1,0 +1,28 @@
+content_version: 1
+key: zhongyuan
+name: 中原（清河·开封·不见山·青州）
+navigation:
+  mode: pathfind
+north_up: true
+base_image: base.png
+ui:
+  scene: map_zhongyuan
+  minimap: minimap
+  minimap_center: minimap_center
+  open_map: open_map
+  full_map: full_map
+  close_map: close_map
+detectors:
+  player_heading:
+    method: concave_arrow
+    hsv_lower:
+    - 18
+    - 90
+    - 120
+    hsv_upper:
+    - 42
+    - 255
+    - 255
+    window_ratio: 0.5
+    min_area: 12
+pois: []

@@ -54,3 +54,7 @@ scenes:
     items:
     - jianghu_card
     - huoyun_card
+  map:
+    name: 地图
+    items:
+    - map_zhongyuan

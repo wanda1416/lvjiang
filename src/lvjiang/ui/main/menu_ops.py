@@ -147,6 +147,11 @@ class MenuOpsMixin:
         reference_mgr.triggered.connect(self._open_reference_manager)
         settings_menu.addAction(reference_mgr)
 
+        map_mgr = QAction(tr("地图管理"), self)
+        map_mgr.triggered.connect(self._open_map_manager)
+        map_mgr.setEnabled(not is_readonly())
+        settings_menu.addAction(map_mgr)
+
         # ── 工具 ──
         tools_menu = menubar.addMenu(tr("工具"))
 
@@ -268,6 +273,26 @@ class MenuOpsMixin:
                 parent=self,
             ),
             lambda _dialog: self._refresh_layout_combo(),
+        )
+
+    def _open_map_manager(self):
+        from ..map_manager import MapManagerDialog
+
+        def open_scene_editor(scene_key: str) -> None:
+            # 坐标标定只有场景编辑器一个入口；打开后定位到该地图的 HUD 场景。
+            self._open_scene_editor()
+            editor = self._modeless_tool_windows.get("scene_editor")
+            if editor is not None and hasattr(editor, "_select_scene"):
+                editor._select_scene(scene_key)
+
+        self._show_modeless_tool(
+            "map_manager",
+            lambda: MapManagerDialog(
+                parent=self,
+                screenshot_callback=self._refresh_capture,
+                layout_manager=self._layout_manager,
+                open_scene_editor=open_scene_editor,
+            ),
         )
 
     def _open_reference_manager(self):

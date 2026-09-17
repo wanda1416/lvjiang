@@ -20,8 +20,9 @@ from ....core.config.versioning import (
     register_versioned_file,
 )
 
-# tune_config.yaml 的 base_rules：可增长的基础规则组登记表，不是枚举设定
-# ——local 若存下完整列表，系统新增的规则组就永远进不到合并视图。
+# tune_config.yaml 只剩品阶门槛与开关注册表；基础规则组与调律规则的存在性
+# 由各自目录决定、顺序与启停写在文件里，不再有登记表。旧版本 local diff 里
+# 残留的 base_rules 仍按注册表语义合并，迁移逻辑读完后会把它清掉。
 register_registry_list_paths("yysls/tune_config.yaml", ("base_rules",))
 
 # game_config.yaml 的三张受保护列表：系统条目不允许被移除，但可以改值、
@@ -45,6 +46,10 @@ register_versioned_file("yysls/tune_config.yaml")
 # 生效，不用等发版——这正是在线下发最有价值的场景。scenes/layouts 则
 # 相反：新增文件要在 scenes.yaml 注册表里登记才有意义，而注册表走发版。
 register_versioned_dir("yysls/tuning_rules", "*.yaml", depth=1,
+                       allow_remote_new=True)
+# 基础规则组同样目录驱动（存在性由目录决定、order 排序），远程可以直接
+# 下发一套新组。
+register_versioned_dir("yysls/base_groups", "*.yaml", depth=1,
                        allow_remote_new=True)
 
 # game_config.yaml 的 schools.*.schemes 负责登记方案名，因此可以随同远程

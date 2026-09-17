@@ -275,13 +275,9 @@ class TuningRulesDialog(QDialog):
             self._insert_group_dropdown(page)
         self._sync_group_dropdowns(group_key)
         # 加载全部规则（含禁用），禁用规则导航文字置灰
-        self._disabled_rule_keys: set[str] = set()
-        try:
-            tuning_rules = self._config_manager.get().tuning_rules
-            self._disabled_rule_keys = {
-                k for k, v in tuning_rules.items() if not v}
-        except Exception:
-            pass
+        self._disabled_rule_keys: set[str] = {
+            key for key, _name in self._manager.get_all_rule_keys_and_names()
+            if not self._manager.is_rule_enabled(key)}
         for key, rule in self._manager.get_rules().items():
             self._add_rule_page(key, rule.name)
         for key, name in self._manager.get_all_rule_keys_and_names():
@@ -554,10 +550,9 @@ class TuningRulesDialog(QDialog):
                 page.deleteLater()
             while self._nav.count() > 6:
                 self._nav.takeItem(6)
-            self._disabled_rule_keys.clear()
-            tuning_rules = self._config_manager.get().tuning_rules
             self._disabled_rule_keys = {
-                key for key, enabled in tuning_rules.items() if not enabled}
+                key for key, _name in self._manager.get_all_rule_keys_and_names()
+                if not self._manager.is_rule_enabled(key)}
             for key, rule in self._manager.get_rules().items():
                 self._add_rule_page(key, rule.name)
             for key, name in self._manager.get_all_rule_keys_and_names():

@@ -38,7 +38,7 @@ def small():
 
 class TestBigWeaponRules:
     def test_modao_required_damage_top(self, big):
-        # 陌刀命中 双切副武器/威威主武器，增伤齐全 → 顶级
+        # 陌刀命中 双切副武器，增伤齐全 → 顶级（威威已独立为 huixin_modao）
         e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "敏"])
         assert big.judge(e).rating == Rating.TOP
 
@@ -64,13 +64,17 @@ class TestBigWeaponRules:
         assert r.rating == Rating.TOP
         assert any(s.startswith("[纯唐 主武器]") for s in r.reasons)
 
-    def test_qiang_weiwei_sub_top(self, big):
-        # 枪只命中 威威 副武器（不需增伤）
+    def test_qiang_belongs_to_weiwei_rule_only(self, big):
+        # 枪只属于 威威 副武器；威威已从会心大外拆到 huixin_modao，
+        # 大外不再判定，否则两条规则按 or 取优会让大外的口径盖过专属规则
         e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
-        assert big.judge(e).rating == Rating.TOP
+        r = big.judge(e)
+        assert r.not_applicable
+        modao = get_tuning_judge("huixin_modao")
+        assert modao.judge(e).rating == Rating.TOP
 
     def test_fan_zoudiyu_sub_top(self, big):
-        # 扇命中 走地玉 副武器（不需增伤），同 威威 副武器写法
+        # 扇命中 翊翊 副武器（不需增伤）
         e = make_equip("扇", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
         assert big.judge(e).rating == Rating.TOP
 

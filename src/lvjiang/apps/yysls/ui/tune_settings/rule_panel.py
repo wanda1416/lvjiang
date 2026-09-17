@@ -279,16 +279,14 @@ class RulePanel(QWidget):
             cb(old_key, new_key, new_name)
 
     def _is_rule_enabled(self) -> bool:
-        """从 tune_config.tuning_rules 读取当前规则启用状态"""
+        """读取规则文件自己的 disabled 声明"""
         try:
-            from lvjiang.apps.yysls.core.tuning_rules import get_tune_config
-            tuning_rules = get_tune_config().tuning_rules
-            return tuning_rules.get(self._key, True)
+            return self._manager.is_rule_enabled(self._key)
         except Exception:
             return True
 
     def _on_rule_enable_changed(self, enabled: bool):
-        """规则设置页启用复选框变更 → 更新 tune_config 并 reload"""
+        """规则设置页启用复选框变更 → 写规则文件的 disabled 并 reload"""
         try:
             self._manager.set_rule_enabled(self._key, enabled)
             now = datetime.now().strftime("%H:%M:%S")

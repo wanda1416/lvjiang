@@ -8,6 +8,7 @@ from .....i18n import tr
 from .models import (
     BEHAVIOR_STAGE_ACTIONS,
     COND_KINDS,
+    DEFAULT_ORDER,
     DYNAMIC_AFFIXES,
     FOOD_EXPECT_KEYS,
     FOOD_LABELS,
@@ -421,7 +422,8 @@ def parse_tuning_rule(data: dict,
     rule = TuningRule(
         key=str(key),
         name=str(name),
-        order=int(data.get("order", 100)),
+        order=_parse_order(data),
+        disabled=_parse_disabled(data),
         playstyles=playstyles,
         transmute_priority=priority,
         affix_pool=affix_pool,
@@ -813,16 +815,33 @@ def parse_tuning_group(data: dict) -> TuningGroup:
         key=key,
         name=name,
         description=str(data.get("description") or ""),
+        order=_parse_order(data),
         materials=_parse_materials(data.get("materials")),
         scan=_parse_scan(data.get("scan"), "scan"),
         tune=_parse_tune(data.get("tune"), "tune"),
     )
 
 
+def _parse_order(data: dict) -> int:
+    raw = data.get("order", DEFAULT_ORDER)
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise RuleValidationError(tr("order 必须是整数"))
+    return raw
+
+
+def _parse_disabled(data: dict) -> bool:
+    raw = data.get("disabled", False)
+    if not isinstance(raw, bool):
+        raise RuleValidationError(tr("disabled 必须是布尔值"))
+    return raw
+
+
 def parse_tune_config(data: dict) -> TuneConfig:
     """原始 tune_config.yaml dict → TuneConfig（校验失败抛 RuleValidationError）
 
-    承载：base_rules（基础规则组声明）+ quality_thresholds + switches。
+    只承载 quality_thresholds + switches。历史上的 ``base_rules`` /
+    ``tuning_rules`` 声明已迁到各规则文件的 ``order`` / ``disabled``，
+    这里遇到只忽略，由管理器负责一次性迁移。
     """
     if not isinstance(data, dict):
         raise RuleValidationError(tr("tune_config 顶层必须是 dict"))
@@ -838,21 +857,6 @@ def parse_tune_config(data: dict) -> TuneConfig:
             raise RuleValidationError(
                 f"{legacy} 段已迁移至基础规则组"
                 f"（base_groups/*.yaml），请从 tune_config.yaml 移除")
-
-    # ── base_rules（基础规则组声明）──
-    raw_base_rules = data.get("base_rules") or []
-    if not isinstance(raw_base_rules, list):
-        raise RuleValidationError(tr("base_rules 必须是 list"))
-    base_rules: list[str] = []
-    for item in raw_base_rules:
-        key = str(item).strip()
-        if not _KEY_RE.match(key):
-            raise RuleValidationError(
-                f"base_rules: 规则组 key 非法: {key!r}")
-        if key in base_rules:
-            raise RuleValidationError(
-                f"base_rules: 规则组 key 重复: {key}")
-        base_rules.append(key)
 
     # ── quality_thresholds（固定 7 个标准部位，须列全）──
     quality_thresholds = _parse_quality_thresholds(
@@ -878,28 +882,7 @@ def parse_tune_config(data: dict) -> TuneConfig:
         switches[k] = sw_name
 
     return TuneConfig(
-        base_rules=base_rules,
         quality_thresholds=quality_thresholds,
         switches=switches,
-        tuning_rules=_parse_tuning_rules(data.get("tuning_rules") or {}),
     )
 
-
-def _parse_tuning_rules(raw) -> dict[str, bool]:
-    """解析 tuning_rules 段：有序 dict，key → 是否启用"""
-    if not isinstance(raw, dict):
-        raise RuleValidationError(tr("tuning_rules 必须是 dict"))
-    result: dict[str, bool] = {}
-    for k, v in raw.items():
-        k = str(k).strip()
-        if not _KEY_RE.match(k):
-            raise RuleValidationError(
-                f"tuning_rules: 规则 key 非法: {k!r}")
-        if not isinstance(v, bool):
-            raise RuleValidationError(
-                f"tuning_rules.{k} 必须是 bool（true/false）")
-        if k in result:
-            raise RuleValidationError(
-                f"tuning_rules: 规则 key 重复: {k}")
-        result[k] = v
-    return result

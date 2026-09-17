@@ -1,11 +1,11 @@
 content_version: 1
 key: huixin_big
 name: 会心大外
+order: 30
 default_rating: excellent
 playstyles:
 - 纯唐
 - 双切
-- 威威
 - 鸢鸢
 - 双刀
 - 尘尘

@@ -45,7 +45,7 @@ local 文件可直接删除；system/remote 预置文件不允许用户删除，
 | `layouts.yaml` | `schema_version: 2` / `layouts` | `core/layout_manager.py`、`screen_calib.py` |
 | `ocr.yaml` | OCR 识别参数与文本规范化规则 | `core/ocr_config.py` / `core/ocr_cleaner.py` |
 | `yysls/game_config.yaml` | `base_attrs` / `affix_caps` / `schools` / `weapon_types` 等 9 项 | `apps/yysls/config/manager.py` |
-| `yysls/tune_config.yaml` | `base_rules` / `tuning_rules` / `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
+| `yysls/tune_config.yaml` | `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
 
 `scenes.yaml` 的当前结构版本为 2，与 `layouts.yaml` 一样使用单一领域顶层键：
 
@@ -141,22 +141,38 @@ system 层扫出的空间即**系统空间**（`is_system_space()`）：用户�
 | 文件 | 路径 | 声明方 |
 |------|------|--------|
 | `scenes.yaml` | `scenes.*.items` / `scenes.*.disabled`（兼容 v1 `layout_scenes.*`） | core（`resolver.py` 常量表） |
-| `yysls/tune_config.yaml` | `base_rules` | 插件（`apps/yysls/config/merge_policy.py`） |
+| `yysls/tune_config.yaml` | `base_rules`（仅为兼容旧 local diff 保留，现已无此键） | 插件（`apps/yysls/config/merge_policy.py`） |
 
 local 形如：
 
 ```yaml
-base_rules:
-  __added__: [我的规则组]
-  __removed__: [aggressive]
-  __order__: [...]            # 仅在用户调过顺序时才写
+scenes:
+  general:
+    items:
+      __added__: [my_scene]
+      __removed__: [some_scene]
+      __order__: [...]            # 仅在用户调过顺序时才写
 ```
 
 读取时 `system 基底 − __removed__ + __added__`，再按 `__order__` 排序；
 `__order__` 未提到的条目（系统新增的）排末尾并保持 system 相对顺序。
 
+调律规则与基础规则组**不再有登记表**：存在性由 `yysls/tuning_rules/`、
+`yysls/base_groups/` 目录决定，顺序由各文件的 `order`（升序、同序按 key，
+预置项 10、20、…，新建默认 10）声明，规则的启停由文件自己的 `disabled`
+声明。旧版本 `tune_config.yaml` 里的 `tuning_rules` / `base_rules` 由规则
+管理器一次性迁移（禁用声明写进对应规则文件）后移除。
+
 存量 local 里的普通列表仍按整键替换处理——已无法区分「用户主动删了某条」
 和「那条当时还不存在」，硬转会误伤；用户下次保存时自动转成增量形式。
+
+### 开发者的私有实体
+
+开发模式默认写 system（随包发布）。`write_entity(..., layer="local")` /
+`delete_entity(..., layer=...)` 允许开发者把某个实体明确放在 local——例如
+只在自己机器上用的基础规则组（调律配置 → 基础规则页的"保存位置"列，普通
+用户看不到这一列）。local 恒高于 system，所以同 key 的 local 组会在这台机器
+上覆盖 system 版本；用户模式下 `layer` 只能是 local，不是给用户开的口子。
 
 ---
 
@@ -169,7 +185,7 @@ base_rules:
 
 | 想停用 | 正确做法 |
 |--------|----------|
-| 某条调律规则 | `tune_config.yaml` 的 `tuning_rules: {key: false}` |
+| 某条调律规则 | 规则文件里 `disabled: true`（用户模式下会生成该规则的 local 影子，此后不再跟随系统更新，还原为系统版本即恢复） |
 | 某个系统布局 | 不选它即可（布局按需切换） |
 | 某张系统参考图 | 新建图库空间，放自己的图 |
 | 某个脚本不在日常页显示 | 脚本配置里取消勾选（存 session，见下） |
@@ -266,8 +282,8 @@ warning），在开发模式下则会直接从系统配置里消失——后者�
 ## 六、插件声明自己的合并策略
 
 `REGISTRY_LIST_PATHS`/`PROTECTED_LIST_PATHS` 曾经把 `yysls/*` 的路径直接
-写死在 `resolver.py` 的常量表里——`core.config` 因此"认识" `base_rules`
-是登记表、`weapon_types` 该按 `name` 判同一性这类纯游戏领域知识。这是
+写死在 `resolver.py` 的常量表里——`core.config` 因此"认识" `weapon_types`
+该按 `name` 判同一性这类纯游戏领域知识。这是
 `core` 不该背的债：往下所有插件的私有配置策略都会挤在同一张 core 常量表
 里，core 和插件各自维护一套对同一份配置的理解，随时可能对不上。
 
@@ -360,14 +376,15 @@ remote 生效 ⟺ remote.content_version > system.content_version
 | `yysls/game_config.yaml` | ❌ | 插件 |
 | `yysls/tune_config.yaml` | ❌ | 插件 |
 | `yysls/tuning_rules/*.yaml` | ✅ | 插件 |
+| `yysls/base_groups/*.yaml` | ✅ | 插件 |
 | `yysls/graduation/*.json` | ✅ | 插件 |
 | `workflows/**/*.wf` | ✅（仅新增） | core |
 
 **`allow_remote_new` 的不对称是有意的**：新场景/新布局要在 `scenes.yaml`
 注册表里登记才有意义，而注册表本身走发版（改它通常伴随代码改动），远程凭空
-多一个场景文件是死的，只会让编辑器列表里冒出用不了的条目。调律规则相反——
-规则管理器对"未在 `tune_config.tuning_rules` 里声明的规则"是追加到末尾而非
-报错，所以远程下发一条全新规则能直接生效。毕业方案由可同步的
+多一个场景文件是死的，只会让编辑器列表里冒出用不了的条目。调律规则和基础
+规则组相反——存在性就是目录里有没有这个文件，所以远程下发一条全新规则或
+一套新规则组能直接生效。毕业方案由可同步的
 `game_config.yaml` 登记方案名，因此两者同时下发时也允许新增方案文件。
 
 `ocr.yaml`、`game_config.yaml` 与 `tune_config.yaml` 是聚合配置：生效的

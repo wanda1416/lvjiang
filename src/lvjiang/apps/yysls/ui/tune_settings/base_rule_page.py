@@ -51,12 +51,18 @@ from .....i18n import tr
 
 # 规则组 key 约束（作文件名，与 rules._KEY_RE 一致）
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+#: 开发者可选的保存位置（层 key → 显示名）
+_LAYER_CHOICES = (("system", "系统"), ("local", "本地"))
+_LAYER_LABELS = {"system": "系统", "local": "本地", "remote": "远程"}
+#: 表格列：规则组名 / 等级门槛 / 调律门槛 / 规则说明 / 保存位置（仅开发模式）
+_COL_DESC = 3
+_COL_LAYER = 4
 
 
 class _NewGroupDialog(QDialog):
     """新增/复制规则组对话框：输入 key（英文标识，作文件名）与名称"""
 
-    def __init__(self, title: str, parent=None):
+    def __init__(self, title: str, parent=None, *, choose_layer: bool = False):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -68,6 +74,13 @@ class _NewGroupDialog(QDialog):
         self._name_edit = QLineEdit()
         self._name_edit.setPlaceholderText(tr("如 激进回收"))
         form.addRow(tr("规则组名称："), self._name_edit)
+        # 保存位置只对开发者开放：私有规则组放 local，不写进随包的 system
+        self._layer_combo: QComboBox | None = None
+        if choose_layer:
+            self._layer_combo = QComboBox()
+            for layer, label in _LAYER_CHOICES:
+                self._layer_combo.addItem(tr(label), layer)
+            form.addRow(tr("保存位置："), self._layer_combo)
         layout.addLayout(form)
 
         buttons = QDialogButtonBox(
@@ -95,6 +108,12 @@ class _NewGroupDialog(QDialog):
 
     def group_name(self) -> str:
         return self._name_edit.text().strip()
+
+    def group_layer(self) -> str | None:
+        """开发者选择的保存位置；未开放该选项时 None（按模式默认）。"""
+        if self._layer_combo is None:
+            return None
+        return str(self._layer_combo.currentData())
 
 
 class BaseRuleGroupPage(QWidget):
@@ -152,12 +171,15 @@ class BaseRuleGroupPage(QWidget):
         combo_row.addStretch()
         layout.addLayout(combo_row)
 
-        # 规则组列表（规则组名 / 等级门槛 / 调律门槛 / 规则说明）
-        self._table = QTableWidget(0, 4)
+        # 规则组列表（规则组名 / 等级门槛 / 调律门槛 / 规则说明 / 保存位置）
+        self._choose_layer = self._manager.can_choose_layer()
+        self._table = QTableWidget(0, 5)
         self._table.setHorizontalHeaderLabels(
-            [tr("规则组名"), tr("等级门槛"), tr("调律门槛"), tr("规则说明")])
-        for col, width in enumerate((220, 100, 120, 300)):
+            [tr("规则组名"), tr("等级门槛"), tr("调律门槛"), tr("规则说明"), tr("保存位置")])
+        for col, width in enumerate((220, 100, 120, 300, 110)):
             self._table.setColumnWidth(col, width)
+        # 保存位置只对开发者有意义：普通用户永远写 local，看这一列只会困惑
+        self._table.setColumnHidden(_COL_LAYER, not self._choose_layer)
         self._table.setEditTriggers(
             QTableWidget.EditTrigger.DoubleClicked
             | QTableWidget.EditTrigger.EditKeyPressed)
@@ -223,26 +245,62 @@ class BaseRuleGroupPage(QWidget):
         for i, g in enumerate(groups.values()):
             row = self._table.rowCount()
             self._table.insertRow(row)
-            # 列 0-2 只读，列 3（规则说明）可编辑
+            # 列 0-2 只读，列 3（规则说明）可编辑，列 4 是下拉（仅开发模式）
             for col, text in enumerate((
                     g.name,
                     str(g.scan.min_level),
                     f"预期 ≥ {RATING_LABELS.get(g.scan.entry_min_rating, g.scan.entry_min_rating)}",
                     g.description)):
                 item = QTableWidgetItem(text)
-                item.setFlags(_editable if col == 3 else _readonly)
+                item.setFlags(_editable if col == _COL_DESC else _readonly)
                 self._table.setItem(row, col, item)
+            self._table.setItem(row, _COL_LAYER, QTableWidgetItem(""))
+            if self._choose_layer:
+                self._table.setCellWidget(
+                    row, _COL_LAYER, self._make_layer_combo(g.key))
             if g.key == self._group_key:
                 select_row = i
         self._table.blockSignals(False)
         if select_row >= 0:
             self._table.selectRow(select_row)
 
+    def _make_layer_combo(self, key: str) -> QComboBox:
+        """保存位置下拉：改选即把规则组文件搬到另一层。"""
+        combo = QComboBox()
+        for layer, label in _LAYER_CHOICES:
+            combo.addItem(tr(label), layer)
+        current = self._manager.layer_of(key)
+        idx = combo.findData(current)
+        if idx < 0:
+            # 远程等不可选的层：只展示，不允许改
+            combo.addItem(tr(_LAYER_LABELS.get(current, current or "?")), current)
+            idx = combo.count() - 1
+            combo.setEnabled(False)
+        combo.setCurrentIndex(idx)
+        combo.setToolTip(tr("开发模式：本地 = 只在这台机器生效，不随安装包发布"))
+        combo.currentIndexChanged.connect(
+            lambda _i, k=key, c=combo: self._on_layer_changed(k, str(c.currentData())))
+        return combo
+
+    def _on_layer_changed(self, key: str, layer: str):
+        if self._loading:
+            return
+        try:
+            self._manager.move_group(key, layer)
+        except (RuleValidationError, PermissionError, OSError) as e:
+            self._status_cb(tr("搬移失败：{e}").format(e=e), True)
+            self.refresh()
+            return
+        self.refresh()
+        self._set_saved_status(
+            tr("规则组「{key}」已移到{layer}").format(
+                key=key, layer=tr(_LAYER_LABELS.get(layer, layer))))
+
     # ── 规则说明编辑 ──
 
     def _on_cell_changed(self, row: int, col: int):
-        """规则说明列（col=3）编辑完成即校验写盘"""
-        if col != 3 or self._loading:
+        """规则说明列编辑完成即校验写盘"""
+        if col != _COL_DESC or self._loading:
             return
         groups = self._manager.get_groups()
         keys = list(groups)
@@ -283,12 +341,12 @@ class BaseRuleGroupPage(QWidget):
     # ── CRUD ──
 
     def _on_add(self):
-        dlg = _NewGroupDialog(tr("新增基础规则组"), self)
+        dlg = _NewGroupDialog(tr("新增基础规则组"), self, choose_layer=self._choose_layer)
         if not dlg.exec():
             return
         key, name = dlg.group_key(), dlg.group_name()
         try:
-            self._manager.create_group(key, name)
+            self._manager.create_group(key, name, layer=dlg.group_layer())
         except RuleValidationError as e:
             QMessageBox.warning(self, tr("新增基础规则组"), str(e))
             return
@@ -300,12 +358,12 @@ class BaseRuleGroupPage(QWidget):
         if src_key is None:
             self._status_cb(tr("请先在列表中选中要复制的规则组"), True)
             return
-        dlg = _NewGroupDialog(tr("复制基础规则组"), self)
+        dlg = _NewGroupDialog(tr("复制基础规则组"), self, choose_layer=self._choose_layer)
         if not dlg.exec():
             return
         key, name = dlg.group_key(), dlg.group_name()
         try:
-            self._manager.copy_group(src_key, key, name)
+            self._manager.copy_group(src_key, key, name, layer=dlg.group_layer())
         except RuleValidationError as e:
             QMessageBox.warning(self, tr("复制基础规则组"), str(e))
             return

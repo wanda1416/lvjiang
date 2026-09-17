@@ -180,6 +180,24 @@ def test_delete_clears_all_plan_references(tmp_path: Path):
     assert all(plan.equipment["ring"] is None for plan in state.plans.values())
 
 
+def test_delete_can_preserve_references_from_every_plan(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    first = repo.load().active_plan_id
+    repo.assign_equipment(first, "ring", equip("active"))
+    second = repo.create_plan("second", "主功法", "副功法").id
+    repo.assign_equipment(second, "ring", equip("standby"))
+    repo.upsert_item(equip("free"))
+
+    deleted = repo.delete_items(
+        {"active", "standby", "free"}, preserve_referenced=True)
+
+    state = repo.load()
+    assert deleted == {"free"}
+    assert set(state.equipment_items) == {"active", "standby"}
+    assert state.plans[first].equipment["ring"] == "active"
+    assert state.plans[second].equipment["ring"] == "standby"
+
+
 def test_delete_all_mock_preserves_real_and_clears_plan_references(
     tmp_path: Path,
 ):

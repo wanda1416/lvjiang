@@ -256,15 +256,40 @@ class LoadoutRepository:
             state.plans[plan_id].equipment[slot_key] = None
         self.update(mutate)
 
-    def delete_items(self, fingerprints: set[str]) -> None:
+    def delete_items(
+        self,
+        fingerprints: set[str],
+        *,
+        preserve_referenced: bool = False,
+    ) -> set[str]:
+        """删除装备，按需原子保护所有现存备战方案正在引用的装备。
+
+        保护集合必须在持有仓储写锁后重新计算，不能依赖确认对话框打开时的
+        UI 快照；否则任务或其他页面在确认期间新建的引用仍可能被误删。
+        返回实际删除的指纹，供调用方准确反馈结果。
+        """
+        deleted: set[str] = set()
+
         def mutate(state: LoadoutState) -> None:
-            for fp in fingerprints:
+            nonlocal deleted
+            requested = set(fingerprints)
+            if preserve_referenced:
+                referenced = {
+                    fp
+                    for plan in state.plans.values()
+                    for fp in plan.equipment.values()
+                    if fp
+                }
+                requested.difference_update(referenced)
+            deleted = requested & state.equipment_items.keys()
+            for fp in deleted:
                 state.equipment_items.pop(fp, None)
             for plan in state.plans.values():
                 for slot, eq_fp in plan.equipment.items():
-                    if eq_fp in fingerprints:
+                    if eq_fp in deleted:
                         plan.equipment[slot] = None
         self.update(mutate)
+        return deleted
 
     def delete_all_mock(self) -> int:
         """删除全部模拟装备并清理所有方案引用，返回删除数量。"""

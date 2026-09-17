@@ -61,6 +61,60 @@ def test_combat_panel_uses_active_season_resistances() -> None:
     assert CombatAttrsTab._current_resistances() == (145.0, 15.0)
 
 
+def test_judgment_card_menu_toggles_shared_yellow_display(monkeypatch) -> None:
+    labels = []
+    toggles = []
+
+    class FakeMenu:
+        def __init__(self, _parent):
+            self.action = object()
+
+        def addAction(self, label):
+            labels.append(label)
+            return self.action
+
+        def exec(self, _position):
+            return self.action
+
+    class FakeCard:
+        @staticmethod
+        def mapToGlobal(position):
+            return position
+
+    fake = type("FakeCombatTab", (), {})()
+    fake._judgment_card = FakeCard()
+    fake._resistance_only = False
+    fake._set_resistance_only = toggles.append
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.ui.loadout.combat.attrs_tab.QMenu", FakeMenu)
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.ui.loadout.combat.attrs_tab.tr", lambda text: text)
+
+    CombatAttrsTab._show_judgment_display_menu(fake, object())
+    fake._resistance_only = True
+    CombatAttrsTab._show_judgment_display_menu(fake, object())
+
+    assert labels == [
+        "仅展示黄字三率和增效",
+        "展示白字和黄字三率和增效",
+    ]
+    assert toggles == [True, False]
+
+
+def test_yellow_display_toggle_refreshes_and_persists_once() -> None:
+    calls = []
+    fake = type("FakeCombatTab", (), {})()
+    fake._resistance_only = False
+    fake._refresh_display = lambda: calls.append("refresh")
+    fake._save_selection = lambda: calls.append("save")
+
+    CombatAttrsTab._set_resistance_only(fake, True)
+    CombatAttrsTab._set_resistance_only(fake, True)
+
+    assert fake._resistance_only is True
+    assert calls == ["refresh", "save"]
+
+
 def test_build_graduation_attrs_is_the_shared_resistance_boundary() -> None:
     base = CombatAttributes(
         precision=0.8, outer_pen=36, lieshi_pen=36, boss_bonus=0.08,

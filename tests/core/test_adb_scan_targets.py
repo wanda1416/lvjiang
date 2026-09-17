@@ -147,7 +147,7 @@ def test_wireless_scan_progress_is_monotonic(monkeypatch, _stub_connect):
 def test_local_scan_finds_emulator_ports(monkeypatch, _stub_connect):
     probed: list[tuple[str, int]] = []
 
-    def fake_probe(ip, port, timeout=0.3):
+    def fake_probe(ip, port, timeout=0.3, ping_first=True):
         probed.append((ip, port))
         return port == 7555
 
@@ -188,7 +188,7 @@ def test_local_scan_stops_between_ports_when_cancelled(monkeypatch, _stub_connec
     probed: list[int] = []
     cancelled = False
 
-    def fake_probe(ip, port, timeout=0.3):
+    def fake_probe(ip, port, timeout=0.3, ping_first=True):
         nonlocal cancelled
         probed.append(port)
         cancelled = True
@@ -206,7 +206,7 @@ def test_local_scan_stops_between_ports_when_cancelled(monkeypatch, _stub_connec
 def test_lan_scan_cancellation_does_not_report_partial_results(monkeypatch):
     cancelled = False
 
-    def fake_probe(ip, port, timeout=0.3):
+    def fake_probe(ip, port, timeout=0.3, ping_first=True):
         nonlocal cancelled
         cancelled = True
         return ip.endswith(".1")

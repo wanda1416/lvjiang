@@ -236,13 +236,15 @@ def list_ipv4_interfaces(include_loopback: bool = False) -> list[NetInterface]:
 
 
 def list_scan_subnets() -> list[str]:
-    """列出待扫描的网段前缀（去重，私有段优先）
+    """列出待扫描的网段前缀（去重，仅私有网段）
 
-    没枚举到任何网卡时退回 get_local_subnet() 的单一结果。
+    只返回 RFC1918 私有网段（10.0.0.0/8、172.16.0.0/12、192.168.0.0/16），
+    过滤掉 VPN/代理虚拟网段（如 198.18.x.x）。
+    没枚举到任何私有网卡时退回 get_local_subnet() 的单一结果。
     """
     subnets: list[str] = []
     for iface in list_ipv4_interfaces():
-        if iface.subnet not in subnets:
+        if iface.private and iface.subnet not in subnets:
             subnets.append(iface.subnet)
     if not subnets:
         fallback = get_local_subnet()
@@ -250,8 +252,48 @@ def list_scan_subnets() -> list[str]:
             subnets.append(fallback)
     return subnets
 
-def probe_port(ip: str, port: int, timeout: float = 0.3) -> bool:
-    """探测 IP:port 是否可达（TCP connect）"""
+def _ping_host(ip: str, timeout: float = 0.02) -> bool:
+    """快速 ping 探测 IP 是否存活（局域网内 20ms 无响应视为不存在）
+
+    Args:
+        ip: 目标 IP
+        timeout: 超时时间（秒），默认 20ms
+
+    Returns:
+        True 如果 IP 存活，False 如果不可达
+    """
+    try:
+        # Windows: ping -n 1 -w <ms> <ip>
+        # Unix: ping -c 1 -W <sec> <ip>
+        if os.name == "nt":
+            timeout_ms = int(timeout * 1000)
+            cmd = ["ping", "-n", "1", "-w", str(timeout_ms), ip]
+        else:
+            timeout_sec = max(1, int(timeout))
+            cmd = ["ping", "-c", "1", "-W", str(timeout_sec), ip]
+        result = subprocess.run(
+            cmd, capture_output=True, timeout=timeout + 0.5,
+            **SUBPROCESS_NO_WINDOW,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def probe_port(ip: str, port: int, timeout: float = 0.3, *, ping_first: bool = True) -> bool:
+    """探测 IP:port 是否可达
+
+    Args:
+        ip: 目标 IP
+        port: 目标端口
+        timeout: TCP connect 超时时间（秒）
+        ping_first: 是否先 ping 探测（局域网内可快速过滤不存在的 IP）
+
+    Returns:
+        True 如果端口开放，False 如果不可达
+    """
+    if ping_first and not _ping_host(ip):
+        return False
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.settimeout(timeout)
@@ -520,7 +562,7 @@ def scan_and_connect_local(
             return []
         if progress_cb:
             progress_cb(f"正在探测 {ip}:{p}...", i, total)
-        if probe_port(ip, p, timeout=0.2):
+        if probe_port(ip, p, timeout=0.2, ping_first=False):
             logger.debug(f"发现 {ip}:{p} 开放")
             open_targets.append((ip, p))
             if progress_cb:

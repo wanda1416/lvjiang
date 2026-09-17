@@ -66,11 +66,13 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+  view: base
 - key: tingfeng
   name: 听风辩位
   type: func
   is_text: false
   is_clickable: true
+  view: base
 - key: more_func
   name: 更多功能
   type: func

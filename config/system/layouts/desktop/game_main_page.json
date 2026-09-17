@@ -69,11 +69,13 @@
     },
     {
       "key": "huanma",
-      "disabled": true
+      "disabled": true,
+      "activation_key": "6"
     },
     {
       "key": "tingfeng",
-      "disabled": true
+      "disabled": true,
+      "activation_key": "V"
     },
     {
       "key": "more_func",

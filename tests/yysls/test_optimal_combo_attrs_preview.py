@@ -167,3 +167,42 @@ def test_detail_panel_reserves_two_strip_rows(qtbot):
     # 假设标签在第二行（assumption_slot），换装状态在第一行
     assert panel.assumption_slot.count() == 2
     assert panel.change_slot.count() == 1
+
+
+def test_both_card_kinds_render_affixes_identically(qtbot):
+    """词条区域只有一份实现：穿戴槽卡片与背包卡片对同一件装备渲染出相同的行。"""
+    from PyQt6.QtWidgets import QLabel
+
+    from lvjiang.apps.yysls.ui.loadout.equip.cards import (
+        _CompactEquipCard,
+        _SlotCard,
+    )
+
+    equip = {
+        "type": "环", "name": "环", "level": 110, "quality": "gold",
+        "is_chengyin": True,
+        "affix_1": {"name": "最大外功攻击", "value": 100},
+        "affix_2": {"name": "会意率", "value": 6.6, "unit": "%",
+                    "is_transferred": True,
+                    "target_transmute_name": "会心率",
+                    "target_transmute_value": 13.2},
+        "dingyin": {"name": "外功穿透", "value": 14.2},
+    }
+
+    def texts(card):
+        return [
+            label.text() for label in card.affix_container.findChildren(QLabel)
+            if label.text() and label is not card.cooldown_label
+        ]
+
+    slot = _SlotCard("ring", "环", "ring")
+    qtbot.addWidget(slot)
+    slot.set_equip(equip)
+    bag = _CompactEquipCard({})
+    qtbot.addWidget(bag)
+    bag.set_equip(equip, "环", "ring")
+
+    assert texts(slot) == texts(bag)
+    assert "会意率 ⟳" in texts(slot) and "(会心率)" in texts(slot)
+    assert "14.2%" in texts(slot)          # 定音按百分比显示
+    assert "承音" in slot.lbl_info.text() and "承音" in bag.lbl_level.text()

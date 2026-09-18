@@ -43,6 +43,7 @@ from __future__ import annotations
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData
 
 from .....i18n import tr
+from ..combat.affix_rules import normal_affix_candidates
 from ..loadout.transmute import retransfer_capability
 from ..tuning_rules import (
     DYNAMIC_AFFIXES,
@@ -270,13 +271,15 @@ class GenericTuningJudge(TuningJudge):
         from ...config import get_game_config
         gc = get_game_config()
         part = result.equipment.part
+        # 部位与武器绑定以游戏配置为准（normal_affix_candidates 是唯一口径）
+        physical = set(normal_affix_candidates(
+            {"type": result.equipment.type}, gc))
 
         def part_ok(name: str) -> bool:
-            # 动态词条不在游戏配置部位表中（缺省会误判全部位），
-            # 仅非武器部位可作填充/转入候选
+            # 动态词条不在游戏配置部位表中，仅非武器部位可作填充/转入候选
             if name in DYNAMIC_AFFIXES:
                 return part != "武器"
-            return part in gc.get_affix_parts(name)
+            return name in physical
 
         def ids(name: str) -> set[str]:
             """词条身份集（字面名 + 动态归类名）"""

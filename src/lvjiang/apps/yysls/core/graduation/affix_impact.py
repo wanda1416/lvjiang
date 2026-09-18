@@ -10,6 +10,7 @@ import copy
 from dataclasses import dataclass
 
 from .....i18n import tr
+from ...config.constants import STACK_MAX
 from ..affix_cap import affix_cap_ratio, affix_cap_value
 from ..combat.affix_rules import normal_affix_candidates
 from ..combat.combat_attrs import (
@@ -86,11 +87,6 @@ class AffixCombinationResult:
     evaluated_combinations: int
 
 
-def _part_name(equip: dict, game_config) -> str:
-    group = game_config.get_type_to_group().get(str(equip.get("type", "")), "")
-    return game_config.get_group_to_part().get(group, "")
-
-
 def _weapon_affix_for(equip: dict, game_config) -> str:
     return game_config.get_weapon_wuxue_affix(str(equip.get("type", "")))
 
@@ -133,22 +129,18 @@ def _can_add_affix(
     game_config,
     effective_names: set[str],
 ) -> bool:
-    weapon_map = game_config.get_all_weapon_wuxue_affixes()
-    weapon_affixes = set(weapon_map.values())
-    if name in weapon_affixes:
-        # 专属武学增效只能加到绑定的武器类型，且同类只生效一条。
-        if name in effective_names:
-            return False
-        return any(
-            isinstance(equip, dict)
-            and weapon_map.get(str(equip.get("type", ""))) == name
-            for equip in equipped.values()
-        )
+    """整套里是否有某件装备能带上词条 ``name``。
 
-    allowed_parts = set(game_config.get_affix_parts(name))
+    部位与武器绑定以 ``normal_affix_candidates``（游戏配置）为唯一口径；
+    「同名只取最高」的词组（``_stack: max``）已在位时再加一条没有收益，
+    直接跳过。
+    """
+    if (name in effective_names
+            and game_config.get_affix_stack(name) == STACK_MAX):
+        return False
     return any(
         isinstance(equip, dict)
-        and _part_name(equip, game_config) in allowed_parts
+        and name in normal_affix_candidates(equip, game_config)
         for equip in equipped.values()
     )
 

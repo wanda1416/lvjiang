@@ -56,8 +56,7 @@ class PlayStyleDialogMixin:
 
     需要主类提供：
     - self._get_current_school() -> str
-    - self._compute_equip_base_attrs() -> CombatAttributes
-    - self._compute_equip_attrs() -> CombatAttributes
+    - self._equipped_snapshot() -> dict | None（原始穿戴，未套任何假设）
     - self._compute_gongjue_attrs() -> CombatAttributes
     - self._refresh_play_styles()
     - self._combo_play_style (QComboBox)
@@ -237,15 +236,20 @@ class PlayStyleDialogMixin:
     ) -> None:
         """Reverse equipment contributions, persist, then refresh the selector."""
 
-        # 反推：base = panel - equip_base - equip_affix - gongjue
-        # equip_base: 装备基础外功攻击（武器/环/佩，根据品阶不同）
-        # equip_affix: 装备词条属性（含劲/势/敏五维转换）
-        # gongjue: 弓玦属性
+        # 反推：base = panel - equipment - gongjue
+        # panel 是游戏面板（OCR 或手填）的真实数值，对应的是**真实穿戴**：
+        # 装备贡献必须按原始快照算，绝不能套面板上的计算假设（满承音/满等级/
+        # 模拟转律只是"算毕业率时把装备看成什么"，游戏面板里没有它们）。
+        # 装备贡献（基础攻击 + 词条 + 五维换算，含同名只取最高等归一化）与
+        # 展示/评分同一口径：scoring.equipment_attrs。
         # 注意：穿透类用户填写的就是基础值，不需要扣减装备
-        equip_base_attrs = self._compute_equip_base_attrs()
-        equip_attrs = self._compute_equip_attrs()
+        from ....config import get_game_config
+        from ....core.graduation.scoring import equipment_attrs
+
+        raw_equipped = self._equipped_snapshot() or {}
+        equip_attrs = equipment_attrs(raw_equipped, get_game_config())
         gongjue_attrs = self._compute_gongjue_attrs()
-        base_attrs = panel_attrs - equip_base_attrs - equip_attrs - gongjue_attrs
+        base_attrs = panel_attrs - equip_attrs - gongjue_attrs
 
         # 穿透类特殊处理：用户填写的就是基础值，直接保存
         from ....core.combat.combat_attrs import PENETRATION_FIELDS

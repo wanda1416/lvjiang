@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import copy
-import json
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -18,20 +17,12 @@ from typing import Callable
 from loguru import logger
 
 from ...config import get_game_config
-from ...config.play_styles import get_play_styles
 from ...config.tune_slots import SLOT_LABELS
 from ..combat.affix_rules import normal_affix_candidates
-from ..combat.combat_attrs import (
-    CombatAttributes,
-    aggregate_equipment_attrs,
-    build_graduation_attrs,
-    compute_equip_base_attrs,
-    compute_gongjue_attrs,
-    max_stack_affixes,
-)
+from ..combat.combat_attrs import CombatAttributes
 from ..equip_validator import validate_combination_dict
-from ..loadout import EQUIPMENT_SLOTS, LoadoutRepository, resolve_school
-from ..loadout.transmute import transmute_pool_union
+from ..loadout import EQUIPMENT_SLOTS, LoadoutRepository
+from ..loadout.transmute import transmute_pool_union, transmute_targets
 from ..tuning_rules import (
     PART_ALIAS,
     SmartTuningConfig,
@@ -39,8 +30,9 @@ from ..tuning_rules import (
     dynamic_affix_map,
     get_tuning_rule_manager,
 )
-from . import get_graduation_calculator
 from .assumptions import Assumptions
+from .context import PlanContextError, PlanScoringContext
+from .scoring import LoadoutScorer
 from .smart_search import (
     SearchBudget,
     SearchOutcome,
@@ -104,6 +96,14 @@ class _PlanContext:
     playstyle: str = ""
     plan_maximum_rate: float | None = None
     first_affixes: dict[str, tuple[str, ...]] | None = None
+    #: 评分内核（含签名缓存）；未注入时按需构造
+    scorer: LoadoutScorer | None = None
+
+    def get_scorer(self, game_config) -> LoadoutScorer:
+        if self.scorer is not None:
+            return self.scorer
+        return LoadoutScorer(
+            self.calculator, self.base_attrs, self.school, game_config)
 
 
 @dataclass(frozen=True)
@@ -115,12 +115,7 @@ class _SelectedTarget:
 
 
 def _rate(context: _PlanContext, equipped: dict[str, dict], game_config) -> float:
-    equipment_attrs = compute_equip_base_attrs(
-        equipped, game_config.get_base_attr_values,
-    ) + aggregate_equipment_attrs(equipped)
-    attrs = build_graduation_attrs(
-        context.base_attrs, equipment_attrs, context.school)
-    return float(context.calculator.calculate(attrs).graduation_rate)
+    return context.get_scorer(game_config).rate(equipped)
 
 
 class SmartTuningEvaluator:
@@ -143,11 +138,7 @@ class SmartTuningEvaluator:
         self._contexts: tuple[_PlanContext, ...] = ()
         self._plan_infos: list[dict] = []
         self._disabled_reason = ""
-        self._rate_cache: dict[tuple[str, str], float] = {}
-        self._other_attrs_cache: dict[tuple[str, str], CombatAttributes] = {}
-        # 其余七件按“同名只取最高”词组统计的词条名 → 值；候选带同名词条时
-        # 不能再用分槽缓存相加，必须整套归一化后聚合。
-        self._other_stack_cache: dict[tuple[str, str], dict[str, float]] = {}
+        # 其余七件的三满投影快照，按 (方案, 槽) 缓存
         self._other_equipped_cache: dict[tuple[str, str], dict[str, dict]] = {}
         if config.enabled and config.evaluation.enabled:
             self._contexts = self._load_contexts(
@@ -259,16 +250,12 @@ class SmartTuningEvaluator:
                         target, plan_id=plan.id, plan_name=plan.name,
                         status="invalid", reason=reason)
                     continue
-                school = resolve_school(
-                    plan.main_martial_art, plan.sub_martial_art, schools)
-                calculator = get_graduation_calculator(
-                    school or "", plan.graduation_scheme)
-                base_data = get_play_styles(school or "").get(
-                    plan.base_attribute)
-                if (not school or calculator is None
-                        or not isinstance(base_data, dict)):
+                try:
+                    scoring = PlanScoringContext.from_plan(
+                        plan, game_config=self._game_config, schools=schools)
+                except PlanContextError as exc:
                     missing_graduation = True
-                    reason = "缺少毕业率方案，智能调律不启用"
+                    reason = f"缺少毕业率方案，智能调律不启用（{exc.reason}）"
                     logger.warning(
                         f"智能调律忽略备战方案「{plan.name}」："
                         f"{reason}")
@@ -276,6 +263,7 @@ class SmartTuningEvaluator:
                         target, plan_id=plan.id, plan_name=plan.name,
                         status="invalid", reason=reason)
                     continue
+                school = scoring.school
                 equipped = state.resolved_equipment(plan.id)
                 if set(equipped) != set(EQUIPMENT_SLOTS):
                     missing_equipment = True
@@ -289,19 +277,17 @@ class SmartTuningEvaluator:
                         status="incomplete", reason=reason)
                     continue
                 try:
-                    base_attrs = CombatAttributes.from_dict(base_data)
-                    base_attrs = base_attrs + compute_gongjue_attrs(
-                        plan.gongjue,
-                        self._game_config.current_equip_level(),
-                        self._game_config.get_affix_caps,
-                    )
+                    # 弓玦固定为方案已选套装；不假设用户会为一件装备换弓玦
+                    scorer = scoring.scorer(game_config=self._game_config)
                     provisional = _PlanContext(
-                        plan.id, plan.name, school, calculator, base_attrs,
+                        plan.id, plan.name, school, scoring.calculator,
+                        scoring.base_attrs,
                         copy.deepcopy(equipped), 0.0,
                         target.rule_key, target.rule_name,
                         target.affix_pool,
-                        str((schools.get(school) or {}).get("attr") or ""),
-                        plan.playstyle)
+                        scoring.attribute,
+                        plan.playstyle,
+                        scorer=scorer)
                     baseline = _rate(provisional, provisional.equipped,
                                      self._game_config)
                     try:
@@ -325,14 +311,16 @@ class SmartTuningEvaluator:
                             PART_ALIAS.get(label_name, label_name))) is not None
                     }
                     contexts[context_key] = _PlanContext(
-                        plan.id, plan.name, school, calculator, base_attrs,
+                        plan.id, plan.name, school, scoring.calculator,
+                        scoring.base_attrs,
                         provisional.equipped, baseline,
                         target.rule_key, target.rule_name,
                         target.affix_pool,
                         provisional.attribute,
                         provisional.playstyle,
                         plan_maximum,
-                        first_affixes)
+                        first_affixes,
+                        scorer=scorer)
                     self._remember_plan(
                         target, plan_id=plan.id, plan_name=plan.name,
                         status="ready", plan_maximum_rate=plan_maximum,
@@ -592,26 +580,18 @@ class SmartTuningEvaluator:
                 # 有池外词条时只处理第一条；否则逐一尝试转出全部已出现的
                 # 非首词条。一次转律最多改一条。
                 selected = outside_pool[:1] or removable
-                transmutable = set(transmute_pool_union(self._game_config))
+                # 智能调律口径：各流派转律库并集 ∩ 本规则词条库（含动态本属
+                # 别名展开）；部位合法性、去重与整件校验由公共过滤链完成。
+                rule_pool = [
+                    target
+                    for target in transmute_pool_union(self._game_config)
+                    if target in pool or aliases.get(target) in pool
+                ]
                 for index, name in selected:
-                    variant = copy.deepcopy(candidate)
-                    variant.pop(f"affix_{index}", None)
-                    present_names = {
-                        str(item.get("name") or "")
-                        for key, item in variant.items()
-                        if key.startswith("affix_") and isinstance(item, dict)
-                        and key != "affix_1"
-                    }
-                    targets = [
-                        target
-                        for target in normal_affix_candidates(
-                            variant, self._game_config)
-                        if target in transmutable
-                        and target != name
-                        and (target in pool or aliases.get(target) in pool)
-                        and target not in present_names
-                    ]
-                    for target in targets:
+                    for target in transmute_targets(
+                            candidate, index, rule_pool, self._game_config):
+                        variant = copy.deepcopy(candidate)
+                        variant.pop(f"affix_{index}", None)
                         # 被转出的槽在 2~4，是当前第一个空槽，转入词条落回原位。
                         filled = self._with_affixes(variant, (target,))
                         if filled is None:
@@ -801,65 +781,30 @@ class SmartTuningEvaluator:
     def _candidate_rate(
         self, context: _PlanContext, slot: str, candidate: dict,
     ) -> float:
-        attrs = self._candidate_attrs(context, slot, candidate)
-        # 不同词条名可能映射成完全相同的毕业率输入（例如其他
-        # 属攻在当前流派模型中不生效）。按最终属性缓存消除重复计算。
-        signature = json.dumps(
-            attrs.to_dict(), ensure_ascii=False, sort_keys=True,
-            separators=(",", ":"))
-        key = (context.plan_id, signature)
-        if key not in self._rate_cache:
-            self._rate_cache[key] = float(
-                context.calculator.calculate(attrs).graduation_rate)
-        return self._rate_cache[key]
+        return context.get_scorer(self._game_config).rate_attrs(
+            self._candidate_attrs(context, slot, candidate))
 
     def _candidate_attrs(
         self, context: _PlanContext, slot: str, candidate: dict,
     ) -> CombatAttributes:
-        """构建候选替换后的三满极限属性，与方案上限保持同一口径。"""
+        """候选替换到该槽后的三满极限属性，与方案上限保持同一口径。
+
+        其余七件的三满投影按 (方案, 槽) 缓存一次；候选与它们合成整套后交
+        评分内核归一化聚合——同名专属武学增伤只取最高等规则由内核统一处理。
+        """
         other_key = (context.plan_id, slot)
-        equipment_attrs = self._other_attrs_cache.get(other_key)
-        if equipment_attrs is None:
-            other_equipped = {
-                key: value for key, value in context.equipped.items()
-                if key != slot
-            }
+        other_equipped = self._other_equipped_cache.get(other_key)
+        if other_equipped is None:
             other_equipped = self._apply_maximum_assumptions(
-                context, other_equipped)
-            equipment_attrs = compute_equip_base_attrs(
-                other_equipped, self._game_config.get_base_attr_values,
-            ) + aggregate_equipment_attrs(other_equipped)
-            self._other_attrs_cache[other_key] = equipment_attrs
+                context, {
+                    key: value for key, value in context.equipped.items()
+                    if key != slot
+                })
             self._other_equipped_cache[other_key] = other_equipped
-            stacks: dict[str, float] = {}
-            for equip in other_equipped.values():
-                for name, value in max_stack_affixes(
-                        equip, self._game_config).items():
-                    stacks[name] = max(stacks.get(name, 0.0), value)
-            self._other_stack_cache[other_key] = stacks
-        candidate_equipped = self._apply_maximum_assumptions(
-            context, {slot: candidate})
-        candidate_stacks = max_stack_affixes(
-            candidate_equipped[slot], self._game_config)
-        if candidate_stacks and any(
-                name in self._other_stack_cache[other_key]
-                for name in candidate_stacks):
-            # 候选与在位装备带同名的专属武学增伤：游戏只生效最高一条，
-            # 分槽相加会算多，退回整套归一化聚合。
-            combined = dict(self._other_equipped_cache[other_key])
-            combined[slot] = candidate_equipped[slot]
-            total_attrs = compute_equip_base_attrs(
-                combined, self._game_config.get_base_attr_values,
-            ) + aggregate_equipment_attrs(combined)
-            return build_graduation_attrs(
-                context.base_attrs, total_attrs, context.school)
-        candidate_attrs = compute_equip_base_attrs(
-            candidate_equipped, self._game_config.get_base_attr_values,
-        ) + aggregate_equipment_attrs(candidate_equipped)
-        attrs = build_graduation_attrs(
-            context.base_attrs, equipment_attrs + candidate_attrs,
-            context.school)
-        return attrs
+        combined = dict(other_equipped)
+        combined[slot] = self._apply_maximum_assumptions(
+            context, {slot: candidate})[slot]
+        return context.get_scorer(self._game_config).attrs(combined)
 
     def _apply_maximum_assumptions(
         self, context: _PlanContext, equipped: dict[str, dict],

@@ -12,17 +12,10 @@
 from __future__ import annotations
 
 import copy
-import json
-import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from ..combat.combat_attrs import (
-    CombatAttributes,
-    aggregate_equipment_attrs,
-    build_graduation_attrs,
-    compute_equip_base_attrs,
-)
+from ..combat.combat_attrs import CombatAttributes
 from ..loadout.models import EQUIPMENT_SLOTS
 from ..loadout.transmute import (
     judge_transmute_eligibility,
@@ -33,8 +26,8 @@ from ..loadout.transmute import (
     validate_saved_target,
     with_transmuted_affix,
 )
-from .affix_impact import _effective_equipped
 from .assumptions import Assumptions
+from .scoring import BudgetExceeded, LoadoutScorer
 from .smart_search import floor_rate
 
 #: 搜索预算：先到者停止。数值集中在这里，实现阶段按实测调整。
@@ -126,48 +119,6 @@ class TransmuteSearchRequest:
         )
 
 
-class _BudgetExceeded(Exception):
-    pass
-
-
-class _Evaluator:
-    """按最终属性输入缓存毕业率，统计真正调用计算器的次数。"""
-
-    def __init__(self, request: TransmuteSearchRequest) -> None:
-        self._request = request
-        self._cache: dict[str, float] = {}
-        self.evaluated = 0
-        self._deadline = time.monotonic() + max(request.time_budget, 0.0)
-
-    def check_budget(self) -> None:
-        request = self._request
-        if request.stop_check is not None and request.stop_check():
-            raise _BudgetExceeded
-        if request.time_budget > 0 and time.monotonic() > self._deadline:
-            raise _BudgetExceeded
-
-    def rate(self, equipped: dict[str, dict]) -> float:
-        request = self._request
-        gc = request.game_config
-        effective = _effective_equipped(equipped, gc)
-        equipment_attrs = compute_equip_base_attrs(
-            effective, gc.get_base_attr_values,
-        ) + aggregate_equipment_attrs(effective)
-        attrs = build_graduation_attrs(
-            request.base_attrs, equipment_attrs, request.school)
-        signature = json.dumps(
-            attrs.to_dict(), ensure_ascii=False, sort_keys=True,
-            separators=(",", ":"))
-        cached = self._cache.get(signature)
-        if cached is not None:
-            return cached
-        self.check_budget()
-        value = float(request.calculator.calculate(attrs).graduation_rate)
-        self._cache[signature] = value
-        self.evaluated += 1
-        return value
-
-
 def _number(value) -> float:
     try:
         return float(value or 0)
@@ -229,7 +180,9 @@ def optimize_transmutes(request: TransmuteSearchRequest) -> TransmutePlanResult:
                 original[slot], gc, pool_union, slots=judged.slots)
     trusted = all(judged.trusted for judged in eligibility.values())
 
-    evaluator = _Evaluator(request)
+    evaluator = LoadoutScorer(
+        request.calculator, request.base_attrs, request.school, gc,
+        stop_check=request.stop_check, time_budget=request.time_budget)
     baseline_rate = evaluator.rate(projected)
 
     saved_rate: float | None = None
@@ -300,7 +253,7 @@ def optimize_transmutes(request: TransmuteSearchRequest) -> TransmutePlanResult:
             else:
                 chosen[slot] = move
                 state = apply_move(state, slot, move[0], move[1])
-    except _BudgetExceeded:
+    except BudgetExceeded:
         exhausted = False
 
     final_rate = evaluator.rate(state)
@@ -326,7 +279,7 @@ def optimize_transmutes(request: TransmuteSearchRequest) -> TransmutePlanResult:
                 if full is not None:
                     reverted[slot] = full
                     swap = final_rate - evaluator.rate(reverted)
-            except _BudgetExceeded:
+            except BudgetExceeded:
                 marginal = swap = 0.0
                 exhausted = False
             source = equip.get(f"affix_{index}") or {}

@@ -1541,3 +1541,5 @@ auto_strings:
   以下是词条收益率（理论值），不代表游戏中可以单独获得或失去一条词条。新增按 Lv{level} 普通词条满值，扣除按当前装备实际值计算。: These are affix yields (theoretical); they do not mean a single affix can be gained or lost in-game. Additions use the Lv{level} normal-affix cap; deductions use the equipment's actual current value.
   新增一条词条的收益率: Yield of adding one affix
   扣除一条当前词条的损失率: Loss of removing one current affix
+  已取消本次搜索。: This search was cancelled.
+  已取消本次搜索；上一次的结果保留。: This search was cancelled; the previous results are kept.

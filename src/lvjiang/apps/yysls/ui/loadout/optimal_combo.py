@@ -5,20 +5,14 @@
 """
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
 from loguru import logger
 from PyQt6.QtCore import (
-    QObject,
-    QRunnable,
     Qt,
-    QThreadPool,
-    QTimer,
     pyqtSignal,
-    pyqtSlot,
 )
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -61,6 +55,7 @@ from ...core.graduation.context import gongjue_attrs
 from ..domain_labels import domain_label
 from ..events import EQUIPMENT_CHANGED, get_event_hub
 from ..layout_helpers import fit_combo_to_contents
+from .background import JobContext, JobController, JobProgress
 
 #: 「评级要求」可选档位，由高到低。垃圾不列：要求「至少是垃圾」等于没有要求。
 _MIN_RATING_CHOICES: tuple[str, ...] = ("顶级", "优秀", "一般")
@@ -209,17 +204,12 @@ _QUALITY_COLORS = {
 # Worker signals + runnable
 # ---------------------------------------------------------------------------
 
-class _SearchSignals(QObject):
-    finished = pyqtSignal(list)  # results list
-    error = pyqtSignal(str)
-
-
 class _ScenarioProgress:
-    """把单套弓玦的搜索进度折算到多场景总进度。"""
+    """把单套弓玦的搜索进度折算到多场景总进度（写入共享的 JobProgress）。"""
 
-    def __init__(self, worker, name: str, index: int, count: int,
+    def __init__(self, progress: JobProgress, name: str, index: int, count: int,
                  completed: int) -> None:
-        self._worker = worker
+        self._progress = progress
         self._name = name or tr("无")
         self._index = index
         self._count = count
@@ -234,7 +224,7 @@ class _ScenarioProgress:
     @evaluated.setter
     def evaluated(self, value: int) -> None:
         self._evaluated = value
-        self._worker.evaluated = self._completed + value
+        self._progress.evaluated = self._completed + value
 
     @property
     def total(self) -> int:
@@ -244,92 +234,67 @@ class _ScenarioProgress:
     def total(self, value: int) -> None:
         self._total = value
         remaining = self._count - self._index + 1
-        self._worker.total = self._completed + value * remaining
+        self._progress.total = self._completed + value * remaining
 
     @property
     def message(self) -> str:
-        return self._worker.message
+        return self._progress.message
 
     @message.setter
     def message(self, value: str) -> None:
         prefix = tr("弓玦 {name}（{index}/{total}）").format(
             name=self._name, index=self._index, total=self._count)
-        self._worker.message = f"{prefix}　{value}"
+        self._progress.message = f"{prefix}　{value}"
 
 
-class _SearchWorker(QRunnable):
-    """后台搜索线程。"""
+def _search_job(
+    candidates: dict[str, list[dict]],
+    school: str,
+    scheme: str,
+    scenarios: list[tuple[str, CombatAttributes]],
+    use_dominance_pruning: bool,
+    assumptions: Assumptions,
+    season_level: int,
+) -> Callable[[JobContext], list[dict[str, Any]]]:
+    """构造交给 JobController 的搜索函数：逐弓玦场景搜索并合并结果。"""
 
-    def __init__(
-        self,
-        candidates: dict[str, list[dict]],
-        school: str,
-        scheme: str,
-        scenarios: list[tuple[str, CombatAttributes]],
-        use_dominance_pruning: bool,
-        assumptions: Assumptions,
-        season_level: int = 0,
-    ) -> None:
-        super().__init__()
-        self.candidates = candidates
-        self.school = school
-        self.scheme = scheme
-        self.scenarios = scenarios
-        self.use_dominance_pruning = use_dominance_pruning
-        self.assumptions = assumptions
-        self.season_level = season_level
-        self.signals = _SearchSignals()
-        self._cancel_event = threading.Event()
-        # 进度计数器（线程安全，由 GIL 保证）
-        self.evaluated = 0
-        self.total = 0
-        self.message = ""
+    def run(ctx: JobContext) -> list[dict[str, Any]]:
+        from ...core.graduation import get_graduation_calculator
+        from ...core.graduation.optimal_combo import search_optimal_combo
 
-    def cancel(self) -> None:
-        self._cancel_event.set()
+        calc = get_graduation_calculator(school, scheme)
+        if calc is None:
+            raise ValueError(tr("未找到对应流派的毕业率方案"))
 
-    def run(self) -> None:
-        try:
-            from ...core.graduation import get_graduation_calculator
-            from ...core.graduation.optimal_combo import search_optimal_combo
+        results: list[dict[str, Any]] = []
+        completed = 0
+        for index, (gongjue, base_attrs) in enumerate(scenarios, 1):
+            if ctx.is_cancelled():
+                break
+            progress = _ScenarioProgress(
+                ctx.progress, gongjue, index, len(scenarios), completed)
+            scenario_results = search_optimal_combo(
+                candidates,
+                calc,
+                base_attrs,
+                use_dominance_pruning=use_dominance_pruning,
+                cancel_flag=ctx.is_cancelled,
+                season_chengyin=assumptions.season_chengyin,
+                season_level=season_level,
+                full_chengyin=assumptions.full_chengyin,
+                full_dingyin=assumptions.full_dingyin,
+                full_level=assumptions.full_level,
+                playstyle=assumptions.playstyle,
+                simulate_transmute=assumptions.simulate_transmute,
+                progress_counter=progress,
+            )
+            completed += progress.evaluated
+            for result in scenario_results:
+                result["gongjue"] = gongjue
+            results.extend(scenario_results)
+        return results
 
-            calc = get_graduation_calculator(self.school, self.scheme)
-            if calc is None:
-                self.signals.error.emit(tr("未找到对应流派的毕业率方案"))
-                return
-
-            results: list[dict[str, Any]] = []
-            scenario_count = len(self.scenarios)
-            completed = 0
-            for index, (gongjue, base_attrs) in enumerate(self.scenarios, 1):
-                if self._cancel_event.is_set():
-                    break
-                progress = _ScenarioProgress(
-                    self, gongjue, index, scenario_count, completed,
-                )
-                scenario_results = search_optimal_combo(
-                    self.candidates,
-                    calc,
-                    base_attrs,
-                    use_dominance_pruning=self.use_dominance_pruning,
-                    cancel_flag=self._cancel_event.is_set,
-                    season_chengyin=self.assumptions.season_chengyin,
-                    season_level=self.season_level,
-                    full_chengyin=self.assumptions.full_chengyin,
-                    full_dingyin=self.assumptions.full_dingyin,
-                    full_level=self.assumptions.full_level,
-                    playstyle=self.assumptions.playstyle,
-                    simulate_transmute=self.assumptions.simulate_transmute,
-                    progress_counter=progress,
-                )
-                completed += progress.evaluated
-                for result in scenario_results:
-                    result["gongjue"] = gongjue
-                results.extend(scenario_results)
-            self.signals.finished.emit(results)
-        except Exception as exc:
-            logger.error(f"最优组合搜索失败: {exc}")
-            self.signals.error.emit(str(exc))
+    return run
 
 
 # ---------------------------------------------------------------------------
@@ -910,7 +875,11 @@ class OptimalComboPage(QWidget):
         self._sub_martial_art = sub_martial_art
         self._level_threshold = level_threshold
         self._affix_filter = affix_filter
-        self._worker: _SearchWorker | None = None
+        self._jobs = JobController(self, poll_interval_ms=1000)
+        self._jobs.finished.connect(self._on_finished)
+        self._jobs.failed.connect(self._on_error)
+        self._jobs.cancelled.connect(self._on_cancelled)
+        self._jobs.progress.connect(self._on_progress)
         self._slot_groups: dict[str, _SlotGroup] = {}
         self._result_cards: list[_ResultCard] = []
         #: 备战方案当前穿戴（slot_key → 装备），结果页据此标出要换的部位
@@ -1551,32 +1520,32 @@ class OptimalComboPage(QWidget):
             self._assumptions_provider().with_playstyle(self._playstyle),
             season_chengyin=self._chk_season_chengyin.isChecked())
         self._searched_assumptions = assumptions
-        self._worker = _SearchWorker(
+        self._jobs.start(_search_job(
             candidates,
             self._school,
             self._scheme,
             scenarios,
             self._chk_pruning.isChecked(),
             assumptions,
-            season_level=season_level,
-        )
-        # 使用 QueuedConnection 确保 slot 在 UI 线程执行
-        # （signal 从后台线程 emit，但 _SearchSignals 的线程亲和性是 UI 线程）
-        self._worker.signals.finished.connect(  # type: ignore[call-arg]
-            self._on_finished, Qt.ConnectionType.QueuedConnection)
-        self._worker.signals.error.connect(  # type: ignore[call-arg]
-            self._on_error, Qt.ConnectionType.QueuedConnection)
-        pool = QThreadPool.globalInstance()
-        if pool is not None:
-            pool.start(self._worker)
-        # 启动定时器轮询进度
-        self._progress_timer = QTimer(self)
-        self._progress_timer.timeout.connect(self._poll_progress)
-        self._progress_timer.start(1000)  # 每 1 秒轮询一次
+            season_level,
+        ))
 
     def _on_cancel(self) -> None:
-        if self._worker:
-            self._worker.cancel()
+        self._jobs.cancel()
+
+    def _on_cancelled(self) -> None:
+        """取消：复位界面，保留上一次完成的结果（不渲染半截结果）。"""
+        self._restore_idle_controls()
+        self._candidate_summary.setText(
+            tr("已取消本次搜索；上一次的结果保留。") if self._results
+            else tr("已取消本次搜索。"))
+
+    def _restore_idle_controls(self) -> None:
+        self._btn_search.setVisible(True)
+        self._btn_cancel.setVisible(False)
+        self._set_search_controls_enabled(True)
+        self._progress.setVisible(False)
+        self._progress_label.setVisible(False)
 
     def _set_search_controls_enabled(self, enabled: bool) -> None:
         """搜索期间冻结条件快照，防止界面与后台参数错位。"""
@@ -1592,28 +1561,14 @@ class OptimalComboPage(QWidget):
         for group in self._slot_groups.values():
             group.setEnabled(enabled)
 
-    def _poll_progress(self) -> None:
-        """定时轮询 worker 的进度计数器。"""
-        if not self._worker:
-            return
-        evaluated = self._worker.evaluated
-        total = self._worker.total
-        message = self._worker.message
+    def _on_progress(self, evaluated: int, total: int, message: str) -> None:
         self._progress.setMaximum(max(total, 1))
         self._progress.setValue(evaluated)
         self._progress_label.setText(
             f"{evaluated:,} / {total:,}" + (f"  {message}" if message else ""))
 
-    @pyqtSlot(list)
     def _on_finished(self, results: list) -> None:
-        # 停止进度轮询定时器
-        if hasattr(self, '_progress_timer'):
-            self._progress_timer.stop()
-        self._btn_search.setVisible(True)
-        self._btn_cancel.setVisible(False)
-        self._set_search_controls_enabled(True)
-        self._progress.setVisible(False)
-        self._progress_label.setVisible(False)
+        self._restore_idle_controls()
         self._candidate_summary.setText(
             tr("搜索完成，共得到 {count} 个可用结果。")
             .format(count=len(results)),
@@ -1648,7 +1603,7 @@ class OptimalComboPage(QWidget):
                 tr("计算假设已变化，当前结果按旧假设得出；请重新搜索。"))
 
     def _worker_running(self) -> bool:
-        return bool(self._worker) and not self._btn_search.isVisible()
+        return self._jobs.running
 
     def _render_results(self, results: list) -> None:
         if not results:
@@ -1679,16 +1634,8 @@ class OptimalComboPage(QWidget):
             self._results_inner.addWidget(card)
             self._result_cards.append(card)
 
-    @pyqtSlot(str)
     def _on_error(self, message: str) -> None:
-        # 停止进度轮询定时器
-        if hasattr(self, '_progress_timer'):
-            self._progress_timer.stop()
-        self._btn_search.setVisible(True)
-        self._btn_cancel.setVisible(False)
-        self._set_search_controls_enabled(True)
-        self._progress.setVisible(False)
-        self._progress_label.setVisible(False)
+        self._restore_idle_controls()
         self._candidate_summary.setText(tr("搜索失败，请检查候选装备后重试。"))
         QMessageBox.critical(self, tr("搜索失败"), message)
 

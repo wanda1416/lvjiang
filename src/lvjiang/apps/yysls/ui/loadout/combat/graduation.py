@@ -2,18 +2,17 @@
 
 职责：
 - GraduationContext 数据类：流派/方案/基础属性公共快照
-- _GraduationTask：线程池任务，调用 get_graduation_calculator 计算
-- CombatGraduationMixin：调度、防抖、结果接收
+- CombatGraduationMixin：防抖、经 JobController 提交计算、结果接收
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from loguru import logger
-from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
 
 from ....core.combat.combat_attrs import CombatAttributes
 from ...events import GRADUATION_UPDATED, get_event_hub
+from ..background import JobContext, JobController
 
 
 @dataclass(frozen=True)
@@ -24,49 +23,6 @@ class GraduationContext:
     scheme: str
     base_attrs: CombatAttributes
     gongjue: str = ""  # 当前弓玦类型（"会意"/"精准"/"会心"/""）
-
-
-class _GraduationSignals(QObject):
-    finished = pyqtSignal(int, str, str, str, object, object)
-
-
-class _GraduationTask(QRunnable):
-    """在线程池执行耗时公式，并携带请求快照返回结果。"""
-
-    def __init__(
-        self,
-        generation: int,
-        user_name: str,
-        school: str,
-        scheme: str,
-        attrs: CombatAttributes,
-    ) -> None:
-        super().__init__()
-        self.generation = generation
-        self.user_name = user_name
-        self.school = school
-        self.scheme = scheme
-        self.attrs = attrs
-        self.signals = _GraduationSignals()
-
-    def run(self) -> None:
-        try:
-            from ....core.graduation import get_graduation_calculator
-
-            calculator = get_graduation_calculator(self.school, self.scheme)
-            result = calculator.calculate(self.attrs) if calculator else None
-            error = None
-        except Exception as exc:  # UI worker boundary
-            result = None
-            error = exc
-        self.signals.finished.emit(
-            self.generation,
-            self.user_name,
-            self.school,
-            self.scheme,
-            result,
-            error,
-        )
 
 
 class CombatGraduationMixin:
@@ -108,6 +64,15 @@ class CombatGraduationMixin:
         )
         self._graduation_timer.start()
 
+    def _graduation_controller(self) -> JobController:
+        jobs = getattr(self, "_graduation_jobs", None)
+        if jobs is None:
+            jobs = JobController(self)  # type: ignore[arg-type]
+            jobs.finished.connect(self._on_graduation_finished)
+            jobs.failed.connect(self._on_graduation_failed)
+            self._graduation_jobs = jobs
+        return jobs
+
     def _start_graduation_task(self) -> None:
         request = self._pending_graduation
         if request is None:
@@ -115,32 +80,29 @@ class CombatGraduationMixin:
         generation, user_name, school, scheme, attrs = request
         if generation != self._graduation_generation:
             return
-        task = _GraduationTask(generation, user_name, school, scheme, attrs)
-        task.signals.finished.connect(self._on_graduation_finished)
-        pool = QThreadPool.globalInstance()
-        if pool is not None:
-            pool.start(task)
 
-    def _on_graduation_finished(
-        self,
-        generation: int,
-        user_name: str,
-        school: str,
-        scheme: str,
-        result,
-        error,
-    ) -> None:
+        def compute(_ctx: JobContext):
+            from ....core.graduation import get_graduation_calculator
+
+            calculator = get_graduation_calculator(school, scheme)
+            result = calculator.calculate(attrs) if calculator else None
+            return (generation, user_name, school, scheme, result)
+
+        self._graduation_controller().start(compute)
+
+    def _on_graduation_failed(self, message: str) -> None:
+        logger.error(f"毕业率计算失败: {message}")
+        get_event_hub(self._host).publish(GRADUATION_UPDATED, None)
+
+    def _on_graduation_finished(self, payload) -> None:
         """仅接收仍与当前用户和配置一致的后台计算结果。"""
+        generation, user_name, school, scheme, result = payload
         if (
             generation != self._graduation_generation
             or user_name != (self._host.active_user_name() or "")
             or school != self._get_current_school()
             or scheme != self._combo_scheme.currentText()
         ):
-            return
-        if error is not None:
-            logger.error(f"毕业率计算失败: {error}")
-            get_event_hub(self._host).publish(GRADUATION_UPDATED, None)
             return
         # 结果通过信号向上传递给 LoadoutPanel
         get_event_hub(self._host).publish(GRADUATION_UPDATED, result)

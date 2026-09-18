@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style
+from ...config.equipment_slots import grid_layout
 from ...config.tune_slots import SLOT_LABELS
 from ...core.graduation.affix_impact import (
     AffixCombinationResult,
@@ -58,11 +59,8 @@ ReportProvider = Callable[[], AffixImpactReport]
 TransmuteRunner = Callable[[Callable[[], bool], Assumptions], TransmutePlanResult]
 ApplyHandler = Callable[[TransmutePlanResult], bool]
 
-#: 默认 4 列 × 2 行；与备战方案槽位布局一致。
-DEFAULT_SLOT_LAYOUT: tuple[tuple[int, int, str], ...] = (
-    (0, 0, "main_weapon"), (0, 1, "sub_weapon"), (0, 2, "head"), (0, 3, "chest"),
-    (1, 0, "ring"), (1, 1, "pendant"), (1, 2, "leg"), (1, 3, "wrist"),
-)
+#: 默认 4 列 × 2 行；与备战方案槽位布局同源（config.equipment_slots）。
+DEFAULT_SLOT_LAYOUT: tuple[tuple[int, int, str], ...] = grid_layout()
 
 
 def transmute_reason_text(code: str) -> str:

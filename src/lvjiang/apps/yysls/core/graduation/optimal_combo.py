@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from loguru import logger
 
+from ...config.equipment_slots import EQUIPMENT_SLOTS
 from ..affix_cap import affix_cap_value
 from ..combat.combat_attrs import (
     BONUS_PERCENT_FIELDS,
@@ -41,11 +42,8 @@ _FIXED_ATTR_NAMES: frozenset[str] = frozenset(
     f.name for f in dataclass_fields(CombatAttributes)
 ) - {"extra_attrs"}
 
-# The 8 equipment slots in enumeration order.
-SLOT_KEYS: list[str] = [
-    "main_weapon", "sub_weapon", "head", "chest",
-    "ring", "pendant", "leg", "wrist",
-]
+# The 8 equipment slots in enumeration order (唯一定义见 config.equipment_slots).
+SLOT_KEYS: list[str] = list(EQUIPMENT_SLOTS)
 
 
 @dataclass(frozen=True)

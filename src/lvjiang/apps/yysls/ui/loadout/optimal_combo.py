@@ -50,6 +50,7 @@ from lvjiang.ui.button_styles import (
 from lvjiang.ui.widgets import FlowLayout
 
 from .....i18n import tr
+from ...config.equipment_slots import SLOT_SPECS
 from ...core.affix_cap import affix_dict_cap_pct
 from ...core.combat.combat_attrs import (
     CombatAttributes,
@@ -192,16 +193,9 @@ class _MultiSelectMenu(QMenu):
 
 
 # 8 个装备槽位的显示顺序与分组映射
+#: (slot_key, display_name, bag_filter_type)；唯一定义见 config.equipment_slots
 _SLOT_ORDER: list[tuple[str, str, str]] = [
-    # (slot_key, display_name, bag_filter_type)
-    ("main_weapon", tr("主武器"), "weapon"),
-    ("sub_weapon", tr("副武器"), "weapon"),
-    ("head", tr("冠胄"), "head"),
-    ("chest", tr("胸甲"), "chest"),
-    ("ring", tr("环"), "ring"),
-    ("pendant", tr("佩"), "pendant"),
-    ("leg", tr("胫甲"), "leg"),
-    ("wrist", tr("腕甲"), "wrist"),
+    (spec.key, spec.label, spec.filter_type) for spec in SLOT_SPECS
 ]
 
 _QUALITY_COLORS = {

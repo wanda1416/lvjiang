@@ -3,10 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import uuid4
 
-EQUIPMENT_SLOTS = (
-    "main_weapon", "sub_weapon", "ring", "pendant",
-    "head", "chest", "leg", "wrist",
-)
+from ...config.equipment_slots import EQUIPMENT_SLOTS
 
 EQUIPMENT_CREATED_AT = "created_at"
 EQUIPMENT_UPDATED_AT = "updated_at"

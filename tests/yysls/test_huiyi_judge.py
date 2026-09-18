@@ -291,6 +291,21 @@ class TestTransmuteSimulation:
         assert result.rating == Rating.EXCELLENT
         assert "最小外功攻击 转律为 势" in "；".join(result.reasons)
 
+    def test_chengyin_retransfer_infers_native_level_from_name(self, judge):
+        """original_level 未记录但名称等阶可识别（吴钩霜甲=110）：与解析器
+        同源的名称识别兜底，允许再次转律。"""
+        equip = self._full_crown()
+        equip.name = "吴钩霜甲"
+        equip.level = 110
+        equip.original_level = 0
+        equip.is_chengyin = True
+        equip.affixes[3].is_transferred = True
+
+        result = judge.check_tuning_worthiness(equip)
+
+        assert result.rating == Rating.EXCELLENT
+        assert "最小外功攻击 再次转律为 势" in "；".join(result.reasons)
+
     def test_chengyin_retransfer_requires_known_native_level(self, judge):
         """当前等级为 110 不能代替名称等阶识别出的原始等级。"""
         equip = self._full_crown()

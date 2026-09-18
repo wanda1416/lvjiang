@@ -43,6 +43,8 @@ class PlanScoringContext:
     scheme: str
     calculator: object
     base_attrs: CombatAttributes      # 含弓玦
+    #: 不含弓玦的基础属性；只给最优组合按弓玦场景自行叠加用
+    base_attrs_without_gongjue: CombatAttributes
     gongjue: str
     playstyle: str
     attribute: str                    # 流派属性（鸣金/裂石/…），动态词条归类用
@@ -70,8 +72,8 @@ class PlanScoringContext:
         base_data = get_play_styles(school).get(plan.base_attribute)
         if calculator is None or not isinstance(base_data, dict):
             raise PlanContextError("缺少毕业率方案或角色基础属性")
-        base_attrs = (CombatAttributes.from_dict(base_data)
-                      + gongjue_attrs(plan.gongjue, game_config))
+        raw_base = CombatAttributes.from_dict(base_data)
+        base_attrs = raw_base + gongjue_attrs(plan.gongjue, game_config)
         return cls(
             plan_id=plan.id,
             plan_name=plan.name,
@@ -79,6 +81,7 @@ class PlanScoringContext:
             scheme=plan.graduation_scheme,
             calculator=calculator,
             base_attrs=base_attrs,
+            base_attrs_without_gongjue=raw_base,
             gongjue=plan.gongjue,
             playstyle=plan.playstyle,
             attribute=str((schools.get(school) or {}).get("attr") or ""),

@@ -813,10 +813,9 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._refresh_extra_attrs(combat_attrs.extra_attrs, buff_resistance)
         school = self._get_current_school()
         # 毕业率输入走公共评分内核（与分析对话框、智能调律同一条链路）
-        from ....core.graduation.scoring import LoadoutScorer
-        graduation_attrs = LoadoutScorer(
-            None, base_attrs + gongjue_attrs, school or "",
-        ).attrs(equipped or {})
+        from ....core.graduation.scoring import graduation_input
+        graduation_attrs = graduation_input(
+            base_attrs + gongjue_attrs, equipped or {}, school or "")
         self._schedule_graduation(graduation_attrs)
 
         # 所有模式走统一策略钩子；full/half 默认 no-op，compact 自行重排。
@@ -1134,11 +1133,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         return get_game_config().current_equip_level()
 
     def _compute_gongjue_attrs(self) -> CombatAttributes:
-        """计算弓玦属性：当前赛季最大等级三率词条上限的一半"""
+        """当前弓玦套装属性（唯一实现见 ``graduation.context.gongjue_attrs``）。"""
         from ....core.graduation.context import gongjue_attrs
 
-        try:
-            return gongjue_attrs(self._get_current_gongjue())
-        except Exception as e:
-            logger.error(f"计算弓玦属性失败: {e}")
-            return CombatAttributes()
+        return gongjue_attrs(self._get_current_gongjue())

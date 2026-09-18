@@ -1988,12 +1988,6 @@ class EquipStatusTab(QWidget):
             QMessageBox.warning(self, tr("提示"), tr("未找到角色详情面板"))
             return
 
-        context = combat_tab.get_graduation_context()
-        if context is None:
-            QMessageBox.warning(
-                self, tr("提示"), tr("请先在角色详情页选择流派和毕业率方案"))
-            return
-
         user_name = self._host.active_user_name()
         if not user_name:
             QMessageBox.warning(self, tr("提示"), tr("没有激活的用户"))
@@ -2022,7 +2016,11 @@ class EquipStatusTab(QWidget):
                 scoring = PlanScoringContext.from_plan(
                     plan, game_config=game_config)
             except PlanContextError as exc:
-                raise ValueError(exc.reason) from exc
+                QMessageBox.warning(
+                    self, tr("提示"),
+                    tr("请先在角色详情页选择流派和毕业率方案（{reason}）")
+                    .format(reason=exc.reason))
+                return
             calculator = scoring.calculator
             base_attrs = scoring.base_attrs
             school = scoring.school
@@ -2079,7 +2077,8 @@ class EquipStatusTab(QWidget):
                 display_params=self._display_params,
             )
             optimal_page = OptimalComboPage(
-                self._host, school, scoring.scheme, context.base_attrs,
+                self._host, school, scoring.scheme,
+                scoring.base_attrs_without_gongjue,
                 level_threshold=self._get_level_threshold(),
                 affix_filter=self._get_affix_filter(),
                 gongjue=scoring.gongjue,

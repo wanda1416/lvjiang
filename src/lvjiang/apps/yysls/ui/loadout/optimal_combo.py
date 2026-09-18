@@ -56,6 +56,13 @@ from ..domain_labels import domain_label
 from ..events import EQUIPMENT_CHANGED, get_event_hub
 from ..layout_helpers import fit_combo_to_contents
 from .background import JobContext, JobController, JobProgress
+from .widgets import (
+    assumption_pill,
+    highlight_pill,
+    make_pill,
+    muted_pill,
+    style_document_tabs,
+)
 
 #: 「评级要求」可选档位，由高到低。垃圾不列：要求「至少是垃圾」等于没有要求。
 _MIN_RATING_CHOICES: tuple[str, ...] = ("顶级", "优秀", "一般")
@@ -504,13 +511,6 @@ class _SlotGroup(QFrame):
 # ── 与备战方案的差异标注 ─────────────────────────────────
 
 #: 计算假设的强调色：和装备卡片上原来那行假设文字保持同一种琥珀色。
-_ASSUMPTION_FG = "#B26A00"
-_ASSUMPTION_BG = "rgba(178, 106, 0, 0.13)"
-
-_PILL_STYLE = (
-    "border-radius: 9px; padding: 1px 8px; font-size: 11px; font-weight: 600;"
-)
-
 #: 部位相对当前备战方案的变化。
 #: 组合详情状态带每行高度（px）；两行固定，空行也占位
 _STRIP_ROW_HEIGHT = 20
@@ -547,30 +547,14 @@ def _changed_slots(
     ]
 
 
-def _make_pill(text: str, fg: str, bg: str, parent: QWidget | None = None) -> QLabel:
-    """胶囊标签：一个短语一个色块，比整行加粗的提示更容易一眼定位。"""
-    label = QLabel(text, parent)
-    label.setStyleSheet(f"color: {fg}; background: {bg}; {_PILL_STYLE}")
-    return label
-
-
-def _assumption_pill(text: str, parent: QWidget | None = None) -> QLabel:
-    return _make_pill(text, _ASSUMPTION_FG, _ASSUMPTION_BG, parent)
-
-
 def _change_pill(change: str, parent: QWidget | None = None) -> QLabel | None:
     """部位变化的胶囊；一致的部位也给一个弱化的确认，避免被误读为漏标。"""
     if change == _CHANGE_SWAP:
-        return _make_pill(
-            "⇄ " + tr("需更换"),
-            "palette(highlighted-text)", "palette(highlight)", parent)
+        return highlight_pill("⇄ " + tr("需更换"), parent)
     if change == _CHANGE_NEW:
-        return _make_pill(
-            "+ " + tr("新穿戴"),
-            "palette(highlighted-text)", "palette(highlight)", parent)
+        return highlight_pill("+ " + tr("新穿戴"), parent)
     if change == _CHANGE_SAME:
-        return _make_pill(
-            "✓ " + tr("已穿戴"), "palette(mid)", "palette(alternate-base)", parent)
+        return muted_pill("✓ " + tr("已穿戴"), parent)
     return None
 
 
@@ -669,7 +653,7 @@ class _SlotDetailPanel(QWidget):
 
         self._clear(self.assumption_slot)
         for text in self.assumptions:
-            self.assumption_slot.addWidget(_assumption_pill(text, self.strip))
+            self.assumption_slot.addWidget(assumption_pill(text, self.strip))
         self.strip.setToolTip(
             tr("计算假设：") + "、".join(self.assumptions)
             if self.assumptions else "")
@@ -747,7 +731,7 @@ class _ResultCard(QFrame):
                         assumption_texts.append(text)
         self.assumption_pills: list[QLabel] = []
         for text in assumption_texts:
-            pill = _assumption_pill(text, self)
+            pill = assumption_pill(text, self)
             pill.setToolTip(tr("计算假设：{text}").format(text=text))
             self.assumption_pills.append(pill)
             top.addWidget(pill, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -792,14 +776,13 @@ class _ResultCard(QFrame):
         if self.changed_slots:
             names = "、".join(
                 slot_labels.get(k, k) for k in self.changed_slots)
-            self.change_summary = _make_pill(
+            self.change_summary = highlight_pill(
                 tr("需更换 {count} 件").format(count=len(self.changed_slots)),
-                "palette(highlighted-text)", "palette(highlight)", chips_host)
+                chips_host)
             self.change_summary.setToolTip(tr("需要更换：{names}").format(names=names))
         else:
-            self.change_summary = _make_pill(
-                "✓ " + tr("与备战方案一致"),
-                "palette(mid)", "palette(alternate-base)", chips_host)
+            self.change_summary = muted_pill(
+                "✓ " + tr("与备战方案一致"), chips_host)
         chips.addWidget(self.change_summary)
         self.slot_chips: dict[str, QLabel] = {}
         for slot_key, _dn, _ft in _SLOT_ORDER:
@@ -810,7 +793,7 @@ class _ResultCard(QFrame):
             name = eq.get("name", "?")
             change = _slot_change(current_equipped.get(slot_key), eq)
             if change in (_CHANGE_SWAP, _CHANGE_NEW):
-                chip = _make_pill(
+                chip = make_pill(
                     f"⇄ {label} · {name}",
                     "palette(highlight)", "palette(alternate-base)", chips_host)
                 chip.setStyleSheet(
@@ -822,7 +805,7 @@ class _ResultCard(QFrame):
                 else:
                     chip.setToolTip(tr("备战方案此部位当前为空"))
             else:
-                chip = _make_pill(
+                chip = make_pill(
                     f"{label} · {name}",
                     "palette(mid)", "palette(alternate-base)", chips_host)
                 chip.setStyleSheet(chip.styleSheet() + " font-weight: 400;")
@@ -1029,14 +1012,7 @@ class OptimalComboPage(QWidget):
 
         # Tab widget: 候选装备 / 最优结果
         self._tab_widget = QTabWidget()
-        self._tab_widget.setObjectName("optimalComboTabs")
-        self._tab_widget.setDocumentMode(True)
-        self._tab_widget.setStyleSheet(
-            "QTabWidget#optimalComboTabs::pane {"
-            " border: 1px solid palette(midlight); border-radius: 7px; }"
-            "QTabWidget#optimalComboTabs QTabBar::tab {"
-            " padding: 9px 18px; min-width: 120px; }"
-        )
+        style_document_tabs(self._tab_widget, "optimalComboTabs")
 
         # Tab 1: 候选装备 (4×2 grid)
         candidates_tab = QWidget()

@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 from loguru import logger
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -54,6 +54,7 @@ from ...core.loadout.transmute import (
 )
 from .background import JobController
 from .equip.cards import _SlotCard
+from .widgets import is_dark_theme, metric_card, set_metric_value
 
 JointAnalyzer = Callable[[tuple[str, ...]], AffixCombinationResult]
 ReportProvider = Callable[[], AffixImpactReport]
@@ -488,32 +489,12 @@ class AffixAnalysisPages(QWidget):
 
     @staticmethod
     def _set_metric(card: QFrame, value: str) -> None:
-        label = card.findChild(QLabel, "affixMetricValue_" + str(
-            card.objectName()).removeprefix("affixMetric_"))
-        if label is not None:
-            label.setText(value)
+        set_metric_value(card, value)
 
     @staticmethod
     def _metric_card(label: str, value: str, name: str) -> QFrame:
-        card = QFrame()
-        card.setObjectName(f"affixMetric_{name}")
-        card.setProperty("surface", "card")
-        row = QHBoxLayout(card)
-        row.setContentsMargins(14, 9, 14, 9)
-        row.setSpacing(10)
-        caption = QLabel(label)
-        caption.setProperty("tone", "muted")
-        number = QLabel(value)
-        number.setObjectName(f"affixMetricValue_{name}")
-        if name == "gain" and value != "—":
-            number.setProperty("status", "success")
-        number.setStyleSheet(
-            "font-size: 17px; font-weight: 700; padding: 2px 6px;"
-        )
-        row.addWidget(caption)
-        row.addStretch()
-        row.addWidget(number)
-        return card
+        return metric_card(
+            label, value, name, success=(name == "gain" and value != "—"))
 
     def _suggestion_tab(self, *, embedded: bool = False) -> QWidget:
         container = QWidget()
@@ -854,7 +835,7 @@ class AffixAnalysisPages(QWidget):
         assert header is not None
         header.setStretchLastSection(False)
 
-        dark_theme = table.palette().color(QPalette.ColorRole.Window).lightness() < 128
+        dark_theme = is_dark_theme(table)
         if positive:
             color = QColor("#66BB6A" if dark_theme else "#2E7D32")
         else:

@@ -25,6 +25,8 @@ from .constants import (
     EQUIP_PART_NAMES,
     POOL_DINGYIN,
     POOL_NORMAL,
+    STACK_MAX,
+    STACK_SUM,
     WUXUE_CATEGORY,
     normalize_equip_part,
 )
@@ -182,6 +184,8 @@ class GameConfigManager:
         self._affix_caps: dict[str, dict[int, dict]] = {}
         # 词组单位：category → unit（"" 或 "%"）
         self._affix_units: dict[str, str] = {}
+        # 词组同名叠加方式：category → sum / max（缺省 sum）
+        self._affix_stacks: dict[str, str] = {}
         # 词库类型：category → POOL_NORMAL / POOL_DINGYIN
         self._affix_pools: dict[str, str] = {}
         # 词条映射：alias → category
@@ -253,6 +257,7 @@ class GameConfigManager:
         self._base_rules.clear()
         self._affix_caps.clear()
         self._affix_units.clear()
+        self._affix_stacks.clear()
         self._affix_pools.clear()
         self._alias_to_category.clear()
         self._alias_groups.clear()
@@ -471,6 +476,10 @@ class GameConfigManager:
             self._affix_pools[category] = pool if pool == POOL_DINGYIN else POOL_NORMAL
             # 解析 _unit 字段（词组级单位，缺省空字符串）
             self._affix_units[category] = levels.get("_unit", "")
+            # 解析 _stack 字段（同名叠加方式，缺省累加）
+            stack = levels.get("_stack", STACK_SUM)
+            self._affix_stacks[category] = (
+                STACK_MAX if stack == STACK_MAX else STACK_SUM)
             # 解析 _parts 字段（分类级词条部位，缺省全部位）
             raw_parts = levels.get("_parts")
             if isinstance(raw_parts, list) and raw_parts:
@@ -616,6 +625,16 @@ class GameConfigManager:
         return list(self._external_alias_to_affixes.get(alias) or [])
 
     # ── 词库类型 ────────────────────────────────────────
+
+    def get_affix_stack(self, affix_name: str) -> str:
+        """词条同名叠加方式：``sum``（累加，缺省）或 ``max``（全套只取最高一条）。
+
+        按词条所属词组的 ``_stack`` 字段查询；未知词条按累加处理。
+        """
+        category = self._alias_to_category.get(affix_name)
+        if not category:
+            return STACK_SUM
+        return self._affix_stacks.get(category, STACK_SUM)
 
     def get_affix_pool(self, affix_name: str) -> str:
         """查询词条的词库类型（自动映射到类别）

@@ -9,6 +9,12 @@ _CHENGYIN_RATIO = 0.94
 POOL_NORMAL = "normal"
 POOL_DINGYIN = "dingyin"
 
+# 词组同名叠加方式（affix_caps 内 _stack 字段）：多件装备出现同名词条时
+# 累加（缺省）还是只取数值最高的一条（如专属武学增伤：两把剑各带一条剑
+# 武学增伤，游戏只生效最高者）。
+STACK_SUM = "sum"
+STACK_MAX = "max"
+
 # 武学增效词条所在的词条类别（affix_caps 节；
 # 游戏配置的武器绑定与调律规则的增伤词条候选共用）
 WUXUE_CATEGORY = "指定武学增效"

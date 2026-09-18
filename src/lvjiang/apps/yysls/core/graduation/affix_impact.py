@@ -17,6 +17,7 @@ from ..combat.combat_attrs import (
     aggregate_equipment_attrs,
     build_graduation_attrs,
     compute_equip_base_attrs,
+    effective_equipped,
     map_affix_to_attr,
 )
 from ..equip_validator import validate_combination_dict
@@ -116,27 +117,12 @@ def _iter_affixes(equipped: dict):
 
 
 def _effective_equipped(equipped: dict, game_config) -> dict:
-    """归一化专属武学增效：只在匹配武器上生效，同类武器取最高一条。"""
-    result = copy.deepcopy(equipped)
-    weapon_affixes = set(game_config.get_all_weapon_wuxue_affixes().values())
-    grouped: dict[tuple[str, str], list[tuple[float, str, str]]] = {}
+    """按游戏规则归一化：部位合法性 + 同名只取最高（专属武学增伤）。
 
-    for slot_key, equip, field, name, value in _iter_affixes(result):
-        if name not in weapon_affixes:
-            continue
-        expected = _weapon_affix_for(equip, game_config)
-        if name != expected:
-            result[slot_key].pop(field, None)
-            continue
-        weapon_type = str(equip.get("type", ""))
-        grouped.setdefault((weapon_type, name), []).append(
-            (value, slot_key, field))
-
-    for occurrences in grouped.values():
-        # 数值最高的一条生效；其余同类词条不参与毕业率计算。
-        for _value, slot_key, field in sorted(occurrences, reverse=True)[1:]:
-            result[slot_key].pop(field, None)
-    return result
+    实现统一在 ``combat_attrs.effective_equipped``；这里保留旧名供本模块与
+    测试引用。
+    """
+    return effective_equipped(equipped, game_config)
 
 
 def _current_affix_level(game_config) -> int:

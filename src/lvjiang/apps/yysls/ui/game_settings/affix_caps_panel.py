@@ -74,6 +74,9 @@ _CHENGYIN_RATIO = 0.94
 # 词条类型（_pool 字段；缺省为普通词条）
 _POOL_DINGYIN = "dingyin"
 
+# 同名叠加方式（_stack 字段；缺省累加）
+STACK_MAX = "max"
+
 
 class _AliasTag(QWidget):
     """词条名标签（双击触发重命名）"""
@@ -230,6 +233,30 @@ class AffixCapsPanel(QWidget):
         unit_layout.addStretch()
         right_layout.addWidget(unit_frame)
 
+        # ── 同名叠加（单选：累加 / 取最大值）──
+        stack_frame = QFrame()
+        stack_frame.setObjectName("stackFrame")
+        stack_frame.setStyleSheet(
+            "QFrame#stackFrame { background-color: palette(alternate-base); border-radius: 4px; padding: 4px; }"
+        )
+        stack_layout = QHBoxLayout(stack_frame)
+        stack_layout.setContentsMargins(8, 4, 8, 4)
+        stack_layout.addWidget(QLabel(tr("同名叠加")))
+        self._radio_stack_sum = QRadioButton(tr("累加"))
+        self._radio_stack_max = QRadioButton(tr("取最大值"))
+        self._radio_stack_max.setToolTip(tr(
+            "多件装备出现同名词条时只生效数值最高的一条，"
+            "例如两把剑各带一条剑武学增伤只算最高者"))
+        self._stack_group = QButtonGroup(self)
+        self._stack_group.addButton(self._radio_stack_sum)
+        self._stack_group.addButton(self._radio_stack_max)
+        self._radio_stack_sum.setChecked(True)
+        self._radio_stack_sum.toggled.connect(self._on_stack_changed)
+        stack_layout.addWidget(self._radio_stack_sum)
+        stack_layout.addWidget(self._radio_stack_max)
+        stack_layout.addStretch()
+        right_layout.addWidget(stack_frame)
+
         # ── 词条分组（单选：不分组 / 分组）──
         group_frame = QFrame()
         group_frame.setObjectName("groupFrame")
@@ -379,6 +406,7 @@ class AffixCapsPanel(QWidget):
             self._table.setRowCount(0)
             self._refresh_pool_radios()
             self._refresh_unit_combo()
+            self._refresh_stack_radios()
             self._refresh_group_radios()
             self._refresh_alias_tags()
             self._refresh_category_parts()
@@ -387,6 +415,7 @@ class AffixCapsPanel(QWidget):
         self._current_affix = affix_names[row]
         self._refresh_pool_radios()
         self._refresh_unit_combo()
+        self._refresh_stack_radios()
         self._refresh_group_radios()
         self._refresh_table()
         self._refresh_alias_tags()
@@ -698,6 +727,34 @@ class AffixCapsPanel(QWidget):
         else:
             category_data.pop("_pool", None)  # 普通词组为缺省，不写字段
         self._refresh_table()
+        self._save_data()
+
+    def _refresh_stack_radios(self):
+        """刷新同名叠加单选框状态"""
+        self._saving = True
+        is_max = False
+        if self._current_affix:
+            affix_caps = self._data.get("affix_caps", {})
+            category_data = affix_caps.get(self._current_affix, {})
+            is_max = (isinstance(category_data, dict)
+                      and category_data.get("_stack") == STACK_MAX)
+        self._radio_stack_max.setChecked(is_max)
+        self._radio_stack_sum.setChecked(not is_max)
+        has_affix = self._current_affix is not None
+        self._radio_stack_sum.setEnabled(has_affix)
+        self._radio_stack_max.setEnabled(has_affix)
+        self._saving = False
+
+    def _on_stack_changed(self):
+        """同名叠加方式切换时保存到 _stack 字段（累加为缺省，不写字段）"""
+        if self._saving or not self._current_affix:
+            return
+        affix_caps = self._data.get("affix_caps", {})
+        category_data = affix_caps.setdefault(self._current_affix, {})
+        if self._radio_stack_max.isChecked():
+            category_data["_stack"] = STACK_MAX
+        else:
+            category_data.pop("_stack", None)
         self._save_data()
 
     def _refresh_unit_combo(self):

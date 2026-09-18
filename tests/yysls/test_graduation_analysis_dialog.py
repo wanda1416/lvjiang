@@ -28,7 +28,8 @@ class _StubOptimalPage(OptimalComboPage):
         self._result_cards = []
         self._current_equipped = {}
         self._slot_labels = {}
-        self._worker = None
+        from lvjiang.apps.yysls.ui.loadout.background import JobController
+        self._jobs = JobController(self)
         self._results_inner = QVBoxLayout()
         self._candidate_summary = QLabel("")
         self._btn_search = QPushButton("开始搜索")

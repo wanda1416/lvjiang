@@ -8,7 +8,7 @@ import copy
 from collections.abc import Callable
 
 from loguru import logger
-from PyQt6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -52,6 +52,7 @@ from ...core.loadout.transmute import (
     TARGET_VALUE_KEY,
     strip_transmute_targets,
 )
+from .background import JobController
 from .equip.cards import _SlotCard
 
 JointAnalyzer = Callable[[tuple[str, ...]], AffixCombinationResult]
@@ -75,31 +76,6 @@ def transmute_reason_text(code: str) -> str:
         REASON_NO_LEVEL_CONFIG: tr("缺少该等级配置"),
     }.get(code, code)
 
-
-class _TransmuteSignals(QObject):
-    finished = pyqtSignal(int, object, object)
-
-
-class _TransmuteWorker(QRunnable):
-    """后台执行转律搜索；只读装备快照，不写数据。"""
-
-    def __init__(self, generation: int, runner: TransmuteRunner,
-                 is_cancelled: Callable[[], bool],
-                 assumptions: Assumptions) -> None:
-        super().__init__()
-        self.signals = _TransmuteSignals()
-        self._generation = generation
-        self._runner = runner
-        self._is_cancelled = is_cancelled
-        self._assumptions = assumptions
-
-    def run(self) -> None:  # type: ignore[override]
-        try:
-            result = self._runner(self._is_cancelled, self._assumptions)
-            self.signals.finished.emit(self._generation, result, None)
-        except Exception as exc:  # noqa: BLE001 - 结果经信号回主线程处理
-            logger.exception("转律建议计算失败")
-            self.signals.finished.emit(self._generation, None, str(exc))
 
 class _ProportionalTableWidget(QTableWidget):
     """随可用宽度按比例扩展全部列，而不是只拉伸某一列。"""
@@ -191,8 +167,10 @@ class AffixAnalysisPages(QWidget):
         self._joint_timer.setSingleShot(True)
         self._joint_timer.setInterval(120)
         self._joint_timer.timeout.connect(self._calculate_joint)
-        self._transmute_generation = 0
-        self._transmute_cancelled = False
+        self._transmute_jobs = JobController(self)
+        self._transmute_jobs.finished.connect(self._on_transmute_finished)
+        self._transmute_jobs.failed.connect(self._on_transmute_failed)
+        self._transmute_jobs.cancelled.connect(self._on_transmute_cancelled)
         self._transmute_result: TransmutePlanResult | None = None
         self._transmute_applied = False
         self._transmute_cards: dict[str, _SlotCard] = {}
@@ -384,9 +362,6 @@ class AffixAnalysisPages(QWidget):
     def _start_transmute(self) -> None:
         if self._transmute_runner is None:
             return
-        self._transmute_generation += 1
-        generation = self._transmute_generation
-        self._transmute_cancelled = False
         self._transmute_run.setEnabled(False)
         self._transmute_cancel.setEnabled(True)
         self._transmute_apply.setEnabled(False)
@@ -396,33 +371,32 @@ class AffixAnalysisPages(QWidget):
         assumptions = Assumptions(**{**assumptions.to_flags(),
                                      "simulate_transmute": False})
         self._set_transmute_basis(assumptions.labels())
-        worker = _TransmuteWorker(
-            generation, self._transmute_runner,
-            lambda: self._transmute_cancelled
-            or generation != self._transmute_generation,
-            assumptions)
-        worker.signals.finished.connect(self._on_transmute_finished)
-        pool = QThreadPool.globalInstance()
-        assert pool is not None
-        pool.start(worker)
+        runner = self._transmute_runner
+        self._transmute_jobs.start(
+            lambda ctx: runner(ctx.is_cancelled, assumptions))
 
     def _cancel_transmute(self) -> None:
-        self._transmute_cancelled = True
-        self._transmute_cancel.setEnabled(False)
-        self._transmute_status.setText(tr("已取消；保留上一次完成的结果。"))
-        self._transmute_run.setEnabled(True)
+        self._transmute_jobs.cancel()
 
-    def _on_transmute_finished(self, generation: int, result, error) -> None:
-        if generation != self._transmute_generation:
-            return
+    def _transmute_idle(self) -> None:
         self._transmute_cancel.setEnabled(False)
         self._transmute_run.setEnabled(True)
         self._transmute_run.setText(tr("重新计算"))
-        if self._transmute_cancelled:
-            return
-        if error is not None or result is None:
+
+    def _on_transmute_cancelled(self) -> None:
+        self._transmute_idle()
+        self._transmute_status.setText(tr("已取消；保留上一次完成的结果。"))
+
+    def _on_transmute_failed(self, message: str) -> None:
+        self._transmute_idle()
+        self._transmute_status.setText(
+            tr("计算失败：{error}").format(error=message or "—"))
+
+    def _on_transmute_finished(self, result) -> None:
+        self._transmute_idle()
+        if not isinstance(result, TransmutePlanResult):
             self._transmute_status.setText(
-                tr("计算失败：{error}").format(error=error or "—"))
+                tr("计算失败：{error}").format(error="—"))
             return
         self.render_transmute_result(result)
 

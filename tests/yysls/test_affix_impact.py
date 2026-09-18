@@ -215,15 +215,15 @@ def test_cultivation_never_suggests_divine_affix_from_transmutation():
 
 
 def _open_dialog(report, school="鸣金·虹", scheme="基础方案", **kwargs):
-    """新版对话框按需构建“培养建议”页；测试直接切到该页触发构建。"""
-    from lvjiang.apps.yysls.ui.loadout.affix_impact_dialog import (
-        AffixImpactDialog,
+    """培养建议页按需构建；测试直接触发该页构建并返回页组。"""
+    from lvjiang.apps.yysls.ui.loadout.affix_analysis_pages import (
+        AffixAnalysisPages,
     )
 
-    dialog = AffixImpactDialog(
+    pages = AffixAnalysisPages(
         school, scheme, report_provider=lambda: report, **kwargs)
-    dialog._tabs.setCurrentIndex(1)
-    return dialog
+    pages.ensure_built(pages.suggestion_page)
+    return pages
 
 
 def _replacement(slot: str, index: int = 2) -> AffixReplacementSuggestion:

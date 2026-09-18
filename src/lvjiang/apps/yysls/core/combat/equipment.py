@@ -42,6 +42,10 @@ class EquipmentInventory:
         return self._state.active_plan_id
 
     @property
+    def active_plan(self):
+        return self._state.active_plan
+
+    @property
     def active_plan_fps(self) -> set[str]:
         """当前激活方案占用的装备指纹集合。"""
         return {fp for fp in self._state.active_plan.equipment.values() if fp}

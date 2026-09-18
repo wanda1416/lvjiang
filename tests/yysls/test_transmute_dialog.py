@@ -4,12 +4,13 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QLabel, QPushButton
 
 from lvjiang.apps.yysls.core.graduation.affix_impact import AffixImpactReport
+from lvjiang.apps.yysls.core.graduation.assumptions import Assumptions
 from lvjiang.apps.yysls.core.graduation.transmute_optimizer import (
     TransmuteMove,
     TransmutePlanResult,
     TransmuteSlotStatus,
 )
-from lvjiang.apps.yysls.ui.loadout.affix_impact_dialog import AffixImpactDialog
+from lvjiang.apps.yysls.ui.loadout.affix_analysis_pages import AffixAnalysisPages
 
 
 def _equipped() -> dict:
@@ -48,60 +49,69 @@ def _result(*, trusted: bool = True) -> TransmutePlanResult:
     )
 
 
-def test_opening_dialog_runs_nothing_until_asked(qtbot):
+def test_opening_pages_runs_nothing_until_asked(qtbot):
     calls = {"report": 0, "search": 0}
 
     def report_provider():
         calls["report"] += 1
         return AffixImpactReport(0.8, 110, (), ())
 
-    def runner(_stop):
+    def runner(_stop, _assumptions):
         calls["search"] += 1
         return _result()
 
-    dialog = AffixImpactDialog(
+    pages = AffixAnalysisPages(
         "鸣金·虹", "基础方案", equipped=_equipped(),
         report_provider=report_provider, transmute_runner=runner,
     )
-    qtbot.addWidget(dialog)
+    qtbot.addWidget(pages)
     assert calls == {"report": 0, "search": 0}
-    assert dialog._tabs.count() == 3
-    assert [dialog._tabs.tabText(i) for i in range(3)] == [
+    assert [title for title, _page in pages.pages()] == [
         "转律建议", "培养建议", "词条收益率"]
 
-    dialog._tabs.setCurrentIndex(2)
-    dialog._tabs.setCurrentIndex(1)
+    pages.ensure_built(pages.yield_page)
+    pages.ensure_built(pages.suggestion_page)
     assert calls["report"] == 1
     assert calls["search"] == 0
 
 
 def test_run_renders_yellow_target_and_enables_apply(qtbot):
     applied: list[TransmutePlanResult] = []
+    seen_assumptions: list[Assumptions] = []
 
-    dialog = AffixImpactDialog(
+    def runner(_stop, assumptions):
+        seen_assumptions.append(assumptions)
+        return _result()
+
+    pages = AffixAnalysisPages(
         "鸣金·虹", "基础方案", equipped=_equipped(),
-        transmute_runner=lambda _stop: _result(),
+        transmute_runner=runner,
         apply_handler=lambda result: applied.append(result) or True,
+        assumptions_provider=lambda: Assumptions(
+            full_chengyin=True, simulate_transmute=True),
     )
-    qtbot.addWidget(dialog)
-    run = dialog.findChild(QPushButton, "transmuteRunButton")
-    apply = dialog.findChild(QPushButton, "transmuteApplyButton")
+    qtbot.addWidget(pages)
+    run = pages.findChild(QPushButton, "transmuteRunButton")
+    apply = pages.findChild(QPushButton, "transmuteApplyButton")
     assert run is not None and apply is not None
     assert not apply.isEnabled()
 
     run.click()
     qtbot.waitUntil(lambda: apply.isEnabled(), timeout=5000)
 
-    ring_card = dialog._transmute_cards["ring"]
+    # 假设在点击时定格；转律建议本身不使用“模拟转律”
+    assert seen_assumptions == [Assumptions(full_chengyin=True)]
+    assert "满承音" in pages._transmute_note.text()
+    ring_card = pages._transmute_cards["ring"]
     targets = ring_card.findChildren(QLabel, "transmuteTargetLabel")
     assert [label.text() for label in targets] == ["(会意率)"]
     assert "推荐" in ring_card.hypothesis_label.text()
-    pendant_card = dialog._transmute_cards["pendant"]
+    pendant_card = pages._transmute_cards["pendant"]
     assert "不支持无限转律" in pendant_card.hypothesis_label.text()
-    status = dialog.findChild(QLabel, "transmuteStatus")
+    status = pages.findChild(QLabel, "transmuteStatus")
     assert status is not None
     assert "建议顺序" in status.text() and "缺 1 件" in status.text()
-    final = dialog.findChild(QLabel, "affixMetricValue_transmuteFinal")
+    final = pages.findChild(QLabel, "affixMetricValue_transmuteFinal")
     assert final is not None and final.text().startswith("81.20%")
 
     apply.click()
@@ -111,15 +121,15 @@ def test_run_renders_yellow_target_and_enables_apply(qtbot):
 
 
 def test_untrusted_result_cannot_be_applied(qtbot):
-    dialog = AffixImpactDialog(
+    pages = AffixAnalysisPages(
         "鸣金·虹", "基础方案", equipped=_equipped(),
-        transmute_runner=lambda _stop: _result(trusted=False),
+        transmute_runner=lambda _stop, _a: _result(trusted=False),
         apply_handler=lambda result: True,
     )
-    qtbot.addWidget(dialog)
-    dialog.render_transmute_result(_result(trusted=False))
-    apply = dialog.findChild(QPushButton, "transmuteApplyButton")
-    status = dialog.findChild(QLabel, "transmuteStatus")
+    qtbot.addWidget(pages)
+    pages.render_transmute_result(_result(trusted=False))
+    apply = pages.findChild(QPushButton, "transmuteApplyButton")
+    status = pages.findChild(QLabel, "transmuteStatus")
     assert apply is not None and not apply.isEnabled()
     assert status is not None and "不可信" in status.text()
 

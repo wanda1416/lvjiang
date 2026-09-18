@@ -24,7 +24,6 @@ from ..combat.affix_rules import normal_affix_candidates
 from ..combat.combat_attrs import (
     CombatAttributes,
     aggregate_equipment_attrs,
-    apply_hypothetical_caps,
     build_graduation_attrs,
     compute_equip_base_attrs,
     compute_gongjue_attrs,
@@ -40,6 +39,7 @@ from ..tuning_rules import (
     get_tuning_rule_manager,
 )
 from . import get_graduation_calculator
+from .assumptions import Assumptions
 from .smart_search import (
     SearchBudget,
     SearchOutcome,
@@ -838,27 +838,16 @@ class SmartTuningEvaluator:
     def _apply_maximum_assumptions(
         self, context: _PlanContext, equipped: dict[str, dict],
     ) -> dict[str, dict]:
-        """按目标玩法应用满等级、满承音、满定音三项统一假设。"""
-        # 智能调律比较的是三项全部拉满后的理论极限。通用培养假设只会把
-        # “低等级升到当前赛季等级”的装备标成承音；当前赛季原生装备不会
-        # 自动改变 is_chengyin。这里必须在虚拟副本上补齐同等级承音分支，
-        # 否则原生 110 级装备的已有词条仍按扫描值计算，而新补词条却使用
-        # 承音上限，形成同一件装备内口径不一致的混合状态。
-        target_level = self._game_config.current_equip_level()
-        maximum_equipped = copy.deepcopy(equipped)
-        for equip in maximum_equipped.values():
-            if not isinstance(equip, dict):
-                continue
-            try:
-                level = int(equip.get("level") or 0)
-            except (TypeError, ValueError):
-                level = 0
-            if target_level > 0 and level == target_level:
-                equip["is_chengyin"] = True
-        return apply_hypothetical_caps(
-            maximum_equipped,
+        """按目标玩法应用满等级、满承音、满定音三项统一假设。
+
+        智能调律比较的是三项全部拉满后的理论极限；当前赛季原生装备也按
+        同等级承音看待（``season_chengyin``），否则原生 110 级装备的已有
+        词条按扫描值、新补词条按承音上限，同一件装备内口径不一致。
+        """
+        return Assumptions(
+            full_level=self._game_config.current_equip_level(),
             full_chengyin=True,
             full_dingyin=True,
-            full_level=target_level,
+            season_chengyin=True,
             playstyle=context.playstyle,
-        )
+        ).project(equipped, self._game_config)

@@ -48,7 +48,7 @@ def dialog(qtbot, monkeypatch):
 
     monkeypatch.setattr(mod, "_SlotGroup", _StubSlotGroup)
 
-    dlg = mod.OptimalComboDialog.__new__(mod.OptimalComboDialog)
+    dlg = mod.OptimalComboPage.__new__(mod.OptimalComboPage)
     dlg._school = "鸣金·虹"
     dlg._main_martial_art = ""
     dlg._sub_martial_art = ""

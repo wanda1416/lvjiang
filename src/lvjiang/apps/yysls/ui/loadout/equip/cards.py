@@ -605,6 +605,7 @@ class _SlotCard(QFrame):
         self._read_only = read_only
         self._selected = False
         self._hovered = False
+        self._attention = False
         self._display_name = display_name
         self._equip_data: dict = {}
 
@@ -688,6 +689,23 @@ class _SlotCard(QFrame):
 
     # ── 选中态 ──
 
+    def _normal_border(self) -> str:
+        """常态边框色：需要引起注意的卡片用强调色，其余按品质区分。"""
+        if self._attention:
+            return "palette(highlight)"
+        return "#b0a080" if self._quality_bg else "palette(midlight)"
+
+    def set_attention(self, attention: bool) -> None:
+        """用强调色边框标出这张卡片（如最优组合里需要更换的部位）。"""
+        self._attention = attention
+        if self._selected or self._hovered:
+            return
+        if self.lbl_info.text() == tr("未装备"):
+            self._apply_style(_SLOT_STYLE_EMPTY)
+        else:
+            self._apply_style(_slot_style_normal(
+                self._quality_bg or "palette(base)", self._normal_border()))
+
     def set_selected(self, selected: bool):
         self._selected = selected
         self.status_tags.set_visible("filtered", selected)
@@ -697,8 +715,7 @@ class _SlotCard(QFrame):
         elif self.lbl_info.text() == tr("未装备"):
             self._apply_style(_SLOT_STYLE_EMPTY)
         else:
-            border = "#b0a080" if self._quality_bg else "palette(midlight)"
-            self._apply_style(_slot_style_normal(bg, border))
+            self._apply_style(_slot_style_normal(bg, self._normal_border()))
 
     def resizeEvent(self, event):  # type: ignore[override]
         super().resizeEvent(event)
@@ -722,9 +739,8 @@ class _SlotCard(QFrame):
             if self.lbl_info.text() == tr("未装备"):
                 self._apply_style(_SLOT_STYLE_EMPTY)
             else:
-                border = "#b0a080" if self._quality_bg else "palette(midlight)"
                 self._apply_style(_slot_style_normal(
-                    self._quality_bg or "palette(base)", border
+                    self._quality_bg or "palette(base)", self._normal_border()
                 ))
         super().leaveEvent(event)
 
@@ -871,9 +887,8 @@ class _SlotCard(QFrame):
             f"font-size: {self._level_fs}px; color: palette(mid); font-weight: bold;")
 
         if not self._selected:
-            border = "#b0a080" if self._quality_bg else "palette(midlight)"
             bg = self._quality_bg or "palette(base)"
-            self._apply_style(_slot_style_normal(bg, border))
+            self._apply_style(_slot_style_normal(bg, self._normal_border()))
 
         # 词条
         self._clear_affixes()

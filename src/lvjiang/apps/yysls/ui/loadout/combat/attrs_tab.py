@@ -1108,28 +1108,25 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             logger.error(f"计算装备基础攻击失败: {e}")
             return CombatAttributes()
 
+    def assumptions(self):
+        """当前假设复选框对应的 ``Assumptions``（备战方案面板口径）。"""
+        from ....core.graduation.assumptions import Assumptions
+
+        return Assumptions(
+            full_level=self._get_full_level(),
+            full_chengyin=self._chk_full_chengyin.isChecked(),
+            full_dingyin=self._chk_full_dingyin.isChecked(),
+            simulate_transmute=self._chk_simulate_transmute.isChecked(),
+            playstyle=self._active_playstyle(),
+        )
+
     def assumption_flags(self) -> dict:
         """当前假设复选框对应的 ``apply_hypothetical_caps`` 参数。"""
-        return {
-            "full_chengyin": self._chk_full_chengyin.isChecked(),
-            "full_dingyin": self._chk_full_dingyin.isChecked(),
-            "full_level": self._get_full_level(),
-            "playstyle": self._active_playstyle(),
-            "simulate_transmute": self._chk_simulate_transmute.isChecked(),
-        }
+        return self.assumptions().to_flags()
 
     def assumption_labels(self) -> tuple[str, ...]:
         """已勾选假设的展示名，供对话框标注计算口径。"""
-        labels = []
-        if self._chk_full_level.isChecked():
-            labels.append(tr("满等级"))
-        if self._chk_full_chengyin.isChecked():
-            labels.append(tr("满承音"))
-        if self._chk_full_dingyin.isChecked():
-            labels.append(tr("满定音"))
-        if self._chk_simulate_transmute.isChecked():
-            labels.append(tr("模拟转律"))
-        return tuple(labels)
+        return self.assumptions().labels()
 
     def _get_full_level(self) -> int:
         """返回满等级的目标等级；未勾选返回 0。"""

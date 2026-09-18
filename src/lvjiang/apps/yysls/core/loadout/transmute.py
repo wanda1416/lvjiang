@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from ..affix_cap import affix_cap_value
 from ..combat.affix_rules import normal_affix_candidates
 from ..equip_validator import validate_combination_dict
+from ..numbers import to_float, to_int
 
 TARGET_NAME_KEY = "target_transmute_name"
 TARGET_VALUE_KEY = "target_transmute_value"
@@ -41,20 +42,6 @@ class TransmuteEligibility:
     trusted: bool = True  # False：装备数据自相矛盾，整体结果不可信
 
 
-def _number(value) -> float:
-    try:
-        return float(value or 0)
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _int(value) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
 def present_affix_indices(equip: dict) -> list[int]:
     return [
         index for index in range(1, 6)
@@ -80,7 +67,7 @@ def retransfer_capability(equip: dict, game_config) -> tuple[bool, str]:
     """
     is_chengyin = bool(equip.get("is_chengyin"))
     if is_chengyin:
-        original = _int(equip.get("original_level"))
+        original = to_int(equip.get("original_level"))
         if original <= 0:
             original = game_config.infer_original_equipment_level(
                 equip.get("name"))
@@ -94,7 +81,7 @@ def retransfer_capability(equip: dict, game_config) -> tuple[bool, str]:
         if not cfg.allow_retransfer_after_chengyin:
             return False, REASON_NO_RETRANSFER_AFTER_CHENGYIN
         return True, ""
-    cfg = game_config.level_config_for(_int(equip.get("level")))
+    cfg = game_config.level_config_for(to_int(equip.get("level")))
     if cfg is None:
         return False, REASON_NO_LEVEL_CONFIG
     if not cfg.allow_retransfer:
@@ -128,7 +115,7 @@ def judge_transmute_eligibility(
         allowed, reason = retransfer_capability(equip, game_config)
         if not allowed:
             return TransmuteEligibility(False, reason)
-    elif game_config.level_config_for(_int(equip.get("level"))) is None:
+    elif game_config.level_config_for(to_int(equip.get("level"))) is None:
         # 首次转律不看再次转律能力，但等级本身必须有配置——没有上限数据
         # 就没有目标值，判定层直接说清，不靠下游取不到上限兜住。
         return TransmuteEligibility(False, REASON_NO_LEVEL_CONFIG)
@@ -174,7 +161,7 @@ def with_transmuted_affix(
 ) -> dict:
     """返回把第 ``index`` 条替换为转律产出 ``name``/``value`` 的装备副本。"""
     changed = copy.deepcopy(equip)
-    caps = game_config.get_affix_caps(_int(equip.get("level")), name) or {}
+    caps = game_config.get_affix_caps(to_int(equip.get("level")), name) or {}
     changed[f"affix_{index}"] = {
         "name": name,
         "value": value,
@@ -206,7 +193,7 @@ def transmute_targets(
         for i in present_affix_indices(equip)
         if i in TRANSMUTABLE_INDICES
     }
-    level = _int(equip.get("level"))
+    level = to_int(equip.get("level"))
     is_chengyin = bool(equip.get("is_chengyin"))
     legal: list[str] = []
     for name in pool:
@@ -256,7 +243,7 @@ def saved_transmute_target(equip: dict) -> tuple[int, str, float] | None:
         if not isinstance(affix, dict):
             continue
         name = str(affix.get(TARGET_NAME_KEY) or "").strip()
-        value = _number(affix.get(TARGET_VALUE_KEY))
+        value = to_float(affix.get(TARGET_VALUE_KEY))
         if name and value > 0:
             return index, name, value
     return None
@@ -316,7 +303,7 @@ def project_transmute_targets(
             continue
         index, name, _stored = saved
         value = transmute_target_value(
-            name, _int(equip.get("level")), bool(equip.get("is_chengyin")),
+            name, to_int(equip.get("level")), bool(equip.get("is_chengyin")),
             game_config)
         if value is None:
             result[slot_key] = equip

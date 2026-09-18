@@ -26,6 +26,7 @@ from ..loadout.transmute import (
     validate_saved_target,
     with_transmuted_affix,
 )
+from ..numbers import to_float, to_int
 from .assumptions import Assumptions
 from .scoring import BudgetExceeded, LoadoutScorer
 from .smart_search import floor_rate
@@ -119,20 +120,6 @@ class TransmuteSearchRequest:
         )
 
 
-def _number(value) -> float:
-    try:
-        return float(value or 0)
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _int(value) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
 def _with_full_value(
     equip: dict, index: int, game_config,
 ) -> dict | None:
@@ -141,7 +128,7 @@ def _with_full_value(
     if not isinstance(affix, dict) or not affix.get("name"):
         return None
     value = transmute_target_value(
-        str(affix["name"]), _int(equip.get("level")),
+        str(affix["name"]), to_int(equip.get("level")),
         bool(equip.get("is_chengyin")), game_config)
     if value is None:
         return None
@@ -198,7 +185,7 @@ def optimize_transmutes(request: TransmuteSearchRequest) -> TransmutePlanResult:
     def apply_move(state: dict[str, dict], slot: str, index: int, name: str) -> dict:
         equip = projected[slot]
         value = transmute_target_value(
-            name, _int(equip.get("level")), bool(equip.get("is_chengyin")), gc)
+            name, to_int(equip.get("level")), bool(equip.get("is_chengyin")), gc)
         changed = dict(state)
         changed[slot] = with_transmuted_affix(
             equip, index, name, value or 0.0, gc)
@@ -288,10 +275,10 @@ def optimize_transmutes(request: TransmuteSearchRequest) -> TransmutePlanResult:
                 fp=fp,
                 affix_index=index,
                 from_name=str(source.get("name") or ""),
-                from_value=_number(source.get("value")),
+                from_value=to_float(source.get("value")),
                 to_name=target,
                 to_value=transmute_target_value(
-                    target, _int(equip.get("level")),
+                    target, to_int(equip.get("level")),
                     bool(equip.get("is_chengyin")), gc) or 0.0,
                 marginal_gain=marginal,
                 swap_gain=swap,

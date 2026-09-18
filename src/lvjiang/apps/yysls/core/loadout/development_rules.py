@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from .....i18n import tr
+from ..numbers import to_float
 
 # 扫描装备的身份字段：由游戏产出时决定，养成过程中恒定不变
 IMMUTABLE_KEYS: tuple[str, ...] = (
@@ -31,13 +32,6 @@ FIRST_AFFIX_INDEX = 1
 
 def _affix(equip: dict, index: int) -> dict:
     return equip.get(f"affix_{index}") or {}
-
-
-def _num(value) -> float:
-    try:
-        return float(value or 0)
-    except (TypeError, ValueError):
-        return 0.0
 
 
 def check_real_development(old: dict, new: dict) -> str | None:
@@ -94,7 +88,7 @@ def _check_dingyin(old: dict, new: dict) -> str | None:
     new_dingyin = new.get("dingyin") or {}
     if old_dingyin.get("name") != new_dingyin.get("name"):
         return tr("扫描装备不能新增、删除或更换定音词条")
-    if _num(new_dingyin.get("value")) < _num(old_dingyin.get("value")):
+    if to_float(new_dingyin.get("value")) < to_float(old_dingyin.get("value")):
         return tr("培养只能提高定音数值")
     return None
 
@@ -116,7 +110,7 @@ def _check_affixes(old: dict, new: dict) -> str | None:
         if bool(before.get("is_transferred")) != bool(
                 after.get("is_transferred")):
             return tr("转律槽位标记不能单独修改")
-        if _num(after.get("value")) < _num(before.get("value")):
+        if to_float(after.get("value")) < to_float(before.get("value")):
             return tr("培养只能提高词条数值")
 
     if len(changed_names) > 1 or changed_names == [FIRST_AFFIX_INDEX]:

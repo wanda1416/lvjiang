@@ -18,6 +18,7 @@ from loguru import logger
 
 from ...config import get_game_config
 from ...config.tune_slots import SLOT_LABELS
+from ..affix_cap import affix_cap_value
 from ..combat.affix_rules import normal_affix_candidates
 from ..combat.combat_attrs import CombatAttributes
 from ..equip_validator import validate_combination_dict
@@ -294,7 +295,7 @@ class SmartTuningEvaluator:
                         # 方案基准与候选必须经过同一个三满入口；其中包含
                         # 当前赛季原生装备的同等级承音假设。若这里直接调用
                         # 通用 helper，方案侧会保留原生装备 100% 词条，而
-                        # 候选侧按承音 94% 计算，比较口径会凭空相差一截。
+                        # 候选侧按承音上限计算，比较口径会凭空相差一截。
                         maximum_equipped = self._apply_maximum_assumptions(
                             provisional, provisional.equipped)
                         plan_maximum = _rate(
@@ -769,11 +770,13 @@ class SmartTuningEvaluator:
         level = int(result.get("level") or 0)
         for index, name in zip(empty_slots, names, strict=False):
             caps = self._game_config.get_affix_caps(level, name)
-            if not caps:
+            chengyin_cap = affix_cap_value(
+                level, name, chengyin=True, game_config=self._game_config)
+            if not caps or chengyin_cap is None:
                 return None
             result[f"affix_{index}"] = {
                 "name": name,
-                "value": float(caps["chengyin"]),
+                "value": chengyin_cap,
                 "unit": caps.get("unit") or None,
             }
         return None if validate_combination_dict(result) else result

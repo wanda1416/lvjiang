@@ -127,7 +127,7 @@ def _affix_cap(affix_name: str, level, *args) -> float:
 def _chengyin_cap(affix_name: str, level, *args) -> float:
     """查询承音装备词条数值上限（不含单位）
 
-    与 affix_cap 相同，但返回承音数值（上限的 94%）。
+    与 affix_cap 相同，但返回承音上限（词组配置里的原值）。
 
     .wf 用法:
         eval cap = chengyin_cap($equip.affix_1.name, $equip.level)
@@ -138,11 +138,9 @@ def _chengyin_cap(affix_name: str, level, *args) -> float:
         level = int(level)
     except (ValueError, TypeError):
         return 0
-    from ...config import get_game_config
-    result = get_game_config().get_affix_caps(level, str(affix_name))
-    if result is None:
-        return 0
-    return result["chengyin"]
+    from ...core.affix_cap import affix_cap_value
+    result = affix_cap_value(level, str(affix_name), chengyin=True)
+    return 0 if result is None else result
 
 
 # ─── 装备判定 ───────────────────────────────────────────

@@ -3,7 +3,7 @@
 装备数据里的 ``cap_pct`` 是给调律 DSL 快速读取用的**派生缓存字段**，
 它只在写盘时由本模块生成。Python 侧任何判定与计算都必须现算，不得回读
 缓存——历史数据里 ``value`` 被改过而 ``cap_pct`` 没跟着重算的情况真实
-存在（例如 value 已是 94% 承音上限、``cap_pct`` 却仍停在旧的 90.8），
+存在（例如 value 已是承音上限、``cap_pct`` 却仍停在旧的 90.8），
 拿它当权威会让超上限校验漏报、让换词条收益算错。
 """
 
@@ -16,6 +16,29 @@ def _number(value) -> float | None:
     return float(value)
 
 
+def affix_cap_value(
+    level, affix_name: str, *, chengyin: bool = False, game_config=None,
+) -> float | None:
+    """该词条在该等级的上限原值：普通上限或承音上限，来自词组配置。
+
+    这是所有计算链路取上限的唯一入口：既不按固定比例推算承音上限，也不
+    读装备上的 ``cap_pct`` 缓存。等级/词条名不可用或配置里没有对应条目
+    时返回 None，由调用方决定跳过还是提示。
+    """
+    if not isinstance(level, int) or isinstance(level, bool) or level <= 0:
+        return None
+    if not affix_name:
+        return None
+    if game_config is None:
+        from ..config import get_game_config
+        game_config = get_game_config()
+    caps = game_config.get_affix_caps(level, affix_name)
+    if not caps:
+        return None
+    cap = _number(caps.get("chengyin" if chengyin else "cap"))
+    return cap if cap else None
+
+
 def affix_cap_ratio(
     level, affix_name: str, value, *, game_config=None,
 ) -> float | None:
@@ -25,16 +48,10 @@ def affix_cap_ratio(
     的分支，而不是退回可能已经过期的 ``cap_pct``。
     """
     numeric = _number(value)
-    if numeric is None or not isinstance(level, int) or level <= 0:
+    if numeric is None:
         return None
-    if not affix_name:
-        return None
-    if game_config is None:
-        from ..config import get_game_config
-        game_config = get_game_config()
-    caps = game_config.get_affix_caps(level, affix_name)
-    cap = _number(caps.get("cap")) if caps else None
-    if not cap:
+    cap = affix_cap_value(level, affix_name, game_config=game_config)
+    if cap is None:
         return None
     return numeric / cap
 

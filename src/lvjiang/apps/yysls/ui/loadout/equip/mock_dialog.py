@@ -33,7 +33,7 @@ from PyQt6.QtWidgets import (
 
 from ......i18n import tr
 from ......ui.button_styles import apply_button_style, apply_dialog_button_box_style
-from ....core.affix_cap import affix_cap_pct
+from ....core.affix_cap import affix_cap_pct, affix_cap_value
 from ....core.equipment_cooldown import next_cooldown_expiry
 from ...layout_helpers import fit_combo_to_contents
 
@@ -189,15 +189,13 @@ class _AffixRow(QWidget):
         name = self._combo_name.currentData()
         if not name or self._cap <= 0:
             return
-        from ....config import get_game_config
-        caps_info = get_game_config().get_affix_caps(self._get_level(), name)
-        if not caps_info:
-            return
+        level = self._get_level()
         mode = self._get_affix_mode()
-        if mode == _MODE_MAX_CY:
-            self._spin_value.setValue(caps_info["chengyin"])
-        elif mode == _MODE_MAX_VAL:
-            self._spin_value.setValue(caps_info["cap"])
+        cap = affix_cap_value(level, name, chengyin=(mode == _MODE_MAX_CY))
+        if cap is None:
+            return
+        if mode in (_MODE_MAX_CY, _MODE_MAX_VAL):
+            self._spin_value.setValue(cap)
 
     def _update_pct(self):
         """更新百分比标签"""
@@ -1161,14 +1159,16 @@ class MockEquipDialog(QDialog):
             affix_data = row.get_data()
             if affix_data:
                 # 词条行按模式预填过数值了；这里只兜底行内没解析到上限
-                # （cap_pct 算不出来）的情况。承音上限是 round(cap*0.94, 2)，
-                # 落库必须跟游戏显示对齐到 1 位小数——否则同一件装备的手填
-                # 快照和实测快照会因 114.12 / 114.1 生成不同指纹。
-                fill = {_MODE_MAX_CY: "chengyin", _MODE_MAX_VAL: "cap"}.get(mode)
-                if fill and affix_data.get("cap_pct") is None:
-                    caps_info = gc.get_affix_caps(level, affix_data["name"])
-                    if caps_info:
-                        affix_data["value"] = round(caps_info[fill], 1)
+                # （cap_pct 算不出来）的情况。承音上限取配置原值，落库仍
+                # 对齐到 1 位小数——否则同一件装备的手填快照和实测快照会
+                # 因 114.12 / 114.1 生成不同指纹。
+                if (mode in (_MODE_MAX_CY, _MODE_MAX_VAL)
+                        and affix_data.get("cap_pct") is None):
+                    cap = affix_cap_value(
+                        level, affix_data["name"],
+                        chengyin=(mode == _MODE_MAX_CY), game_config=gc)
+                    if cap is not None:
+                        affix_data["value"] = round(cap, 1)
                 # cap_pct 是派生缓存，凡是写过 value 就无条件重算，
                 # 不能留下 value 已改、cap_pct 还停在旧比例的脏数据。
                 pct = affix_cap_pct(
@@ -1236,22 +1236,20 @@ class MockEquipDialog(QDialog):
             name = row._combo_name.currentData()
             if not name:
                 continue
-            caps_info = gc.get_affix_caps(level, name)
-            if not caps_info:
+            cap = affix_cap_value(
+                level, name, chengyin=(mode == _MODE_MAX_CY), game_config=gc)
+            if cap is None:
                 continue
-            if mode == _MODE_MAX_VAL:
-                row._spin_value.setValue(caps_info["cap"])
-            elif mode == _MODE_MAX_CY:
-                row._spin_value.setValue(caps_info["chengyin"])
-        # 定音词条也同步更新
+            if mode in (_MODE_MAX_VAL, _MODE_MAX_CY):
+                row._spin_value.setValue(cap)
+        # 定音词条也同步更新（定音不受承音限制，两种模式都取上限）
         dingyin_name = self._dingyin_selected
-        if dingyin_name:
-            caps_info = gc.get_affix_caps(level, dingyin_name)
-            if caps_info and caps_info.get("cap"):
-                if mode == _MODE_MAX_VAL:
-                    self._spin_dingyin.setValue(caps_info["cap"])
-                elif mode == _MODE_MAX_CY:
-                    self._spin_dingyin.setValue(caps_info["chengyin"])
+        if dingyin_name and mode in (_MODE_MAX_VAL, _MODE_MAX_CY):
+            cap = affix_cap_value(
+                level, dingyin_name, chengyin=(mode == _MODE_MAX_CY),
+                game_config=gc)
+            if cap:
+                self._spin_dingyin.setValue(cap)
 
     def _get_base_attr_name(self, group_key: str) -> str:
         """根据部位获取基础属性名"""

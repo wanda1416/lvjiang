@@ -275,8 +275,8 @@ class TestGetAffixCaps:
         caps = mgr.get_affix_caps(110, "会心率")
         assert caps["cap"] == 14
         assert caps["unit"] == "%"
-        # 承音值 = cap * 0.94
-        assert caps["chengyin"] == round(14 * 0.94, 2)
+        # 承音上限读配置原值（系统配置初值按 94% 一位小数生成，之后按游戏校正）
+        assert caps["chengyin"] == 13.2
 
     def test_alias_resolved_before_lookup(self, mgr):
         # 最大外功攻击 → 外功攻击类别，110 阶 cap 121.4
@@ -359,9 +359,35 @@ class TestAffixPool:
         assert caps["cap"] == 16.8
         assert caps["chengyin"] == 16.8
 
-    def test_normal_chengyin_discounted(self, mgr):
+    def test_normal_chengyin_from_config(self, mgr):
         caps = mgr.get_affix_caps(110, "会心率")
-        assert caps["chengyin"] == round(14 * 0.94, 2)
+        assert caps["chengyin"] == 13.2
+
+    def test_chengyin_is_config_value_not_ratio(self, tmp_path):
+        """游戏的承音取舍可能比 94% 高/低 0.1，配置写多少就用多少；
+        缺失字段只在迁移期按 94% 派生。"""
+        import yaml
+
+        from lvjiang.apps.yysls.config import derive_chengyin_cap
+
+        path = tmp_path / "game_config.yaml"
+        path.write_text(yaml.safe_dump({
+            "affix_caps": {
+                "外功攻击": {
+                    "_aliases": ["最大外功攻击"],
+                    110: {"cap": 121.4, "chengyin": 114.2},   # 比 94% 高 0.1
+                    105: {"cap": 105.6},                       # 缺失 → 派生
+                },
+                "外功增益": {
+                    "_pool": "dingyin",
+                    110: {"cap": 16.8, "chengyin": 1.0},       # 定音忽略该字段
+                },
+            },
+        }, allow_unicode=True), encoding="utf-8")
+        mgr = GameConfigManager(path)
+        assert mgr.get_affix_caps(110, "最大外功攻击")["chengyin"] == 114.2
+        assert mgr.get_affix_caps(105, "最大外功攻击")["chengyin"] == derive_chengyin_cap(105.6) == 99.3
+        assert mgr.get_affix_caps(110, "外功增益")["chengyin"] == 16.8
 
 
 # ─── 品阶推断 ──────────────────────────────────────────────

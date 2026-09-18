@@ -52,6 +52,7 @@ from lvjiang.ui.button_styles import apply_button_style
 from .....i18n import tr
 from ..domain_labels import domain_label
 from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
+from ..tune_settings.affix_picker import AffixSelectSortDialog
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
@@ -171,6 +172,23 @@ class SchoolPanel(QWidget):
             edit.textChanged.connect(self._on_field_changed)
 
         right_layout.addWidget(attr_group)
+
+        # ── 转律词条库（流派级：转律只能转入库内词条，序即转入优先级） ──
+        transmute_group = QGroupBox(tr("转律词条库"))
+        transmute_layout = QVBoxLayout(transmute_group)
+
+        pool_row = QHBoxLayout()
+        self._pool_label = QLabel()
+        self._pool_label.setWordWrap(True)
+        self._pool_label.setStyleSheet("color: palette(text);")
+        pool_row.addWidget(self._pool_label, 1)
+        self._btn_pool_edit = QPushButton(tr("编辑"))
+        self._btn_pool_edit.clicked.connect(self._on_pool_edit)
+        apply_button_style(self._btn_pool_edit, variant="neutral")
+        pool_row.addWidget(self._btn_pool_edit)
+        transmute_layout.addLayout(pool_row)
+
+        right_layout.addWidget(transmute_group)
 
         # ── 方案管理 / 基础属性：同一行、等高双栏 ──
         management_layout = QHBoxLayout()
@@ -356,6 +374,7 @@ class SchoolPanel(QWidget):
             edit.setEnabled(enabled)
 
         self._loading = prev_loading
+        self._refresh_transmute_pool(cfg)
         self._refresh_schemes()
         self._refresh_play_styles()
         if self._scheme_list.count():
@@ -464,6 +483,47 @@ class SchoolPanel(QWidget):
                 cfg[key] = group
         self._data.setdefault("schools", {})[name] = cfg
         self._save_data()
+
+    # ── 转律词条库 ──────────────────────────────────────
+
+    def _refresh_transmute_pool(self, cfg: dict):
+        """按当前流派配置刷新词条展示与按钮可用性"""
+        names = cfg.get("transmute_pool") or []
+        self._pool_label.setText("、".join(str(n) for n in names) if names else tr("（未配置）"))
+        self._pool_label.setStyleSheet(
+            "color: palette(text);" if names else "color: palette(mid);")
+        enabled = bool(cfg)
+        self._btn_pool_edit.setEnabled(enabled)
+
+    def _pool_names(self) -> list[str]:
+        text = self._pool_label.text()
+        if not text or text == tr("（未配置）"):
+            return []
+        return [n.strip() for n in text.split("、") if n.strip()]
+
+    def _on_pool_edit(self):
+        """打开词条选择对话框（复用调律规则词条库的 AffixSelectSortDialog）"""
+        school = self._current_school()
+        if not school:
+            return
+        from ...config import get_game_config
+        candidates = get_game_config().get_normal_affix_names()
+        dlg = AffixSelectSortDialog(
+            candidates, self._pool_names(),
+            tr("选择转律词条库（{school}）").format(school=school), self)
+        if dlg.exec():
+            self._write_transmute_pool(school, dlg.selected())
+
+    def _write_transmute_pool(self, school: str, names: list[str]):
+        """回写当前流派的转律词条库（空列表省略键）并刷新"""
+        cfg = self._schools().get(school) or {}
+        if names:
+            cfg["transmute_pool"] = names
+        else:
+            cfg.pop("transmute_pool", None)
+        self._data.setdefault("schools", {})[school] = cfg
+        self._save_data()
+        self._refresh_transmute_pool(cfg)
 
     # ── 保存 ──────────────────────────────────────────────────
 

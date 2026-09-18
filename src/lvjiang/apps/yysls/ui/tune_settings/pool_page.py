@@ -1,8 +1,11 @@
 """词条库设置页（规则顶层）
 
-转律词条库、可用词条库均为「已选词条纯展示 + 编辑
-（AffixSelectSortDialog）」，候选为标准词条全集。选择与排序
-均在对话框内完成。编辑共享 raw dict 顶层字段，变更即回调保存。
+可用词条库、转律词条库均为「已选词条纯展示 + 编辑
+（AffixSelectSortDialog）」。可用词条库候选为标准词条全集；转律
+词条库候选 = 可用词条库已选 ∩ 各流派转律词条库并集（动态类四个
+词条只要在可用词条库里就直接允许，不做并集推算），平铺勾选，
+避免写进游戏里实际转不出来的词条。选择与排序均在对话框内完成。
+编辑共享 raw dict 顶层字段，变更即回调保存。
 """
 
 from __future__ import annotations
@@ -24,7 +27,12 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
+from ...config import get_game_config
+from ...core.loadout.transmute import transmute_pool_union
+from ...core.tuning_rules import DYNAMIC_AFFIXES
 from .affix_picker import AffixSelectSortDialog
+
+CandidateSource = list[str] | Callable[[], list[str]]
 
 
 class _AffixListBox(QWidget):
@@ -34,14 +42,15 @@ class _AffixListBox(QWidget):
     高度，列表随页面剩余空间拉伸（填满到底部）。
     """
 
-    def __init__(self, candidates: list[str],
+    def __init__(self, candidates: CandidateSource,
                  on_changed: Callable[[], None],
                  title: str, rows: int = 7, fill: bool = False,
-                 parent=None):
+                 flat: bool = False, parent=None):
         super().__init__(parent)
         self._candidates = candidates
         self._on_changed = on_changed
         self._title = title
+        self._flat = flat
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -87,9 +96,15 @@ class _AffixListBox(QWidget):
 
     # ── 操作 ──
 
+    def candidates(self) -> list[str]:
+        source = self._candidates
+        return list(source() if callable(source) else source)
+
     def _edit(self):
-        dlg = AffixSelectSortDialog(self._candidates, self.get_names(),
-                                    tr("选择{title}词条").format(title=self._title), self)
+        dlg = AffixSelectSortDialog(
+            self.candidates(), self.get_names(),
+            tr("选择{title}词条").format(title=self._title), self,
+            flat=self._flat)
         if dlg.exec():
             # 对话框内已完成选择与拖拽排序，直接采用其返回顺序写回
             self._list.clear()
@@ -113,19 +128,12 @@ class PoolPage(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
-        # ── 转律词条库 ──
-        prio_box = QGroupBox(tr("转律词条库（全局，优先级从高到低）"))
-        prio_layout = QVBoxLayout(prio_box)
-        self._prio_list = _AffixListBox(
-            self._candidates, self._apply, tr("转律词条库"), rows=7)
-        prio_layout.addWidget(self._prio_list)
-        layout.addWidget(prio_box)
-
-        # ── 可用词条库（填满剩余高度）──
+        # ── 可用词条库（在上，填满剩余高度）──
         pool_box = QGroupBox(tr("可用词条库（全局，各部位词条混放）"))
         pool_layout = QVBoxLayout(pool_box)
         self._pool_list = _AffixListBox(
-            self._candidates, self._apply, tr("可用词条库"), rows=7, fill=True)
+            self._candidates, self._on_pool_changed, tr("可用词条库"),
+            rows=7, fill=True)
         pool_layout.addWidget(self._pool_list, 1)
         note = QLabel(
             tr("可用词条库为全局价值序（越靠前越优先保留与填充）；"
@@ -135,6 +143,42 @@ class PoolPage(QWidget):
         note.setStyleSheet("color: gray; font-size: 12px;")
         pool_layout.addWidget(note)
         layout.addWidget(pool_box, 1)
+
+        # ── 转律词条库（在下，候选收窄为可用词条库 ∩ 可转律词条）──
+        prio_box = QGroupBox(tr("转律词条库（全局，优先级从高到低）"))
+        prio_layout = QVBoxLayout(prio_box)
+        self._prio_list = _AffixListBox(
+            self.transmute_candidates, self._apply, tr("转律词条库"),
+            rows=7, flat=True)
+        prio_layout.addWidget(self._prio_list)
+        prio_note = QLabel(
+            tr("只能从可用词条库里、且各流派转律词条库允许转出的词条中选择；"
+               "动态类四个词条只要在可用词条库中即可选。"))
+        prio_note.setWordWrap(True)
+        prio_note.setStyleSheet("color: gray; font-size: 12px;")
+        prio_layout.addWidget(prio_note)
+        layout.addWidget(prio_box)
+
+    def transmute_candidates(self) -> list[str]:
+        """转律词条库候选：可用词条库已选 ∩ 转律库并集，动态类直接放行。
+
+        顺序沿用可用词条库的价值序。
+        """
+        transmutable = set(transmute_pool_union(get_game_config()))
+        return [
+            name for name in self._pool_list.get_names()
+            if name in DYNAMIC_AFFIXES or name in transmutable
+        ]
+
+    def _on_pool_changed(self) -> None:
+        """可用词条库改动后，转律词条库里已不再可选的词条一并剔除。"""
+        if self._loading:
+            return
+        allowed = set(self.transmute_candidates())
+        kept = [name for name in self._prio_list.get_names() if name in allowed]
+        if kept != self._prio_list.get_names():
+            self._prio_list.set_names(kept)
+        self._apply()
 
     # ── 数据往返 ──
 

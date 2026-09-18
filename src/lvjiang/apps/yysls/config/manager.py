@@ -967,6 +967,23 @@ class GameConfigManager:
             str(name).strip() for name in schemes if str(name).strip()
         ))
 
+    def get_transmute_pool(self, school: str) -> list[str]:
+        """获取流派级转律词条库（顺序即转入优先级）
+
+        流派不存在或未配置（含自建未填的流派）时返回空列表，
+        由调用方自行决定回退策略。
+        """
+        cfg = self._schools.get(school, {})
+        pool = cfg.get("transmute_pool") if cfg else None
+        if not isinstance(pool, list):
+            return []
+        return [str(name).strip() for name in pool if str(name).strip()]
+
+    def get_all_transmute_pools(self) -> dict[str, list[str]]:
+        """全部流派的转律词条库（流派名 → 词条列表，保持配置声明顺序）"""
+        return {school: self.get_transmute_pool(school)
+                for school in self._schools}
+
     # ── 等级配置 ────────────────────────────────────────────
 
     def get_level_configs(self) -> list[LevelConfig]:

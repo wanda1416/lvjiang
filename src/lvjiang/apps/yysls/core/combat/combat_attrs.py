@@ -18,6 +18,7 @@
 """
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field, fields
 from typing import Any
 
@@ -845,6 +846,25 @@ class GraduationAttrContext:
         )
 
 
+def fold_wuxiang_pen(
+    equipment_attrs: CombatAttributes, target_pen_field: str | None,
+) -> CombatAttributes:
+    """把装备定音的无相穿透计入当前流派对应的属攻穿透（原始值，不套抗性）。
+
+    毕业率输入与战斗属性面板的展示都从这里取折算后的装备穿透，保证面板上
+    的数字就是计算用的数字。折算后 ``wuxiang_pen`` 清零——它已经变成属攻
+    穿透的一部分，再折一次不会重复相加（幂等）。``target_pen_field`` 为空
+    （流派无属性）时原样返回。
+    """
+    if not target_pen_field or not equipment_attrs.wuxiang_pen:
+        return equipment_attrs
+    folded = copy.deepcopy(equipment_attrs)
+    setattr(folded, target_pen_field,
+            getattr(folded, target_pen_field, 0.0) + folded.wuxiang_pen)
+    folded.wuxiang_pen = 0.0
+    return folded
+
+
 def build_graduation_attrs(
     base_attrs: CombatAttributes,
     equipment_attrs: CombatAttributes,
@@ -860,8 +880,8 @@ def build_graduation_attrs(
     context = context or GraduationAttrContext.from_school(school)
     judge_resistance = context.judge_resistance
     buff_resistance = context.buff_resistance
+    equipment_attrs = fold_wuxiang_pen(equipment_attrs, context.target_pen_field)
     result = base_attrs + equipment_attrs
-    target_pen = context.target_pen_field
 
     for field_name in THREE_RATE_FIELDS:
         setattr(result, field_name, apply_three_rate_resistance(
@@ -873,8 +893,6 @@ def build_graduation_attrs(
         ))
     for field_name in PENETRATION_FIELDS:
         equipment_value = getattr(equipment_attrs, field_name)
-        if field_name == target_pen:
-            equipment_value += equipment_attrs.wuxiang_pen
         setattr(result, field_name, apply_penetration_resistance(
             equipment_value,
             getattr(base_attrs, field_name),

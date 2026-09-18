@@ -134,6 +134,27 @@ def test_build_graduation_attrs_is_the_shared_resistance_boundary() -> None:
         apply_bonus_resistance(0.095, resistance=15))
 
 
+def test_fold_wuxiang_pen_is_the_single_place_wuxiang_is_mapped() -> None:
+    """面板展示与毕业率输入都用同一份折算：无相穿透只在这里进本流派属攻穿透。"""
+    from lvjiang.apps.yysls.core.combat.combat_attrs import fold_wuxiang_pen
+
+    equipment = CombatAttributes(lieshi_pen=3.0, wuxiang_pen=14.5)
+    folded = fold_wuxiang_pen(equipment, "lieshi_pen")
+    assert folded.lieshi_pen == pytest.approx(17.5)
+    assert folded.wuxiang_pen == 0.0                       # 已并入，清零保证幂等
+    assert equipment.lieshi_pen == pytest.approx(3.0)     # 不改入参
+    assert equipment.wuxiang_pen == pytest.approx(14.5)
+    # 流派无属性 / 无无相穿透：原样返回
+    assert fold_wuxiang_pen(equipment, None) is equipment
+    assert fold_wuxiang_pen(CombatAttributes(lieshi_pen=3.0), "lieshi_pen").lieshi_pen == 3.0
+    # 面板先折算再交给 build_graduation_attrs：与直接传原始装备值结果一致，不二次相加
+    base = CombatAttributes(lieshi_pen=36)
+    once = build_graduation_attrs(base, equipment, "裂石·钧")
+    twice = build_graduation_attrs(base, folded, "裂石·钧")
+    assert once.lieshi_pen == twice.lieshi_pen == pytest.approx(
+        apply_penetration_resistance(17.5, 36, 15))
+
+
 def test_judgment_outcomes_use_yellow_rates_and_direct_rates() -> None:
     attrs = CombatAttributes(
         precision=1.0,
@@ -250,3 +271,56 @@ def test_five_dimension_affixes_reach_the_aggregate() -> None:
     })
 
     assert attrs.min_outer > 0 and attrs.max_outer > 0
+
+
+def test_play_style_reverse_derivation_ignores_panel_assumptions(monkeypatch):
+    """反推基础属性 = 游戏面板 − 真实装备 − 弓玦。游戏面板对应的是真实穿戴，
+    面板上勾着的满承音/满等级/模拟转律不能被扣进去；否则勾选状态一变，
+    同一份面板数值反推出不同的基础属性。"""
+    from lvjiang.apps.yysls.config import get_game_config
+    from lvjiang.apps.yysls.core.graduation.assumptions import Assumptions
+    from lvjiang.apps.yysls.core.graduation.scoring import equipment_attrs
+    from lvjiang.apps.yysls.ui.loadout.combat.play_style_dialog import (
+        PlayStyleDialogMixin,
+    )
+
+    gc = get_game_config()
+    raw = {"main_weapon": {
+        "type": "剑", "name": "剑", "level": 100, "quality": "gold",
+        "affix_1": {"name": "最大外功攻击", "value": 80.0},
+        "affix_2": {"name": "会心率", "value": 5.0, "unit": "%"},
+        "affix_3": {"name": "劲", "value": 40},
+    }}
+    true_base = CombatAttributes(min_outer=1000, max_outer=2000, crit_rate=0.10)
+    panel = true_base + equipment_attrs(raw, gc)      # 游戏面板 = 基础 + 真实装备
+
+    saved: dict = {}
+
+    class _Host(PlayStyleDialogMixin):
+        # 面板上勾着满等级 + 满承音：反推必须无视
+        def assumptions(self):
+            return Assumptions(full_level=110, full_chengyin=True)
+
+        def _equipped_snapshot(self):
+            return raw
+
+        def _compute_gongjue_attrs(self):
+            return CombatAttributes()
+
+        def _save_play_style(self, school, name, base_attrs):
+            saved["base"] = base_attrs
+
+        def _refresh_play_styles(self):
+            pass
+
+        _combo_play_style = type("C", (), {"setCurrentText": lambda self, _n: None})()
+
+    monkeypatch.setattr(
+        "PyQt6.QtWidgets.QMessageBox.information", lambda *a, **k: None)
+    PlayStyleDialogMixin._commit_play_style(
+        _Host(), "鸣金·虹", "测试", panel, workflow_triggered=False)
+
+    base = saved["base"]
+    assert base.min_outer == pytest.approx(true_base.min_outer)
+    assert base.max_outer == pytest.approx(true_base.max_outer)
+    assert base.crit_rate == pytest.approx(true_base.crit_rate)

@@ -724,17 +724,17 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         """刷新属性显示"""
         if self._restoring:
             return
+        from ....config import get_game_config
         from ....core.combat.combat_attrs import (
-            WUXIANG_TO_ATTR_PEN,
-            apply_bonus_resistance,
+            GraduationAttrContext,
             apply_hypothetical_caps,
-            apply_penetration_resistance,
-            apply_three_rate_resistance,
+            build_graduation_attrs,
+            fold_wuxiang_pen,
             has_resistance,
             is_penetration_field,
-            is_three_rate_field,
         )
         from ....core.combat.equipment import EquipmentInventory
+        from ....core.graduation.scoring import equipment_attrs as scored_equipment
 
         # ✅ 会话级缓存：避免反复load装备文件
         user_name = self._host.active_user_name()
@@ -767,25 +767,22 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             except Exception as e:
                 logger.error(f"读取装备数据失败: {e}")
 
-        # 一次性计算所有中间结果
+        # 展示与毕业率同一条链路：装备部分由评分内核归一化聚合（含装备基础
+        # 攻击、词条、定音、五维换算），无相穿透折算与抗性由
+        # build_graduation_attrs 统一施加。面板上的「原始值(生效值)」里，
+        # 原始值 = 基础 + 弓玦 + 折算后的装备值，生效值直接取毕业率输入。
+        school = self._get_current_school() or ""
+        context = GraduationAttrContext.from_school(school)
         base_attrs = self._get_base_attrs()
-        equip_base_attrs = self._compute_equip_base_attrs(equipped)
-        equip_attrs = self._compute_equip_attrs(equipped)
         gongjue_attrs = self._compute_gongjue_attrs()
-        combat_attrs = base_attrs + equip_base_attrs + equip_attrs + gongjue_attrs
-        judge_resistance, buff_resistance = self._current_resistances()
-
-        # 处理无相穿透转换：根据流派属性转换为对应的属攻穿透
-        if equip_attrs.wuxiang_pen > 0:
-            school = self._get_current_school()
-            if school:
-                from ....config import get_game_config
-                gc = get_game_config()
-                school_attr = gc.get_school_attr(school)
-                if school_attr and school_attr in WUXIANG_TO_ATTR_PEN:
-                    target_field = WUXIANG_TO_ATTR_PEN[school_attr]
-                    current = getattr(combat_attrs, target_field, 0.0)
-                    setattr(combat_attrs, target_field, current + equip_attrs.wuxiang_pen)
+        equip_attrs = fold_wuxiang_pen(
+            scored_equipment(equipped or {}, get_game_config()),
+            context.target_pen_field,
+        )
+        combat_attrs = base_attrs + gongjue_attrs + equip_attrs
+        graduation_attrs = build_graduation_attrs(
+            base_attrs + gongjue_attrs, equip_attrs, school, context=context)
+        buff_resistance = context.buff_resistance
 
         self._current_combat_attrs = combat_attrs
 
@@ -794,30 +791,12 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             label = self._attr_labels.get(field_name)
             if label:
                 if has_resistance(field_name):
-                    # 有抗性：显示 原始值(抗性值)
-                    if is_three_rate_field(field_name):
-                        capped = apply_three_rate_resistance(
-                            field_name, value, judge_resistance,
-                        )
-                    elif is_penetration_field(field_name):
-                        # 穿透类：基础配置值 + 装备定音 / 1.15
-                        base_val = getattr(base_attrs, field_name, 0.0)
-                        equip_val = getattr(equip_attrs, field_name, 0.0)
-                        capped = apply_penetration_resistance(
-                            equip_val, base_val, buff_resistance,
-                        )
-                        # 显示：原始值(生效值)，其中原始值 = 基础 + 装备
-                        original = base_val + equip_val
-                        self._set_resistance_text(
-                            label, original, capped, unit, force_decimal=True,
-                        )
-                        continue
-                    else:
-                        # 增伤类：整个值 / 1.15
-                        capped = apply_bonus_resistance(
-                            value, resistance=buff_resistance,
-                        )
-                    self._set_resistance_text(label, value, capped, unit)
+                    # 有抗性：显示 原始值(生效值)，生效值就是毕业率输入
+                    capped = getattr(graduation_attrs, field_name, 0.0)
+                    self._set_resistance_text(
+                        label, value, capped, unit,
+                        force_decimal=is_penetration_field(field_name),
+                    )
                 else:
                     if field_name in _ATTACK_FIELDS:
                         value = round(value)
@@ -826,11 +805,6 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._refresh_attr_penetration(base_attrs, equip_attrs, buff_resistance)
         self._refresh_attr_bonus(combat_attrs)
         self._refresh_extra_attrs(combat_attrs.extra_attrs, buff_resistance)
-        school = self._get_current_school()
-        # 毕业率输入走公共评分内核（与分析对话框、智能调律同一条链路）
-        from ....core.graduation.scoring import graduation_input
-        graduation_attrs = graduation_input(
-            base_attrs + gongjue_attrs, equipped or {}, school or "")
         self._schedule_graduation(graduation_attrs)
 
         # 所有模式走统一策略钩子；full/half 默认 no-op，compact 自行重排。
@@ -914,10 +888,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         values: dict[str, tuple[float, float]] = {}
         for name, field in attr_fields:
             base_value = getattr(base_attrs, field, 0.0)
+            # equip_attrs 已由 fold_wuxiang_pen 把定音无相穿透计入本流派属攻
             equip_value = getattr(equip_attrs, field, 0.0)
-            # 无相穿透属于装备定音，计入当前流派对应的属攻。
-            if field == current_field:
-                equip_value += getattr(equip_attrs, "wuxiang_pen", 0.0)
             original = base_value + equip_value
             effective = apply_penetration_resistance(
                 equip_value, base_value, buff_resistance,
@@ -1061,65 +1033,6 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             return CombatAttributes()
 
         return CombatAttributes.from_dict(play_styles[play_style])
-
-    def _compute_equip_attrs(
-        self, equipped: dict | None = None,
-    ) -> CombatAttributes:
-        """计算装备词条属性总和（含五维转换，不含装备基础攻击值）
-
-        Args:
-            equipped: 已变换的装备数据；为 None 时从仓库加载。
-        """
-        from ....core.combat.combat_attrs import (
-            aggregate_equipment_attrs,
-            apply_hypothetical_caps,
-        )
-        from ....core.combat.equipment import EquipmentInventory
-
-        user_name = self._host.active_user_name()
-        # 调用方已给装备（预览/缓存）时不依赖当前用户；只有要读仓库才需要
-        if equipped is None and not user_name:
-            return CombatAttributes()
-
-        try:
-            if equipped is None:
-                equipped = EquipmentInventory(user_name).equipped
-                equipped = apply_hypothetical_caps(
-                    equipped, **self.assumption_flags())
-            return aggregate_equipment_attrs(equipped)
-        except Exception as e:
-            logger.error(f"读取装备数据失败: {e}")
-            return CombatAttributes()
-
-    def _compute_equip_base_attrs(
-        self, equipped: dict | None = None,
-    ) -> CombatAttributes:
-        """计算装备基础外功攻击值（根据部位/等级/品阶）
-
-        武器/环/佩 提供基础外功攻击，品阶不同数值不同。
-
-        Args:
-            equipped: 已变换的装备数据；为 None 时从仓库加载。
-        """
-        from ....config import get_game_config
-        from ....core.combat.combat_attrs import compute_equip_base_attrs
-        from ....core.combat.equipment import EquipmentInventory
-
-        user_name = self._host.active_user_name()
-        if equipped is None and not user_name:
-            return CombatAttributes()
-
-        try:
-            if equipped is None:
-                equipped = EquipmentInventory(user_name).equipped
-            gc = get_game_config()
-            return compute_equip_base_attrs(
-                equipped,
-                gc.get_base_attr_values,
-            )
-        except Exception as e:
-            logger.error(f"计算装备基础攻击失败: {e}")
-            return CombatAttributes()
 
     def assumptions(self):
         """当前假设复选框对应的 ``Assumptions``（备战方案面板口径）。"""

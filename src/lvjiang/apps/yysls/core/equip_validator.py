@@ -22,6 +22,7 @@ from dataclasses import dataclass
 
 from ....i18n import tr
 from .affix_cap import affix_cap_ratio
+from .combat.affix_rules import normal_affix_candidates
 from .equip_parser.models import Affix, EquipmentData
 
 # extra_data / _extra 中记录异常原因的键
@@ -188,6 +189,10 @@ def _validate_slots(slots: list[tuple[int, Affix]],
     weapon_map = gc.get_all_weapon_wuxue_affixes()
     weapon_affixes = set(weapon_map.values())
     first_names = set(gc.get_first_affixes(group)) if group else set()
+    # 部位与武器绑定的唯一口径：normal_affix_candidates（游戏配置）。
+    # 这里只负责把「不在候选里」归到对应错误码。
+    allowed = set(normal_affix_candidates(
+        {"type": type_name}, gc)) if group else set()
 
     # 配置级合法性：未知词条先报，避免 get_affix_parts 对未知项“缺省全部位”
     # 的宽松回退将 OCR 错词误判为合法。
@@ -211,24 +216,24 @@ def _validate_slots(slots: list[tuple[int, Affix]],
                     .format(name=affix.name, part=part),
                 ))
             continue
+        if affix.name in allowed:
+            continue
         if affix.name in weapon_affixes:
             expected = weapon_map.get(type_name, "")
-            if affix.name != expected:
-                detail = (tr("，该武器对应「{expected}」").format(expected=expected)
-                          if expected else "")
-                reasons.append(IllegalReason(
-                    CODE_WEAPON_AFFIX_MISMATCH,
-                    tr("词条 {slot}「{name}」与装备类型「{type_name}」不匹配{detail}")
-                    .format(slot=slot, name=affix.name,
-                            type_name=type_name, detail=detail),
-                ))
-            continue
-        if part not in gc.get_affix_parts(affix.name):
+            detail = (tr("，该武器对应「{expected}」").format(expected=expected)
+                      if expected else "")
             reasons.append(IllegalReason(
-                CODE_INVALID_AFFIX_PART,
-                tr("词条 {slot}「{name}」不能出现在{part}")
-                .format(slot=slot, name=affix.name, part=part),
+                CODE_WEAPON_AFFIX_MISMATCH,
+                tr("词条 {slot}「{name}」与装备类型「{type_name}」不匹配{detail}")
+                .format(slot=slot, name=affix.name,
+                        type_name=type_name, detail=detail),
             ))
+            continue
+        reasons.append(IllegalReason(
+            CODE_INVALID_AFFIX_PART,
+            tr("词条 {slot}「{name}」不能出现在{part}")
+            .format(slot=slot, name=affix.name, part=part),
+        ))
 
     # 词条 2-5：调律产出的部分。首词条（槽位 1）不参与组合类判定。
     tuned = [a for slot, a in known_slots if slot >= 2]

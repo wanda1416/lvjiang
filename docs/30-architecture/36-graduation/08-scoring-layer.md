@@ -45,3 +45,6 @@ LoadoutScorer.rate(projected)              # effective_equipped → 聚合 → b
 原始等级与承音后开关，未承音看当前等级）与 `transmute_targets(equip, index, pool)`（部位
 合法性、去掉第 2～5 条已有、整件校验）。`judge_transmute_eligibility(require_retransfer=…)`
 区分“只支持一次转律的装备是否参与”：备战方案不参与，自动调律参与。
+
+评分链路里不来自配置的规则常量（三率上限与精准基准、弓玦比例、五维系数、可转律槽位）
+登记在 [../../10-game/06-mechanics-conventions.md](../../10-game/06-mechanics-conventions.md)。

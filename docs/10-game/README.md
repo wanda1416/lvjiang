@@ -13,6 +13,7 @@
 | [03-damage-mechanics.md](03-damage-mechanics.md) | 伤害机制：计算公式、属性转换 |
 | [04-tuning-mechanics.md](04-tuning-mechanics.md) | 调律相关文档的边界与索引 |
 | [05-ui-pages-and-relations.md](05-ui-pages-and-relations.md) | 游戏 UI 页面、叠层、视图状态及自动化流程关联图 |
+| [06-mechanics-conventions.md](06-mechanics-conventions.md) | 游戏机制约定登记表：写死在代码、未进配置的规则事实（五维系数、弓玦、三率上限、调律铁律、部位归并等），含位置与依据 |
 | [10-tuning-rules/](10-tuning-rules/README.md) | 律匠评价规格：装备分级、流派规则、转律模拟与熔断 |
 | [20-affix-analysis/](20-affix-analysis/README.md) | 词条分布规律分析：数据来源、分析脚本、已知偏差清单 |
 

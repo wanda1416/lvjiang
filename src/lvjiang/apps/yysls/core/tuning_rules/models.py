@@ -67,6 +67,8 @@ RATING_LABELS = {"junk": tr("垃圾"), "normal": tr("一般"),
                  "excellent": tr("优秀"), "top": tr("顶级")}
 
 # 部位归并：佩→环、胸甲→冠胄、腕甲→胫甲
+# 游戏规则事实（这三对部位词条池与判定相同），登记于
+# docs/10-game/06-mechanics-conventions.md B1；rule_judge._build_attempts 有第二份。
 PART_ALIAS = {"佩": "环", "胸甲": "冠胄", "腕甲": "胫甲"}
 
 # 模式部位 key 全集

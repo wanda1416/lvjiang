@@ -36,3 +36,7 @@
 | 判定会意 | ≤ 40% |
 
 因此**会心与会意互斥**，无法同时堆到 100%。
+
+> 程序侧对应：两个上限、精准率抗性基准 65%、五维词条换算系数与弓玦「上限一半」
+> 都是代码常量（`core/combat/combat_attrs.py`），等级抗性值本身在配置里。
+> 见 [06-mechanics-conventions.md](06-mechanics-conventions.md) A1–A4。

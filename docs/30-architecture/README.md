@@ -28,6 +28,11 @@
 | [35-workflows/](35-workflows/README.md) | 跨场景业务流程编排 |
 | [36-graduation/](36-graduation/README.md) | 毕业率计算引擎 |
 
+## 相关
+
+- 写死在代码里的游戏规则事实（不在 `config/`）统一登记在
+  [../10-game/06-mechanics-conventions.md](../10-game/06-mechanics-conventions.md)；新增此类常量先登记再写代码。
+
 ## 待补充
 
 - `layers/` — 各层详细说明（ocr、detector、rules-engine、inventory、workflow；capture/input 见 09）

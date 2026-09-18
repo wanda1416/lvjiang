@@ -13,6 +13,7 @@
 | 狗粮规则、大律准石检查等材料配置 | [../60-userguide/04.02-default-config.md](../60-userguide/04.02-default-config.md)、[04.03-behavior-config.md](../60-userguide/04.03-behavior-config.md) | 默认值与在 UI 中如何修改 |
 | 用户如何配置并运行自动调律 | [../60-userguide/README.md](../60-userguide/README.md) | 面向使用者的操作指引 |
 | 如何从观测数据反推出词条分布规律 | [20-affix-analysis/](20-affix-analysis/README.md) | 分析方法与脚本，不沉淀结论 |
+| 写死在代码、未进配置的机制事实（组合铁律、可转律槽、部位归并、动态词条保留名） | [06-mechanics-conventions.md](06-mechanics-conventions.md) | 登记位置与依据；改游戏规则先查这里 |
 
 ## 程序侧对应
 
@@ -21,5 +22,6 @@
 | 评价规格 | `config/system/yysls/tuning_rules/*.yaml`（规则本体）、`config/system/yysls/tune_config.yaml`（启用与顺序） |
 | 词条标准名 | `config/system/yysls/game_config/affixes.yaml` 的 `affix_caps` |
 | 材料与扫描处置 | `config/system/yysls/base_groups/*.yaml` |
+| 规则层保留名与部位归并（`PART_ALIAS`、`DYNAMIC_AFFIXES` 等） | `core/tuning_rules/models.py`，登记于 [06-mechanics-conventions.md](06-mechanics-conventions.md) B1、B3 |
 
 修改规格时必须同步：[10-tuning-rules/](10-tuning-rules/README.md) 下的文档、对应 YAML、以及相关测试。

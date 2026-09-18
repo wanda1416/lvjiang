@@ -53,12 +53,22 @@ def _bare_evaluator() -> SmartTuningEvaluator:
     )
     evaluator._contexts = ()
     evaluator._disabled_reason = ""
-    evaluator._rate_cache = {}
-    evaluator._other_attrs_cache = {}
-    evaluator._other_stack_cache = {}
     evaluator._other_equipped_cache = {}
     evaluator._strategy = get_strategy()
     return evaluator
+
+
+def _patch_affix_rules(monkeypatch, candidates, *, legal=True):
+    """候选/校验在智能调律与公共转律过滤链两处都被引用，需同时打桩。"""
+    for module in (
+        "lvjiang.apps.yysls.core.graduation.smart_tuning",
+        "lvjiang.apps.yysls.core.loadout.transmute",
+    ):
+        monkeypatch.setattr(
+            f"{module}.validate_combination_dict", lambda _equip: [])
+        monkeypatch.setattr(
+            f"{module}.normal_affix_candidates",
+            lambda _equip, _gc, _c=candidates: list(_c))
 
 
 def _context(plan_id: str, main_type: str, sub_type: str) -> _PlanContext:
@@ -234,14 +244,7 @@ def test_pause_blocking_time_does_not_consume_plan_budget(monkeypatch):
         "lvjiang.apps.yysls.core.graduation.smart_tuning._MAX_PLAN_SECONDS",
         0.005,
     )
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [],
-    )
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["A"],
-    )
+    _patch_affix_rules(monkeypatch, ["A"])
     equipment = {
         "type": "环", "level": 110, "quality": "gold",
         **{
@@ -304,12 +307,7 @@ def test_plan_candidates_are_intersection_of_part_and_rule_pool(monkeypatch):
             return SearchOutcome(SearchStatus.IMPROVES, "ok", 2.0, 1)
 
     evaluator._strategy = Capture()
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [])
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["最大牵丝攻击", "最大鸣金攻击", "敏", "会心率"])
+    _patch_affix_rules(monkeypatch, ["最大牵丝攻击", "最大鸣金攻击", "敏", "会心率"])
     context = _PlanContext(
         "p", "方案", "牵丝·翊", object(), object(), {}, 1.0,
         rule_key="huixin", rule_name="会心",
@@ -344,12 +342,7 @@ def test_transmute_search_removes_only_first_affix_outside_rule_pool(
                 SearchStatus.NO_IMPROVEMENT, "checked", 0.5, 1)
 
     evaluator._strategy = Capture()
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [])
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["A", "B", "C", "D", "E"])
+    _patch_affix_rules(monkeypatch, ["A", "B", "C", "D", "E"])
     context = _PlanContext(
         "p", "方案", "流派", object(), object(), {}, 1.0,
         affix_pool=("A", "B", "C", "D", "E"), plan_maximum_rate=1.0)
@@ -386,12 +379,7 @@ def test_transmute_search_tries_each_existing_affix_when_all_are_usable(
                 SearchStatus.NO_IMPROVEMENT, "checked", 0.5, 1)
 
     evaluator._strategy = Capture()
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [])
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["A", "B", "C", "D", "E"])
+    _patch_affix_rules(monkeypatch, ["A", "B", "C", "D", "E"])
     context = _PlanContext(
         "p", "方案", "流派", object(), object(), {}, 1.0,
         affix_pool=("A", "B", "C", "D", "E"), plan_maximum_rate=1.0)
@@ -433,12 +421,7 @@ def test_transmute_branch_can_rescue_candidate_without_mutating_source(
                 SearchStatus.NO_IMPROVEMENT, "原词条不可提升", 0.8, 1)
 
     evaluator._strategy = Rescue()
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [])
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["A", "B", "C", "D"])
+    _patch_affix_rules(monkeypatch, ["A", "B", "C", "D"])
     context = _PlanContext(
         "p", "方案", "流派", object(), object(), {}, 1.0,
         affix_pool=("A", "B", "C", "D"), plan_maximum_rate=1.0)
@@ -472,12 +455,7 @@ def test_playstyle_required_affix_bypasses_normal_rule_pool(monkeypatch):
             return SearchOutcome(SearchStatus.IMPROVES, "ok", 2.0, 1)
 
     evaluator._strategy = Capture()
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [])
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["全武学增效", "A"])
+    _patch_affix_rules(monkeypatch, ["全武学增效", "A"])
     context = _PlanContext(
         "p", "方案", "鸣金·虹", object(), object(), {}, 1.0,
         rule_key="r", rule_name="规则", affix_pool=("A",),
@@ -509,13 +487,7 @@ def test_evaluation_compares_candidate_maximum_with_plan_maximum(monkeypatch):
 
     evaluator._strategy = Capture()
     evaluator._candidate_rate = lambda *_args: 0.8
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [])
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["A"],
-    )
+    _patch_affix_rules(monkeypatch, ["A"])
     context = _PlanContext(
         "p", "方案", "流派", object(), object(), {}, 0.5,
         affix_pool=("A",),
@@ -736,12 +708,7 @@ def test_custom_strategy_can_replace_default_without_touching_evaluator(monkeypa
     register_strategy(Always())
     evaluator = _bare_evaluator()
     evaluator._strategy = get_strategy("always_improves")
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [])
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["A"])
+    _patch_affix_rules(monkeypatch, ["A"])
     context = _PlanContext(
         "p", "方案", "鸣金·虹", object(), object(), {}, 15.0,
         affix_pool=("A",), plan_maximum_rate=15.0)
@@ -759,12 +726,7 @@ def test_weapon_candidates_match_plan_slot_by_type(monkeypatch):
     """全部武器都在 main_weapon 槽遍历：枪对威威方案应替换副武器，横刀对该方案
     不适用；不适用的方案不参与聚合。"""
     evaluator = _bare_evaluator()
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [])
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["A"])
+    _patch_affix_rules(monkeypatch, ["A"])
     seen_slots = []
     evaluator._candidate_rate = lambda _c, slot, _e: seen_slots.append(slot) or 1.0
     weiwei = _PlanContext(
@@ -829,12 +791,7 @@ def test_transmute_branch_only_transmutes_into_pool_union(monkeypatch):
                 SearchStatus.NO_IMPROVEMENT, "checked", 0.5, 1)
 
     evaluator._strategy = Capture()
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [])
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["A", "B", "C", "神"])
+    _patch_affix_rules(monkeypatch, ["A", "B", "C", "神"])
     context = _PlanContext(
         "p", "方案", "流派", object(), object(), {}, 1.0,
         affix_pool=("A", "B", "C", "神"), plan_maximum_rate=1.0)
@@ -863,12 +820,7 @@ def test_no_transmute_pool_means_no_transmute_branch(monkeypatch):
                 SearchStatus.NO_IMPROVEMENT, "checked", 0.5, 1)
 
     evaluator._strategy = Capture()
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
-        lambda _equip: [])
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
-        lambda _equip, _gc: ["A", "B", "C"])
+    _patch_affix_rules(monkeypatch, ["A", "B", "C"])
     context = _PlanContext(
         "p", "方案", "流派", object(), object(), {}, 1.0,
         affix_pool=("A", "B", "C"), plan_maximum_rate=1.0)

@@ -69,13 +69,47 @@ def transferred_indices(equip: dict) -> list[int]:
     ]
 
 
-def judge_transmute_eligibility(equip: dict, game_config) -> TransmuteEligibility:
-    """在原始装备快照上判定能否参与模拟转律，以及允许改哪些槽。
+def retransfer_capability(equip: dict, game_config) -> tuple[bool, str]:
+    """这件装备能否再次转律（改已转律的固定槽）：(允许, 不允许原因代码)。
 
-    资格完全由等级能力配置决定，不硬编码等级：未承音看当前等级的
-    ``allow_retransfer``；已承音看名称识别出的原始等级，且要求
-    ``allow_retransfer_after_chengyin`` 同时为真。只支持一次转律的装备即使
-    尚未转律也不参与——转错一次没有退路，程序不替用户做这个决定。
+    未承音看当前等级的 ``allow_retransfer``；已承音看名称识别出的原始等级，
+    且要求 ``allow_retransfer_after_chengyin`` 同时为真——承音后的当前等级
+    不代表装备来源。三处转律模拟（规则评级潜力、智能调律、备战方案转律
+    建议）共用这一条规则。
+    """
+    is_chengyin = bool(equip.get("is_chengyin"))
+    if is_chengyin:
+        original = _int(equip.get("original_level"))
+        if original <= 0:
+            original = game_config.infer_original_equipment_level(
+                equip.get("name"))
+        if original <= 0:
+            return False, REASON_UNKNOWN_ORIGINAL_LEVEL
+        cfg = game_config.level_config_for(original)
+        if cfg is None:
+            return False, REASON_NO_LEVEL_CONFIG
+        if not cfg.allow_retransfer:
+            return False, REASON_NO_RETRANSFER
+        if not cfg.allow_retransfer_after_chengyin:
+            return False, REASON_NO_RETRANSFER_AFTER_CHENGYIN
+        return True, ""
+    cfg = game_config.level_config_for(_int(equip.get("level")))
+    if cfg is None:
+        return False, REASON_NO_LEVEL_CONFIG
+    if not cfg.allow_retransfer:
+        return False, REASON_NO_RETRANSFER
+    return True, ""
+
+
+def judge_transmute_eligibility(
+    equip: dict, game_config, *, require_retransfer: bool = True,
+) -> TransmuteEligibility:
+    """判定能否参与模拟转律，以及允许改哪些槽（在原始装备快照上判断）。
+
+    ``require_retransfer=True``（备战方案转律建议）：只支持一次转律的装备
+    即使尚未转律也不参与——转错一次没有退路，程序不替用户做这个决定。
+    ``False``（自动调律的评级潜力与智能调律）：尚未转律的装备总可以转一次；
+    已转律的才看再次转律能力。
     """
     if not isinstance(equip, dict):
         return TransmuteEligibility(False, REASON_ILLEGAL)
@@ -89,28 +123,10 @@ def judge_transmute_eligibility(equip: dict, game_config) -> TransmuteEligibilit
         return TransmuteEligibility(
             False, REASON_MULTIPLE_TRANSFERRED, trusted=False)
 
-    is_chengyin = bool(equip.get("is_chengyin"))
-    if is_chengyin:
-        original = _int(equip.get("original_level"))
-        if original <= 0:
-            original = game_config.infer_original_equipment_level(
-                equip.get("name"))
-        if original <= 0:
-            return TransmuteEligibility(False, REASON_UNKNOWN_ORIGINAL_LEVEL)
-        cfg = game_config.level_config_for(original)
-        if cfg is None:
-            return TransmuteEligibility(False, REASON_NO_LEVEL_CONFIG)
-        if not cfg.allow_retransfer:
-            return TransmuteEligibility(False, REASON_NO_RETRANSFER)
-        if not cfg.allow_retransfer_after_chengyin:
-            return TransmuteEligibility(
-                False, REASON_NO_RETRANSFER_AFTER_CHENGYIN)
-    else:
-        cfg = game_config.level_config_for(_int(equip.get("level")))
-        if cfg is None:
-            return TransmuteEligibility(False, REASON_NO_LEVEL_CONFIG)
-        if not cfg.allow_retransfer:
-            return TransmuteEligibility(False, REASON_NO_RETRANSFER)
+    if transferred or require_retransfer:
+        allowed, reason = retransfer_capability(equip, game_config)
+        if not allowed:
+            return TransmuteEligibility(False, reason)
 
     if transferred:
         slots: tuple[int, ...] = (transferred[0],)
@@ -164,6 +180,44 @@ def with_transmuted_affix(
     return changed
 
 
+def transmute_targets(
+    equip: dict,
+    index: int,
+    pool: list[str],
+    game_config,
+) -> list[str]:
+    """第 ``index`` 条转出后的合法转入词条，保持 ``pool`` 顺序。
+
+    过滤链：``pool``（调用方决定口径：备战方案用各流派转律库并集，智能调律
+    用并集 ∩ 规则池）∩ 部位/武器物理可出现 − 第 2～5 条已有名字（首词条是
+    装备自带的，产出允许与之同名）− 与原名相同；再逐个替换后过整件合法性
+    校验。
+    """
+    source = equip.get(f"affix_{index}")
+    if not isinstance(source, dict) or not source.get("name"):
+        return []
+    physical = set(normal_affix_candidates(equip, game_config))
+    present = {
+        str((equip.get(f"affix_{i}") or {}).get("name") or "")
+        for i in present_affix_indices(equip)
+        if i in TRANSMUTABLE_INDICES
+    }
+    level = _int(equip.get("level"))
+    is_chengyin = bool(equip.get("is_chengyin"))
+    legal: list[str] = []
+    for name in pool:
+        if name not in physical or name in present:
+            continue
+        value = transmute_target_value(name, level, is_chengyin, game_config)
+        if value is None:
+            continue
+        if validate_combination_dict(
+                with_transmuted_affix(equip, index, name, value, game_config)):
+            continue
+        legal.append(name)
+    return legal
+
+
 def transmute_candidates(
     equip: dict,
     game_config,
@@ -171,12 +225,7 @@ def transmute_candidates(
     *,
     slots: tuple[int, ...] | None = None,
 ) -> dict[int, list[str]]:
-    """按槽位列出合法目标词条。
-
-    过滤链：转律词条库并集 ∩ 部位/武器物理可出现 − 第 2～5 条已有名字
-    （首词条是装备自带的，调律/转律产出允许与之同名，见 equip_validator）；
-    再逐个替换后过整件合法性校验。
-    """
+    """备战方案口径：按槽位列出合法目标词条（各流派转律库并集）。"""
     if pool_union is None:
         pool_union = transmute_pool_union(game_config)
     if not pool_union:
@@ -186,34 +235,9 @@ def transmute_candidates(
         if not eligibility.eligible:
             return {}
         slots = eligibility.slots
-    physical = set(normal_affix_candidates(equip, game_config))
-    present = {
-        str((equip.get(f"affix_{index}") or {}).get("name") or "")
-        for index in present_affix_indices(equip)
-        if index in TRANSMUTABLE_INDICES
-    }
-    level = _int(equip.get("level"))
-    is_chengyin = bool(equip.get("is_chengyin"))
     result: dict[int, list[str]] = {}
     for index in slots:
-        source = equip.get(f"affix_{index}")
-        if not isinstance(source, dict) or not source.get("name"):
-            continue
-        legal: list[str] = []
-        for name in pool_union:
-            if name not in physical or name in present:
-                continue
-            # 转律库本不含神力词条；这里只是防御，避免配置被改坏后
-            # 通过转律"造出"只能调律得到的词条。
-            if game_config.get_affix_category(name) in ("增效类", "武器类"):
-                continue
-            value = transmute_target_value(name, level, is_chengyin, game_config)
-            if value is None:
-                continue
-            if validate_combination_dict(
-                    with_transmuted_affix(equip, index, name, value, game_config)):
-                continue
-            legal.append(name)
+        legal = transmute_targets(equip, index, pool_union, game_config)
         if legal:
             result[index] = legal
     return result

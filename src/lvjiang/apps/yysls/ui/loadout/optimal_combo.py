@@ -1118,17 +1118,10 @@ class OptimalComboPage(QWidget):
 
     def _compute_gongjue_attrs(self, gongjue_type: str) -> CombatAttributes:
         """计算弓玦属性：当前赛季最大等级三率词条上限的一半。"""
-        if not gongjue_type:
-            return CombatAttributes()
+        from ...core.graduation.context import gongjue_attrs
+
         try:
-            from ...config import get_game_config
-            from ...core.combat.combat_attrs import compute_gongjue_attrs
-            gc = get_game_config()
-            equip_level = gc.current_equip_level()
-            if not equip_level:
-                return CombatAttributes()
-            return compute_gongjue_attrs(
-                gongjue_type, equip_level, gc.get_affix_caps)
+            return gongjue_attrs(gongjue_type)
         except Exception as e:
             logger.error(f"计算弓玦属性失败: {e}")
             return CombatAttributes()

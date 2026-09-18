@@ -16,11 +16,11 @@ from ..combat.combat_attrs import (
     CombatAttributes,
     aggregate_equipment_attrs,
     build_graduation_attrs,
-    compute_equip_base_attrs,
     effective_equipped,
     map_affix_to_attr,
 )
 from ..equip_validator import validate_combination_dict
+from .scoring import LoadoutScorer
 
 _DAMAGE_FIVE_DIMS = {"劲", "势", "敏"}
 _JOINT_TARGETS_PER_AFFIX = 3
@@ -175,11 +175,8 @@ def _graduation_rate(
     school: str,
     game_config,
 ) -> float:
-    equipment_attrs = compute_equip_base_attrs(
-        equipped, game_config.get_base_attr_values,
-    ) + aggregate_equipment_attrs(equipped)
-    attrs = build_graduation_attrs(base_attrs, equipment_attrs, school)
-    return float(calculator.calculate(attrs).graduation_rate)
+    """兼容旧调用与测试的薄包装；实现见 ``LoadoutScorer``。"""
+    return LoadoutScorer(calculator, base_attrs, school, game_config).rate(equipped)
 
 
 def _affix_cap(game_config, level: int, name: str) -> float:
@@ -228,10 +225,7 @@ def _blocked_equipment(
 
 def _replacement_candidates(
     equipped: dict,
-    calculator,
-    base_attrs: CombatAttributes,
-    school: str,
-    game_config,
+    scorer: LoadoutScorer,
     baseline_rate: float,
     fallback_level: int,
     *,
@@ -243,6 +237,7 @@ def _replacement_candidates(
     ``require_legal_result=False`` 仅用于联合搜索：单步替换可暂时重复，后续
     替换可能把冲突位置一并换走；最终方案仍必须通过完整合法性校验。
     """
+    game_config = scorer.game_config
     candidates_out: list[AffixReplacementSuggestion] = []
     blocked = _blocked_equipment(equipped, selected_slots=selected_slots)
     blocked_slots = {item.slot_key for item in blocked}
@@ -285,14 +280,7 @@ def _replacement_candidates(
                 if (require_legal_result
                         and validate_combination_dict(changed[slot_key])):
                     continue
-                rate = _graduation_rate(
-                    calculator,
-                    base_attrs,
-                    _effective_equipped(changed, game_config),
-                    school,
-                    game_config,
-                )
-                delta = rate - baseline_rate
+                delta = scorer.rate(changed) - baseline_rate
                 candidates_out.append(AffixReplacementSuggestion(
                     slot_key=slot_key,
                     equipment_name=str(equip.get("name") or equip.get("type") or slot_key),
@@ -309,20 +297,14 @@ def _replacement_candidates(
 
 def _replacement_suggestions(
     equipped: dict,
-    calculator,
-    base_attrs: CombatAttributes,
-    school: str,
-    game_config,
+    scorer: LoadoutScorer,
     baseline_rate: float,
     fallback_level: int,
 ) -> tuple[list[AffixReplacementSuggestion], list[AffixBlockedEquipment]]:
     """为每个可转律词条找出毕业率提升最大的严格合法替换。"""
     candidates, blocked = _replacement_candidates(
         equipped,
-        calculator,
-        base_attrs,
-        school,
-        game_config,
+        scorer,
         baseline_rate,
         fallback_level,
         require_legal_result=True,
@@ -387,17 +369,12 @@ def analyze_combined_affix_replacements(
         raise ValueError(tr("当前配装存在词条组合异常，请先校正：{names}").format(
             names=names,
         ))
-    effective = _effective_equipped(equipped, game_config)
-    baseline_rate = _graduation_rate(
-        calculator, base_attrs, effective, school, game_config,
-    )
+    scorer = LoadoutScorer(calculator, base_attrs, school, game_config)
+    baseline_rate = scorer.rate(equipped)
     fallback_level = _current_affix_level(game_config)
     candidates, blocked = _replacement_candidates(
         equipped,
-        calculator,
-        base_attrs,
-        school,
-        game_config,
+        scorer,
         baseline_rate,
         fallback_level,
         selected_slots=set(slots),
@@ -484,13 +461,7 @@ def analyze_combined_affix_replacements(
                for slot in affected_slots):
             continue
         evaluated += 1
-        rate = _graduation_rate(
-            calculator,
-            base_attrs,
-            _effective_equipped(changed, game_config),
-            school,
-            game_config,
-        )
+        rate = scorer.rate(changed)
         if rate > best_rate + 1e-12 or (
             abs(rate - best_rate) <= 1e-12
             and best_replacements
@@ -524,18 +495,15 @@ def analyze_affix_impacts(
 
     blocked_equipment = _blocked_equipment(equipped)
 
-    effective = _effective_equipped(equipped, game_config)
-    baseline_rate = _graduation_rate(
-        calculator, base_attrs, effective, school, game_config,
-    )
+    scorer = LoadoutScorer(calculator, base_attrs, school, game_config)
+    effective = effective_equipped(equipped, game_config)
+    baseline_rate = scorer.rate(effective)
     level = int(affix_level or _current_affix_level(game_config))
     effective_names = {
         name for _slot, _equip, _field, name, _value in _iter_affixes(effective)
     }
     # 循环不变量：与候选词条无关，提到循环外算一次即可
-    current_equipment_attrs = compute_equip_base_attrs(
-        effective, game_config.get_base_attr_values,
-    ) + aggregate_equipment_attrs(effective)
+    current_equipment_attrs = scorer.equipment_attrs(effective)
 
     additions: list[AffixImpact] = []
     for name in _candidate_names(game_config):
@@ -553,7 +521,7 @@ def analyze_affix_impacts(
         new_attrs = build_graduation_attrs(
             base_attrs, current_equipment_attrs + delta_attrs, school,
         )
-        rate = float(calculator.calculate(new_attrs).graduation_rate)
+        rate = scorer.rate_attrs(new_attrs)
         additions.append(AffixImpact(name, value, rate - baseline_rate))
 
     removal_candidates: dict[str, list[AffixImpact]] = {}
@@ -567,12 +535,9 @@ def analyze_affix_impacts(
         changed = copy.deepcopy(
             equipped if name in weapon_affixes else effective)
         changed[slot_key].pop(field, None)
-        # 扣除当前生效条目后，同类武器的次高条目可以接替生效。
-        if name in weapon_affixes:
-            changed = _effective_equipped(changed, game_config)
-        rate = _graduation_rate(
-            calculator, base_attrs, changed, school, game_config,
-        )
+        # 扣除当前生效条目后，同类武器的次高条目可以接替生效（归一化在
+        # 评分内核里完成）。
+        rate = scorer.rate(changed)
         removal_candidates.setdefault(name, []).append(
             AffixImpact(name, value, rate - baseline_rate)
         )
@@ -594,10 +559,7 @@ def analyze_affix_impacts(
     if not blocked_equipment:
         suggestions, _unused_blocked = _replacement_suggestions(
             equipped,
-            calculator,
-            base_attrs,
-            school,
-            game_config,
+            scorer,
             baseline_rate,
             level,
         )

@@ -34,7 +34,6 @@ from ....core.combat.combat_attrs import (
     CombatAttributes,
     JudgmentOutcomeRates,
     calculate_judgment_outcomes,
-    compute_gongjue_attrs,
     format_value,
 )
 from ...events import get_event_hub
@@ -719,7 +718,6 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             apply_hypothetical_caps,
             apply_penetration_resistance,
             apply_three_rate_resistance,
-            build_graduation_attrs,
             has_resistance,
             is_penetration_field,
             is_three_rate_field,
@@ -814,11 +812,11 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._refresh_attr_bonus(combat_attrs)
         self._refresh_extra_attrs(combat_attrs.extra_attrs, buff_resistance)
         school = self._get_current_school()
-        graduation_attrs = build_graduation_attrs(
-            base_attrs + gongjue_attrs,
-            equip_base_attrs + equip_attrs,
-            school,
-        )
+        # 毕业率输入走公共评分内核（与分析对话框、智能调律同一条链路）
+        from ....core.graduation.scoring import LoadoutScorer
+        graduation_attrs = LoadoutScorer(
+            None, base_attrs + gongjue_attrs, school or "",
+        ).attrs(equipped or {})
         self._schedule_graduation(graduation_attrs)
 
         # 所有模式走统一策略钩子；full/half 默认 no-op，compact 自行重排。
@@ -1137,17 +1135,10 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
     def _compute_gongjue_attrs(self) -> CombatAttributes:
         """计算弓玦属性：当前赛季最大等级三率词条上限的一半"""
-        gongjue_type = self._get_current_gongjue()
-        if not gongjue_type:
-            return CombatAttributes()
+        from ....core.graduation.context import gongjue_attrs
 
         try:
-            from ....config import get_game_config
-            gc = get_game_config()
-            equip_level = gc.current_equip_level()
-            if not equip_level:
-                return CombatAttributes()
-            return compute_gongjue_attrs(gongjue_type, equip_level, gc.get_affix_caps)
+            return gongjue_attrs(self._get_current_gongjue())
         except Exception as e:
             logger.error(f"计算弓玦属性失败: {e}")
             return CombatAttributes()

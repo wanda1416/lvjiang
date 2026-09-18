@@ -43,6 +43,7 @@ from __future__ import annotations
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData
 
 from .....i18n import tr
+from ..loadout.transmute import retransfer_capability
 from ..tuning_rules import (
     DYNAMIC_AFFIXES,
     GENERIC_ATTR,
@@ -345,21 +346,10 @@ class GenericTuningJudge(TuningJudge):
             ]
             is_retransfer = bool(transferred)
             if is_retransfer:
-                if result.equipment.is_chengyin:
-                    # 承音后的当前等级不能代表装备来源；是否还能转律只由
-                    # 名称等阶识别出的原始等级及其专用开关决定。
-                    original_cfg = gc.level_config_for(
-                        result.equipment.original_level)
-                    can_retransfer = bool(
-                        original_cfg is not None
-                        and original_cfg.allow_retransfer
-                        and original_cfg.allow_retransfer_after_chengyin
-                    )
-                else:
-                    level_cfg = gc.level_config_for(
-                        result.equipment.level or 0)
-                    can_retransfer = bool(
-                        level_cfg is not None and level_cfg.allow_retransfer)
+                # 再次转律能力与备战方案转律建议、智能调律共用同一条规则
+                # （承音看原始等级与承音后开关，未承音看当前等级）。
+                can_retransfer, _reason = retransfer_capability(
+                    result.equipment.to_dict(include_fp=False), gc)
                 candidate_indices = transferred if can_retransfer else []
             else:
                 candidate_indices = list(range(len(filled)))

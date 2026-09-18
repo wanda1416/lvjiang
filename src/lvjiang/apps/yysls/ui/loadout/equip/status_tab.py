@@ -243,13 +243,12 @@ class _FilteredDeleteDialog(QDialog):
 def _affix_analysis_dependencies():
     """集中解析词条分析依赖，便于在不打开对话框时验证导入路径。"""
     from ....config import get_game_config
-    from ....core.combat.combat_attrs import compute_gongjue_attrs
     from ....core.combat.equipment import EquipmentInventory
-    from ....core.graduation import get_graduation_calculator
     from ....core.graduation.affix_impact import (
         analyze_affix_impacts,
         analyze_combined_affix_replacements,
     )
+    from ....core.graduation.context import PlanContextError, PlanScoringContext
     from ....core.graduation.transmute_optimizer import (
         TransmuteSearchRequest,
         optimize_transmutes,
@@ -258,9 +257,9 @@ def _affix_analysis_dependencies():
 
     return (
         get_game_config,
-        compute_gongjue_attrs,
         EquipmentInventory,
-        get_graduation_calculator,
+        PlanScoringContext,
+        PlanContextError,
         analyze_affix_impacts,
         analyze_combined_affix_replacements,
         AffixAnalysisPages,
@@ -2003,9 +2002,9 @@ class EquipStatusTab(QWidget):
         try:
             (
                 get_game_config,
-                compute_gongjue_attrs,
                 EquipmentInventory,
-                get_graduation_calculator,
+                PlanScoringContext,
+                PlanContextError,
                 analyze_affix_impacts,
                 analyze_combined_affix_replacements,
                 AffixAnalysisPages,
@@ -2013,27 +2012,20 @@ class EquipStatusTab(QWidget):
                 optimize_transmutes,
             ) = _affix_analysis_dependencies()
 
-            calculator = get_graduation_calculator(
-                context.school, context.scheme)
-            if calculator is None:
-                raise ValueError(tr("未找到对应流派的毕业率方案"))
-
             game_config = get_game_config()
-            base_attrs = context.base_attrs
-            if context.gongjue:
-                equip_level = game_config.current_equip_level()
-                if equip_level:
-                    base_attrs = base_attrs + compute_gongjue_attrs(
-                        context.gongjue,
-                        equip_level,
-                        game_config.get_affix_caps,
-                    )
-
             inventory = EquipmentInventory(user_name)
             equipped = inventory.equipped
             plan = inventory.active_plan
             plan_id = inventory.active_plan_id
-            school = context.school
+            # 方案 → 计算上下文（流派、模型、基础属性含弓玦）只构造一次
+            try:
+                scoring = PlanScoringContext.from_plan(
+                    plan, game_config=game_config)
+            except PlanContextError as exc:
+                raise ValueError(exc.reason) from exc
+            calculator = scoring.calculator
+            base_attrs = scoring.base_attrs
+            school = scoring.school
             school_pool = tuple(game_config.get_transmute_pool(school))
 
             # 假设栏：备战方案面板假设的副本，关闭即弃
@@ -2063,7 +2055,7 @@ class EquipStatusTab(QWidget):
 
             affix_pages = AffixAnalysisPages(
                 school,
-                context.scheme,
+                scoring.scheme,
                 equipped=equipped,
                 report_provider=lambda: analyze_affix_impacts(
                     equipped,
@@ -2087,10 +2079,10 @@ class EquipStatusTab(QWidget):
                 display_params=self._display_params,
             )
             optimal_page = OptimalComboPage(
-                self._host, school, context.scheme, context.base_attrs,
+                self._host, school, scoring.scheme, context.base_attrs,
                 level_threshold=self._get_level_threshold(),
                 affix_filter=self._get_affix_filter(),
-                gongjue=context.gongjue,
+                gongjue=scoring.gongjue,
                 playstyle=plan.playstyle,
                 main_martial_art=plan.main_martial_art,
                 sub_martial_art=plan.sub_martial_art,
@@ -2099,7 +2091,7 @@ class EquipStatusTab(QWidget):
             dialog = GraduationAnalysisDialog(
                 self,
                 school=school,
-                scheme=context.scheme,
+                scheme=scoring.scheme,
                 plan_name=plan.name,
                 assumption_bar=bar,
                 optimal_page=optimal_page,

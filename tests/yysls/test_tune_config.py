@@ -499,3 +499,58 @@ class TestSettingsPageBasics:
         panel._settings_page._rename_key()
         assert panel.rule_key == "heal_pure"
         assert tmp_manager.get_rule("heal_pure") is not None
+
+
+class TestPoolPage:
+    """可用词条库在上、转律词条库在下；转律候选收窄为可用 ∩ 可转律。"""
+
+    @staticmethod
+    def _page(qtbot, data: dict):
+        from PyQt6.QtWidgets import QGroupBox
+
+        from lvjiang.apps.yysls.ui.tune_settings.pool_page import PoolPage
+
+        changes: list[dict] = []
+        page = PoolPage(
+            ["最大外功攻击", "会意率", "会心率", "精准率", "最大本属攻击",
+             "剑武学增伤", "最大无相攻击"],
+            lambda: changes.append(dict(data)))
+        qtbot.addWidget(page)
+        page.load(data)
+        boxes = [box.title() for box in page.findChildren(QGroupBox)]
+        assert boxes[0].startswith("可用词条库")
+        assert boxes[1].startswith("转律词条库")
+        return page, changes
+
+    def test_transmute_candidates_are_pool_names_allowed_by_transmute_union(
+            self, qtbot):
+        data = {
+            "affix_pool": ["最大外功攻击", "精准率", "会意率", "最大本属攻击",
+                           "剑武学增伤"],
+            "transmute_priority": [],
+        }
+        page, _changes = self._page(qtbot, data)
+        # 精准率不在任何转律库；剑武学增伤是神力；动态类直接放行；顺序沿用可用词条库
+        assert page.transmute_candidates() == [
+            "最大外功攻击", "会意率", "最大本属攻击"]
+
+    def test_shrinking_pool_prunes_transmute_priority(self, qtbot):
+        data = {
+            "affix_pool": ["最大外功攻击", "会意率", "会心率"],
+            "transmute_priority": ["会心率", "会意率"],
+        }
+        page, changes = self._page(qtbot, data)
+        page._pool_list.set_names(["最大外功攻击", "会意率"])
+        page._on_pool_changed()
+        assert data["transmute_priority"] == ["会意率"]
+        assert data["affix_pool"] == ["最大外功攻击", "会意率"]
+        assert changes
+
+    def test_plain_apply_keeps_existing_transmute_priority(self, qtbot):
+        data = {
+            "affix_pool": ["最大外功攻击"],
+            "transmute_priority": ["会心率"],
+        }
+        page, _changes = self._page(qtbot, data)
+        page._apply()
+        assert data["transmute_priority"] == ["会心率"]

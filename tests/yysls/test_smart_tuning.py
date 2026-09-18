@@ -48,6 +48,8 @@ def _bare_evaluator() -> SmartTuningEvaluator:
         },
         get_playstyle=lambda _name: None,
         current_equip_level=lambda: 110,
+        # 转律库并集：转律分支只能转入这里有的词条；“垃圾”“池外”都不在库里
+        get_all_transmute_pools=lambda: {"流派": ["A", "B", "C", "D", "E"]},
     )
     evaluator._contexts = ()
     evaluator._disabled_reason = ""
@@ -359,9 +361,13 @@ def test_transmute_search_removes_only_first_affix_outside_rule_pool(
 
     evaluator._evaluate_plan(context, "ring", equipment)
 
-    assert len(seen) == 2  # 第 0 分支 + 第一条池外词条的转律分支
+    # 第 0 分支 + 第一条池外词条转成库内每个可用目标（B/C/D/E）的分支
+    assert len(seen) == 5
     assert "池外一" in seen[0]
-    assert "池外一" not in seen[1] and "池外二" in seen[1]
+    for names in seen[1:]:
+        assert "池外一" not in names and "池外二" in names
+    assert {tuple(sorted(names - {"首词条", "池外二", "A"})) for names in seen[1:]} == {
+        ("B",), ("C",), ("D",), ("E",)}
 
 
 def test_transmute_search_tries_each_existing_affix_when_all_are_usable(
@@ -397,9 +403,14 @@ def test_transmute_search_tries_each_existing_affix_when_all_are_usable(
 
     evaluator._evaluate_plan(context, "ring", equipment)
 
-    assert len(seen) == 4  # 不转律 + 分别移除第 2、3、4 条
+    # 不转律 + 第 2、3、4 条各转成库内两个未出现的词条（D/E），转入落回原槽
+    assert len(seen) == 7
     assert seen[0] == ("A", "B", "C")
-    assert seen[1:] == [("", "B", "C"), ("A", "", "C"), ("A", "B", "")]
+    assert seen[1:] == [
+        ("D", "B", "C"), ("E", "B", "C"),
+        ("A", "D", "C"), ("A", "E", "C"),
+        ("A", "B", "D"), ("A", "B", "E"),
+    ]
 
 
 def test_transmute_branch_can_rescue_candidate_without_mutating_source(
@@ -440,7 +451,7 @@ def test_transmute_branch_can_rescue_candidate_without_mutating_source(
 
     assert result.status is SmartTuningStatus.IMPROVES
     assert result.maximum_rate == 1.1
-    assert "移除第 2 条「垃圾」" in result.reason
+    assert "第 2 条「垃圾」转为「" in result.reason
     assert equipment["affix_2"]["name"] == "垃圾"
 
 
@@ -803,3 +814,70 @@ def base_tune_config():
         },
         "switches": {},
     }
+
+
+def test_transmute_branch_only_transmutes_into_pool_union(monkeypatch):
+    """规则池里的神力词条可以由调律补出，但不能作为转律转入目标。"""
+    evaluator = _bare_evaluator()
+    evaluator._game_config.get_all_transmute_pools = lambda: {"流派": ["B", "C"]}
+    seen = []
+
+    class Capture(SearchStrategy):
+        def search(self, problem):
+            seen.append(str(problem.equipment.get("affix_2", {}).get("name") or ""))
+            return SearchOutcome(
+                SearchStatus.NO_IMPROVEMENT, "checked", 0.5, 1)
+
+    evaluator._strategy = Capture()
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
+        lambda _equip: [])
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
+        lambda _equip, _gc: ["A", "B", "C", "神"])
+    context = _PlanContext(
+        "p", "方案", "流派", object(), object(), {}, 1.0,
+        affix_pool=("A", "B", "C", "神"), plan_maximum_rate=1.0)
+    equipment = {
+        "type": "环", "level": 110, "quality": "gold",
+        "affix_1": {"name": "首词条", "value": 1},
+        "affix_2": {"name": "垃圾", "value": 1},
+        "affix_3": {"name": "A", "value": 1},
+    }
+
+    evaluator._evaluate_plan(context, "ring", equipment)
+
+    assert seen[0] == "垃圾"
+    assert sorted(seen[1:]) == ["B", "C"]
+
+
+def test_no_transmute_pool_means_no_transmute_branch(monkeypatch):
+    evaluator = _bare_evaluator()
+    evaluator._game_config.get_all_transmute_pools = lambda: {}
+    seen = []
+
+    class Capture(SearchStrategy):
+        def search(self, problem):
+            seen.append(problem.equipment)
+            return SearchOutcome(
+                SearchStatus.NO_IMPROVEMENT, "checked", 0.5, 1)
+
+    evaluator._strategy = Capture()
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.graduation.smart_tuning.validate_combination_dict",
+        lambda _equip: [])
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.graduation.smart_tuning.normal_affix_candidates",
+        lambda _equip, _gc: ["A", "B", "C"])
+    context = _PlanContext(
+        "p", "方案", "流派", object(), object(), {}, 1.0,
+        affix_pool=("A", "B", "C"), plan_maximum_rate=1.0)
+    equipment = {
+        "type": "环", "level": 110, "quality": "gold",
+        "affix_1": {"name": "首词条", "value": 1},
+        "affix_2": {"name": "垃圾", "value": 1},
+    }
+
+    evaluator._evaluate_plan(context, "ring", equipment)
+
+    assert len(seen) == 1

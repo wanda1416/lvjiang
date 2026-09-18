@@ -31,6 +31,7 @@ from ..combat.combat_attrs import (
 )
 from ..equip_validator import validate_combination_dict
 from ..loadout import EQUIPMENT_SLOTS, LoadoutRepository, resolve_school
+from ..loadout.transmute import transmute_pool_union
 from ..tuning_rules import (
     PART_ALIAS,
     SmartTuningConfig,
@@ -566,9 +567,11 @@ class SmartTuningEvaluator:
             pool = set(context.affix_pool)
             aliases = dynamic_affix_map(context.attribute)
 
-            # 第 0 分支始终保留原词条；额外分支把一次未来转律表达为“移除
-            # 一个已出现的第 2~4 词条，再交给同一套补全算法”。当前能进入
-            # 自动调律的装备不可能已有转律词条，无需引入再次转律状态机。
+            # 第 0 分支始终保留原词条；额外分支把一次未来转律表达为“把一个
+            # 已出现的第 2~4 词条转成某个转律库词条，其余空槽再交给同一套
+            # 补全算法”。转入词条必须是游戏里真能转出来的：各流派转律词条库
+            # 的并集 ∩ 规则池 ∩ 部位可出现；空槽由调律补全，不受转律库限制。
+            # 当前能进入自动调律的装备不可能已有转律词条，无需再次转律状态机。
             branches: list[tuple[str, dict]] = [("", candidate)]
             if 2 <= affix_count <= 4:
                 removable: list[tuple[int, str]] = []
@@ -581,14 +584,36 @@ class SmartTuningEvaluator:
                     removable.append((index, name))
                     if name not in pool and aliases.get(name) not in pool:
                         outside_pool.append((index, name))
-                # 有池外词条时只处理第一条；否则逐一尝试移除全部已出现的
-                # 非首词条。一次转律最多移除一条。
+                # 有池外词条时只处理第一条；否则逐一尝试转出全部已出现的
+                # 非首词条。一次转律最多改一条。
                 selected = outside_pool[:1] or removable
+                transmutable = set(transmute_pool_union(self._game_config))
                 for index, name in selected:
                     variant = copy.deepcopy(candidate)
                     variant.pop(f"affix_{index}", None)
-                    branches.append((
-                        f"转律假设：移除第 {index} 条「{name}」", variant))
+                    present_names = {
+                        str(item.get("name") or "")
+                        for key, item in variant.items()
+                        if key.startswith("affix_") and isinstance(item, dict)
+                        and key != "affix_1"
+                    }
+                    targets = [
+                        target
+                        for target in normal_affix_candidates(
+                            variant, self._game_config)
+                        if target in transmutable
+                        and target != name
+                        and (target in pool or aliases.get(target) in pool)
+                        and target not in present_names
+                    ]
+                    for target in targets:
+                        # 被转出的槽在 2~4，是当前第一个空槽，转入词条落回原位。
+                        filled = self._with_affixes(variant, (target,))
+                        if filled is None:
+                            continue
+                        branches.append((
+                            f"转律假设：第 {index} 条「{name}」转为「{target}」",
+                            filled))
 
             budget = SearchBudget(_MAX_PLAN_SECONDS, self._stop_check)
             searched: list[tuple[str, SearchOutcome, tuple[str, ...]]] = []

@@ -126,6 +126,12 @@ regions:
   view: init
   to: /base
   navigation: replace
+- key: yysls_logo
+  name: 游戏logo
+  type: slot
+  is_text: true
+  is_clickable: false
+  view: init
 points:
 - key: point_1
   name: 点1

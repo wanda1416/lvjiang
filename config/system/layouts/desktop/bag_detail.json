@@ -10,7 +10,7 @@
       "activation_key": "ESC",
       "template": {
         "name": "desktop/bag_detail/back",
-        "min_score": 0.6,
+        "min_score": 0.8,
         "record_w": 1936,
         "record_h": 1088
       }

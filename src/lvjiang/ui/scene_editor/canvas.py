@@ -929,8 +929,10 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         sx0, sy0 = self._canvas_to_screenshot_norm(left, top)
         sx1, sy1 = self._canvas_to_screenshot_norm(right, bottom)
         height, width = self._original_image.shape[:2]
-        px0 = min(max(int(sx0 * width), 0), width)
-        py0 = min(max(int(sy0 * height), 0), height)
+        # 四边统一 round：运行时 template_locator.search_box 用同样的取整，
+        # 同分辨率下模板边与 Region 搜索区边完全对齐。
+        px0 = min(max(int(round(sx0 * width)), 0), width)
+        py0 = min(max(int(round(sy0 * height)), 0), height)
         px1 = min(max(int(round(sx1 * width)), 0), width)
         py1 = min(max(int(round(sy1 * height)), 0), height)
         if px1 - px0 < 4 or py1 - py0 < 4:

@@ -176,8 +176,9 @@ def locate_landmark(
 ) -> tuple[float, float, float] | None:
     """在实时截图里找参照图 (ref_xy) 周围那块图案，返回其中心 (x, y, score)；找不到 None
 
-    多尺度 TM_CCOEFF_NORMED：基准比例取两图宽度比，再 ±10% 和 1.0 兜底（同
-    template_locator.adaptive_scales 的思路）。返回的是**参照点**在实时图里的位置——
+    多尺度 TM_CCOEFF_NORMED：基准比例取两图宽度比，再 ±10% 和 1.0 兜底（标定
+    时参照图与实时图来源不同，比例并非精确已知，与 template_locator 按录制
+    画布精确换算的场景不同）。返回的是**参照点**在实时图里的位置——
     参照点不一定在 patch 正中（靠边时被裁），按裁剪偏移折算。
     """
     rh, rw = ref_img.shape[:2]

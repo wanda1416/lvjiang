@@ -108,6 +108,19 @@
         "record_w": 2800,
         "record_h": 1260
       }
+    },
+    {
+      "key": "yysls_logo",
+      "x_ratio": 0.08418571510385961,
+      "y_ratio": 0.12748684990805104,
+      "w_ratio": 0.24436546219644148,
+      "h_ratio": 0.2017144299319476,
+      "template": {
+        "name": "android/game_login_page/yysls_logo",
+        "min_score": 0.8,
+        "record_w": 2800,
+        "record_h": 1260
+      }
     }
   ],
   "points": [

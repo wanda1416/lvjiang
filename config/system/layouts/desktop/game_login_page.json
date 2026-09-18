@@ -110,7 +110,20 @@
       "h_ratio": 0.040222936276993006,
       "template": {
         "name": "desktop/game_login_page/back",
-        "min_score": 0.6,
+        "min_score": 0.8,
+        "record_w": 1936,
+        "record_h": 1088
+      }
+    },
+    {
+      "key": "yysls_logo",
+      "x_ratio": 0.04740700493632566,
+      "y_ratio": 0.11299351501972882,
+      "w_ratio": 0.24768499573863256,
+      "h_ratio": 0.1721783694653447,
+      "template": {
+        "name": "desktop/game_login_page/yysls_logo",
+        "min_score": 0.8,
         "record_w": 1936,
         "record_h": 1088
       }

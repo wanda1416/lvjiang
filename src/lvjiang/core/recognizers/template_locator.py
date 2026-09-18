@@ -4,10 +4,18 @@
 - ReferenceMatcher 是**分类器**：给一块已裁好的区域，回答"它最像图库里哪一条"
 - 本模块是**定位器**：给整帧 + 一张模板，回答"模板出现在哪、多像"
 
-分辨率自适应沿用 Airtest 的做法：Region 的布局模板绑定记录录制画布宽，
-运行时按 ``当前画布宽 / record_w`` 先缩放模板，再在基准比例 ±10% 各试一次
-兜底。声明分辨率自动缩放这套在业界没人
-信（用户都在手写比例换算），所以这里不猜，只按录制尺寸换算。
+分辨率换算与位置容差是两件事，分开处理：
+
+- **缩放只做分辨率换算。** Region 的布局模板绑定记录录制画布宽，运行时按
+  ``当前画布宽 / record_w`` 把模板精确缩放一次；两边都是已知量，不再像
+  Airtest 那样在基准比例 ±10% 盲猜——对几十像素的图标，±10% 是 5–6 px 的
+  形变，同设备上它只会让缩过的模板"挤"进边界舍入后偏小的搜索区，拿一个
+  假的 0.9 冒充命中。
+- **搜索区只吸收舍入差。** 编辑器"截取模板"默认取整个 Region 外框，搜索区
+  与模板等大；归一化坐标乘回像素再取整，模板边与 Region 边、跨分辨率时模板
+  缩放尺寸与 Region 像素尺寸，各自最多差 1 px，所以运行时只保证模板在搜索
+  区内每边有 2 px 余地，Region 不够大才按需外扩。设备间的 UI 偏移不在这里
+  兜底——那是布局校准的事。
 
 模板文件只有 ``config/system/templates/<name>.png``，走 ConfigResolver 的
 system/local 双层，用户可在 local 覆盖。
@@ -211,12 +219,19 @@ def _to_gray(img: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(img[..., :3], cv2.COLOR_BGR2GRAY)
 
 
-def adaptive_scales(canvas_w: int, record_w: int) -> list[float]:
-    """录制宽 → 当前宽的基准比例 ± 10%，再加 1.0 兜底"""
-    base = canvas_w / record_w if record_w > 0 and canvas_w > 0 else 1.0
-    if abs(base - 1.0) < 0.02:
-        return [0.9, 1.0, 1.1]
-    return [base * 0.9, base, base * 1.1, 1.0]
+#: 缩放后的模板在搜索区内每边至少保留的滑动余地（px）：只覆盖取整误差
+#: （每边 ≤1 px，跨分辨率时模板尺寸与 Region 尺寸再各差 ≤1 px）。
+#: Region 本身已经比模板大这么多时不再外扩。
+SEARCH_SLACK_PX = 2
+
+
+def resolution_scale(canvas_w: int, record_w: int) -> float:
+    """录制画布宽 → 当前画布宽的精确比例；任一未知时不缩放（1.0）。"""
+    if record_w > 0 and canvas_w > 0:
+        return canvas_w / record_w
+    return 1.0
+
+
 
 
 def locate(
@@ -226,10 +241,11 @@ def locate(
     scales: list[float] | tuple[float, ...] = (1.0,),
     min_score: float = DEFAULT_MIN_SCORE,
 ) -> Located | None:
-    """在整帧的 [x1,x2]×[y1,y2]（像素闭区间）里做多尺度模板匹配，返回最佳命中或 None
+    """在整帧的 [x1,x2]×[y1,y2]（像素闭区间）里按给定尺度做模板匹配，返回最佳命中或 None
 
     用 TM_CCOEFF_NORMED（去均值归一化相关），对整体亮度偏移不敏感；
     分数 <0 按 0 计。模板缩放后比搜索区域还大的尺度直接跳过。
+    ``scales`` 正常只有一个值（``resolution_scale``）；多值只用于测试或调试。
     """
     h, w = frame_bgr.shape[:2]
     x1 = min(max(int(x1), 0), w - 1)
@@ -262,9 +278,41 @@ def locate(
         if best is not None:
             logger.debug(f"模板 {tpl.name} 最佳分 {best.score:.3f} < {min_score}（scale {best.scale:.2f}）")
         return None
-    if abs(best.scale - 1.0) > 0.03:
-        logger.debug(f"模板 {tpl.name} 自适配 scale={best.scale:.2f} score={best.score:.3f}")
     return best
+
+
+def search_box(
+    frame_shape: tuple[int, ...],
+    tpl: Template,
+    canvas,
+    region,
+) -> tuple[int, int, int, int, float]:
+    """Region 对应的搜索区（像素闭区间）与模板缩放比例。
+
+    Region 边界用 ``round`` 取整，与编辑器裁剪模板时一致。搜索区以 Region 为
+    准，只在它容不下「缩放后的模板 + 每边 ``SEARCH_SLACK_PX``」时才对称外扩到
+    刚好容下；Region 本就更大（部分截取的模板、手画的大区域）则原样使用。
+    返回值不越界保护：``locate`` 会 clip 到帧内。
+    """
+    h, w = frame_shape[:2]
+    canvas_x = canvas.x_ratio * w
+    canvas_y = canvas.y_ratio * h
+    canvas_w = canvas.w_ratio * w
+    canvas_h = canvas.h_ratio * h
+    scale = resolution_scale(int(round(canvas_w)), tpl.record_w)
+    x1 = int(round(canvas_x + region.x_ratio * canvas_w))
+    y1 = int(round(canvas_y + region.y_ratio * canvas_h))
+    x2 = int(round(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)) - 1
+    y2 = int(round(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h)) - 1
+    need_w = int(round(tpl.w * scale)) + 2 * SEARCH_SLACK_PX
+    need_h = int(round(tpl.h * scale)) + 2 * SEARCH_SLACK_PX
+    grow_x = max(0, need_w - (x2 - x1 + 1))
+    grow_y = max(0, need_h - (y2 - y1 + 1))
+    x1 -= grow_x // 2
+    x2 += grow_x - grow_x // 2
+    y1 -= grow_y // 2
+    y2 += grow_y - grow_y // 2
+    return x1, y1, x2, y2, scale
 
 
 def locate_in_region(
@@ -274,20 +322,11 @@ def locate_in_region(
     region,
     min_score: float = DEFAULT_MIN_SCORE,
 ) -> Located | None:
-    """在布局 Region 内定位模板；搜索范围不会越出 Region。"""
-    h, w = frame_bgr.shape[:2]
-    canvas_x = canvas.x_ratio * w
-    canvas_y = canvas.y_ratio * h
-    canvas_w = canvas.w_ratio * w
-    canvas_h = canvas.h_ratio * h
-    x1 = int(canvas_x + region.x_ratio * canvas_w)
-    y1 = int(canvas_y + region.y_ratio * canvas_h)
-    x2 = int(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w) - 1
-    y2 = int(canvas_y + (region.y_ratio + region.h_ratio) * canvas_h) - 1
+    """在布局 Region 内定位模板：模板按录制/当前画布宽精确缩放，搜索区为
+    Region（不足以容下模板 + 每边 ``SEARCH_SLACK_PX`` 时按需外扩）。"""
+    x1, y1, x2, y2, scale = search_box(frame_bgr.shape, tpl, canvas, region)
     return locate(
-        frame_bgr, tpl, x1, y1, x2, y2,
-        scales=adaptive_scales(int(canvas_w), tpl.record_w),
-        min_score=min_score,
+        frame_bgr, tpl, x1, y1, x2, y2, scales=(scale,), min_score=min_score,
     )
 
 

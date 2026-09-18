@@ -64,6 +64,10 @@
 单体奇术增伤与群体奇术增伤、胫甲/臂甲的对首领单位增伤与玩家单位增效），
 同一件装备上也不会同时出现，只会是其中一条。
 
+> 程序侧对应：这条与「属攻类最多 2 条」「词条 2–5 互不重复」「转律只改第 2–5 条」
+> 等组合铁律写死在 `core/equip_validator.py` / `core/loadout/transmute.py`，不在配置里；
+> 位置、依据与变化时要动的地方见 [06-mechanics-conventions.md](06-mechanics-conventions.md) A6–A8。
+
 ---
 
 ## 四、词条颜色等级与数值

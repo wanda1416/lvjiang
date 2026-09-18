@@ -74,7 +74,10 @@ def _over_cap(level, affix: Affix) -> tuple[bool, float | None]:
 
 
 def _categories() -> tuple[str, tuple[str, ...]]:
-    """返回（属攻类归属名, 神力词条归属名元组）"""
+    """返回（属攻类归属名, 神力词条归属名元组）
+
+    组合铁律与这两个归属名写死在代码：docs/10-game/06-mechanics-conventions.md A6。
+    """
     return "属攻类", ("增效类", "武器类")
 
 

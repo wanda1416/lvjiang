@@ -113,6 +113,8 @@ PLAY_STYLE_FIELD_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
     ("", [("outer_bonus", "外功伤害加成", "%"), ("__attr_bonus__", "属攻伤害加成", "%")]),
 ]
 
+# 以下常量是写死的游戏规则事实（不在 config/），登记与依据见
+# docs/10-game/06-mechanics-conventions.md A1–A4；改动先更新登记表。
 # 抗性配置（110级默认值）
 # 三率抗性 = 145 → 除数 = 1 + 145/100 = 2.45
 # 增效抗性 = 15 → 除数 = 1 + 15/100 = 1.15

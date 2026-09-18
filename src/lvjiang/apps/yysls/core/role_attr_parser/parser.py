@@ -235,6 +235,12 @@ def parse_detail2_attr_pen(text: str) -> dict[str, float]:
     """解析"属攻穿透"detail_2 展开文本，提取四门武学的分项穿透数值。
 
     "鸣金穿透：10.3" → mingjin_pen=10.3（无相穿透无对应字段，忽略）
+
+    游戏事实（登记于 docs/10-game/06-mechanics-conventions.md B6）：该详情页
+    把装备定音的「无相穿透」单独列一行，**不**并入各流派分项；当前版本也没有
+    「鸣金穿透」之类的流派穿透装备词条。所以这里读到的四个分项就是角色自身
+    的基础穿透，可直接作为基础属性保存，不需要再扣装备。无相穿透如何计入
+    流派属攻穿透由 ``combat_attrs.fold_wuxiang_pen`` 在计算时处理。
     """
     result: dict[str, float] = {}
     for m in _SCHOOL_PEN_RE.finditer(text or ""):

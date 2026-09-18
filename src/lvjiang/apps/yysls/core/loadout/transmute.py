@@ -19,6 +19,7 @@ TARGET_NAME_KEY = "target_transmute_name"
 TARGET_VALUE_KEY = "target_transmute_value"
 
 #: 转律只能改商角徵羽；宫（第 1 条）永远不动。
+#: 游戏规则事实，登记于 docs/10-game/06-mechanics-conventions.md A7。
 TRANSMUTABLE_INDICES: tuple[int, ...] = (2, 3, 4, 5)
 
 # 不合格原因代码；界面按代码翻译成文案。

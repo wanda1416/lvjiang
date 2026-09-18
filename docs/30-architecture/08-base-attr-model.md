@@ -9,6 +9,11 @@
 `config/system/yysls/attr_model/`。装备词条依旧走原有的
 `equipment_attrs` 通道，既有模块零改动。
 
+> 注意两套五维口径：本模块的面板公式（如 `敏 → 外功攻击, multiplier 0.2639, max 73.9`）
+> 来自 YAML；装备词条的五维换算（1 劲 → 0.225 / 1.36 …）是 `combat_attrs.py` 的代码常量，
+> `attr_model/builtin.py` 只是把后者包装成默认公式。两边系数不同是有意的，
+> 见 [../10-game/06-mechanics-conventions.md](../10-game/06-mechanics-conventions.md) A1、A5。
+
 ## 数据流
 
 ```text

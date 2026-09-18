@@ -28,7 +28,9 @@ from ..combat.combat_attrs import (
     aggregate_equipment_attrs,
     apply_hypothetical_caps,
     compute_equip_base_attrs,
+    effective_equipped,
     has_resistance,
+    max_stack_affixes,
 )
 from .graduation_program import ProgramRuntime
 
@@ -679,6 +681,16 @@ def search_optimal_combo(
     slot_sizes = [len(v) for v in slot_vec_arrays]
     n_dims = len(input_specs)
 
+    # 同名只取最高（专属武学增伤）是组合级规则，单件向量表达不了：记下每件
+    # 候选此类词条在输入向量里的 (维度, 原始贡献)，内环里对同名多件只保留
+    # 最高一条，把其余的贡献从累加向量里扣回去。只有 ≥2 个槽存在这类候选
+    # 时才需要修正（同一件内的同名已在单件归一化时处理）。
+    slot_stack_arrays = _build_stack_arrays(
+        slot_equip_arrays, field_index)
+    stack_slot_count = sum(
+        1 for entries in slot_stack_arrays if any(entries))
+    need_stack_fix = stack_slot_count >= 2
+
     # -- Phase 2: enumerate + evaluate --
     board = TopRLeaderboard(top_r)
     evaluated = 0
@@ -708,6 +720,9 @@ def search_optimal_combo(
             vec = slot_vec_arrays[si][idx]
             for d in range(n_dims):
                 acc[d] += vec[d]
+        # 2b. 同名只取最高：扣掉除最高一条外的同名贡献
+        if need_stack_fix:
+            _apply_max_stack_fix(acc, combo_indices, slot_stack_arrays)
         # 3. 应用抗性规则（向量化等效 build_graduation_attrs）
         _apply_resistance_to_vec(acc, base_vec, field_index, graduation_context)
 
@@ -768,6 +783,64 @@ def search_optimal_combo(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _build_stack_arrays(
+    slot_equip_arrays: list[list[dict]],
+    field_index: dict[str, int],
+) -> list[list[dict[str, tuple[int, float]]]]:
+    """每个候选的“同名只取最高”词条：名称 → (输入向量维度, 原始贡献)。
+
+    原始贡献与 ``aggregate_equipment_attrs`` 的累加口径一致（百分比词条已
+    除以 100），抗性在累加之后统一施加，所以扣减是线性的。方案不读该输入时
+    维度不存在，直接忽略。
+    """
+    from ...config import get_game_config
+    gc = get_game_config()
+    result: list[list[dict[str, tuple[int, float]]]] = []
+    for equips in slot_equip_arrays:
+        entries: list[dict[str, tuple[int, float]]] = []
+        for equip in equips:
+            # 与单件向量同一口径：先做单件归一化（部位合法性、件内同名取高）
+            normalized = effective_equipped({"x": equip}, gc)["x"]
+            stacks = max_stack_affixes(normalized, gc)
+            mapped: dict[str, tuple[int, float]] = {}
+            for name, value in stacks.items():
+                dim = field_index.get(name)
+                if dim is None:
+                    continue
+                single = aggregate_equipment_attrs(
+                    {"x": {"affix_1": {"name": name, "value": value}}},
+                    normalize=False)
+                raw = single.extra_attrs.get(name)
+                if raw is None:
+                    raw = float(getattr(single, name, 0.0))
+                mapped[name] = (dim, float(raw))
+            entries.append(mapped)
+        result.append(entries)
+    return result
+
+
+def _apply_max_stack_fix(
+    acc: list[float],
+    combo_indices: tuple[int, ...] | list[int],
+    slot_stack_arrays: list[list[dict[str, tuple[int, float]]]],
+) -> None:
+    """同名多件只保留最高一条：把其余同名贡献从累加向量扣除（原地）。"""
+    seen: dict[str, float] = {}
+    for si, idx in enumerate(combo_indices):
+        stacks = slot_stack_arrays[si][idx]
+        if not stacks:
+            continue
+        for name, (dim, raw) in stacks.items():
+            previous = seen.get(name)
+            if previous is None:
+                seen[name] = raw
+            elif raw > previous:
+                acc[dim] -= previous
+                seen[name] = raw
+            else:
+                acc[dim] -= raw
+
 
 def _make_base_attr_lookup() -> Callable:
     """Create a base-attr lookup function from the global GameConfigManager."""

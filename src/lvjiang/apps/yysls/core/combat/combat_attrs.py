@@ -23,6 +23,8 @@ from typing import Any
 
 from loguru import logger
 
+from ...config.constants import STACK_MAX
+
 # 战斗属性字段定义（顺序即展示顺序）
 # 每组: (字段名, 显示名, 单位, 是否区间)
 COMBAT_ATTR_FIELDS: list[tuple[str, str, str, bool]] = [
@@ -576,12 +578,99 @@ def apply_hypothetical_caps(
     return result
 
 
-def aggregate_equipment_attrs(equipped: dict) -> CombatAttributes:
+def max_stack_affixes(equip: dict, game_config=None) -> dict[str, float]:
+    """一件装备上“同名只取最高”词组的词条：名称 → 数值。"""
+    if game_config is None:
+        from ...config import get_game_config
+        game_config = get_game_config()
+    result: dict[str, float] = {}
+    for i in range(1, 6):
+        affix = equip.get(f"affix_{i}")
+        if not isinstance(affix, dict):
+            continue
+        name = str(affix.get("name") or "")
+        if not name or game_config.get_affix_stack(name) != STACK_MAX:
+            continue
+        try:
+            value = float(affix.get("value") or 0)
+        except (TypeError, ValueError):
+            value = 0.0
+        result[name] = max(result.get(name, 0.0), value)
+    return result
+
+
+def effective_equipped(equipped: dict, game_config=None) -> dict:
+    """按游戏规则归一化一套装备，供所有毕业率/属性计算共用。
+
+    两条规则都来自游戏配置，不在代码里写死词条名：
+    1. 部位合法性：词条不能出现在该部位/武器类型上的（``affix_parts`` 与武器
+       专属绑定，见 ``normal_affix_candidates``）不参与计算——这类数据只可能
+       来自识别误读或手填；没有 ``type`` 的假想装备不做此过滤。
+    2. 同名叠加：词组 ``_stack: max`` 的词条（专属武学增伤）全套只保留数值
+       最高的一条，其余同名词条移除；缺省词组照常累加。
+
+    返回新的 ``{slot: equip}``，装备 dict 为浅拷贝、词条 dict 不复制不修改。
+    """
+    if game_config is None:
+        from ...config import get_game_config
+        game_config = get_game_config()
+    from .affix_rules import normal_affix_candidates
+
+    known = set(game_config.get_normal_affix_names())
+    allowed_by_type: dict[str, set[str]] = {}
+    result: dict = {}
+    best: dict[str, tuple[float, str, str]] = {}  # name → (value, slot, key)
+    for slot_key, equip in equipped.items():
+        if not isinstance(equip, dict):
+            result[slot_key] = equip
+            continue
+        copied = dict(equip)
+        equip_type = str(equip.get("type") or "")
+        allowed: set[str] | None = None
+        if equip_type:
+            if equip_type not in allowed_by_type:
+                allowed_by_type[equip_type] = set(
+                    normal_affix_candidates(equip, game_config))
+            allowed = allowed_by_type[equip_type]
+        for i in range(1, 6):
+            key = f"affix_{i}"
+            affix = copied.get(key)
+            if not isinstance(affix, dict):
+                continue
+            name = str(affix.get("name") or "")
+            if not name:
+                continue
+            if allowed is not None and name in known and name not in allowed:
+                copied.pop(key, None)
+                continue
+            if game_config.get_affix_stack(name) != STACK_MAX:
+                continue
+            try:
+                value = float(affix.get("value") or 0)
+            except (TypeError, ValueError):
+                value = 0.0
+            current = best.get(name)
+            if current is None or value > current[0]:
+                if current is not None:
+                    result[current[1]].pop(current[2], None)
+                best[name] = (value, slot_key, key)
+            else:
+                copied.pop(key, None)
+        result[slot_key] = copied
+    return result
+
+
+def aggregate_equipment_attrs(
+    equipped: dict, *, normalize: bool = True,
+) -> CombatAttributes:
     """聚合装备属性到战斗属性
 
     Args:
         equipped: 用户装备数据，格式为 {slot_key: equip_dict}
                   equip_dict 包含 affix_1~5 和 dingyin
+        normalize: 先按 ``effective_equipped`` 归一化（部位合法性、同名只取
+                  最高）。只有调用方已经自行归一化、或刻意要看原始累加值时
+                  才关闭。
 
     Returns:
         聚合后的装备属性（不含基础属性和弓玦）
@@ -589,6 +678,8 @@ def aggregate_equipment_attrs(equipped: dict) -> CombatAttributes:
     五维处理：劲/势/敏/体/御 词条先累计总值，再统一转换为战斗属性
     （转换后的值已包含在返回结果中，反推基础属性时自然扣除）
     """
+    if normalize:
+        equipped = effective_equipped(equipped)
     result = CombatAttributes()
     # 五维累计（最后统一转换）
     five_dims = {"劲": 0.0, "势": 0.0, "敏": 0.0, "体": 0.0, "御": 0.0}

@@ -55,6 +55,8 @@ def _bare_evaluator() -> SmartTuningEvaluator:
     evaluator._disabled_reason = ""
     evaluator._rate_cache = {}
     evaluator._other_attrs_cache = {}
+    evaluator._other_stack_cache = {}
+    evaluator._other_equipped_cache = {}
     evaluator._strategy = get_strategy()
     return evaluator
 

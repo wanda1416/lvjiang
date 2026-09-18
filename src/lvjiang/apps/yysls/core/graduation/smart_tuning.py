@@ -27,6 +27,7 @@ from ..combat.combat_attrs import (
     build_graduation_attrs,
     compute_equip_base_attrs,
     compute_gongjue_attrs,
+    max_stack_affixes,
 )
 from ..equip_validator import validate_combination_dict
 from ..loadout import EQUIPMENT_SLOTS, LoadoutRepository, resolve_school
@@ -144,6 +145,10 @@ class SmartTuningEvaluator:
         self._disabled_reason = ""
         self._rate_cache: dict[tuple[str, str], float] = {}
         self._other_attrs_cache: dict[tuple[str, str], CombatAttributes] = {}
+        # 其余七件按“同名只取最高”词组统计的词条名 → 值；候选带同名词条时
+        # 不能再用分槽缓存相加，必须整套归一化后聚合。
+        self._other_stack_cache: dict[tuple[str, str], dict[str, float]] = {}
+        self._other_equipped_cache: dict[tuple[str, str], dict[str, dict]] = {}
         if config.enabled and config.evaluation.enabled:
             self._contexts = self._load_contexts(
                 username, incoming_rule_configs or {}, users_dir)
@@ -825,8 +830,29 @@ class SmartTuningEvaluator:
                 other_equipped, self._game_config.get_base_attr_values,
             ) + aggregate_equipment_attrs(other_equipped)
             self._other_attrs_cache[other_key] = equipment_attrs
+            self._other_equipped_cache[other_key] = other_equipped
+            stacks: dict[str, float] = {}
+            for equip in other_equipped.values():
+                for name, value in max_stack_affixes(
+                        equip, self._game_config).items():
+                    stacks[name] = max(stacks.get(name, 0.0), value)
+            self._other_stack_cache[other_key] = stacks
         candidate_equipped = self._apply_maximum_assumptions(
             context, {slot: candidate})
+        candidate_stacks = max_stack_affixes(
+            candidate_equipped[slot], self._game_config)
+        if candidate_stacks and any(
+                name in self._other_stack_cache[other_key]
+                for name in candidate_stacks):
+            # 候选与在位装备带同名的专属武学增伤：游戏只生效最高一条，
+            # 分槽相加会算多，退回整套归一化聚合。
+            combined = dict(self._other_equipped_cache[other_key])
+            combined[slot] = candidate_equipped[slot]
+            total_attrs = compute_equip_base_attrs(
+                combined, self._game_config.get_base_attr_values,
+            ) + aggregate_equipment_attrs(combined)
+            return build_graduation_attrs(
+                context.base_attrs, total_attrs, context.school)
         candidate_attrs = compute_equip_base_attrs(
             candidate_equipped, self._game_config.get_base_attr_values,
         ) + aggregate_equipment_attrs(candidate_equipped)

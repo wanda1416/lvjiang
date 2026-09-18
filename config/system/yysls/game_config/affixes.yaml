@@ -79,6 +79,7 @@ affix_caps:
       cap: 9.4
   指定武学增效:
     _unit: '%'
+    _stack: max
     _aliases:
     - 剑武学增伤
     - 枪武学增伤

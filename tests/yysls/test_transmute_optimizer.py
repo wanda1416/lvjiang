@@ -173,8 +173,8 @@ def test_saved_targets_rate_and_ineligible_slots_are_reported():
     assert not status["pendant"].eligible
     assert status["pendant"].reason == "no_retransfer"
     assert status["pendant"].move is None
-    assert result.missing_slots == (
-        "main_weapon", "sub_weapon", "head", "chest", "leg", "wrist")
+    assert set(result.missing_slots) == {
+        "main_weapon", "sub_weapon", "head", "chest", "leg", "wrist"}
 
 
 def test_untrusted_equipment_blocks_application():

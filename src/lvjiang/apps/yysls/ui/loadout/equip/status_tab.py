@@ -38,6 +38,7 @@ from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from lvjiang.ui.user_toolbar import add_user_nav_buttons
 
 from ......i18n import tr
+from ....config.equipment_slots import SLOT_SPECS
 from ....core.affix_cap import equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ...events import EQUIPMENT_CHANGED, get_event_hub
@@ -67,15 +68,10 @@ _FILTER_TOGGLE_STYLE = (
 # 顶部槽位布局（固定 2×4）
 # (row, col, slot_key, display_name, filter_type)
 # filter_type 对应 bag_items 的分组 key；主副武器共享 "weapon"
+#: (行, 列, slot_key, 显示名, 背包筛选类型)；唯一定义见 config.equipment_slots
 _SLOT_LAYOUT = [
-    (0, 0, "main_weapon", tr("主武器"), "weapon"),
-    (0, 1, "sub_weapon", tr("副武器"), "weapon"),
-    (0, 2, "head", tr("冠胄"), "head"),
-    (0, 3, "chest", tr("胸甲"), "chest"),
-    (1, 0, "ring", tr("环"), "ring"),
-    (1, 1, "pendant", tr("佩"), "pendant"),
-    (1, 2, "leg", tr("胫甲"), "leg"),
-    (1, 3, "wrist", tr("腕甲"), "wrist"),
+    (spec.row, spec.col, spec.key, spec.label, spec.filter_type)
+    for spec in SLOT_SPECS
 ]
 
 # 部位显示名（bag_items 分组 key → 卡片标签）—— 使用 gc.get_group_to_part() 替代

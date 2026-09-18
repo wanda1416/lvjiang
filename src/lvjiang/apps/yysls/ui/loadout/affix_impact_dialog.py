@@ -1,9 +1,11 @@
 """当前配装词条边际收益对话框。"""
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable
 
-from PyQt6.QtCore import Qt, QTimer
+from loguru import logger
+from PyQt6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -15,6 +17,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QTableWidget,
@@ -25,7 +28,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .....i18n import tr
-from .....ui.button_styles import apply_dialog_button_box_style
+from .....ui.button_styles import apply_button_style, apply_dialog_button_box_style
 from ...config.tune_slots import SLOT_LABELS
 from ...core.graduation.affix_impact import (
     AffixCombinationResult,
@@ -33,19 +36,69 @@ from ...core.graduation.affix_impact import (
     AffixImpactReport,
     AffixReplacementSuggestion,
 )
+from ...core.graduation.transmute_optimizer import TransmutePlanResult
+from ...core.loadout.transmute import (
+    REASON_FIRST_TRANSFERRED,
+    REASON_ILLEGAL,
+    REASON_MULTIPLE_TRANSFERRED,
+    REASON_NO_LEVEL_CONFIG,
+    REASON_NO_RETRANSFER,
+    REASON_NO_RETRANSFER_AFTER_CHENGYIN,
+    REASON_NO_SLOTS,
+    REASON_UNKNOWN_ORIGINAL_LEVEL,
+    TARGET_NAME_KEY,
+    TARGET_VALUE_KEY,
+    strip_transmute_targets,
+)
+from .equip.cards import _SlotCard
 
 JointAnalyzer = Callable[[tuple[str, ...]], AffixCombinationResult]
+ReportProvider = Callable[[], AffixImpactReport]
+TransmuteRunner = Callable[[Callable[[], bool]], TransmutePlanResult]
+ApplyHandler = Callable[[TransmutePlanResult], bool]
 
-_JOINT_BUTTON_STYLE = (
-    "QPushButton { background: palette(highlight); color: palette(highlighted-text); "
-    "border: 1px solid palette(highlight); border-radius: 5px; padding: 6px 13px; "
-    "font-weight: 700; }"
-    "QPushButton:hover { border-color: palette(text); }"
-    "QPushButton:pressed { background: palette(dark); }"
-    "QPushButton:disabled { background: palette(midlight); color: palette(mid); "
-    "border-color: palette(midlight); }"
+#: 默认 4 列 × 2 行；与备战方案槽位布局一致。
+DEFAULT_SLOT_LAYOUT: tuple[tuple[int, int, str], ...] = (
+    (0, 0, "main_weapon"), (0, 1, "sub_weapon"), (0, 2, "head"), (0, 3, "chest"),
+    (1, 0, "ring"), (1, 1, "pendant"), (1, 2, "leg"), (1, 3, "wrist"),
 )
 
+
+def transmute_reason_text(code: str) -> str:
+    return {
+        REASON_UNKNOWN_ORIGINAL_LEVEL: tr("原始等级未知"),
+        REASON_NO_RETRANSFER: tr("不支持无限转律"),
+        REASON_NO_RETRANSFER_AFTER_CHENGYIN: tr("承音后不可转律"),
+        REASON_ILLEGAL: tr("词条组合异常"),
+        REASON_MULTIPLE_TRANSFERRED: tr("多个转律标记，请校正"),
+        REASON_FIRST_TRANSFERRED: tr("首词条带转律标记，请校正"),
+        REASON_NO_SLOTS: tr("没有可转词条"),
+        REASON_NO_LEVEL_CONFIG: tr("缺少该等级配置"),
+    }.get(code, code)
+
+
+class _TransmuteSignals(QObject):
+    finished = pyqtSignal(int, object, object)
+
+
+class _TransmuteWorker(QRunnable):
+    """后台执行转律搜索；只读装备快照，不写数据。"""
+
+    def __init__(self, generation: int, runner: TransmuteRunner,
+                 is_cancelled: Callable[[], bool]) -> None:
+        super().__init__()
+        self.signals = _TransmuteSignals()
+        self._generation = generation
+        self._runner = runner
+        self._is_cancelled = is_cancelled
+
+    def run(self) -> None:  # type: ignore[override]
+        try:
+            result = self._runner(self._is_cancelled)
+            self.signals.finished.emit(self._generation, result, None)
+        except Exception as exc:  # noqa: BLE001 - 结果经信号回主线程处理
+            logger.exception("转律建议计算失败")
+            self.signals.finished.emit(self._generation, None, str(exc))
 
 class _ProportionalTableWidget(QTableWidget):
     """随可用宽度按比例扩展全部列，而不是只拉伸某一列。"""
@@ -94,32 +147,55 @@ class _ProportionalTableWidget(QTableWidget):
 
 
 class AffixImpactDialog(QDialog):
-    """展示可执行的培养建议和理论词条敏感度。"""
+    """转律建议、等品质培养建议与词条收益率三个页签。
+
+    转律建议只在点击“计算”时后台搜索；培养建议与词条收益率首次切换到
+    对应页签时才计算并缓存，打开对话框不会把全部分析跑一遍。
+    """
 
     def __init__(
         self,
-        report: AffixImpactReport,
         school: str,
         scheme: str,
         parent: QWidget | None = None,
         *,
+        equipped: dict[str, dict] | None = None,
+        report_provider: ReportProvider | None = None,
         joint_analyzer: JointAnalyzer | None = None,
+        transmute_runner: TransmuteRunner | None = None,
+        apply_handler: ApplyHandler | None = None,
+        assumption_labels: tuple[str, ...] = (),
+        slot_layout: tuple[tuple[int, int, str], ...] = DEFAULT_SLOT_LAYOUT,
+        display_params: dict | None = None,
     ) -> None:
         super().__init__(parent)
+        self._school = school
+        self._scheme = scheme
+        self._equipped = copy.deepcopy(equipped or {})
+        self._report_provider = report_provider
         self._joint_analyzer = joint_analyzer
+        self._transmute_runner = transmute_runner
+        self._apply_handler = apply_handler
+        self._assumption_labels = tuple(assumption_labels)
+        self._slot_layout = slot_layout
+        self._display_params = dict(display_params or {})
+        self._report: AffixImpactReport | None = None
+        self._actionable_suggestions: tuple[AffixReplacementSuggestion, ...] = ()
+        self._blocked_equipment: tuple = ()
         self._slot_checkboxes: dict[str, QCheckBox] = {}
         self._joint_timer = QTimer(self)
         self._joint_timer.setSingleShot(True)
         self._joint_timer.setInterval(120)
         self._joint_timer.timeout.connect(self._calculate_joint)
-        self._actionable_suggestions = tuple(
-            item for item in report.suggestions
-            if item.graduation_delta > 1e-9
-        )
-        self._blocked_equipment = report.blocked_equipment
+        self._transmute_generation = 0
+        self._transmute_cancelled = False
+        self._transmute_result: TransmutePlanResult | None = None
+        self._transmute_applied = False
+        self._transmute_cards: dict[str, _SlotCard] = {}
+        self._tab_built = {"suggestion": False, "sensitivity": False}
         self.setWindowTitle(tr("词条培养分析"))
         self.setMinimumSize(900, 600)
-        self.resize(1040, 700)
+        self.resize(1080, 720)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 16)
@@ -134,6 +210,75 @@ class AffixImpactDialog(QDialog):
         context.setStyleSheet("font-size: 12px;")
         layout.addWidget(context)
 
+        self._tabs = QTabWidget()
+        self._tabs.setObjectName("affixAnalysisTabs")
+        self._tabs.setDocumentMode(True)
+        self._tabs.setStyleSheet(
+            "QTabWidget#affixAnalysisTabs::pane {"
+            " border: 1px solid palette(midlight); border-radius: 7px; }"
+            "QTabWidget#affixAnalysisTabs QTabBar::tab {"
+            " padding: 9px 18px; min-width: 120px; }"
+        )
+        self._tabs.addTab(self._transmute_tab(), tr("转律建议"))
+        self._suggestion_container = QWidget()
+        QVBoxLayout(self._suggestion_container).setContentsMargins(0, 0, 0, 0)
+        self._tabs.addTab(self._suggestion_container, tr("培养建议"))
+        self._sensitivity_container = QWidget()
+        QVBoxLayout(self._sensitivity_container).setContentsMargins(0, 0, 0, 0)
+        self._tabs.addTab(self._sensitivity_container, tr("词条收益率"))
+        self._tabs.currentChanged.connect(self._on_tab_changed)
+        layout.addWidget(self._tabs, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        apply_dialog_button_box_style(buttons)
+        close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
+        if close_button is not None:
+            close_button.setText(tr("完成"))
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    # ── 按需构建 ──────────────────────────────────────────
+
+    def _ensure_report(self) -> AffixImpactReport | None:
+        if self._report is None and self._report_provider is not None:
+            try:
+                self._report = self._report_provider()
+            except Exception as exc:  # noqa: BLE001 - 页签内提示，不关对话框
+                logger.error(f"词条分析失败: {exc}")
+                QMessageBox.critical(self, tr("分析失败"), str(exc))
+                return None
+            self._actionable_suggestions = tuple(
+                item for item in self._report.suggestions
+                if item.graduation_delta > 1e-9
+            )
+            self._blocked_equipment = self._report.blocked_equipment
+        return self._report
+
+    def _on_tab_changed(self, index: int) -> None:
+        widget = self._tabs.widget(index)
+        if widget is self._suggestion_container and not self._tab_built["suggestion"]:
+            report = self._ensure_report()
+            if report is None:
+                return
+            self._tab_built["suggestion"] = True
+            container_layout = self._suggestion_container.layout()
+            assert container_layout is not None
+            container_layout.addWidget(self._suggestion_page(report))
+        elif widget is self._sensitivity_container and not self._tab_built["sensitivity"]:
+            report = self._ensure_report()
+            if report is None:
+                return
+            self._tab_built["sensitivity"] = True
+            container_layout = self._sensitivity_container.layout()
+            assert container_layout is not None
+            container_layout.addWidget(self._sensitivity_tab(report))
+
+    def _suggestion_page(self, report: AffixImpactReport) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        # 与转律建议页同一套外边距，三张指标卡在两个页签里顶部对齐
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
         metrics = QHBoxLayout()
         metrics.setSpacing(10)
         metrics.addWidget(self._metric_card(
@@ -157,32 +302,221 @@ class AffixImpactDialog(QDialog):
             "gain",
         ), 1)
         layout.addLayout(metrics)
+        layout.addWidget(self._suggestion_tab(embedded=True), 1)
+        return page
 
-        tabs = QTabWidget()
-        tabs.setObjectName("affixAnalysisTabs")
-        tabs.setDocumentMode(True)
-        tabs.setStyleSheet(
-            "QTabWidget#affixAnalysisTabs::pane {"
-            " border: 1px solid palette(midlight); border-radius: 7px; }"
-            "QTabWidget#affixAnalysisTabs QTabBar::tab {"
-            " padding: 9px 18px; min-width: 120px; }"
-        )
-        tabs.addTab(
-            self._suggestion_tab(),
-            tr("培养建议  {count}").format(
-                count=len(self._actionable_suggestions),
-            ),
-        )
-        tabs.addTab(self._sensitivity_tab(report), tr("理论敏感度"))
-        layout.addWidget(tabs, 1)
+    # ── 转律建议 ──────────────────────────────────────────
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        apply_dialog_button_box_style(buttons)
-        close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
-        if close_button is not None:
-            close_button.setText(tr("完成"))
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+    def _transmute_tab(self) -> QWidget:
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        metrics = QHBoxLayout()
+        metrics.setSpacing(10)
+        self._transmute_baseline = self._metric_card(
+            tr("原词条毕业率"), "—", "transmuteBaseline")
+        self._transmute_saved = self._metric_card(
+            tr("已保存目标毕业率"), "—", "transmuteSaved")
+        self._transmute_final = self._metric_card(
+            tr("推荐毕业率"), "—", "transmuteFinal")
+        for card in (self._transmute_baseline, self._transmute_saved,
+                     self._transmute_final):
+            metrics.addWidget(card, 1)
+        layout.addLayout(metrics)
+
+        basis = ("、".join(self._assumption_labels)
+                 if self._assumption_labels else tr("实际数值"))
+        note = QLabel(tr(
+            "八件装备各至多一次转律，目标按转律词条库并集选取；未承音按普通上限"
+            "（彩狗粮 100%），承音按承音上限。基于：{basis}。").format(basis=basis))
+        note.setWordWrap(True)
+        note.setProperty("tone", "muted")
+        layout.addWidget(note)
+
+        self._transmute_status = QLabel(tr("点击「计算」开始搜索；不会自动运行。"))
+        self._transmute_status.setObjectName("transmuteStatus")
+        self._transmute_status.setWordWrap(True)
+        layout.addWidget(self._transmute_status)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        grid = QGridLayout(content)
+        grid.setSpacing(8)
+        grid.setContentsMargins(0, 0, 0, 0)
+        params = {**self._display_params, "card_min_height": max(
+            int(self._display_params.get("card_min_height", 160) or 160), 190)}
+        for row, col, slot_key in self._slot_layout:
+            card = _SlotCard(
+                slot_key, SLOT_LABELS.get(slot_key, slot_key), "",
+                params, read_only=True)
+            card.setObjectName(f"transmuteCard_{slot_key}")
+            equip = self._equipped.get(slot_key)
+            if isinstance(equip, dict):
+                card.set_equip(copy.deepcopy(equip))
+            else:
+                card.set_empty()
+                card.set_note(tr("缺装备，补齐后计算"))
+            grid.addWidget(card, row, col)
+            self._transmute_cards[slot_key] = card
+        for col in range(4):
+            grid.setColumnStretch(col, 1)
+        scroll.setWidget(content)
+        layout.addWidget(scroll, 1)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        self._transmute_run = QPushButton(tr("计算"))
+        self._transmute_run.setObjectName("transmuteRunButton")
+        self._transmute_run.setEnabled(self._transmute_runner is not None)
+        self._transmute_run.clicked.connect(self._start_transmute)
+        self._transmute_cancel = QPushButton(tr("取消计算"))
+        self._transmute_cancel.setObjectName("transmuteCancelButton")
+        self._transmute_cancel.setEnabled(False)
+        self._transmute_cancel.clicked.connect(self._cancel_transmute)
+        self._transmute_apply = QPushButton(tr("应用"))
+        self._transmute_apply.setObjectName("transmuteApplyButton")
+        self._transmute_apply.setToolTip(
+            tr("把推荐目标写入备战方案的装备卡片；目标属于公共装备，"
+               "会影响所有引用这些装备的方案"))
+        self._transmute_apply.setEnabled(False)
+        self._transmute_apply.clicked.connect(self._apply_transmute)
+        # 三个按钮同一套几何与语义配色：主动作、中性、主动作
+        apply_button_style(self._transmute_run, self._transmute_apply,
+                           variant="action")
+        apply_button_style(self._transmute_cancel, variant="neutral")
+        for button in (self._transmute_run, self._transmute_cancel,
+                       self._transmute_apply):
+            button.setMinimumWidth(100)
+            buttons.addWidget(button)
+        layout.addLayout(buttons)
+        return container
+
+    def _start_transmute(self) -> None:
+        if self._transmute_runner is None:
+            return
+        self._transmute_generation += 1
+        generation = self._transmute_generation
+        self._transmute_cancelled = False
+        self._transmute_run.setEnabled(False)
+        self._transmute_cancel.setEnabled(True)
+        self._transmute_apply.setEnabled(False)
+        self._transmute_status.setText(tr("正在搜索转律组合…"))
+        worker = _TransmuteWorker(
+            generation, self._transmute_runner,
+            lambda: self._transmute_cancelled
+            or generation != self._transmute_generation)
+        worker.signals.finished.connect(self._on_transmute_finished)
+        pool = QThreadPool.globalInstance()
+        assert pool is not None
+        pool.start(worker)
+
+    def _cancel_transmute(self) -> None:
+        self._transmute_cancelled = True
+        self._transmute_cancel.setEnabled(False)
+        self._transmute_status.setText(tr("已取消；保留上一次完成的结果。"))
+        self._transmute_run.setEnabled(True)
+
+    def _on_transmute_finished(self, generation: int, result, error) -> None:
+        if generation != self._transmute_generation:
+            return
+        self._transmute_cancel.setEnabled(False)
+        self._transmute_run.setEnabled(True)
+        self._transmute_run.setText(tr("重新计算"))
+        if self._transmute_cancelled:
+            return
+        if error is not None or result is None:
+            self._transmute_status.setText(
+                tr("计算失败：{error}").format(error=error or "—"))
+            return
+        self.render_transmute_result(result)
+
+    def render_transmute_result(self, result: TransmutePlanResult) -> None:
+        """把搜索结果画到八张卡片上，并决定“应用”是否可用。"""
+        self._transmute_result = result
+        self._transmute_applied = False
+        self._set_metric(self._transmute_baseline,
+                         f"{result.baseline_rate * 100:.2f}%")
+        self._set_metric(
+            self._transmute_saved,
+            f"{result.saved_rate * 100:.2f}%" if result.saved_rate is not None
+            else "—")
+        self._set_metric(
+            self._transmute_final,
+            f"{result.final_rate * 100:.2f}%  ({result.gain * 100:+.2f})"
+            if result.moves else f"{result.final_rate * 100:.2f}%")
+        for slot_key, card in self._transmute_cards.items():
+            status = next(
+                (item for item in result.slots if item.slot_key == slot_key),
+                None)
+            equip = self._equipped.get(slot_key)
+            if status is None or not isinstance(equip, dict):
+                continue
+            shown = strip_transmute_targets(copy.deepcopy(equip))
+            move = status.move
+            if move is not None:
+                affix = shown.get(f"affix_{move.affix_index}")
+                if isinstance(affix, dict):
+                    affix[TARGET_NAME_KEY] = move.to_name
+                    affix[TARGET_VALUE_KEY] = move.to_value
+            card.set_equip(shown)
+            if not status.eligible:
+                card.set_note(tr("不参与：{reason}").format(
+                    reason=transmute_reason_text(status.reason)))
+            elif move is None:
+                card.set_note(tr("无需转律"))
+            else:
+                card.set_note(tr("推荐 {gain:+.2f}%（换词条净收益 {swap:+.2f}%）").format(
+                    gain=move.marginal_gain * 100, swap=move.swap_gain * 100))
+        parts: list[str] = []
+        if result.missing_slots:
+            parts.append(tr("缺 {count} 件装备，请补齐后重新计算").format(
+                count=len(result.missing_slots)))
+        if not result.trusted:
+            parts.append(tr("存在词条组合异常的装备，结果不可信，禁止应用"))
+        if not result.exhausted:
+            parts.append(tr("搜索未穷尽（预算耗尽），以下是当前搜索最好结果"))
+        if result.moves:
+            ordered = sorted(result.moves, key=lambda m: -m.marginal_gain)
+            parts.append(tr("建议顺序：{order}").format(order=" → ".join(
+                f"{SLOT_LABELS.get(m.slot_key, m.slot_key)}"
+                f"({m.marginal_gain * 100:+.2f}%)" for m in ordered)))
+            parts.append(tr("共求值 {count} 次").format(count=result.evaluated))
+        else:
+            parts.append(tr("没有找到超过阈值的转律提升（不代表不存在）"))
+        self._transmute_status.setText("；".join(parts))
+        self._transmute_apply.setEnabled(
+            result.applicable and self._apply_handler is not None)
+
+    def _apply_transmute(self) -> None:
+        result = self._transmute_result
+        if result is None or self._apply_handler is None or not result.applicable:
+            return
+        self._transmute_apply.setEnabled(False)
+        try:
+            ok = self._apply_handler(result)
+        except Exception as exc:  # noqa: BLE001 - 失败提示后允许重试
+            logger.error(f"应用转律目标失败: {exc}")
+            QMessageBox.critical(self, tr("应用失败"), str(exc))
+            self._transmute_apply.setEnabled(True)
+            return
+        if not ok:
+            self._transmute_apply.setEnabled(True)
+            return
+        self._transmute_applied = True
+        self._transmute_status.setText(
+            tr("已写入 {count} 件装备的转律目标；勾选备战方案的「模拟转律」查看效果。")
+            .format(count=len(result.moves)))
+
+    @staticmethod
+    def _set_metric(card: QFrame, value: str) -> None:
+        label = card.findChild(QLabel, "affixMetricValue_" + str(
+            card.objectName()).removeprefix("affixMetric_"))
+        if label is not None:
+            label.setText(value)
 
     @staticmethod
     def _metric_card(label: str, value: str, name: str) -> QFrame:
@@ -206,10 +540,11 @@ class AffixImpactDialog(QDialog):
         row.addWidget(number)
         return card
 
-    def _suggestion_tab(self) -> QWidget:
+    def _suggestion_tab(self, *, embedded: bool = False) -> QWidget:
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(14, 14, 14, 14)
+        # 嵌在带外边距的页面里时不再叠加自己的边距
+        layout.setContentsMargins(*((0, 0, 0, 0) if embedded else (14, 14, 14, 14)))
         layout.setSpacing(10)
         banner = QFrame()
         banner.setProperty("status", "info")
@@ -267,7 +602,7 @@ class AffixImpactDialog(QDialog):
         result_top.addWidget(self._joint_gain)
         self._joint_button = QPushButton(tr("计算联合提升"))
         self._joint_button.setObjectName("calculateJointAffixButton")
-        self._joint_button.setStyleSheet(_JOINT_BUTTON_STYLE)
+        apply_button_style(self._joint_button, variant="action")
         self._joint_button.setMinimumWidth(112)
         self._joint_button.setEnabled(False)
         self._joint_button.clicked.connect(self._calculate_joint)

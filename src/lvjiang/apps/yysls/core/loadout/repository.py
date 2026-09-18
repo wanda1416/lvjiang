@@ -23,6 +23,12 @@ from .models import (
     LoadoutPlan,
     LoadoutState,
 )
+from .transmute import (
+    TARGET_NAME_KEY,
+    TARGET_VALUE_KEY,
+    saved_transmute_target,
+    strip_transmute_targets,
+)
 
 _LOCKS_GUARD = threading.Lock()
 _LOCKS: dict[str, threading.RLock] = {}
@@ -56,6 +62,20 @@ def stamp_equipment_write(
             created if isinstance(created, str) else "")
     value[EQUIPMENT_UPDATED_AT] = timestamp
     return value
+
+
+def carry_transmute_target(source: dict, target: dict) -> None:
+    """把 ``source`` 上的转律目标搬到 ``target`` 同一槽位（槽位词条同名时）。"""
+    saved = saved_transmute_target(source)
+    if saved is None:
+        return
+    index, name, value = saved
+    before = (source.get(f"affix_{index}") or {}).get("name")
+    affix = target.get(f"affix_{index}")
+    if not isinstance(affix, dict) or affix.get("name") != before:
+        return
+    affix[TARGET_NAME_KEY] = name
+    affix[TARGET_VALUE_KEY] = value
 
 
 def _timestamp_rank(value) -> float | None:
@@ -211,8 +231,13 @@ class LoadoutRepository:
         if not fp:
             raise ValueError("装备数据无法生成指纹")
         def mutate(state: LoadoutState) -> None:
-            state.equipment_items[fp] = stamp_equipment_write(
-                equip, fp, state.equipment_items.get(fp))
+            existing = state.equipment_items.get(fp)
+            stamped = stamp_equipment_write(equip, fp, existing)
+            # 同指纹意味着五条词条名值都没变：重新扫描不能抹掉用户保存的
+            # 转律目标。扫描数据本身不会带目标字段，所以只需从旧版本搬过来。
+            if existing is not None and saved_transmute_target(stamped) is None:
+                carry_transmute_target(existing, stamped)
+            state.equipment_items[fp] = stamped
         self.update(mutate)
         return fp
 
@@ -249,6 +274,76 @@ class LoadoutRepository:
                 raise ValueError(f"装备已不存在: {fp}")
             equip["lock_status"] = "locked" if locked else "unlock"
             equip[EQUIPMENT_UPDATED_AT] = _now_iso()
+
+        return self.update(mutate)
+
+    def set_transmute_targets(
+        self,
+        plan_id: str,
+        targets: dict[str, tuple[int, str, float] | None],
+        *,
+        expected_fps: set[str] | None = None,
+    ) -> LoadoutState:
+        """原子写入一组装备的转律目标；指纹、真实词条与更新时间戳均不变。
+
+        ``targets`` 以指纹为键：值为 ``(词条序号, 目标名, 目标值)`` 表示写入，
+        ``None`` 表示清除该件已有目标。``expected_fps`` 给出计算时方案八件
+        装备的指纹快照；方案已经换装或装备被重扫改写时拒绝写入，要求重算。
+        完全相同的重复应用不产生写入。
+        """
+        def mutate(state: LoadoutState) -> None:
+            plan = state.plans.get(plan_id)
+            if plan is None:
+                raise ValueError(f"备战方案已不存在: {plan_id}")
+            current = {fp for fp in plan.equipment.values() if fp}
+            if expected_fps is not None and current != set(expected_fps):
+                raise ValueError("备战方案装备已变化，请重新计算后再应用")
+            for fp, target in targets.items():
+                equip = state.equipment_items.get(fp)
+                if equip is None:
+                    raise ValueError(f"装备已不存在: {fp}")
+                if target is None:
+                    strip_transmute_targets(equip)
+                    continue
+                index, name, value = target
+                affix = equip.get(f"affix_{index}")
+                if not isinstance(affix, dict) or not affix.get("name"):
+                    raise ValueError(f"装备 {fp} 第 {index} 条词条不存在")
+                if not name or float(value) <= 0:
+                    raise ValueError("转律目标名称与数值必须同时有效")
+                strip_transmute_targets(equip)
+                affix[TARGET_NAME_KEY] = str(name)
+                affix[TARGET_VALUE_KEY] = float(value)
+
+        before = self.load()
+        after = copy.deepcopy(before)
+        mutate(after)
+        if after.to_dict() == before.to_dict():
+            return before
+        return self.update(mutate)
+
+    def clear_transmute_target(self, fp: str) -> LoadoutState:
+        """只删除指定装备的转律目标字段。"""
+        return self.set_transmute_targets_for_items({fp: None})
+
+    def set_transmute_targets_for_items(
+        self, targets: dict[str, tuple[int, str, float] | None],
+    ) -> LoadoutState:
+        """不校验方案快照的目标写入，供单件清除使用。"""
+        def mutate(state: LoadoutState) -> None:
+            for fp, target in targets.items():
+                equip = state.equipment_items.get(fp)
+                if equip is None:
+                    raise ValueError(f"装备已不存在: {fp}")
+                strip_transmute_targets(equip)
+                if target is None:
+                    continue
+                index, name, value = target
+                affix = equip.get(f"affix_{index}")
+                if not isinstance(affix, dict) or not affix.get("name"):
+                    raise ValueError(f"装备 {fp} 第 {index} 条词条不存在")
+                affix[TARGET_NAME_KEY] = str(name)
+                affix[TARGET_VALUE_KEY] = float(value)
 
         return self.update(mutate)
 
@@ -459,6 +554,15 @@ class LoadoutRepository:
         def mutate(state: LoadoutState) -> None:
             if not old_fp.startswith("mock_"):
                 raise ValueError("只能编辑模拟装备")
+            old = state.equipment_items.get(old_fp) or {}
+            saved = saved_transmute_target(value)
+            if saved is not None:
+                index = saved[0]
+                before = (old.get(f"affix_{index}") or {}).get("name")
+                after = (value.get(f"affix_{index}") or {}).get("name")
+                # 目标所在槽的词条已被改掉，旧目标不再成立。
+                if before != after:
+                    strip_transmute_targets(value)
             stamped = stamp_equipment_write(
                 value, new_fp, state.equipment_items.get(new_fp))
             state.equipment_items.pop(old_fp, None)
@@ -482,6 +586,9 @@ class LoadoutRepository:
         if old_fp.startswith("mock_") or bool(
             (value.get("_extra") or {}).get("is_mock")):
             raise ValueError("扫描装备养成不支持模拟装备")
+        # 养成意味着等级、承音或词条已经真实变化，装备已用掉（或改变了）
+        # 这次转律的前提，旧目标一律作废，需要重新分析。
+        strip_transmute_targets(value)
         new_fp = make_fingerprint(value)
         if not new_fp:
             raise ValueError("装备数据无法生成指纹")

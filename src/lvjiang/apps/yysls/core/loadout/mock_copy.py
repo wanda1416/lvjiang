@@ -9,6 +9,7 @@ from pathlib import Path
 from ..equip_parser.models import make_fingerprint
 from .models import EQUIPMENT_CREATED_AT, EQUIPMENT_UPDATED_AT
 from .repository import LoadoutRepository, stamp_equipment_write
+from .transmute import strip_transmute_targets
 
 _STORAGE_FIELDS = {
     "_fp", EQUIPMENT_CREATED_AT, EQUIPMENT_UPDATED_AT, "cooldown_expires_at",
@@ -29,6 +30,8 @@ def _copy_payload(equip: dict) -> dict:
     value = copy.deepcopy(equip)
     for key in _STORAGE_FIELDS:
         value.pop(key, None)
+    # 转律目标是针对来源用户某个方案算出来的计划，不随复制扩散。
+    strip_transmute_targets(value)
     value.setdefault("_extra", {})["is_mock"] = True
     fp = make_fingerprint(value, is_mock=True)
     if not fp:
@@ -41,7 +44,7 @@ def _comparable(equip: dict) -> dict:
     value = copy.deepcopy(equip)
     for key in _STORAGE_FIELDS:
         value.pop(key, None)
-    return value
+    return strip_transmute_targets(value)
 
 
 def copy_mock_items_to_users(

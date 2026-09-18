@@ -34,6 +34,9 @@ class Affix:
     unit: str | None = None  # "%" 或 None
     is_transferred: bool = False
     cap_pct: float | None = None  # 数值百分比（0-100），表示当前值占该等级上限的比例
+    # 模拟转律目标：只是计划，不改变 name/value；两者必须同时有效才算有目标
+    target_transmute_name: str | None = None
+    target_transmute_value: float | None = None
 
     def to_dict(self) -> dict:
         d: dict = {"name": self.name, "value": self.value}
@@ -43,6 +46,9 @@ class Affix:
             d["is_transferred"] = self.is_transferred
         if self.cap_pct is not None:
             d["cap_pct"] = self.cap_pct
+        if self.target_transmute_name and self.target_transmute_value is not None:
+            d["target_transmute_name"] = self.target_transmute_name
+            d["target_transmute_value"] = self.target_transmute_value
         return d
 
     @classmethod
@@ -53,6 +59,8 @@ class Affix:
             unit=d.get("unit"),
             is_transferred=d.get("is_transferred", False),
             cap_pct=d.get("cap_pct"),
+            target_transmute_name=d.get("target_transmute_name") or None,
+            target_transmute_value=d.get("target_transmute_value"),
         )
 
 

@@ -271,6 +271,7 @@ class LoadoutPanel(QWidget):
             combat._chk_full_level,
             combat._chk_full_chengyin,
             combat._chk_full_dingyin,
+            combat._chk_simulate_transmute,
         )
         for control in controls:
             self._assumption_layout.addWidget(control)

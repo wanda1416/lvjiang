@@ -473,6 +473,7 @@ def apply_hypothetical_caps(
     full_dingyin: bool = False,
     full_level: int = 0,
     playstyle: str = "",
+    simulate_transmute: bool = False,
 ) -> dict:
     """假设装备升至理想状态，返回变换后的装备副本。
 
@@ -487,11 +488,16 @@ def apply_hypothetical_caps(
         full_level: 目标等级（>0 时，低于该等级的装备升至该等级）
             仅升基础属性；词条/定音数值是否升级取决于 full_chengyin/full_dingyin。
             词条上限按升级后的等级查询。
+        simulate_transmute: 模拟转律。把装备上已保存且仍合法的转律目标
+            （``target_transmute_name``）覆盖到对应词条槽；目标数值按副本
+            此时的等级/承音状态取上限，资格按原始装备判断。只用已保存的
+            目标，不做任何搜索。
 
     Returns:
         变换后的装备 dict；无需变换时返回原 dict。
     """
-    if not full_chengyin and not full_dingyin and full_level <= 0:
+    if (not full_chengyin and not full_dingyin and full_level <= 0
+            and not simulate_transmute):
         return equipped
 
     import copy
@@ -550,6 +556,9 @@ def apply_hypothetical_caps(
 
         result[slot_key] = equip
 
+    if simulate_transmute:
+        from ..loadout.transmute import project_transmute_targets
+        result = project_transmute_targets(equipped, result, gc)
     return result
 
 

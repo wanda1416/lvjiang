@@ -37,6 +37,7 @@ from ....core.equip_parser.dingyin_parser import (
 )
 from ....core.equip_validator import illegal_reasons_of
 from ....core.equipment_cooldown import next_cooldown_expiry
+from ....core.loadout.transmute import TARGET_NAME_KEY, TARGET_VALUE_KEY
 
 
 class _ElidedLabel(QLabel):
@@ -119,6 +120,31 @@ def _slot_style_hovered(bg: str = "palette(base)") -> str:
         f"_SlotCard {{ background-color: {bg}; border: 2px solid palette(mid); "
         "border-radius: 7px; }"
     )
+
+
+def transmute_target_color(widget: QWidget) -> str:
+    """转律目标的黄色：深色主题用亮黄，浅色主题用深琥珀，保证可读。"""
+    dark = widget.palette().color(widget.backgroundRole()).lightness() < 128
+    return "#FFD54F" if dark else "#B26A00"
+
+
+def _transmute_target_text(affix: dict) -> str:
+    """词条上保存的转律目标 ``(目标名)``；没有或字段不完整时为空。"""
+    name = str(affix.get(TARGET_NAME_KEY) or "").strip()
+    try:
+        value = float(affix.get(TARGET_VALUE_KEY) or 0)
+    except (TypeError, ValueError):
+        value = 0.0
+    return f"({name})" if name and value > 0 else ""
+
+
+def _transmute_target_tooltip(affix: dict) -> str:
+    name = str(affix.get(TARGET_NAME_KEY) or "").strip()
+    value = affix.get(TARGET_VALUE_KEY)
+    if not name:
+        return ""
+    return tr("转律目标：{name} {value}（未承音按普通上限 100%，承音按承音上限；"
+              "仅在勾选「模拟转律」时计入属性）").format(name=name, value=value)
 
 
 def _affix_value_color(cap_pct: int | float | None) -> str:
@@ -570,10 +596,13 @@ class _SlotCard(QFrame):
         filter_type: str,
         display_params: dict | None = None,
         parent=None,
+        *,
+        read_only: bool = False,
     ):
         super().__init__(parent)
         self.slot_key = slot_key
         self.filter_type = filter_type
+        self._read_only = read_only
         self._selected = False
         self._hovered = False
         self._display_name = display_name
@@ -586,7 +615,8 @@ class _SlotCard(QFrame):
         self._card_h = dp.get("card_min_height", 160)
 
         self.setFixedHeight(self._card_h)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        if not read_only:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._quality_bg: str | None = None
         self._apply_style(_SLOT_STYLE_EMPTY)
 
@@ -714,7 +744,7 @@ class _SlotCard(QFrame):
     def contextMenuEvent(self, event):
         """右键菜单：已装备物品可卸载、养成或编辑，并可复制。"""
         from .status_tab import EquipStatusTab
-        if not getattr(self, '_equip_data', None):
+        if self._read_only or not getattr(self, '_equip_data', None):
             event.ignore()
             return
         is_mock = (
@@ -733,8 +763,22 @@ class _SlotCard(QFrame):
         lock_action = menu.addAction(tr("解锁") if locked else tr("锁定"))
         lock_action.setToolTip(tr("解锁此装备") if locked else tr("锁定此装备"))
         properties_action = menu.addAction(tr("属性"))
+        clear_target_action = None
+        if any(
+            _transmute_target_text(self._equip_data.get(f"affix_{i}") or {})
+            for i in range(1, 6)
+        ):
+            clear_target_action = menu.addAction(tr("清除转律目标"))
+            clear_target_action.setToolTip(
+                tr("删除该装备保存的模拟转律目标；影响所有引用此装备的方案"))
         action = menu.exec(event.globalPos())
-        if action == unequip_action:
+        if clear_target_action is not None and action == clear_target_action:
+            parent = self.parent()
+            while parent and not isinstance(parent, EquipStatusTab):
+                parent = parent.parent()
+            if parent:
+                parent._on_clear_transmute_target(self._equip_data)
+        elif action == unequip_action:
             parent = self.parent()
             while parent and not isinstance(parent, EquipStatusTab):
                 parent = parent.parent()
@@ -880,9 +924,12 @@ class _SlotCard(QFrame):
     def set_hypotheses(self, assumptions) -> None:
         """显示计算假设；装备数据本身始终保持原始值。"""
         labels = [str(value) for value in (assumptions or ()) if str(value)]
-        self.hypothesis_label.setText(
-            tr("计算假设：") + "、".join(labels) if labels else "")
-        self.hypothesis_label.setVisible(bool(labels))
+        self.set_note(tr("计算假设：") + "、".join(labels) if labels else "")
+
+    def set_note(self, text: str) -> None:
+        """在卡片顶部显示一行说明文字（空则隐藏）。"""
+        self.hypothesis_label.setText(text or "")
+        self.hypothesis_label.setVisible(bool(text))
 
     def _add_affix_row(self, affix: dict, level=None, *, tooltip: str = ""):
         value = affix.get("value", "")
@@ -910,6 +957,17 @@ class _SlotCard(QFrame):
         lbl.setStyleSheet(
             f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
         row.addWidget(lbl, stretch=1)
+
+        # 转律目标作为独立分段标签：_ElidedLabel 自绘纯文本，不解析富文本。
+        target_text = _transmute_target_text(affix)
+        if target_text:
+            target = QLabel(target_text)
+            target.setObjectName("transmuteTargetLabel")
+            target.setToolTip(_transmute_target_tooltip(affix))
+            target.setStyleSheet(
+                f"font-size: {self._affix_fs}px; font-weight: bold; "
+                f"color: {transmute_target_color(self)};")
+            row.addWidget(target)
 
         val = QLabel(val_str)
         val.setStyleSheet(
@@ -1261,6 +1319,16 @@ class _CompactEquipCard(QFrame):
             lbl_name.setStyleSheet(
                 f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
             row.addWidget(lbl_name, stretch=1)
+
+            target_text = _transmute_target_text(affix)
+            if target_text:
+                lbl_target = QLabel(target_text)
+                lbl_target.setObjectName("transmuteTargetLabel")
+                lbl_target.setToolTip(_transmute_target_tooltip(affix))
+                lbl_target.setStyleSheet(
+                    f"font-size: {self._affix_fs}px; font-weight: bold; "
+                    f"color: {transmute_target_color(self)};")
+                row.addWidget(lbl_target)
 
             lbl_val = QLabel(val_str)
             lbl_val.setStyleSheet(

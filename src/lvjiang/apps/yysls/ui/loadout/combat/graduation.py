@@ -88,6 +88,9 @@ class CombatGraduationMixin:
 
     def _schedule_graduation(self, combat_attrs: CombatAttributes) -> None:
         """延迟提交毕业率计算；新请求会使旧结果自动失效。"""
+        if getattr(self, "_preview", False):
+            # 预览实例不向面板发布毕业率——那是当前方案的数字，不是预览的
+            return
         self._graduation_generation += 1
         generation = self._graduation_generation
         self._graduation_timer.stop()

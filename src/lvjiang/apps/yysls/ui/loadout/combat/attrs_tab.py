@@ -136,9 +136,16 @@ class _JudgmentOutcomePopup(QFrame):
 class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin, PlayStyleDialogMixin, QWidget):
     """战斗属性 Tab"""
 
-    def __init__(self, host, parent=None):
+    def __init__(self, host, parent=None, *, preview: bool = False):
+        """``preview=True``：只读预览一套指定装备的战斗属性。
+
+        预览实例不读取穿戴装备、不保存选择、不向面板发布毕业率，也不订阅
+        用户切换；装备由 ``show_preview`` 传入（已按假设投影好）。
+        """
         super().__init__(parent)
         self._host = host
+        self._preview = preview
+        self._preview_equipped: dict | None = None
 
         # ✅ 会话级缓存：避免反复load装备文件（多进程安全）
         self._session_user = None  # 当前会话的用户
@@ -330,6 +337,11 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
         # equipment_changed 由外层 LoadoutPanel 统一刷新装备与战斗属性，
         # 子页面不再重复订阅同一事件。
+        if self._preview:
+            # 预览：只剩属性卡片；配置与假设由调用方决定
+            self._toolbar_widget.setVisible(False)
+            self._select_group.setVisible(False)
+            return
         # 订阅用户切换信号（上一个/下一个用户按钮触发）
         self._host.user_changed.connect(self._on_user_changed)
         # 订阅工作流请求打开"创建基础属性"面板并预填数值
@@ -518,7 +530,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         """按方案保存战斗配置，按用户保存纯显示选项。"""
         from lvjiang.core.config.session import load_settings, save_settings
 
-        if self._restoring:
+        if self._restoring or self._preview:
             return
         user_name = self._host.active_user_name()
         if not user_name:
@@ -728,7 +740,10 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         user_name = self._host.active_user_name()
         equipped = None
 
-        if user_name:
+        if self._preview:
+            # 预览装备已由调用方按假设投影，这里不再套面板的假设
+            equipped = self._preview_equipped or {}
+        elif user_name:
             # 检查缓存是否有效
             if self._session_user == user_name and self._equipped_cache is not None:
                 logger.debug(f"复用缓存装备数据 (用户: {user_name})")
@@ -1062,7 +1077,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         from ....core.combat.equipment import EquipmentInventory
 
         user_name = self._host.active_user_name()
-        if not user_name:
+        # 调用方已给装备（预览/缓存）时不依赖当前用户；只有要读仓库才需要
+        if equipped is None and not user_name:
             return CombatAttributes()
 
         try:
@@ -1090,7 +1106,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         from ....core.combat.equipment import EquipmentInventory
 
         user_name = self._host.active_user_name()
-        if not user_name:
+        if equipped is None and not user_name:
             return CombatAttributes()
 
         try:
@@ -1131,6 +1147,20 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             return 0
         from ....config import get_game_config
         return get_game_config().current_equip_level()
+
+    def show_preview(self, equipped: dict, *, gongjue: str | None = None) -> None:
+        """预览一套（已投影的）装备；``gongjue`` 覆盖当前弓玦套装。"""
+        if not self._preview:
+            raise RuntimeError("show_preview 只用于 preview 实例")
+        self._preview_equipped = dict(equipped)
+        if gongjue is not None:
+            self._combo_gongjue.blockSignals(True)
+            index = self._combo_gongjue.findData(gongjue)
+            if index < 0:
+                index = self._combo_gongjue.findText(gongjue)
+            self._combo_gongjue.setCurrentIndex(max(0, index))
+            self._combo_gongjue.blockSignals(False)
+        self._refresh_display()
 
     def _compute_gongjue_attrs(self) -> CombatAttributes:
         """当前弓玦套装属性（唯一实现见 ``graduation.context.gongjue_attrs``）。"""

@@ -609,10 +609,6 @@ yysls:
   历史 {runs} 次 · 处理 {total} 件 · 调律 {tuned} · 回收 {recycled} · 跳过 {skipped} · 重置 {reset} · 异常 {anomaly}: Runs {runs} · Processed {total} · Tuned {tuned} · Recycled {recycled} · Skipped {skipped} · Reset {reset} · Anomalies {anomaly}
   全部评级: All ratings
   绑定开关: Binding Switch
-  全部用户: All users
-  未选择用户: No user selected
-  所选用户没有冷却装备: The selected users have no cooling equipment
-  '{shown} / {total} 件': '{shown} / {total} items'
   需更换: Swap
   新穿戴: Newly worn
   已穿戴: Worn
@@ -628,6 +624,10 @@ yysls:
   '需更换 {count} 件：{names}': 'Swap {count}: {names}'
   与当前备战方案一致，无需更换: Matches the current loadout; nothing to swap
   '弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　卡片显示原始装备数值，计算假设标注在卡片上方': 'Gongjue set: {gongjue}　{n} pieces　·　{change}　·　Cards show original equipment values; assumptions are noted above each card'
+  全部用户: All users
+  未选择用户: No user selected
+  所选用户没有冷却装备: The selected users have no cooling equipment
+  '{shown} / {total} 件': '{shown} / {total} items'
 config:
   wf_scan_equipped: Equipment Analysis
   wf_scan_unequipped: Full Equipment Scan
@@ -1532,3 +1532,12 @@ auto_strings:
   显示上次搜索的 {count} 个结果；重新搜索会覆盖。: Showing the {count} result(s) of the last search; a new search overwrites them.
   计算假设已变化，当前结果按旧假设得出；请重新搜索。: Assumptions changed; the current results use the old ones. Search again.
   计算假设已变化，当前结果按旧假设得出；请重新计算。: Assumptions changed; the current result uses the old ones. Recalculate.
+  # 最优结果：战斗属性预览页
+  查看战斗属性: View Combat Attributes
+  在「最优结果」里点某一条的「查看战斗属性」: Click "View Combat Attributes" on a row in "Best Results"
+  '方案 #{rank}　弓玦套装：{gongjue}　毕业率 {rate:.2f}%　·　属性按搜索时的计算假设与该弓玦套装计算，不是穿戴后的实测值': 'Plan #{rank}　Gongjue set: {gongjue}　Graduation {rate:.2f}%　·　Attributes are computed under the search-time assumptions and this Gongjue set, not measured after equipping'
+  组合详情: Combo Details
+  战斗属性: Combat Attributes
+  以下是词条收益率（理论值），不代表游戏中可以单独获得或失去一条词条。新增按 Lv{level} 普通词条满值，扣除按当前装备实际值计算。: These are affix yields (theoretical); they do not mean a single affix can be gained or lost in-game. Additions use the Lv{level} normal-affix cap; deductions use the equipment's actual current value.
+  新增一条词条的收益率: Yield of adding one affix
+  扣除一条当前词条的损失率: Loss of removing one current affix

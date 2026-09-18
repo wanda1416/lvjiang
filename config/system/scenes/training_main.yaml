@@ -6,29 +6,41 @@ views:
   name: 基底
 - key: equip
   name: 装备
+  kind: page
+  owner: /base
 - key: tianfu
   name: 天赋
+  kind: page
+  owner: /base
 regions:
-- key: role
-  name: 角色详情
-  type: func
-  is_text: true
-  is_clickable: true
 - key: gongfa
   name: 功法
   type: func
   is_text: true
   is_clickable: true
+  view: base
+  to: /base
 - key: equip
   name: 装备
   type: func
   is_text: true
   is_clickable: true
+  view: base
+  to: /equip
 - key: tianfu
   name: 天赋
   type: func
   is_text: true
   is_clickable: true
+  view: base
+  to: /tianfu
+- key: role
+  name: 角色详情
+  type: func
+  is_text: true
+  is_clickable: true
+  view: base
+  to: role_detail
 - key: xinfa
   name: 心法
   type: func
@@ -39,3 +51,9 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+- key: fangan
+  name: 方案管理
+  type: func
+  is_text: true
+  is_clickable: true
+  view: base

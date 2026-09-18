@@ -586,7 +586,147 @@ class _StatusTagBar(QWidget):
 # ── 顶部：可点击槽位卡片 ──────────────────────────────
 
 
-class _SlotCard(QFrame):
+class _AffixRowsMixin:
+    """词条区域的共同渲染：等级行、词条行、定音块、冷却行、清空。
+
+    穿戴槽卡片与背包卡片只在头部/交互上不同，词条区域必须完全一致——
+    转律目标黄字、⟳ 转律标记、上限占比配色、止戈定音提示都只写这一份。
+    需要主类提供 ``affix_container`` / ``affix_layout`` / ``cooldown_label`` /
+    ``_affix_fs`` / ``_level_fs``。
+    """
+
+    affix_container: QWidget
+    affix_layout: QVBoxLayout
+    cooldown_label: QLabel
+    _affix_fs: int
+    _level_fs: int
+
+    # ── 等级行 ──
+
+    def _apply_level_line(self, label: QLabel, equip_data: dict) -> None:
+        """「Lv110 [承音]  87%」：等级、承音标记、词条平均上限占比。"""
+        level = equip_data.get("level") or "?"
+        tag = " [" + tr("承音") + "]" if equip_data.get("is_chengyin") else ""
+        cap_pcts = equip_affix_cap_pcts(equip_data)
+        if cap_pcts:
+            avg_pct = sum(cap_pcts) / len(cap_pcts)
+            pct_color = _affix_value_color(avg_pct)
+            pct_html = (
+                f'&nbsp;&nbsp;<span style="font-size:{self._affix_fs}px;'
+                f'color:{pct_color};font-weight:bold;">{avg_pct:.0f}%</span>')
+            label.setTextFormat(Qt.TextFormat.RichText)
+            label.setText(f"Lv{level}{tag}{pct_html}")
+        else:
+            label.setTextFormat(Qt.TextFormat.PlainText)
+            label.setText(f"Lv{level}{tag}")
+        label.setStyleSheet(
+            f"font-size: {self._level_fs}px; color: palette(mid); font-weight: bold;")
+
+    # ── 词条行 ──
+
+    def _add_affix_row(self, affix: dict, level=None, *, tooltip: str = "") -> None:
+        value = affix.get("value", "")
+        unit = affix.get("unit", "")
+        cap_pct = affix_dict_cap_pct(affix, level)
+
+        if isinstance(value, (int, float)):
+            val_str = f"{value}%" if unit == "%" else (
+                f"{value:.1f}" if isinstance(value, float) else str(value))
+        else:
+            val_str = str(value)
+
+        val_color = _affix_value_color(cap_pct)
+        transfer_mark = " ⟳" if affix.get("is_transferred", False) else ""
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(2)
+
+        lbl = _ElidedLabel(f"{affix['name']}{transfer_mark}")
+        if tooltip:
+            lbl.setToolTip(tooltip)
+        lbl.setStyleSheet(
+            f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
+        row.addWidget(lbl, stretch=1)
+
+        # 转律目标作为独立分段标签：_ElidedLabel 自绘纯文本，不解析富文本。
+        target_text = _transmute_target_text(affix)
+        if target_text:
+            target = QLabel(target_text)
+            target.setObjectName("transmuteTargetLabel")
+            target.setToolTip(_transmute_target_tooltip(affix))
+            target.setStyleSheet(
+                f"font-size: {self._affix_fs}px; font-weight: bold; "
+                f"color: {transmute_target_color(self)};")  # type: ignore[arg-type]
+            row.addWidget(target)
+
+        val = QLabel(val_str)
+        val.setStyleSheet(
+            f"font-size: {self._affix_fs}px; color: {val_color}; font-weight: bold;")
+        row.addWidget(val, alignment=Qt.AlignmentFlag.AlignRight)
+
+        self.affix_layout.addLayout(row)
+
+    def _add_affix_rows(self, equip_data: dict) -> None:
+        """五条普通词条 + 定音块（虚线分隔）。"""
+        equip_level = equip_data.get("level")
+        for i in range(1, 6):
+            affix = equip_data.get(f"affix_{i}")
+            if not affix or not affix.get("name"):
+                continue
+            self._add_affix_row(affix, equip_level)
+
+        dingyin = equip_data.get("dingyin")
+        zhige_dingyin = is_zhige_dingyin(equip_data)
+        normal_dingyin = isinstance(dingyin, dict) and bool(dingyin.get("name"))
+        if not (zhige_dingyin or normal_dingyin):
+            return
+        dash = QFrame()
+        dash.setFrameShape(QFrame.Shape.NoFrame)
+        dash.setStyleSheet("border: none; border-top: 1px dashed palette(mid);")
+        dash.setFixedHeight(1)
+        self.affix_layout.addWidget(dash)
+        if zhige_dingyin:
+            notice = str(
+                (equip_data.get("_extra") or {}).get(DINGYIN_NOTICE_KEY) or "")
+            self._add_affix_row(
+                {"name": tr("<止戈定音>")}, equip_level, tooltip=notice)
+        else:
+            assert isinstance(dingyin, dict)
+            # 定音是百分比词条；数据里未必带 unit
+            self._add_affix_row(
+                {**dingyin, "unit": dingyin.get("unit") or "%"}, equip_level)
+
+    # ── 清空 / 收尾 ──
+
+    def _clear_affixes(self) -> None:
+        self.affix_container.setMinimumHeight(0)
+        while self.affix_layout.count() > 0:
+            item = self.affix_layout.takeAt(0)
+            if item is None:
+                continue
+            widget = item.widget()
+            sub = item.layout()
+            if widget is not None:
+                if widget is self.cooldown_label:
+                    self.cooldown_label.hide()
+                else:
+                    widget.deleteLater()
+            elif sub is not None:
+                while sub.count() > 0:
+                    child = sub.takeAt(0)
+                    child_widget = child.widget() if child is not None else None
+                    if child_widget is not None:
+                        child_widget.deleteLater()
+                sub.deleteLater()
+
+    def _finish_affixes(self, equip_data: dict) -> None:
+        _refresh_card_cooldown(self.cooldown_label, equip_data)
+        self.affix_layout.addWidget(self.cooldown_label)
+        _preserve_card_content_height(self.affix_container)
+
+
+class _SlotCard(_AffixRowsMixin, QFrame):
     """可点击的装备槽位卡片，支持选中/取消选中"""
 
     def __init__(
@@ -874,60 +1014,14 @@ class _SlotCard(QFrame):
         self.lbl_name.setStyleSheet(
             f"font-weight: bold; font-size: {self._name_fs}px;")
 
-        equip_level = equip_data.get("level")
-        level = equip_level or "?"
-        is_chengyin = equip_data.get("is_chengyin", False)
-        tag = " [" + tr("承音") + "]" if is_chengyin else ""
-
-        # 词条平均百分比（内联在等级后面，字号跟随 affix_font_size）
-        pct_fs = self._affix_fs
-        cap_pcts = equip_affix_cap_pcts(equip_data)
-        if cap_pcts:
-            avg_pct = sum(cap_pcts) / len(cap_pcts)
-            pct_color = _affix_value_color(avg_pct)
-            pct_html = f'&nbsp;&nbsp;<span style="font-size:{pct_fs}px;color:{pct_color};font-weight:bold;">{avg_pct:.0f}%</span>'
-            self.lbl_info.setTextFormat(Qt.TextFormat.RichText)
-            self.lbl_info.setText(f"Lv{level}{tag}{pct_html}")
-        else:
-            self.lbl_info.setTextFormat(Qt.TextFormat.PlainText)
-            self.lbl_info.setText(f"Lv{level}{tag}")
-
-        self.lbl_info.setStyleSheet(
-            f"font-size: {self._level_fs}px; color: palette(mid); font-weight: bold;")
+        self._apply_level_line(self.lbl_info, equip_data)
 
         if not self._selected:
             bg = self._quality_bg or "palette(base)"
             self._apply_style(_slot_style_normal(bg, self._normal_border()))
 
-        # 词条
         self._clear_affixes()
-        for i in range(1, 6):
-            affix = equip_data.get(f"affix_{i}")
-            if not affix or not affix.get("name"):
-                continue
-            self._add_affix_row(affix, equip_level)
-
-        # 定音
-        dingyin = equip_data.get("dingyin")
-        zhige_dingyin = is_zhige_dingyin(equip_data)
-        normal_dingyin = isinstance(dingyin, dict) and bool(dingyin.get("name"))
-        if zhige_dingyin or normal_dingyin:
-            dash = QFrame()
-            dash.setFrameShape(QFrame.Shape.NoFrame)
-            dash.setStyleSheet(
-                "border: none; border-top: 1px dashed palette(mid);")
-            dash.setFixedHeight(1)
-            self.affix_layout.addWidget(dash)
-            if zhige_dingyin:
-                notice = str(
-                    (equip_data.get("_extra") or {}).get(DINGYIN_NOTICE_KEY) or ""
-                )
-                self._add_affix_row(
-                    {"name": tr("<止戈定音>")}, equip_level, tooltip=notice,
-                )
-            else:
-                assert isinstance(dingyin, dict)
-                self._add_affix_row(dingyin, equip_level)
+        self._add_affix_rows(equip_data)
         self._finish_affixes(equip_data)
 
     def update_lock_status(self, value: str) -> None:
@@ -955,78 +1049,11 @@ class _SlotCard(QFrame):
         self.hypothesis_label.setText(text or "")
         self.hypothesis_label.setVisible(bool(text))
 
-    def _add_affix_row(self, affix: dict, level=None, *, tooltip: str = ""):
-        value = affix.get("value", "")
-        unit = affix.get("unit", "")
-        cap_pct = affix_dict_cap_pct(affix, level)
-
-        if isinstance(value, (int, float)):
-            val_str = f"{value}%" if unit == "%" else (
-                f"{value:.1f}" if isinstance(value, float) else str(value))
-        else:
-            val_str = str(value)
-
-        val_color = _affix_value_color(cap_pct)
-
-        is_transferred = affix.get("is_transferred", False)
-        transfer_mark = " ⟳" if is_transferred else ""
-
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(2)
-
-        lbl = _ElidedLabel(f"{affix['name']}{transfer_mark}")
-        if tooltip:
-            lbl.setToolTip(tooltip)
-        lbl.setStyleSheet(
-            f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
-        row.addWidget(lbl, stretch=1)
-
-        # 转律目标作为独立分段标签：_ElidedLabel 自绘纯文本，不解析富文本。
-        target_text = _transmute_target_text(affix)
-        if target_text:
-            target = QLabel(target_text)
-            target.setObjectName("transmuteTargetLabel")
-            target.setToolTip(_transmute_target_tooltip(affix))
-            target.setStyleSheet(
-                f"font-size: {self._affix_fs}px; font-weight: bold; "
-                f"color: {transmute_target_color(self)};")
-            row.addWidget(target)
-
-        val = QLabel(val_str)
-        val.setStyleSheet(
-            f"font-size: {self._affix_fs}px; color: {val_color}; font-weight: bold;")
-        row.addWidget(val, alignment=Qt.AlignmentFlag.AlignRight)
-
-        self.affix_layout.addLayout(row)
-
-    def _clear_affixes(self):
-        self.affix_container.setMinimumHeight(0)
-        while self.affix_layout.count() > 0:
-            item = self.affix_layout.takeAt(0)
-            if item.widget():
-                if item.widget() is self.cooldown_label:
-                    self.cooldown_label.hide()
-                else:
-                    item.widget().deleteLater()
-            elif item.layout():
-                sub = item.layout()
-                while sub.count() > 0:
-                    child = sub.takeAt(0)
-                    if child.widget():
-                        child.widget().deleteLater()
-                sub.deleteLater()
-
-    def _finish_affixes(self, equip_data: dict) -> None:
-        _refresh_card_cooldown(self.cooldown_label, equip_data)
-        self.affix_layout.addWidget(self.cooldown_label)
-        _preserve_card_content_height(self.affix_container)
-
 
 # ── 底部：背包装备卡片 ──────────────────────────────
 
 
-class _CompactEquipCard(QFrame):
+class _CompactEquipCard(_AffixRowsMixin, QFrame):
     """紧凑装备卡片 —— 用于背包网格
 
     Signals:
@@ -1293,123 +1320,10 @@ class _CompactEquipCard(QFrame):
         self.status_tags.set_visible("loadout", is_loadout)
         self.illegal_badge.set_reasons(illegal_reasons_of(equip_data))
 
-        equip_level = equip_data.get("level")
-        level = equip_level or "?"
-        is_chengyin = equip_data.get("is_chengyin", False)
-        tag = " [" + tr("承音") + "]" if is_chengyin else ""
-
-        # 词条平均百分比（内联在等级后面，字号跟随 affix_font_size）
-        pct_fs = self._affix_fs
-        cap_pcts = equip_affix_cap_pcts(equip_data)
-        if cap_pcts:
-            avg_pct = sum(cap_pcts) / len(cap_pcts)
-            pct_color = _affix_value_color(avg_pct)
-            pct_html = f'&nbsp;&nbsp;<span style="font-size:{pct_fs}px;color:{pct_color};font-weight:bold;">{avg_pct:.0f}%</span>'
-            self.lbl_level.setTextFormat(Qt.TextFormat.RichText)
-            self.lbl_level.setText(f"Lv{level}{tag}{pct_html}")
-        else:
-            self.lbl_level.setTextFormat(Qt.TextFormat.PlainText)
-            self.lbl_level.setText(f"Lv{level}{tag}")
-
-        self.lbl_level.setStyleSheet(
-            f"font-size: {self._level_fs}px; color: palette(mid); font-weight: bold;")
+        self._apply_level_line(self.lbl_level, equip_data)
 
         self._clear_affixes()
-        for i in range(1, 6):
-            affix = equip_data.get(f"affix_{i}")
-            if not affix or not affix.get("name"):
-                continue
-
-            value = affix.get("value", "")
-            unit = affix.get("unit", "")
-            cap_pct = affix_dict_cap_pct(affix, equip_level)
-
-            if isinstance(value, (int, float)):
-                val_str = f"{value}%" if unit == "%" else (
-                    f"{value:.1f}" if isinstance(value, float) else str(value))
-            else:
-                val_str = str(value)
-
-            val_color = _affix_value_color(cap_pct)
-
-            is_transferred = affix.get("is_transferred", False)
-            transfer_mark = " ⟳" if is_transferred else ""
-
-            row = QHBoxLayout()
-            row.setContentsMargins(0, 0, 0, 0)
-            row.setSpacing(2)
-
-            lbl_name = _ElidedLabel(f"{affix['name']}{transfer_mark}")
-            lbl_name.setStyleSheet(
-                f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
-            row.addWidget(lbl_name, stretch=1)
-
-            target_text = _transmute_target_text(affix)
-            if target_text:
-                lbl_target = QLabel(target_text)
-                lbl_target.setObjectName("transmuteTargetLabel")
-                lbl_target.setToolTip(_transmute_target_tooltip(affix))
-                lbl_target.setStyleSheet(
-                    f"font-size: {self._affix_fs}px; font-weight: bold; "
-                    f"color: {transmute_target_color(self)};")
-                row.addWidget(lbl_target)
-
-            lbl_val = QLabel(val_str)
-            lbl_val.setStyleSheet(
-                f"font-size: {self._affix_fs}px; color: {val_color}; font-weight: bold;")
-            row.addWidget(lbl_val, alignment=Qt.AlignmentFlag.AlignRight)
-
-            self.affix_layout.addLayout(row)
-
-        # 定音
-        dingyin = equip_data.get("dingyin")
-        zhige_dingyin = is_zhige_dingyin(equip_data)
-        normal_dingyin = isinstance(dingyin, dict) and bool(dingyin.get("name"))
-        if zhige_dingyin or normal_dingyin:
-            dash = QFrame()
-            dash.setFrameShape(QFrame.Shape.NoFrame)
-            dash.setStyleSheet(
-                "border: none; border-top: 1px dashed palette(mid);")
-            dash.setFixedHeight(1)
-            self.affix_layout.addWidget(dash)
-
-            if zhige_dingyin:
-                row = QHBoxLayout()
-                row.setContentsMargins(0, 0, 0, 0)
-                lbl_name = _ElidedLabel(tr("<止戈定音>"))
-                notice = str(
-                    (equip_data.get("_extra") or {}).get(DINGYIN_NOTICE_KEY) or ""
-                )
-                if notice:
-                    lbl_name.setToolTip(notice)
-                lbl_name.setStyleSheet(
-                    f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
-                row.addWidget(lbl_name, stretch=1)
-                self.affix_layout.addLayout(row)
-            else:
-                assert isinstance(dingyin, dict)
-                dy_value = dingyin.get("value", "")
-                dy_val_str = (
-                    f"{dy_value}%" if isinstance(dy_value, (int, float))
-                    else str(dy_value))
-                dy_cap_pct = affix_dict_cap_pct(dingyin, equip_level)
-                dy_color = _affix_value_color(dy_cap_pct)
-
-                row = QHBoxLayout()
-                row.setContentsMargins(0, 0, 0, 0)
-                row.setSpacing(2)
-
-                lbl_name = _ElidedLabel(dingyin["name"])
-                lbl_name.setStyleSheet(
-                    f"font-size: {self._affix_fs}px; color: palette(mid); font-weight: bold;")
-                row.addWidget(lbl_name, stretch=1)
-
-                lbl_val = QLabel(dy_val_str)
-                lbl_val.setStyleSheet(
-                    f"font-size: {self._affix_fs}px; color: {dy_color}; font-weight: bold;")
-                row.addWidget(lbl_val, alignment=Qt.AlignmentFlag.AlignRight)
-
-                self.affix_layout.addLayout(row)
+        self._add_affix_rows(equip_data)
         self._finish_affixes(equip_data)
 
     def update_lock_status(self, value: str) -> None:
@@ -1427,24 +1341,3 @@ class _CompactEquipCard(QFrame):
         _refresh_card_cooldown(self.cooldown_label, self._equip_data)
         _preserve_card_content_height(self.affix_container)
 
-    def _clear_affixes(self):
-        self.affix_container.setMinimumHeight(0)
-        while self.affix_layout.count() > 0:
-            item = self.affix_layout.takeAt(0)
-            if item.widget():
-                if item.widget() is self.cooldown_label:
-                    self.cooldown_label.hide()
-                else:
-                    item.widget().deleteLater()
-            elif item.layout():
-                sub = item.layout()
-                while sub.count() > 0:
-                    child = sub.takeAt(0)
-                    if child.widget():
-                        child.widget().deleteLater()
-                sub.deleteLater()
-
-    def _finish_affixes(self, equip_data: dict) -> None:
-        _refresh_card_cooldown(self.cooldown_label, equip_data)
-        self.affix_layout.addWidget(self.cooldown_label)
-        _preserve_card_content_height(self.affix_container)

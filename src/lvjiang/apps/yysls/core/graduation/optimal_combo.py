@@ -28,12 +28,12 @@ from ..combat.combat_attrs import (
     CombatAttributes,
     GraduationAttrContext,
     aggregate_equipment_attrs,
-    apply_hypothetical_caps,
     compute_equip_base_attrs,
     effective_equipped,
     has_resistance,
     max_stack_affixes,
 )
+from .assumptions import Assumptions
 from .graduation_program import ProgramRuntime
 
 # 固定战斗属性字段名集合：extra_attrs 抗性循环需跳过（原逻辑只对
@@ -65,43 +65,39 @@ def _normal_affix_values(equip: dict) -> tuple[tuple[str, Any], ...]:
 
 
 def _apply_overlay_assumptions(
-    variant: CandidateVariant,
-    *,
-    full_chengyin: bool,
-    full_dingyin: bool,
-    full_level: int,
-    playstyle: str,
-    simulate_transmute: bool = False,
+    variant: CandidateVariant, assumptions_spec: Assumptions,
 ) -> CandidateVariant:
-    """依次覆盖虚拟装备，并只记录实际发生的变化。"""
+    """按 ``Assumptions`` 依次覆盖虚拟装备，并只记录实际发生的变化。
+
+    逐项分开投影而不是一次 ``project()``：每一步都要比较前后差异，
+    只把真正改变了装备的假设写进标注。
+    """
     virtual = variant.virtual
     assumptions = list(variant.assumptions)
 
-    if full_level > 0:
+    if assumptions_spec.full_level > 0:
         before_level = virtual.get("level")
-        virtual = apply_hypothetical_caps(
-            {"slot": virtual}, full_level=full_level,
-        )["slot"]
+        virtual = Assumptions(full_level=assumptions_spec.full_level).project(
+            {"slot": virtual})["slot"]
         if virtual.get("level") != before_level:
             assumptions.append("满等级假设")
 
-    if full_chengyin:
+    if assumptions_spec.full_chengyin:
         before_affixes = _normal_affix_values(virtual)
-        virtual = apply_hypothetical_caps(
-            {"slot": virtual}, full_chengyin=True,
-        )["slot"]
+        virtual = Assumptions(full_chengyin=True).project(
+            {"slot": virtual})["slot"]
         if _normal_affix_values(virtual) != before_affixes:
             assumptions.append("满承音假设")
 
-    if full_dingyin:
+    if assumptions_spec.full_dingyin:
         before_dingyin = copy.deepcopy(virtual.get("dingyin"))
-        virtual = apply_hypothetical_caps(
-            {"slot": virtual}, full_dingyin=True, playstyle=playstyle,
-        )["slot"]
+        virtual = Assumptions(
+            full_dingyin=True, playstyle=assumptions_spec.playstyle,
+        ).project({"slot": virtual})["slot"]
         if virtual.get("dingyin") != before_dingyin:
             assumptions.append("满定音假设")
 
-    if simulate_transmute:
+    if assumptions_spec.simulate_transmute:
         # 资格按原始装备判断、数值按虚拟副本状态取，与备战方案面板同口径。
         from ...config import get_game_config
         from ..loadout.transmute import project_transmute_targets
@@ -119,8 +115,9 @@ def _apply_overlay_assumptions(
 def build_candidate_variants(
     candidates: dict[str, list[dict]],
     *,
-    season_chengyin: bool = False,
+    assumptions: Assumptions | None = None,
     season_level: int = 0,
+    season_chengyin: bool = False,
     full_chengyin: bool = False,
     full_dingyin: bool = False,
     full_level: int = 0,
@@ -129,12 +126,22 @@ def build_candidate_variants(
 ) -> dict[str, list[CandidateVariant]]:
     """构建只用于计算的虚拟候选，绝不改写来源装备。
 
+    计算假设用 ``assumptions``（唯一类型）传入；散开的布尔参数只为兼容旧
+    调用与测试，给了 ``assumptions`` 时忽略它们。
+
     每件原装备无条件深拷贝。开启赛季同等级承音时，符合条件的原生装备
     额外派生一个承音分支；该分支只拉满普通词条，定音仍由 ``full_dingyin``
     独立决定。
     """
     from ...config import get_game_config
 
+    if assumptions is None:
+        assumptions = Assumptions(
+            full_level=full_level, full_chengyin=full_chengyin,
+            full_dingyin=full_dingyin, season_chengyin=season_chengyin,
+            simulate_transmute=simulate_transmute, playstyle=playstyle,
+        )
+    season_chengyin = assumptions.season_chengyin
     gc = get_game_config()
     level_cfg = gc.level_config_for(season_level) if season_level > 0 else None
     allow_season_chengyin = bool(level_cfg and level_cfg.allow_chengyin)
@@ -172,14 +179,7 @@ def build_candidate_variants(
                 ))
 
         result[slot_key] = [
-            _apply_overlay_assumptions(
-                variant,
-                full_chengyin=full_chengyin,
-                full_dingyin=full_dingyin,
-                full_level=full_level,
-                playstyle=playstyle,
-                simulate_transmute=simulate_transmute,
-            )
+            _apply_overlay_assumptions(variant, assumptions)
             for variant in variants
         ]
     return result
@@ -547,8 +547,9 @@ def search_optimal_combo(
     use_dominance_pruning: bool = True,
     max_per_slot: int = 0,  # 0 = no limit
     cancel_flag: Callable[[], bool] | None = None,
-    season_chengyin: bool = False,
+    assumptions: Assumptions | None = None,
     season_level: int = 0,
+    season_chengyin: bool = False,
     full_chengyin: bool = False,
     full_dingyin: bool = False,
     full_level: int = 0,
@@ -572,6 +573,8 @@ def search_optimal_combo(
         Whether to remove dominated candidates.
     max_per_slot:
         If > 0, apply linear-score Top-K safety net after pruning.
+    assumptions:
+        计算假设（唯一类型）；散开的布尔参数只为兼容旧调用。
     cancel_flag:
         Callable returning True to abort search early.
     playstyle:
@@ -596,15 +599,14 @@ def search_optimal_combo(
     # -- Phase 0: build virtual candidates --
     # 所有候选一律深拷贝后计算。赛季承音保留原分支并额外创建承音分支；
     # 其余假设只覆盖虚拟分支。原始装备从不进入属性变换函数。
+    if assumptions is None:
+        assumptions = Assumptions(
+            full_level=full_level, full_chengyin=full_chengyin,
+            full_dingyin=full_dingyin, season_chengyin=season_chengyin,
+            simulate_transmute=simulate_transmute, playstyle=playstyle,
+        )
     variants = build_candidate_variants(
-        candidates,
-        season_chengyin=season_chengyin,
-        season_level=season_level,
-        full_chengyin=full_chengyin,
-        full_dingyin=full_dingyin,
-        full_level=full_level,
-        playstyle=playstyle,
-        simulate_transmute=simulate_transmute,
+        candidates, assumptions=assumptions, season_level=season_level,
     )
     variant_by_virtual_id = {
         id(variant.virtual): variant
@@ -755,20 +757,20 @@ def search_optimal_combo(
     results: list[dict[str, Any]] = []
     for rate, combo_indices, dps in board.top(5):
         equipped: dict[str, dict] = {}
-        assumptions: dict[str, list[str]] = {}
+        slot_notes: dict[str, list[str]] = {}
         for si, idx in enumerate(combo_indices):
             chosen = slot_equip_arrays[si][idx]
             variant = variant_by_virtual_id[id(chosen)]
             slot_key = active_slots[si]
             equipped[slot_key] = variant.original
             if variant.assumptions:
-                assumptions[slot_key] = list(variant.assumptions)
+                slot_notes[slot_key] = list(variant.assumptions)
         results.append({
             "rate": rate,
             "dps": dps,
             "total_damage": dps * calculator.combat_time(),
             "equipped": equipped,
-            "assumptions": assumptions,
+            "assumptions": slot_notes,
         })
 
     # ✅ 输出缓存统计信息

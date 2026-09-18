@@ -45,7 +45,7 @@ def _open_base_attr_form(_engine, prefill: dict) -> None:
         logger.debug("open_base_attr_form: 无 UI 回调（测试/独立执行端），跳过")
         return
     try:
-        from lvjiang.apps.yysls.ui.events import APP_ID, OPEN_PLAY_STYLE_FORM
+        from lvjiang.apps.yysls.core.events import APP_ID, OPEN_PLAY_STYLE_FORM
         from lvjiang.ui.app_events import AppEvent
         callback(
             "app_event",

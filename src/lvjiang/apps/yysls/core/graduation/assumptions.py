@@ -60,14 +60,3 @@ class Assumptions:
 
     def with_playstyle(self, playstyle: str) -> Assumptions:
         return replace(self, playstyle=playstyle)
-
-    def to_flags(self) -> dict:
-        """``apply_hypothetical_caps`` 关键字参数形式。"""
-        return {
-            "full_chengyin": self.full_chengyin,
-            "full_dingyin": self.full_dingyin,
-            "full_level": self.full_level,
-            "playstyle": self.playstyle,
-            "simulate_transmute": self.simulate_transmute,
-            "season_chengyin": self.season_chengyin,
-        }

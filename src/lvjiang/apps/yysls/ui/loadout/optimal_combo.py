@@ -286,13 +286,8 @@ def _search_job(
                 base_attrs,
                 use_dominance_pruning=use_dominance_pruning,
                 cancel_flag=ctx.is_cancelled,
-                season_chengyin=assumptions.season_chengyin,
+                assumptions=assumptions,
                 season_level=season_level,
-                full_chengyin=assumptions.full_chengyin,
-                full_dingyin=assumptions.full_dingyin,
-                full_level=assumptions.full_level,
-                playstyle=assumptions.playstyle,
-                simulate_transmute=assumptions.simulate_transmute,
                 progress_counter=progress,
             )
             completed += progress.evaluated

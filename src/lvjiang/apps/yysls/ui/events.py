@@ -6,10 +6,17 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from lvjiang.ui.app_events import AppEvent
 
-APP_ID = "yysls"
-EQUIPMENT_CHANGED = "equipment.changed"
-OPEN_PLAY_STYLE_FORM = "play_style.open_form"
-GRADUATION_UPDATED = "graduation.updated"
+from ..core.events import (
+    APP_ID,
+    EQUIPMENT_CHANGED,
+    GRADUATION_UPDATED,
+    OPEN_PLAY_STYLE_FORM,
+)
+
+__all__ = [
+    "APP_ID", "EQUIPMENT_CHANGED", "GRADUATION_UPDATED", "OPEN_PLAY_STYLE_FORM",
+    "YyslsEventHub", "get_event_hub",
+]
 
 
 class YyslsEventHub(QObject):

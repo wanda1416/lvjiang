@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable
+from dataclasses import replace
 
 from loguru import logger
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
@@ -369,8 +370,7 @@ class AffixAnalysisPages(QWidget):
         self._transmute_status.setText(tr("正在搜索转律组合…"))
         # 假设在点击时定格；转律建议不使用“模拟转律”本身（它就是在算目标）
         assumptions = self._assumptions_provider()
-        assumptions = Assumptions(**{**assumptions.to_flags(),
-                                     "simulate_transmute": False})
+        assumptions = replace(assumptions, simulate_transmute=False)
         self._set_transmute_basis(assumptions.labels())
         runner = self._transmute_runner
         self._transmute_jobs.start(

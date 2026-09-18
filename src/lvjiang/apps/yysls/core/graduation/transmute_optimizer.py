@@ -20,7 +20,6 @@ from dataclasses import dataclass, field
 from ..combat.combat_attrs import (
     CombatAttributes,
     aggregate_equipment_attrs,
-    apply_hypothetical_caps,
     build_graduation_attrs,
     compute_equip_base_attrs,
 )
@@ -35,6 +34,7 @@ from ..loadout.transmute import (
     with_transmuted_affix,
 )
 from .affix_impact import _effective_equipped
+from .assumptions import Assumptions
 from .smart_search import floor_rate
 
 #: 搜索预算：先到者停止。数值集中在这里，实现阶段按实测调整。
@@ -108,11 +108,22 @@ class TransmuteSearchRequest:
     full_chengyin: bool = False
     full_dingyin: bool = False
     full_level: int = 0
+    season_chengyin: bool = False
     playstyle: str = ""
     precision: float = DEFAULT_PRECISION
     time_budget: float = DEFAULT_TIME_BUDGET_SECONDS
     stop_check: Callable[[], bool] | None = None
     school_pool: tuple[str, ...] = field(default_factory=tuple)
+
+    def assumptions(self, *, simulate_transmute: bool = False) -> Assumptions:
+        return Assumptions(
+            full_level=self.full_level,
+            full_chengyin=self.full_chengyin,
+            full_dingyin=self.full_dingyin,
+            season_chengyin=self.season_chengyin,
+            simulate_transmute=simulate_transmute,
+            playstyle=self.playstyle,
+        )
 
 
 class _BudgetExceeded(Exception):
@@ -205,13 +216,7 @@ def optimize_transmutes(request: TransmuteSearchRequest) -> TransmutePlanResult:
     pool_rank = {name: rank for rank, name in enumerate(request.school_pool)}
 
     # 三满投影一次；所有候选都在这份副本上替换。
-    projected = copy.deepcopy(apply_hypothetical_caps(
-        original,
-        full_chengyin=request.full_chengyin,
-        full_dingyin=request.full_dingyin,
-        full_level=request.full_level,
-        playstyle=request.playstyle,
-    ))
+    projected = copy.deepcopy(request.assumptions().project(original, gc))
 
     eligibility = {
         slot: judge_transmute_eligibility(equip, gc)
@@ -233,14 +238,8 @@ def optimize_transmutes(request: TransmuteSearchRequest) -> TransmutePlanResult:
         and validate_saved_target(equip, gc) is None
         for equip in original.values()
     ):
-        saved_projected = apply_hypothetical_caps(
-            original,
-            full_chengyin=request.full_chengyin,
-            full_dingyin=request.full_dingyin,
-            full_level=request.full_level,
-            playstyle=request.playstyle,
-            simulate_transmute=True,
-        )
+        saved_projected = request.assumptions(
+            simulate_transmute=True).project(original, gc)
         saved_rate = evaluator.rate(saved_projected)
 
     def apply_move(state: dict[str, dict], slot: str, index: int, name: str) -> dict:

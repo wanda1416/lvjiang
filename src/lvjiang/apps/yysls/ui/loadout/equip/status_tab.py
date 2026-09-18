@@ -254,7 +254,7 @@ def _affix_analysis_dependencies():
         TransmuteSearchRequest,
         optimize_transmutes,
     )
-    from ..affix_impact_dialog import AffixImpactDialog
+    from ..affix_analysis_pages import AffixAnalysisPages
 
     return (
         get_game_config,
@@ -263,7 +263,7 @@ def _affix_analysis_dependencies():
         get_graduation_calculator,
         analyze_affix_impacts,
         analyze_combined_affix_replacements,
-        AffixImpactDialog,
+        AffixAnalysisPages,
         TransmuteSearchRequest,
         optimize_transmutes,
     )
@@ -1918,40 +1918,20 @@ class EquipStatusTab(QWidget):
             )
 
     def _on_optimal_combo(self):
-        """打开最优组合搜索对话框。"""
-        # 从角色详情 Tab 读取流派/方案/基础属性
-        from ..combat.attrs_tab import CombatAttrsTab
-        combat_tab = None
-        for child in self._host.findChildren(QWidget):
-            if isinstance(child, CombatAttrsTab):
-                combat_tab = child
-                break
-        if combat_tab is None:
-            QMessageBox.warning(self, tr("提示"), tr("未找到角色详情面板"))
-            return
+        """打开毕业率分析对话框的「最优组合」页。"""
+        from ..graduation_analysis import TAB_OPTIMAL
 
-        context = combat_tab.get_graduation_context()
-        if context is None:
-            QMessageBox.warning(
-                self, tr("提示"), tr("请先在角色详情页选择流派和毕业率方案"))
-            return
+        self._open_graduation_analysis(TAB_OPTIMAL)
 
-        from ....core.loadout import LoadoutRepository
-        from ..optimal_combo import OptimalComboDialog
-        plan = LoadoutRepository(
-            self._host.active_user_name()
-        ).load().active_plan
-        dlg = OptimalComboDialog(
-            self._host, context.school, context.scheme, context.base_attrs,
-            level_threshold=self._get_level_threshold(),
-            affix_filter=self._get_affix_filter(),
-            gongjue=context.gongjue,
-            playstyle=plan.playstyle,
-            main_martial_art=plan.main_martial_art,
-            sub_martial_art=plan.sub_martial_art,
-            parent=self,
-        )
-        dlg.exec()
+    def _analysis_cache_for(self, user_name: str, plan_id: str):
+        """按“用户 + 备战方案”隔离的上次计算结果。"""
+        from ..graduation_analysis import AnalysisCache
+
+        caches = getattr(self, "_analysis_caches", None)
+        if caches is None:
+            caches = {}
+            self._analysis_caches = caches
+        return caches.setdefault((user_name, plan_id), AnalysisCache())
 
     def _apply_transmute_result(self, result, *, user_name: str, plan_id: str) -> bool:
         """把转律建议写入公共装备；用户、方案或装备快照过期时拒绝。"""
@@ -1983,8 +1963,19 @@ class EquipStatusTab(QWidget):
         return True
 
     def _on_affix_impact(self):
-        """打开当前配装的词条培养建议与敏感度分析。"""
+        """打开毕业率分析对话框的「转律建议」页。"""
+        from ..graduation_analysis import TAB_TRANSMUTE
+
+        self._open_graduation_analysis(TAB_TRANSMUTE)
+
+    def _open_graduation_analysis(self, initial_tab: int) -> None:
+        """构建共享上下文（流派、模型、基础属性、假设副本）并打开分析对话框。"""
         from ..combat.attrs_tab import CombatAttrsTab
+        from ..graduation_analysis import (
+            AssumptionBar,
+            GraduationAnalysisDialog,
+        )
+        from ..optimal_combo import OptimalComboPage
 
         combat_tab = next(
             (
@@ -2017,7 +2008,7 @@ class EquipStatusTab(QWidget):
                 get_graduation_calculator,
                 analyze_affix_impacts,
                 analyze_combined_affix_replacements,
-                AffixImpactDialog,
+                AffixAnalysisPages,
                 TransmuteSearchRequest,
                 optimize_transmutes,
             ) = _affix_analysis_dependencies()
@@ -2040,18 +2031,18 @@ class EquipStatusTab(QWidget):
 
             inventory = EquipmentInventory(user_name)
             equipped = inventory.equipped
-            if not equipped:
-                QMessageBox.information(
-                    self, tr("词条分析"), tr("当前备战方案尚未装备任何装备。"))
-                return
-            # 冻结搜索上下文：三满设置、流派、模型、基础属性在打开时定格。
-            flags = combat_tab.assumption_flags()
-            flags.pop("simulate_transmute", None)
+            plan = inventory.active_plan
+            plan_id = inventory.active_plan_id
             school = context.school
             school_pool = tuple(game_config.get_transmute_pool(school))
-            plan_id = inventory.active_plan_id
 
-            def transmute_runner(stop_check):
+            # 假设栏：备战方案面板假设的副本，关闭即弃
+            bar = AssumptionBar(
+                combat_tab.assumptions(),
+                season_level=game_config.current_equip_level(),
+            )
+
+            def transmute_runner(stop_check, assumptions):
                 return optimize_transmutes(TransmuteSearchRequest(
                     equipped=copy.deepcopy(equipped),
                     calculator=calculator,
@@ -2060,17 +2051,19 @@ class EquipStatusTab(QWidget):
                     game_config=game_config,
                     stop_check=stop_check,
                     school_pool=school_pool,
-                    **flags,
+                    full_chengyin=assumptions.full_chengyin,
+                    full_dingyin=assumptions.full_dingyin,
+                    full_level=assumptions.full_level,
+                    playstyle=assumptions.playstyle,
                 ))
 
             def apply_handler(result) -> bool:
                 return self._apply_transmute_result(
                     result, user_name=user_name, plan_id=plan_id)
 
-            dialog = AffixImpactDialog(
+            affix_pages = AffixAnalysisPages(
                 school,
                 context.scheme,
-                self,
                 equipped=equipped,
                 report_provider=lambda: analyze_affix_impacts(
                     equipped,
@@ -2090,12 +2083,31 @@ class EquipStatusTab(QWidget):
                 ),
                 transmute_runner=transmute_runner,
                 apply_handler=apply_handler,
-                assumption_labels=tuple(
-                    label for label in combat_tab.assumption_labels()
-                    if label != tr("模拟转律")),
+                assumptions_provider=bar.value,
                 display_params=self._display_params,
+            )
+            optimal_page = OptimalComboPage(
+                self._host, school, context.scheme, context.base_attrs,
+                level_threshold=self._get_level_threshold(),
+                affix_filter=self._get_affix_filter(),
+                gongjue=context.gongjue,
+                playstyle=plan.playstyle,
+                main_martial_art=plan.main_martial_art,
+                sub_martial_art=plan.sub_martial_art,
+                assumptions_provider=bar.value,
+            )
+            dialog = GraduationAnalysisDialog(
+                self,
+                school=school,
+                scheme=context.scheme,
+                plan_name=plan.name,
+                assumption_bar=bar,
+                optimal_page=optimal_page,
+                affix_pages=affix_pages,
+                cache=self._analysis_cache_for(user_name, plan_id),
+                initial_tab=initial_tab,
             )
             dialog.exec()
         except Exception as exc:
-            logger.error(f"词条分析失败: {exc}")
+            logger.error(f"毕业率分析打开失败: {exc}")
             QMessageBox.critical(self, tr("分析失败"), str(exc))

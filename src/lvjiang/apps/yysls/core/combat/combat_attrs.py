@@ -474,6 +474,7 @@ def apply_hypothetical_caps(
     full_level: int = 0,
     playstyle: str = "",
     simulate_transmute: bool = False,
+    season_chengyin: bool = False,
 ) -> dict:
     """假设装备升至理想状态，返回变换后的装备副本。
 
@@ -492,12 +493,16 @@ def apply_hypothetical_caps(
             （``target_transmute_name``）覆盖到对应词条槽；目标数值按副本
             此时的等级/承音状态取上限，资格按原始装备判断。只用已保存的
             目标，不做任何搜索。
+        season_chengyin: 当前赛季原生装备（等级 == full_level、未承音）
+            视为已承音；配合 full_chengyin 才改变词条数值。原生装备的
+            承音是“同等级承音”，满等级假设不会自动覆盖到它们，所以单列。
+            full_level 为 0 时按当前赛季等级判断。
 
     Returns:
         变换后的装备 dict；无需变换时返回原 dict。
     """
     if (not full_chengyin and not full_dingyin and full_level <= 0
-            and not simulate_transmute):
+            and not simulate_transmute and not season_chengyin):
         return equipped
 
     import copy
@@ -506,6 +511,9 @@ def apply_hypothetical_caps(
 
     gc = get_game_config()
     result: dict = {}
+    season_level = full_level if full_level > 0 else gc.current_equip_level()
+    season_cfg = gc.level_config_for(season_level) if season_level > 0 else None
+    season_allowed = bool(season_cfg and season_cfg.allow_chengyin)
 
     for slot_key, equip in equipped.items():
         if not isinstance(equip, dict):
@@ -514,16 +522,22 @@ def apply_hypothetical_caps(
 
         equip = copy.deepcopy(equip)
 
+        try:
+            cur_level = int(equip.get("level") or 0)
+        except (TypeError, ValueError):
+            cur_level = 0
+
         # 满等级：提升装备等级（基础属性随之变化）
         # 低于赛季最高等级的装备均可升级为承音装备
-        if full_level > 0:
-            try:
-                cur_level = int(equip.get("level") or 0)
-            except (TypeError, ValueError):
-                cur_level = 0
-            if 0 < cur_level < full_level:
-                equip["level"] = full_level
-                equip["is_chengyin"] = True
+        if full_level > 0 and 0 < cur_level < full_level:
+            equip["level"] = full_level
+            equip["is_chengyin"] = True
+
+        # 赛季原生装备假设承音：只标记，数值由 full_chengyin 决定
+        if (season_chengyin and season_allowed
+                and cur_level == season_level
+                and not bool(equip.get("is_chengyin"))):
+            equip["is_chengyin"] = True
 
         effective_level = equip.get("level")
         is_cy = equip.get("is_chengyin", False)

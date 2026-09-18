@@ -543,7 +543,7 @@ def test_candidate_maximum_applies_all_three_assumptions(monkeypatch):
         return equipped
 
     monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.apply_hypothetical_caps",
+        "lvjiang.apps.yysls.core.graduation.assumptions.apply_hypothetical_caps",
         fake_caps)
     context = _PlanContext(
         "p", "方案", "流派", object(), object(), {}, 0.5,
@@ -557,24 +557,20 @@ def test_candidate_maximum_applies_all_three_assumptions(monkeypatch):
         "full_dingyin": True,
         "full_level": 110,
         "playstyle": "双切",
+        "simulate_transmute": False,
+        "season_chengyin": True,
     }
 
 
-def test_candidate_maximum_treats_current_season_native_as_chengyin(
-        monkeypatch):
+def test_candidate_maximum_treats_current_season_native_as_chengyin():
+    """当前赛季原生装备按同等级承音：词条取承音上限，原件不被改写。"""
+    from lvjiang.apps.yysls.config import get_game_config
+
     evaluator = _bare_evaluator()
-    captured = {}
-
-    def fake_caps(equipped, **_kwargs):
-        captured.update(equipped)
-        return equipped
-
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.graduation.smart_tuning.apply_hypothetical_caps",
-        fake_caps)
+    evaluator._game_config = get_game_config()
     context = _PlanContext(
         "p", "方案", "流派", object(), object(), {}, 0.5,
-        playstyle="双切", plan_maximum_rate=0.9,
+        playstyle="", plan_maximum_rate=0.9,
     )
     original = {
         "pendant": {
@@ -583,9 +579,11 @@ def test_candidate_maximum_treats_current_season_native_as_chengyin(
         },
     }
 
-    evaluator._apply_maximum_assumptions(context, original)
+    projected = evaluator._apply_maximum_assumptions(context, original)
 
-    assert captured["pendant"]["is_chengyin"] is True
+    assert projected["pendant"]["is_chengyin"] is True
+    assert projected["pendant"]["affix_1"]["value"] == get_game_config(
+    ).get_affix_caps(110, "最小外功攻击")["chengyin"]
     assert original["pendant"]["is_chengyin"] is False
 
 

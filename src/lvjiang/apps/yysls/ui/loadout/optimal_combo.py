@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 from loguru import logger
@@ -41,9 +43,11 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import (
+    apply_button_style,
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.widgets import FlowLayout
 
 from .....i18n import tr
 from ...core.affix_cap import affix_dict_cap_pct
@@ -51,6 +55,7 @@ from ...core.combat.combat_attrs import (
     CombatAttributes,
 )
 from ...core.equip_parser.dingyin_parser import is_zhige_dingyin
+from ...core.graduation.assumptions import Assumptions
 from ..domain_labels import domain_label
 from ..events import EQUIPMENT_CHANGED, get_event_hub
 from ..layout_helpers import fit_combo_to_contents
@@ -205,24 +210,6 @@ _QUALITY_COLORS = {
     "green": "#16A34A",
 }
 
-_PRIMARY_BUTTON_STYLE = (
-    "QPushButton { background: palette(highlight); color: palette(highlighted-text); "
-    "border: 1px solid palette(highlight); border-radius: 5px; padding: 6px 16px; "
-    "font-weight: 700; }"
-    "QPushButton:hover { border-color: palette(text); }"
-    "QPushButton:pressed { background: palette(dark); }"
-    "QPushButton:disabled { background: palette(midlight); color: palette(mid); "
-    "border-color: palette(midlight); }"
-)
-
-_SECONDARY_BUTTON_STYLE = (
-    "QPushButton { background: palette(button); color: palette(button-text); "
-    "border: 1px solid palette(mid); border-radius: 5px; padding: 6px 13px; "
-    "font-weight: 600; }"
-    "QPushButton:hover { border-color: palette(highlight); }"
-)
-
-
 # ---------------------------------------------------------------------------
 # Worker signals + runnable
 # ---------------------------------------------------------------------------
@@ -285,12 +272,8 @@ class _SearchWorker(QRunnable):
         scheme: str,
         scenarios: list[tuple[str, CombatAttributes]],
         use_dominance_pruning: bool,
-        season_chengyin: bool = False,
+        assumptions: Assumptions,
         season_level: int = 0,
-        full_chengyin: bool = False,
-        full_dingyin: bool = False,
-        full_level: int = 0,
-        playstyle: str = "",
     ) -> None:
         super().__init__()
         self.candidates = candidates
@@ -298,12 +281,8 @@ class _SearchWorker(QRunnable):
         self.scheme = scheme
         self.scenarios = scenarios
         self.use_dominance_pruning = use_dominance_pruning
-        self.season_chengyin = season_chengyin
+        self.assumptions = assumptions
         self.season_level = season_level
-        self.full_chengyin = full_chengyin
-        self.full_dingyin = full_dingyin
-        self.full_level = full_level
-        self.playstyle = playstyle
         self.signals = _SearchSignals()
         self._cancel_event = threading.Event()
         # 进度计数器（线程安全，由 GIL 保证）
@@ -339,12 +318,13 @@ class _SearchWorker(QRunnable):
                     base_attrs,
                     use_dominance_pruning=self.use_dominance_pruning,
                     cancel_flag=self._cancel_event.is_set,
-                    season_chengyin=self.season_chengyin,
+                    season_chengyin=self.assumptions.season_chengyin,
                     season_level=self.season_level,
-                    full_chengyin=self.full_chengyin,
-                    full_dingyin=self.full_dingyin,
-                    full_level=self.full_level,
-                    playstyle=self.playstyle,
+                    full_chengyin=self.assumptions.full_chengyin,
+                    full_dingyin=self.assumptions.full_dingyin,
+                    full_level=self.assumptions.full_level,
+                    playstyle=self.assumptions.playstyle,
+                    simulate_transmute=self.assumptions.simulate_transmute,
                     progress_counter=progress,
                 )
                 completed += progress.evaluated
@@ -561,6 +541,180 @@ class _SlotGroup(QFrame):
         return [row.equip for row in self.rows if row.checkbox.isChecked()]
 
 
+# ── 与备战方案的差异标注 ─────────────────────────────────
+
+#: 计算假设的强调色：和装备卡片上原来那行假设文字保持同一种琥珀色。
+_ASSUMPTION_FG = "#B26A00"
+_ASSUMPTION_BG = "rgba(178, 106, 0, 0.13)"
+
+_PILL_STYLE = (
+    "border-radius: 9px; padding: 1px 8px; font-size: 11px; font-weight: 600;"
+)
+
+#: 部位相对当前备战方案的变化。
+_CHANGE_SWAP = "swap"    # 备战方案穿着别的装备，要换下来
+_CHANGE_NEW = "new"      # 备战方案这个部位是空的，直接穿上
+_CHANGE_SAME = "same"    # 与备战方案一致
+_CHANGE_NONE = "none"    # 组合里没有这个部位
+
+
+def _slot_change(current: Any, proposed: Any) -> str:
+    """比较组合里某部位的装备与备战方案当前穿戴，返回 ``_CHANGE_*``。
+
+    按指纹比较而不是按对象：搜索结果里的装备是从候选池复制出来的，
+    同一件装备可能是不同的 dict。
+    """
+    if not isinstance(proposed, dict) or not proposed:
+        return _CHANGE_NONE
+    if not isinstance(current, dict) or not current:
+        return _CHANGE_NEW
+    if _equip_fingerprint(current) == _equip_fingerprint(proposed):
+        return _CHANGE_SAME
+    return _CHANGE_SWAP
+
+
+def _changed_slots(
+    equipped: dict[str, Any], current_equipped: dict[str, Any],
+) -> list[str]:
+    """按部位顺序列出需要动手换装的部位（换下或新穿）。"""
+    return [
+        slot_key for slot_key, _dn, _ft in _SLOT_ORDER
+        if _slot_change(current_equipped.get(slot_key), equipped.get(slot_key))
+        in (_CHANGE_SWAP, _CHANGE_NEW)
+    ]
+
+
+def _make_pill(text: str, fg: str, bg: str, parent: QWidget | None = None) -> QLabel:
+    """胶囊标签：一个短语一个色块，比整行加粗的提示更容易一眼定位。"""
+    label = QLabel(text, parent)
+    label.setStyleSheet(f"color: {fg}; background: {bg}; {_PILL_STYLE}")
+    return label
+
+
+def _assumption_pill(text: str, parent: QWidget | None = None) -> QLabel:
+    return _make_pill(text, _ASSUMPTION_FG, _ASSUMPTION_BG, parent)
+
+
+def _change_pill(change: str, parent: QWidget | None = None) -> QLabel | None:
+    """部位变化的胶囊；一致的部位也给一个弱化的确认，避免被误读为漏标。"""
+    if change == _CHANGE_SWAP:
+        return _make_pill(
+            "⇄ " + tr("需更换"),
+            "palette(highlighted-text)", "palette(highlight)", parent)
+    if change == _CHANGE_NEW:
+        return _make_pill(
+            "+ " + tr("新穿戴"),
+            "palette(highlighted-text)", "palette(highlight)", parent)
+    if change == _CHANGE_SAME:
+        return _make_pill(
+            "✓ " + tr("已穿戴"), "palette(mid)", "palette(alternate-base)", parent)
+    return None
+
+
+class _SlotDetailPanel(QWidget):
+    """组合详情页的单个部位：卡片上方一条状态带 + 装备卡片。
+
+    状态带承担两件事：计算假设（原来挤在卡片内部第一行，占掉词条的
+    空间，还容易被当成装备本身的属性）和「这个部位要不要换」。后者是
+    用户看这一页的真正目的——不熟悉自己穿戴的人，只看八张卡片根本不知
+    道哪几件是新的。
+    """
+
+    def __init__(
+        self, slot_key: str, display_name: str, filter_type: str,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        from .equip.cards import _SlotCard
+
+        self.slot_key = slot_key
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        self.strip = QWidget()
+        strip_layout = QHBoxLayout(self.strip)
+        strip_layout.setContentsMargins(2, 0, 2, 0)
+        strip_layout.setSpacing(6)
+        self.change_slot = QHBoxLayout()
+        self.change_slot.setContentsMargins(0, 0, 0, 0)
+        self.change_slot.setSpacing(6)
+        strip_layout.addLayout(self.change_slot)
+        self.current_label = QLabel("")
+        self.current_label.setProperty("tone", "muted")
+        self.current_label.setStyleSheet("font-size: 11px;")
+        self.current_label.setVisible(False)
+        strip_layout.addWidget(self.current_label)
+        strip_layout.addStretch(1)
+        self.assumption_slot = QHBoxLayout()
+        self.assumption_slot.setContentsMargins(0, 0, 0, 0)
+        self.assumption_slot.setSpacing(4)
+        strip_layout.addLayout(self.assumption_slot)
+        # 状态带高度固定，空槽位也占位，八张卡片才能对齐
+        self.strip.setFixedHeight(20)
+        layout.addWidget(self.strip)
+
+        self.card = _SlotCard(
+            slot_key, display_name, filter_type,
+            display_params={"card_min_height": 180},
+        )
+        # 这一页只看不点：卡片本身是为「穿戴装备」那边的选中交互做的
+        self.card.setCursor(Qt.CursorShape.ArrowCursor)
+        layout.addWidget(self.card)
+
+        self.change = _CHANGE_NONE
+        self.assumptions: list[str] = []
+
+    @staticmethod
+    def _clear(layout: QHBoxLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget() if item is not None else None
+            if widget is not None:
+                widget.deleteLater()
+
+    def show_equip(
+        self, equip: dict, assumptions: list[str], current: Any,
+    ) -> None:
+        self.card.set_equip(equip)
+        self.change = _slot_change(current, equip)
+        self.assumptions = [str(a) for a in assumptions if str(a)]
+
+        self._clear(self.change_slot)
+        pill = _change_pill(self.change, self.strip)
+        if pill is not None:
+            self.change_slot.addWidget(pill)
+        if self.change == _CHANGE_SWAP and isinstance(current, dict):
+            self.current_label.setText(
+                tr("当前：{name}").format(name=current.get("name", "?")))
+            self.current_label.setToolTip(
+                tr("备战方案此部位现在穿的装备，应用组合后会被换下"))
+            self.current_label.setVisible(True)
+        else:
+            self.current_label.setText("")
+            self.current_label.setVisible(False)
+
+        self._clear(self.assumption_slot)
+        for text in self.assumptions:
+            self.assumption_slot.addWidget(_assumption_pill(text, self.strip))
+        self.strip.setToolTip(
+            tr("计算假设：") + "、".join(self.assumptions)
+            if self.assumptions else "")
+
+        self.card.set_attention(self.change in (_CHANGE_SWAP, _CHANGE_NEW))
+
+    def show_empty(self) -> None:
+        self.card.set_attention(False)
+        self.card.set_empty()
+        self.change = _CHANGE_NONE
+        self.assumptions = []
+        self._clear(self.change_slot)
+        self._clear(self.assumption_slot)
+        self.current_label.setText("")
+        self.current_label.setVisible(False)
+        self.strip.setToolTip("")
+
+
 class _ResultCard(QFrame):
     """单条搜索结果卡片。"""
 
@@ -569,11 +723,14 @@ class _ResultCard(QFrame):
 
     def __init__(
         self, rank: int, result: dict[str, Any],
-        slot_labels: dict[str, str], parent: QWidget | None = None,
+        slot_labels: dict[str, str],
+        current_equipped: dict[str, Any] | None = None,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setProperty("surface", "card")
         self.result = result
+        current_equipped = current_equipped or {}
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 10, 14, 10)
@@ -604,21 +761,36 @@ class _ResultCard(QFrame):
         gongjue_label.setStyleSheet("font-size: 12px; color: palette(mid);")
         top.addWidget(gongjue_label)
 
+        # 计算假设放在首行：它们决定了上面那个毕业率是在什么前提下算出来的，
+        # 放在装备列表下面会先看到结论再看到前提。
+        assumptions = result.get("assumptions", {})
+        assumption_texts: list[str] = []
+        if isinstance(assumptions, dict):
+            for slot_key, _dn, _ft in _SLOT_ORDER:
+                for label in assumptions.get(slot_key) or []:
+                    text = str(label)
+                    if text and text not in assumption_texts:
+                        assumption_texts.append(text)
+        self.assumption_pills: list[QLabel] = []
+        for text in assumption_texts:
+            pill = _assumption_pill(text, self)
+            pill.setToolTip(tr("计算假设：{text}").format(text=text))
+            self.assumption_pills.append(pill)
+            top.addWidget(pill, 0, Qt.AlignmentFlag.AlignVCenter)
+
         top.addStretch()
 
         buttons = QVBoxLayout()
         buttons.setSpacing(4)
         apply_btn = QPushButton(tr("应用此组合"))
-        apply_btn.setMinimumHeight(30)
-        apply_btn.setStyleSheet(_PRIMARY_BUTTON_STYLE)
+        apply_button_style(apply_btn, variant="action")
         apply_btn.clicked.connect(
             lambda: self.apply_clicked.emit(result.get("equipped", {})),
         )
         buttons.addWidget(apply_btn)
         # 一行装备名看不出这套组合到底是什么，真要判断得看词条
         detail_btn = QPushButton(tr("查看组合详情"))
-        detail_btn.setMinimumHeight(26)
-        detail_btn.setStyleSheet(_SECONDARY_BUTTON_STYLE)
+        apply_button_style(detail_btn, variant="neutral")
         detail_btn.clicked.connect(
             lambda: self.detail_clicked.emit(result),
         )
@@ -626,42 +798,68 @@ class _ResultCard(QFrame):
         top.addLayout(buttons)
         layout.addLayout(top)
 
-        # Equipment summary
+        # 装备列表：一个部位一个胶囊。相对备战方案要换的部位用强调色，
+        # 前面再给一个汇总数——用户扫一眼就知道这套组合要动几件、动哪几件。
         equipped = result.get("equipped", {})
-        parts: list[str] = []
+        self.changed_slots = _changed_slots(equipped, current_equipped)
+        chips_host = QWidget()
+        chips = FlowLayout(chips_host, spacing=6)
+        chips.setContentsMargins(0, 0, 0, 0)
+        if self.changed_slots:
+            names = "、".join(
+                slot_labels.get(k, k) for k in self.changed_slots)
+            self.change_summary = _make_pill(
+                tr("需更换 {count} 件").format(count=len(self.changed_slots)),
+                "palette(highlighted-text)", "palette(highlight)", chips_host)
+            self.change_summary.setToolTip(tr("需要更换：{names}").format(names=names))
+        else:
+            self.change_summary = _make_pill(
+                "✓ " + tr("与备战方案一致"),
+                "palette(mid)", "palette(alternate-base)", chips_host)
+        chips.addWidget(self.change_summary)
+        self.slot_chips: dict[str, QLabel] = {}
         for slot_key, _dn, _ft in _SLOT_ORDER:
             eq = equipped.get(slot_key)
-            if eq:
-                name = eq.get("name", "?")
-                label = slot_labels.get(slot_key, slot_key)
-                parts.append(f"{label}: {name}")
-        summary = QLabel("  ".join(parts))
-        summary.setProperty("tone", "muted")
-        summary.setStyleSheet("font-size: 12px;")
-        summary.setWordWrap(True)
-        layout.addWidget(summary)
-
-        assumptions = result.get("assumptions", {})
-        assumption_parts = []
-        if isinstance(assumptions, dict):
-            for slot_key, labels in assumptions.items():
-                if labels:
-                    assumption_parts.append(
-                        f"{slot_labels.get(slot_key, slot_key)}：{'、'.join(labels)}")
-        if assumption_parts:
-            assumption_summary = QLabel("　".join(assumption_parts))
-            assumption_summary.setWordWrap(True)
-            assumption_summary.setStyleSheet(
-                "font-size: 12px; color: #B26A00; font-weight: 600;")
-            layout.addWidget(assumption_summary)
+            if not eq:
+                continue
+            label = slot_labels.get(slot_key, slot_key)
+            name = eq.get("name", "?")
+            change = _slot_change(current_equipped.get(slot_key), eq)
+            if change in (_CHANGE_SWAP, _CHANGE_NEW):
+                chip = _make_pill(
+                    f"⇄ {label} · {name}",
+                    "palette(highlight)", "palette(alternate-base)", chips_host)
+                chip.setStyleSheet(
+                    chip.styleSheet() + " border: 1px solid palette(highlight);")
+                current = current_equipped.get(slot_key)
+                if change == _CHANGE_SWAP and isinstance(current, dict):
+                    chip.setToolTip(tr("换下：{name}").format(
+                        name=current.get("name", "?")))
+                else:
+                    chip.setToolTip(tr("备战方案此部位当前为空"))
+            else:
+                chip = _make_pill(
+                    f"{label} · {name}",
+                    "palette(mid)", "palette(alternate-base)", chips_host)
+                chip.setStyleSheet(chip.styleSheet() + " font-weight: 400;")
+            self.slot_chips[slot_key] = chip
+            chips.addWidget(chip)
+        layout.addWidget(chips_host)
 
 
 # ---------------------------------------------------------------------------
 # Main dialog
 # ---------------------------------------------------------------------------
 
-class OptimalComboDialog(QDialog):
-    """最优毕业率装备组合搜索对话框。"""
+class OptimalComboPage(QWidget):
+    """最优毕业率装备组合搜索页（毕业率分析对话框的一个页签）。
+
+    计算假设由对话框的共享假设栏提供（``assumptions_provider``），本页只
+    保留候选筛选与搜索空间选项。
+    """
+
+    #: 搜索结果变化（完成或清空），供对话框写入按用户+方案隔离的缓存
+    results_changed = pyqtSignal(list)
 
     def __init__(
         self,
@@ -676,9 +874,13 @@ class OptimalComboDialog(QDialog):
         main_martial_art: str = "",
         sub_martial_art: str = "",
         parent: QWidget | None = None,
+        *,
+        assumptions_provider: Callable[[], Assumptions] | None = None,
     ) -> None:
         super().__init__(parent)
         self._host = host
+        self._assumptions_provider = assumptions_provider or Assumptions
+        self._results: list[dict[str, Any]] = []
         self._school = school
         self._scheme = scheme
         # base_attrs 不含弓玦，弓玦属性按需计算
@@ -692,49 +894,19 @@ class OptimalComboDialog(QDialog):
         self._worker: _SearchWorker | None = None
         self._slot_groups: dict[str, _SlotGroup] = {}
         self._result_cards: list[_ResultCard] = []
+        #: 备战方案当前穿戴（slot_key → 装备），结果页据此标出要换的部位
+        self._current_equipped: dict[str, Any] = {}
+        self._slot_labels: dict[str, str] = {
+            slot_key: display_name for slot_key, display_name, _ft in _SLOT_ORDER
+        }
 
-        self.setWindowTitle(tr("最优组合"))
-        self.setMinimumSize(920, 620)
-        self.resize(1080, 720)
         self._setup_ui()
         self._load_candidates()
 
-    def _on_rotation(self) -> None:
-        """打开技能轴查看器（实验性）
-
-        轴数据只在毕业率计算器 Excel 里——方案 JSON 编译时丢掉了技能名，
-        所以要用户自己选文件，不从当前方案读。
-        """
-        from .rotation_dialog import RotationDialog
-
-        RotationDialog(parent=self).exec()
-
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 18, 20, 16)
-        layout.setSpacing(12)
-
-        context = QLabel(
-            tr("{school}  ·  {scheme}  ·  基于当前备战方案").format(
-                school=self._school, scheme=self._scheme,
-            )
-        )
-        context.setProperty("tone", "muted")
-        context.setStyleSheet("font-size: 12px;")
-
-        # 首行最右侧放技能轴入口。它是实验性功能：需要用户自备毕业率计算器
-        # Excel，且与本对话框的搜索流程无关，因此不放到备战方案主工具栏上，
-        # 只在这里留一个不显眼的口子。
-        header = QHBoxLayout()
-        header.setContentsMargins(0, 0, 0, 0)
-        header.addWidget(context, stretch=1)
-        self._btn_rotation = QPushButton(tr("技能轴"))
-        self._btn_rotation.setToolTip(
-            tr("实验性：导入毕业率计算器 Excel，查看竞速轴与伤害来源"))
-        apply_compact_button_style(self._btn_rotation, variant="neutral")
-        self._btn_rotation.clicked.connect(self._on_rotation)
-        header.addWidget(self._btn_rotation)
-        layout.addLayout(header)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
 
         filter_settings = QFrame()
         filter_settings.setProperty("surface", "card")
@@ -802,6 +974,7 @@ class OptimalComboDialog(QDialog):
         self._chk_pruning.setToolTip(
             tr("自动淘汰被其他候选完全压制的装备，缩减搜索空间"))
         compute_row.addWidget(self._chk_pruning)
+        # 搜索空间选项而非投影假设：原装备保留，额外派生同等级承音分支
         self._chk_season_chengyin = QCheckBox(tr("赛季装备假设承音"))
         self._chk_season_chengyin.setToolTip(tr(
             "为本赛季等级的原生装备额外创建同等级承音分支；"
@@ -828,23 +1001,6 @@ class OptimalComboDialog(QDialog):
         compute_row.addWidget(self._btn_gongjue)
         compute_row.addStretch()
         compute_layout.addLayout(compute_row)
-
-        assumption_row = QHBoxLayout()
-        assumption_row.setSpacing(14)
-        self._chk_full_chengyin = QCheckBox(tr("满承音"))
-        self._chk_full_chengyin.setToolTip(
-            tr("将承音装备的普通词条数值视为承音上限参与计算"))
-        assumption_row.addWidget(self._chk_full_chengyin)
-        self._chk_full_dingyin = QCheckBox(tr("满定音"))
-        self._chk_full_dingyin.setToolTip(
-            tr("按当前备战方案玩法将定音视为目标满值参与计算"))
-        assumption_row.addWidget(self._chk_full_dingyin)
-        self._chk_full_level = QCheckBox(tr("满等级"))
-        self._chk_full_level.setToolTip(
-            tr("将低于最高等级的装备视为最高等级参与计算"))
-        assumption_row.addWidget(self._chk_full_level)
-        assumption_row.addStretch()
-        compute_layout.addLayout(assumption_row)
         layout.addWidget(compute_settings)
 
         status_card = QFrame()
@@ -860,14 +1016,12 @@ class OptimalComboDialog(QDialog):
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
         self._btn_search = QPushButton(tr("开始搜索"))
-        self._btn_search.setMinimumHeight(32)
-        self._btn_search.setStyleSheet(_PRIMARY_BUTTON_STYLE)
+        apply_button_style(self._btn_search, variant="action")
         self._btn_search.clicked.connect(self._on_search)
         action_row.addWidget(self._btn_search)
 
         self._btn_cancel = QPushButton(tr("取消"))
-        self._btn_cancel.setMinimumHeight(32)
-        self._btn_cancel.setStyleSheet(_SECONDARY_BUTTON_STYLE)
+        apply_button_style(self._btn_cancel, variant="neutral")
         self._btn_cancel.setVisible(False)
         self._btn_cancel.clicked.connect(self._on_cancel)
         action_row.addWidget(self._btn_cancel)
@@ -947,17 +1101,13 @@ class OptimalComboDialog(QDialog):
         detail_layout.addWidget(self._detail_hint)
         detail_grid = QGridLayout()
         detail_grid.setSpacing(8)
+        self._detail_panels: dict[str, _SlotDetailPanel] = {}
         self._detail_cards: dict[str, Any] = {}
-        from .equip.cards import _SlotCard
         for index, (slot_key, display_name, filter_type) in enumerate(_SLOT_ORDER):
-            card = _SlotCard(
-                slot_key, display_name, filter_type,
-                display_params={"card_min_height": 180},
-            )
-            # 这一页只看不点：卡片本身是为「穿戴装备」那边的选中交互做的
-            card.setCursor(Qt.CursorShape.ArrowCursor)
-            detail_grid.addWidget(card, index // 4, index % 4)
-            self._detail_cards[slot_key] = card
+            panel = _SlotDetailPanel(slot_key, display_name, filter_type)
+            detail_grid.addWidget(panel, index // 4, index % 4)
+            self._detail_panels[slot_key] = panel
+            self._detail_cards[slot_key] = panel.card
         for column in range(4):
             detail_grid.setColumnStretch(column, 1)
         detail_layout.addLayout(detail_grid)
@@ -1114,6 +1264,10 @@ class OptimalComboDialog(QDialog):
             return
 
         equipped = inv.equipped
+        self._current_equipped = {
+            slot_key: eq for slot_key, eq in equipped.items()
+            if isinstance(eq, dict) and eq
+        }
 
         # 主副槽位取决于方案中两门武学的当前位置，不能使用流派配置的顺序。
         from ...config import get_game_config
@@ -1320,25 +1474,24 @@ class OptimalComboDialog(QDialog):
         from ...config import get_game_config
         gc = get_game_config()
         season_level = gc.current_equip_level()
-        full_level = (
-            season_level if self._chk_full_level.isChecked() else 0
-        )
         scenarios = [
             (name, self._base_attrs_raw + self._compute_gongjue_attrs(name))
             for name in gongjues
         ]
+        # 假设在点击时定格：搜索期间改动假设栏不影响本次结果；赛季承音是
+        # 本页的搜索空间选项，与共享假设合成后一起交给搜索
+        assumptions = replace(
+            self._assumptions_provider().with_playstyle(self._playstyle),
+            season_chengyin=self._chk_season_chengyin.isChecked())
+        self._searched_assumptions = assumptions
         self._worker = _SearchWorker(
             candidates,
             self._school,
             self._scheme,
             scenarios,
             self._chk_pruning.isChecked(),
-            season_chengyin=self._chk_season_chengyin.isChecked(),
+            assumptions,
             season_level=season_level,
-            full_chengyin=self._chk_full_chengyin.isChecked(),
-            full_dingyin=self._chk_full_dingyin.isChecked(),
-            full_level=full_level,
-            playstyle=self._playstyle,
         )
         # 使用 QueuedConnection 确保 slot 在 UI 线程执行
         # （signal 从后台线程 emit，但 _SearchSignals 的线程亲和性是 UI 线程）
@@ -1367,9 +1520,6 @@ class OptimalComboDialog(QDialog):
             self._chk_pruning,
             self._chk_season_chengyin,
             self._btn_gongjue,
-            self._chk_full_chengyin,
-            self._chk_full_dingyin,
-            self._chk_full_level,
         ):
             control.setEnabled(enabled)
         for group in self._slot_groups.values():
@@ -1401,7 +1551,39 @@ class OptimalComboDialog(QDialog):
             tr("搜索完成，共得到 {count} 个可用结果。")
             .format(count=len(results)),
         )
+        self._results = list(results)
+        self.results_changed.emit(self._results)
+        self._render_results(results)
 
+    def results(self) -> list[dict[str, Any]]:
+        return list(self._results)
+
+    def restore_results(self, results: list[dict[str, Any]]) -> None:
+        """回填缓存的搜索结果（不触发搜索，不写缓存）。"""
+        self._results = list(results)
+        while self._results_inner.count():
+            item = self._results_inner.takeAt(0)
+            if item is not None:
+                w = item.widget()
+                if w is not None:
+                    w.deleteLater()
+        self._result_cards.clear()
+        if results:
+            self._candidate_summary.setText(
+                tr("显示上次搜索的 {count} 个结果；重新搜索会覆盖。")
+                .format(count=len(results)))
+        self._render_results(results)
+
+    def mark_stale(self) -> None:
+        """假设栏改动后提示结果已过期，不自动重算、不清空。"""
+        if self._results and not self._worker_running():
+            self._candidate_summary.setText(
+                tr("计算假设已变化，当前结果按旧假设得出；请重新搜索。"))
+
+    def _worker_running(self) -> bool:
+        return bool(self._worker) and not self._btn_search.isVisible()
+
+    def _render_results(self, results: list) -> None:
         if not results:
             self._tab_widget.setTabText(1, tr("最优结果"))
             lbl = QLabel(tr("未找到有效组合"))
@@ -1418,7 +1600,10 @@ class OptimalComboDialog(QDialog):
         for result in results:
             gongjue = str(result.get("gongjue") or "")
             ranks[gongjue] = ranks.get(gongjue, 0) + 1
-            card = _ResultCard(ranks[gongjue], result, self._slot_labels)
+            card = _ResultCard(
+                ranks[gongjue], result, self._slot_labels,
+                self._current_equipped,
+            )
             card.apply_clicked.connect(self._on_apply_result)
             card.detail_clicked.connect(self._on_show_detail)
             self._results_inner.addWidget(card)
@@ -1449,19 +1634,30 @@ class OptimalComboDialog(QDialog):
             equipped = {}
         if not isinstance(assumptions, dict):
             assumptions = {}
-        for slot_key, card in self._detail_cards.items():
+        current_equipped = self._current_equipped
+        for slot_key, panel in self._detail_panels.items():
             equip = equipped.get(slot_key)
             if isinstance(equip, dict) and equip:
-                card.set_equip(equip)
-                card.set_hypotheses(assumptions.get(slot_key, []))
+                panel.show_equip(
+                    equip, list(assumptions.get(slot_key) or []),
+                    current_equipped.get(slot_key),
+                )
             else:
-                card.set_empty()
+                panel.show_empty()
         filled = sum(1 for eq in equipped.values() if isinstance(eq, dict))
         gongjue = str(result.get("gongjue") or tr("无"))
+        changed = _changed_slots(equipped, current_equipped)
+        if changed:
+            change_text = tr("需更换 {count} 件：{names}").format(
+                count=len(changed),
+                names="、".join(self._slot_labels.get(k, k) for k in changed),
+            )
+        else:
+            change_text = tr("与当前备战方案一致，无需更换")
         self._detail_hint.setText(
-            tr("弓玦套装：{gongjue}　共 {n} 件；卡片显示原始装备数值，"
-               "计算假设标注在卡片顶部")
-            .format(gongjue=gongjue, n=filled))
+            tr("弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　"
+               "卡片显示原始装备数值，计算假设标注在卡片上方")
+            .format(gongjue=gongjue, n=filled, change=change_text))
         self._tab_widget.setCurrentIndex(2)
 
     def _on_apply_result(self, equipped: dict) -> None:

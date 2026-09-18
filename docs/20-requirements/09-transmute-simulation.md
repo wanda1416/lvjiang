@@ -284,7 +284,7 @@ loop:
 | `core/loadout/repository.py` | 原子应用、清除、扫描保留、真实变化失效 |
 | `core/loadout/mock_copy.py` | 复制不携带目标 |
 | `core/graduation/affix_impact.py` | 保留等品质口径；联合计算改为每件单槽 |
-| `ui/loadout/affix_impact_dialog.py`、`ui/loadout/equip/status_tab.py` | 三页签、按需后台分析、预览、应用、取消 |
+| `ui/loadout/affix_analysis_pages.py`、`ui/loadout/graduation_analysis.py`、`ui/loadout/equip/status_tab.py` | 转律建议 / 培养建议 / 词条收益率三页（合并进「毕业率分析」对话框，与最优组合共用假设栏）、按需后台分析、预览、应用、取消 |
 | `ui/loadout/equip/cards.py` | 词条行追加黄色目标分段；右键“清除转律目标” |
 | `ui/loadout/combat/graduation.py`、`ui/loadout/combat/attrs_tab.py` | 冻结三满上下文；第四个复选框；改走投影入口 |
 

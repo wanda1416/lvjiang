@@ -1,4 +1,7 @@
-"""当前配装词条边际收益对话框。"""
+"""词条培养分析页组：转律建议 / 培养建议 / 词条收益率。
+
+三个页面由毕业率分析对话框作为页签承载；本模块只负责页面内容、按需
+计算与后台转律搜索，计算假设由对话框的共享假设栏提供。"""
 from __future__ import annotations
 
 import copy
@@ -10,8 +13,6 @@ from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
-    QDialog,
-    QDialogButtonBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -22,13 +23,12 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QTableWidget,
     QTableWidgetItem,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from .....i18n import tr
-from .....ui.button_styles import apply_button_style, apply_dialog_button_box_style
+from .....ui.button_styles import apply_button_style
 from ...config.tune_slots import SLOT_LABELS
 from ...core.graduation.affix_impact import (
     AffixCombinationResult,
@@ -36,6 +36,7 @@ from ...core.graduation.affix_impact import (
     AffixImpactReport,
     AffixReplacementSuggestion,
 )
+from ...core.graduation.assumptions import Assumptions
 from ...core.graduation.transmute_optimizer import TransmutePlanResult
 from ...core.loadout.transmute import (
     REASON_FIRST_TRANSFERRED,
@@ -54,7 +55,7 @@ from .equip.cards import _SlotCard
 
 JointAnalyzer = Callable[[tuple[str, ...]], AffixCombinationResult]
 ReportProvider = Callable[[], AffixImpactReport]
-TransmuteRunner = Callable[[Callable[[], bool]], TransmutePlanResult]
+TransmuteRunner = Callable[[Callable[[], bool], Assumptions], TransmutePlanResult]
 ApplyHandler = Callable[[TransmutePlanResult], bool]
 
 #: 默认 4 列 × 2 行；与备战方案槽位布局一致。
@@ -85,16 +86,18 @@ class _TransmuteWorker(QRunnable):
     """后台执行转律搜索；只读装备快照，不写数据。"""
 
     def __init__(self, generation: int, runner: TransmuteRunner,
-                 is_cancelled: Callable[[], bool]) -> None:
+                 is_cancelled: Callable[[], bool],
+                 assumptions: Assumptions) -> None:
         super().__init__()
         self.signals = _TransmuteSignals()
         self._generation = generation
         self._runner = runner
         self._is_cancelled = is_cancelled
+        self._assumptions = assumptions
 
     def run(self) -> None:  # type: ignore[override]
         try:
-            result = self._runner(self._is_cancelled)
+            result = self._runner(self._is_cancelled, self._assumptions)
             self.signals.finished.emit(self._generation, result, None)
         except Exception as exc:  # noqa: BLE001 - 结果经信号回主线程处理
             logger.exception("转律建议计算失败")
@@ -146,12 +149,15 @@ class _ProportionalTableWidget(QTableWidget):
         self._resize_columns()
 
 
-class AffixImpactDialog(QDialog):
-    """转律建议、等品质培养建议与词条收益率三个页签。
+class AffixAnalysisPages(QWidget):
+    """转律建议、等品质培养建议与词条收益率三个页面。
 
     转律建议只在点击“计算”时后台搜索；培养建议与词条收益率首次切换到
-    对应页签时才计算并缓存，打开对话框不会把全部分析跑一遍。
+    对应页面时才计算并缓存。本对象本身不显示，只持有页面与共享状态。
     """
+
+    #: 转律建议结果变化（完成），供对话框写入按用户+方案隔离的缓存
+    transmute_result_changed = pyqtSignal(object)
 
     def __init__(
         self,
@@ -164,7 +170,7 @@ class AffixImpactDialog(QDialog):
         joint_analyzer: JointAnalyzer | None = None,
         transmute_runner: TransmuteRunner | None = None,
         apply_handler: ApplyHandler | None = None,
-        assumption_labels: tuple[str, ...] = (),
+        assumptions_provider: Callable[[], Assumptions] | None = None,
         slot_layout: tuple[tuple[int, int, str], ...] = DEFAULT_SLOT_LAYOUT,
         display_params: dict | None = None,
     ) -> None:
@@ -176,7 +182,7 @@ class AffixImpactDialog(QDialog):
         self._joint_analyzer = joint_analyzer
         self._transmute_runner = transmute_runner
         self._apply_handler = apply_handler
-        self._assumption_labels = tuple(assumption_labels)
+        self._assumptions_provider = assumptions_provider or Assumptions
         self._slot_layout = slot_layout
         self._display_params = dict(display_params or {})
         self._report: AffixImpactReport | None = None
@@ -193,49 +199,28 @@ class AffixImpactDialog(QDialog):
         self._transmute_applied = False
         self._transmute_cards: dict[str, _SlotCard] = {}
         self._tab_built = {"suggestion": False, "sensitivity": False}
-        self.setWindowTitle(tr("词条培养分析"))
-        self.setMinimumSize(900, 600)
-        self.resize(1080, 720)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 18, 20, 16)
-        layout.setSpacing(12)
+        # 页面先挂在本对象名下（findChild 可达），加入页签时由 QTabWidget 接管
+        self.transmute_page = self._transmute_tab()
+        self.transmute_page.setParent(self)
+        self.suggestion_page = QWidget(self)
+        QVBoxLayout(self.suggestion_page).setContentsMargins(0, 0, 0, 0)
+        self.yield_page = QWidget(self)
+        QVBoxLayout(self.yield_page).setContentsMargins(0, 0, 0, 0)
 
-        context = QLabel(
-            tr("{school}  ·  {scheme}  ·  基于当前备战方案").format(
-                school=school, scheme=scheme,
-            )
+    def pages(self) -> tuple[tuple[str, QWidget], ...]:
+        """(页签标题, 页面) 序列，按展示顺序。"""
+        return (
+            (tr("转律建议"), self.transmute_page),
+            (tr("培养建议"), self.suggestion_page),
+            (tr("词条收益率"), self.yield_page),
         )
-        context.setProperty("tone", "muted")
-        context.setStyleSheet("font-size: 12px;")
-        layout.addWidget(context)
 
-        self._tabs = QTabWidget()
-        self._tabs.setObjectName("affixAnalysisTabs")
-        self._tabs.setDocumentMode(True)
-        self._tabs.setStyleSheet(
-            "QTabWidget#affixAnalysisTabs::pane {"
-            " border: 1px solid palette(midlight); border-radius: 7px; }"
-            "QTabWidget#affixAnalysisTabs QTabBar::tab {"
-            " padding: 9px 18px; min-width: 120px; }"
-        )
-        self._tabs.addTab(self._transmute_tab(), tr("转律建议"))
-        self._suggestion_container = QWidget()
-        QVBoxLayout(self._suggestion_container).setContentsMargins(0, 0, 0, 0)
-        self._tabs.addTab(self._suggestion_container, tr("培养建议"))
-        self._sensitivity_container = QWidget()
-        QVBoxLayout(self._sensitivity_container).setContentsMargins(0, 0, 0, 0)
-        self._tabs.addTab(self._sensitivity_container, tr("词条收益率"))
-        self._tabs.currentChanged.connect(self._on_tab_changed)
-        layout.addWidget(self._tabs, 1)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        apply_dialog_button_box_style(buttons)
-        close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
-        if close_button is not None:
-            close_button.setText(tr("完成"))
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+    def mark_stale(self) -> None:
+        """假设栏改动后提示转律建议已过期，不自动重算、不清空。"""
+        if self._transmute_result is not None and self._transmute_run.isEnabled():
+            self._transmute_status.setText(
+                tr("计算假设已变化，当前结果按旧假设得出；请重新计算。"))
 
     # ── 按需构建 ──────────────────────────────────────────
 
@@ -245,7 +230,7 @@ class AffixImpactDialog(QDialog):
                 self._report = self._report_provider()
             except Exception as exc:  # noqa: BLE001 - 页签内提示，不关对话框
                 logger.error(f"词条分析失败: {exc}")
-                QMessageBox.critical(self, tr("分析失败"), str(exc))
+                QMessageBox.critical(self.window(), tr("分析失败"), str(exc))
                 return None
             self._actionable_suggestions = tuple(
                 item for item in self._report.suggestions
@@ -254,22 +239,22 @@ class AffixImpactDialog(QDialog):
             self._blocked_equipment = self._report.blocked_equipment
         return self._report
 
-    def _on_tab_changed(self, index: int) -> None:
-        widget = self._tabs.widget(index)
-        if widget is self._suggestion_container and not self._tab_built["suggestion"]:
+    def ensure_built(self, widget: QWidget) -> None:
+        """页面首次显示时才计算培养建议 / 词条收益率。"""
+        if widget is self.suggestion_page and not self._tab_built["suggestion"]:
             report = self._ensure_report()
             if report is None:
                 return
             self._tab_built["suggestion"] = True
-            container_layout = self._suggestion_container.layout()
+            container_layout = self.suggestion_page.layout()
             assert container_layout is not None
             container_layout.addWidget(self._suggestion_page(report))
-        elif widget is self._sensitivity_container and not self._tab_built["sensitivity"]:
+        elif widget is self.yield_page and not self._tab_built["sensitivity"]:
             report = self._ensure_report()
             if report is None:
                 return
             self._tab_built["sensitivity"] = True
-            container_layout = self._sensitivity_container.layout()
+            container_layout = self.yield_page.layout()
             assert container_layout is not None
             container_layout.addWidget(self._sensitivity_tab(report))
 
@@ -326,14 +311,11 @@ class AffixImpactDialog(QDialog):
             metrics.addWidget(card, 1)
         layout.addLayout(metrics)
 
-        basis = ("、".join(self._assumption_labels)
-                 if self._assumption_labels else tr("实际数值"))
-        note = QLabel(tr(
-            "八件装备各至多一次转律，目标按转律词条库并集选取；未承音按普通上限"
-            "（彩狗粮 100%），承音按承音上限。基于：{basis}。").format(basis=basis))
-        note.setWordWrap(True)
-        note.setProperty("tone", "muted")
-        layout.addWidget(note)
+        self._transmute_note = QLabel()
+        self._transmute_note.setWordWrap(True)
+        self._transmute_note.setProperty("tone", "muted")
+        self._set_transmute_basis(())
+        layout.addWidget(self._transmute_note)
 
         self._transmute_status = QLabel(tr("点击「计算」开始搜索；不会自动运行。"))
         self._transmute_status.setObjectName("transmuteStatus")
@@ -395,6 +377,12 @@ class AffixImpactDialog(QDialog):
         layout.addLayout(buttons)
         return container
 
+    def _set_transmute_basis(self, labels: tuple[str, ...]) -> None:
+        basis = "、".join(labels) if labels else tr("实际数值")
+        self._transmute_note.setText(tr(
+            "八件装备各至多一次转律，目标按转律词条库并集选取；未承音按普通上限"
+            "（彩狗粮 100%），承音按承音上限。基于：{basis}。").format(basis=basis))
+
     def _start_transmute(self) -> None:
         if self._transmute_runner is None:
             return
@@ -405,10 +393,16 @@ class AffixImpactDialog(QDialog):
         self._transmute_cancel.setEnabled(True)
         self._transmute_apply.setEnabled(False)
         self._transmute_status.setText(tr("正在搜索转律组合…"))
+        # 假设在点击时定格；转律建议不使用“模拟转律”本身（它就是在算目标）
+        assumptions = self._assumptions_provider()
+        assumptions = Assumptions(**{**assumptions.to_flags(),
+                                     "simulate_transmute": False})
+        self._set_transmute_basis(assumptions.labels())
         worker = _TransmuteWorker(
             generation, self._transmute_runner,
             lambda: self._transmute_cancelled
-            or generation != self._transmute_generation)
+            or generation != self._transmute_generation,
+            assumptions)
         worker.signals.finished.connect(self._on_transmute_finished)
         pool = QThreadPool.globalInstance()
         assert pool is not None
@@ -434,10 +428,19 @@ class AffixImpactDialog(QDialog):
             return
         self.render_transmute_result(result)
 
-    def render_transmute_result(self, result: TransmutePlanResult) -> None:
+    def restore_transmute_result(self, result: TransmutePlanResult) -> None:
+        """回填缓存的转律建议（不触发搜索，不写缓存）。"""
+        self.render_transmute_result(result, emit=False)
+        self._transmute_run.setText(tr("重新计算"))
+
+    def render_transmute_result(
+        self, result: TransmutePlanResult, *, emit: bool = True,
+    ) -> None:
         """把搜索结果画到八张卡片上，并决定“应用”是否可用。"""
         self._transmute_result = result
         self._transmute_applied = False
+        if emit:
+            self.transmute_result_changed.emit(result)
         self._set_metric(self._transmute_baseline,
                          f"{result.baseline_rate * 100:.2f}%")
         self._set_metric(
@@ -500,7 +503,7 @@ class AffixImpactDialog(QDialog):
             ok = self._apply_handler(result)
         except Exception as exc:  # noqa: BLE001 - 失败提示后允许重试
             logger.error(f"应用转律目标失败: {exc}")
-            QMessageBox.critical(self, tr("应用失败"), str(exc))
+            QMessageBox.critical(self.window(), tr("应用失败"), str(exc))
             self._transmute_apply.setEnabled(True)
             return
         if not ok:

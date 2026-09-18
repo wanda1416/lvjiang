@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PyQt6.QtCore import QObject, QTimer, pyqtSlot
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton
 
 from ..i18n import tr
@@ -30,6 +31,26 @@ USER_ACTION_BTN_STYLE = ACTION_BUTTON_STYLE
 _USER_TOOLBAR_BTN_HEIGHT = 36
 
 
+class _NavButtonState(QObject):
+    """按当前用户位置启停「上一个/下一个用户」按钮；生命周期跟随按钮。"""
+
+    def __init__(self, btn_prev: QPushButton, btn_next: QPushButton, host,
+                 parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._btn_prev = btn_prev
+        self._btn_next = btn_next
+        self._host = host
+
+    @pyqtSlot()
+    @pyqtSlot(int)
+    @pyqtSlot(str)
+    def update_enabled(self, *_args) -> None:
+        idx = self._host.user_combo.currentIndex()
+        count = self._host.user_combo.count()
+        self._btn_prev.setEnabled(idx > 0)
+        self._btn_next.setEnabled(idx < count - 1)
+
+
 def add_user_nav_buttons(
     btn_row: QHBoxLayout,
     host,
@@ -56,17 +77,15 @@ def add_user_nav_buttons(
     btn_next.clicked.connect(lambda: host.navigate_user(1))
     btn_row.addWidget(btn_next)
 
-    def _update_enabled(*_args) -> None:
-        idx = host.user_combo.currentIndex()
-        count = host.user_combo.count()
-        btn_prev.setEnabled(idx > 0)
-        btn_next.setEnabled(idx < count - 1)
-
-    host.user_combo.currentIndexChanged.connect(_update_enabled)
-    host.user_changed.connect(lambda _name: _update_enabled())
-    from PyQt6.QtCore import QTimer
-
-    QTimer.singleShot(0, _update_enabled)
+    # 更新器必须随按钮一起销毁：host 是长寿命的主窗口，这里若连的是裸闭包，
+    # 拥有按钮的页面（如分析对话框里每次新建的预览属性页）关闭后闭包仍挂在
+    # host.user_changed 上，下一次切换用户就会对已删除的 QPushButton 调用
+    # setEnabled 而崩溃。把槽放在以按钮为 parent 的 QObject 上，Qt 会在按钮
+    # 销毁时自动断开连接。
+    updater = _NavButtonState(btn_prev, btn_next, host, parent=btn_prev)
+    host.user_combo.currentIndexChanged.connect(updater.update_enabled)
+    host.user_changed.connect(updater.update_enabled)
+    QTimer.singleShot(0, updater.update_enabled)
 
 
 def add_user_toolbar_refresh_button(

@@ -70,6 +70,7 @@ def _apply_overlay_assumptions(
     full_dingyin: bool,
     full_level: int,
     playstyle: str,
+    simulate_transmute: bool = False,
 ) -> CandidateVariant:
     """依次覆盖虚拟装备，并只记录实际发生的变化。"""
     virtual = variant.virtual
@@ -99,6 +100,18 @@ def _apply_overlay_assumptions(
         if virtual.get("dingyin") != before_dingyin:
             assumptions.append("满定音假设")
 
+    if simulate_transmute:
+        # 资格按原始装备判断、数值按虚拟副本状态取，与备战方案面板同口径。
+        from ...config import get_game_config
+        from ..loadout.transmute import project_transmute_targets
+
+        before_affixes = _normal_affix_values(virtual)
+        virtual = project_transmute_targets(
+            {"slot": variant.original}, {"slot": virtual}, get_game_config(),
+        )["slot"]
+        if _normal_affix_values(virtual) != before_affixes:
+            assumptions.append("模拟转律假设")
+
     return CandidateVariant(variant.original, virtual, tuple(assumptions))
 
 
@@ -111,6 +124,7 @@ def build_candidate_variants(
     full_dingyin: bool = False,
     full_level: int = 0,
     playstyle: str = "",
+    simulate_transmute: bool = False,
 ) -> dict[str, list[CandidateVariant]]:
     """构建只用于计算的虚拟候选，绝不改写来源装备。
 
@@ -161,6 +175,7 @@ def build_candidate_variants(
                 full_dingyin=full_dingyin,
                 full_level=full_level,
                 playstyle=playstyle,
+                simulate_transmute=simulate_transmute,
             )
             for variant in variants
         ]
@@ -535,6 +550,7 @@ def search_optimal_combo(
     full_dingyin: bool = False,
     full_level: int = 0,
     playstyle: str = "",
+    simulate_transmute: bool = False,
     progress_counter: Any = None,  # 具有 evaluated, total, message 属性的对象
 ) -> list[dict[str, Any]]:
     """Search for the best equipment combinations.
@@ -585,6 +601,7 @@ def search_optimal_combo(
         full_dingyin=full_dingyin,
         full_level=full_level,
         playstyle=playstyle,
+        simulate_transmute=simulate_transmute,
     )
     variant_by_virtual_id = {
         id(variant.virtual): variant

@@ -124,38 +124,131 @@ def test_equipment_details_open_on_click_not_on_hover() -> None:
 
 # ── 组合详情页 ────────────────────────────────────────────
 
-def test_combo_detail_tab_shows_the_current_equipment() -> None:
-    """满承音/满等级只是算分假设，把假设值摆成装备详情会让人以为装备
-    真是那样。"""
-    from lvjiang.apps.yysls.ui.loadout.optimal_combo import OptimalComboDialog
-
-    dlg = OptimalComboDialog.__new__(OptimalComboDialog)
+def _detail_dialog(current_equipped: dict | None = None):
+    """只搭组合详情页需要的那几样，不走完整构造（那要读 session）。"""
     from PyQt6.QtWidgets import QLabel, QTabWidget
 
-    from lvjiang.apps.yysls.ui.loadout.equip.cards import _SlotCard
+    from lvjiang.apps.yysls.ui.loadout.optimal_combo import (
+        _SLOT_ORDER,
+        OptimalComboPage,
+        _SlotDetailPanel,
+    )
 
-    dlg._detail_cards = {
-        "main_weapon": _SlotCard("main_weapon", "主武器", "weapon"),
-        "head": _SlotCard("head", "冠胄", "head"),
+    dlg = OptimalComboPage.__new__(OptimalComboPage)
+    dlg._detail_panels = {
+        key: _SlotDetailPanel(key, name, ft)
+        for key, name, ft in _SLOT_ORDER if key in ("main_weapon", "head", "ring")
     }
+    dlg._detail_cards = {k: p.card for k, p in dlg._detail_panels.items()}
+    dlg._slot_labels = {key: name for key, name, _ft in _SLOT_ORDER}
+    dlg._current_equipped = dict(current_equipped or {})
     dlg._detail_hint = QLabel()
     dlg._tab_widget = QTabWidget()
     for _ in range(3):
         dlg._tab_widget.addTab(QLabel(), "t")
+    return dlg
 
+
+def test_combo_detail_tab_shows_the_current_equipment() -> None:
+    """满承音/满等级只是算分假设，把假设值摆成装备详情会让人以为装备
+    真是那样；假设文字放在卡片上方的状态带里，不再挤进卡片。"""
+    from lvjiang.apps.yysls.ui.loadout.optimal_combo import OptimalComboPage
+
+    dlg = _detail_dialog()
     equip = {"name": "测试剑", "type": "剑", "level": 110, "quality": "gold",
              "dingyin": {"name": "无相穿透", "value": 1.0}}
-    OptimalComboDialog._on_show_detail(dlg, {
+    OptimalComboPage._on_show_detail(dlg, {
         "equipped": {"main_weapon": equip},
         "assumptions": {"main_weapon": ["同等级承音假设"]},
         "gongjue": "会意",
     })
 
-    assert "测试剑" in dlg._detail_cards["main_weapon"].lbl_name.text()
-    assert dlg._detail_cards["main_weapon"]._equip_data is equip
-    assert "同等级承音假设" in (
-        dlg._detail_cards["main_weapon"].hypothesis_label.text())
+    card = dlg._detail_cards["main_weapon"]
+    assert "测试剑" in card.lbl_name.text()
+    assert card._equip_data is equip
+    assert not card.hypothesis_label.isVisibleTo(card)
+    assert dlg._detail_panels["main_weapon"].assumptions == ["同等级承音假设"]
     assert "会意" in dlg._detail_hint.text()
     # 组合里没有的槽位显示空卡，而不是留着上一次的内容
     assert "冠胄" == dlg._detail_cards["head"].lbl_name.text()
+    assert dlg._detail_panels["head"].change == "none"
     assert dlg._tab_widget.currentIndex() == 2
+
+
+def test_combo_detail_marks_slots_that_differ_from_the_loadout() -> None:
+    """不熟悉自己穿戴的人只看八张卡片不知道该换哪几件：
+    要换的部位给强调色边框和「需更换 / 当前：xxx」，一致的部位给弱化的「已穿戴」。"""
+    from lvjiang.apps.yysls.ui.loadout.optimal_combo import OptimalComboPage
+
+    worn_sword = {"name": "旧剑", "type": "剑", "level": 100, "quality": "gold"}
+    worn_head = {"name": "旧冠", "type": "冠胄", "level": 110, "quality": "gold"}
+    new_sword = {"name": "新剑", "type": "剑", "level": 110, "quality": "gold"}
+    same_head = dict(worn_head)  # 同一件装备的另一份 dict：按指纹判等
+    new_ring = {"name": "新环", "type": "环", "level": 110, "quality": "gold"}
+
+    dlg = _detail_dialog({"main_weapon": worn_sword, "head": worn_head})
+    OptimalComboPage._on_show_detail(dlg, {
+        "equipped": {"main_weapon": new_sword, "head": same_head, "ring": new_ring},
+        "assumptions": {},
+        "gongjue": "会意",
+    })
+
+    sword = dlg._detail_panels["main_weapon"]
+    assert sword.change == "swap"
+    assert sword.card._attention
+    assert "旧剑" in sword.current_label.text()
+    head = dlg._detail_panels["head"]
+    assert head.change == "same"
+    assert not head.card._attention
+    assert not head.current_label.isVisibleTo(head)
+    ring = dlg._detail_panels["ring"]
+    assert ring.change == "new"
+    assert ring.card._attention
+    hint = dlg._detail_hint.text()
+    assert "需更换 2 件" in hint and "主武器" in hint and "环" in hint
+    assert "冠胄" not in hint.split("需更换")[1].split("·")[0]
+
+    # 再看一套与备战方案一致的组合：边框与提示都要回收
+    OptimalComboPage._on_show_detail(dlg, {
+        "equipped": {"main_weapon": dict(worn_sword), "head": dict(worn_head)},
+        "assumptions": {},
+        "gongjue": "会意",
+    })
+    assert dlg._detail_panels["main_weapon"].change == "same"
+    assert not dlg._detail_panels["main_weapon"].card._attention
+    assert dlg._detail_panels["ring"].change == "none"
+    assert "无需更换" in dlg._detail_hint.text()
+
+
+def test_result_card_summarises_changes_and_hoists_assumptions() -> None:
+    """结果列表里每条组合先说要动几件、动哪几件；计算假设在首行。"""
+    from lvjiang.apps.yysls.ui.loadout.optimal_combo import _SLOT_ORDER, _ResultCard
+
+    labels = {key: name for key, name, _ft in _SLOT_ORDER}
+    worn = {"main_weapon": {"name": "旧剑", "type": "剑", "level": 100},
+            "head": {"name": "旧冠", "type": "冠胄", "level": 110}}
+    card = _ResultCard(1, {
+        "rate": 0.5, "dps": 1000, "gongjue": "会意",
+        "equipped": {
+            "main_weapon": {"name": "新剑", "type": "剑", "level": 110},
+            "head": {"name": "旧冠", "type": "冠胄", "level": 110},
+        },
+        "assumptions": {"main_weapon": ["满承音"], "head": ["满承音", "满等级"]},
+    }, labels, worn)
+
+    assert card.changed_slots == ["main_weapon"]
+    assert "需更换 1 件" in card.change_summary.text()
+    assert card.slot_chips["main_weapon"].text().startswith("⇄")
+    assert "旧剑" in card.slot_chips["main_weapon"].toolTip()
+    assert not card.slot_chips["head"].text().startswith("⇄")
+    # 同一条假设在多个部位出现只显示一次
+    assert [p.text() for p in card.assumption_pills] == ["满承音", "满等级"]
+
+    unchanged = _ResultCard(1, {
+        "rate": 0.5, "dps": 1000, "gongjue": "会意",
+        "equipped": {"head": {"name": "旧冠", "type": "冠胄", "level": 110}},
+        "assumptions": {},
+    }, labels, worn)
+    assert unchanged.changed_slots == []
+    assert "一致" in unchanged.change_summary.text()
+    assert unchanged.assumption_pills == []

@@ -38,6 +38,10 @@ class EquipmentInventory:
         return copy.deepcopy(self._state.resolved_equipment())
 
     @property
+    def active_plan_id(self) -> str:
+        return self._state.active_plan_id
+
+    @property
     def active_plan_fps(self) -> set[str]:
         """当前激活方案占用的装备指纹集合。"""
         return {fp for fp in self._state.active_plan.equipment.values() if fp}
@@ -200,6 +204,19 @@ class EquipmentInventory:
     def set_item_lock_status(self, fp: str, locked: bool) -> None:
         """更新装备锁定状态，不重新审计全部装备。"""
         self._state = self._repo.set_item_lock_status(fp, locked)
+
+    def apply_transmute_targets(
+        self,
+        targets: dict[str, tuple[int, str, float] | None],
+        *,
+        expected_fps: set[str] | None = None,
+    ) -> None:
+        """把转律建议写入当前方案的装备；方案装备已变化时抛错要求重算。"""
+        self._state = self._repo.set_transmute_targets(
+            self._state.active_plan_id, targets, expected_fps=expected_fps)
+
+    def clear_transmute_target(self, fp: str) -> None:
+        self._state = self._repo.clear_transmute_target(fp)
 
     def apply_combos(self, combo_equipped: dict[str, dict]) -> None:
         plan_id = self._state.active_plan_id

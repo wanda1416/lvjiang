@@ -250,6 +250,10 @@ def _affix_analysis_dependencies():
         analyze_affix_impacts,
         analyze_combined_affix_replacements,
     )
+    from ....core.graduation.transmute_optimizer import (
+        TransmuteSearchRequest,
+        optimize_transmutes,
+    )
     from ..affix_impact_dialog import AffixImpactDialog
 
     return (
@@ -260,6 +264,8 @@ def _affix_analysis_dependencies():
         analyze_affix_impacts,
         analyze_combined_affix_replacements,
         AffixImpactDialog,
+        TransmuteSearchRequest,
+        optimize_transmutes,
     )
 
 
@@ -1445,6 +1451,31 @@ class EquipStatusTab(QWidget):
             logger.error(f"修改装备锁定状态失败: {exc}")
             QMessageBox.critical(self, tr("修改失败"), str(exc))
 
+    def _on_clear_transmute_target(self, equip_data: dict) -> None:
+        """删除装备上保存的模拟转律目标；目标属于公共装备，影响所有方案。"""
+        fp = str(equip_data.get("_fp") or "")
+        if not fp:
+            QMessageBox.warning(
+                self, tr("清除失败"), tr("装备数据缺少 _fp 字段"))
+            return
+        inv = self._require_inventory()
+        if inv is None:
+            return
+        answer = QMessageBox.question(
+            self, tr("清除转律目标"),
+            tr("将删除「{name}」的转律目标，所有引用该装备的备战方案都会受影响。"
+               "继续？").format(name=equip_data.get("name") or fp),
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            inv.clear_transmute_target(fp)
+            self._sync_inv(notify=True)
+            logger.info("已清除装备转律目标: {}", equip_data.get("name") or fp)
+        except Exception as exc:
+            logger.error(f"清除转律目标失败: {exc}")
+            QMessageBox.critical(self, tr("清除失败"), str(exc))
+
     def _on_equip_requested(self, equip_data: dict, group_key: str):
         """处理装备请求：将背包/模拟中的装备穿戴到对应槽位"""
         user_name = self._host.active_user_name()
@@ -1810,6 +1841,9 @@ class EquipStatusTab(QWidget):
             copied["name"] = original_name + tr("【复制】")
         copied.setdefault("_extra", {})["is_mock"] = True
         copied.pop("_fp", None)
+        # 转律目标是针对原装备算出来的计划，复制件不默认携带。
+        from ....core.loadout.transmute import strip_transmute_targets
+        strip_transmute_targets(copied)
 
         dialog = MockEquipDialog(equip_data=copied, parent=self, default_school=self._get_current_school())
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -1919,6 +1953,35 @@ class EquipStatusTab(QWidget):
         )
         dlg.exec()
 
+    def _apply_transmute_result(self, result, *, user_name: str, plan_id: str) -> bool:
+        """把转律建议写入公共装备；用户、方案或装备快照过期时拒绝。"""
+        inv = self._require_inventory()
+        if inv is None:
+            return False
+        if user_name != (self._host.active_user_name() or ""):
+            raise ValueError(tr("用户已切换，请重新打开分析"))
+        if plan_id != inv.active_plan_id:
+            raise ValueError(tr("备战方案已切换，请重新计算"))
+        moves = result.moves
+        answer = QMessageBox.question(
+            self, tr("应用转律目标"),
+            tr("将写入 {count} 件装备的转律目标。目标属于公共装备，会影响所有"
+               "引用这些装备的备战方案；此次结果只针对当前方案优化。继续？")
+            .format(count=len(moves)),
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return False
+        targets: dict[str, tuple[int, str, float] | None] = {
+            status.fp: None for status in result.slots if status.fp
+        }
+        for move in moves:
+            targets[move.fp] = (move.affix_index, move.to_name, move.to_value)
+        inv.apply_transmute_targets(
+            targets, expected_fps=set(result.equipped_fps))
+        self._sync_inv(notify=True)
+        logger.info("已写入 {} 件装备的转律目标", len(moves))
+        return True
+
     def _on_affix_impact(self):
         """打开当前配装的词条培养建议与敏感度分析。"""
         from ..combat.attrs_tab import CombatAttrsTab
@@ -1955,6 +2018,8 @@ class EquipStatusTab(QWidget):
                 analyze_affix_impacts,
                 analyze_combined_affix_replacements,
                 AffixImpactDialog,
+                TransmuteSearchRequest,
+                optimize_transmutes,
             ) = _affix_analysis_dependencies()
 
             calculator = get_graduation_calculator(
@@ -1973,32 +2038,62 @@ class EquipStatusTab(QWidget):
                         game_config.get_affix_caps,
                     )
 
-            equipped = EquipmentInventory(user_name).equipped
+            inventory = EquipmentInventory(user_name)
+            equipped = inventory.equipped
             if not equipped:
                 QMessageBox.information(
                     self, tr("词条分析"), tr("当前备战方案尚未装备任何装备。"))
                 return
-            report = analyze_affix_impacts(
-                equipped,
-                calculator,
-                base_attrs,
-                context.school,
-                game_config=game_config,
-            )
+            # 冻结搜索上下文：三满设置、流派、模型、基础属性在打开时定格。
+            flags = combat_tab.assumption_flags()
+            flags.pop("simulate_transmute", None)
+            school = context.school
+            school_pool = tuple(game_config.get_transmute_pool(school))
+            plan_id = inventory.active_plan_id
+
+            def transmute_runner(stop_check):
+                return optimize_transmutes(TransmuteSearchRequest(
+                    equipped=copy.deepcopy(equipped),
+                    calculator=calculator,
+                    base_attrs=base_attrs,
+                    school=school,
+                    game_config=game_config,
+                    stop_check=stop_check,
+                    school_pool=school_pool,
+                    **flags,
+                ))
+
+            def apply_handler(result) -> bool:
+                return self._apply_transmute_result(
+                    result, user_name=user_name, plan_id=plan_id)
+
             dialog = AffixImpactDialog(
-                report,
-                context.school,
+                school,
                 context.scheme,
                 self,
+                equipped=equipped,
+                report_provider=lambda: analyze_affix_impacts(
+                    equipped,
+                    calculator,
+                    base_attrs,
+                    school,
+                    game_config=game_config,
+                ),
                 joint_analyzer=lambda slots: analyze_combined_affix_replacements(
                     equipped,
-                    report.suggestions,
+                    (),
                     slots,
                     calculator,
                     base_attrs,
-                    context.school,
+                    school,
                     game_config=game_config,
                 ),
+                transmute_runner=transmute_runner,
+                apply_handler=apply_handler,
+                assumption_labels=tuple(
+                    label for label in combat_tab.assumption_labels()
+                    if label != tr("模拟转律")),
+                display_params=self._display_params,
             )
             dialog.exec()
         except Exception as exc:

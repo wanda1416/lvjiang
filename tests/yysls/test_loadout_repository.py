@@ -536,3 +536,135 @@ def test_ui_state_migrates_without_rewriting_task_data(tmp_path):
     assert repo.get_ui_state("other_panel") == {"collapsed": True}
     assert bob.get_ui_state("equip_filter") == {"type": "head"}
     assert repo.path.read_bytes() == before
+
+
+# ── 模拟转律目标 ──────────────────────────────────────────
+
+
+def _target_ring() -> dict:
+    return developed_real_equip()
+
+
+def test_set_transmute_targets_keeps_fingerprint_and_update_time(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_id = repo.load().active_plan_id
+    ring = _target_ring()
+    fp = repo.assign_equipment(plan_id, "ring", ring)
+    updated_at = repo.load().equipment_items[fp]["updated_at"]
+
+    repo.set_transmute_targets(
+        plan_id, {fp: (2, "会意率", 7.0)}, expected_fps={fp})
+
+    stored = repo.load().equipment_items[fp]
+    assert stored["affix_2"]["target_transmute_name"] == "会意率"
+    assert stored["affix_2"]["target_transmute_value"] == 7.0
+    assert stored["affix_2"]["name"] == "劲"
+    assert stored["_fp"] == fp
+    assert stored["updated_at"] == updated_at
+    assert repo.load().active_plan.equipment["ring"] == fp
+
+
+def test_set_transmute_targets_rejects_stale_plan_snapshot(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_id = repo.load().active_plan_id
+    fp = repo.assign_equipment(plan_id, "ring", _target_ring())
+    with pytest.raises(ValueError, match="重新计算"):
+        repo.set_transmute_targets(
+            plan_id, {fp: (2, "会意率", 7.0)}, expected_fps={fp, "other"})
+    assert "target_transmute_name" not in repo.load().equipment_items[fp]["affix_2"]
+
+
+def test_set_transmute_targets_replaces_and_clears_without_touching_others(
+    tmp_path: Path,
+):
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_id = repo.load().active_plan_id
+    fp = repo.assign_equipment(plan_id, "ring", _target_ring())
+    other = repo.upsert_item({**equip("other-fp"), "affix_1": {"name": "劲", "value": 1}})
+    repo.set_transmute_targets_for_items({other: (1, "会意率", 7.0)})
+
+    repo.set_transmute_targets(plan_id, {fp: (3, "会意率", 7.0)})
+    repo.set_transmute_targets(plan_id, {fp: (4, "会心率", 7.0)})
+    stored = repo.load().equipment_items[fp]
+    assert "target_transmute_name" not in stored["affix_3"]
+    assert stored["affix_4"]["target_transmute_name"] == "会心率"
+
+    repo.set_transmute_targets(plan_id, {fp: None})
+    stored = repo.load().equipment_items[fp]
+    assert all(
+        "target_transmute_name" not in stored[f"affix_{i}"] for i in range(1, 6))
+    assert repo.load().equipment_items[other]["affix_1"]["target_transmute_name"] == "会意率"
+
+
+def test_identical_transmute_apply_does_not_rewrite(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_id = repo.load().active_plan_id
+    fp = repo.assign_equipment(plan_id, "ring", _target_ring())
+    repo.set_transmute_targets(plan_id, {fp: (2, "会意率", 7.0)})
+    before = repo.path.stat().st_mtime_ns
+    repo.set_transmute_targets(plan_id, {fp: (2, "会意率", 7.0)})
+    assert repo.path.stat().st_mtime_ns == before
+
+
+def test_rescan_with_same_fingerprint_keeps_transmute_target(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    ring = _target_ring()
+    fp = repo.upsert_item(ring)
+    repo.set_transmute_targets_for_items({fp: (2, "会意率", 7.0)})
+
+    repo.upsert_item(json.loads(json.dumps(ring, ensure_ascii=False)))
+
+    stored = repo.load().equipment_items[fp]
+    assert stored["affix_2"]["target_transmute_name"] == "会意率"
+
+
+def test_real_development_drops_transmute_targets(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_id = repo.load().active_plan_id
+    old = _target_ring()
+    old_fp = repo.assign_equipment(plan_id, "ring", old)
+    repo.set_transmute_targets_for_items({old_fp: (2, "会意率", 7.0)})
+    changed = json.loads(json.dumps(
+        repo.load().equipment_items[old_fp], ensure_ascii=False))
+    changed["affix_2"] = {"name": "会意率", "value": 7.0, "is_transferred": True}
+
+    new_fp = repo.update_real_development(old_fp, changed)
+
+    stored = repo.load().equipment_items[new_fp]
+    assert all(
+        "target_transmute_name" not in stored[f"affix_{i}"] for i in range(1, 6))
+
+
+def test_mock_edit_clears_target_only_when_that_slot_changes(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    mock = {**_target_ring(), "_extra": {"is_mock": True}}
+    mock.pop("_fp")
+    fp = repo.upsert_item(mock)
+    repo.set_transmute_targets_for_items({fp: (2, "会意率", 7.0)})
+    stored = repo.load().equipment_items[fp]
+
+    same_slot = json.loads(json.dumps(stored, ensure_ascii=False))
+    same_slot["affix_3"] = {"name": "会心率", "value": 5.0}
+    kept_fp = repo.update_mock(fp, same_slot)
+    assert repo.load().equipment_items[kept_fp]["affix_2"]["target_transmute_name"] == "会意率"
+
+    changed = json.loads(json.dumps(
+        repo.load().equipment_items[kept_fp], ensure_ascii=False))
+    changed["affix_2"] = {"name": "势", "value": 60.0}
+    dropped_fp = repo.update_mock(kept_fp, changed)
+    assert "target_transmute_name" not in repo.load().equipment_items[dropped_fp]["affix_2"]
+
+
+def test_mock_copy_between_users_strips_targets(tmp_path: Path):
+    from lvjiang.apps.yysls.core.loadout import copy_mock_items_to_users
+
+    repo = LoadoutRepository("alice", tmp_path)
+    mock = {**_target_ring(), "_extra": {"is_mock": True}}
+    mock.pop("_fp")
+    fp = repo.upsert_item(mock)
+    repo.set_transmute_targets_for_items({fp: (2, "会意率", 7.0)})
+
+    copy_mock_items_to_users("alice", ["bob"], {fp}, tmp_path)
+
+    copied = next(iter(LoadoutRepository("bob", tmp_path).load().equipment_items.values()))
+    assert "target_transmute_name" not in copied["affix_2"]

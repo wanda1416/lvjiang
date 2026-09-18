@@ -276,6 +276,13 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             tr("将低于最高等级的装备视为最高等级（提升基础属性），词条/定音数值由满承音/满定音决定"))
         self._chk_full_level.stateChanged.connect(self._refresh_display)
         self._chk_full_level.stateChanged.connect(lambda _: self._save_selection())
+        self._chk_simulate_transmute = QCheckBox(tr("模拟转律"))
+        self._chk_simulate_transmute.setToolTip(
+            tr("按装备上已保存的转律目标计算（目标由「培养建议 → 转律建议」"
+               "计算并应用）；只用已保存目标，不触发搜索"))
+        self._chk_simulate_transmute.stateChanged.connect(self._refresh_display)
+        self._chk_simulate_transmute.stateChanged.connect(
+            lambda _: self._save_selection())
         # DPS / 毕业率已由顶部公共区域展示
 
         # ── 属性展示区（主题一致的中性数据卡片） ──
@@ -549,6 +556,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             "full_chengyin": self._chk_full_chengyin.isChecked(),
             "full_dingyin": self._chk_full_dingyin.isChecked(),
             "full_level": self._chk_full_level.isChecked(),
+            "simulate_transmute": self._chk_simulate_transmute.isChecked(),
         }
 
         try:
@@ -643,6 +651,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                 selection.get("full_dingyin", False))
             self._chk_full_level.setChecked(
                 selection.get("full_level", False))
+            self._chk_simulate_transmute.setChecked(
+                selection.get("simulate_transmute", False))
 
         except Exception as e:
             logger.debug(f"恢复战斗属性选择失败: {e}")
@@ -740,12 +750,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             try:
                 if equipped:
                     equipped = apply_hypothetical_caps(
-                        equipped,
-                        full_chengyin=self._chk_full_chengyin.isChecked(),
-                        full_dingyin=self._chk_full_dingyin.isChecked(),
-                        full_level=self._get_full_level(),
-                        playstyle=self._active_playstyle(),
-                    )
+                        equipped, **self.assumption_flags())
             except Exception as e:
                 logger.error(f"读取装备数据失败: {e}")
 
@@ -1067,12 +1072,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             if equipped is None:
                 equipped = EquipmentInventory(user_name).equipped
                 equipped = apply_hypothetical_caps(
-                    equipped,
-                    full_chengyin=self._chk_full_chengyin.isChecked(),
-                    full_dingyin=self._chk_full_dingyin.isChecked(),
-                    full_level=self._get_full_level(),
-                    playstyle=self._active_playstyle(),
-                )
+                    equipped, **self.assumption_flags())
             return aggregate_equipment_attrs(equipped)
         except Exception as e:
             logger.error(f"读取装备数据失败: {e}")
@@ -1107,6 +1107,29 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         except Exception as e:
             logger.error(f"计算装备基础攻击失败: {e}")
             return CombatAttributes()
+
+    def assumption_flags(self) -> dict:
+        """当前假设复选框对应的 ``apply_hypothetical_caps`` 参数。"""
+        return {
+            "full_chengyin": self._chk_full_chengyin.isChecked(),
+            "full_dingyin": self._chk_full_dingyin.isChecked(),
+            "full_level": self._get_full_level(),
+            "playstyle": self._active_playstyle(),
+            "simulate_transmute": self._chk_simulate_transmute.isChecked(),
+        }
+
+    def assumption_labels(self) -> tuple[str, ...]:
+        """已勾选假设的展示名，供对话框标注计算口径。"""
+        labels = []
+        if self._chk_full_level.isChecked():
+            labels.append(tr("满等级"))
+        if self._chk_full_chengyin.isChecked():
+            labels.append(tr("满承音"))
+        if self._chk_full_dingyin.isChecked():
+            labels.append(tr("满定音"))
+        if self._chk_simulate_transmute.isChecked():
+            labels.append(tr("模拟转律"))
+        return tuple(labels)
 
     def _get_full_level(self) -> int:
         """返回满等级的目标等级；未勾选返回 0。"""

@@ -1462,3 +1462,49 @@ auto_strings:
   此处不支持删除模拟装备: Mock equipment deletion is not supported here
   确认复制: Confirm Copy
   复制完成: Copy Complete
+  # 模拟转律：转律建议页、备战方案第四假设、卡片目标展示
+  转律建议: Transmute Advice
+  词条收益率: Affix Yield
+  模拟转律: Simulate Transmute
+  按装备上已保存的转律目标计算（目标由「培养建议 → 转律建议」计算并应用）；只用已保存目标，不触发搜索: Compute with the transmute targets saved on equipment (set via Growth Suggestions → Transmute Advice); uses saved targets only, never triggers a search
+  原词条毕业率: Current-Affix Graduation
+  已保存目标毕业率: Saved-Target Graduation
+  推荐毕业率: Recommended Graduation
+  实际数值: actual values
+  八件装备各至多一次转律，目标按转律词条库并集选取；未承音按普通上限（彩狗粮 100%），承音按承音上限。基于：{basis}。: 'At most one transmute per piece across all eight; targets come from the union of transmute affix pools. Non-Chengyin uses the normal cap (100%), Chengyin uses the Chengyin cap. Basis: {basis}.'
+  点击「计算」开始搜索；不会自动运行。: Click "Calculate" to search; it never runs automatically.
+  缺装备，补齐后计算: Missing equipment; fill the slot before calculating
+  计算: Calculate
+  取消计算: Cancel
+  应用: Apply
+  把推荐目标写入备战方案的装备卡片；目标属于公共装备，会影响所有引用这些装备的方案: Write the recommended targets onto the loadout cards; targets belong to shared equipment and affect every plan referencing them
+  正在搜索转律组合…: Searching transmute combinations…
+  已取消；保留上一次完成的结果。: Cancelled; the last completed result is kept.
+  计算失败：{error}: 'Calculation failed: {error}'
+  不参与：{reason}: 'Excluded: {reason}'
+  无需转律: No transmute needed
+  推荐 {gain:+.2f}%（换词条净收益 {swap:+.2f}%）: Recommended {gain:+.2f}% (net swap gain {swap:+.2f}%)
+  缺 {count} 件装备，请补齐后重新计算: '{count} piece(s) missing; fill them and recalculate'
+  存在词条组合异常的装备，结果不可信，禁止应用: Some equipment has illegal affix combinations; the result is untrusted and cannot be applied
+  搜索未穷尽（预算耗尽），以下是当前搜索最好结果: Search not exhausted (budget spent); showing the best result found so far
+  建议顺序：{order}: 'Suggested order: {order}'
+  共求值 {count} 次: '{count} evaluations'
+  没有找到超过阈值的转律提升（不代表不存在）: No transmute gain above the threshold was found (this does not prove none exists)
+  已写入 {count} 件装备的转律目标；勾选备战方案的「模拟转律」查看效果。: Transmute targets written to {count} piece(s); tick "Simulate Transmute" on the loadout to see the effect.
+  原始等级未知: Original level unknown
+  不支持无限转律: No unlimited transmute
+  承音后不可转律: No transmute after Chengyin
+  词条组合异常: Illegal affix combination
+  多个转律标记，请校正: Multiple transmute marks; please correct
+  首词条带转律标记，请校正: First affix marked as transmuted; please correct
+  没有可转词条: No transmutable affix
+  缺少该等级配置: No config for this level
+  转律目标：{name} {value}（未承音按普通上限 100%，承音按承音上限；仅在勾选「模拟转律」时计入属性）: 'Transmute target: {name} {value} (normal cap 100% if not Chengyin, Chengyin cap otherwise; counted only when "Simulate Transmute" is ticked)'
+  清除转律目标: Clear Transmute Target
+  删除该装备保存的模拟转律目标；影响所有引用此装备的方案: Remove the saved transmute target on this equipment; affects every plan referencing it
+  清除失败: Clear Failed
+  将删除「{name}」的转律目标，所有引用该装备的备战方案都会受影响。继续？: This removes the transmute target of "{name}"; every loadout referencing it is affected. Continue?
+  应用转律目标: Apply Transmute Targets
+  将写入 {count} 件装备的转律目标。目标属于公共装备，会影响所有引用这些装备的备战方案；此次结果只针对当前方案优化。继续？: This writes transmute targets to {count} piece(s). Targets belong to shared equipment and affect every loadout referencing them; this result was optimized for the current plan only. Continue?
+  用户已切换，请重新打开分析: The user changed; reopen the analysis
+  备战方案已切换，请重新计算: The loadout changed; recalculate first

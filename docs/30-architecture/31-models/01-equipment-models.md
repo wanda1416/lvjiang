@@ -134,6 +134,8 @@
 | `unit` | string \| null | 单位，百分比类为 `"%"`，否则为 `null` |
 | `is_transferred` | bool | 是否为转律产出 |
 | `cap_pct` | float \| null | 数值占该等级上限的百分比；无上限数据时为 `null` |
+| `target_transmute_name` | str（可选） | 模拟转律目标词条名；只是计划，不改变 `name`/`value`，不参与指纹。一件装备至多一条词条带此字段，须与 `target_transmute_value` 同时有效，见 [模拟转律需求](../../20-requirements/09-transmute-simulation.md) |
+| `target_transmute_value` | float（可选） | 目标词条按实际装备等级／承音状态的上限值（未承音普通上限、承音承音上限）；计算时按投影副本重新取值 |
 
 ---
 

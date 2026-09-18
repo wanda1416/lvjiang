@@ -214,6 +214,18 @@ def test_cultivation_never_suggests_divine_affix_from_transmutation():
     )
 
 
+def _open_dialog(report, school="鸣金·虹", scheme="基础方案", **kwargs):
+    """新版对话框按需构建“培养建议”页；测试直接切到该页触发构建。"""
+    from lvjiang.apps.yysls.ui.loadout.affix_impact_dialog import (
+        AffixImpactDialog,
+    )
+
+    dialog = AffixImpactDialog(
+        school, scheme, report_provider=lambda: report, **kwargs)
+    dialog._tabs.setCurrentIndex(1)
+    return dialog
+
+
 def _replacement(slot: str, index: int = 2) -> AffixReplacementSuggestion:
     return AffixReplacementSuggestion(
         slot_key=slot,
@@ -261,29 +273,16 @@ def test_joint_cultivation_recalculates_two_or_three_equipment(slots):
     assert result.evaluated_combinations > 2 ** len(slots) - 1
 
 
-def test_joint_cultivation_uses_second_best_target_to_avoid_duplicate():
+def test_joint_cultivation_changes_at_most_one_slot_per_equipment():
+    """一次转律只能改一件装备的一个槽，联合方案不得在同件上叠加多槽。"""
     equipped = _equipment()
     equipped["main_weapon"]["affix_3"] = {
         "name": "会心率", "value": 14,
     }
-    suggestions = (
-        _replacement("main_weapon", 2),
-        AffixReplacementSuggestion(
-            slot_key="main_weapon",
-            equipment_name="main_weapon",
-            affix_index=3,
-            from_name="会心率",
-            from_value=14,
-            to_name="最小外功攻击",
-            to_value=100,
-            cap_pct=82.4,
-            graduation_delta=0.02,
-        ),
-    )
 
     result = analyze_combined_affix_replacements(
         equipped,
-        suggestions,
+        (),
         ("main_weapon",),
         _PreferMinimumCalculator(),
         CombatAttributes(),
@@ -291,9 +290,9 @@ def test_joint_cultivation_uses_second_best_target_to_avoid_duplicate():
         game_config=get_game_config(),
     )
 
-    assert len(result.replacements) == 2
-    assert {item.affix_index for item in result.replacements} == {2, 3}
-    assert len({item.to_name for item in result.replacements}) == 2
+    assert len(result.replacements) == 1
+    assert result.replacements[0].slot_key == "main_weapon"
+    assert result.graduation_delta > 0
     changed = copy.deepcopy(equipped)
     for item in result.replacements:
         changed[item.slot_key][f"affix_{item.affix_index}"] = {
@@ -340,26 +339,21 @@ def test_runtime_analysis_dependencies_resolve_from_equip_package():
     )
 
     dependencies = _affix_analysis_dependencies()
-    assert len(dependencies) == 7
+    assert len(dependencies) == 9
     assert all(callable(dependency) for dependency in dependencies)
 
 
 def test_dialog_limits_joint_selection_to_three_equipment(qtbot):
     from PyQt6.QtWidgets import QCheckBox, QLabel
 
-    from lvjiang.apps.yysls.ui.loadout.affix_impact_dialog import (
-        AffixImpactDialog,
-    )
 
     suggestions = tuple(
         _replacement(slot)
         for slot in ("main_weapon", "sub_weapon", "ring", "pendant")
     )
     report = AffixImpactReport(0.8, 110, (), (), suggestions)
-    dialog = AffixImpactDialog(
+    dialog = _open_dialog(
         report,
-        "鸣金·虹",
-        "基础方案",
         joint_analyzer=lambda slots: AffixCombinationResult(
             slots, 0.8, 0.0, (), 0,
         ),
@@ -384,9 +378,6 @@ def test_dialog_limits_joint_selection_to_three_equipment(qtbot):
 def test_dialog_never_labels_negative_delta_as_cultivation_advice(qtbot):
     from PyQt6.QtWidgets import QCheckBox, QLabel
 
-    from lvjiang.apps.yysls.ui.loadout.affix_impact_dialog import (
-        AffixImpactDialog,
-    )
 
     negative = AffixReplacementSuggestion(
         slot_key="ring",
@@ -399,11 +390,8 @@ def test_dialog_never_labels_negative_delta_as_cultivation_advice(qtbot):
         cap_pct=100,
         graduation_delta=-0.02,
     )
-    dialog = AffixImpactDialog(
-        AffixImpactReport(0.8, 110, (), (), (negative,)),
-        "破竹·鸢",
-        "基础方案",
-    )
+    dialog = _open_dialog(
+        AffixImpactReport(0.8, 110, (), (), (negative,)), "破竹·鸢")
     qtbot.addWidget(dialog)
 
     count = dialog.findChild(QLabel, "affixMetricValue_count")
@@ -415,12 +403,9 @@ def test_dialog_never_labels_negative_delta_as_cultivation_advice(qtbot):
 def test_joint_button_is_clickable_and_explains_missing_analyzer(qtbot):
     from PyQt6.QtWidgets import QCheckBox, QLabel, QPushButton
 
-    from lvjiang.apps.yysls.ui.loadout.affix_impact_dialog import (
-        AffixImpactDialog,
-    )
 
     report = AffixImpactReport(0.8, 110, (), (), (_replacement("ring"),))
-    dialog = AffixImpactDialog(report, "破竹·鸢", "基础方案")
+    dialog = _open_dialog(report, "破竹·鸢")
     qtbot.addWidget(dialog)
     checkbox = dialog.findChild(QCheckBox, "affixSlotCheck_ring")
     button = dialog.findChild(QPushButton, "calculateJointAffixButton")
@@ -489,9 +474,6 @@ def test_all_suggested_replacements_are_strictly_legal():
 def test_dialog_explains_blocked_equipment(qtbot):
     from PyQt6.QtWidgets import QLabel
 
-    from lvjiang.apps.yysls.ui.loadout.affix_impact_dialog import (
-        AffixImpactDialog,
-    )
 
     report = AffixImpactReport(
         0.8,
@@ -502,7 +484,7 @@ def test_dialog_explains_blocked_equipment(qtbot):
             "chest", "测试胸甲", ("首词条不合法",),
         ),),
     )
-    dialog = AffixImpactDialog(report, "鸣金·虹", "基础方案")
+    dialog = _open_dialog(report)
     qtbot.addWidget(dialog)
 
     texts = [label.text() for label in dialog.findChildren(QLabel)]

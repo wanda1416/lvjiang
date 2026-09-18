@@ -382,8 +382,9 @@ def analyze_combined_affix_replacements(
     """搜索最多三个部位的多目标联合培养方案。
 
     每个词条位置保留多个高收益目标（而非只沿用表格里的单项第一名），再将
-    「保持不变」与这些目标联合搜索。搜索规模超过上限时使用宽束搜索，最终
-    结果必须通过整件装备的严格合法性校验，并重新计算整套毕业率。
+    「保持不变」与这些目标联合搜索；每件装备至多改一个槽（一次转律只能改
+    一条）。搜索规模超过上限时使用宽束搜索，最终结果必须通过整件装备的严格
+    合法性校验，并重新计算整套毕业率。
 
     ``_suggestions`` 为兼容现有调用保留；联合候选会根据装备与配置重新生成。
     """
@@ -435,10 +436,14 @@ def analyze_combined_affix_replacements(
 
     states: list[tuple[AffixReplacementSuggestion, ...]] = [()]
     for position in sorted(by_position):
+        slot_key = position[0]
         expanded = [
             state + ((candidate,) if candidate is not None else ())
             for state in states
             for candidate in (None, *by_position[position])
+            # 一次转律只能改一件装备的一个槽；同件已经选了别的槽就不再叠加。
+            if candidate is None
+            or all(item.slot_key != slot_key for item in state)
         ]
         if len(expanded) > _JOINT_BEAM_WIDTH:
             ranked: list[

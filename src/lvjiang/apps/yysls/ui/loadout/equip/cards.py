@@ -38,6 +38,7 @@ from ....core.equip_parser.dingyin_parser import (
 from ....core.equip_validator import illegal_reasons_of
 from ....core.equipment_cooldown import next_cooldown_expiry
 from ....core.loadout.transmute import TARGET_NAME_KEY, TARGET_VALUE_KEY
+from ..widgets import is_dark_theme, make_tag
 
 
 class _ElidedLabel(QLabel):
@@ -124,8 +125,7 @@ def _slot_style_hovered(bg: str = "palette(base)") -> str:
 
 def transmute_target_color(widget: QWidget) -> str:
     """转律目标的黄色：深色主题用亮黄，浅色主题用深琥珀，保证可读。"""
-    dark = widget.palette().color(widget.backgroundRole()).lightness() < 128
-    return "#FFD54F" if dark else "#B26A00"
+    return "#FFD54F" if is_dark_theme(widget) else "#B26A00"
 
 
 def _transmute_target_text(affix: dict) -> str:
@@ -159,12 +159,6 @@ def _affix_value_color(cap_pct: int | float | None) -> str:
 
 
 # ── 标签样式 ──────────────────────────────────────────
-
-_TAG_STYLE = (
-    "color: white; border-radius: 8px; "
-    "font-size: 11px; font-weight: 600; padding: 2px 7px;"
-)
-
 
 def _set_quality(widget: QLabel, quality: str) -> None:
     """设置动态品质属性并刷新全局主题选择器。"""
@@ -548,14 +542,6 @@ class _LockBadge(QWidget):
             self.reposition()
 
 
-def _make_tag(text: str, bg: str = "#607D8B", parent=None) -> QLabel:
-    """创建标准标签胶囊（用于 name_row 的标签序列）。"""
-    lbl = QLabel(text, parent)
-    lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-    lbl.setStyleSheet(f"background-color: {bg}; {_TAG_STYLE}")
-    return lbl
-
-
 # ── 状态标签栏 ──────────────────────────────────────────
 
 
@@ -571,7 +557,7 @@ class _StatusTagBar(QWidget):
         self._tags: dict[str, QLabel] = {}
 
     def define(self, key: str, text: str, bg: str = "#607D8B") -> None:
-        label = _make_tag(text, bg, self)
+        label = make_tag(text, bg, self)
         label.setVisible(False)
         self._tags[key] = label
         self._layout.addWidget(label)

@@ -35,6 +35,7 @@ from ...core.graduation.assumptions import Assumptions
 from ...core.graduation.transmute_optimizer import TransmutePlanResult
 from .affix_analysis_pages import AffixAnalysisPages
 from .optimal_combo import OptimalComboPage
+from .widgets import style_document_tabs
 
 TAB_OPTIMAL = 0
 TAB_TRANSMUTE = 1
@@ -168,14 +169,7 @@ class GraduationAnalysisDialog(QDialog):
         layout.addWidget(self._bar)
 
         self._tabs = QTabWidget()
-        self._tabs.setObjectName("graduationAnalysisTabs")
-        self._tabs.setDocumentMode(True)
-        self._tabs.setStyleSheet(
-            "QTabWidget#graduationAnalysisTabs::pane {"
-            " border: 1px solid palette(midlight); border-radius: 7px; }"
-            "QTabWidget#graduationAnalysisTabs QTabBar::tab {"
-            " padding: 9px 18px; min-width: 120px; }"
-        )
+        style_document_tabs(self._tabs, "graduationAnalysisTabs")
         self._tabs.addTab(self._optimal, tr("最优组合"))
         for title, page in self._affix.pages():
             self._tabs.addTab(page, title)

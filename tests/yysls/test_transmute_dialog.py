@@ -175,6 +175,5 @@ def test_assumption_controls_include_simulate_transmute(qtbot):
     ]
     combat = panel._character._combat_attrs_tab
     combat._chk_simulate_transmute.setChecked(True)
-    flags = combat.assumption_flags()
-    assert flags["simulate_transmute"] is True
+    assert combat.assumptions().simulate_transmute is True
     assert "模拟转律" in combat.assumption_labels()

@@ -727,7 +727,6 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         from ....config import get_game_config
         from ....core.combat.combat_attrs import (
             GraduationAttrContext,
-            apply_hypothetical_caps,
             build_graduation_attrs,
             fold_wuxiang_pen,
             has_resistance,
@@ -762,8 +761,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             # 应用假定上限（满承音/满定音/满等级）
             try:
                 if equipped:
-                    equipped = apply_hypothetical_caps(
-                        equipped, **self.assumption_flags())
+                    equipped = self.assumptions().project(equipped)
             except Exception as e:
                 logger.error(f"读取装备数据失败: {e}")
 
@@ -1045,10 +1043,6 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             simulate_transmute=self._chk_simulate_transmute.isChecked(),
             playstyle=self._active_playstyle(),
         )
-
-    def assumption_flags(self) -> dict:
-        """当前假设复选框对应的 ``apply_hypothetical_caps`` 参数。"""
-        return self.assumptions().to_flags()
 
     def assumption_labels(self) -> tuple[str, ...]:
         """已勾选假设的展示名，供对话框标注计算口径。"""

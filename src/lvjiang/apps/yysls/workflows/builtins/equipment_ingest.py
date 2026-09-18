@@ -21,7 +21,7 @@ def _notify_equipment_changed(_engine) -> None:
     if callback is None:
         return
     try:
-        from lvjiang.apps.yysls.ui.events import APP_ID, EQUIPMENT_CHANGED
+        from lvjiang.apps.yysls.core.events import APP_ID, EQUIPMENT_CHANGED
         from lvjiang.ui.app_events import AppEvent
         callback("app_event", event=AppEvent(APP_ID, EQUIPMENT_CHANGED))
     except Exception as e:

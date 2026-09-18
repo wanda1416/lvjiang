@@ -20,6 +20,7 @@ from ..combat.combat_attrs import (
     map_affix_to_attr,
 )
 from ..equip_validator import validate_combination_dict
+from ..numbers import to_float
 from .scoring import LoadoutScorer
 
 _DAMAGE_FIVE_DIMS = {"劲", "势", "敏"}
@@ -85,13 +86,6 @@ class AffixCombinationResult:
     evaluated_combinations: int
 
 
-def _number(value) -> float:
-    try:
-        return float(value or 0)
-    except (TypeError, ValueError):
-        return 0.0
-
-
 def _part_name(equip: dict, game_config) -> str:
     group = game_config.get_type_to_group().get(str(equip.get("type", "")), "")
     return game_config.get_group_to_part().get(group, "")
@@ -111,7 +105,7 @@ def _iter_affixes(equipped: dict):
             if not isinstance(affix, dict):
                 continue
             name = str(affix.get("name") or "")
-            value = _number(affix.get("value"))
+            value = to_float(affix.get("value"))
             if name and value:
                 yield slot_key, equip, field, name, value
 
@@ -233,7 +227,7 @@ def _replacement_candidates(
             if not isinstance(source, dict):
                 continue
             from_name = str(source.get("name") or "")
-            from_value = _number(source.get("value"))
+            from_value = to_float(source.get("value"))
             cap_pct = _source_cap_pct(source, level, game_config)
             if not from_name or from_value <= 0 or cap_pct <= 0:
                 continue

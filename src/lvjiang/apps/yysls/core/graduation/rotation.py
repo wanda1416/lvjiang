@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .....i18n import tr
+from ..numbers import strict_float
 
 #: 轴所在的工作表名
 SHEET_NAME = "期望"
@@ -156,19 +157,13 @@ def _cell(row: tuple, index: int | None):
     return row[index]
 
 
-def _number(value, default: float = 0.0) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return default
-    return float(value)
-
-
 def _combat_time(rows: list[tuple], header: _Header) -> float:
     """战斗时间在左侧属性面板里，按「战斗时间」标签横向找相邻数值"""
     for row in rows:
         for i, cell in enumerate(row):
             if isinstance(cell, str) and cell.strip() == "战斗时间":
                 for nxt in row[i + 1:i + 4]:
-                    value = _number(nxt)
+                    value = strict_float(nxt, 0.0)
                     if value > 0:
                         return value
     return 0.0
@@ -193,13 +188,13 @@ def parse_rotation(path: str | Path) -> Rotation:
         raw_skill = _cell(row, col["技能"])
         if raw_skill is None or not str(raw_skill).strip():
             continue        # 轴之外的空行/汇总行
-        count = int(_number(_cell(row, col["次数"]), 1.0)) or 1
+        count = int(strict_float(_cell(row, col["次数"]), 1.0)) or 1
         hits.append(RotationHit(
             index=len(hits) + 1,
             skill=str(raw_skill).strip(),
             count=count,
             kind=str(_cell(row, col["类型"]) or "").strip(),
-            damage=_number(_cell(row, col["期望"])),
+            damage=strict_float(_cell(row, col["期望"]), 0.0),
             outer_ratio=_cell(row, col["外功倍率"]) if isinstance(
                 _cell(row, col["外功倍率"]), (int, float)) else None,
             attr_ratio=_cell(row, col["属性倍率"]) if isinstance(

@@ -9,11 +9,7 @@
 
 from __future__ import annotations
 
-
-def _number(value) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return float(value)
+from .numbers import strict_float
 
 
 def affix_cap_value(
@@ -35,7 +31,7 @@ def affix_cap_value(
     caps = game_config.get_affix_caps(level, affix_name)
     if not caps:
         return None
-    cap = _number(caps.get("chengyin" if chengyin else "cap"))
+    cap = strict_float(caps.get("chengyin" if chengyin else "cap"))
     return cap if cap else None
 
 
@@ -47,7 +43,7 @@ def affix_cap_ratio(
     上限数据缺失、等级/数值不可用时返回 None——调用方据此走「判不出来」
     的分支，而不是退回可能已经过期的 ``cap_pct``。
     """
-    numeric = _number(value)
+    numeric = strict_float(value)
     if numeric is None:
         return None
     cap = affix_cap_value(level, affix_name, game_config=game_config)

@@ -56,6 +56,7 @@ from ...core.combat.combat_attrs import (
 )
 from ...core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ...core.graduation.assumptions import Assumptions
+from ...core.graduation.context import gongjue_attrs
 from ..domain_labels import domain_label
 from ..events import EQUIPMENT_CHANGED, get_event_hub
 from ..layout_helpers import fit_combo_to_contents
@@ -1116,16 +1117,6 @@ class OptimalComboPage(QWidget):
 
         layout.addWidget(self._tab_widget, stretch=1)
 
-    def _compute_gongjue_attrs(self, gongjue_type: str) -> CombatAttributes:
-        """计算弓玦属性：当前赛季最大等级三率词条上限的一半。"""
-        from ...core.graduation.context import gongjue_attrs
-
-        try:
-            return gongjue_attrs(gongjue_type)
-        except Exception as e:
-            logger.error(f"计算弓玦属性失败: {e}")
-            return CombatAttributes()
-
     def _selected_gongjues(self) -> list[str]:
         """返回选中的弓玦场景；全不选表示按无弓玦计算。"""
         return [
@@ -1468,7 +1459,7 @@ class OptimalComboPage(QWidget):
         gc = get_game_config()
         season_level = gc.current_equip_level()
         scenarios = [
-            (name, self._base_attrs_raw + self._compute_gongjue_attrs(name))
+            (name, self._base_attrs_raw + gongjue_attrs(name))
             for name in gongjues
         ]
         # 假设在点击时定格：搜索期间改动假设栏不影响本次结果；赛季承音是

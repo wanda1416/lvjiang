@@ -27,6 +27,29 @@ class BudgetExceeded(Exception):
     """预算（时间或外部取消）耗尽；调用方决定保留已有结果还是放弃。"""
 
 
+def equipment_attrs(equipped: dict, game_config) -> CombatAttributes:
+    """归一化后的装备属性总和（基础外功 + 词条/定音/五维换算）。"""
+    effective = effective_equipped(equipped, game_config)
+    return compute_equip_base_attrs(
+        effective, game_config.get_base_attr_values,
+    ) + aggregate_equipment_attrs(effective, normalize=False)
+
+
+def graduation_input(
+    base_attrs: CombatAttributes, equipped: dict, school: str, game_config=None,
+) -> CombatAttributes:
+    """“基础属性 + 一套装备 → 毕业率输入”：归一化、聚合、并入基础属性、套抗性。
+
+    不需要计算器的调用方（备战方案面板只做属性展示与后台求值）直接用它；
+    ``LoadoutScorer.attrs`` 内部也是它。
+    """
+    if game_config is None:
+        from ...config import get_game_config
+        game_config = get_game_config()
+    return build_graduation_attrs(
+        base_attrs, equipment_attrs(equipped, game_config), school)
+
+
 class LoadoutScorer:
     def __init__(
         self,
@@ -62,16 +85,12 @@ class LoadoutScorer:
     # ── 属性 ──
 
     def equipment_attrs(self, equipped: dict) -> CombatAttributes:
-        """归一化后的装备属性总和（基础外功 + 词条/定音/五维换算）。"""
-        effective = effective_equipped(equipped, self.game_config)
-        return compute_equip_base_attrs(
-            effective, self.game_config.get_base_attr_values,
-        ) + aggregate_equipment_attrs(effective, normalize=False)
+        return equipment_attrs(equipped, self.game_config)
 
     def attrs(self, equipped: dict) -> CombatAttributes:
         """整套装备 + 基础属性并套抗性后的毕业率输入。"""
-        return build_graduation_attrs(
-            self.base_attrs, self.equipment_attrs(equipped), self.school)
+        return graduation_input(
+            self.base_attrs, equipped, self.school, self.game_config)
 
     # ── 评分 ──
 

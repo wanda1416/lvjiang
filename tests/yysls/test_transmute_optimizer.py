@@ -10,10 +10,7 @@ from lvjiang.apps.yysls.core.combat.combat_attrs import (
     CombatAttributes,
     apply_hypothetical_caps,
 )
-from lvjiang.apps.yysls.core.graduation.affix_impact import (
-    _effective_equipped,
-    _graduation_rate,
-)
+from lvjiang.apps.yysls.core.graduation.scoring import LoadoutScorer
 from lvjiang.apps.yysls.core.graduation.transmute_optimizer import (
     TransmuteSearchRequest,
     optimize_transmutes,
@@ -123,9 +120,7 @@ def test_result_matches_exhaustive_search_on_two_items():
             state[slot] = with_transmuted_affix(
                 state[slot], index, name,
                 transmute_target_value(name, 110, False, gc) or 0.0, gc)
-        rate = _graduation_rate(
-            calc, CombatAttributes(), _effective_equipped(state, gc),
-            "鸣金·虹", gc)
+        rate = LoadoutScorer(calc, CombatAttributes(), "鸣金·虹", gc).rate(state)
         best = max(best, rate)
     assert abs(result.final_rate - best) < 1e-9
 
@@ -225,7 +220,6 @@ def test_projection_matches_dialog_prediction_after_apply():
         affix[TARGET_VALUE_KEY] = move.to_value
     projected = apply_hypothetical_caps(
         applied, simulate_transmute=True, **flags)
-    rate = _graduation_rate(
-        _RateCalculator(), CombatAttributes(),
-        _effective_equipped(projected, gc), "鸣金·虹", gc)
+    rate = LoadoutScorer(
+        _RateCalculator(), CombatAttributes(), "鸣金·虹", gc).rate(projected)
     assert abs(rate - result.final_rate) < 1e-9

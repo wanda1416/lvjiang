@@ -12,7 +12,6 @@ from lvjiang.apps.yysls.core.graduation import (
     get_graduation_calculator,
     invalidate_graduation_cache,
 )
-from lvjiang.apps.yysls.core.graduation.affix_impact import _graduation_rate
 from lvjiang.apps.yysls.core.graduation.assumptions import Assumptions
 from lvjiang.apps.yysls.core.graduation.context import (
     PlanContextError,
@@ -30,6 +29,8 @@ from lvjiang.apps.yysls.core.loadout.models import LoadoutPlan
 
 
 def _equipped() -> dict:
+    """含两把同类武器各带一条剑武学增伤（_stack: max）——向量内环最容易与
+    内核分叉的地方，也是 bab06005 修过的回归类型。"""
     return {
         "main_weapon": {
             "type": "剑", "name": "主剑", "level": 110, "quality": "gold",
@@ -38,9 +39,10 @@ def _equipped() -> dict:
             "affix_3": {"name": "会意率", "value": 5.0, "unit": "%"},
         },
         "sub_weapon": {
-            "type": "枪", "name": "副枪", "level": 105, "quality": "gold",
+            "type": "剑", "name": "副剑", "level": 105, "quality": "gold",
             "affix_1": {"name": "最大外功攻击", "value": 90},
-            "affix_2": {"name": "劲", "value": 50},
+            "affix_2": {"name": "剑武学增伤", "value": 8.0, "unit": "%"},
+            "affix_3": {"name": "劲", "value": 50},
         },
         "ring": {
             "type": "环", "name": "环", "level": 110, "quality": "gold",
@@ -74,9 +76,6 @@ def test_every_entry_point_scores_the_same(calculator):
     scorer = LoadoutScorer(calculator, base, "鸣金·虹", gc)
     reference = scorer.rate(projected)
 
-    # 培养建议的旧包装
-    assert _graduation_rate(
-        calculator, base, projected, "鸣金·虹", gc) == pytest.approx(reference)
     # 智能调律的方案评分
     context = _PlanContext(
         "p", "方案", "鸣金·虹", calculator, base, projected, 0.0)
@@ -94,6 +93,8 @@ def test_every_entry_point_scores_the_same(calculator):
         full_level=110, full_chengyin=True, season_chengyin=True,
         season_level=110)
     assert combos and combos[0]["rate"] == pytest.approx(reference)
+    # 两把剑的剑武学增伤只生效一条：内核与向量内环都不得相加
+    assert scorer.attrs(projected).extra_attrs["剑武学增伤"] < 0.1
 
 
 def test_scorer_caches_by_attribute_signature(calculator):

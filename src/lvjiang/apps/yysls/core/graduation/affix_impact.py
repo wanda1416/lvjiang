@@ -116,15 +116,6 @@ def _iter_affixes(equipped: dict):
                 yield slot_key, equip, field, name, value
 
 
-def _effective_equipped(equipped: dict, game_config) -> dict:
-    """按游戏规则归一化：部位合法性 + 同名只取最高（专属武学增伤）。
-
-    实现统一在 ``combat_attrs.effective_equipped``；这里保留旧名供本模块与
-    测试引用。
-    """
-    return effective_equipped(equipped, game_config)
-
-
 def _current_affix_level(game_config) -> int:
     return game_config.current_equip_level()
 
@@ -166,17 +157,6 @@ def _can_add_affix(
         and _part_name(equip, game_config) in allowed_parts
         for equip in equipped.values()
     )
-
-
-def _graduation_rate(
-    calculator,
-    base_attrs: CombatAttributes,
-    equipped: dict,
-    school: str,
-    game_config,
-) -> float:
-    """兼容旧调用与测试的薄包装；实现见 ``LoadoutScorer``。"""
-    return LoadoutScorer(calculator, base_attrs, school, game_config).rate(equipped)
 
 
 def _affix_cap(game_config, level: int, name: str) -> float | None:

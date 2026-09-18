@@ -14,6 +14,7 @@ from lvjiang.apps.yysls.core.loadout.transmute import (
     REASON_FIRST_TRANSFERRED,
     REASON_ILLEGAL,
     REASON_MULTIPLE_TRANSFERRED,
+    REASON_NO_LEVEL_CONFIG,
     REASON_NO_RETRANSFER,
     REASON_NO_RETRANSFER_AFTER_CHENGYIN,
     REASON_UNKNOWN_ORIGINAL_LEVEL,
@@ -244,3 +245,35 @@ def test_unknown_config_object_is_tolerated():
         infer_original_equipment_level=lambda name: 0,
     )
     assert not judge_transmute_eligibility(_sword(), gc).eligible
+
+
+def test_divine_affixes_in_pool_are_rejected_by_validator():
+    """转律不产神力：即使把神力词条塞进 pool，整件校验（transferred_divine）
+    也会挡住，不需要单独的分类过滤。"""
+    from lvjiang.apps.yysls.core.loadout.transmute import transmute_targets
+
+    gc = get_game_config()
+    targets = transmute_targets(
+        _sword(), 2, ["剑武学增伤", "全武学增效", "会意率"], gc)
+    assert targets == ["会意率"]
+
+
+def test_untransferred_without_level_config_is_not_eligible_even_for_tuning():
+    gc = get_game_config()
+    judged = judge_transmute_eligibility(
+        _sword(level=99), gc, require_retransfer=False)
+    assert not judged.eligible and judged.reason == REASON_NO_LEVEL_CONFIG
+    assert judge_transmute_eligibility(
+        _sword(level=100), gc, require_retransfer=False).eligible
+
+
+def test_retransfer_capability_infers_original_level_from_name():
+    """original_level 缺失（旧数据/模拟装备）时按名称等阶识别，与解析器同源。"""
+    from lvjiang.apps.yysls.core.loadout.transmute import retransfer_capability
+
+    gc = get_game_config()
+    named = _sword(is_chengyin=True, original_level=0, name="吴钩霜甲")
+    assert gc.infer_original_equipment_level("吴钩霜甲") == 110
+    assert retransfer_capability(named, gc) == (True, "")
+    unknown = _sword(is_chengyin=True, original_level=0, name="不认识的名字")
+    assert retransfer_capability(unknown, gc)[1] == REASON_UNKNOWN_ORIGINAL_LEVEL

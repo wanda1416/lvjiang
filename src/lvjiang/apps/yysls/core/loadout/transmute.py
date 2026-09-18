@@ -128,6 +128,10 @@ def judge_transmute_eligibility(
         allowed, reason = retransfer_capability(equip, game_config)
         if not allowed:
             return TransmuteEligibility(False, reason)
+    elif game_config.level_config_for(_int(equip.get("level"))) is None:
+        # 首次转律不看再次转律能力，但等级本身必须有配置——没有上限数据
+        # 就没有目标值，判定层直接说清，不靠下游取不到上限兜住。
+        return TransmuteEligibility(False, REASON_NO_LEVEL_CONFIG)
 
     if transferred:
         slots: tuple[int, ...] = (transferred[0],)

@@ -80,7 +80,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `to_equipment` | `(dict) -> dict` | 解析 OCR 原始数据为标准装备字典，支持链式字段访问 |
 | `make_fingerprint` | `(dict) -> str` | 基于装备数据生成 MD5 去重指纹（8 位 hex） |
 | `affix_cap` | `(name, level) -> float` | 查询词条数值上限 |
-| `chengyin_cap` | `(name, level) -> float` | 查询承音词条数值上限（上限的 94%） |
+| `chengyin_cap` | `(name, level) -> float` | 查询承音词条数值上限（词组配置里的承音原值） |
 | `is_good_equip` | `(dict) -> bool` | 判定装备是否值得保留（高价值词条 ≥ 2） |
 | `evaluate` | `(dict) -> dict` | 使用流派规则评估装备，返回评级结果字典 |
 | `yysls_rich_parse` | `(dict) -> dict` | `as rich` 的转换函数：解析 `level_text`/`count_text` 并删除原字段 |

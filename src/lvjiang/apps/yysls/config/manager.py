@@ -14,6 +14,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import yaml
+from loguru import logger
 
 from ....i18n import tr
 from .constants import (
@@ -162,6 +163,18 @@ def _parse_tuning_stones(raw, where: str) -> dict[str, TuningStoneRule]:
                 f"{where}.{quality}.recycle_refund"),
         )
     return result
+
+
+def derive_chengyin_cap(cap) -> float:
+    """按 94% 从等级上限推一个承音上限**初值**（一位小数，与游戏显示位数一致）。
+
+    只用于两处：新建等级时先填一个默认值给填写者改，以及旧配置缺失
+    ``chengyin`` 字段时的迁移回退。计算链路一律读配置原值，不调用它。
+    """
+    try:
+        return round(float(cap) * _CHENGYIN_RATIO, 1)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 class GameConfigManager:
@@ -495,14 +508,23 @@ class GameConfigManager:
                     continue
                 level = int(level_str)
                 if isinstance(entry, dict):
-                    self._affix_caps[category][level] = {
-                        "cap": entry.get("cap", 0),
-                    }
+                    cap = entry.get("cap", 0)
+                    chengyin = entry.get("chengyin")
                 else:
                     # 兼容旧格式（直接数值）
-                    self._affix_caps[category][level] = {
-                        "cap": entry,
-                    }
+                    cap, chengyin = entry, None
+                if not isinstance(chengyin, (int, float)) or isinstance(chengyin, bool):
+                    # 承音上限是游戏配置原值；缺失只在迁移期出现，按 94% 派生
+                    # 并提示补填——游戏的取舍可能高/低 0.1，派生值不是真值。
+                    chengyin = derive_chengyin_cap(cap)
+                    if self._affix_pools[category] != POOL_DINGYIN:
+                        logger.warning(
+                            f"词组 {category} 等级 {level} 未配置承音上限，"
+                            f"暂按 cap×{_CHENGYIN_RATIO} 派生为 {chengyin}，请在游戏设置里核对")
+                self._affix_caps[category][level] = {
+                    "cap": cap,
+                    "chengyin": chengyin,
+                }
 
         # ── level_configs（顶层等级配置）──
         raw_levels = data.get("level_configs") or []
@@ -674,7 +696,9 @@ class GameConfigManager:
         Returns:
             {"cap": float, "unit": str, "chengyin": float} 或 None
 
-        承音值：普通词条 = cap * 0.94；定音词条不受承音限制，承音值 = cap。
+        ``cap`` 与 ``chengyin`` 都是词组配置里该等级的原值：承音上限由游戏
+        决定、由配置者按游戏显示填写，不按固定比例推算（配置缺失时加载期
+        已按 94% 派生并告警）。定音词条不受承音限制，承音值 = cap。
         unit 从词组级别的 _unit 字段读取。
         """
         category = self.resolve_affix_category(affix_name)
@@ -686,7 +710,7 @@ class GameConfigManager:
         if self._affix_pools.get(category) == POOL_DINGYIN:
             chengyin = cap
         else:
-            chengyin = round(cap * _CHENGYIN_RATIO, 2)
+            chengyin = entry["chengyin"]
         return {
             "cap": cap,
             "unit": self._affix_units.get(category, ""),

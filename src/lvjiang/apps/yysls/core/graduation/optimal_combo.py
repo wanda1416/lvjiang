@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from loguru import logger
 
+from ..affix_cap import affix_cap_value
 from ..combat.combat_attrs import (
     BONUS_PERCENT_FIELDS,
     CRIT_RATE_CAP,
@@ -163,9 +164,11 @@ def build_candidate_variants(
                     affix = virtual.get(f"affix_{index}")
                     if not isinstance(affix, dict) or not affix.get("name"):
                         continue
-                    caps = gc.get_affix_caps(season_level, affix["name"])
-                    if caps:
-                        affix["value"] = caps["chengyin"]
+                    chengyin_cap = affix_cap_value(
+                        season_level, affix["name"], chengyin=True,
+                        game_config=gc)
+                    if chengyin_cap is not None:
+                        affix["value"] = chengyin_cap
                 variants.append(CandidateVariant(
                     original, virtual, ("同等级承音假设",),
                 ))

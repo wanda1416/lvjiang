@@ -482,7 +482,7 @@ def apply_hypothetical_caps(
 
     Args:
         equipped: {slot_key: equip_dict}
-        full_chengyin: 承音装备的普通词条 → 承音上限 (cap×0.94)
+        full_chengyin: 承音装备的普通词条 → 配置里的承音上限
         full_dingyin: 定音假设。给了 playstyle 时**换成该玩法要求的定音**再取
             上限；没有玩法时退回旧行为（保持原定音名、只把数值顶满）。
         playstyle: 目标玩法名。这是「满定音」真正想问的问题——不是"我现在的
@@ -510,6 +510,7 @@ def apply_hypothetical_caps(
     import copy
 
     from ...config import get_game_config
+    from ..affix_cap import affix_cap_value
 
     gc = get_game_config()
     result: dict = {}
@@ -550,9 +551,11 @@ def apply_hypothetical_caps(
             if not affix or not isinstance(affix, dict) or not affix.get("name"):
                 continue
             if full_chengyin and is_cy and effective_level:
-                caps = gc.get_affix_caps(effective_level, affix["name"])
-                if caps:
-                    affix["value"] = caps["chengyin"]
+                chengyin_cap = affix_cap_value(
+                    int(effective_level), affix["name"], chengyin=True,
+                    game_config=gc)
+                if chengyin_cap is not None:
+                    affix["value"] = chengyin_cap
 
         # 定音词条
         dingyin = equip.get("dingyin")

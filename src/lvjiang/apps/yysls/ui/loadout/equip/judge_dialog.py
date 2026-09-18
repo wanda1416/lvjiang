@@ -4,7 +4,7 @@
 改规则后可立即验证。
 左侧为调律规则配置（TuningConfigWidget，初值取自当前用户调律配置，
 改动不回写用户资料）；右侧手选 部位 + 品阶 + 词条 1-5（数值默认
-承音 94%），点「判定」输出调律潜力结论，词条满 5 条时追加各启用
+承音上限），点「判定」输出调律潜力结论，词条满 5 条时追加各启用
 规则的完整定级。词条名一律为 attributes.yaml 标准字段。
 """
 from __future__ import annotations
@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.config import get_game_config
+from lvjiang.apps.yysls.core.affix_cap import affix_cap_value
 from lvjiang.apps.yysls.core.equip_parser.constants import WEAPON_TYPES
 from lvjiang.apps.yysls.core.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.core.evaluator import (
@@ -135,7 +136,7 @@ class EquipAffixEditor(QWidget):
       词条不会是首词条）；词条 2-5 为调律词条，候选为通用调律池
       + 对应部位神力；
     - 部位变更 → 重建全部词条候选并清空已选与数值；
-    - 选中词条 → 数值自动填该等级承音值（cap×94%），可手改；
+    - 选中词条 → 数值自动填该等级承音值（该等级承音上限），可手改；
     - 词条 2-5 互不重复（词条 1 不受限，允许冠胄「会心率×2」）。
     """
 
@@ -268,9 +269,10 @@ class EquipAffixEditor(QWidget):
         name = str(self._affix_combos[row].currentData())
         if name != _NONE_ITEM_KEY:
             level = self._level_combo.get_level()
-            caps = get_game_config().get_affix_caps(level, name) if level else None
-            if caps is not None:
-                self._affix_spins[row].setValue(caps["chengyin"])
+            chengyin_cap = (affix_cap_value(level, name, chengyin=True)
+                            if level else None)
+            if chengyin_cap is not None:
+                self._affix_spins[row].setValue(chengyin_cap)
         else:
             self._affix_spins[row].setValue(0)
         self._refresh_dedup()

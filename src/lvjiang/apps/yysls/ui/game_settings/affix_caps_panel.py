@@ -42,6 +42,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.apps.yysls.config import (
     AFFIX_CATEGORY_NAMES,
     EQUIP_PART_NAMES,
+    derive_chengyin_cap,
     normalize_equip_part,
 )
 from lvjiang.ui.button_styles import (
@@ -56,6 +57,12 @@ from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 from .level_combo import LevelCombo
 
 
+def _as_config_number(text: str) -> int | float:
+    """表格文本 → 配置数值；整数存 int，其余存 float。"""
+    number = float(text)
+    return int(number) if number == int(number) else number
+
+
 def _selectAll(checks: list) -> None:
     for cb in checks:
         cb.setChecked(True)
@@ -68,8 +75,8 @@ def _invertChecks(checks: list) -> None:
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
 _ATTRS_REL = "yysls/game_config"
 
-# 承音比例（默认 94%）
-_CHENGYIN_RATIO = 0.94
+# 承音上限是配置原值（游戏取舍可能与 94% 差 ±0.1）；这里只在新建等级 /
+# 承音列为空时用 derive_chengyin_cap 给一个默认值，填写者可改。
 
 # 词条类型（_pool 字段；缺省为普通词条）
 _POOL_DINGYIN = "dingyin"
@@ -453,12 +460,13 @@ class AffixCapsPanel(QWidget):
 
             # 兼容旧格式（直接是数值）
             if isinstance(entry, (int, float)):
-                cap = entry
+                cap, chengyin = entry, None
             else:
                 cap = entry.get("cap", 0)
-
-            # 计算承音值（94%）
-            chengyin = round(cap * _CHENGYIN_RATIO, 2)
+                chengyin = entry.get("chengyin")
+            # 缺失时只作展示默认值，用户改过或保存后即为原值
+            if not isinstance(chengyin, (int, float)) or isinstance(chengyin, bool):
+                chengyin = derive_chengyin_cap(cap)
 
             # 等级（下拉选择）
             level_combo = LevelCombo(allow_empty=False)
@@ -470,38 +478,42 @@ class AffixCapsPanel(QWidget):
             cap_item = QTableWidgetItem(str(cap))
             self._table.setItem(row, 1, cap_item)
 
-            # 承音（只读）
+            # 承音（可编辑：游戏里的实际承音上限）
             chengyin_item = QTableWidgetItem(str(chengyin))
-            chengyin_item.setFlags(chengyin_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            chengyin_item.setForeground(Qt.GlobalColor.gray)
+            chengyin_item.setToolTip(tr(
+                "游戏内该等级的承音上限，按游戏显示填写；"
+                "新建等级时先按上限×94% 给出默认值"))
             self._table.setItem(row, 2, chengyin_item)
 
         self._saving = False
 
     def _on_cell_changed(self, row: int, col: int):
-        """单元格改变时自动保存（等级和上限列）"""
+        """单元格改变时自动保存（等级、上限、承音列）"""
         if self._saving:
             return
-        if col not in (0, 1):  # 只有等级和上限列可编辑
+        if col not in (0, 1, 2):
             return
+        if col == 1:
+            # 填完上限先给承音一个默认值；承音列已有值则不动
+            self._fill_default_chengyin(row)
         self._sync_table_to_data()
         self._save_data()
-        # 更新承音列
-        self._update_chengyin(row)
 
-    def _update_chengyin(self, row: int):
-        """更新承音列"""
+    def _fill_default_chengyin(self, row: int):
+        """承音列为空时按上限×94% 填默认值，填写者觉得不合理自己改。"""
         cap_item = self._table.item(row, 1)
-        if not cap_item:
+        chengyin_item = self._table.item(row, 2)
+        if not cap_item or not chengyin_item or chengyin_item.text().strip():
             return
         try:
             cap = float(cap_item.text())
-            chengyin = round(cap * _CHENGYIN_RATIO, 2)
-            chengyin_item = self._table.item(row, 2)
-            if chengyin_item:
-                chengyin_item.setText(str(chengyin))
         except ValueError:
-            pass
+            return
+        self._saving = True
+        try:
+            chengyin_item.setText(str(derive_chengyin_cap(cap)))
+        finally:
+            self._saving = False
 
     def _on_unit_combo_changed(self, text: str):
         """词组单位下拉改变时保存到 _unit 字段"""
@@ -601,10 +613,8 @@ class AffixCapsPanel(QWidget):
         cap_item = QTableWidgetItem("")
         self._table.setItem(row, 1, cap_item)
 
-        # 承音列留空（只读）
+        # 承音列留空：填完上限后自动按 94% 给默认值，可改
         chengyin_item = QTableWidgetItem("")
-        chengyin_item.setFlags(chengyin_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        chengyin_item.setForeground(Qt.GlobalColor.gray)
         self._table.setItem(row, 2, chengyin_item)
 
     def _del_level(self):
@@ -658,6 +668,7 @@ class AffixCapsPanel(QWidget):
         for row in range(self._table.rowCount()):
             level_combo = self._table.cellWidget(row, 0)
             cap_item = self._table.item(row, 1)
+            chengyin_item = self._table.item(row, 2)
 
             if not isinstance(level_combo, LevelCombo) or not cap_item:
                 continue
@@ -671,13 +682,20 @@ class AffixCapsPanel(QWidget):
                 continue
 
             try:
-                cap = float(cap_text)
-                # 如果是整数，存 int
-                if cap == int(cap):
-                    cap = int(cap)
-                level_caps[level] = {"cap": cap}
+                cap = _as_config_number(cap_text)
             except ValueError:
-                pass
+                continue
+            entry: dict = {"cap": cap}
+            chengyin_text = chengyin_item.text().strip() if chengyin_item else ""
+            try:
+                chengyin = _as_config_number(chengyin_text) if chengyin_text else None
+            except ValueError:
+                chengyin = None
+            # 定音词组不受承音限制，不落 chengyin；普通词组承音缺省按 94% 派生
+            if not self._is_dingyin():
+                entry["chengyin"] = (
+                    chengyin if chengyin is not None else derive_chengyin_cap(cap))
+            level_caps[level] = entry
 
     def _save_data(self):
         """保存数据到 YAML"""

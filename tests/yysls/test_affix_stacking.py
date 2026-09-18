@@ -200,3 +200,42 @@ def test_affix_caps_panel_edits_stack_mode(qtbot):
     panel._radio_stack_sum.setChecked(True)
     assert "_stack" not in data["affix_caps"]["全部武学增效"]
     assert changes
+
+
+def test_affix_caps_panel_chengyin_is_editable_config_value(qtbot) -> None:
+    """承音上限是配置原值：面板展示配置里的值、可改并写回；
+    填完上限而承音为空时才按 94% 给默认值。"""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QTableWidgetItem
+
+    from lvjiang.apps.yysls.ui.game_settings.affix_caps_panel import (
+        AffixCapsPanel,
+    )
+
+    data = {"affix_caps": {
+        "外功攻击": {"_aliases": ["最大外功攻击"],
+                    "110": {"cap": 121.4, "chengyin": 114.2}},
+    }}
+    changes: list[int] = []
+    panel = AffixCapsPanel(data=data, on_changed=lambda: changes.append(1))
+    qtbot.addWidget(panel)
+    panel._affix_list.setCurrentRow(0)
+
+    chengyin_item = panel._table.item(0, 2)
+    assert chengyin_item is not None
+    assert chengyin_item.text() == "114.2"          # 配置原值，不是 94% 算出的 114.1
+    assert chengyin_item.flags() & Qt.ItemFlag.ItemIsEditable
+
+    chengyin_item.setText("114.0")
+    # 同步回 _data 时等级 key 由 LevelCombo 给出（int）
+    assert data["affix_caps"]["外功攻击"][110] == {"cap": 121.4, "chengyin": 114}
+    assert "110" not in data["affix_caps"]["外功攻击"]
+    assert changes
+
+    # 新建等级：填完上限，承音自动给 94% 默认值，可再改
+    panel._add_level()
+    row = panel._table.rowCount() - 1
+    panel._table.cellWidget(row, 0).set_level(105)
+    panel._table.setItem(row, 1, QTableWidgetItem("105.6"))
+    assert panel._table.item(row, 2).text() == "99.3"
+    assert data["affix_caps"]["外功攻击"][105] == {"cap": 105.6, "chengyin": 99.3}

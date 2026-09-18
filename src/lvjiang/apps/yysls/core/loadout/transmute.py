@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 
+from ..affix_cap import affix_cap_value
 from ..combat.affix_rules import normal_affix_candidates
 from ..equip_validator import validate_combination_dict
 
@@ -156,13 +157,12 @@ def transmute_pool_union(game_config) -> list[str]:
 def transmute_target_value(
     name: str, level: int, is_chengyin: bool, game_config,
 ) -> float | None:
-    """目标词条数值：未承音取普通上限（彩狗粮 100%），承音取承音上限。"""
-    caps = game_config.get_affix_caps(int(level or 0), name)
-    if not caps:
-        return None
-    value = caps.get("chengyin") if is_chengyin else caps.get("cap")
-    number = _number(value)
-    return number if number > 0 else None
+    """目标词条数值：未承音取普通上限（彩狗粮 100%），承音取承音上限。
+
+    两者都是词组配置原值（见 ``affix_cap_value``），不按比例推算。
+    """
+    return affix_cap_value(
+        int(level or 0), name, chengyin=is_chengyin, game_config=game_config)
 
 
 def with_transmuted_affix(

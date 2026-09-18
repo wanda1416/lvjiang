@@ -10,7 +10,7 @@ import copy
 from dataclasses import dataclass
 
 from .....i18n import tr
-from ..affix_cap import affix_cap_ratio
+from ..affix_cap import affix_cap_ratio, affix_cap_value
 from ..combat.affix_rules import normal_affix_candidates
 from ..combat.combat_attrs import (
     CombatAttributes,
@@ -179,26 +179,24 @@ def _graduation_rate(
     return LoadoutScorer(calculator, base_attrs, school, game_config).rate(equipped)
 
 
-def _affix_cap(game_config, level: int, name: str) -> float:
-    caps = game_config.get_affix_caps(level, name)
-    return _number(caps.get("cap")) if caps else 0.0
+def _affix_cap(game_config, level: int, name: str) -> float | None:
+    """该等级该词条的普通上限原值；配置里没有时 None（调用方跳过该候选）。"""
+    return affix_cap_value(level, name, game_config=game_config)
 
 
 def _source_cap_pct(affix: dict, level: int, game_config) -> float:
     """现算当前值占等级上限的比例。
 
-    换词条后的数值按这个比例折算，所以口径必须跟 ``value`` 一致。装备里
-    的 ``cap_pct`` 是给调律 DSL 快查的派生缓存，可能与 ``value`` 早已脱节
-    （改过数值却没重算），拿它折算会算出错误的收益；仅在查不到上限数据
-    时才退回它兜底。
+    换词条后的数值按这个比例折算，所以口径必须跟 ``value`` 一致。
     """
     ratio = affix_cap_ratio(
         level, str(affix.get("name") or ""), affix.get("value"),
         game_config=game_config)
-    if ratio is not None:
-        return min(max(ratio, 0.0), 1.0)
-    recorded = _number(affix.get("cap_pct"))
-    return min(recorded / 100, 1.0) if recorded > 0 else 0.0
+    if ratio is None:
+        # 不退回装备上的 cap_pct 缓存：那是给调律 DSL 快查的派生字段，
+        # 可能与 value 脱节。查不到上限就按 0 处理，候选自然不会被推荐。
+        return 0.0
+    return min(max(ratio, 0.0), 1.0)
 
 
 def _blocked_equipment(
@@ -268,7 +266,10 @@ def _replacement_candidates(
                     continue
                 if to_name == from_name:
                     continue
-                to_value = _affix_cap(game_config, level, to_name) * cap_pct
+                to_cap = _affix_cap(game_config, level, to_name)
+                if to_cap is None:
+                    continue
+                to_value = to_cap * cap_pct
                 if to_value <= 0:
                     continue
                 changed = copy.deepcopy(equipped)
@@ -509,11 +510,8 @@ def analyze_affix_impacts(
     for name in _candidate_names(game_config):
         if not _can_add_affix(name, effective, game_config, effective_names):
             continue
-        caps = game_config.get_affix_caps(level, name)
-        if not caps:
-            continue
-        value = _number(caps.get("cap"))
-        if not value:
+        value = _affix_cap(game_config, level, name)
+        if value is None:
             continue
         delta_attrs = aggregate_equipment_attrs({
             "hypothetical": {"affix_1": {"name": name, "value": value}},

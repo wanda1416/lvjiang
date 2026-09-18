@@ -637,9 +637,10 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         """
         from ...core.recognizers.template_locator import (
             DEFAULT_MIN_SCORE,
-            adaptive_scales,
             get_template_store,
             locate,
+            resolution_scale,
+            search_box,
             with_record_size,
         )
 
@@ -661,17 +662,15 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         canvas_px_h = canvas.h_ratio * h
 
         if search_region is not None:
-            x1 = int(canvas_px_x + search_region.x_ratio * canvas_px_w)
-            y1 = int(canvas_px_y + search_region.y_ratio * canvas_px_h)
-            x2 = int(canvas_px_x + (search_region.x_ratio + search_region.w_ratio) * canvas_px_w) - 1
-            y2 = int(canvas_px_y + (search_region.y_ratio + search_region.h_ratio) * canvas_px_h) - 1
+            # 与 scan by image 同一套口径：round 取整 + 按模板尺寸外扩
+            x1, y1, x2, y2, scale = search_box(img.shape, tpl, canvas, search_region)
         else:
             x1, y1 = int(canvas_px_x), int(canvas_px_y)
             x2, y2 = int(canvas_px_x + canvas_px_w) - 1, int(canvas_px_y + canvas_px_h) - 1
+            scale = resolution_scale(int(round(canvas_px_w)), tpl.record_w)
 
         hit = locate(
-            img, tpl, x1, y1, x2, y2,
-            scales=adaptive_scales(int(canvas_px_w), tpl.record_w),
+            img, tpl, x1, y1, x2, y2, scales=(scale,),
             min_score=DEFAULT_MIN_SCORE if min_score is None else float(min_score),
         )
         if hit is None:

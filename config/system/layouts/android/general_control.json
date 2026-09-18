@@ -50,7 +50,7 @@
       "h_ratio": 0.04827586206896552,
       "template": {
         "name": "android/general_control/back",
-        "min_score": 0.6,
+        "min_score": 0.8,
         "record_w": 2800,
         "record_h": 1260
       }

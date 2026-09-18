@@ -122,15 +122,15 @@ def test_locate_respects_search_region_and_min_score(tmp_path):
 
 
 def test_locate_scale_adaptation(tmp_path):
-    """模板按 2× 宽录制（80px），当前帧里图标 40px：adaptive_scales(640, 1280) 含 0.5 → 命中"""
+    """模板按 2× 宽录制（80px），当前帧里图标 40px：resolution_scale(640, 1280) = 0.5 → 命中"""
     icon40 = _icon(40)
     icon80 = cv2.resize(icon40, (80, 80), interpolation=cv2.INTER_LINEAR)
     frame = _frame_with_icon(icon40, at=(300, 120))
     tpl = tl.template_from_image("big", icon80, record_w=1280, record_h=720)
     assert tpl.record_w == 1280
-    scales = tl.adaptive_scales(640, tpl.record_w)
-    assert 0.5 in scales and 1.0 in scales
-    hit = tl.locate(frame, tpl, 0, 0, 639, 359, scales=scales, min_score=0.8)
+    scale = tl.resolution_scale(640, tpl.record_w)
+    assert scale == pytest.approx(0.5)
+    hit = tl.locate(frame, tpl, 0, 0, 639, 359, scales=(scale,), min_score=0.8)
     assert hit is not None and hit.scale == pytest.approx(0.5)
     assert (hit.cx, hit.cy) == (pytest.approx(319.5, abs=1), pytest.approx(139.5, abs=1))
     # 只试 1.0 则尺寸不对 → 低分
@@ -138,9 +138,61 @@ def test_locate_scale_adaptation(tmp_path):
     assert miss is None
 
 
-def test_adaptive_scales_near_one():
-    assert tl.adaptive_scales(1000, 1010) == [0.9, 1.0, 1.1]
-    assert tl.adaptive_scales(1000, 0) == [0.9, 1.0, 1.1]
+def test_resolution_scale_is_exact_and_never_guessed():
+    """同分辨率恒为 1.0；比例已知就用精确值，不再在 ±10% 之间盲猜。"""
+    assert tl.resolution_scale(2800, 2800) == 1.0
+    assert tl.resolution_scale(2400, 2800) == pytest.approx(2400 / 2800)
+    assert tl.resolution_scale(1000, 0) == 1.0
+    assert tl.resolution_scale(0, 1000) == 1.0
+
+
+class _Box:
+    def __init__(self, x, y, w, h):
+        self.x_ratio, self.y_ratio, self.w_ratio, self.h_ratio = x, y, w, h
+
+
+def test_locate_in_region_tolerates_boundary_rounding_only(tmp_path):
+    """Region 外框正好等于模板（编辑器默认裁法）：同分辨率下必须以 scale=1.0
+    命中；取整误差（≤2 px）由搜索区外扩吸收，再远就该重新校准布局。"""
+    icon = _icon(40)
+    frame = _frame_with_icon(icon, at=(300, 120))
+    tpl = tl.template_from_image("ico", icon, record_w=640, record_h=360)
+    canvas = _Box(0.0, 0.0, 1.0, 1.0)
+    # 用会产生舍入差的比例定义 Region：边界落在 .5 附近
+    region = _Box(300.4 / 640, 120.4 / 640 * (640 / 360), 39.3 / 640, 39.3 / 360)
+
+    hit = tl.locate_in_region(frame, tpl, canvas, region, min_score=0.9)
+    assert hit is not None and hit.scale == 1.0 and hit.score > 0.99
+
+    shifted = _frame_with_icon(icon, at=(302, 118))   # 取整级别的偏差：2 px
+    hit = tl.locate_in_region(shifted, tpl, canvas, region, min_score=0.9)
+    assert hit is not None and hit.scale == 1.0 and hit.score > 0.99
+    assert (hit.cx, hit.cy) == (pytest.approx(302 + 19.5), pytest.approx(118 + 19.5))
+
+    # 超出取整误差范围就不再命中，也不会退化成 0.9 缩放去"凑"
+    far = _frame_with_icon(icon, at=(306, 120))
+    assert tl.locate_in_region(far, tpl, canvas, region, min_score=0.9) is None
+
+
+def test_search_box_grows_only_when_region_cannot_hold_template():
+    tpl = tl.template_from_image("ico", _icon(40), record_w=1280, record_h=720)
+    canvas = _Box(0.0, 0.0, 1.0, 1.0)
+    # Region 与模板等大（整框截取）：缩放后模板 20px，Region [320,340) 需扩到 24px
+    region = _Box(0.5, 0.5, 40 / 1280, 40 / 720)
+    x1, y1, x2, y2, scale = tl.search_box((360, 640), tpl, canvas, region)
+    assert scale == pytest.approx(0.5)
+    assert (x1, x2) == (318, 341)
+    assert (y1, y2) == (178, 201)
+    # Region 本就比模板大（部分截取）：原样使用，不再外扩
+    wide = _Box(0.5, 0.5, 100 / 1280, 100 / 720)
+    x1, y1, x2, y2, _ = tl.search_box((360, 640), tpl, canvas, wide)
+    assert (x1, x2) == (320, 369)
+    assert (y1, y2) == (180, 229)
+    # 只差 1px 时只扩 1px 一侧，不是一律 ±2
+    almost = _Box(0.5, 0.5, 46 / 1280, 48 / 720)   # 23×24 px，需 24×24
+    x1, y1, x2, y2, _ = tl.search_box((360, 640), tpl, canvas, almost)
+    assert (x2 - x1 + 1, y2 - y1 + 1) == (24, 24)
+    assert (x1, y1) == (320, 180)
 
 
 def _touch(path: Path, offset_s: int) -> None:

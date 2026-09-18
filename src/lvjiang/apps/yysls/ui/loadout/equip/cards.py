@@ -728,6 +728,9 @@ class _SlotCard(QFrame):
         self.setStyleSheet(style)
 
     def enterEvent(self, event):
+        if self._read_only:
+            super().enterEvent(event)
+            return
         self._hovered = True
         if not self._selected:
             self._apply_style(_slot_style_hovered(self._quality_bg or "palette(base)"))
@@ -748,6 +751,12 @@ class _SlotCard(QFrame):
 
     def mousePressEvent(self, event):
         from .status_tab import EquipStatusTab
+        # 只读卡片（分析对话框里的组合详情/转律建议）：对话框的父链能一路
+        # 走到备战方案页，不拦下就会触发外面的部位筛选
+        if self._read_only:
+            if event is not None:
+                event.accept()
+            return
         # 仅左键触发部位筛选，右键留给 contextMenuEvent
         if event.button() == Qt.MouseButton.LeftButton:
             parent = self.parent()

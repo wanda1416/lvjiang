@@ -553,6 +553,9 @@ _PILL_STYLE = (
 )
 
 #: 部位相对当前备战方案的变化。
+#: 组合详情状态带每行高度（px）；两行固定，空行也占位
+_STRIP_ROW_HEIGHT = 20
+
 _CHANGE_SWAP = "swap"    # 备战方案穿着别的装备，要换下来
 _CHANGE_NEW = "new"      # 备战方案这个部位是空的，直接穿上
 _CHANGE_SAME = "same"    # 与备战方案一致
@@ -633,34 +636,44 @@ class _SlotDetailPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
+        # 状态带固定两行：第一行换装状态，第二行计算假设。两行都固定
+        # 高度、空着也占位——否则假设多的部位纵向撑高，八张卡片对不齐。
         self.strip = QWidget()
-        strip_layout = QHBoxLayout(self.strip)
+        strip_layout = QVBoxLayout(self.strip)
         strip_layout.setContentsMargins(2, 0, 2, 0)
-        strip_layout.setSpacing(6)
+        strip_layout.setSpacing(2)
+        change_row = QHBoxLayout()
+        change_row.setContentsMargins(0, 0, 0, 0)
+        change_row.setSpacing(6)
         self.change_slot = QHBoxLayout()
         self.change_slot.setContentsMargins(0, 0, 0, 0)
         self.change_slot.setSpacing(6)
-        strip_layout.addLayout(self.change_slot)
+        change_row.addLayout(self.change_slot)
         self.current_label = QLabel("")
         self.current_label.setProperty("tone", "muted")
         self.current_label.setStyleSheet("font-size: 11px;")
         self.current_label.setVisible(False)
-        strip_layout.addWidget(self.current_label)
-        strip_layout.addStretch(1)
+        change_row.addWidget(self.current_label)
+        change_row.addStretch(1)
+        strip_layout.addLayout(change_row)
+        assumption_row = QHBoxLayout()
+        assumption_row.setContentsMargins(0, 0, 0, 0)
+        assumption_row.setSpacing(4)
         self.assumption_slot = QHBoxLayout()
         self.assumption_slot.setContentsMargins(0, 0, 0, 0)
         self.assumption_slot.setSpacing(4)
-        strip_layout.addLayout(self.assumption_slot)
-        # 状态带高度固定，空槽位也占位，八张卡片才能对齐
-        self.strip.setFixedHeight(20)
+        assumption_row.addLayout(self.assumption_slot)
+        assumption_row.addStretch(1)
+        strip_layout.addLayout(assumption_row)
+        self.strip.setFixedHeight(_STRIP_ROW_HEIGHT * 2 + 2)
         layout.addWidget(self.strip)
 
+        # 这一页只看不点：只读卡片不响应点击/悬停，也不弹右键菜单
         self.card = _SlotCard(
             slot_key, display_name, filter_type,
             display_params={"card_min_height": 180},
+            read_only=True,
         )
-        # 这一页只看不点：卡片本身是为「穿戴装备」那边的选中交互做的
-        self.card.setCursor(Qt.CursorShape.ArrowCursor)
         layout.addWidget(self.card)
 
         self.change = _CHANGE_NONE
@@ -721,6 +734,7 @@ class _ResultCard(QFrame):
 
     apply_clicked = pyqtSignal(dict)   # emits equipped dict
     detail_clicked = pyqtSignal(dict)  # emits complete result metadata
+    attrs_clicked = pyqtSignal(dict)   # emits complete result metadata
 
     def __init__(
         self, rank: int, result: dict[str, Any],
@@ -781,9 +795,11 @@ class _ResultCard(QFrame):
 
         top.addStretch()
 
-        buttons = QVBoxLayout()
-        buttons.setSpacing(4)
+        # 三个动作同一行：应用 / 组合详情（看词条）/ 战斗属性（看面板）
+        buttons = QHBoxLayout()
+        buttons.setSpacing(6)
         apply_btn = QPushButton(tr("应用此组合"))
+        apply_btn.setObjectName("resultApplyButton")
         apply_button_style(apply_btn, variant="action")
         apply_btn.clicked.connect(
             lambda: self.apply_clicked.emit(result.get("equipped", {})),
@@ -791,11 +807,19 @@ class _ResultCard(QFrame):
         buttons.addWidget(apply_btn)
         # 一行装备名看不出这套组合到底是什么，真要判断得看词条
         detail_btn = QPushButton(tr("查看组合详情"))
+        detail_btn.setObjectName("resultDetailButton")
         apply_button_style(detail_btn, variant="neutral")
         detail_btn.clicked.connect(
             lambda: self.detail_clicked.emit(result),
         )
         buttons.addWidget(detail_btn)
+        attrs_btn = QPushButton(tr("查看战斗属性"))
+        attrs_btn.setObjectName("resultAttrsButton")
+        apply_button_style(attrs_btn, variant="neutral")
+        attrs_btn.clicked.connect(
+            lambda: self.attrs_clicked.emit(result),
+        )
+        buttons.addWidget(attrs_btn)
         top.addLayout(buttons)
         layout.addLayout(top)
 
@@ -1115,7 +1139,69 @@ class OptimalComboPage(QWidget):
         detail_layout.addStretch()
         self._tab_widget.addTab(detail_tab, tr("组合详情"))
 
+        # Tab 4: 战斗属性（复用角色详情的战斗属性面板，全屏 2×2 排布）
+        attrs_tab = QWidget()
+        attrs_layout = QVBoxLayout(attrs_tab)
+        attrs_layout.setContentsMargins(8, 8, 8, 8)
+        attrs_layout.setSpacing(6)
+        self._attrs_hint = QLabel(tr("在「最优结果」里点某一条的「查看战斗属性」"))
+        self._attrs_hint.setProperty("tone", "muted")
+        self._attrs_hint.setStyleSheet("font-size: 12px;")
+        attrs_layout.addWidget(self._attrs_hint)
+        self._attrs_preview = self._make_attrs_preview()
+        if self._attrs_preview is not None:
+            attrs_layout.addWidget(self._attrs_preview, 1)
+        self._tab_widget.addTab(attrs_tab, tr("战斗属性"))
+
         layout.addWidget(self._tab_widget, stretch=1)
+
+    def _make_attrs_preview(self):
+        """战斗属性预览面板；宿主不可用（测试桩）时留空。"""
+        try:
+            from .combat.attrs_tab import CombatAttrsTab
+
+            preview = CombatAttrsTab(self._host, preview=True)
+            preview.set_embedded_mode("full")
+            return preview
+        except Exception as exc:  # noqa: BLE001 - 预览不可用不影响搜索
+            logger.warning(f"战斗属性预览面板不可用: {exc}")
+            return None
+
+    def _preview_equipped_for(self, result: dict) -> dict[str, dict]:
+        """按搜索时的假设把这套组合投影成算分用的虚拟装备。
+
+        赛季承音分支是逐件选择的：只有结果里标了「同等级承音假设」的部位
+        才按承音投影，其余部位用搜索时的共享假设。
+        """
+        equipped = result.get("equipped", {})
+        per_slot = result.get("assumptions", {})
+        base = getattr(self, "_searched_assumptions", None) or (
+            self._assumptions_provider().with_playstyle(self._playstyle))
+        projected: dict[str, dict] = {}
+        for slot_key, equip in equipped.items():
+            if not isinstance(equip, dict):
+                continue
+            labels = per_slot.get(slot_key) or [] if isinstance(per_slot, dict) else []
+            assumptions = replace(
+                base, season_chengyin="同等级承音假设" in labels)
+            projected[slot_key] = assumptions.project({slot_key: equip})[slot_key]
+        return projected
+
+    def _on_show_attrs(self, result: dict) -> None:
+        """把这套组合的战斗属性铺到「战斗属性」页并切过去。"""
+        if self._attrs_preview is None:
+            return
+        gongjue = str(result.get("gongjue") or "")
+        self._attrs_preview.show_preview(
+            self._preview_equipped_for(result), gongjue=gongjue)
+        rate = result.get("rate", 0)
+        self._attrs_hint.setText(
+            tr("方案 #{rank}　弓玦套装：{gongjue}　毕业率 {rate:.2f}%　·　"
+               "属性按搜索时的计算假设与该弓玦套装计算，不是穿戴后的实测值")
+            .format(rank=result.get("rank") or "-", gongjue=gongjue or tr("无"),
+                    rate=rate * 100))
+        self._tab_widget.setTabText(3, self._ranked_title(tr("战斗属性"), result))
+        self._tab_widget.setCurrentIndex(3)
 
     def _selected_gongjues(self) -> list[str]:
         """返回选中的弓玦场景；全不选表示按无弓玦计算。"""
@@ -1441,9 +1527,12 @@ class OptimalComboPage(QWidget):
             tr("正在比较 {count} 种装备组合，搜索期间仍可取消。")
             .format(count=f"{total:,}"),
         )
-        # 切回候选装备 Tab，重置结果 Tab 标题
+        # 切回候选装备 Tab，重置结果/详情/属性 Tab 标题
         self._tab_widget.setCurrentIndex(0)
         self._tab_widget.setTabText(1, tr("最优结果"))
+        self._tab_widget.setTabText(2, tr("组合详情"))
+        if self._tab_widget.count() > 3:
+            self._tab_widget.setTabText(3, tr("战斗属性"))
 
         # Clear old results
         while self._results_inner.count():
@@ -1584,12 +1673,15 @@ class OptimalComboPage(QWidget):
         for result in results:
             gongjue = str(result.get("gongjue") or "")
             ranks[gongjue] = ranks.get(gongjue, 0) + 1
+            # 方案编号跟着结果走：组合详情 / 战斗属性页签用它标明看的是第几套
+            result["rank"] = ranks[gongjue]
             card = _ResultCard(
                 ranks[gongjue], result, self._slot_labels,
                 self._current_equipped,
             )
             card.apply_clicked.connect(self._on_apply_result)
             card.detail_clicked.connect(self._on_show_detail)
+            card.attrs_clicked.connect(self._on_show_attrs)
             self._results_inner.addWidget(card)
             self._result_cards.append(card)
 
@@ -1642,7 +1734,14 @@ class OptimalComboPage(QWidget):
             tr("弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　"
                "卡片显示原始装备数值，计算假设标注在卡片上方")
             .format(gongjue=gongjue, n=filled, change=change_text))
+        self._tab_widget.setTabText(2, self._ranked_title(tr("组合详情"), result))
         self._tab_widget.setCurrentIndex(2)
+
+    @staticmethod
+    def _ranked_title(title: str, result: dict) -> str:
+        """页签标题带上方案编号：「组合详情 (#2)」。"""
+        rank = result.get("rank")
+        return f"{title} (#{rank})" if rank else title
 
     def _on_apply_result(self, equipped: dict) -> None:
         """将搜索结果的装备组合写入 session（按槽位合并，不覆盖未参与槽位）。"""

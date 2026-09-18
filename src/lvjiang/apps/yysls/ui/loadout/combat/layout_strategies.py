@@ -75,7 +75,7 @@ class FullCardLayout(CardLayoutStrategy):
     def arrange_cards(self, tab, cards) -> None:
         self.drain_layout(tab._main_layout)
         for card in cards:
-            card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+            card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         grid = QGridLayout()
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(12)
@@ -86,10 +86,9 @@ class FullCardLayout(CardLayoutStrategy):
         grid.addWidget(tab._damage_card, 1, 1)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
-        # 伸展空间必须分配给实际承载卡片的两行。原先误设到不存在的
-        # row 2，导致 full 模式四张卡片只保留 sizeHint 高度并挤在顶部。
-        grid.setRowStretch(0, 1)
-        grid.setRowStretch(1, 1)
+        # 卡片以 sizeHint 高度紧凑展示；虚拟行 2 吸收多余空间，
+        # 使两行卡片整体靠上，而非按 1:1 拉伸撑高内部行间距。
+        grid.setRowStretch(2, 1)
         tab._main_layout.addLayout(grid)
 
     def arrange_config_bar(self, tab) -> None:

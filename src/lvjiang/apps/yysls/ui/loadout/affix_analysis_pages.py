@@ -810,7 +810,7 @@ class AffixAnalysisPages(QWidget):
         banner_layout = QHBoxLayout(banner)
         banner_layout.setContentsMargins(12, 8, 12, 8)
         note = QLabel(
-            tr("以下是理论敏感度，不代表游戏中可以单独获得或失去一条词条。"
+            tr("以下是词条收益率（理论值），不代表游戏中可以单独获得或失去一条词条。"
                "新增按 Lv{level} 普通词条满值，扣除按当前装备实际值计算。").format(
                 level=report.affix_level,
             )
@@ -821,10 +821,10 @@ class AffixAnalysisPages(QWidget):
         columns = QHBoxLayout()
         columns.setSpacing(12)
         columns.addWidget(self._section(
-            tr("理论新增一条词条的收益"), report.additions, positive=True,
+            tr("新增一条词条的收益率"), report.additions, positive=True,
         ), 1)
         columns.addWidget(self._section(
-            tr("理论扣除一条当前词条的损失"), report.removals, positive=False,
+            tr("扣除一条当前词条的损失率"), report.removals, positive=False,
         ), 1)
         layout.addLayout(columns, 1)
         return container

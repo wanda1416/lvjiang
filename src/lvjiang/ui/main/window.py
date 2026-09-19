@@ -634,7 +634,6 @@ class MainWindow(
             (hk.pause, tr("暂停")), (hk.stop, tr("结束"))))
         self.adjustSize()
         self.setMinimumHeight(self.height())
-        self._migrate_ui_state()
         self._restore_ui_state()
         self._setup_log_redirect()
 

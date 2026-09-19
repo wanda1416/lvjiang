@@ -964,14 +964,14 @@ class LayoutConfigManager:
         self._config = self._load_config()
 
     def _load_config(self) -> dict:
-        """从 session.json 读 actives.layout（兼容旧 active_layout）
+        """从 session.json 读 actives.layout。
 
-        layout_manager 只管理 active_layout，不触碰 session.json 其他节点。
+        layout_manager 只管理激活布局，不触碰 session.json 其他节点。
         """
         return {"active_layout": get_session_store().get_active("layout", "")}
 
     def _save_config(self):
-        """保存 actives.layout，并清理旧 active_* 顶层键。"""
+        """保存 actives.layout。"""
         get_session_store().set_active(
             "layout", self._config.get("active_layout", ""))
 

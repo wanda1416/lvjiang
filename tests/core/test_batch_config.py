@@ -20,18 +20,6 @@ def test_batch_workflows_round_trip_new_lifecycle():
     assert BatchWorkflows.from_dict(workflows.to_dict()) == workflows
 
 
-def test_legacy_huaruizhi_finish_is_migrated_with_stop_parameter():
-    assert BatchWorkflows.from_dict({
-        "finish_item": "batch/finish_huaruizhi.wf",
-    }).finish_item == "batch/finish_item.wf"
-
-    item = BatchConfigItem.from_dict("legacy", {
-        "workflows": {"finish_item": "batch/finish_huaruizhi.wf"},
-    })
-    assert item.workflows.finish_item == "batch/finish_item.wf"
-    assert item.workflow_params["finish_item"]["stop_app"] is True
-
-
 def test_group_round_trip_preserves_actual_selection_order(tmp_path):
     path = tmp_path / "batch.json"
     group = BatchConfigItem(

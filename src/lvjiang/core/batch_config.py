@@ -17,9 +17,6 @@ BATCH_CONFIG_VERSION = 1
 _WORKFLOW_PHASES = (
     "batch_setup", "prepare_item", "finish_item", "batch_teardown",
 )
-_LEGACY_WORKFLOW_PATHS = {
-    "batch/finish_huaruizhi.wf": "batch/finish_item.wf",
-}
 
 
 @dataclass
@@ -41,8 +38,7 @@ class BatchWorkflows:
     def from_dict(data: object) -> "BatchWorkflows":
         source = data if isinstance(data, dict) else {}
         return BatchWorkflows(**{
-            key: _LEGACY_WORKFLOW_PATHS.get(
-                str(source.get(key, "")), str(source.get(key, "")))
+            key: str(source.get(key, ""))
             for key in ("batch_setup", "prepare_item", "finish_item", "batch_teardown")
         })
 
@@ -118,10 +114,6 @@ class BatchConfigItem:
             dict(source.get("workflow_params", {}))
             if isinstance(source.get("workflow_params"), dict) else {}
         )
-        if workflow_source.get("finish_item") == "batch/finish_huaruizhi.wf":
-            finish_params = dict(workflow_params.get("finish_item", {}))
-            finish_params["stop_app"] = True
-            workflow_params["finish_item"] = finish_params
         item = BatchConfigItem(
             name=name,
             task_ids=_unique_strings(source.get("task_ids")),

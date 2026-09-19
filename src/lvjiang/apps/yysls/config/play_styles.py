@@ -1,8 +1,7 @@
 """基础属性配置存储（兼容旧的 play_styles 命名）。
 
 基础属性数据属于会话级数据（由面板属性反推），不应提交到 git。
-存储在 session.json 的 ``yysls`` 节点（旧的独立 yysls.json 仍可读，
-见 session_node）：
+存储在 session.json 的 ``yysls`` 节点：
 
     play_styles: {
         流派名: {
@@ -19,7 +18,7 @@ from . import session_node
 
 
 def _load() -> dict:
-    """读取插件会话节点（首次运行时回退旧的独立文件）"""
+    """读取插件会话节点。"""
     return session_node.load()
 
 

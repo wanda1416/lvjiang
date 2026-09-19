@@ -213,16 +213,14 @@ def _count_weekly_regens(
 
 
 def _clean_old_alerts(current_keys: set[str]) -> None:
-    """清理已不存在的 key 的提醒记录，同时清除旧格式（alert_above 遗留）"""
+    """清理已不存在的 key 的提醒记录。"""
     history = get_alert_history()
     if not history:
         return
 
     cleaned = {
         k: v for k, v in history.items()
-        # 丢弃旧格式 {user}:{key}:above:current
-        if not k.endswith(":above:current")
-        and k.split(":")[1] in current_keys
+        if k.split(":")[1] in current_keys
     }
     if len(cleaned) != len(history):
         set_alert_history(cleaned)

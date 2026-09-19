@@ -481,7 +481,7 @@ class TestReferenceSpaces:
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
         space_env["session"].parent.mkdir(parents=True, exist_ok=True)
         space_env["session"].write_text(
-            json.dumps({"active_space": "空间A"}), encoding="utf-8")
+            json.dumps({"actives": {"space": "空间A"}}), encoding="utf-8")
         db = ReferenceDatabase(dev_mode=False)
         assert db.get_active_space() == "空间A"
 
@@ -491,7 +491,7 @@ class TestReferenceSpaces:
         assert db.get_active_space() == DEFAULT_SPACE  # 无 session
         space_env["session"].parent.mkdir(parents=True, exist_ok=True)
         space_env["session"].write_text(
-            json.dumps({"active_space": "不存在"}), encoding="utf-8")
+            json.dumps({"actives": {"space": "不存在"}}), encoding="utf-8")
         db2 = ReferenceDatabase(dev_mode=False)
         assert db2.get_active_space() == DEFAULT_SPACE  # 非法回退 DEFAULT_SPACE
 
@@ -512,21 +512,19 @@ class TestReferenceSpaces:
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
         space_env["session"].parent.mkdir(parents=True, exist_ok=True)
         space_env["session"].write_text(
-            json.dumps({"active_user": "tester"}), encoding="utf-8")
+            json.dumps({"actives": {"user": "tester"}}), encoding="utf-8")
         db = ReferenceDatabase(dev_mode=False)
         assert db.set_active_space("幽灵") is False  # 未扫到的空间拒绝
         assert db.set_active_space("空间A") is True
         data = json.loads(space_env["session"].read_text(encoding="utf-8"))
         assert data["actives"] == {"space": "空间A", "user": "tester"}
-        assert "active_space" not in data
-        assert "active_user" not in data
 
     def test_save_writes_active_space_yaml(self, space_env):
         """dev 模式 save 落盘到激活空间的 yaml"""
         _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE, "空间A"])
         space_env["session"].parent.mkdir(parents=True, exist_ok=True)
         space_env["session"].write_text(
-            json.dumps({"active_space": "空间A"}), encoding="utf-8")
+            json.dumps({"actives": {"space": "空间A"}}), encoding="utf-8")
         db = ReferenceDatabase(dev_mode=True)
         img = np.zeros((2, 2, 3), dtype=np.uint8)
         entry = db.add_entry(label="甲", meta={"group": "g"}, image_data=img)

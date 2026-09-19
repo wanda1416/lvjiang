@@ -138,7 +138,6 @@ def test_editable_baseline_dps_recalibrates_graduation_rate(
     import lvjiang.apps.yysls.core.graduation as graduation
     import lvjiang.constants as constants
     import lvjiang.core.config.session as session_mod
-    from lvjiang.apps.yysls.config import session_node
 
     source = DATA_DIR / "鸣金·虹_基础方案.json"
     shutil.copy(source, tmp_path / source.name)
@@ -153,7 +152,6 @@ def test_editable_baseline_dps_recalibrates_graduation_rate(
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path)
     monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")
     monkeypatch.setattr(session_mod, "_store", None)
-    monkeypatch.setattr(session_node, "LEGACY_PATH", tmp_path / "yysls.json")
     invalidate_graduation_cache()
     try:
         attrs = get_graduation_scheme_combat_attrs("鸣金·虹", "基础方案")

@@ -32,20 +32,12 @@ from loguru import logger
 
 from ..fs_util import atomic_write_text
 
-DEFAULT_SESSION_VERSION = 1
-CURRENT_SESSION_VERSION = 2
+#: session.json 文档格式版本。v2 即 0.12.0 起的结构（users 为用户名列表、
+#: 激活项集中在 actives）；没有该字段的文档在首次写入时补上。
+SESSION_VERSION = 2
 
-# 旧顶层 active_* 键 → actives 子键。只有历史上真正写过顶层键的三项在此，
-# 新增的 kind 不要伪造 legacy key，加进 _ACTIVE_KINDS 即可。
-_ACTIVE_LEGACY_KEYS = {
-    "user": "active_user",
-    "layout": "active_layout",
-    "space": "active_space",
-}
-
-# 合法的激活项 kind。plan 是机器级方案（图库+环境+布局+模式的组合），
-# 与用户无关，没有旧顶层键。
-_ACTIVE_KINDS = frozenset(_ACTIVE_LEGACY_KEYS) | {"plan"}
+# 合法的激活项 kind。plan 是机器级方案（图库+环境+布局+模式的组合）。
+_ACTIVE_KINDS = frozenset({"user", "layout", "space", "plan"})
 
 # 只读实例仅隔离会改变“当前实例正在使用什么”的选择状态。未列出的节点和
 # 字段仍按普通 SessionStore 语义持锁、合并并原子落盘。
@@ -54,9 +46,6 @@ _ACTIVE_KINDS = frozenset(_ACTIVE_LEGACY_KEYS) | {"plan"}
 # 可写，只有确认属于实例私有选择时才允许加入这里。
 READONLY_TRANSIENT_PATHS: frozenset[tuple[str, ...]] = frozenset({
     ("actives",),
-    ("active_user",),
-    ("active_layout",),
-    ("active_space",),
     ("settings", "env"),
     ("daily", "workflow_id"),
     ("profile", "overview_active_group"),
@@ -172,6 +161,7 @@ class SessionStore:
             try:
                 disk_data = self._read_disk()
                 working = deepcopy(disk_data)
+                working.setdefault("version", SESSION_VERSION)
                 if readonly:
                     _overlay_readonly_transients(working, self._data)
                 result = mutator(working)
@@ -189,20 +179,7 @@ class SessionStore:
             finally:
                 self._file_lock.release()
 
-    def mutate_document(self, mutator: Callable[[dict], Any]) -> Any:
-        """在一次文件锁内修改整个 session 文档。
-
-        仅供需要跨多个顶层节点保持原子性的格式迁移使用；普通业务仍应使用
-        节点级 API，避免扩大写入所有权。
-        """
-        return self._mutate_disk(mutator)
-
     # ─── 节点读写 ────────────────────────────────────────
-
-    def snapshot(self) -> dict:
-        """返回当前完整文档的深拷贝，供格式迁移判断使用。"""
-        with self._thread_lock:
-            return deepcopy(self._data)
 
     def get_node(self, key: str, default: Any = None) -> Any:
         """读顶层节点（返回深拷贝，调用方改不坏内部态）"""
@@ -276,33 +253,25 @@ class SessionStore:
     # ─── 激活项（actives）─────────────────────────────────
 
     def get_active(self, kind: str, default: Any = None) -> Any:
-        """读取 ``actives.<kind>``，缺失时兼容旧顶层 ``active_<kind>``。"""
+        """读取 ``actives.<kind>``。"""
         if kind not in _ACTIVE_KINDS:
             raise KeyError(f"unknown active kind: {kind}")
         with self._thread_lock:
             actives = self._data.get("actives")
             if isinstance(actives, dict) and kind in actives:
                 return deepcopy(actives[kind])
-            legacy_key = _ACTIVE_LEGACY_KEYS.get(kind)
-            legacy = self._data.get(legacy_key) if legacy_key else None
-            return deepcopy(legacy) if legacy is not None else default
+            return default
 
     def set_active(self, kind: str, value: Any) -> None:
-        """写入一个激活项，并原子迁移、删除全部旧 ``active_*`` 顶层键。"""
+        """写入一个激活项。"""
         if kind not in _ACTIVE_KINDS:
             raise KeyError(f"unknown active kind: {kind}")
 
         def _set(data: dict) -> None:
             current = data.get("actives")
             actives = deepcopy(current) if isinstance(current, dict) else {}
-            # 写任意一项时先保全其余旧值，再统一删除旧键。
-            for active_kind, legacy_key in _ACTIVE_LEGACY_KEYS.items():
-                if active_kind not in actives and legacy_key in data:
-                    actives[active_kind] = deepcopy(data[legacy_key])
             actives[kind] = deepcopy(value)
             data["actives"] = actives
-            for legacy_key in _ACTIVE_LEGACY_KEYS.values():
-                data.pop(legacy_key, None)
 
         self._mutate_disk(_set)
 
@@ -391,20 +360,19 @@ def save_settings(settings: dict[str, Any]) -> None:
 
 
 def load_reference_grid() -> dict[str, Any]:
-    """读取 settings.reference_grid；废弃键不参与回退。"""
+    """读取 settings.reference_grid。"""
     value = load_settings().get("reference_grid")
     return value if isinstance(value, dict) else {}
 
 
 def save_reference_grid(grid: dict[str, Any]) -> None:
-    """保存参考图网格，并清除同节点中已废弃的 material_grid 键。
+    """保存参考图网格。
 
     ⚠️ 使用 mutate_node 确保并发安全，禁止直接 load+save 模式
     """
     def _merge(existing):
         existing = existing if isinstance(existing, dict) else {}
         existing["reference_grid"] = grid
-        existing.pop("material_grid", None)
         return existing
 
     get_session_store().mutate_node("settings", _merge)

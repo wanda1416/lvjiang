@@ -94,7 +94,7 @@ class User:
             {str(k): str(v) for k, v in raw_attributes.items() if k}
             if isinstance(raw_attributes, dict) else {}
         )
-        name = str(data.get("username") or data.get("name") or fallback_name)
+        name = str(data.get("username") or fallback_name)
         return User(
             name=name,
             created_at=str(data.get("created_at", "")),

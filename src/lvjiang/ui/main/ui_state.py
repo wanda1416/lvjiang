@@ -55,47 +55,6 @@ class _FlowContainer(QWidget):
 class UiStateMixin:
     """UI 状态与日常页配置持久化混入类"""
 
-    @staticmethod
-    def _migrate_ui_state():
-        """一次性迁移：旧扁平 ui_state → 按页面归档嵌套结构"""
-        from ...core.config import get_session_store
-        store = get_session_store()
-        state = store.get_node("ui_state", {})
-        if not isinstance(state, dict) or "main_page" in state:
-            return  # 已是新格式或为空
-
-        migrated = False
-
-        # main_page
-        old_main_keys = {"window_size", "splitter_sizes"}
-        if any(k in state for k in old_main_keys):
-            page = {}
-            for k in old_main_keys:
-                if k in state:
-                    page[k] = state.pop(k)
-            state["main_page"] = page
-            migrated = True
-
-        # scene_editor
-        se_prefix = "scene_editor_"
-        se_keys = [k for k in state if k.startswith(se_prefix)]
-        if se_keys:
-            se = state.get("scene_editor", {})
-            for k in se_keys:
-                se[k[len(se_prefix):]] = state.pop(k)
-            state["scene_editor"] = se
-            migrated = True
-
-        # reference_manager
-        if "reference_manager_size" in state:
-            rm = state.get("reference_manager", {})
-            rm["size"] = state.pop("reference_manager_size")
-            state["reference_manager"] = rm
-            migrated = True
-
-        if migrated:
-            store.set_node("ui_state", state)
-
     def _restore_ui_state(self):
         """启动时恢复窗口大小、左右分栏比例和当前 Tab 页签"""
         from ...core.config import load_ui_page_state

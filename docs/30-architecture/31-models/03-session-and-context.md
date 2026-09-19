@@ -133,7 +133,7 @@ eval save()
 ```
 config/session/
 ├── session.json                       ← SessionStore：core/插件的 App/UI 层持久状态
-│                                          （active_user、daily 脚本配置、settings…，
+│                                          （actives、daily 脚本配置、settings…，
 │                                          经 core.config.session 读写，不经 DSL）
 ├── profile.db                          ← SQLite：quota/regen/stock/note 四模型的
 │                                          玩家数据（见 02-player-profile.md）
@@ -155,10 +155,6 @@ config/session/
 - `users/{username}.json`：用户资料，包括账号名、角色名、角色序号和账号尾号；
 - `users/{username}.session.json`：工作流通过 `session` 关键字维护的持久状态；
 - `users/{username}.notes.json`、`users/{username}.loadouts.json`：各自功能的旁路数据。
-
-旧版本把用户对象放在 `session.json.users`、把工作流状态放在
-`users/{username}.json`，并把用户属性放在批量配置行中。启动时的一次性迁移
-先备份旧 `session.json`，再拆分这些文件，最后写入迁移标记。
 
 ---
 

@@ -1,7 +1,7 @@
 """转律建议页：按需计算、卡片黄字目标、应用与清除、假设复选框。"""
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QLabel, QPushButton
+from PyQt6.QtWidgets import QLabel, QPushButton, QScrollArea
 
 from lvjiang.apps.yysls.core.graduation.affix_impact import AffixImpactReport
 from lvjiang.apps.yysls.core.graduation.assumptions import Assumptions
@@ -73,6 +73,21 @@ def test_opening_pages_runs_nothing_until_asked(qtbot):
     pages.ensure_built(pages.suggestion_page)
     assert calls["report"] == 1
     assert calls["search"] == 0
+
+
+def test_transmute_actions_stay_above_dynamic_content(qtbot):
+    """三个操作按钮属于顶部操作栏，不能被动态状态和卡片区推到底部。"""
+    pages = AffixAnalysisPages(
+        "鸣金·虹", "基础方案", equipped=_equipped(),
+        transmute_runner=lambda _stop, _assumptions: _result(),
+    )
+    qtbot.addWidget(pages)
+    layout = pages.transmute_page.layout()
+    assert layout is not None
+    assert layout.itemAt(0).widget() is pages._transmute_actions
+    scroll = pages.transmute_page.findChild(QScrollArea)
+    assert scroll is not None
+    assert layout.indexOf(pages._transmute_actions) < layout.indexOf(scroll)
 
 
 def test_run_renders_yellow_target_and_enables_apply(qtbot):

@@ -276,6 +276,36 @@ class AffixAnalysisPages(QWidget):
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
 
+        self._transmute_actions = QWidget()
+        self._transmute_actions.setObjectName("transmuteActions")
+        buttons = QHBoxLayout(self._transmute_actions)
+        buttons.setContentsMargins(0, 0, 0, 0)
+        buttons.addStretch()
+        self._transmute_run = QPushButton(tr("计算"))
+        self._transmute_run.setObjectName("transmuteRunButton")
+        self._transmute_run.setEnabled(self._transmute_runner is not None)
+        self._transmute_run.clicked.connect(self._start_transmute)
+        self._transmute_cancel = QPushButton(tr("取消计算"))
+        self._transmute_cancel.setObjectName("transmuteCancelButton")
+        self._transmute_cancel.setEnabled(False)
+        self._transmute_cancel.clicked.connect(self._cancel_transmute)
+        self._transmute_apply = QPushButton(tr("应用"))
+        self._transmute_apply.setObjectName("transmuteApplyButton")
+        self._transmute_apply.setToolTip(
+            tr("把推荐目标写入备战方案的装备卡片；目标属于公共装备，"
+               "会影响所有引用这些装备的方案"))
+        self._transmute_apply.setEnabled(False)
+        self._transmute_apply.clicked.connect(self._apply_transmute)
+        # 三个按钮同一套几何与语义配色：主动作、中性、主动作
+        apply_button_style(self._transmute_run, self._transmute_apply,
+                           variant="action")
+        apply_button_style(self._transmute_cancel, variant="neutral")
+        for button in (self._transmute_run, self._transmute_cancel,
+                       self._transmute_apply):
+            button.setMinimumWidth(100)
+            buttons.addWidget(button)
+        layout.addWidget(self._transmute_actions)
+
         metrics = QHBoxLayout()
         metrics.setSpacing(10)
         self._transmute_baseline = self._metric_card(
@@ -326,33 +356,6 @@ class AffixAnalysisPages(QWidget):
             grid.setColumnStretch(col, 1)
         scroll.setWidget(content)
         layout.addWidget(scroll, 1)
-
-        buttons = QHBoxLayout()
-        buttons.addStretch()
-        self._transmute_run = QPushButton(tr("计算"))
-        self._transmute_run.setObjectName("transmuteRunButton")
-        self._transmute_run.setEnabled(self._transmute_runner is not None)
-        self._transmute_run.clicked.connect(self._start_transmute)
-        self._transmute_cancel = QPushButton(tr("取消计算"))
-        self._transmute_cancel.setObjectName("transmuteCancelButton")
-        self._transmute_cancel.setEnabled(False)
-        self._transmute_cancel.clicked.connect(self._cancel_transmute)
-        self._transmute_apply = QPushButton(tr("应用"))
-        self._transmute_apply.setObjectName("transmuteApplyButton")
-        self._transmute_apply.setToolTip(
-            tr("把推荐目标写入备战方案的装备卡片；目标属于公共装备，"
-               "会影响所有引用这些装备的方案"))
-        self._transmute_apply.setEnabled(False)
-        self._transmute_apply.clicked.connect(self._apply_transmute)
-        # 三个按钮同一套几何与语义配色：主动作、中性、主动作
-        apply_button_style(self._transmute_run, self._transmute_apply,
-                           variant="action")
-        apply_button_style(self._transmute_cancel, variant="neutral")
-        for button in (self._transmute_run, self._transmute_cancel,
-                       self._transmute_apply):
-            button.setMinimumWidth(100)
-            buttons.addWidget(button)
-        layout.addLayout(buttons)
         return container
 
     def _set_transmute_basis(self, labels: tuple[str, ...]) -> None:

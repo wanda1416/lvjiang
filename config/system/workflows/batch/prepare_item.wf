@@ -9,9 +9,17 @@
 #%     default: 600
 #%     min: 0
 #%     max: 3600
+#%   - name: restart_app_if_not_login
+#%     label: 不在登录页时重启应用
+#%     type: bool
+#%     default: false
 # 批量条目准备：从登录页切换到当前用户并进入游戏。
 
 import "subcall/login.wf"
+
+if $restart_app_if_not_login
+    call ensure_login_page_by_restart("yyslscn")
+end
 
 eval $username = $batch_users.$batch_index
 call $result = prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait)

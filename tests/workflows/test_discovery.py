@@ -68,6 +68,7 @@ class TestDiscoverWfScripts:
             "#% name: 测试流程\n"
             "#% runnable: true\n"
             "#% batchable: true\n"
+            "#% batch_check: check_batch\n"
             "#% note: 运行前请确认页面。\n"
             "#% parameters:\n"
             "#%   - name: target\n"
@@ -80,6 +81,7 @@ class TestDiscoverWfScripts:
         assert result["test_flow"]["note"] == "运行前请确认页面。"
         assert result["test_flow"]["wf_file"] == "test_flow.wf"
         assert result["test_flow"]["batchable"] is True
+        assert result["test_flow"]["batch_check"] == "check_batch"
         assert len(result["test_flow"]["parameters"]) == 1
 
     def test_unicode_filename_is_a_valid_default_id(self, tmp_path, monkeypatch):

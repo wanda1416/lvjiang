@@ -59,6 +59,7 @@ class BatchScript:
     scope: str = "daily"    # 任务定义性质；daily / dedicated 都进入历史
     parameters: list[dict] | None = None  # 仅参数定义，不携带任何参数值
     env: list[str] | None = None  # 脚本级可运行环境，启动前二次校验
+    batch_check: str = ""  # 批量执行前调用的 wf 内部子过程；空表示直接执行
 
 
 @dataclass(frozen=True)
@@ -95,6 +96,13 @@ class BatchStageResult:
     status: str = RESULT_SUCCESS
     message: str = ""
     state: dict | None = None
+
+
+@dataclass(frozen=True)
+class BatchCheckResult:
+    """业务 wf 的批量可执行性判定结果。"""
+    status: str = RESULT_SUCCESS
+    message: str = ""
 
 
 class BatchWorker(QThread):
@@ -342,6 +350,42 @@ class BatchWorker(QThread):
 
             report.start_entry(label, username)
 
+            # 每个用户、每轮都重新询问业务 wf 自己声明的可执行性。判定发生在
+            # 条目准备之前，因此 profile 已满足条件时不会为了“发现无需执行”
+            # 而启动或登录客户端。
+            check_results: list[tuple[BatchScript, BatchCheckResult]] = []
+            for script in self._scripts:
+                if self._stop_check():
+                    self._stopped = True
+                    break
+                planned = self._task_plan[(run_idx, script.id)]
+                checked = self._check_script(
+                    script, username, params=planned.params)
+                check_results.append((script, checked))
+
+            if self._stopped:
+                report.end_entry()
+                break
+            if not any(
+                checked.status == RESULT_SUCCESS
+                for _script, checked in check_results
+            ):
+                for script, checked in check_results:
+                    ui_status = self._result_to_ui_status(checked.status)
+                    entry_result["scripts"][script.id] = ui_status
+                    self.progress.emit(run_idx, label, script.id, ui_status)
+                    report.start_script(script.id, script.name)
+                    report.end_script(ui_status)
+                    reason = checked.message or checked.status
+                    self.log.emit(
+                        f"[批量] {label} → {script.name} "
+                        f"{'跳过' if checked.status == RESULT_SKIPPED else '检查失败'}: "
+                        f"{reason}")
+                report.record_prepare(ST_SKIPPED)
+                report.end_entry()
+                self.log.emit(f"[批量] {label} 没有可执行任务，忽略该用户")
+                continue
+
             prepared = BatchStageResult(state=batch_state)
             if use_lifecycle:
                 prepared = self._run_stage(
@@ -576,6 +620,25 @@ class BatchWorker(QThread):
         return BatchStageResult(status=status, message=message, state=state)
 
     @staticmethod
+    def _normalize_check_result(value) -> BatchCheckResult:
+        """校验业务 wf 的批量可执行性返回协议。"""
+        if not isinstance(value, dict):
+            return BatchCheckResult(
+                status=RESULT_FAILED,
+                message=tr("批量可执行性子过程必须返回 dict"),
+            )
+        status = value.get("status", RESULT_SUCCESS)
+        message = value.get("message", "")
+        if status not in {RESULT_SUCCESS, RESULT_SKIPPED}:
+            return BatchCheckResult(
+                status=RESULT_FAILED,
+                message=f"批量可执行性子过程返回了未知 status: {status!r}",
+            )
+        if not isinstance(message, str):
+            message = str(message)
+        return BatchCheckResult(status=status, message=message)
+
+    @staticmethod
     def _result_to_ui_status(status: str) -> str:
         return {
             RESULT_SUCCESS: ST_SUCCESS,
@@ -676,6 +739,54 @@ class BatchWorker(QThread):
                 status=RESULT_FAILED,
                 message=f"工作流异常: {e}",
                 state=batch_state,
+            )
+
+    def _check_script(
+        self,
+        script: BatchScript,
+        username: str,
+        *,
+        params: dict,
+    ) -> BatchCheckResult:
+        """调用业务 wf 元数据声明的批量可执行性子过程。
+
+        只加载 def/import，不执行 wf 顶层正文。未声明 ``batch_check`` 的任务
+        保持原行为；声明错误或检查异常按该任务检查失败处理，避免带病执行。
+        """
+        if not script.batch_check:
+            return BatchCheckResult()
+        if not script.wf_file or script.class_name:
+            return BatchCheckResult(
+                status=RESULT_FAILED,
+                message=tr("批量可执行性检查只支持 DSL 工作流"),
+            )
+
+        from ...workflows.discovery import resolve_workflow_path
+        wf_path, _resolved = resolve_workflow_path(script.wf_file, script.id)
+        if wf_path is None:
+            return BatchCheckResult(
+                status=RESULT_FAILED,
+                message=f"工作流文件不存在: {script.wf_file}",
+            )
+
+        engine = self._create_engine()
+        engine.session = {}
+        engine.run_username = username
+        engine.users_dir = self._session_manager._users_dir
+        engine.user_attributes_snapshot = copy.deepcopy(self._user_attributes)
+        engine.workflow_config_snapshot = copy.deepcopy(
+            self._workflow_configs.get(script.id, {}))
+        try:
+            engine.load_subcalls(wf_path)
+            value = engine.call_subcall(
+                script.batch_check, [copy.deepcopy(params)])
+            return self._normalize_check_result(value)
+        except Exception as exc:  # noqa: BLE001 — 单个任务的检查不得拖垮整批
+            logger.error(
+                f"批量可执行性检查失败 ({username}/{script.id}): {exc}")
+            return BatchCheckResult(
+                status=RESULT_FAILED,
+                message=f"可执行性检查异常: {exc}",
             )
 
     def _run_script(self, script: BatchScript, session: dict,

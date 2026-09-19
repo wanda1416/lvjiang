@@ -21,6 +21,7 @@ SAMPLE = """\
 #%   确认无弹窗后执行。
 #% runnable: true
 #% batchable: true
+#% batch_check: check_batch
 #% parameters:
 #%   - name: target_material
 #%     label: 目标材料
@@ -47,6 +48,7 @@ def test_parse_basic_fields():
     assert m["note"] == "请先打开装备页面。\n确认无弹窗后执行。"
     assert m["runnable"] is True
     assert m["batchable"] is True
+    assert m["batch_check"] == "check_batch"
     assert len(m["parameters"]) == 2
 
 
@@ -59,6 +61,12 @@ def test_script_id_accepts_unicode_letters():
 def test_script_id_still_rejects_non_identifier_shapes(script_id):
     with pytest.raises(WorkflowMetadataError, match="Unicode 字母"):
         parse_metadata(f"#% id: {script_id}\n")
+
+
+@pytest.mark.parametrize("value", ["", "2bad", "bad-name", []])
+def test_batch_check_must_be_a_subcall_name(value):
+    with pytest.raises(WorkflowMetadataError, match="batch_check"):
+        parse_metadata(f"#% batch_check: {value!r}\n")
 
 
 def test_runnable_defaults_to_false():

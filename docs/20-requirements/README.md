@@ -17,6 +17,7 @@
 | [07-in-match-navigation.md](07-in-match-navigation.md) | 局内地图目标闭环导航与撤离：渡尘墟、觉障林等玩法通用 | 部分实现（控制面、地图管理、朝向识别已落地） |
 | [08-smart-tuning.md](08-smart-tuning.md) | 智能调律：结合备战方案毕业率的二次调律处理与剩余词条推演 | 第一版已实现 |
 | [09-transmute-simulation.md](09-transmute-simulation.md) | 模拟转律：八件装备联合转律建议、公共装备目标保存、备战方案第四假设 | ✅ 已实现 |
+| [10-batch-task-eligibility.md](10-batch-task-eligibility.md) | 批量任务可执行性：业务 WF 前置判定、整用户跳过与生命周期边界 | ✅ 已实现 |
 
 ## 子需求
 

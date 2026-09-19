@@ -221,6 +221,27 @@ def test_metadata_panel_keeps_env_missing_from_app_config(qtbot, monkeypatch):
     assert parse_metadata(applied[0])["env"] == ["android"]
 
 
+def test_metadata_panel_preserves_batch_check(qtbot):
+    from lvjiang.ui.scripts.metadata_panel import MetadataPanel
+
+    panel = MetadataPanel()
+    qtbot.addWidget(panel)
+    panel.load_text(
+        "#% runnable: true\n#% batchable: true\n"
+        "#% batch_check: check_batch\n\n"
+        "def check_batch($params)\n"
+        "    return {\"status\": \"success\"}\n"
+        "end\n",
+        editable=True,
+    )
+    applied: list[str] = []
+    panel.text_applied.connect(applied.append)
+
+    panel._apply()
+
+    assert parse_metadata(applied[0])["batch_check"] == "check_batch"
+
+
 def test_recording_lands_in_result_pane_until_written(qtbot, tmp_path, monkeypatch):
     """录制占用中央页签；结果不自动改代码，写入后回到代码页。"""
     from lvjiang.core.config import resolver as resolver_module

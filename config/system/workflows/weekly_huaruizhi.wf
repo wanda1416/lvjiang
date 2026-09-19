@@ -1,6 +1,7 @@
 #% name: 周常花蕊织速刷
 #% runnable: true
 #% batchable: true
+#% batch_check: check_huaruizhi_batch
 #% env: [android]
 #% note: |-
 #%   同游 → 止戈 → 渡尘墟，用「单排-AI」托管对战刷花蕊织。
@@ -76,6 +77,16 @@ click [tongyou_main].[zhige_start] after wait @page_refresh
 log "AI 对战已开始，任务结束"
 wait (10,15)
 return 0
+
+# 批量调度专用：读取当前用户的缓存进度，决定本轮是否需要建立游戏现场。
+# 直接运行工作流只执行顶层正文，不会自动调用这个子过程。
+def check_huaruizhi_batch($params)
+    eval $huaruizhi_of_week = profile_get("huaruizhi_of_week")
+    if $huaruizhi_of_week >= 3000
+        return {"status": "skipped", "message": "本周花蕊织进度已满"}
+    end
+    return {"status": "success", "message": ""}
+end
 
 # ─── nav_main_to_duchenxu ──────────────────────────────
 # 主页 → 菜单 → 同游 → 止戈 → 渡尘墟

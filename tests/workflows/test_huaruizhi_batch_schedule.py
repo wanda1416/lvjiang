@@ -1,7 +1,7 @@
-"""花蕊织轮次调度生命周期工作流的行为回归。
+"""花蕊织批量判定与通用生命周期工作流的行为回归。
 
-条目准备与 login.wf 的公共登录页恢复过程要在四种现场下做出不同动作：
-进度已满直接跳过、
+业务 wf 的批量检查在准备前读取进度；通用条目准备按参数选择登录页恢复：
+进度已满直接跳过整个用户、
 已经在登录页就直接登录、进程不在时启动、进程仍在但不在登录页时重启。
 
 启动后不等稳定帧——登录页背景动画常驻，根本不存在稳定帧，只能轮询
@@ -21,7 +21,8 @@ from lvjiang.workflows.metadata import parse_metadata_file
 from tests.workflows.conftest import make_engine
 
 _BATCH_DIR: Path = SYSTEM_CONFIG_DIR / "workflows" / "batch"
-_PREPARE = _BATCH_DIR / "prepare_huaruizhi.wf"
+_PREPARE = _BATCH_DIR / "prepare_item.wf"
+_HUARUIZHI = SYSTEM_CONFIG_DIR / "workflows" / "weekly_huaruizhi.wf"
 _LOGIN = SYSTEM_CONFIG_DIR / "workflows" / "subcall" / "login.wf"
 _FINISH = _BATCH_DIR / "finish_item.wf"
 
@@ -87,8 +88,23 @@ class _Device:
         return [call[0] for call in self.calls if call[0] in watched]
 
 
-def _run_prepare(device: _Device) -> dict:
-    """执行 prepare_huaruizhi.wf 的主流程，返回它的返回协议字典。"""
+def _run_batch_check(device: _Device) -> dict:
+    """只调用业务 wf 声明的批量检查，不执行顶层正文。"""
+    program = parse_text(_HUARUIZHI.read_text(encoding="utf-8"))
+    engine = make_engine(
+        layout=load_layout_by_key("android"),
+        delay_params=load_user_config().delay_params,
+        run_env="android",
+    )
+    device.install(engine)
+    engine._procs = dict(program.procs)
+    return_value, _output = engine._run_proc(
+        program.procs["check_huaruizhi_batch"], [{}])
+    return return_value
+
+
+def _run_prepare(device: _Device, *, restart_app: bool) -> dict:
+    """执行通用 prepare_item.wf，返回它的批量生命周期协议字典。"""
     program = parse_text(_PREPARE.read_text(encoding="utf-8"))
     engine = make_engine(
         layout=load_layout_by_key("android"),
@@ -113,6 +129,7 @@ def _run_prepare(device: _Device) -> dict:
     engine.variables = {
         "batch_users": ["u1"], "batch_index": 0, "batch_state": {},
         "skip_online_role": True, "online_role_max_wait": 0,
+        "restart_app_if_not_login": restart_app,
     }
     try:
         engine._exec_body(program.body)
@@ -144,7 +161,7 @@ def _run_finish(device: _Device, *, stop_app: bool) -> dict:
 def test_full_weekly_progress_skips_without_touching_the_client():
     """进度已满：直接跳过，连进程状态都不必查，更不能启动客户端。"""
     device = _Device(app_running=False, weekly_progress=3000)
-    result = _run_prepare(device)
+    result = _run_batch_check(device)
 
     assert result["status"] == "skipped"
     assert device.names() == ["profile_get"]
@@ -154,20 +171,29 @@ def test_login_page_skips_client_process_operations():
     """已经在登录页：不查询进程，也不重启客户端。"""
     device = _Device(
         app_running=True, weekly_progress=1200, in_login_page=True)
-    result = _run_prepare(device)
+    result = _run_prepare(device, restart_app=True)
 
     assert result["status"] == "success"
-    assert device.names() == ["profile_get"]
+    assert device.names() == []
+
+
+def test_prepare_keeps_legacy_manual_recovery_when_restart_is_disabled():
+    device = _Device(app_running=True, weekly_progress=0)
+
+    result = _run_prepare(device, restart_app=False)
+
+    assert result["status"] == "success"
+    assert device.names() == []
 
 
 def test_stopped_client_is_started_then_returned_to_login_page():
     """客户端不在：启动后轮询启动页返回按钮并点它，回到登录页。"""
     device = _Device(app_running=False, weekly_progress=0)
-    result = _run_prepare(device)
+    result = _run_prepare(device, restart_app=True)
 
     assert result["status"] == "success"
     assert device.names() == [
-        "profile_get", "app_is_running", "app_start",
+        "app_is_running", "app_start",
         "scan_image", "click",
     ]
     assert ("click", "game_login_page", "back") in device.calls
@@ -176,11 +202,11 @@ def test_stopped_client_is_started_then_returned_to_login_page():
 def test_running_client_outside_login_page_is_restarted():
     """进程存在不代表在登录页；其他页面必须重启以恢复确定的登录现场。"""
     device = _Device(app_running=True, weekly_progress=1200)
-    result = _run_prepare(device)
+    result = _run_prepare(device, restart_app=True)
 
     assert result["status"] == "success"
     assert device.names() == [
-        "profile_get", "app_is_running", "app_stop",
+        "app_is_running", "app_stop",
         "app_start", "scan_image", "click",
     ]
 
@@ -189,7 +215,7 @@ def test_startup_back_button_never_appears_falls_back_to_manual():
     """一直找不到返回按钮时必须停下来求助，而不是继续往登录流程里冲。"""
     device = _Device(
         app_running=False, weekly_progress=0, startup_back=False)
-    _run_prepare(device)
+    _run_prepare(device, restart_app=True)
 
     assert "pause" in device.names()
     assert ("click", "game_login_page", "back") not in device.calls
@@ -228,3 +254,11 @@ def test_declared_parameters_match_the_variables_used(path):
     }
     for name in declared:
         assert f"${name}" in source, f"{path.name} 声明了 {name} 却没有使用"
+
+
+def test_huaruizhi_metadata_points_to_declared_batch_check():
+    metadata = parse_metadata_file(_HUARUIZHI)
+    program = parse_text(_HUARUIZHI.read_text(encoding="utf-8"))
+
+    assert metadata["batch_check"] == "check_huaruizhi_batch"
+    assert metadata["batch_check"] in program.procs

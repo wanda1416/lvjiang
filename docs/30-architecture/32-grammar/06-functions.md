@@ -9,20 +9,20 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | [06.1-basic-functions.md](06.1-basic-functions.md) | 基础函数：算术运算、字典/列表操作、字符串处理 |
 | [06.2-system-interaction.md](06.2-system-interaction.md) | 用户交互、系统、应用生命周期、运行环境与后端、玩家档案 |
 | [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数：装备处理、背包遍历与游标、装备入库、基础属性表单 |
-| [06.4-vision-functions.md](06.4-vision-functions.md) | 图色函数：取色、色占比、亮段、色心方位、同色图标、多点找色 |
+| [06.4-vision-functions.md](06.4-vision-functions.md) | 图色函数：取色、像素规则占比、亮段、色心方位、同色图标、多点找色 |
 
 ---
 
 ## 速查表
 
-共 **84 个**内置函数（core 67 个 + yysls 插件 17 个），按功能分为 13 类。
+共 **85 个**内置函数（core 68 个 + yysls 插件 17 个），按功能分为 13 类。
 
 > 本节列表与注册表一致，核对方式：
 >
 > ```python
 > from lvjiang.workflows import builtins as b
 > import lvjiang.apps.yysls.workflows.builtins  # 触发插件注册
-> print(sorted(b.list_functions()))           # → 84 个
+> print(sorted(b.list_functions()))           # → 85 个
 > ```
 
 ### 基础运算（8）
@@ -167,13 +167,14 @@ if is_device()
 end
 ```
 
-### 图色（7）
+### 图色（8）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
 | `pixel` | `(ref) -> [r, g, b]` | 取坐标中心点颜色 |
 | `bright` | `(ref) -> int` | 中心点亮度 r+g+b（0–765） |
 | `color_ratio` | `(rect, "#rrggbb", tol) -> float` / `(rect, "#lo", "#hi") -> float` | 区域内目标色像素占比 |
+| `pixel_ratios` | `(rect, rules, step?) -> {name: float}` | 一帧内按多组通道关系统计像素占比 |
 | `bright_segs` | `(rect, on_min, off_max) -> int` | 沿区域中线数亮→暗跳变次数 |
 | `color_vec` | `(rect, center, c_lo, c_hi, margin, channel?, min_r?, max_r?, step?) -> {deg, count} \| null` | 主导通道像素相对中心的合成方位角 |
 | `find_icons` | `(rect, channel, c_min, margin1, margin2?, o_max?, min_area?, min_bbox?, c_max?) -> [FoundRegion]` | 同色连通块（可 click），按面积降序 |

@@ -32,7 +32,7 @@
 | [06.1-basic-functions.md](06.1-basic-functions.md) | 基础函数：算术、字典/列表、字符串 |
 | [06.2-system-interaction.md](06.2-system-interaction.md) | 系统与交互函数 |
 | [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数 |
-| [06.4-vision-functions.md](06.4-vision-functions.md) | 图色函数：取色、色占比、亮段、色心方位、同色图标、多点找色 |
+| [06.4-vision-functions.md](06.4-vision-functions.md) | 图色函数：取色、像素规则占比、亮段、色心方位、同色图标、多点找色 |
 | [07-subworkflows.md](07-subworkflows.md) | 模块化：import/def/call、变量隔离 |
 | [07.1-metadata.md](07.1-metadata.md) | `.wf` 文件头元数据与外部参数声明 |
 | [08-examples.md](08-examples.md) | 完整示例 |

@@ -1,0 +1,55 @@
+#% name: 视觉状态判断子过程
+
+# 基于区域像素的通道关系判断业务视觉状态。两个过程目前仅作为公共能力
+# 提供，不由现有江湖号令或装备扫描流程导入；待实机样本验证阈值后再替换
+# 旧判定。
+
+# 江湖号令任务卡状态。
+# label_region 应传入任务卡的 label 区域，例如：
+#   [activity_jianghu].$card.[label]
+# 完成态的金色遮罩随亮度变化，因此使用 R/G/B 相对关系而非精确 RGB。
+# 返回 completed / incomplete / unknown。
+def detect_jianghu_card_state($label_region)
+    eval $ratios = pixel_ratios($label_region, {
+        "gold": {
+            "r_min": 100,
+            "g_min": 90,
+            "r_g_min": -5,
+            "g_b_min": 8
+        }
+    }, 2)
+    if $ratios.gold >= 0.30
+        return "completed"
+    end
+    if $ratios.gold <= 0.10
+        return "incomplete"
+    end
+    return "unknown"
+end
+
+# 装备锁定状态。
+# lock_region 应传入 [equip_detail].[lock]。阈值与当前 Python 判定保持一致：
+# 先确认区域有足够前景，再按红色主导像素比例区分锁定与未锁定。
+# 返回 locked / unlock / unknown。
+def detect_equipment_lock_state($lock_region)
+    eval $ratios = pixel_ratios($lock_region, {
+        "foreground": {
+            "max_rgb_min": 50
+        },
+        "locked_red": {
+            "r_min": 50,
+            "r_g_min": 10,
+            "r_b_min": 10
+        }
+    })
+    if $ratios.foreground < 0.10
+        return "unknown"
+    end
+    if $ratios.locked_red >= 0.10
+        return "locked"
+    end
+    if $ratios.locked_red <= 0.02
+        return "unlock"
+    end
+    return "unknown"
+end

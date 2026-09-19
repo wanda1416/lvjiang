@@ -61,12 +61,14 @@ def test_combat_panel_uses_active_season_resistances() -> None:
     assert CombatAttrsTab._current_resistances() == (145.0, 15.0)
 
 
-def test_judgment_card_menu_toggles_shared_yellow_display(monkeypatch) -> None:
+def test_judgment_and_gain_cards_share_yellow_display_menu(monkeypatch) -> None:
     labels = []
     toggles = []
+    parents = []
 
     class FakeMenu:
         def __init__(self, _parent):
+            parents.append(_parent)
             self.action = object()
 
         def addAction(self, label):
@@ -83,6 +85,7 @@ def test_judgment_card_menu_toggles_shared_yellow_display(monkeypatch) -> None:
 
     fake = type("FakeCombatTab", (), {})()
     fake._judgment_card = FakeCard()
+    fake._gain_card = FakeCard()
     fake._resistance_only = False
     fake._set_resistance_only = toggles.append
     monkeypatch.setattr(
@@ -92,13 +95,15 @@ def test_judgment_card_menu_toggles_shared_yellow_display(monkeypatch) -> None:
 
     CombatAttrsTab._show_judgment_display_menu(fake, object())
     fake._resistance_only = True
-    CombatAttrsTab._show_judgment_display_menu(fake, object())
+    CombatAttrsTab._show_judgment_display_menu(
+        fake, object(), fake._gain_card)
 
     assert labels == [
         "仅展示黄字三率和增效",
         "展示白字和黄字三率和增效",
     ]
     assert toggles == [True, False]
+    assert parents == [fake._judgment_card, fake._gain_card]
 
 
 def test_yellow_display_toggle_refreshes_and_persists_once() -> None:

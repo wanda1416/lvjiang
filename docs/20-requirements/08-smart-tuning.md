@@ -127,6 +127,7 @@ smart_tuning:
   failure_action:
     enabled: true
     action: skip             # continue/reset/recycle/skip/tune_full_recycle
+    keep_min_rating: excellent  # 调满后回收专用：junk/normal/excellent/top
 ```
 
 配置缺失时公共能力等价于 `enabled: true`，不编写自动迁移逻辑。
@@ -162,6 +163,10 @@ smart_tuning:
 
 - `[] 启用无法提升后的处理`
 - 动作：继续调律、重置、回收、跳过、调满后回收。
+- 仅当动作选择“调满后回收”时，显示附属项
+  `强制保留 [顶级/优秀/一般/垃圾] 及以上装备`，默认“优秀”。装备调满后
+  使用本次传入的当前调律规则重新判定；评级达到门槛时跳过回收并保留装备。
+  此门槛只属于智能调律失败动作，不改变基础规则表中“调满后回收”的原有语义。
 
 收益判断和失败动作分别带启用开关，允许先观察计算结果而不改变实际流程：
 
@@ -466,7 +471,7 @@ candidate_max_rate + epsilon >= plan_max_rate
 | `reset` | 使用现有重置执行器；成功后重新运行智能判断 |
 | `recycle` | 退出调律页后回收当前装备 |
 | `skip` | 结束并保留当前装备 |
-| `tune_full_recycle` | 进入现有调满后回收模式，后续不再运行智能判断 |
+| `tune_full_recycle` | 进入调满后回收模式，后续不再运行智能判断；调满后若当前规则评级达到附属保留门槛则保留，否则回收 |
 
 智能调律处理只复用动作执行能力，不改变现有调律处理规则，也不归属于基础规则组。
 `reset` 的次数限制和耗尽处置沿用当前运行所选基础规则组。

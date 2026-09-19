@@ -34,7 +34,10 @@ from lvjiang.apps.yysls.workflows.implementations.bag_traversal import (
     PositionalTraversal,
     ScrollState,
 )
-from lvjiang.apps.yysls.workflows.implementations.tuning import TuningRecorder
+from lvjiang.apps.yysls.workflows.implementations.tuning import (
+    TuningMode,
+    TuningRecorder,
+)
 from lvjiang.apps.yysls.workflows.implementations.tuning import (
     executor as tuning_executor,
 )
@@ -1537,6 +1540,45 @@ def test_tune_recycles_after_hit(monkeypatch, action, expected_rounds):
     assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 1
     items = wf.output["recycled_items"]
     assert len(items) == 1 and items[0]["stage"] == "tune"
+
+
+@pytest.mark.parametrize("rating, expected_action", [
+    ("top", "skip"),
+    ("excellent", "skip"),
+    ("normal", "recycle"),
+    (None, "recycle"),
+])
+def test_smart_tune_full_recycle_keeps_configured_rating_and_above(
+        rating, expected_action):
+    """智能调满回收在最终回收前，按当前规则评级执行强制保留。"""
+    wf = FakeWF()
+    wf.equipment_session.mode = TuningMode.TUNE_FULL_RECYCLE
+    wf.equipment_session.tune_full_recycle_keep_min_rating = "excellent"
+    wf.equipment_session.expected_rating = rating
+    equip_data = EquipmentData.from_dict(_equip(5))
+
+    action, reason, resets, count = wf._execute_tuning_processing(
+        TuneBehavior(), equip_data, 5, 0, list(equip_data.affixes),
+        is_initial=False)
+
+    assert action == expected_action
+    assert resets == 0 and count == 5
+    if expected_action == "skip":
+        assert "强制保留门槛" in reason
+
+
+def test_base_rule_tune_full_recycle_keeps_legacy_unconditional_recycle():
+    """基础规则表进入的调满后回收没有智能附属门槛，维持原行为。"""
+    wf = FakeWF()
+    wf.equipment_session.mode = TuningMode.TUNE_FULL_RECYCLE
+    wf.equipment_session.expected_rating = "top"
+    equip_data = EquipmentData.from_dict(_equip(5))
+
+    action, *_ = wf._execute_tuning_processing(
+        TuneBehavior(), equip_data, 5, 0, list(equip_data.affixes),
+        is_initial=False)
+
+    assert action == "recycle"
 
 
 def test_tune_locked_equipment_closes_recycle_menu_without_recycling(

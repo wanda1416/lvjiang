@@ -92,6 +92,7 @@ def test_parse_smart_tuning_public_capability_defaults_to_enabled(
     assert parsed.smart_tuning.evaluation.operator == "gt"
     assert parsed.smart_tuning.evaluation.precision == 0.001
     assert parsed.smart_tuning.failure_action.action == "skip"
+    assert parsed.smart_tuning.failure_action.keep_min_rating == "excellent"
 
 
 def test_parse_smart_tuning_rejects_unknown_operator(base_tune_config):
@@ -109,6 +110,26 @@ def test_parse_smart_tuning_rejects_unknown_precision(base_tune_config):
         "evaluation": {"enabled": True, "precision": 0.005},
     }
     with pytest.raises(ValueError, match="precision"):
+        parse_tune_config(base_tune_config)
+
+
+def test_parse_smart_tuning_keep_min_rating(base_tune_config):
+    base_tune_config["smart_tuning"] = {
+        "failure_action": {
+            "action": "tune_full_recycle",
+            "keep_min_rating": "top",
+        },
+    }
+    parsed = parse_tune_config(base_tune_config)
+    assert parsed.smart_tuning.failure_action.keep_min_rating == "top"
+
+
+def test_parse_smart_tuning_rejects_unknown_keep_min_rating(
+        base_tune_config):
+    base_tune_config["smart_tuning"] = {
+        "failure_action": {"keep_min_rating": "great"},
+    }
+    with pytest.raises(ValueError, match="keep_min_rating"):
         parse_tune_config(base_tune_config)
 
 

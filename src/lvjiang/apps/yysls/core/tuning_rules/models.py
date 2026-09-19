@@ -800,6 +800,7 @@ class SmartTuningFailureAction:
 
     enabled: bool = True
     action: str = "skip"
+    keep_min_rating: str = "excellent"
 
 
 @dataclass

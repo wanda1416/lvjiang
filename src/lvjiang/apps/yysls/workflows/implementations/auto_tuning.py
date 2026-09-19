@@ -1558,6 +1558,19 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         # 调满后回收模式：跳过规则判定，调满即回收
         if self.equipment_session.tune_full_recycle and not is_initial:
             if full:
+                keep_min = (
+                    self.equipment_session.tune_full_recycle_keep_min_rating)
+                current = self.equipment_session.expected_rating
+                if (keep_min in RATING_RANK and current in RATING_RANK
+                        and RATING_RANK[current] >= RATING_RANK[keep_min]):
+                    current_label = RATING_LABELS.get(current, current)
+                    keep_label = RATING_LABELS.get(keep_min, keep_min)
+                    why = (
+                        "调满后回收模式：当前规则判定为"
+                        f"{current_label}，达到强制保留门槛"
+                        f"（≥{keep_label}），跳过回收")
+                    logger.info(f"  [{prefix}] {why}")
+                    return "skip", why, resets_used, affix_count
                 why = "调满后回收模式：词条已满，执行回收"
                 logger.info(f"  [{prefix}] {why}")
                 return "recycle", why, resets_used, affix_count
@@ -1899,6 +1912,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             return reset_action, reset_why, resets_used, affix_count
         if action == "tune_full_recycle":
             self.equipment_session.mode = TuningMode.TUNE_FULL_RECYCLE
+            self.equipment_session.tune_full_recycle_keep_min_rating = (
+                config.keep_min_rating)
             self._emit_smart_final(
                 decision_record["plans"], checkpoint, action)
             return "continue", why, resets_used, affix_count

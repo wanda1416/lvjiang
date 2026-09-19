@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from types import SimpleNamespace
 
-from lvjiang.apps.yysls.profile import periods
+from lvjiang.apps.yysls.core import season_periods as periods
 from lvjiang.core.profile.periods import get_profile_period
 
 

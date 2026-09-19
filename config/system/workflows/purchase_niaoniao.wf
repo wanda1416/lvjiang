@@ -1,0 +1,136 @@
+#% name: 购买袅袅之音·绑
+#% runnable: true
+#% batchable: true
+#% env: [android]
+#% parameters:
+#%   - name: max_scroll
+#%     label: 最大滚动查找次数
+#%     type: int
+#%     default: 12
+
+# 在「商店 - 精选 - 道具」网格中查找并购买「袅袅之音·绑」（周库存有限）。
+#
+# 安全约束（最高优先级）：商店里同时存在两个易混物品——
+#   · 袅袅之音      —— 花真钱 RMB 的付费版，绝不能买；
+#   · 袅袅之音·绑   —— 游戏内货币兑换的绑定版，本流程目标。
+# 为杜绝误买，设两道闸，任一不过都绝不点「购买」：
+#   1) 网格用 find 命中含「绑」字的物品文字，按文字精确 bbox 点击。
+#      （items 面板定义偏宽、行高实际约为面板的 0.7，故不能用
+#       items[r][c] 网格索引点击，只能 find 文字精确点击。）
+#   2) 点开右侧购买面板后，强制校验 item_name 同时含「袅袅」和「绑」，
+#      不满足立即中止、回退，绝不点「购买」。
+#
+# 路径：菜单 → 商店 → 精选 → 道具（默认落在「江湖百珍」子页）→ 半行滚动查找 → 购买
+#
+# 滚动步长：每步 drag items up 0.5（约半行），保证物品不被整行跳过、
+# 且始终有可见行供 find 命中。
+#
+# 周额度与货币（profile 门控）：niaoniao_of_week 记录本周已购「绑」数（cap 2）。
+# 开头先读它，>= 2 直接跳过；再按长鸣玉 changmingyu 余额（每个 200）确认买满
+# 剩余够钱才执行；买成后按本次个数把 niaoniao_of_week 累加回去，周周期自动清零。
+
+import "subcall/navigation.wf"
+import "subcall/page_detection.wf"
+import "subcall/page_action.wf"
+
+# 参数缺省回落（批量注入缺失时用默认值）
+default $max_scroll = 2
+
+# ─── profile 依赖与本周额度检查（买满或长鸣玉不足则整段跳过） ───
+# niaoniao_of_week：本周已购「绑」数量（quota，周周期自动清零，cap 2）。
+# changmingyu：长鸣玉余额（stock），袅袅之音·绑 每个 200。
+# 本周已买满 2 个、或长鸣玉不足以买满剩余，则不导航直接跳过。
+eval profile_declare("quota", "niaoniao_of_week", {"label": "袅袅本周", "cap": 2, "increment_only": true, "sources": ["商店精选"]})
+eval profile_declare("stock", "changmingyu", {"label": "长鸣玉"})
+
+eval $bought_week = profile_get("niaoniao_of_week")
+if $bought_week == null
+    eval $bought_week = 0
+end
+if $bought_week >= 2
+    log "本周袅袅之音·绑已买满（niaoniao_of_week=" + $bought_week + " >= 2），跳过购买"
+    return 0
+end
+
+# 本次买满周库存剩余，逐个 200 长鸣玉
+eval $want = 2 - $bought_week
+eval $cost = $want * 200
+eval $cmyu = profile_get("changmingyu")
+if $cmyu != null and $cmyu < $cost
+    log "长鸣玉不足：买 " + $want + " 个需 " + $cost + "，现有 " + $cmyu + "，跳过购买"
+    return 0
+end
+
+# ─── 导航：菜单 → 商店 → 精选 → 道具 ────────────────────
+call $nav_result = nav_main_to_menu()
+if $nav_result < 0
+    return -1
+end
+
+# 菜单页 → 商店
+scan [game_menu_page].[shop] as $nav_check by contains "商店"
+if not $nav_check
+    eval pause("未找到「商店」入口，请确认在菜单页后点击继续")
+end
+click [game_menu_page].[shop] after wait @page_refresh
+
+# 进店默认在「推荐」，切到「精选」
+click [shop_detail].[jingxuan] after wait @page_refresh
+
+# 精选页左侧默认在「礼包」，切到「道具」
+click [shop_detail].[daoju] after wait @page_refresh
+
+# ─── 在道具网格中查找含「绑」的袅袅之音并购买 ───────────
+eval $bought = 0
+eval $tries = 0
+loop while $tries < $max_scroll
+    find [shop_detail].[items] as $found by contains "绑"
+    if $found
+        # 闸门一命中：按文字精确区域点击该物品，右侧弹出购买面板
+        click $found after wait @page_refresh
+        scan [general_purchase].[item_name] as $pn
+        # 闸门二：购买面板道具名必须同时含「袅袅」和「绑」
+        if $pn.item_name contains "绑" and $pn.item_name contains "袅袅"
+            # 周库存剩余 $want 个：点一次「添加全部」把数量加到最大，再一次买满
+            click [general_purchase].[add_max] after wait @step_interval
+            click [general_purchase].[purchase] after wait @step_interval
+            # 购买几个就给 niaoniao_of_week 加多少（quota 自动 clamp 到 cap 2）
+            eval profile_inc("niaoniao_of_week", $want)
+            log "已购买 " + $want + " 个 袅袅之音·绑，niaoniao_of_week 增加 " + $want
+            eval $bought = 1
+            break
+        else
+            # 命中的「绑」不是袅袅之音，或名称异常：绝不购买，回退中止
+            log error "购买面板道具名不合规（'" + $pn.item_name + "'），疑似误选，中止且不购买"
+            click [general_purchase].[back] after wait @step_interval
+            break
+        end
+    else
+        # 视野内无「绑」，向下滚动半行继续找
+        drag [shop_detail].[items] up 0.5 after wait @step_interval
+        eval $tries = $tries + 1
+    end
+end
+
+if not $bought
+    log "未购买 袅袅之音·绑（可能周库存已购满、货币不足，或滚动到尽头仍未命中）"
+end
+
+# ─── 返回主页 ──────────────────────────────────────────
+# 购买后无任何弹窗提示，但右侧购买面板可能仍开着（比网格多一层），
+# 故用检测式逐级回退：在菜单页点菜单返回，否则点商店返回，命中主页即停。
+eval $back_tries = 0
+loop while $back_tries < 5
+    call $in_main = is_in_main_page()
+    if $in_main
+        break
+    end
+    call $in_menu = is_in_menu_page()
+    if $in_menu
+        click [game_menu_page].[back] after wait @step_interval
+    else
+        click [shop_detail].[back] after wait @step_interval
+    end
+    eval $back_tries = $back_tries + 1
+end
+log "购买袅袅流程结束。"

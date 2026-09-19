@@ -17,7 +17,7 @@
 下发只新增、永不抢占随包或用户脚本。
 
 每项统一 shape：``{id, name, note, wf_file|class, parameters, runnable,
-batchable, scope, hidden, source_layer, is_remote}``。
+batchable, batch_check, scope, hidden, source_layer, is_remote}``。
 """
 from __future__ import annotations
 
@@ -158,6 +158,7 @@ def _discover_wf_scripts(
             "env": meta.get("env") or [],
             "runnable": True,
             "batchable": traits["batchable"],
+            "batch_check": meta.get("batch_check") or "",
             "scope": traits["scope"],
             "hidden": traits["hidden"],
             "source_layer": source_layer,
@@ -187,6 +188,7 @@ def _discover_class_scripts() -> dict[str, dict]:
             # 由实现声明而非系统配置表达，用户偏好另存 session。
             "runnable": True,
             "batchable": True,
+            "batch_check": "",
             "scope": getattr(cls, "SCOPE", None) or "daily",
             "hidden": bool(getattr(cls, Policy.HIDDEN_CLASS_ATTR, False)),
             "source_layer": "class",

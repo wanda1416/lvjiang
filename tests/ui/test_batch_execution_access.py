@@ -11,6 +11,7 @@ from lvjiang.ui.batch.batch_report import BatchReport
 from lvjiang.ui.batch.batch_runner import (
     ST_PENDING,
     ST_SKIPPED,
+    BatchCheckResult,
     BatchContext,
     BatchScript,
     BatchStageResult,
@@ -233,6 +234,86 @@ def test_skipped_prepare_does_not_run_scripts_or_finish(tmp_path, monkeypatch, q
     assert scripts == ["bob"]
 
 
+def test_batch_check_runs_for_every_user_and_round_before_prepare(
+    tmp_path, monkeypatch, qapp,
+):
+    worker = make_worker(tmp_path, monkeypatch, rounds=2)
+    checks = []
+    stages = []
+    scripts = []
+
+    monkeypatch.setattr(
+        worker, "_check_script",
+        lambda script, username, **kwargs: (
+            checks.append(username)
+            or BatchCheckResult(status="skipped", message="额度已满")
+        ),
+    )
+    monkeypatch.setattr(
+        worker, "_run_stage",
+        lambda stage, *args, **kwargs: (
+            stages.append(stage) or BatchStageResult(state={})
+        ),
+    )
+    monkeypatch.setattr(
+        worker, "_run_script",
+        lambda *args, **kwargs: scripts.append(args[2]) or {},
+    )
+
+    worker.run()
+
+    assert checks == ["alice", "bob", "alice", "bob"]
+    assert stages == ["batch_setup", "batch_teardown"]
+    assert scripts == []
+
+
+def test_any_executable_task_makes_the_user_run_all_tasks(
+    tmp_path, monkeypatch, qapp,
+):
+    import lvjiang.core.daily_history as history
+
+    monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
+    monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
+    monkeypatch.setattr(BatchReport, "write", lambda self: None)
+    worker = BatchWorker(
+        ["alice"],
+        [BatchScript("skip", "skip"), BatchScript("run", "run")],
+        BatchConfigItem(
+            name="test", usernames=["alice"],
+            skip_lifecycle_for_single_item=False,
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path), lambda: False,
+    )
+    stages = []
+    executed = []
+    monkeypatch.setattr(
+        worker, "_check_script",
+        lambda script, username, **kwargs: (
+            BatchCheckResult(status="skipped", message="无需执行")
+            if script.id == "skip" else BatchCheckResult()
+        ),
+    )
+    monkeypatch.setattr(
+        worker, "_run_stage",
+        lambda stage, *args, **kwargs: (
+            stages.append(stage) or BatchStageResult(state={})
+        ),
+    )
+    monkeypatch.setattr(
+        worker, "_run_script",
+        lambda script, *args, **kwargs: executed.append(script.id) or {},
+    )
+    monkeypatch.setattr(worker, "_save_result", lambda *args: None)
+
+    worker.run()
+
+    assert stages == [
+        "batch_setup", "prepare_item", "finish_item", "batch_teardown",
+    ]
+    assert executed == ["skip", "run"]
+
+
 def test_task_engine_uses_session_manager_users_dir(tmp_path, monkeypatch, qapp):
     worker = make_worker(tmp_path, monkeypatch)
 
@@ -259,6 +340,46 @@ def test_task_engine_uses_session_manager_users_dir(tmp_path, monkeypatch, qapp)
         "alice",
         params={},
     )
+
+
+def test_batch_check_loads_only_subcalls_and_passes_frozen_params(
+    tmp_path, monkeypatch, qapp,
+):
+    worker = make_worker(tmp_path, monkeypatch)
+    wf_path = tmp_path / "test.wf"
+    seen = {}
+
+    class Engine:
+        session = None
+        run_username = ""
+        users_dir = None
+        user_attributes_snapshot = None
+        workflow_config_snapshot = None
+
+        def load_subcalls(self, path):
+            seen["loaded"] = path
+
+        def call_subcall(self, name, args):
+            seen["called"] = (name, args)
+            return {"status": "skipped", "message": "已完成"}
+
+    monkeypatch.setattr(worker, "_create_engine", Engine)
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.resolve_workflow_path",
+        lambda wf_file, script_id: (wf_path, True),
+    )
+
+    result = worker._check_script(
+        BatchScript(
+            "test", "test", wf_file="test.wf", batch_check="check_batch"),
+        "alice", params={"count": 2},
+    )
+
+    assert result == BatchCheckResult(status="skipped", message="已完成")
+    assert seen == {
+        "loaded": wf_path,
+        "called": ("check_batch", [{"count": 2}]),
+    }
 
 
 def test_lifecycle_stage_receives_saved_workflow_parameters(

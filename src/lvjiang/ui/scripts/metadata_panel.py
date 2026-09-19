@@ -98,6 +98,11 @@ class MetadataPanel(QWidget):
         traits.addWidget(self.check_hidden)
         traits.addStretch()
         form.addRow(tr("脚本声明"), traits)
+        self.edit_batch_check = QLineEdit()
+        self.edit_batch_check.setPlaceholderText(tr("可选，例如 check_batch"))
+        self.edit_batch_check.setToolTip(tr(
+            "批量调度在条目准备前调用的当前 WF 内部子过程；直接运行不会调用"))
+        form.addRow(tr("批量检查子过程"), self.edit_batch_check)
         root.addLayout(form)
 
         root.addWidget(QLabel(tr("参数定义（YAML 列表）")))
@@ -165,6 +170,7 @@ class MetadataPanel(QWidget):
         self.check_runnable.setChecked(bool(meta.get("runnable", False)))
         self.check_batchable.setChecked(bool(meta.get("batchable", False)))
         self.check_hidden.setChecked(bool(meta.get("hidden", False)))
+        self.edit_batch_check.setText(str(meta.get("batch_check") or ""))
         params = meta.get("parameters") or []
         self.edit_parameters.setPlainText(
             yaml.safe_dump(params, allow_unicode=True, sort_keys=False).rstrip("\n")
@@ -176,6 +182,7 @@ class MetadataPanel(QWidget):
             self.edit_name, self.edit_note, self.combo_scope,
             *self._env_checks.values(), self.check_runnable,
             self.check_batchable, self.check_hidden, self.edit_parameters,
+            self.edit_batch_check,
             self.btn_apply,
         ):
             widget.setEnabled(enabled)
@@ -206,6 +213,8 @@ class MetadataPanel(QWidget):
             metadata["runnable"] = self.check_runnable.isChecked()
             metadata["batchable"] = self.check_batchable.isChecked()
             metadata["hidden"] = self.check_hidden.isChecked()
+            if self.edit_batch_check.text().strip():
+                metadata["batch_check"] = self.edit_batch_check.text().strip()
             if parameters:
                 metadata["parameters"] = parameters
             candidate = replace_front_matter(self._text, metadata)

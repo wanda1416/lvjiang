@@ -23,6 +23,7 @@ _TOP_LEVEL_FIELDS = {
     "hidden",
     "runnable",
     "batchable",
+    "batch_check",
 }
 #: 脚本 id 是稳定逻辑标识，不是路径。首字符必须是 Unicode 字母，
 #: 后续允许 Unicode 字母、数字和下划线；中文脚本名属于合法 id。
@@ -219,6 +220,10 @@ def _validate_metadata(data: Any) -> dict:
             "id", "只能使用 Unicode 字母、数字和下划线，且必须以字母开头")
     if "scope" in normalized and normalized["scope"] not in {"daily", "dedicated"}:
         raise _error("scope", "必须是 daily 或 dedicated")
+    if "batch_check" in normalized and (
+            not isinstance(normalized["batch_check"], str)
+            or _PARAMETER_NAME.fullmatch(normalized["batch_check"]) is None):
+        raise _error("batch_check", "必须是合法的 DSL 子过程名")
     for field in ("hidden", "runnable", "batchable"):
         if field in normalized and not isinstance(normalized[field], bool):
             raise _error(field, "必须是布尔值")
@@ -328,6 +333,7 @@ def build_flow_config(path: str | Path) -> dict:
         "wf_file": str(source),
         "runnable": True,      # 用户显式加载的文件就是要跑的
         "batchable": False,    # 临时项不参与批量编排
+        "batch_check": "",
         "scope": meta.get("scope") or "daily",
         "parameters": meta.get("parameters") or [],
         "env": meta.get("env") or [],

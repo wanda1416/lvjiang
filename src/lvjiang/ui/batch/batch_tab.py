@@ -1133,6 +1133,7 @@ class BatchTab(QWidget):
                 scope=cfg.get("scope", "daily"),
                 parameters=list(cfg.get("parameters") or []),
                 env=list(cfg.get("env") or []),
+                batch_check=str(cfg.get("batch_check") or ""),
             ))
         return scripts
 

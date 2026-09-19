@@ -1684,7 +1684,7 @@ task_history:
   scope: Scope
   open_log: Open Execution Log
   open_batch_report: Open Batch Report
-  open_result: Open Result JSON
+  open_result: Open Execution Result
   batch_history: Batch History
   batch_report: Batch Report
   batch_run_id: Batch Run ID

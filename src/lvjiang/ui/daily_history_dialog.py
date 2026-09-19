@@ -234,7 +234,7 @@ class DailyHistoryDialog(QDialog):
         self._task_summary.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse)
         header.addWidget(self._task_summary, 1)
-        self._open_result_button = QPushButton(tr("打开结果 JSON"))
+        self._open_result_button = QPushButton(tr("打开执行结果"))
         self._open_result_button.clicked.connect(self._open_task_result)
         header.addWidget(self._open_result_button)
         self._open_log_button = QPushButton(tr("打开执行日志"))
@@ -472,7 +472,7 @@ class DailyHistoryDialog(QDialog):
             f"batch_run_id: {record.batch_run_id or '—'}")
         self._task_detail.setPlainText(json.dumps({
             "输入参数": record.params,
-            "结果 JSON": str(resolve_history_path(record.result_path) or ""),
+            "执行结果": str(resolve_history_path(record.result_path) or ""),
             "执行日志": str(resolve_history_path(record.log_path) or ""),
             "错误": record.error_message,
         }, ensure_ascii=False, indent=2, default=str))

@@ -131,11 +131,17 @@ class SmartTuningEvaluator:
         users_dir=None,
         stop_check: Callable[[], bool] | None = None,
         strategy: SearchStrategy | None = None,
+        state=None,
+        rules: dict[str, TuningRule] | None = None,
+        game_config=None,
     ) -> None:
+        """``state``（``LoadoutState``）与 ``rules`` 可由调用方注入；不注入时
+        才自己读备战方案仓储与规则管理器。评估器本身不再是仓储的读者。"""
         self.config = config
         self._stop_check = stop_check or (lambda: False)
         self._strategy = strategy or get_strategy()
-        self._game_config = get_game_config()
+        self._game_config = game_config or get_game_config()
+        self._injected_rules = rules
         self._contexts: tuple[_PlanContext, ...] = ()
         self._plan_infos: list[dict] = []
         self._disabled_reason = ""
@@ -143,7 +149,15 @@ class SmartTuningEvaluator:
         self._other_equipped_cache: dict[tuple[str, str], dict[str, dict]] = {}
         if config.enabled and config.evaluation.enabled:
             self._contexts = self._load_contexts(
-                username, incoming_rule_configs or {}, users_dir)
+                username, incoming_rule_configs or {}, users_dir, state)
+
+    @property
+    def rules(self) -> dict[str, TuningRule]:
+        """调律规则表：优先用调用方注入的，否则按需向规则管理器取一次。"""
+        injected = getattr(self, "_injected_rules", None)
+        if injected is not None:
+            return injected
+        return get_tuning_rule_manager().get_rules()
 
     @property
     def active(self) -> bool:
@@ -176,8 +190,7 @@ class SmartTuningEvaluator:
         })
 
     def _selected_targets(self, incoming: dict) -> tuple[_SelectedTarget, ...]:
-        manager = get_tuning_rule_manager()
-        rules = manager.get_rules()
+        rules = self.rules
         selected: list[_SelectedTarget] = []
         source: Iterable[tuple[str, TuningRule, list[str]]]
         if self.config.plan_scope == "all":
@@ -205,7 +218,9 @@ class SmartTuningEvaluator:
         """返回去重玩法集合，保留给诊断与兼容调用。"""
         return {target.playstyle for target in self._selected_targets(incoming)}
 
-    def _load_contexts(self, username: str, incoming: dict, users_dir) -> tuple[_PlanContext, ...]:
+    def _load_contexts(
+        self, username: str, incoming: dict, users_dir, state=None,
+    ) -> tuple[_PlanContext, ...]:
         if not username:
             self._disabled_reason = "未获取到调律用户"
             return ()
@@ -213,14 +228,15 @@ class SmartTuningEvaluator:
         if not targets:
             self._disabled_reason = "当前调律玩法没有可匹配的备战方案"
             return ()
-        try:
-            state = LoadoutRepository(username, users_dir).load()
-        except Exception as exc:  # noqa: BLE001 - 失败放行
-            self._disabled_reason = f"读取备战方案失败: {exc}"
-            return ()
+        if state is None:
+            try:
+                state = LoadoutRepository(username, users_dir).load()
+            except Exception as exc:  # noqa: BLE001 - 失败放行
+                self._disabled_reason = f"读取备战方案失败: {exc}"
+                return ()
 
         schools = self._game_config.get_schools()
-        rules = get_tuning_rule_manager().get_rules()
+        rules = self.rules
         contexts: dict[tuple[str, str], _PlanContext] = {}
         for target in targets:
             tuning_rule = rules.get(target.rule_key)
@@ -489,21 +505,12 @@ class SmartTuningEvaluator:
     def _evaluate_plan(
         self, context: _PlanContext, slot: str, equipment: dict,
     ) -> SmartPlanResult:
+        """单个方案的评估编排：校验 → 枚举转律分支 → 逐分支搜索 → 汇总。
+
+        任何异常都失败放行（UNKNOWN），不阻断调律流程。
+        """
         started = time.perf_counter()
-        try:
-            without_slot = {
-                key: value for key, value in context.equipped.items()
-                if key != slot
-            }
-            without_slot = self._apply_maximum_assumptions(
-                context, without_slot)
-            without_slot_rate = _rate(
-                context, without_slot, self._game_config)
-        except Exception:  # noqa: BLE001 - 展示性指标不应阻断核心判定
-            logger.debug(
-                f"智能调律无法计算七件基线（{context.plan_name}）",
-                exc_info=True)
-            without_slot_rate = None
+        without_slot_rate = self._without_slot_rate(context, slot)
 
         def make_result(
             status: SmartTuningStatus, reason: str,
@@ -530,201 +537,24 @@ class SmartTuningEvaluator:
                     SmartTuningStatus.UNKNOWN,
                     "备战方案极限毕业率计算失败，无法可靠比较")
             candidate = copy.deepcopy(equipment)
-            if (not candidate.get("type") or not candidate.get("level")
-                    or not candidate.get("quality")):
-                return make_result(
-                    SmartTuningStatus.UNKNOWN, "当前装备缺少类型、等级或品阶")
-            for index in range(1, 6):
-                affix = candidate.get(f"affix_{index}")
-                if affix is None:
-                    continue
-                value = affix.get("value") if isinstance(affix, dict) else None
-                if (not isinstance(affix, dict) or not affix.get("name")
-                        or isinstance(value, bool)
-                        or not isinstance(value, (int, float)) or value <= 0):
-                    return make_result(
-                        SmartTuningStatus.UNKNOWN,
-                        f"当前装备第 {index} 条词条数据不完整")
-            flaws = validate_combination_dict(candidate)
-            if flaws:
-                return make_result(
-                    SmartTuningStatus.UNKNOWN, "当前装备组合不合法："
-                    + "；".join(str(item) for item in flaws))
-            present = [candidate.get(f"affix_{i}") for i in range(1, 6)]
-            affix_count = sum(isinstance(item, dict) for item in present)
-            if affix_count >= 5:
-                # 五词条已经进入调律处理的终局判定，不再假设未来转律；
-                # 生产流程会在调用本评估器前结束，这里仍作防御性拦截。
-                return make_result(
-                    SmartTuningStatus.UNKNOWN,
-                    "词条已满，应由调律处理执行终局判定")
-            pool = set(context.affix_pool)
-            aliases = dynamic_affix_map(context.attribute)
+            problem_reason = self._candidate_problem(candidate)
+            if problem_reason:
+                return make_result(SmartTuningStatus.UNKNOWN, problem_reason)
 
-            # 第 0 分支始终保留原词条；额外分支把一次未来转律表达为“把一个
-            # 已出现的第 2~4 词条转成某个转律库词条，其余空槽再交给同一套
-            # 补全算法”。转入词条必须是游戏里真能转出来的：各流派转律词条库
-            # 的并集 ∩ 规则池 ∩ 部位可出现；空槽由调律补全，不受转律库限制。
-            # 当前能进入自动调律的装备不可能已有转律词条，无需再次转律状态机。
-            branches: list[tuple[str, dict]] = [("", candidate)]
-            if 2 <= affix_count <= 4:
-                removable: list[tuple[int, str]] = []
-                outside_pool: list[tuple[int, str]] = []
-                for index in range(2, min(affix_count, 4) + 1):
-                    affix = candidate.get(f"affix_{index}")
-                    if not isinstance(affix, dict):
-                        continue
-                    name = str(affix.get("name") or "")
-                    removable.append((index, name))
-                    if name not in pool and aliases.get(name) not in pool:
-                        outside_pool.append((index, name))
-                # 有池外词条时只处理第一条；否则逐一尝试转出全部已出现的
-                # 非首词条。一次转律最多改一条。
-                selected = outside_pool[:1] or removable
-                # 智能调律口径：各流派转律库并集 ∩ 本规则词条库（含动态本属
-                # 别名展开）；部位合法性、去重与整件校验由公共过滤链完成。
-                rule_pool = [
-                    target
-                    for target in transmute_pool_union(self._game_config)
-                    if target in pool or aliases.get(target) in pool
-                ]
-                for index, name in selected:
-                    for target in transmute_targets(
-                            candidate, index, rule_pool, self._game_config):
-                        variant = copy.deepcopy(candidate)
-                        variant.pop(f"affix_{index}", None)
-                        # 被转出的槽在 2~4，是当前第一个空槽，转入词条落回原位。
-                        filled = self._with_affixes(variant, (target,))
-                        if filled is None:
-                            continue
-                        branches.append((
-                            f"转律假设：第 {index} 条「{name}」转为「{target}」",
-                            filled))
-
+            branches = self._transmute_branches(context, candidate)
             budget = SearchBudget(_MAX_PLAN_SECONDS, self._stop_check)
             searched: list[tuple[str, SearchOutcome, tuple[str, ...]]] = []
             for branch_label, branch in branches:
-                branch_present = [
-                    branch.get(f"affix_{i}") for i in range(1, 6)]
-                missing = 5 - sum(
-                    isinstance(item, dict) for item in branch_present)
-                forced_names: tuple[str, ...] = ()
-
-                # 智能调律必须服从触发它的规则词条库。部位合法池只负责
-                # 物理可出现性，规则池决定该玩法实际允许拿什么来推演。
-                legal = (normal_affix_candidates(branch, self._game_config)
-                         if missing > 0 else [])
-                candidates = list(dict.fromkeys(
-                    name for name in legal
-                    if name in pool or aliases.get(name) in pool))
-
-                required = self._required_affix(context, slot, branch)
-                present_names = {
-                    str(item.get("name") or "")
-                    for item in branch_present if isinstance(item, dict)
-                }
-                if required and required not in present_names:
-                    # 增伤词条不参与“是否允许转出”的特殊保护；移除后仍按
-                    # 最终玩法约束补回，与其他空槽一起进入理论极限计算。
-                    if required not in legal:
-                        searched.append((
-                            branch_label,
-                            SearchOutcome(
-                                SearchStatus.UNKNOWN,
-                                f"玩法「{context.playstyle}」要求词条"
-                                f"「{required}」，但当前部位不允许"),
-                            (),
-                        ))
-                        continue
-                    completed = self._with_affixes(branch, (required,))
-                    if completed is None:
-                        # 这个转律分支本身不合法，不污染其他可行分支。
-                        if branch_label:
-                            continue
-                        searched.append((
-                            branch_label,
-                            SearchOutcome(
-                                SearchStatus.NO_IMPROVEMENT,
-                                f"当前词条组合无法再加入玩法必需词条"
-                                f"「{required}」"),
-                            (),
-                        ))
-                        continue
-                    branch = completed
-                    if required in candidates:
-                        candidates.remove(required)
-                    missing -= 1
-                    forced_names = (required,)
-                if missing > 0 and not candidates:
-                    if branch_label:
-                        # 移除后连五条都补不满，说明该转律假设不可行；它不是
-                        # “计算不确定”，不应阻止其他完整分支给出结论。
-                        continue
-                    searched.append((
-                        branch_label,
-                        SearchOutcome(
-                            SearchStatus.UNKNOWN,
-                            f"规则「{context.rule_name or context.rule_key}」"
-                            "在当前部位没有可用词条"),
-                        forced_names,
-                    ))
-                    continue
-                if branch_label and len(candidates) < missing:
-                    # 候选名不足时必然无法形成完整装备，提前剔除该分支，
-                    # 避免策略层把“不可行”误报成需要放行的 UNKNOWN。
-                    continue
-
-                problem = SearchProblem(
-                    equipment=branch,
-                    candidates=candidates,
-                    missing=missing,
-                    # 必须用相同的三满假设比较。拿候选极限与方案当前实值
-                    # 相比，会把用户以后仍可完成的培养错误算成候选收益。
-                    baseline=context.plan_maximum_rate,
-                    operator=self.config.evaluation.operator,
-                    complete=self._with_affixes,
-                    rate=lambda equip: self._candidate_rate(
-                        context, slot, equip),
-                    budget=budget,
-                    precision=self.config.evaluation.precision,
-                )
-                outcome = self._strategy.search(problem)
-                searched.append((
-                    branch_label, outcome,
-                    (*forced_names, *outcome.winning_affixes)))
+                row = self._search_branch(
+                    context, slot, branch_label, branch, budget)
+                if row is not None:
+                    searched.append(row)
 
             if not searched:
                 return make_result(
                     SmartTuningStatus.UNKNOWN, "没有可用的合法补全分支")
-
-            improving = [row for row in searched
-                         if row[1].status is SearchStatus.IMPROVES]
-            unknown = [row for row in searched
-                       if row[1].status is SearchStatus.UNKNOWN]
-            known = [row for row in searched
-                     if row[1].maximum_rate is not None]
-            best_pool = improving or known or searched
-            best_label, best, winning = max(
-                best_pool,
-                key=lambda row: (row[1].maximum_rate
-                                 if row[1].maximum_rate is not None
-                                 else -1.0),
-            )
-            if improving:
-                status = SmartTuningStatus.IMPROVES
-            elif unknown:
-                # 只要还有一个合法分支未能完成计算，就不能给出破坏性结论。
-                status = SmartTuningStatus.UNKNOWN
-            else:
-                status = SmartTuningStatus.NO_IMPROVEMENT
-            reason = best.reason
-            if best_label:
-                reason += f"；{best_label}"
-            if winning:
-                reason += "：" + "、".join(winning)
-            return make_result(
-                status, reason, best.maximum_rate,
-                sum(row[1].evaluated for row in searched))
+            status, reason, maximum_rate, evaluated = self._summarize(searched)
+            return make_result(status, reason, maximum_rate, evaluated)
         except Exception as exc:  # noqa: BLE001 - 任何异常必须失败放行
             logger.exception(f"智能调律计算失败（{context.plan_name}）")
             return make_result(
@@ -733,6 +563,229 @@ class SmartTuningEvaluator:
             logger.debug(
                 f"智能调律方案计算 {context.plan_name}: "
                 f"{(time.perf_counter() - started) * 1000:.1f}ms")
+
+    def _without_slot_rate(
+        self, context: _PlanContext, slot: str,
+    ) -> float | None:
+        """其余七件按三满投影后的毕业率（展示性指标，失败为 None）。"""
+        try:
+            without_slot = {
+                key: value for key, value in context.equipped.items()
+                if key != slot
+            }
+            without_slot = self._apply_maximum_assumptions(
+                context, without_slot)
+            return _rate(context, without_slot, self._game_config)
+        except Exception:  # noqa: BLE001 - 展示性指标不应阻断核心判定
+            logger.debug(
+                f"智能调律无法计算七件基线（{context.plan_name}）",
+                exc_info=True)
+            return None
+
+    @staticmethod
+    def _candidate_problem(candidate: dict) -> str:
+        """候选装备无法可靠评估时返回原因，可评估返回空串。
+
+        检查顺序即原因优先级：基础字段 → 词条数据 → 组合合法性 → 是否已满。
+        """
+        if (not candidate.get("type") or not candidate.get("level")
+                or not candidate.get("quality")):
+            return "当前装备缺少类型、等级或品阶"
+        for index in range(1, 6):
+            affix = candidate.get(f"affix_{index}")
+            if affix is None:
+                continue
+            value = affix.get("value") if isinstance(affix, dict) else None
+            if (not isinstance(affix, dict) or not affix.get("name")
+                    or isinstance(value, bool)
+                    or not isinstance(value, (int, float)) or value <= 0):
+                return f"当前装备第 {index} 条词条数据不完整"
+        flaws = validate_combination_dict(candidate)
+        if flaws:
+            return "当前装备组合不合法：" + "；".join(str(item) for item in flaws)
+        affix_count = sum(
+            isinstance(candidate.get(f"affix_{i}"), dict) for i in range(1, 6))
+        if affix_count >= 5:
+            # 五词条已经进入调律处理的终局判定，不再假设未来转律；
+            # 生产流程会在调用本评估器前结束，这里仍作防御性拦截。
+            return "词条已满，应由调律处理执行终局判定"
+        return ""
+
+    def _transmute_branches(
+        self, context: _PlanContext, candidate: dict,
+    ) -> list[tuple[str, dict]]:
+        """第 0 分支始终保留原词条；额外分支把一次未来转律表达为“把一个
+        已出现的第 2~4 词条转成某个转律库词条，其余空槽再交给同一套补全
+        算法”。转入词条必须是游戏里真能转出来的：各流派转律词条库的并集
+        ∩ 规则池 ∩ 部位可出现；空槽由调律补全，不受转律库限制。当前能进入
+        自动调律的装备不可能已有转律词条，无需再次转律状态机。"""
+        pool = set(context.affix_pool)
+        aliases = dynamic_affix_map(context.attribute)
+        affix_count = sum(
+            isinstance(candidate.get(f"affix_{i}"), dict) for i in range(1, 6))
+        branches: list[tuple[str, dict]] = [("", candidate)]
+        if not 2 <= affix_count <= 4:
+            return branches
+        removable: list[tuple[int, str]] = []
+        outside_pool: list[tuple[int, str]] = []
+        for index in range(2, min(affix_count, 4) + 1):
+            affix = candidate.get(f"affix_{index}")
+            if not isinstance(affix, dict):
+                continue
+            name = str(affix.get("name") or "")
+            removable.append((index, name))
+            if name not in pool and aliases.get(name) not in pool:
+                outside_pool.append((index, name))
+        # 有池外词条时只处理第一条；否则逐一尝试转出全部已出现的
+        # 非首词条。一次转律最多改一条。
+        selected = outside_pool[:1] or removable
+        # 智能调律口径：各流派转律库并集 ∩ 本规则词条库（含动态本属
+        # 别名展开）；部位合法性、去重与整件校验由公共过滤链完成。
+        rule_pool = [
+            target
+            for target in transmute_pool_union(self._game_config)
+            if target in pool or aliases.get(target) in pool
+        ]
+        for index, name in selected:
+            for target in transmute_targets(
+                    candidate, index, rule_pool, self._game_config):
+                variant = copy.deepcopy(candidate)
+                variant.pop(f"affix_{index}", None)
+                # 被转出的槽在 2~4，是当前第一个空槽，转入词条落回原位。
+                filled = self._with_affixes(variant, (target,))
+                if filled is None:
+                    continue
+                branches.append((
+                    f"转律假设：第 {index} 条「{name}」转为「{target}」",
+                    filled))
+        return branches
+
+    def _search_branch(
+        self, context: _PlanContext, slot: str,
+        branch_label: str, branch: dict, budget: SearchBudget,
+    ) -> tuple[str, SearchOutcome, tuple[str, ...]] | None:
+        """对一个分支做补全搜索；返回 None 表示该分支不可行、不参与汇总。
+
+        原分支（``branch_label`` 为空）的不可行会作为结论保留，转律分支的
+        不可行只是这个假设不成立，不污染其他分支。
+        """
+        # _evaluate_plan 已在 plan_maximum_rate 为 None 时提前返回
+        assert context.plan_maximum_rate is not None
+        pool = set(context.affix_pool)
+        aliases = dynamic_affix_map(context.attribute)
+        branch_present = [branch.get(f"affix_{i}") for i in range(1, 6)]
+        missing = 5 - sum(isinstance(item, dict) for item in branch_present)
+        forced_names: tuple[str, ...] = ()
+
+        # 智能调律必须服从触发它的规则词条库。部位合法池只负责
+        # 物理可出现性，规则池决定该玩法实际允许拿什么来推演。
+        legal = (normal_affix_candidates(branch, self._game_config)
+                 if missing > 0 else [])
+        candidates = list(dict.fromkeys(
+            name for name in legal
+            if name in pool or aliases.get(name) in pool))
+
+        required = self._required_affix(context, slot, branch)
+        present_names = {
+            str(item.get("name") or "")
+            for item in branch_present if isinstance(item, dict)
+        }
+        if required and required not in present_names:
+            # 增伤词条不参与“是否允许转出”的特殊保护；移除后仍按
+            # 最终玩法约束补回，与其他空槽一起进入理论极限计算。
+            if required not in legal:
+                return (
+                    branch_label,
+                    SearchOutcome(
+                        SearchStatus.UNKNOWN,
+                        f"玩法「{context.playstyle}」要求词条"
+                        f"「{required}」，但当前部位不允许"),
+                    (),
+                )
+            completed = self._with_affixes(branch, (required,))
+            if completed is None:
+                # 这个转律分支本身不合法，不污染其他可行分支。
+                if branch_label:
+                    return None
+                return (
+                    branch_label,
+                    SearchOutcome(
+                        SearchStatus.NO_IMPROVEMENT,
+                        f"当前词条组合无法再加入玩法必需词条"
+                        f"「{required}」"),
+                    (),
+                )
+            branch = completed
+            if required in candidates:
+                candidates.remove(required)
+            missing -= 1
+            forced_names = (required,)
+        if missing > 0 and not candidates:
+            if branch_label:
+                # 移除后连五条都补不满，说明该转律假设不可行；它不是
+                # “计算不确定”，不应阻止其他完整分支给出结论。
+                return None
+            return (
+                branch_label,
+                SearchOutcome(
+                    SearchStatus.UNKNOWN,
+                    f"规则「{context.rule_name or context.rule_key}」"
+                    "在当前部位没有可用词条"),
+                forced_names,
+            )
+        if branch_label and len(candidates) < missing:
+            # 候选名不足时必然无法形成完整装备，提前剔除该分支，
+            # 避免策略层把“不可行”误报成需要放行的 UNKNOWN。
+            return None
+
+        problem = SearchProblem(
+            equipment=branch,
+            candidates=candidates,
+            missing=missing,
+            # 必须用相同的三满假设比较。拿候选极限与方案当前实值
+            # 相比，会把用户以后仍可完成的培养错误算成候选收益。
+            baseline=context.plan_maximum_rate,
+            operator=self.config.evaluation.operator,
+            complete=self._with_affixes,
+            rate=lambda equip: self._candidate_rate(context, slot, equip),
+            budget=budget,
+            precision=self.config.evaluation.precision,
+        )
+        outcome = self._strategy.search(problem)
+        return (branch_label, outcome, (*forced_names, *outcome.winning_affixes))
+
+    @staticmethod
+    def _summarize(
+        searched: list[tuple[str, SearchOutcome, tuple[str, ...]]],
+    ) -> tuple[SmartTuningStatus, str, float | None, int]:
+        """多分支汇总：有提升取提升里最高；否则只要有分支未算完就 UNKNOWN。"""
+        improving = [row for row in searched
+                     if row[1].status is SearchStatus.IMPROVES]
+        unknown = [row for row in searched
+                   if row[1].status is SearchStatus.UNKNOWN]
+        known = [row for row in searched
+                 if row[1].maximum_rate is not None]
+        best_pool = improving or known or searched
+        best_label, best, winning = max(
+            best_pool,
+            key=lambda row: (row[1].maximum_rate
+                             if row[1].maximum_rate is not None
+                             else -1.0),
+        )
+        if improving:
+            status = SmartTuningStatus.IMPROVES
+        elif unknown:
+            # 只要还有一个合法分支未能完成计算，就不能给出破坏性结论。
+            status = SmartTuningStatus.UNKNOWN
+        else:
+            status = SmartTuningStatus.NO_IMPROVEMENT
+        reason = best.reason
+        if best_label:
+            reason += f"；{best_label}"
+        if winning:
+            reason += "：" + "、".join(winning)
+        return status, reason, best.maximum_rate, sum(
+            row[1].evaluated for row in searched)
 
     def _required_affix(
         self, context: _PlanContext, slot: str, candidate: dict,

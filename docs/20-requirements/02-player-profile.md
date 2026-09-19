@@ -143,7 +143,7 @@ src/lvjiang/
 ├── ui/profile/               # 用户总览、用户信息和定义面板
 ├── workflows/builtins/profile.py
 │                           # 通用 profile_action/profile_read 等 DSL 函数
-└── apps/yysls/profile/periods.py
+└── apps/yysls/core/season_periods.py
                             # 燕云 season/half_season 周期边界
 ```
 

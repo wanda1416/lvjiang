@@ -1,4 +1,4 @@
-"""燕云赛季类 Profile 周期边界。"""
+"""燕云赛季类 Profile 周期边界（经 AppHooks.profile_period_modules 注册）。"""
 
 from __future__ import annotations
 

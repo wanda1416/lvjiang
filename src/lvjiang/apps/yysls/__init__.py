@@ -68,7 +68,7 @@ hooks = AppHooks(
     ],
 
     profile_period_modules=[
-        "lvjiang.apps.yysls.profile.periods",
+        "lvjiang.apps.yysls.core.season_periods",
     ],
 
     # 统计事件 schema（导入即触发 register_schema 注册）

@@ -164,13 +164,21 @@ class RegionPanelMixin:
 
     # ─── 列表刷新 ────────────────────────────────────────
 
-    def _refresh_region_list(self):
-        """刷新区域表格，显示 name(key)、类型、含文本、可点击"""
+    def _refresh_region_list(self, *, preserve_current: bool = True):
+        """刷新区域表格，显示 name(key)、类型、含文本、可点击。
+
+        ``preserve_current`` 仅用于数据刷新时保留表格当前行。画布主动退出
+        单区域展示时必须关闭它，否则已经清空的画布选择会被旧 currentRow
+        重新画成选中状态，形成列表与画布状态不一致。
+        """
         scroll_bar = self._region_table.verticalScrollBar()
+        assert scroll_bar is not None
         scroll_value = scroll_bar.value()
         current = self._region_table.item(self._region_table.currentRow(), 1)
         selected_key = self._canvas.selected_region_key() or (
-            current.text() if current is not None else None)
+            current.text()
+            if preserve_current and current is not None
+            else None)
         self._region_table.blockSignals(True)
         self._region_table.setRowCount(0)
         registry = get_registry()

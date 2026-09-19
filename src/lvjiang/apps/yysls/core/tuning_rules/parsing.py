@@ -916,6 +916,12 @@ def parse_tune_config(data: dict) -> TuneConfig:
     if failure_action not in BEHAVIOR_ACTIONS:
         raise RuleValidationError(
             f"smart_tuning.failure_action.action 不合法: {failure_action!r}")
+    keep_min_rating = str(
+        raw_action.get("keep_min_rating") or "excellent")
+    if keep_min_rating not in RATING_KEYS:
+        raise RuleValidationError(
+            "smart_tuning.failure_action.keep_min_rating "
+            f"不合法: {keep_min_rating!r}")
     for path, value in (
         ("smart_tuning.enabled", raw_smart.get("enabled", True)),
         ("smart_tuning.evaluation.enabled", raw_eval.get("enabled", True)),
@@ -931,7 +937,8 @@ def parse_tune_config(data: dict) -> TuneConfig:
             enabled=raw_eval.get("enabled", True), operator=operator,
             precision=float(precision)),
         failure_action=SmartTuningFailureAction(
-            enabled=raw_action.get("enabled", True), action=failure_action),
+            enabled=raw_action.get("enabled", True), action=failure_action,
+            keep_min_rating=keep_min_rating),
     )
 
     return TuneConfig(

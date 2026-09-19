@@ -33,3 +33,4 @@ smart_tuning:
   failure_action:
     enabled: true
     action: skip
+    keep_min_rating: excellent

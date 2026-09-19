@@ -53,6 +53,8 @@ class EquipmentSession:
     equipment: EquipmentData | None = None
     expected_rating: str | None = None
     mode: TuningMode = TuningMode.NORMAL
+    # 仅智能调律的“调满后回收”动作设置；基础规则表沿用原有无门槛行为。
+    tune_full_recycle_keep_min_rating: str | None = None
     rounds: int = 0
     resets: int = 0
     stop_reason: str = ""

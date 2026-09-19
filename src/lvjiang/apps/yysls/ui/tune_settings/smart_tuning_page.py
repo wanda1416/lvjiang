@@ -21,6 +21,8 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     BEHAVIOR_ACTION_LABELS,
     BEHAVIOR_ACTION_TOOLTIPS,
     BEHAVIOR_ACTIONS,
+    RATING_KEYS,
+    RATING_LABELS,
     TuneConfigManager,
 )
 
@@ -125,6 +127,23 @@ class SmartTuningPage(QWidget):
         action_row.addWidget(self._action)
         action_row.addStretch()
         action_layout.addLayout(action_row)
+
+        self._keep_min_rating_row = QWidget()
+        keep_layout = QHBoxLayout(self._keep_min_rating_row)
+        keep_layout.setContentsMargins(0, 0, 0, 0)
+        keep_layout.addWidget(QLabel(tr("强制保留")))
+        self._keep_min_rating = QComboBox()
+        self._keep_min_rating.setMinimumWidth(110)
+        for key in reversed(RATING_KEYS):
+            self._keep_min_rating.addItem(RATING_LABELS[key], key)
+        self._keep_min_rating.setToolTip(tr(
+            "调满后按本次传入的当前规则重新判定；达到所选评级的装备"
+            "强制保留，不执行回收。"))
+        self._keep_min_rating.currentIndexChanged.connect(self._changed)
+        keep_layout.addWidget(self._keep_min_rating)
+        keep_layout.addWidget(QLabel(tr("及以上装备")))
+        keep_layout.addStretch()
+        action_layout.addWidget(self._keep_min_rating_row)
         layout.addWidget(action_box)
         layout.addStretch()
 
@@ -145,6 +164,9 @@ class SmartTuningPage(QWidget):
         self._action_enabled.setChecked(config.failure_action.enabled)
         self._action.setCurrentIndex(max(
             0, self._action.findData(config.failure_action.action)))
+        self._keep_min_rating.setCurrentIndex(max(
+            0, self._keep_min_rating.findData(
+                config.failure_action.keep_min_rating)))
         self._sync_enabled()
 
     def _sync_enabled(self) -> None:
@@ -156,6 +178,12 @@ class SmartTuningPage(QWidget):
         self._precision.setEnabled(
             enabled and self._evaluation_enabled.isChecked())
         self._action.setEnabled(enabled and self._action_enabled.isChecked())
+        is_tune_full_recycle = (
+            self._action.currentData() == "tune_full_recycle")
+        self._keep_min_rating_row.setVisible(is_tune_full_recycle)
+        self._keep_min_rating.setEnabled(
+            enabled and self._action_enabled.isChecked()
+            and is_tune_full_recycle)
 
     def _build(self) -> dict:
         data = self._manager.get_raw()
@@ -171,6 +199,8 @@ class SmartTuningPage(QWidget):
             "failure_action": {
                 "enabled": self._action_enabled.isChecked(),
                 "action": self._action.currentData() or "skip",
+                "keep_min_rating": (
+                    self._keep_min_rating.currentData() or "excellent"),
             },
         }
         return data

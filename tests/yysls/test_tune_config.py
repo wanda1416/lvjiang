@@ -29,6 +29,9 @@ from lvjiang.apps.yysls.ui.tune_settings.material_config_page import (
     MaterialConfigPage,
 )
 from lvjiang.apps.yysls.ui.tune_settings.rule_panel import RulePanel
+from lvjiang.apps.yysls.ui.tune_settings.smart_tuning_page import (
+    SmartTuningPage,
+)
 from lvjiang.core.config.resolver import EntityOrigin
 from tests.case_matrix import case_matrix
 
@@ -104,6 +107,28 @@ class TestDialog:
         # 规则页初始只占位，首次进入才构造 RulePanel。
         assert not isinstance(dialog._stack.widget(5), RulePanel)
         assert not dialog.findChildren(RulePanel)
+
+
+    def test_smart_tune_full_recycle_shows_and_saves_keep_threshold(
+            self, qtbot, tmp_config_manager):
+        page = SmartTuningPage(tmp_config_manager, lambda *_args: None)
+        qtbot.addWidget(page)
+
+        assert not page._keep_min_rating_row.isVisible()
+        action_index = page._action.findData("tune_full_recycle")
+        page._action.setCurrentIndex(action_index)
+        page.show()
+        assert page._keep_min_rating_row.isVisible()
+        assert page._keep_min_rating.currentData() == "excellent"
+
+        page._keep_min_rating.setCurrentIndex(
+            page._keep_min_rating.findData("top"))
+        saved = tmp_config_manager.get().smart_tuning.failure_action
+        assert saved.action == "tune_full_recycle"
+        assert saved.keep_min_rating == "top"
+
+        page._action.setCurrentIndex(page._action.findData("skip"))
+        assert not page._keep_min_rating_row.isVisible()
 
     def test_config_version_label_reports_remote_distribution(
             self, qtbot, monkeypatch):

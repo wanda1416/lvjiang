@@ -56,6 +56,9 @@ def dialog(qtbot, monkeypatch):
     dlg._affix_filter = ""
     dlg._slot_groups = {}
     dlg._slot_scroll_areas = {}
+    dlg._chk_apply_tuning = QCheckBox()
+    dlg._chk_apply_tuning.setChecked(True)
+    qtbot.addWidget(dlg._chk_apply_tuning)
     dlg._chk_exclude_mock = QCheckBox()
     qtbot.addWidget(dlg._chk_exclude_mock)
     dlg._candidate_summary = QLabel()

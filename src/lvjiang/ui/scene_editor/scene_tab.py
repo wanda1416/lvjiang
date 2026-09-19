@@ -790,6 +790,9 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
 
     def _on_selection_changed(self):
         """画布选中态变化（非数据修改）：仅刷新各列表显示"""
-        self._refresh_region_list()
+        # 画布是选中态的权威来源。它退出单区域展示后，不得用表格残留的
+        # currentRow 恢复一行假高亮；若画布仍选中区域，刷新函数仍会按 key
+        # 恢复对应行，因此点击模板工具等导致的普通失焦不会清除选择。
+        self._refresh_region_list(preserve_current=False)
         self._on_poi_changed()
         self._refresh_panel_list()

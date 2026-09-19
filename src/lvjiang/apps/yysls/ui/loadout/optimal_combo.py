@@ -15,6 +15,7 @@ from PyQt6.QtCore import (
     pyqtSignal,
 )
 from PyQt6.QtWidgets import (
+    QAbstractScrollArea,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -31,6 +32,7 @@ from PyQt6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -501,6 +503,10 @@ class _SlotGroup(QFrame):
             empty = QLabel(tr("（无候选装备）"))
             empty.setStyleSheet("color: palette(mid); font-size: 12px;")
             layout.addWidget(empty)
+
+        # 候选少时卡片仍填满网格单元，内容固定贴顶；候选多时
+        # 布局的最小高度会交给外层 QScrollArea 产生独立滚动条。
+        layout.addStretch()
 
     def get_selected(self) -> list[dict]:
         """返回勾选的装备列表。"""
@@ -999,6 +1005,12 @@ class OptimalComboPage(QWidget):
 
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
+        self._btn_clear_results = QPushButton(tr("清除结果"))
+        apply_button_style(self._btn_clear_results, variant="neutral")
+        self._btn_clear_results.setVisible(False)
+        self._btn_clear_results.clicked.connect(self._on_clear_results)
+        action_row.addWidget(self._btn_clear_results)
+
         self._btn_search = QPushButton(tr("开始搜索"))
         apply_button_style(self._btn_search, variant="action")
         self._btn_search.clicked.connect(self._on_search)
@@ -1039,8 +1051,16 @@ class OptimalComboPage(QWidget):
             col = idx % 4
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
+            # 候选数量不参与外层 2×4 网格的尺寸计算：八个区域
+            # 始终等高填满，每个区域内部再按需滚动。
+            scroll.setSizeAdjustPolicy(
+                QAbstractScrollArea.SizeAdjustPolicy.AdjustIgnored)
+            scroll.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             scroll.setHorizontalScrollBarPolicy(
                 Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            scroll.setVerticalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             scroll.setFrameShape(QFrame.Shape.NoFrame)
             grid.addWidget(scroll, row, col)
             self._slot_scroll_areas[slot_key] = scroll
@@ -1048,7 +1068,7 @@ class OptimalComboPage(QWidget):
             grid.setColumnStretch(c, 1)
         for r in range(2):
             grid.setRowStretch(r, 1)
-        candidates_layout.addLayout(grid)
+        candidates_layout.addLayout(grid, 1)
         self._tab_widget.addTab(candidates_tab, tr("候选装备"))
 
         # Tab 2: 最优结果
@@ -1336,14 +1356,9 @@ class OptimalComboPage(QWidget):
                 available_slots += 1
             scroll = self._slot_scroll_areas.get(slot_key)
             if scroll:
-                # 用容器包裹 group，底部加 stretch 防止内容居中
-                container = QWidget()
-                container_layout = QVBoxLayout(container)
-                container_layout.setContentsMargins(0, 0, 0, 0)
-                container_layout.setSpacing(0)
-                container_layout.addWidget(group)
-                container_layout.addStretch()
-                scroll.setWidget(container)
+                # group 本身填满可见区，它的布局末尾有 stretch，
+                # 因此空间会留在底部，候选行始终顶部对齐。
+                scroll.setWidget(group)
 
         self._slot_labels = slot_labels
         self._candidate_summary.setText(
@@ -1385,6 +1400,7 @@ class OptimalComboPage(QWidget):
         total *= len(gongjues)
 
         # UI state
+        self._btn_clear_results.setVisible(False)
         self._btn_search.setVisible(False)
         self._btn_cancel.setVisible(True)
         self._set_search_controls_enabled(False)
@@ -1404,14 +1420,9 @@ class OptimalComboPage(QWidget):
         if self._tab_widget.count() > 3:
             self._tab_widget.setTabText(3, tr("战斗属性"))
 
-        # Clear old results
-        while self._results_inner.count():
-            item = self._results_inner.takeAt(0)
-            if item is not None:
-                w = item.widget()
-                if w is not None:
-                    w.deleteLater()
-        self._result_cards.clear()
+        # Clear old rendered results.  self._results 留到搜索成功后再覆盖，
+        # 取消或失败时仍可以恢复上一次结果的操作按钮。
+        self._clear_rendered_results()
 
         # Launch worker
         from ...config import get_game_config
@@ -1448,6 +1459,7 @@ class OptimalComboPage(QWidget):
             else tr("已取消本次搜索。"))
 
     def _restore_idle_controls(self) -> None:
+        self._btn_clear_results.setVisible(bool(self._results))
         self._btn_search.setVisible(True)
         self._btn_cancel.setVisible(False)
         self._set_search_controls_enabled(True)
@@ -1480,12 +1492,12 @@ class OptimalComboPage(QWidget):
             f"{evaluated:,} / {total:,}" + (f"  {message}" if message else ""))
 
     def _on_finished(self, results: list) -> None:
+        self._results = list(results)
         self._restore_idle_controls()
         self._candidate_summary.setText(
             tr("搜索完成，共得到 {count} 个可用结果。")
             .format(count=len(results)),
         )
-        self._results = list(results)
         self.results_changed.emit(self._results)
         self._render_results(results)
 
@@ -1495,6 +1507,16 @@ class OptimalComboPage(QWidget):
     def restore_results(self, results: list[dict[str, Any]]) -> None:
         """回填缓存的搜索结果（不触发搜索，不写缓存）。"""
         self._results = list(results)
+        self._btn_clear_results.setVisible(bool(self._results))
+        self._clear_rendered_results()
+        if results:
+            self._candidate_summary.setText(
+                tr("显示上次搜索的 {count} 个结果；重新搜索会覆盖。")
+                .format(count=len(results)))
+        self._render_results(results)
+
+    def _clear_rendered_results(self) -> None:
+        """清空结果列表控件，不改动搜索结果数据。"""
         while self._results_inner.count():
             item = self._results_inner.takeAt(0)
             if item is not None:
@@ -1502,11 +1524,21 @@ class OptimalComboPage(QWidget):
                 if w is not None:
                     w.deleteLater()
         self._result_cards.clear()
-        if results:
-            self._candidate_summary.setText(
-                tr("显示上次搜索的 {count} 个结果；重新搜索会覆盖。")
-                .format(count=len(results)))
-        self._render_results(results)
+
+    def _on_clear_results(self) -> None:
+        """主动清除当前方案的搜索结果及对话框缓存。"""
+        if self._worker_running() or not self._results:
+            return
+        self._results = []
+        self._clear_rendered_results()
+        self._btn_clear_results.setVisible(False)
+        self._tab_widget.setTabText(1, tr("最优结果"))
+        self._tab_widget.setTabText(2, tr("组合详情"))
+        if self._tab_widget.count() > 3:
+            self._tab_widget.setTabText(3, tr("战斗属性"))
+        self._tab_widget.setCurrentIndex(0)
+        self._candidate_summary.setText(tr("已清除上次搜索结果。"))
+        self.results_changed.emit([])
 
     def mark_stale(self) -> None:
         """假设栏改动后提示结果已过期，不自动重算、不清空。"""

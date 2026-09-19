@@ -47,6 +47,9 @@ class _StubOptimalPage(OptimalComboPage):
         self._jobs = JobController(self)
         self._results_inner = QVBoxLayout()
         self._candidate_summary = QLabel("")
+        self._btn_clear_results = QPushButton("清除结果")
+        self._btn_clear_results.setVisible(False)
+        self._btn_clear_results.clicked.connect(self._on_clear_results)
         self._btn_search = QPushButton("开始搜索")
         self._tab_widget = QTabWidget()
         for _ in range(3):
@@ -135,3 +138,21 @@ def test_changing_assumptions_marks_results_stale_without_recomputing(qtbot):
     # 缓存未被清空或改写
     assert cache.optimal_results == [{"rate": 0.9, "equipped": {}}]
     assert cache.transmute_result is _result() or cache.transmute_result is not None
+
+
+def test_clear_optimal_results_also_clears_plan_cache(qtbot):
+    cached = [{"rate": 0.9, "equipped": {}}]
+    cache = AnalysisCache(optimal_results=list(cached))
+    dialog, _bar, optimal, _pages = _dialog(qtbot, cache)
+
+    assert optimal.results() == cached
+    assert not optimal._btn_clear_results.isHidden()
+
+    optimal._btn_clear_results.click()
+
+    assert optimal.results() == []
+    assert cache.optimal_results == []
+    assert optimal._btn_clear_results.isHidden()
+    assert optimal._tab_widget.currentIndex() == 0
+    assert optimal._candidate_summary.text() == "已清除上次搜索结果。"
+    dialog.reject()

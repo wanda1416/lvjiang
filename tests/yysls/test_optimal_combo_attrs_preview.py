@@ -29,6 +29,32 @@ def _result(rank: int = 2) -> dict:
     }
 
 
+def test_gongjue_select_all_shortcut(qtbot, monkeypatch):
+    from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
+
+    monkeypatch.setattr(OptimalComboPage, "_load_candidates", lambda self: None)
+    monkeypatch.setattr(OptimalComboPage, "_load_tuning_options", lambda self: None)
+    page = OptimalComboPage(
+        _Host(), "鸣金·虹", "基础方案", CombatAttributes(), gongjue="会意",
+    )
+    qtbot.addWidget(page)
+    button = page.findChild(QPushButton, "selectAllGongjueButton")
+    assert button is not None and button.text() == "全选"
+    assert _layout_of(button) is _layout_of(page._btn_gongjue)
+    assert page._selected_gongjues() == ["会意"]
+
+    button.click()
+    assert page._selected_gongjues() == ["会意", "精准", "会心"]
+    assert page._btn_gongjue.text() == "会意 / 精准 / 会心"
+    button.click()
+    assert all(action.isChecked() for action in page._gongjue_actions.values())
+
+    page._set_search_controls_enabled(False)
+    assert not button.isEnabled()
+    page._set_search_controls_enabled(True)
+    assert button.isEnabled()
+
+
 def test_result_card_actions_share_one_row(qtbot):
     card = _ResultCard(1, _result(), {"main_weapon": "主武器"})
     qtbot.addWidget(card)

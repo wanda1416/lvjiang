@@ -969,6 +969,16 @@ class OptimalComboPage(QWidget):
         apply_compact_button_style(self._btn_gongjue, variant="neutral")
         self._refresh_gongjue_text()
         compute_row.addWidget(self._btn_gongjue)
+        self._btn_gongjue_all = QPushButton(tr("全选"))
+        self._btn_gongjue_all.setObjectName("selectAllGongjueButton")
+        self._btn_gongjue_all.setFlat(True)
+        self._btn_gongjue_all.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_gongjue_all.setStyleSheet(
+            "QPushButton { border: none; background: transparent;"
+            " color: palette(link); text-decoration: underline; padding: 0; }"
+            "QPushButton:disabled { color: palette(mid); }")
+        self._btn_gongjue_all.clicked.connect(self._select_all_gongjues)
+        compute_row.addWidget(self._btn_gongjue_all)
         compute_row.addStretch()
         compute_layout.addLayout(compute_row)
         layout.addWidget(compute_settings)
@@ -1151,6 +1161,10 @@ class OptimalComboPage(QWidget):
     def _refresh_gongjue_text(self, _checked: bool = False) -> None:
         selected = self._selected_gongjues()
         self._btn_gongjue.setText(" / ".join(selected) if selected else tr("无"))
+
+    def _select_all_gongjues(self) -> None:
+        for action in self._gongjue_actions.values():
+            action.setChecked(True)
 
     def _load_tuning_options(self) -> None:
         """收集全部规则玩法，按本方案、本流派、本属性分层排序。
@@ -1437,6 +1451,7 @@ class OptimalComboPage(QWidget):
             self._chk_pruning,
             self._chk_season_chengyin,
             self._btn_gongjue,
+            self._btn_gongjue_all,
         ):
             control.setEnabled(enabled)
         for group in self._slot_groups.values():

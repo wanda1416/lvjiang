@@ -117,6 +117,84 @@ def color_ratio_tol(
     return color_ratio(img, x1, y1, x2, y2, lo, hi, step)  # type: ignore[arg-type]
 
 
+_PIXEL_METRICS = frozenset({
+    "r", "g", "b",
+    "r_g", "r_b", "g_b",
+    "max_rgb", "min_rgb",
+})
+
+
+def pixel_ratios(
+    img: np.ndarray,
+    x1: int, y1: int, x2: int, y2: int,
+    rules: dict[str, dict[str, float]],
+    step: int = 1,
+) -> dict[str, float]:
+    """一次裁剪统计多组通道关系像素占比。
+
+    每条规则由 ``<metric>_min`` / ``<metric>_max`` 条件组成。metric 支持
+    r/g/b、通道差 r_g/r_b/g_b，以及 max_rgb/min_rgb。所有条件对同一
+    像素取 AND，多条命名规则共享同一份采样结果。
+
+    与固定 RGB 色块相比，通道差能描述随亮度变化的颜色族，例如金黄色
+    ``r_g_min=-5, g_b_min=8`` 或红色主导
+    ``r_g_min=10, r_b_min=10``。
+    """
+    x1, y1, x2, y2 = _clip_rect(img, x1, y1, x2, y2)
+    if x2 < x1 or y2 < y1:
+        return {str(name): 0.0 for name in rules}
+    if not isinstance(rules, dict) or not rules:
+        raise ValueError("pixel_ratios: rules 必须是非空字典")
+
+    r, g, b = _rgb_planes(img, x1, y1, x2, y2, step)
+    if r.size == 0:
+        return {str(name): 0.0 for name in rules}
+    metrics = {
+        "r": r,
+        "g": g,
+        "b": b,
+        "r_g": r - g,
+        "r_b": r - b,
+        "g_b": g - b,
+        "max_rgb": np.maximum(np.maximum(r, g), b),
+        "min_rgb": np.minimum(np.minimum(r, g), b),
+    }
+
+    result: dict[str, float] = {}
+    for raw_name, spec in rules.items():
+        name = str(raw_name)
+        if not name or not isinstance(spec, dict) or not spec:
+            raise ValueError(
+                f"pixel_ratios: 规则 {name!r} 必须是非空字典")
+        mask = np.ones(r.shape, dtype=bool)
+        for condition, raw_bound in spec.items():
+            if condition.endswith("_min"):
+                metric_name = condition[:-4]
+                compare = "min"
+            elif condition.endswith("_max"):
+                metric_name = condition[:-4]
+                compare = "max"
+            else:
+                raise ValueError(
+                    f"pixel_ratios: 未知条件 {condition!r}，"
+                    "应使用 <metric>_min 或 <metric>_max")
+            if metric_name not in _PIXEL_METRICS:
+                raise ValueError(
+                    f"pixel_ratios: 未知指标 {metric_name!r}，可用: "
+                    f"{', '.join(sorted(_PIXEL_METRICS))}")
+            if (not isinstance(raw_bound, (int, float))
+                    or isinstance(raw_bound, bool)
+                    or not math.isfinite(float(raw_bound))):
+                raise ValueError(
+                    f"pixel_ratios: 条件 {condition!r} 需要有限数值，"
+                    f"实际: {raw_bound!r}")
+            bound = float(raw_bound)
+            values = metrics[metric_name]
+            mask &= values >= bound if compare == "min" else values <= bound
+        result[name] = float(mask.sum()) / float(mask.size)
+    return result
+
+
 # ─── 亮段计数 ─────────────────────────────────────────────
 
 def bright_segments(

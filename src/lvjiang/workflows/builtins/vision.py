@@ -217,6 +217,32 @@ def _color_ratio(_engine=None, ref=None, lo=None, hi_or_tol=None, step=1) -> flo
     return color_ops.color_ratio_tol(frame, x1, y1, x2, y2, color_ops.parse_hex(lo), tol, st)
 
 
+@builtin_func("pixel_ratios")
+def _pixel_ratios(_engine=None, ref=None, rules=None, step=1) -> dict[str, float]:
+    """一次截图统计多组通道关系的像素占比。
+
+    ``rules`` 是 ``{名称: 条件字典}``。条件名采用
+    ``<metric>_min`` / ``<metric>_max``；metric 支持 r/g/b、
+    r_g/r_b/g_b、max_rgb/min_rgb。通道差适合描述有亮度和色差变化的
+    颜色族，不要求像素贴近某个精确 RGB。
+
+    .wf 用法::
+
+        $ratios = pixel_ratios($box, {
+            "gold": {"r_min": 100, "g_min": 90,
+                     "r_g_min": -5, "g_b_min": 8}
+        }, 2)
+    """
+    if not isinstance(rules, dict) or not rules:
+        raise ValueError(tr("pixel_ratios: rules 必须是非空字典"))
+    frame = _canvas_frame(_engine)
+    x1, y1, x2, y2 = _rect_px(frame, ref, "pixel_ratios")
+    return color_ops.pixel_ratios(
+        frame, x1, y1, x2, y2, rules,
+        _int(step, "pixel_ratios.step", 1),
+    )
+
+
 # ─── 亮段计数 ───────────────────────────────────────────
 
 @builtin_func("bright_segs")

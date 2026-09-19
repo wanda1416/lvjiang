@@ -774,6 +774,7 @@ auto_strings:
   '[错误] 请先连接设备': '[Error] Please connect a device first'
   '[错误] 请选择一个工作流': '[Error] Please select a workflow'
   'color_ratio: 缺少颜色参数': 'color_ratio: missing color parameter'
+  'pixel_ratios: rules 必须是非空字典': 'pixel_ratios: rules must be a non-empty mapping'
   cols=1 时滚动方向不能为横向: Scroll direction cannot be horizontal when cols=1
   config 中缺少 model_path: config is missing model_path
   find 结果、矩形或坐标变量: find result, rectangle, or coordinate variable

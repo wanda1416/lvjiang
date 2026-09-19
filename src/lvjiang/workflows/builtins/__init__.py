@@ -7,7 +7,7 @@
 - ``profile``:    用户档案 (profile_get/profile_set/profile_inc/profile_all)
 - ``strings``:    字符串处理 (substr/split/replace/match/trim/upper/lower/to_num)
 - ``system``:     系统与 UI (confirm/pause/notify/input/save/panel_rows/panel_cols)
-- ``vision``:     图色 (pixel/bright/color_ratio/bright_segs/color_vec/find_icons/find_multi_color)
+- ``vision``:     图色 (pixel/bright/color_ratio/pixel_ratios/bright_segs/color_vec/find_icons/find_multi_color)
 
 燕云专属内置函数（``equipment`` / ``bag_traversal``）位于
 ``lvjiang.apps.yysls.workflows.builtins``，由燕云插件在加载时注册。

@@ -71,6 +71,46 @@ def test_color_ratio_requires_coord_ref():
         _call("color_ratio", eng, "not-a-ref", "#ffffff", 10)
 
 
+def test_pixel_ratios_supports_channel_relations_in_one_capture():
+    frame = _frame(w=100, h=100, rgb=(210, 210, 210))
+    frame[:, :60] = _bgr((220, 190, 80))
+    frame[:20, 60:] = _bgr((100, 60, 40))
+    eng = _engine_with(frame)
+    whole = RectCoordRef(cx=0.5, cy=0.5, w=1.0, h=1.0)
+
+    result = _call("pixel_ratios", eng, whole, {
+        "gold": {
+            "r_min": 100,
+            "g_min": 90,
+            "r_g_min": -5,
+            "g_b_min": 8,
+        },
+        "red": {
+            "r_min": 50,
+            "r_g_min": 10,
+            "r_b_min": 10,
+        },
+    }, 1)
+
+    assert result["gold"] == pytest.approx(0.6)
+    assert result["red"] == pytest.approx(0.68)
+    assert eng._capture.capture.call_count == 1
+
+
+@pytest.mark.parametrize("rules, message", [
+    ({}, "非空字典"),
+    ({"x": {}}, "非空字典"),
+    ({"x": {"h_min": 1}}, "未知指标"),
+    ({"x": {"r": 1}}, "未知条件"),
+    ({"x": {"r_min": "bright"}}, "有限数值"),
+])
+def test_pixel_ratios_rejects_invalid_rules(rules, message):
+    eng = _engine_with(_frame())
+    whole = RectCoordRef(cx=0.5, cy=0.5, w=1.0, h=1.0)
+    with pytest.raises(ValueError, match=message):
+        _call("pixel_ratios", eng, whole, rules)
+
+
 def test_found_region_accepted_as_input():
     frame = _frame()
     frame[20:40, 20:60] = _bgr((255, 255, 255))

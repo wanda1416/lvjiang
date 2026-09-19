@@ -75,13 +75,15 @@ class BatchConfigItem:
         self.usernames = [
             name for name in _unique_strings(self.usernames) if is_valid_username(name)
         ]
-        selected_tasks = set(_unique_strings(self.selected_task_ids))
-        selected_users = set(_unique_strings(self.selected_usernames))
+        selected_tasks = _unique_strings(self.selected_task_ids)
+        selected_users = _unique_strings(self.selected_usernames)
+        visible_tasks = set(self.task_ids)
+        visible_users = set(self.usernames)
         self.selected_task_ids = [
-            task_id for task_id in self.task_ids if task_id in selected_tasks
+            task_id for task_id in selected_tasks if task_id in visible_tasks
         ]
         self.selected_usernames = [
-            name for name in self.usernames if name in selected_users
+            name for name in selected_users if name in visible_users
         ]
         if not isinstance(self.rounds, int) or isinstance(self.rounds, bool):
             self.rounds = 1

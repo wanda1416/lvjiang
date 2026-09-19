@@ -97,3 +97,33 @@ def test_visibility_lists_support_select_all_and_none(monkeypatch, qtbot):
         dialog._user_list.item(i).checkState() == Qt.CheckState.Checked
         for i in range(dialog._user_list.count())
     )
+
+
+def test_switching_editor_group_does_not_change_main_active_group(
+    monkeypatch, qtbot,
+):
+    opened = BatchConfig(configs={
+        "主页面组": BatchConfigItem(name="主页面组"),
+        "编辑组": BatchConfigItem(name="编辑组"),
+    }, active_config="主页面组")
+    latest = BatchConfig(configs={
+        "主页面组": BatchConfigItem(name="主页面组"),
+        "编辑组": BatchConfigItem(name="编辑组"),
+    }, active_config="主页面组")
+    saved = []
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.load_batch_config", lambda: opened)
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.save_batch_config", saved.append)
+    dialog = BatchConfigDialog(_Users())
+    qtbot.addWidget(dialog)
+
+    dialog._config_combo.setCurrentText("编辑组")
+    assert dialog._current_name == "编辑组"
+    assert dialog._cfg.active_config == "主页面组"
+
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.load_batch_config", lambda: latest)
+    dialog._on_save()
+
+    assert saved[0].active_config == "主页面组"

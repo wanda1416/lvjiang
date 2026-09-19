@@ -32,7 +32,7 @@ def test_legacy_huaruizhi_finish_is_migrated_with_stop_parameter():
     assert item.workflow_params["finish_item"]["stop_app"] is True
 
 
-def test_group_round_trip_uses_visibility_order_for_selection(tmp_path):
+def test_group_round_trip_preserves_actual_selection_order(tmp_path):
     path = tmp_path / "batch.json"
     group = BatchConfigItem(
         name="日常",
@@ -52,8 +52,8 @@ def test_group_round_trip_uses_visibility_order_for_selection(tmp_path):
     restored = BatchConfigStore(path).load().configs["日常"]
     assert restored.task_ids == ["b", "a"]
     assert restored.usernames == ["用户B", "用户A"]
-    assert restored.selected_task_ids == ["b", "a"]
-    assert restored.selected_usernames == ["用户B", "用户A"]
+    assert restored.selected_task_ids == ["a", "b"]
+    assert restored.selected_usernames == ["用户A", "用户B"]
     assert restored.rounds == 3
     assert restored.workflow_params == group.workflow_params
     assert restored.skip_lifecycle_for_single_item is False

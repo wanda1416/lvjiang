@@ -191,10 +191,13 @@ class BatchConfigDialog(QDialog):
             tr("请选择 workflows 目录下的 .wf 文件"))
 
     def _refresh_config_list(self) -> None:
+        preferred = self._current_name
         self._config_combo.blockSignals(True)
         self._config_combo.clear()
         self._config_combo.addItems(self._cfg.configs)
-        if self._cfg.active_config in self._cfg.configs:
+        if preferred in self._cfg.configs:
+            self._config_combo.setCurrentText(preferred)
+        elif self._cfg.active_config in self._cfg.configs:
             self._config_combo.setCurrentText(self._cfg.active_config)
         self._config_combo.blockSignals(False)
         if self._config_combo.count():
@@ -301,7 +304,6 @@ class BatchConfigDialog(QDialog):
         name = self._config_combo.itemText(index)
         if self._current_name and self._current_name != name:
             self._save_current_config()
-        self._cfg.active_config = name
         self._load_config(name)
 
     def _on_new_config(self) -> None:
@@ -314,7 +316,7 @@ class BatchConfigDialog(QDialog):
             return
         self._save_current_config()
         self._cfg.configs[name] = BatchConfigItem(name=name)
-        self._cfg.active_config = name
+        self._current_name = name
         self._refresh_config_list()
 
     def _on_rename_config(self) -> None:
@@ -338,7 +340,8 @@ class BatchConfigDialog(QDialog):
             else:
                 renamed[name] = item
         self._cfg.configs = renamed
-        self._cfg.active_config = new_name
+        if self._cfg.active_config == old_name:
+            self._cfg.active_config = new_name
         self._current_name = new_name
         self._refresh_config_list()
 
@@ -351,7 +354,9 @@ class BatchConfigDialog(QDialog):
         ) != QMessageBox.StandardButton.Yes:
             return
         del self._cfg.configs[self._current_name]
-        self._cfg.active_config = next(iter(self._cfg.configs), "")
+        if self._cfg.active_config not in self._cfg.configs:
+            self._cfg.active_config = next(iter(self._cfg.configs), "")
+        self._current_name = next(iter(self._cfg.configs), "")
         self._refresh_config_list()
 
     def _on_save(self) -> None:
@@ -384,7 +389,14 @@ class BatchConfigDialog(QDialog):
             draft.workflow_params = current.workflow_params
             merged[name] = draft
         latest.configs = merged
-        latest.active_config = self._cfg.active_config
+        # 配置窗口中的组切换只是在编辑不同草稿。默认执行组属于主页面，
+        # 保存配置时必须保留其最新值；仅当该组已被删除/重命名时才回退。
+        if latest.active_config not in merged:
+            latest.active_config = (
+                self._cfg.active_config
+                if self._cfg.active_config in merged
+                else next(iter(merged), "")
+            )
         save_batch_config(latest)
         # 保存是应用当前全部配置，不关闭窗口，便于继续修改其他配置组。
         # 同步磁盘合并结果，避免下一次保存仍从打开窗口时的旧快照出发。

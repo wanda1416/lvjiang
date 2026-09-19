@@ -13,7 +13,8 @@ import json
 from typing import Any, cast
 
 from loguru import logger
-from PyQt6.QtCore import QEvent, QSize, Qt, QTimer
+from PyQt6.QtCore import QEvent, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QDropEvent
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -122,6 +123,17 @@ def _four_cjk_column_width(widget: QWidget) -> int:
         widget.fontMetrics().horizontalAdvance("汉字宽度")
         + _TABLE_COLUMN_HORIZONTAL_PADDING
     )
+
+
+class _ReorderTreeWidget(QTreeWidget):
+    """Flat tree that reports a completed internal drag/drop reorder."""
+
+    order_changed = pyqtSignal()
+
+    def dropEvent(self, event: QDropEvent | None) -> None:
+        super().dropEvent(event)
+        if event is not None and event.isAccepted():
+            self.order_changed.emit()
 
 
 class BatchTab(QWidget):
@@ -268,7 +280,7 @@ class BatchTab(QWidget):
 
         actions = QHBoxLayout()
         script_label = QLabel(tr("<b>选择执行脚本：</b>"))
-        script_label.setToolTip(tr("执行顺序由批量配置中的任务顺序决定"))
+        script_label.setToolTip(tr("拖动可临时调整实际执行顺序"))
         actions.addWidget(script_label)
         actions.addStretch()
         self._btn_script_all = QPushButton(tr("全选"))
@@ -285,7 +297,7 @@ class BatchTab(QWidget):
             actions.addWidget(button)
         layout.addLayout(actions)
 
-        self._script_list = QTreeWidget()
+        self._script_list = _ReorderTreeWidget()
         self._script_list.setColumnCount(2)
         self._script_list.setHeaderLabels([tr("脚本候选"), tr("执行顺序")])
         self._script_list.setRootIsDecorated(False)
@@ -300,8 +312,11 @@ class BatchTab(QWidget):
         self._script_list.setEditTriggers(
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
+        self._script_list.setDragDropMode(
+            QAbstractItemView.DragDropMode.InternalMove)
+        self._script_list.setDefaultDropAction(Qt.DropAction.MoveAction)
         self._script_list.setToolTip(
-            tr("执行顺序由批量配置中的任务顺序决定"))
+            tr("拖动可调整实际执行顺序；批量配置中的顺序仅作为初始顺序"))
         header = self._script_list.header()
         assert header is not None
         header.setMinimumHeight(32)
@@ -312,6 +327,7 @@ class BatchTab(QWidget):
             1, _four_cjk_column_width(self._script_list)
         )
         self._script_list.itemChanged.connect(self._on_script_item_changed)
+        self._script_list.order_changed.connect(self._on_script_rows_moved)
         layout.addWidget(self._script_list, stretch=1)
 
         self._script_order: list[str] = []
@@ -336,6 +352,19 @@ class BatchTab(QWidget):
         )
         self._script_list.setColumnWidth(0, script_name_width)
         self._script_list.setColumnWidth(1, order_width)
+
+        user_viewport = cast(QWidget, self._user_list.viewport())
+        user_header = cast(QHeaderView, self._user_list.header())
+        user_available = max(
+            user_viewport.width() - _TABLE_VIEWPORT_SAFETY_MARGIN,
+            0,
+        )
+        user_name_width = max(
+            user_header.minimumSectionSize(),
+            user_available - order_width,
+        )
+        self._user_list.setColumnWidth(0, user_name_width)
+        self._user_list.setColumnWidth(1, order_width)
 
         self._set_progress_column_widths()
 
@@ -425,7 +454,7 @@ class BatchTab(QWidget):
         # 全选/全不选行
         select_row = QHBoxLayout()
         user_label = QLabel(tr("<b>选择执行用户：</b>"))
-        user_label.setToolTip(tr("执行顺序由批量配置中的用户顺序决定"))
+        user_label.setToolTip(tr("拖动可临时调整实际执行顺序"))
         select_row.addWidget(user_label)
         select_row.addStretch()
         self._btn_user_all = QPushButton(tr("全选"))
@@ -444,23 +473,36 @@ class BatchTab(QWidget):
             self._btn_user_all, self._btn_user_none, minimum=60)
         layout.addLayout(select_row)
 
-        # 行勾选列表（放在 scroll 中）
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._user_list = _ReorderTreeWidget()
+        self._user_list.setColumnCount(2)
+        self._user_list.setHeaderLabels([tr("用户候选"), tr("执行顺序")])
+        self._user_list.setRootIsDecorated(False)
+        self._user_list.setUniformRowHeights(True)
+        self._user_list.setIndentation(0)
+        self._user_list.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows)
+        self._user_list.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._user_list.setDragDropMode(
+            QAbstractItemView.DragDropMode.InternalMove)
+        self._user_list.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self._user_list.setToolTip(
+            tr("拖动可调整实际执行顺序；批量配置中的顺序仅作为初始顺序"))
+        header = self._user_list.header()
+        assert header is not None
+        header.setMinimumHeight(32)
+        header.setMinimumSectionSize(48)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setStretchLastSection(False)
+        self._user_list.setColumnWidth(
+            1, _four_cjk_column_width(self._user_list))
+        self._user_list.itemChanged.connect(self._on_user_item_changed)
+        self._user_list.order_changed.connect(self._on_user_rows_moved)
+        layout.addWidget(self._user_list, stretch=1)
 
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout(scroll_widget)
-        scroll_layout.setContentsMargins(0, 0, 0, 0)
-
-        self._entry_checkboxes: list[tuple[QCheckBox, str]] = []
-        self._entry_container = QVBoxLayout()
-        self._entry_container.setSpacing(0)
-        scroll_layout.addLayout(self._entry_container)
-        scroll_layout.addStretch()
-
-        scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll, stretch=1)
+        self._user_order: list[str] = []
+        self._user_candidate_order: list[str] = []
+        self._updating_user_list = False
         return widget
 
     # ─── 配置选择 ─────────────────────────────────────────
@@ -650,50 +692,115 @@ class BatchTab(QWidget):
 
     def _refresh_entry_list(self):
         """刷新用户页的勾选列表。"""
-        # 清空旧控件
-        while self._entry_container.count():
-            item = self._entry_container.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        self._entry_checkboxes.clear()
-
         cfg = load_batch_config()
-        config = cfg.get_active()
+        config = cfg.configs.get(self._current_config_name())
+        self._updating_user_list = True
+        self._user_list.clear()
         if not config or not config.usernames:
-            lbl = QLabel(tr("暂无数据，请通过 工具 → 批量配置 添加"))
-            lbl.setStyleSheet("color: palette(mid);")
-            self._entry_container.addWidget(lbl)
+            self._user_order = []
+            self._user_candidate_order = []
+            self._updating_user_list = False
             return
 
-        selected = set(config.selected_usernames)
-        for username in config.usernames:
-            cb = QCheckBox(username)
-            cb.setFixedHeight(_batch_list_row_height(cb))
-            cb.setToolTip(tr("执行顺序由批量配置中的用户顺序决定"))
-            cb.setChecked(username in selected)
-            cb.toggled.connect(self._persist_user_selection)
-            self._entry_container.addWidget(cb)
-            self._entry_checkboxes.append((cb, username))
+        visible = set(config.usernames)
+        selected_order = [
+            name for name in config.selected_usernames if name in visible
+        ]
+        selected = set(selected_order)
+        display_order = selected_order + [
+            name for name in config.usernames if name not in selected
+        ]
+        self._user_candidate_order = list(display_order)
+        self._user_order = list(selected_order)
+        row_height = _batch_list_row_height(self._user_list)
+        for username in display_order:
+            item = QTreeWidgetItem([username, ""])
+            item.setData(0, Qt.ItemDataRole.UserRole, username)
+            item.setFlags(
+                (item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                & ~Qt.ItemFlag.ItemIsDropEnabled
+            )
+            item.setCheckState(
+                0, Qt.CheckState.Checked
+                if username in selected else Qt.CheckState.Unchecked)
+            item.setSizeHint(0, QSize(0, row_height))
+            item.setSizeHint(1, QSize(0, row_height))
+            item.setTextAlignment(1, Qt.AlignmentFlag.AlignCenter)
+            self._user_list.addTopLevelItem(item)
+        self._updating_user_list = False
+        self._refresh_user_order_column()
 
     def _set_all_entries_checked(self, checked: bool):
         """全选/全不选行"""
-        for cb, _username in self._entry_checkboxes:
-            cb.blockSignals(True)
-            cb.setChecked(checked)
-            cb.blockSignals(False)
+        self._updating_user_list = True
+        try:
+            for index in range(self._user_list.topLevelItemCount()):
+                item = self._user_list.topLevelItem(index)
+                if item is None:
+                    continue
+                item.setCheckState(
+                    0, Qt.CheckState.Checked
+                    if checked else Qt.CheckState.Unchecked)
+        finally:
+            self._updating_user_list = False
+        self._user_order = list(self._user_candidate_order) if checked else []
+        self._refresh_user_order_column()
         self._persist_user_selection()
+
+    @staticmethod
+    def _user_name(item: QTreeWidgetItem | None) -> str:
+        if item is None:
+            return ""
+        value = item.data(0, Qt.ItemDataRole.UserRole)
+        return value if isinstance(value, str) else ""
+
+    def _on_user_item_changed(self, _item: QTreeWidgetItem, column: int) -> None:
+        if self._updating_user_list or column != 0:
+            return
+        self._sync_user_order_from_rows()
+
+    def _on_user_rows_moved(self, *_args) -> None:
+        if not self._updating_user_list:
+            self._sync_user_order_from_rows()
+
+    def _sync_user_order_from_rows(self) -> None:
+        self._user_candidate_order = []
+        self._user_order = []
+        for index in range(self._user_list.topLevelItemCount()):
+            item = self._user_list.topLevelItem(index)
+            if item is None:
+                continue
+            username = self._user_name(item)
+            if not username:
+                continue
+            self._user_candidate_order.append(username)
+            if item.checkState(0) == Qt.CheckState.Checked:
+                self._user_order.append(username)
+        self._refresh_user_order_column()
+        self._persist_user_selection()
+
+    def _refresh_user_order_column(self) -> None:
+        order_by_name = {
+            username: str(index)
+            for index, username in enumerate(self._user_order, start=1)
+        }
+        self._updating_user_list = True
+        try:
+            for index in range(self._user_list.topLevelItemCount()):
+                item = self._user_list.topLevelItem(index)
+                if item is None:
+                    continue
+                item.setText(1, order_by_name.get(self._user_name(item), ""))
+        finally:
+            self._updating_user_list = False
 
     def _persist_user_selection(self, *_args) -> None:
         name = self._current_config_name()
-        selected = [
-            username for checkbox, username in self._entry_checkboxes
-            if checkbox.isChecked()
-        ]
         cfg = load_batch_config()
         item = cfg.configs.get(name)
         if item is None:
             return
-        item.selected_usernames = selected
+        item.selected_usernames = list(self._user_order)
         save_batch_config(cfg)
 
     def _get_enabled_usernames(self) -> list[str]:
@@ -702,8 +809,7 @@ class BatchTab(QWidget):
         config = cfg.configs.get(self._current_config_name())
         if not config:
             return []
-        return [username for checkbox, username in self._entry_checkboxes
-                if checkbox.isChecked()]
+        return list(self._user_order)
 
     # ─── 脚本列表 ─────────────────────────────────────────
 
@@ -732,7 +838,13 @@ class BatchTab(QWidget):
         group = batch_cfg.configs.get(self._current_config_name()) or batch_cfg.get_active()
         visible_ids = list(group.task_ids) if group is not None else []
         visible = set(visible_ids)
-        display_ids = list(visible_ids)
+        selected_visible_ids = [
+            task_id for task_id in checked_ids if task_id in visible
+        ]
+        selected_visible = set(selected_visible_ids)
+        display_ids = selected_visible_ids + [
+            task_id for task_id in visible_ids if task_id not in selected_visible
+        ]
         configs = [
             discovered_by_id[task_id] for task_id in display_ids
             if task_id in discovered_by_id
@@ -741,9 +853,9 @@ class BatchTab(QWidget):
         self._script_candidate_order = [
             task_id for task_id in display_ids if task_id in self._script_configs_by_id
         ]
-        checked = set(checked_ids)
         self._script_order = [
-            task_id for task_id in self._script_candidate_order if task_id in checked
+            task_id for task_id in checked_ids
+            if task_id in self._script_configs_by_id
         ]
         # 勾选过、但此刻发现不到的脚本（被删、取消暴露、改成 dedicated、
         # 挪进 standalone/…）。它们不参与本次执行，但必须原位留在
@@ -760,7 +872,10 @@ class BatchTab(QWidget):
         for script_cfg in configs:
             item = QTreeWidgetItem([script_display_name(script_cfg), ""])
             item.setData(0, Qt.ItemDataRole.UserRole, script_cfg)
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setFlags(
+                (item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                & ~Qt.ItemFlag.ItemIsDropEnabled
+            )
             is_checked = script_cfg["id"] in checked_ids
             item.setCheckState(
                 0, Qt.CheckState.Checked if is_checked else Qt.CheckState.Unchecked
@@ -794,6 +909,24 @@ class BatchTab(QWidget):
             candidate for candidate in self._script_candidate_order
             if candidate in selected
         ]
+        self._refresh_script_order_column()
+        self._persist_script_order()
+
+    def _on_script_rows_moved(self, *_args) -> None:
+        if self._updating_script_list:
+            return
+        self._script_candidate_order = []
+        self._script_order = []
+        for index in range(self._script_list.topLevelItemCount()):
+            item = self._script_list.topLevelItem(index)
+            if item is None:
+                continue
+            script_id = self._script_id(item)
+            if not script_id:
+                continue
+            self._script_candidate_order.append(script_id)
+            if item.checkState(0) == Qt.CheckState.Checked:
+                self._script_order.append(script_id)
         self._refresh_script_order_column()
         self._persist_script_order()
 
@@ -1153,7 +1286,6 @@ class BatchTab(QWidget):
         self._config_combo.setEnabled(enabled)
         self._btn_user_all.setEnabled(enabled)
         self._btn_user_none.setEnabled(enabled)
+        self._user_list.setEnabled(enabled)
         self._rounds_spin.setEnabled(enabled)
         self._workflow_params_panel.setEnabled(enabled)
-        for cb, _username in self._entry_checkboxes:
-            cb.setEnabled(enabled)

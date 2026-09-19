@@ -1,4 +1,4 @@
-#% name: 自动购买不肝商店
+#% name: 购买不肝商店
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]

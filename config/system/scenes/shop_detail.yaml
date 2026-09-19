@@ -29,6 +29,23 @@ regions:
   views:
   - base
   - jingxuan
+- key: libao
+  name: 礼包
+  type: func
+  is_text: true
+  is_clickable: true
+  views:
+  - jingxuan
+  - jingxuan_daoju
+- key: daoju
+  name: 道具
+  type: func
+  is_text: true
+  is_clickable: true
+  views:
+  - jingxuan
+  - jingxuan_daoju
+  to: /jingxuan_daoju
 panels:
 - key: items
   name: 购买列表

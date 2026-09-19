@@ -24,8 +24,6 @@ def scripts(monkeypatch):
     }
     monkeypatch.setattr("lvjiang.workflows.discovery.discover_scripts",
                         lambda: list(catalog.values()))
-    monkeypatch.setattr(
-        "lvjiang.workflows.discovery.migrate_legacy_workflows_yaml", lambda: False)
     return catalog
 
 
@@ -128,8 +126,6 @@ class TestRealConfig:
 
     def test_weekly_baiye_freight_hidden(self, monkeypatch):
         from lvjiang.workflows.discovery import discover_scripts
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.migrate_legacy_workflows_yaml", lambda: False)
         by_id = {c["id"]: c for c in discover_scripts()}
         assert by_id["weekly_baiye_freight"]["hidden"] is True
         assert by_id["scan_wallet"]["hidden"] is False

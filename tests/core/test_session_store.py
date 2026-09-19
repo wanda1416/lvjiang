@@ -31,22 +31,32 @@ class TestNodeOps:
         assert store.get_node("ui_state", {}) == {}
 
     def test_set_get_roundtrip(self, store):
-        store.set_node("active_layout", "android")
-        assert store.get_node("active_layout") == "android"
+        store.set_node("actives", {"layout": "android"})
+        assert store.get_node("actives") == {"layout": "android"}
 
     def test_node_isolation(self, store):
         """不同节点独立读写，互不覆盖"""
         store.set_node("ui_state", {"window_size": [800, 600]})
         store.set_node("daily", {"script": "a.wf"})
-        store.set_node("active_layout", "android")
+        store.set_node("actives", {"layout": "android"})
         assert store.get_node("ui_state") == {"window_size": [800, 600]}
         assert store.get_node("daily") == {"script": "a.wf"}
-        assert store.get_node("active_layout") == "android"
+        assert store.get_node("actives") == {"layout": "android"}
 
     def test_set_persists_to_disk(self, store):
         store.set_node("settings", {"adb": True})
         data = json.loads(store.path.read_text(encoding="utf-8"))
-        assert data == {"settings": {"adb": True}}
+        assert data == {"version": 2, "settings": {"adb": True}}
+
+    def test_first_write_stamps_document_version(self, store):
+        """新文档首次落盘就带 version，后续迁移才有判断锚点。"""
+        import json
+
+        from lvjiang.core.config.session import SESSION_VERSION
+
+        store.set_node("k", 1)
+        assert json.loads(store.path.read_text(encoding="utf-8"))["version"] == SESSION_VERSION
+        assert store.get_node("version") == SESSION_VERSION
 
     def test_delete_node(self, store):
         store.set_node("daily", {"x": 1})
@@ -85,57 +95,9 @@ class TestNodeOps:
         assert store.get_node("daily") == {"list": [1, 2]}
 
 
-class TestActivesMigration:
-    def test_reads_legacy_active_keys_without_writing(self, tmp_path):
+class TestActives:
+    def test_round_trip(self, tmp_path):
         path = tmp_path / "session.json"
-        path.write_text(json.dumps({
-            "active_user": "旧用户",
-            "active_layout": "旧布局",
-            "active_space": "旧图库",
-        }), encoding="utf-8")
-        store = SessionStore(path)
-
-        assert store.get_active("user") == "旧用户"
-        assert store.get_active("layout") == "旧布局"
-        assert store.get_active("space") == "旧图库"
-        assert "actives" not in json.loads(path.read_text(encoding="utf-8"))
-
-    def test_new_actives_take_precedence_over_legacy(self, tmp_path):
-        path = tmp_path / "session.json"
-        path.write_text(json.dumps({
-            "actives": {"layout": "新布局"},
-            "active_layout": "旧布局",
-        }), encoding="utf-8")
-        store = SessionStore(path)
-
-        assert store.get_active("layout") == "新布局"
-
-    def test_any_active_write_migrates_all_legacy_keys_atomically(self, tmp_path):
-        path = tmp_path / "session.json"
-        path.write_text(json.dumps({
-            "active_user": "旧用户",
-            "active_layout": "旧布局",
-            "active_space": "旧图库",
-            "daily": {"workflow_id": "task"},
-        }), encoding="utf-8")
-        store = SessionStore(path)
-
-        store.set_active("space", "新图库")
-
-        data = json.loads(path.read_text(encoding="utf-8"))
-        assert data["actives"] == {
-            "user": "旧用户",
-            "layout": "旧布局",
-            "space": "新图库",
-        }
-        assert not ({"active_user", "active_layout", "active_space"} & data.keys())
-        assert data["daily"] == {"workflow_id": "task"}
-
-    def test_plan_kind_has_no_legacy_top_level_key(self, tmp_path):
-        """plan 是新 kind：只走 actives，不该去找伪造的 active_plan。"""
-        path = tmp_path / "session.json"
-        path.write_text(json.dumps({"active_plan": "不该被读到"}),
-                        encoding="utf-8")
         store = SessionStore(path)
 
         assert store.get_active("plan", "") == ""
@@ -157,13 +119,13 @@ class TestActivesMigration:
 class TestDiskSemantics:
     def test_existing_file_loaded_lazily(self, tmp_path):
         path = tmp_path / "session.json"
-        path.write_text(json.dumps({"active_space": "默认"}), encoding="utf-8")
+        path.write_text(json.dumps({"actives": {"space": "默认"}}), encoding="utf-8")
         store = SessionStore(path)
-        assert store.get_node("active_space") == "默认"
+        assert store.get_active("space") == "默认"
         # 写入保留既有节点
-        store.set_node("active_layout", "L1")
+        store.set_active("layout", "L1")
         data = json.loads(path.read_text(encoding="utf-8"))
-        assert data == {"active_space": "默认", "active_layout": "L1"}
+        assert data == {"version": 2, "actives": {"space": "默认", "layout": "L1"}}
 
     def test_corrupt_file_treated_as_empty(self, tmp_path):
         path = tmp_path / "session.json"

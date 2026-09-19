@@ -1,8 +1,7 @@
 """毕业率基准 DPS 会话覆盖层。
 
 用户可在 UI 中校正方案的 100% 毕业率基准 DPS，校正值存入 session 而非
-覆写 Excel 导出的 JSON 源数据。存储在 session.json 的 ``yysls`` 节点
-（旧的独立 yysls.json 仍可读，见 session_node）：
+覆写 Excel 导出的 JSON 源数据。存储在 session.json 的 ``yysls`` 节点：
 
     graduations: {
         流派名: {
@@ -22,7 +21,7 @@ from . import session_node
 
 
 def _load() -> dict:
-    """读取插件会话节点（首次运行时回退旧的独立文件）"""
+    """读取插件会话节点。"""
     return session_node.load()
 
 

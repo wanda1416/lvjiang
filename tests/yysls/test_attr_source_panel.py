@@ -126,14 +126,11 @@ def test_the_real_manager_is_untouched_by_the_panel_fixture() -> None:
 def session_dir(tmp_path, monkeypatch):
     import lvjiang.constants as constants
     import lvjiang.core.config.session as session_mod
-    from lvjiang.apps.yysls.config import session_node
-
     root = tmp_path / "session"
     root.mkdir()
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", root)
     monkeypatch.setattr(constants, "SESSION_PATH", root / "session.json")
     monkeypatch.setattr(session_mod, "_store", None)
-    monkeypatch.setattr(session_node, "LEGACY_PATH", root / "yysls.json")
     return root
 
 

@@ -394,8 +394,6 @@ def _stub_prefs(monkeypatch, *, order=None, visible=None, names=None, scopes=Non
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.load_preferences",
         lambda: DailyScriptPrefs(order or [], visible or {}, names or {}, scopes or {}))
-    monkeypatch.setattr(
-        "lvjiang.workflows.discovery.migrate_legacy_workflows_yaml", lambda: False)
 
 
 class TestListExposedScripts:

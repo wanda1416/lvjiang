@@ -134,20 +134,6 @@ class TestLoadUserConfig:
         assert config.font_sizes.user_overview == 0
         assert config.font_sizes.user_info == 0
 
-    def test_obsolete_material_grid_is_not_loaded(self, session_env, monkeypatch):
-        """0.8 不再兼容旧键，用户需要重新保存 reference_grid。"""
-        monkeypatch.setattr(
-            "lvjiang.core.config.load_app_config", lambda: {})
-        session_env.write_text(json.dumps({
-            "settings": {"material_grid": {"rows": 4, "cols": 5, "height": 100}}
-        }), encoding="utf-8")
-        reset_session_store()
-        config = load_user_config()
-        assert config.reference_grid.rows == 3
-        assert config.reference_grid.cols == 6
-        assert config.reference_grid.height == 122
-        assert config.reference_grid.width == 122
-
     def test_app_yaml_input_sim_override(self, session_env, monkeypatch):
         """app.yaml 的 input_simulation 节点覆盖输入模拟默认值"""
         monkeypatch.setattr(
@@ -224,13 +210,13 @@ class TestLoadUserConfig:
 class TestSaveSessionNodes:
     def test_save_settings_preserves_other_fields(self, session_env):
         """save_settings 只更新 settings 节点，保留其他字段"""
-        session_env.write_text(json.dumps({"active_user": "张三", "ui_state": {"a": 1}}),
+        session_env.write_text(json.dumps({"actives": {"user": "张三"}, "ui_state": {"a": 1}}),
                                encoding="utf-8")
         reset_session_store()
         save_settings({"android_capture_method": "screencap"})
         data = json.loads(session_env.read_text(encoding="utf-8"))
         assert data["settings"] == {"android_capture_method": "screencap"}
-        assert data["active_user"] == "张三"
+        assert data["actives"] == {"user": "张三"}
         assert data["ui_state"] == {"a": 1}
 
     def test_save_reference_grid_creates_file(self, session_env):
@@ -238,26 +224,7 @@ class TestSaveSessionNodes:
         grid = {"rows": 2, "cols": 3, "gap": 1, "height": 80, "width": 90}
         save_reference_grid(grid)
         data = json.loads(session_env.read_text(encoding="utf-8"))
-        assert data == {"settings": {"reference_grid": grid}}
-
-    def test_save_reference_grid_removes_obsolete_key(self, session_env):
-        """一旦保存新配置，只留下 reference_grid，不继续维护旧键。"""
-        session_env.write_text(json.dumps({
-            "settings": {
-                "theme": "dark",
-                "material_grid": {"rows": 9},
-            },
-        }), encoding="utf-8")
-        reset_session_store()
-
-        grid = {"rows": 2, "cols": 3}
-        save_reference_grid(grid)
-
-        settings = json.loads(
-            session_env.read_text(encoding="utf-8")
-        )["settings"]
-        assert settings == {"theme": "dark", "reference_grid": grid}
-
+        assert data == {"version": 2, "settings": {"reference_grid": grid}}
 
 class TestSaveAppConfig:
     INPUT_SIM = {"before_click_wait": [0.1, 0.3], "click_random_offset": 5,

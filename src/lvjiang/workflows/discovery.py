@@ -31,7 +31,7 @@ from . import implementations
 from .file_tree import WORKFLOWS_DIR
 from .metadata import SCRIPT_ID_RE, metadata_for_script_config, script_traits
 from .policy import WorkflowDiscoveryPolicy as Policy
-from .preferences import load_preferences, migrate_legacy_workflows_yaml
+from .preferences import load_preferences
 
 
 @dataclass(frozen=True)
@@ -248,7 +248,6 @@ def list_exposed_scripts(run_env: str | None = None) -> list[dict]:
         自定义显示名。
     """
     discovered = {cfg["id"]: cfg for cfg in discover_scripts()}
-    migrate_legacy_workflows_yaml()   # 一次性搬运，下个版本可删
     prefs = load_preferences()
 
     def shown(sid: str) -> bool:

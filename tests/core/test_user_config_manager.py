@@ -101,7 +101,7 @@ class TestUserConfigManagerInit:
         import json
         session_env.write_text(json.dumps({
             "users": ["用户A", "用户B"],
-            "active_user": "用户B",
+            "actives": {"user": "用户B"},
         }), encoding="utf-8")
         reset_session_store()
         mgr = UserConfigManager()
@@ -112,7 +112,7 @@ class TestUserConfigManagerInit:
         import json
         session_env.write_text(json.dumps({
             "users": ["用户A"],
-            "active_user": "不存在的用户",
+            "actives": {"user": "不存在的用户"},
         }), encoding="utf-8")
         reset_session_store()
         mgr = UserConfigManager()

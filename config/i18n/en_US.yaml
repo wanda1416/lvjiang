@@ -1713,6 +1713,9 @@ task_history:
   可见用户：: 'Visible users:'
   <b>选择执行脚本：</b>: '<b>Select scripts:</b>'
   <b>选择执行用户：</b>: '<b>Select users:</b>'
+  恢复默认顺序: Restore Default Order
+  随机打乱顺序: Shuffle Order
+  拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；批量配置中的顺序仅作为初始顺序: Drag to change the actual execution order; right-click to restore the default order or shuffle it; the order in Batch Configuration is only the initial order
   执行顺序由批量配置中的任务顺序决定: Execution order follows the task order in Batch Configuration
   执行顺序由批量配置中的用户顺序决定: Execution order follows the user order in Batch Configuration
   拖动任务可调整批量执行顺序: Drag tasks to change the batch execution order

@@ -42,6 +42,7 @@ from ....config.equipment_slots import SLOT_SPECS
 from ....core.affix_cap import equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ...events import EQUIPMENT_CHANGED, get_event_hub
+from .batch_copy import BatchCopyMixin
 from .cards import _CompactEquipCard, _SlotCard
 from .mock_dialog import MockEquipDialog
 
@@ -237,31 +238,10 @@ class _FilteredDeleteDialog(QDialog):
 
 
 def _affix_analysis_dependencies():
-    """集中解析词条分析依赖，便于在不打开对话框时验证导入路径。"""
-    from ....config import get_game_config
-    from ....core.combat.equipment import EquipmentInventory
-    from ....core.graduation.affix_impact import (
-        analyze_affix_impacts,
-        analyze_combined_affix_replacements,
-    )
-    from ....core.graduation.context import PlanContextError, PlanScoringContext
-    from ....core.graduation.transmute_optimizer import (
-        TransmuteSearchRequest,
-        optimize_transmutes,
-    )
-    from ..affix_analysis_pages import AffixAnalysisPages
+    """兼容入口：实现见 ``analysis_launcher.analysis_dependencies``。"""
+    from ..analysis_launcher import analysis_dependencies
 
-    return (
-        get_game_config,
-        EquipmentInventory,
-        PlanScoringContext,
-        PlanContextError,
-        analyze_affix_impacts,
-        analyze_combined_affix_replacements,
-        AffixAnalysisPages,
-        TransmuteSearchRequest,
-        optimize_transmutes,
-    )
+    return analysis_dependencies()
 
 
 def _route_weapon_slot(eq_type: str, main_type: str, sub_type: str) -> str:
@@ -282,7 +262,7 @@ def _route_weapon_slot(eq_type: str, main_type: str, sub_type: str) -> str:
 # ── 主 Tab ──────────────────────────────────────────
 
 
-class EquipStatusTab(QWidget):
+class EquipStatusTab(BatchCopyMixin, QWidget):
     """装备 Tab —— 装备背包统一视图。
 
     顶部 8 个可点击槽位（固定 2×4），下方全部装备网格。
@@ -775,138 +755,6 @@ class EquipStatusTab(QWidget):
         is_mock = (self._source_filter.currentData() or "all") == "mock"
         self._btn_batch_copy.setVisible(is_mock)
         self._btn_delete_filtered.setVisible(not is_mock)
-
-    def _enter_batch_copy_mode(self) -> None:
-        if (self._source_filter.currentData() or "all") != "mock":
-            return
-        self._batch_copy_mode = True
-        self._batch_selected_fps.clear()
-        self._batch_target_users.clear()
-        self._filter_widget.setVisible(False)
-        self._batch_copy_widget.setVisible(True)
-        self._slot_container.setVisible(False)
-        self._slot_separator.setVisible(False)
-        self._rebuild_copy_targets_menu()
-        self._update_batch_copy_controls()
-        self._rebuild_grid()
-
-    def _exit_batch_copy_mode(self, *, rebuild: bool = True) -> None:
-        if not hasattr(self, "_batch_copy_widget"):
-            return
-        self._batch_copy_mode = False
-        self._batch_selected_fps.clear()
-        self._batch_target_users.clear()
-        self._batch_copy_widget.setVisible(False)
-        self._filter_widget.setVisible(True)
-        self._slot_container.setVisible(True)
-        self._slot_separator.setVisible(True)
-        self._update_source_actions()
-        if rebuild:
-            self._rebuild_grid()
-
-    def _rebuild_copy_targets_menu(self) -> None:
-        self._copy_targets_menu.clear()
-        current = self._host.active_user_name()
-        for username in self._host.user_manager.list_users():
-            if username == current:
-                continue
-            action = self._copy_targets_menu.addAction(username)
-            action.setCheckable(True)
-            action.toggled.connect(
-                lambda checked, name=username: self._toggle_copy_target(
-                    name, checked))
-
-    def _toggle_copy_target(self, username: str, checked: bool) -> None:
-        if checked:
-            self._batch_target_users.add(username)
-        else:
-            self._batch_target_users.discard(username)
-        self._update_batch_copy_controls()
-
-    def _toggle_batch_card(self, fp: str, checked: bool) -> None:
-        if checked:
-            self._batch_selected_fps.add(fp)
-        else:
-            self._batch_selected_fps.discard(fp)
-        self._update_batch_copy_controls()
-
-    def _select_all_batch_cards(self) -> None:
-        visible = {
-            str(equip.get("_fp") or "")
-            for equip, _part, _group, is_mock, _referenced
-            in self._collect_filtered_cards()
-            if is_mock and equip.get("_fp")
-        }
-        self._batch_selected_fps = (
-            set() if visible and visible <= self._batch_selected_fps else visible)
-        self._rebuild_grid()
-        self._update_batch_copy_controls()
-
-    def _update_batch_copy_controls(self) -> None:
-        count = len(self._batch_selected_fps)
-        target_count = len(self._batch_target_users)
-        visible_fps = {
-            str(equip.get("_fp") or "")
-            for equip, _part, _group, is_mock, _referenced
-            in self._collect_filtered_cards()
-            if is_mock and equip.get("_fp")
-        }
-        self._batch_selected_label.setText(
-            tr("已选择 {count} 件").format(count=count))
-        self._btn_batch_select_all.setText(
-            tr("取消全选")
-            if visible_fps and visible_fps <= self._batch_selected_fps
-            else tr("全选"))
-        target_names = "、".join(sorted(self._batch_target_users))
-        self._btn_copy_targets.setText(
-            f"{tr('复制到')}：{target_names}" if target_names else tr("复制到…"))
-        self._btn_copy_targets.setToolTip(target_names)
-        self._btn_confirm_batch_copy.setEnabled(bool(count and target_count))
-
-    def _copy_selected_mocks(self) -> None:
-        if not self._batch_selected_fps or not self._batch_target_users:
-            return
-        source = self._host.active_user_name()
-        reply = QMessageBox.question(
-            self,
-            tr("确认复制"),
-            tr("确定将 {items} 件模拟装备复制给 {users} 个用户吗？").format(
-                items=len(self._batch_selected_fps),
-                users=len(self._batch_target_users),
-            ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        try:
-            from ....core.loadout import copy_mock_items_to_users
-            results = copy_mock_items_to_users(
-                source,
-                sorted(self._batch_target_users),
-                set(self._batch_selected_fps),
-            )
-        except Exception as exc:
-            logger.exception("批量复制模拟装备失败")
-            QMessageBox.critical(self, tr("复制失败"), str(exc))
-            return
-        lines = []
-        for result in results:
-            if result.error:
-                lines.append(tr("{user}：复制失败：{error}").format(
-                    user=result.target_username, error=result.error))
-            else:
-                lines.append(tr(
-                    "{user}：新增 {copied}，已存在 {existing}，冲突 {conflicts}"
-                ).format(
-                    user=result.target_username,
-                    copied=result.copied,
-                    existing=result.existing,
-                    conflicts=result.conflicts,
-                ))
-        QMessageBox.information(
-            self, tr("复制完成"), "\n".join(lines))
-        self._exit_batch_copy_mode()
 
     def _get_level_threshold(self) -> int:
         """获取等级筛选阈值，0 表示不筛选"""
@@ -1940,15 +1788,34 @@ class EquipStatusTab(QWidget):
 
         self._open_graduation_analysis(TAB_OPTIMAL)
 
-    def _analysis_cache_for(self, user_name: str, plan_id: str):
-        """按“用户 + 备战方案”隔离的上次计算结果。"""
-        from ..graduation_analysis import AnalysisCache
+    def _on_affix_impact(self):
+        """打开毕业率分析对话框的「转律建议」页。"""
+        from ..graduation_analysis import TAB_TRANSMUTE
 
-        caches = getattr(self, "_analysis_caches", None)
-        if caches is None:
-            caches = {}
-            self._analysis_caches = caches
-        return caches.setdefault((user_name, plan_id), AnalysisCache())
+        self._open_graduation_analysis(TAB_TRANSMUTE)
+
+    def _analysis_launcher(self):
+        """分析对话框入口装配器（懒建）；装备页只交出自己掌握的协作者。"""
+        launcher = getattr(self, "_launcher", None)
+        if launcher is None:
+            from ..analysis_launcher import GraduationAnalysisLauncher
+
+            launcher = GraduationAnalysisLauncher(
+                self._host, self,
+                assumptions_source=lambda: self._combat_tab.assumptions(),
+                level_threshold=self._get_level_threshold,
+                affix_filter=self._get_affix_filter,
+                display_params=lambda: self._display_params,
+                apply_transmute=self._apply_transmute_result,
+            )
+            self._launcher = launcher
+        return launcher
+
+    def _open_graduation_analysis(self, initial_tab: int) -> None:
+        if self._combat_tab is None:
+            QMessageBox.warning(self, tr("提示"), tr("未找到角色详情面板"))
+            return
+        self._analysis_launcher().open(initial_tab)
 
     def _apply_transmute_result(self, result, *, user_name: str, plan_id: str) -> bool:
         """把转律建议写入公共装备；用户、方案或装备快照过期时拒绝。"""
@@ -1978,137 +1845,3 @@ class EquipStatusTab(QWidget):
         self._sync_inv(notify=True)
         logger.info("已写入 {} 件装备的转律目标", len(moves))
         return True
-
-    def _on_affix_impact(self):
-        """打开毕业率分析对话框的「转律建议」页。"""
-        from ..graduation_analysis import TAB_TRANSMUTE
-
-        self._open_graduation_analysis(TAB_TRANSMUTE)
-
-    def _open_graduation_analysis(self, initial_tab: int) -> None:
-        """构建共享上下文（流派、模型、基础属性、假设副本）并打开分析对话框。"""
-        from ..graduation_analysis import (
-            AssumptionBar,
-            GraduationAnalysisDialog,
-        )
-        from ..optimal_combo import OptimalComboPage
-
-        combat_tab = self._combat_tab
-        if combat_tab is None:
-            QMessageBox.warning(self, tr("提示"), tr("未找到角色详情面板"))
-            return
-
-        user_name = self._host.active_user_name()
-        if not user_name:
-            QMessageBox.warning(self, tr("提示"), tr("没有激活的用户"))
-            return
-
-        try:
-            (
-                get_game_config,
-                EquipmentInventory,
-                PlanScoringContext,
-                PlanContextError,
-                analyze_affix_impacts,
-                analyze_combined_affix_replacements,
-                AffixAnalysisPages,
-                TransmuteSearchRequest,
-                optimize_transmutes,
-            ) = _affix_analysis_dependencies()
-
-            game_config = get_game_config()
-            inventory = EquipmentInventory(user_name)
-            equipped = inventory.equipped
-            plan = inventory.active_plan
-            plan_id = inventory.active_plan_id
-            # 方案 → 计算上下文（流派、模型、基础属性含弓玦）只构造一次
-            try:
-                scoring = PlanScoringContext.from_plan(
-                    plan, game_config=game_config)
-            except PlanContextError as exc:
-                QMessageBox.warning(
-                    self, tr("提示"),
-                    tr("请先在角色详情页选择流派和毕业率方案（{reason}）")
-                    .format(reason=exc.reason))
-                return
-            calculator = scoring.calculator
-            base_attrs = scoring.base_attrs
-            school = scoring.school
-            school_pool = tuple(game_config.get_transmute_pool(school))
-
-            # 假设栏：备战方案面板假设的副本，关闭即弃
-            bar = AssumptionBar(
-                combat_tab.assumptions(),
-                season_level=game_config.current_equip_level(),
-            )
-
-            def transmute_runner(stop_check, assumptions):
-                return optimize_transmutes(TransmuteSearchRequest(
-                    equipped=copy.deepcopy(equipped),
-                    calculator=calculator,
-                    base_attrs=base_attrs,
-                    school=school,
-                    game_config=game_config,
-                    stop_check=stop_check,
-                    school_pool=school_pool,
-                    full_chengyin=assumptions.full_chengyin,
-                    full_dingyin=assumptions.full_dingyin,
-                    full_level=assumptions.full_level,
-                    playstyle=assumptions.playstyle,
-                ))
-
-            def apply_handler(result) -> bool:
-                return self._apply_transmute_result(
-                    result, user_name=user_name, plan_id=plan_id)
-
-            affix_pages = AffixAnalysisPages(
-                school,
-                scoring.scheme,
-                equipped=equipped,
-                report_provider=lambda: analyze_affix_impacts(
-                    equipped,
-                    calculator,
-                    base_attrs,
-                    school,
-                    game_config=game_config,
-                ),
-                joint_analyzer=lambda slots: analyze_combined_affix_replacements(
-                    equipped,
-                    (),
-                    slots,
-                    calculator,
-                    base_attrs,
-                    school,
-                    game_config=game_config,
-                ),
-                transmute_runner=transmute_runner,
-                apply_handler=apply_handler,
-                assumptions_provider=bar.value,
-                display_params=self._display_params,
-            )
-            optimal_page = OptimalComboPage(
-                self._host, school, scoring.scheme,
-                scoring.base_attrs_without_gongjue,
-                level_threshold=self._get_level_threshold(),
-                affix_filter=self._get_affix_filter(),
-                gongjue=scoring.gongjue,
-                playstyle=plan.playstyle,
-                main_martial_art=plan.main_martial_art,
-                sub_martial_art=plan.sub_martial_art,
-                assumptions_provider=bar.value,
-            )
-            dialog = GraduationAnalysisDialog(
-                self,
-                school=school,
-                scheme=scoring.scheme,
-                plan_name=plan.name,
-                assumption_bar=bar,
-                optimal_page=optimal_page,
-                affix_pages=affix_pages,
-                cache=self._analysis_cache_for(user_name, plan_id),
-                initial_tab=initial_tab,
-            )
-            dialog.exec()
-        except Exception as exc:
-            logger.error(f"毕业率分析打开失败: {exc}")
-            QMessageBox.critical(self, tr("分析失败"), str(exc))

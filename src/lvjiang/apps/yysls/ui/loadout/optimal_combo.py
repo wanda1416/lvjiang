@@ -51,6 +51,10 @@ from ...core.combat.combat_attrs import (
 )
 from ...core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ...core.graduation.assumptions import Assumptions
+from ...core.graduation.candidate_pool import (
+    CandidateFilter,
+    collect_candidates,
+)
 from ...core.graduation.context import gongjue_attrs
 from ..domain_labels import domain_label
 from ..events import EQUIPMENT_CHANGED, get_event_hub
@@ -519,14 +523,14 @@ _CHANGE_NONE = "none"    # 组合里没有这个部位
 def _slot_change(current: Any, proposed: Any) -> str:
     """比较组合里某部位的装备与备战方案当前穿戴，返回 ``_CHANGE_*``。
 
-    按指纹比较而不是按对象：搜索结果里的装备是从候选池复制出来的，
-    同一件装备可能是不同的 dict。
+    按仓储 fp 比较而不是按对象：搜索结果里的装备是从候选池复制出来的，
+    同一条记录可能是不同的 dict；fp 是仓储里“同一件”的唯一口径。
     """
     if not isinstance(proposed, dict) or not proposed:
         return _CHANGE_NONE
     if not isinstance(current, dict) or not current:
         return _CHANGE_NEW
-    if _equip_fingerprint(current) == _equip_fingerprint(proposed):
+    if current.get("_fp") and current.get("_fp") == proposed.get("_fp"):
         return _CHANGE_SAME
     return _CHANGE_SWAP
 
@@ -1281,88 +1285,21 @@ class OptimalComboPage(QWidget):
         logger.debug(
             f"流派 {self._school}: 主武器={main_weapon_type}, 副武器={sub_weapon_type}")
 
-        # group_key → slot_keys 映射
-        # 武器不再无差别双投，而是按流派武器类型精确分配
-        group_to_slots: dict[str, list[str]] = {
-            "head": ["head"],
-            "chest": ["chest"],
-            "ring": ["ring"],
-            "pendant": ["pendant"],
-            "leg": ["leg"],
-            "wrist": ["wrist"],
-        }
-
-        slot_candidates: dict[str, list[dict]] = {
-            key: [] for key, _, _ in _SLOT_ORDER
-        }
-
+        # 候选池的收集与去重是领域逻辑，见 core.graduation.candidate_pool
         exclude_mock = self._chk_exclude_mock.isChecked()
+        pooled = collect_candidates(
+            inv.bag_items, None if exclude_mock else inv.mock_items,
+            main_weapon_type=main_weapon_type, sub_weapon_type=sub_weapon_type,
+            filters=CandidateFilter(self._level_threshold, self._affix_filter),
+        )
 
-        def _is_mock(eq: dict) -> bool:
-            fp = eq.get("_fp", "")
-            if isinstance(fp, str) and fp.startswith("mock_"):
-                return True
-            return bool(eq.get("_extra", {}).get("is_mock"))
-
-        # 背包侧的候选来源：真实装备恒取，模拟装备按开关并入
-        pools: list[dict] = [inv.bag_items]
-        if not exclude_mock:
-            pools.append(inv.mock_items)
-
-        # 1. 已穿戴装备：先按流派武器和装备页筛选条件校验
-        for slot_key, eq in equipped.items():
-            if (isinstance(eq, dict) and slot_key in slot_candidates
-                    and not (exclude_mock and _is_mock(eq))
-                    and self._candidate_passes(slot_key, eq,
-                                               main_weapon_type, sub_weapon_type)):
-                slot_candidates[slot_key].append(eq)
-
-        # 2. 背包装备（含按开关并入的模拟装备）：按 group_key 分发到槽位
-        for pool in pools:
-            if not isinstance(pool, dict):
-                continue
-            for group_key, items_dict in pool.items():
-                if not isinstance(items_dict, dict):
-                    continue
-                if group_key == "weapon":
-                    # 武器按流派类型分配到主/副武器槽
-                    for _fp, eq in items_dict.items():
-                        if not isinstance(eq, dict):
-                            continue
-                        eq_type = eq.get("type", "")
-                        if (main_weapon_type and eq_type == main_weapon_type
-                                and self._candidate_passes("main_weapon", eq,
-                                                           main_weapon_type, sub_weapon_type)):
-                            slot_candidates["main_weapon"].append(eq)
-                        if (sub_weapon_type and eq_type == sub_weapon_type
-                                and self._candidate_passes("sub_weapon", eq,
-                                                           main_weapon_type, sub_weapon_type)):
-                            slot_candidates["sub_weapon"].append(eq)
-                else:
-                    slots = group_to_slots.get(group_key, [])
-                    if not slots:
-                        continue
-                    for _fp, eq in items_dict.items():
-                        if isinstance(eq, dict):
-                            for sk in slots:
-                                if self._candidate_passes(
-                                        sk, eq, main_weapon_type, sub_weapon_type):
-                                    slot_candidates[sk].append(eq)
-
-        # Build UI groups（按指纹去重）
+        # Build UI groups
         slot_labels = {}
         total_candidates = 0
         available_slots = 0
         for slot_key, display_name, _ in _SLOT_ORDER:
             slot_labels[slot_key] = display_name
-            candidates = slot_candidates[slot_key]
-            seen: set[str] = set()
-            unique: list[dict] = []
-            for eq in candidates:
-                fp = _equip_fingerprint(eq)
-                if fp not in seen:
-                    seen.add(fp)
-                    unique.append(eq)
+            unique = pooled.get(slot_key, [])
             group = _SlotGroup(
                 slot_key, display_name, unique, self._school,
                 list(self._tuning_selection), self._min_rating(),
@@ -1395,33 +1332,6 @@ class OptimalComboPage(QWidget):
         # 默认就选中了本流派的玩法，勾选状态必须当场按它过一遍——否则
         # 展示框里写着规则，候选却是全勾的，两边对不上。
         self._on_tuning_changed()
-
-    def _candidate_passes(
-        self, slot_key: str, equip: dict,
-        main_weapon_type: str, sub_weapon_type: str,
-    ) -> bool:
-        """统一应用方案武学派生的武器类型、等级和词条筛选。"""
-        required_weapon = (main_weapon_type if slot_key == "main_weapon"
-                           else sub_weapon_type if slot_key == "sub_weapon" else "")
-        if required_weapon and equip.get("type", "") != required_weapon:
-            return False
-        try:
-            level = int(equip.get("level") or 0)
-        except (TypeError, ValueError):
-            level = 0
-        if self._level_threshold > 0 and level < self._level_threshold:
-            return False
-        if self._affix_filter == "dingyin":
-            dingyin = equip.get("dingyin")
-            return (is_zhige_dingyin(equip)
-                    or isinstance(dingyin, dict) and bool(dingyin.get("name")))
-        if self._affix_filter == "full_tuning":
-            return all(
-                isinstance(equip.get(f"affix_{i}"), dict)
-                and bool(equip[f"affix_{i}"].get("name"))
-                for i in range(1, 6)
-            )
-        return True
 
     def _on_search(self) -> None:
         """启动搜索。"""
@@ -1675,23 +1585,3 @@ class OptimalComboPage(QWidget):
         except Exception as e:
             logger.error(f"应用组合失败: {e}")
             QMessageBox.critical(self, tr("应用失败"), str(e))
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _equip_fingerprint(equip: dict) -> str:
-    """装备指纹：用于去重。"""
-    name = equip.get("name", "")
-    level = equip.get("level", "")
-    quality = equip.get("quality", "")
-    affixes = []
-    for i in range(1, 6):
-        affix = equip.get(f"affix_{i}")
-        if affix and isinstance(affix, dict):
-            affixes.append(f"{affix.get('name', '')}:{affix.get('value', 0)}")
-    dingyin = equip.get("dingyin")
-    if dingyin and isinstance(dingyin, dict):
-        affixes.append(f"dy:{dingyin.get('name', '')}:{dingyin.get('value', 0)}")
-    return f"{name}|{level}|{quality}|{'|'.join(affixes)}"

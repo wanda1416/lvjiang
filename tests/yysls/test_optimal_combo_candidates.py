@@ -119,11 +119,12 @@ class TestExcludeMockSwitch:
         assert names == ["真冠"]
 
     def test_equipped_mock_follows_the_switch(self, dialog, monkeypatch):
-        """已穿戴的模拟装备同样跟随开关"""
+        """已穿戴的模拟装备同样跟随开关：它只是模拟视图里的一条记录"""
+        worn_mock = _equip("穿着的模冠", "冠胄", mock=True)
         _install_inventory(
             monkeypatch,
-            equipped={"head": _equip("穿着的模冠", "冠胄", mock=True)},
-            bag={}, mock={},
+            equipped={"head": worn_mock},
+            bag={}, mock={"head": {"mock_h1": dict(worn_mock)}},
         )
         dialog._chk_exclude_mock.setChecked(True)
         dialog._load_candidates()

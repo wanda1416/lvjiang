@@ -327,6 +327,13 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
         # ── 增益效果（含动态专项增益） ──
         self._gain_card = self._add_gain_card(tmp)
+        self._gain_card.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self._gain_card.customContextMenuRequested.connect(
+            lambda position: self._show_judgment_display_menu(
+                position, self._gain_card))
+        self._gain_card.setToolTip(
+            tr("右键切换白字和黄字三率及增效的显示方式"))
         grid.addWidget(self._gain_card, 0, 1)
 
         # ── 增伤效果卡片 ──
@@ -557,7 +564,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
     # ── 配置选择持久化 ──────────────────────────────────────────
 
     def _save_selection(self):
-        """按方案保存战斗配置，按用户保存纯显示选项（都在该用户的 loadouts.json）。"""
+        """按方案保存战斗配置，按用户保存纯显示选项。"""
         if self._restoring or self._preview:
             return
         user_name = self._host.active_user_name()
@@ -588,7 +595,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         except Exception as e:
             logger.debug(f"保存备战方案战斗配置失败: {e}")
 
-        # 右键显示模式与假设复选框按用户存进 loadouts.json 的 ui_state；
+        # 右键显示模式与假设复选框按用户存进 {user}.json 的 ui_state；
         # 下拉框不写到用户级，避免不同备战方案互相覆盖。
         try:
             repo.set_combat_prefs(self._current_prefs())
@@ -718,15 +725,16 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         )
         self._judgment_popup.show()
 
-    def _show_judgment_display_menu(self, position) -> None:
-        """右键判定属性卡片，切换三率及增效的白字/黄字显示。"""
-        menu = QMenu(self._judgment_card)
+    def _show_judgment_display_menu(self, position, source=None) -> None:
+        """右键判定属性或增益效果卡片，切换共享的显示状态。"""
+        source = source or self._judgment_card
+        menu = QMenu(source)
         if self._resistance_only:
             label = tr("展示白字和黄字三率和增效")
         else:
             label = tr("仅展示黄字三率和增效")
         toggle_action = menu.addAction(label)
-        selected = menu.exec(self._judgment_card.mapToGlobal(position))
+        selected = menu.exec(source.mapToGlobal(position))
         if selected == toggle_action:
             self._set_resistance_only(not self._resistance_only)
 

@@ -1684,7 +1684,7 @@ task_history:
   scope: 性质
   open_log: 打开执行日志
   open_batch_report: 打开批量报告
-  open_result: 打开结果 JSON
+  open_result: 打开执行结果
   batch_history: 批量历史
   batch_report: 批量报告
   batch_run_id: 批量记录 ID

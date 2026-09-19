@@ -2,6 +2,9 @@
 
 > 主题：**图色原语 + `find … by image` 模板定位 + 设备端推住手势 / ESC·HOME + 脚本工作台**
 > 涉及：`core/recognizers/`、`workflows/builtins/vision.py`、`workflows/grammar/`、`core/ondevice/`、`android/app/.../A11yService.kt`、`ui/script_*`、`ui/action_palette.py`
+>
+> 本文是一次性**设计日志**（历史动机与当时取舍）。长期参考（当前算法、失败模式、调优、工具）请查：
+> [30-architecture/37-vision/](../../30-architecture/37-vision/README.md)
 
 ---
 

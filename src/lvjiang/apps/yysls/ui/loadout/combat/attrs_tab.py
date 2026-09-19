@@ -148,8 +148,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._preview_equipped: dict | None = None
 
         # ✅ 会话级缓存：避免反复load装备文件（多进程安全）
-        self._session_user = None  # 当前会话的用户
-        self._equipped_cache = None  # 缓存的装备数据
+        self._session_user: str | None = None  # 当前会话的用户
+        self._equipped_cache: dict | None = None  # 缓存的装备数据
         # 隐藏期间攒下的重载请求；showEvent 时补做一次
         self._reload_pending = False
         # _restore_selection 批量回填下拉时抑制刷新，见该方法
@@ -168,7 +168,9 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._display_mode: str = DISPLAY_MODE_FULL
         self._strategy: CardLayoutStrategy = FullCardLayout()
         self._setup_ui()
-        self._load_data()
+        # 构造期只填下拉框、不算属性：穿戴快照由备战方案面板本轮加载后经
+        # set_equipment_snapshot 注入并统一刷新一次；预览实例则等 show_preview。
+        self._load_data(refresh_display=False)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -350,13 +352,14 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
     # ── 数据加载 ──────────────────────────────────────────────
 
-    def _load_data(self):
+    def _load_data(self, *, refresh_display: bool = True):
         """加载数据并刷新显示"""
         self._refresh_schools()
         self._refresh_play_styles()
         self._refresh_schemes()
         self._restore_selection()
-        self._refresh_display()
+        if refresh_display:
+            self._refresh_display()
 
     def _refresh_schools(self):
         """刷新流派下拉"""
@@ -465,6 +468,33 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._graduation_generation += 1
         self._graduation_timer.stop()
         self._pending_graduation = None
+
+    def set_equipment_snapshot(self, user_name: str, equipped: dict) -> None:
+        """由备战方案面板注入本轮刷新的穿戴快照，避免各页各自再加载一遍。"""
+        self._session_user = user_name
+        self._equipped_cache = equipped
+
+    def _equipped_snapshot(self) -> dict | None:
+        """当前用户的原始穿戴（未套假设）；同一快照内只从仓库读一次。
+
+        返回 None 表示没有激活用户；读仓库失败返回空 dict。
+        """
+        user_name = self._host.active_user_name()
+        if not user_name:
+            return None
+        if self._session_user == user_name and self._equipped_cache is not None:
+            logger.debug(f"复用缓存装备数据 (用户: {user_name})")
+            return self._equipped_cache
+        logger.debug(f"加载装备数据 (用户: {user_name})")
+        from ....core.combat.equipment import EquipmentInventory
+        try:
+            equipped = EquipmentInventory(user_name).equipped
+        except Exception as e:
+            logger.error(f"加载装备失败: {e}")
+            return {}
+        self._session_user = user_name
+        self._equipped_cache = equipped
+        return equipped
 
     def _on_user_changed(self, _name: str) -> None:
         """切换用户时立即废弃尚未完成的毕业率请求。"""
@@ -732,31 +762,13 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             has_resistance,
             is_penetration_field,
         )
-        from ....core.combat.equipment import EquipmentInventory
         from ....core.graduation.scoring import equipment_attrs as scored_equipment
-
-        # ✅ 会话级缓存：避免反复load装备文件
-        user_name = self._host.active_user_name()
-        equipped = None
 
         if self._preview:
             # 预览装备已由调用方按假设投影，这里不再套面板的假设
             equipped = self._preview_equipped or {}
-        elif user_name:
-            # 检查缓存是否有效
-            if self._session_user == user_name and self._equipped_cache is not None:
-                logger.debug(f"复用缓存装备数据 (用户: {user_name})")
-                equipped = self._equipped_cache
-            else:
-                # 会话变化或缓存无效，从磁盘加载
-                logger.debug(f"加载装备数据 (用户: {user_name})")
-                try:
-                    equipped = EquipmentInventory(user_name).equipped
-                    self._session_user = user_name
-                    self._equipped_cache = equipped
-                except Exception as e:
-                    logger.error(f"加载装备失败: {e}")
-                    equipped = {}
+        else:
+            equipped = self._equipped_snapshot()
 
             # 应用假定上限（满承音/满定音/满等级）
             try:

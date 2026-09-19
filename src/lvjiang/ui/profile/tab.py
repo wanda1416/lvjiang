@@ -139,14 +139,19 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         self._reordering = False
         self._content_point_size = 0
         self._refresh_timer = _make_debounce_timer(self, self._refresh_when_idle)
-        self._setup_ui()
+        # 字号先于建表确定：建表时直接按该字号填充，不再建完后整体重刷一遍。
         size = getattr(
             getattr(getattr(host, "_user_config", None), "font_sizes", None),
             "user_overview",
             0,
         )
-        if isinstance(size, int) and size > 0:
-            self.apply_content_font_size(size)
+        if isinstance(size, int) and 8 <= size <= 24:
+            self._content_point_size = size
+        self._setup_ui()
+        if self._content_point_size > 0:
+            font = QFont(self._tab_widget.font())
+            font.setPointSize(self._content_point_size)
+            self._tab_widget.setFont(font)
         self._connect_profile_engine()
 
     def _connect_profile_engine(self) -> None:

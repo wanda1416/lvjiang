@@ -296,6 +296,8 @@ class EquipStatusTab(QWidget):
         self._bag_items: dict = {}
         self._mock_items: dict = {}
         self._inv = None
+        #: 同一备战方案面板里的战斗属性页，由面板注入；假设栏从它取副本
+        self._combat_tab = None
         self._display_params: dict = {}
         self._selected_slot: str | None = None
         self._batch_copy_mode = False
@@ -304,8 +306,11 @@ class EquipStatusTab(QWidget):
         self._batch_target_users: set[str] = set()
         self._slot_cards: dict[str, _SlotCard] = {}
         self._setup_ui()
-        self._refresh_all()
+        # 构造期不读盘：装备数据由外层 LoadoutPanel 加载一次后经
+        # refresh_from 注入，这里只按空库存摆好槽位卡与筛选条。
+        self._reload_display_params()
         self._load_filter_settings()
+        self._refresh_slots()
         self._rebuild_grid()
         # graduation_updated 只更新状态行。equipment_changed 由外层
         # LoadoutPanel 统一编排，避免父子同时订阅后重复重建整套装备卡。
@@ -1282,6 +1287,16 @@ class EquipStatusTab(QWidget):
         self._status_dps.setToolTip(tooltip)
         self._status_graduation.setToolTip(tooltip)
 
+    def bind_combat_tab(self, combat_tab) -> None:
+        """由备战方案面板注入同级的战斗属性页；不再靠 findChildren 摸兄弟。"""
+        self._combat_tab = combat_tab
+
+    def refresh_from(self, inventory) -> None:
+        """用面板本轮已加载的仓储快照刷新，不再自己重新读盘。"""
+        self._inv = inventory
+        self._sync_inv()
+        self._update_status_row()
+
     def _refresh_all(self):
         from ....config.equip_display import load_equip_display
 
@@ -1768,13 +1783,20 @@ class EquipStatusTab(QWidget):
             return None
 
     def _get_current_school(self) -> str:
-        """获取当前角色配置的流派名称"""
-        from ..combat.attrs_tab import CombatAttrsTab
-        for child in self._host.findChildren(QWidget):
-            if isinstance(child, CombatAttrsTab):
-                school = child._get_current_school()
-                return school or ""
-        return ""
+        """当前激活方案的流派：由方案主副武学派生（唯一口径），不问兄弟页。"""
+        if self._inv is not None:
+            return self._inv.active_school
+        user_name = self._host.active_user_name()
+        if not user_name:
+            return ""
+        from ....config import get_game_config
+        from ....core.loadout import LoadoutRepository
+        try:
+            return LoadoutRepository(user_name).load().active_school(
+                get_game_config().get_schools())
+        except Exception as e:  # noqa: BLE001 - 只影响候选过滤，不阻断
+            logger.debug(f"解析当前流派失败: {e}")
+            return ""
 
     def _on_mock_create(self):
         """创建模拟装备"""
@@ -1965,21 +1987,13 @@ class EquipStatusTab(QWidget):
 
     def _open_graduation_analysis(self, initial_tab: int) -> None:
         """构建共享上下文（流派、模型、基础属性、假设副本）并打开分析对话框。"""
-        from ..combat.attrs_tab import CombatAttrsTab
         from ..graduation_analysis import (
             AssumptionBar,
             GraduationAnalysisDialog,
         )
         from ..optimal_combo import OptimalComboPage
 
-        combat_tab = next(
-            (
-                child
-                for child in self._host.findChildren(QWidget)
-                if isinstance(child, CombatAttrsTab)
-            ),
-            None,
-        )
+        combat_tab = self._combat_tab
         if combat_tab is None:
             QMessageBox.warning(self, tr("提示"), tr("未找到角色详情面板"))
             return

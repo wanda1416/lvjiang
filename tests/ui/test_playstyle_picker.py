@@ -180,11 +180,15 @@ def test_combo_detail_marks_slots_that_differ_from_the_loadout() -> None:
     要换的部位给强调色边框和「需更换 / 当前：xxx」，一致的部位给弱化的「已穿戴」。"""
     from lvjiang.apps.yysls.ui.loadout.optimal_combo import OptimalComboPage
 
-    worn_sword = {"name": "旧剑", "type": "剑", "level": 100, "quality": "gold"}
-    worn_head = {"name": "旧冠", "type": "冠胄", "level": 110, "quality": "gold"}
-    new_sword = {"name": "新剑", "type": "剑", "level": 110, "quality": "gold"}
-    same_head = dict(worn_head)  # 同一件装备的另一份 dict：按指纹判等
-    new_ring = {"name": "新环", "type": "环", "level": 110, "quality": "gold"}
+    worn_sword = {"name": "旧剑", "type": "剑", "level": 100, "quality": "gold",
+                  "_fp": "old-sword"}
+    worn_head = {"name": "旧冠", "type": "冠胄", "level": 110, "quality": "gold",
+                 "_fp": "old-head"}
+    new_sword = {"name": "新剑", "type": "剑", "level": 110, "quality": "gold",
+                 "_fp": "new-sword"}
+    same_head = dict(worn_head)  # 同一条仓储记录的另一份 dict：按 fp 判等
+    new_ring = {"name": "新环", "type": "环", "level": 110, "quality": "gold",
+                "_fp": "new-ring"}
 
     dlg = _detail_dialog({"main_weapon": worn_sword, "head": worn_head})
     OptimalComboPage._on_show_detail(dlg, {
@@ -225,13 +229,13 @@ def test_result_card_summarises_changes_and_hoists_assumptions() -> None:
     from lvjiang.apps.yysls.ui.loadout.optimal_combo import _SLOT_ORDER, _ResultCard
 
     labels = {key: name for key, name, _ft in _SLOT_ORDER}
-    worn = {"main_weapon": {"name": "旧剑", "type": "剑", "level": 100},
-            "head": {"name": "旧冠", "type": "冠胄", "level": 110}}
+    worn = {"main_weapon": {"name": "旧剑", "type": "剑", "level": 100, "_fp": "a"},
+            "head": {"name": "旧冠", "type": "冠胄", "level": 110, "_fp": "b"}}
     card = _ResultCard(1, {
         "rate": 0.5, "dps": 1000, "gongjue": "会意",
         "equipped": {
-            "main_weapon": {"name": "新剑", "type": "剑", "level": 110},
-            "head": {"name": "旧冠", "type": "冠胄", "level": 110},
+            "main_weapon": {"name": "新剑", "type": "剑", "level": 110, "_fp": "c"},
+            "head": {"name": "旧冠", "type": "冠胄", "level": 110, "_fp": "b"},
         },
         "assumptions": {"main_weapon": ["满承音"], "head": ["满承音", "满等级"]},
     }, labels, worn)
@@ -246,7 +250,7 @@ def test_result_card_summarises_changes_and_hoists_assumptions() -> None:
 
     unchanged = _ResultCard(1, {
         "rate": 0.5, "dps": 1000, "gongjue": "会意",
-        "equipped": {"head": {"name": "旧冠", "type": "冠胄", "level": 110}},
+        "equipped": {"head": {"name": "旧冠", "type": "冠胄", "level": 110, "_fp": "b"}},
         "assumptions": {},
     }, labels, worn)
     assert unchanged.changed_slots == []

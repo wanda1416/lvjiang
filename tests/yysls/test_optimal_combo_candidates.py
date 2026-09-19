@@ -10,6 +10,7 @@
 """
 
 import pytest
+from PyQt6.QtWidgets import QScrollArea
 
 import lvjiang.apps.yysls.ui.loadout.optimal_combo as mod
 
@@ -184,3 +185,35 @@ def test_weapon_candidates_follow_plan_art_order(dialog, monkeypatch):
 
     assert [e["name"] for e in dialog._captured["main_weapon"]] == ["刀"]
     assert [e["name"] for e in dialog._captured["sub_weapon"]] == ["剑"]
+
+
+def test_slot_groups_fill_equal_regions_and_scroll_internally(qtbot):
+    """候选数量不改变部位区域高度，超出部分由该区域自己滚动。"""
+    scrolls = []
+    groups = []
+    for count in (2, 20):
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.resize(260, 180)
+        group = mod._SlotGroup(
+            "head", "冠胄",
+            [_equip(f"冠胄{i}", "冠胄") for i in range(count)],
+            "鸣金·虹",
+        )
+        scroll.setWidget(group)
+        qtbot.addWidget(scroll)
+        scroll.show()
+        scrolls.append(scroll)
+        groups.append(group)
+
+    qtbot.waitUntil(lambda: all(s.viewport().height() > 0 for s in scrolls))
+
+    short_scroll, long_scroll = scrolls
+    short_group, long_group = groups
+    assert short_scroll.height() == long_scroll.height()
+    assert short_group.height() == short_scroll.viewport().height()
+    assert short_scroll.verticalScrollBar().maximum() == 0
+    assert long_group.height() > long_scroll.viewport().height()
+    assert long_scroll.verticalScrollBar().maximum() > 0
+    # 多出的可见空间留在底部，首个候选行仍紧跟标题。
+    assert short_group.rows[0].y() < short_group.height() // 2

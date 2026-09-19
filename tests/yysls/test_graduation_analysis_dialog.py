@@ -7,6 +7,7 @@ from lvjiang.apps.yysls.core.graduation.assumptions import Assumptions
 from lvjiang.apps.yysls.ui.loadout.affix_analysis_pages import AffixAnalysisPages
 from lvjiang.apps.yysls.ui.loadout.graduation_analysis import (
     TAB_OPTIMAL,
+    TAB_SUGGESTION,
     TAB_TRANSMUTE,
     AnalysisCache,
     AssumptionBar,
@@ -14,6 +15,20 @@ from lvjiang.apps.yysls.ui.loadout.graduation_analysis import (
 )
 from lvjiang.apps.yysls.ui.loadout.optimal_combo import OptimalComboPage
 from tests.yysls.test_transmute_dialog import _equipped, _result
+
+
+def test_quick_entries_open_first_three_tabs_only():
+    from types import SimpleNamespace
+
+    from lvjiang.apps.yysls.ui.loadout.equip.status_tab import EquipStatusTab
+
+    opened: list[int] = []
+    target = SimpleNamespace(_open_graduation_analysis=opened.append)
+    EquipStatusTab._on_optimal_combo(target)
+    EquipStatusTab._on_transmute(target)
+    EquipStatusTab._on_affix_impact(target)
+
+    assert opened == [TAB_OPTIMAL, TAB_TRANSMUTE, TAB_SUGGESTION]
 
 
 class _StubOptimalPage(OptimalComboPage):

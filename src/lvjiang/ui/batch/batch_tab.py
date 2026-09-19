@@ -10,11 +10,13 @@
 from __future__ import annotations
 
 import json
+import random
+from collections.abc import Callable
 from typing import Any, cast
 
 from loguru import logger
-from PyQt6.QtCore import QEvent, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QDropEvent
+from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QAction, QDropEvent
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -26,6 +28,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
@@ -129,11 +132,34 @@ class _ReorderTreeWidget(QTreeWidget):
     """Flat tree that reports a completed internal drag/drop reorder."""
 
     order_changed = pyqtSignal()
+    restore_order_requested = pyqtSignal()
+    shuffle_order_requested = pyqtSignal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_order_menu)
 
     def dropEvent(self, event: QDropEvent | None) -> None:
         super().dropEvent(event)
         if event is not None and event.isAccepted():
             self.order_changed.emit()
+
+    def _show_order_menu(self, position: QPoint) -> None:
+        menu = QMenu(self)
+        restore_action = QAction(tr("恢复默认顺序"), menu)
+        shuffle_action = QAction(tr("随机打乱顺序"), menu)
+        restore_action.triggered.connect(
+            lambda _checked=False: self.restore_order_requested.emit())
+        shuffle_action.triggered.connect(
+            lambda _checked=False: self.shuffle_order_requested.emit())
+        has_rows = self.topLevelItemCount() > 0
+        restore_action.setEnabled(has_rows)
+        shuffle_action.setEnabled(self.topLevelItemCount() > 1)
+        menu.addAction(restore_action)
+        menu.addAction(shuffle_action)
+        viewport = cast(QWidget, self.viewport())
+        menu.exec(viewport.mapToGlobal(position))
 
 
 class BatchTab(QWidget):
@@ -316,7 +342,8 @@ class BatchTab(QWidget):
             QAbstractItemView.DragDropMode.InternalMove)
         self._script_list.setDefaultDropAction(Qt.DropAction.MoveAction)
         self._script_list.setToolTip(
-            tr("拖动可调整实际执行顺序；批量配置中的顺序仅作为初始顺序"))
+            tr("拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；"
+               "批量配置中的顺序仅作为初始顺序"))
         header = self._script_list.header()
         assert header is not None
         header.setMinimumHeight(32)
@@ -328,6 +355,10 @@ class BatchTab(QWidget):
         )
         self._script_list.itemChanged.connect(self._on_script_item_changed)
         self._script_list.order_changed.connect(self._on_script_rows_moved)
+        self._script_list.restore_order_requested.connect(
+            self._restore_script_order)
+        self._script_list.shuffle_order_requested.connect(
+            self._shuffle_script_order)
         layout.addWidget(self._script_list, stretch=1)
 
         self._script_order: list[str] = []
@@ -487,7 +518,8 @@ class BatchTab(QWidget):
             QAbstractItemView.DragDropMode.InternalMove)
         self._user_list.setDefaultDropAction(Qt.DropAction.MoveAction)
         self._user_list.setToolTip(
-            tr("拖动可调整实际执行顺序；批量配置中的顺序仅作为初始顺序"))
+            tr("拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；"
+               "批量配置中的顺序仅作为初始顺序"))
         header = self._user_list.header()
         assert header is not None
         header.setMinimumHeight(32)
@@ -498,6 +530,10 @@ class BatchTab(QWidget):
             1, _four_cjk_column_width(self._user_list))
         self._user_list.itemChanged.connect(self._on_user_item_changed)
         self._user_list.order_changed.connect(self._on_user_rows_moved)
+        self._user_list.restore_order_requested.connect(
+            self._restore_user_order)
+        self._user_list.shuffle_order_requested.connect(
+            self._shuffle_user_order)
         layout.addWidget(self._user_list, stretch=1)
 
         self._user_order: list[str] = []
@@ -690,6 +726,47 @@ class BatchTab(QWidget):
 
     # ─── 行列表 ──────────────────────────────────────────
 
+    @staticmethod
+    def _apply_tree_order(
+        tree: QTreeWidget,
+        ordered_ids: list[str],
+        item_id: Callable[[QTreeWidgetItem | None], str],
+    ) -> None:
+        """按 ID 重排现有行，未出现在目标顺序中的行保持原相对顺序。"""
+        current_items: list[QTreeWidgetItem] = []
+        while tree.topLevelItemCount():
+            item = tree.takeTopLevelItem(0)
+            if item is not None:
+                current_items.append(item)
+
+        items_by_id = {
+            current_id: item
+            for item in current_items
+            if (current_id := item_id(item))
+        }
+        reordered = [
+            items_by_id[current_id]
+            for current_id in ordered_ids
+            if current_id in items_by_id
+        ]
+        reordered_ids = {item_id(item) for item in reordered}
+        reordered.extend(
+            item for item in current_items
+            if item_id(item) not in reordered_ids
+        )
+        tree.addTopLevelItems(reordered)
+
+    @staticmethod
+    def _tree_order(
+        tree: QTreeWidget,
+        item_id: Callable[[QTreeWidgetItem | None], str],
+    ) -> list[str]:
+        return [
+            current_id
+            for index in range(tree.topLevelItemCount())
+            if (current_id := item_id(tree.topLevelItem(index)))
+        ]
+
     def _refresh_entry_list(self):
         """刷新用户页的勾选列表。"""
         cfg = load_batch_config()
@@ -762,6 +839,29 @@ class BatchTab(QWidget):
     def _on_user_rows_moved(self, *_args) -> None:
         if not self._updating_user_list:
             self._sync_user_order_from_rows()
+
+    def _restore_user_order(self) -> None:
+        cfg = load_batch_config()
+        group = cfg.configs.get(self._current_config_name())
+        if group is None:
+            return
+        self._updating_user_list = True
+        try:
+            self._apply_tree_order(
+                self._user_list, list(group.usernames), self._user_name)
+        finally:
+            self._updating_user_list = False
+        self._sync_user_order_from_rows()
+
+    def _shuffle_user_order(self) -> None:
+        order = self._tree_order(self._user_list, self._user_name)
+        random.shuffle(order)
+        self._updating_user_list = True
+        try:
+            self._apply_tree_order(self._user_list, order, self._user_name)
+        finally:
+            self._updating_user_list = False
+        self._sync_user_order_from_rows()
 
     def _sync_user_order_from_rows(self) -> None:
         self._user_candidate_order = []
@@ -929,6 +1029,29 @@ class BatchTab(QWidget):
                 self._script_order.append(script_id)
         self._refresh_script_order_column()
         self._persist_script_order()
+
+    def _restore_script_order(self) -> None:
+        cfg = load_batch_config()
+        group = cfg.configs.get(self._current_config_name())
+        if group is None:
+            return
+        self._updating_script_list = True
+        try:
+            self._apply_tree_order(
+                self._script_list, list(group.task_ids), self._script_id)
+        finally:
+            self._updating_script_list = False
+        self._on_script_rows_moved()
+
+    def _shuffle_script_order(self) -> None:
+        order = self._tree_order(self._script_list, self._script_id)
+        random.shuffle(order)
+        self._updating_script_list = True
+        try:
+            self._apply_tree_order(self._script_list, order, self._script_id)
+        finally:
+            self._updating_script_list = False
+        self._on_script_rows_moved()
 
     def _set_all_scripts_checked(self, checked: bool) -> None:
         self._updating_script_list = True

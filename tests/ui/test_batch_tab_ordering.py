@@ -54,11 +54,11 @@ def test_main_batch_lists_preserve_and_update_actual_execution_order(
     assert tab._checked_script_ids() == ["b", "a"]
     assert tab._get_enabled_usernames() == ["用户B", "用户A"]
 
-    script_a = tab._script_list.takeTopLevelItem(1)
-    tab._script_list.insertTopLevelItem(0, script_a)
+    script_b = tab._script_list.takeTopLevelItem(0)
+    tab._script_list.insertTopLevelItem(2, script_b)
     tab._on_script_rows_moved()
-    user_a = tab._user_list.takeTopLevelItem(1)
-    tab._user_list.insertTopLevelItem(0, user_a)
+    user_b = tab._user_list.takeTopLevelItem(0)
+    tab._user_list.insertTopLevelItem(2, user_b)
     tab._on_user_rows_moved()
 
     group = config.configs["日常"]
@@ -68,3 +68,29 @@ def test_main_batch_lists_preserve_and_update_actual_execution_order(
     assert group.selected_usernames == ["用户A", "用户B"]
     assert tab._script_list.topLevelItem(0).text(1) == "1"
     assert tab._user_list.topLevelItem(0).text(1) == "1"
+
+    tab._script_list.restore_order_requested.emit()
+    tab._user_list.restore_order_requested.emit()
+
+    assert [
+        tab._script_id(tab._script_list.topLevelItem(index))
+        for index in range(tab._script_list.topLevelItemCount())
+    ] == ["a", "b", "c"]
+    assert [
+        tab._user_name(tab._user_list.topLevelItem(index))
+        for index in range(tab._user_list.topLevelItemCount())
+    ] == ["用户A", "用户B", "用户C"]
+    assert tab._checked_script_ids() == ["a", "b"]
+    assert tab._get_enabled_usernames() == ["用户A", "用户B"]
+
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_tab.random.shuffle",
+        lambda values: values.reverse(),
+    )
+    tab._script_list.shuffle_order_requested.emit()
+    tab._user_list.shuffle_order_requested.emit()
+
+    assert tab._checked_script_ids() == ["b", "a"]
+    assert tab._get_enabled_usernames() == ["用户B", "用户A"]
+    assert group.task_ids == ["a", "b", "c"]
+    assert group.usernames == ["用户A", "用户B", "用户C"]

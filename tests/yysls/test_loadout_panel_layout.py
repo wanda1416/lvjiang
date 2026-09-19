@@ -177,3 +177,50 @@ def test_startup_builds_inventory_once_and_first_show_does_not_refresh(
     panel.show()
     qtbot.wait(50)
     assert loads == ["tester", "tester"]   # 隐藏期间可能错过变更，再显示补一次
+
+
+def test_assumption_checkboxes_round_trip_through_user_loadouts(qtbot, tmp_path, monkeypatch):
+    """假设开关与黄字显示偏好写进当前用户的 loadouts.json，下次刷新恢复。"""
+    from lvjiang.apps.yysls.core.combat import equipment as equipment_mod
+    from lvjiang.apps.yysls.core.loadout import LoadoutRepository
+    from lvjiang.apps.yysls.ui.loadout import loadout_panel as panel_mod
+
+    class _NamedHost(_Host):
+        @staticmethod
+        def active_user_name() -> str:
+            return "tester"
+
+    monkeypatch.setattr(
+        panel_mod, "LoadoutRepository",
+        lambda username: LoadoutRepository(username, tmp_path))
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.ui.loadout.combat.attrs_tab.LoadoutRepository",
+        lambda username: LoadoutRepository(username, tmp_path), raising=False)
+
+    class _Inventory(equipment_mod.EquipmentInventory):
+        def __init__(self, user_name: str) -> None:
+            self._repo = LoadoutRepository(user_name, tmp_path)
+            self.reload()
+
+    monkeypatch.setattr(equipment_mod, "EquipmentInventory", _Inventory)
+
+    import lvjiang.apps.yysls.core.loadout as loadout_pkg
+    real_repo = loadout_pkg.LoadoutRepository
+    monkeypatch.setattr(loadout_pkg, "LoadoutRepository",
+                        lambda username, *a: real_repo(username, tmp_path))
+
+    panel = LoadoutPanel(_NamedHost())
+    qtbot.addWidget(panel)
+    panel.refresh()
+    combat = panel._character._combat_attrs_tab
+    assert not combat._chk_full_chengyin.isChecked()
+
+    combat._chk_full_chengyin.setChecked(True)      # 触发 _save_selection
+    stored = real_repo("tester", tmp_path).get_combat_prefs()
+    assert stored["full_chengyin"] is True
+
+    # 新开一个面板：从该用户的 loadouts.json 恢复，而不是 session.json
+    fresh = LoadoutPanel(_NamedHost())
+    qtbot.addWidget(fresh)
+    fresh.refresh()
+    assert fresh._character._combat_attrs_tab._chk_full_chengyin.isChecked()

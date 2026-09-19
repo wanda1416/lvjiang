@@ -1,7 +1,8 @@
 """装备展示设置面板
 
 控制「其他装备」Tab 的卡片外观：字号、卡片高度、网格列数。
-数据存于游戏基础配置的 ``equip_display``。
+数据是本机界面偏好，存于 session.json 的 ``settings.equip_display``，
+不进游戏配置 YAML；对话框点「保存」时写入。
 """
 
 from PyQt6.QtCore import Qt
@@ -29,9 +30,8 @@ _PARAM_DEFS = [
 class EquipDisplayPanel(QWidget):
     """装备展示参数设置面板"""
 
-    def __init__(self, parent=None, *, data: dict, on_changed=None):
+    def __init__(self, parent=None, *, data: dict | None = None, on_changed=None):
         super().__init__(parent)
-        self._data = data
         self._on_changed = on_changed
         self._loading = True
         self._spinboxes: dict[str, QSpinBox] = {}
@@ -67,19 +67,21 @@ class EquipDisplayPanel(QWidget):
         layout.addStretch()
 
     def _load(self):
-        from ...config.equip_display import DEFAULTS
-        params = {**DEFAULTS, **(self._data.get("equip_display") or {})}
+        from ...config.equip_display import load_equip_display
+        params = load_equip_display()
         for key, spin in self._spinboxes.items():
             spin.setValue(int(params.get(key, spin.minimum())))
+
+    def values(self) -> dict[str, int]:
+        return {key: spin.value() for key, spin in self._spinboxes.items()}
 
     def _changed(self, _value: int) -> None:
         if self._loading:
             return
-        self._data["equip_display"] = {
-            key: spin.value() for key, spin in self._spinboxes.items()
-        }
         if self._on_changed is not None:
             self._on_changed()
 
     def save(self) -> None:
-        """兼容旧调用；值在控件变化时已同步到共享配置。"""
+        """写入本机界面偏好（session settings）。"""
+        from ...config.equip_display import save_equip_display
+        save_equip_display(self.values())

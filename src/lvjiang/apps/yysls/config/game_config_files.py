@@ -15,11 +15,9 @@ GAME_CONFIG_DIR = "yysls/game_config"
 
 # 文件顺序同时作为稳定的展示顺序。每个顶层字段只能属于一个文件。
 GAME_CONFIG_FILES: dict[str, tuple[str, ...]] = {
-    f"{GAME_CONFIG_DIR}/basic.yaml": (
-        "basic_config",
-        "equip_display",
-    ),
-    f"{GAME_CONFIG_DIR}/levels_and_seasons.yaml": (
+    f"{GAME_CONFIG_DIR}/basic.yaml": ("basic_config",),
+    # 赛季设置：赛季本身与赛季关联的装备等级能力
+    f"{GAME_CONFIG_DIR}/seasons.yaml": (
         "level_configs",
         "season_configs",
     ),
@@ -51,9 +49,27 @@ def game_config_file_for(section: str) -> str | None:
     return GAME_CONFIG_SECTION_FILES.get(section)
 
 
+#: 已改名的文件：旧名 → 新名。local/remote 层里的旧文件在首次加载时原地改名，
+#: 用户自定义不丢。
+_RENAMED_FILES: dict[str, str] = {
+    f"{GAME_CONFIG_DIR}/levels_and_seasons.yaml": f"{GAME_CONFIG_DIR}/seasons.yaml",
+}
+
+
+def _migrate_renamed_files(resolver: ConfigResolver) -> None:
+    for old_rel, new_rel in _RENAMED_FILES.items():
+        for root in (resolver.local_dir, resolver.remote_dir):
+            old_path = root / old_rel
+            new_path = root / new_rel
+            if old_path.is_file() and not new_path.exists():
+                new_path.parent.mkdir(parents=True, exist_ok=True)
+                old_path.rename(new_path)
+
+
 def load_game_config(resolver: ConfigResolver | None = None) -> dict:
     """读取七份分层配置并合并为业务层使用的扁平文档。"""
     resolver = resolver or get_resolver()
+    _migrate_renamed_files(resolver)
     merged: dict = {}
     for rel_path, sections in GAME_CONFIG_FILES.items():
         data = resolver.load_merged(rel_path)

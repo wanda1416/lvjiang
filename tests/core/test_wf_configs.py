@@ -111,3 +111,26 @@ def session_store(store_path):
     reset_session_store()
     yield
     reset_session_store()
+
+
+class TestPrune:
+    def test_prune_removes_orphans_and_transient_ids_only(self, session_store):
+        from lvjiang.core.config.wf_configs import prune_wf_configs
+
+        set_wf_config("daily_jianghu", {"a": 1})
+        set_wf_config("auto_tuning", {"b": 2})            # 专用脚本：不在入口展示，但存在
+        set_wf_config("activity_jianghu", {"c": 3})       # 改名前的旧 id
+        set_wf_config("__loaded__:purchase_bugan", {"d": 4})  # 编辑器临时 id
+
+        removed = prune_wf_configs(["daily_jianghu", "auto_tuning", "purchase_bugan"])
+
+        assert removed == ["__loaded__:purchase_bugan", "activity_jianghu"]
+        assert set(get_all_wf_configs()) == {"daily_jianghu", "auto_tuning"}
+        assert get_wf_config("auto_tuning") == {"b": 2}
+
+    def test_prune_is_noop_when_everything_is_valid(self, session_store):
+        from lvjiang.core.config.wf_configs import prune_wf_configs
+
+        set_wf_config("daily_jianghu", {"a": 1})
+        assert prune_wf_configs(["daily_jianghu"]) == []
+        assert get_wf_config("daily_jianghu") == {"a": 1}

@@ -31,7 +31,7 @@ register_registry_list_paths("yysls/tune_config.yaml", ("base_rules",))
 register_protected_list_paths("yysls/game_config/equipment.yaml", {
     "weapon_types": "name",
 })
-register_protected_list_paths("yysls/game_config/levels_and_seasons.yaml", {
+register_protected_list_paths("yysls/game_config/seasons.yaml", {
     "level_configs": "level",
     "season_configs": "season_number",
 })

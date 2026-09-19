@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from copy import deepcopy
 from typing import Any
 
@@ -71,6 +72,38 @@ def delete_wf_config(wf_id: str) -> None:
         lambda old: {k: v for k, v in (old if isinstance(old, dict) else {}).items()
                      if k != wf_id},
     )
+
+
+#: 脚本编辑器临时加载的脚本 id 前缀（见 workflows/metadata.py）；这类 id
+#: 只在编辑器会话内有效，落到 wf_configs 里就是垃圾。
+TRANSIENT_ID_PREFIX = "__loaded__:"
+
+
+def prune_wf_configs(valid_ids: Iterable[str]) -> list[str]:
+    """删除不属于任何现存脚本的配置项，返回被删的 id（已排序）。
+
+    ``valid_ids`` 必须是**全部**可发现脚本的 id（``discover_scripts()``），
+    而不是当前入口展示的子集——否则隐藏/专用脚本（如 auto_tuning）的配置
+    会被误删。临时 id（``__loaded__:``）一律视为失效。
+
+    只在用户编辑脚本配置时顺带调用，不在启动期做：孤儿键是多次重构改名
+    留下的，攒着没有坏处，删错了才有。
+    """
+    keep = set(valid_ids)
+    removed: list[str] = []
+
+    def _prune(old: Any) -> dict[str, Any]:
+        node = old if isinstance(old, dict) else {}
+        kept: dict[str, Any] = {}
+        for wf_id, value in node.items():
+            if wf_id in keep and not str(wf_id).startswith(TRANSIENT_ID_PREFIX):
+                kept[wf_id] = value
+            else:
+                removed.append(str(wf_id))
+        return kept
+
+    get_session_store().mutate_node(_NODE_KEY, _prune)
+    return sorted(removed)
 
 
 def get_all_wf_configs() -> dict[str, dict[str, Any]]:

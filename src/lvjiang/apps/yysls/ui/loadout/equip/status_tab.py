@@ -1139,16 +1139,21 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         """由备战方案面板注入同级的战斗属性页；不再靠 findChildren 摸兄弟。"""
         self._combat_tab = combat_tab
 
+    def _reload_display_params(self) -> None:
+        """刷新前重读装备卡片展示参数：设置页改过字号/列数，刷新即生效。"""
+        from ....config.equip_display import load_equip_display
+
+        self._display_params = load_equip_display()
+
     def refresh_from(self, inventory) -> None:
         """用面板本轮已加载的仓储快照刷新，不再自己重新读盘。"""
+        self._reload_display_params()
         self._inv = inventory
         self._sync_inv()
         self._update_status_row()
 
     def _refresh_all(self):
-        from ....config.equip_display import load_equip_display
-
-        self._display_params = load_equip_display()
+        self._reload_display_params()
 
         user_name = self._host.active_user_name()
         if not user_name:

@@ -557,9 +557,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
     # ── 配置选择持久化 ──────────────────────────────────────────
 
     def _save_selection(self):
-        """按方案保存战斗配置，按用户保存纯显示选项。"""
-        from lvjiang.core.config.session import load_settings, save_settings
-
+        """按方案保存战斗配置，按用户保存纯显示选项（都在该用户的 loadouts.json）。"""
         if self._restoring or self._preview:
             return
         user_name = self._host.active_user_name()
@@ -590,9 +588,15 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         except Exception as e:
             logger.debug(f"保存备战方案战斗配置失败: {e}")
 
-        # 右键显示模式与假设复选框继续按用户保存；下拉框不再写到用户级，
-        # 避免不同备战方案互相覆盖。
-        selection = {
+        # 右键显示模式与假设复选框按用户存进 loadouts.json 的 ui_state；
+        # 下拉框不写到用户级，避免不同备战方案互相覆盖。
+        try:
+            repo.set_combat_prefs(self._current_prefs())
+        except Exception as e:
+            logger.debug(f"保存战斗属性选择失败: {e}")
+
+    def _current_prefs(self) -> dict:
+        return {
             "resistance_only": self._resistance_only,
             "full_chengyin": self._chk_full_chengyin.isChecked(),
             "full_dingyin": self._chk_full_dingyin.isChecked(),
@@ -600,18 +604,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             "simulate_transmute": self._chk_simulate_transmute.isChecked(),
         }
 
-        try:
-            settings = load_settings()
-            selections = settings.get("combat_attrs_selections", {})
-            if not isinstance(selections, dict):
-                selections = {}
-            selections[user_name] = selection
-            settings["combat_attrs_selections"] = selections
-            save_settings(settings)
-        except Exception as e:
-            logger.debug(f"保存战斗属性选择失败: {e}")
-
-    def _restore_selection(self, plan=None, school: str | None = None):
+    def _restore_selection(self, plan=None, school: str | None = None,
+                           prefs: dict | None = None):
         """恢复当前方案配置和当前用户的显示选项。
 
         回填 4 个下拉框和若干勾选框，每一个都会触发自己的 _on_*_changed →
@@ -619,23 +613,18 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         表现为连续多条「复用缓存装备数据」）。用 _restoring 抑制，
         由 _load_data 末尾统一刷一次。
         """
-        from lvjiang.core.config.session import load_settings
-
         user_name = self._host.active_user_name()
         if not user_name:
             return
 
         try:
-            settings = load_settings()
-            selections = settings.get("combat_attrs_selections", {})
-            if not isinstance(selections, dict):
-                selections = {}
-            selection = selections.get(user_name, {})
-            if not isinstance(selection, dict):
-                selection = {}
+            from ....core.loadout import LoadoutRepository
+
+            if prefs is None:
+                prefs = LoadoutRepository(user_name).get_combat_prefs()
+            selection = prefs if isinstance(prefs, dict) else {}
 
             if plan is None:
-                from ....core.loadout import LoadoutRepository
                 plan = LoadoutRepository(user_name).load().active_plan
             if school is None:
                 from ....config import get_game_config

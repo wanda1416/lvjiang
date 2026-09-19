@@ -52,7 +52,7 @@ local 文件可直接删除；system/remote 预置文件不允许用户删除，
 | 文件 | 内容 |
 |------|------|
 | `basic.yaml` | 基础配置、字体/装备卡片展示配置 |
-| `levels_and_seasons.yaml` | 等级、赛季 |
+| `seasons.yaml` | 等级、赛季 |
 | `affixes.yaml` | 词组、别名、词条上限与可用部位 |
 | `equipment.yaml` | 装备基础属性、命名系列、武器类型 |
 | `martial_arts.yaml` | 武学 |
@@ -233,8 +233,8 @@ local 改造来获得所需行为，不允许删除系统预置文件。历史 `
 | 文件 | 路径 | 身份字段 | 声明方 |
 |------|------|----------|--------|
 | `yysls/game_config/equipment.yaml` | `weapon_types` | `name` | 插件 |
-| `yysls/game_config/levels_and_seasons.yaml` | `level_configs` | `level` | 插件 |
-| `yysls/game_config/levels_and_seasons.yaml` | `season_configs` | `season_number` | 插件 |
+| `yysls/game_config/seasons.yaml` | `level_configs` | `level` | 插件 |
+| `yysls/game_config/seasons.yaml` | `season_configs` | `season_number` | 插件 |
 
 新赛季、新装备等增量内容用户可以自己加条目，不需要删任何系统设定。
 
@@ -315,7 +315,7 @@ register_registry_list_paths("yysls/tune_config.yaml", ("base_rules",))
 register_protected_list_paths("yysls/game_config/equipment.yaml", {
     "weapon_types": "name",
 })
-register_protected_list_paths("yysls/game_config/levels_and_seasons.yaml", {
+register_protected_list_paths("yysls/game_config/seasons.yaml", {
     "level_configs": "level", "season_configs": "season_number",
 })
 ```

@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style
 from ...config.tune_slots import SLOT_LABELS
-from ...tuning_history.repository import TuningHistoryRepository
+from ...core.tuning_history.repository import TuningHistoryRepository
 from .result_dialog import TuningResultsDialog
 from .result_store import TuningResultStore
 from .styles import HEADER_TITLE_STYLE

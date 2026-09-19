@@ -14,7 +14,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.ports import ResetHostP
 from lvjiang.workflows.builtins.system import pause_user
 
 from ......i18n import tr
-from ....tuning_history.models import (
+from ....core.tuning_history.models import (
     RESET_COOLDOWN,
     RESET_COUNT_UNREADABLE,
     RESET_FAILED,

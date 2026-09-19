@@ -458,7 +458,9 @@ class LoadoutPanel(QWidget):
             combat.set_equipment_snapshot(username, inventory.equipped)
         else:
             self._equipment._refresh_all()
-        combat._restore_selection(state.active_plan, school)
+        combat._restore_selection(
+            state.active_plan, school,
+            prefs=state.ui_state.get("combat_attrs") or {})
         combat._refresh_display()
         self._stale_while_hidden = False
 

@@ -57,7 +57,7 @@
 | 值 | 三率抗性 145（除数 2.45）、增效抗性 15（除数 1.15） |
 | 依据 | 110 级数值 |
 | 注意 | 正式链路（`build_graduation_attrs`、面板展示）都从等级配置传入抗性，默认参数只在等级配置缺失或直接裸调时生效；`calculate_judgment_outcomes` 由调用方传入 |
-| 变化时 | 优先改 `levels_and_seasons.yaml`；常量只是兜底 |
+| 变化时 | 优先改 `seasons.yaml`；常量只是兜底 |
 
 ### A5. 词条 min / max 拆分比 1:2
 
@@ -157,7 +157,7 @@
 | 关键字 | 位置 | 用途 |
 |---|---|---|
 | `"承音"`、`"N阶"` | `core/equip_parser/parser.py` `_parse_level()` | 从装备等级文本识别等级与承音 |
-| 等阶名称（装备名前缀） | `config/manager.py` `infer_original_equipment_level()`，名称表在 `levels_and_seasons.yaml` | 承音后原始等级只按名称前缀识别；名称表在配置，**匹配规则**（最长前缀）在代码 |
+| 等阶名称（装备名前缀） | `config/manager.py` `infer_original_equipment_level()`，名称表在 `seasons.yaml` | 承音后原始等级只按名称前缀识别；名称表在配置，**匹配规则**（最长前缀）在代码 |
 | `"属性攻击"`、`"外功穿透"`、`"属攻穿透"`、`"属攻伤害加成"`、`"无相"` | `core/role_attr_parser/parser.py` | 角色面板 OCR 标签 |
 | 属攻穿透详情页的分项（鸣金/裂石/破竹/牵丝穿透）**不含**装备定音的无相穿透；无相穿透在该页单独一行，且当前版本没有流派穿透装备词条 | `core/role_attr_parser/parser.py` `parse_detail2_attr_pen`（跳过无相行）、`ui/loadout/combat/play_style_dialog.py`（穿透按基础值直接保存） | 反推基础属性时穿透不扣装备的前提。若游戏把无相并入分项显示，这里必须改成减法 |
 | `"战斗时间"` | `core/graduation/rotation.py` | 技能轴 Excel 的行标签 |

@@ -2,9 +2,3 @@ content_version: 1
 basic_config:
   equipment_cooldown_days: 5
   equipment_cooldown_carryover: true
-equip_display:
-  name_font_size: 13
-  level_font_size: 12
-  affix_font_size: 11
-  card_min_height: 180
-  grid_columns: 4

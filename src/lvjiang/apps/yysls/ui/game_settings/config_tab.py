@@ -88,9 +88,10 @@ class GameConfigTab(QWidget):
             data=self._data, on_changed=self._on_changed)
         self._tabs.addTab(self._season_panel, tr("赛季配置"))
 
-        # 字体设置面板（卡片字号、高度、网格列数）
+        # 字体设置面板（卡片字号、高度、网格列数）——本机界面偏好，
+        # 存 session settings，不进游戏配置文档
         self._equip_display_panel = EquipDisplayPanel(
-            data=self._data, on_changed=self._on_changed)
+            on_changed=self._on_changed)
         self._tabs.addTab(self._equip_display_panel, tr("字体设置"))
 
         # 等级配置保存后，刷新其他面板中的 LevelCombo
@@ -105,7 +106,7 @@ class GameConfigTab(QWidget):
         self._season_panel.refresh_level_combos()
 
     def save_auxiliary_config(self) -> None:
-        """兼容旧调用；字体设置已经属于共享游戏配置。"""
+        """游戏配置之外的本机偏好（字体设置）随对话框保存一起写入。"""
         self._equip_display_panel.save()
 
     def validate(self) -> str | None:

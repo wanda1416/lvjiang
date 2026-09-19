@@ -67,6 +67,7 @@ from .wf_configs import (
     delete_wf_config,
     get_all_wf_configs,
     get_wf_config,
+    prune_wf_configs,
     set_wf_config,
     update_wf_config,
 )
@@ -123,6 +124,7 @@ __all__ = [
     "update_wf_config",
     "delete_wf_config",
     "get_all_wf_configs",
+    "prune_wf_configs",
 ]
 
 

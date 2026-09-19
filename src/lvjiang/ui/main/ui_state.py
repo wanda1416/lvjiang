@@ -235,8 +235,15 @@ class UiStateMixin:
                     self._user_manager._users_dir)
         else:
             target_cfg["_saved_params"] = params
-            from ...core.config.wf_configs import update_wf_config
+            from ...core.config.wf_configs import prune_wf_configs, update_wf_config
+            from ...workflows.discovery import discover_scripts
             update_wf_config(sid, params)
+            # 顺带清掉早已不存在的脚本的配置（改名/删除遗留）。按全集判定，
+            # 不用 _workflow_configs——那是入口展示的子集，会误删专用脚本配置。
+            removed = prune_wf_configs(
+                {sid, *(cfg["id"] for cfg in discover_scripts())})
+            if removed:
+                logger.info(f"清理失效脚本配置: {removed}")
 
     def _persist_param_change(self, *_args):
         """参数控件变更后立即写回共享配置。

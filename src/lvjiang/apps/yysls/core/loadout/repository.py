@@ -517,6 +517,35 @@ class LoadoutRepository:
         self.update(mutate)
         return new_fp
 
+    # ── 战斗属性页偏好（假设开关、黄字显示）：随用户的 loadouts.json 走 ──
+
+    COMBAT_PREFS_KEY = "combat_attrs"
+
+    def get_combat_prefs(self) -> dict:
+        """读取战斗属性页的用户偏好（``ui_state.combat_attrs``），缺失为空 dict。
+
+        不调用 ``load()``：浏览尚无备战文件的用户不触发初始化写入。
+        """
+        with self._lock:
+            try:
+                data = json.loads(self.path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                return {}
+        ui_state = data.get("ui_state", {}) if isinstance(data, dict) else {}
+        value = ui_state.get(self.COMBAT_PREFS_KEY) if isinstance(ui_state, dict) else None
+        return copy.deepcopy(value) if isinstance(value, dict) else {}
+
+    def set_combat_prefs(self, prefs: dict) -> None:
+        """写入战斗属性页偏好；内容未变时不写，避免无意义地增加 revision。"""
+        prefs = copy.deepcopy(prefs)
+        if self.get_combat_prefs() == prefs:
+            return
+
+        def _mutate(state: LoadoutState) -> None:
+            state.ui_state[self.COMBAT_PREFS_KEY] = prefs
+
+        self.update(_mutate)
+
     # ── 用户级 UI 状态（筛选等） ──────────────────────────
 
     def get_ui_state(self, key: str) -> dict:

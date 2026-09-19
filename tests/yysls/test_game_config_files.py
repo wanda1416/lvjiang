@@ -35,7 +35,7 @@ def test_game_config_has_exactly_seven_peer_files():
     assert len(GAME_CONFIG_FILES) == 7
     assert {Path(path).name for path in GAME_CONFIG_FILES} == {
         "basic.yaml",
-        "levels_and_seasons.yaml",
+        "seasons.yaml",
         "affixes.yaml",
         "equipment.yaml",
         "martial_arts.yaml",
@@ -63,3 +63,51 @@ def test_save_routes_sections_to_their_owner_files(tmp_path):
     assert equipment["weapon_types"][0]["name"] == "测试武器"
     assert "basic_config" not in equipment
     assert basic["content_version"] == equipment["content_version"] == 1
+
+
+def test_legacy_levels_and_seasons_file_is_renamed_in_local_and_remote(tmp_path: Path):
+    """levels_and_seasons.yaml 改名为 seasons.yaml：本地/远程层旧文件首次加载时
+    原地改名，用户自定义的等级/赛季不丢。"""
+    resolver = _resolver(tmp_path)
+    legacy = resolver.local_dir / "yysls/game_config/levels_and_seasons.yaml"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(yaml.safe_dump({
+        "content_version": 1,
+        "season_configs": [{"season_number": 99, "start_date": "2030-01-01",
+                            "equip_level": 130}],
+    }, allow_unicode=True), encoding="utf-8")
+
+    data = load_game_config(resolver)
+
+    assert not legacy.exists()
+    assert (resolver.local_dir / "yysls/game_config/seasons.yaml").is_file()
+    assert any(int(item.get("season_number", 0)) == 99
+               for item in data["season_configs"])
+
+
+def test_equip_display_lives_in_session_settings_not_game_config(monkeypatch):
+    from lvjiang.apps.yysls.config.equip_display import (
+        DEFAULTS,
+        load_equip_display,
+        save_equip_display,
+    )
+
+    store: dict = {}
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.config.equip_display.load_settings", lambda: store)
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.config.equip_display.save_settings",
+        lambda values: store.update(values))
+
+    assert load_equip_display() == DEFAULTS
+    assert DEFAULTS == {
+        "name_font_size": 13, "level_font_size": 12, "affix_font_size": 12,
+        "card_min_height": 180, "grid_columns": 4,
+    }
+    save_equip_display({"affix_font_size": 14, "grid_columns": 5, "junk": 1})
+    assert store == {"equip_display": {"affix_font_size": 14, "grid_columns": 5}}
+    assert load_equip_display()["affix_font_size"] == 14
+    assert load_equip_display()["name_font_size"] == 13
+    from lvjiang.apps.yysls.config.game_config_files import GAME_CONFIG_SECTION_FILES
+
+    assert "equip_display" not in GAME_CONFIG_SECTION_FILES

@@ -682,3 +682,24 @@ def test_plan_school_is_the_single_source_for_current_school():
     assert plan_school(plan, schools) == "鸣金·虹"
     state = LoadoutState(active_plan_id=plan.id, plans={plan.id: plan})
     assert state.active_school(schools) == "鸣金·虹"
+
+
+def test_combat_prefs_live_in_loadouts_json_and_skip_unchanged_writes(tmp_path):
+    """战斗属性页偏好按用户存 loadouts.json 的 ui_state；内容不变不涨 revision。"""
+    from lvjiang.apps.yysls.core.loadout import LoadoutRepository
+
+    repo = LoadoutRepository("tester", tmp_path)
+    assert repo.get_combat_prefs() == {}          # 无文件也不触发初始化写入
+    assert not repo.path.exists()
+
+    prefs = {"resistance_only": True, "full_chengyin": True, "full_dingyin": False,
+             "full_level": True, "simulate_transmute": False}
+    repo.set_combat_prefs(prefs)
+    assert repo.get_combat_prefs() == prefs
+    revision = repo.load().revision
+
+    repo.set_combat_prefs(dict(prefs))           # 相同内容
+    assert repo.load().revision == revision
+    repo.set_combat_prefs({**prefs, "full_level": False})
+    assert repo.load().revision == revision + 1
+    assert repo.load().ui_state["combat_attrs"]["full_level"] is False

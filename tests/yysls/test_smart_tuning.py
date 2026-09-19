@@ -833,3 +833,39 @@ def test_no_transmute_pool_means_no_transmute_branch(monkeypatch):
     evaluator._evaluate_plan(context, "ring", equipment)
 
     assert len(seen) == 1
+
+
+def test_evaluator_uses_injected_state_and_rules_without_touching_storage(monkeypatch):
+    """备战方案快照与规则表由调用方注入时，评估器不读仓储、不问规则管理器。"""
+    from lvjiang.apps.yysls.core.graduation import smart_tuning as module
+    from lvjiang.apps.yysls.core.loadout import LoadoutState
+
+    def _boom(*_args, **_kwargs):
+        raise AssertionError("不应读取备战方案仓储")
+
+    monkeypatch.setattr(module, "LoadoutRepository", _boom)
+    monkeypatch.setattr(module, "get_tuning_rule_manager", _boom)
+    rule = SimpleNamespace(
+        name="会意", playstyles={"纯唐": SimpleNamespace()},
+        affix_pool=["最大外功攻击"], patterns={},
+    )
+    game_config = _bare_evaluator()._game_config
+    game_config.get_schools = lambda: {}
+    evaluator = SmartTuningEvaluator(
+        _config(), username="tester", incoming_rule_configs={"huiyi": {}},
+        state=LoadoutState.empty(), rules={"huiyi": rule}, game_config=game_config,
+    )
+    # 注入的空方案集：目标玩法找不到方案 → 明确禁用原因，而不是读盘异常
+    assert not evaluator.active
+    assert evaluator.disabled_reason == "没有可靠的备战方案可用于毕业率判定"
+    assert [info["status"] for info in evaluator.plan_infos] == ["missing"]
+
+
+def test_candidate_problem_reasons_keep_priority_order():
+    """校验顺序即原因优先级：基础字段 → 词条数据 → 组合合法性 → 词条已满。"""
+    problem = SmartTuningEvaluator._candidate_problem
+    assert problem({"type": "剑"}) == "当前装备缺少类型、等级或品阶"
+    base = {"type": "剑", "level": 110, "quality": "gold"}
+    assert problem({**base, "affix_2": {"name": "劲", "value": 0}}) == (
+        "当前装备第 2 条词条数据不完整")
+    assert problem({**base, "affix_1": {"name": "最大外功攻击", "value": 1}}) == ""

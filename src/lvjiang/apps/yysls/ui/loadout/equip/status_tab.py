@@ -314,13 +314,20 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         add_user_nav_buttons(action_row, self._host)
         action_row.addStretch()
 
-        # 最优组合
+        # 毕业率分析前三页的快捷入口；词条收益率只在对话框内开放。
         btn_optimal = QPushButton(tr("最优组合"))
         btn_optimal.setToolTip(tr("搜索最优毕业率装备组合"))
         btn_optimal.setMinimumWidth(96)
         btn_optimal.setStyleSheet(_ACTION_BTN_STYLE)
         btn_optimal.clicked.connect(self._on_optimal_combo)
         action_row.addWidget(btn_optimal)
+
+        btn_transmute = QPushButton(tr("转律建议"))
+        btn_transmute.setToolTip(tr("计算当前配装的联合转律方案"))
+        btn_transmute.setMinimumWidth(96)
+        btn_transmute.setStyleSheet(_ACTION_BTN_STYLE)
+        btn_transmute.clicked.connect(self._on_transmute)
+        action_row.addWidget(btn_transmute)
 
         btn_affix_impact = QPushButton(tr("培养建议"))
         btn_affix_impact.setToolTip(tr("分析当前配装的合法培养建议和词条敏感度"))
@@ -1793,11 +1800,17 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
 
         self._open_graduation_analysis(TAB_OPTIMAL)
 
-    def _on_affix_impact(self):
+    def _on_transmute(self):
         """打开毕业率分析对话框的「转律建议」页。"""
         from ..graduation_analysis import TAB_TRANSMUTE
 
         self._open_graduation_analysis(TAB_TRANSMUTE)
+
+    def _on_affix_impact(self):
+        """打开毕业率分析对话框的「培养建议」页。"""
+        from ..graduation_analysis import TAB_SUGGESTION
+
+        self._open_graduation_analysis(TAB_SUGGESTION)
 
     def _analysis_launcher(self):
         """分析对话框入口装配器（懒建）；装备页只交出自己掌握的协作者。"""

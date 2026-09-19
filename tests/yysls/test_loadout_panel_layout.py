@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtWidgets import QComboBox
+from PyQt6.QtWidgets import QComboBox, QPushButton
 
 from lvjiang.apps.yysls.ui.loadout.loadout_panel import LoadoutPanel
 
@@ -48,6 +48,25 @@ def test_assumptions_share_public_metric_row(qtbot):
     assert [panel._metrics_layout.stretch(index) for index in range(3)] == [
         2, 1, 1,
     ]
+
+
+def test_main_toolbar_exposes_first_three_analysis_tabs(qtbot):
+    panel = LoadoutPanel(_Host())
+    qtbot.addWidget(panel)
+    root = panel.layout()
+    assert root is not None
+    toolbar = root.itemAt(0).layout()
+    assert toolbar is not None
+    labels = [
+        widget.text()
+        for index in range(toolbar.count())
+        if (widget := toolbar.itemAt(index).widget()) is not None
+        and isinstance(widget, QPushButton)
+    ]
+    positions = [labels.index(name) for name in (
+        "最优组合", "转律建议", "培养建议")]
+    assert positions == list(range(positions[0], positions[0] + 3))
+    assert "词条收益率" not in labels
 
 
 def test_panel_loads_one_inventory_per_refresh_and_shares_it(qtbot, tmp_path, monkeypatch):

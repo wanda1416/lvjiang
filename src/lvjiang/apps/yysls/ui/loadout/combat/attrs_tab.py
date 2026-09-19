@@ -286,7 +286,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._chk_full_level.stateChanged.connect(lambda _: self._save_selection())
         self._chk_simulate_transmute = QCheckBox(tr("模拟转律"))
         self._chk_simulate_transmute.setToolTip(
-            tr("按装备上已保存的转律目标计算（目标由「培养建议 → 转律建议」"
+            tr("按装备上已保存的转律目标计算（目标由「毕业率分析 → 转律建议」"
                "计算并应用）；只用已保存目标，不触发搜索"))
         self._chk_simulate_transmute.stateChanged.connect(self._refresh_display)
         self._chk_simulate_transmute.stateChanged.connect(

@@ -897,6 +897,10 @@ class OptimalComboPage(QWidget):
         # 必须当场重建——否则改了也只在下次打开对话框才生效。
         self._chk_exclude_mock.toggled.connect(self._on_exclude_mock_toggled)
         filter_row.addWidget(self._chk_exclude_mock)
+        self._chk_apply_tuning = QCheckBox(tr("应用调律规则"))
+        self._chk_apply_tuning.setChecked(True)
+        self._chk_apply_tuning.toggled.connect(self._on_apply_tuning_toggled)
+        filter_row.addWidget(self._chk_apply_tuning)
         tuning_label = QLabel(tr("候选评级"))
         tuning_label.setProperty("tone", "muted")
         tuning_label.setToolTip(tr("仅用于辅助筛选候选装备，不参与装备合法性判断"))
@@ -1229,6 +1233,14 @@ class OptimalComboPage(QWidget):
         self._refresh_tuning_display()
         self._on_tuning_changed()
 
+    def _effective_tuning_selection(self) -> list[tuple[str, str]]:
+        return list(self._tuning_selection) if self._chk_apply_tuning.isChecked() else []
+
+    def _on_apply_tuning_toggled(self, checked: bool) -> None:
+        self._edit_tuning.setEnabled(checked)
+        self._combo_min_rating.setEnabled(checked)
+        self._on_tuning_changed()
+
     def _min_rating(self) -> str:
         return str(self._combo_min_rating.currentData() or _DEFAULT_MIN_RATING)
 
@@ -1236,7 +1248,7 @@ class OptimalComboPage(QWidget):
         """规则或评级要求变化时，前置过滤装备勾选状态。"""
         from ...core.graduation.combo_rules import judge_best_rating
 
-        pairs = list(self._tuning_selection)
+        pairs = self._effective_tuning_selection()
         if not pairs:
             # 没选玩法：不应用规则，全部勾选
             for group in self._slot_groups.values():
@@ -1316,7 +1328,7 @@ class OptimalComboPage(QWidget):
             unique = pooled.get(slot_key, [])
             group = _SlotGroup(
                 slot_key, display_name, unique, self._school,
-                list(self._tuning_selection), self._min_rating(),
+                self._effective_tuning_selection(), self._min_rating(),
             )
             self._slot_groups[slot_key] = group
             total_candidates += len(unique)
@@ -1446,6 +1458,7 @@ class OptimalComboPage(QWidget):
         """搜索期间冻结条件快照，防止界面与后台参数错位。"""
         for control in (
             self._chk_exclude_mock,
+            self._chk_apply_tuning,
             self._edit_tuning,
             self._combo_min_rating,
             self._chk_pruning,
@@ -1454,6 +1467,9 @@ class OptimalComboPage(QWidget):
             self._btn_gongjue_all,
         ):
             control.setEnabled(enabled)
+        apply_tuning = enabled and self._chk_apply_tuning.isChecked()
+        self._edit_tuning.setEnabled(apply_tuning)
+        self._combo_min_rating.setEnabled(apply_tuning)
         for group in self._slot_groups.values():
             group.setEnabled(enabled)
 

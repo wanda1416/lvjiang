@@ -55,6 +55,49 @@ def test_gongjue_select_all_shortcut(qtbot, monkeypatch):
     assert button.isEnabled()
 
 
+def test_apply_tuning_switch_controls_rating_filter(qtbot, monkeypatch):
+    from types import SimpleNamespace
+
+    from PyQt6.QtWidgets import QCheckBox
+
+    from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
+
+    monkeypatch.setattr(OptimalComboPage, "_load_candidates", lambda self: None)
+    page = OptimalComboPage(_Host(), "鸣金·虹", "基础方案", CombatAttributes())
+    qtbot.addWidget(page)
+    assert page._chk_apply_tuning.isChecked()
+    page._tuning_selection = [("test_rule", "test_playstyle")]
+    checkbox = QCheckBox(page)
+    ratings = []
+    row = SimpleNamespace(checkbox=checkbox, equip={}, set_rating=ratings.append)
+    page._slot_groups = {"head": SimpleNamespace(rows=[row], setEnabled=lambda _: None)}
+    calls = []
+
+    def judge(equip, pairs):
+        calls.append(pairs)
+        return SimpleNamespace(meets=lambda _: False, label="垃圾")
+
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.graduation.combo_rules.judge_best_rating", judge)
+    page._on_tuning_changed()
+    assert not checkbox.isChecked() and len(calls) == 1
+
+    page._chk_apply_tuning.setChecked(False)
+    assert checkbox.isChecked() and ratings[-1] == "-"
+    assert len(calls) == 1
+    assert page._effective_tuning_selection() == []
+    assert not page._edit_tuning.isEnabled()
+    assert not page._combo_min_rating.isEnabled()
+    page._set_search_controls_enabled(False)
+    page._set_search_controls_enabled(True)
+    assert not page._edit_tuning.isEnabled()
+
+    page._chk_apply_tuning.setChecked(True)
+    assert not checkbox.isChecked() and len(calls) == 2
+    assert page._edit_tuning.isEnabled() and page._combo_min_rating.isEnabled()
+    assert page._tuning_selection == [("test_rule", "test_playstyle")]
+
+
 def test_result_card_actions_share_one_row(qtbot):
     card = _ResultCard(1, _result(), {"main_weapon": "主武器"})
     qtbot.addWidget(card)

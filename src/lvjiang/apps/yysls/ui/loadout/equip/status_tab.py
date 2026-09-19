@@ -715,7 +715,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._save_user_filter(filters)
 
     def _load_user_filter(self) -> dict:
-        """读取当前用户的筛选状态，兼容旧备战文件中的值"""
+        """读取当前用户的筛选状态。"""
         if self._inv is not None:
             return self._inv._repo.get_ui_state("equip_filter")
         return {}

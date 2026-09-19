@@ -218,9 +218,11 @@ def test_readonly_user_loadout_stays_editable_during_execution(tmp_path, monkeyp
 def test_execution_does_not_lock_equipment_ui_or_profile(tmp_path, monkeypatch, readonly):
     from lvjiang.apps.yysls.core.loadout.repository import LoadoutRepository
     from lvjiang.core.profile.repository import ProfileDB
+    from lvjiang.core.user_config import User, save_user_metadata
 
     monkeypatch.setattr(access, "_readonly", readonly)
     users_dir = tmp_path / "users"
+    save_user_metadata(User("alice"), users_dir)
     repo = LoadoutRepository("alice", users_dir)
     profile = ProfileDB(tmp_path / "profile.db")
     lease = access.acquire_user("alice", users_dir)
@@ -252,6 +254,8 @@ def test_equipment_transactions_from_another_process_preserve_latest_items(tmp_p
     config_target = tmp_path / "config/system/yysls/game_config"
     shutil.copytree(config_source, config_target)
     users = tmp_path / "config/session/users"
+    from lvjiang.core.user_config import User, save_user_metadata
+    save_user_metadata(User("alice"), users)
     repo = LoadoutRepository("alice", users)
     repo.upsert_item({"_fp": "first", "type": "环"})
     before_revision = repo.load().revision

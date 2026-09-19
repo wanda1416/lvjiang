@@ -98,6 +98,60 @@ def test_apply_tuning_switch_controls_rating_filter(qtbot, monkeypatch):
     assert page._tuning_selection == [("test_rule", "test_playstyle")]
 
 
+def test_analysis_options_restore_and_persist_without_call_time_inputs(
+    qtbot, monkeypatch,
+):
+    from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
+
+    monkeypatch.setattr(OptimalComboPage, "_load_candidates", lambda self: None)
+
+    def load_options(page):
+        page._tuning_options = [
+            ("rule-a", "playstyle-a", "规则A-玩法A", "plan"),
+            ("rule-b", "playstyle-b", "规则B-玩法B", "school"),
+        ]
+        page._tuning_selection = [("rule-a", "playstyle-a")]
+        page._refresh_tuning_display()
+
+    monkeypatch.setattr(OptimalComboPage, "_load_tuning_options", load_options)
+    saved = []
+    page = OptimalComboPage(
+        _Host(), "鸣金·虹", "基础方案", CombatAttributes(),
+        gongjue="会意",
+        assumptions_provider=lambda: Assumptions(full_chengyin=True),
+        analysis_settings={
+            "apply_tuning_rules": False,
+            "candidate_rating_rules": [["rule-b", "playstyle-b"]],
+            "minimum_rating": "优秀",
+            "exclude_mock": False,
+            "smart_analysis": False,
+            "season_chengyin": True,
+        },
+        settings_changed=saved.append,
+    )
+    qtbot.addWidget(page)
+
+    assert not page._chk_apply_tuning.isChecked()
+    assert page._tuning_selection == [("rule-b", "playstyle-b")]
+    assert page._min_rating() == "优秀"
+    assert not page._chk_exclude_mock.isChecked()
+    assert not page._chk_pruning.isChecked()
+    assert page._chk_season_chengyin.isChecked()
+    assert saved == []
+
+    page._chk_pruning.setChecked(True)
+    assert saved[-1] == {
+        "apply_tuning_rules": False,
+        "candidate_rating_rules": [["rule-b", "playstyle-b"]],
+        "minimum_rating": "优秀",
+        "exclude_mock": False,
+        "smart_analysis": True,
+        "season_chengyin": True,
+    }
+    assert "gongjue" not in saved[-1]
+    assert "assumptions" not in saved[-1]
+
+
 def test_result_card_actions_share_one_row(qtbot):
     card = _ResultCard(1, _result(), {"main_weapon": "主武器"})
     qtbot.addWidget(card)

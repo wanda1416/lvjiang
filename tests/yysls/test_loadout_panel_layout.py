@@ -198,11 +198,14 @@ def test_startup_builds_inventory_once_and_first_show_does_not_refresh(
     assert loads == ["tester", "tester"]   # 隐藏期间可能错过变更，再显示补一次
 
 
-def test_assumption_checkboxes_round_trip_through_user_loadouts(qtbot, tmp_path, monkeypatch):
-    """假设开关与黄字显示偏好写进当前用户的 loadouts.json，下次刷新恢复。"""
+def test_assumption_checkboxes_round_trip_through_user_metadata(qtbot, tmp_path, monkeypatch):
+    """假设开关与黄字显示偏好写进当前用户的 user.json，下次刷新恢复。"""
     from lvjiang.apps.yysls.core.combat import equipment as equipment_mod
     from lvjiang.apps.yysls.core.loadout import LoadoutRepository
     from lvjiang.apps.yysls.ui.loadout import loadout_panel as panel_mod
+    from lvjiang.core.user_config import User, save_user_metadata
+
+    save_user_metadata(User("tester"), tmp_path)
 
     class _NamedHost(_Host):
         @staticmethod
@@ -238,7 +241,7 @@ def test_assumption_checkboxes_round_trip_through_user_loadouts(qtbot, tmp_path,
     stored = real_repo("tester", tmp_path).get_combat_prefs()
     assert stored["full_chengyin"] is True
 
-    # 新开一个面板：从该用户的 loadouts.json 恢复，而不是 session.json
+    # 新开一个面板：从该用户的 user.json 恢复
     fresh = LoadoutPanel(_NamedHost())
     qtbot.addWidget(fresh)
     fresh.refresh()

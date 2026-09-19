@@ -193,8 +193,10 @@ def test_equipment_slot_click_while_user_is_running(qtbot, tmp_path, monkeypatch
 
     from lvjiang.apps.yysls.core.loadout.repository import LoadoutRepository
     from lvjiang.apps.yysls.ui.loadout.equip.status_tab import EquipStatusTab
+    from lvjiang.core.user_config import User, save_user_metadata
 
     monkeypatch.setattr(access, "_readonly", readonly)
+    save_user_metadata(User("alice"), tmp_path)
     repo = LoadoutRepository("alice", tmp_path)
     repo.upsert_item({"_fp": "ring", "type": "环"})
     before = repo.path.read_bytes()

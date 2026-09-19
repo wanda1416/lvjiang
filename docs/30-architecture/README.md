@@ -27,6 +27,7 @@
 | [34-scene/](34-scene/README.md) | 场景、布局语义与编辑器 |
 | [35-workflows/](35-workflows/README.md) | 跨场景业务流程编排 |
 | [36-graduation/](36-graduation/README.md) | 毕业率计算引擎 |
+| [37-vision/](37-vision/README.md) | 视觉感知子系统：四通道选型、图色与模板匹配算法、坐标一致性契约、调优与失败模式 |
 
 ## 相关
 

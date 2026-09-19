@@ -55,6 +55,8 @@ def dialog(qtbot, monkeypatch):
     dlg._sub_martial_art = ""
     dlg._level_threshold = 0
     dlg._affix_filter = ""
+    dlg._restoring_settings = False
+    dlg._settings_changed = None
     dlg._slot_groups = {}
     dlg._slot_scroll_areas = {}
     dlg._chk_apply_tuning = QCheckBox()

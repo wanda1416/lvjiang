@@ -109,6 +109,13 @@ class GraduationAnalysisLauncher:
             equipped = inventory.equipped
             plan = inventory.active_plan
             plan_id = inventory.active_plan_id
+            from lvjiang.core.user_config import (
+                get_graduation_analysis_settings,
+                set_graduation_analysis_settings,
+            )
+            users_dir = inventory._repo.users_dir
+            analysis_settings = get_graduation_analysis_settings(
+                user_name, plan_id, users_dir)
             # 方案 → 计算上下文（流派、模型、基础属性含弓玦）只构造一次
             try:
                 scoring = PlanScoringContext.from_plan(
@@ -184,6 +191,9 @@ class GraduationAnalysisLauncher:
                 main_martial_art=plan.main_martial_art,
                 sub_martial_art=plan.sub_martial_art,
                 assumptions_provider=bar.value,
+                analysis_settings=analysis_settings,
+                settings_changed=lambda value: set_graduation_analysis_settings(
+                    user_name, plan_id, value, users_dir),
             )
             dialog = GraduationAnalysisDialog(
                 parent,

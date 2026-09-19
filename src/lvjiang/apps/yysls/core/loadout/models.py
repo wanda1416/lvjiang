@@ -82,8 +82,6 @@ class LoadoutState:
     active_plan_id: str = ""
     plans: dict[str, LoadoutPlan] = field(default_factory=dict)
     equipment_items: dict[str, dict] = field(default_factory=dict)
-    # 兼容旧版筛选值；新 UI 状态写入 session.json，避免与任务数据共用执行锁。
-    ui_state: dict[str, dict] = field(default_factory=dict)
 
     @classmethod
     def empty(cls) -> "LoadoutState":
@@ -112,13 +110,11 @@ class LoadoutState:
             for fp, value in items.items()
             if isinstance(value, dict)
         } if isinstance(items, dict) else {}
-        ui = data.get("ui_state", {})
         return cls(
             revision=int(data.get("revision") or 0),
             active_plan_id=active,
             plans=plans,
             equipment_items=normalized_items,
-            ui_state=dict(ui) if isinstance(ui, dict) else {},
         )
 
     def to_dict(self) -> dict:
@@ -127,7 +123,6 @@ class LoadoutState:
             "active_plan_id": self.active_plan_id,
             "plans": {pid: plan.to_dict() for pid, plan in self.plans.items()},
             "equipment_items": self.equipment_items,
-            "ui_state": self.ui_state,
         }
 
     @property

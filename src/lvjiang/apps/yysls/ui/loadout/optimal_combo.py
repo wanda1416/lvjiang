@@ -848,10 +848,14 @@ class OptimalComboPage(QWidget):
         parent: QWidget | None = None,
         *,
         assumptions_provider: Callable[[], Assumptions] | None = None,
+        analysis_settings: dict[str, Any] | None = None,
+        settings_changed: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self._host = host
         self._assumptions_provider = assumptions_provider or Assumptions
+        self._settings_changed = settings_changed
+        self._restoring_settings = False
         self._results: list[dict[str, Any]] = []
         self._school = school
         self._scheme = scheme
@@ -877,6 +881,7 @@ class OptimalComboPage(QWidget):
         }
 
         self._setup_ui()
+        self._restore_analysis_settings(analysis_settings or {})
         self._load_candidates()
 
     def _setup_ui(self) -> None:
@@ -932,7 +937,7 @@ class OptimalComboPage(QWidget):
             self._combo_min_rating.setCurrentIndex(index)
         fit_combo_to_contents(self._combo_min_rating, minimum=88)
         self._combo_min_rating.currentIndexChanged.connect(
-            lambda _i: self._on_tuning_changed())
+            self._on_min_rating_changed)
         filter_row.addWidget(self._combo_min_rating)
         filter_layout.addLayout(filter_row)
         self._load_tuning_options()
@@ -953,12 +958,15 @@ class OptimalComboPage(QWidget):
         self._chk_pruning.setChecked(True)
         self._chk_pruning.setToolTip(
             tr("自动淘汰被其他候选完全压制的装备，缩减搜索空间"))
+        self._chk_pruning.toggled.connect(self._persist_analysis_settings)
         compute_row.addWidget(self._chk_pruning)
         # 搜索空间选项而非投影假设：原装备保留，额外派生同等级承音分支
         self._chk_season_chengyin = QCheckBox(tr("赛季装备假设承音"))
         self._chk_season_chengyin.setToolTip(tr(
             "为本赛季等级的原生装备额外创建同等级承音分支；"
             "只将普通词条拉到承音上限，定音保持原值"))
+        self._chk_season_chengyin.toggled.connect(
+            self._persist_analysis_settings)
         compute_row.addWidget(self._chk_season_chengyin)
 
         gongjue_label = QLabel(tr("弓玦套装"))
@@ -1252,6 +1260,7 @@ class OptimalComboPage(QWidget):
         self._tuning_selection = dialog.values()
         self._refresh_tuning_display()
         self._on_tuning_changed()
+        self._persist_analysis_settings()
 
     def _effective_tuning_selection(self) -> list[tuple[str, str]]:
         return list(self._tuning_selection) if self._chk_apply_tuning.isChecked() else []
@@ -1260,6 +1269,11 @@ class OptimalComboPage(QWidget):
         self._edit_tuning.setEnabled(checked)
         self._combo_min_rating.setEnabled(checked)
         self._on_tuning_changed()
+        self._persist_analysis_settings()
+
+    def _on_min_rating_changed(self, _index: int) -> None:
+        self._on_tuning_changed()
+        self._persist_analysis_settings()
 
     def _min_rating(self) -> str:
         return str(self._combo_min_rating.currentData() or _DEFAULT_MIN_RATING)
@@ -1293,7 +1307,81 @@ class OptimalComboPage(QWidget):
         候选池只在对话框构造时加载一次，而本项默认勾选，用户没有机会
         在加载前取消——不当场重建的话这个开关等于没有。
         """
+        if self._restoring_settings:
+            return
+        self._persist_analysis_settings()
         self._load_candidates()
+
+    def _analysis_settings(self) -> dict[str, Any]:
+        """返回最优组合页自身选项，不包含调用方传入的假设和弓玦。"""
+        return {
+            "apply_tuning_rules": self._chk_apply_tuning.isChecked(),
+            "candidate_rating_rules": [
+                [rule_key, playstyle]
+                for rule_key, playstyle in self._tuning_selection
+            ],
+            "minimum_rating": self._min_rating(),
+            "exclude_mock": self._chk_exclude_mock.isChecked(),
+            "smart_analysis": self._chk_pruning.isChecked(),
+            "season_chengyin": self._chk_season_chengyin.isChecked(),
+        }
+
+    def _persist_analysis_settings(self, _value: object = None) -> None:
+        if self._restoring_settings or self._settings_changed is None:
+            return
+        self._settings_changed(self._analysis_settings())
+
+    def _restore_analysis_settings(self, settings: dict[str, Any]) -> None:
+        """回填当前备战方案的最优组合选项。"""
+        if not settings:
+            return
+        valid_pairs = {
+            (rule_key, playstyle)
+            for rule_key, playstyle, _label, _scope in self._tuning_options
+        }
+        raw_pairs = settings.get("candidate_rating_rules")
+        selected: list[tuple[str, str]] = []
+        if isinstance(raw_pairs, list):
+            for pair in raw_pairs:
+                if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+                    continue
+                candidate = (str(pair[0]), str(pair[1]))
+                if candidate in valid_pairs:
+                    selected.append(candidate)
+
+        controls = (
+            self._chk_apply_tuning,
+            self._chk_exclude_mock,
+            self._combo_min_rating,
+            self._chk_pruning,
+            self._chk_season_chengyin,
+        )
+        self._restoring_settings = True
+        for control in controls:
+            control.blockSignals(True)
+        try:
+            if isinstance(raw_pairs, list):
+                self._tuning_selection = selected
+            self._chk_apply_tuning.setChecked(
+                bool(settings.get("apply_tuning_rules", True)))
+            self._chk_exclude_mock.setChecked(
+                bool(settings.get("exclude_mock", True)))
+            rating_index = self._combo_min_rating.findData(
+                settings.get("minimum_rating"))
+            if rating_index >= 0:
+                self._combo_min_rating.setCurrentIndex(rating_index)
+            self._chk_pruning.setChecked(
+                bool(settings.get("smart_analysis", True)))
+            self._chk_season_chengyin.setChecked(
+                bool(settings.get("season_chengyin", False)))
+        finally:
+            for control in controls:
+                control.blockSignals(False)
+            self._restoring_settings = False
+        enabled = self._chk_apply_tuning.isChecked()
+        self._edit_tuning.setEnabled(enabled)
+        self._combo_min_rating.setEnabled(enabled)
+        self._refresh_tuning_display()
 
     def _load_candidates(self) -> None:
         """从 session 加载候选装备并按槽位分组。

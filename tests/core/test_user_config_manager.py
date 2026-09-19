@@ -6,7 +6,14 @@
 import pytest
 
 from lvjiang.core.config.session import reset_session_store
-from lvjiang.core.user_config import User, UserConfigManager
+from lvjiang.core.user_config import (
+    User,
+    UserConfigManager,
+    get_graduation_analysis_settings,
+    load_user_metadata,
+    save_user_metadata,
+    set_graduation_analysis_settings,
+)
 from tests.case_matrix import case_matrix
 
 
@@ -36,6 +43,8 @@ class TestUser:
             "avatar": "",
             "attributes": {},
             "workflow_params": {},
+            "ui_state": {},
+            "graduation_analysis": {},
         }
 
     def test_from_dict(self):
@@ -54,6 +63,30 @@ class TestUser:
         u2 = User.from_dict(u.to_dict())
         assert u2.name == u.name
         assert u2.created_at == u.created_at
+
+    def test_graduation_analysis_settings_are_keyed_by_plan_id(self, tmp_path):
+        save_user_metadata(User("alice"), tmp_path)
+        first = {
+            "apply_tuning_rules": False,
+            "candidate_rating_rules": [["rule-a", "playstyle-a"]],
+            "minimum_rating": "优秀",
+            "exclude_mock": True,
+            "smart_analysis": False,
+            "season_chengyin": True,
+        }
+        set_graduation_analysis_settings("alice", "plan-a", first, tmp_path)
+        set_graduation_analysis_settings(
+            "alice", "plan-b", {"minimum_rating": "顶级"}, tmp_path)
+
+        assert get_graduation_analysis_settings(
+            "alice", "plan-a", tmp_path) == first
+        user = load_user_metadata("alice", tmp_path)
+        assert user is not None
+        assert user.graduation_analysis == {
+            "plan-a": first,
+            "plan-b": {"minimum_rating": "顶级"},
+        }
+        assert user.ui_state == {}
 
 
 # ─── UserConfigManager ────────────────────────────────────

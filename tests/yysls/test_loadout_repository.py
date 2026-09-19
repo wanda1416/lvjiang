@@ -519,22 +519,30 @@ def test_cannot_delete_last_plan(tmp_path: Path):
         repo.delete_plan(repo.load().active_plan_id)
 
 
-def test_ui_state_migrates_without_rewriting_task_data(tmp_path):
-    from lvjiang.core.config.session import get_session_store, reset_session_store
+def test_ui_state_uses_user_metadata_and_ignores_existing_loadout_value(tmp_path):
+    from lvjiang.core.user_config import User, load_user_metadata, save_user_metadata
 
+    save_user_metadata(User("alice"), tmp_path)
+    save_user_metadata(User("bob"), tmp_path)
     repo = LoadoutRepository("alice", tmp_path)
-    repo.update(lambda state: state.ui_state.update(equip_filter={"type": "ring"}))
+    repo.update(lambda _state: None)
+    legacy = json.loads(repo.path.read_text(encoding="utf-8"))
+    legacy["ui_state"] = {"equip_filter": {"type": "ring"}}
+    repo.path.write_text(json.dumps(legacy), encoding="utf-8")
     before = repo.path.read_bytes()
-    assert repo.get_ui_state("equip_filter") == {"type": "ring"}
-    repo.set_ui_state("equip_filter", {})  # explicit reset must not revive legacy values
+    assert repo.get_ui_state("equip_filter") == {}
+
+    repo.set_ui_state("equip_filter", {"type": "head"})
     repo.set_ui_state("other_panel", {"collapsed": True})
     bob = LoadoutRepository("bob", tmp_path)
-    bob.set_ui_state("equip_filter", {"type": "head"})
-    get_session_store().reload()
-    reset_session_store()
-    assert repo.get_ui_state("equip_filter") == {}
+    bob.set_ui_state("equip_filter", {"type": "ring"})
+    assert repo.get_ui_state("equip_filter") == {"type": "head"}
     assert repo.get_ui_state("other_panel") == {"collapsed": True}
-    assert bob.get_ui_state("equip_filter") == {"type": "head"}
+    assert bob.get_ui_state("equip_filter") == {"type": "ring"}
+    assert load_user_metadata("alice", tmp_path).ui_state == {
+        "equip_filter": {"type": "head"},
+        "other_panel": {"collapsed": True},
+    }
     assert repo.path.read_bytes() == before
 
 
@@ -684,22 +692,27 @@ def test_plan_school_is_the_single_source_for_current_school():
     assert state.active_school(schools) == "鸣金·虹"
 
 
-def test_combat_prefs_live_in_loadouts_json_and_skip_unchanged_writes(tmp_path):
-    """战斗属性页偏好按用户存 loadouts.json 的 ui_state；内容不变不涨 revision。"""
+def test_combat_prefs_live_in_user_json_without_creating_loadouts(tmp_path):
+    """战斗属性偏好只写用户资料，不创建或改动装备数据文件。"""
     from lvjiang.apps.yysls.core.loadout import LoadoutRepository
+    from lvjiang.core.user_config import User, load_user_metadata, save_user_metadata
 
+    save_user_metadata(User("tester"), tmp_path)
     repo = LoadoutRepository("tester", tmp_path)
-    assert repo.get_combat_prefs() == {}          # 无文件也不触发初始化写入
+    assert repo.get_combat_prefs() == {}
     assert not repo.path.exists()
 
     prefs = {"resistance_only": True, "full_chengyin": True, "full_dingyin": False,
              "full_level": True, "simulate_transmute": False}
     repo.set_combat_prefs(prefs)
     assert repo.get_combat_prefs() == prefs
-    revision = repo.load().revision
+    assert not repo.path.exists()
+    user_path = tmp_path / "tester.json"
+    before = user_path.read_bytes()
 
-    repo.set_combat_prefs(dict(prefs))           # 相同内容
-    assert repo.load().revision == revision
+    repo.set_combat_prefs(dict(prefs))
+    assert user_path.read_bytes() == before
     repo.set_combat_prefs({**prefs, "full_level": False})
-    assert repo.load().revision == revision + 1
-    assert repo.load().ui_state["combat_attrs"]["full_level"] is False
+    assert load_user_metadata("tester", tmp_path).ui_state[
+        "combat_attrs"]["full_level"] is False
+    assert not repo.path.exists()

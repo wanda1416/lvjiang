@@ -187,6 +187,9 @@ def _load_translation_file(language: str) -> dict[str, str]:
     同时加载 zh_CN.yaml 基准文件，与目标语言文件并行递归遍历，
     建立 中文原文 → 译文 的映射。结构不对齐的条目自动跳过。
     """
+    if language == "zh_CN":
+        # 中文是原文本身，tr() 直接返回；解析基准文件只会得到空表。
+        return {}
     yaml_file = _i18n_dir / f"{language}.yaml"
     if not yaml_file.exists():
         logger.warning("[i18n] 翻译文件不存在: %s", yaml_file)

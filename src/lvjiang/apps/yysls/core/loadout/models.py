@@ -134,6 +134,10 @@ class LoadoutState:
     def active_plan(self) -> LoadoutPlan:
         return self.plans[self.active_plan_id]
 
+    def active_school(self, schools: dict) -> str:
+        """当前激活方案的流派（见 ``plan_school``）。"""
+        return plan_school(self.active_plan, schools)
+
     def resolved_equipment(self, plan_id: str | None = None) -> dict[str, dict]:
         plan = self.plans[plan_id or self.active_plan_id]
         return {
@@ -141,6 +145,15 @@ class LoadoutState:
             for slot, fp in plan.equipment.items()
             if fp and fp in self.equipment_items
         }
+
+
+def plan_school(plan: LoadoutPlan, schools: dict) -> str:
+    """方案的流派：由主副武学无序反查；解析不出时为空串。
+
+    这是「当前流派是什么」的唯一口径——面板下拉、装备页的候选过滤和
+    评分上下文都从方案派生，不各自维护一份选择。
+    """
+    return resolve_school(plan.main_martial_art, plan.sub_martial_art, schools) or ""
 
 
 def resolve_school(main_art: str, sub_art: str, schools: dict) -> str | None:

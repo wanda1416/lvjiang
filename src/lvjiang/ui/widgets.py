@@ -1,6 +1,6 @@
 """可复用 UI 控件"""
 
-from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QPointF, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QTextCursor, QWheelEvent
 from PyQt6.QtWidgets import (
     QAbstractSpinBox,
@@ -19,39 +19,35 @@ from PyQt6.QtWidgets import (
 _MAX_LOG_LINES = 1000
 
 
-class WheelGuard(QObject):
-    """应用级滚轮拦截器：下拉框/数字输入框一律屏蔽滚轮改值
+def _forward_wheel_to_parent(self, event: QWheelEvent | None) -> None:
+    """下拉框/数字输入框不响应滚轮：克隆后沿父链上抛至被接收，页面照常滚动。"""
+    if event is None:
+        return
+    parent = self.parentWidget()
+    while parent is not None:
+        pos = parent.mapFromGlobal(event.globalPosition().toPoint())
+        clone = QWheelEvent(
+            QPointF(pos), event.globalPosition(),
+            event.pixelDelta(), event.angleDelta(),
+            event.buttons(), event.modifiers(),
+            event.phase(), event.inverted())
+        QApplication.sendEvent(parent, clone)
+        if clone.isAccepted():
+            break
+        parent = parent.parentWidget()
+    event.accept()
 
-    装到 QApplication 上，全局生效（含后续新增控件，无需逐个
-    定制控件类）；滚轮事件交回父级滚动区域，页面滚动不受影响。
+
+def install_wheel_guard(app=None) -> None:
+    """全局屏蔽下拉框/数字输入框的滚轮改值（防滑动页面时误改）。
+
+    直接替换两个基类的 ``wheelEvent``：PyQt 按实例的 Python 类型链查找虚函数
+    重写，之后创建的 QComboBox / QAbstractSpinBox 及其子类都生效。早先装在
+    QApplication 上的事件过滤器要为每个控件的每个事件回到 Python 判一次类型，
+    启动期间几十万次调用能占掉约一秒。
     """
-
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # type: ignore[override]
-        if (event.type() == QEvent.Type.Wheel
-                and isinstance(obj, (QComboBox, QAbstractSpinBox))):
-            # 克隆后沿父链上抛至被接收：页面照常滚动，控件值不变
-            parent = obj.parentWidget()
-            while parent is not None:
-                pos = parent.mapFromGlobal(
-                    event.globalPosition().toPoint())
-                clone = QWheelEvent(
-                    QPointF(pos), event.globalPosition(),
-                    event.pixelDelta(), event.angleDelta(),
-                    event.buttons(), event.modifiers(),
-                    event.phase(), event.inverted())
-                QApplication.sendEvent(parent, clone)
-                if clone.isAccepted():
-                    break
-                parent = parent.parentWidget()
-            return True
-        return super().eventFilter(obj, event)
-
-
-def install_wheel_guard(app) -> WheelGuard:
-    """在 QApplication 上安装全局滚轮拦截器（返回值需持有防回收）"""
-    guard = WheelGuard(app)
-    app.installEventFilter(guard)
-    return guard
+    QComboBox.wheelEvent = _forward_wheel_to_parent  # type: ignore[method-assign, assignment]
+    QAbstractSpinBox.wheelEvent = _forward_wheel_to_parent  # type: ignore[method-assign, assignment]
 
 
 #: 去焦点框的样式规则，见 strip_focus_rect

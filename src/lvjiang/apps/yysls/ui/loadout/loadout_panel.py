@@ -1,6 +1,7 @@
 """Responsive loadout workspace with sidebar/half/full combat modes."""
 from __future__ import annotations
 
+from loguru import logger
 from PyQt6.QtCore import QRectF, QSize, QTimer
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
@@ -24,7 +25,7 @@ from lvjiang.ui.user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_butt
 
 from .....core.config import load_ui_page_state, update_ui_page_state
 from .....i18n import tr
-from ...core.loadout import LoadoutRepository, resolve_school
+from ...core.loadout import LoadoutRepository
 from ..events import get_event_hub
 from .character_detail import CharacterDetailTab
 from .equip.status_tab import EquipStatusTab
@@ -83,6 +84,9 @@ class LoadoutPanel(QWidget):
         self._repo = None
         self._refreshing = False
         self._equipment_events_connected = False
+        #: 隐藏期间不订阅装备变更，重新显示时才需要补一次全量刷新；
+        #: 构造期已经刷新过，首次显示不再重复重建整套装备卡。
+        self._stale_while_hidden = False
         self._graduation_result = None
         saved = load_ui_page_state(_UI_PAGE_KEY)
         mode = saved.get("view_mode")
@@ -222,6 +226,8 @@ class LoadoutPanel(QWidget):
         self._left_shell = self._make_combat_shell()
         self._attach_assumption_controls()
         self._right_shell = self._make_equipment_shell()
+        # 装备页需要战斗属性页的假设副本：由面板显式注入，不靠 findChildren
+        self._equipment.bind_combat_tab(self._character._combat_attrs_tab)
         self._splitter.addWidget(self._left_shell)
         self._splitter.addWidget(self._right_shell)
         self._splitter.setChildrenCollapsible(False)
@@ -353,11 +359,16 @@ class LoadoutPanel(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self._subscribe_equipment_updates()
-        # 隐藏期间不订阅、也不积压消息；进入页面时直接读取最新快照。
-        self._schedule_equipment_refresh()
+        # 隐藏期间不订阅、也不积压消息；再次进入页面时直接读取最新快照。
+        if self._stale_while_hidden:
+            self._schedule_equipment_refresh()
         self._apply_split_sizes()
 
     def hideEvent(self, event):
+        # addTab 会对从未显示过的页面也发一次 hide：那时还没订阅过变更，
+        # 构造期的快照仍然是最新的，不必标脏。
+        if self._equipment_events_connected:
+            self._stale_while_hidden = True
         self._unsubscribe_equipment_updates()
         self._equipment_refresh_timer.stop()
         super().hideEvent(event)
@@ -408,7 +419,15 @@ class LoadoutPanel(QWidget):
         self._repo = self._current_repo()
         if self._repo is None:
             return
-        state = self._repo.load()
+        username = self._host.active_user_name()
+        # 本轮刷新只加载一次仓储快照，装备页与战斗属性页共用
+        from ...core.combat.equipment import EquipmentInventory
+        try:
+            inventory = EquipmentInventory(username)
+        except Exception as e:  # noqa: BLE001 - 与子页各自加载时的容错一致
+            logger.error(f"加载装备失败: {e}")
+            inventory = None
+        state = inventory.state if inventory is not None else self._repo.load()
         self._refreshing = True
         self._plans.clear()
         for pid, plan in state.plans.items():
@@ -429,18 +448,19 @@ class LoadoutPanel(QWidget):
             state.active_plan.sub_martial_art,
         )
         self._refresh_playstyles(state)
-        school = resolve_school(
-            state.active_plan.main_martial_art,
-            state.active_plan.sub_martial_art,
-            schools,
-        )
+        school = state.active_school(schools)
         self._school.setText(school or tr("无方案"))
         self._refreshing = False
         # 下游消费者（装备页/战斗属性页）已显式驱动，无需再 emit
         # equipment_changed：emit 会导致信号订阅者重复全量刷新
-        self._equipment._refresh_all()
-        combat._restore_selection(state.active_plan, school or "")
+        if inventory is not None:
+            self._equipment.refresh_from(inventory)
+            combat.set_equipment_snapshot(username, inventory.equipped)
+        else:
+            self._equipment._refresh_all()
+        combat._restore_selection(state.active_plan, school)
         combat._refresh_display()
+        self._stale_while_hidden = False
 
     def _on_equipment_changed(self):
         """装备变更（UI 操作或工作流写入）：刷新方案展示。

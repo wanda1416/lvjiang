@@ -34,6 +34,17 @@ class EquipmentInventory:
                 logger.error(f"装备 {fp} 状态审计失败（不影响装备加载）: {e}")
 
     @property
+    def state(self):
+        """本次加载的只读快照（``LoadoutState``）；写操作后由 ``reload`` 刷新。"""
+        return self._state
+
+    @property
+    def active_school(self) -> str:
+        """当前激活方案的流派，由主副武学派生（``plan_school``）。"""
+        from ...config import get_game_config
+        return self._state.active_school(get_game_config().get_schools())
+
+    @property
     def equipped(self) -> dict[str, dict]:
         return copy.deepcopy(self._state.resolved_equipment())
 

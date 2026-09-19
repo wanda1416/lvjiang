@@ -668,3 +668,17 @@ def test_mock_copy_between_users_strips_targets(tmp_path: Path):
 
     copied = next(iter(LoadoutRepository("bob", tmp_path).load().equipment_items.values()))
     assert "target_transmute_name" not in copied["affix_2"]
+
+
+def test_plan_school_is_the_single_source_for_current_school():
+    """流派只由方案主副武学派生：无序匹配、缺一门为空。"""
+    from lvjiang.apps.yysls.core.loadout import LoadoutPlan, LoadoutState, plan_school
+
+    schools = {"鸣金·虹": {"main": {"martial_art": "无名剑法"},
+                        "sub": {"martial_art": "无名枪法"}}}
+    plan = LoadoutPlan.create("p")
+    assert plan_school(plan, schools) == ""
+    plan.main_martial_art, plan.sub_martial_art = "无名枪法", "无名剑法"
+    assert plan_school(plan, schools) == "鸣金·虹"
+    state = LoadoutState(active_plan_id=plan.id, plans={plan.id: plan})
+    assert state.active_school(schools) == "鸣金·虹"

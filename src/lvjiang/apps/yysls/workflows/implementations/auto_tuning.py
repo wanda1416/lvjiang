@@ -580,10 +580,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self._history_session = None
         self._history_markdown_path = ""
         try:
-            from lvjiang.apps.yysls.tuning_history.repository import (
+            from lvjiang.apps.yysls.core.tuning_history.repository import (
                 TuningHistoryRepository,
             )
-            from lvjiang.apps.yysls.tuning_history.session import TuningRunSession
+            from lvjiang.apps.yysls.core.tuning_history.session import TuningRunSession
 
             username = (self.engine.run_username if self.engine else "") or "default"
             rules = [

@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call
 
-from lvjiang.apps.yysls.tuning_history.models import (
+from lvjiang.apps.yysls.core.tuning_history.models import (
     RESET_COOLDOWN,
     RESET_COUNT_UNREADABLE,
     RESET_FAILED,

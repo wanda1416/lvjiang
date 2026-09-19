@@ -1,14 +1,14 @@
 """重置成功在结构化历史中形成两次独立调律事件。"""
 from __future__ import annotations
 
-from lvjiang.apps.yysls.tuning_history.models import (
+from lvjiang.apps.yysls.core.tuning_history.models import (
     RESET_COMPLETED,
     RESET_COOLDOWN,
     RESET_EXHAUSTED_RECYCLED,
     RESULT_RECYCLED,
     RESULT_RESET,
 )
-from lvjiang.apps.yysls.tuning_history.projector import TuningResultProjector
+from lvjiang.apps.yysls.core.tuning_history.projector import TuningResultProjector
 
 
 def _projector_after_successful_reset():

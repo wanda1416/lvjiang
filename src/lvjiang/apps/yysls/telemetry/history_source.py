@@ -27,7 +27,7 @@ from loguru import logger
 
 from ....core.telemetry import identity as identity_mod
 from ....core.telemetry.sources import SourceBatch, register_source
-from ..tuning_history.repository import (
+from ..core.tuning_history.repository import (
     TuningHistoryRepository,
     default_db_path,
 )

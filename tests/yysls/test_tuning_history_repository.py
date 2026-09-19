@@ -7,15 +7,15 @@ from datetime import datetime, timedelta, timezone
 
 from scripts.analyze_tuning_affixes import parse_history_db
 
-from lvjiang.apps.yysls.tuning_history.models import (
+from lvjiang.apps.yysls.core.tuning_history.models import (
     TuningEquipmentResult,
     TuningRunSummary,
 )
-from lvjiang.apps.yysls.tuning_history.repository import (
+from lvjiang.apps.yysls.core.tuning_history.repository import (
     CURRENT_VERSION,
     TuningHistoryRepository,
 )
-from lvjiang.apps.yysls.tuning_history.session import TuningRunSession
+from lvjiang.apps.yysls.core.tuning_history.session import TuningRunSession
 
 
 def _run(run_id="run-1", started_at="2026-09-01T01:00:00+00:00"):

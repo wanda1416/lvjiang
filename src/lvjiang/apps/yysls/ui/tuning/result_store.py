@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from ...tuning_history.models import (  # re-export：保持现有导入兼容
+from ...core.tuning_history.models import (  # re-export：保持现有导入兼容
     RESET_ANOMALIES,
     RESET_COMPLETED,
     RESET_COOLDOWN,
@@ -19,7 +19,7 @@ from ...tuning_history.models import (  # re-export：保持现有导入兼容
     RESULT_TUNED_RECYCLED,
     TuningEquipmentResult,
 )
-from ...tuning_history.projector import TuningResultProjector
+from ...core.tuning_history.projector import TuningResultProjector
 from .progress_hub import TuningProgressHub
 
 __all__ = [

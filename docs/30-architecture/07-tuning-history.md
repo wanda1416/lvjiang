@@ -1,5 +1,9 @@
 # 调律历史与管理架构
 
+代码位于 `src/lvjiang/apps/yysls/core/tuning_history/`（`models` / `projector` /
+`repository` / `session`）。它是自动调律的领域模型与持久化，不能脱离 core 独立
+存在，因此归入 core 而不是顶层包。
+
 ## 1. 数据流
 
 ```text

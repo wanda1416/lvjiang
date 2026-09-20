@@ -35,6 +35,17 @@ def is_in_bag_page()
    end
 end
 
+# 调律页底部动作会随装备状态显示「词库预览」「调律」或「定音」，
+# 不能作为页面判据。左上角固定标签进入页面后必然显示「装备调律」。
+def is_in_equip_tune_page()
+   scan [equip_tune_detail].[tune_label] as $found by contains "装备调律"
+   if $found
+       return 1
+   else
+       return 0
+   end
+end
+
 # 角色选择视图是否已打开。
 # 判据取「进入游戏」按钮：场景定义里 enter 属于 roles 视图，
 # 而「选择角色」标签在基底视图常驻，登录没完成时也读得到，不能当判据。

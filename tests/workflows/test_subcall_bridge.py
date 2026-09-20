@@ -89,6 +89,7 @@ def test_real_nav_subcalls_loadable():
     assert "nav_main_to_equip" in eng._procs
     assert "nav_equip_to_tune" in eng._procs
     assert "nav_back_to_main" in eng._procs
+    assert "is_in_equip_tune_page" in eng._procs
 
 
 def test_nav_subcalls_have_explicit_success_return():
@@ -107,3 +108,17 @@ def test_nav_subcalls_have_explicit_success_return():
         final_stmt = program.procs[name].body[-1]
         assert isinstance(final_stmt, Return), f"{name} 缺少显式成功返回值"
         assert final_stmt.value == 0, f"{name} 应以 0 表示成功"
+
+
+def test_tune_navigation_uses_stable_page_label_detector():
+    """调律页身份不能依赖会在满词条时变成「定音」的动作按钮。"""
+    workflows = SYSTEM_CONFIG_DIR / "workflows/subcall"
+    navigation = (workflows / "navigation.wf").read_text(encoding="utf-8")
+    detection = (workflows / "page_detection.wf").read_text(encoding="utf-8")
+
+    assert navigation.count("is_in_equip_tune_page()") == 2
+    assert '[equip_tune_detail].[tune_btn]' not in navigation
+    assert (
+        'scan [equip_tune_detail].[tune_label] as $found '
+        'by contains "装备调律"'
+    ) in detection

@@ -1,7 +1,7 @@
 """角色基础属性 OCR 数据转换器
 
 将角色详情页 detail_1（属性面板_左，反复滚动多屏）+ detail_2（属性面板_右，
-点击"属性攻击"/"外功穿透"/"属攻穿透"后展开的详情）的 OCR 原始文本，解析成
+点击"外功攻击"/"属性攻击"/"外功穿透"/"属攻穿透"后展开的详情）的 OCR 原始文本，解析成
 "创建基础属性"对话框（`_CreatePlayStyleDialog`）能直接使用的 flat dict，
 字段名对齐 `combat_attrs.COMBAT_ATTR_FIELDS`。
 
@@ -10,6 +10,7 @@
         "left_1": "武林造诣 | 2.445鹅 | ... | 五维属性 | ...",
         "left_2": "...",
         ...                              # 每屏一个 key，滚动顺序排列
+        "right_outer_attack": "3769 外功攻击 | ... | 基础外功攻击：3769-3120 | ...",
         "right_attack": "220-443 | 属性攻击 | ... | 鸣金攻击：170-343(...) | ...",
         "right_outer_pen": "0.0 | 外功穿透 | ... 当前外功穿透(非定音部分)：0.0 | ...",
         "right_attr_pen": "10.3 | 属攻穿透 | ... 鸣金穿透：10.3 | ...",
@@ -56,6 +57,7 @@ _SCHOOL_SUFFIX = {
 }
 
 _SCHOOL_ATTACK_LABEL_RE = re.compile(r"(鸣金|裂石|破竹|牵丝|无相)攻击[:：]\s*")
+_BASE_OUTER_ATTACK_RE = re.compile(r"基础外功攻击[:：]\s*")
 _SCHOOL_PEN_RE = re.compile(r"(鸣金|裂石|破竹|牵丝)穿透[:：]\s*(-?\d+\.?\d*)")
 _OUTER_PEN_NON_DINGYIN_RE = re.compile(
     r"外功穿透[（(]非定音部分[）)][:：]\s*(-?\d+\.?\d*)"
@@ -166,7 +168,9 @@ def parse_detail1(tokens: list[str]) -> dict[str, float]:
             min_field, max_field = _RANGE_FIELDS[label]
             if lo is not None:
                 result[min_field] = lo
-            if hi is not None:
+            # 外功攻击在最小值超过最大值时，左区只显示箭头加最小值。
+            # 这个单值不能证明最大值相同；最大值必须从右区“基础外功攻击”读取。
+            if hi is not None and _RANGE_RE.match(value.strip()):
                 result[max_field] = hi
             continue
 
@@ -198,12 +202,27 @@ def parse_detail1(tokens: list[str]) -> dict[str, float]:
     return result
 
 
+def parse_detail2_outer_attack(text: str) -> dict[str, float]:
+    """解析“外功攻击”右区详情中的基础区间，保留最小值大于最大值的顺序。"""
+    match = _BASE_OUTER_ATTACK_RE.search(text or "")
+    if not match:
+        return {}
+    value_part = text[match.end():].split("|", 1)[0]
+    lo, hi = _split_range(value_part)
+    result: dict[str, float] = {}
+    if lo is not None:
+        result["min_outer"] = lo
+    if hi is not None and _RANGE_RE.match(value_part.strip()):
+        result["max_outer"] = hi
+    return result
+
+
 def parse_detail2_attack(text: str) -> dict[str, float]:
     """解析"属性攻击"detail_2 展开文本，提取四门武学 + 无相攻击的区间数值。
 
     "鸣金攻击：170-343(170-343)" → min_mingjin=170, max_mingjin=343
-    "鸣金攻击：← 3713"（恒定值，min>max 时游戏改用箭头+单值展示）→ min_mingjin=
-    max_mingjin=3713，与 parse_detail1 里"外功攻击"共用 _split_range 的恒定值兜底。
+    "鸣金攻击：← 3713"（恒定值，min>max 时游戏改用箭头+单值展示）→
+    min_mingjin=max_mingjin=3713。
 
     取值截止到标签匹配位置之后的第一个"|"（与 detail_1 按 "|" 切 token 的
     边界语义一致），交给 _split_range 解析，而不是直接在数值上写死
@@ -262,8 +281,9 @@ class RoleAttrParser:
         """解析 scan_role_base_attr.wf 暂存的原始 OCR dict，返回 flat 数值字典。
 
         Args:
-            raw: {"left_1": ..., "left_2": ..., "right_attack": ...,
-                  "right_outer_pen": ..., "right_attr_pen": ...}
+            raw: {"left_1": ..., "left_2": ..., "right_outer_attack": ...,
+                  "right_attack": ..., "right_outer_pen": ...,
+                  "right_attr_pen": ...}
 
         Returns:
             {field_name: float}，可直接用于 `_CreatePlayStyleDialog` 预填。
@@ -285,8 +305,12 @@ class RoleAttrParser:
         else:
             logger.warning("RoleAttrParser.parse: 未找到任何 left_* 快照")
 
-        # detail_2 精确数据覆盖 detail_1 的兜底值（仅 outer_pen 存在覆盖关系，
-        # attack/attr_pen 是 detail_1 没有的分流派数据，只新增不覆盖）
+        # detail_2 精确数据覆盖 detail_1 的兜底值。尤其外功攻击左区在
+        # min > max 时只显示 min，不能用该单值推导 max。
+        right_outer_attack = raw.get("right_outer_attack")
+        if right_outer_attack:
+            result.update(parse_detail2_outer_attack(right_outer_attack))
+
         right_attack = raw.get("right_attack")
         if right_attack:
             result.update(parse_detail2_attack(right_attack))

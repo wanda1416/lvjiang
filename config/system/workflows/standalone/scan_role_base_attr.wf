@@ -16,8 +16,9 @@
 # 流程：
 #   1. 导航到角色详情页（nav_main_to_role）
 #   2. 循环 scroll_count 次：每次 scan detail_1 暂存原始文本（left_N），
-#      顺带查找"属性攻击/外功穿透/属攻穿透"三个字段，命中就点击展开
-#      detail_2 并暂存（right_attack/right_outer_pen/right_attr_pen），
+#      顺带查找"外功攻击/属性攻击/外功穿透/属攻穿透"四个字段，命中就点击展开
+#      detail_2 并暂存（right_outer_attack/right_attack/right_outer_pen/
+#      right_attr_pen），
 #      再向上拖拽滚动 0.5 屏
 #   3. 把暂存的原始 dict 一次性交给 to_role_base_attrs 解析（去重 + 提取
 #      字段全部在这一次调用内完成）
@@ -32,6 +33,7 @@ if $nav_result == -1
     log error "无法进入角色详情页，终止"
 else
     eval $data = {}
+    eval $got_outer_attack = false
     eval $got_attack = false
     eval $got_outer_pen = false
     eval $got_attr_pen = false
@@ -41,6 +43,16 @@ else
         scan [role_detail].[detail_1] as $r1
         eval $key = "left_" + $i
         eval $data.$key = $r1.detail_1
+
+        if not $got_outer_attack
+            find [role_detail].[detail_1] as $f by contains "外功攻击"
+            if $f
+                click $f after wait stable @page_refresh
+                scan [role_detail].[detail_2] as $r2
+                eval $data.right_outer_attack = $r2.detail_2
+                eval $got_outer_attack = true
+            end
+        end
 
         if not $got_attack
             find [role_detail].[detail_1] as $f by contains "属性攻击"

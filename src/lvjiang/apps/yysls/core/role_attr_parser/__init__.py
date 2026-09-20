@@ -10,6 +10,7 @@ from .parser import (
     parse_detail1,
     parse_detail2_attack,
     parse_detail2_attr_pen,
+    parse_detail2_outer_attack,
     parse_detail2_outer_pen,
 )
 
@@ -19,6 +20,7 @@ __all__ = [
     "merge_scroll_snapshots",
     "parse_detail1",
     "parse_detail2_attack",
+    "parse_detail2_outer_attack",
     "parse_detail2_outer_pen",
     "parse_detail2_attr_pen",
 ]

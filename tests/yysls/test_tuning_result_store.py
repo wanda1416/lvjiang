@@ -65,6 +65,32 @@ def test_store_collects_skipped_recycled_and_tuned_in_processing_order(qtbot):
     assert store.results[0].reason == "扫描处理后跳过"
     assert store.results[1].reason == "命中回收规则"
     assert store.results[2].reason == "达到目标，保留"
+    assert store.results[2].final_rating == ""
+
+
+def test_only_full_equipment_keeps_final_rating_in_history(qtbot):
+    """调用方误传预期评级时，历史边界仍拒绝给未满装备定级。"""
+    hub = TuningProgressHub()
+    store = TuningResultStore(hub)
+    hub.slot_entered.emit("wrist", "腕甲")
+
+    _start(hub, "未满装备")
+    hub.equipment_finished.emit({
+        "name": "未满装备", "rounds": 2, "status": "done",
+        "final_rating": "excellent", "telemetry_final_rating": "excellent",
+        "final_affixes": [{"name": f"词条{i}"} for i in range(1, 5)],
+    })
+    _start(hub, "满词条装备")
+    hub.equipment_finished.emit({
+        "name": "满词条装备", "rounds": 3, "status": "done",
+        "final_rating": "excellent", "telemetry_final_rating": "excellent",
+        "final_affixes": [{"name": f"词条{i}"} for i in range(1, 6)],
+    })
+
+    assert store.results[0].final_rating == ""
+    assert store.results[0].telemetry_final_rating == ""
+    assert store.results[1].final_rating == "excellent"
+    assert store.results[1].telemetry_final_rating == "excellent"
 
 
 def test_tuned_recycle_and_weapon_slots_share_filter(qtbot):
@@ -157,11 +183,11 @@ def test_smart_reset_opinion_does_not_outlive_the_reset(qtbot):
     })
     hub.equipment_finished.emit({
         "name": "重置后继续环", "rounds": 3, "status": "done",
-        "reason": "词条已满，无行为规则命中 → 结束并锁定装备",
+        "reason": "词条已满，无行为规则命中 → 结束并保留装备",
         "final_affixes": [],
     })
 
-    assert store.results[0].reason == "词条已满，无行为规则命中 → 结束并锁定装备"
+    assert store.results[0].reason == "词条已满，无行为规则命中 → 结束并保留装备"
 
 
 def test_progress_widget_shows_ordered_smart_plan_details(qtbot):

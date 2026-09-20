@@ -195,6 +195,10 @@ class TuningRecorder:
         for r in tuned:
             if r.get("recycled"):
                 continue
+            # 未满词条时只有流程使用的潜力预测，不存在最终评级。
+            # 即使上游误留下 judgement，也不得进入成品清单。
+            if len(r.get("final_affixes") or []) < 5:
+                continue
             ratings: list[str] = []
             best: str | None = None
             for j in (r.get("final_judgement") or {}).values():

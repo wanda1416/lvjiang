@@ -21,6 +21,15 @@ from .models import (
     TuningEquipmentResult,
 )
 
+_FULL_AFFIX_COUNT = 5
+
+
+def _rating_if_complete(affixes: tuple[dict, ...], value) -> str:
+    """未满五条的装备没有最终评级，拒绝把预期评级写入历史。"""
+    if len(affixes) < _FULL_AFFIX_COUNT:
+        return ""
+    return str(value or "")
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
@@ -204,6 +213,7 @@ class TuningResultProjector:
         ).strip()
         initial = deepcopy(started.get("affixes") or [])
         final = deepcopy(info.get("final_affixes") or initial)
+        final_snapshot = tuple(final)
         item = TuningEquipmentResult(
             equipment_id=self.current_id,
             slot_key=self.current_slot,
@@ -213,8 +223,9 @@ class TuningResultProjector:
             type=str(started.get("type") or ""),
             level=started.get("level"),
             quality=str(started.get("quality") or ""),
-            final_affixes=tuple(final),
-            final_rating=str(info.get("final_rating") or ""),
+            final_affixes=final_snapshot,
+            final_rating=_rating_if_complete(
+                final_snapshot, info.get("final_rating")),
             rounds=rounds,
             result=result,
             reason=reason,
@@ -228,8 +239,8 @@ class TuningResultProjector:
             tuning_mode=str(info.get("tuning_mode") or ""),
             telemetry_stop_reason=str(
                 info.get("telemetry_stop_reason") or ""),
-            telemetry_final_rating=str(
-                info.get("telemetry_final_rating") or ""),
+            telemetry_final_rating=_rating_if_complete(
+                final_snapshot, info.get("telemetry_final_rating")),
             resets=int(info.get("resets") or 0),
             lock_status=str(started.get("lock_status") or ""),
             cooldown_kind=str(started.get("cooldown_kind") or ""),
@@ -249,6 +260,7 @@ class TuningResultProjector:
         now = self._clock()
         before = tuple(deepcopy(
             info.get("before_affixes") or started.get("affixes") or []))
+        before_rating = _rating_if_complete(before, info.get("before_rating"))
         item = TuningEquipmentResult(
             equipment_id=self.current_id,
             slot_key=self.current_slot,
@@ -258,7 +270,7 @@ class TuningResultProjector:
             quality=str(info.get("quality") or started.get("quality") or ""),
             initial_affixes=tuple(deepcopy(started.get("affixes") or [])),
             final_affixes=before,
-            final_rating=str(info.get("before_rating") or ""),
+            final_rating=before_rating,
             rounds=self._completed_round_count(),
             result=RESULT_RESET,
             reason=self.smart_opinion or self.reset_reason or "执行重置调律",
@@ -270,7 +282,7 @@ class TuningResultProjector:
             round_details=tuple(deepcopy(self.round_details)),
             tuning_mode=str(info.get("tuning_mode") or "normal"),
             telemetry_stop_reason="reset_completed",
-            telemetry_final_rating=str(info.get("before_rating") or ""),
+            telemetry_final_rating=before_rating,
             resets=int(info.get("resets_used") or 0),
             lock_status=str(started.get("lock_status") or ""),
             cooldown_kind=str(started.get("cooldown_kind") or ""),

@@ -1472,7 +1472,7 @@ class TestBehaviorSettings:
                             "最大外功攻击"])[0] == "recycle"
 
     def test_tune_decide_defaults_and_full(self):
-        # 无命中默认：未满 = 继续调律；词条满 = 结束并锁定；
+        # 无命中默认：未满 = 继续调律；词条满 = 结束并保留；
         # full=True 时 continue 规则转为 lock，并终止后续规则判定
         junk, normal, top = (_rating("junk"), _rating("normal"),
                              _rating("top"))
@@ -1485,23 +1485,31 @@ class TestBehaviorSettings:
         # 首条命中 → 回收（满/未满一致）
         assert tune.decide("武器", "gold", 95, junk, False)[0] == "recycle"
         assert tune.decide("武器", "gold", 95, junk, True)[0] == "recycle"
-        # 次条 continue：未满命中生效；词条满转锁定
+        # 次条 continue：未满命中生效；词条满后只有传入规则最终评级
+        # 达到优秀才转锁定，普通档只结束保留。
         assert tune.decide("武器", "gold", 95, normal,
                            False)[0] == "continue"
-        assert tune.decide("武器", "gold", 95, normal, True)[0] == "lock"
+        assert tune.decide(
+            "武器", "gold", 95, normal, True,
+            final_rating="normal")[0] == "skip"
+        assert tune.decide(
+            "武器", "gold", 95, normal, True,
+            final_rating="excellent")[0] == "lock"
         guarded = TuneBehavior(enabled=True, rules=[
             BehaviorRule(ratings=["top"], action="continue"),
             BehaviorRule(action="recycle"),
         ])
-        assert guarded.decide("武器", "gold", 95, top, True)[0] == "lock"
-        # 全部不命中 → 默认：未满继续、满锁定合格装备
+        assert guarded.decide(
+            "武器", "gold", 95, top, True,
+            final_rating="top")[0] == "lock"
+        # 全部不命中 → 默认：未满继续、满后结束保留，不推导锁定资格
         assert tune.decide("武器", "gold", 95, top, False)[0] == "continue"
-        assert tune.decide("武器", "gold", 95, top, True)[0] == "lock"
+        assert tune.decide("武器", "gold", 95, top, True)[0] == "skip"
         # 未启用 → 同默认
         assert TuneBehavior().decide(
             "武器", "gold", 95, junk, False)[0] == "continue"
         assert TuneBehavior().decide(
-            "武器", "gold", 95, junk, True)[0] == "lock"
+            "武器", "gold", 95, junk, True)[0] == "skip"
         assert TuneBehavior(lock_qualified=False).decide(
             "武器", "gold", 95, junk, True)[0] == "skip"
 

@@ -136,14 +136,24 @@ class TestTuningDocWriter:
             "c": {"name": "九灵", "rating": "顶级", "skipped": False,
                   "not_applicable": True, "reasons": ["部位不适用"]},
         }
-        writer.finish_equipment(2, 4, "判定不再可达顶级/优秀", judgement)
+        writer.finish_equipment(3, 5, "词条已满", judgement)
         text = _read(writer)
         assert "最终评级：血河：优秀（可转律）；素问：跳过（未实现）" in text
         assert "九灵" not in text
-        assert "本件小结：共 2 轮，词条 4/5，结束原因：判定不再可达顶级/优秀" in text
+        assert "本件小结：共 3 轮，词条 5/5，结束原因：词条已满" in text
+
+    def test_unfinished_equipment_has_no_final_rating(self, writer):
+        judgement = {
+            "a": {"name": "血河", "rating": "优秀", "skipped": False,
+                  "not_applicable": False, "reasons": ["潜力预测"]},
+        }
+        writer.finish_equipment(2, 4, "无法继续调律", judgement)
+        text = _read(writer)
+        assert "最终评级：未评级（词条未满）" in text
+        assert "血河：优秀" not in text
 
     def test_finish_equipment_no_conclusion(self, writer):
-        writer.finish_equipment(0, 2, "无法继续调律", {})
+        writer.finish_equipment(0, 5, "无法形成结论", {})
         assert "最终评级：无有效结论" in _read(writer)
 
     def test_note_and_end_run_interrupted(self, writer):

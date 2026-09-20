@@ -1219,7 +1219,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 status="already_full" if affix_count >= self.MAX_AFFIX else "done",
                 reason=f"首次调律处理：{initial_decision.reason}",
                 final_rating=(actual_expect or "")
-                if affix_count >= self.MAX_AFFIX else "")
+                if len(equip_data.affixes) >= self.MAX_AFFIX else "")
             self.recorder.discard_report()
             return self._make_fingerprint(equip_data.to_dict()), None
         if (initial_decision.action is BehaviorAction.RECYCLE
@@ -1360,8 +1360,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             incoming, new_expect = \
                 self.judge.refresh_expectation(equip_data)
             self.equipment_session.expected_rating = new_expect
-            # 最终评级仅在词条满 5 条后才有意义；它包含当前仍合法的转律上限。
-            if affix_count >= self.MAX_AFFIX:
+            # 最终评级只由成功解析出的五条实际词条产生。affix_count 是流程
+            # 计数，OCR 解析失败时可能领先，不能据此把潜力预测记为最终评级。
+            actual_affix_count = len(equip_data.affixes)
+            actual_full = actual_affix_count >= self.MAX_AFFIX
+            if actual_full:
                 last_final = new_expect
                 final_for_signal = last_final
             else:
@@ -1374,7 +1377,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 "food_reason": self.executor.round_food_reason,
                 "material_stock": self.executor.get_material_stock(),
                 "current_affixes": [a.to_dict() for a in equip_data.affixes],
-                "affix_count": affix_count,
+                "affix_count": actual_affix_count,
                 "expect_rating": new_expect,
                 "final_rating": final_for_signal,
                 "rule_ratings": incoming,
@@ -1444,38 +1447,49 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self.navigator.leave_tune(
             for_recycle=will_recycle)
 
+        final_affix_count = len(equip_data.affixes)
+        is_final = final_affix_count >= self.MAX_AFFIX
+        # 未满装备只有用于流程决策的最大预期，不产生终局判定。
+        judgement = self.judge.final_judge(equip_data) if is_final else {}
+        final_rating_key = self.judge.expect_key(judgement) if is_final else None
+        excellent_or_better = bool(
+            final_rating_key in RATING_RANK
+            and RATING_RANK[final_rating_key] >= RATING_RANK["excellent"])
+
         # 锁定是布尔切换动作，必须幂等：只对本次至少调律过一轮、
-        # 调律处理明确要求锁定且扫描状态为 unlock 的装备点击。
+        # 调律处理明确要求锁定、实际满词条且传入规则最终评级达到优秀
+        # 的装备点击。最大预期不能授权锁定。
         # 即使用户关闭了“跳过锁定装备”，已锁定也绝不二次点击。
-        if qualified_lock_reason and rounds > 0:
+        if (qualified_lock_reason and rounds > 0 and is_final
+                and excellent_or_better):
             if equip_data.lock_status == "unlock":
                 logger.info(
-                    f"  [{name}] 调律合格，返回装备详情页后执行锁定")
+                    f"  [{name}] 最终评级达到优秀，返回装备详情页后执行锁定")
                 self.navigator.lock_current_equipment()
                 equip_data.lock_status = "locked"
                 self._emit_operation(
-                    "finish", "合格装备已锁定",
+                    "finish", "优秀及以上装备已锁定",
                     reason=qualified_lock_reason, action="lock")
             elif equip_data.lock_status == "locked":
                 logger.info(f"  [{name}] 装备已锁定，不重复点击锁定开关")
             else:
                 logger.warning(
                     f"  [{name}] 锁定状态未识别，为避免误解锁已跳过自动锁定")
-
-        judgement = self.judge.final_judge(equip_data)
         self.recorder.report_set("rounds", rounds)
-        self.recorder.report_set("final_affix_count", affix_count)
+        self.recorder.report_set("final_affix_count", final_affix_count)
         self.recorder.report_set("final_judgement", judgement)
         # 终态词条（含逐轮新增），供运行结束时的成品清单
         self.recorder.report_set("final_affixes",
                                  [a.to_dict() for a in equip_data.affixes])
-        logger.info(f"  [{name}] 调律结束：共 {rounds} 轮，词条 {affix_count}/{self.MAX_AFFIX}")
+        logger.info(
+            f"  [{name}] 调律结束：共 {rounds} 轮，"
+            f"词条 {final_affix_count}/{self.MAX_AFFIX}")
         if not stop_reason:
             stop_reason = ("用户中断" if self.is_stopped
                            else "调律结束")
             stop_key = "user_stopped" if self.is_stopped else "completed"
-        self.recorder.doc_finish_equipment(rounds, affix_count, stop_reason,
-                                           judgement)
+        self.recorder.doc_finish_equipment(
+            rounds, final_affix_count, stop_reason, judgement)
         # 命中回收的装备在回到背包页后执行（阻断时不回收）
         outcome = None
         if tune_recycle_reason and not self.is_stopped:
@@ -1490,9 +1504,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             self.recorder.collect_reports()[-1:])
         # 进度信号：装备处理结束
         # 最终评级是满词条装备当前仍能合法达到的评级上限。
-        if affix_count >= self.MAX_AFFIX and last_final is not None:
+        if is_final and last_final is not None:
             final_rating = last_final or ""
-        elif affix_count >= self.MAX_AFFIX:
+        elif is_final:
             # 兆底：循环未执行但词条已满（路径 A 已单独处理，此处保险）
             final_rating = self.judge.expect_key(judgement) or ""
         else:
@@ -1501,13 +1515,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             "name": name,
             "final_rating": final_rating,
             "rounds": rounds,
-            "affix_count": affix_count,
+            "affix_count": final_affix_count,
             "final_affixes": [a.to_dict() for a in equip_data.affixes],
             "status": "recycled" if outcome is RecycleOutcome.RECYCLED else "done",
             "reason": stop_reason,
             "tuning_mode": self.equipment_session.mode.value,
             "telemetry_stop_reason": stop_key,
-            "telemetry_final_rating": _best_rating(judgement) or "",
+            "telemetry_final_rating": (
+                (_best_rating(judgement) or "") if is_final else ""),
             "resets": resets_used,
         })
         if outcome is RecycleOutcome.RECYCLED:
@@ -1990,7 +2005,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 "after_affix_count": min(len(equip_data.affixes), 1),
                 "resets_used": resets_used + 1,
                 # recorder 中的评级属于重置前装备；重置后等待重新判定。
-                "before_rating": self.equipment_session.expected_rating or "",
+                "before_rating": (
+                    (self.equipment_session.expected_rating or "")
+                    if len(equip_data.affixes) >= self.MAX_AFFIX else ""),
                 "expect_rating": "",
                 "tuning_mode": self.equipment_session.mode.value,
             })

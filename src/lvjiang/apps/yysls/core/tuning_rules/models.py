@@ -393,7 +393,7 @@ STONE_ACTION_LABELS = {"skip": tr("跳过该装备"), "abort": tr("结束全部�
 
 @dataclass
 class FoodRule:
-    """狗粮添加规则（有序规则表的一条）
+    """材料处理规则（有序规则表的一条）
 
     条件语义与扫描/调律处理规则一致：部位、品阶、判定语义、
     判定结果与首词条初始数值；材料处理只允许 pct_op=ge。
@@ -731,7 +731,6 @@ class ScanBehavior:
     评级判定语义与仅注入首词条均逐规则声明（BehaviorRule）。
     max_consecutive_recycles: 回收补位循环上限
     """
-    enabled: bool = True
     min_level: int = 100
     entry_min_rating: str = "excellent"
     entry_first_affix_only: bool = True
@@ -743,9 +742,7 @@ class ScanBehavior:
                rating_of: RatingProvider,
                affix_names: list[str] | None = None,
                ) -> tuple[str, str]:
-        """返回 (动作, 决策说明)；未启用/无命中时为 ("skip", 说明)"""
-        if not self.enabled:
-            return "skip", tr("扫描处置未启用 → 跳过该装备")
+        """返回 (动作, 决策说明)；无命中时为 ("skip", 说明)。"""
         hit = _first_hit(self.rules, part, quality, cap_pct, rating_of,
                          affix_names)
         if hit:
@@ -764,7 +761,7 @@ class TuneBehavior:
     条件：full=True 时 continue 动作自动转为 lock/skip，并以该规则
     作为最终命中结果，不再继续匹配后续规则。
     无命中默认：未满=继续调律；满=结束并保留。自动锁定只能来自
-    明确命中的 continue 规则，不能由“词条已满”本身推导；未启用同默认。
+    明确命中的 continue 规则，不能由“词条已满”本身推导。
     max_resets: 单件装备重置次数上限（按钮文本携带剩余次数另作
     硬门，不超过游戏硬限 MAX_TUNE_RESETS）；
     reset_exhausted_action: 规则命中重置但重置**确定且永久**不可用时的
@@ -772,7 +769,6 @@ class TuneBehavior:
     以及本地 max_resets 门槛。OCR 读不到次数属识别异常（下次可能就读到
     了），一律强制跳过并记 count_unreadable，绝不在这里转回收。
     """
-    enabled: bool = False
     rules: list[BehaviorRule] = field(default_factory=list)
     max_resets: int = MAX_TUNE_RESETS
     reset_exhausted_action: str = "skip"
@@ -786,8 +782,6 @@ class TuneBehavior:
         """返回 (动作, 决策说明)；满词条可能返回内部动作 lock。"""
         default = (("skip", tr("词条已满，无行为规则命中 → 结束并保留装备"))
                    if full else ("continue", tr("无行为规则命中 → 继续调律")))
-        if not self.enabled:
-            return default
         # continue 规则即使词条已满也必须命中，并在下方转为 lock/skip，
         # 从而终止后续规则判定并保留装备。
         hit = _first_hit(self.rules, part, quality, cap_pct, rating_of,

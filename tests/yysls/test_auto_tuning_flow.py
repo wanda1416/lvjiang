@@ -653,7 +653,6 @@ def test_only_explicit_continue_with_excellent_final_rating_locks(
         patch_worth, patch_collect_affix):
     """锁定资格来自传入规则的满词条最终评级，不来自最大预期或默认分支。"""
     base = _behavior_base(tune=TuneBehavior(
-        enabled=True,
         rules=[BehaviorRule(ratings=["top"], action="continue")],
     ))
     wf = _wf_with(base)
@@ -686,7 +685,6 @@ def test_continue_rule_does_not_lock_normal_final_rating(
     base = _behavior_base(
         scan=ScanBehavior(entry_min_rating="normal"),
         tune=TuneBehavior(
-            enabled=True,
             rules=[BehaviorRule(ratings=["normal"], action="continue")],
         ),
     )
@@ -1357,7 +1355,7 @@ def test_scan_recycles_junk(monkeypatch):
     """扫描处置回收：未达门槛 + 处置规则命中 → 更多→回收→确认"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
-    base = _behavior_base(scan=ScanBehavior(enabled=True,
+    base = _behavior_base(scan=ScanBehavior(
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
     fp = wf._process_equipment("垃圾适子", _equip(2), WEAPON_DETAIL)
@@ -1385,7 +1383,7 @@ def test_scan_first_affix_only_spares_resettable(monkeypatch):
     base = _behavior_base(
         scan=ScanBehavior(entry_first_affix_only=True),
         tune=TuneBehavior(
-            enabled=True, rules=[BehaviorRule(action="skip")]))
+            rules=[BehaviorRule(action="skip")]))
     wf = _wf_with(base)
     fp = wf._process_equipment("待重置金装", _equip(3), WEAPON_DETAIL)
 
@@ -1411,7 +1409,7 @@ def test_scan_entry_first_affix_potential_not_reused_for_full_affix_rule(
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential",
                         _excellent_first_judge)
     base = _behavior_base(scan=ScanBehavior(
-        enabled=True, entry_min_rating="top", entry_first_affix_only=True,
+        entry_min_rating="top", entry_first_affix_only=True,
         rules=[BehaviorRule(ratings=["junk"], judge_scope="incoming",
                             first_affix_only=False, action="recycle")]))
     wf = _wf_with(base)
@@ -1427,7 +1425,7 @@ def test_scan_first_affix_only_off_recycles(monkeypatch):
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         _first_affix_judge)
     base = _behavior_base(scan=ScanBehavior(
-        enabled=True, entry_first_affix_only=False,
+        entry_first_affix_only=False,
         rules=[BehaviorRule(ratings=["junk"], action="recycle")]))
     wf = _wf_with(base)
     fp = wf._process_equipment("待重置金装", _equip(3), WEAPON_DETAIL)
@@ -1446,7 +1444,6 @@ def test_scan_recycles_when_no_applicable_rule(monkeypatch):
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(skipped))
     base = _behavior_base(scan=ScanBehavior(
-        enabled=True,
         rules=[BehaviorRule(max_quality="purple", ratings=["junk"],
                             action="recycle")]))
     wf = _wf_with(base)
@@ -1470,7 +1467,6 @@ def test_scan_custom_scope_protects(monkeypatch):
     monkeypatch.setattr(tuning_judge, "get_rule_names",
                         lambda: {"huiyi": "会意"})
     base = _behavior_base(scan=ScanBehavior(
-        enabled=True,
         rules=[BehaviorRule(ratings=["junk"], judge_scope="custom",
                             judge_rules=["huiyi"], action="recycle")]))
     wf = _wf_with(base)
@@ -1493,7 +1489,7 @@ def test_scan_affix_scope_protects_purple_weapon(monkeypatch):
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
     base = _behavior_base(scan=ScanBehavior(
-        enabled=True, rules=[_AFFIX_SKIP_RULE] + _RECYCLE_ALL))
+        rules=[_AFFIX_SKIP_RULE] + _RECYCLE_ALL))
     wf = _wf_with(base)
     fp = wf._process_equipment("紫武好词条", _equip(
         2, quality="purple", cap_pct=95), WEAPON_DETAIL)
@@ -1508,7 +1504,7 @@ def test_scan_affix_scope_pct_insufficient_recycles(monkeypatch):
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
     base = _behavior_base(scan=ScanBehavior(
-        enabled=True, rules=[_AFFIX_SKIP_RULE] + _RECYCLE_ALL))
+        rules=[_AFFIX_SKIP_RULE] + _RECYCLE_ALL))
     wf = _wf_with(base)
     fp = wf._process_equipment("紫武低分", _equip(
         2, quality="purple", cap_pct=80), WEAPON_DETAIL)
@@ -1527,7 +1523,7 @@ def test_scan_affix_scope_first_affix_only(monkeypatch):
         ratings=["最大外功攻击"], pct_op="ge", pct=90,
         first_affix_only=True, action="skip")
     base = _behavior_base(scan=ScanBehavior(
-        enabled=True, rules=[rule] + _RECYCLE_ALL))
+        rules=[rule] + _RECYCLE_ALL))
     wf = _wf_with(base)
     # 目标词条在第二位（首词条为杂词，cap 95 满足 pct 条件）
     d = _equip(2, quality="purple", cap_pct=95)
@@ -1545,7 +1541,7 @@ def test_scan_rule_not_matched_keeps(monkeypatch):
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
     base = _behavior_base(scan=ScanBehavior(
-        enabled=True, rules=[BehaviorRule(pct=30, action="recycle")]))
+        rules=[BehaviorRule(pct=30, action="recycle")]))
     wf = _wf_with(base)
     fp = wf._process_equipment("低分胚", _equip(2, cap_pct=50),
                                WEAPON_DETAIL)
@@ -1559,7 +1555,7 @@ def test_scan_no_recycle_button_keeps(monkeypatch):
     """子菜单无「回收」按钮 → 收起弹窗保留装备"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
-    base = _behavior_base(scan=ScanBehavior(enabled=True,
+    base = _behavior_base(scan=ScanBehavior(
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
     wf._nav_tune_ok = False   # ocr_scene_by 返空 → 找不到回收按钮
@@ -1640,7 +1636,7 @@ def test_tune_recycles_after_hit(monkeypatch, action, expected_rounds):
     """调律处理回收：普通回收在详情页直达，调满后回收仍先调满。"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_WORTHY))
-    base = _behavior_base(tune=TuneBehavior(enabled=True,
+    base = _behavior_base(tune=TuneBehavior(
                                             rules=[BehaviorRule(action=action)]))
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
@@ -1713,7 +1709,7 @@ def test_tune_locked_equipment_closes_recycle_menu_without_recycling(
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_WORTHY))
     base = _behavior_base(tune=TuneBehavior(
-        enabled=True, rules=[BehaviorRule(action="recycle")]))
+        rules=[BehaviorRule(action="recycle")]))
     wf = _wf_with(base)
     wf.run_ctx.skip_locked_equipment = False
     wf._ocr_map[TUNE_SCENE] = {
@@ -1738,7 +1734,7 @@ def test_tune_skip_ends_keeps(monkeypatch):
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_WORTHY))
     base = _behavior_base(tune=TuneBehavior(
-        enabled=True, rules=[BehaviorRule(action="skip")]))
+        rules=[BehaviorRule(action="skip")]))
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
@@ -1763,7 +1759,6 @@ def test_tune_reset_restores_and_retunes(monkeypatch, patch_collect_affix):
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
     base = _behavior_base(
         tune=TuneBehavior(
-            enabled=True,
             rules=[BehaviorRule(ratings=["junk"], action="reset")],
             max_resets=3))
     monkeypatch.setattr(auto_tuning, "get_game_config",
@@ -1803,7 +1798,6 @@ def test_tune_reset_blocked_ocr_unreadable(monkeypatch):
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
     base = _behavior_base(
         tune=TuneBehavior(
-            enabled=True,
             rules=[BehaviorRule(ratings=["junk"], action="reset")]))
     # 如果旧逻辑在进页时立即准备材料，这条规则会触发 OCR。
     # 重置判定失败后没有真实调律，因此正确行为是一次也不扫。
@@ -1842,7 +1836,6 @@ def test_tune_reset_local_cap(monkeypatch):
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
     base = _behavior_base(
         tune=TuneBehavior(
-            enabled=True,
             rules=[BehaviorRule(ratings=["junk"], action="reset")],
             max_resets=3))
     monkeypatch.setattr(auto_tuning, "get_game_config",
@@ -1879,7 +1872,6 @@ def test_tune_reset_cooldown_check_fails(monkeypatch):
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
     base = _behavior_base(
         tune=TuneBehavior(
-            enabled=True,
             rules=[BehaviorRule(ratings=["junk"], action="reset")],
             reset_exhausted_action="recycle"))  # 回收配置不应生效
     monkeypatch.setattr(auto_tuning, "get_game_config",
@@ -1916,7 +1908,6 @@ def test_tune_reset_exhausted_recycles(monkeypatch):
     monkeypatch.setattr(tuning_judge, "judge_equipment_potential", judge)
     base = _behavior_base(
         tune=TuneBehavior(
-            enabled=True,
             rules=[BehaviorRule(ratings=["junk"], action="reset")],
             reset_exhausted_action="recycle"))
     monkeypatch.setattr(auto_tuning, "get_game_config",
@@ -1942,7 +1933,7 @@ def test_full_equipment_recycled(monkeypatch):
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_WORTHY))
     base = _behavior_base(tune=TuneBehavior(
-        enabled=True, rules=[BehaviorRule(action="recycle")]))
+        rules=[BehaviorRule(action="recycle")]))
     wf = _wf_with(base)
     fp = wf._process_equipment("满词条剑", _equip(5), WEAPON_DETAIL)
 
@@ -1959,7 +1950,7 @@ def test_recycle_locked_equipment(monkeypatch):
     收起弹窗返回 RecycleOutcome.LOCKED，不卡死"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
-    base = _behavior_base(scan=ScanBehavior(enabled=True,
+    base = _behavior_base(scan=ScanBehavior(
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
     # 模拟装备锁定：回收确认弹窗内无「确认」字样
@@ -1984,7 +1975,7 @@ def test_scanned_locked_equipment_skips_recycle(monkeypatch):
     messages: list[str] = []
     monkeypatch.setattr(auto_tuning.logger, "info",
                         lambda message, *a, **k: messages.append(str(message)))
-    base = _behavior_base(scan=ScanBehavior(enabled=True,
+    base = _behavior_base(scan=ScanBehavior(
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
     wf.run_ctx.skip_locked_equipment = False
@@ -2083,7 +2074,6 @@ def test_reset_cooldown_completed_uses_normal_entry_and_first_processing(
     base = _behavior_base(
         scan=ScanBehavior(entry_min_rating="top"),
         tune=TuneBehavior(
-            enabled=True,
             rules=[BehaviorRule(action="reset")],
             max_resets=1,
         ),
@@ -2120,7 +2110,7 @@ def test_recycle_inferred_locked_logs_scan_mismatch_error(monkeypatch):
         "logger.error",
         lambda message, *a, **k: errors.append(str(message)),
     )
-    base = _behavior_base(scan=ScanBehavior(enabled=True,
+    base = _behavior_base(scan=ScanBehavior(
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
     wf._ocr_map[CONTROL_SCENE] = {"confirm": "装备已锁定"}
@@ -2142,7 +2132,7 @@ def test_recycle_locked_equipment_not_retried(monkeypatch):
     """同一轮再次读到已锁定装备时直接跳过，不重复打开回收链"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
-    base = _behavior_base(scan=ScanBehavior(enabled=True,
+    base = _behavior_base(scan=ScanBehavior(
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
     wf._ocr_map[CONTROL_SCENE] = {"confirm": "装备已锁定"}
@@ -2162,7 +2152,7 @@ def test_recycle_unavailable_not_blocked(monkeypatch):
     """回收入口缺失不阻断（只记锁定）：重扫到允许再次尝试"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
-    base = _behavior_base(scan=ScanBehavior(enabled=True,
+    base = _behavior_base(scan=ScanBehavior(
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
     wf._nav_tune_ok = False
@@ -2184,7 +2174,7 @@ def test_locked_block_is_fingerprint_scoped(monkeypatch):
     """阻断按指纹生效：同指纹装备（锁态必然一致）重读直接跳过"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_JUNK))
-    base = _behavior_base(scan=ScanBehavior(enabled=True,
+    base = _behavior_base(scan=ScanBehavior(
                                             rules=_RECYCLE_ALL))
     wf = _wf_with(base)
     wf._ocr_map[CONTROL_SCENE] = {"confirm": "装备已锁定"}
@@ -2207,7 +2197,7 @@ def test_materials_block_no_behavior(monkeypatch):
     base = TuningGroup(
         materials=MaterialSettings(stone_check_enabled=True,
                                    stone_min_count=100, food_rules=[]),
-        tune=TuneBehavior(enabled=True))
+        tune=TuneBehavior())
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律"}
     wf._material_infos = {(1, 2): _reference(count=3)}

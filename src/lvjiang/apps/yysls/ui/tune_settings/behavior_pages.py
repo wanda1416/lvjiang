@@ -851,7 +851,7 @@ class ScanBehaviorPage(_BehaviorPageBase):
             "按下表处置，自上而下首条命中即生效并阻断后续规则；"
             "无命中 = 保留") + "）"))
 
-        # 门槛设置区（位于处置表启用开关上方）
+        # 门槛设置区
         half_line = self.fontMetrics().height() // 2
         threshold_row = QHBoxLayout()
         threshold_row.addWidget(QLabel(tr("等级门槛")))
@@ -895,17 +895,10 @@ class ScanBehaviorPage(_BehaviorPageBase):
         recycle_row.addStretch()
         layout.addLayout(recycle_row)
         layout.addSpacing(half_line)
-
-        # 处置表区：启用开关紧贴规则表
-        layout.addSpacing(self.fontMetrics().height())
-        head = QHBoxLayout()
-        self._enabled_cb = QCheckBox(tr("启用处置表"))
-        self._enabled_cb.setToolTip(
-            tr("停用后不进调律的装备一律保留（调律门槛仍生效）"))
-        self._enabled_cb.stateChanged.connect(lambda _s: self._apply())
-        head.addWidget(self._enabled_cb)
-        head.addStretch()
-        layout.addLayout(head)
+        layout.addWidget(QLabel(
+            "<b>" + tr("扫描处理规则") + "</b>（" + tr(
+                "未达调律门槛时自上而下匹配，首条命中即生效；"
+                "全部不命中则保留") + "）"))
 
     def _load_stage(self, stage) -> None:
         self._min_level_combo.set_level(stage.min_level)
@@ -913,11 +906,9 @@ class ScanBehaviorPage(_BehaviorPageBase):
         self._entry_combo.setCurrentIndex(max(idx, 0))
         self._entry_first_affix_cb.setChecked(stage.entry_first_affix_only)
         self._max_recycle_spin.setValue(stage.max_consecutive_recycles)
-        self._enabled_cb.setChecked(stage.enabled)
 
     def _stage_raw(self) -> dict:
         return {
-            "enabled": self._enabled_cb.isChecked(),
             "min_level": self._min_level_combo.get_level() or 100,
             "entry_min_rating": self._entry_combo.currentData(),
             "entry_first_affix_only": self._entry_first_affix_cb.isChecked(),
@@ -939,11 +930,6 @@ class TuneBehaviorPage(_BehaviorPageBase):
         half_line = self.fontMetrics().height() // 2
 
         head = QHBoxLayout()
-        self._enabled_cb = QCheckBox(tr("启用行为表"))
-        self._enabled_cb.setToolTip(tr("停用后按无命中默认行为执行"))
-        self._enabled_cb.stateChanged.connect(lambda _s: self._apply())
-        head.addWidget(self._enabled_cb)
-        head.addSpacing(half_line)
         head.addWidget(QLabel(tr("单件重置次数上限")))
         self._resets_spin = QSpinBox()
         self._resets_spin.setRange(0, MAX_TUNE_RESETS)
@@ -977,9 +963,13 @@ class TuneBehaviorPage(_BehaviorPageBase):
         lock_row.addWidget(self._lock_qualified_cb)
         lock_row.addStretch()
         layout.addLayout(lock_row)
+        layout.addSpacing(half_line)
+        layout.addWidget(QLabel(
+            "<b>" + tr("调律处理规则") + "</b>（" + tr(
+                "进入调律前及每轮结束后自上而下匹配；"
+                "全部不命中时未满继续、已满保留") + "）"))
 
     def _load_stage(self, stage) -> None:
-        self._enabled_cb.setChecked(stage.enabled)
         self._resets_spin.setValue(stage.max_resets)
         idx = self._exhausted_combo.findData(stage.reset_exhausted_action)
         self._exhausted_combo.setCurrentIndex(max(idx, 0))
@@ -987,7 +977,6 @@ class TuneBehaviorPage(_BehaviorPageBase):
 
     def _stage_raw(self) -> dict:
         return {
-            "enabled": self._enabled_cb.isChecked(),
             "rules": self._rules_raw(),
             "max_resets": self._resets_spin.value(),
             "reset_exhausted_action": self._exhausted_combo.currentData(),

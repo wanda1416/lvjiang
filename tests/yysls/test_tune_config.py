@@ -239,8 +239,7 @@ class TestBehaviorPages:
         assert statuses and not statuses[-1][1], statuses[-1][0]
         after = tmp_group_manager.get_group("default")
         assert after.scan.entry_min_rating == new_entry
-        # 处置表其他字段不受影响
-        assert after.scan.enabled == group.scan.enabled
+        # 处置表规则不受影响
         assert after.scan.rules == group.scan.rules
 
         page._entry_first_affix_cb.setChecked(
@@ -256,7 +255,9 @@ class TestBehaviorPages:
         qtbot.addWidget(page)
         scan = tmp_group_manager.get_group("default").scan
         # 回填与真实配置一致
-        assert page._enabled_cb.isChecked() == scan.enabled
+        assert not hasattr(page, "_enabled_cb")
+        assert any("扫描处理规则" in label.text()
+                   for label in page.findChildren(QLabel))
         assert page._table.rowCount() == len(scan.rules)
         # 判定语义与仅首词条已下沉为表格列（列索引经 _ci 取），
         # 逐行回填
@@ -296,6 +297,11 @@ class TestBehaviorPages:
             tmp_group_manager, "default",
             lambda text, error: statuses.append((text, error)))
         qtbot.addWidget(page)
+        assert page._stone_cb.text() == "启动大律准石数量检查"
+        labels = [label.text() for label in page.findChildren(QLabel)]
+        assert not any("<b>大律准石数量检查</b>" in text
+                       for text in labels)
+        assert any("材料处理规则" in text for text in labels)
         parts = page._table.cellWidget(0, page._ci["parts"])
         assert parts.selected() == list(QUALITY_PARTS)
         assert "全部" in parts.text()
@@ -377,20 +383,20 @@ class TestBehaviorPages:
                                 lambda t, e: statuses.append((t, e)))
         qtbot.addWidget(page)
         tune = tmp_group_manager.get_group("default").tune
-        assert page._enabled_cb.isChecked() == tune.enabled
+        assert not hasattr(page, "_enabled_cb")
+        assert any("调律处理规则" in label.text()
+                   for label in page.findChildren(QLabel))
         assert page._resets_spin.value() == tune.max_resets
         assert (page._exhausted_combo.currentData()
                 == tune.reset_exhausted_action)
         assert page._lock_qualified_cb.isChecked() == tune.lock_qualified
 
-        # 启用 + 上限调整 → 保存生效，且不覆盖 scan 子段
+        # 上限调整 → 保存生效，且不覆盖 scan 子段
         scan_before = tmp_group_manager.get_raw("default")["scan"]
-        page._enabled_cb.setChecked(True)
         page._resets_spin.setValue(1)
         page._lock_qualified_cb.setChecked(not tune.lock_qualified)
         assert statuses and not statuses[-1][1], statuses[-1][0]
         saved = tmp_group_manager.get_group("default").tune
-        assert saved.enabled is True
         assert saved.max_resets == 1
         assert saved.lock_qualified is not tune.lock_qualified
         assert tmp_group_manager.get_raw("default")["scan"] == scan_before

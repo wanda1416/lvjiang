@@ -47,7 +47,6 @@ materials:
     on_insufficient: continue
 scan:
   entry_first_affix_only: true
-  enabled: true
   min_level: 100
   entry_min_rating: top
   max_consecutive_recycles: 50
@@ -104,7 +103,6 @@ scan:
     first_affix_only: false
 tune:
   lock_qualified: true
-  enabled: true
   rules:
   - enabled: true
     parts:

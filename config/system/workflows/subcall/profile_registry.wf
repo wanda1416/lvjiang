@@ -1,0 +1,49 @@
+#% name: Profile 定义注册表
+
+# 系统工作流使用的 Profile 数据模型统一登记在这里。业务工作流只传入自己
+# 依赖的 key 列表；已有同类型定义保持不变，不覆盖用户自定义字段。
+#
+# 返回：0=全部定义可用；-1=存在未知 key、声明失败或已有模型类型冲突。
+def declare_profiles($keys)
+    eval $registry = {
+        "tongbao": {"model": "stock", "definition": {"label": "通宝(万)"}},
+        "bugan": {"model": "stock", "definition": {"label": "么玉"}},
+        "baoqian": {"model": "stock", "definition": {"label": "宝钱(万)"}},
+        "changmingyu": {"model": "stock", "definition": {"label": "长鸣玉"}},
+        "bugan_of_week": {"model": "quota", "definition": {"label": "不肝进度", "cap": 23000, "period": "week", "increment_only": true, "sources": ["不肝"]}},
+        "nn_bugan_of_week": {"model": "quota", "definition": {"label": "不肝", "cap": 1, "period": "week", "increment_only": true, "sources": ["不肝商店"]}},
+        "niaoniao_of_week": {"model": "quota", "definition": {"label": "袅袅本周", "cap": 2, "period": "week", "increment_only": true, "sources": ["商店精选"]}},
+        "xinfa_of_week": {"model": "quota", "definition": {"label": "心法心得本周", "cap": 600, "period": "week", "increment_only": true, "sources": ["心得置换"]}},
+        "haoling_of_week": {"model": "quota", "definition": {"label": "当周获取号令", "period": "week", "increment_only": true, "sources": ["江湖号令"]}},
+        "huaruizhi_of_week": {"model": "quota", "definition": {"label": "花蕊织本周", "cap": 3000, "period": "week", "increment_only": true, "sources": ["渡尘墟"]}},
+        "tili": {"model": "regen", "definition": {"label": "体力", "cap": 2500, "regen_type": "boundary", "regen_amount": 450, "regen_period": "day", "reset_time": "05:00"}}
+    }
+
+    # 先验证完整列表，避免拼错一个 key 后只创建了前半部分。
+    for key in $keys
+        eval $item = $registry.$key
+        if not $item
+            log error "Profile 注册表中不存在 key: " + $key
+            return -1
+        end
+    end
+
+    for key in $keys
+        eval $item = $registry.$key
+        eval $result = profile_declare($item.model, $key, $item.definition)
+        if not $result.ok
+            log error "Profile 声明失败: " + $key + "（" + $result.reason + "）"
+            return -1
+        end
+
+        # profile_declare 不覆盖已有定义；显式拦截同名但模型类型不同的配置。
+        eval $actual_model = profile_model($key)
+        eval $expected_model = $item.model
+        if not $actual_model equals $expected_model
+            log error "Profile 模型类型不匹配: " + $key + "，期望 " + $expected_model + "，实际 " + $actual_model
+            return -1
+        end
+    end
+
+    return 0
+end

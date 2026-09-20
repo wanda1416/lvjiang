@@ -56,11 +56,11 @@ default $tol_changmingyu = 0
 
 import "subcall/navigation.wf"
 import "subcall/game_profile.wf"
+import "subcall/profile_registry.wf"
 
-# ─── 校验 profile key 已定义 ─────────────────────────────
-eval $profile_keys = ["tongbao", "bugan", "baoqian", "changmingyu", "bugan_of_week"]
-call $chk = check_profile($profile_keys)
-if $chk < 0
+# ─── 声明本任务依赖的 Profile 数据模型 ───────────────────
+call $profile_ok = declare_profiles(["tongbao", "bugan", "baoqian", "changmingyu", "bugan_of_week"])
+if $profile_ok < 0
     return -1
 end
 

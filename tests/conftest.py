@@ -51,6 +51,26 @@ def _isolate_session_store(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_profile_store(tmp_path, monkeypatch):
+    """每个用例使用独立 Profile 定义与数据库，禁止读取用户真实数据。
+
+    Profile 不经过 SessionStore，拥有独立的 profile.yaml/profile.db 路径与
+    模块级单例。只隔离 session.json 仍会让工作流测试因已有业务周期定义而
+    失败，或者在调用 profile_declare 时尝试修改真实配置。
+    """
+    from lvjiang.core.profile import repository, schema
+
+    profile_dir = tmp_path / "session"
+    monkeypatch.setattr(schema, "_PROFILE_PATH", profile_dir / "profile.yaml")
+    monkeypatch.setattr(repository, "_DB_PATH", profile_dir / "profile.db")
+    schema._config = None
+    repository.reset_profile_db()
+    yield
+    schema._config = None
+    repository.reset_profile_db()
+
+
+@pytest.fixture(autouse=True)
 def _reset_game_config():
     """每个用例前重置 GameConfigManager 单例
 

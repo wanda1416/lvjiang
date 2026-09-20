@@ -244,9 +244,15 @@ regen 模型区分两种刷新机制，DSL 函数自动处理：
 | `profile_set` | `(key, value) -> float \| str` | 写入 profile 值；realtime regen 自动规范化时间锚点，note 直接写文本 |
 | `profile_inc` | `(key, delta?) -> float` | 增减 profile 值（delta 默认 1），返回新值；note 不支持，仅记警告 |
 | `profile_model` | `(key) -> str` | 查询 key 所属模型：`"quota"` / `"regen"` / `"stock"` / `"note"`；key 未定义返回 `""` |
+| `profile_declare` | `(model, key, definition) -> dict` | 幂等创建缺失定义，已有定义不覆盖；系统业务工作流应通过全局注册表间接调用 |
 | `profile_all` | `() -> dict` | 获取全部 profile 数据，regen 条目返回计算后的当前值 |
 | `profile_observe` | `(key, value) -> dict` | 上报外部观测值（仅 quota 模型），同周期内拒绝更小的值；返回 `{accepted, value, reason}` |
 | `user_get` | `(username, key) -> any \| null` | 按「内部用户名」读取用户资料属性（内存快照优先），取不到返回 `null` |
+
+系统业务 key 的定义由 `subcall/profile_registry.wf` 统一登记。业务工作流导入该文件后，在
+正文开头调用一次 `declare_profiles(["key1", "key2"])`；函数会先验证整个列表，再幂等
+创建缺失定义，并校验已有定义的模型类型。注册表只提供这一个声明过程，不按 key 拆分函数。
+通用 `game_profile.wf` 只负责读取、观察值同步等操作，不持有具体业务模型定义。
 
 ### DSL 用法
 

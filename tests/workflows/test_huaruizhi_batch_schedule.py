@@ -37,6 +37,11 @@ _STUB_EXIT_TO_LOGIN = (
     '    eval mark_exit()\n'
     'end\n'
 )
+_STUB_DECLARE_PROFILES = (
+    'def declare_profiles($keys)\n'
+    '    return 0\n'
+    'end\n'
+)
 
 
 class _Device:
@@ -98,6 +103,8 @@ def _run_batch_check(device: _Device) -> dict:
     )
     device.install(engine)
     engine._procs = dict(program.procs)
+    engine._procs["declare_profiles"] = parse_text(
+        _STUB_DECLARE_PROFILES).procs["declare_profiles"]
     return_value, _output = engine._run_proc(
         program.procs["check_huaruizhi_batch"], [{}])
     return return_value

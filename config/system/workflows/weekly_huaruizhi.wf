@@ -31,6 +31,12 @@ import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 import "subcall/page_action.wf"
 import "subcall/game_profile.wf"
+import "subcall/profile_registry.wf"
+
+call $profile_ok = declare_profiles(["huaruizhi_of_week"])
+if $profile_ok < 0
+    return -1
+end
 
 default $nav_from_main = true
 
@@ -81,6 +87,10 @@ return 0
 # 批量调度专用：读取当前用户的缓存进度，决定本轮是否需要建立游戏现场。
 # 直接运行工作流只执行顶层正文，不会自动调用这个子过程。
 def check_huaruizhi_batch($params)
+    call $profile_ok = declare_profiles(["huaruizhi_of_week"])
+    if $profile_ok < 0
+        return {"status": "success", "message": "Profile 定义失败，保守执行任务并在正文重试"}
+    end
     eval $huaruizhi_of_week = profile_get("huaruizhi_of_week")
     if $huaruizhi_of_week >= 3000
         return {"status": "skipped", "message": "本周花蕊织进度已满"}

@@ -32,5 +32,9 @@ def test_weekly_progress_uses_one_shared_parser_and_sync_path():
     assert "parse_bugan_jindu" not in wallet
     assert "sync_weekly_progress($progress.huaruizhi_of_week" in huaruizhi
     assert xinfa.count("sync_weekly_remaining(") == 2
-    assert 'profile_declare("quota", "xinfa_of_week"' in xinfa
-    assert '"cap": 600' in xinfa
+    registry = (_WORKFLOWS / "subcall" / "profile_registry.wf").read_text(
+        encoding="utf-8"
+    )
+    assert 'declare_profiles(["xinfa_of_week"])' in xinfa
+    assert '"xinfa_of_week": {"model": "quota"' in registry
+    assert '"cap": 600' in registry

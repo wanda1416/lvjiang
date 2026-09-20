@@ -4,33 +4,12 @@
 # 提供角色档案相关的扫描解析操作，供各工作流 import 后调用。
 #
 # 包含过程：
-#   check_profile($keys)   — 批量校验 profile key 已定义，未定义则阻塞提醒
 #   sync_weekly_progress($raw, $key, $last, $label)
 #       — 解析 a/b 周进度并按本周期单调规则同步 profile
 #   sync_weekly_remaining($raw, $key, $last, $expected_total, $label)
 #       — 解析“剩余/总量”，换算为已消耗量后同步 profile
 #
-# 依赖某个 profile key 的工作流建议在开头用内置函数 profile_declare 声明
-# （幂等导入，仅创建缺失定义），声明成功后 check_profile 只作兑底断言：
-#   eval profile_declare("quota", "xxx_of_week",
-#       {"label": "标签", "cap": 1, "increment_only": true})
-
-# ─── 批量校验 profile key ─────────────────────────────────
-# 参数：$keys — key 列表（如 ["tongbao", "bugan"]）
-# 逐个检查 key 是否在 profile.yaml 中已定义（quota/regen/stock/note）
-# 返回：0 全部已定义，-1 存在未定义 key（已弹窗提醒）
-def check_profile($keys)
-    for key in $keys
-        eval $model = profile_model($key)
-        if not $model
-            eval $msg = "profile key '" + $key + "' 未在 profile.yaml 中定义，请检查配置"
-            log error $msg
-            eval pause($msg)
-            return -1
-        end
-    end
-    return 0
-end
+# Profile 定义由 subcall/profile_registry.wf 统一负责。
 
 # ─── 解析并同步每周进度 ──────────────────────────────────
 # 参数：

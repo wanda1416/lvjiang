@@ -77,18 +77,17 @@ if not $buy_keyword_keys contains "振玉"
     eval $buy_keywords.振玉 = true
 end
 
-# ─── profile 依赖声明（幂等导入：仅创建缺失定义，已有定义不修改） ───
-# 外观兑换依赖的 key：本周已购标记（quota 默认周周期，cap=1 自动清零）
-# 与长鸣玉库存；体力为 regen 模型，同步观察值后由引擎按周期推算回复。
-# 已在 profile.yaml 定义的机器上本段是 no-op。
-eval profile_declare("quota", "nn_bugan_of_week", {"label": "不肝", "cap": 1, "increment_only": true, "sources": ["不肝商店"]})
-eval profile_declare("stock", "changmingyu", {"label": "长鸣玉"})
-eval profile_declare("regen", "tili", {"label": "体力", "cap": 2500, "regen_type": "boundary", "regen_amount": 450})
-
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 import "subcall/game_profile.wf"
 import "subcall/page_action.wf"
+import "subcall/profile_registry.wf"
+
+# ─── 声明本任务依赖的 Profile 数据模型 ───────────────────
+call $profile_ok = declare_profiles(["bugan_of_week", "nn_bugan_of_week", "changmingyu", "tili"])
+if $profile_ok < 0
+    return -1
+end
 
 # ─── 导航：从首页到不肝商店视图 ─────────────────────────
 call $nav_result = nav_main_to_menu()

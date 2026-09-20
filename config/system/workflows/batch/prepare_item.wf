@@ -1,26 +1,32 @@
 #% parameters:
+#%   - name: max_roll_account
+#%     label: 最大滚动次数
+#%     type: number
+#%     default: 8
+#%     min: 1
+#%     max: 20
 #%   - name: skip_online_role
 #%     label: 角色在线跳过
 #%     type: bool
 #%     default: true
 #%   - name: online_role_max_wait
-#%     label: 在线等待时间（秒）
+#%     label: 最大等待时间（秒）
 #%     type: number
 #%     default: 600
 #%     min: 0
 #%     max: 3600
-#%   - name: restart_app_if_not_login
-#%     label: 不在登录页时重启应用
+#%   - name: allow_restart_app
+#%     label: 准备时允许重启应用
 #%     type: bool
 #%     default: false
 # 批量条目准备：从登录页切换到当前用户并进入游戏。
 
 import "subcall/login.wf"
 
-if $restart_app_if_not_login
+if $allow_restart_app
     call ensure_login_page_by_restart("yyslscn")
 end
 
 eval $username = $batch_users.$batch_index
-call $result = prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait)
+call $result = prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait, $max_roll_account)
 return $result

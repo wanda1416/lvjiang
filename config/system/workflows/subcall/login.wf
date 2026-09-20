@@ -3,7 +3,7 @@
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 
-def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait)
+def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait, $max_roll_account)
     eval check_env(["android", "desktop"])
     eval $account = user_get($username, "account")
     eval $role = user_get($username, "role")
@@ -30,7 +30,7 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
             return {"status": "failed", "message": "用户未配置账号尾号", "state": $batch_state}
         end
         log "需要切换账号: " + $account
-        call switch_account($tail, $role_index, $account, $role, $batch_state)
+        call switch_account($tail, $role_index, $account, $role, $batch_state, $max_roll_account)
     end
 
     log "切换角色: " + $role
@@ -117,7 +117,7 @@ end
 # 登录页 → 选账号 → 登录 → 回到登录页角色入口（page_state=1）
 # 不包含选角色，由调用方决定是否接着调用 select_role
 
-def switch_account($tail, $role_index, $account, $role, $batch_state)
+def switch_account($tail, $role_index, $account, $role, $batch_state, $max_roll_account)
     log "当前匹配" + $tail
     log "当前下标" + $role_index
 
@@ -148,14 +148,14 @@ def switch_account($tail, $role_index, $account, $role, $batch_state)
 
     # 2. 查找目标账号（最多滚动 5 次）
     eval $found_user = ""
-    loop 5
+    loop $max_roll_account
         find [game_login_page].[user_list] as $found_user by contains $tail
         if $found_user
             click $found_user
             break
         end
         env:"android" -> drag [game_login_page].[point_2] to [game_login_page].[point_1]
-        env:"desktop" -> scroll [game_login_page].[user_list] down 3
+        env:"desktop" -> scroll [game_login_page].[user_list] down 2
         wait @page_refresh
     end
 

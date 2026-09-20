@@ -3,9 +3,9 @@
 状态机行为点「材料处理」（每轮调律开始前的行为）：
 - 大律准石数量检查：开关 + 数量基准 + 不足处理（低于基准判材料
   不足，按不足处理执行：跳过该装备 / 结束全部调律 / 询问是否继续）；
-- 狗粮添加规则：有序规则表（可自由增删行），每条规则 = 三条件
-  （首词条百分比 / 装备期望 / 装备品阶）+ 动作（添加狗粮或不添加）
-  + 材料不足时行为（继续走后续规则 / 跳过该装备）。
+- 狗粮添加规则：有序规则表（可自由增删行），条件与扫描/调律
+  处理一致（部位 / 品阶 / 判定语义 / 判定结果 / 首词条百分比，
+  其中比较方向固定为 ≥）+ 每轮添加狗粮 + 材料不足时行为。
 沿用「变更即校验即暂存」模式：控件变更即重建 raw dict → 校验 →
 通过才写盘并 reload，失败时状态栏红字提示。
 `_build()` 以管理器最新 raw 为底、只替换 materials 段，
@@ -36,29 +36,47 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.core.tuning_rules import (
-    FOOD_EXPECT_KEYS,
     FOOD_LABELS,
     INSUFFICIENT_LABELS,
-    QUALITY_LABELS,
+    QUALITY_PARTS,
+    RATING_KEYS,
     RATING_LABELS,
     STONE_ACTION_LABELS,
     FoodRule,
     TuningGroup,
     TuningGroupManager,
+    rule_affix_candidates,
 )
 from lvjiang.apps.yysls.ui.layout_helpers import fit_combo_to_contents
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
+from ..domain_labels import domain_label
+from .behavior_pages import (
+    _QUALITY_KEYS,
+    _QUALITY_LABELS,
+    _AffixEntriesButton,
+    _JudgeScopeCell,
+    _MultiSelect,
+    _PctCell,
+)
 
 # 狗粮下拉框的「不添加」占位项（对应配置空串）
 _NO_FOOD = tr("- 不添加 -")
-# 品阶下拉候选（按品阶从低到高，blue=不限）
-_QUALITY_KEYS = ("blue", "purple", "gold")
-
-# 规则表列定义（第一列为序号）
+# 规则表列定义（第一列为序号）；条件列与扫描/调律处理同语义。
 _SEQ_COL = 0
-_COLS = ("#", tr("首词条 ≥ %"), tr("期望 ≥"), tr("品阶 ≥"), tr("每轮添加"), "材料不足时")  # runtime tr()
+_COL_KEYS = ("seq", "parts", "quality", "judge", "ratings", "pct",
+             "food", "insufficient")
+_COL_TITLES = {
+    "seq": "#",
+    "parts": tr("部位"),
+    "quality": tr("品阶"),
+    "judge": tr("判定语义"),
+    "ratings": tr("判定结果"),
+    "pct": tr("首词条 %"),
+    "food": tr("每轮添加"),
+    "insufficient": tr("材料不足时"),
+}
 
 
 class MaterialConfigPage(QWidget):
@@ -142,15 +160,19 @@ class MaterialConfigPage(QWidget):
         # 狗粮添加规则（标题顶部留半个字高度）
         layout.addSpacing(half_line)
         layout.addWidget(QLabel(
-            "<b>" + tr("狗粮添加规则") + "</b>（" + tr("每轮调律自上而下匹配，首条命中即生效；"
-            "全部不命中则不添加") + "）"))
-        self._table = QTableWidget(0, len(_COLS))
-        self._table.setHorizontalHeaderLabels([tr(c) for c in _COLS])
+            "<b>" + tr("狗粮添加规则") + "</b>（" + tr(
+                "每轮调律自上而下匹配；命中后按材料不足动作结束或顺延；"
+                "全部不命中则不添加") + "）"))
+        self._ci = {key: index for index, key in enumerate(_COL_KEYS)}
+        self._table = QTableWidget(0, len(_COL_KEYS))
+        self._table.setHorizontalHeaderLabels(
+            [tr(_COL_TITLES[key]) for key in _COL_KEYS])
         header = self._table.horizontalHeader()
-        # 下拉列按内容宽度展示；首词条数值列吸收剩余空间。窗口不足时
-        # 表格自然出现横向滚动，不再把中文选项压到只剩箭头。
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(
+            self._ci["parts"], QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(
+            self._ci["ratings"], QHeaderView.ResizeMode.Stretch)
         # 序号列固定宽度，隐藏原生行号
         header.setSectionResizeMode(
             _SEQ_COL, QHeaderView.ResizeMode.Fixed)
@@ -201,29 +223,37 @@ class MaterialConfigPage(QWidget):
         seq_label.setProperty("rule_enabled", rule.enabled)
         self._table.setCellWidget(row, _SEQ_COL, seq_label)
 
-        pct = QSpinBox()
-        pct.setRange(0, 100)
-        pct.setSuffix(" %")
-        pct.setToolTip(tr("0 = 不限首词条"))
-        pct.setValue(rule.pct)
-        pct.valueChanged.connect(lambda _v: self._apply())
-        self._table.setCellWidget(row, 1, pct)
-
-        expect = QComboBox()
-        for key in FOOD_EXPECT_KEYS:
-            expect.addItem(RATING_LABELS.get(key, key), key)
-        fit_combo_to_contents(expect, minimum=88)
-        expect.setCurrentIndex(max(expect.findData(rule.min_expect), 0))
-        expect.currentIndexChanged.connect(lambda _i: self._apply())
-        self._table.setCellWidget(row, 2, expect)
+        parts = _MultiSelect(
+            [(part, domain_label(part)) for part in QUALITY_PARTS],
+            self._apply,
+        )
+        parts.set_selected(rule.parts)
+        self._table.setCellWidget(row, self._ci["parts"], parts)
 
         quality = QComboBox()
         for key in _QUALITY_KEYS:
-            quality.addItem(QUALITY_LABELS.get(key, key), key)
-        fit_combo_to_contents(quality, minimum=88)
-        quality.setCurrentIndex(max(quality.findData(rule.min_quality), 0))
+            quality.addItem(_QUALITY_LABELS.get(key, key), key)
+        fit_combo_to_contents(quality, minimum=112)
+        quality.setCurrentIndex(max(quality.findData(rule.max_quality), 0))
         quality.currentIndexChanged.connect(lambda _i: self._apply())
-        self._table.setCellWidget(row, 3, quality)
+        self._table.setCellWidget(row, self._ci["quality"], quality)
+
+        ratings = self._create_ratings_widget(rule.judge_scope)
+        self._apply_ratings_domain(
+            ratings, rule.judge_scope, rule.ratings)
+        self._table.setCellWidget(row, self._ci["ratings"], ratings)
+
+        judge = _JudgeScopeCell(
+            self._apply,
+            on_scope_changed=lambda scope: self._apply_ratings_domain(
+                ratings, scope, []),
+        )
+        judge.set_value(rule.judge_scope, rule.judge_rules)
+        self._table.setCellWidget(row, self._ci["judge"], judge)
+
+        pct = _PctCell(
+            "ge", rule.pct, self._apply, allowed_ops=("ge",))
+        self._table.setCellWidget(row, self._ci["pct"], pct)
 
         food = QComboBox()
         food.addItem(_NO_FOOD, "")
@@ -232,7 +262,7 @@ class MaterialConfigPage(QWidget):
         fit_combo_to_contents(food, minimum=104)
         food.setCurrentIndex(max(food.findData(rule.food), 0))
         food.currentIndexChanged.connect(lambda _i: self._apply())
-        self._table.setCellWidget(row, 4, food)
+        self._table.setCellWidget(row, self._ci["food"], food)
 
         action = QComboBox()
         for key, label in INSUFFICIENT_LABELS.items():
@@ -240,8 +270,30 @@ class MaterialConfigPage(QWidget):
         fit_combo_to_contents(action, minimum=132)
         action.setCurrentIndex(max(action.findData(rule.on_insufficient), 0))
         action.currentIndexChanged.connect(lambda _i: self._apply())
-        self._table.setCellWidget(row, 5, action)
+        self._table.setCellWidget(row, self._ci["insufficient"], action)
         self._set_row_enabled(row, rule.enabled)
+
+    def _create_ratings_widget(self, scope: str):
+        if scope == "affix":
+            return _AffixEntriesButton([], self._apply)
+        return _MultiSelect([], self._apply)
+
+    def _apply_ratings_domain(self, ratings, scope: str,
+                              selected: list[str]) -> None:
+        if scope == "affix":
+            vocab = rule_affix_candidates()
+            ratings.set_items([(name, name) for name in vocab])
+            ratings.setToolTip(
+                tr("命中条件：装备任一条题名属于勾选词条；"
+                   "自选词条语义不跑潜力判定"))
+            ratings.set_selected(selected or vocab[:1])
+            return
+        ratings.set_items(
+            [(rating, RATING_LABELS.get(rating, rating))
+             for rating in reversed(RATING_KEYS)])
+        ratings.setToolTip(
+            tr("命中条件：预期评级属于勾选档位（全选 = 不限）"))
+        ratings.set_selected(selected)
 
     def _on_rule_context_menu(self, pos) -> None:
         index = self._table.indexAt(pos)
@@ -345,15 +397,26 @@ class MaterialConfigPage(QWidget):
 
     def _set_row_values(self, row: int, values: dict) -> None:
         """将 raw dict 写回指定行的控件"""
-        pct: QSpinBox = self._table.cellWidget(row, 1)
-        pct.setValue(values["pct"])
-        expect: QComboBox = self._table.cellWidget(row, 2)
-        expect.setCurrentIndex(max(expect.findData(values["min_expect"]), 0))
-        quality: QComboBox = self._table.cellWidget(row, 3)
-        quality.setCurrentIndex(max(quality.findData(values["min_quality"]), 0))
-        food: QComboBox = self._table.cellWidget(row, 4)
+        parts: _MultiSelect = self._table.cellWidget(row, self._ci["parts"])
+        selected_parts = values["parts"]
+        if selected_parts == ["全部"]:
+            selected_parts = list(QUALITY_PARTS)
+        parts.set_selected(selected_parts)
+        quality: QComboBox = self._table.cellWidget(row, self._ci["quality"])
+        quality.setCurrentIndex(max(
+            quality.findData(values["max_quality"]), 0))
+        ratings = self._table.cellWidget(row, self._ci["ratings"])
+        self._apply_ratings_domain(
+            ratings, values["judge_scope"], values["ratings"])
+        judge: _JudgeScopeCell = self._table.cellWidget(
+            row, self._ci["judge"])
+        judge.set_value(values["judge_scope"], values["judge_rules"])
+        pct: _PctCell = self._table.cellWidget(row, self._ci["pct"])
+        pct.set_value("ge", values["pct"])
+        food: QComboBox = self._table.cellWidget(row, self._ci["food"])
         food.setCurrentIndex(max(food.findData(values["food"]), 0))
-        action: QComboBox = self._table.cellWidget(row, 5)
+        action: QComboBox = self._table.cellWidget(
+            row, self._ci["insufficient"])
         action.setCurrentIndex(max(action.findData(values["on_insufficient"]), 0))
         self._set_row_enabled(row, values.get("enabled", True))
 
@@ -361,17 +424,28 @@ class MaterialConfigPage(QWidget):
 
     def _row_rule(self, row: int) -> dict:
         """收集一行的规则控件值为 raw dict"""
-        pct: QSpinBox = self._table.cellWidget(row, 1)
-        expect: QComboBox = self._table.cellWidget(row, 2)
-        quality: QComboBox = self._table.cellWidget(row, 3)
-        food: QComboBox = self._table.cellWidget(row, 4)
-        action: QComboBox = self._table.cellWidget(row, 5)
+        parts: _MultiSelect = self._table.cellWidget(row, self._ci["parts"])
+        quality: QComboBox = self._table.cellWidget(row, self._ci["quality"])
+        ratings = self._table.cellWidget(row, self._ci["ratings"])
+        judge: _JudgeScopeCell = self._table.cellWidget(
+            row, self._ci["judge"])
+        pct: _PctCell = self._table.cellWidget(row, self._ci["pct"])
+        food: QComboBox = self._table.cellWidget(row, self._ci["food"])
+        action: QComboBox = self._table.cellWidget(
+            row, self._ci["insufficient"])
         seq = self._table.cellWidget(row, _SEQ_COL)
+        selected_parts = parts.selected()
+        if set(selected_parts) == set(QUALITY_PARTS):
+            selected_parts = ["全部"]
         return {
             "enabled": bool(seq.property("rule_enabled")),
+            "parts": selected_parts,
+            "max_quality": quality.currentData(),
+            "judge_scope": judge.scope(),
+            "judge_rules": judge.rules(),
+            "ratings": ratings.selected(),
+            "pct_op": "ge",
             "pct": pct.value(),
-            "min_expect": expect.currentData(),
-            "min_quality": quality.currentData(),
             "food": food.currentData(),
             "on_insufficient": action.currentData(),
         }

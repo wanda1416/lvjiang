@@ -29,6 +29,7 @@ from lvjiang.apps.yysls.core.affix_cap import affix_cap_value
 from lvjiang.apps.yysls.core.equip_parser.constants import WEAPON_TYPES
 from lvjiang.apps.yysls.core.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.core.evaluator import (
+    get_rule_names,
     get_tuning_judge,
     is_rule_implemented,
     judge_equipment_potential,
@@ -530,7 +531,18 @@ class EquipJudgeTestDialog(QDialog):
                     level=equip.level, quality=equip.quality,
                     affixes=equip.affixes[:1],
                     extra_data={**equip.extra_data, "affix_count": 1})
-            results = judge_equipment_potential(target, configs, rule_keys)
+            if scope == "incoming":
+                judge_configs = configs
+                use_keys = rule_keys
+            elif scope == "custom":
+                known = set(get_rule_names())
+                judge_configs = None
+                use_keys = [key for key in keys if key in known] or None
+            else:
+                judge_configs = None
+                use_keys = None
+            results = judge_equipment_potential(
+                target, judge_configs, use_keys)
             best: str | None = None
             for r in results.values():
                 if r.get("skipped") or r.get("not_applicable"):
@@ -583,9 +595,16 @@ class EquipJudgeTestDialog(QDialog):
 
         for i, new_affix in enumerate(tune_affixes):
             rnd = i + 1
-            # 狗粮决策（只取决于首词条 pct + 当前期望评级 + 品阶）
+            # 狗粮决策与真实流程共用部位/品阶/判定语义/判定结果/
+            # 首词条比例条件，库存使用预览用固定充足值。
             food = group.materials.decide_food(
-                cap_pct, expect_key, equip_quality, _DUMMY_STOCKS)
+                equip_part,
+                equip_quality,
+                cap_pct,
+                rating_of,
+                _DUMMY_STOCKS,
+                [a.name for a in equip.affixes],
+            )
             food_tag = (food.food if food.action == "feed"
                         else tr("无") if food.action == "none"
                         else food.action)

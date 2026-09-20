@@ -731,7 +731,7 @@ def test_food_rule_feeds_each_round(patch_worth, monkeypatch):
     from lvjiang.core.recognizers import ReferenceInfo
 
     base = TuningGroup(materials=MaterialSettings(food_rules=[
-        FoodRule(pct=90, min_expect="excellent", food="金狗粮")]))
+        FoodRule(pct=90, ratings=["top", "excellent"], food="金狗粮")]))
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100", "tune_tip": ""}
@@ -755,7 +755,7 @@ def test_food_rule_feeds_each_round(patch_worth, monkeypatch):
 def test_collapsed_material_panel_expands_before_scan(patch_worth):
     """真实调律前先展开折叠的材料区，稳定后才识别库存。"""
     base = TuningGroup(materials=MaterialSettings(food_rules=[
-        FoodRule(pct=90, min_expect="excellent", food="金狗粮")]))
+        FoodRule(pct=90, ratings=["top", "excellent"], food="金狗粮")]))
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {
         "auto_add": "", "auto_add_2": "点击添加材料",
@@ -790,7 +790,7 @@ def test_ghost_duplicate_slot_not_mask_stock(patch_worth, monkeypatch):
     """低置信度误匹配的同名幽灵槽（数量 None）不得覆盖真槽库存，
     且狗粮点击定位到数量有效的真槽（复刻 20260730 雁南飞甲现场）"""
     base = TuningGroup(materials=MaterialSettings(food_rules=[
-        FoodRule(pct=90, min_expect="excellent", food="紫狗粮")]))
+        FoodRule(pct=90, ratings=["top", "excellent"], food="紫狗粮")]))
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100", "tune_tip": ""}
@@ -1616,6 +1616,21 @@ def test_behavior_rating_logs_winning_rule_names(monkeypatch):
     messages = [str(call.args[0]) for call in info.call_args_list]
     assert any("按全部规则判定为 顶级（命中规则：会心小外）" in msg
                for msg in messages)
+
+
+def test_material_rating_provider_reuses_current_incoming_rating(monkeypatch):
+    """材料处理复用本轮已刷新评级，其他判定语义仍按需计算。"""
+    wf = FakeWF()
+    equip_data = EquipmentData.from_dict(_equip(2))
+    judge = MagicMock(return_value={})
+    monkeypatch.setattr(wf.judge, "judge_by_scope", judge)
+    rating_of = wf.judge.rating_provider(
+        equip_data, incoming_rating="excellent")
+
+    assert rating_of("incoming", [], False) == "excellent"
+    judge.assert_not_called()
+    assert rating_of("all", [], False) == "junk"
+    judge.assert_called_once()
 
 
 @pytest.mark.parametrize("action, expected_rounds", [
@@ -3017,7 +3032,7 @@ def test_food_refund_popup_closed_only_when_detected(patch_worth, monkeypatch):
     [space] 基本 OCR 不出），非空即算命中。
     """
     base = TuningGroup(materials=MaterialSettings(food_rules=[
-        FoodRule(pct=90, min_expect="excellent", food="金狗粮")]))
+        FoodRule(pct=90, ratings=["top", "excellent"], food="金狗粮")]))
 
     def run(tip: str):
         wf = _wf_with(base)

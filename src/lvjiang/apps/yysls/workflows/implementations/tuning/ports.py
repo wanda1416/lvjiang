@@ -122,6 +122,9 @@ class TuningRoundHostPort(Protocol):
     def equipment_session(self) -> Any: ...
 
     @property
+    def judge(self) -> Any: ...
+
+    @property
     def engine(self) -> Any: ...
 
     output: dict

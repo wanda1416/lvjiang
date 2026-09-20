@@ -34,6 +34,8 @@ from ......i18n import tr
 if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 
+_RATING_UNSET = object()
+
 
 class TuningJudge:
     """调律判定与评级：潜力判定、期望评级、行为表评级提供者"""
@@ -95,6 +97,7 @@ class TuningJudge:
     def rating_provider(self, equip_data: EquipmentData,
                         incoming: dict | None = None, *,
                         incoming_first_affix_only: bool = False,
+                        incoming_rating: str | None | object = _RATING_UNSET,
                         ) -> RatingProvider:
         """构造行为表的评级提供者（同一装备当前词条状态内缓存）
 
@@ -113,6 +116,11 @@ class TuningJudge:
             seed_fao = incoming_first_affix_only and len(equip_data.affixes) > 1
             cache[("incoming", (), seed_fao)] = (
                 self.expect_key(incoming) or "junk")
+        elif incoming_rating is not _RATING_UNSET:
+            # 材料处理每轮已有刚刷新的传入规则最高评级，只需把该值
+            # 作为 incoming 缓存种子；全部/自选规则仍按需懒算。
+            cache[("incoming", (), False)] = (
+                str(incoming_rating) if incoming_rating else "junk")
         label = equip_data.name or equip_data.type
 
         def rating_of(scope: str, keys: list[str],

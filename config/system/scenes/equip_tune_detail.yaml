@@ -3,7 +3,7 @@ key: equip_tune_detail
 name: 调律
 views:
 - key: base
-  name: 基底
+  name: 调律主页
 - key: result
   name: 调律结果
   same_layer: false
@@ -123,6 +123,12 @@ regions:
   is_clickable: true
   view: reset_tune
   to: /base
+- key: tune_label
+  name: 调律标签
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: base
 panels:
 - key: materials
   name: 材料格

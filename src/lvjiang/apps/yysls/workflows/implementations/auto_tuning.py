@@ -1267,41 +1267,35 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 status="skip_tuning", reason="测试开关已启用")
             return self._make_fingerprint(equip_data.to_dict()), None
 
-        # 进入调律页成功，缓存材料区 OCR（后续轮次复用，避免每轮 OCR）
-        self._emit_operation("material", "已进入调律页，正在读取材料库存")
-        self.executor.abort_reason = ""
-        self.executor.cache_equipment_materials()
-        initial_material_stop_reason = self.executor.abort_reason
-
         # 调律处理支撑：首词条快照（重置后仅剩首词条）+ 本件重置计数
         base_affixes = list(equip_data.affixes)
         resets_used = 0
         tune_recycle_reason = ""
         qualified_lock_reason = ""
-        # 结构化历史会话已在 material 阶段标记本件进入调律；逐轮与终态
-        # 均通过统一进度事件归档，匿名统计再从最近七天历史做白名单投影。
+        # 逐轮与终态通过统一进度事件归档，匿名统计再从
+        # 最近七天历史做白名单投影。材料检查不属于“进入页面”，
+        # 只在 tune_once 确认本轮即将执行真实调律时触发。
         stop_key = "completed"
 
         # 首次调律处理已在装备详情页纯判定；这里只消费
         # 已缓存决策中必须在调律页执行的动作（如重置）。
-        skip_tune_loop = bool(initial_material_stop_reason)
-        stop_reason = initial_material_stop_reason
-        if not skip_tune_loop:
-            action, why, resets_used, affix_count = self._execute_tuning_processing(
-                tune_cfg, equip_data, affix_count, resets_used, base_affixes,
-                potential=actual_potential, is_initial=True,
-                pre_decision=initial_decision, decision_emitted=True)
-            self.recorder.doc_note(f"首次调律处理：{why}")
-            if action == "continue":
-                if resets_used > 0:
-                    self.recorder.report_set("resets", resets_used)
-            else:
-                skip_tune_loop = True
-                if action == "recycle":
-                    tune_recycle_reason = f"首次调律处理：{why}"
-                stop_reason = f"首次调律处理：{why}"
-                stop_key = "judged_before_tuning"
-                self.recorder.report_set("stop_reason", stop_reason)
+        skip_tune_loop = False
+        stop_reason = ""
+        action, why, resets_used, affix_count = self._execute_tuning_processing(
+            tune_cfg, equip_data, affix_count, resets_used, base_affixes,
+            potential=actual_potential, is_initial=True,
+            pre_decision=initial_decision, decision_emitted=True)
+        self.recorder.doc_note(f"首次调律处理：{why}")
+        if action == "continue":
+            if resets_used > 0:
+                self.recorder.report_set("resets", resets_used)
+        else:
+            skip_tune_loop = True
+            if action == "recycle":
+                tune_recycle_reason = f"首次调律处理：{why}"
+            stop_reason = f"首次调律处理：{why}"
+            stop_key = "judged_before_tuning"
+            self.recorder.report_set("stop_reason", stop_reason)
 
         # 智能调律是调律处理放行后的二次判定。
         if not skip_tune_loop and not self.equipment_session.tune_full_recycle:
@@ -1982,8 +1976,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 previous_affix_count
                 if previous_affix_count is not None
                 else len(equip_data.affixes))
-            # 重置成功，重新缓存材料区（重置后材料数量已变化）
-            self.executor.cache_materials()
+            # 重置会改变材料数量，旧缓存已不可信。此时只作废；
+            # 若后续确实要执行调律，再由 tune_once 展开面板后读取。
+            self.executor.invalidate_cache()
             self._emit_progress("equipment_reset", {
                 "name": equip_data.name or equip_data.type,
                 "type": equip_data.type,

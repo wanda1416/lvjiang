@@ -355,7 +355,7 @@ class TuningTab(QWidget):
         layout.addWidget(self._skip_tuning_cb)
         self._validate_stone_cache_cb = QCheckBox(tr("运行时校验缓存"))
         self._validate_stone_cache_cb.setToolTip(tr(
-            "启用后，每实际进入 5 件装备调律时重新读取律准石；"
+            "启用后，每实际开始调律 5 件装备时重新读取律准石；"
             "有效读数与缓存相差超过 1 个大律准石时记录错误日志。"))
         self._validate_stone_cache_cb.stateChanged.connect(
             lambda _state: self._save_tuning_config())

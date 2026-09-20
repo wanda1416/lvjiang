@@ -154,7 +154,7 @@ class TuningExecutor:
         self._entered_tuning_equipment = 0
 
     def cache_equipment_materials(self) -> None:
-        """记录一次实际进入调律页，并读取本件装备的材料区。"""
+        """记录一件装备实际开始调律，并准备材料缓存。"""
         self._activate_material_level()
         self._entered_tuning_equipment += 1
         validate_cache = (
@@ -164,11 +164,12 @@ class TuningExecutor:
         self.cache_materials(validate_stone_cache=validate_cache)
 
     def cache_materials(self, *, validate_stone_cache: bool = False):
-        """进入调律页或重置后调用：OCR 材料区一次并缓存
+        """真实调律前调用：按需 OCR 材料区并缓存。
 
         缓存大律准石、小律准石和三种狗粮的数值，后续调律轮次
         直接使用缓存，避免每轮重复 OCR。狗粮每轮 -1 由
-        decrement_food() 维护；重置或退出调律页后需重新调用本方法刷新。
+        decrement_food() 维护；重置或退出调律页后只作废缓存，
+        下一次真实调律前再刷新。
 
         ⚠️ 材料区在场小律准石时缓存**只能用一轮**：一键添加会把小律准石
         一次性用光，图标随之从材料区消失，它后面的槽位整体左移一格，
@@ -500,12 +501,25 @@ class TuningExecutor:
             self.abort_reason = "未找到「添加」入口"
             return None
 
-        # 使用缓存的材料数据：大律准石检查 + 逐轮狗粮决策共用
-        # 缓存由 cache_materials() 在进入调律页/重置后刷新，
+        # 只有走到真实调律入口才准备材料。满词条的定音页、
+        # 重置检查和未来自动定音可以共用页面，但不会因此读取律准石。
+        # 首先确认添加入口；若材料区折叠，上面已展开并等待稳定。
+        if round_no == 1:
+            emit_operation = getattr(wf, "_emit_operation", None)
+            if callable(emit_operation):
+                emit_operation(
+                    "material", "即将开始调律，正在读取材料库存",
+                    round_no=round_no)
+            self.cache_equipment_materials()
+        else:
+            self.ensure_materials_cached()
+        if self.abort_reason or self.materials_exhausted:
+            return None
+
+        # 使用缓存的材料数据：大律准石检查 + 逐轮狗粮决策共用。
         # 每轮调律后由 decrement_food() 扣减狗粮数量。
         # 上一轮若在场小律准石，缓存已被置为失效，这里重新识别一次——
         # 槽位可能因小律准石耗尽而整体左移，旧坐标不能再用。
-        self.ensure_materials_cached()
         settings = self._wf.base_group.materials
         infos = self._material_cache
         if not self._check_stone_stock(settings, infos):

@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps.yysls.core.tuning_rules import (
+    QUALITY_PARTS,
     TuneConfigManager,
     TuningGroupManager,
     TuningRuleManager,
@@ -283,6 +284,34 @@ class TestBehaviorPages:
         page._table.setCurrentCell(before, 0)
         page._on_del_rule()
         assert len(tmp_group_manager.get_group("default").scan.rules) == before
+
+    @pytest.mark.parametrize(
+        ("page_type", "stage_name"),
+        [(ScanBehaviorPage, "scan"), (TuneBehaviorPage, "tune")],
+    )
+    def test_move_rule_preserves_all_parts(self, qtbot, tmp_group_manager,
+                                           page_type, stage_name):
+        """规则移动往返时，持久化简写「全部」仍须回填为部位全选。"""
+        statuses: list[tuple[str, bool]] = []
+        page = page_type(tmp_group_manager, "default",
+                         lambda t, e: statuses.append((t, e)))
+        qtbot.addWidget(page)
+
+        parts = page._table.cellWidget(0, page._ci["parts"])
+        assert parts.selected() == list(QUALITY_PARTS)
+        assert "全部" in parts.text()
+
+        page._table.selectRow(0)
+        page._on_move_down()
+
+        moved_parts = page._table.cellWidget(1, page._ci["parts"])
+        assert moved_parts.selected() == list(QUALITY_PARTS)
+        assert "全部" in moved_parts.text()
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        stage = getattr(tmp_group_manager.get_group("default"), stage_name)
+        assert stage.rules[1].parts == list(QUALITY_PARTS)
+        assert (tmp_group_manager.get_raw("default")[stage_name]
+                ["rules"][1]["parts"] == ["全部"])
 
     def test_tune_page_roundtrip(self, qtbot, tmp_group_manager):
         statuses: list[tuple[str, bool]] = []

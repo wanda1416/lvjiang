@@ -1,9 +1,9 @@
 """RoleAttrParser（角色基础属性 OCR 数据转换器）测试
 
-用真实滚动识别样例（7 屏 detail_1 + 3 段 detail_2）覆盖：
+用真实滚动识别样例（7 屏 detail_1 + 4 段 detail_2）覆盖：
 - merge_scroll_snapshots 的跨屏去重拼接（含边界跳跃噪声 token、原地重复幂等）
 - parse_detail1 的已知字段提取（区间、百分号取白字、通用兜底 key）
-- parse_detail2_attack / outer_pen / attr_pen 的分流派数值提取
+- parse_detail2_outer_attack / attack / outer_pen / attr_pen 的详情数值提取
 - RoleAttrParser.parse 整链（detail_2 覆盖 detail_1 兜底值）
 """
 
@@ -15,8 +15,10 @@ from lvjiang.apps.yysls.core.role_attr_parser.parser import (
     parse_detail1,
     parse_detail2_attack,
     parse_detail2_attr_pen,
+    parse_detail2_outer_attack,
     parse_detail2_outer_pen,
 )
+from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 
 # 真实滚动识别样例（角色详情页，属性面板_左，向上拖拽 0.5 屏/次）
 LEFT_SNAPSHOTS = [
@@ -36,6 +38,12 @@ RIGHT_ATTACK = (
     "无相攻击：0-0(可根据当前使用武学，提升 | 相应流派属性攻击) | 除无相攻击以外的任意类型属攻，在不计算 | "
     "无相攻击动态提升数值的前提下，如果最小"
 )
+RIGHT_OUTER_ATTACK = (
+    "3769 外功攻击 | 影响攻击造成外功伤害的能力。 | "
+    "基础外功攻击：3769-3120 | 生效外功攻击：4210-3890（可通过使用增 | "
+    "益食物提升) | 当前生效最小外功攻击大于生效最大外功攻 | "
+    "击，将造成固定伤害 | 获取途径 | 角色升级。"
+)
 RIGHT_OUTER_PEN = (
     "0.0 | 外功穿透 | 提升外功攻击造成伤害和治疗的能力。 | 伤害提升会受外功抗性影响 | "
     "当前外功穿透(定音部分)：0.0 | 当前外功穿透(非定音部分)：0.0 | 同等级段对抗生效外功穿透：0.0 | "
@@ -52,6 +60,7 @@ RIGHT_ATTR_PEN = (
 
 def _raw_dict() -> dict:
     raw = {f"left_{i + 1}": text for i, text in enumerate(LEFT_SNAPSHOTS)}
+    raw["right_outer_attack"] = RIGHT_OUTER_ATTACK
     raw["right_attack"] = RIGHT_ATTACK
     raw["right_outer_pen"] = RIGHT_OUTER_PEN
     raw["right_attr_pen"] = RIGHT_ATTR_PEN
@@ -102,8 +111,8 @@ class TestParseDetail1:
 
     def test_constant_value_arrow_notation(self):
         """min > max 时游戏改用"箭头 + 单值"展示恒定值（"← 3713"），
-        而不是常规的 "min-max" 区间格式 —— 之前会被 _split_range 判定为
-        不匹配、整个字段丢失，现在应解析为 min=max=该值。"""
+        而不是常规的 "min-max" 区间格式。该值只能确认最小外功攻击，
+        最大值必须从右区“基础外功攻击”读取，不能再复制成同一个值。"""
         snapshot = (
             "战斗属性 | 角色状态 | 280 | 基础属性 | 气血最大值 | 251548(301858) | "
             "真气最大值 | 100 | 外功攻击 | ← 3713 | 属性攻击 | 763-1551 | "
@@ -112,7 +121,7 @@ class TestParseDetail1:
         tokens = merge_scroll_snapshots([snapshot])
         result = parse_detail1(tokens)
         assert result["min_outer"] == 3713.0
-        assert result["max_outer"] == 3713.0
+        assert "max_outer" not in result
 
     def test_percent_takes_white_text_not_parenthetical(self):
         """"114.2%(94.8%)" 取括号外的白字数值 114.2，不是括号内的 94.8"""
@@ -145,6 +154,29 @@ class TestParseDetail1:
 
 
 # ─── parse_detail2_* ──────────────────────────────────────
+
+class TestParseDetail2OuterAttack:
+    def test_extracts_base_range_without_reordering(self):
+        result = parse_detail2_outer_attack(RIGHT_OUTER_ATTACK)
+        assert result == {"min_outer": 3769.0, "max_outer": 3120.0}
+
+    def test_ignores_effective_range_without_base_label(self):
+        assert parse_detail2_outer_attack(
+            "生效外功攻击：3769-3120 | 当前造成固定伤害"
+        ) == {}
+
+
+def test_scan_reads_outer_attack_before_attribute_attack():
+    """先保存不受食物影响的基础外功区间，再读取各流派属性攻击。"""
+    workflow = (
+        SYSTEM_CONFIG_DIR / "workflows/standalone/scan_role_base_attr.wf"
+    ).read_text(encoding="utf-8")
+
+    outer_find = 'by contains "外功攻击"'
+    attr_find = 'by contains "属性攻击"'
+    assert workflow.index(outer_find) < workflow.index(attr_find)
+    assert "eval $data.right_outer_attack = $r2.detail_2" in workflow
+
 
 class TestParseDetail2Attack:
     def test_extracts_all_schools(self):
@@ -229,8 +261,8 @@ class TestParseDetail2AttrPen:
 class TestParseIntegration:
     def test_full_pipeline(self, parser):
         result = parser.parse(_raw_dict())
-        assert result["min_outer"] == 900.0
-        assert result["max_outer"] == 2604.0
+        assert result["min_outer"] == 3769.0
+        assert result["max_outer"] == 3120.0
         assert result["precision"] == 114.2
         assert result["min_mingjin"] == 170.0
         assert result["max_mingjin"] == 343.0
@@ -249,6 +281,13 @@ class TestParseIntegration:
         result = parser.parse(raw)
         # 无 detail_2 时用 detail_1 里"外功穿透"headline 兜底
         assert result["outer_pen"] == 0.0
+
+    def test_missing_outer_attack_detail_keeps_normal_left_range(self, parser):
+        raw = _raw_dict()
+        del raw["right_outer_attack"]
+        result = parser.parse(raw)
+        assert result["min_outer"] == 900.0
+        assert result["max_outer"] == 2604.0
 
     def test_missing_detail2_no_school_breakdown(self, parser):
         raw = _raw_dict()

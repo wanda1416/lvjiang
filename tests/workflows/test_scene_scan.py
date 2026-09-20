@@ -284,6 +284,39 @@ def test_daily_jianghu_claim_reputation_guard():
     assert "context.mode_checked" not in text
 
 
+def test_daily_jianghu_restores_single_mode_only_after_switching():
+    """合影切到多人模式后，收尾必须切回单人并确认主页；未切换过则不动模式。
+
+    单人 / 多人两个方向结构对称，只保留一个按目标参数化的切换过程。
+    """
+    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
+    text = wf.read_text(encoding="utf-8")
+    assert "switch_to_multi_mode" not in text
+    assert "def switch_game_mode($target)" in text
+    switch = text[text.index("def switch_game_mode("):text.index("def restore_single_mode(")]
+    assert 'eval $mode_key = $target + "_mode"' in switch
+    assert "click [game_menu_page].$mode_key" in switch
+    assert "[mp_mode]" not in switch and "[sp_mode]" not in switch
+
+    # 只有真正执行了切换才记为需要恢复
+    nav = text[text.index("def back_to_haoling("):]
+    switched = nav.index('call $switched = switch_game_mode("mp")')
+    guard = nav.index("if $switched", switched)
+    mark = nav.index("eval $mode_switched = true", guard)
+    assert switched < guard < mark
+
+    # 收尾：退回主页之后、任何 def 之前，切换过才切回
+    tail = text[text.index('log "六个任务刷新处理完成"'):text.index("def is_task_completed(")]
+    back = tail.index("click [game_menu_page].[back]")
+    restore = tail.index("if $mode_switched", back)
+    assert "call restore_single_mode()" in tail[restore:]
+
+    body = text[text.index("def restore_single_mode("):text.index("def back_to_haoling(")]
+    assert 'call $switched = switch_game_mode("sp")' in body
+    assert body.index("call $nav_result = nav_main_to_menu()") < body.index('switch_game_mode("sp")')
+    assert body.index('switch_game_mode("sp")') < body.index("call $in_main = is_in_main_page()")
+
+
 def test_daily_jianghu_exposes_independent_user_facing_task_toggles():
     """六项任务独立勾选；界面名称与内部 OCR 关键词明确解耦。"""
     wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"

@@ -63,6 +63,8 @@ def test_successful_reset_splits_before_and_after_cooldown_results():
     assert before.round_details[0]["food_used"] == "金狗粮"
     assert before.round_details[0]["food_reason"] == "预期优秀，添加金狗粮"
     assert before.round_details[0]["completed"] is True
+    assert before.final_rating == ""
+    assert before.telemetry_final_rating == ""
     assert before.telemetry_stop_reason == "reset_completed"
     assert before.cooldown_kind == "reset"
     assert before.cooldown_state == "completed"

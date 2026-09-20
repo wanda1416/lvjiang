@@ -16,7 +16,7 @@ import pytest
 
 import lvjiang.apps.yysls.workflows.builtins.equipment  # noqa: F401
 from lvjiang.apps.yysls.config import LevelConfig
-from lvjiang.apps.yysls.core.equip_parser import EquipmentData
+from lvjiang.apps.yysls.core.equip_parser import Affix, EquipmentData
 from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
 from lvjiang.apps.yysls.core.tuning_rules import (
     BehaviorRule,
@@ -288,6 +288,19 @@ def patch_worth(monkeypatch):
     """默认：值得调律（血河 顶级）；终局判定返回同一结构"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_WORTHY))
+
+
+@pytest.fixture
+def patch_collect_affix(monkeypatch):
+    """模拟每轮都成功解析出一个新词条，供调满路径使用。"""
+    def collect(_self, equip_data, _text):
+        index = len(equip_data.affixes) + 1
+        affix = Affix(name=f"测试词条{index}", value=float(index))
+        equip_data.affixes.append(affix)
+        equip_data.extra_data["affix_count"] = len(equip_data.affixes)
+        return f"{affix.name} {affix.value:g}"
+
+    monkeypatch.setattr(TuningNavigator, "collect_new_affix", collect)
 
 
 def test_android_route_restores_detail_menu():
@@ -587,10 +600,10 @@ def test_no_tune_entry(patch_worth):
     assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 2
 
 
-def test_worth_tuned_to_full(patch_worth, monkeypatch):
+def test_worth_tuned_to_full(patch_worth, patch_collect_affix, monkeypatch):
     """值得 → 调律循环到 5 条 → tuned + 返回 back。
 
-    调律处理默认关 → 每轮走默认「继续调律」，词条满默认结束并锁定。
+    调律处理默认关 → 每轮走默认「继续调律」，词条满默认结束并保留。
     石头检查等材料配置注入代码默认值，不读真实 yaml（开关变更不应破测）。
     """
     wf = FakeWF()
@@ -608,9 +621,9 @@ def test_worth_tuned_to_full(patch_worth, monkeypatch):
     assert (TUNE_SCENE, "back") in wf.clicks   # 单次 back 返回背包页
     # back 回背包后再点一次「更多」收起弹窗 → more_func 共 2 次（展开 + 收起）
     assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 2
-    # 词条满 → 调律处理默认结束并锁定，不回收
-    assert "结束并锁定装备" in reports[0]["stop_reason"]
-    assert (EQUIP_DETAIL, "lock") in wf.clicks
+    # 无规则命中不能证明装备合格：词条满后只结束保留，不自动锁定
+    assert "结束并保留装备" in reports[0]["stop_reason"]
+    assert (EQUIP_DETAIL, "lock") not in wf.clicks
     assert "recycled_items" not in wf.output
     # 每轮调律结果挂在本件 report 下，与装备一一对应（不再全局平铺）
     assert len(reports[0]["tune_results"]) == 3
@@ -618,7 +631,7 @@ def test_worth_tuned_to_full(patch_worth, monkeypatch):
 
 
 def test_worth_tuned_to_full_does_not_unlock_existing_lock(
-        patch_worth, monkeypatch):
+        patch_worth, patch_collect_affix, monkeypatch):
     """关闭锁定保护也只允许处理装备，成品锁定必须保持幂等。"""
     wf = FakeWF()
     wf.run_ctx.skip_locked_equipment = False
@@ -634,6 +647,63 @@ def test_worth_tuned_to_full_does_not_unlock_existing_lock(
     assert reports[0]["rounds"] == 3
     assert reports[0]["final_affix_count"] == 5
     assert (EQUIP_DETAIL, "lock") not in wf.clicks
+
+
+def test_only_explicit_continue_with_excellent_final_rating_locks(
+        patch_worth, patch_collect_affix):
+    """锁定资格来自传入规则的满词条最终评级，不来自最大预期或默认分支。"""
+    base = _behavior_base(tune=TuneBehavior(
+        enabled=True,
+        rules=[BehaviorRule(ratings=["top"], action="continue")],
+    ))
+    wf = _wf_with(base)
+    wf._ocr_map[TUNE_SCENE] = {
+        "auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
+        "tune_affix": "最大外功攻击 100", "tune_tip": "",
+    }
+    equip = _equip(2, quality="gold", cap_pct=50)
+    equip["lock_status"] = "unlock"
+
+    wf._process_equipment("优秀剑", equip, WEAPON_DETAIL)
+
+    assert (EQUIP_DETAIL, "lock") in wf.clicks
+    report = wf.output["tuning_reports"][0]
+    assert report["final_affix_count"] == 5
+    assert report["final_judgement"]
+
+
+def test_continue_rule_does_not_lock_normal_final_rating(
+        monkeypatch, patch_collect_affix):
+    """命中 continue 也不能让普通最终评级获得自动锁定资格。"""
+    normal = {
+        "s": {"name": "血河", "rating": "一般", "skipped": False,
+              "not_applicable": False, "reasons": ["最终仅为一般"]},
+    }
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: normal)
+    monkeypatch.setattr(tuning_judge, "judge_equipment_potential",
+                        lambda *a, **k: normal)
+    base = _behavior_base(
+        scan=ScanBehavior(entry_min_rating="normal"),
+        tune=TuneBehavior(
+            enabled=True,
+            rules=[BehaviorRule(ratings=["normal"], action="continue")],
+        ),
+    )
+    wf = _wf_with(base)
+    wf._ocr_map[TUNE_SCENE] = {
+        "auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
+        "tune_affix": "最大外功攻击 100", "tune_tip": "",
+    }
+    equip = _equip(2, quality="gold", cap_pct=50)
+    equip["lock_status"] = "unlock"
+
+    wf._process_equipment("普通剑", equip, WEAPON_DETAIL)
+
+    assert (EQUIP_DETAIL, "lock") not in wf.clicks
+    report = wf.output["tuning_reports"][0]
+    assert report["final_affix_count"] == 5
+    assert "最终评级未达优秀" in report["stop_reason"]
 
 
 def test_food_skip_rule_stops_equipment(patch_worth, monkeypatch):
@@ -1667,8 +1737,8 @@ def test_tune_skip_ends_keeps(monkeypatch):
     assert "recycled_items" not in wf.output
 
 
-def test_tune_reset_restores_and_retunes(monkeypatch):
-    """首次调律处理重置后，从首词条继续调满并锁定合格装备。"""
+def test_tune_reset_restores_and_retunes(monkeypatch, patch_collect_affix):
+    """首次调律处理重置后，从首词条继续调满并形成最终评级。"""
     calls = {"n": 0}
 
     def judge(*a, **k):
@@ -1698,7 +1768,8 @@ def test_tune_reset_restores_and_retunes(monkeypatch):
     assert reports[0]["resets"] == 1
     assert reports[0]["rounds"] == 4              # 重置不是调律轮次，1→5 共 4 轮
     assert reports[0]["final_affix_count"] == 5   # 重置后继续调到满
-    assert "锁定装备" in reports[0]["stop_reason"]
+    assert "结束并保留装备" in reports[0]["stop_reason"]
+    assert (EQUIP_DETAIL, "lock") not in wf.clicks
     assert (TUNE_SCENE, "reset_tune") in wf.clicks
     assert (TUNE_SCENE, "reset_confirm") in wf.clicks
     assert (CONTROL_SCENE, "confirm") in wf.clicks
@@ -2454,7 +2525,8 @@ def test_new_rows_recycled_empty_slot_stops():
 class TestTuningDocIntegration:
     """调律说明文档端到端：假流程注入 ctx.doc_dir 后跑通并检查叙事内容"""
 
-    def test_doc_written_only_for_tuned(self, monkeypatch, tmp_path):
+    def test_doc_written_only_for_tuned(
+            self, monkeypatch, patch_collect_affix, tmp_path):
         """好剑调律到满写入文档；垃圾剑被跳过完全不出现在文档中"""
         monkeypatch.setattr(
             auto_tuning, "judge_equipment_potential",
@@ -2485,11 +2557,11 @@ class TestTuningDocIntegration:
         assert "## 1. 好剑 · 剑（110级 金色）" in text
         assert "- 血河：顶级（词条匹配）" in text
         assert "狗粮策略：" in text
-        assert "第 1 轮：一键添加律准石 → 新词条「最大外功攻击 100」" in text
+        assert "第 1 轮：一键添加律准石 → 新词条「测试词条3 3」" in text
         assert "  → 无行为规则命中 → 继续调律" in text
-        assert "  → 词条已满，无行为规则命中 → 结束并锁定装备" in text
+        assert "  → 词条已满，无行为规则命中 → 结束并保留装备" in text
         assert ("本件小结：共 3 轮，词条 5/5，结束原因："
-                "词条已满，无行为规则命中 → 结束并锁定装备") in text
+                "词条已满，无行为规则命中 → 结束并保留装备") in text
         # 运行小结
         assert "## 运行结束" in text
         assert "（正常完成）" in text
@@ -2508,7 +2580,10 @@ class TestTuningDocIntegration:
         def _report(name, judgement):
             return {"name": name, "type": "剑", "level": 110,
                     "quality": "gold", "final_judgement": judgement,
-                    "final_affixes": [{"name": "劲", "value": 10}]}
+                    "final_affixes": [
+                        {"name": f"词条{i}", "value": 10}
+                        for i in range(1, 6)
+                    ]}
 
         def _j(rating, skipped=False, na=False):
             return {"name": "血河", "rating": rating,
@@ -2525,6 +2600,8 @@ class TestTuningDocIntegration:
                      "b": {"name": "会意", "rating": "优秀",
                            "skipped": False, "not_applicable": False,
                            "reasons": []}}),
+            {**_report("未满剑", {"s": _j("优秀")}),
+             "final_affixes": [{"name": "劲", "value": 10}]},
         ]
         items = TuningRecorder.summary_items(tuned)
         assert [i["name"] for i in items] == ["顶级剑", "一般剑", "双规则剑"]

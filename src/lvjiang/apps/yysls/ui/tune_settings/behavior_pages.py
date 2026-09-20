@@ -959,10 +959,12 @@ class TuneBehaviorPage(_BehaviorPageBase):
         layout.addLayout(head)
 
         lock_row = QHBoxLayout()
-        self._lock_qualified_cb = QCheckBox(tr("锁定合格装备"))
+        self._lock_qualified_cb = QCheckBox(tr("锁定优秀及以上装备"))
         self._lock_qualified_cb.setToolTip(
-            tr("装备至少完成一轮调律后，若词条已满且无规则命中，\n"
-               "或命中“继续调律或锁定”，返回装备详情页后自动锁定。\n"
+            tr("装备至少完成一轮调律后，若词条已满且明确命中\n"
+               "“继续调律或锁定”规则，并且传入规则的最终评级达到\n"
+               "优秀或顶级，返回装备详情页后自动锁定。\n"
+               "无规则命中只结束并保留，不会自动锁定。\n"
                "已锁定装备不会再点击，避免误解锁。"))
         self._lock_qualified_cb.stateChanged.connect(lambda _s: self._apply())
         lock_row.addWidget(self._lock_qualified_cb)

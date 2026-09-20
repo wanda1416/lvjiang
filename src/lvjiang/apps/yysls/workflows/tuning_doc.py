@@ -144,13 +144,16 @@ class TuningDocWriter:
         """本件收尾：最终评级（有效结论，不写"不适用"）+ 小结"""
         self._write()
         lines = []
-        for r in (judgement or {}).values():
-            if r.get("not_applicable"):
-                continue
-            tag = tr("跳过") if r.get("skipped") else r.get("rating", "")
-            detail = "；".join(r.get("reasons") or [])
-            lines.append(f"{r['name']}：{tag}（{detail}）")
-        final_rating_str = '；'.join(lines) if lines else tr('无有效结论')
+        if affix_count >= 5:
+            for r in (judgement or {}).values():
+                if r.get("not_applicable"):
+                    continue
+                tag = tr("跳过") if r.get("skipped") else r.get("rating", "")
+                detail = "；".join(r.get("reasons") or [])
+                lines.append(f"{r['name']}：{tag}（{detail}）")
+            final_rating_str = '；'.join(lines) if lines else tr('无有效结论')
+        else:
+            final_rating_str = tr("未评级（词条未满）")
         self._write(f"最终评级：{final_rating_str}")
         self._write(f"本件小结：共 {rounds} 轮，词条 {affix_count}/5，"
                     f"结束原因：{stop_reason}")

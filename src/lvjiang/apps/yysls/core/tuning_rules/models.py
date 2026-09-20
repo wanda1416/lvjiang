@@ -508,7 +508,7 @@ BEHAVIOR_STAGE_ACTIONS = {
 BEHAVIOR_STAGE_LABELS = {"scan": "扫描处理", "tune": "调律处理"}
 # 动作说明（供 UI tooltip 显示）
 BEHAVIOR_ACTION_TOOLTIPS = {
-    "continue": "继续调律或锁定：词条未满时继续，词条满后结束并按设置锁定装备，不执行后续规则",
+    "continue": "继续调律或锁定：词条未满时继续；词条满后结束，仅在传入规则最终评级达到优秀且已开启设置时锁定",
     "reset": "重置装备：清空首词条以外的全部词条后继续（冷却期限制，每件限一次）",
     "recycle": "回收装备：分解为材料",
     "skip": "跳过该装备：结束保留在背包",
@@ -723,8 +723,8 @@ class TuneBehavior:
     每轮 decide 时评级按各规则自身判定语义懒取；词条满为边界
     条件：full=True 时 continue 动作自动转为 lock/skip，并以该规则
     作为最终命中结果，不再继续匹配后续规则。
-    无命中默认：未满=继续调律；满时按 lock_qualified 决定锁定或
-    跳过；未启用同默认。
+    无命中默认：未满=继续调律；满=结束并保留。自动锁定只能来自
+    明确命中的 continue 规则，不能由“词条已满”本身推导；未启用同默认。
     max_resets: 单件装备重置次数上限（按钮文本携带剩余次数另作
     硬门，不超过游戏硬限 MAX_TUNE_RESETS）；
     reset_exhausted_action: 规则命中重置但重置**确定且永久**不可用时的
@@ -741,12 +741,10 @@ class TuneBehavior:
     def decide(self, part: str | None, quality: str | None,
                cap_pct: float | None, rating_of: RatingProvider,
                full: bool,
-               affix_names: list[str] | None = None) -> tuple[str, str]:
+               affix_names: list[str] | None = None,
+               final_rating: str | None = None) -> tuple[str, str]:
         """返回 (动作, 决策说明)；满词条可能返回内部动作 lock。"""
-        default = ((("lock" if self.lock_qualified else "skip"),
-                    tr("词条已满，无行为规则命中 → 结束并锁定装备")
-                    if self.lock_qualified else
-                    tr("词条已满，无行为规则命中 → 跳过该装备"))
+        default = (("skip", tr("词条已满，无行为规则命中 → 结束并保留装备"))
                    if full else ("continue", tr("无行为规则命中 → 继续调律")))
         if not self.enabled:
             return default
@@ -756,12 +754,26 @@ class TuneBehavior:
                          affix_names)
         if hit:
             idx, rule = hit
-            # continue 动作在词条满时按自动锁定开关转为 lock/skip
-            action = (("lock" if self.lock_qualified else "skip")
-                      if full and rule.action == "continue"
-                      else rule.action)
-            label = (tr("锁定合格装备") if action == "lock"
-                     else BEHAVIOR_ACTION_LABELS.get(action, action))
+            action = rule.action
+            label = BEHAVIOR_ACTION_LABELS.get(action, action)
+            if full and rule.action == "continue":
+                # 满词条后只有传入规则形成的最终评级有效。行为规则自身
+                # 使用的 judge_scope 可能是全部/自选规则，不能拿来授权锁定。
+                excellent = (
+                    final_rating in RATING_RANK
+                    and RATING_RANK[final_rating] >= RATING_RANK["excellent"]
+                )
+                if self.lock_qualified and excellent:
+                    action = "lock"
+                    label = tr("锁定优秀及以上装备")
+                else:
+                    action = "skip"
+                    if not self.lock_qualified:
+                        label = tr("结束并保留装备")
+                    elif final_rating in RATING_LABELS:
+                        label = tr("最终评级未达优秀 → 结束并保留装备")
+                    else:
+                        label = tr("尚无最终评级 → 结束并保留装备")
             return action, (
                 f"规则{idx}（{rule.summary()}）命中 → {label}")
         return default

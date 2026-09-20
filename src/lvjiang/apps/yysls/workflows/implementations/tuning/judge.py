@@ -183,13 +183,19 @@ class TuningJudge:
     ) -> BehaviorDecision:
         """纯单轮结束行为决策；不执行重置、回收或继续动作。"""
         part, quality, cap_pct = self.recycle_inputs(equip_data)
+        rating_of = self.rating_provider(equip_data, incoming)
+        final_rating = (
+            rating_of("incoming", [], False)
+            if len(equip_data.affixes) >= 5 else None
+        )
         action, reason = config.decide(
             part,
             quality,
             cap_pct,
-            self.rating_provider(equip_data, incoming),
+            rating_of,
             full,
             [affix.name for affix in equip_data.affixes],
+            final_rating,
         )
         return BehaviorDecision.from_raw(action, reason)
 

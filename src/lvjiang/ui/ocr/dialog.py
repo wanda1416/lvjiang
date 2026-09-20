@@ -303,8 +303,9 @@ class OCRDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         layout.addWidget(QLabel(
-            tr("清洗规则只在 scan/find 的 with 声明或 Python OCR 调用显式选择后生效。\n"
-               "改完点「保存」后生效，无需重启；未保存的修改可以用「撤销」恢复。")
+            tr("默认规则对所有 OCR 全局生效；scan/find 的 with 声明会在默认规则后"
+               "叠加所选业务规则组。\n改完点「保存」后生效，无需重启；未保存的"
+               "修改可以用「撤销」恢复。")
         ))
 
         group_row = QHBoxLayout()
@@ -312,6 +313,7 @@ class OCRDialog(QDialog):
         self._cleaning_group_combo = QComboBox()
         self._cleaning_group_combo.setMinimumWidth(240)
         cleaner = OCRCleaner()
+        self._cleaning_group_combo.addItem(tr("默认规则（全局）"), None)
         for key, config in cleaner.get_groups().items():
             self._cleaning_group_combo.addItem(
                 str(config.get("label") or key), key)
@@ -450,6 +452,7 @@ class OCRDialog(QDialog):
         # 载入已保存的规则。填表会触发 cellChanged，_refresh_rules_tables 内部
         # 已屏蔽信号；这里再显式清一次脏标记，保证刚打开时「保存」是灰的。
         self._refresh_rules_tables()
+        self._update_cleaning_group_actions()
         self._set_rules_dirty(False)
 
         return widget
@@ -489,9 +492,18 @@ class OCRDialog(QDialog):
 
     # ─── 清洗规则：脏标记与存取 ──────────────────────────────
 
-    def _current_cleaning_group(self) -> str:
+    def _current_cleaning_group(self) -> str | None:
         combo = getattr(self, "_cleaning_group_combo", None)
-        return str(combo.currentData()) if combo is not None else "equip"
+        if combo is None:
+            return None
+        data = combo.currentData()
+        return str(data) if data is not None else None
+
+    def _update_cleaning_group_actions(self) -> None:
+        """默认规则固定存在，不能重命名或删除。"""
+        editable_group = self._current_cleaning_group() is not None
+        self._btn_rename_cleaning_group.setEnabled(editable_group)
+        self._btn_delete_cleaning_group.setEnabled(editable_group)
 
     def _select_cleaning_group(self, key: str) -> None:
         index = self._cleaning_group_combo.findData(key)
@@ -532,6 +544,8 @@ class OCRDialog(QDialog):
             self._status_label.setText(tr("请先保存或取消当前清洗组的修改"))
             return
         key = self._current_cleaning_group()
+        if key is None:
+            return
         current = self._cleaning_group_combo.currentText()
         label, ok = QInputDialog.getText(
             self, tr("重命名规则组"), tr("规则组名称："), text=current)
@@ -551,6 +565,8 @@ class OCRDialog(QDialog):
             self._status_label.setText(tr("请先保存或取消当前清洗组的修改"))
             return
         key = self._current_cleaning_group()
+        if key is None:
+            return
         label = self._cleaning_group_combo.currentText()
         reply = QMessageBox.question(
             self, tr("删除规则组"),
@@ -574,6 +590,7 @@ class OCRDialog(QDialog):
             self._repl_table.setRowCount(0)
             self._pattern_table.setRowCount(0)
         self._status_label.setText(tr("规则组已删除"))
+        self._update_cleaning_group_actions()
 
     def _on_cleaning_group_changed(self, _index: int) -> None:
         if getattr(self, "_rules_dirty", False):
@@ -585,6 +602,7 @@ class OCRDialog(QDialog):
             return
         self._last_cleaning_group_index = self._cleaning_group_combo.currentIndex()
         self._refresh_rules_tables()
+        self._update_cleaning_group_actions()
 
     def _set_rules_dirty(self, dirty: bool):
         """更新未保存标记：没有改动时「保存」置灰，避免空保存又写一份影子"""

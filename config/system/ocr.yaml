@@ -5,6 +5,13 @@ recognition:
     max_content_height: 1200
     gap: 16
 normalization:
+  default:
+    replacements: {}
+    patterns:
+      '[【［]': '['
+      '[】］]': ']'
+      （: (
+      ）: )
   groups:
     equip:
       label: 装备词条
@@ -17,8 +24,4 @@ normalization:
         缚祷: 缚袴
         率丝: 牵丝
       patterns:
-        '[【［]': '['
-        '[】］]': ']'
-        （: (
-        ）: )
         '[荐存·]': ''

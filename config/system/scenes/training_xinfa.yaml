@@ -3,7 +3,7 @@ key: training_xinfa
 name: 心法
 views:
 - key: base
-  name: 基底
+  name: 心法详情
 - key: zhihuan
   name: 心得置换
 - key: purchase_confirm
@@ -98,6 +98,12 @@ regions:
   is_clickable: true
 - key: num
   name: 可换数量
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: zhihuan
+- key: stock_of_week
+  name: 周库存
   type: attr
   is_text: true
   is_clickable: false

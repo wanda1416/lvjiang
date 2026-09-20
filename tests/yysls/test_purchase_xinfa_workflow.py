@@ -6,6 +6,7 @@ from pathlib import Path
 from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import (
     Break,
+    CallProc,
     If,
     PanelGridDrag,
     Recognize,
@@ -114,3 +115,25 @@ def test_bag_xinfa_checks_specific_confirm_and_watches_menu_area():
     assert stable_waits
     assert all(wait.area.scene == "general_control" for wait in stable_waits)
     assert all(wait.area.entity == "menu_area" for wait in stable_waits)
+
+
+def test_weekly_stock_is_scanned_before_and_after_purchase_loop():
+    """周库存只在循环入口和统一出口各同步一次，退出分支不得绕过末次扫描。"""
+    program = parse_file(_WORKFLOW)
+    stock_scans = [
+        node for node in program.body
+        if isinstance(node, Scan)
+        and node.fields
+        and node.fields[0].value == "stock_of_week"
+    ]
+    sync_calls = [
+        node for node in program.body
+        if isinstance(node, CallProc)
+        and node.name == "sync_weekly_remaining"
+    ]
+    loops = [node for node in program.body if isinstance(node, WhileLoop)]
+
+    assert len(stock_scans) == 2
+    assert len(sync_calls) == 2
+    assert len(loops) == 1
+    assert sum(isinstance(node, Break) for node in _walk(loops[0].body)) == 2

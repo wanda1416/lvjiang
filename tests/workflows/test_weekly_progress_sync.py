@@ -12,12 +12,16 @@ def test_weekly_progress_uses_one_shared_parser_and_sync_path():
     )
     daily = (_WORKFLOWS / "daily_jianghu.wf").read_text(encoding="utf-8")
     purchase = (_WORKFLOWS / "purchase_bugan.wf").read_text(encoding="utf-8")
+    xinfa = (_WORKFLOWS / "purchase_xinfa.wf").read_text(encoding="utf-8")
     wallet = (_WORKFLOWS / "scan_wallet.wf").read_text(encoding="utf-8")
     huaruizhi = (_WORKFLOWS / "weekly_huaruizhi.wf").read_text(encoding="utf-8")
 
     assert "def sync_weekly_progress(" in common
     assert "extract_progress($raw)" in common
     assert "profile_observe($key, $current)" in common
+    assert "def sync_weekly_remaining(" in common
+    assert "$consumed = $expected_total - $progress.current" in common
+    assert "profile_observe($key, $consumed)" in common
     assert "split($raw" not in common
     assert '$raw contains "|"' not in common
 
@@ -27,3 +31,6 @@ def test_weekly_progress_uses_one_shared_parser_and_sync_path():
     assert "parse_bugan_jindu" not in purchase
     assert "parse_bugan_jindu" not in wallet
     assert "sync_weekly_progress($progress.huaruizhi_of_week" in huaruizhi
+    assert xinfa.count("sync_weekly_remaining(") == 2
+    assert 'profile_declare("quota", "xinfa_of_week"' in xinfa
+    assert '"cap": 600' in xinfa

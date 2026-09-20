@@ -209,11 +209,15 @@ class TestBehaviorPages:
                     page._ci[key])
                     == QHeaderView.ResizeMode.ResizeToContents)
 
-        for col in (2, 3, 4, 5):
+        for key in ("quality", "judge", "food", "insufficient"):
+            col = material._ci[key]
             combo = material._table.cellWidget(0, col)
             _assert_combo_text_fits(combo)
             assert (material._table.horizontalHeader().sectionResizeMode(col)
                     == QHeaderView.ResizeMode.ResizeToContents)
+        pct = material._table.cellWidget(0, material._ci["pct"])
+        assert pct._op.count() == 1
+        assert pct.op() == "ge"
 
     def test_scan_page_entry_rating_roundtrip(self, qtbot,
                                                tmp_group_manager):
@@ -284,6 +288,60 @@ class TestBehaviorPages:
         page._table.setCurrentCell(before, 0)
         page._on_del_rule()
         assert len(tmp_group_manager.get_group("default").scan.rules) == before
+
+    def test_material_move_preserves_all_parts(self, qtbot,
+                                               tmp_group_manager):
+        statuses: list[tuple[str, bool]] = []
+        page = MaterialConfigPage(
+            tmp_group_manager, "default",
+            lambda text, error: statuses.append((text, error)))
+        qtbot.addWidget(page)
+        parts = page._table.cellWidget(0, page._ci["parts"])
+        assert parts.selected() == list(QUALITY_PARTS)
+        assert "全部" in parts.text()
+
+        page._table.selectRow(0)
+        page._on_move_down()
+
+        moved = page._table.cellWidget(1, page._ci["parts"])
+        assert moved.selected() == list(QUALITY_PARTS)
+        assert "全部" in moved.text()
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        assert (tmp_group_manager.get_group("default")
+                .materials.food_rules[1].parts == list(QUALITY_PARTS))
+        assert (tmp_group_manager.get_raw("default")["materials"]
+                ["food_rules"][1]["parts"] == ["全部"])
+
+    def test_material_rule_uses_shared_conditions(self, qtbot,
+                                                  tmp_group_manager):
+        statuses: list[tuple[str, bool]] = []
+        page = MaterialConfigPage(
+            tmp_group_manager, "default",
+            lambda text, error: statuses.append((text, error)))
+        qtbot.addWidget(page)
+        row = 0
+        parts = page._table.cellWidget(row, page._ci["parts"])
+        parts.set_selected(["胸甲"])
+        quality = page._table.cellWidget(row, page._ci["quality"])
+        quality.setCurrentIndex(quality.findData("purple_only"))
+        ratings = page._table.cellWidget(row, page._ci["ratings"])
+        ratings.set_selected(["excellent"])
+        pct = page._table.cellWidget(row, page._ci["pct"])
+        pct.set_value("ge", 91)
+        insufficient = page._table.cellWidget(
+            row, page._ci["insufficient"])
+        insufficient.setCurrentIndex(insufficient.findData("next"))
+        page._apply()
+
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        rule = (tmp_group_manager.get_group("default")
+                .materials.food_rules[row])
+        assert rule.parts == ["胸甲"]
+        assert rule.max_quality == "purple_only"
+        assert rule.judge_scope == "incoming"
+        assert rule.ratings == ["excellent"]
+        assert (rule.pct_op, rule.pct) == ("ge", 91)
+        assert rule.on_insufficient == "next"
 
     @pytest.mark.parametrize(
         ("page_type", "stage_name"),

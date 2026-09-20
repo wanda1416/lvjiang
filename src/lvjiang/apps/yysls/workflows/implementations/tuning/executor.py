@@ -17,6 +17,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     STONE_LABEL,
     FoodDecision,
     MaterialSettings,
+    RatingProvider,
 )
 from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
     TuningRoundHostPort,
@@ -638,8 +639,7 @@ class TuningExecutor:
                            settings: MaterialSettings,
                            infos: dict | None,
                            expect_rating: str | None) -> FoodDecision:
-        """逐轮狗粮决策：按材料设置规则表（首词条/期望/品阶三条件）
-        与本轮材料区持有量决策（与石头检查共用同一次识别）"""
+        """逐轮狗粮决策：按统一条件规则与本轮库存决定材料动作。"""
         if not settings.food_rules:
             return FoodDecision("none", "", tr("未配置狗粮规则 → 不添加"))
         cap_pct = (equip_data.affixes[0].cap_pct
@@ -651,8 +651,16 @@ class TuningExecutor:
             # 数量 None = 该材料是装备而非狗粮，视为已耗尽（count=0）
             count = self._get_count(info) if self._get_count(info) is not None else 0
             stocks[label] = count
+        rating_of: RatingProvider = self._wf.judge.rating_provider(
+            equip_data, incoming_rating=expect_rating)
         decision = settings.decide_food(
-            int(cap_pct) if cap_pct is not None else None, expect_rating, equip_data.quality, stocks)
+            equip_data.part,
+            equip_data.quality,
+            int(cap_pct) if cap_pct is not None else None,
+            rating_of,
+            stocks,
+            [affix.name for affix in equip_data.affixes],
+        )
         log = logger.warning if decision.action == "skip" else logger.info
         log(f"狗粮策略: {decision.reason}")
         return decision

@@ -366,12 +366,9 @@ FOOD_LABELS = ("金狗粮", "紫狗粮", "彩狗粮")
 # 整体左移一格。它在场时材料区的槽位坐标是易失的，缓存不能跨轮复用
 # （见 TuningExecutor.cache_materials）。
 SMALL_STONE_LABEL = "小律准石"
-# 评级档位序（狗粮规则「期望 ≥」比较）
+# 评级档位序
 RATING_RANK = {"junk": 0, "normal": 1, "excellent": 2, "top": 3}
-# 狗粮规则可选的期望档位（能进调律的装备至少优秀，
-# 一般≈不限；垃圾档无意义不开放）
-FOOD_EXPECT_KEYS = ("top", "excellent", "normal")
-# 品阶序与展示名（狗粮规则「品阶 ≥」比较；蓝=不限）
+# 品阶序与展示名
 # 行为规则品阶条件：gold=不限（≤金色即全部），gold_only=仅金装，
 # purple_only=仅紫装（精确），purple=紫装及以下（≤紫色），
 # blue=蓝装及以下（≤蓝色）
@@ -379,11 +376,14 @@ QUALITY_RANK = {"blue": 0, "purple": 1, "gold": 2,
                 "gold_only": 3, "purple_only": 4}
 QUALITY_LABELS = {"gold": tr("金色"), "purple": tr("紫色"), "blue": tr("蓝色"),
                   "gold_only": tr("仅金色"), "purple_only": tr("仅紫色")}
-# 狗粮规则品阶标签（仅含阈值语义的品阶，不含精确匹配品阶）
-_FOOD_QUALITY_LABELS = {"gold": tr("金色"), "purple": tr("紫色"), "blue": tr("蓝色")}
-# 材料不足时的行为：continue=继续调律（不添加狗粮），skip=跳过该装备
-INSUFFICIENT_ACTIONS = ("continue", "skip")
-INSUFFICIENT_LABELS = {"continue": tr("继续调律"), "skip": tr("跳过该装备")}
+# 狗粮不足时的行为：continue=不添加并继续本轮调律，skip=跳过装备，
+# next=放弃本条动作并继续判定下一条规则。
+INSUFFICIENT_ACTIONS = ("continue", "skip", "next")
+INSUFFICIENT_LABELS = {
+    "continue": tr("继续调律"),
+    "skip": tr("跳过该装备"),
+    "next": tr("顺延判定规则"),
+}
 # 大律准石不足时的处理：skip=跳过该装备（继续遍历），abort=结束
 # 全部调律，ask=confirm 弹窗询问（确认继续后本次运行不再检查）
 STONE_ACTIONS = ("skip", "abort", "ask")
@@ -395,25 +395,51 @@ STONE_ACTION_LABELS = {"skip": tr("跳过该装备"), "abort": tr("结束全部�
 class FoodRule:
     """狗粮添加规则（有序规则表的一条）
 
-    三个条件全部满足时命中：首词条 cap_pct >= pct（pct=0 不限，
-    cap_pct 识别失败视为不达标）、装备期望评级 >= min_expect、
-    装备品阶 >= min_quality（blue=不限）。
+    条件语义与扫描/调律处理规则一致：部位、品阶、判定语义、
+    判定结果与首词条初始数值；材料处理只允许 pct_op=ge。
     food 空串 = 命中即明确不添加（终止规则，可表达「金品阶不喂」）。
     on_insufficient：命中但持有量不足（读不到即没有）时，
-    continue=继续调律（不添加狗粮），skip=跳过该装备。
+    continue=不添加并继续调律，skip=跳过该装备，next=顺延到
+    下一条规则（例如彩狗粮不足后降级添加金狗粮）。
     """
     enabled: bool = True
+    parts: list[str] = field(default_factory=list)
+    max_quality: str = "gold"
+    pct_op: str = "ge"
     pct: int = 0
-    min_expect: str = "normal"
-    min_quality: str = "blue"
+    ratings: list[str] = field(default_factory=list)
+    judge_scope: str = "incoming"
+    judge_rules: list[str] = field(default_factory=list)
     food: str = ""
     on_insufficient: str = "continue"
 
+    def matches(self, part: str | None, quality: str | None,
+                cap_pct: float | None, rating: str | None,
+                affix_names: list[str] | None = None) -> bool:
+        """复用行为规则的条件匹配，确保三个处理阶段语义一致。"""
+        return BehaviorRule(
+            enabled=self.enabled,
+            parts=self.parts,
+            max_quality=self.max_quality,
+            pct_op=self.pct_op,
+            pct=self.pct,
+            ratings=self.ratings,
+            judge_scope=self.judge_scope,
+            judge_rules=self.judge_rules,
+        ).matches(part, quality, cap_pct, rating, affix_names)
+
     def summary(self) -> str:
-        """条件摘要文本（日志与说明文档）"""
-        return (f"首词条≥{self.pct}% 且 期望≥"
-                f"{RATING_LABELS.get(self.min_expect, self.min_expect)} 且 "
-                f"品阶≥{_FOOD_QUALITY_LABELS.get(self.min_quality, self.min_quality)}")
+        """条件摘要文本（与行为规则使用同一生成逻辑）。"""
+        return BehaviorRule(
+            enabled=self.enabled,
+            parts=self.parts,
+            max_quality=self.max_quality,
+            pct_op=self.pct_op,
+            pct=self.pct,
+            ratings=self.ratings,
+            judge_scope=self.judge_scope,
+            judge_rules=self.judge_rules,
+        ).summary()
 
 
 @dataclass
@@ -436,49 +462,63 @@ class MaterialSettings:
     关闭（用户自行保证材料充足）。
     stone_insufficient_action: 不足处理（STONE_ACTIONS：跳过该
     装备 / 结束全部调律 / 询问是否继续），默认结束全部调律。
-    food_rules: 有序狗粮规则表，逐轮顺序判定首条完全满足（条件
-    命中 + 材料充足）的规则；全部走完无命中 → 不添加。
+    food_rules: 有序狗粮规则表，逐轮顺序判定；条件命中后按狗粮
+    库存与不足动作决定添加、继续调律、跳过装备或顺延下一规则。
     """
     stone_check_enabled: bool = False
     stone_min_count: int = 80
     stone_insufficient_action: str = "abort"
     food_rules: list[FoodRule] = field(default_factory=list)
 
-    def decide_food(self, cap_pct: int | None, expect: str | None,
-                    quality: str | None,
-                    stocks: dict[str, int | None]) -> FoodDecision:
-        """逐轮狗粮决策：顺序扫规则表，首条完全满足即生效
+    def decide_food(self, part: str | None, quality: str | None,
+                    cap_pct: int | None, rating_of: RatingProvider,
+                    stocks: dict[str, int | None],
+                    affix_names: list[str] | None = None) -> FoodDecision:
+        """逐轮狗粮决策：顺序匹配统一条件，不足时按动作收束或顺延
 
         Args:
+            part: 装备标准部位。
+            quality: 装备品阶 key。
             cap_pct: 首词条数值百分比（None=识别失败，仅 pct=0 可命中）
-            expect: 装备期望评级 key（RATING_RANK；None 保守不命中）
-            quality: 装备品阶 key（QUALITY_RANK；未知保守不命中）
+            rating_of: 与扫描/调律处理相同的逐规则评级提供者。
             stocks: 材料 label → 持有量（缺 key/None/<1 均视为不足）
+            affix_names: 当前装备词条名，供自选词条语义匹配。
         """
-        expect_rank = RATING_RANK.get(expect or "", -1)
-        quality_rank = QUALITY_RANK.get(quality or "", -1)
+        deferred: list[str] = []
         for idx, rule in enumerate(self.food_rules, start=1):
             if not rule.enabled:
                 continue
-            if rule.pct > 0 and (cap_pct is None or cap_pct < rule.pct):
-                continue
-            if expect_rank < RATING_RANK.get(rule.min_expect, 99):
-                continue
-            if quality_rank < QUALITY_RANK.get(rule.min_quality, 99):
+            rating = (
+                rating_of(rule.judge_scope, rule.judge_rules, False)
+                if rule.ratings and rule.judge_scope != "affix" else None
+            )
+            if not rule.matches(part, quality, cap_pct, rating, affix_names):
                 continue
             desc = f"规则{idx}（{rule.summary()}）命中"
             if not rule.food:
-                return FoodDecision("none", "", f"{desc} → 不添加狗粮")
+                reason = f"{desc} → 不添加狗粮"
+                return FoodDecision("none", "", "；".join(deferred + [reason]))
             stock = stocks.get(rule.food)
             if stock is None or stock < 1:
                 if rule.on_insufficient == "skip":
+                    reason = f"{desc}但 {rule.food} 持有量不足 → 跳过该装备"
                     return FoodDecision(
-                        "skip", rule.food,
-                        f"{desc}但 {rule.food} 持有量不足 → 跳过该装备")
-                continue  # 继续走后续规则
+                        "skip", rule.food, "；".join(deferred + [reason]))
+                if rule.on_insufficient == "continue":
+                    reason = (
+                        f"{desc}但 {rule.food} 持有量不足"
+                        " → 不添加狗粮，继续调律"
+                    )
+                    return FoodDecision(
+                        "none", "", "；".join(deferred + [reason]))
+                deferred.append(
+                    f"{desc}但 {rule.food} 持有量不足 → 顺延判定规则")
+                continue
+            reason = f"{desc} → 本轮添加 {rule.food}"
             return FoodDecision(
-                "feed", rule.food, f"{desc} → 本轮添加 {rule.food}")
-        return FoodDecision("none", "", tr("无狗粮规则命中 → 不添加"))
+                "feed", rule.food, "；".join(deferred + [reason]))
+        reason = tr("无狗粮规则命中 → 不添加")
+        return FoodDecision("none", "", "；".join(deferred + [reason]))
 
 
 # ─── 行为配置（状态机三行为点：扫描处理 / 材料处理 / 调律处理）──

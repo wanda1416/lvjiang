@@ -187,13 +187,14 @@ class _PctCell(QWidget):
     """
 
     def __init__(self, op: str, value: int,
-                 changed: Callable[[], None], parent=None):
+                 changed: Callable[[], None], parent=None,
+                 allowed_ops: tuple[str, ...] = PCT_OPS):
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(2, 0, 2, 0)
         layout.setSpacing(2)
         self._op = QComboBox()
-        for key in PCT_OPS:
+        for key in allowed_ops:
             self._op.addItem(PCT_OP_LABELS.get(key, key), key)
         # 符号列需容纳「符号 + 下拉箭头」，过窄会被箭头挤掉
         self._op.setMinimumWidth(52)

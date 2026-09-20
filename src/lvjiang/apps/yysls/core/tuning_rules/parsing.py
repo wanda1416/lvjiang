@@ -11,7 +11,6 @@ from .models import (
     COND_KINDS,
     DEFAULT_ORDER,
     DYNAMIC_AFFIXES,
-    FOOD_EXPECT_KEYS,
     FOOD_LABELS,
     GENERIC_ATTR,
     INSUFFICIENT_ACTIONS,
@@ -456,25 +455,27 @@ def parse_tuning_rule(data: dict,
 
 
 def _parse_food_rule(raw, where: str) -> FoodRule:
-    """单条狗粮规则解析：字段可缺省（落 FoodRule 默认值）"""
+    """单条狗粮规则解析：复用行为规则条件，比较方向固定为 ge。"""
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
+    legacy = [key for key in ("min_expect", "min_quality") if key in raw]
+    if legacy:
+        raise RuleValidationError(
+            f"{where}: 字段 {legacy} 已废弃；材料规则改用 parts / "
+            "max_quality / judge_scope / ratings")
+    if "first_affix_only" in raw:
+        raise RuleValidationError(
+            f"{where}.first_affix_only 仅扫描处置表规则可声明")
+    condition_raw = dict(raw)
+    condition_raw.setdefault("pct_op", "ge")
+    condition_raw.setdefault("pct", 0)
+    condition_raw["action"] = "skip"
+    condition = _parse_behavior_rule(
+        condition_raw, where, ("skip",), allow_first_affix=False)
+    if condition.pct_op != "ge":
+        raise RuleValidationError(
+            f"{where}.pct_op 非法: {condition.pct_op!r}（材料规则仅允许 'ge'）")
     defaults = FoodRule()
-    pct = raw.get("pct", defaults.pct)
-    if isinstance(pct, bool) or not isinstance(pct, int):
-        raise RuleValidationError(f"{where}.pct 必须是整数")
-    if not (0 <= pct <= 100):
-        raise RuleValidationError(f"{where}.pct 超出范围 [0, 100]: {pct}")
-    expect = str(raw.get("min_expect", defaults.min_expect))
-    if expect not in FOOD_EXPECT_KEYS:
-        raise RuleValidationError(
-            f"{where}.min_expect 非法: {expect!r}"
-            f"（须为 {list(FOOD_EXPECT_KEYS)}）")
-    quality = str(raw.get("min_quality", defaults.min_quality))
-    if quality not in _VALID_QUALITIES:
-        raise RuleValidationError(
-            f"{where}.min_quality 非法: {quality!r}"
-            f"（须为 {list(_VALID_QUALITIES)}）")
     food = str(raw.get("food") or "")
     if food and food not in FOOD_LABELS:
         raise RuleValidationError(
@@ -488,9 +489,18 @@ def _parse_food_rule(raw, where: str) -> FoodRule:
     enabled = raw.get("enabled", defaults.enabled)
     if not isinstance(enabled, bool):
         raise RuleValidationError(f"{where}.enabled 必须是 bool")
-    return FoodRule(enabled=enabled, pct=pct, min_expect=expect,
-                    min_quality=quality,
-                    food=food, on_insufficient=action)
+    return FoodRule(
+        enabled=enabled,
+        parts=condition.parts,
+        max_quality=condition.max_quality,
+        pct_op=condition.pct_op,
+        pct=condition.pct,
+        ratings=condition.ratings,
+        judge_scope=condition.judge_scope,
+        judge_rules=condition.judge_rules,
+        food=food,
+        on_insufficient=action,
+    )
 
 
 def _parse_materials(raw, where: str = "materials") -> MaterialSettings:

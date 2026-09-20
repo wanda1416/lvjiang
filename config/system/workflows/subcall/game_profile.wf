@@ -7,6 +7,8 @@
 #   check_profile($keys)   — 批量校验 profile key 已定义，未定义则阻塞提醒
 #   sync_weekly_progress($raw, $key, $last, $label)
 #       — 解析 a/b 周进度并按本周期单调规则同步 profile
+#   sync_weekly_remaining($raw, $key, $last, $expected_total, $label)
+#       — 解析“剩余/总量”，换算为已消耗量后同步 profile
 #
 # 依赖某个 profile key 的工作流建议在开头用内置函数 profile_declare 声明
 # （幂等导入，仅创建缺失定义），声明成功后 check_profile 只作兑底断言：
@@ -75,6 +77,64 @@ def sync_weekly_progress($raw, $key, $last, $label)
             return $last
         end
         log warn $label + "识别值 " + $current + " 小于当前周期 profile 值 " + $observed.value + "，判定为脏数据并放弃回写"
+        return $observed.value
+    end
+
+    log error $label + "同步 profile 失败，原因: " + $observed.reason + "，保留本轮上次有效值 " + $last
+    return $last
+end
+
+# ─── 解析周库存剩余量并同步已消耗配额 ─────────────────────
+# 参数：
+#   $raw            — 仅包含库存区域的 OCR 原文，例如 "600/600"
+#   $key            — 记录本周已消耗数量的 quota profile key
+#   $last           — 本轮上次有效的已消耗量；首次读取传 -1
+#   $expected_total — 固定周库存上限；OCR 分母不一致时拒绝同步
+#   $label          — 日志名称
+# 返回：最终采用的已消耗量；OCR 与 profile 均无有效值时返回 $last
+def sync_weekly_remaining($raw, $key, $last, $expected_total, $label)
+    eval $progress = extract_progress($raw)
+    if not $progress.valid
+        eval $profile_value = profile_get($key)
+        if $profile_value >= 0
+            if $profile_value < $last
+                log warn $label + " OCR 解析失败: " + $raw + "，profile 值 " + $profile_value + " 小于本轮上次有效值 " + $last + "，继续使用本轮值"
+                return $last
+            end
+            log warn $label + " OCR 解析失败: " + $raw + "，回退使用 profile 值 " + $profile_value
+            return $profile_value
+        end
+        log error $label + " OCR 解析失败: " + $raw + "，profile 也无有效值，保留本轮上次有效值 " + $last
+        return $last
+    end
+
+    if $progress.total != $expected_total
+        log warn $label + "识别到库存 " + $progress.current + "/" + $progress.total + "，分母不是预期的 " + $expected_total + "，放弃同步"
+        return $last
+    end
+
+    eval $consumed = $expected_total - $progress.current
+    if $consumed < $last
+        log warn $label + "识别到已购买 " + $consumed + "/" + $expected_total + "，小于本轮上次有效值 " + $last + "，判定为脏数据并放弃同步"
+        return $last
+    end
+
+    eval $model = profile_model($key)
+    if not $model
+        log $label + ": 已购买 " + $consumed + "/" + $expected_total + "；profile 未定义 " + $key + "，跳过写入"
+        return $consumed
+    end
+
+    eval $observed = profile_observe($key, $consumed)
+    if $observed.accepted
+        log $label + ": 已购买 " + $observed.value + "/" + $expected_total
+        return $observed.value
+    end
+    if $observed.reason equals "regressed"
+        if $observed.value < $last
+            return $last
+        end
+        log warn $label + "识别值 " + $consumed + " 小于当前周期 profile 值 " + $observed.value + "，判定为脏数据并放弃回写"
         return $observed.value
     end
 

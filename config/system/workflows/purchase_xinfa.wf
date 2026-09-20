@@ -29,6 +29,11 @@
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
+import "subcall/game_profile.wf"
+
+# xinfa_of_week 记录本周已购买心法心得数。心得置换页展示的是剩余库存，
+# 因此 600/600 对应 profile=0，0/600 对应 profile=600。
+eval profile_declare("quota", "xinfa_of_week", {"label": "心法心得本周", "cap": 600, "increment_only": true, "sources": ["心得置换"]})
 
 default $open_bag_xinfa = false
 default $max_xinfa_boxes = 5
@@ -66,6 +71,10 @@ scan [training_xinfa].[exchange] as $nav_check by contains "置换"
 if not $nav_check
     eval pause("未进入心得置换页面，请手动导航后点击继续")
 end
+
+# 进入循环前记录一次周库存基线。分母必须识别为固定上限 600，避免脏 OCR 回写。
+scan [training_xinfa].[stock_of_week] as $weekly_stock
+call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_of_week", -1, 600, "本周心法心得购买")
 
 # ─── 返回导航 ────────────────────────────────────────────
 def go_back()
@@ -164,8 +173,7 @@ loop while 1 == 1
     scan [training_xinfa].[sanben_1,sanben_2,sanben_3,sanben_4,sanben_5] as $zixuan by contains "自选"
     if not $zixuan
        log "找不到自选散本，结束"
-       call go_back()
-       return -1
+       break
     end
 
     # 先走一遍回收，避免书票不足，心法过多
@@ -182,11 +190,17 @@ loop while 1 == 1
     scan [training_xinfa].[confirm] as $confirm by contains "确认"
     if not $confirm
        log "书票数量不足，结束"
-       call go_back()
-       return -1
+       break
     end
 
     click [training_xinfa].[add_max] after wait @step_interval
     click [training_xinfa].[confirm] after wait @page_refresh
     click [general_control].[blank_area] after wait @step_interval
 end
+
+
+# 循环结束时再读取一次，最后一次成功购买造成的库存下降会换算为已购买量。
+scan [training_xinfa].[stock_of_week] as $weekly_stock
+call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_of_week", $xinfa_of_week, 600, "本周心法心得购买")
+call go_back()
+return -1

@@ -735,7 +735,13 @@ class _BehaviorPageBase(QWidget):
         """将 raw dict 写回指定行的控件"""
         table = self._table
         parts: _MultiSelect = table.cellWidget(row, self._ci["parts"])
-        parts.set_selected(values["parts"])
+        # _row_rule 为保持 YAML 紧凑，会把全选序列化成领域值
+        # ["全部"]；它不是 _MultiSelect 的真实选项 key。行交换时须先
+        # 展开回完整部位集，否则移动规则会把全选错误回填成全部未选。
+        selected_parts = values["parts"]
+        if selected_parts == ["全部"]:
+            selected_parts = list(QUALITY_PARTS)
+        parts.set_selected(selected_parts)
         quals: QComboBox = table.cellWidget(row, self._ci["quality"])
         quals.setCurrentIndex(max(quals.findData(values["max_quality"]), 0))
         pct: _PctCell = table.cellWidget(row, self._ci["pct"])

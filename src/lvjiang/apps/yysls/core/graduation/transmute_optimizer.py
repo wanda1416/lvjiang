@@ -102,7 +102,6 @@ class TransmuteSearchRequest:
     full_chengyin: bool = False
     full_dingyin: bool = False
     full_level: int = 0
-    season_chengyin: bool = False
     playstyle: str = ""
     precision: float = DEFAULT_PRECISION
     time_budget: float = DEFAULT_TIME_BUDGET_SECONDS
@@ -114,7 +113,6 @@ class TransmuteSearchRequest:
             full_level=self.full_level,
             full_chengyin=self.full_chengyin,
             full_dingyin=self.full_dingyin,
-            season_chengyin=self.season_chengyin,
             simulate_transmute=simulate_transmute,
             playstyle=self.playstyle,
         )

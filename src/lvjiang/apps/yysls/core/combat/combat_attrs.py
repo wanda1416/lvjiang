@@ -479,7 +479,6 @@ def apply_hypothetical_caps(
     full_level: int = 0,
     playstyle: str = "",
     simulate_transmute: bool = False,
-    season_chengyin: bool = False,
 ) -> dict:
     """假设装备升至理想状态，返回变换后的装备副本。
 
@@ -498,16 +497,11 @@ def apply_hypothetical_caps(
             （``target_transmute_name``）覆盖到对应词条槽；目标数值按副本
             此时的等级/承音状态取上限，资格按原始装备判断。只用已保存的
             目标，不做任何搜索。
-        season_chengyin: 当前赛季原生装备（等级 == full_level、未承音）
-            视为已承音；配合 full_chengyin 才改变词条数值。原生装备的
-            承音是“同等级承音”，满等级假设不会自动覆盖到它们，所以单列。
-            full_level 为 0 时按当前赛季等级判断。
-
     Returns:
         变换后的装备 dict；无需变换时返回原 dict。
     """
     if (not full_chengyin and not full_dingyin and full_level <= 0
-            and not simulate_transmute and not season_chengyin):
+            and not simulate_transmute):
         return equipped
 
     import copy
@@ -517,10 +511,6 @@ def apply_hypothetical_caps(
 
     gc = get_game_config()
     result: dict = {}
-    season_level = full_level if full_level > 0 else gc.current_equip_level()
-    season_cfg = gc.level_config_for(season_level) if season_level > 0 else None
-    season_allowed = bool(season_cfg and season_cfg.allow_chengyin)
-
     for slot_key, equip in equipped.items():
         if not isinstance(equip, dict):
             result[slot_key] = equip
@@ -539,12 +529,6 @@ def apply_hypothetical_caps(
             equip["level"] = full_level
             equip["is_chengyin"] = True
 
-        # 赛季原生装备假设承音：只标记，数值由 full_chengyin 决定
-        if (season_chengyin and season_allowed
-                and cur_level == season_level
-                and not bool(equip.get("is_chengyin"))):
-            equip["is_chengyin"] = True
-
         effective_level = equip.get("level")
         is_cy = equip.get("is_chengyin", False)
 
@@ -558,7 +542,13 @@ def apply_hypothetical_caps(
                     int(effective_level), affix["name"], chengyin=True,
                     game_config=gc)
                 if chengyin_cap is not None:
-                    affix["value"] = chengyin_cap
+                    # “满承音”只提升真实承音装备，不得把已经更高的识别值
+                    # 反向覆盖为较低上限。
+                    try:
+                        current = float(affix.get("value") or 0.0)
+                    except (TypeError, ValueError):
+                        current = 0.0
+                    affix["value"] = max(current, chengyin_cap)
 
         # 定音词条
         dingyin = equip.get("dingyin")
@@ -568,13 +558,31 @@ def apply_hypothetical_caps(
             if target:
                 # 按玩法配齐：装备原本定的音不是目标就是白定的，直接换掉。
                 caps = gc.get_affix_caps(effective_level, target)
-                equip["dingyin"] = (
-                    {"name": target, "value": caps["cap"]} if caps else {})
+                if caps:
+                    target_value = float(caps["cap"])
+                    if (isinstance(dingyin, dict)
+                            and dingyin.get("name") == target):
+                        try:
+                            target_value = max(
+                                float(dingyin.get("value") or 0.0),
+                                target_value,
+                            )
+                        except (TypeError, ValueError):
+                            pass
+                    equip["dingyin"] = {
+                        "name": target, "value": target_value,
+                    }
+                else:
+                    equip["dingyin"] = {}
             elif dingyin and isinstance(dingyin, dict) and dingyin.get("name"):
                 # 没有玩法（或玩法没配该部位定音）时退回旧行为：只顶数值。
                 caps = gc.get_affix_caps(effective_level, dingyin["name"])
                 if caps:
-                    dingyin["value"] = caps["cap"]
+                    try:
+                        current = float(dingyin.get("value") or 0.0)
+                    except (TypeError, ValueError):
+                        current = 0.0
+                    dingyin["value"] = max(current, float(caps["cap"]))
 
         result[slot_key] = equip
 

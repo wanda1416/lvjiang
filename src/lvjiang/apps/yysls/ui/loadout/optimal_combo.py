@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import replace
 from typing import Any
 
 from loguru import logger
@@ -59,7 +58,10 @@ from ...core.graduation.candidate_pool import (
     collect_candidates,
 )
 from ...core.graduation.context import gongjue_attrs
-from ...core.graduation.optimal_combo import OPTIMAL_RESULT_LIMIT
+from ...core.graduation.optimal_combo import (
+    OPTIMAL_RESULT_LIMIT,
+    build_candidate_variants,
+)
 from ..domain_labels import domain_label
 from ..events import EQUIPMENT_CHANGED, get_event_hub
 from ..layout_helpers import fit_combo_to_contents
@@ -279,6 +281,7 @@ def _search_job(
     use_dominance_pruning: bool,
     assumptions: Assumptions,
     season_level: int,
+    season_chengyin: bool = False,
 ) -> Callable[[JobContext], list[dict[str, Any]]]:
     """构造交给 JobController 的搜索函数：逐弓玦场景搜索并合并结果。"""
 
@@ -305,6 +308,7 @@ def _search_job(
                 cancel_flag=ctx.is_cancelled,
                 assumptions=assumptions,
                 season_level=season_level,
+                season_chengyin=season_chengyin,
                 progress_counter=progress,
             )
             completed += progress.evaluated
@@ -1169,14 +1173,27 @@ class OptimalComboPage(QWidget):
         per_slot = result.get("assumptions", {})
         base = getattr(self, "_searched_assumptions", None) or (
             self._assumptions_provider().with_playstyle(self._playstyle))
+        from ...config import get_game_config
+
         projected: dict[str, dict] = {}
+        season_level = get_game_config().current_equip_level()
         for slot_key, equip in equipped.items():
             if not isinstance(equip, dict):
                 continue
             labels = per_slot.get(slot_key) or [] if isinstance(per_slot, dict) else []
-            assumptions = replace(
-                base, season_chengyin="同等级承音假设" in labels)
-            projected[slot_key] = assumptions.project({slot_key: equip})[slot_key]
+            use_season_branch = "同等级承音假设" in labels
+            variants = build_candidate_variants(
+                {slot_key: [equip]}, assumptions=base,
+                season_level=season_level,
+                season_chengyin=use_season_branch,
+            )[slot_key]
+            selected = next(
+                (variant for variant in variants
+                 if ("同等级承音假设" in variant.assumptions)
+                 == use_season_branch),
+                variants[0],
+            )
+            projected[slot_key] = selected.virtual
         return projected
 
     def _on_show_attrs(self, result: dict, *, activate: bool = True) -> None:
@@ -1533,11 +1550,10 @@ class OptimalComboPage(QWidget):
             (name, self._base_attrs_raw + gongjue_attrs(name))
             for name in gongjues
         ]
-        # 假设在点击时定格：搜索期间改动假设栏不影响本次结果；赛季承音是
-        # 本页的搜索空间选项，与共享假设合成后一起交给搜索
-        assumptions = replace(
-            self._assumptions_provider().with_playstyle(self._playstyle),
-            season_chengyin=self._chk_season_chengyin.isChecked())
+        # 假设在点击时定格：搜索期间改动假设栏不影响本次结果。赛季承音
+        # 独立作为本页的搜索空间选项传入，不进入共享假设或备战方案静态值。
+        assumptions = self._assumptions_provider().with_playstyle(self._playstyle)
+        season_chengyin = self._chk_season_chengyin.isChecked()
         self._searched_assumptions = assumptions
         self._jobs.start(_search_job(
             candidates,
@@ -1547,6 +1563,7 @@ class OptimalComboPage(QWidget):
             self._chk_pruning.isChecked(),
             assumptions,
             season_level,
+            season_chengyin,
         ))
 
     def _on_cancel(self) -> None:

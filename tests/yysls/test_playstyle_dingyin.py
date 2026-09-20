@@ -38,6 +38,17 @@ def test_non_target_dingyin_is_replaced_not_kept(styled):
     assert out["main_weapon"]["dingyin"]["value"] > 1.0
 
 
+def test_target_dingyin_above_configured_cap_is_not_reduced(styled):
+    """“满定音”是正向假设，异常偏高的已有目标值也不能被反向覆盖。"""
+    equip = _equip("主武器", "外功穿透")
+    equip["dingyin"]["value"] = 999.0
+
+    out = apply_hypothetical_caps(
+        {"main_weapon": equip}, full_dingyin=True, playstyle="纯唐")
+
+    assert out["main_weapon"]["dingyin"]["value"] == 999.0
+
+
 def test_defense_slots_converge_to_one_skill_affix(styled):
     """四件防具各定各的音 → 收敛成同一个技能增效。
 

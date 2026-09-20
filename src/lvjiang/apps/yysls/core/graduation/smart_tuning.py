@@ -308,10 +308,9 @@ class SmartTuningEvaluator:
                     baseline = _rate(provisional, provisional.equipped,
                                      self._game_config)
                     try:
-                        # 方案基准与候选必须经过同一个三满入口；其中包含
-                        # 当前赛季原生装备的同等级承音假设。若这里直接调用
-                        # 通用 helper，方案侧会保留原生装备 100% 词条，而
-                        # 候选侧按承音上限计算，比较口径会凭空相差一截。
+                        # 方案基准与候选经过同一个三满入口。同等级承音会
+                        # 创造平行装备分支，只属于最优组合的显式搜索选项，
+                        # 不能改变备战方案或智能调律的静态理论值。
                         maximum_equipped = self._apply_maximum_assumptions(
                             provisional, provisional.equipped)
                         plan_maximum = _rate(
@@ -867,14 +866,13 @@ class SmartTuningEvaluator:
     ) -> dict[str, dict]:
         """按目标玩法应用满等级、满承音、满定音三项统一假设。
 
-        智能调律比较的是三项全部拉满后的理论极限；当前赛季原生装备也按
-        同等级承音看待（``season_chengyin``），否则原生 110 级装备的已有
-        词条按扫描值、新补词条按承音上限，同一件装备内口径不一致。
+        智能调律比较的是三项全部拉满后的理论极限。满承音只提升装备本身
+        已经是承音（或因满等级升级而成为承音）的普通词条；当前赛季原生
+        装备保持原生状态。候选新词条仍按不投入彩色狗粮时可达到的上限补全。
         """
         return Assumptions(
             full_level=self._game_config.current_equip_level(),
             full_chengyin=True,
             full_dingyin=True,
-            season_chengyin=True,
             playstyle=context.playstyle,
         ).project(equipped, self._game_config)

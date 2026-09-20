@@ -155,10 +155,9 @@ def build_candidate_variants(
     if assumptions is None:
         assumptions = Assumptions(
             full_level=full_level, full_chengyin=full_chengyin,
-            full_dingyin=full_dingyin, season_chengyin=season_chengyin,
+            full_dingyin=full_dingyin,
             simulate_transmute=simulate_transmute, playstyle=playstyle,
         )
-    season_chengyin = assumptions.season_chengyin
     gc = get_game_config()
     level_cfg = gc.level_config_for(season_level) if season_level > 0 else None
     allow_season_chengyin = bool(level_cfg and level_cfg.allow_chengyin)
@@ -621,11 +620,12 @@ def search_optimal_combo(
     if assumptions is None:
         assumptions = Assumptions(
             full_level=full_level, full_chengyin=full_chengyin,
-            full_dingyin=full_dingyin, season_chengyin=season_chengyin,
+            full_dingyin=full_dingyin,
             simulate_transmute=simulate_transmute, playstyle=playstyle,
         )
     variants = build_candidate_variants(
         candidates, assumptions=assumptions, season_level=season_level,
+        season_chengyin=season_chengyin,
     )
     variant_by_virtual_id = {
         id(variant.virtual): variant

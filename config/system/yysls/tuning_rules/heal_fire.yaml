@@ -25,16 +25,32 @@ affix_pool:
 - 最大无相攻击
 - 最大牵丝攻击
 - 势
+- 最小牵丝攻击
+- 最小无相攻击
 common_conditions:
   normal_conditions:
   - count_max:
       symbols:
       - 最大外功攻击
       max: 0
+  - count_min:
+      symbols:
+      - 最大无相攻击
+      - 最小无相攻击
+      - 最小牵丝攻击
+      - 最大牵丝攻击
+      min: 2
   excellent_conditions:
   - count_min:
       symbols:
       - 势
+      min: 1
+  - count_min:
+      symbols:
+      - 最大无相攻击
+      - 最小无相攻击
+      - 最大牵丝攻击
+      - 最小牵丝攻击
       min: 1
 patterns:
   主武器:
@@ -56,13 +72,12 @@ patterns:
           - 精准率
           min: 1
     top_conditions:
-    - - count_max:
-          symbols:
-          - 最大无相攻击
-          max: 0
-      - not_together:
+    - - not_together:
         - 敏
         - 会心率
+      - not_together:
+        - 敏
+        - 精准率
   副武器:
     first:
     - 最大外功攻击
@@ -82,13 +97,12 @@ patterns:
           - 精准率
           min: 1
     top_conditions:
-    - - count_max:
-          symbols:
-          - 最大无相攻击
-          max: 0
-      - not_together:
+    - - not_together:
         - 敏
         - 会心率
+      - not_together:
+        - 敏
+        - 精准率
   环:
     first:
     - 最大外功攻击
@@ -108,13 +122,12 @@ patterns:
           - 精准率
           min: 1
     top_conditions:
-    - - count_max:
-          symbols:
-          - 最大牵丝攻击
-          max: 0
-      - not_together:
+    - - not_together:
         - 敏
         - 会心率
+      - not_together:
+        - 敏
+        - 精准率
   冠胄:
     first:
     - 会心率
@@ -127,8 +140,9 @@ patterns:
     top_conditions:
     - count_max:
         symbols:
-        - 最大牵丝攻击
-        max: 0
+        - 精准率
+        max: 1
+        include_first: true
   胫甲:
     first:
     - 劲
@@ -142,5 +156,4 @@ patterns:
         symbols:
         - 会心率
         - 精准率
-        - 最大牵丝攻击
         max: 0

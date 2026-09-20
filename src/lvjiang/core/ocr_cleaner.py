@@ -1,4 +1,4 @@
-"""按业务规则组执行 OCR 文本清洗。
+"""按全局默认规则和可选业务规则组执行 OCR 文本清洗。
 
 配置通过 ConfigResolver 多层合并读写：
 - config/system/ocr.yaml  系统默认配置（随代码分发）
@@ -6,7 +6,8 @@
 - config/local/ocr.yaml   用户自定义配置（覆盖前两层）
 开发模式写入 system，用户模式写入 local diff。
 
-每个 ``normalization.groups.<key>`` 包含展示用 ``label`` 以及两类规则：
+``normalization.default`` 是所有 OCR 都会执行的安全规范化规则；每个
+``normalization.groups.<key>`` 则包含展示用 ``label`` 以及额外业务规则：
 - replacements: 文本替换 {"错误文本": "正确文本"} 或 {"噪声": ""}
 - patterns: 正则替换 {"正则": "替换"}
 """
@@ -66,6 +67,11 @@ class OCRCleaner:
             for key, value in groups.items()
             if isinstance(value, dict)
         }
+
+    def _default(self) -> dict[str, Any]:
+        """返回全局默认规则；该规则层不可删除，也不属于 DSL 清洗组。"""
+        config = self._normalization().get("default")
+        return config if isinstance(config, dict) else {}
 
     def get_group_label(self, group: str) -> str:
         config = self._group(group)
@@ -130,10 +136,9 @@ class OCRCleaner:
     def clean(self, text: str, group: str | None = None) -> str:
         """清洗 OCR 文本
 
-        按顺序执行：
-        1. 文本替换（replacements）
-        2. 正则替换（patterns）
-        3. 首尾空白去除
+        固定按顺序执行：默认文本替换、默认正则替换、可选组文本替换、
+        可选组正则替换，最后去除首尾空白。规则分层顺序不能用字典合并
+        代替，因为后一层需要处理前一层的输出。
 
         Args:
             text: 原始 OCR 文本
@@ -144,16 +149,18 @@ class OCRCleaner:
         if not text:
             return text
 
-        if group is None:
-            return text.strip()
-        result = text
+        result = self._apply_rules(text, self._default())
+        if group is not None:
+            result = self._apply_rules(result, self._group(group))
+        return result.strip()
 
-        # 1. 文本替换
-        config = self._group(group)
+    @staticmethod
+    def _apply_rules(text: str, config: dict[str, Any]) -> str:
+        """按 replacements → patterns 顺序应用单层规则。"""
+        result = text
         for wrong, correct in config.get("replacements", {}).items():
             result = result.replace(wrong, correct)
 
-        # 2. 正则替换
         for pattern, replacement in config.get("patterns", {}).items():
             if pattern:
                 try:
@@ -161,38 +168,40 @@ class OCRCleaner:
                 except re.error as e:
                     logger.warning(f"正则替换失败 '{pattern}': {e}")
 
-        return result.strip()
+        return result
 
     # ─── 配置管理（供 UI 调用）───────────────────────────────
 
-    def get_replacements(self, group: str = "equip") -> dict[str, str]:
+    def _rules_config(self, group: str | None) -> dict[str, Any]:
+        return self._default() if group is None else self._group(group)
+
+    def get_replacements(self, group: str | None = "equip") -> dict[str, str]:
         """获取所有文本替换规则"""
-        return dict(self._group(group).get("replacements", {}))
+        return dict(self._rules_config(group).get("replacements", {}))
 
-    def get_patterns(self, group: str = "equip") -> dict[str, str]:
+    def get_patterns(self, group: str | None = "equip") -> dict[str, str]:
         """获取所有正则替换规则"""
-        return dict(self._group(group).get("patterns", {}))
+        return dict(self._rules_config(group).get("patterns", {}))
 
-
-    def set_replacements(self, replacements: dict[str, str], group: str = "equip"):
+    def set_replacements(
+        self, replacements: dict[str, str], group: str | None = "equip",
+    ) -> None:
         """批量设置文本替换规则并保存一次"""
         normalization = self._normalization()
-        groups = dict(normalization.get("groups") or {})
-        config = dict(self._group(group))
+        config = dict(self._rules_config(group))
         config["replacements"] = dict(replacements)
-        groups[group] = config
-        normalization["groups"] = groups
+        self._store_rules_config(normalization, group, config)
         self._config["normalization"] = normalization
         self._save_config()
 
-    def set_patterns(self, patterns: dict[str, str], group: str = "equip"):
+    def set_patterns(
+        self, patterns: dict[str, str], group: str | None = "equip",
+    ) -> None:
         """批量设置正则替换规则并保存一次"""
         normalization = self._normalization()
-        groups = dict(normalization.get("groups") or {})
-        config = dict(self._group(group))
+        config = dict(self._rules_config(group))
         config["patterns"] = dict(patterns)
-        groups[group] = config
-        normalization["groups"] = groups
+        self._store_rules_config(normalization, group, config)
         self._config["normalization"] = normalization
         self._save_config()
 
@@ -200,18 +209,29 @@ class OCRCleaner:
         self,
         replacements: dict[str, str],
         patterns: dict[str, str],
-        group: str = "equip",
+        group: str | None = "equip",
     ) -> None:
         """同时保存两类规范化规则。"""
         normalization = self._normalization()
-        groups = dict(normalization.get("groups") or {})
-        config = dict(self._group(group))
+        config = dict(self._rules_config(group))
         config["replacements"] = dict(replacements)
         config["patterns"] = dict(patterns)
-        groups[group] = config
-        normalization["groups"] = groups
+        self._store_rules_config(normalization, group, config)
         self._config["normalization"] = normalization
         self._save_config()
+
+    @staticmethod
+    def _store_rules_config(
+        normalization: dict[str, Any],
+        group: str | None,
+        config: dict[str, Any],
+    ) -> None:
+        if group is None:
+            normalization["default"] = config
+            return
+        groups = dict(normalization.get("groups") or {})
+        groups[group] = config
+        normalization["groups"] = groups
 
     def _save_config(self):
         """通过 ConfigResolver 保存完整配置（开发→system，用户→local diff）

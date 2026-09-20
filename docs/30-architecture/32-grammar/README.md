@@ -370,7 +370,7 @@ find [scene].[area] as $var by image [game_menu_page].[back]
 | `by <mode> <target>` | 降级：dict → str/位置 | scan / recognize / find |
 | `as rich` | 升级：str → dict，并执行输出区域 OCR | 仅 recognize |
 | `with <func>` | 配合 rich | 仅 recognize |
-| `with "<清洗组>"` | OCR 结果清洗分组 | scan / find |
+| `with "<清洗组>"` | 在全局默认清洗后叠加业务规则组 | scan / find |
 | `where confidence >= <n>` | 过滤 | scan / recognize / find |
 | `on group "<name>"` | 限定分组 | 仅 recognize |
 
@@ -380,7 +380,8 @@ by 模式：`equals "文本"` / `contains "文本"` / `equals_any $list` / `cont
 
 `with "<清洗组>"` 是 `scan` / `find` 的 OCR 结果清洗子句，与 `recognize` 的
 `with <func>` 是两个不同的东西（前者接字符串，后者接函数名）：
-它按配置中的清洗组对识别文本做后处理，不能与 `by image` 同时使用。
+所有 OCR 会先执行全局默认清洗；该子句再按配置中的清洗组做附加处理，
+不能与 `by image` 同时使用。
 详见 [04.1-scan.md](04.1-scan.md#清洗子句) / [04.3-find.md](04.3-find.md#清洗子句)。
 
 ### 与 click 的配合

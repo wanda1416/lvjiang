@@ -42,8 +42,11 @@ class TestOCRCleaner:
         assert OCRCleaner().clean("保存", "equip") == "保"
 
     def test_chinese_brackets_to_english(self):
-        assert OCRCleaner().clean("【转】最大攻击", "equip") == "[转]最大攻击"
-        assert OCRCleaner().clean("会心率（%）", "equip") == "会心率(%)"
+        assert OCRCleaner().clean("【转】最大攻击") == "[转]最大攻击"
+        assert OCRCleaner().clean("会心率（%）") == "会心率(%)"
+
+    def test_equipment_group_layers_on_global_rules(self):
+        assert OCRCleaner().clean("【荐猜准率】", "equip") == "[精准率]"
 
     def test_strip_whitespace(self):
         assert OCRCleaner().clean("  会心率 5%  ", "equip") == "会心率 5%"

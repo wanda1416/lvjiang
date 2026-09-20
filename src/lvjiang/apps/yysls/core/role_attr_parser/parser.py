@@ -57,7 +57,9 @@ _SCHOOL_SUFFIX = {
 
 _SCHOOL_ATTACK_LABEL_RE = re.compile(r"(鸣金|裂石|破竹|牵丝|无相)攻击[:：]\s*")
 _SCHOOL_PEN_RE = re.compile(r"(鸣金|裂石|破竹|牵丝)穿透[:：]\s*(-?\d+\.?\d*)")
-_OUTER_PEN_NON_DINGYIN_RE = re.compile(r"外功穿透\(非定音部分\)[:：]\s*(-?\d+\.?\d*)")
+_OUTER_PEN_NON_DINGYIN_RE = re.compile(
+    r"外功穿透[（(]非定音部分[）)][:：]\s*(-?\d+\.?\d*)"
+)
 
 
 def _to_float(text: str) -> float | None:
@@ -85,6 +87,7 @@ _CONSTANT_VALUE_RE = re.compile(r"^[^\d-]*(-?\d+)$")
 
 def _split_range(value: str) -> tuple[float | None, float | None]:
     """"900-2604" → (900.0, 2604.0)；"← 3713" → (3713.0, 3713.0)（恒定值兜底）"""
+    value = value.replace("（", "(").replace("）", ")")
     value = value.split("(", 1)[0].strip()
     m = _RANGE_RE.match(value)
     if m:

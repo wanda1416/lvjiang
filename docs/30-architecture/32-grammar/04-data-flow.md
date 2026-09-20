@@ -67,7 +67,7 @@ recognize ... as rich $var [with <func>] [on group "<name>"]
 | `by image "<模板名>"` | 显式模板定位，返回命中矩形 | — | 仅 find |
 | `as rich` | 返回含元数据和输出 OCR 字段的富 dict | **升级**：str → dict | 仅 recognize |
 | `with <func>` | 指定 rich dict 的转换函数 | 配合 rich 使用 | 仅 recognize |
-| `with "<清洗组>"` | OCR 结果按清洗组后处理 | **后处理**：不改变类型 | scan / find |
+| `with "<清洗组>"` | 在全局默认清洗后叠加业务规则组 | **后处理**：不改变类型 | scan / find |
 | `where confidence >= <n>` | 过滤低置信度结果（阈值 `[0.0, 1.0]`，超出范围输出警告） | **过滤**：不改变类型 | scan / recognize / find |
 | `on group "<name>"` | 限定材料匹配分组 | **过滤**：缩小匹配范围 | 仅 recognize |
 

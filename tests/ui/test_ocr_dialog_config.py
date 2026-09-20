@@ -46,12 +46,13 @@ def test_recognition_config_is_third_tab_and_can_be_saved(
     qtbot.addWidget(dialog)
     assert dialog._tabs.count() == 3
     assert dialog._tabs.tabText(2) == "识别配置"
-    assert dialog._cleaning_group_combo.currentText() == "装备词条"
-    assert "equip" not in dialog._cleaning_group_combo.currentText()
+    assert dialog._cleaning_group_combo.currentText() == "默认规则（全局）"
     assert dialog._cleaning_group_combo.minimumWidth() == 240
     assert dialog._btn_add_cleaning_group.text() == "创建规则组"
     assert dialog._btn_rename_cleaning_group.text() == "重命名规则组"
     assert dialog._btn_delete_cleaning_group.text() == "删除规则组"
+    assert not dialog._btn_rename_cleaning_group.isEnabled()
+    assert not dialog._btn_delete_cleaning_group.isEnabled()
     assert dialog._btn_cancel_rules.text() == "撤销"
     assert dialog._btn_cancel_config.text() == "撤销"
     assert not dialog._btn_cancel_rules.isEnabled()

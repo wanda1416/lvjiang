@@ -163,6 +163,19 @@ class TestParseDetail2Attack:
     def test_empty_text(self):
         assert parse_detail2_attack("") == {}
 
+    def test_real_ocr_text_with_fullwidth_parentheses(self):
+        text = (
+            "617-1566 | 属性攻击 | 当前各属攻生效数值 | "
+            "鸣金攻击：0-0 (0-0) | 裂石攻击：0-0 (0-0) | "
+            "牵丝攻击： 0-0（0-0) | 破竹攻击：538-1342（538-1342） | "
+            "无相攻击：79-225（可根据当前使用武学， | 提升相应流派属性攻击）"
+        )
+        result = parse_detail2_attack(text)
+        assert result["min_pozhu"] == 538.0
+        assert result["max_pozhu"] == 1342.0
+        assert result["min_wuxiang"] == 79.0
+        assert result["max_wuxiang"] == 225.0
+
     def test_constant_value_arrow_notation_mixed_with_ranges(self):
         """某一门武学 min>max（恒定值 "← 数字"）与其余正常区间混在一起时，
         恒定值那一门应解析为 min=max=该值，不影响其余武学的正常区间解析"""
@@ -188,6 +201,14 @@ class TestParseDetail2OuterPen:
 
     def test_missing_pattern(self):
         assert parse_detail2_outer_pen("无关文本") == {}
+
+    def test_accepts_mixed_parentheses_from_real_ocr(self):
+        text = (
+            "58.4外功穿透 | 当前外功穿透(定音部分)：67.2 | "
+            "当前外功穿透（非定音部分)：0.0 | "
+            "同等级段对抗生效外功穿透：58.4"
+        )
+        assert parse_detail2_outer_pen(text) == {"outer_pen": 0.0}
 
 
 class TestParseDetail2AttrPen:

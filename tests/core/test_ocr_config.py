@@ -42,7 +42,7 @@ def test_loads_recognition_and_normalization_from_aggregate_config(
     )
 
     config = load_ocr_config()
-    assert config["normalization"]["groups"]["equip"]["replacements"] == {"错": "对"}
+    assert config["normalization"]["default"]["replacements"] == {"错": "对"}
     assert load_region_batch_config().gap == 12
 
 
@@ -66,8 +66,7 @@ def test_legacy_local_rules_override_until_new_local_rules_are_saved(
     )
 
     config = load_ocr_config()
-    assert config["normalization"]["groups"]["equip"] == {
-        "label": "装备词条",
+    assert config["normalization"]["default"] == {
         "replacements": {"旧": "用户"},
         "patterns": {"[。]": ""},
     }
@@ -95,7 +94,34 @@ def test_saving_recognition_config_preserves_normalization(monkeypatch, tmp_path
         "max_content_height": 1600,
         "gap": 24,
     }
-    assert config["normalization"]["groups"]["equip"]["replacements"] == {"错": "对"}
+    assert config["normalization"]["default"]["replacements"] == {"错": "对"}
+
+
+def test_default_rules_apply_before_selected_group(monkeypatch, tmp_path):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    _write(system / "ocr.yaml", {
+        "normalization": {
+            "default": {
+                "replacements": {"甲": "乙"},
+                "patterns": {"乙": "丙"},
+            },
+            "groups": {"equip": {
+                "label": "装备词条",
+                "replacements": {"丙": "丁"},
+                "patterns": {"丁": "戊"},
+            }},
+        },
+    })
+    monkeypatch.setattr(
+        resolver_module, "_resolver",
+        ConfigResolver(system, local, dev_mode=False),
+    )
+    OCRCleaner.reset_instance()
+
+    cleaner = OCRCleaner()
+    assert cleaner.clean("甲") == "丙"
+    assert cleaner.clean("甲", "equip") == "戊"
 
 
 def test_cleaning_group_create_rename_delete(monkeypatch, tmp_path):

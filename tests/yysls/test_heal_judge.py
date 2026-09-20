@@ -79,6 +79,8 @@ class TestFireRatings:
     @case_matrix("equip_type,affixes,quality,expected", [
         # 扇（不需增伤）
         ("扇", ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击", "精准率"], "gold", Rating.TOP),
+        ("扇", ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击", "最大牵丝攻击"], "gold", Rating.EXCELLENT),
+        ("扇", ["最大外功攻击", "最大外功攻击", "劲", "最大牵丝攻击", "最小无相攻击"], "gold", Rating.NORMAL),
         ("扇", ["最大外功攻击", "最小外功攻击", "敏", "最大无相攻击", "会心率"], "gold", Rating.NORMAL),
         ("扇", ["最大外功攻击", "扇武学增效", "最大外功攻击", "劲", "势"], "gold", Rating.JUNK),
         # 冠胄
@@ -92,6 +94,39 @@ class TestFireRatings:
     def test_rating(self, fire, equip_type, affixes, quality, expected):
         e = make_equip(equip_type, affixes, quality=quality)
         assert fire.judge(e).rating == expected
+
+    def test_crit_and_precision_share_the_same_weapon_tier(self, fire):
+        common = ["最大外功攻击", "最大外功攻击", "劲", "最小外功攻击"]
+        crit = fire.judge(make_equip("扇", [*common, "会心率"]))
+        precision = fire.judge(make_equip("扇", [*common, "精准率"]))
+        assert crit.rating == precision.rating == Rating.TOP
+
+        with_agility = ["最大外功攻击", "最大外功攻击", "劲", "敏"]
+        crit = fire.judge(make_equip("扇", [*with_agility, "会心率"]))
+        precision = fire.judge(make_equip("扇", [*with_agility, "精准率"]))
+        assert crit.rating == precision.rating == Rating.EXCELLENT
+
+    @pytest.mark.parametrize("equip_type", ["冠胄", "胸甲"])
+    def test_head_and_chest_double_precision_are_not_top(
+        self, fire, equip_type,
+    ):
+        single = make_equip(
+            equip_type,
+            ["精准率", "单体类奇术增伤", "最大外功攻击", "劲", "敏"],
+            quality="purple",
+        )
+        doubled = make_equip(
+            equip_type,
+            ["精准率", "单体类奇术增伤", "最大外功攻击", "劲", "精准率"],
+            quality="purple",
+        )
+
+        assert fire.judge(single).rating == Rating.TOP
+        assert fire.judge(doubled).rating == Rating.EXCELLENT
+
+    def test_precision_is_not_a_transmute_target(self, fire):
+        assert "精准率" in fire.rule.affix_pool
+        assert "精准率" not in fire.rule.transmute_priority
 
 
 # ─── 势语义：势与三率同现降一般，仅带势/首词条三率封顶优秀 ──────────

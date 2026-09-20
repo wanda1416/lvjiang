@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -58,6 +59,7 @@ from ...core.graduation.candidate_pool import (
     collect_candidates,
 )
 from ...core.graduation.context import gongjue_attrs
+from ...core.graduation.optimal_combo import OPTIMAL_RESULT_LIMIT
 from ..domain_labels import domain_label
 from ..events import EQUIPMENT_CHANGED, get_event_hub
 from ..layout_helpers import fit_combo_to_contents
@@ -75,6 +77,15 @@ _MIN_RATING_CHOICES: tuple[str, ...] = ("顶级", "优秀", "一般")
 
 #: 默认要求。一般是「这件装备还能用」的下限，比顶级/优秀都不容易把候选筛空。
 _DEFAULT_MIN_RATING = "一般"
+
+
+def _global_top_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """跨弓玦场景按毕业率统一排名，只保留全局 Top N。"""
+    return sorted(
+        results,
+        key=lambda result: float(result.get("rate") or 0.0),
+        reverse=True,
+    )[:OPTIMAL_RESULT_LIMIT]
 
 
 def _playstyle_match_scope(
@@ -300,7 +311,7 @@ def _search_job(
             for result in scenario_results:
                 result["gongjue"] = gongjue
             results.extend(scenario_results)
-        return results
+        return _global_top_results(results)
 
     return run
 
@@ -681,8 +692,7 @@ class _ResultCard(QFrame):
     """单条搜索结果卡片。"""
 
     apply_clicked = pyqtSignal(dict)   # emits equipped dict
-    detail_clicked = pyqtSignal(dict)  # emits complete result metadata
-    attrs_clicked = pyqtSignal(dict)   # emits complete result metadata
+    view_clicked = pyqtSignal(dict)    # emits complete result metadata
 
     def __init__(
         self, rank: int, result: dict[str, Any],
@@ -692,6 +702,8 @@ class _ResultCard(QFrame):
     ) -> None:
         super().__init__(parent)
         self.setProperty("surface", "card")
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         self.result = result
         current_equipped = current_equipped or {}
 
@@ -743,7 +755,7 @@ class _ResultCard(QFrame):
 
         top.addStretch()
 
-        # 三个动作同一行：应用 / 组合详情（看词条）/ 战斗属性（看面板）
+        # 两个动作同一行：应用，或一次刷新组合详情和战斗属性两个预览页。
         buttons = QHBoxLayout()
         buttons.setSpacing(6)
         apply_btn = QPushButton(tr("应用此组合"))
@@ -754,20 +766,13 @@ class _ResultCard(QFrame):
         )
         buttons.addWidget(apply_btn)
         # 一行装备名看不出这套组合到底是什么，真要判断得看词条
-        detail_btn = QPushButton(tr("查看组合详情"))
-        detail_btn.setObjectName("resultDetailButton")
-        apply_button_style(detail_btn, variant="neutral")
-        detail_btn.clicked.connect(
-            lambda: self.detail_clicked.emit(result),
+        view_btn = QPushButton(tr("查看该组合"))
+        view_btn.setObjectName("resultViewButton")
+        apply_button_style(view_btn, variant="neutral")
+        view_btn.clicked.connect(
+            lambda: self.view_clicked.emit(result),
         )
-        buttons.addWidget(detail_btn)
-        attrs_btn = QPushButton(tr("查看战斗属性"))
-        attrs_btn.setObjectName("resultAttrsButton")
-        apply_button_style(attrs_btn, variant="neutral")
-        attrs_btn.clicked.connect(
-            lambda: self.attrs_clicked.emit(result),
-        )
-        buttons.addWidget(attrs_btn)
+        buttons.addWidget(view_btn)
         top.addLayout(buttons)
         layout.addLayout(top)
 
@@ -1083,16 +1088,23 @@ class OptimalComboPage(QWidget):
         results_tab = QWidget()
         results_layout = QVBoxLayout(results_tab)
         results_layout.setContentsMargins(0, 0, 0, 0)
-        results_scroll = QScrollArea()
-        results_scroll.setWidgetResizable(True)
-        results_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._results_scroll = QScrollArea()
+        self._results_scroll.setWidgetResizable(True)
+        self._results_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._results_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._results_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         results_container = QWidget()
         self._results_inner = QVBoxLayout()
         self._results_inner.setContentsMargins(8, 8, 8, 8)
         self._results_inner.setSpacing(8)
+        self._results_inner.setSizeConstraint(
+            QLayout.SizeConstraint.SetMinimumSize)
+        self._results_inner.setAlignment(Qt.AlignmentFlag.AlignTop)
         results_container.setLayout(self._results_inner)
-        results_scroll.setWidget(results_container)
-        results_layout.addWidget(results_scroll)
+        self._results_scroll.setWidget(results_container)
+        results_layout.addWidget(self._results_scroll)
         self._tab_widget.addTab(results_tab, tr("最优结果"))
 
         # Tab 3: 组合详情（4×2 装备卡片，复用穿戴装备那套卡片）
@@ -1100,7 +1112,7 @@ class OptimalComboPage(QWidget):
         detail_layout = QVBoxLayout(detail_tab)
         detail_layout.setContentsMargins(8, 8, 8, 8)
         detail_layout.setSpacing(6)
-        self._detail_hint = QLabel(tr("在「最优结果」里点某一条的「查看组合详情」"))
+        self._detail_hint = QLabel(tr("在「最优结果」里点某一条的「查看该组合」"))
         self._detail_hint.setProperty("tone", "muted")
         self._detail_hint.setStyleSheet("font-size: 12px;")
         detail_layout.addWidget(self._detail_hint)
@@ -1124,7 +1136,7 @@ class OptimalComboPage(QWidget):
         attrs_layout = QVBoxLayout(attrs_tab)
         attrs_layout.setContentsMargins(8, 8, 8, 8)
         attrs_layout.setSpacing(6)
-        self._attrs_hint = QLabel(tr("在「最优结果」里点某一条的「查看战斗属性」"))
+        self._attrs_hint = QLabel(tr("在「最优结果」里点某一条的「查看该组合」"))
         self._attrs_hint.setProperty("tone", "muted")
         self._attrs_hint.setStyleSheet("font-size: 12px;")
         attrs_layout.addWidget(self._attrs_hint)
@@ -1167,8 +1179,8 @@ class OptimalComboPage(QWidget):
             projected[slot_key] = assumptions.project({slot_key: equip})[slot_key]
         return projected
 
-    def _on_show_attrs(self, result: dict) -> None:
-        """把这套组合的战斗属性铺到「战斗属性」页并切过去。"""
+    def _on_show_attrs(self, result: dict, *, activate: bool = True) -> None:
+        """把这套组合的战斗属性铺到「战斗属性」页。"""
         if self._attrs_preview is None:
             return
         gongjue = str(result.get("gongjue") or "")
@@ -1181,7 +1193,8 @@ class OptimalComboPage(QWidget):
             .format(rank=result.get("rank") or "-", gongjue=gongjue or tr("无"),
                     rate=rate * 100))
         self._tab_widget.setTabText(3, self._ranked_title(tr("战斗属性"), result))
-        self._tab_widget.setCurrentIndex(3)
+        if activate:
+            self._tab_widget.setCurrentIndex(3)
 
     def _selected_gongjues(self) -> list[str]:
         """返回选中的弓玦场景；全不选表示按无弓玦计算。"""
@@ -1580,28 +1593,28 @@ class OptimalComboPage(QWidget):
             f"{evaluated:,} / {total:,}" + (f"  {message}" if message else ""))
 
     def _on_finished(self, results: list) -> None:
-        self._results = list(results)
+        self._results = _global_top_results(list(results))
         self._restore_idle_controls()
         self._candidate_summary.setText(
             tr("搜索完成，共得到 {count} 个可用结果。")
-            .format(count=len(results)),
+            .format(count=len(self._results)),
         )
         self.results_changed.emit(self._results)
-        self._render_results(results)
+        self._render_results(self._results)
 
     def results(self) -> list[dict[str, Any]]:
         return list(self._results)
 
     def restore_results(self, results: list[dict[str, Any]]) -> None:
         """回填缓存的搜索结果（不触发搜索，不写缓存）。"""
-        self._results = list(results)
+        self._results = _global_top_results(list(results))
         self._btn_clear_results.setVisible(bool(self._results))
         self._clear_rendered_results()
-        if results:
+        if self._results:
             self._candidate_summary.setText(
                 tr("显示上次搜索的 {count} 个结果；重新搜索会覆盖。")
-                .format(count=len(results)))
-        self._render_results(results)
+                .format(count=len(self._results)))
+        self._render_results(self._results)
 
     def _clear_rendered_results(self) -> None:
         """清空结果列表控件，不改动搜索结果数据。"""
@@ -1650,19 +1663,15 @@ class OptimalComboPage(QWidget):
             1, tr("最优结果") + f"  (Top {len(results)})")
         self._tab_widget.setCurrentIndex(1)
 
-        ranks: dict[str, int] = {}
-        for result in results:
-            gongjue = str(result.get("gongjue") or "")
-            ranks[gongjue] = ranks.get(gongjue, 0) + 1
+        for rank, result in enumerate(results, 1):
             # 方案编号跟着结果走：组合详情 / 战斗属性页签用它标明看的是第几套
-            result["rank"] = ranks[gongjue]
+            result["rank"] = rank
             card = _ResultCard(
-                ranks[gongjue], result, self._slot_labels,
+                rank, result, self._slot_labels,
                 self._current_equipped,
             )
             card.apply_clicked.connect(self._on_apply_result)
-            card.detail_clicked.connect(self._on_show_detail)
-            card.attrs_clicked.connect(self._on_show_attrs)
+            card.view_clicked.connect(self._on_show_result)
             self._results_inner.addWidget(card)
             self._result_cards.append(card)
 
@@ -1671,8 +1680,14 @@ class OptimalComboPage(QWidget):
         self._candidate_summary.setText(tr("搜索失败，请检查候选装备后重试。"))
         QMessageBox.critical(self, tr("搜索失败"), message)
 
-    def _on_show_detail(self, result: dict) -> None:
-        """把这套组合铺到「组合详情」页并切过去。
+    def _on_show_result(self, result: dict) -> None:
+        """同步刷新两个组合预览页，并先展示组合详情。"""
+        self._on_show_detail(result, activate=False)
+        self._on_show_attrs(result, activate=False)
+        self._tab_widget.setCurrentIndex(2)
+
+    def _on_show_detail(self, result: dict, *, activate: bool = True) -> None:
+        """把这套组合铺到「组合详情」页。
 
         卡片只显示原始装备；虚拟计算装备绝不进入展示层。为了兼容直接调用
         本方法的旧代码，不带结果元数据时将参数本身视为 equipped。
@@ -1708,7 +1723,8 @@ class OptimalComboPage(QWidget):
                "卡片显示原始装备数值，计算假设标注在卡片上方")
             .format(gongjue=gongjue, n=filled, change=change_text))
         self._tab_widget.setTabText(2, self._ranked_title(tr("组合详情"), result))
-        self._tab_widget.setCurrentIndex(2)
+        if activate:
+            self._tab_widget.setCurrentIndex(2)
 
     @staticmethod
     def _ranked_title(title: str, result: dict) -> str:

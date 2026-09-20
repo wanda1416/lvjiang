@@ -45,6 +45,10 @@ _FIXED_ATTR_NAMES: frozenset[str] = frozenset(
 # The 8 equipment slots in enumeration order (唯一定义见 config.equipment_slots).
 SLOT_KEYS: list[str] = list(EQUIPMENT_SLOTS)
 
+# 最优组合对外展示的统一结果上限。搜索榜容量仍可更大，用于计算期剪枝；
+# 最终只把全局最优的这些组合交给 UI 和缓存。
+OPTIMAL_RESULT_LIMIT = 10
+
 
 @dataclass(frozen=True)
 class CandidateVariant:
@@ -62,6 +66,19 @@ def _normal_affix_values(equip: dict) -> tuple[tuple[str, Any], ...]:
         if isinstance((affix := equip.get(f"affix_{index}")), dict)
         and affix.get("name")
     )
+
+
+def _dingyin_value(equip: dict) -> tuple[str, Any]:
+    """返回影响计算的定音身份，忽略 cap_pct 等展示元数据。"""
+    dingyin = equip.get("dingyin")
+    if not isinstance(dingyin, dict):
+        return "", None
+    value = dingyin.get("value")
+    try:
+        value = float(value) if value is not None else None
+    except (TypeError, ValueError):
+        pass
+    return str(dingyin.get("name") or ""), value
 
 
 def _apply_overlay_assumptions(
@@ -90,11 +107,11 @@ def _apply_overlay_assumptions(
             assumptions.append("满承音假设")
 
     if assumptions_spec.full_dingyin:
-        before_dingyin = copy.deepcopy(virtual.get("dingyin"))
+        before_dingyin = _dingyin_value(virtual)
         virtual = Assumptions(
             full_dingyin=True, playstyle=assumptions_spec.playstyle,
         ).project({"slot": virtual})["slot"]
-        if virtual.get("dingyin") != before_dingyin:
+        if _dingyin_value(virtual) != before_dingyin:
             assumptions.append("满定音假设")
 
     if assumptions_spec.simulate_transmute:
@@ -506,7 +523,9 @@ class TopRLeaderboard:
         self._entries.insert(pos, (rate, combo, dps))
         return True
 
-    def top(self, n: int = 5) -> list[tuple[float, list[int], float]]:
+    def top(
+        self, n: int = OPTIMAL_RESULT_LIMIT,
+    ) -> list[tuple[float, list[int], float]]:
         return self._entries[:n]
 
 
@@ -584,7 +603,7 @@ def search_optimal_combo(
 
     Returns
     -------
-    List of up to 5 result dicts, each containing ``rate``, ``dps``,
+    List of up to 10 result dicts, each containing ``rate``, ``dps``,
     ``total_damage``, original ``equipped`` and per-slot ``assumptions``.
     """
     # 立即反馈，避免 UI 看起来卡住
@@ -755,7 +774,7 @@ def search_optimal_combo(
 
     # -- Phase 3: build results --
     results: list[dict[str, Any]] = []
-    for rate, combo_indices, dps in board.top(5):
+    for rate, combo_indices, dps in board.top():
         equipped: dict[str, dict] = {}
         slot_notes: dict[str, list[str]] = {}
         for si, idx in enumerate(combo_indices):

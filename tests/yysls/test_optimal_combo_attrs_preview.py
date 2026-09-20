@@ -1,11 +1,20 @@
-"""最优结果卡片三个动作同排；「战斗属性 (#N)」页预览该组合的属性面板。"""
+"""最优结果卡片动作、全局排名与组合预览。"""
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTabWidget
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QLayout,
+    QPushButton,
+    QSizePolicy,
+    QTabWidget,
+)
 
 from lvjiang.apps.yysls.core.graduation.assumptions import Assumptions
 from lvjiang.apps.yysls.ui.loadout.optimal_combo import (
     OptimalComboPage,
+    _global_top_results,
     _ResultCard,
 )
 from tests.yysls.test_loadout_panel_layout import _Host
@@ -53,6 +62,11 @@ def test_gongjue_select_all_shortcut(qtbot, monkeypatch):
     assert not button.isEnabled()
     page._set_search_controls_enabled(True)
     assert button.isEnabled()
+    assert page._results_scroll.verticalScrollBarPolicy() == (
+        Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    assert page._results_inner.sizeConstraint() == (
+        QLayout.SizeConstraint.SetMinimumSize)
+    assert page._results_inner.alignment() == Qt.AlignmentFlag.AlignTop
 
 
 def test_apply_tuning_switch_controls_rating_filter(qtbot, monkeypatch):
@@ -157,7 +171,7 @@ def test_result_card_actions_share_one_row(qtbot):
     qtbot.addWidget(card)
     buttons = {
         name: card.findChild(QPushButton, name)
-        for name in ("resultApplyButton", "resultDetailButton", "resultAttrsButton")
+        for name in ("resultApplyButton", "resultViewButton")
     }
     assert all(button is not None for button in buttons.values())
     rows = {
@@ -166,9 +180,47 @@ def test_result_card_actions_share_one_row(qtbot):
     assert len(rows) == 1 and isinstance(next(iter(rows)), QHBoxLayout)
 
     seen: list[dict] = []
-    card.attrs_clicked.connect(seen.append)
-    buttons["resultAttrsButton"].click()
+    card.view_clicked.connect(seen.append)
+    buttons["resultViewButton"].click()
     assert seen and seen[0]["gongjue"] == "会意"
+    assert card.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Maximum
+
+
+def test_multiple_gongjues_share_one_global_top_ten():
+    results = [
+        {"rate": rate, "gongjue": gongjue}
+        for gongjue, rates in (
+            ("会意", (0.99, 0.70, 0.60, 0.50, 0.40, 0.30)),
+            ("会心", (0.98, 0.97, 0.96, 0.95, 0.94, 0.93)),
+        )
+        for rate in rates
+    ]
+
+    top = _global_top_results(results)
+
+    assert len(top) == 10
+    assert [item["rate"] for item in top] == sorted(
+        (item["rate"] for item in results), reverse=True)[:10]
+    assert [item["gongjue"] for item in top[:3]] == ["会意", "会心", "会心"]
+
+
+def test_view_result_refreshes_both_preview_tabs(qtbot):
+    page = OptimalComboPage.__new__(OptimalComboPage)
+    page._tab_widget = QTabWidget()
+    qtbot.addWidget(page._tab_widget)
+    for title in ("候选装备", "最优结果", "组合详情", "战斗属性"):
+        page._tab_widget.addTab(QLabel(), title)
+    calls: list[tuple[str, dict, bool]] = []
+    page._on_show_detail = lambda result, *, activate=True: calls.append(
+        ("detail", result, activate))
+    page._on_show_attrs = lambda result, *, activate=True: calls.append(
+        ("attrs", result, activate))
+    result = _result()
+
+    OptimalComboPage._on_show_result(page, result)
+
+    assert calls == [("detail", result, False), ("attrs", result, False)]
+    assert page._tab_widget.currentIndex() == 2
 
 
 def _layout_of(widget):

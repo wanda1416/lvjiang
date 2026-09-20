@@ -488,7 +488,7 @@ class TestSearchOptimalCombo:
         )
         results = search_optimal_combo(candidates, calc, base_attrs)
         assert len(results) > 0
-        assert len(results) <= 5
+        assert len(results) <= 10
         # Results sorted by rate descending
         for i in range(len(results) - 1):
             assert results[i]["rate"] >= results[i + 1]["rate"]
@@ -638,7 +638,11 @@ class TestSearchOptimalCombo:
             "affix_1": {
                 "name": "会心率", "value": affix_caps["chengyin"],
             },
-            "dingyin": {"name": target, "value": dingyin_caps["cap"]},
+            "dingyin": {
+                "name": target,
+                "value": dingyin_caps["cap"],
+                "cap_pct": 100.0,
+            },
         }
 
         variant = build_candidate_variants(

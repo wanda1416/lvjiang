@@ -1533,8 +1533,8 @@ auto_strings:
   计算假设已变化，当前结果按旧假设得出；请重新搜索。: Assumptions changed; the current results use the old ones. Search again.
   计算假设已变化，当前结果按旧假设得出；请重新计算。: Assumptions changed; the current result uses the old ones. Recalculate.
   # 最优结果：战斗属性预览页
-  查看战斗属性: View Combat Attributes
-  在「最优结果」里点某一条的「查看战斗属性」: Click "View Combat Attributes" on a row in "Best Results"
+  查看该组合: View This Combo
+  在「最优结果」里点某一条的「查看该组合」: Click "View This Combo" on a row in "Best Results"
   '方案 #{rank}　弓玦套装：{gongjue}　毕业率 {rate:.2f}%　·　属性按搜索时的计算假设与该弓玦套装计算，不是穿戴后的实测值': 'Plan #{rank}　Gongjue set: {gongjue}　Graduation {rate:.2f}%　·　Attributes are computed under the search-time assumptions and this Gongjue set, not measured after equipping'
   组合详情: Combo Details
   战斗属性: Combat Attributes

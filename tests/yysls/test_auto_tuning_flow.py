@@ -128,6 +128,7 @@ class FakeWF(AutoTuningWorkflow):
         # 显式加载导航 subcall（生产路径在 run() 中加载，测试路径在此加载）
         self.navigator.load_dependencies()
         self.clicks: list[tuple[str, str]] = []
+        self.events: list[tuple] = []
         self.ocr_calls: list[tuple[str, list[str] | None]] = []
         self.scan_reject_calls: list = []
         self.full_calls: list = []
@@ -160,6 +161,7 @@ class FakeWF(AutoTuningWorkflow):
 
     def click_region(self, scene_key, field_key, jitter: bool = True, **kw):
         self.clicks.append((scene_key, field_key))
+        self.events.append(("click", scene_key, field_key))
 
     def ocr_scene(self, scene_key, field_keys=None, min_confidence=None,
                   cleaning_group=None):
@@ -226,6 +228,7 @@ class FakeWF(AutoTuningWorkflow):
 
     def recognize_references_info_panel(self, scene_key, panel_key, group=None):
         self.material_info_calls += 1
+        self.events.append(("material_scan", scene_key, panel_key))
         return dict(self._material_infos)
 
     def click_panel(self, scene_key, panel_key, row, col, **kw):
@@ -673,10 +676,32 @@ def test_food_rule_feeds_each_round(patch_worth, monkeypatch):
     reports = wf.output["tuning_reports"]
     assert reports[0]["status"] == "tuned"
     assert reports[0]["rounds"] == 3
-    # 材料识别只在进入调律页时调用一次（缓存优化）
+    # 材料识别只在首轮真实调律前调用一次（缓存优化）
     assert wf.material_info_calls == 1
     # 每轮：点狗粮槽位（缓存扣减，不重 OCR）
     assert wf.clicks.count((TUNE_SCENE, "materials", 1, 3)) == 3
+
+
+def test_collapsed_material_panel_expands_before_scan(patch_worth):
+    """真实调律前先展开折叠的材料区，稳定后才识别库存。"""
+    base = TuningGroup(materials=MaterialSettings(food_rules=[
+        FoodRule(pct=90, min_expect="excellent", food="金狗粮")]))
+    wf = _wf_with(base)
+    wf._ocr_map[TUNE_SCENE] = {
+        "auto_add": "", "auto_add_2": "点击添加材料",
+        "tune_btn": "调律", "tune_affix": "最大外功攻击 100",
+        "tune_tip": "",
+    }
+    wf._material_infos = {(1, 3): _reference("金狗粮", count=42)}
+
+    wf._process_equipment("折叠材料区剑", _equip(2, cap_pct=95),
+                          WEAPON_DETAIL)
+
+    expand = ("click", TUNE_SCENE, "expand")
+    scan = ("material_scan", TUNE_SCENE, "materials")
+    assert expand in wf.events and scan in wf.events
+    assert wf.events.index(expand) < wf.events.index(scan)
+    assert wf.material_info_calls == 1
 
 
 def test_no_recognition_when_stone_off_and_no_rules(patch_worth, monkeypatch):
@@ -956,8 +981,8 @@ def test_stone_low_aborts_tuning_flow(patch_worth, stone_check_on):
     assert reports[0]["rounds"] == 0
     assert wf.executor.materials_exhausted
     assert wf.output["stop_reason"]
-    # 本用例关闭律准石缓存：进页扫一次，首个检查点再扫一次。
-    assert wf.material_info_calls == 2
+    # 进页不读材料；首轮真实调律前只扫一次。
+    assert wf.material_info_calls == 1
     # 退出路径仍收束：调律页 back 正常点击
     assert (TUNE_SCENE, "back") in wf.clicks
 
@@ -1694,6 +1719,9 @@ def test_tune_reset_blocked_ocr_unreadable(monkeypatch):
         tune=TuneBehavior(
             enabled=True,
             rules=[BehaviorRule(ratings=["junk"], action="reset")]))
+    # 如果旧逻辑在进页时立即准备材料，这条规则会触发 OCR。
+    # 重置判定失败后没有真实调律，因此正确行为是一次也不扫。
+    base.materials.food_rules = [FoodRule(food="紫狗粮")]
     monkeypatch.setattr(auto_tuning, "get_game_config",
                         lambda: _mock_game_config([LevelConfig(level=110, allow_reset=True)]))
     wf = _wf_with(base)
@@ -1712,6 +1740,7 @@ def test_tune_reset_blocked_ocr_unreadable(monkeypatch):
     # 里看出这件是"没看清楚"而不是"规则让它停"。
     assert "无法识别重置次数" in reports[0]["stop_reason"]
     assert (TUNE_SCENE, "reset_confirm") not in wf.clicks
+    assert wf.material_info_calls == 0
     # 关键：识别不出次数绝不能触发回收。
     assert "recycled_items" not in wf.output
 

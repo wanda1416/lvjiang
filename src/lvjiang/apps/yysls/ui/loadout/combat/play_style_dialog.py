@@ -12,6 +12,7 @@ from loguru import logger
 from PyQt6.QtCore import QLocale, Qt
 from PyQt6.QtGui import QDoubleValidator
 from PyQt6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFrame,
@@ -20,6 +21,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -80,12 +82,15 @@ class PlayStyleDialogMixin:
             return
 
         # 获取流派属性
-        from ....config import get_game_config
+        from ....config import get_game_config, get_play_styles
         gc = get_game_config()
         school_attr = gc.get_school_attr(school)
 
         dlg = _CreatePlayStyleDialog(
-            self._play_style_dialog_parent(), school_attr=school_attr)
+            self._play_style_dialog_parent(),
+            school_attr=school_attr,
+            existing_names=list(get_play_styles(school)),
+        )
         self._finish_play_style_dialog(school, dlg)
 
     def _on_open_play_style_form(self, prefill: dict):
@@ -104,7 +109,7 @@ class PlayStyleDialogMixin:
             )
             return
 
-        from ....config import get_game_config
+        from ....config import get_game_config, get_play_styles
         gc = get_game_config()
         school_attr = gc.get_school_attr(school)
 
@@ -112,6 +117,7 @@ class PlayStyleDialogMixin:
             self._play_style_dialog_parent(),
             school_attr=school_attr,
             initial_values=prefill,
+            existing_names=list(get_play_styles(school)),
         )
         self._finish_play_style_dialog(school, dlg, workflow_triggered=True)
 
@@ -349,13 +355,19 @@ class PlayStyleDialogMixin:
 class _CreatePlayStyleDialog(QDialog):
     """创建基础属性对话框 — 输入面板属性，反推并保存基础值。"""
 
-    def __init__(self, parent=None, school_attr: str | None = None,
-                 initial_values: dict[str, float] | None = None):
+    def __init__(
+        self,
+        parent=None,
+        school_attr: str | None = None,
+        initial_values: dict[str, float] | None = None,
+        existing_names: list[str] | None = None,
+    ):
         super().__init__(parent)
         self.setWindowTitle(tr("创建基础属性"))
         self.setMinimumWidth(720)
         self._school_attr = school_attr
         self._edits: dict[str, QLineEdit] = {}
+        self._existing_names = list(existing_names or [])
         self._initial_values = self._resolve_initial_values(initial_values, school_attr)
         self._setup_ui()
 
@@ -441,10 +453,6 @@ class _CreatePlayStyleDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 14)
         layout.setSpacing(8)
 
-        title = QLabel(tr("创建基础属性"))
-        title.setStyleSheet("font-size: 18px; font-weight: 600;")
-        layout.addWidget(title)
-
         hint = QLabel(
             tr("填写这套基础配置对应的面板属性。装备专属属性无需填写；"
                "外功穿透和属攻穿透仅填写基础值，不包含装备定音。")
@@ -507,11 +515,23 @@ class _CreatePlayStyleDialog(QDialog):
         name_label = QLabel(tr("基础属性名称"))
         name_label.setStyleSheet("font-size: 13px; font-weight: 600;")
         name_row.addWidget(name_label)
-        self._edit_name = QLineEdit()
+        self._combo_name = QComboBox()
+        self._combo_name.setEditable(True)
+        self._combo_name.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._combo_name.addItems(self._existing_names)
+        # 已有名称只是快速覆盖候选；默认保持空白，仍以创建新名称为主。
+        self._combo_name.setCurrentIndex(-1)
+        self._edit_name = self._combo_name.lineEdit()
+        assert self._edit_name is not None
         self._edit_name.setPlaceholderText(tr("输入基础属性名称"))
         self._edit_name.setMaxLength(20)
-        self._edit_name.setMinimumHeight(32)
-        name_row.addWidget(self._edit_name)
+        self._combo_name.setMinimumHeight(32)
+        # 名称输入框紧跟标签，与标签一起只占左半区（combo 与尾部
+        # 空白各分一半伸展空间），不拉满整行。
+        self._combo_name.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        name_row.addWidget(self._combo_name, 1)
+        name_row.addStretch(1)
         layout.addLayout(name_row)
 
         buttons = QDialogButtonBox(

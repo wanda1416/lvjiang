@@ -112,6 +112,18 @@ def test_eligibility_is_judged_on_original_snapshot_not_projection():
     assert judge_transmute_eligibility(original["main_weapon"], gc).eligible
 
 
+def test_full_chengyin_never_reduces_an_existing_affix_value():
+    gc = get_game_config()
+    equip = _sword(is_chengyin=True)
+    cap = gc.get_affix_caps(110, "最大外功攻击")["chengyin"]
+    equip["affix_1"]["value"] = cap + 1
+
+    projected = apply_hypothetical_caps(
+        {"main_weapon": equip}, full_chengyin=True)
+
+    assert projected["main_weapon"]["affix_1"]["value"] == cap + 1
+
+
 def test_transferred_slot_is_the_only_option_and_bad_marks_are_untrusted():
     gc = get_game_config()
     once = _sword()

@@ -553,12 +553,11 @@ def test_candidate_maximum_applies_all_three_assumptions(monkeypatch):
         "full_level": 110,
         "playstyle": "双切",
         "simulate_transmute": False,
-        "season_chengyin": True,
     }
 
 
-def test_candidate_maximum_treats_current_season_native_as_chengyin():
-    """当前赛季原生装备按同等级承音：词条取承音上限，原件不被改写。"""
+def test_candidate_maximum_keeps_current_season_native_equipment_native():
+    """同等级承音只属于最优组合分支，不得污染智能调律的三满静态值。"""
     from lvjiang.apps.yysls.config import get_game_config
 
     evaluator = _bare_evaluator()
@@ -576,9 +575,8 @@ def test_candidate_maximum_treats_current_season_native_as_chengyin():
 
     projected = evaluator._apply_maximum_assumptions(context, original)
 
-    assert projected["pendant"]["is_chengyin"] is True
-    assert projected["pendant"]["affix_1"]["value"] == get_game_config(
-    ).get_affix_caps(110, "最小外功攻击")["chengyin"]
+    assert projected["pendant"]["is_chengyin"] is False
+    assert projected["pendant"]["affix_1"]["value"] == 87.1
     assert original["pendant"]["is_chengyin"] is False
 
 

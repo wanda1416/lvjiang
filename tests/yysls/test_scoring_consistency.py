@@ -18,7 +18,10 @@ from lvjiang.apps.yysls.core.graduation.context import (
     PlanScoringContext,
     gongjue_attrs,
 )
-from lvjiang.apps.yysls.core.graduation.optimal_combo import search_optimal_combo
+from lvjiang.apps.yysls.core.graduation.optimal_combo import (
+    build_candidate_variants,
+    search_optimal_combo,
+)
 from lvjiang.apps.yysls.core.graduation.scoring import BudgetExceeded, LoadoutScorer
 from lvjiang.apps.yysls.core.graduation.smart_tuning import _PlanContext, _rate
 from lvjiang.apps.yysls.core.graduation.transmute_optimizer import (
@@ -65,13 +68,19 @@ def calculator():
     return calc
 
 
-def test_every_entry_point_scores_the_same(calculator):
+def test_entry_points_share_scorer_while_season_branch_stays_optimal_only(
+    calculator,
+):
     gc = get_game_config()
     base = CombatAttributes(min_outer=1200, max_outer=3000, intent_rate=0.2)
-    assumptions = Assumptions(full_level=110, full_chengyin=True,
-                              season_chengyin=True)
+    assumptions = Assumptions(full_level=110, full_chengyin=True)
     equipped = _equipped()
-    projected = assumptions.project(equipped, gc)
+    variants = build_candidate_variants(
+        {slot: [equip] for slot, equip in equipped.items()},
+        assumptions=assumptions, season_level=110, season_chengyin=True,
+    )
+    projected = {slot: slot_variants[-1].virtual
+                 for slot, slot_variants in variants.items()}
 
     scorer = LoadoutScorer(calculator, base, "鸣金·虹", gc)
     reference = scorer.rate(projected)
@@ -84,8 +93,10 @@ def test_every_entry_point_scores_the_same(calculator):
     result = optimize_transmutes(TransmuteSearchRequest(
         equipped=copy.deepcopy(equipped), calculator=calculator,
         base_attrs=base, school="鸣金·虹", game_config=gc,
-        full_level=110, full_chengyin=True, season_chengyin=True))
-    assert result.baseline_rate == pytest.approx(reference)
+        full_level=110, full_chengyin=True))
+    reference_without_season_branch = scorer.rate(
+        assumptions.project(equipped, gc))
+    assert result.baseline_rate == pytest.approx(reference_without_season_branch)
     # 最优组合：每槽只有这一件候选，搜索结果就是这套装备
     combos = search_optimal_combo(
         {slot: [equip] for slot, equip in equipped.items()},
@@ -95,6 +106,31 @@ def test_every_entry_point_scores_the_same(calculator):
     assert combos and combos[0]["rate"] == pytest.approx(reference)
     # 两把剑的剑武学增伤只生效一条：内核与向量内环都不得相加
     assert scorer.attrs(projected).extra_attrs["剑武学增伤"] < 0.1
+
+
+@pytest.mark.parametrize("assumptions", [
+    Assumptions(full_level=110),
+    Assumptions(full_chengyin=True),
+    Assumptions(full_dingyin=True, playstyle="无名"),
+    Assumptions(
+        full_level=110, full_chengyin=True,
+        full_dingyin=True, playstyle="无名",
+    ),
+])
+def test_each_full_assumption_never_reduces_graduation_rate(
+    calculator, assumptions,
+):
+    """三个“满”都是正向提升，不得把备战方案静态毕业率向下投影。"""
+    gc = get_game_config()
+    equipped = _equipped()
+    equipped["sub_weapon"]["is_chengyin"] = True
+    base = CombatAttributes(min_outer=1200, max_outer=3000, intent_rate=0.2)
+    scorer = LoadoutScorer(calculator, base, "鸣金·虹", gc)
+
+    before = scorer.rate(equipped)
+    after = scorer.rate(assumptions.project(equipped, gc))
+
+    assert after >= before
 
 
 def test_scorer_caches_by_attribute_signature(calculator):

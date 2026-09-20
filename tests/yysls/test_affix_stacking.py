@@ -168,10 +168,9 @@ def test_smart_tuning_candidate_uses_max_stacking_with_incumbent(monkeypatch):
     assert isinstance(evaluator, SmartTuningEvaluator)
     evaluator._candidate_rate(context, "sub_weapon", _sword("候选", 8.0))
     assert seen
-    # 智能调律按三满口径：两条都升到 110 承音上限 9.212%，同名只取最高一条，
-    # 再过增益抗性 1.15 → 0.0801；若分槽相加会得到两倍。
-    caps = gc.get_affix_caps(110, "剑武学增伤")
-    expected = caps["chengyin"] / 100 / 1.15
+    # 两件都是当前赛季原生装备，满承音不会把它们静态改成承音；同名词条
+    # 仍只取在位装备较高的 9%，再过增益抗性 1.15。若分槽相加会得到两倍。
+    expected = 9.0 / 100 / 1.15
     assert abs(seen[-1].extra_attrs["剑武学增伤"] - expected) < 1e-9
 
 

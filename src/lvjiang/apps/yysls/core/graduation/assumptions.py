@@ -17,8 +17,6 @@ class Assumptions:
     """计算假设。全部关闭时投影即原样。
 
     - ``full_level``：>0 时低于该等级的装备升到该等级（并视为承音）。
-    - ``season_chengyin``：当前赛季原生装备（等级 == 目标等级、未承音）视为
-      已承音；只影响 ``full_chengyin`` 取值时的词条上限，单独打开无效果。
     - ``full_chengyin`` / ``full_dingyin``：承音装备普通词条 / 定音顶到上限。
     - ``simulate_transmute``：按装备上已保存的转律目标计算。
     - ``playstyle``：满定音时按该玩法要求的定音替换。
@@ -27,7 +25,6 @@ class Assumptions:
     full_level: int = 0
     full_chengyin: bool = False
     full_dingyin: bool = False
-    season_chengyin: bool = False
     simulate_transmute: bool = False
     playstyle: str = ""
 
@@ -40,7 +37,6 @@ class Assumptions:
             full_level=self.full_level,
             playstyle=self.playstyle,
             simulate_transmute=self.simulate_transmute,
-            season_chengyin=self.season_chengyin,
         )
 
     def labels(self) -> tuple[str, ...]:
@@ -48,8 +44,6 @@ class Assumptions:
         result: list[str] = []
         if self.full_level:
             result.append(tr("满等级"))
-        if self.season_chengyin:
-            result.append(tr("赛季装备假设承音"))
         if self.full_chengyin:
             result.append(tr("满承音"))
         if self.full_dingyin:

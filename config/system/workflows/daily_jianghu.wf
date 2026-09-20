@@ -85,6 +85,12 @@ import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 import "subcall/page_action.wf"
 import "subcall/game_profile.wf"
+import "subcall/profile_registry.wf"
+
+call $profile_ok = declare_profiles(["haoling_of_week"])
+if $profile_ok < 0
+   return -1
+end
 
 eval $haoling_of_week = -1
 eval $mode_checked = false

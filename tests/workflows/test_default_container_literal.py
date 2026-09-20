@@ -29,6 +29,18 @@ _PURCHASE_BUGAN = (
 )
 
 
+def _parameter_defaults_preamble(source: str) -> str:
+    """只截取参数默认值与旧 checkgroup 补齐逻辑。
+
+    不能把首个 import 之前的整段正文都交给测试引擎：业务工作流可以在
+    import 前声明 Profile 或执行其他入口动作，而这个测试只负责参数语义。
+    """
+    start = source.index("default $buy_keywords = ")
+    guard = source.index('if not $buy_keyword_keys contains "振玉"', start)
+    end = source.index("\nend", guard) + len("\nend")
+    return source[start:end] + "\n"
+
+
 class TestDefaultContainerLiteral:
     def test_dict_scalars_are_real_values(self):
         v = run('default $d = {"a": true, "b": false, "n": 3, "s": "x"}\n')
@@ -88,7 +100,8 @@ def test_purchase_bugan_metadata_and_runtime_defaults_stay_in_sync():
     assert parameter["default"]["振玉"] is True
 
     # 批量任务可能直接注入升级前保存的字典，不经过日常参数面板。
-    preamble = source.partition('import "subcall/navigation.wf"')[0]
+    preamble = _parameter_defaults_preamble(source)
+    assert "profile_" not in preamble
     legacy = run(preamble, {"buy_keywords": {"心法": False}})
     assert legacy["buy_keywords"] == {"心法": False, "振玉": True}
 

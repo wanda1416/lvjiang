@@ -189,7 +189,8 @@ def _profile_declare(
     profile_model 可直接使用。definition 校验失败不抛异常，返回 ok=False，
     工作流功能退化为「key 未定义」现状，不阻断执行。
 
-    .wf 用法（建议放在工作流开头，一次性声明全部依赖）:
+    系统业务工作流通过 subcall/profile_registry.wf 的 declare_profiles
+    集中声明依赖；自定义工作流也可直接调用本函数：
         eval profile_declare("quota", "nn_bugan_of_week",
             {"label": "不肝", "cap": 1, "increment_only": true})
         eval profile_declare("stock", "changmingyu", {"label": "长鸣玉"})

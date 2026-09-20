@@ -32,6 +32,7 @@
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 import "subcall/page_action.wf"
+import "subcall/profile_registry.wf"
 
 # 参数缺省回落（批量注入缺失时用默认值）
 default $max_scroll = 2
@@ -40,8 +41,10 @@ default $max_scroll = 2
 # niaoniao_of_week：本周已购「绑」数量（quota，周周期自动清零，cap 2）。
 # changmingyu：长鸣玉余额（stock），袅袅之音·绑 每个 200。
 # 本周已买满 2 个、或长鸣玉不足以买满剩余，则不导航直接跳过。
-eval profile_declare("quota", "niaoniao_of_week", {"label": "袅袅本周", "cap": 2, "increment_only": true, "sources": ["商店精选"]})
-eval profile_declare("stock", "changmingyu", {"label": "长鸣玉"})
+call $profile_ok = declare_profiles(["niaoniao_of_week", "changmingyu"])
+if $profile_ok < 0
+    return -1
+end
 
 eval $bought_week = profile_get("niaoniao_of_week")
 if $bought_week == null

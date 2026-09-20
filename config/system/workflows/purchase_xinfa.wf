@@ -30,10 +30,14 @@
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 import "subcall/game_profile.wf"
+import "subcall/profile_registry.wf"
 
 # xinfa_of_week 记录本周已购买心法心得数。心得置换页展示的是剩余库存，
 # 因此 600/600 对应 profile=0，0/600 对应 profile=600。
-eval profile_declare("quota", "xinfa_of_week", {"label": "心法心得本周", "cap": 600, "increment_only": true, "sources": ["心得置换"]})
+call $profile_ok = declare_profiles(["xinfa_of_week"])
+if $profile_ok < 0
+    return -1
+end
 
 default $open_bag_xinfa = false
 default $max_xinfa_boxes = 5

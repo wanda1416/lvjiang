@@ -160,6 +160,12 @@ config/
     session.json              # 会话状态（分组配置、提醒历史、UI 状态）
 ```
 
+系统业务工作流依赖的 key 定义集中在
+`config/system/workflows/subcall/profile_registry.wf`。涉及 Profile 的工作流在正文开头把
+所需 key 列表传给唯一的 `declare_profiles` 过程；该过程只补齐缺失定义，不覆盖已有同类型
+定义。未知 key 或同名异类型定义必须终止声明，避免静默写错模型。批量前置检查不执行正文，
+因此若它需要读取 Profile，也必须先调用同一个过程。
+
 **profile.yaml 示例**：
 
 ```yaml

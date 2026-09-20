@@ -26,7 +26,8 @@
 
 ## 花蕊织
 
-`weekly_huaruizhi.wf` 的批量检查读取 `huaruizhi_of_week`。达到 3000 时返回跳过；
+`weekly_huaruizhi.wf` 的批量检查先通过全局 Profile 注册表幂等声明
+`huaruizhi_of_week`，再读取进度。达到 3000 时返回跳过；
 任务正文仍保留进入渡尘墟后同步实际进度并阻止多开一局的保护。通用
 `prepare_item.wf` 通过默认关闭的“不在登录页时重启应用”参数提供花蕊织轮次所需的
 现场恢复能力，批量目录不再保留花蕊织专用生命周期工作流。

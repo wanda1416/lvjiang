@@ -3,7 +3,7 @@
 状态机行为点「材料处理」（每轮调律开始前的行为）：
 - 大律准石数量检查：开关 + 数量基准 + 不足处理（低于基准判材料
   不足，按不足处理执行：跳过该装备 / 结束全部调律 / 询问是否继续）；
-- 狗粮添加规则：有序规则表（可自由增删行），条件与扫描/调律
+- 材料处理规则：有序规则表（可自由增删行），条件与扫描/调律
   处理一致（部位 / 品阶 / 判定语义 / 判定结果 / 首词条百分比，
   其中比较方向固定为 ≥）+ 每轮添加狗粮 + 材料不足时行为。
 沿用「变更即校验即暂存」模式：控件变更即重建 raw dict → 校验 →
@@ -131,12 +131,9 @@ class MaterialConfigPage(QWidget):
         half_line = self.fontMetrics().height() // 2
         layout.addSpacing(half_line)
 
-        # 大律准石数量检查
-        layout.addWidget(QLabel(
-            "<b>" + tr("大律准石数量检查") + "</b>（" + tr("调律前识别材料区数量，"
-            "低于基准判材料不足，按不足处理执行") + "）"))
+        # 大律准石检查与其他规则表上方设置保持同级，不另设小标题。
         stone_row = QHBoxLayout()
-        self._stone_cb = QCheckBox(tr("启用检查"))
+        self._stone_cb = QCheckBox(tr("启动大律准石数量检查"))
         self._stone_cb.stateChanged.connect(lambda _s: self._apply())
         stone_row.addWidget(self._stone_cb)
         stone_row.addWidget(QLabel(tr("数量基准")))
@@ -157,10 +154,10 @@ class MaterialConfigPage(QWidget):
         stone_row.addStretch()
         layout.addLayout(stone_row)
 
-        # 狗粮添加规则（标题顶部留半个字高度）
+        # 材料处理规则（标题顶部留半个字高度）
         layout.addSpacing(half_line)
         layout.addWidget(QLabel(
-            "<b>" + tr("狗粮添加规则") + "</b>（" + tr(
+            "<b>" + tr("材料处理规则") + "</b>（" + tr(
                 "每轮调律自上而下匹配；命中后按材料不足动作结束或顺延；"
                 "全部不命中则不添加") + "）"))
         self._ci = {key: index for index, key in enumerate(_COL_KEYS)}

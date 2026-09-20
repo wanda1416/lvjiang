@@ -2063,10 +2063,11 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """
         label = equip_data.name or equip_data.type
         cfg = self.base_group.scan
-        if detail_scene is None or not cfg.enabled:
-            logger.info(f"  [扫描处理] {label} 不进调律（处置未启用，保留）")
+        if detail_scene is None:
+            logger.info(f"  [扫描处理] {label} 缺少装备详情场景，保留")
             self._emit_progress("scan_decision", {
-                "name": label, "action": "kept", "reason": "处置未启用，保留"})
+                "name": label, "action": "kept",
+                "reason": "缺少装备详情场景，保留"})
             return None
         # potential 若来自"仅首词条"门槛判定，只能复用给同口径规则
         decision = self.judge.decide_scan(

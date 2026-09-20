@@ -737,13 +737,16 @@ def _reject_stage_judge(raw: dict, where: str) -> None:
 
 
 def _parse_scan(raw, where: str) -> ScanBehavior:
-    """扫描处理解析：{enabled, min_level, entry_min_rating,
+    """扫描处理解析：{min_level, entry_min_rating,
     max_consecutive_recycles, rules}；缺省段取 ScanBehavior 默认值"""
     if raw is None:
         return ScanBehavior()
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
     _reject_stage_judge(raw, where)
+    if "enabled" in raw:
+        raise RuleValidationError(
+            f"{where}.enabled 已废弃；扫描处理规则始终生效")
     if "first_affix_only" in raw:
         raise RuleValidationError(
             f"{where}.first_affix_only 已废弃，改为逐条规则声明"
@@ -769,7 +772,6 @@ def _parse_scan(raw, where: str) -> ScanBehavior:
         raise RuleValidationError(
             f"{where}.max_consecutive_recycles 必须大于 0: {mcr}")
     return ScanBehavior(
-        enabled=bool(raw.get("enabled", True)),
         min_level=min_level,
         entry_min_rating=entry,
         entry_first_affix_only=bool(
@@ -781,13 +783,16 @@ def _parse_scan(raw, where: str) -> ScanBehavior:
 
 
 def _parse_tune(raw, where: str) -> TuneBehavior:
-    """调律处理解析：{enabled, rules, max_resets,
+    """调律处理解析：{rules, max_resets,
     reset_exhausted_action, lock_qualified}；缺省段取 TuneBehavior 默认值"""
     if raw is None:
         return TuneBehavior()
     if not isinstance(raw, dict):
         raise RuleValidationError(f"{where} 必须是 dict")
     _reject_stage_judge(raw, where)
+    if "enabled" in raw:
+        raise RuleValidationError(
+            f"{where}.enabled 已废弃；调律处理规则始终生效")
     max_resets = raw.get("max_resets", MAX_TUNE_RESETS)
     if isinstance(max_resets, bool) or not isinstance(max_resets, int):
         raise RuleValidationError(f"{where}.max_resets 必须是整数")
@@ -801,7 +806,6 @@ def _parse_tune(raw, where: str) -> TuneBehavior:
             f"{where}.reset_exhausted_action 非法: {exhausted!r}"
             + tr("（须为 ['recycle', 'skip']）"))
     return TuneBehavior(
-        enabled=bool(raw.get("enabled", False)),
         rules=_parse_behavior_rules(raw.get("rules"), f"{where}.rules",
                                     "tune"),
         max_resets=max_resets,

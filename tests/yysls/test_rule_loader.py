@@ -1211,19 +1211,17 @@ def _rating(value: str | None):
 
 class TestBehaviorSettings:
     def test_defaults_when_section_missing(self):
-        # scan/tune 段缺省 → scan 默认启用（门槛 excellent），
-        # tune 默认关，max_resets 取游戏硬限
+        # scan/tune 段缺省 → 空规则表，门槛与重置设置取默认值
         g = parse_tuning_group(_valid_group())
-        assert g.scan.enabled is True and g.scan.rules == []
+        assert g.scan.rules == []
         assert g.scan.entry_min_rating == "excellent"
-        assert g.tune.enabled is False and g.tune.rules == []
+        assert g.tune.rules == []
         assert g.tune.max_resets == MAX_TUNE_RESETS
         assert g.tune.reset_exhausted_action == "skip"
 
     def test_full_section_parsed(self):
         data = _valid_group()
         data["scan"] = {
-            "enabled": True,
             "entry_min_rating": "top",
             "rules": [
                 {"parts": ["武器"], "max_quality": "blue",
@@ -1235,7 +1233,6 @@ class TestBehaviorSettings:
             ],
         }
         data["tune"] = {
-            "enabled": True,
             "rules": [
                 {"enabled": False, "max_rating": "junk", "judge_scope": "all",
                  "action": "recycle"},
@@ -1247,14 +1244,12 @@ class TestBehaviorSettings:
             "reset_exhausted_action": "recycle",
         }
         g = parse_tuning_group(data)
-        assert g.scan.enabled is True
         assert g.scan.entry_min_rating == "top"
         assert g.scan.rules == [BehaviorRule(
             parts=["武器"], max_quality="blue", ratings=["junk"],
             judge_scope="custom",
             judge_rules=["huiyi_general", "heal_pure"],
             first_affix_only=True, action="recycle")]
-        assert g.tune.enabled is True
         # 判定语义逐规则声明，缺省 incoming
         assert [r.judge_scope for r in g.tune.rules] == [
             "all", "incoming", "incoming", "incoming"]
@@ -1265,12 +1260,11 @@ class TestBehaviorSettings:
         assert g.tune.reset_exhausted_action == "recycle"
 
     def test_stage_missing_defaults(self):
-        # 只声明 tune → scan 取默认（启用/excellent）
+        # 只声明 tune → scan 取默认门槛
         data = _valid_group()
-        data["tune"] = {"enabled": True}
+        data["tune"] = {}
         g = parse_tuning_group(data)
-        assert g.tune.enabled is True and g.tune.rules == []
-        assert g.scan.enabled is True
+        assert g.tune.rules == []
         assert g.scan.entry_min_rating == "excellent"
 
     def test_legacy_recycle_rejected(self):
@@ -1282,6 +1276,7 @@ class TestBehaviorSettings:
 
     @case_matrix("scan", [
         ["not", "a", "dict"],                            # 段须为 dict
+        {"enabled": True},                               # 阶段级开关已废弃
         {"entry_min_rating": "good"},                    # 门槛档位非法
         {"judge_scope": "incoming"},                     # 段级语义已废弃
         {"first_affix_only": True},                      # 段级仅首词条已废弃
@@ -1340,6 +1335,7 @@ class TestBehaviorSettings:
 
     @case_matrix("tune", [
         ["not", "a", "dict"],                            # 段须为 dict
+        {"enabled": True},                               # 阶段级开关已废弃
         {"judge_rules": []},                             # 段级自选已废弃
         {"rules": [{"action": "skip",
                       "first_affix_only": True}]},       # 仅首词条仅扫描处置表可声明
@@ -1357,10 +1353,10 @@ class TestBehaviorSettings:
             parse_tuning_group(data)
 
     def test_scan_decide_first_hit(self):
-        # 处置表自上而下首条命中；未启用/无命中 → skip 跳过
+        # 处置表自上而下首条命中；无命中 → skip 跳过
         junk = _rating("junk")
         data = _valid_group()
-        data["scan"] = {"enabled": True, "rules": [
+        data["scan"] = {"rules": [
             {"max_pct": 30, "action": "recycle"},
             {"max_quality": "purple", "action": "skip"},
         ]}
@@ -1373,13 +1369,8 @@ class TestBehaviorSettings:
         assert scan.decide("武器", "gold", 50, junk)[0] == "skip"
         # max_pct 限制下 cap_pct 识别失败视为不达标（保守不回收）
         assert scan.decide("武器", "gold", None, junk)[0] == "skip"
-        # 未启用 → 一律跳过
-        data["scan"]["enabled"] = False
-        disabled = parse_tuning_group(data).scan
-        assert disabled.decide("武器", "gold", 20, junk)[0] == "skip"
-
     def test_disabled_behavior_rule_is_skipped(self):
-        scan = ScanBehavior(enabled=True, rules=[
+        scan = ScanBehavior(rules=[
             BehaviorRule(enabled=False, action="recycle"),
             BehaviorRule(action="skip"),
         ])
@@ -1395,7 +1386,7 @@ class TestBehaviorSettings:
             return "top" if scope == "custom" else "junk"
 
         data = _valid_group()
-        data["scan"] = {"enabled": True, "rules": [
+        data["scan"] = {"rules": [
             {"max_rating": "junk", "judge_scope": "custom",
              "judge_rules": ["huiyi_general"], "action": "recycle"},
             {"max_rating": "junk", "action": "recycle"},
@@ -1413,7 +1404,7 @@ class TestBehaviorSettings:
     def test_purple_only_quality(self):
         # purple_only 为精确档：仅紫色命中，金/蓝不命中
         data = _valid_group()
-        data["scan"] = {"enabled": True, "rules": [
+        data["scan"] = {"rules": [
             {"max_quality": "purple_only", "action": "recycle"},
         ]}
         scan = parse_tuning_group(data).scan
@@ -1432,7 +1423,7 @@ class TestBehaviorSettings:
             return "junk"
 
         data = _valid_group()
-        data["scan"] = {"enabled": True, "rules": [
+        data["scan"] = {"rules": [
             {"parts": ["武器"], "max_quality": "purple_only",
              "judge_scope": "affix",
              "ratings": ["最大鸣金攻击", "最大外功攻击",
@@ -1463,7 +1454,7 @@ class TestBehaviorSettings:
     def test_affix_scope_first_affix_only(self):
         # 勾选仅首词条时只判定 affixes[0]：目标词非首不命中
         data = _valid_group()
-        data["scan"] = {"enabled": True, "rules": [
+        data["scan"] = {"rules": [
             {"judge_scope": "affix", "ratings": ["最大外功攻击"],
              "first_affix_only": True, "action": "skip"},
             {"action": "recycle"},
@@ -1483,7 +1474,7 @@ class TestBehaviorSettings:
         junk, normal, top = (_rating("junk"), _rating("normal"),
                              _rating("top"))
         data = _valid_group()
-        data["tune"] = {"enabled": True, "rules": [
+        data["tune"] = {"rules": [
             {"max_rating": "junk", "action": "recycle"},
             {"max_rating": "normal", "action": "continue"},
         ]}
@@ -1501,7 +1492,7 @@ class TestBehaviorSettings:
         assert tune.decide(
             "武器", "gold", 95, normal, True,
             final_rating="excellent")[0] == "lock"
-        guarded = TuneBehavior(enabled=True, rules=[
+        guarded = TuneBehavior(rules=[
             BehaviorRule(ratings=["top"], action="continue"),
             BehaviorRule(action="recycle"),
         ])
@@ -1511,7 +1502,7 @@ class TestBehaviorSettings:
         # 全部不命中 → 默认：未满继续、满后结束保留，不推导锁定资格
         assert tune.decide("武器", "gold", 95, top, False)[0] == "continue"
         assert tune.decide("武器", "gold", 95, top, True)[0] == "skip"
-        # 未启用 → 同默认
+        # 空规则表 → 同默认
         assert TuneBehavior().decide(
             "武器", "gold", 95, junk, False)[0] == "continue"
         assert TuneBehavior().decide(

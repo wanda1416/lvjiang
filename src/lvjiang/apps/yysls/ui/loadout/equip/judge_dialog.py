@@ -568,23 +568,18 @@ class EquipJudgeTestDialog(QDialog):
 
         if not passes:
             log.append(tr("未达门槛 → 扫描处理"))
-            if group.scan.enabled:
-                action, why = group.scan.decide(
-                    equip_part, equip_quality, float(cap_pct)
-                    if cap_pct is not None else None,
-                    rating_of, [a.name for a in equip.affixes])
-                if action == "tune_full_recycle":
-                    log.append(f"  {why} → 调满后回收")
-                    self.result_text.setPlainText("\n".join(log))
-                    return
-                if action == "tune_this":
-                    log.append(f"  {why} → 强制调律")
-                else:
-                    log.append(f"  {why}")
-                    self.result_text.setPlainText("\n".join(log))
-                    return
+            action, why = group.scan.decide(
+                equip_part, equip_quality, float(cap_pct)
+                if cap_pct is not None else None,
+                rating_of, [a.name for a in equip.affixes])
+            if action == "tune_full_recycle":
+                log.append(f"  {why} → 调满后回收")
+                self.result_text.setPlainText("\n".join(log))
+                return
+            if action == "tune_this":
+                log.append(f"  {why} → 强制调律")
             else:
-                log.append(tr("  扫描处理未启用 → 跳过"))
+                log.append(f"  {why}")
                 self.result_text.setPlainText("\n".join(log))
                 return
 

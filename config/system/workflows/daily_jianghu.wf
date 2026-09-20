@@ -55,7 +55,8 @@
 #      1. 识别卡片文字是否命中用户勾选的任务
 #      2. 命中 → 读取任务文本，分发执行对应动作
 #      3. 未命中 → 点击卡片刷新按钮，等待后重新识别，直到命中或达到刷新上限
-#   4. 收尾：若仍在活动页，退回游戏首页
+#   4. 收尾：若仍在活动页，退回游戏首页；本次为合影切换过多人模式，则
+#      再经菜单切回单人模式，并确认回到游戏主页
 #
 # 参数：
 #   max_refresh — 单个任务最大刷新次数，默认 50
@@ -77,7 +78,7 @@ default $do_juezhanglin = true
 
 # 各任务过程共享运行配置与跨任务状态；当前任务的 idx / label / task_text
 # 仍显式传递，避免子过程依赖隐藏的当前任务上下文。
-global $claim_reward, $max_refresh, $max_claim_reputation, $haoling_of_week, $mode_checked
+global $claim_reward, $max_refresh, $max_claim_reputation, $haoling_of_week, $mode_checked, $mode_switched
 global $do_heying, $do_huanzhuang, $do_qingjing, $do_kanbao, $do_yinjiu, $do_juezhanglin
 
 import "subcall/navigation.wf"
@@ -87,6 +88,7 @@ import "subcall/game_profile.wf"
 
 eval $haoling_of_week = -1
 eval $mode_checked = false
+eval $mode_switched = false
 
 # 六项都未勾选时没有执行诉求，直接退出；只要勾选任一项，候选匹配仍按
 # 完整六类目标进行，用户开关只影响命中后的动作与领奖。
@@ -199,6 +201,12 @@ if $at_haoling
    click [activity_jianghu].[back] after wait @step_interval
    click [school_main].[back] after wait @step_interval
    click [game_menu_page].[back] after wait @step_interval
+end
+
+# 本次为合影切到过多人模式：从主页进菜单切回单人模式，再确认回到主页。
+# 未切换过的不动作，保持用户原有模式。
+if $mode_switched
+   call restore_single_mode()
 end
 
 # 判断一次扫描结果是否代表任务已经完成。
@@ -634,19 +642,29 @@ def action_juezhanglin($label)
    log "觉障林动作暂未实现"
 end
 
-# 跳转到多人模式：前置在菜单页。江湖号令需多人模式，
-# 识别到单人模式则经模式选择页切换并踏入，轮询等待回到游戏主页；
-# 已是多人模式则不动作。
-# 后置：切换过则在游戏主页（调用方需重新打开菜单），未切换仍在菜单页
-def switch_to_multi_mode()
-   scan [game_menu_page].[mode] as $is_single by contains "单人"
-   if not $is_single
+# 切换游戏模式：前置在菜单页。$target 为 "mp"（多人）或 "sp"（单人），
+# 两种模式在模式选择页结构对称，只是按钮不同。
+# 模式标签已显示目标模式则不动作；否则经模式选择页切换并踏入，
+# 轮询等待回到游戏主页。
+# 返回：1=执行了切换（当前在游戏主页，调用方需重新打开菜单）；
+#       0=已是目标模式，未动作（仍在菜单页）
+def switch_game_mode($target)
+   if $target equals "mp"
+      eval $from_text = "单人"
+      eval $target_name = "多人模式"
+   else
+      eval $from_text = "多人"
+      eval $target_name = "单人模式"
+   end
+   scan [game_menu_page].[mode] as $need_switch by contains $from_text
+   if not $need_switch
       return 0
    end
 
-   log "检测到单人模式，切换至多人模式"
+   log "检测到" + $from_text + "模式，切换至" + $target_name
+   eval $mode_key = $target + "_mode"
    click [game_menu_page].[mode] after wait @step_interval
-   click [game_menu_page].[mp_mode] after wait @step_interval
+   click [game_menu_page].$mode_key after wait @step_interval
    click [game_menu_page].[enter_mode] after wait @page_refresh
 
    # 踏入后每 2s 检测一次游戏主页，最多 10 次
@@ -657,14 +675,38 @@ def switch_to_multi_mode()
       wait 2
       call $in_main = is_in_main_page()
       if $in_main
-         log "已进入多人模式，回到游戏主页"
+         log "已进入" + $target_name + "，回到游戏主页"
          break
       end
    end
    if not $in_main
       log "等待 20s 仍未回到游戏主页"
-      eval pause("切换多人模式后未检测到游戏主页，请手动处理后点击确定")
+      eval pause("切换" + $target_name + "后未检测到游戏主页，请手动处理后点击确定")
    end
+   return 1
+end
+
+# 收尾切回单人模式：主页 → 菜单 → 切换单人模式 → 确认回到游戏主页。
+# 已是单人模式（用户中途手动切回）则只关闭菜单。
+def restore_single_mode()
+   log "本次为合影切换过多人模式，收尾切回单人模式"
+   call $nav_result = nav_main_to_menu()
+   if $nav_result < 0
+      log "打不开菜单页，无法切回单人模式"
+      return -1
+   end
+   call $switched = switch_game_mode("sp")
+   if not $switched
+      log "已是单人模式，关闭菜单"
+      click [game_menu_page].[back] after wait @step_interval
+   end
+   call $in_main = is_in_main_page()
+   if not $in_main
+      log "切回单人模式后未回到游戏主页"
+      eval pause("切回单人模式后未检测到游戏主页，请手动回到主页后点击确定")
+      return -1
+   end
+   log "已切回单人模式并回到游戏主页"
    return 0
 end
 
@@ -685,11 +727,14 @@ def back_to_haoling()
    # 无需再次导航。mode_checked 是本次执行内的全局标记，下次运行会重置。
    if $do_heying and not $mode_checked
       eval $mode_checked = true
-      call switch_to_multi_mode()
-      # 切换后落在游戏主页，重新打开菜单继续导航
-      call $nav_result = nav_main_to_menu()
-      if $nav_result < 0
-         return -1
+      call $switched = switch_game_mode("mp")
+      if $switched
+         # 记下本次切换过，收尾时切回；切换后落在游戏主页，重新打开菜单继续导航
+         eval $mode_switched = true
+         call $nav_result = nav_main_to_menu()
+         if $nav_result < 0
+            return -1
+         end
       end
    end
 

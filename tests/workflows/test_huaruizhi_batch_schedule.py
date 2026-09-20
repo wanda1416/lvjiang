@@ -129,7 +129,7 @@ def _run_prepare(device: _Device, *, restart_app: bool) -> dict:
     engine.variables = {
         "batch_users": ["u1"], "batch_index": 0, "batch_state": {},
         "skip_online_role": True, "online_role_max_wait": 0,
-        "restart_app_if_not_login": restart_app,
+        "allow_restart_app": restart_app,
     }
     try:
         engine._exec_body(program.body)

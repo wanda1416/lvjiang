@@ -90,7 +90,8 @@ def test_lifecycle_parameter_definitions_reads_workflow_metadata():
         finish_item="batch/finish_item.wf",
     ))
     assert [item["name"] for item in definitions["prepare_item"]] == [
-        "skip_online_role", "online_role_max_wait", "restart_app_if_not_login",
+        "max_roll_account", "skip_online_role", "online_role_max_wait",
+        "allow_restart_app",
     ]
     assert definitions["finish_item"] == [{
         "name": "stop_app",

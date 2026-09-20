@@ -348,8 +348,7 @@ class TuningTab(QWidget):
         layout.addWidget(self._positional_traversal_cb)
 
         layout.addWidget(QLabel("<b>" + tr("调试参数：") + "</b>"))
-        self._skip_tuning_cb = QCheckBox(
-            tr("跳过实际调律（仅进出调律页，测试滚动用）"))
+        self._skip_tuning_cb = QCheckBox(tr("跳过实际调律"))
         self._skip_tuning_cb.stateChanged.connect(
             lambda _state: self._save_tuning_config())
         layout.addWidget(self._skip_tuning_cb)

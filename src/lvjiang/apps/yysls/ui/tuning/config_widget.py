@@ -46,8 +46,7 @@ class TuningGlobalsWidget(QWidget):
         # ── 跳过实际调律（临时测试开关，仅模拟进出调律页）──
         self._skip_tuning_cb: QCheckBox | None = None
         if show_skip_tuning:
-            self._skip_tuning_cb = QCheckBox(
-                tr("跳过实际调律（仅进出调律页，测试滚动用）"))
+            self._skip_tuning_cb = QCheckBox(tr("跳过实际调律"))
             self._skip_tuning_cb.stateChanged.connect(
                 lambda _state: self.config_changed.emit())
             self._layout.addWidget(self._skip_tuning_cb)

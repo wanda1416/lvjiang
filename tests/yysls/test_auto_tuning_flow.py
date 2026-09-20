@@ -136,6 +136,7 @@ class FakeWF(AutoTuningWorkflow):
         self._material_infos: dict[str, object] = {}
         self.material_info_calls = 0
         self._nav_tune_ok = True
+        self._tune_page_ok = True
 
     @property
     def is_stopped(self) -> bool:
@@ -210,9 +211,13 @@ class FakeWF(AutoTuningWorkflow):
         # 调律按钮查找
         if scene_key == "equip_detail":
             return "sub_func_1" if self._nav_tune_ok else ""
-        # 调律页校验
-        if scene_key == "equip_tune_detail" and "tune_btn" in field_keys:
-            return "词库预览"
+        # 调律页校验：固定标题不受词条是否已满、动作按钮文字影响。
+        if scene_key == "equip_tune_detail" and "tune_label" in field_keys:
+            return (
+                "tune_label"
+                if self._tune_page_ok and target_value == "装备调律"
+                else ""
+            )
         return ""
 
     def recognize_references_by(self, scene_key, field_keys, target_value,
@@ -253,6 +258,17 @@ def _wf_with(base: TuningGroup) -> FakeWF:
     wf = FakeWF()
     wf.run_ctx.base_group = base
     return wf
+
+
+def test_tune_page_detector_uses_stable_label_not_dynamic_button():
+    """满词条时动作按钮为「定音」，页面身份仍由固定标题确认。"""
+    wf = FakeWF()
+    wf._ocr_map[TUNE_SCENE] = {"tune_btn": "定音"}
+
+    assert wf.engine.call_subcall("is_in_equip_tune_page") == 1
+
+    wf._tune_page_ok = False
+    assert wf.engine.call_subcall("is_in_equip_tune_page") == 0
 
 
 @pytest.fixture(autouse=True)

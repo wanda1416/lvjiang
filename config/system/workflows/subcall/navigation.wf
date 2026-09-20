@@ -305,12 +305,12 @@ def nav_equip_to_tune()
         click [equip_detail].$tune_key after wait @page_refresh
     end
 
-    # 校验是否到达调律页
-    scan [equip_tune_detail].[tune_btn] as $tune_check by contains "词库预览"
-    if not $tune_check
+    # 使用固定页面标签校验；tune_btn 会随装备状态变化，不能作为页面判据。
+    call $in_tune = is_in_equip_tune_page()
+    if not $in_tune
         eval pause("未进入调律页面，请手动导航后点击继续")
-        scan [equip_tune_detail].[tune_btn] as $tune_check by contains "词库预览"
-        if not $tune_check
+        call $in_tune = is_in_equip_tune_page()
+        if not $in_tune
             return -1
         end
     end

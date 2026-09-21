@@ -23,6 +23,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tuning_rule_manager,
 )
 from lvjiang.apps.yysls.ui.tune_settings import TuningRulesDialog
+from lvjiang.apps.yysls.ui.tune_settings.base_rule_page import BaseRuleGroupPage
 from lvjiang.apps.yysls.ui.tune_settings.behavior_pages import (
     ScanBehaviorPage,
     TuneBehaviorPage,
@@ -34,7 +35,7 @@ from lvjiang.apps.yysls.ui.tune_settings.rule_panel import RulePanel
 from lvjiang.apps.yysls.ui.tune_settings.smart_tuning_page import (
     SmartTuningPage,
 )
-from lvjiang.core.config.resolver import EntityOrigin, get_resolver
+from lvjiang.core.config.resolver import ConfigResolver, EntityOrigin, get_resolver
 from tests.case_matrix import case_matrix
 
 PROJECT_ROOT = Path(__file__).parents[2]
@@ -74,6 +75,26 @@ def tmp_group_manager(tmp_path):
     yysls_dir.mkdir(exist_ok=True)
     shutil.copy(BASE_FILE, yysls_dir / "tune_config.yaml")
     return TuningGroupManager(groups_dir=tmp_path)
+
+
+@pytest.fixture
+def layered_group_manager(tmp_path):
+    """开发模式真实分层，测试展示顺序和组操作的行映射。"""
+    groups_dir = tmp_path / "system/yysls/base_groups"
+    groups_dir.mkdir(parents=True)
+    for source in GROUPS_DIR.glob("*.yaml"):
+        shutil.copy(source, groups_dir)
+    resolver = ConfigResolver(
+        system_dir=tmp_path / "system",
+        local_dir=tmp_path / "local",
+        dev_mode=True,
+    )
+    manager = TuningGroupManager(resolver=resolver)
+    manager.create_group("mine", "本地组", layer="local")
+    raw = manager.get_raw("mine")
+    raw["order"] = 1
+    manager.save_group("mine", raw)
+    return manager
 
 
 @pytest.fixture
@@ -207,6 +228,28 @@ class TestDialog:
 
 class TestBehaviorPages:
     """行为处理页 smoke：真实配置回填 + 变更即校验即保存"""
+
+    def test_group_page_sorts_system_before_local_without_changing_order(
+            self, qtbot, layered_group_manager):
+        manager = layered_group_manager
+        assert list(manager.get_groups())[0] == "mine"
+        page = BaseRuleGroupPage(manager, "default", lambda *_args: None)
+        qtbot.addWidget(page)
+        assert page._display_keys == ["default", "aggressive", "mine"]
+        assert [page._combo.itemData(i) for i in range(page._combo.count())] \
+            == page._display_keys
+        assert page.current_group_key() == "default"
+
+        page._table.selectRow(2)
+        assert page._selected_key() == "mine"
+        page._table.item(0, 3).setText("系统说明")
+        assert manager.get_group("default").description == "系统说明"
+        assert manager.get_group("mine").description != "系统说明"
+
+        manager.move_group("mine", "system")
+        page.refresh()
+        assert page._display_keys == ["mine", "default", "aggressive"]
+        assert page.current_group_key() == "default"
 
     def test_all_dropdowns_keep_readable_width(self, qtbot,
                                                tmp_group_manager):

@@ -124,8 +124,9 @@ class BaseRuleGroupPage(QWidget):
         super().__init__(parent)
         self._manager = manager
         groups = manager.get_groups()
+        self._display_keys: list[str] = []
         self._group_key = group_key if manager.get_group(group_key) \
-            else (next(iter(groups), ""))
+            else (self._ordered_keys(groups)[0] if groups else "")
         self._status_cb = status_cb
         # 规则组切换回调（由对话框注册，通知行为页重载）
         self._switch_cb: Callable[[str], None] | None = None
@@ -143,6 +144,10 @@ class BaseRuleGroupPage(QWidget):
 
     def current_group_key(self) -> str:
         return self._group_key
+
+    def display_group_keys(self) -> list[str]:
+        """下拉框与表格共用的显示顺序。"""
+        return list(self._display_keys)
 
     def refresh(self):
         """重载规则组清单（下拉 + 列表），外部目录变更后可调用"""
@@ -223,14 +228,20 @@ class BaseRuleGroupPage(QWidget):
 
     # ── 清单刷新 ──
 
+    def _ordered_keys(self, groups: dict) -> list[str]:
+        """系统/远程在前、本地在后；各层保留管理器的 order 顺序。"""
+        return sorted(groups, key=lambda key:
+                      self._manager.layer_of(key) == "local")
+
     def _refresh(self):
         groups = self._manager.get_groups()
+        self._display_keys = self._ordered_keys(groups)
         if self._group_key not in groups:
-            self._group_key = next(iter(groups), "")
+            self._group_key = self._display_keys[0] if self._display_keys else ""
         self._combo.blockSignals(True)
         self._combo.clear()
-        for key, g in groups.items():
-            self._combo.addItem(g.name, key)
+        for key in self._display_keys:
+            self._combo.addItem(groups[key].name, key)
         idx = self._combo.findData(self._group_key)
         self._combo.setCurrentIndex(max(idx, 0))
         # 规则组名称是页面主选择，不应为追求紧凑而缩到只剩箭头。
@@ -242,7 +253,8 @@ class BaseRuleGroupPage(QWidget):
         select_row = -1
         _readonly = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
         _editable = _readonly | Qt.ItemFlag.ItemIsEditable
-        for i, g in enumerate(groups.values()):
+        for i, key in enumerate(self._display_keys):
+            g = groups[key]
             row = self._table.rowCount()
             self._table.insertRow(row)
             # 列 0-2 只读，列 3（规则说明）可编辑，列 4 是下拉（仅开发模式）
@@ -302,11 +314,9 @@ class BaseRuleGroupPage(QWidget):
         """规则说明列编辑完成即校验写盘"""
         if col != _COL_DESC or self._loading:
             return
-        groups = self._manager.get_groups()
-        keys = list(groups)
-        if row >= len(keys):
+        if row >= len(self._display_keys):
             return
-        key = keys[row]
+        key = self._display_keys[row]
         new_desc = (self._table.item(row, col).text().strip()
                     if self._table.item(row, col) else "")
         # 更新 raw dict 的 description 字段
@@ -393,7 +403,8 @@ class BaseRuleGroupPage(QWidget):
             return
         if self._group_key == key:
             groups = self._manager.get_groups()
-            self._group_key = next(iter(groups), "")
+            ordered = self._ordered_keys(groups)
+            self._group_key = ordered[0] if ordered else ""
             if self._switch_cb is not None and self._group_key:
                 self._switch_cb(self._group_key)
         self._loading = True
@@ -404,11 +415,9 @@ class BaseRuleGroupPage(QWidget):
 
     def _selected_key(self) -> str | None:
         row = self._table.currentRow()
-        if row < 0:
+        if row < 0 or row >= len(self._display_keys):
             return None
-        groups = self._manager.get_groups()
-        keys = list(groups)
-        return keys[row] if row < len(keys) else None
+        return self._display_keys[row]
 
     def _switch_to(self, key: str):
         """CRUD 成功后切到目标组并通知行为页"""

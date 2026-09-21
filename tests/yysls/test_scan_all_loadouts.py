@@ -201,7 +201,10 @@ def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():
     navigation_text = (base / "subcall/loadout/loadout_plan_navigation.wf").read_text(
         encoding="utf-8")
     assert "loadout_scan_targets" not in batch_text
+    assert "eval $first_plan = true\nfor name in $names\n    if not $first_plan" in batch_text
     assert "len($name) > 0" in navigation_text
+    assert "scroll [training_main].[plan_list]" not in navigation_text
+    assert "drag [training_main].[plan_list]" not in navigation_text
     for path in (base / "scan_equipped.wf", base / "standalone/scan_role_base_attr.wf"):
         names = {item["name"] for item in parse_metadata_file(path)["parameters"]}
         assert {"plan_name", "main_art", "sub_art"} <= names

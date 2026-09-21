@@ -26,15 +26,15 @@ if not $names
     log error "游戏方案列表未识别到任何方案"
     return -1
 end
-call $nav_result = nav_game_plans_to_main()
-if $nav_result < 0
-    return -1
-end
+eval $first_plan = true
 for name in $names
-    call $nav_result = nav_main_to_game_plans()
-    if $nav_result < 0
-        return -1
+    if not $first_plan
+        call $nav_result = nav_main_to_game_plans()
+        if $nav_result < 0
+            return -1
+        end
     end
+    eval $first_plan = false
     call $selected = select_game_plan($name)
     if $selected == -1
         return -1

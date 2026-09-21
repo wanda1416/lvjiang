@@ -2,13 +2,6 @@
   "content_version": 1,
   "regions": [
     {
-      "key": "role",
-      "x_ratio": 0.8621504465158726,
-      "y_ratio": 0.30123220017942687,
-      "w_ratio": 0.08194660433758272,
-      "h_ratio": 0.052995447901294734
-    },
-    {
       "key": "gongfa",
       "x_ratio": 0.05328300416660492,
       "y_ratio": 0.029967610052267918,
@@ -28,6 +21,13 @@
       "y_ratio": 0.029967610052267925,
       "w_ratio": 0.05562623941114486,
       "h_ratio": 0.058643451809951536
+    },
+    {
+      "key": "role",
+      "x_ratio": 0.8621504465158726,
+      "y_ratio": 0.30123220017942687,
+      "w_ratio": 0.08194660433758272,
+      "h_ratio": 0.052995447901294734
     },
     {
       "key": "xinfa",
@@ -60,41 +60,41 @@
     {
       "key": "main_art",
       "x_ratio": 0.33,
-      "y_ratio": 0.43,
+      "y_ratio": 0.4066369346171127,
       "w_ratio": 0.12,
-      "h_ratio": 0.055
+      "h_ratio": 0.07544203513701658
     },
     {
       "key": "sub_art",
       "x_ratio": 0.33,
-      "y_ratio": 0.595,
+      "y_ratio": 0.5629508569293609,
       "w_ratio": 0.12,
-      "h_ratio": 0.055
+      "h_ratio": 0.07815696115612414
     },
     {
       "key": "use_area",
       "x_ratio": 0.83,
       "y_ratio": 0.88,
-      "w_ratio": 0.17,
-      "h_ratio": 0.11
+      "w_ratio": 0.17000000000000004,
+      "h_ratio": 0.09088865910570587
     },
     {
       "key": "modal_message",
       "x_ratio": 0.33,
-      "y_ratio": 0.40,
+      "y_ratio": 0.4,
       "w_ratio": 0.44,
-      "h_ratio": 0.11
+      "h_ratio": 0.14627667244325315
     }
   ],
   "panels": [
     {
       "key": "plan_list",
-      "x_ratio": 0.068,
-      "y_ratio": 0.30,
-      "w_ratio": 0.19,
-      "h_ratio": 0.42,
+      "x_ratio": 0.05569726878112387,
+      "y_ratio": 0.3,
+      "w_ratio": 0.20230273121887615,
+      "h_ratio": 0.5320915511053159,
       "cols": 1,
-      "rows": 4,
+      "rows": 5,
       "min_visible": 0.95,
       "calibration": "even",
       "scroll_direction": "vertical"

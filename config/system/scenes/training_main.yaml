@@ -91,7 +91,7 @@ regions:
   name: 使用方案按钮区
   type: attr
   is_text: true
-  is_clickable: false
+  is_clickable: true
   view: fangan
 - key: modal_message
   name: 方案切换提示

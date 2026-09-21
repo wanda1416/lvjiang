@@ -61,6 +61,49 @@ def test_close_discards_staged_changes(tmp_path):
     assert source.load_merged("config.yaml") == {"value": 1}
 
 
+def test_dev_session_commits_new_entity_to_selected_local_layer(tmp_path):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    system.mkdir()
+    local.mkdir()
+    source = ConfigResolver(system_dir=system, local_dir=local, dev_mode=True)
+    session = ConfigEditSession(
+        source, merged_paths=(), entity_dirs=("demo/entities",))
+
+    rel_path = "demo/entities/private.yaml"
+    session.resolver.write_entity(
+        rel_path, "key: private\n", layer="local")
+    session.commit()
+
+    assert (local / rel_path).read_text(encoding="utf-8") == "key: private\n"
+    assert not (system / rel_path).exists()
+    session.close()
+
+
+def test_dev_session_commits_layer_move_even_when_content_is_unchanged(
+        tmp_path):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    rel_path = "demo/entities/moved.yaml"
+    target = system / rel_path
+    target.parent.mkdir(parents=True)
+    target.write_text("key: moved\n", encoding="utf-8")
+    local.mkdir()
+    source = ConfigResolver(system_dir=system, local_dir=local, dev_mode=True)
+    session = ConfigEditSession(
+        source, merged_paths=(), entity_dirs=("demo/entities",))
+
+    session.resolver.write_entity(
+        rel_path, "key: moved\n", layer="local")
+    session.resolver.delete_entity(rel_path, layer="system")
+    session.commit()
+
+    assert not target.exists()
+    assert (local / rel_path).read_text(encoding="utf-8") == "key: moved\n"
+    assert source.describe_entity(rel_path).layer == "local"
+    session.close()
+
+
 def test_windows_session_commit_does_not_expand_crlf_twice(
         tmp_path, monkeypatch):
     """Windows 工作副本已有 CRLF，提交前必须还原为逻辑换行。"""

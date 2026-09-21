@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -116,11 +117,21 @@ class TuningProgressWidget(QWidget):
         columns_layout = QHBoxLayout(columns)
         columns_layout.setContentsMargins(0, 0, 0, 0)
         columns_layout.setSpacing(8)
+        # 装备详情会在读取后变高；只滚动详情，底部智能调律保持可见。
+        current_column = QWidget()
+        current_column_layout = QVBoxLayout(current_column)
+        current_column_layout.setContentsMargins(0, 0, 0, 0)
+        current_column_layout.setSpacing(8)
+        self._current_scroll = QScrollArea()
+        self._current_scroll.setWidgetResizable(True)
+        self._current_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        current_column_layout.addWidget(self._current_scroll, 1)
         current_panel = QWidget()
+        self._current_scroll.setWidget(current_panel)
         current_layout = QVBoxLayout(current_panel)
         current_layout.setContentsMargins(0, 0, 0, 0)
         current_layout.setSpacing(8)
-        columns_layout.addWidget(current_panel, 1)
+        columns_layout.addWidget(current_column, 1)
 
         # ── 当前装备 ──
         equip_group = QGroupBox(tr("当前装备"))
@@ -221,9 +232,14 @@ class TuningProgressWidget(QWidget):
         self._smart_plans_label = QLabel("")
         self._smart_plans_label.setWordWrap(True)
         self._smart_plans_label.setStyleSheet("font-size: 11px;")
-        smart_layout.addWidget(self._smart_plans_label)
+        self._smart_plans_scroll = QScrollArea()
+        self._smart_plans_scroll.setWidgetResizable(True)
+        self._smart_plans_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._smart_plans_scroll.setMaximumHeight(180)
+        self._smart_plans_scroll.setWidget(self._smart_plans_label)
+        smart_layout.addWidget(self._smart_plans_scroll)
         self._smart_group.setVisible(False)
-        current_layout.addWidget(self._smart_group)
+        current_column_layout.addWidget(self._smart_group)
         current_layout.addStretch()
 
         self._previous_group = QGroupBox(tr("上一件装备"))

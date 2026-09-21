@@ -1,6 +1,8 @@
 """自动调律装备总览的旁路结果聚合。"""
 
 
+from PyQt6.QtCore import QPoint
+
 from lvjiang.apps.yysls.ui.tuning.progress_hub import TuningProgressHub
 from lvjiang.apps.yysls.ui.tuning.progress_widget import TuningProgressWidget
 from lvjiang.apps.yysls.ui.tuning.result_store import (
@@ -221,6 +223,34 @@ def test_progress_widget_shows_ordered_smart_plan_details(qtbot):
     assert "七件极限：81.00%" in text
     assert "候选极限：94.50%" in text
     assert "备战方案不完整" in text
+
+
+def test_smart_progress_stays_visible_after_equipment_expands(qtbot):
+    hub = TuningProgressHub()
+    widget = TuningProgressWidget(hub)
+    qtbot.addWidget(widget)
+    widget.resize(900, 600)
+    widget.show()
+    widget.reset_state()
+    hub.smart_tuning_updated.emit({
+        "enabled": True, "state": "initial", "message": "方案已加载",
+        "plans": [{"plan_name": "测试方案", "status": "ready"}],
+    })
+    qtbot.waitExposed(widget)
+
+    hub.equipment_started.emit({
+        "name": "测试装备", "type": "主武器", "level": 110,
+        "quality": "gold",
+        "affixes": [{"name": f"测试词条{i}", "value": i} for i in range(5)],
+        "target_affixes": [f"目标词条{i}" for i in range(12)],
+    })
+    qtbot.wait(10)
+    assert widget._smart_group.isVisible()
+    assert widget._smart_summary_label.text() == "等待当前装备分析..."
+    assert widget._smart_group.parent() is widget._current_scroll.parent()
+    smart_bottom = widget._smart_group.mapTo(
+        widget, QPoint(0, widget._smart_group.height())).y()
+    assert smart_bottom <= widget.height()
 
 
 def test_reset_only_equipment_is_still_a_tuning_result(qtbot):

@@ -178,6 +178,16 @@ def test_scan_reads_outer_attack_before_attribute_attack():
     assert "eval $data.right_outer_attack = $r2.detail_2" in workflow
 
 
+def test_scan_reads_initial_role_page_before_scrolling():
+    """角色面板进入时位于顶部，首次读取前不应预先滚动。"""
+    workflow = (
+        SYSTEM_CONFIG_DIR / "workflows/subcall/loadout/role_base_attr_scan.wf"
+    ).read_text(encoding="utf-8")
+    first_scan = workflow.index("scan [role_detail].[detail_1] as $r1")
+    assert "scroll [role_detail].[detail_1]" not in workflow[:first_scan]
+    assert "drag [role_detail].[detail_1]" not in workflow[:first_scan]
+
+
 class TestParseDetail2Attack:
     def test_extracts_all_schools(self):
         result = parse_detail2_attack(RIGHT_ATTACK)

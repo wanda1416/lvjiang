@@ -15,7 +15,7 @@ def nav_main_to_game_plans()
     click [training_main].[gongfa] after wait @step_interval
     click [training_main].[fangan] after wait @page_refresh
     scan [training_main].[plan_list] as $list
-    if not $list.plan_list
+    if not $list
         return -1
     end
     return 0
@@ -40,9 +40,50 @@ def nav_game_plans_to_main()
     return 0
 end
 
-def select_game_plan($name, $main_art, $sub_art)
-    # 每套方案均从列表顶端查找，避免依赖游戏列表与本地顺序一致。
-    loop 5
+def collect_game_plan_names()
+    # 整面板按布局实际行数识别；空槽没有文字。列表可能超过一屏。
+    loop 6
+        if env("desktop")
+            scroll [training_main].[plan_list] up 8
+        else
+            drag [training_main].[plan_list] down 0.5
+        end
+        wait @step_interval
+    end
+    eval $names = []
+    eval $seen = {}
+    eval $unchanged = 0
+    loop 16
+        scan [training_main].[plan_list] as $grid
+        eval $before = len($names)
+        for row in keys($grid)
+            eval $name = trim($grid.$row.[1])
+            if len($name) > 0 and not $seen.$name
+                eval append($names, $name)
+                eval $seen.$name = true
+            end
+        end
+        if len($names) == $before
+            eval $unchanged = $unchanged + 1
+            if $unchanged >= 2
+                break
+            end
+        else
+            eval $unchanged = 0
+        end
+        if env("desktop")
+            scroll [training_main].[plan_list] down 3
+        else
+            drag [training_main].[plan_list] up 0.5
+        end
+        wait @step_interval
+    end
+    return $names
+end
+
+def select_game_plan($name)
+    # 按游戏列表发现的名称重新定位；扫描装备后会回主页，列表页需重新进入。
+    loop 6
         if env("desktop")
             scroll [training_main].[plan_list] up 8
         else
@@ -68,15 +109,18 @@ def select_game_plan($name, $main_art, $sub_art)
         return -1
     end
     click $found after wait @page_refresh
-    scan [training_main].[main_art, sub_art] as $arts
-    if not (($arts.main_art contains $main_art and $arts.sub_art contains $sub_art) or ($arts.main_art contains $sub_art and $arts.sub_art contains $main_art))
-        log error "游戏方案武学与本地配置不一致: " + $name
+    scan [training_main].[plan_title, main_art, sub_art] as $detail
+    eval $title = trim($detail.plan_title)
+    eval $main_art = trim($detail.main_art)
+    eval $sub_art = trim($detail.sub_art)
+    if $title != $name or not $main_art or not $sub_art
+        log error "游戏方案名称或武学识别不完整: " + $name
         return -1
     end
 
-    find [training_main].[use_area] as $use by contains "使用方案"
+    scan [training_main].[use_area] as $use by contains "使用方案"
     if $use
-        click $use after wait @page_refresh
+        click [training_main].[use_area] after wait @page_refresh
         loop 3
             scan [training_main].[modal_message] as $message
             if $message.modal_message contains "装备缺失"
@@ -109,7 +153,7 @@ def select_game_plan($name, $main_art, $sub_art)
         end
     end
     scan [training_main].[plan_list] as $ready
-    if not $ready.plan_list
+    if not $ready
         log error "方案切换后未恢复方案列表: " + $name
         return -1
     end
@@ -118,5 +162,5 @@ def select_game_plan($name, $main_art, $sub_art)
         log error "切换后仍显示使用方案按钮: " + $name
         return -1
     end
-    return 0
+    return {"name": $title, "main_art": $main_art, "sub_art": $sub_art}
 end

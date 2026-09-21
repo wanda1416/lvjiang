@@ -10,9 +10,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
-    QMessageBox,
     QPushButton,
     QSizePolicy,
     QSplitter,
@@ -30,6 +28,7 @@ from ..events import get_event_hub
 from .character_detail import CharacterDetailTab
 from .equip.status_tab import EquipStatusTab
 from .plan_create_dialog import PlanCreateDialog
+from .plan_manager_dialog import PlanManagerDialog
 
 _METRIC_CARD = (
     "QFrame {background:palette(base);border:1px solid palette(midlight);"
@@ -178,32 +177,25 @@ class LoadoutPanel(QWidget):
         plan_row.addWidget(self._plans, 2)
         for label, callback, variant in (
             (tr("新建"), self._create_plan, "action"),
-            (tr("重命名"), self._rename_plan, "neutral"),
-            (tr("删除"), self._delete_plan, "danger"),
+            (tr("管理"), self._manage_plans, "neutral"),
         ):
             button = QPushButton(label)
             apply_compact_button_style(button, variant=variant)
             button.clicked.connect(callback)
             plan_row.addWidget(button)
         plan_row.addSpacing(16)
+        plan_row.addWidget(QLabel(tr("流派")))
+        self._school = QLabel(tr("无方案"))
+        plan_row.addWidget(self._school, 1)
         plan_row.addWidget(QLabel(tr("主武学")))
-        self._main_art = QComboBox()
+        self._main_art = QLabel("-")
         plan_row.addWidget(self._main_art, 1)
         plan_row.addWidget(QLabel(tr("副武学")))
-        self._sub_art = QComboBox()
+        self._sub_art = QLabel("-")
         plan_row.addWidget(self._sub_art, 1)
-        # 玩法决定调律方向（要什么增伤、定什么音）；流派只决定毕业率计算。
-        # 候选由两个武学**无序**匹配——主副只是顺序标签，纯唐和双切的武学对
-        # 完全相同，区别只在增伤要求落在哪一边，所以两个都该列出来由用户挑。
         plan_row.addWidget(QLabel(tr("玩法")))
-        self._playstyle = QComboBox()
+        self._playstyle = QLabel("-")
         plan_row.addWidget(self._playstyle, 1)
-        self._school = QLabel(tr("无方案"))
-        self._school.setMinimumWidth(80)
-        plan_row.addWidget(self._school)
-        self._main_art.currentTextChanged.connect(self._configure_arts)
-        self._sub_art.currentTextChanged.connect(self._configure_arts)
-        self._playstyle.currentTextChanged.connect(self._configure_playstyle)
         root.addLayout(plan_row)
 
         # Row 3: always-visible assumptions + public metrics.
@@ -431,26 +423,18 @@ class LoadoutPanel(QWidget):
         state = inventory.state if inventory is not None else self._repo.load()
         self._refreshing = True
         self._plans.clear()
-        for pid, plan in state.plans.items():
+        for pid in state.ordered_plan_ids():
+            plan = state.plans[pid]
             self._plans.addItem(plan.name, pid)
         self._plans.setCurrentIndex(self._plans.findData(state.active_plan_id))
         from ...config import get_game_config
         game_config = get_game_config()
         schools = game_config.get_schools()
-        # 武学本身没有主副身份。两个位置都必须读取独立武学注册表；流派配置
-        # 只在选定两门武学后用于无序反查流派，不能反过来充当武学数据源。
-        martial_arts = ["", *game_config.get_martial_arts()]
-        self._set_combo(
-            self._main_art, martial_arts,
-            state.active_plan.main_martial_art,
-        )
-        self._set_combo(
-            self._sub_art, martial_arts,
-            state.active_plan.sub_martial_art,
-        )
-        self._refresh_playstyles(state)
+        self._main_art.setText(state.active_plan.main_martial_art or "-")
+        self._sub_art.setText(state.active_plan.sub_martial_art or "-")
+        self._playstyle.setText(state.active_plan.playstyle or "-")
         school = state.active_school(schools)
-        self._school.setText(school or tr("无方案"))
+        self._school.setText(school or tr("自定义"))
         self._refreshing = False
         # 下游消费者（装备页/战斗属性页）已显式驱动，无需再 emit
         # equipment_changed：emit 会导致信号订阅者重复全量刷新
@@ -495,12 +479,6 @@ class LoadoutPanel(QWidget):
         self._metric_dps.setToolTip(tooltip)
         self._metric_rate.setToolTip(tooltip)
 
-    @staticmethod
-    def _set_combo(combo, values, selected):
-        combo.clear()
-        combo.addItems(list(values))
-        combo.setCurrentText(selected)
-
     def _switch_plan(self, _index):
         if self._refreshing or not self._repo:
             return
@@ -522,66 +500,12 @@ class LoadoutPanel(QWidget):
             playstyle=dialog.playstyle)
         self.refresh()
 
-    def _rename_plan(self):
-        if not self._repo:
-            return
-        state = self._repo.load()
-        name, ok = QInputDialog.getText(
-            self, tr("重命名方案"), tr("方案名称:"), text=state.active_plan.name)
-        if ok:
-            self._repo.configure_plan(state.active_plan_id, name=name)
+    def _manage_plans(self) -> None:
+        dialog = PlanManagerDialog(
+            self._host.user_manager.list_users(),
+            self._host.active_user_name(),
+            self._repo.users_dir if self._repo else None,
+            self)
+        dialog.exec()
+        if self._host.active_user_name() in dialog.changed_users:
             self.refresh()
-
-    def _delete_plan(self):
-        if not self._repo:
-            return
-        state = self._repo.load()
-        if QMessageBox.question(
-            self, tr("删除方案"), tr("确定删除当前方案吗？"),
-        ) == QMessageBox.StandardButton.Yes:
-            try:
-                self._repo.delete_plan(state.active_plan_id)
-                self.refresh()
-            except ValueError as exc:
-                QMessageBox.warning(self, tr("删除失败"), str(exc))
-
-    def _refresh_playstyles(self, state) -> None:
-        """按当前两个武学列出可选玩法。
-
-        武学没登记进任何玩法时列表为空——那只是算不出定音目标，方案照常可用，
-        不该因此报错或硬塞一个玩法给用户（那等于替他决定怎么打）。
-        """
-        from ...config import get_game_config
-
-        plan = state.active_plan
-        arts = [plan.main_martial_art, plan.sub_martial_art]
-        names = get_game_config().get_playstyles_for_arts(arts)
-        self._set_combo(self._playstyle, [""] + names, plan.playstyle)
-        self._playstyle.setEnabled(bool(names))
-        self._playstyle.setToolTip(
-            "" if names else tr("这两个武学尚未登记到任何玩法"))
-
-    def _configure_arts(self):
-        if self._refreshing or not self._repo:
-            return
-        main_art = self._main_art.currentText()
-        sub_art = self._sub_art.currentText()
-        # 允许临时出现未配对状态。这里只保存武学，不把刷新后暂时为空的玩法
-        # 一并写回，否则 A+B -> A+C -> B+C 这类换位过程会误删原玩法。
-        state = self._repo.load()
-        self._repo.configure_plan(
-            state.active_plan_id,
-            main_martial_art=main_art,
-            sub_martial_art=sub_art,
-        )
-        self.refresh()
-
-    def _configure_playstyle(self):
-        if self._refreshing or not self._repo:
-            return
-        state = self._repo.load()
-        self._repo.configure_plan(
-            state.active_plan_id,
-            playstyle=self._playstyle.currentText(),
-        )
-        self.refresh()

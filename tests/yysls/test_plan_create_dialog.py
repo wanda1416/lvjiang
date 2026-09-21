@@ -1,5 +1,6 @@
 """新建方案的流派快捷填充、无序玩法筛选与创建保存。"""
 
+from lvjiang.apps.yysls.core.loadout.models import LoadoutPlan
 from lvjiang.apps.yysls.core.loadout.repository import LoadoutRepository
 from lvjiang.apps.yysls.ui.loadout.plan_create_dialog import PlanCreateDialog
 
@@ -85,3 +86,36 @@ def test_manual_mixed_arts_can_choose_playstyle_and_save(qtbot, tmp_path):
     plan = repo.create_plan(dialog.plan_name, dialog.main_art,
                             dialog.sub_art, playstyle=dialog.playstyle)
     assert repo.load().plans[plan.id].playstyle == "混搭玩法"
+
+
+def test_edit_named_school_locks_arts_until_custom_selected(qtbot):
+    plan = LoadoutPlan(
+        id="plan-id", name="原方案", main_martial_art="武学乙",
+        sub_martial_art="武学甲", playstyle="甲玩法")
+    dialog = PlanCreateDialog(_GameConfig(), plan=plan)
+    qtbot.addWidget(dialog)
+    assert dialog._combo_school.currentData() == "流派甲"
+    assert (dialog.main_art, dialog.sub_art) == ("武学乙", "武学甲")
+    assert not dialog._combo_main.isEnabled()
+    assert not dialog._combo_sub.isEnabled()
+    assert dialog.playstyle == "甲玩法"
+
+    dialog._combo_school.setCurrentIndex(0)
+    assert dialog._combo_main.isEnabled()
+    assert dialog._combo_sub.isEnabled()
+    dialog._combo_main.setCurrentText("武学甲")
+    dialog._combo_sub.setCurrentText("武学丙")
+    assert _options(dialog._combo_playstyle) == ["", "混搭玩法"]
+
+
+def test_edit_keeps_unknown_existing_arts_and_playstyle(qtbot):
+    plan = LoadoutPlan(
+        id="plan-id", name="旧方案", main_martial_art="旧武学甲",
+        sub_martial_art="旧武学乙", playstyle="旧玩法")
+    dialog = PlanCreateDialog(_GameConfig(), plan=plan)
+    qtbot.addWidget(dialog)
+    dialog._edit_name.setText("新名称")
+    assert (dialog.main_art, dialog.sub_art, dialog.playstyle) == (
+        "旧武学甲", "旧武学乙", "旧玩法")
+    dialog._validate_and_accept()
+    assert dialog.result() == dialog.DialogCode.Accepted

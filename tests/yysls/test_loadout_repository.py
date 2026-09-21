@@ -519,6 +519,39 @@ def test_cannot_delete_last_plan(tmp_path: Path):
         repo.delete_plan(repo.load().active_plan_id)
 
 
+def test_plan_order_and_management_create_do_not_change_active_plan(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    first = repo.load().active_plan_id
+    second = repo.create_plan("第二套", "武学甲", "武学乙",
+                              activate=False).id
+    third = repo.create_plan("第三套", "武学丙", "武学丁",
+                             activate=False).id
+    assert repo.load().active_plan_id == first
+    assert repo.load().ordered_plan_ids() == [first, second, third]
+
+    repo.move_plan(third, -1)
+    state = repo.load()
+    assert state.ordered_plan_ids() == [first, third, second]
+    assert state.active_plan_id == first
+    assert json.loads(repo.path.read_text(encoding="utf-8"))["plan_order"] \
+        == [first, third, second]
+
+    repo.delete_plan(first)
+    state = repo.load()
+    assert state.ordered_plan_ids() == [third, second]
+    assert state.active_plan_id == third
+
+
+def test_old_plan_file_uses_existing_order_without_writing(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    old = repo.load().to_dict()
+    old["plans"]["second"] = {"name": "第二套"}
+    old.pop("plan_order")
+    repo.path.write_text(json.dumps(old), encoding="utf-8")
+    assert repo.load().ordered_plan_ids() == ["default", "second"]
+    assert "plan_order" not in json.loads(repo.path.read_text(encoding="utf-8"))
+
+
 def test_ui_state_uses_user_metadata_and_ignores_existing_loadout_value(tmp_path):
     from lvjiang.core.user_config import User, load_user_metadata, save_user_metadata
 

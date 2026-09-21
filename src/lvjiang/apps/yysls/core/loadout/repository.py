@@ -159,7 +159,8 @@ class LoadoutRepository:
                 tmp_path.unlink()
 
     def create_plan(self, name: str, main_martial_art: str,
-                    sub_martial_art: str, *, playstyle: str = "") -> LoadoutPlan:
+                    sub_martial_art: str, *, playstyle: str = "",
+                    activate: bool = True) -> LoadoutPlan:
         """新建方案：必须同时绑定主武学与副武学，不允许无武学方案。"""
         main_martial_art = main_martial_art.strip()
         sub_martial_art = sub_martial_art.strip()
@@ -174,7 +175,9 @@ class LoadoutRepository:
                 sub_martial_art=sub_martial_art,
                 playstyle=playstyle)
             state.plans[created.id] = created
-            state.active_plan_id = created.id
+            state.plan_order = state.ordered_plan_ids()
+            if activate:
+                state.active_plan_id = created.id
         self.update(mutate)
         assert created is not None
         return created
@@ -185,9 +188,29 @@ class LoadoutRepository:
                 raise ValueError("至少保留一个备战方案")
             if plan_id not in state.plans:
                 raise KeyError(plan_id)
+            order = state.ordered_plan_ids()
+            index = order.index(plan_id)
             del state.plans[plan_id]
+            state.plan_order = [pid for pid in order if pid != plan_id]
             if state.active_plan_id == plan_id:
-                state.active_plan_id = next(iter(state.plans))
+                state.active_plan_id = state.plan_order[
+                    min(index, len(state.plan_order) - 1)]
+        self.update(mutate)
+
+    def move_plan(self, plan_id: str, offset: int) -> None:
+        """仅调整当前用户的方案展示顺序，不切换活动方案。"""
+        if offset not in (-1, 1):
+            raise ValueError("方案只能上移或下移一位")
+        def mutate(state: LoadoutState) -> None:
+            if plan_id not in state.plans:
+                raise KeyError(plan_id)
+            order = state.ordered_plan_ids()
+            index = order.index(plan_id)
+            target = index + offset
+            if target < 0 or target >= len(order):
+                return
+            order[index], order[target] = order[target], order[index]
+            state.plan_order = order
         self.update(mutate)
 
     def switch_plan(self, plan_id: str) -> None:

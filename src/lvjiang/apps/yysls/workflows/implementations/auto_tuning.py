@@ -75,6 +75,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning import (
 )
 from lvjiang.apps.yysls.workflows.tuning_context import TuningContextMixin
 from lvjiang.apps.yysls.workflows.tuning_doc import TuningDocWriter
+from lvjiang.core.config.resolver import get_resolver
 from lvjiang.workflows.base import BaseWorkflow
 
 from .....i18n import tr
@@ -1658,6 +1659,8 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         self._emit_progress("smart_tuning_updated", {"enabled": False})
         config = get_tune_config().smart_tuning
         self._smart_config = config
+        if not get_resolver().is_dev_mode():
+            return
         user_enabled = self.ctx.smart_tuning_enabled
         if user_enabled is None:
             user_enabled = bool(

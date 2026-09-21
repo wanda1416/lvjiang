@@ -15,7 +15,7 @@
    - 层1 可解析：字段提取成功，有明确语义 → 正常处理
    - 层2 不可解析但存在数据：有内容但无法提取语义 → 记 error，跳过当前件，继续下一件
    - 层3 无法解析：完全空/无内容 → 视为空槽位，正常终止扫描
-   涉及 `scan_equipped.wf` / `scan_unequipped.wf` / `subcall/equipment_scan.wf` /
+   涉及 `scan_equipped.wf` / `scan_unequipped.wf` / `subcall/loadout/equipment_scan.wf` /
    `auto_tuning.py` 门控逻辑。
 2. **统计报表面板**：跨任务的数据汇总视图（处理装备数、评级分布、材料消耗、
    狗粮投入），与叙事型调律说明文档互补。数据源已在 v0.10.0 齐备

@@ -1,6 +1,6 @@
 #% name: 八部位穿戴扫描
 
-# 前置：背包装备列表；写入目标由 bind_scanned_loadout 或旧入口绑定。
+# 前置：背包装备列表；写入目标由 bind_scanned_loadout 绑定。
 def scan_equipped_slots()
     eval $written = 0
     for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]

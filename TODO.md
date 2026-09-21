@@ -140,7 +140,7 @@ except Exception as e:                                # 解析失败
 - [ ] 层3 无法解析：完全空/无内容 → 视为空槽位，正常终止扫描
 - [ ] 判空信号改由 scan 层（raw dict 全空/纯噪声）给出
 
-**涉及**: `scan_equipped.wf` / `scan_unequipped.wf` / `subcall/equipment_scan.wf` /
+**涉及**: `scan_equipped.wf` / `scan_unequipped.wf` / `subcall/loadout/equipment_scan.wf` /
 `auto_tuning.py` 门控逻辑
 
 **优先级**: 🟡 **高**（当前会把 OCR 失败误当背包到底，静默提前结束扫描）

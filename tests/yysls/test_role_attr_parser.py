@@ -169,7 +169,7 @@ class TestParseDetail2OuterAttack:
 def test_scan_reads_outer_attack_before_attribute_attack():
     """先保存不受食物影响的基础外功区间，再读取各流派属性攻击。"""
     workflow = (
-        SYSTEM_CONFIG_DIR / "workflows/subcall/role_base_attr_scan.wf"
+        SYSTEM_CONFIG_DIR / "workflows/subcall/loadout/role_base_attr_scan.wf"
     ).read_text(encoding="utf-8")
 
     outer_find = 'by contains "外功攻击"'

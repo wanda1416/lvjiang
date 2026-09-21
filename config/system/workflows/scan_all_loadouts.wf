@@ -11,9 +11,9 @@
 #%     max: 20
 
 default $scroll_count = 8
-import "subcall/loadout_plan_navigation.wf"
-import "subcall/equipped_plan_scan.wf"
-import "subcall/role_base_attr_plan_scan.wf"
+import "subcall/loadout/loadout_plan_navigation.wf"
+import "subcall/loadout/equipped_plan_scan.wf"
+import "subcall/loadout/role_base_attr_plan_scan.wf"
 
 # 列表在任务开始时冻结；浏览游戏页面不改变主界面活动方案。
 eval $targets = loadout_scan_targets()

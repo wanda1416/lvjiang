@@ -120,9 +120,11 @@ def test_workflow_and_shared_subcalls_parse():
     for path in (
         "scan_all_loadouts.wf", "scan_equipped.wf",
         "standalone/scan_role_base_attr.wf",
-        "subcall/loadout_plan_navigation.wf",
-        "subcall/equipped_slots_scan.wf", "subcall/role_base_attr_scan.wf",
-        "subcall/equipped_plan_scan.wf", "subcall/role_base_attr_plan_scan.wf",
+        "subcall/loadout/loadout_plan_navigation.wf",
+        "subcall/loadout/equipped_slots_scan.wf",
+        "subcall/loadout/role_base_attr_scan.wf",
+        "subcall/loadout/equipped_plan_scan.wf",
+        "subcall/loadout/role_base_attr_plan_scan.wf",
     ):
         parse_file(base / path)
 

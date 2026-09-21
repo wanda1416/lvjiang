@@ -47,7 +47,7 @@ default $min_level = 110
 default $min_affix_count = 0
 
 import "subcall/navigation.wf"
-import "subcall/equipment_scan.wf"
+import "subcall/loadout/equipment_scan.wf"
 
 call $nav_result = nav_main_to_equip()
 if $nav_result < 0

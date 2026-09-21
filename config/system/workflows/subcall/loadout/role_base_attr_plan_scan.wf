@@ -1,7 +1,7 @@
 #% name: 指定方案基础属性扫描
 
 import "subcall/navigation.wf"
-import "subcall/role_base_attr_scan.wf"
+import "subcall/loadout/role_base_attr_scan.wf"
 
 # 弹窗模式保留原有停在角色页的行为；静默模式明确绑定方案并回主页。
 def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scroll_count)

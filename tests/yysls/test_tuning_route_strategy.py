@@ -35,7 +35,7 @@ def test_route_dependencies_include_shared_page_actions():
         call("subcall/navigation.wf"),
         call("subcall/page_detection.wf"),
         call("subcall/page_action.wf"),
-        call("subcall/equipment_scan.wf"),
+        call("subcall/loadout/equipment_scan.wf"),
     ]
 
 

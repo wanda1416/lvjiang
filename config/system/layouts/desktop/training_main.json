@@ -60,40 +60,41 @@
     },
     {
       "key": "main_art",
-      "x_ratio": 0.34,
-      "y_ratio": 0.30,
+      "x_ratio": 0.33999999999999997,
+      "y_ratio": 0.28,
       "w_ratio": 0.13,
-      "h_ratio": 0.065
+      "h_ratio": 0.059626616293681434
     },
     {
       "key": "sub_art",
-      "x_ratio": 0.34,
-      "y_ratio": 0.425,
+      "x_ratio": 0.33999999999999997,
+      "y_ratio": 0.40726209948355996,
       "w_ratio": 0.13,
-      "h_ratio": 0.065
+      "h_ratio": 0.059626616293681434
     },
     {
       "key": "use_area",
-      "x_ratio": 0.78,
-      "y_ratio": 0.88,
-      "w_ratio": 0.22,
-      "h_ratio": 0.12
+      "x_ratio": 0.8608081593668326,
+      "y_ratio": 0.8940501543805267,
+      "w_ratio": 0.13919184063316736,
+      "h_ratio": 0.06474511067505784,
+      "activation_key": "SPACE"
     },
     {
       "key": "modal_message",
-      "x_ratio": 0.34,
-      "y_ratio": 0.43,
-      "w_ratio": 0.43,
-      "h_ratio": 0.10
+      "x_ratio": 0.3345661709665033,
+      "y_ratio": 0.4168829153565327,
+      "w_ratio": 0.4354338290334967,
+      "h_ratio": 0.11311708464346731
     }
   ],
   "panels": [
     {
       "key": "plan_list",
-      "x_ratio": 0.08,
+      "x_ratio": 0.06095433397339049,
       "y_ratio": 0.28,
-      "w_ratio": 0.19,
-      "h_ratio": 0.58,
+      "w_ratio": 0.2090456660266095,
+      "h_ratio": 0.5871354507389803,
       "cols": 1,
       "rows": 7,
       "min_visible": 0.95,

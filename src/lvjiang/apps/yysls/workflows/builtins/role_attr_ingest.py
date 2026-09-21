@@ -60,24 +60,11 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
         CombatAttributes.from_dict(panel_values), state.resolved_equipment(plan_id),
         gongjue_attrs(plan.gongjue))
     values = stored_base_fields(school_attr, base)
-    name = f"{username}_{plan.playstyle}"
+    name = f"{username}_{plan.name}"
     if not values:
         raise ValueError(f"基础属性 {name!r} 反推结果为空，拒绝写入")
-    run_values = _engine.context.setdefault("_scanned_base_attrs", {})
-    prior = run_values.get((school, name))
-    if prior is not None:
-        differences = [
-            field for field in set(prior) | set(values)
-            if abs(prior.get(field, 0.0) - values.get(field, 0.0))
-            > max(2.0, abs(prior.get(field, 0.0)) * 0.001)
-        ]
-        if differences:
-            raise ValueError(
-                f"同一玩法的方案反推出不同基础属性 {name!r}: "
-                + "、".join(sorted(differences)))
     save_play_style(school, name, values)
     repo.configure_plan(plan_id, base_attribute=name)
-    run_values[(school, name)] = values
     from .equipment_ingest import _notify_equipment_changed
     _notify_equipment_changed(_engine)
     logger.info(f"基础属性已静默写入: {school}/{name}（方案 {plan.name}）")

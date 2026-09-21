@@ -19,9 +19,11 @@ from lvjiang.apps.yysls.workflows.builtins.role_attr_ingest import (
     _save_scanned_base_attrs,
 )
 from lvjiang.core.scene_definition import SceneRegistry
+from lvjiang.workflows.engine.signals import _ReturnSignal
 from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import CallProc
 from lvjiang.workflows.metadata import parse_metadata_file
+from tests.workflows.conftest import make_engine
 
 
 def _engine(tmp_path):
@@ -201,13 +203,68 @@ def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():
     navigation_text = (base / "subcall/loadout/loadout_plan_navigation.wf").read_text(
         encoding="utf-8")
     assert "loadout_scan_targets" not in batch_text
-    assert "eval $first_plan = true\nfor name in $names\n    if not $first_plan" in batch_text
+    assert "for name in $names\n    if not $in_game_plans" in batch_text
+    assert "if $selected == -1" in batch_text
+    assert "继续在方案列表尝试下一套" in batch_text
+    assert "if $selected == -2" in batch_text
     assert "len($name) > 0" in navigation_text
     assert "scroll [training_main].[plan_list]" not in navigation_text
     assert "drag [training_main].[plan_list]" not in navigation_text
     for path in (base / "scan_equipped.wf", base / "standalone/scan_role_base_attr.wf"):
         names = {item["name"] for item in parse_metadata_file(path)["parameters"]}
         assert {"plan_name", "main_art", "sub_art"} <= names
+
+
+@pytest.mark.parametrize("unsafe_failure,second_succeeds,expected_names,expected_result", [
+    (False, True, ["方案甲", "方案乙"], 0),
+    (False, False, ["方案甲", "方案乙"], -1),
+    (True, False, ["方案甲"], -1),
+])
+def test_batch_retries_next_plan_without_reentering_after_safe_failure(
+    monkeypatch, unsafe_failure, second_succeeds, expected_names, expected_result,
+):
+    engine = make_engine()
+    calls = []
+
+    def fake_call(node):
+        name = engine._resolve(node.args[0]) if node.args else None
+        calls.append((node.name, name))
+        result = {
+            "nav_main_to_game_plans": 0,
+            "collect_game_plan_names": ["方案甲", "方案乙"],
+            "select_game_plan": (
+                {"name": "方案乙", "main_art": "武学甲", "sub_art": "武学乙"}
+                if name == "方案乙" and second_succeeds else
+                -2 if name == "方案甲" and unsafe_failure else -1
+            ),
+            "nav_game_plans_to_main": 0,
+            "scan_equipped_plan": 8,
+        }[node.name]
+        if node.result_var is not None:
+            engine.variables[node.result_var] = result
+
+    original_eval = engine._exec_eval
+
+    def fake_eval(node):
+        if node.func_name == "ensure_scanned_loadout":
+            engine.variables[node.target] = {
+                "ok": True, "name": "方案乙", "main_art": "武学甲",
+                "sub_art": "武学乙", "playstyle": "",
+            }
+        else:
+            original_eval(node)
+
+    monkeypatch.setattr(engine, "_exec_call_proc", fake_call)
+    monkeypatch.setattr(engine, "_exec_eval", fake_eval)
+    workflow = parse_file(Path("config/system/workflows/scan_all_loadouts.wf"))
+    with pytest.raises(_ReturnSignal) as returned:
+        engine._exec_body(workflow.body)
+    assert returned.value.value == expected_result
+    assert [name for proc, name in calls if proc == "select_game_plan"] == expected_names
+    assert sum(proc == "nav_main_to_game_plans" for proc, _ in calls) == 1
+    assert sum(proc == "nav_game_plans_to_main" for proc, _ in calls) == int(
+        not unsafe_failure)
+    assert sum(proc == "scan_equipped_plan" for proc, _ in calls) == int(second_succeeds)
 
 
 def test_silent_base_subtracts_only_bound_plan_equipment(tmp_path, monkeypatch):

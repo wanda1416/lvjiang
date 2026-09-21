@@ -159,7 +159,7 @@ class LoadoutRepository:
                 tmp_path.unlink()
 
     def create_plan(self, name: str, main_martial_art: str,
-                    sub_martial_art: str) -> LoadoutPlan:
+                    sub_martial_art: str, *, playstyle: str = "") -> LoadoutPlan:
         """新建方案：必须同时绑定主武学与副武学，不允许无武学方案。"""
         main_martial_art = main_martial_art.strip()
         sub_martial_art = sub_martial_art.strip()
@@ -171,7 +171,8 @@ class LoadoutRepository:
             created = LoadoutPlan(
                 id=uuid4().hex, name=name.strip() or "未命名方案",
                 main_martial_art=main_martial_art,
-                sub_martial_art=sub_martial_art)
+                sub_martial_art=sub_martial_art,
+                playstyle=playstyle)
             state.plans[created.id] = created
             state.active_plan_id = created.id
         self.update(mutate)

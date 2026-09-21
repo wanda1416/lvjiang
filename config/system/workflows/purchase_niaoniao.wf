@@ -26,8 +26,8 @@
 # 且始终有可见行供 find 命中。
 #
 # 周额度与货币（profile 门控）：niaoniao_of_week 记录本周已购「绑」数（cap 2）。
-# 开头先读它，>= 2 直接跳过；再按长鸣玉 changmingyu 余额（每个 200）确认买满
-# 剩余够钱才执行；买成后按本次个数把 niaoniao_of_week 累加回去，周周期自动清零。
+# 开头先读它，>= 2 直接跳过；再按长鸣玉 changmingyu 余额（每个 200）计算
+# 本次最多可买数量；买成后按本次个数把 niaoniao_of_week 累加回去，周周期自动清零。
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
@@ -37,10 +37,10 @@ import "subcall/profile_registry.wf"
 # 参数缺省回落（批量注入缺失时用默认值）
 default $max_scroll = 2
 
-# ─── profile 依赖与本周额度检查（买满或长鸣玉不足则整段跳过） ───
+# ─── profile 依赖与本周额度检查（买满或不足 200 长鸣玉则整段跳过） ───
 # niaoniao_of_week：本周已购「绑」数量（quota，周周期自动清零，cap 2）。
 # changmingyu：长鸣玉余额（stock），袅袅之音·绑 每个 200。
-# 本周已买满 2 个、或长鸣玉不足以买满剩余，则不导航直接跳过。
+# 本周已买满 2 个、或长鸣玉连 1 个都买不起，则不导航直接跳过。
 call $profile_ok = declare_profiles(["niaoniao_of_week", "changmingyu"])
 if $profile_ok < 0
     return -1
@@ -55,13 +55,16 @@ if $bought_week >= 2
     return 0
 end
 
-# 本次买满周库存剩余，逐个 200 长鸣玉
-eval $want = 2 - $bought_week
-eval $cost = $want * 200
+# 在本周剩余额度内尽量购买；余额只够 1 个时仍继续购买。
+eval $remaining = 2 - $bought_week
 eval $cmyu = profile_get("changmingyu")
-if $cmyu != null and $cmyu < $cost
-    log "长鸣玉不足：买 " + $want + " 个需 " + $cost + "，现有 " + $cmyu + "，跳过购买"
+call $want = niaoniao_purchase_count($bought_week, $cmyu)
+if $want <= 0
+    log "长鸣玉不足：购买 1 个需 200，现有 " + $cmyu + "，跳过购买"
     return 0
+end
+if $want < $remaining
+    log "长鸣玉现有 " + $cmyu + "，本次可购买 " + $want + " 个 袅袅之音·绑"
 end
 
 # ─── 导航：菜单 → 商店 → 精选 → 道具 ────────────────────
@@ -137,3 +140,22 @@ loop while $back_tries < 5
     eval $back_tries = $back_tries + 1
 end
 log "购买袅袅流程结束。"
+
+# 按本周剩余额度和长鸣玉余额计算本次购买数量（周上限 2，每个 200）。
+# 余额未知时沿用原行为，交给购买面板的「最大」按钮按实际条件选择数量。
+def niaoniao_purchase_count($bought_week, $cmyu)
+    if $bought_week >= 2
+        return 0
+    end
+    eval $remaining = 2 - $bought_week
+    if $cmyu == null
+        return $remaining
+    end
+    if $cmyu < 200
+        return 0
+    end
+    if $remaining >= 2 and $cmyu < 400
+        return 1
+    end
+    return $remaining
+end

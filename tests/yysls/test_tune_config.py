@@ -343,23 +343,41 @@ class TestBehaviorPages:
         assert after.rules[0].first_affix_only == (not first)
         assert after.entry_min_rating == scan.entry_min_rating
 
-    def test_scan_coverage_refreshes_for_group_and_rule_changes(
-            self, qtbot, tmp_group_manager):
-        page = ScanBehaviorPage(
-            tmp_group_manager, "default", lambda *_args: None)
+    @pytest.mark.parametrize("page_type", [
+        ScanBehaviorPage,
+        MaterialConfigPage,
+        TuneBehaviorPage,
+    ])
+    def test_rule_coverage_is_on_demand_and_clears_for_all_pages(
+            self, qtbot, tmp_group_manager, page_type):
+        statuses = []
+        page = page_type(tmp_group_manager, "default",
+                         lambda text, error: statuses.append((text, error)))
         qtbot.addWidget(page)
-        assert page._coverage_tree.topLevelItemCount() == len(QUALITY_PARTS)
-        assert "均有候选规则" in page._coverage_summary.text()
+        check = page._coverage_check
+        assert check.button.text() == "校验规则"
+        assert check.panel.isHidden()
+        check.button.click()
+        assert check.button.text() == "清理结果"
+        assert not check.panel.isHidden()
+        assert check.panel.text()
+        check.button.click()
+        assert check.button.text() == "校验规则"
+        assert check.panel.isHidden()
 
+        check.button.click()
         page.set_group("aggressive")
-        assert "均有候选规则" in page._coverage_summary.text()
-        page._table.setCurrentCell(2, 0)
-        page._on_del_rule()
-        page._table.setCurrentCell(2, 0)
-        page._on_del_rule()
-        assert "覆盖缺口" in page._coverage_summary.text()
-        assert "胸甲/紫装" in page._coverage_summary.text()
-        assert len(tmp_group_manager.get_group("default").scan.rules) == 4
+        assert check.panel.isHidden()
+        assert check.button.text() == "校验规则"
+        page._table.setRowCount(0)
+        page._apply()
+        assert statuses and not statuses[-1][1], statuses[-1][0]
+        check.button.click()
+        assert f"发现 {len(QUALITY_PARTS) * 2} 处" in check.panel.text()
+        assert "武器 · 金装" in check.panel.text()
+        assert "武器 · 紫装" in check.panel.text()
+        check.button.click()
+        assert check.panel.isHidden()
 
     def test_scan_page_add_delete_rule(self, qtbot, tmp_group_manager):
         statuses: list[tuple[str, bool]] = []

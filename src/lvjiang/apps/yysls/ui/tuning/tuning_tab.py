@@ -27,6 +27,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.core.config.resolver import get_resolver
+
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style, fit_button_width
 from .....ui.execution_user_selector import ExecutionUserSelector
@@ -87,6 +89,7 @@ class TuningTab(QWidget):
     def __init__(self, host, parent=None):
         super().__init__(parent)
         self._host = host
+        self._dev_mode = get_resolver().is_dev_mode()
         self._loading_tuning_config = False
         self._build_ui()
         self._execution_user_selector.resolved_user_changed.connect(
@@ -95,7 +98,6 @@ class TuningTab(QWidget):
         self._load_tuning_config()
         host.automation_state_changed.connect(self._on_automation_state)
         # 基础配置变更时刷新「参数」页开关（新增/删除开关即时生效）
-        from .....core.config.resolver import get_resolver
         get_resolver().add_change_listener(self._on_base_config_changed)
 
     # ─── UI 构建 ─────────────────────────────────────────────
@@ -404,15 +406,16 @@ class TuningTab(QWidget):
         self._sp_target_row.setEnabled(False)
         self._sp_target_col.setEnabled(False)
 
-        layout.addWidget(QLabel("<b>" + tr("智能调律：") + "</b>"))
         self._smart_tuning_cb = QCheckBox(tr("启用智能调律"))
         self._smart_tuning_cb.setToolTip(tr(
             "这是当前用户的二次确认开关。只有调律配置中的公共智能调律开关"
             "也已启用时才会生效；运行前请为相关备战方案扫描完整的八件穿戴装备。"))
         self._smart_tuning_cb.stateChanged.connect(
             lambda _state: self._save_tuning_config())
-        layout.addWidget(self._smart_tuning_cb)
-        self._sync_smart_tuning_availability()
+        if self._dev_mode:
+            layout.addWidget(QLabel("<b>" + tr("智能调律：") + "</b>"))
+            layout.addWidget(self._smart_tuning_cb)
+            self._sync_smart_tuning_availability()
 
         layout.addStretch()
         return self._wrap_scroll(panel)

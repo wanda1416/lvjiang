@@ -56,6 +56,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.stone_stock import (
 )
 from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 from lvjiang.core.config import load_user_config
+from lvjiang.core.config.resolver import get_resolver
 from lvjiang.core.layout_manager import load_layout_by_key
 from lvjiang.workflows.engine import WorkflowEngine
 
@@ -261,6 +262,19 @@ def _wf_with(base: TuningGroup) -> FakeWF:
     wf = FakeWF()
     wf.run_ctx.base_group = base
     return wf
+
+
+def test_non_dev_run_ignores_saved_smart_tuning_switch(monkeypatch):
+    wf = FakeWF()
+    wf.run_ctx.smart_tuning_enabled = True
+    events = []
+    monkeypatch.setattr(wf, "_emit_progress", lambda *args: events.append(args))
+    monkeypatch.setattr(get_resolver(), "is_dev_mode", lambda: False)
+
+    wf._prepare_smart_tuning()
+
+    assert wf._smart_evaluator is None
+    assert events == [("smart_tuning_updated", {"enabled": False})]
 
 
 def test_tune_page_detector_uses_stable_label_not_dynamic_button():

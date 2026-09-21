@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QHeaderView,
     QLabel,
+    QMessageBox,
 )
 
 from lvjiang.apps.yysls.core.tuning_rules import (
@@ -33,7 +34,7 @@ from lvjiang.apps.yysls.ui.tune_settings.rule_panel import RulePanel
 from lvjiang.apps.yysls.ui.tune_settings.smart_tuning_page import (
     SmartTuningPage,
 )
-from lvjiang.core.config.resolver import EntityOrigin
+from lvjiang.core.config.resolver import EntityOrigin, get_resolver
 from tests.case_matrix import case_matrix
 
 PROJECT_ROOT = Path(__file__).parents[2]
@@ -108,6 +109,28 @@ class TestDialog:
         # 规则页初始只占位，首次进入才构造 RulePanel。
         assert not isinstance(dialog._stack.widget(5), RulePanel)
         assert not dialog.findChildren(RulePanel)
+
+    def test_non_dev_dialog_omits_smart_tuning_page(
+            self, qtbot, monkeypatch):
+        monkeypatch.setattr(get_resolver(), "is_dev_mode", lambda: False)
+        dialog = TuningRulesDialog()
+        qtbot.addWidget(dialog)
+
+        assert dialog._smart_page is None
+        assert all(dialog._nav.item(i).text() != "智能调律"
+                   for i in range(dialog._nav.count()))
+        assert not dialog.findChildren(SmartTuningPage)
+        assert dialog._nav.item(4).text() != "智能调律"
+        assert dialog._stack.widget(4) is dialog._playstyle_page
+
+        monkeypatch.setattr(
+            QMessageBox, "question",
+            lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes)
+        dialog._dirty = True
+        dialog._discard_changes()
+        dialog._nav.setCurrentRow(5)
+        assert dialog._smart_page is None
+        assert dialog._stack.currentWidget() is dialog._playstyle_page
 
 
     def test_smart_tune_full_recycle_shows_and_saves_keep_threshold(

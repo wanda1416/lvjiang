@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QLabel
 
 from lvjiang.apps.yysls.ui.tuning.tuning_tab import TuningTab
 from lvjiang.core.config.models import HotkeyConfig
+from lvjiang.core.config.resolver import get_resolver
 from lvjiang.core.config.session import reset_session_store
 from lvjiang.core.user_config import (
     User,
@@ -106,6 +107,23 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     tab._positional_traversal_cb.setChecked(False)
     saved = get_user_workflow_params("测试用户", "auto_tuning", users_dir)
     assert saved is not None and saved["scroll_strategy"] == ""
+    reset_session_store()
+
+
+def test_non_dev_parameters_hide_smart_tuning(qtbot, tmp_path, monkeypatch):
+    import lvjiang.constants as constants_mod
+
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", tmp_path / "session.json")
+    monkeypatch.setattr(get_resolver(), "is_dev_mode", lambda: False)
+    reset_session_store()
+    users_dir = tmp_path / "users"
+    save_user_metadata(User(name="测试用户"), users_dir)
+    tab = TuningTab(_Host(users_dir))
+    qtbot.addWidget(tab)
+
+    labels = [label.text() for label in tab._config_tabs.widget(1).findChildren(QLabel)]
+    assert "<b>智能调律：</b>" not in labels
+    assert tab._smart_tuning_cb.parentWidget() is None
     reset_session_store()
 
 

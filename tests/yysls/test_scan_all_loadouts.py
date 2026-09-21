@@ -1,4 +1,5 @@
 """Game-plan scans must bind by name and use the scanned plan, not the UI active one."""
+import json
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -135,6 +136,25 @@ def test_game_plan_scene_loads_with_distinct_popup_views():
     assert {view.key for view in scene.views} >= {
         "fangan_fill", "fangan_confirm",
     }
+    fill = next(region for region in scene.regions
+                if region.key == "smart_fill")
+    assert fill.views == ["fangan_fill"]
+    assert fill.is_text and fill.is_clickable
+
+    for platform in ("android", "desktop"):
+        layout_path = Path(f"config/system/layouts/{platform}/training_main.json")
+        layout = json.loads(layout_path.read_text(encoding="utf-8"))
+        button = next(region for region in layout["regions"]
+                      if region["key"] == "smart_fill")
+        assert all(button[key] > 0 for key in ("w_ratio", "h_ratio"))
+        assert button.get("activation_key") == (
+            "SPACE" if platform == "desktop" else None)
+
+    navigation = Path(
+        "config/system/workflows/subcall/loadout/loadout_plan_navigation.wf"
+    ).read_text(encoding="utf-8")
+    assert 'scan [training_main].[smart_fill] as $action by contains "智能填充"' in navigation
+    assert "click [training_main].[smart_fill]" in navigation
 
 
 def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():

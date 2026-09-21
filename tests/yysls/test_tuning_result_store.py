@@ -1,7 +1,7 @@
 """自动调律装备总览的旁路结果聚合。"""
 
 
-from PyQt6.QtCore import QPoint
+from PyQt6.QtWidgets import QScrollArea
 
 from lvjiang.apps.yysls.ui.tuning.progress_hub import TuningProgressHub
 from lvjiang.apps.yysls.ui.tuning.progress_widget import TuningProgressWidget
@@ -225,18 +225,22 @@ def test_progress_widget_shows_ordered_smart_plan_details(qtbot):
     assert "备战方案不完整" in text
 
 
-def test_smart_progress_stays_visible_after_equipment_expands(qtbot):
+def test_smart_progress_is_peer_and_changes_only_on_smart_updates(qtbot):
     hub = TuningProgressHub()
     widget = TuningProgressWidget(hub)
     qtbot.addWidget(widget)
-    widget.resize(900, 600)
-    widget.show()
     widget.reset_state()
     hub.smart_tuning_updated.emit({
         "enabled": True, "state": "initial", "message": "方案已加载",
         "plans": [{"plan_name": "测试方案", "status": "ready"}],
     })
-    qtbot.waitExposed(widget)
+    panel = widget._smart_group.parentWidget()
+    assert [panel.layout().itemAt(i).widget().title() for i in range(5)] == [
+        "当前装备", "词条进度", "规则评级", "调律状态", "智能调律",
+    ]
+    assert not widget.findChildren(QScrollArea)
+    initial_summary = widget._smart_summary_label.text()
+    initial_plans = widget._smart_plans_label.text()
 
     hub.equipment_started.emit({
         "name": "测试装备", "type": "主武器", "level": 110,
@@ -244,13 +248,19 @@ def test_smart_progress_stays_visible_after_equipment_expands(qtbot):
         "affixes": [{"name": f"测试词条{i}", "value": i} for i in range(5)],
         "target_affixes": [f"目标词条{i}" for i in range(12)],
     })
-    qtbot.wait(10)
-    assert widget._smart_group.isVisible()
-    assert widget._smart_summary_label.text() == "等待当前装备分析..."
-    assert widget._smart_group.parent() is widget._current_scroll.parent()
-    smart_bottom = widget._smart_group.mapTo(
-        widget, QPoint(0, widget._smart_group.height())).y()
-    assert smart_bottom <= widget.height()
+    assert not widget._smart_group.isHidden()
+    assert widget._smart_summary_label.text() == initial_summary
+    assert widget._smart_plans_label.text() == initial_plans
+    hub.equipment_finished.emit({
+        "name": "测试装备", "rounds": 0, "status": "done",
+        "final_affixes": [],
+    })
+    assert widget._smart_summary_label.text() == initial_summary
+    assert widget._smart_plans_label.text() == initial_plans
+    hub.smart_tuning_updated.emit({
+        "enabled": True, "state": "evaluated", "message": "已有新结果",
+    })
+    assert widget._smart_summary_label.text() == "已有新结果"
 
 
 def test_reset_only_equipment_is_still_a_tuning_result(qtbot):

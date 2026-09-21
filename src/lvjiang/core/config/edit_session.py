@@ -74,15 +74,20 @@ class ConfigEditSession:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(local_source, target)
 
-    def _entity_snapshot(self) -> dict[str, bytes]:
-        result: dict[str, bytes] = {}
+    def _entity_snapshot(self) -> dict[tuple[str, str], bytes]:
+        """记录两个可编辑实体层；仅存生效内容会丢失保存位置。"""
+        result: dict[tuple[str, str], bytes] = {}
         for rel_dir in self._entity_dirs:
             for name in self.resolver.enumerate_entities(
                     rel_dir, "*.yaml", include_internal=True):
                 rel_path = f"{rel_dir}/{name}"
-                path = self.resolver.resolve_read(rel_path)
-                if path is not None:
-                    result[rel_path] = path.read_bytes()
+                for layer, root in (
+                    ("system", self.resolver.system_dir),
+                    ("local", self.resolver.local_dir),
+                ):
+                    path = root / rel_path
+                    if path.is_file():
+                        result[(rel_path, layer)] = path.read_bytes()
         return result
 
     @staticmethod
@@ -105,10 +110,9 @@ class ConfigEditSession:
             self._source.save_merged(rel_path, data)
 
         current = self._entity_snapshot()
-        for rel_path in sorted(self._baseline_entities.keys() - current.keys()):
-            self._source.delete_entity(rel_path)
-        for rel_path, payload in current.items():
-            if self._baseline_entities.get(rel_path) == payload:
+        # 先写目标层，再删源层；搬移过程中失败时至少保留一份文件。
+        for (rel_path, layer), payload in current.items():
+            if self._baseline_entities.get((rel_path, layer)) == payload:
                 continue
             text = payload.decode("utf-8")
             if os.linesep == "\r\n":
@@ -119,18 +123,22 @@ class ConfigEditSession:
                 # 最终落盘时只做一次平台换行转换。
                 text = text.replace("\r\n", "\n").replace("\r", "\n")
             content_version = None
-            if self._source.is_dev_mode() and versioning.spec_for(rel_path):
+            if (layer == "system" and self._source.is_dev_mode()
+                    and versioning.spec_for(rel_path)):
                 # 会话的 system 基底可能是正在生效的 remote 新版本。普通
                 # 编辑必须像直接通过真实 resolver 保存一样，保留真实 system
                 # 的旧版本，让 remote 继续生效；只有用户在会话里显式提升过
                 # 版本时，才把新版本号一并提交到真实 system。
                 draft_version = self._payload_version(rel_path, payload)
                 baseline_version = self._payload_version(
-                    rel_path, self._baseline_entities.get(rel_path))
+                    rel_path, self._baseline_entities.get((rel_path, layer)))
                 if draft_version != baseline_version:
                     content_version = draft_version
             self._source.write_entity(
-                rel_path, text, content_version=content_version)
+                rel_path, text, content_version=content_version, layer=layer)
+        for rel_path, layer in sorted(
+                self._baseline_entities.keys() - current.keys()):
+            self._source.delete_entity(rel_path, layer=layer)
         self._baseline_entities = current
 
     def reset(self) -> None:

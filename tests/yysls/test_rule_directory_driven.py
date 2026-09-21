@@ -13,6 +13,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     TuningGroupManager,
     TuningRuleManager,
 )
+from lvjiang.core.config.edit_session import ConfigEditSession
 from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -171,6 +172,26 @@ class TestLegacyMigration:
 
 
 class TestGroupsFromDirectory:
+    def test_dialog_session_preserves_selected_local_group_layer(self, tmp_path):
+        resolver = _layered(tmp_path, dev_mode=True)
+        session = ConfigEditSession(
+            resolver, merged_paths=("yysls/tune_config.yaml",),
+            entity_dirs=("yysls/base_groups", "yysls/tuning_rules"))
+        manager = TuningGroupManager(resolver=session.resolver)
+        manager.create_group("mine", "本地组", layer="local")
+
+        session.commit()
+        rel_path = "yysls/base_groups/mine.yaml"
+        assert (tmp_path / "local" / rel_path).is_file()
+        assert not (tmp_path / "system" / rel_path).exists()
+        assert resolver.describe_entity(rel_path).layer == "local"
+
+        manager.move_group("mine", "system")
+        session.commit()
+        assert not (tmp_path / "local" / rel_path).exists()
+        assert (tmp_path / "system" / rel_path).is_file()
+        session.close()
+
     def test_groups_enumerated_and_ordered(self, tmp_path):
         resolver = _layered(tmp_path, dev_mode=True)
         groups_dir = tmp_path / "system/yysls/base_groups"

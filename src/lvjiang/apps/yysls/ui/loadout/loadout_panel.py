@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QSizePolicy,
     QSplitter,
@@ -185,17 +186,22 @@ class LoadoutPanel(QWidget):
             plan_row.addWidget(button)
         plan_row.addSpacing(16)
         plan_row.addWidget(QLabel(tr("流派")))
-        self._school = QLabel(tr("无方案"))
+        self._school = QLineEdit(tr("无方案"))
         plan_row.addWidget(self._school, 1)
         plan_row.addWidget(QLabel(tr("主武学")))
-        self._main_art = QLabel("-")
+        self._main_art = QLineEdit("-")
         plan_row.addWidget(self._main_art, 1)
         plan_row.addWidget(QLabel(tr("副武学")))
-        self._sub_art = QLabel("-")
+        self._sub_art = QLineEdit("-")
         plan_row.addWidget(self._sub_art, 1)
         plan_row.addWidget(QLabel(tr("玩法")))
-        self._playstyle = QLabel("-")
+        self._playstyle = QLineEdit("-")
         plan_row.addWidget(self._playstyle, 1)
+        for field in (self._school, self._main_art, self._sub_art,
+                      self._playstyle):
+            field.setReadOnly(True)
+            field.setEnabled(False)
+            field.setMinimumWidth(100)
         root.addLayout(plan_row)
 
         # Row 3: always-visible assumptions + public metrics.
@@ -435,6 +441,9 @@ class LoadoutPanel(QWidget):
         self._playstyle.setText(state.active_plan.playstyle or "-")
         school = state.active_school(schools)
         self._school.setText(school or tr("自定义"))
+        for field in (self._school, self._main_art, self._sub_art,
+                      self._playstyle):
+            field.setToolTip(field.text())
         self._refreshing = False
         # 下游消费者（装备页/战斗属性页）已显式驱动，无需再 emit
         # equipment_changed：emit 会导致信号订阅者重复全量刷新

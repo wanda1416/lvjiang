@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtWidgets import QComboBox, QLabel, QPushButton
+from PyQt6.QtWidgets import QComboBox, QLineEdit, QPushButton
 
 from lvjiang.apps.yysls.ui.loadout.loadout_panel import LoadoutPanel
 
@@ -79,8 +79,11 @@ def test_plan_row_only_exposes_create_manage_and_read_only_details(qtbot):
                if isinstance(row.itemAt(index).widget(), QPushButton)]
     assert buttons == ["新建", "管理"]
     assert isinstance(panel._plans, QComboBox)
-    assert all(isinstance(widget, QLabel) for widget in (
-        panel._school, panel._main_art, panel._sub_art, panel._playstyle))
+    fields = (panel._school, panel._main_art,
+              panel._sub_art, panel._playstyle)
+    assert all(isinstance(widget, QLineEdit) for widget in fields)
+    assert all(widget.isReadOnly() and not widget.isEnabled()
+               for widget in fields)
 
 
 def test_panel_loads_one_inventory_per_refresh_and_shares_it(qtbot, tmp_path, monkeypatch):

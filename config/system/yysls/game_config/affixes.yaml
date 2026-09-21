@@ -115,6 +115,9 @@ affix_caps:
     105:
       cap: 8.6
       chengyin: 8.1
+    100:
+      cap: 7.4
+      chengyin: 7.0
   全部武学增效:
     _unit: '%'
     _aliases:
@@ -125,6 +128,9 @@ affix_caps:
     105:
       cap: 4.2
       chengyin: 3.9
+    100:
+      cap: 3.6
+      chengyin: 3.4
   对单位增效:
     _unit: '%'
     _aliases:
@@ -136,6 +142,9 @@ affix_caps:
     105:
       cap: 4.4
       chengyin: 4.1
+    100:
+      cap: 3.8
+      chengyin: 3.6
   奇术类增伤:
     _unit: '%'
     _aliases:
@@ -147,6 +156,9 @@ affix_caps:
     105:
       cap: 13.4
       chengyin: 12.6
+    100:
+      cap: 11.6
+      chengyin: 10.9
   气血最大值:
     _aliases:
     - 气血最大值
@@ -156,6 +168,9 @@ affix_caps:
     105:
       cap: 4010
       chengyin: 3769.4
+    100:
+      cap: 3444
+      chengyin: 3237.4
   外功防御:
     _aliases:
     - 外功防御
@@ -165,6 +180,9 @@ affix_caps:
     105:
       cap: 52.8
       chengyin: 49.6
+    100:
+      cap: 45.4
+      chengyin: 42.7
   外功增益:
     _pool: dingyin
     _unit: '%'

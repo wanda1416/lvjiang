@@ -2,16 +2,6 @@
 
 # 前置：角色详情页；返回解析后的面板属性，不做 UI 或存储写入。
 def capture_role_base_attrs($scroll_count)
-    # 连续切换方案时角色页可能保留上次滚动位置，先回到属性列表顶端。
-    $desktop = is_post()
-    if $desktop
-        scroll [role_detail].[detail_1] up 20 interval 0.1
-    else
-        loop 5
-            drag [role_detail].[detail_1] down 0.5
-        end
-    end
-    wait stable @scroll_settle
     eval $data = {}
     eval $got_outer_attack = false
     eval $got_attack = false

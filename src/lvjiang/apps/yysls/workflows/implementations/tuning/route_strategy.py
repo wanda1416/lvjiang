@@ -19,7 +19,7 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.ports import (
 _NAV_FILE = "subcall/navigation.wf"
 _PAGE_DETECTION_FILE = "subcall/page_detection.wf"
 _PAGE_ACTION_FILE = "subcall/page_action.wf"
-_EQUIPMENT_SCAN_FILE = "subcall/equipment_scan.wf"
+_EQUIPMENT_SCAN_FILE = "subcall/loadout/equipment_scan.wf"
 _RECYCLE_ENTRY_FIELDS = [
     "sub_func_1", "sub_func_2", "sub_func_3", "sub_func_4",
 ]

@@ -1,8 +1,8 @@
 #% name: 指定备战方案装备扫描
 
 import "subcall/navigation.wf"
-import "subcall/equipment_scan.wf"
-import "subcall/equipped_slots_scan.wf"
+import "subcall/loadout/equipment_scan.wf"
+import "subcall/loadout/equipped_slots_scan.wf"
 
 # 前置：游戏已经使用目标方案且当前在主页。
 # 返回实际成功写入的槽位数；绑定只作用于本次 WF，不改变 UI 活动方案。

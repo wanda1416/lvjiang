@@ -415,8 +415,10 @@ class TuningRulesDialog(QDialog):
         for combo in self._group_dropdowns:
             combo.blockSignals(True)
             combo.clear()
-            for key, group in self._group_manager.get_groups().items():
-                combo.addItem(group.name, key)
+            for key in self._base_page.display_group_keys():
+                group = self._group_manager.get_group(key)
+                if group is not None:
+                    combo.addItem(group.name, key)
             idx = combo.findData(group_key)
             if idx >= 0:
                 combo.setCurrentIndex(idx)

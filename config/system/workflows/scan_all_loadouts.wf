@@ -15,40 +15,55 @@ import "subcall/loadout/loadout_plan_navigation.wf"
 import "subcall/loadout/equipped_plan_scan.wf"
 import "subcall/loadout/role_base_attr_plan_scan.wf"
 
-# 列表在任务开始时冻结；浏览游戏页面不改变主界面活动方案。
-eval $targets = loadout_scan_targets()
-if not $targets
-    log error "当前用户没有配置完整武学的备战方案"
+# 以游戏列表为扫描来源；主界面活动方案保持不变。
+call $nav_result = nav_main_to_game_plans()
+if $nav_result < 0
+    log error "无法进入游戏备战方案管理"
     return -1
 end
-for target in $targets
-    if not $target.playstyle
-        log error "备战方案未配置玩法，无法生成基础属性: " + $target.name
-    else
-        call $nav_result = nav_main_to_game_plans()
-        if $nav_result < 0
-            log error "无法进入游戏备战方案管理"
-            return -1
-        end
-        call $selected = select_game_plan($target.name, $target.main_art, $target.sub_art)
-        if $selected < 0
-            return -1
-        end
-        call $nav_result = nav_game_plans_to_main()
-        if $nav_result < 0
-            return -1
-        end
-        call $written = scan_equipped_plan($target.name, $target.main_art, $target.sub_art)
-        if $written != 8
-            log error "备战方案装备未完整扫描，跳过基础属性: " + $target.name
-            return -1
-        end
-        call $saved = scan_role_base_attr_for_plan(
-            $target.name, $target.main_art, $target.sub_art, true, $scroll_count)
-        if $saved == -1
-            return -1
-        end
-        log info "已扫描备战方案: " + $target.name + "，基础属性: " + $saved
+call $names = collect_game_plan_names()
+if not $names
+    log error "游戏方案列表未识别到任何方案"
+    return -1
+end
+call $nav_result = nav_game_plans_to_main()
+if $nav_result < 0
+    return -1
+end
+for name in $names
+    call $nav_result = nav_main_to_game_plans()
+    if $nav_result < 0
+        return -1
     end
+    call $selected = select_game_plan($name)
+    if $selected == -1
+        return -1
+    end
+    call $nav_result = nav_game_plans_to_main()
+    if $nav_result < 0
+        return -1
+    end
+    eval $target = ensure_scanned_loadout(
+        $selected.name, $selected.main_art, $selected.sub_art)
+    if not $target.ok
+        log error "跳过游戏方案 " + $selected.name + ": " + $target.reason
+        continue
+    end
+    call $written = scan_equipped_plan(
+        $target.name, $target.main_art, $target.sub_art)
+    if $written != 8
+        log error "备战方案装备未完整扫描，跳过基础属性: " + $target.name
+        continue
+    end
+    if not $target.playstyle
+        log warn "备战方案没有匹配玩法，已扫描装备但跳过基础属性: " + $target.name
+        continue
+    end
+    call $saved = scan_role_base_attr_for_plan(
+        $target.name, $target.main_art, $target.sub_art, true, $scroll_count)
+    if $saved == -1
+        return -1
+    end
+    log info "已扫描备战方案: " + $target.name + "，基础属性: " + $saved
 end
 return 0

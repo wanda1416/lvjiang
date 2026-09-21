@@ -11,8 +11,8 @@ from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
 from lvjiang.apps.yysls.core.loadout import LoadoutRepository
 from lvjiang.apps.yysls.workflows.builtins.equipment_ingest import (
     _bind_scanned_loadout,
+    _ensure_scanned_loadout,
     _loadout_scan_target,
-    _loadout_scan_targets,
     _write_equipped,
 )
 from lvjiang.apps.yysls.workflows.builtins.role_attr_ingest import (
@@ -46,10 +46,12 @@ def test_plan_scan_binding_keeps_active_plan_unchanged(tmp_path):
     active = repo.load().active_plan_id
     plan = repo.create_plan("方案甲", "无名剑法", "无名枪法",
                             playstyle="玩法甲", activate=False)
-    targets = _loadout_scan_targets(engine)
-    assert targets == [{
-        "name": "方案甲", "main_art": "无名剑法",
-        "sub_art": "无名枪法", "playstyle": "玩法甲"}]
+    target = _ensure_scanned_loadout(engine, "方案甲", "无名枪法", "无名剑法")
+    assert target == {
+        "name": "方案甲", "main_art": "无名枪法",
+        "sub_art": "无名剑法", "playstyle": "玩法甲",
+        "ok": True, "created": False,
+    }
     assert _bind_scanned_loadout(engine, "方案甲", "无名枪法", "无名剑法") == plan.id
     assert repo.load().active_plan_id == active
     with pytest.raises(ValueError, match="武学"):
@@ -67,11 +69,39 @@ def test_ambiguous_name_never_writes_arbitrary_plan(tmp_path):
     repo = LoadoutRepository(engine.run_username, tmp_path)
     for _ in range(2):
         repo.create_plan("同名", "无名剑法", "无名枪法", activate=False)
-    with pytest.raises(ValueError, match="重名"):
-        _loadout_scan_targets(engine)
+    result = _ensure_scanned_loadout(engine, "同名", "无名剑法", "无名枪法")
+    assert result == {"ok": False, "reason": "本地存在同名备战方案，无法确定写入目标"}
     with pytest.raises(ValueError, match="匹配 2 个"):
         _bind_scanned_loadout(engine, "同名", "无名剑法", "无名枪法")
     assert "_bound_loadout_plan_id" not in engine.context
+
+
+def test_game_plan_creates_local_plan_and_infers_playstyle_without_activation(tmp_path):
+    engine = _engine(tmp_path)
+    repo = LoadoutRepository(engine.run_username, tmp_path)
+    active = repo.load().active_plan_id
+    for name, expected_style in (("火拳奶", "火拳"),
+                                 ("纯奶PVE", "纯奶"),
+                                 ("未命名方案", "火拳")):
+        result = _ensure_scanned_loadout(engine, name, "千香引魂蛊", "明川药典")
+        assert result["ok"] is True
+        assert result["created"] is True
+        assert result["playstyle"] == expected_style
+        assert repo.load().active_plan_id == active
+        again = _ensure_scanned_loadout(engine, name, "明川药典", "千香引魂蛊")
+        assert again["created"] is False
+        assert again["playstyle"] == expected_style
+    assert len(repo.load().plans) == 4
+
+
+def test_game_plan_same_name_with_other_arts_does_not_mutate_local_plan(tmp_path):
+    engine = _engine(tmp_path)
+    repo = LoadoutRepository(engine.run_username, tmp_path)
+    plan = repo.create_plan("方案甲", "无名剑法", "无名枪法",
+                            playstyle="玩法甲", activate=False)
+    result = _ensure_scanned_loadout(engine, "方案甲", "明川药典", "千香引魂蛊")
+    assert result == {"ok": False, "reason": "本地同名方案的武学与游戏不一致"}
+    assert repo.load().plans[plan.id].playstyle == "玩法甲"
 
 
 def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
@@ -166,6 +196,12 @@ def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():
     assert "scan_role_base_attr_for_plan" in set(_calls(role.body))
     assert {"scan_equipped_plan", "scan_role_base_attr_for_plan"} <= set(
         _calls(batch.body))
+    assert {"collect_game_plan_names", "select_game_plan"} <= set(_calls(batch.body))
+    batch_text = (base / "scan_all_loadouts.wf").read_text(encoding="utf-8")
+    navigation_text = (base / "subcall/loadout/loadout_plan_navigation.wf").read_text(
+        encoding="utf-8")
+    assert "loadout_scan_targets" not in batch_text
+    assert "len($name) > 0" in navigation_text
     for path in (base / "scan_equipped.wf", base / "standalone/scan_role_base_attr.wf"):
         names = {item["name"] for item in parse_metadata_file(path)["parameters"]}
         assert {"plan_name", "main_art", "sub_art"} <= names

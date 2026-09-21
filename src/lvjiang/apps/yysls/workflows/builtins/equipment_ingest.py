@@ -11,24 +11,45 @@ def _repository(_engine):
     return LoadoutRepository(username, getattr(_engine, "users_dir", None))
 
 
-@builtin_func("loadout_scan_targets")
-def _loadout_scan_targets(_engine) -> list[dict[str, str]]:
-    """Freeze this user's configured plans in their visible order for one run."""
-    state = _repository(_engine).load()
-    targets = [
-        {
-            "name": state.plans[pid].name,
-            "main_art": state.plans[pid].main_martial_art,
-            "sub_art": state.plans[pid].sub_martial_art,
-            "playstyle": state.plans[pid].playstyle,
-        }
-        for pid in state.ordered_plan_ids()
-        if state.plans[pid].main_martial_art and state.plans[pid].sub_martial_art
-    ]
-    names = [item["name"] for item in targets]
-    if len(names) != len(set(names)):
-        raise ValueError("备战方案存在重名；游戏只提供名称，不能安全批量扫描")
-    return targets
+@builtin_func("ensure_scanned_loadout")
+def _ensure_scanned_loadout(
+    _engine, name: str, main_art: str, sub_art: str,
+) -> dict[str, str | bool]:
+    """Match a game plan by name, or create it without changing the active plan."""
+    from ...config import get_game_config
+    from ...core.loadout import resolve_school
+
+    name, main_art, sub_art = (str(value or "").strip()
+                               for value in (name, main_art, sub_art))
+    if not name or not main_art or not sub_art or main_art == sub_art:
+        raise ValueError("游戏方案名称或两门武学识别不完整，不能创建备战方案")
+    repo = _repository(_engine)
+    matches = [plan for plan in repo.load().plans.values() if plan.name == name]
+    if len(matches) > 1:
+        return {"ok": False, "reason": "本地存在同名备战方案，无法确定写入目标"}
+    if matches:
+        plan = matches[0]
+        if {plan.main_martial_art, plan.sub_martial_art} != {main_art, sub_art}:
+            return {"ok": False, "reason": "本地同名方案的武学与游戏不一致"}
+        return {"ok": True, "name": name,
+                "main_art": main_art, "sub_art": sub_art,
+                "playstyle": plan.playstyle, "created": False}
+
+    game_config = get_game_config()
+    school = resolve_school(main_art, sub_art, game_config.get_schools())
+    arts = {main_art, sub_art}
+    # get_playstyles() 保留配置声明顺序；UI 候选接口按名称排序，不能用于默认项。
+    candidates = [style for style, definition in game_config.get_playstyles().items()
+                  if set(definition.get("arts") or []) == arts
+                  and (not school or definition.get("school") == school)]
+    playstyle = next((style for style in candidates if style in name),
+                     candidates[0] if candidates else "")
+    repo.create_plan(name, main_art, sub_art,
+                     playstyle=playstyle, activate=False)
+    logger.info(f"已从游戏新建备战方案: {name}，流派={school or '-'}，玩法={playstyle or '-'}")
+    return {"ok": True, "name": name,
+            "main_art": main_art, "sub_art": sub_art,
+            "playstyle": playstyle, "created": True}
 
 
 @builtin_func("bind_scanned_loadout")

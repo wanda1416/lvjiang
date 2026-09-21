@@ -300,6 +300,24 @@ class TestBehaviorPages:
         assert after.rules[0].first_affix_only == (not first)
         assert after.entry_min_rating == scan.entry_min_rating
 
+    def test_scan_coverage_refreshes_for_group_and_rule_changes(
+            self, qtbot, tmp_group_manager):
+        page = ScanBehaviorPage(
+            tmp_group_manager, "default", lambda *_args: None)
+        qtbot.addWidget(page)
+        assert page._coverage_tree.topLevelItemCount() == len(QUALITY_PARTS)
+        assert "均有候选规则" in page._coverage_summary.text()
+
+        page.set_group("aggressive")
+        assert "均有候选规则" in page._coverage_summary.text()
+        page._table.setCurrentCell(2, 0)
+        page._on_del_rule()
+        page._table.setCurrentCell(2, 0)
+        page._on_del_rule()
+        assert "覆盖缺口" in page._coverage_summary.text()
+        assert "胸甲/紫装" in page._coverage_summary.text()
+        assert len(tmp_group_manager.get_group("default").scan.rules) == 4
+
     def test_scan_page_add_delete_rule(self, qtbot, tmp_group_manager):
         statuses: list[tuple[str, bool]] = []
         page = ScanBehaviorPage(tmp_group_manager, "default",

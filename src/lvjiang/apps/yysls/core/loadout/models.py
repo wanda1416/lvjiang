@@ -81,13 +81,15 @@ class LoadoutState:
     revision: int = 0
     active_plan_id: str = ""
     plans: dict[str, LoadoutPlan] = field(default_factory=dict)
+    plan_order: list[str] = field(default_factory=list)
     equipment_items: dict[str, dict] = field(default_factory=dict)
 
     @classmethod
     def empty(cls) -> "LoadoutState":
         # 尚未落盘时，各读取者必须看到同一个默认方案 ID，首次编辑才持久化。
         plan = LoadoutPlan(id="default", name="默认方案")
-        return cls(active_plan_id=plan.id, plans={plan.id: plan})
+        return cls(active_plan_id=plan.id, plans={plan.id: plan},
+                   plan_order=[plan.id])
 
     @classmethod
     def from_dict(cls, data: dict) -> "LoadoutState":
@@ -101,9 +103,17 @@ class LoadoutState:
         } if isinstance(raw_plans, dict) else {}
         if not plans:
             return cls.empty()
+        raw_order = data.get("plan_order")
+        order: list[str] = []
+        if isinstance(raw_order, list):
+            for value in raw_order:
+                pid = str(value)
+                if pid in plans and pid not in order:
+                    order.append(pid)
+        order.extend(pid for pid in plans if pid not in order)
         active = str(data.get("active_plan_id") or "")
         if active not in plans:
-            active = next(iter(plans))
+            active = order[0]
         items = data.get("equipment_items", {})
         normalized_items = {
             str(fp): normalize_equipment_times(value)
@@ -114,6 +124,7 @@ class LoadoutState:
             revision=int(data.get("revision") or 0),
             active_plan_id=active,
             plans=plans,
+            plan_order=order,
             equipment_items=normalized_items,
         )
 
@@ -122,8 +133,17 @@ class LoadoutState:
             "revision": self.revision,
             "active_plan_id": self.active_plan_id,
             "plans": {pid: plan.to_dict() for pid, plan in self.plans.items()},
+            "plan_order": self.ordered_plan_ids(),
             "equipment_items": self.equipment_items,
         }
+
+    def ordered_plan_ids(self) -> list[str]:
+        """旧数据沿原对象顺序展示；新顺序只引用仍存在的方案 ID。"""
+        order: list[str] = []
+        for pid in self.plan_order:
+            if pid in self.plans and pid not in order:
+                order.append(pid)
+        return order + [pid for pid in self.plans if pid not in order]
 
     @property
     def active_plan(self) -> LoadoutPlan:

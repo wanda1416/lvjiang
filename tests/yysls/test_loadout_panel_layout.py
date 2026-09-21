@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtWidgets import QComboBox, QPushButton
+from PyQt6.QtWidgets import QComboBox, QLabel, QPushButton
 
 from lvjiang.apps.yysls.ui.loadout.loadout_panel import LoadoutPanel
 
@@ -67,6 +67,20 @@ def test_main_toolbar_exposes_first_three_analysis_tabs(qtbot):
         "最优组合", "转律建议", "培养建议")]
     assert positions == list(range(positions[0], positions[0] + 3))
     assert "词条收益率" not in labels
+
+
+def test_plan_row_only_exposes_create_manage_and_read_only_details(qtbot):
+    panel = LoadoutPanel(_Host())
+    qtbot.addWidget(panel)
+    row = panel.layout().itemAt(1).layout()
+    assert row is not None
+    buttons = [row.itemAt(index).widget().text()
+               for index in range(row.count())
+               if isinstance(row.itemAt(index).widget(), QPushButton)]
+    assert buttons == ["新建", "管理"]
+    assert isinstance(panel._plans, QComboBox)
+    assert all(isinstance(widget, QLabel) for widget in (
+        panel._school, panel._main_art, panel._sub_art, panel._playstyle))
 
 
 def test_panel_loads_one_inventory_per_refresh_and_shares_it(qtbot, tmp_path, monkeypatch):

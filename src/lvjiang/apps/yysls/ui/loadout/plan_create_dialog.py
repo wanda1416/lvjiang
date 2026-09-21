@@ -14,17 +14,20 @@ from PyQt6.QtWidgets import (
 from .....i18n import tr
 from .....ui.button_styles import apply_dialog_button_box_style
 from ...config import GameConfigManager
+from ...core.loadout import LoadoutPlan, resolve_school
 from ..layout_helpers import fit_combo_to_contents
 
 
 class PlanCreateDialog(QDialog):
     """流派是武学组合的便捷入口，不是单独持久化的方案字段。"""
 
-    def __init__(self, game_config: GameConfigManager, parent=None):
+    def __init__(self, game_config: GameConfigManager, parent=None,
+                 *, plan: LoadoutPlan | None = None):
         super().__init__(parent)
-        self.setWindowTitle(tr("新建方案"))
+        self.setWindowTitle(tr("编辑方案") if plan else tr("新建方案"))
         self._game_config = game_config
         self._schools = game_config.get_schools()
+        self._editing_plan = plan
         self._preferred_playstyle = ""
         form = QFormLayout(self)
         self._edit_name = QLineEdit()
@@ -39,6 +42,10 @@ class PlanCreateDialog(QDialog):
         form.addRow(tr("流派:"), self._combo_school)
 
         martial_arts = list(game_config.get_martial_arts())
+        if plan is not None:
+            for art in (plan.main_martial_art, plan.sub_martial_art):
+                if art and art not in martial_arts:
+                    martial_arts.append(art)
         self._combo_main = QComboBox()
         self._combo_main.addItems([""] + martial_arts)
         fit_combo_to_contents(self._combo_main, minimum=160)
@@ -56,6 +63,21 @@ class PlanCreateDialog(QDialog):
         form.addRow(tr("玩法:"), self._combo_playstyle)
         self._refresh_playstyles()
 
+        if plan is not None:
+            self._edit_name.setText(plan.name)
+            with QSignalBlocker(self._combo_main), QSignalBlocker(self._combo_sub):
+                self._combo_main.setCurrentText(plan.main_martial_art)
+                self._combo_sub.setCurrentText(plan.sub_martial_art)
+            school = resolve_school(plan.main_martial_art,
+                                    plan.sub_martial_art, self._schools) or ""
+            with QSignalBlocker(self._combo_school):
+                self._combo_school.setCurrentIndex(max(
+                    self._combo_school.findData(school), 0))
+            self._combo_main.setEnabled(not school)
+            self._combo_sub.setEnabled(not school)
+            self._preferred_playstyle = plan.playstyle
+            self._refresh_playstyles()
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)
@@ -66,6 +88,8 @@ class PlanCreateDialog(QDialog):
 
     def _on_school_changed(self, _index: int) -> None:
         school = self._combo_school.currentData()
+        self._combo_main.setEnabled(not school)
+        self._combo_sub.setEnabled(not school)
         if school:
             config = self._schools[school]
             with QSignalBlocker(self._combo_main), QSignalBlocker(self._combo_sub):
@@ -97,15 +121,26 @@ class PlanCreateDialog(QDialog):
             names = [name for name in names
                      if (self._game_config.get_playstyle(name) or {}).get(
                          "school") == school]
+        legacy_style = ""
+        plan = self._editing_plan
+        if (plan is not None and plan.playstyle
+                and {self.main_art, self.sub_art}
+                == {plan.main_martial_art, plan.sub_martial_art}
+                and plan.playstyle not in names):
+            legacy_style = plan.playstyle
         with QSignalBlocker(self._combo_playstyle):
             self._combo_playstyle.clear()
             self._combo_playstyle.addItem(tr("不选择玩法"), "")
             for name in names:
                 self._combo_playstyle.addItem(name, name)
+            if legacy_style:
+                self._combo_playstyle.addItem(
+                    tr("{name}（当前不匹配）").format(name=legacy_style),
+                    legacy_style)
             self._combo_playstyle.setCurrentIndex(max(
                 self._combo_playstyle.findData(self._preferred_playstyle), 0))
         fit_combo_to_contents(self._combo_playstyle, minimum=160)
-        self._combo_playstyle.setEnabled(bool(names))
+        self._combo_playstyle.setEnabled(bool(names or legacy_style))
 
     def _on_playstyle_changed(self, _index: int) -> None:
         self._preferred_playstyle = self.playstyle

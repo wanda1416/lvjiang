@@ -249,19 +249,10 @@ class PlayStyleDialogMixin:
         # 装备贡献（基础攻击 + 词条 + 五维换算，含同名只取最高等归一化）与
         # 展示/评分同一口径：scoring.equipment_attrs。
         # 注意：穿透类用户填写的就是基础值，不需要扣减装备
-        from ....config import get_game_config
-        from ....core.graduation.scoring import equipment_attrs
-
+        from ....core.combat.base_attribute_ingest import derive_base_attributes
         raw_equipped = self._equipped_snapshot() or {}
-        equip_attrs = equipment_attrs(raw_equipped, get_game_config())
-        gongjue_attrs = self._compute_gongjue_attrs()
-        base_attrs = panel_attrs - equip_attrs - gongjue_attrs
-
-        # 穿透类特殊处理：用户填写的就是基础值，直接保存
-        from ....core.combat.combat_attrs import PENETRATION_FIELDS
-        for pen_field in PENETRATION_FIELDS:
-            panel_val = getattr(panel_attrs, pen_field, 0.0)
-            setattr(base_attrs, pen_field, panel_val)
+        base_attrs = derive_base_attributes(
+            panel_attrs, raw_equipped, self._compute_gongjue_attrs())
 
         # 保存
         try:
@@ -320,30 +311,10 @@ class PlayStyleDialogMixin:
     def _save_play_style(self, school: str, name: str, base_attrs: CombatAttributes):
         """保存基础属性到 session 配置（仅保存允许的字段）。"""
         from ....config import get_game_config, save_play_style
-        from ....core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP
-
-        # 解析占位符：根据流派属性获取实际字段名
+        from ....core.combat.base_attribute_ingest import stored_base_fields
         gc = get_game_config()
         school_attr = gc.get_school_attr(school)
-        attr_map = SCHOOL_ATTR_FIELD_MAP.get(school_attr, {}) if school_attr else {}
-
-        play_style_data = {}
-        for _, fields in PLAY_STYLE_FIELD_GROUPS:
-            for fn, _, _ in fields:
-                # 解析占位符
-                if fn == "__attr_pen__":
-                    fn = attr_map.get("attr_pen", "")
-                elif fn == "__attr_bonus__":
-                    fn = attr_map.get("attr_bonus", "")
-                elif fn == "__min_attr__":
-                    fn = attr_map.get("min_attr", "")
-                elif fn == "__max_attr__":
-                    fn = attr_map.get("max_attr", "")
-                if not fn or fn.startswith("__"):
-                    continue
-                v = getattr(base_attrs, fn, 0)
-                if v:
-                    play_style_data[fn] = v
+        play_style_data = stored_base_fields(school_attr or "", base_attrs)
 
         try:
             save_play_style(school, name, play_style_data)

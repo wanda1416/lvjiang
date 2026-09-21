@@ -561,8 +561,15 @@ class TuningGroupManager:
     # ── 查询 ──
 
     def get_groups(self) -> dict[str, TuningGroup]:
-        """key → TuningGroup（按 order 升序）"""
-        return dict(self._groups)
+        """统一显示顺序：系统/远程在前、本地在后，再按 order、key 升序。"""
+        return {
+            key: self._groups[key]
+            for key in sorted(self._groups, key=lambda key: (
+                self.layer_of(key) == LAYER_LOCAL,
+                self._groups[key].order,
+                key,
+            ))
+        }
 
     def get_group(self, key: str) -> TuningGroup | None:
         return self._groups.get(key)

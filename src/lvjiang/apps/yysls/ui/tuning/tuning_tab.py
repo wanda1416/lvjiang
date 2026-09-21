@@ -130,6 +130,7 @@ class TuningTab(QWidget):
 
         self._config_tabs = QTabWidget()
         self._config_tabs.addTab(self._build_rules_page(), tr("规则"))
+        self._config_tabs.addTab(self._build_slots_page(), tr("部位"))
         self._config_tabs.addTab(self._build_parameters_page(), tr("参数"))
         tab_layout.addWidget(self._config_tabs)
 
@@ -256,8 +257,8 @@ class TuningTab(QWidget):
         rb.setChecked(True)
         rb.blockSignals(False)
 
-    def _build_parameters_page(self) -> QWidget:
-        """「参数」页：部位、全局开关、调律设置与调试参数。"""
+    def _build_slots_page(self) -> QWidget:
+        """「部位」页：调律部位选择及全选操作。"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -294,6 +295,14 @@ class TuningTab(QWidget):
                 self._tuning_checkboxes.append(cb)
             slots_row.addWidget(grp)
         layout.addLayout(slots_row)
+        layout.addStretch()
+        return self._wrap_scroll(panel)
+
+    def _build_parameters_page(self) -> QWidget:
+        """「参数」页：全局开关、调律设置与调试参数。"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
 
         layout.addWidget(QLabel("<b>" + tr("全局开关：") + "</b>"))
         self._tuning_globals = TuningGlobalsWidget(show_skip_tuning=False)

@@ -230,8 +230,7 @@ class BaseRuleGroupPage(QWidget):
 
     def _ordered_keys(self, groups: dict) -> list[str]:
         """系统/远程在前、本地在后；各层保留管理器的 order 顺序。"""
-        return sorted(groups, key=lambda key:
-                      self._manager.layer_of(key) == "local")
+        return list(groups)
 
     def _refresh(self):
         groups = self._manager.get_groups()

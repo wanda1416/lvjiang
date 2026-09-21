@@ -230,12 +230,25 @@ class TestBehaviorPages:
     """行为处理页 smoke：真实配置回填 + 变更即校验即保存"""
 
     def test_group_page_sorts_system_before_local_without_changing_order(
-            self, qtbot, layered_group_manager):
+            self, qtbot, layered_group_manager, monkeypatch):
+        from PyQt6.QtWidgets import QVBoxLayout, QWidget
+
+        from lvjiang.apps.yysls.ui.tuning.tuning_tab import TuningTab
+
         manager = layered_group_manager
-        assert list(manager.get_groups())[0] == "mine"
+        assert list(manager.get_groups()) == ["default", "aggressive", "mine"]
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.core.tuning_rules.get_tuning_group_manager",
+            lambda: manager)
+        main_page = QWidget()
+        qtbot.addWidget(main_page)
+        main_page._base_group_key = "default"
+        main_page._group_layout = QVBoxLayout(main_page)
+        TuningTab._refresh_base_group_radios(main_page)
         page = BaseRuleGroupPage(manager, "default", lambda *_args: None)
         qtbot.addWidget(page)
         assert page._display_keys == ["default", "aggressive", "mine"]
+        assert list(main_page._group_radios) == page.display_group_keys()
         assert [page._combo.itemData(i) for i in range(page._combo.count())] \
             == page._display_keys
         assert page.current_group_key() == "default"
@@ -249,6 +262,9 @@ class TestBehaviorPages:
         manager.move_group("mine", "system")
         page.refresh()
         assert page._display_keys == ["mine", "default", "aggressive"]
+        TuningTab._refresh_base_group_radios(main_page)
+        assert list(main_page._group_radios) == page.display_group_keys()
+        assert main_page._base_group_key == "default"
         assert page.current_group_key() == "default"
 
     def test_all_dropdowns_keep_readable_width(self, qtbot,

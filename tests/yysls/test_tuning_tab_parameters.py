@@ -47,13 +47,21 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     tab = TuningTab(_Host(users_dir))
     qtbot.addWidget(tab)
 
-    assert tab._config_tabs.count() == 2
-    assert [tab._config_tabs.tabText(i) for i in range(2)] == ["规则", "参数"]
+    assert tab._config_tabs.count() == 3
+    assert [tab._config_tabs.tabText(i) for i in range(3)] == ["规则", "部位", "参数"]
+    slots_page = tab._config_tabs.widget(1)
+    parameters_page = tab._config_tabs.widget(2)
+    assert all(slots_page.isAncestorOf(cb) for cb in tab._tuning_checkboxes)
+    assert not any(parameters_page.isAncestorOf(cb) for cb in tab._tuning_checkboxes)
+    assert "<b>调律部位：</b>" in {
+        label.text() for label in slots_page.findChildren(QLabel)
+    }
     labels = {
         label.text()
-        for label in tab._config_tabs.widget(1).findChildren(QLabel)
+        for label in tab._config_tabs.widget(2).findChildren(QLabel)
     }
-    assert {"<b>调律部位：</b>", "<b>全局开关：</b>",
+    assert "<b>调律部位：</b>" not in labels
+    assert {"<b>全局开关：</b>",
             "<b>调律设置：</b>", "<b>调试参数：</b>",
             "<b>智能调律：</b>"} <= labels
 

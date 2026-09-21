@@ -14,10 +14,6 @@ def nav_main_to_game_plans()
     click [game_menu_page].[peiyang] after wait @page_refresh
     click [training_main].[gongfa] after wait @step_interval
     click [training_main].[fangan] after wait @page_refresh
-    scan [training_main].[plan_list] as $list
-    if not $list
-        return -1
-    end
     return 0
 end
 
@@ -41,69 +37,21 @@ def nav_game_plans_to_main()
 end
 
 def collect_game_plan_names()
-    # 整面板按布局实际行数识别；空槽没有文字。列表可能超过一屏。
-    loop 6
-        if env("desktop")
-            scroll [training_main].[plan_list] up 8
-        else
-            drag [training_main].[plan_list] down 0.5
-        end
-        wait @step_interval
-    end
+    # 第一版只扫描当前网格可见行；空槽无文字，不滚动、不去重。
+    scan [training_main].[plan_list] as $grid
     eval $names = []
-    eval $seen = {}
-    eval $unchanged = 0
-    loop 16
-        scan [training_main].[plan_list] as $grid
-        eval $before = len($names)
-        for row in keys($grid)
-            eval $name = trim($grid.$row.[1])
-            if len($name) > 0 and not $seen.$name
-                eval append($names, $name)
-                eval $seen.$name = true
-            end
+    for row in keys($grid)
+        eval $name = trim($grid.$row.[1])
+        if len($name) > 0
+            eval append($names, $name)
         end
-        if len($names) == $before
-            eval $unchanged = $unchanged + 1
-            if $unchanged >= 2
-                break
-            end
-        else
-            eval $unchanged = 0
-        end
-        if env("desktop")
-            scroll [training_main].[plan_list] down 3
-        else
-            drag [training_main].[plan_list] up 0.5
-        end
-        wait @step_interval
     end
     return $names
 end
 
 def select_game_plan($name)
-    # 按游戏列表发现的名称重新定位；扫描装备后会回主页，列表页需重新进入。
-    loop 6
-        if env("desktop")
-            scroll [training_main].[plan_list] up 8
-        else
-            drag [training_main].[plan_list] down 0.5
-        end
-        wait @step_interval
-    end
-    eval $found = ""
-    loop 16
-        find [training_main].[plan_list] as $found by equals $name
-        if $found
-            break
-        end
-        if env("desktop")
-            scroll [training_main].[plan_list] down 3
-        else
-            drag [training_main].[plan_list] up 0.5
-        end
-        wait @step_interval
-    end
+    # 只定位先前从当前网格读到的方案，超出网格的方案暂不支持。
+    find [training_main].[plan_list] as $found by equals $name
     if not $found
         log error "游戏方案列表未找到: " + $name
         return -1

@@ -34,7 +34,7 @@ from ..grammar.ast_nodes import TupleLiteral
 from ..runtime_layout import require_enabled
 from .signals import WorkflowUserError
 
-# 数值相等容差：== / != 统一用容差比较，避免浮点误差（如 0.1+0.2 != 0.3）
+# 数值相等容差：== / != 对数值统一用容差比较，避免浮点误差。
 _NUM_EQ_EPSILON = 1e-9
 
 
@@ -47,6 +47,18 @@ class _EvalMixin:
     def _str_or_empty(val) -> str:
         """将值转为字符串，null 视为空字符串"""
         return "" if val is None else str(val)
+
+    def _equal_numeric_or_text(self, left, right) -> bool:
+        """== / !=：可转数字时保留容差语义，否则比较两个原始字符串。"""
+        left_value = self._resolve(left)
+        right_value = self._resolve(right)
+        left_number = self._to_number(left_value)
+        right_number = self._to_number(right_value)
+        if left_number is not None and right_number is not None:
+            return abs(left_number - right_number) < _NUM_EQ_EPSILON
+        if isinstance(left_value, str) and isinstance(right_value, str):
+            return left_value == right_value
+        return False
 
     def _eval_condition(self, node) -> bool:
         """递归求值条件表达式 AST 节点"""
@@ -86,17 +98,9 @@ class _EvalMixin:
                 num_right = self._resolve_arith(node.right)
                 return num_left <= num_right if num_left is not None and num_right is not None else False
             case NotEqual():
-                num_left = self._resolve_arith(node.left)
-                num_right = self._resolve_arith(node.right)
-                if num_left is None or num_right is None:
-                    return True
-                return abs(num_left - num_right) >= _NUM_EQ_EPSILON
+                return not self._equal_numeric_or_text(node.left, node.right)
             case NumericEqual():
-                num_left = self._resolve_arith(node.left)
-                num_right = self._resolve_arith(node.right)
-                if num_left is None or num_right is None:
-                    return False
-                return abs(num_left - num_right) < _NUM_EQ_EPSILON
+                return self._equal_numeric_or_text(node.left, node.right)
             case Not():
                 return not self._eval_condition(node.operand)
             case And():

@@ -22,7 +22,6 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -117,21 +116,11 @@ class TuningProgressWidget(QWidget):
         columns_layout = QHBoxLayout(columns)
         columns_layout.setContentsMargins(0, 0, 0, 0)
         columns_layout.setSpacing(8)
-        # 装备详情会在读取后变高；只滚动详情，底部智能调律保持可见。
-        current_column = QWidget()
-        current_column_layout = QVBoxLayout(current_column)
-        current_column_layout.setContentsMargins(0, 0, 0, 0)
-        current_column_layout.setSpacing(8)
-        self._current_scroll = QScrollArea()
-        self._current_scroll.setWidgetResizable(True)
-        self._current_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        current_column_layout.addWidget(self._current_scroll, 1)
         current_panel = QWidget()
-        self._current_scroll.setWidget(current_panel)
         current_layout = QVBoxLayout(current_panel)
         current_layout.setContentsMargins(0, 0, 0, 0)
         current_layout.setSpacing(8)
-        columns_layout.addWidget(current_column, 1)
+        columns_layout.addWidget(current_panel, 1)
 
         # ── 当前装备 ──
         equip_group = QGroupBox(tr("当前装备"))
@@ -232,14 +221,9 @@ class TuningProgressWidget(QWidget):
         self._smart_plans_label = QLabel("")
         self._smart_plans_label.setWordWrap(True)
         self._smart_plans_label.setStyleSheet("font-size: 11px;")
-        self._smart_plans_scroll = QScrollArea()
-        self._smart_plans_scroll.setWidgetResizable(True)
-        self._smart_plans_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self._smart_plans_scroll.setMaximumHeight(180)
-        self._smart_plans_scroll.setWidget(self._smart_plans_label)
-        smart_layout.addWidget(self._smart_plans_scroll)
+        smart_layout.addWidget(self._smart_plans_label)
         self._smart_group.setVisible(False)
-        current_column_layout.addWidget(self._smart_group)
+        current_layout.addWidget(self._smart_group)
         current_layout.addStretch()
 
         self._previous_group = QGroupBox(tr("上一件装备"))
@@ -483,9 +467,6 @@ class TuningProgressWidget(QWidget):
         self._scan_decision_label.setVisible(False)
         self._status_msg_label.setVisible(False)
         self._material_label.setVisible(False)
-        if self._smart_group.isVisible():
-            self._smart_summary_label.setText(tr("等待下一件装备..."))
-            self._smart_plans_label.setText("")
 
     # ─── 格式化 ───────────────────────────────────────────────
 
@@ -668,9 +649,6 @@ class TuningProgressWidget(QWidget):
         self._material_label.setVisible(False)
         self._status_msg_label.setVisible(False)
         self._rule_ratings_label.setText(tr("等待评级..."))
-        if self._smart_group.isVisible():
-            self._smart_summary_label.setText(tr("等待当前装备分析..."))
-            self._smart_plans_label.setText("")
         self._record_event(f"读取：{name}，初始词条 {len(affixes)}/5")
         if state_parts:
             self._record_event("装备状态：" + "、".join(state_parts))

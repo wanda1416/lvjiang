@@ -13,7 +13,7 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
         derive_base_attributes,
         stored_base_fields,
     )
-    from ...core.combat.combat_attrs import CombatAttributes
+    from ...core.combat.combat_attrs import COMBAT_ATTR_FIELDS, CombatAttributes
     from ...core.graduation.context import gongjue_attrs
     from ...core.loadout import LoadoutRepository, resolve_school
 
@@ -50,8 +50,14 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
     }
     if not required_school <= prefill.keys():
         raise ValueError(f"流派 {school!r} 的属性攻击或穿透识别不完整")
+    # OCR 返回百分数的面板写法（如 110.1 表示 110.1%）；战斗模型和装备贡献
+    # 使用小数（1.101）。与手动创建表单的 get_panel_attrs 保持同一单位。
+    panel_values = dict(prefill)
+    for field, _, unit, _ in COMBAT_ATTR_FIELDS:
+        if unit == "%" and field in panel_values:
+            panel_values[field] = float(panel_values[field]) / 100.0
     base = derive_base_attributes(
-        CombatAttributes.from_dict(prefill), state.resolved_equipment(plan_id),
+        CombatAttributes.from_dict(panel_values), state.resolved_equipment(plan_id),
         gongjue_attrs(plan.gongjue))
     values = stored_base_fields(school_attr, base)
     name = f"{username}_{plan.playstyle}"

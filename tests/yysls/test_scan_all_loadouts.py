@@ -124,6 +124,10 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
         "min_mingjin": 10.0, "max_mingjin": 20.0,
         "mingjin_pen": 0.0,
         "precision": 70.0, "crit_rate": 80.0,
+        "intent_rate": 22.8, "direct_crit": 9.2,
+        "direct_intent": 1.5, "crit_dmg": 54.0,
+        "intent_dmg": 35.0, "outer_bonus": 2.5,
+        "outer_pen": 58.4,
         "_right_outer_valid": True,
         "_right_outer_pen_valid": True,
         "_right_attr_pen_valid": True,
@@ -134,6 +138,17 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
     assert _save_scanned_base_attrs(engine, parsed) == "test_user_玩法甲"
     assert saved[0][0] == "鸣金·虹"
     assert saved[0][1] == "test_user_玩法甲"
+    values = saved[0][2]
+    for field, expected in (
+        ("precision", 0.7), ("crit_rate", 0.8),
+        ("intent_rate", 0.228), ("direct_crit", 0.092),
+        ("direct_intent", 0.015),
+        ("crit_dmg", 0.54), ("intent_dmg", 0.35),
+        ("outer_bonus", 0.025),
+    ):
+        assert values[field] == pytest.approx(expected)
+    assert values["outer_pen"] == pytest.approx(58.4)
+    assert parsed["precision"] == 70.0  # 不改写 OCR 原始数据
     assert repo.load().plans[plan.id].base_attribute == "test_user_玩法甲"
     assert repo.load().active_plan_id == active
     assert get_game_config().get_school_attr(saved[0][0]) == "鸣金"

@@ -8,7 +8,68 @@ from lvjiang.workflows.builtins._registry import builtin_func
 def _repository(_engine):
     from ...core.loadout import LoadoutRepository
     username = getattr(_engine, "run_username", "") or "default"
-    return LoadoutRepository(username)
+    return LoadoutRepository(username, getattr(_engine, "users_dir", None))
+
+
+@builtin_func("loadout_scan_targets")
+def _loadout_scan_targets(_engine) -> list[dict[str, str]]:
+    """Freeze this user's configured plans in their visible order for one run."""
+    state = _repository(_engine).load()
+    targets = [
+        {
+            "name": state.plans[pid].name,
+            "main_art": state.plans[pid].main_martial_art,
+            "sub_art": state.plans[pid].sub_martial_art,
+            "playstyle": state.plans[pid].playstyle,
+        }
+        for pid in state.ordered_plan_ids()
+        if state.plans[pid].main_martial_art and state.plans[pid].sub_martial_art
+    ]
+    names = [item["name"] for item in targets]
+    if len(names) != len(set(names)):
+        raise ValueError("备战方案存在重名；游戏只提供名称，不能安全批量扫描")
+    return targets
+
+
+@builtin_func("bind_scanned_loadout")
+def _bind_scanned_loadout(_engine, name: str, main_art: str, sub_art: str) -> str:
+    """Bind writes to the one local plan matching the verified game name and arts."""
+    _engine.context.pop("_bound_loadout_plan_id", None)
+    state = _repository(_engine).load()
+    matches = [plan for plan in state.plans.values() if plan.name == name]
+    if len(matches) != 1:
+        raise ValueError(f"备战方案名称 {name!r} 匹配 {len(matches)} 个本地方案，无法安全写入")
+    plan = matches[0]
+    if sorted((plan.main_martial_art, plan.sub_martial_art)) != sorted((main_art, sub_art)):
+        raise ValueError(f"备战方案 {name!r} 的游戏武学与本地配置不一致，停止写入")
+    _engine.context["_bound_loadout_plan_id"] = plan.id
+    return plan.id
+
+
+@builtin_func("loadout_scan_target")
+def _loadout_scan_target(
+    _engine, name: str = "", main_art: str = "", sub_art: str = "",
+) -> dict[str, str]:
+    """Resolve direct-run parameters without switching the UI active plan."""
+    state = _repository(_engine).load()
+    if name:
+        matches = [plan for plan in state.plans.values() if plan.name == name]
+        if len(matches) != 1:
+            raise ValueError(f"备战方案名称 {name!r} 匹配 {len(matches)} 个本地方案")
+        plan = matches[0]
+    else:
+        plan = state.active_plan
+    if main_art and sub_art and sorted((main_art, sub_art)) != sorted((
+            plan.main_martial_art, plan.sub_martial_art)):
+        raise ValueError(f"备战方案 {plan.name!r} 的传入武学与本地配置不一致")
+    if bool(main_art) != bool(sub_art):
+        raise ValueError("主武学和副武学参数必须同时提供")
+    return {
+        "name": plan.name,
+        "main_art": main_art or plan.main_martial_art,
+        "sub_art": sub_art or plan.sub_martial_art,
+        "playstyle": plan.playstyle,
+    }
 
 
 def _notify_equipment_changed(_engine) -> None:
@@ -46,8 +107,7 @@ def _write_equipped(_engine, slot_key: str, equip_dict: dict) -> str:
     repo = _repository(_engine)
     plan_id = _engine.context.get("_bound_loadout_plan_id")
     if not plan_id:
-        plan_id = repo.load().active_plan_id
-        _engine.context["_bound_loadout_plan_id"] = plan_id
+        raise ValueError("扫描装备前必须通过方案名称与武学绑定写入目标")
     fp = repo.assign_equipment(plan_id, slot_key, equip_dict)
     _notify_equipment_changed(_engine)
     return fp

@@ -5,6 +5,79 @@ from loguru import logger
 from lvjiang.workflows.builtins._registry import builtin_func
 
 
+@builtin_func("save_scanned_base_attrs")
+def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
+    """Silently store the real base values for the bound plan's school/playstyle."""
+    from ...config import get_game_config, save_play_style
+    from ...core.combat.base_attribute_ingest import (
+        derive_base_attributes,
+        stored_base_fields,
+    )
+    from ...core.combat.combat_attrs import CombatAttributes
+    from ...core.graduation.context import gongjue_attrs
+    from ...core.loadout import LoadoutRepository, resolve_school
+
+    plan_id = _engine.context.get("_bound_loadout_plan_id")
+    if not plan_id:
+        raise ValueError("尚未绑定经过验证的备战方案，不能静默写入基础属性")
+    required = {"min_outer", "max_outer", "precision", "crit_rate"}
+    if (not isinstance(prefill, dict) or not required <= prefill.keys()
+            or prefill.get("_right_outer_valid") is not True
+            or prefill.get("_right_outer_pen_valid") is not True
+            or prefill.get("_right_attr_pen_valid") is not True):
+        raise ValueError("角色属性右侧详情识别不完整，拒绝静默覆盖基础属性")
+    username = getattr(_engine, "run_username", "")
+    if not username:
+        raise ValueError("任务未绑定用户，不能静默写入基础属性")
+    repo = LoadoutRepository(username, getattr(_engine, "users_dir", None))
+    state = repo.load()
+    plan = state.plans.get(plan_id)
+    if plan is None or not plan.playstyle:
+        raise ValueError("备战方案不存在或未配置玩法，不能命名基础属性")
+    game_config = get_game_config()
+    school = resolve_school(plan.main_martial_art, plan.sub_martial_art,
+                            game_config.get_schools())
+    if not school:
+        raise ValueError(f"备战方案 {plan.name!r} 的武学无法解析流派")
+    school_attr = game_config.get_school_attr(school)
+    if not school_attr:
+        raise ValueError(f"流派 {school!r} 没有属性映射")
+    from ...core.combat.combat_attrs import SCHOOL_ATTR_FIELD_MAP
+    mapping = SCHOOL_ATTR_FIELD_MAP.get(school_attr, {})
+    required_school = {
+        mapping.get("min_attr"), mapping.get("max_attr"),
+        mapping.get("attr_pen"),
+    }
+    if not required_school <= prefill.keys():
+        raise ValueError(f"流派 {school!r} 的属性攻击或穿透识别不完整")
+    base = derive_base_attributes(
+        CombatAttributes.from_dict(prefill), state.resolved_equipment(plan_id),
+        gongjue_attrs(plan.gongjue))
+    values = stored_base_fields(school_attr, base)
+    name = f"{username}_{plan.playstyle}"
+    if not values:
+        raise ValueError(f"基础属性 {name!r} 反推结果为空，拒绝写入")
+    run_values = _engine.context.setdefault("_scanned_base_attrs", {})
+    prior = run_values.get((school, name))
+    if prior is not None:
+        differences = [
+            field for field in set(prior) | set(values)
+            if abs(prior.get(field, 0.0) - values.get(field, 0.0))
+            > max(2.0, abs(prior.get(field, 0.0)) * 0.001)
+        ]
+        if differences:
+            raise ValueError(
+                f"同一玩法的方案反推出不同基础属性 {name!r}: "
+                + "、".join(sorted(differences)))
+    save_play_style(school, name, values)
+    repo.configure_plan(plan_id, base_attribute=name)
+    run_values[(school, name)] = values
+    from .equipment_ingest import _notify_equipment_changed
+    _notify_equipment_changed(_engine)
+    logger.info(f"基础属性已静默写入: {school}/{name}（方案 {plan.name}）")
+    return name
+
+
 @builtin_func("to_role_base_attrs")
 def _to_role_base_attrs(raw: dict) -> dict:
     """解析角色详情页滚动识别的 OCR 原始数据为基础属性字典

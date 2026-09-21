@@ -2,53 +2,30 @@
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]
-#
-# 装备分析工作流
-#
-# 流程结构：
-#   1. 导航：从首页进入装备页面（调用 nav_main_to_equip）
-#   2. 读取武器类装备：主武器、副武器、戒指、吊坠
-#   3. 读取防具类装备：冠胄、胸甲、胫甲、腕甲
-#   4. 逐槽调用 write_equipped 写入本次绑定的备战方案
-#   5. 返回主界面（调用 nav_back_to_main）
-#
-# 输出：
-#   通过 write_equipped 逐槽写入备战方案（无 collect 输出）
+#% parameters:
+#%   - name: plan_name
+#%     label: 备战方案名称（留空使用当前方案）
+#%     type: text
+#%     default: ""
+#%   - name: main_art
+#%     label: 主武学（可留空从方案读取）
+#%     type: text
+#%     default: ""
+#%   - name: sub_art
+#%     label: 副武学（可留空从方案读取）
+#%     type: text
+#%     default: ""
 
-import "subcall/navigation.wf"
-import "subcall/equipment_scan.wf"
+# 直接运行只负责解析参数；可复用逻辑位于 scan_equipped_plan 子过程。
+default $plan_name = ""
+default $main_art = ""
+default $sub_art = ""
+import "subcall/equipped_plan_scan.wf"
 
-call $nav_result = nav_main_to_equip()
-if $nav_result < 0
+eval $target = loadout_scan_target($plan_name, $main_art, $sub_art)
+call $written = scan_equipped_plan($target.name, $target.main_art, $target.sub_art)
+if $written < 0
     return -1
 end
-
-# 武器类（equip_weapon_detail）
-for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
-    click [bag_equip_detail].$slot after wait @step_interval
-    call $scan_result = scan_equipment_detail("equip_weapon_detail")
-    eval $equip = to_equipment($scan_result)
-    if not $equip.type
-        log error "equip_type OCR 失败, slot=" + $slot
-    else
-        eval write_equipped($slot, $equip)
-    end
-end
-
-# 防具类（equip_armor_detail）
-for slot in ["head", "chest", "leg", "wrist"]
-    click [bag_equip_detail].$slot after wait @step_interval
-    call $scan_result = scan_equipment_detail("equip_armor_detail")
-    eval $equip = to_equipment($scan_result)
-    if not $equip.type
-        log error "equip_type OCR 失败, slot=" + $slot
-    else
-        eval write_equipped($slot, $equip)
-    end
-end
-
-# 返回主界面
-call $nav_result = nav_back_to_main()
-if $nav_result < 0
-    return -1
-end
+log info "备战方案装备扫描完成: " + $target.name + "，成功写入 " + $written + "/8 件"
+return $written

@@ -606,7 +606,7 @@ class LessEqual:
 
 @dataclass(frozen=True)
 class NotEqual:
-    """$var != expr 或 $var.field != expr"""
+    """$var != expr 或 $var.field != expr；数字容差、字符串精确比较"""
     left: Any  # VarRef | FieldAccess
     right: Any  # float | ArithOp | VarRef | FieldAccess
     line_no: int = 0
@@ -614,7 +614,7 @@ class NotEqual:
 
 @dataclass(frozen=True)
 class NumericEqual:
-    """$var == expr 或 $var.field == expr"""
+    """$var == expr 或 $var.field == expr；数字容差、字符串精确比较"""
     left: Any  # VarRef | FieldAccess
     right: Any  # float | ArithOp | VarRef | FieldAccess
     line_no: int = 0

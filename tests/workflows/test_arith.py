@@ -97,6 +97,26 @@ class TestArithEval:
         prog = parse_text('if 0.1 + 0.2 != 0.4\n    log "ne"\nend\n')
         assert engine._eval_condition(prog.body[0].condition) is True
 
+    @case_matrix("expression,variables,expected", [
+        ("$title == $name", {"title": "测试方案甲", "name": "测试方案甲"}, True),
+        ("$title != $name", {"title": "测试方案甲", "name": "测试方案甲"}, False),
+        ("$title == $name", {"title": "测试方案甲", "name": "测试方案乙"}, False),
+        ("$title != $name", {"title": "测试方案甲", "name": "测试方案乙"}, True),
+        ('"方案" == "方案"', {}, True),
+        ('"方案" != "方案"', {}, False),
+        ("$a == $b", {"a": "1.0", "b": 1}, True),
+        ("$a != $b", {"a": "1.0", "b": 1}, False),
+        ("$a == $b", {"a": None, "b": None}, False),
+        ("$a != $b", {"a": None, "b": None}, True),
+    ])
+    def test_equality_supports_text_without_changing_numeric_or_null_semantics(
+        self, expression, variables, expected,
+    ):
+        engine = make_engine()
+        engine.variables = variables
+        prog = parse_text(f'if {expression}\n    log "matched"\nend\n')
+        assert engine._eval_condition(prog.body[0].condition) is expected
+
 
 # ─── 字符串拼接 ──────────────────────────────────────────────
 

@@ -86,6 +86,14 @@
       "y_ratio": 0.4168829153565327,
       "w_ratio": 0.4354338290334967,
       "h_ratio": 0.11311708464346731
+    },
+    {
+      "key": "smart_fill",
+      "x_ratio": 0.529,
+      "y_ratio": 0.568,
+      "w_ratio": 0.104,
+      "h_ratio": 0.04,
+      "activation_key": "SPACE"
     }
   ],
   "panels": [

@@ -99,6 +99,12 @@ regions:
   is_text: true
   is_clickable: false
   view: fangan_fill
+- key: smart_fill
+  name: 智能填充
+  type: func
+  is_text: true
+  is_clickable: true
+  view: fangan_fill
 panels:
 - key: plan_list
   name: 备战方案列表

@@ -204,6 +204,25 @@ class TestGroupsFromDirectory:
         assert list(manager.get_groups()) == ["early", "default", "aggressive"]
         assert [g.order for g in manager.get_groups().values()] == [5, 10, 20]
 
+    def test_group_order_prioritizes_layer_then_order_and_key(self, tmp_path):
+        resolver = _layered(tmp_path, dev_mode=True)
+        manager = TuningGroupManager(resolver=resolver)
+        for key, order in (("local_z", 1), ("local_b", 5), ("local_a", 5)):
+            manager.create_group(key, key, layer="local")
+            raw = manager.get_raw(key)
+            raw["order"] = order
+            manager.save_group(key, raw)
+
+        expected = ["default", "aggressive", "local_z", "local_a", "local_b"]
+        assert list(manager.get_groups()) == expected
+        manager.reload()
+        assert list(manager.get_groups()) == expected
+
+        manager.move_group("local_z", "system")
+        assert list(manager.get_groups()) == [
+            "local_z", "default", "aggressive", "local_a", "local_b",
+        ]
+
     def test_key_must_match_filename(self, tmp_path):
         resolver = _layered(tmp_path, dev_mode=True)
         groups_dir = tmp_path / "system/yysls/base_groups"

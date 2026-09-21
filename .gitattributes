@@ -1,2 +1,16 @@
 # shell 脚本强制 LF：CRLF 会让 bash 报 "\r: command not found"
 *.sh text eol=lf
+
+# 配置类文本统一 LF：Windows 保存器落 CRLF 会把整份 config 文件行尾翻一遍，
+# 制造「改一行全改」的假 diff。按扩展名精确匹配，避免误伤 png/db 等二进制。
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.wf   text eol=lf
+
+# 二进制显式声明，防止被 text 规则误转换
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.db   binary
+*.ico  binary

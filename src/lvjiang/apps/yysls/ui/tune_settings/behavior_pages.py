@@ -45,8 +45,6 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSpinBox,
     QTableWidget,
-    QTreeWidget,
-    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -81,7 +79,7 @@ from lvjiang.ui.button_styles import (
 
 from .....i18n import tr
 from ..domain_labels import domain_label
-from .scan_coverage import scan_quality_coverage
+from .rule_coverage import RuleCoverageCheck
 
 # 品阶候选（从高到低，最高档 = 不限；扫描/调律处理共用）
 _QUALITY_KEYS = ("gold", "gold_only", "purple_only", "purple", "blue")
@@ -541,8 +539,11 @@ class _BehaviorPageBase(QWidget):
         apply_button_style(del_btn, variant="danger")
         apply_button_style(self._up_btn, self._down_btn, variant="neutral")
         btn_row.addStretch()
+        self._coverage_check = RuleCoverageCheck(
+            lambda: getattr(self._current_group(), self.STAGE).rules, self)
+        btn_row.addWidget(self._coverage_check.button)
         layout.addLayout(btn_row)
-        self._init_footer(layout)
+        layout.addWidget(self._coverage_check.panel)
         layout.addStretch()
 
         # 表格选中变化时更新移动按钮状态
@@ -550,12 +551,6 @@ class _BehaviorPageBase(QWidget):
 
     def _init_head(self, layout: QVBoxLayout):
         raise NotImplementedError
-
-    def _init_footer(self, layout: QVBoxLayout) -> None:
-        """供扫描处理增加规则表下方的只读提示。"""
-
-    def _refresh_footer(self, stage) -> None:
-        """规则组切换或保存后刷新只读提示。"""
 
     def _apply_ratings_domain(self, ratings, scope: str,
                               selected: list[str]) -> None:
@@ -779,7 +774,7 @@ class _BehaviorPageBase(QWidget):
         self._table.setRowCount(0)
         for rule in stage.rules:
             self._make_row_widgets(rule)
-        self._refresh_footer(stage)
+        self._coverage_check.clear()
 
     def _load_stage(self, stage) -> None:
         raise NotImplementedError
@@ -833,6 +828,7 @@ class _BehaviorPageBase(QWidget):
     def _apply(self):
         if self._loading:
             return
+        self._coverage_check.clear()
         data = self._build()
         err = self._manager.validate(data)
         if err:
@@ -846,7 +842,6 @@ class _BehaviorPageBase(QWidget):
             return
         now = datetime.now().strftime("%H:%M:%S")
         self._status_cb(tr("已保存并生效（{now}）").format(now=now), False)
-        self._refresh_footer(getattr(self._current_group(), self.STAGE))
         # 通知其他页面刷新（如基础规则页展示门槛值）
         if self._save_cb is not None:
             self._save_cb()
@@ -856,62 +851,6 @@ class ScanBehaviorPage(_BehaviorPageBase):
     """扫描处理编辑页（只负责 behavior.scan 子段）"""
 
     STAGE = "scan"
-
-    def _init_footer(self, layout: QVBoxLayout) -> None:
-        self._coverage_summary = QLabel()
-        self._coverage_summary.setObjectName("scan_coverage_summary")
-        self._coverage_summary.setWordWrap(True)
-        layout.addWidget(self._coverage_summary)
-        self._coverage_tree = QTreeWidget()
-        self._coverage_tree.setObjectName("scan_coverage_tree")
-        self._coverage_tree.setHeaderLabels(
-            [tr("部位 / 品阶 / 候选规则"), tr("检查结果")])
-        header = self._coverage_tree.header()
-        assert header is not None
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self._coverage_tree.setMinimumHeight(170)
-        self._coverage_tree.setMaximumHeight(260)
-        self._coverage_tree.setToolTip(tr(
-            "只检查部位和金/紫品阶是否有启用的扫描处理规则。"
-            "列出的规则还须满足判定结果、首词条数值等条件才能真正命中；"
-            "此处不预测运行时处置结果。"))
-        layout.addWidget(self._coverage_tree)
-
-    def _refresh_footer(self, stage) -> None:
-        cells = scan_quality_coverage(stage.rules)
-        self._coverage_tree.clear()
-        parts: dict[str, QTreeWidgetItem] = {}
-        missing: list[str] = []
-        for cell in cells:
-            if cell.part not in parts:
-                parts[cell.part] = QTreeWidgetItem(
-                    self._coverage_tree, [domain_label(cell.part)])
-            quality_label = tr("金装") if cell.quality == "gold" else tr("紫装")
-            quality_item = QTreeWidgetItem(
-                parts[cell.part],
-                [quality_label, tr("有候选规则") if cell.rule_numbers
-                 else tr("无规则覆盖")])
-            if not cell.rule_numbers:
-                missing.append(f"{cell.part}/{quality_label}")
-            for number in cell.rule_numbers:
-                rule = stage.rules[number - 1]
-                action = _STAGE_ACTION_LABELS["scan"].get(
-                    rule.action, rule.action)
-                item = QTreeWidgetItem(
-                    quality_item, [tr("规则{number} · {action}").format(
-                        number=number, action=action)])
-                item.setToolTip(0, rule.summary())
-        self._coverage_tree.expandToDepth(0)
-        if missing:
-            self._coverage_summary.setText(tr(
-                "扫描处理部位/品阶覆盖缺口：{missing}。"
-                "仅检查有无候选规则，不预测判定结果或首词条条件。"
-            ).format(missing="、".join(missing)))
-        else:
-            self._coverage_summary.setText(tr(
-                "扫描处理部位/品阶均有候选规则（金装、紫装）；"
-                "是否命中仍取决于判定结果和首词条条件。"))
 
     def _init_head(self, layout: QVBoxLayout):
         layout.addWidget(QLabel(

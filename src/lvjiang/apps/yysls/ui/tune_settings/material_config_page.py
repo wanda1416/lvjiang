@@ -60,6 +60,7 @@ from .behavior_pages import (
     _MultiSelect,
     _PctCell,
 )
+from .rule_coverage import RuleCoverageCheck
 
 # 狗粮下拉框的「不添加」占位项（对应配置空串）
 _NO_FOOD = tr("- 不添加 -")
@@ -203,7 +204,11 @@ class MaterialConfigPage(QWidget):
         apply_button_style(del_btn, variant="danger")
         apply_button_style(self._up_btn, self._down_btn, variant="neutral")
         btn_row.addStretch()
+        self._coverage_check = RuleCoverageCheck(
+            lambda: self._current_group().materials.food_rules, self)
+        btn_row.addWidget(self._coverage_check.button)
         layout.addLayout(btn_row)
+        layout.addWidget(self._coverage_check.panel)
         layout.addStretch()
 
         # 表格选中变化时更新移动按钮状态
@@ -329,6 +334,7 @@ class MaterialConfigPage(QWidget):
         self._table.setRowCount(0)
         for rule in m.food_rules:
             self._make_row_widgets(rule)
+        self._coverage_check.clear()
 
     # ── 行增删 ──
 
@@ -466,6 +472,7 @@ class MaterialConfigPage(QWidget):
     def _apply(self):
         if self._loading:
             return
+        self._coverage_check.clear()
         data = self._build()
         err = self._manager.validate(data)
         if err:

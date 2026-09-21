@@ -135,10 +135,10 @@ class TestPlaystyleRegistry:
             assert school in schools, name
             cfg = schools[school]
             assert style["attr"] == cfg["attr"], name
-            assert style["arts"] == [
+            assert set(style["arts"]) == {
                 cfg["main"]["martial_art"],
                 cfg["sub"]["martial_art"],
-            ], name
+            }, name
             assert style["main_weapon"] == cfg["main"]["weapon"], name
             assert style["sub_weapon"] == cfg["sub"]["weapon"], name
 

@@ -514,14 +514,12 @@ class LoadoutPanel(QWidget):
             return
         from ...config import get_game_config
         game_config = get_game_config()
-        dialog = PlanCreateDialog(
-            game_config.get_schools(),
-            game_config.get_martial_arts(),
-            self,
-        )
+        dialog = PlanCreateDialog(game_config, self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        self._repo.create_plan(dialog.plan_name, dialog.main_art, dialog.sub_art)
+        self._repo.create_plan(
+            dialog.plan_name, dialog.main_art, dialog.sub_art,
+            playstyle=dialog.playstyle)
         self.refresh()
 
     def _rename_plan(self):

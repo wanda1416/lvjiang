@@ -75,13 +75,13 @@ def select_game_plan($name)
                 scan [training_main].[smart_fill] as $action by contains "智能填充"
                 if not $action
                     log error "缺装备弹窗未识别到智能填充按钮"
-                    return -1
+                    return -2
                 end
                 click [training_main].[smart_fill] after wait @page_refresh
             else if $message.modal_message contains "未保存"
                 scan [general_control].[confirm] as $action by contains "切换"
                 if not $action
-                    return -1
+                    return -2
                 end
                 click [general_control].[confirm] after wait @page_refresh
             else
@@ -90,7 +90,7 @@ def select_game_plan($name)
         end
         scan [training_main].[modal_message] as $message
         if $message.modal_message contains "装备缺失" or $message.modal_message contains "未保存"
-            return -1
+            return -2
         end
     else
         scan [training_main].[plan_title] as $title by contains $name
@@ -103,7 +103,7 @@ def select_game_plan($name)
     scan [training_main].[plan_list] as $ready
     if not $ready
         log error "方案切换后未恢复方案列表: " + $name
-        return -1
+        return -2
     end
     find [training_main].[use_area] as $still_use by contains "使用方案"
     if $still_use

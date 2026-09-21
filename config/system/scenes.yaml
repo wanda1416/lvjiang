@@ -21,6 +21,7 @@ scenes:
     - equip_armor_detail
     - equip_tune_detail
     - training_main
+    - training_plan
     - training_xinfa
     - role_detail
     - tongyou_main

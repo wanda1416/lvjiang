@@ -180,19 +180,29 @@ def test_workflow_and_shared_subcalls_parse():
 
 
 def test_game_plan_scene_loads_with_distinct_popup_views():
-    scene = SceneRegistry().get_scene("training_main")
-    assert scene is not None
-    assert {view.key for view in scene.views} >= {
-        "fangan_fill", "fangan_confirm",
-    }
+    registry = SceneRegistry()
+    main = registry.get_scene("training_main")
+    scene = registry.get_scene("training_plan")
+    assert main is not None and scene is not None
+    assert {view.key for view in main.views}.isdisjoint({"fangan", "fangan_fill", "fangan_confirm"})
+    assert {view.key for view in scene.views} == {"base", "fill", "confirm"}
+    entry = next(region for region in main.regions if region.key == "fangan")
+    assert entry.to == "training_plan/base"
+    back = next(region for region in scene.regions if region.key == "back")
+    assert back.to == "training_main/base"
     fill = next(region for region in scene.regions
                 if region.key == "smart_fill")
-    assert fill.views == ["fangan_fill"]
+    assert fill.views == ["fill"]
     assert fill.is_text and fill.is_clickable
 
     for platform in ("android", "desktop"):
-        layout_path = Path(f"config/system/layouts/{platform}/training_main.json")
-        layout = json.loads(layout_path.read_text(encoding="utf-8"))
+        base = Path(f"config/system/layouts/{platform}")
+        main_layout = json.loads((base / "training_main.json").read_text(encoding="utf-8"))
+        layout = json.loads((base / "training_plan.json").read_text(encoding="utf-8"))
+        assert {region["key"] for region in main_layout["regions"]}.isdisjoint(
+            {"plan_title", "main_art", "sub_art", "use_area", "modal_message", "smart_fill"})
+        assert not main_layout["panels"]
+        assert {panel["key"] for panel in layout["panels"]} == {"plan_list"}
         button = next(region for region in layout["regions"]
                       if region["key"] == "smart_fill")
         assert all(button[key] > 0 for key in ("w_ratio", "h_ratio"))
@@ -202,8 +212,9 @@ def test_game_plan_scene_loads_with_distinct_popup_views():
     navigation = Path(
         "config/system/workflows/subcall/loadout/loadout_plan_navigation.wf"
     ).read_text(encoding="utf-8")
-    assert 'scan [training_main].[smart_fill] as $action by contains "智能填充"' in navigation
-    assert "click [training_main].[smart_fill]" in navigation
+    assert 'scan [training_plan].[smart_fill] as $action by contains "智能填充"' in navigation
+    assert "click [training_plan].[smart_fill]" in navigation
+    assert "click [training_plan].[back]" in navigation
 
 
 def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():
@@ -225,8 +236,8 @@ def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():
     assert "继续在方案列表尝试下一套" in batch_text
     assert "if $selected == -2" in batch_text
     assert "len($name) > 0" in navigation_text
-    assert "scroll [training_main].[plan_list]" not in navigation_text
-    assert "drag [training_main].[plan_list]" not in navigation_text
+    assert "scroll [training_plan].[plan_list]" not in navigation_text
+    assert "drag [training_plan].[plan_list]" not in navigation_text
     for path in (base / "scan_equipped.wf", base / "standalone/scan_role_base_attr.wf"):
         names = {item["name"] for item in parse_metadata_file(path)["parameters"]}
         assert {"plan_name", "main_art", "sub_art"} <= names

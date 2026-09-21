@@ -18,7 +18,7 @@ def nav_main_to_game_plans()
 end
 
 def nav_game_plans_to_main()
-    click [training_main].[back] after wait @page_refresh
+    click [training_plan].[back] after wait @page_refresh
     scan [training_main].[gongfa] as $gongfa by contains "功法"
     if not $gongfa
         return -1
@@ -38,7 +38,7 @@ end
 
 def collect_game_plan_names()
     # 第一版只扫描当前网格可见行；空槽无文字，不滚动、不去重。
-    scan [training_main].[plan_list] as $grid
+    scan [training_plan].[plan_list] as $grid
     eval $names = []
     for row in keys($grid)
         eval $name = trim($grid.$row.[1])
@@ -51,13 +51,13 @@ end
 
 def select_game_plan($name)
     # 只定位先前从当前网格读到的方案，超出网格的方案暂不支持。
-    find [training_main].[plan_list] as $found by equals $name
+    find [training_plan].[plan_list] as $found by equals $name
     if not $found
         log error "游戏方案列表未找到: " + $name
         return -1
     end
     click $found after wait @page_refresh
-    scan [training_main].[plan_title, main_art, sub_art] as $detail
+    scan [training_plan].[plan_title, main_art, sub_art] as $detail
     eval $title = trim($detail.plan_title)
     eval $main_art = trim($detail.main_art)
     eval $sub_art = trim($detail.sub_art)
@@ -66,18 +66,18 @@ def select_game_plan($name)
         return -1
     end
 
-    scan [training_main].[use_area] as $use by contains "使用方案"
+    scan [training_plan].[use_area] as $use by contains "使用方案"
     if $use
-        click [training_main].[use_area] after wait @page_refresh
+        click [training_plan].[use_area] after wait @page_refresh
         loop 3
-            scan [training_main].[modal_message] as $message
+            scan [training_plan].[modal_message] as $message
             if $message.modal_message contains "装备缺失"
-                scan [training_main].[smart_fill] as $action by contains "智能填充"
+                scan [training_plan].[smart_fill] as $action by contains "智能填充"
                 if not $action
                     log error "缺装备弹窗未识别到智能填充按钮"
                     return -2
                 end
-                click [training_main].[smart_fill] after wait @page_refresh
+                click [training_plan].[smart_fill] after wait @page_refresh
             else if $message.modal_message contains "未保存"
                 scan [general_control].[confirm] as $action by contains "切换"
                 if not $action
@@ -88,24 +88,24 @@ def select_game_plan($name)
                 break
             end
         end
-        scan [training_main].[modal_message] as $message
+        scan [training_plan].[modal_message] as $message
         if $message.modal_message contains "装备缺失" or $message.modal_message contains "未保存"
             return -2
         end
     else
-        scan [training_main].[plan_title] as $title by contains $name
-        find [training_main].[use_area] as $save_as by contains "另存为"
+        scan [training_plan].[plan_title] as $title by contains $name
+        find [training_plan].[use_area] as $save_as by contains "另存为"
         if not $title and not $save_as
             log error "未找到使用方案按钮，也无法确认已在目标方案: " + $name
             return -1
         end
     end
-    scan [training_main].[plan_list] as $ready
+    scan [training_plan].[plan_list] as $ready
     if not $ready
         log error "方案切换后未恢复方案列表: " + $name
         return -2
     end
-    find [training_main].[use_area] as $still_use by contains "使用方案"
+    find [training_plan].[use_area] as $still_use by contains "使用方案"
     if $still_use
         log error "切换后仍显示使用方案按钮: " + $name
         return -1

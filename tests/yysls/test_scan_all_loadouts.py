@@ -135,9 +135,9 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
     with pytest.raises(ValueError, match="右侧详情"):
         _save_scanned_base_attrs(engine, {**parsed, "_right_outer_valid": False})
     assert saved == []
-    assert _save_scanned_base_attrs(engine, parsed) == "test_user_玩法甲"
+    assert _save_scanned_base_attrs(engine, parsed) == "test_user_方案甲"
     assert saved[0][0] == "鸣金·虹"
-    assert saved[0][1] == "test_user_玩法甲"
+    assert saved[0][1] == "test_user_方案甲"
     values = saved[0][2]
     for field, expected in (
         ("precision", 0.7), ("crit_rate", 0.8),
@@ -149,7 +149,7 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
         assert values[field] == pytest.approx(expected)
     assert values["outer_pen"] == pytest.approx(58.4)
     assert parsed["precision"] == 70.0  # 不改写 OCR 原始数据
-    assert repo.load().plans[plan.id].base_attribute == "test_user_玩法甲"
+    assert repo.load().plans[plan.id].base_attribute == "test_user_方案甲"
     assert repo.load().active_plan_id == active
     assert get_game_config().get_school_attr(saved[0][0]) == "鸣金"
 
@@ -157,10 +157,12 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
                               playstyle="玩法甲", activate=False)
     _bind_scanned_loadout(engine, second.name, second.main_martial_art,
                           second.sub_martial_art)
-    with pytest.raises(ValueError, match="不同基础属性"):
-        _save_scanned_base_attrs(engine, {**parsed, "min_outer": 120.0})
-    assert repo.load().plans[second.id].base_attribute == ""
-    assert len(saved) == 1
+    assert _save_scanned_base_attrs(
+        engine, {**parsed, "min_outer": 120.0}) == "test_user_方案乙"
+    assert repo.load().plans[second.id].base_attribute == "test_user_方案乙"
+    assert [item[1] for item in saved] == ["test_user_方案甲", "test_user_方案乙"]
+    assert saved[0][2]["min_outer"] == 100.0
+    assert saved[1][2]["min_outer"] == 120.0
 
 
 def test_workflow_and_shared_subcalls_parse():

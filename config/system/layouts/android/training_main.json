@@ -49,6 +49,55 @@
       "y_ratio": 0.8902277259695422,
       "w_ratio": 0.0997168740898382,
       "h_ratio": 0.07338471253364709
+    },
+    {
+      "key": "plan_title",
+      "x_ratio": 0.275,
+      "y_ratio": 0.14,
+      "w_ratio": 0.24,
+      "h_ratio": 0.08
+    },
+    {
+      "key": "main_art",
+      "x_ratio": 0.33,
+      "y_ratio": 0.43,
+      "w_ratio": 0.12,
+      "h_ratio": 0.055
+    },
+    {
+      "key": "sub_art",
+      "x_ratio": 0.33,
+      "y_ratio": 0.595,
+      "w_ratio": 0.12,
+      "h_ratio": 0.055
+    },
+    {
+      "key": "use_area",
+      "x_ratio": 0.83,
+      "y_ratio": 0.88,
+      "w_ratio": 0.17,
+      "h_ratio": 0.11
+    },
+    {
+      "key": "modal_message",
+      "x_ratio": 0.33,
+      "y_ratio": 0.40,
+      "w_ratio": 0.44,
+      "h_ratio": 0.11
+    }
+  ],
+  "panels": [
+    {
+      "key": "plan_list",
+      "x_ratio": 0.068,
+      "y_ratio": 0.30,
+      "w_ratio": 0.19,
+      "h_ratio": 0.42,
+      "cols": 1,
+      "rows": 4,
+      "min_visible": 0.95,
+      "calibration": "even",
+      "scroll_direction": "vertical"
     }
   ]
 }

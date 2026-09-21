@@ -1,0 +1,21 @@
+#% name: 指定备战方案装备扫描
+
+import "subcall/navigation.wf"
+import "subcall/equipment_scan.wf"
+import "subcall/equipped_slots_scan.wf"
+
+# 前置：游戏已经使用目标方案且当前在主页。
+# 返回实际成功写入的槽位数；绑定只作用于本次 WF，不改变 UI 活动方案。
+def scan_equipped_plan($name, $main_art, $sub_art)
+    eval bind_scanned_loadout($name, $main_art, $sub_art)
+    call $nav_result = nav_main_to_equip()
+    if $nav_result < 0
+        return -1
+    end
+    call $written = scan_equipped_slots()
+    call $nav_result = nav_back_to_main()
+    if $nav_result < 0
+        return -1
+    end
+    return $written
+end

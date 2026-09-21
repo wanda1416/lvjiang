@@ -1,0 +1,29 @@
+#% name: 八部位穿戴扫描
+
+# 前置：背包装备列表；写入目标由 bind_scanned_loadout 或旧入口绑定。
+def scan_equipped_slots()
+    eval $written = 0
+    for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]
+        click [bag_equip_detail].$slot after wait @step_interval
+        call $scan_result = scan_equipment_detail("equip_weapon_detail")
+        eval $equip = to_equipment($scan_result)
+        if not $equip.type
+            log error "equip_type OCR 失败, slot=" + $slot
+        else
+            eval write_equipped($slot, $equip)
+            eval $written = $written + 1
+        end
+    end
+    for slot in ["head", "chest", "leg", "wrist"]
+        click [bag_equip_detail].$slot after wait @step_interval
+        call $scan_result = scan_equipment_detail("equip_armor_detail")
+        eval $equip = to_equipment($scan_result)
+        if not $equip.type
+            log error "equip_type OCR 失败, slot=" + $slot
+        else
+            eval write_equipped($slot, $equip)
+            eval $written = $written + 1
+        end
+    end
+    return $written
+end

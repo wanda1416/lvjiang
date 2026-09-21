@@ -69,6 +69,40 @@ regions:
   is_text: true
   is_clickable: true
   view: base
+- key: plan_title
+  name: 当前方案名称
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: fangan
+- key: main_art
+  name: 方案主武学
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: fangan
+- key: sub_art
+  name: 方案副武学
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: fangan
+- key: use_area
+  name: 使用方案按钮区
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: fangan
+- key: modal_message
+  name: 方案切换提示
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: fangan_fill
+panels:
+- key: plan_list
+  name: 备战方案列表
+  view: fangan
 references:
 - scene: general_control
   entity: confirm

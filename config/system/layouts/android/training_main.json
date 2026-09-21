@@ -49,62 +49,7 @@
       "y_ratio": 0.8902277259695422,
       "w_ratio": 0.0997168740898382,
       "h_ratio": 0.07338471253364709
-    },
-    {
-      "key": "plan_title",
-      "x_ratio": 0.275,
-      "y_ratio": 0.14,
-      "w_ratio": 0.16171100925166104,
-      "h_ratio": 0.08000000000000002
-    },
-    {
-      "key": "main_art",
-      "x_ratio": 0.33,
-      "y_ratio": 0.4066369346171127,
-      "w_ratio": 0.10671100925166105,
-      "h_ratio": 0.07544203513701658
-    },
-    {
-      "key": "sub_art",
-      "x_ratio": 0.33,
-      "y_ratio": 0.5629508569293609,
-      "w_ratio": 0.10671100925166105,
-      "h_ratio": 0.07815696115612414
-    },
-    {
-      "key": "use_area",
-      "x_ratio": 0.83,
-      "y_ratio": 0.88,
-      "w_ratio": 0.17000000000000004,
-      "h_ratio": 0.09088865910570587
-    },
-    {
-      "key": "modal_message",
-      "x_ratio": 0.33,
-      "y_ratio": 0.4,
-      "w_ratio": 0.44,
-      "h_ratio": 0.14627667244325315
-    },
-    {
-      "key": "smart_fill",
-      "x_ratio": 0.758,
-      "y_ratio": 0.65,
-      "w_ratio": 0.184,
-      "h_ratio": 0.078
     }
   ],
-  "panels": [
-    {
-      "key": "plan_list",
-      "x_ratio": 0.0767104463137764,
-      "y_ratio": 0.3,
-      "w_ratio": 0.14480224293971466,
-      "h_ratio": 0.5320915511053159,
-      "cols": 1,
-      "rows": 5,
-      "min_visible": 0.95,
-      "calibration": "even",
-      "scroll_direction": "vertical"
-    }
-  ]
+  "panels": []
 }

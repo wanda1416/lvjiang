@@ -13,6 +13,7 @@ from lvjiang.apps.yysls.workflows.builtins.equipment_ingest import (
     _bind_scanned_loadout,
     _ensure_scanned_loadout,
     _loadout_scan_target,
+    _scanned_loadout_names,
     _set_scanned_loadout_gongjue,
     _write_equipped,
 )
@@ -95,6 +96,18 @@ def test_scanned_gongjue_writes_only_bound_plan(tmp_path):
     assert state.plans[target.id].gongjue == "精准"
     assert state.active_plan_id == active
     assert state.plans[active].gongjue == ""
+
+
+def test_existing_plan_names_snapshot_does_not_change_active_plan(tmp_path):
+    engine = _engine(tmp_path)
+    repo = LoadoutRepository(engine.run_username, tmp_path)
+    active = repo.load().active_plan_id
+    repo.create_plan("方案甲", "无名剑法", "无名枪法", activate=False)
+    snapshot = _scanned_loadout_names(engine)
+    assert snapshot["方案甲"] is True
+    repo.create_plan("方案乙", "无名剑法", "无名枪法", activate=False)
+    assert "方案乙" not in snapshot
+    assert repo.load().active_plan_id == active
 
 
 @pytest.mark.parametrize(
@@ -244,6 +257,181 @@ def test_workflow_and_shared_subcalls_parse():
         parse_file(base / path)
 
 
+def test_batch_skips_all_existing_plans_before_switching(monkeypatch):
+    workflow_path = Path("config/system/workflows/scan_all_loadouts.wf")
+    workflow = parse_file(workflow_path)
+    params = {item["name"]: item for item in
+              parse_metadata_file(workflow_path)["parameters"]}
+    assert params["skip_existing"]["default"] is False
+    engine = make_engine()
+    engine.variables = {"skip_existing": True}
+    calls = []
+
+    def fake_call(node):
+        calls.append(node.name)
+        assert node.name in {
+            "nav_main_to_game_plans", "collect_game_plan_names",
+            "nav_game_plans_to_main",
+        }
+        result = {
+            "nav_main_to_game_plans": 0,
+            "collect_game_plan_names": ["方案甲", "方案乙"],
+            "nav_game_plans_to_main": 0,
+        }[node.name]
+        engine.variables[node.result_var] = result
+
+    original_eval = engine._exec_eval
+
+    def fake_eval(node):
+        if node.func_name == "scanned_loadout_names":
+            engine.variables[node.target] = {"方案甲": True, "方案乙": True}
+        else:
+            original_eval(node)
+
+    monkeypatch.setattr(engine, "_exec_call_proc", fake_call)
+    monkeypatch.setattr(engine, "_exec_eval", fake_eval)
+    with pytest.raises(_ReturnSignal) as returned:
+        engine._exec_body(workflow.body)
+    assert returned.value.value == 0
+    assert calls == ["nav_main_to_game_plans", "collect_game_plan_names",
+                     "nav_game_plans_to_main"]
+    assert engine.variables["skipped_existing"] == 2.0
+
+
+def test_batch_continues_after_one_plan_base_attr_failure(monkeypatch):
+    workflow = parse_file(Path("config/system/workflows/scan_all_loadouts.wf"))
+    engine = make_engine()
+    calls = []
+
+    def fake_call(node):
+        name = engine._resolve(node.args[0]) if node.args else None
+        calls.append((node.name, name))
+        result = {
+            "nav_main_to_game_plans": 0,
+            "collect_game_plan_names": ["方案甲", "方案乙"],
+            "nav_game_plans_to_main": 0,
+            "scan_equipped_plan": 8,
+            "scan_role_base_attr_for_plan": -2 if name == "方案甲" else "已保存",
+        }.get(node.name)
+        if node.name == "select_game_plan":
+            result = {"name": name, "main_art": "武学甲", "sub_art": "武学乙"}
+        if node.result_var is not None:
+            engine.variables[node.result_var] = result
+
+    original_eval = engine._exec_eval
+
+    def fake_eval(node):
+        if node.func_name == "ensure_scanned_loadout":
+            name = engine.variables["selected"]["name"]
+            engine.variables[node.target] = {
+                "ok": True, "name": name, "main_art": "武学甲",
+                "sub_art": "武学乙", "playstyle": "玩法甲",
+            }
+        else:
+            original_eval(node)
+
+    monkeypatch.setattr(engine, "_exec_call_proc", fake_call)
+    monkeypatch.setattr(engine, "_exec_eval", fake_eval)
+    with pytest.raises(_ReturnSignal) as returned:
+        engine._exec_body(workflow.body)
+    assert returned.value.value == 0
+    assert [name for proc, name in calls if proc == "scan_role_base_attr_for_plan"] == [
+        "方案甲", "方案乙"]
+
+
+@pytest.mark.parametrize("scan_kind", ["equipment", "base_attrs"])
+@pytest.mark.parametrize("safe_home", [True, False])
+def test_plan_scan_recovers_from_data_error_and_returns_to_main(
+        monkeypatch, scan_kind, safe_home):
+    path = Path("config/system/workflows/subcall/loadout") / (
+        "equipped_plan_scan.wf" if scan_kind == "equipment"
+        else "role_base_attr_plan_scan.wf")
+    proc_name = ("scan_equipped_plan" if scan_kind == "equipment"
+                 else "scan_role_base_attr_for_plan")
+    proc = parse_file(path).procs[proc_name]
+    engine = make_engine()
+    engine.variables = {
+        "name": "方案甲", "main_art": "武学甲", "sub_art": "武学乙",
+        "silent_write": True, "scroll_count": 8,
+    }
+    calls = []
+    clicked = []
+
+    def fake_call(node):
+        calls.append(node.name)
+        if node.name == "scan_equipped_slots":
+            raise ValueError("装备数据不完整")
+        result = {
+            "nav_main_to_equip": 0, "nav_back_to_main": 0 if safe_home else -1,
+            "nav_main_to_role": 0,
+            "capture_role_base_attrs": {"min_outer": 100.0},
+            "nav_main_to_menu": 0 if safe_home else -1,
+            "is_in_main_page": 1,
+        }[node.name]
+        if node.result_var is not None:
+            engine.variables[node.result_var] = result
+
+    original_eval = engine._exec_eval
+
+    def fake_eval(node):
+        if node.func_name == "bind_scanned_loadout":
+            return
+        if node.func_name == "save_scanned_base_attrs":
+            raise ValueError("角色属性右侧详情识别不完整")
+        original_eval(node)
+
+    monkeypatch.setattr(engine, "_exec_call_proc", fake_call)
+    monkeypatch.setattr(engine, "_exec_eval", fake_eval)
+    monkeypatch.setattr(engine, "_exec_click", lambda node: clicked.append(node))
+    monkeypatch.setattr(engine, "_exec_wait", lambda _node: None)
+    with pytest.raises(_ReturnSignal) as returned:
+        engine._exec_body(proc.body)
+    assert returned.value.value == (-2 if safe_home else -1)
+    if scan_kind == "equipment":
+        assert calls[-1] == "nav_back_to_main"
+    else:
+        assert calls[-1] == ("is_in_main_page" if safe_home else "nav_main_to_menu")
+        assert len(clicked) == (2 if safe_home else 1)
+
+
+@pytest.mark.parametrize("needs_switch", [True, False])
+def test_select_game_plan_does_not_use_button_text_as_success_check(
+        monkeypatch, needs_switch):
+    """切换后无弹窗即可继续；当前方案没有“另存为”也不误报失败。"""
+    proc = parse_file(Path(
+        "config/system/workflows/subcall/loadout/loadout_plan_navigation.wf"
+    )).procs["select_game_plan"]
+    engine = make_engine()
+    engine.variables = {"name": "测试方案"}
+    clicked = []
+    found_targets = []
+
+    def fake_find(node):
+        found_targets.append(node.var_name)
+        engine.variables[node.var_name] = "测试方案"
+
+    def fake_scan(node):
+        values = {
+            "detail": {"plan_title": "测试方案", "main_art": "武学甲",
+                       "sub_art": "武学乙"},
+            "use": 1 if needs_switch else 0,
+            "message": {"modal_message": ""},
+        }
+        engine.variables[node.target.name] = values[node.target.name]
+
+    monkeypatch.setattr(engine, "_exec_find", fake_find)
+    monkeypatch.setattr(engine, "_exec_scan", fake_scan)
+    monkeypatch.setattr(engine, "_exec_click", lambda node: clicked.append(node))
+    monkeypatch.setattr(engine, "_exec_wait", lambda _node: None)
+    with pytest.raises(_ReturnSignal) as returned:
+        engine._exec_body(proc.body)
+    assert returned.value.value == {
+        "name": "测试方案", "main_art": "武学甲", "sub_art": "武学乙",
+    }
+    assert found_targets == ["found"]
+    assert len(clicked) == (2 if needs_switch else 1)
+
+
 @pytest.mark.parametrize(
     ("main_checks", "retry_answers", "expected", "prompt_count"),
     [
@@ -342,7 +530,7 @@ def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():
     navigation_text = (base / "subcall/loadout/loadout_plan_navigation.wf").read_text(
         encoding="utf-8")
     assert "loadout_scan_targets" not in batch_text
-    assert "for name in $names\n    if not $in_game_plans" in batch_text
+    assert "for name in $names\n    if $skip_existing" in batch_text
     assert "if $selected == -1" in batch_text
     assert "继续在方案列表尝试下一套" in batch_text
     assert "if $selected == -2" in batch_text

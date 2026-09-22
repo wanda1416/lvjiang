@@ -101,10 +101,11 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `bag_cursor_visit` | `(fingerprint) -> str` | 登记行首锚点，返回 `"new"` / `"skip"` / `"end"` |
 | `bag_cursor_finish_window` | `(visible_rows, expected_rows) -> str` | 提交一个窗口，返回 `"scroll"`（继续滚动）或 `"end"`（到底） |
 
-### 装备入库与角色属性（5）
+### 装备入库与角色属性（6）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
+| `scanned_loadout_names` | `() -> dict` | 返回本地已有备战方案名称的快照 |
 | `write_bag_item` | `(group_key, dict) -> str` | 把一件背包装备写入用户装备库，返回指纹；类型与分组不匹配时报错 |
 | `write_equipped` | `(slot_key, dict) -> str` | 把装备写入本次扫描绑定方案的指定槽位，返回指纹 |
 | `set_scanned_loadout_gongjue` | `(gongjue) -> str` | 设置本次扫描绑定方案的弓玦套装，不切换活动方案 |

@@ -7,12 +7,19 @@ def capture_role_base_attrs($scroll_count)
     eval $got_attack = false
     eval $got_outer_pen = false
     eval $got_attr_pen = false
+    eval $previous = ""
     eval $i = 1
 
     loop while $i <= $scroll_count
         scan [role_detail].[detail_1] as $r1
+        eval $current = $r1.detail_1
+        if len($current) > 0 and $current == $previous
+            log info "角色属性列表连续两次识别相同，结束滚动扫描"
+            break
+        end
         eval $key = "left_" + $i
-        eval $data.$key = $r1.detail_1
+        eval $data.$key = $current
+        eval $previous = $current
         if not $got_outer_attack
             find [role_detail].[detail_1] as $f by contains "外功攻击"
             if $f
@@ -50,14 +57,16 @@ def capture_role_base_attrs($scroll_count)
             end
         end
 
-        $is_post = is_post()
-        if $is_post
-            scroll [role_detail].[detail_1] down 2 interval 0.1
-        else
-            drag [role_detail].[detail_1] up 0.5
+        if $i < $scroll_count
+            $is_post = is_post()
+            if $is_post
+                scroll [role_detail].[detail_1] down 2 interval 0.1
+            else
+                drag [role_detail].[detail_1] up 0.5
+            end
+            wait stable @scroll_settle
         end
         eval $i = $i + 1
-        wait stable @scroll_settle
     end
     eval $parsed = to_role_base_attrs($data)
     eval $outer_detail = to_role_base_attrs({"right_outer_attack": $data.right_outer_attack})

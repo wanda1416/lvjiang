@@ -1,7 +1,7 @@
 """RoleAttrParser（角色基础属性 OCR 数据转换器）测试
 
 用真实滚动识别样例（7 屏 detail_1 + 4 段 detail_2）覆盖：
-- merge_scroll_snapshots 的跨屏去重拼接（含边界跳跃噪声 token、原地重复幂等）
+- 左区逐屏解析，后一次有效识别纠正前一屏 OCR 错字
 - parse_detail1 的已知字段提取（区间、百分号取白字、通用兜底 key）
 - parse_detail2_outer_attack / attack / outer_pen / attr_pen 的详情数值提取
 - RoleAttrParser.parse 整链（detail_2 覆盖 detail_1 兜底值）
@@ -11,7 +11,6 @@ import pytest
 
 from lvjiang.apps.yysls.core.role_attr_parser.parser import (
     RoleAttrParser,
-    merge_scroll_snapshots,
     parse_detail1,
     parse_detail2_attack,
     parse_detail2_attr_pen,
@@ -19,6 +18,9 @@ from lvjiang.apps.yysls.core.role_attr_parser.parser import (
     parse_detail2_outer_pen,
 )
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
+from lvjiang.workflows.grammar import parse_file
+from lvjiang.workflows.grammar.ast_nodes import Eval
+from tests.workflows.conftest import make_engine
 
 # 真实滚动识别样例（角色详情页，属性面板_左，向上拖拽 0.5 屏/次）
 LEFT_SNAPSHOTS = [
@@ -72,37 +74,11 @@ def parser():
     return RoleAttrParser()
 
 
-# ─── merge_scroll_snapshots ───────────────────────────────
-
-class TestMergeScrollSnapshots:
-    def test_merges_without_duplicates(self):
-        merged = merge_scroll_snapshots(LEFT_SNAPSHOTS)
-        # 每个已知字段标签只出现一次
-        assert merged.count("精准率") == 1
-        assert merged.count("外功穿透") == 1
-        assert merged.count("属攻伤害加成") == 1
-
-    def test_handles_boundary_ocr_noise(self):
-        """滚动边界上被裁出的表头残片（如"敏势"）不应破坏重叠匹配、也不重复保留"""
-        merged = merge_scroll_snapshots(LEFT_SNAPSHOTS[:2])
-        assert merged.count("基础属性") == 1
-        assert merged.count("气血最大值") == 1
-
-    def test_repeated_snapshot_is_idempotent(self):
-        """原地没滚动/多滚一次导致同一屏被重复喂入 → 不产生新增内容"""
-        once = merge_scroll_snapshots(LEFT_SNAPSHOTS)
-        twice = merge_scroll_snapshots(LEFT_SNAPSHOTS + [LEFT_SNAPSHOTS[-1], LEFT_SNAPSHOTS[-1]])
-        assert once == twice
-
-    def test_empty_input(self):
-        assert merge_scroll_snapshots([]) == []
-
-
 # ─── parse_detail1 ────────────────────────────────────────
 
 class TestParseDetail1:
     # 纯函数、无副作用，直接算成模块级常量即可，不需要走 fixture
-    _tokens = merge_scroll_snapshots(LEFT_SNAPSHOTS)
+    _tokens = [token.strip() for snap in LEFT_SNAPSHOTS for token in snap.split("|")]
 
     def test_range_field(self):
         result = parse_detail1(self._tokens)
@@ -118,7 +94,7 @@ class TestParseDetail1:
             "真气最大值 | 100 | 外功攻击 | ← 3713 | 属性攻击 | 763-1551 | "
             "外功防御 | 877 | 判定属性 | 精准率 | 139.6%(95.5%)"
         )
-        tokens = merge_scroll_snapshots([snapshot])
+        tokens = [token.strip() for token in snapshot.split("|")]
         result = parse_detail1(tokens)
         assert result["min_outer"] == 3713.0
         assert "max_outer" not in result
@@ -186,6 +162,48 @@ def test_scan_reads_initial_role_page_before_scrolling():
     first_scan = workflow.index("scan [role_detail].[detail_1] as $r1")
     assert "scroll [role_detail].[detail_1]" not in workflow[:first_scan]
     assert "drag [role_detail].[detail_1]" not in workflow[:first_scan]
+
+
+@pytest.mark.parametrize(
+    ("snapshots", "limit", "expected_scans", "expected_drags"),
+    [
+        (["精准率 | 70%", "会心伤害加成 | 50%", "会心伤害加成 | 50%"],
+         8, 3, 2),
+        (["精准率 | 70%", "会心伤害加成 | 50%"], 2, 2, 1),
+    ],
+)
+def test_role_scan_stops_on_identical_text_without_extra_drag(
+    monkeypatch, snapshots, limit, expected_scans, expected_drags,
+):
+    """运行生产 DSL 的扫描循环：重复文本立即退出，轮数耗尽不再拖动。"""
+    proc = parse_file(
+        SYSTEM_CONFIG_DIR / "workflows/subcall/loadout/role_base_attr_scan.wf"
+    ).procs["capture_role_base_attrs"]
+    parse_index = next(
+        index for index, node in enumerate(proc.body)
+        if isinstance(node, Eval) and node.target == "parsed"
+    )
+    engine = make_engine()
+    engine.variables = {"scroll_count": limit}
+    events = []
+
+    def scan(node):
+        events.append("scan")
+        engine.variables[node.target.name] = {
+            "detail_1": snapshots[len([event for event in events if event == "scan"]) - 1]
+        }
+
+    def find(node):
+        engine.variables[node.var_name] = ""
+
+    monkeypatch.setattr(engine, "_exec_scan", scan)
+    monkeypatch.setattr(engine, "_exec_find", find)
+    monkeypatch.setattr(engine, "_exec_drag", lambda _node: events.append("drag"))
+    monkeypatch.setattr(engine, "_exec_wait_stable", lambda _node: None)
+    engine._exec_body(proc.body[:parse_index])
+    assert events.count("scan") == expected_scans
+    assert events.count("drag") == expected_drags
+    assert engine.variables["data"]["left_1"] == snapshots[0]
 
 
 class TestParseDetail2Attack:
@@ -269,6 +287,21 @@ class TestParseDetail2AttrPen:
 # ─── RoleAttrParser.parse 整链 ────────────────────────────
 
 class TestParseIntegration:
+    def test_later_valid_screen_corrects_earlier_ocr_label(self, parser):
+        """重复数值不能让前一屏的错字吞掉后一屏的正确标签。"""
+        raw = {
+            "left_1": "增减伤效果 | 今心伤害加成 | 50.0%",
+            "left_2": (
+                "战斗属性 | 角色状态 | 增减伤效果 | 会心伤害加成 | 50.0% | "
+                "会意伤害加成 | 40.2% | 属攻伤害加成 | 15.0%"
+            ),
+            "left_3": "会心伤害加成 | 未识别 | 属攻伤害加成 | 未识别",
+        }
+        result = parser.parse(raw)
+        assert result["crit_dmg"] == 50.0
+        assert result["intent_dmg"] == 40.2
+        assert result["attr_bonus_current"] == 15.0
+
     def test_full_pipeline(self, parser):
         result = parser.parse(_raw_dict())
         assert result["min_outer"] == 3769.0

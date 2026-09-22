@@ -127,6 +127,7 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
         "intent_rate": 22.8, "direct_crit": 9.2,
         "direct_intent": 1.5, "crit_dmg": 54.0,
         "intent_dmg": 35.0, "outer_bonus": 2.5,
+        "attr_bonus_current": 15.0,
         "outer_pen": 58.4,
         "_right_outer_valid": True,
         "_right_outer_pen_valid": True,
@@ -134,6 +135,11 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
     }
     with pytest.raises(ValueError, match="右侧详情"):
         _save_scanned_base_attrs(engine, {**parsed, "_right_outer_valid": False})
+    for missing in ("crit_dmg", "attr_bonus_current"):
+        with pytest.raises(ValueError, match="增减伤属性识别不完整"):
+            _save_scanned_base_attrs(engine, {
+                key: value for key, value in parsed.items() if key != missing
+            })
     assert saved == []
     assert _save_scanned_base_attrs(engine, parsed) == "test_user_方案甲"
     assert saved[0][0] == "鸣金·虹"
@@ -144,7 +150,7 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
         ("intent_rate", 0.228), ("direct_crit", 0.092),
         ("direct_intent", 0.015),
         ("crit_dmg", 0.54), ("intent_dmg", 0.35),
-        ("outer_bonus", 0.025),
+        ("outer_bonus", 0.025), ("mingjin_bonus", 0.15),
     ):
         assert values[field] == pytest.approx(expected)
     assert values["outer_pen"] == pytest.approx(58.4)
@@ -321,6 +327,8 @@ def test_silent_base_subtracts_only_bound_plan_equipment(tmp_path, monkeypatch):
         "min_outer": 100.0, "max_outer": 200.0,
         "min_mingjin": 10.0, "max_mingjin": 20.0,
         "mingjin_pen": 0.0, "precision": 70.0, "crit_rate": 80.0,
+        "crit_dmg": 50.0, "intent_dmg": 40.0,
+        "outer_bonus": 0.0, "attr_bonus_current": 15.0,
         "_right_outer_valid": True,
         "_right_outer_pen_valid": True,
         "_right_attr_pen_valid": True,

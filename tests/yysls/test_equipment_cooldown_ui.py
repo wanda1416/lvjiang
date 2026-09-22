@@ -30,6 +30,15 @@ def test_equipment_lock_status_is_third_property_row():
     assert missing[2] == ("状态", "")
 
 
+def test_equipment_properties_list_referencing_plans():
+    referenced = _equipment_property_rows(
+        {"_fp": "fp"}, ["无名PVE", "无名PVP"])
+    unreferenced = _equipment_property_rows({"_fp": "fp"})
+
+    assert referenced[3] == ("引用方案", "无名PVE、无名PVP")
+    assert unreferenced[3] == ("引用方案", "无")
+
+
 def test_cooldown_remaining_rounds_up_partial_minute():
     expires = NOW + timedelta(days=2, hours=3, minutes=4, seconds=1)
 
@@ -239,12 +248,14 @@ def test_properties_dialog_carries_expired_cooldown_progress(qtbot):
 def test_cooldown_manager_collects_all_users_and_sorts_ascending(tmp_path):
     alice = LoadoutRepository("alice", tmp_path)
     bob = LoadoutRepository("bob", tmp_path)
-    alice.upsert_item({
+    later = {
         "_fp": "later",
         "type": "环",
         "level": 110,
         "cooldown_expires_at": "2026-09-10T10:00:00+00:00",
-    })
+    }
+    alice.assign_equipment(
+        alice.load().active_plan_id, "ring", later)
     alice.upsert_item({
         "_fp": "without-cooldown",
         "type": "佩",
@@ -264,6 +275,7 @@ def test_cooldown_manager_collects_all_users_and_sorts_ascending(tmp_path):
         ("bob", "earlier"),
         ("alice", "later"),
     ]
+    assert entries[1].referenced_plans == ("默认方案",)
 
 
 def test_cooldown_manager_uses_six_columns_and_shared_cards(qtbot, tmp_path):

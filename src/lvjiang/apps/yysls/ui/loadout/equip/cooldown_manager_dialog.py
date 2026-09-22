@@ -45,6 +45,7 @@ class _CooldownEquipmentEntry:
     username: str
     equip: dict
     expires_at: datetime | None
+    referenced_plans: tuple[str, ...] = ()
 
 
 def _load_cooldown_entries(
@@ -58,13 +59,15 @@ def _load_cooldown_entries(
             repo = LoadoutRepository(username, users_dir)
             if not repo.path.exists():
                 continue
-            for equip in repo.load().equipment_items.values():
+            state = repo.load()
+            for fp, equip in state.equipment_items.items():
                 expires_at = _parse_cooldown_time(
                     equip.get("cooldown_expires_at"))
                 if (expires_at is not None
                         or equip.get("cooldown_state") == "completed"):
                     entries.append(_CooldownEquipmentEntry(
-                        username, equip, expires_at))
+                        username, equip, expires_at,
+                        tuple(state.referencing_plan_names(fp))))
         except Exception:
             logger.exception(f"读取用户 {username} 的冷却装备失败")
     return sorted(entries, key=lambda entry: (
@@ -264,7 +267,8 @@ class CooldownEquipmentDialog(QDialog):
 
         _show_equipment_properties(
             self, entry.equip, cooldown_changed=update_cooldown,
-            dingyin_changed=switch_dingyin)
+            dingyin_changed=switch_dingyin,
+            referenced_plans=entry.referenced_plans)
         if changed:
             self._reload()
 

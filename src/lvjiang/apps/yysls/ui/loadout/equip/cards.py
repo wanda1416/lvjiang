@@ -323,7 +323,10 @@ def _dingyin_slot_text(equip: dict, key: str) -> str:
     return f"{name}（{notice}）" if notice else name
 
 
-def _equipment_property_rows(equip: dict) -> list[tuple[str, str]]:
+def _equipment_property_rows(
+    equip: dict,
+    referenced_plans: list[str] | tuple[str, ...] = (),
+) -> list[tuple[str, str]]:
     """构建所有装备卡片共用的属性行。"""
     is_mock = bool((equip.get("_extra") or {}).get("is_mock"))
     source = tr("模拟") if is_mock else tr("扫描")
@@ -344,6 +347,7 @@ def _equipment_property_rows(equip: dict) -> list[tuple[str, str]]:
         (tr("来源"), source),
         (tr("指纹"), str(equip.get("_fp") or "")),
         (tr("状态"), lock_status),
+        (tr("引用方案"), "、".join(referenced_plans) or tr("无")),
         (tr("普通定音"), _dingyin_slot_text(equip, "dingyin")),
         (tr("止戈定音"), _dingyin_slot_text(equip, DINGYIN_ZHIGE_KEY)),
         (tr("冷却类型"), cooldown_kind),
@@ -356,10 +360,13 @@ def _equipment_property_rows(equip: dict) -> list[tuple[str, str]]:
     ]
 
 
-def _equipment_properties_text(equip: dict) -> str:
+def _equipment_properties_text(
+    equip: dict,
+    referenced_plans: list[str] | tuple[str, ...] = (),
+) -> str:
     """构建所有装备卡片共用的属性文本。"""
     return "\n".join(f"{name}：{value}" for name, value in
-                     _equipment_property_rows(equip))
+                     _equipment_property_rows(equip, referenced_plans))
 
 
 class _EquipmentPropertiesDialog(QDialog):
@@ -372,6 +379,7 @@ class _EquipmentPropertiesDialog(QDialog):
         cooldown_changed: Callable[[str], bool] | None = None,
         dingyin_changed: Callable[[str], bool] | None = None,
         dingyin_kind: str = "",
+        referenced_plans: list[str] | tuple[str, ...] = (),
     ):
         super().__init__(parent)
         self._equip = dict(equip)
@@ -392,7 +400,8 @@ class _EquipmentPropertiesDialog(QDialog):
         form.setHorizontalSpacing(24)
         form.setVerticalSpacing(12)
         self._value_labels: dict[str, QLabel] = {}
-        for name, value in _equipment_property_rows(self._equip):
+        for name, value in _equipment_property_rows(
+                self._equip, referenced_plans):
             field_name = QLabel(f"{name}：")
             field_name.setStyleSheet("color: palette(mid); font-weight: 600;")
             field_value = QLabel(value)
@@ -525,6 +534,7 @@ def _show_equipment_properties(
     cooldown_changed: Callable[[str], bool] | None = None,
     dingyin_changed: Callable[[str], bool] | None = None,
     dingyin_kind: str = "",
+    referenced_plans: list[str] | tuple[str, ...] = (),
 ) -> None:
     try:
         parent.isVisible()
@@ -532,7 +542,8 @@ def _show_equipment_properties(
         parent = None
     _EquipmentPropertiesDialog(
         equip, parent, cooldown_changed=cooldown_changed,
-        dingyin_changed=dingyin_changed, dingyin_kind=dingyin_kind).exec()
+        dingyin_changed=dingyin_changed, dingyin_kind=dingyin_kind,
+        referenced_plans=referenced_plans).exec()
 
 
 class _IllegalBadge(QLabel):

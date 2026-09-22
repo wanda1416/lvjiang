@@ -173,6 +173,16 @@ class LoadoutState:
                 order.append(pid)
         return order + [pid for pid in self.plans if pid not in order]
 
+    def referencing_plan_names(self, fingerprint: str) -> list[str]:
+        """按方案顺序返回引用指定装备的方案名称。"""
+        if not fingerprint:
+            return []
+        return [
+            self.plans[plan_id].name
+            for plan_id in self.ordered_plan_ids()
+            if fingerprint in self.plans[plan_id].equipment.values()
+        ]
+
     @property
     def active_plan(self) -> LoadoutPlan:
         return self.plans[self.active_plan_id]

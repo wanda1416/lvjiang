@@ -4,8 +4,8 @@
 进度已满直接跳过整个用户、
 已经在登录页就直接登录、进程不在时启动、进程仍在但不在登录页时重启。
 
-启动后不等稳定帧——登录页背景动画常驻，根本不存在稳定帧，只能轮询
-启动页的返回按钮。这条由下面的用例锁住。
+启动后不等稳定帧——登录页背景动画常驻，根本不存在稳定帧；启动页
+通过游戏 logo 判定，返回按钮只用来点击。
 """
 
 from pathlib import Path
@@ -26,9 +26,9 @@ _HUARUIZHI = SYSTEM_CONFIG_DIR / "workflows" / "weekly_huaruizhi.wf"
 _LOGIN = SYSTEM_CONFIG_DIR / "workflows" / "subcall" / "login.wf"
 _FINISH = _BATCH_DIR / "finish_item.wf"
 
-# 真实过程要连设备，替换成只记账的桩：登录本身由 login.wf 的用例覆盖。
-_STUB_PREPARE_USER = (
-    'def prepare_user($username, $state, $skip_online, $max_wait)\n'
+# 角色选择由 login.wf 的专项用例覆盖；这里保留真实的准备与恢复过程。
+_STUB_SELECT_ROLE = (
+    'def select_role($index, $role, $state, $skip_online, $max_wait)\n'
     '    return {"status": "success", "message": "", "state": $state}\n'
     'end\n'
 )
@@ -48,11 +48,13 @@ class _Device:
     """记录对客户端进程和画面的全部动作。"""
 
     def __init__(self, *, app_running: bool, weekly_progress, startup_back=True,
-                 in_login_page: bool = False):
+                 in_login_page: bool = False, manual_recovery: bool = True):
         self.app_running = app_running
         self.weekly_progress = weekly_progress
         self.startup_back = startup_back
         self.in_login_page = in_login_page
+        self.manual_recovery = manual_recovery
+        self.started = False
         self.calls: list[tuple] = []
 
     def install(self, engine) -> None:
@@ -67,20 +69,35 @@ class _Device:
                 return self.app_running
             if name in ("app_start", "app_stop"):
                 self.app_running = name == "app_start"
+                if name == "app_start":
+                    self.started = True
                 return True
             if name in ("mark_exit", "pause"):
+                if name == "pause" and self.manual_recovery:
+                    self.in_login_page = True  # 模拟用户手动回到登录主页
                 return None
             return passthrough(name, args, engine=engine)
 
         workflow.call_function = call_function
         workflow.match_region_templates = self._match_templates
-        workflow.click_region = lambda scene, key, **kw: self.calls.append(
-            ("click", scene, key))
+        workflow.click_region = self._click
+        workflow.ocr_scene_by = self._ocr
         workflow.wait_seconds = lambda seconds: None
+
+    def _click(self, scene, key, **kwargs):
+        self.calls.append(("click", scene, key))
+        if (scene, key) == ("game_login_page", "back"):
+            self.in_login_page = True
+
+    def _ocr(self, scene, keys, value, mode, **kwargs):
+        if self.in_login_page and (scene, "switch_role") in [
+                (scene, key) for key in keys]:
+            return "选择角色"
+        return ""
 
     def _match_templates(self, regions, **kwargs):
         self.calls.append(("scan_image", tuple(r.key for r in regions)))
-        if not self.startup_back:
+        if not self.startup_back or not self.started or self.in_login_page:
             return {}
         return {region.key: {"score": 0.9} for region in regions}
 
@@ -121,20 +138,15 @@ def _run_prepare(device: _Device, *, restart_app: bool) -> dict:
     device.install(engine)
     engine._procs = dict(program.procs)
     login_program = parse_text(_LOGIN.read_text(encoding="utf-8"))
-    engine._procs["ensure_login_page_by_restart"] = dict(
-        login_program.procs)["ensure_login_page_by_restart"]
-    engine._procs["prepare_user"] = parse_text(_STUB_PREPARE_USER).procs[
-        "prepare_user"]
-    login_page_result = 1 if device.in_login_page else 0
-    login_page_check = parse_text(
-        "def is_in_login_page()\n"
-        f"    return {login_page_result}\n"
-        "end\n"
-    )
-    engine._procs["is_in_login_page"] = login_page_check.procs[
-        "is_in_login_page"]
+    engine._procs.update(dict(login_program.procs))
+    engine._procs["select_role"] = parse_text(_STUB_SELECT_ROLE).procs[
+        "select_role"]
+    engine.user_attributes_snapshot = {"u1": {
+        "account": "acc", "role": "role", "role_index": "1", "tail": "1234",
+    }}
     engine.variables = {
-        "batch_users": ["u1"], "batch_index": 0, "batch_state": {},
+        "batch_users": ["u1"], "batch_index": 0,
+        "batch_state": {"account": "acc"},
         "skip_online_role": True, "online_role_max_wait": 0,
         "allow_restart_app": restart_app,
     }
@@ -190,20 +202,21 @@ def test_prepare_keeps_legacy_manual_recovery_when_restart_is_disabled():
     result = _run_prepare(device, restart_app=False)
 
     assert result["status"] == "success"
-    assert device.names() == []
+    assert device.names() == ["scan_image", "pause"]
 
 
 def test_stopped_client_is_started_then_returned_to_login_page():
-    """客户端不在：启动后轮询启动页返回按钮并点它，回到登录页。"""
+    """客户端不在：启动后识别 logo，点击返回并确认登录主页。"""
     device = _Device(app_running=False, weekly_progress=0)
     result = _run_prepare(device, restart_app=True)
 
     assert result["status"] == "success"
     assert device.names() == [
-        "app_is_running", "app_start",
+        "scan_image", "app_is_running", "app_start",
         "scan_image", "click",
     ]
     assert ("click", "game_login_page", "back") in device.calls
+    assert ("scan_image", ("yysls_logo",)) in device.calls
 
 
 def test_running_client_outside_login_page_is_restarted():
@@ -213,17 +226,19 @@ def test_running_client_outside_login_page_is_restarted():
 
     assert result["status"] == "success"
     assert device.names() == [
-        "app_is_running", "app_stop",
+        "scan_image", "app_is_running", "app_stop",
         "app_start", "scan_image", "click",
     ]
 
 
-def test_startup_back_button_never_appears_falls_back_to_manual():
-    """一直找不到返回按钮时必须停下来求助，而不是继续往登录流程里冲。"""
+def test_startup_logo_never_appears_falls_back_to_manual():
+    """一直找不到启动页 logo 时必须停下来求助，不得盲点返回。"""
     device = _Device(
-        app_running=False, weekly_progress=0, startup_back=False)
-    _run_prepare(device, restart_app=True)
+        app_running=False, weekly_progress=0, startup_back=False,
+        manual_recovery=False)
+    result = _run_prepare(device, restart_app=True)
 
+    assert result["status"] == "failed"
     assert "pause" in device.names()
     assert ("click", "game_login_page", "back") not in device.calls
 

@@ -203,3 +203,132 @@ def test_login_always_goes_through_the_role_selection_page():
         ("game_login_page", "enter"),
     ]
     assert engine.variables["batch_state"]["page_state"] == 2
+
+
+def _run_login_prepare(*, platform="desktop", initial_page="other",
+                       users_ready=True, logo_ready=True, restart=True,
+                       state_account="acc"):
+    """用页面状态回放真实 DSL 的启动、选账号与返回路径。"""
+    engine = make_engine(
+        layout=load_layout_by_key(platform),
+        delay_params=load_user_config().delay_params,
+        run_env=platform,
+    )
+    engine._procs = _all_procs()
+    engine._procs["select_role"] = parse_text(
+        'def select_role($index, $role, $state, $skip, $wait)\n'
+        '    return {"status": "success", "message": "", "state": $state}\n'
+        'end\n').procs["select_role"]
+    engine.user_attributes_snapshot = {"u1": {
+        "account": "acc", "role": "role", "role_index": "1", "tail": "1234",
+    }}
+    state = {"account": state_account, "role": "", "page_state": 0}
+    engine.variables = {"batch_state": state}
+    page = initial_page
+    actions = []
+    workflow = engine._ensure_workflow()
+    original_call = workflow.call_function
+
+    def call_function(name, args, engine=None):
+        nonlocal page
+        if name == "app_is_running":
+            actions.append("app_is_running")
+            return False
+        if name == "app_start":
+            actions.append("app_start")
+            page = "users"
+            return True
+        if name == "pause":
+            actions.append("pause")
+            return ""
+        return original_call(name, args, engine=engine)
+
+    def fake_scan(node):
+        key = node.fields[0].value if node.fields else ""
+        matches = {
+            "switch_role": page == "base",
+            "switch_user": page == "accounts",
+            "yysls_logo": page == "startup" and logo_ready,
+            "login": page == "users" and users_ready,
+        }
+        engine.variables[node.target.name] = key if matches.get(key) else ""
+
+    def fake_click(node):
+        nonlocal page
+        target = node.target
+        key = getattr(target, "entity", getattr(target, "name", ""))
+        actions.append(key)
+        if key == "user_icon":
+            page = ("users" if platform == "desktop" and
+                    "switch_user" in actions else "accounts")
+        elif key == "switch_user":
+            page = "users" if platform == "android" else "base"
+        elif key == "login":
+            page = "startup"
+        elif key == "back":
+            page = "base"
+
+    def fake_find(node):
+        engine.variables[node.var_name] = "1234"
+
+    workflow.call_function = call_function
+    engine._exec_scan = fake_scan
+    engine._exec_click = fake_click
+    engine._exec_find = fake_find
+    engine._exec_wait = lambda _node: None
+    engine._exec_body(parse_text(
+        f'call $result = prepare_user("u1", $batch_state, true, 0, 1, '
+        f'{str(restart).lower()})\n').body)
+    return engine.variables["result"], state, actions
+
+
+def test_pc_restart_uses_existing_users_view_and_logs_in_before_role_selection():
+    result, state, actions = _run_login_prepare()
+
+    assert result["status"] == "success"
+    assert actions == ["app_is_running", "app_start", "tap_user",
+                       "found_user", "login", "back"]
+    assert state == {"account": "acc", "role": "", "page_state": 1}
+
+
+def test_pc_non_restart_account_switch_reuses_selection_and_startup_return():
+    result, state, actions = _run_login_prepare(
+        initial_page="base", restart=False, state_account="other")
+
+    assert result["status"] == "success"
+    assert actions == ["more_user", "user_icon", "switch_user", "user_icon",
+                       "tap_user", "found_user", "login", "back"]
+    assert state == {"account": "acc", "role": "", "page_state": 1}
+
+
+def test_android_account_switch_keeps_direct_login_path():
+    result, state, actions = _run_login_prepare(
+        platform="android", initial_page="base", restart=False,
+        state_account="other")
+
+    assert result["status"] == "success"
+    assert actions == ["more_user", "user_icon", "switch_user",
+                       "tap_user", "found_user", "login"]
+    assert state == {"account": "acc", "role": "", "page_state": 1}
+
+
+@pytest.mark.parametrize("missing", ["users", "logo"])
+def test_pc_restart_missing_page_pauses_without_committing_account(missing):
+    result, state, actions = _run_login_prepare(
+        users_ready=missing != "users", logo_ready=missing != "logo")
+
+    assert result["status"] == "failed"
+    assert "pause" in actions
+    assert state == {"account": "acc", "role": "", "page_state": 0}
+    if missing == "users":
+        assert "tap_user" not in actions
+    else:
+        assert "back" not in actions
+
+
+def test_startup_page_at_entry_returns_to_login_without_restarting():
+    result, _state, actions = _run_login_prepare(
+        initial_page="startup", restart=False)
+
+    assert result["status"] == "success"
+    assert actions == ["back"]

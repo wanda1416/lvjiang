@@ -180,6 +180,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         self._init_capture_snapshot()
         # 执行状态
         self.variables: dict = {}
+        # try/catch 内的预期业务异常由 DSL 自行处理，不先记成整项任务失败。
+        self._try_depth = 0
         # global 声明按变量名跨 call 共享；普通变量仍由 _run_proc 隔离。
         self._global_variable_names: set[str] = set()
         self._global_variables: dict = {}
@@ -980,6 +982,10 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             except _ContinueSignal:
                 raise  # continue 直接穿透，由循环处理
             except BaseException as e:
+                if self._try_depth and isinstance(
+                    e, (WorkflowUserError, KeyError, ValueError, TypeError)
+                ):
+                    raise
                 line_info = f"(行 {node.line_no})" if hasattr(node, 'line_no') and node.line_no else ""
                 logger.error(f"DSL 执行异常 {line_info}: {e}")
                 logger.error(f"异常详情:\n{traceback.format_exc()}")

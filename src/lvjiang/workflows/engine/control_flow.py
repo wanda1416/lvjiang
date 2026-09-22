@@ -141,11 +141,15 @@ class _ControlFlowMixin:
         捕获 WorkflowUserError / KeyError / ValueError / TypeError，
         控制流信号（_BreakSignal / _ReturnSignal / _GotoSignal / _ContinueSignal）穿透不捕获。
         """
+        self._try_depth += 1
         try:
-            self._exec_body(node.body)
-        except (WorkflowUserError, KeyError, ValueError, TypeError) as e:
-            logger.debug(f"try: 捕获异常 {type(e).__name__}: {e}")
-            if node.err_var is not None:
-                self.variables[node.err_var] = str(e)
-            if node.catch_body:
-                self._exec_body(node.catch_body)
+            try:
+                self._exec_body(node.body)
+            except (WorkflowUserError, KeyError, ValueError, TypeError) as e:
+                logger.debug(f"try: 捕获异常 {type(e).__name__}: {e}")
+                if node.err_var is not None:
+                    self.variables[node.err_var] = str(e)
+                if node.catch_body:
+                    self._exec_body(node.catch_body)
+        finally:
+            self._try_depth -= 1

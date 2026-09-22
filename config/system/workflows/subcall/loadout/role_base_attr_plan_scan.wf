@@ -3,26 +3,35 @@
 import "subcall/navigation.wf"
 import "subcall/loadout/role_base_attr_scan.wf"
 
-# 弹窗模式保留原有停在角色页的行为；静默模式明确绑定方案并回主页。
+# 弹窗模式保留原有停在角色页的行为；静默模式失败后也回主页。
+# 返回 -2 表示本方案识别/写入失败但已回主页，-1 表示导航不安全。
 def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scroll_count)
     call $nav_result = nav_main_to_role()
     if $nav_result < 0
         log error "无法进入角色详情页，终止"
         return -1
     end
-    call $parsed = capture_role_base_attrs($scroll_count)
-    if not $parsed
-        log error "基础属性识别为空，未写入"
-        return -1
+    eval $scan_error = ""
+    eval $saved_name = ""
+    try
+        call $parsed = capture_role_base_attrs($scroll_count)
+        if not $parsed
+            eval $scan_error = "基础属性识别为空"
+        else if not $silent_write
+            eval open_base_attr_form($parsed)
+            log info "基础属性识别完成，已弹出创建面板供确认"
+            return "dialog"
+        else
+            eval bind_scanned_loadout($name, $main_art, $sub_art)
+            eval $saved_name = save_scanned_base_attrs($parsed)
+        end
+    catch $err
+        eval $scan_error = $err
     end
     if not $silent_write
-        eval open_base_attr_form($parsed)
-        log info "基础属性识别完成，已弹出创建面板供确认"
-        return "dialog"
+        log error "基础属性识别失败: " + $scan_error
+        return -1
     end
-
-    eval bind_scanned_loadout($name, $main_art, $sub_art)
-    eval $saved_name = save_scanned_base_attrs($parsed)
     click [role_detail].[back] after wait @page_refresh
     call $nav_result = nav_main_to_menu()
     if $nav_result < 0
@@ -32,6 +41,10 @@ def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scr
     call $in_main = is_in_main_page()
     if not $in_main
         return -1
+    end
+    if $scan_error
+        log warn "跳过备战方案基础属性写入: " + $name + "；" + $scan_error
+        return -2
     end
     log info "基础属性识别并写入: " + $saved_name
     return $saved_name

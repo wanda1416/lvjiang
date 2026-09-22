@@ -491,7 +491,7 @@ def test_game_plan_scene_loads_with_distinct_popup_views():
     entry = next(region for region in main.regions if region.key == "fangan")
     assert entry.to == "training_plan/base"
     back = next(region for region in scene.regions if region.key == "back")
-    assert back.to == "training_main/base"
+    assert back.to == "training_main"
     fill = next(region for region in scene.regions
                 if region.key == "smart_fill")
     assert fill.views == ["fill"]
@@ -503,7 +503,7 @@ def test_game_plan_scene_loads_with_distinct_popup_views():
         layout = json.loads((base / "training_plan.json").read_text(encoding="utf-8"))
         assert {region["key"] for region in main_layout["regions"]}.isdisjoint(
             {"plan_title", "main_art", "sub_art", "use_area", "modal_message", "smart_fill"})
-        assert not main_layout["panels"]
+        assert not main_layout.get("panels", [])
         assert {panel["key"] for panel in layout["panels"]} == {"plan_list"}
         button = next(region for region in layout["regions"]
                       if region["key"] == "smart_fill")

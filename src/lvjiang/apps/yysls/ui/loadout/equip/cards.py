@@ -447,17 +447,20 @@ class _EquipmentPropertiesDialog(QDialog):
         只有一种定音时禁用而不是隐藏：功能是存在的，只是这件装备当前不具备
         条件，说清原因比让按钮消失更有用。
         """
-        switchable = (self._dingyin_changed is not None
-                      and can_switch_dingyin(self._equip))
+        supported = self._dingyin_changed is not None
+        switchable = supported and can_switch_dingyin(self._equip)
         self._switch_dingyin_button.setEnabled(switchable)
+        # 两种禁用原因必须分开说：装备只有一种定音，和这个入口不提供切换，
+        # 是完全不同的事。合成一句会对着两种定音都有的装备说假话。
         if switchable:
             target = (tr("止戈定音") if self._dingyin_kind == DINGYIN_NORMAL
                       else tr("普通定音"))
-            self._switch_dingyin_button.setToolTip(
-                tr("切换到") + target)
+            reason = tr("切换到") + target
+        elif not supported:
+            reason = tr("当前入口不支持切换定音，请在装备页操作")
         else:
-            self._switch_dingyin_button.setToolTip(
-                tr("该装备只扫描到一种定音，无法切换"))
+            reason = tr("该装备只扫描到一种定音，无法切换")
+        self._switch_dingyin_button.setToolTip(reason)
         for key in (tr("普通定音"), tr("止戈定音")):
             label = self._value_labels.get(key)
             if label is None:

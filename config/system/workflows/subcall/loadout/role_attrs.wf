@@ -32,13 +32,16 @@ def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scr
         return -1
     end
     click [role_detail].[back] after wait @page_refresh
-    call $nav_result = nav_main_to_menu()
-    if $nav_result < 0
+    click [game_menu_page].[back] after wait @page_refresh
+    # 菜单第二页没有“包裹/培养”；背景的“限时”也不能单独证明已回主页。
+    scan [general_control].[back] as $remaining_back by image
+    if $remaining_back
+        log error "退出角色页后仍检测到返回按钮，未确认已回主页"
         return -1
     end
-    click [game_menu_page].[back] after wait @page_refresh
     call $in_main = is_in_main_page()
     if not $in_main
+        log error "退出角色页后未识别到主页"
         return -1
     end
     if $scan_error

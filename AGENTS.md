@@ -320,16 +320,21 @@ git diff --check
 
 2. 确保功能提交和发布准备提交均已进入并推送到远端 `master`。不得给仅存在于 `dev`
    的提交打正式标签。
-3. fetch 并确认本地发布提交、`origin/master`、版本文件和发布说明完全一致。
-4. 在该发布提交创建无 `v` 前缀的标签并推送：
+3. fetch 并确认本地发布提交、`origin/master`、`public/master`、版本文件和发布说明
+   完全一致。先推送 `origin/master` 并完成本地发布验证，验证通过后再推送
+   `public/master`。
+4. 在该发布提交创建无 `v` 前缀的标签，并把同一个标签同时推送到 `origin` 和
+   `public`：
 
    ```bash
    git tag X.Y.Z
    git push origin X.Y.Z
+   git push public X.Y.Z
    ```
 
-5. 标签推送会触发 `.github/workflows/release.yml`。必须确认校验、Ruff、mypy、pytest、
-   Windows ZIP/安装器、校验和以及 GitHub Release 全部成功，才可报告发布完成。
+5. 推送后确认两个远端的 `master` 和 `X.Y.Z` 标签均指向同一发布提交。
+   `public` 标签推送会触发 `.github/workflows/release.yml`。必须确认校验、Ruff、mypy、
+   pytest、Windows ZIP/安装器、校验和以及 GitHub Release 全部成功，才可报告发布完成。
 
 ### 6.4 失败处理
 

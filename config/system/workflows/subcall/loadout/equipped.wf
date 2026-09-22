@@ -70,15 +70,15 @@ def scan_equipped_slots()
     eval $bow_text = $bow_detail.equip_detail
     eval $bow_kind = ""
     eval $bow_matches = 0
-    if $bow_text contains "会意"
+    if $bow_text contains "会意" or $bow_text contains "追影"
         eval $bow_kind = "会意"
         eval $bow_matches = $bow_matches + 1
     end
-    if $bow_text contains "会心"
+    if $bow_text contains "会心" or $bow_text contains "惊弦"
         eval $bow_kind = "会心"
         eval $bow_matches = $bow_matches + 1
     end
-    if $bow_text contains "精准"
+    if $bow_text contains "精准" or $bow_text contains "饮羽"
         eval $bow_kind = "精准"
         eval $bow_matches = $bow_matches + 1
     end

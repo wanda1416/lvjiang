@@ -122,8 +122,8 @@ class GraduationAnalysisLauncher:
                     plan, game_config=game_config)
             except PlanContextError as exc:
                 QMessageBox.warning(
-                    parent, tr("提示"),
-                    tr("请先在角色详情页选择流派和毕业率方案（{reason}）")
+                    parent, tr("配置不完整"),
+                    tr("无法打开毕业率分析：{reason}。请检查当前备战方案的战斗属性设置。")
                     .format(reason=exc.reason))
                 return
             calculator = scoring.calculator

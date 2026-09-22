@@ -67,11 +67,25 @@ class PlanScoringContext:
         school = resolve_school(
             plan.main_martial_art, plan.sub_martial_art, schools)
         if not school:
-            raise PlanContextError("主副武学未解析出流派")
-        calculator = get_graduation_calculator(school, plan.graduation_scheme)
-        base_data = get_play_styles(school).get(plan.base_attribute)
-        if calculator is None or not isinstance(base_data, dict):
-            raise PlanContextError("缺少毕业率方案或角色基础属性")
+            raise PlanContextError("当前备战方案的主副武学无法匹配流派，请检查武学选择")
+        problems: list[str] = []
+        calculator = None
+        if not plan.graduation_scheme:
+            problems.append("当前备战方案未选择毕业率方案")
+        else:
+            calculator = get_graduation_calculator(school, plan.graduation_scheme)
+            if calculator is None:
+                problems.append(f"毕业率方案「{plan.graduation_scheme}」不可用，请检查流派模型")
+        base_data = None
+        if not plan.base_attribute:
+            problems.append("当前备战方案未选择角色基础属性")
+        else:
+            base_data = get_play_styles(school).get(plan.base_attribute)
+            if not isinstance(base_data, dict):
+                problems.append(f"角色基础属性「{plan.base_attribute}」在流派「{school}」下不存在")
+        if problems:
+            raise PlanContextError("；".join(problems))
+        assert calculator is not None and isinstance(base_data, dict)
         raw_base = CombatAttributes.from_dict(base_data)
         base_attrs = raw_base + gongjue_attrs(plan.gongjue, game_config)
         return cls(

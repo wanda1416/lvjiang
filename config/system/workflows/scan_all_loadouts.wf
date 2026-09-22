@@ -16,9 +16,9 @@
 
 default $scroll_count = 8
 default $skip_existing = false
-import "subcall/loadout/loadout_plan_navigation.wf"
-import "subcall/loadout/equipped_plan_scan.wf"
-import "subcall/loadout/role_base_attr_plan_scan.wf"
+import "subcall/loadout/game_plans.wf"
+import "subcall/loadout/equipped.wf"
+import "subcall/loadout/role_attrs.wf"
 
 # 以游戏列表为扫描来源；主界面活动方案保持不变。
 call $nav_result = nav_main_to_game_plans()

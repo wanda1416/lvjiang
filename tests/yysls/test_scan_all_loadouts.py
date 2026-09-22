@@ -124,7 +124,7 @@ def test_bow_detail_dsl_updates_gongjue_only_when_unique(
         tmp_path, monkeypatch, detail, expected):
     """运行生产 DSL 的弓扫描段，确保不会凭空猜测或改动活动方案。"""
     proc = parse_file(
-        Path("config/system/workflows/subcall/loadout/equipped_slots_scan.wf")
+        Path("config/system/workflows/subcall/loadout/equipped.wf")
     ).procs["scan_equipped_slots"]
     engine = make_engine()
     engine.run_username = "test_user"
@@ -248,13 +248,16 @@ def test_workflow_and_shared_subcalls_parse():
     for path in (
         "scan_all_loadouts.wf", "scan_equipped.wf",
         "standalone/scan_role_base_attr.wf",
-        "subcall/loadout/loadout_plan_navigation.wf",
-        "subcall/loadout/equipped_slots_scan.wf",
-        "subcall/loadout/role_base_attr_scan.wf",
-        "subcall/loadout/equipped_plan_scan.wf",
-        "subcall/loadout/role_base_attr_plan_scan.wf",
+        "subcall/loadout/game_plans.wf",
+        "subcall/loadout/equipped.wf",
+        "subcall/loadout/role_attrs.wf",
+        "subcall/loadout/equipment_scan.wf",
     ):
         parse_file(base / path)
+    assert {"scan_equipped_plan", "scan_equipped_slots"} <= set(
+        parse_file(base / "subcall/loadout/equipped.wf").procs)
+    assert {"scan_role_base_attr_for_plan", "capture_role_base_attrs"} <= set(
+        parse_file(base / "subcall/loadout/role_attrs.wf").procs)
 
 
 def test_batch_skips_all_existing_plans_before_switching(monkeypatch):
@@ -344,8 +347,8 @@ def test_batch_continues_after_one_plan_base_attr_failure(monkeypatch):
 def test_plan_scan_recovers_from_data_error_and_returns_to_main(
         monkeypatch, scan_kind, safe_home):
     path = Path("config/system/workflows/subcall/loadout") / (
-        "equipped_plan_scan.wf" if scan_kind == "equipment"
-        else "role_base_attr_plan_scan.wf")
+        "equipped.wf" if scan_kind == "equipment"
+        else "role_attrs.wf")
     proc_name = ("scan_equipped_plan" if scan_kind == "equipment"
                  else "scan_role_base_attr_for_plan")
     proc = parse_file(path).procs[proc_name]
@@ -399,7 +402,7 @@ def test_select_game_plan_does_not_use_button_text_as_success_check(
         monkeypatch, needs_switch):
     """切换后无弹窗即可继续；当前方案没有“另存为”也不误报失败。"""
     proc = parse_file(Path(
-        "config/system/workflows/subcall/loadout/loadout_plan_navigation.wf"
+        "config/system/workflows/subcall/loadout/game_plans.wf"
     )).procs["select_game_plan"]
     engine = make_engine()
     engine.variables = {"name": "测试方案"}
@@ -445,7 +448,7 @@ def test_return_from_game_plans_checks_only_home_and_prompts_on_mismatch(
         monkeypatch, main_checks, retry_answers, expected, prompt_count):
     """返回路径不依赖中间页 OCR；终点失配由用户决定重试或停止。"""
     proc = parse_file(Path(
-        "config/system/workflows/subcall/loadout/loadout_plan_navigation.wf"
+        "config/system/workflows/subcall/loadout/game_plans.wf"
     )).procs["nav_game_plans_to_main"]
     engine = make_engine()
     clicked = []
@@ -509,7 +512,7 @@ def test_game_plan_scene_loads_with_distinct_popup_views():
             "SPACE" if platform == "desktop" else None)
 
     navigation = Path(
-        "config/system/workflows/subcall/loadout/loadout_plan_navigation.wf"
+        "config/system/workflows/subcall/loadout/game_plans.wf"
     ).read_text(encoding="utf-8")
     assert 'scan [training_plan].[smart_fill] as $action by contains "智能填充"' in navigation
     assert "click [training_plan].[smart_fill]" in navigation
@@ -527,7 +530,7 @@ def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():
         _calls(batch.body))
     assert {"collect_game_plan_names", "select_game_plan"} <= set(_calls(batch.body))
     batch_text = (base / "scan_all_loadouts.wf").read_text(encoding="utf-8")
-    navigation_text = (base / "subcall/loadout/loadout_plan_navigation.wf").read_text(
+    navigation_text = (base / "subcall/loadout/game_plans.wf").read_text(
         encoding="utf-8")
     assert "loadout_scan_targets" not in batch_text
     assert "for name in $names\n    if $skip_existing" in batch_text

@@ -32,7 +32,7 @@ default $silent_write = false
 default $plan_name = ""
 default $main_art = ""
 default $sub_art = ""
-import "subcall/loadout/role_base_attr_plan_scan.wf"
+import "subcall/loadout/role_attrs.wf"
 
 if $silent_write
     eval $target = loadout_scan_target($plan_name, $main_art, $sub_art)

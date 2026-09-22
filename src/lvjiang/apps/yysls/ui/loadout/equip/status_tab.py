@@ -40,7 +40,10 @@ from lvjiang.ui.user_toolbar import add_user_nav_buttons
 from ......i18n import tr
 from ....config.equipment_slots import SLOT_SPECS
 from ....core.affix_cap import equip_affix_cap_pcts
-from ....core.equip_parser.dingyin_parser import has_normal_dingyin
+from ....core.equip_parser.dingyin_parser import (
+    DINGYIN_TYPE_KEY,
+    has_normal_dingyin,
+)
 from ...events import EQUIPMENT_CHANGED, get_event_hub
 from .batch_copy import BatchCopyMixin
 from .cards import _CompactEquipCard, _SlotCard
@@ -1253,7 +1256,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
 
             equip = self._equipped.get(slot_key)
             if equip:
-                card.set_equip(equip)
+                card.set_equip(
+                    equip, dingyin_kind=self._plan_dingyin_kind(slot_key))
             else:
                 card.set_empty()
             # 保持选中态
@@ -1293,8 +1297,73 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 QMessageBox.critical(self, tr("修改失败"), str(exc))
                 return False
 
+        slot_key = self._slot_of_equipped(equip_data)
+
+        def switch_dingyin(kind: str) -> bool:
+            """装备栏里切的是这套方案的选择，背包里切的是装备自身的展示态。
+
+            两个入口各写各的：在装备栏切音不该改掉背包里这件装备的默认展示，
+            反过来也一样。
+            """
+            fp = str(equip_data.get("_fp") or "")
+            if not fp:
+                QMessageBox.warning(
+                    self, tr("切换失败"), tr("装备数据缺少 _fp 字段"))
+                return False
+            inv = self._require_inventory()
+            if inv is None:
+                return False
+            try:
+                if slot_key:
+                    inv.set_plan_dingyin(slot_key, kind)
+                else:
+                    inv.set_item_dingyin_type(fp, kind)
+                    self._update_item_metadata(fp, DINGYIN_TYPE_KEY, kind)
+            except Exception as exc:
+                logger.error(f"切换定音失败: {exc}")
+                QMessageBox.critical(self, tr("切换失败"), str(exc))
+                return False
+            # 只重画受影响的卡片：方案选择只改装备栏，展示状态只改背包卡片。
+            if slot_key:
+                self._refresh_slots()
+            else:
+                self._refresh_dingyin_cards(fp)
+            return True
+
         _show_equipment_properties(
-            self.window(), equip_data, cooldown_changed=update_cooldown)
+            self.window(), equip_data, cooldown_changed=update_cooldown,
+            dingyin_changed=switch_dingyin,
+            dingyin_kind=(self._plan_dingyin_kind(slot_key)
+                          if slot_key else ""))
+
+    def _refresh_dingyin_cards(self, fp: str) -> None:
+        """重画背包/模拟列表里同指纹的卡片，不重载整页。"""
+        for index in range(self._grid.count()):
+            item = self._grid.itemAt(index)
+            card = item.widget() if item is not None else None
+            if not isinstance(card, _CompactEquipCard):
+                continue
+            data = getattr(card, "_equip_data", {})
+            if str(data.get("_fp") or "") == fp:
+                card.refresh_affixes()
+
+    def _plan_dingyin_kind(self, slot_key: str) -> str:
+        """当前方案对这个槽位选了哪种定音；未记录返回空串交给卡片自己解析。"""
+        inv = self._inv
+        if inv is None or not slot_key:
+            return ""
+        plan = inv.state.plans.get(inv.state.active_plan_id)
+        return str(plan.dingyin.get(slot_key) or "") if plan else ""
+
+    def _slot_of_equipped(self, equip_data: dict) -> str:
+        """这件装备正占着当前方案的哪个槽位；不在装备栏里返回空串。"""
+        fp = str(equip_data.get("_fp") or "")
+        if not fp:
+            return ""
+        return next(
+            (key for key, value in self._equipped.items()
+             if str((value or {}).get("_fp") or "") == fp),
+            "")
 
     def _on_lock_requested(self, equip_data: dict, locked: bool) -> None:
         """在不改变装备指纹的前提下修改锁定状态。"""

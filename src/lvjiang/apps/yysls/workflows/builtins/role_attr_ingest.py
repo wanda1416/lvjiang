@@ -5,6 +5,58 @@ from loguru import logger
 from lvjiang.workflows.builtins._registry import builtin_func
 
 
+def _plan_base_attr_target(username: str, plan) -> tuple[str, str]:
+    """静默写入会用到的 (流派, 基础属性名称)。
+
+    命名和流派解析只写这一份：查询「是否已存在」与实际写入必须问同一个目标，
+    分开写迟早出现「查到不存在、写进另一个名字」。
+    """
+    from ...config import get_game_config
+    from ...core.loadout import resolve_school
+
+    school = resolve_school(plan.main_martial_art, plan.sub_martial_art,
+                            get_game_config().get_schools())
+    return school or "", f"{username}_{plan.name}"
+
+
+@builtin_func("has_scanned_base_attrs")
+def _has_scanned_base_attrs(
+    _engine, name: str = "", main_art: str = "", sub_art: str = "",
+) -> bool:
+    """该用户在这套备战方案下的基础属性是否已经保存过。
+
+    基础属性以「用户名_备战方案名」存在所属流派下，所以查询必须带上方案。
+    解析不出唯一方案、武学对不上或流派解析失败时一律返回 false——查询的用途
+    是「要不要跳过扫描」，拿不准就别跳过，让后续写入按自己的规则报错。
+    """
+    from ...config import get_play_styles
+    from ...core.loadout import LoadoutRepository
+
+    username = str(getattr(_engine, "run_username", "") or "")
+    plan_name = str(name or "").strip()
+    if not username or not plan_name:
+        return False
+    state = LoadoutRepository(
+        username, getattr(_engine, "users_dir", None)).load()
+    matches = [plan for plan in state.plans.values()
+               if plan.name == plan_name]
+    if len(matches) != 1:
+        logger.warning(
+            f"基础属性查询未命中唯一备战方案: {plan_name!r}，按未存在处理")
+        return False
+    plan = matches[0]
+    arts = (str(main_art or "").strip(), str(sub_art or "").strip())
+    if all(arts) and sorted(arts) != sorted(
+            (plan.main_martial_art, plan.sub_martial_art)):
+        logger.warning(
+            f"备战方案 {plan_name!r} 的武学与传入不一致，按未存在处理")
+        return False
+    school, attr_name = _plan_base_attr_target(username, plan)
+    if not school:
+        return False
+    return attr_name in get_play_styles(school)
+
+
 @builtin_func("save_scanned_base_attrs")
 def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
     """Silently store the real base values for the bound plan's school/playstyle."""
@@ -15,7 +67,7 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
     )
     from ...core.combat.combat_attrs import COMBAT_ATTR_FIELDS, CombatAttributes
     from ...core.graduation.context import gongjue_attrs
-    from ...core.loadout import LoadoutRepository, resolve_school
+    from ...core.loadout import LoadoutRepository
 
     plan_id = _engine.context.get("_bound_loadout_plan_id")
     if not plan_id:
@@ -43,8 +95,7 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
     if plan is None or not plan.playstyle:
         raise ValueError("备战方案不存在或未配置玩法，不能命名基础属性")
     game_config = get_game_config()
-    school = resolve_school(plan.main_martial_art, plan.sub_martial_art,
-                            game_config.get_schools())
+    school, name = _plan_base_attr_target(username, plan)
     if not school:
         raise ValueError(f"备战方案 {plan.name!r} 的武学无法解析流派")
     school_attr = game_config.get_school_attr(school)
@@ -71,7 +122,6 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
         CombatAttributes.from_dict(panel_values), state.resolved_equipment(plan_id),
         gongjue_attrs(plan.gongjue))
     values = stored_base_fields(school_attr, base)
-    name = f"{username}_{plan.name}"
     if not values:
         raise ValueError(f"基础属性 {name!r} 反推结果为空，拒绝写入")
     save_play_style(school, name, values)

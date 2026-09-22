@@ -18,6 +18,7 @@ from lvjiang.apps.yysls.workflows.builtins.equipment_ingest import (
     _write_equipped,
 )
 from lvjiang.apps.yysls.workflows.builtins.role_attr_ingest import (
+    _has_scanned_base_attrs,
     _save_scanned_base_attrs,
 )
 from lvjiang.core.scene_definition import SceneRegistry
@@ -26,6 +27,18 @@ from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import CallProc
 from lvjiang.workflows.metadata import parse_metadata_file
 from tests.workflows.conftest import make_engine
+
+#: 一份通过全部完整性校验的角色面板 OCR 结果。
+_BASE_ATTR_OCR = {
+    "min_outer": 100.0, "max_outer": 200.0,
+    "min_mingjin": 10.0, "max_mingjin": 20.0, "mingjin_pen": 0.0,
+    "precision": 70.0, "crit_rate": 80.0,
+    "intent_rate": 22.8, "direct_crit": 9.2, "direct_intent": 1.5,
+    "crit_dmg": 54.0, "intent_dmg": 35.0, "outer_bonus": 2.5,
+    "attr_bonus_current": 15.0, "outer_pen": 58.4,
+    "_right_outer_valid": True, "_right_attr_attack_valid": True,
+    "_right_outer_pen_valid": True, "_right_attr_pen_valid": True,
+}
 
 
 def _engine(tmp_path):
@@ -636,3 +649,77 @@ def test_silent_base_subtracts_only_bound_plan_equipment(tmp_path, monkeypatch):
     assert seen == [{"head": {"type": "冠胄", "_fp": "fp",
                               "created_at": "", "updated_at": ""}}]
     assert saved[0]["min_outer"] == 95.0
+
+
+def test_existing_base_attr_query_matches_the_write_target(tmp_path, monkeypatch):
+    """查询与静默写入必须问同一个目标：用户名_方案名，按方案所属流派存放。
+
+    两边各写一份命名规则的话，会出现「查到不存在、结果写进另一个名字」——
+    跳过开关就永远跳不掉，或者反过来跳掉了该扫的。
+    """
+    engine = _engine(tmp_path)
+    repo = LoadoutRepository(engine.run_username, tmp_path)
+    plan = repo.create_plan("方案甲", "无名剑法", "无名枪法",
+                            playstyle="玩法甲", activate=False)
+    stored: dict[str, dict] = {}
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.config.save_play_style",
+        lambda school, name, values: stored.setdefault(school, {}).update(
+            {name: values}))
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.config.get_play_styles",
+        lambda school: dict(stored.get(school) or {}))
+
+    assert _has_scanned_base_attrs(
+        engine, "方案甲", plan.main_martial_art, plan.sub_martial_art) is False
+
+    _bind_scanned_loadout(engine, "方案甲", plan.main_martial_art,
+                          plan.sub_martial_art)
+    _save_scanned_base_attrs(engine, _BASE_ATTR_OCR)
+
+    assert _has_scanned_base_attrs(
+        engine, "方案甲", plan.main_martial_art, plan.sub_martial_art) is True
+    # 同一用户的另一套方案各存各的，不能被上一套的存在挡掉
+    repo.create_plan("方案乙", "无名枪法", "无名剑法",
+                     playstyle="玩法甲", activate=False)
+    assert _has_scanned_base_attrs(engine, "方案乙", "无名枪法", "无名剑法") is False
+
+
+@pytest.mark.parametrize("name,main_art,sub_art", [
+    ("不存在的方案", "", ""),
+    ("方案甲", "无名剑法", "其他武学"),
+    ("", "", ""),
+])
+def test_base_attr_query_reports_missing_when_it_cannot_be_sure(
+        tmp_path, monkeypatch, name, main_art, sub_art):
+    """拿不准时一律报「不存在」——查询的用途是决定要不要跳过扫描。
+
+    报「存在」会静默跳过本该扫描的方案；报不存在最多多扫一次，后续写入还会
+    按自己的规则拦下真正的不一致。
+    """
+    engine = _engine(tmp_path)
+    repo = LoadoutRepository(engine.run_username, tmp_path)
+    plan = repo.create_plan("方案甲", "无名剑法", "无名枪法",
+                            playstyle="玩法甲", activate=False)
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.config.get_play_styles",
+        lambda school: {f"{engine.run_username}_{plan.name}": {}})
+
+    assert _has_scanned_base_attrs(engine, name, main_art, sub_art) is False
+
+
+def test_skip_existing_base_attrs_is_declared_and_gates_only_that_step():
+    """开关必须是声明过的参数，且只挡基础属性那一步。
+
+    装备扫描在它之前完成并计数，重复扫方案的本意正是「装备要重扫、基础属性
+    不必」；挡到装备上就把整个开关的用途弄反了。
+    """
+    path = Path("config/system/workflows/scan_all_loadouts.wf")
+    names = {item["name"] for item in
+             parse_metadata_file(path).get("parameters", [])}
+    assert "skip_existing_base_attrs" in names
+
+    body = path.read_text(encoding="utf-8")
+    guard = body.index("$skip_existing_base_attrs and has_scanned_base_attrs")
+    assert body.index("scan_equipped_plan(") < guard
+    assert guard < body.index("scan_role_base_attr_for_plan(")

@@ -36,10 +36,11 @@ regions:
   is_text: true
   is_clickable: false
 - key: base_attr
-  name: 基础属性1
+  name: 基础属性
   type: attr
   is_text: true
   is_clickable: false
+  view: base
 - key: main_func
   name: 主功能
   type: func
@@ -82,6 +83,12 @@ regions:
   is_text: true
   is_clickable: true
   view: func_area
+- key: equip_detail
+  name: 装备详情
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: base
 references:
 - scene: general_control
   entity: cancel

@@ -59,6 +59,8 @@ class BatchConfigItem:
     selected_task_ids: list[str] = field(default_factory=list)
     selected_usernames: list[str] = field(default_factory=list)
     rounds: int = 1
+    profile_sort_key: str = ""
+    profile_sort_direction: str = "asc"
     workflows: BatchWorkflows = field(default_factory=BatchWorkflows)
     workflow_params: dict[str, dict] = field(default_factory=dict)
     # 保留历史字段名以兼容已有 batch.json；当前“条目”就是选中的用户。
@@ -84,6 +86,10 @@ class BatchConfigItem:
         if not isinstance(self.rounds, int) or isinstance(self.rounds, bool):
             self.rounds = 1
         self.rounds = min(999, max(1, self.rounds))
+        if not isinstance(self.profile_sort_key, str):
+            self.profile_sort_key = ""
+        if self.profile_sort_direction not in ("asc", "desc"):
+            self.profile_sort_direction = "asc"
         self.workflow_params = {
             phase: dict(values)
             for phase, values in self.workflow_params.items()
@@ -98,6 +104,8 @@ class BatchConfigItem:
             "selected_task_ids": list(self.selected_task_ids),
             "selected_usernames": list(self.selected_usernames),
             "rounds": self.rounds,
+            "profile_sort_key": self.profile_sort_key,
+            "profile_sort_direction": self.profile_sort_direction,
             "workflows": self.workflows.to_dict(),
             "workflow_params": self.workflow_params,
             "skip_lifecycle_for_single_item": self.skip_lifecycle_for_single_item,
@@ -121,6 +129,8 @@ class BatchConfigItem:
             selected_task_ids=_unique_strings(source.get("selected_task_ids")),
             selected_usernames=_unique_strings(source.get("selected_usernames")),
             rounds=source.get("rounds", 1),
+            profile_sort_key=source.get("profile_sort_key", ""),
+            profile_sort_direction=source.get("profile_sort_direction", "asc"),
             workflows=BatchWorkflows.from_dict(workflow_source),
             workflow_params=workflow_params,
             skip_lifecycle_for_single_item=(

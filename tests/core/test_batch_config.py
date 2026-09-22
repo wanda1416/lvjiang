@@ -20,7 +20,7 @@ def test_batch_workflows_round_trip_new_lifecycle():
     assert BatchWorkflows.from_dict(workflows.to_dict()) == workflows
 
 
-def test_group_round_trip_preserves_actual_selection_order(tmp_path):
+def test_group_round_trip_preserves_selection_and_sort_settings(tmp_path):
     path = tmp_path / "batch.json"
     group = BatchConfigItem(
         name="日常",
@@ -29,6 +29,8 @@ def test_group_round_trip_preserves_actual_selection_order(tmp_path):
         selected_task_ids=["a", "b"],
         selected_usernames=["用户A", "用户B"],
         rounds=3,
+        profile_sort_key="weekly_work",
+        profile_sort_direction="desc",
         workflow_params={
             "prepare_item": {"skip_online_role": False,
                              "online_role_max_wait": 300},
@@ -43,6 +45,8 @@ def test_group_round_trip_preserves_actual_selection_order(tmp_path):
     assert restored.selected_task_ids == ["a", "b"]
     assert restored.selected_usernames == ["用户A", "用户B"]
     assert restored.rounds == 3
+    assert restored.profile_sort_key == "weekly_work"
+    assert restored.profile_sort_direction == "desc"
     assert restored.workflow_params == group.workflow_params
     assert restored.skip_lifecycle_for_single_item is False
 
@@ -52,6 +56,10 @@ def test_group_rounds_default_and_normalize():
     assert BatchConfigItem.from_dict("过小", {"rounds": 0}).rounds == 1
     assert BatchConfigItem.from_dict("过大", {"rounds": 1000}).rounds == 999
     assert BatchConfigItem.from_dict("非法", {"rounds": "2"}).rounds == 1
+    assert BatchConfigItem.from_dict("默认", {}).profile_sort_direction == "asc"
+    assert BatchConfigItem.from_dict(
+        "非法", {"profile_sort_direction": "invalid"}
+    ).profile_sort_direction == "asc"
 
 
 def test_single_user_lifecycle_skip_defaults_true_and_rejects_invalid_value():

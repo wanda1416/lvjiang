@@ -84,10 +84,23 @@ def _check_chengyin(old: dict, new: dict) -> str | None:
 
 
 def _check_dingyin(old: dict, new: dict) -> str | None:
+    """普通定音槽的合法变化。
+
+    一件装备可以同时定着普通定音和止戈定音，游戏里随时无成本切换，所以
+    「这次只扫到止戈」是合法现场，不是删除了普通定音——两种定音各占一槽，
+    写入时本次没带的那一槽会由仓储从旧记录合并回来。这里只管普通定音槽：
+    它有值就必须同名且只增不减，而已有的普通定音不能在养成后凭空消失。
+    """
     old_dingyin = old.get("dingyin") or {}
     new_dingyin = new.get("dingyin") or {}
+    if not new_dingyin.get("name"):
+        if old_dingyin.get("name"):
+            return tr("扫描装备不能删除定音词条")
+        return None
+    if not old_dingyin.get("name"):
+        return tr("扫描装备不能新增定音词条")
     if old_dingyin.get("name") != new_dingyin.get("name"):
-        return tr("扫描装备不能新增、删除或更换定音词条")
+        return tr("扫描装备不能更换定音词条")
     if to_float(new_dingyin.get("value")) < to_float(old_dingyin.get("value")):
         return tr("培养只能提高定音数值")
     return None

@@ -420,7 +420,7 @@ def test_real_development_allows_dingyin_growth_without_changing_fingerprint(
     (lambda item: item["affix_2"].update(value=1.0), "只能提高词条数值"),
     (lambda item: item["dingyin"].update(value=1.0), "只能提高定音数值"),
     (lambda item: item.update(dingyin={"name": "会心伤害", "value": 10}),
-     "不能新增、删除或更换定音"),
+     "不能更换定音词条"),
 ])
 def test_real_development_rejects_illegal_changes(
     tmp_path: Path, mutate, error,

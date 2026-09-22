@@ -126,12 +126,18 @@ git push
 
 ### 第五步：推送标签，自动打包发布（推荐）
 
-确保本地位于已经推送的 `master` 发布提交，然后执行：
+确保本地位于已经推送到 `origin/master` 和 `public/master` 的同一发布提交，然后执行：
 
 ```powershell
 git tag X.Y.Z
 git push origin X.Y.Z
+git push public X.Y.Z
 ```
+
+`origin` 与 `public` 必须同时保有同名标签，且两个远端的 `master` 和标签都指向同一
+发布提交。`origin` 用于保持私有开发仓库的版本历史完整，`public` 的标签负责触发公开
+发布工作流。任一远端推送失败时都应停止并修复一致性，不能把只存在于单个远端的标签
+视为发布完成。
 
 Release 工作流会依次完成：
 
@@ -197,8 +203,8 @@ packaging\package.bat
 - [ ] `python scripts/add_content_version.py --check` 通过（存量/新增文件的版本字段齐全）
 - [ ] `uv.lock` 变更已纳入提交（如有）
 - [ ] 所有变更已提交并推送
-- [ ] 发布提交已进入远端 `master`
-- [ ] `X.Y.Z` 标签与 `pyproject.toml` 一致并已推送
+- [ ] 发布提交已进入 `origin/master` 和 `public/master`，且两者指向同一提交
+- [ ] `X.Y.Z` 标签与 `pyproject.toml` 一致，已同时推送到 `origin` 和 `public`，且指向同一提交
 - [ ] GitHub Release 工作流中的配置检查、Ruff、mypy 和 pytest 全部通过
 - [ ] 云端 `packaging/package.bat` 打包成功，版本注入校验通过
 - [ ] GitHub Release 已发布，ZIP、安装器和 `SHA256SUMS.txt` 已上传

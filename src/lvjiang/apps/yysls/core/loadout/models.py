@@ -60,6 +60,15 @@ class LoadoutPlan:
     def create(cls, name: str = "默认方案") -> "LoadoutPlan":
         return cls(id=uuid4().hex, name=name)
 
+    def clear_slot(self, slot_key: str) -> None:
+        """清空一个槽位：装备和它的定音选择必须一起走。
+
+        只清装备会在磁盘上留下「空槽位仍有定音选择」的自相矛盾状态，下一件
+        装进来还可能继承到上一件的定音模式。卸下、删除装备都走这里。
+        """
+        self.equipment[slot_key] = None
+        self.dingyin.pop(slot_key, None)
+
     @classmethod
     def from_dict(cls, plan_id: str, data: dict) -> "LoadoutPlan":
         slots = _empty_slots()

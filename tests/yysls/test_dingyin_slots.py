@@ -296,3 +296,28 @@ def test_legacy_global_notice_moves_into_the_displayed_slot():
     assert equip["dingyin_zhige"][DINGYIN_SLOT_NOTICE] == "旧提示"
     assert DINGYIN_SLOT_NOTICE not in equip["dingyin"]
     assert LEGACY_DINGYIN_NOTICE_KEY not in equip["_extra"]
+
+
+# ─── 删除装备的槽位不变量 ──────────────────────────────────
+
+@pytest.mark.parametrize("delete", [
+    lambda repo: repo.delete_items({"mock_x"}),
+    lambda repo: repo.delete_all_mock(),
+])
+def test_deleting_equipment_also_drops_the_plan_dingyin_choice(
+    tmp_path: Path, delete,
+):
+    """空槽位不能留着定音选择——那是磁盘上自相矛盾的状态。"""
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_a = repo.load().active_plan_id
+    mock = _equip(_fp="mock_x", dingyin=dict(_NORMAL),
+                  dingyin_zhige=dict(_ZHIGE), dingyin_type=DINGYIN_ZHIGE)
+    mock["_extra"] = {"is_mock": True}
+    repo.assign_equipment(plan_a, "ring", mock, scanned=True)
+    assert repo.load().plans[plan_a].dingyin["ring"] == DINGYIN_ZHIGE
+
+    delete(repo)
+
+    plan = repo.load().plans[plan_a]
+    assert plan.equipment["ring"] is None
+    assert "ring" not in plan.dingyin

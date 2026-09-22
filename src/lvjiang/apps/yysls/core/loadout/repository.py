@@ -453,10 +453,7 @@ class LoadoutRepository:
         def mutate(state: LoadoutState) -> None:
             if plan_id not in state.plans:
                 raise KeyError(plan_id)
-            plan = state.plans[plan_id]
-            plan.equipment[slot_key] = None
-            # 槽位空了，定音选择跟着走；留着会套到下一件装备头上。
-            plan.dingyin.pop(slot_key, None)
+            state.plans[plan_id].clear_slot(slot_key)
         self.update(mutate)
 
     def delete_items(
@@ -495,9 +492,9 @@ class LoadoutRepository:
             for fp in deleted:
                 state.equipment_items.pop(fp, None)
             for plan in state.plans.values():
-                for slot, eq_fp in plan.equipment.items():
-                    if eq_fp in deleted:
-                        plan.equipment[slot] = None
+                for slot in [s for s, eq_fp in plan.equipment.items()
+                             if eq_fp in deleted]:
+                    plan.clear_slot(slot)
         self.update(mutate)
         return deleted
 
@@ -514,9 +511,9 @@ class LoadoutRepository:
             for fp in fingerprints:
                 state.equipment_items.pop(fp, None)
             for plan in state.plans.values():
-                for slot, referenced_fp in plan.equipment.items():
-                    if referenced_fp in fingerprints:
-                        plan.equipment[slot] = None
+                for slot in [s for s, fp in plan.equipment.items()
+                             if fp in fingerprints]:
+                    plan.clear_slot(slot)
 
         self.update(mutate)
         return deleted

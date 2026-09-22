@@ -23,6 +23,7 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
     required = {"min_outer", "max_outer", "precision", "crit_rate"}
     if (not isinstance(prefill, dict) or not required <= prefill.keys()
             or prefill.get("_right_outer_valid") is not True
+            or prefill.get("_right_attr_attack_valid") is not True
             or prefill.get("_right_outer_pen_valid") is not True
             or prefill.get("_right_attr_pen_valid") is not True):
         raise ValueError("角色属性右侧详情识别不完整，拒绝静默覆盖基础属性")
@@ -86,7 +87,8 @@ def _to_role_base_attrs(raw: dict) -> dict:
     """解析角色详情页滚动识别的 OCR 原始数据为基础属性字典
 
     raw 由 scan_role_base_attr.wf 暂存：{"left_1": ..., "left_2": ...,
-    "right_attack": ..., "right_outer_pen": ..., "right_attr_pen": ...}。
+    "right_outer_attack": ..., "right_attr_attack": ...,
+    "right_outer_pen": ..., "right_attr_pen": ...}。
     返回字段名对齐 combat_attrs.COMBAT_ATTR_FIELDS 的 flat dict，
     可直接交给 open_base_attr_form 预填"创建基础属性"面板。
 

@@ -11,7 +11,7 @@
         "left_2": "...",
         ...                              # 每屏一个 key，滚动顺序排列
         "right_outer_attack": "3769 外功攻击 | ... | 基础外功攻击：3769-3120 | ...",
-        "right_attack": "220-443 | 属性攻击 | ... | 鸣金攻击：170-343(...) | ...",
+        "right_attr_attack": "220-443 | 属性攻击 | ... | 鸣金攻击：170-343(...) | ...",
         "right_outer_pen": "0.0 | 外功穿透 | ... 当前外功穿透(非定音部分)：0.0 | ...",
         "right_attr_pen": "10.3 | 属攻穿透 | ... 鸣金穿透：10.3 | ...",
     }
@@ -173,7 +173,7 @@ def parse_detail2_outer_attack(text: str) -> dict[str, float]:
     return result
 
 
-def parse_detail2_attack(text: str) -> dict[str, float]:
+def parse_detail2_attr_attack(text: str) -> dict[str, float]:
     """解析"属性攻击"detail_2 展开文本，提取四门武学 + 无相攻击的区间数值。
 
     "鸣金攻击：170-343(170-343)" → min_mingjin=170, max_mingjin=343
@@ -238,7 +238,7 @@ class RoleAttrParser:
 
         Args:
             raw: {"left_1": ..., "left_2": ..., "right_outer_attack": ...,
-                  "right_attack": ..., "right_outer_pen": ...,
+                  "right_attr_attack": ..., "right_outer_pen": ...,
                   "right_attr_pen": ...}
 
         Returns:
@@ -269,9 +269,9 @@ class RoleAttrParser:
         if right_outer_attack:
             result.update(parse_detail2_outer_attack(right_outer_attack))
 
-        right_attack = raw.get("right_attack")
-        if right_attack:
-            result.update(parse_detail2_attack(right_attack))
+        right_attr_attack = raw.get("right_attr_attack")
+        if right_attr_attack:
+            result.update(parse_detail2_attr_attack(right_attr_attack))
 
         right_outer_pen = raw.get("right_outer_pen")
         if right_outer_pen:

@@ -225,7 +225,11 @@ class SchoolPanel(QWidget):
         self._ps_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._ps_list.customContextMenuRequested.connect(self._on_ps_context_menu)
         self._ps_list.currentRowChanged.connect(self._on_ps_selected)
-        ps_layout.addWidget(self._ps_list)
+        ps_layout.addWidget(self._ps_list, stretch=1)
+        self._btn_add_play_style = QPushButton(tr("新建属性…"))
+        self._btn_add_play_style.clicked.connect(self._on_add_play_style)
+        apply_button_style(self._btn_add_play_style, variant="neutral")
+        ps_layout.addWidget(self._btn_add_play_style)
         management_layout.addWidget(ps_group, stretch=1)
         right_layout.addLayout(management_layout)
 
@@ -340,9 +344,13 @@ class SchoolPanel(QWidget):
         row = self._school_list.currentRow()
         return self._names[row] if 0 <= row < len(self._names) else None
 
-    def select_school_base_attr(self, school: str, base_attr: str) -> None:
-        """供外部一键跳转：选中流派及其基础属性。"""
+    def select_school_base_attr(
+        self, school: str | None, base_attr: str | None,
+    ) -> None:
+        """供外部跳转：有指定流派和基础属性时才定位。"""
         self._refresh_list(select=school)
+        if not base_attr:
+            return
         matches = self._ps_list.findItems(
             base_attr, Qt.MatchFlag.MatchExactly,
         )
@@ -356,6 +364,7 @@ class SchoolPanel(QWidget):
                              hint=READONLY_HINT)
         self._btn_del.setEnabled(name is not None and ok)
         self._btn_del.setToolTip(hint)
+        self._btn_add_play_style.setEnabled(name is not None)
         cfg = (self._schools().get(name) or {}) if name else {}
         main = cfg.get("main") or {}
         sub = cfg.get("sub") or {}
@@ -660,6 +669,31 @@ class SchoolPanel(QWidget):
         self._refresh_schemes()
 
     # ── 基础属性管理 ──────────────────────────────────────────
+
+    def _on_add_play_style(self) -> None:
+        """在当前流派中新建基础属性，不覆盖已有同名项。"""
+        school = self._current_school()
+        if not school:
+            return
+        from ...config import get_game_config, get_play_styles, save_play_style
+
+        dialog = _PlayStyleEditDialog(
+            self, school_attr=get_game_config().get_school_attr(school),
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        name = dialog.get_name()
+        if name in get_play_styles(school):
+            QMessageBox.warning(
+                self, tr("名称已存在"),
+                tr("基础属性「{name}」已存在，请使用其他名称。").format(name=name),
+            )
+            return
+        save_play_style(school, name, dialog.get_attrs())
+        self._refresh_play_styles()
+        matches = self._ps_list.findItems(name, Qt.MatchFlag.MatchExactly)
+        if matches:
+            self._ps_list.setCurrentItem(matches[0])
 
     def _refresh_play_styles(self):
         """刷新当前流派的基础属性列表"""

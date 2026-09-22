@@ -169,8 +169,10 @@ class GameConfigDialog(QDialog):
         else:
             event.ignore()
 
-    def select_school_base_attr(self, school: str, base_attr: str) -> None:
-        """显示后定位到流派配置及指定基础属性。"""
+    def select_school_base_attr(
+        self, school: str | None, base_attr: str | None,
+    ) -> None:
+        """显示后打开流派配置，有指定属性时再定位。"""
         QTimer.singleShot(
             0, lambda: self._tab.select_school_base_attr(school, base_attr),
         )

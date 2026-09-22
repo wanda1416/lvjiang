@@ -58,7 +58,73 @@ def test_scheme_list_aligns_with_base_list_and_import_stays_below(qtbot):
     ).y()
     assert scheme_top == base_top
     assert import_top > scheme_top
+    create_top = panel._btn_add_play_style.mapTo(
+        panel, panel._btn_add_play_style.rect().topLeft()
+    ).y()
+    assert create_top == import_top
     assert panel._scheme_group.geometry().height() == panel._base_attrs_group.geometry().height()
+
+
+def test_create_base_attr_from_school_panel_selects_new_entry(qtbot, monkeypatch):
+    from lvjiang.apps.yysls.ui.game_settings import school_panel as module
+
+    panel = _panel(qtbot)
+    styles = {}
+    saved = []
+    monkeypatch.setattr("lvjiang.apps.yysls.config.get_play_styles",
+                        lambda _school: styles)
+    monkeypatch.setattr("lvjiang.apps.yysls.config.save_play_style",
+                        lambda school, name, attrs: (
+                            saved.append((school, name, attrs)),
+                            styles.update({name: attrs}),
+                        ))
+
+    class _Dialog:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def exec(self):
+            return 1
+
+        def get_name(self):
+            return "新属性"
+
+        def get_attrs(self):
+            return {"min_outer": 123.0}
+
+    monkeypatch.setattr(module, "_PlayStyleEditDialog", _Dialog)
+    panel._btn_add_play_style.click()
+    assert saved == [("测试流派", "新属性", {"min_outer": 123.0})]
+    assert panel._ps_list.currentItem().text() == "新属性"
+
+
+def test_create_base_attr_rejects_existing_name(qtbot, monkeypatch):
+    from lvjiang.apps.yysls.ui.game_settings import school_panel as module
+
+    panel = _panel(qtbot)
+    monkeypatch.setattr("lvjiang.apps.yysls.config.get_play_styles",
+                        lambda _school: {"已有属性": {"min_outer": 1.0}})
+    writes = []
+    monkeypatch.setattr("lvjiang.apps.yysls.config.save_play_style",
+                        lambda *args: writes.append(args))
+    warnings = []
+    monkeypatch.setattr(module.QMessageBox, "warning",
+                        lambda *_args: warnings.append(True))
+
+    class _Dialog:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def exec(self):
+            return 1
+
+        def get_name(self):
+            return "已有属性"
+
+    monkeypatch.setattr(module, "_PlayStyleEditDialog", _Dialog)
+    panel._btn_add_play_style.click()
+    assert warnings == [True]
+    assert writes == []
 
 
 def test_scheme_adps_precedes_attack_attributes(qtbot, monkeypatch):

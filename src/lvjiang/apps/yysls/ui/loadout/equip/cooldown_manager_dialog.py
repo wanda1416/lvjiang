@@ -238,8 +238,33 @@ class CooldownEquipmentDialog(QDialog):
             self.changed = True
             return True
 
+        def switch_dingyin(kind: str) -> bool:
+            """冷却管理列的是背包视角的装备，没有方案上下文。
+
+            切的是装备自身的展示状态，与背包卡片同一个入口语义；装备属性
+            对话框在哪里打开都该是同一套能力，不该按入口残缺。
+            """
+            nonlocal changed
+            fp = str(entry.equip.get("_fp") or "")
+            if not fp:
+                QMessageBox.warning(
+                    self, tr("切换失败"), tr("装备数据缺少 _fp 字段"))
+                return False
+            try:
+                LoadoutRepository(
+                    entry.username, self._users_dir,
+                ).set_item_dingyin_type(fp, kind)
+            except Exception as exc:
+                logger.exception(f"切换用户 {entry.username} 的装备定音失败")
+                QMessageBox.critical(self, tr("切换失败"), str(exc))
+                return False
+            changed = True
+            self.changed = True
+            return True
+
         _show_equipment_properties(
-            self, entry.equip, cooldown_changed=update_cooldown)
+            self, entry.equip, cooldown_changed=update_cooldown,
+            dingyin_changed=switch_dingyin)
         if changed:
             self._reload()
 

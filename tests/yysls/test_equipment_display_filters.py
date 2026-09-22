@@ -336,3 +336,36 @@ def test_source_actions_offer_copy_only_for_mock_type(qtbot):
     EquipStatusTab._update_source_actions(tab)
     assert delete_button.isHidden()
     assert not copy_button.isHidden()
+
+
+def test_properties_dialog_separates_the_two_disabled_reasons(qtbot):
+    """禁用要给对的原因：入口不支持切换 ≠ 装备只有一种定音。
+
+    合成一句会对着两种定音都有的装备说假话，用户会以为是数据问题去重扫。
+    """
+    from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
+        ZHIGE_DINGYIN_NAME,
+    )
+    from lvjiang.apps.yysls.ui.loadout.equip.cards import (
+        _EquipmentPropertiesDialog,
+    )
+
+    both = {"_fp": "f", "type": "环",
+            "dingyin": {"name": "外功穿透", "value": 14.2},
+            "dingyin_zhige": {"name": ZHIGE_DINGYIN_NAME}}
+    only_one = {"_fp": "f", "type": "环",
+                "dingyin": {"name": "外功穿透", "value": 14.2}}
+
+    unsupported = _EquipmentPropertiesDialog(both)
+    qtbot.addWidget(unsupported)
+    assert not unsupported._switch_dingyin_button.isEnabled()
+    assert "入口" in unsupported._switch_dingyin_button.toolTip()
+
+    single = _EquipmentPropertiesDialog(only_one, dingyin_changed=lambda _k: True)
+    qtbot.addWidget(single)
+    assert not single._switch_dingyin_button.isEnabled()
+    assert "一种定音" in single._switch_dingyin_button.toolTip()
+
+    usable = _EquipmentPropertiesDialog(both, dingyin_changed=lambda _k: True)
+    qtbot.addWidget(usable)
+    assert usable._switch_dingyin_button.isEnabled()

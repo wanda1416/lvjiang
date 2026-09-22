@@ -207,7 +207,7 @@ def test_login_always_goes_through_the_role_selection_page():
 
 def _run_login_prepare(*, platform="desktop", initial_page="other",
                        users_ready=True, logo_ready=True, restart=True,
-                       state_account="acc"):
+                       state_account=""):
     """用页面状态回放真实 DSL 的启动、选账号与返回路径。"""
     engine = make_engine(
         layout=load_layout_by_key(platform),
@@ -236,7 +236,7 @@ def _run_login_prepare(*, platform="desktop", initial_page="other",
             return False
         if name == "app_start":
             actions.append("app_start")
-            page = "users"
+            page = "users" if platform == "desktop" else "startup"
             return True
         if name == "pause":
             actions.append("pause")
@@ -264,7 +264,10 @@ def _run_login_prepare(*, platform="desktop", initial_page="other",
         elif key == "switch_user":
             page = "users" if platform == "android" else "base"
         elif key == "login":
-            page = "startup"
+            # 只有 PC 重启后的首次账号登录进入启动页；普通账号切换和
+            # Android 登录都直接回到登录主页。
+            page = ("startup" if platform == "desktop" and
+                    "app_start" in actions else "base")
         elif key == "back":
             page = "base"
 
@@ -291,13 +294,13 @@ def test_pc_restart_uses_existing_users_view_and_logs_in_before_role_selection()
     assert state == {"account": "acc", "role": "", "page_state": 1}
 
 
-def test_pc_non_restart_account_switch_reuses_selection_and_startup_return():
+def test_pc_non_restart_account_switch_never_checks_or_leaves_startup_page():
     result, state, actions = _run_login_prepare(
         initial_page="base", restart=False, state_account="other")
 
     assert result["status"] == "success"
     assert actions == ["more_user", "user_icon", "switch_user", "user_icon",
-                       "tap_user", "found_user", "login", "back"]
+                       "tap_user", "found_user", "login"]
     assert state == {"account": "acc", "role": "", "page_state": 1}
 
 
@@ -312,6 +315,15 @@ def test_android_account_switch_keeps_direct_login_path():
     assert state == {"account": "acc", "role": "", "page_state": 1}
 
 
+def test_android_restart_keeps_original_startup_then_account_switch_path():
+    result, state, actions = _run_login_prepare(platform="android")
+
+    assert result["status"] == "success"
+    assert actions == ["app_is_running", "app_start", "back", "more_user",
+                       "user_icon", "switch_user", "tap_user", "found_user", "login"]
+    assert state == {"account": "acc", "role": "", "page_state": 1}
+
+
 @pytest.mark.parametrize("missing", ["users", "logo"])
 def test_pc_restart_missing_page_pauses_without_committing_account(missing):
     result, state, actions = _run_login_prepare(
@@ -319,7 +331,7 @@ def test_pc_restart_missing_page_pauses_without_committing_account(missing):
 
     assert result["status"] == "failed"
     assert "pause" in actions
-    assert state == {"account": "acc", "role": "", "page_state": 0}
+    assert state == {"account": "", "role": "", "page_state": 0}
     if missing == "users":
         assert "tap_user" not in actions
     else:
@@ -328,7 +340,7 @@ def test_pc_restart_missing_page_pauses_without_committing_account(missing):
 
 def test_startup_page_at_entry_returns_to_login_without_restarting():
     result, _state, actions = _run_login_prepare(
-        initial_page="startup", restart=False)
+        initial_page="startup", restart=False, state_account="acc")
 
     assert result["status"] == "success"
     assert actions == ["back"]

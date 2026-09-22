@@ -89,8 +89,20 @@ def ensure_login_page_by_restart($app_id, $tail, $account, $batch_state, $max_ro
         if not $ready
             return 0
         end
-        call $logged_in = select_account_and_login($tail, $account, $batch_state, $max_roll_account)
-        return $logged_in
+        call $logged_in = select_account_and_login($tail, $max_roll_account)
+        if not $logged_in
+            return 0
+        end
+        # PC 仅在重启后的首次账号登录会进入启动页；关闭后即回到登录主页。
+        # 账号已经在本分支选定，prepare_user 随后会直接选择角色，不再重复切换账号。
+        call $in_login_page = leave_startup_page()
+        if not $in_login_page
+            return 0
+        end
+        eval $batch_state.account = $account
+        eval $batch_state.role = ""
+        eval $batch_state.page_state = 1
+        return 1
     end
     scene [game_login_page] view [init]
     call $in_login_page = leave_startup_page()
@@ -210,13 +222,21 @@ def switch_account($tail, $account, $batch_state, $max_roll_account)
         click [game_login_page].[switch_user] after wait @page_refresh
     end
 
-    call $logged_in = select_account_and_login($tail, $account, $batch_state, $max_roll_account)
-    return $logged_in
+    call $logged_in = select_account_and_login($tail, $max_roll_account)
+    if not $logged_in
+        return 0
+    end
+    # 非重启账号切换登录后直接回到登录主页，不经过启动页。
+    eval $batch_state.account = $account
+    eval $batch_state.role = ""
+    eval $batch_state.page_state = 1
+    return 1
 end
 
 
-# 前置：已经进入切换用户视图；PC 重启和正常切换共用此段。
-def select_account_and_login($tail, $account, $batch_state, $max_roll_account)
+# 前置：已经进入切换用户视图。这里只负责选择并登录账号；登录后的页面流转由
+# 调用方按“PC 重启”或“普通账号切换”各自处理。
+def select_account_and_login($tail, $max_roll_account)
     click [game_login_page].[tap_user] after wait @page_refresh
 
     # 2. 按条目准备参数限定的次数查找目标账号
@@ -238,20 +258,8 @@ def select_account_and_login($tail, $account, $batch_state, $max_roll_account)
     end
     wait @page_refresh
 
-    # 3. 登录 → 回到登录页角色入口
+    # 3. 提交账号登录；登录后的页面由调用方按所在流程处理。
     click [game_login_page].[login] after wait @page_refresh
-    if env("desktop")
-        call $in_login_page = leave_startup_page()
-        if not $in_login_page
-            return 0
-        end
-    end
-
-    # PC 必须经启动页返回并确认登录主页；Android 保持原有登录后选角色路径。
-    eval $batch_state.account = $account
-    eval $batch_state.role = ""
-    eval $batch_state.page_state = 1
-
     return 1
 end
 

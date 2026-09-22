@@ -16,6 +16,11 @@ from lvjiang.core.user_file_locks import user_file_lock_path
 
 from ..equipment_cooldown import next_cooldown_expiry
 from .development_rules import check_real_development
+from .equipment_write import (
+    WriteSource,
+    merge_equipment_write,
+    union_dingyin_slots,
+)
 from .models import (
     EQUIPMENT_CREATED_AT,
     EQUIPMENT_SLOTS,
@@ -44,15 +49,19 @@ def stamp_equipment_write(
     existing: dict | None,
     *,
     now: str | None = None,
+    source: WriteSource = WriteSource.EDIT,
 ) -> dict:
-    """生成一次 fp 写入的数据。
+    """生成一次 fp 写入的数据：先过合并契约，再盖时间戳。
 
     新 fp 同时记录创建和更新时间；已有 fp 保留其创建时间并刷新更新时间。
     历史装备没有创建时间时保持空值，不能用当前时间伪造，也不允许调用方
     携带的旧时间覆盖仓储中的事实。
+
+    合并放在这里而不是各调用点：写 ``equipment_items`` 的路径都要盖时间戳，
+    盯住这一个出口就不会再漏掉某条路径整条替换掉定音或转律目标。
     """
     timestamp = now or _now_iso()
-    value = copy.deepcopy(equip)
+    value = merge_equipment_write(equip, existing, source=source)
     value["_fp"] = fp
     if existing is None:
         value[EQUIPMENT_CREATED_AT] = timestamp
@@ -62,20 +71,6 @@ def stamp_equipment_write(
             created if isinstance(created, str) else "")
     value[EQUIPMENT_UPDATED_AT] = timestamp
     return value
-
-
-def carry_transmute_target(source: dict, target: dict) -> None:
-    """把 ``source`` 上的转律目标搬到 ``target`` 同一槽位（槽位词条同名时）。"""
-    saved = saved_transmute_target(source)
-    if saved is None:
-        return
-    index, name, value = saved
-    before = (source.get(f"affix_{index}") or {}).get("name")
-    affix = target.get(f"affix_{index}")
-    if not isinstance(affix, dict) or affix.get("name") != before:
-        return
-    affix[TARGET_NAME_KEY] = name
-    affix[TARGET_VALUE_KEY] = value
 
 
 def _timestamp_rank(value) -> float | None:
@@ -247,7 +242,12 @@ class LoadoutRepository:
                 plan.graduation_scheme = graduation_scheme
         self.update(mutate)
 
-    def upsert_item(self, equip: dict) -> str:
+    def upsert_item(self, equip: dict,
+                    *, source: WriteSource = WriteSource.BAG_SCAN) -> str:
+        """写入一件背包/模拟装备。
+
+        默认按背包扫描处理：背包里读到的定音就是这件装备该展示的定音。
+        """
         fp = str(equip.get("_fp") or "")
         if not fp:
             from ..equip_parser.models import make_fingerprint
@@ -256,13 +256,8 @@ class LoadoutRepository:
         if not fp:
             raise ValueError("装备数据无法生成指纹")
         def mutate(state: LoadoutState) -> None:
-            existing = state.equipment_items.get(fp)
-            stamped = stamp_equipment_write(equip, fp, existing)
-            # 同指纹意味着五条词条名值都没变：重新扫描不能抹掉用户保存的
-            # 转律目标。扫描数据本身不会带目标字段，所以只需从旧版本搬过来。
-            if existing is not None and saved_transmute_target(stamped) is None:
-                carry_transmute_target(existing, stamped)
-            state.equipment_items[fp] = stamped
+            state.equipment_items[fp] = stamp_equipment_write(
+                equip, fp, state.equipment_items.get(fp), source=source)
         self.update(mutate)
         return fp
 
@@ -372,7 +367,13 @@ class LoadoutRepository:
 
         return self.update(mutate)
 
-    def assign_equipment(self, plan_id: str, slot_key: str, equip: dict) -> str:
+    def assign_equipment(self, plan_id: str, slot_key: str,
+                         equip: dict) -> str:
+        """把装备挂到方案槽位。
+
+        备战扫描读到的定音种类属于「切换备战方案时游戏自动切过去的状态」，
+        不是用户给这件装备定的展示偏好，所以不写回装备自身。
+        """
         if slot_key not in EQUIPMENT_SLOTS:
             raise ValueError(f"未知装备槽位: {slot_key}")
         fp = str(equip.get("_fp") or "")
@@ -386,7 +387,8 @@ class LoadoutRepository:
             if plan_id not in state.plans:
                 raise ValueError("目标备战方案已不存在")
             state.equipment_items[fp] = stamp_equipment_write(
-                equip, fp, state.equipment_items.get(fp))
+                equip, fp, state.equipment_items.get(fp),
+                source=WriteSource.PLAN_SCAN)
             state.plans[plan_id].equipment[slot_key] = fp
         self.update(mutate)
         return fp
@@ -500,6 +502,9 @@ class LoadoutRepository:
             for new, old_items in grouped.items():
                 target = state.equipment_items[new]
                 all_items = [target, *old_items]
+                # 合并的是同一件实体：被合并掉那条身上的定音同样是这件装备的
+                # 事实，保留记录缺哪个槽就从它们那里补，不能随记录一起丢掉。
+                union_dingyin_slots(target, old_items)
                 target[EQUIPMENT_CREATED_AT] = _pick_timestamp(
                     (item.get(EQUIPMENT_CREATED_AT) for item in all_items),
                     latest=False)
@@ -619,9 +624,14 @@ class LoadoutRepository:
             old = state.equipment_items.get(old_fp)
             if old is None:
                 raise ValueError(f"待养成装备已不存在: {old_fp}")
-            reason = check_real_development(old, value)
+            # 指纹变了也还是同一件装备：两种定音都要跟过去，否则本次没带的
+            # 那一种会随旧指纹一起被删掉。合并放在校验之前，校验看到的才是
+            # 真正会落盘的内容。转律目标上面已按失效规则清掉，不会被搬回来。
+            merged = merge_equipment_write(value, old)
+            reason = check_real_development(old, merged)
             if reason:
                 raise ValueError(reason)
+            value.update(merged)
             if any(
                 (old.get(f"affix_{index}") or {}).get("name")
                 != (value.get(f"affix_{index}") or {}).get("name")

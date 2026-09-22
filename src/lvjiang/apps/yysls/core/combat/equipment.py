@@ -247,6 +247,8 @@ class EquipmentInventory:
             for slot, equip in combo_equipped.items():
                 fp = str(equip.get("_fp") or "") or make_fingerprint(
                     equip, is_mock=bool(equip.get("_extra", {}).get("is_mock")))
+                # 组合应用写回的是仓储里的原始装备，不带定音假设，也不表达
+                # 任何展示意图：走统一入口保住两种定音和转律目标即可。
                 state.equipment_items[fp] = stamp_equipment_write(
                     equip, fp, state.equipment_items.get(fp))
                 plan.equipment[slot] = fp

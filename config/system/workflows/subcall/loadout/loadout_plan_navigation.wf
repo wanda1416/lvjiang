@@ -64,6 +64,8 @@ def select_game_plan($name)
         return -1
     end
 
+    # 仅用按钮文案决定是否需要点击；不能用切换后的文案判定成败。
+    # 当前方案再次选中时可能没有“使用方案”，也不保证出现“另存为”。
     scan [training_plan].[use_area] as $use by contains "使用方案"
     if $use
         click [training_plan].[use_area] after wait @page_refresh
@@ -90,23 +92,6 @@ def select_game_plan($name)
         if $message.modal_message contains "装备缺失" or $message.modal_message contains "未保存"
             return -2
         end
-    else
-        scan [training_plan].[plan_title] as $title by contains $name
-        find [training_plan].[use_area] as $save_as by contains "另存为"
-        if not $title and not $save_as
-            log error "未找到使用方案按钮，也无法确认已在目标方案: " + $name
-            return -1
-        end
-    end
-    scan [training_plan].[plan_list] as $ready
-    if not $ready
-        log error "方案切换后未恢复方案列表: " + $name
-        return -2
-    end
-    find [training_plan].[use_area] as $still_use by contains "使用方案"
-    if $still_use
-        log error "切换后仍显示使用方案按钮: " + $name
-        return -1
     end
     return {"name": $title, "main_art": $main_art, "sub_art": $sub_art}
 end

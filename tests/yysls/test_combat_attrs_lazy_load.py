@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from lvjiang.apps.yysls.core.loadout import LoadoutRepository
 from lvjiang.apps.yysls.ui.loadout.combat.attrs_tab import CombatAttrsTab
 
 
@@ -112,3 +113,119 @@ def test_restore_selection_suppresses_the_refresh_cascade():
     fake = SimpleNamespace(_restoring=True, calls=[])
     assert CombatAttrsTab._refresh_display(fake) is None
     assert fake.calls == []
+
+
+class _Combo:
+    def __init__(self):
+        self.items = []
+        self.index = -1
+
+    def replace(self, items):
+        self.items = items
+        self.index = 0 if items else -1
+
+    def findText(self, text):  # noqa: N802 - QComboBox contract
+        return self.items.index(text) if text in self.items else -1
+
+    def findData(self, value):  # noqa: N802 - QComboBox contract
+        return self.findText(value)
+
+    def setCurrentIndex(self, index):  # noqa: N802 - QComboBox contract
+        self.index = index
+
+    def currentIndex(self):  # noqa: N802 - QComboBox contract
+        return self.index
+
+    def currentText(self):  # noqa: N802 - QComboBox contract
+        return self.items[self.index] if self.index >= 0 else ""
+
+
+def _selection_tab(*, preview=False):
+    base, scheme, gongjue = _Combo(), _Combo(), _Combo()
+    tab = SimpleNamespace(
+        _host=SimpleNamespace(active_user_name=lambda: "tester"),
+        _preview=preview,
+        _restoring=False,
+        _combo_play_style=base,
+        _combo_scheme=scheme,
+        _combo_gongjue=gongjue,
+        _refresh_play_styles=lambda: base.replace(["属性甲", "属性乙"]),
+        _refresh_schemes=lambda: scheme.replace(["基础方案"]),
+        _persist_displayed_defaults=CombatAttrsTab._persist_displayed_defaults,
+        _chk_full_chengyin=SimpleNamespace(setChecked=lambda _: None),
+        _chk_full_dingyin=SimpleNamespace(setChecked=lambda _: None),
+        _chk_full_level=SimpleNamespace(setChecked=lambda _: None),
+        _chk_simulate_transmute=SimpleNamespace(setChecked=lambda _: None),
+    )
+    gongjue.replace([""])
+    return tab
+
+
+def test_displayed_defaults_are_saved_only_to_current_plan(tmp_path, monkeypatch):
+    repo = LoadoutRepository("tester", tmp_path)
+    old_plan = repo.load().active_plan_id
+    new_plan = repo.create_plan("新方案", "武学甲", "武学乙")
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.loadout.LoadoutRepository",
+        lambda _name: repo,
+    )
+    tab = _selection_tab()
+    before = repo.load().revision
+
+    CombatAttrsTab._restore_selection(
+        tab, repo.load().active_plan, "测试流派", prefs={})
+
+    state = repo.load()
+    assert state.revision == before + 1
+    assert (state.active_plan.base_attribute, state.active_plan.graduation_scheme) == (
+        "属性甲", "基础方案")
+    assert state.plans[old_plan].base_attribute == ""
+    assert state.plans[old_plan].graduation_scheme == ""
+    assert state.active_plan_id == new_plan.id
+
+    CombatAttrsTab._restore_selection(tab, state.active_plan, "测试流派", prefs={})
+    assert repo.load().revision == state.revision
+
+    repo.configure_plan(new_plan.id, base_attribute="属性乙")
+    configured = repo.load()
+    CombatAttrsTab._restore_selection(
+        tab, configured.active_plan, "测试流派", prefs={})
+    assert tab._combo_play_style.currentText() == "属性乙"
+    assert repo.load().revision == configured.revision
+
+
+def test_unavailable_saved_selection_is_not_silently_replaced(tmp_path, monkeypatch):
+    repo = LoadoutRepository("tester", tmp_path)
+    plan = repo.create_plan("已有方案", "武学甲", "武学乙")
+    repo.configure_plan(
+        plan.id, base_attribute="旧属性", graduation_scheme="旧方案")
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.loadout.LoadoutRepository",
+        lambda _name: repo,
+    )
+    tab = _selection_tab()
+    before = repo.load().revision
+
+    CombatAttrsTab._restore_selection(
+        tab, repo.load().active_plan, "测试流派", prefs={})
+
+    assert tab._combo_play_style.currentIndex() == -1
+    assert tab._combo_scheme.currentIndex() == -1
+    assert repo.load().revision == before
+    assert repo.load().active_plan.graduation_scheme == "旧方案"
+
+
+def test_preview_does_not_persist_displayed_defaults(tmp_path, monkeypatch):
+    repo = LoadoutRepository("tester", tmp_path)
+    plan = repo.create_plan("预览方案", "武学甲", "武学乙")
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.loadout.LoadoutRepository",
+        lambda _name: repo,
+    )
+    tab = _selection_tab(preview=True)
+    before = repo.load().revision
+
+    CombatAttrsTab._restore_selection(tab, plan, "测试流派", prefs={})
+
+    assert repo.load().revision == before
+    assert repo.load().active_plan.graduation_scheme == ""

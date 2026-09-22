@@ -196,3 +196,37 @@ def test_plan_context_from_plan_includes_fixed_gongjue(monkeypatch):
             id="p3", name="无方案", main_martial_art="无名剑法",
             sub_martial_art="无名枪法", base_attribute="不存在",
             graduation_scheme="基础方案"), game_config=gc)
+
+
+def test_plan_context_names_each_missing_setting(monkeypatch):
+    gc = get_game_config()
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.graduation.context.get_play_styles",
+        lambda school: {"已保存属性": {"min_outer": 1000}} if school == "鸣金·虹" else {},
+    )
+    plan = LoadoutPlan(
+        id="p1", name="测试方案", main_martial_art="无名剑法",
+        sub_martial_art="无名枪法", base_attribute="已保存属性",
+        graduation_scheme="",
+    )
+
+    with pytest.raises(PlanContextError, match="未选择毕业率方案") as error:
+        PlanScoringContext.from_plan(plan, game_config=gc)
+    assert "基础属性" not in error.value.reason
+
+    plan.graduation_scheme = "基础方案"
+    plan.base_attribute = ""
+    with pytest.raises(PlanContextError, match="未选择角色基础属性") as error:
+        PlanScoringContext.from_plan(plan, game_config=gc)
+    assert "毕业率方案" not in error.value.reason
+
+    plan.base_attribute = "不存在的属性"
+    with pytest.raises(PlanContextError, match="不存在的属性.*不存在"):
+        PlanScoringContext.from_plan(plan, game_config=gc)
+
+    plan.base_attribute = ""
+    plan.graduation_scheme = ""
+    with pytest.raises(PlanContextError) as error:
+        PlanScoringContext.from_plan(plan, game_config=gc)
+    assert "未选择毕业率方案" in error.value.reason
+    assert "未选择角色基础属性" in error.value.reason

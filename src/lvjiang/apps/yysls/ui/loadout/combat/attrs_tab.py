@@ -530,9 +530,13 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             repo = LoadoutRepository(user_name)
             plan = repo.load().active_plan
             values = (
-                self._combo_play_style.currentText(),
+                self._combo_play_style.currentText()
+                if self._combo_play_style.currentIndex() >= 0
+                else plan.base_attribute,
                 self._get_current_gongjue(),
-                self._combo_scheme.currentText(),
+                self._combo_scheme.currentText()
+                if self._combo_scheme.currentIndex() >= 0
+                else plan.graduation_scheme,
             )
             if values != (
                 plan.base_attribute, plan.gongjue, plan.graduation_scheme
@@ -575,6 +579,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         if not user_name:
             return
 
+        defaults: dict[str, str] = {}
         try:
             from ....core.loadout import LoadoutRepository
 
@@ -610,18 +615,20 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             # 恢复基础属性
             if play_style:
                 idx = self._combo_play_style.findText(play_style)
-                if idx >= 0:
-                    self._combo_play_style.setCurrentIndex(idx)
+                self._combo_play_style.setCurrentIndex(idx)
+            elif self._combo_play_style.currentText():
+                defaults["base_attribute"] = self._combo_play_style.currentText()
 
             # 恢复弓玦
             idx = self._combo_gongjue.findData(gongjue)
             self._combo_gongjue.setCurrentIndex(max(0, idx))
 
-            # 恢复方案；不存在或失效时保留第一项
+            # 空值显示第一个可用项并写回；失效引用则显示为空，避免伪装成已配置。
             if scheme:
                 idx = self._combo_scheme.findText(scheme)
-                if idx >= 0:
-                    self._combo_scheme.setCurrentIndex(idx)
+                self._combo_scheme.setCurrentIndex(idx)
+            elif self._combo_scheme.currentText():
+                defaults["graduation_scheme"] = self._combo_scheme.currentText()
 
             # 恢复右键菜单控制的黄字展示模式。加载结束统一刷新，不在这里
             # 触发额外计算或保存。
@@ -641,6 +648,30 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             logger.debug(f"恢复战斗属性选择失败: {e}")
         finally:
             self._restoring = False
+        if defaults and not self._preview:
+            self._persist_displayed_defaults(user_name, plan.id, defaults)
+
+    @staticmethod
+    def _persist_displayed_defaults(
+        user_name: str, plan_id: str, defaults: dict[str, str],
+    ) -> None:
+        """只补当前方案仍为空的选择，不用页面快照覆盖其他字段。"""
+        from ....core.loadout import LoadoutRepository
+
+        try:
+            repo = LoadoutRepository(user_name)
+            state = repo.load()
+            if state.active_plan_id != plan_id:
+                return
+            current = state.plans[plan_id]
+            updates = {
+                field: value for field, value in defaults.items()
+                if not getattr(current, field)
+            }
+            if updates:
+                repo.configure_plan(plan_id, **updates)
+        except Exception as exc:
+            logger.warning(f"保存备战方案默认战斗配置失败: {exc}")
 
     # ── 属性展示 ──────────────────────────────────────────────
 

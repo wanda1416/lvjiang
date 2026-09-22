@@ -82,12 +82,21 @@ _PRIMARY_BUTTON_STYLE = (
     "QPushButton:pressed { background: palette(dark); }"
 )
 
+_DISABLED_AFFIX_FIELD_STYLE = (
+    "QComboBox:disabled, QDoubleSpinBox:disabled { "
+    "background-color: palette(button); color: palette(mid); "
+    "border: 1px solid palette(midlight); }"
+)
+
 
 class _AffixRow(QWidget):
     """单行词条编辑：词条名下拉 + 数值输入"""
 
     def __init__(self, index: int, affix_names: list[str], parent=None):
         super().__init__(parent)
+        # Windows 原生样式下 disabled 输入框仍可能保持白底，用户无法仅凭外观
+        # 判断这一行是否可修改。只覆盖禁用态，启用控件继续沿用全局主题。
+        self.setStyleSheet(_DISABLED_AFFIX_FIELD_STYLE)
         self._index = index
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

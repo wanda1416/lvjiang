@@ -51,6 +51,7 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+  view: base
 - key: fangan
   name: 方案管理
   type: func

@@ -19,7 +19,7 @@ regions:
   is_text: false
   is_clickable: true
   view: base
-  to: training_main/base
+  to: training_main
 - key: plan_title
   name: 当前方案名称
   type: attr

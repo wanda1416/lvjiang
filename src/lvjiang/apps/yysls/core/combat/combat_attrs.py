@@ -507,7 +507,7 @@ def apply_hypothetical_caps(
     import copy
 
     from ...config import get_game_config
-    from ..affix_cap import affix_cap_value
+    from ..affix_cap import affix_cap_value, can_cultivate_affix_values
 
     gc = get_game_config()
     result: dict = {}
@@ -530,7 +530,7 @@ def apply_hypothetical_caps(
             equip["is_chengyin"] = True
 
         effective_level = equip.get("level")
-        is_cy = equip.get("is_chengyin", False)
+        is_cy = can_cultivate_affix_values(equip)
 
         # 普通词条 affix_1~5
         for i in range(1, 6):

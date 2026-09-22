@@ -27,11 +27,11 @@ def _real_equip() -> dict:
     return equip
 
 
-def test_real_development_locks_identity_and_allows_value_growth(qtbot):
+def test_real_development_locks_identity_and_non_chengyin_values(qtbot):
     dialog = MockEquipDialog(_real_equip())
     qtbot.addWidget(dialog)
 
-    assert dialog.windowTitle() == "养成扫描装备"
+    assert dialog.windowTitle() == "养成真实装备"
     assert not dialog._combo_part.isEnabled()
     assert not dialog._combo_weapon_type.isEnabled()
     assert not dialog._edit_name.isEnabled()
@@ -42,7 +42,7 @@ def test_real_development_locks_identity_and_allows_value_growth(qtbot):
     assert dialog._spin_dingyin.minimum() == 10.0
     assert not dialog._affix_rows[0]._combo_name.isEnabled()
     assert dialog._affix_rows[1]._combo_name.isEnabled()
-    assert dialog._affix_rows[1]._spin_value.minimum() == 60.0
+    assert not dialog._affix_rows[1]._spin_value.isEnabled()
 
 
 def test_real_equipment_copy_marker_keeps_dialog_in_mock_edit_mode(qtbot):
@@ -88,6 +88,8 @@ def test_dingyin_cultivation_keeps_fingerprint_and_cooldown(qtbot):
 
 def test_transmute_marks_slot_and_resets_configured_five_day_cooldown(qtbot):
     equip = _real_equip()
+    equip["affix_2"]["is_transferred"] = True
+    equip["_fp"] = make_fingerprint(equip)
     dialog = MockEquipDialog(equip)
     qtbot.addWidget(dialog)
     row = dialog._affix_rows[1]
@@ -119,6 +121,8 @@ def test_dialog_and_repository_share_one_rule_set(qtbot):
     )
 
     equip = _real_equip()
+    equip["affix_2"]["is_transferred"] = True
+    equip["_fp"] = make_fingerprint(equip)
     dialog = MockEquipDialog(equip)
     qtbot.addWidget(dialog)
     row = dialog._affix_rows[1]
@@ -153,7 +157,13 @@ def test_untouched_equipment_is_rejected_by_the_dialog_only(qtbot):
 
 
 def test_transmute_allows_smaller_value_in_new_units_and_restores_original_floor(qtbot):
-    dialog = MockEquipDialog(_real_equip())
+    equip = _real_equip()
+    equip["is_chengyin"] = True
+    equip["level"] = 110
+    equip["original_level"] = 110
+    equip["affix_2"]["is_transferred"] = True
+    equip["_fp"] = make_fingerprint(equip)
+    dialog = MockEquipDialog(equip)
     qtbot.addWidget(dialog)
     row = dialog._affix_rows[1]
     row._combo_name.setCurrentIndex(row._combo_name.findData("会意率"))
@@ -166,3 +176,97 @@ def test_transmute_allows_smaller_value_in_new_units_and_restores_original_floor
     row._combo_name.setCurrentIndex(row._combo_name.findData("劲"))
     row._spin_value.setValue(5.0)
     assert row.get_data()["value"] == 60.0
+
+
+def test_non_chengyin_fill_modes_cannot_change_values(qtbot):
+    equip = _real_equip()
+    dialog = MockEquipDialog(equip)
+    qtbot.addWidget(dialog)
+    before = [row._spin_value.value() for row in dialog._affix_rows]
+
+    # 满承音不能改写非承音装备的普通词条；定音属于独立假设，不受此限制。
+    dialog._radio_mode_max_cy.setChecked(True)
+
+    assert [row._spin_value.value() for row in dialog._affix_rows] == before
+    assert dialog._spin_dingyin.value() >= 10.0
+
+
+def test_non_chengyin_transmute_enables_only_the_new_value(qtbot):
+    equip = _real_equip()
+    equip["affix_2"]["is_transferred"] = True
+    equip["_fp"] = make_fingerprint(equip)
+    dialog = MockEquipDialog(equip)
+    qtbot.addWidget(dialog)
+    row = dialog._affix_rows[1]
+
+    assert row._combo_name.isEnabled()
+    assert not row._spin_value.isEnabled()
+    row._combo_name.setCurrentIndex(row._combo_name.findData("会意率"))
+    assert row._spin_value.isEnabled()
+    row._spin_value.setValue(5.0)
+
+    assert row.get_data()["value"] == 5.0
+    assert dialog._validate_real_development(
+        dialog._build_real_development_data()) is None
+
+
+def test_existing_transfer_without_retransfer_greys_non_editable_rows(qtbot):
+    equip = _real_equip()
+    equip["level"] = 100
+    equip["original_level"] = 100
+    equip["affix_2"]["is_transferred"] = True
+    equip["_fp"] = make_fingerprint(equip)
+
+    dialog = MockEquipDialog(equip)
+    qtbot.addWidget(dialog)
+
+    assert all(not row.isEnabled() for row in dialog._affix_rows)
+
+
+def test_chengyin_real_equipment_allows_value_growth(qtbot):
+    equip = _real_equip()
+    equip["is_chengyin"] = True
+    equip["level"] = 110
+    equip["_fp"] = make_fingerprint(equip)
+
+    dialog = MockEquipDialog(equip)
+    qtbot.addWidget(dialog)
+
+    assert dialog._spin_dingyin.isEnabled()
+    assert all(row._spin_value.isEnabled() for row in dialog._affix_rows)
+    assert all(not row._combo_name.isEnabled() for row in dialog._affix_rows)
+    assert dialog._radio_mode_max_val.isEnabled()
+
+
+def test_chengyin_retransfer_requires_original_level_permission(qtbot):
+    equip = _real_equip()
+    equip["is_chengyin"] = True
+    equip["level"] = 110
+    equip["original_level"] = 105
+    equip["affix_2"]["is_transferred"] = True
+    equip["_fp"] = make_fingerprint(equip)
+
+    dialog = MockEquipDialog(equip)
+    qtbot.addWidget(dialog)
+
+    assert not dialog._affix_rows[1]._combo_name.isEnabled()
+    assert dialog._affix_rows[1]._spin_value.isEnabled()
+
+
+def test_chengyin_retransfer_opens_only_the_existing_slot(qtbot):
+    equip = _real_equip()
+    equip["is_chengyin"] = True
+    equip["level"] = 110
+    equip["original_level"] = 110
+    equip["affix_2"]["is_transferred"] = True
+    equip["_fp"] = make_fingerprint(equip)
+
+    dialog = MockEquipDialog(equip)
+    qtbot.addWidget(dialog)
+
+    assert dialog._affix_rows[1]._combo_name.isEnabled()
+    assert all(
+        not row._combo_name.isEnabled()
+        for index, row in enumerate(dialog._affix_rows)
+        if index != 1
+    )

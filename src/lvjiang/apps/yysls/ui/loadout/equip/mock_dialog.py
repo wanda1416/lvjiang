@@ -33,7 +33,11 @@ from PyQt6.QtWidgets import (
 
 from ......i18n import tr
 from ......ui.button_styles import apply_button_style, apply_dialog_button_box_style
-from ....core.affix_cap import affix_cap_pct, affix_cap_value
+from ....core.affix_cap import (
+    affix_cap_pct,
+    affix_cap_value,
+    can_cultivate_affix_values,
+)
 from ....core.equipment_cooldown import next_cooldown_expiry
 from ...layout_helpers import fit_combo_to_contents
 
@@ -265,7 +269,7 @@ class MockEquipDialog(QDialog):
         self._delete_all_mock = delete_all_mock
 
         if self._is_real_development:
-            self.setWindowTitle(tr("养成扫描装备"))
+            self.setWindowTitle(tr("养成真实装备"))
         else:
             self.setWindowTitle(
                 tr("编辑模拟装备") if self._is_edit else tr("模拟装备"))
@@ -857,9 +861,9 @@ class MockEquipDialog(QDialog):
             self._update_dingyin_pct()
 
     def _configure_real_development(self) -> None:
-        """扫描装备只开放转律、承音和词条数值培养。"""
+        """真实装备只开放实际允许的转律、承音和数值培养。"""
         self._context_label.setText(tr(
-            "扫描装备的既定属性不可修改  ·  "
+            "真实装备的既定属性不可修改  ·  "
             "仅支持转律、承音和词条数值培养"
         ))
         for widget in (
@@ -874,6 +878,8 @@ class MockEquipDialog(QDialog):
 
         dingyin = self._equip_data.get("dingyin") or {}
         has_dingyin = bool(dingyin.get("name"))
+        can_grow_values = can_cultivate_affix_values(self._equip_data)
+        # 满定音与满承音是两条独立假设；普通定音不要求装备已经承音。
         self._spin_dingyin.setEnabled(has_dingyin)
         if has_dingyin:
             self._spin_dingyin.setMinimum(float(dingyin.get("value") or 0.0))
@@ -901,30 +907,65 @@ class MockEquipDialog(QDialog):
         self._check_chengyin.toggled.connect(
             self._on_real_chengyin_toggled)
 
-        transferred = [
-            index for index in range(1, 6)
-            if bool((self._equip_data.get(f"affix_{index}") or {}).get(
-                "is_transferred"))
-        ]
-        fixed_transfer = transferred[0] if len(transferred) == 1 else None
+        from ....core.loadout.transmute import (
+            judge_transmute_eligibility,
+            transmute_candidates,
+            transmute_target_value,
+        )
+
+        game_config = get_game_config()
+        eligibility = judge_transmute_eligibility(
+            self._equip_data, game_config)
+        candidates = (
+            transmute_candidates(
+                self._equip_data, game_config, slots=eligibility.slots)
+            if eligibility.eligible else {}
+        )
+        transmutable_slots = set(candidates)
         for index, row in enumerate(self._affix_rows, 1):
             old = self._equip_data.get(f"affix_{index}") or {}
             if not old.get("name"):
-                row._combo_name.setEnabled(False)
-                row._spin_value.setEnabled(False)
+                row.setEnabled(False)
                 continue
+
+            # 与毕业率转律建议使用同一候选集，避免真实装备编辑能选到精准等
+            # 游戏转律词库不会产出的词条。原词条保留为“取消修改”的入口。
+            old_name = str(old.get("name") or "")
+            choices = [old_name, *candidates.get(index, [])]
+            row._combo_name.blockSignals(True)
+            row._combo_name.clear()
+            for name in choices:
+                row._combo_name.addItem(name, name)
+            row._combo_name.setCurrentIndex(0)
+            fit_combo_to_contents(row._combo_name, minimum=220)
+            row._combo_name.blockSignals(False)
+
             def update_minimum(_index=0, *, item=row, original=old):
+                selected = item._combo_name.currentData()
+                unchanged = selected == original.get("name")
                 minimum = (float(original.get("value") or 0.0)
-                           if item._combo_name.currentData() == original.get("name")
-                           else 0.0)
+                           if unchanged else 0.0)
                 item._spin_value.setMinimum(minimum)
-                item._prefill_value()
+                if not unchanged and selected:
+                    target = transmute_target_value(
+                        selected, self._get_level(),
+                        bool(self._equip_data.get("is_chengyin")), game_config)
+                    item._spin_value.setValue(float(target or 0.0))
+                elif can_grow_values:
+                    item._prefill_value()
+                else:
+                    # disabled 只阻止用户输入，不能阻止 radio/下拉信号程序化改值。
+                    item._spin_value.setValue(
+                        float(original.get("value") or 0.0))
+                item._spin_value.setEnabled(
+                    can_grow_values or not unchanged)
 
             row._combo_name.currentIndexChanged.connect(update_minimum)
             update_minimum()
-            # 宫不可转律；已有转律槽时只能继续修改该固定槽。
-            row._combo_name.setEnabled(
-                index > 1 and (fixed_transfer is None or index == fixed_transfer))
+            row._combo_name.setEnabled(index in transmutable_slots)
+            # 两项都不可操作时禁用整行，让名称、数值和说明统一呈灰色。
+            row.setEnabled(
+                row._combo_name.isEnabled() or row._spin_value.isEnabled())
 
     def _on_real_chengyin_toggled(self, checked: bool) -> None:
         level = (
@@ -1232,22 +1273,27 @@ class MockEquipDialog(QDialog):
         from ....config import get_game_config
         gc = get_game_config()
         level = self._get_level()
-        for row in self._affix_rows:
-            name = row._combo_name.currentData()
-            if not name:
-                continue
-            cap = affix_cap_value(
-                level, name, chengyin=(mode == _MODE_MAX_CY), game_config=gc)
-            if cap is None:
-                continue
-            if mode in (_MODE_MAX_VAL, _MODE_MAX_CY):
-                row._spin_value.setValue(cap)
+        can_fill_affixes = (
+            not self._is_real_development
+            or can_cultivate_affix_values(self._equip_data)
+        )
+        if can_fill_affixes:
+            for row in self._affix_rows:
+                name = row._combo_name.currentData()
+                if not name:
+                    continue
+                cap = affix_cap_value(
+                    level, name, chengyin=(mode == _MODE_MAX_CY),
+                    game_config=gc)
+                if cap is None:
+                    continue
+                if mode in (_MODE_MAX_VAL, _MODE_MAX_CY):
+                    row._spin_value.setValue(cap)
         # 定音词条也同步更新（定音不受承音限制，两种模式都取上限）
         dingyin_name = self._dingyin_selected
         if dingyin_name and mode in (_MODE_MAX_VAL, _MODE_MAX_CY):
             cap = affix_cap_value(
-                level, dingyin_name, chengyin=(mode == _MODE_MAX_CY),
-                game_config=gc)
+                level, dingyin_name, chengyin=False, game_config=gc)
             if cap:
                 self._spin_dingyin.setValue(cap)
 

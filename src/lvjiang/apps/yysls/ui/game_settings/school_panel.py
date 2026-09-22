@@ -232,6 +232,7 @@ class SchoolPanel(QWidget):
         # ── 数值展示：方案为只读满值，基础属性保留可编辑能力 ──
         value_group = QGroupBox(tr("数值展示"))
         value_layout = QVBoxLayout(value_group)
+        self._value_group_layout = value_layout
         self._value_source_label = QLabel(tr("请选择方案或基础属性"))
         self._value_source_label.setStyleSheet("color: palette(mid);")
         value_layout.addWidget(self._value_source_label)
@@ -674,22 +675,32 @@ class SchoolPanel(QWidget):
 
     def _clear_ps_editor(self):
         """清空共享数值展示区。"""
-        while self._value_content_layout.count():
-            item = self._value_content_layout.takeAt(0)
-            if item.widget():
-                widget = item.widget()
-                # deleteLater() 要等事件循环返回才生效；切换列表时新旧面板会短暂
-                # 叠在同一个滚动区域。先隐藏并脱离父控件，保证本次刷新立即清空。
-                widget.hide()
-                widget.setParent(None)
-                widget.deleteLater()
         self._ps_edits.clear()
         self._ps_current_name = ""
         self._scheme_baseline_edit = None
-        # SetMinimumSize 会缓存内容最低高度；移除旧卡片后立即重新计算，
-        # 否则切换到空内容时外层滚动条仍停留在旧长度。
+        self._replace_value_content([])
+
+    def _replace_value_content(self, widgets: list[QWidget]) -> None:
+        """在未展示的容器里装好卡片，再一次替换，避免中途高度塌缩。"""
+        old = self._value_content_widget
+        new = QWidget()
+        layout = QVBoxLayout(new)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(6)
+        for widget in widgets:
+            layout.addWidget(widget)
+        if widgets:
+            layout.addStretch()
+        layout.activate()
+        new.adjustSize()
+        self._value_group_layout.replaceWidget(old, new)
+        new.show()
+        self._value_content_widget = new
+        self._value_content_layout = layout
+        old.hide()
+        old.setParent(None)
+        old.deleteLater()
         self._details_widget.layout().invalidate()
-        self._details_widget.adjustSize()
 
     def _on_scheme_selected(self, row: int) -> None:
         """选中方案 → 展示 Excel 输入满值（输入契约不包含食物加成）。"""
@@ -699,7 +710,9 @@ class SchoolPanel(QWidget):
         self._ps_list.blockSignals(True)
         self._ps_list.setCurrentRow(-1)
         self._ps_list.blockSignals(False)
-        self._clear_ps_editor()
+        self._ps_edits.clear()
+        self._ps_current_name = ""
+        self._scheme_baseline_edit = None
         scheme = self._scheme_list.item(row).text()
         self._value_source_label.setText(
             tr("方案：{name}（满值属性，不含食物加成）").format(name=scheme)
@@ -717,19 +730,15 @@ class SchoolPanel(QWidget):
             self._value_source_label.setText(tr("方案数值读取失败：{error}").format(
                 error=str(exc),
             ))
+            self._replace_value_content([])
             return
         from ...config import get_game_config
 
         school_attr = get_game_config().get_school_attr(school)
-        self._value_content_layout.addWidget(
-            self._create_scheme_metrics_widget(
-                school, scheme, adps, baseline_dps,
-            )
-        )
-        self._value_content_layout.addWidget(
-            self._create_standard_attrs_widget(attrs, school_attr, editable=False)
-        )
-        self._value_content_layout.addStretch()
+        self._replace_value_content([
+            self._create_scheme_metrics_widget(school, scheme, adps, baseline_dps),
+            self._create_standard_attrs_widget(attrs, school_attr, editable=False),
+        ])
 
     def _create_scheme_metrics_widget(
         self, school: str, scheme: str, adps: float, baseline_dps: float,
@@ -799,7 +808,8 @@ class SchoolPanel(QWidget):
         styles = get_play_styles(school)
         name = self._ps_list.item(row).text()
         attrs = styles.get(name, {})
-        self._clear_ps_editor()
+        self._ps_edits.clear()
+        self._scheme_baseline_edit = None
         self._ps_current_name = name
         self._value_source_label.setText(
             tr("基础属性：{name}").format(name=name))
@@ -813,8 +823,7 @@ class SchoolPanel(QWidget):
         card = self._create_standard_attrs_widget(
             combat_attrs, school_attr, editable=True,
         )
-        self._value_content_layout.addWidget(card)
-        self._value_content_layout.addStretch()
+        self._replace_value_content([card])
 
     def _create_standard_attrs_widget(
         self, attrs, school_attr: str | None, *, editable: bool,

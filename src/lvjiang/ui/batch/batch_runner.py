@@ -88,6 +88,8 @@ class BatchContext:
     window_top: int = 0
     pause_event: object = None  # threading.Event | None
     ui_callback: Callable[..., object] | None = None
+    # 条目准备重启客户端后，宿主据此把定位状态跟到新窗口。
+    window_rebind_hook: Callable[[dict], None] | None = None
 
 
 @dataclass(frozen=True)
@@ -685,6 +687,7 @@ class BatchWorker(QThread):
         # 生命周期与条目脚本必须复用宿主的主线程 UI broker；否则
         # pause/confirm 会退化为无法被 F10 关闭的系统原生阻塞框。
         engine._ui_callback = ctx.ui_callback
+        engine.window_rebind_hook = ctx.window_rebind_hook
         return engine
 
     def _run_stage(

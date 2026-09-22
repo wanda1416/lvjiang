@@ -172,6 +172,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         self.run_env = str(run_env)
         self._window_left = window_left
         self._window_top = window_top
+        # 客户端重启换窗口后由宿主同步自身窗口状态（UI 层注入）。
+        self.window_rebind_hook: Callable[[dict], None] | None = None
         self._stop_check = stop_check or (lambda: False)
         # 暂停事件（由 UI 层注入）：set=运行，clear=暂停阻塞
         self._pause_event = pause_event
@@ -231,6 +233,35 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         # UI 每 set 一次事件，引擎只往前走一条。两者都在工作流线程里触发。
         self.statement_hook: Callable[[int, dict], None] | None = None
         self.step_mode: bool = False
+
+    def rebind_target_window(self, window: dict) -> None:
+        """客户端重启后，把新窗口落到本次运行的输入与截图绑定上。
+
+        句柄和窗口原点都是运行启动时的快照。重启换了窗口不重绑，后台模式
+        会继续 PostMessage 到已销毁的句柄——底层不检查投递返回值，点击全部
+        静默落空；截图区域也还停在旧位置。批量里一旦发生，剩余条目会整批
+        空转到各处 pause，正是无人值守调度最不能接受的失败方式。
+        """
+        hwnd = int(window.get("hwnd") or 0)
+        if hwnd and getattr(self._input, "background_mode", False):
+            self._input.target_hwnd = hwnd
+        left, top = window.get("left"), window.get("top")
+        width, height = window.get("width"), window.get("height")
+        if left is not None and top is not None:
+            self._window_left = int(left)
+            self._window_top = int(top)
+            if self._workflow is not None:
+                self._workflow._window_left = self._window_left
+                self._workflow._window_top = self._window_top
+            if width is not None and height is not None:
+                self._capture.set_capture_region(
+                    int(left), int(top), int(width), int(height))
+        # 旧窗口的像素不能再代表当前画面。
+        self.clear_capture_snapshot()
+        logger.info(
+            f"[窗口重绑] hwnd={hwnd} 原点=({self._window_left},{self._window_top})")
+        if self.window_rebind_hook is not None:
+            self.window_rebind_hook(dict(window))
 
     def _ensure_workflow(self) -> BaseWorkflow:
         """懒创建 BaseWorkflow Python 门面

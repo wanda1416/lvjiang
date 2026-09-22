@@ -1102,6 +1102,25 @@ class WindowOpsMixin:
             logger.error(f"刷新截图失败: {e}")
             return None, f"截图失败: {e}"
 
+    # ─── 运行期窗口重绑 ───────────────────────────────────
+
+    def _on_target_window_rebound(self, window: dict):
+        """工作流重启客户端后回调：把定位状态挪到新窗口上。
+
+        运行在工作流线程，因此只改纯数据 `_target_window`，不碰任何控件；
+        预览、场景编辑器和下一次运行都从它取值，不然定位状态会一直停在
+        已经销毁的句柄上，直到用户手动重新定位。
+        """
+        target = self._target_window
+        if not target:
+            return
+        for key in ("hwnd", "pid", "title", "executable",
+                    "left", "top", "width", "height"):
+            if window.get(key) is not None:
+                target[key] = window[key]
+        logger.info(
+            f"[定位跟随] 客户端已重启，跟随到新窗口 hwnd={target.get('hwnd')}")
+
     # ─── Win32 工具 ───────────────────────────────────────
 
     def _refresh_window_rect(self, w: dict):

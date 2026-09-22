@@ -26,6 +26,13 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
             or prefill.get("_right_outer_pen_valid") is not True
             or prefill.get("_right_attr_pen_valid") is not True):
         raise ValueError("角色属性右侧详情识别不完整，拒绝静默覆盖基础属性")
+    required_bonus = {"crit_dmg", "intent_dmg", "outer_bonus", "attr_bonus_current"}
+    missing_bonus = required_bonus - prefill.keys()
+    if missing_bonus:
+        raise ValueError(
+            f"角色面板增减伤属性识别不完整（缺少 {', '.join(sorted(missing_bonus))}），"
+            "拒绝静默覆盖基础属性"
+        )
     username = getattr(_engine, "run_username", "")
     if not username:
         raise ValueError("任务未绑定用户，不能静默写入基础属性")
@@ -53,6 +60,9 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
     # OCR 返回百分数的面板写法（如 110.1 表示 110.1%）；战斗模型和装备贡献
     # 使用小数（1.101）。与手动创建表单的 get_panel_attrs 保持同一单位。
     panel_values = dict(prefill)
+    bonus_field = mapping.get("attr_bonus")
+    if bonus_field:
+        panel_values.setdefault(bonus_field, panel_values["attr_bonus_current"])
     for field, _, unit, _ in COMBAT_ATTR_FIELDS:
         if unit == "%" and field in panel_values:
             panel_values[field] = float(panel_values[field]) / 100.0

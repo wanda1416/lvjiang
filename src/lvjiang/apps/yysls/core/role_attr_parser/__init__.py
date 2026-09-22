@@ -6,7 +6,6 @@
 from .parser import (
     RoleAttrParser,
     get_role_attr_parser,
-    merge_scroll_snapshots,
     parse_detail1,
     parse_detail2_attack,
     parse_detail2_attr_pen,
@@ -17,7 +16,6 @@ from .parser import (
 __all__ = [
     "RoleAttrParser",
     "get_role_attr_parser",
-    "merge_scroll_snapshots",
     "parse_detail1",
     "parse_detail2_attack",
     "parse_detail2_outer_attack",

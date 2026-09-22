@@ -101,52 +101,8 @@ def _split_range(value: str) -> tuple[float | None, float | None]:
     return None, None
 
 
-def merge_scroll_snapshots(snapshots: list[str]) -> list[str]:
-    """把多屏 OCR 文本按 token（"|" 分隔）去重拼接成一份连续序列。
-
-    滚动距离为半屏，相邻两屏天然有约一半重叠内容：在新一屏 token 列表里
-    搜索"已合并列表的后缀"作为连续子串出现的位置（不要求从新一屏开头
-    对齐——滚动边界上的表头/行首文字经常被 OCR 裁出不同的残片，如
-    "体劲御敏势" 滚到只剩 "敏势" 可见，新一屏开头会多出这类噪声 token），
-    命中后只把匹配窗口之后的部分接上去，窗口之前的残片视为已见内容丢弃。
-    某一屏与上一屏完全相同（原地没滚动/多滚一次触底）时，整屏被判定为
-    全量重叠，不产生任何新增 —— 天然幂等，可直接喂多份重复文本。
-    找不到任何重叠时退化为整屏直接拼接（不静默丢数据），并记 warning。
-    """
-    merged: list[str] = []
-    for snap in snapshots:
-        if not snap:
-            continue
-        tokens = [t.strip() for t in snap.split("|") if t.strip()]
-        if not tokens:
-            continue
-        if not merged:
-            merged = tokens
-            continue
-
-        max_k = min(len(merged), len(tokens))
-        matched_end = None
-        for k in range(max_k, 0, -1):
-            suffix = merged[-k:]
-            for start in range(len(tokens) - k + 1):
-                if tokens[start:start + k] == suffix:
-                    matched_end = start + k
-                    break
-            if matched_end is not None:
-                break
-
-        if matched_end is None:
-            logger.warning(
-                f"merge_scroll_snapshots: 未找到重叠，直接拼接（可能丢失连续性）: {tokens[:3]}..."
-            )
-            merged.extend(tokens)
-        else:
-            merged.extend(tokens[matched_end:])
-    return merged
-
-
 def parse_detail1(tokens: list[str]) -> dict[str, float]:
-    """解析合并去重后的 detail_1 token 序列，提取已知字段的数值。
+    """解析单屏 detail_1 token 序列，提取已知字段的数值。
 
     命中已知标签 → 取下一个 token 做数值解析；命中不了的 token 跳过。
     """
@@ -298,10 +254,12 @@ class RoleAttrParser:
             (k for k in raw if k.startswith("left_") and raw.get(k)),
             key=lambda k: int(k.rsplit("_", 1)[-1]) if k.rsplit("_", 1)[-1].isdigit() else 0,
         )
-        snapshots = [raw[k] for k in left_keys]
-        if snapshots:
-            tokens = merge_scroll_snapshots(snapshots)
-            result.update(parse_detail1(tokens))
+        if left_keys:
+            # 各屏独立提取完整的标签和值；后一次有效识别可纠正前一屏 OCR 错字。
+            # 不按重叠 token 裁剪，否则相同的数值可能误删新屏的正确标签。
+            for key in left_keys:
+                tokens = [t.strip() for t in raw[key].split("|") if t.strip()]
+                result.update(parse_detail1(tokens))
         else:
             logger.warning("RoleAttrParser.parse: 未找到任何 left_* 快照")
 

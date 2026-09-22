@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from itertools import combinations
 
 from ...config.models import LevelConfig
-from ..equip_parser.dingyin_parser import is_zhige_dingyin
+from ..equip_parser.dingyin_parser import has_any_dingyin
 
 _EPSILON = 1e-6
 _KNOWN_QUALITIES = frozenset({"gold", "purple", "blue", "green"})
@@ -53,10 +53,13 @@ def _affixes(equip: dict) -> list[dict] | None:
 
 
 def _has_dingyin(equip: dict) -> bool:
-    dingyin = equip.get("dingyin")
-    return (
-        isinstance(dingyin, dict) and bool(dingyin.get("name"))
-    ) or is_zhige_dingyin(equip)
+    """承音资格只问「定过音没有」，两种定音都算。
+
+    这和毕业率候选池的「已定音」筛选不是一回事：那边问的是对 PVE 毕业率有没有
+    贡献，止戈目前贡献为 0 所以不算；这边是游戏规则层面的合并资格。直接看数据槽
+    而不看 _extra 派生标记——标记要等下次加载才刷新，切换定音后会短暂对不上。
+    """
+    return has_any_dingyin(equip)
 
 
 def _eligible(equip: dict, levels: dict[int, LevelConfig]) -> bool:

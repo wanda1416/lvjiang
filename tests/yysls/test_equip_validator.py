@@ -272,11 +272,12 @@ class TestHistoricalDiscovery:
             ZHIGE_DINGYIN_KEY,
         )
 
+        # 历史记录：只有旧的止戈标记，没有新的定音种类和止戈数据槽。
         equip = {
             "type": "环",
             "affix_1": {"name": "会心率", "value": 1.0},
-            "dingyin": {"name": "止戈特殊效果", "value": 999},
-            "_extra": {},
+            "affix_2": {"name": "会心率", "value": 1.0},
+            "_extra": {ZHIGE_DINGYIN_KEY: True},
         }
         state = SimpleNamespace(equipment_items={"fp": equip})
         inventory = EquipmentInventory.__new__(EquipmentInventory)
@@ -286,6 +287,8 @@ class TestHistoricalDiscovery:
 
         assert ILLEGAL_KEY in equip["_extra"]
         assert equip["_extra"][ZHIGE_DINGYIN_KEY] is True
+        # 加载时补出止戈数据槽，历史装备不必重扫也能正常展示。
+        assert equip["dingyin_zhige"]["name"]
 
     def test_one_dirty_item_does_not_skip_later_items(self, monkeypatch):
         from lvjiang.apps.yysls.core import equip_validator

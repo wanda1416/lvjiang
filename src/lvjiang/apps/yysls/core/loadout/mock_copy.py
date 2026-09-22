@@ -6,6 +6,7 @@ import copy
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..equip_parser.dingyin_parser import DINGYIN_TYPE_KEY
 from ..equip_parser.models import make_fingerprint
 from .models import EQUIPMENT_CREATED_AT, EQUIPMENT_UPDATED_AT
 from .repository import LoadoutRepository, stamp_equipment_write
@@ -44,6 +45,9 @@ def _comparable(equip: dict) -> dict:
     value = copy.deepcopy(equip)
     for key in _STORAGE_FIELDS:
         value.pop(key, None)
+    # 展示用的定音种类不是装备内容：两件其余完全相同、只是当前显示不同音的
+    # 模拟装备是同一件，不能报成冲突。
+    value.pop(DINGYIN_TYPE_KEY, None)
     return strip_transmute_targets(value)
 
 

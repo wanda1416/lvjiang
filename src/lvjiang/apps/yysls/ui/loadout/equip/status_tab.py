@@ -40,7 +40,7 @@ from lvjiang.ui.user_toolbar import add_user_nav_buttons
 from ......i18n import tr
 from ....config.equipment_slots import SLOT_SPECS
 from ....core.affix_cap import equip_affix_cap_pcts
-from ....core.equip_parser.dingyin_parser import is_zhige_dingyin
+from ....core.equip_parser.dingyin_parser import has_normal_dingyin
 from ...events import EQUIPMENT_CHANGED, get_event_hub
 from .batch_copy import BatchCopyMixin
 from .cards import _CompactEquipCard, _SlotCard
@@ -843,10 +843,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         # 词条筛选
         affix_filter = self._get_affix_filter()
         if affix_filter == "dingyin":
-            # 有定音词条（包含满调律）
-            dingyin = equip.get("dingyin")
-            if not (is_zhige_dingyin(equip)
-                    or bool(dingyin and dingyin.get("name"))):
+            # 只认普通定音，与毕业率候选池同一口径：止戈目前不算用户要的定音。
+            if not has_normal_dingyin(equip):
                 return False
         elif affix_filter == "full_tuning":
             # 满调律：5 条非定音词条（affix_1 到 affix_5 都有）

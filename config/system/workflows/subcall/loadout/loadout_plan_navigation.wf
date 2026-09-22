@@ -18,20 +18,18 @@ def nav_main_to_game_plans()
 end
 
 def nav_game_plans_to_main()
+    # 按既定返回路径操作，只在终点确认主页；中途 OCR 偶发漏判不应终止整批扫描。
     click [training_plan].[back] after wait @page_refresh
-    scan [training_main].[gongfa] as $gongfa by contains "功法"
-    if not $gongfa
-        return -1
-    end
     click [training_main].[back] after wait @page_refresh
-    call $in_menu = is_in_menu_page()
-    if not $in_menu
-        return -1
-    end
     click [game_menu_page].[back] after wait @page_refresh
     call $in_main = is_in_main_page()
-    if not $in_main
-        return -1
+    loop while not $in_main
+        eval $retry = confirm("未确认已返回主页。请手动回到主页后点击是重试检查；点击否结束本次扫描")
+        if not $retry
+            log warn "用户选择停止：未能确认已返回主页"
+            return -1
+        end
+        call $in_main = is_in_main_page()
     end
     return 0
 end

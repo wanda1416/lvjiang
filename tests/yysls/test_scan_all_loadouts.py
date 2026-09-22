@@ -244,6 +244,52 @@ def test_workflow_and_shared_subcalls_parse():
         parse_file(base / path)
 
 
+@pytest.mark.parametrize(
+    ("main_checks", "retry_answers", "expected", "prompt_count"),
+    [
+        ([1], [], 0, 0),
+        ([0, 1], [True], 0, 1),
+        ([0, 0, 1], [True, True], 0, 2),
+        ([0], [False], -1, 1),
+    ],
+)
+def test_return_from_game_plans_checks_only_home_and_prompts_on_mismatch(
+        monkeypatch, main_checks, retry_answers, expected, prompt_count):
+    """返回路径不依赖中间页 OCR；终点失配由用户决定重试或停止。"""
+    proc = parse_file(Path(
+        "config/system/workflows/subcall/loadout/loadout_plan_navigation.wf"
+    )).procs["nav_game_plans_to_main"]
+    engine = make_engine()
+    clicked = []
+    checks = iter(main_checks)
+    answers = iter(retry_answers)
+    prompts = []
+
+    monkeypatch.setattr(engine, "_exec_click", lambda node: clicked.append(node))
+    monkeypatch.setattr(engine, "_exec_wait", lambda _node: None)
+
+    def fake_call(node):
+        assert node.name == "is_in_main_page"
+        engine.variables[node.result_var] = next(checks)
+
+    original_eval = engine._exec_eval
+
+    def fake_eval(node):
+        if node.func_name == "confirm":
+            prompts.append(node)
+            engine.variables[node.target] = next(answers)
+        else:
+            original_eval(node)
+
+    monkeypatch.setattr(engine, "_exec_call_proc", fake_call)
+    monkeypatch.setattr(engine, "_exec_eval", fake_eval)
+    with pytest.raises(_ReturnSignal) as returned:
+        engine._exec_body(proc.body)
+    assert returned.value.value == expected
+    assert len(clicked) == 3
+    assert len(prompts) == prompt_count
+
+
 def test_game_plan_scene_loads_with_distinct_popup_views():
     registry = SceneRegistry()
     main = registry.get_scene("training_main")

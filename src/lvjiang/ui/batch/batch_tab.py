@@ -13,6 +13,7 @@ import json
 import math
 import random
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, cast
 
 from loguru import logger
@@ -132,6 +133,20 @@ def _four_cjk_column_width(widget: QWidget) -> int:
     )
 
 
+@dataclass(frozen=True)
+class ProfileOrderStatus:
+    """右键「指定顺序排序」当前的可用性。
+
+    配置组没有指定排序时，这个动作对当前数据根本不适用，隐藏；配置了但
+    Profile 定义已被删除属于「功能存在、此刻不可用」，保留并置灰，把原因
+    写在菜单项上，不让用户点了才发现没反应。
+    """
+
+    visible: bool = False
+    enabled: bool = False
+    reason: str = ""
+
+
 class _ReorderTreeWidget(QTreeWidget):
     """Flat tree that reports a completed internal drag/drop reorder."""
 
@@ -143,7 +158,8 @@ class _ReorderTreeWidget(QTreeWidget):
     def __init__(self, parent: QWidget | None = None, *, profile_order: bool = False) -> None:
         super().__init__(parent)
         self._profile_order = profile_order
-        self.profile_order_available = False
+        # 菜单弹出时现算：Profile 定义可能在别处被删，缓存值会过期。
+        self.profile_order_status: Callable[[], ProfileOrderStatus] | None = None
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_order_menu)
 
@@ -166,11 +182,19 @@ class _ReorderTreeWidget(QTreeWidget):
         menu.addAction(restore_action)
         menu.addAction(shuffle_action)
         if self._profile_order:
-            profile_action = QAction(tr("指定顺序排序"), menu)
-            profile_action.setEnabled(has_rows and self.profile_order_available)
-            profile_action.triggered.connect(
-                lambda _checked=False: self.profile_order_requested.emit())
-            menu.addAction(profile_action)
+            status = (self.profile_order_status() if self.profile_order_status
+                      else ProfileOrderStatus())
+            if status.visible:
+                text = tr("指定顺序排序")
+                if status.reason:
+                    text += f"（{status.reason}）"
+                profile_action = QAction(text, menu)
+                profile_action.setEnabled(has_rows and status.enabled)
+                profile_action.setToolTip(status.reason)
+                profile_action.triggered.connect(
+                    lambda _checked=False: self.profile_order_requested.emit())
+                menu.addAction(profile_action)
+                menu.setToolTipsVisible(True)
         viewport = cast(QWidget, self.viewport())
         menu.exec(viewport.mapToGlobal(position))
 
@@ -561,6 +585,7 @@ class BatchTab(QWidget):
             self._shuffle_user_order)
         self._user_list.profile_order_requested.connect(
             self._sort_user_order_by_profile)
+        self._user_list.profile_order_status = self._profile_order_status
         layout.addWidget(self._user_list, stretch=1)
 
         self._user_order: list[str] = []
@@ -629,8 +654,6 @@ class BatchTab(QWidget):
             max(0, self._profile_sort_direction.findData(direction)))
         self._profile_sort_key.blockSignals(False)
         self._profile_sort_direction.blockSignals(False)
-        self._user_list.profile_order_available = bool(
-            selected_key and any(definition.key == selected_key for definition in definitions))
         for key, label in self._workflow_labels.items():
             path = getattr(item.workflows, key) if item is not None else ""
             label.setText(path or tr("未配置"))
@@ -779,13 +802,6 @@ class BatchTab(QWidget):
         item.profile_sort_direction = str(
             self._profile_sort_direction.currentData() or "asc")
         save_batch_config(cfg)
-        try:
-            available = bool(
-                item.profile_sort_key and
-                get_profile_config().get_key(item.profile_sort_key) is not None)
-        except (OSError, ValueError):
-            available = False
-        self._user_list.profile_order_available = available
 
     def _current_config_name(self) -> str:
         """获取当前选中的配置名"""
@@ -927,6 +943,28 @@ class BatchTab(QWidget):
         finally:
             self._updating_user_list = False
         self._sync_user_order_from_rows()
+
+    def _profile_order_status(self) -> ProfileOrderStatus:
+        """右键菜单弹出时判定「指定顺序排序」是否可用。
+
+        不缓存：Profile 定义可能在定义编辑器里被删掉，而批量页收不到通知。
+        """
+        cfg = load_batch_config()
+        group = cfg.configs.get(self._current_config_name())
+        key = group.profile_sort_key if group is not None else ""
+        if not key:
+            # 当前配置组没有指定排序，这个动作无从谈起。
+            return ProfileOrderStatus()
+        try:
+            exists = get_profile_config().get_key(key) is not None
+        except (OSError, ValueError) as exc:
+            logger.warning(f"读取 Profile 定义失败，指定排序不可用: {exc}")
+            exists = False
+        if not exists:
+            return ProfileOrderStatus(
+                visible=True, enabled=False,
+                reason=tr("Profile 定义已不存在"))
+        return ProfileOrderStatus(visible=True, enabled=True)
 
     def _sort_user_order_by_profile(self) -> None:
         """按当前配置的 Profile 数值对用户行执行一次稳定排序。"""

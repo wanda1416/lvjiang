@@ -201,7 +201,10 @@ class LoadoutPanel(QWidget):
                       self._playstyle):
             field.setReadOnly(True)
             field.setEnabled(False)
-            field.setMinimumWidth(100)
+            field.setMinimumWidth(80)
+        # 仅移动“方案/弓玦”的显示位置；控件仍由战斗属性页持有，
+        # 其计算、选择与持久化路径均不因所在行改变。
+        self._plan_row = plan_row
         root.addLayout(plan_row)
 
         # Row 3: always-visible assumptions + public metrics.
@@ -223,6 +226,7 @@ class LoadoutPanel(QWidget):
 
         self._splitter = QSplitter()
         self._left_shell = self._make_combat_shell()
+        self._attach_plan_controls()
         self._attach_assumption_controls()
         self._right_shell = self._make_equipment_shell()
         # 装备页需要战斗属性页的假设副本：由面板显式注入，不靠 findChildren
@@ -281,6 +285,12 @@ class LoadoutPanel(QWidget):
         for control in controls:
             self._assumption_layout.addWidget(control)
         self._assumption_layout.addStretch()
+
+    def _attach_plan_controls(self) -> None:
+        combat = self._character._combat_attrs_tab
+        self._plan_row.addSpacing(8)
+        self._plan_row.addWidget(combat._plan_scheme_field, 1)
+        self._plan_row.addWidget(combat._plan_gongjue_field, 1)
 
     def _make_combat_shell(self) -> QWidget:
         shell = QWidget()

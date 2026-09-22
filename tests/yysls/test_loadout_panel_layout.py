@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QPushButton
 
@@ -84,6 +85,44 @@ def test_plan_row_only_exposes_create_manage_and_read_only_details(qtbot):
     assert all(isinstance(widget, QLineEdit) for widget in fields)
     assert all(widget.isReadOnly() and not widget.isEnabled()
                for widget in fields)
+    combat = panel._character._combat_attrs_tab
+    assert row.indexOf(combat._plan_scheme_field) > row.indexOf(panel._playstyle)
+    assert row.indexOf(combat._plan_gongjue_field) > row.indexOf(
+        combat._plan_scheme_field)
+    assert combat._select_group.title() == "当前属性"
+    assert combat._select_layout.count() == 2
+    assert [combat._select_layout.itemAt(i).widget() for i in range(2)][1] is (
+        combat._btn_edit_play_style)
+
+
+@pytest.mark.parametrize("school", ["测试流派", ""])
+def test_edit_attrs_opens_school_config_without_selected_attr(
+    qtbot, monkeypatch, school,
+):
+    from lvjiang.apps.yysls.ui import game_settings
+
+    panel = LoadoutPanel(_Host())
+    qtbot.addWidget(panel)
+    combat = panel._character._combat_attrs_tab
+    combat._current_school_name = school
+    combat._combo_play_style.clear()
+    opened = []
+
+    class _Dialog:
+        def __init__(self, parent):
+            assert parent is panel._host
+
+        def select_school_base_attr(self, school, base_attr):
+            opened.append((school, base_attr))
+
+        def exec(self):
+            return 0
+
+    monkeypatch.setattr(game_settings, "GameConfigDialog", _Dialog)
+    monkeypatch.setattr(combat, "_refresh_play_styles", lambda: None)
+    monkeypatch.setattr(combat, "_refresh_display", lambda: None)
+    combat._on_edit_play_style()
+    assert opened == [(school or None, "")]
 
 
 def test_panel_loads_one_inventory_per_refresh_and_shares_it(qtbot, tmp_path, monkeypatch):

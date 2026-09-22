@@ -70,35 +70,10 @@ class PlayStyleDialogMixin:
         """Return the concrete QWidget host expected by Qt dialog APIs."""
         return cast(QWidget, self)
 
-    def _on_create_play_style(self):
-        """创建基础属性按钮 → 弹出对话框。"""
-        school = self._get_current_school()
-        if not school:
-            QMessageBox.warning(
-                self._play_style_dialog_parent(),
-                tr("无法创建"),
-                tr("请先选择一个流派"),
-            )
-            return
-
-        # 获取流派属性
-        from ....config import get_game_config, get_play_styles
-        gc = get_game_config()
-        school_attr = gc.get_school_attr(school)
-
-        dlg = _CreatePlayStyleDialog(
-            self._play_style_dialog_parent(),
-            school_attr=school_attr,
-            existing_names=list(get_play_styles(school)),
-        )
-        self._finish_play_style_dialog(school, dlg)
-
     def _on_open_play_style_form(self, prefill: dict):
         """工作流触发（open_play_style_form 信号）→ 弹出对话框并预填 OCR 识别结果。
 
-        与手动点击「创建基础属性」按钮走同一套保存尾逻辑，唯一区别是
-        对话框构造时带上 initial_values 预填。当前未选择流派时提示用户
-        先选择，不静默丢弃识别结果。
+        当前未解析出流派时提示用户先确定方案武学，不静默丢弃识别结果。
         """
         school = self._get_current_school()
         if not school:
@@ -130,8 +105,7 @@ class PlayStyleDialogMixin:
     ):
         """展示对话框并处理保存：重名检查、反推基础值、写入、刷新。
 
-        手动按钮（_on_create_play_style）和工作流预填触发
-        （_on_open_play_style_form）共用保存逻辑。工作流触发时必须非模态：
+        工作流预填触发时必须非模态：
         自动化本身不等待表单，主窗口也不能因表单而被禁用。
         """
         if workflow_triggered:

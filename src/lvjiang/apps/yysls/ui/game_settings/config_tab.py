@@ -116,7 +116,9 @@ class GameConfigTab(QWidget):
             self._tabs.setCurrentWidget(self._season_panel)
         return error
 
-    def select_school_base_attr(self, school: str, base_attr: str) -> None:
-        """切换到流派配置，并定位指定基础属性。"""
+    def select_school_base_attr(
+        self, school: str | None, base_attr: str | None,
+    ) -> None:
+        """切换到流派配置；有指定属性时再定位。"""
         self._tabs.setCurrentWidget(self._school_panel)
         self._school_panel.select_school_base_attr(school, base_attr)

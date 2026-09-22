@@ -1,8 +1,7 @@
 """燕云「战斗属性」Tab
 
-展示角色最终战斗属性（基础属性 + 装备 + 弓玦），支持：
-- 选择流派 / 基础属性 / 弓玦 / 方案
-- 创建基础属性（弹出对话框输入面板属性，反推基础属性并保存）
+展示角色最终战斗属性（基础属性 + 装备 + 弓玦），支持选择基础属性。
+流派由备战方案的武学组合派生，方案与弓玦控件由外层备战方案行承载。
 """
 from __future__ import annotations
 
@@ -17,7 +16,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMenu,
-    QMessageBox,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -190,23 +188,15 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         btn_row.addStretch()
         layout.addWidget(self._toolbar_widget)
 
-        # ── 当前配置 ──
-        select_group = QGroupBox(tr("当前配置"))
+        # ── 当前属性 ──
+        select_group = QGroupBox(tr("当前属性"))
         self._select_group = select_group
         select_layout = QGridLayout(select_group)
         self._select_layout = select_layout
         select_layout.setContentsMargins(14, 14, 14, 12)
         select_layout.setSpacing(8)
 
-        school_field = QWidget()
-        school_layout = QHBoxLayout(school_field)
-        school_layout.setContentsMargins(0, 0, 0, 0)
-        school_layout.addWidget(QLabel(tr("流派")))
-        self._combo_school = QComboBox()
-        self._combo_school.setMinimumWidth(84)
-        self._combo_school.setMinimumHeight(30)
-        self._combo_school.currentTextChanged.connect(self._on_school_changed)
-        school_layout.addWidget(self._combo_school, 1)
+        self._current_school_name = ""
 
         base_field = QWidget()
         base_layout = QHBoxLayout(base_field)
@@ -220,12 +210,12 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
         self._btn_edit_play_style = QPushButton(tr("编辑属性"))
         self._btn_edit_play_style.setMinimumHeight(30)
-        self._btn_edit_play_style.setToolTip(tr("在游戏配置中编辑当前属性"))
+        self._btn_edit_play_style.setToolTip(tr("打开游戏配置中的流派配置与基础属性"))
         self._btn_edit_play_style.clicked.connect(self._on_edit_play_style)
         apply_button_style(self._btn_edit_play_style, variant="neutral")
 
-        gongjue_field = QWidget()
-        gongjue_layout = QHBoxLayout(gongjue_field)
+        self._plan_gongjue_field = QWidget()
+        gongjue_layout = QHBoxLayout(self._plan_gongjue_field)
         gongjue_layout.setContentsMargins(0, 0, 0, 0)
         gongjue_layout.addWidget(QLabel(tr("弓玦")))
         self._combo_gongjue = QComboBox()
@@ -238,8 +228,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._combo_gongjue.currentTextChanged.connect(self._on_gongjue_changed)
         gongjue_layout.addWidget(self._combo_gongjue, 1)
 
-        scheme_field = QWidget()
-        scheme_layout = QHBoxLayout(scheme_field)
+        self._plan_scheme_field = QWidget()
+        scheme_layout = QHBoxLayout(self._plan_scheme_field)
         scheme_layout.setContentsMargins(0, 0, 0, 0)
         scheme_layout.addWidget(QLabel(tr("方案")))
         self._combo_scheme = QComboBox()
@@ -248,19 +238,9 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._combo_scheme.currentTextChanged.connect(self._on_scheme_changed)
         scheme_layout.addWidget(self._combo_scheme, 1)
 
-        self._btn_create_play = QPushButton(tr("新建属性"))
-        self._btn_create_play.setMinimumHeight(30)
-        self._btn_create_play.clicked.connect(self._on_create_play_style)
-        apply_button_style(self._btn_create_play)
-
-        self._config_fields = (
-            school_field, base_field, self._btn_edit_play_style,
-            gongjue_field, scheme_field, self._btn_create_play,
-        )
-        for col, widget in enumerate(self._config_fields):
-            select_layout.addWidget(widget, 0, col)
-        for col in range(6):
-            select_layout.setColumnStretch(col, 1)
+        select_layout.addWidget(base_field, 0, 0)
+        select_layout.addWidget(self._btn_edit_play_style, 0, 1)
+        select_layout.setColumnStretch(0, 1)
 
         self._config_row = QWidget()
         config_row_layout = QHBoxLayout(self._config_row)
@@ -361,29 +341,15 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
     def _load_data(self, *, refresh_display: bool = True):
         """加载数据并刷新显示"""
-        self._refresh_schools()
+        self._current_school_name = ""
         self._refresh_play_styles()
         self._refresh_schemes()
         self._restore_selection()
         if refresh_display:
             self._refresh_display()
 
-    def _refresh_schools(self):
-        """刷新流派下拉"""
-        from ....config import get_game_config
-        gc = get_game_config()
-        schools = gc.get_schools()
-
-        self._combo_school.blockSignals(True)
-        self._combo_school.clear()
-        self._combo_school.addItem("")
-        for name in schools:
-            self._combo_school.addItem(name)
-        fit_combo_to_contents(self._combo_school, minimum=84)
-        self._combo_school.blockSignals(False)
-
     def _refresh_play_styles(self):
-        """刷新基础属性下拉（根据当前选择的流派）。"""
+        """刷新基础属性下拉（根据当前方案派生的流派）。"""
         from ....config import get_play_styles
 
         school = self._get_current_school()
@@ -397,9 +363,6 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
         fit_combo_to_contents(self._combo_play_style, minimum=104)
         self._combo_play_style.blockSignals(False)
-        self._btn_edit_play_style.setEnabled(
-            bool(school and self._combo_play_style.currentText())
-        )
 
     def _refresh_schemes(self):
         """刷新当前流派的毕业率方案；有配置时默认选中第一项。"""
@@ -415,37 +378,25 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._combo_scheme.blockSignals(False)
 
     def _get_current_school(self) -> str | None:
-        """获取当前选择的流派"""
-        school = self._combo_school.currentText()
-        return school if school else None
-
-    def _on_school_changed(self, _school: str):
-        """流派切换 → 刷新基础属性和方案下拉。"""
-        self._refresh_play_styles()
-        self._refresh_schemes()
-        self._refresh_display()
-        self._save_selection()
+        """获取由当前方案武学组合派生的流派。"""
+        return self._current_school_name or None
 
     def _on_play_style_changed(self, _name: str):
         """基础属性切换。"""
-        self._btn_edit_play_style.setEnabled(
-            bool(_name and self._get_current_school())
-        )
         self._refresh_display()
         self._save_selection()
 
     def _on_edit_play_style(self) -> None:
-        """打开游戏配置，并定位到当前流派的当前基础属性。"""
+        """打开流派配置；存在已选属性时才定位到该属性。"""
         school = self._get_current_school()
         play_style = self._combo_play_style.currentText()
-        if not school or not play_style:
-            QMessageBox.warning(self, tr("无法编辑"), tr("请先选择属性"))
-            return
         from ...game_settings import GameConfigDialog
 
         dialog = GameConfigDialog(parent=self._host)
         dialog.select_school_base_attr(school, play_style)
         dialog.exec()
+        if not school:
+            return
         self._refresh_play_styles()
         index = self._combo_play_style.findText(play_style)
         if index >= 0:
@@ -651,13 +602,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             self._restoring = True
             resistance_only = selection.get("resistance_only", False)
 
-            # 流派由当前方案的主副武学派生，不读取用户级旧选择。
-            if school:
-                idx = self._combo_school.findText(school)
-                if idx >= 0:
-                    self._combo_school.setCurrentIndex(idx)
-            else:
-                self._combo_school.setCurrentIndex(0)
+            # 流派由当前方案的主副武学派生，不提供第二个可编辑入口。
+            self._current_school_name = school or ""
             self._refresh_play_styles()
             self._refresh_schemes()
 

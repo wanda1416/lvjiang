@@ -130,11 +130,14 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
         "attr_bonus_current": 15.0,
         "outer_pen": 58.4,
         "_right_outer_valid": True,
+        "_right_attr_attack_valid": True,
         "_right_outer_pen_valid": True,
         "_right_attr_pen_valid": True,
     }
     with pytest.raises(ValueError, match="右侧详情"):
         _save_scanned_base_attrs(engine, {**parsed, "_right_outer_valid": False})
+    with pytest.raises(ValueError, match="右侧详情"):
+        _save_scanned_base_attrs(engine, {**parsed, "_right_attr_attack_valid": False})
     for missing in ("crit_dmg", "attr_bonus_current"):
         with pytest.raises(ValueError, match="增减伤属性识别不完整"):
             _save_scanned_base_attrs(engine, {
@@ -330,6 +333,7 @@ def test_silent_base_subtracts_only_bound_plan_equipment(tmp_path, monkeypatch):
         "crit_dmg": 50.0, "intent_dmg": 40.0,
         "outer_bonus": 0.0, "attr_bonus_current": 15.0,
         "_right_outer_valid": True,
+        "_right_attr_attack_valid": True,
         "_right_outer_pen_valid": True,
         "_right_attr_pen_valid": True,
     })

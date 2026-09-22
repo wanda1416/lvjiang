@@ -4,7 +4,7 @@
 def capture_role_base_attrs($scroll_count)
     eval $data = {}
     eval $got_outer_attack = false
-    eval $got_attack = false
+    eval $got_attr_attack = false
     eval $got_outer_pen = false
     eval $got_attr_pen = false
     eval $previous = ""
@@ -29,13 +29,13 @@ def capture_role_base_attrs($scroll_count)
                 eval $got_outer_attack = true
             end
         end
-        if not $got_attack
+        if not $got_attr_attack
             find [role_detail].[detail_1] as $f by contains "属性攻击"
             if $f
                 click $f after wait stable @page_refresh
                 scan [role_detail].[detail_2] as $r2
-                eval $data.right_attack = $r2.detail_2
-                eval $got_attack = true
+                eval $data.right_attr_attack = $r2.detail_2
+                eval $got_attr_attack = true
             end
         end
         if not $got_outer_pen
@@ -68,11 +68,15 @@ def capture_role_base_attrs($scroll_count)
         end
         eval $i = $i + 1
     end
+    # 四段右区详情独立解析和校验；左区的汇总值不能替代右区的基础/分流派数值。
+    # 属性攻击至少要识别一门流派的完整区间；仅识别无相攻击不算成功。
     eval $parsed = to_role_base_attrs($data)
     eval $outer_detail = to_role_base_attrs({"right_outer_attack": $data.right_outer_attack})
+    eval $attr_attack_detail = to_role_base_attrs({"right_attr_attack": $data.right_attr_attack})
     eval $outer_pen_detail = to_role_base_attrs({"right_outer_pen": $data.right_outer_pen})
     eval $attr_pen_detail = to_role_base_attrs({"right_attr_pen": $data.right_attr_pen})
     eval $parsed._right_outer_valid = has_key($outer_detail, "min_outer") and has_key($outer_detail, "max_outer")
+    eval $parsed._right_attr_attack_valid = (has_key($attr_attack_detail, "min_mingjin") and has_key($attr_attack_detail, "max_mingjin")) or (has_key($attr_attack_detail, "min_lieshi") and has_key($attr_attack_detail, "max_lieshi")) or (has_key($attr_attack_detail, "min_qiansi") and has_key($attr_attack_detail, "max_qiansi")) or (has_key($attr_attack_detail, "min_pozhu") and has_key($attr_attack_detail, "max_pozhu"))
     eval $parsed._right_outer_pen_valid = has_key($outer_pen_detail, "outer_pen")
     eval $parsed._right_attr_pen_valid = len(keys($attr_pen_detail)) > 0
     return $parsed

@@ -12,7 +12,7 @@ import pytest
 from lvjiang.apps.yysls.core.role_attr_parser.parser import (
     RoleAttrParser,
     parse_detail1,
-    parse_detail2_attack,
+    parse_detail2_attr_attack,
     parse_detail2_attr_pen,
     parse_detail2_outer_attack,
     parse_detail2_outer_pen,
@@ -33,7 +33,7 @@ LEFT_SNAPSHOTS = [
     "会意伤害加成 | 30.2% | 外功伤害加成 | 0.0% | 外功伤害减免 | 0.0% | 属攻伤害加成 | 4.1% | 属攻伤害减免 | 0.0% | 增疗效果 | 属性治疗 | 123-123 | 会心治疗加成 | 50.0% | 外功治疗加成 | 0.0% | 属攻治疗加成 | 4.1%",
 ]
 
-RIGHT_ATTACK = (
+RIGHT_ATTR_ATTACK = (
     "220-443 | 属性攻击 | 在对应的武学天赋解锁后，就可以基于全部 | 属性攻击造成额外伤害。 | "
     "每门武学还可以额外提升一种属性攻击的伤 | 害效果。 | 当前各属攻生效数值 | "
     "鸣金攻击：170-343(170-343) | 裂石攻击：0-0(0-0) | 牵丝攻击：50-100(50-100) | 破竹攻击：0-0(0-0) | "
@@ -63,7 +63,7 @@ RIGHT_ATTR_PEN = (
 def _raw_dict() -> dict:
     raw = {f"left_{i + 1}": text for i, text in enumerate(LEFT_SNAPSHOTS)}
     raw["right_outer_attack"] = RIGHT_OUTER_ATTACK
-    raw["right_attack"] = RIGHT_ATTACK
+    raw["right_attr_attack"] = RIGHT_ATTR_ATTACK
     raw["right_outer_pen"] = RIGHT_OUTER_PEN
     raw["right_attr_pen"] = RIGHT_ATTR_PEN
     return raw
@@ -152,6 +152,39 @@ def test_scan_reads_outer_attack_before_attribute_attack():
     attr_find = 'by contains "属性攻击"'
     assert workflow.index(outer_find) < workflow.index(attr_find)
     assert "eval $data.right_outer_attack = $r2.detail_2" in workflow
+    assert "eval $data.right_attr_attack = $r2.detail_2" in workflow
+
+
+@pytest.mark.parametrize(
+    ("attr_attack", "expected"),
+    [
+        ("", False),
+        ("无相攻击：79-225", False),
+        ("鸣金攻击：170-343", True),
+        ("裂石攻击：0-0", True),
+        ("牵丝攻击：50-100", True),
+        ("破竹攻击：538-1342", True),
+        ("鸣金攻击：无法识别", False),
+    ],
+)
+def test_scan_requires_parsed_school_attack_detail(attr_attack, expected):
+    """运行生产 DSL 校验：无相或只有攻击标签，不能冒充流派属性攻击。"""
+    proc = parse_file(
+        SYSTEM_CONFIG_DIR / "workflows/subcall/loadout/role_base_attr_scan.wf"
+    ).procs["capture_role_base_attrs"]
+    parse_index = next(
+        index for index, node in enumerate(proc.body)
+        if isinstance(node, Eval) and node.target == "parsed"
+    )
+    engine = make_engine()
+    engine.variables = {"data": {
+        "right_outer_attack": RIGHT_OUTER_ATTACK,
+        "right_attr_attack": attr_attack,
+        "right_outer_pen": RIGHT_OUTER_PEN,
+        "right_attr_pen": RIGHT_ATTR_PEN,
+    }}
+    engine._exec_body(proc.body[parse_index:-1])
+    assert engine.variables["parsed"]["_right_attr_attack_valid"] is expected
 
 
 def test_scan_reads_initial_role_page_before_scrolling():
@@ -206,9 +239,9 @@ def test_role_scan_stops_on_identical_text_without_extra_drag(
     assert engine.variables["data"]["left_1"] == snapshots[0]
 
 
-class TestParseDetail2Attack:
+class TestParseDetail2AttrAttack:
     def test_extracts_all_schools(self):
-        result = parse_detail2_attack(RIGHT_ATTACK)
+        result = parse_detail2_attr_attack(RIGHT_ATTR_ATTACK)
         assert result["min_mingjin"] == 170.0
         assert result["max_mingjin"] == 343.0
         assert result["min_lieshi"] == 0.0
@@ -221,7 +254,7 @@ class TestParseDetail2Attack:
         assert result["max_wuxiang"] == 0.0
 
     def test_empty_text(self):
-        assert parse_detail2_attack("") == {}
+        assert parse_detail2_attr_attack("") == {}
 
     def test_real_ocr_text_with_fullwidth_parentheses(self):
         text = (
@@ -230,7 +263,7 @@ class TestParseDetail2Attack:
             "牵丝攻击： 0-0（0-0) | 破竹攻击：538-1342（538-1342） | "
             "无相攻击：79-225（可根据当前使用武学， | 提升相应流派属性攻击）"
         )
-        result = parse_detail2_attack(text)
+        result = parse_detail2_attr_attack(text)
         assert result["min_pozhu"] == 538.0
         assert result["max_pozhu"] == 1342.0
         assert result["min_wuxiang"] == 79.0
@@ -244,7 +277,7 @@ class TestParseDetail2Attack:
             "鸣金攻击：← 1500 | 裂石攻击：0-0(0-0) | 牵丝攻击：50-100(50-100) | "
             "破竹攻击：0-0(0-0) | 无相攻击：0-0(可根据当前使用武学，提升 | 相应流派属性攻击)"
         )
-        result = parse_detail2_attack(text)
+        result = parse_detail2_attr_attack(text)
         assert result["min_mingjin"] == 1500.0
         assert result["max_mingjin"] == 1500.0
         assert result["min_lieshi"] == 0.0
@@ -334,7 +367,7 @@ class TestParseIntegration:
 
     def test_missing_detail2_no_school_breakdown(self, parser):
         raw = _raw_dict()
-        del raw["right_attack"]
+        del raw["right_attr_attack"]
         result = parser.parse(raw)
         assert "min_mingjin" not in result
         # 但通用兜底 key 仍来自 detail_1

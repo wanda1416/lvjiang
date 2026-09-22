@@ -6,8 +6,12 @@ import copy
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..equip_parser.dingyin_parser import DINGYIN_TYPE_KEY
+from ..equip_parser.dingyin_parser import (
+    DINGYIN_SLOT_NOTICE,
+    DINGYIN_TYPE_KEY,
+)
 from ..equip_parser.models import make_fingerprint
+from .equipment_write import DINGYIN_SLOT_KEYS
 from .models import EQUIPMENT_CREATED_AT, EQUIPMENT_UPDATED_AT
 from .repository import LoadoutRepository, stamp_equipment_write
 from .transmute import strip_transmute_targets
@@ -45,9 +49,13 @@ def _comparable(equip: dict) -> dict:
     value = copy.deepcopy(equip)
     for key in _STORAGE_FIELDS:
         value.pop(key, None)
-    # 展示用的定音种类不是装备内容：两件其余完全相同、只是当前显示不同音的
-    # 模拟装备是同一件，不能报成冲突。
+    # 展示用的定音种类和槽内的核对说明都不是装备内容：两件其余完全相同、
+    # 只是当前显示不同音或带着一条扫描提示的模拟装备是同一件，不能报成冲突。
     value.pop(DINGYIN_TYPE_KEY, None)
+    for key in DINGYIN_SLOT_KEYS:
+        slot = value.get(key)
+        if isinstance(slot, dict):
+            slot.pop(DINGYIN_SLOT_NOTICE, None)
     return strip_transmute_targets(value)
 
 

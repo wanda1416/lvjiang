@@ -44,9 +44,15 @@ DINGYIN_TYPES = (DINGYIN_NORMAL, DINGYIN_ZHIGE)
 # 将来能解析出真实名称和数值时直接往里填，消费方不用改。
 DINGYIN_ZHIGE_KEY = "dingyin_zhige"
 ZHIGE_DINGYIN_NAME = "止戈定音"
-# 非普通定音疑似 OCR 误读时的说明；不使用装备异常小标记，卡片仍直接展示
-# <止戈定音>，说明仅作为该行的提示信息。
-DINGYIN_NOTICE_KEY = "dingyin_notice"
+# 定音槽内的核对说明（数值未识别、疑似误读等）。不使用装备异常小标记，
+# 只作为该行的提示信息。
+#
+# 它存在槽里而不是 _extra 里：两种定音各自可能带着自己的说明，而合并时本次
+# 没带的那一槽是整块搬过去的，提示跟着槽走才不会丢、也不会串到另一种定音
+# 头上。放 _extra 就得靠「记得把提示和槽配对搬」，迟早漏。
+DINGYIN_SLOT_NOTICE = "notice"
+#: 历史记录里的全局提示键，读取时迁进对应槽后删除。
+LEGACY_DINGYIN_NOTICE_KEY = "dingyin_notice"
 
 
 def is_zhige_dingyin(equip_dict: dict) -> bool:
@@ -114,6 +120,35 @@ def resolve_dingyin_type(equip_dict: dict) -> str:
     return kind
 
 
+def dingyin_slot(equip_dict: dict, kind: str) -> dict:
+    """取某一种定音的数据槽；没有就是空 dict。"""
+    key = DINGYIN_ZHIGE_KEY if kind == DINGYIN_ZHIGE else "dingyin"
+    slot = equip_dict.get(key)
+    return slot if isinstance(slot, dict) else {}
+
+
+def dingyin_notice(equip_dict: dict, kind: str) -> str:
+    """某一种定音自己的核对说明。"""
+    return str(dingyin_slot(equip_dict, kind).get(DINGYIN_SLOT_NOTICE) or "")
+
+
+def _migrate_legacy_notice(equip_dict: dict, kind: str) -> None:
+    """历史记录的全局提示迁进它当时展示的那一槽。
+
+    旧模型只有一条定音，提示挂在 _extra 上也不会有歧义；双槽之后必须归位，
+    否则它会跟着装备一直显示在另一种定音头上。
+    """
+    raw_extra = equip_dict.get("_extra")
+    if not isinstance(raw_extra, dict):
+        return
+    notice = raw_extra.pop(LEGACY_DINGYIN_NOTICE_KEY, None)
+    if not notice:
+        return
+    slot = dingyin_slot(equip_dict, kind)
+    if slot and not slot.get(DINGYIN_SLOT_NOTICE):
+        slot[DINGYIN_SLOT_NOTICE] = str(notice)
+
+
 def refresh_dingyin_marker_dict(equip_dict: dict) -> bool:
     """按 dingyin_type 刷新止戈标记与历史记录的止戈槽，返回是否展示止戈。
 
@@ -124,6 +159,7 @@ def refresh_dingyin_marker_dict(equip_dict: dict) -> bool:
     kind = stored_dingyin_type(equip_dict)
     if kind == DINGYIN_ZHIGE and not has_zhige_dingyin(equip_dict):
         equip_dict[DINGYIN_ZHIGE_KEY] = {"name": ZHIGE_DINGYIN_NAME}
+    _migrate_legacy_notice(equip_dict, kind)
     raw_extra = equip_dict.get("_extra")
     extra = raw_extra if isinstance(raw_extra, dict) else {}
     if kind == DINGYIN_ZHIGE:

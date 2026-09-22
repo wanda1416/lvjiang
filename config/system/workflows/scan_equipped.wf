@@ -20,7 +20,7 @@
 default $plan_name = ""
 default $main_art = ""
 default $sub_art = ""
-import "subcall/loadout/equipped_plan_scan.wf"
+import "subcall/loadout/equipped.wf"
 
 eval $target = loadout_scan_target($plan_name, $main_art, $sub_art)
 call $written = scan_equipped_plan($target.name, $target.main_art, $target.sub_art)

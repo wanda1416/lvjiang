@@ -32,8 +32,15 @@ from ......i18n import tr
 from ......ui.button_styles import apply_dialog_button_box_style
 from ....core.affix_cap import affix_dict_cap_pct, equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import (
+    DINGYIN_NORMAL,
     DINGYIN_NOTICE_KEY,
-    is_zhige_dingyin,
+    DINGYIN_TYPES,
+    DINGYIN_ZHIGE,
+    DINGYIN_ZHIGE_KEY,
+    can_switch_dingyin,
+    has_normal_dingyin,
+    has_zhige_dingyin,
+    resolve_dingyin_type,
 )
 from ....core.equip_validator import illegal_reasons_of
 from ....core.equipment_cooldown import next_cooldown_expiry
@@ -293,6 +300,24 @@ def _preserve_card_content_height(container: QWidget) -> None:
     container.setMinimumHeight(container.sizeHint().height())
 
 
+#: 行渲染的私有开关，只在 _add_affix_rows → _add_affix_row 之间传递，
+#: 绝不写进装备数据。
+_SWITCHABLE_KEY = "_dingyin_switchable"
+
+
+def _dingyin_slot_text(equip: dict, key: str) -> str:
+    """属性页里一个定音槽的展示文本；没有数据时明说未记录。"""
+    slot = equip.get(key)
+    if not isinstance(slot, dict) or not slot.get("name"):
+        return tr("未记录")
+    name = str(slot["name"])
+    value = slot.get("value")
+    if not isinstance(value, (int, float)):
+        return name
+    unit = str(slot.get("unit") or "%")
+    return f"{name} {value}{unit}"
+
+
 def _equipment_property_rows(equip: dict) -> list[tuple[str, str]]:
     """构建所有装备卡片共用的属性行。"""
     is_mock = bool((equip.get("_extra") or {}).get("is_mock"))
@@ -314,6 +339,8 @@ def _equipment_property_rows(equip: dict) -> list[tuple[str, str]]:
         (tr("来源"), source),
         (tr("指纹"), str(equip.get("_fp") or "")),
         (tr("状态"), lock_status),
+        (tr("普通定音"), _dingyin_slot_text(equip, "dingyin")),
+        (tr("止戈定音"), _dingyin_slot_text(equip, DINGYIN_ZHIGE_KEY)),
         (tr("冷却类型"), cooldown_kind),
         (tr("冷却状态"), cooldown_state),
         (tr("原始等级"), str(int(equip.get("original_level") or 0))),
@@ -338,10 +365,18 @@ class _EquipmentPropertiesDialog(QDialog):
         equip: dict,
         parent: QWidget | None = None,
         cooldown_changed: Callable[[str], bool] | None = None,
+        dingyin_changed: Callable[[str], bool] | None = None,
+        dingyin_kind: str = "",
     ):
         super().__init__(parent)
         self._equip = dict(equip)
         self._cooldown_changed = cooldown_changed
+        # 调用方决定这次切换写到哪儿：装备栏写方案槽位选择，背包写装备自身的
+        # 展示状态。对话框只负责问「切到哪一种」，不知道也不该知道写到哪。
+        self._dingyin_changed = dingyin_changed
+        self._dingyin_kind = (
+            dingyin_kind if dingyin_kind in DINGYIN_TYPES
+            else resolve_dingyin_type(self._equip))
         self.setObjectName("equipmentPropertiesDialog")
         self.setWindowTitle(tr("装备属性"))
         self.setMinimumWidth(480)
@@ -386,12 +421,54 @@ class _EquipmentPropertiesDialog(QDialog):
         close_button = buttons.button(QDialogButtonBox.StandardButton.Close)
         if close_button is not None:
             close_button.setText(tr("关闭"))
+        switch_button = buttons.addButton(
+            tr("切换定音"), QDialogButtonBox.ButtonRole.ActionRole)
+        assert switch_button is not None
+        self._switch_dingyin_button: QPushButton = switch_button
         self._clear_cooldown_button.clicked.connect(self._clear_cooldown)
         self._reset_cooldown_button.clicked.connect(self._reset_cooldown)
+        self._switch_dingyin_button.clicked.connect(self._switch_dingyin)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
         self._refresh_cooldown()
+        self._refresh_dingyin()
+
+    # ── 定音切换 ──
+
+    def _refresh_dingyin(self) -> None:
+        """按两个槽的实际数据决定能不能切。
+
+        只有一种定音时禁用而不是隐藏：功能是存在的，只是这件装备当前不具备
+        条件，说清原因比让按钮消失更有用。
+        """
+        switchable = (self._dingyin_changed is not None
+                      and can_switch_dingyin(self._equip))
+        self._switch_dingyin_button.setEnabled(switchable)
+        if switchable:
+            target = (tr("止戈定音") if self._dingyin_kind == DINGYIN_NORMAL
+                      else tr("普通定音"))
+            self._switch_dingyin_button.setToolTip(
+                tr("切换到") + target)
+        else:
+            self._switch_dingyin_button.setToolTip(
+                tr("该装备只扫描到一种定音，无法切换"))
+        for key in (tr("普通定音"), tr("止戈定音")):
+            label = self._value_labels.get(key)
+            if label is None:
+                continue
+            current = (key == tr("止戈定音")) == (
+                self._dingyin_kind == DINGYIN_ZHIGE)
+            label.setStyleSheet(
+                "font-weight: 600;" if current else "color: palette(mid);")
+
+    def _switch_dingyin(self) -> None:
+        kind = (DINGYIN_ZHIGE if self._dingyin_kind == DINGYIN_NORMAL
+                else DINGYIN_NORMAL)
+        if self._dingyin_changed is None or not self._dingyin_changed(kind):
+            return
+        self._dingyin_kind = kind
+        self._refresh_dingyin()
 
     def _set_cooldown(self, value: str) -> None:
         if (self._cooldown_changed is not None
@@ -438,13 +515,16 @@ def _show_equipment_properties(
     parent,
     equip: dict,
     cooldown_changed: Callable[[str], bool] | None = None,
+    dingyin_changed: Callable[[str], bool] | None = None,
+    dingyin_kind: str = "",
 ) -> None:
     try:
         parent.isVisible()
     except (AttributeError, RuntimeError):
         parent = None
     _EquipmentPropertiesDialog(
-        equip, parent, cooldown_changed=cooldown_changed).exec()
+        equip, parent, cooldown_changed=cooldown_changed,
+        dingyin_changed=dingyin_changed, dingyin_kind=dingyin_kind).exec()
 
 
 class _IllegalBadge(QLabel):
@@ -623,6 +703,8 @@ class _AffixRowsMixin:
 
         val_color = _affix_value_color(cap_pct)
         transfer_mark = " ⟳" if affix.get("is_transferred", False) else ""
+        if affix.get(_SWITCHABLE_KEY):
+            transfer_mark += " ⇄"
 
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
@@ -653,8 +735,14 @@ class _AffixRowsMixin:
 
         self.affix_layout.addLayout(row)
 
-    def _add_affix_rows(self, equip_data: dict) -> None:
-        """五条普通词条 + 定音块（虚线分隔）。"""
+    def _add_affix_rows(self, equip_data: dict, *,
+                        dingyin_kind: str = "") -> None:
+        """五条普通词条 + 定音块（虚线分隔）。
+
+        ``dingyin_kind`` 由装备栏卡片传入该方案对这个槽位的选择；背包卡片不传，
+        按装备自身的展示状态。一件装备两种定音都有时，名称后面挂一个可切换
+        标记，与属性对话框里的切换按钮同一个判定。
+        """
         equip_level = equip_data.get("level")
         for i in range(1, 6):
             affix = equip_data.get(f"affix_{i}")
@@ -662,26 +750,32 @@ class _AffixRowsMixin:
                 continue
             self._add_affix_row(affix, equip_level)
 
-        dingyin = equip_data.get("dingyin")
-        zhige_dingyin = is_zhige_dingyin(equip_data)
-        normal_dingyin = isinstance(dingyin, dict) and bool(dingyin.get("name"))
-        if not (zhige_dingyin or normal_dingyin):
+        if not (has_normal_dingyin(equip_data)
+                or has_zhige_dingyin(equip_data)):
             return
+        kind = (dingyin_kind if dingyin_kind in DINGYIN_TYPES
+                else resolve_dingyin_type(equip_data))
+        if kind == DINGYIN_ZHIGE and not has_zhige_dingyin(equip_data):
+            kind = DINGYIN_NORMAL
+        elif kind == DINGYIN_NORMAL and not has_normal_dingyin(equip_data):
+            kind = DINGYIN_ZHIGE
         dash = QFrame()
         dash.setFrameShape(QFrame.Shape.NoFrame)
         dash.setStyleSheet("border: none; border-top: 1px dashed palette(mid);")
         dash.setFixedHeight(1)
         self.affix_layout.addWidget(dash)
-        if zhige_dingyin:
-            notice = str(
-                (equip_data.get("_extra") or {}).get(DINGYIN_NOTICE_KEY) or "")
-            self._add_affix_row(
-                {"name": tr("<止戈定音>")}, equip_level, tooltip=notice)
-        else:
-            assert isinstance(dingyin, dict)
+        switchable = can_switch_dingyin(equip_data)
+        notice = str(
+            (equip_data.get("_extra") or {}).get(DINGYIN_NOTICE_KEY) or "")
+        row: dict = {"name": tr("<止戈定音>")}
+        if kind != DINGYIN_ZHIGE:
+            dingyin = equip_data.get("dingyin") or {}
             # 定音是百分比词条；数据里未必带 unit
-            self._add_affix_row(
-                {**dingyin, "unit": dingyin.get("unit") or "%"}, equip_level)
+            row = {**dingyin, "unit": dingyin.get("unit") or "%"}
+        if switchable:
+            row = {**row, _SWITCHABLE_KEY: True}
+            notice = notice or tr("该装备两种定音都有，可在装备属性中切换")
+        self._add_affix_row(row, equip_level, tooltip=notice)
 
     # ── 清空 / 收尾 ──
 
@@ -710,6 +804,18 @@ class _AffixRowsMixin:
         _refresh_card_cooldown(self.cooldown_label, equip_data)
         self.affix_layout.addWidget(self.cooldown_label)
         _preserve_card_content_height(self.affix_container)
+
+    def refresh_affixes(self, *, dingyin_kind: str = "") -> None:
+        """只重画词条与定音区，不重建整张卡片。
+
+        切换定音只改这一块，没有理由让整页重载。
+        """
+        equip_data = getattr(self, "_equip_data", None) or {}
+        if not equip_data:
+            return
+        self._clear_affixes()
+        self._add_affix_rows(equip_data, dingyin_kind=dingyin_kind)
+        self._finish_affixes(equip_data)
 
 
 class _SlotCard(_AffixRowsMixin, QFrame):
@@ -982,9 +1088,10 @@ class _SlotCard(_AffixRowsMixin, QFrame):
         if not self._selected:
             self._apply_style(_SLOT_STYLE_EMPTY)
 
-    def set_equip(self, equip_data: dict):
+    def set_equip(self, equip_data: dict, *, dingyin_kind: str = ""):
         self.set_hypotheses([])
         self._equip_data = equip_data
+        self._dingyin_kind = dingyin_kind
         self.lock_badge.set_locked(
             equip_data.get("lock_status") == "locked")
         self.status_tags.set_visible(

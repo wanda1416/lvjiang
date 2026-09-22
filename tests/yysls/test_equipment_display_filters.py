@@ -284,12 +284,15 @@ def test_cooldown_change_syncs_kind_and_state_in_memory(monkeypatch):
         _require_inventory=lambda: inventory,
         _update_item_metadata=lambda fp, key, value: patched.append(
             (fp, key, value)),
+        # 背包里的装备：不在任何方案槽位上，切换定音写装备自身的展示状态。
+        _slot_of_equipped=lambda equip_data: "",
+        _plan_dingyin_kind=lambda slot_key: "",
     )
     captured: dict = {}
     monkeypatch.setattr(
         cards, "_show_equipment_properties",
-        lambda parent, equip, cooldown_changed=None: captured.update(
-            callback=cooldown_changed))
+        lambda parent, equip, cooldown_changed=None, **kwargs: captured.update(
+            callback=cooldown_changed, **kwargs))
     equip = {"_fp": "ring-fp", "cooldown_kind": "reset",
              "cooldown_state": "completed", "cooldown_expires_at": ""}
 

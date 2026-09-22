@@ -33,11 +33,12 @@ from ......ui.button_styles import apply_dialog_button_box_style
 from ....core.affix_cap import affix_dict_cap_pct, equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
-    DINGYIN_NOTICE_KEY,
+    DINGYIN_SLOT_NOTICE,
     DINGYIN_TYPES,
     DINGYIN_ZHIGE,
     DINGYIN_ZHIGE_KEY,
     can_switch_dingyin,
+    dingyin_notice,
     has_normal_dingyin,
     has_zhige_dingyin,
     resolve_dingyin_type,
@@ -306,16 +307,20 @@ _SWITCHABLE_KEY = "_dingyin_switchable"
 
 
 def _dingyin_slot_text(equip: dict, key: str) -> str:
-    """属性页里一个定音槽的展示文本；没有数据时明说未记录。"""
+    """属性页里一个定音槽的展示文本；没有数据时明说未记录。
+
+    该槽自己的核对说明一并跟上——数值是 0 时，用户最需要知道的就是它为什么
+    是 0。
+    """
     slot = equip.get(key)
     if not isinstance(slot, dict) or not slot.get("name"):
         return tr("未记录")
     name = str(slot["name"])
     value = slot.get("value")
-    if not isinstance(value, (int, float)):
-        return name
-    unit = str(slot.get("unit") or "%")
-    return f"{name} {value}{unit}"
+    notice = str(slot.get(DINGYIN_SLOT_NOTICE) or "")
+    if isinstance(value, (int, float)):
+        name = f"{name} {value}{str(slot.get('unit') or '%')}"
+    return f"{name}（{notice}）" if notice else name
 
 
 def _equipment_property_rows(equip: dict) -> list[tuple[str, str]]:
@@ -765,13 +770,15 @@ class _AffixRowsMixin:
         dash.setFixedHeight(1)
         self.affix_layout.addWidget(dash)
         switchable = can_switch_dingyin(equip_data)
-        notice = str(
-            (equip_data.get("_extra") or {}).get(DINGYIN_NOTICE_KEY) or "")
+        # 提示取当前展示那一槽自己的，不能拿全局的——另一种定音的核对说明
+        # 挂到这一行上只会误导。
+        notice = dingyin_notice(equip_data, kind)
         row: dict = {"name": tr("<止戈定音>")}
         if kind != DINGYIN_ZHIGE:
             dingyin = equip_data.get("dingyin") or {}
             # 定音是百分比词条；数据里未必带 unit
             row = {**dingyin, "unit": dingyin.get("unit") or "%"}
+        row.pop(DINGYIN_SLOT_NOTICE, None)
         if switchable:
             row = {**row, _SWITCHABLE_KEY: True}
             notice = notice or tr("该装备两种定音都有，可在装备属性中切换")

@@ -12,10 +12,15 @@ import pytest
 
 from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
+    DINGYIN_SLOT_NOTICE,
     DINGYIN_TYPE_KEY,
     DINGYIN_ZHIGE,
+    LEGACY_DINGYIN_NOTICE_KEY,
+    ZHIGE_DINGYIN_KEY,
     ZHIGE_DINGYIN_NAME,
     can_switch_dingyin,
+    dingyin_notice,
+    refresh_dingyin_marker_dict,
     resolve_dingyin_type,
 )
 from lvjiang.apps.yysls.core.loadout import LoadoutRepository
@@ -226,3 +231,68 @@ def test_transmute_target_survives_a_plan_scan(tmp_path: Path):
 
     stored = repo.load().equipment_items["real-fp"]
     assert stored["affix_1"]["target_transmute_name"] == "会心率"
+
+
+# ─── 核对说明跟着槽走 ──────────────────────────────────────
+
+def _zero_normal() -> dict:
+    return _equip(
+        dingyin={"name": "外功穿透", "value": 0.0,
+                 DINGYIN_SLOT_NOTICE: "数值未能识别，已按 0 记录"},
+        dingyin_type=DINGYIN_NORMAL)
+
+
+def _misread_zhige() -> dict:
+    return _equip(
+        dingyin_zhige={"name": ZHIGE_DINGYIN_NAME,
+                       DINGYIN_SLOT_NOTICE: "疑似误读，请核对"},
+        dingyin_type=DINGYIN_ZHIGE)
+
+
+def test_slot_notice_survives_a_scan_of_the_other_dingyin():
+    """0 值定音的说明必须和它一起留下。
+
+    说明就是「这个 0 是怎么来的」的唯一解释；跟着丢了，用户只看到一个孤零零
+    的 0，分不清是没读出来还是装备真是 0。
+    """
+    merged = merge_equipment_write(
+        _misread_zhige(), _zero_normal(), source=WriteSource.BAG_SCAN)
+
+    assert merged["dingyin"][DINGYIN_SLOT_NOTICE]
+    assert merged["dingyin_zhige"][DINGYIN_SLOT_NOTICE]
+
+
+def test_a_clean_scan_only_clears_its_own_slot_notice():
+    """重新扫到干净的普通定音，不该顺手抹掉止戈那条说明。"""
+    merged = merge_equipment_write(
+        _equip(dingyin=dict(_NORMAL), dingyin_type=DINGYIN_NORMAL),
+        _misread_zhige(), source=WriteSource.BAG_SCAN)
+
+    assert DINGYIN_SLOT_NOTICE not in merged["dingyin"]
+    assert merged["dingyin_zhige"][DINGYIN_SLOT_NOTICE]
+
+
+def test_notice_is_read_from_the_displayed_slot():
+    """展示普通定音时不能读到止戈那条说明，反之亦然。"""
+    equip = _equip(
+        dingyin={"name": "外功穿透", "value": 0.0,
+                 DINGYIN_SLOT_NOTICE: "普通槽说明"},
+        dingyin_zhige={"name": ZHIGE_DINGYIN_NAME,
+                       DINGYIN_SLOT_NOTICE: "止戈槽说明"})
+
+    assert dingyin_notice(equip, DINGYIN_NORMAL) == "普通槽说明"
+    assert dingyin_notice(equip, DINGYIN_ZHIGE) == "止戈槽说明"
+
+
+def test_legacy_global_notice_moves_into_the_displayed_slot():
+    """历史记录的全局说明归位到它当时展示的那一槽，不再跟着另一种定音走。"""
+    equip = {
+        "dingyin": {"name": "外功穿透", "value": 10.0},
+        "_extra": {ZHIGE_DINGYIN_KEY: True,
+                   LEGACY_DINGYIN_NOTICE_KEY: "旧提示"},
+    }
+    refresh_dingyin_marker_dict(equip)
+
+    assert equip["dingyin_zhige"][DINGYIN_SLOT_NOTICE] == "旧提示"
+    assert DINGYIN_SLOT_NOTICE not in equip["dingyin"]
+    assert LEGACY_DINGYIN_NOTICE_KEY not in equip["_extra"]

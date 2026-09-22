@@ -9,7 +9,7 @@ import pytest
 
 from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
-    DINGYIN_NOTICE_KEY,
+    DINGYIN_SLOT_NOTICE,
     DINGYIN_ZHIGE,
     ZHIGE_DINGYIN_KEY,
     ZHIGE_DINGYIN_NAME,
@@ -187,7 +187,8 @@ class TestParserDelegation:
         assert equip.dingyin["name"] == "外功穿透"
         assert equip.dingyin["value"] == 0.0
         assert any("已按 0 记录" in w for w in equip.warnings)
-        assert "已按 0 记录" in equip.extra_data[DINGYIN_NOTICE_KEY]
+        # 说明挂在它解释的那一槽里，合并时跟着槽一起搬，不会丢也不会串。
+        assert "已按 0 记录" in equip.dingyin[DINGYIN_SLOT_NOTICE]
 
     def test_affixes_less_than_5_skips_dingyin(self, parser):
         """词条不满 5 个时不可能有定音，读到什么都是脏数据，整段跳过。
@@ -301,14 +302,14 @@ class TestMisreadReachesWarnings:
 
     def test_misread_warns_but_still_uses_non_normal_marker(self, parser):
         from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
-            DINGYIN_NOTICE_KEY,
             ZHIGE_DINGYIN_KEY,
         )
         equip = self._parse(parser, "外功穿诱 +14.2%")
         assert any("疑似误读" in w for w in equip.warnings)
         assert "外功穿透" in " ".join(equip.warnings)
         assert equip.extra_data[ZHIGE_DINGYIN_KEY] is True
-        assert "外功穿透" in equip.extra_data[DINGYIN_NOTICE_KEY]
+        # 说明挂在止戈槽自己身上，不会跟着另一种定音走。
+        assert "外功穿透" in equip.dingyin_zhige[DINGYIN_SLOT_NOTICE]
 
     def test_genuine_zhige_still_silent(self, parser):
         from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (

@@ -15,7 +15,7 @@ from .constants import (
 )
 from .dingyin_parser import (
     DINGYIN_NORMAL,
-    DINGYIN_NOTICE_KEY,
+    DINGYIN_SLOT_NOTICE,
     DINGYIN_ZHIGE,
     ZHIGE_DINGYIN_KEY,
     ZHIGE_DINGYIN_NAME,
@@ -346,7 +346,6 @@ class EquipmentParser:
             equip.dingyin = result
             equip.dingyin_type = DINGYIN_NORMAL
             equip.extra_data.pop(ZHIGE_DINGYIN_KEY, None)
-            equip.extra_data.pop(DINGYIN_NOTICE_KEY, None)
             # 计算定音词条 cap_pct（与普通词条相同逻辑）
             if equip.level and result.get("name"):
                 caps = self._attr_config.get_affix_caps(
@@ -362,11 +361,13 @@ class EquipmentParser:
             # 比悄悄留着上一次的数值更容易被发现；重扫一次即可恢复。
             notice = (
                 f"定音「{matched}」数值未能识别，已按 0 记录，请重新扫描核对")
-            equip.dingyin = {"name": matched, "value": 0.0, "cap_pct": 0.0}
+            equip.dingyin = {
+                "name": matched, "value": 0.0, "cap_pct": 0.0,
+                DINGYIN_SLOT_NOTICE: notice,
+            }
             equip.dingyin_type = DINGYIN_NORMAL
             equip.warnings.append(notice)
             equip.extra_data.pop(ZHIGE_DINGYIN_KEY, None)
-            equip.extra_data[DINGYIN_NOTICE_KEY] = notice
             logger.warning(f"定音数值无法提取，按 0 记录: {dingyin_text!r}")
             return
 
@@ -381,9 +382,8 @@ class EquipmentParser:
                 f"定音词条疑似误读为 {dingyin_text!r}，"
                 f"可能是「{suspected}」，请核对")
             equip.warnings.append(notice)
-            equip.extra_data[DINGYIN_NOTICE_KEY] = notice
+            equip.dingyin_zhige[DINGYIN_SLOT_NOTICE] = notice
         else:
-            equip.extra_data.pop(DINGYIN_NOTICE_KEY, None)
             logger.info(f"识别为止戈定音: {dingyin_text!r}")
 
     def _calc_affix_cap_pct(self, equip: EquipmentData):

@@ -51,7 +51,6 @@ from ...core.affix_cap import affix_dict_cap_pct
 from ...core.combat.combat_attrs import (
     CombatAttributes,
 )
-from ...core.equip_parser.dingyin_parser import is_zhige_dingyin
 from ...core.graduation.assumptions import Assumptions
 from ...core.graduation.candidate_pool import (
     CandidateFilter,
@@ -366,9 +365,7 @@ def _equip_tooltip(equip: dict) -> str:
             parts.append(line)
     # 定音词条
     dingyin = equip.get("dingyin")
-    if is_zhige_dingyin(equip):
-        parts.append(tr("&lt;止戈定音&gt;"))
-    elif isinstance(dingyin, dict) and dingyin.get("name"):
+    if isinstance(dingyin, dict) and dingyin.get("name"):
         val = dingyin.get("value", "")
         cap_pct = affix_dict_cap_pct(dingyin, level)
         line = f"{tr('定音')} {dingyin['name']}: {val}"

@@ -160,8 +160,8 @@ def test_multiple_transfer_markers_are_rejected():
 def test_zhige_dingyin_is_eligible():
     old = _equip(dingyin=False)
     new = _equip(values=(11, 21, 31, 41, 51), dingyin=False)
-    old["_extra"] = {"is_zhige_dingyin": True}
-    new["_extra"] = {"is_zhige_dingyin": True}
+    old["dingyin_zhige"] = {"name": "止戈定音"}
+    new["dingyin_zhige"] = {"name": "止戈定音"}
 
     assert len(_find(old, new)) == 1
 

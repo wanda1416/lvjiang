@@ -1124,7 +1124,7 @@ class _SlotCard(_AffixRowsMixin, QFrame):
             self._apply_style(_slot_style_normal(bg, self._normal_border()))
 
         self._clear_affixes()
-        self._add_affix_rows(equip_data)
+        self._add_affix_rows(equip_data, dingyin_kind=dingyin_kind)
         self._finish_affixes(equip_data)
 
     def update_lock_status(self, value: str) -> None:
@@ -1443,4 +1443,3 @@ class _CompactEquipCard(_AffixRowsMixin, QFrame):
         self._equip_data["cooldown_state"] = "cooling" if value else ""
         _refresh_card_cooldown(self.cooldown_label, self._equip_data)
         _preserve_card_content_height(self.affix_container)
-

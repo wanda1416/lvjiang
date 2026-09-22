@@ -22,6 +22,7 @@ import copy
 from enum import Enum
 
 from ..equip_parser.dingyin_parser import (
+    DINGYIN_NORMAL,
     DINGYIN_TYPE_KEY,
     DINGYIN_TYPES,
     DINGYIN_ZHIGE_KEY,
@@ -70,10 +71,16 @@ def merge_equipment_write(
 ) -> dict:
     """把一次写入合并到旧记录上，返回可直接落盘的新记录（不改入参）。
 
-    ``existing`` 为空表示这件装备第一次入库，本次数据就是全部事实。
+    ``existing`` 为空表示这件装备第一次入库；备战扫描仍只把本次类型记到
+    方案，装备自身采用普通定音这个默认展示状态。
     """
     value = copy.deepcopy(incoming)
+    extra = value.get("_extra")
+    if isinstance(extra, dict):
+        extra.pop("is_zhige_dingyin", None)
     if existing is None:
+        if source is WriteSource.PLAN_SCAN:
+            value[DINGYIN_TYPE_KEY] = DINGYIN_NORMAL
         return value
 
     # 一次扫描只可能读到一种定音，另一种槽必须原样留着——否则切到止戈扫一次
@@ -88,7 +95,7 @@ def merge_equipment_write(
         if old_kind in DINGYIN_TYPES:
             value[DINGYIN_TYPE_KEY] = old_kind
         else:
-            value.pop(DINGYIN_TYPE_KEY, None)
+            value[DINGYIN_TYPE_KEY] = DINGYIN_NORMAL
 
     # 转律目标是用户算出来的计划，扫描数据永远不带它，只能从旧版本搬。
     if saved_transmute_target(value) is None:

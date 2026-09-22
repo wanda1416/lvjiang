@@ -17,7 +17,6 @@ from .dingyin_parser import (
     DINGYIN_NORMAL,
     DINGYIN_SLOT_NOTICE,
     DINGYIN_ZHIGE,
-    ZHIGE_DINGYIN_KEY,
     ZHIGE_DINGYIN_NAME,
     DingyinParser,
 )
@@ -345,7 +344,6 @@ class EquipmentParser:
         if result:
             equip.dingyin = result
             equip.dingyin_type = DINGYIN_NORMAL
-            equip.extra_data.pop(ZHIGE_DINGYIN_KEY, None)
             # 计算定音词条 cap_pct（与普通词条相同逻辑）
             if equip.level and result.get("name"):
                 caps = self._attr_config.get_affix_caps(
@@ -367,7 +365,6 @@ class EquipmentParser:
             }
             equip.dingyin_type = DINGYIN_NORMAL
             equip.warnings.append(notice)
-            equip.extra_data.pop(ZHIGE_DINGYIN_KEY, None)
             logger.warning(f"定音数值无法提取，按 0 记录: {dingyin_text!r}")
             return
 
@@ -375,7 +372,6 @@ class EquipmentParser:
         # 词库，名称先固定；疑似误读只作为核对提示，不改变归属。
         equip.dingyin_zhige = {"name": ZHIGE_DINGYIN_NAME}
         equip.dingyin_type = DINGYIN_ZHIGE
-        equip.extra_data[ZHIGE_DINGYIN_KEY] = True
         suspected = self._dingyin_parser.suspected_misread(dingyin_text)
         if suspected is not None:
             notice = (

@@ -41,7 +41,9 @@ from ......i18n import tr
 from ....config.equipment_slots import SLOT_SPECS
 from ....core.affix_cap import equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import (
+    DINGYIN_NORMAL,
     DINGYIN_TYPE_KEY,
+    DINGYIN_TYPES,
     has_normal_dingyin,
 )
 from ...events import EQUIPMENT_CHANGED, get_event_hub
@@ -1348,12 +1350,15 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 card.refresh_affixes()
 
     def _plan_dingyin_kind(self, slot_key: str) -> str:
-        """当前方案对这个槽位选了哪种定音；未记录返回空串交给卡片自己解析。"""
+        """当前方案对槽位选择的定音；未记录固定按普通定音。"""
         inv = self._inv
         if inv is None or not slot_key:
             return ""
         plan = inv.state.plans.get(inv.state.active_plan_id)
-        return str(plan.dingyin.get(slot_key) or "") if plan else ""
+        if plan is None:
+            return DINGYIN_NORMAL
+        kind = str(plan.dingyin.get(slot_key) or "")
+        return kind if kind in DINGYIN_TYPES else DINGYIN_NORMAL
 
     def _slot_of_equipped(self, equip_data: dict) -> str:
         """这件装备正占着当前方案的哪个槽位；不在装备栏里返回空串。"""

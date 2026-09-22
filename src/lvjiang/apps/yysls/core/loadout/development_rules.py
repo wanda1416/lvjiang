@@ -4,7 +4,7 @@
 
 - 转律：把商角徵羽中的一个词条换成别的词条，换后槽位固定
 - 承音：升到下一个已配置等级，且该等级配置允许承音
-- 培养：只增不减地提高词条或定音数值
+- 培养：只增不减地提高词条或同名定音数值；定音词条本身可自由切换
 
 其余字段一律不可改。判定与展示分离：本模块只回答「这次变化合不合法」，
 返回面向用户的原因文本或 ``None``；拦截还是提示由调用方决定 ——
@@ -90,7 +90,8 @@ def _check_dingyin(old: dict, new: dict) -> str | None:
     一件装备可以同时定着普通定音和止戈定音，游戏里随时无成本切换，所以
     「这次只扫到止戈」是合法现场，不是删除了普通定音——两种定音各占一槽，
     写入时本次没带的那一槽会由仓储从旧记录合并回来。这里只管普通定音槽：
-    它有值就必须同名且只增不减，而已有的普通定音不能在养成后凭空消失。
+    已有的普通定音不能凭空新增或删除；定音词条本身可无成本切换，只有保持
+    同名时才比较数值并要求只增不减。
     """
     old_dingyin = old.get("dingyin") or {}
     new_dingyin = new.get("dingyin") or {}
@@ -101,7 +102,7 @@ def _check_dingyin(old: dict, new: dict) -> str | None:
     if not old_dingyin.get("name"):
         return tr("真实装备不能新增定音词条")
     if old_dingyin.get("name") != new_dingyin.get("name"):
-        return tr("真实装备不能更换定音词条")
+        return None
     old_value = to_float(old_dingyin.get("value"))
     new_value = to_float(new_dingyin.get("value"))
     if new_value < old_value:

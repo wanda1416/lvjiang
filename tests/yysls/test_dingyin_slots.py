@@ -15,12 +15,9 @@ from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
     DINGYIN_SLOT_NOTICE,
     DINGYIN_TYPE_KEY,
     DINGYIN_ZHIGE,
-    LEGACY_DINGYIN_NOTICE_KEY,
-    ZHIGE_DINGYIN_KEY,
     ZHIGE_DINGYIN_NAME,
     can_switch_dingyin,
     dingyin_notice,
-    refresh_dingyin_marker_dict,
     resolve_dingyin_type,
 )
 from lvjiang.apps.yysls.core.loadout import LoadoutRepository
@@ -86,6 +83,28 @@ def test_plan_scan_never_touches_the_stored_dingyin_type():
         _zhige_scan(), _normal_scan(), source=WriteSource.PLAN_SCAN)
 
     assert merged["dingyin_zhige"] == _ZHIGE, "数据槽仍然要如实记录"
+    assert merged[DINGYIN_TYPE_KEY] == DINGYIN_NORMAL
+
+
+def test_plan_scan_treats_a_missing_stored_type_as_normal():
+    """旧装备缺类型就是普通定音，不能被方案扫描带来的止戈状态污染。"""
+    existing = _normal_scan()
+    existing.pop(DINGYIN_TYPE_KEY)
+    incoming = _zhige_scan()
+    incoming["_extra"] = {"is_zhige_dingyin": True, "affix_count": 5}
+
+    merged = merge_equipment_write(
+        incoming, existing, source=WriteSource.PLAN_SCAN)
+
+    assert merged[DINGYIN_TYPE_KEY] == DINGYIN_NORMAL
+    assert merged["_extra"] == {"affix_count": 5}
+
+
+def test_first_plan_scan_uses_normal_as_the_equipment_display_default():
+    merged = merge_equipment_write(
+        _zhige_scan(), None, source=WriteSource.PLAN_SCAN)
+
+    assert merged["dingyin_zhige"] == _ZHIGE
     assert merged[DINGYIN_TYPE_KEY] == DINGYIN_NORMAL
 
 
@@ -282,20 +301,6 @@ def test_notice_is_read_from_the_displayed_slot():
 
     assert dingyin_notice(equip, DINGYIN_NORMAL) == "普通槽说明"
     assert dingyin_notice(equip, DINGYIN_ZHIGE) == "止戈槽说明"
-
-
-def test_legacy_global_notice_moves_into_the_displayed_slot():
-    """历史记录的全局说明归位到它当时展示的那一槽，不再跟着另一种定音走。"""
-    equip = {
-        "dingyin": {"name": "外功穿透", "value": 10.0},
-        "_extra": {ZHIGE_DINGYIN_KEY: True,
-                   LEGACY_DINGYIN_NOTICE_KEY: "旧提示"},
-    }
-    refresh_dingyin_marker_dict(equip)
-
-    assert equip["dingyin_zhige"][DINGYIN_SLOT_NOTICE] == "旧提示"
-    assert DINGYIN_SLOT_NOTICE not in equip["dingyin"]
-    assert LEGACY_DINGYIN_NOTICE_KEY not in equip["_extra"]
 
 
 # ─── 删除装备的槽位不变量 ──────────────────────────────────

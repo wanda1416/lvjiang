@@ -15,8 +15,8 @@ UI 增删定音词条后无需改代码。
 ``dingyin_type`` 记录扫描时装备展示的是哪一种，只影响展示，不影响计算。
 
 无法按普通定音词库解析的文本一律按游戏中可预计的「止戈定音」处理。它不是
-装备异常，不进入 ``illegal_equip``；``_extra.is_zhige_dingyin`` 作为派生标记
-保留，供尚未改造的读取方继续判断。
+装备异常，不进入 ``illegal_equip``。当前展示种类只由 ``dingyin_type`` 描述；
+缺失时按普通定音读取，不再维护第二份派生标记。
 """
 
 import re
@@ -31,10 +31,6 @@ from loguru import logger
 # 别名，定音词条会整体解析失败。
 _DINGYIN_CATEGORIES = ("外功增益", "属攻增益", "指定技能增效")
 
-# _extra 中的止戈定音标记；与 illegal_equip 完全独立。
-# 它现在是 dingyin_type 的派生值，不再是权威来源——保留是为了让还没改造的
-# 读取方（卡片、承音合并资格）零改动继续工作。
-ZHIGE_DINGYIN_KEY = "is_zhige_dingyin"
 # 装备当前展示的定音种类。缺失按 normal 读，见 resolve_dingyin_type()。
 DINGYIN_TYPE_KEY = "dingyin_type"
 DINGYIN_NORMAL = "normal"
@@ -51,15 +47,6 @@ ZHIGE_DINGYIN_NAME = "止戈定音"
 # 没带的那一槽是整块搬过去的，提示跟着槽走才不会丢、也不会串到另一种定音
 # 头上。放 _extra 就得靠「记得把提示和槽配对搬」，迟早漏。
 DINGYIN_SLOT_NOTICE = "notice"
-#: 历史记录里的全局提示键，读取时迁进对应槽后删除。
-LEGACY_DINGYIN_NOTICE_KEY = "dingyin_notice"
-
-
-def is_zhige_dingyin(equip_dict: dict) -> bool:
-    """装备是否带有止戈定音标记。"""
-    return bool((equip_dict.get("_extra") or {}).get(ZHIGE_DINGYIN_KEY))
-
-
 def has_normal_dingyin(equip_dict: dict) -> bool:
     """普通定音槽是否有数据。"""
     dingyin = equip_dict.get("dingyin")
@@ -75,11 +62,9 @@ def has_zhige_dingyin(equip_dict: dict) -> bool:
 def has_any_dingyin(equip_dict: dict) -> bool:
     """这件装备定过音没有——两种都算。
 
-    历史记录只有 ``is_zhige_dingyin`` 标记、还没补出止戈数据槽，同样算数：
-    资格判定不该依赖调用方有没有先走过一次加载期刷新。
+    数据槽是事实来源，展示类型不参与资格判定。
     """
-    return (has_normal_dingyin(equip_dict) or has_zhige_dingyin(equip_dict)
-            or stored_dingyin_type(equip_dict) == DINGYIN_ZHIGE)
+    return has_normal_dingyin(equip_dict) or has_zhige_dingyin(equip_dict)
 
 
 def can_switch_dingyin(equip_dict: dict) -> bool:
@@ -92,18 +77,9 @@ def can_switch_dingyin(equip_dict: dict) -> bool:
 
 
 def stored_dingyin_type(equip_dict: dict) -> str:
-    """记录里存着的定音种类；历史记录只按旧的止戈标记推定。
-
-    旧实现还会按「名称能不能被词库解释」反推止戈。这里不再那样做：名称判定
-    会随定音词库配置增删而翻转，不该决定一个已经存成事实的展示状态。历史上
-    被写进普通定音槽的止戈名称重扫一次就会归位。
-    """
+    """记录里存着的展示种类；缺失或非法值一律按普通定音。"""
     kind = str(equip_dict.get(DINGYIN_TYPE_KEY) or "")
-    if kind in DINGYIN_TYPES:
-        return kind
-    if (equip_dict.get("_extra") or {}).get(ZHIGE_DINGYIN_KEY):
-        return DINGYIN_ZHIGE
-    return DINGYIN_NORMAL
+    return kind if kind in DINGYIN_TYPES else DINGYIN_NORMAL
 
 
 def resolve_dingyin_type(equip_dict: dict) -> str:
@@ -130,44 +106,6 @@ def dingyin_slot(equip_dict: dict, kind: str) -> dict:
 def dingyin_notice(equip_dict: dict, kind: str) -> str:
     """某一种定音自己的核对说明。"""
     return str(dingyin_slot(equip_dict, kind).get(DINGYIN_SLOT_NOTICE) or "")
-
-
-def _migrate_legacy_notice(equip_dict: dict, kind: str) -> None:
-    """历史记录的全局提示迁进它当时展示的那一槽。
-
-    旧模型只有一条定音，提示挂在 _extra 上也不会有歧义；双槽之后必须归位，
-    否则它会跟着装备一直显示在另一种定音头上。
-    """
-    raw_extra = equip_dict.get("_extra")
-    if not isinstance(raw_extra, dict):
-        return
-    notice = raw_extra.pop(LEGACY_DINGYIN_NOTICE_KEY, None)
-    if not notice:
-        return
-    slot = dingyin_slot(equip_dict, kind)
-    if slot and not slot.get(DINGYIN_SLOT_NOTICE):
-        slot[DINGYIN_SLOT_NOTICE] = str(notice)
-
-
-def refresh_dingyin_marker_dict(equip_dict: dict) -> bool:
-    """按 dingyin_type 刷新止戈标记与历史记录的止戈槽，返回是否展示止戈。
-
-    标记现在是 ``dingyin_type`` 的派生值。绝不能反过来从 ``dingyin.name``
-    推标记——新模型下普通定音槽会长期保留数据，那样每次加载都会把止戈态
-    改回普通态。历史记录在这里补出 ``dingyin_zhige`` 展示槽，不改磁盘格式。
-    """
-    kind = stored_dingyin_type(equip_dict)
-    if kind == DINGYIN_ZHIGE and not has_zhige_dingyin(equip_dict):
-        equip_dict[DINGYIN_ZHIGE_KEY] = {"name": ZHIGE_DINGYIN_NAME}
-    _migrate_legacy_notice(equip_dict, kind)
-    raw_extra = equip_dict.get("_extra")
-    extra = raw_extra if isinstance(raw_extra, dict) else {}
-    if kind == DINGYIN_ZHIGE:
-        equip_dict["_extra"] = extra
-        extra[ZHIGE_DINGYIN_KEY] = True
-    else:
-        extra.pop(ZHIGE_DINGYIN_KEY, None)
-    return kind == DINGYIN_ZHIGE
 
 
 class DingyinParser:

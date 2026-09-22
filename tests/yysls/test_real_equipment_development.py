@@ -37,7 +37,7 @@ def test_real_development_locks_identity_and_non_chengyin_values(qtbot):
     assert not dialog._edit_name.isEnabled()
     assert not dialog._combo_level.isEnabled()
     assert not dialog._combo_quality.isEnabled()
-    assert not dialog._btn_dingyin.isEnabled()
+    assert dialog._btn_dingyin.isEnabled()
     assert dialog._spin_dingyin.isEnabled()
     assert dialog._spin_dingyin.minimum() == 10.0
     assert not dialog._affix_rows[0]._combo_name.isEnabled()
@@ -83,6 +83,23 @@ def test_dingyin_cultivation_keeps_fingerprint_and_cooldown(qtbot):
     assert result["dingyin"]["value"] == 11.0
     assert result["_fp"] == equip["_fp"]
     assert result["cooldown_expires_at"] == equip["cooldown_expires_at"]
+    assert dialog._validate_real_development(result) is None
+
+
+def test_real_development_can_switch_dingyin_affix(qtbot):
+    equip = _real_equip()
+    dialog = MockEquipDialog(equip)
+    qtbot.addWidget(dialog)
+    replacement = next(
+        name for name in dialog._get_dingyin_affixes_filtered()
+        if name != equip["dingyin"]["name"]
+    )
+
+    dialog._on_dingyin_affix_selected(replacement)
+    result = dialog._build_real_development_data()
+
+    assert result["dingyin"]["name"] == replacement
+    assert result["_fp"] == equip["_fp"]
     assert dialog._validate_real_development(result) is None
 
 

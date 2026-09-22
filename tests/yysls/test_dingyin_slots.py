@@ -8,6 +8,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
     DINGYIN_TYPE_KEY,
@@ -121,31 +123,92 @@ def test_legacy_record_without_type_reads_as_normal():
 
 # ─── 仓储写入路径 ──────────────────────────────────────────
 
-def test_plan_scan_keeps_the_other_dingyin(tmp_path: Path):
+def test_plan_scan_keeps_the_other_dingyin_and_records_the_plan_choice(
+    tmp_path: Path,
+):
     """完整复现用户现场：方案 A 扫到普通，方案 B 扫到止戈。"""
     repo = LoadoutRepository("alice", tmp_path)
     plan_a = repo.load().active_plan_id
     plan_b = repo.create_plan("B", "主功法", "副功法").id
 
-    repo.assign_equipment(plan_a, "ring", _normal_scan())
-    repo.assign_equipment(plan_b, "ring", _zhige_scan())
+    repo.assign_equipment(plan_a, "ring", _normal_scan(), scanned=True)
+    repo.assign_equipment(plan_b, "ring", _zhige_scan(), scanned=True)
 
-    stored = repo.load().equipment_items["real-fp"]
+    state = repo.load()
+    stored = state.equipment_items["real-fp"]
     # 切回方案 A 时普通定音还在
     assert stored["dingyin"] == _NORMAL
     assert stored["dingyin_zhige"] == _ZHIGE
-    # 备战扫描不改装备自身的展示状态
+    # 各方案记住自己那一侧，装备自身的展示状态不被备战扫描改写
+    assert state.plans[plan_a].dingyin["ring"] == DINGYIN_NORMAL
+    assert state.plans[plan_b].dingyin["ring"] == DINGYIN_ZHIGE
     assert stored.get(DINGYIN_TYPE_KEY) == DINGYIN_NORMAL
 
 
-def test_bag_scan_updates_the_display_state(tmp_path: Path):
+def test_bag_scan_leaves_plan_choices_alone(tmp_path: Path):
     repo = LoadoutRepository("alice", tmp_path)
-    repo.upsert_item(_normal_scan())
+    plan_a = repo.load().active_plan_id
+    repo.assign_equipment(plan_a, "ring", _normal_scan(), scanned=True)
+
     repo.upsert_item(_zhige_scan())
 
-    stored = repo.load().equipment_items["real-fp"]
-    assert stored["dingyin"] == _NORMAL
-    assert stored[DINGYIN_TYPE_KEY] == DINGYIN_ZHIGE
+    state = repo.load()
+    assert state.equipment_items["real-fp"][DINGYIN_TYPE_KEY] == DINGYIN_ZHIGE
+    assert state.plans[plan_a].dingyin["ring"] == DINGYIN_NORMAL
+
+
+def test_switching_writes_only_its_own_state(tmp_path: Path):
+    """两个切换入口各写各的，绝不互相串扰。"""
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_a = repo.load().active_plan_id
+    repo.assign_equipment(plan_a, "ring", _normal_scan(), scanned=True)
+    repo.upsert_item(_zhige_scan())
+
+    repo.set_plan_dingyin(plan_a, "ring", DINGYIN_ZHIGE)
+    state = repo.load()
+    assert state.plans[plan_a].dingyin["ring"] == DINGYIN_ZHIGE
+    assert state.equipment_items["real-fp"][DINGYIN_TYPE_KEY] == DINGYIN_ZHIGE
+
+    repo.set_item_dingyin_type("real-fp", DINGYIN_NORMAL)
+    state = repo.load()
+    assert state.equipment_items["real-fp"][DINGYIN_TYPE_KEY] == DINGYIN_NORMAL
+    assert state.plans[plan_a].dingyin["ring"] == DINGYIN_ZHIGE
+
+
+def test_switching_is_refused_when_only_one_slot_has_data(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_a = repo.load().active_plan_id
+    repo.assign_equipment(plan_a, "ring", _normal_scan(), scanned=True)
+
+    with pytest.raises(ValueError, match="无法切换"):
+        repo.set_plan_dingyin(plan_a, "ring", DINGYIN_ZHIGE)
+    with pytest.raises(ValueError, match="无法切换"):
+        repo.set_item_dingyin_type("real-fp", DINGYIN_ZHIGE)
+
+
+def test_replacing_or_clearing_a_slot_drops_its_dingyin_choice(tmp_path: Path):
+    """换了一件装备，上一件的定音选择不能顺延给它。"""
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_a = repo.load().active_plan_id
+    repo.assign_equipment(plan_a, "ring", _zhige_scan(), scanned=True)
+    assert repo.load().plans[plan_a].dingyin["ring"] == DINGYIN_ZHIGE
+
+    other = _equip(_fp="other-fp", dingyin=dict(_NORMAL))
+    repo.assign_equipment(plan_a, "ring", other)
+    assert "ring" not in repo.load().plans[plan_a].dingyin
+
+    repo.assign_equipment(plan_a, "ring", _zhige_scan(), scanned=True)
+    repo.unassign(plan_a, "ring")
+    assert "ring" not in repo.load().plans[plan_a].dingyin
+
+
+def test_plan_dingyin_survives_a_reload(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_a = repo.load().active_plan_id
+    repo.assign_equipment(plan_a, "ring", _zhige_scan(), scanned=True)
+
+    reloaded = LoadoutRepository("alice", tmp_path).load()
+    assert reloaded.plans[plan_a].dingyin["ring"] == DINGYIN_ZHIGE
 
 
 def test_transmute_target_survives_a_plan_scan(tmp_path: Path):
@@ -159,7 +222,7 @@ def test_transmute_target_survives_a_plan_scan(tmp_path: Path):
     }
     repo.assign_equipment(plan_a, "ring", saved)
 
-    repo.assign_equipment(plan_a, "ring", _zhige_scan())
+    repo.assign_equipment(plan_a, "ring", _zhige_scan(), scanned=True)
 
     stored = repo.load().equipment_items["real-fp"]
     assert stored["affix_1"]["target_transmute_name"] == "会心率"

@@ -14,6 +14,11 @@ from fasteners import InterProcessLock
 
 from lvjiang.core.user_file_locks import user_file_lock_path
 
+from ..equip_parser.dingyin_parser import (
+    DINGYIN_TYPE_KEY,
+    DINGYIN_TYPES,
+    can_switch_dingyin,
+)
 from ..equipment_cooldown import next_cooldown_expiry
 from .development_rules import check_real_development
 from .equipment_write import (
@@ -367,12 +372,13 @@ class LoadoutRepository:
 
         return self.update(mutate)
 
-    def assign_equipment(self, plan_id: str, slot_key: str,
-                         equip: dict) -> str:
+    def assign_equipment(self, plan_id: str, slot_key: str, equip: dict,
+                         *, scanned: bool = False) -> str:
         """把装备挂到方案槽位。
 
-        备战扫描读到的定音种类属于「切换备战方案时游戏自动切过去的状态」，
-        不是用户给这件装备定的展示偏好，所以不写回装备自身。
+        ``scanned=True`` 表示这是一次备战扫描：本次读到的定音种类属于该方案
+        （切换备战方案时游戏会自动切定音），记进方案槽位，不改装备自身的
+        展示状态。手动穿戴没有扫描依据，只清掉上一件留下的槽位选择。
         """
         if slot_key not in EQUIPMENT_SLOTS:
             raise ValueError(f"未知装备槽位: {slot_key}")
@@ -383,21 +389,74 @@ class LoadoutRepository:
                 equip, is_mock=bool(equip.get("_extra", {}).get("is_mock")))
         if not fp:
             raise ValueError("装备数据无法生成指纹")
+        scanned_kind = str(equip.get(DINGYIN_TYPE_KEY) or "")
         def mutate(state: LoadoutState) -> None:
             if plan_id not in state.plans:
                 raise ValueError("目标备战方案已不存在")
             state.equipment_items[fp] = stamp_equipment_write(
                 equip, fp, state.equipment_items.get(fp),
                 source=WriteSource.PLAN_SCAN)
-            state.plans[plan_id].equipment[slot_key] = fp
+            plan = state.plans[plan_id]
+            replaced = plan.equipment[slot_key] != fp
+            plan.equipment[slot_key] = fp
+            if scanned and scanned_kind in DINGYIN_TYPES:
+                plan.dingyin[slot_key] = scanned_kind
+            elif replaced:
+                # 换了一件装备，上一件的定音选择不能顺延给它。
+                plan.dingyin.pop(slot_key, None)
         self.update(mutate)
         return fp
+
+    def set_plan_dingyin(self, plan_id: str, slot_key: str,
+                         kind: str) -> LoadoutState:
+        """切换某套方案下某个槽位展示哪种定音。
+
+        只动这套方案的选择，不碰装备自身的 ``dingyin_type``——装备栏里的
+        切换等于在游戏里给这套方案换音，不代表用户改了这件装备的默认展示。
+        """
+        if slot_key not in EQUIPMENT_SLOTS:
+            raise ValueError(f"未知装备槽位: {slot_key}")
+        if kind not in DINGYIN_TYPES:
+            raise ValueError(f"未知定音种类: {kind!r}")
+
+        def mutate(state: LoadoutState) -> None:
+            plan = state.plans.get(plan_id)
+            if plan is None:
+                raise ValueError("目标备战方案已不存在")
+            fp = plan.equipment.get(slot_key)
+            equip = state.equipment_items.get(fp) if fp else None
+            if equip is None:
+                raise ValueError("该槽位没有装备")
+            if not can_switch_dingyin(equip):
+                raise ValueError("该装备只有一种定音，无法切换")
+            plan.dingyin[slot_key] = kind
+
+        return self.update(mutate)
+
+    def set_item_dingyin_type(self, fp: str, kind: str) -> LoadoutState:
+        """切换背包中某件装备默认展示哪种定音，不影响任何方案的选择。"""
+        if kind not in DINGYIN_TYPES:
+            raise ValueError(f"未知定音种类: {kind!r}")
+
+        def mutate(state: LoadoutState) -> None:
+            equip = state.equipment_items.get(fp)
+            if equip is None:
+                raise ValueError(f"装备已不存在: {fp}")
+            if not can_switch_dingyin(equip):
+                raise ValueError("该装备只有一种定音，无法切换")
+            equip[DINGYIN_TYPE_KEY] = kind
+            equip[EQUIPMENT_UPDATED_AT] = _now_iso()
+
+        return self.update(mutate)
 
     def unassign(self, plan_id: str, slot_key: str) -> None:
         def mutate(state: LoadoutState) -> None:
             if plan_id not in state.plans:
                 raise KeyError(plan_id)
-            state.plans[plan_id].equipment[slot_key] = None
+            plan = state.plans[plan_id]
+            plan.equipment[slot_key] = None
+            # 槽位空了，定音选择跟着走；留着会套到下一件装备头上。
+            plan.dingyin.pop(slot_key, None)
         self.update(mutate)
 
     def delete_items(

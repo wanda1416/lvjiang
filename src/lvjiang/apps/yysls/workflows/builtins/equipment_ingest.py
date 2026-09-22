@@ -135,7 +135,7 @@ def _write_equipped(_engine, slot_key: str, equip_dict: dict) -> str:
     plan_id = _engine.context.get("_bound_loadout_plan_id")
     if not plan_id:
         raise ValueError("扫描装备前必须通过方案名称与武学绑定写入目标")
-    fp = repo.assign_equipment(plan_id, slot_key, equip_dict)
+    fp = repo.assign_equipment(plan_id, slot_key, equip_dict, scanned=True)
     _notify_equipment_changed(_engine)
     return fp
 

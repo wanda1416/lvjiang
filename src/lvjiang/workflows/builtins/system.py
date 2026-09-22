@@ -304,6 +304,7 @@ def _apps(_engine):
             capture=getattr(_engine, "_capture", None),
             stop_check=getattr(_engine, "_stop_check", None),
             target_platform=target_platform,
+            on_window_rebound=getattr(_engine, "rebind_target_window", None),
         )
         _engine._app_controller = controller
     return controller

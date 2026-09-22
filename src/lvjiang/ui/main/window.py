@@ -962,6 +962,7 @@ class MainWindow(
             window_top=window_top,
             pause_event=getattr(self, '_pause_event', None),
             ui_callback=self._create_ui_callback(),
+            window_rebind_hook=self._on_target_window_rebound,
         )
 
         # 获取当前配置

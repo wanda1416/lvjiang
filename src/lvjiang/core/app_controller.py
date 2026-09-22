@@ -90,9 +90,13 @@ def get_active_connected_app_info() -> dict | None:
 
 class WindowsAppController:
     def __init__(self, apps: dict[str, AndroidAppConfig], *,
-                 stop_check: Callable[[], bool] | None = None):
+                 stop_check: Callable[[], bool] | None = None,
+                 on_window_rebound: Callable[[dict], None] | None = None):
         self.apps = apps
         self.stop_check = stop_check or (lambda: False)
+        # 重启换窗口后回调宿主：句柄与窗口原点都是宿主启动时的快照，
+        # 不重绑就会继续投递到已销毁的句柄（PostMessage 不报错）。
+        self.on_window_rebound = on_window_rebound
         self._placements: dict[str, dict] = {}
 
     def get(self, name: str) -> AndroidAppConfig:
@@ -260,7 +264,21 @@ class WindowsAppController:
                 int(window["hwnd"]), 0, placement["left"], placement["top"],
                 placement["width"], placement["height"], 0x0014)
         logger.info(f"[PCApp] 已启动 {name} ({executable})")
+        self._publish(app, window)
         return True
+
+    def _publish(self, app: AndroidAppConfig, window: dict) -> None:
+        """把重启后的新窗口作为唯一来源发布出去。
+
+        位置还原之后再取一次实时矩形：SetWindowPos 之前枚举到的是新窗口
+        自己开的位置，直接拿去当截图区域会整体偏移。
+        """
+        refreshed = next(
+            (item for item in self._windows() if self._matches(app, item)),
+            None) or window
+        record_connected_window(refreshed)
+        if self.on_window_rebound is not None:
+            self.on_window_rebound(dict(refreshed))
 
 
 class AppController:
@@ -268,7 +286,8 @@ class AppController:
 
     def __init__(self, apps: dict[str, AndroidAppConfig], *, device=None,
                  capture=None, stop_check: Callable[[], bool] | None = None,
-                 target_platform: str):
+                 target_platform: str,
+                 on_window_rebound: Callable[[dict], None] | None = None):
         self.apps = apps
         platform = str(target_platform or "").strip().lower()
         if platform not in {"android", "pc"}:
@@ -277,7 +296,8 @@ class AppController:
         self._android = (AndroidAppController(
             device, apps, capture=capture, stop_check=stop_check)
             if device is not None else None)
-        self._windows = WindowsAppController(apps, stop_check=stop_check)
+        self._windows = WindowsAppController(
+            apps, stop_check=stop_check, on_window_rebound=on_window_rebound)
 
     def _target(self, name: str):
         app = self.apps.get(str(name or "").strip())

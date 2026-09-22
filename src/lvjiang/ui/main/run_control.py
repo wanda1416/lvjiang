@@ -1355,6 +1355,7 @@ class RunControlMixin:
         from ...core.config.wf_configs import get_wf_config
         engine.workflow_config_snapshot = get_wf_config(flow_id)
         engine._ui_callback = self._create_ui_callback()
+        engine.window_rebind_hook = self._on_target_window_rebound
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
         # 执行前先提交面板，再从统一解析器生成该用户的参数快照。
@@ -1697,6 +1698,7 @@ class RunControlMixin:
             stop_check=self._is_stopped,
             pause_event=self._pause_event,
         )
+        engine.window_rebind_hook = self._on_target_window_rebound
         self._bind_engine_user(engine, username)
         from ...core.config.wf_configs import get_wf_config
         engine.workflow_config_snapshot = get_wf_config(impl_name)

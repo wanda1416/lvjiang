@@ -355,6 +355,7 @@ class DebugPanel(QWidget):
         if make_cb is not None:
             engine._ui_callback = make_cb()
         engine.statement_hook = self._bridge.stepped.emit
+        engine.window_rebind_hook = main._on_target_window_rebound
         return engine
 
     def _start(self, step: bool) -> bool:

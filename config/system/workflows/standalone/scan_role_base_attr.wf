@@ -41,7 +41,7 @@ if $silent_write
 else
     call $result = scan_role_base_attr_for_plan("", "", "", false, $scroll_count)
 end
-if $result == -1
+if $result < 0
     return -1
 end
 return 0

@@ -260,7 +260,7 @@ class RoleAttrParser:
             for key in left_keys:
                 tokens = [t.strip() for t in raw[key].split("|") if t.strip()]
                 result.update(parse_detail1(tokens))
-        else:
+        elif not any(k.startswith("right_") and raw.get(k) for k in raw):
             logger.warning("RoleAttrParser.parse: 未找到任何 left_* 快照")
 
         # detail_2 精确数据覆盖 detail_1 的兜底值。尤其外功攻击左区在

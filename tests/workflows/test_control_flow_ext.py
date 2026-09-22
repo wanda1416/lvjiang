@@ -3,6 +3,7 @@
 归档自 P0/P1 开发期冒烟测试（scripts/_phase1_smoke.py、_phase2_smoke.py）。
 """
 import pytest
+from loguru import logger
 
 from lvjiang.workflows.engine.signals import WorkflowUserError, _ReturnSignal
 from lvjiang.workflows.grammar import parse_text
@@ -128,6 +129,18 @@ end
 # ─── try / catch ──────────────────────────────────────────
 
 class TestTryCatch:
+    def test_handled_error_does_not_log_workflow_failure(self):
+        errors = []
+        sink = logger.add(
+            lambda message: errors.append(message.record["message"]), level="ERROR")
+        try:
+            result = run('try\n    eval $x = $s.missing\ncatch $err\n'
+                         '    eval $handled = true\nend\n', {"s": "text"})
+        finally:
+            logger.remove(sink)
+        assert result["handled"] is True
+        assert not any("DSL 执行异常" in message for message in errors)
+
     def test_parse_with_err_var(self):
         prog = parse_text('try\n    eval $x = 1\ncatch $err\n    log "caught"\nend\n')
         node = prog.body[0]

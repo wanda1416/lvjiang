@@ -22,6 +22,19 @@ def _empty_slots() -> dict[str, str | None]:
     return {key: None for key in EQUIPMENT_SLOTS}
 
 
+def _slot_dingyin(raw: object) -> dict[str, str]:
+    """只保留已知槽位上的合法定音种类；其余一律当未记录丢弃。"""
+    from ..equip_parser.dingyin_parser import DINGYIN_TYPES
+
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        key: str(raw[key])
+        for key in EQUIPMENT_SLOTS
+        if str(raw.get(key) or "") in DINGYIN_TYPES
+    }
+
+
 @dataclass
 class LoadoutPlan:
     id: str
@@ -38,6 +51,10 @@ class LoadoutPlan:
     gongjue: str = ""
     graduation_scheme: str = ""
     equipment: dict[str, str | None] = field(default_factory=_empty_slots)
+    # 每个槽位在这套方案下展示哪种定音（normal/zhige）。游戏里备战方案自己
+    # 记着这件装备该显示哪种音，切方案就跟着切，所以它属于方案而不是装备。
+    # 缺键表示未记录，按 normal 读；不参与任何计算。
+    dingyin: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def create(cls, name: str = "默认方案") -> "LoadoutPlan":
@@ -61,6 +78,7 @@ class LoadoutPlan:
             gongjue=str(data.get("gongjue") or ""),
             graduation_scheme=str(data.get("graduation_scheme") or ""),
             equipment=slots,
+            dingyin=_slot_dingyin(data.get("dingyin")),
         )
 
     def to_dict(self) -> dict:
@@ -73,6 +91,7 @@ class LoadoutPlan:
             "gongjue": self.gongjue,
             "graduation_scheme": self.graduation_scheme,
             "equipment": dict(self.equipment),
+            "dingyin": dict(self.dingyin),
         }
 
 

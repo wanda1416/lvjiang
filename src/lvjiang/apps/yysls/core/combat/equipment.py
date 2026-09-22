@@ -220,6 +220,15 @@ class EquipmentInventory:
         """更新装备锁定状态，不重新审计全部装备。"""
         self._state = self._repo.set_item_lock_status(fp, locked)
 
+    def set_plan_dingyin(self, slot_key: str, kind: str) -> None:
+        """切换当前方案某个槽位展示哪种定音，不动装备自身的展示状态。"""
+        self._state = self._repo.set_plan_dingyin(
+            self._state.active_plan_id, slot_key, kind)
+
+    def set_item_dingyin_type(self, fp: str, kind: str) -> None:
+        """切换背包中某件装备默认展示哪种定音，不动任何方案的选择。"""
+        self._state = self._repo.set_item_dingyin_type(fp, kind)
+
     def apply_transmute_targets(
         self,
         targets: dict[str, tuple[int, str, float] | None],
@@ -251,6 +260,8 @@ class EquipmentInventory:
                 # 任何展示意图：走统一入口保住两种定音和转律目标即可。
                 state.equipment_items[fp] = stamp_equipment_write(
                     equip, fp, state.equipment_items.get(fp))
+                if plan.equipment[slot] != fp:
+                    plan.dingyin.pop(slot, None)
                 plan.equipment[slot] = fp
         self._repo.update(mutate)
         self.reload()

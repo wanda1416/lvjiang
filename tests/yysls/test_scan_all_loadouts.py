@@ -368,7 +368,6 @@ def test_plan_scan_recovers_from_data_error_and_returns_to_main(
             "nav_main_to_equip": 0, "nav_back_to_main": 0 if safe_home else -1,
             "nav_main_to_role": 0,
             "capture_role_base_attrs": {"min_outer": 100.0},
-            "nav_main_to_menu": 0 if safe_home else -1,
             "is_in_main_page": 1,
         }[node.name]
         if node.result_var is not None:
@@ -385,6 +384,9 @@ def test_plan_scan_recovers_from_data_error_and_returns_to_main(
 
     monkeypatch.setattr(engine, "_exec_call_proc", fake_call)
     monkeypatch.setattr(engine, "_exec_eval", fake_eval)
+    monkeypatch.setattr(engine, "_exec_scan", lambda node: engine.variables.update({
+        node.target.name: "" if safe_home else "back",
+    }))
     monkeypatch.setattr(engine, "_exec_click", lambda node: clicked.append(node))
     monkeypatch.setattr(engine, "_exec_wait", lambda _node: None)
     with pytest.raises(_ReturnSignal) as returned:
@@ -393,8 +395,9 @@ def test_plan_scan_recovers_from_data_error_and_returns_to_main(
     if scan_kind == "equipment":
         assert calls[-1] == "nav_back_to_main"
     else:
-        assert calls[-1] == ("is_in_main_page" if safe_home else "nav_main_to_menu")
-        assert len(clicked) == (2 if safe_home else 1)
+        assert "nav_main_to_menu" not in calls
+        assert calls[-1] == ("is_in_main_page" if safe_home else "capture_role_base_attrs")
+        assert len(clicked) == 2
 
 
 @pytest.mark.parametrize("needs_switch", [True, False])

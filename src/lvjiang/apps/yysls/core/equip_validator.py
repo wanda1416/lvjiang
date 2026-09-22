@@ -13,7 +13,7 @@ docs/10-game/01-equipment-system.md 中的装备产出硬规则。这里绝不�
 调律规则属于用户玩法策略，不能决定一件装备是否能由游戏产出。
 
 定音不在本模块判定。止戈定音是可预计的合法状态，由定音解析链路使用独立
-``_extra.is_zhige_dingyin`` 标记，不得混入 ``illegal_equip``。
+止戈定音由独立数据槽与 ``dingyin_type`` 表达，不得混入 ``illegal_equip``。
 """
 
 from __future__ import annotations

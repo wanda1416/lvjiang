@@ -53,7 +53,7 @@ class LoadoutPlan:
     equipment: dict[str, str | None] = field(default_factory=_empty_slots)
     # 每个槽位在这套方案下展示哪种定音（normal/zhige）。游戏里备战方案自己
     # 记着这件装备该显示哪种音，切方案就跟着切，所以它属于方案而不是装备。
-    # 缺键表示未记录，按 normal 读；不参与任何计算。
+    # 缺键固定按 normal 读；不参与任何计算。
     dingyin: dict[str, str] = field(default_factory=dict)
 
     @classmethod

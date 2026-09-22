@@ -416,14 +416,29 @@ def test_real_development_allows_dingyin_growth_without_changing_fingerprint(
     assert repo.load().equipment_items[old_fp]["dingyin"]["value"] == 11.0
 
 
+def test_real_development_allows_switching_dingyin_affix(
+    tmp_path: Path,
+):
+    repo = LoadoutRepository("alice", tmp_path)
+    old = developed_real_equip()
+    old_fp = repo.upsert_item(old)
+    changed = json.loads(json.dumps(old, ensure_ascii=False))
+    changed["dingyin"] = {"name": "属攻穿透", "value": 9.0}
+
+    new_fp = repo.update_real_development(old_fp, changed)
+
+    assert new_fp == old_fp
+    assert repo.load().equipment_items[old_fp]["dingyin"] == {
+        "name": "属攻穿透", "value": 9.0,
+    }
+
+
 @pytest.mark.parametrize("mutate,error", [
     (lambda item: item.update(name="伪造名称"), "既定属性不可修改"),
     (lambda item: item["affix_1"].update(name="势"), "商角徵羽"),
     (lambda item: item["affix_2"].update(value=1.0),
      "非承音装备不能培养词条数值"),
     (lambda item: item["dingyin"].update(value=1.0), "只能提高定音数值"),
-    (lambda item: item.update(dingyin={"name": "会心伤害", "value": 10}),
-     "不能更换定音词条"),
 ])
 def test_real_development_rejects_illegal_changes(
     tmp_path: Path, mutate, error,

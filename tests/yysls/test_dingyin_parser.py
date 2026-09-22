@@ -11,10 +11,9 @@ from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
     DINGYIN_SLOT_NOTICE,
     DINGYIN_ZHIGE,
-    ZHIGE_DINGYIN_KEY,
     ZHIGE_DINGYIN_NAME,
     DingyinParser,
-    refresh_dingyin_marker_dict,
+    stored_dingyin_type,
 )
 from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
 from lvjiang.core.ocr_cleaner import OCRCleaner
@@ -165,7 +164,7 @@ class TestParserDelegation:
         assert equip.dingyin == {}
         assert equip.dingyin_zhige == {"name": ZHIGE_DINGYIN_NAME}
         assert equip.dingyin_type == DINGYIN_ZHIGE
-        assert equip.extra_data[ZHIGE_DINGYIN_KEY] is True
+        assert "is_zhige_dingyin" not in equip.extra_data
         assert not any("定音词条无法解析" in w for w in equip.warnings)
 
     def test_normal_name_with_bad_value_is_recorded_as_zero(self, parser):
@@ -181,7 +180,7 @@ class TestParserDelegation:
             **self._FULL_AFFIXES,
             "dingyin": "外功穿透",
         })
-        assert ZHIGE_DINGYIN_KEY not in equip.extra_data
+        assert "is_zhige_dingyin" not in equip.extra_data
         assert equip.dingyin_zhige == {}
         assert equip.dingyin_type == DINGYIN_NORMAL
         assert equip.dingyin["name"] == "外功穿透"
@@ -211,49 +210,14 @@ class TestParserDelegation:
         assert len(equip.affixes) == 2
 
 
-class TestZhigeMarker:
-    """标记是 dingyin_type 的派生值，不再反过来决定它。"""
+class TestStoredDingyinType:
+    def test_missing_type_is_always_normal(self):
+        equip = {"_extra": {"is_zhige_dingyin": True}}
+        assert stored_dingyin_type(equip) == DINGYIN_NORMAL
 
-    def test_legacy_marker_becomes_a_zhige_slot(self):
-        """历史记录只有标记没有数据槽，读取时补出固定名称的止戈槽。"""
-        equip = {"dingyin": {}, "_extra": {ZHIGE_DINGYIN_KEY: True}}
-        assert refresh_dingyin_marker_dict(equip) is True
-        assert equip["dingyin_zhige"] == {"name": ZHIGE_DINGYIN_NAME}
-
-    def test_zhige_type_survives_a_kept_normal_dingyin(self):
-        """两种定音并存时，加载不能因为普通槽有值就把止戈态改回去。
-
-        旧实现从 dingyin.name 反推标记，新模型下普通槽会长期保留数据，
-        那样每次加载都会把止戈态抹掉——正是这次要修的丢失。
-        """
-        equip = {
-            "dingyin": {"name": "外功穿透", "value": 10},
-            "dingyin_zhige": {"name": ZHIGE_DINGYIN_NAME},
-            "dingyin_type": DINGYIN_ZHIGE,
-        }
-        assert refresh_dingyin_marker_dict(equip) is True
-        assert equip["dingyin"] == {"name": "外功穿透", "value": 10}
-        assert equip["_extra"][ZHIGE_DINGYIN_KEY] is True
-
-    def test_normal_type_clears_stale_marker(self):
-        equip = {
-            "dingyin": {"name": "外功穿透", "value": 10},
-            "dingyin_type": DINGYIN_NORMAL,
-            "_extra": {ZHIGE_DINGYIN_KEY: True},
-        }
-        assert refresh_dingyin_marker_dict(equip) is False
-        assert ZHIGE_DINGYIN_KEY not in equip["_extra"]
-
-    def test_unknown_legacy_name_stays_in_the_normal_slot(self):
-        """历史上被写进普通槽的止戈名称不做识别搬迁。
-
-        名称判定会随定音词库增删而翻转，不能让它去改一个已经存成事实的
-        展示状态；这种记录重扫一次就会归位。
-        """
-        equip = {"dingyin": {"name": "止戈特殊效果", "value": 99}}
-        assert refresh_dingyin_marker_dict(equip) is False
-        assert equip["dingyin"] == {"name": "止戈特殊效果", "value": 99}
-        assert "dingyin_zhige" not in equip
+    def test_explicit_zhige_type_is_used(self):
+        assert stored_dingyin_type(
+            {"dingyin_type": DINGYIN_ZHIGE}) == DINGYIN_ZHIGE
 
 
 class TestMisreadVsZhige:
@@ -300,21 +264,17 @@ class TestMisreadReachesWarnings:
             "dingyin": dingyin,
         })
 
-    def test_misread_warns_but_still_uses_non_normal_marker(self, parser):
-        from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
-            ZHIGE_DINGYIN_KEY,
-        )
+    def test_misread_warns_but_still_uses_zhige_slot(self, parser):
         equip = self._parse(parser, "外功穿诱 +14.2%")
         assert any("疑似误读" in w for w in equip.warnings)
         assert "外功穿透" in " ".join(equip.warnings)
-        assert equip.extra_data[ZHIGE_DINGYIN_KEY] is True
+        assert equip.dingyin_type == DINGYIN_ZHIGE
+        assert "is_zhige_dingyin" not in equip.extra_data
         # 说明挂在止戈槽自己身上，不会跟着另一种定音走。
         assert "外功穿透" in equip.dingyin_zhige[DINGYIN_SLOT_NOTICE]
 
     def test_genuine_zhige_still_silent(self, parser):
-        from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
-            ZHIGE_DINGYIN_KEY,
-        )
         equip = self._parse(parser, "止戈特殊效果 +12")
-        assert equip.extra_data[ZHIGE_DINGYIN_KEY] is True
+        assert equip.dingyin_type == DINGYIN_ZHIGE
+        assert "is_zhige_dingyin" not in equip.extra_data
         assert not any("疑似误读" in w for w in equip.warnings)

@@ -789,11 +789,13 @@ class MockEquipDialog(QDialog):
                 action.setData(affix_name)
                 action.triggered.connect(
                     lambda checked, n=affix_name: self._on_dingyin_affix_selected(n))
-        # 添加“无”选项
-        menu.addSeparator()
-        none_action = menu.addAction(tr("（无）"))
-        none_action.setData("")
-        none_action.triggered.connect(lambda: self._on_dingyin_affix_selected(""))
+        # 真实装备可以无成本切换已有定音词条，但不能借编辑器删除定音。
+        if not self._is_real_development:
+            menu.addSeparator()
+            none_action = menu.addAction(tr("（无）"))
+            none_action.setData("")
+            none_action.triggered.connect(
+                lambda: self._on_dingyin_affix_selected(""))
         menu.exec(self._btn_dingyin.mapToGlobal(self._btn_dingyin.rect().bottomLeft()))
 
     def _on_dingyin_affix_selected(self, affix_name: str):
@@ -872,12 +874,14 @@ class MockEquipDialog(QDialog):
             self._edit_name,
             self._combo_level,
             self._combo_quality,
-            self._btn_dingyin,
         ):
             widget.setEnabled(False)
 
         dingyin = self._equip_data.get("dingyin") or {}
         has_dingyin = bool(dingyin.get("name"))
+        self._btn_dingyin.setEnabled(has_dingyin)
+        if not has_dingyin:
+            self._btn_dingyin.setToolTip(tr("此装备没有可切换的普通定音词条"))
         can_grow_values = can_cultivate_affix_values(self._equip_data)
         # 满定音与满承音是两条独立假设；普通定音不要求装备已经承音。
         self._spin_dingyin.setEnabled(has_dingyin)
@@ -1009,6 +1013,7 @@ class MockEquipDialog(QDialog):
         old_dingyin = self._equip_data.get("dingyin") or {}
         if old_dingyin.get("name"):
             dingyin = copy.deepcopy(old_dingyin)
+            dingyin["name"] = self._dingyin_selected
             dingyin["value"] = round(self._spin_dingyin.value(), 1)
             pct = affix_dict_cap_pct(
                 dingyin, result["level"], game_config=game_config)
@@ -1054,12 +1059,15 @@ class MockEquipDialog(QDialog):
         return None
 
     def _has_development_change(self, result: dict) -> bool:
-        """是否真的动过：词条名/数值、定音数值或等级任一变化。"""
+        """是否真的动过：词条名/数值、定音名称/数值或等级任一变化。"""
         old = self._equip_data
         if result.get("level") != old.get("level"):
             return True
-        if (float((result.get("dingyin") or {}).get("value") or 0.0)
-                != float((old.get("dingyin") or {}).get("value") or 0.0)):
+        before_dingyin = old.get("dingyin") or {}
+        after_dingyin = result.get("dingyin") or {}
+        if (before_dingyin.get("name") != after_dingyin.get("name")
+                or float(after_dingyin.get("value") or 0.0)
+                != float(before_dingyin.get("value") or 0.0)):
             return True
         for index in range(1, 6):
             before = old.get(f"affix_{index}") or {}

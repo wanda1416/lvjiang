@@ -266,18 +266,13 @@ class TestIllegalReasonsOf:
 
 
 class TestHistoricalDiscovery:
-    def test_inventory_reload_refreshes_existing_marks(self):
+    def test_inventory_reload_refreshes_existing_illegal_reasons(self):
         from lvjiang.apps.yysls.core.combat.equipment import EquipmentInventory
-        from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
-            ZHIGE_DINGYIN_KEY,
-        )
 
-        # 历史记录：只有旧的止戈标记，没有新的定音种类和止戈数据槽。
         equip = {
             "type": "环",
             "affix_1": {"name": "会心率", "value": 1.0},
             "affix_2": {"name": "会心率", "value": 1.0},
-            "_extra": {ZHIGE_DINGYIN_KEY: True},
         }
         state = SimpleNamespace(equipment_items={"fp": equip})
         inventory = EquipmentInventory.__new__(EquipmentInventory)
@@ -286,14 +281,10 @@ class TestHistoricalDiscovery:
         inventory.reload()
 
         assert ILLEGAL_KEY in equip["_extra"]
-        assert equip["_extra"][ZHIGE_DINGYIN_KEY] is True
-        # 加载时补出止戈数据槽，历史装备不必重扫也能正常展示。
-        assert equip["dingyin_zhige"]["name"]
 
     def test_one_dirty_item_does_not_skip_later_items(self, monkeypatch):
         from lvjiang.apps.yysls.core import equip_validator
         from lvjiang.apps.yysls.core.combat.equipment import EquipmentInventory
-        from lvjiang.apps.yysls.core.equip_parser import dingyin_parser
 
         bad = {"bad": True}
         good: dict = {}
@@ -308,11 +299,6 @@ class TestHistoricalDiscovery:
             return []
 
         monkeypatch.setattr(equip_validator, "annotate_equipment_dict", audit)
-        monkeypatch.setattr(
-            dingyin_parser, "refresh_dingyin_marker_dict",
-            lambda equip: equip.__setitem__("dingyin_refreshed", True) or False,
-        )
-
         inventory.reload()
 
-        assert good == {"audited": True, "dingyin_refreshed": True}
+        assert good == {"audited": True}

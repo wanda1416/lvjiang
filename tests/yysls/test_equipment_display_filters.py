@@ -7,6 +7,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
     QComboBox,
     QGridLayout,
+    QLabel,
     QPushButton,
     QStyle,
     QStyleOptionComboBox,
@@ -249,6 +250,64 @@ def test_single_item_metadata_updates_cards_without_rebuilding_grid(qtbot):
     assert not slot.lock_badge.isHidden()
     assert not compact.lock_badge.isHidden()
     assert grid.itemAt(0).widget() is compact
+
+
+def test_slot_card_renders_the_plan_dingyin_instead_of_equipment_default(qtbot):
+    """PVP 扫到止戈后，正在查看的 PVE 方案仍必须显示自己的普通定音。"""
+    card = _SlotCard("ring", "环", "ring")
+    qtbot.addWidget(card)
+    card.set_equip({
+        "_fp": "same",
+        "type": "环",
+        "name": "流星环",
+        "level": 110,
+        "dingyin": {"name": "外功穿透", "value": 14.2},
+        "dingyin_zhige": {"name": "止戈定音"},
+        "dingyin_type": "zhige",
+    }, dingyin_kind="normal")
+
+    texts = {label.text() for label in card.findChildren(QLabel)}
+    assert any("外功穿透" in value for value in texts)
+    assert not any("<止戈定音>" in value for value in texts)
+
+
+def test_missing_plan_dingyin_defaults_to_normal():
+    plan = SimpleNamespace(dingyin={})
+    tab = SimpleNamespace(
+        _inv=SimpleNamespace(
+            state=SimpleNamespace(
+                active_plan_id="pve", plans={"pve": plan})))
+
+    assert EquipStatusTab._plan_dingyin_kind(tab, "ring") == "normal"
+
+
+def test_slot_properties_switch_calls_the_plan_write_entry(monkeypatch):
+    from lvjiang.apps.yysls.ui.loadout.equip import cards
+
+    writes: list[tuple[str, str]] = []
+    inventory = SimpleNamespace(
+        set_plan_dingyin=lambda slot, kind: writes.append((slot, kind)))
+    tab = SimpleNamespace(
+        window=lambda: None,
+        _require_inventory=lambda: inventory,
+        _slot_of_equipped=lambda equip_data: "ring",
+        _plan_dingyin_kind=lambda slot_key: "normal",
+        _refresh_slots=lambda: None,
+        _refresh_dingyin_cards=lambda fp: None,
+    )
+    captured: dict = {}
+    monkeypatch.setattr(
+        cards, "_show_equipment_properties",
+        lambda parent, equip, **kwargs: captured.update(kwargs))
+    equip = {
+        "_fp": "ring-fp",
+        "dingyin": {"name": "外功穿透", "value": 14.2},
+        "dingyin_zhige": {"name": "止戈定音"},
+    }
+
+    EquipStatusTab._on_properties_requested(tab, equip)
+    assert captured["dingyin_changed"]("zhige") is True
+    assert writes == [("ring", "zhige")]
 
 
 def test_lock_request_only_updates_one_item_without_full_sync():

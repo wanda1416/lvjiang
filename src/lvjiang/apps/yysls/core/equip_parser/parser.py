@@ -14,8 +14,11 @@ from .constants import (
     infer_category,
 )
 from .dingyin_parser import (
+    DINGYIN_NORMAL,
     DINGYIN_NOTICE_KEY,
+    DINGYIN_ZHIGE,
     ZHIGE_DINGYIN_KEY,
+    ZHIGE_DINGYIN_NAME,
     DingyinParser,
 )
 from .models import Affix, EquipAttr, EquipmentData
@@ -82,42 +85,10 @@ class EquipmentParser:
         # 计算词条数值百分比（cap_pct）
         self._calc_affix_cap_pct(equip)
 
-        # 定音词条（词条不满 5 个时不可能有定音，跳过解析）
+        # 定音词条（词条不满 5 个时不可能有定音，读到什么都是脏数据，整段跳过）
         dingyin_text = raw.get("dingyin", "").strip()
         if dingyin_text and len(equip.affixes) >= 5:
-            result = self._dingyin_parser.parse(dingyin_text)
-            if result:
-                equip.dingyin = result
-                equip.extra_data.pop(ZHIGE_DINGYIN_KEY, None)
-                equip.extra_data.pop(DINGYIN_NOTICE_KEY, None)
-                # 计算定音词条 cap_pct（与普通词条相同逻辑）
-                if equip.level and result.get("name"):
-                    caps = self._attr_config.get_affix_caps(
-                        equip.level, result["name"])
-                    if caps and caps.get("cap"):
-                        result["cap_pct"] = round(
-                            result["value"] / caps["cap"] * 100, 1)
-            else:
-                suspected = self._dingyin_parser.suspected_misread(dingyin_text)
-                if self._dingyin_parser.matches_normal_name(dingyin_text):
-                    # 名称属于普通定音但数值解析失败，仍是未预计的 OCR 问题，
-                    # 不能伪装成止戈定音。
-                    equip.warnings.append(f"定音词条无法解析: {dingyin_text!r}")
-                elif suspected is not None:
-                    # 启发式判断只能作为核对提示，不能改变“非普通定音统一按
-                    # 止戈展示”的确定语义，否则误判会让定音整行凭空消失。
-                    notice = (
-                        f"定音词条疑似误读为 {dingyin_text!r}，"
-                        f"可能是「{suspected}」，请核对")
-                    equip.warnings.append(notice)
-                    equip.extra_data[ZHIGE_DINGYIN_KEY] = True
-                    equip.extra_data[DINGYIN_NOTICE_KEY] = notice
-                else:
-                    # 普通定音词库无法解释的文本是可预计的止戈定音，不属于装备
-                    # 异常，也不保留其名称/数值；UI 只展示 <止戈定音>。
-                    equip.extra_data[ZHIGE_DINGYIN_KEY] = True
-                    equip.extra_data.pop(DINGYIN_NOTICE_KEY, None)
-                    logger.info(f"识别为止戈定音: {dingyin_text!r}")
+            self._parse_dingyin(equip, dingyin_text)
 
         # 辅助信息
         equip.extra_data["affix_count"] = len(equip.affixes)
@@ -363,6 +334,57 @@ class EquipmentParser:
 
         logger.warning(f"base_attr 无法解析: {raw!r}")
         return None
+
+    def _parse_dingyin(self, equip, dingyin_text: str) -> None:
+        """把一次定音读数落进两个槽之一，并记下本次展示的种类。
+
+        一次扫描只可能读到一种定音，所以只写它对应的那个槽；另一个槽由仓储
+        写入入口从旧记录合并回来，不在这里造数据。
+        """
+        result = self._dingyin_parser.parse(dingyin_text)
+        if result:
+            equip.dingyin = result
+            equip.dingyin_type = DINGYIN_NORMAL
+            equip.extra_data.pop(ZHIGE_DINGYIN_KEY, None)
+            equip.extra_data.pop(DINGYIN_NOTICE_KEY, None)
+            # 计算定音词条 cap_pct（与普通词条相同逻辑）
+            if equip.level and result.get("name"):
+                caps = self._attr_config.get_affix_caps(
+                    equip.level, result["name"])
+                if caps and caps.get("cap"):
+                    result["cap_pct"] = round(
+                        result["value"] / caps["cap"] * 100, 1)
+            return
+
+        matched = self._dingyin_parser.matched_name(dingyin_text)
+        if matched is not None:
+            # 名称认得出、只是数值没读出来：按 0 记录。0 在卡片上一眼就不对，
+            # 比悄悄留着上一次的数值更容易被发现；重扫一次即可恢复。
+            notice = (
+                f"定音「{matched}」数值未能识别，已按 0 记录，请重新扫描核对")
+            equip.dingyin = {"name": matched, "value": 0.0, "cap_pct": 0.0}
+            equip.dingyin_type = DINGYIN_NORMAL
+            equip.warnings.append(notice)
+            equip.extra_data.pop(ZHIGE_DINGYIN_KEY, None)
+            equip.extra_data[DINGYIN_NOTICE_KEY] = notice
+            logger.warning(f"定音数值无法提取，按 0 记录: {dingyin_text!r}")
+            return
+
+        # 名称都解释不了的一律按可预计的止戈定音处理。真实止戈词条还没进
+        # 词库，名称先固定；疑似误读只作为核对提示，不改变归属。
+        equip.dingyin_zhige = {"name": ZHIGE_DINGYIN_NAME}
+        equip.dingyin_type = DINGYIN_ZHIGE
+        equip.extra_data[ZHIGE_DINGYIN_KEY] = True
+        suspected = self._dingyin_parser.suspected_misread(dingyin_text)
+        if suspected is not None:
+            notice = (
+                f"定音词条疑似误读为 {dingyin_text!r}，"
+                f"可能是「{suspected}」，请核对")
+            equip.warnings.append(notice)
+            equip.extra_data[DINGYIN_NOTICE_KEY] = notice
+        else:
+            equip.extra_data.pop(DINGYIN_NOTICE_KEY, None)
+            logger.info(f"识别为止戈定音: {dingyin_text!r}")
 
     def _calc_affix_cap_pct(self, equip: EquipmentData):
         """计算每条词条的数值百分比（cap_pct）

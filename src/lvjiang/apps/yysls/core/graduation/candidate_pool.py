@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ...config.equipment_slots import EQUIPMENT_SLOTS
-from ..equip_parser.dingyin_parser import is_zhige_dingyin
+from ..equip_parser.dingyin_parser import has_normal_dingyin
 
 #: 非武器分组 → 槽位；武器按方案武器类型分配，不在此表。
 GROUP_TO_SLOTS: dict[str, tuple[str, ...]] = {
@@ -40,9 +40,9 @@ class CandidateFilter:
         if self.level_threshold > 0 and level < self.level_threshold:
             return False
         if self.affix_filter == "dingyin":
-            dingyin = equip.get("dingyin")
-            return (is_zhige_dingyin(equip)
-                    or isinstance(dingyin, dict) and bool(dingyin.get("name")))
+            # 只认普通定音：毕业率模型只读 dingyin，止戈贡献为 0，
+            # 放它进候选池等于让一件没定音的装备冒充定过音。
+            return has_normal_dingyin(equip)
         if self.affix_filter == "full_tuning":
             return all(
                 isinstance(equip.get(f"affix_{i}"), dict)

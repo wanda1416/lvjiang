@@ -11,6 +11,12 @@ def _repository(_engine):
     return LoadoutRepository(username, getattr(_engine, "users_dir", None))
 
 
+@builtin_func("scanned_loadout_names")
+def _scanned_loadout_names(_engine) -> dict[str, bool]:
+    """Snapshot existing local plan names before a batch scans game plans."""
+    return {plan.name: True for plan in _repository(_engine).load().plans.values()}
+
+
 @builtin_func("ensure_scanned_loadout")
 def _ensure_scanned_loadout(
     _engine, name: str, main_art: str, sub_art: str,

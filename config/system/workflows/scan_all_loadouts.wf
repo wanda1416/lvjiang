@@ -9,8 +9,13 @@
 #%     default: 8
 #%     min: 1
 #%     max: 20
+#%   - name: skip_existing
+#%     label: 跳过已存在的备战方案
+#%     type: bool
+#%     default: false
 
 default $scroll_count = 8
+default $skip_existing = false
 import "subcall/loadout/loadout_plan_navigation.wf"
 import "subcall/loadout/equipped_plan_scan.wf"
 import "subcall/loadout/role_base_attr_plan_scan.wf"
@@ -26,9 +31,21 @@ if not $names
     log error "游戏方案列表未识别到任何方案"
     return -1
 end
+eval $existing_names = {}
+if $skip_existing
+    eval $existing_names = scanned_loadout_names()
+end
 eval $in_game_plans = true
 eval $completed = 0
+eval $attempted = 0
+eval $skipped_existing = 0
 for name in $names
+    if $skip_existing and has_key($existing_names, $name)
+        log info "跳过已存在的备战方案: " + $name
+        eval $skipped_existing = $skipped_existing + 1
+        continue
+    end
+    eval $attempted = $attempted + 1
     if not $in_game_plans
         call $nav_result = nav_main_to_game_plans()
         if $nav_result < 0
@@ -50,16 +67,28 @@ for name in $names
         return -1
     end
     eval $in_game_plans = false
-    eval $target = ensure_scanned_loadout(
-        $selected.name, $selected.main_art, $selected.sub_art)
+    eval $target_error = ""
+    try
+        eval $target = ensure_scanned_loadout(
+            $selected.name, $selected.main_art, $selected.sub_art)
+    catch $err
+        eval $target_error = $err
+    end
+    if $target_error
+        log warn "跳过游戏方案 " + $selected.name + ": " + $target_error
+        continue
+    end
     if not $target.ok
         log error "跳过游戏方案 " + $selected.name + ": " + $target.reason
         continue
     end
     call $written = scan_equipped_plan(
         $target.name, $target.main_art, $target.sub_art)
+    if $written == -1
+        return -1
+    end
     if $written != 8
-        log error "备战方案装备未完整扫描，跳过基础属性: " + $target.name
+        log warn "备战方案装备未完整扫描，跳过基础属性: " + $target.name
         continue
     end
     eval $completed = $completed + 1
@@ -72,6 +101,9 @@ for name in $names
     if $saved == -1
         return -1
     end
+    if $saved == -2
+        continue
+    end
     log info "已扫描备战方案: " + $target.name + "，基础属性: " + $saved
 end
 if $in_game_plans
@@ -81,6 +113,10 @@ if $in_game_plans
     end
 end
 if $completed == 0
+    if $attempted == 0 and $skipped_existing > 0
+        log info "游戏中的备战方案均已存在，本次无需重复扫描"
+        return 0
+    end
     log error "没有任何备战方案完成装备扫描"
     return -1
 end

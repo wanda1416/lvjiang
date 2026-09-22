@@ -13,6 +13,7 @@ from lvjiang.apps.yysls.workflows.builtins.equipment_ingest import (
     _bind_scanned_loadout,
     _ensure_scanned_loadout,
     _loadout_scan_target,
+    _set_scanned_loadout_gongjue,
     _write_equipped,
 )
 from lvjiang.apps.yysls.workflows.builtins.role_attr_ingest import (
@@ -76,6 +77,61 @@ def test_ambiguous_name_never_writes_arbitrary_plan(tmp_path):
     with pytest.raises(ValueError, match="匹配 2 个"):
         _bind_scanned_loadout(engine, "同名", "无名剑法", "无名枪法")
     assert "_bound_loadout_plan_id" not in engine.context
+
+
+def test_scanned_gongjue_writes_only_bound_plan(tmp_path):
+    engine = _engine(tmp_path)
+    repo = LoadoutRepository(engine.run_username, tmp_path)
+    active = repo.load().active_plan_id
+    target = repo.create_plan("方案甲", "无名剑法", "无名枪法", activate=False)
+    with pytest.raises(ValueError, match="绑定写入目标"):
+        _set_scanned_loadout_gongjue(engine, "会意")
+    _bind_scanned_loadout(engine, target.name, target.main_martial_art,
+                          target.sub_martial_art)
+    with pytest.raises(ValueError, match="无法识别"):
+        _set_scanned_loadout_gongjue(engine, "未知")
+    assert _set_scanned_loadout_gongjue(engine, "精准") == "精准"
+    state = repo.load()
+    assert state.plans[target.id].gongjue == "精准"
+    assert state.active_plan_id == active
+    assert state.plans[active].gongjue == ""
+
+
+@pytest.mark.parametrize(
+    ("detail", "expected"),
+    [
+        ("弓玦套装 | 会意", "会意"),
+        ("弓玦套装 | 会心", "会心"),
+        ("弓玦套装 | 精准", "精准"),
+        ("未识别到套装", None),
+        ("会意 | 会心", None),
+    ],
+)
+def test_bow_detail_dsl_updates_gongjue_only_when_unique(
+        tmp_path, monkeypatch, detail, expected):
+    """运行生产 DSL 的弓扫描段，确保不会凭空猜测或改动活动方案。"""
+    proc = parse_file(
+        Path("config/system/workflows/subcall/loadout/equipped_slots_scan.wf")
+    ).procs["scan_equipped_slots"]
+    engine = make_engine()
+    engine.run_username = "test_user"
+    engine.users_dir = tmp_path
+    repo = LoadoutRepository(engine.run_username, tmp_path)
+    active = repo.load().active_plan_id
+    target = repo.create_plan("方案甲", "无名剑法", "无名枪法", activate=False)
+    _bind_scanned_loadout(engine, target.name, target.main_martial_art,
+                          target.sub_martial_art)
+    engine.variables = {"written": 8}
+    monkeypatch.setattr(engine, "_exec_click", lambda _node: None)
+    monkeypatch.setattr(engine, "_exec_wait", lambda _node: None)
+    monkeypatch.setattr(engine, "_exec_scan", lambda _node: engine.variables.update(
+        bow_detail={"equip_detail": detail}))
+    with pytest.raises(_ReturnSignal) as returned:
+        engine._exec_body(proc.body[3:])
+    assert returned.value.value == (8 if expected else -1)
+    state = repo.load()
+    assert state.plans[target.id].gongjue == (expected or "")
+    assert state.active_plan_id == active
 
 
 def test_game_plan_creates_local_plan_and_infers_playstyle_without_activation(tmp_path):

@@ -481,7 +481,7 @@ falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 | **装备（7）** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` `yysls_rich_parse` |
 | **背包遍历（3）** | `check_scroll` `notify_scroll` `scroll_advance` |
 | **背包游标（3）** | `bag_cursor_init` `bag_cursor_visit` `bag_cursor_finish_window` |
-| **入库与角色属性（4）** | `write_bag_item` `write_equipped` `to_role_base_attrs` `open_base_attr_form` |
+| **入库与角色属性（5）** | `write_bag_item` `write_equipped` `set_scanned_loadout_gongjue` `to_role_base_attrs` `open_base_attr_form` |
 | **时间（2）** | `clock` `datetime` |
 | **用户交互与系统（7）** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` |
 | **应用生命周期（6）** | `app_is_running` `app_stop` `app_start` `android_app_stop` `android_app_start` `android_wait_stable_frame` |

@@ -132,3 +132,18 @@ def _write_equipped(_engine, slot_key: str, equip_dict: dict) -> str:
     fp = repo.assign_equipment(plan_id, slot_key, equip_dict)
     _notify_equipment_changed(_engine)
     return fp
+
+
+@builtin_func("set_scanned_loadout_gongjue")
+def _set_scanned_loadout_gongjue(_engine, gongjue: str) -> str:
+    """Set the scanned plan's bow-jue set without changing the UI active plan."""
+    if gongjue not in ("会意", "会心", "精准"):
+        raise ValueError(f"无法识别的弓玦套装: {gongjue!r}")
+    plan_id = _engine.context.get("_bound_loadout_plan_id")
+    if not plan_id:
+        raise ValueError("写入弓玦前必须通过方案名称与武学绑定写入目标")
+    repo = _repository(_engine)
+    repo.configure_plan(plan_id, gongjue=gongjue)
+    _notify_equipment_changed(_engine)
+    logger.info(f"已更新扫描方案的弓玦套装: {gongjue}")
+    return gongjue

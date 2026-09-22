@@ -25,5 +25,29 @@ def scan_equipped_slots()
             eval $written = $written + 1
         end
     end
+    # 弓玦不占八个装备槽位，但基础属性反推必须扣除当前方案的弓玦加成。
+    # 只读详情区域的套装关键词；识别不唯一时不沿用方案中可能过期的旧值。
+    click [bag_equip_detail].[bow] after wait @step_interval
+    scan [equip_detail].[equip_detail] as $bow_detail
+    eval $bow_text = $bow_detail.equip_detail
+    eval $bow_kind = ""
+    eval $bow_matches = 0
+    if $bow_text contains "会意"
+        eval $bow_kind = "会意"
+        eval $bow_matches = $bow_matches + 1
+    end
+    if $bow_text contains "会心"
+        eval $bow_kind = "会心"
+        eval $bow_matches = $bow_matches + 1
+    end
+    if $bow_text contains "精准"
+        eval $bow_kind = "精准"
+        eval $bow_matches = $bow_matches + 1
+    end
+    if $bow_matches != 1
+        log error "弓玦套装识别失败或不唯一，跳过该方案的基础属性反推"
+        return -1
+    end
+    eval set_scanned_loadout_gongjue($bow_kind)
     return $written
 end

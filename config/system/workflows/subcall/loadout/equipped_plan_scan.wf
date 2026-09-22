@@ -17,5 +17,8 @@ def scan_equipped_plan($name, $main_art, $sub_art)
     if $nav_result < 0
         return -1
     end
+    if $written < 0
+        return -1
+    end
     return $written
 end

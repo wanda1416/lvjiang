@@ -116,19 +116,32 @@ class WindowsAppController:
             return True
         return bool(app.window_title and app.window_title in window.get("title", ""))
 
-    def _find(self, app: AndroidAppConfig) -> dict | None:
-        observed = _observed_window
+    def _claims(self, app: AndroidAppConfig, window: dict) -> bool:
+        """window 是否就是这个注册项：显式特征匹配，或唯一未绑定的 PC 应用。"""
+        if self._matches(app, window):
+            return True
         pc_apps = [item for item in self.apps.values()
                    if item.platform in {"pc", "both"}]
-        if observed is not None and (
-                self._matches(app, observed)
-                or (len(pc_apps) == 1
-                    and not app.executable and not app.window_title)):
+        return (len(pc_apps) == 1
+                and not app.executable and not app.window_title)
+
+    def _bind(self, app: AndroidAppConfig, window: dict) -> None:
+        """运行期绑定：窗口模式首次定位即成为该注册项后续启停依据。
+
+        绑定的是应用身份，与这个窗口当下是否还活着无关。重启正是靠它按
+        可执行文件枚举出新窗口；若等到「旧窗口仍存活」才绑定，客户端已经
+        退出时（上一条目停止应用、崩溃掉线）就永远绑不上，start() 会把
+        游戏拉起来却找不到窗口，直到超时报错。
+        """
+        if not app.executable and window.get("executable"):
+            app.executable = str(window["executable"])
+            app.window_title = str(window.get("title") or "")
+
+    def _find(self, app: AndroidAppConfig) -> dict | None:
+        observed = _observed_window
+        if observed is not None and self._claims(app, observed):
+            self._bind(app, observed)
             if sys.platform != "win32" or self._window_is_current(observed):
-                if not app.executable and observed.get("executable"):
-                    # 运行期绑定：窗口模式首次定位即成为该注册项后续启停依据。
-                    app.executable = str(observed["executable"])
-                    app.window_title = str(observed.get("title") or "")
                 return dict(observed)
         return next((item for item in self._windows() if self._matches(app, item)), None)
 

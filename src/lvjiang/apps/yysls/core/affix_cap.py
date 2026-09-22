@@ -12,6 +12,16 @@ from __future__ import annotations
 from .numbers import strict_float
 
 
+def can_cultivate_affix_values(equip) -> bool:
+    """真实装备的普通词条能否继续培养数值。
+
+    毕业率“满承音”投影、真实装备编辑和写入校验共用这一条事实：只有
+    已经承音的装备才能提高现有普通词条数值。转律生成新词条时填写它的
+    新数值不属于培养旧数值，由转律规则单独处理。
+    """
+    return isinstance(equip, dict) and bool(equip.get("is_chengyin"))
+
+
 def affix_cap_value(
     level, affix_name: str, *, chengyin: bool = False, game_config=None,
 ) -> float | None:
@@ -90,6 +100,7 @@ def equip_affix_cap_pcts(equip, *, game_config=None) -> list[float]:
 
 
 __all__ = [
+    "can_cultivate_affix_values",
     "affix_cap_ratio",
     "affix_cap_pct",
     "affix_dict_cap_pct",

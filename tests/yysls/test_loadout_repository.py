@@ -351,7 +351,7 @@ def test_real_development_migrates_every_plan_and_resets_transmute_cooldown(
 
     changed = json.loads(json.dumps(old, ensure_ascii=False))
     changed["affix_2"] = {
-        "name": "精准率", "value": 4.0, "is_transferred": True,
+        "name": "会意率", "value": 4.0, "is_transferred": True,
     }
     new_fp = repo.update_real_development(old_fp, changed)
 
@@ -375,7 +375,7 @@ def test_real_development_carries_expired_cooldown_progress(tmp_path: Path):
     old_fp = repo.upsert_item(old)
     changed = json.loads(json.dumps(old, ensure_ascii=False))
     changed["affix_2"] = {
-        "name": "精准率", "value": 4.0, "is_transferred": True,
+        "name": "会意率", "value": 4.0, "is_transferred": True,
     }
 
     new_fp = repo.update_real_development(old_fp, changed)
@@ -386,7 +386,7 @@ def test_real_development_carries_expired_cooldown_progress(tmp_path: Path):
         previous + timedelta(days=5)).timestamp()) < 1
 
 
-def test_real_development_can_only_cultivate_existing_transferred_slot(
+def test_non_chengyin_can_set_value_when_retransmuting_fixed_slot(
     tmp_path: Path,
 ):
     repo = LoadoutRepository("alice", tmp_path)
@@ -394,7 +394,9 @@ def test_real_development_can_only_cultivate_existing_transferred_slot(
     old["affix_3"]["is_transferred"] = True
     old_fp = repo.upsert_item(old)
     cultivated = json.loads(json.dumps(old, ensure_ascii=False))
-    cultivated["affix_3"]["value"] = 61.0
+    cultivated["affix_3"] = {
+        "name": "会意率", "value": 4.0, "is_transferred": True,
+    }
 
     assert repo.update_real_development(old_fp, cultivated) != old_fp
 
@@ -417,7 +419,8 @@ def test_real_development_allows_dingyin_growth_without_changing_fingerprint(
 @pytest.mark.parametrize("mutate,error", [
     (lambda item: item.update(name="伪造名称"), "既定属性不可修改"),
     (lambda item: item["affix_1"].update(name="势"), "商角徵羽"),
-    (lambda item: item["affix_2"].update(value=1.0), "只能提高词条数值"),
+    (lambda item: item["affix_2"].update(value=1.0),
+     "非承音装备不能培养词条数值"),
     (lambda item: item["dingyin"].update(value=1.0), "只能提高定音数值"),
     (lambda item: item.update(dingyin={"name": "会心伤害", "value": 10}),
      "不能更换定音词条"),

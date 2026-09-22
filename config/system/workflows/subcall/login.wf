@@ -3,7 +3,7 @@
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 
-def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait, $max_roll_account)
+def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait, $max_roll_account, $allow_restart_app)
     eval check_env(["android", "desktop"])
     eval $account = user_get($username, "account")
     eval $role = user_get($username, "role")
@@ -21,7 +21,21 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
 
     call $in_login_page = is_in_login_page()
     if not $in_login_page
-        eval pause("当前不在登录页，请切换到登录页后点击继续")
+        call $in_startup_page = is_in_startup_page()
+        if $in_startup_page
+            call $in_login_page = leave_startup_page()
+        else if $allow_restart_app
+            if env("desktop") and not $tail
+                return {"status": "failed", "message": "用户未配置账号尾号", "state": $batch_state}
+            end
+            call $in_login_page = ensure_login_page_by_restart("yyslscn", $tail, $account, $batch_state, $max_roll_account)
+        else
+            eval pause("当前不在登录页，请切换到登录页后点击继续")
+            call $in_login_page = is_in_login_page()
+        end
+        if not $in_login_page
+            return {"status": "failed", "message": "未能回到登录主页", "state": $batch_state}
+        end
     end
 
     log "目标账号：" + $account
@@ -30,7 +44,10 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
             return {"status": "failed", "message": "用户未配置账号尾号", "state": $batch_state}
         end
         log "需要切换账号: " + $account
-        call switch_account($tail, $role_index, $account, $role, $batch_state, $max_roll_account)
+        call $switched = switch_account($tail, $account, $batch_state, $max_roll_account)
+        if not $switched
+            return {"status": "failed", "message": "未能切换到目标账号", "state": $batch_state}
+        end
     end
 
     log "切换角色: " + $role
@@ -56,36 +73,86 @@ end
 
 
 # ─── 恢复到登录页 ───────────────────────────
-# 已在登录页时不做任何事；其他现场通过重启客户端恢复确定的登录起点。
-# 登录页背景动画常驻，不等稳定帧，只轮询启动页的返回按钮。
+# 调用方优先识别登录主页或启动页；其他现场按参数重启客户端。
+# 登录页背景动画常驻，不等稳定帧；启动页用游戏 logo 识别。
 
-def ensure_login_page_by_restart($app_id)
-    eval check_env(["android"])
-    call $in_login_page = is_in_login_page()
-    if $in_login_page
-        return 1
-    end
-
+# PC 重启后直接处于切换用户视图；Android 重启后处于启动页面。
+# 调用方已检查当前不在登录主页和启动页面，并已校验目标账号资料。
+def ensure_login_page_by_restart($app_id, $tail, $account, $batch_state, $max_roll_account)
     if app_is_running($app_id)
         app stop $app_id
     end
     app start $app_id timeout 30
+    if env("desktop")
+        scene [game_login_page] view [users]
+        call $ready = wait_for_switch_users_page()
+        if not $ready
+            return 0
+        end
+        call $logged_in = select_account_and_login($tail, $account, $batch_state, $max_roll_account)
+        return $logged_in
+    end
     scene [game_login_page] view [init]
+    call $in_login_page = leave_startup_page()
+    return $in_login_page
+end
 
-    eval $login_page_ready = 0
+
+def is_in_startup_page()
+    scan [game_login_page].[yysls_logo] as $logo by image
+    if $logo
+        return 1
+    end
+    return 0
+end
+
+
+# back 仅是点击目标；启动页必须由 logo 判定。
+def leave_startup_page()
+    eval $startup_ready = 0
     loop 60
-        scan [game_login_page].[back] as $startup_back by image
-        if $startup_back
-            click [game_login_page].[back] after wait @page_refresh
-            eval $login_page_ready = 1
+        call $startup_ready = is_in_startup_page()
+        if $startup_ready
             break
         end
         wait @page_refresh
     end
-    if not $login_page_ready
-        eval pause("未检测到游戏启动页返回按钮，请手动回到登录页后点击继续")
+    if not $startup_ready
+        eval pause("未检测到游戏启动页标志，请手动回到登录主页后点击继续")
+        call $in_login_page = is_in_login_page()
+        if $in_login_page
+            return 1
+        end
+        call $startup_ready = is_in_startup_page()
+        if not $startup_ready
+            return 0
+        end
     end
-    return 1
+    click [game_login_page].[back] after wait @page_refresh
+    call $in_login_page = is_in_login_page()
+    if not $in_login_page
+        eval pause("点击启动页返回后未进入登录主页，请手动处理后点击继续")
+        call $in_login_page = is_in_login_page()
+    end
+    return $in_login_page
+end
+
+
+def wait_for_switch_users_page()
+    eval $ready = 0
+    loop 60
+        scan [game_login_page].[login] as $ready by contains "进入游戏"
+        if $ready
+            return 1
+        end
+        wait @page_refresh
+    end
+    eval pause("未检测到切换用户页的「进入游戏」，请手动定位后点击继续")
+    scan [game_login_page].[login] as $ready by contains "进入游戏"
+    if $ready
+        return 1
+    end
+    return 0
 end
 
 
@@ -117,9 +184,8 @@ end
 # 登录页 → 选账号 → 登录 → 回到登录页角色入口（page_state=1）
 # 不包含选角色，由调用方决定是否接着调用 select_role
 
-def switch_account($tail, $role_index, $account, $role, $batch_state, $max_roll_account)
+def switch_account($tail, $account, $batch_state, $max_roll_account)
     log "当前匹配" + $tail
-    log "当前下标" + $role_index
 
     # 1. 登录页 → 用户切换视图
     click [game_login_page].[more_user] after wait @page_refresh
@@ -144,9 +210,16 @@ def switch_account($tail, $role_index, $account, $role, $batch_state, $max_roll_
         click [game_login_page].[switch_user] after wait @page_refresh
     end
 
+    call $logged_in = select_account_and_login($tail, $account, $batch_state, $max_roll_account)
+    return $logged_in
+end
+
+
+# 前置：已经进入切换用户视图；PC 重启和正常切换共用此段。
+def select_account_and_login($tail, $account, $batch_state, $max_roll_account)
     click [game_login_page].[tap_user] after wait @page_refresh
 
-    # 2. 查找目标账号（最多滚动 5 次）
+    # 2. 按条目准备参数限定的次数查找目标账号
     eval $found_user = ""
     loop $max_roll_account
         find [game_login_page].[user_list] as $found_user by contains $tail
@@ -166,17 +239,20 @@ def switch_account($tail, $role_index, $account, $role, $batch_state, $max_roll_
     wait @page_refresh
 
     # 3. 登录 → 回到登录页角色入口
-    # 登录要走一次网络鉴权，这里只按标准节奏等一拍，不假设已经就位；
-    # 真正的就位判定交给 select_role 的重试校验。
     click [game_login_page].[login] after wait @page_refresh
+    if env("desktop")
+        call $in_login_page = leave_startup_page()
+        if not $in_login_page
+            return 0
+        end
+    end
 
-    # 已确认目标账号，保留账号状态
-    # 下一条同账号任务可以跳过账号切换，直接选角色
+    # PC 必须经启动页返回并确认登录主页；Android 保持原有登录后选角色路径。
     eval $batch_state.account = $account
     eval $batch_state.role = ""
     eval $batch_state.page_state = 1
 
-    return {"status": "account_ready", "message": "", "state": $batch_state}
+    return 1
 end
 
 

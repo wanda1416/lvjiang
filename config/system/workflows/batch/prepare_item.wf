@@ -23,10 +23,6 @@
 
 import "subcall/login.wf"
 
-if $allow_restart_app
-    call ensure_login_page_by_restart("yyslscn")
-end
-
 eval $username = $batch_users.$batch_index
-call $result = prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait, $max_roll_account)
+call $result = prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait, $max_roll_account, $allow_restart_app)
 return $result

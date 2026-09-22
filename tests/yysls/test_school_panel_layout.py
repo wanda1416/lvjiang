@@ -4,6 +4,7 @@ import pytest
 
 pytest.importorskip("PyQt6.QtWidgets")
 
+from PyQt6.QtCore import QEvent, QObject
 from PyQt6.QtWidgets import QApplication, QGroupBox, QLabel, QScrollArea
 
 from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
@@ -75,3 +76,50 @@ def test_scheme_adps_precedes_attack_attributes(qtbot, monkeypatch):
     assert panel._value_content_layout.itemAt(0).widget().objectName() == "schemeMetricsPanel"
     card = panel._value_content_layout.itemAt(1).widget()
     assert any(group.title() == "攻击属性" for group in card.findChildren(QGroupBox))
+
+
+@pytest.mark.parametrize("previous_source", ["base", "scheme"])
+def test_switching_base_attrs_does_not_collapse_details_mid_update(
+        qtbot, monkeypatch, previous_source):
+    """从基础属性或方案切过来时，不先缩成空白再重新撑开。"""
+    panel = _panel(qtbot)
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.config.get_play_styles",
+        lambda _school: {"属性甲": {}, "属性乙": {}},
+    )
+    panel._ps_list.addItems(["属性甲", "属性乙"])
+    if previous_source == "scheme":
+        panel._scheme_list.addItem("测试方案")
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.core.graduation.get_graduation_scheme_combat_attrs",
+            lambda _school, _scheme: CombatAttributes(),
+        )
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.core.graduation.get_graduation_scheme_metrics",
+            lambda _school, _scheme: (100.0, 120.0),
+        )
+        panel._scheme_list.setCurrentRow(0)
+    else:
+        panel._ps_list.setCurrentRow(0)
+    QApplication.processEvents()
+    original_height = panel._details_widget.height()
+
+    class ResizeRecorder(QObject):
+        def __init__(self):
+            super().__init__()
+            self.heights = []
+
+        def eventFilter(self, _watched, event):
+            if event.type() == QEvent.Type.Resize:
+                self.heights.append(event.size().height())
+            return False
+
+    recorder = ResizeRecorder()
+    panel._details_widget.installEventFilter(recorder)
+    panel._ps_list.setCurrentRow(1)
+    QApplication.processEvents()
+    final_height = panel._details_widget.height()
+    if previous_source == "base":
+        assert final_height == original_height
+    assert all(height >= final_height for height in recorder.heights), (
+        original_height, recorder.heights)

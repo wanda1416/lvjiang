@@ -91,13 +91,11 @@ def test_plan_scan_treats_a_missing_stored_type_as_normal():
     existing = _normal_scan()
     existing.pop(DINGYIN_TYPE_KEY)
     incoming = _zhige_scan()
-    incoming["_extra"] = {"is_zhige_dingyin": True, "affix_count": 5}
 
     merged = merge_equipment_write(
         incoming, existing, source=WriteSource.PLAN_SCAN)
 
     assert merged[DINGYIN_TYPE_KEY] == DINGYIN_NORMAL
-    assert merged["_extra"] == {"affix_count": 5}
 
 
 def test_first_plan_scan_uses_normal_as_the_equipment_display_default():

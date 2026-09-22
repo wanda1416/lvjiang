@@ -75,9 +75,6 @@ def merge_equipment_write(
     方案，装备自身采用普通定音这个默认展示状态。
     """
     value = copy.deepcopy(incoming)
-    extra = value.get("_extra")
-    if isinstance(extra, dict):
-        extra.pop("is_zhige_dingyin", None)
     if existing is None:
         if source is WriteSource.PLAN_SCAN:
             value[DINGYIN_TYPE_KEY] = DINGYIN_NORMAL

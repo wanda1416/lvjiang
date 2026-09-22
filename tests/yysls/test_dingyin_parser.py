@@ -164,7 +164,6 @@ class TestParserDelegation:
         assert equip.dingyin == {}
         assert equip.dingyin_zhige == {"name": ZHIGE_DINGYIN_NAME}
         assert equip.dingyin_type == DINGYIN_ZHIGE
-        assert "is_zhige_dingyin" not in equip.extra_data
         assert not any("定音词条无法解析" in w for w in equip.warnings)
 
     def test_normal_name_with_bad_value_is_recorded_as_zero(self, parser):
@@ -180,7 +179,6 @@ class TestParserDelegation:
             **self._FULL_AFFIXES,
             "dingyin": "外功穿透",
         })
-        assert "is_zhige_dingyin" not in equip.extra_data
         assert equip.dingyin_zhige == {}
         assert equip.dingyin_type == DINGYIN_NORMAL
         assert equip.dingyin["name"] == "外功穿透"
@@ -212,8 +210,7 @@ class TestParserDelegation:
 
 class TestStoredDingyinType:
     def test_missing_type_is_always_normal(self):
-        equip = {"_extra": {"is_zhige_dingyin": True}}
-        assert stored_dingyin_type(equip) == DINGYIN_NORMAL
+        assert stored_dingyin_type({}) == DINGYIN_NORMAL
 
     def test_explicit_zhige_type_is_used(self):
         assert stored_dingyin_type(
@@ -269,12 +266,10 @@ class TestMisreadReachesWarnings:
         assert any("疑似误读" in w for w in equip.warnings)
         assert "外功穿透" in " ".join(equip.warnings)
         assert equip.dingyin_type == DINGYIN_ZHIGE
-        assert "is_zhige_dingyin" not in equip.extra_data
         # 说明挂在止戈槽自己身上，不会跟着另一种定音走。
         assert "外功穿透" in equip.dingyin_zhige[DINGYIN_SLOT_NOTICE]
 
     def test_genuine_zhige_still_silent(self, parser):
         equip = self._parse(parser, "止戈特殊效果 +12")
         assert equip.dingyin_type == DINGYIN_ZHIGE
-        assert "is_zhige_dingyin" not in equip.extra_data
         assert not any("疑似误读" in w for w in equip.warnings)

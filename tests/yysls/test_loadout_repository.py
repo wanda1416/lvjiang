@@ -216,6 +216,20 @@ def test_delete_clears_all_plan_references(tmp_path: Path):
     assert all(plan.equipment["ring"] is None for plan in state.plans.values())
 
 
+def test_referencing_plan_names_follow_plan_order(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    first = repo.load().active_plan_id
+    repo.configure_plan(first, name="方案一")
+    second = repo.create_plan("方案二", "主功法", "副功法").id
+    repo.assign_equipment(first, "ring", equip())
+    repo.assign_equipment(second, "ring", equip())
+
+    assert repo.load().referencing_plan_names("real-fp") == [
+        "方案一", "方案二",
+    ]
+    assert repo.load().referencing_plan_names("missing") == []
+
+
 def test_delete_can_preserve_references_from_every_plan(tmp_path: Path):
     repo = LoadoutRepository("alice", tmp_path)
     first = repo.load().active_plan_id

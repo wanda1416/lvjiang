@@ -1300,6 +1300,12 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 return False
 
         slot_key = self._slot_of_equipped(equip_data)
+        fp = str(equip_data.get("_fp") or "")
+        loaded_inv = getattr(self, "_inv", None)
+        state = getattr(loaded_inv, "state", None)
+        referenced_plans = (
+            state.referencing_plan_names(fp)
+            if state is not None and fp else [])
 
         def switch_dingyin(kind: str) -> bool:
             """装备栏里切的是这套方案的选择，背包里切的是装备自身的展示态。
@@ -1336,7 +1342,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             self.window(), equip_data, cooldown_changed=update_cooldown,
             dingyin_changed=switch_dingyin,
             dingyin_kind=(self._plan_dingyin_kind(slot_key)
-                          if slot_key else ""))
+                          if slot_key else ""),
+            referenced_plans=referenced_plans)
 
     def _refresh_dingyin_cards(self, fp: str) -> None:
         """重画背包/模拟列表里同指纹的卡片，不重载整页。"""

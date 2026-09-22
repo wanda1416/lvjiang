@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 from collections.abc import Callable
 from typing import Any, cast
@@ -48,6 +49,9 @@ from ...core.batch_config import (
     load_batch_config,
     save_batch_config,
 )
+from ...core.profile.models import MODEL_QUOTA
+from ...core.profile.schema import get_profile_config
+from ...core.profile.service import profile_read
 from ...i18n import tr
 from ..button_styles import apply_button_style, fit_button_width
 from ..main.run_control import (
@@ -134,9 +138,12 @@ class _ReorderTreeWidget(QTreeWidget):
     order_changed = pyqtSignal()
     restore_order_requested = pyqtSignal()
     shuffle_order_requested = pyqtSignal()
+    profile_order_requested = pyqtSignal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, profile_order: bool = False) -> None:
         super().__init__(parent)
+        self._profile_order = profile_order
+        self.profile_order_available = False
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_order_menu)
 
@@ -158,6 +165,12 @@ class _ReorderTreeWidget(QTreeWidget):
         shuffle_action.setEnabled(self.topLevelItemCount() > 1)
         menu.addAction(restore_action)
         menu.addAction(shuffle_action)
+        if self._profile_order:
+            profile_action = QAction(tr("指定顺序排序"), menu)
+            profile_action.setEnabled(has_rows and self.profile_order_available)
+            profile_action.triggered.connect(
+                lambda _checked=False: self.profile_order_requested.emit())
+            menu.addAction(profile_action)
         viewport = cast(QWidget, self.viewport())
         menu.exec(viewport.mapToGlobal(position))
 
@@ -241,6 +254,18 @@ class BatchTab(QWidget):
         self._rounds_spin.setValue(1)
         self._rounds_spin.valueChanged.connect(self._persist_rounds)
         summary_form.addRow(tr("执行轮数："), self._rounds_spin)
+        profile_sort_row = QWidget()
+        profile_sort_layout = QHBoxLayout(profile_sort_row)
+        profile_sort_layout.setContentsMargins(0, 0, 0, 0)
+        self._profile_sort_key = QComboBox()
+        self._profile_sort_direction = QComboBox()
+        self._profile_sort_direction.addItem(tr("升序"), "asc")
+        self._profile_sort_direction.addItem(tr("降序"), "desc")
+        self._profile_sort_key.currentIndexChanged.connect(self._persist_profile_sort)
+        self._profile_sort_direction.currentIndexChanged.connect(self._persist_profile_sort)
+        profile_sort_layout.addWidget(self._profile_sort_key, 1)
+        profile_sort_layout.addWidget(self._profile_sort_direction)
+        summary_form.addRow(tr("指定排序："), profile_sort_row)
         self._workflow_labels: dict[str, QLabel] = {}
         for key, label in (
             ("batch_setup", tr("批次准备") + "："),
@@ -504,7 +529,7 @@ class BatchTab(QWidget):
             self._btn_user_all, self._btn_user_none, minimum=60)
         layout.addLayout(select_row)
 
-        self._user_list = _ReorderTreeWidget()
+        self._user_list = _ReorderTreeWidget(profile_order=True)
         self._user_list.setColumnCount(2)
         self._user_list.setHeaderLabels([tr("用户候选"), tr("执行顺序")])
         self._user_list.setRootIsDecorated(False)
@@ -518,7 +543,7 @@ class BatchTab(QWidget):
             QAbstractItemView.DragDropMode.InternalMove)
         self._user_list.setDefaultDropAction(Qt.DropAction.MoveAction)
         self._user_list.setToolTip(
-            tr("拖动可调整实际执行顺序；右键可恢复默认或随机打乱顺序；"
+            tr("拖动可调整实际执行顺序；右键可恢复默认、随机打乱或按 Profile 排序；"
                "批量配置中的顺序仅作为初始顺序"))
         header = self._user_list.header()
         assert header is not None
@@ -534,6 +559,8 @@ class BatchTab(QWidget):
             self._restore_user_order)
         self._user_list.shuffle_order_requested.connect(
             self._shuffle_user_order)
+        self._user_list.profile_order_requested.connect(
+            self._sort_user_order_by_profile)
         layout.addWidget(self._user_list, stretch=1)
 
         self._user_order: list[str] = []
@@ -578,6 +605,32 @@ class BatchTab(QWidget):
         self._rounds_spin.blockSignals(True)
         self._rounds_spin.setValue(item.rounds if item is not None else 1)
         self._rounds_spin.blockSignals(False)
+        self._profile_sort_key.blockSignals(True)
+        self._profile_sort_direction.blockSignals(True)
+        self._profile_sort_key.clear()
+        self._profile_sort_key.addItem(tr("不指定"), "")
+        try:
+            definitions = get_profile_config().get_all_keys()
+        except (OSError, ValueError) as exc:
+            logger.warning(f"读取 Profile 定义失败，指定排序不可用: {exc}")
+            definitions = []
+        for definition in definitions:
+            profile_label = definition.label or definition.key
+            self._profile_sort_key.addItem(
+                f"{profile_label} ({definition.key})", definition.key)
+        selected_key = item.profile_sort_key if item is not None else ""
+        index = self._profile_sort_key.findData(selected_key)
+        if index < 0 and selected_key:
+            self._profile_sort_key.addItem(tr("定义已不存在：") + selected_key, selected_key)
+            index = self._profile_sort_key.count() - 1
+        self._profile_sort_key.setCurrentIndex(max(0, index))
+        direction = item.profile_sort_direction if item is not None else "asc"
+        self._profile_sort_direction.setCurrentIndex(
+            max(0, self._profile_sort_direction.findData(direction)))
+        self._profile_sort_key.blockSignals(False)
+        self._profile_sort_direction.blockSignals(False)
+        self._user_list.profile_order_available = bool(
+            selected_key and any(definition.key == selected_key for definition in definitions))
         for key, label in self._workflow_labels.items():
             path = getattr(item.workflows, key) if item is not None else ""
             label.setText(path or tr("未配置"))
@@ -717,6 +770,23 @@ class BatchTab(QWidget):
         item.rounds = rounds
         save_batch_config(cfg)
 
+    def _persist_profile_sort(self, *_args) -> None:
+        cfg = load_batch_config()
+        item = cfg.configs.get(self._current_config_name())
+        if item is None:
+            return
+        item.profile_sort_key = str(self._profile_sort_key.currentData() or "")
+        item.profile_sort_direction = str(
+            self._profile_sort_direction.currentData() or "asc")
+        save_batch_config(cfg)
+        try:
+            available = bool(
+                item.profile_sort_key and
+                get_profile_config().get_key(item.profile_sort_key) is not None)
+        except (OSError, ValueError):
+            available = False
+        self._user_list.profile_order_available = available
+
     def _current_config_name(self) -> str:
         """获取当前选中的配置名"""
         idx = self._config_combo.currentIndex()
@@ -780,15 +850,10 @@ class BatchTab(QWidget):
             return
 
         visible = set(config.usernames)
-        selected_order = [
-            name for name in config.selected_usernames if name in visible
-        ]
-        selected = set(selected_order)
-        display_order = selected_order + [
-            name for name in config.usernames if name not in selected
-        ]
+        selected = set(config.selected_usernames) & visible
+        display_order = list(config.usernames)
         self._user_candidate_order = list(display_order)
-        self._user_order = list(selected_order)
+        self._user_order = [name for name in display_order if name in selected]
         row_height = _batch_list_row_height(self._user_list)
         for username in display_order:
             item = QTreeWidgetItem([username, ""])
@@ -863,6 +928,60 @@ class BatchTab(QWidget):
             self._updating_user_list = False
         self._sync_user_order_from_rows()
 
+    def _sort_user_order_by_profile(self) -> None:
+        """按当前配置的 Profile 数值对用户行执行一次稳定排序。"""
+        cfg = load_batch_config()
+        group = cfg.configs.get(self._current_config_name())
+        if group is None or not group.profile_sort_key:
+            return
+        schema = get_profile_config()
+        key = group.profile_sort_key
+        if schema.get_key(key) is None:
+            logger.warning(f"指定顺序排序已取消：Profile 定义不存在: {key}")
+            return
+        order = self._tree_order(self._user_list, self._user_name)
+        values: dict[str, float | None] = {}
+        quota = schema.get_model_type(key) == MODEL_QUOTA
+        for username in order:
+            try:
+                value = profile_read(username, key)
+            except Exception as exc:
+                logger.warning(f"读取用户 Profile 排序值失败: {username}/{key}: {exc}")
+                values[username] = None
+                continue
+            if value is None and quota:
+                # 配额尚无记录等于本周期尚未完成，按 0 排序。
+                values[username] = 0.0
+                continue
+            try:
+                number = float(value) if value is not None else None
+            except (TypeError, ValueError):
+                number = None
+            values[username] = number if number is not None and math.isfinite(number) else None
+        descending = group.profile_sort_direction == "desc"
+        # 缺失/非数字一律排末尾；Python 的稳定排序保留同值用户的原相对顺序。
+        sorted_order = sorted(
+            order,
+            key=lambda username: (
+                values[username] is None,
+                -(values[username] or 0) if descending else (values[username] or 0),
+            ),
+        )
+        self._updating_user_list = True
+        try:
+            self._apply_tree_order(self._user_list, sorted_order, self._user_name)
+        finally:
+            self._updating_user_list = False
+        self._sync_user_order_from_rows()
+        missing = sum(value is None for value in values.values())
+        message = tr("已按 Profile 排序用户") + f": {key} ({len(order)} " + tr("人") + ")"
+        if missing:
+            message += f"；{missing} " + tr("人无数值，置于末尾")
+        logger.info(message)
+        append_log = getattr(self._host, "append_log", None)
+        if callable(append_log):
+            append_log(message)
+
     def _sync_user_order_from_rows(self) -> None:
         self._user_candidate_order = []
         self._user_order = []
@@ -900,7 +1019,12 @@ class BatchTab(QWidget):
         item = cfg.configs.get(name)
         if item is None:
             return
-        item.selected_usernames = list(self._user_order)
+        # 只保存勾选集合；用户页的拖拽、随机和 Profile 排序均为本次运行态。
+        selected = set(self._user_order)
+        if set(item.selected_usernames) == selected:
+            return
+        item.selected_usernames = [
+            username for username in item.usernames if username in selected]
         save_batch_config(cfg)
 
     def _get_enabled_usernames(self) -> list[str]:

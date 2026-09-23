@@ -1145,7 +1145,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         # 填充
         pos = 0
         for equip, part_label, group_key, is_mock, is_loadout in same_slot_cards:
-            card = _CompactEquipCard(self._display_params)
+            card = _CompactEquipCard(
+                self._display_params, allow_dingyin_switch=True)
             card.set_equip(
                 equip, part_label, group_key,
                 is_mock=is_mock, is_loadout=is_loadout,
@@ -1156,6 +1157,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             card.copy_requested.connect(self._on_copy_requested)
             card.lock_requested.connect(self._on_lock_requested)
             card.properties_requested.connect(self._on_properties_requested)
+            card.dingyin_requested.connect(self._on_bag_dingyin_requested)
             if self._batch_copy_mode:
                 fp = str(equip.get("_fp") or "")
                 card.set_selection_mode(
@@ -1169,7 +1171,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             pos = (pos // cols + 1) * cols
 
         for equip, part_label, group_key, is_mock, is_loadout in other_cards:
-            card = _CompactEquipCard(self._display_params)
+            card = _CompactEquipCard(
+                self._display_params, allow_dingyin_switch=True)
             card.set_equip(
                 equip, part_label, group_key,
                 is_mock=is_mock, is_loadout=is_loadout,
@@ -1180,6 +1183,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             card.copy_requested.connect(self._on_copy_requested)
             card.lock_requested.connect(self._on_lock_requested)
             card.properties_requested.connect(self._on_properties_requested)
+            card.dingyin_requested.connect(self._on_bag_dingyin_requested)
             if self._batch_copy_mode:
                 fp = str(equip.get("_fp") or "")
                 card.set_selection_mode(
@@ -1351,7 +1355,9 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
 
     # ── 装备操作 ──
 
-    def _on_properties_requested(self, equip_data: dict) -> None:
+    def _on_properties_requested(
+        self, equip_data: dict, *, slot_key: str = "",
+    ) -> None:
         """展示装备属性，并把冷却时间变更持久化。"""
         from .cards import _show_equipment_properties
 
@@ -1383,7 +1389,6 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 QMessageBox.critical(self, tr("修改失败"), str(exc))
                 return False
 
-        slot_key = self._slot_of_equipped(equip_data)
         fp = str(equip_data.get("_fp") or "")
         loaded_inv = getattr(self, "_inv", None)
         state = getattr(loaded_inv, "state", None)
@@ -1392,35 +1397,9 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             if state is not None and fp else [])
 
         def switch_dingyin(kind: str) -> bool:
-            """装备栏里切的是这套方案的选择，背包里切的是装备自身的展示态。
-
-            两个入口各写各的：在装备栏切音不该改掉背包里这件装备的默认展示，
-            反过来也一样。
-            """
-            fp = str(equip_data.get("_fp") or "")
-            if not fp:
-                QMessageBox.warning(
-                    self, tr("切换失败"), tr("装备数据缺少 _fp 字段"))
-                return False
-            inv = self._require_inventory()
-            if inv is None:
-                return False
-            try:
-                if slot_key:
-                    inv.set_plan_dingyin(slot_key, kind)
-                else:
-                    inv.set_item_dingyin_type(fp, kind)
-                    self._update_item_metadata(fp, DINGYIN_TYPE_KEY, kind)
-            except Exception as exc:
-                logger.error(f"切换定音失败: {exc}")
-                QMessageBox.critical(self, tr("切换失败"), str(exc))
-                return False
-            # 只重画受影响的卡片：方案选择只改装备栏，展示状态只改背包卡片。
-            if slot_key:
-                self._refresh_slots()
-            else:
-                self._refresh_dingyin_cards(fp)
-            return True
+            return EquipStatusTab._on_dingyin_requested(
+                self,
+                equip_data, kind, slot_key=slot_key)
 
         _show_equipment_properties(
             self.window(), equip_data, cooldown_changed=update_cooldown,
@@ -1428,6 +1407,45 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             dingyin_kind=(self._plan_dingyin_kind(slot_key)
                           if slot_key else ""),
             referenced_plans=referenced_plans)
+
+    def _on_bag_dingyin_requested(
+        self, equip_data: dict, kind: str,
+    ) -> None:
+        """背包卡片没有方案槽位上下文，只改装备自身展示态。"""
+        self._on_dingyin_requested(equip_data, kind, slot_key="")
+
+    def _on_dingyin_requested(
+        self, equip_data: dict, kind: str, *, slot_key: str,
+    ) -> bool:
+        """定音切换的唯一 UI 写入出口。
+
+        装备槽传入 slot_key，只写方案引用；背包传空字符串，
+        只写装备 dingyin_type。不再按指纹反查装备是否正在穿戴。
+        """
+        fp = str(equip_data.get("_fp") or "")
+        if not fp:
+            QMessageBox.warning(
+                self, tr("切换失败"), tr("装备数据缺少 _fp 字段"))
+            return False
+        inv = self._require_inventory()
+        if inv is None:
+            return False
+        try:
+            if slot_key:
+                inv.set_plan_dingyin(slot_key, kind)
+            else:
+                inv.set_item_dingyin_type(fp, kind)
+                self._update_item_metadata(fp, DINGYIN_TYPE_KEY, kind)
+        except Exception as exc:
+            logger.error(f"切换定音失败: {exc}")
+            QMessageBox.critical(self, tr("切换失败"), str(exc))
+            return False
+        # 只重画受影响的卡片：方案选择只改装备栏，展示状态只改背包卡片。
+        if slot_key:
+            self._refresh_slots()
+        else:
+            self._refresh_dingyin_cards(fp)
+        return True
 
     def _refresh_dingyin_cards(self, fp: str) -> None:
         """重画背包/模拟列表里同指纹的卡片，不重载整页。"""
@@ -1450,16 +1468,6 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             return DINGYIN_NORMAL
         kind = str(plan.dingyin.get(slot_key) or "")
         return kind if kind in DINGYIN_TYPES else DINGYIN_NORMAL
-
-    def _slot_of_equipped(self, equip_data: dict) -> str:
-        """这件装备正占着当前方案的哪个槽位；不在装备栏里返回空串。"""
-        fp = str(equip_data.get("_fp") or "")
-        if not fp:
-            return ""
-        return next(
-            (key for key, value in self._equipped.items()
-             if str((value or {}).get("_fp") or "") == fp),
-            "")
 
     def _on_lock_requested(self, equip_data: dict, locked: bool) -> None:
         """在不改变装备指纹的前提下修改锁定状态。"""

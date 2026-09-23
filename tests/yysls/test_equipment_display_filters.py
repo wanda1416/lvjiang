@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QGridLayout,
     QLabel,
+    QMenu,
     QPushButton,
     QStyle,
     QStyleOptionComboBox,
@@ -320,7 +321,6 @@ def test_slot_properties_switch_calls_the_plan_write_entry(monkeypatch):
     tab = SimpleNamespace(
         window=lambda: None,
         _require_inventory=lambda: inventory,
-        _slot_of_equipped=lambda equip_data: "ring",
         _plan_dingyin_kind=lambda slot_key: "normal",
         _refresh_slots=lambda: None,
         _refresh_dingyin_cards=lambda fp: None,
@@ -335,9 +335,50 @@ def test_slot_properties_switch_calls_the_plan_write_entry(monkeypatch):
         "dingyin_zhige": {"name": "止戈定音"},
     }
 
-    EquipStatusTab._on_properties_requested(tab, equip)
+    EquipStatusTab._on_properties_requested(tab, equip, slot_key="ring")
     assert captured["dingyin_changed"]("zhige") is True
     assert writes == [("ring", "zhige")]
+
+
+def test_bag_properties_switch_never_changes_plan_even_when_item_is_equipped(
+    monkeypatch,
+):
+    """入口上下文是唯一语义：背包卡片不按指纹反查当前方案。"""
+    from lvjiang.apps.yysls.ui.loadout.equip import cards
+
+    plan_writes: list[tuple[str, str]] = []
+    item_writes: list[tuple[str, str]] = []
+    patched: list[tuple[str, str, str]] = []
+    inventory = SimpleNamespace(
+        set_plan_dingyin=lambda slot, kind: plan_writes.append((slot, kind)),
+        set_item_dingyin_type=lambda fp, kind: item_writes.append((fp, kind)),
+    )
+    tab = SimpleNamespace(
+        window=lambda: None,
+        _require_inventory=lambda: inventory,
+        _plan_dingyin_kind=lambda slot_key: "normal",
+        _refresh_slots=lambda: None,
+        _refresh_dingyin_cards=lambda fp: None,
+        _update_item_metadata=lambda fp, key, value: patched.append(
+            (fp, key, value)),
+        # 即使同指纹正在装备槽，背包入口也不能写方案。
+        _equipped={"ring": {"_fp": "same-fp"}},
+    )
+    captured: dict = {}
+    monkeypatch.setattr(
+        cards, "_show_equipment_properties",
+        lambda parent, equip, **kwargs: captured.update(kwargs))
+    equip = {
+        "_fp": "same-fp",
+        "dingyin": {"name": "外功穿透", "value": 14.2},
+        "dingyin_zhige": {"name": "止戈定音"},
+    }
+
+    EquipStatusTab._on_properties_requested(tab, equip)
+    assert captured["dingyin_changed"]("zhige") is True
+    assert plan_writes == []
+    assert item_writes == [("same-fp", "zhige")]
+    assert patched == [("same-fp", "dingyin_type", "zhige")]
 
 
 def test_lock_request_only_updates_one_item_without_full_sync():
@@ -458,3 +499,36 @@ def test_properties_dialog_separates_the_two_disabled_reasons(qtbot):
     usable = _EquipmentPropertiesDialog(both, dingyin_changed=lambda _k: True)
     qtbot.addWidget(usable)
     assert usable._switch_dingyin_button.isEnabled()
+    assert usable._switch_dingyin_button.text() == "切换止戈定音"
+    usable._switch_dingyin_button.click()
+    assert usable._switch_dingyin_button.text() == "切换普通定音"
+
+
+def test_dingyin_context_action_only_exists_for_two_slots_and_names_target(
+    qtbot,
+):
+    from lvjiang.apps.yysls.ui.loadout.equip.cards import (
+        _add_dingyin_switch_action,
+    )
+
+    menu = QMenu()
+    qtbot.addWidget(menu)
+    selected: list[str] = []
+    both = {
+        "dingyin": {"name": "外功穿透", "value": 14.2},
+        "dingyin_zhige": {"name": "止戈定音"},
+    }
+
+    action = _add_dingyin_switch_action(
+        menu, both, "normal", selected.append)
+    assert action is not None
+    assert action.text() == "切换止戈定音"
+    action.trigger()
+    assert selected == ["zhige"]
+
+    single = QMenu()
+    qtbot.addWidget(single)
+    assert _add_dingyin_switch_action(
+        single, {"dingyin": both["dingyin"]}, "normal", selected.append,
+    ) is None
+    assert single.actions() == []

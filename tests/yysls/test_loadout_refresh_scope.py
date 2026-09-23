@@ -1,7 +1,11 @@
-"""备战方案页的刷新范围：谁的变更该刷新谁。
+"""备战方案页的刷新范围：谁的变更、刷几次。
 
-装备变更事件必须带用户名。批量任务里 B 用户每扫到一件装备就发一次事件，
-不带用户名就无从过滤，正在看 A 用户的人会被 B 的扫描按住反复重建整页。
+两条契约，都是实测出来的卡顿来源：
+
+1. 装备变更事件必须带用户名。批量任务里 B 用户每扫到一件装备就发一次事件，
+   不带用户名就无从过滤，正在看 A 用户的人会被 B 的扫描按住反复重建整页。
+2. 切换用户只重载一次。装备页和外层面板曾经各自订阅 user_changed、各读一份
+   ``EquipmentInventory``、各重建一次网格；筛选还要再重建第三次。
 """
 
 from __future__ import annotations
@@ -10,8 +14,12 @@ from types import SimpleNamespace
 
 import pytest
 from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtWidgets import QComboBox
 
+import lvjiang.apps.yysls.core.combat.equipment as equipment_module
+import lvjiang.constants as constants_module
 from lvjiang.apps.yysls.ui.events import EQUIPMENT_CHANGED, YyslsEventHub
+from lvjiang.apps.yysls.ui.loadout.equip.status_tab import EquipStatusTab
 from lvjiang.apps.yysls.ui.loadout.loadout_panel import LoadoutPanel
 
 # ─── 事件载荷 ──────────────────────────────────────────────
@@ -97,3 +105,103 @@ def test_own_and_unknown_changes_still_refresh(username):
     LoadoutPanel._schedule_equipment_refresh(panel, username)
 
     assert panel._equipment_refresh_timer.started is True
+
+
+# ─── 切换用户只重载一次 ────────────────────────────────────
+
+
+class _Users:
+    @staticmethod
+    def list_users() -> list[str]:
+        return ["甲", "乙"]
+
+
+class _Host(QObject):
+    user_changed = pyqtSignal(str)
+    app_event = pyqtSignal(object)
+
+    def __init__(self, name: str = "") -> None:
+        super().__init__()
+        self.user_manager = _Users()
+        self.user_combo = QComboBox()
+        self.name = name
+
+    def active_user_name(self) -> str:
+        return self.name
+
+    @staticmethod
+    def navigate_user(_delta: int) -> None:
+        return None
+
+
+def test_user_switch_loads_one_inventory_and_rebuilds_once(
+        qtbot, tmp_path, monkeypatch):
+    """换用户：一份 EquipmentInventory、一次网格重建。
+
+    面板与装备页曾经各订阅一次 user_changed，各读一份库存；装备页还要在
+    换上新筛选后再重建一次网格。三次重建里只有一次有意义。
+    """
+    monkeypatch.setattr(constants_module, "USERS_DIR", tmp_path)
+    loaded: list[str] = []
+    real = equipment_module.EquipmentInventory
+
+    class _Counting(real):  # type: ignore[valid-type,misc]
+        def __init__(self, user_name: str) -> None:
+            loaded.append(user_name)
+            super().__init__(user_name)
+
+    monkeypatch.setattr(equipment_module, "EquipmentInventory", _Counting)
+
+    host = _Host("甲")
+    panel = LoadoutPanel(host)
+    qtbot.addWidget(panel)
+    assert loaded == ["甲"]
+
+    rebuilds: list[str] = []
+    panel._equipment._rebuild_grid = lambda: rebuilds.append("grid")
+    host.name = "乙"
+    host.user_changed.emit("乙")
+
+    assert loaded == ["甲", "乙"]
+    assert rebuilds == ["grid"]
+
+
+# ─── 筛选读取的时点 ────────────────────────────────────────
+
+
+def _equip_stub():
+    fake = SimpleNamespace(
+        _inv="甲的库存",
+        _user_filters_stale=False,
+        _reload_display_params=lambda: None,
+        _update_status_row=lambda: None,
+        seen=[],
+    )
+    fake._exit_batch_copy_mode = lambda *, rebuild: None
+    fake._apply_pending_filters = (
+        lambda: EquipStatusTab._apply_pending_filters(fake))
+    fake._load_filter_settings = lambda: fake.seen.append(("筛选", fake._inv))
+    fake._sync_inv = lambda: fake.seen.append(("网格", fake._inv))
+    return fake
+
+
+def test_filters_are_read_after_the_new_inventory_and_before_the_grid():
+    """筛选存在各用户自己的仓储里，早读一步拿到的是上一个用户的筛选。
+
+    晚读一步则要用旧筛选先建一次网格再重建——这正是原来的第三次重建。
+    """
+    fake = _equip_stub()
+
+    EquipStatusTab.prepare_for_user_change(fake)
+    EquipStatusTab.refresh_from(fake, "乙的库存")
+
+    assert fake.seen == [("筛选", "乙的库存"), ("网格", "乙的库存")]
+
+
+def test_a_plain_refresh_does_not_reset_the_filter_bar():
+    """扫描写入触发的刷新不是换用户，不该把用户调好的筛选条重置回存档值。"""
+    fake = _equip_stub()
+
+    EquipStatusTab.refresh_from(fake, "甲的库存")
+
+    assert fake.seen == [("网格", "甲的库存")]

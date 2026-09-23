@@ -13,7 +13,13 @@
       "x_ratio": 0.9087083446866484,
       "y_ratio": 0.0642592310007404,
       "w_ratio": 0.06276284319633807,
-      "h_ratio": 0.14504025182570707
+      "h_ratio": 0.14504025182570707,
+      "template": {
+        "name": "android/jianghu_card/refresh",
+        "min_score": 0.8,
+        "record_w": 2800,
+        "record_h": 1260
+      }
     },
     {
       "key": "finish_logo",

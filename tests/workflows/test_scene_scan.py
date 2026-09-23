@@ -5,6 +5,7 @@ engine _execute_dsl 在解析后据此逐条校验引用是否已在当前布局
 未绑定直接抛 WorkflowUserError，不进入执行阶段（取代手写 required_scenes）。
 """
 
+import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -240,14 +241,21 @@ def test_daily_jianghu_claim_reputation_guard():
     claim_def = text[text.index("def claim_reward("):text.index("def claim_reward(") + 500]
     assert "click [general_control].[blank_area]" in claim_def
 
-    completed_call = "call $task_completed = is_task_completed($text_result)"
+    completed_call = "call $task_completed = is_task_completed($label)"
     initial_scan = "scan [activity_jianghu].$label.[label] as $text_result"
     target_call = "call $hit = is_target_task($task_text)"
-    assert "def is_task_completed($text_result)" in text
-    assert text.count(completed_call) == 2  # 处理前与动作后共用同一判定
-    assert text.index(initial_scan) < text.index(completed_call)
-    assert text.index(completed_call) < text.index(target_call)
-    assert "continue" in text[text.index(completed_call):text.index(target_call)]
+    assert "def is_task_completed($label)" in text
+    # 处理前、动作后与刷新后都只认同一个刷新按钮判定。
+    assert text.count(completed_call) == 3
+    process = text[text.index("def process_jianghu_cards("):text.index(
+        "def is_task_completed(")]
+    assert process.index(completed_call) < process.index(initial_scan)
+    assert process.index(initial_scan) < process.index(target_call)
+    assert "continue" in process[process.index(completed_call):process.index(target_call)]
+    completed = text[text.index("def is_task_completed("):text.index(
+        "def has_selected_task(")]
+    assert "scan [activity_jianghu].$label.[refresh] as $refresh_found by image" in completed
+    assert "len(" not in completed
     assert "def is_target_task($text)" in text
     assert "as $hit by contains_any $targets" not in text
 
@@ -363,7 +371,7 @@ def test_daily_jianghu_exposes_independent_user_facing_task_toggles():
 
     outer_loop = text[
         text.index('for idx in ["1", "2", "3", "4", "5", "6"]'):
-        text.index('log "六个任务刷新处理完成"')
+        text.index('return {"ok": true, "found_precompleted"')
     ]
     gate = outer_loop.index(
         "call $should_execute = should_execute_task($task_text)")
@@ -419,14 +427,14 @@ def test_daily_jianghu_missing_drink_skips_reward_check_after_cleanup():
     text = wf.read_text(encoding="utf-8")
     outer_loop = text[
         text.index('for idx in ["1", "2", "3", "4", "5", "6"]'):
-        text.index('log "六个任务刷新处理完成"')
+        text.index('return {"ok": true, "found_precompleted"')
     ]
     dispatch = outer_loop.index(
         "call $skip_reward_check = execute_target_task($task_text, $label, $idx)")
     skip = outer_loop.index("if $skip_reward_check", dispatch)
-    post_action_scan = outer_loop.index(
-        "scan [activity_jianghu].$label.[label] as $text_result", skip)
-    assert "continue" in outer_loop[skip:post_action_scan]
+    post_action_check = outer_loop.index(
+        "call $task_completed = is_task_completed($label)", skip)
+    assert "continue" in outer_loop[skip:post_action_check]
 
     drink = text[
         text.index("def action_yinjiu("):
@@ -440,32 +448,57 @@ def test_daily_jianghu_missing_drink_skips_reward_check_after_cleanup():
     assert "# targets 领域约束" in text
 
 
-def test_daily_jianghu_closes_stale_completed_task_overlay():
-    """刷新两次仍是同一 OCR，说明完成后的旧任务浮层没有自动关闭。"""
+def test_daily_jianghu_uses_refresh_icon_for_completion_and_one_rescan():
+    """任务文字会保留；刷新按钮消失才表示完成，首轮至多触发一次补扫。"""
     wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
     text = wf.read_text(encoding="utf-8")
 
     outer_loop = text[
         text.index('for idx in ["1", "2", "3", "4", "5", "6"]'):
-        text.index('log "六个任务刷新处理完成"')
+        text.index('return {"ok": true, "found_precompleted"')
     ]
     assert "call $refresh_result = refresh_task_until_terminal(" in outer_loop
     assert 'if $refresh_status equals "completed"' in outer_loop
     assert "call claim_completed_reward($label, $idx)" in outer_loop
     assert 'if $refresh_status equals "target"' in outer_loop
+    assert "eval $found_precompleted = true" in outer_loop
+
+    top_level = text[:text.index("def process_jianghu_cards(")]
+    first = top_level.index("call $first_pass = process_jianghu_cards(false)")
+    guard = top_level.index("if $first_pass.found_precompleted", first)
+    second = top_level.index("call $second_pass = process_jianghu_cards(true)", guard)
+    assert first < guard < second
+    assert top_level.count("process_jianghu_cards(") == 2
+    assert 'ensure_at_haoling("补扫", 1)' in top_level[guard:second]
+    process = text[text.index("def process_jianghu_cards("):text.index(
+        "def is_task_completed(")]
+    assert "if $claim_reward and not $is_rescan" in process
 
     refresh_proc = text[
         text.index("def refresh_task_until_terminal("):
         text.index("# 对已经确认完成的任务", text.index(
             "def refresh_task_until_terminal("))
     ]
-    assert "if $task_text equals $previous_task_text" in refresh_proc
-    assert "if $same_ocr_count >= 2" in refresh_proc
-    assert 'log warn "任务 "' in refresh_proc
-    assert "click [activity_jianghu].[overlay_back]" in refresh_proc
+    assert "call $task_completed = is_task_completed($label)" in refresh_proc
+    assert "$same_ocr_count" not in refresh_proc
+    assert "click [activity_jianghu].[overlay_back]" not in refresh_proc
     assert 'return {"status": "target"' in refresh_proc
     assert 'return {"status": "completed"' in refresh_proc
     assert 'return {"status": "exhausted"' in refresh_proc
+
+    for platform, record_size in (
+        ("android", (2800, 1260)),
+        ("desktop", (1936, 1088)),
+    ):
+        layout_path = SYSTEM_CONFIG_DIR / "layouts" / platform / "jianghu_card.json"
+        layout = json.loads(layout_path.read_text(encoding="utf-8"))
+        refresh = next(item for item in layout["regions"] if item["key"] == "refresh")
+        binding = refresh["template"]
+        assert binding["name"] == f"{platform}/jianghu_card/refresh"
+        assert (binding["record_w"], binding["record_h"]) == record_size
+        assert (
+            SYSTEM_CONFIG_DIR / "templates" / f"{binding['name']}.png"
+        ).is_file()
 
 
 def test_daily_jianghu_uses_layer_specific_back_regions():

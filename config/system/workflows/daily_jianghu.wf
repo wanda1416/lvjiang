@@ -48,14 +48,15 @@
 #
 # 流程结构：
 #   0. 起始定位：通过公共页面判断确认在活动页，否则先导航
-#   for 遍历 6 组 card_N
+#   调用过程遍历 6 组 card_N
 #      0. 再次校验仍在号令页；不在则阻塞弹窗提示用户手动
 #         处理（前一个任务卡住退出时可能漏回号令页，需及时拦截，
 #         避免后续任务在错误页面上继续乱点）
-#      1. 识别卡片文字是否命中用户勾选的任务
+#      1. 通过刷新按钮判断任务是否已经完成，再识别卡片文字是否命中目标
 #      2. 命中 → 读取任务文本，分发执行对应动作
 #      3. 未命中 → 点击卡片刷新按钮，等待后重新识别，直到命中或达到刷新上限
-#   4. 收尾：若仍在活动页，退回游戏首页；本次为合影切换过多人模式，则
+#   4. 第一轮若遇到处理前已完成的任务，回到号令页补扫一次，覆盖任务换位
+#   5. 收尾：若仍在活动页，退回游戏首页；本次为合影切换过多人模式，则
 #      再经菜单切回单人模式，并确认回到游戏主页
 #
 # 参数：
@@ -116,86 +117,25 @@ end
 # 此后只有领奖会改变该值，故「读取即写入」足以保证实时与存储一致。
 call $haoling_of_week = sync_haoling_of_week()
 
-for idx in ["1", "2", "3", "4", "5", "6"]
+call $first_pass = process_jianghu_cards(false)
+if not $first_pass.ok
+   return -1
+end
 
-   # 任务开头再校验一次是否仍在号令页：前一个任务若卡住退出，
-   # 可能未回到号令页，导致后续任务全部错乱。此时停在未知页面，
-   # 不能自动导航（auto_nav=0），阻塞弹窗提示用户手动处理
-   call $haoling_ok = ensure_at_haoling($idx, 0)
+# 处理前遇到已经完成的任务，既可能是用户提前做过，也可能是前面的任务
+# 完成后卡片换位。两者不再额外区分：六张卡处理完后统一补扫一次即可。
+if $first_pass.found_precompleted
+   log "首轮遇到处理前已完成的任务，补扫六张江湖号令卡片"
+   # 第六项外部任务且不领奖时会停在游戏主页；其他情况仍在号令页。
+   # 复用既有页面校验，已在号令页时不导航，否则按主页路径返回。
+   call $haoling_ok = ensure_at_haoling("补扫", 1)
    if $haoling_ok < 0
       return -1
    end
-
-   # 动态构造本组的子场景引用 key
-   eval $label = "card_" + $idx
-
-   # 每轮先扫描一次，完成判定和后续任务匹配共用同一份文字结果。
-   scan [activity_jianghu].$label.[label] as $text_result
-   log "任务 " + $idx + "（" + $label + "）初次扫描：" + $text_result.label
-   call $task_completed = is_task_completed($text_result)
-   if $task_completed
-      log "任务 " + $idx + " 在处理前已经完成，跳过任务切换与执行"
-      if $claim_reward
-         call claim_completed_reward($label, $idx)
-      end
-      continue
+   call $second_pass = process_jianghu_cards(true)
+   if not $second_pass.ok
+      return -1
    end
-
-   # 复用上面的 OCR 文字判断是否为目标任务，不重复扫描。
-   eval $task_text = $text_result.label
-   call $hit = is_target_task($task_text)
-   if $hit
-      log "任务 " + $idx + " 已是目标任务"
-   else
-      call $refresh_result = refresh_task_until_terminal(
-         $label, $idx, $task_text)
-      eval $refresh_status = $refresh_result.status
-      eval $task_text = $refresh_result.task_text
-
-      if $refresh_status equals "completed"
-         if $claim_reward
-            call claim_completed_reward($label, $idx)
-         end
-         continue
-      end
-
-      if $refresh_status equals "target"
-         eval $hit = 1
-      else
-         log "任务 " + $idx + " 达到刷新上限仍未命中，跳过"
-      end
-   end
-
-   # 命中目标任务 → 读取任务文本，分发执行对应动作
-   if $hit
-      call $should_execute = should_execute_task($task_text)
-      if not $should_execute
-         log "任务 " + $idx + "（" + $label + "）属于固定目标，但用户未勾选执行，保留任务并跳过动作与领奖"
-         continue
-      end
-      log "任务 " + $idx + "（" + $label + "）执行前：" + $task_text
-
-      call $skip_reward_check = execute_target_task($task_text, $label, $idx)
-      if $skip_reward_check
-         log "任务 " + $idx + " 未完成，跳过领奖检测"
-         continue
-      end
-
-      # 领取奖励（勾选时）：先确认任务文字已经消失。完成后的卡片会变成
-      # 领奖提示，因此 label 必然为空；仍有文字说明任务没有真正完成。
-      # 觉障林未实现，点击会卡页面，无论是否勾选均跳过领奖。
-      if $claim_reward and not $task_text contains "觉障林"
-         scan [activity_jianghu].$label.[label] as $text_result
-         log "任务 " + $idx + "（" + $label + "）执行后扫描：" + $text_result.label
-         call $task_completed = is_task_completed($text_result)
-         if $task_completed
-            call claim_completed_reward($label, $idx)
-         else
-            log "任务 " + $idx + " 执行后标签仍有文字，判定未真正完成，跳过领奖"
-         end
-      end
-   end
-
 end
 
 log "六个任务刷新处理完成"
@@ -215,16 +155,108 @@ if $mode_switched
    call restore_single_mode()
 end
 
-# 判断一次扫描结果是否代表任务已经完成。
-# 完成后任务文字消失，label 为空并显示领奖提示；所有调用点统一走这里，
-# 避免处理前跳过与动作后领奖使用不同判定。
-# OCR 可能只残留少量乱码/碎字，5 个字符以内（含）视同空文本。
-def is_task_completed($text_result)
-   eval $text = trim($text_result.label)
-   if len($text) <= 5
-      return 1
+# 完整处理当前页面的六张任务卡。返回：
+#   ok                 — 六张卡是否正常处理完；
+#   found_precompleted — 是否有卡片在本轮执行前就已完成。
+# 调用方仅依据第一轮结果决定是否补扫一次，第二轮不会继续递归。
+def process_jianghu_cards($is_rescan)
+   eval $found_precompleted = false
+
+   for idx in ["1", "2", "3", "4", "5", "6"]
+
+      # 任务开头再校验一次是否仍在号令页：前一个任务若卡住退出，
+      # 可能未回到号令页，导致后续任务全部错乱。此时停在未知页面，
+      # 不能自动导航（auto_nav=0），阻塞弹窗提示用户手动处理
+      call $haoling_ok = ensure_at_haoling($idx, 0)
+      if $haoling_ok < 0
+         return {"ok": false, "found_precompleted": $found_precompleted}
+      end
+
+      # 动态构造本组的子场景引用 key
+      eval $label = "card_" + $idx
+
+      # 完成后的任务仍保留原文案，右上角刷新按钮才是稳定状态信号。
+      # 只有这个执行前入口会记录 found_precompleted；本轮动作完成不触发补扫。
+      call $task_completed = is_task_completed($label)
+      if $task_completed
+         eval $found_precompleted = true
+         log "任务 " + $idx + " 在处理前已经完成，跳过任务切换与执行"
+         # 首轮已经处理过全部可领取奖励；补扫只补漏任务，不重复点击
+         # 已完成卡片。补扫中新执行完成的任务仍走下方正常领奖分支。
+         if $claim_reward and not $is_rescan
+            call claim_completed_reward($label, $idx)
+         end
+         continue
+      end
+
+      scan [activity_jianghu].$label.[label] as $text_result
+      log "任务 " + $idx + "（" + $label + "）初次扫描：" + $text_result.label
+
+      # 复用上面的 OCR 文字判断是否为目标任务，不重复扫描。
+      eval $task_text = $text_result.label
+      call $hit = is_target_task($task_text)
+      if $hit
+         log "任务 " + $idx + " 已是目标任务"
+      else
+         call $refresh_result = refresh_task_until_terminal(
+            $label, $idx, $task_text)
+         eval $refresh_status = $refresh_result.status
+         eval $task_text = $refresh_result.task_text
+
+         if $refresh_status equals "completed"
+            if $claim_reward
+               call claim_completed_reward($label, $idx)
+            end
+            continue
+         end
+
+         if $refresh_status equals "target"
+            eval $hit = 1
+         else
+            log "任务 " + $idx + " 达到刷新上限仍未命中，跳过"
+         end
+      end
+
+      # 命中目标任务 → 读取任务文本，分发执行对应动作
+      if $hit
+         call $should_execute = should_execute_task($task_text)
+         if not $should_execute
+            log "任务 " + $idx + "（" + $label + "）属于固定目标，但用户未勾选执行，保留任务并跳过动作与领奖"
+            continue
+         end
+         log "任务 " + $idx + "（" + $label + "）执行前：" + $task_text
+
+         call $skip_reward_check = execute_target_task($task_text, $label, $idx)
+         if $skip_reward_check
+            log "任务 " + $idx + " 未完成，跳过领奖检测"
+            continue
+         end
+
+         # 领取奖励（勾选时）：完成后任务文字仍会保留，刷新按钮消失才
+         # 表示任务已经真正完成。觉障林未实现，无论是否勾选均跳过领奖。
+         if $claim_reward and not $task_text contains "觉障林"
+            call $task_completed = is_task_completed($label)
+            if $task_completed
+               call claim_completed_reward($label, $idx)
+            else
+               log "任务 " + $idx + " 执行后刷新按钮仍存在，判定未真正完成，跳过领奖"
+            end
+         end
+      end
+
    end
-   return 0
+
+   return {"ok": true, "found_precompleted": $found_precompleted}
+end
+
+# 判断卡片是否已经完成。任务完成后文字仍会保留，但右上角刷新按钮消失；
+# 所有调用点统一使用布局绑定模板，避免 OCR 文案长度造成误判。
+def is_task_completed($label)
+   scan [activity_jianghu].$label.[refresh] as $refresh_found by image
+   if $refresh_found
+      return 0
+   end
+   return 1
 end
 
 # 仅用于六项全关时快速退出，不参与目标候选判定。
@@ -308,15 +340,22 @@ end
 
 # 刷新非目标任务，直到出现一种终态：
 #   target    — 已刷新到目标任务，task_text 为命中的任务文字；
-#   completed — 连续两次刷新 OCR 均未变化，判定旧任务已完成并关闭浮层；
+#   completed — 刷新按钮消失，说明卡片已经完成；
 #   exhausted — 达到刷新上限仍未命中。
 # 返回字典同时携带最后一次 OCR，避免依赖过程外变量或 context。
 def refresh_task_until_terminal($label, $idx, $initial_text)
    eval $previous_task_text = trim($initial_text)
-   eval $same_ocr_count = 0
 
    loop $max_refresh
       click [activity_jianghu].$label.[refresh] after wait stable @page_refresh least 0.3
+
+      # 任务文字可能保持不变，不能据此推断完成；每次刷新后只认刷新按钮。
+      call $task_completed = is_task_completed($label)
+      if $task_completed
+         log "任务 " + $idx + " 刷新按钮已经消失，判定任务已完成"
+         return {"status": "completed", "task_text": $previous_task_text}
+      end
+
       scan [activity_jianghu].$label.[label] as $text_result
       eval $task_text = trim($text_result.label)
       log "任务 " + $idx + "（" + $label + "）刷新扫描：" + $task_text
@@ -327,18 +366,7 @@ def refresh_task_until_terminal($label, $idx, $initial_text)
          return {"status": "target", "task_text": $task_text}
       end
 
-      if $task_text equals $previous_task_text
-         eval $same_ocr_count = $same_ocr_count + 1
-      else
-         eval $same_ocr_count = 0
-      end
       eval $previous_task_text = $task_text
-
-      if $same_ocr_count >= 2
-         log warn "任务 " + $idx + " 连续两次刷新仍为相同内容，判定任务已经完成，关闭旧任务浮层"
-         click [activity_jianghu].[overlay_back] after wait stable @page_refresh least 0.3
-         return {"status": "completed", "task_text": $task_text}
-      end
    end
 
    return {"status": "exhausted", "task_text": $previous_task_text}

@@ -29,6 +29,7 @@ from .equipment_write import (
 from .models import (
     COMBAT_TYPE_PVE,
     EQUIPMENT_CREATED_AT,
+    EQUIPMENT_LAST_SEEN_AT,
     EQUIPMENT_SLOTS,
     EQUIPMENT_UPDATED_AT,
     LoadoutPlan,
@@ -57,6 +58,7 @@ def stamp_equipment_write(
     *,
     now: str | None = None,
     source: WriteSource = WriteSource.EDIT,
+    observed: bool = False,
 ) -> dict:
     """生成一次 fp 写入的数据：先过合并契约，再盖时间戳。
 
@@ -77,6 +79,12 @@ def stamp_equipment_write(
         value[EQUIPMENT_CREATED_AT] = (
             created if isinstance(created, str) else "")
     value[EQUIPMENT_UPDATED_AT] = timestamp
+    previous_seen = existing.get(EQUIPMENT_LAST_SEEN_AT) if existing else ""
+    value[EQUIPMENT_LAST_SEEN_AT] = (
+        timestamp
+        if observed and not bool((value.get("_extra") or {}).get("is_mock"))
+        else previous_seen if isinstance(previous_seen, str) else ""
+    )
     return value
 
 
@@ -91,6 +99,13 @@ def _timestamp_rank(value) -> float | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.timestamp()
+
+
+def _equipment_seen_rank(equip: dict) -> float | None:
+    """扫描时间排序值；历史装备缺失独立字段时回退到更新时间。"""
+    seen = _timestamp_rank(equip.get(EQUIPMENT_LAST_SEEN_AT))
+    return seen if seen is not None else _timestamp_rank(
+        equip.get(EQUIPMENT_UPDATED_AT))
 
 
 def _pick_timestamp(values, *, latest: bool) -> str:
@@ -255,7 +270,8 @@ class LoadoutRepository:
         self.update(mutate)
 
     def upsert_item(self, equip: dict,
-                    *, source: WriteSource = WriteSource.BAG_SCAN) -> str:
+                    *, source: WriteSource = WriteSource.BAG_SCAN,
+                    observed: bool = True) -> str:
         """写入一件背包/模拟装备。
 
         默认按背包扫描处理：背包里读到的定音就是这件装备该展示的定音。
@@ -269,9 +285,28 @@ class LoadoutRepository:
             raise ValueError("装备数据无法生成指纹")
         def mutate(state: LoadoutState) -> None:
             state.equipment_items[fp] = stamp_equipment_write(
-                equip, fp, state.equipment_items.get(fp), source=source)
+                equip, fp, state.equipment_items.get(fp), source=source,
+                observed=observed)
         self.update(mutate)
         return fp
+
+    def mark_item_seen(self, fp: str) -> bool:
+        """刷新真实扫描时间；不存在或模拟装备不创建、不修改。"""
+        current = self.load().equipment_items.get(fp)
+        if current is None or bool((current.get("_extra") or {}).get("is_mock")):
+            return False
+        marked = False
+
+        def mutate(state: LoadoutState) -> None:
+            nonlocal marked
+            equip = state.equipment_items.get(fp)
+            if equip is None or bool((equip.get("_extra") or {}).get("is_mock")):
+                return
+            equip[EQUIPMENT_LAST_SEEN_AT] = _now_iso()
+            marked = True
+
+        self.update(mutate)
+        return marked
 
     def set_item_cooldown(self, fp: str, expires_at: str) -> LoadoutState:
         """只修改指定装备的冷却到期时间，指纹不变。"""
@@ -402,7 +437,7 @@ class LoadoutRepository:
                 raise ValueError("目标备战方案已不存在")
             state.equipment_items[fp] = stamp_equipment_write(
                 equip, fp, state.equipment_items.get(fp),
-                source=WriteSource.PLAN_SCAN)
+                source=WriteSource.PLAN_SCAN, observed=scanned)
             plan = state.plans[plan_id]
             replaced = plan.equipment[slot_key] != fp
             plan.equipment[slot_key] = fp
@@ -469,6 +504,7 @@ class LoadoutRepository:
         *,
         preserve_referenced: bool = False,
         preserve_locked: bool = False,
+        last_seen_before: str | None = None,
     ) -> set[str]:
         """删除装备，按需原子保护备战引用或已锁定装备。
 
@@ -477,10 +513,20 @@ class LoadoutRepository:
         返回实际删除的指纹，供调用方准确反馈结果。
         """
         deleted: set[str] = set()
+        cutoff = _timestamp_rank(last_seen_before)
+        if last_seen_before is not None and cutoff is None:
+            raise ValueError("扫描时间截止值不是合法 ISO 时间")
 
         def mutate(state: LoadoutState) -> None:
             nonlocal deleted
             requested = set(fingerprints)
+            if cutoff is not None:
+                requested = {
+                    fp for fp in requested
+                    if (seen := _equipment_seen_rank(
+                        state.equipment_items.get(fp) or {})) is None
+                    or seen < cutoff
+                }
             if preserve_referenced:
                 referenced = {
                     fp
@@ -557,8 +603,8 @@ class LoadoutRepository:
                     if fp in resolved:
                         plan.equipment[slot] = resolved[fp]
             # 合并只是在存量快照之间建立同一实体关系，不算一次装备内容更新。
-            # 保留版本继承整组最早创建时间和最新更新时间；全组旧数据都没有
-            # 时间时明确写空，绝不退化成 Unix 纪元。
+            # 保留版本继承整组最早创建时间、最新更新时间和最新扫描时间；
+            # 全组旧数据都没有时间时明确写空，绝不退化成 Unix 纪元。
             grouped: dict[str, list[dict]] = {}
             for old, new in resolved.items():
                 grouped.setdefault(new, []).append(state.equipment_items[old])
@@ -573,6 +619,9 @@ class LoadoutRepository:
                     latest=False)
                 target[EQUIPMENT_UPDATED_AT] = _pick_timestamp(
                     (item.get(EQUIPMENT_UPDATED_AT) for item in all_items),
+                    latest=True)
+                target[EQUIPMENT_LAST_SEEN_AT] = _pick_timestamp(
+                    (item.get(EQUIPMENT_LAST_SEEN_AT) for item in all_items),
                     latest=True)
             for old in resolved:
                 state.equipment_items.pop(old, None)
@@ -719,6 +768,13 @@ class LoadoutRepository:
                 (old.get(EQUIPMENT_CREATED_AT),
                  target.get(EQUIPMENT_CREATED_AT) if target else None),
                 latest=False,
+            )
+            stamped[EQUIPMENT_LAST_SEEN_AT] = _pick_timestamp(
+                (old.get(EQUIPMENT_LAST_SEEN_AT)
+                 or old.get(EQUIPMENT_UPDATED_AT),
+                 (target.get(EQUIPMENT_LAST_SEEN_AT)
+                  or target.get(EQUIPMENT_UPDATED_AT)) if target else None),
+                latest=True,
             )
             state.equipment_items[new_fp] = stamped
             for plan in state.plans.values():

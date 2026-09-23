@@ -45,6 +45,7 @@ from ....core.equip_parser.dingyin_parser import (
 )
 from ....core.equip_validator import illegal_reasons_of
 from ....core.equipment_cooldown import next_cooldown_expiry
+from ....core.loadout.models import EQUIPMENT_LAST_SEEN_AT
 from ....core.loadout.transmute import TARGET_NAME_KEY, TARGET_VALUE_KEY
 from ..widgets import is_dark_theme, make_tag
 
@@ -357,6 +358,8 @@ def _equipment_property_rows(
             equip.get("cooldown_expires_at"))),
         (tr("创建时间"), _format_equipment_time(equip.get("created_at"))),
         (tr("更新时间"), _format_equipment_time(equip.get("updated_at"))),
+        (tr("扫描时间"), _format_equipment_time(
+            equip.get(EQUIPMENT_LAST_SEEN_AT) or equip.get("updated_at"))),
     ]
 
 

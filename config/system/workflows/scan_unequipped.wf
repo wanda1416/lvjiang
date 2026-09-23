@@ -94,6 +94,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
     eval $window_idx = 0
     call $slot_equip = scan_cell($detail_kind)
     eval $slot_type = $slot_equip.type
+    eval mark_equipment_seen($slot_equip)
 
     loop while 1 == 1
         align [bag_equip_detail].[bag_grid]
@@ -131,6 +132,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
 
             if $signal equals "new"
                 if $equip.level < $min_level
+                    eval mark_equipment_seen($equip)
                     if $group equals "weapon" and $equip.type equals $slot_type
                         log "  同类型低等级，跳过到下一行"
                     else
@@ -144,6 +146,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
                         eval write_bag_item($group, $equip)
                         eval $total_count = $total_count + 1
                     else
+                        eval mark_equipment_seen($equip)
                         eval $filtered_count = $filtered_count + 1
                         log "  [" + $r + ",1] 词条 " + $equip._extra.affix_count + " < " + $min_affix_count + "，不写入"
                     end
@@ -172,6 +175,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
                             break
                         end
                         if $equip.level < $min_level
+                            eval mark_equipment_seen($equip)
                             if $group equals "weapon" and $equip.type equals $slot_type
                                 log "    同类型低等级，跳过到下一行"
                                 break
@@ -186,6 +190,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
                             eval write_bag_item($group, $equip)
                             eval $total_count = $total_count + 1
                         else
+                            eval mark_equipment_seen($equip)
                             eval $filtered_count = $filtered_count + 1
                             log "    [" + $r + "," + $c + "] 词条 " + $equip._extra.affix_count + " < " + $min_affix_count + "，不写入"
                         end

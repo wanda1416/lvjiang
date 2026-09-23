@@ -7,6 +7,7 @@ from ...config.equipment_slots import EQUIPMENT_SLOTS
 
 EQUIPMENT_CREATED_AT = "created_at"
 EQUIPMENT_UPDATED_AT = "updated_at"
+EQUIPMENT_LAST_SEEN_AT = "last_seen_at"
 
 #: 方案的对战类型：对环境（PVE）还是对玩家（PVP）。稳定 key 用于落盘和判断，
 #: PVE/PVP 只是展示文案，不得互换。缺失按 PVE 读——老方案都是 PVE 时代建的。
@@ -18,7 +19,11 @@ COMBAT_TYPES = (COMBAT_TYPE_PVE, COMBAT_TYPE_PVP)
 def normalize_equipment_times(equip: dict) -> dict:
     """复制装备并把历史数据缺失的时间字段规范为空字符串。"""
     value = dict(equip)
-    for key in (EQUIPMENT_CREATED_AT, EQUIPMENT_UPDATED_AT):
+    for key in (
+        EQUIPMENT_CREATED_AT,
+        EQUIPMENT_UPDATED_AT,
+        EQUIPMENT_LAST_SEEN_AT,
+    ):
         timestamp = value.get(key)
         value[key] = timestamp if isinstance(timestamp, str) else ""
     return value

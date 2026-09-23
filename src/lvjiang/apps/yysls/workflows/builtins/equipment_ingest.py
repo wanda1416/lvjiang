@@ -174,6 +174,21 @@ def _write_bag_item(_engine, group_key: str, equip_dict: dict) -> str:
     return fp
 
 
+@builtin_func("mark_equipment_seen")
+def _mark_equipment_seen(_engine, equip_dict: dict) -> bool:
+    """记录一次真实装备观察；被扫描条件过滤的旧装备也需要刷新。"""
+    if not isinstance(equip_dict, dict):
+        return False
+    from ...core.equip_parser.models import make_fingerprint
+    fp = str(equip_dict.get("_fp") or make_fingerprint(equip_dict) or "")
+    if not fp:
+        return False
+    marked = _repository(_engine).mark_item_seen(fp)
+    if marked:
+        _notify_equipment_changed(_engine)
+    return marked
+
+
 @builtin_func("write_equipped")
 def _write_equipped(_engine, slot_key: str, equip_dict: dict) -> str:
     repo = _repository(_engine)

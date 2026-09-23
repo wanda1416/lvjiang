@@ -1203,7 +1203,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
 
     def _on_refresh(self):
         self._refresh_all()
-        get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
+        get_event_hub(self._host).publish(
+            EQUIPMENT_CHANGED, self._host.active_user_name() or "")
 
     def _update_status_row(self, result=None):
         """更新状态展示行：从 LoadoutPanel 读取 DPS 和毕业率。"""
@@ -1290,7 +1291,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._refresh_slots()
         self._rebuild_grid()
         if notify:
-            get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
+            get_event_hub(self._host).publish(
+                EQUIPMENT_CHANGED, self._host.active_user_name() or "")
 
     def _update_item_metadata(self, fp: str, key: str, value: str) -> None:
         """原地同步不影响指纹和属性的单装备字段。"""
@@ -1719,7 +1721,10 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             QMessageBox.critical(self, tr("合并失败"), str(exc))
             return
         self._refresh_all()
-        get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
+        # 承音合并会写多个用户，逐个通知——只报当前用户会漏掉其余几个。
+        hub = get_event_hub(self._host)
+        for username in replacements_by_user:
+            hub.publish(EQUIPMENT_CHANGED, username)
         QMessageBox.information(
             self, tr("合并完成"),
             tr("已合并 {count} 组装备。此操作保留右侧版本，并迁移所有备战方案引用。")

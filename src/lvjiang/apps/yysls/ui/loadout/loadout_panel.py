@@ -397,8 +397,15 @@ class LoadoutPanel(QWidget):
             self._schedule_equipment_refresh)
         self._equipment_events_connected = False
 
-    def _schedule_equipment_refresh(self) -> None:
-        """合并同一事件循环内的变更，不让刷新重入。"""
+    def _schedule_equipment_refresh(self, username: str = "") -> None:
+        """合并同一事件循环内的变更，不让刷新重入。
+
+        只响应当前查看用户的变更。批量任务里 B 用户每扫到一件装备就发一次
+        事件，不过滤的话正在看 A 用户的人会被 B 的扫描按住，整页装备卡反复
+        重建。空用户名表示事件来源没报用户，按原样照常刷新。
+        """
+        if username and username != (self._host.active_user_name() or ""):
+            return
         if self.isVisible() and not self._equipment_refresh_timer.isActive():
             self._equipment_refresh_timer.start(0)
 

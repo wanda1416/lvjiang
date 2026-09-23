@@ -1,4 +1,8 @@
-"""新建备战方案：流派用于快速填充武学，玩法按武学无序组合筛选。"""
+"""新建备战方案：流派用于快速填充武学，玩法按武学无序组合筛选。
+
+只服务「新建」——已有方案在方案管理表格里逐列编辑，不再开对话框。新建必须
+一次给齐两门武学（``create_plan`` 拒绝半套方案），所以这条路径仍是表单。
+"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QSignalBlocker
@@ -6,9 +10,10 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QFormLayout,
+    QLabel,
     QLineEdit,
     QMessageBox,
+    QVBoxLayout,
 )
 
 from .....i18n import tr
@@ -23,7 +28,7 @@ from ...core.loadout import (
 )
 from ...core.loadout.models import COMBAT_TYPE_PVE, COMBAT_TYPE_PVP
 from ..domain_labels import combat_type_label
-from ..layout_helpers import fit_combo_to_contents
+from ..layout_helpers import config_field_card, fit_combo_to_contents
 
 
 class PlanCreateDialog(QDialog):
@@ -37,9 +42,13 @@ class PlanCreateDialog(QDialog):
         self._schools = game_config.get_schools()
         self._editing_plan = plan
         self._preferred_playstyle = ""
-        form = QFormLayout(self)
+        # 用配置面板同款的卡片行，而不是裸 QFormLayout：六个字段平铺在一个
+        # 密集块里，标签和编辑器挤在一起，扫读很费劲。
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 12)
+        root.setSpacing(10)
         self._edit_name = QLineEdit()
-        form.addRow(tr("方案名称:"), self._edit_name)
+        root.addWidget(config_field_card(tr("方案名称"), self._edit_name))
 
         self._combo_school = QComboBox()
         self._combo_school.addItem(tr("不选择流派"), "")
@@ -47,7 +56,7 @@ class PlanCreateDialog(QDialog):
             self._combo_school.addItem(school, school)
         fit_combo_to_contents(self._combo_school, minimum=160)
         self._combo_school.currentIndexChanged.connect(self._on_school_changed)
-        form.addRow(tr("流派:"), self._combo_school)
+        root.addWidget(config_field_card(tr("流派"), self._combo_school))
 
         martial_arts = list(game_config.get_martial_arts())
         if plan is not None:
@@ -58,24 +67,24 @@ class PlanCreateDialog(QDialog):
         self._combo_main.addItems([""] + martial_arts)
         fit_combo_to_contents(self._combo_main, minimum=160)
         self._combo_main.currentIndexChanged.connect(self._on_arts_changed)
-        form.addRow(tr("主武学:"), self._combo_main)
+        root.addWidget(config_field_card(tr("主武学"), self._combo_main))
         self._combo_sub = QComboBox()
         self._combo_sub.addItems([""] + martial_arts)
         fit_combo_to_contents(self._combo_sub, minimum=160)
         self._combo_sub.currentIndexChanged.connect(self._on_arts_changed)
-        form.addRow(tr("副武学:"), self._combo_sub)
+        root.addWidget(config_field_card(tr("副武学"), self._combo_sub))
 
         self._combo_playstyle = QComboBox()
         self._combo_playstyle.currentIndexChanged.connect(
             self._on_playstyle_changed)
-        form.addRow(tr("玩法:"), self._combo_playstyle)
+        root.addWidget(config_field_card(tr("玩法"), self._combo_playstyle))
         self._refresh_playstyles()
 
         self._combo_combat = QComboBox()
         for kind in (COMBAT_TYPE_PVE, COMBAT_TYPE_PVP):
             self._combo_combat.addItem(combat_type_label(kind), kind)
         fit_combo_to_contents(self._combo_combat, minimum=160)
-        form.addRow(tr("对战类型:"), self._combo_combat)
+        root.addWidget(config_field_card(tr("对战类型"), self._combo_combat))
 
         if plan is not None:
             self._edit_name.setText(plan.name)
@@ -94,13 +103,22 @@ class PlanCreateDialog(QDialog):
             self._preferred_playstyle = plan.playstyle
             self._refresh_playstyles()
 
+        hint = QLabel(tr("选择流派会自动填入对应的两门武学并锁定；"
+                         "要自由搭配就选「不选择流派」"))
+        hint.setWordWrap(True)
+        hint.setContentsMargins(14, 2, 14, 0)
+        hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        root.addWidget(hint)
+        root.addStretch()
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel)
         apply_dialog_button_box_style(buttons)
         buttons.accepted.connect(self._validate_and_accept)
         buttons.rejected.connect(self.reject)
-        form.addRow(buttons)
+        # 按钮自成一行，不再当作表单的第七个字段。
+        root.addWidget(buttons)
 
     def _on_school_changed(self, _index: int) -> None:
         school = str(self._combo_school.currentData() or "")

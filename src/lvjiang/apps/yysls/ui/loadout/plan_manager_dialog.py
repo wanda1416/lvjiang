@@ -3,9 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from loguru import logger
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPalette
 from PyQt6.QtWidgets import (
     QDialog,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -22,9 +25,21 @@ from PyQt6.QtWidgets import (
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style
 from ...config import GameConfigManager, get_game_config
-from ...core.loadout import LoadoutRepository, resolve_school
+from ...core.loadout import (
+    LoadoutPlan,
+    LoadoutRepository,
+    resolve_school,
+)
 from ..domain_labels import combat_type_label
+from ..layout_helpers import configure_navigation_list
 from .plan_create_dialog import PlanCreateDialog
+from .plan_table_delegate import (
+    COL_NAME,
+    PlanFieldDelegate,
+    locked_columns,
+    locked_reason,
+    plan_field_updates,
+)
 
 
 class PlanManagerDialog(QDialog):
@@ -42,17 +57,23 @@ class PlanManagerDialog(QDialog):
         self._loading = False
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 12)
+        layout.setSpacing(12)
         splitter = QSplitter()
-        layout.addWidget(splitter)
+        layout.addWidget(splitter, stretch=1)
 
         self._users = QListWidget()
+        configure_navigation_list(self._users, minimum_width=190)
         self._users.addItems(usernames)
         self._users.currentTextChanged.connect(self._load_user)
         splitter.addWidget(self._users)
 
         right = QWidget()
         right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(12, 0, 0, 0)
+        right_layout.setSpacing(10)
         toolbar = QHBoxLayout()
+        toolbar.setSpacing(8)
         for label, name, callback, variant in (
             (tr("新建"), "_add_button", self._create_plan, "action"),
             (tr("删除"), "_delete_button", self._delete_plan, "danger"),
@@ -66,13 +87,19 @@ class PlanManagerDialog(QDialog):
             toolbar.addWidget(button)
         toolbar.addStretch()
         right_layout.addLayout(toolbar)
-        right_layout.addWidget(QLabel(
-            tr("双击方案可编辑名称、流派、武学、玩法与对战类型")))
+        notice = QFrame()
+        notice.setProperty("surface", "card")
+        notice_layout = QVBoxLayout(notice)
+        notice_layout.setContentsMargins(12, 8, 12, 8)
+        notice_layout.setSpacing(4)
+        notice_layout.addWidget(QLabel(
+            tr("选中一行后再单击单元格即可逐项编辑；灰色单元格由流派决定")))
         hint = QLabel(tr("PVP 方案不参与智能调律：目前没有 PVP 调律方案，"
                          "一起加载会让够不到 PVE 标准的装备被判成有提升"))
         hint.setWordWrap(True)
         hint.setStyleSheet("color: palette(mid); font-size: 11px;")
-        right_layout.addWidget(hint)
+        notice_layout.addWidget(hint)
+        right_layout.addWidget(notice)
 
         self._table = QTableWidget(0, 6)
         self._table.setHorizontalHeaderLabels([
@@ -80,20 +107,38 @@ class PlanManagerDialog(QDialog):
             tr("对战类型")])
         header = self._table.horizontalHeader()
         assert header is not None
-        header.setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch)
+        # 名称吃掉多余宽度，其余按内容收窄；六列平分会让「对战类型」和
+        # 「名称」一样宽，扫读时抓不到重点。
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(COL_NAME, QHeaderView.ResizeMode.Stretch)
         vertical_header = self._table.verticalHeader()
         assert vertical_header is not None
         vertical_header.setVisible(False)
+        vertical_header.setDefaultSectionSize(
+            max(28, self._table.fontMetrics().height() + 10))
+        self._table.setAlternatingRowColors(True)
+        self._table.setShowGrid(False)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        # 选中后再单击才进编辑：单击即编辑容易在挑行时误触。
+        self._table.setEditTriggers(
+            QTableWidget.EditTrigger.SelectedClicked
+            | QTableWidget.EditTrigger.EditKeyPressed)
+        self._table.setItemDelegate(PlanFieldDelegate(
+            self._game_config, self._plan_at, self._commit_field, self._table))
         self._table.itemSelectionChanged.connect(self._update_actions)
-        self._table.cellDoubleClicked.connect(self._edit_plan)
-        right_layout.addWidget(self._table)
+        right_layout.addWidget(self._table, stretch=1)
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([180, 720])
+        splitter.setSizes([190, 710])
+
+        bottom = QHBoxLayout()
+        bottom.addStretch()
+        close_button = QPushButton(tr("关闭"))
+        apply_button_style(close_button, variant="neutral")
+        close_button.clicked.connect(self.accept)
+        bottom.addWidget(close_button)
+        layout.addLayout(bottom)
 
         if usernames:
             index = usernames.index(current_user) if current_user in usernames else 0
@@ -109,6 +154,33 @@ class PlanManagerDialog(QDialog):
         row = self._table.currentRow()
         item = self._table.item(row, 0) if row >= 0 else None
         return str(item.data(Qt.ItemDataRole.UserRole) or "") if item else ""
+
+    def _plan_at(self, row: int) -> LoadoutPlan | None:
+        """表格第 row 行当前对应的方案；委托据此构建编辑器。"""
+        repo = self._repo()
+        item = self._table.item(row, COL_NAME) if row >= 0 else None
+        pid = str(item.data(Qt.ItemDataRole.UserRole) or "") if item else ""
+        return repo.load().plans.get(pid) if repo and pid else None
+
+    def _commit_field(self, plan: LoadoutPlan, column: int,
+                      value: str) -> None:
+        """写回一次列编辑，然后整行重读——联动结果只认仓储里的事实。"""
+        repo = self._repo()
+        if repo is None:
+            return
+        updates = plan_field_updates(
+            self._game_config.get_schools(), plan, column, value)
+        if not updates:
+            # 名称空串等无效输入：放弃写入，让单元格回滚成原值。
+            self._load_user(selected_id=plan.id)
+            return
+        try:
+            repo.configure_plan(plan.id, **updates)
+        except Exception as exc:  # noqa: BLE001 - 单次编辑失败不该关掉对话框
+            logger.error(f"编辑备战方案失败: {exc}")
+            QMessageBox.warning(self, tr("保存失败"), str(exc))
+        self._mark_changed()
+        self._load_user(selected_id=plan.id)
 
     def _load_user(self, _name: str = "", *, selected_id: str = "") -> None:
         repo = self._repo()
@@ -128,11 +200,25 @@ class PlanManagerDialog(QDialog):
                     plan.playstyle or "-",
                     combat_type_label(plan.combat_type),
                 ]
+                locked = locked_columns(schools, plan)
                 for col, value in enumerate(values):
                     item = QTableWidgetItem(value)
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled
-                                  | Qt.ItemFlag.ItemIsSelectable)
-                    if col == 0:
+                    flags = (Qt.ItemFlag.ItemIsEnabled
+                             | Qt.ItemFlag.ItemIsSelectable)
+                    if col in locked:
+                        # 不可编辑就画成灰底灰字：只靠 flags() 拦截是静默的，
+                        # 用户点不动又看不出原因。
+                        item.setBackground(
+                            self.palette().alternateBase())
+                        item.setForeground(
+                            self.palette().brush(
+                                QPalette.ColorGroup.Disabled,
+                                QPalette.ColorRole.Text))
+                        item.setToolTip(locked_reason())
+                    else:
+                        flags |= Qt.ItemFlag.ItemIsEditable
+                    item.setFlags(flags)
+                    if col == COL_NAME:
                         item.setData(Qt.ItemDataRole.UserRole, pid)
                         if pid == state.active_plan_id:
                             item.setText(f"★ {plan.name}")
@@ -176,32 +262,6 @@ class PlanManagerDialog(QDialog):
             return
         self._mark_changed()
         self._load_user(selected_id=plan.id)
-
-    def _edit_plan(self, row: int, _column: int) -> None:
-        repo = self._repo()
-        if repo is None:
-            return
-        item = self._table.item(row, 0)
-        pid = str(item.data(Qt.ItemDataRole.UserRole) or "") if item else ""
-        plan = repo.load().plans.get(pid)
-        if plan is None:
-            self._load_user()
-            return
-        dialog = PlanCreateDialog(self._game_config, self, plan=plan)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-        try:
-            repo.configure_plan(
-                pid, name=dialog.plan_name,
-                main_martial_art=dialog.main_art,
-                sub_martial_art=dialog.sub_art,
-                playstyle=dialog.playstyle,
-                combat_type=dialog.combat_type)
-        except Exception as exc:
-            QMessageBox.warning(self, tr("保存失败"), str(exc))
-            return
-        self._mark_changed()
-        self._load_user(selected_id=pid)
 
     def _delete_plan(self) -> None:
         repo = self._repo()

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from loguru import logger
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFontMetrics, QIntValidator, QKeyEvent
+from PyQt6.QtGui import QFontMetrics, QIntValidator
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -19,15 +19,12 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
-    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
-    QLayout,
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QScrollArea,
     QSpinBox,
     QSplitter,
     QTableWidget,
@@ -58,6 +55,7 @@ from ...core.profile.models import (
 from ...core.profile.periods import get_profile_period, list_profile_periods
 from ...i18n import tr
 from ..button_styles import apply_button_style, fit_button_width
+from ..tag_input import TagInputWidget
 
 # 模型 TAB 顺序
 _MODEL_ORDER = [MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN, MODEL_NOTE]
@@ -327,113 +325,7 @@ class _SyncTargetsWidget(QWidget):
         return targets
 
 
-class _TagInputWidget(QFrame):
-    """按 Enter 创建可删除标签的来源/用途词条输入框。"""
-
-    def __init__(self, values: list[str], parent=None) -> None:
-        super().__init__(parent)
-        self.setObjectName("profileTagInput")
-        self.setMinimumHeight(52)
-        self.setMaximumHeight(52)
-        self.setStyleSheet(
-            "QFrame#profileTagInput { border: 1px solid palette(mid); "
-            "border-radius: 4px; background: palette(base); }"
-            "QFrame#profileTagChip { border: 1px solid palette(mid); "
-            "border-radius: 9px; background: palette(alternate-base); }"
-            "QFrame#profileTagChip QLabel { border: none; background: transparent; }"
-            "QFrame#profileTagChip QPushButton { border: none; background: transparent; "
-            "padding: 0 2px; color: palette(mid); }"
-            "QFrame#profileTagChip QPushButton:hover { color: palette(text); }"
-            "QFrame#profileTagInput QLineEdit { border: none; background: transparent; }"
-        )
-
-        self._values: list[str] = []
-        self._chips: dict[str, QFrame] = {}
-
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(1, 1, 1, 1)
-        self._scroll = QScrollArea()
-        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self._scroll.setWidgetResizable(False)
-        self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        outer_layout.addWidget(self._scroll)
-
-        self._content = QWidget()
-        self._row = QHBoxLayout(self._content)
-        self._row.setContentsMargins(4, 3, 4, 3)
-        self._row.setSpacing(5)
-        self._row.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-        self._scroll.setWidget(self._content)
-
-        self._input = QLineEdit()
-        self._input.setMinimumWidth(150)
-        self._input.installEventFilter(self)
-
-        self._row.addWidget(self._input)
-        for value in values:
-            self.add_tag(value)
-
-    def eventFilter(self, watched, event):  # type: ignore[override]
-        """Enter 只提交标签，不触发所在对话框的默认按钮。"""
-        if (
-            watched is self._input
-            and isinstance(event, QKeyEvent)
-            and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
-        ):
-            self._commit_input()
-            return True
-        return super().eventFilter(watched, event)
-
-    def _commit_input(self) -> None:
-        value = self._input.text().strip()
-        if value:
-            self.add_tag(value)
-            self._input.clear()
-
-    def add_tag(self, value: str) -> bool:
-        value = value.strip()
-        if not value or value in self._chips:
-            return False
-
-        chip = QFrame()
-        chip.setObjectName("profileTagChip")
-        chip_layout = QHBoxLayout(chip)
-        chip_layout.setContentsMargins(7, 2, 3, 2)
-        chip_layout.setSpacing(2)
-        chip_layout.addWidget(QLabel(value))
-        remove = QPushButton("×")
-        remove.setFixedSize(18, 18)
-        # QDialog 会把 autoDefault 按钮视为 Enter 的候选默认按钮。
-        # 否则用户在输入框按 Enter 新增标签时，会同时点击第一个“×”。
-        remove.setAutoDefault(False)
-        remove.setToolTip(tr("删除"))
-        remove.clicked.connect(lambda _checked, text=value: self.remove_tag(text))
-        chip_layout.addWidget(remove)
-
-        self._values.append(value)
-        self._chips[value] = chip
-        # 输入框始终位于标签之后。
-        self._row.insertWidget(max(0, self._row.count() - 1), chip)
-        self._content.adjustSize()
-        self.updateGeometry()
-        return True
-
-    def remove_tag(self, value: str) -> None:
-        chip = self._chips.pop(value, None)
-        if chip is None:
-            return
-        self._values.remove(value)
-        self._row.removeWidget(chip)
-        chip.deleteLater()
-        self._content.adjustSize()
-        self.updateGeometry()
-
-    def tags(self) -> list[str]:
-        return list(self._values)
-
-
-class _AmountTagInputWidget(_TagInputWidget):
+class _AmountTagInputWidget(TagInputWidget):
     """一行内可录入多个正整数快捷数量。"""
 
     _COMPACT_HEIGHT = 36
@@ -493,7 +385,7 @@ def _merge_terms(explicit: list[str], steps: list[StepDef], *, positive: bool) -
 
 
 class _ChangeRulesWidget(QWidget):
-    """只编辑绑定了快捷数量的规则；独立词条由 _TagInputWidget 管理。"""
+    """只编辑绑定了快捷数量的规则；独立词条由 TagInputWidget 管理。"""
 
     _KIND_USE = "use"
     _KIND_SOURCE = "source"
@@ -1116,12 +1008,12 @@ class ProfileDefinitionDialog(QDialog):
             if isinstance(existing, (QuotaKeyDef, RegenKeyDef, StockKeyDef))
             else []
         )
-        source_tags = _TagInputWidget(
+        source_tags = TagInputWidget(
             _standalone_terms(
                 existing.sources if existing else [], existing_steps, positive=True
             )
         )
-        use_tags = _TagInputWidget(
+        use_tags = TagInputWidget(
             _standalone_terms(
                 existing.uses if existing else [], existing_steps, positive=False
             )
@@ -1361,8 +1253,8 @@ class ProfileDefinitionDialog(QDialog):
 
             source_input = widgets["source_tags"]
             use_input = widgets["use_tags"]
-            assert isinstance(source_input, _TagInputWidget)
-            assert isinstance(use_input, _TagInputWidget)
+            assert isinstance(source_input, TagInputWidget)
+            assert isinstance(use_input, TagInputWidget)
 
             steps_list: list[StepDef] = []
             change_rules = widgets.get("change_rules")

@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.tag_input import TagInputWidget
 
 from .....i18n import tr
 from ...config import get_game_config
@@ -122,6 +123,17 @@ class PlaystylePanel(QWidget):
         metadata_hint.setContentsMargins(14, 2, 14, 0)
         metadata_hint.setStyleSheet("color: palette(mid); font-size: 11px;")
         right_layout.addWidget(metadata_hint)
+        # 关键字是**参与匹配**的，必须排在上面那句「仅作玩法说明」之后，
+        # 否则会被它一并否定掉。
+        self._keywords = TagInputWidget([])
+        right_layout.addWidget(config_field_card(tr("匹配关键字"), self._keywords))
+        keyword_hint = QLabel(tr(
+            "扫描全部备战方案时，方案名直接含玩法名优先；否则命中关键字的玩法"
+            "胜出，多个命中取最长关键字。按 Enter 添加"))
+        keyword_hint.setWordWrap(True)
+        keyword_hint.setContentsMargins(14, 2, 14, 0)
+        keyword_hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        right_layout.addWidget(keyword_hint)
         self._hint = QLabel()
         self._hint.setWordWrap(True)
         self._hint.setContentsMargins(14, 2, 14, 0)
@@ -143,6 +155,7 @@ class PlaystylePanel(QWidget):
             combo.currentTextChanged.connect(self._on_field_changed)
         for combo in (self._combo_art_a, self._combo_art_b):
             combo.currentTextChanged.connect(self._on_arts_changed)
+        self._keywords.tags_changed.connect(lambda: self._on_field_changed(""))
 
     def _editors(self) -> tuple[QComboBox, ...]:
         return (self._combo_school, self._combo_art_a, self._combo_art_b,
@@ -238,6 +251,7 @@ class PlaystylePanel(QWidget):
         self._combo_art_a.setCurrentText(arts[0] if arts else "")
         self._combo_art_b.setCurrentText(arts[1] if len(arts) > 1 else "")
         self._combo_attr.setCurrentText(attr)
+        self._keywords.set_tags(list(cfg.get("match_keywords") or []))
         self._loading = False
         self._sync_derived(cfg)
 
@@ -350,6 +364,7 @@ class PlaystylePanel(QWidget):
                         self._combo_all_skill.currentText(),
                     "qishu_requirement": self._combo_qishu.currentText(),
                     "unit_requirement": self._combo_unit.currentText(),
+                    "match_keywords": self._keywords.tags(),
                 })
                 break
         self._data["playstyles"] = entries

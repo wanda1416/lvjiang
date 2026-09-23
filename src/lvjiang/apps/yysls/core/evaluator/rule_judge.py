@@ -44,7 +44,11 @@ from lvjiang.apps.yysls.core.equip_parser import EquipmentData
 
 from .....i18n import tr
 from ..combat.affix_rules import normal_affix_candidates
-from ..loadout.transmute import retransfer_capability
+from ..loadout.transmute import (
+    judge_transmute_eligibility,
+    transmute_pool_union,
+    transmute_targets,
+)
 from ..tuning_rules import (
     DYNAMIC_AFFIXES,
     GENERIC_ATTR,
@@ -95,9 +99,21 @@ class GenericTuningJudge(TuningJudge):
         """调律潜力判定：价值序填充空槽 + 模拟一次转律，返回评级上限"""
         return self._run(equip, partial=True)
 
+    def judge_with_legal_transmute(self, equip: EquipmentData) -> JudgeResult:
+        """静态词条评级 + 当前状态允许的一次转律，不填充空槽。"""
+        return self._run(
+            equip, partial=True, fill_empty=False, require_retransfer=True)
+
     # ─── 主流程 ────────────────────────────────────────────
 
-    def _run(self, equip: EquipmentData, partial: bool) -> JudgeResult:
+    def _run(
+        self,
+        equip: EquipmentData,
+        partial: bool,
+        *,
+        fill_empty: bool = True,
+        require_retransfer: bool = False,
+    ) -> JudgeResult:
         result = JudgeResult(equipment=equip)
 
         attempts = self._build_attempts(equip)
@@ -123,7 +139,7 @@ class GenericTuningJudge(TuningJudge):
             result.reasons.append(tr("无词条数据"))
             return result
 
-        n_free = (5 - len(equip.affixes)) if partial else 0
+        n_free = (5 - len(equip.affixes)) if partial and fill_empty else 0
 
         # 逐个武器规则组合尝试，取最优结果
         best_label = ""
@@ -131,7 +147,8 @@ class GenericTuningJudge(TuningJudge):
         for label, part_key, pattern, damage, attr, ps_switch in attempts:
             res = self._judge_attempt(
                 equip, part_key, pattern, damage, attr, partial, n_free,
-                ps_switch=ps_switch)
+                ps_switch=ps_switch,
+                require_retransfer=require_retransfer)
             score = -1 if res.skipped else _RANK[res.rating]
             if best is None or score > (-1 if best.skipped else _RANK[best.rating]):
                 best, best_label = res, label
@@ -146,7 +163,8 @@ class GenericTuningJudge(TuningJudge):
     def _judge_attempt(self, equip: EquipmentData, part_key: str,
                        pattern: PartPattern, damage: str | None,
                        attr: str, partial: bool, n_free: int,
-                       ps_switch: str | None = None) -> JudgeResult:
+                       ps_switch: str | None = None,
+                       require_retransfer: bool = False) -> JudgeResult:
         """按单个部位/玩法组合判定一次
 
         ps_switch 为玩法绑定开关 key：非 None 时在有效开关上下文中
@@ -180,7 +198,8 @@ class GenericTuningJudge(TuningJudge):
             return self._eval_partial(
                 result, pattern, damage, equiv,
                 first_token, tokens, n_free,
-                switches=effective_switches)
+                switches=effective_switches,
+                require_retransfer=require_retransfer)
 
         rating, reason = self._grade(
             pattern, damage, first_token, tokens, equiv,
@@ -250,7 +269,8 @@ class GenericTuningJudge(TuningJudge):
                       damage: str | None, equiv: dict[str, str],
                       first_token: str, tokens: list[str],
                       n_free: int,
-                      switches: dict[str, bool] | None = None) -> JudgeResult:
+                      switches: dict[str, bool] | None = None,
+                      require_retransfer: bool = False) -> JudgeResult:
         """潜力判定：按可用词条库价值序填充空槽 + 模拟一次转律
 
         填充（best-case 上限）：遍历 affix_pool（声明序即价值序），
@@ -328,7 +348,9 @@ class GenericTuningJudge(TuningJudge):
                                   switches=switches)
         reason = label(why)
 
-        # 转律分支：按装备状态确定合法槽位，再穷举所有合法转入词条。
+        # 转律分支：资格和可转槽位复用公共转律判定，再穷举
+        # 规则的合法转入词条。最优组合使用 require_retransfer=True，
+        # 只把可无限转律的结果视为静态可达；调律潜力保留首次转律。
         if filled and self.config.get("can_transmute", True):
             pool = self.rule.pool_set
             order = self.rule.affix_pool
@@ -343,19 +365,21 @@ class GenericTuningJudge(TuningJudge):
                 pos = [order.index(n) for n in ids(t) if n in order]
                 return min(pos) if pos else 10 ** 3
 
-            transferred = [
-                i for i, affix in enumerate(result.equipment.affixes[1:])
-                if affix.is_transferred
-            ]
-            is_retransfer = bool(transferred)
-            if is_retransfer:
-                # 再次转律能力与备战方案转律建议、智能调律共用同一条规则
-                # （承音看原始等级与承音后开关，未承音看当前等级）。
-                can_retransfer, _reason = retransfer_capability(
-                    result.equipment.to_dict(include_fp=False), gc)
-                candidate_indices = transferred if can_retransfer else []
-            else:
-                candidate_indices = list(range(len(filled)))
+            equip_dict = result.equipment.to_dict(include_fp=False)
+            eligibility = judge_transmute_eligibility(
+                equip_dict, gc, require_retransfer=require_retransfer)
+            transferred = any(
+                affix.is_transferred
+                for affix in result.equipment.affixes[1:])
+            is_retransfer = transferred
+            candidate_indices = [
+                slot - 2 for slot in eligibility.slots
+                if 0 <= slot - 2 < len(tokens)
+            ] if eligibility.eligible else []
+            # 潜力判定会先虚拟填充空槽；这些新词条也属于尚未
+            # 转律的普通槽。静态转律入口 n_free=0，不会走该分支。
+            if eligibility.eligible and not is_retransfer and n_free:
+                candidate_indices.extend(range(len(tokens), len(filled)))
 
             # 垃圾/低价值词条优先，只影响同档结果的说明；评级仍穷举取上限。
             candidate_indices.sort(
@@ -368,7 +392,46 @@ class GenericTuningJudge(TuningJudge):
                 excluded = ids(dropped)
                 for t in rest:
                     excluded |= ids(t)
-                for gain in self.rule.transmute_priority:
+                if require_retransfer:
+                    # 静态可达评级不使用“推荐优先级”代替游戏的
+                    # 真实转律池：先取全流派转律并集，再由公共过滤链
+                    # 按槽位、部位、去重和整件合法性筛出实际可转目标。
+                    rule_pool = [
+                        name for name in transmute_pool_union(gc)
+                        if name in pool or equiv.get(name) in pool
+                    ]
+                    legal_gains = transmute_targets(
+                        equip_dict, idx + 2, rule_pool, gc)
+                    priority_positions = {
+                        name: position
+                        for position, name in enumerate(
+                            self.rule.transmute_priority)
+                    }
+                    legal_positions = {
+                        name: position
+                        for position, name in enumerate(legal_gains)
+                    }
+
+                    def gain_order(
+                        name: str,
+                        priorities: dict[str, int] = priority_positions,
+                        fallback: dict[str, int] = legal_positions,
+                    ) -> tuple[int, int]:
+                        identities = ids(name)
+                        positions = [
+                            priorities[item]
+                            for item in identities if item in priorities
+                        ]
+                        if positions:
+                            return (0, min(positions))
+                        return (1, fallback[name])
+
+                    # 必须枚举全部合法目标；推荐优先级只用于
+                    # 同评级结果的稳定择优，不得缩小候选集。
+                    gains = sorted(legal_gains, key=gain_order)
+                else:
+                    gains = self.rule.transmute_priority
+                for gain in gains:
                     if not part_ok(gain) or ids(gain) & excluded:
                         continue
                     r2, why2 = self._grade(

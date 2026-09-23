@@ -8,6 +8,12 @@ from ...config.equipment_slots import EQUIPMENT_SLOTS
 EQUIPMENT_CREATED_AT = "created_at"
 EQUIPMENT_UPDATED_AT = "updated_at"
 
+#: 方案的对战类型：对环境（PVE）还是对玩家（PVP）。稳定 key 用于落盘和判断，
+#: PVE/PVP 只是展示文案，不得互换。缺失按 PVE 读——老方案都是 PVE 时代建的。
+COMBAT_TYPE_PVE = "pve"
+COMBAT_TYPE_PVP = "pvp"
+COMBAT_TYPES = (COMBAT_TYPE_PVE, COMBAT_TYPE_PVP)
+
 
 def normalize_equipment_times(equip: dict) -> dict:
     """复制装备并把历史数据缺失的时间字段规范为空字符串。"""
@@ -16,6 +22,15 @@ def normalize_equipment_times(equip: dict) -> dict:
         timestamp = value.get(key)
         value[key] = timestamp if isinstance(timestamp, str) else ""
     return value
+
+
+def normalize_combat_type(value: object) -> str:
+    """把任意来源的值收敛成合法对战类型；不认识的一律按 PVE。
+
+    缺字段的历史方案、手改坏的 json 都走这里，读取侧不必各自判断。
+    """
+    kind = str(value or "").strip().lower()
+    return kind if kind in COMBAT_TYPES else COMBAT_TYPE_PVE
 
 
 def _empty_slots() -> dict[str, str | None]:
@@ -50,6 +65,9 @@ class LoadoutPlan:
     base_attribute: str = ""
     gongjue: str = ""
     graduation_scheme: str = ""
+    # 这套方案打的是 PVE 还是 PVP。目前只有智能调律用它：没有 PVP 调律方案，
+    # 把 PVP 方案一起加载会让大量够不到 PVE 标准的装备被判成有提升。
+    combat_type: str = COMBAT_TYPE_PVE
     equipment: dict[str, str | None] = field(default_factory=_empty_slots)
     # 每个槽位在这套方案下展示哪种定音（normal/zhige）。游戏里备战方案自己
     # 记着这件装备该显示哪种音，切方案就跟着切，所以它属于方案而不是装备。
@@ -86,6 +104,7 @@ class LoadoutPlan:
             base_attribute=str(data.get("base_attribute") or ""),
             gongjue=str(data.get("gongjue") or ""),
             graduation_scheme=str(data.get("graduation_scheme") or ""),
+            combat_type=normalize_combat_type(data.get("combat_type")),
             equipment=slots,
             dingyin=_slot_dingyin(data.get("dingyin")),
         )
@@ -99,6 +118,7 @@ class LoadoutPlan:
             "base_attribute": self.base_attribute,
             "gongjue": self.gongjue,
             "graduation_scheme": self.graduation_scheme,
+            "combat_type": self.combat_type,
             "equipment": dict(self.equipment),
             "dingyin": dict(self.dingyin),
         }

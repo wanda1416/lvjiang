@@ -516,7 +516,7 @@ class LoadoutPanel(QWidget):
             return
         self._repo.create_plan(
             dialog.plan_name, dialog.main_art, dialog.sub_art,
-            playstyle=dialog.playstyle)
+            playstyle=dialog.playstyle, combat_type=dialog.combat_type)
         self.refresh()
 
     def _manage_plans(self) -> None:

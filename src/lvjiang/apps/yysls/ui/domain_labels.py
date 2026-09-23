@@ -5,6 +5,7 @@
 """
 
 from ....i18n import tr
+from ..core.loadout.models import COMBAT_TYPE_PVE, COMBAT_TYPE_PVP
 
 _LABELS = {
     value: label
@@ -97,3 +98,17 @@ _LABELS = {
 def domain_label(value: str) -> str:
     """返回领域值在当前界面语言下的标签。"""
     return _LABELS.get(value, value)
+
+
+_COMBAT_TYPE_LABELS = {
+    COMBAT_TYPE_PVE: tr("PVE"),
+    COMBAT_TYPE_PVP: tr("PVP"),
+}
+
+
+def combat_type_label(value: str) -> str:
+    """备战方案对战类型的展示文案。
+
+    落盘和判断一律用 pve/pvp 这两个稳定 key，只有渲染时经过这里。
+    """
+    return _COMBAT_TYPE_LABELS.get(value, value)

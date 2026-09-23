@@ -27,11 +27,13 @@ from .equipment_write import (
     union_dingyin_slots,
 )
 from .models import (
+    COMBAT_TYPE_PVE,
     EQUIPMENT_CREATED_AT,
     EQUIPMENT_SLOTS,
     EQUIPMENT_UPDATED_AT,
     LoadoutPlan,
     LoadoutState,
+    normalize_combat_type,
 )
 from .transmute import (
     TARGET_NAME_KEY,
@@ -160,6 +162,7 @@ class LoadoutRepository:
 
     def create_plan(self, name: str, main_martial_art: str,
                     sub_martial_art: str, *, playstyle: str = "",
+                    combat_type: str = COMBAT_TYPE_PVE,
                     activate: bool = True) -> LoadoutPlan:
         """新建方案：必须同时绑定主武学与副武学，不允许无武学方案。"""
         main_martial_art = main_martial_art.strip()
@@ -173,7 +176,8 @@ class LoadoutRepository:
                 id=uuid4().hex, name=name.strip() or "未命名方案",
                 main_martial_art=main_martial_art,
                 sub_martial_art=sub_martial_art,
-                playstyle=playstyle)
+                playstyle=playstyle,
+                combat_type=normalize_combat_type(combat_type))
             state.plans[created.id] = created
             state.plan_order = state.ordered_plan_ids()
             if activate:
@@ -224,6 +228,7 @@ class LoadoutRepository:
                        main_martial_art: str | None = None,
                        sub_martial_art: str | None = None,
                        playstyle: str | None = None,
+                       combat_type: str | None = None,
                        base_attribute: str | None = None,
                        gongjue: str | None = None,
                        graduation_scheme: str | None = None) -> None:
@@ -239,6 +244,8 @@ class LoadoutRepository:
                 plan.sub_martial_art = sub_martial_art
             if playstyle is not None:
                 plan.playstyle = playstyle
+            if combat_type is not None:
+                plan.combat_type = normalize_combat_type(combat_type)
             if base_attribute is not None:
                 plan.base_attribute = base_attribute
             if gongjue is not None:

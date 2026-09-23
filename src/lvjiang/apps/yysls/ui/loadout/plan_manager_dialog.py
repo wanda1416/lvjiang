@@ -55,6 +55,8 @@ class PlanManagerDialog(QDialog):
         self._game_config = game_config or get_game_config()
         self.changed_users: set[str] = set()
         self._loading = False
+        #: 表格各行对应的方案，与表格在 _load_user 里一起重建。
+        self._row_plans: list[LoadoutPlan] = []
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 12)
@@ -156,11 +158,13 @@ class PlanManagerDialog(QDialog):
         return str(item.data(Qt.ItemDataRole.UserRole) or "") if item else ""
 
     def _plan_at(self, row: int) -> LoadoutPlan | None:
-        """表格第 row 行当前对应的方案；委托据此构建编辑器。"""
-        repo = self._repo()
-        item = self._table.item(row, COL_NAME) if row >= 0 else None
-        pid = str(item.data(Qt.ItemDataRole.UserRole) or "") if item else ""
-        return repo.load().plans.get(pid) if repo and pid else None
+        """表格第 row 行当前对应的方案；委托据此构建编辑器。
+
+        取 _load_user 本轮的快照，不重新读盘：委托每编辑一格要问三次（建
+        编辑器、填初值、提交），每次 repo.load() 就是三遍读文件加解析。写回
+        后 _commit_field 会走 _load_user，表格和快照总是一起重建。
+        """
+        return self._row_plans[row] if 0 <= row < len(self._row_plans) else None
 
     def _commit_field(self, plan: LoadoutPlan, column: int,
                       value: str) -> None:
@@ -186,6 +190,7 @@ class PlanManagerDialog(QDialog):
         repo = self._repo()
         self._loading = True
         self._table.setRowCount(0)
+        self._row_plans = []
         if repo is not None:
             state = repo.load()
             schools = self._game_config.get_schools()
@@ -193,6 +198,7 @@ class PlanManagerDialog(QDialog):
                 plan = state.plans[pid]
                 row = self._table.rowCount()
                 self._table.insertRow(row)
+                self._row_plans.append(plan)
                 values = [
                     plan.name, resolve_school(plan.main_martial_art,
                                               plan.sub_martial_art, schools) or tr("自定义"),

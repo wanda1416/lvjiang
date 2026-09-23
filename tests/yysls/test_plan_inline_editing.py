@@ -186,3 +186,33 @@ def test_combat_type_default_is_pve(schools):
     assert plan_field_updates(
         schools, _plan(), COL_COMBAT, COMBAT_TYPE_PVE) == {
             "combat_type": COMBAT_TYPE_PVE}
+
+
+def test_plan_at_reuses_the_loaded_snapshot(qtbot, tmp_path, monkeypatch):
+    """取行对应的方案不再读盘：委托每编辑一格要问三次，三次读盘是白花的。
+
+    表格和快照在 _load_user 里一起重建，不会失配。
+    """
+    from lvjiang.apps.yysls.ui.loadout.plan_manager_dialog import (
+        PlanManagerDialog,
+    )
+
+    repo = LoadoutRepository("alice", tmp_path)
+    created = repo.create_plan("方案甲", CUSTOM_MAIN, CUSTOM_SUB,
+                               activate=False)
+    dialog = PlanManagerDialog(["alice"], "alice", tmp_path,
+                               game_config=get_game_config())
+    qtbot.addWidget(dialog)
+
+    loads: list[str] = []
+    original = LoadoutRepository.load
+    monkeypatch.setattr(
+        LoadoutRepository, "load",
+        lambda self: (loads.append(self.username), original(self))[1])
+
+    rows = [dialog._plan_at(row) for row in range(3)]
+
+    assert loads == []
+    assert rows[1] is not None and rows[1].id == created.id
+    # 越界行返回 None，而不是抛 IndexError
+    assert rows[2] is None

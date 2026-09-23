@@ -12,8 +12,8 @@ from lvjiang.ui.profile.settings_dialog import (
     _ChangeRulesWidget,
     _ChangeScriptFileField,
     _SyncTargetsWidget,
-    _TagInputWidget,
 )
+from lvjiang.ui.tag_input import TagInputWidget
 
 
 @pytest.mark.parametrize("dev_mode", [True, False])
@@ -98,7 +98,7 @@ def test_enter_adds_term_without_removing_existing_term(qtbot, term_kind):
     layout = QVBoxLayout(dialog)
     old_terms = [f"旧{term_kind}一", f"旧{term_kind}二"]
     new_term = f"新{term_kind}"
-    widget = _TagInputWidget(old_terms)
+    widget = TagInputWidget(old_terms)
     layout.addWidget(widget)
     accepted = []
     confirm = QPushButton("确定")

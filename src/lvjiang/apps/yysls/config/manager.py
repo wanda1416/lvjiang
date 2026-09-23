@@ -368,6 +368,9 @@ class GameConfigManager:
                     "qishu_requirement") or "不需要").strip(),
                 "unit_requirement": str(entry.get(
                     "unit_requirement") or "不需要").strip(),
+                # 扫描全部备战方案时的匹配关键字。同一流派同一武学组合下可能
+                # 并存多个玩法（火拳/纯奶），方案名未必写着玩法名，靠它兜底。
+                "match_keywords": _string_list(entry.get("match_keywords")),
             }
         self._schools = dict(data.get("schools") or {})
         for group, levels in (data.get("equipment_name_series") or {}).items():

@@ -17,6 +17,44 @@ def _scanned_loadout_names(_engine) -> dict[str, bool]:
     return {plan.name: True for plan in _repository(_engine).load().plans.values()}
 
 
+def _match_playstyle(name: str, candidates: list[str],
+                     playstyles: dict[str, dict]) -> str:
+    """按方案名从候选玩法里挑一个。
+
+    同一流派同一武学组合下可能并存多个玩法（牵丝·霖的火拳和纯奶武学完全
+    相同），方案名未必写着玩法名，只靠名字包含会落空并静默取第一个候选。
+
+    三级判定：
+
+    1. 方案名里直接出现玩法名——最具体的信号，优先；
+    2. 命中玩法配置的匹配关键字，**取最长的那条**。方案名「输出奶」会同时
+       命中火拳的「输出」和纯奶的「奶」，取长的才能选中火拳；按声明顺序就
+       不一定对。长度相同时按配置声明顺序，并记一条日志提醒配置冲突。
+    3. 都落空时回落第一个候选，保持原有行为。
+    """
+    if not candidates:
+        return ""
+    for style in candidates:
+        if style in name:
+            return style
+    best_style, best_keyword = "", ""
+    for style in candidates:
+        for keyword in (playstyles.get(style) or {}).get("match_keywords") or []:
+            if keyword not in name or len(keyword) < len(best_keyword):
+                continue
+            if best_keyword and len(keyword) == len(best_keyword):
+                logger.warning(
+                    f"备战方案 {name!r} 同时命中等长关键字 {best_keyword!r} 与 "
+                    f"{keyword!r}，按配置顺序取 {best_style!r}")
+                continue
+            best_style, best_keyword = style, keyword
+    if best_style:
+        logger.info(
+            f"备战方案 {name!r} 按关键字 {best_keyword!r} 匹配玩法 {best_style!r}")
+        return best_style
+    return candidates[0]
+
+
 @builtin_func("ensure_scanned_loadout")
 def _ensure_scanned_loadout(
     _engine, name: str, main_art: str, sub_art: str,
@@ -45,11 +83,11 @@ def _ensure_scanned_loadout(
     school = resolve_school(main_art, sub_art, game_config.get_schools())
     arts = {main_art, sub_art}
     # get_playstyles() 保留配置声明顺序；UI 候选接口按名称排序，不能用于默认项。
-    candidates = [style for style, definition in game_config.get_playstyles().items()
+    playstyles = game_config.get_playstyles()
+    candidates = [style for style, definition in playstyles.items()
                   if set(definition.get("arts") or []) == arts
                   and (not school or definition.get("school") == school)]
-    playstyle = next((style for style in candidates if style in name),
-                     candidates[0] if candidates else "")
+    playstyle = _match_playstyle(name, candidates, playstyles)
     repo.create_plan(name, main_art, sub_art,
                      playstyle=playstyle, activate=False)
     logger.info(f"已从游戏新建备战方案: {name}，流派={school or '-'}，玩法={playstyle or '-'}")

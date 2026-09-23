@@ -18,6 +18,9 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
     if not $role_index
         return {"status": "failed", "message": "用户未配置角色序号", "state": $batch_state}
     end
+    # 自动流程停下来求助时，人工要能一眼看出该把客户端摆成什么样。批量里
+    # 多个用户轮流跑，隔了几分钟回来看到一句「请手动选定账号」是没法操作的。
+    eval $login_target = "账号 " + $account + "（尾号 " + $tail + "）、角色 " + $role
 
     call $in_login_page = is_in_login_page()
     if not $in_login_page
@@ -28,9 +31,12 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
             if env("desktop") and not $tail
                 return {"status": "failed", "message": "用户未配置账号尾号", "state": $batch_state}
             end
-            call $in_login_page = ensure_login_page_by_restart("yyslscn", $tail, $account, $batch_state, $max_roll_account)
+            call $in_login_page = ensure_login_page_by_restart(
+                "yyslscn", $tail, $account, $batch_state, $max_roll_account,
+                $login_target)
         else
-            eval pause("当前不在登录页，请切换到登录页后点击继续")
+            eval pause("当前不在登录页，请切换到登录页后点击继续。本次目标："
+                + $login_target)
             call $in_login_page = is_in_login_page()
         end
         if not $in_login_page
@@ -44,7 +50,8 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
             return {"status": "failed", "message": "用户未配置账号尾号", "state": $batch_state}
         end
         log "需要切换账号: " + $account
-        call $switched = switch_account($tail, $account, $batch_state, $max_roll_account)
+        call $switched = switch_account(
+            $tail, $account, $batch_state, $max_roll_account, $login_target)
         if not $switched
             return {"status": "failed", "message": "未能切换到目标账号", "state": $batch_state}
         end
@@ -78,7 +85,7 @@ end
 
 # PC 重启后直接处于切换用户视图；Android 重启后处于启动页面。
 # 调用方已检查当前不在登录主页和启动页面，并已校验目标账号资料。
-def ensure_login_page_by_restart($app_id, $tail, $account, $batch_state, $max_roll_account)
+def ensure_login_page_by_restart($app_id, $tail, $account, $batch_state, $max_roll_account, $login_target)
     if app_is_running($app_id)
         app stop $app_id
     end
@@ -89,7 +96,8 @@ def ensure_login_page_by_restart($app_id, $tail, $account, $batch_state, $max_ro
         if not $ready
             return 0
         end
-        call $logged_in = select_account_and_login($tail, $max_roll_account)
+        call $logged_in = select_account_and_login(
+            $tail, $max_roll_account, $login_target)
         if not $logged_in
             return 0
         end
@@ -196,7 +204,7 @@ end
 # 登录页 → 选账号 → 登录 → 回到登录页角色入口（page_state=1）
 # 不包含选角色，由调用方决定是否接着调用 select_role
 
-def switch_account($tail, $account, $batch_state, $max_roll_account)
+def switch_account($tail, $account, $batch_state, $max_roll_account, $login_target)
     log "当前匹配" + $tail
 
     # 1. 登录页 → 用户切换视图
@@ -222,7 +230,8 @@ def switch_account($tail, $account, $batch_state, $max_roll_account)
         click [game_login_page].[switch_user] after wait @page_refresh
     end
 
-    call $logged_in = select_account_and_login($tail, $max_roll_account)
+    call $logged_in = select_account_and_login(
+        $tail, $max_roll_account, $login_target)
     if not $logged_in
         return 0
     end
@@ -236,7 +245,7 @@ end
 
 # 前置：已经进入切换用户视图。这里只负责选择并登录账号；登录后的页面流转由
 # 调用方按“PC 重启”或“普通账号切换”各自处理。
-def select_account_and_login($tail, $max_roll_account)
+def select_account_and_login($tail, $max_roll_account, $login_target)
     click [game_login_page].[tap_user] after wait @page_refresh
 
     # 2. 按条目准备参数限定的次数查找目标账号
@@ -252,9 +261,11 @@ def select_account_and_login($tail, $max_roll_account)
         wait @page_refresh
     end
 
-    # 找不到 → 暂停手动处理
+    # 找不到 → 暂停手动处理。这里不做二次校验：选没选对只有人能判断，
+    # 所以提示必须写清该登录哪个账号，把正确性交给人工确认。
     if not $found_user
-        eval pause("未找到账号，请手动选定账号后点击 继续")
+        eval pause("未找到账号，请手动选定并登录：" + $login_target
+            + "，选好后点击继续")
     end
     wait @page_refresh
 
@@ -294,7 +305,8 @@ def select_role($role_index, $role, $batch_state, $skip_online_role, $online_rol
         log "未进入选择角色页面，重试"
     end
     if not $role_page
-        eval pause("无法进入选择角色页面，请手动进入后点击继续")
+        eval pause("无法进入选择角色页面，请手动进入角色列表后点击继续。"
+            + "本次目标角色：" + $role + "（第 " + $role_index + " 个）")
     end
 
     # 选角色（role_list: 1列4行，role_index 1-4 → panel 行 1-4）

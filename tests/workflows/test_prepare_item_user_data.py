@@ -207,7 +207,7 @@ def test_login_always_goes_through_the_role_selection_page():
 
 def _run_login_prepare(*, platform="desktop", initial_page="other",
                        users_ready=True, logo_ready=True, restart=True,
-                       state_account=""):
+                       state_account="", user_found=True):
     """用页面状态回放真实 DSL 的启动、选账号与返回路径。"""
     engine = make_engine(
         layout=load_layout_by_key(platform),
@@ -226,6 +226,7 @@ def _run_login_prepare(*, platform="desktop", initial_page="other",
     engine.variables = {"batch_state": state}
     page = initial_page
     actions = []
+    prompts: list[str] = []
     workflow = engine._ensure_workflow()
     original_call = workflow.call_function
 
@@ -240,6 +241,7 @@ def _run_login_prepare(*, platform="desktop", initial_page="other",
             return True
         if name == "pause":
             actions.append("pause")
+            prompts.append(str(args[0]) if args else "")
             return ""
         return original_call(name, args, engine=engine)
 
@@ -272,7 +274,8 @@ def _run_login_prepare(*, platform="desktop", initial_page="other",
             page = "base"
 
     def fake_find(node):
-        engine.variables[node.var_name] = "1234"
+        # 账号列表翻遍也没命中目标尾号，是需要人工接手的典型现场。
+        engine.variables[node.var_name] = "1234" if user_found else ""
 
     workflow.call_function = call_function
     engine._exec_scan = fake_scan
@@ -282,11 +285,11 @@ def _run_login_prepare(*, platform="desktop", initial_page="other",
     engine._exec_body(parse_text(
         f'call $result = prepare_user("u1", $batch_state, true, 0, 1, '
         f'{str(restart).lower()})\n').body)
-    return engine.variables["result"], state, actions
+    return engine.variables["result"], state, actions, prompts
 
 
 def test_pc_restart_uses_existing_users_view_and_logs_in_before_role_selection():
-    result, state, actions = _run_login_prepare()
+    result, state, actions, _prompts = _run_login_prepare()
 
     assert result["status"] == "success"
     assert actions == ["app_is_running", "app_start", "tap_user",
@@ -295,7 +298,7 @@ def test_pc_restart_uses_existing_users_view_and_logs_in_before_role_selection()
 
 
 def test_pc_non_restart_account_switch_never_checks_or_leaves_startup_page():
-    result, state, actions = _run_login_prepare(
+    result, state, actions, _prompts = _run_login_prepare(
         initial_page="base", restart=False, state_account="other")
 
     assert result["status"] == "success"
@@ -305,7 +308,7 @@ def test_pc_non_restart_account_switch_never_checks_or_leaves_startup_page():
 
 
 def test_android_account_switch_keeps_direct_login_path():
-    result, state, actions = _run_login_prepare(
+    result, state, actions, _prompts = _run_login_prepare(
         platform="android", initial_page="base", restart=False,
         state_account="other")
 
@@ -316,7 +319,7 @@ def test_android_account_switch_keeps_direct_login_path():
 
 
 def test_android_restart_keeps_original_startup_then_account_switch_path():
-    result, state, actions = _run_login_prepare(platform="android")
+    result, state, actions, _prompts = _run_login_prepare(platform="android")
 
     assert result["status"] == "success"
     assert actions == ["app_is_running", "app_start", "back", "more_user",
@@ -326,7 +329,7 @@ def test_android_restart_keeps_original_startup_then_account_switch_path():
 
 @pytest.mark.parametrize("missing", ["users", "logo"])
 def test_pc_restart_missing_page_pauses_without_committing_account(missing):
-    result, state, actions = _run_login_prepare(
+    result, state, actions, _prompts = _run_login_prepare(
         users_ready=missing != "users", logo_ready=missing != "logo")
 
     assert result["status"] == "failed"
@@ -339,8 +342,30 @@ def test_pc_restart_missing_page_pauses_without_committing_account(missing):
 
 
 def test_startup_page_at_entry_returns_to_login_without_restarting():
-    result, _state, actions = _run_login_prepare(
+    result, _state, actions, _prompts = _run_login_prepare(
         initial_page="startup", restart=False, state_account="acc")
 
     assert result["status"] == "success"
     assert actions == ["back"]
+
+
+@pytest.mark.parametrize("scenario", [
+    # 账号列表里找不到目标尾号：人工要照着提示选中正确账号
+    {"user_found": False, "initial_page": "base", "restart": False,
+     "state_account": "other"},
+    # 起点既不在登录页也不在启动页，且不允许重启
+    {"initial_page": "other", "restart": False},
+])
+def test_manual_pause_prompts_name_the_account_and_role_to_log_in(scenario):
+    """停下来求助时必须写清该登录哪个账号、哪个角色。
+
+    这条流程不对人工操作做二次校验——选没选对只有人能判断。那么提示就是
+    唯一的依据：批量里多个用户轮流跑，隔几分钟回来看到一句「请手动选定账号」
+    根本没法操作，照着当前屏幕随手点一个就会在错账号上跑完整个任务。
+    """
+    _result, _state, actions, prompts = _run_login_prepare(**scenario)
+
+    assert "pause" in actions
+    joined = " | ".join(prompts)
+    assert "acc" in joined, joined
+    assert "role" in joined, joined

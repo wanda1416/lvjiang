@@ -286,8 +286,8 @@ class TestMultiRuleRating:
             assert verdict.meets("一般") is False
             assert verdict.meets("顶级") is False
 
-    def test_candidate_rating_is_the_actual_one_not_the_potential(self) -> None:
-        """最优组合只能看装备**现在**是什么，不能看它调满之后能是什么。
+    def test_candidate_rating_does_not_fill_missing_affixes(self) -> None:
+        """最优组合只能看现有词条，不能看装备调满后能是什么。
 
         潜力判定会把空词条槽当万能牌填满、还模拟一次转律，一件只有
         「最小外功攻击」的胚子照样能算出顶级。拿它筛候选的话，搜索会
@@ -308,6 +308,53 @@ class TestMultiRuleRating:
         assert potential.rating.value == "顶级"      # 潜力确实虚高
 
         verdict = judge_best_rating(blank, [("huixin_small", "双切")])
+        assert verdict.label == "垃圾"
+        assert verdict.meets("一般") is False
+
+    @staticmethod
+    def _xiaowai_wrist(**overrides) -> dict:
+        equip = {
+            "type": "腕甲", "name": "雁南飞披膊", "quality": "gold",
+            "level": 105, "original_level": 105, "is_chengyin": False,
+            "affix_1": {"name": "会心率", "value": 1},
+            "affix_2": {"name": "劲", "value": 1},
+            "affix_3": {"name": "对首领单位增伤", "value": 1},
+            "affix_4": {"name": "精准率", "value": 1},
+            "affix_5": {"name": "最小外功攻击", "value": 1},
+        }
+        equip.update(overrides)
+        return equip
+
+    @pytest.mark.parametrize("overrides", [
+        {},
+        {"level": 110, "original_level": 110, "is_chengyin": False},
+        {"level": 110, "original_level": 110, "is_chengyin": True},
+    ])
+    def test_candidate_uses_best_legal_transmute(self, overrides) -> None:
+        """105/110 未承音及原生 110 承音都可把劲转为敏。"""
+        from lvjiang.apps.yysls.core.graduation.combo_rules import (
+            judge_best_rating,
+            judge_tuning_candidate,
+        )
+
+        equip = self._xiaowai_wrist(**overrides)
+        result = judge_tuning_candidate(equip, "huixin_small", "翊翊")
+        verdict = judge_best_rating(equip, [("huixin_small", "翊翊")])
+
+        assert verdict.label == "优秀"
+        assert verdict.meets("一般") is True
+        assert "劲 转律为 敏" in "；".join(result.reasons)
+
+    def test_candidate_does_not_transmute_level_105_chengyin(self) -> None:
+        """105 原生装备承音到 110 后不允许再转律。"""
+        from lvjiang.apps.yysls.core.graduation.combo_rules import (
+            judge_best_rating,
+        )
+
+        equip = self._xiaowai_wrist(
+            level=110, original_level=105, is_chengyin=True)
+        verdict = judge_best_rating(equip, [("huixin_small", "翊翊")])
+
         assert verdict.label == "垃圾"
         assert verdict.meets("一般") is False
 

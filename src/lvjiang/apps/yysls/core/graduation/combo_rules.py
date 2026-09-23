@@ -32,12 +32,16 @@ class CandidateRule(Protocol):
 
 
 def judge_tuning_candidate(equip: dict, rule_key: str, playstyle: str):
-    """使用调律系统唯一判定入口返回装备的实际评级。"""
+    """按当前词条及一次合法转律返回装备的静态可达评级。
+
+    不填充空词条；只有装备当前状态允许无限转律/再次转律时，
+    才枚举现有非首词条的合法转律结果。
+    """
     from ..equip_parser import EquipmentData
     from ..evaluator import get_tuning_judge
 
     judge = get_tuning_judge(rule_key, {"playstyles": [playstyle]})
-    return judge.judge(EquipmentData.from_dict(equip))
+    return judge.judge_with_legal_transmute(EquipmentData.from_dict(equip))
 
 
 #: 评级由低到高。索引即档位，比较大小就是比档位。

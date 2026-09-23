@@ -112,3 +112,11 @@ class TuningJudge(ABC):
         视为值得调律；未实现的规则抛 NotImplementedError（调用方跳过）。
         """
         raise NotImplementedError(f"{self.rule_name} 调律潜力判定暂未实现")
+
+    def judge_with_legal_transmute(self, equip: EquipmentData) -> JudgeResult:
+        """按当前词条做静态评级，并取一次合法转律后的评级上限。
+
+        不填充空词条槽；只有装备当前状态允许无限转律/再次转律时，
+        才模拟已有非首词条的一次转律。
+        """
+        raise NotImplementedError(f"{self.rule_name} 合法转律评级暂未实现")

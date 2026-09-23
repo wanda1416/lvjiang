@@ -19,7 +19,10 @@ from lvjiang.apps.yysls.core.graduation.optimal_combo import search_optimal_comb
 
 def _sword(name: str, bonus: float, *, extra: dict | None = None) -> dict:
     equip = {
-        "name": name, "type": "剑", "level": 110, "quality": "gold",
+        # 当前赛季等级的原生装备：钉死等阶会让「原生不被改成承音」这条
+        # 前提在换赛季后悄悄失效，用例就不再测它自称在测的东西。
+        "name": name, "type": "剑",
+        "level": get_game_config().current_equip_level(), "quality": "gold",
         "affix_1": {"name": "最大外功攻击", "value": 100},
         "affix_2": {"name": "剑武学增伤", "value": bonus, "unit": "%"},
     }
@@ -146,6 +149,19 @@ def test_optimal_combo_applies_max_stacking_across_weapon_slots():
     assert summed.extra_attrs["剑武学增伤"] > 0.1  # 原始数据确实有两条
 
 
+def _buff_divisor() -> float:
+    """当前赛季装备等级的增益抗性除数。
+
+    抗性每个等阶都会变，写死只会让补数据的提交无端变红；这里验的是抗性有
+    没有被施加，不是某一赛季的数字。
+    """
+    from lvjiang.apps.yysls.config import get_game_config
+
+    gc = get_game_config()
+    config = gc.level_config_for(gc.current_equip_level())
+    return 1 + float((config and config.buff_resistance) or 0) / 100
+
+
 def test_smart_tuning_candidate_uses_max_stacking_with_incumbent(monkeypatch):
     from lvjiang.apps.yysls.core.graduation.smart_tuning import (
         SmartTuningEvaluator,
@@ -162,15 +178,16 @@ def test_smart_tuning_candidate_uses_max_stacking_with_incumbent(monkeypatch):
     context = _PlanContext(
         "p", "方案", "鸣金·虹", calculator, CombatAttributes(),
         {"main_weapon": _sword("在位", 9.0),
-         "sub_weapon": {"type": "枪", "level": 110,
+         "sub_weapon": {"type": "枪",
+                        "level": get_game_config().current_equip_level(),
                         "affix_1": {"name": "最大外功攻击", "value": 100}}},
         1.0, affix_pool=("A",), plan_maximum_rate=1.0, playstyle="")
     assert isinstance(evaluator, SmartTuningEvaluator)
     evaluator._candidate_rate(context, "sub_weapon", _sword("候选", 8.0))
     assert seen
     # 两件都是当前赛季原生装备，满承音不会把它们静态改成承音；同名词条
-    # 仍只取在位装备较高的 9%，再过增益抗性 1.15。若分槽相加会得到两倍。
-    expected = 9.0 / 100 / 1.15
+    # 仍只取在位装备较高的 9%，再过一遍增益抗性。若分槽相加会得到两倍。
+    expected = 9.0 / 100 / _buff_divisor()
     assert abs(seen[-1].extra_attrs["剑武学增伤"] - expected) < 1e-9
 
 

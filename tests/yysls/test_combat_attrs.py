@@ -57,8 +57,20 @@ def test_resistance_functions_accept_level_config_values() -> None:
     assert apply_penetration_resistance(12, 36, 20) == pytest.approx(46)
 
 
+def _active_resistances() -> tuple[float, float]:
+    """当前赛季装备等级的（判定抗性, 增益抗性）。
+
+    抗性是每个等阶都会变的游戏数值，测试里写死只会让补数据的提交无端变红。
+    这里和生产走同一条取值链路，验的是接线而不是某一赛季的数字。
+    """
+    gc = get_game_config()
+    config = gc.level_config_for(gc.current_equip_level())
+    assert config is not None, "当前赛季装备等级没有对应的等级配置"
+    return float(config.judge_resistance or 0), float(config.buff_resistance or 0)
+
+
 def test_combat_panel_uses_active_season_resistances() -> None:
-    assert CombatAttrsTab._current_resistances() == (145.0, 15.0)
+    assert CombatAttrsTab._current_resistances() == _active_resistances()
 
 
 def test_judgment_and_gain_cards_share_yellow_display_menu(monkeypatch) -> None:
@@ -128,15 +140,16 @@ def test_build_graduation_attrs_is_the_shared_resistance_boundary() -> None:
         precision=0.2, outer_pen=12, wuxiang_pen=14.5, boss_bonus=0.015,
     )
     result = build_graduation_attrs(base, equipment, "裂石·钧")
+    judge, buff = _active_resistances()
 
     assert result.precision == pytest.approx(
-        apply_three_rate_resistance("precision", 1.0, 145))
+        apply_three_rate_resistance("precision", 1.0, judge))
     assert result.outer_pen == pytest.approx(
-        apply_penetration_resistance(12, 36, 15))
+        apply_penetration_resistance(12, 36, buff))
     assert result.lieshi_pen == pytest.approx(
-        apply_penetration_resistance(14.5, 36, 15))
+        apply_penetration_resistance(14.5, 36, buff))
     assert result.boss_bonus == pytest.approx(
-        apply_bonus_resistance(0.095, resistance=15))
+        apply_bonus_resistance(0.095, resistance=buff))
 
 
 def test_fold_wuxiang_pen_is_the_single_place_wuxiang_is_mapped() -> None:
@@ -157,7 +170,7 @@ def test_fold_wuxiang_pen_is_the_single_place_wuxiang_is_mapped() -> None:
     once = build_graduation_attrs(base, equipment, "裂石·钧")
     twice = build_graduation_attrs(base, folded, "裂石·钧")
     assert once.lieshi_pen == twice.lieshi_pen == pytest.approx(
-        apply_penetration_resistance(17.5, 36, 15))
+        apply_penetration_resistance(17.5, 36, _active_resistances()[1]))
 
 
 def test_judgment_outcomes_use_yellow_rates_and_direct_rates() -> None:

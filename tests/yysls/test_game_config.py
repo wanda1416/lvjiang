@@ -6,6 +6,7 @@
 """
 
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -31,6 +32,28 @@ def mgr():
 # ─── 词条别名归一 ──────────────────────────────────────────
 
 class TestResolveAffixCategory:
+    def test_nanlu_season_spans_thirteen_weeks_and_one_day(self):
+        path = (
+            Path(__file__).resolve().parents[2]
+            / "config/system/yysls/game_config/seasons.yaml"
+        )
+        seasons = {
+            season.name: season
+            for season in GameConfigManager(path).get_season_configs()
+        }
+        # 按编号取：赛季名会改（南吕 → 南吕相和），编号才是稳定标识
+        nanlu = next(s for s in seasons.values() if s.season_number == 2)
+
+        assert nanlu.name.startswith("南吕")
+        assert nanlu.start_date == date(2026, 9, 24)
+        assert nanlu.end_date == date(2026, 12, 25)
+        assert nanlu.first_half_end_date == date(2026, 11, 4)
+        assert nanlu.end_date - nanlu.start_date == timedelta(weeks=13, days=1)
+        assert nanlu.first_half_end_date + timedelta(days=1) \
+            - nanlu.start_date == timedelta(weeks=6)
+        assert nanlu.equip_level == 115
+        assert nanlu.min_chengyin_level == 105
+
     def test_adjacent_seasons_must_share_boundary_date(self):
         base = [
             {
@@ -180,6 +203,20 @@ class TestResolveAffixCategory:
 
     def test_unknown_name_passthrough(self, mgr):
         assert mgr.resolve_affix_category("未知词条") == "未知词条"
+
+    def test_level_115_material_rules_match_110(self):
+        path = (Path(__file__).resolve().parents[2]
+                / "config/system/yysls/game_config/seasons.yaml")
+        levels = {item.level: item for item in GameConfigManager(path).get_level_configs()}
+        assert levels[115].min_material_count == levels[110].min_material_count
+        assert levels[115].allow_reset == levels[110].allow_reset
+        assert levels[115].reset_no_refund == levels[110].reset_no_refund
+        assert levels[115].tuning_stones == levels[110].tuning_stones
+        for quality in ("gold", "purple"):
+            rule = levels[115].tuning_stones[quality]
+            for values in (rule.tune_cost, rule.reset_refund, rule.recycle_refund):
+                assert set(values) == {1, 2, 3, 4, 5}
+                assert values[5] > 0
 
     def test_level_chengyin_capabilities(self, mgr):
         levels = {item.level: item for item in mgr.get_level_configs()}

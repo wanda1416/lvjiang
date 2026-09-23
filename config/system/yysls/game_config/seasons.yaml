@@ -1,187 +1,191 @@
-content_version: 1
+content_version: 2
 level_configs:
 - level: 91
   allow_reset: false
-  reset_no_refund: true
   allow_chengyin: true
   allow_retransfer: false
+  allow_retransfer_after_chengyin: false
   judge_resistance: 45
+  reset_no_refund: true
   tuning_stones:
     gold:
-      tune_cost:
-        1: 0
-        2: 6
-        3: 12
-        4: 24
-        5: 36
-      reset_refund:
-        1: 0
-        2: 0
-        3: 0
-        4: 0
-        5: 0
       recycle_refund:
-        1: 6
+        1: 6.0
         2: 10.8
         3: 20.4
         4: 39.6
         5: 68.4
-    purple:
-      tune_cost:
-        1: 0
-        2: 4
-        3: 10
-        4: 20
-        5: 30
       reset_refund:
-        1: 0
-        2: 0
-        3: 0
-        4: 0
-        5: 0
+        1: 0.0
+        2: 0.0
+        3: 0.0
+        4: 0.0
+        5: 0.0
+      tune_cost:
+        1: 0.0
+        2: 6.0
+        3: 12.0
+        4: 24.0
+        5: 36.0
+    purple:
       recycle_refund:
-        1: 3
+        1: 3.0
         2: 6.2
         3: 14.2
         4: 30.2
         5: 54.2
+      reset_refund:
+        1: 0.0
+        2: 0.0
+        3: 0.0
+        4: 0.0
+        5: 0.0
+      tune_cost:
+        1: 0.0
+        2: 4.0
+        3: 10.0
+        4: 20.0
+        5: 30.0
 - level: 96
   allow_reset: false
-  reset_no_refund: true
   allow_chengyin: true
   allow_retransfer: false
+  allow_retransfer_after_chengyin: false
   judge_resistance: 65
+  reset_no_refund: true
   tuning_stones:
     gold:
-      tune_cost:
-        1: 0
-        2: 6
-        3: 12
-        4: 24
-        5: 36
-      reset_refund:
-        1: 0
-        2: 0
-        3: 0
-        4: 0
-        5: 0
       recycle_refund:
-        1: 6
+        1: 6.0
         2: 10.8
         3: 20.4
         4: 39.6
         5: 68.4
-    purple:
-      tune_cost:
-        1: 0
-        2: 4
-        3: 10
-        4: 20
-        5: 30
       reset_refund:
-        1: 0
-        2: 0
-        3: 0
-        4: 0
-        5: 0
+        1: 0.0
+        2: 0.0
+        3: 0.0
+        4: 0.0
+        5: 0.0
+      tune_cost:
+        1: 0.0
+        2: 6.0
+        3: 12.0
+        4: 24.0
+        5: 36.0
+    purple:
       recycle_refund:
-        1: 3
+        1: 3.0
         2: 6.2
         3: 14.2
         4: 30.2
         5: 54.2
+      reset_refund:
+        1: 0.0
+        2: 0.0
+        3: 0.0
+        4: 0.0
+        5: 0.0
+      tune_cost:
+        1: 0.0
+        2: 4.0
+        3: 10.0
+        4: 20.0
+        5: 30.0
 - level: 100
   allow_reset: true
-  reset_no_refund: true
   allow_chengyin: true
   allow_retransfer: false
+  allow_retransfer_after_chengyin: false
   min_material_count: 1
   judge_resistance: 85
+  reset_no_refund: true
   tuning_stones:
     gold:
-      tune_cost:
-        1: 0
-        2: 6
-        3: 12
-        4: 24
-        5: 36
-      reset_refund:
-        1: 0
-        2: 0
-        3: 0
-        4: 0
-        5: 0
       recycle_refund:
-        1: 6
+        1: 6.0
         2: 10.8
         3: 20.4
         4: 39.6
         5: 68.4
-    purple:
-      tune_cost:
-        1: 0
-        2: 4
-        3: 10
-        4: 20
-        5: 30
       reset_refund:
-        1: 0
-        2: 0
-        3: 0
-        4: 0
-        5: 0
+        1: 0.0
+        2: 0.0
+        3: 0.0
+        4: 0.0
+        5: 0.0
+      tune_cost:
+        1: 0.0
+        2: 6.0
+        3: 12.0
+        4: 24.0
+        5: 36.0
+    purple:
       recycle_refund:
-        1: 3
+        1: 3.0
         2: 6.2
         3: 14.2
         4: 30.2
         5: 54.2
+      reset_refund:
+        1: 0.0
+        2: 0.0
+        3: 0.0
+        4: 0.0
+        5: 0.0
+      tune_cost:
+        1: 0.0
+        2: 4.0
+        3: 10.0
+        4: 20.0
+        5: 30.0
 - level: 105
   allow_reset: true
-  reset_no_refund: true
   allow_chengyin: true
   allow_retransfer: true
+  allow_retransfer_after_chengyin: false
   min_material_count: 2
   judge_resistance: 115
+  reset_no_refund: true
   tuning_stones:
     gold:
-      tune_cost:
-        1: 0
-        2: 6
-        3: 12
-        4: 24
-        5: 36
-      reset_refund:
-        1: 0
-        2: 0
-        3: 0
-        4: 0
-        5: 0
       recycle_refund:
-        1: 6
+        1: 6.0
         2: 10.8
         3: 20.4
         4: 39.6
         5: 68.4
-    purple:
-      tune_cost:
-        1: 0
-        2: 4
-        3: 10
-        4: 20
-        5: 30
       reset_refund:
-        1: 0
-        2: 0
-        3: 0
-        4: 0
-        5: 0
+        1: 0.0
+        2: 0.0
+        3: 0.0
+        4: 0.0
+        5: 0.0
+      tune_cost:
+        1: 0.0
+        2: 6.0
+        3: 12.0
+        4: 24.0
+        5: 36.0
+    purple:
       recycle_refund:
-        1: 3
+        1: 3.0
         2: 6.2
         3: 14.2
         4: 30.2
         5: 54.2
+      reset_refund:
+        1: 0.0
+        2: 0.0
+        3: 0.0
+        4: 0.0
+        5: 0.0
+      tune_cost:
+        1: 0.0
+        2: 4.0
+        3: 10.0
+        4: 20.0
+        5: 30.0
 - level: 110
   allow_reset: true
   allow_chengyin: true
@@ -190,45 +194,94 @@ level_configs:
   min_material_count: 2
   judge_resistance: 145
   buff_resistance: 15
+  reset_no_refund: false
   tuning_stones:
     gold:
-      tune_cost:
-        1: 0
-        2: 6
-        3: 12
-        4: 24
-        5: 36
-      reset_refund:
-        1: 0
-        2: 3
-        3: 9
-        4: 21
-        5: 39
       recycle_refund:
-        1: 6
+        1: 6.0
         2: 10.8
         3: 20.4
         4: 39.6
         5: 68.4
-    purple:
-      tune_cost:
-        1: 0
-        2: 4
-        3: 10
-        4: 20
-        5: 30
       reset_refund:
-        1: 0
-        2: 2
-        3: 7
-        4: 17
-        5: 32
+        1: 0.0
+        2: 3.0
+        3: 9.0
+        4: 21.0
+        5: 39.0
+      tune_cost:
+        1: 0.0
+        2: 6.0
+        3: 12.0
+        4: 24.0
+        5: 36.0
+    purple:
       recycle_refund:
-        1: 3
+        1: 3.0
         2: 6.2
         3: 14.2
         4: 30.2
         5: 54.2
+      reset_refund:
+        1: 0.0
+        2: 2.0
+        3: 7.0
+        4: 17.0
+        5: 32.0
+      tune_cost:
+        1: 0.0
+        2: 4.0
+        3: 10.0
+        4: 20.0
+        5: 30.0
+- level: 115
+  allow_reset: true
+  allow_chengyin: true
+  allow_retransfer: true
+  allow_retransfer_after_chengyin: true
+  min_material_count: 2
+  judge_resistance: 180
+  buff_resistance: 32
+  reset_no_refund: false
+  tuning_stones:
+    gold:
+      recycle_refund:
+        1: 6.0
+        2: 10.8
+        3: 20.4
+        4: 39.6
+        5: 68.4
+      reset_refund:
+        1: 0.0
+        2: 3.0
+        3: 9.0
+        4: 21.0
+        5: 39.0
+      tune_cost:
+        1: 0.0
+        2: 6.0
+        3: 12.0
+        4: 24.0
+        5: 36.0
+    purple:
+      recycle_refund:
+        1: 3.0
+        2: 6.2
+        3: 14.2
+        4: 30.2
+        5: 54.2
+      reset_refund:
+        1: 0.0
+        2: 2.0
+        3: 7.0
+        4: 17.0
+        5: 32.0
+      tune_cost:
+        1: 0.0
+        2: 4.0
+        3: 10.0
+        4: 20.0
+        5: 30.0
 season_configs:
 - season_number: 1
   name: 蕤宾叠奏
@@ -237,3 +290,10 @@ season_configs:
   first_half_end_date: '2026-08-07'
   equip_level: 110
   min_chengyin_level: 100
+- season_number: 2
+  name: 南吕相和
+  start_date: '2026-09-24'
+  end_date: '2026-12-25'
+  first_half_end_date: '2026-11-04'
+  equip_level: 115
+  min_chengyin_level: 105

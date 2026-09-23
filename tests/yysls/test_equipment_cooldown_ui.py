@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.loadout import LoadoutRepository
 from lvjiang.apps.yysls.ui.loadout.equip.cards import (
     _CompactEquipCard,
@@ -190,12 +191,15 @@ def test_properties_dialog_spaces_fields_and_updates_cooldown(qtbot):
     assert not dialog._remaining_value.isHidden()
     assert dialog._remaining_value.text().startswith("（")
 
-    before = datetime.now(timezone.utc) + timedelta(days=5, seconds=-1)
+    # 天数取配置：它是每次版本更新都可能改的游戏数值，钉死只会让改数据的
+    # 提交无端变红，保护不了任何东西。要验的是「重置按配置天数重算」。
+    days = get_game_config().get_equipment_cooldown_days()
+    before = datetime.now(timezone.utc) + timedelta(days=days, seconds=-1)
     dialog._reset_cooldown_button.click()
     reset_value = datetime.fromisoformat(changes[-1])
-    after = datetime.now(timezone.utc) + timedelta(days=5)
+    after = datetime.now(timezone.utc) + timedelta(days=days)
     assert before <= reset_value <= after
-    assert dialog._remaining_value.text() == "（5 天 0 小时 0 分钟）"
+    assert dialog._remaining_value.text() == f"（{days} 天 0 小时 0 分钟）"
 
     dialog._clear_cooldown_button.click()
     assert changes[-1] == ""
@@ -242,7 +246,9 @@ def test_properties_dialog_carries_expired_cooldown_progress(qtbot):
 
     reset_value = datetime.fromisoformat(changes[-1])
     assert abs(reset_value.timestamp() - (
-        previous + timedelta(days=5)).timestamp()) < 1
+        previous + timedelta(
+            days=get_game_config().get_equipment_cooldown_days())
+    ).timestamp()) < 1
 
 
 def test_cooldown_manager_collects_all_users_and_sorts_ascending(tmp_path):

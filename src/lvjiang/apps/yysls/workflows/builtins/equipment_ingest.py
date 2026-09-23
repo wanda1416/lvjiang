@@ -5,10 +5,14 @@ from loguru import logger
 from lvjiang.workflows.builtins._registry import builtin_func
 
 
+def _run_username(_engine) -> str:
+    return getattr(_engine, "run_username", "") or "default"
+
+
 def _repository(_engine):
     from ...core.loadout import LoadoutRepository
-    username = getattr(_engine, "run_username", "") or "default"
-    return LoadoutRepository(username, getattr(_engine, "users_dir", None))
+    return LoadoutRepository(
+        _run_username(_engine), getattr(_engine, "users_dir", None))
 
 
 @builtin_func("scanned_loadout_names")
@@ -147,6 +151,9 @@ def _loadout_scan_target(
 def _notify_equipment_changed(_engine) -> None:
     """写入成功后经通用 UI 桥发布 yysls 事件。
 
+    载荷是本次写入的用户名：批量任务每扫到一件装备就发一次，界面据此只
+    刷新正在查看的那个用户，不让 B 的扫描把正在看 A 的人拖住。
+
     无回调时（测试/独立执行端）静默跳过；通知失败仅记日志，
     不影响写入结果。
     """
@@ -156,7 +163,8 @@ def _notify_equipment_changed(_engine) -> None:
     try:
         from lvjiang.apps.yysls.core.events import APP_ID, EQUIPMENT_CHANGED
         from lvjiang.ui.app_events import AppEvent
-        callback("app_event", event=AppEvent(APP_ID, EQUIPMENT_CHANGED))
+        callback("app_event", event=AppEvent(
+            APP_ID, EQUIPMENT_CHANGED, _run_username(_engine)))
     except Exception as e:
         logger.debug(f"equipment_changed 通知失败（写入已生效）: {e}")
 

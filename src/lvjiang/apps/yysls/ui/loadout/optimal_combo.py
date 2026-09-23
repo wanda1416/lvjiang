@@ -1759,7 +1759,7 @@ class OptimalComboPage(QWidget):
             inv.apply_combos(equipped)
 
             # Notify host
-            get_event_hub(self._host).publish(EQUIPMENT_CHANGED)
+            get_event_hub(self._host).publish(EQUIPMENT_CHANGED, user_name)
             QMessageBox.information(
                 self, tr("已应用"),
                 tr("最优组合已应用到装备栏"))

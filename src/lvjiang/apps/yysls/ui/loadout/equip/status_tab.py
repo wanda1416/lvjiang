@@ -295,6 +295,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._batch_selected_fps: set[str] = set()
         self._batch_target_users: set[str] = set()
         self._slot_cards: dict[str, _SlotCard] = {}
+        #: 换用户后筛选待重读；见 prepare_for_user_change。
+        self._user_filters_stale = False
         self._setup_ui()
         # 构造期不读盘：装备数据由外层 LoadoutPanel 加载一次后经
         # refresh_from 注入，这里只按空库存摆好槽位卡与筛选条。
@@ -660,9 +662,6 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         scroll.setWidget(wrapper)
         layout.addWidget(scroll, stretch=1)
 
-        # 订阅用户切换
-        self._host.user_changed.connect(self._on_user_changed)
-
     def set_embedded_mode(self, embedded: bool = True) -> None:
         """Hide duplicated chrome when hosted by LoadoutPanel."""
         self._action_widget.setVisible(not embedded)
@@ -674,11 +673,28 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
 
     # ── 筛选 ──
 
-    def _on_user_changed(self, _name: str) -> None:
+    def prepare_for_user_change(self) -> None:
+        """换用户时先退出批量模式，并记下「筛选待重读」。
+
+        装备数据**不在这里**重载。外层 LoadoutPanel 紧接着会 refresh()，把本轮
+        唯一一份 ``EquipmentInventory`` 经 ``refresh_from`` 交给本页——这正是
+        ``refresh_from``「不再自己重新读盘」的用意。本页再自己读一次只会拿到
+        同样的数据，却要多重建两次整张装备网格。
+        """
         self._exit_batch_copy_mode(rebuild=False)
-        self._refresh_all()
+        self._user_filters_stale = True
+
+    def _apply_pending_filters(self) -> None:
+        """换用户后重读筛选：必须在 _inv 换成新用户之后、重建网格之前。
+
+        筛选存在各用户自己的仓储里（``_load_user_filter`` 读的是
+        ``self._inv._repo``），早一步读到的是上一个用户的筛选，晚一步则要用
+        旧筛选先建一次网格再重建。
+        """
+        if not self._user_filters_stale:
+            return
+        self._user_filters_stale = False
         self._load_filter_settings()
-        self._rebuild_grid()
 
     def _load_filter_settings(self):
         """按当前用户加载界面筛选状态并设置下拉框"""
@@ -1248,37 +1264,38 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         """用面板本轮已加载的仓储快照刷新，不再自己重新读盘。"""
         self._reload_display_params()
         self._inv = inventory
+        self._apply_pending_filters()
         self._sync_inv()
         self._update_status_row()
+
+    def _clear_inventory(self) -> None:
+        self._inv = None
+        self._equipped = {}
+        self._bag_items = {}
+        self._mock_items = {}
+        self._apply_pending_filters()
+        self._refresh_slots()
+        self._rebuild_grid()
 
     def _refresh_all(self):
         self._reload_display_params()
 
         user_name = self._host.active_user_name()
         if not user_name:
-            self._inv = None
-            self._equipped = {}
-            self._bag_items = {}
-            self._mock_items = {}
-            self._refresh_slots()
-            self._rebuild_grid()
+            self._clear_inventory()
             return
 
         try:
             from ....core.combat.equipment import EquipmentInventory
             self._inv = EquipmentInventory(user_name)
-            self._sync_inv()
-            self._update_status_row()
-            return
         except Exception as e:
             logger.error(f"加载装备失败: {e}")
-            self._inv = None
-            self._equipped = {}
-            self._bag_items = {}
-            self._mock_items = {}
+            self._clear_inventory()
+            self._update_status_row()
+            return
 
-        self._refresh_slots()
-        self._rebuild_grid()
+        self._apply_pending_filters()
+        self._sync_inv()
         self._update_status_row()
 
     def _sync_inv(self, *, notify: bool = False) -> None:

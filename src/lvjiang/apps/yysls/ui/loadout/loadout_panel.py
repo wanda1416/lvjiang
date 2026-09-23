@@ -98,7 +98,7 @@ class LoadoutPanel(QWidget):
             else None
         )
         self._build_ui()
-        host.user_changed.connect(lambda _name: self.refresh())
+        host.user_changed.connect(self._on_user_changed)
         self._event_hub = get_event_hub(host)
         self._event_hub.graduation_updated.connect(self._sync_metrics)
         self._equipment_refresh_timer = QTimer(self)
@@ -427,6 +427,16 @@ class LoadoutPanel(QWidget):
         username = self._host.active_user_name()
         return LoadoutRepository(username) if username else None
 
+    def _on_user_changed(self, _name: str) -> None:
+        """换用户：本面板统一重载一次，子页不再各自读盘。
+
+        装备页换用户时要换的只是它自己的筛选和批量模式；装备数据由下面的
+        refresh() 加载一次后分发。两边各订阅 user_changed 各读一次盘，是
+        用户切换要等好几秒的主因。
+        """
+        self._equipment.prepare_for_user_change()
+        self.refresh()
+
     def refresh(self):
         # refresh 的语义是重新读取装备数据。必须在任何下拉框联动触发
         # _refresh_display 之前废弃旧穿戴快照，否则“刷新”仍会复用旧装备。
@@ -434,6 +444,8 @@ class LoadoutPanel(QWidget):
         combat.invalidate_equipment_snapshot()
         self._repo = self._current_repo()
         if self._repo is None:
+            # 没有激活用户：装备页此刻收不到任何刷新，由它自己清空展示。
+            self._equipment._refresh_all()
             return
         username = self._host.active_user_name()
         # 本轮刷新只加载一次仓储快照，装备页与战斗属性页共用

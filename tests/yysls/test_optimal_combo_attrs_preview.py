@@ -20,16 +20,28 @@ from lvjiang.apps.yysls.ui.loadout.optimal_combo import (
 from tests.yysls.test_loadout_panel_layout import _Host
 
 
+def _season_level() -> int:
+    """当前赛季装备等级。
+
+    「同等级承音假设」只作用于当前赛季等级的原生装备，所以这里不能钉死某个
+    等阶——换赛季时钉死的数字会让本该通过的用例变红。
+    """
+    from lvjiang.apps.yysls.config import get_game_config
+
+    return get_game_config().current_equip_level()
+
+
 def _result(rank: int = 2) -> dict:
+    level = _season_level()
     return {
         "rate": 0.8, "dps": 1000, "gongjue": "会意", "rank": rank,
         "equipped": {
             "main_weapon": {
-                "type": "剑", "name": "剑", "level": 110, "quality": "gold",
+                "type": "剑", "name": "剑", "level": level, "quality": "gold",
                 "affix_1": {"name": "最大外功攻击", "value": 100},
             },
             "ring": {
-                "type": "环", "name": "环", "level": 110, "quality": "gold",
+                "type": "环", "name": "环", "level": level, "quality": "gold",
                 "is_chengyin": False,
                 "affix_1": {"name": "最大外功攻击", "value": 100},
             },
@@ -354,7 +366,7 @@ def test_both_card_kinds_render_affixes_identically(qtbot):
     )
 
     equip = {
-        "type": "环", "name": "环", "level": 110, "quality": "gold",
+        "type": "环", "name": "环", "level": _season_level(), "quality": "gold",
         "is_chengyin": True,
         "affix_1": {"name": "最大外功攻击", "value": 100},
         "affix_2": {"name": "会意率", "value": 6.6, "unit": "%",

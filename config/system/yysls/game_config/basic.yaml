@@ -1,4 +1,4 @@
 content_version: 1
 basic_config:
-  equipment_cooldown_days: 5
+  equipment_cooldown_days: 3
   equipment_cooldown_carryover: true

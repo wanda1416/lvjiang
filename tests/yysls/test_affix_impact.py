@@ -113,6 +113,19 @@ def test_missing_weapon_bonus_is_addable_but_not_removable():
     assert "剑武学增伤" not in {item.name for item in report.removals}
 
 
+def _buff_divisor() -> float:
+    """当前赛季装备等级的增益抗性除数。
+
+    抗性每个等阶都会变，写死只会让补数据的提交无端变红；这里验的是抗性有
+    没有被施加，不是某一赛季的数字。
+    """
+    from lvjiang.apps.yysls.config import get_game_config
+
+    gc = get_game_config()
+    config = gc.level_config_for(gc.current_equip_level())
+    return 1 + float((config and config.buff_resistance) or 0) / 100
+
+
 def test_duplicate_same_weapon_bonus_only_uses_the_best_one():
     equipped = _equipment()
     equipped["sub_weapon"] = {
@@ -131,8 +144,8 @@ def test_duplicate_same_weapon_bonus_only_uses_the_best_one():
     )
 
     sword = next(item for item in report.removals if item.name == "剑武学增伤")
-    # 扣除 9.8% 后 7.0% 接替生效；抗性 15 导致实际损失 2.8% / 1.15。
-    assert sword.graduation_delta == pytest.approx(-0.028 / 1.15)
+    # 扣除 9.8% 后 7.0% 接替生效；再过一遍增益抗性。
+    assert sword.graduation_delta == pytest.approx(-0.028 / _buff_divisor())
     assert "剑武学增伤" not in {item.name for item in report.additions}
 
 

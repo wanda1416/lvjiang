@@ -568,7 +568,9 @@ def test_candidate_maximum_keeps_current_season_native_equipment_native():
     )
     original = {
         "pendant": {
-            "type": "佩", "level": 110, "is_chengyin": False,
+            # 当前赛季等级的原生装备：换赛季后钉死 110 会让用例名和事实脱节
+            "type": "佩", "level": get_game_config().current_equip_level(),
+            "is_chengyin": False,
             "affix_1": {"name": "最小外功攻击", "value": 87.1},
         },
     }

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 import lvjiang.apps.yysls.core.loadout.repository as repository_module
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.loadout import LoadoutRepository, resolve_school
 
 
@@ -443,7 +444,8 @@ def test_real_development_migrates_every_plan_and_resets_transmute_cooldown(
     assert stored["affix_2"]["is_transferred"] is True
     expires_at = datetime.fromisoformat(stored["cooldown_expires_at"])
     remaining = expires_at - datetime.now(expires_at.tzinfo)
-    assert timedelta(days=4, hours=23) < remaining <= timedelta(days=5)
+    days = get_game_config().get_equipment_cooldown_days()
+    assert timedelta(days=days, hours=-1) < remaining <= timedelta(days=days)
 
 
 def test_real_development_preserves_scan_time_across_fingerprint_change(
@@ -484,7 +486,9 @@ def test_real_development_carries_expired_cooldown_progress(tmp_path: Path):
     stored = repo.load().equipment_items[new_fp]
     expires_at = datetime.fromisoformat(stored["cooldown_expires_at"])
     assert abs(expires_at.timestamp() - (
-        previous + timedelta(days=5)).timestamp()) < 1
+        previous + timedelta(
+            days=get_game_config().get_equipment_cooldown_days())
+    ).timestamp()) < 1
 
 
 def test_non_chengyin_can_set_value_when_retransmuting_fixed_slot(

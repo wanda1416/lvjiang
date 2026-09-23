@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.equip_parser.models import make_fingerprint
 from lvjiang.apps.yysls.ui.loadout.equip.mock_dialog import MockEquipDialog
 
@@ -103,7 +104,7 @@ def test_real_development_can_switch_dingyin_affix(qtbot):
     assert dialog._validate_real_development(result) is None
 
 
-def test_transmute_marks_slot_and_resets_configured_five_day_cooldown(qtbot):
+def test_transmute_marks_slot_and_resets_the_configured_cooldown(qtbot):
     equip = _real_equip()
     equip["affix_2"]["is_transferred"] = True
     equip["_fp"] = make_fingerprint(equip)
@@ -124,7 +125,8 @@ def test_transmute_marks_slot_and_resets_configured_five_day_cooldown(qtbot):
     assert result["affix_2"]["is_transferred"] is True
     expires_at = datetime.fromisoformat(result["cooldown_expires_at"])
     remaining = expires_at - datetime.now(expires_at.tzinfo)
-    assert timedelta(days=4, hours=23) < remaining <= timedelta(days=5)
+    days = get_game_config().get_equipment_cooldown_days()
+    assert timedelta(days=days, hours=-1) < remaining <= timedelta(days=days)
 
 
 def test_dialog_and_repository_share_one_rule_set(qtbot):

@@ -13,6 +13,9 @@ affix_caps:
     100:
       cap: 90.6
       chengyin: 85.2
+    115:
+      cap: 139.6
+      chengyin: 131.2
   属性攻击:
     _group: true
     _aliases:
@@ -40,6 +43,9 @@ affix_caps:
     100:
       cap: 51.4
       chengyin: 48.3
+    115:
+      cap: 79.2
+      chengyin: 74.4
   五维属性:
     _aliases:
     - 劲
@@ -56,6 +62,9 @@ affix_caps:
     100:
       cap: 57.4
       chengyin: 54
+    115:
+      cap: 88.4
+      chengyin: 83.1
   会意率:
     _unit: '%'
     _aliases:
@@ -69,6 +78,9 @@ affix_caps:
     100:
       cap: 5.2
       chengyin: 4.9
+    115:
+      cap: 8.1
+      chengyin: 7.6
   会心率:
     _unit: '%'
     _aliases:
@@ -82,6 +94,9 @@ affix_caps:
     100:
       cap: 10.4
       chengyin: 9.8
+    115:
+      cap: 16.2
+      chengyin: 15.2
   精准率:
     _unit: '%'
     _aliases:
@@ -95,6 +110,9 @@ affix_caps:
     100:
       cap: 9.4
       chengyin: 8.8
+    115:
+      cap: 14.4
+      chengyin: 13.5
   指定武学增效:
     _unit: '%'
     _stack: max
@@ -117,7 +135,10 @@ affix_caps:
       chengyin: 8.1
     100:
       cap: 7.4
-      chengyin: 7.0
+      chengyin: 7
+    115:
+      cap: 11.3
+      chengyin: 10.6
   全部武学增效:
     _unit: '%'
     _aliases:
@@ -131,6 +152,9 @@ affix_caps:
     100:
       cap: 3.6
       chengyin: 3.4
+    115:
+      cap: 5.6
+      chengyin: 5.3
   对单位增效:
     _unit: '%'
     _aliases:
@@ -145,21 +169,22 @@ affix_caps:
     100:
       cap: 3.8
       chengyin: 3.6
+    115:
+      cap: 5.9
+      chengyin: 5.5
   奇术类增伤:
     _unit: '%'
     _aliases:
     - 单体类奇术增伤
     - 群体类奇术增伤
     - 全奇术增伤
-    # 115 起冠胸调律库把单体/群体合并为全奇术增伤。旧词条不能从这里删除：
-    # 110 及以下装备上它依然合法，OCR 仍会扫到，历史记录也仍要解析得出来。
     _alias_levels:
-      单体类奇术增伤: {through_level: 110}
-      群体类奇术增伤: {through_level: 110}
-      全奇术增伤: {from_level: 115}
-    # 升级规则：装备从 from_level（或更低）升到 to_level（或更高）时，旧词条
-    # 自动变成新词条。105 一路承音到 115 同样触发。只作用于升级投影，真实
-    # 扫描结果以游戏画面为准，不在这里改写。
+      单体类奇术增伤:
+        through_level: 110
+      群体类奇术增伤:
+        through_level: 110
+      全奇术增伤:
+        from_level: 115
     _upgrades:
     - from_level: 110
       to_level: 115
@@ -167,6 +192,9 @@ affix_caps:
       - 单体类奇术增伤
       - 群体类奇术增伤
       to: 全奇术增伤
+    115:
+      cap: 17.7
+      chengyin: 16.5
     110:
       cap: 15.4
       chengyin: 14.5
@@ -188,6 +216,9 @@ affix_caps:
     100:
       cap: 3444
       chengyin: 3237.4
+    115:
+      cap: 5302
+      chengyin: 4983.9
   外功防御:
     _aliases:
     - 外功防御
@@ -200,6 +231,9 @@ affix_caps:
     100:
       cap: 45.4
       chengyin: 42.7
+    115:
+      cap: 69.8
+      chengyin: 65.6
   外功增益:
     _pool: dingyin
     _unit: '%'
@@ -216,6 +250,8 @@ affix_caps:
       cap: 14.6
     100:
       cap: 12.8
+    115:
+      cap: 19.4
   属攻增益:
     _pool: dingyin
     _unit: '%'
@@ -231,6 +267,8 @@ affix_caps:
       cap: 17.4
     100:
       cap: 15.2
+    115:
+      cap: 23
   指定技能增效:
     _pool: dingyin
     _group: true
@@ -315,6 +353,8 @@ affix_caps:
       cap: 8
     100:
       cap: 7
+    115:
+      cap: 10.6
 affix_categories:
   外功类:
   - 最大外功攻击

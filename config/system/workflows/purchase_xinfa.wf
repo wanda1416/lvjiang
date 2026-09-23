@@ -78,7 +78,7 @@ end
 
 # 进入循环前记录一次周库存基线。分母必须识别为固定上限 600，避免脏 OCR 回写。
 scan [training_xinfa].[stock_of_week] as $weekly_stock
-call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_of_week", -1, 600, "本周心法心得购买")
+call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_of_week", -1, 600, "本周心法心得购买", "日常")
 
 # ─── 返回导航 ────────────────────────────────────────────
 def go_back()
@@ -205,6 +205,6 @@ end
 
 # 循环结束时再读取一次，最后一次成功购买造成的库存下降会换算为已购买量。
 scan [training_xinfa].[stock_of_week] as $weekly_stock
-call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_of_week", $xinfa_of_week, 600, "本周心法心得购买")
+call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_of_week", $xinfa_of_week, 600, "本周心法心得购买", "日常")
 call go_back()
 return -1

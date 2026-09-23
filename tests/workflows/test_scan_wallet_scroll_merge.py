@@ -46,6 +46,15 @@ _FRESH_LAST_ROW = {
 }
 
 
+def test_wallet_profile_writes_record_configured_business_sources():
+    source = _WF_PATH.read_text(encoding="utf-8")
+
+    assert 'safe_set("tongbao", $tongbao_wan, $tol_tongbao, "通宝(万)", "日常获取")' in source
+    assert 'safe_set("bugan", $vals.bugan, $tol_bugan, "么玉", "日常活动")' in source
+    assert 'safe_set("baoqian", $baoqian_wan, $tol_baoqian, "宝钱(万)", "不肝商店")' in source
+    assert 'safe_set("changmingyu", $vals.changmingyu, $tol_changmingyu, "长鸣玉", "日常获取")' in source
+
+
 def _run_with_wf_procs(code: str, initial: dict) -> dict:
     """执行 DSL 片段，并注册生产 scan_wallet.wf 里定义的全部子过程"""
     engine = make_engine()

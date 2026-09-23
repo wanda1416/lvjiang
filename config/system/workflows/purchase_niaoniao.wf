@@ -101,7 +101,7 @@ loop while $tries < $max_scroll
             click [general_purchase].[add_max] after wait @step_interval
             click [general_purchase].[purchase] after wait @step_interval
             # 购买几个就给 niaoniao_of_week 加多少（quota 自动 clamp 到 cap 2）
-            eval profile_inc("niaoniao_of_week", $want)
+            eval profile_inc("niaoniao_of_week", $want, "百珍商店")
             log "已购买 " + $want + " 个 袅袅之音·绑，niaoniao_of_week 增加 " + $want
             eval $bought = 1
             break

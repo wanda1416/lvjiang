@@ -104,7 +104,7 @@ click [game_menu_page].[bugan] after wait @page_refresh
 # ─── 获取本周不肝进度 ──────────────────────────────────
 click [bugan_detail].[bugan_view] after wait @step_interval
 scan [bugan_detail].[bugan_jindu] as $jindu_str
-call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度")
+call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度", "日常活动")
 
 # 领取不肝进度奖励
 scan [bugan_detail].[purchase] as $found by contains "全部领取"
@@ -125,7 +125,7 @@ if not $nav_check
 end
 
 # 战斗养成第一栏会展示当前体力（如 1,950/2,500），进店先同步一次
-call sync_current_tili()
+call sync_current_tili("日常")
 
 if env("android")
     # ─── 战斗养成：依次购买两个商品面板 ─────────────────────
@@ -141,7 +141,7 @@ end
 
 # 购买宝钱会消耗体力，买过就再同步一次最新值
 if $bought_baoqian
-    call sync_current_tili()
+    call sync_current_tili("宝钱")
 end
 
 # ─── 营生（类目5）：只买第一格（先确认格子内容是营生） ────
@@ -220,7 +220,7 @@ if not $waiguan_skip
         log "购买外观兑换：袅袅之音"
         eval $nn_model = profile_model("nn_bugan_of_week")
         if $nn_model
-            eval profile_set("nn_bugan_of_week", 1)
+            eval profile_set("nn_bugan_of_week", 1, "不肝商店")
             log "已写入 nn_bugan_of_week=1（本周已购标记）"
         end
     end
@@ -270,11 +270,11 @@ end
 # tili 是 regen 模型：profile_set 写入观察值与时间戳，之后的回复由引擎
 # 按周期规则推算，不适用 quota 的 sync_weekly_progress 单调语义。
 # 识别失败只记日志不阻断；返回 0。
-def sync_current_tili()
+def sync_current_tili($source)
     scan [bugan_detail].[current_tili] as $tili_scan
     eval $tili_progress = extract_progress($tili_scan.current_tili)
     if $tili_progress.valid
-        eval profile_set("tili", $tili_progress.current)
+        eval profile_set("tili", $tili_progress.current, $source)
         log "当前体力: " + $tili_progress.current + "/" + $tili_progress.total
     else
         log "当前体力识别失败: '" + $tili_scan.current_tili + "'，跳过同步"

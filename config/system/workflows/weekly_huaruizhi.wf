@@ -132,7 +132,7 @@ def nav_main_to_duchenxu()
     end
     click [tongyou_main].[huaruizhi_total] after wait @page_refresh
     scan [tongyou_main].[huaruizhi_of_week] as $progress
-    call $huaruizhi_of_week = sync_weekly_progress($progress.huaruizhi_of_week, "huaruizhi_of_week", -1, "本周花蕊织进度")
+    call $huaruizhi_of_week = sync_weekly_progress($progress.huaruizhi_of_week, "huaruizhi_of_week", -1, "本周花蕊织进度", "日常")
     return {"status": 0, "huaruizhi_of_week": $huaruizhi_of_week}
 end
 

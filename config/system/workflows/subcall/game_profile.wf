@@ -4,9 +4,9 @@
 # 提供角色档案相关的扫描解析操作，供各工作流 import 后调用。
 #
 # 包含过程：
-#   sync_weekly_progress($raw, $key, $last, $label)
+#   sync_weekly_progress($raw, $key, $last, $label, $source)
 #       — 解析 a/b 周进度并按本周期单调规则同步 profile
-#   sync_weekly_remaining($raw, $key, $last, $expected_total, $label)
+#   sync_weekly_remaining($raw, $key, $last, $expected_total, $label, $source)
 #       — 解析“剩余/总量”，换算为已消耗量后同步 profile
 #
 # Profile 定义由 subcall/profile_registry.wf 统一负责。
@@ -17,8 +17,9 @@
 #   $key   — 对应的 quota profile key
 #   $last  — 本轮上次有效值；首次读取传 -1
 #   $label — 日志名称
+#   $source — 写入 Profile 历史的业务来源
 # 返回：最终采用的进度；OCR 与 profile 均无有效值时返回 $last
-def sync_weekly_progress($raw, $key, $last, $label)
+def sync_weekly_progress($raw, $key, $last, $label, $source)
     eval $progress = extract_progress($raw)
     if not $progress.valid
         eval $profile_value = profile_get($key)
@@ -46,7 +47,7 @@ def sync_weekly_progress($raw, $key, $last, $label)
         return $current
     end
 
-    eval $observed = profile_observe($key, $current)
+    eval $observed = profile_observe($key, $current, $source)
     if $observed.accepted
         log $label + ": " + $observed.value + "/" + $progress.total
         return $observed.value
@@ -70,8 +71,9 @@ end
 #   $last           — 本轮上次有效的已消耗量；首次读取传 -1
 #   $expected_total — 固定周库存上限；OCR 分母不一致时拒绝同步
 #   $label          — 日志名称
+#   $source         — 写入 Profile 历史的业务来源
 # 返回：最终采用的已消耗量；OCR 与 profile 均无有效值时返回 $last
-def sync_weekly_remaining($raw, $key, $last, $expected_total, $label)
+def sync_weekly_remaining($raw, $key, $last, $expected_total, $label, $source)
     eval $progress = extract_progress($raw)
     if not $progress.valid
         eval $profile_value = profile_get($key)
@@ -104,7 +106,7 @@ def sync_weekly_remaining($raw, $key, $last, $expected_total, $label)
         return $consumed
     end
 
-    eval $observed = profile_observe($key, $consumed)
+    eval $observed = profile_observe($key, $consumed, $source)
     if $observed.accepted
         log $label + ": 已购买 " + $observed.value + "/" + $expected_total
         return $observed.value

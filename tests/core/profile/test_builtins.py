@@ -97,6 +97,34 @@ def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
     assert stored_ts <= datetime.now() - timedelta(minutes=3, seconds=58)
 
 
+def test_profile_write_builtins_record_explicit_business_sources(profile_func_env):
+    from lvjiang.core.profile.repository import db_get_history
+    from lvjiang.workflows.builtins.profile import (
+        _profile_inc,
+        _profile_observe,
+        _profile_set,
+    )
+
+    engine = SimpleNamespace(run_username=profile_func_env.username)
+
+    _profile_set(engine, "resource_meter", 100, "首次扫描")
+    _profile_inc(engine, "resource_meter", -20, "资源消耗")
+    _profile_observe(engine, "weekly_progress", 80, "每周任务")
+
+    regen_history = db_get_history(
+        profile_func_env.username, type_="regen", key="resource_meter"
+    )
+    quota_history = db_get_history(
+        profile_func_env.username, type_="quota", key="weekly_progress"
+    )
+
+    assert [item["source"] for item in regen_history[:2]] == [
+        "资源消耗",
+        "首次扫描",
+    ]
+    assert quota_history[0]["source"] == "每周任务"
+
+
 def test_profile_observe_rejects_regression_in_same_period(profile_func_env):
     from lvjiang.core.profile.repository import db_read_entry, db_upsert
     from lvjiang.workflows.builtins.profile import _profile_observe

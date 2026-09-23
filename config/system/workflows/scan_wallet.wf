@@ -88,7 +88,7 @@ end
 
 # 累计除以 10000 写入通宝(万)
 eval $tongbao_wan = $tongbao_total / 10000
-call safe_set("tongbao", $tongbao_wan, $tol_tongbao, "通宝(万)")
+call safe_set("tongbao", $tongbao_wan, $tol_tongbao, "通宝(万)", "日常获取")
 
 # ─── 扫描其他货币（money_2, 6列 × N行；行数按环境自适应：安卓3/桌面4）───
 # where confidence >= 0.6 过滤掉低置信度噪声
@@ -142,16 +142,16 @@ if env("android")
 end
 
 if $vals.bugan > 0
-    call safe_set("bugan", $vals.bugan, $tol_bugan, "么玉")
+    call safe_set("bugan", $vals.bugan, $tol_bugan, "么玉", "日常活动")
 end
 
 if $vals.baoqian > 0
     eval $baoqian_wan = $vals.baoqian / 10000
-    call safe_set("baoqian", $baoqian_wan, $tol_baoqian, "宝钱(万)")
+    call safe_set("baoqian", $baoqian_wan, $tol_baoqian, "宝钱(万)", "不肝商店")
 end
 
 if $vals.changmingyu > 0
-    call safe_set("changmingyu", $vals.changmingyu, $tol_changmingyu, "长鸣玉")
+    call safe_set("changmingyu", $vals.changmingyu, $tol_changmingyu, "长鸣玉", "日常获取")
 end
 
 log "钱袋货币扫描完成"
@@ -163,7 +163,7 @@ if $bugan_pos
     click [bag_wallet_detail].[money_2][$bugan_row][$bugan_col] after wait @step_interval
     
     scan [bag_wallet_detail].[bugan_jindu] as $jindu_str
-    call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度")
+    call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度", "日常活动")
 end
 
 # ─── 返回主界面 ──────────────────────────────────────────
@@ -251,7 +251,7 @@ end
 
 # ─── 容差写入子过程 ────────────────────────────────────
 # 校验新值与旧值差值是否在容差范围内，通过则写入，否则跳过
-def safe_set($key, $new_val, $tolerance, $label)
+def safe_set($key, $new_val, $tolerance, $label, $source)
     eval $old = profile_get($key)
     if $tolerance > 0 and $old
         eval $delta = $new_val - $old
@@ -261,6 +261,6 @@ def safe_set($key, $new_val, $tolerance, $label)
             return
         end
     end
-    eval profile_set($key, $new_val)
+    eval profile_set($key, $new_val, $source)
     log $label + ": " + $new_val
 end

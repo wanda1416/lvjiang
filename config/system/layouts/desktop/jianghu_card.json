@@ -13,7 +13,13 @@
       "x_ratio": 0.923705722070845,
       "y_ratio": 0.06411869823770279,
       "w_ratio": 0.047169904781717786,
-      "h_ratio": 0.10214984281982563
+      "h_ratio": 0.10214984281982563,
+      "template": {
+        "name": "desktop/jianghu_card/refresh",
+        "min_score": 0.8,
+        "record_w": 1936,
+        "record_h": 1088
+      }
     }
   ],
   "crop_canvas": {

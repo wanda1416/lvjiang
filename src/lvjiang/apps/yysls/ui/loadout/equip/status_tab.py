@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timedelta, timezone
 
 from loguru import logger
 from PyQt6.QtCore import QSize, Qt
@@ -45,6 +46,10 @@ from ....core.equip_parser.dingyin_parser import (
     DINGYIN_TYPE_KEY,
     DINGYIN_TYPES,
     has_normal_dingyin,
+)
+from ....core.loadout.models import (
+    EQUIPMENT_LAST_SEEN_AT,
+    EQUIPMENT_UPDATED_AT,
 )
 from ...events import EQUIPMENT_CHANGED, get_event_hub
 from .batch_copy import BatchCopyMixin
@@ -400,9 +405,9 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         metrics_row.addStretch()
         info_layout.addLayout(metrics_row)
 
-        # 筛选项保持单行，避免窗口尚有横向空间时提前折行。
-        filter_row = QHBoxLayout()
-        filter_row.setSpacing(8)
+        # 排序/来源/操作与具体筛选条件分成两行，窄窗口下仍保持完整可读。
+        primary_filter_row = QHBoxLayout()
+        primary_filter_row.setSpacing(8)
 
         # 右区：筛选下拉框
         _filter_lbl_style = "font-size: 12px; color: palette(mid);"
@@ -410,7 +415,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         # 排序
         lbl_sort = QLabel(tr("排序"))
         lbl_sort.setStyleSheet(_filter_lbl_style)
-        filter_row.addWidget(lbl_sort)
+        primary_filter_row.addWidget(lbl_sort)
         self._sort_filter = QComboBox()
         self._sort_filter.addItem(tr("默认"), "default")
         self._sort_filter.addItem(tr("等级倒序"), "level_desc")
@@ -419,7 +424,38 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             QComboBox.SizeAdjustPolicy.AdjustToContents)
         _fit_filter_combo(self._sort_filter)
         self._sort_filter.currentIndexChanged.connect(self._on_filter_changed)
-        filter_row.addWidget(self._sort_filter)
+        primary_filter_row.addWidget(self._sort_filter)
+
+        lbl_source = QLabel(tr("类型"))
+        lbl_source.setStyleSheet(_filter_lbl_style)
+        primary_filter_row.addWidget(lbl_source)
+        self._source_filter = QComboBox()
+        self._source_filter.addItem(tr("全部"), "all")
+        self._source_filter.addItem(tr("背包"), "bag")
+        self._source_filter.addItem(tr("模拟"), "mock")
+        self._source_filter.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
+        _fit_filter_combo(self._source_filter)
+        self._source_filter.currentIndexChanged.connect(self._on_filter_changed)
+        primary_filter_row.addWidget(self._source_filter)
+        primary_filter_row.addStretch()
+
+        self._btn_delete_filtered = QPushButton(tr("删除筛选装备"))
+        self._btn_delete_filtered.setToolTip(tr(
+            "只删除当前筛选出的背包装备，此处不支持删除模拟装备"))
+        self._btn_delete_filtered.setStyleSheet(_ACTION_BTN_STYLE)
+        self._btn_delete_filtered.clicked.connect(self._on_delete_filtered)
+        primary_filter_row.addWidget(self._btn_delete_filtered)
+
+        self._btn_batch_copy = QPushButton(tr("批量复制装备"))
+        self._btn_batch_copy.setToolTip(tr("批量复制模拟装备到其他用户"))
+        apply_button_style(self._btn_batch_copy)
+        self._btn_batch_copy.clicked.connect(self._enter_batch_copy_mode)
+        self._btn_batch_copy.setVisible(False)
+        primary_filter_row.addWidget(self._btn_batch_copy)
+
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(8)
 
         self._advanced_filter_widget = QWidget()
         advanced_filter_row = QHBoxLayout(self._advanced_filter_widget)
@@ -500,51 +536,43 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         _fit_filter_combo(self._status_filter)
         self._status_filter.currentIndexChanged.connect(self._on_filter_changed)
         advanced_filter_row.addWidget(self._status_filter)
+
+        lbl_scan_time = QLabel(tr("扫描时间"))
+        lbl_scan_time.setStyleSheet(_filter_lbl_style)
+        advanced_filter_row.addWidget(lbl_scan_time)
+        self._scan_time_filter = QComboBox()
+        self._scan_time_filter.addItem(tr("全部"), "all")
+        self._scan_time_filter.addItem(tr("超过 3 天"), "3")
+        self._scan_time_filter.addItem(tr("超过 7 天"), "7")
+        self._scan_time_filter.addItem(tr("超过 14 天"), "14")
+        self._scan_time_filter.addItem(tr("超过 30 天"), "30")
+        self._scan_time_filter.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
+        _fit_filter_combo(self._scan_time_filter)
+        self._scan_time_filter.currentIndexChanged.connect(
+            self._on_filter_changed)
+        advanced_filter_row.addWidget(self._scan_time_filter)
         filter_row.addWidget(self._advanced_filter_widget)
 
         self._filter_collapse_button = QToolButton()
-        self._status_filter.ensurePolished()
-        toggle_side = self._status_filter.sizeHint().height()
+        self._scan_time_filter.ensurePolished()
+        toggle_side = self._scan_time_filter.sizeHint().height()
         self._filter_collapse_button.setFixedSize(toggle_side, toggle_side)
         icon_side = max(8, round(toggle_side * 0.4))
         self._filter_collapse_button.setIconSize(QSize(icon_side, icon_side))
         self._filter_collapse_button.setStyleSheet(_FILTER_TOGGLE_STYLE)
-        self._filter_collapse_button.setToolTip(tr("收起部位至状态筛选"))
+        self._filter_collapse_button.setToolTip(tr("收起筛选条件"))
         self._filter_collapse_button.clicked.connect(
             self._toggle_advanced_filters)
         filter_row.addWidget(self._filter_collapse_button)
 
-        # 数据来源筛选：全部/背包/模拟
-        lbl_source = QLabel(tr("类型"))
-        lbl_source.setStyleSheet(_filter_lbl_style)
-        filter_row.addWidget(lbl_source)
-        self._source_filter = QComboBox()
-        self._source_filter.addItem(tr("全部"), "all")
-        self._source_filter.addItem(tr("背包"), "bag")
-        self._source_filter.addItem(tr("模拟"), "mock")
-        self._source_filter.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToContents)
-        _fit_filter_combo(self._source_filter)
-        self._source_filter.currentIndexChanged.connect(self._on_filter_changed)
-        filter_row.addWidget(self._source_filter)
-
         filter_row.addStretch()
-
-        self._btn_delete_filtered = QPushButton(tr("删除筛选装备"))
-        self._btn_delete_filtered.setToolTip(tr(
-            "只删除当前筛选出的背包装备，此处不支持删除模拟装备"))
-        self._btn_delete_filtered.setStyleSheet(_ACTION_BTN_STYLE)
-        self._btn_delete_filtered.clicked.connect(self._on_delete_filtered)
-        filter_row.addWidget(self._btn_delete_filtered)
-
-        self._btn_batch_copy = QPushButton(tr("批量复制装备"))
-        self._btn_batch_copy.setToolTip(tr("批量复制模拟装备到其他用户"))
-        apply_button_style(self._btn_batch_copy)
-        self._btn_batch_copy.clicked.connect(self._enter_batch_copy_mode)
-        self._btn_batch_copy.setVisible(False)
-        filter_row.addWidget(self._btn_batch_copy)
         self._filter_widget = QWidget()
-        self._filter_widget.setLayout(filter_row)
+        filter_layout = QVBoxLayout(self._filter_widget)
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(6)
+        filter_layout.addLayout(primary_filter_row)
+        filter_layout.addLayout(filter_row)
         info_layout.addWidget(self._filter_widget)
 
         self._batch_copy_widget = QWidget()
@@ -663,6 +691,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._source_filter.blockSignals(True)
         self._quality_filter.blockSignals(True)
         self._status_filter.blockSignals(True)
+        self._scan_time_filter.blockSignals(True)
         try:
             # 排序
             sort_idx = self._sort_filter.findData(filters.get("sort", "default"))
@@ -693,6 +722,10 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 filters.get("status", "all"))
             self._status_filter.setCurrentIndex(
                 status_idx if status_idx >= 0 else 0)
+            scan_time_idx = self._scan_time_filter.findData(
+                filters.get("scan_time", "all"))
+            self._scan_time_filter.setCurrentIndex(
+                scan_time_idx if scan_time_idx >= 0 else 0)
         finally:
             self._sort_filter.blockSignals(False)
             self._type_filter.blockSignals(False)
@@ -701,6 +734,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             self._source_filter.blockSignals(False)
             self._quality_filter.blockSignals(False)
             self._status_filter.blockSignals(False)
+            self._scan_time_filter.blockSignals(False)
         self._set_advanced_filters_collapsed(
             bool(filters.get("filters_collapsed", False)))
         self._update_source_actions()
@@ -715,6 +749,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             "source": self._source_filter.currentData(),
             "quality": self._quality_filter.currentData(),
             "status": self._status_filter.currentData(),
+            "scan_time": self._scan_time_filter.currentData(),
             "filters_collapsed": self._filters_collapsed,
         }
         self._save_user_filter(filters)
@@ -752,8 +787,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._filters_collapsed = collapsed
         self._advanced_filter_widget.setVisible(not collapsed)
         action_text = (
-            tr("展开部位至状态筛选") if collapsed
-            else tr("收起部位至状态筛选"))
+            tr("展开筛选条件") if collapsed
+            else tr("收起筛选条件"))
         icon_type = (
             QStyle.StandardPixmap.SP_ArrowRight if collapsed
             else QStyle.StandardPixmap.SP_ArrowLeft)
@@ -776,6 +811,51 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
     def _get_affix_filter(self) -> str:
         """获取词条筛选类型。"""
         return self._affix_filter.currentData()
+
+    @staticmethod
+    def _effective_scan_time(equip: dict) -> datetime | None:
+        """读取扫描时间；历史装备缺失独立字段时回退更新时间。"""
+        value = equip.get(EQUIPMENT_LAST_SEEN_AT) or equip.get(
+            EQUIPMENT_UPDATED_AT)
+        if not isinstance(value, str) or not value.strip():
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    def _passes_scan_time_filter(
+        self,
+        equip: dict,
+        *,
+        is_mock: bool,
+        now: datetime | None = None,
+    ) -> bool:
+        """模拟装备不受扫描时间约束；真实装备按最后观察时间筛选。"""
+        if is_mock:
+            return True
+        mode = str(self._scan_time_filter.currentData() or "all")
+        if mode == "all":
+            return True
+        scanned_at = EquipStatusTab._effective_scan_time(equip)
+        if scanned_at is None:
+            return True
+        current = now or datetime.now(timezone.utc)
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=timezone.utc)
+        return scanned_at < current.astimezone(timezone.utc) - timedelta(
+            days=int(mode))
+
+    def _scan_time_delete_constraint(self) -> str | None:
+        """把界面筛选转换成仓储层的原子复核条件。"""
+        mode = str(self._scan_time_filter.currentData() or "all")
+        if mode == "all":
+            return None
+        cutoff = datetime.now(timezone.utc) - timedelta(days=int(mode))
+        return cutoff.isoformat(timespec="milliseconds")
 
     def _reset_filter_for_mock(self):
         """创建/复制模拟装备后，自动切换筛选以便新装备可见。
@@ -988,6 +1068,10 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                             and not self._equip_passes_filter(
                         equip, is_referenced=is_referenced,
                     )):
+                        continue
+                    if (not batch_copy
+                            and not self._passes_scan_time_filter(
+                                equip, is_mock=is_mock)):
                         continue
                     cards.append((
                         equip, part_label, group_key, is_mock, is_referenced,
@@ -1536,6 +1620,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             f"{tr('等级')}：{self._level_filter.currentText()}",
             f"{tr('词条')}：{self._affix_filter.currentText()}",
             f"{tr('状态')}：{self._status_filter.currentText()}",
+            f"{tr('扫描时间')}：{self._scan_time_filter.currentText()}",
             f"{tr('类型')}：{self._deletion_source_summary()}",
         ))
 
@@ -1553,6 +1638,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 self, tr("提示"), tr("当前筛选条件下没有可删除的背包装备"))
             return
 
+        last_seen_before = self._scan_time_delete_constraint()
+
         referenced = inv.referenced_plan_fps
         dialog = _FilteredDeleteDialog(
             self._filter_summary(), fingerprints, referenced, self,
@@ -1565,6 +1652,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 fingerprints,
                 preserve_referenced=dialog.preserve_referenced,
                 preserve_locked=dialog.preserve_locked,
+                last_seen_before=last_seen_before,
             )
             self._sync_inv(notify=True)
             logger.info(

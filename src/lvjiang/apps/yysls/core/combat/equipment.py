@@ -128,6 +128,7 @@ class EquipmentInventory:
         *,
         preserve_referenced: bool = False,
         preserve_locked: bool = False,
+        last_seen_before: str | None = None,
     ) -> set[str]:
         """批量删除装备，并可保护备战引用或已锁定装备。"""
         deleted: set[str] = set()
@@ -136,6 +137,7 @@ class EquipmentInventory:
                 fingerprints,
                 preserve_referenced=preserve_referenced,
                 preserve_locked=preserve_locked,
+                last_seen_before=last_seen_before,
             )
             self.reload()
         return deleted

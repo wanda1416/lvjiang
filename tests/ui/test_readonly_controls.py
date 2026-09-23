@@ -204,7 +204,10 @@ def test_equipment_slot_click_while_user_is_running(qtbot, tmp_path, monkeypatch
     tab = SimpleNamespace(
         _selected_slot=None, _slot_cards={}, _filters_collapsed=False,
         _inv=SimpleNamespace(_repo=repo), _rebuild_grid=lambda: rebuilt.append(True))
-    for name in ("sort", "type", "level", "affix", "source", "quality", "status"):
+    for name in (
+        "sort", "type", "level", "affix", "source", "quality", "status",
+        "scan_time",
+    ):
         combo = QComboBox()
         qtbot.addWidget(combo)
         combo.addItem("全部", "all")

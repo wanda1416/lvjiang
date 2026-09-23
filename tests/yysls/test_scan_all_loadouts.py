@@ -647,7 +647,8 @@ def test_silent_base_subtracts_only_bound_plan_equipment(tmp_path, monkeypatch):
         "_right_attr_pen_valid": True,
     })
     assert seen == [{"head": {"type": "冠胄", "_fp": "fp",
-                              "created_at": "", "updated_at": ""}}]
+                              "created_at": "", "updated_at": "",
+                              "last_seen_at": ""}}]
     assert saved[0]["min_outer"] == 95.0
 
 

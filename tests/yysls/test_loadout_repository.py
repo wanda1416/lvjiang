@@ -157,11 +157,13 @@ def test_new_fp_records_both_times_and_existing_fp_refreshes_update(
     created = repo.load().equipment_items["real-fp"]
     assert created["created_at"] == "2026-09-01T01:00:00.000+00:00"
     assert created["updated_at"] == "2026-09-01T01:00:00.000+00:00"
+    assert created["last_seen_at"] == "2026-09-01T01:00:00.000+00:00"
 
     repo.upsert_item({**equip(), "level": 111})
     updated = repo.load().equipment_items["real-fp"]
     assert updated["created_at"] == created["created_at"]
     assert updated["updated_at"] == "2026-09-01T02:00:00.000+00:00"
+    assert updated["last_seen_at"] == "2026-09-01T02:00:00.000+00:00"
 
 
 def test_legacy_equipment_times_are_empty_and_creation_is_not_fabricated(
@@ -176,6 +178,7 @@ def test_legacy_equipment_times_are_empty_and_creation_is_not_fabricated(
     legacy = repo.load().equipment_items["real-fp"]
     assert legacy["created_at"] == ""
     assert legacy["updated_at"] == ""
+    assert legacy["last_seen_at"] == ""
 
     monkeypatch.setattr(
         repository_module, "_now_iso",
@@ -184,6 +187,68 @@ def test_legacy_equipment_times_are_empty_and_creation_is_not_fabricated(
     refreshed = repo.load().equipment_items["real-fp"]
     assert refreshed["created_at"] == ""
     assert refreshed["updated_at"] == "2026-09-01T03:00:00.000+00:00"
+    assert refreshed["last_seen_at"] == "2026-09-01T03:00:00.000+00:00"
+
+
+def test_manual_equipment_change_does_not_refresh_last_seen(
+    tmp_path: Path, monkeypatch,
+):
+    timestamps = iter([
+        "2026-09-01T01:00:00.000+00:00",
+        "2026-09-10T01:00:00.000+00:00",
+    ])
+    monkeypatch.setattr(repository_module, "_now_iso", lambda: next(timestamps))
+    repo = LoadoutRepository("alice", tmp_path)
+    repo.upsert_item(equip())
+    repo.set_item_lock_status("real-fp", True)
+
+    stored = repo.load().equipment_items["real-fp"]
+    assert stored["updated_at"] == "2026-09-10T01:00:00.000+00:00"
+    assert stored["last_seen_at"] == "2026-09-01T01:00:00.000+00:00"
+
+
+def test_mark_item_seen_refreshes_only_scan_time(
+    tmp_path: Path, monkeypatch,
+):
+    timestamps = iter([
+        "2026-09-01T01:00:00.000+00:00",
+        "2026-09-10T01:00:00.000+00:00",
+    ])
+    monkeypatch.setattr(repository_module, "_now_iso", lambda: next(timestamps))
+    repo = LoadoutRepository("alice", tmp_path)
+    repo.upsert_item(equip())
+
+    assert repo.mark_item_seen("real-fp")
+    assert not repo.mark_item_seen("missing")
+    stored = repo.load().equipment_items["real-fp"]
+    assert stored["updated_at"] == "2026-09-01T01:00:00.000+00:00"
+    assert stored["last_seen_at"] == "2026-09-10T01:00:00.000+00:00"
+
+
+def test_stale_delete_rechecks_scan_time_and_supports_legacy_update_time(
+    tmp_path: Path, monkeypatch,
+):
+    timestamps = iter([
+        "2026-09-01T01:00:00.000+00:00",
+        "2026-09-10T01:00:00.000+00:00",
+    ])
+    monkeypatch.setattr(repository_module, "_now_iso", lambda: next(timestamps))
+    repo = LoadoutRepository("alice", tmp_path)
+    repo.upsert_item(equip("old"))
+    repo.upsert_item(equip("recent"))
+
+    state = repo.load()
+    state.equipment_items["old"].pop("last_seen_at")
+    repo.path.write_text(
+        json.dumps(state.to_dict(), ensure_ascii=False), encoding="utf-8")
+
+    deleted = repo.delete_items(
+        {"old", "recent"},
+        last_seen_before="2026-09-05T00:00:00.000+00:00",
+    )
+
+    assert deleted == {"old"}
+    assert set(repo.load().equipment_items) == {"recent"}
 
 
 def test_combo_application_uses_the_same_timestamp_write_path(
@@ -379,6 +444,28 @@ def test_real_development_migrates_every_plan_and_resets_transmute_cooldown(
     expires_at = datetime.fromisoformat(stored["cooldown_expires_at"])
     remaining = expires_at - datetime.now(expires_at.tzinfo)
     assert timedelta(days=4, hours=23) < remaining <= timedelta(days=5)
+
+
+def test_real_development_preserves_scan_time_across_fingerprint_change(
+    tmp_path: Path, monkeypatch,
+):
+    timestamps = iter([
+        "2026-09-01T01:00:00.000+00:00",
+        "2026-09-10T01:00:00.000+00:00",
+    ])
+    monkeypatch.setattr(repository_module, "_now_iso", lambda: next(timestamps))
+    repo = LoadoutRepository("alice", tmp_path)
+    old = developed_real_equip()
+    old_fp = repo.upsert_item(old)
+    changed = json.loads(json.dumps(old, ensure_ascii=False))
+    changed["affix_2"] = {
+        "name": "会意率", "value": 4.0, "is_transferred": True,
+    }
+
+    new_fp = repo.update_real_development(old_fp, changed)
+    stored = repo.load().equipment_items[new_fp]
+    assert stored["updated_at"] == "2026-09-10T01:00:00.000+00:00"
+    assert stored["last_seen_at"] == "2026-09-01T01:00:00.000+00:00"
 
 
 def test_real_development_carries_expired_cooldown_progress(tmp_path: Path):

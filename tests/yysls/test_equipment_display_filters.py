@@ -1,5 +1,6 @@
 """装备展示新增品阶、调律进度和备战状态筛选。"""
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from PyQt6.QtCore import Qt
@@ -108,6 +109,34 @@ def test_loadout_status_uses_any_plan_reference(qtbot):
         unreferenced, equip, is_referenced=True)
 
 
+def test_scan_time_filter_falls_back_to_updated_at_and_ignores_mocks(qtbot):
+    scan_filter = QComboBox()
+    scan_filter.addItem("超过 3 天", "3")
+    qtbot.addWidget(scan_filter)
+    tab = SimpleNamespace(_scan_time_filter=scan_filter)
+    now = datetime(2026, 9, 23, tzinfo=timezone.utc)
+    old = {"updated_at": "2026-09-19T23:59:59+00:00"}
+    recent = {"updated_at": "2026-09-21T00:00:00+00:00"}
+
+    assert EquipStatusTab._passes_scan_time_filter(
+        tab, old, is_mock=False, now=now)
+    assert not EquipStatusTab._passes_scan_time_filter(
+        tab, recent, is_mock=False, now=now)
+    assert EquipStatusTab._passes_scan_time_filter(
+        tab, recent, is_mock=True, now=now)
+
+
+def test_scan_time_filter_treats_records_without_any_time_as_expired(qtbot):
+    scan_filter = QComboBox()
+    scan_filter.addItem("超过 30 天", "30")
+    qtbot.addWidget(scan_filter)
+    tab = SimpleNamespace(_scan_time_filter=scan_filter)
+
+    assert EquipStatusTab._passes_scan_time_filter(
+        tab, {}, is_mock=False,
+        now=datetime(2026, 9, 23, tzinfo=timezone.utc))
+
+
 def test_filtered_collection_excludes_current_equipment_and_marks_references(
     qtbot, monkeypatch,
 ):
@@ -134,6 +163,7 @@ def test_filtered_collection_excludes_current_equipment_and_marks_references(
         },
         _mock_items={},
         _equip_passes_filter=lambda _equip, *, is_referenced: True,
+        _passes_scan_time_filter=lambda _equip, *, is_mock: True,
     )
 
     cards = EquipStatusTab._collect_filtered_cards(tab)

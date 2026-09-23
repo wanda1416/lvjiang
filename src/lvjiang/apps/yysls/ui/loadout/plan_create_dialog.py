@@ -15,6 +15,8 @@ from .....i18n import tr
 from .....ui.button_styles import apply_dialog_button_box_style
 from ...config import GameConfigManager
 from ...core.loadout import LoadoutPlan, resolve_school
+from ...core.loadout.models import COMBAT_TYPE_PVE, COMBAT_TYPE_PVP
+from ..domain_labels import combat_type_label
 from ..layout_helpers import fit_combo_to_contents
 
 
@@ -63,8 +65,16 @@ class PlanCreateDialog(QDialog):
         form.addRow(tr("玩法:"), self._combo_playstyle)
         self._refresh_playstyles()
 
+        self._combo_combat = QComboBox()
+        for kind in (COMBAT_TYPE_PVE, COMBAT_TYPE_PVP):
+            self._combo_combat.addItem(combat_type_label(kind), kind)
+        fit_combo_to_contents(self._combo_combat, minimum=160)
+        form.addRow(tr("对战类型:"), self._combo_combat)
+
         if plan is not None:
             self._edit_name.setText(plan.name)
+            self._combo_combat.setCurrentIndex(max(
+                self._combo_combat.findData(plan.combat_type), 0))
             with QSignalBlocker(self._combo_main), QSignalBlocker(self._combo_sub):
                 self._combo_main.setCurrentText(plan.main_martial_art)
                 self._combo_sub.setCurrentText(plan.sub_martial_art)
@@ -171,3 +181,7 @@ class PlanCreateDialog(QDialog):
     @property
     def playstyle(self) -> str:
         return str(self._combo_playstyle.currentData() or "")
+
+    @property
+    def combat_type(self) -> str:
+        return str(self._combo_combat.currentData() or COMBAT_TYPE_PVE)

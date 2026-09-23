@@ -888,3 +888,58 @@ def test_candidate_problem_reasons_keep_priority_order():
     assert problem({**base, "affix_2": {"name": "劲", "value": 0}}) == (
         "当前装备第 2 条词条数据不完整")
     assert problem({**base, "affix_1": {"name": "最大外功攻击", "value": 1}}) == ""
+
+
+def _plan(plan_id: str, name: str, combat_type: str):
+    from lvjiang.apps.yysls.core.loadout.models import LoadoutPlan
+
+    return LoadoutPlan(
+        id=plan_id, name=name, main_martial_art="无名剑法",
+        sub_martial_art="无名枪法", playstyle="无名",
+        combat_type=combat_type,
+    )
+
+
+def test_pvp_plans_are_filtered_out_with_a_visible_reason(monkeypatch):
+    """同玩法的 PVP 方案不能一起加载，但也不能静默丢掉。
+
+    没有 PVP 调律方案，PVP 方案基线低，一起加载会让大量够不到 PVE 标准的装备
+    被判成有提升——这就是要过滤的原因。而只有 PVP 方案的用户如果只看到
+    「没有匹配的备战方案」，根本不知道发生了什么，所以必须留下诊断记录。
+
+    这里让 PVE 方案在后续的装备完整性检查上失败：PVP 记成 skipped、PVE 记成
+    incomplete，正好同时证明「PVP 被挡在门外」和「PVE 照常走完整条管线」，
+    不必为此搭出整套评分上下文。
+    """
+    from lvjiang.apps.yysls.core.graduation import smart_tuning as module
+    from lvjiang.apps.yysls.core.loadout.models import (
+        COMBAT_TYPE_PVE,
+        COMBAT_TYPE_PVP,
+    )
+
+    evaluator = _bare_evaluator()
+    evaluator._plan_infos = []
+    evaluator._injected_rules = {}
+    evaluator._game_config.get_schools = lambda: {}
+    evaluator._game_config.get_playstyles_for_arts = lambda _arts: ["无名"]
+    target = _SelectedTarget("key", "规则", "无名", ())
+    monkeypatch.setattr(evaluator, "_selected_targets", lambda _i: (target,))
+    monkeypatch.setattr(
+        module.PlanScoringContext, "from_plan",
+        classmethod(lambda _cls, plan, **_kw: SimpleNamespace(school="流派")))
+    state = SimpleNamespace(
+        plans={
+            "pve": _plan("pve", "无名PVE", COMBAT_TYPE_PVE),
+            "pvp": _plan("pvp", "无名PVP", COMBAT_TYPE_PVP),
+        },
+        resolved_equipment=lambda _plan_id: {},
+    )
+
+    contexts = evaluator._load_contexts("alice", {}, None, state=state)
+
+    assert contexts == ()
+    by_status = {info["status"]: info for info in evaluator._plan_infos}
+    assert "PVP" in by_status["skipped"]["reason"]
+    assert by_status["skipped"]["plan_name"] == "无名PVP"
+    # PVE 方案没有被过滤掉，是走到装备完整性检查才停的
+    assert by_status["incomplete"]["plan_name"] == "无名PVE"

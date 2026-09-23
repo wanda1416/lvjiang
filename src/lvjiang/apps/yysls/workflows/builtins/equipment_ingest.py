@@ -62,6 +62,7 @@ def _ensure_scanned_loadout(
     """Match a game plan by name, or create it without changing the active plan."""
     from ...config import get_game_config
     from ...core.loadout import resolve_school
+    from ...core.loadout.models import COMBAT_TYPE_PVE, COMBAT_TYPE_PVP
 
     name, main_art, sub_art = (str(value or "").strip()
                                for value in (name, main_art, sub_art))
@@ -88,9 +89,15 @@ def _ensure_scanned_loadout(
                   if set(definition.get("arts") or []) == arts
                   and (not school or definition.get("school") == school)]
     playstyle = _match_playstyle(name, candidates, playstyles)
-    repo.create_plan(name, main_art, sub_art,
-                     playstyle=playstyle, activate=False)
-    logger.info(f"已从游戏新建备战方案: {name}，流派={school or '-'}，玩法={playstyle or '-'}")
+    # 游戏里 PVP 方案通常就叫「xxPVP」；照名字先定下来，省得用户扫完再逐个
+    # 去改。认不出就按 PVE——绝大多数方案是 PVE，猜错的代价也只是少过滤一条。
+    combat_type = (COMBAT_TYPE_PVP if "pvp" in name.lower()
+                   else COMBAT_TYPE_PVE)
+    repo.create_plan(name, main_art, sub_art, playstyle=playstyle,
+                     combat_type=combat_type, activate=False)
+    logger.info(
+        f"已从游戏新建备战方案: {name}，流派={school or '-'}，"
+        f"玩法={playstyle or '-'}，对战类型={combat_type}")
     return {"ok": True, "name": name,
             "main_art": main_art, "sub_art": sub_art,
             "playstyle": playstyle, "created": True}

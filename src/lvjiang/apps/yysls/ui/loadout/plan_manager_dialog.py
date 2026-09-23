@@ -23,6 +23,7 @@ from .....i18n import tr
 from .....ui.button_styles import apply_button_style
 from ...config import GameConfigManager, get_game_config
 from ...core.loadout import LoadoutRepository, resolve_school
+from ..domain_labels import combat_type_label
 from .plan_create_dialog import PlanCreateDialog
 
 
@@ -65,11 +66,18 @@ class PlanManagerDialog(QDialog):
             toolbar.addWidget(button)
         toolbar.addStretch()
         right_layout.addLayout(toolbar)
-        right_layout.addWidget(QLabel(tr("双击方案可编辑名称、流派、武学与玩法")))
+        right_layout.addWidget(QLabel(
+            tr("双击方案可编辑名称、流派、武学、玩法与对战类型")))
+        hint = QLabel(tr("PVP 方案不参与智能调律：目前没有 PVP 调律方案，"
+                         "一起加载会让够不到 PVE 标准的装备被判成有提升"))
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        right_layout.addWidget(hint)
 
-        self._table = QTableWidget(0, 5)
+        self._table = QTableWidget(0, 6)
         self._table.setHorizontalHeaderLabels([
-            tr("名称"), tr("流派"), tr("主武学"), tr("副武学"), tr("玩法")])
+            tr("名称"), tr("流派"), tr("主武学"), tr("副武学"), tr("玩法"),
+            tr("对战类型")])
         header = self._table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(
@@ -118,6 +126,7 @@ class PlanManagerDialog(QDialog):
                                               plan.sub_martial_art, schools) or tr("自定义"),
                     plan.main_martial_art, plan.sub_martial_art,
                     plan.playstyle or "-",
+                    combat_type_label(plan.combat_type),
                 ]
                 for col, value in enumerate(values):
                     item = QTableWidgetItem(value)
@@ -160,7 +169,8 @@ class PlanManagerDialog(QDialog):
         try:
             plan = repo.create_plan(
                 dialog.plan_name, dialog.main_art, dialog.sub_art,
-                playstyle=dialog.playstyle, activate=False)
+                playstyle=dialog.playstyle,
+                combat_type=dialog.combat_type, activate=False)
         except Exception as exc:
             QMessageBox.warning(self, tr("新建失败"), str(exc))
             return
@@ -185,7 +195,8 @@ class PlanManagerDialog(QDialog):
                 pid, name=dialog.plan_name,
                 main_martial_art=dialog.main_art,
                 sub_martial_art=dialog.sub_art,
-                playstyle=dialog.playstyle)
+                playstyle=dialog.playstyle,
+                combat_type=dialog.combat_type)
         except Exception as exc:
             QMessageBox.warning(self, tr("保存失败"), str(exc))
             return

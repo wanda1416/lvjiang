@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox
 
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.loadout import LoadoutRepository
+from lvjiang.apps.yysls.core.loadout.models import COMBAT_TYPE_PVE, COMBAT_TYPE_PVP
 from lvjiang.apps.yysls.ui.loadout import plan_manager_dialog as manager_module
 from lvjiang.apps.yysls.ui.loadout.plan_manager_dialog import PlanManagerDialog
 
@@ -73,6 +74,7 @@ def test_create_and_edit_in_manager_do_not_switch_active_plan(
             self.main_art = "武学甲"
             self.sub_art = "武学乙"
             self.playstyle = "玩法甲"
+            self.combat_type = COMBAT_TYPE_PVE if plan else COMBAT_TYPE_PVP
 
         def exec(self):
             return QDialog.DialogCode.Accepted
@@ -84,8 +86,10 @@ def test_create_and_edit_in_manager_do_not_switch_active_plan(
     assert state.active_plan_id == active_id
     new_id = state.ordered_plan_ids()[1]
     assert state.plans[new_id].playstyle == "玩法甲"
+    assert state.plans[new_id].combat_type == COMBAT_TYPE_PVP
 
     dialog._edit_plan(1, 0)
     state = repo.load()
     assert state.plans[new_id].name == "已编辑"
+    assert state.plans[new_id].combat_type == COMBAT_TYPE_PVP
     assert state.active_plan_id == active_id

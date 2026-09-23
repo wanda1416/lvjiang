@@ -23,6 +23,7 @@ from ..combat.affix_rules import normal_affix_candidates
 from ..combat.combat_attrs import CombatAttributes
 from ..equip_validator import validate_combination_dict
 from ..loadout import EQUIPMENT_SLOTS, LoadoutRepository
+from ..loadout.models import COMBAT_TYPE_PVP
 from ..loadout.transmute import transmute_pool_union, transmute_targets
 from ..tuning_rules import (
     PART_ALIAS,
@@ -240,9 +241,22 @@ class SmartTuningEvaluator:
         contexts: dict[tuple[str, str], _PlanContext] = {}
         for target in targets:
             tuning_rule = rules.get(target.rule_key)
-            plans = [plan for plan in state.plans.values()
-                     if plan.playstyle == target.playstyle]
+            matched = [plan for plan in state.plans.values()
+                       if plan.playstyle == target.playstyle]
+            # 目前没有 PVP 调律方案。把 PVP 方案一起加载，会让大量够不到 PVE
+            # 标准的装备因为 PVP 方案基线低而被判成有提升。
+            plans = [plan for plan in matched
+                     if plan.combat_type != COMBAT_TYPE_PVP]
             label = f"规则「{target.rule_name}」-玩法「{target.playstyle}」"
+            for plan in matched:
+                if plan.combat_type != COMBAT_TYPE_PVP:
+                    continue
+                # 不能静默丢掉：只有 PVP 方案的用户否则只会看到「没有匹配的
+                # 备战方案」，完全不知道发生了什么。
+                self._remember_plan(
+                    target, plan_id=plan.id, plan_name=plan.name,
+                    status="skipped",
+                    reason="PVP 方案不参与智能调律")
             if not plans:
                 logger.warning(f"智能调律忽略{label}：没有匹配的备战方案")
                 self._remember_plan(

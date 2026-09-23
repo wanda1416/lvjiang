@@ -324,6 +324,38 @@ def _dingyin_slot_text(equip: dict, key: str) -> str:
     return f"{name}（{notice}）" if notice else name
 
 
+def _opposite_dingyin_kind(kind: str) -> str:
+    """返回当前定音的另一个展示槽。"""
+    return DINGYIN_NORMAL if kind == DINGYIN_ZHIGE else DINGYIN_ZHIGE
+
+
+def _dingyin_switch_text(target_kind: str) -> str:
+    """明确展示切换目标，避免“切换定音”语义不清。"""
+    target = (tr("普通定音") if target_kind == DINGYIN_NORMAL
+              else tr("止戈定音"))
+    return tr("切换") + target
+
+
+def _add_dingyin_switch_action(
+    menu: QMenu,
+    equip: dict,
+    current_kind: str,
+    callback: Callable[[str], None],
+):
+    """两种定音都存在时，在菜单中增加明确的目标切换动作。"""
+    if not can_switch_dingyin(equip):
+        return None
+    current = (current_kind if current_kind in DINGYIN_TYPES
+               else resolve_dingyin_type(equip))
+    target = _opposite_dingyin_kind(current)
+    action = menu.addAction(_dingyin_switch_text(target))
+    assert action is not None
+    action.setToolTip(tr("切换卡片当前展示的定音"))
+    action.triggered.connect(
+        lambda _checked=False, kind=target: callback(kind))
+    return action
+
+
 def _equipment_property_rows(
     equip: dict,
     referenced_plans: list[str] | tuple[str, ...] = (),
@@ -462,12 +494,15 @@ class _EquipmentPropertiesDialog(QDialog):
         supported = self._dingyin_changed is not None
         switchable = supported and can_switch_dingyin(self._equip)
         self._switch_dingyin_button.setEnabled(switchable)
+        target_kind = _opposite_dingyin_kind(self._dingyin_kind)
+        self._switch_dingyin_button.setText(
+            _dingyin_switch_text(target_kind))
         # 两种禁用原因必须分开说：装备只有一种定音，和这个入口不提供切换，
         # 是完全不同的事。合成一句会对着两种定音都有的装备说假话。
         if switchable:
-            target = (tr("止戈定音") if self._dingyin_kind == DINGYIN_NORMAL
-                      else tr("普通定音"))
-            reason = tr("切换到") + target
+            reason = tr("切换到") + (
+                tr("普通定音") if target_kind == DINGYIN_NORMAL
+                else tr("止戈定音"))
         elif not supported:
             reason = tr("当前入口不支持切换定音，请在装备页操作")
         else:
@@ -483,8 +518,7 @@ class _EquipmentPropertiesDialog(QDialog):
                 "font-weight: 600;" if current else "color: palette(mid);")
 
     def _switch_dingyin(self) -> None:
-        kind = (DINGYIN_ZHIGE if self._dingyin_kind == DINGYIN_NORMAL
-                else DINGYIN_NORMAL)
+        kind = _opposite_dingyin_kind(self._dingyin_kind)
         if self._dingyin_changed is None or not self._dingyin_changed(kind):
             return
         self._dingyin_kind = kind
@@ -1044,6 +1078,9 @@ class _SlotCard(_AffixRowsMixin, QFrame):
         lock_action = menu.addAction(tr("解锁") if locked else tr("锁定"))
         lock_action.setToolTip(tr("解锁此装备") if locked else tr("锁定此装备"))
         properties_action = menu.addAction(tr("属性"))
+        _add_dingyin_switch_action(
+            menu, self._equip_data, self._dingyin_kind,
+            self._request_dingyin_switch)
         clear_target_action = None
         if any(
             _transmute_target_text(self._equip_data.get(f"affix_{i}") or {})
@@ -1088,8 +1125,20 @@ class _SlotCard(_AffixRowsMixin, QFrame):
             while parent and not isinstance(parent, EquipStatusTab):
                 parent = parent.parent()
             if parent:
-                parent._on_properties_requested(self._equip_data)
+                parent._on_properties_requested(
+                    self._equip_data, slot_key=self.slot_key)
         event.accept()
+
+    def _request_dingyin_switch(self, kind: str) -> None:
+        """装备槽右键切换只写当前备战方案的槽位选择。"""
+        from .status_tab import EquipStatusTab
+
+        parent = self.parent()
+        while parent and not isinstance(parent, EquipStatusTab):
+            parent = parent.parent()
+        if parent:
+            parent._on_dingyin_requested(
+                self._equip_data, kind, slot_key=self.slot_key)
 
     # ── 数据填充 ──
 
@@ -1185,6 +1234,7 @@ class _CompactEquipCard(_AffixRowsMixin, QFrame):
     copy_requested = pyqtSignal(dict, str)
     lock_requested = pyqtSignal(dict, bool)
     properties_requested = pyqtSignal(dict)
+    dingyin_requested = pyqtSignal(dict, str)
     selection_changed = pyqtSignal(str, bool)
 
     def __init__(
@@ -1193,9 +1243,11 @@ class _CompactEquipCard(_AffixRowsMixin, QFrame):
         parent=None,
         *,
         context_mode: Literal["full", "properties"] = "full",
+        allow_dingyin_switch: bool = False,
     ):
         super().__init__(parent)
         self._context_mode = context_mode
+        self._allow_dingyin_switch = allow_dingyin_switch
         dp = display_params or {}
         self._name_fs = dp.get("name_font_size", 13)
         self._level_fs = dp.get("level_font_size", 12)
@@ -1395,6 +1447,10 @@ class _CompactEquipCard(_AffixRowsMixin, QFrame):
         properties_action.setToolTip(tr("查看装备来源、指纹、原始等级和时间"))
         properties_action.triggered.connect(
             partial(self._emit_properties_action, self.properties_requested, data))
+        if self._allow_dingyin_switch:
+            _add_dingyin_switch_action(
+                menu, data, resolve_dingyin_type(data),
+                lambda kind: self.dingyin_requested.emit(data, kind))
         menu.popup(global_pos)
 
     @staticmethod

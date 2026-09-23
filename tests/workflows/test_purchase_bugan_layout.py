@@ -68,3 +68,12 @@ def test_workflow_has_no_parenthesized_not_condition():
     """DSL 条件不支持括号分组：not(...) 会被解析成函数调用直接报错。"""
     source = _WORKFLOW.read_text(encoding="utf-8")
     assert "not (" not in source
+
+
+def test_profile_writes_record_their_business_sources():
+    source = _WORKFLOW.read_text(encoding="utf-8")
+
+    assert 'call sync_current_tili("日常")' in source
+    assert 'call sync_current_tili("宝钱")' in source
+    assert 'profile_set("tili", $tili_progress.current, $source)' in source
+    assert 'profile_set("nn_bugan_of_week", 1, "不肝商店")' in source

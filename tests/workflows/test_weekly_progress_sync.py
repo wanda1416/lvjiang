@@ -18,20 +18,24 @@ def test_weekly_progress_uses_one_shared_parser_and_sync_path():
 
     assert "def sync_weekly_progress(" in common
     assert "extract_progress($raw)" in common
-    assert "profile_observe($key, $current)" in common
+    assert "profile_observe($key, $current, $source)" in common
     assert "def sync_weekly_remaining(" in common
     assert "$consumed = $expected_total - $progress.current" in common
-    assert "profile_observe($key, $consumed)" in common
+    assert "profile_observe($key, $consumed, $source)" in common
     assert "split($raw" not in common
     assert '$raw contains "|"' not in common
 
     assert "sync_weekly_progress($result.haoling_of_week" in daily
+    assert '"当周获取号令", "江湖号令")' in daily
     assert "sync_weekly_progress($jindu_str.bugan_jindu" in purchase
+    assert '"本周不肝进度", "日常活动")' in purchase
     assert "sync_weekly_progress($jindu_str.bugan_jindu" in wallet
     assert "parse_bugan_jindu" not in purchase
     assert "parse_bugan_jindu" not in wallet
     assert "sync_weekly_progress($progress.huaruizhi_of_week" in huaruizhi
+    assert '"本周花蕊织进度", "日常")' in huaruizhi
     assert xinfa.count("sync_weekly_remaining(") == 2
+    assert xinfa.count('"本周心法心得购买", "日常")') == 2
     registry = (_WORKFLOWS / "subcall" / "profile_registry.wf").read_text(
         encoding="utf-8"
     )

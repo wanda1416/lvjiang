@@ -263,9 +263,12 @@ def test_daily_jianghu_claim_reputation_guard():
     sync_proc = text.index("def sync_haoling_of_week(")
     sync_body = text[sync_proc:sync_proc + 500]
     assert "scan [activity_jianghu].[haoling_of_week] as $result" in sync_body
+    # 只锁前三个实参：扫到的值、写哪个 profile key、本轮上次有效值——这三者
+    # 才是「读取即写入 + 防回写」的契约。展示文案和业务来源由
+    # test_weekly_progress_sync 负责，这里再锁一遍只会让每加一个参数就跟着改。
     assert (
         'sync_weekly_progress($result.haoling_of_week, "haoling_of_week", '
-        '$haoling_of_week, "当周获取号令")'
+        '$haoling_of_week,'
     ) in sync_body
     assert "write_haoling_profile" not in text
 

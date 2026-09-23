@@ -57,16 +57,18 @@ def _profile_get(_engine, key: str, *args) -> float | str | None:
 
 
 @builtin_func("profile_set")
-def _profile_set(_engine, key: str, value, *args) -> float | str:
+def _profile_set(
+    _engine, key: str, value, source: str | None = None, *args,
+) -> float | str:
     """写入 profile 属性值（自动识别模型类型）
 
     走共享写入管线 profile_action()，与 UI 增减完全一致：
     数值模型: clamp → delta → detail → db_upsert → sync_targets。
     note 模型: 文本直接写入 value_text 列，不走数值管线。
-    source 固定为 "DSL 写入"。
+    source 可由工作流显式传入；省略时兼容使用 "DSL 写入"。
 
     .wf 用法:
-        eval profile_set("weekly_task", 10)
+        eval profile_set("weekly_task", 10, "日常任务")
         eval profile_set("energy", 100)
         eval profile_set("user_note", "已完成")
     """
@@ -79,6 +81,7 @@ def _profile_set(_engine, key: str, value, *args) -> float | str:
     username = _get_username(_engine)
     config = get_profile_config()
     model_type = config.get_model_type(key) or ""
+    write_source = str(source).strip() if source else tr("DSL 写入")
 
     # note 模型允许字符串值，不强制转 float
     if model_type == "note":
@@ -89,7 +92,7 @@ def _profile_set(_engine, key: str, value, *args) -> float | str:
             text = str(value)
         return profile_action(
             username, key, set_value=text,
-            source=tr("DSL 写入"),
+            source=write_source,
         )
 
     try:
@@ -98,11 +101,13 @@ def _profile_set(_engine, key: str, value, *args) -> float | str:
         logger.warning(f"profile_set: value 无法转为数字: {value!r}")
         return 0
 
-    return profile_action(username, key, set_value=value_num, source=tr("DSL 写入"))
+    return profile_action(username, key, set_value=value_num, source=write_source)
 
 
 @builtin_func("profile_observe")
-def _profile_observe(_engine, key: str, value, *args) -> dict:
+def _profile_observe(
+    _engine, key: str, value, source: str | None = None, *args,
+) -> dict:
     """按当前配额周期同步外部观测值，同周期内拒绝较小值。
 
     返回 ``{accepted, value, reason}``；仅支持 quota，未定义或其他模型不会
@@ -114,22 +119,23 @@ def _profile_observe(_engine, key: str, value, *args) -> dict:
     from ...core.profile.service import profile_observe
 
     username = _get_username(_engine)
-    return profile_observe(
-        username, key, value, source=tr("DSL OCR 观测")
-    )
+    write_source = str(source).strip() if source else tr("DSL OCR 观测")
+    return profile_observe(username, key, value, source=write_source)
 
 
 @builtin_func("profile_inc")
-def _profile_inc(_engine, key: str, delta=1, *args) -> float:
+def _profile_inc(
+    _engine, key: str, delta=1, source: str | None = None, *args,
+) -> float:
     """增减 profile 属性值（自动识别模型类型）
 
     走共享写入管线 profile_action()，与 UI 增减完全一致：
     clamp → delta → detail → db_upsert → sync_targets。
-    source 固定为 "DSL 写入"。
+    source 可由工作流显式传入；省略时兼容使用 "DSL 写入"。
 
     .wf 用法:
         # 完成任务，配额 -1
-        eval $remaining = profile_inc("weekly_task", 1)
+        eval $remaining = profile_inc("weekly_task", 1, "日常任务")
         log concat("周任务进度: ", $remaining)
 
         # 消耗通用资源
@@ -154,7 +160,8 @@ def _profile_inc(_engine, key: str, delta=1, *args) -> float:
 
     from ...core.profile.service import profile_action
     username = _get_username(_engine)
-    result = profile_action(username, key, delta=delta_num, source=tr("DSL 写入"))
+    write_source = str(source).strip() if source else tr("DSL 写入")
+    result = profile_action(username, key, delta=delta_num, source=write_source)
     return float(result) if not isinstance(result, str) else 0.0
 
 

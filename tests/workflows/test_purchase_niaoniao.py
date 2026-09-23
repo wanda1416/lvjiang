@@ -52,4 +52,4 @@ def test_purchase_still_uses_max_button() -> None:
 
     assert "click [general_purchase].[add_max]" in source
     assert "click [general_purchase].[add_one]" not in source
-    assert 'profile_inc("niaoniao_of_week", $want)' in source
+    assert 'profile_inc("niaoniao_of_week", $want, "百珍商店")' in source

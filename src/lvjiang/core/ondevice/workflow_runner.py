@@ -26,7 +26,7 @@ from ...core.input_base import InputBackend
 from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
 from ...i18n import tr
-from ...workflows.engine import WorkflowEngine
+from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from .capture import A11yCapture
 from .input import A11yInput
 
@@ -110,7 +110,7 @@ def create_engine(
     user_config = load_user_config()
     input_ctrl = _create_input(user_config.input_sim)
 
-    engine = WorkflowEngine(
+    engine = DeviceWorkflowEngineBuilder(
         capture=capture,
         ocr=ocr,
         input_ctrl=input_ctrl,
@@ -122,7 +122,7 @@ def create_engine(
         window_left=0,
         window_top=0,
         stop_check=stop_check,
-    )
+    ).build()
     return engine
 
 

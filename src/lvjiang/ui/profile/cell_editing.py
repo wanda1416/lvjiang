@@ -203,7 +203,7 @@ class ProfileCellEditingMixin:
             and _is_continuous_regen(kd)
             and abs(parsed_value - math.floor(parsed_value)) > 1e-9
         )
-        if delta == 0 and not force_target_write:
+        if delta == 0:
             return
 
         # Cell 编辑路径根据变动方向选择对应词表（增加→来源，减少→用途）
@@ -386,6 +386,8 @@ class ProfileCellEditingMixin:
 
         UI 只负责收集上下文、处理提示和刷新；写入语义统一委托 profile.service.profile_action。
         """
+        if delta == 0:
+            return
         from ...core.profile.service import (
             ProfileWriteConflict,
             profile_action,
@@ -566,7 +568,7 @@ class ProfileCellEditingMixin:
             and _is_continuous_regen(kd)
             and abs(new_value - math.floor(new_value)) > 1e-9
         )
-        if delta == 0 and not force_target_write:
+        if delta == 0:
             return
 
         # 新词条归入实际变动方向对应的词表：增加→来源，减少→用途

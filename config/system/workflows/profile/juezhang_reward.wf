@@ -1,0 +1,13 @@
+#% name: 觉障段位奖励联动
+#% runnable: false
+#% hidden: true
+
+# 只有从阈值下方首次达到或跨过阈值时计入一次袅袅。Profile 触发运行时会注入
+# old_value/new_value/origin_key 等变量；本脚本不依赖任何设备能力。
+# 阈值只写一处：之前判断条件和日志文案各写一遍，调阈值时漏改日志，界面上
+# 报的数字和实际触发点对不上。
+$threshold = 3200
+if $old_value < $threshold and $new_value >= $threshold
+    eval profile_inc("niaoniao", 1, "止戈段位")
+    log "觉障段位达到 " + $threshold + "，袅袅之音增加 1"
+end

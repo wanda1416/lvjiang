@@ -13,7 +13,7 @@ from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
-from ...workflows.engine import WorkflowEngine
+from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from .execution_access import guarded_finish, guarded_launch
 
 _RESULT_LOG_SUPPRESSED_FLOW_IDS = frozenset({"auto_tuning"})
@@ -1335,7 +1335,7 @@ class RunControlMixin:
             window_left = self._target_window["left"]
             window_top = self._target_window["top"]
 
-        engine = WorkflowEngine(
+        engine = DeviceWorkflowEngineBuilder(
             capture=self._capture,
             ocr=self._ocr,
             input_ctrl=self._input,
@@ -1349,7 +1349,7 @@ class RunControlMixin:
             window_top=window_top,
             stop_check=self._is_stopped,
             pause_event=self._pause_event,
-        )
+        ).build()
         # session/context 初始化：启动时快照执行用户，全程只依赖此绑定值
         self._bind_engine_user(engine, username)
         from ...core.config.wf_configs import get_wf_config
@@ -1683,7 +1683,7 @@ class RunControlMixin:
             window_left = self._target_window["left"]
             window_top = self._target_window["top"]
 
-        engine = WorkflowEngine(
+        engine = DeviceWorkflowEngineBuilder(
             capture=self._capture,
             ocr=self._ocr,
             input_ctrl=self._input,
@@ -1697,7 +1697,7 @@ class RunControlMixin:
             window_top=window_top,
             stop_check=self._is_stopped,
             pause_event=self._pause_event,
-        )
+        ).build()
         engine.window_rebind_hook = self._on_target_window_rebound
         self._bind_engine_user(engine, username)
         from ...core.config.wf_configs import get_wf_config

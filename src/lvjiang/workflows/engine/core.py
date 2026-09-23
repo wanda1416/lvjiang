@@ -6,7 +6,7 @@ import traceback
 from dataclasses import fields, is_dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import Callable, cast
 
 import cv2
 from loguru import logger
@@ -139,10 +139,10 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
     def __init__(
         self,
         *,
-        capture: CaptureBackend,
-        ocr: OCREngine,
-        input_ctrl: InputBackend,
-        layout: Layout,
+        capture: CaptureBackend | None,
+        ocr: OCREngine | None,
+        input_ctrl: InputBackend | None,
+        layout: Layout | None,
         input_sim: InputSimConfig | None = None,
         delay_params: dict[str, DelayParam] | None = None,
         android_apps: dict[str, AndroidAppConfig] | None = None,
@@ -178,7 +178,9 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         # 暂停事件（由 UI 层注入）：set=运行，clear=暂停阻塞
         self._pause_event = pause_event
         # 引擎生命周期服务：DSL 委托与 Python 类工作流共享图库匹配缓存。
-        self._reference_recognizer = ReferenceRecognizer(self._ocr)
+        self._reference_recognizer = (
+            ReferenceRecognizer(self._ocr) if self._ocr is not None else None
+        )
         self._init_capture_snapshot()
         # 执行状态
         self.variables: dict = {}
@@ -244,6 +246,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         """
         hwnd = int(window.get("hwnd") or 0)
         if hwnd and getattr(self._input, "background_mode", False):
+            assert self._input is not None
             self._input.target_hwnd = hwnd
         left, top = window.get("left"), window.get("top")
         width, height = window.get("width"), window.get("height")
@@ -254,6 +257,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 self._workflow._window_left = self._window_left
                 self._workflow._window_top = self._window_top
             if width is not None and height is not None:
+                if self._capture is None:
+                    raise WorkflowUserError("当前工作流运行时没有截图能力")
                 self._capture.set_capture_region(
                     int(left), int(top), int(width), int(height))
         # 旧窗口的像素不能再代表当前画面。
@@ -273,10 +278,10 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         """
         if self._workflow is None:
             self._workflow = BaseWorkflow(
-                capture=self._capture,
-                ocr=self._ocr,
-                input_ctrl=self._input,
-                layout=self._layout,
+                capture=cast(CaptureBackend, self._capture),
+                ocr=cast(OCREngine, self._ocr),
+                input_ctrl=cast(InputBackend, self._input),
+                layout=cast(Layout, self._layout),
                 input_sim=self._input_sim,
                 delay_params=self._delay_params,
                 window_left=self._window_left,
@@ -333,7 +338,20 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
     @user_execution
     def execute(self, source, *, initial_variables: dict | None = None,
                 _reset_context: bool = True) -> dict:
+        """使用用户执行锁运行设备工作流。"""
+        return self._execute_unlocked(
+            source,
+            initial_variables=initial_variables,
+            _reset_context=_reset_context,
+        )
+
+    def _execute_unlocked(self, source, *, initial_variables: dict | None = None,
+                          _reset_context: bool = True) -> dict:
         """统一执行入口
+
+        此入口不获取用户执行锁，只允许由固定了运行时边界的 Builder 调用。
+        Profile 触发脚本需要与同一用户的设备任务并行，因此使用此入口；
+        普通设备任务必须继续调用 :meth:`execute`。
 
         Args:
             source: .wf 文件路径 或 BaseWorkflow 实例
@@ -1166,6 +1184,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 trace = load_input_trace(path)
             except InputTraceError as exc:
                 raise WorkflowUserError(str(exc)) from exc
+        if self._capture is None or self._layout is None:
+            raise WorkflowUserError("当前工作流运行时没有输入回放能力")
         width, height = self._capture.get_capture_size()
         canvas = self._layout.get_canvas()
         replay(

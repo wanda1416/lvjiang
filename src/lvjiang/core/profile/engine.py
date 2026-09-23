@@ -339,6 +339,17 @@ class ProfileEngine(QThread):
             )
             if updated:
                 logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 周期重置")
+                from .triggers import enqueue_profile_change
+                enqueue_profile_change(
+                    username=user_name,
+                    model="quota",
+                    key=kd.key,
+                    old_value=stored_value,
+                    new_value=0,
+                    source="周期重置",
+                    change_type="tick",
+                    script=kd.change_script,
+                )
                 modified = True
             else:
                 logger.warning(f"{user_name} quota.{kd.key} CAS 失败，放弃本轮")
@@ -372,6 +383,17 @@ class ProfileEngine(QThread):
                     detail=f"regen:{delta:+.4f}",
                 )
                 if updated:
+                    from .triggers import enqueue_profile_change
+                    enqueue_profile_change(
+                        username=user_name,
+                        model="regen",
+                        key=kd.key,
+                        old_value=stored_value,
+                        new_value=computed,
+                        source="自动恢复",
+                        change_type="tick",
+                        script=kd.change_script,
+                    )
                     modified = True
                 else:
                     logger.warning(f"{user_name} regen.{kd.key} CAS 失败，放弃本轮")

@@ -22,9 +22,17 @@ def __getattr__(name):
     if name == "WorkflowEngine":
         from .core import WorkflowEngine
         return WorkflowEngine
+    if name in {"DeviceWorkflowEngineBuilder", "ProfileWorkflowEngineBuilder"}:
+        from .builders import DeviceWorkflowEngineBuilder, ProfileWorkflowEngineBuilder
+        return {
+            "DeviceWorkflowEngineBuilder": DeviceWorkflowEngineBuilder,
+            "ProfileWorkflowEngineBuilder": ProfileWorkflowEngineBuilder,
+        }[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
     "WorkflowEngine",
+    "DeviceWorkflowEngineBuilder",
+    "ProfileWorkflowEngineBuilder",
     "WorkflowUserError",
 ]

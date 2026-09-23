@@ -796,12 +796,18 @@ class MainWindow(
 
         # Profile 是主引擎共享的用户档案能力，不由任何插件注入。
         from ...core.profile.engine import get_or_create_engine, stop_engine
+        from ...core.profile.triggers import (
+            get_or_create_script_runner,
+            stop_script_runner,
+        )
         from ..profile import ProfileTab, UserInfoTab
 
         profile_engine = get_or_create_engine(self._user_manager)
         if not profile_engine.isRunning():
             profile_engine.start()
             self.register_cleanup(stop_engine)
+        get_or_create_script_runner(self._user_manager.users_dir)
+        self.register_cleanup(stop_script_runner)
 
         self._profile_tab = ProfileTab(self)
         self._user_info_tab = UserInfoTab(self)

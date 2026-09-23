@@ -480,6 +480,15 @@ class TestFormatSyncLabel:
 
 
 class TestKeyDefSyncTargets:
+    def test_change_script_roundtrip_for_concrete_model(self):
+        kd = StockKeyDef.from_dict({
+            "key": "credits",
+            "label": "积分",
+            "change_script": "profile/credits_changed.wf",
+        })
+        assert kd.change_script == "profile/credits_changed.wf"
+        assert kd.to_dict()["change_script"] == "profile/credits_changed.wf"
+
     def test_no_sync(self):
         kd = KeyDef.from_dict({"key": "k", "label": "l"})
         assert kd.sync_targets == []

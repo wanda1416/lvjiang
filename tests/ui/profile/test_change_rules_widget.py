@@ -10,9 +10,85 @@ import lvjiang.core.profile as profile_core
 from lvjiang.core.profile.models import StepDef, SyncTargetDef
 from lvjiang.ui.profile.settings_dialog import (
     _ChangeRulesWidget,
+    _ChangeScriptFileField,
     _SyncTargetsWidget,
     _TagInputWidget,
 )
+
+
+@pytest.mark.parametrize("dev_mode", [True, False])
+def test_change_script_picker_starts_in_mode_specific_workflow_root(
+    qtbot, monkeypatch, tmp_path, dev_mode
+):
+    from lvjiang.core import config
+    from lvjiang.ui.profile import settings_dialog
+
+    system_dir = tmp_path / "system"
+    local_dir = tmp_path / "local"
+    remote_dir = tmp_path / "remote"
+    default_root = (system_dir if dev_mode else local_dir) / "workflows"
+    selected = default_root / "profile" / "changed.wf"
+    selected.parent.mkdir(parents=True)
+    selected.write_text("log \"ok\"\n", encoding="utf-8")
+    requested: list[str] = []
+
+    resolver = SimpleNamespace(
+        system_dir=system_dir,
+        local_dir=local_dir,
+        remote_dir=remote_dir,
+        write_dir=lambda rel: requested.append(rel) or default_root,
+    )
+    monkeypatch.setattr(config, "get_resolver", lambda: resolver)
+    dialog_args: list[tuple] = []
+
+    def choose_file(*args):
+        dialog_args.append(args)
+        return str(selected), ""
+
+    monkeypatch.setattr(settings_dialog.QFileDialog, "getOpenFileName", choose_file)
+    field = _ChangeScriptFileField()
+    qtbot.addWidget(field)
+
+    field._select_file()
+
+    assert requested == ["workflows"]
+    assert dialog_args[0][2] == str(default_root)
+    assert field.text() == "profile/changed.wf"
+    assert field._input.isReadOnly()
+
+
+@pytest.mark.parametrize(
+    ("content", "message_method"),
+    [("log \"ok\"\n", "information"), ("if\n", "warning")],
+)
+def test_change_script_validation_only_parses_syntax(
+    qtbot, monkeypatch, tmp_path, content, message_method
+):
+    from lvjiang.ui.profile import settings_dialog
+    from lvjiang.workflows import discovery
+
+    workflow = tmp_path / "changed.wf"
+    workflow.write_text(content, encoding="utf-8")
+    monkeypatch.setattr(
+        discovery, "resolve_workflow_path", lambda _script: (workflow, "changed.wf")
+    )
+    shown: list[str] = []
+    monkeypatch.setattr(
+        settings_dialog.QMessageBox,
+        "information",
+        lambda *_args: shown.append("information"),
+    )
+    monkeypatch.setattr(
+        settings_dialog.QMessageBox,
+        "warning",
+        lambda *_args: shown.append("warning"),
+    )
+    field = _ChangeScriptFileField("changed.wf")
+    qtbot.addWidget(field)
+
+    field._validate_file()
+
+    assert shown == [message_method]
 
 
 @pytest.mark.parametrize("term_kind", ["来源", "用途"])

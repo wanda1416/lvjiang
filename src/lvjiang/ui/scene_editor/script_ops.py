@@ -166,7 +166,7 @@ class ScriptOpsMixin:
 
         try:
             # 构建 WorkflowEngine
-            from ...workflows.engine import WorkflowEngine
+            from ...workflows.engine import DeviceWorkflowEngineBuilder
             layout_key = self._current_layout.key if self._current_layout else ""
             if not layout_key:
                 self._result_text.setPlainText(tr("[错误] 没有已加载的布局"))
@@ -177,7 +177,7 @@ class ScriptOpsMixin:
                 self._result_text.setPlainText(f"[错误] 无法加载布局: {layout_key}")
                 return
 
-            engine = WorkflowEngine(
+            engine = DeviceWorkflowEngineBuilder(
                 capture=main_win._capture,
                 ocr=main_win._ocr,
                 input_ctrl=main_win._input,
@@ -190,7 +190,7 @@ class ScriptOpsMixin:
                 window_left=window_left,
                 window_top=window_top,
                 stop_check=lambda: False,
-            )
+            ).build()
             # session/context 装配（与主入口一致）
             # 使用下拉列表选中的用户，而非主页面的 active user
             username = self._script_user_combo.currentText()

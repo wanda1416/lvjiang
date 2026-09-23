@@ -320,7 +320,7 @@ class DebugPanel(QWidget):
         return None
 
     def _build_engine(self):
-        from ...workflows.engine import WorkflowEngine
+        from ...workflows.engine import DeviceWorkflowEngineBuilder
 
         main = self._main
         lm = main._layout_manager
@@ -335,7 +335,7 @@ class DebugPanel(QWidget):
             inp = main._input
             if getattr(inp, "background_mode", False):
                 inp.target_hwnd = w.get("hwnd")
-        engine = WorkflowEngine(
+        engine = DeviceWorkflowEngineBuilder(
             capture=main._capture, ocr=main._ocr, input_ctrl=main._input,
             layout=layout,
             input_sim=main._user_config.input_sim,
@@ -346,7 +346,7 @@ class DebugPanel(QWidget):
             window_left=left, window_top=top,
             stop_check=lambda: self._stop_flag,
             pause_event=self._pause_event,
-        )
+        ).build()
         username = main._user_manager.get_active_user_name()
         engine.session = main._session_manager.load(username)
         engine.run_username = username

@@ -12,6 +12,11 @@ from .models import (
     plan_school,
     resolve_school,
 )
+from .plan_fields import (
+    matches_school_arts,
+    playstyle_options,
+    school_arts,
+)
 from .repository import LoadoutRepository
 
 __all__ = [
@@ -25,4 +30,7 @@ __all__ = [
     "find_chengyin_merge_candidates",
     "plan_school",
     "resolve_school",
+    "matches_school_arts",
+    "playstyle_options",
+    "school_arts",
 ]

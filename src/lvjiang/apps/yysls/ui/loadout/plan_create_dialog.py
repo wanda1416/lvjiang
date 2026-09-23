@@ -14,7 +14,13 @@ from PyQt6.QtWidgets import (
 from .....i18n import tr
 from .....ui.button_styles import apply_dialog_button_box_style
 from ...config import GameConfigManager
-from ...core.loadout import LoadoutPlan, resolve_school
+from ...core.loadout import (
+    LoadoutPlan,
+    matches_school_arts,
+    playstyle_options,
+    resolve_school,
+    school_arts,
+)
 from ...core.loadout.models import COMBAT_TYPE_PVE, COMBAT_TYPE_PVP
 from ..domain_labels import combat_type_label
 from ..layout_helpers import fit_combo_to_contents
@@ -97,60 +103,39 @@ class PlanCreateDialog(QDialog):
         form.addRow(buttons)
 
     def _on_school_changed(self, _index: int) -> None:
-        school = self._combo_school.currentData()
+        school = str(self._combo_school.currentData() or "")
         self._combo_main.setEnabled(not school)
         self._combo_sub.setEnabled(not school)
         if school:
-            config = self._schools[school]
+            main_art, sub_art = school_arts(self._schools, school)
             with QSignalBlocker(self._combo_main), QSignalBlocker(self._combo_sub):
-                self._combo_main.setCurrentText(
-                    str((config.get("main") or {}).get("martial_art") or ""))
-                self._combo_sub.setCurrentText(
-                    str((config.get("sub") or {}).get("martial_art") or ""))
+                self._combo_main.setCurrentText(main_art)
+                self._combo_sub.setCurrentText(sub_art)
         self._refresh_playstyles()
 
     def _on_arts_changed(self, _index: int) -> None:
-        school = self._combo_school.currentData()
-        if school:
-            config = self._schools[school]
-            configured = {
-                str((config.get(side) or {}).get("martial_art") or "")
-                for side in ("main", "sub")
-            }
-            if {self.main_art, self.sub_art} != configured:
-                # 手动改动流派的预置组合后，转入自由选武学模式。
-                with QSignalBlocker(self._combo_school):
-                    self._combo_school.setCurrentIndex(0)
+        school = str(self._combo_school.currentData() or "")
+        if school and not matches_school_arts(
+                self._schools, school, self.main_art, self.sub_art):
+            # 手动改动流派的预置组合后，转入自由选武学模式。
+            with QSignalBlocker(self._combo_school):
+                self._combo_school.setCurrentIndex(0)
         self._refresh_playstyles()
 
     def _refresh_playstyles(self) -> None:
-        names = self._game_config.get_playstyles_for_arts(
-            [self.main_art, self.sub_art])
-        school = self._combo_school.currentData()
-        if school:
-            names = [name for name in names
-                     if (self._game_config.get_playstyle(name) or {}).get(
-                         "school") == school]
-        legacy_style = ""
-        plan = self._editing_plan
-        if (plan is not None and plan.playstyle
-                and {self.main_art, self.sub_art}
-                == {plan.main_martial_art, plan.sub_martial_art}
-                and plan.playstyle not in names):
-            legacy_style = plan.playstyle
+        options = playstyle_options(
+            self._game_config, self.main_art, self.sub_art,
+            school=str(self._combo_school.currentData() or ""),
+            plan=self._editing_plan)
         with QSignalBlocker(self._combo_playstyle):
             self._combo_playstyle.clear()
-            self._combo_playstyle.addItem(tr("不选择玩法"), "")
-            for name in names:
-                self._combo_playstyle.addItem(name, name)
-            if legacy_style:
-                self._combo_playstyle.addItem(
-                    tr("{name}（当前不匹配）").format(name=legacy_style),
-                    legacy_style)
+            for label, value in options:
+                self._combo_playstyle.addItem(label, value)
             self._combo_playstyle.setCurrentIndex(max(
                 self._combo_playstyle.findData(self._preferred_playstyle), 0))
         fit_combo_to_contents(self._combo_playstyle, minimum=160)
-        self._combo_playstyle.setEnabled(bool(names or legacy_style))
+        # 首项恒为「不选择玩法」，只有它时说明这组武学没有登记任何玩法。
+        self._combo_playstyle.setEnabled(len(options) > 1)
 
     def _on_playstyle_changed(self, _index: int) -> None:
         self._preferred_playstyle = self.playstyle

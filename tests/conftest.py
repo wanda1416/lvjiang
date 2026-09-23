@@ -1,13 +1,15 @@
-"""全局测试防线：严禁原生阻塞弹窗
+"""全局测试防线：严禁一切阻塞弹窗
 
-native_confirm/native_pause 是平台原生 MessageBox，一旦在测试里被
-触发会无限阻塞 pytest（CI/无人值守直接卡死）。此处全局替换为立即
-抛错：任何走到 confirm/pause 的路径必须在测试内自行打桩（如 stub
-_confirm_continue、注入 _ui_callback 或 monkeypatch 内置函数）。
-native_notify 非阻塞但会在桌面弹真通知，替换为 no-op 消音。
+原生 MessageBox 和 Qt 模态对话框在测试里都没人去点，一旦弹出就无限阻塞
+pytest——不报错、不超时，CI 和无人值守只表现为「卡住了」。两条防线都把它们
+换成立即抛错，需要驱动对话框的用例自行在测试内打桩。
 
-builtins.system 用 from-import 在加载时绑定了本地名，所以
-platforms 与 system 两处都要补丁。
+- ``_no_native_dialogs``：平台原生 native_confirm/native_pause。走到
+  confirm/pause 的路径必须自己打桩（stub _confirm_continue、注入
+  _ui_callback 或 monkeypatch 内置函数）。native_notify 不阻塞但会在桌面弹
+  真通知，替换为 no-op 消音。builtins.system 用 from-import 在加载时绑定了
+  本地名，所以 platforms 与 system 两处都要补丁。
+- ``_no_qt_modal_dialogs``：QMessageBox 等静态便捷函数与 QDialog.exec()。
 """
 
 from pathlib import Path
@@ -31,6 +33,63 @@ def _no_native_dialogs(monkeypatch):
         monkeypatch.setattr(f"{mod}.native_confirm", _banned)
         monkeypatch.setattr(f"{mod}.native_pause", _banned)
         monkeypatch.setattr(f"{mod}.native_notify", lambda *a, **k: None)
+
+
+#: Qt 的模态入口：静态便捷函数按类名分组，另加实例上的 exec()。
+#: 只列真正阻塞的——open()/show() 不等待，测试里出现是正常的。
+_BLOCKING_QT_DIALOGS = {
+    "QMessageBox": (
+        "warning", "critical", "information", "question", "about", "aboutQt"),
+    "QInputDialog": (
+        "getText", "getMultiLineText", "getItem", "getInt", "getDouble"),
+    "QFileDialog": (
+        "getOpenFileName", "getOpenFileNames", "getSaveFileName",
+        "getExistingDirectory"),
+    "QColorDialog": ("getColor",),
+    "QFontDialog": ("getFont",),
+}
+
+
+@pytest.fixture(autouse=True)
+def _no_qt_modal_dialogs(monkeypatch):
+    """全局测试防线：严禁 Qt 模态对话框。
+
+    离屏模式下没人去点确定，``QMessageBox.warning`` 和 ``QDialog.exec()``
+    会无限等下去——整个套件挂死，不报错也不超时，只能靠人去猜是哪一条卡住。
+    真实事故：UI 槽函数里一个 AttributeError 被 ``except`` 接住后弹
+    ``QMessageBox.warning``，本该是一条清晰的失败，结果变成全量卡在 84% 二十
+    多分钟。
+
+    这里把它们换成立即抛错，把「无限挂起」变成「秒级可见的失败」。需要驱动
+    对话框的用例自行在测试内打桩（``monkeypatch.setattr(QMessageBox,
+    "question", ...)``），测试体里的打桩晚于本 fixture，自然覆盖它。
+    """
+    from PyQt6 import QtWidgets
+
+    def _banned(api: str):
+        def _raise(*args, **kwargs):
+            # 标题和正文都带上：各 API 的参数位置不一样，而被 except 兜住的
+            # 原始错误通常在正文里，只取第一个字符串会把它丢掉。
+            texts = [a for a in args if isinstance(a, str) and a.strip()]
+            detail = " | ".join(texts)
+            raise AssertionError(
+                f"测试中触发了 Qt 模态对话框 {api}"
+                + (f"：{detail}" if detail else "")
+                + "。它在离屏模式下会无限阻塞，必须在测试内打桩；"
+                  "若这是被 except 兜住的意外错误，请先修那个错误。")
+        return _raise
+
+    for class_name, methods in _BLOCKING_QT_DIALOGS.items():
+        cls = getattr(QtWidgets, class_name, None)
+        if cls is None:
+            continue
+        for method in methods:
+            if hasattr(cls, method):
+                monkeypatch.setattr(cls, method, _banned(
+                    f"{class_name}.{method}()"))
+    # QMessageBox/QInputDialog 等都继承 QDialog，实例 exec() 一并封死。
+    monkeypatch.setattr(
+        QtWidgets.QDialog, "exec", _banned("QDialog.exec()"))
 
 
 @pytest.fixture(autouse=True)

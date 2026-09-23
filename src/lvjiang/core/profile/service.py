@@ -321,7 +321,36 @@ def profile_action(
             return ""
         text = str(set_value) if set_value is not None else (str(delta) if delta is not None else "")
         text = normalize_note_text(text, kd)
-        db_upsert(username, model_type, key, 0, change_type="action", value_text=text, source=source)
+        old_entry = db_read_entry(username, model_type, key)
+        old_text = old_entry.get("value_text", "") if old_entry else None
+        if old_entry and text == (old_text or "") and not force_write:
+            return text
+        from .triggers import (
+            prepare_trigger_event,
+            submit_profile_trigger,
+            trigger_context,
+        )
+        event = prepare_trigger_event(
+            username=username,
+            model=model_type,
+            key=key,
+            old_value=old_text,
+            new_value=text,
+            delta=None,
+            source=source,
+            change_type="action" if is_action else "override",
+            script=kd.change_script,
+        )
+        if event is None:
+            return old_text or ""
+        db_upsert(
+            username, model_type, key, 0,
+            change_type="action" if is_action else "override",
+            value_text=text,
+            source=source,
+        )
+        with trigger_context(event):
+            submit_profile_trigger(event)
         return text
 
     # ── 1. 读当前值 ──
@@ -373,6 +402,22 @@ def profile_action(
 
     # ── 7. 写入 DB ──
     change_type = "action" if is_action else "override"
+    from .triggers import prepare_trigger_event, submit_profile_trigger, trigger_context
+    event = None
+    if actual_delta != 0:
+        event = prepare_trigger_event(
+            username=username,
+            model=model_type,
+            key=key,
+            old_value=current_value,
+            new_value=semantic_new_value,
+            delta=actual_delta,
+            source=source,
+            change_type=change_type,
+            script=kd.change_script if kd else "",
+        )
+        if event is None:
+            return current_value
     if is_action and use_cas and expected_entry is not None:
         updated = db_update_if_current(
             username, model_type, key,
@@ -401,15 +446,18 @@ def profile_action(
     )
 
     # ── 8. 触发器同步 ──
-    if is_action and kd and kd.sync_targets:
-        from .sync import fire_sync_targets
-        fire_sync_targets(
-            write_fn=sync_write_adapter,
-            user_name=username,
-            source_kd=kd,
-            delta=actual_delta,
-            source=source,
-        )
+    if event is not None:
+        with trigger_context(event):
+            submit_profile_trigger(event)
+            if is_action and kd and kd.sync_targets:
+                from .sync import fire_sync_targets
+                fire_sync_targets(
+                    write_fn=sync_write_adapter,
+                    user_name=username,
+                    source_kd=kd,
+                    delta=actual_delta,
+                    source=source,
+                )
 
     return semantic_new_value
 
@@ -460,6 +508,21 @@ def sync_write_adapter(
             actual_delta = _normalize_float_noise(semantic_new_value - current_value)
             custom_updated_at = datetime.now().isoformat(timespec="seconds")
 
+    from .triggers import prepare_trigger_event, submit_profile_trigger, trigger_context
+    event = prepare_trigger_event(
+        username=user_name,
+        model=model_type,
+        key=key,
+        old_value=current_value,
+        new_value=semantic_new_value,
+        delta=actual_delta,
+        source=source,
+        change_type=change_type,
+        script=kd.change_script if kd else "",
+    )
+    if event is None:
+        return current_value, 0
+
     try:
         db_upsert(
             user_name, model_type, key, new_value,
@@ -472,4 +535,6 @@ def sync_write_adapter(
         logger.error(f"sync_write_adapter failed: {user_name}.{model_type}.{key}: {e}")
         return None
 
+    with trigger_context(event):
+        submit_profile_trigger(event)
     return semantic_new_value, actual_delta

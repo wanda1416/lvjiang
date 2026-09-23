@@ -43,6 +43,27 @@ Profile 是全局共享的用户数据。不增加 `app_id`，不做 app 分库�
 多个 app 可以同时读写一份 Profile；key 位于共享命名空间，应由定义者
 自行避免冲突。
 
+## 变更脚本
+
+每个 `KeyDef` 可通过 `change_script` 关联一个相对于 `workflows/` 的 DSL 文件。
+实际落库值发生变化后，写入方只冻结并提交事件；应用级
+`ProfileScriptRunner` 按 FIFO 顺序执行，提交方立即返回。事件向脚本注入
+`origin_key`、`origin_model`、`key`、`model`、`old_value`、`new_value`、
+`delta`、`source` 和 `change_type`。
+
+Profile 脚本每次使用新的轻量 `WorkflowEngine`，加载该用户的 Session 读取快照，
+但不装配截图、OCR、输入、布局和 Session 保存回调。它调用无锁执行入口，既不
+检查也不等待用户执行锁；因此不能用整份 Session 快照回写，否则会覆盖并行设备
+任务的更新。Profile 写入仍走 Profile repository 的独立原子管线。
+
+脚本再次写 Profile 时自动透传原始触发 key 和内部触发路径。目标节点已经位于
+路径中时，在落库前拒绝该次写入，覆盖直接回环和多节点回环。单个脚本失败只写
+日志，不中断后续队列。应用关闭时停止接收并丢弃未执行事件，队列不持久化。
+
+工作流运行时只提供两种 Builder：设备 Builder 固定装配完整资源并使用用户锁，
+Profile Builder 固定装配轻量无锁环境。新增第三类运行边界时应增加新的 Builder，
+不得继续扩张一个可任意组合权限和资源的构造入口。
+
 ## 周期扩展
 
 quota 的 `period` 必须在加载 `profile.yaml` 前已注册。core 默认注册

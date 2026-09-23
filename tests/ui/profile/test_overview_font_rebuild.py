@@ -17,6 +17,9 @@ def test_rebuild_after_model_edit_preserves_overview_font(qtbot, monkeypatch):
         lambda: SimpleNamespace(get_key=lambda _key: None),
     )
     monkeypatch.setattr(ProfileTab, "_connect_profile_engine", lambda _self: None)
+    monkeypatch.setattr(
+        ProfileTab, "_connect_profile_script_runner", lambda _self: None
+    )
 
     host = SimpleNamespace(
         user_manager=SimpleNamespace(list_users=lambda: []),
@@ -29,3 +32,26 @@ def test_rebuild_after_model_edit_preserves_overview_font(qtbot, monkeypatch):
 
     assert tab._tables["默认"].font().pointSize() == 17
     assert tab._tables["默认"].horizontalHeader().font().pointSize() == 17
+
+
+def test_profile_script_status_only_changes_indicator(qtbot, monkeypatch):
+    monkeypatch.setattr(profile_tab, "get_groups", lambda: {"默认": {"columns": []}})
+    monkeypatch.setattr(profile_tab, "get_active_group", lambda: "默认")
+    monkeypatch.setattr(profile_tab, "set_active_group", lambda _name: None)
+    monkeypatch.setattr(ProfileTab, "_connect_profile_engine", lambda _self: None)
+    monkeypatch.setattr(
+        ProfileTab, "_connect_profile_script_runner", lambda _self: None
+    )
+    host = SimpleNamespace(user_manager=SimpleNamespace(list_users=lambda: []))
+    tab = ProfileTab(host)
+    qtbot.addWidget(tab)
+    refresh_calls: list[bool] = []
+    monkeypatch.setattr(tab, "refresh", lambda: refresh_calls.append(True))
+
+    tab._set_profile_script_busy(True, 2)
+    assert not tab._profile_script_status.isHidden()
+    assert refresh_calls == []
+
+    tab._set_profile_script_busy(False, 0)
+    assert tab._profile_script_status.isHidden()
+    assert refresh_calls == []

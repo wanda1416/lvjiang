@@ -27,7 +27,7 @@ from ...core.batch_config import BatchConfigItem, lifecycle_parameter_definition
 from ...core.config.resolver import get_resolver
 from ...core.config.users import SessionManager
 from ...i18n import tr
-from ...workflows.engine import WorkflowEngine
+from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from .batch_report import BatchReport
 
 # 进度状态常量
@@ -669,7 +669,7 @@ class BatchWorker(QThread):
     def _create_engine(self) -> WorkflowEngine:
         """创建新引擎（共享后端引用，每个脚本独立实例）"""
         ctx = self._ctx
-        engine = WorkflowEngine(
+        engine = DeviceWorkflowEngineBuilder(
             capture=ctx.capture,  # type: ignore[arg-type]
             ocr=ctx.ocr,  # type: ignore[arg-type]
             input_ctrl=ctx.input_ctrl,  # type: ignore[arg-type]
@@ -683,7 +683,7 @@ class BatchWorker(QThread):
             window_top=ctx.window_top,
             stop_check=self._stop_check,
             pause_event=ctx.pause_event,
-        )
+        ).build()
         # 生命周期与条目脚本必须复用宿主的主线程 UI broker；否则
         # pause/confirm 会退化为无法被 F10 关闭的系统原生阻塞框。
         engine._ui_callback = ctx.ui_callback

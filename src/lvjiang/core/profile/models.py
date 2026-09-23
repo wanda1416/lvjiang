@@ -212,6 +212,7 @@ class KeyDef:
     sources: list[str] = field(default_factory=list)
     uses: list[str] = field(default_factory=list)
     sync_targets: list[SyncTargetDef] = field(default_factory=list)
+    change_script: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> KeyDef:
@@ -226,6 +227,7 @@ class KeyDef:
             sources=[str(s).strip() for s in data.get("sources", []) if str(s).strip()],
             uses=[str(s).strip() for s in data.get("uses", []) if str(s).strip()],
             sync_targets=parse_sync_targets(data.get("sync_targets", [])),
+            change_script=str(data.get("change_script", "")).strip(),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -286,6 +288,7 @@ class QuotaKeyDef(KeyDef):
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,
+            change_script=base.change_script,
             period=data.get("period", "week"),
             steps=parse_steps(data.get("steps", [])),
             reset_time=data.get("reset_time", "05:00"),
@@ -333,6 +336,7 @@ class RegenKeyDef(KeyDef):
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,
+            change_script=base.change_script,
             regen_type=data.get("regen_type", "realtime"),
             regen_rate_value=data.get("regen_rate_value", 0.0),
             regen_rate_unit=data.get("regen_rate_unit", "minute"),
@@ -371,6 +375,7 @@ class StockKeyDef(KeyDef):
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,
+            change_script=base.change_script,
             steps=parse_steps(data.get("steps", [])),
         )
 
@@ -398,6 +403,7 @@ class NoteKeyDef(KeyDef):
             sources=base.sources,
             uses=base.uses,
             sync_targets=base.sync_targets,
+            change_script=base.change_script,
         )
 
 

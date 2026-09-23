@@ -15,7 +15,7 @@ ProfileTab: 宽表展示所有用户的概要信息，交互式列头配置。
 from __future__ import annotations
 
 from loguru import logger
-from PyQt6.QtCore import QModelIndex, QObject, Qt, QTimer
+from PyQt6.QtCore import QModelIndex, QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QKeyEvent, QKeySequence
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
+    QLabel,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -65,6 +66,12 @@ def _make_debounce_timer(parent: QObject, callback, interval_ms: int = 500) -> Q
     timer.setInterval(interval_ms)
     timer.timeout.connect(callback)
     return timer
+
+
+class _ProfileScriptStatusBridge(QObject):
+    """把任意工作线程的状态回调排队投递到 Qt 主线程。"""
+
+    busy_changed = pyqtSignal(bool, int)
 
 
 class ProfileOverviewTable(QTableWidget):
@@ -153,6 +160,7 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
             font.setPointSize(self._content_point_size)
             self._tab_widget.setFont(font)
         self._connect_profile_engine()
+        self._connect_profile_script_runner()
 
     def _connect_profile_engine(self) -> None:
         """让后台 profile 更新能刷新总览 UI。"""
@@ -167,6 +175,28 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         """合并后台批量更新，避免每个用户更新都刷新整张总览表。"""
         if not self._refresh_timer.isActive():
             self._refresh_timer.start()
+
+    def _connect_profile_script_runner(self) -> None:
+        """状态信号只控制指示灯，不刷新用户总览数据。"""
+        try:
+            from ...core.profile.triggers import get_or_create_script_runner
+            runner = get_or_create_script_runner(self._host.user_manager.users_dir)
+            self._profile_script_bridge = _ProfileScriptStatusBridge(self)
+            self._profile_script_bridge.busy_changed.connect(
+                self._set_profile_script_busy
+            )
+            runner.add_busy_listener(self._profile_script_bridge.busy_changed.emit)
+            self._set_profile_script_busy(runner.is_busy, runner.pending_count)
+        except Exception as e:
+            logger.debug(f"ProfileTab 连接 Profile 脚本队列失败: {e}")
+
+    def _set_profile_script_busy(self, busy: bool, pending_count: int) -> None:
+        self._profile_script_status.setVisible(busy)
+        self._profile_script_status.setToolTip(
+            tr("Profile 关联脚本处理中（待处理 {count}）").format(
+                count=pending_count
+            ) if busy else ""
+        )
 
     def _is_editing_cell(self) -> bool:
         """判断总览表是否有正在编辑的单元格。"""
@@ -215,6 +245,13 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         toolbar.addWidget(btn_remove_group)
 
         toolbar.addStretch()
+
+        self._profile_script_status = QLabel("●")
+        self._profile_script_status.setStyleSheet(
+            "color: #2ecc71; font-size: 18px; font-weight: bold;"
+        )
+        self._profile_script_status.setVisible(False)
+        toolbar.addWidget(self._profile_script_status)
         layout.addLayout(toolbar)
 
         # ── 内容区：QTabWidget ──

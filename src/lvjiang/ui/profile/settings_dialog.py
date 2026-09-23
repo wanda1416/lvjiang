@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFontMetrics, QIntValidator, QKeyEvent
@@ -15,6 +17,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDoubleSpinBox,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -58,6 +61,91 @@ from ..button_styles import apply_button_style, fit_button_width
 
 # 模型 TAB 顺序
 _MODEL_ORDER = [MODEL_QUOTA, MODEL_STOCK, MODEL_REGEN, MODEL_NOTE]
+
+
+class _ChangeScriptFileField(QWidget):
+    """Profile 变更脚本选择器，只保存 workflows 内的相对路径。"""
+
+    def __init__(self, value: str = "", parent: QWidget | None = None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self._input = QLineEdit(value)
+        self._input.setReadOnly(True)
+        self._input.setPlaceholderText(tr("未选择"))
+        self._input.setToolTip(tr("数值实际变化后异步执行；路径相对于 workflows 目录"))
+        layout.addWidget(self._input, 1)
+
+        self._select_button = QPushButton(tr("选择..."))
+        self._validate_button = QPushButton(tr("校验"))
+        self._clear_button = QPushButton(tr("清除"))
+        for button in (
+            self._select_button, self._validate_button, self._clear_button,
+        ):
+            button.setAutoDefault(False)
+            apply_button_style(button, variant="neutral")
+            layout.addWidget(button)
+
+        self._select_button.clicked.connect(self._select_file)
+        self._validate_button.clicked.connect(self._validate_file)
+        self._clear_button.clicked.connect(self._input.clear)
+
+    def text(self) -> str:
+        return self._input.text().strip()
+
+    def _select_file(self) -> None:
+        from ...core.config import get_resolver
+
+        resolver = get_resolver()
+        # write_dir 按开发模式路由：开发者 -> system，普通用户 -> local。
+        default_root = resolver.write_dir("workflows")
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            tr("选择变更脚本"),
+            str(default_root),
+            tr("工作流文件 (*.wf)"),
+        )
+        if not path:
+            return
+
+        chosen = Path(path).resolve()
+        for layer_root in (resolver.local_dir, resolver.system_dir):
+            base = (layer_root / "workflows").resolve()
+            try:
+                relative = chosen.relative_to(base).as_posix()
+            except ValueError:
+                continue
+            self._input.setText(relative)
+            return
+        QMessageBox.warning(
+            self,
+            tr("选择变更脚本"),
+            tr("请选择 config/system/workflows 或 config/local/workflows 目录下的 .wf 文件"),
+        )
+
+    def _validate_file(self) -> None:
+        from ...workflows.discovery import resolve_workflow_path
+        from ...workflows.grammar import parse_file
+
+        script = self.text()
+        if not script:
+            QMessageBox.warning(self, tr("校验失败"), tr("请先选择变更脚本"))
+            return
+        path, _ = resolve_workflow_path(script)
+        if path is None:
+            QMessageBox.warning(
+                self,
+                tr("校验失败"),
+                tr("变更脚本不存在: workflows/{path}").format(path=script),
+            )
+            return
+        try:
+            parse_file(path)
+        except Exception as exc:  # noqa: BLE001 - 需将 DSL 解析错误展示给用户
+            QMessageBox.warning(self, tr("校验失败"), str(exc))
+            return
+        QMessageBox.information(self, tr("校验通过"), tr("工作流语法正确"))
 
 
 def _format_cap(kd: KeyDef) -> str:
@@ -978,6 +1066,11 @@ class ProfileDefinitionDialog(QDialog):
         label_input.setPlaceholderText(tr("中文，如 周任务"))
         layout.addRow(tr("标签:"), label_input)
 
+        change_script_input = _ChangeScriptFileField(
+            existing.change_script if existing else ""
+        )
+        layout.addRow(tr("变更脚本:"), change_script_input)
+
         # 模型专属字段
         widgets: dict[str, QWidget] = {}
 
@@ -1299,6 +1392,7 @@ class ProfileDefinitionDialog(QDialog):
             soft_final = widgets["soft"].isChecked()
             show_cap_final = widgets["show_cap"].isChecked()
             decimal_final = widgets["decimal"].isChecked()
+            change_script = change_script_input.text().strip()
 
             # 构造 KeyDef
             if model_type == MODEL_QUOTA:
@@ -1307,6 +1401,7 @@ class ProfileDefinitionDialog(QDialog):
                     sources=sources_list,
                     uses=uses_list,
                     sync_targets=sync_targets_list,
+                    change_script=change_script,
                     period=widgets["period"].currentData(),
                     cap=cap_final,
                     soft=soft_final,
@@ -1325,6 +1420,7 @@ class ProfileDefinitionDialog(QDialog):
                     sources=sources_list,
                     uses=uses_list,
                     sync_targets=sync_targets_list,
+                    change_script=change_script,
                     cap=cap_final,
                     soft=soft_final,
                     show_cap=show_cap_final,
@@ -1346,6 +1442,7 @@ class ProfileDefinitionDialog(QDialog):
                     sources=sources_list,
                     uses=uses_list,
                     sync_targets=sync_targets_list,
+                    change_script=change_script,
                     cap=cap_final,
                     soft=soft_final,
                     show_cap=show_cap_final,
@@ -1358,13 +1455,17 @@ class ProfileDefinitionDialog(QDialog):
                     sources=sources_list,
                     uses=uses_list,
                     sync_targets=sync_targets_list,
+                    change_script=change_script,
                     cap=cap_final,
                     soft=soft_final,
                     show_cap=show_cap_final,
                     decimal=decimal_final,
                 )
             else:
-                kd = KeyDef(key=key, label=label, sources=sources_list, uses=uses_list)
+                kd = KeyDef(
+                    key=key, label=label, sources=sources_list, uses=uses_list,
+                    change_script=change_script,
+                )
 
             result_kd[0] = kd
             dialog.accept()

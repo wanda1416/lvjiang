@@ -64,6 +64,12 @@ class SeasonConfig:
     end_date: 赛季结束日期
     first_half_end_date: 上半赛季结束日期（每赛季 84 天，前 42 天为上半赛季）
     equip_level: 当前赛季装备等级（如 90, 96, 100）
+    min_chengyin_level: 本赛季仍可承音的最低装备等级（0/None 表示不限制）
+
+        和 ``LevelConfig.allow_chengyin`` 不是一回事：后者描述该等级的装备
+        当年是否允许承音，是装备自身的属性；本字段是赛季级的作废线——低于
+        它的装备本赛季事实上已被抛弃，既不能原地承音也不能承音到下一阶，
+        因此不参与任何满等级/满承音假设。换赛季时只改这一处。
     """
     season_number: int = 0
     name: str = ""
@@ -71,6 +77,7 @@ class SeasonConfig:
     end_date: date | None = None
     first_half_end_date: date | None = None
     equip_level: int | None = None
+    min_chengyin_level: int | None = None
 
 
 # ─── 品阶推断数据结构 ──────────────────────────────────────

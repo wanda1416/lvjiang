@@ -523,9 +523,11 @@ def apply_hypothetical_caps(
         except (TypeError, ValueError):
             cur_level = 0
 
-        # 满等级：提升装备等级（基础属性随之变化）
-        # 低于赛季最高等级的装备均可升级为承音装备
-        if full_level > 0 and 0 < cur_level < full_level:
+        # 满等级：提升装备等级（基础属性随之变化）。
+        # 本赛季已停止承音的低阶装备不在此列——它事实上已被抛弃，既不能原地
+        # 承音也不能承音到下一阶，把它当成能升到满级会把毕业率算高。
+        if (full_level > 0 and 0 < cur_level < full_level
+                and gc.can_chengyin_this_season(cur_level)):
             equip["level"] = full_level
             equip["is_chengyin"] = True
 

@@ -71,6 +71,7 @@ COMBAT_ATTR_FIELDS: list[tuple[str, str, str, bool]] = [
     # 奇术增伤（增效类，装备提供，不参与反推）
     ("single_qs_bonus", "单体类奇术增伤", "%", False),
     ("group_qs_bonus", "群体类奇术增伤", "%", False),
+    ("all_qs_bonus", "全奇术增伤", "%", False),
     # 武器/技能增效（流派相关，动态字段）
     # 这些字段通过 extra_attrs 存储
 ]
@@ -149,7 +150,7 @@ WUXIANG_TO_ATTR_PEN = {
 # 增伤字段（整个值除以除数）
 BONUS_PERCENT_FIELDS = {
     "all_skill_bonus", "boss_bonus", "player_bonus",
-    "single_qs_bonus", "group_qs_bonus",
+    "single_qs_bonus", "group_qs_bonus", "all_qs_bonus",
 }
 
 # 动态增效字段后缀（整个值除以除数）
@@ -251,6 +252,8 @@ class CombatAttributes:
     # 奇术增伤（小数，有抗性，装备提供）
     single_qs_bonus: float = 0.0
     group_qs_bonus: float = 0.0
+    #: 115 起的合并词条，覆盖全部奇术
+    all_qs_bonus: float = 0.0
 
     # 动态字段（流派/玩法特有）
     extra_attrs: dict[str, float] = field(default_factory=dict)
@@ -395,9 +398,11 @@ AFFIX_TO_ATTR: dict[str, str] = {
     "全武学增效": "all_skill_bonus",
     "对首领单位增伤": "boss_bonus",
     "对玩家单位增效": "player_bonus",
-    # 奇术增伤
+    # 奇术增伤。115 起游戏把单体/群体合并成全奇术增伤，它覆盖全部奇术，
+    # 所以单列一个字段——折算成哪一路由毕业率方案决定，见 graduation。
     "单体类奇术增伤": "single_qs_bonus",
     "群体类奇术增伤": "group_qs_bonus",
+    "全奇术增伤": "all_qs_bonus",
     # 伤害加成
     "外功伤害加成": "outer_bonus",
     "鸣金伤害加成": "mingjin_bonus",

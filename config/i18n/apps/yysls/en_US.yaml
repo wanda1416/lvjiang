@@ -696,6 +696,8 @@ auto_strings:
   '下一点恢复: 已达上限': 'Next point recovers: cap reached'
   不应用规则: Don't Apply Rule
   不添加狗粮: Don't Add Fodder
+  全奇术增伤: All Arts Damage
+  群体类奇术增伤: AoE Arts Damage
   逐轮狗粮决策: Round-by-Round Fodder Decisions
   本轮未执行调律: Tuning Not Performed
   '第 {n} 轮：{food}{outcome}': 'Round {n}: {food}{outcome}'

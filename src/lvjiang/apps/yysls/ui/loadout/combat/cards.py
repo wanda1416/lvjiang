@@ -167,6 +167,7 @@ class CombatCardsMixin:
             (3, 1, "群体类奇术增伤", "group_qs_bonus"),
             (4, 0, "对首领单位增伤", "boss_bonus"),
             (4, 1, "对玩家单位增效", "player_bonus"),
+            (5, 0, "全奇术增伤", "all_qs_bonus"),
         )
         # 存储原始布局位置用于自适应重排
         self._gain_grid_items: list[tuple[QWidget, int, int]] = []

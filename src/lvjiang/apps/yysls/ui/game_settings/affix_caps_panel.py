@@ -51,6 +51,9 @@ from lvjiang.ui.button_styles import (
 )
 
 from .....i18n import tr
+from ...config.affix_levels import FROM_KEY as FROM_LEVEL_KEY
+from ...config.affix_levels import THROUGH_KEY as THROUGH_LEVEL_KEY
+from ...config.affix_levels import LevelRange, parse_range
 from ..domain_labels import domain_label
 from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
@@ -161,6 +164,8 @@ class AffixCapsPanel(QWidget):
         self._on_changed = on_changed
         self._current_affix: str | None = None
         self._saving = False  # 防止递归保存
+        #: 词条名 → [起始等级下拉, 截止等级下拉]，随词条行一起重建
+        self._alias_level_combos: dict[str, list[LevelCombo]] = {}
         self._init_ui()
         self._load_data()
 
@@ -370,6 +375,7 @@ class AffixCapsPanel(QWidget):
         apply_button_style(self._btn_del_level, variant="danger")
 
         right_layout.addLayout(btn_layout)
+
         splitter.addWidget(right_widget)
 
         splitter.setChildrenCollapsible(False)
@@ -983,6 +989,8 @@ class AffixCapsPanel(QWidget):
 
     def _refresh_alias_tags(self):
         """刷新词条名称显示（不分组=流式标签 / 分组=Tab 页）"""
+        # 旧行连同它的等级下拉一起作废：留着会在切换词组后写回上一个词组。
+        self._alias_level_combos.clear()
         grouped = self._is_grouped()
         self._alias_tags_widget.setVisible(not grouped)
         self._alias_group_tabs.setVisible(grouped)
@@ -1097,6 +1105,23 @@ class AffixCapsPanel(QWidget):
                 lambda _c, a=alias, b=parts_btn: self._pick_affix_parts(a, b))
         row_layout.addWidget(parts_btn)
 
+        # 生效等级范围（不填即不限）。新赛季移除的词条在这里填截止等级，
+        # 而不是从词组里删掉——低等阶装备上它仍然合法，OCR 也仍会扫到。
+        level_range = self._get_alias_levels(alias)
+        for index, value in (
+            (0, level_range.from_level),
+            (1, level_range.through_level),
+        ):
+            combo = LevelCombo(allow_empty=True, empty_label=tr("不限"))
+            combo.setToolTip(
+                tr("生效起始等级") if index == 0 else tr("生效截止等级"))
+            combo.set_level(value or None)
+            combo.currentIndexChanged.connect(
+                lambda _i, a=alias: self._on_alias_levels_changed(a))
+            combo.setMinimumWidth(78)
+            row_layout.addWidget(combo)
+            self._alias_level_combos.setdefault(alias, []).append(combo)
+
         row_layout.addStretch()
 
         # 删除按钮
@@ -1181,6 +1206,44 @@ class AffixCapsPanel(QWidget):
         else:
             self._data.setdefault("affix_parts", {})[alias] = parts
             btn.setText(self._format_parts(parts))
+        self._save_data()
+
+    def _get_alias_levels(self, alias: str) -> LevelRange:
+        """读该词条的生效等级范围（存在所属词组的 _alias_levels 下）"""
+        category_data = (self._data.get("affix_caps") or {}).get(
+            self._current_affix) or {}
+        raw = (category_data.get("_alias_levels") or {}).get(alias)
+        return parse_range(raw)
+
+    def _on_alias_levels_changed(self, alias: str):
+        if self._saving:
+            return
+        combos = self._alias_level_combos.get(alias) or []
+        if len(combos) < 2:
+            return
+        bounds = [int(combo.get_level() or 0) for combo in combos[:2]]
+        level_range = LevelRange(bounds[0], bounds[1])
+        category_data = (self._data.get("affix_caps") or {}).get(
+            self._current_affix)
+        if not isinstance(category_data, dict):
+            return
+        alias_levels = category_data.get("_alias_levels")
+        if not isinstance(alias_levels, dict):
+            alias_levels = {}
+        if level_range.configured:
+            entry: dict = {}
+            if level_range.from_level:
+                entry[FROM_LEVEL_KEY] = level_range.from_level
+            if level_range.through_level:
+                entry[THROUGH_LEVEL_KEY] = level_range.through_level
+            alias_levels[alias] = entry
+        else:
+            alias_levels.pop(alias, None)
+        # 全是开区间就把整个键去掉，不给绝大多数词组留一个空字典。
+        if alias_levels:
+            category_data["_alias_levels"] = alias_levels
+        else:
+            category_data.pop("_alias_levels", None)
         self._save_data()
 
     def _drop_affix_parts(self, alias: str):

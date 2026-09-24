@@ -34,16 +34,20 @@ class LevelCombo(QComboBox):
         self,
         allow_empty: bool = False,
         parent: QWidget | None = None,
+        empty_label: str = "",
     ):
         super().__init__(parent)
         self._allow_empty = allow_empty
+        #: 空项的展示文案。留空是纯占位；生效等级范围这类「不配即开区间」的
+        #: 场景需要写明「不限」，否则空白看起来像漏填。
+        self._empty_label = empty_label
         self._refresh_items()
 
     def _refresh_items(self):
         """填充等级列表（降序）"""
         self.clear()
         if self._allow_empty:
-            self.addItem("", None)
+            self.addItem(self._empty_label, None)
         configs = get_game_config().get_level_configs()
         levels = sorted([c.level for c in configs], reverse=True)
         if not levels:

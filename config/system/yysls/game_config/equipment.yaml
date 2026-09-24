@@ -49,7 +49,7 @@ base_attrs:
     - 势
     - 敏
     - 最大无相攻击
-    - 最小无相攻击
+    - {name: 最小无相攻击, through_level: 110}
   ring:
     _name_suffixes:
     - 云珑
@@ -171,7 +171,7 @@ base_attrs:
     - 精准率
     - 会心率
     - 会意率
-    - 体
+    - {name: 体, through_level: 110}
     - 外功防御
     - 气血最大值
   wrist:
@@ -185,7 +185,7 @@ base_attrs:
     - 精准率
     - 会心率
     - 会意率
-    - 体
+    - {name: 体, through_level: 110}
     - 外功防御
     - 气血最大值
 equipment_name_series:

@@ -631,7 +631,10 @@ def effective_equipped(equipped: dict, game_config=None) -> dict:
     from .affix_rules import normal_affix_candidates
 
     known = set(game_config.get_normal_affix_names())
-    allowed_by_type: dict[str, set[str]] = {}
+    # 候选同时取决于装备类型和等级（同一部位在不同等阶的词条库不一样），
+    # 所以缓存键必须带上等级——只按类型缓存的话，一套里混着 110 和 115 的
+    # 同部位装备时，先遇到的那件会替后面的决定过滤规则。
+    allowed_by_type: dict[tuple[str, int], set[str]] = {}
     result: dict = {}
     best: dict[str, tuple[float, str, str]] = {}  # name → (value, slot, key)
     for slot_key, equip in equipped.items():
@@ -642,10 +645,15 @@ def effective_equipped(equipped: dict, game_config=None) -> dict:
         equip_type = str(equip.get("type") or "")
         allowed: set[str] | None = None
         if equip_type:
-            if equip_type not in allowed_by_type:
-                allowed_by_type[equip_type] = set(
+            try:
+                level = int(equip.get("level") or 0)
+            except (TypeError, ValueError):
+                level = 0
+            cache_key = (equip_type, level)
+            if cache_key not in allowed_by_type:
+                allowed_by_type[cache_key] = set(
                     normal_affix_candidates(equip, game_config))
-            allowed = allowed_by_type[equip_type]
+            allowed = allowed_by_type[cache_key]
         for i in range(1, 6):
             key = f"affix_{i}"
             affix = copied.get(key)

@@ -119,6 +119,16 @@ def validate_combination_dict(equip_dict: dict) -> list[IllegalReason]:
             if r.code in COMBINATION_CODES]
 
 
+def _int_or_none(raw: object) -> int | None:
+    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
 def validate_equipment_dict(equip_dict: dict) -> list[IllegalReason]:
     """判定装备 JSON dict，按 ``affix_1`` ~ ``affix_5`` 键取槽位号。
 
@@ -146,12 +156,15 @@ def validate_equipment_dict(equip_dict: dict) -> list[IllegalReason]:
             continue
         slots.append((i, Affix.from_dict({**raw, "name": name})))
     return malformed + _validate_slots(
-        slots, equip_dict.get("type"), equip_dict.get("level"))
+        slots, equip_dict.get("type"), equip_dict.get("level"),
+        original_level=equip_dict.get("original_level"))
 
 
 def _validate_slots(slots: list[tuple[int, Affix]],
                     equip_type: str | None,
-                    level: int | None = None) -> list[IllegalReason]:
+                    level: int | None = None,
+                    original_level: int | None = None
+                    ) -> list[IllegalReason]:
     """核心判定：slots 为 (槽位号, 词条) 列表，槽位号从 1 开始。
 
     返回全部违规原因（可能多条）；完全合法返回空列表。
@@ -191,7 +204,11 @@ def _validate_slots(slots: list[tuple[int, Affix]],
     normal_names = set(gc.get_normal_affix_names())
     weapon_map = gc.get_all_weapon_wuxue_affixes()
     weapon_affixes = set(weapon_map.values())
-    first_names = set(gc.get_first_affixes(group)) if group else set()
+    # 首词条池按**原生等级**取：首词条在装备产出时就定死了，承音升阶不会
+    # 换掉它。拿当前等级判会把「原生 110 首出、已承音到 115」的装备整批
+    # 误判成非法。原生等级未知时不按等级收窄。
+    first_names = (set(gc.get_first_affixes(group, _int_or_none(original_level)))
+                   if group else set())
     # 部位与武器绑定的唯一口径：normal_affix_candidates（游戏配置）。
     # 这里只负责把「不在候选里」归到对应错误码。
     allowed = set(normal_affix_candidates(

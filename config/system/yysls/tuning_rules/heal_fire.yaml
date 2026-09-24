@@ -16,6 +16,7 @@ transmute_priority:
 affix_pool:
 - 对首领单位增伤
 - 单体类奇术增伤
+- 全奇术增伤
 - 最大外功攻击
 - 劲
 - 最小外功攻击
@@ -136,6 +137,7 @@ patterns:
     - count_max:
         symbols:
         - 单体类奇术增伤
+        - 全奇术增伤
         max: 0
     top_conditions:
     - count_max:

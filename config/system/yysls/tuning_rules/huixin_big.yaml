@@ -32,6 +32,7 @@ affix_pool:
 - 最大本属攻击
 - 势
 - 单体类奇术增伤
+- 全奇术增伤
 - 对玩家单位增效
 common_conditions:
   normal_conditions:
@@ -99,6 +100,7 @@ patterns:
       - count_min:
           symbols:
           - 单体类奇术增伤
+          - 全奇术增伤
           min: 1
     top_conditions:
     - - contains_all:

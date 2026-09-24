@@ -19,6 +19,7 @@
 | [09-transmute-simulation.md](09-transmute-simulation.md) | 模拟转律：八件装备联合转律建议、公共装备目标保存、备战方案第四假设 | ✅ 已实现 |
 | [10-batch-task-eligibility.md](10-batch-task-eligibility.md) | 批量任务可执行性：业务 WF 前置判定、整用户跳过与生命周期边界 | ✅ 已实现 |
 | [11-loadout-management.md](11-loadout-management.md) | 跨用户备战方案管理、显式排序与主页面只读边界 | ✅ 已实现 |
+| [12-nanlu-season.md](12-nanlu-season.md) | 南吕相和赛季：115 阶词条范围、赛季承音门槛、评级与毕业率适配 | 部分实现 |
 
 ## 子需求
 

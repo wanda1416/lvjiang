@@ -32,4 +32,3 @@ def adapt_attrs_to_model_inputs(
         single_qs_bonus=attrs.single_qs_bonus + attrs.all_qs_bonus,
         all_qs_bonus=0.0,
     )
-

@@ -80,6 +80,32 @@ class SeasonConfig:
     min_chengyin_level: int | None = None
 
 
+@dataclass(frozen=True)
+class AffixUpgrade:
+    """跨等级的词条升级规则。
+
+    规则写「从 from_level 到 to_level」，判定按**跨过这段**：装备起始等级不高于
+    ``from_level``、目标等级不低于 ``to_level`` 就触发。所以 105 装备一路承音到
+    115 同样命中 110→115 这条规则，不用为每个起点单独写一条。
+
+    往往是 N→1：同一组里的几个旧词条合并成同一个新词条。
+
+    这不是 OCR 别名，也不是重命名：原生低阶装备仍然显示旧词条，历史记录不
+    改名，真实扫描结果以画面为准。只有实际执行或模拟了升级的装备才转换。
+    """
+
+    from_level: int = 0
+    to_level: int = 0
+    from_name: str = ""
+    to_name: str = ""
+    operation: str = "chengyin"
+
+    def applies(self, name: str, from_level: int, to_level: int) -> bool:
+        if name != self.from_name or not self.to_level:
+            return False
+        return from_level <= self.from_level and to_level >= self.to_level
+
+
 # ─── 品阶推断数据结构 ──────────────────────────────────────
 
 @dataclass

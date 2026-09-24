@@ -472,6 +472,27 @@ def map_affix_to_attr(affix_name: str) -> tuple[str | None, bool]:
     return None, False
 
 
+def _upgrade_affix_names(equip: dict, from_level: int, to_level: int,
+                         game_config) -> None:
+    """按词条升级表就地改写副本上的普通词条名。
+
+    只作用于已经深拷贝出来的投影副本：原始装备必须保持游戏里的真实样子，
+    真实扫描结果也以画面为准，不在这里改写。升级只换名字，数值随后按目标
+    等级的上限重新投影。
+    """
+    for index in range(1, 6):
+        affix = equip.get(f"affix_{index}")
+        if not isinstance(affix, dict):
+            continue
+        name = str(affix.get("name") or "")
+        if not name:
+            continue
+        upgraded = game_config.resolve_affix_upgrade(
+            name, from_level, to_level)
+        if upgraded:
+            affix["name"] = upgraded
+
+
 def apply_hypothetical_caps(
     equipped: dict,
     full_chengyin: bool = False,
@@ -528,6 +549,7 @@ def apply_hypothetical_caps(
         # 承音也不能承音到下一阶，把它当成能升到满级会把毕业率算高。
         if (full_level > 0 and 0 < cur_level < full_level
                 and gc.can_chengyin_this_season(cur_level)):
+            _upgrade_affix_names(equip, cur_level, full_level, gc)
             equip["level"] = full_level
             equip["is_chengyin"] = True
 

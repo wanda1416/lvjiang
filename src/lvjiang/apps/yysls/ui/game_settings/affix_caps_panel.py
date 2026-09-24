@@ -166,6 +166,8 @@ class AffixCapsPanel(QWidget):
         self._saving = False  # 防止递归保存
         #: 词条名 → [起始等级下拉, 截止等级下拉]，随词条行一起重建
         self._alias_level_combos: dict[str, list[LevelCombo]] = {}
+        #: 程序化重建升级规则表期间屏蔽控件写回
+        self._loading_upgrades = False
         self._init_ui()
         self._load_data()
 
@@ -375,6 +377,55 @@ class AffixCapsPanel(QWidget):
         apply_button_style(self._btn_del_level, variant="danger")
 
         right_layout.addLayout(btn_layout)
+
+        # ── 升级规则（本词组内的跨等级合并，放在最底下）──
+        self._upgrade_frame = QFrame()
+        self._upgrade_frame.setObjectName("affixUpgradeFrame")
+        self._upgrade_frame.setStyleSheet(
+            "QFrame#affixUpgradeFrame { background-color: palette(alternate-base); "
+            "border-radius: 4px; padding: 4px; }"
+        )
+        upgrade_layout = QVBoxLayout(self._upgrade_frame)
+        upgrade_layout.setContentsMargins(8, 4, 8, 4)
+        upgrade_layout.setSpacing(6)
+        upgrade_header = QHBoxLayout()
+        upgrade_header.addWidget(QLabel(tr("升级规则")))
+        upgrade_hint = QLabel(tr(
+            "装备从起始等级（或更低）升到目标等级（或更高）时，"
+            "原词条自动变成目标词条；只影响升级投影，不改真实扫描结果"))
+        upgrade_hint.setStyleSheet("color: palette(mid);")
+        upgrade_header.addWidget(upgrade_hint, 1)
+        self._btn_add_upgrade = QPushButton(tr("+ 规则"))
+        self._btn_add_upgrade.setMinimumWidth(70)
+        self._btn_add_upgrade.clicked.connect(self._add_upgrade_rule)
+        apply_button_style(self._btn_add_upgrade)
+        upgrade_header.addWidget(self._btn_add_upgrade)
+        self._btn_del_upgrade = QPushButton(tr("- 规则"))
+        self._btn_del_upgrade.setMinimumWidth(70)
+        self._btn_del_upgrade.clicked.connect(self._del_upgrade_rule)
+        apply_button_style(self._btn_del_upgrade, variant="danger")
+        upgrade_header.addWidget(self._btn_del_upgrade)
+        upgrade_layout.addLayout(upgrade_header)
+
+        self._upgrade_table = QTableWidget(0, 4)
+        self._upgrade_table.setHorizontalHeaderLabels(
+            [tr("起始等级"), tr("目标等级"), tr("原词条"), tr("目标词条")])
+        self._upgrade_table.verticalHeader().setVisible(False)
+        upgrade_header_view = self._upgrade_table.horizontalHeader()
+        for column in (0, 1):
+            upgrade_header_view.setSectionResizeMode(
+                column, QHeaderView.ResizeMode.ResizeToContents)
+        upgrade_header_view.setSectionResizeMode(
+            2, QHeaderView.ResizeMode.Stretch)
+        upgrade_header_view.setSectionResizeMode(
+            3, QHeaderView.ResizeMode.ResizeToContents)
+        self._upgrade_table.setEditTriggers(
+            QTableWidget.EditTrigger.NoEditTriggers)
+        self._upgrade_table.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectRows)
+        self._upgrade_table.setMaximumHeight(160)
+        upgrade_layout.addWidget(self._upgrade_table)
+        right_layout.addWidget(self._upgrade_frame)
 
         splitter.addWidget(right_widget)
 
@@ -991,6 +1042,7 @@ class AffixCapsPanel(QWidget):
         """刷新词条名称显示（不分组=流式标签 / 分组=Tab 页）"""
         # 旧行连同它的等级下拉一起作废：留着会在切换词组后写回上一个词组。
         self._alias_level_combos.clear()
+        self._refresh_upgrade_rules()
         grouped = self._is_grouped()
         self._alias_tags_widget.setVisible(not grouped)
         self._alias_group_tabs.setVisible(grouped)
@@ -1206,6 +1258,141 @@ class AffixCapsPanel(QWidget):
         else:
             self._data.setdefault("affix_parts", {})[alias] = parts
             btn.setText(self._format_parts(parts))
+        self._save_data()
+
+    # ── 升级规则 ──────────────────────────────────────────
+
+    def _upgrade_rules_raw(self) -> list[dict]:
+        """当前词组的 ``_upgrades`` 原始列表（不存在则空列表）"""
+        category_data = (self._data.get("affix_caps") or {}).get(
+            self._current_affix)
+        if not isinstance(category_data, dict):
+            return []
+        rules = category_data.get("_upgrades")
+        return [r for r in rules if isinstance(r, dict)] if isinstance(
+            rules, list) else []
+
+    def _refresh_upgrade_rules(self):
+        """按当前词组重建升级规则表。
+
+        原词条是多选：N→1 是常态（单体、群体一起并成全奇术），一条规则列出
+        全部来源才看得出这是一次合并。
+        """
+        self._upgrade_frame.setVisible(bool(self._current_affix))
+        if not self._current_affix:
+            return
+        self._loading_upgrades = True
+        try:
+            rules = self._upgrade_rules_raw()
+            aliases = self._all_aliases()
+            self._upgrade_table.setRowCount(len(rules))
+            for row, rule in enumerate(rules):
+                for column, key in ((0, "from_level"), (1, "to_level")):
+                    combo = LevelCombo(allow_empty=True,
+                                       empty_label=tr("未设置"))
+                    raw = rule.get(key)
+                    combo.set_level(raw if isinstance(raw, int) else None)
+                    combo.currentIndexChanged.connect(
+                        lambda _i, r=row: self._on_upgrade_changed(r))
+                    self._upgrade_table.setCellWidget(row, column, combo)
+
+                sources = self._rule_sources(rule)
+                from_btn = QPushButton(
+                    " / ".join(sources) if sources else tr("选择原词条"))
+                apply_button_style(from_btn, variant="neutral")
+                from_btn.clicked.connect(
+                    lambda _c, r=row: self._pick_upgrade_sources(r))
+                self._upgrade_table.setCellWidget(row, 2, from_btn)
+
+                to_combo = QComboBox()
+                to_combo.addItem(tr("（未选择）"), "")
+                for alias in aliases:
+                    to_combo.addItem(alias, alias)
+                to_combo.setCurrentIndex(
+                    max(to_combo.findData(str(rule.get("to") or "")), 0))
+                to_combo.currentIndexChanged.connect(
+                    lambda _i, r=row: self._on_upgrade_changed(r))
+                self._upgrade_table.setCellWidget(row, 3, to_combo)
+        finally:
+            self._loading_upgrades = False
+
+    def _all_aliases(self) -> list[str]:
+        """当前词组的全部词条名（分组词组把各组拼起来）"""
+        if self._is_grouped():
+            return [name for names in self._get_alias_groups().values()
+                    for name in names]
+        return list(self._get_aliases())
+
+    @staticmethod
+    def _rule_sources(rule: dict) -> list[str]:
+        raw = rule.get("from")
+        names = raw if isinstance(raw, list) else [raw]
+        return [str(n).strip() for n in names if str(n or "").strip()]
+
+    def _pick_upgrade_sources(self, row: int):
+        from ..tune_settings.affix_picker import AffixSelectSortDialog
+        rules = self._upgrade_rules_raw()
+        if row >= len(rules):
+            return
+        dlg = AffixSelectSortDialog(
+            self._all_aliases(), self._rule_sources(rules[row]),
+            tr("选择原词条"), self, flat=True,
+        )
+        if not dlg.exec():
+            return
+        rules[row]["from"] = dlg.selected()
+        self._write_upgrade_rules(rules)
+        self._refresh_upgrade_rules()
+
+    def _on_upgrade_changed(self, row: int):
+        if self._loading_upgrades or self._saving:
+            return
+        rules = self._upgrade_rules_raw()
+        if row >= len(rules):
+            return
+        for column, key in ((0, "from_level"), (1, "to_level")):
+            combo = self._upgrade_table.cellWidget(row, column)
+            level = combo.get_level() if isinstance(combo, LevelCombo) else None
+            if level:
+                rules[row][key] = int(level)
+            else:
+                rules[row].pop(key, None)
+        to_combo = self._upgrade_table.cellWidget(row, 3)
+        target = str(to_combo.currentData() or "") if isinstance(
+            to_combo, QComboBox) else ""
+        if target:
+            rules[row]["to"] = target
+        else:
+            rules[row].pop("to", None)
+        self._write_upgrade_rules(rules)
+
+    def _add_upgrade_rule(self):
+        if not self._current_affix:
+            return
+        rules = self._upgrade_rules_raw()
+        rules.append({})
+        self._write_upgrade_rules(rules)
+        self._refresh_upgrade_rules()
+
+    def _del_upgrade_rule(self):
+        row = self._upgrade_table.currentRow()
+        rules = self._upgrade_rules_raw()
+        if row < 0 or row >= len(rules):
+            return
+        rules.pop(row)
+        self._write_upgrade_rules(rules)
+        self._refresh_upgrade_rules()
+
+    def _write_upgrade_rules(self, rules: list[dict]):
+        """写回当前词组；空列表连键一起删，不给多数词组留空壳。"""
+        category_data = (self._data.get("affix_caps") or {}).get(
+            self._current_affix)
+        if not isinstance(category_data, dict):
+            return
+        if rules:
+            category_data["_upgrades"] = rules
+        else:
+            category_data.pop("_upgrades", None)
         self._save_data()
 
     def _get_alias_levels(self, alias: str) -> LevelRange:

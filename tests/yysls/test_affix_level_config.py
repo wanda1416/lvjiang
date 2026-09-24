@@ -1,7 +1,8 @@
-"""生效等级范围与赛季承音作废线接进真实配置后的行为。
+"""生效等级范围接进真实配置后的行为。
 
-锁住新赛季的三件事：115 不再首出哪些词条、115 调律库换掉了哪些词条、低于
-赛季作废线的装备不再参与满等级假设。数值可以晚到，这些结构规则先立住。
+锁住的是新赛季的四件事：115 不再首出哪些词条、115 调律库换掉了哪些词条、
+低于赛季作废线的装备不再参与满等级假设、以及承音跨过 115 时旧奇术词条变成
+全奇术增伤。数值可以晚到，这些结构规则先立住。
 """
 
 from __future__ import annotations
@@ -155,6 +156,15 @@ def test_equipment_at_the_floor_still_projects(season_floor):
     assert result["head"]["is_chengyin"] is True
 
 
+def test_crossing_115_merges_the_old_qishu_affix(season_floor):
+    season_floor(105)
+
+    result = apply_hypothetical_caps({"head": _qishu_head(110)},
+                                     full_level=115)
+
+    assert result["head"]["affix_2"]["name"] == "全奇术增伤"
+
+
 def test_projection_never_touches_the_original(season_floor):
     """投影是派生副本：真实装备必须保持游戏里的样子。"""
     season_floor(105)
@@ -163,6 +173,16 @@ def test_projection_never_touches_the_original(season_floor):
     apply_hypothetical_caps({"head": original}, full_level=115)
 
     assert original["level"] == 110
+    assert original["affix_2"]["name"] == "单体类奇术增伤"
+
+
+def test_staying_below_115_keeps_the_old_affix_name(season_floor):
+    season_floor(100)
+
+    result = apply_hypothetical_caps({"head": _qishu_head(105)},
+                                     full_level=110)
+
+    assert result["head"]["affix_2"]["name"] == "单体类奇术增伤"
 
 
 # ─── 神力归属 ──────────────────────────────────────────────

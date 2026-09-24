@@ -12,6 +12,7 @@ import copy
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from typing import TypeGuard
 
 import yaml
 from loguru import logger
@@ -34,12 +35,46 @@ from .constants import (
     normalize_equip_part,
 )
 from .models import (
+    AffixUpgrade,
     AttrRange,
     LevelConfig,
     LevelRule,
     SeasonConfig,
     TuningStoneRule,
 )
+
+
+def _parse_affix_upgrades(raw_rule: object) -> list[AffixUpgrade]:
+    """把一条 ``_upgrades`` 配置展开成逐个旧词条的规则。
+
+    ``from`` 允许写一个名字或一组名字：几个旧词条合并成同一个新词条是常态，
+    拆成多行只会让同一条规则散开。
+    """
+    if not isinstance(raw_rule, dict):
+        return []
+    from_level = raw_rule.get("from_level")
+    to_level = raw_rule.get("to_level")
+    to_name = str(raw_rule.get("to") or "").strip()
+    if not _positive_int(from_level) or not _positive_int(to_level):
+        return []
+    if not to_name or from_level >= to_level:
+        return []
+    raw_from = raw_rule.get("from")
+    from_names = raw_from if isinstance(raw_from, list) else [raw_from]
+    operation = str(raw_rule.get("operation") or "chengyin")
+    rules = []
+    for raw_name in from_names:
+        from_name = str(raw_name or "").strip()
+        if from_name:
+            rules.append(AffixUpgrade(
+                from_level=from_level, to_level=to_level,
+                from_name=from_name, to_name=to_name, operation=operation))
+    return rules
+
+
+def _positive_int(value: object) -> TypeGuard[int]:
+    return (isinstance(value, int) and not isinstance(value, bool)
+            and value > 0)
 
 
 def _parse_date(value) -> date | None:
@@ -255,6 +290,8 @@ class GameConfigManager:
         self._first_affix_levels: dict[str, dict[str, LevelRange]] = {}
         # 词条生效等级范围：词条名 → LevelRange（词组下的 _alias_levels）
         self._affix_levels: dict[str, LevelRange] = {}
+        # 词条升级规则：跨过某等级时旧词条自动变成的新词条
+        self._affix_upgrades: list[AffixUpgrade] = []
 
         self._load()
 
@@ -289,6 +326,7 @@ class GameConfigManager:
         self._first_affixes.clear()
         self._first_affix_levels.clear()
         self._affix_levels.clear()
+        self._affix_upgrades.clear()
         self._affix_external_aliases.clear()
         self._martial_arts.clear()
         self._playstyles.clear()
@@ -506,6 +544,10 @@ class GameConfigManager:
             elif isinstance(aliases, list):
                 for alias in aliases:
                     self._alias_to_category[alias] = category
+            # 解析 _upgrades 字段（词组内的跨等级升级规则）。规则跟着词组走：
+            # 词条升级基本都是同一组内部的合并，写在组里才看得见上下文。
+            for raw_rule in levels.get("_upgrades") or []:
+                self._affix_upgrades.extend(_parse_affix_upgrades(raw_rule))
             # 解析 _alias_levels 字段（别名 → 生效等级范围）
             raw_alias_levels = levels.get("_alias_levels")
             if isinstance(raw_alias_levels, dict):
@@ -861,6 +903,30 @@ class GameConfigManager:
         识别和保存，那些走词条注册表，不走这里。
         """
         return self.get_affix_level_range(affix_name).covers(level)
+
+    def get_affix_upgrades(self) -> list[AffixUpgrade]:
+        """全部跨等级词条升级规则（按配置声明序）。"""
+        return list(self._affix_upgrades)
+
+    def resolve_affix_upgrade(self, affix_name: str, from_level: int,
+                              to_level: int,
+                              operation: str = "chengyin") -> str:
+        """装备从 ``from_level`` 升到 ``to_level`` 时该词条变成什么。
+
+        没有匹配规则返回空串（调用方保持原词条不变）。规则可以串联：一次
+        跨过两道坎时逐道应用，避免为「105 直接到 120」单独写规则。
+        """
+        name = affix_name
+        changed = True
+        while changed:
+            changed = False
+            for rule in self._affix_upgrades:
+                if (rule.operation == operation
+                        and rule.applies(name, from_level, to_level)):
+                    name = rule.to_name
+                    changed = True
+                    break
+        return "" if name == affix_name else name
 
     def get_weapon_wuxue_affix(self, weapon: str) -> str:
         """武器对应的武学增效词条（来自 weapon_types 的 wuxue_affix 字段）

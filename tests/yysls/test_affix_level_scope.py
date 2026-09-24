@@ -1,4 +1,4 @@
-"""词条生效等级范围的区间原语。
+"""词条生效等级范围、赛季承音作废线与跨等级升级。
 
 新赛季会移除一批旧词条、加入新词条，但旧词条不能从配置里删掉——历史装备
 上仍然存着它，OCR 仍会扫到，低等阶装备上它依然合法。所以这里锁住的是
@@ -13,6 +13,7 @@ from lvjiang.apps.yysls.config.affix_levels import (
     parse_entry,
     parse_range,
 )
+from lvjiang.apps.yysls.config.models import AffixUpgrade
 
 # ─── 区间原语 ──────────────────────────────────────────────
 
@@ -61,3 +62,34 @@ def test_open_range_dumps_back_to_a_bare_string():
 def test_garbage_range_falls_back_to_open():
     assert parse_range("110") == LevelRange()
     assert parse_range({"through_level": "x"}) == LevelRange()
+
+
+# ─── 升级规则 ──────────────────────────────────────────────
+
+def _merge_rule() -> AffixUpgrade:
+    return AffixUpgrade(from_level=110, to_level=115,
+                        from_name="单体类奇术增伤", to_name="全奇术增伤")
+
+
+def test_upgrade_triggers_on_crossing_the_span():
+    """「从 110 到 115」判的是跨过这段：105 一路承音到 115 同样要触发。"""
+    rule = _merge_rule()
+
+    assert rule.applies("单体类奇术增伤", 110, 115)
+    assert rule.applies("单体类奇术增伤", 105, 115)
+    assert rule.applies("单体类奇术增伤", 105, 120)
+
+
+def test_upgrade_does_not_fire_short_of_the_target():
+    rule = _merge_rule()
+
+    assert not rule.applies("单体类奇术增伤", 105, 110)
+
+
+def test_upgrade_does_not_fire_above_the_span():
+    """已经在坎上面的装备再升阶不该再被这条规则动。"""
+    assert not _merge_rule().applies("单体类奇术增伤", 115, 120)
+
+
+def test_upgrade_ignores_other_affixes():
+    assert not _merge_rule().applies("体", 110, 115)

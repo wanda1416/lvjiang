@@ -157,6 +157,16 @@ affix_caps:
       单体类奇术增伤: {through_level: 110}
       群体类奇术增伤: {through_level: 110}
       全奇术增伤: {from_level: 115}
+    # 升级规则：装备从 from_level（或更低）升到 to_level（或更高）时，旧词条
+    # 自动变成新词条。105 一路承音到 115 同样触发。只作用于升级投影，真实
+    # 扫描结果以游戏画面为准，不在这里改写。
+    _upgrades:
+    - from_level: 110
+      to_level: 115
+      from:
+      - 单体类奇术增伤
+      - 群体类奇术增伤
+      to: 全奇术增伤
     110:
       cap: 15.4
       chengyin: 14.5

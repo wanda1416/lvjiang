@@ -20,7 +20,10 @@ from ..equip_parser.dingyin_parser import (
     can_switch_dingyin,
 )
 from ..equipment_cooldown import next_cooldown_expiry
-from .development_rules import check_real_development
+from .development_rules import (
+    check_real_development,
+    expected_affix_name_after_level_change,
+)
 from .equipment_write import (
     WriteSource,
     merge_equipment_write,
@@ -744,11 +747,18 @@ class LoadoutRepository:
             if reason:
                 raise ValueError(reason)
             value.update(merged)
-            if any(
-                (old.get(f"affix_{index}") or {}).get("name")
-                != (value.get(f"affix_{index}") or {}).get("name")
+            old_level = int(old.get("level") or 0)
+            new_level = int(value.get("level") or 0)
+            has_transmute = any(
+                expected_affix_name_after_level_change(
+                    str((old.get(f"affix_{index}") or {}).get("name") or ""),
+                    old_level,
+                    new_level,
+                ) != str(
+                    (value.get(f"affix_{index}") or {}).get("name") or "")
                 for index in range(1, 6)
-            ):
+            )
+            if has_transmute:
                 from ...config import get_game_config
 
                 game_config = get_game_config()

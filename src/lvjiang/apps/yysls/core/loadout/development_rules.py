@@ -67,19 +67,30 @@ def _check_chengyin(old: dict, new: dict) -> str | None:
     new_chengyin = bool(new.get("is_chengyin"))
     if old_chengyin and not new_chengyin:
         return tr("承音状态不能撤销")
-    if new_level == old_level:
-        if old_chengyin != new_chengyin:
-            return tr("承音必须同时提升装备等级")
+    if old_chengyin == new_chengyin and new_level == old_level:
         return None
+    if old_chengyin:
+        return tr("已承音的装备不能再次承音")
+    if new_level > old_level and not new_chengyin:
+        return tr("提升装备等级必须同时承音")
 
+    game_config = get_game_config()
+    if not game_config.can_chengyin_this_season(old_level):
+        return tr("本赛季该等级的装备已不能承音")
     configs = sorted(
-        get_game_config().get_level_configs(), key=lambda item: item.level)
+        game_config.get_level_configs(), key=lambda item: item.level)
     current = next(
         (item for item in configs if item.level == old_level), None)
+    if current is None or not current.allow_chengyin:
+        return tr("该等级的装备不支持承音")
+    if new_level == old_level:
+        # 原地承音：装备已经在本赛季最高等阶，升无可升，只标记承音、数值不变。
+        if old_level < game_config.current_equip_level():
+            return tr("承音必须同时提升装备等级")
+        return None
     next_level = next(
         (item.level for item in configs if item.level > old_level), None)
-    if (old_chengyin or not new_chengyin or current is None
-            or not current.allow_chengyin or new_level != next_level):
+    if new_level != next_level:
         return tr("承音只能提升到下一个已配置等级")
     return None
 
@@ -110,15 +121,48 @@ def _check_dingyin(old: dict, new: dict) -> str | None:
     return None
 
 
+def expected_affix_name_after_level_change(
+    name: str, old_level: int, new_level: int,
+) -> str:
+    """同一条词条在目标等级上应有的名字。
+
+    游戏在承音跨过某个等阶时会把旧词条自动换成合并后的新词条（115 起
+    单体/群体类奇术增伤 → 全奇术增伤）。这是同一条词条换了名字，不是转律，
+    所以不能按「改了名字」去判它占用转律名额、也不该给它打上转律标记。
+    """
+    if not name or new_level <= old_level:
+        return name
+    from ...config import get_game_config
+
+    return get_game_config().resolve_affix_upgrade(
+        name, old_level, new_level) or name
+
+
+def _becomes_chengyin(old: dict, new: dict) -> bool:
+    return (not bool(old.get("is_chengyin"))
+            and bool(new.get("is_chengyin")))
+
+
+def _chengyin_cap(name: str, level: int) -> float | None:
+    from ..affix_cap import affix_cap_value
+
+    return affix_cap_value(level, name, chengyin=True)
+
+
 def _check_affixes(old: dict, new: dict) -> str | None:
     changed_names: list[int] = []
     old_transferred: list[int] = []
+    old_level = int(old.get("level") or 0)
+    new_level = int(new.get("level") or 0)
+    becoming_chengyin = _becomes_chengyin(old, new)
     for index in AFFIX_INDEXES:
         before = _affix(old, index)
         after = _affix(new, index)
         if before.get("is_transferred"):
             old_transferred.append(index)
-        if before.get("name") != after.get("name"):
+        expected = expected_affix_name_after_level_change(
+            str(before.get("name") or ""), old_level, new_level)
+        if expected != str(after.get("name") or ""):
             changed_names.append(index)
             if not before.get("name") or not after.get("name"):
                 return tr("真实装备不能新增或删除词条")
@@ -129,11 +173,16 @@ def _check_affixes(old: dict, new: dict) -> str | None:
             return tr("转律槽位标记不能单独修改")
         before_value = to_float(before.get("value"))
         after_value = to_float(after.get("value"))
-        if (not can_cultivate_affix_values(old)
+        if (not can_cultivate_affix_values(old) and not becoming_chengyin
                 and after_value != before_value):
             return tr("非承音装备不能培养词条数值")
         if after_value < before_value:
-            return tr("培养只能提高词条数值")
+            # 承音的那一刻允许向下截断：承音上限低于普通上限，原地承音时
+            # 已经顶满的词条必须落回承音上限，这不是「培养倒退」。
+            cap = (_chengyin_cap(str(after.get("name") or ""), new_level)
+                   if becoming_chengyin else None)
+            if cap is None or abs(after_value - cap) > 1e-6:
+                return tr("培养只能提高词条数值")
 
     if len(changed_names) > 1 or changed_names == [FIRST_AFFIX_INDEX]:
         return tr("转律只能修改商角徵羽中的一个词条")

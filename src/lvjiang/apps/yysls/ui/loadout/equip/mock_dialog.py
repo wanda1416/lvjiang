@@ -573,7 +573,11 @@ class MockEquipDialog(QDialog):
         fit_combo_to_contents(self._combo_weapon_type, minimum=140)
 
     def _get_first_affix_names(self) -> list[str]:
-        """获取当前部位的首词条候选列表（来自 base_attrs.<part>._first_affixes）"""
+        """当前部位在当前等级的首词条候选。
+
+        模拟装备就是按所选等级现造的，所以首词条按该等级的生效范围过滤：
+        115 不该再选得出 110 起已退役的首词条。
+        """
         from ....config import get_game_config
         gc = get_game_config()
         part_name = self._combo_part.currentData()
@@ -582,7 +586,10 @@ class MockEquipDialog(QDialog):
         group_key = _PART_TO_GROUP.get(part_name, "")
         if not group_key:
             return []
-        return gc.get_first_affixes(group_key)
+        return gc.get_first_affixes(group_key, self._current_level())
+
+    def _current_level(self) -> int:
+        return int(self._combo_level.currentData() or 0)
 
     def _get_filtered_affix_names(self) -> list[str]:
         """根据当前部位和武器类型过滤普通词条列表
@@ -612,10 +619,12 @@ class MockEquipDialog(QDialog):
         if not part_display:
             return [name for name in all_normal if name not in all_wuxue or name == wuxue_affix]
 
+        level = self._current_level()
         return [
             name for name in all_normal
             if (name not in all_wuxue or name == wuxue_affix)
             and part_display in gc.get_affix_parts(name)
+            and gc.is_affix_available(name, level)
         ]
 
     def _update_affix_rows(self):
@@ -646,7 +655,12 @@ class MockEquipDialog(QDialog):
         self._refresh_affix_warning()
 
     def _on_level_changed(self, _index: int):
-        """等级变化时刷新所有词条行的满值和百分比"""
+        """等级变化时刷新词条候选、满值和百分比。
+
+        候选必须一起重建：换到 115 还留着该等级已退役的词条，存出来就是
+        一件游戏里造不出来的装备。
+        """
+        self._update_affix_rows()
         for row in self._affix_rows:
             row._refresh_cap_info()
         self._update_dingyin_pct()

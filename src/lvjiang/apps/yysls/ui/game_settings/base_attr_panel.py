@@ -40,6 +40,8 @@ from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, EQUIP_PART_NAMES, WUXUE_C
 from lvjiang.ui.button_styles import apply_button_style
 
 from .....i18n import tr
+from ...config.affix_levels import OPEN as OPEN_LEVEL_RANGE
+from ...config.affix_levels import LevelRange, dump_entry, parse_entry
 from ..layout_helpers import configure_navigation_list
 from .factory_guard import deletable, factory_list_values
 from .level_combo import LevelCombo
@@ -273,6 +275,10 @@ class BaseAttrPanel(QWidget):
         self._current_part: str | None = None
         self._current_series: str | None = None
         self._saving = False  # 防止递归保存
+        #: 当前部位的首词条：[(词条名, 生效等级范围)]，顺序即配置顺序
+        self._first: list[tuple[str, LevelRange]] = []
+        #: 程序化重建首词条表期间屏蔽等级下拉的写回信号
+        self._loading_first_affixes = False
         self._init_ui()
         self._load_data()
 
@@ -324,16 +330,35 @@ class BaseAttrPanel(QWidget):
             "QFrame#firstAffixFrame { background-color: palette(alternate-base); "
             "border-radius: 4px; padding: 4px; }"
         )
-        first_affix_layout = QHBoxLayout(self._first_affix_frame)
+        first_affix_layout = QVBoxLayout(self._first_affix_frame)
         first_affix_layout.setContentsMargins(8, 4, 8, 4)
-        first_affix_layout.addWidget(QLabel(tr("首词条")))
-        self._first_affix_btn = QPushButton(tr("（点击选择首词条）"))
+        first_affix_layout.setSpacing(6)
+        first_affix_header = QHBoxLayout()
+        first_affix_header.addWidget(QLabel(tr("首词条")))
+        self._first_affix_hint = QLabel(
+            tr("生效等级不填即不限；新等阶移除的词条填截止等级，"
+               "低等阶装备上它仍然合法"))
+        self._first_affix_hint.setStyleSheet("color: palette(mid);")
+        first_affix_header.addWidget(self._first_affix_hint, 1)
+        self._first_affix_btn = QPushButton(tr("选择首词条"))
         self._first_affix_btn.clicked.connect(self._pick_first_affixes)
         apply_button_style(self._first_affix_btn, variant="neutral")
-        first_affix_layout.addWidget(self._first_affix_btn, 1)
-        self._first_affix_hint = QLabel("")
-        self._first_affix_hint.setStyleSheet("color: palette(mid);")
-        first_affix_layout.addWidget(self._first_affix_hint)
+        first_affix_header.addWidget(self._first_affix_btn)
+        first_affix_layout.addLayout(first_affix_header)
+        self._first_affix_table = QTableWidget(0, 3)
+        self._first_affix_table.setHorizontalHeaderLabels(
+            [tr("词条"), tr("生效起始等级"), tr("生效截止等级")])
+        self._first_affix_table.verticalHeader().setVisible(False)
+        first_header = self._first_affix_table.horizontalHeader()
+        first_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        first_header.setSectionResizeMode(
+            1, QHeaderView.ResizeMode.ResizeToContents)
+        first_header.setSectionResizeMode(
+            2, QHeaderView.ResizeMode.ResizeToContents)
+        self._first_affix_table.setEditTriggers(
+            QTableWidget.EditTrigger.NoEditTriggers)
+        self._first_affix_table.setMaximumHeight(200)
+        first_affix_layout.addWidget(self._first_affix_table)
         self._first_affix_frame.setVisible(False)
         right_layout.addWidget(self._first_affix_frame)
 
@@ -781,19 +806,60 @@ class BaseAttrPanel(QWidget):
     # ── 首词条（每个部位限定首词条候选，数据存于 _first_affixes）──
 
     def _refresh_first_affixes(self):
-        """刷新首词条展示（始终可编辑，不受属性跟随影响）"""
+        """刷新首词条表（始终可编辑，不受属性跟随影响）"""
         if not self._current_part:
             self._first_affix_frame.setVisible(False)
             return
         self._first_affix_frame.setVisible(True)
 
         part_data = self._part_data(self._current_part)
-        self._first = list(part_data.get("_first_affixes") or [])
+        self._first = []
+        for raw_entry in part_data.get("_first_affixes") or []:
+            name, level_range = parse_entry(raw_entry)
+            if name:
+                self._first.append((name, level_range))
         self._first_affix_btn.setEnabled(True)
-        self._first_affix_btn.setText(
-            "/".join(self._first) if self._first else tr("（点击选择首词条）")
-        )
-        self._first_affix_hint.setText("")
+        self._rebuild_first_affix_table()
+
+    def _rebuild_first_affix_table(self):
+        """一行一个首词条，各带生效等级范围。
+
+        等级下拉用「不限」而不是空白：不配就是开区间，空白看起来像漏填。
+        """
+        self._loading_first_affixes = True
+        try:
+            self._first_affix_table.setRowCount(len(self._first))
+            for row, (name, level_range) in enumerate(self._first):
+                self._first_affix_table.setItem(
+                    row, 0, QTableWidgetItem(name))
+                for col, value in (
+                    (1, level_range.from_level),
+                    (2, level_range.through_level),
+                ):
+                    combo = LevelCombo(allow_empty=True,
+                                       empty_label=tr("不限"))
+                    combo.set_level(value or None)
+                    combo.currentIndexChanged.connect(
+                        self._on_first_affix_level_changed)
+                    self._first_affix_table.setCellWidget(row, col, combo)
+        finally:
+            self._loading_first_affixes = False
+
+    def _on_first_affix_level_changed(self, _index: int):
+        if self._loading_first_affixes:
+            return
+        self._collect_first_affix_levels()
+        self._save_first_affixes()
+
+    def _collect_first_affix_levels(self):
+        for row, (name, _old) in enumerate(self._first):
+            bounds: list[int] = []
+            for col in (1, 2):
+                combo = self._first_affix_table.cellWidget(row, col)
+                level = (combo.get_level()
+                         if isinstance(combo, LevelCombo) else None)
+                bounds.append(int(level or 0))
+            self._first[row] = (name, LevelRange(bounds[0], bounds[1]))
 
     def _pick_first_affixes(self):
         """打开词条选择对话框，候选为词组配置中当前部位可见的普通词条"""
@@ -815,14 +881,16 @@ class BaseAttrPanel(QWidget):
 
         from ..tune_settings.affix_picker import AffixSelectSortDialog
         dlg = AffixSelectSortDialog(
-            candidates, list(self._first),
+            candidates, [name for name, _range in self._first],
             tr("选择首词条"), self, flat=True,
         )
         if dlg.exec():
-            self._first = dlg.selected()
-            self._first_affix_btn.setText(
-                "/".join(self._first) if self._first else tr("（点击选择首词条）")
-            )
+            # 只改成员和顺序，已配好的生效等级按词条名保留：重新勾一次不该
+            # 把别的词条的等级范围清掉。
+            kept = {name: level_range for name, level_range in self._first}
+            self._first = [(name, kept.get(name, OPEN_LEVEL_RANGE))
+                           for name in dlg.selected()]
+            self._rebuild_first_affix_table()
             self._save_first_affixes()
 
     def _save_first_affixes(self):
@@ -831,7 +899,10 @@ class BaseAttrPanel(QWidget):
             return
         part_data = self._part_data(self._current_part)
         if self._first:
-            part_data["_first_affixes"] = list(self._first)
+            part_data["_first_affixes"] = [
+                dump_entry(name, level_range)
+                for name, level_range in self._first
+            ]
         else:
             part_data.pop("_first_affixes", None)
         self._save_data()

@@ -17,6 +17,8 @@ import yaml
 from loguru import logger
 
 from ....i18n import tr
+from .affix_levels import OPEN as OPEN_LEVEL_RANGE
+from .affix_levels import LevelRange, parse_entry, parse_range
 from .constants import (
     _CHENGYIN_RATIO,
     _KEY_TO_TYPE,
@@ -249,6 +251,10 @@ class GameConfigManager:
         self._base_attr_names: list[str] = []
         # 首词条候选（从 base_attrs 各部位的 _first_affixes 字段收集）
         self._first_affixes: dict[str, list[str]] = {}
+        # 首词条生效等级范围：部位 → 词条名 → LevelRange
+        self._first_affix_levels: dict[str, dict[str, LevelRange]] = {}
+        # 词条生效等级范围：词条名 → LevelRange（词组下的 _alias_levels）
+        self._affix_levels: dict[str, LevelRange] = {}
 
         self._load()
 
@@ -281,6 +287,8 @@ class GameConfigManager:
         self._external_alias_to_affixes.clear()
         self._base_attr_names.clear()
         self._first_affixes.clear()
+        self._first_affix_levels.clear()
+        self._affix_levels.clear()
         self._affix_external_aliases.clear()
         self._martial_arts.clear()
         self._playstyles.clear()
@@ -427,7 +435,18 @@ class GameConfigManager:
             # 首词条独立解析（不受 _follow 影响）
             first_affixes = section.get("_first_affixes")
             if isinstance(first_affixes, list) and first_affixes:
-                self._first_affixes[key] = [str(a) for a in first_affixes]
+                names: list[str] = []
+                ranges: dict[str, LevelRange] = {}
+                for raw_entry in first_affixes:
+                    name, level_range = parse_entry(raw_entry)
+                    if not name:
+                        continue
+                    names.append(name)
+                    if level_range.configured:
+                        ranges[name] = level_range
+                self._first_affixes[key] = names
+                if ranges:
+                    self._first_affix_levels[key] = ranges
             part_type = _KEY_TO_TYPE.get(key)
             if part_type:
                 self._part_name_suffixes[part_type] = _string_list(
@@ -487,6 +506,13 @@ class GameConfigManager:
             elif isinstance(aliases, list):
                 for alias in aliases:
                     self._alias_to_category[alias] = category
+            # 解析 _alias_levels 字段（别名 → 生效等级范围）
+            raw_alias_levels = levels.get("_alias_levels")
+            if isinstance(raw_alias_levels, dict):
+                for alias, raw_range in raw_alias_levels.items():
+                    level_range = parse_range(raw_range)
+                    if level_range.configured:
+                        self._affix_levels[str(alias)] = level_range
             # 解析 _pool 字段（缺省普通词条）
             pool = levels.get("_pool", POOL_NORMAL)
             self._affix_pools[category] = pool if pool == POOL_DINGYIN else POOL_NORMAL
@@ -798,13 +824,42 @@ class GameConfigManager:
             "wrist": "腕甲",
         }
 
-    def get_first_affixes(self, part: str) -> list[str]:
+    def get_first_affixes(self, part: str, level: int | None = None
+                          ) -> list[str]:
         """指定部位的首词条候选列表（来自 base_attrs.<part>._first_affixes）
 
         part 为 group_key（weapon/ring/pendant/head/chest/leg/wrist）。
         未配置时返回空列表。
+
+        给了 ``level`` 就按该等级的生效范围过滤。这里的等级应当是装备的
+        **原生等级**：首词条在装备产出时就定死了，承音升阶不会换掉它，拿
+        当前等级去判会把「原生 110 首出、已承音到 115」的装备误判成非法。
         """
-        return list(self._first_affixes.get(part, []))
+        names = self._first_affixes.get(part, [])
+        if level is None:
+            return list(names)
+        ranges = self._first_affix_levels.get(part, {})
+        return [name for name in names
+                if ranges.get(name, OPEN_LEVEL_RANGE).covers(level)]
+
+    def get_first_affix_level_range(self, part: str,
+                                    affix_name: str) -> LevelRange:
+        """该部位该首词条的生效等级范围；未配置为开区间。"""
+        return self._first_affix_levels.get(part, {}).get(
+            affix_name, OPEN_LEVEL_RANGE)
+
+    def get_affix_level_range(self, affix_name: str) -> LevelRange:
+        """词条自身的生效等级范围；未配置为开区间。"""
+        return self._affix_levels.get(affix_name, OPEN_LEVEL_RANGE)
+
+    def is_affix_available(self, affix_name: str,
+                           level: int | None) -> bool:
+        """该等级能否**新产出**这个词条（调律、转律目标等）。
+
+        只管产出，不管合法性：退役词条在旧装备上仍然合法、仍要能被 OCR
+        识别和保存，那些走词条注册表，不走这里。
+        """
+        return self.get_affix_level_range(affix_name).covers(level)
 
     def get_weapon_wuxue_affix(self, weapon: str) -> str:
         """武器对应的武学增效词条（来自 weapon_types 的 wuxue_affix 字段）

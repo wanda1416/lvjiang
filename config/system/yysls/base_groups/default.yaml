@@ -19,46 +19,56 @@ materials:
     min_count: 80
     insufficient_action: ask
   food_rules:
-  - parts: [全部]
+  - parts:
+    - 全部
     max_quality: gold_only
     judge_scope: incoming
     judge_rules: []
-    ratings: [top]
+    ratings:
+    - top
     pct_op: ge
     pct: 98
     food: 彩狗粮
     on_insufficient: next
-  - parts: [全部]
+  - parts:
+    - 全部
     max_quality: gold_only
     judge_scope: incoming
     judge_rules: []
-    ratings: [top, excellent]
+    ratings:
+    - top
+    - excellent
     pct_op: ge
     pct: 88
     food: 金狗粮
     on_insufficient: skip
-  - parts: [全部]
+  - parts:
+    - 全部
     max_quality: purple_only
     judge_scope: incoming
     judge_rules: []
-    ratings: [top]
+    ratings:
+    - top
     pct_op: ge
     pct: 90
     food: 金狗粮
     on_insufficient: skip
-  - parts: [全部]
+  - parts:
+    - 全部
     max_quality: purple_only
     judge_scope: incoming
     judge_rules: []
-    ratings: [top, excellent]
+    ratings:
+    - top
+    - excellent
     pct_op: ge
     pct: 0
     food: 紫狗粮
     on_insufficient: continue
 scan:
-  entry_first_affix_only: true
-  min_level: 100
+  min_level: 105
   entry_min_rating: top
+  entry_first_affix_only: true
   max_consecutive_recycles: 50
   rules:
   - enabled: true

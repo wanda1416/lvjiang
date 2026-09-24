@@ -826,12 +826,10 @@ class SmartTuningEvaluator:
                 level = int(candidate.get("level") or 0)
             except (TypeError, ValueError):
                 level = 0
-            level_range = self._game_config.get_affix_level_range(required)
-            source_level = level_range.through_level
-            if level and source_level and level > source_level:
-                return (self._game_config.resolve_affix_upgrade(
-                    required, source_level, level) or required)
-            return required
+            # 玩法需求按候选等级投影；来源 0 不限制升级来源门槛，
+            # 不依赖词条产出上界，也不代表真实装备的来源等级。
+            return (self._game_config.resolve_affix_upgrade(
+                required, 0, level) or required)
         if slot in {"leg", "wrist"}:
             return {
                 "首领": "对首领单位增伤",

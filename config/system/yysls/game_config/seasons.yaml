@@ -236,3 +236,4 @@ season_configs:
   end_date: '2026-09-24'
   first_half_end_date: '2026-08-07'
   equip_level: 110
+  min_chengyin_level: 100

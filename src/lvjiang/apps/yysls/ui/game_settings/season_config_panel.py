@@ -59,7 +59,8 @@ _START_DATE_COL = 3
 _END_DATE_COL = 4
 _FIRST_HALF_COL = 5
 _EQUIP_LEVEL_COL = 6
-_COLS = ("#", tr("赛季编号"), tr("赛季名称"), tr("开始日期"), tr("结束日期"), "上半赛季结束", "装备等级")  # runtime tr()
+_MIN_CHENGYIN_COL = 7
+_COLS = ("#", tr("赛季编号"), tr("赛季名称"), tr("开始日期"), tr("结束日期"), "上半赛季结束", "装备等级", "最低承音等级")  # runtime tr()
 
 
 class SeasonConfigPanel(QWidget):
@@ -214,6 +215,18 @@ class SeasonConfigPanel(QWidget):
         level_combo.currentIndexChanged.connect(lambda _v: self._apply())
         self._table.setCellWidget(row, _EQUIP_LEVEL_COL, level_combo)
 
+        # 最低承音等级（赛季级作废线，不填即不限）
+        min_chengyin_combo = LevelCombo(allow_empty=True,
+                                        empty_label=tr("不限"))
+        min_chengyin_combo.setToolTip(tr(
+            "本赛季仍可承音的最低装备等级。低于它的装备本赛季已被抛弃，"
+            "既不能原地承音也不能承音到下一阶，因此不参与满等级/满承音假设。\n"
+            "这与等级配置里的「支持承音」不是一回事：后者描述该等级的装备"
+            "当年是否允许承音。"))
+        min_chengyin_combo.set_level(cfg.min_chengyin_level)
+        min_chengyin_combo.currentIndexChanged.connect(lambda _v: self._apply())
+        self._table.setCellWidget(row, _MIN_CHENGYIN_COL, min_chengyin_combo)
+
     # ── 行增删移动 ──
 
     def _on_add_row(self):
@@ -308,6 +321,8 @@ class SeasonConfigPanel(QWidget):
         end_date_edit: QDateEdit = self._table.cellWidget(row, _END_DATE_COL)
         first_half_edit: QDateEdit = self._table.cellWidget(row, _FIRST_HALF_COL)
         level_combo: LevelCombo = self._table.cellWidget(row, _EQUIP_LEVEL_COL)
+        min_chengyin_combo: LevelCombo = self._table.cellWidget(
+            row, _MIN_CHENGYIN_COL)
 
         # 转换 QDate 到 date
         def qdate_to_date(qd: QDate) -> date | None:
@@ -322,6 +337,7 @@ class SeasonConfigPanel(QWidget):
             "end_date": qdate_to_date(end_date_edit.date()),
             "first_half_end_date": qdate_to_date(first_half_edit.date()),
             "equip_level": level_combo.get_level(),
+            "min_chengyin_level": min_chengyin_combo.get_level(),
         }
 
     def _set_row_values(self, row: int, values: dict) -> None:
@@ -360,6 +376,12 @@ class SeasonConfigPanel(QWidget):
         level_combo.blockSignals(True)
         level_combo.set_level(values.get("equip_level"))
         level_combo.blockSignals(False)
+
+        min_chengyin_combo: LevelCombo = self._table.cellWidget(
+            row, _MIN_CHENGYIN_COL)
+        min_chengyin_combo.blockSignals(True)
+        min_chengyin_combo.set_level(values.get("min_chengyin_level"))
+        min_chengyin_combo.blockSignals(False)
 
     # ── 校验 ──
 

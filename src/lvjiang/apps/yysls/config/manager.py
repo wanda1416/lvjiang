@@ -603,6 +603,7 @@ class GameConfigManager:
                 end_date=_parse_date(item.get("end_date")),
                 first_half_end_date=_parse_date(item.get("first_half_end_date")),
                 equip_level=item.get("equip_level"),
+                min_chengyin_level=item.get("min_chengyin_level"),
             ))
         # 按赛季编号排序
         self._season_configs.sort(key=lambda c: c.season_number)
@@ -1141,6 +1142,30 @@ class GameConfigManager:
         无匹配返回 None。
         """
         return self.season_at(datetime.now())
+
+    def current_min_chengyin_level(self) -> int:
+        """本赛季仍可承音的最低装备等级；未配置或无生效赛季返回 0。
+
+        低于它的装备本赛季已被抛弃：既不能原地承音，也不能承音到下一阶，
+        所以任何满等级/满承音假设都不该把它算进去。
+        """
+        season = self.current_season()
+        if season is not None and season.min_chengyin_level:
+            return int(season.min_chengyin_level)
+        return 0
+
+    def can_chengyin_this_season(self, level: int | None) -> bool:
+        """该等级的装备本赛季还能不能承音。
+
+        等级未知时放行：作废线是用来排除确知已过期的装备，不是给缺失数据
+        判罪。
+        """
+        floor = self.current_min_chengyin_level()
+        if not floor:
+            return True
+        if not isinstance(level, int) or isinstance(level, bool) or level <= 0:
+            return True
+        return level >= floor
 
     def current_equip_level(self) -> int:
         """返回当前生效赛季的装备等级；无生效赛季时返回 0。

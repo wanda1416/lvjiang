@@ -1,7 +1,7 @@
-"""生效等级范围接进真实配置后的行为。
+"""生效等级范围与赛季承音作废线接进真实配置后的行为。
 
-锁住新赛季的两件事：115 不再首出哪些词条、115 调律库换掉了哪些词条。数值
-可以晚到，这些结构规则先立住。
+锁住新赛季的三件事：115 不再首出哪些词条、115 调律库换掉了哪些词条、低于
+赛季作废线的装备不再参与满等级假设。数值可以晚到，这些结构规则先立住。
 """
 
 from __future__ import annotations
@@ -9,7 +9,9 @@ from __future__ import annotations
 import pytest
 
 from lvjiang.apps.yysls.config import get_game_config
+from lvjiang.apps.yysls.config.models import SeasonConfig
 from lvjiang.apps.yysls.core.combat.affix_rules import normal_affix_candidates
+from lvjiang.apps.yysls.core.combat.combat_attrs import apply_hypothetical_caps
 from lvjiang.apps.yysls.core.equip_validator import validate_equipment_dict
 
 
@@ -88,6 +90,79 @@ def test_natively_115_equipment_cannot_have_a_retired_first_affix():
     reasons = validate_equipment_dict(_leg_with_first("体", 115, 115))
 
     assert [r for r in reasons if "首词条" in r.message]
+
+
+# ─── 赛季承音作废线 ────────────────────────────────────────
+
+@pytest.fixture
+def season_floor(monkeypatch, gc):
+    """把当前赛季固定成「最低承音 105」，不依赖机器日期。"""
+    def _apply(floor: int | None):
+        monkeypatch.setattr(
+            gc, "current_season",
+            lambda: SeasonConfig(season_number=9, equip_level=115,
+                                 min_chengyin_level=floor))
+    return _apply
+
+
+def test_levels_below_the_floor_cannot_chengyin(gc, season_floor):
+    season_floor(105)
+
+    assert not gc.can_chengyin_this_season(100)
+    assert gc.can_chengyin_this_season(105)
+    assert gc.can_chengyin_this_season(110)
+
+
+def test_no_floor_allows_every_level(gc, season_floor):
+    season_floor(None)
+
+    assert gc.can_chengyin_this_season(100)
+
+
+def test_unknown_level_is_not_written_off(gc, season_floor):
+    season_floor(105)
+
+    assert gc.can_chengyin_this_season(None)
+
+
+# ─── 满等级投影 ────────────────────────────────────────────
+
+def _qishu_head(level: int) -> dict:
+    return {
+        "type": "冠胄", "level": level, "original_level": level,
+        "affix_2": {"name": "单体类奇术增伤", "value": 10.0},
+    }
+
+
+def test_abandoned_equipment_is_not_projected_to_full_level(season_floor):
+    """低于作废线的装备本赛季已经升不动了，算进满等级会把毕业率算高。"""
+    season_floor(105)
+
+    result = apply_hypothetical_caps({"head": _qishu_head(100)},
+                                     full_level=115)
+
+    assert result["head"]["level"] == 100
+    assert not result["head"].get("is_chengyin")
+
+
+def test_equipment_at_the_floor_still_projects(season_floor):
+    season_floor(105)
+
+    result = apply_hypothetical_caps({"head": _qishu_head(105)},
+                                     full_level=115)
+
+    assert result["head"]["level"] == 115
+    assert result["head"]["is_chengyin"] is True
+
+
+def test_projection_never_touches_the_original(season_floor):
+    """投影是派生副本：真实装备必须保持游戏里的样子。"""
+    season_floor(105)
+    original = _qishu_head(110)
+
+    apply_hypothetical_caps({"head": original}, full_level=115)
+
+    assert original["level"] == 110
 
 
 # ─── 神力归属 ──────────────────────────────────────────────

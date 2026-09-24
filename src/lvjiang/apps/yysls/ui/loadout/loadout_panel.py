@@ -30,6 +30,7 @@ from .character_detail import CharacterDetailTab
 from .equip.status_tab import EquipStatusTab
 from .plan_create_dialog import PlanCreateDialog
 from .plan_manager_dialog import PlanManagerDialog
+from .widgets import HypothesisViewToggle
 
 _METRIC_CARD = (
     "QFrame {background:palette(base);border:1px solid palette(midlight);"
@@ -284,7 +285,23 @@ class LoadoutPanel(QWidget):
         )
         for control in controls:
             self._assumption_layout.addWidget(control)
+            control.toggled.connect(self._refresh_hypothesis_view)
         self._assumption_layout.addStretch()
+        self._hypothesis_view_toggle = HypothesisViewToggle()
+        self._hypothesis_view_toggle.toggled.connect(
+            self._on_hypothesis_view_toggled)
+        self._assumption_layout.addWidget(self._hypothesis_view_toggle)
+
+    def _on_hypothesis_view_toggled(self, enabled: bool) -> None:
+        equipment = getattr(self, "_equipment", None)
+        if equipment is not None:
+            equipment.set_hypothesis_view_enabled(enabled)
+
+    def _refresh_hypothesis_view(self, _checked: bool | None = None) -> None:
+        equipment = getattr(self, "_equipment", None)
+        toggle = getattr(self, "_hypothesis_view_toggle", None)
+        if equipment is not None and toggle is not None and toggle.isChecked():
+            equipment.refresh_hypothesis_view()
 
     def _attach_plan_controls(self) -> None:
         combat = self._character._combat_attrs_tab
@@ -485,6 +502,7 @@ class LoadoutPanel(QWidget):
             state.active_plan, school,
             prefs=self._repo.get_combat_prefs())
         combat._refresh_display()
+        self._refresh_hypothesis_view()
         self._stale_while_hidden = False
 
     def _on_equipment_changed(self):

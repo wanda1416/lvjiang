@@ -66,6 +66,7 @@ from ..events import EQUIPMENT_CHANGED, get_event_hub
 from ..layout_helpers import fit_combo_to_contents
 from .background import JobContext, JobController, JobProgress
 from .widgets import (
+    HypothesisViewToggle,
     assumption_pill,
     highlight_pill,
     make_pill,
@@ -1113,10 +1114,16 @@ class OptimalComboPage(QWidget):
         detail_layout = QVBoxLayout(detail_tab)
         detail_layout.setContentsMargins(8, 8, 8, 8)
         detail_layout.setSpacing(6)
+        detail_header = QHBoxLayout()
         self._detail_hint = QLabel(tr("在「最优结果」里点某一条的「查看该组合」"))
         self._detail_hint.setProperty("tone", "muted")
         self._detail_hint.setStyleSheet("font-size: 12px;")
-        detail_layout.addWidget(self._detail_hint)
+        detail_header.addWidget(self._detail_hint, 1)
+        self._detail_hypothesis_toggle = HypothesisViewToggle()
+        self._detail_hypothesis_toggle.toggled.connect(
+            self._on_detail_hypothesis_toggled)
+        detail_header.addWidget(self._detail_hypothesis_toggle)
+        detail_layout.addLayout(detail_header)
         detail_grid = QGridLayout()
         detail_grid.setSpacing(8)
         self._detail_panels: dict[str, _SlotDetailPanel] = {}
@@ -1703,10 +1710,20 @@ class OptimalComboPage(QWidget):
     def _on_show_detail(self, result: dict, *, activate: bool = True) -> None:
         """把这套组合铺到「组合详情」页。
 
-        卡片只显示原始装备；虚拟计算装备绝不进入展示层。为了兼容直接调用
-        本方法的旧代码，不带结果元数据时将参数本身视为 equipped。
+        默认显示原始装备；开启假设视图后显示搜索时用于算分的内存副本。
+        为了兼容直接调用本方法的旧代码，不带结果元数据时将参数本身视为
+        equipped。
         """
-        equipped = result.get("equipped", result)
+        self._detail_result = result
+        original_equipped = result.get("equipped", result)
+        equipped = original_equipped
+        if self._detail_hypothesis_toggle.isChecked():
+            if "equipped" in result:
+                equipped = self._preview_equipped_for(result)
+            else:
+                base = self._assumptions_provider().with_playstyle(
+                    self._playstyle)
+                equipped = base.project(original_equipped)
         assumptions = result.get("assumptions", {})
         if not isinstance(equipped, dict):
             equipped = {}
@@ -1722,9 +1739,10 @@ class OptimalComboPage(QWidget):
                 )
             else:
                 panel.show_empty()
-        filled = sum(1 for eq in equipped.values() if isinstance(eq, dict))
+        filled = sum(
+            1 for eq in original_equipped.values() if isinstance(eq, dict))
         gongjue = str(result.get("gongjue") or tr("无"))
-        changed = _changed_slots(equipped, current_equipped)
+        changed = _changed_slots(original_equipped, current_equipped)
         if changed:
             change_text = tr("需更换 {count} 件：{names}").format(
                 count=len(changed),
@@ -1732,13 +1750,23 @@ class OptimalComboPage(QWidget):
             )
         else:
             change_text = tr("与当前备战方案一致，无需更换")
+        view_text = (
+            tr("卡片显示应用假设后的内存副本")
+            if self._detail_hypothesis_toggle.isChecked()
+            else tr("卡片显示原始装备数值，计算假设标注在卡片上方")
+        )
         self._detail_hint.setText(
-            tr("弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　"
-               "卡片显示原始装备数值，计算假设标注在卡片上方")
-            .format(gongjue=gongjue, n=filled, change=change_text))
+            tr("弓玦套装：{gongjue}　共 {n} 件　·　{change}　·　{view}")
+            .format(gongjue=gongjue, n=filled, change=change_text,
+                    view=view_text))
         self._tab_widget.setTabText(2, self._ranked_title(tr("组合详情"), result))
         if activate:
             self._tab_widget.setCurrentIndex(2)
+
+    def _on_detail_hypothesis_toggled(self, _enabled: bool) -> None:
+        result = getattr(self, "_detail_result", None)
+        if isinstance(result, dict):
+            self._on_show_detail(result, activate=False)
 
     @staticmethod
     def _ranked_title(title: str, result: dict) -> str:

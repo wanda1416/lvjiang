@@ -124,7 +124,7 @@ class _FilteredDeleteDialog(QDialog):
         locked_fingerprints: set[str] | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle(tr("确认删除"))
+        self.setWindowTitle(tr("删除背包装备确认"))
         self.setMinimumWidth(520)
         self._candidates = set(candidate_fingerprints)
         self._referenced = self._candidates & set(referenced_fingerprints)
@@ -288,6 +288,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._inv = None
         #: 同一备战方案面板里的战斗属性页，由面板注入；假设栏从它取副本
         self._combat_tab = None
+        #: 仅影响顶部八个装备槽的展示，不参与仓储写入。
+        self._hypothesis_view_enabled = False
         self._display_params: dict = {}
         self._selected_slot: str | None = None
         self._batch_copy_mode = False
@@ -416,6 +418,19 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         # 右区：筛选下拉框
         _filter_lbl_style = "font-size: 12px; color: palette(mid);"
 
+        lbl_source = QLabel(tr("类型"))
+        lbl_source.setStyleSheet(_filter_lbl_style)
+        primary_filter_row.addWidget(lbl_source)
+        self._source_filter = QComboBox()
+        self._source_filter.addItem(tr("全部"), "all")
+        self._source_filter.addItem(tr("背包"), "bag")
+        self._source_filter.addItem(tr("模拟"), "mock")
+        self._source_filter.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToContents)
+        _fit_filter_combo(self._source_filter)
+        self._source_filter.currentIndexChanged.connect(self._on_filter_changed)
+        primary_filter_row.addWidget(self._source_filter)
+
         # 排序
         lbl_sort = QLabel(tr("排序"))
         lbl_sort.setStyleSheet(_filter_lbl_style)
@@ -429,19 +444,6 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         _fit_filter_combo(self._sort_filter)
         self._sort_filter.currentIndexChanged.connect(self._on_filter_changed)
         primary_filter_row.addWidget(self._sort_filter)
-
-        lbl_source = QLabel(tr("类型"))
-        lbl_source.setStyleSheet(_filter_lbl_style)
-        primary_filter_row.addWidget(lbl_source)
-        self._source_filter = QComboBox()
-        self._source_filter.addItem(tr("全部"), "all")
-        self._source_filter.addItem(tr("背包"), "bag")
-        self._source_filter.addItem(tr("模拟"), "mock")
-        self._source_filter.setSizeAdjustPolicy(
-            QComboBox.SizeAdjustPolicy.AdjustToContents)
-        _fit_filter_combo(self._source_filter)
-        self._source_filter.currentIndexChanged.connect(self._on_filter_changed)
-        primary_filter_row.addWidget(self._source_filter)
         primary_filter_row.addStretch()
 
         self._btn_delete_filtered = QPushButton(tr("删除筛选装备"))
@@ -472,8 +474,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._type_filter = QComboBox()
         self._type_filter.addItem(tr("全部"), "all")
         for sk, dn, _ in [
-            ("main_weapon", tr("主武器"), "weapon"),
-            ("sub_weapon", tr("副武器"), "weapon"),
+            ("main_weapon", tr("主武"), "weapon"),
+            ("sub_weapon", tr("副武"), "weapon"),
             ("ring", tr("环"), "ring"),
             ("pendant", tr("佩"), "pendant"),
             ("head", tr("冠胄"), "head"),
@@ -485,6 +487,12 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._type_filter.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
         _fit_filter_combo(self._type_filter)
+        shared_filter_width = max(
+            self._source_filter.minimumWidth(),
+            self._type_filter.minimumWidth(),
+        )
+        self._source_filter.setFixedWidth(shared_filter_width)
+        self._type_filter.setFixedWidth(shared_filter_width)
         self._type_filter.currentIndexChanged.connect(self._on_filter_changed)
         advanced_filter_row.addWidget(self._type_filter)
 
@@ -1256,6 +1264,30 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         """由备战方案面板注入同级的战斗属性页；不再靠 findChildren 摸兄弟。"""
         self._combat_tab = combat_tab
 
+    def set_hypothesis_view_enabled(self, enabled: bool) -> None:
+        """只重绘装备槽；投影副本不进入库存、卡片网格或仓储。"""
+        enabled = bool(enabled)
+        if self._hypothesis_view_enabled == enabled:
+            return
+        self._hypothesis_view_enabled = enabled
+        self._refresh_slots()
+
+    def refresh_hypothesis_view(self) -> None:
+        """假设选项变化后刷新已开启的假设视图。"""
+        if self._hypothesis_view_enabled:
+            self._refresh_slots()
+
+    def _slot_view_equipment(self) -> tuple[dict, object | None]:
+        """返回顶部装备槽使用的数据；开启时始终是一次性内存副本。"""
+        if not self._hypothesis_view_enabled or self._combat_tab is None:
+            return self._equipped, None
+        try:
+            assumptions = self._combat_tab.assumptions()
+            return assumptions.project(copy.deepcopy(self._equipped)), assumptions
+        except Exception as exc:  # noqa: BLE001 - 展示失败不能破坏真实装备页
+            logger.error(f"生成装备假设视图失败，已回退真实装备: {exc}")
+            return self._equipped, None
+
     def _reload_display_params(self) -> None:
         """刷新前重读装备卡片展示参数：设置页改过字号/列数，刷新即生效。"""
         from ....config.equip_display import load_equip_display
@@ -1357,6 +1389,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
 
     def _refresh_slots(self):
         dp = self._display_params
+        displayed, assumptions = self._slot_view_equipment()
         for _row, _col, slot_key, _display_name, _filter_type in _SLOT_LAYOUT:
             card = self._slot_cards[slot_key]
             card._name_fs = dp.get("name_font_size", 13)
@@ -1365,10 +1398,13 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             card._card_h = dp.get("card_min_height", 160)
             card.setFixedHeight(card._card_h)
 
-            equip = self._equipped.get(slot_key)
+            equip = displayed.get(slot_key)
             if equip:
+                dingyin_kind = self._plan_dingyin_kind(slot_key)
+                if assumptions is not None and assumptions.full_dingyin:
+                    dingyin_kind = DINGYIN_NORMAL
                 card.set_equip(
-                    equip, dingyin_kind=self._plan_dingyin_kind(slot_key))
+                    equip, dingyin_kind=dingyin_kind)
             else:
                 card.set_empty()
             # 保持选中态
@@ -1650,11 +1686,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             f"{tr('词条')}：{self._affix_filter.currentText()}",
             f"{tr('状态')}：{self._status_filter.currentText()}",
             f"{tr('扫描时间')}：{self._scan_time_filter.currentText()}",
-            f"{tr('类型')}：{self._deletion_source_summary()}",
         ))
-
-    def _deletion_source_summary(self) -> str:
-        return tr("背包")
 
     def _on_delete_filtered(self) -> None:
         """删除筛选结果；默认及当前穿戴保护在此处明确收口。"""

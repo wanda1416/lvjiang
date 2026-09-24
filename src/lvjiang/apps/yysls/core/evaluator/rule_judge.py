@@ -291,9 +291,12 @@ class GenericTuningJudge(TuningJudge):
         from ...config import get_game_config
         gc = get_game_config()
         part = result.equipment.part
-        # 部位与武器绑定以游戏配置为准（normal_affix_candidates 是唯一口径）
+        # 部位、武器绑定与生效等级都以游戏配置为准（normal_affix_candidates
+        # 是唯一口径）。等级必须带上：不带的话 115 装备仍会把该等级已经调不
+        # 出来的词条当成可填充候选，把潜力评级算高。
         physical = set(normal_affix_candidates(
-            {"type": result.equipment.type}, gc))
+            {"type": result.equipment.type,
+             "level": result.equipment.level}, gc))
 
         def part_ok(name: str) -> bool:
             # 动态词条不在游戏配置部位表中，仅非武器部位可作填充/转入候选

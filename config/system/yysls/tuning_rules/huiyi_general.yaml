@@ -30,6 +30,7 @@ affix_pool:
 - 会心率
 - 精准率
 - 单体类奇术增伤
+- 全奇术增伤
 - 对玩家单位增效
 patterns:
   主武器:
@@ -63,6 +64,7 @@ patterns:
       - count_min:
           symbols:
           - 单体类奇术增伤
+          - 全奇术增伤
           min: 1
     top_conditions:
     - - contains_all:
@@ -86,6 +88,7 @@ patterns:
           - 势
           - 劲
           - 单体类奇术增伤
+          - 全奇术增伤
           min: 2
       - count_max:
           symbols:

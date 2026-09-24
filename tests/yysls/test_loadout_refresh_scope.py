@@ -18,9 +18,11 @@ from PyQt6.QtWidgets import QComboBox
 
 import lvjiang.apps.yysls.core.combat.equipment as equipment_module
 import lvjiang.constants as constants_module
+from lvjiang.apps.yysls.core.loadout import LoadoutRepository
 from lvjiang.apps.yysls.ui.events import EQUIPMENT_CHANGED, YyslsEventHub
 from lvjiang.apps.yysls.ui.loadout.equip.status_tab import EquipStatusTab
 from lvjiang.apps.yysls.ui.loadout.loadout_panel import LoadoutPanel
+from lvjiang.core.user_config import User, save_user_metadata
 
 # ─── 事件载荷 ──────────────────────────────────────────────
 
@@ -164,6 +166,23 @@ def test_user_switch_loads_one_inventory_and_rebuilds_once(
 
     assert loaded == ["甲", "乙"]
     assert rebuilds == ["grid"]
+
+
+def test_saved_filters_are_applied_on_startup(qtbot, tmp_path, monkeypatch):
+    """启动时就要装上该用户存下来的筛选，而不是切一次用户才生效。
+
+    构造期那次 _load_filter_settings 还没有 _inv，读不到任何用户的存档，
+    摆出来的只能是默认值——真正属于这个用户的筛选要等库存注入后才读得到。
+    """
+    monkeypatch.setattr(constants_module, "USERS_DIR", tmp_path)
+    save_user_metadata(User(name="甲"), tmp_path)
+    LoadoutRepository("甲", tmp_path).set_ui_state(
+        "equip_filter", {"sort": "level_desc"})
+
+    panel = LoadoutPanel(_Host("甲"))
+    qtbot.addWidget(panel)
+
+    assert panel._equipment._sort_filter.currentData() == "level_desc"
 
 
 # ─── 筛选读取的时点 ────────────────────────────────────────

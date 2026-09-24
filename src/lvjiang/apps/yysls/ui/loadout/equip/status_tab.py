@@ -295,8 +295,10 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._batch_selected_fps: set[str] = set()
         self._batch_target_users: set[str] = set()
         self._slot_cards: dict[str, _SlotCard] = {}
-        #: 换用户后筛选待重读；见 prepare_for_user_change。
-        self._user_filters_stale = False
+        #: 筛选待按当前用户重读；见 prepare_for_user_change。构造期就是脏的：
+        #: 下面那次 _load_filter_settings 还没有 _inv，只能摆出默认值，真正
+        #: 属于这个用户的筛选要等库存注入后才读得到。
+        self._user_filters_stale = True
         self._setup_ui()
         # 构造期不读盘：装备数据由外层 LoadoutPanel 加载一次后经
         # refresh_from 注入，这里只按空库存摆好槽位卡与筛选条。
@@ -685,7 +687,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._user_filters_stale = True
 
     def _apply_pending_filters(self) -> None:
-        """换用户后重读筛选：必须在 _inv 换成新用户之后、重建网格之前。
+        """重读当前用户的筛选：必须在 _inv 就位之后、重建网格之前。
 
         筛选存在各用户自己的仓储里（``_load_user_filter`` 读的是
         ``self._inv._repo``），早一步读到的是上一个用户的筛选，晚一步则要用

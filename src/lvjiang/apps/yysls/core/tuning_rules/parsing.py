@@ -814,6 +814,54 @@ def _parse_tune(raw, where: str) -> TuneBehavior:
     )
 
 
+def _parse_smart_tuning(raw: object, where: str) -> SmartTuningConfig:
+    """解析基础规则组内的智能调律参数。"""
+    raw_smart = raw or {}
+    if not isinstance(raw_smart, dict):
+        raise RuleValidationError(f"{where} 必须是 dict")
+    plan_scope = str(raw_smart.get("plan_scope") or "incoming")
+    if plan_scope not in ("incoming", "all"):
+        raise RuleValidationError(f"{where}.plan_scope 只能是 incoming 或 all")
+    raw_eval = raw_smart.get("evaluation") or {}
+    if not isinstance(raw_eval, dict):
+        raise RuleValidationError(f"{where}.evaluation 必须是 dict")
+    operator = str(raw_eval.get("operator") or "gt")
+    if operator not in ("gt", "gte"):
+        raise RuleValidationError(f"{where}.evaluation.operator 只能是 gt 或 gte")
+    precision = raw_eval.get("precision", 0.001)
+    if (isinstance(precision, bool)
+            or not isinstance(precision, (int, float))
+            or float(precision) not in (0.01, 0.001, 0.0001)):
+        raise RuleValidationError(
+            f"{where}.evaluation.precision 只能是 0.01、0.001 或 0.0001")
+    raw_action = raw_smart.get("failure_action") or {}
+    if not isinstance(raw_action, dict):
+        raise RuleValidationError(f"{where}.failure_action 必须是 dict")
+    failure_action = str(raw_action.get("action") or "skip")
+    if failure_action not in BEHAVIOR_ACTIONS:
+        raise RuleValidationError(
+            f"{where}.failure_action.action 不合法: {failure_action!r}")
+    keep_min_rating = str(raw_action.get("keep_min_rating") or "excellent")
+    if keep_min_rating not in RATING_KEYS:
+        raise RuleValidationError(
+            f"{where}.failure_action.keep_min_rating 不合法: {keep_min_rating!r}")
+    for path, value in (
+        ("evaluation.enabled", raw_eval.get("enabled", True)),
+        ("failure_action.enabled", raw_action.get("enabled", True)),
+    ):
+        if not isinstance(value, bool):
+            raise RuleValidationError(f"{where}.{path} 必须是布尔值")
+    return SmartTuningConfig(
+        plan_scope=plan_scope,
+        evaluation=SmartTuningEvaluation(
+            enabled=raw_eval.get("enabled", True), operator=operator,
+            precision=float(precision)),
+        failure_action=SmartTuningFailureAction(
+            enabled=raw_action.get("enabled", True), action=failure_action,
+            keep_min_rating=keep_min_rating),
+    )
+
+
 def parse_tuning_group(data: dict) -> TuningGroup:
     """原始 base_groups/*.yaml dict → TuningGroup（校验失败抛
     RuleValidationError）"""
@@ -839,6 +887,8 @@ def parse_tuning_group(data: dict) -> TuningGroup:
         materials=_parse_materials(data.get("materials")),
         scan=_parse_scan(data.get("scan"), "scan"),
         tune=_parse_tune(data.get("tune"), "tune"),
+        smart_tuning=_parse_smart_tuning(
+            data.get("smart_tuning"), "smart_tuning"),
     )
 
 
@@ -859,7 +909,7 @@ def _parse_disabled(data: dict) -> bool:
 def parse_tune_config(data: dict) -> TuneConfig:
     """原始 tune_config.yaml dict → TuneConfig（校验失败抛 RuleValidationError）
 
-    承载 quality_thresholds + switches + smart_tuning。历史上的 ``base_rules`` /
+    承载 quality_thresholds + switches。历史上的 ``base_rules`` /
     ``tuning_rules`` 声明已迁到各规则文件的 ``order`` / ``disabled``，
     这里遇到只忽略，由管理器负责一次性迁移。
     """
@@ -901,62 +951,7 @@ def parse_tune_config(data: dict) -> TuneConfig:
             raise RuleValidationError(f"switches.{k}.name 不能为空")
         switches[k] = sw_name
 
-    # ─── 智能调律（公共能力默认启用；用户级开关仍默认关闭）───
-    raw_smart = data.get("smart_tuning") or {}
-    if not isinstance(raw_smart, dict):
-        raise RuleValidationError(tr("smart_tuning 必须是 dict"))
-    plan_scope = str(raw_smart.get("plan_scope") or "incoming")
-    if plan_scope not in ("incoming", "all"):
-        raise RuleValidationError(
-            tr("smart_tuning.plan_scope 只能是 incoming 或 all"))
-    raw_eval = raw_smart.get("evaluation") or {}
-    if not isinstance(raw_eval, dict):
-        raise RuleValidationError(tr("smart_tuning.evaluation 必须是 dict"))
-    operator = str(raw_eval.get("operator") or "gt")
-    if operator not in ("gt", "gte"):
-        raise RuleValidationError(
-            tr("smart_tuning.evaluation.operator 只能是 gt 或 gte"))
-    precision = raw_eval.get("precision", 0.001)
-    if (isinstance(precision, bool)
-            or not isinstance(precision, (int, float))
-            or float(precision) not in (0.01, 0.001, 0.0001)):
-        raise RuleValidationError(
-            tr("smart_tuning.evaluation.precision 只能是 0.01、0.001 或 0.0001"))
-    raw_action = raw_smart.get("failure_action") or {}
-    if not isinstance(raw_action, dict):
-        raise RuleValidationError(
-            tr("smart_tuning.failure_action 必须是 dict"))
-    failure_action = str(raw_action.get("action") or "skip")
-    if failure_action not in BEHAVIOR_ACTIONS:
-        raise RuleValidationError(
-            f"smart_tuning.failure_action.action 不合法: {failure_action!r}")
-    keep_min_rating = str(
-        raw_action.get("keep_min_rating") or "excellent")
-    if keep_min_rating not in RATING_KEYS:
-        raise RuleValidationError(
-            "smart_tuning.failure_action.keep_min_rating "
-            f"不合法: {keep_min_rating!r}")
-    for path, value in (
-        ("smart_tuning.enabled", raw_smart.get("enabled", True)),
-        ("smart_tuning.evaluation.enabled", raw_eval.get("enabled", True)),
-        ("smart_tuning.failure_action.enabled", raw_action.get("enabled", True)),
-    ):
-        if not isinstance(value, bool):
-            raise RuleValidationError(f"{path} 必须是布尔值")
-
-    smart_tuning = SmartTuningConfig(
-        enabled=raw_smart.get("enabled", True),
-        plan_scope=plan_scope,
-        evaluation=SmartTuningEvaluation(
-            enabled=raw_eval.get("enabled", True), operator=operator,
-            precision=float(precision)),
-        failure_action=SmartTuningFailureAction(
-            enabled=raw_action.get("enabled", True), action=failure_action,
-            keep_min_rating=keep_min_rating),
-    )
-
     return TuneConfig(
         quality_thresholds=quality_thresholds,
         switches=switches,
-        smart_tuning=smart_tuning,
     )

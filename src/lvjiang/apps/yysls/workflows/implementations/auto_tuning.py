@@ -75,7 +75,6 @@ from lvjiang.apps.yysls.workflows.implementations.tuning import (
 )
 from lvjiang.apps.yysls.workflows.tuning_context import TuningContextMixin
 from lvjiang.apps.yysls.workflows.tuning_doc import TuningDocWriter
-from lvjiang.core.config.resolver import get_resolver
 from lvjiang.workflows.base import BaseWorkflow
 
 from .....i18n import tr
@@ -597,7 +596,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 "min_level": self.ctx.min_level,
                 "skip_tuning": self.ctx.skip_tuning,
                 "smart_tuning": asdict(
-                    self._smart_config or get_tune_config().smart_tuning),
+                    self._smart_config or group.smart_tuning),
             }
             from lvjiang.apps.yysls.telemetry import vocab
             config["game_config_customized"] = vocab.game_config_customized()
@@ -1657,20 +1656,20 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """按本次运行用户和玩法快照初始化智能调律。"""
         self._smart_evaluator = None
         self._emit_progress("smart_tuning_updated", {"enabled": False})
-        config = get_tune_config().smart_tuning
+        group = self._ensure_base_group()
+        config = group.smart_tuning
         self._smart_config = config
-        if not get_resolver().is_dev_mode():
-            return
         user_enabled = self.ctx.smart_tuning_enabled
         if user_enabled is None:
+            enabled_by_group = self._workflow_config().get(
+                "smart_tuning_enabled", {})
             user_enabled = bool(
-                self._workflow_config().get("smart_tuning_enabled", False))
-        if not config.enabled:
-            if user_enabled:
-                logger.info("智能调律公共总开关未启用，本轮不执行智能判定")
-            return
+                enabled_by_group.get(group.key, False)
+                if isinstance(enabled_by_group, dict) else False)
         if not user_enabled:
-            logger.info("当前用户未二次启用智能调律，本轮不执行智能判定")
+            logger.info(
+                f"当前用户未对基础规则组「{group.name}」启用智能调律，"
+                "本轮不执行智能判定")
             return
         if not config.evaluation.enabled:
             return

@@ -732,7 +732,7 @@ def get_tuning_group(key: str) -> TuningGroup | None:
 class TuneConfigManager:
     """全局调律配置管理器（单文件 tune_config.yaml）
 
-    承载品阶门槛、开关注册表与智能调律公共配置；提供加载、校验、
+    承载品阶门槛与开关注册表；提供加载、校验、
     原始数据访问（UI 编辑用）与保存 + reload。
     """
 

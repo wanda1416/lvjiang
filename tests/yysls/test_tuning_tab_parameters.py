@@ -62,17 +62,10 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     }
     assert "<b>调律部位：</b>" not in labels
     assert {"<b>全局开关：</b>",
-            "<b>调律设置：</b>", "<b>调试参数：</b>",
-            "<b>智能调律：</b>"} <= labels
-
-    # 与其他参数分组一致：标题和复选框分别占据顶层布局的一行。
-    parameter_layout = tab._smart_tuning_cb.parentWidget().layout()
-    smart_label = next(
-        label for label in tab._smart_tuning_cb.parentWidget().findChildren(QLabel)
-        if label.text() == "<b>智能调律：</b>")
-    assert parameter_layout.indexOf(smart_label) >= 0
-    assert parameter_layout.indexOf(tab._smart_tuning_cb) == (
-        parameter_layout.indexOf(smart_label) + 1)
+            "<b>调律设置：</b>", "<b>调试参数：</b>"} <= labels
+    assert "<b>智能调律：</b>" not in labels
+    rules_page = tab._config_tabs.widget(0)
+    assert rules_page.isAncestorOf(tab._smart_tuning_cb)
 
     assert len(tab._tuning_globals._switch_cbs) == 2
     assert not any(
@@ -91,7 +84,7 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     assert tab._initial_stone_min.value() == 0
     assert tab._initial_stone_min.text() == ""
     assert not tab._validate_stone_cache_cb.isChecked()
-    # 公共能力默认启用，但用户级二次确认仍默认关闭。
+    # 用户对每个基础规则组分别选择是否启用，默认关闭。
     assert not tab._smart_tuning_cb.isChecked()
     assert tab._smart_tuning_cb.isEnabled()
     tab._smart_tuning_cb.setChecked(True)
@@ -110,7 +103,7 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     assert saved["initial_stone_check_enabled"] is True
     assert saved["initial_stone_min_count"] == 120
     assert saved["validate_stone_cache"] is True
-    assert saved["smart_tuning_enabled"] is True
+    assert saved["smart_tuning_enabled"]["default"] is True
 
     tab._positional_traversal_cb.setChecked(False)
     saved = get_user_workflow_params("测试用户", "auto_tuning", users_dir)
@@ -118,7 +111,7 @@ def test_tuning_tab_has_rules_and_parameters_pages(qtbot, tmp_path, monkeypatch)
     reset_session_store()
 
 
-def test_non_dev_parameters_hide_smart_tuning(qtbot, tmp_path, monkeypatch):
+def test_non_dev_rules_expose_smart_tuning(qtbot, tmp_path, monkeypatch):
     import lvjiang.constants as constants_mod
 
     monkeypatch.setattr(constants_mod, "SESSION_PATH", tmp_path / "session.json")
@@ -129,9 +122,37 @@ def test_non_dev_parameters_hide_smart_tuning(qtbot, tmp_path, monkeypatch):
     tab = TuningTab(_Host(users_dir))
     qtbot.addWidget(tab)
 
-    labels = [label.text() for label in tab._config_tabs.widget(1).findChildren(QLabel)]
-    assert "<b>智能调律：</b>" not in labels
-    assert tab._smart_tuning_cb.parentWidget() is None
+    rules_page = tab._config_tabs.widget(0)
+    assert rules_page.isAncestorOf(tab._smart_tuning_cb)
+    assert tab._smart_tuning_cb.isEnabled()
+    reset_session_store()
+
+
+def test_smart_tuning_selection_follows_base_group(
+    qtbot, tmp_path, monkeypatch,
+):
+    import lvjiang.constants as constants_mod
+
+    monkeypatch.setattr(constants_mod, "SESSION_PATH", tmp_path / "session.json")
+    reset_session_store()
+    users_dir = tmp_path / "users"
+    save_user_metadata(User(name="测试用户"), users_dir)
+    tab = TuningTab(_Host(users_dir))
+    qtbot.addWidget(tab)
+
+    tab._smart_tuning_cb.setChecked(True)
+    tab._group_radios["aggressive"].setChecked(True)
+    assert not tab._smart_tuning_cb.isChecked()
+    tab._smart_tuning_cb.setChecked(True)
+    tab._group_radios["default"].setChecked(True)
+    assert tab._smart_tuning_cb.isChecked()
+
+    saved = get_user_workflow_params("测试用户", "auto_tuning", users_dir)
+    assert saved is not None
+    assert saved["smart_tuning_enabled"] == {
+        "default": True,
+        "aggressive": True,
+    }
     reset_session_store()
 
 

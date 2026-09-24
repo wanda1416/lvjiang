@@ -18,7 +18,7 @@ def test_new_user_uses_defaults_with_no_selected_rules(tmp_path):
     assert config["rules"] == {}
     assert config["selected_slots"] == list(DEFAULT_SLOTS)
     assert "sub_weapon" not in config["selected_slots"]
-    assert config["smart_tuning_enabled"] is False
+    assert config["smart_tuning_enabled"] == {}
     assert config["skip_locked_equipment"] is True
 
 

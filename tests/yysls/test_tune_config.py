@@ -120,6 +120,7 @@ class TestDialog:
         assert dialog._nav.item(2).text() == "材料处理"
         assert dialog._nav.item(3).text() == "调律处理"
         assert dialog._nav.item(4).text() == "智能调律"
+        assert len(dialog._group_dropdowns) == 4
         # 智能调律之后才与流派规则区分
         assert not dialog._nav.item(5).flags()
         assert dialog._nav.item(6).text() == "流派规则"
@@ -131,32 +132,30 @@ class TestDialog:
         assert not isinstance(dialog._stack.widget(5), RulePanel)
         assert not dialog.findChildren(RulePanel)
 
-    def test_non_dev_dialog_omits_smart_tuning_page(
+    def test_non_dev_dialog_exposes_smart_tuning_page(
             self, qtbot, monkeypatch):
         monkeypatch.setattr(get_resolver(), "is_dev_mode", lambda: False)
         dialog = TuningRulesDialog()
         qtbot.addWidget(dialog)
 
-        assert dialog._smart_page is None
-        assert all(dialog._nav.item(i).text() != "智能调律"
-                   for i in range(dialog._nav.count()))
-        assert not dialog.findChildren(SmartTuningPage)
-        assert dialog._nav.item(4).text() != "智能调律"
-        assert dialog._stack.widget(4) is dialog._playstyle_page
+        assert isinstance(dialog._smart_page, SmartTuningPage)
+        assert dialog._nav.item(4).text() == "智能调律"
+        assert dialog.findChildren(SmartTuningPage)
+        assert dialog._stack.widget(4) is dialog._smart_page
 
         monkeypatch.setattr(
             QMessageBox, "question",
             lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes)
         dialog._dirty = True
         dialog._discard_changes()
-        dialog._nav.setCurrentRow(5)
-        assert dialog._smart_page is None
+        dialog._nav.setCurrentRow(6)
         assert dialog._stack.currentWidget() is dialog._playstyle_page
 
 
     def test_smart_tune_full_recycle_shows_and_saves_keep_threshold(
-            self, qtbot, tmp_config_manager):
-        page = SmartTuningPage(tmp_config_manager, lambda *_args: None)
+            self, qtbot, tmp_group_manager):
+        page = SmartTuningPage(
+            tmp_group_manager, "default", lambda *_args: None)
         qtbot.addWidget(page)
 
         assert not page._keep_min_rating_row.isVisible()
@@ -168,9 +167,14 @@ class TestDialog:
 
         page._keep_min_rating.setCurrentIndex(
             page._keep_min_rating.findData("top"))
-        saved = tmp_config_manager.get().smart_tuning.failure_action
+        saved = tmp_group_manager.get_group("default").smart_tuning.failure_action
         assert saved.action == "tune_full_recycle"
         assert saved.keep_min_rating == "top"
+
+        page.set_group("aggressive")
+        assert page._action.currentData() == "skip"
+        assert (tmp_group_manager.get_group("default")
+                .smart_tuning.failure_action.action == "tune_full_recycle")
 
         page._action.setCurrentIndex(page._action.findData("skip"))
         assert not page._keep_min_rating_row.isVisible()

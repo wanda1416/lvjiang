@@ -1,4 +1,4 @@
-"""智能调律公共配置页。"""
+"""基础规则组的智能调律参数页。"""
 from __future__ import annotations
 
 from typing import Callable
@@ -23,19 +23,20 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     BEHAVIOR_ACTIONS,
     RATING_KEYS,
     RATING_LABELS,
-    TuneConfigManager,
+    TuningGroupManager,
 )
 
 from .....i18n import tr
 
 
 class SmartTuningPage(QWidget):
-    """编辑 tune_config.yaml.smart_tuning，不随基础规则组切换。"""
+    """编辑当前 ``base_groups/*.yaml`` 的 ``smart_tuning`` 段。"""
 
-    def __init__(self, manager: TuneConfigManager,
+    def __init__(self, manager: TuningGroupManager, group_key: str,
                  status_cb: Callable[[str, bool], None], parent=None):
         super().__init__(parent)
         self._manager = manager
+        self._group_key = group_key
         self._status_cb = status_cb
         self._loading = True
         self._init_ui()
@@ -53,10 +54,6 @@ class SmartTuningPage(QWidget):
         description.setWordWrap(True)
         description.setStyleSheet("color: #666;")
         layout.addWidget(description)
-
-        self._enabled = QCheckBox(tr("启用智能调律"))
-        self._enabled.toggled.connect(self._changed)
-        layout.addWidget(self._enabled)
 
         scope_box = QGroupBox(tr("备战方案范围"))
         scope_layout = QVBoxLayout(scope_box)
@@ -147,13 +144,11 @@ class SmartTuningPage(QWidget):
         layout.addWidget(action_box)
         layout.addStretch()
 
-        self._dependent_widgets = (
-            scope_box, evaluation_box, action_box,
-        )
-
     def _load(self) -> None:
-        config = self._manager.get().smart_tuning
-        self._enabled.setChecked(config.enabled)
+        group = self._manager.get_group(self._group_key)
+        if group is None:
+            return
+        config = group.smart_tuning
         self._scope_incoming.setChecked(config.plan_scope == "incoming")
         self._scope_all.setChecked(config.plan_scope == "all")
         self._evaluation_enabled.setChecked(config.evaluation.enabled)
@@ -170,25 +165,18 @@ class SmartTuningPage(QWidget):
         self._sync_enabled()
 
     def _sync_enabled(self) -> None:
-        enabled = self._enabled.isChecked()
-        for widget in self._dependent_widgets:
-            widget.setEnabled(enabled)
-        self._operator.setEnabled(
-            enabled and self._evaluation_enabled.isChecked())
-        self._precision.setEnabled(
-            enabled and self._evaluation_enabled.isChecked())
-        self._action.setEnabled(enabled and self._action_enabled.isChecked())
+        self._operator.setEnabled(self._evaluation_enabled.isChecked())
+        self._precision.setEnabled(self._evaluation_enabled.isChecked())
+        self._action.setEnabled(self._action_enabled.isChecked())
         is_tune_full_recycle = (
             self._action.currentData() == "tune_full_recycle")
         self._keep_min_rating_row.setVisible(is_tune_full_recycle)
         self._keep_min_rating.setEnabled(
-            enabled and self._action_enabled.isChecked()
-            and is_tune_full_recycle)
+            self._action_enabled.isChecked() and is_tune_full_recycle)
 
     def _build(self) -> dict:
-        data = self._manager.get_raw()
+        data = self._manager.get_raw(self._group_key)
         data["smart_tuning"] = {
-            "enabled": self._enabled.isChecked(),
             "plan_scope": (
                 "all" if self._scope_all.isChecked() else "incoming"),
             "evaluation": {
@@ -216,9 +204,18 @@ class SmartTuningPage(QWidget):
                 tr("校验失败（未保存）：{err}").format(err=error), True)
             return
         try:
-            self._manager.save(data)
+            self._manager.save_group(self._group_key, data)
         except Exception as exc:  # noqa: BLE001
             logger.exception("智能调律配置暂存失败")
             self._status_cb(tr("保存失败：{e}").format(e=exc), True)
             return
         self._status_cb(tr("智能调律配置已暂存"), False)
+
+    def set_group(self, group_key: str) -> None:
+        """切换目标基础规则组并重载本页。"""
+        self._group_key = group_key
+        self._loading = True
+        try:
+            self._load()
+        finally:
+            self._loading = False

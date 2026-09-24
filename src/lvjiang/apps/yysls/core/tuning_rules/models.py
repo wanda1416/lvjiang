@@ -814,24 +814,6 @@ class TuneBehavior:
 
 
 @dataclass
-class TuningGroup:
-    """基础规则组（base_groups/ 下一个 YAML 文件，可多套切换）
-
-    承载单次调律运行的策略基线：材料设置 + 行为配置
-    （扫描/调律处理）。激进/保守等账号策略差异体现在不同规则组，
-    启动时经 TuningRunContext 注入工作流。存在性由目录决定，展示顺序由
-    ``order`` 声明。
-    """
-    key: str = "default"
-    name: str = tr("基础规则")
-    description: str = ""
-    order: int = DEFAULT_ORDER
-    materials: MaterialSettings = field(default_factory=MaterialSettings)
-    scan: ScanBehavior = field(default_factory=ScanBehavior)
-    tune: TuneBehavior = field(default_factory=TuneBehavior)
-
-
-@dataclass
 class SmartTuningEvaluation:
     """智能调律的毕业率判定。"""
 
@@ -851,14 +833,32 @@ class SmartTuningFailureAction:
 
 @dataclass
 class SmartTuningConfig:
-    """全局智能调律配置。"""
+    """基础规则组的智能调律参数。"""
 
-    enabled: bool = True
     plan_scope: str = "incoming"
     evaluation: SmartTuningEvaluation = field(
         default_factory=SmartTuningEvaluation)
     failure_action: SmartTuningFailureAction = field(
         default_factory=SmartTuningFailureAction)
+
+
+@dataclass
+class TuningGroup:
+    """基础规则组（base_groups/ 下一个 YAML 文件，可多套切换）
+
+    承载单次调律运行的策略基线：材料、扫描/调律处理及智能调律参数。
+    激进/保守等账号策略差异体现在不同规则组，启动时经
+    ``TuningRunContext`` 注入工作流。存在性由目录决定，展示顺序由
+    ``order`` 声明。
+    """
+    key: str = "default"
+    name: str = tr("基础规则")
+    description: str = ""
+    order: int = DEFAULT_ORDER
+    materials: MaterialSettings = field(default_factory=MaterialSettings)
+    scan: ScanBehavior = field(default_factory=ScanBehavior)
+    tune: TuneBehavior = field(default_factory=TuneBehavior)
+    smart_tuning: SmartTuningConfig = field(default_factory=SmartTuningConfig)
 
 
 @dataclass
@@ -873,7 +873,6 @@ class TuneConfig:
     """
     quality_thresholds: dict[str, list[str]] = field(default_factory=dict)
     switches: dict[str, str] = field(default_factory=dict)
-    smart_tuning: SmartTuningConfig = field(default_factory=SmartTuningConfig)
 
     def quality_ok(self, part: str, quality: str | None,
                    overrides: dict[str, list[str]] | None = None) -> bool:

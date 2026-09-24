@@ -34,7 +34,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
     "skip_start": None,
     "target_cell": None,
     "min_level": None,
-    "smart_tuning_enabled": False,
+    "smart_tuning_enabled": {},
 }
 
 

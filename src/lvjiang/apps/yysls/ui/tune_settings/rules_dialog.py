@@ -1,6 +1,6 @@
 """装备调律配置对话框
 
-左侧一级导航（基础规则组 + 状态机三行为点 + 开发模式智能调律 ｜
+左侧一级导航（基础规则组 + 状态机三行为点 + 智能调律 ｜
 流派规则 + 各规则）
 + 右侧内容区（QStackedWidget）：
 - 基础规则：规则组切换/新增/复制/删除 + 等级/调律门槛
@@ -8,7 +8,7 @@
 - 扫描处理：进调律前的进入门槛与处置表（ScanBehaviorPage）；
 - 材料处理：每轮调律开始前的律准石检查与狗粮规则（MaterialConfigPage）；
 - 调律处理：进入调律前及每轮结束后的行为表与重置设置（TuneBehaviorPage）；
-- 智能调律：仅开发模式展示，不随基础规则组切换；
+- 智能调律：所有用户可配置，参数随基础规则组切换；
 - 流派规则：品阶门槛与开关设定（PlaystyleConfigPage，全局不随组切换）；
 - 各规则：单规则编辑面板（RulePanel，内部含 7 项二级导航）；
   双击规则导航项弹窗修改规则名称（配置页项不可改名）。
@@ -133,7 +133,6 @@ class TuningRulesDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         source_resolver = get_resolver()
-        self._dev_mode = source_resolver.is_dev_mode()
         self._edit_session = ConfigEditSession(
             source_resolver,
             merged_paths=("yysls/tune_config.yaml",),
@@ -259,11 +258,9 @@ class TuningRulesDialog(QDialog):
         self._tune_page = TuneBehaviorPage(
             self._group_manager, group_key, self._set_status)
         self._stack.addWidget(self._tune_page)
-        self._smart_page = None
-        if self._dev_mode:
-            self._smart_page = SmartTuningPage(
-                self._config_manager, self._set_status)
-            self._stack.addWidget(self._smart_page)
+        self._smart_page = SmartTuningPage(
+            self._group_manager, group_key, self._set_status)
+        self._stack.addWidget(self._smart_page)
         self._playstyle_page = PlaystyleConfigPage(
             self._config_manager, self._set_status)
         self._stack.addWidget(self._playstyle_page)
@@ -274,8 +271,7 @@ class TuningRulesDialog(QDialog):
             (tr("调律处理"), self._tune_page),
         ):
             self._add_page_nav(title, page)
-        if self._smart_page is not None:
-            self._add_page_nav(tr("智能调律"), self._smart_page)
+        self._add_page_nav(tr("智能调律"), self._smart_page)
         add_nav_separator(self._nav)
         self._add_page_nav(tr("流派规则"), self._playstyle_page)
         # 规则组切换后三个行为页同步重载
@@ -285,7 +281,10 @@ class TuningRulesDialog(QDialog):
         # 三个行为页顶部插入「当前规则」下拉（快速切换基础规则组）
         self._group_dropdowns: list[QComboBox] = []
         self._syncing_group = False
-        for page in (self._scan_page, self._material_page, self._tune_page):
+        for page in (
+            self._scan_page, self._material_page, self._tune_page,
+            self._smart_page,
+        ):
             self._insert_group_dropdown(page)
         self._sync_group_dropdowns(group_key)
         # 加载全部规则（含禁用），禁用规则导航文字置灰
@@ -384,12 +383,13 @@ class TuningRulesDialog(QDialog):
         self._stack.setCurrentIndex(index)
 
     def _on_group_switched(self, group_key: str):
-        """基础规则组切换 → 三个行为页对准新组并重载"""
+        """基础规则组切换 → 各组级配置页对准新组并重载。"""
         self._syncing_group = True
         try:
             self._scan_page.set_group(group_key)
             self._material_page.set_group(group_key)
             self._tune_page.set_group(group_key)
+            self._smart_page.set_group(group_key)
             self._sync_group_dropdowns(group_key)
         finally:
             self._syncing_group = False
@@ -591,15 +591,6 @@ class TuningRulesDialog(QDialog):
             self._stack.removeWidget(old_playstyle)
             self._stack.insertWidget(playstyle_index, self._playstyle_page)
             old_playstyle.deleteLater()
-
-            if self._smart_page is not None:
-                old_smart = self._smart_page
-                smart_index = self._stack.indexOf(old_smart)
-                self._smart_page = SmartTuningPage(
-                    self._config_manager, self._set_status)
-                self._stack.removeWidget(old_smart)
-                self._stack.insertWidget(smart_index, self._smart_page)
-                old_smart.deleteLater()
 
             for index in reversed(range(self._stack.count())):
                 page = self._stack.widget(index)

@@ -264,7 +264,7 @@ def _wf_with(base: TuningGroup) -> FakeWF:
     return wf
 
 
-def test_non_dev_run_ignores_saved_smart_tuning_switch(monkeypatch):
+def test_non_dev_run_honors_saved_smart_tuning_switch(monkeypatch):
     wf = FakeWF()
     wf.run_ctx.smart_tuning_enabled = True
     events = []
@@ -273,8 +273,8 @@ def test_non_dev_run_ignores_saved_smart_tuning_switch(monkeypatch):
 
     wf._prepare_smart_tuning()
 
-    assert wf._smart_evaluator is None
-    assert events == [("smart_tuning_updated", {"enabled": False})]
+    assert wf._smart_evaluator is not None
+    assert events[0] == ("smart_tuning_updated", {"enabled": False})
 
 
 def test_tune_page_detector_uses_stable_label_not_dynamic_button():

@@ -148,7 +148,7 @@ class SmartTuningEvaluator:
         self._disabled_reason = ""
         # 其余七件的三满投影快照，按 (方案, 槽) 缓存
         self._other_equipped_cache: dict[tuple[str, str], dict[str, dict]] = {}
-        if config.enabled and config.evaluation.enabled:
+        if config.evaluation.enabled:
             self._contexts = self._load_contexts(
                 username, incoming_rule_configs or {}, users_dir, state)
 
@@ -374,7 +374,7 @@ class SmartTuningEvaluator:
     def evaluate(self, slot: str, equipment: dict) -> SmartTuningResult:
         """判定当前装备的合法承音上限是否能提升任一方案。"""
         started = time.perf_counter()
-        if not self.config.enabled or not self.config.evaluation.enabled:
+        if not self.config.evaluation.enabled:
             return SmartTuningResult(SmartTuningStatus.UNKNOWN, "智能判定未启用")
         if not self.active:
             return SmartTuningResult(

@@ -3,6 +3,16 @@ key: aggressive
 name: 激进规则
 order: 20
 description: 激进回收策略，降低门槛以最大化材料消耗速度
+smart_tuning:
+  plan_scope: incoming
+  evaluation:
+    enabled: true
+    operator: gt
+    precision: 0.001
+  failure_action:
+    enabled: true
+    action: skip
+    keep_min_rating: excellent
 materials:
   stone_check:
     enabled: true

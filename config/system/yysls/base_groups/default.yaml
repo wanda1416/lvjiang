@@ -3,6 +3,16 @@ key: default
 name: 默认规则
 order: 10
 description: 均衡策略，兼顾材料消耗与装备质量，适合日常使用
+smart_tuning:
+  plan_scope: incoming
+  evaluation:
+    enabled: true
+    operator: gt
+    precision: 0.001
+  failure_action:
+    enabled: true
+    action: skip
+    keep_min_rating: excellent
 materials:
   stone_check:
     enabled: true

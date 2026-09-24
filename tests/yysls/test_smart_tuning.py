@@ -456,6 +456,68 @@ def test_transmute_branch_can_rescue_candidate_without_mutating_source(
     assert equipment["affix_2"]["name"] == "垃圾"
 
 
+@pytest.mark.parametrize("requirement", ["单体", "群体"])
+@pytest.mark.parametrize("slot", ["head", "chest"])
+@pytest.mark.parametrize("level,merged", [
+    (110, False), (115, True), ("115", True),
+    (None, False), (0, False), ("未知", False),
+])
+def test_required_qishu_affix_follows_candidate_level(
+        monkeypatch, requirement, slot, level, merged):
+    from lvjiang.apps.yysls.config import get_game_config
+
+    evaluator = _bare_evaluator()
+    evaluator._game_config = gc = get_game_config()
+    monkeypatch.setattr(gc, "get_playstyle", lambda _: {"qishu_requirement": requirement})
+    candidate = {"type": "冠胄" if slot == "head" else "胸甲", "level": level}
+
+    result = evaluator._required_affix(_context("方案", "剑", "枪"), slot, candidate)
+
+    assert result == ("全奇术增伤" if merged else f"{requirement}类奇术增伤")
+
+
+@pytest.mark.parametrize("through_level", [0, 115, 120])
+@pytest.mark.parametrize("requirement", ["单体", "群体"])
+def test_required_qishu_affix_does_not_depend_on_production_upper_bound(
+        monkeypatch, through_level, requirement):
+    from lvjiang.apps.yysls.config import get_game_config
+    from lvjiang.apps.yysls.config.affix_levels import LevelRange
+
+    evaluator = _bare_evaluator()
+    evaluator._game_config = gc = get_game_config()
+    monkeypatch.setattr(gc, "get_playstyle", lambda _: {"qishu_requirement": requirement})
+    original = f"{requirement}类奇术增伤"
+    monkeypatch.setitem(gc._affix_levels, original, LevelRange(through_level=through_level))
+
+    result = evaluator._required_affix(
+        _context("方案", "剑", "枪"), "head", {"type": "冠胄", "level": 115})
+
+    assert result == "全奇术增伤"
+
+
+def test_required_qishu_affix_resolves_upgrade_chain_and_keeps_unmatched_name(monkeypatch):
+    from lvjiang.apps.yysls.config import get_game_config
+    from lvjiang.apps.yysls.config.models import AffixUpgrade
+
+    evaluator = _bare_evaluator()
+    evaluator._game_config = gc = get_game_config()
+    monkeypatch.setattr(gc, "get_playstyle", lambda _: {"qishu_requirement": "单体"})
+    # 只在内存中追加未来升级规则，不改真实词条或产出范围配置。
+    monkeypatch.setattr(gc, "_affix_upgrades", [
+        *gc.get_affix_upgrades(),
+        AffixUpgrade(from_level=115, to_level=120,
+                     from_name="全奇术增伤", to_name="测试奇术增伤"),
+    ])
+    context = _context("方案", "剑", "枪")
+    candidate = {"type": "冠胄", "level": 120}
+    assert evaluator._required_affix(context, "head", candidate) == "测试奇术增伤"
+
+    monkeypatch.setattr(gc, "_affix_upgrades", [])
+    assert evaluator._required_affix(context, "head", candidate) == "单体类奇术增伤"
+    monkeypatch.setattr(gc, "get_playstyle", lambda _: {})
+    assert evaluator._required_affix(context, "head", candidate) == ""
+
+
 def test_playstyle_required_affix_bypasses_normal_rule_pool(monkeypatch):
     evaluator = _bare_evaluator()
     evaluator._game_config.get_playstyle = lambda _name: {

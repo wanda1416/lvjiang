@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.affix_cap import affix_cap_value
+from lvjiang.apps.yysls.core.combat.affix_rules import normal_affix_candidates
 from lvjiang.apps.yysls.core.equip_parser.constants import WEAPON_TYPES
 from lvjiang.apps.yysls.core.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.core.evaluator import (
@@ -52,60 +53,6 @@ from ...tuning.config_widget import TuningConfigWidget
 # 选中「武器」时另出二级下拉选具体武器，避免武器与部位混叠
 PART_WEAPON = "武器"
 PART_ITEMS: list[str] = [PART_WEAPON, "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲"]
-
-# 调律词条池（词条 2-5，全部位可出，attributes.yaml 标准字段名）
-_COMMON_AFFIXES: list[str] = [
-    "最大外功攻击", "最小外功攻击",
-    "劲", "势", "敏", "体", "御",
-    "会意率", "会心率", "精准率",
-    *[f"{prefix}{attr}攻击"
-      for attr in ("无相", "裂石", "牵丝", "破竹", "鸣金")
-      for prefix in ("最大", "最小")],
-]
-
-# 初始词条池（词条 1，按部位区分，源：01-equipment-system.md 三.1）
-_INITIAL_WEAPON: list[str] = [
-    "最大外功攻击", "最小外功攻击",
-    "最大无相攻击", "最小无相攻击", "敏", "势",
-]
-_INITIAL_JEWELRY: list[str] = ["最大外功攻击", "最小外功攻击"]
-_INITIAL_HEAD_CHEST: list[str] = [
-    "会心率", "会意率", "精准率", "气血最大值", "外功防御",
-]
-_INITIAL_LEG_WRIST: list[str] = [
-    "会心率", "会意率", "劲", "精准率", "体", "御",
-    "气血最大值", "外功防御",
-]
-_INITIAL_AFFIXES: dict[str, list[str]] = {
-    **{w: _INITIAL_WEAPON for w in WEAPON_TYPES},
-    "环": _INITIAL_JEWELRY, "佩": _INITIAL_JEWELRY,
-    "冠胄": _INITIAL_HEAD_CHEST, "胸甲": _INITIAL_HEAD_CHEST,
-    "胫甲": _INITIAL_LEG_WRIST, "腕甲": _INITIAL_LEG_WRIST,
-}
-
-# 武器 → 专属武学增伤/增效词条
-_WEAPON_WUXUE: dict[str, list[str]] = {
-    "陌刀": ["陌刀武学增伤"],
-    "舞绫鼓": ["舞绫鼓武学增伤"],
-    "双刀": ["双刀武学增伤"],
-    "绳镖": ["绳镖武学增伤"],
-    "横刀": ["横刀武学增伤"],
-    "手甲": ["手甲武学增伤"],
-    "剑": ["剑武学增伤"],
-    "枪": ["枪武学增伤"],
-    "扇": ["扇武学增伤", "扇武学增效"],
-    "伞": ["伞武学增伤"],
-}
-
-# 非武器部位 → 专属神力词条
-_PART_EXTRA: dict[str, list[str]] = {
-    "环": ["全武学增效"],
-    "佩": ["全武学增效"],
-    "冠胄": ["单体类奇术增伤"],
-    "胸甲": ["单体类奇术增伤"],
-    "胫甲": ["对首领单位增伤", "对玩家单位增效"],
-    "腕甲": ["对首领单位增伤", "对玩家单位增效"],
-}
 
 _NONE_ITEM = tr("（未选）")
 _NONE_ITEM_KEY = ""
@@ -197,6 +144,8 @@ class EquipAffixEditor(QWidget):
             self._affix_combos.append(combo)
             self._affix_spins.append(spin)
 
+        self._level_combo.currentIndexChanged.connect(
+            self._rebuild_affix_options)
         self._on_part_changed()
 
     # ─── 候选池 ──────────────────────────────────────────────
@@ -214,19 +163,25 @@ class EquipAffixEditor(QWidget):
         self.weapon_combo.setVisible(is_weapon)
         self._rebuild_affix_options()
 
-    def _divine_affixes(self) -> list[str]:
-        """当前部位的专属神力词条（仅调律可得，不会是首词条）"""
-        equip_type = self.current_type()
-        return (_WEAPON_WUXUE.get(equip_type)
-                or _PART_EXTRA.get(equip_type) or [])
-
     def _initial_candidates(self) -> list[str]:
-        """词条 1 候选：仅部位初始词条池"""
-        return list(_INITIAL_AFFIXES.get(self.current_type(), []))
+        """词条 1 候选：公共装备配置中的当前等级首词条池。
+
+        ``get_first_affixes`` 按 group_key（weapon/ring/head/…）取，不是按
+        展示部位名（武器/环/冠胄/…）——后者查不到任何条目，会让首词条下拉
+        整个变空。
+        """
+        manager = get_game_config()
+        group = manager.get_type_to_group().get(self.current_type(), "")
+        if not group:
+            return []
+        return manager.get_first_affixes(group, self._level_combo.get_level())
 
     def _tuning_candidates(self) -> list[str]:
-        """词条 2-5 候选：通用调律池 + 部位神力"""
-        return [*_COMMON_AFFIXES, *self._divine_affixes()]
+        """词条 2-5 候选：公共配置中的部位、武器和等级交集。"""
+        return normal_affix_candidates({
+            "type": self.current_type(),
+            "level": self._level_combo.get_level(),
+        }, get_game_config())
 
     def _rebuild_affix_options(self):
         """部位变更：重建全部词条候选并清空已选与数值"""

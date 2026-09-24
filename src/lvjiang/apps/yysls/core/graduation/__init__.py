@@ -20,6 +20,7 @@ from ..combat.combat_attrs import (
     CombatAttributes,
 )
 from .graduation_program import ProgramRuntime
+from .model_inputs import adapt_attrs_to_model_inputs
 
 _DATA_REL_DIR = "yysls/graduation"
 _ALL_SCHOOLS = {
@@ -84,11 +85,13 @@ class GenericCalculator(GraduationCalculator):
         return self._combat_time
 
     def calculate(self, attrs: CombatAttributes) -> GraduationResult:
+        specs = self._data["program"]["inputs"]
+        attrs = adapt_attrs_to_model_inputs(attrs, specs)
         values = [
             float(getattr(attrs, spec["name"], 0.0))
             if spec["kind"] == "field"
             else float(attrs.extra_attrs.get(spec["name"], 0.0))
-            for spec in self._data["program"]["inputs"]
+            for spec in specs
         ]
         outputs = ProgramRuntime(self._data["program"], values).outputs()
         graduation_rate = outputs["dps"] / self._baseline
@@ -99,6 +102,13 @@ class GenericCalculator(GraduationCalculator):
             baseline_dps=self._baseline,
             combat_time=outputs["combat_time"],
         )
+
+
+def _fold_all_qs_bonus(
+    attrs: CombatAttributes, specs: list[dict[str, Any]],
+) -> CombatAttributes:
+    """兼容原内部入口；实际契约集中在 model_inputs。"""
+    return adapt_attrs_to_model_inputs(attrs, specs)
 
 
 def invalidate_graduation_cache() -> None:

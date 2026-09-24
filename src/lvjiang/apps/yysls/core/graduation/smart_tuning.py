@@ -816,10 +816,22 @@ class SmartTuningEvaluator:
             return ("全武学增效"
                     if cfg.get("all_skill_requirement") == "需要" else "")
         if slot in {"head", "chest"}:
-            return {
+            required = {
                 "单体": "单体类奇术增伤",
                 "群体": "群体类奇术增伤",
             }.get(str(cfg.get("qishu_requirement") or ""), "")
+            if not required:
+                return ""
+            try:
+                level = int(candidate.get("level") or 0)
+            except (TypeError, ValueError):
+                level = 0
+            level_range = self._game_config.get_affix_level_range(required)
+            source_level = level_range.through_level
+            if level and source_level and level > source_level:
+                return (self._game_config.resolve_affix_upgrade(
+                    required, source_level, level) or required)
+            return required
         if slot in {"leg", "wrist"}:
             return {
                 "首领": "对首领单位增伤",

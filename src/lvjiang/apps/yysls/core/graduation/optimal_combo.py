@@ -35,6 +35,7 @@ from ..combat.combat_attrs import (
 )
 from .assumptions import Assumptions
 from .graduation_program import ProgramRuntime
+from .model_inputs import adapt_attrs_to_model_inputs
 
 # 固定战斗属性字段名集合：extra_attrs 抗性循环需跳过（原逻辑只对
 # BONUS_PERCENT_FIELDS/PENETRATION_FIELDS/THREE_RATE_FIELDS 固定字段套公式）。
@@ -210,6 +211,7 @@ def _attrs_to_input(
     input_specs: list[dict[str, str]],
 ) -> list[float]:
     """Project *CombatAttributes* onto the program's input vector."""
+    attrs = adapt_attrs_to_model_inputs(attrs, input_specs)
     return [
         float(getattr(attrs, spec["name"], 0.0))
         if spec["kind"] == "field"
@@ -240,6 +242,7 @@ def _compute_base_vec_raw(
     This is the raw base contribution. Resistance will be applied
     after combining with equipment contributions.
     """
+    base_attrs = adapt_attrs_to_model_inputs(base_attrs, input_specs)
     vec = _zero_input(input_specs)
 
     # Fixed fields
@@ -271,6 +274,7 @@ def _compute_equip_vec_raw(
 
     Resistance will be applied after combining all equipment contributions.
     """
+    equip_attrs = adapt_attrs_to_model_inputs(equip_attrs, input_specs)
     vec = _zero_input(input_specs)
     target_pen = context.target_pen_field
 

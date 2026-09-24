@@ -8,6 +8,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import (
     QComboBox,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
     QMenu,
     QPushButton,
@@ -207,6 +208,7 @@ def test_filtered_delete_dialog_defaults_to_protecting_loadout_items(qtbot):
     )
     qtbot.addWidget(dialog)
 
+    assert dialog.windowTitle() == "删除背包装备确认"
     assert dialog.preserve_referenced
     assert dialog.preserve_locked
     assert dialog.effective_delete_count == 0
@@ -232,6 +234,25 @@ def test_filtered_delete_dialog_disables_delete_when_everything_is_protected(
 
     assert dialog.effective_delete_count == 0
     assert not dialog._delete_button.isEnabled()
+
+
+def test_filter_toolbar_uses_type_before_sort_and_compact_weapon_labels(qtbot):
+    from tests.yysls.test_loadout_panel_layout import _Host
+
+    tab = EquipStatusTab(_Host())
+    qtbot.addWidget(tab)
+
+    primary = next(
+        layout for layout in tab.findChildren(QHBoxLayout)
+        if layout.indexOf(tab._source_filter) >= 0
+        and layout.indexOf(tab._sort_filter) >= 0
+    )
+    assert primary.indexOf(tab._source_filter) < primary.indexOf(tab._sort_filter)
+    assert [tab._type_filter.itemText(index) for index in range(3)] == [
+        "全部", "主武", "副武",
+    ]
+    assert tab._source_filter.width() == tab._type_filter.width()
+    assert "类型：背包" not in tab._filter_summary()
 
 
 def test_compact_card_batch_mode_selects_by_click_and_blocks_context(qtbot):

@@ -6,7 +6,16 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPalette
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QTabWidget, QWidget
+from PyQt6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QTabWidget,
+    QToolButton,
+    QWidget,
+)
+
+from .....i18n import tr
 
 # ── 主题 ──
 
@@ -29,6 +38,25 @@ def style_document_tabs(tabs: QTabWidget, object_name: str) -> None:
         f"QTabWidget#{object_name} QTabBar::tab {{"
         " padding: 9px 18px; min-width: 120px; }"
     )
+
+
+class HypothesisViewToggle(QToolButton):
+    """切换装备卡片的真实数据与计算假设内存副本。"""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("hypothesisViewToggle")
+        self.setText(tr("假设视图"))
+        self.setCheckable(True)
+        self.setToolTip(tr(
+            "在原始装备与应用当前计算假设后的内存副本之间切换"))
+        self.setStyleSheet(
+            "QToolButton { border: 1px solid palette(mid); border-radius: 10px;"
+            " padding: 3px 10px; color: palette(mid); }"
+            "QToolButton:hover { background: palette(midlight); }"
+            "QToolButton:checked { background: palette(highlight);"
+            " color: palette(highlighted-text); border-color: palette(highlight); }"
+        )
 
 
 # ── 胶囊 ──

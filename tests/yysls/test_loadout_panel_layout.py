@@ -49,6 +49,43 @@ def test_assumptions_share_public_metric_row(qtbot):
     assert [panel._metrics_layout.stretch(index) for index in range(3)] == [
         2, 1, 1,
     ]
+    assert panel._hypothesis_view_toggle.text() == "假设视图"
+    assert panel._assumption_layout.itemAt(
+        panel._assumption_layout.count() - 1).widget() is (
+            panel._hypothesis_view_toggle)
+
+
+def test_hypothesis_view_projects_slot_cards_without_mutating_equipment(
+    qtbot, monkeypatch,
+):
+    from lvjiang.apps.yysls.config import get_game_config
+    from lvjiang.apps.yysls.core.graduation.assumptions import Assumptions
+
+    panel = LoadoutPanel(_Host())
+    qtbot.addWidget(panel)
+    original = {
+        "type": "环", "name": "测试环", "level": 110,
+        "quality": "gold", "is_chengyin": False,
+        "affix_1": {"name": "最大外功攻击", "value": 100},
+    }
+    panel._equipment._equipped = {"ring": original}
+    assumptions = Assumptions(full_level=get_game_config().current_equip_level())
+    monkeypatch.setattr(
+        panel._character._combat_attrs_tab, "assumptions", lambda: assumptions)
+    panel._equipment._refresh_slots()
+
+    panel._hypothesis_view_toggle.setChecked(True)
+
+    shown = panel._equipment._slot_cards["ring"]._equip_data
+    assert shown is not original
+    assert shown["level"] == get_game_config().current_equip_level()
+    assert shown["is_chengyin"] is True
+    assert "承音" in panel._equipment._slot_cards["ring"].lbl_info.text()
+    assert original["level"] == 110
+    assert original["is_chengyin"] is False
+
+    panel._hypothesis_view_toggle.setChecked(False)
+    assert panel._equipment._slot_cards["ring"]._equip_data is original
 
 
 def test_main_toolbar_exposes_first_three_analysis_tabs(qtbot):

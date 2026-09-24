@@ -286,6 +286,41 @@ def test_show_attrs_projects_per_slot_and_labels_tab_with_rank(qtbot):
     assert result["equipped"]["ring"].get("is_chengyin") is False
 
 
+def test_detail_hypothesis_toggle_switches_between_original_and_projection(
+    qtbot, monkeypatch,
+):
+    from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
+
+    monkeypatch.setattr(OptimalComboPage, "_load_candidates", lambda self: None)
+    page = OptimalComboPage(
+        _Host(), "鸣金·虹", "基础方案", CombatAttributes(),
+        playstyle="无名",
+        assumptions_provider=lambda: Assumptions(full_chengyin=True),
+    )
+    qtbot.addWidget(page)
+    page._searched_assumptions = Assumptions(
+        full_chengyin=True, playstyle="无名")
+    result = _result()
+
+    page._on_show_detail(result)
+    original = page._detail_panels["ring"].card._equip_data
+    assert original["is_chengyin"] is False
+    assert original["affix_1"]["value"] == 100
+
+    page._detail_hypothesis_toggle.setChecked(True)
+    projected = page._detail_panels["ring"].card._equip_data
+    assert projected is not original
+    assert projected["is_chengyin"] is True
+    assert projected["affix_1"]["value"] != 100
+    assert "内存副本" in page._detail_hint.text()
+    assert result["equipped"]["ring"]["is_chengyin"] is False
+    assert result["equipped"]["ring"]["affix_1"]["value"] == 100
+
+    page._detail_hypothesis_toggle.setChecked(False)
+    assert page._detail_panels["ring"].card._equip_data is (
+        result["equipped"]["ring"])
+
+
 def test_combat_attrs_preview_instance_is_read_only(qtbot, monkeypatch):
     from lvjiang.apps.yysls.ui.loadout.combat.attrs_tab import CombatAttrsTab
 

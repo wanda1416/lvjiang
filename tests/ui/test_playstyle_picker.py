@@ -126,7 +126,7 @@ def test_equipment_details_open_on_click_not_on_hover() -> None:
 
 def _detail_dialog(current_equipped: dict | None = None):
     """只搭组合详情页需要的那几样，不走完整构造（那要读 session）。"""
-    from PyQt6.QtWidgets import QLabel, QTabWidget
+    from PyQt6.QtWidgets import QCheckBox, QLabel, QTabWidget
 
     from lvjiang.apps.yysls.ui.loadout.optimal_combo import (
         _SLOT_ORDER,
@@ -143,6 +143,8 @@ def _detail_dialog(current_equipped: dict | None = None):
     dlg._slot_labels = {key: name for key, name, _ft in _SLOT_ORDER}
     dlg._current_equipped = dict(current_equipped or {})
     dlg._detail_hint = QLabel()
+    # 假设视图开关：不勾选即默认的「显示原始装备」，正是这两条用例要验的
+    dlg._detail_hypothesis_toggle = QCheckBox()
     dlg._tab_widget = QTabWidget()
     for _ in range(3):
         dlg._tab_widget.addTab(QLabel(), "t")

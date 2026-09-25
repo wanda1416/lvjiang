@@ -151,11 +151,40 @@ class TestParseDetail1:
         buf = io.StringIO()
         sink_id = logger.add(buf, level="WARNING")
         try:
-            result = parse_detail1(["会心率", "未识别"])
+            result = parse_detail1(["外功穿透", "未识别"])
         finally:
             logger.remove(sink_id)
-        assert "crit_rate" not in result
-        assert "会心率" in buf.getvalue()
+        assert "outer_pen" not in result
+        assert "外功穿透" in buf.getvalue()
+
+    @pytest.mark.parametrize("label", [
+        "精准率", "会心率", "会意率", "直接会心率", "直接会意率",
+        "会心伤害加成", "会意伤害加成", "外功伤害加成", "属攻伤害加成",
+    ])
+    def test_scanned_ratio_requires_the_game_fixed_tenth_format(self, label):
+        """实机中这些字段即使为整数也显示 .0；缺少小数点必须整次失败。"""
+        buf = io.StringIO()
+        sink_id = logger.add(buf, level="ERROR")
+        try:
+            with pytest.raises(ValueError, match="固定一位小数百分比"):
+                parse_detail1([label, "52 2%"])
+        finally:
+            logger.remove(sink_id)
+        logged = buf.getvalue()
+        assert label in logged
+        assert "52 2%" in logged
+        assert "避免遗漏小数点" in logged
+
+    def test_later_ambiguous_rate_cannot_overwrite_an_earlier_valid_snapshot(self):
+        raw = {
+            "left_1": "判定属性 | 会心率 | 52.2%",
+            "left_2": "判定属性 | 会心率 | 52 2%",
+        }
+        with pytest.raises(ValueError, match="会心率.*52 2%"):
+            RoleAttrParser().parse(raw)
+
+    def test_integer_resistances_are_outside_the_strict_scan_fields(self):
+        assert parse_detail1(["判定抗性", "180%", "增益抗性", "32%"]) == {}
 
     def test_unknown_labels_ignored(self):
         result = parse_detail1(self._tokens)
@@ -189,6 +218,13 @@ def test_scan_reads_outer_attack_before_attribute_attack():
     assert workflow.index(outer_find) < workflow.index(attr_find)
     assert "eval $data.right_outer_attack = $r2.detail_2" in workflow
     assert "eval $data.right_attr_attack = $r2.detail_2" in workflow
+
+
+def test_scan_failure_tells_user_to_create_base_attrs_manually():
+    workflow = (
+        SYSTEM_CONFIG_DIR / "workflows/subcall/loadout/role_attrs.wf"
+    ).read_text(encoding="utf-8")
+    assert "自动写基础属性失败，请用户手动新建属性" in workflow
 
 
 @pytest.mark.parametrize(

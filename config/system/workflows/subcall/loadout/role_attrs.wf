@@ -28,7 +28,7 @@ def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scr
         eval $scan_error = $err
     end
     if not $silent_write
-        log error "基础属性识别失败: " + $scan_error
+        log error "自动写基础属性失败，请用户手动新建属性: " + $scan_error
         return -1
     end
     click [role_detail].[back] after wait @page_refresh
@@ -45,7 +45,7 @@ def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scr
         return -1
     end
     if $scan_error
-        log warn "跳过备战方案基础属性写入: " + $name + "；" + $scan_error
+        log error "自动写基础属性失败，请用户手动新建属性: " + $name + "；" + $scan_error
         return -2
     end
     log info "基础属性识别并写入: " + $saved_name

@@ -32,7 +32,7 @@ from ...core.loadout import (
 )
 from ..domain_labels import combat_type_label
 from ..game_settings.level_combo import LevelCombo
-from ..layout_helpers import configure_navigation_list
+from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from .plan_create_dialog import PlanCreateDialog
 from .plan_table_delegate import (
     COL_NAME,
@@ -79,11 +79,14 @@ class PlanManagerDialog(QDialog):
         world_level_row.addWidget(QLabel(tr("个人世界等级：")))
         season_level = self._game_config.current_equip_level()
         follow_label = (
-            tr("随赛季等级（{level}）").format(level=season_level)
-            if season_level else tr("随赛季等级")
+            tr("随赛季更新（{level}）").format(level=season_level)
+            if season_level else tr("随赛季更新")
         )
         self._world_level_combo = LevelCombo(
             allow_empty=True, empty_label=follow_label)
+        # 「随赛季更新（115）」比等级数字长得多，按文本实测宽度撑开，
+        # 并把下拉箭头和边距算进去，否则这一项会被截断成「随赛季更…」。
+        fit_combo_to_contents(self._world_level_combo, minimum=180)
         self._world_level_combo.setToolTip(tr(
             "个人等级决定毕业率计算使用的抗性，并限定可加载的最高方案等级。"
             "留空时自动跟随当前赛季等级。"))

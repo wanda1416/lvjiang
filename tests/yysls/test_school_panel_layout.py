@@ -8,6 +8,7 @@ from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QGroupBox,
+    QHeaderView,
     QLabel,
     QScrollArea,
     QTableWidgetItem,
@@ -36,10 +37,12 @@ def _add_scheme(panel: SchoolPanel, name: str = "测试方案") -> None:
     )
     row = panel._scheme_list.rowCount()
     panel._scheme_list.insertRow(row)
-    item = QTableWidgetItem(name)
-    item.setData(Qt.ItemDataRole.UserRole, ref)
-    panel._scheme_list.setItem(row, 0, item)
-    panel._scheme_list.setItem(row, 1, QTableWidgetItem("110级 · v1"))
+    # 与生产同形：等级 / 名称 / 版本三列，ref 挂在首列。
+    level_item = QTableWidgetItem("110级")
+    level_item.setData(Qt.ItemDataRole.UserRole, ref)
+    panel._scheme_list.setItem(row, 0, level_item)
+    panel._scheme_list.setItem(row, 1, QTableWidgetItem(name))
+    panel._scheme_list.setItem(row, 2, QTableWidgetItem("v1"))
 
 
 def test_school_details_scroll_together_without_squeezing_values(qtbot):
@@ -209,3 +212,20 @@ def test_switching_base_attrs_does_not_collapse_details_mid_update(
         assert final_height == original_height
     assert all(height >= final_height for height in recorder.heights), (
         original_height, recorder.heights)
+
+
+def test_scheme_table_columns_are_level_name_version(qtbot):
+    """列序即 _selected_model_ref 取 ref 的位置，改列要连带改它。"""
+    panel = _panel(qtbot)
+    header = panel._scheme_list.horizontalHeader()
+
+    assert panel._scheme_list.columnCount() == 3
+    assert [panel._scheme_list.horizontalHeaderItem(i).text()
+            for i in range(3)] == ["方案等级", "方案名称", "版本号"]
+    # 名称列吃掉剩余宽度，等级和版本按内容收窄
+    assert header.sectionResizeMode(1) == QHeaderView.ResizeMode.Stretch
+
+    _add_scheme(panel)
+    panel._scheme_list.selectRow(0)
+    ref = panel._selected_model_ref()
+    assert ref is not None and ref.level == 110 and ref.version == 1

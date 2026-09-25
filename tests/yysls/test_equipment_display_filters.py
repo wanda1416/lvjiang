@@ -542,6 +542,27 @@ def test_properties_dialog_shows_set_with_inline_switch_button(qtbot):
     assert ("huanhua", "浣花") in dialog._equipment_set_options()
 
 
+def test_equipment_cards_show_plain_set_name_at_level_row_end(qtbot):
+    equip = {
+        "type": "环", "name": "流星环", "level": 110,
+        "quality": "gold", "equipment_set": "yudou",
+    }
+    slot = _SlotCard("ring", "环", "ring")
+    compact = _CompactEquipCard()
+    qtbot.addWidget(slot)
+    qtbot.addWidget(compact)
+
+    slot.set_equip(equip)
+    compact.set_equip(equip, "环", "ring")
+
+    assert slot.lbl_equipment_set.text() == "玉斗"
+    assert compact.lbl_equipment_set.text() == "玉斗"
+    assert "玉斗" not in slot.lbl_info.text()
+    assert "玉斗" not in compact.lbl_level.text()
+    assert "套装" not in slot.lbl_equipment_set.text()
+    assert "·" not in compact.lbl_equipment_set.text()
+
+
 def test_dingyin_context_action_only_exists_for_two_slots_and_names_target(
     qtbot,
 ):

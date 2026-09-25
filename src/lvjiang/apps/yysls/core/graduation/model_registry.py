@@ -40,8 +40,17 @@ def model_rel_path(school: str, scheme: str, level: int, version: int) -> str:
 
 
 def _parse_model(rel_path: str, data: object) -> GraduationModelRef | None:
-    if not isinstance(data, dict) or data.get("schema_version") != MODEL_SCHEMA_VERSION:
+    if not isinstance(data, dict):
+        logger.warning(f"毕业率模型不是 JSON 对象，已忽略: {rel_path}")
+        return None
+    if data.get("schema_version") != MODEL_SCHEMA_VERSION:
         # 旧用户模型明确不兼容：不猜等级、不迁移，也不让它进入方案列表。
+        # 但必须留下日志——否则用户自己导入过的方案会凭空消失，而界面上
+        # 只会说「方案不可用」，排查链路是断的。
+        logger.warning(
+            f"毕业率模型格式是 schema {data.get('schema_version')!r}，"
+            f"当前只识别 {MODEL_SCHEMA_VERSION}，已忽略 {rel_path}；"
+            "该方案需要用对应的 Excel 重新导入一次")
         return None
     school = str(data.get("school") or "").strip()
     scheme = str(data.get("scheme") or "").strip()
@@ -107,6 +116,23 @@ def select_graduation_model(
     ]
     return max(candidates, key=lambda item: (item.level, item.version),
                default=None)
+
+
+def describe_missing_model(school: str, scheme: str, world_level: int) -> str:
+    """没选出模型时说清为什么，而不是笼统一句「方案不可用」。
+
+    最常见的原因是个人世界等级低于所有已有模型的等级——这时该调的是世界
+    等级或导入低等级模型，而不是去翻流派模型配置。
+    """
+    candidates = available_models(school, scheme)
+    if not candidates:
+        if not available_models(school):
+            return f"流派「{school}」还没有任何毕业率模型，请先导入"
+        return f"流派「{school}」没有名为「{scheme}」的毕业率模型"
+    lowest = min(ref.level for ref in candidates)
+    return (
+        f"毕业率方案「{scheme}」最低只有 {lowest} 级模型，高于当前个人世界"
+        f"等级 {world_level}；请调高世界等级，或导入该等级可用的模型")
 
 
 @lru_cache(maxsize=None)

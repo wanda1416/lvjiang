@@ -234,6 +234,8 @@ class _AffixRow(QWidget):
         }
         if self._source_data.get("is_transferred"):
             result["is_transferred"] = True
+            if self._source_data.get("is_original"):
+                result["is_original"] = True
         if self._unit:
             result["unit"] = self._unit
         # cap_pct 只是给调律 DSL 快查的派生缓存，与 value 同一口径生成
@@ -1133,6 +1135,8 @@ class MockEquipDialog(QDialog):
                     expected, old_level, result["level"]) or expected
             if affix.get("name") != expected:
                 affix["is_transferred"] = True
+                # 换了名字就是真转律产出，不再是"切回原词条"那一种
+                affix.pop("is_original", None)
                 name_changed = True
             elif old.get("is_transferred"):
                 affix["is_transferred"] = True

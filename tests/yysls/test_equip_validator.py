@@ -32,7 +32,8 @@ from tests.case_matrix import case_matrix
 _CAP_110 = {"最大外功攻击": 121.4, "劲": 76.8}
 
 
-def _equip(names, *, part="环", values=None, transferred=(), dingyin=None):
+def _equip(names, *, part="环", values=None, transferred=(), original=(),
+           dingyin=None):
     """按顺序构造词条；values 为与 names 等长的真实数值列表。
 
     刻意不设 cap_pct：它是给调律 DSL 快查的派生缓存，判定器必须现算，
@@ -42,7 +43,8 @@ def _equip(names, *, part="环", values=None, transferred=(), dingyin=None):
     for i, n in enumerate(names):
         affixes.append(Affix(
             name=n, value=(values[i] if values else 1.0),
-            is_transferred=(i in transferred),
+            is_transferred=(i in transferred or i in original),
+            is_original=(i in original),
         ))
     return EquipmentData(type=part, name="测试装备", level=110, quality="gold",
                          affixes=affixes, dingyin=dingyin or {})
@@ -105,6 +107,18 @@ class TestCountRules:
         codes = _codes(_equip(
             ["劲", "全武学增效", "势", "会意率"], transferred=(1,)))
         assert CODE_TRANSFERRED_DIVINE in codes
+
+    def test_original_divine_affix_is_fine(self):
+        """[原]：转律槽切回了装备原生词条，原生神力词条本来就合法。
+
+        误报的后果不只是多一条提示——整件装备会被判非法，转律资格
+        trusted=False，直接从毕业率和最优组合里掉出去。
+        """
+        names = ["劲", "全武学增效", "势", "会意率"]
+        assert CODE_TRANSFERRED_DIVINE in _codes(
+            _equip(names, transferred=(1,)))
+        assert CODE_TRANSFERRED_DIVINE not in _codes(
+            _equip(names, original=(1,)))
 
     def test_transferred_normal_affix_is_fine(self):
         """普通词条由转律产出完全正常，只有神力词条不行。"""

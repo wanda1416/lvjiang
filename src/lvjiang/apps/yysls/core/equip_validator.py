@@ -176,6 +176,8 @@ def _validate_slots(slots: list[tuple[int, Affix]],
     2. ``attack_overflow`` —— 属攻类词条最多 2 条（铁律二：绝不出现第三次）。
     3. ``divine_overflow`` —— 神力词条最多 1 条。
     4. ``transferred_divine`` —— 神力词条被标记为转律产出（转律不产神力词条）。
+       标了 ``is_original`` 的除外：那是转律槽切回了装备原生词条（[原]），
+       原生神力词条本来就合法。
     5. 装备类型、词条池、首词条池、词条部位与武器专属词条均以游戏配置为准。
     6. ``cap_overflow`` —— 普通词条数值高于该等级上限（现算，不看
        ``cap_pct`` 缓存），只可能是 OCR 数值误读或等级识别错误。
@@ -281,7 +283,9 @@ def _validate_slots(slots: list[tuple[int, Affix]],
             attack_count += 1
         elif category in divine_cats:
             divine_count += 1
-            if affix.is_transferred:
+            # is_original：该槽转律过但切回了原词条（游戏里的 [原]），这条
+            # 词条是装备原生的，不是转律产出，神力铁律管不到它。
+            if affix.is_transferred and not affix.is_original:
                 reasons.append(IllegalReason(
                     CODE_TRANSFERRED_DIVINE,
                     tr("神力词条「{name}」不能是转律产出：转律不会产出神力词条")

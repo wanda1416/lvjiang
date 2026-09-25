@@ -32,7 +32,12 @@ class Affix:
     name: str
     value: float
     unit: str | None = None  # "%" 或 None
+    # 本条所在槽位是这件装备的固定转律槽（[转] 或 [原] 都算）
     is_transferred: bool = False
+    # 槽是转律槽，但当前生效的是装备原生词条（游戏里的 [原]，转律后切回原词条）。
+    # 转律资格、可转槽位只看 is_transferred；只有"这条是不是转律产出"的判定
+    # （神力词条不可能由转律产出）才需要再看这一条。
+    is_original: bool = False
     cap_pct: float | None = None  # 数值百分比（0-100），表示当前值占该等级上限的比例
     # 模拟转律目标：只是计划，不改变 name/value；两者必须同时有效才算有目标
     target_transmute_name: str | None = None
@@ -44,6 +49,8 @@ class Affix:
             d["unit"] = self.unit
         if self.is_transferred:
             d["is_transferred"] = self.is_transferred
+        if self.is_original:
+            d["is_original"] = self.is_original
         if self.cap_pct is not None:
             d["cap_pct"] = self.cap_pct
         if self.target_transmute_name and self.target_transmute_value is not None:
@@ -58,6 +65,7 @@ class Affix:
             value=d["value"],
             unit=d.get("unit"),
             is_transferred=d.get("is_transferred", False),
+            is_original=d.get("is_original", False),
             cap_pct=d.get("cap_pct"),
             target_transmute_name=d.get("target_transmute_name") or None,
             target_transmute_value=d.get("target_transmute_value"),

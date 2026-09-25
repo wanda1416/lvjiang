@@ -542,9 +542,10 @@ class LoadoutPanel(QWidget):
             select_graduation_model(school, plan.graduation_scheme, world_level)
             if school and plan.graduation_scheme else None
         )
+        # 只挂等级，不挂版本：这一行和隔壁的 DPS 并排，版本号会把它撑得很碎。
+        # 具体加载了哪个版本在毕业率分析对话框的上下文行里写全。
         self._metric_rate_name.setText(
-            tr("{level}级·v{version}·毕业率").format(
-                level=model.level, version=model.version)
+            tr("{level}级·毕业率").format(level=model.level)
             if model is not None else tr("毕业率"))
 
     def _sync_metrics(self, result):

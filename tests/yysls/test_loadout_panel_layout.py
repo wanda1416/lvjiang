@@ -127,9 +127,47 @@ def test_plan_row_only_exposes_create_manage_and_read_only_details(qtbot):
     assert row.indexOf(combat._plan_gongjue_field) > row.indexOf(
         combat._plan_scheme_field)
     assert combat._select_group.title() == "当前属性"
-    assert combat._select_layout.count() == 2
-    assert [combat._select_layout.itemAt(i).widget() for i in range(2)][1] is (
-        combat._btn_edit_play_style)
+    assert combat._select_layout.count() == 3
+    assert [combat._select_layout.itemAt(i).widget() for i in range(3)][1:] == [
+        combat._btn_edit_play_style,
+        combat._btn_create_play_style,
+    ]
+
+
+def test_current_attrs_actions_adapt_to_full_and_half_width(qtbot):
+    panel = LoadoutPanel(_Host())
+    qtbot.addWidget(panel)
+    combat = panel._character._combat_attrs_tab
+
+    combat.set_embedded_mode("full")
+    assert combat._base_attr_label.isVisibleTo(combat._select_group)
+    assert combat._btn_edit_play_style.text() == "编辑属性"
+    assert combat._btn_create_play_style.text() == "新建属性"
+
+    combat.set_embedded_mode("half")
+    assert combat._base_attr_label.isHidden()
+    assert combat._btn_edit_play_style.text() == "编辑"
+    assert combat._btn_create_play_style.text() == "新建"
+
+
+def test_create_attrs_opens_empty_panel_derivation_form(qtbot, monkeypatch):
+    panel = LoadoutPanel(_Host())
+    qtbot.addWidget(panel)
+    combat = panel._character._combat_attrs_tab
+    combat._current_school_name = "鸣金·虹"
+    opened = []
+
+    def finish(school, dialog):
+        opened.append((school, dialog))
+
+    monkeypatch.setattr(combat, "_finish_play_style_dialog", finish)
+    combat._on_create_play_style()
+
+    school, dialog = opened[0]
+    qtbot.addWidget(dialog)
+    assert school == "鸣金·虹"
+    assert dialog._edits
+    assert all(edit.text() == "" for edit in dialog._edits.values())
 
 
 @pytest.mark.parametrize("school", ["测试流派", ""])

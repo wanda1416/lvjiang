@@ -1220,19 +1220,28 @@ class _PlayStyleEditDialog(QDialog):
             row_layout.setSpacing(6)
 
             for field_name, display_label, unit in fields:
+                if unit:
+                    display_label = tr("{label}（{unit}）").format(
+                        label=tr(display_label), unit=unit,
+                    )
                 row_layout.addWidget(QLabel(tr(display_label)))
                 spin = QDoubleSpinBox()
                 spin.setRange(-999999, 999999)
                 spin.setDecimals(4)
                 spin.setSingleStep(0.1)
                 spin.setMinimumWidth(140)
-                if unit == "%":
-                    spin.setSuffix("%")
-                v = attrs.get(field_name, 0)
-                if unit == "%":
-                    spin.setValue(v * 100)
+                if field_name in attrs:
+                    v = attrs[field_name]
+                    if unit == "%":
+                        spin.setValue(v * 100)
+                    else:
+                        spin.setValue(v)
                 else:
-                    spin.setValue(v)
+                    # 新建时不要让一整页 0 / 0.00% 抢占输入焦点；空白仍按
+                    # 零值保存语义处理，用户可以直接键入需要的数值。
+                    editor = spin.lineEdit()
+                    if editor is not None:
+                        editor.clear()
                 row_layout.addWidget(spin)
                 self._spins[field_name] = spin
 

@@ -347,3 +347,45 @@ def test_play_style_reverse_derivation_ignores_panel_assumptions(monkeypatch):
     assert base.min_outer == pytest.approx(true_base.min_outer)
     assert base.max_outer == pytest.approx(true_base.max_outer)
     assert base.crit_rate == pytest.approx(true_base.crit_rate)
+
+
+def test_play_style_reverse_derivation_subtracts_equipment_set_bonus(monkeypatch):
+    """手填面板新建属性时，套装加成与单件装备属性一样必须被扣除。"""
+    from lvjiang.apps.yysls.config import get_game_config
+    from lvjiang.apps.yysls.core.graduation.scoring import equipment_attrs
+    from lvjiang.apps.yysls.ui.loadout.combat.play_style_dialog import (
+        PlayStyleDialogMixin,
+    )
+
+    raw = {
+        "main_weapon": {"type": "剑", "level": 110, "equipment_set": "yudou"},
+        "sub_weapon": {"type": "枪", "level": 110, "equipment_set": "yudou"},
+        "ring": {"type": "环", "level": 110, "equipment_set": "feisun"},
+        "pendant": {"type": "佩", "level": 110, "equipment_set": "feisun"},
+    }
+    true_base = CombatAttributes(max_outer=2000, intent_rate=0.2)
+    panel = true_base + equipment_attrs(raw, get_game_config())
+    saved: dict = {}
+
+    class _Host(PlayStyleDialogMixin):
+        def _equipped_snapshot(self):
+            return raw
+
+        def _compute_gongjue_attrs(self):
+            return CombatAttributes()
+
+        def _save_play_style(self, school, name, base_attrs):
+            saved["base"] = base_attrs
+
+        def _refresh_play_styles(self):
+            pass
+
+        _combo_play_style = type("C", (), {"setCurrentText": lambda self, _n: None})()
+
+    monkeypatch.setattr(
+        "PyQt6.QtWidgets.QMessageBox.information", lambda *a, **k: None)
+    PlayStyleDialogMixin._commit_play_style(
+        _Host(), "鸣金·虹", "测试", panel, workflow_triggered=False)
+
+    assert saved["base"].max_outer == pytest.approx(true_base.max_outer)
+    assert saved["base"].intent_rate == pytest.approx(true_base.intent_rate)

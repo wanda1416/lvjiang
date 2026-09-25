@@ -94,7 +94,9 @@ class PlanScoringContext:
             calculator = get_graduation_calculator(
                 school, plan.graduation_scheme, effective_level)
             if calculator is None:
-                problems.append(f"毕业率方案「{plan.graduation_scheme}」不可用，请检查流派模型")
+                from .model_registry import describe_missing_model
+                problems.append(describe_missing_model(
+                    school, plan.graduation_scheme, effective_level))
         base_data = None
         if not plan.base_attribute:
             problems.append("当前备战方案未选择角色基础属性")

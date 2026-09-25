@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lvjiang"
-version = "0.13.2"
+version = "0.13.3"
 description = "通用视觉 RPA 引擎（支持插件扩展，燕云十六声装备调律工具）"
 requires-python = ">=3.11,<3.13"  # RapidOCR 1.4.4 要求 Python <3.13；3.11+ 才有 Windows 高精度 sleep（core.timing 依赖）；开发/发布使用 3.12
 dependencies = [

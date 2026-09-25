@@ -59,5 +59,7 @@ register_versioned_dir("yysls/base_groups", "*.yaml", depth=1,
 # 毕业率模型的身份写在文件自己里（schema_version + 流派/方案/等级/版本），
 # 发现层只认当前 schema 且四项齐全的实体，所以可随远程下发全新方案文件，
 # 不需要另在 game_config 里登记一份方案名清单。
-register_versioned_dir("yysls/graduation", "*.json", depth=1,
+# 模型按等级分子目录（graduation/<等级>级/<流派>_<方案>_v<版本>.json），
+# 所以深度是 2：等级膨胀时不至于把一个目录堆到几十个文件。
+register_versioned_dir("yysls/graduation", "*.json", depth=2,
                        allow_remote_new=True)

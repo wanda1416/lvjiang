@@ -25,18 +25,30 @@ class GraduationModelRef:
     rel_path: str
 
 
-def model_filename(school: str, scheme: str, level: int, version: int) -> str:
+def level_dirname(level: int) -> str:
+    """等级子目录名。
+
+    等级拆成子目录而不是堆在文件名里：每开一个新等阶就多一批模型，平铺下去
+    这个目录会越来越难看。身份仍以 JSON 元数据为准，目录只是归置。
+    """
+    if level <= 0:
+        raise ValueError("方案等级必须大于 0")
+    return f"{level}级"
+
+
+def model_filename(school: str, scheme: str, version: int) -> str:
     """返回模型实体文件名；身份仍以 JSON 元数据为准。"""
     cleaned = scheme.strip()
     if not cleaned or any(char in cleaned for char in '<>:"/\\|?*'):
         raise ValueError("方案名称为空或包含文件名非法字符")
-    if level <= 0 or version <= 0:
-        raise ValueError("方案等级和版本号必须大于 0")
-    return f"{school}_{cleaned}_{level}_v{version}.json"
+    if version <= 0:
+        raise ValueError("方案版本号必须大于 0")
+    return f"{school}_{cleaned}_v{version}.json"
 
 
 def model_rel_path(school: str, scheme: str, level: int, version: int) -> str:
-    return f"{DATA_REL_DIR}/{model_filename(school, scheme, level, version)}"
+    return (f"{DATA_REL_DIR}/{level_dirname(level)}/"
+            f"{model_filename(school, scheme, version)}")
 
 
 def _parse_model(rel_path: str, data: object) -> GraduationModelRef | None:
@@ -70,8 +82,9 @@ def list_graduation_models() -> tuple[GraduationModelRef, ...]:
     """枚举当前配置分层中所有新格式模型。"""
     resolver = get_resolver()
     refs: dict[tuple[str, str, int, int], GraduationModelRef] = {}
-    for filename in resolver.enumerate_entities(DATA_REL_DIR, "*.json"):
-        rel_path = f"{DATA_REL_DIR}/{filename}"
+    # 递归枚举：模型按等级分在子目录里，单层枚举扫不到。
+    for entry in resolver.enumerate_entity_tree(DATA_REL_DIR, "*.json"):
+        rel_path = f"{DATA_REL_DIR}/{entry}"
         path = resolver.resolve_read(rel_path)
         if path is None:
             continue

@@ -22,6 +22,7 @@ from .model_registry import (
     MODEL_SCHEMA_VERSION,
     available_models,
     invalidate_model_registry,
+    level_dirname,
     model_filename,
     model_rel_path,
 )
@@ -468,7 +469,8 @@ def validate_model(model: dict[str, Any]) -> dict[str, float]:
 def scheme_path(
     school: str, scheme: str, level: int, version: int,
 ) -> Path:
-    return GRADUATION_DIR / model_filename(school, scheme, level, version)
+    return (GRADUATION_DIR / level_dirname(level)
+            / model_filename(school, scheme, version))
 
 
 def write_model(path: Path, model: dict[str, Any]) -> None:

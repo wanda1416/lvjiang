@@ -37,7 +37,7 @@ SCHOOLS = [
 
 def _load(school: str) -> dict:
     return json.loads(
-        (DATA_DIR / f"{school}_基础方案_110_v1.json").read_text(encoding="utf-8")
+        (DATA_DIR / "110级" / f"{school}_基础方案_v1.json").read_text(encoding="utf-8")
     )
 
 
@@ -142,13 +142,16 @@ def test_editable_baseline_dps_recalibrates_graduation_rate(
     import lvjiang.constants as constants
     import lvjiang.core.config.session as session_mod
 
-    source = DATA_DIR / "鸣金·虹_基础方案_110_v1.json"
+    source = DATA_DIR / "110级" / "鸣金·虹_基础方案_v1.json"
     shutil.copy(source, tmp_path / source.name)
     monkeypatch.setattr(
         registry, "get_resolver",
+        # 发现层走递归枚举（方案按等级分子目录），替身得提供同一个方法，
+        # 否则它测的就不是生产实际调用的那条路。
         lambda: type("Resolver", (), {
             "resolve_read": lambda self, rel_path: tmp_path / Path(rel_path).name,
-            "enumerate_entities": lambda self, _rel_dir, _pattern: [source.name],
+            "enumerate_entity_tree":
+                lambda self, _rel_dir, _pattern: [f"110级/{source.name}"],
         })(),
     )
     # 基准 DPS 覆盖值现存于 session.json 的 yysls 节点（见 config/session_node）；
@@ -180,7 +183,7 @@ def test_runtime_loads_newer_remote_graduation_scheme(
     from lvjiang.core.config.resolver import ConfigResolver
 
     load_config_policies()
-    rel_path = "yysls/graduation/鸣金·虹_基础方案_110_v1.json"
+    rel_path = "yysls/graduation/110级/鸣金·虹_基础方案_v1.json"
     source = _load("鸣金·虹")
     for layer, version, marker in (
         ("system", 1, "system"),
@@ -268,7 +271,7 @@ def test_v2_records_environment_without_exposing_it_as_inputs() -> None:
 
 @case_matrix("school", SCHOOLS)
 def test_v2_contains_no_excel_affix_aliases(school: str) -> None:
-    raw = (DATA_DIR / f"{school}_基础方案_110_v1.json").read_text(
+    raw = (DATA_DIR / "110级" / f"{school}_基础方案_v1.json").read_text(
         encoding="utf-8")
     game_config = get_game_config()
     for exact_name in game_config.get_wuxue_affix_names():

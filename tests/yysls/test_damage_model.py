@@ -104,7 +104,9 @@ def test_a_scheme_from_another_workbook_is_reported_as_out_of_sync(
     """比 sha256 而不是文件名：改过表内容却没改文件名，正是两边悄悄分家
     的时刻。"""
     manager, path = models_dir
-    (path / "鸣金·虹_基础方案_110_v1.json").write_text(
+    # 孤立目录是单层的，方案就摆在模型旁边（见 _scheme_rel）；
+    # 生产布局的等级子目录由 test_graduation_model_registry 覆盖。
+    (path / "鸣金·虹_基础方案_v1.json").write_text(
         json.dumps({
             "schema_version": 3,
             "school": "鸣金·虹",
@@ -145,7 +147,8 @@ def test_every_school_with_a_graduation_scheme_has_a_damage_model() -> None:
     root = Path(__file__).resolve().parents[2]
     schemes = {
         json.loads(path.read_text(encoding="utf-8"))["school"]
-        for path in (root / "config/system/yysls/graduation").glob("*.json")
+        # 方案按等级分子目录，所以要递归找
+        for path in (root / "config/system/yysls/graduation").glob("*/*.json")
     }
 
     assert schemes and schemes <= set(get_damage_model_manager().schools())

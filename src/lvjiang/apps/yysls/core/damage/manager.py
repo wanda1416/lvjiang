@@ -1,7 +1,7 @@
 """伤害模型的加载、缓存与写回
 
 一个流派方案一个文件（``config/system/yysls/damage_model/<流派>.yaml``），
-与 ``config/system/yysls/graduation/<流派>_<方案>_<等级>_v<版本>.json`` 配套：后者存
+与 ``config/system/yysls/graduation/<等级>级/<流派>_<方案>_v<版本>.json`` 配套：后者存
 编译出来的求值程序与环境参数，前者存那份程序里读不出来的系数表。
 
 两边同源于一份 Excel。``source.sha256`` 对不上就说明有一边换过表而
@@ -91,7 +91,8 @@ class DamageModelManager:
         if model is None or not model.source.get("sha256"):
             return ""
         candidates: list[tuple[int, int, str, dict]] = []
-        for filename in self._resolver.enumerate_entities(
+        # 递归枚举：方案按等级分在子目录里（graduation/<等级>级/…）。
+        for filename in self._resolver.enumerate_entity_tree(
             self._scheme_rel("").rstrip("/"), "*.json",
         ):
             rel = self._scheme_rel(filename)
@@ -113,7 +114,7 @@ class DamageModelManager:
                 ))
         if not candidates:
             return tr("找不到配套方案 {name}").format(
-                name=f"{school}_{model.scheme}_<等级>_v<版本>.json")
+                name=f"<等级>级/{school}_{model.scheme}_v<版本>.json")
         _level, _version, _filename, scheme = max(candidates)
         theirs = str((scheme.get("source") or {}).get("sha256") or "")
         if theirs and theirs != model.source["sha256"]:

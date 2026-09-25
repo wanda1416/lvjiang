@@ -31,7 +31,7 @@ def _pairs() -> list[tuple[Path, dict]]:
     if not directory.is_dir():
         return []
     pairs = []
-    for scheme_path in sorted(_SCHEME_DIR.glob("*.json")):
+    for scheme_path in sorted(_SCHEME_DIR.glob("*/*.json")):
         scheme = json.loads(scheme_path.read_text(encoding="utf-8"))
         excel = directory / scheme.get("source", {}).get("file", "")
         if excel.is_file():

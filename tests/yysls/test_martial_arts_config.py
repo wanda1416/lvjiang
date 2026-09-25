@@ -163,8 +163,8 @@ class TestPlaystyleRegistry:
                 continue
 
             scheme_path = (
-                _GRADUATION_DIR
-                / f'{style["school"]}_基础方案_110_v1.json'
+                _GRADUATION_DIR / "110级"
+                / f'{style["school"]}_基础方案_v1.json'
             )
             scheme = json.loads(scheme_path.read_text(encoding="utf-8"))
             extra = scheme["baseline_attrs"]["extra_attrs"]

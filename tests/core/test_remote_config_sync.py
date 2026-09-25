@@ -377,7 +377,7 @@ def test_yysls_online_config_paths_are_registered():
     assert versioning.spec_for("yysls/game_config/playstyles.yaml") is not None
     assert versioning.spec_for("yysls/tune_config.yaml") is not None
     graduation = versioning.spec_for(
-        "yysls/graduation/鸣金·虹_基础方案.json")
+        "yysls/graduation/110级/鸣金·虹_基础方案_v1.json")
     assert graduation is not None and graduation.allow_remote_new
 
 

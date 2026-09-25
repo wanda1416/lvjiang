@@ -171,3 +171,29 @@ def test_missing_model_reason_separates_no_model_from_wrong_name(
             "破竹·风", "基础方案", 115)
     finally:
         registry.invalidate_model_registry()
+
+
+def test_models_live_in_level_subdirectories(tmp_path, monkeypatch) -> None:
+    """等级是子目录，不再堆在文件名里——等级膨胀时目录才不会失控。"""
+    assert registry.model_rel_path("鸣金·虹", "基础方案", 115, 2) == (
+        "yysls/graduation/115级/鸣金·虹_基础方案_v2.json")
+
+    _with_models(tmp_path, monkeypatch, [(110, 1), (115, 1)])
+    try:
+        found = {(ref.level, ref.rel_path)
+                 for ref in registry.list_graduation_models()}
+        assert found == {
+            (110, "yysls/graduation/110级/鸣金·虹_基础方案_v1.json"),
+            (115, "yysls/graduation/115级/鸣金·虹_基础方案_v1.json"),
+        }
+    finally:
+        registry.invalidate_model_registry()
+
+
+def test_shipped_models_are_all_under_a_level_directory() -> None:
+    """随包下发的 11 份模型必须已经迁到子目录，否则发现层扫不到。"""
+    refs = registry.list_graduation_models()
+    assert refs, "系统层没有发现任何模型"
+    for ref in refs:
+        assert ref.rel_path.startswith(
+            f"{registry.DATA_REL_DIR}/{registry.level_dirname(ref.level)}/")

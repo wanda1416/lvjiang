@@ -32,7 +32,7 @@ def _panel(qtbot) -> SchoolPanel:
 def _add_scheme(panel: SchoolPanel, name: str = "测试方案") -> None:
     ref = GraduationModelRef(
         "测试流派", name, 110, 1,
-        f"yysls/graduation/测试流派_{name}_110_v1.json",
+        f"yysls/graduation/110级/测试流派_{name}_v1.json",
     )
     row = panel._scheme_list.rowCount()
     panel._scheme_list.insertRow(row)

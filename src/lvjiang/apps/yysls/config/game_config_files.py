@@ -29,6 +29,7 @@ GAME_CONFIG_FILES: dict[str, tuple[str, ...]] = {
     ),
     f"{GAME_CONFIG_DIR}/equipment.yaml": (
         "base_attrs",
+        "equipment_sets",
         "equipment_name_series",
         "weapon_types",
     ),

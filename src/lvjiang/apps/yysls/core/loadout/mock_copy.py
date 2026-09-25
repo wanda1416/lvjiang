@@ -52,6 +52,8 @@ def _comparable(equip: dict) -> dict:
     # 展示用的定音种类和槽内的核对说明都不是装备内容：两件其余完全相同、
     # 只是当前显示不同音或带着一条扫描提示的模拟装备是同一件，不能报成冲突。
     value.pop(DINGYIN_TYPE_KEY, None)
+    # 套装可随时切换，也不参与实体指纹；当前选择不同不是装备内容冲突。
+    value.pop("equipment_set", None)
     for key in DINGYIN_SLOT_KEYS:
         slot = value.get(key)
         if isinstance(slot, dict):

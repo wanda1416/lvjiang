@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from loguru import logger
 
+from ...config import get_game_config
 from ...config.equipment_slots import EQUIPMENT_SLOTS
 from ..affix_cap import affix_cap_value
 from ..combat.combat_attrs import (
@@ -33,6 +34,7 @@ from ..combat.combat_attrs import (
     has_resistance,
     max_stack_affixes,
 )
+from ..combat.equipment_sets import LEFT_SET_SLOTS, equipment_set_bonus
 from .assumptions import Assumptions
 from .graduation_program import ProgramRuntime
 from .model_inputs import adapt_attrs_to_model_inputs
@@ -447,6 +449,19 @@ def prune_dominated(
         for i in range(n):
             dominated = False
             for j in range(n):
+                if slot_key in {"main_weapon", "sub_weapon", "ring", "pendant"}:
+                    # 左侧装备还参与组合级套装与平均等级计算。不同套装或等级的
+                    # 候选即使单件属性被支配，也不能互相剪掉。
+                    identity_i = (
+                        str(entries[i][0].get("equipment_set") or ""),
+                        int(entries[i][0].get("level") or 0),
+                    )
+                    identity_j = (
+                        str(entries[j][0].get("equipment_set") or ""),
+                        int(entries[j][0].get("level") or 0),
+                    )
+                    if identity_i != identity_j:
+                        continue
                 if i != j and _dominates(entries[j][1], entries[i][1]):
                     # j dominates i; break ties by index to avoid mutual removal
                     if j < i or not _dominates(entries[i][1], entries[j][1]):
@@ -548,6 +563,10 @@ def _apply_top_k_safety(
     """If any slot still has > max_per_slot candidates, keep only top-K by linear score."""
     result: dict[str, list[tuple[dict, CombatAttributes, list[float]]]] = {}
     for slot_key, entries in slot_deltas.items():
+        if slot_key in {"main_weapon", "sub_weapon", "ring", "pendant"}:
+            # Top-K 无法表达跨槽套装收益；左侧保留全部候选才不会提前丢解。
+            result[slot_key] = entries
+            continue
         if len(entries) > max_per_slot:
             scored = sorted(entries, key=lambda e: _score_vector(e[2]), reverse=True)
             result[slot_key] = scored[:max_per_slot]
@@ -578,6 +597,7 @@ def search_optimal_combo(
     full_level: int = 0,
     playstyle: str = "",
     simulate_transmute: bool = False,
+    equipment_set: str = "",
     progress_counter: Any = None,  # 具有 evaluated, total, message 属性的对象
 ) -> list[dict[str, Any]]:
     """Search for the best equipment combinations.
@@ -632,6 +652,15 @@ def search_optimal_combo(
         candidates, assumptions=assumptions, season_level=season_level,
         season_chengyin=season_chengyin,
     )
+    if equipment_set:
+        known_sets = get_game_config().get_equipment_sets("left")
+        if equipment_set not in known_sets:
+            raise ValueError(f"未知左四套装: {equipment_set!r}")
+        # 游戏可随时切换已选套装；最优组合不搜索每件装备当前套装，
+        # 而是把用户选定的一种套装投影到全部左四虚拟候选。
+        for slot_key in LEFT_SET_SLOTS:
+            for variant in variants.get(slot_key, []):
+                variant.virtual["equipment_set"] = equipment_set
     variant_by_virtual_id = {
         id(variant.virtual): variant
         for slot_variants in variants.values()
@@ -720,6 +749,8 @@ def search_optimal_combo(
     stack_slot_count = sum(
         1 for entries in slot_stack_arrays if any(entries))
     need_stack_fix = stack_slot_count >= 2
+    game_config = get_game_config()
+    set_bonus_cache: dict[tuple[tuple[str, float], ...], list[float]] = {}
 
     # -- Phase 2: enumerate + evaluate --
     board = TopRLeaderboard(top_r)
@@ -753,6 +784,29 @@ def search_optimal_combo(
         # 2b. 同名只取最高：扣掉除最高一条外的同名贡献
         if need_stack_fix:
             _apply_max_stack_fix(acc, combo_indices, slot_stack_arrays)
+        # 2c. 套装是组合级属性，单件向量无法提前表达。假设已经作用于 virtual
+        # 装备，所以这里的等级正是最终视图等级。
+        selected = {
+            active_slots[si]: slot_equip_arrays[si][idx]
+            for si, idx in enumerate(combo_indices)
+        }
+        # 右四候选不影响左四套装。按左四的套装+等级状态缓存，
+        # 才能在枚举不同防具组合时真正复用；完整组合 key 永远不重复。
+        set_key = tuple(
+            (
+                str((selected.get(slot_key) or {}).get("equipment_set") or ""),
+                float((selected.get(slot_key) or {}).get("level") or 0),
+            )
+            for slot_key in LEFT_SET_SLOTS
+        )
+        set_vec = set_bonus_cache.get(set_key)
+        if set_vec is None:
+            set_attrs = equipment_set_bonus(selected, game_config)
+            set_vec = _compute_equip_vec_raw(
+                set_attrs, input_specs, field_index, graduation_context)
+            set_bonus_cache[set_key] = set_vec
+        for d in range(n_dims):
+            acc[d] += set_vec[d]
         # 3. 应用抗性规则（向量化等效 build_graduation_attrs）
         _apply_resistance_to_vec(acc, base_vec, field_index, graduation_context)
 
@@ -797,6 +851,7 @@ def search_optimal_combo(
             "dps": dps,
             "total_damage": dps * calculator.combat_time(),
             "equipped": equipped,
+            "equipment_set": equipment_set,
             "assumptions": slot_notes,
         })
 

@@ -34,6 +34,7 @@ from lvjiang.apps.yysls.core.graduation.optimal_combo import (
     prune_dominated,
     search_optimal_combo,
 )
+from lvjiang.apps.yysls.core.graduation.scoring import LoadoutScorer
 
 # ---------------------------------------------------------------------------
 # Unit tests — pure logic (no game data needed)
@@ -104,6 +105,22 @@ class TestDominance:
         pruned = prune_dominated(slot_deltas)
         # Equal entries: keep first (by index tiebreak)
         assert len(pruned["main_weapon"]) == 1
+
+    def test_left_slot_does_not_prune_different_set_or_level(self) -> None:
+        good = ({"name": "good", "equipment_set": "yudou", "level": 110},
+                CombatAttributes(max_outer=200), [200])
+        weaker_other_set = (
+            {"name": "set", "equipment_set": "feisun", "level": 110},
+            CombatAttributes(max_outer=100), [100])
+        weaker_other_level = (
+            {"name": "level", "equipment_set": "yudou", "level": 115},
+            CombatAttributes(max_outer=100), [100])
+        pruned = prune_dominated({
+            "main_weapon": [good, weaker_other_set, weaker_other_level],
+        })
+        assert [entry[0]["name"] for entry in pruned["main_weapon"]] == [
+            "good", "set", "level",
+        ]
 
 
 class TestGenerateCombos:
@@ -539,6 +556,68 @@ class TestSearchOptimalCombo:
         # Results sorted by rate descending
         for i in range(len(results) - 1):
             assert results[i]["rate"] >= results[i + 1]["rate"]
+
+    def test_search_vector_matches_shared_set_bonus_scoring(self) -> None:
+        """最优组合内环必须与公共评分器计入同一份组合级套装属性。"""
+        calc = _get_calculator()
+        equipped = {
+            slot: {
+                "name": slot,
+                "type": "剑" if "weapon" in slot else (
+                    "环" if slot == "ring" else "佩"),
+                "level": 110,
+                "quality": "gold",
+                "equipment_set": "yudou",
+            }
+            for slot in ("main_weapon", "sub_weapon", "ring", "pendant")
+        }
+        candidates = {slot: [equip] for slot, equip in equipped.items()}
+        base = CombatAttributes(
+            min_outer=1500, max_outer=5000,
+            min_mingjin=500, max_mingjin=1300,
+            precision=0.8, crit_rate=0.18, intent_rate=0.3,
+        )
+        expected = LoadoutScorer(calc, base, "鸣金·虹").rate(equipped)
+        result = search_optimal_combo(
+            candidates, calc, base, use_dominance_pruning=False)
+        assert result[0]["rate"] == pytest.approx(expected)
+
+    def test_search_uses_one_selected_set_for_all_left_candidates(self) -> None:
+        calc = _get_calculator()
+        equipped = {
+            slot: {
+                "name": slot,
+                "type": "剑" if "weapon" in slot else (
+                    "环" if slot == "ring" else "佩"),
+                "level": 110,
+                "quality": "gold",
+                "equipment_set": "feisun",
+            }
+            for slot in ("main_weapon", "sub_weapon", "ring", "pendant")
+        }
+        candidates = {slot: [equip] for slot, equip in equipped.items()}
+        base = CombatAttributes(
+            min_outer=1500, max_outer=5000,
+            min_mingjin=500, max_mingjin=1300,
+            precision=0.8, crit_rate=0.18, intent_rate=0.3,
+        )
+        expected_equipped = {
+            slot: {**equip, "equipment_set": "yudou"}
+            for slot, equip in equipped.items()
+        }
+        expected = LoadoutScorer(calc, base, "鸣金·虹").rate(
+            expected_equipped)
+
+        result = search_optimal_combo(
+            candidates, calc, base, use_dominance_pruning=False,
+            equipment_set="yudou")
+
+        assert result[0]["rate"] == pytest.approx(expected)
+        assert result[0]["equipment_set"] == "yudou"
+        assert all(
+            equip["equipment_set"] == "feisun"
+            for equip in result[0]["equipped"].values()
+        )
 
     @staticmethod
     def _dingyin_equip() -> dict:

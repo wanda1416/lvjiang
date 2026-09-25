@@ -203,6 +203,7 @@ class GraduationAnalysisLauncher:
                 analysis_settings=analysis_settings,
                 settings_changed=lambda value: set_graduation_analysis_settings(
                     user_name, plan_id, value, users_dir),
+                equipment_set=game_config.recommended_equipment_set(school),
             )
             dialog = GraduationAnalysisDialog(
                 parent,

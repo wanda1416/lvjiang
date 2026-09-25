@@ -120,6 +120,9 @@ class EquipmentData:
     # 本次扫描时装备展示的是哪种定音（normal/zhige）；空表示本次没读到。
     # 只影响展示，不参与任何计算，也不参与指纹。
     dingyin_type: str = ""
+    # 装备自身当前记录的原始套装。备战方案切换出来的套装另存于方案槽位，
+    # 不得反写这里；稳定 key 由游戏配置 equipment_sets 注册。
+    equipment_set: str = ""
     extra_data: dict = field(default_factory=dict)  # 辅助信息，如 {"affix_count": 5}
     warnings: list[str] = field(default_factory=list)
 
@@ -174,6 +177,8 @@ class EquipmentData:
             d["dingyin_zhige"] = self.dingyin_zhige
         if self.dingyin_type:
             d["dingyin_type"] = self.dingyin_type
+        if self.equipment_set:
+            d["equipment_set"] = self.equipment_set
         if self.warnings:
             d["_warnings"] = self.warnings
         if self.extra_data:
@@ -215,6 +220,7 @@ class EquipmentData:
             dingyin=d.get("dingyin") or {},
             dingyin_zhige=d.get("dingyin_zhige") or {},
             dingyin_type=str(d.get("dingyin_type") or ""),
+            equipment_set=str(d.get("equipment_set") or ""),
             warnings=d.get("_warnings", []),
             extra_data=d.get("_extra", {}),
         )

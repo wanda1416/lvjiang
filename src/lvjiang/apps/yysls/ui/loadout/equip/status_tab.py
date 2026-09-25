@@ -1458,9 +1458,26 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 self,
                 equip_data, kind, slot_key=slot_key)
 
+        def switch_equipment_set(set_key: str) -> bool:
+            inv = self._require_inventory()
+            if inv is None:
+                return False
+            try:
+                if slot_key:
+                    inv.set_plan_equipment_set(slot_key, set_key)
+                else:
+                    inv.set_item_equipment_set(fp, set_key)
+                self._sync_inv()
+                return True
+            except Exception as exc:
+                logger.error(f"修改装备套装失败: {exc}")
+                QMessageBox.critical(self, tr("修改失败"), str(exc))
+                return False
+
         _show_equipment_properties(
             self.window(), equip_data, cooldown_changed=update_cooldown,
             dingyin_changed=switch_dingyin,
+            equipment_set_changed=switch_equipment_set,
             dingyin_kind=(self._plan_dingyin_kind(slot_key)
                           if slot_key else ""),
             referenced_plans=referenced_plans)

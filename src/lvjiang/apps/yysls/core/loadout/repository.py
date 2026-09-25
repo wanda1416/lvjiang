@@ -447,6 +447,7 @@ class LoadoutRepository:
         if not fp:
             raise ValueError("装备数据无法生成指纹")
         scanned_kind = str(equip.get(DINGYIN_TYPE_KEY) or "")
+        scanned_set = str(equip.get("equipment_set") or "")
         def mutate(state: LoadoutState) -> None:
             if plan_id not in state.plans:
                 raise ValueError("目标备战方案已不存在")
@@ -461,6 +462,10 @@ class LoadoutRepository:
             elif replaced:
                 # 换了一件装备，上一件的定音选择不能顺延给它。
                 plan.dingyin.pop(slot_key, None)
+            if scanned and scanned_set:
+                plan.equipment_sets[slot_key] = scanned_set
+            elif replaced:
+                plan.equipment_sets.pop(slot_key, None)
         self.update(mutate)
         return fp
 
@@ -488,6 +493,35 @@ class LoadoutRepository:
                 raise ValueError("该装备只有一种定音，无法切换")
             plan.dingyin[slot_key] = kind
 
+        return self.update(mutate)
+
+    def set_plan_equipment_set(
+        self, plan_id: str, slot_key: str, set_key: str,
+    ) -> LoadoutState:
+        """修改方案槽位套装，不改变装备原始套装。"""
+        if slot_key not in EQUIPMENT_SLOTS:
+            raise ValueError(f"未知装备槽位: {slot_key}")
+        def mutate(state: LoadoutState) -> None:
+            plan = state.plans.get(plan_id)
+            if plan is None or not plan.equipment.get(slot_key):
+                raise ValueError("该槽位没有装备")
+            if set_key:
+                plan.equipment_sets[slot_key] = set_key
+            else:
+                plan.equipment_sets.pop(slot_key, None)
+        return self.update(mutate)
+
+    def set_item_equipment_set(self, fp: str, set_key: str) -> LoadoutState:
+        """修改背包装备的原始套装，不影响方案已经记录的覆盖值。"""
+        def mutate(state: LoadoutState) -> None:
+            equip = state.equipment_items.get(fp)
+            if equip is None:
+                raise ValueError(f"装备已不存在: {fp}")
+            if set_key:
+                equip["equipment_set"] = set_key
+            else:
+                equip.pop("equipment_set", None)
+            equip[EQUIPMENT_UPDATED_AT] = _now_iso()
         return self.update(mutate)
 
     def set_item_dingyin_type(self, fp: str, kind: str) -> LoadoutState:
@@ -629,6 +663,12 @@ class LoadoutRepository:
                 # 合并的是同一件实体：被合并掉那条身上的定音同样是这件装备的
                 # 事实，保留记录缺哪个槽就从它们那里补，不能随记录一起丢掉。
                 union_dingyin_slots(target, old_items)
+                if not str(target.get("equipment_set") or ""):
+                    for item in old_items:
+                        equipment_set = str(item.get("equipment_set") or "")
+                        if equipment_set:
+                            target["equipment_set"] = equipment_set
+                            break
                 target[EQUIPMENT_CREATED_AT] = _pick_timestamp(
                     (item.get(EQUIPMENT_CREATED_AT) for item in all_items),
                     latest=False)

@@ -80,6 +80,21 @@ def merge_equipment_write(
             value[DINGYIN_TYPE_KEY] = DINGYIN_NORMAL
         return value
 
+    # 备战扫描看到的是方案切换后的套装，只用于更新 plan；装备原始套装只在
+    # 首次入库或背包扫描时建立。已存在装备即使原值为空，也不能被方案污染。
+    if source is WriteSource.PLAN_SCAN:
+        old_set = str(existing.get("equipment_set") or "")
+        if old_set:
+            value["equipment_set"] = old_set
+        else:
+            value.pop("equipment_set", None)
+    elif not str(value.get("equipment_set") or ""):
+        # OCR 没识别到套装不是“确认无套装”。失败必须非破坏性；用户明确
+        # 清空则走仓储的 set_item_equipment_set，不通过扫描合并表达。
+        old_set = str(existing.get("equipment_set") or "")
+        if old_set:
+            value["equipment_set"] = old_set
+
     # 一次扫描只可能读到一种定音，另一种槽必须原样留着——否则切到止戈扫一次
     # 就把普通定音抹了，切回原来的备战方案会发现定音没了。
     for key in DINGYIN_SLOT_KEYS:

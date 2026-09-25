@@ -52,6 +52,7 @@ from ...core.combat.combat_attrs import (
     CombatAttributes,
     GraduationAttrContext,
 )
+from ...core.combat.equipment_sets import LEFT_SET_SLOTS
 from ...core.graduation.assumptions import Assumptions
 from ...core.graduation.candidate_pool import (
     CandidateFilter,
@@ -284,6 +285,7 @@ def _search_job(
     season_level: int,
     graduation_context: GraduationAttrContext,
     season_chengyin: bool = False,
+    equipment_set: str = "",
 ) -> Callable[[JobContext], list[dict[str, Any]]]:
     """构造交给 JobController 的搜索函数：逐弓玦场景搜索并合并结果。"""
 
@@ -312,6 +314,7 @@ def _search_job(
                 graduation_context=graduation_context,
                 season_level=season_level,
                 season_chengyin=season_chengyin,
+                equipment_set=equipment_set,
                 progress_counter=progress,
             )
             completed += progress.evaluated
@@ -696,7 +699,7 @@ class _SlotDetailPanel(QWidget):
 class _ResultCard(QFrame):
     """单条搜索结果卡片。"""
 
-    apply_clicked = pyqtSignal(dict)   # emits equipped dict
+    apply_clicked = pyqtSignal(dict)   # emits complete result metadata
     view_clicked = pyqtSignal(dict)    # emits complete result metadata
 
     def __init__(
@@ -736,6 +739,15 @@ class _ResultCard(QFrame):
         top.addWidget(dps_label)
 
         gongjue = str(result.get("gongjue") or tr("无"))
+        from ...config import get_game_config
+        equipment_set_name = get_game_config().equipment_set_name(
+            str(result.get("equipment_set") or ""))
+        equipment_set_label = QLabel(
+            tr("装备套装：{name}").format(
+                name=equipment_set_name or tr("未选择")))
+        equipment_set_label.setStyleSheet(
+            "font-size: 12px; color: palette(mid);")
+        top.addWidget(equipment_set_label)
         gongjue_label = QLabel(
             tr("弓玦套装：{name}").format(name=gongjue))
         gongjue_label.setStyleSheet("font-size: 12px; color: palette(mid);")
@@ -767,7 +779,7 @@ class _ResultCard(QFrame):
         apply_btn.setObjectName("resultApplyButton")
         apply_button_style(apply_btn, variant="action")
         apply_btn.clicked.connect(
-            lambda: self.apply_clicked.emit(result.get("equipped", {})),
+            lambda: self.apply_clicked.emit(result),
         )
         buttons.addWidget(apply_btn)
         # 一行装备名看不出这套组合到底是什么，真要判断得看词条
@@ -862,6 +874,7 @@ class OptimalComboPage(QWidget):
         assumptions_provider: Callable[[], Assumptions] | None = None,
         analysis_settings: dict[str, Any] | None = None,
         settings_changed: Callable[[dict[str, Any]], None] | None = None,
+        equipment_set: str = "",
     ) -> None:
         super().__init__(parent)
         self._host = host
@@ -870,6 +883,11 @@ class OptimalComboPage(QWidget):
         self._restoring_settings = False
         self._results: list[dict[str, Any]] = []
         self._school = school
+        from ...config import get_game_config
+        self._default_equipment_set = (
+            equipment_set
+            or get_game_config().recommended_equipment_set(school)
+        )
         self._scheme = scheme
         # base_attrs 不含弓玦，弓玦属性按需计算
         self._base_attrs_raw = base_attrs
@@ -986,6 +1004,23 @@ class OptimalComboPage(QWidget):
         self._chk_season_chengyin.toggled.connect(
             self._persist_analysis_settings)
         compute_row.addWidget(self._chk_season_chengyin)
+
+        equipment_set_label = QLabel(tr("装备套装"))
+        equipment_set_label.setProperty("tone", "muted")
+        compute_row.addWidget(equipment_set_label)
+        self._combo_equipment_set = QComboBox()
+        from ...config import get_game_config
+        for key, entry in get_game_config().get_equipment_sets("left").items():
+            self._combo_equipment_set.addItem(
+                str(entry.get("name") or key), key)
+        set_index = self._combo_equipment_set.findData(
+            self._default_equipment_set)
+        if set_index >= 0:
+            self._combo_equipment_set.setCurrentIndex(set_index)
+        fit_combo_to_contents(self._combo_equipment_set, minimum=96)
+        self._combo_equipment_set.currentIndexChanged.connect(
+            self._on_equipment_set_changed)
+        compute_row.addWidget(self._combo_equipment_set)
 
         gongjue_label = QLabel(tr("弓玦套装"))
         gongjue_label.setProperty("tone", "muted")
@@ -1209,7 +1244,20 @@ class OptimalComboPage(QWidget):
                 variants[0],
             )
             projected[slot_key] = selected.virtual
+        self._apply_result_equipment_set(projected, result)
         return projected
+
+    @staticmethod
+    def _apply_result_equipment_set(equipped: dict, result: dict) -> dict:
+        """把搜索时选定的左四套装只投影到结果副本。"""
+        equipment_set = str(result.get("equipment_set") or "")
+        if not equipment_set:
+            return equipped
+        for slot_key in LEFT_SET_SLOTS:
+            equip = equipped.get(slot_key)
+            if isinstance(equip, dict):
+                equip["equipment_set"] = equipment_set
+        return equipped
 
     def _on_show_attrs(self, result: dict, *, activate: bool = True) -> None:
         """把这套组合的战斗属性铺到「战斗属性」页。"""
@@ -1239,6 +1287,12 @@ class OptimalComboPage(QWidget):
     def _refresh_gongjue_text(self, _checked: bool = False) -> None:
         selected = self._selected_gongjues()
         self._btn_gongjue.setText(" / ".join(selected) if selected else tr("无"))
+
+    def _on_equipment_set_changed(self, _index: int) -> None:
+        if self._restoring_settings:
+            return
+        self._persist_analysis_settings()
+        self.mark_stale()
 
     def _select_all_gongjues(self) -> None:
         for action in self._gongjue_actions.values():
@@ -1370,6 +1424,8 @@ class OptimalComboPage(QWidget):
             "exclude_mock": self._chk_exclude_mock.isChecked(),
             "smart_analysis": self._chk_pruning.isChecked(),
             "season_chengyin": self._chk_season_chengyin.isChecked(),
+            "equipment_set": str(
+                self._combo_equipment_set.currentData() or ""),
         }
 
     def _persist_analysis_settings(self, _value: object = None) -> None:
@@ -1401,6 +1457,7 @@ class OptimalComboPage(QWidget):
             self._combo_min_rating,
             self._chk_pruning,
             self._chk_season_chengyin,
+            self._combo_equipment_set,
         )
         self._restoring_settings = True
         for control in controls:
@@ -1420,6 +1477,10 @@ class OptimalComboPage(QWidget):
                 bool(settings.get("smart_analysis", True)))
             self._chk_season_chengyin.setChecked(
                 bool(settings.get("season_chengyin", False)))
+            equipment_set_index = self._combo_equipment_set.findData(
+                str(settings.get("equipment_set") or ""))
+            if equipment_set_index >= 0:
+                self._combo_equipment_set.setCurrentIndex(equipment_set_index)
         finally:
             for control in controls:
                 control.blockSignals(False)
@@ -1530,6 +1591,11 @@ class OptimalComboPage(QWidget):
                 tr("以下部位没有候选装备：") + "、".join(missing))
             return
 
+        equipment_set = str(self._combo_equipment_set.currentData() or "")
+        if not equipment_set:
+            QMessageBox.warning(self, tr("无法搜索"), tr("请选择装备套装"))
+            return
+
         gongjues = self._selected_gongjues() or [""]
         total *= len(gongjues)
 
@@ -1582,6 +1648,7 @@ class OptimalComboPage(QWidget):
             season_level,
             self._graduation_context,
             season_chengyin,
+            equipment_set,
         ))
 
     def _on_cancel(self) -> None:
@@ -1611,6 +1678,7 @@ class OptimalComboPage(QWidget):
             self._combo_min_rating,
             self._chk_pruning,
             self._chk_season_chengyin,
+            self._combo_equipment_set,
             self._btn_gongjue,
             self._btn_gongjue_all,
         ):
@@ -1730,6 +1798,12 @@ class OptimalComboPage(QWidget):
         """
         self._detail_result = result
         original_equipped = result.get("equipped", result)
+        if result.get("equipment_set") and isinstance(original_equipped, dict):
+            original_equipped = {
+                slot_key: dict(equip) if isinstance(equip, dict) else equip
+                for slot_key, equip in original_equipped.items()
+            }
+            self._apply_result_equipment_set(original_equipped, result)
         equipped = original_equipped
         if self._detail_hypothesis_toggle.isChecked():
             if "equipped" in result:
@@ -1788,7 +1862,7 @@ class OptimalComboPage(QWidget):
         rank = result.get("rank")
         return f"{title} (#{rank})" if rank else title
 
-    def _on_apply_result(self, equipped: dict) -> None:
+    def _on_apply_result(self, result: dict) -> None:
         """将搜索结果的装备组合写入 session（按槽位合并，不覆盖未参与槽位）。"""
         user_name = self._host.active_user_name()
         if not user_name:
@@ -1798,7 +1872,10 @@ class OptimalComboPage(QWidget):
         try:
             from ...core.combat.equipment import EquipmentInventory
             inv = EquipmentInventory(user_name)
-            inv.apply_combos(equipped)
+            inv.apply_combos(
+                result.get("equipped", {}),
+                equipment_set=str(result.get("equipment_set") or ""),
+            )
 
             # Notify host
             get_event_hub(self._host).publish(EQUIPMENT_CHANGED, user_name)

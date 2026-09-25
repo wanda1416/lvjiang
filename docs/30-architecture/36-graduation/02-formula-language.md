@@ -123,6 +123,6 @@
 2. **公式模型**（`excel_formula.py`）：在 `FormulaModel._call()` 中添加求值逻辑
 3. **程序编译器**（`graduation_program.py`）：在 `ProgramCompiler._call()` 中添加编译期处理（常量折叠 / 特殊展开）
 4. **运行时**（`graduation_program.py`）：在 `evaluate_operation()` 中添加 opcode 执行语义
-5. **测试**（`tests/test_graduation_excel_model.py`）：添加新函数的单元测试
+5. **测试**（`tests/yysls/test_graduation_excel_model.py`）：添加新函数的单元测试
 
 **重要约束**：扩展期间不得静默读取旧缓存值替代计算。遇到未实现函数时，转换阶段必须直接失败并抛出 `FormulaError`。

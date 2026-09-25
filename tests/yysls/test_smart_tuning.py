@@ -989,6 +989,7 @@ def test_pvp_plans_are_filtered_out_with_a_visible_reason(monkeypatch):
             "pvp": _plan("pvp", "无名PVP", COMBAT_TYPE_PVP),
         },
         resolved_equipment=lambda _plan_id: {},
+        effective_world_level=lambda season_level: season_level,
     )
 
     contexts = evaluator._load_contexts("alice", {}, None, state=state)

@@ -144,6 +144,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._host = host
         self._preview = preview
         self._preview_equipped: dict | None = None
+        self._preview_world_level: int | None = None
 
         # ✅ 会话级缓存：避免反复load装备文件（多进程安全）
         self._session_user: str | None = None  # 当前会话的用户
@@ -157,7 +158,9 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._resistance_only = False
 
         self._graduation_generation = 0
-        self._pending_graduation: tuple[int, str, str, str, CombatAttributes] | None = None
+        self._pending_graduation: (
+            tuple[int, str, str, str, int, CombatAttributes] | None
+        ) = None
         self._graduation_timer = QTimer(self)
         self._graduation_timer.setSingleShot(True)
         self._graduation_timer.setInterval(180)
@@ -675,13 +678,12 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
     # ── 属性展示 ──────────────────────────────────────────────
 
-    @staticmethod
-    def _current_resistances() -> tuple[float, float]:
-        """读取当前生效赛季等级的判定抗性与增益抗性。"""
+    def _current_resistances(self) -> tuple[float, float]:
+        """读取当前用户个人世界等级的判定抗性与增益抗性。"""
         from ....config import get_game_config
 
         gc = get_game_config()
-        config = gc.level_config_for(gc.current_equip_level())
+        config = gc.level_config_for(self._effective_world_level())
         if config is None:
             return 0.0, 0.0
         return float(config.judge_resistance or 0), float(config.buff_resistance or 0)
@@ -756,7 +758,9 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         # build_graduation_attrs 统一施加。面板上的「原始值(生效值)」里，
         # 原始值 = 基础 + 弓玦 + 折算后的装备值，生效值直接取毕业率输入。
         school = self._get_current_school() or ""
-        context = GraduationAttrContext.from_school(school)
+        world_level = self._effective_world_level()
+        context = GraduationAttrContext.from_school(
+            school, world_level=world_level, game_config=get_game_config())
         base_attrs = self._get_base_attrs()
         gongjue_attrs = self._compute_gongjue_attrs()
         equip_attrs = fold_wuxiang_pen(
@@ -1038,14 +1042,17 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         """返回满等级的目标等级；未勾选返回 0。"""
         if not self._chk_full_level.isChecked():
             return 0
-        from ....config import get_game_config
-        return get_game_config().current_equip_level()
+        return self._effective_world_level()
 
-    def show_preview(self, equipped: dict, *, gongjue: str | None = None) -> None:
+    def show_preview(
+        self, equipped: dict, *, gongjue: str | None = None,
+        world_level: int | None = None,
+    ) -> None:
         """预览一套（已投影的）装备；``gongjue`` 覆盖当前弓玦套装。"""
         if not self._preview:
             raise RuntimeError("show_preview 只用于 preview 实例")
         self._preview_equipped = dict(equipped)
+        self._preview_world_level = world_level
         if gongjue is not None:
             self._combo_gongjue.blockSignals(True)
             index = self._combo_gongjue.findData(gongjue)
@@ -1059,4 +1066,23 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         """当前弓玦套装属性（唯一实现见 ``graduation.context.gongjue_attrs``）。"""
         from ....core.graduation.context import gongjue_attrs
 
-        return gongjue_attrs(self._get_current_gongjue())
+        return gongjue_attrs(
+            self._get_current_gongjue(), world_level=self._effective_world_level())
+
+    def _effective_world_level(self) -> int:
+        """毕业率相关等级：预览用注入值，正常页面用当前用户设置。"""
+        from ....config import get_game_config
+
+        season_level = get_game_config().current_equip_level()
+        if self._preview:
+            return self._preview_world_level or season_level
+        user_name = self._host.active_user_name()
+        if not user_name:
+            return season_level
+        from ....core.loadout import LoadoutRepository
+        try:
+            return LoadoutRepository(user_name).load().effective_world_level(
+                season_level)
+        except Exception as exc:  # noqa: BLE001 - 显示失败回退赛季口径
+            logger.error(f"读取个人世界等级失败，按赛季等级计算: {exc}")
+            return season_level

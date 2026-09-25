@@ -96,6 +96,7 @@ class _PlanContext:
     affix_pool: tuple[str, ...] = ()
     attribute: str = ""
     playstyle: str = ""
+    world_level: int = 0
     plan_maximum_rate: float | None = None
     first_affixes: dict[str, tuple[str, ...]] | None = None
     #: 评分内核（含签名缓存）；未注入时按需构造
@@ -237,6 +238,8 @@ class SmartTuningEvaluator:
                 return ()
 
         schools = self._game_config.get_schools()
+        world_level = state.effective_world_level(
+            self._game_config.current_equip_level())
         rules = self.rules
         contexts: dict[tuple[str, str], _PlanContext] = {}
         for target in targets:
@@ -283,7 +286,8 @@ class SmartTuningEvaluator:
                     continue
                 try:
                     scoring = PlanScoringContext.from_plan(
-                        plan, game_config=self._game_config, schools=schools)
+                        plan, game_config=self._game_config, schools=schools,
+                        world_level=world_level)
                 except PlanContextError as exc:
                     missing_graduation = True
                     reason = f"缺少毕业率方案，智能调律不启用（{exc.reason}）"
@@ -318,6 +322,7 @@ class SmartTuningEvaluator:
                         target.affix_pool,
                         scoring.attribute,
                         plan.playstyle,
+                        world_level=scoring.world_level,
                         scorer=scorer)
                     baseline = _rate(provisional, provisional.equipped,
                                      self._game_config)
@@ -341,15 +346,21 @@ class SmartTuningEvaluator:
                             PART_ALIAS.get(label_name, label_name))) is not None
                     }
                     contexts[context_key] = _PlanContext(
-                        plan.id, plan.name, school, scoring.calculator,
-                        scoring.base_attrs,
-                        provisional.equipped, baseline,
-                        target.rule_key, target.rule_name,
-                        target.affix_pool,
-                        provisional.attribute,
-                        provisional.playstyle,
-                        plan_maximum,
-                        first_affixes,
+                        plan_id=plan.id,
+                        plan_name=plan.name,
+                        school=school,
+                        calculator=scoring.calculator,
+                        base_attrs=scoring.base_attrs,
+                        equipped=provisional.equipped,
+                        baseline_rate=baseline,
+                        rule_key=target.rule_key,
+                        rule_name=target.rule_name,
+                        affix_pool=target.affix_pool,
+                        attribute=provisional.attribute,
+                        playstyle=provisional.playstyle,
+                        world_level=scoring.world_level,
+                        plan_maximum_rate=plan_maximum,
+                        first_affixes=first_affixes,
                         scorer=scorer)
                     self._remember_plan(
                         target, plan_id=plan.id, plan_name=plan.name,
@@ -895,7 +906,10 @@ class SmartTuningEvaluator:
         装备保持原生状态。候选新词条仍按不投入彩色狗粮时可达到的上限补全。
         """
         return Assumptions(
-            full_level=self._game_config.current_equip_level(),
+            full_level=(
+                context.world_level
+                or self._game_config.current_equip_level()
+            ),
             full_chengyin=True,
             full_dingyin=True,
             playstyle=context.playstyle,

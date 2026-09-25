@@ -1,5 +1,7 @@
 """战斗属性聚合与动态抗性测试。"""
 
+from types import SimpleNamespace
+
 import pytest
 
 from lvjiang.apps.yysls.config import get_game_config
@@ -70,7 +72,10 @@ def _active_resistances() -> tuple[float, float]:
 
 
 def test_combat_panel_uses_active_season_resistances() -> None:
-    assert CombatAttrsTab._current_resistances() == _active_resistances()
+    gc = get_game_config()
+    panel = SimpleNamespace(
+        _effective_world_level=lambda: gc.current_equip_level())
+    assert CombatAttrsTab._current_resistances(panel) == _active_resistances()
 
 
 def test_judgment_and_gain_cards_share_yellow_display_menu(monkeypatch) -> None:

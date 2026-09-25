@@ -28,7 +28,7 @@
 |---|---|
 | [01-data-flow.md](01-data-flow.md) | 端到端数据流与各层职责 |
 | [02-formula-language.md](02-formula-language.md) | Excel 公式子集规范：词法、语法、函数清单、扩展流程 |
-| [03-json-model.md](03-json-model.md) | JSON v2 Schema 契约：字段定义、类型、约束 |
+| [03-json-model.md](03-json-model.md) | JSON v3 Schema 契约：字段定义、类型、约束 |
 | [04-alias-resolution.md](04-alias-resolution.md) | 别名解析规则：约束求解流程、错误处理、配置依赖 |
 | [05-compiler-runtime.md](05-compiler-runtime.md) | 编译器与运行时：部分求值、opcode 语义表、执行模型 |
 | [06-operations.md](06-operations.md) | 操作指南：导入、验证、对账、扩展、故障排查 |

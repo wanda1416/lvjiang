@@ -27,6 +27,7 @@ from PyQt6.QtGui import QDoubleValidator
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
+    QDialogButtonBox,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
@@ -34,6 +35,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QInputDialog,
     QLabel,
     QLayout,
@@ -44,6 +46,8 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -55,6 +59,7 @@ from ..domain_labels import domain_label
 from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from ..tune_settings.affix_picker import AffixSelectSortDialog
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
+from .level_combo import LevelCombo
 
 # 配置文件（聚合键值，经 resolver 读合并视图、按模式写回）
 _ATTRS_REL = "yysls/game_config"
@@ -209,10 +214,22 @@ class SchoolPanel(QWidget):
         self._btn_import_scheme = QPushButton(tr("导入 Excel…"))
         self._btn_import_scheme.clicked.connect(self._on_import_scheme)
         apply_button_style(self._btn_import_scheme, variant="neutral")
-        self._scheme_list = QListWidget()
+        self._scheme_list = QTableWidget(0, 2)
+        self._scheme_list.setHorizontalHeaderLabels([
+            tr("方案名称"), tr("方案等级、版本号")])
+        self._scheme_list.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch)
+        self._scheme_list.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.ResizeToContents)
+        self._scheme_list.verticalHeader().setVisible(False)
+        self._scheme_list.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectRows)
+        self._scheme_list.setEditTriggers(
+            QTableWidget.EditTrigger.NoEditTriggers)
         self._scheme_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._scheme_list.customContextMenuRequested.connect(self._on_scheme_context_menu)
-        self._scheme_list.currentRowChanged.connect(self._on_scheme_selected)
+        self._scheme_list.currentCellChanged.connect(
+            lambda row, _col, _old_row, _old_col: self._on_scheme_selected(row))
         scheme_layout.addWidget(self._scheme_list, stretch=1)
         scheme_layout.addWidget(self._btn_import_scheme)
         management_layout.addWidget(scheme_group, stretch=1)
@@ -391,8 +408,8 @@ class SchoolPanel(QWidget):
         self._refresh_transmute_pool(cfg)
         self._refresh_schemes()
         self._refresh_play_styles()
-        if self._scheme_list.count():
-            self._scheme_list.setCurrentRow(0)
+        if self._scheme_list.rowCount():
+            self._scheme_list.selectRow(0)
         elif self._ps_list.count():
             self._ps_list.setCurrentRow(0)
         else:
@@ -558,16 +575,28 @@ class SchoolPanel(QWidget):
     # ── 方案管理 ──────────────────────────────────────────────
 
     def _refresh_schemes(self):
-        self._scheme_list.clear()
+        self._scheme_list.setRowCount(0)
         school = self._current_school()
         if not school:
             self._btn_import_scheme.setEnabled(False)
             return
         self._btn_import_scheme.setEnabled(True)
-        cfg = self._schools().get(school) or {}
-        schemes = cfg.get("schemes") or []
-        if isinstance(schemes, list):
-            self._scheme_list.addItems([str(name) for name in schemes if str(name)])
+        from ...core.graduation.model_registry import available_models
+        for ref in available_models(school):
+            row = self._scheme_list.rowCount()
+            self._scheme_list.insertRow(row)
+            name_item = QTableWidgetItem(ref.scheme)
+            name_item.setData(Qt.ItemDataRole.UserRole, ref)
+            self._scheme_list.setItem(row, 0, name_item)
+            self._scheme_list.setItem(
+                row, 1,
+                QTableWidgetItem(tr("{level}级 · v{version}").format(
+                    level=ref.level, version=ref.version)))
+
+    def _selected_model_ref(self):
+        row = self._scheme_list.currentRow()
+        item = self._scheme_list.item(row, 0) if row >= 0 else None
+        return item.data(Qt.ItemDataRole.UserRole) if item is not None else None
 
     def _on_import_scheme(self):
         school = self._current_school()
@@ -578,25 +607,39 @@ class SchoolPanel(QWidget):
         )
         if not excel_path:
             return
-        name, ok = QInputDialog.getText(
-            self, tr("方案名称"), tr("保存为方案："), text=tr("基础方案"),
-        )
-        name = name.strip()
-        if not ok or not name:
+        meta_dialog = QDialog(self)
+        meta_dialog.setWindowTitle(tr("导入毕业率方案"))
+        meta_layout = QFormLayout(meta_dialog)
+        name_edit = QLineEdit(tr("基础方案"))
+        level_combo = LevelCombo()
+        from ...config import get_game_config
+        current_level = get_game_config().current_equip_level()
+        if current_level:
+            level_combo.set_level(current_level)
+        level_combo.setToolTip(tr(
+            "默认使用当前赛季等级，也可以手动选择旧等级。"))
+        meta_layout.addRow(tr("方案名称："), name_edit)
+        meta_layout.addRow(tr("方案等级："), level_combo)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(meta_dialog.accept)
+        buttons.rejected.connect(meta_dialog.reject)
+        meta_layout.addRow(buttons)
+        if meta_dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        name = name_edit.text().strip()
+        model_level = level_combo.get_level()
+        if not name or model_level is None:
+            QMessageBox.warning(self, tr("导入失败"), tr("请填写方案名称并选择方案等级"))
             return
         cfg = self._schools().get(school) or {}
         schemes = cfg.get("schemes") or []
-        if name in schemes:
-            ret = QMessageBox.question(
-                self, tr("方案已存在"),
-                tr("方案「{name}」已存在，是否覆盖？").format(name=name),
-            )
-            if ret != QMessageBox.StandardButton.Yes:
-                return
         try:
             from ...core.graduation import invalidate_graduation_cache
             from ...core.graduation.graduation_converter import import_graduation_scheme
-            destination, outputs = import_graduation_scheme(excel_path, school, name)
+            destination, outputs = import_graduation_scheme(
+                excel_path, school, name, model_level)
             invalidate_graduation_cache()
         except Exception as exc:
             logger.exception("导入毕业率方案失败")
@@ -608,9 +651,11 @@ class SchoolPanel(QWidget):
             self._data.setdefault("schools", {})[school] = cfg
             self._save_data()
         self._refresh_schemes()
-        matches = self._scheme_list.findItems(name, Qt.MatchFlag.MatchExactly)
-        if matches:
-            self._scheme_list.setCurrentItem(matches[0])
+        for row in range(self._scheme_list.rowCount() - 1, -1, -1):
+            ref = self._scheme_list.item(row, 0).data(Qt.ItemDataRole.UserRole)
+            if ref.scheme == name and ref.level == model_level:
+                self._scheme_list.selectRow(row)
+                break
         QMessageBox.information(
             self, tr("导入成功"),
             tr("方案「{name}」已生成。\nDPS：{dps:.2f}\n文件：{path}").format(
@@ -627,26 +672,28 @@ class SchoolPanel(QWidget):
         del_action = menu.addAction(tr("删除"))
         action = menu.exec(self._scheme_list.mapToGlobal(pos))
         if action == del_action:
-            self._do_delete_scheme(item.text())
+            self._scheme_list.selectRow(item.row())
+            self._do_delete_scheme()
 
-    def _do_delete_scheme(self, name: str):
+    def _do_delete_scheme(self):
         """删除毕业率方案：移除 JSON 文件 + 更新 game_config.yaml"""
         school = self._current_school()
-        if not school:
+        ref = self._selected_model_ref()
+        if not school or ref is None:
             return
         ret = QMessageBox.question(
             self, tr("确认删除"),
-            tr("确定删除方案「{name}」？\n对应的 JSON 文件也会被删除。").format(name=name),
+            tr("确定删除方案「{name}」的 {level}级 v{version}？\n"
+               "对应的 JSON 文件也会被删除。").format(
+                   name=ref.scheme, level=ref.level, version=ref.version),
         )
         if ret != QMessageBox.StandardButton.Yes:
             return
         # 1. 先删除 JSON 文件（失败则中止，保持配置与磁盘一致）
         try:
-            from ...core.graduation.graduation_converter import scheme_path
-            json_file = scheme_path(school, name)
-            if json_file.exists():
-                json_file.unlink()
-                logger.info(f"已删除方案文件: {json_file}")
+            from lvjiang.core.config.resolver import get_resolver
+            get_resolver().delete_entity(ref.rel_path)
+            logger.info(f"已删除方案文件: {ref.rel_path}")
         except Exception as exc:
             logger.warning(f"删除方案文件失败: {exc}")
             QMessageBox.warning(
@@ -654,18 +701,21 @@ class SchoolPanel(QWidget):
                 tr("无法删除方案文件: {exc}").format(exc=exc),
             )
             return
-        # 2. 从 schemes 列表中移除并保存
-        cfg = self._schools().get(school) or {}
-        schemes = [s for s in (cfg.get("schemes") or []) if s != name]
-        cfg["schemes"] = schemes
-        self._data.setdefault("schools", {})[school] = cfg
-        self._save_data()
-        # 3. 失效毕业率缓存
+        # 2. 失效毕业率缓存；若该逻辑方案已无任何版本，再移除方案登记。
         try:
             from ...core.graduation import invalidate_graduation_cache
             invalidate_graduation_cache()
         except Exception:
             pass
+        from ...core.graduation.model_registry import available_models
+        if not available_models(school, ref.scheme):
+            cfg = self._schools().get(school) or {}
+            cfg["schemes"] = [
+                name for name in (cfg.get("schemes") or [])
+                if name != ref.scheme
+            ]
+            self._data.setdefault("schools", {})[school] = cfg
+            self._save_data()
         self._refresh_schemes()
 
     # ── 基础属性管理 ──────────────────────────────────────────
@@ -747,9 +797,14 @@ class SchoolPanel(QWidget):
         self._ps_edits.clear()
         self._ps_current_name = ""
         self._scheme_baseline_edit = None
-        scheme = self._scheme_list.item(row).text()
+        item = self._scheme_list.item(row, 0)
+        if item is None:
+            return
+        ref = item.data(Qt.ItemDataRole.UserRole)
+        scheme = ref.scheme
         self._value_source_label.setText(
-            tr("方案：{name}（满值属性，不含食物加成）").format(name=scheme)
+            tr("方案：{name} · {level}级 v{version}（满值属性，不含食物加成）")
+            .format(name=scheme, level=ref.level, version=ref.version)
         )
         try:
             from ...core.graduation import (
@@ -757,8 +812,10 @@ class SchoolPanel(QWidget):
                 get_graduation_scheme_metrics,
             )
 
-            attrs = get_graduation_scheme_combat_attrs(school, scheme)
-            adps, baseline_dps = get_graduation_scheme_metrics(school, scheme)
+            attrs = get_graduation_scheme_combat_attrs(
+                school, scheme, model_ref=ref)
+            adps, baseline_dps = get_graduation_scheme_metrics(
+                school, scheme, model_ref=ref)
         except Exception as exc:
             logger.error(f"读取毕业率方案数值失败: {exc}")
             self._value_source_label.setText(tr("方案数值读取失败：{error}").format(
@@ -770,12 +827,14 @@ class SchoolPanel(QWidget):
 
         school_attr = get_game_config().get_school_attr(school)
         self._replace_value_content([
-            self._create_scheme_metrics_widget(school, scheme, adps, baseline_dps),
+            self._create_scheme_metrics_widget(
+                school, scheme, ref, adps, baseline_dps),
             self._create_standard_attrs_widget(attrs, school_attr, editable=False),
         ])
 
     def _create_scheme_metrics_widget(
-        self, school: str, scheme: str, adps: float, baseline_dps: float,
+        self, school: str, scheme: str, model_ref,
+        adps: float, baseline_dps: float,
     ) -> QWidget:
         """四张属性卡片下方的方案 DPS 校正区。"""
         panel = QFrame()
@@ -803,21 +862,23 @@ class SchoolPanel(QWidget):
         edit.setValidator(QDoubleValidator(0.01, 999999999.0, 2, edit))
         edit.setToolTip(tr("修改后，毕业率按 当前ADPS ÷ 此基准DPS 重新计算"))
         edit.editingFinished.connect(
-            lambda: self._save_scheme_baseline_dps(school, scheme, edit)
+            lambda: self._save_scheme_baseline_dps(
+                school, scheme, model_ref, edit)
         )
         self._scheme_baseline_edit = edit
         layout.addWidget(edit)
         return panel
 
     def _save_scheme_baseline_dps(
-        self, school: str, scheme: str, edit: QLineEdit,
+        self, school: str, scheme: str, model_ref, edit: QLineEdit,
     ) -> None:
         """保存人工校正的 100% 毕业率基准 DPS。"""
         try:
             value = float(edit.text())
             from ...core.graduation import set_graduation_baseline_dps
 
-            set_graduation_baseline_dps(school, scheme, value)
+            set_graduation_baseline_dps(
+                school, scheme, value, model_ref=model_ref)
             edit.setText(f"{value:.2f}")
         except Exception as exc:
             logger.error(f"保存毕业率基准 DPS 失败: {exc}")
@@ -825,7 +886,8 @@ class SchoolPanel(QWidget):
             try:
                 from ...core.graduation import get_graduation_scheme_metrics
 
-                _adps, old_value = get_graduation_scheme_metrics(school, scheme)
+                _adps, old_value = get_graduation_scheme_metrics(
+                    school, scheme, model_ref=model_ref)
                 edit.setText(f"{old_value:.2f}")
             except Exception:
                 pass
@@ -836,7 +898,8 @@ class SchoolPanel(QWidget):
         if not school or row < 0:
             return
         self._scheme_list.blockSignals(True)
-        self._scheme_list.setCurrentRow(-1)
+        self._scheme_list.setCurrentCell(-1, -1)
+        self._scheme_list.clearSelection()
         self._scheme_list.blockSignals(False)
         from ...config import get_game_config, get_play_styles
         styles = get_play_styles(school)

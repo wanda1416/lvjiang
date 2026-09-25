@@ -9,7 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ...config.play_styles import get_play_styles
-from ..combat.combat_attrs import CombatAttributes, compute_gongjue_attrs
+from ..combat.combat_attrs import (
+    CombatAttributes,
+    GraduationAttrContext,
+    compute_gongjue_attrs,
+)
 from ..loadout.models import LoadoutPlan, resolve_school
 from .scoring import LoadoutScorer
 
@@ -22,14 +26,19 @@ class PlanContextError(ValueError):
         self.reason = reason
 
 
-def gongjue_attrs(gongjue: str, game_config=None) -> CombatAttributes:
-    """弓玦套装属性：当前赛季最大等级三率词条上限的一半；空套装为零。"""
+def gongjue_attrs(
+    gongjue: str, game_config=None, *, world_level: int | None = None,
+) -> CombatAttributes:
+    """弓玦套装属性：个人世界等级三率词条上限的一半；空套装为零。"""
     if not gongjue:
         return CombatAttributes()
     if game_config is None:
         from ...config import get_game_config
         game_config = get_game_config()
-    level = game_config.current_equip_level()
+    level = (
+        int(world_level) if world_level is not None
+        else game_config.current_equip_level()
+    )
     if not level:
         return CombatAttributes()
     return compute_gongjue_attrs(gongjue, level, game_config.get_affix_caps)
@@ -41,7 +50,11 @@ class PlanScoringContext:
     plan_name: str
     school: str
     scheme: str
+    world_level: int
+    model_level: int
+    model_version: int
     calculator: object
+    attr_context: GraduationAttrContext
     base_attrs: CombatAttributes      # 含弓玦
     #: 不含弓玦的基础属性；只给最优组合按弓玦场景自行叠加用
     base_attrs_without_gongjue: CombatAttributes
@@ -56,6 +69,7 @@ class PlanScoringContext:
         *,
         game_config=None,
         schools: dict | None = None,
+        world_level: int | None = None,
     ) -> PlanScoringContext:
         from . import get_graduation_calculator
 
@@ -64,6 +78,10 @@ class PlanScoringContext:
             game_config = get_game_config()
         if schools is None:
             schools = game_config.get_schools()
+        effective_level = (
+            int(world_level) if world_level is not None
+            else game_config.current_equip_level()
+        )
         school = resolve_school(
             plan.main_martial_art, plan.sub_martial_art, schools)
         if not school:
@@ -73,7 +91,8 @@ class PlanScoringContext:
         if not plan.graduation_scheme:
             problems.append("当前备战方案未选择毕业率方案")
         else:
-            calculator = get_graduation_calculator(school, plan.graduation_scheme)
+            calculator = get_graduation_calculator(
+                school, plan.graduation_scheme, effective_level)
             if calculator is None:
                 problems.append(f"毕业率方案「{plan.graduation_scheme}」不可用，请检查流派模型")
         base_data = None
@@ -87,13 +106,21 @@ class PlanScoringContext:
             raise PlanContextError("；".join(problems))
         assert calculator is not None and isinstance(base_data, dict)
         raw_base = CombatAttributes.from_dict(base_data)
-        base_attrs = raw_base + gongjue_attrs(plan.gongjue, game_config)
+        base_attrs = raw_base + gongjue_attrs(
+            plan.gongjue, game_config, world_level=effective_level)
+        attr_context = GraduationAttrContext.from_school(
+            school, world_level=effective_level, game_config=game_config)
+        model = calculator.model
         return cls(
             plan_id=plan.id,
             plan_name=plan.name,
             school=school,
             scheme=plan.graduation_scheme,
+            world_level=effective_level,
+            model_level=model.level,
+            model_version=model.version,
             calculator=calculator,
+            attr_context=attr_context,
             base_attrs=base_attrs,
             base_attrs_without_gongjue=raw_base,
             gongjue=plan.gongjue,
@@ -104,4 +131,5 @@ class PlanScoringContext:
     def scorer(self, *, game_config=None, **budget) -> LoadoutScorer:
         return LoadoutScorer(
             self.calculator, self.base_attrs, self.school, game_config,
+            attr_context=self.attr_context,
             **budget)

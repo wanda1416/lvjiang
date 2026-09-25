@@ -50,6 +50,21 @@ def test_default_plan_and_shared_pool(tmp_path: Path):
     assert not (tmp_path / "alice.loadouts.json.lock").exists()
 
 
+def test_world_level_is_user_scoped_and_can_follow_season(tmp_path: Path):
+    alice = LoadoutRepository("alice", tmp_path)
+    bob = LoadoutRepository("bob", tmp_path)
+
+    assert alice.load().effective_world_level(115) == 115
+    alice.set_world_level(110)
+    assert alice.load().world_level == 110
+    assert alice.load().effective_world_level(115) == 110
+    assert bob.load().world_level is None
+
+    alice.set_world_level(None)
+    assert alice.load().world_level is None
+    assert alice.load().effective_world_level(115) == 115
+
+
 def test_upsert_is_idempotent(tmp_path: Path):
     repo = LoadoutRepository("alice", tmp_path)
     repo.upsert_item(equip())

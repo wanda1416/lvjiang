@@ -104,8 +104,17 @@ def test_a_scheme_from_another_workbook_is_reported_as_out_of_sync(
     """比 sha256 而不是文件名：改过表内容却没改文件名，正是两边悄悄分家
     的时刻。"""
     manager, path = models_dir
-    (path / "鸣金·虹_基础方案.json").write_text(
-        json.dumps({"source": {"sha256": "另一份表"}}), encoding="utf-8")
+    (path / "鸣金·虹_基础方案_110_v1.json").write_text(
+        json.dumps({
+            "schema_version": 3,
+            "school": "鸣金·虹",
+            "scheme": "基础方案",
+            "model_level": 110,
+            "model_version": 1,
+            "source": {"sha256": "另一份表"},
+        }),
+        encoding="utf-8",
+    )
     manager.reload()
 
     assert "不同源" in manager.mismatched("鸣金·虹")
@@ -135,7 +144,7 @@ def test_every_school_with_a_graduation_scheme_has_a_damage_model() -> None:
 
     root = Path(__file__).resolve().parents[2]
     schemes = {
-        path.stem.rsplit("_", 1)[0]
+        json.loads(path.read_text(encoding="utf-8"))["school"]
         for path in (root / "config/system/yysls/graduation").glob("*.json")
     }
 

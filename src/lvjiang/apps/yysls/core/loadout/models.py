@@ -132,6 +132,8 @@ class LoadoutPlan:
 @dataclass
 class LoadoutState:
     revision: int = 0
+    # 个人世界等级；None 表示随当前赛季装备等级。它属于用户而非某套方案。
+    world_level: int | None = None
     active_plan_id: str = ""
     plans: dict[str, LoadoutPlan] = field(default_factory=dict)
     plan_order: list[str] = field(default_factory=list)
@@ -175,6 +177,13 @@ class LoadoutState:
         } if isinstance(items, dict) else {}
         return cls(
             revision=int(data.get("revision") or 0),
+            world_level=(
+                int(data["world_level"])
+                if isinstance(data.get("world_level"), int)
+                and not isinstance(data.get("world_level"), bool)
+                and data["world_level"] > 0
+                else None
+            ),
             active_plan_id=active,
             plans=plans,
             plan_order=order,
@@ -184,6 +193,7 @@ class LoadoutState:
     def to_dict(self) -> dict:
         return {
             "revision": self.revision,
+            "world_level": self.world_level,
             "active_plan_id": self.active_plan_id,
             "plans": {pid: plan.to_dict() for pid, plan in self.plans.items()},
             "plan_order": self.ordered_plan_ids(),
@@ -197,6 +207,10 @@ class LoadoutState:
             if pid in self.plans and pid not in order:
                 order.append(pid)
         return order + [pid for pid in self.plans if pid not in order]
+
+    def effective_world_level(self, season_level: int) -> int:
+        """返回用户显式等级；未设置时随当前赛季等级。"""
+        return self.world_level or int(season_level or 0)
 
     def referencing_plan_names(self, fingerprint: str) -> list[str]:
         """按方案顺序返回引用指定装备的方案名称。"""

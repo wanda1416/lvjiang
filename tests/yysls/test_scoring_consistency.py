@@ -179,8 +179,17 @@ def test_plan_context_from_plan_includes_fixed_gongjue(monkeypatch):
         id="p1", name="测试方案", main_martial_art="无名剑法",
         sub_martial_art="无名枪法", playstyle="无名",
         base_attribute="无名1.0", gongjue="会意", graduation_scheme="基础方案")
-    context = PlanScoringContext.from_plan(plan, game_config=gc)
+    context = PlanScoringContext.from_plan(
+        plan, game_config=gc, world_level=115)
     assert context.school == "鸣金·虹" and context.attribute == "鸣金"
+    # 当前只内置 110 表：115 角色仍选 110 的最新模型，但抗性严格按
+    # 个人世界等级 115，模型等级不得反向覆盖角色等级。
+    assert context.world_level == 115
+    assert context.model_level == 110 and context.model_version == 1
+    level_cfg = gc.level_config_for(115)
+    assert level_cfg is not None
+    assert context.attr_context.judge_resistance == level_cfg.judge_resistance
+    assert context.attr_context.buff_resistance == level_cfg.buff_resistance
     assert context.gongjue == "会意" and context.playstyle == "无名"
     expected = gongjue_attrs("会意", gc)
     assert expected.intent_rate > 0

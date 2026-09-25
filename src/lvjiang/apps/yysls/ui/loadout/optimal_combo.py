@@ -50,6 +50,7 @@ from ...config.equipment_slots import SLOT_SPECS
 from ...core.affix_cap import affix_dict_cap_pct
 from ...core.combat.combat_attrs import (
     CombatAttributes,
+    GraduationAttrContext,
 )
 from ...core.graduation.assumptions import Assumptions
 from ...core.graduation.candidate_pool import (
@@ -281,6 +282,7 @@ def _search_job(
     use_dominance_pruning: bool,
     assumptions: Assumptions,
     season_level: int,
+    graduation_context: GraduationAttrContext,
     season_chengyin: bool = False,
 ) -> Callable[[JobContext], list[dict[str, Any]]]:
     """构造交给 JobController 的搜索函数：逐弓玦场景搜索并合并结果。"""
@@ -289,7 +291,7 @@ def _search_job(
         from ...core.graduation import get_graduation_calculator
         from ...core.graduation.optimal_combo import search_optimal_combo
 
-        calc = get_graduation_calculator(school, scheme)
+        calc = get_graduation_calculator(school, scheme, season_level)
         if calc is None:
             raise ValueError(tr("未找到对应流派的毕业率方案"))
 
@@ -307,6 +309,7 @@ def _search_job(
                 use_dominance_pruning=use_dominance_pruning,
                 cancel_flag=ctx.is_cancelled,
                 assumptions=assumptions,
+                graduation_context=graduation_context,
                 season_level=season_level,
                 season_chengyin=season_chengyin,
                 progress_counter=progress,
@@ -852,6 +855,8 @@ class OptimalComboPage(QWidget):
         playstyle: str = "",
         main_martial_art: str = "",
         sub_martial_art: str = "",
+        world_level: int = 0,
+        graduation_context: GraduationAttrContext | None = None,
         parent: QWidget | None = None,
         *,
         assumptions_provider: Callable[[], Assumptions] | None = None,
@@ -872,6 +877,12 @@ class OptimalComboPage(QWidget):
         self._playstyle = playstyle
         self._main_martial_art = main_martial_art
         self._sub_martial_art = sub_martial_art
+        self._world_level = world_level
+        self._graduation_context = (
+            graduation_context
+            or GraduationAttrContext.from_school(
+                school, world_level=world_level or None)
+        )
         self._level_threshold = level_threshold
         self._affix_filter = affix_filter
         self._jobs = JobController(self, poll_interval_ms=1000)
@@ -1180,7 +1191,7 @@ class OptimalComboPage(QWidget):
         from ...config import get_game_config
 
         projected: dict[str, dict] = {}
-        season_level = get_game_config().current_equip_level()
+        season_level = self._world_level or get_game_config().current_equip_level()
         for slot_key, equip in equipped.items():
             if not isinstance(equip, dict):
                 continue
@@ -1206,7 +1217,8 @@ class OptimalComboPage(QWidget):
             return
         gongjue = str(result.get("gongjue") or "")
         self._attrs_preview.show_preview(
-            self._preview_equipped_for(result), gongjue=gongjue)
+            self._preview_equipped_for(result), gongjue=gongjue,
+            world_level=self._world_level)
         rate = result.get("rate", 0)
         self._attrs_hint.setText(
             tr("方案 #{rank}　弓玦套装：{gongjue}　毕业率 {rate:.2f}%　·　"
@@ -1549,9 +1561,10 @@ class OptimalComboPage(QWidget):
         # Launch worker
         from ...config import get_game_config
         gc = get_game_config()
-        season_level = gc.current_equip_level()
+        season_level = self._world_level or gc.current_equip_level()
         scenarios = [
-            (name, self._base_attrs_raw + gongjue_attrs(name))
+            (name, self._base_attrs_raw + gongjue_attrs(
+                name, gc, world_level=season_level))
             for name in gongjues
         ]
         # 假设在点击时定格：搜索期间改动假设栏不影响本次结果。赛季承音
@@ -1567,6 +1580,7 @@ class OptimalComboPage(QWidget):
             self._chk_pruning.isChecked(),
             assumptions,
             season_level,
+            self._graduation_context,
             season_chengyin,
         ))
 

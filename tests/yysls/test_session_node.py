@@ -49,10 +49,10 @@ class TestRoundTrip:
             set_baseline_dps,
         )
 
-        set_baseline_dps("破竹·樽", "基础方案", 999.5)
-        assert get_baseline_dps("破竹·樽", "基础方案") == 999.5
-        clear_baseline_dps("破竹·樽", "基础方案")
-        assert get_baseline_dps("破竹·樽", "基础方案") is None
+        set_baseline_dps("破竹·樽", "基础方案", 110, 1, 999.5)
+        assert get_baseline_dps("破竹·樽", "基础方案", 110, 1) == 999.5
+        clear_baseline_dps("破竹·樽", "基础方案", 110, 1)
+        assert get_baseline_dps("破竹·樽", "基础方案", 110, 1) is None
 
     def test_both_modules_share_one_node(self, session_env):
         """两个模块写同一个节点，互相不能覆盖对方的键。"""
@@ -60,7 +60,7 @@ class TestRoundTrip:
         from lvjiang.apps.yysls.config.play_styles import save_play_style
 
         save_play_style("破竹·樽", "A", {"atk": 1})
-        set_baseline_dps("破竹·樽", "基础方案", 100.0)
+        set_baseline_dps("破竹·樽", "基础方案", 110, 1, 100.0)
 
         node = _session(session_env)["yysls"]
         assert "play_styles" in node and "graduations" in node

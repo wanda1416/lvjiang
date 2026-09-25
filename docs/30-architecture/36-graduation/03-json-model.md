@@ -1,23 +1,29 @@
-# JSON v2 Schema 契约
+# JSON v3 Schema 契约
 
-每个流派的每个毕业率方案对应一个 JSON 文件，存储编译后的计算模型。当前 schema 版本为 `2`。
+每个流派、逻辑方案、模型等级和版本对应一个 JSON 文件，存储编译后的计算模型。当前
+schema 版本为 `3`。
 
 ## 文件命名
 
 ```
-config/system/yysls/graduation/{流派}_{方案}.json
+config/system/yysls/graduation/{流派}_{方案}_{等级}_v{版本}.json
 ```
 
 - `{流派}`：含中间点的完整流派名，如 `鸣金·虹`、`牵丝·玉`
 - `{方案}`：方案名称，如 `基础方案`、`会心大外流`
-- 示例：`鸣金·虹_基础方案.json`、`牵丝·玉_牵丝穿透流.json`
+- `{等级}`：模型所依据的装备等级，如 `110`
+- `{版本}`：同等级模型的递增整数版本，如 `1`
+- 示例：`鸣金·虹_基础方案_110_v1.json`
 
 ## 顶层结构
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "school": "鸣金·虹",
+  "scheme": "基础方案",
+  "model_level": 110,
+  "model_version": 1,
   "source": { ... },
   "baseline_attrs": { ... },
   "environment": { ... },
@@ -28,11 +34,17 @@ config/system/yysls/graduation/{流派}_{方案}.json
 
 ### schema_version
 
-整数，当前固定为 `2`。`GenericCalculator` 在加载时检查此字段，非 `2` 则抛出 `ValueError`。
+整数，当前固定为 `3`。旧 schema 明确不兼容，不进入模型注册表。
 
 ### school
 
 字符串，流派全名。必须与 `game_config.get_schools()` 返回的键完全一致。
+
+### scheme / model_level / model_version
+
+三者与 `school` 共同构成模型身份。运行时按个人世界等级选择不超过它的最高
+`model_level`，再选择该等级最大的 `model_version`。文件名便于人工审计，加载和选择以
+JSON 元数据为准。
 
 ### source
 
@@ -222,8 +234,9 @@ Excel 源文件溯源信息：
 
 运行时不做 `/100` 转换——Excel 中的 `50%` 在词法阶段已被解析为 `0.5`。
 
-## v1 → v2 迁移
+## v2 → v3 切换
 
 v1 schema 包含完整的 `formula_language`、`inputs`（带 `type`/`unit`/`target`/`label_ref`）、`outputs`（带 `ref`）和 `sheets`（完整工作表数据）。v2 移除了冗余的公式结构，只保留编译后的 `program`。
 
-迁移在 `graduation_converter.py` 的 `_compile_v2()` 中完成：读取 v1 工作簿模型 → 编译为节点程序 → 输出 v2 JSON。v1 格式的 JSON 不再被运行时支持。
+v3 在 v2 的可执行模型上增加逻辑方案、模型等级和模型版本身份。本次不迁移用户侧旧
+JSON；重新导入 Excel 会生成 v3。内置模型统一以 110 级 v1 提供。

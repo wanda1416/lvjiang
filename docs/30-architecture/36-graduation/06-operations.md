@@ -9,7 +9,7 @@
 .venv\Scripts\python.exe scripts\extract_graduation_data.py --check
 
 # 正式导入：生成 JSON 文件到 config/system/yysls/graduation/
-.venv\Scripts\python.exe scripts\extract_graduation_data.py
+.venv\Scripts\python.exe scripts\extract_graduation_data.py --level 110 --version 1
 
 # 运行测试验证
 .venv\Scripts\python.exe -m pytest tests\test_graduation_excel_model.py -q -p no:cacheprovider
@@ -50,7 +50,7 @@
 批量脚本默认生成"基础方案"。指定其他方案名：
 
 ```powershell
-.venv\Scripts\python.exe scripts\extract_graduation_data.py --scheme "会心大外流"
+.venv\Scripts\python.exe scripts\extract_graduation_data.py --scheme "会心大外流" --level 110 --version 1
 ```
 
 ## 单流派导入（UI）
@@ -59,11 +59,11 @@
 
 1. 选择目标流派
 2. 点击"导入"，选择 `.xlsx` 文件
-3. 输入方案名称
-4. 系统执行 `import_graduation_scheme()` → 别名解析 → 编译 → 验证 → 写入 JSON
-5. 成功后自动注册到流派的 `schemes` 列表
+3. 输入方案名称并选择方案等级；等级默认跟随当前赛季，也可选择旧等级
+4. 系统执行 `import_graduation_scheme()` → 计算同等级下一版本 → 别名解析 → 编译 → 验证 → 写入 JSON
+5. 成功后自动注册逻辑方案；同名同等级再次导入会新增版本，不覆盖旧版本
 
-导入完成后会清除 `GenericCalculator._load_data` 的 LRU 缓存，确保后续计算使用新数据。
+导入完成后会清除模型注册表与模型内容缓存，确保后续计算立即选择新版本。
 
 ## 验证对账
 
@@ -86,7 +86,7 @@
 from lvjiang.apps.yysls.core.graduation.graduation_converter import validate_model
 import json
 
-model = json.load(open("config/system/yysls/graduation/鸣金·虹_基础方案.json", encoding="utf-8"))
+model = json.load(open("config/system/yysls/graduation/鸣金·虹_基础方案_110_v1.json", encoding="utf-8"))
 results = validate_model(model)  # 返回 dict，或抛出 FormulaError
 ```
 
@@ -100,7 +100,7 @@ results = validate_model(model)  # 返回 dict，或抛出 FormulaError
    - 如果函数参数全是常量，可以在编译期直接求值（常量折叠）
    - 如果需要运行时输入，生成对应的运算节点
 4. **运行时**（`graduation_program.py`）：在 `evaluate_operation()` 中添加 opcode 执行语义
-5. **测试**（`tests/test_graduation_excel_model.py`）：添加新函数的单元测试
+5. **测试**（`tests/yysls/test_graduation_excel_model.py`）：添加新函数的单元测试
 
 **约束**：不得静默读取旧缓存值替代计算。未实现函数必须抛出 `FormulaError`。
 
@@ -108,7 +108,7 @@ results = validate_model(model)  # 返回 dict，或抛出 FormulaError
 
 ## 缓存管理
 
-`GenericCalculator._load_data()` 使用 `@lru_cache` 按 `(school, scheme)` 缓存 JSON 加载结果。以下场景需要清除缓存：
+模型注册表缓存实体清单，模型加载缓存按实体路径保存 JSON。以下场景需要清除缓存：
 
 - 覆写方案 JSON 文件后
 - 重新导入 Excel 后
@@ -130,4 +130,4 @@ UI 的方案导入流程会自动调用此函数。
 | 导入失败：毕业率不是 100% | Excel 满值表有误 | 检查 Excel 源文件中的满值输入 |
 | 计算结果与 Excel 不一致 | 编译后程序与公式结果偏差 | 运行 `--check` 模式查看详细偏差 |
 | 修改 Excel 后计算不变 | LRU 缓存未清除 | 调用 `invalidate_graduation_cache()` 或重启应用 |
-| JSON 加载失败：`unsupported schema version` | JSON 文件是 v1 格式 | 重新从 Excel 导入生成 v2 格式 |
+| 旧方案未显示 | JSON 不是 v3 格式 | 重新从 Excel 导入并明确选择模型等级 |

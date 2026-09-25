@@ -6,7 +6,9 @@
     graduations: {
         流派名: {
             方案名: {
-                "baseline_dps": float
+                "110": {
+                    "1": {"baseline_dps": float}
+                }
             }
         }
     }
@@ -25,18 +27,25 @@ def _load() -> dict:
     return session_node.load()
 
 
-def get_baseline_dps(school_name: str, scheme_name: str) -> float | None:
+def get_baseline_dps(
+    school_name: str, scheme_name: str, model_level: int, model_version: int,
+) -> float | None:
     """读取 session 中用户校正的基准 DPS；未设置时返回 None。"""
     data = _load()
     return (
         data.get("graduations", {})
         .get(school_name, {})
         .get(scheme_name, {})
+        .get(str(model_level), {})
+        .get(str(model_version), {})
         .get("baseline_dps")
     )
 
 
-def set_baseline_dps(school_name: str, scheme_name: str, value: float) -> None:
+def set_baseline_dps(
+    school_name: str, scheme_name: str, model_level: int, model_version: int,
+    value: float,
+) -> None:
     """写入 session 中的基准 DPS 覆盖值。"""
     value = float(value)
     if value <= 0:
@@ -44,19 +53,31 @@ def set_baseline_dps(school_name: str, scheme_name: str, value: float) -> None:
     def _apply(data: dict) -> dict:
         graduations = data.setdefault("graduations", {})
         school = graduations.setdefault(school_name, {})
-        school.setdefault(scheme_name, {})["baseline_dps"] = value
+        scheme = school.setdefault(scheme_name, {})
+        level = scheme.setdefault(str(model_level), {})
+        level.setdefault(str(model_version), {})["baseline_dps"] = value
         return data
 
     session_node.mutate(_apply)
-    logger.debug(f"已保存毕业率基准 DPS 覆盖: {school_name}/{scheme_name} = {value}")
+    logger.debug(
+        "已保存毕业率基准 DPS 覆盖: "
+        f"{school_name}/{scheme_name}/{model_level}/v{model_version} = {value}")
 
 
-def clear_baseline_dps(school_name: str, scheme_name: str) -> None:
+def clear_baseline_dps(
+    school_name: str, scheme_name: str, model_level: int, model_version: int,
+) -> None:
     """清除 session 中的基准 DPS 覆盖，回退到 JSON 默认值。"""
     def _apply(data: dict) -> dict:
         scheme = data.get("graduations", {}).get(school_name, {}).get(scheme_name)
-        if scheme and "baseline_dps" in scheme:
-            del scheme["baseline_dps"]
+        level = scheme.get(str(model_level), {}) if isinstance(scheme, dict) else {}
+        version = level.get(str(model_version)) if isinstance(level, dict) else None
+        if isinstance(version, dict) and "baseline_dps" in version:
+            del version["baseline_dps"]
+            if not version:
+                del level[str(model_version)]
+            if not level:
+                del scheme[str(model_level)]
             if not scheme:
                 del data["graduations"][school_name][scheme_name]
         return data

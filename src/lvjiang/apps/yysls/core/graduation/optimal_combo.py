@@ -570,6 +570,7 @@ def search_optimal_combo(
     max_per_slot: int = 0,  # 0 = no limit
     cancel_flag: Callable[[], bool] | None = None,
     assumptions: Assumptions | None = None,
+    graduation_context: GraduationAttrContext | None = None,
     season_level: int = 0,
     season_chengyin: bool = False,
     full_chengyin: bool = False,
@@ -645,7 +646,10 @@ def search_optimal_combo(
     slot_keys = [
         k for k in SLOT_KEYS if k in virtual_candidates and virtual_candidates[k]
     ]
-    graduation_context = GraduationAttrContext.from_school(calculator._school)
+    graduation_context = (
+        graduation_context
+        or GraduationAttrContext.from_school(calculator._school)
+    )
     field_index = _build_field_index_map(input_specs)
 
     slot_deltas = compute_slot_deltas(

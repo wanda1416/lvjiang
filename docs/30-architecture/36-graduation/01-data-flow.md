@@ -18,8 +18,8 @@
                            │  └─────────────────────────────────────┘
                            ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  JSON v2 模型                                                       │
-│  config/system/yysls/graduation/{流派}_{方案}.json                    │
+│  JSON v3 模型                                                       │
+│  config/system/yysls/graduation/{流派}_{方案}_{等级}_v{版本}.json      │
 │  包含：baseline_attrs / environment / reference / program            │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │  L4  GenericCalculator.calculate(attrs)
@@ -40,7 +40,7 @@
 | 层 | 输入 | 输出 | 触发时机 |
 |---|---|---|---|
 | **L1 公式解析** | Excel 公式字符串（如 `=B2*C2+D2`） | AST 节点（`{op, value/args/left/right}`） | L2 转换时逐公式调用 |
-| **L2 模型转换** | `.xlsx` 文件路径 + 流派名 | JSON v2 模型（dict） | 用户导入 Excel 或批量脚本 |
+| **L2 模型转换** | `.xlsx` 文件路径 + 流派名 + 方案名 + 等级 + 版本 | JSON v3 模型（dict） | 用户导入 Excel 或批量脚本 |
 | **L3 程序编译** | JSON 工作簿模型 + 输入绑定 | 紧凑节点程序（inputs / nodes / outputs） | L2 内部调用 |
 | **L4 运行时** | 节点程序 + `CombatAttributes` | `GraduationResult` | 用户切换装备 / 方案时 |
 
@@ -54,7 +54,7 @@
 ### L2 模型转换
 
 - **输入**：Excel 文件路径 + 流派名（如 `"鸣金·虹"`）
-- **输出**：完整的 JSON v2 模型，包含工作表数据、编译后的节点程序、基准属性、环境配置
+- **输出**：完整的 JSON v3 模型，包含模型身份、编译后的节点程序、基准属性、环境配置
 - **关键步骤**：
   1. 用 openpyxl 分别加载公式模式（`data_only=False`）和缓存模式（`data_only=True`）
   2. 遍历所有工作表，将每个非空单元格提取为 `{formula, cached}` 或 `{value}`
@@ -82,7 +82,7 @@
   - `graduation_rate`：毕业率（DPS / baseline_dps）
   - `baseline_dps`：基准 DPS（来自 Excel 满值表）
   - `combat_time`：战斗时间
-- **缓存**：`GenericCalculator._load_data()` 使用 `@lru_cache` 按 `(school, scheme)` 缓存 JSON 加载
+- **缓存**：模型注册表缓存实体清单，模型内容按实体相对路径缓存；导入或删除后统一失效
 
 ## 关键设计决策
 
@@ -105,10 +105,11 @@
 毕业率计算器要求三个标识严格一致：
 
 1. `game_config.get_schools()` 返回的流派名（如 `"鸣金·虹"`，含中间点）
-2. JSON 文件名（如 `鸣金·虹_基础方案.json`）
-3. `get_graduation_calculator()` 的查询参数
+2. JSON 元数据中的方案名称、模型等级和模型版本
+3. `get_graduation_calculator()` 的流派、方案名称和个人世界等级查询参数
 
-任一层不一致会导致计算器返回 `None`，UI 显示"未实现"。
+运行时选择不超过个人世界等级的最高模型等级，再取该等级最新版本。找不到合格模型时，
+计算器返回 `None`，UI 显示方案不可用。
 
 ### 与外部计算器的关系
 

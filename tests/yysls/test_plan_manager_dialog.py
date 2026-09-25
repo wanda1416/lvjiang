@@ -36,6 +36,27 @@ def test_switch_user_and_reorder_keep_both_active_plans(qtbot, tmp_path):
     assert dialog.changed_users == {"bob"}
 
 
+def test_switch_user_only_displays_its_world_level(qtbot, tmp_path):
+    alice = LoadoutRepository("alice", tmp_path)
+    bob = LoadoutRepository("bob", tmp_path)
+    alice.set_world_level(110)
+
+    dialog = PlanManagerDialog(
+        ["alice", "bob"], "alice", tmp_path,
+        game_config=get_game_config())
+    qtbot.addWidget(dialog)
+    assert dialog._world_level_combo.get_level() == 110
+
+    dialog._users.setCurrentRow(1)
+    assert dialog._world_level_combo.get_level() is None
+    assert alice.load().world_level == 110
+    assert bob.load().world_level is None
+
+    dialog._world_level_combo.set_level(105)
+    assert bob.load().world_level == 105
+    assert alice.load().world_level == 110
+
+
 def test_delete_plan_keeps_shared_equipment_and_only_target_user(
         qtbot, tmp_path, monkeypatch):
     alice = LoadoutRepository("alice", tmp_path)

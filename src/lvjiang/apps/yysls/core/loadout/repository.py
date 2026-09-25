@@ -204,6 +204,18 @@ class LoadoutRepository:
         assert created is not None
         return created
 
+    def set_world_level(self, level: int | None) -> None:
+        """设置用户个人世界等级；None 恢复为随赛季等级。"""
+        if level is not None and (
+            not isinstance(level, int) or isinstance(level, bool) or level <= 0
+        ):
+            raise ValueError("个人世界等级必须是正整数")
+
+        def mutate(state: LoadoutState) -> None:
+            state.world_level = level
+
+        self.update(mutate)
+
     def delete_plan(self, plan_id: str) -> None:
         def mutate(state: LoadoutState) -> None:
             if len(state.plans) <= 1:

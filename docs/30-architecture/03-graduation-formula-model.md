@@ -6,7 +6,7 @@
 ## 数据流
 
 `data/temp/excel/*.xlsx` 是 DPS 与毕业率的唯一真源。开发期转换脚本读取公式和
-Excel 缓存值，生成 `config/system/yysls/graduation/{流派}_{方案}.json`；应用运行时只加载 JSON，
+Excel 缓存值，生成 `config/system/yysls/graduation/{流派}_{方案}_{等级}_v{版本}.json`；应用运行时只加载 JSON，
 计算阶段不依赖 Excel 或 openpyxl；只有“游戏配置 → 流派配置 → 方案管理”的
 导入动作需要 openpyxl。
 
@@ -25,7 +25,7 @@ Excel 工作簿
 
 ```powershell
 .venv\Scripts\python.exe scripts\extract_graduation_data.py --check
-.venv\Scripts\python.exe scripts\extract_graduation_data.py
+.venv\Scripts\python.exe scripts\extract_graduation_data.py --level 110 --version 1
 .venv\Scripts\python.exe -m pytest tests\test_graduation_excel_model.py -q -p no:cacheprovider
 ```
 
@@ -38,13 +38,15 @@ Excel 工作簿
 .venv\Scripts\python.exe scripts\extract_graduation_data.py --check --school "鸣金·虹"
 ```
 
-脚本默认生成“基础方案”，可用 `--scheme "方案名"` 指定其他名称。桌面端也可以在
-“方案管理”中选择 Excel、编辑方案名并直接生成；成功后会把方案注册到对应流派的
+脚本默认生成“基础方案”，可用 `--scheme`、`--level` 和 `--version` 指定模型身份。
+桌面端也可以在“方案管理”中选择 Excel、编辑方案名、选择等级并直接生成；同等级重复
+导入自动增加版本。成功后会把逻辑方案注册到对应流派的
 `schools.<流派>.schemes`。主面板在弓玦之后显示方案下拉框，并将当前方案传给计算器。
 
 ## JSON 契约
 
-v2 schema 包含以下顶层字段：`schema_version`、`school`、`source`、`baseline_attrs`、`environment`、`reference`、`program`。
+v3 schema 包含以下顶层字段：`schema_version`、`school`、`scheme`、`model_level`、
+`model_version`、`source`、`baseline_attrs`、`environment`、`reference`、`program`。
 详见 [03-json-model.md](36-graduation/03-json-model.md)。
 
 百分比统一使用小数比例，例如 `8.52%` 保存为 `0.0852`。
@@ -78,7 +80,7 @@ Excel 中的“全武增”“首领增”“拳甲增”“蓄力技定音”�
 | [36-graduation/README.md](36-graduation/README.md) | 四层管线总览与模块索引 |
 | [01-data-flow.md](36-graduation/01-data-flow.md) | 端到端数据流与各层职责 |
 | [02-formula-language.md](36-graduation/02-formula-language.md) | Excel 公式子集规范 |
-| [03-json-model.md](36-graduation/03-json-model.md) | JSON v2 Schema 契约 |
+| [03-json-model.md](36-graduation/03-json-model.md) | JSON v3 Schema 契约 |
 | [04-alias-resolution.md](36-graduation/04-alias-resolution.md) | 别名解析规则 |
 | [05-compiler-runtime.md](36-graduation/05-compiler-runtime.md) | 编译器与运行时 |
 | [06-operations.md](36-graduation/06-operations.md) | 操作指南与故障排查 |

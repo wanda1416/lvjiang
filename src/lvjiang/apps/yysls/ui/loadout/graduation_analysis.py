@@ -128,6 +128,8 @@ class GraduationAnalysisDialog(QDialog):
         *,
         school: str,
         scheme: str,
+        model_level: int,
+        model_version: int,
         plan_name: str,
         assumption_bar: AssumptionBar,
         optimal_page: OptimalComboPage,
@@ -148,9 +150,12 @@ class GraduationAnalysisDialog(QDialog):
         layout.setContentsMargins(20, 18, 20, 16)
         layout.setSpacing(10)
 
+        # 带上实际加载的模型等级与版本：同名方案可能有多个等级多个版本，
+        # 不写出来用户无法判断这一屏是按哪一份算的。
         context = QLabel(
-            tr("{school}  ·  {scheme}  ·  {plan}").format(
-                school=school, scheme=scheme, plan=plan_name))
+            tr("{school}  ·  {scheme}  ·  {level}级  ·  v{version}  ·  {plan}")
+            .format(school=school, scheme=scheme, level=model_level,
+                    version=model_version, plan=plan_name))
         context.setProperty("tone", "muted")
         context.setStyleSheet("font-size: 12px;")
         # 首行最右侧放技能轴入口。它是实验性功能：需要用户自备毕业率计算器

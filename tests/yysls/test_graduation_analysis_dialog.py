@@ -71,7 +71,8 @@ def _dialog(qtbot, cache: AnalysisCache, *, initial_tab=TAB_OPTIMAL,
     )
     optimal = _StubOptimalPage(bar.value)
     dialog = GraduationAnalysisDialog(
-        None, school="鸣金·虹", scheme="基础方案", plan_name="默认方案",
+        None, school="鸣金·虹", scheme="基础方案",
+        model_level=110, model_version=1, plan_name="默认方案",
         assumption_bar=bar, optimal_page=optimal, affix_pages=pages,
         cache=cache, initial_tab=initial_tab,
     )
@@ -156,3 +157,17 @@ def test_clear_optimal_results_also_clears_plan_cache(qtbot):
     assert optimal._tab_widget.currentIndex() == 0
     assert optimal._candidate_summary.text() == "已清除上次搜索结果。"
     dialog.reject()
+
+
+def test_context_line_states_the_loaded_model_level_and_version(qtbot):
+    """同名方案可能有多个等级多个版本，标题不写出来就无从判断加载了哪一份。"""
+    from PyQt6.QtWidgets import QLabel
+
+    dialog, *_rest = _dialog(qtbot, AnalysisCache())
+    texts = [
+        widget.text() for widget in dialog.findChildren(QLabel)
+        if "基础方案" in widget.text()
+    ]
+
+    assert texts, "没找到上下文行"
+    assert any("110级" in text and "v1" in text for text in texts), texts

@@ -22,6 +22,13 @@ from .dingyin_parser import (
 )
 from .models import Affix, EquipAttr, EquipmentData
 
+# 固定转律槽标记：[转] 是转律产出，[原] 是转律后切回的原词条，两者都说明
+# 该槽是这件装备唯一的转律槽。右括号常被 OCR 吃掉或读成 1，一并容忍。
+# 这些是 OCR 截屏文字，恒为中文，正则不能过 tr()。
+_TRANSFER_MARK_RE = re.compile(r"\[转[1\]]?")
+_ORIGINAL_MARK_RE = re.compile(r"\[原[1\]]?")
+_SLOT_MARK_RE = re.compile(r"\[[转原][1\]]?")
+
 
 class EquipmentParser:
     """装备 OCR 数据转换器"""
@@ -482,7 +489,7 @@ class EquipmentParser:
 
         处理流程：
         0. 数据清洗（委托 cleaner：误识别替换 + 噪声字符删除）
-        1. 检测 [转] 转律标记
+        1. 检测 [转]/[原] 转律槽标记
         2. 过滤套装信息
         3. 匹配已知词条名称（最长前缀优先）
         4. 提取数值和单位
@@ -498,8 +505,14 @@ class EquipmentParser:
         # ── 1. 转律标记检测与移除 ──
         # 符号已统一为英文括号，匹配 [转1] / [转] / [转1 / [转 等变体
         # text 是 OCR 截屏文字，恒为中文，正则不能过 tr()（同上）。
-        is_transferred = bool(re.search(r"\[转[1\]]?", text))
-        text = re.sub(r"\[转[1\]]?", "", text)
+        #
+        # [原] 是 110 阶起出现的另一种展示：该槽转律过、玩家又切回了原词条。
+        # 槽位语义与 [转] 完全相同（固定转律槽，后续转律只能动这一条），但
+        # 词条本身是装备原生的，所以额外记 is_original——神力词条不可能由转律
+        # 产出，那条校验必须放过 [原]，否则整件装备会被误判非法。
+        is_original = bool(_ORIGINAL_MARK_RE.search(text))
+        is_transferred = is_original or bool(_TRANSFER_MARK_RE.search(text))
+        text = _SLOT_MARK_RE.sub("", text)
 
         # ── 2. 过滤套装信息 ──
         if "套装" in text:
@@ -541,6 +554,7 @@ class EquipmentParser:
             value=value,
             unit=unit,
             is_transferred=is_transferred,
+            is_original=is_original,
         )
 
 

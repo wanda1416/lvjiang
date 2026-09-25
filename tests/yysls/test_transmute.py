@@ -144,6 +144,22 @@ def test_transferred_slot_is_the_only_option_and_bad_marks_are_untrusted():
     assert judge_transmute_eligibility(_sword(), gc).slots == (2, 3, 4)
 
 
+def test_original_mark_pins_the_slot_like_a_transfer():
+    """[原]：转律过、又切回原词条。槽位照样被锁死，未来只能转这一条。
+
+    is_original 只影响"这条是不是转律产出"（神力校验），转律资格和
+    可转槽位一律只看 is_transferred。
+    """
+    gc = get_game_config()
+    reverted = _sword()
+    reverted["affix_3"]["is_transferred"] = True
+    reverted["affix_3"]["is_original"] = True
+
+    judged = judge_transmute_eligibility(reverted, gc)
+    assert judged.eligible and judged.slots == (3,)
+    assert set(transmute_candidates(reverted, gc)) == {3}
+
+
 def test_candidates_come_from_pool_union_minus_present_and_part_rules():
     gc = get_game_config()
     union = transmute_pool_union(gc)

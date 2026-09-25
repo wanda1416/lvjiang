@@ -263,6 +263,28 @@ class TestParseSingleAffix:
             assert affix.name == "会心率"
         assert affix.is_transferred
 
+    @case_matrix("text", [
+        "[原]最小鸣金攻击 121.4",
+        "[原1最小鸣金攻击 121.4",   # OCR 将 ] 误识别为 1
+        "[原最小鸣金攻击 121.4",    # OCR 漏识别闭合括号
+    ])
+    def test_original_mark_is_same_slot_as_transfer(self, parser, text):
+        """[原] 是 110 阶起的展示：该槽转律过、又切回了原词条。
+
+        槽位语义与 [转] 相同（固定转律槽），但词条本身是装备原生的。
+        以前这条整段解析不出来，还会连带丢掉它后面的所有词条。
+        """
+        affix = parser._parse_single_affix(clean(text))
+        assert affix.name == "最小鸣金攻击"
+        assert affix.value == 121.4
+        assert affix.is_transferred
+        assert affix.is_original
+
+    def test_transfer_mark_is_not_original(self, parser):
+        affix = parser._parse_single_affix(clean("[转]最小鸣金攻击 121.4"))
+        assert affix.is_transferred
+        assert not affix.is_original
+
     def test_wuxue_dynamic_affix(self, parser):
         affix = parser._parse_single_affix("剑武学增伤 8.2%")
         assert affix.name == "剑武学增伤"
@@ -382,6 +404,19 @@ class TestParseFullChain:
         )
         parser._parse_affixes(_weapon_raw(affix_yu=tail))
         assert warnings == []
+
+    def test_original_mark_does_not_truncate_later_affixes(self, parser):
+        """[原] 以前整条解析不出来，还会级联丢掉它后面的所有词条。"""
+        affixes, warnings = parser._parse_affixes(_weapon_raw(
+            affix_jue="[原]最小鸣金攻击 +121.4",
+            affix_zhi="劲 +76.8",
+            affix_yu="精准率 +12.4%",
+        ))
+        assert [a.name for a in affixes] == [
+            "最大外功攻击", "会心率", "最小鸣金攻击", "劲", "精准率"]
+        assert warnings == []
+        assert affixes[2].is_transferred and affixes[2].is_original
+        assert not affixes[3].is_transferred
 
     def test_yu_empty_is_normal(self, parser):
         # 前 4 条齐全、第 5 条为空 → 正常结束无 warning

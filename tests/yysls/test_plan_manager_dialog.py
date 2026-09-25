@@ -117,3 +117,22 @@ def test_create_and_edit_in_manager_do_not_switch_active_plan(
     assert state.plans[new_id].name == "已编辑"
     assert state.plans[new_id].combat_type == COMBAT_TYPE_PVP
     assert state.active_plan_id == active_id
+
+
+def test_world_level_combo_offers_follow_season_and_fits_its_label(
+        qtbot, tmp_path):
+    """「随赛季更新（115）」比等级数字长得多，宽度要按文本撑开。
+
+    截断成「随赛季更…」会让用户看不出默认口径是跟随赛季，这一项恰恰是默认值。
+    """
+    from lvjiang.apps.yysls.config import get_game_config
+
+    dialog = PlanManagerDialog(
+        ["alice"], "alice", tmp_path, game_config=get_game_config())
+    qtbot.addWidget(dialog)
+    combo = dialog._world_level_combo
+
+    season = get_game_config().current_equip_level()
+    assert combo.itemText(0) == f"随赛季更新（{season}）"
+    assert combo.itemData(0) is None            # 首项即「不写等级」
+    assert combo.minimumWidth() >= 180

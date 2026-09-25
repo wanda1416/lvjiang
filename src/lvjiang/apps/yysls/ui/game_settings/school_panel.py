@@ -214,13 +214,13 @@ class SchoolPanel(QWidget):
         self._btn_import_scheme = QPushButton(tr("导入 Excel…"))
         self._btn_import_scheme.clicked.connect(self._on_import_scheme)
         apply_button_style(self._btn_import_scheme, variant="neutral")
-        self._scheme_list = QTableWidget(0, 2)
+        self._scheme_list = QTableWidget(0, 3)
         self._scheme_list.setHorizontalHeaderLabels([
-            tr("方案名称"), tr("方案等级、版本号")])
-        self._scheme_list.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Stretch)
-        self._scheme_list.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.ResizeMode.ResizeToContents)
+            tr("方案等级"), tr("方案名称"), tr("版本号")])
+        header = self._scheme_list.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self._scheme_list.verticalHeader().setVisible(False)
         self._scheme_list.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows)
@@ -585,13 +585,15 @@ class SchoolPanel(QWidget):
         for ref in available_models(school):
             row = self._scheme_list.rowCount()
             self._scheme_list.insertRow(row)
-            name_item = QTableWidgetItem(ref.scheme)
-            name_item.setData(Qt.ItemDataRole.UserRole, ref)
-            self._scheme_list.setItem(row, 0, name_item)
+            level_item = QTableWidgetItem(
+                tr("{level}级").format(level=ref.level))
+            # ref 挂在首列：_selected_model_ref 按首列取，列序调整时跟着走。
+            level_item.setData(Qt.ItemDataRole.UserRole, ref)
+            self._scheme_list.setItem(row, 0, level_item)
+            self._scheme_list.setItem(row, 1, QTableWidgetItem(ref.scheme))
             self._scheme_list.setItem(
-                row, 1,
-                QTableWidgetItem(tr("{level}级 · v{version}").format(
-                    level=ref.level, version=ref.version)))
+                row, 2,
+                QTableWidgetItem(tr("v{version}").format(version=ref.version)))
 
     def _selected_model_ref(self):
         row = self._scheme_list.currentRow()

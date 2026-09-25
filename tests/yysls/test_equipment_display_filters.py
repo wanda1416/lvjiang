@@ -525,6 +525,23 @@ def test_properties_dialog_separates_the_two_disabled_reasons(qtbot):
     assert usable._switch_dingyin_button.text() == "切换普通定音"
 
 
+def test_properties_dialog_shows_set_with_inline_switch_button(qtbot):
+    from lvjiang.apps.yysls.ui.loadout.equip.cards import (
+        _EquipmentPropertiesDialog,
+    )
+
+    dialog = _EquipmentPropertiesDialog(
+        {"type": "环", "equipment_set": "yudou"},
+        equipment_set_changed=lambda _key: True,
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog._equipment_set_value_label.text() == "玉斗"
+    assert dialog._switch_equipment_set_button.text() == "切换套装"
+    assert dialog._switch_equipment_set_button.isEnabled()
+    assert ("huanhua", "浣花") in dialog._equipment_set_options()
+
+
 def test_dingyin_context_action_only_exists_for_two_slots_and_names_target(
     qtbot,
 ):

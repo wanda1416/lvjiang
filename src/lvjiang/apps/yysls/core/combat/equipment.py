@@ -6,6 +6,7 @@ import copy
 from loguru import logger
 
 from ..loadout import EQUIPMENT_SLOTS, LoadoutRepository
+from ..loadout.equipment_write import WriteSource
 from ..loadout.repository import stamp_equipment_write
 
 
@@ -229,6 +230,15 @@ class EquipmentInventory:
         """切换背包中某件装备默认展示哪种定音，不动任何方案的选择。"""
         self._state = self._repo.set_item_dingyin_type(fp, kind)
 
+    def set_plan_equipment_set(self, slot_key: str, set_key: str) -> None:
+        """修改当前方案槽位的套装覆盖。"""
+        self._state = self._repo.set_plan_equipment_set(
+            self._state.active_plan_id, slot_key, set_key)
+
+    def set_item_equipment_set(self, fp: str, set_key: str) -> None:
+        """修改装备自身的原始套装。"""
+        self._state = self._repo.set_item_equipment_set(fp, set_key)
+
     def apply_transmute_targets(
         self,
         targets: dict[str, tuple[int, str, float] | None],
@@ -242,7 +252,14 @@ class EquipmentInventory:
     def clear_transmute_target(self, fp: str) -> None:
         self._state = self._repo.clear_transmute_target(fp)
 
-    def apply_combos(self, combo_equipped: dict[str, dict]) -> None:
+    def apply_combos(
+        self, combo_equipped: dict[str, dict], *, equipment_set: str = "",
+    ) -> None:
+        """应用最优组合，并把所选左四套装写入当前方案。
+
+        搜索候选来自方案解析副本，可能带着方案套装覆盖；写装备池时必须按
+        ``PLAN_SCAN`` 口径保留仓储原始套装，不能把覆盖态反写为装备事实。
+        """
         plan_id = self._state.active_plan_id
         for slot in combo_equipped:
             if slot not in EQUIPMENT_SLOTS:
@@ -256,12 +273,21 @@ class EquipmentInventory:
             for slot, equip in combo_equipped.items():
                 fp = str(equip.get("_fp") or "") or make_fingerprint(
                     equip, is_mock=bool(equip.get("_extra", {}).get("is_mock")))
-                # 组合应用写回的是仓储里的原始装备，不带定音假设，也不表达
-                # 任何展示意图：走统一入口保住两种定音和转律目标即可。
+                # 组合应用写回的是仓储里的原始装备，不带定音假设或方案
+                # 套装覆盖；后者只写 plan.equipment_sets。
                 state.equipment_items[fp] = stamp_equipment_write(
-                    equip, fp, state.equipment_items.get(fp))
-                if plan.equipment[slot] != fp:
+                    equip, fp, state.equipment_items.get(fp),
+                    source=WriteSource.PLAN_SCAN)
+                replaced = plan.equipment[slot] != fp
+                if replaced:
                     plan.dingyin.pop(slot, None)
                 plan.equipment[slot] = fp
+                if slot in {"main_weapon", "sub_weapon", "ring", "pendant"}:
+                    if equipment_set:
+                        plan.equipment_sets[slot] = equipment_set
+                    elif replaced:
+                        plan.equipment_sets.pop(slot, None)
+                elif replaced:
+                    plan.equipment_sets.pop(slot, None)
         self._repo.update(mutate)
         self.reload()

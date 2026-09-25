@@ -263,6 +263,10 @@ class GameConfigManager:
         self._part_name_suffixes: dict[str, list[str]] = {}
         self._part_type_aliases: dict[str, list[str]] = {}
         self._equipment_name_series: dict[str, dict[int, str]] = {}
+        # 套装注册表：左右两侧是独立身份；左侧额外登记两件套属性及推荐关系。
+        self._equipment_sets: dict[str, dict[str, dict]] = {
+            "left": {}, "right": {},
+        }
         # 武学注册表：武学名 → {"weapon": 武器, "attr": 属性}（顶层 martial_arts）
         # 武器和属性都是武学的固有属性，流派/玩法只引用武学，不再各自录入武器——
         # 那会让 weapon 和 martial_art 两个字段可以互相矛盾且无人校验。
@@ -337,6 +341,7 @@ class GameConfigManager:
         self._part_name_suffixes.clear()
         self._part_type_aliases.clear()
         self._equipment_name_series.clear()
+        self._equipment_sets = {"left": {}, "right": {}}
         self._schools.clear()
         self._level_configs.clear()
         self._season_configs.clear()
@@ -425,6 +430,29 @@ class GameConfigManager:
                     int(level): str(name).strip()
                     for level, name in levels.items() if str(name).strip()
                 }
+        raw_sets = data.get("equipment_sets") or {}
+        if isinstance(raw_sets, dict):
+            for side in ("left", "right"):
+                entries = raw_sets.get(side) or {}
+                if not isinstance(entries, dict):
+                    continue
+                for key, entry in entries.items():
+                    if not isinstance(entry, dict):
+                        continue
+                    name = str(entry.get("name") or "").strip()
+                    if not name:
+                        continue
+                    normalized = {"name": name}
+                    if side == "left":
+                        normalized.update({
+                            "two_piece_affix": str(
+                                entry.get("two_piece_affix") or "").strip(),
+                            "recommended_right": str(
+                                entry.get("recommended_right") or "").strip(),
+                            "recommended_school": str(
+                                entry.get("recommended_school") or "").strip(),
+                        })
+                    self._equipment_sets[side][str(key)] = normalized
 
         # ── affix_categories（顶层；固定 5 类归属→词条名列表）──
         raw_categories = data.get("affix_categories") or {}
@@ -788,6 +816,48 @@ class GameConfigManager:
             "unit": self._affix_units.get(category, ""),
             "chengyin": chengyin,
         }
+
+    def get_affix_cap_levels(self, affix_name: str) -> list[int]:
+        """返回词条已登记数值的等级，供跨等级规则选择相邻档位。"""
+        category = self.resolve_affix_category(affix_name)
+        return sorted(self._affix_caps.get(category, {}))
+
+    def get_equipment_sets(self, side: str | None = None) -> dict:
+        """返回套装注册表副本；左右套装身份始终分开。"""
+        if side in ("left", "right"):
+            return copy.deepcopy(self._equipment_sets[side])
+        return copy.deepcopy(self._equipment_sets)
+
+    def resolve_equipment_set(self, text: str, side: str) -> str:
+        """从 OCR 全文中识别指定侧的已注册套装，返回稳定 key。"""
+        if not text or side not in ("left", "right"):
+            return ""
+        compact = "".join(str(text).split()).replace("|", "")
+        matches = [
+            (key, str(entry.get("name") or ""))
+            for key, entry in self._equipment_sets[side].items()
+            if f"{str(entry.get('name') or '')}套装" in compact
+        ]
+        if not matches:
+            return ""
+        # 长名优先，避免未来短名成为另一套装名称的子串。
+        return max(matches, key=lambda item: len(item[1]))[0]
+
+    def equipment_set_name(self, key: str) -> str:
+        """稳定 key 转展示名称；未知 key 返回空串。"""
+        for side in ("left", "right"):
+            entry = self._equipment_sets[side].get(key)
+            if entry:
+                return str(entry.get("name") or "")
+        return ""
+
+    def recommended_equipment_set(self, school: str) -> str:
+        """返回流派配置的推荐左四套装；未登记时返回空串。"""
+        school = str(school or "").strip()
+        for key, entry in self._equipment_sets["left"].items():
+            if str(entry.get("recommended_school") or "").strip() == school:
+                return key
+        return ""
 
     def get_all_affix_categories(self) -> list[str]:
         """返回所有已配置的词条类别名"""

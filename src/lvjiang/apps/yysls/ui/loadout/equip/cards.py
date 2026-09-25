@@ -376,11 +376,15 @@ def _equipment_property_rows(
         "cooling": tr("冷却中"),
         "completed": tr("冷却完成"),
     }.get(str(equip.get("cooldown_state") or ""), "")
+    from ....config import get_game_config
+    set_name = get_game_config().equipment_set_name(
+        str(equip.get("equipment_set") or ""))
     return [
         (tr("来源"), source),
         (tr("指纹"), str(equip.get("_fp") or "")),
         (tr("状态"), lock_status),
         (tr("引用方案"), "、".join(referenced_plans) or tr("无")),
+        (tr("装备套装"), set_name or tr("未记录")),
         (tr("普通定音"), _dingyin_slot_text(equip, "dingyin")),
         (tr("止戈定音"), _dingyin_slot_text(equip, DINGYIN_ZHIGE_KEY)),
         (tr("冷却类型"), cooldown_kind),
@@ -413,6 +417,7 @@ class _EquipmentPropertiesDialog(QDialog):
         parent: QWidget | None = None,
         cooldown_changed: Callable[[str], bool] | None = None,
         dingyin_changed: Callable[[str], bool] | None = None,
+        equipment_set_changed: Callable[[str], bool] | None = None,
         dingyin_kind: str = "",
         referenced_plans: list[str] | tuple[str, ...] = (),
     ):
@@ -422,6 +427,7 @@ class _EquipmentPropertiesDialog(QDialog):
         # 调用方决定这次切换写到哪儿：装备栏写方案槽位选择，背包写装备自身的
         # 展示状态。对话框只负责问「切到哪一种」，不知道也不该知道写到哪。
         self._dingyin_changed = dingyin_changed
+        self._equipment_set_changed = equipment_set_changed
         self._dingyin_kind = (
             dingyin_kind if dingyin_kind in DINGYIN_TYPES
             else resolve_dingyin_type(self._equip))
@@ -443,8 +449,19 @@ class _EquipmentPropertiesDialog(QDialog):
             field_value.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse)
             field_value.setWordWrap(True)
-            form.addRow(field_name, field_value)
             self._value_labels[name] = field_value
+            if name == tr("装备套装"):
+                self._equipment_set_value_label = field_value
+                set_row = QHBoxLayout()
+                set_row.setContentsMargins(0, 0, 0, 0)
+                set_row.addWidget(field_value, 1)
+                self._switch_equipment_set_button = QPushButton(tr("切换套装"))
+                self._switch_equipment_set_button.clicked.connect(
+                    self._switch_equipment_set)
+                set_row.addWidget(self._switch_equipment_set_button)
+                form.addRow(field_name, set_row)
+                continue
+            form.addRow(field_name, field_value)
 
             if name == tr("冷却时间"):
                 self._remaining_name = QLabel(f"{tr('剩余时间')}：")
@@ -482,6 +499,59 @@ class _EquipmentPropertiesDialog(QDialog):
 
         self._refresh_cooldown()
         self._refresh_dingyin()
+        self._refresh_equipment_set()
+
+    def _equipment_set_options(self) -> list[tuple[str, str]]:
+        """按装备侧返回全部可选套装。"""
+        from ....config import get_game_config
+        from ....core.equip_parser.constants import infer_category
+
+        side = "right" if infer_category(self._equip.get("type")) == "armor" else "left"
+        return [
+            (key, str(entry.get("name") or key))
+            for key, entry in get_game_config().get_equipment_sets(side).items()
+        ]
+
+    def _refresh_equipment_set(self) -> None:
+        from ....config import get_game_config
+
+        key = str(self._equip.get("equipment_set") or "")
+        name = get_game_config().equipment_set_name(key)
+        self._equipment_set_value_label.setText(name or tr("未记录"))
+        enabled = self._equipment_set_changed is not None
+        self._switch_equipment_set_button.setEnabled(enabled)
+        self._switch_equipment_set_button.setToolTip(
+            tr("当前入口不支持修改套装") if not enabled else "")
+
+    def _switch_equipment_set(self) -> None:
+        if self._equipment_set_changed is None:
+            return
+        menu = QMenu(self)
+        current = str(self._equip.get("equipment_set") or "")
+        empty_action = menu.addAction(tr("未记录"))
+        assert empty_action is not None
+        empty_action.setData("")
+        empty_action.setCheckable(True)
+        empty_action.setChecked(not current)
+        menu.addSeparator()
+        for key, name in self._equipment_set_options():
+            action = menu.addAction(name)
+            assert action is not None
+            action.setData(key)
+            action.setCheckable(True)
+            action.setChecked(key == current)
+        chosen = menu.exec(self._switch_equipment_set_button.mapToGlobal(
+            self._switch_equipment_set_button.rect().bottomLeft()))
+        if chosen is None:
+            return
+        key = str(chosen.data() or "")
+        if key == current or not self._equipment_set_changed(key):
+            return
+        if key:
+            self._equip["equipment_set"] = key
+        else:
+            self._equip.pop("equipment_set", None)
+        self._refresh_equipment_set()
 
     # ── 定音切换 ──
 
@@ -570,6 +640,7 @@ def _show_equipment_properties(
     equip: dict,
     cooldown_changed: Callable[[str], bool] | None = None,
     dingyin_changed: Callable[[str], bool] | None = None,
+    equipment_set_changed: Callable[[str], bool] | None = None,
     dingyin_kind: str = "",
     referenced_plans: list[str] | tuple[str, ...] = (),
 ) -> None:
@@ -579,7 +650,9 @@ def _show_equipment_properties(
         parent = None
     _EquipmentPropertiesDialog(
         equip, parent, cooldown_changed=cooldown_changed,
-        dingyin_changed=dingyin_changed, dingyin_kind=dingyin_kind,
+        dingyin_changed=dingyin_changed,
+        equipment_set_changed=equipment_set_changed,
+        dingyin_kind=dingyin_kind,
         referenced_plans=referenced_plans).exec()
 
 
@@ -1181,6 +1254,12 @@ class _SlotCard(_AffixRowsMixin, QFrame):
             f"font-weight: bold; font-size: {self._name_fs}px;")
 
         self._apply_level_line(self.lbl_info, equip_data)
+        from ....config import get_game_config
+        set_name = get_game_config().equipment_set_name(
+            str(equip_data.get("equipment_set") or ""))
+        if set_name:
+            self.lbl_info.setText(
+                f"{self.lbl_info.text()} · {set_name}{tr('套装')}")
 
         if not self._selected:
             bg = self._quality_bg or "palette(base)"
@@ -1494,6 +1573,12 @@ class _CompactEquipCard(_AffixRowsMixin, QFrame):
         self.illegal_badge.set_reasons(illegal_reasons_of(equip_data))
 
         self._apply_level_line(self.lbl_level, equip_data)
+        from ....config import get_game_config
+        set_name = get_game_config().equipment_set_name(
+            str(equip_data.get("equipment_set") or ""))
+        if set_name:
+            self.lbl_level.setText(
+                f"{self.lbl_level.text()} · {set_name}{tr('套装')}")
 
         self._clear_affixes()
         self._add_affix_rows(equip_data)

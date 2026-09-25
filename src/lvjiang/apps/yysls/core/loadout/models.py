@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from uuid import uuid4
 
@@ -55,6 +56,17 @@ def _slot_dingyin(raw: object) -> dict[str, str]:
     }
 
 
+def _slot_equipment_sets(raw: object) -> dict[str, str]:
+    """方案套装只保留已知槽位上的非空稳定 key。"""
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        key: str(raw[key]).strip()
+        for key in EQUIPMENT_SLOTS
+        if str(raw.get(key) or "").strip()
+    }
+
+
 @dataclass
 class LoadoutPlan:
     id: str
@@ -78,6 +90,8 @@ class LoadoutPlan:
     # 记着这件装备该显示哪种音，切方案就跟着切，所以它属于方案而不是装备。
     # 缺键固定按 normal 读；不参与任何计算。
     dingyin: dict[str, str] = field(default_factory=dict)
+    # 切换备战方案会切换各槽位套装；它覆盖展示和计算，但不改装备原始套装。
+    equipment_sets: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def create(cls, name: str = "默认方案") -> "LoadoutPlan":
@@ -91,6 +105,7 @@ class LoadoutPlan:
         """
         self.equipment[slot_key] = None
         self.dingyin.pop(slot_key, None)
+        self.equipment_sets.pop(slot_key, None)
 
     @classmethod
     def from_dict(cls, plan_id: str, data: dict) -> "LoadoutPlan":
@@ -112,6 +127,7 @@ class LoadoutPlan:
             combat_type=normalize_combat_type(data.get("combat_type")),
             equipment=slots,
             dingyin=_slot_dingyin(data.get("dingyin")),
+            equipment_sets=_slot_equipment_sets(data.get("equipment_sets")),
         )
 
     def to_dict(self) -> dict:
@@ -126,6 +142,7 @@ class LoadoutPlan:
             "combat_type": self.combat_type,
             "equipment": dict(self.equipment),
             "dingyin": dict(self.dingyin),
+            "equipment_sets": dict(self.equipment_sets),
         }
 
 
@@ -232,11 +249,16 @@ class LoadoutState:
 
     def resolved_equipment(self, plan_id: str | None = None) -> dict[str, dict]:
         plan = self.plans[plan_id or self.active_plan_id]
-        return {
-            slot: self.equipment_items[fp]
-            for slot, fp in plan.equipment.items()
-            if fp and fp in self.equipment_items
-        }
+        resolved: dict[str, dict] = {}
+        for slot, fp in plan.equipment.items():
+            if not fp or fp not in self.equipment_items:
+                continue
+            equip = copy.deepcopy(self.equipment_items[fp])
+            plan_set = str(plan.equipment_sets.get(slot) or "")
+            if plan_set:
+                equip["equipment_set"] = plan_set
+            resolved[slot] = equip
+        return resolved
 
 
 def plan_school(plan: LoadoutPlan, schools: dict) -> str:

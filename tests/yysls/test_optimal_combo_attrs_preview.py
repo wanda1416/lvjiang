@@ -63,6 +63,7 @@ def test_gongjue_select_all_shortcut(qtbot, monkeypatch):
     assert button is not None and button.text() == "全选"
     assert _layout_of(button) is _layout_of(page._btn_gongjue)
     assert page._selected_gongjues() == ["会意"]
+    assert page._combo_equipment_set.currentData() == "yudou"
 
     button.click()
     assert page._selected_gongjues() == ["会意", "精准", "会心"]
@@ -173,13 +174,16 @@ def test_analysis_options_restore_and_persist_without_call_time_inputs(
         "exclude_mock": False,
         "smart_analysis": True,
         "season_chengyin": True,
+        "equipment_set": "yudou",
     }
     assert "gongjue" not in saved[-1]
     assert "assumptions" not in saved[-1]
 
 
 def test_result_card_actions_share_one_row(qtbot):
-    card = _ResultCard(1, _result(), {"main_weapon": "主武器"})
+    result = _result()
+    result["equipment_set"] = "yudou"
+    card = _ResultCard(1, result, {"main_weapon": "主武器"})
     qtbot.addWidget(card)
     buttons = {
         name: card.findChild(QPushButton, name)
@@ -195,6 +199,10 @@ def test_result_card_actions_share_one_row(qtbot):
     card.view_clicked.connect(seen.append)
     buttons["resultViewButton"].click()
     assert seen and seen[0]["gongjue"] == "会意"
+    applied: list[dict] = []
+    card.apply_clicked.connect(applied.append)
+    buttons["resultApplyButton"].click()
+    assert applied == [result]
     assert card.sizePolicy().verticalPolicy() == QSizePolicy.Policy.Maximum
 
 

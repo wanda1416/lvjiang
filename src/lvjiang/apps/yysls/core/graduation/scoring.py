@@ -22,6 +22,7 @@ from ..combat.combat_attrs import (
     compute_equip_base_attrs,
     effective_equipped,
 )
+from ..combat.equipment_sets import equipment_set_bonus
 
 
 class BudgetExceeded(Exception):
@@ -33,7 +34,9 @@ def equipment_attrs(equipped: dict, game_config) -> CombatAttributes:
     effective = effective_equipped(equipped, game_config)
     return compute_equip_base_attrs(
         effective, game_config.get_base_attr_values,
-    ) + aggregate_equipment_attrs(effective, normalize=False)
+    ) + aggregate_equipment_attrs(
+        effective, normalize=False,
+    ) + equipment_set_bonus(effective, game_config)
 
 
 def graduation_input(

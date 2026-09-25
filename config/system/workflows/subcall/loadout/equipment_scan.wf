@@ -19,6 +19,8 @@ def scan_equipment_detail($detail_scene)
             call apply_cooldown_affixes($raw, $cooldown)
         end
         eval $raw.lock_status = equipment_lock_status([equip_detail].[lock])
+        scan [equip_detail].[equip_detail] as $set_detail with "equip"
+        eval $raw.equip_detail = $set_detail.equip_detail
         return $raw
     end
 
@@ -36,6 +38,8 @@ def scan_equipment_detail($detail_scene)
             call apply_cooldown_affixes($raw, $cooldown)
         end
         eval $raw.lock_status = equipment_lock_status([equip_detail].[lock])
+        scan [equip_detail].[equip_detail] as $set_detail with "equip"
+        eval $raw.equip_detail = $set_detail.equip_detail
         return $raw
     end
 

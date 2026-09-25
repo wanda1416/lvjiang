@@ -7,7 +7,10 @@
 - RoleAttrParser.parse 整链（detail_2 覆盖 detail_1 兜底值）
 """
 
+import io
+
 import pytest
+from loguru import logger
 
 from lvjiang.apps.yysls.core.role_attr_parser.parser import (
     RoleAttrParser,
@@ -120,6 +123,39 @@ class TestParseDetail1:
         assert result["max_attr_current"] == 527.0
         assert result["attr_pen_current"] == 10.3
         assert result["attr_bonus_current"] == 4.1
+
+    def test_inline_ocr_spaces_do_not_drop_fields(self):
+        """OCR 在行内插空格（"51. 1%"、"1 817-6051"、"3 6.0"）不能让字段消失。
+
+        真实日志：会心率被读成 "51. 1%( 18.3%)"，数值解析失败 → crit_rate 整个
+        丢掉 → 静默写入门禁拒绝，且报的是无关的"右侧详情识别不完整"。
+        """
+        snapshot = (
+            "战斗属性 | 角色状态 | 外功攻击 | 1 817-6051 | 属性攻击 | 640-1 539 | "
+            "判定属性 | 精 准率 | 113. 4%(82.3%) | 会心率 | 51. 1%( 18.3%) | "
+            "会意率 | 98.9%(35.3%) | 属攻穿透 | 3 6.0 | 属攻伤害加成 | 15. 0%"
+        )
+        result = parse_detail1([token.strip() for token in snapshot.split("|")])
+        assert result["crit_rate"] == 51.1
+        assert result["precision"] == 113.4
+        assert result["intent_rate"] == 98.9
+        assert result["min_outer"] == 1817.0
+        assert result["max_outer"] == 6051.0
+        assert result["min_attr_current"] == 640.0
+        assert result["max_attr_current"] == 1539.0
+        assert result["attr_pen_current"] == 36.0
+        assert result["attr_bonus_current"] == 15.0
+
+    def test_unparsed_known_label_is_logged(self):
+        """标签认识、数值读不出来时必须留痕，否则日志里没有任何线索。"""
+        buf = io.StringIO()
+        sink_id = logger.add(buf, level="WARNING")
+        try:
+            result = parse_detail1(["会心率", "未识别"])
+        finally:
+            logger.remove(sink_id)
+        assert "crit_rate" not in result
+        assert "会心率" in buf.getvalue()
 
     def test_unknown_labels_ignored(self):
         result = parse_detail1(self._tokens)
@@ -284,6 +320,20 @@ class TestParseDetail2AttrAttack:
         assert result["max_lieshi"] == 0.0
         assert result["min_qiansi"] == 50.0
         assert result["max_qiansi"] == 100.0
+
+
+def test_detail2_tolerates_inline_ocr_spaces():
+    """右区详情同样按行内空格无关解析：标签、冒号和数值都可能被插空格。"""
+    assert parse_detail2_outer_attack(
+        "基础外功攻击： 1 817-6 051 | 生效外功攻击：1817-6051"
+    ) == {"min_outer": 1817.0, "max_outer": 6051.0}
+    assert parse_detail2_attr_attack(
+        "鸣金攻击：5 61-1382(561-1382) | 裂石攻击：0-0(0-0)"
+    )["min_mingjin"] == 561.0
+    assert parse_detail2_outer_pen(
+        "当前外功穿透(非定音部分)： 5. 1 | 同等级段对抗生效外功穿透：55.9"
+    ) == {"outer_pen": 5.1}
+    assert parse_detail2_attr_pen("鸣 金穿透：3 6.0")["mingjin_pen"] == 36.0
 
 
 class TestParseDetail2OuterPen:

@@ -1125,16 +1125,6 @@ class GameConfigManager:
         cfg = self._schools.get(school, {})
         return cfg.get("attr") if cfg else None
 
-    def get_graduation_schemes(self, school: str) -> list[str]:
-        """获取流派已注册的毕业率方案，保持配置声明顺序。"""
-        cfg = self._schools.get(school, {})
-        schemes = cfg.get("schemes") if cfg else None
-        if not isinstance(schemes, list):
-            return []
-        return list(dict.fromkeys(
-            str(name).strip() for name in schemes if str(name).strip()
-        ))
-
     def get_transmute_pool(self, school: str) -> list[str]:
         """获取流派级转律词条库（顺序即转入优先级）
 

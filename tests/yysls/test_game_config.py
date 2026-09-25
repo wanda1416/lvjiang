@@ -545,12 +545,14 @@ class TestWeaponTypesAndSchools:
         assert cfg_zun["main"] == {"weapon": "手甲", "martial_art": "悬身拳法"}
         assert cfg_zun["sub"] == {"weapon": "双刀", "martial_art": "断水双诀"}
 
-    def test_graduation_schemes(self, mgr):
-        # 已注册流派至少包含基础方案
-        schemes = mgr.get_graduation_schemes("鸣金·虹")
-        assert "基础方案" in schemes
-        # 未注册流派返回空
-        assert mgr.get_graduation_schemes("未注册流派") == []
+    def test_schools_no_longer_register_scheme_names(self, mgr):
+        """方案名只由磁盘上的模型文件决定，游戏配置里不再另记一份。
+
+        另记一份就要人工保持同步，而远程下发和手工拷贝都绕得过它：模型在
+        流派配置页看得见、备战方案下拉里却选不到。
+        """
+        assert not any(
+            "schemes" in (cfg or {}) for cfg in mgr.get_schools().values())
 
     def test_school_bindings_valid(self, mgr):
         # 属性合法；主/副武器须在注册表内

@@ -368,14 +368,19 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._combo_play_style.blockSignals(False)
 
     def _refresh_schemes(self):
-        """刷新当前流派的毕业率方案；有配置时默认选中第一项。"""
-        from ....config import get_game_config
+        """刷新当前流派的毕业率方案；有配置时默认选中第一项。
+
+        方案名取自模型注册表，也就是磁盘上真实存在的模型文件——流派配置页
+        列的是同一份。改读游戏配置里另记的一份清单会漂移：远程下发或手工
+        拷进来的模型在配置页看得见，这里却选不到。
+        """
+        from ....core.graduation.model_registry import scheme_names
 
         school = self._get_current_school()
         self._combo_scheme.blockSignals(True)
         self._combo_scheme.clear()
         if school:
-            for name in get_game_config().get_graduation_schemes(school):
+            for name in scheme_names(school):
                 self._combo_scheme.addItem(name)
         fit_combo_to_contents(self._combo_scheme, minimum=104)
         self._combo_scheme.blockSignals(False)

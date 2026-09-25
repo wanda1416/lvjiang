@@ -56,7 +56,8 @@ register_versioned_dir("yysls/tuning_rules", "*.yaml", depth=1,
 register_versioned_dir("yysls/base_groups", "*.yaml", depth=1,
                        allow_remote_new=True)
 
-# game_config/schools.yaml 的 schools.*.schemes 负责登记方案名，因此可随远程
-# game_config 下发全新方案文件。
+# 毕业率模型的身份写在文件自己里（schema_version + 流派/方案/等级/版本），
+# 发现层只认当前 schema 且四项齐全的实体，所以可随远程下发全新方案文件，
+# 不需要另在 game_config 里登记一份方案名清单。
 register_versioned_dir("yysls/graduation", "*.json", depth=1,
                        allow_remote_new=True)

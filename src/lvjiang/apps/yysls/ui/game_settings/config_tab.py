@@ -1,10 +1,9 @@
 """游戏配置 - 主容器
 
-包含十个 Tab 页：
+包含九个 Tab 页：
 - 基础配置（全局冷却时间等跨维度规则）
 - 词组配置（最基础的配置，不依赖任何 tab）
-- 装备配置（基础属性规则 + 武器类型注册）
-- 套装配置（左右套装注册 + 左四两件套属性）
+- 装备配置（基础属性规则、武器类型注册和输出/防具套装）
 - 武学配置（武学名 → 武器 + 属性，流派/玩法的共同前置）
 - 流派配置
 - 玩法配置（调律方向：增伤/定音要求，从调律规则中拆出的公共定义）
@@ -22,7 +21,6 @@ from .affix_caps_panel import AffixCapsPanel
 from .base_attr_panel import BaseAttrPanel
 from .basic_config_panel import BasicConfigPanel
 from .equip_display_panel import EquipDisplayPanel
-from .equipment_set_panel import EquipmentSetPanel
 from .level_config_panel import LevelConfigPanel
 from .martial_art_panel import MartialArtPanel
 from .playstyle_panel import PlaystylePanel
@@ -64,10 +62,6 @@ class GameConfigTab(QWidget):
         self._base_panel = BaseAttrPanel(
             data=self._data, on_changed=self._on_changed)
         self._tabs.addTab(self._base_panel, tr("装备配置"))
-
-        self._equipment_set_panel = EquipmentSetPanel(
-            data=self._data, on_changed=self._on_changed)
-        self._tabs.addTab(self._equipment_set_panel, tr("套装配置"))
 
         # 武学配置面板（流派/玩法的共同前置：武器和属性由武学派生）
         self._martial_art_panel = MartialArtPanel(

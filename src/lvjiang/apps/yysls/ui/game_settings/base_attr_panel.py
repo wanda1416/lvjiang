@@ -43,6 +43,7 @@ from .....i18n import tr
 from ...config.affix_levels import OPEN as OPEN_LEVEL_RANGE
 from ...config.affix_levels import LevelRange, dump_entry, parse_entry
 from ..layout_helpers import configure_navigation_list
+from .equipment_set_panel import EquipmentSetEditor
 from .factory_guard import deletable, factory_list_values
 from .level_combo import LevelCombo
 
@@ -384,6 +385,13 @@ class BaseAttrPanel(QWidget):
         self._series_frame.setVisible(False)
         right_layout.addWidget(self._series_frame)
 
+        # 输出/防具套装与各自的等阶名称属于同一配置页，不再
+        # 单独占用一个一级 Tab。
+        self._equipment_set_editor = EquipmentSetEditor(
+            data=self._data, on_changed=self._save_data)
+        self._equipment_set_editor.setVisible(False)
+        right_layout.addWidget(self._equipment_set_editor)
+
         # ── 武器类型（仅主武器部位；维护 weapon_types 注册表）──
         self._weapon_frame = QFrame()
         self._weapon_frame.setObjectName("weaponFrame")
@@ -524,6 +532,7 @@ class BaseAttrPanel(QWidget):
         self._current_part = key if kind == "part" else None
         is_series = self._current_series is not None
         self._series_frame.setVisible(is_series)
+        self._equipment_set_editor.setVisible(is_series)
         for widget in (
             self._first_affix_frame, self._weapon_frame, self._part_name_frame,
             self._attr_frame, self._table, self._btn_add_level,
@@ -531,6 +540,7 @@ class BaseAttrPanel(QWidget):
             widget.setVisible(not is_series)
         if is_series:
             self._refresh_series_table()
+            self._equipment_set_editor.set_series(self._current_series)
             return
 
         self._refresh_follow_controls()

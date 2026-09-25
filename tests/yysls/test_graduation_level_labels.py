@@ -53,8 +53,11 @@ def test_dps_carries_the_personal_world_level(tmp_path, gc, qtbot):
     assert dps == f"{season}级·DPS"
 
 
-def test_graduation_carries_the_model_level_and_version(tmp_path, gc, qtbot):
-    """毕业率衡量「相对这一档的最大 DPS 还差多少」，挂模型等级与版本。"""
+def test_graduation_carries_the_model_level(tmp_path, gc, qtbot):
+    """毕业率衡量「相对这一档的最大 DPS 还差多少」，挂模型标定等级。
+
+    只挂等级不挂版本：这一行与 DPS 并排，风格要一致；版本在分析对话框写全。
+    """
     state = _state(tmp_path, gc)
     model = select_graduation_model(
         "鸣金·虹", "基础方案", gc.current_equip_level())
@@ -62,7 +65,8 @@ def test_graduation_carries_the_model_level_and_version(tmp_path, gc, qtbot):
 
     _dps, rate = _labels(state, "鸣金·虹", gc)
 
-    assert rate == f"{model.level}级·v{model.version}·毕业率"
+    assert rate == f"{model.level}级·毕业率"
+    assert "v" not in rate
 
 
 def test_two_labels_may_disagree(tmp_path, gc, qtbot):

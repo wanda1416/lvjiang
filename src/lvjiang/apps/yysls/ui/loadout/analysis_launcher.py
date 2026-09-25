@@ -147,7 +147,6 @@ class GraduationAnalysisLauncher:
                     school=school,
                     game_config=game_config,
                     graduation_context=scoring.attr_context,
-                    affix_level=world_level,
                     stop_check=stop_check,
                     school_pool=school_pool,
                     full_chengyin=assumptions.full_chengyin,

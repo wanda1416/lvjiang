@@ -29,7 +29,10 @@ from PyQt6.QtWidgets import (
 )
 
 from ......i18n import tr
-from ......ui.button_styles import apply_dialog_button_box_style
+from ......ui.button_styles import (
+    apply_compact_button_style,
+    apply_dialog_button_box_style,
+)
 from ....core.affix_cap import affix_dict_cap_pct, equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
@@ -458,6 +461,8 @@ class _EquipmentPropertiesDialog(QDialog):
                 self._switch_equipment_set_button = QPushButton(tr("切换套装"))
                 self._switch_equipment_set_button.clicked.connect(
                     self._switch_equipment_set)
+                apply_compact_button_style(
+                    self._switch_equipment_set_button, variant="neutral")
                 set_row.addWidget(self._switch_equipment_set_button)
                 form.addRow(field_name, set_row)
                 continue
@@ -1018,11 +1023,22 @@ class _SlotCard(_AffixRowsMixin, QFrame):
         header.addWidget(self.illegal_badge)
         layout.addLayout(header)
 
-        # 等级行
+        # 等级行：套装独立靠右，不与等级文字拼接，避免长文本破坏对齐。
+        level_row = QHBoxLayout()
+        level_row.setContentsMargins(0, 0, 0, 0)
+        level_row.setSpacing(8)
         self.lbl_info = QLabel("")
         self.lbl_info.setStyleSheet(
             f"font-size: {self._level_fs}px; color: palette(mid);")
-        layout.addWidget(self.lbl_info)
+        level_row.addWidget(self.lbl_info)
+        level_row.addStretch(1)
+        self.lbl_equipment_set = QLabel("")
+        self.lbl_equipment_set.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.lbl_equipment_set.setStyleSheet(
+            f"font-size: {self._level_fs}px; color: palette(mid); "
+            "font-weight: 600;")
+        level_row.addWidget(self.lbl_equipment_set)
+        layout.addLayout(level_row)
 
         # 分割线
         line = QFrame()
@@ -1229,6 +1245,7 @@ class _SlotCard(_AffixRowsMixin, QFrame):
         self.lbl_info.setText(tr("未装备"))
         self.lbl_info.setStyleSheet(
             f"font-size: {self._level_fs}px; color: palette(mid);")
+        self.lbl_equipment_set.clear()
         self._clear_affixes()
         self._finish_affixes({})
         if not self._selected:
@@ -1257,9 +1274,7 @@ class _SlotCard(_AffixRowsMixin, QFrame):
         from ....config import get_game_config
         set_name = get_game_config().equipment_set_name(
             str(equip_data.get("equipment_set") or ""))
-        if set_name:
-            self.lbl_info.setText(
-                f"{self.lbl_info.text()} · {set_name}{tr('套装')}")
+        self.lbl_equipment_set.setText(set_name)
 
         if not self._selected:
             bg = self._quality_bg or "palette(base)"
@@ -1377,12 +1392,25 @@ class _CompactEquipCard(_AffixRowsMixin, QFrame):
         name_row.addWidget(self.illegal_badge)
         layout.addLayout(name_row)
 
+        level_row = QHBoxLayout()
+        level_row.setContentsMargins(0, 0, 0, 0)
+        level_row.setSpacing(8)
         self.lbl_level = QLabel()
         self.lbl_level.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_level.setStyleSheet(
             f"font-size: {self._level_fs}px; color: palette(mid);")
-        layout.addWidget(self.lbl_level)
+        level_row.addWidget(self.lbl_level)
+        level_row.addStretch(1)
+        self.lbl_equipment_set = QLabel()
+        self.lbl_equipment_set.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.lbl_equipment_set.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.lbl_equipment_set.setStyleSheet(
+            f"font-size: {self._level_fs}px; color: palette(mid); "
+            "font-weight: 600;")
+        level_row.addWidget(self.lbl_equipment_set)
+        layout.addLayout(level_row)
 
         line = QFrame()
         line.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -1576,9 +1604,7 @@ class _CompactEquipCard(_AffixRowsMixin, QFrame):
         from ....config import get_game_config
         set_name = get_game_config().equipment_set_name(
             str(equip_data.get("equipment_set") or ""))
-        if set_name:
-            self.lbl_level.setText(
-                f"{self.lbl_level.text()} · {set_name}{tr('套装')}")
+        self.lbl_equipment_set.setText(set_name)
 
         self._clear_affixes()
         self._add_affix_rows(equip_data)

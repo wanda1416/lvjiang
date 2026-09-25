@@ -16,7 +16,10 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
 from lvjiang.apps.yysls.core.graduation.model_registry import GraduationModelRef
-from lvjiang.apps.yysls.ui.game_settings.school_panel import SchoolPanel
+from lvjiang.apps.yysls.ui.game_settings.school_panel import (
+    SchoolPanel,
+    _PlayStyleEditDialog,
+)
 
 
 def _panel(qtbot) -> SchoolPanel:
@@ -119,6 +122,23 @@ def test_create_base_attr_from_school_panel_selects_new_entry(qtbot, monkeypatch
     panel._btn_add_play_style.click()
     assert saved == [("测试流派", "新属性", {"min_outer": 123.0})]
     assert panel._ps_list.currentItem().text() == "新属性"
+
+
+def test_create_base_attr_fields_start_blank_but_existing_values_are_filled(qtbot):
+    created = _PlayStyleEditDialog(school_attr="鸣金")
+    qtbot.addWidget(created)
+    assert created._spins
+    assert all(spin.lineEdit().text() == "" for spin in created._spins.values())
+
+    edited = _PlayStyleEditDialog(
+        name="已有属性",
+        attrs={"min_outer": 123.0, "crit_rate": 0.25},
+        school_attr="鸣金",
+    )
+    qtbot.addWidget(edited)
+    assert edited._spins["min_outer"].lineEdit().text() == "123.0000"
+    assert edited._spins["crit_rate"].lineEdit().text() == "25.0000"
+    assert edited._spins["max_outer"].lineEdit().text() == ""
 
 
 def test_create_base_attr_rejects_existing_name(qtbot, monkeypatch):

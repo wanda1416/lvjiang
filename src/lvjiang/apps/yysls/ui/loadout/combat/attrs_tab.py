@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMenu,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -204,7 +205,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         base_field = QWidget()
         base_layout = QHBoxLayout(base_field)
         base_layout.setContentsMargins(0, 0, 0, 0)
-        base_layout.addWidget(QLabel(tr("属性")))
+        self._base_attr_label = QLabel(tr("属性"))
+        base_layout.addWidget(self._base_attr_label)
         self._combo_play_style = QComboBox()
         self._combo_play_style.setMinimumWidth(104)
         self._combo_play_style.setMinimumHeight(30)
@@ -216,6 +218,13 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._btn_edit_play_style.setToolTip(tr("打开游戏配置中的流派配置与基础属性"))
         self._btn_edit_play_style.clicked.connect(self._on_edit_play_style)
         apply_button_style(self._btn_edit_play_style, variant="neutral")
+
+        self._btn_create_play_style = QPushButton(tr("新建属性"))
+        self._btn_create_play_style.setMinimumHeight(30)
+        self._btn_create_play_style.setToolTip(
+            tr("填写当前面板属性，并自动扣除穿戴装备、套装与弓玦属性"))
+        self._btn_create_play_style.clicked.connect(self._on_create_play_style)
+        apply_button_style(self._btn_create_play_style, variant="neutral")
 
         self._plan_gongjue_field = QWidget()
         gongjue_layout = QHBoxLayout(self._plan_gongjue_field)
@@ -243,6 +252,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
         select_layout.addWidget(base_field, 0, 0)
         select_layout.addWidget(self._btn_edit_play_style, 0, 1)
+        select_layout.addWidget(self._btn_create_play_style, 0, 2)
         select_layout.setColumnStretch(0, 1)
 
         self._config_row = QWidget()
@@ -410,6 +420,34 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         if index >= 0:
             self._combo_play_style.setCurrentIndex(index)
         self._refresh_display()
+
+    def _on_create_play_style(self) -> None:
+        """填写游戏面板值，并按当前真实穿戴反推一份新的基础属性。"""
+        school = self._get_current_school()
+        if not school:
+            QMessageBox.warning(
+                self,
+                tr("无法创建"),
+                tr("请先选择包含流派信息的备战方案"),
+            )
+            return
+
+        from ....config import get_game_config, get_play_styles
+        from .play_style_dialog import _CreatePlayStyleDialog
+
+        dialog = _CreatePlayStyleDialog(
+            self,
+            school_attr=get_game_config().get_school_attr(school),
+            existing_names=list(get_play_styles(school)),
+        )
+        self._finish_play_style_dialog(school, dialog)
+
+    def _apply_attribute_controls_mode(self) -> None:
+        """按战斗属性面板宽度切换当前属性栏的精简文案。"""
+        full = self._display_mode == DISPLAY_MODE_FULL
+        self._base_attr_label.setVisible(full)
+        self._btn_edit_play_style.setText(tr("编辑属性") if full else tr("编辑"))
+        self._btn_create_play_style.setText(tr("新建属性") if full else tr("新建"))
 
     def _on_gongjue_changed(self, _gongjue: str):
         """弓玦切换"""

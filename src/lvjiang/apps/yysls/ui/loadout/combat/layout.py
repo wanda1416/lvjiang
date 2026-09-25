@@ -81,6 +81,7 @@ class CombatLayoutMixin:
         )
         self._strategy.arrange_cards(self, cards)
         self._strategy.arrange_config_bar(self)
+        self._apply_attribute_controls_mode()
 
     # ── resizeEvent：委托策略 ────────────────────────────────
 

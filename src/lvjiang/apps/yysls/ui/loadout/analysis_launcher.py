@@ -208,6 +208,8 @@ class GraduationAnalysisLauncher:
                 parent,
                 school=school,
                 scheme=scoring.scheme,
+                model_level=scoring.model_level,
+                model_version=scoring.model_version,
                 plan_name=plan.name,
                 assumption_bar=bar,
                 optimal_page=optimal_page,

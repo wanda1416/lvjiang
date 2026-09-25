@@ -219,9 +219,9 @@ class LoadoutPanel(QWidget):
         self._assumption_layout.setContentsMargins(16, 8, 16, 8)
         self._assumption_layout.setSpacing(16)
         metrics.addWidget(self._assumption_card, 2)
-        self._metric_dps = self._metric(
+        self._metric_dps_name, self._metric_dps = self._metric(
             metrics, tr("DPS"), yellow=False, stretch=1)
-        self._metric_rate = self._metric(
+        self._metric_rate_name, self._metric_rate = self._metric(
             metrics, tr("毕业率"), yellow=True, stretch=1)
         root.addLayout(metrics)
 
@@ -257,7 +257,13 @@ class LoadoutPanel(QWidget):
 
     def _metric(
         self, parent: QHBoxLayout, name: str, *, yellow: bool, stretch: int,
-    ) -> QLabel:
+    ) -> tuple[QLabel, QLabel]:
+        """返回（名称标签, 数值标签）。
+
+        名称要随方案改写——毕业率挂的是模型标定等级，DPS 挂的是个人世界
+        等级，两者可以不同（110 的表配 115 的角色就是现状），不写出来用户
+        没法判断眼前这两个数是按什么口径算的。
+        """
         card = QFrame()
         card.setStyleSheet(_METRIC_CARD)
         row = QHBoxLayout(card)
@@ -272,7 +278,7 @@ class LoadoutPanel(QWidget):
         row.addStretch()
         row.addWidget(value)
         parent.addWidget(card, stretch)
-        return value
+        return label, value
 
     def _attach_assumption_controls(self) -> None:
         """Move combat assumptions into the always-visible summary row."""
@@ -487,6 +493,7 @@ class LoadoutPanel(QWidget):
         self._playstyle.setText(state.active_plan.playstyle or "-")
         school = state.active_school(schools)
         self._school.setText(school or tr("自定义"))
+        self._refresh_metric_labels(state, school, game_config)
         for field in (self._school, self._main_art, self._sub_art,
                       self._playstyle):
             field.setToolTip(field.text())
@@ -514,6 +521,31 @@ class LoadoutPanel(QWidget):
         if self._refreshing:
             return
         self.refresh()
+
+    def _refresh_metric_labels(self, state, school: str, game_config) -> None:
+        """把等级口径写进两个指标的名称里。
+
+        毕业率挂**模型标定等级与版本**：它衡量的是「相对这一档的最大 DPS
+        还差多少」，换了哪一份表结论就不同版本。DPS 挂**个人世界等级**：
+        它是过完该等级抗性之后的绝对值。两者可以不一致——110 的社区表配
+        115 的角色正是现在的常态，写出来用户才不会以为软件算错了。
+        """
+        from ...core.graduation.model_registry import select_graduation_model
+
+        world_level = state.effective_world_level(
+            game_config.current_equip_level())
+        self._metric_dps_name.setText(
+            tr("{level}级·DPS").format(level=world_level)
+            if world_level else tr("DPS"))
+        plan = state.active_plan
+        model = (
+            select_graduation_model(school, plan.graduation_scheme, world_level)
+            if school and plan.graduation_scheme else None
+        )
+        self._metric_rate_name.setText(
+            tr("{level}级·v{version}·毕业率").format(
+                level=model.level, version=model.version)
+            if model is not None else tr("毕业率"))
 
     def _sync_metrics(self, result):
         """接收毕业率计算结果并更新 DPS / 毕业率展示。"""

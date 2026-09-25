@@ -54,6 +54,15 @@ _CURRENT_PERCENT_FIELDS: dict[str, str] = {
     "属攻伤害加成": "attr_bonus_current",
 }
 
+# 真实角色面板日志确认：这些被基础属性扫描消费的比例字段固定显示一位小数，
+# 即使整数和零也分别显示为 52.0% / 0.0%。只把这份有实机证据的字段列入
+# 严格校验；判定抗性、增益抗性等整数百分比不在解析范围内，也不能泛化套用。
+_FIXED_TENTH_PERCENT_LABELS = frozenset({
+    "精准率", "会心率", "会意率", "直接会心率", "直接会意率",
+    "会心伤害加成", "会意伤害加成", "外功伤害加成", "属攻伤害加成",
+})
+_FIXED_TENTH_PERCENT_RE = re.compile(r"^-?\d+\.\d%$")
+
 # 区间字段（"900-2604" 这种 min-max 格式）
 _RANGE_FIELDS: dict[str, tuple[str, str]] = {
     "外功攻击": ("min_outer", "max_outer"),
@@ -83,8 +92,8 @@ def _squeeze(text: str) -> str:
     的标签和数值都不含有意义的空格，所以行内空白一律删除，而不是逐个字段写
     容错正则。
 
-    代价是 OCR 同时漏掉小数点时（"51 1%"）会并成 "511%"。滚动扫描每屏独立
-    解析、后一屏覆盖前一屏，这类单屏误读会被相邻屏的正确识别纠正。
+    比例字段另有固定一位小数的业务格式校验；不能仅靠删空格把缺失小数点的
+    "51 1%" 当成 "511%"。整数攻击区间等字段则继续使用这里的空格容错。
     """
     return _WHITESPACE_RE.sub("", text)
 
@@ -104,6 +113,28 @@ def _strip_percent_paren(value: str) -> float | None:
     value = _squeeze(value).split("(", 1)[0]
     value = value.rstrip("%")
     return _to_float(value)
+
+
+def _parse_scanned_percent(label: str, raw_value: str) -> float | None:
+    """解析基础属性扫描中的比例字段，并守住游戏固定一位小数的格式。"""
+    normalized = _squeeze(raw_value).replace("（", "(").replace("）", ")")
+    displayed = normalized.split("(", 1)[0]
+    if label in _FIXED_TENTH_PERCENT_LABELS:
+        if not _FIXED_TENTH_PERCENT_RE.fullmatch(displayed):
+            # 完全不可读的 OCR 仍交给多屏快照合并兜底；只拒绝“已经像一个
+            # 数值”却违反固定一位小数格式的结果。这能精确拦住 52 2% ->
+            # 522% 的污染，又不会让后续一屏的“未识别”覆盖前一屏已读到的正确值。
+            if not re.search(r"\d", displayed):
+                return None
+            merged = displayed.rstrip("%")
+            message = (
+                f"角色属性识别失败：{label} 应显示为固定一位小数百分比"
+                f"（例如 52.0%），实际 OCR 为 {raw_value!r}；"
+                f"拒绝按 {merged!r} 写入，避免遗漏小数点后污染基础属性"
+            )
+            logger.error(message)
+            raise ValueError(message)
+    return _strip_percent_paren(normalized)
 
 
 _RANGE_RE = re.compile(r"^(-?\d+)\s*-\s*(-?\d+)$")
@@ -142,15 +173,15 @@ def parse_detail1(tokens: list[str]) -> dict[str, float]:
     标签和数值都先删掉行内空白，OCR 插进来的空格不影响匹配（见 _squeeze）。
     """
     result: dict[str, float] = {}
-    tokens = [_squeeze(token) for token in tokens]
     n = len(tokens)
-    for i, label in enumerate(tokens):
+    for i, raw_label in enumerate(tokens):
         if i + 1 >= n:
             continue
+        label = _squeeze(raw_label)
         value = tokens[i + 1]
 
         if label in _PERCENT_FIELDS:
-            num = _strip_percent_paren(value)
+            num = _parse_scanned_percent(label, value)
             if num is not None:
                 result[_PERCENT_FIELDS[label]] = num
             else:
@@ -166,7 +197,7 @@ def parse_detail1(tokens: list[str]) -> dict[str, float]:
                 _warn_unparsed(label, value)
             # 外功攻击在最小值超过最大值时，左区只显示箭头加最小值。
             # 这个单值不能证明最大值相同；最大值必须从右区“基础外功攻击”读取。
-            if hi is not None and _RANGE_RE.match(value):
+            if hi is not None and _RANGE_RE.match(_squeeze(value)):
                 result[max_field] = hi
             continue
 
@@ -181,7 +212,7 @@ def parse_detail1(tokens: list[str]) -> dict[str, float]:
                 result["max_attr_current"] = hi
             continue
         if label in _CURRENT_PERCENT_FIELDS:
-            num = _strip_percent_paren(value)
+            num = _parse_scanned_percent(label, value)
             if num is not None:
                 # 无 detail_2 时的兜底，detail_2 的精确值会覆盖
                 result[_CURRENT_PERCENT_FIELDS[label]] = num

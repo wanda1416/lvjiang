@@ -137,6 +137,16 @@ def test_old_schema_model_is_ignored_with_an_actionable_log(
         registry.invalidate_model_registry()
 
 
+def test_scheme_names_come_from_the_model_files(tmp_path, monkeypatch) -> None:
+    """方案名只由磁盘上的模型决定，同名多等级多版本只列一次。"""
+    _with_models(tmp_path, monkeypatch, [(110, 1), (110, 2), (115, 1)])
+    try:
+        assert registry.scheme_names("鸣金·虹") == ("基础方案",)
+        assert registry.scheme_names("并不存在的流派") == ()
+    finally:
+        registry.invalidate_model_registry()
+
+
 def test_missing_model_reason_points_at_the_world_level(
     tmp_path, monkeypatch,
 ) -> None:

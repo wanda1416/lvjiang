@@ -118,6 +118,17 @@ def select_graduation_model(
                default=None)
 
 
+def scheme_names(school: str) -> tuple[str, ...]:
+    """该流派已有模型实体的方案名（去重，按名称排序）。
+
+    方案名的唯一来源就是磁盘上的模型文件：能算的才列得出来。另记一份
+    清单意味着两边要人工保持同步，而远程下发、手工拷贝都绕得过清单。
+    """
+    return tuple(sorted({
+        ref.scheme for ref in available_models(school)
+    }))
+
+
 def describe_missing_model(school: str, scheme: str, world_level: int) -> str:
     """没选出模型时说清为什么，而不是笼统一句「方案不可用」。
 

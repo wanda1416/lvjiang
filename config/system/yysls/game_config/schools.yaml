@@ -1,8 +1,6 @@
 content_version: 1
 schools:
   鸣金·虹:
-    schemes:
-    - 基础方案
     attr: 鸣金
     main:
       weapon: 剑
@@ -19,8 +17,6 @@ schools:
     - 劲
     - 势
   鸣金·影:
-    schemes:
-    - 基础方案
     attr: 鸣金
     main:
       weapon: 剑
@@ -37,8 +33,6 @@ schools:
     - 劲
     - 势
   裂石·威:
-    schemes:
-    - 基础方案
     attr: 裂石
     main:
       weapon: 陌刀
@@ -55,8 +49,6 @@ schools:
     - 敏
     - 劲
   裂石·钧:
-    schemes:
-    - 基础方案
     attr: 裂石
     main:
       weapon: 横刀
@@ -73,8 +65,6 @@ schools:
     - 敏
     - 劲
   牵丝·玉:
-    schemes:
-    - 基础方案
     attr: 牵丝
     main:
       weapon: 伞
@@ -91,8 +81,6 @@ schools:
     - 敏
     - 劲
   牵丝·霖:
-    schemes:
-    - 基础方案
     attr: 牵丝
     main:
       weapon: 扇
@@ -109,8 +97,6 @@ schools:
     - 敏
     - 劲
   牵丝·翊:
-    schemes:
-    - 基础方案
     attr: 牵丝
     main:
       martial_art: 文动霓裳
@@ -127,8 +113,6 @@ schools:
     - 敏
     - 劲
   破竹·风:
-    schemes:
-    - 基础方案
     attr: 破竹
     main:
       weapon: 双刀
@@ -145,8 +129,6 @@ schools:
     - 敏
     - 劲
   破竹·尘:
-    schemes:
-    - 基础方案
     attr: 破竹
     main:
       weapon: 伞
@@ -163,8 +145,6 @@ schools:
     - 敏
     - 劲
   破竹·鸢:
-    schemes:
-    - 基础方案
     attr: 破竹
     main:
       weapon: 手甲
@@ -181,8 +161,6 @@ schools:
     - 敏
     - 劲
   破竹·樽:
-    schemes:
-    - 基础方案
     attr: 破竹
     main:
       weapon: 手甲

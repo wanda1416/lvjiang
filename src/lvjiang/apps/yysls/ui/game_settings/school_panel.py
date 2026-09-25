@@ -633,8 +633,6 @@ class SchoolPanel(QWidget):
         if not name or model_level is None:
             QMessageBox.warning(self, tr("导入失败"), tr("请填写方案名称并选择方案等级"))
             return
-        cfg = self._schools().get(school) or {}
-        schemes = cfg.get("schemes") or []
         try:
             from ...core.graduation import invalidate_graduation_cache
             from ...core.graduation.graduation_converter import import_graduation_scheme
@@ -645,11 +643,6 @@ class SchoolPanel(QWidget):
             logger.exception("导入毕业率方案失败")
             QMessageBox.critical(self, tr("导入失败"), str(exc))
             return
-        if name not in schemes:
-            schemes = list(schemes) + [name]
-            cfg["schemes"] = schemes
-            self._data.setdefault("schools", {})[school] = cfg
-            self._save_data()
         self._refresh_schemes()
         for row in range(self._scheme_list.rowCount() - 1, -1, -1):
             ref = self._scheme_list.item(row, 0).data(Qt.ItemDataRole.UserRole)
@@ -707,15 +700,6 @@ class SchoolPanel(QWidget):
             invalidate_graduation_cache()
         except Exception:
             pass
-        from ...core.graduation.model_registry import available_models
-        if not available_models(school, ref.scheme):
-            cfg = self._schools().get(school) or {}
-            cfg["schemes"] = [
-                name for name in (cfg.get("schemes") or [])
-                if name != ref.scheme
-            ]
-            self._data.setdefault("schools", {})[school] = cfg
-            self._save_data()
         self._refresh_schemes()
 
     # ── 基础属性管理 ──────────────────────────────────────────

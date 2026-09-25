@@ -15,7 +15,7 @@ import copy
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from ..combat.combat_attrs import CombatAttributes
+from ..combat.combat_attrs import CombatAttributes, GraduationAttrContext
 from ..loadout.models import EQUIPMENT_SLOTS
 from ..loadout.transmute import (
     judge_transmute_eligibility,
@@ -99,6 +99,7 @@ class TransmuteSearchRequest:
     base_attrs: CombatAttributes
     school: str
     game_config: object
+    graduation_context: GraduationAttrContext | None = None
     full_chengyin: bool = False
     full_dingyin: bool = False
     full_level: int = 0
@@ -167,6 +168,7 @@ def optimize_transmutes(request: TransmuteSearchRequest) -> TransmutePlanResult:
 
     evaluator = LoadoutScorer(
         request.calculator, request.base_attrs, request.school, gc,
+        attr_context=request.graduation_context,
         stop_check=request.stop_check, time_budget=request.time_budget)
     baseline_rate = evaluator.rate(projected)
 

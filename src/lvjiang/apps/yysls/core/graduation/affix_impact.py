@@ -15,6 +15,7 @@ from ..affix_cap import affix_cap_ratio, affix_cap_value
 from ..combat.affix_rules import normal_affix_candidates
 from ..combat.combat_attrs import (
     CombatAttributes,
+    GraduationAttrContext,
     aggregate_equipment_attrs,
     build_graduation_attrs,
     effective_equipped,
@@ -313,6 +314,8 @@ def analyze_combined_affix_replacements(
     school: str,
     *,
     game_config=None,
+    graduation_context: GraduationAttrContext | None = None,
+    affix_level: int | None = None,
 ) -> AffixCombinationResult:
     """搜索最多三个部位的多目标联合培养方案。
 
@@ -336,9 +339,11 @@ def analyze_combined_affix_replacements(
         raise ValueError(tr("当前配装存在词条组合异常，请先校正：{names}").format(
             names=names,
         ))
-    scorer = LoadoutScorer(calculator, base_attrs, school, game_config)
+    scorer = LoadoutScorer(
+        calculator, base_attrs, school, game_config,
+        attr_context=graduation_context)
     baseline_rate = scorer.rate(equipped)
-    fallback_level = _current_affix_level(game_config)
+    fallback_level = int(affix_level or _current_affix_level(game_config))
     candidates, blocked = _replacement_candidates(
         equipped,
         scorer,
@@ -454,6 +459,7 @@ def analyze_affix_impacts(
     *,
     game_config=None,
     affix_level: int | None = None,
+    graduation_context: GraduationAttrContext | None = None,
 ) -> AffixImpactReport:
     """计算当前配装可行的新增收益与实际词条扣除损失。"""
     if game_config is None:
@@ -462,7 +468,9 @@ def analyze_affix_impacts(
 
     blocked_equipment = _blocked_equipment(equipped)
 
-    scorer = LoadoutScorer(calculator, base_attrs, school, game_config)
+    scorer = LoadoutScorer(
+        calculator, base_attrs, school, game_config,
+        attr_context=graduation_context)
     effective = effective_equipped(equipped, game_config)
     baseline_rate = scorer.rate(effective)
     level = int(affix_level or _current_affix_level(game_config))
@@ -484,6 +492,7 @@ def analyze_affix_impacts(
         })
         new_attrs = build_graduation_attrs(
             base_attrs, current_equipment_attrs + delta_attrs, school,
+            context=graduation_context,
         )
         rate = scorer.rate_attrs(new_attrs)
         additions.append(AffixImpact(name, value, rate - baseline_rate))

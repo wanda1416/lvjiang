@@ -37,7 +37,7 @@ SCHOOLS = [
 
 def _load(school: str) -> dict:
     return json.loads(
-        (DATA_DIR / f"{school}_基础方案.json").read_text(encoding="utf-8")
+        (DATA_DIR / f"{school}_基础方案_110_v1.json").read_text(encoding="utf-8")
     )
 
 
@@ -94,7 +94,10 @@ def test_converted_model_matches_excel_cached_outputs(school: str) -> None:
     model = _load(school)
     assert next(iter(model)) == "content_version"
     assert model["content_version"] == 1
-    assert model["schema_version"] == 2
+    assert model["schema_version"] == 3
+    assert model["scheme"] == "基础方案"
+    assert model["model_level"] == 110
+    assert model["model_version"] == 1
     assert model["source"]["sha256"]
     assert "sheets" not in model
     baseline = model["baseline_attrs"]
@@ -135,16 +138,17 @@ def test_runtime_reports_workbook_baseline() -> None:
 def test_editable_baseline_dps_recalibrates_graduation_rate(
     tmp_path, monkeypatch,
 ) -> None:
-    import lvjiang.apps.yysls.core.graduation as graduation
+    import lvjiang.apps.yysls.core.graduation.model_registry as registry
     import lvjiang.constants as constants
     import lvjiang.core.config.session as session_mod
 
-    source = DATA_DIR / "鸣金·虹_基础方案.json"
+    source = DATA_DIR / "鸣金·虹_基础方案_110_v1.json"
     shutil.copy(source, tmp_path / source.name)
     monkeypatch.setattr(
-        graduation, "get_resolver",
+        registry, "get_resolver",
         lambda: type("Resolver", (), {
             "resolve_read": lambda self, rel_path: tmp_path / Path(rel_path).name,
+            "enumerate_entities": lambda self, _rel_dir, _pattern: [source.name],
         })(),
     )
     # 基准 DPS 覆盖值现存于 session.json 的 yysls 节点（见 config/session_node）；
@@ -171,31 +175,34 @@ def test_editable_baseline_dps_recalibrates_graduation_rate(
 def test_runtime_loads_newer_remote_graduation_scheme(
         tmp_path, monkeypatch) -> None:
     import lvjiang.apps.yysls.core.graduation as graduation
+    import lvjiang.apps.yysls.core.graduation.model_registry as registry
     from lvjiang.apps import load_config_policies
     from lvjiang.core.config.resolver import ConfigResolver
 
     load_config_policies()
-    rel_path = "yysls/graduation/鸣金·虹_基础方案.json"
+    rel_path = "yysls/graduation/鸣金·虹_基础方案_110_v1.json"
+    source = _load("鸣金·虹")
     for layer, version, marker in (
         ("system", 1, "system"),
         ("remote", 2, "remote"),
     ):
         path = tmp_path / layer / rel_path
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
-            "content_version": version,
-            "marker": marker,
-        }), encoding="utf-8")
+        data = dict(source)
+        data.update(content_version=version, marker=marker)
+        path.write_text(json.dumps(data), encoding="utf-8")
     resolver = ConfigResolver(
         system_dir=tmp_path / "system",
         local_dir=tmp_path / "local",
         remote_dir=tmp_path / "remote",
     )
-    monkeypatch.setattr(graduation, "get_resolver", lambda: resolver)
+    monkeypatch.setattr(registry, "get_resolver", lambda: resolver)
     invalidate_graduation_cache()
     try:
-        assert graduation.GenericCalculator._load_data(
-            "鸣金·虹", "基础方案")["marker"] == "remote"
+        calculator = graduation.get_graduation_calculator(
+            "鸣金·虹", "基础方案", 110)
+        assert calculator is not None
+        assert registry.load_model(calculator.model.rel_path)["marker"] == "remote"
     finally:
         invalidate_graduation_cache()
 
@@ -261,7 +268,8 @@ def test_v2_records_environment_without_exposing_it_as_inputs() -> None:
 
 @case_matrix("school", SCHOOLS)
 def test_v2_contains_no_excel_affix_aliases(school: str) -> None:
-    raw = (DATA_DIR / f"{school}_基础方案.json").read_text(encoding="utf-8")
+    raw = (DATA_DIR / f"{school}_基础方案_110_v1.json").read_text(
+        encoding="utf-8")
     game_config = get_game_config()
     for exact_name in game_config.get_wuxue_affix_names():
         for alias in game_config.get_affix_aliases(exact_name):

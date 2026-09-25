@@ -31,6 +31,7 @@ from ...core.loadout import (
     resolve_school,
 )
 from ..domain_labels import combat_type_label
+from ..game_settings.level_combo import LevelCombo
 from ..layout_helpers import configure_navigation_list
 from .plan_create_dialog import PlanCreateDialog
 from .plan_table_delegate import (
@@ -74,6 +75,23 @@ class PlanManagerDialog(QDialog):
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(12, 0, 0, 0)
         right_layout.setSpacing(10)
+        world_level_row = QHBoxLayout()
+        world_level_row.addWidget(QLabel(tr("个人世界等级：")))
+        season_level = self._game_config.current_equip_level()
+        follow_label = (
+            tr("随赛季等级（{level}）").format(level=season_level)
+            if season_level else tr("随赛季等级")
+        )
+        self._world_level_combo = LevelCombo(
+            allow_empty=True, empty_label=follow_label)
+        self._world_level_combo.setToolTip(tr(
+            "个人等级决定毕业率计算使用的抗性，并限定可加载的最高方案等级。"
+            "留空时自动跟随当前赛季等级。"))
+        self._world_level_combo.currentIndexChanged.connect(
+            self._on_world_level_changed)
+        world_level_row.addWidget(self._world_level_combo)
+        world_level_row.addStretch()
+        right_layout.addLayout(world_level_row)
         toolbar = QHBoxLayout()
         toolbar.setSpacing(8)
         for label, name, callback, variant in (
@@ -193,6 +211,10 @@ class PlanManagerDialog(QDialog):
         self._row_plans = []
         if repo is not None:
             state = repo.load()
+            self._world_level_combo.blockSignals(True)
+            self._world_level_combo.set_level(state.world_level)
+            self._world_level_combo.blockSignals(False)
+            self._world_level_combo.setEnabled(True)
             schools = self._game_config.get_schools()
             for pid in state.ordered_plan_ids():
                 plan = state.plans[pid]
@@ -232,8 +254,28 @@ class PlanManagerDialog(QDialog):
                     self._table.setItem(row, col, item)
                 if pid == selected_id:
                     self._table.selectRow(row)
+        else:
+            self._world_level_combo.blockSignals(True)
+            self._world_level_combo.set_level(None)
+            self._world_level_combo.blockSignals(False)
+            self._world_level_combo.setEnabled(False)
         self._loading = False
         self._update_actions()
+
+    def _on_world_level_changed(self, _index: int) -> None:
+        if self._loading:
+            return
+        repo = self._repo()
+        if repo is None:
+            return
+        try:
+            repo.set_world_level(self._world_level_combo.get_level())
+        except Exception as exc:  # noqa: BLE001 - 局部设置失败不关闭管理器
+            logger.error(f"保存个人世界等级失败: {exc}")
+            QMessageBox.warning(self, tr("保存失败"), str(exc))
+            self._load_user()
+            return
+        self._mark_changed()
 
     def _update_actions(self) -> None:
         if self._loading:

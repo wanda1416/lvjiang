@@ -1,7 +1,10 @@
 {
   "content_version": 1,
-  "schema_version": 2,
+  "schema_version": 3,
   "school": "鸣金·影",
+  "scheme": "基础方案",
+  "model_level": 110,
+  "model_version": 1,
   "source": {
     "file": "鸣金影110阶竞速轴属性毕业率进阶计算器1.5.xlsx",
     "version": "1.5",

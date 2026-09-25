@@ -16,6 +16,7 @@ from collections.abc import Callable
 
 from ..combat.combat_attrs import (
     CombatAttributes,
+    GraduationAttrContext,
     aggregate_equipment_attrs,
     build_graduation_attrs,
     compute_equip_base_attrs,
@@ -37,6 +38,7 @@ def equipment_attrs(equipped: dict, game_config) -> CombatAttributes:
 
 def graduation_input(
     base_attrs: CombatAttributes, equipped: dict, school: str, game_config=None,
+    *, attr_context: GraduationAttrContext | None = None,
 ) -> CombatAttributes:
     """“基础属性 + 一套装备 → 毕业率输入”：归一化、聚合、并入基础属性、套抗性。
 
@@ -47,7 +49,8 @@ def graduation_input(
         from ...config import get_game_config
         game_config = get_game_config()
     return build_graduation_attrs(
-        base_attrs, equipment_attrs(equipped, game_config), school)
+        base_attrs, equipment_attrs(equipped, game_config), school,
+        context=attr_context)
 
 
 class LoadoutScorer:
@@ -58,6 +61,7 @@ class LoadoutScorer:
         school: str,
         game_config=None,
         *,
+        attr_context: GraduationAttrContext | None = None,
         stop_check: Callable[[], bool] | None = None,
         time_budget: float = 0.0,
     ) -> None:
@@ -68,6 +72,7 @@ class LoadoutScorer:
         self.base_attrs = base_attrs
         self.school = school
         self.game_config = game_config
+        self.attr_context = attr_context
         self._stop_check = stop_check
         self._deadline = (
             time.monotonic() + time_budget if time_budget > 0 else None)
@@ -90,7 +95,8 @@ class LoadoutScorer:
     def attrs(self, equipped: dict) -> CombatAttributes:
         """整套装备 + 基础属性并套抗性后的毕业率输入。"""
         return graduation_input(
-            self.base_attrs, equipped, self.school, self.game_config)
+            self.base_attrs, equipped, self.school, self.game_config,
+            attr_context=self.attr_context)
 
     # ── 评分 ──
 

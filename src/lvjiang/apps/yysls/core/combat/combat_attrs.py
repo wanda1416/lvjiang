@@ -875,17 +875,23 @@ class GraduationAttrContext:
     target_pen_field: str | None
 
     @classmethod
-    def from_school(cls, school: str) -> "GraduationAttrContext":
-        from ...config import get_game_config
-
-        gc = get_game_config()
-        level_cfg = gc.level_config_for(gc.current_equip_level())
+    def from_school(
+        cls, school: str, *, world_level: int | None = None, game_config=None,
+    ) -> "GraduationAttrContext":
+        if game_config is None:
+            from ...config import get_game_config
+            game_config = get_game_config()
+        level = (
+            int(world_level) if world_level is not None
+            else game_config.current_equip_level()
+        )
+        level_cfg = game_config.level_config_for(level)
         if level_cfg is not None:
             judge_resistance = float(level_cfg.judge_resistance or 0)
             buff_resistance = float(level_cfg.buff_resistance or 0)
         else:
             judge_resistance = buff_resistance = 0.0
-        school_attr = gc.get_school_attr(school) if school else None
+        school_attr = game_config.get_school_attr(school) if school else None
         return cls(
             judge_resistance=judge_resistance,
             buff_resistance=buff_resistance,

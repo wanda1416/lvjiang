@@ -22,6 +22,7 @@ class GraduationContext:
     school: str
     scheme: str
     base_attrs: CombatAttributes
+    world_level: int
     gongjue: str = ""  # 当前弓玦类型（"会意"/"精准"/"会心"/""）
 
 
@@ -59,8 +60,9 @@ class CombatGraduationMixin:
             return
 
         attrs_snapshot = CombatAttributes.from_dict(combat_attrs.to_dict())
+        world_level = self._effective_world_level()
         self._pending_graduation = (
-            generation, user_name, school, scheme, attrs_snapshot,
+            generation, user_name, school, scheme, world_level, attrs_snapshot,
         )
         self._graduation_timer.start()
 
@@ -77,16 +79,17 @@ class CombatGraduationMixin:
         request = self._pending_graduation
         if request is None:
             return
-        generation, user_name, school, scheme, attrs = request
+        generation, user_name, school, scheme, world_level, attrs = request
         if generation != self._graduation_generation:
             return
 
         def compute(_ctx: JobContext):
             from ....core.graduation import get_graduation_calculator
 
-            calculator = get_graduation_calculator(school, scheme)
+            calculator = get_graduation_calculator(
+                school, scheme, world_level)
             result = calculator.calculate(attrs) if calculator else None
-            return (generation, user_name, school, scheme, result)
+            return (generation, user_name, school, scheme, world_level, result)
 
         self._graduation_controller().start(compute)
 
@@ -96,12 +99,13 @@ class CombatGraduationMixin:
 
     def _on_graduation_finished(self, payload) -> None:
         """仅接收仍与当前用户和配置一致的后台计算结果。"""
-        generation, user_name, school, scheme, result = payload
+        generation, user_name, school, scheme, world_level, result = payload
         if (
             generation != self._graduation_generation
             or user_name != (self._host.active_user_name() or "")
             or school != self._get_current_school()
             or scheme != self._combo_scheme.currentText()
+            or world_level != self._effective_world_level()
         ):
             return
         # 结果通过信号向上传递给 LoadoutPanel
@@ -123,5 +127,6 @@ class CombatGraduationMixin:
             school=school,
             scheme=scheme,
             base_attrs=CombatAttributes.from_dict(base_attrs.to_dict()),
+            world_level=self._effective_world_level(),
             gongjue=gongjue,
         )

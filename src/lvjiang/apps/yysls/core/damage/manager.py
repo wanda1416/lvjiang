@@ -1,7 +1,7 @@
 """伤害模型的加载、缓存与写回
 
 一个流派方案一个文件（``config/system/yysls/damage_model/<流派>.yaml``），
-与 ``config/system/yysls/graduation/<流派>_<方案>.json`` 配套：后者存
+与 ``config/system/yysls/graduation/<流派>_<方案>_<等级>_v<版本>.json`` 配套：后者存
 编译出来的求值程序与环境参数，前者存那份程序里读不出来的系数表。
 
 两边同源于一份 Excel。``source.sha256`` 对不上就说明有一边换过表而
@@ -90,14 +90,31 @@ class DamageModelManager:
         model = self._models.get(school)
         if model is None or not model.source.get("sha256"):
             return ""
-        rel = self._scheme_rel(f"{school}_{model.scheme}.json")
-        path = self._resolver.resolve_read(rel)
-        if path is None:
-            return tr("找不到配套方案 {name}").format(name=Path(rel).name)
-        try:
-            scheme = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as e:
-            return tr("配套方案读取失败: {msg}").format(msg=str(e))
+        candidates: list[tuple[int, int, str, dict]] = []
+        for filename in self._resolver.enumerate_entities(
+            self._scheme_rel("").rstrip("/"), "*.json",
+        ):
+            rel = self._scheme_rel(filename)
+            path = self._resolver.resolve_read(rel)
+            if path is None:
+                continue
+            try:
+                scheme = json.loads(path.read_text(encoding="utf-8"))
+            except Exception as e:
+                return tr("配套方案读取失败: {msg}").format(msg=str(e))
+            if (scheme.get("schema_version") == 3
+                    and scheme.get("school") == school
+                    and scheme.get("scheme") == model.scheme):
+                candidates.append((
+                    int(scheme.get("model_level") or 0),
+                    int(scheme.get("model_version") or 0),
+                    filename,
+                    scheme,
+                ))
+        if not candidates:
+            return tr("找不到配套方案 {name}").format(
+                name=f"{school}_{model.scheme}_<等级>_v<版本>.json")
+        _level, _version, _filename, scheme = max(candidates)
         theirs = str((scheme.get("source") or {}).get("sha256") or "")
         if theirs and theirs != model.source["sha256"]:
             return tr("与配套方案不同源，系数表可能已过期（重新导入 Excel 可修复）")

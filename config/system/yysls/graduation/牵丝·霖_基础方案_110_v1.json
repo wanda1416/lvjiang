@@ -1,7 +1,10 @@
 {
   "content_version": 1,
-  "schema_version": 2,
+  "schema_version": 3,
   "school": "牵丝·霖",
+  "scheme": "基础方案",
+  "model_level": 110,
+  "model_version": 1,
   "source": {
     "file": "牵丝霖110阶竞速轴属性毕业率进阶计算器1.1.xlsx",
     "version": "1.1",

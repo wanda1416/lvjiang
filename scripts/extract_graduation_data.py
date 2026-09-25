@@ -13,6 +13,9 @@ from lvjiang.apps.yysls.core.graduation.graduation_converter import (  # noqa: E
     validate_model,
     write_model,
 )
+from lvjiang.apps.yysls.core.graduation.model_registry import (  # noqa: E402
+    model_filename,
+)
 
 EXCEL_DIR = ROOT / "data" / "temp" / "excel"
 OUTPUT_DIR = ROOT / "config" / "system" / "yysls" / "graduation"
@@ -44,12 +47,15 @@ def main() -> None:
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--school")
     parser.add_argument("--scheme", default="基础方案")
+    parser.add_argument("--level", type=int, default=110)
+    parser.add_argument("--version", type=int, default=1)
     args = parser.parse_args()
     selected = [(p, s) for p, s in workbooks() if not args.school or s == args.school]
     if not selected:
         raise SystemExit(f"unknown school: {args.school}")
     for path, school in selected:
-        model = convert_workbook(path, school)
+        model = convert_workbook(
+            path, school, args.scheme, args.level, args.version)
         outputs = validate_model(model)
         if f"{outputs['graduation_rate'] * 100:.2f}%" != "100.00%":
             raise RuntimeError(
@@ -57,7 +63,11 @@ def main() -> None:
                 f"{outputs['graduation_rate'] * 100:.8f}%"
             )
         if not args.check:
-            write_model(OUTPUT_DIR / f"{school}_{args.scheme}.json", model)
+            write_model(
+                OUTPUT_DIR / model_filename(
+                    school, args.scheme, args.level, args.version),
+                model,
+            )
         print(
             f"{school}: nodes={len(model['program']['nodes'])}, "
             f"DPS={outputs['dps']:.6f}, graduation={outputs['graduation_rate']:.9f}"

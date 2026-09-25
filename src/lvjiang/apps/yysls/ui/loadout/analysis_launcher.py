@@ -116,10 +116,12 @@ class GraduationAnalysisLauncher:
             users_dir = inventory._repo.users_dir
             analysis_settings = get_graduation_analysis_settings(
                 user_name, plan_id, users_dir)
+            world_level = inventory.state.effective_world_level(
+                game_config.current_equip_level())
             # 方案 → 计算上下文（流派、模型、基础属性含弓玦）只构造一次
             try:
                 scoring = PlanScoringContext.from_plan(
-                    plan, game_config=game_config)
+                    plan, game_config=game_config, world_level=world_level)
             except PlanContextError as exc:
                 QMessageBox.warning(
                     parent, tr("配置不完整"),
@@ -134,7 +136,7 @@ class GraduationAnalysisLauncher:
             # 假设栏：备战方案面板假设的副本，关闭即弃
             bar = AssumptionBar(
                 self._assumptions_source(),
-                season_level=game_config.current_equip_level(),
+                season_level=world_level,
             )
 
             def transmute_runner(stop_check, assumptions):
@@ -144,6 +146,8 @@ class GraduationAnalysisLauncher:
                     base_attrs=base_attrs,
                     school=school,
                     game_config=game_config,
+                    graduation_context=scoring.attr_context,
+                    affix_level=world_level,
                     stop_check=stop_check,
                     school_pool=school_pool,
                     full_chengyin=assumptions.full_chengyin,
@@ -166,6 +170,8 @@ class GraduationAnalysisLauncher:
                     base_attrs,
                     school,
                     game_config=game_config,
+                    graduation_context=scoring.attr_context,
+                    affix_level=world_level,
                 ),
                 joint_analyzer=lambda slots: analyze_combined_affix_replacements(
                     equipped,
@@ -175,6 +181,7 @@ class GraduationAnalysisLauncher:
                     base_attrs,
                     school,
                     game_config=game_config,
+                    graduation_context=scoring.attr_context,
                 ),
                 transmute_runner=transmute_runner,
                 apply_handler=apply_handler,
@@ -190,6 +197,8 @@ class GraduationAnalysisLauncher:
                 playstyle=plan.playstyle,
                 main_martial_art=plan.main_martial_art,
                 sub_martial_art=plan.sub_martial_art,
+                world_level=world_level,
+                graduation_context=scoring.attr_context,
                 assumptions_provider=bar.value,
                 analysis_settings=analysis_settings,
                 settings_changed=lambda value: set_graduation_analysis_settings(

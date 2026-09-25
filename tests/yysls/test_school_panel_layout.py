@@ -4,10 +4,17 @@ import pytest
 
 pytest.importorskip("PyQt6.QtWidgets")
 
-from PyQt6.QtCore import QEvent, QObject
-from PyQt6.QtWidgets import QApplication, QGroupBox, QLabel, QScrollArea
+from PyQt6.QtCore import QEvent, QObject, Qt
+from PyQt6.QtWidgets import (
+    QApplication,
+    QGroupBox,
+    QLabel,
+    QScrollArea,
+    QTableWidgetItem,
+)
 
 from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
+from lvjiang.apps.yysls.core.graduation.model_registry import GraduationModelRef
 from lvjiang.apps.yysls.ui.game_settings.school_panel import SchoolPanel
 
 
@@ -20,6 +27,19 @@ def _panel(qtbot) -> SchoolPanel:
     panel.resize(900, 700)
     panel.show()
     return panel
+
+
+def _add_scheme(panel: SchoolPanel, name: str = "测试方案") -> None:
+    ref = GraduationModelRef(
+        "测试流派", name, 110, 1,
+        f"yysls/graduation/测试流派_{name}_110_v1.json",
+    )
+    row = panel._scheme_list.rowCount()
+    panel._scheme_list.insertRow(row)
+    item = QTableWidgetItem(name)
+    item.setData(Qt.ItemDataRole.UserRole, ref)
+    panel._scheme_list.setItem(row, 0, item)
+    panel._scheme_list.setItem(row, 1, QTableWidgetItem("110级 · v1"))
 
 
 def test_school_details_scroll_together_without_squeezing_values(qtbot):
@@ -129,14 +149,14 @@ def test_create_base_attr_rejects_existing_name(qtbot, monkeypatch):
 
 def test_scheme_adps_precedes_attack_attributes(qtbot, monkeypatch):
     panel = _panel(qtbot)
-    panel._scheme_list.addItem("测试方案")
+    _add_scheme(panel)
     monkeypatch.setattr(
         "lvjiang.apps.yysls.core.graduation.get_graduation_scheme_combat_attrs",
-        lambda _school, _scheme: CombatAttributes(),
+        lambda _school, _scheme, **_kwargs: CombatAttributes(),
     )
     monkeypatch.setattr(
         "lvjiang.apps.yysls.core.graduation.get_graduation_scheme_metrics",
-        lambda _school, _scheme: (100.0, 120.0),
+        lambda _school, _scheme, **_kwargs: (100.0, 120.0),
     )
     panel._on_scheme_selected(0)
     assert panel._value_content_layout.itemAt(0).widget().objectName() == "schemeMetricsPanel"
@@ -155,16 +175,16 @@ def test_switching_base_attrs_does_not_collapse_details_mid_update(
     )
     panel._ps_list.addItems(["属性甲", "属性乙"])
     if previous_source == "scheme":
-        panel._scheme_list.addItem("测试方案")
+        _add_scheme(panel)
         monkeypatch.setattr(
             "lvjiang.apps.yysls.core.graduation.get_graduation_scheme_combat_attrs",
-            lambda _school, _scheme: CombatAttributes(),
+            lambda _school, _scheme, **_kwargs: CombatAttributes(),
         )
         monkeypatch.setattr(
             "lvjiang.apps.yysls.core.graduation.get_graduation_scheme_metrics",
-            lambda _school, _scheme: (100.0, 120.0),
+            lambda _school, _scheme, **_kwargs: (100.0, 120.0),
         )
-        panel._scheme_list.setCurrentRow(0)
+        panel._scheme_list.selectRow(0)
     else:
         panel._ps_list.setCurrentRow(0)
     QApplication.processEvents()

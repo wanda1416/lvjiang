@@ -14,9 +14,17 @@ import yaml
 from openpyxl.worksheet.formula import ArrayFormula
 
 from lvjiang.constants import PROJECT_ROOT
+from lvjiang.core.config.resolver import get_resolver
 
 from .excel_formula import FormulaError, FormulaModel, parse_formula
 from .graduation_program import ProgramCompiler, ProgramRuntime
+from .model_registry import (
+    MODEL_SCHEMA_VERSION,
+    available_models,
+    invalidate_model_registry,
+    model_filename,
+    model_rel_path,
+)
 
 GRADUATION_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "graduation"
 GAME_CONFIG_DIR = PROJECT_ROOT / "config" / "system" / "yysls" / "game_config"
@@ -343,7 +351,7 @@ def _compile_v2(
     )
     return {
         "content_version": 1,
-        "schema_version": 2,
+        "schema_version": MODEL_SCHEMA_VERSION,
         "school": school,
         "source": workbook_model["model"]["source"],
         "baseline_attrs": baseline_attrs,
@@ -354,7 +362,13 @@ def _compile_v2(
     }
 
 
-def convert_workbook(path: Path, school: str) -> dict[str, Any]:
+def convert_workbook(
+    path: Path,
+    school: str,
+    scheme: str = "基础方案",
+    model_level: int = 110,
+    model_version: int = 1,
+) -> dict[str, Any]:
     formulas = openpyxl.load_workbook(path, data_only=False, read_only=False)
     cached = openpyxl.load_workbook(path, data_only=True, read_only=False)
     try:
@@ -416,18 +430,23 @@ def convert_workbook(path: Path, school: str) -> dict[str, Any]:
             "outputs": {name: {"ref": ref} for name, ref in OUTPUTS.items()},
             "sheets": sheets,
         }
-        return _compile_v2(
+        model = _compile_v2(
             workbook_model, school, affix_names,
             _extract_environment(formulas, cached), inputs,
         )
+        model["scheme"] = scheme
+        model["model_level"] = model_level
+        model["model_version"] = model_version
+        return model
     finally:
         formulas.close()
         cached.close()
 
 
 def validate_model(model: dict[str, Any]) -> dict[str, float]:
-    if model.get("schema_version") != 2:
-        raise FormulaError("graduation model must use schema version 2")
+    if model.get("schema_version") != MODEL_SCHEMA_VERSION:
+        raise FormulaError(
+            f"graduation model must use schema version {MODEL_SCHEMA_VERSION}")
     baseline = model["baseline_attrs"]
     extra = baseline.get("extra_attrs", {})
     values = [
@@ -446,11 +465,10 @@ def validate_model(model: dict[str, Any]) -> dict[str, float]:
     return results
 
 
-def scheme_path(school: str, scheme: str) -> Path:
-    cleaned = scheme.strip()
-    if not cleaned or any(char in cleaned for char in '<>:"/\\|?*'):
-        raise ValueError("方案名称为空或包含文件名非法字符")
-    return GRADUATION_DIR / f"{school}_{cleaned}.json"
+def scheme_path(
+    school: str, scheme: str, level: int, version: int,
+) -> Path:
+    return GRADUATION_DIR / model_filename(school, scheme, level, version)
 
 
 def write_model(path: Path, model: dict[str, Any]) -> None:
@@ -468,13 +486,21 @@ def write_model(path: Path, model: dict[str, Any]) -> None:
 
 
 def import_graduation_scheme(
-    excel_path: str | Path, school: str, scheme: str,
+    excel_path: str | Path, school: str, scheme: str, model_level: int,
 ) -> tuple[Path, dict[str, float]]:
     source = Path(excel_path)
     if source.suffix.lower() != ".xlsx" or not source.is_file():
         raise ValueError("请选择有效的 .xlsx 文件")
-    model = convert_workbook(source, school)
+    versions = [
+        ref.version for ref in available_models(school, scheme)
+        if ref.level == model_level
+    ]
+    model_version = max(versions, default=0) + 1
+    model = convert_workbook(
+        source, school, scheme, model_level, model_version)
     outputs = validate_model(model)
-    destination = scheme_path(school, scheme)
-    write_model(destination, model)
+    rel_path = model_rel_path(school, scheme, model_level, model_version)
+    payload = json.dumps(model, ensure_ascii=False, indent=2) + "\n"
+    destination = get_resolver().write_entity(rel_path, payload)
+    invalidate_model_registry()
     return destination, outputs

@@ -220,8 +220,10 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
         _save_scanned_base_attrs(engine, {**parsed, "_right_outer_valid": False})
     with pytest.raises(ValueError, match="右侧详情"):
         _save_scanned_base_attrs(engine, {**parsed, "_right_attr_attack_valid": False})
-    for missing in ("crit_dmg", "attr_bonus_current"):
-        with pytest.raises(ValueError, match="增减伤属性识别不完整"):
+    # 左区任一必需字段缺失都要点名具体字段：会心率曾因 OCR 空格解析不出来，
+    # 却报成"右侧详情识别不完整"，排查方向被带偏一整轮。
+    for missing in ("crit_rate", "precision", "crit_dmg", "attr_bonus_current"):
+        with pytest.raises(ValueError, match=f"缺少 {missing}"):
             _save_scanned_base_attrs(engine, {
                 key: value for key, value in parsed.items() if key != missing
             })

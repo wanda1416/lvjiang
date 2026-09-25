@@ -72,18 +72,31 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
     plan_id = _engine.context.get("_bound_loadout_plan_id")
     if not plan_id:
         raise ValueError("尚未绑定经过验证的备战方案，不能静默写入基础属性")
-    required = {"min_outer", "max_outer", "precision", "crit_rate"}
-    if (not isinstance(prefill, dict) or not required <= prefill.keys()
-            or prefill.get("_right_outer_valid") is not True
-            or prefill.get("_right_attr_attack_valid") is not True
-            or prefill.get("_right_outer_pen_valid") is not True
-            or prefill.get("_right_attr_pen_valid") is not True):
-        raise ValueError("角色属性右侧详情识别不完整，拒绝静默覆盖基础属性")
-    required_bonus = {"crit_dmg", "intent_dmg", "outer_bonus", "attr_bonus_current"}
-    missing_bonus = required_bonus - prefill.keys()
-    if missing_bonus:
+    if not isinstance(prefill, dict):
+        raise ValueError("角色属性识别结果为空，拒绝静默覆盖基础属性")
+    # 左区必需字段与右区详情标志分开报错：两者曾共用一条"右侧详情识别不完整"，
+    # 实际缺的是左区某个百分比字段时，日志会把排查方向带到完全无关的地方。
+    invalid_right = [
+        name for flag, name in (
+            ("_right_outer_valid", "外功攻击"),
+            ("_right_attr_attack_valid", "属性攻击"),
+            ("_right_outer_pen_valid", "外功穿透"),
+            ("_right_attr_pen_valid", "属攻穿透"),
+        ) if prefill.get(flag) is not True
+    ]
+    if invalid_right:
         raise ValueError(
-            f"角色面板增减伤属性识别不完整（缺少 {', '.join(sorted(missing_bonus))}），"
+            f"角色属性右侧详情识别不完整（{'、'.join(invalid_right)}），"
+            "拒绝静默覆盖基础属性"
+        )
+    required = {
+        "min_outer", "max_outer", "precision", "crit_rate",
+        "crit_dmg", "intent_dmg", "outer_bonus", "attr_bonus_current",
+    }
+    missing = required - prefill.keys()
+    if missing:
+        raise ValueError(
+            f"角色面板属性识别不完整（缺少 {', '.join(sorted(missing))}），"
             "拒绝静默覆盖基础属性"
         )
     username = getattr(_engine, "run_username", "")

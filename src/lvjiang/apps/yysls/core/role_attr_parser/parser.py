@@ -46,6 +46,14 @@ _PERCENT_FIELDS: dict[str, str] = {
     "外功伤害加成": "outer_bonus",
 }
 
+# detail_1 只有"当前流派"合并数值的百分比/单值字段，作为对应 detail_2 精确
+# 数据缺失时的兜底（通用 key，见模块顶注释）
+_CURRENT_PERCENT_FIELDS: dict[str, str] = {
+    "外功穿透": "outer_pen",
+    "属攻穿透": "attr_pen_current",
+    "属攻伤害加成": "attr_bonus_current",
+}
+
 # 区间字段（"900-2604" 这种 min-max 格式）
 _RANGE_FIELDS: dict[str, tuple[str, str]] = {
     "外功攻击": ("min_outer", "max_outer"),
@@ -64,8 +72,25 @@ _OUTER_PEN_NON_DINGYIN_RE = re.compile(
 )
 
 
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _squeeze(text: str) -> str:
+    """删掉 OCR 在一行里插进来的全部空白。
+
+    识别层会把 "51.1%" 读成 "51. 1%"、把 "36.0" 读成 "3 6.0"，这类空白没有
+    语义，却让数值解析整条失败，字段被静默丢弃（见 v0.13.3 的会心率）。面板
+    的标签和数值都不含有意义的空格，所以行内空白一律删除，而不是逐个字段写
+    容错正则。
+
+    代价是 OCR 同时漏掉小数点时（"51 1%"）会并成 "511%"。滚动扫描每屏独立
+    解析、后一屏覆盖前一屏，这类单屏误读会被相邻屏的正确识别纠正。
+    """
+    return _WHITESPACE_RE.sub("", text)
+
+
 def _to_float(text: str) -> float | None:
-    text = text.strip()
+    text = _squeeze(text)
     if not text:
         return None
     try:
@@ -76,8 +101,8 @@ def _to_float(text: str) -> float | None:
 
 def _strip_percent_paren(value: str) -> float | None:
     """"114.2%(94.8%)" → 114.2（取括号外的"白字"数值）；"40.0%" → 40.0"""
-    value = value.split("(", 1)[0].strip()
-    value = value.rstrip("%").strip()
+    value = _squeeze(value).split("(", 1)[0]
+    value = value.rstrip("%")
     return _to_float(value)
 
 
@@ -89,8 +114,8 @@ _CONSTANT_VALUE_RE = re.compile(r"^[^\d-]*(-?\d+)$")
 
 def _split_range(value: str) -> tuple[float | None, float | None]:
     """"900-2604" → (900.0, 2604.0)；"← 3713" → (3713.0, 3713.0)（恒定值兜底）"""
-    value = value.replace("（", "(").replace("）", ")")
-    value = value.split("(", 1)[0].strip()
+    value = _squeeze(value).replace("（", "(").replace("）", ")")
+    value = value.split("(", 1)[0]
     m = _RANGE_RE.match(value)
     if m:
         return float(m.group(1)), float(m.group(2))
@@ -101,12 +126,23 @@ def _split_range(value: str) -> tuple[float | None, float | None]:
     return None, None
 
 
+def _warn_unparsed(label: str, value: str) -> None:
+    """标签命中但数值解析不出来——必须留痕。
+
+    以前这里静默跳过，结果是面板少一个字段、静默写入被门禁拒绝，日志里却
+    没有任何线索指向具体是哪个字段的 OCR 出了问题。
+    """
+    logger.warning(f"角色属性识别: 标签 {label!r} 的数值无法解析: {value!r}")
+
+
 def parse_detail1(tokens: list[str]) -> dict[str, float]:
     """解析单屏 detail_1 token 序列，提取已知字段的数值。
 
     命中已知标签 → 取下一个 token 做数值解析；命中不了的 token 跳过。
+    标签和数值都先删掉行内空白，OCR 插进来的空格不影响匹配（见 _squeeze）。
     """
     result: dict[str, float] = {}
+    tokens = [_squeeze(token) for token in tokens]
     n = len(tokens)
     for i, label in enumerate(tokens):
         if i + 1 >= n:
@@ -117,6 +153,8 @@ def parse_detail1(tokens: list[str]) -> dict[str, float]:
             num = _strip_percent_paren(value)
             if num is not None:
                 result[_PERCENT_FIELDS[label]] = num
+            else:
+                _warn_unparsed(label, value)
             continue
 
         if label in _RANGE_FIELDS:
@@ -124,35 +162,31 @@ def parse_detail1(tokens: list[str]) -> dict[str, float]:
             min_field, max_field = _RANGE_FIELDS[label]
             if lo is not None:
                 result[min_field] = lo
+            else:
+                _warn_unparsed(label, value)
             # 外功攻击在最小值超过最大值时，左区只显示箭头加最小值。
             # 这个单值不能证明最大值相同；最大值必须从右区“基础外功攻击”读取。
-            if hi is not None and _RANGE_RE.match(value.strip()):
+            if hi is not None and _RANGE_RE.match(value):
                 result[max_field] = hi
             continue
 
-        # 属性攻击/外功穿透/属攻穿透/属攻伤害加成：detail_1 只有"当前流派"合并
-        # 数值，作为对应 detail_2 精确数据缺失时的兜底（通用 key，见模块顶注释）
+        # 以下是"当前流派"合并数值，detail_2 精确数据缺失时的兜底
         if label == "属性攻击":
             lo, hi = _split_range(value)
             if lo is not None:
                 result["min_attr_current"] = lo
+            else:
+                _warn_unparsed(label, value)
             if hi is not None:
                 result["max_attr_current"] = hi
             continue
-        if label == "外功穿透":
+        if label in _CURRENT_PERCENT_FIELDS:
             num = _strip_percent_paren(value)
             if num is not None:
-                result["outer_pen"] = num  # 无 detail_2 时的兜底，detail_2 会覆盖
-            continue
-        if label == "属攻穿透":
-            num = _strip_percent_paren(value)
-            if num is not None:
-                result["attr_pen_current"] = num
-            continue
-        if label == "属攻伤害加成":
-            num = _strip_percent_paren(value)
-            if num is not None:
-                result["attr_bonus_current"] = num
+                # 无 detail_2 时的兜底，detail_2 的精确值会覆盖
+                result[_CURRENT_PERCENT_FIELDS[label]] = num
+            else:
+                _warn_unparsed(label, value)
             continue
 
     return result
@@ -160,7 +194,8 @@ def parse_detail1(tokens: list[str]) -> dict[str, float]:
 
 def parse_detail2_outer_attack(text: str) -> dict[str, float]:
     """解析“外功攻击”右区详情中的基础区间，保留最小值大于最大值的顺序。"""
-    match = _BASE_OUTER_ATTACK_RE.search(text or "")
+    text = _squeeze(text or "")
+    match = _BASE_OUTER_ATTACK_RE.search(text)
     if not match:
         return {}
     value_part = text[match.end():].split("|", 1)[0]
@@ -168,7 +203,7 @@ def parse_detail2_outer_attack(text: str) -> dict[str, float]:
     result: dict[str, float] = {}
     if lo is not None:
         result["min_outer"] = lo
-    if hi is not None and _RANGE_RE.match(value_part.strip()):
+    if hi is not None and _RANGE_RE.match(value_part):
         result["max_outer"] = hi
     return result
 
@@ -185,7 +220,7 @@ def parse_detail2_attr_attack(text: str) -> dict[str, float]:
     "num-num" 正则，这样恒定值格式也能落到同一套解析逻辑，不需要为箭头
     格式单独写一份正则。
     """
-    text = text or ""
+    text = _squeeze(text or "")
     result: dict[str, float] = {}
     for m in _SCHOOL_ATTACK_LABEL_RE.finditer(text):
         name = m.group(1)
@@ -203,7 +238,7 @@ def parse_detail2_attr_attack(text: str) -> dict[str, float]:
 
 def parse_detail2_outer_pen(text: str) -> dict[str, float]:
     """解析"外功穿透"detail_2 展开文本，取"(非定音部分)"数值。"""
-    m = _OUTER_PEN_NON_DINGYIN_RE.search(text or "")
+    m = _OUTER_PEN_NON_DINGYIN_RE.search(_squeeze(text or ""))
     if not m:
         return {}
     return {"outer_pen": float(m.group(1))}
@@ -221,7 +256,7 @@ def parse_detail2_attr_pen(text: str) -> dict[str, float]:
     流派属攻穿透由 ``combat_attrs.fold_wuxiang_pen`` 在计算时处理。
     """
     result: dict[str, float] = {}
-    for m in _SCHOOL_PEN_RE.finditer(text or ""):
+    for m in _SCHOOL_PEN_RE.finditer(_squeeze(text or "")):
         name, val = m.group(1), m.group(2)
         suffix = _SCHOOL_SUFFIX.get(name)
         if suffix is None:

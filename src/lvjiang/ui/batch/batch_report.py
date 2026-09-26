@@ -112,6 +112,11 @@ class BatchReport:
         self._entries.append(entry)
         self._current_entry = entry
 
+    def set_entry_username(self, username: str) -> None:
+        """属性单元准备完成后补全实际执行用户。"""
+        if self._current_entry is not None:
+            self._current_entry.username = username
+
     def record_prepare(self, status: str) -> None:
         if self._current_entry:
             self._current_entry.prepare_status = status

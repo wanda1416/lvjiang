@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import copy
 import json
+import time
 import traceback
 from contextlib import ExitStack, nullcontext
 from dataclasses import dataclass
@@ -24,6 +25,7 @@ from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from ...core.batch_config import BatchConfigItem, lifecycle_parameter_definitions
+from ...core.batch_units import group_users
 from ...core.config.resolver import get_resolver
 from ...core.config.users import SessionManager
 from ...i18n import tr
@@ -98,6 +100,8 @@ class BatchStageResult:
     status: str = RESULT_SUCCESS
     message: str = ""
     state: dict | None = None
+    username: str = ""
+    retry_after: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -118,6 +122,7 @@ class BatchWorker(QThread):
     # (run_idx, 条目标签, script_id, 状态)：run_idx 是用户名序列中的
     # 位置，进度表按它直接定位，不靠标签文本匹配（标签会重名）。
     progress = pyqtSignal(int, str, str, str)
+    selected_task_plan = pyqtSignal(int, object)
     log = pyqtSignal(str)
     finished_all = pyqtSignal(dict)
 
@@ -130,9 +135,11 @@ class BatchWorker(QThread):
         session_manager: SessionManager,
         stop_check: Callable[[], bool],
         parent=None,
+        candidate_usernames: list[str] | None = None,
     ):
         super().__init__(parent)
         self._usernames = list(usernames)
+        self._candidate_usernames = list(candidate_usernames or usernames)
         self._scripts = copy.deepcopy(scripts)
         self._config = copy.deepcopy(config)
         self._ctx = ctx
@@ -140,6 +147,8 @@ class BatchWorker(QThread):
         self._stop_check = stop_check
         self._stopped = False
         self._task_plan: dict[tuple[int, str], PlannedTask] = {}
+        self._member_task_plan: dict[tuple[str, str], PlannedTask] = {}
+        self._unit_members: dict[str, list[str]] = {}
         self._user_attributes: dict[str, dict[str, str]] = {}
         self._workflow_configs: dict[str, dict] = {}
         self._lifecycle_params: dict[str, dict] = {}
@@ -157,12 +166,21 @@ class BatchWorker(QThread):
         }
         self._workflow_configs = copy.deepcopy(shared)
         users = {}
-        for username in self._usernames:
+        attr_mode = self._config.execution_unit_key != "user"
+        member_names = self._candidate_usernames if attr_mode else self._usernames
+        if attr_mode:
+            groups = group_users(
+                member_names, self._config.execution_unit_key,
+                self._session_manager._users_dir)
+            self._unit_members = {
+                value: list(groups.get(value, [])) for value in self._usernames
+            }
+        for username in member_names:
             user = load_user_metadata(username, self._session_manager._users_dir)
             users[username] = user
             self._user_attributes[username] = (
                 dict(user.attributes) if user is not None else {})
-        for run_idx, username in enumerate(self._usernames):
+        for run_idx, username in enumerate(member_names):
             user = users.get(username)
             for script in self._scripts:
                 override = (
@@ -171,8 +189,12 @@ class BatchWorker(QThread):
                     else None)
                 params, source = merge_task_params(
                     script.parameters or [], shared[script.id], override)
-                self._task_plan[(run_idx, script.id)] = PlannedTask(
+                planned = PlannedTask(
                     run_idx, username, script, params, source)
+                if attr_mode:
+                    self._member_task_plan[(username, script.id)] = planned
+                else:
+                    self._task_plan[(run_idx, script.id)] = planned
         for phase, definitions in lifecycle_parameter_definitions(
             self._config.workflows,
         ).items():
@@ -208,6 +230,9 @@ class BatchWorker(QThread):
                 self._execution_lease = None
 
     def _run_locked(self):
+        if self._config.execution_unit_key != "user":
+            self._run_locked_by_attr()
+            return
         from ...core.daily_history import try_create_batch_run
         batch_run = try_create_batch_run(
             config_name=self._config.name,
@@ -589,6 +614,245 @@ class BatchWorker(QThread):
 
         self.finished_all.emit(summary)
 
+    def _run_locked_by_attr(self) -> None:
+        """属性单元的运行态调度；旧用户执行路径不受影响。"""
+        from ...core.access import AccessDeniedError, acquire_user
+        from ...core.daily_history import try_create_batch_run, try_create_task_run
+
+        if not self._config.workflows.prepare_item:
+            raise ValueError("属性执行单元必须配置条目准备工作流")
+        unit_key = self._config.execution_unit_key
+        batch_run = try_create_batch_run(
+            config_name=self._config.name,
+            input_snapshot={
+                "execution_unit_key": unit_key,
+                "units": copy.deepcopy(self._unit_members),
+                "usernames": list(dict.fromkeys(
+                    name for members in self._unit_members.values()
+                    for name in members)),
+                "scripts": [{"task_id": s.id, "task_name": s.name,
+                             "scope": s.scope} for s in self._scripts],
+                "rounds": self._config.rounds,
+                "workflows": self._config.workflows.to_dict(),
+                "workflow_params": copy.deepcopy(self._lifecycle_params),
+            },
+        )
+        self._batch_run = batch_run
+        batch_run_id = batch_run.batch_run_id if batch_run is not None else ""
+        summary: dict = {"batch_run_id": batch_run_id, "entries": {},
+                         "stopped": False, "lifecycle": {}}
+        report = BatchReport(
+            config_name=self._config.name,
+            scripts=[(s.id, s.name) for s in self._scripts],
+            workflows=self._config.workflows.to_dict(),
+            total_rows=len(self._usernames) * self._config.rounds,
+        )
+        report.start_batch()
+        batch_state: dict = {}
+        setup = self._run_stage(
+            "batch_setup", self._config.workflows.batch_setup,
+            -1, "", batch_state)
+        batch_state = setup.state if setup.state is not None else batch_state
+        summary["lifecycle"]["batch_setup"] = setup.status
+        counts = {value: 0 for value in self._usernames}
+        next_ready = {value: 0.0 for value in self._usernames}
+        deferrals = {value: 0 for value in self._usernames}
+        done: set[str] = set()
+        attempt = 0
+        cursor = 0
+        if setup.status != RESULT_SUCCESS:
+            self._stopped = setup.status == RESULT_STOPPED
+            done.update(self._usernames)
+            self.log.emit(self._stage_message(tr("批次准备"), setup))
+
+        while len(done) < len(self._usernames) and not self._stop_check():
+            ready = [value for value in self._usernames
+                     if value not in done and next_ready[value] <= time.monotonic()]
+            if not ready:
+                time.sleep(min(1.0, max(0.0, min(
+                    next_ready[value] for value in self._usernames if value not in done
+                ) - time.monotonic())))
+                continue
+            unit = next((value for value in self._usernames[cursor:]
+                         if value in ready), ready[0])
+            run_idx = self._usernames.index(unit)
+            cursor = (run_idx + 1) % len(self._usernames)
+            members = self._unit_members.get(unit, [])
+            if not members:
+                self.log.emit(f"[批量] 单元 {unit} 无用户资料，跳过")
+                done.add(unit)
+                continue
+            attempt += 1
+            round_number = counts[unit] + 1
+            label = f"{unit} · 第 {round_number} 次 · 尝试 {attempt}"
+            self.log.emit(f"[批量] {unit_key}={unit}，第 {round_number}/{self._config.rounds} 次")
+            report.start_entry(label, "")
+            entry: dict = {"prepare": ST_SKIPPED, "finish": ST_SKIPPED,
+                           "username": "", "scripts": {}}
+            summary["entries"][label] = entry
+            try:
+                # 准备工作流可能选择任意成员；在它操作客户端前锁定整组。
+                with ExitStack() as locks:
+                    for name in sorted(members):
+                        lease = acquire_user(name, self._session_manager._users_dir)
+                        locks.callback(lease.release)
+                        locks.enter_context(lease.authorized())
+
+                    eligible: list[str] = []
+                    for name in members:
+                        if any(self._check_script(
+                            script, name,
+                            params=self._member_task_plan[(name, script.id)].params,
+                        ).status == RESULT_SUCCESS for script in self._scripts):
+                            eligible.append(name)
+                    if not eligible:
+                        self.log.emit(f"[批量] {unit} 内所有角色均无可执行任务")
+                        done.add(unit)
+                        for script in self._scripts:
+                            entry["scripts"][script.id] = ST_SKIPPED
+                            self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
+                        report.record_prepare(ST_SKIPPED)
+                        continue
+
+                    prepared = self._run_stage(
+                        "prepare_item", self._config.workflows.prepare_item,
+                        run_idx, "", batch_state, round_number=round_number,
+                        unit_members=eligible,
+                    )
+                    batch_state = prepared.state if prepared.state is not None else batch_state
+                    entry["prepare"] = self._result_to_ui_status(prepared.status)
+                    report.record_prepare(entry["prepare"])
+                    if prepared.status != RESULT_SUCCESS:
+                        self.log.emit(self._stage_message(label, prepared))
+                        for script in self._scripts:
+                            entry["scripts"][script.id] = ST_SKIPPED
+                            self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
+                        if prepared.status == RESULT_STOPPED:
+                            self._stopped = True
+                            done.add(unit)
+                        elif prepared.retry_after > 0 and deferrals[unit] < 30:
+                            deferrals[unit] += 1
+                            next_ready[unit] = time.monotonic() + prepared.retry_after
+                        else:
+                            done.add(unit)
+                        continue
+
+                    username = prepared.username
+                    if username not in eligible:
+                        raise ValueError(
+                            f"条目准备未返回本单元可执行的用户名: {username!r}")
+                    deferrals[unit] = 0
+                    entry["username"] = username
+                    report.set_entry_username(username)
+                    self.selected_task_plan.emit(run_idx, {
+                        (run_idx, script.id): self._member_task_plan[(username, script.id)]
+                        for script in self._scripts
+                    })
+                    session = self._session_manager.load(username)
+                    for script in self._scripts:
+                        if self._stop_check():
+                            self._stopped = True
+                            break
+                        self.progress.emit(run_idx, label, script.id, ST_RUNNING)
+                        report.start_script(script.id, script.name)
+                        planned = self._member_task_plan[(username, script.id)]
+                        task_run = try_create_task_run(
+                            username=username, task_id=script.id,
+                            task_name=script.name, task_scope=script.scope,
+                            params=copy.deepcopy(planned.params), source="batch",
+                            batch_run_id=batch_run_id,
+                            repository=(batch_run.repository
+                                        if batch_run is not None else None),
+                        )
+                        try:
+                            capture = (task_run.capture_logs()
+                                       if task_run is not None else nullcontext())
+                            with capture:
+                                result = self._run_script(
+                                    script, session, username,
+                                    params=copy.deepcopy(planned.params))
+                                self._session_manager.save(username, session)
+                            entry["scripts"][script.id] = ST_SUCCESS
+                            report.end_script(ST_SUCCESS, result)
+                            self.progress.emit(run_idx, label, script.id, ST_SUCCESS)
+                            result_path = self._save_result(username, script, result)
+                            if task_run is not None:
+                                task_run.finish(status="completed", result_path=result_path)
+                        except Exception as exc:  # noqa: BLE001
+                            logger.exception(f"属性单元任务失败: {unit}/{script.id}")
+                            entry["scripts"][script.id] = ST_FAILED
+                            report.end_script(ST_FAILED)
+                            self.progress.emit(run_idx, label, script.id, ST_FAILED)
+                            self.log.emit(f"[批量] {label} → {script.name} 失败: {exc}")
+                            if task_run is not None:
+                                task_run.finish(status="failed", error_message=str(exc))
+                    if self._stopped:
+                        report.finish_pending()
+                    finished = self._run_stage(
+                        "finish_item", self._config.workflows.finish_item,
+                        run_idx, username, batch_state,
+                        {"prepare": prepared.status,
+                         "scripts": {key: self._ui_status_to_result(value)
+                                     for key, value in entry["scripts"].items()}},
+                        round_number=round_number,
+                    )
+                    batch_state = finished.state if finished.state is not None else batch_state
+                    entry["finish"] = self._result_to_ui_status(finished.status)
+                    report.record_finish(entry["finish"])
+                    if finished.status == RESULT_STOPPED:
+                        self._stopped = True
+                    elif finished.status != RESULT_SUCCESS:
+                        self.log.emit(self._stage_message(f"{label} 条目收尾", finished))
+                    counts[unit] += 1
+                    selected_still_eligible = any(
+                        self._check_script(
+                            script, username,
+                            params=self._member_task_plan[(username, script.id)].params,
+                        ).status == RESULT_SUCCESS for script in self._scripts
+                    )
+                    next_ready[unit] = time.monotonic() + (
+                        prepared.retry_after if selected_still_eligible else 0)
+                    if counts[unit] >= self._config.rounds:
+                        done.add(unit)
+            except AccessDeniedError as exc:
+                self.log.emit(f"[批量] {unit} 暂不可执行: {exc}")
+                deferrals[unit] += 1
+                next_ready[unit] = time.monotonic() + 60
+                if deferrals[unit] >= 30:
+                    done.add(unit)
+            except Exception as exc:  # noqa: BLE001
+                logger.exception(f"属性单元执行失败: {unit}")
+                self.log.emit(f"[批量] {unit} 执行失败: {exc}")
+                entry["prepare"] = ST_FAILED
+                done.add(unit)
+            finally:
+                report.end_entry()
+
+        self._stopped = self._stopped or self._stop_check()
+        summary["stopped"] = self._stopped
+        if setup.status == RESULT_SUCCESS:
+            teardown = self._run_stage(
+                "batch_teardown", self._config.workflows.batch_teardown,
+                -1, "", batch_state,
+                {"stopped": self._stopped, "entries": summary["entries"]},
+                round_number=self._config.rounds)
+            summary["lifecycle"]["batch_teardown"] = teardown.status
+        report.end_batch(stopped=self._stopped)
+        report_path = report.write()
+        if batch_run is not None:
+            failed = (
+                any(value == RESULT_FAILED
+                    for value in summary["lifecycle"].values())
+                or any(entry["prepare"] == ST_FAILED
+                       or entry["finish"] == ST_FAILED
+                       or ST_FAILED in entry["scripts"].values()
+                       for entry in summary["entries"].values())
+            )
+            batch_run.finish(
+                status="interrupted" if self._stopped else "failed" if failed
+                else "completed", report_path=report_path)
+        self.finished_all.emit(summary)
+
     # ─── 生命周期协议 ────────────────────────────────────
 
     @staticmethod
@@ -605,6 +869,8 @@ class BatchWorker(QThread):
         status = value.get("status", RESULT_SUCCESS)
         message = value.get("message", "")
         state = value.get("state", current_state)
+        username = value.get("username", "")
+        retry_after = value.get("retry_after", 0)
         if status not in _RESULT_STATUSES:
             return BatchStageResult(
                 status=RESULT_FAILED,
@@ -619,7 +885,13 @@ class BatchWorker(QThread):
                 message=tr("生命周期 wf 的 state 必须是 dict"),
                 state=current_state,
             )
-        return BatchStageResult(status=status, message=message, state=state)
+        if not isinstance(username, str) or not isinstance(retry_after, (int, float)):
+            return BatchStageResult(
+                status=RESULT_FAILED, message=tr("生命周期 wf 返回了无效角色或重试时间"),
+                state=current_state)
+        return BatchStageResult(
+            status=status, message=message, state=state,
+            username=username, retry_after=max(0.0, float(retry_after)))
 
     @staticmethod
     def _normalize_check_result(value) -> BatchCheckResult:
@@ -699,6 +971,7 @@ class BatchWorker(QThread):
         batch_state: dict,
         item_result: dict | None = None,
         round_number: int = 0,
+        unit_members: list[str] | None = None,
     ) -> BatchStageResult:
         """执行一个生命周期 wf，并统一校验其返回协议。"""
         if not wf_name:
@@ -713,7 +986,7 @@ class BatchWorker(QThread):
 
         engine = self._create_engine()
         engine.session = {}
-        engine.run_username = username
+        engine.run_username = "" if unit_members is not None else username
         engine.users_dir = self._session_manager._users_dir
         engine.user_attributes_snapshot = copy.deepcopy(self._user_attributes)
 
@@ -730,6 +1003,16 @@ class BatchWorker(QThread):
             "batch_state": working_state,
             "batch_item_result": item_result or {},
         })
+        if unit_members is not None:
+            variables.update({
+                "batch_unit_key": self._config.execution_unit_key,
+                "batch_unit_value": self._usernames[run_idx],
+                "batch_unit_members": [
+                    {"username": name, "attributes": copy.deepcopy(
+                        self._user_attributes.get(name, {}))}
+                    for name in unit_members
+                ],
+            })
 
         try:
             engine.execute(wf_path, initial_variables=variables)

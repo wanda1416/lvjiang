@@ -58,6 +58,10 @@ class BatchConfigItem:
     usernames: list[str] = field(default_factory=list)
     selected_task_ids: list[str] = field(default_factory=list)
     selected_usernames: list[str] = field(default_factory=list)
+    # 旧用户字段保持原样；属性单元另存可见范围和主页面勾选范围。
+    execution_unit_key: str = "user"
+    visible_units: dict[str, list[str]] = field(default_factory=dict)
+    selected_units: dict[str, list[str]] = field(default_factory=dict)
     rounds: int = 1
     profile_sort_key: str = ""
     profile_sort_direction: str = "asc"
@@ -83,6 +87,18 @@ class BatchConfigItem:
         self.selected_usernames = [
             name for name in selected_users if name in visible_users
         ]
+        if not isinstance(self.execution_unit_key, str) or not self.execution_unit_key:
+            self.execution_unit_key = "user"
+        for field_name in ("visible_units", "selected_units"):
+            value = getattr(self, field_name)
+            setattr(self, field_name, {
+                key: _unique_strings(items)
+                for key, items in value.items()
+                if isinstance(key, str) and key and isinstance(items, list)
+            } if isinstance(value, dict) else {})
+        for key, selected in list(self.selected_units.items()):
+            visible = set(self.visible_units.get(key, []))
+            self.selected_units[key] = [value for value in selected if value in visible]
         if not isinstance(self.rounds, int) or isinstance(self.rounds, bool):
             self.rounds = 1
         self.rounds = min(999, max(1, self.rounds))
@@ -103,6 +119,9 @@ class BatchConfigItem:
             "usernames": list(self.usernames),
             "selected_task_ids": list(self.selected_task_ids),
             "selected_usernames": list(self.selected_usernames),
+            "execution_unit_key": self.execution_unit_key,
+            "visible_units": self.visible_units,
+            "selected_units": self.selected_units,
             "rounds": self.rounds,
             "profile_sort_key": self.profile_sort_key,
             "profile_sort_direction": self.profile_sort_direction,
@@ -128,6 +147,9 @@ class BatchConfigItem:
             usernames=_unique_strings(source.get("usernames")),
             selected_task_ids=_unique_strings(source.get("selected_task_ids")),
             selected_usernames=_unique_strings(source.get("selected_usernames")),
+            execution_unit_key=source.get("execution_unit_key", "user"),
+            visible_units=source.get("visible_units", {}),
+            selected_units=source.get("selected_units", {}),
             rounds=source.get("rounds", 1),
             profile_sort_key=source.get("profile_sort_key", ""),
             profile_sort_direction=source.get("profile_sort_direction", "asc"),

@@ -92,7 +92,10 @@ class BatchConfigDialog(QDialog):
         user_layout = QVBoxLayout(user_box)
         user_layout.setContentsMargins(0, 0, 0, 0)
         user_header = QHBoxLayout()
-        user_header.addWidget(QLabel(tr("可见用户：")))
+        user_header.addWidget(QLabel(tr("可见单元：")))
+        self._unit_combo = QComboBox()
+        self._unit_combo.currentIndexChanged.connect(self._on_unit_changed)
+        user_header.addWidget(self._unit_combo, 1)
         user_header.addStretch()
         user_all = QPushButton(tr("全选"))
         user_none = QPushButton(tr("全不选"))
@@ -105,7 +108,7 @@ class BatchConfigDialog(QDialog):
         self._user_list = QListWidget()
         self._user_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self._user_list.setDefaultDropAction(Qt.DropAction.MoveAction)
-        self._user_list.setToolTip(tr("拖动用户可调整批量执行顺序"))
+        self._user_list.setToolTip(tr("拖动单元可调整批量初始顺序"))
         user_layout.addWidget(self._user_list)
         choices.addWidget(user_box)
         choices.setSizes([430, 430])
@@ -123,10 +126,10 @@ class BatchConfigDialog(QDialog):
             self._selectors[key] = combo
             wf_form.addRow(label, row)
         self._skip_single_lifecycle = QCheckBox(
-            tr("单用户执行时跳过上述生命周期工作流")
+            tr("单个执行单元时跳过上述生命周期工作流")
         )
         self._skip_single_lifecycle.setToolTip(
-            tr("实际只选择一个用户时，直接执行任务，不运行四个生命周期 wf；执行多轮同样生效")
+            tr("实际只选择一个用户单元时，直接执行任务；属性单元始终运行准备工作流")
         )
         wf_form.addRow("", self._skip_single_lifecycle)
         layout.addLayout(wf_form)
@@ -240,16 +243,24 @@ class BatchConfigDialog(QDialog):
                 else Qt.CheckState.Unchecked)
             self._task_list.addItem(row)
 
-        selected_users = set(item.usernames)
-        ordered = [name for name in item.usernames if name in self._users.list_users()]
-        ordered += [name for name in self._users.list_users() if name not in selected_users]
-        self._user_list.clear()
-        for username in ordered:
-            row = QListWidgetItem(username)
-            row.setFlags(row.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            row.setCheckState(
-                Qt.CheckState.Checked if username in selected_users else Qt.CheckState.Unchecked)
-            self._user_list.addItem(row)
+        self._unit_combo.blockSignals(True)
+        self._unit_combo.clear()
+        keys: dict[str, None] = {"user": None}
+        getter = getattr(self._users, "get_user", None)
+        if callable(getter):
+            for username in self._users.list_users():
+                user = getter(username)
+                if user is not None:
+                    keys.update({key: None for key, value in user.attributes.items()
+                                 if key and str(value).strip()})
+        for key in keys:
+            self._unit_combo.addItem(tr("用户") if key == "user" else key, key)
+        if self._unit_combo.findData(item.execution_unit_key) < 0:
+            self._unit_combo.addItem(item.execution_unit_key, item.execution_unit_key)
+        self._unit_combo.setCurrentIndex(
+            self._unit_combo.findData(item.execution_unit_key))
+        self._unit_combo.blockSignals(False)
+        self._populate_unit_list(item)
         for key, combo in self._selectors.items():
             combo.setCurrentText(getattr(item.workflows, key))
         self._skip_single_lifecycle.setChecked(
@@ -257,6 +268,9 @@ class BatchConfigDialog(QDialog):
 
     def _clear_editor(self) -> None:
         self._current_name = ""
+        self._unit_combo.blockSignals(True)
+        self._unit_combo.clear()
+        self._unit_combo.blockSignals(False)
         self._task_list.clear()
         self._user_list.clear()
         for combo in self._selectors.values():
@@ -280,23 +294,68 @@ class BatchConfigDialog(QDialog):
             task_id for task_id in task_ids if task_id not in old_task_ids
         ]
 
-        old_usernames = set(item.usernames)
-        usernames = []
-        for index in range(self._user_list.count()):
-            row = self._user_list.item(index)
-            if row is not None and row.checkState() == Qt.CheckState.Checked:
-                usernames.append(row.text())
-        item.usernames = usernames
-        item.selected_usernames = [
-            username for username in item.selected_usernames if username in usernames
-        ] + [
-            username for username in usernames if username not in old_usernames
-        ]
+        self._save_unit_list(item)
         item.workflows = BatchWorkflows(**{
             key: combo.currentText().strip() for key, combo in self._selectors.items()
         })
         item.skip_lifecycle_for_single_item = (
             self._skip_single_lifecycle.isChecked())
+
+    def _populate_unit_list(self, item: BatchConfigItem) -> None:
+        key = item.execution_unit_key
+        if key == "user":
+            candidates = self._users.list_users()
+        else:
+            values: dict[str, None] = {}
+            getter = getattr(self._users, "get_user", None)
+            if callable(getter):
+                for username in self._users.list_users():
+                    user = getter(username)
+                    value = (str(user.attributes.get(key, "")).strip()
+                             if user is not None else "")
+                    if value:
+                        values[value] = None
+            candidates = list(values)
+        visible = item.usernames if key == "user" else item.visible_units.get(key, candidates)
+        selected = set(visible)
+        ordered = [value for value in visible if value in candidates]
+        ordered.extend(value for value in candidates if value not in selected)
+        self._user_list.clear()
+        for value in ordered:
+            row = QListWidgetItem(value)
+            row.setFlags(row.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            row.setCheckState(
+                Qt.CheckState.Checked if value in selected else Qt.CheckState.Unchecked)
+            self._user_list.addItem(row)
+
+    def _save_unit_list(self, item: BatchConfigItem) -> None:
+        values = [
+            row.text()
+            for index in range(self._user_list.count())
+            if (row := self._user_list.item(index)) is not None
+            and row.checkState() == Qt.CheckState.Checked
+        ]
+        key = item.execution_unit_key
+        if key == "user":
+            old = set(item.usernames)
+            item.usernames = values
+            item.selected_usernames = [
+                name for name in item.selected_usernames if name in values
+            ] + [name for name in values if name not in old]
+        else:
+            old = set(item.visible_units.get(key, []))
+            item.visible_units[key] = values
+            item.selected_units[key] = [
+                value for value in item.selected_units.get(key, []) if value in values
+            ] + [value for value in values if value not in old]
+
+    def _on_unit_changed(self, index: int) -> None:
+        item = self._cfg.configs.get(self._current_name)
+        if item is None or index < 0:
+            return
+        self._save_unit_list(item)
+        item.execution_unit_key = str(self._unit_combo.itemData(index))
+        self._populate_unit_list(item)
 
     def _on_config_selected(self, index: int) -> None:
         if index < 0:
@@ -384,6 +443,12 @@ class BatchConfigDialog(QDialog):
             ] + [
                 username for username in draft.usernames if username not in old_users
             ]
+            for key, visible in draft.visible_units.items():
+                old_visible = set(current.visible_units.get(key, []))
+                draft.selected_units[key] = [
+                    value for value in current.selected_units.get(key, [])
+                    if value in visible
+                ] + [value for value in visible if value not in old_visible]
             # 轮数和生命周期参数由批量主页面维护，本对话框不回写打开时快照。
             draft.rounds = current.rounds
             draft.workflow_params = current.workflow_params

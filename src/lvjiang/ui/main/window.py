@@ -989,12 +989,14 @@ class MainWindow(
             ctx=ctx,
             session_manager=self._session_manager,
             stop_check=self._is_stopped,
+            candidate_usernames=self._user_manager.list_users(),
         )
         self._batch_tab.apply_task_plan(worker.task_plan_snapshot())
 
         # 信号连接：进度 → batch_tab，日志 → log_text
         # （批量层显式传递用户，不再联动主页面用户下拉）
         worker.progress.connect(self._batch_tab.update_progress)
+        worker.selected_task_plan.connect(self._batch_tab.apply_selected_unit_plan)
         worker.log.connect(self._log_append)
         worker.finished_all.connect(self._batch_tab.on_batch_finished)
         worker.finished_all.connect(

@@ -1,4 +1,4 @@
-"""批量执行 Tab — 脚本 / 用户 / 进度 / 参数四页子 Tab
+"""批量执行 Tab — 脚本 / 单元 / 进度 / 参数四页子 Tab
 
 挂载于主窗口左侧 Tab「批量」。
 仿照调律 Tab 结构：顶部开始/停止按钮 + 四页子 Tab。
@@ -251,7 +251,7 @@ class BatchTab(QWidget):
         layout.addLayout(btn_layout)
 
         config_row = QHBoxLayout()
-        config_row.addWidget(QLabel(tr("当前配置组：")))
+        config_row.addWidget(QLabel(tr("当前配置：")))
         self._config_combo = QComboBox()
         self._config_combo.setMinimumWidth(150)
         self._config_combo.currentIndexChanged.connect(self._on_config_changed)
@@ -261,7 +261,7 @@ class BatchTab(QWidget):
         # ── 四页子 Tab ──
         self._sub_tabs = QTabWidget()
         self._sub_tabs.addTab(self._build_script_page(), tr("脚本"))
-        self._sub_tabs.addTab(self._build_config_page(), tr("用户"))
+        self._sub_tabs.addTab(self._build_config_page(), tr("单元"))
         self._sub_tabs.addTab(self._build_progress_page(), tr("进度"))
         self._sub_tabs.addTab(self._build_params_page(), tr("参数"))
         layout.addWidget(self._sub_tabs)
@@ -536,9 +536,9 @@ class BatchTab(QWidget):
 
         # 全选/全不选行
         select_row = QHBoxLayout()
-        user_label = QLabel(tr("<b>选择执行用户：</b>"))
-        user_label.setToolTip(tr("拖动可临时调整实际执行顺序"))
-        select_row.addWidget(user_label)
+        self._unit_label = QLabel(tr("<b>选择执行单元：</b>"))
+        self._unit_label.setToolTip(tr("拖动可临时调整实际执行顺序"))
+        select_row.addWidget(self._unit_label)
         select_row.addStretch()
         self._btn_user_all = QPushButton(tr("全选"))
         self._btn_user_all.setFixedWidth(60)
@@ -558,7 +558,7 @@ class BatchTab(QWidget):
 
         self._user_list = _ReorderTreeWidget(profile_order=True)
         self._user_list.setColumnCount(2)
-        self._user_list.setHeaderLabels([tr("用户候选"), tr("执行顺序")])
+        self._user_list.setHeaderLabels([tr("单元候选"), tr("执行顺序")])
         self._user_list.setRootIsDecorated(False)
         self._user_list.setUniformRowHeights(True)
         self._user_list.setIndentation(0)
@@ -659,6 +659,12 @@ class BatchTab(QWidget):
             max(0, self._profile_sort_direction.findData(direction)))
         self._profile_sort_key.blockSignals(False)
         self._profile_sort_direction.blockSignals(False)
+        user_unit = item is None or item.execution_unit_key == "user"
+        self._profile_sort_key.setEnabled(user_unit)
+        self._profile_sort_direction.setEnabled(user_unit)
+        sort_reason = "" if user_unit else tr("属性单元包含多个用户，无法按单个用户的 Profile 排序")
+        self._profile_sort_key.setToolTip(sort_reason or self._profile_sort_key.currentText())
+        self._profile_sort_direction.setToolTip(sort_reason)
         for key, label in self._workflow_labels.items():
             path = getattr(item.workflows, key) if item is not None else ""
             label.setText(path or tr("未配置"))
@@ -868,15 +874,22 @@ class BatchTab(QWidget):
         config = cfg.configs.get(self._current_config_name())
         self._updating_user_list = True
         self._user_list.clear()
-        if not config or not config.usernames:
+        if not config:
             self._user_order = []
             self._user_candidate_order = []
             self._updating_user_list = False
             return
 
-        visible = set(config.usernames)
-        selected = set(config.selected_usernames) & visible
-        display_order = list(config.usernames)
+        key = config.execution_unit_key
+        self._unit_label.setText(
+            tr("<b>选择执行单元（用户）：</b>") if key == "user"
+            else tr("<b>选择执行单元（{key}）：</b>").format(key=key))
+        display_order = (list(config.usernames) if key == "user" else
+                         list(config.visible_units.get(key, [])))
+        visible = set(display_order)
+        selected_values = (config.selected_usernames if key == "user" else
+                           config.selected_units.get(key, display_order))
+        selected = set(selected_values) & visible
         self._user_candidate_order = list(display_order)
         self._user_order = [name for name in display_order if name in selected]
         row_height = _batch_list_row_height(self._user_list)
@@ -938,7 +951,10 @@ class BatchTab(QWidget):
         self._updating_user_list = True
         try:
             self._apply_tree_order(
-                self._user_list, list(group.usernames), self._user_name)
+                self._user_list,
+                (list(group.usernames) if group.execution_unit_key == "user" else
+                 list(group.visible_units.get(group.execution_unit_key, []))),
+                self._user_name)
         finally:
             self._updating_user_list = False
         self._sync_user_order_from_rows()
@@ -964,6 +980,10 @@ class BatchTab(QWidget):
         if not key:
             # 当前配置组没有指定排序，这个动作无从谈起。
             return ProfileOrderStatus()
+        if group is not None and group.execution_unit_key != "user":
+            return ProfileOrderStatus(
+                visible=True, enabled=False,
+                reason=tr("属性单元包含多个用户，无法按单个用户的 Profile 排序"))
         try:
             exists = get_profile_config().get_key(key) is not None
         except (OSError, ValueError) as exc:
@@ -980,6 +1000,8 @@ class BatchTab(QWidget):
         cfg = load_batch_config()
         group = cfg.configs.get(self._current_config_name())
         if group is None or not group.profile_sort_key:
+            return
+        if group.execution_unit_key != "user":
             return
         schema = get_profile_config()
         key = group.profile_sort_key
@@ -1068,10 +1090,17 @@ class BatchTab(QWidget):
             return
         # 只保存勾选集合；用户页的拖拽、随机和 Profile 排序均为本次运行态。
         selected = set(self._user_order)
-        if set(item.selected_usernames) == selected:
-            return
-        item.selected_usernames = [
-            username for username in item.usernames if username in selected]
+        key = item.execution_unit_key
+        if key == "user":
+            if set(item.selected_usernames) == selected:
+                return
+            item.selected_usernames = [
+                username for username in item.usernames if username in selected]
+        else:
+            visible = item.visible_units.get(key, [])
+            if set(item.selected_units.get(key, visible)) == selected:
+                return
+            item.selected_units[key] = [value for value in visible if value in selected]
         save_batch_config(cfg)
 
     def _get_enabled_usernames(self) -> list[str]:
@@ -1328,7 +1357,7 @@ class BatchTab(QWidget):
         scripts = self._checked_scripts()
 
         if not usernames:
-            self._host.append_log(tr("[批量] 暂无启用的用户，请到「用户」页勾选"))
+            self._host.append_log(tr("[批量] 暂无启用的单元，请到「单元」页勾选"))
             return
         if not scripts:
             self._host.append_log(tr("[批量] 请至少勾选一个脚本"))
@@ -1395,6 +1424,22 @@ class BatchTab(QWidget):
                 (tr("* 表示当前用户使用独立参数\n")
                  if planned.parameter_source == "user" else "")
                 + tr("点击查看本轮任务参数"))
+
+    def apply_selected_unit_plan(
+        self, _run_idx: int, plan: dict[tuple[int, str], PlannedTask],
+    ) -> None:
+        """属性单元确定角色后，显示该角色冻结的任务参数。"""
+        self._progress_task_plan.update(plan)
+        for key, planned in plan.items():
+            row = self._progress_row_index.get(key)
+            item = self._progress_table.item(row, 1) if row is not None else None
+            if item is not None:
+                item.setText(
+                    ("* " if planned.parameter_source == "user" else "")
+                    + planned.script.name)
+                item.setToolTip(
+                    tr("执行用户：{username}\n点击查看本轮任务参数").format(
+                        username=planned.username))
 
     @staticmethod
     def _format_param_value(value) -> str:

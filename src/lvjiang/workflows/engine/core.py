@@ -235,6 +235,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         # UI 每 set 一次事件，引擎只往前走一条。两者都在工作流线程里触发。
         self.statement_hook: Callable[[int, dict], None] | None = None
         self.step_mode: bool = False
+        # 单步执行 call 时把整个过程视为当前语句，不向调试器暴露过程体。
+        self._debug_step_over_depth: int = 0
 
     def rebind_target_window(self, window: dict) -> None:
         """客户端重启后，把新窗口落到本次运行的输入与截图绑定上。
@@ -301,6 +303,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
 
         快照是浅拷贝：UI 线程只读展示，引擎继续改自己的 dict 互不干扰。
         """
+        if self._debug_step_over_depth:
+            return
         if self.statement_hook is None and not self.step_mode:
             return
         line_no = getattr(node, "line_no", 0) or 0
@@ -704,6 +708,10 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         logger.info(f"=== DSL 工作流开始: {resolved.stem} ({len(program.body)} 条顶层指令, {len(self._procs)} 个过程) ===")
 
         try:
+            # import 已在加载阶段解析完成；调试时仍把根脚本中的每条 import
+            # 作为一条可见语句，单步放行后不进入被导入文件。
+            for imp in program.imports:
+                self._exec_stmt(imp)
             self._exec_body(program.body)
         except _GotoSignal as sig:
             logger.error(f"goto 目标标签不存在: {sig.target}")

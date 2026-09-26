@@ -2,7 +2,7 @@
 
 从「工具 → 脚本编辑」打开（F6）。左侧是 workflows 整棵目录树的合并视图
 （见 ``workflows.file_tree``：system ∪ local，local 影子优先，不做任何过滤），
-中间是代码 / 录制 / 元数据工作区，右侧是指令与调试面板
+中间是代码 / 元数据 / 录制工作区，右侧是指令与调试面板
 （「指令」Tab：快捷指令式选操作填槽位插入，见 ``action_palette``；「调试」Tab：截图画布
 取点/取色/取区域 → 插入脚本；运行/单步/继续/暂停/停止 + 当前行高亮 + 变量表 + 日志，
 见 ``workbench.DebugPanel``）。
@@ -414,8 +414,8 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self.record = ScriptRecordDialog(self._main, editor_host=self)
         self.code_tabs = QTabWidget()
         self.code_tabs.addTab(self.editor, tr("代码"))
-        self.code_tabs.addTab(self.record, tr("录制"))
         self.code_tabs.addTab(self.metadata_panel, tr("元数据"))
+        self.code_tabs.addTab(self.record, tr("录制"))
         self.code_tabs.currentChanged.connect(self._on_code_tab_changed)
         rl.addWidget(self.code_tabs)
         self.lbl_status = QLabel("")

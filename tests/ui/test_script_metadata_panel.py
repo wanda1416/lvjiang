@@ -66,8 +66,15 @@ def test_workbench_actions_belong_to_editor_tab(qtbot, tmp_path, monkeypatch):
     assert "100ms" in widget.record.radio_precision_low.toolTip()
     assert "lvtrace" in widget.record.radio_precision_high.toolTip()
     assert widget.record.minimumWidth() == 0
-    assert widget.code_tabs.indexOf(widget.record) == 1
-    assert widget.code_tabs.tabText(1) == "录制"
+    assert [widget.code_tabs.tabText(i) for i in range(widget.code_tabs.count())] == [
+        "代码", "元数据", "录制",
+    ]
+    assert widget.code_tabs.indexOf(widget.record) == 2
+    assert widget.debug.canvas._placeholder.splitlines() == [
+        "点「刷新截图」抓一帧",
+        "左键点：取点/取色；左键拖：取区域",
+        "右键拖：平移；滚轮：缩放",
+    ]
     assert widget.side_tabs.indexOf(widget.record) == -1
     assert [widget.side_tabs.tabText(i) for i in range(widget.side_tabs.count())] == [
         "指令", "调试"]

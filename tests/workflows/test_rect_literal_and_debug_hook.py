@@ -154,6 +154,38 @@ class TestStepMode:
         assert not worker.is_alive()
         assert eng.variables["a"] == 1
 
+    def test_import_is_one_step_and_call_does_not_enter_proc_body(self, tmp_path):
+        code = (
+            'import "subcall/helper.wf"\n'
+            "def helper()\n"
+            '    log "inside"\n'
+            "end\n"
+            "call helper()\n"
+            "$after = 1\n"
+        )
+        eng, prog, pause, _stopped, lines = self._engine(code)
+        eng._load_and_validate = lambda _path: prog
+        worker = threading.Thread(
+            target=eng._execute_dsl,
+            args=(tmp_path / "debug.wf",),
+            daemon=True,
+        )
+
+        worker.start()
+        assert _wait_until(lambda: lines == [1])
+        pause.set()
+        assert _wait_until(lambda: lines == [1, 5])
+        pause.set()
+        assert _wait_until(lambda: lines == [1, 5, 6])
+        assert 3 not in lines
+        assert "after" not in eng.variables
+
+        eng.step_mode = False
+        pause.set()
+        worker.join(3)
+        assert not worker.is_alive()
+        assert eng.variables["after"] == 1
+
     def test_stop_wakes_blocked_engine(self):
         eng, prog, pause, stopped, lines = self._engine("$a = 1\n$b = 2\n")
         worker = threading.Thread(target=lambda: self._run_swallow(eng, prog), daemon=True)

@@ -38,6 +38,8 @@ class _DataOpsMixin:
     """数据指令执行：OCR/识别取数、collect 输出、eval 赋值、过程调用"""
 
     _base_dir: Path | None
+    _debug_step_over_depth: int
+    step_mode: bool
 
     def _resolve_literal(self, value) -> Any:
         """递归解析 literal 内的 VarRef/FieldAccess/Literal（用于 default 的 dict/list）
@@ -609,8 +611,17 @@ class _DataOpsMixin:
             if i < len(node.args):
                 resolved_args.append(self._resolve(node.args[i]))
             # 未传参数保持未定义状态（访问时返回 null）
-        # 2. 执行过程体（变量/output 隔离）
-        return_value, callee_output = self._run_proc(proc_def, resolved_args)
+        # 2. 执行过程体（变量/output 隔离）。单步模式把 call 当成一个原子
+        # 语句：调用行只停一次，过程体（包括来自 import 的过程）不再逐行暂停或
+        # 把其源文件行号错误映射到当前编辑器。
+        step_over = self.step_mode
+        if step_over:
+            self._debug_step_over_depth += 1
+        try:
+            return_value, callee_output = self._run_proc(proc_def, resolved_args)
+        finally:
+            if step_over:
+                self._debug_step_over_depth -= 1
         # 3. 绑定返回值到调用方变量
         if node.result_var is not None:
             self.variables[node.result_var] = return_value

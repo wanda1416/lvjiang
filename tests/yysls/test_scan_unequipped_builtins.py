@@ -153,14 +153,48 @@ def test_scan_unequipped_uses_window_protocol_and_correct_detail_scenes():
     assert "bag_cursor_next" not in text
 
 
-def test_scan_unequipped_closes_detail_only_on_desktop():
-    """关闭详情是桌面端防遮挡措施，Android 不应收到 ESC/BACK。"""
+def test_scan_unequipped_closes_desktop_detail_before_first_column_only():
+    """桌面详情只在首列点击前及部位结束时关闭，连续列扫描不关闭。"""
     root = Path(__file__).resolve().parents[2]
     text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
     assert text.count('press "ESC" after wait @page_refresh') == 2
-    assert text.count(
-        'env:"desktop" -> press "ESC" after wait @page_refresh') == 2
+
+    row_loop = text.index("loop while $r <= $rows")
+    first_col_click = text.index(
+        "click [bag_equip_detail].[bag_grid][$r][1]", row_loop)
+    close_before_first_col = text.index(
+        'press "ESC" after wait @page_refresh', row_loop)
+    assert close_before_first_col < first_col_click
+
+    remaining_cols = text.index("eval $c = 2", first_col_click)
+    after_remaining_cols = text.index(
+        'if $signal equals "end" or $signal equals "level_end"',
+        remaining_cols,
+    )
+    assert 'press "ESC"' not in text[remaining_cols:after_remaining_cols]
+
+    final_close = text.rindex('press "ESC" after wait @page_refresh')
+    assert final_close > after_remaining_cols
+
+
+def test_scan_unequipped_only_marks_confirmed_detail_as_open():
+    """穿戴空槽或首列空槽不得被当成已经打开装备详情。"""
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
+        encoding="utf-8")
+
+    slot_scan = text.index("call $slot_equip = scan_cell($detail_kind)")
+    slot_guard = text.index("if $slot_equip.type", slot_scan)
+    slot_open = text.index("eval $detail_open = 1", slot_guard)
+    mark_seen = text.index("eval mark_equipment_seen($slot_equip)", slot_scan)
+    assert slot_scan < slot_guard < slot_open < mark_seen
+
+    first_col_scan = text.index("call $equip = scan_cell($detail_kind)")
+    empty_guard = text.index("if not $equip.type", first_col_scan)
+    empty_break = text.index("break", empty_guard)
+    first_col_open = text.index("eval $detail_open = 1", first_col_scan)
+    assert first_col_scan < empty_guard < empty_break < first_col_open
 
 
 def test_scan_unequipped_seen_row_skips_remaining_columns():

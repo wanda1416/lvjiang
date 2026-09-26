@@ -68,6 +68,22 @@ class PlanManagerDialog(QDialog):
         self._users = QListWidget()
         configure_navigation_list(self._users, minimum_width=190)
         self._users.addItems(usernames)
+        user_nav_width = min(
+            320,
+            max(
+                190,
+                max(
+                    (self._users.fontMetrics().horizontalAdvance(username) + 32
+                     for username in usernames),
+                    default=0,
+                ),
+            ),
+        )
+        self._users.setMinimumWidth(user_nav_width)
+        for index, username in enumerate(usernames):
+            item = self._users.item(index)
+            if item is not None:
+                item.setToolTip(username)
         self._users.currentTextChanged.connect(self._load_user)
         splitter.addWidget(self._users)
 
@@ -153,7 +169,7 @@ class PlanManagerDialog(QDialog):
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([190, 710])
+        splitter.setSizes([user_nav_width, 900 - user_nav_width])
 
         bottom = QHBoxLayout()
         bottom.addStretch()

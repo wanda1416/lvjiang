@@ -61,7 +61,7 @@ from ..main.run_control import (
     STATE_STOPPING,
 )
 from ..theme import get_theme_manager
-from ..widgets import add_top_aligned_row
+from ..widgets import add_top_aligned_row, fit_combo_popup_to_contents
 from .batch_runner import (
     ST_FAILED,
     ST_PENDING,
@@ -285,11 +285,14 @@ class BatchTab(QWidget):
         self._profile_sort_direction = QComboBox()
         self._profile_sort_direction.addItem(tr("升序"), "asc")
         self._profile_sort_direction.addItem(tr("降序"), "desc")
+        self._profile_sort_key.currentTextChanged.connect(
+            self._profile_sort_key.setToolTip)
         self._profile_sort_key.currentIndexChanged.connect(self._persist_profile_sort)
         self._profile_sort_direction.currentIndexChanged.connect(self._persist_profile_sort)
         profile_sort_layout.addWidget(self._profile_sort_key, 1)
         profile_sort_layout.addWidget(self._profile_sort_direction)
-        summary_form.addRow(tr("指定排序："), profile_sort_row)
+        summary_form.addRow(QLabel(tr("指定排序：")))
+        summary_form.addRow(profile_sort_row)
         self._workflow_labels: dict[str, QLabel] = {}
         for key, label in (
             ("batch_setup", tr("批次准备") + "："),
@@ -649,6 +652,8 @@ class BatchTab(QWidget):
             self._profile_sort_key.addItem(tr("定义已不存在：") + selected_key, selected_key)
             index = self._profile_sort_key.count() - 1
         self._profile_sort_key.setCurrentIndex(max(0, index))
+        fit_combo_popup_to_contents(self._profile_sort_key)
+        self._profile_sort_key.setToolTip(self._profile_sort_key.currentText())
         direction = item.profile_sort_direction if item is not None else "asc"
         self._profile_sort_direction.setCurrentIndex(
             max(0, self._profile_sort_direction.findData(direction)))
@@ -752,7 +757,11 @@ class BatchTab(QWidget):
                 widget.setObjectName(name)
                 self._workflow_param_widgets[(phase, name)] = widget
                 self._workflow_param_types[(phase, name)] = str(param_type)
-                form.addRow(f"{label}：", widget)
+                if isinstance(widget, QPlainTextEdit):
+                    form.addRow(QLabel(f"{label}："))
+                    form.addRow(widget)
+                else:
+                    form.addRow(f"{label}：", widget)
             self._workflow_params_layout.addWidget(group)
         self._workflow_params_panel.setVisible(bool(self._workflow_param_groups))
 

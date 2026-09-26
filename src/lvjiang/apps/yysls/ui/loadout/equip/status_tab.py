@@ -554,6 +554,8 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         advanced_filter_row.addWidget(lbl_scan_time)
         self._scan_time_filter = QComboBox()
         self._scan_time_filter.addItem(tr("全部"), "all")
+        self._scan_time_filter.addItem(tr("超过 1 小时"), "1h")
+        self._scan_time_filter.addItem(tr("超过 1 天"), "1d")
         self._scan_time_filter.addItem(tr("超过 3 天"), "3")
         self._scan_time_filter.addItem(tr("超过 7 天"), "7")
         self._scan_time_filter.addItem(tr("超过 14 天"), "14")
@@ -872,15 +874,25 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         current = now or datetime.now(timezone.utc)
         if current.tzinfo is None:
             current = current.replace(tzinfo=timezone.utc)
-        return scanned_at < current.astimezone(timezone.utc) - timedelta(
-            days=int(mode))
+        return scanned_at < current.astimezone(timezone.utc) - (
+            EquipStatusTab._scan_time_duration(mode))
+
+    @staticmethod
+    def _scan_time_duration(mode: str) -> timedelta:
+        """把稳定筛选值换算成展示和删除复核共用的时长。"""
+        if mode == "1h":
+            return timedelta(hours=1)
+        if mode == "1d":
+            return timedelta(days=1)
+        return timedelta(days=int(mode))
 
     def _scan_time_delete_constraint(self) -> str | None:
         """把界面筛选转换成仓储层的原子复核条件。"""
         mode = str(self._scan_time_filter.currentData() or "all")
         if mode == "all":
             return None
-        cutoff = datetime.now(timezone.utc) - timedelta(days=int(mode))
+        cutoff = datetime.now(timezone.utc) - (
+            EquipStatusTab._scan_time_duration(mode))
         return cutoff.isoformat(timespec="milliseconds")
 
     def _reset_filter_for_mock(self):

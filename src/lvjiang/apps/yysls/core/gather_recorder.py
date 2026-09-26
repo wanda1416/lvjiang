@@ -1,12 +1,11 @@
-"""采集选点监听：使用主程序连接状态捕获目标区域点击，不生成键盘脚本。"""
+"""采集选点监听：F1 读取当前鼠标位置并生成领域动作。"""
 from __future__ import annotations
 
 import threading
-import time
 from copy import deepcopy
 from typing import Callable
 
-from .gather import GatherClickBuffer, crop_region, viewport_signature
+from .gather import GatherClickBuffer
 
 
 class GatherInputRecorder:
@@ -22,7 +21,6 @@ class GatherInputRecorder:
         self.buffer = GatherClickBuffer()
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
-        self.thread: threading.Thread | None = None
 
     @staticmethod
     def _cursor_position() -> tuple[int, int]:
@@ -33,29 +31,10 @@ class GatherInputRecorder:
         return int(x), int(y)
 
     def start(self) -> None:
-        self.thread = threading.Thread(target=self._capture_loop, daemon=True, name="gather-preview")
-        self.thread.start()
+        self.stop_event.clear()
 
     def stop(self) -> None:
         self.stop_event.set()
-        if self.thread is not None:
-            self.thread.join(timeout=2)
-            self.thread = None
-
-    def _capture_loop(self) -> None:
-        try:
-            while not self.stop_event.is_set():
-                if not self.connected():
-                    raise ValueError("游戏连接已断开，请重新连接后开始选点")
-                frame = self.capture.capture(timeout=0.5)
-                if frame is not None:
-                    signature = viewport_signature(crop_region(frame, self.layout, "map_view"))
-                    with self.lock:
-                        self.buffer.update_frame(time.monotonic(), signature)
-                self.stop_event.wait(0.15)
-        except Exception as exc:
-            if not self.stop_event.is_set():
-                self.failed(str(exc))
 
     def mark_current(self):
         if self.stop_event.is_set() or not self.connected():
@@ -75,5 +54,5 @@ class GatherInputRecorder:
         if not inside:
             raise ValueError("鼠标不在地图选点区域，请悬停到采集物图标后重试")
         with self.lock:
-            step = self.buffer.mark(rx, ry, time.monotonic())
+            step = self.buffer.mark(rx, ry)
         return step

@@ -15,33 +15,30 @@ from lvjiang.apps.yysls.core.gather import (
 )
 from lvjiang.apps.yysls.core.gather_recorder import GatherInputRecorder
 from lvjiang.apps.yysls.workflows.implementations.auto_gather import AutoGatherWorkflow
-from lvjiang.core.config.session import SessionStore
 from lvjiang.core.layout_models import Layout, Region
 from lvjiang.workflows.engine.signals import _BreakSignal
+from lvjiang.workflows.grammar import parse_text
 
 
 def make_route(name="测试路线"):
     return GatherRoute(name=name, start_note="测试起点", layout_key="desktop",
-                       steps=[GatherStep(0.4, 0.5, viewport_signature(np.zeros((32, 48, 3), np.uint8)))])
+                       steps=[GatherStep(0.4, 0.5)])
 
 
 def test_f1_records_current_mouse_position_and_latest_map_view():
     buffer = GatherClickBuffer()
-    before = viewport_signature(np.zeros((32, 48, 3), np.uint8))
-    buffer.update_frame(1, before)
-    step = buffer.mark(0.4, 0.6, 1.1)
-    assert (step.x, step.y, step.viewport) == (0.4, 0.6, before)
+    step = buffer.mark(0.4, 0.6)
+    assert (step.x, step.y, step.viewport) == (0.4, 0.6, "")
 
 
-@pytest.mark.parametrize("x,y,now", [(0.4, 0.5, 2), (1.1, 0.5, 1.1)])
-def test_stale_frame_and_outside_cursor_do_not_record(x, y, now):
+@pytest.mark.parametrize("x,y", [(-0.1, 0.5), (1.1, 0.5)])
+def test_outside_cursor_does_not_record(x, y):
     buffer = GatherClickBuffer()
-    buffer.update_frame(1, make_route().steps[0].viewport)
     with pytest.raises(ValueError):
-        buffer.mark(x, y, now)
+        buffer.mark(x, y)
 
 
-def test_recorder_f1_reads_current_cursor_without_mouse_click(monkeypatch):
+def test_recorder_f1_reads_current_cursor_without_mouse_click():
     layout = Layout(key="desktop")
     layout.regions["map_gather"] = [
         Region(key="map_area", x_ratio=0, y_ratio=0, w_ratio=1, h_ratio=1)
@@ -52,25 +49,21 @@ def test_recorder_f1_reads_current_cursor_without_mouse_click(monkeypatch):
         connected=lambda: True, failed=lambda message: None,
         cursor_position=lambda: (140, 250),
     )
-    recorder.buffer.update_frame(10, make_route().steps[0].viewport)
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.core.gather_recorder.time.monotonic", lambda: 10.1)
-
     step = recorder.mark_current()
 
     assert (step.x, step.y) == pytest.approx((0.4, 0.5))
 
 
 def test_save_merges_owned_route_and_rejects_stale_edit(tmp_path):
-    path = tmp_path / "session.json"
-    first = GatherStore(SessionStore(path))
+    root = tmp_path / "workflows" / "gather"
+    first = GatherStore(root)
     a, b = make_route("甲"), make_route("乙")
     previous = first.save(a, None)
-    second = GatherStore(SessionStore(path))
+    second = GatherStore(root)
     second.save(b, None)
     a.name = "甲改名"
     first.save(a, previous)
-    fresh = GatherStore(SessionStore(path))
+    fresh = GatherStore(root)
     routes, errors = fresh.routes()
     assert not errors
     assert {r.name for r in routes} == {"甲改名", "乙"}
@@ -80,10 +73,10 @@ def test_save_merges_owned_route_and_rejects_stale_edit(tmp_path):
 
 
 def test_bad_route_is_isolated(tmp_path):
-    store = GatherStore(SessionStore(tmp_path / "session.json"))
+    root = tmp_path / "workflows" / "gather"
+    store = GatherStore(root)
     store.save(make_route(), None)
-    store.session.mutate_node("yysls_gather", lambda node: {
-        **node, "routes": {**node["routes"], "broken": {"steps": [{"x": 1}]}}})
+    (root / "broken.wf").write_text("press M\n", encoding="utf-8")
     routes, errors = store.routes()
     assert len(routes) == len(errors) == 1
 
@@ -198,16 +191,19 @@ def test_existing_route_defaults_travel_confirmation_to_f():
 def test_route_compiles_to_clean_semantic_wf():
     route = make_route()
     route.steps[0].travel_seconds = 12.5
-    assert route_to_dsl(route).splitlines() == [
-        "press M",
+    body = [line for line in route_to_dsl(route).splitlines()
+            if line and not line.startswith("#")]
+    assert body == [
+        'press "M"',
         "click (0.400000, 0.500000)",
-        "press V",
+        'press "V"',
         "wait 0.800",
-        "press F",
+        'press "F"',
         "wait 12.500",
-        "press 1",
+        'press "1"',
         "wait 6.000",
     ]
+    assert len(parse_text(route_to_dsl(route)).body) == 8
 
 
 def test_replay_preserves_order_without_mutating_saved_route(monkeypatch):
@@ -252,6 +248,7 @@ def test_gather_history_is_not_duplicated_in_console():
 
 def test_disabled_recognition_region_rejects_before_navigation(monkeypatch):
     wf, actions, _ = make_workflow(monkeypatch, ["map"])
-    wf._layout.regions["map_gather"][0].disabled = True
+    next(region for region in wf._layout.regions["map_gather"]
+         if region.key == "travel").disabled = True
     assert "标定" in wf.run()["error"]
     assert not actions

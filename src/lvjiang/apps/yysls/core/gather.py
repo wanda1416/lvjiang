@@ -2,19 +2,24 @@
 from __future__ import annotations
 
 import base64
+import json
 import math
+import re
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from uuid import uuid4
 
 import cv2
 import numpy as np
 
-from ....core.config.session import SessionStore, get_session_store
+from ....core.config.resolver import LOCAL_CONFIG_DIR
+from ....core.fs_util import atomic_write_text
+from ....workflows.metadata import parse_metadata
 
-NODE = "yysls_gather"
 SCENE = "map_gather"
 SIGNATURE_SHAPE = (32, 48)
+GATHER_WORKFLOWS_DIR = LOCAL_CONFIG_DIR / "workflows" / "gather"
 
 
 def viewport_signature(image: np.ndarray) -> str:
@@ -53,7 +58,7 @@ def crop_region(frame: np.ndarray, layout, key: str) -> np.ndarray:
 class GatherStep:
     x: float
     y: float
-    viewport: str
+    viewport: str = ""
     travel_seconds: float = 0
 
     def validate(self) -> None:
@@ -61,7 +66,8 @@ class GatherStep:
             raise ValueError("采集点坐标或耗时无效")
         if not (0 <= self.x <= 1 and 0 <= self.y <= 1 and 0 <= self.travel_seconds <= 1800):
             raise ValueError("采集点坐标或耗时超出范围")
-        signature_array(self.viewport)
+        if self.viewport:
+            signature_array(self.viewport)
 
 
 @dataclass
@@ -105,84 +111,130 @@ class GatherRoute:
 def gather_step_dsl(route: GatherRoute, step: GatherStep) -> list[str]:
     """把一个领域采集点编译为干净的 WF 动作，不包含原始输入噪声。"""
     return [
-        f"press {route.map_key}",
+        f"press {json.dumps(route.map_key)}",
         f"click ({step.x:.6f}, {step.y:.6f})",
-        f"press {route.travel_key}",
+        f"press {json.dumps(route.travel_key)}",
         "wait 0.800",
-        f"press {route.confirm_key}",
+        f"press {json.dumps(route.confirm_key)}",
         f"wait {step.travel_seconds:.3f}",
-        f"press {route.gather_key}",
+        f"press {json.dumps(route.gather_key)}",
         f"wait {route.gather_seconds:.3f}",
     ]
 
 
 def route_to_dsl(route: GatherRoute) -> str:
-    """生成可审阅的语义 WF；实际任务额外保留视口与到达安全检查。"""
+    """生成可直接执行和编辑的标准 WF 文件内容。"""
     route.validate(runnable=True)
-    return "\n".join(line for step in route.steps for line in gather_step_dsl(route, step)) + "\n"
+    meta = [
+        f"#% id: gather_{route.key}",
+        f"#% name: {json.dumps(route.name, ensure_ascii=False)}",
+        "#% runnable: true",
+        "#% batchable: false",
+        "#% scope: dedicated",
+        "#% env: [desktop]",
+        f"#% note: {json.dumps(route.start_note, ensure_ascii=False)}",
+        f"# gather-layout: {json.dumps(route.layout_key, ensure_ascii=False)}",
+        f"# gather-travel-timeout: {route.travel_timeout:g}",
+        "",
+    ]
+    body = [line for step in route.steps for line in gather_step_dsl(route, step)]
+    return "\n".join(meta + body) + "\n"
 
 
 class GatherStore:
-    """每次只合并一条路线；旧编辑窗口不得覆盖别的路线或新的同名版本。"""
+    """以 ``config/local/workflows/gather/*.wf`` 作为路线唯一来源。"""
 
-    def __init__(self, session: SessionStore | None = None):
-        self.session = session or get_session_store()
+    def __init__(self, root: Path | None = None):
+        self.root = root or GATHER_WORKFLOWS_DIR
+
+    @staticmethod
+    def _parse(path: Path) -> GatherRoute:
+        text = path.read_text(encoding="utf-8-sig")
+        meta = parse_metadata(text)
+        layout_match = re.search(r'^# gather-layout:\s*(.+)$', text, re.MULTILINE)
+        timeout_match = re.search(r'^# gather-travel-timeout:\s*([0-9.]+)$', text, re.MULTILINE)
+        if layout_match is None or timeout_match is None:
+            raise ValueError("缺少采集路线元数据")
+        layout_key = json.loads(layout_match.group(1))
+        commands = [
+            line.strip() for line in text.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        if not commands or len(commands) % 8:
+            raise ValueError("采集 WF 必须由每点 8 条标准动作组成")
+        route = GatherRoute(
+            key=path.stem,
+            name=meta.get("name") or path.stem,
+            start_note=meta.get("note") or "",
+            layout_key=layout_key,
+            travel_timeout=float(timeout_match.group(1)),
+        )
+        for offset in range(0, len(commands), 8):
+            block = commands[offset:offset + 8]
+            press_map = re.fullmatch(r'press\s+"([^"]+)"', block[0])
+            click = re.fullmatch(r"click\s+\(([0-9.]+),\s*([0-9.]+)\)", block[1])
+            press_travel = re.fullmatch(r'press\s+"([^"]+)"', block[2])
+            confirm_wait = re.fullmatch(r"wait\s+([0-9.]+)", block[3])
+            press_confirm = re.fullmatch(r'press\s+"([^"]+)"', block[4])
+            travel_wait = re.fullmatch(r"wait\s+([0-9.]+)", block[5])
+            press_gather = re.fullmatch(r'press\s+"([^"]+)"', block[6])
+            gather_wait = re.fullmatch(r"wait\s+([0-9.]+)", block[7])
+            matches = (press_map, click, press_travel, confirm_wait,
+                       press_confirm, travel_wait, press_gather, gather_wait)
+            if any(match is None for match in matches):
+                raise ValueError(f"第 {offset // 8 + 1} 个采集点不是标准采集序列")
+            assert press_map is not None
+            assert click is not None
+            assert press_travel is not None
+            assert confirm_wait is not None
+            assert press_confirm is not None
+            assert travel_wait is not None
+            assert press_gather is not None
+            assert gather_wait is not None
+            if abs(float(confirm_wait.group(1)) - 0.8) > 0.001:
+                raise ValueError("V 与 F 之间的等待必须为 0.8 秒")
+            keys = (press_map.group(1), press_travel.group(1),
+                    press_confirm.group(1), press_gather.group(1))
+            waits = (float(travel_wait.group(1)), float(gather_wait.group(1)))
+            if route.steps and keys != (route.map_key, route.travel_key,
+                                        route.confirm_key, route.gather_key):
+                raise ValueError("同一路线各采集点的按键必须一致")
+            if route.steps and abs(waits[1] - route.gather_seconds) > 0.001:
+                raise ValueError("同一路线各采集点的采集等待必须一致")
+            route.map_key, route.travel_key, route.confirm_key, route.gather_key = keys
+            route.gather_seconds = waits[1]
+            route.steps.append(GatherStep(float(click.group(1)), float(click.group(2)),
+                                          travel_seconds=waits[0]))
+        route.validate(runnable=True)
+        return route
 
     def routes(self) -> tuple[list[GatherRoute], list[str]]:
-        node = self.session.get_node(NODE, {})
-        if not isinstance(node, dict) or node.get("schema_version", 1) != 1:
-            return [], ["采集路线格式不受支持，请检查配置版本"]
-        if not isinstance(node.get("routes", {}), dict):
-            return [], ["采集路线列表格式错误"]
         routes, errors = [], []
-        for key, data in node.get("routes", {}).items():
+        for path in sorted(self.root.glob("*.wf")) if self.root.exists() else []:
             try:
-                route = GatherRoute.from_dict(data)
-                if route.key != key:
-                    raise ValueError("路线标识不一致")
-                routes.append(route)
-            except (ValueError, TypeError, KeyError) as exc:
-                errors.append(f"一条采集路线无法读取：{exc}")
+                routes.append(self._parse(path))
+            except (ValueError, TypeError, KeyError, OSError, json.JSONDecodeError) as exc:
+                errors.append(f"采集脚本 {path.name} 无法读取：{exc}")
         return routes, errors
 
     def save(self, route: GatherRoute, previous: dict | None) -> dict:
-        route.validate()
+        route.validate(runnable=True)
         value = asdict(route)
-
-        def mutate(node):
-            node = deepcopy(node or {})
-            if not isinstance(node, dict) or node.get("schema_version", 1) != 1:
-                raise ValueError("采集路线格式不受支持，未写入任何变更")
-            routes = node.setdefault("routes", {})
-            if not isinstance(routes, dict):
-                raise ValueError("采集路线列表格式错误，未写入任何变更")
-            if routes.get(route.key) != previous:
+        path = self.root / f"{route.key}.wf"
+        if path.exists():
+            current = asdict(self._parse(path))
+            if current != previous:
                 raise ValueError("这条路线已被其他窗口修改，请重新打开后编辑")
-            routes[route.key] = value
-            node["schema_version"] = 1
-            return node
-
-        try:
-            self.session.mutate_node(NODE, mutate)
-        except ValueError:
-            # 并行保存冲突后，下一次打开必须能看到磁盘上的新版本。
-            self.session.reload()
-            raise
+        elif previous is not None:
+            raise ValueError("这条路线已被其他窗口删除，请重新打开后编辑")
+        atomic_write_text(path, route_to_dsl(route), prefix=f".{route.key}.")
         return deepcopy(value)
 
 
 class GatherClickBuffer:
-    """保存最新地图画面，并在 F1 时按当前鼠标位置生成采集点。"""
+    """在 F1 时按当前鼠标位置生成一个语义采集点。"""
 
-    def __init__(self):
-        self.latest: tuple[float, str] | None = None
-
-    def update_frame(self, timestamp: float, viewport: str) -> None:
-        self.latest = (timestamp, viewport)
-
-    def mark(self, x: float, y: float, timestamp: float) -> GatherStep:
-        if self.latest is None or not 0 <= timestamp - self.latest[0] <= 0.75:
-            raise ValueError("暂未取得当前地图画面，请保持地图打开后重试")
+    def mark(self, x: float, y: float) -> GatherStep:
         if not (0 <= x <= 1 and 0 <= y <= 1):
             raise ValueError("鼠标不在游戏画布内，请悬停到采集物图标后重试")
-        return GatherStep(x, y, self.latest[1])
+        return GatherStep(x, y)

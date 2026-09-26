@@ -3,6 +3,8 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call
 
+from loguru import logger
+
 from lvjiang.apps.yysls.core.tuning_history.models import (
     RESET_COOLDOWN,
     RESET_COUNT_UNREADABLE,
@@ -672,6 +674,28 @@ def test_missing_notification_text_does_not_blind_click():
         min_material_count=2, notify_if_cooling=True)
 
     assert outcome == RESET_COOLDOWN and message
+    assert call.click_region("equip_tune_detail", "reset_notify") \
+        not in wf.method_calls
+    assert call.click_region("equip_tune_detail", "reset_back") \
+        in wf.method_calls
+
+
+def test_unreadable_reset_page_logs_error_without_changing_cooldown_flow():
+    """两个识别区都无状态证据时保留原跳过流程，并留下可定位错误。"""
+    wf = _reset_wf(reset_check="", reset_notify="")
+    resetter = TuningResetter(wf, DesktopTuningRouteStrategy(wf))
+    errors: list[str] = []
+    sink = logger.add(
+        lambda message: errors.append(message.record["message"]), level="ERROR")
+    try:
+        outcome, message = resetter.try_reset_tune(
+            SimpleNamespace(max_resets=3), resets_used=0, why="测试规则命中",
+            min_material_count=2, notify_if_cooling=True)
+    finally:
+        logger.remove(sink)
+
+    assert outcome == RESET_COOLDOWN and message
+    assert any("重置页状态无法判定" in error for error in errors)
     assert call.click_region("equip_tune_detail", "reset_notify") \
         not in wf.method_calls
     assert call.click_region("equip_tune_detail", "reset_back") \

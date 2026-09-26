@@ -10,8 +10,10 @@ from lvjiang.apps.yysls.core.gather import (
     GatherRoute,
     GatherStep,
     GatherStore,
+    route_to_dsl,
     viewport_signature,
 )
+from lvjiang.apps.yysls.core.gather_recorder import GatherInputRecorder
 from lvjiang.apps.yysls.workflows.implementations.auto_gather import AutoGatherWorkflow
 from lvjiang.core.config.session import SessionStore
 from lvjiang.core.layout_models import Layout, Region
@@ -23,28 +25,40 @@ def make_route(name="测试路线"):
                        steps=[GatherStep(0.4, 0.5, viewport_signature(np.zeros((32, 48, 3), np.uint8)))])
 
 
-def test_confirm_records_click_before_map_pan():
+def test_f1_records_current_mouse_position_and_latest_map_view():
     buffer = GatherClickBuffer()
     before = viewport_signature(np.zeros((32, 48, 3), np.uint8))
-    after = viewport_signature(np.full((32, 48, 3), 255, np.uint8))
     buffer.update_frame(1, before)
-    buffer.press(0.4, 0.6, 1.1)
-    buffer.update_frame(1.2, after)
-    buffer.release(0.4, 0.6)
-    step = buffer.confirm()
+    step = buffer.mark(0.4, 0.6, 1.1)
     assert (step.x, step.y, step.viewport) == (0.4, 0.6, before)
-    with pytest.raises(ValueError, match="先在游戏地图"):
-        buffer.confirm()
 
 
-@pytest.mark.parametrize("stale,drag", [(True, False), (False, True)])
-def test_stale_frame_and_drag_do_not_record(stale, drag):
+@pytest.mark.parametrize("x,y,now", [(0.4, 0.5, 2), (1.1, 0.5, 1.1)])
+def test_stale_frame_and_outside_cursor_do_not_record(x, y, now):
     buffer = GatherClickBuffer()
     buffer.update_frame(1, make_route().steps[0].viewport)
-    buffer.press(0.4, 0.5, 2 if stale else 1.1)
-    buffer.release(0.6 if drag else 0.4, 0.5)
     with pytest.raises(ValueError):
-        buffer.confirm()
+        buffer.mark(x, y, now)
+
+
+def test_recorder_f1_reads_current_cursor_without_mouse_click(monkeypatch):
+    layout = Layout(key="desktop")
+    layout.regions["map_gather"] = [
+        Region(key="map_area", x_ratio=0, y_ratio=0, w_ratio=1, h_ratio=1)
+    ]
+    capture = SimpleNamespace(get_capture_size=lambda: (100, 100))
+    recorder = GatherInputRecorder(
+        capture, layout, {"left": 100, "top": 200},
+        connected=lambda: True, failed=lambda message: None,
+        cursor_position=lambda: (140, 250),
+    )
+    recorder.buffer.update_frame(10, make_route().steps[0].viewport)
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.gather_recorder.time.monotonic", lambda: 10.1)
+
+    step = recorder.mark_current()
+
+    assert (step.x, step.y) == pytest.approx((0.4, 0.5))
 
 
 def test_save_merges_owned_route_and_rejects_stale_edit(tmp_path):
@@ -102,7 +116,6 @@ def make_workflow(monkeypatch, scenes, *, selected=True):
     monkeypatch.setattr(wf, "_sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
     monkeypatch.setattr(wf, "_frame", frame)
     monkeypatch.setattr(wf, "_text", text)
-    monkeypatch.setattr(wf, "_activate", lambda key: actions.append(key))
     monkeypatch.setattr(wf, "_press", lambda key: actions.append(key))
     monkeypatch.setattr(wf, "click_at", lambda *args, **kw: actions.append("click"))
     monkeypatch.setattr(wf, "_ratio_to_screen", lambda x, y: (10, 10))
@@ -113,18 +126,18 @@ def test_unreachable_timeout_never_collects_or_skips(monkeypatch):
     wf, actions, route = make_workflow(monkeypatch, ["map"])
     wf.route.steps.append(deepcopy(wf.route.steps[0]))
     assert "超时" in wf.run()["error"]
-    assert actions == ["V"]
+    assert actions == ["V", "F"]
     assert wf.output["steps"] == []
 
 
-def test_confirm_selects_direct_once_and_records_only_after_collection(monkeypatch):
-    wf, actions, _ = make_workflow(monkeypatch, ["map", "map", "confirm", "confirm"] + ["home"] * 14 + ["map"])
+def test_replay_presses_v_then_f_and_records_only_after_collection(monkeypatch):
+    wf, actions, _ = make_workflow(monkeypatch, ["map", "map", "home", "map"])
     completed = []
     wf.completed = completed.append
     result = wf.run()
-    assert actions == ["V", "confirm_direct", "1", "M"]
+    assert actions == ["V", "F", "1"]
     assert result["steps"][0]["collection_triggered"] is True
-    assert result["steps"][0]["travel_seconds"] >= 6
+    assert result["steps"][0]["travel_seconds"] >= 0
     assert completed == [result]
 
 
@@ -176,6 +189,27 @@ def test_existing_route_defaults_auto_travel_to_v():
     assert GatherRoute.from_dict(data).travel_key == "V"
 
 
+def test_existing_route_defaults_travel_confirmation_to_f():
+    data = asdict(make_route())
+    data.pop("confirm_key")
+    assert GatherRoute.from_dict(data).confirm_key == "F"
+
+
+def test_route_compiles_to_clean_semantic_wf():
+    route = make_route()
+    route.steps[0].travel_seconds = 12.5
+    assert route_to_dsl(route).splitlines() == [
+        "press M",
+        "click (0.400000, 0.500000)",
+        "press V",
+        "wait 0.800",
+        "press F",
+        "wait 12.500",
+        "press 1",
+        "wait 6.000",
+    ]
+
+
 def test_replay_preserves_order_without_mutating_saved_route(monkeypatch):
     wf, actions, original = make_workflow(monkeypatch, ["map"], selected=False)
     wf.route.steps.append(GatherStep(0.6, 0.7, wf.route.steps[0].viewport))
@@ -196,7 +230,7 @@ def test_unconfigured_task_returns_actionable_error(monkeypatch):
     assert "采集页" in wf.run()["error"]
 
 
-def test_continuous_motion_does_not_count_as_arrival(monkeypatch):
+def test_missing_home_state_does_not_count_as_arrival(monkeypatch):
     wf, actions, _ = make_workflow(monkeypatch, ["map"])
     frame_number = [0]
 
@@ -206,9 +240,9 @@ def test_continuous_motion_does_not_count_as_arrival(monkeypatch):
 
     monkeypatch.setattr(wf, "_frame", moving_frame)
     monkeypatch.setattr(wf, "_ensure_map", lambda: moving_frame())
-    monkeypatch.setattr(wf, "_text", lambda frame, key: "TAB Num2" if key == "home_controls" else "")
+    monkeypatch.setattr(wf, "_text", lambda frame, key: "")
     assert "超时" in wf.run()["error"]
-    assert actions == ["V"]
+    assert actions == ["V", "F"]
 
 
 def test_gather_history_is_not_duplicated_in_console():

@@ -8,7 +8,6 @@ from typing import Callable
 from loguru import logger
 
 from lvjiang.apps.yysls.core.gather import (
-    SCENE,
     GatherRoute,
     GatherStep,
     crop_region,
@@ -81,10 +80,6 @@ class AutoGatherWorkflow(BaseWorkflow):
             time.sleep(min(0.1, max(0, end - self._now())))
         self._checkpoint()
 
-    def _activate(self, key: str) -> None:
-        self._checkpoint()
-        self.click_region(SCENE, key, jitter=False, pre_delay=(0, 0), post_delay=(0, 0))
-
     def _press(self, key: str) -> None:
         self._checkpoint()
         self.press(key, wait=None)
@@ -106,43 +101,20 @@ class AutoGatherWorkflow(BaseWorkflow):
         raise ValueError("打开采集地图超时，请确认开图键及资源筛选")
 
     def _arrive(self, step: GatherStep) -> float:
-        self._report("travel", "发起识途，等待到达")
-        start = self._now()
+        self._report("travel", "发起识途并确认前往")
         self._press(self.route.travel_key)
-        deadline = start + self.route.travel_timeout
-        earliest = max(3.0, step.travel_seconds * 0.8)
-        confirmed = False
-        previous = None
-        stable_since = None
+        self._sleep(0.8)
+        self._press(self.route.confirm_key)
+        start = self._now()
+        self._report("timing", f"按录制时间等待 {step.travel_seconds:.1f} 秒")
+        self._sleep(step.travel_seconds)
+        deadline = start + max(step.travel_seconds, self.route.travel_timeout)
         while self._now() < deadline:
-            self._sleep(0.5)
             frame = self._frame()
-            confirmation = self._text(frame, "confirm_direct")
-            if "识途直达" in confirmation:
-                if not confirmed:
-                    self._report("confirm", "选择识途直达")
-                    self._activate("confirm_direct")
-                    confirmed = True
-                previous = stable_since = None
-                continue
-            if self._is_map(frame):
-                previous = stable_since = None
-                continue
-            # 地图退出不等于到达；要求主页操作区及实景连续稳定。
-            if not self._is_home(frame):
-                previous = stable_since = None
-                continue
-            current = viewport_signature(crop_region(frame, self._layout, "motion"))
-            now = self._now()
-            if previous and viewport_difference(current, previous) < 0.012 and now - start >= earliest:
-                if stable_since is None:
-                    stable_since = now
-                elif now - stable_since >= 3:
-                    self._report("arrived", "主页已恢复且画面稳定，准备采集")
-                    return now - start
-            else:
-                stable_since = None
-            previous = current
+            if self._is_home(frame):
+                self._report("arrived", "已到达录制位置，准备采集")
+                return self._now() - start
+            self._sleep(0.5)
         raise ValueError("识途到达超时：可能无法识途或途中受阻。路线已停止，请恢复起点后重试")
 
     def run(self) -> dict:
@@ -169,7 +141,7 @@ class AutoGatherWorkflow(BaseWorkflow):
         self.route.validate(runnable=True)
         # 启动前检查全部识别区域，避免走到半程才发现缺少标定。
         frame = self._frame()
-        for key in ("map_view", "map_area", "travel", "confirm_direct", "home_controls", "motion"):
+        for key in ("map_view", "map_area", "travel", "home_controls"):
             crop_region(frame, self._layout, key)
         for index, step in enumerate(self.route.steps, 1):
             self._step_number = index

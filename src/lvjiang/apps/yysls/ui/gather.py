@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import sys
+import time
 from copy import deepcopy
 from dataclasses import asdict
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -22,6 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ....core.access import is_readonly
+from ....core.key_names import normalize_pressable
 from ....core.platforms import hotkey_pynput_token, start_global_hotkeys
 from ....i18n import tr
 from ....ui.button_styles import (
@@ -31,14 +33,13 @@ from ....ui.button_styles import (
 )
 from ....ui.execution_user_selector import ExecutionUserSelector
 from ....ui.hotkeys import hotkey_label
-from ..core.gather import GatherRoute, GatherStep, GatherStore
+from ..core.gather import GatherRoute, GatherStep, GatherStore, gather_step_dsl
 from ..core.gather_recorder import GatherInputRecorder
 
 
 class GatherSignals(QObject):
     progress = pyqtSignal(str)
     completed = pyqtSignal(dict)
-    clicked = pyqtSignal()
     failed = pyqtSignal(str)
     mark = pyqtSignal()
     travel = pyqtSignal()
@@ -72,8 +73,8 @@ def _desktop_error(host) -> str:
         return tr("只读实例不能执行采集或监听录制")
     if host._selected_run_env() != "desktop" or host._backend == "adb":
         return tr("实验性采集仅支持桌面游戏环境")
-    if not host._backend_ready() or not host._target_window:
-        return tr("请先定位游戏窗口")
+    if not host._backend_ready():
+        return tr("请先连接游戏")
     allows = getattr(host, "_plan_allows_backend", None)
     if allows is not None and not allows():
         return tr("当前连接方案不支持所选后端")
@@ -224,17 +225,12 @@ class GatherRecordingDialog(QDialog):
         self.recorder: GatherInputRecorder | None = None
         self.hotkeys = None
         self.marked: GatherStep | None = None
-        self._trial_step: GatherStep | None = None
-        self._trial_active = False
-        self._resume_recording = False
-        self._close_when_idle = False
+        self._travel_started_at: float | None = None
+        self._confirm_pending = False
         self.signals = GatherSignals(self)
         self.signals.mark.connect(self.mark)
         self.signals.travel.connect(self.travel)
-        self.signals.clicked.connect(self._clicked)
         self.signals.failed.connect(self._recording_failed)
-        self.signals.completed.connect(self._completed)
-        self.signals.progress.connect(self._progress)
         layout = QVBoxLayout(self)
         row = QHBoxLayout()
         self.saved = QComboBox()
@@ -257,6 +253,7 @@ class GatherRecordingDialog(QDialog):
         self.origin.setPlaceholderText(tr("填写传送起点、资源和单人／多人页"))
         self.map_key = QLineEdit("M")
         self.auto_travel_key = QLineEdit("V")
+        self.confirm_key = QLineEdit("F")
         self.gather_key = QLineEdit("1")
         self.timeout = QSpinBox()
         self.timeout.setRange(10, 1800)
@@ -274,6 +271,7 @@ class GatherRecordingDialog(QDialog):
         for label, widget in (("路线名称", self.name), ("固定起点说明", self.origin),
                               ("打开地图按键", self.map_key),
                               ("自动识途按键", self.auto_travel_key),
+                              ("确认识途按键", self.confirm_key),
                               ("采集按键", self.gather_key),
                               ("识途超时", self.timeout), ("采集动作等待", self.gather_wait),
                               ("确认标记快捷键", self.mark_key), ("识途试跑快捷键", self.travel_key)):
@@ -282,24 +280,18 @@ class GatherRecordingDialog(QDialog):
         self.users = ExecutionUserSelector(host.user_manager)
         layout.addWidget(self.users)
         host.user_changed.connect(lambda _: self.users.refresh_users())
-        hint = QLabel(tr("先传送到固定起点，打开资源地图，不拖动或缩放。开始选点后，"
-                         "点击目标，再按确认标记键；按识途试跑键自动前往并触发采集。"
-                         "试跑成功才加入草稿，随后继续选下一个点。\n"
+        hint = QLabel(tr("先传送到固定起点并打开资源地图。开始录制后，把鼠标悬停在目标图标上按 F1；"
+                         "第一次按 F2 会自动执行 V、等待后按 F 并开始计时；到达后再按 F2 结束计时。"
+                         "每次按键生成的回放操作都会立即显示在下方。\n"
                          "录制热键可能同时传给游戏，请选择不冲突的按键。"))
         hint.setWordWrap(True)
         layout.addWidget(hint)
         row = QHBoxLayout()
-        self.record_button = QPushButton(tr("开始选点"))
+        self.record_button = QPushButton(tr("开始录制"))
         self.record_button.clicked.connect(self.toggle_recording)
-        self.mark_button = QPushButton(tr("确认标记"))
-        self.mark_button.clicked.connect(self.mark)
-        self.travel_button = QPushButton(tr("识途试跑"))
-        self.travel_button.clicked.connect(self.travel)
-        apply_button_style(self.record_button, self.travel_button, variant="action")
-        apply_button_style(self.mark_button, variant="neutral")
-        fit_button_width(self.record_button, self.mark_button, self.travel_button)
-        for button in (self.record_button, self.mark_button, self.travel_button):
-            row.addWidget(button)
+        apply_button_style(self.record_button, variant="action")
+        row.addWidget(self.record_button)
+        row.addStretch()
         layout.addLayout(row)
         self.steps = QListWidget()
         layout.addWidget(self.steps, 1)
@@ -328,6 +320,7 @@ class GatherRecordingDialog(QDialog):
         self.route.start_note = self.origin.text().strip()
         self.route.map_key = self.map_key.text().strip().upper()
         self.route.travel_key = self.auto_travel_key.text().strip().upper()
+        self.route.confirm_key = self.confirm_key.text().strip().upper()
         self.route.gather_key = self.gather_key.text().strip().upper()
         self.route.travel_timeout = self.timeout.value()
         self.route.gather_seconds = self.gather_wait.value()
@@ -362,6 +355,7 @@ class GatherRecordingDialog(QDialog):
         self.origin.setText(self.route.start_note)
         self.map_key.setText(self.route.map_key)
         self.auto_travel_key.setText(self.route.travel_key)
+        self.confirm_key.setText(self.route.confirm_key)
         self.gather_key.setText(self.route.gather_key)
         self.timeout.setValue(int(self.route.travel_timeout))
         self.gather_wait.setValue(int(self.route.gather_seconds))
@@ -395,19 +389,32 @@ class GatherRecordingDialog(QDialog):
             self.status.setText(str(exc))
 
     def _undo(self):
-        if self.route.steps:
+        if self.marked is not None:
+            self.marked = None
+            self._travel_started_at = None
+            self._confirm_pending = False
+            self._refresh_steps()
+        elif self.route.steps:
             self.route.steps.pop()
             self._refresh_steps()
 
     def _refresh_steps(self):
         self.steps.clear()
-        for i, step in enumerate(self.route.steps, 1):
-            self.steps.addItem(tr("第 {index} 点 · 试跑 {seconds:.1f} 秒").format(
-                index=i, seconds=step.travel_seconds))
-        self._refresh()
-
-    def _clicked(self):
-        self.marked = None
+        sequence = 1
+        for step in self.route.steps:
+            for line in gather_step_dsl(self.route, step):
+                self.steps.addItem(f"{sequence}. {line}")
+                sequence += 1
+        if self.marked is not None:
+            self.steps.addItem(f"{sequence}. press {self.route.map_key}")
+            self.steps.addItem(
+                f"{sequence + 1}. click ({self.marked.x:.6f}, {self.marked.y:.6f})")
+            sequence += 2
+            if self._confirm_pending or self._travel_started_at is not None:
+                for line in (f"press {self.route.travel_key}", "wait 0.800",
+                             f"press {self.route.confirm_key}"):
+                    self.steps.addItem(f"{sequence}. {line}")
+                    sequence += 1
         self._refresh()
 
     def mark(self):
@@ -415,8 +422,11 @@ class GatherRecordingDialog(QDialog):
             return
         try:
             self._check_recording_context()
-            self.marked = self.recorder.confirm()
-            self.status.setText(tr("已标记刚才的点击，按识途试跑键前往"))
+            if self.marked is not None:
+                raise ValueError(tr("当前采集点尚未完成，请到达后再按 F2，然后录制下一点"))
+            self.marked = self.recorder.mark_current()
+            self.status.setText(tr("已记录当前鼠标坐标。按 F2 执行 V → F 并开始计时"))
+            self._refresh_steps()
         except ValueError as exc:
             self.status.setText(str(exc))
         self._refresh()
@@ -433,6 +443,8 @@ class GatherRecordingDialog(QDialog):
             self.recorder.stop()
             self.recorder = None
         self.marked = None
+        self._travel_started_at = None
+        self._confirm_pending = False
         self._refresh()
 
     def toggle_recording(self):
@@ -468,7 +480,7 @@ class GatherRecordingDialog(QDialog):
             self.recorder = GatherInputRecorder(
                 self.host._capture, layout, self.host._target_window,
                 connected=self.host._backend_ready,
-                changed=self.signals.clicked.emit, failed=self.signals.failed.emit)
+                failed=self.signals.failed.emit)
             self.recorder.start()
 
             def hotkey(signal):
@@ -482,48 +494,63 @@ class GatherRecordingDialog(QDialog):
             if self.hotkeys is None:
                 raise ValueError(tr("无法注册录制热键，请检查输入监听权限"))
             self.status.setText(tr(
-                "全局热键 {mark}/{travel} 已注册。请切到游戏地图点击目标，再确认标记"
+                "全局热键 {mark}/{travel} 已注册。鼠标悬停目标后按 {mark} 记录坐标"
             ).format(mark=mark, travel=travel))
             self._refresh()
         except (ValueError, RuntimeError, OSError, ImportError) as exc:
             self._recording_failed(str(exc))
 
     def travel(self):
-        if self.host.is_running or self.marked is None:
+        if self.host.is_running or self.marked is None or self._confirm_pending:
             return
         try:
             self._check_recording_context()
         except ValueError as exc:
             self._recording_failed(str(exc))
             return
-        self._trial_step = deepcopy(self.marked)
-        self._stop_recording()
-        snapshot = deepcopy(self.route)
-        snapshot.steps = [deepcopy(self._trial_step)]
-        self._trial_active = True
-        self._resume_recording = False
+        if self._travel_started_at is not None:
+            self.marked.travel_seconds = max(0.1, time.monotonic() - self._travel_started_at)
+            self.route.steps.append(self.marked)
+            self.status.setText(tr("已记录到达时间 {seconds:.1f} 秒；回放时随后按 {key} 采集").format(
+                seconds=self.marked.travel_seconds, key=self.route.gather_key))
+            self.marked = None
+            self._travel_started_at = None
+            self._refresh_steps()
+            return
         try:
-            _start_task(self.host, snapshot, self.signals, self.users.resolve_username(), selected_target=True)
+            self._read_form()
+            self._send_key(self.route.travel_key)
         except (ValueError, RuntimeError) as exc:
             self.status.setText(str(exc))
-        if not self.host.is_running:
-            self._trial_active = False
-            self._trial_step = None
-        self._refresh()
-
-    def _completed(self, result):
-        if self._trial_step is None:
             return
-        steps = result.get("steps", [])
-        if len(steps) == 1 and steps[0].get("collection_triggered"):
-            self._trial_step.travel_seconds = steps[0]["travel_seconds"]
-            self.route.steps.append(self._trial_step)
-            self._trial_step = None
-            self._resume_recording = True
-            self._refresh_steps()
+        self._confirm_pending = True
+        self.status.setText(tr("已按 {travel}，等待后将自动按 {confirm}").format(
+            travel=self.route.travel_key, confirm=self.route.confirm_key))
+        self._refresh_steps()
+        QTimer.singleShot(800, self._confirm_travel)
 
-    def _progress(self, message):
-        self.status.setText(message)
+    def _send_key(self, key: str) -> None:
+        normalized = normalize_pressable(key)
+        input_ctrl = getattr(self.host, "_input", None)
+        if input_ctrl is None:
+            raise ValueError(tr("当前连接没有可用的输入后端"))
+        input_ctrl.key_down(normalized)
+        input_ctrl.key_up(normalized)
+
+    def _confirm_travel(self) -> None:
+        if self.recorder is None or self.marked is None or not self._confirm_pending:
+            return
+        try:
+            self._check_recording_context()
+            self._send_key(self.route.confirm_key)
+            self._travel_started_at = time.monotonic()
+            self.status.setText(tr("已按 {key} 并开始计时；到达后再按 F2").format(
+                key=self.route.confirm_key))
+        except (ValueError, RuntimeError) as exc:
+            self.status.setText(str(exc))
+        finally:
+            self._confirm_pending = False
+            self._refresh_steps()
 
     def _state(self, state):
         if self.host.is_running:
@@ -533,17 +560,6 @@ class GatherRecordingDialog(QDialog):
                 self._check_recording_context()
             except ValueError as exc:
                 self._recording_failed(str(exc))
-        elif self._trial_active:
-            self._trial_active = False
-            self._trial_step = None
-            if self._close_when_idle:
-                self._close_when_idle = False
-                self.close()
-            elif self._resume_recording and self.isVisible():
-                self._resume_recording = False
-                self._start_recording()
-            else:
-                self.status.setText(tr("试跑已结束，未新增采集点。请检查日志和当前位置后继续"))
         self._refresh()
 
     def _check_recording_context(self):
@@ -559,21 +575,14 @@ class GatherRecordingDialog(QDialog):
         self.saved.setEnabled(editable)
         self.open_button.setEnabled(editable)
         self.new_button.setEnabled(editable)
-        self.undo_button.setEnabled(editable and bool(self.route.steps))
+        self.undo_button.setEnabled(editable and bool(self.route.steps or self.marked))
         self.save_button.setEnabled(editable and bool(self.route.steps))
         self.record_button.setEnabled(not busy and not _desktop_error(self.host))
         self.record_button.setToolTip(_desktop_error(self.host))
-        self.record_button.setText(tr("结束选点") if recording else tr("开始选点"))
+        self.record_button.setText(tr("结束录制") if recording else tr("开始录制"))
         apply_button_style(self.record_button, variant="danger" if recording else "action")
-        self.mark_button.setEnabled(recording and not busy)
-        self.travel_button.setEnabled(recording and not busy and self.marked is not None)
 
     def closeEvent(self, event):  # noqa: N802
-        if self._trial_active and self.host.is_running:
-            self._close_when_idle = True
-            self.host.request_stop()
-            event.ignore()
-            return
         self._stop_recording()
         if self.host.is_running:
             # 其他任务运行中不弹模态确认，保留草稿待下次打开。

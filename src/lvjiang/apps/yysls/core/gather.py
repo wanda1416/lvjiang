@@ -72,6 +72,7 @@ class GatherRoute:
     layout_key: str = ""
     map_key: str = "M"
     travel_key: str = "V"
+    confirm_key: str = "F"
     gather_key: str = "1"
     travel_timeout: float = 120
     gather_seconds: float = 6
@@ -81,7 +82,7 @@ class GatherRoute:
         from ....core.key_names import normalize_pressable
         if not self.key or not self.name.strip():
             raise ValueError("请填写路线名称")
-        for key in (self.map_key, self.travel_key, self.gather_key):
+        for key in (self.map_key, self.travel_key, self.confirm_key, self.gather_key):
             normalize_pressable(key)
         if not (math.isfinite(self.travel_timeout) and 10 <= self.travel_timeout <= 1800):
             raise ValueError("识途超时必须在 10–1800 秒之间")
@@ -99,6 +100,26 @@ class GatherRoute:
         route = cls(**value)
         route.validate()
         return route
+
+
+def gather_step_dsl(route: GatherRoute, step: GatherStep) -> list[str]:
+    """把一个领域采集点编译为干净的 WF 动作，不包含原始输入噪声。"""
+    return [
+        f"press {route.map_key}",
+        f"click ({step.x:.6f}, {step.y:.6f})",
+        f"press {route.travel_key}",
+        "wait 0.800",
+        f"press {route.confirm_key}",
+        f"wait {step.travel_seconds:.3f}",
+        f"press {route.gather_key}",
+        f"wait {route.gather_seconds:.3f}",
+    ]
+
+
+def route_to_dsl(route: GatherRoute) -> str:
+    """生成可审阅的语义 WF；实际任务额外保留视口与到达安全检查。"""
+    route.validate(runnable=True)
+    return "\n".join(line for step in route.steps for line in gather_step_dsl(route, step)) + "\n"
 
 
 class GatherStore:
@@ -151,29 +172,17 @@ class GatherStore:
 
 
 class GatherClickBuffer:
-    """只记录真实点击；F1 确认时不读取当前鼠标位置。调用方负责线程同步。"""
+    """保存最新地图画面，并在 F1 时按当前鼠标位置生成采集点。"""
 
     def __init__(self):
         self.latest: tuple[float, str] | None = None
-        self.down: tuple[float, float, str] | None = None
-        self.pending: GatherStep | None = None
 
     def update_frame(self, timestamp: float, viewport: str) -> None:
         self.latest = (timestamp, viewport)
 
-    def press(self, x: float, y: float, timestamp: float) -> None:
-        self.pending = None
-        self.down = None
-        if self.latest and 0 <= timestamp - self.latest[0] <= 0.75:
-            self.down = (x, y, self.latest[1])
-
-    def release(self, x: float, y: float) -> None:
-        down, self.down = self.down, None
-        if down and math.hypot(x - down[0], y - down[1]) <= 0.004:
-            self.pending = GatherStep(down[0], down[1], down[2])
-
-    def confirm(self) -> GatherStep:
-        if self.pending is None:
-            raise ValueError("请先在游戏地图上点击一个采集点，再确认标记")
-        step, self.pending = self.pending, None
-        return deepcopy(step)
+    def mark(self, x: float, y: float, timestamp: float) -> GatherStep:
+        if self.latest is None or not 0 <= timestamp - self.latest[0] <= 0.75:
+            raise ValueError("暂未取得当前地图画面，请保持地图打开后重试")
+        if not (0 <= x <= 1 and 0 <= y <= 1):
+            raise ValueError("鼠标不在游戏画布内，请悬停到采集物图标后重试")
+        return GatherStep(x, y, self.latest[1])

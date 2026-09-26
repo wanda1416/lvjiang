@@ -35,6 +35,11 @@ class Host(QWidget):
         self.stops = 0
         self.pauses = 0
         self.cleanups = []
+        self.input_events = []
+        self._input = SimpleNamespace(
+            key_down=lambda key: self.input_events.append(("down", key)),
+            key_up=lambda key: self.input_events.append(("up", key)),
+        )
 
     def register_cleanup(self, callback):
         self.cleanups.append(callback)
@@ -111,8 +116,6 @@ def test_gather_buttons_use_shared_styles_for_actions_and_states(qtbot):
     assert editor.open_button.styleSheet() == NEUTRAL_BUTTON_STYLE
     assert editor.new_button.styleSheet() == ACTION_BUTTON_STYLE
     assert editor.record_button.styleSheet() == ACTION_BUTTON_STYLE
-    assert editor.mark_button.styleSheet() == NEUTRAL_BUTTON_STYLE
-    assert editor.travel_button.styleSheet() == ACTION_BUTTON_STYLE
     assert editor.undo_button.styleSheet() == DANGER_BUTTON_STYLE
     assert editor.save_button.styleSheet() == ACTION_BUTTON_STYLE
 
@@ -146,37 +149,13 @@ def test_editing_route_does_not_change_selected_run_route(qtbot):
     assert saved_b.travel_key == "B"
 
 
-def test_single_nonmodal_editor_and_failed_trial_not_saved(qtbot, monkeypatch):
+def test_single_nonmodal_editor(qtbot):
     host = Host()
     qtbot.addWidget(host)
     editor = open_recording(host)
     qtbot.addWidget(editor)
     assert open_recording(host) is editor
     assert not editor.isModal()
-    editor.route = make_route()
-    editor.previous = asdict(editor.route)
-    editor._load_form()
-    editor._trial_step = editor.route.steps[0]
-    editor._trial_active = True
-    editor._state("ready")
-    assert len(editor.route.steps) == 1
-    assert editor._trial_step is None
-
-
-def test_close_waits_for_trial_shutdown(qtbot):
-    host = Host()
-    qtbot.addWidget(host)
-    editor = GatherRecordingDialog(host)
-    qtbot.addWidget(editor)
-    editor.show()
-    editor._trial_active = True
-    host.is_running = True
-    assert not editor.close()
-    assert host.stops == 1
-    assert editor.isVisible()
-    host.is_running = False
-    host.automation_state_changed.emit("ready")
-    assert not editor.isVisible()
 
 
 def test_escape_stops_recording_listener(qtbot):
@@ -193,7 +172,7 @@ def test_escape_stops_recording_listener(qtbot):
     assert not editor.isVisible()
 
 
-def test_recording_trial_only_updates_draft_after_success(qtbot, monkeypatch):
+def test_f1_f2_build_visible_sequence_and_record_travel_time(qtbot, monkeypatch):
     host = Host()
     qtbot.addWidget(host)
     editor = GatherRecordingDialog(host)
@@ -201,21 +180,25 @@ def test_recording_trial_only_updates_draft_after_success(qtbot, monkeypatch):
     editor.route = make_route()
     editor.route.steps.clear()
     editor._load_form()
-    editor.marked = make_route().steps[0]
+    point = make_route().steps[0]
+    editor.recorder = SimpleNamespace(mark_current=lambda: point, stop=lambda: None)
     monkeypatch.setattr(editor, "_check_recording_context", lambda: None)
+    clock = iter([10.0, 22.5])
+    monkeypatch.setattr("lvjiang.apps.yysls.ui.gather.time.monotonic", lambda: next(clock))
 
-    def launch(*args, **kwargs):
-        host.is_running = True
-        host.automation_state_changed.emit("running")
-
-    monkeypatch.setattr(host, "run_workflow_implementation", launch)
+    editor.mark()
+    assert editor.marked is point
+    assert editor.steps.item(0).text() == "1. press M"
+    assert editor.steps.item(1).text() == "2. click (0.400000, 0.500000)"
     editor.travel()
-    assert editor._trial_active
-    assert editor._trial_step is not None
-    editor._completed({"steps": [{"travel_seconds": 12.5, "collection_triggered": True}]})
+    assert host.input_events == [("down", "V"), ("up", "V")]
+    editor._confirm_travel()
+    assert host.input_events[-2:] == [("down", "F"), ("up", "F")]
+    assert editor.steps.item(2).text() == "3. press V"
+    assert editor.steps.item(4).text() == "5. press F"
+    editor.travel()
     assert len(editor.route.steps) == 1
     assert editor.route.steps[0].travel_seconds == 12.5
+    assert editor.steps.item(6).text() == "7. press 1"
     assert GatherStore().routes()[0] == []
-    host.is_running = False
-    host.automation_state_changed.emit("ready")
     editor.previous = asdict(editor.route)

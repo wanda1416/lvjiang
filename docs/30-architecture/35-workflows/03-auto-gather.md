@@ -3,18 +3,21 @@
 燕云插件注入「采集」左页签和「燕云 → 采集录制」菜单，并注册 `auto_gather`。
 类继承 `BaseWorkflow`、声明 `SCOPE = dedicated`，通过既有
 `run_workflow_implementation` 接入执行租约、后台线程、暂停/停止和任务历史，
-不进入日常/批量的默认脚本清单。不新增通用 DSL 语法或修改地图模型。
+不进入日常/批量的默认脚本清单。不新增通用 DSL 语法或修改地图模型。采集录制器
+只记录领域事件，并把路线确定性编译为现有 `press`、`click`、`wait` WF 动作预览；
+它不复用原始脚本录制器，因后者会包含鼠标轨迹和无业务意义的中间输入。
 
 | 组件 | 职责 |
 |---|---|
-| `apps/yysls/core/gather.py` | 路线、步骤、视口摘要、草稿点击缓冲、单条路线原子保存 |
-| `apps/yysls/core/gather_recorder.py` | Windows 前台游戏窗口内点击监听、点击前视口缓存 |
-| `apps/yysls/ui/gather.py` | 独立编辑器、采集页、Qt 信号桥、启动快照 |
-| `apps/yysls/workflows/implementations/auto_gather.py` | 录制试跑和回放共用执行状态机 |
+| `apps/yysls/core/gather.py` | 路线、步骤、视口摘要、语义 WF 生成、单条路线原子保存 |
+| `apps/yysls/core/gather_recorder.py` | F1 当前鼠标坐标换算、地图视口缓存 |
+| `apps/yysls/ui/gather.py` | F1/F2 状态机、WF 预览、采集页、启动快照 |
+| `apps/yysls/workflows/implementations/auto_gather.py` | 带视口和到达检查的专有回放状态机 |
 | `scenes/map_gather.yaml` / 布局 | 地图范围、识途按钮、可选确认框、主页及运动检查区域 |
 
-状态流：检查地图 → 核验视口并点击（试跑时用户已点击）→ 发起识途 → 可选识途直达确认
-→ 主页恢复且连续稳定 → 触发采集键 → 等待动作 → 重新开图。
+录制状态流：F1 读取鼠标坐标 → 第一次 F2 发送 V/F 并开始计时 → 第二次 F2
+结束计时并封存采集点。回放状态流：检查地图 → 核验视口并点击 → 发送 V/F
+→ 等待录制耗时并确认主页 → 触发采集键 → 等待动作 → 下一点重新开图。
 运行快照包括路线、参数和布局；用户及环境沿用宿主启动快照。异常保留部分结构化事件，
 交给宿主标记任务失败；停止通过基类 `_BreakSignal` 正常退出。
 

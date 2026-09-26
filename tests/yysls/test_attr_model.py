@@ -21,10 +21,11 @@ from lvjiang.apps.yysls.core.attr_model import (
     solve_residual,
     split_affix_cap,
 )
+from lvjiang.apps.yysls.core.attr_model.builtin import ROLE_JIN_TO_MIN_OUTER
 from lvjiang.apps.yysls.core.combat.combat_attrs import (
-    JIN_TO_MIN_OUTER,
     MIN_TO_MIN_OUTER,
     CombatAttributes,
+    compute_equip_base_attrs,
     convert_five_dims,
 )
 
@@ -326,13 +327,8 @@ def test_formula_referencing_unknown_source_is_rejected() -> None:
 
 # ── 内建的五维转换 ────────────────────────────────────────
 
-def test_builtin_dimension_conversion_matches_convert_five_dims() -> None:
-    """内建转换与 combat_attrs.convert_five_dims 必须给出同一结果。
-
-    装备词条上的五维走 convert_five_dims，基础属性里的五维走本模块。
-    两条路径共用 combat_attrs 里的同一组系数，这里守住它们不漂移——
-    真出现两份系数时，这个断言是唯一会红的地方。
-    """
+def test_role_dimension_conversion_uses_the_calculator_min_outer_coefficient() -> None:
+    """角色底子与装备词条只在劲转最小外功的口径上不同。"""
     jin, shi, agility = 137.0, 96.0, 211.0
     effects = [
         _effect(
@@ -346,7 +342,10 @@ def test_builtin_dimension_conversion_matches_convert_five_dims() -> None:
     result = _resolve(effects).combat_attrs
     expected = convert_five_dims(jin=jin, shi=shi, min_val=agility)
 
-    for name in ("min_outer", "max_outer", "crit_rate", "intent_rate"):
+    assert result.min_outer == pytest.approx(
+        jin * ROLE_JIN_TO_MIN_OUTER + agility * MIN_TO_MIN_OUTER)
+    assert result.min_outer != pytest.approx(expected.min_outer)
+    for name in ("max_outer", "crit_rate", "intent_rate"):
         assert getattr(result, name) == pytest.approx(getattr(expected, name))
 
 
@@ -371,7 +370,7 @@ def test_dimension_breakdown_separates_each_dimension() -> None:
     result = _resolve(effects)
     sources = {m.source_id: m.delta for m in result.combat.modifiers_for("min_outer")}
 
-    assert sources[DIMENSION_JIN] == pytest.approx(100.0 * JIN_TO_MIN_OUTER)
+    assert sources[DIMENSION_JIN] == pytest.approx(100.0 * ROLE_JIN_TO_MIN_OUTER)
     assert sources[DIMENSION_MIN] == pytest.approx(100.0 * MIN_TO_MIN_OUTER)
 
 
@@ -389,22 +388,119 @@ def test_shipped_config_loads_without_errors() -> None:
     assert {effect.kind for effect in manager.effects()} <= set(SOURCE_KINDS)
 
 
-def test_shipped_full_affix_entry_tracks_the_real_affix_caps() -> None:
-    """已填的 full_affix 条目走真实 affix_caps，不是测试桩。
-
-    这条把配置、affix_caps 与拆分规律绑在一起：任何一处改动而另外
-    两处没跟上，都会在这里红灯。
-    """
+def test_shipped_yishui_matches_the_current_calculator() -> None:
+    """南吕相和心法用计算器实值，不把装备词条上限当成心法值。"""
     manager = get_attr_model_manager()
-    cap = get_game_config().get_affix_caps(110, "外功攻击")
-    assert cap is not None, "affix_caps 缺少 110 级外功攻击"
-
     result = manager.resolve(
-        level=110, school_attr="牵丝", selected=("易水歌·二重",)
+        level=115, school_attr="牵丝",
+        selected=("易水歌·二重", "易水歌·五重"),
     )
+    assert result.combat_attrs.min_outer == pytest.approx(43.4)
+    assert result.combat_attrs.max_outer == pytest.approx(86.8)
+    assert result.combat_attrs.direct_crit == pytest.approx(0.046)
 
-    total = result.combat_attrs.min_outer + result.combat_attrs.max_outer
-    assert total == pytest.approx(cap["cap"], abs=0.05)
+
+def test_shipped_115_baseline_matches_the_diy_calculator_without_affixes() -> None:
+    """表格默认组合去掉 40 条普通词条后，来源与装备基础值应可复算。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout, InnerWaySlot
+
+    manager = get_attr_model_manager()
+    loadout = AttrLoadout(
+        level=115,
+        school="破竹·鸢",
+        inner_ways=tuple(InnerWaySlot(name, 6) for name in (
+            "扶摇直上", "易水歌", "擒天势", "断石之构")),
+        selections={
+            "breakthrough": "南吕相和·满突破",
+            "gear_set": "撼天",
+            "arsenal": "武备·破竹",
+        },
+    )
+    result = manager.resolve_loadout(
+        loadout, school_attr="破竹", martial_arts=("天志垂象", "千机索天"))
+
+    attrs = result.panel_attrs
+    assert attrs.min_outer == pytest.approx(1731.64341463415)
+    assert attrs.max_outer == pytest.approx(2582.64)
+    assert attrs.precision == pytest.approx(1.254)
+    assert attrs.crit_rate == pytest.approx(0.738722926829268)
+    assert attrs.direct_crit == pytest.approx(0.133)
+    assert attrs.crit_dmg == pytest.approx(0.54)
+    assert attrs.intent_rate == pytest.approx(0.25552)
+    assert attrs.min_pozhu == pytest.approx(539)
+    assert attrs.max_pozhu == pytest.approx(1079)
+    assert attrs.outer_pen == pytest.approx(77.6)
+    assert attrs.pozhu_pen == pytest.approx(30)
+    assert attrs.pozhu_bonus == pytest.approx(0.15)
+
+    empty_gold_115 = {
+        slot: {"level": 115, "quality": "gold"}
+        for slot in (
+            "main_weapon", "sub_weapon", "ring", "pendant",
+            "head", "chest", "leg", "wrist",
+        )
+    }
+    equipment = compute_equip_base_attrs(
+        empty_gold_115, get_game_config().get_base_attr_values)
+    assert equipment.min_outer == pytest.approx(380)
+    assert equipment.max_outer == pytest.approx(757)
+    assert attrs.min_outer + equipment.min_outer == pytest.approx(2111.64341463415)
+    assert attrs.max_outer + equipment.max_outer == pytest.approx(3339.64)
+
+
+@pytest.mark.parametrize("school,required_dim,template", [
+    ("鸣金·影", "dim_jin", "intent"),
+    ("鸣金·虹", "dim_shi", "intent"),
+    ("裂石·威", "dim_jin", "tank"),
+    ("裂石·钧", "dim_min", "crit"),
+    ("牵丝·玉", "dim_min", "crit"),
+    ("牵丝·翊", "dim_min", "crit"),
+    ("破竹·尘", "dim_min", "crit"),
+    ("破竹·风", "dim_min", "crit"),
+    ("破竹·鸢", "dim_min", "crit"),
+    ("破竹·樽", "dim_min", "crit"),
+])
+def test_all_calculator_martial_art_choices_match_the_115_baseline(
+    school: str, required_dim: str, template: str,
+) -> None:
+    """计算器列出的十个流派都按同一 492 点天赋阈值推导。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout
+
+    config = get_game_config().get_schools()[school]
+    school_attr = config["attr"]
+    martial_arts = tuple(
+        config[side]["martial_art"] for side in ("main", "sub"))
+    result = get_attr_model_manager().resolve_loadout(
+        AttrLoadout(
+            level=115, school=school,
+            selections={"arsenal": f"武备·{school_attr}"},
+        ),
+        school_attr=school_attr,
+        martial_arts=martial_arts,
+    )
+    attrs = result.panel_attrs
+
+    ratio = result.panel.values[required_dim] / 492
+    talent_attack = 129.9 * ratio
+    assert attrs.min_outer == pytest.approx(
+        845.88 + (talent_attack if template in ("tank", "crit") else 0))
+    assert attrs.max_outer == pytest.approx(
+        1513.84 + (talent_attack if template in ("tank", "intent") else 0))
+    assert attrs.crit_rate == pytest.approx(
+        0.51104 + (0.15 * ratio if template == "crit" else 0))
+    assert attrs.intent_rate == pytest.approx(
+        0.25552 + (0.075 * ratio if template == "intent" else 0))
+
+    attr_fields = {
+        "鸣金": ("min_mingjin", "max_mingjin", "mingjin_pen", "mingjin_bonus"),
+        "裂石": ("min_lieshi", "max_lieshi", "lieshi_pen", "lieshi_bonus"),
+        "牵丝": ("min_qiansi", "max_qiansi", "qiansi_pen", "qiansi_bonus"),
+        "破竹": ("min_pozhu", "max_pozhu", "pozhu_pen", "pozhu_bonus"),
+    }[school_attr]
+    assert getattr(attrs, attr_fields[0]) == pytest.approx(539)
+    assert getattr(attrs, attr_fields[1]) == pytest.approx(1079)
+    assert getattr(attrs, attr_fields[2]) == pytest.approx(30)
+    assert getattr(attrs, attr_fields[3]) == pytest.approx(0.15)
 
 
 # ── 写回 ──────────────────────────────────────────────────

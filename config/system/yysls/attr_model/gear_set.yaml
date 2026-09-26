@@ -1,4 +1,29 @@
 # 来源类别: gear_set
-# schema 见 core/attr_model/parsing.py
+# 每项已经包含两把武器、环、佩的四条叠音累计 370 / 738，选择一套即可。
+# 套装只登记 DIY 计算器能够证明的常驻静态属性，条件效果留给伤害模型。
 kind: gear_set
-entries: {}
+entries:
+  飞隼:
+    label: 飞隼（含四条叠音）
+    stats: {min_outer: 370, max_outer: 738, intent_rate: 0.08}
+  时雨:
+    label: 时雨（含四条叠音）
+    stats: {min_outer: 370, max_outer: 738, precision: 0.163, crit_dmg: 0.10}
+  撼天:
+    label: 撼天（含四条叠音）
+    stats: {min_outer: 510, max_outer: 738}
+  连星:
+    label: 连星（含四条叠音）
+    stats: {min_outer: 510, max_outer: 738}
+  玉斗:
+    label: 玉斗（含四条叠音）
+    stats: {min_outer: 370, max_outer: 878}
+  裁云:
+    label: 裁云（含四条叠音）
+    stats: {min_outer: 510, max_outer: 738}
+  断岳:
+    label: 断岳（含四条叠音）
+    stats: {min_outer: 510, max_outer: 738}
+  燕归:
+    label: 燕归（含四条叠音）
+    stats: {min_outer: 510, max_outer: 738}

@@ -1,4 +1,26 @@
 # 来源类别: oddity
-# schema 见 core/attr_model/parsing.py
+# DIY 计算器 0.10.1 的满收集攻击累计；同地图多段数据在这里按地图合并。
 kind: oddity
-entries: {}
+entries:
+  蹊跷·清河:
+    stats: {min_outer: 8, max_outer: 16}
+  蹊跷·开封:
+    stats: {min_outer: 16, max_outer: 24}
+  蹊跷·河西:
+    stats: {min_outer: 8, max_outer: 16}
+  蹊跷·不见山:
+    stats: {min_outer: 8, max_outer: 16}
+  蹊跷·开封皇宫:
+    stats: {min_outer: 17.2, max_outer: 21.2}
+  蹊跷·青州:
+    stats: {min_outer: 4, max_outer: 8}
+  蹊跷·夹钟叠奏下半:
+    stats: {min_outer: 13.2, max_outer: 13.2}
+  蹊跷·蕤宾叠奏上半:
+    stats: {min_outer: 13.2, max_outer: 26.4}
+  蹊跷·江南:
+    stats: {min_outer: 24, max_outer: 36}
+  蹊跷·杭州西:
+    stats: {min_outer: 12, max_outer: 12}
+  蹊跷·杭州全收集:
+    stats: {min_outer: 13.2, max_outer: 26.4}

@@ -1,59 +1,155 @@
 # 来源类别: martial_art
-# schema 见 core/attr_model/parsing.py
-#
-# 本文件只是**数值覆盖层**，不存武学名册。名册以 game_config.yaml 的
-# martial_arts 为准，加载时按「武学名·天赋」自动补齐待填条目——武学是
-# 本仓库自己维护的权威数据，存两份必然漏同步。
-#
-# 一门武学的整棵天赋树算一个条目：天赋点怎么加由流派与配装决定，本
-# 模型只关心这门武学最终给了多少静态属性。
-#
-# 无名两门的数据回写自 profiles/鸣金·虹.yaml（2026-09-07 用户实测，19重）。
-# 势/鸣金/会意的转换保留公式，不能把实例中已封顶的观测值写成常数。
-# 条件增伤、技能规则和共享强化声明仍在角色资料中，不混入静态属性。
+# 数值来自 DIY 计算器 0.10.1 的“武学天赋”页。
+# 表格按流派给出两门武学的累计静态属性，因此累计值统一登记在主武学；
+# 副武学条目只声明已合并，避免流派自动选择两门武学时重复计算。
+# 天赋攻击/三率按基础五维 492 达到表格上限；属攻穿透/加成按表格阈值封顶。
 kind: martial_art
 entries:
   无名剑法·天赋:
     group: 无名剑法
-    label: 无名剑法·天赋（19重）
+    label: 鸣金·虹武学天赋汇总
     stats:
-      max_outer:
-        formula:
-          source: dim_shi
-          multiplier: 0.26406926406926406
-          min: 0
-          max: 122
-      min_mingjin: 153
-      max_mingjin: 306
-      mingjin_pen:
-        formula:
-          source: max_mingjin
-          multiplier: 0.0335946248600224
-          min: 0
-          max: 30
+      max_outer: {formula: {source: dim_shi, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      intent_rate: {formula: {source: dim_shi, multiplier: 0.0001524390243902439, min: 0, max: 0.075}}
+      min_mingjin: 328
+      max_mingjin: 656
+      mingjin_pen: {formula: {source: max_mingjin, multiplier: 0.0335946248600224, min: 0, max: 30}}
+      mingjin_bonus: {formula: {source: max_mingjin, multiplier: 0.000167973124300112, min: 0, max: 0.15}}
   无名枪法·天赋:
     group: 无名枪法
-    label: 无名枪法·天赋（19重）
+    label: 已合并到鸣金·虹武学天赋汇总
+    no_effect: true
+  积矩九剑·天赋:
+    group: 积矩九剑
+    label: 鸣金·影武学天赋汇总
     stats:
-      stamina_max:
-        # 固定10 + clamp(会意率 * 50 - 5, 0, 10)。
-        formula:
-          source: intent_rate
-          multiplier: 50
-          offset: 5
-          min: 10
-          max: 20
-      intent_rate:
-        formula:
-          source: dim_shi
-          multiplier: 0.00015151515151515154
-          min: 0
-          max: 0.07
-      min_mingjin: 153
-      max_mingjin: 306
-      mingjin_bonus:
-        formula:
-          source: max_mingjin
-          multiplier: 0.00016797312430011198
-          min: 0
-          max: 0.15
+      max_outer: {formula: {source: dim_jin, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      intent_rate: {formula: {source: dim_jin, multiplier: 0.0001524390243902439, min: 0, max: 0.075}}
+      min_mingjin: 328
+      max_mingjin: 656
+      mingjin_pen: {formula: {source: max_mingjin, multiplier: 0.0335946248600224, min: 0, max: 30}}
+      mingjin_bonus: {formula: {source: max_mingjin, multiplier: 0.000167973124300112, min: 0, max: 0.15}}
+  九曲惊神枪·天赋:
+    group: 九曲惊神枪
+    label: 已合并到鸣金·影武学天赋汇总
+    no_effect: true
+  嗟夫刀法·天赋:
+    group: 嗟夫刀法
+    label: 裂石·威武学天赋汇总
+    stats:
+      min_outer: {formula: {source: dim_jin, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      max_outer: {formula: {source: dim_jin, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      min_lieshi: 328
+      max_lieshi: 656
+      lieshi_pen: {formula: {source: min_lieshi, multiplier: 0.06711409395973154, min: 0, max: 30}}
+      lieshi_bonus: {formula: {source: min_lieshi, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
+  八方风雷枪·天赋:
+    group: 八方风雷枪
+    label: 已合并到裂石·威武学天赋汇总
+    no_effect: true
+  斩雪刀法·天赋:
+    group: 斩雪刀法
+    label: 裂石·钧武学天赋汇总
+    stats:
+      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
+      min_lieshi: 328
+      max_lieshi: 656
+      lieshi_pen: {formula: {source: min_lieshi, multiplier: 0.06711409395973154, min: 0, max: 30}}
+      lieshi_bonus: {formula: {source: min_lieshi, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
+  十方破阵·天赋:
+    group: 十方破阵
+    label: 已合并到裂石·钧武学天赋汇总
+    no_effect: true
+  九重春色·天赋:
+    group: 九重春色
+    label: 牵丝·玉武学天赋汇总
+    stats:
+      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
+      min_qiansi: 328
+      max_qiansi: 656
+      qiansi_pen: {formula: {source: min_qiansi, multiplier: 0.06711409395973154, min: 0, max: 30}}
+      qiansi_bonus: {formula: {source: min_qiansi, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
+  青山执笔·天赋:
+    group: 青山执笔
+    label: 已合并到牵丝·玉武学天赋汇总
+    no_effect: true
+  文动霓裳·天赋:
+    group: 文动霓裳
+    label: 牵丝·翊武学天赋汇总
+    stats:
+      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
+      min_qiansi: 328
+      max_qiansi: 656
+      qiansi_pen: {formula: {source: min_qiansi, multiplier: 0.06711409395973154, min: 0, max: 30}}
+      qiansi_bonus: {formula: {source: min_qiansi, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
+  杏游草野·天赋:
+    group: 杏游草野
+    label: 已合并到牵丝·翊武学天赋汇总
+    no_effect: true
+  明川药典·天赋:
+    group: 明川药典
+    modeled: false
+    label: 牵丝·霖不在 DIY 计算器武学天赋表中
+  千香引魂蛊·天赋:
+    group: 千香引魂蛊
+    modeled: false
+    label: 牵丝·霖不在 DIY 计算器武学天赋表中
+  泥犁三垢·天赋:
+    group: 泥犁三垢
+    label: 破竹·风武学天赋汇总
+    stats:
+      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
+      min_pozhu: 328
+      max_pozhu: 656
+      pozhu_pen: {formula: {source: min_pozhu, multiplier: 0.06711409395973154, min: 0, max: 30}}
+      pozhu_bonus: {formula: {source: min_pozhu, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
+  粟子游尘·天赋:
+    group: 粟子游尘
+    label: 已合并到破竹·风武学天赋汇总
+    no_effect: true
+  醉梦游春·天赋:
+    group: 醉梦游春
+    label: 破竹·尘武学天赋汇总
+    stats:
+      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
+      min_pozhu: 328
+      max_pozhu: 656
+      pozhu_pen: {formula: {source: min_pozhu, multiplier: 0.06711409395973154, min: 0, max: 30}}
+      pozhu_bonus: {formula: {source: min_pozhu, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
+  粟子行云·天赋:
+    group: 粟子行云
+    label: 已合并到破竹·尘武学天赋汇总
+    no_effect: true
+  天志垂象·天赋:
+    group: 天志垂象
+    label: 破竹·鸢武学天赋汇总
+    stats:
+      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
+      min_pozhu: 328
+      max_pozhu: 656
+      pozhu_pen: {formula: {source: min_pozhu, multiplier: 0.06711409395973154, min: 0, max: 30}}
+      pozhu_bonus: {formula: {source: min_pozhu, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
+  千机索天·天赋:
+    group: 千机索天
+    label: 已合并到破竹·鸢武学天赋汇总
+    no_effect: true
+  悬身拳法·天赋:
+    group: 悬身拳法
+    label: 破竹·樽武学天赋汇总
+    stats:
+      min_outer: {formula: {source: dim_min, multiplier: 0.26402439024390245, min: 0, max: 129.9}}
+      crit_rate: {formula: {source: dim_min, multiplier: 0.0003048780487804878, min: 0, max: 0.15}}
+      min_pozhu: 328
+      max_pozhu: 656
+      pozhu_pen: {formula: {source: min_pozhu, multiplier: 0.06711409395973154, min: 0, max: 30}}
+      pozhu_bonus: {formula: {source: min_pozhu, multiplier: 0.0003355704697986577, min: 0, max: 0.15}}
+  断水双诀·天赋:
+    group: 断水双诀
+    label: 已合并到破竹·樽武学天赋汇总
+    no_effect: true

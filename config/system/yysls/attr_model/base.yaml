@@ -1,21 +1,30 @@
 # 来源类别: base
-# 当前已知基础快照：个人等级23级五维各242，基础天赋估计各41。
-# 来自鸣金·虹角色实例；不代表任意等级/天赋进度，其他角色应按实际修改。
-# 这里只补原始五维，外功/会心/会意由内建转换统一计算，不能重复填写。
-# 天赋详细来源仍待补，41是估计值；体/御转换系数未知，不推测。
+# 南吕相和赛季 DIY 计算器 0.10.1 的满养成公共底子。
+# 角色等级为 100，装备等级为 115；装备基础值和叠音不在这里重复计算。
+# 表格没有给出五维 304 的细分来源，暂按累计快照记录，后续有证据再拆。
 kind: base
 entries:
-  个人等级·23级五维累计:
+  南吕相和·满养成公共属性:
+    label: 100级满养成公共属性（115阶赛季）
     stats:
-      dim_jin: 242
-      dim_shi: 242
-      dim_min: 242
-      dim_ti: 242
-      dim_yu: 242
-  基础天赋·已知五维估计:
+      dim_jin: 304
+      dim_shi: 304
+      dim_min: 304
+      dim_ti: 304
+      dim_yu: 304
+      precision: 1.134
+      crit_rate: 0.28
+      intent_rate: 0.14
+      crit_dmg: 0.5
+      intent_dmg: 0.35
+      min_wuxiang: 79.2
+      max_wuxiang: 92.4
+      outer_pen: 77.6
+  角色等级·100级攻击累计:
     stats:
-      dim_jin: 41
-      dim_shi: 41
-      dim_min: 41
-      dim_ti: 41
-      dim_yu: 41
+      min_outer: 263
+      max_outer: 506
+  基础天赋·满级攻击累计:
+    stats:
+      min_outer: 105.6
+      max_outer: 105.6

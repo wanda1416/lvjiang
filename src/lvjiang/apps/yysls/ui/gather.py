@@ -10,6 +10,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -259,6 +260,16 @@ class GatherRecordingDialog(QDialog):
         self.timeout.setRange(10, 1800)
         self.timeout.setValue(120)
         self.timeout.setSuffix(tr(" 秒"))
+        self.map_open_wait = QDoubleSpinBox()
+        self.target_select_wait = QDoubleSpinBox()
+        self.travel_prompt_wait = QDoubleSpinBox()
+        for field, value in ((self.map_open_wait, 5.0),
+                             (self.target_select_wait, 1.5),
+                             (self.travel_prompt_wait, 1.5)):
+            field.setRange(0.1, 120)
+            field.setDecimals(1)
+            field.setValue(value)
+            field.setSuffix(tr(" 秒"))
         self.gather_wait = QSpinBox()
         self.gather_wait.setRange(1, 120)
         self.gather_wait.setValue(6)
@@ -273,7 +284,11 @@ class GatherRecordingDialog(QDialog):
                               ("自动识途按键", self.auto_travel_key),
                               ("确认识途按键", self.confirm_key),
                               ("采集按键", self.gather_key),
-                              ("识途超时", self.timeout), ("采集动作等待", self.gather_wait),
+                              ("识途超时", self.timeout),
+                              ("地图打开等待", self.map_open_wait),
+                              ("目标选中等待", self.target_select_wait),
+                              ("识途提示等待", self.travel_prompt_wait),
+                              ("采集动作等待", self.gather_wait),
                               ("确认标记快捷键", self.mark_key), ("识途试跑快捷键", self.travel_key)):
             fields.addRow(tr(label), widget)
         layout.addWidget(self.form)
@@ -323,6 +338,9 @@ class GatherRecordingDialog(QDialog):
         self.route.confirm_key = self.confirm_key.text().strip().upper()
         self.route.gather_key = self.gather_key.text().strip().upper()
         self.route.travel_timeout = self.timeout.value()
+        self.route.map_open_seconds = self.map_open_wait.value()
+        self.route.target_select_seconds = self.target_select_wait.value()
+        self.route.travel_prompt_seconds = self.travel_prompt_wait.value()
         self.route.gather_seconds = self.gather_wait.value()
 
     def _reload_saved(self):
@@ -358,6 +376,9 @@ class GatherRecordingDialog(QDialog):
         self.confirm_key.setText(self.route.confirm_key)
         self.gather_key.setText(self.route.gather_key)
         self.timeout.setValue(int(self.route.travel_timeout))
+        self.map_open_wait.setValue(self.route.map_open_seconds)
+        self.target_select_wait.setValue(self.route.target_select_seconds)
+        self.travel_prompt_wait.setValue(self.route.travel_prompt_seconds)
         self.gather_wait.setValue(int(self.route.gather_seconds))
         self._refresh_steps()
 
@@ -406,12 +427,14 @@ class GatherRecordingDialog(QDialog):
                 self.steps.addItem(f"{sequence}. {line}")
                 sequence += 1
         if self.marked is not None:
-            self.steps.addItem(f'{sequence}. press "{self.route.map_key}"')
-            self.steps.addItem(
-                f"{sequence + 1}. click ({self.marked.x:.6f}, {self.marked.y:.6f})")
-            sequence += 2
+            for line in (f'press "{self.route.map_key}"', "wait $gather_map_open_wait",
+                         f"click ({self.marked.x:.6f}, {self.marked.y:.6f})",
+                         "wait $gather_target_select_wait"):
+                self.steps.addItem(f"{sequence}. {line}")
+                sequence += 1
             if self._confirm_pending or self._travel_started_at is not None:
-                for line in (f'press "{self.route.travel_key}"', "wait 0.800",
+                for line in (f'press "{self.route.travel_key}"',
+                             "wait $gather_travel_prompt_wait",
                              f'press "{self.route.confirm_key}"'):
                     self.steps.addItem(f"{sequence}. {line}")
                     sequence += 1
@@ -527,7 +550,7 @@ class GatherRecordingDialog(QDialog):
         self.status.setText(tr("已按 {travel}，等待后将自动按 {confirm}").format(
             travel=self.route.travel_key, confirm=self.route.confirm_key))
         self._refresh_steps()
-        QTimer.singleShot(800, self._confirm_travel)
+        QTimer.singleShot(round(self.route.travel_prompt_seconds * 1000), self._confirm_travel)
 
     def _send_key(self, key: str) -> None:
         normalized = normalize_pressable(key)

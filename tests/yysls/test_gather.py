@@ -194,16 +194,22 @@ def test_route_compiles_to_clean_semantic_wf():
     body = [line for line in route_to_dsl(route).splitlines()
             if line and not line.startswith("#")]
     assert body == [
+        "default $gather_map_open_wait = 5.000",
+        "default $gather_target_select_wait = 1.500",
+        "default $gather_travel_prompt_wait = 1.500",
+        "default $gather_collect_wait = 6.000",
         'press "M"',
+        "wait $gather_map_open_wait",
         "click (0.400000, 0.500000)",
+        "wait $gather_target_select_wait",
         'press "V"',
-        "wait 0.800",
+        "wait $gather_travel_prompt_wait",
         'press "F"',
         "wait 12.500",
         'press "1"',
-        "wait 6.000",
+        "wait $gather_collect_wait",
     ]
-    assert len(parse_text(route_to_dsl(route)).body) == 8
+    assert len(parse_text(route_to_dsl(route)).body) == 14
 
 
 def test_replay_preserves_order_without_mutating_saved_route(monkeypatch):

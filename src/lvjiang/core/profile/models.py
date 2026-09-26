@@ -30,6 +30,9 @@ MODEL_NOTE = "note"
 
 ALL_MODELS = (MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK, MODEL_NOTE)
 
+# Key 定义内分组。持久化使用稳定英文 key，界面负责本地化显示。
+DEFAULT_KEY_GROUP = "default"
+
 MODEL_LABELS = {
     MODEL_QUOTA: tr("配额"),
     MODEL_REGEN: tr("再生"),
@@ -203,6 +206,7 @@ class KeyDef:
     """
 
     key: str = ""
+    group: str = DEFAULT_KEY_GROUP
     label: str = ""
     description: str = ""
     cap: int | None = None
@@ -218,6 +222,7 @@ class KeyDef:
     def from_dict(cls, data: dict[str, Any]) -> KeyDef:
         return cls(
             key=data.get("key", ""),
+            group=normalize_key_group(data.get("group")),
             label=data.get("label", ""),
             description=data.get("description", ""),
             cap=data.get("cap"),
@@ -234,6 +239,10 @@ class KeyDef:
         """序列化为 dict（仅输出非默认值）"""
         result: dict[str, Any] = {}
         for f in fields(self):
+            if f.name == "group":
+                # 默认分组也显式写出，并保持在 key 之后，便于直接阅读 YAML。
+                result["group"] = normalize_key_group(self.group)
+                continue
             val = getattr(self, f.name)
             # 处理 default 和 default_factory
             if f.default is not MISSING:
@@ -248,6 +257,20 @@ class KeyDef:
             else:
                 result[f.name] = val
         return result
+
+
+def normalize_key_group(raw: Any) -> str:
+    """规范化定义分组；旧配置缺失或空白时归入默认分组。"""
+    value = str(raw or "").strip()
+    return value or DEFAULT_KEY_GROUP
+
+
+def group_key_definitions(key_defs: list[KeyDef]) -> dict[str, list[KeyDef]]:
+    """按定义出现顺序分组，并保持组内 key 的相对顺序。"""
+    grouped: dict[str, list[KeyDef]] = {}
+    for key_def in key_defs:
+        grouped.setdefault(normalize_key_group(key_def.group), []).append(key_def)
+    return grouped
 
 
 @dataclass
@@ -279,6 +302,7 @@ class QuotaKeyDef(KeyDef):
         base = KeyDef.from_dict(data)
         return cls(
             key=base.key,
+            group=base.group,
             label=base.label,
             description=base.description,
             cap=base.cap,
@@ -327,6 +351,7 @@ class RegenKeyDef(KeyDef):
         base = KeyDef.from_dict(data)
         return cls(
             key=base.key,
+            group=base.group,
             label=base.label,
             description=base.description,
             cap=base.cap,
@@ -366,6 +391,7 @@ class StockKeyDef(KeyDef):
         base = KeyDef.from_dict(data)
         return cls(
             key=base.key,
+            group=base.group,
             label=base.label,
             description=base.description,
             cap=base.cap,
@@ -394,6 +420,7 @@ class NoteKeyDef(KeyDef):
         base = KeyDef.from_dict(data)
         return cls(
             key=base.key,
+            group=base.group,
             label=base.label,
             description=base.description,
             cap=base.cap,

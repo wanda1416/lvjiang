@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 
 from loguru import logger
@@ -21,6 +23,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -36,6 +39,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.profile.models import (
     ALL_MODELS,
+    DEFAULT_KEY_GROUP,
     DIR_BOTH,
     DIRECTION_LABELS,
     MODEL_LABELS,
@@ -51,6 +55,8 @@ from ...core.profile.models import (
     StockKeyDef,
     SyncTargetDef,
     format_sync_label,
+    group_key_definitions,
+    normalize_key_group,
 )
 from ...core.profile.periods import get_profile_period, list_profile_periods
 from ...i18n import tr
@@ -560,6 +566,11 @@ class _ModelTab(QWidget):
 
         # 工具栏
         toolbar = QHBoxLayout()
+        toolbar.addWidget(QLabel(tr("分组:")))
+        self._group_combo = QComboBox()
+        self._group_combo.setMinimumContentsLength(10)
+        self._group_combo.currentIndexChanged.connect(self._group_changed)
+        toolbar.addWidget(self._group_combo)
         toolbar.addStretch()
 
         btn_add = QPushButton("+ " + tr("新增"))
@@ -588,28 +599,29 @@ class _ModelTab(QWidget):
         layout.addLayout(toolbar)
 
         # key 表格 — 根据模型类型决定列结构
-        # Quota: Key | 标签 | 上限 | 周期 | 来源 | 详情摘要
-        # Regen: Key | 标签 | 上限 | 周期 | 用途 | 详情摘要
-        # Stock: Key | 标签 | 上限 | 来源 | 用途 | 详情摘要
-        # Note:  Key | 标签 | 上限 | 来源/用途 | 详情摘要
+        # Quota: Key | 分组 | 标签 | 上限 | 周期 | 来源 | 详情摘要
+        # Regen: Key | 分组 | 标签 | 上限 | 周期 | 用途 | 详情摘要
+        # Stock: Key | 分组 | 标签 | 上限 | 来源 | 用途 | 详情摘要
+        # Note:  Key | 分组 | 标签 | 上限 | 来源/用途 | 详情摘要
         self._table = QTableWidget()
         if self._model_type == MODEL_QUOTA:
-            self._table.setColumnCount(6)
-            self._table.setHorizontalHeaderLabels(["Key", tr("标签"), tr("上限"), tr("周期"), tr("来源"), tr("详情摘要")])
+            self._table.setColumnCount(7)
+            self._table.setHorizontalHeaderLabels(["Key", tr("分组"), tr("标签"), tr("上限"), tr("周期"), tr("来源"), tr("详情摘要")])
         elif self._model_type == MODEL_REGEN:
-            self._table.setColumnCount(6)
-            self._table.setHorizontalHeaderLabels(["Key", tr("标签"), tr("上限"), tr("周期"), tr("用途"), tr("详情摘要")])
+            self._table.setColumnCount(7)
+            self._table.setHorizontalHeaderLabels(["Key", tr("分组"), tr("标签"), tr("上限"), tr("周期"), tr("用途"), tr("详情摘要")])
         elif self._model_type == MODEL_NOTE:
-            self._table.setColumnCount(5)
-            self._table.setHorizontalHeaderLabels(["Key", tr("标签"), tr("上限"), tr("来源/用途"), tr("详情摘要")])
-        else:
             self._table.setColumnCount(6)
-            self._table.setHorizontalHeaderLabels(["Key", tr("标签"), tr("上限"), tr("来源"), tr("用途"), tr("详情摘要")])
+            self._table.setHorizontalHeaderLabels(["Key", tr("分组"), tr("标签"), tr("上限"), tr("来源/用途"), tr("详情摘要")])
+        else:
+            self._table.setColumnCount(7)
+            self._table.setHorizontalHeaderLabels(["Key", tr("分组"), tr("标签"), tr("上限"), tr("来源"), tr("用途"), tr("详情摘要")])
         self._table.verticalHeader().setVisible(False)
         self._table.setAlternatingRowColors(True)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.doubleClicked.connect(self._edit_key)
+        self._table.cellClicked.connect(self._cell_clicked)
 
         # 表头加粗
         header_font = self._table.horizontalHeader().font()
@@ -624,25 +636,26 @@ class _ModelTab(QWidget):
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setMinimumSectionSize(min_col_width)
         if self._model_type == MODEL_NOTE:
             # Note: 来源/用途: 固定, 详情摘要: 拉伸
-            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-            self._table.setColumnWidth(3, 200)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+            self._table.setColumnWidth(4, 200)
         elif self._model_type == MODEL_STOCK:
             # 来源/用途: 固定, 详情摘要: 拉伸
-            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
             header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
-            self._table.setColumnWidth(3, 150)
+            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
             self._table.setColumnWidth(4, 150)
+            self._table.setColumnWidth(5, 150)
         else:
             # Quota/Regen: 周期: 自适应, 来源或用途: 固定, 详情摘要: 拉伸
-            header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
-            self._table.setColumnWidth(4, 150)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
+            self._table.setColumnWidth(5, 150)
 
         layout.addWidget(self._table)
 
@@ -653,6 +666,21 @@ class _ModelTab(QWidget):
     @property
     def model_type(self) -> str:
         return self._model_type
+
+    @property
+    def current_group(self) -> str:
+        return normalize_key_group(self._group_combo.currentData())
+
+    def set_groups(self, groups: list[str], selected: str) -> None:
+        """刷新派生分组列表，并保持当前选择。"""
+        self._group_combo.blockSignals(True)
+        self._group_combo.clear()
+        for group in groups:
+            label = tr("默认") if group == DEFAULT_KEY_GROUP else group
+            self._group_combo.addItem(label, group)
+        index = self._group_combo.findData(selected)
+        self._group_combo.setCurrentIndex(index if index >= 0 else 0)
+        self._group_combo.blockSignals(False)
 
     def _get_parent(self) -> "ProfileDefinitionDialog | None":
         parent = self.parent()
@@ -665,12 +693,26 @@ class _ModelTab(QWidget):
         if dialog:
             dialog._add_key(self._model_type)
 
-    def _edit_key(self):
+    def _edit_key(self, index=None):
+        if index is not None and index.column() == 1:
+            return
         dialog = self._get_parent()
         if dialog:
             row = self._table.currentRow()
             if row >= 0:
                 dialog._edit_key(self._model_type, row)
+
+    def _cell_clicked(self, row: int, column: int):
+        if column != 1:
+            return
+        dialog = self._get_parent()
+        if dialog:
+            dialog._edit_key_group(self._model_type, row)
+
+    def _group_changed(self):
+        dialog = self._get_parent()
+        if dialog:
+            dialog._refresh_model_tab(self._model_type, self.current_group)
 
     def _delete_key(self):
         dialog = self._get_parent()
@@ -703,6 +745,7 @@ class ProfileDefinitionDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(tr("用户数据模型定义"))
         self.setMinimumSize(800, 550)
+        self._drafts: dict[str, list[KeyDef]] = {}
         self._setup_ui()
         self._load_data()
 
@@ -747,11 +790,36 @@ class ProfileDefinitionDialog(QDialog):
         config = get_profile_config()
 
         for model_type in _MODEL_ORDER:
-            tab = self._tabs[model_type]
-            keys = config.get_keys_by_model(model_type)
-            tab.table.setRowCount(len(keys))
-            for row, kd in enumerate(keys):
-                self._populate_row(tab, row, kd)
+            # 编辑器只修改自己的深拷贝；取消不会污染运行中的配置单例。
+            self._drafts[model_type] = deepcopy(config.get_keys_by_model(model_type))
+            self._refresh_model_tab(model_type)
+
+    def _refresh_model_tab(
+        self,
+        model_type: str,
+        preferred_group: str | None = None,
+        selected_key: str | None = None,
+    ) -> None:
+        """从该类型的全部草稿重新派生分组并绘制当前组。"""
+        tab = self._tabs[model_type]
+        grouped = group_key_definitions(self._drafts[model_type])
+        groups = list(grouped) or [DEFAULT_KEY_GROUP]
+        requested = normalize_key_group(preferred_group or tab.current_group)
+        selected_group = requested if requested in groups else groups[0]
+        tab.set_groups(groups, selected_group)
+
+        visible = grouped.get(selected_group, [])
+        tab.table.blockSignals(True)
+        tab.table.setRowCount(len(visible))
+        for row, kd in enumerate(visible):
+            self._populate_row(tab, row, kd)
+            if kd.key == selected_key:
+                tab.table.setCurrentCell(row, 0)
+        tab.table.blockSignals(False)
+
+    @staticmethod
+    def _group_display_name(group: str) -> str:
+        return tr("默认") if group == DEFAULT_KEY_GROUP else group
 
     @staticmethod
     def _populate_row(tab: _ModelTab, row: int, kd: KeyDef) -> None:
@@ -759,28 +827,29 @@ class ProfileDefinitionDialog(QDialog):
         key_item = QTableWidgetItem(kd.key)
         key_item.setData(_ROLE_KEYDEF, kd)
         tab.table.setItem(row, 0, key_item)
-        tab.table.setItem(row, 1, QTableWidgetItem(kd.label))
-        tab.table.setItem(row, 2, QTableWidgetItem(_format_cap(kd)))
+        group_item = QTableWidgetItem(
+            ProfileDefinitionDialog._group_display_name(normalize_key_group(kd.group))
+        )
+        group_item.setToolTip(tr("点击更改分组"))
+        tab.table.setItem(row, 1, group_item)
+        tab.table.setItem(row, 2, QTableWidgetItem(kd.label))
+        tab.table.setItem(row, 3, QTableWidgetItem(_format_cap(kd)))
         if tab.model_type == MODEL_QUOTA:
-            # Key | 标签 | 上限 | 周期 | 来源 | 详情摘要
-            tab.table.setItem(row, 3, QTableWidgetItem(_format_period(kd)))
-            tab.table.setItem(row, 4, QTableWidgetItem(",".join(kd.sources)))
-            tab.table.setItem(row, 5, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
+            tab.table.setItem(row, 4, QTableWidgetItem(_format_period(kd)))
+            tab.table.setItem(row, 5, QTableWidgetItem(",".join(kd.sources)))
+            tab.table.setItem(row, 6, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
         elif tab.model_type == MODEL_REGEN:
-            # Key | 标签 | 上限 | 周期 | 用途 | 详情摘要
-            tab.table.setItem(row, 3, QTableWidgetItem(_format_period(kd)))
-            tab.table.setItem(row, 4, QTableWidgetItem(",".join(kd.uses)))
-            tab.table.setItem(row, 5, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
+            tab.table.setItem(row, 4, QTableWidgetItem(_format_period(kd)))
+            tab.table.setItem(row, 5, QTableWidgetItem(",".join(kd.uses)))
+            tab.table.setItem(row, 6, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
         elif tab.model_type == MODEL_NOTE:
-            # Key | 标签 | 上限 | 来源/用途 | 详情摘要
             combined = list(dict.fromkeys(kd.sources + kd.uses))
-            tab.table.setItem(row, 3, QTableWidgetItem(",".join(combined)))
-            tab.table.setItem(row, 4, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
-        else:
-            # Key | 标签 | 上限 | 来源 | 用途 | 详情摘要
-            tab.table.setItem(row, 3, QTableWidgetItem(",".join(kd.sources)))
-            tab.table.setItem(row, 4, QTableWidgetItem(",".join(kd.uses)))
+            tab.table.setItem(row, 4, QTableWidgetItem(",".join(combined)))
             tab.table.setItem(row, 5, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
+        else:
+            tab.table.setItem(row, 4, QTableWidgetItem(",".join(kd.sources)))
+            tab.table.setItem(row, 5, QTableWidgetItem(",".join(kd.uses)))
+            tab.table.setItem(row, 6, QTableWidgetItem(ProfileDefinitionDialog._summarize(kd)))
 
     @staticmethod
     def _summarize(kd: KeyDef) -> str:
@@ -870,9 +939,9 @@ class ProfileDefinitionDialog(QDialog):
             return
 
         tab = self._tabs[model_type]
-        row = tab.table.rowCount()
-        tab.table.setRowCount(row + 1)
-        self._populate_row(tab, row, kd)
+        kd = replace(kd, group=tab.current_group)
+        self._drafts[model_type].append(kd)
+        self._refresh_model_tab(model_type, kd.group, kd.key)
 
     def _edit_key(self, model_type: str, row: int):
         """编辑 key"""
@@ -890,7 +959,43 @@ class ProfileDefinitionDialog(QDialog):
         if kd is None:
             return
 
-        self._populate_row(tab, row, kd)
+        drafts = self._drafts[model_type]
+        drafts[drafts.index(old_kd)] = kd
+        self._refresh_model_tab(model_type, kd.group, kd.key)
+
+    def _edit_key_group(self, model_type: str, row: int):
+        """编辑单个 key 的定义分组；分组列表由全部 key 重新派生。"""
+        tab = self._tabs[model_type]
+        key_item = tab.table.item(row, 0)
+        if not key_item:
+            return
+        old_kd = key_item.data(_ROLE_KEYDEF)
+        if old_kd is None:
+            raise RuntimeError(f"行 {row} 缺少 KeyDef 数据，无法编辑分组")
+
+        current = self._group_display_name(normalize_key_group(old_kd.group))
+        value, accepted = QInputDialog.getText(
+            self,
+            tr("更改分组"),
+            tr("分组名称:"),
+            text=current,
+        )
+        if not accepted:
+            return
+        self._assign_key_group(model_type, old_kd, value)
+
+    def _assign_key_group(self, model_type: str, key_def: KeyDef, value: str) -> None:
+        """把一个 key 移入指定组，供界面操作与回归测试共用。"""
+        cleaned = value.strip()
+        group = (
+            DEFAULT_KEY_GROUP
+            if not cleaned or cleaned == tr("默认")
+            else normalize_key_group(cleaned)
+        )
+        updated = replace(key_def, group=group)
+        drafts = self._drafts[model_type]
+        drafts[drafts.index(key_def)] = updated
+        self._refresh_model_tab(model_type, group, updated.key)
 
     def _delete_key(self, model_type: str, row: int):
         """删除 key"""
@@ -907,16 +1012,28 @@ class ProfileDefinitionDialog(QDialog):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        tab.table.removeRow(row)
+        old_kd = key_item.data(_ROLE_KEYDEF)
+        if old_kd is None:
+            raise RuntimeError(f"行 {row} 缺少 KeyDef 数据，无法删除")
+        self._drafts[model_type].remove(old_kd)
+        self._refresh_model_tab(model_type, tab.current_group)
 
     def _swap_keys(self, model_type: str, a: int, b: int):
-        """交换两行"""
+        """交换当前分组内两个 key 在完整定义序列中的位置。"""
         tab = self._tabs[model_type]
-        for col in range(tab.table.columnCount()):
-            item_a = tab.table.takeItem(a, col)
-            item_b = tab.table.takeItem(b, col)
-            tab.table.setItem(a, col, item_b)
-            tab.table.setItem(b, col, item_a)
+        item_a = tab.table.item(a, 0)
+        item_b = tab.table.item(b, 0)
+        if not item_a or not item_b:
+            return
+        key_a = item_a.data(_ROLE_KEYDEF)
+        key_b = item_b.data(_ROLE_KEYDEF)
+        if key_a is None or key_b is None:
+            raise RuntimeError("行缺少 KeyDef 数据，无法调整顺序")
+        drafts = self._drafts[model_type]
+        index_a = drafts.index(key_a)
+        index_b = drafts.index(key_b)
+        drafts[index_a], drafts[index_b] = drafts[index_b], drafts[index_a]
+        self._refresh_model_tab(model_type, tab.current_group, key_a.key)
 
     # ─── 编辑对话框 ──────────────────────────────────────────
 
@@ -924,11 +1041,7 @@ class ProfileDefinitionDialog(QDialog):
         """返回当前总定义窗口中的所有 key。"""
         result: set[str] = set()
         for model_type in _MODEL_ORDER:
-            tab = self._tabs[model_type]
-            for row in range(tab.table.rowCount()):
-                item = tab.table.item(row, 0)
-                if item:
-                    result.add(item.text())
+            result.update(kd.key for kd in self._drafts[model_type])
         return result
 
     @staticmethod
@@ -1285,11 +1398,12 @@ class ProfileDefinitionDialog(QDialog):
             show_cap_final = widgets["show_cap"].isChecked()
             decimal_final = widgets["decimal"].isChecked()
             change_script = change_script_input.text().strip()
+            group = existing.group if existing else DEFAULT_KEY_GROUP
 
             # 构造 KeyDef
             if model_type == MODEL_QUOTA:
                 kd = QuotaKeyDef(
-                    key=key, label=label,
+                    key=key, group=group, label=label,
                     sources=sources_list,
                     uses=uses_list,
                     sync_targets=sync_targets_list,
@@ -1308,7 +1422,7 @@ class ProfileDefinitionDialog(QDialog):
                 orange_val = widgets["alert_orange"].value()
                 red_val = widgets["alert_red"].value()
                 kd = RegenKeyDef(
-                    key=key, label=label,
+                    key=key, group=group, label=label,
                     sources=sources_list,
                     uses=uses_list,
                     sync_targets=sync_targets_list,
@@ -1330,7 +1444,7 @@ class ProfileDefinitionDialog(QDialog):
                 )
             elif model_type == MODEL_STOCK:
                 kd = StockKeyDef(
-                    key=key, label=label,
+                    key=key, group=group, label=label,
                     sources=sources_list,
                     uses=uses_list,
                     sync_targets=sync_targets_list,
@@ -1343,7 +1457,7 @@ class ProfileDefinitionDialog(QDialog):
                 )
             elif model_type == MODEL_NOTE:
                 kd = NoteKeyDef(
-                    key=key, label=label,
+                    key=key, group=group, label=label,
                     sources=sources_list,
                     uses=uses_list,
                     sync_targets=sync_targets_list,
@@ -1355,7 +1469,8 @@ class ProfileDefinitionDialog(QDialog):
                 )
             else:
                 kd = KeyDef(
-                    key=key, label=label, sources=sources_list, uses=uses_list,
+                    key=key, group=group, label=label,
+                    sources=sources_list, uses=uses_list,
                     change_script=change_script,
                 )
 
@@ -1374,22 +1489,11 @@ class ProfileDefinitionDialog(QDialog):
         """保存所有模型类型的 key 定义到 profile.yaml"""
         from ...core.profile.schema import ProfileSchema, save_profile_config
 
-        keys_by_model: dict[str, list[KeyDef]] = {}
-
-        for model_type in _MODEL_ORDER:
-            tab = self._tabs[model_type]
-            key_defs: list[KeyDef] = []
-
-            for row in range(tab.table.rowCount()):
-                key_item = tab.table.item(row, 0)
-                if not key_item:
-                    continue
-                kd = key_item.data(_ROLE_KEYDEF)
-                if kd is None:
-                    raise RuntimeError(f"行 {row} 缺少 KeyDef 数据，无法保存")
-                key_defs.append(kd)
-
-            keys_by_model[model_type] = key_defs
+        # 保存完整草稿；当前分组只是过滤视图，不能遗漏其他组。
+        keys_by_model = {
+            model_type: list(self._drafts[model_type])
+            for model_type in _MODEL_ORDER
+        }
 
         schema = ProfileSchema(keys_by_model=keys_by_model)
 

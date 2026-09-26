@@ -8,6 +8,7 @@ from tests.case_matrix import case_matrix
 
 from lvjiang.core.profile.models import (
     ALL_MODELS,
+    DEFAULT_KEY_GROUP,
     DIR_BOTH,
     DIR_NEG,
     DIR_POS,
@@ -25,6 +26,7 @@ from lvjiang.core.profile.models import (
     StockKeyDef,
     SyncTargetDef,
     format_sync_label,
+    group_key_definitions,
     parse_key_def,
     parse_steps,
     parse_sync_key,
@@ -38,6 +40,7 @@ class TestKeyDef:
     def test_defaults(self):
         kd = KeyDef()
         assert kd.key == ""
+        assert kd.group == DEFAULT_KEY_GROUP
         assert kd.label == ""
         assert kd.description == ""
         assert kd.sources == []
@@ -66,9 +69,25 @@ class TestKeyDef:
     def test_to_dict_only_non_default(self):
         kd = KeyDef(key="k", label="l")
         d = kd.to_dict()
-        assert d == {"key": "k", "label": "l"}
+        assert d == {"key": "k", "group": "default", "label": "l"}
         # description="" 是默认值，不输出
         assert "description" not in d
+
+    def test_group_defaults_for_missing_or_blank_value(self):
+        assert KeyDef.from_dict({"key": "missing"}).group == DEFAULT_KEY_GROUP
+        assert KeyDef.from_dict({"key": "blank", "group": "  "}).group == DEFAULT_KEY_GROUP
+
+    def test_group_roundtrip_and_order(self):
+        definitions = [
+            KeyDef.from_dict({"key": "a"}),
+            KeyDef.from_dict({"key": "b", "group": "资产"}),
+            KeyDef.from_dict({"key": "c"}),
+        ]
+        grouped = group_key_definitions(definitions)
+
+        assert list(grouped) == ["default", "资产"]
+        assert [kd.key for kd in grouped["default"]] == ["a", "c"]
+        assert definitions[1].to_dict()["group"] == "资产"
 
 
 # ─── QuotaKeyDef ─────────────────────────────────────────────
@@ -260,7 +279,7 @@ class TestStockKeyDef:
     def test_to_dict_minimal(self):
         kd = StockKeyDef(key="k", label="l")
         d = kd.to_dict()
-        assert d == {"key": "k", "label": "l"}
+        assert d == {"key": "k", "group": "default", "label": "l"}
 
 
 # ─── parse_key_def ───────────────────────────────────────────

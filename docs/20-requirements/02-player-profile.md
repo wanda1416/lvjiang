@@ -176,12 +176,14 @@ config/
 ```yaml
 quota:
 - key: niaoniao_of_week
+  group: default
   label: 袅袅进度
   cap: 3
   steps: [1]
   sync_to: niaoniao
   increment_only: true
 - key: bugan_of_week
+  group: default
   label: 不肝进度
   cap: 23000
   steps: [1000, 23000]
@@ -190,6 +192,7 @@ quota:
 
 regen:
 - key: tili
+  group: default
   label: 体力
   cap: 2500
   regen_type: boundary
@@ -198,6 +201,7 @@ regen:
   alert_above: 2150
   steps: [-900, -1100, -2400]
 - key: xinli
+  group: default
   label: 心力
   cap: 600
   regen_type: realtime
@@ -208,20 +212,35 @@ regen:
 
 stock:
 - key: niaoniao
+  group: default
   label: 袅袅之音
   steps: [-1, -10]
 - key: baoqian
+  group: 资产
   label: 宝钱(万)
 - key: changmingyu
+  group: 资产
   label: 长鸣玉
   steps: [-200, -400]
 
 note:
 - key: build_note
+  group: default
   label: 配装定位
   cap: 7            # 可选：note 也能配上限/软上限/展示上限
   show_cap: true    # 值是数字才显示 X/Y；"主玩会心双刀" 这类文本不受影响，原样显示
 ```
+
+每个 key 通过 `group` 声明类型内分组。缺失或空白值按 `default` 处理，保存时
+显式写出；中文界面把 `default` 显示为「默认」。定义编辑器只展示当前分组，
+分组列表从该模型的全部 key 按首次出现顺序派生，不单独创建空分组。点击表格的
+「分组」列可把单个 key 移入已有或新分组；新增、删除、上移、下移只作用于当前
+分组中的 key。切换分组属于编辑器状态，确定时保存全部分组，取消不修改持久化
+配置。
+
+这里的类型内分组属于 `profile.yaml` 的 key 定义，只组织定义编辑器中的长列表；
+它与 `session.json.profile.overview_groups` 中用户总览的展示分组相互独立，不改变
+总览分组、活动分组、数据库 key 或工作流引用。
 
 **note 与其余三个模型的区别**：存的是自由文本而非数值，不进 `profile_history`
 的数值变更轨迹，也不参与 `sync_targets` 同步。`cap`/`soft`/`show_cap` 字段

@@ -20,13 +20,22 @@ DSL 读写函数，以及「用户总览」和「用户信息」两个通用页�
 
 ## 存储契约
 
-此次模块升格只改变代码归属，不迁移、不改写现有数据：
+Profile 的运行数据契约保持不变；定义文件增加了仅用于编辑器组织的字段：
 
-- `config/session/profile.yaml` 的四模型结构不变。
+- `config/session/profile.yaml` 仍以四个模型的列表保存 key。每个 `KeyDef` 带
+  `group`；旧条目缺失或空白时归入稳定 key `default`，下次保存显式写出。
 - `config/session/profile.db` 仍为 schema v5。
 - `profile_entries` 仍以 `(username, type, key)` 为复合主键。
 - `profile_history` 表结构不变。
 - `session.json.profile` 中的分组、活跃分组和告警历史节点不变。
+
+定义分组不另建顶层或模型内的 `groups` 节点。编辑器从一个模型的完整 `KeyDef`
+序列按 `group` 首次出现顺序派生分组，组内保持 key 的相对顺序；没有 key 的组随即
+消失。界面中的分组筛选是编辑草稿状态，保存必须写回该模型的全部草稿，不能只写
+当前可见组。中文界面将 `default` 显示为「默认」。
+
+`session.json.profile.overview_groups` 继续由用户总览拥有，负责用户可见列和布局。
+它与 `KeyDef.group` 没有同步、重命名或默认选择关系。
 
 「用户信息」页的便利贴不属于 Profile：它不需要预先在
 `profile.yaml` 定义 key，也不参与 DSL、周期计算或变更历史。便利贴

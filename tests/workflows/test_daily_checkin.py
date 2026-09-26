@@ -18,7 +18,8 @@ WORKFLOW_PATH = ROOT / "config/system/workflows/daily_checkin.wf"
 
 class CheckinGame:
     def __init__(self, monkeypatch, *, activities: str, rewards: str,
-                 missing_rewards: tuple[str, ...] = ()):
+                 missing_rewards: tuple[str, ...] = (),
+                 viewports: tuple[tuple[str, ...], ...] | None = None):
         config = load_user_config()
         self.engine = WorkflowEngine(
             capture=MagicMock(), ocr=MagicMock(), input_ctrl=MagicMock(),
@@ -32,6 +33,10 @@ class CheckinGame:
         }
         self.events: list[tuple[str, str, str]] = []
         self.missing_rewards = set(missing_rewards)
+        self.viewports = viewports or (tuple(
+            line.strip() for line in activities.splitlines() if line.strip()
+        ),)
+        self.viewport_index = 0
         original_call = self.engine._exec_call_proc
 
         def call(node):
@@ -43,15 +48,24 @@ class CheckinGame:
 
         def scan(node):
             key = str(node.fields[0].value)
-            target = str(self.engine._resolve(node.by.target))
-            self.events.append(("scan", key, target))
-            self.engine.variables[node.target.name] = key
+            if node.by is None:
+                text = "|".join(self.viewports[self.viewport_index])
+                self.events.append(("scan", key, text))
+                self.engine.variables[node.target.name] = {key: text}
+            else:
+                target = str(self.engine._resolve(node.by.target))
+                self.events.append(("scan", key, target))
+                self.engine.variables[node.target.name] = key
 
         def find(node):
             area = str(node.search_region)
             target = str(self.engine._resolve(node.by.target))
             self.events.append(("find", area, target))
-            if area == "checkin" and target in self.missing_rewards:
+            if area == "reward_list":
+                visible = target in self.viewports[self.viewport_index]
+            else:
+                visible = target not in self.missing_rewards
+            if not visible:
                 self.engine.variables[node.var_name] = ""
             else:
                 self.engine.variables[node.var_name] = FoundRegion(
@@ -68,11 +82,16 @@ class CheckinGame:
                 self.events.append((
                     "click", str(target.scene), str(target.entity)))
 
+        def drag(node):
+            self.events.append(("drag", "reward_list", "up"))
+            self.viewport_index = min(
+                self.viewport_index + 1, len(self.viewports) - 1)
+
         monkeypatch.setattr(self.engine, "_exec_call_proc", call)
         monkeypatch.setattr(self.engine, "_exec_scan", scan)
         monkeypatch.setattr(self.engine, "_exec_find", find)
         monkeypatch.setattr(self.engine, "_exec_click", click)
-        monkeypatch.setattr(self.engine, "_exec_drag", lambda node: None)
+        monkeypatch.setattr(self.engine, "_exec_drag", drag)
         monkeypatch.setattr(self.engine, "_exec_wait", lambda node: None)
 
     def run(self):
@@ -95,6 +114,7 @@ def test_parameters_are_multiline_and_have_public_defaults():
         ("朝夕共赏\n金秋共贺", "签到"),
         ("朝夕共赏\n\n金秋共贺", "签到\n领取\n领取"),
         ("朝夕共赏\n金秋共贺", "签到\n \n"),
+        ("朝夕共赏\n朝夕共赏", "签到\n领取"),
     ],
 )
 def test_invalid_pair_config_aborts_before_navigation(monkeypatch, activities, rewards):
@@ -123,6 +143,37 @@ def test_each_pair_finds_and_clicks_ocr_result_then_returns_to_list(monkeypatch)
     ]
     assert game.events.count(("click", "activity_main", "back")) == 3
     assert game.events[-1] == ("click", "game_menu_page", "back")
+
+
+def test_each_viewport_checks_all_pending_activities_before_scrolling(monkeypatch):
+    """配置顺序与列表顺序相反时，也不会滚到底后漏掉首页活动。"""
+    game = CheckinGame(
+        monkeypatch,
+        activities="末页活动\n首页活动",
+        rewards="领取\n签到",
+        viewports=(("首页活动",), ("中间活动",), ("末页活动",)),
+    ).run()
+
+    assert [event[2] for event in game.events if event[0] == "click_found"] == [
+        "首页活动", "签到", "末页活动", "领取",
+    ]
+    assert game.events.count(("drag", "reward_list", "up")) == 2
+
+
+def test_equal_list_scan_stops_scrolling_at_bottom(monkeypatch):
+    game = CheckinGame(
+        monkeypatch,
+        activities="不存在的活动",
+        rewards="领取",
+        viewports=(("第一页",), ("末页",), ("末页",)),
+    ).run()
+
+    list_scans = [
+        event for event in game.events
+        if event[0] == "scan" and event[1] == "reward_list"
+    ]
+    assert [event[2] for event in list_scans] == ["第一页", "末页", "末页"]
+    assert game.events.count(("drag", "reward_list", "up")) == 2
 
 
 def test_activity_layout_uses_generic_keys_and_desktop_has_no_space_binding():

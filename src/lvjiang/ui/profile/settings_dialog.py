@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QSpinBox,
     QSplitter,
+    QTabBar,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -566,12 +567,13 @@ class _ModelTab(QWidget):
 
         # 工具栏
         toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel(tr("分组:")))
-        self._group_combo = QComboBox()
-        self._group_combo.setMinimumContentsLength(10)
-        self._group_combo.currentIndexChanged.connect(self._group_changed)
-        toolbar.addWidget(self._group_combo)
-        toolbar.addStretch()
+        self._group_tabs = QTabBar()
+        self._group_tabs.setExpanding(False)
+        self._group_tabs.setElideMode(Qt.TextElideMode.ElideNone)
+        self._group_tabs.setUsesScrollButtons(True)
+        self._group_tabs.currentChanged.connect(self._group_changed)
+        # 占满操作按钮左侧空间；分组总宽度超出后 QTabBar 自动显示滚动按钮。
+        toolbar.addWidget(self._group_tabs, 1)
 
         btn_add = QPushButton("+ " + tr("新增"))
         btn_add.clicked.connect(self._add_key)
@@ -621,7 +623,7 @@ class _ModelTab(QWidget):
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.doubleClicked.connect(self._edit_key)
-        self._table.cellClicked.connect(self._cell_clicked)
+        self._table.cellDoubleClicked.connect(self._cell_double_clicked)
 
         # 表头加粗
         header_font = self._table.horizontalHeader().font()
@@ -669,18 +671,30 @@ class _ModelTab(QWidget):
 
     @property
     def current_group(self) -> str:
-        return normalize_key_group(self._group_combo.currentData())
+        index = self._group_tabs.currentIndex()
+        return normalize_key_group(
+            self._group_tabs.tabData(index) if index >= 0 else None
+        )
 
     def set_groups(self, groups: list[str], selected: str) -> None:
         """刷新派生分组列表，并保持当前选择。"""
-        self._group_combo.blockSignals(True)
-        self._group_combo.clear()
+        self._group_tabs.blockSignals(True)
+        while self._group_tabs.count():
+            self._group_tabs.removeTab(0)
         for group in groups:
             label = tr("默认") if group == DEFAULT_KEY_GROUP else group
-            self._group_combo.addItem(label, group)
-        index = self._group_combo.findData(selected)
-        self._group_combo.setCurrentIndex(index if index >= 0 else 0)
-        self._group_combo.blockSignals(False)
+            index = self._group_tabs.addTab(label)
+            self._group_tabs.setTabData(index, group)
+        selected_index = next(
+            (
+                index
+                for index in range(self._group_tabs.count())
+                if self._group_tabs.tabData(index) == selected
+            ),
+            0,
+        )
+        self._group_tabs.setCurrentIndex(selected_index)
+        self._group_tabs.blockSignals(False)
 
     def _get_parent(self) -> "ProfileDefinitionDialog | None":
         parent = self.parent()
@@ -702,7 +716,7 @@ class _ModelTab(QWidget):
             if row >= 0:
                 dialog._edit_key(self._model_type, row)
 
-    def _cell_clicked(self, row: int, column: int):
+    def _cell_double_clicked(self, row: int, column: int):
         if column != 1:
             return
         dialog = self._get_parent()

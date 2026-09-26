@@ -17,6 +17,9 @@
 `batch_check`；至少有一名可执行时，把可执行成员的
 `[{username, attributes}, ...]` 交给条目准备工作流。准备工作流成功时必须返回
 属于该列表的 `username`。任务、独立参数、Session、历史与条目收尾均绑定此用户名。
+选定角色后仅执行该角色 `batch_check` 返回 `success` 的任务；其余任务按检查得到的
+`skipped` 或 `failed` 写入进度、报告和任务历史。结果文件或历史写入失败只记录告警，
+不改变已完成任务的业务结果。
 准备阶段之前锁定本单元全部成员，结束后释放；无法锁定时延期尝试该单元。
 
 生命周期新增 `batch_unit_key`、`batch_unit_value`、`batch_unit_members`，

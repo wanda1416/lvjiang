@@ -699,18 +699,30 @@ class BatchWorker(QThread):
                         locks.enter_context(lease.authorized())
 
                     eligible: list[str] = []
+                    checks_by_member: dict[str, dict[str, BatchCheckResult]] = {}
                     for name in members:
-                        if any(self._check_script(
-                            script, name,
-                            params=self._member_task_plan[(name, script.id)].params,
-                        ).status == RESULT_SUCCESS for script in self._scripts):
+                        checks = {
+                            script.id: self._check_script(
+                                script, name,
+                                params=self._member_task_plan[(name, script.id)].params,
+                            ) for script in self._scripts
+                        }
+                        checks_by_member[name] = checks
+                        if any(check.status == RESULT_SUCCESS
+                               for check in checks.values()):
                             eligible.append(name)
                     if not eligible:
                         self.log.emit(f"[批量] {unit} 内所有角色均无可执行任务")
                         done.add(unit)
                         for script in self._scripts:
-                            entry["scripts"][script.id] = ST_SKIPPED
-                            self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
+                            statuses = [checks[script.id].status
+                                        for checks in checks_by_member.values()]
+                            status = (ST_FAILED if RESULT_FAILED in statuses
+                                      else ST_SKIPPED)
+                            entry["scripts"][script.id] = status
+                            self.progress.emit(run_idx, label, script.id, status)
+                            report.start_script(script.id, script.name)
+                            report.end_script(status)
                         report.record_prepare(ST_SKIPPED)
                         continue
 
@@ -753,9 +765,39 @@ class BatchWorker(QThread):
                         if self._stop_check():
                             self._stopped = True
                             break
+                        planned = self._member_task_plan[(username, script.id)]
+                        checked = checks_by_member[username][script.id]
+                        if checked.status != RESULT_SUCCESS:
+                            status = self._result_to_ui_status(checked.status)
+                            entry["scripts"][script.id] = status
+                            self.progress.emit(run_idx, label, script.id, status)
+                            report.start_script(script.id, script.name)
+                            report.end_script(status)
+                            reason = checked.message or checked.status
+                            self.log.emit(
+                                f"[批量] {label} → {script.name} "
+                                f"{'跳过' if status == ST_SKIPPED else '检查失败'}: "
+                                f"{reason}")
+                            check_run = try_create_task_run(
+                                username=username, task_id=script.id,
+                                task_name=script.name, task_scope=script.scope,
+                                params=copy.deepcopy(planned.params), source="batch",
+                                batch_run_id=batch_run_id,
+                                repository=(batch_run.repository
+                                            if batch_run is not None else None),
+                            )
+                            if check_run is not None:
+                                try:
+                                    check_run.finish(
+                                        status=checked.status,
+                                        error_message=reason,
+                                    )
+                                except Exception as history_exc:  # noqa: BLE001
+                                    logger.warning(
+                                        f"任务历史收尾失败，继续批量任务: {history_exc}")
+                            continue
                         self.progress.emit(run_idx, label, script.id, ST_RUNNING)
                         report.start_script(script.id, script.name)
-                        planned = self._member_task_plan[(username, script.id)]
                         task_run = try_create_task_run(
                             username=username, task_id=script.id,
                             task_name=script.name, task_scope=script.scope,
@@ -775,17 +817,49 @@ class BatchWorker(QThread):
                             entry["scripts"][script.id] = ST_SUCCESS
                             report.end_script(ST_SUCCESS, result)
                             self.progress.emit(run_idx, label, script.id, ST_SUCCESS)
-                            result_path = self._save_result(username, script, result)
+                            self.log.emit(f"[批量] {label} → {script.name} 完成")
+                            try:
+                                result_path = self._save_result(
+                                    username, script, result)
+                            except Exception as output_exc:  # noqa: BLE001
+                                result_path = None
+                                logger.warning(
+                                    f"批量结果保存失败，继续任务收尾: {output_exc}")
+                                self.log.emit(
+                                    f"[批量] {label} → {script.name} "
+                                    f"结果 JSON 保存失败: {output_exc}")
                             if task_run is not None:
-                                task_run.finish(status="completed", result_path=result_path)
+                                try:
+                                    task_run.finish(
+                                        status=("interrupted" if self._stop_check()
+                                                else "completed"),
+                                        result_path=result_path)
+                                except Exception as history_exc:  # noqa: BLE001
+                                    logger.warning(
+                                        f"任务历史收尾失败，继续批量任务: {history_exc}")
                         except Exception as exc:  # noqa: BLE001
                             logger.exception(f"属性单元任务失败: {unit}/{script.id}")
+                            result_path = None
+                            try:
+                                result_path = self._save_result(
+                                    username, script, {
+                                        "error": str(exc),
+                                        "exception_type": type(exc).__name__,
+                                    })
+                            except Exception as output_exc:  # noqa: BLE001
+                                logger.warning(f"批量失败结果保存失败: {output_exc}")
                             entry["scripts"][script.id] = ST_FAILED
                             report.end_script(ST_FAILED)
                             self.progress.emit(run_idx, label, script.id, ST_FAILED)
                             self.log.emit(f"[批量] {label} → {script.name} 失败: {exc}")
                             if task_run is not None:
-                                task_run.finish(status="failed", error_message=str(exc))
+                                try:
+                                    task_run.finish(
+                                        status="failed", result_path=result_path,
+                                        error_message=str(exc))
+                                except Exception as history_exc:  # noqa: BLE001
+                                    logger.warning(
+                                        f"任务历史收尾失败，继续批量任务: {history_exc}")
                     if self._stopped:
                         report.finish_pending()
                     finished = self._run_stage(
@@ -838,7 +912,12 @@ class BatchWorker(QThread):
                 round_number=self._config.rounds)
             summary["lifecycle"]["batch_teardown"] = teardown.status
         report.end_batch(stopped=self._stopped)
-        report_path = report.write()
+        report_path = None
+        try:
+            report_path = report.write()
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"批量报告写入失败: {exc}")
+            self.log.emit(f"[批量] 报告写入失败（不影响执行结果）: {exc}")
         if batch_run is not None:
             failed = (
                 any(value == RESULT_FAILED
@@ -848,9 +927,12 @@ class BatchWorker(QThread):
                        or ST_FAILED in entry["scripts"].values()
                        for entry in summary["entries"].values())
             )
-            batch_run.finish(
-                status="interrupted" if self._stopped else "failed" if failed
-                else "completed", report_path=report_path)
+            try:
+                batch_run.finish(
+                    status="interrupted" if self._stopped else "failed" if failed
+                    else "completed", report_path=report_path)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"批量历史收尾失败，继续退出批量任务: {exc}")
         self.finished_all.emit(summary)
 
     # ─── 生命周期协议 ────────────────────────────────────

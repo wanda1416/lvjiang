@@ -2,21 +2,67 @@
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]
+#% note: |-
+#%   左侧活动名称与右侧领奖关键字必须逐行对应，并按活动列表从上到下填写。
+#% parameters:
+#%   - name: activity_names
+#%     label: 左侧活动名称（每行一个）
+#%     type: text
+#%     multiline: true
+#%     default: "朝夕共赏"
+#%   - name: reward_keywords
+#%     label: 右侧领奖关键字（与活动名称逐行对应）
+#%     type: text
+#%     multiline: true
+#%     default: "签到"
 
 # 每日自动签到流程
 #
 # 流程结构：
-#   1. 从游戏首页进入菜单 → 活动页面
-#   2. 依次调用各活动签到过程（当前仅朝夕共赏，后续可扩展）
-#   3. 全部完成后从菜单退回主页
-#
-# 各活动过程前置：在活动列表页
-# 各活动过程后置：退回菜单页（找不到活动时原地不动）
+#   1. 执行前校验两份逐行对应的活动配置
+#   2. 从游戏首页进入菜单 → 活动页面
+#   3. 按活动列表顺序定位活动，在领奖区域查找并点击对应关键字
+#   4. 全部完成后从菜单退回主页
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 
-# ─── 从游戏首页进入活动页面 ─────────────────────────────
+default $activity_names = "朝夕共赏"
+default $reward_keywords = "签到"
+
+# ─── 校验并整理逐行配置 ──────────────────────────────────
+eval $activity_lines = split_lines($activity_names)
+eval $reward_lines = split_lines($reward_keywords)
+
+if len($activity_lines) == 0
+    log error "每日签到配置无效：请至少填写一个左侧活动名称。"
+    return -1
+end
+if len($activity_lines) != len($reward_lines)
+    log error "每日签到配置无效：左侧活动名称有 " + len($activity_lines) + " 项，右侧领奖关键字有 " + len($reward_lines) + " 项，请逐行对应填写。"
+    return -1
+end
+
+eval $activities = []
+eval $rewards = []
+for activity_line in $activity_lines
+    eval $activity_name = trim($activity_line)
+    if $activity_name is_empty
+        log error "每日签到配置无效：左侧活动名称不能包含空行。"
+        return -1
+    end
+    eval append($activities, $activity_name)
+end
+for reward_line in $reward_lines
+    eval $reward_keyword = trim($reward_line)
+    if $reward_keyword is_empty
+        log error "每日签到配置无效：右侧领奖关键字不能包含空行。"
+        return -1
+    end
+    eval append($rewards, $reward_keyword)
+end
+
+# ─── 从游戏首页进入活动页面 ──────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
     return -1
@@ -28,49 +74,50 @@ if not $nav_check
 end
 click [game_menu_page].[huodong] after wait @page_refresh
 
-# ─── 各活动签到 ──────────────────────────────────────
-call checkin_zhaoxi()
+# ─── 依次领取各活动奖励 ──────────────────────────────────
+for activity_name in $activities
+    eval $reward_head = slice($rewards, 0, 0)
+    eval $reward_keyword = $reward_head[0]
+    eval remove($rewards, $reward_keyword)
+    call claim_activity($activity_name, $reward_keyword)
+end
 
-# TODO: 后续在此添加更多活动签到过程
-# call checkin_xxx()
-
-# ─── 从活动退回菜单 ──────────────────────────────────────
+# ─── 从活动退回菜单，再退回主页 ──────────────────────────
 click [activity_main].[back] after wait @step_interval
-# ─── 从菜单退回主页 ──────────────────────────────────────
 click [game_menu_page].[back] after wait @step_interval
 log "每日签到流程结束。"
 
-# ─── 朝夕共赏 ──────────────────────────────────────────
-# 在活动列表中查找朝夕共赏 → 进入 → 签到 → 退回菜单页
-def checkin_zhaoxi()
-   # 最多滚动 5 次
-   $found = ""
-   wait @step_interval
-   loop 5
-      find [activity_main].[liebiao] as $found by contains "朝夕"
-      if $found
-         log "定位到朝夕共赏，准备领奖。"
-         break
-      end
-      drag [activity_main].[liebiao] up 0.5 after wait @step_interval
-   end
+# ─── 通用活动领奖过程 ────────────────────────────────────
+# 前置和后置均为活动列表页；单项失败不会阻止后续活动。
+def claim_activity($activity_name, $reward_keyword)
+    eval $found = ""
+    wait @step_interval
+    loop 5
+        find [activity_main].[reward_list] as $found by contains $activity_name
+        if $found
+            log "定位到活动“" + $activity_name + "”，准备领奖。"
+            break
+        end
+        drag [activity_main].[reward_list] up 0.5 after wait @step_interval
+    end
 
-   if not $found
-      log "未找到朝夕共赏活动，可能未开放或已结束。"
-      return -1
-   end
+    if not $found
+        log "未找到活动“" + $activity_name + "”，可能未开放、已结束或不在当前滚动范围。"
+        return -1
+    end
 
-   click $found after wait @page_refresh
+    click $found after wait @page_refresh
 
-   scan [activity_main].[qiandao] as $sign by contains "签到"
-   if $sign
-      log "检测到签到按钮，点击签到领奖。"
-      click [activity_main].[qiandao] after wait @page_refresh
-      log "签到完成！"
+    find [activity_main].[checkin] as $reward by contains $reward_keyword
+    if $reward
+        log "检测到“" + $reward_keyword + "”，点击领取。"
+        click $reward after wait @page_refresh
+        log "活动“" + $activity_name + "”领取完成。"
+    else
+        log "活动“" + $activity_name + "”未找到“" + $reward_keyword + "”，可能已经领取。"
+    end
 
-      # 签到后：两次 back 退回菜单页
-      click [activity_main].[back] after wait @step_interval
-   else
-      log "今日已签到，无需重复操作。"
-   end
+    # 无论是否存在领奖按钮，都回到活动列表继续下一项。
+    click [activity_main].[back] after wait @step_interval
+    return 0
 end

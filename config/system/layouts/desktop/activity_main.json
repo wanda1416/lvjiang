@@ -2,19 +2,18 @@
   "content_version": 1,
   "regions": [
     {
-      "key": "liebiao",
+      "key": "reward_list",
       "x_ratio": 0.11626621988571689,
       "y_ratio": 0.1439959885471476,
       "w_ratio": 0.09718437783832878,
       "h_ratio": 0.7440855534853481
     },
     {
-      "key": "qiandao",
+      "key": "checkin",
       "x_ratio": 0.8171790219857976,
       "y_ratio": 0.8752170940066525,
       "w_ratio": 0.16712079927338785,
-      "h_ratio": 0.08073468563931774,
-      "activation_key": "SPACE"
+      "h_ratio": 0.08073468563931774
     },
     {
       "key": "back",

@@ -1,0 +1,11 @@
+{
+  "content_version": 1,
+  "regions": [
+    {"key": "map_area", "x_ratio": 0.005, "y_ratio": 0.1, "w_ratio": 0.7, "h_ratio": 0.8},
+    {"key": "map_view", "x_ratio": 0.28, "y_ratio": 0.12, "w_ratio": 0.42, "h_ratio": 0.7},
+    {"key": "travel", "x_ratio": 0.71, "y_ratio": 0.91, "w_ratio": 0.12, "h_ratio": 0.05, "activation_key": "V"},
+    {"key": "confirm_direct", "x_ratio": 0.446, "y_ratio": 0.568, "w_ratio": 0.08, "h_ratio": 0.04, "activation_key": "F"},
+    {"key": "home_controls", "x_ratio": 0.77, "y_ratio": 0.84, "w_ratio": 0.22, "h_ratio": 0.13},
+    {"key": "motion", "x_ratio": 0.3, "y_ratio": 0.18, "w_ratio": 0.4, "h_ratio": 0.4}
+  ]
+}

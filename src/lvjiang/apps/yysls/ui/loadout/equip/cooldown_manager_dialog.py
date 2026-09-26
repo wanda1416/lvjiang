@@ -220,10 +220,10 @@ class CooldownEquipmentDialog(QDialog):
         _equip: dict,
     ) -> None:
         changed = False
+        fp = str(entry.equip.get("_fp") or "")
 
         def update_cooldown(value: str) -> bool:
             nonlocal changed
-            fp = str(entry.equip.get("_fp") or "")
             if not fp:
                 QMessageBox.warning(
                     self, tr("修改失败"), tr("装备数据缺少 _fp 字段"))
@@ -248,7 +248,6 @@ class CooldownEquipmentDialog(QDialog):
             对话框在哪里打开都该是同一套能力，不该按入口残缺。
             """
             nonlocal changed
-            fp = str(entry.equip.get("_fp") or "")
             if not fp:
                 QMessageBox.warning(
                     self, tr("切换失败"), tr("装备数据缺少 _fp 字段"))
@@ -265,9 +264,29 @@ class CooldownEquipmentDialog(QDialog):
             self.changed = True
             return True
 
+        repo = LoadoutRepository(entry.username, self._users_dir)
+
+        def dingyin_swap_candidates(kind: str) -> list[dict]:
+            return repo.dingyin_swap_candidates(fp, kind)
+
+        def swap_dingyin(kind: str, target_fp: str) -> dict | None:
+            nonlocal changed
+            try:
+                state = repo.swap_item_dingyin(fp, target_fp, kind)
+            except Exception as exc:
+                logger.exception(
+                    f"互换用户 {entry.username} 的装备定音失败")
+                QMessageBox.critical(self, tr("互换失败"), str(exc))
+                return None
+            changed = True
+            self.changed = True
+            return state.equipment_items.get(fp)
+
         _show_equipment_properties(
             self, entry.equip, cooldown_changed=update_cooldown,
             dingyin_changed=switch_dingyin,
+            dingyin_swap_candidates=dingyin_swap_candidates,
+            dingyin_swapped=swap_dingyin,
             referenced_plans=entry.referenced_plans)
         if changed:
             self._reload()

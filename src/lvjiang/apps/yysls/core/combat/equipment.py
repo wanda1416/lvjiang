@@ -230,6 +230,14 @@ class EquipmentInventory:
         """切换背包中某件装备默认展示哪种定音，不动任何方案的选择。"""
         self._state = self._repo.set_item_dingyin_type(fp, kind)
 
+    def dingyin_swap_candidates(self, fp: str, kind: str) -> list[dict]:
+        """加载同部位、且具有指定定音槽的其他装备。"""
+        return self._repo.dingyin_swap_candidates(fp, kind)
+
+    def swap_item_dingyin(self, first_fp: str, second_fp: str, kind: str) -> None:
+        """互换两件装备的具体定音属性。"""
+        self._state = self._repo.swap_item_dingyin(first_fp, second_fp, kind)
+
     def set_plan_equipment_set(self, slot_key: str, set_key: str) -> None:
         """修改当前方案槽位的套装覆盖。"""
         self._state = self._repo.set_plan_equipment_set(

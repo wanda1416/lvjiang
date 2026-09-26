@@ -208,6 +208,59 @@ def test_switching_is_refused_when_only_one_slot_has_data(tmp_path: Path):
         repo.set_item_dingyin_type("real-fp", DINGYIN_ZHIGE)
 
 
+def test_normal_dingyin_swap_is_atomic_and_keeps_plan_kinds(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    plan_id = repo.load().active_plan_id
+    first = _equip(
+        _fp="ring-a", name="甲环",
+        dingyin={"name": "外功穿透", "value": 14.2},
+        dingyin_zhige={"name": "止戈甲"},
+        dingyin_type=DINGYIN_ZHIGE,
+    )
+    second = _equip(
+        _fp="ring-b", name="乙环",
+        dingyin={"name": "会意伤害", "value": 9.2},
+        dingyin_zhige={"name": "止戈乙"},
+        dingyin_type=DINGYIN_NORMAL,
+    )
+    repo.assign_equipment(plan_id, "ring", first, scanned=True)
+    repo.upsert_item(second)
+
+    before = repo.load()
+    plan_kind = before.plans[plan_id].dingyin["ring"]
+    repo.swap_item_dingyin("ring-a", "ring-b", DINGYIN_NORMAL)
+    state = repo.load()
+
+    assert state.equipment_items["ring-a"]["dingyin"] == second["dingyin"]
+    assert state.equipment_items["ring-b"]["dingyin"] == first["dingyin"]
+    assert state.equipment_items["ring-a"]["dingyin_zhige"] == {"name": "止戈甲"}
+    assert state.equipment_items["ring-b"]["dingyin_zhige"] == {"name": "止戈乙"}
+    assert state.equipment_items["ring-a"][DINGYIN_TYPE_KEY] == (
+        before.equipment_items["ring-a"][DINGYIN_TYPE_KEY])
+    assert state.equipment_items["ring-b"][DINGYIN_TYPE_KEY] == (
+        before.equipment_items["ring-b"][DINGYIN_TYPE_KEY])
+    assert state.plans[plan_id].dingyin["ring"] == plan_kind
+
+
+def test_dingyin_swap_candidates_use_equipment_part(tmp_path: Path):
+    repo = LoadoutRepository("alice", tmp_path)
+    items = [
+        _equip(_fp="sword", type="剑", dingyin={"name": "甲", "value": 1}),
+        _equip(_fp="spear", type="枪", dingyin={"name": "乙", "value": 2}),
+        _equip(_fp="ring", type="环", dingyin={"name": "丙", "value": 3}),
+        _equip(_fp="fan-no-dingyin", type="扇"),
+    ]
+    for item in items:
+        repo.upsert_item(item)
+
+    assert [item["_fp"] for item in repo.dingyin_swap_candidates(
+        "sword", DINGYIN_NORMAL)] == ["spear"]
+    with pytest.raises(ValueError, match="同类型"):
+        repo.swap_item_dingyin("sword", "ring", DINGYIN_NORMAL)
+    with pytest.raises(ValueError, match="尚未配置"):
+        repo.swap_item_dingyin("sword", "spear", DINGYIN_ZHIGE)
+
+
 def test_replacing_or_clearing_a_slot_drops_its_dingyin_choice(tmp_path: Path):
     """换了一件装备，上一件的定音选择不能顺延给它。"""
     repo = LoadoutRepository("alice", tmp_path)

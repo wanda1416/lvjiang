@@ -542,6 +542,114 @@ def test_properties_dialog_shows_set_with_inline_switch_button(qtbot):
     assert ("huanhua", "浣花") in dialog._equipment_set_options()
 
 
+def test_properties_dialog_offers_normal_swap_and_disables_zhige_swap(qtbot):
+    from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import (
+        DINGYIN_NORMAL,
+        DINGYIN_ZHIGE,
+    )
+    from lvjiang.apps.yysls.ui.loadout.equip.cards import (
+        _EquipmentPropertiesDialog,
+    )
+
+    dialog = _EquipmentPropertiesDialog(
+        {
+            "_fp": "ring-a", "type": "环", "equipment_set": "yudou",
+            "dingyin": {"name": "外功穿透", "value": 14.2},
+            "dingyin_zhige": {"name": "止戈定音"},
+        },
+        equipment_set_changed=lambda _key: True,
+        dingyin_swap_candidates=lambda _kind: [],
+        dingyin_swapped=lambda _kind, _fp: None,
+    )
+    qtbot.addWidget(dialog)
+
+    normal = dialog._swap_dingyin_buttons[DINGYIN_NORMAL]
+    zhige = dialog._swap_dingyin_buttons[DINGYIN_ZHIGE]
+    assert normal.text() == "互换定音"
+    assert normal.isEnabled()
+    assert normal.styleSheet() == dialog._switch_equipment_set_button.styleSheet()
+    assert not zhige.isEnabled()
+    assert "尚未配置" in zhige.toolTip()
+
+
+def test_dingyin_swap_dialog_lists_candidate_details(qtbot):
+    from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import DINGYIN_NORMAL
+    from lvjiang.apps.yysls.ui.loadout.equip.cards import _DingyinSwapDialog
+
+    dialog = _DingyinSwapDialog(
+        {"_fp": "ring-a", "type": "环", "name": "甲环"},
+        [{
+            "_fp": "ring-b", "type": "环", "name": "乙环", "level": 110,
+            "dingyin": {"name": "会意伤害", "value": 9.2},
+        }],
+        DINGYIN_NORMAL,
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog._candidates.count() == 1
+    assert "乙环" in dialog._candidates.item(0).text()
+    assert "会意伤害" in dialog._candidates.item(0).text()
+    assert not dialog._swap_button.isEnabled()
+    dialog._candidates.setCurrentRow(0)
+    assert dialog._swap_button.isEnabled()
+    assert dialog.selected_fingerprint == "ring-b"
+
+
+def test_properties_normal_swap_button_updates_display(
+    qtbot, monkeypatch,
+):
+    from PyQt6.QtWidgets import QDialog
+
+    from lvjiang.apps.yysls.core.equip_parser.dingyin_parser import DINGYIN_NORMAL
+    from lvjiang.apps.yysls.ui.loadout.equip import cards
+
+    requested: list[str] = []
+    swapped: list[tuple[str, str]] = []
+    candidate = {
+        "_fp": "ring-b", "type": "环", "name": "乙环",
+        "dingyin": {"name": "会意伤害", "value": 9.2},
+    }
+
+    class _AcceptedSwapDialog:
+        selected_fingerprint = "ring-b"
+
+        def __init__(self, _current, candidates, kind, _parent):
+            assert candidates == [candidate]
+            assert kind == DINGYIN_NORMAL
+
+        @staticmethod
+        def exec():
+            return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(cards, "_DingyinSwapDialog", _AcceptedSwapDialog)
+
+    def candidates(kind):
+        requested.append(kind)
+        return [candidate]
+
+    def swap(kind, fp):
+        swapped.append((kind, fp))
+        return {
+            "_fp": "ring-a", "type": "环", "name": "甲环",
+            "dingyin": dict(candidate["dingyin"]),
+        }
+
+    dialog = cards._EquipmentPropertiesDialog(
+        {
+            "_fp": "ring-a", "type": "环", "name": "甲环",
+            "dingyin": {"name": "外功穿透", "value": 14.2},
+        },
+        dingyin_swap_candidates=candidates,
+        dingyin_swapped=swap,
+    )
+    qtbot.addWidget(dialog)
+    dialog._swap_dingyin_buttons[DINGYIN_NORMAL].click()
+
+    assert requested == [DINGYIN_NORMAL]
+    assert swapped == [(DINGYIN_NORMAL, "ring-b")]
+    assert "会意伤害" in dialog._value_labels["普通定音"].text()
+
+
 def test_equipment_cards_show_plain_set_name_at_level_row_end(qtbot):
     equip = {
         "type": "环", "name": "流星环", "level": 110,

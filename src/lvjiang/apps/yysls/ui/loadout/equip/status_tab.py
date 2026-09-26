@@ -1474,10 +1474,36 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
                 QMessageBox.critical(self, tr("修改失败"), str(exc))
                 return False
 
+        def dingyin_swap_candidates(kind: str) -> list[dict]:
+            inv = self._require_inventory()
+            if inv is None:
+                return []
+            try:
+                return inv.dingyin_swap_candidates(fp, kind)
+            except Exception as exc:
+                logger.error(f"加载定音互换候选失败: {exc}")
+                raise
+
+        def swap_dingyin(kind: str, target_fp: str) -> dict | None:
+            inv = self._require_inventory()
+            if inv is None:
+                return None
+            try:
+                inv.swap_item_dingyin(fp, target_fp, kind)
+                updated = copy.deepcopy(inv.state.equipment_items.get(fp))
+                self._sync_inv(notify=True)
+                return updated
+            except Exception as exc:
+                logger.error(f"互换装备定音失败: {exc}")
+                QMessageBox.critical(self, tr("互换失败"), str(exc))
+                return None
+
         _show_equipment_properties(
             self.window(), equip_data, cooldown_changed=update_cooldown,
             dingyin_changed=switch_dingyin,
             equipment_set_changed=switch_equipment_set,
+            dingyin_swap_candidates=dingyin_swap_candidates,
+            dingyin_swapped=swap_dingyin,
             dingyin_kind=(self._plan_dingyin_kind(slot_key)
                           if slot_key else ""),
             referenced_plans=referenced_plans)

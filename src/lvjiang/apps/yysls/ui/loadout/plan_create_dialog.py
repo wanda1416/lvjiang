@@ -16,6 +16,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from lvjiang.ui.layout_helpers import config_field_card, fit_combo_to_contents
+
 from .....i18n import tr
 from .....ui.button_styles import apply_dialog_button_box_style
 from ...config import GameConfigManager
@@ -28,7 +30,6 @@ from ...core.loadout import (
 )
 from ...core.loadout.models import COMBAT_TYPE_PVE, COMBAT_TYPE_PVP
 from ..domain_labels import combat_type_label
-from ..layout_helpers import config_field_card, fit_combo_to_contents
 
 
 class PlanCreateDialog(QDialog):

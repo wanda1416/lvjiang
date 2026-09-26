@@ -43,9 +43,16 @@ from lvjiang.ui.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.layout_helpers import fit_combo_to_contents
 from lvjiang.ui.widgets import FlowLayout
 
 from .....i18n import tr
+from .....ui.presentation import (
+    highlight_pill,
+    make_pill,
+    muted_pill,
+    style_document_tabs,
+)
 from ...config.equipment_slots import SLOT_SPECS
 from ...core.affix_cap import affix_dict_cap_pct
 from ...core.combat.combat_attrs import (
@@ -65,15 +72,10 @@ from ...core.graduation.optimal_combo import (
 )
 from ..domain_labels import domain_label
 from ..events import EQUIPMENT_CHANGED, get_event_hub
-from ..layout_helpers import fit_combo_to_contents
 from .background import JobContext, JobController, JobProgress
 from .widgets import (
     HypothesisViewToggle,
     assumption_pill,
-    highlight_pill,
-    make_pill,
-    muted_pill,
-    style_document_tabs,
 )
 
 #: 「评级要求」可选档位，由高到低。垃圾不列：要求「至少是垃圾」等于没有要求。

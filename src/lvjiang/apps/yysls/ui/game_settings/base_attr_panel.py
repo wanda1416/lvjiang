@@ -38,11 +38,11 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, EQUIP_PART_NAMES, WUXUE_CATEGORY
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.layout_helpers import configure_navigation_list
 
 from .....i18n import tr
 from ...config.affix_levels import OPEN as OPEN_LEVEL_RANGE
 from ...config.affix_levels import LevelRange, dump_entry, parse_entry
-from ..layout_helpers import configure_navigation_list
 from .equipment_set_panel import EquipmentSetEditor
 from .factory_guard import deletable, factory_list_values
 from .level_combo import LevelCombo

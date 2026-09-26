@@ -47,7 +47,6 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     get_tuning_group_manager,
     get_tuning_rule_manager,
 )
-from lvjiang.apps.yysls.ui.layout_helpers import fit_combo_to_contents
 from lvjiang.core.config.edit_session import ConfigEditSession
 from lvjiang.core.config.resolver import get_resolver
 from lvjiang.ui.button_styles import (
@@ -55,13 +54,14 @@ from lvjiang.ui.button_styles import (
     apply_dialog_button_box_style,
 )
 from lvjiang.ui.config_origin import layer_style, origin_tooltip
-
-from .....i18n import tr
-from ..layout_helpers import (
+from lvjiang.ui.layout_helpers import (
     configure_navigation_list,
+    fit_combo_to_contents,
     mark_navigation_list,
     navigation_width_for_chars,
 )
+
+from .....i18n import tr
 from .base_rule_page import BaseRuleGroupPage
 from .behavior_pages import ScanBehaviorPage, TuneBehaviorPage
 from .material_config_page import MaterialConfigPage

@@ -31,11 +31,11 @@ from .....ui.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
+from .....ui.presentation import style_document_tabs
 from ...core.graduation.assumptions import Assumptions
 from ...core.graduation.transmute_optimizer import TransmutePlanResult
 from .affix_analysis_pages import AffixAnalysisPages
 from .optimal_combo import OptimalComboPage
-from .widgets import style_document_tabs
 
 TAB_OPTIMAL = 0
 TAB_TRANSMUTE = 1

@@ -39,6 +39,7 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 from lvjiang.ui.theme import get_theme_manager
 
 from .....i18n import tr
@@ -48,7 +49,6 @@ from ...core.damage import (
     get_damage_model_manager,
     invalidate_damage_model_cache,
 )
-from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 
 
 def _status_color(status: str) -> QBrush:

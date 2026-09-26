@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.layout_helpers import fit_combo_to_contents
 from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from lvjiang.ui.user_toolbar import add_user_nav_buttons
 
@@ -36,7 +37,6 @@ from ....core.combat.combat_attrs import (
     format_value,
 )
 from ...events import get_event_hub
-from ...layout_helpers import fit_combo_to_contents
 from .cards import CombatCardsMixin
 from .graduation import CombatGraduationMixin
 from .layout import (

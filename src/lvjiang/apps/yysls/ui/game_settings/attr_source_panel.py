@@ -53,6 +53,7 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 from lvjiang.ui.theme import get_theme_manager
 
 from .....i18n import tr
@@ -72,7 +73,6 @@ from ...core.attr_model import (
     invalidate_attr_model_cache,
 )
 from ...core.combat.combat_attrs import COMBAT_ATTR_FIELDS
-from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 
 #: 取值方式
 MODE_PENDING = "未填"

@@ -30,13 +30,13 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     rule_affix_candidates,
     specific_attr_names,
 )
-
-from .....i18n import tr
-from ..layout_helpers import (
+from lvjiang.ui.layout_helpers import (
     configure_navigation_list,
     mark_navigation_list,
     navigation_width_for_chars,
 )
+
+from .....i18n import tr
 from .common_judge_page import CommonJudgePage
 from .part_pattern_page import PartPatternPage
 from .pool_page import PoolPage

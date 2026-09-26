@@ -106,7 +106,7 @@ class _MultiSelectMenu(QMenu):
 
 def _fit_filter_combo(combo: QComboBox) -> int:
     """按主题边框、箭头和最长选项计算筛选框与弹出列表的宽度。"""
-    from ...layout_helpers import fit_combo_to_contents
+    from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
     return fit_combo_to_contents(combo)
 

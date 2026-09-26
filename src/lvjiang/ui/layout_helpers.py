@@ -1,4 +1,4 @@
-"""Shared sizing and styling helpers for YYSLS configuration UIs."""
+"""配置界面共用的尺寸与布局辅助函数。"""
 
 from __future__ import annotations
 

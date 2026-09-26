@@ -31,6 +31,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.layout_helpers import fit_combo_to_contents
+
 from ......i18n import tr
 from ......ui.button_styles import apply_button_style, apply_dialog_button_box_style
 from ....core.affix_cap import (
@@ -39,7 +41,6 @@ from ....core.affix_cap import (
     can_cultivate_affix_values,
 )
 from ....core.equipment_cooldown import next_cooldown_expiry
-from ...layout_helpers import fit_combo_to_contents
 
 # 部位 → group_key 映射
 _PART_TO_GROUP = {

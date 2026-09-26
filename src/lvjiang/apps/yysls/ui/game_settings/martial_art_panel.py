@@ -22,10 +22,10 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.layout_helpers import config_field_card, configure_navigation_list
 
 from .....i18n import tr
 from ...config import get_game_config
-from ..layout_helpers import config_field_card, configure_navigation_list
 
 _ATTRS_REL = "yysls/game_config"
 

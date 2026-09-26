@@ -49,13 +49,13 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 
 from .....i18n import tr
 from ...config.affix_levels import FROM_KEY as FROM_LEVEL_KEY
 from ...config.affix_levels import THROUGH_KEY as THROUGH_LEVEL_KEY
 from ...config.affix_levels import LevelRange, parse_range
 from ..domain_labels import domain_label
-from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 from .level_combo import LevelCombo
 

@@ -14,3 +14,7 @@
 复用；内容冲突、旧节点形状错误或出现未知子项时停止迁移并保留原数据。
 `play_styles` 与 `attr_derivations` 的联合更新使用可恢复事务，保存、删除、
 重命名基础属性后两份状态保持一致。
+
+目录锁、原子读写、版本校验和事务恢复由通用
+`core.config.document_store.DocumentDirectoryStore` 提供；燕云适配器只登记上述
+文件并实现旧 `session.json.yysls` 节点迁移。该抽取不改变磁盘格式和初始化顺序。

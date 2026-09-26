@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style
+from .....ui.presentation import is_dark_theme
 from ...config.equipment_slots import grid_layout
 from ...config.tune_slots import SLOT_LABELS
 from ...core.graduation.affix_impact import (
@@ -55,7 +56,7 @@ from ...core.loadout.transmute import (
 )
 from .background import JobController
 from .equip.cards import _SlotCard
-from .widgets import is_dark_theme, metric_card, set_metric_value
+from .widgets import metric_card, set_metric_value
 
 JointAnalyzer = Callable[[tuple[str, ...]], AffixCombinationResult]
 ReportProvider = Callable[[], AffixImpactReport]

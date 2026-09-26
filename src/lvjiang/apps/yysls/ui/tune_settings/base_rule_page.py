@@ -41,11 +41,11 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     RuleValidationError,
     TuningGroupManager,
 )
-from lvjiang.apps.yysls.ui.layout_helpers import fit_combo_to_contents
 from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr
 

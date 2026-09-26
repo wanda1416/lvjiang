@@ -28,9 +28,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.layout_helpers import fit_combo_to_contents
+
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style
-from ..layout_helpers import fit_combo_to_contents
 from .affix_picker import AffixSelectSortDialog
 
 # 原语类型 → 显示名（4 原语，include_first 全原语可勾）

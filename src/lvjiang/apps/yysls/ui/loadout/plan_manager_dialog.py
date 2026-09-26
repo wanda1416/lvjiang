@@ -22,6 +22,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
+
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style
 from ...config import GameConfigManager, get_game_config
@@ -32,7 +34,6 @@ from ...core.loadout import (
 )
 from ..domain_labels import combat_type_label
 from ..game_settings.level_combo import LevelCombo
-from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from .plan_create_dialog import PlanCreateDialog
 from .plan_table_delegate import (
     COL_NAME,

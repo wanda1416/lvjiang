@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style, apply_dialog_button_box_style
+from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr
 from ...core.attr_model.character import CharacterProfileManager, evaluate_profile
@@ -38,7 +39,6 @@ from ...core.attr_model.models import (
     Formula,
 )
 from ...core.combat.combat_attrs import COMBAT_ATTR_FIELDS
-from ..layout_helpers import fit_combo_to_contents
 
 _LABELS = {name: label for name, label, *_ in COMBAT_ATTR_FIELDS} | DIMENSION_LABELS | ROLE_FIELDS
 _KINDS = {"level": "个人等级", "talent": "基础天赋", "oddity": "蹊跷",

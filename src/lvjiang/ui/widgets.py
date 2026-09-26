@@ -12,38 +12,15 @@ from PyQt6.QtWidgets import (
     QLayout,
     QMenu,
     QPushButton,
-    QStyle,
-    QStyleOptionComboBox,
     QTextEdit,
     QWidget,
 )
 
+from .layout_helpers import fit_combo_popup_to_contents
+
+__all__ = ["fit_combo_popup_to_contents"]
+
 _MAX_LOG_LINES = 1000
-
-
-def fit_combo_popup_to_contents(combo: QComboBox, *, minimum: int = 0) -> int:
-    """让下拉列表完整展示最长选项，同时允许收起后的控件保持紧凑。"""
-    combo.ensurePolished()
-    text_width = max(
-        (combo.fontMetrics().horizontalAdvance(combo.itemText(index))
-         for index in range(combo.count())),
-        default=0,
-    )
-    option = QStyleOptionComboBox()
-    option.initFrom(combo)
-    style = combo.style()
-    assert style is not None
-    width = style.sizeFromContents(
-        QStyle.ContentsType.CT_ComboBox,
-        option,
-        QSize(text_width, combo.fontMetrics().height()),
-        combo,
-    ).width()
-    width = max(minimum, width + 12)
-    view = combo.view()
-    assert view is not None
-    view.setMinimumWidth(width)
-    return width
 
 
 def _forward_wheel_to_parent(self, event: QWheelEvent | None) -> None:

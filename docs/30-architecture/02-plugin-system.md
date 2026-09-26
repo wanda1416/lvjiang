@@ -70,6 +70,17 @@ src/lvjiang/apps/<name>/
 └── ui/                # 插件专属 UI 组件（Tab 页面、对话框、菜单 builder）
 ```
 
+插件只保留领域规则和领域状态。已经稳定的通用机制由插件依赖公共层：
+
+- `core.config.document_store.DocumentDirectoryStore`：带目录锁、版本标记和
+  跨文档事务恢复的 JSON 文档目录；插件通过初始化钩子实现自己的旧数据迁移。
+- `workflows.ports`：工作流实现使用的场景自动化与子流程引擎 Protocol；插件端
+  Protocol 组合这些能力并补充领域常量和状态。
+- `ui.layout_helpers`、`ui.presentation`：配置布局、主题判断和轻量展示组件。
+
+公共模块不得反向导入插件。装备、调律、地图等业务步骤及失败语义仍由插件定义；
+仅因代码位于插件的 `core` 目录，不构成迁入公共层的理由。
+
 ## 开发新插件
 
 ### 1. 创建插件目录

@@ -17,6 +17,7 @@ from typing import Any
 
 import yaml
 
+from .document_store import DocumentDirectoryStore
 from .models import (
     AndroidAppConfig,
     DelayParam,
@@ -76,6 +77,7 @@ __all__ = [
     # 基础设施
     "DELETED_KEY",
     "ConfigResolver",
+    "DocumentDirectoryStore",
     "compute_diff",
     "get_resolver",
     "merge_doc",

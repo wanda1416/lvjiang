@@ -8,22 +8,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol
 
+from lvjiang.workflows.ports import SceneAutomationPort, SubcallEnginePort
+
 if TYPE_CHECKING:
     from lvjiang.core.layout_models import Region
     from lvjiang.core.recognizers import ReferenceInfo
 
 
-class SubcallEnginePort(Protocol):
-    """导航 DSL 桥所需的最小 Engine 能力。"""
-
-    run_env: str
-
-    def load_subcalls(self, wf_path: Any) -> None: ...
-
-    def call_subcall(self, name: str, args: list | None = None) -> Any: ...
-
-
-class RouteHostPort(Protocol):
+class RouteHostPort(SceneAutomationPort, Protocol):
     """平台路径适配器可使用的 Workflow 原语。"""
 
     TUNE_SCENE: str
@@ -32,33 +24,6 @@ class RouteHostPort(Protocol):
 
     @property
     def engine(self) -> SubcallEnginePort | None: ...
-
-    def click_region(self, scene_key: str, field_key: str, **kwargs) -> Any: ...
-
-    def wait_stable(self, timeout: float | str) -> Any: ...
-
-    def wait_delay(self, delay_name: str) -> Any: ...
-
-    def ocr_scene_by(
-        self,
-        scene_key: str,
-        field_keys: list[str],
-        target_value: Any,
-        mode: str,
-        min_confidence: float | None = None,
-    ) -> str: ...
-
-    def ocr_scene(
-        self,
-        scene_key: str,
-        field_keys: list[str] | None = None,
-        min_confidence: float | None = None,
-        regions_override: list[Region] | None = None,
-        cleaning_group: str | None = None,
-    ) -> dict[str, str]: ...
-
-    def press(self, key: str, wait: str | None = "step_interval") -> Any: ...
-
 
 class RecycleHostPort(Protocol):
     """装备回收用例所需的最小 Workflow 能力。"""

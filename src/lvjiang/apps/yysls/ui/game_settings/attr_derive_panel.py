@@ -45,6 +45,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr
 from ...config import (
@@ -74,7 +75,6 @@ from ...core.combat.combat_attrs import (
     CombatAttributes,
     compute_gongjue_attrs,
 )
-from ..layout_helpers import fit_combo_to_contents
 from .level_combo import LevelCombo
 
 #: 差异大于该值才算对不上。面板只显示到小数点后一位。

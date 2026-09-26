@@ -53,10 +53,10 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 
 from .....i18n import tr
 from ..domain_labels import domain_label
-from ..layout_helpers import configure_navigation_list, fit_combo_to_contents
 from ..tune_settings.affix_picker import AffixSelectSortDialog
 from .factory_guard import READONLY_HINT, deletable, factory_dict_keys
 from .level_combo import LevelCombo

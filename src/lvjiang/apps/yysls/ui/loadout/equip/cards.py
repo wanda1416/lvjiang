@@ -36,6 +36,7 @@ from ......ui.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
+from ......ui.presentation import is_dark_theme, make_tag
 from ....core.affix_cap import affix_dict_cap_pct, equip_affix_cap_pcts
 from ....core.equip_parser.dingyin_parser import (
     DINGYIN_NORMAL,
@@ -53,7 +54,6 @@ from ....core.equip_validator import illegal_reasons_of
 from ....core.equipment_cooldown import next_cooldown_expiry
 from ....core.loadout.models import EQUIPMENT_LAST_SEEN_AT
 from ....core.loadout.transmute import TARGET_NAME_KEY, TARGET_VALUE_KEY
-from ..widgets import is_dark_theme, make_tag
 
 
 class _ElidedLabel(QLabel):

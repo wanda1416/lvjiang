@@ -58,13 +58,12 @@ class DocumentDirectoryStore:
         if not self._file_lock.acquire(blocking=True, timeout=self.LOCK_TIMEOUT):
             raise TimeoutError(f"无法获取{self.label}目录锁: {self.root}")
 
-    @staticmethod
-    def _read(path: Path) -> dict:
+    def _read(self, path: Path) -> dict:
         if not path.exists():
-            raise FileNotFoundError(f"会话文件缺失: {path}")
+            raise FileNotFoundError(f"{self.label}文件缺失: {path}")
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
-            raise ValueError(f"会话文件根节点必须是对象: {path}")
+            raise ValueError(f"{self.label}文件根节点必须是对象: {path}")
         return data
 
     @staticmethod

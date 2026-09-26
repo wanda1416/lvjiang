@@ -10,6 +10,8 @@ from typing import Any, Callable
 
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtWidgets import QMessageBox
 
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
@@ -173,6 +175,16 @@ def _show_modeless_dialog(dialog) -> None:
     dialog.activateWindow()
 
 
+class _PauseMessageBox(QMessageBox):
+    """暂停提示只允许用户通过明确按钮决定继续或结束。"""
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # type: ignore[override]
+        if event.key() == Qt.Key.Key_Escape:
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+
 class _UIHelper(QObject):
     """工作流线程 → 主线程的非模态对话框桥。
 
@@ -310,7 +322,7 @@ class _UIHelper(QObject):
             )
             return
         if action == "pause":
-            box = QMessageBox(self._window)
+            box = _PauseMessageBox(self._window)
             box.setIcon(QMessageBox.Icon.Information)
             box.setWindowTitle(tr("工作流暂停"))
             box.setText(kwargs.get("message", ""))

@@ -486,7 +486,7 @@ class SettingsDialog(QDialog):
 
         left = QVBoxLayout()
         caption = QLabel(
-            tr("方案把图库、环境、布局绑成一个整体，并声明支持的连接模式。"))
+            tr("方案把图库、环境、布局绑成一个整体，并声明连接模式和启动权限要求。"))
         caption.setWordWrap(True)
         left.addWidget(caption)
         self._plan_list = QListWidget()
@@ -530,6 +530,9 @@ class SettingsDialog(QDialog):
         modes.addWidget(self._plan_mode_adb)
         modes.addStretch()
         form.addRow(tr("模式") + ":", modes)
+        self._plan_requires_admin = QCheckBox(
+            tr("仅 Windows 生效：开始执行前要求律匠以管理员身份运行"))
+        form.addRow(tr("管理员权限") + ":", self._plan_requires_admin)
         # 分发：勾上则方案写进 app.yaml 随包发布，否则留在本机 session.json。
         # 只有开发模式看得到——普通用户既不该改发行配置，也不需要理解这层。
         self._plan_distribute = QCheckBox(
@@ -543,6 +546,7 @@ class SettingsDialog(QDialog):
                        self._plan_layout_combo):
             widget.currentIndexChanged.connect(self._on_plan_field_edited)
         for box in (self._plan_mode_window, self._plan_mode_adb,
+                    self._plan_requires_admin,
                     self._plan_distribute):
             box.toggled.connect(self._on_plan_field_edited)
         row.addLayout(form, 4)
@@ -598,6 +602,7 @@ class SettingsDialog(QDialog):
         widgets = (self._plan_name_edit, self._plan_space_combo,
                    self._plan_env_combo, self._plan_layout_combo,
                    self._plan_mode_window, self._plan_mode_adb,
+                   self._plan_requires_admin,
                    self._plan_distribute)
         for widget in widgets:
             widget.blockSignals(True)
@@ -617,6 +622,8 @@ class SettingsDialog(QDialog):
             bool(plan) and PLAN_MODE_WINDOW in plan.modes)
         self._plan_mode_adb.setChecked(
             bool(plan) and PLAN_MODE_ADB in plan.modes)
+        self._plan_requires_admin.setChecked(
+            bool(plan) and plan.requires_admin)
         self._plan_distribute.setChecked(bool(plan) and plan.distributed)
         for widget in widgets:
             widget.blockSignals(False)
@@ -658,14 +665,15 @@ class SettingsDialog(QDialog):
             self._plan_env_combo.currentData() or "",
             self._plan_layout_combo.currentData() or "",
             modes,
+            self._plan_requires_admin.isChecked(),
             self._plan_distribute.isChecked(),
         )
         current = (plan.space, plan.env, plan.layout, plan.modes,
-                   plan.distributed)
+                   plan.requires_admin, plan.distributed)
         if current == updated:
             return False
         (plan.space, plan.env, plan.layout, plan.modes,
-         plan.distributed) = updated
+         plan.requires_admin, plan.distributed) = updated
         return True
 
     def _on_plan_field_edited(self, *_args) -> None:

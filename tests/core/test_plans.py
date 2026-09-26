@@ -29,12 +29,20 @@ def _plan(name: str, **kwargs) -> Plan:
 
 def test_save_and_load_round_trip():
     plan = _plan("端游", space="端游", env="desktop", layout="desktop",
-                 modes=[PLAN_MODE_WINDOW])
+                 modes=[PLAN_MODE_WINDOW], requires_admin=True)
 
     save_plans([plan])
 
     loaded = load_plans()
     assert [p.to_dict() for p in loaded] == [plan.to_dict()]
+    assert loaded[0].requires_admin is True
+
+
+def test_missing_or_non_boolean_admin_requirement_defaults_to_false():
+    assert Plan.from_dict({"id": "old", "name": "旧方案"}).requires_admin is False
+    assert Plan.from_dict({
+        "id": "bad", "name": "损坏方案", "requires_admin": "false",
+    }).requires_admin is False
 
 
 def test_create_defaults_to_no_mode_restriction():

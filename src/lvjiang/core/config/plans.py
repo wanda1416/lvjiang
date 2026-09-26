@@ -1,10 +1,10 @@
-"""方案（Plan）—— 机器级的「图库 + 环境 + 布局 + 连接模式」组合
+"""方案（Plan）—— 机器级的「图库 + 环境 + 布局 + 连接要求」组合
 
 解决的问题：图库、环境、布局三者必须配套使用，代码里却互不认识，切一次
 目标要点三下；而连接模式（窗口 / ADB）既不持久化也无人校验，于是「连了
 ADB 却还用着端游那套组合」时，坐标原点按窗口算，点击整体偏移且不报错。
 
-方案把这四者绑成一个具名整体，并声明自己支持哪些连接模式。
+方案把这些设置绑成一个具名整体，并声明支持的连接模式和启动权限要求。
 
 方案存两处，由 ``distributed`` 标志决定去向：
 
@@ -55,6 +55,9 @@ class Plan:
     space: str = ""
     env: str = ""
     layout: str = ""
+    # Windows 端游通常以提升权限运行；勾选后在启动任何自动化前验证律匠
+    # 当前进程也已提升。该要求属于连接方案，不根据 env/name 猜测。
+    requires_admin: bool = False
     # 支持的连接模式。空表示不限制——损坏的配置绝不能把用户锁在
     # 「开始执行」之外。
     modes: list[str] = field(default_factory=list)
@@ -65,6 +68,7 @@ class Plan:
     @classmethod
     def create(cls, name: str, *, space: str = "", env: str = "",
                layout: str = "", modes: Sequence[str] | None = None,
+               requires_admin: bool = False,
                distributed: bool = False) -> Plan:
         return cls(
             id=uuid4().hex,
@@ -72,6 +76,7 @@ class Plan:
             space=space,
             env=env,
             layout=layout,
+            requires_admin=requires_admin,
             modes=_clean_modes(modes),
             distributed=distributed,
         )
@@ -96,6 +101,7 @@ class Plan:
             space=_clean_str(data.get("space")),
             env=_clean_str(data.get("env")),
             layout=_clean_str(data.get("layout")),
+            requires_admin=data.get("requires_admin") is True,
             modes=_clean_modes(data.get("modes")),
             distributed=distributed,
         )
@@ -108,6 +114,7 @@ class Plan:
             "space": self.space,
             "env": self.env,
             "layout": self.layout,
+            "requires_admin": self.requires_admin,
             "modes": list(self.modes),
         }
 

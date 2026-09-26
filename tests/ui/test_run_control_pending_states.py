@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from PyQt6.QtWidgets import QPushButton, QWidget
 
+from lvjiang.core.config.plans import Plan
 from lvjiang.ui.main.run_control import (
     STATE_PAUSING,
     STATE_STOPPING,
@@ -78,6 +79,27 @@ class Host(QWidget, RunControlMixin):
         return True
 
 
+class AdminGateHost(RunControlMixin):
+    def __init__(self):
+        self._current_worker = None
+        self._run_state = "idle"
+        self._user_config = SimpleNamespace(
+            hotkeys=SimpleNamespace(start="F9", stop="F10", pause="F11"),
+        )
+        self.plan = Plan.create("端游", requires_admin=True)
+        self.messages = []
+        self._status_bar = _StatusBar()
+
+    def _selected_plan(self):
+        return self.plan
+
+    def _show_workflow_start_error(self, message):
+        self.messages.append(message)
+
+    def statusBar(self):  # noqa: N802 - Qt API shape
+        return self._status_bar
+
+
 def test_pause_button_stays_pending_until_worker_observes_event(qtbot):
     host = Host()
     qtbot.addWidget(host)
@@ -116,3 +138,29 @@ def test_stop_button_stays_pending_until_worker_finishes(qtbot):
     assert not host._stop_requested
     assert host.btn_run_workflow.isEnabled()
     assert host.automation_state_changed.values[-1] == "idle"
+
+
+def test_admin_plan_rejects_start_before_automation_state_changes(monkeypatch):
+    from lvjiang.core import platforms
+
+    monkeypatch.setattr(platforms, "IS_WINDOWS", True)
+    monkeypatch.setattr(platforms, "is_process_elevated", lambda: False)
+    host = AdminGateHost()
+
+    assert not host._begin_automation("测试任务")
+    assert host._run_state == "idle"
+    assert "端游" in host.messages[0]
+    assert "以管理员身份运行" in host.messages[0]
+    assert host._status_bar.message == host.messages[0]
+
+
+def test_admin_requirement_is_windows_only(monkeypatch):
+    from lvjiang.core import platforms
+
+    monkeypatch.setattr(platforms, "IS_WINDOWS", False)
+    monkeypatch.setattr(
+        platforms, "is_process_elevated",
+        lambda: (_ for _ in ()).throw(AssertionError("不应检查")),
+    )
+
+    assert AdminGateHost()._plan_admin_requirement_error() == ""

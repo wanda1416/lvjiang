@@ -452,17 +452,21 @@ config:
   delay_scroll_settle: Scroll Settle Wait
 auto_strings:
   从当前组合新建: New from current
+  管理员权限: Administrator privileges
+  仅 Windows 生效：开始执行前要求律匠以管理员身份运行: 'Windows only: require LvJiang to run as administrator before execution'
   连接方案: Connection Plans
   分发: Distribute
   写入 app.yaml，随安装包分发: Write into app.yaml and ship with the installer
   新方案: New plan
   方案「{name}」至少要勾选一种连接模式: 'Plan "{name}" needs at least one connection mode'
   方案名称不能为空: Plan name cannot be empty
-  方案把图库、环境、布局绑成一个整体，并声明支持的连接模式。: A plan binds gallery, environment and layout together and declares the connection modes it supports.
+  方案把图库、环境、布局绑成一个整体，并声明连接模式和启动权限要求。: A plan binds gallery, environment and layout together and declares its connection modes and launch privilege requirements.
   方案设置: Plan Settings
   确定删除方案「{name}」吗？: 'Delete plan "{name}"?'
   ADB 模式: ADB mode
   当前方案「{name}」不支持{mode}: 'Plan "{name}" does not support {mode}'
+  连接方案「{name}」要求管理员权限，但律匠当前未以管理员身份运行。Windows 会阻止低权限进程向高权限游戏窗口发送点击和键盘输入。请关闭律匠，右键选择「以管理员身份运行」，然后重新执行。: 'Connection plan "{name}" requires administrator privileges, but LvJiang is not running as administrator. Windows blocks lower-privileged processes from sending clicks and keyboard input to elevated game windows. Close LvJiang, choose "Run as administrator", and try again.'
+  无法确认律匠当前是否具有管理员权限。连接方案「{name}」要求管理员权限，为避免点击或键盘输入失效，本次执行已拒绝。请关闭律匠，以管理员身份重新启动后再试。: 'LvJiang could not verify its administrator privileges. Connection plan "{name}" requires administrator privileges, so execution was rejected to prevent clicks or keyboard input from failing. Close LvJiang, restart it as administrator, and try again.'
   方案不支持: Unsupported by plan
   窗口模式: Window mode
   '- 自定义 -': '- Custom -'

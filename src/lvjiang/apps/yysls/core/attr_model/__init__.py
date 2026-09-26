@@ -1,8 +1,8 @@
 """基础属性来源建模
 
-回答「装备之外的战斗属性从哪来」，产出 ``build_graduation_attrs`` 的
-``base_attrs``。装备词条依旧走原有的 ``equipment_attrs`` 通道，本包
-不改动任何既有模块。
+回答「排除装备普通词条后的完整属性从哪来」。推导结果包含所选等级的
+装备固有值和独立等级弓玦；保存为运行时 ``base_attrs`` 时扣回两者，
+装备词条与实际装备固有值继续走原有 ``equipment_attrs`` 通道。
 
 分层：models（领域模型 + 固定词汇）← parsing（YAML 解析校验）←
 resolver（依赖求值 + breakdown + 反解）← manager（加载缓存 + 单例），
@@ -21,7 +21,12 @@ from .builtin import (
     DIMENSION_JIN,
     DIMENSION_MIN,
     DIMENSION_SHI,
+    EQUIPMENT_BASE,
+    GONGJUE,
     dimension_effects,
+    equipment_base_effect,
+    full_gold_equipment_attrs,
+    gongjue_effect,
 )
 from .manager import (
     AttrModelManager,
@@ -107,6 +112,8 @@ __all__ = [
     "DIMENSION_CATEGORY",
     "DIMENSION_FIELDS",
     "DIMENSION_JIN",
+    "EQUIPMENT_BASE",
+    "GONGJUE",
     "DIMENSION_LABELS",
     "PERCENT_FIELDS",
     "SUPPORTED_FULL_AFFIX_CATEGORIES",
@@ -131,6 +138,9 @@ __all__ = [
     "attr_attack_fields",
     "diff_against_panel",
     "dimension_effects",
+    "equipment_base_effect",
+    "full_gold_equipment_attrs",
+    "gongjue_effect",
     "expand_full_affix",
     "game_config_caps_lookup",
     "get_attr_model_manager",

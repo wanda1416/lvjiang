@@ -214,6 +214,16 @@ def test_the_loadout_is_remembered_between_openings(derive, monkeypatch) -> None
     assert reopened._loadout().inner_ways[0].tier == 2
 
 
+def test_115_loadout_defaults_to_the_seasons_110_gongjue_level(derive) -> None:
+    """弓玦仍可手选，但旧装配没记录时不能悄悄套用 115 或最低等级。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout
+
+    dialog, _ = derive
+    dialog._apply_loadout(AttrLoadout(level=115, school=dialog._school()))
+
+    assert dialog._loadout().gongjue_level == 110
+
+
 def test_saving_records_both_the_snapshot_and_the_loadout(derive) -> None:
     """只存扁平数值的话，事后没人知道它是怎么推出来的。"""
     from lvjiang.apps.yysls.config import get_derivation, get_play_styles
@@ -404,7 +414,8 @@ def test_every_source_kind_lands_on_exactly_one_page() -> None:
     # 五维转换是内建的，没有可填条目，不需要页面
     expected = {
         kind for kind, policy in SELECTION_POLICIES.items()
-        if not (policy == SELECT_DERIVED and kind == "dimension")
+        if not (policy == SELECT_DERIVED
+                and kind in {"dimension", "equipment_base", "gongjue"})
     }
 
     assert len(covered) == len(set(covered)), "有来源类别出现在多个页面"

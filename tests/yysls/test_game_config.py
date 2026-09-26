@@ -52,6 +52,8 @@ class TestResolveAffixCategory:
         assert nanlu.first_half_end_date + timedelta(days=1) \
             - nanlu.start_date == timedelta(weeks=6)
         assert nanlu.equip_level == 115
+        assert nanlu.gongjue_level == 110
+        assert GameConfigManager(path).gongjue_level_for(115) == 110
         assert nanlu.min_chengyin_level == 105
 
     def test_adjacent_seasons_must_share_boundary_date(self):

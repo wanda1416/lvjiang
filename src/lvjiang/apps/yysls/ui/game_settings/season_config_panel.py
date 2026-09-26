@@ -59,8 +59,9 @@ _START_DATE_COL = 3
 _END_DATE_COL = 4
 _FIRST_HALF_COL = 5
 _EQUIP_LEVEL_COL = 6
-_MIN_CHENGYIN_COL = 7
-_COLS = ("#", tr("赛季编号"), tr("赛季名称"), tr("开始日期"), tr("结束日期"), "上半赛季结束", "装备等级", "最低承音等级")  # runtime tr()
+_GONGJUE_LEVEL_COL = 7
+_MIN_CHENGYIN_COL = 8
+_COLS = ("#", tr("赛季编号"), tr("赛季名称"), tr("开始日期"), tr("结束日期"), "上半赛季结束", "装备等级", "弓玦等级", "最低承音等级")  # runtime tr()
 
 
 class SeasonConfigPanel(QWidget):
@@ -215,6 +216,14 @@ class SeasonConfigPanel(QWidget):
         level_combo.currentIndexChanged.connect(lambda _v: self._apply())
         self._table.setCellWidget(row, _EQUIP_LEVEL_COL, level_combo)
 
+        # 弓玦可能跨赛季沿用旧词条等级，例如 115 装备仍使用 110 弓玦。
+        gongjue_level_combo = LevelCombo(allow_empty=True)
+        gongjue_level_combo.setToolTip(tr(
+            "本赛季弓玦套装采用的词条等级；不填时跟随装备等级"))
+        gongjue_level_combo.set_level(cfg.gongjue_level)
+        gongjue_level_combo.currentIndexChanged.connect(lambda _v: self._apply())
+        self._table.setCellWidget(row, _GONGJUE_LEVEL_COL, gongjue_level_combo)
+
         # 最低承音等级（赛季级作废线，不填即不限）
         min_chengyin_combo = LevelCombo(allow_empty=True,
                                         empty_label=tr("不限"))
@@ -321,6 +330,8 @@ class SeasonConfigPanel(QWidget):
         end_date_edit: QDateEdit = self._table.cellWidget(row, _END_DATE_COL)
         first_half_edit: QDateEdit = self._table.cellWidget(row, _FIRST_HALF_COL)
         level_combo: LevelCombo = self._table.cellWidget(row, _EQUIP_LEVEL_COL)
+        gongjue_level_combo: LevelCombo = self._table.cellWidget(
+            row, _GONGJUE_LEVEL_COL)
         min_chengyin_combo: LevelCombo = self._table.cellWidget(
             row, _MIN_CHENGYIN_COL)
 
@@ -337,6 +348,7 @@ class SeasonConfigPanel(QWidget):
             "end_date": qdate_to_date(end_date_edit.date()),
             "first_half_end_date": qdate_to_date(first_half_edit.date()),
             "equip_level": level_combo.get_level(),
+            "gongjue_level": gongjue_level_combo.get_level(),
             "min_chengyin_level": min_chengyin_combo.get_level(),
         }
 
@@ -376,6 +388,12 @@ class SeasonConfigPanel(QWidget):
         level_combo.blockSignals(True)
         level_combo.set_level(values.get("equip_level"))
         level_combo.blockSignals(False)
+
+        gongjue_level_combo: LevelCombo = self._table.cellWidget(
+            row, _GONGJUE_LEVEL_COL)
+        gongjue_level_combo.blockSignals(True)
+        gongjue_level_combo.set_level(values.get("gongjue_level"))
+        gongjue_level_combo.blockSignals(False)
 
         min_chengyin_combo: LevelCombo = self._table.cellWidget(
             row, _MIN_CHENGYIN_COL)

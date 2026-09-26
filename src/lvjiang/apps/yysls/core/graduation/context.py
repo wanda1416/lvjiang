@@ -41,7 +41,9 @@ def gongjue_attrs(
     )
     if not level:
         return CombatAttributes()
-    return compute_gongjue_attrs(gongjue, level, game_config.get_affix_caps)
+    gongjue_level = game_config.gongjue_level_for(level)
+    return compute_gongjue_attrs(
+        gongjue, gongjue_level, game_config.get_affix_caps)
 
 
 @dataclass(frozen=True)

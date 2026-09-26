@@ -1,4 +1,4 @@
-"""基础属性推导面板：由属性来源算出装备之外的战斗属性。
+"""基础属性推导面板：算出排除装备普通词条后的完整战斗属性。
 
 和「创建基础属性」互补——那边是抄面板再反推，这边是正向推导，两者
 应当得到同一个结果。所以对话框的重点不是算出一个数，而是**逐来源的
@@ -6,8 +6,9 @@
 只知道总数不对。
 
 界面按游戏里实际能装的东西组织：四个心法槽（每槽一门 + 重数，选第
-N 重则一重至 N 重全部生效），套装/武备/神工/吃食等各选一项。两门
-武学由流派的主副武学决定，不给选；五维转换恒生效。
+N 重则一重至 N 重全部生效），套装/武备/神工/吃食等各选一项；装备
+固有值由推导等级自动产生，弓玦类型与等级独立选择。两门武学由流派的
+主副武学决定，不给选；五维转换恒生效。
 
 **没有「全部来源」这个选项**——互斥来源一起相加必然是错的，而空装配
 得到的零值一眼能看出没配，比一个似是而非的数安全。
@@ -68,7 +69,11 @@ from ...core.attr_model import (
     get_attr_model_manager,
     invalidate_attr_model_cache,
 )
-from ...core.combat.combat_attrs import COMBAT_ATTR_FIELDS, CombatAttributes
+from ...core.combat.combat_attrs import (
+    COMBAT_ATTR_FIELDS,
+    CombatAttributes,
+    compute_gongjue_attrs,
+)
 from ..layout_helpers import fit_combo_to_contents
 from .level_combo import LevelCombo
 
@@ -147,6 +152,21 @@ class AttrDerivePanel(QWidget):
 
         others_box = QGroupBox(tr("其他来源"))
         others_form = QFormLayout(others_box)
+        self._combo_gongjue = QComboBox()
+        self._combo_gongjue.addItem(tr("（不选）"), "")
+        for gongjue in ("会意", "精准", "会心"):
+            self._combo_gongjue.addItem(gongjue, gongjue)
+        self._combo_gongjue.currentIndexChanged.connect(self._on_changed)
+        self._combo_gongjue_level = QComboBox()
+        for cfg in get_game_config().get_level_configs():
+            self._combo_gongjue_level.addItem(str(cfg.level), cfg.level)
+        self._combo_gongjue_level.currentIndexChanged.connect(self._on_changed)
+        gongjue_row = QWidget()
+        gongjue_layout = QHBoxLayout(gongjue_row)
+        gongjue_layout.setContentsMargins(0, 0, 0, 0)
+        gongjue_layout.addWidget(self._combo_gongjue, 2)
+        gongjue_layout.addWidget(self._combo_gongjue_level, 1)
+        others_form.addRow(tr("弓玦（类型 / 等级）"), gongjue_row)
         for kind, policy in SELECTION_POLICIES.items():
             if policy != SELECT_SINGLE:
                 continue
@@ -295,6 +315,8 @@ class AttrDerivePanel(QWidget):
             level=self._combo_level.get_level() or 0,
             school=self._school(),
             inner_ways=tuple(slots),
+            gongjue=str(self._combo_gongjue.currentData() or ""),
+            gongjue_level=int(self._combo_gongjue_level.currentData() or 0),
             selections=selections,
         )
 
@@ -314,6 +336,14 @@ class AttrDerivePanel(QWidget):
         for kind, combo in self._single_combos.items():
             combo.setCurrentIndex(
                 max(0, combo.findData(loadout.selections.get(kind, _EMPTY))))
+        self._combo_gongjue.setCurrentIndex(
+            max(0, self._combo_gongjue.findData(loadout.gongjue)))
+        gongjue_level = (
+            loadout.gongjue_level
+            or get_game_config().gongjue_level_for(loadout.level)
+        )
+        self._combo_gongjue_level.setCurrentIndex(max(
+            0, self._combo_gongjue_level.findData(gongjue_level)))
 
     def _on_reference_changed(self) -> None:
         """选中一套基础属性时，把它当时的装配也调出来。
@@ -339,7 +369,16 @@ class AttrDerivePanel(QWidget):
 
     # ── 推导 ──
 
-    def _reference_attrs(self) -> CombatAttributes | None:
+    def _reference_attrs(
+        self, loadout: AttrLoadout | None = None,
+    ) -> CombatAttributes | None:
+        """把旧口径对照换算成与推导一致的“满级无普通词条”口径。
+
+        OCR/手工基础属性按既有契约排除了装备固有值；新推导值包含所选
+        等级八件金装的固有值。旧对照在这里只做派生加法，不写回磁盘。
+        弓玦同样由既有保存契约排除，因此按当前独立选择补入。这个换算只
+        服务对照展示，不会修改旧基础属性。
+        """
         name = self._combo_reference.currentData()
         if not name:
             return None
@@ -369,6 +408,12 @@ class AttrDerivePanel(QWidget):
                 original = self._resolve(AttrLoadout.from_dict(derivation))
                 delta = original.combat_attrs - original.panel_attrs
             reference = reference - delta
+        if loadout is not None:
+            gc = get_game_config()
+            reference = reference + self._manager().equipment_base_attrs(
+                loadout.level)
+            reference = reference + compute_gongjue_attrs(
+                loadout.gongjue, loadout.gongjue_level, gc.get_affix_caps)
         return reference
 
     def _resolve(self, loadout: AttrLoadout, *, residual=None):
@@ -401,7 +446,7 @@ class AttrDerivePanel(QWidget):
             return
         try:
             result = self._resolve(loadout)
-            reference = self._reference_attrs()
+            reference = self._reference_attrs(loadout)
             residual = self._residual(loadout, reference)
         except AttrModelError as exc:
             self._summary.setText(tr("推导失败：{msg}").format(msg=str(exc)))
@@ -512,7 +557,7 @@ class AttrDerivePanel(QWidget):
             return
         try:
             residual = (
-                self._residual(loadout, self._reference_attrs())
+                self._residual(loadout, self._reference_attrs(loadout))
                 if self._check_residual.isChecked() else {}
             )
             result = self._resolve(loadout, residual=residual)
@@ -532,8 +577,18 @@ class AttrDerivePanel(QWidget):
             derivation = loadout.to_dict()
             derivation["combat_delta"] = (
                 result.combat_attrs - result.panel_attrs).to_dict()
-            save_play_style(self._school(), name.strip(),
-                            result.combat_attrs.to_dict(), derivation=derivation)
+            # 推导/对照展示采用完整无词条口径；既有运行链路会按实际装备
+            # 与方案弓玦另行叠加，所以落盘前必须扣掉这两项，避免重复。
+            gc = get_game_config()
+            runtime_base = (
+                result.combat_attrs
+                - self._manager().equipment_base_attrs(loadout.level)
+                - compute_gongjue_attrs(
+                    loadout.gongjue, loadout.gongjue_level, gc.get_affix_caps)
+            )
+            save_play_style(
+                self._school(), name.strip(), runtime_base.to_dict(),
+                derivation=derivation)
         except Exception as exc:
             logger.error(f"保存基础属性失败: {exc}")
             QMessageBox.warning(self, tr("保存失败"), str(exc))

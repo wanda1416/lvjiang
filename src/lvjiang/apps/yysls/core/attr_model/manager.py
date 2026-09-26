@@ -17,7 +17,13 @@ from loguru import logger
 from .....core.config.resolver import ConfigResolver, get_resolver
 from .....i18n import tr
 from ...config import get_game_config
-from .builtin import dimension_effects
+from ..combat.combat_attrs import CombatAttributes
+from .builtin import (
+    dimension_effects,
+    equipment_base_effect,
+    full_gold_equipment_attrs,
+    gongjue_effect,
+)
 from .models import (
     SELECT_ALL,
     SELECT_DERIVED,
@@ -87,6 +93,7 @@ class AttrModelManager:
     ):
         #: 武学名册的来源。默认取 game_config，测试可注入。
         self._martial_art_roster = martial_art_roster
+        self._include_builtin_equipment = sources_dir is None
         if sources_dir is None:
             self._resolver = get_resolver()
             self._rel_dir = _SOURCES_REL_DIR
@@ -208,6 +215,13 @@ class AttrModelManager:
 
     def errors(self) -> dict[str, str]:
         return dict(self._errors)
+
+    def equipment_base_attrs(self, level: int) -> CombatAttributes:
+        """完整系统模型的满级金装固有值；孤立来源目录返回空属性。"""
+        if not self._include_builtin_equipment:
+            return CombatAttributes()
+        return full_gold_equipment_attrs(
+            level, get_game_config().get_base_attr_values)
 
     def source_file(self, source_id: str) -> str | None:
         return self._files.get(source_id)
@@ -394,7 +408,17 @@ class AttrModelManager:
             elif loadout.selections.get(effect.kind) == effect.source_id:
                 chosen.append(effect)
 
-        return chosen + dimension_effects()
+        gongjue = gongjue_effect(
+            loadout.gongjue, loadout.gongjue_level,
+            get_game_config().get_affix_caps,
+        )
+        builtins: list[StatEffect] = []
+        if self._include_builtin_equipment:
+            builtins.append(equipment_base_effect(
+                loadout.level, get_game_config().get_base_attr_values))
+        if gongjue is not None:
+            builtins.append(gongjue)
+        return chosen + builtins + dimension_effects()
 
     def resolve_loadout(
         self,

@@ -35,7 +35,9 @@ config/system/yysls/attr_model/*.yaml   一类来源一个文件
 | `dimension` | 五维 → 战斗属性转换 |
 | `martial_art` | 武学天赋 |
 | `inner_way` | 心法 |
-| `gear_set` | 输出套装与叠音；弓玦仍由毕业率公共链路单独加入 |
+| `equipment_base` | 按推导等级从装备配置自动生成八件金装固有值 |
+| `gear_set` | 输出套装与叠音 |
+| `gongjue` | 类型与等级独立选择；保存时扣回，由毕业率公共链路单独加入 |
 | `arsenal` | 武备 |
 | `divinecraft` | 神工 |
 | `oddity` | 奇物 |

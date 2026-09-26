@@ -2,26 +2,23 @@
 #
 # 条目 id 用「心法名·重数」，求值时按用户实际上的心法筛选（selected）。
 #
-# 游戏事实：心法给出的「一整条词条」按 1:2 拆成最小/最大，两者之和
-# 等于该等级该词条的满值。所以这类条目只写 full_affix，数值由
-# game_config.yaml 的 affix_caps[等级] 生成，换赛季只改 affix_caps。
-# 已在 96 级（25.9 + 51.9 = 77.8）与 110 级（40.5 + 80.9 = 121.4）
-# 两个独立数据点上验证。
+# 南吕相和数值以 DIY 计算器 0.10.1 的满重累计为准。表格未提供逐重
+# 归属：已有可靠归属的条目保留在本文件，其余累计放在
+# inner_way_calculator.yaml 的六重补足条目，后续取得证据再细分。
 #
-# 不符合该规律的重数直接写 stats 常数；未测量的条目留 modeled: false，
-# 贡献 0 并计入 UI 的建模进度，缺口由反解兜底。
-#
-# 无名心法、千山法、威猛歌、凝神章的已知数据回写自 profiles/鸣金·虹.yaml。
-# 二重为用户提供的单人模式23级显示值，直接记录 stats，不套用装备满词条，
-# 也不随这里的装备等级 level 外推；五重按已知固定增益记录。
+# 无名心法仍来自 profiles/鸣金·虹.yaml 的单人模式 23 级实例，不拿它
+# 覆盖当前赛季的通用满养成数值。
 # 无名心法一/三/四/六重仅有触发或技能机制，确认无静态属性；声明保留在
-# 角色资料中。其余三门未提供的重数继续待填，不以「无静态属性」代替未知。
+# 角色资料中。未提供的重数继续待填，不以「无静态属性」代替未知。
 kind: inner_way
 entries:
   易水歌·二重:
-    full_affix: 外功攻击
     group: 易水歌
     tier: 2
+    label: 易水歌·满重累计攻击（细分重数待补）
+    stats:
+      min_outer: 43.4
+      max_outer: 86.8
   易水歌·一重:
     modeled: false
     group: 易水歌
@@ -35,9 +32,11 @@ entries:
     group: 易水歌
     tier: 4
   易水歌·五重:
-    modeled: false
     group: 易水歌
     tier: 5
+    label: 易水歌·满重累计直接会心（细分重数待补）
+    stats:
+      direct_crit: 0.046
   易水歌·六重:
     modeled: false
     group: 易水歌
@@ -339,7 +338,7 @@ entries:
     tier: 2
     label: 威猛歌·二重（单人模式23级）
     stats:
-      intent_rate: 0.063
+      intent_rate: 0.067
   威猛歌·三重:
     modeled: false
     group: 威猛歌
@@ -366,8 +365,8 @@ entries:
     tier: 2
     label: 千山法·二重（单人模式23级）
     stats:
-      min_mingjin: 20.7
-      max_mingjin: 41.3
+      min_mingjin: 22.1
+      max_mingjin: 44.3
   千山法·三重:
     modeled: false
     group: 千山法
@@ -469,8 +468,8 @@ entries:
     tier: 2
     label: 凝神章·二重（单人模式23级）
     stats:
-      min_outer: 36.4
-      max_outer: 72.8
+      min_outer: 39
+      max_outer: 78
   凝神章·三重:
     modeled: false
     group: 凝神章

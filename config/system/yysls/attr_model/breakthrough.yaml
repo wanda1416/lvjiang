@@ -1,4 +1,9 @@
 # 来源类别: breakthrough
-# schema 见 core/attr_model/parsing.py
+# DIY 计算器 0.10.1 只给出当前满突破累计值，详细阶段后续补充。
 kind: breakthrough
-entries: {}
+entries:
+  南吕相和·满突破:
+    label: 满突破
+    stats:
+      min_outer: 122
+      max_outer: 244

@@ -1,4 +1,19 @@
 # 来源类别: arsenal
-# schema 见 core/attr_model/parsing.py
+# “本系”需要落到明确属性字段，因此按四种流派属性分别提供选项。
 kind: arsenal
-entries: {}
+entries:
+  武备·通用:
+    label: 通用武备
+    stats: {min_outer: 186, max_outer: 373}
+  武备·鸣金:
+    label: 本系武备（鸣金）
+    stats: {min_mingjin: 211, max_mingjin: 423}
+  武备·裂石:
+    label: 本系武备（裂石）
+    stats: {min_lieshi: 211, max_lieshi: 423}
+  武备·牵丝:
+    label: 本系武备（牵丝）
+    stats: {min_qiansi: 211, max_qiansi: 423}
+  武备·破竹:
+    label: 本系武备（破竹）
+    stats: {min_pozhu: 211, max_pozhu: 423}

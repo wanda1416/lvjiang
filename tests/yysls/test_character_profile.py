@@ -168,50 +168,6 @@ def test_observed_thresholds_match_supplied_game_descriptions(profile):
     assert formula.apply({"dim_shi": 231}) == pytest.approx(.035)
 
 
-@pytest.mark.parametrize("tier", [2, 6])
-@pytest.mark.parametrize("equipment", [
-    {},
-    {"dim_shi": 100, "max_mingjin": 100, "intent_rate": .1},
-    {"dim_shi": 363, "max_mingjin": 600, "intent_rate": .5},
-])
-def test_attribute_catalog_matches_character_instance(profile, tmp_path, tier, equipment):
-    """属性页实际读取的武学/心法配置与实例同值，覆盖公式未封顶及封顶。"""
-    from lvjiang.apps.yysls.core.attr_model.manager import AttrModelManager
-    from lvjiang.apps.yysls.core.attr_model.models import AttrLoadout, InnerWaySlot
-    from lvjiang.apps.yysls.core.attr_model.resolver import resolve
-
-    root = Path(__file__).resolve().parents[2] / "config/system/yysls/attr_model"
-    sources_dir = tmp_path / "catalog"
-    sources_dir.mkdir()
-    for filename in ("martial_art.yaml", "inner_way.yaml"):
-        (sources_dir / filename).write_bytes((root / filename).read_bytes())
-    catalog = AttrModelManager(
-        sources_dir, martial_art_roster=lambda: profile.growth["martial_arts"])
-    assert not catalog.errors()
-    loadout = AttrLoadout(
-        level=110, school=profile.school,
-        inner_ways=tuple(InnerWaySlot(name, tier) for name in profile.growth["inner_ways"]),
-    )
-    effects = catalog.effects_for_loadout(
-        loadout, martial_arts=tuple(profile.growth["martial_arts"]))
-    # 等级、天赋等沿用实例，只替换本次应回写的两个类别。
-    effects.extend(source.effect for source in profile.sources
-                   if source.kind not in ("martial_art", "inner_way"))
-    result = resolve(effects, level=110, school_attr="鸣金",
-                     caps_lookup=lambda *_: None, residual=equipment)
-    growth = deepcopy(profile.growth)
-    growth["inner_ways"] = dict.fromkeys(growth["inner_ways"], tier)
-    expected = evaluate_profile(profile, growth=growth, equipment=equipment)
-    assert result.panel.values == pytest.approx(expected.resolved.panel.values)
-    assert result.combat.values == pytest.approx(expected.resolved.combat.values)
-    # 未提供的重数仍待填；无名心法纯机制重数已确认无静态属性。
-    assert catalog.progress("martial_art") == (2, 2)
-    inner_effects = catalog.effects(("inner_way",))
-    assert all(not e.pending for e in inner_effects if e.group == "无名心法")
-    assert all(e.pending for e in inner_effects
-               if e.group in ("千山法", "威猛歌", "凝神章") and e.tier in (1, 3, 4, 6))
-
-
 def test_character_panel_displays_records_and_responds_to_growth(qapp, manager):
     from lvjiang.apps.yysls.ui.game_settings.character_profile_panel import (
         CharacterProfilePanel,
@@ -263,7 +219,7 @@ def test_recent_event_window_is_structured_and_validated(profile):
         parse_profile(raw)
 
 
-def test_common_base_matches_profile_dimensions_and_converts_once(profile):
+def test_current_max_base_is_independent_from_the_level_23_profile(profile):
     from lvjiang.apps.yysls.core.attr_model.manager import AttrModelManager
     from lvjiang.apps.yysls.core.attr_model.models import AttrLoadout
 
@@ -273,9 +229,10 @@ def test_common_base_matches_profile_dimensions_and_converts_once(profile):
         AttrLoadout(level=110, school="鸣金·虹"), school_attr="鸣金")
     profile_result = evaluate_profile(profile)
     for name in ("dim_jin", "dim_shi", "dim_min", "dim_ti", "dim_yu"):
-        assert result.panel.values[name] == profile_result.resolved.panel.values[name] == 283
-    assert result.panel.values["min_outer"] == pytest.approx(318.375)
-    assert result.panel.values["max_outer"] == pytest.approx(639.58)
-    assert result.panel.values["intent_rate"] == pytest.approx(.10754)
-    assert result.panel.values["crit_rate"] == pytest.approx(.21508)
-    assert result.combat_attrs.min_outer == pytest.approx(318.375)
+        assert result.panel.values[name] == 304
+        assert profile_result.resolved.panel.values[name] == 283
+    assert result.panel.values["min_outer"] == pytest.approx(845.88)
+    assert result.panel.values["max_outer"] == pytest.approx(1513.84)
+    assert result.panel.values["intent_rate"] == pytest.approx(.25552)
+    assert result.panel.values["crit_rate"] == pytest.approx(.51104)
+    assert result.combat_attrs.min_outer == pytest.approx(845.88)

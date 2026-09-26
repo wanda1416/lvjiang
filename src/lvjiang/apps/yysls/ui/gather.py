@@ -406,13 +406,13 @@ class GatherRecordingDialog(QDialog):
                 self.steps.addItem(f"{sequence}. {line}")
                 sequence += 1
         if self.marked is not None:
-            self.steps.addItem(f"{sequence}. press {self.route.map_key}")
+            self.steps.addItem(f'{sequence}. press "{self.route.map_key}"')
             self.steps.addItem(
                 f"{sequence + 1}. click ({self.marked.x:.6f}, {self.marked.y:.6f})")
             sequence += 2
             if self._confirm_pending or self._travel_started_at is not None:
-                for line in (f"press {self.route.travel_key}", "wait 0.800",
-                             f"press {self.route.confirm_key}"):
+                for line in (f'press "{self.route.travel_key}"', "wait 0.800",
+                             f'press "{self.route.confirm_key}"'):
                     self.steps.addItem(f"{sequence}. {line}")
                     sequence += 1
         self._refresh()

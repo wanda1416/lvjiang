@@ -1,6 +1,7 @@
 from dataclasses import asdict
 from types import SimpleNamespace
 
+import pytest
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QWidget
 
@@ -16,6 +17,14 @@ from lvjiang.ui.button_styles import (
     NEUTRAL_BUTTON_STYLE,
 )
 from tests.yysls.test_gather import make_route
+
+
+@pytest.fixture(autouse=True)
+def isolated_gather_workflows(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.core.gather.GATHER_WORKFLOWS_DIR",
+        tmp_path / "config" / "local" / "workflows" / "gather",
+    )
 
 
 class Host(QWidget):
@@ -188,17 +197,17 @@ def test_f1_f2_build_visible_sequence_and_record_travel_time(qtbot, monkeypatch)
 
     editor.mark()
     assert editor.marked is point
-    assert editor.steps.item(0).text() == "1. press M"
+    assert editor.steps.item(0).text() == '1. press "M"'
     assert editor.steps.item(1).text() == "2. click (0.400000, 0.500000)"
     editor.travel()
     assert host.input_events == [("down", "V"), ("up", "V")]
     editor._confirm_travel()
     assert host.input_events[-2:] == [("down", "F"), ("up", "F")]
-    assert editor.steps.item(2).text() == "3. press V"
-    assert editor.steps.item(4).text() == "5. press F"
+    assert editor.steps.item(2).text() == '3. press "V"'
+    assert editor.steps.item(4).text() == '5. press "F"'
     editor.travel()
     assert len(editor.route.steps) == 1
     assert editor.route.steps[0].travel_seconds == 12.5
-    assert editor.steps.item(6).text() == "7. press 1"
+    assert editor.steps.item(6).text() == '7. press "1"'
     assert GatherStore().routes()[0] == []
     editor.previous = asdict(editor.route)

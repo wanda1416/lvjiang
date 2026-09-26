@@ -141,7 +141,10 @@ class AutoGatherWorkflow(BaseWorkflow):
         self.route.validate(runnable=True)
         # 启动前检查全部识别区域，避免走到半程才发现缺少标定。
         frame = self._frame()
-        for key in ("map_view", "map_area", "travel", "home_controls"):
+        required = ["travel", "home_controls"]
+        if any(step.viewport for step in self.route.steps):
+            required.append("map_view")
+        for key in required:
             crop_region(frame, self._layout, key)
         for index, step in enumerate(self.route.steps, 1):
             self._step_number = index
@@ -150,8 +153,9 @@ class AutoGatherWorkflow(BaseWorkflow):
             if not self.selected_target:
                 self._sleep(0.8)
                 frame = self._frame()
-                signature = viewport_signature(crop_region(frame, self._layout, "map_view"))
-                if viewport_difference(step.viewport, signature) > 0.04:
+                signature = (viewport_signature(crop_region(frame, self._layout, "map_view"))
+                             if step.viewport else "")
+                if step.viewport and viewport_difference(step.viewport, signature) > 0.04:
                     raise ValueError("地图视口与录制不符，未点击目标。请恢复起点、缩放和资源筛选")
                 self._checkpoint()
                 self.click_at(*self._ratio_to_screen(step.x, step.y), random_offset=False,

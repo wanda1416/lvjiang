@@ -1,6 +1,6 @@
 """属性来源的装配状态存储。
 
-存两样东西，都在 session.json 的 ``yysls`` 节点里：
+存两样东西，分别位于 ``config/session/yysls/``：
 
     attr_loadout:      { 流派: 装配状态 }              # 当前在编辑的
     attr_derivations:  { 流派: { 基础属性名: 装配状态 } }  # 存过的推导
@@ -29,23 +29,22 @@ _DERIVATION_KEY = "attr_derivations"
 
 
 def _load() -> dict:
-    return session_node.load()
+    return session_node.load(_LOADOUT_KEY)
 
 
 def get_loadout(school: str) -> dict:
     """当前正在编辑的装配状态；没有则空 dict"""
-    data = _load().get(_LOADOUT_KEY) or {}
-    stored = data.get(school)
+    stored = _load().get(school)
     return dict(stored) if isinstance(stored, dict) else {}
 
 
 def save_loadout(school: str, loadout: dict) -> None:
     """记住当前装配，下次打开推导对话框直接接着用"""
     def _apply(data: dict) -> dict:
-        data.setdefault(_LOADOUT_KEY, {})[school] = loadout
+        data[school] = loadout
         return data
 
-    session_node.mutate(_apply)
+    session_node.mutate(_LOADOUT_KEY, _apply)
 
 
 def get_derivation(school: str, name: str) -> dict:
@@ -54,7 +53,7 @@ def get_derivation(school: str, name: str) -> dict:
     空 dict 意味着这套基础属性不是推导来的（多半是抄面板反推的），
     或者存于本功能之前。
     """
-    data = _load().get(_DERIVATION_KEY) or {}
+    data = session_node.load(_DERIVATION_KEY)
     stored = (data.get(school) or {}).get(name)
     return dict(stored) if isinstance(stored, dict) else {}
 
@@ -62,17 +61,17 @@ def get_derivation(school: str, name: str) -> dict:
 def save_derivation(school: str, name: str, loadout: dict) -> None:
     """连同基础属性一起记下推导用的装配"""
     def _apply(data: dict) -> dict:
-        data.setdefault(_DERIVATION_KEY, {}).setdefault(school, {})[name] = loadout
+        data.setdefault(school, {})[name] = loadout
         return data
 
-    session_node.mutate(_apply)
+    session_node.mutate(_DERIVATION_KEY, _apply)
     logger.debug(f"已记录推导装配: {school}/{name}")
 
 
 def delete_derivation(school: str, name: str) -> None:
     """基础属性删掉时一并清掉，避免同名的新配置读到旧装配"""
     def _apply(data: dict) -> dict:
-        (data.get(_DERIVATION_KEY, {}).get(school) or {}).pop(name, None)
+        (data.get(school) or {}).pop(name, None)
         return data
 
-    session_node.mutate(_apply)
+    session_node.mutate(_DERIVATION_KEY, _apply)

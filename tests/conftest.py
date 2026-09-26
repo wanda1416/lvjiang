@@ -94,10 +94,12 @@ def _no_qt_modal_dialogs(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _isolate_session_store(tmp_path, monkeypatch):
-    """每个用例默认使用独立 session.json，禁止测试接触用户会话数据。"""
+    """每个用例使用独立的 session.json 和插件会话目录。"""
     from lvjiang import constants
+    from lvjiang.apps.yysls.config.session_node import reset_session_storage
     from lvjiang.core.config.session import reset_session_store
 
+    monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path / "session")
     monkeypatch.setattr(
         constants, "SESSION_PATH", tmp_path / "session" / "session.json",
     )
@@ -105,8 +107,10 @@ def _isolate_session_store(tmp_path, monkeypatch):
         constants, "BATCH_CONFIG_PATH", tmp_path / "session" / "batch.json",
     )
     reset_session_store()
+    reset_session_storage()
     yield
     reset_session_store()
+    reset_session_storage()
 
 
 @pytest.fixture(autouse=True)

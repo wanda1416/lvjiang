@@ -154,7 +154,7 @@ def test_editable_baseline_dps_recalibrates_graduation_rate(
                 lambda self, _rel_dir, _pattern: [f"110级/{source.name}"],
         })(),
     )
-    # 基准 DPS 覆盖值现存于 session.json 的 yysls 节点（见 config/session_node）；
+    # 基准 DPS 覆盖值现存于 config/session/yysls/graduations.json；
     # 把 session 目录整体指到 tmp_path 并重置单例，避免污染真实 session。
     monkeypatch.setattr(constants, "SESSION_CONFIG_DIR", tmp_path)
     monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "session.json")

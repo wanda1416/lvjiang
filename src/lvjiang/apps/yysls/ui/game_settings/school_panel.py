@@ -14,7 +14,7 @@
     }
 修改即时写盘，并刷新 GameConfigManager 单例。
 
-基础属性数据存于 config/session/session.json 的 yysls.play_styles 节点。
+基础属性数据存于 config/session/yysls/play_styles.json。
 """
 
 from __future__ import annotations

@@ -55,6 +55,12 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
 
     logger.info("[plugin] 注册插件: %s", hooks.name or "<unnamed>")
 
+    for callback in hooks.startup_callbacks:
+        try:
+            callback()
+        except Exception:  # noqa: BLE001
+            logger.exception("[plugin] 启动初始化失败: %s", hooks.id or hooks.name)
+
     if hooks.id:
         app_ids = registry.setdefault("app_ids", [])
         if hooks.id not in app_ids:

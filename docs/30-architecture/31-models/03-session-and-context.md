@@ -132,9 +132,15 @@ eval save()
 
 ```
 config/session/
-├── session.json                       ← SessionStore：core/插件的 App/UI 层持久状态
+├── session.json                       ← SessionStore：通用 App/UI 层持久状态
 │                                          （actives、daily 脚本配置、settings…，
 │                                          经 core.config.session 读写，不经 DSL）
+├── yysls/                             ← 燕云插件会话状态（每个登记子项一个 JSON）
+│   ├── play_styles.json
+│   ├── graduations.json
+│   ├── attr_loadout.json
+│   ├── attr_derivations.json
+│   └── _meta.json                     ← 一次性旧数据迁移版本
 ├── profile.db                          ← SQLite：quota/regen/stock/note 四模型的
 │                                          玩家数据（见 02-player-profile.md）
 └── users/

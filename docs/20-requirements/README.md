@@ -21,6 +21,7 @@
 | [11-loadout-management.md](11-loadout-management.md) | 跨用户备战方案管理、显式排序与主页面只读边界 | ✅ 已实现 |
 | [12-nanlu-season.md](12-nanlu-season.md) | 南吕相和赛季：115 阶词条范围、赛季承音门槛、评级与毕业率适配 | 部分实现 |
 | [13-base-attribute-baseline.md](13-base-attribute-baseline.md) | 115 阶满养成基础属性：按流派与来源选择推导无 40 词条基线 | 基础静态模型已实现 |
+| [14-yysls-session-files.md](14-yysls-session-files.md) | 燕云会话数据分文件存储与旧节点一次性迁移 | ✅ 已实现 |
 
 ## 子需求
 

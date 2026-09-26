@@ -147,7 +147,9 @@ class SessionStore:
         text = json.dumps(data, ensure_ascii=False, indent=2)
         atomic_write_text(self.path, text, prefix=".session_")
 
-    def _mutate_disk(self, mutator: Callable[[dict], Any]) -> Any:
+    def _mutate_disk(
+        self, mutator: Callable[[dict], Any], *, stamp_version: bool = True,
+    ) -> Any:
         """在文件锁内对最新磁盘快照执行变更并原子落盘。
 
         - 线程锁串行化同一进程内对 fasteners 锁实例的访问
@@ -161,7 +163,8 @@ class SessionStore:
             try:
                 disk_data = self._read_disk()
                 working = deepcopy(disk_data)
-                working.setdefault("version", SESSION_VERSION)
+                if stamp_version:
+                    working.setdefault("version", SESSION_VERSION)
                 if readonly:
                     _overlay_readonly_transients(working, self._data)
                 result = mutator(working)
@@ -230,6 +233,28 @@ class SessionStore:
             data.pop(key, None)
 
         self._mutate_disk(_delete)
+
+    def consume_node(self, key: str, consumer: Callable[[Any], None]) -> bool:
+        """持锁消费并删除一个顶层节点，供一次性外迁使用。
+
+        ``consumer`` 在最新磁盘快照的写锁内执行。只有 consumer 成功返回后
+        才会删除节点并落盘；consumer 抛出异常时原节点保持不变。回调不得
+        再调用本 SessionStore，避免锁重入跨进程文件锁。
+
+        返回 True 表示节点存在且已消费，False 表示节点原本不存在。
+        """
+        consumed = False
+
+        def _consume(data: dict) -> None:
+            nonlocal consumed
+            if key not in data:
+                return
+            consumer(deepcopy(data[key]))
+            data.pop(key)
+            consumed = True
+
+        self._mutate_disk(_consume, stamp_version=False)
+        return consumed
 
     def get_runtime_path(self, node: str, key: str) -> Any:
         """Read a runtime leaf from the current Session snapshot."""

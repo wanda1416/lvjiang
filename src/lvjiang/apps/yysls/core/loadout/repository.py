@@ -15,8 +15,10 @@ from fasteners import InterProcessLock
 from lvjiang.core.user_file_locks import user_file_lock_path
 
 from ..equip_parser.dingyin_parser import (
+    DINGYIN_NORMAL,
     DINGYIN_TYPE_KEY,
     DINGYIN_TYPES,
+    DINGYIN_ZHIGE_KEY,
     can_switch_dingyin,
 )
 from ..equipment_cooldown import next_cooldown_expiry
@@ -537,6 +539,65 @@ class LoadoutRepository:
                 raise ValueError("该装备只有一种定音，无法切换")
             equip[DINGYIN_TYPE_KEY] = kind
             equip[EQUIPMENT_UPDATED_AT] = _now_iso()
+
+        return self.update(mutate)
+
+    def dingyin_swap_candidates(self, fp: str, kind: str) -> list[dict]:
+        """返回与目标装备同部位、且具有指定定音槽的其他装备。"""
+        if kind not in DINGYIN_TYPES:
+            raise ValueError(f"未知定音种类: {kind!r}")
+        from ..equip_parser.constants import infer_part
+
+        state = self.load()
+        current = state.equipment_items.get(fp)
+        if current is None:
+            raise ValueError(f"装备已不存在: {fp}")
+        part = infer_part(current.get("type"))
+        if part == "unknown":
+            raise ValueError("无法识别当前装备部位")
+        slot_key = "dingyin" if kind == DINGYIN_NORMAL else DINGYIN_ZHIGE_KEY
+        return [
+            copy.deepcopy(equip)
+            for candidate_fp, equip in state.equipment_items.items()
+            if candidate_fp != fp
+            and infer_part(equip.get("type")) == part
+            and isinstance(equip.get(slot_key), dict)
+            and bool(equip.get(slot_key))
+        ]
+
+    def swap_item_dingyin(
+        self, first_fp: str, second_fp: str, kind: str,
+    ) -> LoadoutState:
+        """原子互换两件同部位装备的指定定音槽。
+
+        只交换具体定音属性；装备展示种类和各备战方案保存的定音种类保持不变。
+        """
+        if kind != DINGYIN_NORMAL:
+            raise ValueError("止戈定音类型尚未配置，暂不支持互换")
+        if first_fp == second_fp:
+            raise ValueError("不能与当前装备互换定音")
+        from ..equip_parser.constants import infer_part
+
+        def mutate(state: LoadoutState) -> None:
+            first = state.equipment_items.get(first_fp)
+            second = state.equipment_items.get(second_fp)
+            if first is None or second is None:
+                raise ValueError("参与互换的装备已不存在")
+            first_part = infer_part(first.get("type"))
+            second_part = infer_part(second.get("type"))
+            if first_part == "unknown" or first_part != second_part:
+                raise ValueError("只能互换同类型装备的定音")
+            first_value = first.get("dingyin")
+            second_value = second.get("dingyin")
+            if not isinstance(first_value, dict) or not first_value:
+                raise ValueError("当前装备没有普通定音")
+            if not isinstance(second_value, dict) or not second_value:
+                raise ValueError("目标装备没有普通定音")
+            first["dingyin"] = copy.deepcopy(second_value)
+            second["dingyin"] = copy.deepcopy(first_value)
+            timestamp = _now_iso()
+            first[EQUIPMENT_UPDATED_AT] = timestamp
+            second[EQUIPMENT_UPDATED_AT] = timestamp
 
         return self.update(mutate)
 

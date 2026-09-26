@@ -13,6 +13,7 @@ from typing import Literal
 from PyQt6.QtCore import QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPaintEvent, QPen
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
@@ -20,6 +21,8 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QMenu,
     QMessageBox,
     QPushButton,
@@ -411,6 +414,99 @@ def _equipment_properties_text(
                      _equipment_property_rows(equip, referenced_plans))
 
 
+class _DingyinSwapDialog(QDialog):
+    """选择一件同部位装备，与当前装备互换指定定音槽。"""
+
+    def __init__(
+        self,
+        current: dict,
+        candidates: list[dict],
+        kind: str,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._kind = kind
+        self.setWindowTitle(tr("互换普通定音"))
+        self.setMinimumSize(620, 360)
+
+        layout = QVBoxLayout(self)
+        current_name = str(current.get("name") or tr("未命名装备"))
+        explanation = QLabel(tr(
+            "选择一件同类型装备，互换两者的普通定音属性。"
+            "装备展示的定音类别和备战方案引用不会改变。"))
+        explanation.setWordWrap(True)
+        layout.addWidget(explanation)
+        layout.addWidget(QLabel(tr("当前装备：{name}").format(
+            name=current_name)))
+
+        self._candidates = QListWidget()
+        self._candidates.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection)
+        slot_key = "dingyin" if kind == DINGYIN_NORMAL else DINGYIN_ZHIGE_KEY
+        ordered = sorted(
+            candidates,
+            key=lambda equip: (
+                str(equip.get("type") or ""),
+                str(equip.get("name") or ""),
+                str(equip.get("_fp") or ""),
+            ),
+        )
+        for equip in ordered:
+            fp = str(equip.get("_fp") or "")
+            if not fp:
+                continue
+            source = (tr("模拟") if bool((equip.get("_extra") or {}).get("is_mock"))
+                      else tr("扫描"))
+            name = str(equip.get("name") or tr("未命名装备"))
+            equip_type = str(equip.get("type") or tr("未知类型"))
+            level = int(equip.get("level") or 0)
+            dingyin = _dingyin_slot_text(equip, slot_key)
+            text = tr("{name}　{type} · {level}级　{dingyin}　[{source}]").format(
+                name=name,
+                type=equip_type,
+                level=level,
+                dingyin=dingyin,
+                source=source,
+            )
+            item = QListWidgetItem(text)
+            item.setData(Qt.ItemDataRole.UserRole, fp)
+            item.setToolTip(_equipment_properties_text(equip))
+            self._candidates.addItem(item)
+        if self._candidates.count() == 0:
+            empty = QListWidgetItem(tr("没有其他具有普通定音的同类型装备"))
+            empty.setFlags(Qt.ItemFlag.NoItemFlags)
+            self._candidates.addItem(empty)
+        layout.addWidget(self._candidates, 1)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel)
+        apply_dialog_button_box_style(buttons)
+        swap_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        assert swap_button is not None
+        self._swap_button: QPushButton = swap_button
+        self._swap_button.setText(tr("互换定音"))
+        self._swap_button.setEnabled(False)
+        cancel_button = buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if cancel_button is not None:
+            cancel_button.setText(tr("取消"))
+        self._candidates.currentItemChanged.connect(
+            lambda current_item, _previous: self._swap_button.setEnabled(
+                current_item is not None
+                and bool(current_item.data(Qt.ItemDataRole.UserRole))))
+        self._candidates.itemDoubleClicked.connect(
+            lambda item: self.accept()
+            if item.data(Qt.ItemDataRole.UserRole) else None)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    @property
+    def selected_fingerprint(self) -> str:
+        item = self._candidates.currentItem()
+        return str(item.data(Qt.ItemDataRole.UserRole) or "") if item else ""
+
+
 class _EquipmentPropertiesDialog(QDialog):
     """不触发系统消息提示音的装备属性只读对话框。"""
 
@@ -421,6 +517,8 @@ class _EquipmentPropertiesDialog(QDialog):
         cooldown_changed: Callable[[str], bool] | None = None,
         dingyin_changed: Callable[[str], bool] | None = None,
         equipment_set_changed: Callable[[str], bool] | None = None,
+        dingyin_swap_candidates: Callable[[str], list[dict]] | None = None,
+        dingyin_swapped: Callable[[str, str], dict | None] | None = None,
         dingyin_kind: str = "",
         referenced_plans: list[str] | tuple[str, ...] = (),
     ):
@@ -431,6 +529,8 @@ class _EquipmentPropertiesDialog(QDialog):
         # 展示状态。对话框只负责问「切到哪一种」，不知道也不该知道写到哪。
         self._dingyin_changed = dingyin_changed
         self._equipment_set_changed = equipment_set_changed
+        self._dingyin_swap_candidates = dingyin_swap_candidates
+        self._dingyin_swapped = dingyin_swapped
         self._dingyin_kind = (
             dingyin_kind if dingyin_kind in DINGYIN_TYPES
             else resolve_dingyin_type(self._equip))
@@ -444,6 +544,7 @@ class _EquipmentPropertiesDialog(QDialog):
         form.setHorizontalSpacing(24)
         form.setVerticalSpacing(12)
         self._value_labels: dict[str, QLabel] = {}
+        self._swap_dingyin_buttons: dict[str, QPushButton] = {}
         for name, value in _equipment_property_rows(
                 self._equip, referenced_plans):
             field_name = QLabel(f"{name}：")
@@ -465,6 +566,21 @@ class _EquipmentPropertiesDialog(QDialog):
                     self._switch_equipment_set_button, variant="neutral")
                 set_row.addWidget(self._switch_equipment_set_button)
                 form.addRow(field_name, set_row)
+                continue
+            if name in (tr("普通定音"), tr("止戈定音")):
+                kind = (DINGYIN_NORMAL if name == tr("普通定音")
+                        else DINGYIN_ZHIGE)
+                dingyin_row = QHBoxLayout()
+                dingyin_row.setContentsMargins(0, 0, 0, 0)
+                dingyin_row.addWidget(field_value, 1)
+                swap_button = QPushButton(tr("互换定音"))
+                swap_button.clicked.connect(
+                    lambda _checked=False, target_kind=kind:
+                    self._swap_dingyin(target_kind))
+                apply_compact_button_style(swap_button, variant="neutral")
+                dingyin_row.addWidget(swap_button)
+                self._swap_dingyin_buttons[kind] = swap_button
+                form.addRow(field_name, dingyin_row)
                 continue
             form.addRow(field_name, field_value)
 
@@ -504,6 +620,7 @@ class _EquipmentPropertiesDialog(QDialog):
 
         self._refresh_cooldown()
         self._refresh_dingyin()
+        self._refresh_dingyin_swap_buttons()
         self._refresh_equipment_set()
 
     def _equipment_set_options(self) -> list[tuple[str, str]]:
@@ -559,6 +676,48 @@ class _EquipmentPropertiesDialog(QDialog):
         self._refresh_equipment_set()
 
     # ── 定音切换 ──
+
+    def _refresh_dingyin_swap_buttons(self) -> None:
+        normal = self._swap_dingyin_buttons[DINGYIN_NORMAL]
+        normal_supported = (
+            self._dingyin_swap_candidates is not None
+            and self._dingyin_swapped is not None)
+        normal.setEnabled(normal_supported and has_normal_dingyin(self._equip))
+        if not has_normal_dingyin(self._equip):
+            normal.setToolTip(tr("该装备没有普通定音"))
+        elif not normal_supported:
+            normal.setToolTip(tr("当前入口不支持互换定音，请在装备页操作"))
+        else:
+            normal.setToolTip(tr("与另一件同类型装备互换普通定音属性"))
+
+        zhige = self._swap_dingyin_buttons[DINGYIN_ZHIGE]
+        zhige.setEnabled(False)
+        zhige.setToolTip(tr("止戈定音具体类型尚未配置，暂不支持互换"))
+
+    def _swap_dingyin(self, kind: str) -> None:
+        if (kind != DINGYIN_NORMAL
+                or self._dingyin_swap_candidates is None
+                or self._dingyin_swapped is None):
+            return
+        try:
+            candidates = self._dingyin_swap_candidates(kind)
+        except Exception as exc:
+            QMessageBox.critical(self, tr("加载失败"), str(exc))
+            return
+        dialog = _DingyinSwapDialog(self._equip, candidates, kind, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        target_fp = dialog.selected_fingerprint
+        if not target_fp:
+            return
+        updated = self._dingyin_swapped(kind, target_fp)
+        if updated is None:
+            return
+        self._equip = dict(updated)
+        self._value_labels[tr("普通定音")].setText(
+            _dingyin_slot_text(self._equip, "dingyin"))
+        self._refresh_dingyin()
+        self._refresh_dingyin_swap_buttons()
 
     def _refresh_dingyin(self) -> None:
         """按两个槽的实际数据决定能不能切。
@@ -646,6 +805,8 @@ def _show_equipment_properties(
     cooldown_changed: Callable[[str], bool] | None = None,
     dingyin_changed: Callable[[str], bool] | None = None,
     equipment_set_changed: Callable[[str], bool] | None = None,
+    dingyin_swap_candidates: Callable[[str], list[dict]] | None = None,
+    dingyin_swapped: Callable[[str, str], dict | None] | None = None,
     dingyin_kind: str = "",
     referenced_plans: list[str] | tuple[str, ...] = (),
 ) -> None:
@@ -657,6 +818,8 @@ def _show_equipment_properties(
         equip, parent, cooldown_changed=cooldown_changed,
         dingyin_changed=dingyin_changed,
         equipment_set_changed=equipment_set_changed,
+        dingyin_swap_candidates=dingyin_swap_candidates,
+        dingyin_swapped=dingyin_swapped,
         dingyin_kind=dingyin_kind,
         referenced_plans=referenced_plans).exec()
 

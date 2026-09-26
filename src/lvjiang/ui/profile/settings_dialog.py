@@ -15,6 +15,7 @@ from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFontMetrics, QIntValidator
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -26,6 +27,7 @@ from PyQt6.QtWidgets import (
     QInputDialog,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSpinBox,
@@ -621,9 +623,15 @@ class _ModelTab(QWidget):
         self._table.verticalHeader().setVisible(False)
         self._table.setAlternatingRowColors(True)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.doubleClicked.connect(self._edit_key)
-        self._table.cellDoubleClicked.connect(self._cell_double_clicked)
+        self._table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._table.customContextMenuRequested.connect(self._show_context_menu)
+
+        self._group_context_menu = QMenu(self._table)
+        self._change_group_action = self._group_context_menu.addAction(tr("更改分组"))
+        self._change_group_action.triggered.connect(self._change_selected_groups)
 
         # 表头加粗
         header_font = self._table.horizontalHeader().font()
@@ -716,12 +724,27 @@ class _ModelTab(QWidget):
             if row >= 0:
                 dialog._edit_key(self._model_type, row)
 
-    def _cell_double_clicked(self, row: int, column: int):
-        if column != 1:
+    def _show_context_menu(self, position) -> None:
+        index = self._table.indexAt(position)
+        if not index.isValid():
             return
+        selected_rows = {
+            selected.row() for selected in self._table.selectionModel().selectedRows()
+        }
+        if index.row() not in selected_rows:
+            self._table.clearSelection()
+            self._table.selectRow(index.row())
+        self._group_context_menu.exec(self._table.viewport().mapToGlobal(position))
+
+    def _change_selected_groups(self) -> None:
         dialog = self._get_parent()
         if dialog:
-            dialog._edit_key_group(self._model_type, row)
+            rows = sorted(
+                index.row()
+                for index in self._table.selectionModel().selectedRows()
+            )
+            if rows:
+                dialog._edit_key_groups(self._model_type, rows)
 
     def _group_changed(self):
         dialog = self._get_parent()
@@ -766,7 +789,7 @@ class ProfileDefinitionDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
 
-        info = QLabel(tr("定义数据模型的 key。双击行可编辑。"))
+        info = QLabel(tr("定义数据模型的 key。双击非分组列可编辑，右键可批量更改分组。"))
         info.setStyleSheet("color: palette(mid); margin-bottom: 10px;")
         layout.addWidget(info)
 
@@ -977,39 +1000,61 @@ class ProfileDefinitionDialog(QDialog):
         drafts[drafts.index(old_kd)] = kd
         self._refresh_model_tab(model_type, kd.group, kd.key)
 
-    def _edit_key_group(self, model_type: str, row: int):
-        """编辑单个 key 的定义分组；分组列表由全部 key 重新派生。"""
+    def _edit_key_groups(self, model_type: str, rows: list[int]) -> None:
+        """通过可编辑下拉框批量修改所选 key 的定义分组。"""
         tab = self._tabs[model_type]
-        key_item = tab.table.item(row, 0)
-        if not key_item:
+        key_defs: list[KeyDef] = []
+        for row in rows:
+            key_item = tab.table.item(row, 0)
+            if not key_item:
+                continue
+            key_def = key_item.data(_ROLE_KEYDEF)
+            if key_def is None:
+                raise RuntimeError(f"行 {row} 缺少 KeyDef 数据，无法编辑分组")
+            key_defs.append(key_def)
+        if not key_defs:
             return
-        old_kd = key_item.data(_ROLE_KEYDEF)
-        if old_kd is None:
-            raise RuntimeError(f"行 {row} 缺少 KeyDef 数据，无法编辑分组")
 
-        current = self._group_display_name(normalize_key_group(old_kd.group))
-        value, accepted = QInputDialog.getText(
+        known_groups = list(group_key_definitions(self._drafts[model_type]))
+        group_labels = [self._group_display_name(group) for group in known_groups]
+        current_group = normalize_key_group(key_defs[0].group)
+        current_index = (
+            known_groups.index(current_group) if current_group in known_groups else 0
+        )
+        value, accepted = QInputDialog.getItem(
             self,
             tr("更改分组"),
             tr("分组名称:"),
-            text=current,
+            group_labels,
+            current_index,
+            True,
         )
         if not accepted:
             return
-        self._assign_key_group(model_type, old_kd, value)
+        self._assign_key_groups(model_type, key_defs, value)
 
-    def _assign_key_group(self, model_type: str, key_def: KeyDef, value: str) -> None:
-        """把一个 key 移入指定组，供界面操作与回归测试共用。"""
+    def _assign_key_groups(
+        self,
+        model_type: str,
+        key_defs: list[KeyDef],
+        value: str,
+    ) -> None:
+        """把一批 key 移入指定组，供界面操作与回归测试共用。"""
         cleaned = value.strip()
         group = (
             DEFAULT_KEY_GROUP
             if not cleaned or cleaned == tr("默认")
             else normalize_key_group(cleaned)
         )
-        updated = replace(key_def, group=group)
+        selected_ids = {id(key_def) for key_def in key_defs}
         drafts = self._drafts[model_type]
-        drafts[drafts.index(key_def)] = updated
-        self._refresh_model_tab(model_type, group, updated.key)
+        self._drafts[model_type] = [
+            replace(key_def, group=group)
+            if id(key_def) in selected_ids
+            else key_def
+            for key_def in drafts
+        ]
+        self._refresh_model_tab(model_type, group, key_defs[0].key)
 
     def _delete_key(self, model_type: str, row: int):
         """删除 key"""

@@ -27,7 +27,11 @@ class PickCanvas(OCRCanvas):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._press_pos = None
-        self._placeholder = "点「刷新截图」抓一帧；左键点=取点/取色，拖=取区域，右键拖=平移，滚轮=缩放"
+        self._placeholder = (
+            "点「刷新截图」抓一帧\n"
+            "左键点：取点/取色；左键拖：取区域\n"
+            "右键拖：平移；滚轮：缩放"
+        )
 
     # ─── 像素读取 ──────────────────────────────────────
 

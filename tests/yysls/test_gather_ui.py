@@ -198,16 +198,17 @@ def test_f1_f2_build_visible_sequence_and_record_travel_time(qtbot, monkeypatch)
     editor.mark()
     assert editor.marked is point
     assert editor.steps.item(0).text() == '1. press "M"'
-    assert editor.steps.item(1).text() == "2. click (0.400000, 0.500000)"
+    assert editor.steps.item(1).text() == "2. wait $gather_map_open_wait"
+    assert editor.steps.item(2).text() == "3. click (0.400000, 0.500000)"
     editor.travel()
     assert host.input_events == [("down", "V"), ("up", "V")]
     editor._confirm_travel()
     assert host.input_events[-2:] == [("down", "F"), ("up", "F")]
-    assert editor.steps.item(2).text() == '3. press "V"'
-    assert editor.steps.item(4).text() == '5. press "F"'
+    assert editor.steps.item(4).text() == '5. press "V"'
+    assert editor.steps.item(6).text() == '7. press "F"'
     editor.travel()
     assert len(editor.route.steps) == 1
     assert editor.route.steps[0].travel_seconds == 12.5
-    assert editor.steps.item(6).text() == '7. press "1"'
+    assert editor.steps.item(8).text() == '9. press "1"'
     assert GatherStore().routes()[0] == []
     editor.previous = asdict(editor.route)

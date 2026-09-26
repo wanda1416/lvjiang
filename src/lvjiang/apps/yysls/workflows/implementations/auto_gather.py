@@ -91,19 +91,19 @@ class AutoGatherWorkflow(BaseWorkflow):
         if not self._is_home(frame):
             raise ValueError("未识别到采集地图或游戏主页，请手动打开目标资源的采集地图")
         self._press(self.route.map_key)
-        deadline = self._now() + 10
+        self._sleep(self.route.map_open_seconds)
+        deadline = self._now() + max(10, self.route.map_open_seconds)
         while self._now() < deadline:
-            self._sleep(0.5)
             frame = self._frame()
             if self._is_map(frame):
-                self._sleep(0.8)
-                return self._frame()
+                return frame
+            self._sleep(0.5)
         raise ValueError("打开采集地图超时，请确认开图键及资源筛选")
 
     def _arrive(self, step: GatherStep) -> float:
         self._report("travel", "发起识途并确认前往")
         self._press(self.route.travel_key)
-        self._sleep(0.8)
+        self._sleep(self.route.travel_prompt_seconds)
         self._press(self.route.confirm_key)
         start = self._now()
         self._report("timing", f"按录制时间等待 {step.travel_seconds:.1f} 秒")
@@ -151,8 +151,6 @@ class AutoGatherWorkflow(BaseWorkflow):
             self._report("map", "检查采集地图")
             frame = self._ensure_map()
             if not self.selected_target:
-                self._sleep(0.8)
-                frame = self._frame()
                 signature = (viewport_signature(crop_region(frame, self._layout, "map_view"))
                              if step.viewport else "")
                 if step.viewport and viewport_difference(step.viewport, signature) > 0.04:
@@ -160,7 +158,7 @@ class AutoGatherWorkflow(BaseWorkflow):
                 self._checkpoint()
                 self.click_at(*self._ratio_to_screen(step.x, step.y), random_offset=False,
                               pre_delay=(0, 0), post_delay=(0, 0))
-                self._sleep(1)
+                self._sleep(self.route.target_select_seconds)
                 if not self._is_map(self._frame()):
                     raise ValueError("点击后未识别到识途按钮，请重新录制该路线")
             travel = self._arrive(step)

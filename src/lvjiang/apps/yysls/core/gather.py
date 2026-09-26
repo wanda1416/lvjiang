@@ -81,6 +81,9 @@ class GatherRoute:
     confirm_key: str = "F"
     gather_key: str = "1"
     travel_timeout: float = 120
+    map_open_seconds: float = 5
+    target_select_seconds: float = 1.5
+    travel_prompt_seconds: float = 1.5
     gather_seconds: float = 6
     steps: list[GatherStep] = field(default_factory=list)
 
@@ -92,8 +95,14 @@ class GatherRoute:
             normalize_pressable(key)
         if not (math.isfinite(self.travel_timeout) and 10 <= self.travel_timeout <= 1800):
             raise ValueError("识途超时必须在 10–1800 秒之间")
-        if not (math.isfinite(self.gather_seconds) and 1 <= self.gather_seconds <= 120):
-            raise ValueError("采集等待必须在 1–120 秒之间")
+        common_waits = (
+            self.map_open_seconds,
+            self.target_select_seconds,
+            self.travel_prompt_seconds,
+            self.gather_seconds,
+        )
+        if not all(math.isfinite(value) and 0.1 <= value <= 120 for value in common_waits):
+            raise ValueError("采集公共等待必须在 0.1–120 秒之间")
         if runnable and (not self.steps or not self.layout_key or not self.start_note.strip()):
             raise ValueError("请录制采集点并填写固定起点说明")
         for step in self.steps:
@@ -112,13 +121,15 @@ def gather_step_dsl(route: GatherRoute, step: GatherStep) -> list[str]:
     """把一个领域采集点编译为干净的 WF 动作，不包含原始输入噪声。"""
     return [
         f"press {json.dumps(route.map_key)}",
+        "wait $gather_map_open_wait",
         f"click ({step.x:.6f}, {step.y:.6f})",
+        "wait $gather_target_select_wait",
         f"press {json.dumps(route.travel_key)}",
-        "wait 0.800",
+        "wait $gather_travel_prompt_wait",
         f"press {json.dumps(route.confirm_key)}",
         f"wait {step.travel_seconds:.3f}",
         f"press {json.dumps(route.gather_key)}",
-        f"wait {route.gather_seconds:.3f}",
+        "wait $gather_collect_wait",
     ]
 
 
@@ -135,6 +146,11 @@ def route_to_dsl(route: GatherRoute) -> str:
         f"#% note: {json.dumps(route.start_note, ensure_ascii=False)}",
         f"# gather-layout: {json.dumps(route.layout_key, ensure_ascii=False)}",
         f"# gather-travel-timeout: {route.travel_timeout:g}",
+        "",
+        f"default $gather_map_open_wait = {route.map_open_seconds:.3f}",
+        f"default $gather_target_select_wait = {route.target_select_seconds:.3f}",
+        f"default $gather_travel_prompt_wait = {route.travel_prompt_seconds:.3f}",
+        f"default $gather_collect_wait = {route.gather_seconds:.3f}",
         "",
     ]
     body = [line for step in route.steps for line in gather_step_dsl(route, step)]
@@ -156,55 +172,70 @@ class GatherStore:
         if layout_match is None or timeout_match is None:
             raise ValueError("缺少采集路线元数据")
         layout_key = json.loads(layout_match.group(1))
+        defaults = {
+            name: float(value)
+            for name, value in re.findall(
+                r"^default\s+\$(gather_[a-z_]+)\s*=\s*([0-9.]+)$", text, re.MULTILINE)
+        }
+        required_defaults = {
+            "gather_map_open_wait",
+            "gather_target_select_wait",
+            "gather_travel_prompt_wait",
+            "gather_collect_wait",
+        }
+        if set(defaults) != required_defaults:
+            raise ValueError("采集 WF 缺少开头的公共等待参数")
         commands = [
             line.strip() for line in text.splitlines()
-            if line.strip() and not line.lstrip().startswith("#")
+            if line.strip() and not line.lstrip().startswith(("#", "default "))
         ]
-        if not commands or len(commands) % 8:
-            raise ValueError("采集 WF 必须由每点 8 条标准动作组成")
+        if not commands or len(commands) % 10:
+            raise ValueError("采集 WF 必须由每点 10 条标准动作组成")
         route = GatherRoute(
             key=path.stem,
             name=meta.get("name") or path.stem,
             start_note=meta.get("note") or "",
             layout_key=layout_key,
             travel_timeout=float(timeout_match.group(1)),
+            map_open_seconds=defaults["gather_map_open_wait"],
+            target_select_seconds=defaults["gather_target_select_wait"],
+            travel_prompt_seconds=defaults["gather_travel_prompt_wait"],
+            gather_seconds=defaults["gather_collect_wait"],
         )
-        for offset in range(0, len(commands), 8):
-            block = commands[offset:offset + 8]
+        for offset in range(0, len(commands), 10):
+            block = commands[offset:offset + 10]
             press_map = re.fullmatch(r'press\s+"([^"]+)"', block[0])
-            click = re.fullmatch(r"click\s+\(([0-9.]+),\s*([0-9.]+)\)", block[1])
-            press_travel = re.fullmatch(r'press\s+"([^"]+)"', block[2])
-            confirm_wait = re.fullmatch(r"wait\s+([0-9.]+)", block[3])
-            press_confirm = re.fullmatch(r'press\s+"([^"]+)"', block[4])
-            travel_wait = re.fullmatch(r"wait\s+([0-9.]+)", block[5])
-            press_gather = re.fullmatch(r'press\s+"([^"]+)"', block[6])
-            gather_wait = re.fullmatch(r"wait\s+([0-9.]+)", block[7])
-            matches = (press_map, click, press_travel, confirm_wait,
-                       press_confirm, travel_wait, press_gather, gather_wait)
+            map_wait = re.fullmatch(r"wait\s+\$gather_map_open_wait", block[1])
+            click = re.fullmatch(r"click\s+\(([0-9.]+),\s*([0-9.]+)\)", block[2])
+            select_wait = re.fullmatch(r"wait\s+\$gather_target_select_wait", block[3])
+            press_travel = re.fullmatch(r'press\s+"([^"]+)"', block[4])
+            prompt_wait = re.fullmatch(r"wait\s+\$gather_travel_prompt_wait", block[5])
+            press_confirm = re.fullmatch(r'press\s+"([^"]+)"', block[6])
+            travel_wait = re.fullmatch(r"wait\s+([0-9.]+)", block[7])
+            press_gather = re.fullmatch(r'press\s+"([^"]+)"', block[8])
+            gather_wait = re.fullmatch(r"wait\s+\$gather_collect_wait", block[9])
+            matches = (press_map, map_wait, click, select_wait, press_travel,
+                       prompt_wait, press_confirm, travel_wait, press_gather, gather_wait)
             if any(match is None for match in matches):
-                raise ValueError(f"第 {offset // 8 + 1} 个采集点不是标准采集序列")
+                raise ValueError(f"第 {offset // 10 + 1} 个采集点不是标准采集序列")
             assert press_map is not None
+            assert map_wait is not None
             assert click is not None
+            assert select_wait is not None
             assert press_travel is not None
-            assert confirm_wait is not None
+            assert prompt_wait is not None
             assert press_confirm is not None
             assert travel_wait is not None
             assert press_gather is not None
             assert gather_wait is not None
-            if abs(float(confirm_wait.group(1)) - 0.8) > 0.001:
-                raise ValueError("V 与 F 之间的等待必须为 0.8 秒")
             keys = (press_map.group(1), press_travel.group(1),
                     press_confirm.group(1), press_gather.group(1))
-            waits = (float(travel_wait.group(1)), float(gather_wait.group(1)))
             if route.steps and keys != (route.map_key, route.travel_key,
                                         route.confirm_key, route.gather_key):
                 raise ValueError("同一路线各采集点的按键必须一致")
-            if route.steps and abs(waits[1] - route.gather_seconds) > 0.001:
-                raise ValueError("同一路线各采集点的采集等待必须一致")
             route.map_key, route.travel_key, route.confirm_key, route.gather_key = keys
-            route.gather_seconds = waits[1]
             route.steps.append(GatherStep(float(click.group(1)), float(click.group(2)),
-                                          travel_seconds=waits[0]))
+                                          travel_seconds=float(travel_wait.group(1))))
         route.validate(runnable=True)
         return route
 

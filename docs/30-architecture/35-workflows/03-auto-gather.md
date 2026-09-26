@@ -6,6 +6,9 @@
 不进入日常/批量的默认脚本清单。不新增通用 DSL 语法或修改地图模型。采集录制器
 只记录领域事件，并把路线确定性编译为现有 `press`、`click`、`wait` WF 动作预览；
 它不复用原始脚本录制器，因后者会包含鼠标轨迹和无业务意义的中间输入。
+页面连锁反应使用脚本开头的 `gather_map_open_wait`、`gather_target_select_wait`、
+`gather_travel_prompt_wait`、`gather_collect_wait` 四个 `default` 参数，不借用
+语义不同的全局 `page_refresh`。
 
 | 组件 | 职责 |
 |---|---|

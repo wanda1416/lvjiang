@@ -58,9 +58,13 @@ def _bag_cursor_visit(_engine, fingerprint: str | None, *args) -> str:
 
 @builtin_func("bag_cursor_finish_window")
 def _bag_cursor_finish_window(
-    _engine, visible_rows: int, expected_rows: int, *args
+    _engine, visible_rows: int, expected_rows: int,
+    hit_confirmed_empty: bool = False, *args,
 ) -> str:
     """提交一个完整窗口，返回 ``scroll`` 或 ``end``。
+
+    确认读到空槽且本轮没有新增行时立即结束；该条件只作为旧规则前的
+    额外截断，不改变满窗连续两轮零新增等既有兜底。
 
     到底规则与自动调律 dedup 策略一致：非满窗且零新增立即结束；
     满窗连续两轮零新增结束；总滚动轮数另有保险丝。
@@ -77,6 +81,10 @@ def _bag_cursor_finish_window(
     new_count = cursor["new_count"]
     if not cursor["window"]:
         logger.info("bag_cursor_finish_window: 空窗口 → end")
+        return "end"
+
+    if hit_confirmed_empty and new_count == 0:
+        logger.info("bag_cursor_finish_window: 零新增且确认读到空槽 → end")
         return "end"
 
     if new_count == 0:

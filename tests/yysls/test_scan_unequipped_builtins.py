@@ -178,23 +178,32 @@ def test_scan_unequipped_closes_desktop_detail_before_first_column_only():
     assert final_close > after_remaining_cols
 
 
-def test_scan_unequipped_only_marks_confirmed_detail_as_open():
-    """穿戴空槽或首列空槽不得被当成已经打开装备详情。"""
+def test_scan_unequipped_tracks_detail_state_from_raw_scan_content():
+    """空槽关闭详情；仅类型 OCR 失败但仍有详情内容时保持打开状态。"""
     root = Path(__file__).resolve().parents[2]
     text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
 
-    slot_scan = text.index("call $slot_equip = scan_cell($detail_kind)")
-    slot_guard = text.index("if $slot_equip.type", slot_scan)
-    slot_open = text.index("eval $detail_open = 1", slot_guard)
-    mark_seen = text.index("eval mark_equipment_seen($slot_equip)", slot_scan)
-    assert slot_scan < slot_guard < slot_open < mark_seen
+    assert text.count("eval $detail_open = $cell.detail_open") == 2
+    assert "eval $detail_open = $slot_cell.detail_open" in text
+    assert (
+        "if $raw.equip_type or $raw.equip_level or $raw.base_attr "
+        "or $raw.equip_detail"
+    ) in text
 
-    first_col_scan = text.index("call $equip = scan_cell($detail_kind)")
+    first_col_scan = text.index("call $cell = scan_cell($detail_kind)")
+    state_update = text.index(
+        "eval $detail_open = $cell.detail_open", first_col_scan)
     empty_guard = text.index("if not $equip.type", first_col_scan)
-    empty_break = text.index("break", empty_guard)
-    first_col_open = text.index("eval $detail_open = 1", first_col_scan)
-    assert first_col_scan < empty_guard < empty_break < first_col_open
+    assert first_col_scan < state_update < empty_guard
+
+    remaining_cols = text.index("eval $c = 2", empty_guard)
+    remaining_scan = text.index(
+        "call $cell = scan_cell($detail_kind)", remaining_cols)
+    remaining_state_update = text.index(
+        "eval $detail_open = $cell.detail_open", remaining_scan)
+    remaining_empty_guard = text.index("if not $equip.type", remaining_scan)
+    assert remaining_scan < remaining_state_update < remaining_empty_guard
 
 
 def test_scan_unequipped_seen_row_skips_remaining_columns():

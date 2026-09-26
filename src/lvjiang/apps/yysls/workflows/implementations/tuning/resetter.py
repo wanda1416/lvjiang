@@ -126,11 +126,22 @@ class TuningResetter:
         ) or ""
         if _RESET_AVAILABLE_TOKEN not in check_text:
             logger.info(
-                "  冷却期检查未通过（reset_check={!r}），装备在冷却期，降级跳过",
+                "  冷却期检查未通过（reset_check={!r}），按既有冷却路径跳过",
                 check_text,
             )
+            notification_enabled = False
             if notify_if_cooling:
-                self._enable_reset_notification()
+                notification_enabled = self._enable_reset_notification()
+            # 原有冷却跳过和关闭页面的行为不变。只有两处识别都不能证明
+            # 当前页面状态时才报异常，便于排查截图或 OCR 区域失配。
+            if (not notification_enabled
+                    and not ("后" in check_text and "重置" in check_text)):
+                logger.error(
+                    "  重置页状态无法判定，仍按冷却路径跳过："
+                    "reset_check={!r}，reset_notify={}。请核对重置页截图与识别区域",
+                    check_text,
+                    "未识别到“提醒”" if notify_if_cooling else "未扫描（详情已有重置冷却记录）",
+                )
             self._close_dialog()
             return (RESET_COOLDOWN, tr("装备重置冷却期，跳过该装备"))
 

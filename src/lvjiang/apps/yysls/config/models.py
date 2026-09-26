@@ -64,6 +64,7 @@ class SeasonConfig:
     end_date: 赛季结束日期
     first_half_end_date: 上半赛季结束日期（每赛季 84 天，前 42 天为上半赛季）
     equip_level: 当前赛季装备等级（如 90, 96, 100）
+    gongjue_level: 当前赛季弓玦沿用的词条等级；不填时跟随装备等级
     min_chengyin_level: 本赛季仍可承音的最低装备等级（0/None 表示不限制）
 
         和 ``LevelConfig.allow_chengyin`` 不是一回事：后者描述该等级的装备
@@ -77,6 +78,8 @@ class SeasonConfig:
     end_date: date | None = None
     first_half_end_date: date | None = None
     equip_level: int | None = None
+    #: 弓玦沿用的词条等级；可低于当前赛季装备等级。
+    gongjue_level: int | None = None
     min_chengyin_level: int | None = None
 
 

@@ -1,10 +1,10 @@
 """基础属性来源建模的领域模型与固定词汇
 
-回答的问题是「装备之外的战斗属性从哪来」：等级底子、突破、五维转换、
-武学天赋、心法、套装、武备、弓玦、神工、奇物、秘籍、吃食。每个来源
+回答的问题是「排除装备普通词条后的完整属性从哪来」：装备固有值、等级底子、
+突破、五维转换、武学天赋、心法、套装、武备、弓玦、神工、奇物、秘籍、吃食。每个来源
 产出若干 :class:`StatEffect`，求值后汇总成 :class:`CombatAttributes`，
-作为 ``build_graduation_attrs(base_attrs=...)`` 的入参；装备词条依旧
-走原有的 ``equipment_attrs`` 通道，本包不碰。
+推导页展示完整无词条目标；保存给毕业率时扣回装备固有值和弓玦，装备词条
+及实际装备固有值仍走原有的 ``equipment_attrs`` 通道。
 
 工作字段空间（WORKING_FIELDS）是 CombatAttributes 的超集，额外含五维
 （dim_*）。五维本身不是战斗属性，但武学天赋的转换公式要读它（例如
@@ -36,11 +36,13 @@ from ..combat.combat_attrs import COMBAT_ATTR_FIELDS, CombatAttributes
 #: 来源类别。声明序即 breakdown 展示序，也是求值时的稳定顺序。
 SOURCE_KINDS: tuple[str, ...] = (
     "base",          # 角色等级底子
+    "equipment_base",  # 当前等级八件金装的固有基础值（不含词条）
     "breakthrough",  # 突破
     "dimension",     # 五维 → 战斗属性转换
     "martial_art",   # 武学天赋
     "inner_way",     # 心法
-    "gear_set",      # 套装（含弓玦）
+    "gear_set",      # 输出套装与装备叠音
+    "gongjue",       # 弓玦（类型与等级独立于装备赛季等级）
     "arsenal",       # 武备
     "divinecraft",   # 神工
     "oddity",        # 奇物
@@ -50,11 +52,13 @@ SOURCE_KINDS: tuple[str, ...] = (
 
 SOURCE_KIND_LABELS: dict[str, str] = {
     "base": "等级底子",
+    "equipment_base": "装备固有值",
     "breakthrough": "突破",
     "dimension": "五维转换",
     "martial_art": "武学天赋",
     "inner_way": "心法",
     "gear_set": "套装",
+    "gongjue": "弓玦",
     "arsenal": "武备",
     "divinecraft": "神工",
     "oddity": "奇物",
@@ -162,11 +166,13 @@ SELECT_ALL = "all"
 #: 填数据时发现不符再改——它是模型结构，不是游戏数值。
 SELECTION_POLICIES: dict[str, str] = {
     "base": SELECT_ALL,            # 等级底子恒生效
+    "equipment_base": SELECT_DERIVED,  # 由等级按装备配置自动推导
     "breakthrough": SELECT_SINGLE,  # 当前突破等级只有一个
     "dimension": SELECT_DERIVED,    # 内建，恒生效
     "martial_art": SELECT_DERIVED,  # 由流派的主/副武学决定
     "inner_way": SELECT_SLOTS,      # 四个槽，每槽带重数
     "gear_set": SELECT_SINGLE,
+    "gongjue": SELECT_DERIVED,      # 由独立的弓玦类型/等级选择派生
     "arsenal": SELECT_SINGLE,
     "divinecraft": SELECT_SINGLE,
     "oddity": SELECT_ALL,           # 奇物是已收集的，全部生效
@@ -338,6 +344,8 @@ class AttrLoadout:
     level: int
     school: str
     inner_ways: tuple[InnerWaySlot, ...] = ()
+    gongjue: str = ""
+    gongjue_level: int = 0
     #: 单选类来源：类别 → 条目 id
     selections: dict[str, str] = field(default_factory=dict)
 
@@ -364,6 +372,8 @@ class AttrLoadout:
             "inner_ways": [
                 {"name": slot.name, "tier": slot.tier} for slot in self.inner_ways
             ],
+            "gongjue": self.gongjue,
+            "gongjue_level": self.gongjue_level,
             "selections": dict(self.selections),
         }
 
@@ -384,6 +394,8 @@ class AttrLoadout:
             level=int(payload.get("level") or 0),
             school=str(payload.get("school") or ""),
             inner_ways=tuple(slots),
+            gongjue=str(payload.get("gongjue") or ""),
+            gongjue_level=int(payload.get("gongjue_level") or 0),
             selections=selections,
         )
 

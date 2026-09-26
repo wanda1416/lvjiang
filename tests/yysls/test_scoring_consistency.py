@@ -192,7 +192,7 @@ def test_plan_context_from_plan_includes_fixed_gongjue(monkeypatch):
     assert context.attr_context.buff_resistance == level_cfg.buff_resistance
     assert context.gongjue == "会意" and context.playstyle == "无名"
     expected = gongjue_attrs("会意", gc)
-    assert expected.intent_rate > 0
+    assert expected.intent_rate == pytest.approx(0.035)
     assert context.base_attrs.intent_rate == pytest.approx(
         0.2 + expected.intent_rate)
     assert context.scorer(game_config=gc).school == "鸣金·虹"

@@ -673,6 +673,7 @@ class GameConfigManager:
                 end_date=_parse_date(item.get("end_date")),
                 first_half_end_date=_parse_date(item.get("first_half_end_date")),
                 equip_level=item.get("equip_level"),
+                gongjue_level=item.get("gongjue_level"),
                 min_chengyin_level=item.get("min_chengyin_level"),
             ))
         # 按赛季编号排序
@@ -1245,6 +1246,13 @@ class GameConfigManager:
             if cfg.season_number == season_number:
                 return cfg
         return None
+
+    def gongjue_level_for(self, equip_level: int) -> int:
+        """返回该装备赛季实际使用的弓玦词条等级。"""
+        for cfg in self._season_configs:
+            if cfg.equip_level == equip_level:
+                return int(cfg.gongjue_level or equip_level)
+        return int(equip_level)
 
     def season_at(self, moment: datetime) -> SeasonConfig | None:
         """返回指定本地时间生效的赛季。

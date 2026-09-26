@@ -25,7 +25,6 @@ from lvjiang.apps.yysls.core.attr_model.builtin import ROLE_JIN_TO_MIN_OUTER
 from lvjiang.apps.yysls.core.combat.combat_attrs import (
     MIN_TO_MIN_OUTER,
     CombatAttributes,
-    compute_equip_base_attrs,
     convert_five_dims,
 )
 
@@ -420,8 +419,8 @@ def test_shipped_115_baseline_matches_the_diy_calculator_without_affixes() -> No
         loadout, school_attr="破竹", martial_arts=("天志垂象", "千机索天"))
 
     attrs = result.panel_attrs
-    assert attrs.min_outer == pytest.approx(1731.64341463415)
-    assert attrs.max_outer == pytest.approx(2582.64)
+    assert attrs.min_outer == pytest.approx(2111.64341463415)
+    assert attrs.max_outer == pytest.approx(3339.64)
     assert attrs.precision == pytest.approx(1.254)
     assert attrs.crit_rate == pytest.approx(0.738722926829268)
     assert attrs.direct_crit == pytest.approx(0.133)
@@ -429,23 +428,15 @@ def test_shipped_115_baseline_matches_the_diy_calculator_without_affixes() -> No
     assert attrs.intent_rate == pytest.approx(0.25552)
     assert attrs.min_pozhu == pytest.approx(539)
     assert attrs.max_pozhu == pytest.approx(1079)
-    assert attrs.outer_pen == pytest.approx(77.6)
+    # 工作簿 B26 的 77.6 是计算器穿透数值，不是系统保存的基础穿透百分比。
+    assert attrs.outer_pen == pytest.approx(0)
     assert attrs.pozhu_pen == pytest.approx(30)
     assert attrs.pozhu_bonus == pytest.approx(0.15)
 
-    empty_gold_115 = {
-        slot: {"level": 115, "quality": "gold"}
-        for slot in (
-            "main_weapon", "sub_weapon", "ring", "pendant",
-            "head", "chest", "leg", "wrist",
-        )
-    }
-    equipment = compute_equip_base_attrs(
-        empty_gold_115, get_game_config().get_base_attr_values)
-    assert equipment.min_outer == pytest.approx(380)
-    assert equipment.max_outer == pytest.approx(757)
-    assert attrs.min_outer + equipment.min_outer == pytest.approx(2111.64341463415)
-    assert attrs.max_outer + equipment.max_outer == pytest.approx(3339.64)
+    assert result.panel.contribution_by_kind("min_outer")[
+        "equipment_base"] == pytest.approx(380)
+    assert result.panel.contribution_by_kind("max_outer")[
+        "equipment_base"] == pytest.approx(757)
 
 
 @pytest.mark.parametrize("school,required_dim,template", [
@@ -483,9 +474,9 @@ def test_all_calculator_martial_art_choices_match_the_115_baseline(
     ratio = result.panel.values[required_dim] / 492
     talent_attack = 129.9 * ratio
     assert attrs.min_outer == pytest.approx(
-        845.88 + (talent_attack if template in ("tank", "crit") else 0))
+        1225.88 + (talent_attack if template in ("tank", "crit") else 0))
     assert attrs.max_outer == pytest.approx(
-        1513.84 + (talent_attack if template in ("tank", "intent") else 0))
+        2270.84 + (talent_attack if template in ("tank", "intent") else 0))
     assert attrs.crit_rate == pytest.approx(
         0.51104 + (0.15 * ratio if template == "crit" else 0))
     assert attrs.intent_rate == pytest.approx(
@@ -501,6 +492,53 @@ def test_all_calculator_martial_art_choices_match_the_115_baseline(
     assert getattr(attrs, attr_fields[1]) == pytest.approx(1079)
     assert getattr(attrs, attr_fields[2]) == pytest.approx(30)
     assert getattr(attrs, attr_fields[3]) == pytest.approx(0.15)
+
+
+def test_gongjue_keeps_its_own_level_in_a_115_baseline() -> None:
+    """115 装备基准可搭配尚未升级的 110 会意弓玦，不偷用 115 上限。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout
+
+    manager = get_attr_model_manager()
+    without = manager.resolve_loadout(
+        AttrLoadout(level=115, school="鸣金·虹"), school_attr="鸣金")
+    with_110 = manager.resolve_loadout(
+        AttrLoadout(
+            level=115, school="鸣金·虹",
+            gongjue="会意", gongjue_level=110,
+        ),
+        school_attr="鸣金",
+    )
+
+    assert with_110.panel_attrs.intent_rate - without.panel_attrs.intent_rate \
+        == pytest.approx(0.035)
+    assert with_110.panel.contribution_by_kind("intent_rate")[
+        "gongjue"] == pytest.approx(0.035)
+
+
+def test_every_school_uses_the_same_equipment_and_independent_gongjue_levels() -> None:
+    """装备固有值和弓玦等级是全流派公共口径，不能只在鸣金·虹生效。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout
+
+    manager = get_attr_model_manager()
+    schools = get_game_config().get_schools()
+    assert len(schools) == 11
+
+    for school, config in schools.items():
+        result = manager.resolve_loadout(
+            AttrLoadout(
+                level=115, school=school,
+                gongjue="会意", gongjue_level=110,
+            ),
+            school_attr=config["attr"],
+            martial_arts=tuple(
+                config[side]["martial_art"] for side in ("main", "sub")),
+        )
+        assert result.panel.contribution_by_kind("min_outer")[
+            "equipment_base"] == pytest.approx(380)
+        assert result.panel.contribution_by_kind("max_outer")[
+            "equipment_base"] == pytest.approx(757)
+        assert result.panel.contribution_by_kind("intent_rate")[
+            "gongjue"] == pytest.approx(0.035)
 
 
 # ── 写回 ──────────────────────────────────────────────────

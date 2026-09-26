@@ -11,6 +11,12 @@ from ...i18n import tr
 from ..base import AppHooks, TelemetryDisclosure
 
 
+def _initialize_session_storage() -> None:
+    from .config.session_node import initialize_session_storage
+
+    initialize_session_storage()
+
+
 def _build_tuning_tab(host):
     from .ui.tuning import TuningTab
     return TuningTab(host)
@@ -44,6 +50,7 @@ def _quality_stylesheet(tokens):
 hooks = AppHooks(
     id="yysls",
     name=tr("燕云十六声"),
+    startup_callbacks=[_initialize_session_storage],
     window_title=tr("律匠 - 燕云十六声装备调律工具") + f" v{__version__}",
 
     # 注入通用 MainWindow 的 Tab / 菜单

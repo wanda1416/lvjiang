@@ -32,6 +32,10 @@ class AppHooks:
     # 插件显示名（例如 "燕云十六声"）
     name: str = ""
 
+    # 插件注册后、其余扩展装配前执行的轻量启动回调。用于一次性数据迁移等
+    # 无 UI 初始化；失败由加载器隔离并记录，不阻断其他插件与主程序启动。
+    startup_callbacks: list[Callable[[], None]] = field(default_factory=list)
+
     # 覆盖主窗口标题（None 表示使用通用默认标题；多插件时后注册者覆盖）
     window_title: str | None = None
 

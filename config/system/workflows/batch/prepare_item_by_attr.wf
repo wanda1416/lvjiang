@@ -1,0 +1,48 @@
+#% parameters:
+#%   - name: profile_key
+#%     label: 选择角色所用 Profile key
+#%     type: text
+#%     default: ""
+# 仅供属性执行单元使用：按指定 Profile 的当前值选最小角色。
+
+import "subcall/login.wf"
+
+if not $profile_key
+    return {"status": "failed", "message": "请配置选择角色所用的 Profile key", "state": $batch_state}
+end
+eval $model = profile_model($profile_key)
+if not $model or $model equals "note"
+    return {"status": "failed", "message": "Profile key 不存在或不是数值类型: " + $profile_key, "state": $batch_state}
+end
+
+eval $chosen = ""
+eval $minimum = null
+for member in $batch_unit_members
+    eval $username = $member.username
+    eval $value = profile_get($profile_key, $username)
+    # 尚无记录的配额按零进度参与选择。
+    if $value is_empty
+        eval $value = 0
+    end
+    eval $number = to_num($value)
+    if not $chosen or $number < $minimum
+        eval $minimum = $number
+        eval $chosen = $username
+    end
+end
+
+if not $chosen
+    return {"status": "skipped", "message": "本单元没有可执行角色", "state": $batch_state}
+end
+
+log "本次选择角色: " + $chosen + "，" + $profile_key + "=" + $minimum
+call $result = prepare_user($chosen, $batch_state, true, 0, 8, true)
+eval $result.username = $chosen
+if $result.status equals "skipped"
+    # 服务端仍占用该账号时，整组稍后再试，不消耗本轮执行次数。
+    eval $result.retry_after = 60
+else if $result.status equals "success"
+    # 托管对战在服务端继续约 20 分钟，期间不再调度同一账号。
+    eval $result.retry_after = 1200
+end
+return $result

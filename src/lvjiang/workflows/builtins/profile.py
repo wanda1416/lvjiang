@@ -1,7 +1,7 @@
 """内置函数 - 用户 Profile 读写
 
 提供 DSL 工作流对 quota/regen/stock/note 四模型的访问能力。
-所有函数通过 _engine.run_username 获取当前用户名。
+默认通过 _engine.run_username 获取当前用户名；profile_get 可显式读取指定用户。
 """
 
 from loguru import logger
@@ -33,7 +33,7 @@ def _user_get(_engine, username: str, key: str, *args):
 
 
 @builtin_func("profile_get")
-def _profile_get(_engine, key: str, *args) -> float | str | None:
+def _profile_get(_engine, key: str, username: str | None = None, *args) -> float | str | None:
     """读取 profile 属性值（自动识别模型类型）
 
     走共享读取管线 core.profile.service.profile_read()，与 UI 读取路径一致：
@@ -41,8 +41,11 @@ def _profile_get(_engine, key: str, *args) -> float | str | None:
     note 模型返回文本字符串，其他模型返回数值。
     key 不存在返回 None。
 
+    可传第二个参数读取同一批量执行单元中其他用户的当前值。
+
     .wf 用法:
         eval $value = profile_get("weekly_task")
+        eval $other = profile_get("weekly_task", $username)
         if $value != null
             log concat("周任务进度: ", $value)
         end
@@ -52,8 +55,8 @@ def _profile_get(_engine, key: str, *args) -> float | str | None:
         return None
 
     from ...core.profile.service import profile_read
-    username = _get_username(_engine)
-    return profile_read(username, key)
+    target = str(username) if username else _get_username(_engine)
+    return profile_read(target, key)
 
 
 @builtin_func("profile_set")

@@ -134,7 +134,7 @@ click [game_menu_page].[back] after wait @step_interval
 log "每日签到流程结束。"
 
 # ─── 当前列表视口的通用活动领奖过程 ──────────────────────
-# 只在当前视口查找，不负责滚动；命中后退回原列表视口。
+# 活动列表与领奖区处于同一页面；这里只切换活动并领奖，不执行返回。
 def claim_visible_activity($activity_name, $reward_keyword)
     find [activity_main].[reward_list] as $found by contains $activity_name
     if not $found
@@ -153,7 +153,5 @@ def claim_visible_activity($activity_name, $reward_keyword)
         log "活动“" + $activity_name + "”未找到“" + $reward_keyword + "”，可能已经领取。"
     end
 
-    # 无论是否存在领奖按钮，都回到活动列表继续下一项。
-    click [activity_main].[back] after wait @step_interval
     return 1
 end

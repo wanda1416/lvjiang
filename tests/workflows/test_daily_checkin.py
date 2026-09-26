@@ -32,6 +32,7 @@ class CheckinGame:
             "reward_keywords": rewards,
         }
         self.events: list[tuple[str, str, str]] = []
+        self.logs: list[str] = []
         self.missing_rewards = set(missing_rewards)
         self.viewports = viewports or (tuple(
             line.strip() for line in activities.splitlines() if line.strip()
@@ -93,6 +94,10 @@ class CheckinGame:
         monkeypatch.setattr(self.engine, "_exec_click", click)
         monkeypatch.setattr(self.engine, "_exec_drag", drag)
         monkeypatch.setattr(self.engine, "_exec_wait", lambda node: None)
+        monkeypatch.setattr(
+            "lvjiang.workflows.engine.core.logger.info",
+            lambda message: self.logs.append(str(message)),
+        )
 
     def run(self):
         self.engine.execute(str(WORKFLOW_PATH))
@@ -141,7 +146,7 @@ def test_each_pair_finds_and_clicks_ocr_result_then_returns_to_list(monkeypatch)
     assert [event[2] for event in game.events if event[0] == "click_found"] == [
         "朝夕共赏", "签到", "金秋共贺",
     ]
-    assert game.events.count(("click", "activity_main", "back")) == 3
+    assert game.events.count(("click", "activity_main", "back")) == 1
     assert game.events[-1] == ("click", "game_menu_page", "back")
 
 
@@ -174,6 +179,9 @@ def test_equal_list_scan_stops_scrolling_at_bottom(monkeypatch):
     ]
     assert [event[2] for event in list_scans] == ["第一页", "末页", "末页"]
     assert game.events.count(("drag", "reward_list", "up")) == 2
+    assert [message for message in game.logs if "未找到活动" in message] == [
+        "未找到活动“不存在的活动”，可能未开放、已结束或不在当前滚动范围。"
+    ]
 
 
 def test_activity_layout_uses_generic_keys_and_desktop_has_no_space_binding():

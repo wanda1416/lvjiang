@@ -106,6 +106,21 @@ class TestBagCursorFinishWindow:
         _visit_window(engine, ["b", "c"])
         assert _fn("bag_cursor_finish_window")(engine, 2, 3) == "end"
 
+    def test_confirmed_empty_and_zero_new_ends_after_one_probe(self, engine):
+        """新增窗口后的首次无新增空槽确认即可结束，不再多拖一轮。"""
+        _init(engine)
+        _visit_window(engine, ["a", "b"])
+        assert _fn("bag_cursor_finish_window")(engine, 3, 3, True) == "scroll"
+
+        assert _visit_window(engine, ["a", "b"]) == ["skip", "skip"]
+        assert _fn("bag_cursor_finish_window")(engine, 3, 3, True) == "end"
+
+    def test_confirmed_empty_with_new_row_keeps_legacy_scroll(self, engine):
+        """当前窗口仍有新装备时，空槽不应阻止下一次探测滚动。"""
+        _init(engine)
+        _visit_window(engine, ["a"])
+        assert _fn("bag_cursor_finish_window")(engine, 3, 3, True) == "scroll"
+
     def test_new_item_resets_idle(self, engine):
         _init(engine)
         _visit_window(engine, ["a", "b", "c"])
@@ -144,7 +159,8 @@ def test_scan_unequipped_uses_window_protocol_and_correct_detail_scenes():
     text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
     assert "bag_cursor_visit($fp)" in text
-    assert "bag_cursor_finish_window($rows, $rows)" in text
+    assert "bag_cursor_finish_window(" in text
+    assert "$rows, $rows, $hit_confirmed_empty)" in text
     assert 'panel_rows("bag_equip_detail", "bag_grid")' in text
     assert ('call scan_slot_bag("ring", "ring", "weapon", $min_level, '
             '$min_affix_count)') in text
@@ -204,6 +220,18 @@ def test_scan_unequipped_tracks_detail_state_from_raw_scan_content():
         "eval $detail_open = $cell.detail_open", remaining_scan)
     remaining_empty_guard = text.index("if not $equip.type", remaining_scan)
     assert remaining_scan < remaining_state_update < remaining_empty_guard
+
+
+def test_scan_unequipped_only_truncates_on_confirmed_empty_cells():
+    """OCR 扫到任意详情文本时不触发新增截断，继续沿用旧游标规则。"""
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
+        encoding="utf-8")
+
+    assert "eval $hit_confirmed_empty = 0" in text
+    assert text.count("eval $hit_confirmed_empty = 1") == 2
+    assert text.count("if not $detail_open") == 2
+    assert "$rows, $rows, $hit_confirmed_empty)" in text
 
 
 def test_scan_unequipped_seen_row_skips_remaining_columns():

@@ -103,6 +103,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
         align [bag_equip_detail].[bag_grid]
         eval $rows = panel_rows("bag_equip_detail", "bag_grid")
         eval $cols = panel_cols("bag_equip_detail", "bag_grid")
+        eval $hit_confirmed_empty = 0
         eval $window_idx = $window_idx + 1
         log "[窗口 " + $window_idx + "] 部位 " + $group + ": 检测到 " + $rows + " 行 × " + $cols + " 列"
 
@@ -128,6 +129,11 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
             eval $detail_open = $cell.detail_open
             # type 为空 → equip_type OCR 失败，当前槽位结束
             if not $equip.type
+                # 只有用于判定详情的关键字段均为空才确认空槽；背景聊天等 OCR 噪声
+                # 会让 detail_open 保持为 1，不参与提前截断。
+                if not $detail_open
+                    eval $hit_confirmed_empty = 1
+                end
                 log error "  [" + $r + ",1] equip_type OCR 失败，槽位结束"
                 break
             end
@@ -170,6 +176,9 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
                         eval $detail_open = $cell.detail_open
                         # type 为空 → equip_type OCR 失败，结束本行
                         if not $equip.type
+                            if not $detail_open
+                                eval $hit_confirmed_empty = 1
+                            end
                             log warn "    [" + $r + "," + $c + "] equip_type OCR 失败，结束本行"
                             break
                         end
@@ -220,7 +229,8 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
             break
         end
 
-        eval $signal = bag_cursor_finish_window($rows, $rows)
+        eval $signal = bag_cursor_finish_window(
+            $rows, $rows, $hit_confirmed_empty)
         if $signal equals "end"
             log "  已到达背包末尾"
             break

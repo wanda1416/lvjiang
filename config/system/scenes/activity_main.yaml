@@ -12,6 +12,9 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+  views:
+  - base
+  - checkin
 - key: checkin
   name: 领奖操作区
   type: attr
@@ -23,3 +26,6 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+  views:
+  - base
+  - checkin

@@ -63,6 +63,7 @@ plans:
   space: 端游
   env: desktop
   layout: desktop
+  requires_admin: true
   modes:
   - windows
 - id: f29e8e838d2a40d8b22aa48627a1c14f

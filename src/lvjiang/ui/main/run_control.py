@@ -861,6 +861,11 @@ class RunControlMixin:
                 tr("自动化运行中"), (hk.stop, tr("结束"))))
             logger.warning(f"拒绝启动 {name}：已有自动化在运行")
             return False
+        admin_error = self._plan_admin_requirement_error()
+        if admin_error:
+            self.statusBar().showMessage(admin_error)
+            self._show_workflow_start_error(admin_error)
+            return False
         self._stop_requested = False
         self._run_state = "running"
         # 暂停事件：set=运行，clear=暂停阻塞
@@ -875,6 +880,31 @@ class RunControlMixin:
             (hk.stop, tr("结束"))))
         logger.info(f"开始自动化: {name}")
         return True
+
+    def _plan_admin_requirement_error(self) -> str:
+        """返回当前方案未满足的 Windows 管理员权限要求；空串表示通过。"""
+        from ...core import platforms
+
+        # 管理员提升是 Windows 的进程令牌语义。macOS/Linux 的桌面授权需要
+        # 各自的能力门禁，不能拿这个开关代替。
+        if not platforms.IS_WINDOWS:
+            return ""
+        plan = self._selected_plan()
+        if plan is None or not plan.requires_admin:
+            return ""
+        elevated = platforms.is_process_elevated()
+        if elevated is True:
+            return ""
+        if elevated is None:
+            return tr(
+                "无法确认律匠当前是否具有管理员权限。连接方案「{name}」要求管理员权限，"
+                "为避免点击或键盘输入失效，本次执行已拒绝。请关闭律匠，以管理员身份重新启动后再试。"
+            ).format(name=plan.name)
+        return tr(
+            "连接方案「{name}」要求管理员权限，但律匠当前未以管理员身份运行。"
+            "Windows 会阻止低权限进程向高权限游戏窗口发送点击和键盘输入。"
+            "请关闭律匠，右键选择「以管理员身份运行」，然后重新执行。"
+        ).format(name=plan.name)
 
     def _end_automation(self, name: str):
         """结束自动化，恢复 UI 状态。由工作流线程实际结束后调用。"""

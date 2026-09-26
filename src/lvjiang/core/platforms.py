@@ -30,6 +30,63 @@ IS_MACOS = sys.platform == "darwin"
 # 非 Windows 只支持 ADB 模式（UI 层据此隐藏窗口扫描入口）
 DESKTOP_BACKEND_AVAILABLE = IS_WINDOWS
 
+
+def is_process_elevated() -> bool | None:
+    """当前 Windows 进程是否使用提升后的令牌；非 Windows 返回 ``None``。
+
+    查询失败也返回 ``None``，由要求管理员权限的调用方按失败关闭处理。不要
+    根据管理员组成员身份判断：UAC 下管理员账号的普通令牌仍然没有提升权限。
+    """
+    if not IS_WINDOWS:
+        return None
+
+    import ctypes
+    from ctypes import wintypes
+
+    token_query = 0x0008
+    token_elevation_class = 20
+
+    class TokenElevation(ctypes.Structure):
+        _fields_ = [("TokenIsElevated", wintypes.DWORD)]
+
+    token = wintypes.HANDLE()
+    try:
+        kernel32 = ctypes.windll.kernel32
+        advapi32 = ctypes.windll.advapi32
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        advapi32.OpenProcessToken.argtypes = (
+            wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE),
+        )
+        advapi32.OpenProcessToken.restype = wintypes.BOOL
+        advapi32.GetTokenInformation.argtypes = (
+            wintypes.HANDLE, ctypes.c_uint, ctypes.c_void_p, wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+        )
+        advapi32.GetTokenInformation.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        if not advapi32.OpenProcessToken(
+            kernel32.GetCurrentProcess(), token_query, ctypes.byref(token),
+        ):
+            raise ctypes.WinError()
+        elevation = TokenElevation()
+        returned = wintypes.DWORD()
+        if not advapi32.GetTokenInformation(
+            token,
+            token_elevation_class,
+            ctypes.byref(elevation),
+            ctypes.sizeof(elevation),
+            ctypes.byref(returned),
+        ):
+            raise ctypes.WinError()
+        return bool(elevation.TokenIsElevated)
+    except (AttributeError, OSError) as exc:
+        logger.warning(f"无法检查当前进程的 Windows 管理员权限: {exc}")
+        return None
+    finally:
+        if token.value:
+            ctypes.windll.kernel32.CloseHandle(token)
+
 # 后台 CLI 子进程（adb 等）统一附加参数：Windows 下 windowed（console=False）
 # 打包运行时进程自身无控制台，每次 subprocess 都会给子进程新开控制台窗口，
 # 必须用 CREATE_NO_WINDOW 抑制；开发模式/非 Windows 无副作用。

@@ -1,7 +1,7 @@
 #% name: 购买袅袅之音·绑
 #% runnable: true
 #% batchable: true
-#% env: [android]
+#% env: [android, desktop]
 #% parameters:
 #%   - name: max_scroll
 #%     label: 最大滚动查找次数

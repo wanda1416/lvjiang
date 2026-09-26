@@ -401,6 +401,7 @@ def _reset_wf(**ocr_overrides):
         "reset_check": "当前装备剩余可重置次数：3",
         "reset_info": "持有 4",
         "reset_confirm": "确认",
+        "reset_notify": "提醒",
         "confirm": "确认",
         "cancel": "取消",
     }
@@ -611,6 +612,70 @@ def test_cooldown_closes_the_dialog_with_the_reset_view_back():
     assert call.click_region("equip_tune_detail", "reset_back") \
         in wf.method_calls
     assert call.click_region("equip_tune_detail", "back") not in wf.method_calls
+
+
+def test_second_reset_attempt_enables_notification_before_leaving():
+    """本轮已重置过一次时，打开重置页补设提醒后再按冷却退出。"""
+    wf = _reset_wf()
+    resetter = TuningResetter(wf, DesktopTuningRouteStrategy(wf))
+
+    outcome, message = resetter.try_reset_tune(
+        SimpleNamespace(max_resets=3), resets_used=1, why="测试规则命中")
+
+    assert outcome == RESET_COOLDOWN and message
+    calls = wf.method_calls
+    opened = calls.index(call.click_region("equip_tune_detail", "reset_tune"))
+    notified = calls.index(call.click_region("equip_tune_detail", "reset_notify"))
+    closed = calls.index(call.click_region("equip_tune_detail", "reset_back"))
+    assert opened < notified < closed
+    assert call.click_region("equip_tune_detail", "reset_confirm") not in calls
+
+
+def test_newly_discovered_cooldown_enables_notification():
+    """详情无重置冷却信息、弹窗才发现冷却时补设提醒。"""
+    wf = _reset_wf(reset_check="6小时32分后可调律重置")
+    resetter = TuningResetter(wf, DesktopTuningRouteStrategy(wf))
+
+    outcome, message = resetter.try_reset_tune(
+        SimpleNamespace(max_resets=3), resets_used=0, why="测试规则命中",
+        min_material_count=2, notify_if_cooling=True)
+
+    assert outcome == RESET_COOLDOWN and message
+    calls = wf.method_calls
+    notified = calls.index(call.click_region("equip_tune_detail", "reset_notify"))
+    closed = calls.index(call.click_region("equip_tune_detail", "reset_back"))
+    assert notified < closed
+
+
+def test_known_reset_cooldown_does_not_toggle_notification():
+    """详情已有重置冷却信息时，不切换可能已经开启的提醒。"""
+    wf = _reset_wf(reset_check="6小时32分后可调律重置")
+    resetter = TuningResetter(wf, DesktopTuningRouteStrategy(wf))
+
+    outcome, message = resetter.try_reset_tune(
+        SimpleNamespace(max_resets=3), resets_used=0, why="测试规则命中",
+        min_material_count=2, notify_if_cooling=False)
+
+    assert outcome == RESET_COOLDOWN and message
+    assert call.click_region("equip_tune_detail", "reset_notify") \
+        not in wf.method_calls
+
+
+def test_missing_notification_text_does_not_blind_click():
+    """提醒入口 OCR 失败时仍关闭弹窗，但不盲点切换控件。"""
+    wf = _reset_wf(
+        reset_check="6小时32分后可调律重置", reset_notify="")
+    resetter = TuningResetter(wf, DesktopTuningRouteStrategy(wf))
+
+    outcome, message = resetter.try_reset_tune(
+        SimpleNamespace(max_resets=3), resets_used=0, why="测试规则命中",
+        min_material_count=2, notify_if_cooling=True)
+
+    assert outcome == RESET_COOLDOWN and message
+    assert call.click_region("equip_tune_detail", "reset_notify") \
+        not in wf.method_calls
+    assert call.click_region("equip_tune_detail", "reset_back") \
+        in wf.method_calls
 
 
 def test_material_shortage_closes_the_dialog_with_the_reset_view_back():

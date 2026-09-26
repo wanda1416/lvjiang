@@ -1986,7 +1986,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             reason=why, resets=resets_used)
         result = self.resetter.try_reset_tune(
             tune_cfg, resets_used, why,
-            min_material_count=level_cfg.min_material_count)
+            min_material_count=level_cfg.min_material_count,
+            notify_if_cooling=not (
+                equip_data.cooldown_kind == "reset"
+                and equip_data.cooldown_state in {"cooling", "completed"}
+            ),
+        )
         if result is True:
             self.stone_stock.record_reset(
                 equip_data,

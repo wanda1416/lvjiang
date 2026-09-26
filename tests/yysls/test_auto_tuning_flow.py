@@ -1859,7 +1859,8 @@ def test_tune_reset_local_cap(monkeypatch):
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律 3/3",
                                "reset_check": "当前装备剩余可重置次数：3",
-                               "reset_info": "持有 100"}
+                               "reset_info": "持有 100",
+                               "reset_notify": "提醒"}
     wf._process_equipment("重置一次剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -1867,6 +1868,7 @@ def test_tune_reset_local_cap(monkeypatch):
     assert reports[0]["resets"] == 1
     assert reports[0]["rounds"] == 1      # 首次先重置，首轮后命中冷却硬限
     assert wf.clicks.count((TUNE_SCENE, "reset_confirm")) == 1
+    assert wf.clicks.count((TUNE_SCENE, "reset_notify")) == 1
     assert "recycled_items" not in wf.output
 
 
@@ -1895,7 +1897,8 @@ def test_tune_reset_cooldown_check_fails(monkeypatch):
                                "tune_affix": "最大外功攻击 100",
                                "tune_tip": "", "reset_tune": "重置调律(3)",
                                # 游戏原文
-                               "reset_check": "6小时32分后可调律重置"}
+                               "reset_check": "6小时32分后可调律重置",
+                               "reset_notify": "提醒"}
     fp = wf._process_equipment("冷却剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -1905,10 +1908,39 @@ def test_tune_reset_cooldown_check_fails(monkeypatch):
     assert "冷却期" in reports[0]["stop_reason"]
     # 点了 reset_tune 后检查失败 → 点 back 回调律页，未点 reset_confirm
     assert (TUNE_SCENE, "reset_tune") in wf.clicks
+    assert (TUNE_SCENE, "reset_notify") in wf.clicks
     assert (TUNE_SCENE, "back") in wf.clicks
     assert (TUNE_SCENE, "reset_confirm") not in wf.clicks
     # 强制跳过，不走 reset_exhausted_action=recycle
     assert "recycled_items" not in wf.output
+
+
+@pytest.mark.parametrize("kind,state,expected", [
+    ("", "", True),
+    ("reset", "cooling", False),
+    ("reset", "completed", False),
+    ("transmute", "cooling", True),
+])
+def test_reset_notification_uses_only_reset_cooldown_snapshot(
+        monkeypatch, kind, state, expected):
+    """仅装备详情中的重置冷却状态能证明无需补设提醒。"""
+    monkeypatch.setattr(
+        auto_tuning, "get_game_config",
+        lambda: _mock_game_config([LevelConfig(level=110, allow_reset=True)]))
+    base = _behavior_base(tune=TuneBehavior())
+    wf = _wf_with(base)
+    wf.resetter.try_reset_tune = MagicMock(
+        return_value=("cooldown", "装备重置冷却期"))
+    equip = EquipmentData.from_dict(_equip(2))
+    equip.cooldown_kind = kind
+    equip.cooldown_state = state
+
+    action, _why, _resets = wf._execute_reset_action(
+        base.tune, equip, 0, "测试规则命中")
+
+    assert action == "skip"
+    assert wf.resetter.try_reset_tune.call_args.kwargs[
+        "notify_if_cooling"] is expected
 
 
 def test_tune_reset_exhausted_recycles(monkeypatch):

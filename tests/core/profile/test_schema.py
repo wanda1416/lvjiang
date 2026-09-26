@@ -135,6 +135,7 @@ class TestLoadConfig:
         assert len(schema.get_all_keys()) == 2
         assert isinstance(schema.get_key("task_token"), QuotaKeyDef)
         assert isinstance(schema.get_key("energy"), RegenKeyDef)
+        assert schema.get_key("task_token").group == "default"
 
     def test_load_old_format_raises(self, profile_env):
         """旧格式（fields/groups）抛出异常"""
@@ -220,6 +221,9 @@ class TestSaveConfig:
         reloaded = _load_config()
         assert reloaded.get_key("test") is not None
         assert isinstance(reloaded.get_key("test"), QuotaKeyDef)
+
+        saved = yaml.safe_load(path.read_text(encoding="utf-8"))
+        assert saved["quota"][0]["group"] == "default"
 
     def test_roundtrip_all_models(self, profile_env):
         schema = ProfileSchema(keys_by_model={

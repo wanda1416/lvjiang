@@ -56,3 +56,17 @@ def test_rejects_unknown_and_invalid_multi_document_updates(tmp_path):
         store.mutate_many(("known", "known"), lambda data: data)
     with pytest.raises(ValueError, match="全部请求"):
         store.mutate_many(("known",), lambda _: {})
+
+
+def test_read_errors_use_store_label(tmp_path):
+    store = DocumentDirectoryStore(
+        tmp_path, {"left": "left.json"}, label="本地配置")
+    store.ensure_initialized()
+    path = tmp_path / "left.json"
+    path.unlink()
+    with pytest.raises(FileNotFoundError, match="本地配置文件缺失"):
+        store.load("left")
+
+    path.write_text("[]", encoding="utf-8")
+    with pytest.raises(ValueError, match="本地配置文件根节点必须是对象"):
+        store.load("left")

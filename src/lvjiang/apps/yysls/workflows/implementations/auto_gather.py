@@ -108,7 +108,7 @@ class AutoGatherWorkflow(BaseWorkflow):
     def _arrive(self, step: GatherStep) -> float:
         self._report("travel", "发起识途，等待到达")
         start = self._now()
-        self._activate("travel")
+        self._press(self.route.travel_key)
         deadline = start + self.route.travel_timeout
         earliest = max(3.0, step.travel_seconds * 0.8)
         confirmed = False

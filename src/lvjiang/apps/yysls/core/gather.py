@@ -71,6 +71,7 @@ class GatherRoute:
     start_note: str = ""
     layout_key: str = ""
     map_key: str = "M"
+    travel_key: str = "V"
     gather_key: str = "1"
     travel_timeout: float = 120
     gather_seconds: float = 6
@@ -80,7 +81,7 @@ class GatherRoute:
         from ....core.key_names import normalize_pressable
         if not self.key or not self.name.strip():
             raise ValueError("请填写路线名称")
-        for key in (self.map_key, self.gather_key):
+        for key in (self.map_key, self.travel_key, self.gather_key):
             normalize_pressable(key)
         if not (math.isfinite(self.travel_timeout) and 10 <= self.travel_timeout <= 1800):
             raise ValueError("识途超时必须在 10–1800 秒之间")

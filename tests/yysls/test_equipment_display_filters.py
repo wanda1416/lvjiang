@@ -1,6 +1,6 @@
 """装备展示新增品阶、调律进度和备战状态筛选。"""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from PyQt6.QtCore import Qt
@@ -128,6 +128,44 @@ def test_scan_time_filter_falls_back_to_updated_at_and_ignores_mocks(qtbot):
         tab, recent, is_mock=True, now=now)
 
 
+def test_scan_time_filter_supports_one_hour_and_one_day(qtbot, monkeypatch):
+    """扫完全部装备后，一小时条件只命中过时旧件，删除复核用同一阈值。"""
+    from lvjiang.apps.yysls.ui.loadout.equip import status_tab
+
+    scan_filter = QComboBox()
+    scan_filter.addItem("超过 1 小时", "1h")
+    scan_filter.addItem("超过 1 天", "1d")
+    qtbot.addWidget(scan_filter)
+    tab = SimpleNamespace(_scan_time_filter=scan_filter)
+    now = datetime(2026, 9, 23, 12, tzinfo=timezone.utc)
+    monkeypatch.setattr(status_tab, "datetime", SimpleNamespace(
+        now=lambda _zone: now,
+        fromisoformat=datetime.fromisoformat,
+    ))
+    old = {"last_seen_at": "2026-09-23T10:59:59+00:00"}
+    newly_scanned = {"last_seen_at": "2026-09-23T11:30:00+00:00"}
+
+    assert EquipStatusTab._passes_scan_time_filter(
+        tab, old, is_mock=False, now=now)
+    assert not EquipStatusTab._passes_scan_time_filter(
+        tab, newly_scanned, is_mock=False, now=now)
+    assert EquipStatusTab._passes_scan_time_filter(
+        tab, newly_scanned, is_mock=True, now=now)
+    assert datetime.fromisoformat(
+        EquipStatusTab._scan_time_delete_constraint(tab)) == (
+            now - timedelta(hours=1))
+
+    scan_filter.setCurrentIndex(1)
+    assert not EquipStatusTab._passes_scan_time_filter(
+        tab, old, is_mock=False, now=now)
+    assert EquipStatusTab._passes_scan_time_filter(
+        tab, {"last_seen_at": "2026-09-22T11:59:59+00:00"},
+        is_mock=False, now=now)
+    assert datetime.fromisoformat(
+        EquipStatusTab._scan_time_delete_constraint(tab)) == (
+            now - timedelta(days=1))
+
+
 def test_scan_time_filter_treats_records_without_any_time_as_expired(qtbot):
     scan_filter = QComboBox()
     scan_filter.addItem("超过 30 天", "30")
@@ -252,6 +290,9 @@ def test_filter_toolbar_uses_type_before_sort_and_compact_weapon_labels(qtbot):
         "全部", "主武", "副武",
     ]
     assert tab._source_filter.width() == tab._type_filter.width()
+    assert [
+        tab._scan_time_filter.itemData(index) for index in range(3)
+    ] == ["all", "1h", "1d"]
     assert "类型：背包" not in tab._filter_summary()
 
 

@@ -129,6 +129,12 @@ regions:
   is_text: true
   is_clickable: false
   view: base
+- key: reset_notify
+  name: 重置提醒
+  type: func
+  is_text: true
+  is_clickable: false
+  view: reset_tune
 panels:
 - key: materials
   name: 材料格

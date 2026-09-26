@@ -16,7 +16,7 @@ import threading
 from copy import deepcopy
 
 from loguru import logger
-from PyQt6.QtCore import QEvent, QObject, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -293,6 +293,9 @@ class MainWindow(
         self._stop_requested = False
         self._current_worker = None
         self._overlay = BorderOverlay()
+        self._red_box_flash_timer = QTimer(self)
+        self._red_box_flash_timer.setSingleShot(True)
+        self._red_box_flash_timer.timeout.connect(self._hide_red_box_after_locate)
         self._capture = None
         self._last_capture = None
         self._close_cleanup_started = False
@@ -546,12 +549,12 @@ class MainWindow(
         row2.addWidget(self.lbl_window_info)
         row2.addStretch()
 
-        # 红框标定：定位后窗口边缘是否显示红色标记框，纯运行期状态，不持久化，
-        # 每次启动默认勾选。
+        # 红框标定：默认只在定位成功后短暂显示，勾选后持续显示；
+        # 勾选状态仅在本次运行期间有效。
         self.chk_red_box = QCheckBox(tr("红框标定"))
         self.chk_red_box.setVisible(False)
-        self.chk_red_box.setChecked(True)
-        self.chk_red_box.setToolTip(tr("定位窗口后是否显示红色边框标记；不保存配置，仅本次运行期间生效"))
+        self.chk_red_box.setChecked(False)
+        self.chk_red_box.setToolTip(tr("定位成功后红框显示 1 秒；勾选后持续显示至断连，仅本次运行期间生效"))
         self.chk_red_box.stateChanged.connect(self._on_red_box_changed)
         row2.addWidget(self.chk_red_box)
 
@@ -1094,5 +1097,6 @@ class MainWindow(
             self._teardown_adb_backend()
         else:
             self._stop_capture_backend()
+        self._red_box_flash_timer.stop()
         self._overlay.destroy()
         super().closeEvent(event)

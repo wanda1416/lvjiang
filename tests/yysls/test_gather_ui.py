@@ -96,11 +96,14 @@ def test_editing_route_does_not_change_selected_run_route(qtbot):
     editor.saved.setCurrentIndex(editor.saved.findData(b.key))
     editor._open()
     editor.name.setText("乙改名")
+    editor.auto_travel_key.setText("B")
     editor._save()
     assert tab.routes.currentData() == a.key
     assert editor.route.name == "乙改名"
     reloaded, _ = store.routes()
-    assert next(r for r in reloaded if r.key == b.key).steps == b.steps
+    saved_b = next(r for r in reloaded if r.key == b.key)
+    assert saved_b.steps == b.steps
+    assert saved_b.travel_key == "B"
 
 
 def test_single_nonmodal_editor_and_failed_trial_not_saved(qtbot, monkeypatch):

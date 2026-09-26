@@ -238,6 +238,7 @@ class GatherRecordingDialog(QDialog):
         self.origin = QLineEdit()
         self.origin.setPlaceholderText(tr("填写传送起点、资源和单人／多人页"))
         self.map_key = QLineEdit("M")
+        self.auto_travel_key = QLineEdit("V")
         self.gather_key = QLineEdit("1")
         self.timeout = QSpinBox()
         self.timeout.setRange(10, 1800)
@@ -253,7 +254,9 @@ class GatherRecordingDialog(QDialog):
             combo.addItems([f"F{i}" for i in range(1, 9)])
         self.travel_key.setCurrentText("F2")
         for label, widget in (("路线名称", self.name), ("固定起点说明", self.origin),
-                              ("打开地图按键", self.map_key), ("采集按键", self.gather_key),
+                              ("打开地图按键", self.map_key),
+                              ("自动识途按键", self.auto_travel_key),
+                              ("采集按键", self.gather_key),
                               ("识途超时", self.timeout), ("采集动作等待", self.gather_wait),
                               ("确认标记快捷键", self.mark_key), ("识途试跑快捷键", self.travel_key)):
             fields.addRow(tr(label), widget)
@@ -300,6 +303,7 @@ class GatherRecordingDialog(QDialog):
         self.route.name = self.name.text().strip()
         self.route.start_note = self.origin.text().strip()
         self.route.map_key = self.map_key.text().strip().upper()
+        self.route.travel_key = self.auto_travel_key.text().strip().upper()
         self.route.gather_key = self.gather_key.text().strip().upper()
         self.route.travel_timeout = self.timeout.value()
         self.route.gather_seconds = self.gather_wait.value()
@@ -331,6 +335,7 @@ class GatherRecordingDialog(QDialog):
         self.name.setText(self.route.name)
         self.origin.setText(self.route.start_note)
         self.map_key.setText(self.route.map_key)
+        self.auto_travel_key.setText(self.route.travel_key)
         self.gather_key.setText(self.route.gather_key)
         self.timeout.setValue(int(self.route.travel_timeout))
         self.gather_wait.setValue(int(self.route.gather_seconds))
@@ -436,11 +441,12 @@ class GatherRecordingDialog(QDialog):
             self.route.layout_key = key
             self.recorder = GatherInputRecorder(
                 self.host._capture, layout, self.host._target_window,
+                connected=self.host._backend_ready,
                 changed=self.signals.clicked.emit, failed=self.signals.failed.emit)
             self.recorder.start()
 
             def hotkey(signal):
-                if self.recorder is not None and self.recorder.foreground():
+                if self.recorder is not None and self.host._backend_ready():
                     signal.emit()
 
             self.hotkeys = start_global_hotkeys({
@@ -449,7 +455,9 @@ class GatherRecordingDialog(QDialog):
             })
             if self.hotkeys is None:
                 raise ValueError(tr("无法注册录制热键，请检查输入监听权限"))
-            self.status.setText(tr("正在选点：请切到游戏地图点击目标，再确认标记"))
+            self.status.setText(tr(
+                "全局热键 {mark}/{travel} 已注册。请切到游戏地图点击目标，再确认标记"
+            ).format(mark=mark, travel=travel))
             self._refresh()
         except (ValueError, RuntimeError, OSError, ImportError) as exc:
             self._recording_failed(str(exc))
@@ -513,14 +521,8 @@ class GatherRecordingDialog(QDialog):
         self._refresh()
 
     def _check_recording_context(self):
-        error = _desktop_error(self.host)
-        if error:
-            raise ValueError(error)
-        if (self.route.layout_key != self.host.layout_combo.currentData()
-                or self.recorder is None
-                or self.recorder.window != self.host._target_window
-                or self.recorder.capture is not self.host._capture):
-            raise ValueError(tr("窗口或布局已切换，请重新开始选点"))
+        if self.recorder is None or not self.host._backend_ready():
+            raise ValueError(tr("游戏连接已断开，请重新连接后开始选点"))
 
     def _refresh(self):
         busy = self.host.is_running

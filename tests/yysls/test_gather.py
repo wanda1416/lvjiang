@@ -113,7 +113,7 @@ def test_unreachable_timeout_never_collects_or_skips(monkeypatch):
     wf, actions, route = make_workflow(monkeypatch, ["map"])
     wf.route.steps.append(deepcopy(wf.route.steps[0]))
     assert "超时" in wf.run()["error"]
-    assert actions == ["travel"]
+    assert actions == ["V"]
     assert wf.output["steps"] == []
 
 
@@ -122,7 +122,7 @@ def test_confirm_selects_direct_once_and_records_only_after_collection(monkeypat
     completed = []
     wf.completed = completed.append
     result = wf.run()
-    assert actions == ["travel", "confirm_direct", "1", "M"]
+    assert actions == ["V", "confirm_direct", "1", "M"]
     assert result["steps"][0]["collection_triggered"] is True
     assert result["steps"][0]["travel_seconds"] >= 6
     assert completed == [result]
@@ -170,6 +170,12 @@ def test_empty_route_is_not_runnable():
         GatherRoute().validate(runnable=True)
 
 
+def test_existing_route_defaults_auto_travel_to_v():
+    data = asdict(make_route())
+    data.pop("travel_key")
+    assert GatherRoute.from_dict(data).travel_key == "V"
+
+
 def test_replay_preserves_order_without_mutating_saved_route(monkeypatch):
     wf, actions, original = make_workflow(monkeypatch, ["map"], selected=False)
     wf.route.steps.append(GatherStep(0.6, 0.7, wf.route.steps[0].viewport))
@@ -202,7 +208,7 @@ def test_continuous_motion_does_not_count_as_arrival(monkeypatch):
     monkeypatch.setattr(wf, "_ensure_map", lambda: moving_frame())
     monkeypatch.setattr(wf, "_text", lambda frame, key: "TAB Num2" if key == "home_controls" else "")
     assert "超时" in wf.run()["error"]
-    assert actions == ["travel"]
+    assert actions == ["V"]
 
 
 def test_gather_history_is_not_duplicated_in_console():

@@ -449,7 +449,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._btn_delete_filtered = QPushButton(tr("删除筛选装备"))
         self._btn_delete_filtered.setToolTip(tr(
             "只删除当前筛选出的背包装备，此处不支持删除模拟装备"))
-        self._btn_delete_filtered.setStyleSheet(_ACTION_BTN_STYLE)
+        apply_button_style(self._btn_delete_filtered, variant="danger")
         self._btn_delete_filtered.clicked.connect(self._on_delete_filtered)
         primary_filter_row.addWidget(self._btn_delete_filtered)
 

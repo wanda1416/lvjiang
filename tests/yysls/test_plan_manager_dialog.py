@@ -136,3 +136,15 @@ def test_world_level_combo_offers_follow_season_and_fits_its_label(
     assert combo.itemText(0) == f"随赛季更新（{season}）"
     assert combo.itemData(0) is None            # 首项即「不写等级」
     assert combo.minimumWidth() >= 180
+
+
+def test_long_username_expands_navigation_and_keeps_full_tooltip(qtbot, tmp_path):
+    username = "user@example.com-long-profile-name"
+    dialog = PlanManagerDialog(
+        [username], username, tmp_path, game_config=get_game_config())
+    qtbot.addWidget(dialog)
+
+    required_width = dialog._users.fontMetrics().horizontalAdvance(username) + 32
+    assert dialog._users.minimumWidth() == min(320, max(190, required_width))
+    assert dialog._users.minimumWidth() > 190
+    assert dialog._users.item(0).toolTip() == username

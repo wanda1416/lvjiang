@@ -1,6 +1,7 @@
 from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtWidgets import QFormLayout, QPlainTextEdit
 
-from lvjiang.core.batch_config import BatchConfig, BatchConfigItem
+from lvjiang.core.batch_config import BatchConfig, BatchConfigItem, BatchWorkflows
 from lvjiang.core.profile.models import MODEL_QUOTA, QuotaKeyDef
 from lvjiang.core.profile.schema import ProfileSchema
 from lvjiang.ui.batch import batch_tab
@@ -24,6 +25,16 @@ class _Host(QObject):
     @staticmethod
     def _selected_run_env():
         return None
+
+
+def _prepare_batch_tab(monkeypatch, config, *, schema=None):
+    monkeypatch.setattr(batch_tab, "load_batch_config", lambda: config)
+    monkeypatch.setattr(batch_tab, "save_batch_config", lambda _cfg: None)
+    if schema is not None:
+        monkeypatch.setattr(batch_tab, "get_profile_config", lambda: schema)
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.list_exposed_scripts", lambda _run_env: [],
+    )
 
 
 def test_main_batch_lists_preserve_and_update_actual_execution_order(
@@ -98,6 +109,64 @@ def test_main_batch_lists_preserve_and_update_actual_execution_order(
     assert group.task_ids == ["a", "b", "c"]
     assert group.usernames == ["用户A", "用户B", "用户C"]
     assert group.selected_usernames == ["用户B", "用户A"]
+
+
+def test_batch_multiline_parameter_uses_full_width_row(monkeypatch, qtbot):
+    group = BatchConfigItem(
+        name="日常",
+        workflows=BatchWorkflows(prepare_item="batch/example.wf"),
+    )
+    config = BatchConfig({"日常": group}, "日常")
+    _prepare_batch_tab(monkeypatch, config)
+    monkeypatch.setattr(batch_tab, "lifecycle_parameter_definitions", lambda _wf: {
+        "batch_setup": [],
+        "prepare_item": [{
+            "name": "activities",
+            "type": "text",
+            "label": "需要领取的活动名称（每行一个）",
+            "multiline": True,
+            "default": "朝夕共赏\n金秋共贺",
+        }],
+        "finish_item": [],
+        "batch_teardown": [],
+    })
+
+    tab = BatchTab(_Host())
+    qtbot.addWidget(tab)
+    edit = tab._workflow_param_widgets[("prepare_item", "activities")]
+    assert isinstance(edit, QPlainTextEdit)
+    form = edit.parentWidget().layout()
+    assert isinstance(form, QFormLayout)
+    assert form.itemAt(0, QFormLayout.ItemRole.SpanningRole).widget().text() == (
+        "需要领取的活动名称（每行一个）："
+    )
+    assert form.getWidgetPosition(edit) == (1, QFormLayout.ItemRole.SpanningRole)
+
+
+def test_batch_profile_sort_uses_full_row_and_readable_popup(monkeypatch, qtbot):
+    config = BatchConfig({"日常": BatchConfigItem(name="日常")}, "日常")
+    long_label = "每周累计获得袅袅之音数量"
+    schema = ProfileSchema(keys_by_model={
+        MODEL_QUOTA: [QuotaKeyDef(key="weekly_niaoniao_total", label=long_label)],
+    })
+    _prepare_batch_tab(monkeypatch, config, schema=schema)
+
+    tab = BatchTab(_Host())
+    qtbot.addWidget(tab)
+    combo = tab._profile_sort_key
+    combo.setCurrentIndex(1)
+    expected = f"{long_label} (weekly_niaoniao_total)"
+
+    assert combo.currentText() == expected
+    assert combo.toolTip() == expected
+    assert combo.view().minimumWidth() > combo.fontMetrics().horizontalAdvance(expected)
+    summary_form = combo.parentWidget().parentWidget().layout()
+    assert isinstance(summary_form, QFormLayout)
+    assert summary_form.getWidgetPosition(combo.parentWidget()) == (
+        2, QFormLayout.ItemRole.SpanningRole)
+    assert summary_form.itemAt(1, QFormLayout.ItemRole.SpanningRole).widget().text() == (
+        "指定排序："
+    )
 
 
 def test_user_profile_order_is_explicit_temporary_and_missing_quota_is_zero(

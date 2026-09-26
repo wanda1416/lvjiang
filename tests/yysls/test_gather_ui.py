@@ -10,6 +10,11 @@ from lvjiang.apps.yysls.ui.gather import (
     GatherTab,
     open_recording,
 )
+from lvjiang.ui.button_styles import (
+    ACTION_BUTTON_STYLE,
+    DANGER_BUTTON_STYLE,
+    NEUTRAL_BUTTON_STYLE,
+)
 from tests.yysls.test_gather import make_route
 
 
@@ -79,6 +84,41 @@ def test_tab_uses_common_launch_pause_stop(qtbot):
     tab.pause_button.click()
     tab.f9_run()
     assert host.stops == host.pauses == 1
+
+
+def test_gather_buttons_use_shared_styles_for_actions_and_states(qtbot):
+    store = GatherStore()
+    store.save(make_route(), None)
+    host = Host()
+    qtbot.addWidget(host)
+    tab = GatherTab(host)
+    qtbot.addWidget(tab)
+
+    assert tab.run_button.styleSheet() == ACTION_BUTTON_STYLE
+    assert tab.pause_button.styleSheet() == NEUTRAL_BUTTON_STYLE
+    assert tab.edit_button.styleSheet() == NEUTRAL_BUTTON_STYLE
+
+    host.is_running = True
+    host.automation_state_changed.emit("running")
+    assert tab.run_button.styleSheet() == DANGER_BUTTON_STYLE
+    assert tab.pause_button.styleSheet() == NEUTRAL_BUTTON_STYLE
+    host.automation_state_changed.emit("paused")
+    assert tab.pause_button.styleSheet() == ACTION_BUTTON_STYLE
+
+    host.is_running = False
+    editor = GatherRecordingDialog(host)
+    qtbot.addWidget(editor)
+    assert editor.open_button.styleSheet() == NEUTRAL_BUTTON_STYLE
+    assert editor.new_button.styleSheet() == ACTION_BUTTON_STYLE
+    assert editor.record_button.styleSheet() == ACTION_BUTTON_STYLE
+    assert editor.mark_button.styleSheet() == NEUTRAL_BUTTON_STYLE
+    assert editor.travel_button.styleSheet() == ACTION_BUTTON_STYLE
+    assert editor.undo_button.styleSheet() == DANGER_BUTTON_STYLE
+    assert editor.save_button.styleSheet() == ACTION_BUTTON_STYLE
+
+    editor.recorder = SimpleNamespace(stop=lambda: None)
+    editor._refresh()
+    assert editor.record_button.styleSheet() == DANGER_BUTTON_STYLE
 
 
 def test_editing_route_does_not_change_selected_run_route(qtbot):

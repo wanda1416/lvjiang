@@ -365,14 +365,14 @@ context.bag_fingerprints = {
   ├─ 等级配置缺失                    → skip（异常，不转处置）
   ├─ 等级 allow_reset: false          → reset_exhausted_action（该等级永远不可重置）
   └─ try_reset_tune
-      ├─ resets_used >= 1             → skip（本件已重置过，冷却期内）
+      ├─ resets_used >= 1             → 打开重置页并开启提醒 → skip（冷却期内）
       ├─ resets_used >= max_resets     → reset_exhausted_action（本地次数门槛）
       ├─ 读 reset_tune 剩余次数
       │   ├─ 没读出明确数字            → skip + 记异常 count_unreadable
       │   └─ 明确读到 0                → reset_exhausted_action
       ├─ click reset_tune（桌面布局绑定为按键 R）
       ├─ 读 reset_check
-      │   └─ 无「次数」               → skip（冷却期）
+      │   └─ 无「次数」               → 详情原先无重置冷却信息时开启提醒 → skip
       ├─ 读 reset_info 校验材料（按等级 min_material_count）
       │   ├─ 无「持有」               → skip（识别失败）
       │   └─ 持有 < 要求               → skip（传律石不够）
@@ -383,6 +383,12 @@ context.bag_fingerprints = {
           ├─ click confirm
           └─ click close_btn → 重置成功，词条回到首条继续调律
 ```
+
+开启提醒前必须在 `reset_notify` 区域识别到固定文案“提醒”，识别不到时记录
+明确日志并退出，不盲点复选框。仅有两条路径允许点击这个切换控件：本轮已经
+由程序成功重置过一次；或装备详情没有 `reset` 类型的冷却信息、进入重置页后
+才发现正在冷却。装备详情已有重置冷却信息时，提醒可能已经开启，不得再次
+点击；`transmute` 等其他冷却也不得作为重置提醒状态的依据。
 
 #### 转处置的三个入口（其余一律 skip）
 

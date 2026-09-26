@@ -33,6 +33,7 @@ from ....core.tuning_history.models import (
 # 与冷却文案没有任何字符交集，漏字漏成它是不可能的；而漏认导致的反向
 # 误判只会让本可重置的装备被当成冷却期跳过，是安全的那一侧。
 _RESET_AVAILABLE_TOKEN = "次数"
+_RESET_NOTIFY_TOKEN = "提醒"
 
 if TYPE_CHECKING:
     from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
@@ -70,6 +71,7 @@ class TuningResetter:
         resets_used: int,
         why: str,
         min_material_count: int | None = None,
+        notify_if_cooling: bool = False,
     ) -> bool | tuple[str, str]:
         """检查约束并提交重置。
 
@@ -89,6 +91,14 @@ class TuningResetter:
         )
         if resets_used >= 1:
             logger.info("  本件已重置过一次，冷却期内不再重置")
+            wf._emit_operation(
+                "reset", "本件已重置过一次，正在开启重置冷却提醒",
+                reason=why, resets=resets_used,
+            )
+            self._routes.open_reset_dialog()
+            wf.wait_stable("page_refresh")
+            self._enable_reset_notification()
+            self._close_dialog()
             return (RESET_COOLDOWN, tr("本件已重置过一次，冷却期内不再重置"))
         if resets_used >= cfg.max_resets:
             logger.info("  重置次数已达上限（{}），不再重置", cfg.max_resets)
@@ -119,6 +129,8 @@ class TuningResetter:
                 "  冷却期检查未通过（reset_check={!r}），装备在冷却期，降级跳过",
                 check_text,
             )
+            if notify_if_cooling:
+                self._enable_reset_notification()
             self._close_dialog()
             return (RESET_COOLDOWN, tr("装备重置冷却期，跳过该装备"))
 
@@ -217,3 +229,27 @@ class TuningResetter:
         # 右上角，但位置有细微差别，拿基底坐标关重置弹窗是压着"恰好重合"在赌。
         self._wf.click_region(self._wf.TUNE_SCENE, "reset_back")
         self._wf.wait_delay("step_interval")
+
+    def _enable_reset_notification(self) -> bool:
+        """在已确认未设提醒的冷却分支中开启重置提醒。
+
+        ``reset_notify`` 同时覆盖复选框和固定文案。只有 OCR 仍能看到“提醒”
+        才点击，避免界面状态不明时盲点一个切换控件。
+        """
+        wf = self._wf
+        text = wf.ocr_scene(wf.TUNE_SCENE, ["reset_notify"]).get(
+            "reset_notify", ""
+        ) or ""
+        if _RESET_NOTIFY_TOKEN not in text:
+            logger.warning(
+                "  未识别到重置提醒入口（reset_notify={!r}），未能设置冷却提醒",
+                text,
+            )
+            wf._emit_operation(
+                "reset", "未识别到重置提醒入口，未能设置冷却提醒")
+            return False
+        wf.click_region(wf.TUNE_SCENE, "reset_notify")
+        wf.wait_delay("step_interval")
+        logger.info("  已开启重置冷却提醒")
+        wf._emit_operation("reset", "已开启重置冷却提醒")
+        return True

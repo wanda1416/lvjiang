@@ -133,7 +133,7 @@ regions:
   name: 重置提醒
   type: func
   is_text: true
-  is_clickable: false
+  is_clickable: true
   view: reset_tune
 panels:
 - key: materials

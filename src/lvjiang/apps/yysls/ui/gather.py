@@ -24,6 +24,11 @@ from PyQt6.QtWidgets import (
 from ....core.access import is_readonly
 from ....core.platforms import hotkey_pynput_token, start_global_hotkeys
 from ....i18n import tr
+from ....ui.button_styles import (
+    apply_button_style,
+    exec_styled_message_box,
+    fit_button_width,
+)
 from ....ui.execution_user_selector import ExecutionUserSelector
 from ....ui.hotkeys import hotkey_label
 from ..core.gather import GatherRoute, GatherStep, GatherStore
@@ -100,6 +105,9 @@ class GatherTab(QWidget):
         self.run_button.clicked.connect(self.f9_run)
         self.pause_button = QPushButton(tr("暂停"))
         self.pause_button.clicked.connect(host.request_pause_resume)
+        apply_button_style(self.run_button, variant="action")
+        apply_button_style(self.pause_button, variant="neutral")
+        fit_button_width(self.run_button, self.pause_button)
         buttons.addWidget(self.run_button)
         buttons.addWidget(self.pause_button)
         layout.addLayout(buttons)
@@ -113,9 +121,10 @@ class GatherTab(QWidget):
         self.start_note = QLabel()
         self.start_note.setWordWrap(True)
         layout.addWidget(self.start_note)
-        edit = QPushButton(tr("采集录制…"))
-        edit.clicked.connect(lambda: open_recording(host))
-        layout.addWidget(edit)
+        self.edit_button = QPushButton(tr("采集录制…"))
+        self.edit_button.clicked.connect(lambda: open_recording(host))
+        apply_button_style(self.edit_button, variant="neutral")
+        layout.addWidget(self.edit_button)
         note = QLabel(tr("请先回到录制起点，保持地图缩放和资源筛选一致。\n"
                          "单轮执行；途中失败会停止。智能扫描与循环采集尚未开放。"))
         note.setWordWrap(True)
@@ -168,13 +177,19 @@ class GatherTab(QWidget):
             reason = tr("请先录制并保存路线")
         self.run_button.setEnabled(running or not reason)
         self.run_button.setToolTip(reason)
+        apply_button_style(self.run_button, variant="danger" if running else "action")
         self.pause_button.setEnabled(running and state not in ("pausing", "stopping"))
         self.pause_button.setText(hotkey_label(tr("恢复") if state == "paused" else tr("暂停"), hk.pause))
+        apply_button_style(
+            self.pause_button,
+            variant="action" if running and state == "paused" else "neutral",
+        )
         if state == "stopping":
             self.run_button.setEnabled(False)
             self.run_button.setText(tr("结束中"))
         elif state == "pausing":
             self.pause_button.setText(tr("暂停中"))
+        fit_button_width(self.run_button, self.pause_button)
         self.routes.setEnabled(not running)
         self.users.setEnabled(not running)
 
@@ -230,6 +245,9 @@ class GatherRecordingDialog(QDialog):
         row.addWidget(self.open_button)
         self.new_button = QPushButton(tr("新建"))
         self.new_button.clicked.connect(self._new)
+        apply_button_style(self.open_button, variant="neutral")
+        apply_button_style(self.new_button, variant="action")
+        fit_button_width(self.open_button, self.new_button)
         row.addWidget(self.new_button)
         layout.addLayout(row)
         self.form = QWidget()
@@ -277,6 +295,9 @@ class GatherRecordingDialog(QDialog):
         self.mark_button.clicked.connect(self.mark)
         self.travel_button = QPushButton(tr("识途试跑"))
         self.travel_button.clicked.connect(self.travel)
+        apply_button_style(self.record_button, self.travel_button, variant="action")
+        apply_button_style(self.mark_button, variant="neutral")
+        fit_button_width(self.record_button, self.mark_button, self.travel_button)
         for button in (self.record_button, self.mark_button, self.travel_button):
             row.addWidget(button)
         layout.addLayout(row)
@@ -287,6 +308,9 @@ class GatherRecordingDialog(QDialog):
         self.undo_button.clicked.connect(self._undo)
         self.save_button = QPushButton(tr("保存路线"))
         self.save_button.clicked.connect(self._save)
+        apply_button_style(self.undo_button, variant="danger")
+        apply_button_style(self.save_button, variant="action")
+        fit_button_width(self.undo_button, self.save_button)
         row.addWidget(self.undo_button)
         row.addStretch()
         row.addWidget(self.save_button)
@@ -326,10 +350,12 @@ class GatherRecordingDialog(QDialog):
         baseline = self.previous or asdict(GatherRoute(key=self.route.key))
         if asdict(self.route) == baseline:
             return True
-        return QMessageBox.question(
-            self, tr("未保存的采集录制"), tr("放弃当前未保存的草稿？"),
-            QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Cancel) == QMessageBox.StandardButton.Discard
+        box = QMessageBox(QMessageBox.Icon.Question, tr("未保存的采集录制"),
+                          tr("放弃当前未保存的草稿？"),
+                          QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
+                          self)
+        box.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        return exec_styled_message_box(box) == QMessageBox.StandardButton.Discard
 
     def _load_form(self):
         self.name.setText(self.route.name)
@@ -538,6 +564,7 @@ class GatherRecordingDialog(QDialog):
         self.record_button.setEnabled(not busy and not _desktop_error(self.host))
         self.record_button.setToolTip(_desktop_error(self.host))
         self.record_button.setText(tr("结束选点") if recording else tr("开始选点"))
+        apply_button_style(self.record_button, variant="danger" if recording else "action")
         self.mark_button.setEnabled(recording and not busy)
         self.travel_button.setEnabled(recording and not busy and self.marked is not None)
 

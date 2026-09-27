@@ -1,15 +1,14 @@
 #% name: 视觉状态判断子过程
 
-# 基于区域像素的通道关系判断业务视觉状态。两个过程目前仅作为公共能力
-# 提供，不由现有江湖号令或装备扫描流程导入；待实机样本验证阈值后再替换
-# 旧判定。
+# 基于区域像素的通道关系判断业务视觉状态。
 
-# 江湖号令任务卡状态。
+# 江湖号令奖励状态。仅在刷新图标消失、任务已完成后调用；正常任务
+# 同样没有金光，单凭本过程不能判断任务是否完成。
 # label_region 应传入任务卡的 label 区域，例如：
-#   [activity_jianghu].$card.[label]
-# 完成态的金色遮罩随亮度变化，因此使用 R/G/B 相对关系而非精确 RGB。
-# 返回 completed / incomplete / unknown。
-def detect_jianghu_card_state($label_region)
+#   [activity_jianghu].[card_1].[label]
+# 待领取奖励的金色光效随亮度变化，因此使用 R/G/B 相对关系。
+# 返回 unclaimed / claimed / unknown；不确定时禁止点击领奖。
+def detect_jianghu_reward_state($label_region)
     eval $ratios = pixel_ratios($label_region, {
         "gold": {
             "r_min": 100,
@@ -19,12 +18,34 @@ def detect_jianghu_card_state($label_region)
         }
     }, 2)
     if $ratios.gold >= 0.30
-        return "completed"
+        return "unclaimed"
     end
     if $ratios.gold <= 0.10
-        return "incomplete"
+        return "claimed"
     end
     return "unknown"
+end
+
+# 子场景引用可以在 scan/click 中动态选取，表达式中的区域引用必须使用
+# 静态 key；这里仅负责将六个卡片 key 转为各自的 label 区域。
+def detect_jianghu_card_reward_state($card)
+    if $card equals "card_1"
+        eval $label_region = [activity_jianghu].[card_1].[label]
+    else if $card equals "card_2"
+        eval $label_region = [activity_jianghu].[card_2].[label]
+    else if $card equals "card_3"
+        eval $label_region = [activity_jianghu].[card_3].[label]
+    else if $card equals "card_4"
+        eval $label_region = [activity_jianghu].[card_4].[label]
+    else if $card equals "card_5"
+        eval $label_region = [activity_jianghu].[card_5].[label]
+    else if $card equals "card_6"
+        eval $label_region = [activity_jianghu].[card_6].[label]
+    else
+        return "unknown"
+    end
+    call $state = detect_jianghu_reward_state($label_region)
+    return $state
 end
 
 # 装备锁定状态。

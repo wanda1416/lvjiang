@@ -29,24 +29,24 @@ def _run(frame: np.ndarray, call: str) -> tuple[str, int]:
 
 
 @pytest.mark.parametrize(("frame", "expected"), [
-    (_frame((220, 190, 80)), "completed"),
-    (_frame((230, 230, 230)), "incomplete"),
+    (_frame((220, 190, 80)), "unclaimed"),
+    (_frame((230, 230, 230)), "claimed"),
 ])
-def test_jianghu_card_state_uses_gold_coverage(frame, expected):
+def test_jianghu_reward_state_uses_gold_coverage(frame, expected):
     state, captures = _run(
         frame,
-        "call $state = detect_jianghu_card_state((0, 0, 1, 1))",
+        "call $state = detect_jianghu_reward_state((0, 0, 1, 1))",
     )
     assert state == expected
     assert captures == 1
 
 
-def test_jianghu_card_state_preserves_ambiguous_band():
+def test_jianghu_reward_state_preserves_ambiguous_band():
     frame = _frame((230, 230, 230))
     frame[:, :20] = (80, 190, 220)  # BGR，对应暖黄色 RGB(220, 190, 80)
     state, _captures = _run(
         frame,
-        "call $state = detect_jianghu_card_state((0, 0, 1, 1))",
+        "call $state = detect_jianghu_reward_state((0, 0, 1, 1))",
     )
     assert state == "unknown"
 

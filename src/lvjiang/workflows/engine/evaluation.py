@@ -49,15 +49,15 @@ class _EvalMixin:
         return "" if val is None else str(val)
 
     def _equal_numeric_or_text(self, left, right) -> bool:
-        """== / !=：可转数字时保留容差语义，否则比较两个原始字符串。"""
+        """== / !=：两个字符串精确比较，其余可转数字时用容差比较。"""
         left_value = self._resolve(left)
         right_value = self._resolve(right)
+        if isinstance(left_value, str) and isinstance(right_value, str):
+            return left_value == right_value
         left_number = self._to_number(left_value)
         right_number = self._to_number(right_value)
         if left_number is not None and right_number is not None:
             return abs(left_number - right_number) < _NUM_EQ_EPSILON
-        if isinstance(left_value, str) and isinstance(right_value, str):
-            return left_value == right_value
         return False
 
     def _eval_condition(self, node) -> bool:

@@ -141,15 +141,15 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
             eval $signal = bag_cursor_visit($fp)
             log "  [" + $r + ",1] " + $equip.type + " Lv" + $equip.level + " fp=" + $fp + " → " + $signal
 
-            if $signal equals "end"
+            if $signal == "end"
                 log "  锚点已见过，结束当前窗口"
                 break
             end
 
-            if $signal equals "new"
+            if $signal == "new"
                 if $equip.level < $min_level
                     eval mark_equipment_seen($equip)
-                    if $group equals "weapon" and $equip.type equals $slot_type
+                    if $group == "weapon" and $equip.type == $slot_type
                         log "  同类型低等级，跳过到下一行"
                     else
                         log "  等级 " + $equip.level + " < " + $min_level + "，等级截止"
@@ -196,7 +196,7 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
                         end
                         if $equip.level < $min_level
                             eval mark_equipment_seen($equip)
-                            if $group equals "weapon" and $equip.type equals $slot_type
+                            if $group == "weapon" and $equip.type == $slot_type
                                 log "    同类型低等级，跳过到下一行"
                                 break
                             else
@@ -219,19 +219,19 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
                 end
             end
 
-            if $signal equals "end" or $signal equals "level_end"
+            if $signal == "end" or $signal == "level_end"
                 break
             end
             eval $r = $r + 1
         end
 
-        if $signal equals "end" or $signal equals "level_end"
+        if $signal == "end" or $signal == "level_end"
             break
         end
 
         eval $signal = bag_cursor_finish_window(
             $rows, $rows, $hit_confirmed_empty)
-        if $signal equals "end"
+        if $signal == "end"
             log "  已到达背包末尾"
             break
         end
@@ -255,7 +255,7 @@ end
 # 扫描当前格子并解析装备，同时根据原始详情字段判断详情层是否仍然打开。
 # equip_type 单字段可能 OCR 失败，不能单独用它区分空槽和识别失败。
 def scan_cell($detail_kind)
-    if $detail_kind equals "weapon"
+    if $detail_kind == "weapon"
         call $raw = scan_equipment_detail("equip_weapon_detail")
     else
         call $raw = scan_equipment_detail("equip_armor_detail")

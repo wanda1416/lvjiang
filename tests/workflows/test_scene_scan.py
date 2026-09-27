@@ -19,6 +19,8 @@ from lvjiang.workflows.static_check import check_refs
 from lvjiang.workflows.workflow_references import collect_refs, collect_scene_keys
 from tests.case_matrix import case_matrix
 
+from .conftest import make_engine
+
 # ─── 搜集单元测试 ─────────────────────────────────────────
 
 def _collect(text: str) -> set[str]:
@@ -290,14 +292,56 @@ def test_daily_jianghu_claim_reputation_guard():
     reread = text.index(
         "call $haoling_of_week = sync_haoling_of_week()", claim_proc)
     assert claim_proc < limit < reward_state < claim < reread
-    assert 'if $reward_state equals "claimed"' in text[reward_state:claim]
-    assert 'if not ($reward_state equals "unclaimed")' in text[reward_state:claim]
+    assert 'if $reward_state == "claimed"' in text[reward_state:claim]
+    assert 'if $reward_state != "unclaimed"' in text[reward_state:claim]
     assert (
         "global $claim_reward, $max_refresh, $max_claim_reputation, "
         "$haoling_of_week, $mode_checked"
     ) in text
     assert "context.claim_reward" not in text
     assert "context.mode_checked" not in text
+
+
+@pytest.mark.parametrize(("reward_state", "expected_clicks"), [
+    ("claimed", 0),
+    ("unknown", 0),
+    ("unclaimed", 1),
+])
+def test_daily_jianghu_claim_guard_executes(reward_state, expected_clicks):
+    """实际执行领奖过程，已领和不确定状态都不能点击。"""
+    text = (SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf").read_text(
+        encoding="utf-8")
+    claim = text[text.index("def claim_completed_reward("):
+                 text.index("def sync_haoling_of_week(")]
+    source = (
+        "global $reward_probe, $claimed_clicks, $haoling_of_week, "
+        "$max_claim_reputation\n"
+        + claim
+        + """
+def detect_jianghu_card_reward_state($label)
+   return $reward_probe
+end
+def claim_reward($label, $idx)
+   eval $claimed_clicks = $claimed_clicks + 1
+end
+def sync_haoling_of_week()
+   return 120
+end
+call claim_completed_reward("card_1", "1")
+"""
+    )
+    program = parse_text(source)
+    engine = make_engine()
+    engine.variables.update({
+        "reward_probe": reward_state,
+        "claimed_clicks": 0,
+        "haoling_of_week": 0,
+        "max_claim_reputation": 1500,
+    })
+    engine._procs = dict(program.procs)
+    engine._exec_body(program.body)
+    assert engine.variables["claimed_clicks"] == expected_clicks
+    assert engine.variables["haoling_of_week"] == (120 if expected_clicks else 0)
 
 
 def test_daily_jianghu_restores_single_mode_only_after_switching():
@@ -419,7 +463,7 @@ def test_daily_jianghu_keeps_dispatch_and_external_finish_order():
         text.index("def finish_external_task("):
         text.index("def action_huanzhuang(")
     ]
-    assert 'if $idx equals "6" and not $claim_reward' in finish
+    assert 'if $idx == "6" and not $claim_reward' in finish
     assert "call back_to_haoling()" in finish
     assert text.count('call finish_external_task($idx, "合影")') == 1
     assert text.count('call finish_external_task($idx, "看报")') == 1
@@ -463,9 +507,9 @@ def test_daily_jianghu_uses_refresh_icon_for_completion_and_one_rescan():
         text.index('return {"ok": true, "found_precompleted"')
     ]
     assert "call $refresh_result = refresh_task_until_terminal(" in outer_loop
-    assert 'if $refresh_status equals "completed"' in outer_loop
+    assert 'if $refresh_status == "completed"' in outer_loop
     assert "call claim_completed_reward($label, $idx)" in outer_loop
-    assert 'if $refresh_status equals "target"' in outer_loop
+    assert 'if $refresh_status == "target"' in outer_loop
     assert "eval $found_precompleted = true" in outer_loop
 
     top_level = text[:text.index("def process_jianghu_cards(")]

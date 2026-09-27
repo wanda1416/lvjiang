@@ -52,7 +52,7 @@ def sync_weekly_progress($raw, $key, $last, $label, $source)
         log $label + ": " + $observed.value + "/" + $progress.total
         return $observed.value
     end
-    if $observed.reason equals "regressed"
+    if $observed.reason == "regressed"
         if $observed.value < $last
             return $last
         end
@@ -111,7 +111,7 @@ def sync_weekly_remaining($raw, $key, $last, $expected_total, $label, $source)
         log $label + ": 已购买 " + $observed.value + "/" + $expected_total
         return $observed.value
     end
-    if $observed.reason equals "regressed"
+    if $observed.reason == "regressed"
         if $observed.value < $last
             return $last
         end

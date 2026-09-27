@@ -29,17 +29,17 @@ end
 # 子场景引用可以在 scan/click 中动态选取，表达式中的区域引用必须使用
 # 静态 key；这里仅负责将六个卡片 key 转为各自的 label 区域。
 def detect_jianghu_card_reward_state($card)
-    if $card equals "card_1"
+    if $card == "card_1"
         eval $label_region = [activity_jianghu].[card_1].[label]
-    else if $card equals "card_2"
+    else if $card == "card_2"
         eval $label_region = [activity_jianghu].[card_2].[label]
-    else if $card equals "card_3"
+    else if $card == "card_3"
         eval $label_region = [activity_jianghu].[card_3].[label]
-    else if $card equals "card_4"
+    else if $card == "card_4"
         eval $label_region = [activity_jianghu].[card_4].[label]
-    else if $card equals "card_5"
+    else if $card == "card_5"
         eval $label_region = [activity_jianghu].[card_5].[label]
-    else if $card equals "card_6"
+    else if $card == "card_6"
         eval $label_region = [activity_jianghu].[card_6].[label]
     else
         return "unknown"

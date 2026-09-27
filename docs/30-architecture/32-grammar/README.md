@@ -448,11 +448,11 @@ env:"android" -> click [game_main_page].[menu] after wait @page_refresh
 ```
 # 基础条件
 $var contains "文本"                  # 包含子串
-$var equals "文本"                    # 完全相等
+$var == "文本" / $var != "文本"        # 字符串精确比较
 $var in ["a", "b"]                    # 等于列表中任一项
 $var is_empty                         # 为空或不存在
 $var > N / < N / >= N / <= N         # 数值比较
-$var == N / != N                      # 容差比较（浮点安全）
+$var == N / != N                      # 数值容差比较（浮点安全）
 $var                                  # truthy 检查
 not <条件>                            # 取反
 

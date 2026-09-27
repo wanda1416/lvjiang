@@ -106,6 +106,8 @@ class TestArithEval:
         ('"方案" != "方案"', {}, False),
         ("$a == $b", {"a": "1.0", "b": 1}, True),
         ("$a != $b", {"a": "1.0", "b": 1}, False),
+        ("$a == $b", {"a": "001", "b": "1"}, False),
+        ("$a != $b", {"a": "001", "b": "1"}, True),
         ("$a == $b", {"a": None, "b": None}, False),
         ("$a != $b", {"a": None, "b": None}, True),
     ])

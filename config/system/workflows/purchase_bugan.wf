@@ -305,8 +305,8 @@ def buy_panel($panel_key, $keywords)
             end
             log "命中商品 [" + $panel_key + "] 行" + $r + "列" + $c + " (" + $hit + "): " + $cell
             call buy_cell($panel_key, $r, $c)
-            # 注意：DSL 的 == 是数值比较，字符串必须用 equals（否则恒 False）
-            if $hit equals "宝钱"
+            # 字符串直接用 == 精确比较。
+            if $hit == "宝钱"
                 eval $bought_baoqian = 1
             end
         end

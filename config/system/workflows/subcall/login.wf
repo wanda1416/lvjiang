@@ -45,7 +45,7 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
     end
 
     log "目标账号：" + $account
-    if not $batch_state.account equals $account
+    if $batch_state.account != $account
         if not $tail
             return {"status": "failed", "message": "用户未配置账号尾号", "state": $batch_state}
         end

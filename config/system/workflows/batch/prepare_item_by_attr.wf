@@ -11,7 +11,7 @@ if not $profile_key
     return {"status": "failed", "message": "请配置选择角色所用的 Profile key", "state": $batch_state}
 end
 eval $model = profile_model($profile_key)
-if not $model or $model equals "note"
+if not $model or $model == "note"
     return {"status": "failed", "message": "Profile key 不存在或不是数值类型: " + $profile_key, "state": $batch_state}
 end
 

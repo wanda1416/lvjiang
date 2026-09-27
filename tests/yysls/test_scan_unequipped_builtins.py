@@ -185,7 +185,7 @@ def test_scan_unequipped_closes_desktop_detail_before_first_column_only():
 
     remaining_cols = text.index("eval $c = 2", first_col_click)
     after_remaining_cols = text.index(
-        'if $signal equals "end" or $signal equals "level_end"',
+        'if $signal == "end" or $signal == "level_end"',
         remaining_cols,
     )
     assert 'press "ESC"' not in text[remaining_cols:after_remaining_cols]
@@ -240,7 +240,7 @@ def test_scan_unequipped_seen_row_skips_remaining_columns():
     text = (root / "config/system/workflows/scan_unequipped.wf").read_text(
         encoding="utf-8")
     assert text.count("bag_cursor_visit($fp)") == 1
-    new_branch = text.index('if $signal equals "new"')
+    new_branch = text.index('if $signal == "new"')
     remaining_cols = text.index("eval $c = 2")
     assert remaining_cols > new_branch
 
@@ -252,7 +252,7 @@ def test_scan_unequipped_level_threshold_ends_current_slot_without_cast():
     assert "int($equip.level)" not in text
     assert "$equip.level < $min_level" in text
     assert 'eval $signal = "level_end"' in text
-    assert 'if $signal equals "end" or $signal equals "level_end"' in text
+    assert 'if $signal == "end" or $signal == "level_end"' in text
 
 
 def test_proc_writes_each_item_through_builtin():

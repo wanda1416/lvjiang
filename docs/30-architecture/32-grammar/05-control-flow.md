@@ -18,7 +18,7 @@
 | label | `@label_name` | 标签，goto 的目标 | [05.2](05.2-flow-jumps.md#三label--goto--标签跳转) |
 | goto | `goto label_name` | 同文件内无条件跳转 | [05.2](05.2-flow-jumps.md#三label--goto--标签跳转) |
 
-`if` / `loop while` / `loop until` 的条件写法（`contains` / `equals` / `and` / `or` /
+`if` / `loop while` / `loop until` 的条件写法（`contains` / `==` / `!=` / `and` / `or` /
 算术比较等）三者通用，集中在 [05.3-conditions.md](05.3-conditions.md)。
 
 ## 两类指令的区别

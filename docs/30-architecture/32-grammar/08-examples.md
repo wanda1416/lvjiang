@@ -38,7 +38,7 @@ click [equip_tune_detail].[tune_btn]
 wait @page_refresh
 scan [equip_tune_detail].[tune_affix, tune_tip] as $tune_result
 
-if $tune_result.result equals "成功"
+if $tune_result.result == "成功"
     log "调律成功"
     goto tune_done
 end
@@ -95,7 +95,7 @@ loop while $attempt < 3
     end
 end
 
-if $success equals 0
+if $success == 0
     log "扫描全部失败，执行兜底"
     goto fallback_handler
 end

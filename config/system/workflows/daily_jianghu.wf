@@ -204,14 +204,14 @@ def process_jianghu_cards($is_rescan)
          eval $refresh_status = $refresh_result.status
          eval $task_text = $refresh_result.task_text
 
-         if $refresh_status equals "completed"
+         if $refresh_status == "completed"
             if $claim_reward
                call claim_completed_reward($label, $idx)
             end
             continue
          end
 
-         if $refresh_status equals "target"
+         if $refresh_status == "target"
             eval $hit = 1
          else
             log "任务 " + $idx + " 达到刷新上限仍未命中，跳过"
@@ -383,11 +383,11 @@ def claim_completed_reward($label, $idx)
    end
    if $haoling_of_week < $max_claim_reputation
       call $reward_state = detect_jianghu_card_reward_state($label)
-      if $reward_state equals "claimed"
+      if $reward_state == "claimed"
          log "任务 " + $idx + " 已完成且奖励已领取，跳过重复点击"
          return 0
       end
-      if not ($reward_state equals "unclaimed")
+      if $reward_state != "unclaimed"
          log "任务 " + $idx + " 已完成但奖励金光状态无法确认，跳过领奖"
          return 0
       end
@@ -458,7 +458,7 @@ end
 # 合影、看报、饮酒都会落在游戏首页：非末个任务或需要领奖时返回号令页；
 # 末个任务且无需领奖时保持在首页。调用位置和导航时机由各动作自行决定。
 def finish_external_task($idx, $task_name)
-   if $idx equals "6" and not $claim_reward
+   if $idx == "6" and not $claim_reward
       log "末个任务" + $task_name + "完成且无需领奖，留在桌面"
    else
       call back_to_haoling()
@@ -694,7 +694,7 @@ end
 # 返回：1=执行了切换（当前在游戏主页，调用方需重新打开菜单）；
 #       0=已是目标模式，未动作（仍在菜单页）
 def switch_game_mode($target)
-   if $target equals "mp"
+   if $target == "mp"
       eval $from_text = "单人"
       eval $target_name = "多人模式"
    else

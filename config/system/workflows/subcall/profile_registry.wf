@@ -39,7 +39,7 @@ def declare_profiles($keys)
         # profile_declare 不覆盖已有定义；显式拦截同名但模型类型不同的配置。
         eval $actual_model = profile_model($key)
         eval $expected_model = $item.model
-        if not $actual_model equals $expected_model
+        if $actual_model != $expected_model
             log error "Profile 模型类型不匹配: " + $key + "，期望 " + $expected_model + "，实际 " + $actual_model
             return -1
         end

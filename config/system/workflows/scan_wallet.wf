@@ -211,7 +211,7 @@ def scan_get($data, $rows, $target)
         for c in range(1, 6)
             eval $cell = $data.$r.$c
             eval $label = $cell.label
-            if $label equals $target
+            if $label == $target
                 eval $conf = $cell.confidence
                 if $conf > $best_conf
                     eval $best_val = $cell.count
@@ -233,7 +233,7 @@ def find_cell($data, $rows, $target)
         for c in range(1, 6)
             eval $cell = $data.$r.$c
             eval $label = $cell.label
-            if $label equals $target
+            if $label == $target
                 eval $conf = $cell.confidence
                 if $conf > $best_conf
                     eval $best_row = $r

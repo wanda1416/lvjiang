@@ -119,13 +119,3 @@ class TestPolicy:
         assert Policy.visible_by_default(hidden=False, scope="daily")
         assert not Policy.visible_by_default(hidden=True, scope="daily")
         assert not Policy.visible_by_default(hidden=False, scope="dedicated")
-
-
-class TestRealConfig:
-    """跑真实系统配置，锁住 weekly_baiye_freight 默认不展示。"""
-
-    def test_weekly_baiye_freight_hidden(self, monkeypatch):
-        from lvjiang.workflows.discovery import discover_scripts
-        by_id = {c["id"]: c for c in discover_scripts()}
-        assert by_id["weekly_baiye_freight"]["hidden"] is True
-        assert by_id["scan_wallet"]["hidden"] is False

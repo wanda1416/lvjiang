@@ -24,7 +24,7 @@ from lvjiang.workflows.metadata import parse_metadata_file
 from tests.workflows.conftest import run
 
 _PURCHASE_BUGAN = (
-    Path(__file__).parents[2]
+    Path(__file__).parents[3]
     / "config" / "system" / "workflows" / "purchase_bugan.wf"
 )
 

@@ -1,0 +1,24 @@
+#% name: 纯逻辑数值过程
+
+# 整数最大公约数，支持负数与零；gcd(0, 0) = 0。
+def gcd($a, $b)
+    eval $left = abs($a)
+    eval $right = abs($b)
+    loop while $right != 0
+        eval $remainder = mod($left, $right)
+        eval $left = $right
+        eval $right = $remainder
+    end
+    return $left
+end
+
+# 每个位置的累加和，输出长度与输入相同。
+def prefix_sums($items)
+    eval $result = []
+    eval $total = 0
+    for item in $items
+        eval $total = $total + $item
+        eval append($result, $total)
+    end
+    return $result
+end

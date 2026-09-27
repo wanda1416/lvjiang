@@ -1,0 +1,61 @@
+#% name: 纯逻辑集合过程
+
+# 保留首次出现顺序；输入限同类数字或字符串，不修改原列表。
+def unique($items)
+    eval $result = []
+    for item in $items
+        eval $found = false
+        for existing in $result
+            if $item == $existing
+                eval $found = true
+                break
+            end
+        end
+        if not $found
+            eval append($result, $item)
+        end
+    end
+    return $result
+end
+
+# 只展开一层，内层元素原样保留。
+def flatten_once($groups)
+    eval $result = []
+    for group in $groups
+        for item in $group
+            eval append($result, $item)
+        end
+    end
+    return $result
+end
+
+# 按正整数 size 分块；size <= 0 返回空列表。
+def chunk($items, $size)
+    eval $result = []
+    if $size <= 0
+        return $result
+    end
+    eval $start = 0
+    loop while $start < len($items)
+        eval $part = slice($items, $start, $start + $size - 1)
+        eval append($result, $part)
+        eval $start = $start + $size
+    end
+    return $result
+end
+
+# 按字典中的非空字符串字段分组；缺少字段的行不进入结果。
+def group_by_key($rows, $key)
+    eval $result = {}
+    for row in $rows
+        eval $group = $row.$key
+        if $group
+            if not has_key($result, $group)
+                eval append($result, $group, [])
+            end
+            eval $members = $result.$group
+            eval append($members, $row)
+        end
+    end
+    return $result
+end

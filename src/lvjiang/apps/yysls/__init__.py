@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from ..._version import __version__
+from ...core.config import get_resolver
 from ...i18n import tr
 from ..base import AppHooks, TelemetryDisclosure
 
@@ -25,6 +26,13 @@ def _build_tuning_tab(host):
 def _build_gather_tab(host):
     from .ui.gather import GatherTab
     return GatherTab(host)
+
+
+def _left_tab_builders():
+    tabs = [(tr("调律"), _build_tuning_tab)]
+    if get_resolver().is_dev_mode():
+        tabs.append((tr("采集"), _build_gather_tab))
+    return tabs
 
 
 def _build_loadout_panel(host):
@@ -54,7 +62,7 @@ hooks = AppHooks(
     window_title=tr("律匠 - 燕云十六声装备调律工具") + f" v{__version__}",
 
     # 注入通用 MainWindow 的 Tab / 菜单
-    left_tab_builders=[(tr("调律"), _build_tuning_tab), (tr("采集"), _build_gather_tab)],
+    left_tab_builders=_left_tab_builders(),
     right_tab_builders=[
         (tr("备战方案"), _build_loadout_panel),
         (tr("调律管理"), _build_tuning_management_tab),

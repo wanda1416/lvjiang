@@ -37,9 +37,9 @@ def build_menu(host, menubar) -> None:
     entries = [
         (tr("游戏配置"), _open_game_config, "F5"),
         (tr("调律配置"), _open_tuning_rules, "F6"),
-        (tr("采集录制"), _open_gather_recording, ""),
     ]
     if get_resolver().is_dev_mode():
+        entries.append((tr("采集录制"), _open_gather_recording, ""))
         entries.append((tr("属性配置"), _open_attr_config, ""))
 
     for label, handler, shortcut in entries:

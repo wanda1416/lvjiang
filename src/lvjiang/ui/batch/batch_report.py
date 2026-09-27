@@ -52,6 +52,7 @@ class _EntryRecord:
     status: str = ""
     prepare_status: str = ""
     finish_status: str = ""
+    error: str = ""
     scripts: list[_ScriptRecord] = field(default_factory=list)
     duration: float = 0.0
     _start: float = 0.0
@@ -125,6 +126,10 @@ class BatchReport:
         if self._current_entry:
             self._current_entry.finish_status = status
 
+    def record_error(self, message: str) -> None:
+        if self._current_entry:
+            self._current_entry.error = message
+
     def start_script(self, script_id: str, script_name: str) -> None:
         rec = _ScriptRecord(script_id=script_id, script_name=script_name)
         rec.start()
@@ -183,8 +188,8 @@ class BatchReport:
                          f"{tr('（用户中断）') if self._stopped else tr('（正常完成）')}")
             total_sec = (self._end_time - st).total_seconds()
             lines.append(f"- 总耗时：{_fmt_duration(total_sec)}")
-        lines.append(f"- 计划行数：{self._total_rows}")
-        lines.append(f"- 实际执行：{len(self._entries)} 行")
+        lines.append(f"- 计划执行：{self._total_rows} 单元轮次")
+        lines.append(f"- 实际尝试：{len(self._entries)} 次")
 
         # 脚本列表
         script_names = "、".join(name for _, name in self._scripts)
@@ -213,6 +218,8 @@ class BatchReport:
                 lines.append(f"- 条目准备：{entry.prepare_status}")
             if entry.finish_status:
                 lines.append(f"- 条目收尾：{entry.finish_status}")
+            if entry.error:
+                lines.append(f"- 单元错误：{entry.error}")
 
             # 各脚本
             for sr in entry.scripts:
@@ -234,19 +241,35 @@ class BatchReport:
         entry_success = sum(
             1 for e in self._entries
             if e.prepare_status != tr("失败") and e.finish_status != tr("失败")
+            and not e.error
             and e.scripts
             and all(s.status == tr("成功") for s in e.scripts)
         )
         entry_lifecycle_fail = sum(
             1 for e in self._entries
             if e.prepare_status == tr("失败") or e.finish_status == tr("失败"))
-        entry_partial = total_entries - entry_success - entry_lifecycle_fail
+        entry_error = sum(
+            1 for e in self._entries
+            if e.error and e.prepare_status != tr("失败")
+            and e.finish_status != tr("失败"))
+        entry_skipped = sum(
+            1 for e in self._entries
+            if not e.error and e.prepare_status == tr("跳过")
+            and e.finish_status != tr("失败")
+            and (not e.scripts or all(s.status == tr("跳过") for s in e.scripts)))
+        entry_partial = (
+            total_entries - entry_success - entry_lifecycle_fail
+            - entry_error - entry_skipped)
         lines.append(f"- 行执行总计：{total_entries} 行")
         lines.append(f"  - 全部成功：{entry_success}")
         if entry_partial:
             lines.append(f"  - 部分失败：{entry_partial}")
+        if entry_skipped:
+            lines.append(f"  - 跳过：{entry_skipped}")
         if entry_lifecycle_fail:
             lines.append(f"  - 生命周期失败：{entry_lifecycle_fail}")
+        if entry_error:
+            lines.append(f"  - 单元执行失败：{entry_error}")
         lines.append("")
 
         # 脚本级统计

@@ -53,6 +53,25 @@ class TestVisibility:
                 "level", "extra"}
         assert visible_parameter_names(defs, {"level": 9}) == {"level"}
 
+    def test_in_list_uses_numeric_equality_for_decimal_literal(self):
+        defs = [
+            {"name": "level", "type": "number", "default": 1},
+            {"name": "extra", "type": "text", "require": "$level in [1.0]"},
+        ]
+        validate_requires(defs)
+        assert visible_parameter_names(defs, {"level": 1}) == {"level", "extra"}
+
+    def test_dynamic_empty_contains_target_reports_require_error(self):
+        defs = [
+            {"name": "text", "type": "text", "default": "abc"},
+            {"name": "needle", "type": "text", "default": "x"},
+            {"name": "extra", "type": "text",
+             "require": "$text contains $needle"},
+        ]
+        validate_requires(defs)
+        with pytest.raises(RequireError, match="contains 右侧不能为空"):
+            visible_parameter_names(defs, {"text": "abc", "needle": ""})
+
     def test_list_require_is_and(self):
         # mode 不在列表里 → detail 隐藏，即使另一条件成立
         assert "detail" not in _visible(
@@ -170,6 +189,14 @@ class TestStaticValidation:
             validate_requires([
                 *_DEFS, {"name": "probe", "type": "text", "require": "$mode =="}])
 
+    def test_rejects_empty_contains_literal(self):
+        with pytest.raises(RequireError, match="contains 右侧不能为空"):
+            validate_requires([
+                {"name": "text", "type": "text", "default": "abc"},
+                {"name": "extra", "type": "text",
+                 "require": '$text contains ""'},
+            ])
+
 
 class TestBoolText:
     """布尔字面文本只认 true / false / 1 / 0。"""
@@ -215,6 +242,19 @@ class TestBoolText:
             "#%     type: bool\n"
             f"#%     default: '{default}'\n")
         assert meta["parameters"][0]["default"] == default
+
+    @pytest.mark.parametrize(("default", "expected"), [
+        ("yes", True), ("no", False), ("on", True), ("off", False),
+    ])
+    def test_unquoted_yaml_bool_aliases_are_parsed_before_validation(
+        self, default, expected,
+    ):
+        meta = parse_metadata(
+            "#% parameters:\n"
+            "#%   - name: flag\n"
+            "#%     type: bool\n"
+            f"#%     default: {default}\n")
+        assert meta["parameters"][0]["default"] is expected
 
 
 class TestMetadataIntegration:

@@ -32,8 +32,8 @@ def to_number(val) -> int | float | None:
 
 
 #: 布尔参数允许的字面文本（大小写不敏感）。
-#: 只收这四种：``yes`` / ``no`` / ``on`` / ``off`` 既不是 DSL 字面量、也不是 JSON
-#: 或 YAML 的布尔写法，认它们只会让同一个值在不同入口有不同拼法。
+#: 字符串只收这四种。YAML 会先把未加引号的 yes/no/on/off 解析为真正的 bool；
+#: 加引号后它们仍是字符串，不在此处作为额外别名接受。
 BOOL_TEXT = {"true": True, "false": False, "1": True, "0": False}
 
 

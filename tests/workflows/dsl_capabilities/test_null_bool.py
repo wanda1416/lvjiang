@@ -2,6 +2,10 @@
 
 归档自 P2 开发期冒烟测试（scripts/_phase5_smoke.py）。
 """
+import pytest
+from lark.exceptions import VisitError
+
+from lvjiang.workflows.errors import WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
 from tests.case_matrix import case_matrix
 from tests.workflows.conftest import make_engine, run
@@ -103,8 +107,8 @@ class TestConditions:
         v = run(IF_ELSE_TPL % ('eval $x = null\neval $y = null', '$x equals $y'))
         assert v["r"] == 1.0
 
-    def test_in_and_contains_only_reject_null(self):
-        """0 / false / 空串是合法值，不能被当成「不匹配」。
+    def test_falsey_left_values_remain_usable(self):
+        """0 / false / 空串是合法左值，不能被当成「不匹配」。
 
         守卫曾写成 ``if left else False``，于是 ``$zero in [0, 1]`` 为假——
         与 ``!=`` 恒真同一类错误：把「假值」当成「比不上」。
@@ -121,6 +125,31 @@ class TestConditions:
         ):
             v = run(IF_ELSE_TPL % ('', expr), variables)
             assert v["r"] == expected, expr
+
+    @case_matrix("expression,value,expected", [
+        ("$x in [null]", None, True),
+        ("$x in [1.0]", 1, True),
+        ("$x in [false]", False, True),
+        ('$x in ["False"]', False, False),
+        ("$x in [0]", False, False),
+        ("$x in [null]", "", False),
+        ("$x in []", 1, False),
+    ])
+    def test_in_uses_the_same_equality_as_equals(self, expression, value, expected):
+        result = run(IF_ELSE_TPL % ('', expression), {"x": value})
+        assert (result["r"] == 1) is expected
+
+    @pytest.mark.parametrize("needle", [None, "", "   "])
+    def test_contains_rejects_empty_dynamic_needle(self, needle):
+        with pytest.raises(WorkflowUserError, match="contains 右侧不能为空"):
+            run('if $text contains $needle\nend\n', {
+                "text": "abc", "needle": needle,
+            })
+
+    @pytest.mark.parametrize("literal", ['""', '"   "', "null"])
+    def test_contains_rejects_empty_literal_during_parse(self, literal):
+        with pytest.raises(VisitError, match="contains 右侧不能为空"):
+            parse_text(f'if $text contains {literal}\nend\n')
 
     def test_field_access_truthy(self):
         """if $dict.field → 存在且非空为 True"""

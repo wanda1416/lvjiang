@@ -32,6 +32,7 @@ from functools import lru_cache
 from typing import Any
 
 from ..workflows.engine.evaluation import _EvalMixin
+from ..workflows.errors import WorkflowUserError
 from ..workflows.grammar.ast_nodes import (
     And,
     Contains,
@@ -82,7 +83,10 @@ class _RequireEvaluator(_EvalMixin):
         self.variables = variables
 
     def holds(self, node: Any) -> bool:
-        return bool(self._eval_condition(node))
+        try:
+            return bool(self._eval_condition(node))
+        except WorkflowUserError as exc:
+            raise RequireError(str(exc)) from exc
 
 
 # ─── 解析 ─────────────────────────────────────────────────

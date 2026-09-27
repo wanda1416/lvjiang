@@ -17,9 +17,16 @@
       "template": {
         "name": "desktop/jianghu_card/refresh",
         "min_score": 0.8,
-        "record_w": 1936,
-        "record_h": 1088
+        "record_w": 542,
+        "record_h": 250
       }
+    },
+    {
+      "key": "finish_logo",
+      "x_ratio": 0.0,
+      "y_ratio": 0.0,
+      "w_ratio": 0.09932126696832579,
+      "h_ratio": 0.18778298298130264
     }
   ],
   "crop_canvas": {

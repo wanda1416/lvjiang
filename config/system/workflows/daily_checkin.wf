@@ -149,6 +149,7 @@ def claim_visible_activity($activity_name, $reward_keyword)
         log "检测到“" + $reward_keyword + "”，点击领取。"
         click $reward after wait @page_refresh
         log "活动“" + $activity_name + "”领取完成。"
+        click [general_control].[blank_area] after wait @step_interval
     else
         log "活动“" + $activity_name + "”未找到“" + $reward_keyword + "”，可能已经领取。"
     end

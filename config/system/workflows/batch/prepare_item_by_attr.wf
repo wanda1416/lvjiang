@@ -3,6 +3,26 @@
 #%     label: 选择数据模型
 #%     type: text
 #%     default: ""
+#%   - name: max_roll_account
+#%     label: 最大滚动次数
+#%     type: number
+#%     default: 8
+#%     min: 1
+#%     max: 20
+#%   - name: skip_online_role
+#%     label: 角色在线跳过
+#%     type: bool
+#%     default: true
+#%   - name: online_role_max_wait
+#%     label: 最大等待时间（秒）
+#%     type: number
+#%     default: 0
+#%     min: 0
+#%     max: 3600
+#%   - name: allow_restart_app
+#%     label: 准备时允许重启应用
+#%     type: bool
+#%     default: true
 # 仅供属性执行单元使用：按指定 Profile 的当前值选最小角色。
 
 import "subcall/login.wf"
@@ -36,6 +56,6 @@ if not $chosen
 end
 
 log "本次选择角色: " + $chosen + "，" + $profile_key + "=" + $minimum
-call $result = prepare_user($chosen, $batch_state, true, 0, 8, true)
+call $result = prepare_user($chosen, $batch_state, $skip_online_role, $online_role_max_wait, $max_roll_account, $allow_restart_app)
 eval $result.username = $chosen
 return $result

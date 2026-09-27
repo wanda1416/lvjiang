@@ -1,8 +1,9 @@
 """系统布局 × Python 类工作流的静态坐标引用门禁。
 
 DSL 工作流由 ``test_system_wf_refs_gate.py`` 覆盖；本文件补齐类工作流中
-``self.click_region(...)`` 等调用。只抽取可以静态求值的字符串字面量、
-``self.CONST`` 和字符串列表，动态场景或动态 key 仍需运行时验证。
+``self.click_region(...)`` 和固定场景的 ``crop_region(...)`` 等调用。
+只抽取可以静态求值的字符串字面量、``self.CONST`` 和字符串列表，
+动态场景或动态 key 仍需运行时验证。
 """
 
 from __future__ import annotations
@@ -10,6 +11,8 @@ from __future__ import annotations
 import ast
 import importlib
 from pathlib import Path
+
+import pytest
 
 from lvjiang.apps import load_app
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
@@ -44,11 +47,19 @@ def _literal(node: ast.AST, cls):
 def _collect(path: Path, cls) -> list[tuple[str, str, str, int]]:
     """返回 ``(scene, key, kind, lineno)``；动态参数调用跳过。"""
     tree = ast.parse(path.read_text(encoding="utf-8"))
+    module = importlib.import_module(cls.__module__)
     refs: list[tuple[str, str, str, int]] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         fn = node.func
+        if isinstance(fn, ast.Name) and fn.id == "crop_region" and len(node.args) >= 3:
+            helper = getattr(module, fn.id, None)
+            scene = getattr(helper, "__globals__", {}).get("SCENE")
+            key = _literal(node.args[2], cls)
+            if isinstance(scene, str) and isinstance(key, str):
+                refs.append((scene, key, "region", node.lineno))
+            continue
         if not (
             isinstance(fn, ast.Attribute)
             and isinstance(fn.value, ast.Name)
@@ -107,6 +118,18 @@ def test_class_workflow_gate_has_inputs():
     assert _system_layouts(), "config/system/layouts 下没有布局"
 
 
+def test_gather_crop_region_is_checked():
+    """采集工作流通过固定场景的裁剪函数读取布局。"""
+    workflow_id, cls = next(
+        item for item in _class_workflows() if item[0] == "auto_gather"
+    )
+    module = importlib.import_module(cls.__module__)
+    refs = _collect(Path(module.__file__), cls)
+    assert ("map_gather", "map_view", "region") in {
+        (scene, key, kind) for scene, key, kind, _line in refs
+    }, workflow_id
+
+
 @case_matrix("layout_name", _system_layouts())
 @case_matrix(
     ("workflow_id", "cls"),
@@ -115,6 +138,9 @@ def test_class_workflow_gate_has_inputs():
 )
 def test_class_workflow_refs_all_bound(workflow_id, cls, layout_name):
     """所有可静态求值的类工作流坐标引用必须在系统布局中有绑定。"""
+    if environments := getattr(cls, "ENV", None):
+        if layout_name not in environments:
+            pytest.skip(f"{workflow_id} 不适用于 {layout_name}")
     module = importlib.import_module(cls.__module__)
     path = Path(module.__file__)
     refs = _collect(path, cls)

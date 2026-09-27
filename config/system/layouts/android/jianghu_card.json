@@ -10,15 +10,15 @@
     },
     {
       "key": "refresh",
-      "x_ratio": 0.9087083446866484,
-      "y_ratio": 0.0642592310007404,
-      "w_ratio": 0.06276284319633807,
-      "h_ratio": 0.14504025182570707,
+      "x_ratio": 0.9089882820661749,
+      "y_ratio": 0.05557808733837478,
+      "w_ratio": 0.06623804005916689,
+      "h_ratio": 0.15924298047200933,
       "template": {
         "name": "android/jianghu_card/refresh",
         "min_score": 0.8,
         "record_w": 766,
-        "record_h": 319,
+        "record_h": 321,
         "allow_inverted": true
       }
     },
@@ -26,20 +26,14 @@
       "key": "finish_logo",
       "x_ratio": 0.0,
       "y_ratio": 0.0,
-      "w_ratio": 0.07183990267866751,
-      "h_ratio": 0.151562408340288,
-      "template": {
-        "name": "android/jianghu_card/finish_logo",
-        "min_score": 0.8,
-        "record_w": 766,
-        "record_h": 319
-      }
+      "w_ratio": 0.06944593867205079,
+      "h_ratio": 0.151562408340288
     }
   ],
   "crop_canvas": {
     "x_ratio": 0.08256478515194544,
-    "y_ratio": 0.3205459300424975,
+    "y_ratio": 0.3186544134138795,
     "w_ratio": 0.27347689581687074,
-    "h_ratio": 0.2528709409961511
+    "h_ratio": 0.25476245762476907
   }
 }

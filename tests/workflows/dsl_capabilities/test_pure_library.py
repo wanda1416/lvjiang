@@ -35,10 +35,54 @@ def call(libraries, library, procedure, *args):
         ([], []),
         ([3, 1, 3, 2, 1], [3, 1, 2]),
         (["b", "a", "b", "c"], ["b", "a", "c"]),
+        # 判重走 ==，所以数字与其字符串形态是同一个值
+        ([3, "3"], [3]),
     ],
 )
 def test_unique(libraries, items, expected):
     assert call(libraries, "collections", "unique", items) == expected
+
+
+@pytest.mark.parametrize(
+    ("items", "expected"),
+    [
+        ([False, False], [False]),
+        ([True, True, False], [True, False]),
+        ([None, None], [None]),
+        ([0, 0], [0]),
+        (["", ""], [""]),
+    ],
+)
+def test_unique_deduplicates_bool_null_and_zero(libraries, items, expected):
+    """false / null / 0 / 空串都是值，重复出现必须被去掉。
+
+    这依赖 == 按类型判等：曾经 `null == null` 与 `false == false` 恒假
+    （to_number 拒绝布尔、null 无分支，两者都落进数值分支被判不可比），
+    于是 unique([false, false]) 原样返回两个元素，去重对这几类值完全失效。
+    如果本用例开始失败，先查 _equal_numeric_or_text 的类型分支是否被改回去了。
+    """
+    assert call(libraries, "collections", "unique", items) == expected
+
+
+@pytest.mark.parametrize(
+    ("items", "expected"),
+    [
+        ([False, 0], [False, 0]),
+        ([None, False], [None, False]),
+        ([None, 0], [None, 0]),
+        ([False, "false"], [False, "false"]),
+        ([None, ""], [None, ""]),
+    ],
+)
+def test_unique_keeps_values_of_different_types(libraries, items, expected):
+    """类型不同就是不同的值：false 不是 0，null 不是 false，也不是空串。"""
+    assert call(libraries, "collections", "unique", items) == expected
+
+
+@pytest.mark.parametrize("items", [[[1], [1]], [{"a": 1}, {"a": 1}]])
+def test_unique_does_not_deduplicate_containers(libraries, items):
+    """== 对列表和字典恒假，嵌套结构不参与判重——契约里已写明。"""
+    assert call(libraries, "collections", "unique", items) == items
 
 
 @pytest.mark.parametrize(

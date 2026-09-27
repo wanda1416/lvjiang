@@ -17,7 +17,7 @@ import json
 import time
 import traceback
 from contextlib import ExitStack, nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Callable
 
@@ -100,6 +100,13 @@ class BatchStageResult:
     message: str = ""
     state: dict | None = None
     username: str = ""
+    #: wf 是否执行过顶层 return。跑到末尾一次 return 都没走时为 False——
+    #: 对「只做事不返回」的阶段无所谓，但属性单元的条目准备必须回传 username，
+    #: 这时要能把「没返回」和「返回了但内容不对」分开报。
+    returned: bool = True
+    #: 实际加载的 wf 路径。config/local 与 config/remote 会顶替 system，
+    #: 报错时带上它，本地覆盖这类问题一眼可见，不用去翻编辑器。
+    source: str = ""
 
 
 @dataclass(frozen=True)
@@ -771,11 +778,8 @@ class BatchWorker(QThread):
 
                     username = prepared.username
                     if username not in eligible:
-                        raise ValueError(
-                            f"条目准备工作流 {self._config.workflows.prepare_item!r} "
-                            f"未返回本单元可执行的用户名（得到 {username!r}）：属性"
-                            f"单元必须由它选定成员并回传 username，可执行成员为 "
-                            f"{eligible}")
+                        raise ValueError(self._unit_prepare_protocol_error(
+                            prepared, eligible))
                     deferrals[unit] = 0
                     entry["username"] = username
                     report.set_entry_username(username)
@@ -963,13 +967,34 @@ class BatchWorker(QThread):
                 logger.warning(f"批量历史收尾失败，继续退出批量任务: {exc}")
         self.finished_all.emit(summary)
 
+    def _unit_prepare_protocol_error(
+        self, prepared: BatchStageResult, eligible: list[str],
+    ) -> str:
+        """属性单元条目准备违反协议时的报文。
+
+        「wf 一次 return 都没走」和「返回了但 username 不对」是两种完全不同的
+        排查方向，混成一句话会把人带到错误的地方；实际加载路径一并带上，因为
+        config/local 与 config/remote 会顶替 system，用户自己改过的那份会永久生效。
+        """
+        wf_name = self._config.workflows.prepare_item
+        where = f"（实际加载 {prepared.source}）" if prepared.source else ""
+        if not prepared.returned:
+            return (
+                f"条目准备工作流 {wf_name!r}{where} 没有返回任何值：属性单元要求它"
+                f"返回 {{status, state, username}}。请检查该 wf 是否有顶层 return，"
+                f"以及是否被 config/local 或 config/remote 顶替成了旧版本")
+        return (
+            f"条目准备工作流 {wf_name!r}{where} 未返回本单元可执行的用户名"
+            f"（得到 {prepared.username!r}）：属性单元必须由它选定成员并回传"
+            f" username，可执行成员为 {eligible}")
+
     # ─── 生命周期协议 ────────────────────────────────────
 
     @staticmethod
     def _normalize_stage_result(value, current_state: dict) -> BatchStageResult:
         """校验 wf 返回协议；不解析 state 内任何业务字段。"""
         if value is None:
-            return BatchStageResult(state=current_state)
+            return BatchStageResult(state=current_state, returned=False)
         if not isinstance(value, dict):
             return BatchStageResult(
                 status=RESULT_FAILED,
@@ -1125,7 +1150,8 @@ class BatchWorker(QThread):
 
         try:
             engine.execute(wf_path, initial_variables=variables)
-            return self._normalize_stage_result(engine.return_value, batch_state)
+            result = self._normalize_stage_result(engine.return_value, batch_state)
+            return replace(result, source=str(wf_path))
         except Exception as e:
             logger.error(
                 f"批量阶段失败 ({phase}, "

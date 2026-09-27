@@ -87,6 +87,7 @@ import "subcall/page_detection.wf"
 import "subcall/page_action.wf"
 import "subcall/game_profile.wf"
 import "subcall/profile_registry.wf"
+import "subcall/visual_state.wf"
 
 call $profile_ok = declare_profiles(["haoling_of_week"])
 if $profile_ok < 0
@@ -372,14 +373,24 @@ def refresh_task_until_terminal($label, $idx, $initial_text)
    return {"status": "exhausted", "task_text": $previous_task_text}
 end
 
-# 对已经确认完成的任务执行声望上限检查与领奖。haoling_of_week 在六轮
-# 任务间持续更新，max_claim_reputation 是运行配置，二者均直接读取全局值。
+# 对已经确认完成的任务检查奖励金光与声望上限后领奖。刷新图标消失
+# 只能证明任务完成，不能证明奖励尚未领取；领奖入口必须再次区分两种状态。
+# haoling_of_week 在六轮任务间持续更新，max_claim_reputation 是运行配置。
 def claim_completed_reward($label, $idx)
    if $haoling_of_week < 0
       log "任务 " + $idx + " 已完成，但当周声望识别无效，跳过领奖"
       return 0
    end
    if $haoling_of_week < $max_claim_reputation
+      call $reward_state = detect_jianghu_card_reward_state($label)
+      if $reward_state equals "claimed"
+         log "任务 " + $idx + " 已完成且奖励已领取，跳过重复点击"
+         return 0
+      end
+      if not ($reward_state equals "unclaimed")
+         log "任务 " + $idx + " 已完成但奖励金光状态无法确认，跳过领奖"
+         return 0
+      end
       call claim_reward($label, $idx)
       # 领奖改变了当周累计值，立即刷新并写入 profile；识别失败或数值回退
       # 会保留上次有效值，后续继续按该值判断是否领奖。

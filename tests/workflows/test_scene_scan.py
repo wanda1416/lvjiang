@@ -283,10 +283,15 @@ def test_daily_jianghu_claim_reputation_guard():
     claim_proc = text.index("def claim_completed_reward(")
     limit = text.index(
         "if $haoling_of_week < $max_claim_reputation", claim_proc)
+    reward_state = text.index(
+        "call $reward_state = detect_jianghu_card_reward_state($label)",
+        claim_proc)
     claim = text.index("call claim_reward($label, $idx)", claim_proc)
     reread = text.index(
         "call $haoling_of_week = sync_haoling_of_week()", claim_proc)
-    assert claim_proc < limit < claim < reread
+    assert claim_proc < limit < reward_state < claim < reread
+    assert 'if $reward_state equals "claimed"' in text[reward_state:claim]
+    assert 'if not ($reward_state equals "unclaimed")' in text[reward_state:claim]
     assert (
         "global $claim_reward, $max_refresh, $max_claim_reputation, "
         "$haoling_of_week, $mode_checked"
@@ -487,7 +492,7 @@ def test_daily_jianghu_uses_refresh_icon_for_completion_and_one_rescan():
     assert 'return {"status": "exhausted"' in refresh_proc
 
     for platform, record_size in (
-        ("android", (766, 319)),
+        ("android", (766, 321)),
         ("desktop", (542, 250)),
     ):
         layout_path = SYSTEM_CONFIG_DIR / "layouts" / platform / "jianghu_card.json"

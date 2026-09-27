@@ -166,8 +166,8 @@ def test_batch_profile_sort_uses_full_row_and_readable_popup(monkeypatch, qtbot)
     summary_form = combo.parentWidget().parentWidget().layout()
     assert isinstance(summary_form, QFormLayout)
     assert summary_form.getWidgetPosition(combo.parentWidget()) == (
-        2, QFormLayout.ItemRole.SpanningRole)
-    assert summary_form.itemAt(1, QFormLayout.ItemRole.SpanningRole).widget().text() == (
+        3, QFormLayout.ItemRole.SpanningRole)
+    assert summary_form.itemAt(2, QFormLayout.ItemRole.SpanningRole).widget().text() == (
         "指定排序："
     )
 

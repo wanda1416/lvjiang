@@ -278,6 +278,9 @@ class BatchTab(QWidget):
         self._rounds_spin.setValue(1)
         self._rounds_spin.valueChanged.connect(self._persist_rounds)
         summary_form.addRow(tr("执行轮数："), self._rounds_spin)
+        self._unit_combo = QComboBox()
+        self._unit_combo.currentIndexChanged.connect(self._persist_execution_unit)
+        summary_form.addRow(tr("调度单元："), self._unit_combo)
         profile_sort_row = QWidget()
         profile_sort_layout = QHBoxLayout(profile_sort_row)
         profile_sort_layout.setContentsMargins(0, 0, 0, 0)
@@ -636,6 +639,26 @@ class BatchTab(QWidget):
         self._rounds_spin.blockSignals(True)
         self._rounds_spin.setValue(item.rounds if item is not None else 1)
         self._rounds_spin.blockSignals(False)
+        self._unit_combo.blockSignals(True)
+        self._unit_combo.clear()
+        self._unit_combo.addItem(tr("用户名"), "user")
+        if item is not None:
+            manager = getattr(self._host, "_user_manager", None)
+            keys: dict[str, None] = {}
+            if manager is not None:
+                for username in item.usernames:
+                    user = manager.get_user(username)
+                    if user is not None:
+                        keys.update({key: None for key, value in user.attributes.items()
+                                     if key and str(value).strip()})
+            keys.setdefault(item.execution_unit_key, None)
+            for key in keys:
+                if key != "user":
+                    self._unit_combo.addItem(key, key)
+            self._unit_combo.setCurrentIndex(
+                max(0, self._unit_combo.findData(item.execution_unit_key)))
+        fit_combo_popup_to_contents(self._unit_combo)
+        self._unit_combo.blockSignals(False)
         self._profile_sort_key.blockSignals(True)
         self._profile_sort_direction.blockSignals(True)
         self._profile_sort_key.clear()
@@ -810,6 +833,37 @@ class BatchTab(QWidget):
         item.rounds = rounds
         save_batch_config(cfg)
 
+    def _persist_execution_unit(self, index: int) -> None:
+        if index < 0:
+            return
+        cfg = load_batch_config()
+        item = cfg.configs.get(self._current_config_name())
+        if item is None:
+            return
+        key = str(self._unit_combo.itemData(index))
+        if item.execution_unit_key == key:
+            return
+        item.execution_unit_key = key
+        save_batch_config(cfg)
+        self._refresh_entry_list()
+        self._summary_form.setRowVisible(self._profile_sort_label, key == "user")
+        self._summary_form.setRowVisible(self._profile_sort_row, key == "user")
+
+    def _unit_candidates(self, config: BatchConfigItem) -> list[str]:
+        if config.execution_unit_key == "user":
+            return list(config.usernames)
+        manager = getattr(self._host, "_user_manager", None)
+        if manager is None:
+            return []
+        values: dict[str, None] = {}
+        for username in config.usernames:
+            user = manager.get_user(username)
+            value = (str(user.attributes.get(config.execution_unit_key, "")).strip()
+                     if user is not None else "")
+            if value:
+                values[value] = None
+        return list(values)
+
     def _persist_profile_sort(self, *_args) -> None:
         cfg = load_batch_config()
         item = cfg.configs.get(self._current_config_name())
@@ -897,8 +951,7 @@ class BatchTab(QWidget):
         self._user_list.setColumnWidth(
             0, max(self._user_list.columnWidth(0),
                    header.fontMetrics().horizontalAdvance(candidate_label) + 24))
-        display_order = (list(config.usernames) if key == "user" else
-                         list(config.visible_units.get(key, [])))
+        display_order = self._unit_candidates(config)
         visible = set(display_order)
         selected_values = (config.selected_usernames if key == "user" else
                            config.selected_units.get(key, display_order))
@@ -965,8 +1018,7 @@ class BatchTab(QWidget):
         try:
             self._apply_tree_order(
                 self._user_list,
-                (list(group.usernames) if group.execution_unit_key == "user" else
-                 list(group.visible_units.get(group.execution_unit_key, []))),
+                self._unit_candidates(group),
                 self._user_name)
         finally:
             self._updating_user_list = False
@@ -1108,7 +1160,7 @@ class BatchTab(QWidget):
             item.selected_usernames = [
                 username for username in item.usernames if username in selected]
         else:
-            visible = item.visible_units.get(key, [])
+            visible = self._unit_candidates(item)
             if set(item.selected_units.get(key, visible)) == selected:
                 return
             item.selected_units[key] = [value for value in visible if value in selected]

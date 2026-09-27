@@ -989,7 +989,7 @@ class MainWindow(
             ctx=ctx,
             session_manager=self._session_manager,
             stop_check=self._is_stopped,
-            candidate_usernames=self._user_manager.list_users(),
+            candidate_usernames=list(config.usernames),
         )
         self._batch_tab.apply_task_plan(worker.task_plan_snapshot())
 

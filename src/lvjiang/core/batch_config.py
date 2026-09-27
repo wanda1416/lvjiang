@@ -96,9 +96,6 @@ class BatchConfigItem:
                 for key, items in value.items()
                 if isinstance(key, str) and key and isinstance(items, list)
             } if isinstance(value, dict) else {})
-        for key, selected in list(self.selected_units.items()):
-            visible = set(self.visible_units.get(key, []))
-            self.selected_units[key] = [value for value in selected if value in visible]
         if not isinstance(self.rounds, int) or isinstance(self.rounds, bool):
             self.rounds = 1
         self.rounds = min(999, max(1, self.rounds))
@@ -120,8 +117,8 @@ class BatchConfigItem:
             "selected_task_ids": list(self.selected_task_ids),
             "selected_usernames": list(self.selected_usernames),
             "execution_unit_key": self.execution_unit_key,
-            "visible_units": self.visible_units,
-            "selected_units": self.selected_units,
+            "visible_units": {key: list(value) for key, value in self.visible_units.items()},
+            "selected_units": {key: list(value) for key, value in self.selected_units.items()},
             "rounds": self.rounds,
             "profile_sort_key": self.profile_sort_key,
             "profile_sort_direction": self.profile_sort_direction,

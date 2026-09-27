@@ -54,6 +54,32 @@ def test_save_preserves_main_page_selection_order(monkeypatch, qtbot):
     assert dialog._cfg is saved[0]
 
 
+def test_save_keeps_main_page_dispatch_unit_and_unit_selection(monkeypatch, qtbot):
+    stale = BatchConfig(configs={
+        "组": BatchConfigItem(name="组", usernames=["用户A"]),
+    }, active_config="组")
+    latest = BatchConfig(configs={
+        "组": BatchConfigItem(
+            name="组", usernames=["用户A"], execution_unit_key="account",
+            selected_units={"account": []}, profile_sort_key="quota_key",
+        ),
+    }, active_config="组")
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.load_batch_config", lambda: stale)
+    saved = []
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.save_batch_config", saved.append)
+    dialog = BatchConfigDialog(_Users())
+    qtbot.addWidget(dialog)
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.load_batch_config", lambda: latest)
+    dialog._on_save()
+    item = saved[0].configs["组"]
+    assert item.execution_unit_key == "account"
+    assert item.selected_units == {"account": []}
+    assert item.profile_sort_key == "quota_key"
+
+
 def test_rename_preserves_group_data_and_position(monkeypatch, qtbot):
     config = BatchConfig(configs={
         "第一组": BatchConfigItem(name="第一组"),

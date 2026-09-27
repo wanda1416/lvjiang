@@ -25,6 +25,24 @@ def parameters_for_env(
     ]
 
 
+def parameters_for_values(
+    parameter_defs: list[dict], values: dict[str, Any],
+) -> list[dict]:
+    """返回当前取值下应当展示的参数定义（按 ``require`` 依赖筛选）。
+
+    与 :func:`parameters_for_env` 同一条边界：只约束 UI 展示，不裁剪运行时参数
+    快照。条件不满足的参数照旧出现在 :func:`merge_task_params` 的结果里，wf 引用
+    它不会报未定义；该值此时无意义，由 wf 自己保证不使用。
+    """
+    from .param_require import visible_parameter_names
+
+    visible = visible_parameter_names(parameter_defs, values)
+    return [
+        item for item in parameter_defs
+        if isinstance(item, dict) and str(item.get("name", "")) in visible
+    ]
+
+
 def parameter_defaults(parameter_defs: list[dict]) -> dict[str, Any]:
     return {
         str(item["name"]): deepcopy(item.get("default"))

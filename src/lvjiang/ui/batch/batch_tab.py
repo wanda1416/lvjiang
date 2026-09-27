@@ -705,6 +705,10 @@ class BatchTab(QWidget):
         self._workflow_param_groups.clear()
         self._workflow_param_widgets.clear()
         self._workflow_param_types.clear()
+        # require 依赖按行控显隐：记下每个参数占用的行号与本阶段的参数定义
+        self._workflow_param_forms: dict[str, QFormLayout] = {}
+        self._workflow_param_rows: dict[tuple[str, str], list[int]] = {}
+        self._workflow_param_defs: dict[str, list[dict]] = {}
         if item is None:
             self._workflow_params_panel.setVisible(False)
             return
@@ -722,9 +726,12 @@ class BatchTab(QWidget):
             group = QGroupBox(phase_labels[phase])
             form = QFormLayout(group)
             self._workflow_param_groups.append(group)
+            self._workflow_param_forms[phase] = form
+            self._workflow_param_defs[phase] = list(params)
             saved = item.workflow_params.get(phase, {})
             for definition in params:
                 name = str(definition["name"])
+                rows_before = form.rowCount()
                 label = str(definition.get("label") or name)
                 value = saved.get(name, definition.get("default"))
                 param_type = definition.get("type", "select")
@@ -794,10 +801,40 @@ class BatchTab(QWidget):
                     form.addRow(widget)
                 else:
                     form.addRow(f"{label}：", widget)
+                self._workflow_param_rows[(phase, name)] = list(
+                    range(rows_before, form.rowCount()))
             self._workflow_params_layout.addWidget(group)
+        self._refresh_workflow_param_visibility()
         self._workflow_params_panel.setVisible(bool(self._workflow_param_groups))
 
-    def _persist_workflow_params(self, *_args) -> None:
+    def _refresh_workflow_param_visibility(self) -> None:
+        """按 require 依赖隐藏当前取值下不适用的生命周期参数行。
+
+        只改显隐：控件和值都留着，运行时参数快照照旧包含它们。
+        """
+        defs_by_phase = getattr(self, "_workflow_param_defs", {})
+        if not any(item.get("require")
+                   for params in defs_by_phase.values() for item in params):
+            return
+        from ...core.param_require import RequireError, visible_parameter_names
+        collected = self._collect_workflow_params()
+        for phase, params in defs_by_phase.items():
+            form = self._workflow_param_forms.get(phase)
+            if form is None:
+                continue
+            try:
+                visible = visible_parameter_names(params, collected.get(phase, {}))
+            except RequireError as exc:
+                logger.warning(f"生命周期参数依赖求值失败，本次全部展示: {exc}")
+                continue
+            for (row_phase, name), indices in self._workflow_param_rows.items():
+                if row_phase != phase:
+                    continue
+                for index in indices:
+                    form.setRowVisible(index, name in visible)
+
+    def _collect_workflow_params(self) -> dict[str, dict]:
+        """从控件读出各阶段参数值；写回配置与算 require 可见性共用这一份。"""
         values: dict[str, dict] = {}
         for key, widget in self._workflow_param_widgets.items():
             phase, name = key
@@ -819,12 +856,16 @@ class BatchTab(QWidget):
             else:
                 value = cast(QLineEdit, widget).text()
             values.setdefault(phase, {})[name] = value
+        return values
+
+    def _persist_workflow_params(self, *_args) -> None:
+        values = self._collect_workflow_params()
         cfg = load_batch_config()
         item = cfg.configs.get(self._current_config_name())
-        if item is None:
-            return
-        item.workflow_params = values
-        save_batch_config(cfg)
+        if item is not None:
+            item.workflow_params = values
+            save_batch_config(cfg)
+        self._refresh_workflow_param_visibility()
 
     def _persist_rounds(self, rounds: int) -> None:
         cfg = load_batch_config()

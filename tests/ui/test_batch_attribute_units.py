@@ -315,6 +315,93 @@ def test_skipped_prepare_consumes_round_and_uses_normal_loop(
     assert executed == ["u2", "u1", "u2"]
 
 
+@pytest.mark.parametrize("phase", ["prepare_item", "finish_item"])
+def test_attribute_lifecycle_stop_ends_whole_batch(
+    tmp_path, monkeypatch, qapp, phase,
+):
+    import lvjiang.core.daily_history as history
+
+    for name, account in (("u1", "a"), ("u2", "b")):
+        save_user_metadata(User(name, attributes={"account": account}), tmp_path)
+    monkeypatch.setattr(history, "try_create_batch_run", lambda **_kw: None)
+    monkeypatch.setattr(history, "try_create_task_run", lambda **_kw: None)
+    monkeypatch.setattr(BatchReport, "write", lambda self: None)
+    worker = BatchWorker(
+        ["a", "b"], [BatchScript("task", "task")],
+        BatchConfigItem(
+            name="attribute", execution_unit_key="account", rounds=2,
+            workflows=BatchWorkflows(prepare_item="prepare.wf", finish_item="finish.wf"),
+        ),
+        BatchContext(None, None, None, None), SessionManager(tmp_path),
+        lambda: False, candidate_usernames=["u1", "u2"],
+    )
+    prepared = []
+    executed = []
+    finished = []
+    worker.finished_all.connect(finished.append)
+
+    def stage(current, _wf, _index, _username, _state, *args, **kwargs):
+        if current == "prepare_item":
+            prepared.append(kwargs["unit_members"][0])
+            if phase == current:
+                return BatchStageResult(status="stopped", state={})
+            return BatchStageResult(username="u1", state={})
+        if current == phase:
+            return BatchStageResult(status="stopped", state={})
+        return BatchStageResult(state={})
+
+    monkeypatch.setattr(worker, "_run_stage", stage)
+    monkeypatch.setattr(worker, "_run_script", lambda *_args, **_kw:
+                        executed.append("task") or {})
+    monkeypatch.setattr(worker, "_save_result", lambda *_args: None)
+    worker.run()
+
+    assert prepared == ["u1"]
+    assert executed == ([] if phase == "prepare_item" else ["task"])
+    assert finished[0]["stopped"] is True
+    assert len(finished[0]["entries"]) == 1
+
+
+@pytest.mark.parametrize("setup_status", ["failed", "stopped"])
+def test_attribute_setup_failure_marks_all_planned_rows(
+    tmp_path, monkeypatch, qapp, setup_status,
+):
+    import lvjiang.core.daily_history as history
+
+    for name, account in (("u1", "a"), ("u2", "b")):
+        save_user_metadata(User(name, attributes={"account": account}), tmp_path)
+    monkeypatch.setattr(history, "try_create_batch_run", lambda **_kw: None)
+    reports = []
+    monkeypatch.setattr(BatchReport, "write", lambda self: reports.append(self) or None)
+    worker = BatchWorker(
+        ["a", "b"], [BatchScript("task", "task")],
+        BatchConfigItem(
+            name="attribute", execution_unit_key="account", rounds=2,
+            workflows=BatchWorkflows(prepare_item="prepare.wf", batch_setup="setup.wf"),
+        ),
+        BatchContext(None, None, None, None), SessionManager(tmp_path),
+        lambda: False, candidate_usernames=["u1", "u2"],
+    )
+    monkeypatch.setattr(worker, "_run_stage", lambda *_args, **_kw:
+                        BatchStageResult(status=setup_status, state={}))
+    monkeypatch.setattr(worker, "_run_script", lambda *_args, **_kw:
+                        pytest.fail("batch_setup 失败后仍运行了业务任务"))
+    progress = []
+    finished = []
+    worker.progress.connect(lambda _idx, _label, _script, status:
+                            progress.append(status))
+    worker.finished_all.connect(finished.append)
+    worker.run()
+
+    assert progress == [ST_SKIPPED] * 4
+    assert len(finished[0]["entries"]) == 4
+    assert finished[0]["stopped"] is (setup_status == "stopped")
+    assert len(reports[0]._entries) == 4
+    assert all(record.prepare_status == ST_SKIPPED
+               and [script.status for script in record.scripts] == [ST_SKIPPED]
+               for record in reports[0]._entries)
+
+
 def test_attribute_unit_runs_only_selected_members_successful_checks(
     tmp_path, monkeypatch, qapp,
 ):

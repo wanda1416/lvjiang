@@ -3,8 +3,8 @@
 解析出的轴总伤与 DPS 必须与已编译方案的 reference 完全一致——这是判断
 解析口径对不对的唯一硬标准（期望列内部已含次数，多乘一次就会翻倍）。
 
-Excel 不随仓库分发，缺失时整组跳过。放路径的环境变量：LVJIANG_EXCEL_DIR，
-未设置时回落到项目内的 data/excel 目录。
+缺少原始 Excel 时整组跳过。可通过 LVJIANG_EXCEL_DIR 指定原始表根目录，
+未设置时使用项目内的 data/excel 目录；原始表按等级分子目录存放。
 """
 
 import json
@@ -33,7 +33,7 @@ def _pairs() -> list[tuple[Path, dict]]:
     pairs = []
     for scheme_path in sorted(_SCHEME_DIR.glob("*/*.json")):
         scheme = json.loads(scheme_path.read_text(encoding="utf-8"))
-        excel = directory / scheme.get("source", {}).get("file", "")
+        excel = directory / f"{scheme['model_level']}级" / scheme.get("source", {}).get("file", "")
         if excel.is_file():
             pairs.append((excel, scheme))
     return pairs

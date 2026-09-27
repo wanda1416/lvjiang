@@ -50,7 +50,7 @@ def test_formula_parser_supports_workbook_subset() -> None:
 @pytest.mark.slow
 def test_converter_resolves_skill_alias_in_school_group() -> None:
     path = next(
-        (p for p in EXCEL_DIR.glob("*鸣金虹*.xlsx") if "副本" not in p.stem),
+        (p for p in EXCEL_DIR.glob("*/*鸣金虹*.xlsx") if "副本" not in p.stem),
         None,
     )
     if path is None:
@@ -61,7 +61,7 @@ def test_converter_resolves_skill_alias_in_school_group() -> None:
 
 @pytest.mark.slow
 def test_converter_ignores_blank_skill_affix_label() -> None:
-    path = next(EXCEL_DIR.glob("*牵丝霖*.xlsx"), None)
+    path = next(EXCEL_DIR.glob("*/*牵丝霖*.xlsx"), None)
     if path is None:
         pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/*牵丝霖*.xlsx")
     model = convert_workbook(path, "牵丝·霖")
@@ -74,7 +74,7 @@ def test_converter_ignores_blank_skill_affix_label() -> None:
 @pytest.mark.slow
 def test_converter_supports_multiple_skill_affixes_and_shifted_environment() -> None:
     """破竹·风比通用表多一行老鼠定音，后续环境行也随之下移。"""
-    path = next(EXCEL_DIR.glob("破竹风*.xlsx"), None)
+    path = next(EXCEL_DIR.glob("*/破竹风*.xlsx"), None)
     if path is None:
         pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/破竹风*.xlsx")
 

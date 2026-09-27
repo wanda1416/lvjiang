@@ -38,4 +38,4 @@ def test_selects_lowest_profile_role():
     except _ReturnSignal as signal:
         seen.append(signal.value)
     assert seen[0]["username"] == "u2"
-    assert seen[0]["retry_after"] == 1200
+    assert "retry_after" not in seen[0]

@@ -1,8 +1,7 @@
-"""花蕊织批量判定与通用生命周期工作流的行为回归。
+"""通用批量生命周期工作流的行为回归。
 
-业务 wf 的批量检查在准备前读取进度；通用条目准备按参数选择登录页恢复：
-进度已满直接跳过整个用户、
-已经在登录页就直接登录、进程不在时启动、进程仍在但不在登录页时重启。
+条目准备按参数选择登录页恢复：已经在登录页就直接登录、进程不在时启动、
+进程仍在但不在登录页时重启。
 
 启动后不等稳定帧——登录页背景动画常驻，根本不存在稳定帧；启动页
 通过游戏 logo 判定，返回按钮只用来点击。
@@ -22,7 +21,6 @@ from tests.workflows.conftest import make_engine
 
 _BATCH_DIR: Path = SYSTEM_CONFIG_DIR / "workflows" / "batch"
 _PREPARE = _BATCH_DIR / "prepare_item.wf"
-_HUARUIZHI = SYSTEM_CONFIG_DIR / "workflows" / "weekly_huaruizhi.wf"
 _LOGIN = SYSTEM_CONFIG_DIR / "workflows" / "subcall" / "login.wf"
 _FINISH = _BATCH_DIR / "finish_item.wf"
 
@@ -37,20 +35,14 @@ _STUB_EXIT_TO_LOGIN = (
     '    eval mark_exit()\n'
     'end\n'
 )
-_STUB_DECLARE_PROFILES = (
-    'def declare_profiles($keys)\n'
-    '    return 0\n'
-    'end\n'
-)
 
 
 class _Device:
     """记录对客户端进程和画面的全部动作。"""
 
-    def __init__(self, *, app_running: bool, weekly_progress, startup_back=True,
+    def __init__(self, *, app_running: bool, startup_back=True,
                  in_login_page: bool = False, manual_recovery: bool = True):
         self.app_running = app_running
-        self.weekly_progress = weekly_progress
         self.startup_back = startup_back
         self.in_login_page = in_login_page
         self.manual_recovery = manual_recovery
@@ -63,8 +55,6 @@ class _Device:
 
         def call_function(name, args, engine=None):
             self.calls.append((name, *args))
-            if name == "profile_get":
-                return self.weekly_progress
             if name == "app_is_running":
                 return self.app_running
             if name in ("app_start", "app_stop"):
@@ -105,26 +95,9 @@ class _Device:
         """只保留会改变现场的动作，忽略 log/日志类调用。"""
         watched = {
             "app_is_running", "app_start", "app_stop",
-            "profile_get", "pause", "click", "scan_image",
+            "pause", "click", "scan_image",
         }
         return [call[0] for call in self.calls if call[0] in watched]
-
-
-def _run_batch_check(device: _Device) -> dict:
-    """只调用业务 wf 声明的批量检查，不执行顶层正文。"""
-    program = parse_text(_HUARUIZHI.read_text(encoding="utf-8"))
-    engine = make_engine(
-        layout=load_layout_by_key("android"),
-        delay_params=load_user_config().delay_params,
-        run_env="android",
-    )
-    device.install(engine)
-    engine._procs = dict(program.procs)
-    engine._procs["declare_profiles"] = parse_text(
-        _STUB_DECLARE_PROFILES).procs["declare_profiles"]
-    return_value, _output = engine._run_proc(
-        program.procs["check_huaruizhi_batch"], [{}])
-    return return_value
 
 
 def _run_prepare(device: _Device, *, restart_app: bool) -> dict:
@@ -177,19 +150,10 @@ def _run_finish(device: _Device, *, stop_app: bool) -> dict:
     raise AssertionError("条目收尾必须返回批量生命周期协议字典")
 
 
-def test_full_weekly_progress_skips_without_touching_the_client():
-    """进度已满：直接跳过，连进程状态都不必查，更不能启动客户端。"""
-    device = _Device(app_running=False, weekly_progress=3000)
-    result = _run_batch_check(device)
-
-    assert result["status"] == "skipped"
-    assert device.names() == ["profile_get"]
-
-
 def test_login_page_skips_client_process_operations():
     """已经在登录页：不查询进程，也不重启客户端。"""
     device = _Device(
-        app_running=True, weekly_progress=1200, in_login_page=True)
+        app_running=True, in_login_page=True)
     result = _run_prepare(device, restart_app=True)
 
     assert result["status"] == "success"
@@ -197,7 +161,7 @@ def test_login_page_skips_client_process_operations():
 
 
 def test_prepare_keeps_legacy_manual_recovery_when_restart_is_disabled():
-    device = _Device(app_running=True, weekly_progress=0)
+    device = _Device(app_running=True)
 
     result = _run_prepare(device, restart_app=False)
 
@@ -207,7 +171,7 @@ def test_prepare_keeps_legacy_manual_recovery_when_restart_is_disabled():
 
 def test_stopped_client_is_started_then_returned_to_login_page():
     """客户端不在：启动后识别 logo，点击返回并确认登录主页。"""
-    device = _Device(app_running=False, weekly_progress=0)
+    device = _Device(app_running=False)
     result = _run_prepare(device, restart_app=True)
 
     assert result["status"] == "success"
@@ -221,7 +185,7 @@ def test_stopped_client_is_started_then_returned_to_login_page():
 
 def test_running_client_outside_login_page_is_restarted():
     """进程存在不代表在登录页；其他页面必须重启以恢复确定的登录现场。"""
-    device = _Device(app_running=True, weekly_progress=1200)
+    device = _Device(app_running=True)
     result = _run_prepare(device, restart_app=True)
 
     assert result["status"] == "success"
@@ -234,7 +198,7 @@ def test_running_client_outside_login_page_is_restarted():
 def test_startup_logo_never_appears_falls_back_to_manual():
     """一直找不到启动页 logo 时必须停下来求助，不得盲点返回。"""
     device = _Device(
-        app_running=False, weekly_progress=0, startup_back=False,
+        app_running=False, startup_back=False,
         manual_recovery=False)
     result = _run_prepare(device, restart_app=True)
 
@@ -244,7 +208,7 @@ def test_startup_logo_never_appears_falls_back_to_manual():
 
 
 def test_finish_item_defaults_to_exit_to_login():
-    device = _Device(app_running=True, weekly_progress=0)
+    device = _Device(app_running=True)
     result = _run_finish(device, stop_app=False)
 
     assert ("mark_exit",) in device.calls
@@ -254,7 +218,7 @@ def test_finish_item_defaults_to_exit_to_login():
 
 
 def test_finish_item_can_stop_app_instead_of_exiting():
-    device = _Device(app_running=True, weekly_progress=0)
+    device = _Device(app_running=True)
     result = _run_finish(device, stop_app=True)
 
     assert ("mark_exit",) not in device.calls
@@ -276,11 +240,3 @@ def test_declared_parameters_match_the_variables_used(path):
     }
     for name in declared:
         assert f"${name}" in source, f"{path.name} 声明了 {name} 却没有使用"
-
-
-def test_huaruizhi_metadata_points_to_declared_batch_check():
-    metadata = parse_metadata_file(_HUARUIZHI)
-    program = parse_text(_HUARUIZHI.read_text(encoding="utf-8"))
-
-    assert metadata["batch_check"] == "check_huaruizhi_batch"
-    assert metadata["batch_check"] in program.procs

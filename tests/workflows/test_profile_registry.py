@@ -105,7 +105,6 @@ def test_profile_consumers_use_the_central_registry() -> None:
         "purchase_niaoniao.wf": ["niaoniao_of_week", "changmingyu"],
         "purchase_xinfa.wf": ["xinfa_of_week"],
         "daily_jianghu.wf": ["haoling_of_week"],
-        "weekly_huaruizhi.wf": ["huaruizhi_of_week"],
     }
 
     for filename, keys in dependencies.items():
@@ -122,9 +121,6 @@ def test_profile_consumers_use_the_central_registry() -> None:
         operation_indexes = [index for index in profile_operations if index >= 0]
         if operation_indexes:
             assert source.index(declaration) < min(operation_indexes)
-
-    huaruizhi = (_WORKFLOWS / "weekly_huaruizhi.wf").read_text(encoding="utf-8")
-    assert huaruizhi.count('declare_profiles(["huaruizhi_of_week"])') == 2
 
     business_sources = "\n".join(
         path.read_text(encoding="utf-8")

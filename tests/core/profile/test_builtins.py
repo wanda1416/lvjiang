@@ -75,6 +75,32 @@ def test_profile_all_computes_realtime_regen_value(profile_func_env):
     assert by_all == pytest.approx(by_get, abs=0.02)
 
 
+def test_profile_builtins_reject_unbound_username(profile_func_env):
+    from lvjiang.core.profile.repository import db_read_entry, db_upsert
+    from lvjiang.workflows.builtins.profile import (
+        _profile_all,
+        _profile_get,
+        _profile_inc,
+        _profile_observe,
+        _profile_set,
+    )
+
+    db_upsert(profile_func_env.username, "quota", "weekly_progress", 17)
+    engine = SimpleNamespace(run_username="")
+    assert _profile_get(engine, "weekly_progress", profile_func_env.username) == 17
+    for operation in (
+        lambda: _profile_get(engine, "weekly_progress"),
+        lambda: _profile_all(engine),
+        lambda: _profile_set(engine, "weekly_progress", 20),
+        lambda: _profile_inc(engine, "weekly_progress", 1),
+        lambda: _profile_observe(engine, "weekly_progress", 20),
+    ):
+        with pytest.raises(ValueError, match="缺少执行用户名"):
+            operation()
+    assert db_read_entry("default", "quota", "weekly_progress") == {}
+    assert db_read_entry(profile_func_env.username, "quota", "weekly_progress")["value"] == 17
+
+
 def test_profile_inc_preserves_realtime_fraction_progress(profile_func_env):
     from lvjiang.core.profile.repository import (
         db_read_entry,

@@ -12,8 +12,11 @@ from ...i18n import tr
 
 
 def _get_username(_engine) -> str:
-    """从引擎获取当前用户名"""
-    return getattr(_engine, "run_username", "") or "default"
+    """从引擎获取当前用户名；未绑定用户时拒绝隐式读写。"""
+    username = getattr(_engine, "run_username", "")
+    if not isinstance(username, str) or not username.strip():
+        raise ValueError("Profile 操作缺少执行用户名；请先绑定用户")
+    return username
 
 
 @builtin_func("user_get")

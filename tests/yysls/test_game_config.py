@@ -32,29 +32,33 @@ def mgr():
 # ─── 词条别名归一 ──────────────────────────────────────────
 
 class TestResolveAffixCategory:
-    def test_nanlu_season_spans_thirteen_weeks_and_one_day(self):
-        path = (
-            Path(__file__).resolve().parents[2]
-            / "config/system/yysls/game_config/seasons.yaml"
-        )
-        seasons = {
-            season.name: season
-            for season in GameConfigManager(path).get_season_configs()
-        }
-        # 按编号取：赛季名会改（南吕 → 南吕相和），编号才是稳定标识
-        nanlu = next(s for s in seasons.values() if s.season_number == 2)
+    def test_gongjue_level_falls_back_to_equip_level(self, tmp_path):
+        """弓玦等级查找：配了就用配置值，没配或没有该装备等级则等于装备等级。
 
-        assert nanlu.name.startswith("南吕")
-        assert nanlu.start_date == date(2026, 9, 24)
-        assert nanlu.end_date == date(2026, 12, 25)
-        assert nanlu.first_half_end_date == date(2026, 11, 4)
-        assert nanlu.end_date - nanlu.start_date == timedelta(weeks=13, days=1)
-        assert nanlu.first_half_end_date + timedelta(days=1) \
-            - nanlu.start_date == timedelta(weeks=6)
-        assert nanlu.equip_level == 115
-        assert nanlu.gongjue_level == 110
-        assert GameConfigManager(path).gongjue_level_for(115) == 110
-        assert nanlu.min_chengyin_level == 105
+        原来这里断言的是随包 seasons.yaml 里南吕相和的一堆字面日期与等级，
+        赛季配置一更新就失败，却抓不到任何真实回归——查找逻辑本身反而没被测到。
+        """
+        path = tmp_path / "game_config.yaml"
+        path.write_text(
+            "season_configs:\n"
+            "- season_number: 1\n"
+            "  start_date: '2026-01-01'\n"
+            "  end_date: '2026-04-01'\n"
+            "  equip_level: 110\n"
+            "  gongjue_level: 105\n"
+            "- season_number: 2\n"
+            "  start_date: '2026-04-01'\n"
+            "  end_date: '2026-07-01'\n"
+            "  equip_level: 115\n",
+            encoding="utf-8",
+        )
+        manager = GameConfigManager(path)
+
+        assert manager.gongjue_level_for(110) == 105
+        # 该赛季没写 gongjue_level → 回落到装备等级
+        assert manager.gongjue_level_for(115) == 115
+        # 没有任何赛季用这个装备等级 → 同样回落
+        assert manager.gongjue_level_for(120) == 120
 
     def test_adjacent_seasons_must_share_boundary_date(self):
         base = [

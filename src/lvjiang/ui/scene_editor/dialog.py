@@ -479,6 +479,7 @@ class SceneEditorDialog(
             lambda msg: self._status_bar.showMessage(msg, 5000))
         tab.on_view_changed = self._on_tab_view_changed
         tab.on_screenshot_changed = self._on_tab_screenshot_changed
+        tab.on_screenshot_set_changed = self._on_tab_screenshot_set_changed
         tab.on_scene_type_changed = self._on_scene_type_changed
         tab.on_scene_references_added = self._on_scene_references_added
         tab.on_scene_reference_removed = self._on_scene_reference_removed
@@ -638,9 +639,20 @@ class SceneEditorDialog(
             self._current_layout.key, scene_key, view, index)
         if img is not None:
             tab.canvas.set_image(img)
+            if is_subscene(scene_key):
+                tab.canvas.focus_canvas()
         else:
             tab.canvas.clear_image()
         self._update_info_label()
+
+    def _on_tab_screenshot_set_changed(self, scene_key: str, view: str) -> None:
+        """截图管理可删除或重排文件，丢弃该场景截图的旧内存副本。"""
+        if self._current_layout is None:
+            return
+        layout_key = self._current_layout.key
+        for key in tuple(self._img_cache):
+            if key[:3] == (layout_key, scene_key, view):
+                del self._img_cache[key]
 
     # ─── 跨场景迁移 ────────────────────────────────────
 
@@ -804,6 +816,8 @@ class SceneEditorDialog(
         self._loaded_scenes.add(scene_key)
         if current_tab:
             current_tab.canvas.set_image(new_image)
+            if is_subscene(scene_key):
+                current_tab.canvas.focus_canvas()
         scene_name = get_scene_name(scene_key)
         self._status_bar.showMessage(f"已保存「{scene_name}」场景截图")
         self._update_info_label()
@@ -830,6 +844,8 @@ class SceneEditorDialog(
         if current_tab:
             current_tab._refresh_screenshot_combo()
             current_tab.canvas.set_image(new_image)
+            if is_subscene(scene_key):
+                current_tab.canvas.focus_canvas()
         scene_name = get_scene_name(scene_key)
         self._status_bar.showMessage(
             f"已追加「{scene_name}」截图 {next_index}")

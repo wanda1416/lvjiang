@@ -99,6 +99,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
         # 当前截图序号（多截图模式）；截图切换回调：(scene_key, view, index)
         self._current_screenshot_index: int = 1
         self.on_screenshot_changed: Callable[[str, str, int], None] | None = None
+        self.on_screenshot_set_changed: Callable[[str, str], None] | None = None
         # 新增跨场景引用回调：(scene_key, [(源场景, 实体), ...])，由 dialog 注入。
         # 引用的坐标是布局加载期展开的，新加的那几条得补进当前布局才画得出来。
         self.on_scene_references_added: (
@@ -219,7 +220,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
             self._on_screenshot_combo_changed)
         bar.addWidget(self._screenshot_combo)
         self._btn_manage_screenshots = QPushButton(tr("管理"))
-        self._btn_manage_screenshots.setToolTip(tr("管理当前视图的多张截图"))
+        self._btn_manage_screenshots.setToolTip(tr("管理当前截图列表"))
         self._btn_manage_screenshots.clicked.connect(
             self._on_manage_screenshots)
         apply_button_style(self._btn_manage_screenshots, variant="neutral")
@@ -266,11 +267,13 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
 
     def _refresh_scene_type_ui(self):
         subscene = is_subscene(self._scene_key)
-        for widget in (
-                self._view_label, self._view_combo, self._btn_manage_views,
-                self._screenshot_label, self._screenshot_combo,
-                self._btn_manage_screenshots):
+        for widget in (self._view_label, self._view_combo,
+                       self._btn_manage_views):
             widget.setVisible(not subscene)
+        # 子场景没有视图，但可以为同一画布保存多张截图。
+        for widget in (self._screenshot_label, self._screenshot_combo,
+                       self._btn_manage_screenshots):
+            widget.setVisible(True)
         if hasattr(self, "_right_tabs"):
             self._right_tabs.setTabEnabled(4, not subscene)
 
@@ -627,6 +630,9 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
             self._current_view, self)
         dlg.exec()
         if getattr(dlg, "_changed", False):
+            if self.on_screenshot_set_changed:
+                self.on_screenshot_set_changed(
+                    self._scene_key, self._current_view)
             self._refresh_screenshot_combo()
             if self.on_screenshot_changed:
                 self.on_screenshot_changed(

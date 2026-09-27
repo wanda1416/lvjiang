@@ -1,33 +1,4 @@
 content_version: 1
-equipment_sets:
-  left:
-    yudou: {name: 玉斗, recommended_right: yixiang, recommended_school: 鸣金·虹, two_piece_affix: 最大外功攻击}
-    huanhua: {name: 浣花, recommended_right: lixue, recommended_school: 牵丝·霖, two_piece_affix: 会心率}
-    feisun: {name: 飞隼, recommended_right: yingyang, recommended_school: 鸣金·影, two_piece_affix: 会意率}
-    shiyu: {name: 时雨, recommended_right: guiyue, recommended_school: 裂石·威, two_piece_affix: 精准率}
-    duanyue: {name: 断岳, recommended_right: xuanjia, recommended_school: 裂石·钧, two_piece_affix: 最小外功攻击}
-    yanliuchongchong: {name: 烟柳重重, recommended_right: buzhihan, recommended_school: 牵丝·玉, two_piece_affix: 精准率}
-    yangui: {name: 燕归, recommended_right: jiangning, recommended_school: 破竹·风, two_piece_affix: 最小外功攻击}
-    lianxing: {name: 连星, recommended_right: baoyu, recommended_school: 破竹·尘, two_piece_affix: 最小外功攻击}
-    hantian: {name: 撼天, recommended_right: shangyi, recommended_school: 破竹·鸢, two_piece_affix: 最小外功攻击}
-    jifengzhou: {name: 急风骤, recommended_right: lingbubo, recommended_school: 自由, two_piece_affix: 最大外功攻击}
-    caiyun: {name: 裁云, recommended_right: mingke, recommended_school: 牵丝·翊, two_piece_affix: 最小外功攻击}
-    yueshanqing: {name: 岳山倾, recommended_right: yuwuque, recommended_school: 自由, two_piece_affix: 最小外功攻击}
-    qingshang: {name: 倾觞, recommended_right: yingzhan, recommended_school: 破竹·樽, two_piece_affix: 最小外功攻击}
-  right:
-    yixiang: {name: 易相}
-    lixue: {name: 梨雪}
-    yingyang: {name: 鹰扬}
-    guiyue: {name: 桂月}
-    xuanjia: {name: 玄甲}
-    buzhihan: {name: 不知寒}
-    jiangning: {name: 江凝}
-    baoyu: {name: 抱玉}
-    shangyi: {name: 尚义}
-    lingbubo: {name: 凌波步}
-    mingke: {name: 鸣珂}
-    yuwuque: {name: 御无缺}
-    yingzhan: {name: 盈盏}
 base_attrs:
   weapon:
     _attr: 外功攻击
@@ -246,6 +217,100 @@ base_attrs:
       through_level: 110
     - 外功防御
     - 气血最大值
+equipment_sets:
+  left:
+    yudou:
+      name: 玉斗
+      recommended_right: yixiang
+      recommended_school: 鸣金·虹
+      two_piece_affix: 最大外功攻击
+    huanhua:
+      name: 浣花
+      recommended_right: lixue
+      recommended_school: 牵丝·霖
+      two_piece_affix: 会心率
+    feisun:
+      name: 飞隼
+      recommended_right: yingyang
+      recommended_school: 鸣金·影
+      two_piece_affix: 会意率
+    shiyu:
+      name: 时雨
+      recommended_right: guiyue
+      recommended_school: 裂石·威
+      two_piece_affix: 精准率
+    duanyue:
+      name: 断岳
+      recommended_right: xuanjia
+      recommended_school: 裂石·钧
+      two_piece_affix: 最小外功攻击
+    yanliuchongchong:
+      name: 烟柳重重
+      recommended_right: buzhihan
+      recommended_school: 牵丝·玉
+      two_piece_affix: 精准率
+    yangui:
+      name: 燕归
+      recommended_right: jiangning
+      recommended_school: 破竹·风
+      two_piece_affix: 最小外功攻击
+    lianxing:
+      name: 连星
+      recommended_right: baoyu
+      recommended_school: 破竹·尘
+      two_piece_affix: 最小外功攻击
+    hantian:
+      name: 撼天
+      recommended_right: shangyi
+      recommended_school: 破竹·鸢
+      two_piece_affix: 最小外功攻击
+    jifengzhou:
+      name: 急风骤
+      recommended_right: lingbubo
+      recommended_school: 自由
+      two_piece_affix: 最大外功攻击
+    caiyun:
+      name: 裁云
+      recommended_right: mingke
+      recommended_school: 牵丝·翊
+      two_piece_affix: 最小外功攻击
+    yueshanqing:
+      name: 岳山倾
+      recommended_right: yuwuque
+      recommended_school: 自由
+      two_piece_affix: 最小外功攻击
+    qingshang:
+      name: 倾觞
+      recommended_right: yingzhan
+      recommended_school: 破竹·樽
+      two_piece_affix: 最小外功攻击
+  right:
+    yixiang:
+      name: 易相
+    lixue:
+      name: 梨雪
+    yingyang:
+      name: 鹰扬
+    guiyue:
+      name: 桂月
+    xuanjia:
+      name: 玄甲
+    buzhihan:
+      name: 不知寒
+    jiangning:
+      name: 江凝
+    baoyu:
+      name: 抱玉
+    shangyi:
+      name: 尚义
+    lingbubo:
+      name: 凌波步
+    mingke:
+      name: 鸣珂
+    yuwuque:
+      name: 御无缺
+    yingzhan:
+      name: 盈盏
 equipment_name_series:
   output:
     110: 流星

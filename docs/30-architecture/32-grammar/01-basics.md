@@ -108,7 +108,7 @@ DSL 支持 6 种值类型，变量的实际类型由赋值来源决定（动态�
 | 上下文 | null 行为 | 示例 |
 |---|---|---|
 | 条件判断 | falsy | `if $null_var` → 不进入 |
-| `is_empty` | 视为空 | `$null_var is_empty` → true |
+| `is_empty` | 视为空（数字 0 与 false 不算空） | `$null_var is_empty` → true |
 | 算术运算 | 视为 0（int） | `null + 5` → 5 |
 | `concat` | 视为空字符串 | `concat("a", null, "b")` → "ab" |
 | `equals` 比较 | 两侧 null 相等 | `null equals null` → true |

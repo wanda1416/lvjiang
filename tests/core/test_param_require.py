@@ -103,11 +103,35 @@ class TestStaticValidation:
         "$skip_online_role != true",
         "$skip_online_role in [true]",
     ])
-    def test_rejects_equality_against_bool_with_a_working_hint(self, expression):
-        """DSL 的 == 对布尔恒假，写成 == false 会静默永不成立，必须当场拒绝。"""
-        with pytest.raises(RequireError, match="相等比较对布尔恒假"):
+    def test_accepts_boolean_equality(self, expression):
+        """布尔相等已按类型判等，== false 与 not $flag 等价，不再需要拦。"""
+        validate_requires([
+            *_DEFS, {"name": "probe", "type": "text", "require": expression}])
+
+    @pytest.mark.parametrize("expression", [
+        "$skip_online_role == 1",
+        "$skip_online_role == 0",
+        '$skip_online_role == "true"',
+    ])
+    def test_rejects_non_bool_comparison_against_bool(self, expression):
+        """布尔只与布尔相等，拿数字或字符串比一定不成立，属于写错。"""
+        with pytest.raises(RequireError, match="只能用 true / false"):
             validate_requires([
                 *_DEFS, {"name": "probe", "type": "text", "require": expression}])
+
+    def test_boolean_equality_and_truthiness_agree(self):
+        """`== false` 与 `not $flag` 必须给出同一个可见性结果。"""
+        for expression in ("not $skip_online_role", "$skip_online_role == false"):
+            defs = [
+                {"name": "skip_online_role", "type": "bool", "default": True},
+                {"name": "wait", "type": "number", "default": 0,
+                 "require": expression},
+            ]
+            validate_requires(defs)
+            assert visible_parameter_names(defs, {"skip_online_role": False}) == {
+                "skip_online_role", "wait"}
+            assert visible_parameter_names(defs, {"skip_online_role": True}) == {
+                "skip_online_role"}
 
     def test_rejects_value_outside_select_options(self):
         with pytest.raises(RequireError, match="不在"):

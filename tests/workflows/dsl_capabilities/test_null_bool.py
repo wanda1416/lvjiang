@@ -63,6 +63,25 @@ class TestConditions:
         v = run(IF_ELSE_TPL % ('eval $x = null\neval $y = null', '$x equals $y'))
         assert v["r"] == 1.0
 
+    def test_in_and_contains_only_reject_null(self):
+        """0 / false / 空串是合法值，不能被当成「不匹配」。
+
+        守卫曾写成 ``if left else False``，于是 ``$zero in [0, 1]`` 为假——
+        与 ``!=`` 恒真同一类错误：把「假值」当成「比不上」。
+        """
+        for expr, variables, expected in (
+            ("$zero in [0, 1]", {"zero": 0}, 1.0),
+            ("$flag in [false]", {"flag": False}, 1.0),
+            ("$empty in [\"\"]", {"empty": ""}, 1.0),
+            ("$one in [0, 1]", {"one": 1}, 1.0),
+            ("$two in [0, 1]", {"two": 2}, 0.0),
+            ("$none in [0, 1]", {"none": None}, 0.0),
+            ("$zero contains \"0\"", {"zero": 0}, 1.0),
+            ("$none contains \"x\"", {"none": None}, 0.0),
+        ):
+            v = run(IF_ELSE_TPL % ('', expr), variables)
+            assert v["r"] == expected, expr
+
     def test_field_access_truthy(self):
         """if $dict.field → 存在且非空为 True"""
         v = run(IF_ELSE_TPL % ('', '$d.a'), {"d": {"a": "hello"}})

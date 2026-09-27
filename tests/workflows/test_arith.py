@@ -108,12 +108,34 @@ class TestArithEval:
         ("$a != $b", {"a": "1.0", "b": 1}, False),
         ("$a == $b", {"a": "001", "b": "1"}, False),
         ("$a != $b", {"a": "001", "b": "1"}, True),
-        ("$a == $b", {"a": None, "b": None}, False),
-        ("$a != $b", {"a": None, "b": None}, True),
+        # null 只与 null 相等；此前 to_number 拒绝 None 使两者落到"不可比"，
+        # == 恒假、!= 恒真，if $x != null 永远成立。
+        ("$a == $b", {"a": None, "b": None}, True),
+        ("$a != $b", {"a": None, "b": None}, False),
+        ("$a == null", {"a": None}, True),
+        ("$a != null", {"a": None}, False),
+        ("$a != null", {"a": "abc"}, True),
+        ("$a != null", {"a": 0}, True),
+        ("$a == null", {"a": 0}, False),
+        ("$a == null", {"a": ""}, False),
+        # 布尔同理：to_number 刻意拒绝 bool（bool ⊂ int），必须先判掉
+        ("$a == true", {"a": True}, True),
+        ("$a == false", {"a": False}, True),
+        ("$a != true", {"a": True}, False),
+        ("$a != false", {"a": False}, False),
+        ("$a == false", {"a": True}, False),
+        ("$a == $b", {"a": True, "b": True}, True),
+        ("$a != $b", {"a": True, "b": False}, True),
+        # 布尔不是数字，也不是它的字面文本
+        ("$a == 1", {"a": True}, False),
+        ("$a == 0", {"a": False}, False),
+        ("$a == null", {"a": False}, False),
+        ('$a == "true"', {"a": True}, False),
     ])
-    def test_equality_supports_text_without_changing_numeric_or_null_semantics(
+    def test_equality_compares_by_type(
         self, expression, variables, expected,
     ):
+        """相等比较按类型：字符串精确、布尔只比布尔、null 只比 null、其余按数字容差。"""
         engine = make_engine()
         engine.variables = variables
         prog = parse_text(f'if {expression}\n    log "matched"\nend\n')

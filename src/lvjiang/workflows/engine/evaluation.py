@@ -49,11 +49,27 @@ class _EvalMixin:
         return "" if val is None else str(val)
 
     def _equal_numeric_or_text(self, left, right) -> bool:
-        """== / !=：两个字符串精确比较，其余可转数字时用容差比较。"""
+        """== / !=：按类型判等。
+
+        - 两个字符串：精确比较
+        - 布尔：只与布尔相等（``$flag == 1`` 为假）
+        - null：只与 null 相等（``null == 0`` / ``null == ""`` 均为假）
+        - 其余可转数字时用容差比较（OCR 读出的 "3" 与数字 3 视为相等）
+        - 类型不可比：不相等
+
+        布尔和 null 必须在数值分支**之前**判掉：``to_number`` 刻意拒绝布尔
+        （bool ⊂ int），null 也没有数值形态，两者落到数值分支都会被当成
+        「不可比」→ 恒假，再经 ``!=`` 的取反变成恒真。此前
+        ``$flag == false`` 恒假、``$x != null`` 恒真就是这么来的。
+        """
         left_value = self._resolve(left)
         right_value = self._resolve(right)
         if isinstance(left_value, str) and isinstance(right_value, str):
             return left_value == right_value
+        if isinstance(left_value, bool) or isinstance(right_value, bool):
+            return left_value is right_value
+        if left_value is None or right_value is None:
+            return left_value is right_value
         left_number = self._to_number(left_value)
         right_number = self._to_number(right_value)
         if left_number is not None and right_number is not None:
@@ -66,10 +82,11 @@ class _EvalMixin:
             case Contains():
                 left = self._resolve(node.left)
                 right = self._resolve(node.right)
-                return (
-                    self._str_or_empty(right) in self._str_or_empty(left)
-                    if left else False
-                )
+                # 只有 null 谈不上包含关系；0 / false / "" 是合法值，要照常比较，
+                # 否则「假值」会被当成「不匹配」——与 != 恒真同一类错误。
+                if left is None:
+                    return False
+                return self._str_or_empty(right) in self._str_or_empty(left)
             case Equals():
                 left = self._resolve(node.left)
                 right = self._resolve(node.right)
@@ -77,7 +94,10 @@ class _EvalMixin:
             case InList():
                 left = self._resolve(node.left)
                 right = [self._str_or_empty(self._resolve(item)) for item in node.right]
-                return self._str_or_empty(left) in right if left else False
+                # 同上：null 不属于任何列表，但 $zero in [0, 1] 必须成立。
+                if left is None:
+                    return False
+                return self._str_or_empty(left) in right
             case IsEmpty():
                 left = self._resolve(node.expr)
                 return not left or (isinstance(left, str) and left.strip() == "")

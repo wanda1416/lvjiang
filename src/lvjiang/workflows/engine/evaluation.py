@@ -64,6 +64,10 @@ class _EvalMixin:
         """
         left_value = self._resolve(left)
         right_value = self._resolve(right)
+        return self._equal_values(left_value, right_value)
+
+    def _equal_values(self, left_value, right_value) -> bool:
+        """比较已求值的值，供 ==、!= 和 in 使用同一套规则。"""
         if isinstance(left_value, str) and isinstance(right_value, str):
             return left_value == right_value
         if isinstance(left_value, bool) or isinstance(right_value, bool):
@@ -82,22 +86,22 @@ class _EvalMixin:
             case Contains():
                 left = self._resolve(node.left)
                 right = self._resolve(node.right)
-                # 只有 null 谈不上包含关系；0 / false / "" 是合法值，要照常比较，
-                # 否则「假值」会被当成「不匹配」——与 != 恒真同一类错误。
+                if right is None or (isinstance(right, str) and not right.strip()):
+                    raise WorkflowUserError("contains 右侧不能为空，请提供非空查找文本")
+                # 左侧 null 没有可供查找的文本；0 / false / "" 仍是合法左值。
                 if left is None:
                     return False
-                return self._str_or_empty(right) in self._str_or_empty(left)
+                return str(right) in self._str_or_empty(left)
             case Equals():
                 left = self._resolve(node.left)
                 right = self._resolve(node.right)
                 return self._str_or_empty(left) == self._str_or_empty(right)
             case InList():
                 left = self._resolve(node.left)
-                right = [self._str_or_empty(self._resolve(item)) for item in node.right]
-                # 同上：null 不属于任何列表，但 $zero in [0, 1] 必须成立。
-                if left is None:
-                    return False
-                return self._str_or_empty(left) in right
+                return any(
+                    self._equal_values(left, self._resolve(item))
+                    for item in node.right
+                )
             case IsEmpty():
                 return self._is_empty(self._resolve(node.expr))
             case GreaterThan():

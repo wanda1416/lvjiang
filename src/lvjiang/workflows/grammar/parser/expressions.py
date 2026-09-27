@@ -322,6 +322,11 @@ class _ExprMixin:
 
     def contains_op(self, items):
         left, right = items
+        if isinstance(right, Literal) and (
+            right.value is None
+            or isinstance(right.value, str) and not right.value.strip()
+        ):
+            raise ValueError("contains 右侧不能为空，请提供非空查找文本")
         return Contains(left=left, right=right, line_no=self._line(items))
 
     def equals_op(self, items):

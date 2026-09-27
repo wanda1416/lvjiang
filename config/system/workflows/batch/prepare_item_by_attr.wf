@@ -1,3 +1,4 @@
+#% batch_unit_prepare: true
 #% parameters:
 #%   - name: profile_key
 #%     label: 选择数据模型

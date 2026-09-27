@@ -157,6 +157,80 @@ def test_main_tab_filters_attribute_units_without_changing_user_mode(
     assert tab._get_enabled_usernames() == ["u1"]
 
 
+def test_start_is_blocked_when_prepare_wf_cannot_select_a_unit_user(
+    monkeypatch, qtbot,
+):
+    """按属性调度、准备 wf 不会回传 username 时，开始前就要拦住。
+
+    以前要等跑起来才抛「未返回本单元可执行的用户名」，而且是每个单元各抛一次、
+    全部被丢弃，整批空跑还动过客户端。
+    """
+    class Host(QObject):
+        automation_state_changed = pyqtSignal(str)
+        is_running = False
+
+        class _Config:
+            class hotkeys:
+                start = "F9"
+                pause = "F10"
+
+        _user_config = _Config()
+        _user_manager = None
+        logs: list[str] = []
+
+        @staticmethod
+        def _selected_run_env():
+            return None
+
+        def append_log(self, text):
+            self.logs.append(text)
+
+        def run_batch(self, _usernames, _scripts):
+            raise AssertionError("不该走到启动批量")
+
+    users = {"u1": User("u1", attributes={"account": "a"})}
+
+    class Manager:
+        def get_user(self, name):
+            return users[name]
+
+    host = Host()
+    host._user_manager = Manager()
+    config = BatchConfig(configs={
+        "group": BatchConfigItem(
+            name="group", usernames=["u1"], selected_usernames=["u1"],
+            execution_unit_key="account", selected_units={"account": ["a"]},
+            task_ids=["t1"], selected_task_ids=["t1"],
+            workflows=BatchWorkflows(prepare_item="batch/prepare_item.wf"),
+        ),
+    }, active_config="group")
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_tab.load_batch_config", lambda: config)
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_tab.save_batch_config", lambda _cfg: None)
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.list_exposed_scripts",
+        lambda _env=None: [{"id": "t1", "name": "任务一", "batchable": True,
+                            "scope": "daily", "path": "t1.wf"}])
+    tab = BatchTab(host)
+    qtbot.addWidget(tab)
+
+    warnings = []
+    monkeypatch.setattr(
+        "PyQt6.QtWidgets.QMessageBox.warning",
+        lambda *args, **kwargs: warnings.append(args[2]))
+    tab._start_batch()
+    assert len(warnings) == 1
+    assert "batch/prepare_item.wf" in warnings[0]
+    assert "batch_unit_prepare" in warnings[0]
+
+    # 换成会回传 username 的准备 wf 就不再拦。
+    config.configs["group"].workflows = BatchWorkflows(
+        prepare_item="batch/prepare_item_by_attr.wf")
+    with pytest.raises(AssertionError, match="不该走到启动批量"):
+        tab._start_batch()
+
+
 def test_attribute_prepare_selects_real_user_for_task_and_session(
     tmp_path, monkeypatch, qapp,
 ):

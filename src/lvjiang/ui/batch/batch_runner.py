@@ -755,7 +755,10 @@ class BatchWorker(QThread):
                     username = prepared.username
                     if username not in eligible:
                         raise ValueError(
-                            f"条目准备未返回本单元可执行的用户名: {username!r}")
+                            f"条目准备工作流 {self._config.workflows.prepare_item!r} "
+                            f"未返回本单元可执行的用户名（得到 {username!r}）：属性"
+                            f"单元必须由它选定成员并回传 username，可执行成员为 "
+                            f"{eligible}")
                     deferrals[unit] = 0
                     entry["username"] = username
                     report.set_entry_username(username)

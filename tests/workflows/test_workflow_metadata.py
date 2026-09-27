@@ -69,6 +69,13 @@ def test_batch_check_must_be_a_subcall_name(value):
         parse_metadata(f"#% batch_check: {value!r}\n")
 
 
+def test_batch_unit_prepare_must_be_bool():
+    assert parse_metadata("#% batch_unit_prepare: true\n")[
+        "batch_unit_prepare"] is True
+    with pytest.raises(WorkflowMetadataError, match="batch_unit_prepare"):
+        parse_metadata("#% batch_unit_prepare: 'yes'\n")
+
+
 def test_runnable_defaults_to_false():
     """未声明 runnable / batchable 的 .wf 不注册为脚本"""
     m = parse_metadata("#% name: 内部过程库\n")

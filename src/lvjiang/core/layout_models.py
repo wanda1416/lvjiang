@@ -74,6 +74,7 @@ class TemplateBinding:
     min_score: float = 0.8
     record_w: int = 0
     record_h: int = 0
+    allow_inverted: bool = False
 
     def __post_init__(self):
         name = self.name.strip()
@@ -94,12 +95,15 @@ class TemplateBinding:
         object.__setattr__(self, "min_score", score)
         object.__setattr__(self, "record_w", record_w)
         object.__setattr__(self, "record_h", record_h)
+        object.__setattr__(self, "allow_inverted", bool(self.allow_inverted))
 
     def to_dict(self) -> dict:
         result = {"name": self.name, "min_score": self.min_score}
         if self.record_w > 0:
             result["record_w"] = self.record_w
             result["record_h"] = self.record_h
+        if self.allow_inverted:
+            result["allow_inverted"] = True
         return result
 
     @staticmethod
@@ -113,6 +117,7 @@ class TemplateBinding:
             min_score=value.get("min_score", 0.8),
             record_w=value.get("record_w", 0),
             record_h=value.get("record_h", 0),
+            allow_inverted=value.get("allow_inverted", False),
         )
 
 

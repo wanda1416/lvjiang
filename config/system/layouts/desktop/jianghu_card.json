@@ -18,7 +18,8 @@
         "name": "desktop/jianghu_card/refresh",
         "min_score": 0.8,
         "record_w": 542,
-        "record_h": 250
+        "record_h": 250,
+        "allow_inverted": true
       }
     },
     {

@@ -28,6 +28,7 @@ from ..grammar import (
 from ..runtime_layout import (
     enabled_regions,
     require_enabled,
+    resolve_subscene_instance,
     resolve_subscene_region,
     resolve_subscene_target_scene,
 )
@@ -186,8 +187,11 @@ class _DataOpsMixin:
                 raise WorkflowUserError(
                     f"区域 [{target_scene}].[{entity}] 未绑定模板")
             try:
+                instance = resolve_subscene_instance(
+                    self._layout, scene, reference)
                 self.variables[var_name] = workflow.match_region_templates(
-                    [region], min_score=min_conf, scene_key=target_scene)
+                    [region], min_score=min_conf, scene_key=target_scene,
+                    scale_canvas_ratio=instance.w_ratio)
             except ValueError as exc:
                 raise WorkflowUserError(str(exc)) from exc
             self._coord_meta[var_name] = {entity: region}
@@ -728,12 +732,13 @@ class _DataOpsMixin:
         # 执行搜索：by image → 模板定位；其余 → OCR 文字搜索
         if match_mode == "image":
             (match_target, binding_score,
-             record_w, record_h) = self._resolve_find_image_target(
+             record_w, record_h, allow_inverted) = self._resolve_find_image_target(
                 by_clause.target)
             result = self._ensure_workflow().find_image_in_region(
                 match_target, search_region,
                 min_score=binding_score if min_conf is None else min_conf,
                 record_w=record_w, record_h=record_h,
+                allow_inverted=allow_inverted,
             )
         else:
             match_target = self._resolve(by_clause.target)
@@ -746,10 +751,10 @@ class _DataOpsMixin:
 
     def _resolve_find_image_target(
         self, target,
-    ) -> tuple[str, float | None, int, int]:
+    ) -> tuple[str, float | None, int, int, bool]:
         """解析 find 模板来源；Region 即便 disabled 也可作为纯模板载体。"""
         if not isinstance(target, EntityRef):
-            return str(self._resolve(target)), None, 0, 0
+            return str(self._resolve(target)), None, 0, 0, False
         scene = target.scene
         key = target.entity
         region = next(
@@ -766,4 +771,5 @@ class _DataOpsMixin:
         return (
             region.template.name, region.template.min_score,
             region.template.record_w, region.template.record_h,
+            region.template.allow_inverted,
         )

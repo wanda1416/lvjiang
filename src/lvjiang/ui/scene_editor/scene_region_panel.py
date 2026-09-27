@@ -159,6 +159,12 @@ class RegionPanelMixin:
                        self._btn_test_template, self._btn_unbind_template):
             apply_button_style(button, variant="neutral")
         layout.addLayout(template_row)
+        self._template_allow_inverted = QCheckBox(tr("兼容反色图标"))
+        self._template_allow_inverted.setToolTip(
+            tr("同一图标在深色和浅色背景下颜色反转时，同时尝试反色匹配"))
+        self._template_allow_inverted.toggled.connect(
+            self._on_template_inverted_changed)
+        layout.addWidget(self._template_allow_inverted)
         self._refresh_template_controls()
         return panel
 
@@ -363,6 +369,11 @@ class RegionPanelMixin:
         self._template_score.setValue(binding.min_score if binding else 0.8)
         self._template_score.blockSignals(False)
         self._template_score.setEnabled(editable and binding is not None)
+        self._template_allow_inverted.blockSignals(True)
+        self._template_allow_inverted.setChecked(
+            binding.allow_inverted if binding else False)
+        self._template_allow_inverted.blockSignals(False)
+        self._template_allow_inverted.setEnabled(editable and binding is not None)
         self._btn_capture_template.setEnabled(editable)
         self._btn_crop_template.setEnabled(editable)
         self._btn_test_template.setEnabled(binding is not None)
@@ -414,7 +425,19 @@ class RegionPanelMixin:
         from ...core.layout_models import TemplateBinding
         self._canvas.set_selected_template(TemplateBinding(
             region.template.name, self._template_score.value(),
-            region.template.record_w, region.template.record_h))
+            region.template.record_w, region.template.record_h,
+            region.template.allow_inverted))
+        self._refresh_template_controls()
+
+    def _on_template_inverted_changed(self, checked: bool):
+        region = self._canvas.selected_region()
+        if region is None or region.template is None:
+            return
+        from ...core.layout_models import TemplateBinding
+        binding = region.template
+        self._canvas.set_selected_template(TemplateBinding(
+            binding.name, binding.min_score, binding.record_w,
+            binding.record_h, checked))
         self._refresh_template_controls()
 
     def _on_edit_region_from_table(self, row, col):

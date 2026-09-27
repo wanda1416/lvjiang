@@ -487,8 +487,8 @@ def test_daily_jianghu_uses_refresh_icon_for_completion_and_one_rescan():
     assert 'return {"status": "exhausted"' in refresh_proc
 
     for platform, record_size in (
-        ("android", (2800, 1260)),
-        ("desktop", (1936, 1088)),
+        ("android", (766, 319)),
+        ("desktop", (542, 250)),
     ):
         layout_path = SYSTEM_CONFIG_DIR / "layouts" / platform / "jianghu_card.json"
         layout = json.loads(layout_path.read_text(encoding="utf-8"))

@@ -166,6 +166,11 @@ class TemplateBinding:
 - **匹配时**：`resolution_scale(canvas_w, record_w) = canvas_w / record_w`
 - **校验**：`record_w` 与 `record_h` **必须同为正数或同为 0**（`__post_init__` L91），半设是配置错误。
 
+子场景的 `crop_canvas` 是它在录制截图中的画布，模板记录这块子画布的像素尺寸。
+运行时先将子 Region 投影到父画布确定搜索位置，再以该引用实例的实际像素宽度
+计算模板缩放；普通场景仍以布局主画布宽度计算。不能把子模板的 `record_w`
+写成整张截图或父画布宽度。
+
 `record_w = 0` 意味着**未记录录制尺寸**，`resolution_scale` 退化为 `1.0`。这时跨分辨率必挂，只在**同一分辨率**下工作。手写 JSON 布局时要补这个字段，或者用编辑器重录。
 
 ---

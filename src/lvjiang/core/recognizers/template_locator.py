@@ -138,6 +138,7 @@ class Located:
     h: int
     score: float      # 0–1
     scale: float      # 命中时用的缩放比例
+    inverted: bool = False
 
 
 class TemplateStore:
@@ -240,6 +241,8 @@ def locate(
     x1: int, y1: int, x2: int, y2: int,
     scales: list[float] | tuple[float, ...] = (1.0,),
     min_score: float = DEFAULT_MIN_SCORE,
+    *,
+    allow_inverted: bool = False,
 ) -> Located | None:
     """在整帧的 [x1,x2]×[y1,y2]（像素闭区间）里按给定尺度做模板匹配，返回最佳命中或 None
 
@@ -265,15 +268,20 @@ def locate(
             continue
         t = tpl.gray if (tw == tpl.w and th == tpl.h) else cv2.resize(
             tpl.gray, (tw, th), interpolation=cv2.INTER_AREA if s < 1 else cv2.INTER_LINEAR)
-        res = cv2.matchTemplate(region, t, cv2.TM_CCOEFF_NORMED)
-        _min_v, max_v, _min_loc, max_loc = cv2.minMaxLoc(res)
-        score = max(float(max_v), 0.0)
-        if best is None or score > best.score:
-            best = Located(
-                cx=x1 + max_loc[0] + (tw - 1) / 2.0,
-                cy=y1 + max_loc[1] + (th - 1) / 2.0,
-                w=tw, h=th, score=score, scale=float(s),
-            )
+        candidates = [(False, t)]
+        if allow_inverted:
+            candidates.append((True, 255 - t))
+        for inverted, candidate in candidates:
+            res = cv2.matchTemplate(region, candidate, cv2.TM_CCOEFF_NORMED)
+            _min_v, max_v, _min_loc, max_loc = cv2.minMaxLoc(res)
+            score = max(float(max_v), 0.0)
+            if best is None or score > best.score:
+                best = Located(
+                    cx=x1 + max_loc[0] + (tw - 1) / 2.0,
+                    cy=y1 + max_loc[1] + (th - 1) / 2.0,
+                    w=tw, h=th, score=score, scale=float(s),
+                    inverted=inverted,
+                )
     if best is None or best.score < min_score:
         if best is not None:
             logger.debug(f"模板 {tpl.name} 最佳分 {best.score:.3f} < {min_score}（scale {best.scale:.2f}）")
@@ -286,6 +294,8 @@ def search_box(
     tpl: Template,
     canvas,
     region,
+    *,
+    scale_canvas_ratio: float = 1.0,
 ) -> tuple[int, int, int, int, float]:
     """Region 对应的搜索区（像素闭区间）与模板缩放比例。
 
@@ -299,7 +309,10 @@ def search_box(
     canvas_y = canvas.y_ratio * h
     canvas_w = canvas.w_ratio * w
     canvas_h = canvas.h_ratio * h
-    scale = resolution_scale(int(round(canvas_w)), tpl.record_w)
+    # 子场景 Region 的坐标已经投影到父画布，但模板录制尺寸属于子画布。
+    # 仅缩放基准使用引用实例宽度；搜索区域仍按父画布坐标计算。
+    scale = resolution_scale(
+        int(round(canvas_w * scale_canvas_ratio)), tpl.record_w)
     x1 = int(round(canvas_x + region.x_ratio * canvas_w))
     y1 = int(round(canvas_y + region.y_ratio * canvas_h))
     x2 = int(round(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w)) - 1
@@ -321,12 +334,18 @@ def locate_in_region(
     canvas,
     region,
     min_score: float = DEFAULT_MIN_SCORE,
+    *,
+    scale_canvas_ratio: float = 1.0,
+    allow_inverted: bool = False,
 ) -> Located | None:
     """在布局 Region 内定位模板：模板按录制/当前画布宽精确缩放，搜索区为
     Region（不足以容下模板 + 每边 ``SEARCH_SLACK_PX`` 时按需外扩）。"""
-    x1, y1, x2, y2, scale = search_box(frame_bgr.shape, tpl, canvas, region)
+    x1, y1, x2, y2, scale = search_box(
+        frame_bgr.shape, tpl, canvas, region,
+        scale_canvas_ratio=scale_canvas_ratio)
     return locate(
         frame_bgr, tpl, x1, y1, x2, y2, scales=(scale,), min_score=min_score,
+        allow_inverted=allow_inverted,
     )
 
 

@@ -629,6 +629,7 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         min_score: float | None = None,
         record_w: int = 0,
         record_h: int = 0,
+        allow_inverted: bool = False,
     ) -> FoundRegion | str:
         """在指定区域或全画布做模板定位，返回命中区域（画布归一化）或 ""
 
@@ -672,6 +673,7 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         hit = locate(
             img, tpl, x1, y1, x2, y2, scales=(scale,),
             min_score=DEFAULT_MIN_SCORE if min_score is None else float(min_score),
+            allow_inverted=allow_inverted,
         )
         if hit is None:
             logger.debug(f"find: 模板 {template_name} 未命中")
@@ -695,6 +697,7 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         min_score: float | None = None,
         *,
         scene_key: str = "",
+        scale_canvas_ratio: float = 1.0,
     ) -> str:
         """按顺序匹配各 Region 的布局模板，返回首个命中的 key 或空串。
 
@@ -734,11 +737,14 @@ class _RecognitionMixin(CaptureSnapshotMixin):
             tpl = with_record_size(
                 tpl, binding.record_w, binding.record_h)
             threshold = binding.min_score if min_score is None else float(min_score)
-            hit = locate_in_region(img, tpl, canvas, region, threshold)
+            hit = locate_in_region(
+                img, tpl, canvas, region, threshold,
+                scale_canvas_ratio=scale_canvas_ratio,
+                allow_inverted=binding.allow_inverted)
             if hit is not None:
                 logger.info(
                     f"scan by image 命中: scene={scene_key} region={region.key} "
                     f"template={binding.name} score={hit.score:.3f} "
-                    f"scale={hit.scale:.2f}")
+                    f"scale={hit.scale:.2f} inverted={hit.inverted}")
                 return region.key
         return ""

@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 import pytest
 
-from lvjiang.core.layout_models import FoundRegion, Region, TemplateBinding
+from lvjiang.core.layout_models import FoundRegion, Region, SubsceneRef, TemplateBinding
 from lvjiang.core.recognizers import template_locator as tl
 from lvjiang.workflows.engine.signals import WorkflowUserError
 from lvjiang.workflows.grammar import Find, parse_text
@@ -291,6 +291,20 @@ def test_engine_find_image_uses_disabled_region_template_binding(synthetic_store
     assert hit.text == "ico"
 
 
+def test_find_image_honors_binding_inverted_mode(synthetic_store):
+    frame = _frame_with_icon(255 - synthetic_store, at=(300, 120))
+    eng = _engine_with(frame)
+    eng._layout.get_scene_regions.return_value = [
+        Region("icon", 0, 0, 0, 0, disabled=True,
+               template=TemplateBinding("ico", 0.8, 640, 360,
+                                        allow_inverted=True)),
+    ]
+
+    hit = _run(eng, "find as $hit by image [s].[icon]\n")["hit"]
+
+    assert isinstance(hit, FoundRegion)
+
+
 def test_engine_find_region_binding_uses_layout_record_size(
     tmp_path, monkeypatch,
 ):
@@ -412,6 +426,35 @@ def test_scan_by_image_returns_bound_region_key(synthetic_store):
     assert values["hit"] == "right"
     assert eng._coord_meta["hit"] == {"wrong": regions[0], "right": regions[1]}
     eng._capture.capture.assert_called_once()
+
+
+def test_subscene_scan_scales_from_each_instance_canvas(synthetic_store):
+    """子场景模板的录制宽度属于子画布，父画布只决定投影位置。"""
+    child = Region(
+        "refresh", 0.5, 0.25, 0.25, 0.25,
+        template=TemplateBinding("ico", 0.8, 160, 160, allow_inverted=True),
+    )
+    instances = [
+        SubsceneRef("card_1", 0.25, 0.0, 0.25, 160 / 360),
+        SubsceneRef("card_2", 0.5, 0.0, 0.3, 192 / 360),
+    ]
+    for instance, icon_size, left, top, inverted in (
+        (instances[0], 40, 240, 40, False),
+        (instances[1], 48, 416, 48, True),
+    ):
+        icon = cv2.resize(synthetic_store, (icon_size, icon_size))
+        if inverted:
+            icon = 255 - icon
+        frame = _frame_with_icon(icon, at=(left, top), size=(640, 360))
+        eng = _engine_with(frame)
+        eng._layout.get_scene_regions.return_value = [child]
+        eng._layout.get_scene_subscene_refs.return_value = instances
+
+        result = _run(
+            eng, f"scan [activity_jianghu].[{instance.key}].[refresh] "
+            "as $hit by image\n")
+
+        assert result["hit"] == "refresh"
 
 
 def test_scan_by_image_requires_binding_for_explicit_region(synthetic_store):

@@ -39,12 +39,7 @@ def resolve_subscene_entity(layout, parent_scene: str, reference_key: str,
     from ..core.layout_models import Panel, Point, Region
 
     target_scene = resolve_subscene_target_scene(parent_scene, reference_key)
-    instances = layout.get_scene_subscene_refs(parent_scene)
-    instance = next((r for r in instances if r.key == reference_key), None)
-    if instance is None:
-        raise WorkflowUserError(
-            f"场景 {parent_scene} 的子场景引用未绑定坐标: {reference_key}")
-    require_enabled(instance, parent_scene, "subscene_ref")
+    instance = resolve_subscene_instance(layout, parent_scene, reference_key)
     child = next((r for r in layout.get_scene_regions(target_scene)
                   if r.key == entity_key), None)
     if child is not None:
@@ -85,6 +80,18 @@ def resolve_subscene_entity(layout, parent_scene: str, reference_key: str,
         )
     raise WorkflowUserError(
         f"子场景 {target_scene} 的实体未绑定坐标: {entity_key}")
+
+
+def resolve_subscene_instance(layout, parent_scene: str, reference_key: str):
+    """取得父场景中的子画布实例，供坐标投影和模板缩放共用。"""
+    resolve_subscene_target_scene(parent_scene, reference_key)
+    instance = next((r for r in layout.get_scene_subscene_refs(parent_scene)
+                     if r.key == reference_key), None)
+    if instance is None:
+        raise WorkflowUserError(
+            f"场景 {parent_scene} 的子场景引用未绑定坐标: {reference_key}")
+    require_enabled(instance, parent_scene, "subscene_ref")
+    return instance
 
 
 def resolve_subscene_region(layout, parent_scene: str, reference_key: str,

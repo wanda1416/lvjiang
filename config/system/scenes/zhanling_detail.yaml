@@ -1,6 +1,13 @@
 content_version: 1
 key: zhanling_detail
 name: 战令
+views:
+- key: base
+  name: 任务
+- key: open
+  name: 开启
+- key: reward
+  name: 奖励
 regions:
 - key: back
   name: 返回

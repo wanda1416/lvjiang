@@ -3,8 +3,8 @@ revision = 3
 requires-python = ">=3.11, <3.13"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform == 'darwin'",
-    "python_full_version < '3.12' and sys_platform == 'darwin'",
     "python_full_version >= '3.12' and sys_platform != 'darwin'",
+    "python_full_version < '3.12' and sys_platform == 'darwin'",
     "python_full_version < '3.12' and sys_platform != 'darwin'",
 ]
 
@@ -270,7 +270,7 @@ wheels = [
 
 [[package]]
 name = "lvjiang"
-version = "0.13.3"
+version = "0.13.4"
 source = { editable = "." }
 dependencies = [
     { name = "av" },

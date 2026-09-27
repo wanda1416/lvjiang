@@ -392,7 +392,6 @@ class BatchConfigDialog(QDialog):
                 username for username in draft.usernames if username not in old_users
             ]
             draft.execution_unit_key = current.execution_unit_key
-            draft.visible_units = current.visible_units
             draft.selected_units = current.selected_units
             # 轮数和生命周期参数由批量主页面维护，本对话框不回写打开时快照。
             draft.rounds = current.rounds

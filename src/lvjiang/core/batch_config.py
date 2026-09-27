@@ -58,9 +58,8 @@ class BatchConfigItem:
     usernames: list[str] = field(default_factory=list)
     selected_task_ids: list[str] = field(default_factory=list)
     selected_usernames: list[str] = field(default_factory=list)
-    # 旧用户字段保持原样；属性单元另存可见范围和主页面勾选范围。
+    # 旧用户字段保持原样；属性单元只保存主页面的勾选范围。
     execution_unit_key: str = "user"
-    visible_units: dict[str, list[str]] = field(default_factory=dict)
     selected_units: dict[str, list[str]] = field(default_factory=dict)
     rounds: int = 1
     profile_sort_key: str = ""
@@ -89,13 +88,12 @@ class BatchConfigItem:
         ]
         if not isinstance(self.execution_unit_key, str) or not self.execution_unit_key:
             self.execution_unit_key = "user"
-        for field_name in ("visible_units", "selected_units"):
-            value = getattr(self, field_name)
-            setattr(self, field_name, {
-                key: _unique_strings(items)
-                for key, items in value.items()
-                if isinstance(key, str) and key and isinstance(items, list)
-            } if isinstance(value, dict) else {})
+        value = self.selected_units
+        self.selected_units = {
+            key: _unique_strings(items)
+            for key, items in value.items()
+            if isinstance(key, str) and key and isinstance(items, list)
+        } if isinstance(value, dict) else {}
         if not isinstance(self.rounds, int) or isinstance(self.rounds, bool):
             self.rounds = 1
         self.rounds = min(999, max(1, self.rounds))
@@ -117,7 +115,6 @@ class BatchConfigItem:
             "selected_task_ids": list(self.selected_task_ids),
             "selected_usernames": list(self.selected_usernames),
             "execution_unit_key": self.execution_unit_key,
-            "visible_units": {key: list(value) for key, value in self.visible_units.items()},
             "selected_units": {key: list(value) for key, value in self.selected_units.items()},
             "rounds": self.rounds,
             "profile_sort_key": self.profile_sort_key,
@@ -145,7 +142,6 @@ class BatchConfigItem:
             selected_task_ids=_unique_strings(source.get("selected_task_ids")),
             selected_usernames=_unique_strings(source.get("selected_usernames")),
             execution_unit_key=source.get("execution_unit_key", "user"),
-            visible_units=source.get("visible_units", {}),
             selected_units=source.get("selected_units", {}),
             rounds=source.get("rounds", 1),
             profile_sort_key=source.get("profile_sort_key", ""),

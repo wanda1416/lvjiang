@@ -5,7 +5,6 @@ import pytest
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 
 from lvjiang.core.batch_config import BatchConfig, BatchConfigItem, BatchWorkflows
-from lvjiang.core.batch_units import group_users
 from lvjiang.core.config.users import SessionManager
 from lvjiang.core.user_config import User, save_user_metadata
 from lvjiang.ui.batch.batch_config_dialog import BatchConfigDialog
@@ -34,17 +33,10 @@ def test_old_batch_config_stays_in_user_mode():
     assert item.selected_usernames == ["u2"]
     attribute_item = BatchConfigItem.from_dict("attribute", {
         "execution_unit_key": "account", "selected_units": {"account": ["a"]},
+        "visible_units": {"account": ["stale"]},
     })
     assert attribute_item.selected_units == {"account": ["a"]}
-
-
-def test_attribute_units_include_all_registered_members(tmp_path):
-    save_user_metadata(User("u1", attributes={"account": "a"}), tmp_path)
-    save_user_metadata(User("u2", attributes={"account": "a"}), tmp_path)
-    save_user_metadata(User("u3", attributes={"account": "b"}), tmp_path)
-    assert group_users(["u1", "u2", "u3"], "account", tmp_path) == {
-        "a": ["u1", "u2"], "b": ["u3"],
-    }
+    assert "visible_units" not in attribute_item.to_dict()
 
 
 def test_attribute_worker_members_follow_visible_users(tmp_path, qapp):
@@ -246,7 +238,6 @@ def test_attribute_prepare_selects_real_user_for_task_and_session(
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     config = BatchConfigItem(
         name="attribute", execution_unit_key="account",
-        visible_units={"account": ["a"]},
         selected_units={"account": ["a"]},
         workflows=BatchWorkflows(prepare_item="batch/prepare_item_by_attr.wf"),
     )

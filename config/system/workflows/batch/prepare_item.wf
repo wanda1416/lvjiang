@@ -11,6 +11,7 @@
 #%     default: true
 #%   - name: online_role_max_wait
 #%     label: 最大等待时间（秒）
+#%     require: not $skip_online_role
 #%     type: number
 #%     default: 600
 #%     min: 0

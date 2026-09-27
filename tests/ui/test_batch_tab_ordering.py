@@ -165,6 +165,45 @@ def test_batch_multiline_parameter_uses_full_width_row(monkeypatch, qtbot):
     assert form.getWidgetPosition(edit) == (1, QFormLayout.ItemRole.SpanningRole)
 
 
+def test_batch_dependent_parameter_row_follows_require(monkeypatch, qtbot):
+    """require 不满足时整行隐藏；勾上上游开关立刻出现，值不丢。"""
+    group = BatchConfigItem(
+        name="日常",
+        workflows=BatchWorkflows(prepare_item="batch/example.wf"),
+    )
+    config = BatchConfig({"日常": group}, "日常")
+    _prepare_batch_tab(monkeypatch, config)
+    monkeypatch.setattr(batch_tab, "lifecycle_parameter_definitions", lambda _wf: {
+        "batch_setup": [],
+        "prepare_item": [
+            {"name": "skip_online_role", "type": "bool",
+             "label": "角色在线跳过", "default": True},
+            {"name": "online_role_max_wait", "type": "number",
+             "label": "最大等待时间（秒）", "default": 30, "min": 0, "max": 3600,
+             "require": "not $skip_online_role"},
+        ],
+        "finish_item": [],
+        "batch_teardown": [],
+    })
+
+    tab = BatchTab(_Host())
+    qtbot.addWidget(tab)
+    skip = tab._workflow_param_widgets[("prepare_item", "skip_online_role")]
+    wait = tab._workflow_param_widgets[("prepare_item", "online_role_max_wait")]
+    form = wait.parentWidget().layout()
+    assert isinstance(form, QFormLayout)
+    wait_row = form.getWidgetPosition(wait)[0]
+
+    assert not form.isRowVisible(wait_row)
+    skip.setChecked(False)
+    assert form.isRowVisible(wait_row)
+    # 隐藏不丢值：运行时快照照旧包含该参数
+    skip.setChecked(True)
+    assert not form.isRowVisible(wait_row)
+    assert wait.value() == 30
+    assert group.workflow_params["prepare_item"]["online_role_max_wait"] == 30
+
+
 def test_batch_profile_sort_uses_full_row_and_readable_popup(monkeypatch, qtbot):
     config = BatchConfig({"日常": BatchConfigItem(name="日常")}, "日常")
     long_label = "每周累计获得袅袅之音数量"

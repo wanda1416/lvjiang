@@ -35,7 +35,7 @@ _PARAMETER_TYPES = {"select", "number", "bool", "checkgroup", "text"}
 _PARAMETER_NAME = re.compile(
     r"^[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*$",
 )
-_COMMON_PARAMETER_FIELDS = {"name", "label", "type", "default", "env"}
+_COMMON_PARAMETER_FIELDS = {"name", "label", "type", "default", "env", "require"}
 _TYPE_PARAMETER_FIELDS = {
     "select": {"options"},
     "number": {"min", "max"},
@@ -129,6 +129,14 @@ def _validate_parameter(parameter: Any, index: int) -> dict | None:
         raise _error(f"{path}.label", "必须是字符串")
     if "env" in parameter:
         _validate_env_list(parameter["env"], f"{path}.env")
+    if "require" in parameter:
+        # 这里只校验单条语法；引用的参数是否存在、类型是否可比，要等全部参数
+        # 收齐后由 _validate_requires_across 对账。
+        from ..core.param_require import RequireError, parse_require
+        try:
+            parse_require(parameter["require"])
+        except RequireError as exc:
+            raise _error(f"{path}.require", str(exc)) from exc
 
     param_type = parameter.get("type", "select")
     if not isinstance(param_type, str):
@@ -245,7 +253,22 @@ def _validate_metadata(data: Any) -> dict:
         normalized_parameters.append(item)
     if "parameters" in normalized:
         normalized["parameters"] = normalized_parameters
+    _validate_requires_across(normalized_parameters)
     return normalized
+
+
+def _validate_requires_across(parameters: list[dict]) -> None:
+    """参数间的 ``require`` 引用对账：名字、类型、比较值与循环依赖。
+
+    拼错一个参数名会让控件永远不出现，和 ``env`` 写错环境名一样必须在解析期
+    报出来，而不是等用户发现某个参数“消失了”。
+    """
+    from ..core.param_require import RequireError, validate_requires
+
+    try:
+        validate_requires(parameters)
+    except RequireError as exc:
+        raise _error("parameters.require", str(exc)) from exc
 
 
 def parse_metadata(text: str) -> dict:

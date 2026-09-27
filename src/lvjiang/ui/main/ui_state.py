@@ -115,27 +115,13 @@ class UiStateMixin:
         self._save_displayed_params()
         self._rebuild_param_panel()
 
-    def _save_displayed_params(self):
-        """将当前参数面板的值写入 _displayed_script_id 对应的配置项
+    def _collect_displayed_params(self, parameters: list[dict]) -> dict:
+        """从当前参数面板的控件读出各参数的值。
 
-        仅对 scope=daily 的脚本生效；专用脚本的参数由专属页面管理，
-        日常页禁止读写。
+        写回配置和按 ``require`` 算可见性都读这一份，避免两处各写一套控件遍历
+        而慢慢走偏。
         """
-        sid = getattr(self, '_displayed_script_id', None)
-        # 切到批量 Tab 后参数面板不可见，但里面的控件和值仍然有效；批量启动
-        # 前的兜底同步必须允许从这个隐藏面板收集。脚本 scope 在下方另行校验。
-        if not sid or not self._param_panel:
-            return
-        # 找到对应配置项，临时用 _collect_flow_params 的逻辑从面板搜集值
-        target_cfg = next((c for c in self._workflow_configs if c["id"] == sid), None)
-        if not target_cfg:
-            return
-        # ⚠️ 专用脚本的参数由专属页面管理，日常页禁止读写
-        if target_cfg.get("scope", "daily") != "daily":
-            return
-        if not target_cfg.get("parameters"):
-            return
-        params = {}
+        params: dict = {}
         from PyQt6.QtWidgets import (
             QCheckBox,
             QComboBox,
@@ -143,7 +129,7 @@ class UiStateMixin:
             QSpinBox,
             QWidget,
         )
-        for param_def in target_cfg.get("parameters", []):
+        for param_def in parameters:
             name = param_def["name"]
             # checkgroup：从容器内收集各复选框状态为 dict
             if param_def.get("type") == "checkgroup":
@@ -174,6 +160,29 @@ class UiStateMixin:
             multiline = self._param_panel.findChild(QPlainTextEdit, name)
             if multiline is not None:
                 params[name] = multiline.toPlainText()
+        return params
+
+    def _save_displayed_params(self):
+        """将当前参数面板的值写入 _displayed_script_id 对应的配置项
+
+        仅对 scope=daily 的脚本生效；专用脚本的参数由专属页面管理，
+        日常页禁止读写。
+        """
+        sid = getattr(self, '_displayed_script_id', None)
+        # 切到批量 Tab 后参数面板不可见，但里面的控件和值仍然有效；批量启动
+        # 前的兜底同步必须允许从这个隐藏面板收集。脚本 scope 在下方另行校验。
+        if not sid or not self._param_panel:
+            return
+        # 找到对应配置项，临时用 _collect_flow_params 的逻辑从面板搜集值
+        target_cfg = next((c for c in self._workflow_configs if c["id"] == sid), None)
+        if not target_cfg:
+            return
+        # ⚠️ 专用脚本的参数由专属页面管理，日常页禁止读写
+        if target_cfg.get("scope", "daily") != "daily":
+            return
+        if not target_cfg.get("parameters"):
+            return
+        params = self._collect_displayed_params(target_cfg.get("parameters", []))
         if getattr(self, "_displayed_param_is_user_override", False):
             username = getattr(self, "_displayed_param_username", "")
             if username:
@@ -211,6 +220,7 @@ class UiStateMixin:
         保存，用户改完参数直接启动批量时，批量线程会读到上一次的值。
         """
         self._save_displayed_params()
+        self._refresh_param_visibility()
 
     def _save_daily_config(self):
         """保存日常页脚本选择；参数由 _save_displayed_params 按脚本字段级落盘
@@ -309,10 +319,14 @@ class UiStateMixin:
             independent.setVisible(True)
         if all_user_params is not None:
             all_user_params.setVisible(True)
+        # require 依赖要按行控制显隐，这里记下每个参数占用的行号（多行控件占两行）
+        self._displayed_param_defs = list(params)
+        self._param_rows: dict[str, list[int]] = {}
         for param_def in params:
             name = param_def["name"]
             label = param_def.get("label", name)
             param_type = param_def.get("type", "select")
+            rows_before = self._param_layout.rowCount()
             # 已保存值优先于定义默认值
             default = saved.get(name, param_def.get("default"))
             options = param_def.get("options", [])
@@ -396,7 +410,35 @@ class UiStateMixin:
                             combo.setCurrentIndex(idx)
                 combo.currentIndexChanged.connect(self._persist_param_change)
                 self._param_layout.addRow(label + ":", combo)
+            self._param_rows[str(name)] = list(
+                range(rows_before, self._param_layout.rowCount()))
+        self._refresh_param_visibility()
         self._param_panel.setVisible(True)
+
+    def _refresh_param_visibility(self) -> None:
+        """按 require 依赖隐藏当前取值下不适用的参数行。
+
+        只改显隐：控件和值都留着，运行时快照照旧包含这些参数（见
+        ``task_params.parameters_for_values``），wf 引用它们不会未定义。
+        """
+        rows = getattr(self, "_param_rows", None)
+        if not rows:
+            return
+        defs = getattr(self, "_displayed_param_defs", [])
+        if not any(item.get("require") for item in defs):
+            return
+        from ...core.param_require import RequireError, visible_parameter_names
+        try:
+            visible = visible_parameter_names(
+                defs, self._collect_displayed_params(defs))
+        except RequireError as exc:
+            # 元数据解析期已挡住非法 require；真落到这里说明定义绕过了校验，
+            # 此时全部展示，不能让面板变成空白。
+            logger.warning(f"参数依赖求值失败，本次全部展示: {exc}")
+            return
+        for name, indices in rows.items():
+            for index in indices:
+                self._param_layout.setRowVisible(index, name in visible)
 
     def _on_independent_params_toggled(self, enabled: bool) -> None:
         """在共享参数与当前用户的独立参数之间切换。"""

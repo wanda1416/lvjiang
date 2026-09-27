@@ -147,6 +147,52 @@ class TestStaticValidation:
                 *_DEFS, {"name": "probe", "type": "text", "require": "$mode =="}])
 
 
+class TestBoolText:
+    """布尔字面文本只认 true / false / 1 / 0。"""
+
+    @pytest.mark.parametrize(("text", "expected"), [
+        ("true", True), ("TRUE", True), ("1", True),
+        ("false", False), ("0", False), (" true ", True),
+    ])
+    def test_accepted_forms(self, text, expected):
+        from lvjiang.workflows.builtins._coerce import is_bool_text, to_bool
+
+        assert is_bool_text(text)
+        assert to_bool(text) is expected
+
+    @pytest.mark.parametrize("text", ["yes", "no", "on", "off", "", "maybe"])
+    def test_rejected_forms_are_not_bool_text(self, text):
+        """yes / no / on / off 既不是 DSL 字面量也不是 JSON/YAML 写法，不再认。"""
+        from lvjiang.workflows.builtins._coerce import is_bool_text, to_bool
+
+        assert not is_bool_text(text)
+        assert to_bool(text) is False
+
+    def test_real_bool_passes_through(self):
+        from lvjiang.workflows.builtins._coerce import to_bool
+
+        assert to_bool(True) is True
+        assert to_bool(False) is False
+
+    @pytest.mark.parametrize("default", ["yes", "no", "on", "off"])
+    def test_bool_default_rejects_the_old_loose_spellings(self, default):
+        with pytest.raises(WorkflowMetadataError, match="true / false / 1 / 0"):
+            parse_metadata(
+                "#% parameters:\n"
+                "#%   - name: flag\n"
+                "#%     type: bool\n"
+                f"#%     default: '{default}'\n")
+
+    @pytest.mark.parametrize("default", ["true", "false", "1", "0"])
+    def test_bool_default_still_accepts_the_four(self, default):
+        meta = parse_metadata(
+            "#% parameters:\n"
+            "#%   - name: flag\n"
+            "#%     type: bool\n"
+            f"#%     default: '{default}'\n")
+        assert meta["parameters"][0]["default"] == default
+
+
 class TestMetadataIntegration:
     _HEAD = (
         "#% parameters:\n"

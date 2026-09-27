@@ -168,32 +168,35 @@ def test_attribute_prepare_selects_real_user_for_task_and_session(
     assert seen == ["u2"]
 
 
-def test_online_deferral_does_not_consume_unit_round(tmp_path, monkeypatch, qapp):
+def test_skipped_prepare_consumes_round_and_uses_normal_loop(
+    tmp_path, monkeypatch, qapp,
+):
     import lvjiang.core.daily_history as history
 
     save_user_metadata(User("u1", attributes={"account": "a"}), tmp_path)
+    save_user_metadata(User("u2", attributes={"account": "b"}), tmp_path)
     monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        ["a"], [BatchScript("task", "task")],
+        ["a", "b"], [BatchScript("task", "task")],
         BatchConfigItem(
-            name="attribute", execution_unit_key="account", rounds=1,
+            name="attribute", execution_unit_key="account", rounds=2,
             workflows=BatchWorkflows(prepare_item="prepare.wf"),
         ),
         BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1"],
+        lambda: False, candidate_usernames=["u1", "u2"],
     )
     prepares = []
     executed = []
 
     def stage(phase, _wf, _index, _username, _state, *args, **kwargs):
         if phase == "prepare_item":
-            prepares.append(kwargs["round_number"])
-            if len(prepares) == 1:
-                return BatchStageResult(
-                    status="skipped", state={}, retry_after=0.001)
-            return BatchStageResult(username="u1", state={})
+            selected = kwargs["unit_members"][0]
+            prepares.append((selected, kwargs["round_number"]))
+            if selected == "u1" and kwargs["round_number"] == 1:
+                return BatchStageResult(status="skipped", state={})
+            return BatchStageResult(username=selected, state={})
         return BatchStageResult(state={})
 
     monkeypatch.setattr(worker, "_run_stage", stage)
@@ -202,8 +205,8 @@ def test_online_deferral_does_not_consume_unit_round(tmp_path, monkeypatch, qapp
     monkeypatch.setattr(worker, "_save_result", lambda *args: None)
     worker.run()
 
-    assert prepares == [1, 1]
-    assert executed == ["u1"]
+    assert prepares == [("u1", 1), ("u2", 1), ("u1", 2), ("u2", 2)]
+    assert executed == ["u2", "u1", "u2"]
 
 
 def test_attribute_unit_runs_only_selected_members_successful_checks(

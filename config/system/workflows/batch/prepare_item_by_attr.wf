@@ -38,11 +38,4 @@ end
 log "本次选择角色: " + $chosen + "，" + $profile_key + "=" + $minimum
 call $result = prepare_user($chosen, $batch_state, true, 0, 8, true)
 eval $result.username = $chosen
-if $result.status equals "skipped"
-    # 服务端仍占用该账号时，整组稍后再试，不消耗本轮执行次数。
-    eval $result.retry_after = 60
-else if $result.status equals "success"
-    # 托管对战在服务端继续约 20 分钟，期间不再调度同一账号。
-    eval $result.retry_after = 1200
-end
 return $result

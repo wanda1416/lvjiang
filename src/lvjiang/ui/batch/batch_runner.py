@@ -101,7 +101,6 @@ class BatchStageResult:
     message: str = ""
     state: dict | None = None
     username: str = ""
-    retry_after: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -742,9 +741,10 @@ class BatchWorker(QThread):
                         if prepared.status == RESULT_STOPPED:
                             self._stopped = True
                             done.add(unit)
-                        elif prepared.retry_after > 0 and deferrals[unit] < 30:
-                            deferrals[unit] += 1
-                            next_ready[unit] = time.monotonic() + prepared.retry_after
+                        elif prepared.status == RESULT_SKIPPED:
+                            counts[unit] += 1
+                            if counts[unit] >= self._config.rounds:
+                                done.add(unit)
                         else:
                             done.add(unit)
                         continue
@@ -878,14 +878,6 @@ class BatchWorker(QThread):
                     elif finished.status != RESULT_SUCCESS:
                         self.log.emit(self._stage_message(f"{label} 条目收尾", finished))
                     counts[unit] += 1
-                    selected_still_eligible = any(
-                        self._check_script(
-                            script, username,
-                            params=self._member_task_plan[(username, script.id)].params,
-                        ).status == RESULT_SUCCESS for script in self._scripts
-                    )
-                    next_ready[unit] = time.monotonic() + (
-                        prepared.retry_after if selected_still_eligible else 0)
                     if counts[unit] >= self._config.rounds:
                         done.add(unit)
             except AccessDeniedError as exc:
@@ -952,7 +944,6 @@ class BatchWorker(QThread):
         message = value.get("message", "")
         state = value.get("state", current_state)
         username = value.get("username", "")
-        retry_after = value.get("retry_after", 0)
         if status not in _RESULT_STATUSES:
             return BatchStageResult(
                 status=RESULT_FAILED,
@@ -967,13 +958,13 @@ class BatchWorker(QThread):
                 message=tr("生命周期 wf 的 state 必须是 dict"),
                 state=current_state,
             )
-        if not isinstance(username, str) or not isinstance(retry_after, (int, float)):
+        if not isinstance(username, str):
             return BatchStageResult(
-                status=RESULT_FAILED, message=tr("生命周期 wf 返回了无效角色或重试时间"),
+                status=RESULT_FAILED, message=tr("生命周期 wf 返回了无效角色"),
                 state=current_state)
         return BatchStageResult(
             status=status, message=message, state=state,
-            username=username, retry_after=max(0.0, float(retry_after)))
+            username=username)
 
     @staticmethod
     def _normalize_check_result(value) -> BatchCheckResult:

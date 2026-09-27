@@ -46,6 +46,7 @@ from PyQt6.QtWidgets import (
 
 from ...core.batch_config import (
     BatchConfigItem,
+    declares_unit_prepare,
     lifecycle_parameter_definitions,
     load_batch_config,
     save_batch_config,
@@ -1430,14 +1431,28 @@ class BatchTab(QWidget):
 
         # 构建进度表
         config = cfg.configs.get(self._current_config_name())
-        if (config is not None and config.execution_unit_key != "user"
-                and not config.workflows.prepare_item):
+        if config is not None and config.execution_unit_key != "user":
+            # 属性单元的一个单元值可能对应多名用户，必须由条目准备 wf 选定并回传
+            # 用户名。不声明这条协议的 wf 跑起来只会让每个单元都以同一个协议错误
+            # 被丢弃，整批空跑，所以在动客户端之前就拦住。
             from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.warning(
-                self, tr("无法开始批量任务"),
-                tr("当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。"),
-            )
-            return
+            if not config.workflows.prepare_item:
+                QMessageBox.warning(
+                    self, tr("无法开始批量任务"),
+                    tr("当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。"),
+                )
+                return
+            if not declares_unit_prepare(config.workflows.prepare_item):
+                QMessageBox.warning(
+                    self, tr("无法开始批量任务"),
+                    tr("当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回"
+                       "本单元的用户名。请改用 batch/prepare_item_by_attr.wf，"
+                       "或在自写的准备工作流里声明 #% batch_unit_prepare: true "
+                       "并返回 username。").format(
+                        key=config.execution_unit_key,
+                        wf=config.workflows.prepare_item),
+                )
+                return
         self._build_progress_table(usernames, config, scripts)
         self._set_config_enabled(False)
 

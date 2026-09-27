@@ -24,6 +24,7 @@ _TOP_LEVEL_FIELDS = {
     "runnable",
     "batchable",
     "batch_check",
+    "batch_unit_prepare",
 }
 #: 脚本 id 是稳定逻辑标识，不是路径。首字符必须是 Unicode 字母，
 #: 后续允许 Unicode 字母、数字和下划线；中文脚本名属于合法 id。
@@ -224,7 +225,7 @@ def _validate_metadata(data: Any) -> dict:
             not isinstance(normalized["batch_check"], str)
             or _PARAMETER_NAME.fullmatch(normalized["batch_check"]) is None):
         raise _error("batch_check", "必须是合法的 DSL 子过程名")
-    for field in ("hidden", "runnable", "batchable"):
+    for field in ("hidden", "runnable", "batchable", "batch_unit_prepare"):
         if field in normalized and not isinstance(normalized[field], bool):
             raise _error(field, "必须是布尔值")
 

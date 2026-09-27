@@ -183,6 +183,26 @@ def lifecycle_parameter_definitions(
     return definitions
 
 
+def declares_unit_prepare(wf_name: str) -> bool:
+    """条目准备 wf 是否声明了「为属性单元选定用户」这条协议。
+
+    属性单元的一个单元值可能对应多名用户，准备 wf 必须回传本轮选中的
+    ``username``；不回传时批量层只能在跑起来之后才发现，且每个单元都会以同一个
+    协议错误被丢弃。作者用 ``#% batch_unit_prepare: true`` 显式声明，批量层据此
+    在开始前拦截，而不是靠猜 wf 内容或写死文件名——用户自写的准备 wf 同样可以声明。
+    """
+    from ..workflows.metadata import metadata_for_script_config
+    from .config.resolver import get_resolver
+
+    if not wf_name:
+        return False
+    path = get_resolver().resolve_read(f"workflows/{wf_name}")
+    if path is None:
+        return False
+    metadata, _warning = metadata_for_script_config(path)
+    return bool(metadata.get("batch_unit_prepare", False))
+
+
 @dataclass
 class BatchConfig:
     configs: dict[str, BatchConfigItem] = field(default_factory=dict)

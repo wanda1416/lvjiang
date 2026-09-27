@@ -46,6 +46,20 @@ def test_selects_lowest_profile_role():
     assert seen[0]["state"]["login_args"] == [False, 30, 12, False]
 
 
+def test_only_the_attribute_wf_declares_the_unit_prepare_protocol():
+    """按属性调度必须用会回传 username 的准备 wf；普通条目准备不声明该协议。
+
+    以前配错只能等跑起来抛「未返回本单元可执行的用户名」，每个单元都被丢弃、
+    整批空跑。声明放在 wf 头部，批量层据此在开始前拦截。
+    """
+    from lvjiang.core.batch_config import declares_unit_prepare
+
+    assert declares_unit_prepare("batch/prepare_item_by_attr.wf") is True
+    assert declares_unit_prepare("batch/prepare_item.wf") is False
+    assert declares_unit_prepare("") is False
+    assert declares_unit_prepare("batch/not_there.wf") is False
+
+
 def test_declares_the_same_login_parameters_as_prepare_item():
     """两个条目准备 wf 透传同一组登录参数；漏声明会让配置静默走默认值。"""
     from lvjiang.workflows.metadata import metadata_for_script_config

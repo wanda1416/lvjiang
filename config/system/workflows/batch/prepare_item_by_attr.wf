@@ -1,6 +1,6 @@
 #% parameters:
 #%   - name: profile_key
-#%     label: 选择角色所用 Profile key
+#%     label: 选择数据模型
 #%     type: text
 #%     default: ""
 # 仅供属性执行单元使用：按指定 Profile 的当前值选最小角色。

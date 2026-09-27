@@ -1,3 +1,4 @@
+import pytest
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QFormLayout, QPlainTextEdit
 
@@ -65,6 +66,8 @@ def test_main_batch_lists_preserve_and_update_actual_execution_order(
     tab = BatchTab(_Host())
     qtbot.addWidget(tab)
 
+    assert tab._unit_label.text() == "<b>选择执行单元</b>"
+    assert tab._user_list.headerItem().text(0) == "单元候选（用户名）"
     assert tab._checked_script_ids() == ["b", "a"]
     assert tab._get_enabled_usernames() == ["用户A", "用户B"]
 
@@ -284,3 +287,39 @@ def test_profile_order_entry_hides_when_unset_and_greys_out_when_undefined(
     tab._user_list.clear()
     actions = _order_menu_actions(tab, monkeypatch)
     assert all(not enabled for _text, enabled in actions), actions
+
+
+@pytest.mark.parametrize("unit_key", ["role", "account"])
+def test_profile_sort_is_hidden_for_attribute_units_and_restored_for_user(
+    monkeypatch, qtbot, unit_key,
+):
+    group = BatchConfigItem(
+        name="日常", execution_unit_key=unit_key,
+        usernames=["用户A"],
+        visible_units={unit_key: ["单元A"]},
+        profile_sort_key="weekly_work",
+    )
+    config = BatchConfig({"日常": group}, "日常")
+    schema = ProfileSchema(keys_by_model={
+        MODEL_QUOTA: [QuotaKeyDef(key="weekly_work", label="周进度")],
+    })
+    _prepare_batch_tab(monkeypatch, config, schema=schema)
+    tab = BatchTab(_Host())
+    qtbot.addWidget(tab)
+
+    form = tab._summary_form
+    assert not form.isRowVisible(tab._profile_sort_label)
+    assert not form.isRowVisible(tab._profile_sort_row)
+    assert not any(
+        "指定顺序排序" in text
+        for text, _enabled in _order_menu_actions(tab, monkeypatch)
+    )
+    assert group.profile_sort_key == "weekly_work"
+
+    group.execution_unit_key = "user"
+    tab._refresh_params()
+    tab._refresh_entry_list()
+
+    assert form.isRowVisible(tab._profile_sort_label)
+    assert form.isRowVisible(tab._profile_sort_row)
+    assert ("指定顺序排序", True) in _order_menu_actions(tab, monkeypatch)

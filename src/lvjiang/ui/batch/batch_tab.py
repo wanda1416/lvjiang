@@ -137,7 +137,7 @@ def _four_cjk_column_width(widget: QWidget) -> int:
 class ProfileOrderStatus:
     """右键「指定顺序排序」当前的可用性。
 
-    配置组没有指定排序时，这个动作对当前数据根本不适用，隐藏；配置了但
+    属性单元或配置组没有指定排序时，这个动作不适用，隐藏；配置了但
     Profile 定义已被删除属于「功能存在、此刻不可用」，保留并置灰，把原因
     写在菜单项上，不让用户点了才发现没反应。
     """
@@ -291,7 +291,10 @@ class BatchTab(QWidget):
         self._profile_sort_direction.currentIndexChanged.connect(self._persist_profile_sort)
         profile_sort_layout.addWidget(self._profile_sort_key, 1)
         profile_sort_layout.addWidget(self._profile_sort_direction)
-        summary_form.addRow(QLabel(tr("指定排序：")))
+        self._profile_sort_label = QLabel(tr("指定排序："))
+        self._profile_sort_row = profile_sort_row
+        self._summary_form = summary_form
+        summary_form.addRow(self._profile_sort_label)
         summary_form.addRow(profile_sort_row)
         self._workflow_labels: dict[str, QLabel] = {}
         for key, label in (
@@ -357,7 +360,7 @@ class BatchTab(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
 
         actions = QHBoxLayout()
-        script_label = QLabel(tr("<b>选择执行脚本：</b>"))
+        script_label = QLabel(tr("<b>选择执行脚本</b>"))
         script_label.setToolTip(tr("拖动可临时调整实际执行顺序"))
         actions.addWidget(script_label)
         actions.addStretch()
@@ -536,7 +539,7 @@ class BatchTab(QWidget):
 
         # 全选/全不选行
         select_row = QHBoxLayout()
-        self._unit_label = QLabel(tr("<b>选择执行单元：</b>"))
+        self._unit_label = QLabel(tr("<b>选择执行单元</b>"))
         self._unit_label.setToolTip(tr("拖动可临时调整实际执行顺序"))
         select_row.addWidget(self._unit_label)
         select_row.addStretch()
@@ -570,7 +573,7 @@ class BatchTab(QWidget):
             QAbstractItemView.DragDropMode.InternalMove)
         self._user_list.setDefaultDropAction(Qt.DropAction.MoveAction)
         self._user_list.setToolTip(
-            tr("拖动可调整实际执行顺序；右键可恢复默认、随机打乱或按 Profile 排序；"
+            tr("拖动可调整实际执行顺序；右键可恢复默认或随机打乱；"
                "批量配置中的顺序仅作为初始顺序"))
         header = self._user_list.header()
         assert header is not None
@@ -659,12 +662,11 @@ class BatchTab(QWidget):
             max(0, self._profile_sort_direction.findData(direction)))
         self._profile_sort_key.blockSignals(False)
         self._profile_sort_direction.blockSignals(False)
-        user_unit = item is None or item.execution_unit_key == "user"
-        self._profile_sort_key.setEnabled(user_unit)
-        self._profile_sort_direction.setEnabled(user_unit)
-        sort_reason = "" if user_unit else tr("属性单元包含多个用户，无法按单个用户的 Profile 排序")
-        self._profile_sort_key.setToolTip(sort_reason or self._profile_sort_key.currentText())
-        self._profile_sort_direction.setToolTip(sort_reason)
+        user_unit = item is not None and item.execution_unit_key == "user"
+        self._summary_form.setRowVisible(self._profile_sort_label, user_unit)
+        self._summary_form.setRowVisible(self._profile_sort_row, user_unit)
+        self._profile_sort_key.setToolTip(self._profile_sort_key.currentText())
+        self._profile_sort_direction.setToolTip("")
         for key, label in self._workflow_labels.items():
             path = getattr(item.workflows, key) if item is not None else ""
             label.setText(path or tr("未配置"))
@@ -811,7 +813,7 @@ class BatchTab(QWidget):
     def _persist_profile_sort(self, *_args) -> None:
         cfg = load_batch_config()
         item = cfg.configs.get(self._current_config_name())
-        if item is None:
+        if item is None or item.execution_unit_key != "user":
             return
         item.profile_sort_key = str(self._profile_sort_key.currentData() or "")
         item.profile_sort_direction = str(
@@ -881,9 +883,20 @@ class BatchTab(QWidget):
             return
 
         key = config.execution_unit_key
-        self._unit_label.setText(
-            tr("<b>选择执行单元（用户）：</b>") if key == "user"
-            else tr("<b>选择执行单元（{key}）：</b>").format(key=key))
+        self._user_list.setToolTip(
+            tr("拖动可调整实际执行顺序；右键可恢复默认、随机打乱或按 Profile 排序；"
+               "批量配置中的顺序仅作为初始顺序")
+            if key == "user" else
+            tr("拖动可调整实际执行顺序；右键可恢复默认或随机打乱；"
+               "批量配置中的顺序仅作为初始顺序"))
+        candidate_label = tr("单元候选（用户名）") if key == "user" else (
+            tr("单元候选（{key}）").format(key=key))
+        self._user_list.headerItem().setText(0, candidate_label)
+        header = self._user_list.header()
+        assert header is not None
+        self._user_list.setColumnWidth(
+            0, max(self._user_list.columnWidth(0),
+                   header.fontMetrics().horizontalAdvance(candidate_label) + 24))
         display_order = (list(config.usernames) if key == "user" else
                          list(config.visible_units.get(key, [])))
         visible = set(display_order)
@@ -976,14 +989,12 @@ class BatchTab(QWidget):
         """
         cfg = load_batch_config()
         group = cfg.configs.get(self._current_config_name())
-        key = group.profile_sort_key if group is not None else ""
+        if group is None or group.execution_unit_key != "user":
+            return ProfileOrderStatus()
+        key = group.profile_sort_key
         if not key:
             # 当前配置组没有指定排序，这个动作无从谈起。
             return ProfileOrderStatus()
-        if group is not None and group.execution_unit_key != "user":
-            return ProfileOrderStatus(
-                visible=True, enabled=False,
-                reason=tr("属性单元包含多个用户，无法按单个用户的 Profile 排序"))
         try:
             exists = get_profile_config().get_key(key) is not None
         except (OSError, ValueError) as exc:

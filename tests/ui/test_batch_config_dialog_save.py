@@ -1,4 +1,5 @@
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget
 
 from lvjiang.core.batch_config import BatchConfig, BatchConfigItem
 from lvjiang.ui.batch.batch_config_dialog import BatchConfigDialog
@@ -97,6 +98,38 @@ def test_visibility_lists_support_select_all_and_none(monkeypatch, qtbot):
         dialog._user_list.item(i).checkState() == Qt.CheckState.Checked
         for i in range(dialog._user_list.count())
     )
+
+
+def test_batch_config_lists_other_environment_scripts(monkeypatch, qtbot):
+    class DesktopParent(QWidget):
+        @staticmethod
+        def _selected_run_env():
+            return "desktop"
+
+    config = BatchConfig(configs={
+        "组": BatchConfigItem(name="组", usernames=["用户A"]),
+    }, active_config="组")
+    monkeypatch.setattr(
+        "lvjiang.ui.batch.batch_config_dialog.load_batch_config", lambda: config)
+    requested_envs = []
+
+    def exposed(run_env=None):
+        requested_envs.append(run_env)
+        return [{
+            "id": "android_task", "name": "安卓任务", "wf_file": "task.wf",
+            "batchable": True, "env": ["android"],
+        }] if run_env is None else []
+
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.list_exposed_scripts", exposed)
+    parent = DesktopParent()
+    qtbot.addWidget(parent)
+    dialog = BatchConfigDialog(_Users(), parent)
+    qtbot.addWidget(dialog)
+
+    assert requested_envs == [None]
+    assert dialog._task_list.count() == 1
+    assert dialog._task_list.item(0).text() == "安卓任务"
 
 
 def test_switching_editor_group_does_not_change_main_active_group(

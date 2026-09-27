@@ -117,6 +117,8 @@ def test_main_tab_filters_attribute_units_without_changing_user_mode(
     tab = BatchTab(Host())
     qtbot.addWidget(tab)
 
+    assert tab._unit_label.text() == "<b>选择执行单元</b>"
+    assert tab._user_list.headerItem().text(0) == "单元候选（account）"
     assert tab._get_enabled_usernames() == ["b"]
     tab._user_list.topLevelItem(0).setCheckState(0, Qt.CheckState.Checked)
     assert config.configs["group"].selected_units["account"] == ["a", "b"]

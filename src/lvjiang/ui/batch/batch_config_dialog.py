@@ -92,7 +92,7 @@ class BatchConfigDialog(QDialog):
         user_layout = QVBoxLayout(user_box)
         user_layout.setContentsMargins(0, 0, 0, 0)
         user_header = QHBoxLayout()
-        user_header.addWidget(QLabel(tr("可见单元：")))
+        user_header.addWidget(QLabel(tr("调度单元：")))
         self._unit_combo = QComboBox()
         self._unit_combo.currentIndexChanged.connect(self._on_unit_changed)
         user_header.addWidget(self._unit_combo, 1)
@@ -216,11 +216,9 @@ class BatchConfigDialog(QDialog):
             return
         from ...workflows.discovery import list_exposed_scripts, script_display_name
 
-        run_env_getter = getattr(self.parent(), "_selected_run_env", None)
-        run_env = run_env_getter() if callable(run_env_getter) else None
         try:
             scripts = [
-                cfg for cfg in list_exposed_scripts(run_env)
+                cfg for cfg in list_exposed_scripts()
                 if cfg.get("batchable", False)
             ]
         except Exception:

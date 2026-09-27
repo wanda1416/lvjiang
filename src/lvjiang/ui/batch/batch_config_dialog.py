@@ -92,10 +92,7 @@ class BatchConfigDialog(QDialog):
         user_layout = QVBoxLayout(user_box)
         user_layout.setContentsMargins(0, 0, 0, 0)
         user_header = QHBoxLayout()
-        user_header.addWidget(QLabel(tr("调度单元：")))
-        self._unit_combo = QComboBox()
-        self._unit_combo.currentIndexChanged.connect(self._on_unit_changed)
-        user_header.addWidget(self._unit_combo, 1)
+        user_header.addWidget(QLabel(tr("可见用户：")))
         user_header.addStretch()
         user_all = QPushButton(tr("全选"))
         user_none = QPushButton(tr("全不选"))
@@ -108,7 +105,7 @@ class BatchConfigDialog(QDialog):
         self._user_list = QListWidget()
         self._user_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self._user_list.setDefaultDropAction(Qt.DropAction.MoveAction)
-        self._user_list.setToolTip(tr("拖动单元可调整批量初始顺序"))
+        self._user_list.setToolTip(tr("拖动用户可调整批量初始顺序"))
         user_layout.addWidget(self._user_list)
         choices.addWidget(user_box)
         choices.setSizes([430, 430])
@@ -241,39 +238,21 @@ class BatchConfigDialog(QDialog):
                 else Qt.CheckState.Unchecked)
             self._task_list.addItem(row)
 
-        self._unit_combo.blockSignals(True)
-        self._unit_combo.clear()
-        keys: dict[str, None] = {"user": None}
-        getter = getattr(self._users, "get_user", None)
-        if callable(getter):
-            for username in self._users.list_users():
-                user = getter(username)
-                if user is not None:
-                    keys.update({key: None for key, value in user.attributes.items()
-                                 if key and str(value).strip()})
-        for key in keys:
-            self._unit_combo.addItem(tr("用户") if key == "user" else key, key)
-        if self._unit_combo.findData(item.execution_unit_key) < 0:
-            self._unit_combo.addItem(item.execution_unit_key, item.execution_unit_key)
-        self._unit_combo.setCurrentIndex(
-            self._unit_combo.findData(item.execution_unit_key))
-        self._unit_combo.blockSignals(False)
-        self._populate_unit_list(item)
+        self._populate_user_list(item)
         for key, combo in self._selectors.items():
             combo.setCurrentText(getattr(item.workflows, key))
         self._skip_single_lifecycle.setChecked(
             item.skip_lifecycle_for_single_item)
+        self._skip_single_lifecycle.setEnabled(item.execution_unit_key == "user")
 
     def _clear_editor(self) -> None:
         self._current_name = ""
-        self._unit_combo.blockSignals(True)
-        self._unit_combo.clear()
-        self._unit_combo.blockSignals(False)
         self._task_list.clear()
         self._user_list.clear()
         for combo in self._selectors.values():
             combo.setCurrentText("")
         self._skip_single_lifecycle.setChecked(True)
+        self._skip_single_lifecycle.setEnabled(False)
 
     def _save_current_config(self) -> None:
         item = self._cfg.configs.get(self._current_name)
@@ -292,29 +271,16 @@ class BatchConfigDialog(QDialog):
             task_id for task_id in task_ids if task_id not in old_task_ids
         ]
 
-        self._save_unit_list(item)
+        self._save_user_list(item)
         item.workflows = BatchWorkflows(**{
             key: combo.currentText().strip() for key, combo in self._selectors.items()
         })
         item.skip_lifecycle_for_single_item = (
             self._skip_single_lifecycle.isChecked())
 
-    def _populate_unit_list(self, item: BatchConfigItem) -> None:
-        key = item.execution_unit_key
-        if key == "user":
-            candidates = self._users.list_users()
-        else:
-            values: dict[str, None] = {}
-            getter = getattr(self._users, "get_user", None)
-            if callable(getter):
-                for username in self._users.list_users():
-                    user = getter(username)
-                    value = (str(user.attributes.get(key, "")).strip()
-                             if user is not None else "")
-                    if value:
-                        values[value] = None
-            candidates = list(values)
-        visible = item.usernames if key == "user" else item.visible_units.get(key, candidates)
+    def _populate_user_list(self, item: BatchConfigItem) -> None:
+        candidates = self._users.list_users()
+        visible = item.usernames
         selected = set(visible)
         ordered = [value for value in visible if value in candidates]
         ordered.extend(value for value in candidates if value not in selected)
@@ -326,34 +292,18 @@ class BatchConfigDialog(QDialog):
                 Qt.CheckState.Checked if value in selected else Qt.CheckState.Unchecked)
             self._user_list.addItem(row)
 
-    def _save_unit_list(self, item: BatchConfigItem) -> None:
+    def _save_user_list(self, item: BatchConfigItem) -> None:
         values = [
             row.text()
             for index in range(self._user_list.count())
             if (row := self._user_list.item(index)) is not None
             and row.checkState() == Qt.CheckState.Checked
         ]
-        key = item.execution_unit_key
-        if key == "user":
-            old = set(item.usernames)
-            item.usernames = values
-            item.selected_usernames = [
-                name for name in item.selected_usernames if name in values
-            ] + [name for name in values if name not in old]
-        else:
-            old = set(item.visible_units.get(key, []))
-            item.visible_units[key] = values
-            item.selected_units[key] = [
-                value for value in item.selected_units.get(key, []) if value in values
-            ] + [value for value in values if value not in old]
-
-    def _on_unit_changed(self, index: int) -> None:
-        item = self._cfg.configs.get(self._current_name)
-        if item is None or index < 0:
-            return
-        self._save_unit_list(item)
-        item.execution_unit_key = str(self._unit_combo.itemData(index))
-        self._populate_unit_list(item)
+        old = set(item.usernames)
+        item.usernames = values
+        item.selected_usernames = [
+            name for name in item.selected_usernames if name in values
+        ] + [name for name in values if name not in old]
 
     def _on_config_selected(self, index: int) -> None:
         if index < 0:
@@ -441,14 +391,13 @@ class BatchConfigDialog(QDialog):
             ] + [
                 username for username in draft.usernames if username not in old_users
             ]
-            for key, visible in draft.visible_units.items():
-                old_visible = set(current.visible_units.get(key, []))
-                draft.selected_units[key] = [
-                    value for value in current.selected_units.get(key, [])
-                    if value in visible
-                ] + [value for value in visible if value not in old_visible]
+            draft.execution_unit_key = current.execution_unit_key
+            draft.visible_units = current.visible_units
+            draft.selected_units = current.selected_units
             # 轮数和生命周期参数由批量主页面维护，本对话框不回写打开时快照。
             draft.rounds = current.rounds
+            draft.profile_sort_key = current.profile_sort_key
+            draft.profile_sort_direction = current.profile_sort_direction
             draft.workflow_params = current.workflow_params
             merged[name] = draft
         latest.configs = merged

@@ -32,6 +32,10 @@ def test_old_batch_config_stays_in_user_mode():
     assert item.execution_unit_key == "user"
     assert item.usernames == ["u1", "u2"]
     assert item.selected_usernames == ["u2"]
+    attribute_item = BatchConfigItem.from_dict("attribute", {
+        "execution_unit_key": "account", "selected_units": {"account": ["a"]},
+    })
+    assert attribute_item.selected_units == {"account": ["a"]}
 
 
 def test_attribute_units_include_all_registered_members(tmp_path):
@@ -43,7 +47,20 @@ def test_attribute_units_include_all_registered_members(tmp_path):
     }
 
 
-def test_config_dialog_switches_unit_without_replacing_user_selection(
+def test_attribute_worker_members_follow_visible_users(tmp_path, qapp):
+    save_user_metadata(User("u1", attributes={"account": "a"}), tmp_path)
+    save_user_metadata(User("u2", attributes={"account": "a"}), tmp_path)
+    worker = BatchWorker(
+        ["a"], [], BatchConfigItem(
+            name="group", usernames=["u1"], execution_unit_key="account"),
+        BatchContext(None, None, None, None), SessionManager(tmp_path),
+        lambda: False, candidate_usernames=["u1"],
+    )
+    assert worker._unit_members == {"a": ["u1"]}
+    assert "u2" not in worker._user_attributes
+
+
+def test_config_dialog_edits_only_visible_users(
     monkeypatch, qtbot,
 ):
     users = {
@@ -71,14 +88,13 @@ def test_config_dialog_switches_unit_without_replacing_user_selection(
         "lvjiang.ui.batch.batch_config_dialog.save_batch_config", saved.append)
     dialog = BatchConfigDialog(Manager())
     qtbot.addWidget(dialog)
-    dialog._unit_combo.setCurrentIndex(dialog._unit_combo.findData("account"))
-    assert dialog._user_list.count() == 1
+    assert dialog._user_list.count() == 2
+    dialog._user_list.item(1).setCheckState(Qt.CheckState.Unchecked)
     dialog._on_save()
 
     group = saved[0].configs["group"]
-    assert group.execution_unit_key == "account"
-    assert group.visible_units["account"] == ["a"]
-    assert group.usernames == ["u1", "u2"]
+    assert group.execution_unit_key == "user"
+    assert group.usernames == ["u1"]
     assert group.selected_usernames == ["u1"]
 
 
@@ -95,16 +111,28 @@ def test_main_tab_filters_attribute_units_without_changing_user_mode(
                 pause = "F10"
 
         _user_config = _Config()
+        _user_manager = None
 
         @staticmethod
         def _selected_run_env():
             return None
 
+    users = {
+        "u1": User("u1", attributes={"account": "a"}),
+        "u2": User("u2", attributes={"account": "b"}),
+        "u3": User("u3", attributes={"account": "a"}),
+    }
+
+    class Manager:
+        def get_user(self, name):
+            return users[name]
+
+    host = Host()
+    host._user_manager = Manager()
     config = BatchConfig(configs={
         "group": BatchConfigItem(
             name="group", usernames=["u1", "u2"],
             selected_usernames=["u1"], execution_unit_key="account",
-            visible_units={"account": ["a", "b"]},
             selected_units={"account": ["b"]},
         ),
     }, active_config="group")
@@ -114,15 +142,19 @@ def test_main_tab_filters_attribute_units_without_changing_user_mode(
         "lvjiang.ui.batch.batch_tab.save_batch_config", lambda _cfg: None)
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.list_exposed_scripts", lambda _env: [])
-    tab = BatchTab(Host())
+    tab = BatchTab(host)
     qtbot.addWidget(tab)
 
     assert tab._unit_label.text() == "<b>选择执行单元</b>"
+    assert tab._unit_combo.currentData() == "account"
     assert tab._user_list.headerItem().text(0) == "单元候选（account）"
     assert tab._get_enabled_usernames() == ["b"]
     tab._user_list.topLevelItem(0).setCheckState(0, Qt.CheckState.Checked)
     assert config.configs["group"].selected_units["account"] == ["a", "b"]
     assert config.configs["group"].selected_usernames == ["u1"]
+    tab._unit_combo.setCurrentIndex(tab._unit_combo.findData("user"))
+    assert tab._user_list.headerItem().text(0) == "单元候选（用户名）"
+    assert tab._get_enabled_usernames() == ["u1"]
 
 
 def test_attribute_prepare_selects_real_user_for_task_and_session(

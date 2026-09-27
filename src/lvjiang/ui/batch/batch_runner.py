@@ -25,7 +25,6 @@ from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from ...core.batch_config import BatchConfigItem, lifecycle_parameter_definitions
-from ...core.batch_units import group_users
 from ...core.config.resolver import get_resolver
 from ...core.config.users import SessionManager
 from ...i18n import tr
@@ -138,7 +137,8 @@ class BatchWorker(QThread):
     ):
         super().__init__(parent)
         self._usernames = list(usernames)
-        self._candidate_usernames = list(candidate_usernames or usernames)
+        self._candidate_usernames = list(
+            usernames if candidate_usernames is None else candidate_usernames)
         self._scripts = copy.deepcopy(scripts)
         self._config = copy.deepcopy(config)
         self._ctx = ctx
@@ -167,18 +167,21 @@ class BatchWorker(QThread):
         users = {}
         attr_mode = self._config.execution_unit_key != "user"
         member_names = self._candidate_usernames if attr_mode else self._usernames
-        if attr_mode:
-            groups = group_users(
-                member_names, self._config.execution_unit_key,
-                self._session_manager._users_dir)
-            self._unit_members = {
-                value: list(groups.get(value, [])) for value in self._usernames
-            }
         for username in member_names:
             user = load_user_metadata(username, self._session_manager._users_dir)
             users[username] = user
             self._user_attributes[username] = (
                 dict(user.attributes) if user is not None else {})
+        if attr_mode:
+            groups: dict[str, list[str]] = {}
+            for username in member_names:
+                value = str(self._user_attributes[username].get(
+                    self._config.execution_unit_key, "")).strip()
+                if value:
+                    groups.setdefault(value, []).append(username)
+            self._unit_members = {
+                value: list(groups.get(value, [])) for value in self._usernames
+            }
         for run_idx, username in enumerate(member_names):
             user = users.get(username)
             for script in self._scripts:

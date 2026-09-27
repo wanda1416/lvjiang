@@ -770,3 +770,42 @@ def test_attribute_batch_output_failure_still_emits_summary(
     assert next(iter(finished[0]["entries"].values()))["scripts"] == {
         "A": ST_SUCCESS,
     }
+
+
+@pytest.mark.parametrize(
+    ("prepared", "expect"),
+    [
+        # wf 跑到末尾一次 return 都没走：engine.return_value 保持 None，
+        # _normalize_stage_result 的默认状态恰好是 success + 空 username，
+        # 于是真正的原因（本地覆盖成了没有 return 的旧版本）完全看不出来。
+        (BatchStageResult(state={}, returned=False, source="/local/prepare.wf"),
+         ["没有返回任何值", "顶层 return", "config/local", "/local/prepare.wf"]),
+        # 返回了，但选的用户不在本单元可执行成员里
+        (BatchStageResult(state={}, username="外人", source="/system/prepare.wf"),
+         ["未返回本单元可执行的用户名", "'外人'", "/system/prepare.wf"]),
+    ],
+)
+def test_unit_prepare_protocol_error_separates_the_two_causes(
+    tmp_path, qapp, prepared, expect,
+):
+    """两种违反协议的排查方向完全不同，报文必须分开，并带上实际加载路径。"""
+    worker = BatchWorker(
+        ["a"], [BatchScript("task", "task")],
+        BatchConfigItem(
+            name="attribute", execution_unit_key="account",
+            workflows=BatchWorkflows(prepare_item="batch/prepare_item_by_attr.wf"),
+        ),
+        BatchContext(None, None, None, None), SessionManager(tmp_path),
+        lambda: False, candidate_usernames=[],
+    )
+    message = worker._unit_prepare_protocol_error(prepared, ["u1", "u2"])
+    for fragment in expect:
+        assert fragment in message
+    assert "batch/prepare_item_by_attr.wf" in message
+
+
+def test_stage_result_marks_whether_the_workflow_returned():
+    """没有返回值与显式返回 null 都算「没回传」，供上层区分报文。"""
+    assert BatchWorker._normalize_stage_result(None, {}).returned is False
+    assert BatchWorker._normalize_stage_result(
+        {"status": "success"}, {}).returned is True

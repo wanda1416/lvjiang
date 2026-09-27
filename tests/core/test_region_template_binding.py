@@ -35,6 +35,11 @@ def test_template_binding_roundtrip_and_optional_omission():
     assert Region.from_dict(data).template == region.template
     assert region.clone().template == region.template
 
+    inverted = TemplateBinding("card/refresh", record_w=542, record_h=250,
+                               allow_inverted=True)
+    assert TemplateBinding.from_dict(inverted.to_dict()) == inverted
+    assert inverted.to_dict()["allow_inverted"] is True
+
 
 @pytest.mark.parametrize("name", ["", "../secret", "/absolute", "a\\b"])
 def test_template_name_rejects_unsafe_paths(name):

@@ -344,8 +344,12 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
             self._canvas._notify_status(str(exc))
             return
         name = self._template_name(region_key)
+        selected = self._canvas.selected_region()
+        allow_inverted = bool(
+            selected and selected.template and selected.template.allow_inverted)
         binding = TemplateBinding(
-            name, self._template_score.value(), record_w, record_h)
+            name, self._template_score.value(), record_w, record_h,
+            allow_inverted)
         self._pending_templates[name] = (image.copy(), record_w, record_h)
         self._pending_template_deletes.discard(name)
         if self._canvas.set_selected_template(binding, force_changed=True):
@@ -410,7 +414,8 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
                 template = with_record_size(
                     loaded, binding.record_w, binding.record_h)
             hit = locate_in_region(
-                frame, template, self._canvas.get_canvas_config(), region, 0.0)
+                frame, template, self._canvas.get_canvas_config(), region, 0.0,
+                allow_inverted=binding.allow_inverted)
         except ValueError as exc:
             self._canvas.show_template_test_result(False)
             self._canvas._notify_status(str(exc))

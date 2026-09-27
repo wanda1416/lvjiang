@@ -60,6 +60,9 @@ def locate(frame_bgr, tpl, x1, y1, x2, y2, scales=(1.0,), min_score=DEFAULT_MIN_
 
 `scales=(scale,)` **只有一个尺度**：`scale = resolution_scale(canvas_w, tpl.record_w) = canvas_w / record_w`。
 
+这里的 `canvas_w` 与录制画布处于同一级：普通场景取主画布宽；子场景取当前
+父场景引用实例的像素宽。子场景搜索区的位置仍由投影到父画布后的 Region 决定。
+
 - 录制时画布 1920 px，当前画布 1920 px → scale = 1.0
 - 录制时 1920，当前 1080（投屏/手机）→ scale ≈ 0.5625
 - `record_w = 0` → 返回 1.0（**不做跨分辨率适配**，桌面录的模板放手机上会不命中）
@@ -67,6 +70,9 @@ def locate(frame_bgr, tpl, x1, y1, x2, y2, scales=(1.0,), min_score=DEFAULT_MIN_
 **为什么不做多尺度金字塔**：律匠的 Region 是**归一化坐标**，模板绑定携带 `record_w/record_h`，"录制画布宽 → 当前画布宽"是**精确的线性映射**，一个尺度就能覆盖所有分辨率。加金字塔只会拖慢搜索（每层跑一次 matchTemplate）+ 引入误命中风险（多层峰值竞争）。
 
 **缩放插值**：`INTER_AREA`（缩小）与 `INTER_LINEAR`（放大）——缩小用面积平均更保形，放大用双线性更平滑。
+
+绑定设为 `allow_inverted: true` 时，同一尺度还会尝试模板的灰度反色版本，
+取两个结果中的较高分。适用于同一图标在深浅背景间反色的情况；普通模板默认关闭。
 
 ### 命中判定
 
@@ -91,8 +97,8 @@ def locate(frame_bgr, tpl, x1, y1, x2, y2, scales=(1.0,), min_score=DEFAULT_MIN_
 ## 搜索区：search_box()
 
 ```python
-def search_box(frame_shape, tpl, canvas, region):
-    scale = resolution_scale(round(canvas_w), tpl.record_w)
+def search_box(frame_shape, tpl, canvas, region, *, scale_canvas_ratio=1.0):
+    scale = resolution_scale(round(canvas_w * scale_canvas_ratio), tpl.record_w)
     x1 = round(canvas_x + region.x_ratio * canvas_w)
     y1 = round(canvas_y + region.y_ratio * canvas_h)
     x2 = round(canvas_x + (region.x_ratio + region.w_ratio) * canvas_w) - 1

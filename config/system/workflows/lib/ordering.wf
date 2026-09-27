@@ -1,0 +1,87 @@
+#% name: 纯逻辑排序与查找过程
+
+# 数字升序；三路划分保留相等元素的原顺序，不修改输入。
+def quicksort($items)
+    if len($items) <= 1
+        return slice($items, 0, len($items) - 1)
+    end
+    eval $pivot = $items[0]
+    eval $left = []
+    eval $equal = []
+    eval $right = []
+    for item in $items
+        if $item < $pivot
+            eval append($left, $item)
+        else
+            if $item > $pivot
+                eval append($right, $item)
+            else
+                eval append($equal, $item)
+            end
+        end
+    end
+    call $sorted_left = quicksort($left)
+    call $sorted_right = quicksort($right)
+    eval $result = []
+    for item in $sorted_left
+        eval append($result, $item)
+    end
+    for item in $equal
+        eval append($result, $item)
+    end
+    for item in $sorted_right
+        eval append($result, $item)
+    end
+    return $result
+end
+
+# 合并两个已升序的数字列表，相等时先取左侧。
+def merge_sorted($left, $right)
+    eval $result = []
+    eval $i = 0
+    eval $j = 0
+    loop while $i < len($left) and $j < len($right)
+        if $left[$i] <= $right[$j]
+            eval append($result, $left[$i])
+            eval $i = $i + 1
+        else
+            eval append($result, $right[$j])
+            eval $j = $j + 1
+        end
+    end
+    loop while $i < len($left)
+        eval append($result, $left[$i])
+        eval $i = $i + 1
+    end
+    loop while $j < len($right)
+        eval append($result, $right[$j])
+        eval $j = $j + 1
+    end
+    return $result
+end
+
+# 已升序列表中第一个 >= value 的位置；都小于 value 时返回列表长度。
+def lower_bound($items, $value)
+    eval $lo = 0
+    eval $hi = len($items)
+    loop while $lo < $hi
+        eval $mid = ($lo + $hi - mod($lo + $hi, 2)) / 2
+        if $items[$mid] < $value
+            eval $lo = $mid + 1
+        else
+            eval $hi = $mid
+        end
+    end
+    return $lo
+end
+
+# 已升序列表中第一个相等值的位置；未找到返回 -1。
+def binary_search($items, $value)
+    call $index = lower_bound($items, $value)
+    if $index < len($items)
+        if $items[$index] == $value
+            return $index
+        end
+    end
+    return -1
+end

@@ -45,6 +45,13 @@ import "subcall/navigation.wf"
 - **循环检测**：解析期检测循环 import，发现后抛出错误
 - **冲突检测**：不同文件的同名过程，以及根工作流与导入文件的同名过程，均直接报错并列出两个来源
 
+`workflows/lib/` 收纳不依赖游戏页面或用户资料的纯逻辑过程，当前提供
+`collections.wf`（去重、展开、分块、分组）、`ordering.wf`（快排、合并、
+二分查找）和 `numeric.wf`（最大公约数、前缀和）。例如
+`import "lib/ordering.wf"` 后可用 `call $ordered = quicksort($numbers)`。
+这些文件只定义过程，不声明 `runnable` 或 `batchable`，不会进入脚本列表。
+它们的执行与 DSL 能力边界由 `tests/workflows/dsl_capabilities/` 验证。
+
 ```
 # 循环 import 示例（会报错）
 # a.wf: import "b.wf"

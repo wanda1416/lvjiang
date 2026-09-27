@@ -99,8 +99,7 @@ class _EvalMixin:
                     return False
                 return self._str_or_empty(left) in right
             case IsEmpty():
-                left = self._resolve(node.expr)
-                return not left or (isinstance(left, str) and left.strip() == "")
+                return self._is_empty(self._resolve(node.expr))
             case GreaterThan():
                 num_left = self._resolve_arith(node.left)
                 num_right = self._resolve_arith(node.right)
@@ -142,6 +141,33 @@ class _EvalMixin:
             case _:
                 # 普通表达式在布尔上下文中按其运行时值判断。
                 return bool(self._resolve(node))
+
+    @staticmethod
+    def _is_empty(value) -> bool:
+        """is_empty：只问「有没有内容」，不把「值是零」也算进来。
+
+        三种"空"各有专属问法，互不重叠：
+
+        - 完全没有值 → ``== null``
+        - 有字符串但没内容 → ``is_empty``（trim 后为空）
+        - 有值且为零 → ``== 0``
+
+        所以数字和布尔**永远不为空**：``0`` 与 ``false`` 是"有值且为零/假"，
+        不是"没读到东西"。此前实现是 ``not left``，把它们一并算空只是 Python
+        真值性的副产品，没有任何需求驱动——随包工作流的 6 处 is_empty 全部
+        作用在字符串、空串哨兵或集合上。
+        """
+        if value is None:
+            return True
+        if isinstance(value, bool):
+            return False          # bool ⊂ int，必须先于数字判掉
+        if isinstance(value, (int, float)):
+            return False
+        if isinstance(value, str):
+            return value.strip() == ""
+        if isinstance(value, (list, tuple, dict, set)):
+            return len(value) == 0
+        return not value          # 其他对象沿用真值性
 
     @staticmethod
     def _to_number(val):

@@ -3,6 +3,7 @@
 归档自 P2 开发期冒烟测试（scripts/_phase5_smoke.py）。
 """
 from lvjiang.workflows.grammar import parse_text
+from tests.case_matrix import case_matrix
 from tests.workflows.conftest import make_engine, run
 
 IF_ELSE_TPL = '''%s
@@ -53,6 +54,45 @@ class TestConditions:
     def test_null_is_empty(self):
         v = run(IF_ELSE_TPL % ('eval $x = null', '$x is_empty'))
         assert v["r"] == 1.0
+
+    @case_matrix("literal,empty", [
+        # 没有值
+        ("null", True),
+        # 有字符串但没内容
+        ('""', True),
+        ('"   "', True),
+        ('"abc"', False),
+        # 字符串 "0" 有内容，和数字 0 是两回事
+        ('"0"', False),
+        # 空集合没有内容
+        ("[]", True),
+        ("{}", True),
+        ('["a"]', False),
+        ('{"a": 1}', False),
+        # ⚠️ 数字与布尔永远不为空：0 / false 是「有值且为零/假」，
+        # 不是「没读到东西」。判零用 == 0，判无值用 == null。
+        # 实现曾是 not left，把它们一并算空只是 Python 真值性的副产品。
+        # 如果这几行开始失败，说明 is_empty 又退回真值性了，不要改断言。
+        ("0", False),
+        ("0.0", False),
+        ("1", False),
+        ("false", False),
+        ("true", False),
+    ])
+    def test_is_empty_asks_about_content_not_zero(self, literal, empty):
+        """is_empty 只问「有没有内容」。三种「空」各有专属问法，互不重叠：
+
+        没有值 → ``== null``；有串没内容 → ``is_empty``；值为零 → ``== 0``。
+        """
+        v = run(IF_ELSE_TPL % (f'eval $x = {literal}', '$x is_empty'))
+        assert v["r"] == (1.0 if empty else 0.0)
+
+    def test_is_empty_and_null_check_are_not_interchangeable(self):
+        """收紧后 is_empty 与 == null 在 0 上分道扬镳，这正是收紧的目的。"""
+        assert run(IF_ELSE_TPL % ('eval $x = 0', '$x is_empty'))["r"] == 0.0
+        assert run(IF_ELSE_TPL % ('eval $x = 0', '$x == null'))["r"] == 0.0
+        assert run(IF_ELSE_TPL % ('eval $x = null', '$x is_empty'))["r"] == 1.0
+        assert run(IF_ELSE_TPL % ('eval $x = null', '$x == null'))["r"] == 1.0
 
     def test_undefined_var_falsy(self):
         v = run(IF_ELSE_TPL % ('', '$undefined_var'))

@@ -7,7 +7,7 @@ from lvjiang.apps.yysls.ui import menus
 
 
 @pytest.mark.parametrize("dev_mode", [False, True])
-def test_attribute_config_is_dev_only_without_shortcut(
+def test_developer_menu_entries_are_dev_only_without_shortcut(
         qtbot, monkeypatch, dev_mode):
     host = QMainWindow()
     qtbot.addWidget(host)
@@ -23,7 +23,10 @@ def test_attribute_config_is_dev_only_without_shortcut(
     assert actions["游戏配置"].shortcut().toString() == "F5"
     assert actions["调律配置"].shortcut().toString() == "F6"
     if dev_mode:
+        assert "采集录制" in actions
+        assert actions["采集录制"].shortcut().isEmpty()
         assert "属性配置" in actions
         assert actions["属性配置"].shortcut().isEmpty()
     else:
+        assert "采集录制" not in actions
         assert "属性配置" not in actions

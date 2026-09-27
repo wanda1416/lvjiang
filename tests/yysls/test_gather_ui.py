@@ -69,13 +69,20 @@ class Host(QWidget):
         self.launches.append((args, kwargs))
 
 
-def test_fourth_tab_plugin_registration_and_dedicated_task():
-    from lvjiang.apps.yysls import hooks
+@pytest.mark.parametrize("dev_mode", [False, True])
+def test_gather_tab_is_registered_only_in_dev_mode(monkeypatch, dev_mode):
+    from lvjiang.apps import yysls
+    monkeypatch.setattr(
+        yysls, "get_resolver",
+        lambda: SimpleNamespace(is_dev_mode=lambda: dev_mode),
+    )
     from lvjiang.apps.yysls.workflows.implementations.auto_gather import (
         AutoGatherWorkflow,
     )
-    assert [name for name, _ in hooks.left_tab_builders] == ["调律", "采集"]
-    assert "auto_gather" in hooks.workflow_implementations
+    assert [name for name, _ in yysls._left_tab_builders()] == (
+        ["调律", "采集"] if dev_mode else ["调律"]
+    )
+    assert "auto_gather" in yysls.hooks.workflow_implementations
     assert AutoGatherWorkflow.SCOPE == "dedicated"
 
 

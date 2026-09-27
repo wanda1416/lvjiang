@@ -55,6 +55,7 @@ from ...core.profile.models import MODEL_QUOTA
 from ...core.profile.schema import get_profile_config
 from ...core.profile.service import profile_read
 from ...i18n import tr
+from ...workflows.builtins._coerce import to_bool
 from ..button_styles import apply_button_style, fit_button_width
 from ..main.run_control import (
     STATE_PAUSING,
@@ -738,9 +739,7 @@ class BatchTab(QWidget):
                 widget: QWidget
                 if param_type == "bool":
                     checkbox = QCheckBox()
-                    checkbox.setChecked(
-                        value.lower() in ("true", "1", "yes", "on")
-                        if isinstance(value, str) else bool(value))
+                    checkbox.setChecked(to_bool(value))
                     checkbox.toggled.connect(self._persist_workflow_params)
                     widget = checkbox
                 elif param_type == "number":

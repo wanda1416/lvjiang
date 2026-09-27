@@ -200,11 +200,10 @@ def _validate_parameter(parameter: Any, index: int) -> dict | None:
                 raise _error(f"{path}.{field}", "必须是字符串")
     elif "default" in parameter:
         default = parameter["default"]
-        bool_strings = {"true", "false", "1", "0", "yes", "no", "on", "off"}
-        if not isinstance(default, bool) and (
-            not isinstance(default, str) or default.lower() not in bool_strings
-        ):
-            raise _error(f"{path}.default", "必须是布尔值或明确的布尔字符串")
+        from .builtins._coerce import is_bool_text
+        if not isinstance(default, bool) and not is_bool_text(default):
+            raise _error(
+                f"{path}.default", "必须是布尔值或 true / false / 1 / 0")
     return normalized
 
 

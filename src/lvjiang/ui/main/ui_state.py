@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...i18n import tr
+from ...workflows.builtins._coerce import to_bool
 from ..widgets import FlowLayout
 
 
@@ -341,7 +342,7 @@ class UiStateMixin:
                 chk = QCheckBox()
                 chk.setObjectName(name)
                 if isinstance(default, str):
-                    chk.setChecked(default.lower() in ("true", "1", "yes", "on"))
+                    chk.setChecked(to_bool(default))
                 else:
                     chk.setChecked(bool(default))
                 chk.toggled.connect(self._persist_param_change)

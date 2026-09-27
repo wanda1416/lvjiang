@@ -1,11 +1,12 @@
 import pytest
 from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtWidgets import QFormLayout, QPlainTextEdit
+from PyQt6.QtWidgets import QFormLayout, QMessageBox, QPlainTextEdit
 
 from lvjiang.core.batch_config import BatchConfig, BatchConfigItem, BatchWorkflows
 from lvjiang.core.profile.models import MODEL_QUOTA, QuotaKeyDef
 from lvjiang.core.profile.schema import ProfileSchema
 from lvjiang.ui.batch import batch_tab
+from lvjiang.ui.batch.batch_runner import BatchScript
 from lvjiang.ui.batch.batch_tab import BatchTab
 
 
@@ -36,6 +37,24 @@ def _prepare_batch_tab(monkeypatch, config, *, schema=None):
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.list_exposed_scripts", lambda _run_env: [],
     )
+
+
+def test_attribute_start_requires_prepare_workflow(monkeypatch, qtbot):
+    config = BatchConfig({
+        "组": BatchConfigItem(name="组", usernames=["u1"],
+                               execution_unit_key="account"),
+    }, "组")
+    _prepare_batch_tab(monkeypatch, config)
+    tab = BatchTab(_Host())
+    qtbot.addWidget(tab)
+    monkeypatch.setattr(tab, "_get_enabled_usernames", lambda: ["a"])
+    monkeypatch.setattr(tab, "_checked_scripts", lambda: [BatchScript("A", "A")])
+    warnings = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_args:
+                        warnings.append(_args[2]))
+    tab._start_batch()
+    assert "条目准备" in warnings[0]
+    assert tab._progress_table.rowCount() == 0
 
 
 def test_main_batch_lists_preserve_and_update_actual_execution_order(

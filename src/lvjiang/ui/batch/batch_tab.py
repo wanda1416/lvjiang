@@ -1430,6 +1430,14 @@ class BatchTab(QWidget):
 
         # 构建进度表
         config = cfg.configs.get(self._current_config_name())
+        if (config is not None and config.execution_unit_key != "user"
+                and not config.workflows.prepare_item):
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, tr("无法开始批量任务"),
+                tr("当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。"),
+            )
+            return
         self._build_progress_table(usernames, config, scripts)
         self._set_config_enabled(False)
 

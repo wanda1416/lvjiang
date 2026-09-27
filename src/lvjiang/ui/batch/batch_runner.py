@@ -769,7 +769,10 @@ class BatchWorker(QThread):
                             self._stopped = True
                             break
                         planned = self._member_task_plan[(username, script.id)]
-                        checked = checks_by_member[username][script.id]
+                        # 资格筛选只用于选角色；前一个脚本可能已经修改 Profile，
+                        # 因此每个脚本执行前都要重新检查当前角色。
+                        checked = self._check_script(
+                            script, username, params=planned.params)
                         if checked.status != RESULT_SUCCESS:
                             status = self._result_to_ui_status(checked.status)
                             entry["scripts"][script.id] = status
@@ -885,14 +888,23 @@ class BatchWorker(QThread):
                         done.add(unit)
             except AccessDeniedError as exc:
                 self.log.emit(f"[批量] {unit} 暂不可执行: {exc}")
+                entry["prepare"] = ST_SKIPPED
+                report.record_prepare(ST_SKIPPED)
                 deferrals[unit] += 1
                 next_ready[unit] = time.monotonic() + 60
                 if deferrals[unit] >= 30:
+                    self.log.emit(f"[批量] {unit} 连续 30 次无法取得用户锁，本次停止调度该单元")
+                    for script in self._scripts:
+                        entry["scripts"][script.id] = ST_SKIPPED
+                        self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
+                        report.start_script(script.id, script.name)
+                        report.end_script(ST_SKIPPED)
                     done.add(unit)
             except Exception as exc:  # noqa: BLE001
                 logger.exception(f"属性单元执行失败: {unit}")
                 self.log.emit(f"[批量] {unit} 执行失败: {exc}")
-                entry["prepare"] = ST_FAILED
+                entry["error"] = str(exc)
+                report.record_error(str(exc))
                 done.add(unit)
             finally:
                 report.end_entry()
@@ -920,6 +932,7 @@ class BatchWorker(QThread):
                 or any(entry["prepare"] == ST_FAILED
                        or entry["finish"] == ST_FAILED
                        or ST_FAILED in entry["scripts"].values()
+                       or entry.get("error")
                        for entry in summary["entries"].values())
             )
             try:

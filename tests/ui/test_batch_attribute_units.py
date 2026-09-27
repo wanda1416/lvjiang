@@ -329,6 +329,133 @@ def test_attribute_unit_runs_only_selected_members_successful_checks(
     ]
 
 
+def test_attribute_rechecks_each_script_after_previous_script(tmp_path, monkeypatch, qapp):
+    import lvjiang.core.daily_history as history
+
+    save_user_metadata(User("u1", attributes={"account": "a"}), tmp_path)
+    monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
+    monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
+    monkeypatch.setattr(BatchReport, "write", lambda self: None)
+    worker = BatchWorker(
+        ["a"], [BatchScript("A", "A"), BatchScript("B", "B")],
+        BatchConfigItem(name="group", execution_unit_key="account",
+                        workflows=BatchWorkflows(prepare_item="prepare.wf")),
+        BatchContext(None, None, None, None), SessionManager(tmp_path),
+        lambda: False, candidate_usernames=["u1"],
+    )
+    changed = False
+    checks = []
+    executed = []
+
+    def check(script, username, **_kwargs):
+        checks.append((username, script.id))
+        return BatchCheckResult(
+            status="skipped" if script.id == "B" and changed else "success")
+
+    def run(script, *_args, **_kwargs):
+        nonlocal changed
+        executed.append(script.id)
+        changed = True
+        return {}
+
+    monkeypatch.setattr(worker, "_check_script", check)
+    monkeypatch.setattr(worker, "_run_stage", lambda phase, *_args, **_kw:
+                        BatchStageResult(username="u1" if phase == "prepare_item" else "",
+                                         state={}))
+    monkeypatch.setattr(worker, "_run_script", run)
+    monkeypatch.setattr(worker, "_save_result", lambda *args: None)
+    finished = []
+    worker.finished_all.connect(finished.append)
+    worker.run()
+
+    assert checks == [("u1", "A"), ("u1", "B"), ("u1", "A"), ("u1", "B")]
+    assert executed == ["A"]
+    assert next(iter(finished[0]["entries"].values()))["scripts"] == {
+        "A": ST_SUCCESS, "B": ST_SKIPPED,
+    }
+
+
+def test_attribute_session_failure_keeps_successful_prepare(tmp_path, monkeypatch, qapp):
+    import lvjiang.core.daily_history as history
+
+    save_user_metadata(User("u1", attributes={"account": "a"}), tmp_path)
+
+    class BatchRun:
+        batch_run_id = "batch"
+        repository = None
+
+        def finish(self, **kwargs):
+            statuses.append(kwargs["status"])
+
+    statuses = []
+    monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: BatchRun())
+    reports = []
+    monkeypatch.setattr(BatchReport, "write", lambda self: reports.append(self) or None)
+    worker = BatchWorker(
+        ["a"], [BatchScript("A", "A")],
+        BatchConfigItem(name="group", execution_unit_key="account",
+                        workflows=BatchWorkflows(prepare_item="prepare.wf")),
+        BatchContext(None, None, None, None), SessionManager(tmp_path),
+        lambda: False, candidate_usernames=["u1"],
+    )
+    monkeypatch.setattr(worker, "_run_stage", lambda phase, *_args, **_kw:
+                        BatchStageResult(username="u1" if phase == "prepare_item" else "",
+                                         state={}))
+    monkeypatch.setattr(worker._session_manager, "load", lambda _name:
+                        (_ for _ in ()).throw(OSError("session unavailable")))
+    finished = []
+    worker.finished_all.connect(finished.append)
+    worker.run()
+
+    entry = next(iter(finished[0]["entries"].values()))
+    assert entry["prepare"] == ST_SUCCESS
+    assert entry["error"] == "session unavailable"
+    assert reports[0]._entries[0].prepare_status == ST_SUCCESS
+    assert reports[0]._entries[0].error == "session unavailable"
+    assert statuses == ["failed"]
+
+
+def test_attribute_lock_conflict_limit_reports_skipped_unit(tmp_path, monkeypatch, qapp):
+    import itertools
+
+    import lvjiang.core.access as access
+    import lvjiang.core.daily_history as history
+    import lvjiang.ui.batch.batch_runner as runner
+
+    save_user_metadata(User("u1", attributes={"account": "a"}), tmp_path)
+    monkeypatch.setattr(history, "try_create_batch_run", lambda **kw: None)
+    monkeypatch.setattr(
+        access, "acquire_user",
+        lambda *_args: (_ for _ in ()).throw(access.AccessDeniedError("busy")),
+    )
+    ticks = itertools.count()
+    monkeypatch.setattr(runner.time, "monotonic", lambda: next(ticks) * 61.0)
+    reports = []
+    monkeypatch.setattr(BatchReport, "write", lambda self: reports.append(self) or None)
+    worker = BatchWorker(
+        ["a"], [BatchScript("A", "A")],
+        BatchConfigItem(name="group", execution_unit_key="account",
+                        workflows=BatchWorkflows(prepare_item="prepare.wf")),
+        BatchContext(None, None, None, None), SessionManager(tmp_path),
+        lambda: False, candidate_usernames=["u1"],
+    )
+    monkeypatch.setattr(worker, "_run_stage", lambda *_args, **_kw:
+                        BatchStageResult(state={}))
+    logs = []
+    progress = []
+    worker.log.connect(logs.append)
+    worker.progress.connect(lambda _idx, _label, _script, status:
+                            progress.append(status))
+    worker.run()
+
+    assert len(reports[0]._entries) == 30
+    assert "计划执行：1 单元轮次" in reports[0].render()
+    assert "实际尝试：30 次" in reports[0].render()
+    assert "跳过：30" in reports[0].render()
+    assert progress == [ST_SKIPPED]
+    assert any("连续 30 次无法取得用户锁" in message for message in logs)
+
+
 @pytest.mark.parametrize("failure", ["result", "history"])
 def test_attribute_persistence_failure_does_not_change_business_result(
     tmp_path, monkeypatch, qapp, failure,

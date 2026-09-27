@@ -218,14 +218,12 @@ def _validate_direct_literals(
         target_type = str(target.get("type", "select"))
         right = child.right if isinstance(child, InList) else [child.right]
         for value in _literal_values(right):
-            if target_type == "bool":
-                # DSL 的 == / != 对布尔恒假（to_number 刻意不把布尔当数字），
-                # 写成 == false 会静默永不成立，必须当场拒绝并给出惯用写法。
-                hint = ("not $" if value is True else "$") + left.name
+            if target_type == "bool" and not isinstance(value, bool):
+                # 布尔只与布尔相等（$flag == 1 恒假），拿别的类型比一定不成立，
+                # 属于写错而不是"条件暂不满足"。
                 raise RequireError(
-                    f"参数 {name!r} 的 require 不能用 == / != / in 比较 bool "
-                    f"参数 {left.name!r}：DSL 的相等比较对布尔恒假，"
-                    f"请直接写「{hint}」")
+                    f"参数 {name!r} 的 require 比较 bool 参数 {left.name!r} "
+                    "时只能用 true / false")
             if target_type == "number" and isinstance(value, (bool, str)):
                 raise RequireError(
                     f"参数 {name!r} 的 require 比较 number 参数 {left.name!r} "

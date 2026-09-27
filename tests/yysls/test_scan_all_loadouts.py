@@ -262,7 +262,7 @@ def test_workflow_and_shared_subcalls_parse():
     base = Path("config/system/workflows")
     for path in (
         "scan_all_loadouts.wf", "scan_equipped.wf",
-        "standalone/scan_role_base_attr.wf",
+        "scan_role_base_attr.wf",
         "subcall/loadout/game_plans.wf",
         "subcall/loadout/equipped.wf",
         "subcall/loadout/role_attrs.wf",
@@ -540,7 +540,7 @@ def test_game_plan_scene_loads_with_distinct_popup_views():
 def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():
     base = Path("config/system/workflows")
     equipment = parse_file(base / "scan_equipped.wf")
-    role = parse_file(base / "standalone/scan_role_base_attr.wf")
+    role = parse_file(base / "scan_role_base_attr.wf")
     batch = parse_file(base / "scan_all_loadouts.wf")
     assert "scan_equipped_plan" in set(_calls(equipment.body))
     assert "scan_role_base_attr_for_plan" in set(_calls(role.body))
@@ -558,7 +558,7 @@ def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():
     assert "len($name) > 0" in navigation_text
     assert "scroll [training_plan].[plan_list]" not in navigation_text
     assert "drag [training_plan].[plan_list]" not in navigation_text
-    for path in (base / "scan_equipped.wf", base / "standalone/scan_role_base_attr.wf"):
+    for path in (base / "scan_equipped.wf", base / "scan_role_base_attr.wf"):
         names = {item["name"] for item in parse_metadata_file(path)["parameters"]}
         assert {"plan_name", "main_art", "sub_art"} <= names
 

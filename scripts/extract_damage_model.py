@@ -28,6 +28,8 @@ from pathlib import Path
 import openpyxl
 import yaml
 
+from lvjiang.apps.yysls.core.graduation.model_registry import level_dirname
+
 ROOT = Path(__file__).resolve().parents[1]
 EXCEL_DIR = ROOT / "data" / "excel"
 SCHEME_DIR = ROOT / "config" / "system" / "yysls" / "graduation"
@@ -174,26 +176,37 @@ def _buffs(book, cached_book) -> dict[str, dict]:
     return buffs
 
 
-def _scheme(school: str) -> tuple[str, dict]:
+def _scheme(school: str, scheme: str = "") -> tuple[str, dict]:
     """找到该流派的方案 JSON。伤害模型与它同源，source 要对得上。"""
-    matches = sorted(SCHEME_DIR.glob(f"{school}_*.json"))
+    matches = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in SCHEME_DIR.glob("*/*.json")
+    ]
+    matches = [
+        data for data in matches
+        if data.get("school") == school and (not scheme or data.get("scheme") == scheme)
+    ]
     if not matches:
         raise ExtractError(f"找不到 {school} 的毕业率方案，请先导入 Excel")
-    path = matches[0]
-    return path.stem[len(school) + 1:], json.loads(path.read_text(encoding="utf-8"))
+    names = {str(data["scheme"]) for data in matches}
+    if len(names) > 1:
+        raise ExtractError(f"{school} 有多个方案，请用 --scheme 指定：{'、'.join(sorted(names))}")
+    data = max(matches, key=lambda item: (item["model_level"], item["model_version"]))
+    return str(data["scheme"]), data
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("school", help="流派名，如 鸣金·虹")
+    parser.add_argument("--scheme", default="", help="方案名；同一流派有多个方案时必填")
     parser.add_argument("--dry-run", action="store_true", help="只打印，不写文件")
     args = parser.parse_args()
 
-    scheme, data = _scheme(args.school)
+    scheme, data = _scheme(args.school, args.scheme)
     source = dict(data.get("source") or {})
-    excel = EXCEL_DIR / str(source.get("file") or "")
+    excel = EXCEL_DIR / level_dirname(data["model_level"]) / str(source.get("file") or "")
     if not excel.exists():
-        raise ExtractError(f"方案记录的 Excel 不在 data/excel 下: {excel.name}")
+        raise ExtractError(f"方案记录的 Excel 不存在: {excel.relative_to(ROOT)}")
     digest = hashlib.sha256(excel.read_bytes()).hexdigest()
     if source.get("sha256") and digest != source["sha256"]:
         raise ExtractError(

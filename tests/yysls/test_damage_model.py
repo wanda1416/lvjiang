@@ -194,7 +194,9 @@ def test_all_shipped_models_match_excel_extraction(extractor):
     root = Path(__file__).resolve().parents[2]
     for path in sorted((root / "config/system/yysls/damage_model").glob("*.yaml")):
         doc = yaml.safe_load(path.read_text(encoding="utf-8"))
-        excel = root / "data/excel" / doc["source"]["file"]
+        sources = list((root / "data/excel").glob(f"*/{doc['source']['file']}"))
+        assert len(sources) == 1, (path.name, sources)
+        excel = sources[0]
         book = openpyxl.load_workbook(excel, data_only=False)
         cached = openpyxl.load_workbook(excel, data_only=True)
         try:
@@ -209,6 +211,13 @@ def test_all_shipped_models_match_excel_extraction(extractor):
         finally:
             book.close()
             cached.close()
+
+
+def test_extractor_finds_current_scheme_in_level_directory(extractor):
+    scheme, data = extractor["_scheme"]("鸣金·虹")
+    assert scheme == data["scheme"] == "基础方案"
+    assert data["model_level"] == 110
+    assert data["source"]["file"]
 
 
 def test_conversion_survives_skill_edit_and_reload(models_dir):

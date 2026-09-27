@@ -998,15 +998,23 @@ class MainWindow(
         worker.progress.connect(self._batch_tab.update_progress)
         worker.selected_task_plan.connect(self._batch_tab.apply_selected_unit_plan)
         worker.log.connect(self._log_append)
-        worker.finished_all.connect(self._batch_tab.on_batch_finished)
-        worker.finished_all.connect(
-            lambda _: self._end_automation(tr("批量执行"))
-        )
+        # finished_all 在 run() 尚未退出时发出；此时释放最后一个 QThread
+        # 引用可能让 Qt 直接终止进程。等线程真正结束后再解锁界面。
+        worker.finished.connect(self._on_batch_worker_finished)
 
         self._current_worker = worker  # type: ignore[assignment]
         self._set_context_controls_locked(LOCK_REASON_BATCH, True)
         worker.start()
         return True
+
+    def _on_batch_worker_finished(self) -> None:
+        """批量线程完全退出后恢复界面并释放线程引用。"""
+        worker = self._current_worker
+        if worker is None:
+            return
+        worker.wait()
+        self._batch_tab.on_batch_finished({})
+        self._end_automation(tr("批量执行"))
 
     def _open_batch_config(self):
         """工具菜单 → 批量配置：打开配置对话框"""

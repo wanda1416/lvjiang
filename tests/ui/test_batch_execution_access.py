@@ -1,4 +1,6 @@
 """Batch user leases cover preparation, execution, persistence and cleanup."""
+from types import SimpleNamespace
+
 import pytest
 
 from lvjiang.core.access import AccessDeniedError, acquire_user
@@ -17,6 +19,23 @@ from lvjiang.ui.batch.batch_runner import (
     BatchStageResult,
     BatchWorker,
 )
+from lvjiang.ui.main.window import MainWindow
+
+
+def test_batch_ui_waits_for_thread_exit_before_releasing_worker():
+    order = []
+    worker = SimpleNamespace(wait=lambda: order.append("thread exited"))
+    tab = SimpleNamespace(
+        on_batch_finished=lambda summary: order.append("tab unlocked"))
+    host = SimpleNamespace(
+        _current_worker=worker,
+        _batch_tab=tab,
+        _end_automation=lambda name: order.append("worker released"),
+    )
+
+    MainWindow._on_batch_worker_finished(host)
+
+    assert order == ["thread exited", "tab unlocked", "worker released"]
 
 
 def make_worker(tmp_path, monkeypatch, *, rounds=1):

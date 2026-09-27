@@ -666,8 +666,25 @@ class BatchWorker(QThread):
             self._stopped = setup.status == RESULT_STOPPED
             done.update(self._usernames)
             self.log.emit(self._stage_message(tr("批次准备"), setup))
+            for round_number in range(1, self._config.rounds + 1):
+                for run_idx, unit in enumerate(self._usernames):
+                    label = f"{unit} · 第 {round_number} 次"
+                    skipped_entry = {
+                        "prepare": ST_SKIPPED, "finish": ST_SKIPPED,
+                        "username": "",
+                        "scripts": {script.id: ST_SKIPPED for script in self._scripts},
+                    }
+                    summary["entries"][label] = skipped_entry
+                    report.start_entry(label, "")
+                    report.record_prepare(ST_SKIPPED)
+                    for script in self._scripts:
+                        self.progress.emit(run_idx, label, script.id, ST_SKIPPED)
+                        report.start_script(script.id, script.name)
+                        report.end_script(ST_SKIPPED)
+                    report.end_entry()
 
-        while len(done) < len(self._usernames) and not self._stop_check():
+        while (len(done) < len(self._usernames)
+               and not self._stopped and not self._stop_check()):
             ready = [value for value in self._usernames
                      if value not in done and next_ready[value] <= time.monotonic()]
             if not ready:

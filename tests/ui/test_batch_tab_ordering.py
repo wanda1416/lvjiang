@@ -315,7 +315,6 @@ def test_profile_sort_is_hidden_for_attribute_units_and_restored_for_user(
     group = BatchConfigItem(
         name="日常", execution_unit_key=unit_key,
         usernames=["用户A"],
-        visible_units={unit_key: ["单元A"]},
         profile_sort_key="weekly_work",
     )
     config = BatchConfig({"日常": group}, "日常")

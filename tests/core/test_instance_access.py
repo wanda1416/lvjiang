@@ -126,7 +126,7 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
     assert session.get_node("profile")["overview_active_group"] == "new"
     assert session.get_node("ui_state")["main_page"]["left_tab_index"] == 1
 
-    disk = json.loads((tmp_path / "session.json").read_text())
+    disk = json.loads((tmp_path / "session.json").read_text(encoding="utf-8"))
     assert disk["actives"]["plan"] == "original"
     assert disk["settings"] == {"env": "desktop", "language": "en_US"}
     assert disk["daily"] == {"workflow_id": "old", "scripts": {"order": ["b"]}}
@@ -142,7 +142,8 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
 
     resolver.save_merged("app.yaml", {"plans": [{"name": "temporary"}]})
     assert resolver.load_merged("app.yaml")["plans"][0]["name"] == "temporary"
-    assert "temporary" in (tmp_path / "system/app.yaml").read_text()
+    assert "temporary" in (tmp_path / "system/app.yaml").read_text(
+        encoding="utf-8")
     resolver.write_entity("scenes/new.yaml", "{}")
     assert resolver.resolve_read("scenes/new.yaml") is not None
     users = SessionManager(tmp_path / "users")
@@ -174,7 +175,7 @@ def test_readonly_history_write_does_not_flush_temporary_settings(tmp_path, monk
     store.update_node("profile", {"overview_active_group": "temporary"})
     store.mutate_runtime_path("profile", "alert_history", lambda _: {"alice:key": "now"})
     assert store.get_node("profile")["overview_active_group"] == "temporary"
-    disk = json.loads((tmp_path / "session.json").read_text())
+    disk = json.loads((tmp_path / "session.json").read_text(encoding="utf-8"))
     assert disk["profile"] == {
         "overview_active_group": "original", "alert_history": {"alice:key": "now"},
     }
@@ -187,7 +188,7 @@ def test_readonly_reload_refreshes_writable_state_and_keeps_transients(tmp_path,
     monkeypatch.setattr(access, "_readonly", True)
     store.update_node("settings", {"env": "android"})
 
-    disk = json.loads(path.read_text())
+    disk = json.loads(path.read_text(encoding="utf-8"))
     disk["settings"]["language"] = "en_US"
     path.write_text(json.dumps(disk), encoding="utf-8")
     store.reload()

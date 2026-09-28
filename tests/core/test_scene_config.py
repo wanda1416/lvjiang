@@ -65,7 +65,7 @@ def test_legacy_panel_calibration_fields_are_ignored_and_removed_on_save(tmp_pat
     assert vars(panel) == {"key": "grid", "name": "Grid", "views": []}
     panel.name = "Renamed"
     registry.update_panel_in_scene("main", "grid", panel)
-    saved = yaml.safe_load(path.read_text())
+    saved = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert saved["panels"] == [{"key": "grid", "name": "Renamed"}]
 
 
@@ -241,8 +241,10 @@ def test_dev_save_keeps_local_only_group_and_scene_in_local(tmp_path):
     assert not (system / "scenes/map_one.yaml").exists()
     assert not (system / "scenes/map_two.yaml").exists()
     assert not (local / "scenes/map_one.yaml").exists()
-    assert yaml.safe_load((local / "scenes/map_two.yaml").read_text())["name"] == "新名"
-    assert "map" not in yaml.safe_load((system / "scenes.yaml").read_text())["scenes"]
+    assert yaml.safe_load(
+        (local / "scenes/map_two.yaml").read_text(encoding="utf-8"))["name"] == "新名"
+    assert "map" not in yaml.safe_load(
+        (system / "scenes.yaml").read_text(encoding="utf-8"))["scenes"]
     assert load_scene_manifest(resolver).groups["map"] == ["map_two"]
 
 

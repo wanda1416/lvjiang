@@ -129,7 +129,7 @@ def test_dev_mode_edits_local_map_without_creating_system_copy(tmp_path):
     manager.save_with_image(map_def, b"map image")
     assert not system_path.exists()
     assert not (resolver.system_dir / "maps/localmap/base.png").exists()
-    assert yaml.safe_load(local_path.read_text())["name"] == "改名"
+    assert yaml.safe_load(local_path.read_text(encoding="utf-8"))["name"] == "改名"
     assert (resolver.local_dir / "maps/localmap/base.png").read_bytes() == b"map image"
 
     manager.delete("localmap", delete_hud_scene=False)

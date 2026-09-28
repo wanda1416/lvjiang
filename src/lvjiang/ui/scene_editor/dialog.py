@@ -809,13 +809,18 @@ class SceneEditorDialog(
             if reply != QMessageBox.StandardButton.Yes:
                 self._status_bar.showMessage(tr("已取消刷新截图"))
                 return
-        save_scene_screenshot(
-            layout_name, scene_key, new_image, view, active_idx)
+        try:
+            stored_image = save_scene_screenshot(
+                layout_name, scene_key, new_image, view, active_idx)
+        except (OSError, ValueError) as exc:
+            self._status_bar.showMessage(tr("保存截图失败：{reason}").format(reason=exc))
+            return
+        display_image = stored_image if stored_image is not None else new_image
         self._img_cache[
-            (layout_name, scene_key, view, active_idx)] = new_image
+            (layout_name, scene_key, view, active_idx)] = display_image
         self._loaded_scenes.add(scene_key)
         if current_tab:
-            current_tab.canvas.set_image(new_image)
+            current_tab.canvas.set_image(display_image)
             if is_subscene(scene_key):
                 current_tab.canvas.focus_canvas()
         scene_name = get_scene_name(scene_key)
@@ -834,16 +839,21 @@ class SceneEditorDialog(
         view = current_tab.current_view if current_tab else ""
         indices = list_scene_screenshots(layout_name, scene_key, view)
         next_index = max(indices) + 1 if indices else 1
-        save_scene_screenshot(
-            layout_name, scene_key, new_image, view, next_index)
+        try:
+            stored_image = save_scene_screenshot(
+                layout_name, scene_key, new_image, view, next_index)
+        except (OSError, ValueError) as exc:
+            self._status_bar.showMessage(tr("保存截图失败：{reason}").format(reason=exc))
+            return
         set_active_screenshot_index(
             layout_name, scene_key, view, next_index)
+        display_image = stored_image if stored_image is not None else new_image
         self._img_cache[
-            (layout_name, scene_key, view, next_index)] = new_image
+            (layout_name, scene_key, view, next_index)] = display_image
         self._loaded_scenes.add(scene_key)
         if current_tab:
             current_tab._refresh_screenshot_combo()
-            current_tab.canvas.set_image(new_image)
+            current_tab.canvas.set_image(display_image)
             if is_subscene(scene_key):
                 current_tab.canvas.focus_canvas()
         scene_name = get_scene_name(scene_key)

@@ -11,6 +11,7 @@
 
 # 二进制显式声明，防止被 text 规则误转换
 *.png  binary
+*.webp binary
 *.jpg  binary
 *.jpeg binary
 *.db   binary

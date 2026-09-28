@@ -4,9 +4,25 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from lvjiang.core import layout_manager
 from lvjiang.ui.scene_editor import scene_tab as scene_tab_module
 from lvjiang.ui.scene_editor.dialog import SceneEditorDialog
 from lvjiang.ui.scene_editor.scene_tab import SceneTab
+from lvjiang.ui.scene_editor.screenshot_dialog import ScreenshotManagerDialog
+
+
+def test_screenshot_manager_saves_format_for_current_view(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(layout_manager, "SCREENSHOTS_DIR", tmp_path)
+    dialog = ScreenshotManagerDialog("layout", "general_move", "other")
+    qtbot.addWidget(dialog)
+
+    assert dialog._format_combo.currentData() == "webp"
+    dialog._format_combo.setCurrentIndex(dialog._format_combo.findData("png"))
+
+    assert layout_manager.get_scene_screenshot_format(
+        "layout", "general_move", "other") == "png"
+    assert layout_manager.get_scene_screenshot_format(
+        "layout", "general_move", "") == "webp"
 
 
 def test_layout_binding_populates_existing_default_screenshot(qtbot, monkeypatch):

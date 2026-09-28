@@ -1130,15 +1130,14 @@ def apply_penetration_resistance(
 
 
 def compute_gongjue_attrs(gongjue_type: str, equip_level: int,
-                          affix_caps_lookup) -> CombatAttributes:
-    """计算弓玦属性：当前赛季最大等级三率词条上限的一半
-
-    弓玦套装本质是给玩家凑半条词条用的。
+                          affix_caps_lookup, *, bonus_lookup=None) -> CombatAttributes:
+    """按实际生效等级计算弓玦属性；已登记的实测值优先。
 
     Args:
         gongjue_type: 弓玦类型（"会意"/"精准"/"会心"/""）
-        equip_level: 当前赛季装备等级
+        equip_level: 弓玦实际生效等级
         affix_caps_lookup: 查询函数 (level, affix_name) -> {"cap": float} | None
+        bonus_lookup: 实测加成查询函数，返回百分数
     """
     result = CombatAttributes()
     if not gongjue_type:
@@ -1152,14 +1151,15 @@ def compute_gongjue_attrs(gongjue_type: str, equip_level: int,
     if not affix_name or not field_name:
         return result
 
-    cap_data = affix_caps_lookup(equip_level, affix_name)
-    if cap_data is None:
+    bonus = bonus_lookup(gongjue_type, equip_level) if bonus_lookup else None
+    if bonus is None:
+        cap_data = affix_caps_lookup(equip_level, affix_name)
+        bonus = float(cap_data["cap"]) / 2 if cap_data else None
+    if bonus is None:
         logger.warning(f"弓玦属性计算：未找到 {affix_name} Lv{equip_level} 的词条上限")
         return result
 
-    # 弓玦 = 单条词条上限的一半（百分比转小数）
-    half_cap = cap_data["cap"] / 2.0 / 100.0
-    setattr(result, field_name, half_cap)
+    setattr(result, field_name, bonus / 100.0)
     return result
 
 

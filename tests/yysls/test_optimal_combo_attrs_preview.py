@@ -254,10 +254,11 @@ def _layout_of(widget):
 
 class _FakePreview:
     def __init__(self) -> None:
-        self.calls: list[tuple[dict, str | None, int]] = []
+        self.calls: list[tuple[dict, str | None, int, int]] = []
 
-    def show_preview(self, equipped, *, gongjue=None, world_level=0):
-        self.calls.append((equipped, gongjue, world_level))
+    def show_preview(self, equipped, *, gongjue=None, world_level=0,
+                     gongjue_level=0):
+        self.calls.append((equipped, gongjue, world_level, gongjue_level))
 
 
 def _page(qtbot) -> tuple[OptimalComboPage, _FakePreview]:
@@ -266,6 +267,7 @@ def _page(qtbot) -> tuple[OptimalComboPage, _FakePreview]:
     page._assumptions_provider = lambda: Assumptions(full_chengyin=True)
     page._searched_assumptions = Assumptions(full_chengyin=True, playstyle="无名")
     page._world_level = 115
+    page._gongjue_level = 113
     page._tab_widget = QTabWidget()
     qtbot.addWidget(page._tab_widget)
     for title in ("候选装备", "最优结果", "组合详情", "战斗属性"):
@@ -285,9 +287,10 @@ def test_show_attrs_projects_per_slot_and_labels_tab_with_rank(qtbot):
     assert page._tab_widget.currentIndex() == 3
     assert page._tab_widget.tabText(3) == "战斗属性 (#3)"
     assert "#3" in page._attrs_hint.text() and "会意" in page._attrs_hint.text()
-    (equipped, gongjue, world_level), = preview.calls
+    (equipped, gongjue, world_level, gongjue_level), = preview.calls
     assert gongjue == "会意"
     assert world_level == 115
+    assert gongjue_level == 113
     # 只有标了「同等级承音假设」的部位按承音投影；主武器保持原样
     assert equipped["ring"]["is_chengyin"] is True
     assert equipped["ring"]["affix_1"]["value"] != 100

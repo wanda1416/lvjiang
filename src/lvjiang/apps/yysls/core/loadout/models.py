@@ -81,6 +81,7 @@ class LoadoutPlan:
     # 派生，不重复存储；显示选项属于用户偏好，仍保存在 session settings。
     base_attribute: str = ""
     gongjue: str = ""
+    gongjue_level: int = 0  # 0 表示沿用当前赛季弓玦等级
     graduation_scheme: str = ""
     # 这套方案打的是 PVE 还是 PVP。目前只有智能调律用它：没有 PVP 调律方案，
     # 把 PVP 方案一起加载会让大量够不到 PVE 标准的装备被判成有提升。
@@ -123,6 +124,7 @@ class LoadoutPlan:
             playstyle=str(data.get("playstyle") or ""),
             base_attribute=str(data.get("base_attribute") or ""),
             gongjue=str(data.get("gongjue") or ""),
+            gongjue_level=int(data.get("gongjue_level") or 0),
             graduation_scheme=str(data.get("graduation_scheme") or ""),
             combat_type=normalize_combat_type(data.get("combat_type")),
             equipment=slots,
@@ -138,6 +140,7 @@ class LoadoutPlan:
             "playstyle": self.playstyle,
             "base_attribute": self.base_attribute,
             "gongjue": self.gongjue,
+            "gongjue_level": self.gongjue_level,
             "graduation_scheme": self.graduation_scheme,
             "combat_type": self.combat_type,
             "equipment": dict(self.equipment),

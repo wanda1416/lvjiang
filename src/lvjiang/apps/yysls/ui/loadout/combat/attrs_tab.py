@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -146,6 +147,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._preview = preview
         self._preview_equipped: dict | None = None
         self._preview_world_level: int | None = None
+        self._preview_gongjue_level: int | None = None
 
         # ✅ 会话级缓存：避免反复load装备文件（多进程安全）
         self._session_user: str | None = None  # 当前会话的用户
@@ -239,6 +241,15 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         fit_combo_to_contents(self._combo_gongjue, minimum=84)
         self._combo_gongjue.currentTextChanged.connect(self._on_gongjue_changed)
         gongjue_layout.addWidget(self._combo_gongjue, 1)
+        self._gongjue_level = QSpinBox()
+        self._gongjue_level.setRange(0, 999)
+        self._gongjue_level.setKeyboardTracking(False)
+        self._gongjue_level.setMinimumWidth(90)
+        self._gongjue_level.setSpecialValueText(tr("随赛季"))
+        self._gongjue_level.setSuffix(tr(" 级"))
+        self._gongjue_level.setToolTip(tr("弓玦实际生效等级，可输入 113 等中间等级；随赛季表示使用赛季默认等级。"))
+        self._gongjue_level.valueChanged.connect(self._on_gongjue_changed)
+        gongjue_layout.addWidget(self._gongjue_level)
 
         self._plan_scheme_field = QWidget()
         scheme_layout = QHBoxLayout(self._plan_scheme_field)
@@ -449,8 +460,25 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._btn_edit_play_style.setText(tr("编辑属性") if full else tr("编辑"))
         self._btn_create_play_style.setText(tr("新建属性") if full else tr("新建"))
 
-    def _on_gongjue_changed(self, _gongjue: str):
+    def _on_gongjue_changed(self, _gongjue: str | int):
         """弓玦切换"""
+        if isinstance(_gongjue, int) and _gongjue > 0:
+            from ....config import get_game_config
+            from ....core.loadout import LoadoutRepository
+
+            kind = self._get_current_gongjue()
+            if kind and get_game_config().get_gongjue_bonus(kind, _gongjue) is None:
+                username = self._host.active_user_name()
+                old_level = (LoadoutRepository(username).load().active_plan.gongjue_level
+                             if username else 0)
+                self._gongjue_level.blockSignals(True)
+                self._gongjue_level.setValue(old_level)
+                self._gongjue_level.blockSignals(False)
+                QMessageBox.warning(
+                    self, tr("等级尚无数据"),
+                    tr("{level} 级弓玦没有可用的加成数据，请选择已配置的等级。")
+                    .format(level=_gongjue))
+                return
         self._refresh_display()
         self._save_selection()
 
@@ -580,18 +608,21 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                 if self._combo_play_style.currentIndex() >= 0
                 else plan.base_attribute,
                 self._get_current_gongjue(),
+                self._gongjue_level.value(),
                 self._combo_scheme.currentText()
                 if self._combo_scheme.currentIndex() >= 0
                 else plan.graduation_scheme,
             )
             if values != (
-                plan.base_attribute, plan.gongjue, plan.graduation_scheme
+                plan.base_attribute, plan.gongjue, plan.gongjue_level,
+                plan.graduation_scheme
             ):
                 repo.configure_plan(
                     plan.id,
                     base_attribute=values[0],
                     gongjue=values[1],
-                    graduation_scheme=values[2],
+                    gongjue_level=values[2],
+                    graduation_scheme=values[3],
                 )
         except Exception as e:
             logger.debug(f"保存备战方案战斗配置失败: {e}")
@@ -668,6 +699,9 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             # 恢复弓玦
             idx = self._combo_gongjue.findData(gongjue)
             self._combo_gongjue.setCurrentIndex(max(0, idx))
+            self._gongjue_level.blockSignals(True)
+            self._gongjue_level.setValue(plan.gongjue_level)
+            self._gongjue_level.blockSignals(False)
 
             # 空值显示第一个可用项并写回；失效引用则显示为空，避免伪装成已配置。
             if scheme:
@@ -715,7 +749,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
                 if not getattr(current, field)
             }
             if updates:
-                repo.configure_plan(plan_id, **updates)
+                repo.configure_plan(plan_id, **updates)  # type: ignore[arg-type]
         except Exception as exc:
             logger.warning(f"保存备战方案默认战斗配置失败: {exc}")
 
@@ -1090,12 +1124,14 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
     def show_preview(
         self, equipped: dict, *, gongjue: str | None = None,
         world_level: int | None = None,
+        gongjue_level: int | None = None,
     ) -> None:
         """预览一套（已投影的）装备；``gongjue`` 覆盖当前弓玦套装。"""
         if not self._preview:
             raise RuntimeError("show_preview 只用于 preview 实例")
         self._preview_equipped = dict(equipped)
         self._preview_world_level = world_level
+        self._preview_gongjue_level = gongjue_level
         if gongjue is not None:
             self._combo_gongjue.blockSignals(True)
             index = self._combo_gongjue.findData(gongjue)
@@ -1110,7 +1146,9 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         from ....core.graduation.context import gongjue_attrs
 
         return gongjue_attrs(
-            self._get_current_gongjue(), world_level=self._effective_world_level())
+            self._get_current_gongjue(), world_level=self._effective_world_level(),
+            gongjue_level=(self._preview_gongjue_level if self._preview
+                           else self._gongjue_level.value()))
 
     def _effective_world_level(self) -> int:
         """毕业率相关等级：预览用注入值，正常页面用当前用户设置。"""

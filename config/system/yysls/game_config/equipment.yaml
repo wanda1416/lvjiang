@@ -217,6 +217,12 @@ base_attrs:
       through_level: 110
     - 外功防御
     - 气血最大值
+# 弓玦实测加成（百分数）；中间等级按区间给出，不从普通词条上限推算。
+gongjue_bonuses:
+  会意:
+    110: 3.5
+    111-114: 3.75
+    115: 4.0
 equipment_sets:
   left:
     yudou:

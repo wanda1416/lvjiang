@@ -133,7 +133,8 @@ def _save_scanned_base_attrs(_engine, prefill: dict) -> str:
             panel_values[field] = float(panel_values[field]) / 100.0
     base = derive_base_attributes(
         CombatAttributes.from_dict(panel_values), state.resolved_equipment(plan_id),
-        gongjue_attrs(plan.gongjue))
+        gongjue_attrs(plan.gongjue, game_config,
+                      gongjue_level=plan.gongjue_level))
     values = stored_base_fields(school_attr, base)
     if not values:
         raise ValueError(f"基础属性 {name!r} 反推结果为空，拒绝写入")

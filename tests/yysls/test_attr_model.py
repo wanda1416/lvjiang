@@ -513,6 +513,13 @@ def test_gongjue_keeps_its_own_level_in_a_115_baseline() -> None:
         == pytest.approx(0.035)
     assert with_110.panel.contribution_by_kind("intent_rate")[
         "gongjue"] == pytest.approx(0.035)
+    for level, expected in ((113, 0.0375), (115, 0.04)):
+        result = manager.resolve_loadout(
+            AttrLoadout(level=115, school="鸣金·虹",
+                        gongjue="会意", gongjue_level=level),
+            school_attr="鸣金")
+        assert result.panel_attrs.intent_rate - without.panel_attrs.intent_rate \
+            == pytest.approx(expected)
 
 
 def test_every_school_uses_the_same_equipment_and_independent_gongjue_levels() -> None:

@@ -29,6 +29,12 @@ def mgr():
     return get_game_config()
 
 
+def test_gongjue_bonus_uses_actual_effective_level(mgr):
+    assert [mgr.get_gongjue_bonus("会意", level)
+            for level in (110, 111, 113, 114, 115)] == [
+                3.5, 3.75, 3.75, 3.75, 4.0]
+
+
 # ─── 词条别名归一 ──────────────────────────────────────────
 
 class TestResolveAffixCategory:

@@ -267,6 +267,7 @@ class GameConfigManager:
         self._equipment_sets: dict[str, dict[str, dict]] = {
             "left": {}, "right": {},
         }
+        self._gongjue_bonuses: dict[str, dict[tuple[int, int], float]] = {}
         # 武学注册表：武学名 → {"weapon": 武器, "attr": 属性}（顶层 martial_arts）
         # 武器和属性都是武学的固有属性，流派/玩法只引用武学，不再各自录入武器——
         # 那会让 weapon 和 martial_art 两个字段可以互相矛盾且无人校验。
@@ -342,6 +343,7 @@ class GameConfigManager:
         self._part_type_aliases.clear()
         self._equipment_name_series.clear()
         self._equipment_sets = {"left": {}, "right": {}}
+        self._gongjue_bonuses.clear()
         self._schools.clear()
         self._level_configs.clear()
         self._season_configs.clear()
@@ -431,6 +433,21 @@ class GameConfigManager:
                     for level, name in levels.items() if str(name).strip()
                 }
         raw_sets = data.get("equipment_sets") or {}
+        for kind, levels in (data.get("gongjue_bonuses") or {}).items():
+            if not isinstance(levels, dict):
+                continue
+            ranges: dict[tuple[int, int], float] = {}
+            for key, value in levels.items():
+                bounds = str(key).split("-", 1)
+                try:
+                    low = int(bounds[0])
+                    high = int(bounds[-1])
+                    bonus = float(value)
+                except (ValueError, TypeError):
+                    continue
+                if 0 < low <= high and bonus >= 0:
+                    ranges[low, high] = bonus
+            self._gongjue_bonuses[str(kind)] = ranges
         if isinstance(raw_sets, dict):
             for side in ("left", "right"):
                 entries = raw_sets.get(side) or {}
@@ -822,6 +839,29 @@ class GameConfigManager:
         """返回词条已登记数值的等级，供跨等级规则选择相邻档位。"""
         category = self.resolve_affix_category(affix_name)
         return sorted(self._affix_caps.get(category, {}))
+
+    def get_gongjue_bonus(self, gongjue_type: str, level: int) -> float | None:
+        """弓玦百分数；实测区间优先，其他类型沿用相邻词条档的中点。"""
+        for (low, high), value in self._gongjue_bonuses.get(gongjue_type, {}).items():
+            if low <= level <= high:
+                return value
+        affix = {"会意": "会意率", "会心": "会心率", "精准": "精准率"}.get(
+            gongjue_type)
+        if not affix:
+            return None
+        caps = self.get_affix_caps(level, affix)
+        if caps:
+            return float(caps["cap"]) / 2
+        levels = self.get_affix_cap_levels(affix)
+        lower = max((item for item in levels if item < level), default=None)
+        upper = min((item for item in levels if item > level), default=None)
+        if lower is None or upper is None:
+            return None
+        low_caps = self.get_affix_caps(lower, affix)
+        high_caps = self.get_affix_caps(upper, affix)
+        if low_caps is None or high_caps is None:
+            return None
+        return (float(low_caps["cap"]) + float(high_caps["cap"])) / 4
 
     def get_equipment_sets(self, side: str | None = None) -> dict:
         """返回套装注册表副本；左右套装身份始终分开。"""

@@ -263,6 +263,7 @@ class LoadoutRepository:
                        combat_type: str | None = None,
                        base_attribute: str | None = None,
                        gongjue: str | None = None,
+                       gongjue_level: int | None = None,
                        graduation_scheme: str | None = None) -> None:
         def mutate(state: LoadoutState) -> None:
             if plan_id not in state.plans:
@@ -282,6 +283,10 @@ class LoadoutRepository:
                 plan.base_attribute = base_attribute
             if gongjue is not None:
                 plan.gongjue = gongjue
+            if gongjue_level is not None:
+                if gongjue_level < 0:
+                    raise ValueError("弓玦生效等级不能为负数")
+                plan.gongjue_level = gongjue_level
             if graduation_scheme is not None:
                 plan.graduation_scheme = graduation_scheme
         self.update(mutate)

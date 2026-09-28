@@ -9,6 +9,11 @@
 | local | `config/local/` | 用户覆盖层：影子文件 + 键级 diff | ❌ |
 | session | `config/session/` | 纯运行态，不经 resolver（见 `core.config.session`） | ❌ |
 
+上表的“进 git”指公开主仓库。开发版把 `config/local/` 单独作为与 `premium`
+配套的资源仓库：其中可以包含高级功能所需的场景、布局、脚本和开发数据；公开版
+仍把同一路径用作用户覆盖层。`config/session/` 是另一份独立的运行数据仓库。
+匿名安装标识虽然落在 local 路径下，仍只属于单机运行态，应排除在 Git 跟踪之外。
+
 **读**：`local > remote（版本更新才生效）> system`，两种模式一致。
 **写**：按模式路由——开发模式（`.git` 存在或 `LVJIANG_DEV_MODE=1`）写 system 全量；
 用户模式写 local diff。**任何模式都不写 remote**——那层是下发下来的，

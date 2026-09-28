@@ -220,10 +220,10 @@ python -m lvjiang -reg yysls
 | 层 | 路径 | 内容 | 是否提交到代码仓库 |
 |---|---|---|---|
 | 系统默认 | `config/system/` | 场景 / 工作流（`.wf`）/ 布局 / 输入参数 / 预置连接方案 / 调律规则 / 参考图 | ✅ |
-| 用户覆盖 | `config/local/` | 用户对 `app.yaml` 的键级 diff（配置管理对话框写入） | ❌ |
+| 用户覆盖 | `config/local/` | 配置键级差异、用户脚本和其他本地实体；开发版还提供与 premium 配套的资源 | ❌ |
 | 运行时会话 | `config/session/` | `session.json`（当前状态、自建连接方案）、用户数据、工作流输出日志 | ❌ |
 
-`config/local/` 与 `config/session/` 只保存在你自己的电脑上，律匠不会把其中任何内容上传到任何服务器。律匠全部的联网行为见 [隐私说明](PRIVACY.md)。
+公开版不会自动上传 `config/local/` 或 `config/session/` 的内容。开发者可分别使用独立仓库同步开发版资源和运行数据；匿名安装标识始终不应进入仓库。律匠的联网行为见 [隐私说明](PRIVACY.md)。
 
 `config/system/app.yaml` 示例（输入模拟 + 命名延迟参数）：
 

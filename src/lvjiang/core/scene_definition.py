@@ -464,7 +464,9 @@ class SceneRegistry:
                   if any(r.scene == key for r in s.subscene_refs)]
         if owners:
             raise ValueError(f"场景 {key} 正被以下场景引用，不能删除: {', '.join(owners)}")
-        self._resolver.delete_entity(f"scenes/{key}.yaml")
+        rel_path = f"scenes/{key}.yaml"
+        self._resolver.delete_entity(
+            rel_path, layer=self._resolver.local_only_layer(rel_path))
         del self._scenes[key]
         self._order.remove(key)
         # 从分组中移除
@@ -485,6 +487,8 @@ class SceneRegistry:
             # 重命名是写新删旧；先鉴权，禁止在用户模式下为 system 场景
             # 创建孤立的新 key 影子文件。
             self._resolver.ensure_entity_deletable(f"scenes/{key}.yaml")
+        old_rel_path = f"scenes/{key}.yaml"
+        old_layer = self._resolver.local_only_layer(old_rel_path)
         scene = self._scenes[key]
         old_name = scene.name
         old_order = list(self._order)
@@ -502,7 +506,7 @@ class SceneRegistry:
         scene.name = new_name
         try:
             # 先写新文件，成功后再删除旧文件，避免写入失败时丢失原定义。
-            self._save_scene_yaml(scene)
+            self._save_scene_yaml(scene, layer=old_layer)
         except Exception:
             scene.key = key
             scene.name = old_name
@@ -530,7 +534,7 @@ class SceneRegistry:
                 if changed:
                     self._save_scene_yaml(owner)
 
-            self._resolver.delete_entity(f"scenes/{key}.yaml")
+            self._resolver.delete_entity(old_rel_path, layer=old_layer)
 
             # 无热重载的独立 SceneRegistry 也要维持内存状态；有热
             # 重载时 pop 则是幂等空操作。新场景优先使用热重载从
@@ -1155,8 +1159,9 @@ class SceneRegistry:
         self._save_scene_yaml(scene, content_version=content_version)
 
     def _save_scene_yaml(self, scene: SceneDef,
-                         content_version: int | None = None):
-        """将场景定义经 resolver 写入 YAML（开发→system/scenes，用户→local/scenes）"""
+                         content_version: int | None = None,
+                         layer: str | None = None):
+        """将场景定义写入 YAML，保留 local 独有场景的所属层。"""
         data: dict[str, Any] = {"key": scene.key, "name": scene.name}
         if scene.type != "scene":
             data["type"] = scene.type
@@ -1214,8 +1219,10 @@ class SceneRegistry:
                  **({"navigation": r.navigation} if r.navigation is not None else {})}
                 for r in scene.references
             ]
+        rel_path = f"scenes/{scene.key}.yaml"
         self._resolver.write_entity(
-            f"scenes/{scene.key}.yaml",
+            rel_path,
             yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False),
             content_version=content_version,
+            layer=layer or self._resolver.local_only_layer(rel_path),
         )

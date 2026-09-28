@@ -1194,10 +1194,12 @@ class LayoutConfigManager:
                 })
             if positions:
                 entry["reference_positions"] = positions
+            rel_path = _scene_rel(scene_dir_name, sk)
             resolver.write_entity(
-                _scene_rel(scene_dir_name, sk),
+                rel_path,
                 json.dumps(entry, ensure_ascii=False, indent=2),
                 content_version=versions.get(sk),
+                layer=resolver.local_only_layer(rel_path),
             )
         mode = f"增量 {len(scene_keys)}/{len(all_scene_keys)} 场景" if changed_scenes is not None else tr("全量")
         logger.info(f"布局已保存: {layout.name} ({layout.key}, {mode})")

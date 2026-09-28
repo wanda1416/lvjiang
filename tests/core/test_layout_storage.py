@@ -196,6 +196,20 @@ class TestSaveLoadRoundtrip:
         assert (scene_dir / "scene_a.json").exists()
         assert (scene_dir / "scene_b.json").exists()
 
+    def test_dev_save_keeps_local_only_scene_layout_in_local(self, env):
+        mgr = LayoutConfigManager()
+        assert mgr.save_layout(_make_layout())
+        system_path = env / "system/layouts/test_layout/scene_a.json"
+        local_path = env / "local/layouts/test_layout/scene_a.json"
+        local_path.parent.mkdir(parents=True)
+        system_path.rename(local_path)
+
+        layout = mgr.load_layout("test_layout")
+        layout.get_scene_regions("scene_a")[0].x_ratio = 0.2
+        assert mgr.save_layout(layout, changed_scenes={"scene_a"})
+        assert not system_path.exists()
+        assert json.loads(local_path.read_text())["regions"][0]["x_ratio"] == 0.2
+
     def test_layouts_yaml_created(self, env):
         mgr = LayoutConfigManager()
         mgr.save_layout(_make_layout())

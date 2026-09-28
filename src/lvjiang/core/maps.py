@@ -421,7 +421,7 @@ class MapManager:
     # ─── 写入 ──────────────────────────────────────────────
 
     def save(self, map_def: MapDef, *, force: bool = False) -> Path:
-        """保存地图定义（开发模式写 system，用户模式写 local 影子）。"""
+        """保存地图定义；已有 local 地图在开发模式下仍写回 local。"""
         MapDef.from_dict(map_def.to_dict())  # 复用同一套校验
         duplicate = next(
             (item for item in self.list_maps()
@@ -433,7 +433,8 @@ class MapManager:
             raise MapError(tr("地图名称已存在: {name}").format(name=map_def.name))
         self.validate_bindings(map_def)
         return self._resolver.write_entity(
-            map_rel_path(map_def.key), dump_map_yaml(map_def), force=force)
+            map_rel_path(map_def.key), dump_map_yaml(map_def), force=force,
+            layer=LAYER_LOCAL if map_def.layer == LAYER_LOCAL else None)
 
     def import_base_image(self, map_def: MapDef, data: bytes) -> Path:
         """写入底图（PNG 字节）。底图不参与版本管理，直接落到写层。"""
@@ -441,14 +442,16 @@ class MapManager:
             raise MapError(tr("底图数据为空"))
         map_def.base_image_sha256 = image_sha256(data)
         return self._resolver.write_entity(
-            base_image_rel_path(map_def.key, map_def.base_image), data, force=True)
+            base_image_rel_path(map_def.key, map_def.base_image), data, force=True,
+            layer=LAYER_LOCAL if map_def.layer == LAYER_LOCAL else None)
 
     def save_with_image(
         self, map_def: MapDef, data: bytes, *, force: bool = False,
     ) -> Path:
         """原子语义地保存底图与定义；定义失败时恢复写层原底图。"""
         rel = base_image_rel_path(map_def.key, map_def.base_image)
-        root = (self._resolver.system_dir if self._resolver.is_dev_mode()
+        root = (self._resolver.system_dir
+                if self._resolver.is_dev_mode() and map_def.layer != LAYER_LOCAL
                 else self._resolver.local_dir)
         target = root / rel
         existed = target.is_file()
@@ -460,7 +463,9 @@ class MapManager:
         except Exception:
             map_def.base_image_sha256 = previous_sha
             if existed:
-                self._resolver.write_entity(rel, previous, force=True)
+                self._resolver.write_entity(
+                    rel, previous, force=True,
+                    layer=LAYER_LOCAL if map_def.layer == LAYER_LOCAL else None)
             elif target.exists():
                 target.unlink()
             raise
@@ -524,11 +529,12 @@ class MapManager:
         """
         map_def = self.load(key)
         self._resolver.ensure_entity_deletable(map_rel_path(key))
-        self._resolver.delete_entity(map_rel_path(key))
+        layer = LAYER_LOCAL if map_def.layer == LAYER_LOCAL else None
+        self._resolver.delete_entity(map_rel_path(key), layer=layer)
         image_rel = base_image_rel_path(key, map_def.base_image)
         if self._resolver.resolve_read(image_rel) is not None:
             try:
-                self._resolver.delete_entity(image_rel)
+                self._resolver.delete_entity(image_rel, layer=layer)
             except Exception as exc:  # noqa: BLE001 — 底图删不掉不阻断定义删除
                 logger.warning(f"删除底图失败 {image_rel}: {exc}")
         if (delete_hud_scene and map_def.ui.generated_scene

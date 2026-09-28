@@ -29,6 +29,9 @@ coverage.xml
 # Logs
 logs/
 
+# premium 
+src/lvjiang/apps/premium
+
 # local config (user overlay / session runtime / 在线下发层)
 /config/local*
 /config/session*

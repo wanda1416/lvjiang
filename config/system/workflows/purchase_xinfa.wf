@@ -8,7 +8,8 @@
 #%     type: bool
 #%     default: false
 #%   - name: max_xinfa_boxes
-#%     label: 最多打开心法心得数
+#%     label: 最多打开数量
+#%     require: $open_bag_xinfa
 #%     type: number
 #%     default: 5
 #%     min: 1

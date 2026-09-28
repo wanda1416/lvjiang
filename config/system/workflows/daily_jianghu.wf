@@ -16,6 +16,7 @@
 #%     min: 15
 #%   - name: max_claim_reputation
 #%     label: 最大领取声望
+#%     require: $claim_reward
 #%     type: number
 #%     default: 1500
 #%     min: 0

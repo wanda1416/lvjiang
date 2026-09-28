@@ -230,6 +230,8 @@ def test_daily_jianghu_claim_reputation_guard():
     assert parameters["max_claim_reputation"] == {
         "name": "max_claim_reputation",
         "label": "最大领取声望",
+        # 声望上限只在领奖时起作用，不领奖时整行不展示
+        "require": "$claim_reward",
         "type": "number",
         "default": 1500,
         "min": 0,

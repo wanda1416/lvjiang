@@ -3,6 +3,7 @@
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 
+from lvjiang.core.task_params import parameters_for_values
 from lvjiang.workflows.grammar import parse_file
 from lvjiang.workflows.grammar.ast_nodes import (
     Break,
@@ -47,11 +48,15 @@ def test_open_bag_xinfa_parameter_is_opt_in():
         "default": False,
     }, {
         "name": "max_xinfa_boxes",
-        "label": "最多打开心法心得数",
+        "label": "最多打开数量",
+        # 只在打开背包心法时才用得上，关着时整行不展示
+        "require": "$open_bag_xinfa",
         "type": "number",
         "default": 5,
         "min": 1,
     }]
+    assert [item["name"] for item in parameters_for_values(
+        metadata["parameters"], {"open_bag_xinfa": False})] == ["open_bag_xinfa"]
 
 
 def test_bag_xinfa_hit_branch_is_bounded():

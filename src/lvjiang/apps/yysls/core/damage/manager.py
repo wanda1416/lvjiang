@@ -7,6 +7,10 @@
 两边同源于一份 Excel。``source.sha256`` 对不上就说明有一边换过表而
 另一边没跟上，:meth:`mismatched` 会报出来——不比对的话，页面上显示
 的系数和毕业率实际用的系数可以差一个赛季，而且看不出来。
+
+方案按等级分文件，系数表没有等级维度（一个流派一份）。所以判定口径是
+「**存在**同源的配套方案即视为一致」，而不是「必须与最高等级那份同源」：
+某个流派新增更高等级的方案时，旧等级的系数表并没有过期。
 """
 
 from __future__ import annotations
@@ -82,10 +86,15 @@ class DamageModelManager:
         return dict(self._errors)
 
     def mismatched(self, school: str) -> str:
-        """与配套方案 JSON 的来源不一致时返回说明，一致返回空串
+        """没有任何配套方案与系数表同源时返回说明，否则返回空串
 
         比的是 sha256 而不是文件名或版本号：改过表内容却没改文件名的
         情况最常见，而那正是两边悄悄分家的时刻。
+
+        只要有**一份**配套方案与系数表同源就算一致。方案按等级分文件，系数表
+        却是一个流派一份，因此新增更高等级的方案不代表旧等级的系数表过期——
+        否则 115 级方案一进来就会让还在用 110 阶表的流派永远挂着「已过期」，
+        而按提示去导入 115 的 Excel 并不是想要的结果。
         """
         model = self._models.get(school)
         if model is None or not model.source.get("sha256"):
@@ -115,11 +124,16 @@ class DamageModelManager:
         if not candidates:
             return tr("找不到配套方案 {name}").format(
                 name=f"<等级>级/{school}_{model.scheme}_v<版本>.json")
-        _level, _version, _filename, scheme = max(candidates)
-        theirs = str((scheme.get("source") or {}).get("sha256") or "")
-        if theirs and theirs != model.source["sha256"]:
-            return tr("与配套方案不同源，系数表可能已过期（重新导入 Excel 可修复）")
-        return ""
+        recorded = [
+            str((scheme.get("source") or {}).get("sha256") or "")
+            for *_ignored, scheme in candidates
+        ]
+        if any(sha == model.source["sha256"] for sha in recorded):
+            return ""
+        if not any(recorded):
+            # 配套方案都没记来源，无从比较，不制造噪声。
+            return ""
+        return tr("与配套方案不同源，系数表可能已过期（重新导入 Excel 可修复）")
 
     # ── 写回 ────────────────────────────────────────────
 

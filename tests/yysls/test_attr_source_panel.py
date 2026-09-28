@@ -231,6 +231,12 @@ def test_loadout_without_record_follows_the_seasons_gongjue_level(derive) -> Non
     assert dialog._loadout().gongjue_level == expected
 
 
+def test_gongjue_intermediate_level_can_be_entered(derive) -> None:
+    dialog, _ = derive
+    dialog._combo_gongjue_level.setValue(113)
+    assert dialog._loadout().gongjue_level == 113
+
+
 def test_saving_records_both_the_snapshot_and_the_loadout(derive) -> None:
     """只存扁平数值的话，事后没人知道它是怎么推出来的。"""
     from lvjiang.apps.yysls.config import get_derivation, get_play_styles

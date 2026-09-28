@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from lvjiang.apps.yysls.config import get_game_config
+from lvjiang.apps.yysls.core.combat.base_attribute_ingest import derive_base_attributes
 from lvjiang.apps.yysls.core.combat.combat_attrs import CombatAttributes
 from lvjiang.apps.yysls.core.graduation import (
     get_graduation_calculator,
@@ -197,6 +198,18 @@ def test_plan_context_from_plan_includes_fixed_gongjue(monkeypatch):
     assert context.base_attrs.intent_rate == pytest.approx(
         0.2 + expected.intent_rate)
     assert context.scorer(game_config=gc).school == "鸣金·虹"
+
+    plan.gongjue_level = 113
+    upgraded = PlanScoringContext.from_plan(
+        plan, game_config=gc, world_level=115)
+    assert upgraded.gongjue_level == 113
+    assert upgraded.base_attrs.intent_rate == pytest.approx(0.2375)
+    assert gongjue_attrs("会意", gc, gongjue_level=113).intent_rate == pytest.approx(
+        0.0375)
+    assert derive_base_attributes(
+        CombatAttributes(intent_rate=0.2375), {},
+        gongjue_attrs("会意", gc, gongjue_level=113),
+    ).intent_rate == pytest.approx(0.2)
 
     with pytest.raises(PlanContextError):
         PlanScoringContext.from_plan(

@@ -209,15 +209,24 @@ def _write_equipped(_engine, slot_key: str, equip_dict: dict) -> str:
 
 
 @builtin_func("set_scanned_loadout_gongjue")
-def _set_scanned_loadout_gongjue(_engine, gongjue: str) -> str:
-    """Set the scanned plan's bow-jue set without changing the UI active plan."""
+def _set_scanned_loadout_gongjue(_engine, gongjue: str, detail: str) -> str:
+    """原子写入扫描到的弓玦类型及实际生效等级。"""
+    import re
+
     if gongjue not in ("会意", "会心", "精准"):
         raise ValueError(f"无法识别的弓玦套装: {gongjue!r}")
+    levels = re.findall(r"生效等级\s*[:：]\s*(\d{2,3})", detail)
+    if len(levels) != 1:
+        raise ValueError("弓玦详情未能唯一识别「生效等级」，拒绝写入方案")
+    level = int(levels[0])
+    from ...config import get_game_config
+    if get_game_config().get_gongjue_bonus(gongjue, level) is None:
+        raise ValueError(f"弓玦 {gongjue} 的 {level} 级加成尚未配置，拒绝写入方案")
     plan_id = _engine.context.get("_bound_loadout_plan_id")
     if not plan_id:
         raise ValueError("写入弓玦前必须通过方案名称与武学绑定写入目标")
     repo = _repository(_engine)
-    repo.configure_plan(plan_id, gongjue=gongjue)
+    repo.configure_plan(plan_id, gongjue=gongjue, gongjue_level=level)
     _notify_equipment_changed(_engine)
-    logger.info(f"已更新扫描方案的弓玦套装: {gongjue}")
+    logger.info(f"已更新扫描方案的弓玦套装: {gongjue} Lv{level}")
     return gongjue

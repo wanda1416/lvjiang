@@ -149,6 +149,8 @@ def _selection_tab(*, preview=False):
         _combo_play_style=base,
         _combo_scheme=scheme,
         _combo_gongjue=gongjue,
+        _gongjue_level=SimpleNamespace(
+            blockSignals=lambda _: None, setValue=lambda _: None),
         _refresh_play_styles=lambda: base.replace(["属性甲", "属性乙"]),
         _refresh_schemes=lambda: scheme.replace(["基础方案"]),
         _persist_displayed_defaults=CombatAttrsTab._persist_displayed_defaults,

@@ -37,6 +37,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -157,10 +158,15 @@ class AttrDerivePanel(QWidget):
         for gongjue in ("会意", "精准", "会心"):
             self._combo_gongjue.addItem(gongjue, gongjue)
         self._combo_gongjue.currentIndexChanged.connect(self._on_changed)
-        self._combo_gongjue_level = QComboBox()
-        for cfg in get_game_config().get_level_configs():
-            self._combo_gongjue_level.addItem(str(cfg.level), cfg.level)
-        self._combo_gongjue_level.currentIndexChanged.connect(self._on_changed)
+        self._combo_gongjue_level = QSpinBox()
+        cap_levels = get_game_config().get_affix_cap_levels("会意率")
+        self._combo_gongjue_level.setRange(
+            min(cap_levels) if cap_levels else 1,
+            max(cap_levels) if cap_levels else 999)
+        self._combo_gongjue_level.setKeyboardTracking(False)
+        self._combo_gongjue_level.setMinimumWidth(84)
+        self._combo_gongjue_level.setSuffix(tr(" 级"))
+        self._combo_gongjue_level.valueChanged.connect(self._on_changed)
         gongjue_row = QWidget()
         gongjue_layout = QHBoxLayout(gongjue_row)
         gongjue_layout.setContentsMargins(0, 0, 0, 0)
@@ -316,7 +322,7 @@ class AttrDerivePanel(QWidget):
             school=self._school(),
             inner_ways=tuple(slots),
             gongjue=str(self._combo_gongjue.currentData() or ""),
-            gongjue_level=int(self._combo_gongjue_level.currentData() or 0),
+            gongjue_level=self._combo_gongjue_level.value(),
             selections=selections,
         )
 
@@ -342,8 +348,7 @@ class AttrDerivePanel(QWidget):
             loadout.gongjue_level
             or get_game_config().gongjue_level_for(loadout.level)
         )
-        self._combo_gongjue_level.setCurrentIndex(max(
-            0, self._combo_gongjue_level.findData(gongjue_level)))
+        self._combo_gongjue_level.setValue(gongjue_level)
 
     def _on_reference_changed(self) -> None:
         """选中一套基础属性时，把它当时的装配也调出来。
@@ -413,7 +418,8 @@ class AttrDerivePanel(QWidget):
             reference = reference + self._manager().equipment_base_attrs(
                 loadout.level)
             reference = reference + compute_gongjue_attrs(
-                loadout.gongjue, loadout.gongjue_level, gc.get_affix_caps)
+                loadout.gongjue, loadout.gongjue_level, gc.get_affix_caps,
+                bonus_lookup=gc.get_gongjue_bonus)
         return reference
 
     def _resolve(self, loadout: AttrLoadout, *, residual=None):
@@ -584,7 +590,8 @@ class AttrDerivePanel(QWidget):
                 result.combat_attrs
                 - self._manager().equipment_base_attrs(loadout.level)
                 - compute_gongjue_attrs(
-                    loadout.gongjue, loadout.gongjue_level, gc.get_affix_caps)
+                    loadout.gongjue, loadout.gongjue_level, gc.get_affix_caps,
+                    bonus_lookup=gc.get_gongjue_bonus)
             )
             save_play_style(
                 self._school(), name.strip(), runtime_base.to_dict(),

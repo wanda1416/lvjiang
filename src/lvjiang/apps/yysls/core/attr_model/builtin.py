@@ -73,12 +73,13 @@ def equipment_base_effect(level: int, base_attr_lookup) -> StatEffect:
 
 
 def gongjue_effect(
-    gongjue_type: str, level: int, affix_caps_lookup,
+    gongjue_type: str, level: int, affix_caps_lookup, *, bonus_lookup=None,
 ) -> StatEffect | None:
     """按独立等级生成弓玦来源；115 装备可以继续搭配 110 弓玦。"""
     if not gongjue_type or not level:
         return None
-    attrs = compute_gongjue_attrs(gongjue_type, level, affix_caps_lookup)
+    attrs = compute_gongjue_attrs(
+        gongjue_type, level, affix_caps_lookup, bonus_lookup=bonus_lookup)
     stats: dict[str, float | Formula] = {
         name: float(getattr(attrs, name))
         for name in ("precision", "crit_rate", "intent_rate")

@@ -35,9 +35,9 @@
 | 项 | 值 |
 |---|---|
 | 位置 | `core/combat/combat_attrs.py` `compute_gongjue_attrs()`；调用入口统一在 `core/graduation/context.py` `gongjue_attrs()` |
-| 值 | 弓玦属性 = `season_configs.gongjue_level` 对应三率词条普通上限 ÷ 2；字段为空时才跟随赛季装备等级。南吕相和装备与弓玦同为 115（该赛季初期弓玦曾为 110，后随游戏更新升至 115）。类型映射写死：会意 → 会意率 / `intent_rate`，会心 → 会心率 / `crit_rate`，精准 → 精准率 / `precision` |
+| 值 | 优先使用方案实际扫描或手填的生效等级，未设置时使用 `season_configs.gongjue_level`。会意弓玦实测档位登记在 `equipment.yaml/gongjue_bonuses`：110 为 3.5%，111–114 为 3.75%，115 为 4.0%；其余类型按普通词条上限一半，中间等级按相邻档中点。类型映射：会意 → 会意率 / `intent_rate`，会心 → 会心率 / `crit_rate`，精准 → 精准率 / `precision` |
 | 依据 | 游戏内弓玦面板数值实测 |
-| 变化时 | 弓玦等级改 `seasons.yaml`；新弓玦类型改两个映射 dict；比例改 `half_cap` 一行。赛季等级为 0（未配置赛季）时弓玦属性为零，见 0.12.2 发布说明 |
+| 变化时 | 赛季默认等级改 `seasons.yaml`，实测加成改 `equipment.yaml/gongjue_bonuses`；新增弓玦类型需补齐映射。无可用等级时弓玦属性为零，见 0.12.2 发布说明 |
 
 ### A3. 三率抗性的基准与上限
 

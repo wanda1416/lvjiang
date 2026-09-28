@@ -193,6 +193,7 @@ class GraduationAnalysisLauncher:
                 level_threshold=self._level_threshold(),
                 affix_filter=self._affix_filter(),
                 gongjue=scoring.gongjue,
+                gongjue_level=scoring.gongjue_level,
                 playstyle=plan.playstyle,
                 main_martial_art=plan.main_martial_art,
                 sub_martial_art=plan.sub_martial_art,

@@ -866,6 +866,7 @@ class OptimalComboPage(QWidget):
         level_threshold: int = 0,
         affix_filter: str = "all",
         gongjue: str = "",
+        gongjue_level: int = 0,
         playstyle: str = "",
         main_martial_art: str = "",
         sub_martial_art: str = "",
@@ -894,6 +895,7 @@ class OptimalComboPage(QWidget):
         # base_attrs 不含弓玦，弓玦属性按需计算
         self._base_attrs_raw = base_attrs
         self._current_gongjue = gongjue
+        self._gongjue_level = gongjue_level
         self._playstyle = playstyle
         self._main_martial_art = main_martial_art
         self._sub_martial_art = sub_martial_art
@@ -1268,7 +1270,8 @@ class OptimalComboPage(QWidget):
         gongjue = str(result.get("gongjue") or "")
         self._attrs_preview.show_preview(
             self._preview_equipped_for(result), gongjue=gongjue,
-            world_level=self._world_level)
+            world_level=self._world_level,
+            gongjue_level=self._gongjue_level)
         rate = result.get("rate", 0)
         self._attrs_hint.setText(
             tr("方案 #{rank}　弓玦套装：{gongjue}　毕业率 {rate:.2f}%　·　"
@@ -1632,7 +1635,8 @@ class OptimalComboPage(QWidget):
         season_level = self._world_level or gc.current_equip_level()
         scenarios = [
             (name, self._base_attrs_raw + gongjue_attrs(
-                name, gc, world_level=season_level))
+                name, gc, world_level=season_level,
+                gongjue_level=self._gongjue_level))
             for name in gongjues
         ]
         # 假设在点击时定格：搜索期间改动假设栏不影响本次结果。赛季承音

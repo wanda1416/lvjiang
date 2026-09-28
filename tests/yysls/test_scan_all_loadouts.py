@@ -99,16 +99,24 @@ def test_scanned_gongjue_writes_only_bound_plan(tmp_path):
     active = repo.load().active_plan_id
     target = repo.create_plan("方案甲", "无名剑法", "无名枪法", activate=False)
     with pytest.raises(ValueError, match="绑定写入目标"):
-        _set_scanned_loadout_gongjue(engine, "会意")
+        _set_scanned_loadout_gongjue(engine, "会意", "生效等级:113")
     _bind_scanned_loadout(engine, target.name, target.main_martial_art,
                           target.sub_martial_art)
     with pytest.raises(ValueError, match="无法识别"):
-        _set_scanned_loadout_gongjue(engine, "未知")
-    assert _set_scanned_loadout_gongjue(engine, "精准") == "精准"
+        _set_scanned_loadout_gongjue(engine, "未知", "生效等级:113")
+    with pytest.raises(ValueError, match="生效等级"):
+        _set_scanned_loadout_gongjue(engine, "精准", "装备等阶 115")
+    assert _set_scanned_loadout_gongjue(
+        engine, "精准", "二件套[生效等级:113]") == "精准"
     state = repo.load()
     assert state.plans[target.id].gongjue == "精准"
+    assert state.plans[target.id].gongjue_level == 113
     assert state.active_plan_id == active
     assert state.plans[active].gongjue == ""
+    with pytest.raises(ValueError, match="生效等级"):
+        _set_scanned_loadout_gongjue(engine, "会意", "装备等阶 115")
+    unchanged = repo.load().plans[target.id]
+    assert (unchanged.gongjue, unchanged.gongjue_level) == ("精准", 113)
 
 
 def test_existing_plan_names_snapshot_does_not_change_active_plan(tmp_path):
@@ -126,9 +134,10 @@ def test_existing_plan_names_snapshot_does_not_change_active_plan(tmp_path):
 @pytest.mark.parametrize(
     ("detail", "expected"),
     [
-        ("弓玦套装 | 会意", "会意"),
-        ("弓玦套装 | 会心", "会心"),
-        ("弓玦套装 | 精准", "精准"),
+        ("追影套装2/2 | 二件套[生效等级:113] | 会意率 +3.8%", "会意"),
+        ("弓玦套装 | 会心 | 生效等级:110", "会心"),
+        ("弓玦套装 | 精准 | 生效等级:115", "精准"),
+        ("弓玦套装 | 会意", None),
         ("未识别到套装", None),
         ("会意 | 会心", None),
     ],
@@ -157,6 +166,9 @@ def test_bow_detail_dsl_updates_gongjue_only_when_unique(
     assert returned.value.value == (8 if expected else -1)
     state = repo.load()
     assert state.plans[target.id].gongjue == (expected or "")
+    assert state.plans[target.id].gongjue_level == (113 if expected == "会意" else
+                                                   110 if expected == "会心" else
+                                                   115 if expected == "精准" else 0)
     assert state.active_plan_id == active
 
 

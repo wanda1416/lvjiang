@@ -217,7 +217,7 @@ class PlanManagerDialog(QDialog):
             self._load_user(selected_id=plan.id)
             return
         try:
-            repo.configure_plan(plan.id, **updates)
+            repo.configure_plan(plan.id, **updates)  # type: ignore[arg-type]
         except Exception as exc:  # noqa: BLE001 - 单次编辑失败不该关掉对话框
             logger.error(f"编辑备战方案失败: {exc}")
             QMessageBox.warning(self, tr("保存失败"), str(exc))

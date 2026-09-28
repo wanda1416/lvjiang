@@ -28,8 +28,9 @@ class PlanContextError(ValueError):
 
 def gongjue_attrs(
     gongjue: str, game_config=None, *, world_level: int | None = None,
+    gongjue_level: int | None = None,
 ) -> CombatAttributes:
-    """弓玦套装属性：个人世界等级三率词条上限的一半；空套装为零。"""
+    """按方案实际生效等级取弓玦加成；未记录等级时跟随赛季。"""
     if not gongjue:
         return CombatAttributes()
     if game_config is None:
@@ -39,11 +40,12 @@ def gongjue_attrs(
         int(world_level) if world_level is not None
         else game_config.current_equip_level()
     )
-    if not level:
+    if not level and not gongjue_level:
         return CombatAttributes()
-    gongjue_level = game_config.gongjue_level_for(level)
+    gongjue_level = gongjue_level or game_config.gongjue_level_for(level)
     return compute_gongjue_attrs(
-        gongjue, gongjue_level, game_config.get_affix_caps)
+        gongjue, gongjue_level, game_config.get_affix_caps,
+        bonus_lookup=game_config.get_gongjue_bonus)
 
 
 @dataclass(frozen=True)
@@ -61,6 +63,7 @@ class PlanScoringContext:
     #: 不含弓玦的基础属性；只给最优组合按弓玦场景自行叠加用
     base_attrs_without_gongjue: CombatAttributes
     gongjue: str
+    gongjue_level: int
     playstyle: str
     attribute: str                    # 流派属性（鸣金/裂石/…），动态词条归类用
 
@@ -111,7 +114,8 @@ class PlanScoringContext:
         assert calculator is not None and isinstance(base_data, dict)
         raw_base = CombatAttributes.from_dict(base_data)
         base_attrs = raw_base + gongjue_attrs(
-            plan.gongjue, game_config, world_level=effective_level)
+            plan.gongjue, game_config, world_level=effective_level,
+            gongjue_level=plan.gongjue_level)
         attr_context = GraduationAttrContext.from_school(
             school, world_level=effective_level, game_config=game_config)
         model = calculator.model
@@ -128,6 +132,8 @@ class PlanScoringContext:
             base_attrs=base_attrs,
             base_attrs_without_gongjue=raw_base,
             gongjue=plan.gongjue,
+            gongjue_level=plan.gongjue_level or game_config.gongjue_level_for(
+                effective_level),
             playstyle=plan.playstyle,
             attribute=str((schools.get(school) or {}).get("attr") or ""),
         )

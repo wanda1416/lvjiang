@@ -411,6 +411,7 @@ class AttrModelManager:
         gongjue = gongjue_effect(
             loadout.gongjue, loadout.gongjue_level,
             get_game_config().get_affix_caps,
+            bonus_lookup=get_game_config().get_gongjue_bonus,
         )
         builtins: list[StatEffect] = []
         if self._include_builtin_equipment:

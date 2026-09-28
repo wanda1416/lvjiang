@@ -86,6 +86,11 @@ def scan_equipped_slots()
         log error "弓玦套装识别失败或不唯一，跳过该方案的基础属性反推"
         return -1
     end
-    eval set_scanned_loadout_gongjue($bow_kind)
+    try
+        eval set_scanned_loadout_gongjue($bow_kind, $bow_text)
+    catch $err
+        log error "弓玦生效等级识别失败，跳过该方案的基础属性反推: " + $err
+        return -1
+    end
     return $written
 end

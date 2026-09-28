@@ -726,6 +726,12 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             logger.info(f"=== DSL 工作流被停止，收集到 {len(self.output)} 项数据 ===")
             return self.output
 
+        if self._stop_check():
+            # _exec_body 遇到停止请求是正常 return（不抛信号），顶层因此走到这里。
+            # 打成「完成」会让调用方把「被停止、没走到 return」误当成正常结束，
+            # 批量层就会把 return_value=None 当成 success + 空返回值。
+            logger.info(f"=== DSL 工作流被停止，收集到 {len(self.output)} 项数据 ===")
+            return self.output
         logger.info(f"=== DSL 工作流完成，收集到 {len(self.output)} 项数据 ===")
         return self.output
 

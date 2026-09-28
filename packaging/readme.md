@@ -86,6 +86,20 @@ Release 标题，确保发布页面与历史版本维持一致。
 - **`content_version` 不再自动 +1**（0.9 起）。开发模式的普通保存只**保留**原版本号，提升必须在编辑器里显式操作：场景编辑器点「提升至 vN」再保存，调律规则点 key 行的「提升」按钮。这条以前是自动的，现在纯人工，本轮改过、要走在线下发的配置**逐个确认版本号**。
 - 开发模式下若线上版本正顶替某个文件，普通保存写进 system 也不会生效（版本号没超过线上那份）。编辑器保存后会明确提示「尚未生效」，看到就去点提升。
 - Android 的 `versionCode` 是配置解压 stamp，不递增则设备上仍是旧配置。
+- **`config/system` 在升级时按通道清理，各通道能力不同**。它随包分发、用户侧只读
+  （用户改动落 `config/local`），所以升级必须做到「与包内容完全一致」而不是「覆盖
+  同名文件」——否则上游删除或移动过的文件会永远留在用户机器上：`.wf` 换个目录就变
+  成两份同 id 脚本（一份生效一份幽灵，编辑器标红冲突），被删掉的场景、布局、参照图
+  继续以旧内容加载。当前状态：
+
+  | 通道 | 清理行为 |
+  |------|---------|
+  | Windows 安装器 | `[InstallDelete]` 在拷文件前清空 `{app}\config\system` 与 `{app}\_internal` |
+  | Android APK | `versionCode` 变化时先删 `filesDir/lvjiang/config/system` 再全量解压 |
+  | Windows 便携版 ZIP | **不清理**，用户必须解压到新目录，见下方打包产物说明 |
+
+  三条通道都不动 `config/local` 和 `config/session`——前者是用户覆盖，后者是运行
+  数据，都不随包分发。
 
 **🔧 修复章节的收录原则：**
 
@@ -164,6 +178,11 @@ packaging\package.bat
 - `dist/lvjiang/lvjiang.exe` — 可执行文件
 - `dist/lvjiang-vX.Y.Z-win64.zip` — 发布压缩包（便携版）
 - `dist/lvjiang-vX.Y.Z-win64-setup.exe` — Windows 安装包（推荐）
+
+> **便携版升级必须解压到新目录。** ZIP 由用户自行解压，没有任何一方能删除旧文件，
+> 就地覆盖会留下上一版已经删除或移动过的 `config/system` 内容。发布说明里给便携版
+> 用户的指引固定是「解压到新目录，再把 `config/local`、`config/session` 拷过去」。
+> 安装器和 APK 已各自清理，不需要这条提示。
 
 打包脚本会自动：
 1. 从 `pyproject.toml` 读取版本号注入到 `src/lvjiang/_version.py`

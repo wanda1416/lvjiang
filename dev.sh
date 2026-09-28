@@ -88,6 +88,20 @@ setup_with_uv() {
 # ─── Main ───
 main() {
     local python_cmd
+    local extra_apps=()
+    local forwarded=()
+
+    for arg in "$@"; do
+        if [[ "$arg" == "--all" ]]; then
+            extra_apps=(-reg premium)
+        else
+            forwarded+=("$arg")
+        fi
+    done
+    if (( ${#extra_apps[@]} )) && [[ ! -f src/lvjiang/apps/premium/__init__.py ]]; then
+        error "--all requires the premium repository at src/lvjiang/apps/premium"
+        exit 1
+    fi
     
     python_cmd=$(find_python) || exit 1
     
@@ -99,7 +113,7 @@ main() {
     # allows running bare python without pip install -e .
     export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
     
-    exec "$python_cmd" -m lvjiang -reg yysls "$@"
+    exec "$python_cmd" -m lvjiang -reg yysls "${extra_apps[@]}" "${forwarded[@]}"
 }
 
 main "$@"

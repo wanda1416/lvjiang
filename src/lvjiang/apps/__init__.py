@@ -15,7 +15,7 @@ from .base import AppHooks
 
 logger = logging.getLogger(__name__)
 
-# 插件名 → 模块路径。新增插件时在此登记即可。
+# 内置插件可保留别名；其他插件按 lvjiang.apps.<name> 显式发现。
 _APP_REGISTRY: dict[str, str] = {
     "yysls": "lvjiang.apps.yysls",
 }
@@ -27,13 +27,16 @@ def load_app(name: str) -> AppHooks:
 
     插件模块必须在顶层导出 ``hooks: AppHooks`` 属性。
     """
-    if name not in _APP_REGISTRY:
-        raise KeyError(
-            f"未登记的插件: {name!r}。可用插件: {list(_APP_REGISTRY)}"
-        )
-    module_path = _APP_REGISTRY[name]
+    if not name.isascii() or not name.isidentifier() or name.startswith("_"):
+        raise KeyError(f"无效的插件名: {name!r}")
+    module_path = _APP_REGISTRY.get(name, f"lvjiang.apps.{name}")
     try:
         module = importlib.import_module(module_path)
+    except ModuleNotFoundError as exc:
+        if exc.name == module_path:
+            raise KeyError(f"插件 {name!r} 未安装") from exc
+        logger.exception("加载插件 %s 失败", module_path)
+        raise RuntimeError(f"加载插件 {name!r} 失败: {exc}") from exc
     except Exception as exc:  # noqa: BLE001
         logger.exception("加载插件 %s 失败", module_path)
         raise RuntimeError(f"加载插件 {name!r} 失败: {exc}") from exc
@@ -108,6 +111,11 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
         except Exception:  # noqa: BLE001
             logger.exception("[plugin] 工作流注册失败")
         logger.info("[plugin]   workflows: %s", list(hooks.workflow_implementations.keys()))
+
+    if hooks.result_log_suppressed_ids:
+        registry.setdefault("result_log_suppressed_ids", set()).update(
+            hooks.result_log_suppressed_ids
+        )
 
     if hooks.builtin_modules:
         registry.setdefault("builtin_modules", []).extend(hooks.builtin_modules)

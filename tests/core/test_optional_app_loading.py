@@ -1,0 +1,35 @@
+"""Optional plugins must stay opt-in and need no public registry entry."""
+
+import sys
+from types import ModuleType
+
+import pytest
+
+from lvjiang.apps import load_app, register_hooks
+from lvjiang.apps.base import AppHooks
+
+
+def test_uninstalled_optional_app_has_clear_error():
+    with pytest.raises(KeyError, match="未安装"):
+        load_app("missing_optional_app")
+
+
+def test_installed_optional_app_registers_by_module_name(monkeypatch):
+    module = ModuleType("lvjiang.apps.optional_demo")
+    module.hooks = AppHooks(
+        id="optional_demo",
+        result_log_suppressed_ids=["optional_task"],
+    )
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+
+    registry = {}
+    register_hooks(load_app("optional_demo"), registry)
+
+    assert registry["app_ids"] == ["optional_demo"]
+    assert registry["result_log_suppressed_ids"] == {"optional_task"}
+
+
+def test_builtin_app_does_not_include_optional_gather():
+    hooks = load_app("yysls")
+    assert "auto_gather" not in hooks.workflow_implementations
+    assert [name for name, _ in hooks.left_tab_builders] == ["调律"]

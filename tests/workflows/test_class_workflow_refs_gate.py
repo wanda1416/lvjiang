@@ -118,18 +118,6 @@ def test_class_workflow_gate_has_inputs():
     assert _system_layouts(), "config/system/layouts 下没有布局"
 
 
-def test_gather_crop_region_is_checked():
-    """采集工作流通过固定场景的裁剪函数读取布局。"""
-    workflow_id, cls = next(
-        item for item in _class_workflows() if item[0] == "auto_gather"
-    )
-    module = importlib.import_module(cls.__module__)
-    refs = _collect(Path(module.__file__), cls)
-    assert ("map_gather", "map_view", "region") in {
-        (scene, key, kind) for scene, key, kind, _line in refs
-    }, workflow_id
-
-
 @case_matrix("layout_name", _system_layouts())
 @case_matrix(
     ("workflow_id", "cls"),

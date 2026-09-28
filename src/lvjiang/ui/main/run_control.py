@@ -13,12 +13,12 @@ from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QMessageBox
 
+from lvjiang.apps import get_registry
+
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from .execution_access import guarded_finish, guarded_launch
-
-_RESULT_LOG_SUPPRESSED_FLOW_IDS = frozenset({"auto_tuning", "auto_gather"})
 
 # 顶部上下文选择器的锁定原因。定义在这里而不是 window.py：window 已经
 # import 本模块，反向 import 会成环。
@@ -106,12 +106,9 @@ def _to_history_snapshot(obj):
 def _log_workflow_result(flow_id: str, result: Any, *, interrupted: bool) -> bool:
     """Log a workflow's structured result unless it has a dedicated report.
 
-    Auto tuning already writes a Markdown tuning report.  Dumping the same
-    ``tuning_reports`` payload again through loguru duplicates it in both the
-    desktop console and the log file, often by thousands of lines.
-    Gathering already logs each transition and stores the same events in task history.
+    A plugin may already write its own detailed report and history.
     """
-    if flow_id in _RESULT_LOG_SUPPRESSED_FLOW_IDS:
+    if flow_id in get_registry().get("result_log_suppressed_ids", ()):
         return False
     serializable = _to_serializable(result)
     tag = tr("（用户中断，部分结果）") if interrupted else ""

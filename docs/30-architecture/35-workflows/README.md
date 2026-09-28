@@ -14,7 +14,6 @@
 |------|------|------|----------|------|
 | 01 | [01-current-equip-analysis.md](01-current-equip-analysis.md) | 用户当前装备分析 | bag_equip_detail, equip_weapon_detail, equip_armor_detail | yysls |
 | 02 | [01-auto-tuning.md](../../20-requirements/01-auto-tuning.md) | 自动调律（背包滚动遍历） | bag_equip_detail, equip_weapon_detail, equip_armor_detail | yysls |
-| 03 | [03-auto-gather.md](03-auto-gather.md) | 实验性采集录制与单轮回放 | map_gather | yysls |
 
 > 注：以上流程均为燕云十六声插件（`src/lvjiang/apps/yysls/`）专属工作流。通用 DSL 语法见 [32-grammar](../32-grammar/README.md)。
 

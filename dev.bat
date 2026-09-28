@@ -15,4 +15,21 @@ rem launched from a fresh/elevated shell where the venv is not activated.
 set "PY=%~dp0.venv\Scripts\python.exe"
 if not exist "%PY%" set "PY=python"
 
-"%PY%" -m lvjiang -reg yysls %*
+set "EXTRA_APPS="
+set "FORWARD_ARGS="
+:parse_args
+if "%~1"=="" goto launch
+if /I "%~1"=="--all" goto add_premium
+set "FORWARD_ARGS=%FORWARD_ARGS% %1"
+shift
+goto parse_args
+:add_premium
+set "EXTRA_APPS=-reg premium"
+shift
+goto parse_args
+:launch
+if defined EXTRA_APPS if not exist "%~dp0src\lvjiang\apps\premium\__init__.py" (
+    echo [ERROR] --all requires the premium repository at src\lvjiang\apps\premium 1>&2
+    exit /b 1
+)
+"%PY%" -m lvjiang -reg yysls %EXTRA_APPS% %FORWARD_ARGS%

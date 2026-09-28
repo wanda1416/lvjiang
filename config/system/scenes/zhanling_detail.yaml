@@ -4,10 +4,10 @@ name: 战令
 views:
 - key: base
   name: 任务
-- key: open
-  name: 开启
 - key: reward
   name: 奖励
+- key: open
+  name: 开启
 - key: popup
   name: 领奖弹窗
   kind: modal
@@ -17,6 +17,9 @@ regions:
   type: func
   is_text: false
   is_clickable: true
+  views:
+  - base
+  - reward
 - key: claim_all
   name: 一键领取
   type: func

@@ -16,8 +16,8 @@ import java.io.FileOutputStream
  * Python 侧 constants.PROJECT_ROOT 在安卓端指向 filesDir/lvjiang，两条路径在此汇合。
  * 用户修改落 config/local（无 .git → 用户模式），不会被升级解压覆盖。
  *
- * 解压策略：用 versionCode 做 stamp，每次升级 APK 后首次启动全量重解；
- * 同一版本重复启动不重复写（跳过已存在目录）。
+ * 解压策略：用 versionCode 做 stamp，每次升级 APK 后首次启动清空目录再全量重解，
+ * 使设备上的 config/system 与 APK 内容完全一致；同一版本重复启动跳过。
  */
 class App : Application() {
 
@@ -44,7 +44,13 @@ class App : Application() {
      * 把 assets/config/system 解压到 filesDir/lvjiang/。
      *
      * 只在 APK 升级后首次启动时执行（versionCode 变化）；同版本重复启动跳过。
-     * 不删旧文件再写——直接覆盖同名，残留的旧文件不影响（Python 侧按名字找）。
+     *
+     * 先整目录删掉再解压：只覆盖同名文件的话，上游删除或移动过的文件会永远留在
+     * 设备上。`.wf` 挪个目录就会在用户侧变成两份同 id 脚本（一份生效一份幽灵），
+     * 场景、布局、参照图被删除后同样会继续以旧内容加载。
+     *
+     * 删的只是 config/system —— 用户自己的改动落在 config/local（无 .git 即用户
+     * 模式），不在这个目录里。解压中途失败时不写 stamp，下次启动整轮重来。
      */
     private fun syncSystemConfig() {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
@@ -61,6 +67,10 @@ class App : Application() {
         }
 
         try {
+            if (systemTarget.exists() && !systemTarget.deleteRecursively()) {
+                // 删不干净就继续铺新的：残留文件仍是老问题，但总好过没有配置
+                Log.w(TAG, "旧系统配置未能完全删除，继续解压覆盖")
+            }
             systemTarget.mkdirs()
             copyAssetDir("config/system", systemTarget)
             prefs.edit().putInt(KEY_VERSION, currentVersion).apply()

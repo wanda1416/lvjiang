@@ -277,6 +277,32 @@ class TestMetadataIntegration:
         with pytest.raises(WorkflowMetadataError, match="未声明的参数"):
             parse_metadata(self._HEAD + "#%     require: not $skip_onlin_role\n")
 
+    @pytest.mark.parametrize(("wf", "switch", "dependent"), [
+        # 三处的依赖开关默认都是关的，也就是说这些参数在默认配置下本来就是摆设，
+        # 用户改了没有任何效果也没有任何提示——正是 require 要解决的场景。
+        ("scan_role_base_attr.wf", "silent_write",
+         ["plan_name", "main_art", "sub_art"]),
+        ("daily_jianghu.wf", "claim_reward", ["max_claim_reputation"]),
+        ("purchase_xinfa.wf", "open_bag_xinfa", ["max_xinfa_boxes"]),
+    ])
+    def test_shipped_workflows_hide_parameters_behind_their_switch(
+        self, wf, switch, dependent,
+    ):
+        """开关关着时依赖参数不展示，打开后出现。"""
+        from pathlib import Path
+
+        from lvjiang.workflows.metadata import parse_metadata_file
+
+        defs = parse_metadata_file(
+            Path("config/system/workflows") / wf)["parameters"]
+        switch_def = next(item for item in defs if item["name"] == switch)
+        assert switch_def.get("default") is False, "依赖开关默认应当是关的"
+        off = {item["name"] for item in parameters_for_values(defs, {switch: False})}
+        on = {item["name"] for item in parameters_for_values(defs, {switch: True})}
+        assert off.isdisjoint(dependent)
+        assert set(dependent) <= on
+        assert on - off == set(dependent)
+
     def test_shipped_prepare_workflows_declare_the_dependency(self):
         """最大等待时间只有关掉「角色在线跳过」才有意义。"""
         from pathlib import Path

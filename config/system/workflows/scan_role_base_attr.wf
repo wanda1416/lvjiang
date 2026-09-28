@@ -11,19 +11,22 @@
 #%     min: 1
 #%     max: 20
 #%   - name: silent_write
-#%     label: 静默写入指定备战方案并返回主页
+#%     label: 静默写入备战方案
 #%     type: bool
 #%     default: false
 #%   - name: plan_name
-#%     label: 静默写入目标方案（留空用当前方案）
+#%     label: 目标方案（留空用当前）
+#%     require: $silent_write
 #%     type: text
 #%     default: ""
 #%   - name: main_art
-#%     label: 静默写入主武学（可留空）
+#%     label: 主武学（可留空）
+#%     require: $silent_write
 #%     type: text
 #%     default: ""
 #%   - name: sub_art
-#%     label: 静默写入副武学（可留空）
+#%     label: 副武学（可留空）
+#%     require: $silent_write
 #%     type: text
 #%     default: ""
 

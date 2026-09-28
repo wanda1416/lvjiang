@@ -8,21 +8,21 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 |------|------|
 | [06.1-basic-functions.md](06.1-basic-functions.md) | 基础函数：算术运算、字典/列表操作、字符串处理 |
 | [06.2-system-interaction.md](06.2-system-interaction.md) | 用户交互、系统、应用生命周期、运行环境与后端、玩家档案 |
-| [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数：装备处理、背包遍历与游标、装备入库、基础属性表单 |
+| [06.3-game-functions.md](06.3-game-functions.md) | 游戏相关函数：装备处理、背包遍历与游标、装备入库、基础属性表单、游戏属性 |
 | [06.4-vision-functions.md](06.4-vision-functions.md) | 图色函数：取色、像素规则占比、亮段、色心方位、同色图标、多点找色 |
 
 ---
 
 ## 速查表
 
-共 **85 个**内置函数（core 68 个 + yysls 插件 17 个），按功能分为 13 类。
+共 **86 个**内置函数（core 68 个 + yysls 插件 18 个），按功能分为 14 类。
 
 > 本节列表与注册表一致，核对方式：
 >
 > ```python
 > from lvjiang.workflows import builtins as b
 > import lvjiang.apps.yysls.workflows.builtins  # 触发插件注册
-> print(sorted(b.list_functions()))           # → 85 个
+> print(sorted(b.list_functions()))           # → 86 个
 > ```
 
 ### 基础运算（8）
@@ -111,6 +111,12 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `set_scanned_loadout_gongjue` | `(gongjue) -> str` | 设置本次扫描绑定方案的弓玦套装，不切换活动方案 |
 | `to_role_base_attrs` | `(dict) -> dict` | 解析角色详情页 OCR 原始数据为基础属性字典 |
 | `open_base_attr_form` | `(dict) -> null` | 弹出「创建基础属性」面板并预填数值，不阻塞工作流 |
+
+### 游戏属性（1）
+
+| 函数 | 签名 | 说明 |
+|---|---|---|
+| `game_attr` | `(attr_name) -> str` | 查询游戏配置里的属性；当前支持 `season_name`（当前赛季名称），未支持的属性名返回 `""` |
 
 ### 时间（2）
 

@@ -809,3 +809,56 @@ def test_stage_result_marks_whether_the_workflow_returned():
     assert BatchWorker._normalize_stage_result(None, {}).returned is False
     assert BatchWorker._normalize_stage_result(
         {"status": "success"}, {}).returned is True
+
+
+def test_stop_during_unit_prepare_is_not_a_protocol_error(
+    tmp_path, monkeypatch, qapp,
+):
+    """按停止时 wf 走不到 return，不能报成「没有返回任何值」的协议违规。
+
+    _exec_body 遇到停止请求是正常 return（不抛信号），顶层 wf 因此跑到末尾而
+    return_value 保持 None，_normalize_stage_result 对 None 的默认状态恰好是
+    success + 空 username——于是用户按停止会收到一屏「违反协议」的堆栈。
+    用假引擎走真实的 _run_stage，避免把被测逻辑连同 _run_stage 一起替换掉。
+    """
+    import lvjiang.core.daily_history as history
+
+    for name, account in (("u1", "a"), ("u2", "b")):
+        save_user_metadata(User(name, attributes={"account": account}), tmp_path)
+    monkeypatch.setattr(history, "try_create_batch_run", lambda **_kw: None)
+    monkeypatch.setattr(BatchReport, "write", lambda self: None)
+    stopped = {"value": False}
+
+    class _StoppedEngine:
+        """模拟引擎：执行期间收到停止请求，因此没有任何返回值。"""
+
+        return_value = None
+
+        def execute(self, _path, initial_variables=None):
+            stopped["value"] = True
+            return {}
+
+    worker = BatchWorker(
+        ["a", "b"], [BatchScript("task", "task")],
+        BatchConfigItem(
+            name="attribute", execution_unit_key="account", rounds=2,
+            workflows=BatchWorkflows(prepare_item="batch/prepare_item_by_attr.wf"),
+        ),
+        BatchContext(None, None, None, None), SessionManager(tmp_path),
+        lambda: stopped["value"], candidate_usernames=["u1", "u2"],
+    )
+    monkeypatch.setattr(worker, "_create_engine", _StoppedEngine)
+    monkeypatch.setattr(worker, "_check_script",
+                        lambda *_a, **_k: BatchCheckResult())
+    monkeypatch.setattr(worker, "_run_script", lambda *_a, **_k:
+                        pytest.fail("停止后仍执行了业务任务"))
+    finished = []
+    worker.finished_all.connect(finished.append)
+    worker.run()
+
+    assert "error" not in finished[0], finished[0].get("error")
+    assert finished[0]["stopped"] is True
+    entry = next(iter(finished[0]["entries"].values()))
+    assert not entry.get("error"), entry
+    assert entry["prepare"] == ST_SKIPPED
+    assert entry["scripts"]["task"] == ST_SKIPPED

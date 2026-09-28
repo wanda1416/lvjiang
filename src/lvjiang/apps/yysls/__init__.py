@@ -73,6 +73,7 @@ hooks = AppHooks(
         "lvjiang.apps.yysls.workflows.builtins.equip_funcs",
         "lvjiang.apps.yysls.workflows.builtins.equipment_ingest",
         "lvjiang.apps.yysls.workflows.builtins.role_attr_ingest",
+        "lvjiang.apps.yysls.workflows.builtins.game_attr",
     ],
 
     profile_period_modules=[

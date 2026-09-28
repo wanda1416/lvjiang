@@ -27,7 +27,9 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 
-from .config.resolver import ConfigResolver, merge_doc
+import yaml
+
+from .config.resolver import LAYER_LOCAL, ConfigResolver, merge_doc
 
 SCENES_SCHEMA_VERSION = 2
 SCENES_REGISTRY_PATHS = ("scenes.*.items", "scenes.*.disabled")
@@ -175,5 +177,29 @@ def save_scene_doc(resolver: ConfigResolver, doc: dict) -> None:
     """保存 v2；用户模式相对“已转换的 system v2”计算增量。"""
     normalized = normalize_scene_doc(doc)
     system = normalize_scene_doc(resolver.load_system("scenes.yaml"))
+    if resolver.is_dev_mode():
+        local = normalize_scene_doc(resolver.load_local("scenes.yaml"))
+        local_only = set(local.get("scenes", {})) - set(system.get("scenes", {}))
+        if local_only:
+            system_doc = deepcopy(normalized)
+            local_doc = deepcopy(local)
+            for key in local_only:
+                group = normalized.get("scenes", {}).get(key)
+                system_doc.get("scenes", {}).pop(key, None)
+                if group is None:
+                    local_doc.get("scenes", {}).pop(key, None)
+                else:
+                    local_doc.setdefault("scenes", {})[key] = deepcopy(group)
+            resolver.save_merged("scenes.yaml", system_doc,
+                                 registry=SCENES_REGISTRY_PATHS)
+            if local_doc.get("scenes"):
+                resolver.write_entity(
+                    "scenes.yaml",
+                    yaml.dump(local_doc, allow_unicode=True,
+                              default_flow_style=False, sort_keys=False),
+                    layer=LAYER_LOCAL)
+            else:
+                resolver.delete_entity("scenes.yaml", layer=LAYER_LOCAL)
+            return
     resolver.save_merged("scenes.yaml", normalized, base_doc=system,
                          registry=SCENES_REGISTRY_PATHS)

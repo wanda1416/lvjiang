@@ -219,6 +219,33 @@ def test_user_save_uses_normalized_v2_base_and_does_not_freeze_registry(tmp_path
         "main", "system_scene", "later", "mine"]
 
 
+def test_dev_save_keeps_local_only_group_and_scene_in_local(tmp_path):
+    system = tmp_path / "system"
+    local = tmp_path / "local"
+    _write(system / "scenes.yaml", {
+        "schema_version": 2,
+        "scenes": {"general": {"name": "通用", "items": ["main"]}},
+    })
+    _write(local / "scenes.yaml", {
+        "scenes": {"map": {"name": "地图", "items": ["map_one"]}},
+    })
+    _write(local / "scenes/map_one.yaml", {"key": "map_one", "name": "原名"})
+    resolver = ConfigResolver(system_dir=system, local_dir=local, dev_mode=True)
+    manifest = load_scene_manifest(resolver)
+    registry = SceneRegistry(
+        resolver, manifest.order, manifest.groups, manifest.group_names,
+        manifest.disabled)
+    registry.rename_scene("map_one", "map_two", "新名")
+    registry.save_group_config()
+
+    assert not (system / "scenes/map_one.yaml").exists()
+    assert not (system / "scenes/map_two.yaml").exists()
+    assert not (local / "scenes/map_one.yaml").exists()
+    assert yaml.safe_load((local / "scenes/map_two.yaml").read_text())["name"] == "新名"
+    assert "map" not in yaml.safe_load((system / "scenes.yaml").read_text())["scenes"]
+    assert load_scene_manifest(resolver).groups["map"] == ["map_two"]
+
+
 def test_dev_save_converts_v1_file_to_v2(tmp_path):
     system = tmp_path / "system"
     local = tmp_path / "local"

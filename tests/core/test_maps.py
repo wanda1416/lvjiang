@@ -115,6 +115,28 @@ def test_save_and_reload_pois_and_ui(tmp_path):
     assert loaded.ui.full_map == "full_map"
 
 
+def test_dev_mode_edits_local_map_without_creating_system_copy(tmp_path):
+    resolver, _, manager = _env(tmp_path)
+    manager.create("localmap", "本地地图")
+    system_path = resolver.system_dir / "maps/localmap/map.yaml"
+    local_path = resolver.local_dir / "maps/localmap/map.yaml"
+    local_path.parent.mkdir(parents=True)
+    system_path.rename(local_path)
+
+    map_def = manager.load("localmap")
+    assert map_def.layer == "local"
+    map_def.name = "改名"
+    manager.save_with_image(map_def, b"map image")
+    assert not system_path.exists()
+    assert not (resolver.system_dir / "maps/localmap/base.png").exists()
+    assert yaml.safe_load(local_path.read_text())["name"] == "改名"
+    assert (resolver.local_dir / "maps/localmap/base.png").read_bytes() == b"map image"
+
+    manager.delete("localmap", delete_hud_scene=False)
+    assert not local_path.exists()
+    assert not (resolver.local_dir / "maps/localmap/base.png").exists()
+
+
 def test_save_rejects_missing_hud_scene_or_wrong_entity_kind(tmp_path):
     _, _, manager = _env(tmp_path)
     map_def = manager.create("duchenxu", "渡尘墟")

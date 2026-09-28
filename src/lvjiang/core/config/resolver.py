@@ -678,6 +678,13 @@ class ConfigResolver:
             return self.system_dir
         raise PermissionError(f"当前模式不允许写入 {layer} 层")
 
+    def local_only_layer(self, rel_path: str) -> str | None:
+        """开发模式下，已有且只存在于 local 的实体继续写回 local。"""
+        if (self.is_dev_mode() and (self.local_dir / rel_path).is_file()
+                and not (self.system_dir / rel_path).exists()):
+            return LAYER_LOCAL
+        return None
+
     def write_entity(self, rel_path: str, data: str | bytes, *,
                      force: bool = False,
                      content_version: int | None = None,

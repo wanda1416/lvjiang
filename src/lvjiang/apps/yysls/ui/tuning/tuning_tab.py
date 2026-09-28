@@ -30,7 +30,11 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.config.resolver import get_resolver
 
 from .....i18n import tr
-from .....ui.button_styles import apply_button_style, fit_button_width
+from .....ui.button_styles import (
+    apply_button_style,
+    apply_execution_button_style,
+    fit_button_width,
+)
 from .....ui.execution_user_selector import ExecutionUserSelector
 from .....ui.hotkeys import hotkey_label
 from .....ui.main.run_control import STATE_PLAN_UNSUPPORTED
@@ -40,27 +44,6 @@ from ...config.auto_tuning_config import (
 )
 from ...config.tune_slots import LOCKED_SLOTS, SLOT_GROUPS
 from .config_widget import TuningConfigWidget, TuningGlobalsWidget
-
-_STYLE_BTN_RUN = (
-    "background-color: #4CAF50; color: white; font-weight: bold; "
-    "padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_STOP = (
-    "background-color: #f44336; color: white; font-weight: bold; "
-    "padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_NOT_READY = (
-    "background-color: #FFC107; color: #333; font-weight: bold; "
-    "padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_DISABLED = (
-    "background-color: #9E9E9E; color: white; font-weight: bold; "
-    "padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_PAUSE = (
-    "background-color: #FF9800; color: white; font-weight: bold; "
-    "padding: 8px; font-size: 13px;"
-)
 
 
 def _tuning_switch_names(switches: dict[str, bool]) -> list[str]:
@@ -113,14 +96,14 @@ class TuningTab(QWidget):
         self.btn_run_tuning = QPushButton(hotkey_label(
             tr("开始调律"), self._host._user_config.hotkeys.start))
         self.btn_run_tuning.clicked.connect(self.f9_run)
-        self.btn_run_tuning.setStyleSheet(_STYLE_BTN_RUN)
-        btn_layout.addWidget(self.btn_run_tuning)
+        apply_execution_button_style(self.btn_run_tuning, "run")
+        btn_layout.addWidget(self.btn_run_tuning, 1)
 
         self.btn_pause_resume = QPushButton(tr("暂停"))
         self.btn_pause_resume.setEnabled(False)
-        self.btn_pause_resume.setStyleSheet(_STYLE_BTN_DISABLED)
+        apply_execution_button_style(self.btn_pause_resume, "disabled")
         self.btn_pause_resume.clicked.connect(self._on_pause_resume_clicked)
-        btn_layout.addWidget(self.btn_pause_resume)
+        btn_layout.addWidget(self.btn_pause_resume, 1)
         tab_layout.addLayout(btn_layout)
 
         self._execution_user_selector = ExecutionUserSelector(
@@ -441,17 +424,17 @@ class TuningTab(QWidget):
         hk = self._host._user_config.hotkeys
         if state in ("running", "paused"):
             self.btn_run_tuning.setText(hotkey_label(tr("结束"), hk.stop))
-            self.btn_run_tuning.setStyleSheet(_STYLE_BTN_STOP)
+            apply_execution_button_style(self.btn_run_tuning, "stop")
         elif state == "not_ready":
             self.btn_run_tuning.setText(tr("未就绪"))
-            self.btn_run_tuning.setStyleSheet(_STYLE_BTN_NOT_READY)
+            apply_execution_button_style(self.btn_run_tuning, "not_ready")
         elif state == STATE_PLAN_UNSUPPORTED:
             # 不能落进下面的 else：那里还会 mark_done()，会误报完成。
             self.btn_run_tuning.setText(tr("方案不支持"))
-            self.btn_run_tuning.setStyleSheet(_STYLE_BTN_DISABLED)
+            apply_execution_button_style(self.btn_run_tuning, "disabled")
         else:
             self.btn_run_tuning.setText(hotkey_label(tr("开始调律"), hk.start))
-            self.btn_run_tuning.setStyleSheet(_STYLE_BTN_RUN)
+            apply_execution_button_style(self.btn_run_tuning, "run")
             # 工作流结束：通知调律进度 Tab 标记完成
             engine = getattr(self._host, '_current_engine', None)
             if engine is not None and hasattr(engine, '_progress_hub'):
@@ -462,15 +445,15 @@ class TuningTab(QWidget):
         if state == "running":
             self.btn_pause_resume.setText(hotkey_label(tr("暂停"), hk.pause))
             self.btn_pause_resume.setEnabled(True)
-            self.btn_pause_resume.setStyleSheet(_STYLE_BTN_PAUSE)
+            apply_execution_button_style(self.btn_pause_resume, "pause")
         elif state == "paused":
             self.btn_pause_resume.setText(hotkey_label(tr("恢复"), hk.pause))
             self.btn_pause_resume.setEnabled(True)
-            self.btn_pause_resume.setStyleSheet(_STYLE_BTN_RUN)
+            apply_execution_button_style(self.btn_pause_resume, "run")
         else:
             self.btn_pause_resume.setText(tr("暂停"))
             self.btn_pause_resume.setEnabled(False)
-            self.btn_pause_resume.setStyleSheet(_STYLE_BTN_DISABLED)
+            apply_execution_button_style(self.btn_pause_resume, "disabled")
         # 进度面板的暂停提示：独立于按钮，避免只看右侧面板时误以为卡死
         widget = self._find_progress_widget()
         if widget is not None:

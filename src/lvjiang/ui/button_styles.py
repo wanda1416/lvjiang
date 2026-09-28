@@ -88,6 +88,27 @@ def apply_button_style(
             button.setStyleSheet(style)
 
 
+_EXECUTION_BUTTON_COLORS = {
+    "run": ("#4CAF50", "white"),
+    "stop": ("#f44336", "white"),
+    "stopping": ("#ef9a9a", "white"),
+    "not_ready": ("#FFC107", "#333"),
+    "disabled": ("#9E9E9E", "white"),
+    "pause": ("#FF9800", "white"),
+    "pausing": ("#FFB74D", "white"),
+}
+
+
+def apply_execution_button_style(button: QPushButton, variant: str) -> None:
+    """主页面各执行 Tab 的启停和暂停按钮共用同一尺寸与状态颜色。"""
+    background, foreground = _EXECUTION_BUTTON_COLORS[variant]
+    button.setStyleSheet(
+        f"background-color: {background}; color: {foreground}; "
+        "font-weight: bold; font-size: 13px; padding: 6px 8px;"
+    )
+    button.setFixedHeight(36)
+
+
 def apply_compact_tool_button_style(*buttons: QToolButton | None) -> None:
     """Style compact help/info controls without regular-button padding."""
     for button in buttons:

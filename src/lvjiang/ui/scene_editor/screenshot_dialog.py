@@ -3,6 +3,7 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import (
+    QComboBox,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -16,10 +17,12 @@ from PyQt6.QtWidgets import (
 from ...core.layout_manager import (
     delete_scene_screenshot,
     get_active_screenshot_index,
+    get_scene_screenshot_format,
     list_scene_screenshots,
     load_scene_screenshot,
     reindex_scene_screenshots,
     set_active_screenshot_index,
+    set_scene_screenshot_format,
 )
 from ...core.scene_registry import get_scene_name
 from ...i18n import tr
@@ -111,6 +114,19 @@ class ScreenshotManagerDialog(QDialog):
         fit_button_width(self._btn_up, self._btn_down, minimum=32)
         layout.addLayout(btn_row)
 
+        format_row = QHBoxLayout()
+        format_row.addWidget(QLabel(tr("当前视图新截图格式：")))
+        self._format_combo = QComboBox()
+        self._format_combo.addItem(tr("WebP（质量 90，默认）"), "webp")
+        self._format_combo.addItem(tr("PNG（无损，适合识别困难时）"), "png")
+        selected = get_scene_screenshot_format(layout_name, scene_key, view)
+        self._format_combo.setCurrentIndex(self._format_combo.findData(selected))
+        self._format_combo.setToolTip(tr(
+            "仅影响当前布局、场景和视图后续刷新或追加的截图；已有截图保持原格式。"))
+        self._format_combo.currentIndexChanged.connect(self._on_format_changed)
+        format_row.addWidget(self._format_combo, 1)
+        layout.addLayout(format_row)
+
         # ── 预览区域 ──
         self._preview = QLabel()
         self._preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -137,6 +153,11 @@ class ScreenshotManagerDialog(QDialog):
     def _indices(self) -> list[int]:
         return list_scene_screenshots(
             self._layout_name, self._scene_key, self._view)
+
+    def _on_format_changed(self, _index: int) -> None:
+        set_scene_screenshot_format(
+            self._layout_name, self._scene_key, self._view,
+            self._format_combo.currentData())
 
     def _active_index(self) -> int:
         return get_active_screenshot_index(

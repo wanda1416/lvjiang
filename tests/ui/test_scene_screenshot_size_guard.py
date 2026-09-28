@@ -108,6 +108,25 @@ def test_refresh_same_size_does_not_prompt(monkeypatch):
     assert harness._img_cache[("android", "game_main_page", "base", 1)] is new_image
 
 
+def test_refresh_displays_encoded_screenshot_for_immediate_recognition(monkeypatch):
+    raw = np.full((720, 1280, 3), 150, dtype=np.uint8)
+    stored = np.full((720, 1280, 3), 149, dtype=np.uint8)
+    harness = _RefreshHarness(raw)
+    monkeypatch.setattr(
+        "lvjiang.ui.scene_editor.dialog.load_scene_screenshot",
+        lambda *_args: raw,
+    )
+    monkeypatch.setattr(
+        "lvjiang.ui.scene_editor.dialog.save_scene_screenshot",
+        lambda *_args: stored,
+    )
+
+    harness._on_refresh_image()
+
+    assert harness._tabs["game_main_page"].canvas.image is stored
+    assert harness._img_cache[("android", "game_main_page", "base", 1)] is stored
+
+
 def test_refresh_saves_mismatched_screenshot_after_confirmation(monkeypatch):
     old_image = np.zeros((720, 1280, 3), dtype=np.uint8)
     new_image = np.zeros((1080, 1920, 3), dtype=np.uint8)

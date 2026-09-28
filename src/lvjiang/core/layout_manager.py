@@ -12,6 +12,7 @@
 import json
 import re
 import shutil
+import uuid
 from pathlib import Path
 from typing import Iterable
 
@@ -42,6 +43,8 @@ from .scene_registry import (
 
 # 布局截图属于运行态产出，落 session 层
 SCREENSHOTS_DIR = SESSION_CONFIG_DIR / "screenshots"
+_SCREENSHOT_EXTENSIONS = ("webp", "png")
+_WEBP_QUALITY = 90
 
 
 def _safe_name(name: str) -> str:
@@ -54,7 +57,9 @@ def layout_screenshots_dir(layout_name: str) -> Path:
     return SCREENSHOTS_DIR / _safe_name(layout_name)
 
 
-def scene_screenshot_name(scene_key: str, view: str = "", index: int = 1) -> str:
+def scene_screenshot_name(
+    scene_key: str, view: str = "", index: int = 1, *, extension: str = "png",
+) -> str:
     """截图文件名：基底视图沿用场景名，其余视图加 __视图 key 后缀
 
     同一场景的多个视图（同一页面的不同滚动态）各自一张底图，
@@ -68,9 +73,23 @@ def scene_screenshot_name(scene_key: str, view: str = "", index: int = 1) -> str
         base = scene_key
     else:
         base = f"{scene_key}__{view}"
+    if extension not in _SCREENSHOT_EXTENSIONS:
+        raise ValueError(f"不支持的场景截图格式: {extension}")
     if index <= 1:
-        return f"{base}.png"
-    return f"{base}__{index}.png"
+        return f"{base}.{extension}"
+    return f"{base}__{index}.{extension}"
+
+
+def _existing_screenshot_path(
+    layout_name: str, scene_key: str, view: str, index: int,
+) -> Path | None:
+    d = layout_screenshots_dir(layout_name)
+    for extension in _SCREENSHOT_EXTENSIONS:
+        path = d / scene_screenshot_name(
+            scene_key, view, index, extension=extension)
+        if path.is_file():
+            return path
+    return None
 
 
 # ─── 截图管理 ────────────────────────────────────────────
@@ -83,8 +102,8 @@ def load_scene_screenshot(
     别名布局使用自己的截图目录（按布局名），不重定向到父布局，
     避免截图操作污染父布局。
     """
-    path = layout_screenshots_dir(layout_name) / scene_screenshot_name(scene_key, view, index)
-    if not path.exists():
+    path = _existing_screenshot_path(layout_name, scene_key, view, index)
+    if path is None:
         return None
     try:
         import cv2
@@ -104,7 +123,7 @@ def load_scene_screenshot(
 def save_scene_screenshot(
     layout_name: str, scene_key: str, image: np.ndarray,
     view: str = "", index: int = 1,
-):
+) -> np.ndarray:
     """保存场景（可选视图、截图序号）截图（支持中文路径）
 
     image: BGR numpy 数组（项目内部统一使用 BGR）
@@ -112,14 +131,34 @@ def save_scene_screenshot(
     import cv2
     d = layout_screenshots_dir(layout_name)
     d.mkdir(parents=True, exist_ok=True)
-    path = d / scene_screenshot_name(scene_key, view, index)
-    # image 已是 BGR，cv2.imencode 期望 BGR，无需翻转
-    success, buf = cv2.imencode('.png', image)
-    if success:
-        path.write_bytes(buf.tobytes())
-        logger.info(f"截图已保存: {path}")
-    else:
-        logger.error(f"截图编码失败: {path}")
+    extension = get_scene_screenshot_format(layout_name, scene_key, view)
+    path = d / scene_screenshot_name(scene_key, view, index, extension=extension)
+    if extension == "webp" and not cv2.haveImageWriter(".webp"):
+        raise OSError("当前 OpenCV 不支持 WebP，请在截图管理中改用 PNG")
+    params = ([cv2.IMWRITE_WEBP_QUALITY, _WEBP_QUALITY]
+              if extension == "webp" else [])
+    # image 已是 BGR，cv2.imencode 期望 BGR，无需翻转。
+    try:
+        success, buf = cv2.imencode(f".{extension}", image, params)
+    except cv2.error as exc:
+        raise OSError(f"截图编码失败: {path}") from exc
+    if not success:
+        raise OSError(f"截图编码失败: {path}")
+    stored_image = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+    if stored_image is None:
+        raise OSError(f"截图编码后无法解码: {path}")
+    temporary = d / f".{path.stem}.{uuid.uuid4().hex}.{extension}"
+    try:
+        temporary.write_bytes(buf.tobytes())
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    for other in _SCREENSHOT_EXTENSIONS:
+        if other != extension:
+            (d / scene_screenshot_name(
+                scene_key, view, index, extension=other)).unlink(missing_ok=True)
+    logger.info(f"截图已保存: {path}")
+    return stored_image
 
 
 def copy_screenshots(src_layout: str, dst_layout: str):
@@ -145,7 +184,7 @@ def delete_screenshots(layout_name: str):
 def rename_scene_screenshots(old_key: str, new_key: str):
     """重命名所有布局下的场景截图文件（含多视图后缀）
 
-    匹配规则：{old_key}.png 和 {old_key}__*.png
+    匹配规则：{old_key}.png/.webp 和 {old_key}__*.png/.webp
     """
     if old_key == new_key:
         return
@@ -156,15 +195,25 @@ def rename_scene_screenshots(old_key: str, new_key: str):
         if not layout_dir.is_dir():
             continue
         # 只匹配 {old_key}.png 和 {old_key}__*.png，不能误伤同前缀场景。
-        candidates = [layout_dir / f"{old_key}.png"]
-        candidates.extend(layout_dir.glob(f"{old_key}__*.png"))
-        for png in candidates:
-            if not png.is_file():
-                continue
-            suffix = png.stem[len(old_key):]  # 空或 "__view_key"
-            new_name = f"{new_key}{suffix}.png"
-            png.rename(layout_dir / new_name)
-            logger.info(f"截图已重命名: {png.name} -> {new_name}")
+        for extension in _SCREENSHOT_EXTENSIONS:
+            candidates = [layout_dir / f"{old_key}.{extension}"]
+            candidates.extend(layout_dir.glob(f"{old_key}__*.{extension}"))
+            for image_path in candidates:
+                if not image_path.is_file():
+                    continue
+                suffix = image_path.stem[len(old_key):]
+                new_name = f"{new_key}{suffix}.{extension}"
+                image_path.rename(layout_dir / new_name)
+                logger.info(f"截图已重命名: {image_path.name} -> {new_name}")
+        meta = _load_screenshot_meta(layout_dir.name)
+        changed = False
+        for field in ("active", "format"):
+            values = meta.get(field, {})
+            if old_key in values:
+                values[new_key] = values.pop(old_key)
+                changed = True
+        if changed:
+            _save_screenshot_meta(layout_dir.name, meta)
 
 
 # ─── 多截图管理 ──────────────────────────────────────────
@@ -192,6 +241,29 @@ def _save_screenshot_meta(layout_name: str, meta: dict) -> None:
     p.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def get_scene_screenshot_format(
+    layout_name: str, scene_key: str, view: str = "",
+) -> str:
+    """当前视图新截图的保存格式；旧数据默认采用 WebP。"""
+    selected = (
+        _load_screenshot_meta(layout_name)
+        .get("format", {})
+        .get(scene_key, {})
+        .get(view or "", "webp")
+    )
+    return selected if selected in _SCREENSHOT_EXTENSIONS else "webp"
+
+
+def set_scene_screenshot_format(
+    layout_name: str, scene_key: str, view: str, extension: str,
+) -> None:
+    if extension not in _SCREENSHOT_EXTENSIONS:
+        raise ValueError(f"不支持的场景截图格式: {extension}")
+    meta = _load_screenshot_meta(layout_name)
+    meta.setdefault("format", {}).setdefault(scene_key, {})[view or ""] = extension
+    _save_screenshot_meta(layout_name, meta)
+
+
 def _screenshot_base_stem(scene_key: str, view: str) -> str:
     """Return the filename stem shared by all screenshots of (scene, view)."""
     from .scene_definition_models import BASE_VIEW_KEY
@@ -206,19 +278,19 @@ def list_scene_screenshots(
     """Return sorted screenshot indices for (scene, view) under *layout_name*.
 
     Scans the screenshot directory with a regex that matches:
-      {base_stem}.png          -> index 1
-      {base_stem}__<N>.png     -> index N  (N >= 2)
+      {base_stem}.png/.webp          -> index 1
+      {base_stem}__<N>.png/.webp     -> index N  (N >= 2)
     """
     d = layout_screenshots_dir(layout_name)
     if not d.exists():
         return []
     stem = _screenshot_base_stem(scene_key, view)
-    pattern = re.compile(re.escape(stem) + r"(?:__(\d+))?\.png$")
-    indices: list[int] = []
+    pattern = re.compile(re.escape(stem) + r"(?:__(\d+))?\.(?:png|webp)$")
+    indices: set[int] = set()
     for f in d.iterdir():
         m = pattern.match(f.name)
         if m:
-            indices.append(int(m.group(1)) if m.group(1) else 1)
+            indices.add(int(m.group(1)) if m.group(1) else 1)
     return sorted(indices)
 
 
@@ -257,18 +329,23 @@ def delete_scene_screenshot(
 ) -> None:
     """Delete one screenshot and re-index the rest so no gap remains."""
     d = layout_screenshots_dir(layout_name)
-    victim = d / scene_screenshot_name(scene_key, view, index)
-    if victim.exists():
-        victim.unlink()
-        logger.info(f"截图已删除: {victim.name}")
+    for extension in _SCREENSHOT_EXTENSIONS:
+        victim = d / scene_screenshot_name(
+            scene_key, view, index, extension=extension)
+        if victim.exists():
+            victim.unlink()
+            logger.info(f"截图已删除: {victim.name}")
 
     # Re-index: shift every file with index > deleted down by 1
     indices = list_scene_screenshots(layout_name, scene_key, view)
     for old_idx in sorted(i for i in indices if i > index):
-        old_path = d / scene_screenshot_name(scene_key, view, old_idx)
-        new_path = d / scene_screenshot_name(scene_key, view, old_idx - 1)
-        if old_path.exists():
-            old_path.rename(new_path)
+        for extension in _SCREENSHOT_EXTENSIONS:
+            old_path = d / scene_screenshot_name(
+                scene_key, view, old_idx, extension=extension)
+            new_path = d / scene_screenshot_name(
+                scene_key, view, old_idx - 1, extension=extension)
+            if old_path.exists():
+                old_path.rename(new_path)
 
     # Fix active pointer
     meta = _load_screenshot_meta(layout_name)
@@ -286,15 +363,19 @@ def reindex_scene_screenshots(
     if old_index == new_index:
         return
     d = layout_screenshots_dir(layout_name)
-    path_a = d / scene_screenshot_name(scene_key, view, old_index)
-    path_b = d / scene_screenshot_name(scene_key, view, new_index)
-    if not path_a.exists() or not path_b.exists():
+    path_a = _existing_screenshot_path(layout_name, scene_key, view, old_index)
+    path_b = _existing_screenshot_path(layout_name, scene_key, view, new_index)
+    if path_a is None or path_b is None:
         return
     # Three-way swap via temp file
-    tmp = d / f"_swap_tmp_{old_index}_{new_index}.png"
+    tmp = d / f"_swap_tmp_{uuid.uuid4().hex}{path_a.suffix}"
+    new_a = d / scene_screenshot_name(
+        scene_key, view, new_index, extension=path_a.suffix[1:])
+    new_b = d / scene_screenshot_name(
+        scene_key, view, old_index, extension=path_b.suffix[1:])
     path_a.rename(tmp)
-    path_b.rename(path_a)
-    tmp.rename(path_b)
+    path_b.rename(new_b)
+    tmp.rename(new_a)
 
     # Swap active pointer if it referenced either index
     meta = _load_screenshot_meta(layout_name)
@@ -340,12 +421,22 @@ def delete_scene_across_all_layouts(scene_key: str):
         for layout_dir in SCREENSHOTS_DIR.iterdir():
             if not layout_dir.is_dir():
                 continue
-            candidates = [layout_dir / f"{scene_key}.png"]
-            candidates.extend(layout_dir.glob(f"{scene_key}__*.png"))
-            for path in candidates:
-                if path.is_file():
-                    path.unlink()
-                    logger.info(f"场景截图已删除: {path}")
+            for extension in _SCREENSHOT_EXTENSIONS:
+                candidates = [layout_dir / f"{scene_key}.{extension}"]
+                candidates.extend(layout_dir.glob(f"{scene_key}__*.{extension}"))
+                for path in candidates:
+                    if path.is_file():
+                        path.unlink()
+                        logger.info(f"场景截图已删除: {path}")
+            meta = _load_screenshot_meta(layout_dir.name)
+            changed = False
+            for field in ("active", "format"):
+                values = meta.get(field, {})
+                if scene_key in values:
+                    del values[scene_key]
+                    changed = True
+            if changed:
+                _save_screenshot_meta(layout_dir.name, meta)
 
 
 def rename_item_key_across_all_layouts(scene_key: str, kind: str, old_key: str, new_key: str):
@@ -485,8 +576,8 @@ def rename_view_screenshots(scene_key: str, old_view_key: str, new_view_key: str
     """重命名所有布局下某视图的截图文件（含多截图 __N 后缀）
 
     截图命名规则：
-    - 基底视图 (view="" 或 view="base"): {scene_key}.png / {scene_key}__N.png
-    - 其他视图: {scene_key}__{view_key}.png / {scene_key}__{view_key}__N.png
+    - 基底视图 (view="" 或 view="base"): {scene_key}.png/.webp
+    - 其他视图: {scene_key}__{view_key}.png/.webp（含多截图后缀）
     """
     if old_view_key == new_view_key:
         return
@@ -495,19 +586,28 @@ def rename_view_screenshots(scene_key: str, old_view_key: str, new_view_key: str
         return
     old_stem = _screenshot_base_stem(scene_key, old_view_key)
     new_stem = _screenshot_base_stem(scene_key, new_view_key)
-    pattern = re.compile(re.escape(old_stem) + r"(__\d+)?\.png$")
+    pattern = re.compile(re.escape(old_stem) + r"(__\d+)?\.(png|webp)$")
     for layout_dir in screenshots_base.iterdir():
         if not layout_dir.is_dir():
             continue
-        for png in list(layout_dir.iterdir()):
-            m = pattern.match(png.name)
+        for image_path in list(layout_dir.iterdir()):
+            m = pattern.match(image_path.name)
             if not m:
                 continue
             suffix = m.group(1) or ""  # "" or "__N"
-            new_name = f"{new_stem}{suffix}.png"
-            if new_name != png.name:
-                png.rename(layout_dir / new_name)
-                logger.info(f"视图截图已重命名: {png.name} -> {new_name}")
+            new_name = f"{new_stem}{suffix}.{m.group(2)}"
+            if new_name != image_path.name:
+                image_path.rename(layout_dir / new_name)
+                logger.info(f"视图截图已重命名: {image_path.name} -> {new_name}")
+        meta = _load_screenshot_meta(layout_dir.name)
+        changed = False
+        for field in ("active", "format"):
+            views = meta.get(field, {}).get(scene_key, {})
+            if old_view_key in views:
+                views[new_view_key] = views.pop(old_view_key)
+                changed = True
+        if changed:
+            _save_screenshot_meta(layout_dir.name, meta)
 
 
 # ─── 跨场景迁移 ──────────────────────────────────────────

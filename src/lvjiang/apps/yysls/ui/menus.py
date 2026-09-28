@@ -9,11 +9,12 @@ from PyQt6.QtGui import QAction
 
 from ....core.config import get_resolver
 from ....i18n import tr
+from ....ui.plugin_menus import add_plugin_menu
 
 
 def build_menu(host, menubar) -> None:
     """在通用菜单栏上追加「燕云」菜单（host 作为对话框 parent）"""
-    menu = menubar.addMenu(tr("燕云"))
+    menu = add_plugin_menu(menubar, "yysls", tr("燕云"))
 
     def _open_game_config():
         from .game_settings import GameConfigDialog

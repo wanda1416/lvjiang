@@ -35,6 +35,10 @@ class _Resolver:
     def resolve_read(self, rel):
         return self.root / rel.split("/", 1)[1]
 
+    def local_only_layer(self, _rel):
+        """替身只有一个目录，不存在 system/local 分层，写哪层都是它自己。"""
+        return None
+
     def write_entity(self, rel, data, **_kwargs):
         (self.root / rel.split("/", 1)[1]).write_text(data, encoding="utf-8")
 

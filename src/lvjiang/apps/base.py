@@ -29,6 +29,9 @@ class AppHooks:
     # 稳定机器标识（小写 ASCII，不可翻译），例如 "yysls"
     id: str = ""
 
+    # 必须已按顺序注册的插件 ID；缺失时整个插件拒绝注册。
+    requires_app_ids: tuple[str, ...] = ()
+
     # 插件显示名（例如 "燕云十六声"）
     name: str = ""
 

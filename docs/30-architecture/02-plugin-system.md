@@ -24,6 +24,7 @@ python -m src -reg foo -reg bar  # 多插件同时加载
 @dataclass
 class AppHooks:
     name: str                                  # 插件显示名
+    requires_app_ids: tuple[str, ...] = ()      # 必须先注册的插件稳定 ID
     window_title: str | None = None            # 覆盖主窗口标题（多插件时后注册者覆盖）
     left_tab_builders: list = field(default_factory=list)   # [(label, builder), ...]
     right_tab_builders: list = field(default_factory=list)  # builder(host) -> QWidget
@@ -43,6 +44,11 @@ builder 约定：
 - builder 必须是顶层轻函数，函数体内延迟 import 实际类（保持「插件 import
   不触发 PyQt6」约定）
 - 单个 builder 抛异常只记日志不中断其他插件
+- 增强插件用 `requires_app_ids=("目标插件 ID",)` 声明加载顺序。宿主在任何
+  启动回调或扩展注册前检查依赖，缺失时拒绝加载。
+- 插件主菜单用 `ui.plugin_menus.add_plugin_menu(menubar, app_id, label)`
+  按稳定 ID 登记；增强插件用 `require_plugin_menu(menubar, app_id)` 向已存在的
+  菜单追加动作，不依据翻译后的菜单文字查找。
 
 宿主 API（插件页面通过 host 使用，不摸私有属性）：
 

@@ -56,6 +56,14 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
     """
     registry = registry if registry is not None else _get_global_registry()
 
+    loaded_ids = set(registry.get("app_ids", ()))
+    missing = [app_id for app_id in hooks.requires_app_ids if app_id not in loaded_ids]
+    if missing:
+        raise RuntimeError(
+            f"插件 {hooks.id or hooks.name!r} 依赖尚未加载的插件: "
+            f"{', '.join(missing)}；请先加载依赖插件"
+        )
+
     logger.info("[plugin] 注册插件: %s", hooks.name or "<unnamed>")
 
     for callback in hooks.startup_callbacks:

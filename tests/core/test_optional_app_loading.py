@@ -33,3 +33,24 @@ def test_builtin_app_does_not_include_optional_gather():
     hooks = load_app("yysls")
     assert "auto_gather" not in hooks.workflow_implementations
     assert [name for name, _ in hooks.left_tab_builders] == ["调律"]
+
+
+def test_required_app_is_checked_before_any_registration():
+    callbacks = []
+    hooks = AppHooks(
+        id="extension",
+        requires_app_ids=("base",),
+        startup_callbacks=[lambda: callbacks.append("started")],
+    )
+    registry = {}
+
+    with pytest.raises(RuntimeError, match="base"):
+        register_hooks(hooks, registry)
+
+    assert registry == {}
+    assert callbacks == []
+
+    register_hooks(AppHooks(id="base"), registry)
+    register_hooks(hooks, registry)
+    assert registry["app_ids"] == ["base", "extension"]
+    assert callbacks == ["started"]

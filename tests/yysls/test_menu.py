@@ -19,6 +19,7 @@ def test_developer_menu_entries_are_dev_only_without_shortcut(
 
     menus.build_menu(host, host.menuBar())
 
+    assert host.menuBar().actions()[0].data() == "yysls"
     actions = {action.text(): action for action in host.menuBar().actions()[0].menu().actions()}
     assert actions["游戏配置"].shortcut().toString() == "F5"
     assert actions["调律配置"].shortcut().toString() == "F6"

@@ -1151,6 +1151,12 @@ class BatchWorker(QThread):
         try:
             engine.execute(wf_path, initial_variables=variables)
             result = self._normalize_stage_result(engine.return_value, batch_state)
+            if not result.returned and self._stop_check():
+                # 停止请求让 _exec_body 提前 return，wf 没机会走到它的 return；
+                # 这是用户按了停止，不是 wf 违反返回协议，不能报成协议错误。
+                result = replace(
+                    result, status=RESULT_STOPPED,
+                    message=tr("执行被停止"))
             return replace(result, source=str(wf_path))
         except Exception as e:
             logger.error(

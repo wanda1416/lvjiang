@@ -8,6 +8,9 @@ views:
   name: 开启
 - key: reward
   name: 奖励
+- key: popup
+  name: 领奖弹窗
+  kind: modal
 regions:
 - key: back
   name: 返回
@@ -19,3 +22,48 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+- key: reward_tab
+  name: 奖励页签
+  type: func
+  is_text: true
+  is_clickable: true
+  views:
+  - base
+  - reward
+  to: /reward
+  navigation: switch
+- key: task_tab
+  name: 任务页签
+  type: func
+  is_text: true
+  is_clickable: true
+  views:
+  - base
+  - reward
+  to: /base
+  navigation: switch
+- key: season
+  name: 赛季名称
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: reward
+- key: season_update
+  name: 赛季更新提示
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: open
+- key: open_action
+  name: 开启动作
+  type: func
+  is_text: true
+  is_clickable: true
+  view: open
+- key: popup_action
+  name: 领奖弹窗动作
+  type: func
+  is_text: true
+  is_clickable: true
+  view: popup
+  to: /reward

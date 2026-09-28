@@ -23,7 +23,14 @@ layouts/{layout}/map_{key}.json  各布局坐标（场景编辑器标定；地�
 `maps/*.yaml` 已注册为版本化实体。底图不是独立版本实体，地图定义通过
 `base_image_sha256` 锁定与自己配套的图片；摘要不一致时拒绝加载，禁止把远程
 YAML 与旧 system 图片静默拼成一张地图。远程下发二进制底图需等目录级资产机制
-落地，当前发布地图仍应把底图随应用打包。
+落地；未来若发布带底图的地图，底图仍需随应用打包。
+
+当前私有地图资料放在 `config/local/maps/`；配套 HUD 场景、布局坐标和
+`scenes.yaml` 中的地图分组也分别放在 `config/local/scenes/`、
+`config/local/layouts/` 和 `config/local/scenes.yaml`。`config/system` 不包含这批
+地图资料。加载时按 key 合并场景清单，并按实体路径解析 local 文件。
+开发模式编辑这批 local 实体时，地图定义、HUD 场景和布局坐标继续写回 local；
+保存场景分组也保留 local 独有的分组，不把它复制进 system。
 
 ### 小地图区域为什么随地图走
 

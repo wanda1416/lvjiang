@@ -191,8 +191,9 @@ def test_plan_context_from_plan_includes_fixed_gongjue(monkeypatch):
     assert context.attr_context.judge_resistance == level_cfg.judge_resistance
     assert context.attr_context.buff_resistance == level_cfg.buff_resistance
     assert context.gongjue == "会意" and context.playstyle == "无名"
+    # 契约是「弓玦计入基础属性」，具体数值随赛季 gongjue_level 变化，不写死
     expected = gongjue_attrs("会意", gc)
-    assert expected.intent_rate == pytest.approx(0.035)
+    assert expected.intent_rate > 0
     assert context.base_attrs.intent_rate == pytest.approx(
         0.2 + expected.intent_rate)
     assert context.scorer(game_config=gc).school == "鸣金·虹"

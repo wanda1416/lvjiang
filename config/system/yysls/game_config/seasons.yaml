@@ -297,5 +297,5 @@ season_configs:
   end_date: '2026-12-25'
   first_half_end_date: '2026-11-06'
   equip_level: 115
-  gongjue_level: 110
+  gongjue_level: 115
   min_chengyin_level: 105

@@ -214,14 +214,21 @@ def test_the_loadout_is_remembered_between_openings(derive, monkeypatch) -> None
     assert reopened._loadout().inner_ways[0].tier == 2
 
 
-def test_115_loadout_defaults_to_the_seasons_110_gongjue_level(derive) -> None:
-    """弓玦仍可手选，但旧装配没记录时不能悄悄套用 115 或最低等级。"""
+def test_loadout_without_record_follows_the_seasons_gongjue_level(derive) -> None:
+    """弓玦仍可手选，但旧装配没记录时要跟随赛季配置，不能套用最低等级。
+
+    期望值取自 game_config 而不是写死——赛季把 gongjue_level 从 110 改到 115
+    是常规配置更新，不该让这个用例失败。
+    """
+    from lvjiang.apps.yysls.config import get_game_config
     from lvjiang.apps.yysls.core.attr_model import AttrLoadout
 
     dialog, _ = derive
     dialog._apply_loadout(AttrLoadout(level=115, school=dialog._school()))
 
-    assert dialog._loadout().gongjue_level == 110
+    expected = get_game_config().gongjue_level_for(115)
+    assert expected > 0
+    assert dialog._loadout().gongjue_level == expected
 
 
 def test_saving_records_both_the_snapshot_and_the_loadout(derive) -> None:

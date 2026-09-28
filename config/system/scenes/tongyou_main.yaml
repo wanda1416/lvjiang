@@ -12,6 +12,8 @@ views:
   name: 止戈
   kind: page
   owner: /base
+- key: zhige_jingjie
+  name: 止戈境界
 - key: chuangdang
   name: 闯荡
   kind: page
@@ -73,6 +75,36 @@ regions:
   type: attr
   is_text: true
   is_clickable: false
+  view: zhige
+- key: zhige_task
+  name: 止戈任务
+  type: attr
+  is_text: true
+  is_clickable: true
+  view: zhige_jingjie
+- key: zhige_reward
+  name: 止戈奖励
+  type: attr
+  is_text: true
+  is_clickable: true
+  view: zhige_jingjie
+- key: zhige_of_season
+  name: 赛季止戈进度
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: zhige_jingjie
+- key: zhige_of_week
+  name: 本周止戈进度
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: zhige_jingjie
+- key: zhige_jingjie
+  name: 止戈境界
+  type: attr
+  is_text: true
+  is_clickable: true
   view: zhige
 panels:
 - key: zhige_items

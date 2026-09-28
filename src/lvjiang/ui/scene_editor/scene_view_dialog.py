@@ -83,19 +83,25 @@ class ViewManagerDialog(QDialog):
         for label, key in [("独立页面", "page"), ("同页取景", "viewport"),
                            ("页内标签", "tab"), ("浮层窗口", "modal")]:
             self._relation.addItem(tr(label), key)
-        self._owner = QComboBox()
-        self._owner.addItem(tr("无关联视图"), "")
-        for sk, scene in self._registry.all_scenes().items():
-            for view in scene.views:
-                self._owner.addItem(f"{scene.name} / {view.name}",
-                                    f"/{view.key}" if sk == self._scene_key else f"{sk}/{view.key}")
+        self._owner_group = QComboBox()
+        self._owner_scene = QComboBox()
+        self._owner_view = QComboBox()
+        self._owner_group.currentIndexChanged.connect(self._on_owner_group_changed)
+        self._owner_scene.currentIndexChanged.connect(self._on_owner_scene_changed)
         self._btn_save_relation = QPushButton(tr("保存关系"))
         self._btn_save_relation.clicked.connect(self._save_relation)
         apply_button_style(self._btn_save_relation)
+        relation_row.addWidget(QLabel(tr("关系：")))
         relation_row.addWidget(self._relation)
-        relation_row.addWidget(self._owner, 1)
-        relation_row.addWidget(self._btn_save_relation)
+        relation_row.addStretch()
         layout.addLayout(relation_row)
+        owner_row = QHBoxLayout()
+        owner_row.addWidget(QLabel(tr("关联视图：")))
+        owner_row.addWidget(self._owner_group, 2)
+        owner_row.addWidget(self._owner_scene, 3)
+        owner_row.addWidget(self._owner_view, 2)
+        owner_row.addWidget(self._btn_save_relation)
+        layout.addLayout(owner_row)
         # 加入对话框后再按最终字体和样式测量，保证本体及弹出列表均能
         # 完整展示四个汉字。
         set_combo_minimum_character_capacity(self._relation, 4)
@@ -195,14 +201,7 @@ class ViewManagerDialog(QDialog):
             target.addWidget(label)
 
     def _refresh(self):
-        self._owner.clear()
-        self._owner.addItem(tr("无关联视图"), "")
-        for sk, scene in self._registry.all_scenes().items():
-            for view in scene.views:
-                self._owner.addItem(f"{scene.name} / {view.name}",
-                                    f"/{view.key}" if sk == self._scene_key else f"{sk}/{view.key}")
-            if not scene.views and not scene.is_subscene:
-                self._owner.addItem(f"{scene.name} / 基底", f"{sk}/base")
+        self._refresh_owner_groups()
         selected = self._selected_view_key()
         self._list.clear()
         views = self._registry.get_scene_views(self._scene_key)
@@ -230,6 +229,76 @@ class ViewManagerDialog(QDialog):
         # 更新上移/下移按钮状态
         self._update_move_buttons()
         self._refresh_contract()
+
+    def _refresh_owner_groups(self) -> None:
+        self._owner_group.blockSignals(True)
+        self._owner_group.clear()
+        self._owner_group.addItem(tr("无关联视图"), "")
+        for group_key, group_name in self._registry.get_groups():
+            if self._owner_scenes(group_key):
+                self._owner_group.addItem(group_name, group_key)
+        self._owner_group.blockSignals(False)
+        self._on_owner_group_changed(0)
+
+    def _owner_scenes(self, group_key: str) -> list[tuple[str, str]]:
+        return [
+            (scene_key, scene.name)
+            for scene_key, scene in self._registry.all_scenes().items()
+            if self._registry.get_scene_group(scene_key) == group_key
+            and (scene.views or not scene.is_subscene)
+        ]
+
+    def _on_owner_group_changed(self, _index: int) -> None:
+        group_key = self._owner_group.currentData()
+        self._owner_scene.blockSignals(True)
+        self._owner_scene.clear()
+        if group_key:
+            for scene_key, scene_name in self._owner_scenes(group_key):
+                self._owner_scene.addItem(scene_name, scene_key)
+        self._owner_scene.blockSignals(False)
+        self._owner_scene.setEnabled(self._owner_scene.count() > 0)
+        self._on_owner_scene_changed(0)
+
+    def _on_owner_scene_changed(self, _index: int) -> None:
+        scene_key = self._owner_scene.currentData()
+        scene = self._registry.get_scene(scene_key) if scene_key else None
+        self._owner_view.blockSignals(True)
+        self._owner_view.clear()
+        if scene is not None:
+            if scene.views:
+                for view in scene.views:
+                    self._owner_view.addItem(view.name, view.key)
+            else:
+                self._owner_view.addItem(tr("基底"), BASE_VIEW_KEY)
+        self._owner_view.blockSignals(False)
+        self._owner_view.setEnabled(self._owner_view.count() > 0)
+
+    def _set_owner_value(self, owner: str) -> None:
+        if not owner:
+            self._owner_group.setCurrentIndex(0)
+            self._on_owner_group_changed(0)
+            return
+        scene_key, _, view_key = owner.partition("/")
+        scene_key = scene_key or self._scene_key
+        group_key = self._registry.get_scene_group(scene_key)
+        group_index = self._owner_group.findData(group_key)
+        self._owner_group.setCurrentIndex(max(0, group_index))
+        self._on_owner_group_changed(0)
+        scene_index = self._owner_scene.findData(scene_key)
+        if scene_index >= 0:
+            self._owner_scene.setCurrentIndex(scene_index)
+            self._on_owner_scene_changed(0)
+            view_index = self._owner_view.findData(view_key or BASE_VIEW_KEY)
+            if view_index >= 0:
+                self._owner_view.setCurrentIndex(view_index)
+
+    def _owner_value(self) -> str:
+        scene_key = self._owner_scene.currentData()
+        view_key = self._owner_view.currentData()
+        if not scene_key or not view_key:
+            return ""
+        return (f"/{view_key}" if scene_key == self._scene_key
+                else f"{scene_key}/{view_key}")
 
     def _refresh_contract(self, *_args):
         """展示选中视图的入口与转移。
@@ -284,7 +353,7 @@ class ViewManagerDialog(QDialog):
         if view is not None:
             self._relation.setCurrentIndex(max(0, self._relation.findData(view.relation)))
             owner = view.owner or ("/base" if not view.kind and same_layer else "")
-            self._owner.setCurrentIndex(max(0, self._owner.findData(owner)))
+            self._set_owner_value(owner)
         if entries:
             entry_lines = [_entry_line(t) for t in entries]
         elif view_key == BASE_VIEW_KEY:
@@ -522,7 +591,7 @@ class ViewManagerDialog(QDialog):
         from ...core.scene_transitions import validate_view_relations
         old = (view.kind, view.owner, view.same_layer)
         view.kind = self._relation.currentData()
-        view.owner = self._owner.currentData() or ""
+        view.owner = self._owner_value()
         view.same_layer = view.kind == "viewport"
         problems = [p for p in validate_view_relations(self._registry.all_scenes())
                     if p.startswith(f"{self._scene_key}/{key} ")]

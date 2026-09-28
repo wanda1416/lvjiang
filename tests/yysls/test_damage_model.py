@@ -122,6 +122,37 @@ def test_a_scheme_from_another_workbook_is_reported_as_out_of_sync(
     assert "不同源" in manager.mismatched("鸣金·虹")
 
 
+def _write_scheme(path, level: int, sha: str, version: int = 1) -> None:
+    (path / f"鸣金·虹_基础方案_v{version}.json").write_text(
+        json.dumps({
+            "schema_version": 3,
+            "school": "鸣金·虹",
+            "scheme": "基础方案",
+            "model_level": level,
+            "model_version": version,
+            "source": {"sha256": sha},
+        }),
+        encoding="utf-8",
+    )
+
+
+def test_a_higher_level_scheme_does_not_age_out_the_coefficient_table(
+    models_dir,
+) -> None:
+    """只要有一份配套方案同源就算一致，不必是最高等级那份。
+
+    方案按等级分文件，系数表却是一个流派一份。某流派新增 115 级方案时，仍在用
+    110 阶表的它并没有过期——若按「必须与最高等级方案同源」判定，页面会永远挂着
+    「已过期，重新导入 Excel 可修复」，而导入 115 的 Excel 并不是想要的结果。
+    """
+    manager, path = models_dir
+    _write_scheme(path, 110, "abc")          # 与系数表同源
+    _write_scheme(path, 115, "另一份表", version=2)  # 更高等级，另一份 Excel
+    manager.reload()
+
+    assert manager.mismatched("鸣金·虹") == ""
+
+
 def test_a_missing_scheme_is_reported_too(models_dir) -> None:
     manager, _ = models_dir
 

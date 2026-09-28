@@ -25,7 +25,7 @@ layouts/{layout}/map_{key}.json  各布局坐标（场景编辑器标定；地�
 YAML 与旧 system 图片静默拼成一张地图。远程下发二进制底图需等目录级资产机制
 落地；未来若发布带底图的地图，底图仍需随应用打包。
 
-当前私有地图资料放在 `config/local/maps/`；配套 HUD 场景、布局坐标和
+当前开发版地图资料放在 `config/local/maps/`；配套 HUD 场景、布局坐标和
 `scenes.yaml` 中的地图分组也分别放在 `config/local/scenes/`、
 `config/local/layouts/` 和 `config/local/scenes.yaml`。`config/system` 不包含这批
 地图资料。加载时按 key 合并场景清单，并按实体路径解析 local 文件。

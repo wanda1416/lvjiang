@@ -90,16 +90,12 @@ mkdir -p src/lvjiang/apps/mygame
 touch src/lvjiang/apps/mygame/__init__.py
 ```
 
-### 2. 注册插件
+### 2. 加载插件
 
-在 `src/lvjiang/apps/__init__.py` 的 `_APP_REGISTRY` 中添加：
-
-```python
-_APP_REGISTRY: dict[str, str] = {
-    "yysls": "lvjiang.apps.yysls",
-    "mygame": "lvjiang.apps.mygame",  # 新增
-}
-```
+运行时使用 `-reg mygame` 显式加载 `lvjiang.apps.mygame`。
+插件目录可由独立仓库提供，无需修改主仓库的插件名册；不传 `-reg` 时不会加载。
+本地 `dev.sh` / `dev.bat` 默认只加载 `yysls`，显式传 `--all` 才额外加载
+`premium`。公开发布在干净检出上构建，不包含独立私有仓库。
 
 ### 3. 实现 hooks
 

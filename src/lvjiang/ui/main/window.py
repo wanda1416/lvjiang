@@ -48,7 +48,11 @@ from ...core.layout_manager import LayoutConfigManager
 from ...core.reference_db import ReferenceDatabase
 from ...core.user_config import UserConfigManager
 from ...i18n import tr
-from ..button_styles import apply_button_style, apply_compact_button_style
+from ..button_styles import (
+    apply_button_style,
+    apply_compact_button_style,
+    apply_execution_button_style,
+)
 from ..overlay import BorderOverlay
 from ..widgets import TrimmedLogEdit
 from .capture_ops import CaptureOpsMixin
@@ -644,6 +648,7 @@ class MainWindow(
         """构建左侧 Tab（通用：日常），再追加插件注入的 Tab。"""
         # ── Tab 1: 日常 ──
         daily_scroll = QScrollArea()
+        daily_scroll.setFrameShape(QFrame.Shape.NoFrame)
         daily_scroll.setWidgetResizable(True)
         daily_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         daily_panel = QWidget()
@@ -659,18 +664,14 @@ class MainWindow(
             tr("开始执行"), self._user_config.hotkeys.start))
         # Explicitly discard clicked(bool); the access wrapper accepts *args.
         self.btn_run_workflow.clicked.connect(lambda: self._on_run_workflow())
-        self.btn_run_workflow.setStyleSheet(
-            "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-        )
-        btn_layout.addWidget(self.btn_run_workflow)
+        apply_execution_button_style(self.btn_run_workflow, "run")
+        btn_layout.addWidget(self.btn_run_workflow, 1)
 
         self.btn_pause_resume = QPushButton(tr("暂停"))
         self.btn_pause_resume.clicked.connect(self._on_pause_resume)
         self.btn_pause_resume.setEnabled(False)  # 初始禁用
-        self.btn_pause_resume.setStyleSheet(
-            "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-        )
-        btn_layout.addWidget(self.btn_pause_resume)
+        apply_execution_button_style(self.btn_pause_resume, "disabled")
+        btn_layout.addWidget(self.btn_pause_resume, 1)
         daily_layout.addLayout(btn_layout)
 
         from ..execution_user_selector import ExecutionUserSelector

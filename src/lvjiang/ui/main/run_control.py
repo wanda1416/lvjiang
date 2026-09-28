@@ -18,6 +18,7 @@ from lvjiang.apps import get_registry
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
+from ..button_styles import apply_execution_button_style
 from .execution_access import guarded_finish, guarded_launch
 
 # 顶部上下文选择器的锁定原因。定义在这里而不是 window.py：window 已经
@@ -1183,27 +1184,19 @@ class RunControlMixin:
         if run_state == 'running':
             btn.setText(self._hotkey_label(tr("暂停"), hk.pause))
             btn.setEnabled(True)
-            btn.setStyleSheet(
-                "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_execution_button_style(btn, "pause")
         elif run_state == STATE_PAUSING:
             btn.setText(tr("暂停中"))
             btn.setEnabled(False)
-            btn.setStyleSheet(
-                "background-color: #FFB74D; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_execution_button_style(btn, "pausing")
         elif run_state == 'paused':
             btn.setText(self._hotkey_label(tr("恢复"), hk.pause))
             btn.setEnabled(True)
-            btn.setStyleSheet(
-                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_execution_button_style(btn, "run")
         else:  # idle
             btn.setText(tr("暂停"))
             btn.setEnabled(False)
-            btn.setStyleSheet(
-                "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_execution_button_style(btn, "disabled")
 
     # ─── ADB 断连暂停恢复 ────────────────────────────────
 
@@ -1596,41 +1589,31 @@ class RunControlMixin:
             state = STATE_STOPPING
             self.btn_run_workflow.setText(tr("结束中"))
             self.btn_run_workflow.setEnabled(False)
-            self.btn_run_workflow.setStyleSheet(
-                "background-color: #ef9a9a; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_execution_button_style(self.btn_run_workflow, "stopping")
         elif self._running:
             state = run_state  # running 或 paused
             self.btn_run_workflow.setEnabled(True)
             self.btn_run_workflow.setText(self._hotkey_label(tr("结束"), hk.stop))
-            self.btn_run_workflow.setStyleSheet(
-                "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_execution_button_style(self.btn_run_workflow, "stop")
         elif not self._backend_ready():
             state = "not_ready"
             self.btn_run_workflow.setEnabled(True)
             label = tr("未连接") if self._backend == "adb" else tr("未定位")
             self.btn_run_workflow.setText(label)
-            self.btn_run_workflow.setStyleSheet(
-                "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_execution_button_style(self.btn_run_workflow, "not_ready")
         elif not self._plan_allows_backend():
             # 只置灰不 setEnabled(False)：禁用的控件收不到鼠标事件，点了就
             # 没有任何反馈，也就没法在左下角说明原因。
             state = STATE_PLAN_UNSUPPORTED
             self.btn_run_workflow.setEnabled(True)
             self.btn_run_workflow.setText(tr("方案不支持"))
-            self.btn_run_workflow.setStyleSheet(
-                "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_execution_button_style(self.btn_run_workflow, "disabled")
         else:
             state = "idle"
             self.btn_run_workflow.setEnabled(True)
             self.btn_run_workflow.setText(self._hotkey_label(
                 tr("开始执行"), hk.start))
-            self.btn_run_workflow.setStyleSheet(
-                "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-            )
+            apply_execution_button_style(self.btn_run_workflow, "run")
         self.automation_state_changed.emit(state)
         from ..execution_user_selector import ExecutionUserSelector
         for selector in self.findChildren(ExecutionUserSelector):

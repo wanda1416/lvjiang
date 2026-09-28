@@ -56,7 +56,11 @@ from ...core.profile.schema import get_profile_config
 from ...core.profile.service import profile_read
 from ...i18n import tr
 from ...workflows.builtins._coerce import to_bool
-from ..button_styles import apply_button_style, fit_button_width
+from ..button_styles import (
+    apply_button_style,
+    apply_execution_button_style,
+    fit_button_width,
+)
 from ..main.run_control import (
     STATE_PAUSING,
     STATE_PLAN_UNSUPPORTED,
@@ -88,34 +92,6 @@ def _status_color(status: str):
     }
     value = colours.get(status)
     return QColor(value) if value else None
-
-_STYLE_BTN_RUN = (
-    "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_STOP = (
-    "background-color: #f44336; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_STOPPING = (
-    "background-color: #ef9a9a; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_NOT_READY = (
-    "background-color: #FFC107; color: #333; font-weight: bold; padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_PLAN_UNSUPPORTED = (
-    "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_PAUSE = (
-    "background-color: #FF9800; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_PAUSING = (
-    "background-color: #FFB74D; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_RESUME = (
-    "background-color: #4CAF50; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-)
-_STYLE_BTN_DISABLED = (
-    "background-color: #9E9E9E; color: white; font-weight: bold; padding: 8px; font-size: 13px;"
-)
 
 _BATCH_LIST_VERTICAL_PADDING = 12
 _TABLE_COLUMN_HORIZONTAL_PADDING = 20
@@ -241,21 +217,24 @@ class BatchTab(QWidget):
         from ..hotkeys import hotkey_label
         self._btn_run = QPushButton(hotkey_label(
             tr("开始执行"), self._host._user_config.hotkeys.start))
-        self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
+        apply_execution_button_style(self._btn_run, "run")
         self._btn_run.clicked.connect(self._on_run_clicked)
-        btn_layout.addWidget(self._btn_run)
+        btn_layout.addWidget(self._btn_run, 1)
 
         self._btn_pause_resume = QPushButton(tr("暂停"))
         self._btn_pause_resume.setEnabled(False)
-        self._btn_pause_resume.setStyleSheet(_STYLE_BTN_DISABLED)
+        apply_execution_button_style(self._btn_pause_resume, "disabled")
         self._btn_pause_resume.clicked.connect(self._on_pause_resume_clicked)
-        btn_layout.addWidget(self._btn_pause_resume)
+        btn_layout.addWidget(self._btn_pause_resume, 1)
         layout.addLayout(btn_layout)
 
         config_row = QHBoxLayout()
+        config_row.setContentsMargins(0, 0, 0, 0)
+        config_row.setSpacing(8)
         config_row.addWidget(QLabel(tr("当前配置：")))
         self._config_combo = QComboBox()
         self._config_combo.setMinimumWidth(150)
+        self._config_combo.setMinimumHeight(32)
         self._config_combo.currentIndexChanged.connect(self._on_config_changed)
         config_row.addWidget(self._config_combo, stretch=1)
         layout.addLayout(config_row)
@@ -1709,40 +1688,40 @@ class BatchTab(QWidget):
         if state == STATE_STOPPING:
             self._btn_run.setText(tr("结束中"))
             self._btn_run.setEnabled(False)
-            self._btn_run.setStyleSheet(_STYLE_BTN_STOPPING)
+            apply_execution_button_style(self._btn_run, "stopping")
         elif state in ("running", STATE_PAUSING, "paused"):
             self._btn_run.setText(hotkey_label(tr("结束"), hk.stop))
             self._btn_run.setEnabled(True)
-            self._btn_run.setStyleSheet(_STYLE_BTN_STOP)
+            apply_execution_button_style(self._btn_run, "stop")
         elif state == "not_ready":
             self._btn_run.setText(tr("未连接"))
             self._btn_run.setEnabled(True)
-            self._btn_run.setStyleSheet(_STYLE_BTN_NOT_READY)
+            apply_execution_button_style(self._btn_run, "not_ready")
         elif state == STATE_PLAN_UNSUPPORTED:
             self._btn_run.setText(tr("方案不支持"))
             self._btn_run.setEnabled(True)
-            self._btn_run.setStyleSheet(_STYLE_BTN_PLAN_UNSUPPORTED)
+            apply_execution_button_style(self._btn_run, "disabled")
         else:
             self._btn_run.setText(hotkey_label(tr("开始执行"), hk.start))
             self._btn_run.setEnabled(True)
-            self._btn_run.setStyleSheet(_STYLE_BTN_RUN)
+            apply_execution_button_style(self._btn_run, "run")
         # 刷新暂停/恢复按钮
         if state == "running":
             self._btn_pause_resume.setText(hotkey_label(tr("暂停"), hk.pause))
             self._btn_pause_resume.setEnabled(True)
-            self._btn_pause_resume.setStyleSheet(_STYLE_BTN_PAUSE)
+            apply_execution_button_style(self._btn_pause_resume, "pause")
         elif state == STATE_PAUSING:
             self._btn_pause_resume.setText(tr("暂停中"))
             self._btn_pause_resume.setEnabled(False)
-            self._btn_pause_resume.setStyleSheet(_STYLE_BTN_PAUSING)
+            apply_execution_button_style(self._btn_pause_resume, "pausing")
         elif state == "paused":
             self._btn_pause_resume.setText(hotkey_label(tr("恢复"), hk.pause))
             self._btn_pause_resume.setEnabled(True)
-            self._btn_pause_resume.setStyleSheet(_STYLE_BTN_RESUME)
+            apply_execution_button_style(self._btn_pause_resume, "run")
         else:
             self._btn_pause_resume.setText(tr("暂停"))
             self._btn_pause_resume.setEnabled(False)
-            self._btn_pause_resume.setStyleSheet(_STYLE_BTN_DISABLED)
+            apply_execution_button_style(self._btn_pause_resume, "disabled")
 
     def _set_config_enabled(self, enabled: bool):
         """运行期间锁定配置组、脚本、用户和参数。"""

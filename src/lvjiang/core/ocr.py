@@ -1,6 +1,7 @@
 """OCR 引擎封装 - RapidOCR (ONNX Runtime) 封装，懒加载。
 
-调用方可按需传入 ``cleaning_group``；未指定时只去除首尾空白。
+调用方可按需传入 ``cleaning_group``；未指定时仍会执行 ``normalization.default``
+那层全局规范化，再去除首尾空白——没有「完全不清洗」这条路径。
 """
 
 from dataclasses import dataclass
@@ -155,9 +156,8 @@ class OCREngine:
             return {}
         if len(crops) == 1:
             key, crop = crops[0]
-            ocr_results = (self.recognize(
+            ocr_results = self.recognize(
                 crop, cleaning_group=cleaning_group)
-                if cleaning_group else self.recognize(crop))
             if min_confidence is not None:
                 ocr_results = [
                     r for r in ocr_results
@@ -231,9 +231,8 @@ class OCREngine:
                 placements.append((key, 0, y, crop_w, y + crop_h))
                 y += crop_h + region_batch.gap
 
-            batch_results = (self.recognize(
+            batch_results = self.recognize(
                 sheet, cleaning_group=cleaning_group)
-                if cleaning_group else self.recognize(sheet))
             for ocr_result in batch_results:
                 if (min_confidence is not None
                         and ocr_result.confidence < min_confidence):
@@ -323,9 +322,7 @@ class OCREngine:
                    cleaning_group: str | None = None) -> str:
         """对单张小图做 OCR，返回清洗后的文本（多条用 | 分隔）"""
         OCRCleaner().validate_group(cleaning_group)
-        ocr_results = (self.recognize(
-            image, cleaning_group=cleaning_group)
-            if cleaning_group else self.recognize(image))
+        ocr_results = self.recognize(image, cleaning_group=cleaning_group)
         if min_confidence is not None:
             ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
         return " | ".join(r.text for r in ocr_results) if ocr_results else ""

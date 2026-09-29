@@ -23,7 +23,7 @@ def test_ocr_scene_regions_includes_referenced_text_definition(monkeypatch):
     monkeypatch.setattr(
         engine,
         "recognize",
-        lambda _crop: [OCRResult("识别结果", 1.0, [])],
+        lambda _crop, cleaning_group=None: [OCRResult("识别结果", 1.0, [])],
     )
     image = np.zeros((100, 100, 3), dtype=np.uint8)
     region = Region(

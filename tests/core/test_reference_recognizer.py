@@ -35,7 +35,7 @@ def _make_db(tmp_path, meta_schema) -> ReferenceDatabase:
 
 
 class _FakeOCR:
-    def recognize(self, crop):
+    def recognize(self, crop, cleaning_group=None):
         height, width = crop.shape[:2]
         return [SimpleNamespace(text=f"{height}x{width}")]
 

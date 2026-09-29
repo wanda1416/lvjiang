@@ -217,6 +217,56 @@ def test_judgment_outcomes_prioritize_intent_when_rates_overflow() -> None:
     assert rates.scratch == pytest.approx(0.0)
 
 
+def test_judgment_outcomes_report_white_overflow_at_yellow_caps() -> None:
+    attrs = CombatAttributes(
+        precision=1.9,
+        crit_rate=1.75,
+        intent_rate=0.9,
+    )
+
+    rates = calculate_judgment_outcomes(attrs, resistance=100)
+
+    assert (rates.white_precision, rates.white_crit, rates.white_intent) == (
+        1.9, 1.75, 0.9,
+    )
+    assert rates.precision == pytest.approx(1.0)
+    assert rates.judgment_crit == pytest.approx(0.8)
+    assert rates.judgment_intent == pytest.approx(0.4)
+    assert rates.precision_overflow == pytest.approx(0.55)
+    assert rates.crit_overflow == pytest.approx(0.15)
+    assert rates.intent_overflow == pytest.approx(0.1)
+
+
+def test_judgment_popup_shows_white_sources_and_overflow_before_final_rates(
+    qtbot, monkeypatch,
+) -> None:
+    from PyQt6.QtWidgets import QLabel
+
+    from lvjiang.apps.yysls.ui.loadout.combat.attrs_tab import (
+        _JudgmentOutcomePopup,
+    )
+
+    monkeypatch.setattr(
+        "lvjiang.apps.yysls.ui.loadout.combat.attrs_tab.tr",
+        lambda text: text,
+    )
+    rates = calculate_judgment_outcomes(
+        CombatAttributes(precision=1.9, crit_rate=1.75, intent_rate=0.9),
+        resistance=100,
+    )
+    popup = _JudgmentOutcomePopup(rates)
+    qtbot.addWidget(popup)
+    labels = [label.text() for label in popup.findChildren(QLabel)]
+
+    assert labels.index("判定精准") < labels.index("判定会心")
+    assert labels.index("判定会心") < labels.index("判定会意")
+    assert labels.index("判定会意") < labels.index("最终会心")
+    assert "白字会心率 175.00%" in labels
+    assert "80.00%（溢出白字会心率 15.00%）" in labels
+    assert "100.00%（溢出白字精准率 55.00%）" in labels
+    assert "40.00%（溢出白字会意率 10.00%）" in labels
+
+
 # ── 五维转换 ──────────────────────────────────────────────
 
 #: 归一容差。当前实测系数下最差 0.986（势/敏），留 2% 余量；

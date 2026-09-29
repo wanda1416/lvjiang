@@ -15,6 +15,9 @@
     # 自检：把刚签出来的码验一遍
     python scripts/issue_license.py verify --code LVJ1.xxx.yyy
 
+日常签发用 ops/license-issuer 那个 GUI 更顺手，本脚本保留是因为 keygen 只能放在
+命令行里——生成私钥不可逆，不该做成随手点得到的按钮。
+
 **不要复用 Android 的 lvjiang.jks。** 那把钥匙丢了或泄漏，你就无法给已安装用户发布
 升级包（见 android/README-signing.md）。签发许可要在日常办公机上反复动用私钥，
 暴露面完全不同——密钥分离，一把钥匙只干一件事。
@@ -55,9 +58,13 @@ def cmd_keygen(args: argparse.Namespace) -> int:
     )
 
     path = Path(args.key)
-    if path.exists() and not args.force:
-        print(f"[!] 私钥已存在: {path}\n    覆盖会让所有已签发的激活码失效。"
-              f"确实要换钥匙请加 --force", file=sys.stderr)
+    if path.exists():
+        # 没有 --force 之类的逃生口：覆盖私钥会让所有已签发的激活码一起失效，
+        # 而且不可逆。真要轮换就自己把旧文件挪走——那一步的分量应该由人来掂。
+        print(f"[!] 私钥已存在，拒绝覆盖: {path}\n"
+              f"    覆盖会让所有已签发的激活码失效，且无法恢复。\n"
+              f"    确实要换钥匙：先手动备份并移走这个文件，再重新执行。",
+              file=sys.stderr)
         return 1
 
     private = Ed25519PrivateKey.generate()
@@ -174,9 +181,8 @@ def main() -> int:
                         help=f"私钥路径（默认 {DEFAULT_KEY_PATH}）")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_keygen = sub.add_parser("keygen", help="生成签发密钥对")
-    p_keygen.add_argument("--force", action="store_true",
-                          help="覆盖已存在的私钥（会让已签发的码全部失效）")
+    p_keygen = sub.add_parser(
+        "keygen", help="生成签发密钥对（私钥已存在时拒绝执行）")
     p_keygen.set_defaults(func=cmd_keygen)
 
     p_issue = sub.add_parser("issue", help="签发一张激活码")

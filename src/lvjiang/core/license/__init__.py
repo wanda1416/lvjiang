@@ -24,7 +24,16 @@ from .code import Entitlement, License, LicenseError, evaluate, verify_code
 from .hardware import current_serial, serial_is_wellformed
 from .store import clear_code, license_path, load_code, save_code
 
+#: 可签发的高级功能登记表 ``{功能名: 展示名}``。签发工具据此列出可选项——
+#: 让工具自己维护一份清单，迟早和这里对不上，签出开不了任何功能的码。
+#:
+#: **目前为空：还没有任何功能接入门禁**（后台截图曾短暂挂在这里，现已直接开放）。
+#: 整套授权链路是通的，只是暂时没有消费者。将来要把某个功能设为高级功能时，
+#: 在这里登记一个名字，并在该功能的 UI 入口与能力入口各校验一次 has_feature()。
+KNOWN_FEATURES: dict[str, str] = {}
+
 __all__ = [
+    "KNOWN_FEATURES",
     "Entitlement",
     "License",
     "LicenseError",

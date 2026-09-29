@@ -796,7 +796,6 @@ class MainWindow(
         self._btn_clear_log.setToolTip(tr("清空当前窗口的全部日志，包括被级别筛选隐藏的日志"))
         apply_button_style(self._btn_clear_log, variant="neutral")
         self._btn_clear_log.clicked.connect(self._clear_log)
-        filter_bar.addWidget(self._btn_clear_log)
         filter_bar.addStretch()
         filter_bar.addWidget(QLabel(tr("日志级别")))
         self._log_level_combo = QComboBox()
@@ -808,6 +807,7 @@ class MainWindow(
         self._log_level_combo.setToolTip(tr("切换日志显示级别：低于选中级别的日志将被隐藏"))
         self._log_level_combo.currentIndexChanged.connect(self._on_log_level_changed)
         filter_bar.addWidget(self._log_level_combo)
+        filter_bar.addWidget(self._btn_clear_log)
         log_layout.addLayout(filter_bar)
 
         self.tabs.addTab(log_container, tr("运行日志"))

@@ -347,13 +347,9 @@ class WindowOpsMixin:
                 self.chk_bg_mode.blockSignals(False)
             self.chk_bg_mode.setVisible(True)
             self.chk_bg_mode.setEnabled(True)
-        # 后台截图默认值取自配置（基础配置 → 窗口截图），本次运行内可临时改。
-        if hasattr(self, "chk_bg_capture") and not self.chk_bg_capture.isVisible():
-            self.chk_bg_capture.blockSignals(True)
-            self.chk_bg_capture.setChecked(
-                self._user_config.desktop_background_capture)
-            self.chk_bg_capture.blockSignals(False)
+        # 后台截图的可用性由「后台模式 + 组件可用性」决定，勾选状态取配置默认值
         self._refresh_bg_capture_visibility()
+        self._apply_bg_capture_default()
         # 红框标定随后台模式一起显示；勾选状态只在本次运行期间有效。
         if hasattr(self, "chk_red_box"):
             self.chk_red_box.setVisible(True)
@@ -872,36 +868,70 @@ class WindowOpsMixin:
             return
         if self._backend == "windows" and self._target_window is not None:
             self.chk_bg_mode.setEnabled(not self._running)
-            if hasattr(self, "chk_bg_capture"):
-                # 运行中换截图后端会把正在用的实例停掉，和输入模式一样锁死
-                self.chk_bg_capture.setEnabled(not self._running)
+            # 运行中换截图后端会把正在用的实例停掉，和输入模式一样锁死；
+            # 可用性只在一处判断，这里统一走过去
+            self._refresh_bg_capture_visibility()
 
     def _refresh_bg_capture_visibility(self):
-        """刷新「后台截图」开关的显隐与可用性。
+        """刷新「后台截图」开关的显隐、可用性与勾选状态。
 
-        在 Windows 投屏模式下**常驻显示**，只在未开后台模式时禁用并说明原因——
-        随勾选凭空冒出来会让整排控件跳位，而且「功能存在但当前不可用」按项目惯例
-        就该禁用而不是隐藏（隐藏留给「压根不适用于当前环境」，比如安卓设备模式）。
+        在 Windows 投屏模式下**常驻显示**，只在不可用时整体置灰——随勾选凭空冒出来
+        会让整排控件跳位，而且「功能存在但当前不可用」按项目惯例就该禁用并给原因，
+        隐藏留给「压根不适用于当前环境」，比如安卓设备模式。
 
-        为什么必须绑着后台模式：前台输入（SendInput）要求游戏窗口在前台，这时换成
-        后台截图没有意义——窗口本来就露着；反过来若允许这个组合，用户会以为可以把
-        窗口盖起来，实际一盖输入就失效，现象还是「脚本点了没反应」，很难自己定位。
-        所以取消后台模式时连带把它关掉。
+        它跟着「后台模式」走：
+        - 未开后台模式：禁用且不勾选。前台输入（SendInput）要求游戏窗口在前台，
+          这时后台截图没有意义；真正危险的是反过来——只开后台截图、输入仍是前台，
+          用户以为可以把窗口盖起来，一盖输入就失效，现象还是「脚本点了没反应」。
+        - 勾上后台模式：立刻可用，并按配置（基础配置 → 窗口截图）的默认值自动勾上。
+          配置里那一项是绝对默认值，不受「窗口输入」设置的影响，两者的组合约束在这里
+          统一兜住，所以设置页不做互相禁用。
+
+        组件本身不可用（非 Windows、缺依赖）时同样禁用并把原因写进提示，不等用户
+        勾选后才报错。
         """
         if not hasattr(self, "chk_bg_capture"):
             return
         in_windows_mode = self._backend == "windows"
+        self.chk_bg_capture.setVisible(in_windows_mode)
+        if not in_windows_mode:
+            return
+
         background_input = (
             hasattr(self, "chk_bg_mode") and self.chk_bg_mode.isChecked())
-        if not background_input and self.chk_bg_capture.isChecked():
+        from ...core.desktop import wgc_available
+        supported, unsupported_reason = wgc_available()
+
+        if not background_input:
+            reason = tr(
+                "需要先勾选「后台模式」：前台输入要求窗口在前台，配后台截图没有意义")
+        elif not supported:
+            reason = unsupported_reason
+        elif self._running:
+            reason = tr("运行中不能切换截图方式，请先停止任务")
+        else:
+            reason = ""
+        self.chk_bg_capture.setEnabled(not reason)
+        self.chk_bg_capture.setToolTip(reason or bg_capture_tip())
+
+        if (not background_input or not supported) \
+                and self.chk_bg_capture.isChecked():
             # 退回前台截图，避免留下「前台输入 + 后台截图」的组合
             self.chk_bg_capture.setChecked(False)
-        self.chk_bg_capture.setVisible(in_windows_mode)
-        self.chk_bg_capture.setEnabled(
-            in_windows_mode and background_input and not self._running)
-        self.chk_bg_capture.setToolTip(
-            bg_capture_tip() if background_input else
-            tr("需要先启用「后台模式」：前台输入要求窗口在前台，配后台截图没有意义"))
+
+    def _apply_bg_capture_default(self):
+        """勾上「后台模式」时按配置默认值自动勾上「后台截图」。
+
+        只在后台模式刚打开（或刚进入投屏模式）时调用一次，不放进
+        ``_refresh_bg_capture_visibility``——那个方法也在任务起停时被调用，
+        放进去会把用户本次运行内手动取消的勾选又打回来。
+        """
+        if not hasattr(self, "chk_bg_capture"):
+            return
+        if not self._user_config.desktop_background_capture:
+            return
+        if self.chk_bg_capture.isEnabled() and not self.chk_bg_capture.isChecked():
+            self.chk_bg_capture.setChecked(True)
 
     def _on_disconnect(self):
         """通用断连：根据后端模式清理资源并恢复 UI"""
@@ -1019,6 +1049,9 @@ class WindowOpsMixin:
     def _on_bg_mode_changed(self, state):
         """后台模式开关切换：在 PostMessageInput / SendInputInput 之间替换整个 _input 实例"""
         self._refresh_bg_capture_visibility()
+        if bool(state):
+            # 后台截图这下可用了，按配置默认值跟上
+            self._apply_bg_capture_default()
         if not self._target_window:
             return
         hwnd = self._target_window["hwnd"]

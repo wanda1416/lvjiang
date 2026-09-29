@@ -219,16 +219,18 @@ class SettingsDialog(QDialog):
         form.addRow(_form_divider())
 
         # ── 窗口（PC 投屏）──
+        # 前台在前、后台在后，和下面「窗口截图」的两项一一对应，扫一眼就能看出
+        # 「前台输入 + 前台截图」「后台输入 + 后台截图」这两种常规搭配
         self._input_group = QButtonGroup(self)
-        self._input_bg_radio = QRadioButton(tr("后台输入 (PostMessage)"))
         self._input_fg_radio = QRadioButton(tr("光标输入 (SendInput)"))
-        self._input_group.addButton(self._input_bg_radio)
+        self._input_bg_radio = QRadioButton(tr("后台输入 (PostMessage)"))
         self._input_group.addButton(self._input_fg_radio)
+        self._input_group.addButton(self._input_bg_radio)
         self._input_bg_radio.setChecked(self._config.desktop_background_input)
         self._input_fg_radio.setChecked(
             not self._config.desktop_background_input)
         form.addRow(tr("窗口输入:"), _radio_row(
-            self._input_bg_radio, self._input_fg_radio))
+            self._input_fg_radio, self._input_bg_radio))
 
         self._desktop_capture_group = QButtonGroup(self)
         self._desktop_capture_fg_radio = QRadioButton(tr("前台截图 (mss)"))
@@ -244,7 +246,8 @@ class SettingsDialog(QDialog):
             "实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。"
             "后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；"
             "它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。"
-            "这里设的是默认值，主界面定位窗口后仍可临时切换。")
+            "这里设的是默认值：主界面只有勾选「后台模式」后才会按它自动勾上"
+            "「后台截图」，本次运行内仍可随时改。")
         self._desktop_capture_bg_radio.setToolTip(self._desktop_capture_tip)
         desktop_capture_row = _radio_row(
             self._desktop_capture_fg_radio, self._desktop_capture_bg_radio)
@@ -289,23 +292,7 @@ class SettingsDialog(QDialog):
         form.addRow(tr("安卓截图:"), _radio_row(
             self._capture_stream_radio, self._capture_static_radio))
 
-        # 光标输入要求窗口在前台，这时后台截图没有意义——别让人在这里配出一个
-        # 保存后却不生效的组合，主界面那边同样是这条规则
-        self._input_bg_radio.toggled.connect(self._refresh_desktop_capture_choice)
-        self._refresh_desktop_capture_choice()
-
         return tab
-
-    def _refresh_desktop_capture_choice(self):
-        """窗口输入模式决定后台截图能不能选"""
-        background_input = self._input_bg_radio.isChecked()
-        self._desktop_capture_bg_radio.setEnabled(background_input)
-        self._desktop_capture_bg_radio.setToolTip(
-            self._desktop_capture_tip if background_input else
-            tr("需要把「窗口输入」设为后台输入：光标输入要求窗口在前台，"
-               "配后台截图没有意义"))
-        if not background_input and self._desktop_capture_bg_radio.isChecked():
-            self._desktop_capture_fg_radio.setChecked(True)
 
     # ─── 应用注册（ADB / PC）──────────────────────────────
 

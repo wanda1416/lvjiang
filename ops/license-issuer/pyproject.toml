@@ -1,0 +1,35 @@
+[project]
+name = "license-issuer"
+version = "0.1.0"
+description = "律匠激活码签发器——本机 GUI，签发绑机码与免绑定码，并用主程序内置公钥自检"
+requires-python = ">=3.11"
+dependencies = [
+    "PyQt6>=6.6",
+    "cryptography>=42.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+license-issuer = "license_issuer.app:run"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+# 独立于主项目的 ruff 配置——否则会继承仓库根 pyproject.toml 的 [tool.ruff]。
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]

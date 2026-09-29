@@ -1,9 +1,12 @@
-"""后台截图开关只在「后台模式」之下出现。
+"""后台截图开关：Windows 模式下常驻，未开后台模式时禁用。
 
 两者必须成对：前台输入（SendInput）要求游戏窗口在前台，这时后台截图没有意义；
 真正危险的是反过来——只开后台截图、输入仍是前台，用户以为可以把窗口盖起来，
 一盖输入就失效，而且现象是「脚本点了没反应」，很难自己定位到这个组合上。
 所以取消后台模式时必须连带把后台截图关掉，这里把这条规则钉住。
+
+**禁用而不是隐藏**：随勾选凭空冒出来会让整排控件跳位；而且「功能存在但当前不可用」
+按项目惯例就该禁用并给原因，隐藏留给「压根不适用于当前环境」——安卓设备模式那种。
 """
 
 from PyQt6.QtWidgets import QCheckBox, QWidget
@@ -32,11 +35,14 @@ def _host(qtbot, backend="windows"):
     return host
 
 
-def test_hidden_while_foreground_input(qtbot):
+def test_disabled_not_hidden_while_foreground_input(qtbot):
+    """前台输入时禁用并给出原因，不是让它消失——消失会让整排控件跳位。"""
     host = _host(qtbot)
     host.chk_bg_mode.setChecked(False)
     host._refresh_bg_capture_visibility()
-    assert not host.chk_bg_capture.isVisible()
+    assert host.chk_bg_capture.isVisible()
+    assert not host.chk_bg_capture.isEnabled()
+    assert "后台模式" in host.chk_bg_capture.toolTip()
 
 
 def test_shown_once_background_input_is_on(qtbot):
@@ -57,12 +63,14 @@ def test_leaving_background_mode_also_clears_background_capture(qtbot):
     host.chk_bg_mode.setChecked(False)
     host._refresh_bg_capture_visibility()
 
+    # 勾选被清掉（关键），但控件仍在原位、只是禁用
     assert not host.chk_bg_capture.isChecked()
-    assert not host.chk_bg_capture.isVisible()
+    assert host.chk_bg_capture.isVisible()
+    assert not host.chk_bg_capture.isEnabled()
 
 
 def test_hidden_in_device_mode(qtbot):
-    """安卓截图本就来自设备，不存在遮挡问题，开关不该出现。"""
+    """安卓截图本就来自设备，压根不适用——这种才该隐藏。"""
     host = _host(qtbot, backend="adb")
     host.chk_bg_mode.setChecked(True)
     host._refresh_bg_capture_visibility()

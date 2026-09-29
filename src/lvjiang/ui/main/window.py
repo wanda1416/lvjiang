@@ -65,7 +65,7 @@ from .run_control import (
 from .startup_ops import StartupOpsMixin
 from .tray_ops import TrayOpsMixin
 from .ui_state import UiStateMixin
-from .window_ops import WindowOpsMixin
+from .window_ops import WindowOpsMixin, bg_capture_tip
 
 
 class _LogBridge(QObject):
@@ -567,12 +567,12 @@ class MainWindow(
         self.chk_bg_mode.stateChanged.connect(self._on_bg_mode_changed)
         row2.addWidget(self.chk_bg_mode)
 
-        self.chk_bg_capture = QCheckBox(tr("后台截图"))
+        # Beta 截图通道：WGC 与部分脚本的识别/时序假设还没磨合好，所以标注并在
+        # 提示里写明不受理不可用反馈——别让人把「脚本跑不通」当 bug 报回来
+        self.chk_bg_capture = QCheckBox(tr("后台截图 (Beta)"))
         self.chk_bg_capture.setVisible(False)
         self.chk_bg_capture.setChecked(False)
-        self.chk_bg_capture.setToolTip(
-            tr("用 Windows Graphics Capture 取帧，游戏窗口被别的窗口盖住也能截图；"
-               "窗口最小化时仍然拿不到画面。仅本次运行期间生效"))
+        self.chk_bg_capture.setToolTip(bg_capture_tip())
         self.chk_bg_capture.stateChanged.connect(self._on_bg_capture_changed)
         row2.addWidget(self.chk_bg_capture)
 

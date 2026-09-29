@@ -101,8 +101,8 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 
 主窗口连接流程（`ui/main/window_ops.py::_DeviceWorker._do_connect`）按用户配置
 `android_input_method = "device_gesture"`
-（设置页「安卓输入方式」/ 主窗口「设备端手势 (Beta)」勾选）决定是否尝试输入代理。
-截图始终独立服从「安卓截图方式」中的 `scrcpy` / `ADB screencap` 选择：
+（设置页「安卓输入」/ 主窗口「设备端手势 (Beta)」勾选）决定是否尝试输入代理。
+截图始终独立服从「安卓截图」中的 `scrcpy` / `ADB screencap` 选择：
 
 - 连上：输入走 `AgentInput`；截图仍按设置走 `AdbCapture` 或 `AndroidStreamCapture`
 - 连不上：日志提示一行，整体回退 `AdbInput` + screencap/scrcpy，**不算连接失败**

@@ -232,6 +232,10 @@ class UserConfig:
     android_input_method: str = "adb"       # adb / device_gesture（Beta，需 App）
     desktop_window_title: str = ""         # 桌面模式投屏窗口标题关键字
     desktop_background_input: bool = True  # 桌面模式是否启用后台输入（PostMessage）
+    # 桌面截图默认走后台截图（WGC，窗口被遮挡也能截）。默认关：mss 更快更稳，
+    # 且后台截图依赖后台输入——前台输入要求窗口本来就在前台，配它没有意义。
+    # 窗口最小化时两者都拿不到画面。
+    desktop_background_capture: bool = False
     reference_grid: ReferenceGridConfig = field(default_factory=ReferenceGridConfig)
     input_sim: InputSimConfig = field(default_factory=InputSimConfig)     # 输入模拟
     delay_params: dict[str, DelayParam] = field(default_factory=dict)     # 命名延迟参数

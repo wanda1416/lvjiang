@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -72,6 +73,25 @@ _SPIN_WIDTH = 90
 # 热键候选最长为 F10/F11/F12；显式定宽，避免“脚本录制”行与提示按钮
 # 共用子布局时 QComboBox 被压缩到只剩下部分文字。
 _HOTKEY_COMBO_WIDTH = 90
+
+
+def _radio_row(*buttons: QRadioButton) -> QWidget:
+    """把一组单选横排成 QFormLayout 的一个 field"""
+    row = QWidget()
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(0, 0, 0, 0)
+    for button in buttons:
+        layout.addWidget(button)
+    layout.addStretch()
+    return row
+
+
+def _form_divider() -> QFrame:
+    """功能分组之间的分隔线"""
+    line = QFrame()
+    line.setFrameShape(QFrame.Shape.HLine)
+    line.setFrameShadow(QFrame.Shadow.Sunken)
+    return line
 
 
 class SettingsDialog(QDialog):
@@ -148,7 +168,10 @@ class SettingsDialog(QDialog):
         self._capture_static_radio.toggled.connect(self._mark_dirty)
         self._android_input_adb_radio.toggled.connect(self._mark_dirty)
         self._android_input_agent_radio.toggled.connect(self._mark_dirty)
-        self._input_combo.currentIndexChanged.connect(self._mark_dirty)
+        self._input_bg_radio.toggled.connect(self._mark_dirty)
+        self._input_fg_radio.toggled.connect(self._mark_dirty)
+        self._desktop_capture_fg_radio.toggled.connect(self._mark_dirty)
+        self._desktop_capture_bg_radio.toggled.connect(self._mark_dirty)
         self._title_edit.textChanged.connect(self._mark_dirty)
         for entry in self._android_app_rows:
             self._connect_android_app_row_dirty(entry)
@@ -174,41 +197,68 @@ class SettingsDialog(QDialog):
     # ─── Tab1 基础配置 ─────────────────────────────────────
 
     def _build_basic_tab(self) -> QWidget:
+        """基础配置：语言 / 窗口（PC）/ 安卓，三组之间用分隔线断开。
+
+        同类选项用同一种控件：窗口输入与安卓那两组都是二选一，统一成单选按钮，
+        免得同一页里一处下拉、一处单选。
+        """
         tab = QWidget()
         form = QFormLayout(tab)
 
-        # ── 语言选择 ──
+        # ── 语言 ──
         from ..i18n import available_languages, current_language
         self._lang_combo = QComboBox()
-        languages = available_languages()
-        for lang in languages:
-            self._lang_combo.addItem(f"{lang['name']} ({lang['code']})", lang["code"])
-        current = current_language()
-        idx = self._lang_combo.findData(current)
+        for lang in available_languages():
+            self._lang_combo.addItem(
+                f"{lang['name']} ({lang['code']})", lang["code"])
+        idx = self._lang_combo.findData(current_language())
         if idx >= 0:
             self._lang_combo.setCurrentIndex(idx)
         form.addRow(tr("界面语言") + ":", self._lang_combo)
 
-        capture_row = QWidget()
-        capture_layout = QHBoxLayout(capture_row)
-        capture_layout.setContentsMargins(0, 0, 0, 0)
-        self._capture_group = QButtonGroup(self)
-        self._capture_stream_radio = QRadioButton(tr("Scrcpy 流式截图"))
-        self._capture_static_radio = QRadioButton(tr("ADB screencap 静态截图"))
-        self._capture_group.addButton(self._capture_stream_radio)
-        self._capture_group.addButton(self._capture_static_radio)
-        self._capture_stream_radio.setChecked(
-            self._config.android_capture_method == "scrcpy")
-        self._capture_static_radio.setChecked(
-            self._config.android_capture_method == "screencap")
-        capture_layout.addWidget(self._capture_stream_radio)
-        capture_layout.addWidget(self._capture_static_radio)
-        capture_layout.addStretch()
-        form.addRow(tr("安卓截图方式:"), capture_row)
+        form.addRow(_form_divider())
 
-        input_row = QWidget()
-        input_layout = QHBoxLayout(input_row)
-        input_layout.setContentsMargins(0, 0, 0, 0)
+        # ── 窗口（PC 投屏）──
+        self._input_group = QButtonGroup(self)
+        self._input_bg_radio = QRadioButton(tr("后台输入 (PostMessage)"))
+        self._input_fg_radio = QRadioButton(tr("光标输入 (SendInput)"))
+        self._input_group.addButton(self._input_bg_radio)
+        self._input_group.addButton(self._input_fg_radio)
+        self._input_bg_radio.setChecked(self._config.desktop_background_input)
+        self._input_fg_radio.setChecked(
+            not self._config.desktop_background_input)
+        form.addRow(tr("窗口输入:"), _radio_row(
+            self._input_bg_radio, self._input_fg_radio))
+
+        self._desktop_capture_group = QButtonGroup(self)
+        self._desktop_capture_fg_radio = QRadioButton(tr("前台截图 (mss)"))
+        self._desktop_capture_bg_radio = QRadioButton(tr("后台截图 (WGC，Beta)"))
+        self._desktop_capture_group.addButton(self._desktop_capture_fg_radio)
+        self._desktop_capture_group.addButton(self._desktop_capture_bg_radio)
+        self._desktop_capture_bg_radio.setChecked(
+            self._config.desktop_background_capture)
+        self._desktop_capture_fg_radio.setChecked(
+            not self._config.desktop_background_capture)
+        form.addRow(tr("窗口截图:"), _radio_row(
+            self._desktop_capture_fg_radio, self._desktop_capture_bg_radio))
+
+        desktop_capture_caption = QLabel(
+            tr("后台截图是实验性功能，很多脚本暂时无法在该模式下跑通，"
+               "不受理该功能的不可用反馈。"
+               "它让游戏窗口被别的窗口盖住时也能截图，代价是比 mss 略慢；"
+               "它需要同时使用后台输入，窗口最小化时两者都拿不到画面。"
+               "这里设的是默认值，主界面定位窗口后仍可临时切换。"))
+        desktop_capture_caption.setWordWrap(True)
+        desktop_capture_caption.setStyleSheet("color: palette(mid);")
+        form.addRow("", desktop_capture_caption)
+
+        self._title_edit = QLineEdit(self._config.desktop_window_title)
+        self._title_edit.setPlaceholderText(tr("空串不自动定位窗口"))
+        form.addRow(tr("窗口标题:"), self._title_edit)
+
+        form.addRow(_form_divider())
+
+        # ── 安卓 ──
         self._android_input_group = QButtonGroup(self)
         self._android_input_adb_radio = QRadioButton(tr("ADB shell input"))
         self._android_input_agent_radio = QRadioButton(
@@ -223,23 +273,40 @@ class SettingsDialog(QDialog):
             "实验功能：手机需安装律匠 App 并开启无障碍服务；"
             "仅改变点击和滑动的执行通道，不改变截图方式。连接失败时回退 ADB shell input。")
         self._android_input_agent_radio.setToolTip(agent_tip)
-        input_row.setToolTip(agent_tip)
-        input_layout.addWidget(self._android_input_adb_radio)
-        input_layout.addWidget(self._android_input_agent_radio)
-        input_layout.addStretch()
-        form.addRow(tr("安卓输入方式:"), input_row)
+        android_input_row = _radio_row(
+            self._android_input_adb_radio, self._android_input_agent_radio)
+        android_input_row.setToolTip(agent_tip)
+        form.addRow(tr("安卓输入:"), android_input_row)
 
-        self._input_combo = QComboBox()
-        self._input_combo.addItem(tr("后台输入 (PostMessage)"), True)
-        self._input_combo.addItem(tr("光标输入 (SendInput)"), False)
-        self._input_combo.setCurrentIndex(0 if self._config.desktop_background_input else 1)
-        form.addRow(tr("窗口输入模式:"), self._input_combo)
+        self._capture_group = QButtonGroup(self)
+        self._capture_stream_radio = QRadioButton(tr("Scrcpy 流式截图"))
+        self._capture_static_radio = QRadioButton(tr("ADB screencap 静态截图"))
+        self._capture_group.addButton(self._capture_stream_radio)
+        self._capture_group.addButton(self._capture_static_radio)
+        self._capture_stream_radio.setChecked(
+            self._config.android_capture_method == "scrcpy")
+        self._capture_static_radio.setChecked(
+            self._config.android_capture_method == "screencap")
+        form.addRow(tr("安卓截图:"), _radio_row(
+            self._capture_stream_radio, self._capture_static_radio))
 
-        self._title_edit = QLineEdit(self._config.desktop_window_title)
-        self._title_edit.setPlaceholderText(tr("空串不自动定位窗口"))
-        form.addRow(tr("默认窗口标题:"), self._title_edit)
+        # 光标输入要求窗口在前台，这时后台截图没有意义——别让人在这里配出一个
+        # 保存后却不生效的组合，主界面那边同样是这条规则
+        self._input_bg_radio.toggled.connect(self._refresh_desktop_capture_choice)
+        self._refresh_desktop_capture_choice()
 
         return tab
+
+    def _refresh_desktop_capture_choice(self):
+        """窗口输入模式决定后台截图能不能选"""
+        background_input = self._input_bg_radio.isChecked()
+        self._desktop_capture_bg_radio.setEnabled(background_input)
+        self._desktop_capture_bg_radio.setToolTip(
+            "" if background_input else
+            tr("需要把「窗口输入」设为后台输入：光标输入要求窗口在前台，"
+               "配后台截图没有意义"))
+        if not background_input and self._desktop_capture_bg_radio.isChecked():
+            self._desktop_capture_fg_radio.setChecked(True)
 
     # ─── 应用注册（ADB / PC）──────────────────────────────
 
@@ -1497,7 +1564,8 @@ class SettingsDialog(QDialog):
                 "scrcpy" if self._capture_stream_radio.isChecked() else "screencap"),
             "android_input_method": (
                 "device_gesture" if self._android_input_agent_radio.isChecked() else "adb"),
-            "desktop_background_input": self._input_combo.currentData(),
+            "desktop_background_input": self._input_bg_radio.isChecked(),
+            "desktop_background_capture": self._desktop_capture_bg_radio.isChecked(),
             "desktop_window_title": self._title_edit.text().strip(),
             "hotkeys": hotkeys,
             "font_sizes": {

@@ -15,10 +15,15 @@ def db(tmp_path):
     return tmp_path / "ledger.db"
 
 
-def _add(db, code_id="L1", bind="none", serial=None, levels=("lv1",),
+def _add(db, seq=None, code_id=None, bind="none", serial=None, levels=("lv1",),
          expires=None, code="LVJ1.A.B", note=""):
+    """写一条记录。不传流水号时自动取下一个，编号按绑定方式渲染。"""
+    if seq is None:
+        seq = ledger.next_seq(db)
+    if code_id is None:
+        code_id = ledger.make_code_id(bind, seq)
     return ledger.record_issue(
-        code_id=code_id, bind=bind, serial=serial, levels=levels,
+        seq=seq, code_id=code_id, bind=bind, serial=serial, levels=levels,
         expires=expires, code=code, note=note, path=db)
 
 
@@ -100,3 +105,45 @@ def test_note_can_be_added_afterwards(db):
     row_id = _add(db, note="")
     ledger.update_note(row_id, "给王五", path=db)
     assert ledger.list_records(path=db)[0].note == "给王五"
+
+
+class TestSeqAllocation:
+    """流水号才是编号的真身：两类码共用一条序列，数字全局唯一"""
+
+    def test_empty_ledger_starts_at_one(self, db):
+        assert ledger.next_seq(db) == 1
+        assert ledger.next_code_id("serial", db) == "B0001"
+        assert ledger.next_code_id("none", db) == "F0001"
+
+    def test_increments_from_max(self, db):
+        _add(db, seq=1)
+        _add(db, seq=7)
+        assert ledger.next_seq(db) == 8
+
+    def test_uses_max_not_count(self, db):
+        """删过行之后条数会和流水号对不上，重复编号会让台账查不准。"""
+        _add(db, seq=42)
+        assert ledger.next_seq(db) == 43
+
+    def test_sequence_is_shared_between_bind_modes(self, db):
+        """绑机与免绑定共用一条序列，不会出现 B0003 与 F0003 两张不同的码。"""
+        _add(db, bind="serial")
+        _add(db, bind="none")
+        _add(db, bind="serial")
+        ids = [r.code_id for r in ledger.list_records(path=db)]
+        assert ids == ["B0003", "F0002", "B0001"]
+
+    def test_prefix_tells_the_kind(self, db):
+        assert ledger.make_code_id("serial", 1) == "B0001"
+        assert ledger.make_code_id("none", 1) == "F0001"
+
+    def test_rolls_past_four_digits(self, db):
+        """9999 之后自然进位，位数只补不截。"""
+        assert ledger.make_code_id("serial", 9999) == "B9999"
+        assert ledger.make_code_id("serial", 10000) == "B10000"
+
+    def test_exists_check(self, db):
+        _add(db, bind="serial")
+        assert ledger.code_id_exists("B0001", db)
+        assert ledger.code_id_exists("  B0001  ", db)
+        assert not ledger.code_id_exists("F0001", db)

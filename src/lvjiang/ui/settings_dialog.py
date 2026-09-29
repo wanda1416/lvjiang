@@ -239,18 +239,17 @@ class SettingsDialog(QDialog):
             self._config.desktop_background_capture)
         self._desktop_capture_fg_radio.setChecked(
             not self._config.desktop_background_capture)
-        form.addRow(tr("窗口截图:"), _radio_row(
-            self._desktop_capture_fg_radio, self._desktop_capture_bg_radio))
-
-        desktop_capture_caption = QLabel(
-            tr("后台截图是实验性功能，很多脚本暂时无法在该模式下跑通，"
-               "不受理该功能的不可用反馈。"
-               "它让游戏窗口被别的窗口盖住时也能截图，代价是比 mss 略慢；"
-               "它需要同时使用后台输入，窗口最小化时两者都拿不到画面。"
-               "这里设的是默认值，主界面定位窗口后仍可临时切换。"))
-        desktop_capture_caption.setWordWrap(True)
-        desktop_capture_caption.setStyleSheet("color: palette(mid);")
-        form.addRow("", desktop_capture_caption)
+        # 细则只挂悬浮提示，不铺在页面上——和「设备端手势」同一处理
+        self._desktop_capture_tip = tr(
+            "实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。"
+            "后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；"
+            "它要求窗口输入同时为后台输入，窗口最小化时两者都拿不到画面。"
+            "这里设的是默认值，主界面定位窗口后仍可临时切换。")
+        self._desktop_capture_bg_radio.setToolTip(self._desktop_capture_tip)
+        desktop_capture_row = _radio_row(
+            self._desktop_capture_fg_radio, self._desktop_capture_bg_radio)
+        desktop_capture_row.setToolTip(self._desktop_capture_tip)
+        form.addRow(tr("窗口截图:"), desktop_capture_row)
 
         self._title_edit = QLineEdit(self._config.desktop_window_title)
         self._title_edit.setPlaceholderText(tr("空串不自动定位窗口"))
@@ -302,7 +301,7 @@ class SettingsDialog(QDialog):
         background_input = self._input_bg_radio.isChecked()
         self._desktop_capture_bg_radio.setEnabled(background_input)
         self._desktop_capture_bg_radio.setToolTip(
-            "" if background_input else
+            self._desktop_capture_tip if background_input else
             tr("需要把「窗口输入」设为后台输入：光标输入要求窗口在前台，"
                "配后台截图没有意义"))
         if not background_input and self._desktop_capture_bg_radio.isChecked():

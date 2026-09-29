@@ -207,6 +207,13 @@ QPushButton:disabled, QToolButton:disabled {{
 QDialogButtonBox QPushButton {{
     padding: 6px 18px;
 }}
+/* 上面的 QWidget 规则给所有控件写死了 color，它会盖掉调色板里的 Disabled 分组，
+   于是禁用的勾选框、单选和说明文字仍是常态色——看起来像「点不到」而不是「不可用」。
+   按钮早就单独补过 :disabled，这里把其余带文字的控件一并补上。 */
+QCheckBox:disabled, QRadioButton:disabled, QLabel:disabled,
+QGroupBox:disabled, QGroupBox::title:disabled {{
+    color: {t.text_disabled};
+}}
 QListWidget[navigation="true"] {{
     font-size: 14px;
     padding: 4px;

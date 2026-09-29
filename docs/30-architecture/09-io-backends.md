@@ -89,14 +89,31 @@
 
 ## 三、截图能力矩阵
 
-| | DesktopCapture (PC) | AgentCapture (a11y) | AndroidStreamCapture (scrcpy) | AdbCapture (screencap) | 设备端 ondevice |
-|---|---|---|---|---|---|
-| 机制 | mss 抓窗口区域，专用工作线程 | `takeScreenshot` RGBA 裸字节 | scrcpy 服务端 H.264 流，后台线程持续解码 | `adb exec-out screencap -p`，逐帧子进程 + PNG 编解码 | a11y `takeScreenshot` 或 Shizuku `screencap` |
-| 单帧耗时 | 十几 ms | 几十 ms | `capture()` 零等待返回最新帧 | 300–800 ms | 同 a11y/shell |
-| 前置条件 | 目标窗口可见（最小化拿不到） | Android 11+、无障碍已开 | 设备端推 scrcpy-server.jar | 只需 adb | app 常驻 |
-| 限制 | 被遮挡部分是遮挡物；DPI 感知换算 | 有节流（连续调用最小间隔数百毫秒）；`FLAG_SECURE` 窗口不可截 | 有压缩失真；`capture_lossless` 另取 | 慢；无 UI 实时预览 | 同 a11y/shell |
-| 尺寸来源 | 窗口客户区 | 截图实际尺寸 | 设备原始分辨率（不缩放，与 tap 同坐标系） | 实际截图尺寸（横屏游戏 wm size 可能是竖屏，以截图为准） | 同左 |
-| 实时预览 | ✅ | ✅ 轮询 | ✅ 帧回调 | ❌ | — |
+| | DesktopCapture (PC) | WgcCapture (PC 后台) | AgentCapture (a11y) | AndroidStreamCapture (scrcpy) | AdbCapture (screencap) | 设备端 ondevice |
+|---|---|---|---|---|---|---|
+| 机制 | mss 抓窗口区域，专用工作线程 | Windows Graphics Capture 按 hwnd 取帧，推送式 | `takeScreenshot` RGBA 裸字节 | scrcpy 服务端 H.264 流，后台线程持续解码 | `adb exec-out screencap -p`，逐帧子进程 + PNG 编解码 | a11y `takeScreenshot` 或 Shizuku `screencap` |
+| 单帧耗时 | 十几 ms | `capture()` 零等待返回最新帧 | 几十 ms | `capture()` 零等待返回最新帧 | 300–800 ms | 同 a11y/shell |
+| 前置条件 | 目标窗口可见（最小化拿不到） | Win10 1903+、装了 windows-capture；窗口未最小化 | Android 11+、无障碍已开 | 设备端推 scrcpy-server.jar | 只需 adb | app 常驻 |
+| 限制 | 被遮挡部分是遮挡物；DPI 感知换算 | **被遮挡仍可用**；最小化后停帧；部分系统版本会画捕获边框 | 有节流（连续调用最小间隔数百毫秒）；`FLAG_SECURE` 窗口不可截 | 有压缩失真；`capture_lossless` 另取 | 慢；无 UI 实时预览 | 同 a11y/shell |
+| 尺寸来源 | 窗口客户区 | 对齐到窗口矩形，与 mss 同构 | 截图实际尺寸 | 设备原始分辨率（不缩放，与 tap 同坐标系） | 实际截图尺寸（横屏游戏 wm size 可能是竖屏，以截图为准） | 同左 |
+| 实时预览 | ✅ | ✅ | ✅ 轮询 | ✅ 帧回调 | ❌ | — |
+
+### PC 后台截图（遮挡可用，最小化不可用）
+
+主窗口「扫描窗口」模式下有一个**后台截图**开关（默认关，仅本次运行期间生效）。
+打开后 PC 端取帧从 mss 换成 Windows Graphics Capture：
+
+- **能解决的**：游戏窗口被别的窗口盖住照样截得到。DWM 合成模型下，被遮挡的窗口
+  仍在各自的缓冲区里正常渲染，盖不盖只影响屏幕合成结果。
+- **不能解决的**：最小化。窗口最小化后没有被合成的客户区表面，WGC 随之停帧——
+  这条路的上限是「被遮挡也能跑」，不是「最小化挂后台」。独占全屏失焦时引擎可能
+  自行降帧，也不在这条路的管辖范围内。
+- **几何对齐**：WGC 交付的帧是窗口可见边界（DWM `DWMWA_EXTENDED_FRAME_BOUNDS`），
+  比 `GetWindowRect` 窄若干像素（Win10 两侧各约 8px 不可见调整边框）。后端按两个
+  矩形的差值把帧贴回窗口矩形尺寸再交出去，输出与 mss 那张图逐像素同构，**既有布局
+  标定不用重做**。多出来的边框区域填黑。
+- 输入侧另有「后台模式」开关（PostMessage）。两个开关互相独立：截图能后台不代表
+  输入能后台，部分游戏不响应消息注入。要真正无人值守，两个都得成立。
 
 坐标系约定：所有 Android 截图后端输出的图像与 `input tap` 使用同一坐标系（不缩放、
 已对齐设备方向），工作流的画布归一化坐标经布局 canvas 换算后直接可用。

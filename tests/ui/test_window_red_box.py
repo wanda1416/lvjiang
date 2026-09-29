@@ -29,6 +29,8 @@ class _Host(WindowOpsMixin, QWidget):
         self._backend = "windows"
         self._device_ready = False
         self._target_window = None
+        # 定位流程会按「后台截图」开关装配截图后端，宿主需提供这个字段
+        self._capture = None
         self._overlay = _Overlay()
         self._red_box_flash_timer = QTimer(self)
         self._red_box_flash_timer.setSingleShot(True)

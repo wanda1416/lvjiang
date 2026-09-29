@@ -3,7 +3,8 @@
 提供基于 Win32 API 的输入与截图能力：
 - SendInputInput：移动真实光标，需窗口在前台
 - PostMessageInput：向目标窗口投递鼠标消息，不移动光标
-- DesktopCapture：基于 mss 的桌面窗口截图
+- DesktopCapture：基于 mss 的桌面窗口截图（抓屏幕矩形，窗口必须可见）
+- WgcCapture：基于 Windows Graphics Capture 的后台截图（窗口被遮挡仍可用）
 - list_visible_windows：枚举所有可见窗口
 
 工厂函数：
@@ -16,6 +17,7 @@ from ..input_base import InputBackend
 from .capture import DesktopCapture
 from .post_message import PostMessageInput
 from .send_input import SendInputInput
+from .wgc_capture import WgcCapture, wgc_available
 from .win32_util import list_visible_windows
 
 
@@ -42,12 +44,18 @@ def create_input_backend(
         raise ValueError(f"未知的桌面输入模式: {mode!r}，可选: 'send', 'post'")
 
 
-def create_capture_backend() -> DesktopCapture:
+def create_capture_backend(background: bool = False):
     """创建桌面端截图后端
 
+    Args:
+        background: True 走 Windows Graphics Capture（窗口被遮挡仍可截图），
+            False 走 mss（抓屏幕矩形，窗口必须可见且无遮挡）
+
     Returns:
-        DesktopCapture 实例
+        WgcCapture 或 DesktopCapture 实例
     """
+    if background:
+        return WgcCapture()
     return DesktopCapture()
 
 
@@ -55,6 +63,8 @@ __all__ = [
     "SendInputInput",
     "PostMessageInput",
     "DesktopCapture",
+    "WgcCapture",
+    "wgc_available",
     "list_visible_windows",
     "create_input_backend",
     "create_capture_backend",

@@ -335,6 +335,11 @@ class WindowOpsMixin:
                 self.chk_bg_mode.blockSignals(False)
             self.chk_bg_mode.setVisible(True)
             self.chk_bg_mode.setEnabled(True)
+        # 后台截图同样只在 Windows 投屏模式下有意义（安卓截图本就来自设备）；
+        # 勾选状态只在本次运行期间有效，默认关。
+        if hasattr(self, "chk_bg_capture"):
+            self.chk_bg_capture.setVisible(True)
+            self.chk_bg_capture.setEnabled(True)
         # 红框标定随后台模式一起显示；勾选状态只在本次运行期间有效。
         if hasattr(self, "chk_red_box"):
             self.chk_red_box.setVisible(True)
@@ -429,6 +434,8 @@ class WindowOpsMixin:
             self.chk_agent.setEnabled(True)
         if hasattr(self, "chk_bg_mode"):
             self.chk_bg_mode.setVisible(False)
+        if hasattr(self, "chk_bg_capture"):
+            self.chk_bg_capture.setVisible(False)
         if hasattr(self, "chk_red_box"):
             self.chk_red_box.setVisible(False)
         self._red_box_flash_timer.stop()
@@ -929,6 +936,9 @@ class WindowOpsMixin:
         self._refresh_run_button()
         self._capture_preview()
 
+        # 定位成功后按开关建立截图后端（后台截图要在这里才拿得到 hwnd 建会话）
+        self._rebuild_desktop_capture()
+
         # 定位成功后根据 checkbox 状态选择输入后端
         if hasattr(self, 'chk_bg_mode'):
             if self.chk_bg_mode.isChecked():
@@ -978,6 +988,70 @@ class WindowOpsMixin:
             from ...core.desktop import SendInputInput
             self._input = SendInputInput(input_sim=self._user_config.input_sim)
             self.log_text.append(tr("[模式] 已切换到前台模式（SendInput，移动光标）"))
+
+    def _on_bg_capture_changed(self, state):
+        """后台截图开关切换：在 WgcCapture / DesktopCapture 之间重建截图后端
+
+        与后台模式（输入）同样是本次运行期间的切换，初始值来自用户配置。
+        """
+        if bool(state):
+            from ...core.desktop import wgc_available
+            ok, reason = wgc_available()
+            if not ok:
+                self.log_text.append(tr("[截图] 后台截图不可用：") + reason)
+                self.chk_bg_capture.blockSignals(True)
+                self.chk_bg_capture.setChecked(False)
+                self.chk_bg_capture.blockSignals(False)
+                return
+        self._rebuild_desktop_capture()
+        if not self._target_window:
+            # 还没定位窗口，等定位时再真正建会话
+            return
+        if bool(state):
+            self.log_text.append(
+                tr("[截图] 已切换到后台截图（WGC，窗口被遮挡也能截；最小化仍不行）"))
+        else:
+            self.log_text.append(tr("[截图] 已切换到前台截图（mss，窗口需可见无遮挡）"))
+
+    def _rebuild_desktop_capture(self):
+        """按开关状态重建桌面截图后端并绑定当前窗口，返回该后端。
+
+        后端实例带着会话状态（WGC 的取帧线程），切换时必须整个换掉而不是改标志位。
+        WGC 建会话失败就退回 mss 并复位开关——让用户停在一个截不到图的状态比报错更糟。
+        """
+        from ...core.desktop import DesktopCapture, WgcCapture
+        want_bg = bool(
+            getattr(self, "chk_bg_capture", None) is not None
+            and self.chk_bg_capture.isChecked()
+        )
+        current = self._capture
+        if current is None or isinstance(current, WgcCapture) != want_bg:
+            if current is not None:
+                try:
+                    current.stop()
+                except Exception as exc:
+                    logger.debug(f"停止旧截图后端时报错（忽略）: {exc}")
+            self._capture = WgcCapture() if want_bg else DesktopCapture()
+
+        w = self._target_window
+        if not w:
+            return self._capture
+        self._capture.set_capture_region(w["left"], w["top"], w["width"], w["height"])
+        if want_bg and not self._capture.attach_hwnd(w["hwnd"]):
+            self.log_text.append(
+                tr("[截图] 后台截图启动失败，已退回前台截图（窗口最小化时用不了）"))
+            try:
+                self._capture.stop()
+            except Exception:
+                pass
+            self._capture = DesktopCapture()
+            self._capture.set_capture_region(
+                w["left"], w["top"], w["width"], w["height"])
+            if getattr(self, "chk_bg_capture", None) is not None:
+                self.chk_bg_capture.blockSignals(True)
+                self.chk_bg_capture.setChecked(False)
+                self.chk_bg_capture.blockSignals(False)
+        return self._capture
 
     def _on_capture_method_changed(self, state):
         """截图方式开关切换：在 screencap / scrcpy 之间重建截图后端"""
@@ -1071,12 +1145,8 @@ class WindowOpsMixin:
         # windows 投屏窗口
         if not self._target_window:
             return None
-        from ...core.desktop import DesktopCapture
-        if self._capture is None:
-            self._capture = DesktopCapture()
-        w = self._target_window
-        self._capture.set_capture_region(w['left'], w['top'], w['width'], w['height'])
-        return self._capture.capture()
+        capture = self._rebuild_desktop_capture()
+        return capture.capture() if capture is not None else None
 
     def _get_last_capture(self) -> np.ndarray | None:
         """获取最近一次截屏图片（numpy BGR）"""
@@ -1097,14 +1167,8 @@ class WindowOpsMixin:
         if not self._target_window:
             return None, tr("请先在主窗口定位窗口")
         try:
-            from ...core.desktop import DesktopCapture
-            if self._capture is None:
-                self._capture = DesktopCapture()
-            w = self._target_window
-            self._capture.set_capture_region(
-                w['left'], w['top'], w['width'], w['height']
-            )
-            img = self._capture.capture()
+            capture = self._rebuild_desktop_capture()
+            img = capture.capture() if capture is not None else None
             if img is not None:
                 self._last_capture = img
                 return img, None

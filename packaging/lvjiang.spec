@@ -8,13 +8,24 @@
 - 插件（load_app("yysls")）与工作流实现均为运行时动态 import，
   collect_submodules 全量收集 lvjiang 子模块兜底；
 - config/system 与 data/adb、data/scrcpy 不进 _internal，由 package.bat 拷到 exe 旁
-  （用户可见，配合 config/local 覆盖机制；内置 adb 使用户免装 platform-tools）。
+  （用户可见，配合 config/local 覆盖机制；内置 adb 使用户免装 platform-tools）；
+- windows_capture（后台截图）只在用到时才 import，静态分析收不到，且它带一个原生
+  .pyd —— collect_all 整包收集。没装时跳过：非 Windows 本来就不会打包。
 """
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 datas, binaries, hiddenimports = collect_all("rapidocr_onnxruntime")
 datas += [("../src/lvjiang/workflows/grammar", "lvjiang/workflows/grammar")]
 hiddenimports += collect_submodules("lvjiang")
+
+try:
+    wc_datas, wc_binaries, wc_hidden = collect_all("windows_capture")
+except Exception as exc:  # noqa: BLE001 - 打包脚本，缺包只需跳过并提示
+    print(f"[spec] 未收集 windows_capture（后台截图将不可用）: {exc}")
+else:
+    datas += wc_datas
+    binaries += wc_binaries
+    hiddenimports += wc_hidden
 
 a = Analysis(
     ["launcher.py"],

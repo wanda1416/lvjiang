@@ -569,3 +569,51 @@ def list_visible_windows() -> list[dict]:
 
     logger.debug(f"枚举到 {len(results)} 个可见窗口（已排除自身进程）")
     return results
+
+
+# ─── DWM 可见边界 ─────────────────────────────────────────────
+
+#: DwmGetWindowAttribute 的 DWMWA_EXTENDED_FRAME_BOUNDS
+_DWMWA_EXTENDED_FRAME_BOUNDS = 9
+
+
+def get_window_rect(hwnd: int) -> tuple[int, int, int, int] | None:
+    """``GetWindowRect`` 的物理屏幕矩形 ``(left, top, width, height)``。
+
+    Win10 起窗口矩形两侧各含约 8px 不可见的调整边框，这块区域在屏幕上显示的是
+    窗口背后的内容——mss 截图连同它一起抓，所以窗口矩形就是 mss 那张图的口径。
+    """
+    if _user32 is None:
+        return None
+    rect = wintypes.RECT()
+    if not _user32.GetWindowRect(wintypes.HWND(hwnd), ctypes.byref(rect)):
+        return None
+    return (rect.left, rect.top,
+            rect.right - rect.left, rect.bottom - rect.top)
+
+
+def get_window_visible_rect(hwnd: int) -> tuple[int, int, int, int] | None:
+    """窗口**可见**边界 ``(left, top, width, height)``，取不到时返回 ``None``。
+
+    即 DWM 的 ``DWMWA_EXTENDED_FRAME_BOUNDS``：去掉不可见调整边框后，用户真正
+    看得见的那一块。Windows Graphics Capture 交付的帧就是这块内容，因此它比
+    ``GetWindowRect`` 窄若干像素——两者的差值正是 WGC 帧贴回窗口矩形时的偏移。
+    """
+    if sys.platform != "win32":
+        return None
+    rect = wintypes.RECT()
+    try:
+        hr = ctypes.windll.dwmapi.DwmGetWindowAttribute(
+            wintypes.HWND(hwnd),
+            ctypes.c_uint(_DWMWA_EXTENDED_FRAME_BOUNDS),
+            ctypes.byref(rect),
+            ctypes.sizeof(rect),
+        )
+    except OSError as exc:  # dwmapi 不可用（理论上 Vista 起都有）
+        logger.debug(f"DwmGetWindowAttribute 不可用: {exc}")
+        return None
+    if hr != 0:
+        logger.debug(f"DwmGetWindowAttribute 失败: hr={hr}")
+        return None
+    return (rect.left, rect.top,
+            rect.right - rect.left, rect.bottom - rect.top)

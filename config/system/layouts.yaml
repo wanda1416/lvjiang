@@ -2,7 +2,7 @@ schema_version: 2
 layouts:
   android:
     name: 安卓布局
-    desc: 用于安卓设备，适配横屏宽高比 20:9 无边框场景
+    desc: 安卓设备，横屏无边框 20:9
     canvas:
       x_ratio: 0.0
       y_ratio: 0.0
@@ -10,7 +10,7 @@ layouts:
       h_ratio: 1.0
   android_cast:
     name: 投屏布局
-    desc: 用于模拟器等存在边框的场景，需要对画布先裁剪
+    desc: 模拟器/投屏窗口，画面带边框
     extends: android
     canvas:
       x_ratio: 0.0
@@ -19,7 +19,7 @@ layouts:
       h_ratio: 0.9214251493308252
   desktop:
     name: 桌面布局
-    desc: 用于 PC 端游，建议窗口模式，分辨率 1920*1080
+    desc: PC 端游，建议窗口模式 1920*1080
     canvas:
       x_ratio: 0.0041322314049587
       y_ratio: 0.0277033065236819

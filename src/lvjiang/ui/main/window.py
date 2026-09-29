@@ -567,6 +567,15 @@ class MainWindow(
         self.chk_bg_mode.stateChanged.connect(self._on_bg_mode_changed)
         row2.addWidget(self.chk_bg_mode)
 
+        self.chk_bg_capture = QCheckBox(tr("后台截图"))
+        self.chk_bg_capture.setVisible(False)
+        self.chk_bg_capture.setChecked(False)
+        self.chk_bg_capture.setToolTip(
+            tr("用 Windows Graphics Capture 取帧，游戏窗口被别的窗口盖住也能截图；"
+               "窗口最小化时仍然拿不到画面。仅本次运行期间生效"))
+        self.chk_bg_capture.stateChanged.connect(self._on_bg_capture_changed)
+        row2.addWidget(self.chk_bg_capture)
+
         self.chk_scrcpy = QCheckBox(tr("流式截图"))
         self.chk_scrcpy.setVisible(False)
         self.chk_scrcpy.stateChanged.connect(self._on_capture_method_changed)

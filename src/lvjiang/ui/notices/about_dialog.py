@@ -39,7 +39,7 @@ class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("关于律匠"))
-        self.setFixedSize(400, 350)
+        self.setFixedSize(420, 520)
         self._update_checker = None
         self._setup_ui()
 
@@ -80,14 +80,45 @@ class AboutDialog(QDialog):
         tech_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(tech_label)
 
-        # ─── 开源声明 ───
+        # ─── 免费声明与许可证 ───
+        # 「完全开源」这个说法不准确：PolyForm Noncommercial 限制商业用途，
+        # 不符合 OSI 的开源定义。写成"源码公开、免费使用"才是事实。
         opensource_label = QLabel(
             f"<p style='text-align: center; font-size: 15px; font-weight: 600;'>"
-            f"{tr('本项目完全开源免费')}"
+            f"{tr('本项目源码公开、免费使用')}"
             f"</p>"
         )
         opensource_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(opensource_label)
+
+        license_label = QLabel(
+            "<p style='text-align: center; font-size: 11px;'>"
+            f"{tr('许可证')}：PolyForm Noncommercial License 1.0.0"
+            f"<br><span style='color: gray;'>{tr('仅限非商业使用')}</span>"
+            "</p>"
+        )
+        license_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        license_label.setWordWrap(True)
+        layout.addWidget(license_label)
+
+        # ─── 免责声明 ───
+        # 措辞与发布说明页脚保持一致，避免同一件事两种口径。
+        # 提示语先算好再拼：f-string 替换字段里换行要 Python 3.12，本项目下限是 3.11
+        usage_notice = tr(
+            "本项目仅供学习与技术研究使用。使用自动化工具操作游戏可能违反相关游戏的"
+            "用户协议，由此产生的后果由使用者自行承担。")
+        warranty_notice = tr(
+            "软件按现状提供，不附带任何担保，作者不对使用本软件造成的任何损失负责。")
+        disclaimer_label = QLabel(
+            "<p style='font-size: 11px;'>"
+            f"<b>{tr('免责声明')}</b>：{usage_notice}{warranty_notice}"
+            "</p>"
+        )
+        disclaimer_label.setWordWrap(True)
+        disclaimer_label.setStyleSheet(
+            "color: palette(mid); border: 1px solid palette(mid); "
+            "border-radius: 4px; padding: 6px;")
+        layout.addWidget(disclaimer_label)
 
         layout.addStretch()
 
@@ -102,7 +133,12 @@ class AboutDialog(QDialog):
         self._github_btn = QPushButton("GitHub")
         self._github_btn.clicked.connect(self._open_github)
         btn_layout.addWidget(self._github_btn)
-        apply_button_style(self._check_update_btn, self._github_btn)
+
+        self._license_btn = QPushButton(tr("许可证"))
+        self._license_btn.clicked.connect(self._open_license)
+        btn_layout.addWidget(self._license_btn)
+        apply_button_style(
+            self._check_update_btn, self._github_btn, self._license_btn)
 
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
@@ -112,8 +148,7 @@ class AboutDialog(QDialog):
         # ─── 版权信息 ───
         copyright_label = QLabel(
             "<p style='text-align: center; color: gray; font-size: 10px;'>"
-            "Copyright © 2024-2026 wanda1416<br>"
-            f"{tr('本项目仅供学习交流使用')}"
+            "Copyright © 2024-2026 wanda1416"
             "</p>"
         )
         copyright_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -166,3 +201,17 @@ class AboutDialog(QDialog):
     def _open_github(self):
         """打开 GitHub 仓库页面"""
         QDesktopServices.openUrl(QUrl(f"https://github.com/{GITHUB_REPO}"))
+
+    def _open_license(self):
+        """打开随包分发的许可证全文；发行包里没有时退到官方条款页。
+
+        发行包由 package.bat 拷一份 LICENSE.txt 到 exe 旁；源码运行时则是仓库根的
+        LICENSE。两处都找不到才走网页——离线用户也该看得到条款。
+        """
+        from ...constants import PROJECT_ROOT
+        for candidate in (PROJECT_ROOT / "LICENSE.txt", PROJECT_ROOT / "LICENSE"):
+            if candidate.is_file():
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(candidate)))
+                return
+        QDesktopServices.openUrl(QUrl(
+            "https://polyformproject.org/licenses/noncommercial/1.0.0/"))

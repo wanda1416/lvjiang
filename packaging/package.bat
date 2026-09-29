@@ -42,6 +42,13 @@ if errorlevel 1 exit /b 1
 xcopy /e /i /y data\image dist\lvjiang\data\image >nul
 if errorlevel 1 exit /b 1
 
+rem License text ships with the binary: the disclaimer and liability limit only
+rem protect if they travel with the software, not just the download page.
+rem Named .txt so it opens on double-click; the installer picks it up via
+rem [Files] Source: ..\dist\lvjiang\* and needs no change.
+copy /y LICENSE dist\lvjiang\LICENSE.txt >nul
+if errorlevel 1 exit /b 1
+
 powershell -NoProfile -Command "Compress-Archive -Path dist/lvjiang -DestinationPath dist/lvjiang-v%APP_VERSION%-win64.zip -Force"
 if errorlevel 1 exit /b 1
 

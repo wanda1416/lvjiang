@@ -145,6 +145,7 @@ class IssuerWindow(QMainWindow):
     def _build_issue_box(self) -> QGroupBox:
         box = QGroupBox("签发")
         form = QFormLayout(box)
+        self._issue_form = form
 
         # 绑定方式放第一行：它决定编号前缀，也决定下面要不要填序列号
         bind_row = QHBoxLayout()
@@ -164,14 +165,20 @@ class IssuerWindow(QMainWindow):
         self._id_edit.setToolTip("按绑定方式与台账流水号自动生成，不可手改")
         form.addRow("码编号：", self._id_edit)
 
+        # 输入框与提示放进同一个 field：分成两行的话，提示为空时那一行仍然占着
+        # 高度，序列号和授权等级之间会空出一条明显的缝
         self._serial_edit = QLineEdit()
         self._serial_edit.setPlaceholderText(
             "用户在「配置管理 → 功能激活」里复制给你的那串")
         self._serial_edit.textChanged.connect(self._refresh_serial_hint)
-        form.addRow("序列号：", self._serial_edit)
         self._serial_hint = QLabel()
         self._serial_hint.setStyleSheet(_MUTED)
-        form.addRow("", self._serial_hint)
+        self._serial_hint.setVisible(False)
+        self._serial_field = QVBoxLayout()
+        self._serial_field.setContentsMargins(0, 0, 0, 0)
+        self._serial_field.addWidget(self._serial_edit)
+        self._serial_field.addWidget(self._serial_hint)
+        form.addRow("序列号：", self._serial_field)
 
         # 只列登记表里的等级，不提供自由填写：手打的名字客户端认不出来，
         # 签出来也开不了任何东西，而且要等用户回来才发现
@@ -216,8 +223,8 @@ class IssuerWindow(QMainWindow):
         self._expiry_radios["1y"].setChecked(True)
         expiry_box.addLayout(quick_row)
         expiry_box.addWidget(self._expiry_edit)
+        expiry_box.addWidget(self._expiry_hint)
         form.addRow("有效期：", expiry_box)
-        form.addRow("", self._expiry_hint)
 
         self._note_edit = QLineEdit()
         self._note_edit.setPlaceholderText("发给谁，写进台账，不进激活码")
@@ -248,8 +255,8 @@ class IssuerWindow(QMainWindow):
     def _refresh_bind_state(self):
         bound = self._bind_serial_radio.isChecked()
         self._refresh_code_id()
-        self._serial_edit.setEnabled(bound)
-        self._serial_hint.setVisible(bound)
+        # 免绑定码根本不看序列号，留个灰掉的输入框在那儿只会让人以为还能填
+        self._issue_form.setRowVisible(self._serial_field, bound)
         self._refresh_serial_hint()
 
         # 「永久」只对绑机码开放：免绑定码是 bearer token，谁拿到谁能用，
@@ -294,8 +301,10 @@ class IssuerWindow(QMainWindow):
             return
         text = self._serial_edit.text().strip()
         if not text:
+            self._serial_hint.setVisible(False)
             self._serial_hint.setText("")
             return
+        self._serial_hint.setVisible(True)
         if serial_is_wellformed(text):
             self._serial_hint.setText("✓ 校验位正确")
             self._serial_hint.setStyleSheet(_OK)

@@ -335,11 +335,9 @@ class WindowOpsMixin:
                 self.chk_bg_mode.blockSignals(False)
             self.chk_bg_mode.setVisible(True)
             self.chk_bg_mode.setEnabled(True)
-        # 后台截图同样只在 Windows 投屏模式下有意义（安卓截图本就来自设备）；
+        # 后台截图挂在后台模式之下，随它一起显隐（见 _refresh_bg_capture_visibility）；
         # 勾选状态只在本次运行期间有效，默认关。
-        if hasattr(self, "chk_bg_capture"):
-            self.chk_bg_capture.setVisible(True)
-            self.chk_bg_capture.setEnabled(True)
+        self._refresh_bg_capture_visibility()
         # 红框标定随后台模式一起显示；勾选状态只在本次运行期间有效。
         if hasattr(self, "chk_red_box"):
             self.chk_red_box.setVisible(True)
@@ -858,6 +856,30 @@ class WindowOpsMixin:
             return
         if self._backend == "windows" and self._target_window is not None:
             self.chk_bg_mode.setEnabled(not self._running)
+            if hasattr(self, "chk_bg_capture"):
+                # 运行中换截图后端会把正在用的实例停掉，和输入模式一样锁死
+                self.chk_bg_capture.setEnabled(not self._running)
+
+    def _refresh_bg_capture_visibility(self):
+        """后台截图开关只在「后台模式」勾选时出现。
+
+        两者搭配才成立：前台输入（SendInput）要求游戏窗口在前台，这时把截图换成
+        后台截图没有任何意义——窗口本来就露着；反过来若允许这个组合，用户会以为
+        可以把窗口盖起来，实际一盖输入就失效，问题还很难自己看出来。
+        所以取消后台模式时连带把后台截图关掉并隐藏。
+        """
+        if not hasattr(self, "chk_bg_capture"):
+            return
+        want = (
+            self._backend == "windows"
+            and hasattr(self, "chk_bg_mode")
+            and self.chk_bg_mode.isChecked()
+        )
+        if not want and self.chk_bg_capture.isChecked():
+            # 退回前台截图，避免留下「前台输入 + 后台截图」的组合
+            self.chk_bg_capture.setChecked(False)
+        self.chk_bg_capture.setVisible(want)
+        self.chk_bg_capture.setEnabled(want and not self._running)
 
     def _on_disconnect(self):
         """通用断连：根据后端模式清理资源并恢复 UI"""
@@ -974,6 +996,7 @@ class WindowOpsMixin:
 
     def _on_bg_mode_changed(self, state):
         """后台模式开关切换：在 PostMessageInput / SendInputInput 之间替换整个 _input 实例"""
+        self._refresh_bg_capture_visibility()
         if not self._target_window:
             return
         hwnd = self._target_window["hwnd"]
@@ -1118,6 +1141,14 @@ class WindowOpsMixin:
             if self.preview_label.isVisible():
                 self.preview_label.setText(tr("截屏失败"))
             return
+        self._show_preview_image(img)
+
+    def _show_preview_image(self, img):
+        """把一帧画面渲染到预览区并记为最近一次截图。
+
+        取帧与渲染分开：截屏按钮已经抓过一帧，再调 _capture_preview 会为了刷新
+        预览白抓第二次——两帧之间画面可能已经变了，存下来的和看到的还对不上。
+        """
         self._last_capture = img
         try:
             h, w_img = img.shape[:2]

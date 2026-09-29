@@ -20,7 +20,7 @@ _SRC = _REPO_ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from lvjiang.core.license import KNOWN_FEATURES  # noqa: E402
+from lvjiang.core.license import load_levels  # noqa: E402
 from lvjiang.core.license.code import (  # noqa: E402
     PUBLIC_KEY_B32,
     License,
@@ -35,7 +35,6 @@ from lvjiang.core.license.hardware import (  # noqa: E402
 )
 
 __all__ = [
-    "KNOWN_FEATURES",
     "DEFAULT_KEY_PATH",
     "IssueRequest",
     "License",
@@ -43,6 +42,7 @@ __all__ = [
     "SigningKeyError",
     "issue",
     "key_status",
+    "load_levels",
     "normalize_serial",
     "serial_is_wellformed",
     "verify",
@@ -72,7 +72,15 @@ class IssueRequest:
         if not self.code_id.strip():
             return "请填写码编号"
         if not self.features:
-            return "请至少勾选一项功能"
+            return "请至少勾选一个授权等级"
+        known = {level.name for level in load_levels()}
+        unknown = [f for f in self.features if f not in known]
+        if unknown:
+            # 只签登记表里的等级：手打的名字客户端认不出来，签出来也开不了东西
+            return f"未登记的授权等级：{'、'.join(unknown)}"
+        if not self.bind_to_serial and self.expires is None:
+            # 免绑定码是 bearer token，离线又撤不掉，有效期是唯一的把手
+            return "免绑定码必须设置有效期"
         if self.bind_to_serial:
             if not self.serial.strip():
                 return "绑机码需要填写目标机器的序列号"

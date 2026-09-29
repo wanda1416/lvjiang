@@ -795,7 +795,7 @@ auto_strings:
   rows=1 时滚动方向不能为纵向: Scroll direction cannot be vertical when rows=1
   scenes.yaml 必须至少包含一个场景分组，请检查配置: scenes.yaml must contain at least one scene group; please check the config
   scrcpy 流式: scrcpy Streaming
-  scrcpy 视频流: scrcpy Video Stream
+  Scrcpy 流式截图: Scrcpy Streaming Capture
   '{name}: 需要数值，实际: {v!r}': '{name}: expected a number, got: {v!r}'
   '{what}: 需要坐标引用（$var = [scene].[region]、find 结果或 (x, y[, w, h]) 字面量），实际: {t}': '{what}: expected a coordinate reference ($var = [scene].[region], a find result, or an (x, y[, w, h]) literal), got: {t}'
   '{what}: 需要坐标引用，实际: {t}': '{what}: expected a coordinate reference, got: {t}'

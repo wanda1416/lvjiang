@@ -191,7 +191,7 @@ class SettingsDialog(QDialog):
         capture_layout = QHBoxLayout(capture_row)
         capture_layout.setContentsMargins(0, 0, 0, 0)
         self._capture_group = QButtonGroup(self)
-        self._capture_stream_radio = QRadioButton(tr("scrcpy 视频流"))
+        self._capture_stream_radio = QRadioButton(tr("Scrcpy 流式截图"))
         self._capture_static_radio = QRadioButton(tr("ADB screencap 静态截图"))
         self._capture_group.addButton(self._capture_stream_radio)
         self._capture_group.addButton(self._capture_static_radio)

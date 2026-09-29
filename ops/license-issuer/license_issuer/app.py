@@ -1,7 +1,7 @@
 """激活码签发器 — 本机 GUI
 
 只做签发与自检两件事。**不生成私钥**：那是一次性且不可逆的操作，放在随手点得到的
-按钮后面迟早出事，留在 ``scripts/issue_license.py keygen`` 里。
+按钮后面迟早出事，留在同目录的 ``keygen.py`` 命令行里。
 
 界面分两块：上半签发，下半自检。签完的码会自动用主程序内置的公钥验一遍——发出去
 之前就知道它一定能被客户端接受，而不是等用户回来说「激活码无效」。
@@ -84,8 +84,8 @@ class IssuerWindow(QMainWindow):
         self._key_status = QLabel()
         self._key_status.setWordWrap(True)
         vbox.addWidget(self._key_status)
-        hint = QLabel("本工具不生成私钥。需要新建或轮换请用 "
-                      "scripts/issue_license.py keygen——那是不可逆操作，"
+        hint = QLabel("本工具不生成私钥。需要新建或轮换请用同目录的 "
+                      "keygen.py——那是不可逆操作，"
                       "不该放在随手点得到的按钮后面。")
         hint.setWordWrap(True)
         hint.setStyleSheet(_MUTED)

@@ -13,8 +13,9 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-#: 主程序源码根。ops 下的工具是仓库内的维护工具，直接吃同一份源码。
-_REPO_ROOT = Path(__file__).resolve().parents[4]
+#: 主程序源码根。ops 下的工具是仓库内的维护工具，直接吃同一份源码，
+#: 也直接用根目录那个 .venv——依赖（PyQt6 / cryptography）主项目本来就有。
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _SRC = _REPO_ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))

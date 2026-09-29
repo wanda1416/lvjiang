@@ -91,6 +91,38 @@ class _JudgmentOutcomePopup(QFrame):
         def pct(value: float) -> str:
             return f"{value:.2%}"
 
+        judgment_grid = QGridLayout()
+        judgment_grid.setHorizontalSpacing(14)
+        judgment_grid.setVerticalSpacing(6)
+        judgment_rows = (
+            (tr("判定精准"), tr("白字精准率"), rates.white_precision,
+             rates.precision, rates.precision_overflow),
+            (tr("判定会心"), tr("白字会心率"), rates.white_crit,
+             rates.judgment_crit, rates.crit_overflow),
+            (tr("判定会意"), tr("白字会意率"), rates.white_intent,
+             rates.judgment_intent, rates.intent_overflow),
+        )
+        for row, (name, source, white, value, overflow) in enumerate(
+            judgment_rows
+        ):
+            name_label = QLabel(name)
+            name_label.setStyleSheet("font-weight: 600;")
+            source_label = QLabel(f"{source} {pct(white)}")
+            source_label.setStyleSheet("color: palette(mid);")
+            detail = pct(value)
+            if overflow >= 0.00005:
+                detail += tr("（溢出{source} {overflow}）").format(
+                    source=source, overflow=pct(overflow))
+            value_label = QLabel(detail)
+            value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+            value_label.setStyleSheet("color: palette(highlight);")
+            judgment_grid.addWidget(name_label, row, 0)
+            judgment_grid.addWidget(source_label, row, 1)
+            judgment_grid.addWidget(value_label, row, 2)
+        judgment_grid.setColumnStretch(1, 1)
+        layout.addLayout(judgment_grid)
+        layout.addSpacing(4)
+
         grid = QGridLayout()
         grid.setHorizontalSpacing(14)
         grid.setVerticalSpacing(6)

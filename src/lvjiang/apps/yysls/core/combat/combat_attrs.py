@@ -1034,7 +1034,15 @@ def apply_three_rate_resistance(
 class JudgmentOutcomeRates:
     """一次攻击的四种互斥判定结果及其计算中间值。"""
 
+    white_precision: float
+    white_crit: float
+    white_intent: float
     precision: float
+    judgment_crit: float
+    judgment_intent: float
+    precision_overflow: float
+    crit_overflow: float
+    intent_overflow: float
     crit_chance: float
     intent_chance: float
     crit: float
@@ -1059,18 +1067,27 @@ def calculate_judgment_outcomes(
     def probability(value: float) -> float:
         return min(1.0, max(0.0, value))
 
+    divisor = 1.0 + resistance / 100.0
+
+    def white_overflow(value: float, cap: float, base: float = 0.0) -> float:
+        """将黄字上限反推为白字门槛，再求超出的白字百分点。"""
+        white_limit = base + (cap - base) * divisor
+        return max(0.0, value - white_limit)
+
     precision = probability(apply_three_rate_resistance(
         "precision", attrs.precision, resistance,
     ))
+    judgment_crit = probability(apply_three_rate_resistance(
+        "crit_rate", attrs.crit_rate, resistance,
+    ))
+    judgment_intent = probability(apply_three_rate_resistance(
+        "intent_rate", attrs.intent_rate, resistance,
+    ))
     intent_chance = probability(
-        apply_three_rate_resistance(
-            "intent_rate", attrs.intent_rate, resistance,
-        ) + attrs.direct_intent
+        judgment_intent + attrs.direct_intent
     )
     requested_crit = probability(
-        apply_three_rate_resistance(
-            "crit_rate", attrs.crit_rate, resistance,
-        ) + attrs.direct_crit
+        judgment_crit + attrs.direct_crit
     )
     crit_chance = min(requested_crit, 1.0 - intent_chance)
 
@@ -1079,7 +1096,16 @@ def calculate_judgment_outcomes(
     scratch = (1.0 - precision) * (1.0 - intent_chance)
     normal = precision * (1.0 - intent_chance - crit_chance)
     return JudgmentOutcomeRates(
+        white_precision=attrs.precision,
+        white_crit=attrs.crit_rate,
+        white_intent=attrs.intent_rate,
         precision=precision,
+        judgment_crit=judgment_crit,
+        judgment_intent=judgment_intent,
+        precision_overflow=white_overflow(
+            attrs.precision, 1.0, PRECISION_BASE / 100.0),
+        crit_overflow=white_overflow(attrs.crit_rate, CRIT_RATE_CAP),
+        intent_overflow=white_overflow(attrs.intent_rate, INTENT_RATE_CAP),
         crit_chance=crit_chance,
         intent_chance=intent_chance,
         crit=crit,

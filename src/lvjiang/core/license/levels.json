@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "levels": [
+    {
+      "name": "lv1",
+      "label": "Lv1",
+      "desc": "第一档高级功能"
+    }
+  ]
+}

@@ -16,18 +16,34 @@
 > `src/lvjiang/core/license/__init__.py` 的 `KNOWN_FEATURES` 里登记，并在该功能的
 > UI 入口与能力入口各校验一次 `has_feature()`。
 
+## 目录构成
+
+| 文件 | 作用 |
+|---|---|
+| `issuer.py` | 签发 GUI 入口（日常用这个） |
+| `keygen.py` | 生成签发密钥对，一次性；私钥已存在时直接拒绝 |
+| `license_issuer/signing.py` | 签发逻辑，与界面分离，可单测 |
+| `license_issuer/app.py` | 界面 |
+
+签发与验签的正文格式不在这里定义，直接复用主程序的
+`src/lvjiang/core/license/code.py`——两处各写一遍，改了其中一处就会静默签出验不过
+的码，而现象只是用户说「激活码无效」，两头都查不出来。
+
 ## 快速开始
 
-```bash
-cd ops/license-issuer
-uv sync                     # 或 pip install -e ".[dev]"
-uv run license-issuer       # 或 python -m license_issuer.app
+**直接用仓库根目录的 `.venv`，不需要单独建环境**——依赖（PyQt6、cryptography）
+主项目本来就有，签发用的正文格式也直接复用 `src/lvjiang/core/license`。
+
+```powershell
+# 仓库根目录执行
+.venv\Scripts\python.exe ops\license-issuer\issuer.py      # Windows
+.venv/bin/python ops/license-issuer/issuer.py                # macOS / Linux
 ```
 
 首次使用需要先有私钥（本工具**不生成**私钥，见下）：
 
-```bash
-python ../../scripts/issue_license.py keygen
+```powershell
+.venv\Scripts\python.exe ops\license-issuer\keygen.py
 ```
 
 它把私钥写到 `~/.lvjiang/license_signing_key.txt`，并打印一行公钥让你粘进
@@ -72,9 +88,12 @@ python ../../scripts/issue_license.py keygen
 ## 测试
 
 ```bash
-cd ops/license-issuer
-PYTHONPATH=src python -m pytest tests -q
+# 仓库根目录执行，用同一个 .venv
+PYTHONPATH=ops/license-issuer .venv/bin/python -m pytest ops/license-issuer/tests -q
 ```
+
+这些用例不在主仓库的 `pytest tests` 范围内（ops 下的工具与主程序分开跑），改动
+签发逻辑后记得单独跑一次。
 
 签发逻辑与界面分离（`signing.py` / `app.py`），测的是签发逻辑：每签一张都用主程序
 的验签函数验回去，确保两端格式不会各走各的。

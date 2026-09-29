@@ -37,7 +37,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from .ledger import DEFAULT_LEDGER_PATH, list_records, record_issue
+from .ledger import (
+    DEFAULT_LEDGER_PATH,
+    code_id_exists,
+    list_records,
+    make_code_id,
+    next_seq,
+    record_issue,
+)
 from .signing import (
     DEFAULT_KEY_PATH,
     IssueRequest,
@@ -94,8 +101,9 @@ class IssuerWindow(QMainWindow):
         tabs.addTab(self._build_ledger_tab(), "台账")
 
         self._refresh_key_status()
-        self._refresh_bind_state()
         self._refresh_ledger()
+        self._allocate_seq()
+        self._refresh_bind_state()
 
     # ─── 私钥 ──────────────────────────────────────────────
 
@@ -138,10 +146,7 @@ class IssuerWindow(QMainWindow):
         box = QGroupBox("签发")
         form = QFormLayout(box)
 
-        self._id_edit = QLineEdit()
-        self._id_edit.setPlaceholderText("例如 L0042，记进你的台账")
-        form.addRow("码编号：", self._id_edit)
-
+        # 绑定方式放第一行：它决定编号前缀，也决定下面要不要填序列号
         bind_row = QHBoxLayout()
         self._bind_serial_radio = QRadioButton("绑定机器序列号")
         self._bind_serial_radio.setChecked(True)
@@ -151,6 +156,13 @@ class IssuerWindow(QMainWindow):
         bind_row.addWidget(self._bind_none_radio)
         bind_row.addStretch()
         form.addRow("绑定方式：", bind_row)
+
+        # 编号只读、自动生成：它是「前缀 + 台账流水号」算出来的，手改一下就可能
+        # 与台账里已有的号撞上，而撞号之后「用户报编号查去向」就废了
+        self._id_edit = QLineEdit()
+        self._id_edit.setReadOnly(True)
+        self._id_edit.setToolTip("按绑定方式与台账流水号自动生成，不可手改")
+        form.addRow("码编号：", self._id_edit)
 
         self._serial_edit = QLineEdit()
         self._serial_edit.setPlaceholderText(
@@ -216,8 +228,26 @@ class IssuerWindow(QMainWindow):
         form.addRow("", self._issue_btn)
         return box
 
+    def _allocate_seq(self):
+        """从台账取下一个流水号。两类码共用一条序列，所以数字全局唯一。"""
+        try:
+            self._pending_seq = next_seq()
+        except Exception as exc:  # noqa: BLE001 - 台账不可用时不该连签发都做不了
+            self._pending_seq = None
+            self._id_edit.setPlaceholderText(f"台账不可用：{exc}")
+        self._refresh_code_id()
+
+    def _refresh_code_id(self):
+        """按当前绑定方式渲染编号；流水号不变，只换前缀"""
+        if getattr(self, "_pending_seq", None) is None:
+            self._id_edit.clear()
+            return
+        bind = "serial" if self._bind_serial_radio.isChecked() else "none"
+        self._id_edit.setText(make_code_id(bind, self._pending_seq))
+
     def _refresh_bind_state(self):
         bound = self._bind_serial_radio.isChecked()
+        self._refresh_code_id()
         self._serial_edit.setEnabled(bound)
         self._serial_hint.setVisible(bound)
         self._refresh_serial_hint()
@@ -283,8 +313,18 @@ class IssuerWindow(QMainWindow):
             QMessageBox.warning(self, "签发", "有效期必须晚于今天")
             return
 
+        code_id = self._id_edit.text().strip()
+        if code_id and code_id_exists(code_id):
+            # 编号重复，「用户报编号查去向」就失效了——台账的价值正在于此
+            confirm = QMessageBox.question(
+                self, "编号重复",
+                f"台账里已经有 {code_id} 了。重复编号会让按编号查询查出多条，"
+                f"分不清用户手上的是哪一张。\n仍然使用这个编号？")
+            if confirm != QMessageBox.StandardButton.Yes:
+                return
+
         request = IssueRequest(
-            code_id=self._id_edit.text(),
+            code_id=code_id,
             bind_to_serial=self._bind_serial_radio.isChecked(),
             serial=self._serial_edit.text(),
             features=self._selected_levels(),
@@ -300,6 +340,7 @@ class IssuerWindow(QMainWindow):
         # 而那要求你知道这张码是谁的。记账失败必须让人看见，不能静默吞掉。
         try:
             record_issue(
+                seq=self._pending_seq,
                 code_id=request.code_id.strip(),
                 bind="serial" if request.bind_to_serial else "none",
                 serial=(normalize_serial(request.serial)
@@ -317,6 +358,8 @@ class IssuerWindow(QMainWindow):
         self._result_edit.setPlainText(code)
         self._verify_current(code)
         self._refresh_ledger()
+        self._allocate_seq()
+        self._note_edit.clear()
 
     # ─── 结果与自检 ────────────────────────────────────────
 

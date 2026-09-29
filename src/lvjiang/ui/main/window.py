@@ -783,6 +783,11 @@ class MainWindow(
         # 底部级别过滤栏
         filter_bar = QHBoxLayout()
         filter_bar.setContentsMargins(4, 0, 4, 2)
+        self._btn_clear_log = QPushButton(tr("清理日志"))
+        self._btn_clear_log.setToolTip(tr("清空当前窗口的全部日志，包括被级别筛选隐藏的日志"))
+        apply_button_style(self._btn_clear_log, variant="neutral")
+        self._btn_clear_log.clicked.connect(self._clear_log)
+        filter_bar.addWidget(self._btn_clear_log)
         filter_bar.addStretch()
         filter_bar.addWidget(QLabel(tr("日志级别")))
         self._log_level_combo = QComboBox()
@@ -898,6 +903,11 @@ class MainWindow(
         for level, text in self._log_buffer:
             if level >= self._log_min_level:
                 self.log_text.append(text)
+
+    def _clear_log(self):
+        """清空本窗口日志记录及可见文本，避免切换级别时重新出现。"""
+        self._log_buffer.clear()
+        self.log_text.clear()
 
     def _setup_log_redirect(self):
         self._log_bridge = _LogBridge(self)

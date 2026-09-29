@@ -22,11 +22,25 @@ from ...constants import PICTURE_DIR, VIDEO_DIR
 from ...i18n import tr
 
 
+def _shade(color: str, factor: float) -> str:
+    """把 ``#rrggbb`` 整体调亮（factor>1）或调暗（factor<1）"""
+    r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+    scaled = (min(255, max(0, round(c * factor))) for c in (r, g, b))
+    return "#" + "".join(f"{c:02x}" for c in scaled)
+
+
 def _cap_btn_style(bg: str) -> str:
-    """面板按钮统一样式（含禁用态），与主窗口按钮风格一致"""
+    """面板按钮统一样式（含悬停/按下/禁用态），与主窗口按钮风格一致
+
+    悬停与按下两态不是装饰：没有它们，点下去界面毫无反应，用户分不清是没点上
+    还是点了没生效——尤其截屏这种「成功了也只多一行日志」的操作。
+    """
     return (
         f"QPushButton {{ background-color: {bg}; color: white; font-weight: bold; "
         f"padding: 6px; border: none; border-radius: 4px; }} "
+        f"QPushButton:hover {{ background-color: {_shade(bg, 1.15)}; }} "
+        f"QPushButton:pressed {{ background-color: {_shade(bg, 0.75)}; "
+        f"padding-top: 7px; padding-bottom: 5px; }} "
         "QPushButton:disabled { background-color: #444; color: #888; }"
     )
 
@@ -44,6 +58,7 @@ _STYLE_RECORD_IDLE = _cap_btn_style("#607D8B")   # 蓝灰（与脚本录制按�
 _STYLE_RECORD_STOP = _cap_btn_style("#d32f2f")   # 红色（录制中 → 停止）
 _STYLE_PAUSE = _cap_btn_style("#455A64")
 _STYLE_SNAP = _cap_btn_style("#2196F3")
+_STYLE_REFRESH = _cap_btn_style("#00897B")     # 青绿，与截屏区分开
 _STYLE_SAVE = _cap_btn_style("#4CAF50")          # 绿色强调
 _STYLE_DISCARD = _cap_btn_style("#757575")
 
@@ -102,8 +117,16 @@ class CaptureOpsMixin:
 
         lay.addWidget(_cap_divider())
 
+        # 刷新：只更新预览，不落盘。与截屏的区别就在于存不存文件
+        self.btn_refresh_preview = QPushButton(tr("刷新"))
+        self.btn_refresh_preview.setStyleSheet(_STYLE_REFRESH)
+        self.btn_refresh_preview.setToolTip(tr("重新取一帧并更新预览，不保存文件"))
+        self.btn_refresh_preview.clicked.connect(self._on_refresh_preview)
+        lay.addWidget(self.btn_refresh_preview)
+
         # 截屏（独立于录屏状态机，点击立即保存）
         self.btn_snap = QPushButton(tr("截屏"))
+        self.btn_snap.setToolTip(tr("取一帧、更新预览并保存到 data/picture"))
         self.btn_snap.setStyleSheet(_STYLE_SNAP)
         self.btn_snap.clicked.connect(self._on_snap)
         lay.addWidget(self.btn_snap)
@@ -181,6 +204,7 @@ class CaptureOpsMixin:
             self.btn_discard_rec.setEnabled(True)
 
         self.btn_snap.setEnabled(connected)
+        self.btn_refresh_preview.setEnabled(connected)
         self._refresh_rec_time()
 
     def _refresh_rec_time(self):
@@ -293,12 +317,23 @@ class CaptureOpsMixin:
 
     # ─── 截屏 ─────────────────────────────────────────────
 
+    def _on_refresh_preview(self):
+        """刷新：重新取一帧更新预览，不落盘"""
+        img = self._grab_capture_image()
+        if img is None:
+            self.log_text.append(tr("[预览] 刷新失败：无可用画面"))
+            return
+        self._show_preview_image(img)
+        self.statusBar().showMessage(tr("预览已刷新"), 2000)
+
     def _on_snap(self):
-        """截屏：立即保存当前帧到 data/picture"""
+        """截屏：更新预览并把这一帧保存到 data/picture"""
         img = self._grab_capture_image()
         if img is None:
             self.log_text.append(tr("[截屏] 截屏失败：无可用画面"))
             return
+        # 先更新预览：存下来的必须就是屏幕上看到的那一帧，不能事后再抓一次
+        self._show_preview_image(img)
         import cv2
         try:
             PICTURE_DIR.mkdir(parents=True, exist_ok=True)

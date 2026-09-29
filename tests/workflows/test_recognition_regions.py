@@ -41,7 +41,7 @@ class _FakeOCR:
         self.texts = texts or {}
         self.calls = []
 
-    def recognize(self, crop):
+    def recognize(self, crop, cleaning_group=None):
         # 裁切图的首个像素值当区域序号用（见 _make_img）
         idx = int(crop[0][0][0])
         self.calls.append(idx)

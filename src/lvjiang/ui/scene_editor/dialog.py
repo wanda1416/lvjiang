@@ -336,7 +336,9 @@ class SceneEditorDialog(
         self._btn_recognize.clicked.connect(self._on_recognize)
         btn_row.addWidget(self._btn_recognize)
         self._combo_ocr_group = QComboBox()
-        self._combo_ocr_group.addItem(tr("不清洗"), None)
+        # 「默认规则（全局）」不是「不清洗」：normalization.default 那层对所有 OCR
+        # 无条件生效，这里只决定要不要再叠一个业务组。叫法与「工具 → 图像识别」统一
+        self._combo_ocr_group.addItem(tr("默认规则（全局）"), None)
         from ...core.ocr_cleaner import OCRCleaner
         for key, config in OCRCleaner().get_groups().items():
             self._combo_ocr_group.addItem(str(config.get("label") or key), key)

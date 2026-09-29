@@ -26,7 +26,7 @@ def test_multiple_regions_share_one_ocr_call_and_restore_fields(monkeypatch):
     engine = OCREngine()
     calls = []
 
-    def recognize(sheet):
+    def recognize(sheet, cleaning_group=None):
         calls.append(sheet.shape)
         # first 高 10，间隔 16，second 从 y=26 开始。返回顺序故意打乱。
         return [
@@ -56,7 +56,7 @@ def test_batch_preserves_line_breaks_inside_region(monkeypatch):
     monkeypatch.setattr(
         engine,
         "recognize",
-        lambda _sheet: [
+        lambda _sheet, cleaning_group=None: [
             OCRResult("第二行", 1.0, _bbox(1, 12, 9, 16)),
             OCRResult("第一行", 1.0, _bbox(1, 1, 9, 5)),
         ],
@@ -83,7 +83,7 @@ def test_batch_uses_maximum_bbox_overlap_and_confidence(monkeypatch):
     monkeypatch.setattr(
         engine,
         "recognize",
-        lambda _sheet: [
+        lambda _sheet, cleaning_group=None: [
             # 跨过 gap，但与 second 的重叠面积更大。
             OCRResult("归第二区", 0.95, _bbox(0, 8, 20, 32)),
             OCRResult("低置信度", 0.2, _bbox(0, 1, 10, 8)),
@@ -106,7 +106,7 @@ def test_large_region_set_is_split_into_bounded_batches(monkeypatch):
     engine = OCREngine()
     shapes = []
 
-    def recognize(sheet):
+    def recognize(sheet, cleaning_group=None):
         shapes.append(sheet.shape)
         return []
 
@@ -131,7 +131,7 @@ def test_single_region_keeps_direct_recognition_path(monkeypatch):
     engine = OCREngine()
     shapes = []
 
-    def recognize(crop):
+    def recognize(crop, cleaning_group=None):
         shapes.append(crop.shape)
         return [OCRResult("单区域", 1.0, [])]
 

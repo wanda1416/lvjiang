@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QRadioButton,
     QScrollArea,
@@ -106,6 +107,7 @@ class SettingsDialog(QDialog):
         self._tabs.addTab(self._build_plan_tab(), tr("方案设置"))
         self._tabs.addTab(self._build_font_tab(), tr("字体设置"))
         self._tabs.addTab(self._build_hotkey_tab(), tr("热键设置"))
+        self._tabs.addTab(self._build_license_tab(), tr("功能激活"))
         self._privacy_tab_index = self._tabs.addTab(
             self._build_privacy_tab(), tr("网络与隐私"))
         layout.addWidget(self._tabs)
@@ -1015,6 +1017,137 @@ class SettingsDialog(QDialog):
     # 公告/更新是给用户的服务，统计是用户给项目的贡献，分开存放；关闭
     # 统计必须同步清空本地缓冲，这类有副作用的操作不适合被"保存"按钮
     # 延后到不确定的时间点（用户可能改完就直接关对话框）。
+
+    # ─── 高级功能（离线激活） ──────────────────────────────
+
+    def _build_license_tab(self) -> QWidget:
+        """激活入口：显示本机序列号、填写激活码、查看当前授权。
+
+        激活是即时动作，不走对话框底部的「保存」——那个按钮管的是配置项，
+        而激活码要么当场验通过写盘，要么当场告诉你为什么不行。
+        """
+        from ..core.license import current_serial
+
+        tab = QWidget()
+        vbox = QVBoxLayout(tab)
+
+        # ── 当前状态 ──
+        self._license_status = QLabel()
+        self._license_status.setWordWrap(True)
+        vbox.addWidget(self._license_status)
+
+        # ── 本机序列号 ──
+        serial_box = QGroupBox(tr("本机序列号"))
+        serial_layout = QVBoxLayout(serial_box)
+        serial_row = QHBoxLayout()
+        self._serial_edit = QLineEdit()
+        self._serial_edit.setReadOnly(True)
+        serial = current_serial()
+        self._serial_edit.setText(serial or tr("读不到硬件标识（非 Windows 平台）"))
+        serial_row.addWidget(self._serial_edit)
+        self._copy_serial_btn = QPushButton(tr("复制"))
+        self._copy_serial_btn.setEnabled(bool(serial))
+        self._copy_serial_btn.clicked.connect(self._on_copy_serial)
+        serial_row.addWidget(self._copy_serial_btn)
+        serial_layout.addLayout(serial_row)
+        serial_caption = QLabel(
+            tr("需要绑定本机的激活码时，把这串序列号发给作者。它由主板标识算出，"
+               "每次启动现算、不会存盘，也不包含任何可还原的硬件信息。"))
+        serial_caption.setWordWrap(True)
+        serial_caption.setStyleSheet("color: palette(mid);")
+        serial_layout.addWidget(serial_caption)
+        vbox.addWidget(serial_box)
+
+        # ── 激活码 ──
+        code_box = QGroupBox(tr("激活码"))
+        code_layout = QVBoxLayout(code_box)
+        self._license_edit = QPlainTextEdit()
+        self._license_edit.setPlaceholderText(
+            tr("把激活码粘贴到这里，换行和空格会被自动忽略"))
+        self._license_edit.setFixedHeight(80)
+        code_layout.addWidget(self._license_edit)
+        code_row = QHBoxLayout()
+        self._activate_btn = QPushButton(tr("激活"))
+        self._activate_btn.clicked.connect(self._on_activate_license)
+        code_row.addWidget(self._activate_btn)
+        self._clear_license_btn = QPushButton(tr("清除激活"))
+        self._clear_license_btn.clicked.connect(self._on_clear_license)
+        code_row.addWidget(self._clear_license_btn)
+        code_row.addStretch()
+        code_layout.addLayout(code_row)
+        code_caption = QLabel(
+            tr("部分激活码不绑定机器，直接粘贴即可，不需要提供序列号。"))
+        code_caption.setWordWrap(True)
+        code_caption.setStyleSheet("color: palette(mid);")
+        code_layout.addWidget(code_caption)
+        vbox.addWidget(code_box)
+
+        vbox.addStretch()
+        apply_button_style(self._activate_btn)
+        apply_button_style(self._copy_serial_btn, variant="neutral")
+        apply_button_style(self._clear_license_btn, variant="danger")
+        self._refresh_license_status()
+        return tab
+
+    def _refresh_license_status(self):
+        """刷新授权状态文字"""
+        from ..core.license import current_entitlement
+
+        result = current_entitlement()
+        issued = result.license
+        if issued is None:
+            self._license_status.setText(
+                tr("当前未激活，高级功能不可用。") + f"（{result.reason}）")
+            self._license_status.setStyleSheet("color: palette(mid);")
+            self._clear_license_btn.setEnabled(False)
+            return
+        bind = tr("免绑定") if not issued.is_bound else tr("已绑定本机")
+        expires = issued.expires.isoformat() if issued.expires else tr("永久")
+        feats = "、".join(sorted(result.features)) or tr("无")
+        self._license_status.setText(
+            tr("已激活") + f"：{issued.code_id} | {bind} | "
+            + tr("有效期") + f" {expires}\n" + tr("已开放") + f"：{feats}")
+        self._license_status.setStyleSheet("color: #2e7d32;")
+        self._clear_license_btn.setEnabled(True)
+
+    def _on_copy_serial(self):
+        from PyQt6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(self._serial_edit.text())
+            QToolTip.showText(
+                self._copy_serial_btn.mapToGlobal(
+                    self._copy_serial_btn.rect().bottomLeft()),
+                tr("已复制"), self._copy_serial_btn)
+
+    def _on_activate_license(self):
+        from ..core.license import try_activate
+
+        code = self._license_edit.toPlainText().strip()
+        if not code:
+            QMessageBox.information(self, tr("激活"), tr("请先粘贴激活码"))
+            return
+        result = try_activate(code)
+        if result.active:
+            self._license_edit.clear()
+            self._refresh_license_status()
+            QMessageBox.information(
+                self, tr("激活"),
+                tr("激活成功。部分功能需要重新定位窗口后生效。"))
+        else:
+            QMessageBox.warning(self, tr("激活失败"), result.reason)
+
+    def _on_clear_license(self):
+        from ..core.license import clear_code, refresh_entitlement
+
+        confirm = QMessageBox.question(
+            self, tr("清除激活"),
+            tr("清除后高级功能将不可用，激活码本身仍然有效，可以再次填入。"))
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        clear_code()
+        refresh_entitlement()
+        self._refresh_license_status()
 
     def _build_privacy_tab(self) -> QWidget:
         tab = QWidget()

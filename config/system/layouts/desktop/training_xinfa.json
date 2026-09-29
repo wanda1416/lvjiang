@@ -127,14 +127,14 @@
     {
       "scene": "general_control",
       "entity": "confirm",
-      "x_ratio": 0.49659782929684226,
-      "y_ratio": 0.634702404681917
+      "x_ratio": 0.496569477874316,
+      "y_ratio": 0.6394398300296198
     },
     {
       "scene": "general_control",
       "entity": "cancel",
-      "x_ratio": 0.4198347473807928,
-      "y_ratio": 0.634702404681917
+      "x_ratio": 0.4191667036089661,
+      "y_ratio": 0.6394398300296198
     }
   ]
 }

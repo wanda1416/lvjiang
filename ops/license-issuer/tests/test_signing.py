@@ -71,7 +71,7 @@ class TestIssue:
         from lvjiang.core.license.code import verify_code
         code = issue(IssueRequest(
             code_id="L1", bind_to_serial=True, serial=_serial(),
-            features=("some_feature",)), key_file)
+            features=("lv1",)), key_file)
         license_ = verify_code(code, public_b32)
         assert license_.is_bound
         assert license_.code_id == "L1"
@@ -80,7 +80,7 @@ class TestIssue:
         from lvjiang.core.license.code import verify_code
         code = issue(IssueRequest(
             code_id="L2", bind_to_serial=False,
-            features=("bg_capture",), expires=date(2030, 1, 1)), key_file)
+            features=("lv1",), expires=date(2030, 1, 1)), key_file)
         license_ = verify_code(code, public_b32)
         assert not license_.is_bound
         assert license_.expires == date(2030, 1, 1)
@@ -92,37 +92,58 @@ class TestIssue:
         code = issue(IssueRequest(
             code_id="L3", bind_to_serial=True,
             serial=_serial().lower().replace("-", " "),
-            features=("bg_capture",)), key_file)
+            features=("lv1",)), key_file)
         assert verify_code(code, public_b32).serial == normalize_serial(_serial())
 
     def test_missing_key_is_reported(self, tmp_path):
         with pytest.raises(SigningKeyError):
             issue(IssueRequest(code_id="L", bind_to_serial=False,
-                               features=("bg_capture",)), tmp_path / "nope")
+                               features=("lv1",), expires=date(2030, 1, 1)),
+                  tmp_path / "nope")
 
 
 class TestValidation:
     def test_requires_code_id(self):
         assert "编号" in IssueRequest(
-            code_id="  ", bind_to_serial=False, features=("x",)).validate()
+            code_id="  ", bind_to_serial=False, features=("lv1",),
+            expires=date(2030, 1, 1)).validate()
 
-    def test_requires_a_feature(self):
-        """没有功能的码签出来毫无意义，拦在签发前。"""
-        assert "功能" in IssueRequest(
-            code_id="L", bind_to_serial=False).validate()
+    def test_requires_a_level(self):
+        """没有等级的码签出来毫无意义，拦在签发前。"""
+        assert "等级" in IssueRequest(
+            code_id="L", bind_to_serial=False,
+            expires=date(2030, 1, 1)).validate()
+
+    def test_rejects_unregistered_level(self):
+        """手打的等级名客户端认不出来，签出来也开不了东西——签发前就拦住。"""
+        problem = IssueRequest(
+            code_id="L", bind_to_serial=False, features=("lv9",),
+            expires=date(2030, 1, 1)).validate()
+        assert "未登记" in problem
+
+    def test_unbound_requires_expiry(self):
+        """免绑定码是 bearer token，离线又撤不掉，必须有有效期。"""
+        assert "有效期" in IssueRequest(
+            code_id="L", bind_to_serial=False, features=("lv1",)).validate()
+
+    def test_bound_may_be_permanent(self):
+        """绑机码只在那台机器上生效，永久是可接受的。"""
+        assert IssueRequest(
+            code_id="L", bind_to_serial=True, serial=_serial(),
+            features=("lv1",)).validate() == ""
 
     def test_bound_requires_serial(self):
         assert "序列号" in IssueRequest(
-            code_id="L", bind_to_serial=True, features=("x",)).validate()
+            code_id="L", bind_to_serial=True, features=("lv1",)).validate()
 
     def test_bound_rejects_typoed_serial(self):
         """校验位不对就别签了——签出来用户也用不了，白跑一轮沟通。"""
         bad = _serial()[:-1] + ("A" if _serial()[-1] != "A" else "B")
         assert "校验位" in IssueRequest(
             code_id="L", bind_to_serial=True, serial=bad,
-            features=("x",)).validate()
+            features=("lv1",)).validate()
 
     def test_unbound_ignores_serial(self):
         assert IssueRequest(
             code_id="L", bind_to_serial=False, serial="garbage",
-            features=("x",)).validate() == ""
+            features=("lv1",), expires=date(2030, 1, 1)).validate() == ""

@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QStyle, QStyleOptionComboBox
 
 from lvjiang.core.scene_definition import SceneRegistry
 from lvjiang.core.scene_definition_models import SceneDef, ViewDef
+from lvjiang.core.scene_transitions import Transition
 from lvjiang.ui.button_styles import ACTION_BUTTON_STYLE
 
 pytestmark = pytest.mark.usefixtures('qapp')
@@ -127,3 +128,52 @@ def test_view_manager_owner_picker_filters_by_group_and_scene(monkeypatch):
     assert not dialog._owner_scene.isEnabled()
     assert not dialog._owner_view.isEnabled()
     assert dialog._owner_value() == ''
+
+
+def test_view_manager_contract_scrolls_instead_of_squeezing(monkeypatch, qapp):
+    """入口/跳转条数由场景声明决定，多了必须能滚，而不是把整页挤扁。
+
+    game_settings 的页签视图实测有近 20 条契约行。契约区不封顶时它会按内容一路
+    撑高，把视图列表和按钮排压到最小高度以下——控件都还在，只是挤成一片文字，
+    读不出哪条属于哪一段。这里钉住「契约区高度有上限 + 溢出时可滚动 + 视图列表
+    不被压到最小高度以下」。
+    """
+    from lvjiang.ui.scene_editor import scene_view_dialog
+
+    registry = SceneRegistry()
+    # 一个页签视图 + 足够多的来源场景，凑出溢出所需的行数
+    registry._scenes['host'] = SceneDef('host', '宿主', views=[
+        ViewDef('base', '页面', kind='page'),
+        ViewDef('tab', '标签', kind='tab', owner='/base')])
+    registry._order.append('host')
+    registry._init_groups({'main': ['host']}, {'main': '主场景'})
+    monkeypatch.setattr(scene_view_dialog, 'get_registry', lambda: registry)
+    monkeypatch.setattr(
+        scene_view_dialog, 'entries_of_view',
+        lambda *_a: [_transition(f'entry_{i}') for i in range(10)])
+    monkeypatch.setattr(
+        scene_view_dialog, 'exits_of_view',
+        lambda *_a: [_transition(f'exit_{i}') for i in range(10)])
+
+    dialog = scene_view_dialog.ViewManagerDialog('host')
+    dialog.show()
+    dialog._list.setCurrentRow(1)
+    qapp.processEvents()      # 断言的是布局结果，要等这一轮布局跑完
+
+    # 10 条入口（页签视图还会多一行调用方说明）+ 10 条跳转，一条不少
+    assert dialog._entry_lines.count() >= 10
+    assert dialog._exit_lines.count() == 10
+    scroll = dialog._contract_scroll
+    # 封顶：契约区不会随行数无限长
+    assert scroll.maximumHeight() <= 260
+    assert scroll.height() <= scroll.maximumHeight()
+    # 溢出时内容仍是完整高度，且可以滚到底——不是被压缩进视口
+    assert dialog._contract.height() > scroll.viewport().height()
+    assert scroll.verticalScrollBar().maximum() > 0
+    # 视图列表没有被契约区挤到最小高度以下
+    assert dialog._list.height() >= dialog._list.minimumHeight()
+
+
+def _transition(entity: str) -> Transition:
+    return Transition(from_scene='host', from_view='tab', entity=entity,
+                      to_scene='host', to_view='tab')

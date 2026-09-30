@@ -10,11 +10,13 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -123,7 +125,25 @@ class ViewManagerDialog(QDialog):
         self._exit_lines = QVBoxLayout()
         self._exit_lines.setSpacing(3)
         contract_layout.addLayout(self._exit_lines)
-        layout.addWidget(self._contract)
+        contract_layout.addStretch()
+
+        # 契约区放进滚动区：入口/跳转的条数由场景声明决定，game_settings 的页签
+        # 视图能有近 20 条。不封顶的话它会按内容一路撑高，把视图列表和按钮排一起
+        # 压扁——控件还在，只是全挤成一片，读不出哪条属于哪一段。
+        # SetMinimumSize：契约区的最小高度要跟着行数长，否则 setWidgetResizable
+        # 会把内容压到视口高度、照样挤在一起，滚动条也就永远不出现
+        contract_layout.setSizeConstraint(
+            QLayout.SizeConstraint.SetMinimumSize)
+        self._contract_scroll = QScrollArea()
+        self._contract_scroll.setWidget(self._contract)
+        self._contract_scroll.setWidgetResizable(True)
+        self._contract_scroll.setMinimumHeight(120)
+        self._contract_scroll.setMaximumHeight(220)
+        self._contract_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._contract_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        layout.addWidget(self._contract_scroll)
 
         btn_row = QHBoxLayout()
         self._btn_add = QPushButton(tr("新增视图"))
@@ -375,6 +395,8 @@ class ViewManagerDialog(QDialog):
                       else [(tr("未声明"), "")])
         self._replace_contract_lines(self._entry_lines, entry_lines)
         self._replace_contract_lines(self._exit_lines, exit_lines)
+        # 换视图后重新贴合内容高度：行数变少时若不收回，滚动条会一直挂着
+        self._contract.adjustSize()
 
     def _selected_view_key(self) -> str | None:
         item = self._list.currentItem()

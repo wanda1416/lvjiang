@@ -2,7 +2,7 @@
 
 > Layer owner：L7 Contract（PC 与设备 app 之间的线协议）
 > Feeds/Affects：L8 `src/lvjiang/core/android/agent.py`、`android/.../AgentServer.kt`；L6 ADB 模式的截图/输入后端选择
-> Stability：稳定（协议版本 2；两端实现必须同步改）
+> Stability：稳定（协议版本 3；两端实现必须同步改）
 
 ## 为什么要有它
 
@@ -64,6 +64,7 @@ PC 端 ADB 模式原先只有两条路控制手机：`adb shell input tap/swipe`
 | `long_press` | `x`,`y`,`duration_ms`(800) | — |
 | `swipe` | `x1`,`y1`,`x2`,`y2`,`duration_ms`(300) | — |
 | `hold_move` | `x1`,`y1`,`x2`,`y2`,`move_ms`,`hold_ms` | a11y 两段 stroke 真正停住；shell 通道把 hold 合并进 swipe 时长（匀速插值，推满只在结尾生效） |
+| `gesture` | `strokes:[{start_ms, move_ms, hold_ms, points:[[x,y],...]}]` | 多路触点一次并发下发（输入时间线）。**只走 a11y**：shell 的 `input` 单指、无法交错两个 pointer，强制 `via="shell"` 直接报错而不是拆成顺序注入。整块一个 `GestureDescription`，超出本机 `getMaxStrokeCount()` 或`getMaxGestureDuration()` 时返回 `ok=false` 并点明是哪条限制 |
 | `key` | `name:"BACK"/"HOME"` 或 `keycode:int` | BACK/HOME 无障碍用 `performGlobalAction`；其它 keycode 只有 Shizuku 能发（`auto` 下自动转 shell，没 Shizuku 报错不静默降级） |
 | `shell` | `cmd:[...]` | Shizuku 执行，stdout 作二进制负载 |
 | `calib_get` | — | `key`（机型_WxH）、`screen{w,h,rotation}`、`calib{sx,ox,sy,oy}`、`identity`、`stored`、`overlay{w,h}\|null` |
@@ -74,6 +75,25 @@ PC 端 ADB 模式原先只有两条路控制手机：`adb shell input tap/swipe`
 | `float_icon` | `hidden`(true) | 动态显隐悬浮球（截图/标定前藏起来，免得被截进画面）。返回 `running`（悬浮服务是否在跑）、`hidden` |
 
 坐标都是设备截图坐标系的像素（与 `screencap` / 无障碍截图一致），PC 端不做旋转变换。
+
+### 输入时间线的落地细节
+
+`gesture` 的每条 stroke 取 `points` 的**终点**按住 `move_ms + hold_ms`，没有滑动
+过程。原因是一条 `StrokeDescription` 只能匀速走完整条 path，表达不了"滑到位再停住"；
+而 `continueStroke` 的续接段要另起一次 `dispatchGesture`（`hold_move` 就是那么做的），
+放进同一个 `GestureDescription` 就不是并发了。对推摇杆来说"直接按在推满位置并保持"
+正是要的效果，所以 `move_ms` 并入总时长而不单独插值。
+
+真机上还有三件事要实测（框架层支持是明确的，这三条与设备/游戏有关）：本机
+`getMaxStrokeCount()` 的实际值、游戏是否接受注入的多点触控、真实触摸取消整组手势
+的表现。探针：
+
+```bash
+python -m lvjiang.core.android.gesture_probe [-s SERIAL] [--hold 2.0]
+```
+
+它发两路并发触点（左下角按住、期间右下角点两次），回报设备端是否完成。**回报成功
+只说明系统接受了注入**，游戏是否响应要靠眼睛看。
 
 ### 屏幕映射（ScreenMap）
 

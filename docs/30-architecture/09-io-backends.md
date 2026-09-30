@@ -86,6 +86,12 @@
   指针被强制抬起。ADB 注入不受影响。
 - **按键**：Android 侧只有 shell/ADB 能发任意 keycode，且 `keyevent` 是一次性的，
   `press hold / down / up` 在所有 Android 路径都不可能真正保持。
+- **并发输入（输入时间线）**：只有两条路做得到——PC（按键与鼠标各有独立状态）与
+  a11y（一个 `GestureDescription` 装多条 stroke，各带 `startTime`）。ADB shell input
+  与 Shizuku 都走 `input`，单指且无法交错两个 pointer，**不做静默降级**：脚本用
+  `#% requires: [device_gesture]` 声明，加载期就拒绝。两侧支持的步骤类型还不一样：
+  PC 只接按键（端游的移动是 WASD，不为鼠标拖拽发明并发），a11y 只接触点（安卓的
+  `keyevent` 保持不住）。见 [32-grammar/03.7-timeline.md](32-grammar/03.7-timeline.md)。
 
 ## 三、截图能力矩阵
 

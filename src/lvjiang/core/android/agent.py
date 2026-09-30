@@ -39,7 +39,7 @@ AGENT_SOCKET_NAME = "lvjiang-agent"
 #: 律匠 app 包名，日志提示用
 AGENT_PACKAGE = "com.lvjiang.app"
 #: 协议版本：设备端返回不一致时拒绝使用（避免两端静默错位）
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 
 #: PC 本地转发端口范围（与 scrcpy 的 27183 错开）
 _PORT_RANGE = (27300, 27399)
@@ -529,6 +529,35 @@ class AgentInput(InputBackend):
                        gesture_ms=move_ms, **coords)
         _post = post_delay if post_delay is not None else self.after_click_wait
         time.sleep(random.uniform(*_post))
+
+    # ─── 输入时间线 ───────────────────────────────────────
+    #: 只落地触点类步骤。安卓侧 keyevent 是一次性的，`press hold/down/up` 在任何
+    #: Android 路径都不可能真正保持，所以按键类步骤这里明确不支持而不是假装能跑。
+    timeline_kinds = frozenset({"touch"})
+
+    def run_timeline(self, steps) -> None:
+        """整块编译成一次多 stroke 手势下发。
+
+        为什么必须是**一次**：多 stroke 同属一个 GestureDescription 才是真并发；
+        拆成多次 dispatch 就变回顺序执行，而调用方看到的仍是"并发已生效"。
+        """
+        from ..timeline import describe_timeline, validate_timeline
+        self.check_timeline_kinds(steps)
+        validate_timeline(steps, touch=True)
+        strokes = [
+            {
+                "start_ms": int(round(step.offset * 1000)),
+                "move_ms": int(round(step.move * 1000)),
+                "hold_ms": int(round(step.hold * 1000)),
+                "points": [[int(step.x1), int(step.y1)],
+                           [int(step.x2), int(step.y2)]],
+            }
+            for step in steps
+        ]
+        span_ms = int(round(max(step.end for step in steps) * 1000))
+        logger.debug(f"[Agent] 时间线 {describe_timeline(steps)}")
+        self._call("gesture", "时间线", strokes=strokes,
+                   gesture_ms=span_ms)
 
     # ─── 键盘 ─────────────────────────────────────────────
 

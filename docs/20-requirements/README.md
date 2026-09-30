@@ -23,6 +23,7 @@
 | [12-nanlu-season.md](12-nanlu-season.md) | 南吕相和赛季：115 阶词条范围、赛季承音门槛、评级与毕业率适配 | 部分实现 |
 | [13-base-attribute-baseline.md](13-base-attribute-baseline.md) | 115 阶满养成基础属性：按流派与来源选择推导无 40 词条基线 | 基础静态模型已实现 |
 | [14-yysls-session-files.md](14-yysls-session-files.md) | 燕云会话数据分文件存储与旧节点一次性迁移 | ✅ 已实现 |
+| [15-input-timeline.md](15-input-timeline.md) | 输入时间线：描述严格并发的操作序列，多路手势与跨端落地 | 需求与边界已确认，尚未实现 |
 
 ## 子需求
 

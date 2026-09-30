@@ -366,6 +366,24 @@ class Global:
 
 
 @dataclass(frozen=True)
+class TimelineEntry:
+    """时间线上的一路输入：``offset`` 是相对块起点的绝对偏移（秒）"""
+    offset: Any
+    action: Any
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
+class Timeline:
+    """timeline ... end — 若干路输入并发执行，各自按声明的偏移起跑
+
+    entries 按偏移升序排列（解析期排好，执行期不再排序）。
+    """
+    entries: list = field(default_factory=list)
+    line_no: int = 0
+
+
+@dataclass(frozen=True)
 class Try:
     """try ... catch $err ... end — 异常处理
 

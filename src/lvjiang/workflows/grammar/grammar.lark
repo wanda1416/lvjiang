@@ -47,6 +47,7 @@ start: (_NL | statement)*
           | label_stmt
           | goto_stmt
           | try_stmt
+          | timeline_stmt
 
 scene_stmt: "scene"i bracket_expr ["view"i bracket_expr] _NL -> scene_location
           | "scene"i "unknown"i _NL -> scene_unknown
@@ -413,6 +414,25 @@ return_stmt: "return"i [expression] _NL
 label_stmt: "@" NAME _NL
 
 goto_stmt: "goto"i NAME _NL
+
+// timeline：描述若干路输入各自在时间线上何时开始，块内并发执行
+//
+//   timeline
+//       @0.0  drag [general_move].[move_backward] duration 0.1 hold 2.1
+//       @0.5  click [general_combat].[tiaoyue]
+//       @1.5  click [general_combat].[tiaoyue]
+//   end
+//
+// `@<秒>` 是相对本块起点的**绝对偏移**，不是间隔——并发的正确性只取决于各路
+// 何时开始，用间隔表达会让「第三路相对谁」变含糊。
+//
+// 块内只允许输入类语句：scan/find/if/loop/call 一律在此报解析错误，错误直接指向
+// 那一行。允许识别就等于承认时序会漂，而「看着严格、实际漂移」比不支持更糟。
+// 边界与各后端落地见 docs/20-requirements/15-input-timeline.md。
+timeline_stmt: "timeline"i _NL (_NL | timeline_entry)* "end"i _NL
+timeline_entry: "@" timeline_offset timeline_action
+timeline_offset: number | var_ref | wait_range
+?timeline_action: click_stmt | drag_stmt | press_stmt | place_stmt
 
 // try/catch：异常处理
 // catch 后可选绑定一个变量名，接收错误消息字符串

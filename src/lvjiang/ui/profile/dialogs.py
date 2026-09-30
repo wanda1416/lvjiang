@@ -17,18 +17,24 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
 )
 
-from ...core.profile.repository import db_get_history
+from ...core.profile.repository import db_count_history, db_get_history
 from ...i18n import tr
-from ..button_styles import apply_dialog_button_box_style
+from ..button_styles import (
+    apply_button_style,
+    apply_dialog_button_box_style,
+    fit_button_width,
+)
 
 # ProfileDefinitionDialog 位于 settings_dialog.py，此处 re-export 便于统一导入。
 from .settings_dialog import ProfileDefinitionDialog  # noqa: F401
@@ -39,25 +45,35 @@ __all__ = ["HistoryDialog", "ask_value_dialog", "ProfileDefinitionDialog"]
 
 
 class HistoryDialog(QDialog):
-    """查看指定 key 的变更记录（最近 50 条）"""
+    """按 key 查看变更记录；可限定单个用户，也可跨用户分页。"""
 
     _TYPE_LABEL = {"tick": tr("定时"), "action": tr("操作"), "override": tr("覆写")}  # runtime tr()
 
-    def __init__(self, user_name: str, model_type: str, key: str, key_label: str, parent=None):
+    def __init__(
+        self, user_name: str | None, model_type: str, key: str,
+        key_label: str, parent=None,
+    ):
         super().__init__(parent)
-        self.setWindowTitle(f"{key_label} — {user_name} " + tr("变更记录"))
-        self.resize(820, 420)
-        self._setup_ui(user_name, model_type, key)
+        self._user_name = user_name
+        self._model_type = model_type
+        self._key = key
+        self._page = 1
+        self._page_size = 100
+        title = f"{key_label} — {user_name}" if user_name is not None else key_label
+        self.setWindowTitle(f"{title} " + tr("变更记录"))
+        self.resize(820 if user_name is not None else 960, 480)
+        self._setup_ui()
+        self._load_page()
 
-    def _setup_ui(self, user_name: str, model_type: str, key: str):
+    def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
-
-        history = db_get_history(user_name, type_=model_type, key=key, limit=50)
-
-        table = QTableWidget()
-        table.setColumnCount(6)
+        table = QTableWidget(self)
+        table.setColumnCount(7)
         table.setHorizontalHeaderLabels([
-                    tr("时间"), tr("类型"), tr("旧值"), tr("新值"), tr("来源"), tr("详情")])
+            tr("时间"), tr("用户名"), tr("类型"), tr("旧值"),
+            tr("新值"), tr("来源"), tr("详情"),
+        ])
+        table.setColumnHidden(1, self._user_name is not None)
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         table.setAlternatingRowColors(True)
@@ -67,15 +83,74 @@ class HistoryDialog(QDialog):
 
         header = table.horizontalHeader()
         if header is not None:
-            # 时间列：固定 140px（够放 "MM-DD HH:MM:SS"）
             header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
             table.setColumnWidth(0, 140)
-            # 窄字段列（类型/旧值/新值/来源）：固定宽，不挤占详情列空间
-            for col, w in ((1, 60), (2, 70), (3, 70), (4, 100)):
+            header.setSectionResizeMode(
+                1, QHeaderView.ResizeMode.ResizeToContents)
+            for col, w in ((2, 60), (3, 70), (4, 70), (5, 100)):
                 header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
                 table.setColumnWidth(col, w)
-            # 详情列：stretch 占满剩余空间
-            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
+
+        self._table = table
+        layout.addWidget(table)
+
+        pager = QHBoxLayout()
+        pager.addWidget(QLabel(tr("每页")))
+        self._page_size_combo = QComboBox(self)
+        for size in (50, 100, 200, 500):
+            self._page_size_combo.addItem(str(size), size)
+        self._page_size_combo.setCurrentIndex(
+            self._page_size_combo.findData(self._page_size))
+        self._page_size_combo.currentIndexChanged.connect(
+            self._on_page_size_changed)
+        pager.addWidget(self._page_size_combo)
+        pager.addWidget(QLabel(tr("条记录")))
+        pager.addStretch()
+        self._page_label = QLabel()
+        pager.addWidget(self._page_label)
+        self._first_button = QPushButton(tr("首页"))
+        self._previous_button = QPushButton(tr("上一页"))
+        self._next_button = QPushButton(tr("下一页"))
+        self._last_button = QPushButton(tr("末页"))
+        self._first_button.clicked.connect(lambda: self._go_to_page(1))
+        self._previous_button.clicked.connect(
+            lambda: self._go_to_page(self._page - 1))
+        self._next_button.clicked.connect(lambda: self._go_to_page(self._page + 1))
+        self._last_button.clicked.connect(
+            lambda: self._go_to_page(self._page_count))
+        for button in (
+            self._first_button, self._previous_button,
+            self._next_button, self._last_button,
+        ):
+            apply_button_style(button, variant="neutral")
+            pager.addWidget(button)
+        fit_button_width(
+            self._first_button, self._previous_button,
+            self._next_button, self._last_button,
+        )
+        layout.addLayout(pager)
+
+    def _on_page_size_changed(self) -> None:
+        self._page_size = int(self._page_size_combo.currentData())
+        self._page = 1
+        self._load_page()
+
+    def _go_to_page(self, page: int) -> None:
+        if 1 <= page <= self._page_count and page != self._page:
+            self._page = page
+            self._load_page()
+
+    def _load_page(self) -> None:
+        total = db_count_history(
+            self._user_name, type_=self._model_type, key=self._key)
+        self._page_count = max(1, (total + self._page_size - 1) // self._page_size)
+        self._page = min(self._page, self._page_count)
+        history = db_get_history(
+            self._user_name, type_=self._model_type, key=self._key,
+            limit=self._page_size, offset=(self._page - 1) * self._page_size,
+        )
+        table = self._table
 
         table.setRowCount(len(history))
         for row, rec in enumerate(history):
@@ -108,13 +183,25 @@ class HistoryDialog(QDialog):
                 )
 
             table.setItem(row, 0, QTableWidgetItem(formatted_ts))
-            table.setItem(row, 1, QTableWidgetItem(tr(self._TYPE_LABEL.get(ct, ct))))
-            table.setItem(row, 2, QTableWidgetItem(old_str))
-            table.setItem(row, 3, QTableWidgetItem(new_str))
-            table.setItem(row, 4, QTableWidgetItem(rec.get("source", "")))
-            table.setItem(row, 5, QTableWidgetItem(rec.get("detail", "")))
+            table.setItem(row, 1, QTableWidgetItem(rec.get("username", "")))
+            table.setItem(row, 2, QTableWidgetItem(tr(self._TYPE_LABEL.get(ct, ct))))
+            table.setItem(row, 3, QTableWidgetItem(old_str))
+            table.setItem(row, 4, QTableWidgetItem(new_str))
+            table.setItem(row, 5, QTableWidgetItem(rec.get("source", "")))
+            table.setItem(row, 6, QTableWidgetItem(rec.get("detail", "")))
 
-        layout.addWidget(table)
+        start = (self._page - 1) * self._page_size + 1 if total else 0
+        end = start + len(history) - 1 if history else 0
+        self._page_label.setText(tr(
+            "第 {page}/{pages} 页 · 显示 {start}–{end} / 共 {total} 条"
+        ).format(
+            page=self._page, pages=self._page_count,
+            start=start, end=end, total=total,
+        ))
+        self._first_button.setEnabled(self._page > 1)
+        self._previous_button.setEnabled(self._page > 1)
+        self._next_button.setEnabled(self._page < self._page_count)
+        self._last_button.setEnabled(self._page < self._page_count)
 
 
 # ─── 通用数值输入对话框 ────────────────────────────────────────────

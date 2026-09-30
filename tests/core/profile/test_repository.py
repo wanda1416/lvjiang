@@ -626,6 +626,26 @@ class TestHistory:
         # 最新在前
         assert limited[0]["new_value"] == 19
 
+    def test_cross_user_history_filters_and_pages_by_key(self, db: ProfileDB):
+        db.upsert("u1", "quota", "target", 1, change_type="action")
+        db.upsert("u2", "quota", "target", 2, change_type="action")
+        db.upsert("u1", "quota", "other", 3, change_type="action")
+        db.upsert("u2", "stock", "target", 4, change_type="action")
+        db.upsert("u1", "quota", "target", 5, change_type="action")
+
+        assert db.count_history(None, "quota", "target") == 3
+        assert db.count_history("u1", "quota", "target") == 2
+        assert db.count_history("u2", "quota", "target") == 1
+        assert [row["new_value"] for row in db.get_history(
+            None, "quota", "target", limit=2,
+        )] == [5, 2]
+        assert [row["new_value"] for row in db.get_history(
+            None, "quota", "target", limit=2, offset=2,
+        )] == [1]
+        assert [row["new_value"] for row in db.get_history(
+            "u1", "quota", "target", limit=1, offset=1,
+        )] == [1]
+
 
 # ─── History 清理 ─────────────────────────────────────────────
 

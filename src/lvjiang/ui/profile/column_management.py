@@ -204,6 +204,8 @@ class ProfileColumnMixin:
         h_header = table.horizontalHeader()
         assert h_header is not None
         logical_index = h_header.logicalIndexAt(pos)
+        if logical_index < 0:
+            return
         menu = QMenu(self)
 
         if logical_index == 0:
@@ -215,6 +217,18 @@ class ProfileColumnMixin:
                 tr("编辑当前列"),
                 lambda: self._edit_column_definition(group_name, data_index),
             )
+            visible_keys = self._visible_columns(group_name)
+            if data_index < len(visible_keys):
+                key = visible_keys[data_index]
+                config = get_profile_config()
+                key_def = config.get_key(key)
+                model_type = config.get_model_type(key)
+                if key_def is not None and model_type:
+                    menu.addAction(
+                        tr("查看历史记录"),
+                        lambda: self._show_history_dialog(
+                            None, model_type, key, key_def.label),
+                    )
             menu.addSeparator()
             menu.addAction(tr("右侧新增列"), lambda: self._add_column(group_name, data_index))
             menu.addAction(tr("删除当前列"), lambda: self._remove_column(group_name, data_index))

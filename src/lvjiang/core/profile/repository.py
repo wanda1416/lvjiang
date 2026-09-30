@@ -468,24 +468,14 @@ class ProfileDB:
 
     def get_history(
         self,
-        username: str,
+        username: str | None,
         type_: str | None = None,
         key: str | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[dict]:
-        """查询变更历史，支持按 type/key 过滤，按时间倒序"""
-        conditions = ["username = ?"]
-        params: list = [username]
-
-        if type_ is not None:
-            conditions.append("type = ?")
-            params.append(type_)
-        if key is not None:
-            conditions.append("key = ?")
-            params.append(key)
-
-        where = " AND ".join(conditions)
-        params.append(limit)
+        """查询变更历史；username=None 时跨用户，按写入顺序倒序分页。"""
+        where, params = self._history_filter(username, type_, key)
 
         conn = self._connect()
         try:
@@ -493,8 +483,8 @@ class ProfileDB:
                 f"SELECT id, ts, username, type, key, old_value, new_value, "
                 f"old_value_text, new_value_text, change_type, detail, source "
                 f"FROM profile_history "
-                f"WHERE {where} ORDER BY id DESC LIMIT ?",
-                params,
+                f"WHERE {where} ORDER BY id DESC LIMIT ? OFFSET ?",
+                (*params, limit, offset),
             ).fetchall()
         finally:
             conn.close()
@@ -509,6 +499,35 @@ class ProfileDB:
             }
             for r in rows
         ]
+
+    def count_history(
+        self,
+        username: str | None,
+        type_: str | None = None,
+        key: str | None = None,
+    ) -> int:
+        """返回相同筛选条件下的历史记录总数。"""
+        where, params = self._history_filter(username, type_, key)
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                f"SELECT COUNT(*) FROM profile_history WHERE {where}", params,
+            ).fetchone()
+            return int(row[0]) if row else 0
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _history_filter(
+        username: str | None, type_: str | None, key: str | None,
+    ) -> tuple[str, list[str]]:
+        conditions: list[str] = []
+        params: list[str] = []
+        for column, value in (("username", username), ("type", type_), ("key", key)):
+            if value is not None:
+                conditions.append(f"{column} = ?")
+                params.append(value)
+        return " AND ".join(conditions) or "1 = 1", params
 
     def cleanup_history(self, days: int = 90) -> int:
         """清理 N 天前的历史记录，返回删除行数"""
@@ -609,12 +628,21 @@ def db_update_if_current(
 
 
 def db_get_history(
-    username: str,
+    username: str | None,
     type_: str | None = None,
     key: str | None = None,
     limit: int = 100,
+    offset: int = 0,
 ) -> list[dict]:
-    return get_profile_db().get_history(username, type_, key, limit)
+    return get_profile_db().get_history(username, type_, key, limit, offset)
+
+
+def db_count_history(
+    username: str | None,
+    type_: str | None = None,
+    key: str | None = None,
+) -> int:
+    return get_profile_db().count_history(username, type_, key)
 
 
 def db_cleanup_history(days: int = 90) -> int:

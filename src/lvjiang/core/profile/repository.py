@@ -127,6 +127,14 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_v6(conn: sqlite3.Connection) -> None:
+    """为跨用户按类型和 key 查看历史提供倒序索引。"""
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_history_type_key "
+        "ON profile_history(type, key, id DESC)"
+    )
+
+
 # 有序迁移列表: (版本号, 描述, 迁移函数)
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial schema", _migrate_v1),
@@ -134,6 +142,7 @@ MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (3, "entries add updated_time column", _migrate_v3),
     (4, "entries add value_text column", _migrate_v4),
     (5, "history add old/new_value_text columns", _migrate_v5),
+    (6, "history add type/key index", _migrate_v6),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]

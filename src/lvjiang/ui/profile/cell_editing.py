@@ -628,9 +628,9 @@ class ProfileCellEditingMixin:
 
     def _show_history_dialog(  # type: ignore[misc]
         self: ProfileTab,
-        user_name: str, model_type: str, key: str, key_label: str,
+        user_name: str | None, model_type: str, key: str, key_label: str,
     ) -> None:
-        """打开历史记录查看器，展示指定 key 的最近变更记录"""
+        """打开共用历史查看器；无用户名时展示该 key 的所有用户记录。"""
         dialog = HistoryDialog(user_name, model_type, key, key_label, self)
         dialog.exec()
 

@@ -21,7 +21,7 @@ from ...core.config import (
     parse_android_apps,
 )
 from ...core.config.resolver import get_resolver
-from ...core.input_base import InputBackend
+from ...core.input_base import InputBackend, InputBackendKind
 from ...core.input_trace import InputTrace, InputTraceError, load_input_trace
 from ...core.key_validation import validate_key_name
 from ...core.layout_models import Layout
@@ -66,6 +66,7 @@ from ..grammar.ast_nodes import (
     SceneDeclaration,
     Screenshot,
     Scroll,
+    Timeline,
     Try,
     UntilLoop,
     Wait,
@@ -88,6 +89,7 @@ from .signals import (
     _GotoSignal,
     _ReturnSignal,
 )
+from .timeline import _TimelineMixin
 
 # ─── 引擎 ─────────────────────────────────────────────────
 
@@ -127,7 +129,7 @@ def _normalize_import_path(raw: str) -> str:
 
 
 class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsMixin,
-                     _ControlFlowMixin, _EvalMixin):
+                     _ControlFlowMixin, _EvalMixin, _TimelineMixin):
     """工作流运行时核心。
 
     直接持有输入、截图、布局与运行时缓存，管理 session/context
@@ -425,6 +427,36 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         self._load_and_validate(
             Path(wf_path).resolve(), reachable_only=False, enforce_run_env=False)
 
+    #: 能力名 → 满足它的输入后端。并发输入只有 a11y 手势能落地：
+    #: ADB shell input 单指，keyevent 也不可能真正保持。
+    _CAPABILITY_BACKENDS = {
+        "device_gesture": {InputBackendKind.AGENT, InputBackendKind.A11Y},
+    }
+    #: 只在设备端才有意义的能力。跨端脚本声明 device_gesture 说的是"在安卓上我
+    #: 需要手势通道"，不是"我只能在安卓跑"——桌面运行时这条声明应当无所谓。
+    _DEVICE_ONLY_CAPABILITIES = frozenset({"device_gesture"})
+
+    def _enforce_required_capabilities(self, required: list[str]) -> None:
+        """加载期判定 ``#% requires``，不满足直接拒绝。
+
+        放在加载期而不是执行期：脚本要么能跑要么不能跑，不该跑到一半才发现
+        当前通道注入不了并发手势——那时角色已经被点到别处去了。
+        """
+        from ..metadata import CAPABILITIES
+        kind = getattr(self._input, "kind", InputBackendKind.UNKNOWN)
+        for name in required:
+            allowed = self._CAPABILITY_BACKENDS.get(name)
+            if allowed is None or kind in allowed:
+                continue
+            if name in self._DEVICE_ONLY_CAPABILITIES and not kind.is_device:
+                continue
+            raise WorkflowUserError(
+                f"本脚本要求 {CAPABILITIES.get(name, name)}，"
+                f"当前输入通道是 {kind.value}，无法执行。"
+                "请在「配置管理 → 基础配置 → 安卓输入」里选择「设备端手势」"
+                "并重新连接设备"
+            )
+
     def _load_and_validate(
         self,
         resolved: Path,
@@ -452,6 +484,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             raise WorkflowUserError(
                 f"check_env: 当前环境 {self.run_env!r} "
                 f"不在允许列表 {allowed_envs} 中，工作流中止")
+        if enforce_run_env:
+            self._enforce_required_capabilities(metadata.get("requires") or [])
         program = parse_file(resolved)
 
         # 解析 import 图：同一物理文件在本次加载中只处理一次，
@@ -1148,6 +1182,8 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 self._exec_call_proc(node)
             case Try():
                 self._exec_try(node)
+            case Timeline():
+                self._exec_timeline(node)
             case _:
                 logger.error(f"未知节点类型: {type(node).__name__}")
 

@@ -25,6 +25,12 @@ _TOP_LEVEL_FIELDS = {
     "batchable",
     "batch_check",
     "batch_unit_prepare",
+    "requires",
+}
+#: 脚本可声明的运行能力。声明的目的是**加载期就能判定**能不能跑，而不是跑到
+#: 那一条指令才失败——并发输入只有 a11y 手势能落地，ADB shell input 做不到。
+CAPABILITIES = {
+    "device_gesture": "设备端手势（安卓输入设为「设备端手势」）",
 }
 #: 脚本 id 是稳定逻辑标识，不是路径。首字符必须是 Unicode 字母，
 #: 后续允许 Unicode 字母、数字和下划线；中文脚本名属于合法 id。
@@ -207,6 +213,19 @@ def _validate_parameter(parameter: Any, index: int) -> dict | None:
     return normalized
 
 
+def _validate_requires(value: Any) -> None:
+    """requires 必须是已登记能力的列表。
+
+    拼错的能力名不能静默放行——那会让「声明了却没门禁」看起来一切正常。
+    """
+    if not isinstance(value, list) or not value:
+        raise _error("requires", "必须是非空列表")
+    for item in value:
+        if not isinstance(item, str) or item not in CAPABILITIES:
+            known = "、".join(sorted(CAPABILITIES))
+            raise _error("requires", f"未知能力 {item!r}；可用：{known}")
+
+
 def _validate_metadata(data: Any) -> dict:
     if not isinstance(data, dict):
         raise _error("根节点", "必须是键值映射")
@@ -221,6 +240,8 @@ def _validate_metadata(data: Any) -> dict:
         raise _error("name", "必须是非空字符串")
     if "env" in normalized:
         _validate_env_list(normalized["env"], "env")
+    if "requires" in normalized:
+        _validate_requires(normalized["requires"])
     if "id" in normalized and (
             not isinstance(normalized["id"], str)
             or SCRIPT_ID_RE.fullmatch(normalized["id"]) is None):
@@ -360,4 +381,5 @@ def build_flow_config(path: str | Path) -> dict:
         "scope": meta.get("scope") or "daily",
         "parameters": meta.get("parameters") or [],
         "env": meta.get("env") or [],
+        "requires": meta.get("requires") or [],
     }

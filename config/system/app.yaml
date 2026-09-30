@@ -73,3 +73,11 @@ plans:
   layout: android_cast
   modes:
   - windows
+- id: 7ce5dc50d0c547f8963ff5f834e1b6de
+  name: 端游全屏
+  space: 端游
+  env: desktop
+  layout: desktop_fullscreen
+  requires_admin: true
+  modes:
+  - windows

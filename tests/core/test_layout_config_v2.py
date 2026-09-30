@@ -64,10 +64,16 @@ def test_system_layout_keys_have_matching_layout_and_template_directories():
         (root / "config/system/layouts.yaml").read_text(encoding="utf-8"))
     entries = parse_layout_entries(doc)
 
-    assert list(entries) == ["android", "android_cast", "desktop"]
+    assert list(entries) == [
+        "android", "android_cast", "desktop", "desktop_fullscreen"]
     assert [entry.name for entry in entries.values()] == [
-        "安卓布局", "投屏布局", "桌面布局",
+        "安卓布局", "投屏布局", "桌面布局", "桌面全屏",
     ]
+    # 根布局各自拥有场景定义与模板目录
     for key in ("android", "desktop"):
         assert (root / "config/system/layouts" / key).is_dir()
         assert (root / "config/system/templates" / key).is_dir()
+    # 继承布局只有画布，区域实时读根布局——多出目录就说明它被当根布局标注过了
+    for key in ("android_cast", "desktop_fullscreen"):
+        assert entries[key].extends
+        assert not (root / "config/system/layouts" / key).exists()

@@ -14,6 +14,14 @@ from collections.abc import Callable
 from enum import Enum
 
 from ..core.config import InputSimConfig
+from .timeline import TimelineStep
+
+
+class TimelineUnsupported(RuntimeError):
+    """当前输入通道无法落地这条时间线。
+
+    单独一个类型，方便上层把它转成面向用户的改写建议——而不是当成后端故障。
+    """
 
 
 class InputBackendKind(str, Enum):
@@ -197,6 +205,33 @@ class InputBackend(ABC):
             pre_delay: 拖拽前延迟范围。None=使用默认 before_click_wait，(0,0)=不延迟。
             post_delay: 拖拽后延迟范围。None=使用默认 after_click_wait，(0,0)=不延迟。
         """
+
+    # ─── 输入时间线 ────────────────────────────────────────────
+    # 并发输入不是所有通道都做得到：桌面按键与鼠标各有独立状态；设备端只有
+    # a11y 手势能多路并发（ADB shell input 单指、keyevent 一次性）。所以这里给
+    # 默认拒绝而不是抽象方法——子类按自己真能落地的类型覆写，不支持的保持拒绝，
+    # 报错里要写清"换什么通道/怎么改写"，不静默降级。
+    #: 本后端能落地的时间线步骤类型
+    timeline_kinds: frozenset[str] = frozenset()
+
+    def run_timeline(self, steps: "list[TimelineStep]") -> None:
+        """按声明的偏移并发执行一组输入。
+
+        子类覆写前要保证：异常路径也必须释放已按下的键/抬起手指，否则角色会
+        一直往一个方向走。
+        """
+        raise TimelineUnsupported(
+            f"当前输入通道（{self.kind.value}）不支持输入时间线"
+        )
+
+    def check_timeline_kinds(self, steps: "list[TimelineStep]") -> None:
+        """子类覆写 run_timeline 时先调它，把不支持的步骤类型挡在下发之前。"""
+        unsupported = {s.kind for s in steps} - set(self.timeline_kinds)
+        if unsupported:
+            raise TimelineUnsupported(
+                f"当前输入通道（{self.kind.value}）不支持时间线里的"
+                f" {'、'.join(sorted(unsupported))} 类步骤"
+            )
 
     @abstractmethod
     def key_down(self, key: str) -> None:

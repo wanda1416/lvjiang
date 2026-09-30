@@ -453,6 +453,19 @@ class SendInputInput(InputBackend):
 
     # ─── 键盘 ─────────────────────────────────────────────────
 
+    # ─── 输入时间线 ────────────────────────────────────────
+    #: 只落地按键类步骤。触点类（多指并发）是设备端 a11y 的能力；端游的移动是
+    #: WASD 而不是鼠标拖拽，为它发明"并发鼠标拖拽"没有真实用例。
+    timeline_kinds = frozenset({"key"})
+
+    def run_timeline(self, steps) -> None:
+        """按声明的偏移并发下发按键；退出路径一律释放已按下的键。"""
+        from ..timeline import run_key_timeline, validate_timeline
+        self.check_timeline_kinds(steps)
+        validate_timeline(steps, touch=False)
+        run_key_timeline(
+            steps, self.key_down, self.key_up, stop_check=self.stop_check)
+
     def key_down(self, key: str) -> None:
         """按下按键（仅 keydown，不释放）
 

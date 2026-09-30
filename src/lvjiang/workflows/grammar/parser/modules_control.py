@@ -19,6 +19,8 @@ from ..ast_nodes import (
     Loop,
     ProcDef,
     Return,
+    Timeline,
+    TimelineEntry,
     Try,
     UntilLoop,
     VarRef,
@@ -265,6 +267,39 @@ class _ModuleControlMixin:
 
     def goto_stmt(self, items):
         return Goto(target=str(items[0]), line_no=self._line(items))
+
+    # ─── 输入时间线：timeline ────────────────────
+
+    def timeline_offset(self, items):
+        return items[0]
+
+    def timeline_entry(self, items):
+        """@<偏移> <输入语句> — 一路输入在时间线上的起点"""
+        offset, action = items[0], items[1]
+        # 带 wait_clauses 的语句会被展开成 [waits..., action, waits...] 列表。
+        # after wait 在块内是陷阱：时序由 @偏移 决定，写了也不会生效，
+        # 而"写了没生效"比不支持更难发现。直接拒绝并指出该用什么。
+        if isinstance(action, list):
+            raise WorkflowUserError(
+                f"第 {self._line(items)} 行：timeline 块内不能用 after wait，"
+                "各路的起跑时刻由 @偏移 决定；要表达持续时长请用 hold"
+            )
+        return TimelineEntry(
+            offset=offset, action=action, line_no=self._line(items))
+
+    def timeline_stmt(self, items):
+        """timeline ... end — 块内各路按偏移并发执行
+
+        偏移在这里排序一次，执行期不再排——排序属于"这个块长什么样"，
+        是解析产物的一部分。变量偏移无法在解析期比较，保持书写顺序。
+        """
+        entries = [i for i in items if isinstance(i, TimelineEntry)]
+        if not entries:
+            raise WorkflowUserError(
+                f"第 {self._line(items)} 行：timeline 块不能为空")
+        if all(isinstance(e.offset, (int, float)) for e in entries):
+            entries.sort(key=lambda e: e.offset)
+        return Timeline(entries=entries, line_no=self._line(items))
 
     # ─── 异常处理：try / catch ───────────────────
 

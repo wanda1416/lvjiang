@@ -202,15 +202,13 @@ class SceneEditorDialog(
         self._layout_combo.currentIndexChanged.connect(self._on_combo_changed)
         top_bar.addWidget(self._layout_combo)
 
-        self._btn_save = QPushButton(tr("保存"))
-        self._btn_save.clicked.connect(self._on_save_layout)
-        top_bar.addWidget(self._btn_save)
-
-        self._btn_discard = QPushButton(tr("放弃改动"))
-        self._btn_discard.clicked.connect(self._on_discard_layout_changes)
-        self._btn_discard.setEnabled(False)
-        self._btn_discard.setToolTip(tr("恢复当前布局最近一次保存的状态"))
-        top_bar.addWidget(self._btn_discard)
+        # 按作用对象分三组，组间留空隙：先是对「布局这个对象」的增删改，
+        # 再是对「当前改动」的存弃，最后才是画面与场景的编辑动作。
+        # 原先保存/放弃夹在下拉和新建之间，读起来像是在保存下拉框选的东西。
+        self._btn_edit = QPushButton(tr("编辑"))
+        self._btn_edit.setToolTip(tr("编辑当前布局的名称、描述与画布尺寸要求"))
+        self._btn_edit.clicked.connect(self._on_edit_layout_info)
+        top_bar.addWidget(self._btn_edit)
 
         self._btn_new = QPushButton(tr("新建"))
         self._btn_new.clicked.connect(self._on_new_layout)
@@ -223,6 +221,20 @@ class SceneEditorDialog(
         self._btn_delete = QPushButton(tr("删除"))
         self._btn_delete.clicked.connect(self._on_delete_layout)
         top_bar.addWidget(self._btn_delete)
+
+        top_bar.addSpacing(20)
+
+        self._btn_save = QPushButton(tr("保存"))
+        self._btn_save.clicked.connect(self._on_save_layout)
+        top_bar.addWidget(self._btn_save)
+
+        self._btn_discard = QPushButton(tr("放弃改动"))
+        self._btn_discard.clicked.connect(self._on_discard_layout_changes)
+        self._btn_discard.setEnabled(False)
+        self._btn_discard.setToolTip(tr("恢复当前布局最近一次保存的状态"))
+        top_bar.addWidget(self._btn_discard)
+
+        top_bar.addSpacing(20)
 
         # ── 分裂按钮：刷新截图 | + ──
         _split_widget = QWidget()
@@ -274,6 +286,7 @@ class SceneEditorDialog(
             self._btn_new_scene,
         )
         apply_button_style(
+            self._btn_edit,
             self._btn_discard,
             self._btn_refresh,
             self._btn_add_screenshot,

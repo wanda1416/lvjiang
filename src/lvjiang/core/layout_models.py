@@ -653,6 +653,10 @@ class Layout:
     name: str = ""
     desc: str = ""  # 描述性文本（来自 layouts.yaml，仅展示用）
     canvas: CanvasConfig = field(default_factory=CanvasConfig)
+    #: 画布裁剪后应有的宽高比（``20:9`` / ``2.22``），空串表示不校验；
+    #: 与 canvas 一样取自布局自身条目，继承布局不跟随根布局
+    aspect: str = ""
+    aspect_tolerance: float = 0.005
     regions: dict[str, list[Region]] = field(default_factory=dict)
     points: dict[str, list[Point]] = field(default_factory=dict)
     arrows: dict[str, list[Arrow]] = field(default_factory=dict)

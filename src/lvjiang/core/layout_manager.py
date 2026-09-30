@@ -25,6 +25,7 @@ from .config.resolver import get_resolver
 from .config.session import get_session_store
 from .key_validation import validate_layout_activation_keys
 from .layout_config import (
+    DEFAULT_ASPECT_TOLERANCE,
     LayoutEntry,
     load_layout_doc,
     load_layout_entries,
@@ -862,7 +863,13 @@ def load_layout_by_key(name: str) -> Layout | None:
     _drop_orphan_coords(regions, points)
     _expand_scene_references(regions, points, reference_positions)
 
+    # aspect 与 canvas 同源：都描述「这个布局怎么看画面」，取自身条目而非根布局
+    own_entry = layouts_doc.get(name) or {}
+    aspect = str(own_entry.get("aspect", "") or "")
+    tolerance = own_entry.get("aspect_tolerance", DEFAULT_ASPECT_TOLERANCE)
+
     return Layout(key=name, name=display_name, desc=desc, canvas=canvas,
+                  aspect=aspect, aspect_tolerance=float(tolerance),
                   regions=regions,
                   points=points, arrows=arrows, panels=panels,
                   crop_canvases=crop_canvases, subscene_refs=subscene_refs)
@@ -1238,6 +1245,16 @@ class LayoutConfigManager:
         elif existing.get("desc"):
             entry_out["desc"] = existing["desc"]
         entry_out["canvas"] = layout.canvas.to_dict()
+        # 与 desc 同理：内存布局没带就沿用清单里的旧值。清空要走布局信息编辑，
+        # 那条路径直接改清单——保存场景坐标顺手抹掉画布尺寸要求太容易了
+        if layout.aspect:
+            entry_out["aspect"] = layout.aspect
+        elif existing.get("aspect"):
+            entry_out["aspect"] = existing["aspect"]
+        if existing.get("aspect_tolerance") is not None:
+            entry_out["aspect_tolerance"] = existing["aspect_tolerance"]
+        elif layout.aspect_tolerance != DEFAULT_ASPECT_TOLERANCE:
+            entry_out["aspect_tolerance"] = layout.aspect_tolerance
         layouts_doc[layout.key] = entry_out
         try:
             save_layout_doc(merged, resolver)

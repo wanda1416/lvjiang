@@ -4,8 +4,10 @@ from loguru import logger
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
+    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -19,7 +21,13 @@ from ...core.config.resolver import (
     get_resolver,
 )
 from ...core.key_validation import validate_layout_activation_keys
-from ...core.layout_config import load_layout_doc
+from ...core.layout_config import (
+    DEFAULT_ASPECT_TOLERANCE,
+    MAX_ASPECT_TOLERANCE,
+    load_layout_doc,
+    parse_aspect_ratio,
+    save_layout_doc,
+)
 from ...core.layout_manager import (
     copy_screenshots,
     delete_screenshots,
@@ -80,6 +88,118 @@ class LayoutOpsMixin:
             )
             return None
         return key, name
+
+    def _on_edit_layout_info(self):
+        """编辑当前布局的清单信息：名称、描述、画布尺寸要求。
+
+        直接改 layouts.yaml，不走 save_layout：那条路径是「保存场景坐标」，会按
+        内存布局重建条目，清空 aspect 这类声明反而要靠它保留旧值，语义正好相反。
+        """
+        layout = self._current_layout
+        if layout is None:
+            return
+        doc = load_layout_doc()
+        entry = (doc.get("layouts") or {}).get(layout.key)
+        if not isinstance(entry, dict):
+            QMessageBox.warning(
+                self, tr("无法编辑"),  # type: ignore[arg-type]
+                tr("布局清单里找不到当前布局，请先保存布局"))
+            return
+
+        dialog = QDialog(self)  # type: ignore[arg-type]
+        dialog.setWindowTitle(tr("布局信息"))
+        box = QVBoxLayout(dialog)
+        form = QFormLayout()
+        name_input = QLineEdit(str(entry.get("name") or ""))
+        desc_input = QLineEdit(str(entry.get("desc") or ""))
+        desc_input.setPlaceholderText(tr("一句话说明这个布局用在什么画面上"))
+        desc_input.setToolTip(tr("显示在主界面布局下拉旁，过长会放不下"))
+        aspect_input = QLineEdit(str(entry.get("aspect") or ""))
+        aspect_input.setPlaceholderText(tr("例如 20:9 或 2.22，留空表示不校验"))
+        aspect_input.setToolTip(tr(
+            "画布裁剪后应有的宽高比。启动任务前会按它校验目标窗口/设备，"
+            "不符合就拒绝执行——形态错配不会报错，只会让坐标整体偏移。"))
+        tolerance_input = QDoubleSpinBox()
+        tolerance_input.setDecimals(2)
+        tolerance_input.setSingleStep(0.1)
+        tolerance_input.setSuffix(" %")
+        tolerance_input.setRange(0.01, MAX_ASPECT_TOLERANCE * 100)
+        tolerance_input.setValue(float(entry.get(
+            "aspect_tolerance", DEFAULT_ASPECT_TOLERANCE)) * 100)
+        tolerance_input.setToolTip(tr("允许的相对误差，默认 0.5%"))
+        form.addRow(tr("布局名称"), name_input)
+        form.addRow(tr("描述"), desc_input)
+        form.addRow(tr("画布尺寸"), aspect_input)
+        form.addRow(tr("允许误差"), tolerance_input)
+        box.addLayout(form)
+        hint = QLabel(tr("布局 key「{key}」创建后不可修改。").format(key=layout.key))
+        hint.setStyleSheet("color: palette(mid);")
+        box.addWidget(hint)
+
+        buttons = QHBoxLayout()
+        ok_button = QPushButton(tr("确定"))
+        cancel_button = QPushButton(tr("取消"))
+        apply_button_style(ok_button)
+        apply_button_style(cancel_button, variant="neutral")
+        fit_button_width(ok_button, cancel_button)
+        buttons.addStretch()
+        buttons.addWidget(ok_button)
+        buttons.addWidget(cancel_button)
+        box.addLayout(buttons)
+        ok_button.clicked.connect(dialog.accept)
+        cancel_button.clicked.connect(dialog.reject)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        name = name_input.text().strip()
+        if not name:
+            QMessageBox.warning(
+                self, tr("输入不完整"), tr("布局名称不能为空"))  # type: ignore[arg-type]
+            return
+        aspect = aspect_input.text().strip()
+        try:
+            parse_aspect_ratio(aspect)
+        except ValueError as exc:
+            QMessageBox.warning(
+                self, tr("画布尺寸无效"), str(exc))  # type: ignore[arg-type]
+            return
+
+        entry["name"] = name
+        if desc_input.text().strip():
+            entry["desc"] = desc_input.text().strip()
+        else:
+            entry.pop("desc", None)
+        if aspect:
+            entry["aspect"] = aspect
+            entry["aspect_tolerance"] = round(tolerance_input.value() / 100, 5)
+        else:
+            # 尺寸要求取消了，容差留着没有意义
+            entry.pop("aspect", None)
+            entry.pop("aspect_tolerance", None)
+        try:
+            save_layout_doc(doc)
+        except ValueError as exc:
+            QMessageBox.warning(
+                self, tr("保存失败"), str(exc))  # type: ignore[arg-type]
+            return
+        reloaded = self._manager.load_layout(layout.key)
+        if reloaded is not None:
+            reloaded.regions = layout.regions
+            reloaded.points = layout.points
+            reloaded.arrows = layout.arrows
+            reloaded.panels = layout.panels
+            reloaded.crop_canvases = layout.crop_canvases
+            reloaded.subscene_refs = layout.subscene_refs
+            reloaded.canvas = layout.canvas
+            self._current_layout = reloaded
+        self._refresh_combo()
+        idx = self._layout_combo.findData(layout.key)
+        if idx >= 0:
+            self._layout_combo.blockSignals(True)
+            self._layout_combo.setCurrentIndex(idx)
+            self._layout_combo.blockSignals(False)
+        self._update_ui_state()
+        self._status_bar.showMessage(tr("布局信息已保存"))
 
     def _validate_layout_keys_for_save(self, layout: Layout) -> bool:
         """保存前向用户展示具体的非法按键绑定。"""

@@ -262,7 +262,7 @@ class TestSchemaMigration:
 
         assert row[0] == MIGRATIONS[-1][0]
 
-    def test_shared_profile_schema_contract_stays_v5_without_app_id(
+    def test_shared_profile_schema_contract_stays_unscoped_without_app_id(
         self, db: ProfileDB
     ):
         """Profile 是跨插件共享数据，不按 app_id 分库或改表。"""
@@ -288,10 +288,48 @@ class TestSchemaMigration:
             )
         ]
 
-        assert CURRENT_VERSION == 5
+        assert CURRENT_VERSION == 6
         assert primary_key == ["username", "type", "key"]
         assert "app_id" not in entry_columns
         assert "app_id" not in history_columns
+
+    def test_cross_user_history_index_is_migrated(self, db: ProfileDB):
+        conn = db._connect()
+        try:
+            indexes = {
+                row[1] for row in conn.execute(
+                    "PRAGMA index_list(profile_history)"
+                ).fetchall()
+            }
+        finally:
+            conn.close()
+        assert "idx_history_type_key" in indexes
+
+    def test_migrate_v6_preserves_existing_history(self, tmp_path: Path):
+        db_path = tmp_path / "v5_profile.db"
+        db = ProfileDB(db_path)
+        db.upsert("u", "quota", "target", 7, change_type="action")
+        conn = db._connect()
+        try:
+            conn.execute("DROP INDEX idx_history_type_key")
+            conn.execute("DELETE FROM schema_version WHERE version = 6")
+            conn.commit()
+        finally:
+            conn.close()
+
+        migrated = ProfileDB(db_path)
+
+        conn = migrated._connect()
+        try:
+            indexes = {
+                row[1] for row in conn.execute(
+                    "PRAGMA index_list(profile_history)"
+                ).fetchall()
+            }
+        finally:
+            conn.close()
+        assert "idx_history_type_key" in indexes
+        assert migrated.get_history("u", "quota", "target")[0]["new_value"] == 7
 
     def test_reopen_is_idempotent(self, tmp_path: Path):
         """重复打开同一 DB 不报错（幂等性）"""

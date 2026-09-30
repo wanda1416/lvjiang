@@ -877,6 +877,11 @@ class RunControlMixin:
             self.statusBar().showMessage(admin_error)
             self._show_workflow_start_error(admin_error)
             return False
+        aspect_error = self._layout_aspect_error()
+        if aspect_error:
+            self.statusBar().showMessage(aspect_error)
+            self._show_workflow_start_error(aspect_error)
+            return False
         self._stop_requested = False
         self._run_state = "running"
         # 暂停事件：set=运行，clear=暂停阻塞
@@ -916,6 +921,60 @@ class RunControlMixin:
             "Windows 会阻止低权限进程向高权限游戏窗口发送点击和键盘输入。"
             "请关闭律匠，右键选择「以管理员身份运行」，然后重新执行。"
         ).format(name=plan.name)
+
+    def _layout_aspect_error(self) -> str:
+        """返回画布宽高比不符合布局声明的说明；空串表示通过。
+
+        布局声明了画布尺寸（如 20:9）却对不上，说明目标窗口或设备的画面形态跟这个
+        布局压根不是一路的——最典型的是端游窗口模式选了「桌面全屏」，或者设备不是
+        20:9。这种错配不会报错，只会让所有坐标整体偏移，所以在启动前拦住。
+
+        未声明尺寸、未定位窗口、拿不到截图尺寸时一律放行：门禁只拦已知的错配，
+        不拦「还不知道」。
+        """
+        from ...core.layout_config import canvas_aspect_deviation
+
+        key = self.layout_combo.currentData()
+        if not key:
+            return ""
+        layout = self._layout_manager.load_layout(key)
+        if layout is None or not layout.aspect:
+            return ""
+        from ...core.layout_config import parse_aspect_ratio
+        try:
+            expected = parse_aspect_ratio(layout.aspect)
+        except ValueError:
+            return ""
+        if expected is None:
+            return ""
+        capture = getattr(self, "_capture", None)
+        if capture is None:
+            return ""
+        try:
+            width, height = capture.get_capture_size()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"取截图尺寸失败，跳过画布尺寸校验: {exc}")
+            return ""
+        canvas = layout.canvas
+        canvas_w = canvas.w_ratio * float(width)
+        canvas_h = canvas.h_ratio * float(height)
+        deviation = canvas_aspect_deviation(expected, canvas_w, canvas_h)
+        if deviation is None or deviation <= layout.aspect_tolerance:
+            return ""
+        return tr(
+            "当前布局画布区域尺寸不符合预定义要求，请修改布局后重试。\n\n"
+            "布局「{layout}」要求画布宽高比 {expected}，"
+            "当前画布为 {width}×{height}（比例 {actual}），偏差 {deviation}，"
+            "超出允许的 {tolerance}。"
+        ).format(
+            layout=layout.name,
+            expected=layout.aspect,
+            width=round(canvas_w),
+            height=round(canvas_h),
+            actual=f"{canvas_w / canvas_h:.4f}",
+            deviation=f"{deviation * 100:.2f}%",
+            tolerance=f"{layout.aspect_tolerance * 100:.2f}%",
+        )
 
     def _end_automation(self, name: str):
         """结束自动化，恢复 UI 状态。由工作流线程实际结束后调用。"""

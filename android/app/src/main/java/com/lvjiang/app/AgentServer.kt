@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object AgentServer {
 
     const val SOCKET_NAME = "lvjiang-agent"
-    const val PROTOCOL_VERSION = 2
+    const val PROTOCOL_VERSION = 3
 
     private const val TAG = "AgentServer"
 
@@ -228,6 +228,7 @@ object AgentServer {
         "long_press" -> longPress(req)
         "swipe" -> swipe(req)
         "hold_move" -> holdMove(req)
+        "gesture" -> gesture(req)
         "key" -> key(req)
         "shell" -> shell(req)
         "calib_get" -> ok(calibInfo())
@@ -446,6 +447,43 @@ object AgentServer {
             gestureResult(via, A11yBridge.holdMove(x1, y1, x2, y2, moveMs, holdMs), "推住")
         } else {
             shellResult(via, ShellBridge.swipe(x1, y1, x2, y2, (moveMs + holdMs).toInt()))
+        }
+    }
+
+    /**
+     * 输入时间线：多路触点一次并发下发，只有无障碍通道能做到。
+     *
+     * shell/ADB 走的是 `input`，单指且无法交错两个 pointer，所以这里直接报错
+     * 而不是拆成多次顺序注入——顺序执行冒充并发，现象是"脚本点了没反应"，
+     * 比明确失败难查得多。
+     */
+    private fun gesture(req: JSONObject): Pair<JSONObject, ByteArray?> = withVia(req) { via ->
+        if (via != "a11y") {
+            fail("输入时间线只能走无障碍通道，当前为 $via")
+        } else {
+            val arr = req.optJSONArray("strokes")
+            if (arr == null || arr.length() == 0) {
+                fail("strokes 为空")
+            } else {
+                val strokes = ArrayList<TimelineStroke>(arr.length())
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val pts = o.getJSONArray("points")
+                    val a = pts.getJSONArray(0)
+                    val b = if (pts.length() > 1) pts.getJSONArray(1) else a
+                    strokes.add(
+                        TimelineStroke(
+                            startMs = o.optLong("start_ms", 0),
+                            moveMs = o.optLong("move_ms", 0),
+                            holdMs = o.optLong("hold_ms", 0),
+                            x1 = a.getInt(0), y1 = a.getInt(1),
+                            x2 = b.getInt(0), y2 = b.getInt(1),
+                        ),
+                    )
+                }
+                val error = A11yBridge.timeline(strokes)
+                if (error == null) ok(JSONObject().put("via", via)) else fail(error)
+            }
         }
     }
 

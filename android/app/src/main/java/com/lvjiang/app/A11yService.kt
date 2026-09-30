@@ -78,6 +78,20 @@ class A11yService : AccessibilityService() {
  * 注意 Kotlin object 在 Chaquopy 里要走 A11yBridge.INSTANCE：编译后那些方法
  * 仍是实例方法，挂在编译器生成的 INSTANCE 静态字段上。
  */
+/**
+ * 时间线上的一路触点。字段与 PC 协议的 `gesture.strokes[]` 一一对应，
+ * 不在两端各起一套名字。
+ */
+data class TimelineStroke(
+    val startMs: Long,
+    val moveMs: Long,
+    val holdMs: Long,
+    val x1: Int,
+    val y1: Int,
+    val x2: Int,
+    val y2: Int,
+)
+
 object A11yBridge {
 
     private const val TAG = "A11yBridge"
@@ -263,6 +277,80 @@ object A11yBridge {
         }
         val dwellStroke = moveStroke.continueStroke(dwellPath, 0, holdMs, false)
         return dispatchAndWait(service, dwellStroke, holdMs)
+    }
+
+    /**
+     * 输入时间线：若干路触点各自在时间线上的起点，一次性并发下发。
+     *
+     * 关键是**一个** GestureDescription 装多条 stroke——同属一个手势才是真并发，
+     * 拆成多次 dispatch 就退化成顺序执行，而 PC 侧看到的仍是"并发已生效"。
+     * 每条 stroke 的 startTime 相对手势起点，系统按帧调度。
+     *
+     * 整组原子：任一路非法或被真实触摸打断，回调都是整组 onCancelled，不会留下
+     * "一根手指还按着"的半截状态。所以这里也不做部分成功的返回。
+     *
+     * strokes 每项：startMs / moveMs / holdMs / (x1,y1) / (x2,y2)。落地方式见下面
+     * 循环里的注释——时间线里的推杆是"直接按在目标点上保持"，没有滑动过程。
+     * 未在真机验证：多路并发能否被游戏接受、本机 getMaxStrokeCount 的实际值，
+     * 用 `python -m lvjiang.core.android.gesture_probe` 单独测。
+     */
+    fun timeline(strokes: List<TimelineStroke>): String? {
+        val service = A11yService.instance ?: return "无障碍服务未连接"
+        if (strokes.isEmpty()) return "时间线没有任何步骤"
+        val maxStrokes = android.accessibilityservice.GestureDescription.getMaxStrokeCount()
+        if (strokes.size > maxStrokes) {
+            return "时间线有 ${strokes.size} 路触点，本机同时可注入上限为 $maxStrokes"
+        }
+        val maxDuration =
+            android.accessibilityservice.GestureDescription.getMaxGestureDuration()
+        val span = strokes.maxOf { it.startMs + it.moveMs + it.holdMs }
+        if (span > maxDuration) {
+            return "时间线总长 ${span}ms 超过本机单次手势上限 ${maxDuration}ms"
+        }
+
+        val builder = android.accessibilityservice.GestureDescription.Builder()
+        for (s in strokes) {
+            val b = ScreenMap.mapPoint(s.x2, s.y2)
+            // 一条 stroke 只能匀速走完整条 path，表达不了"滑到位再停住"；而
+            // continueStroke 的续接段要另起一次 dispatchGesture（holdMove 就是
+            // 那么做的），放进同一个 GestureDescription 就不是并发了。
+            //
+            // 所以时间线里的推杆取**直接按在目标点上并保持**：手指整段时间都在
+            // 推满的位置，这正是"推到位停住"要的效果，只是没有滑动过程。
+            // moveMs 因此并入总时长而不单独插值。
+            val duration = (s.moveMs + s.holdMs).coerceAtLeast(1)
+            val path = Path().apply { moveTo(b[0].toFloat(), b[1].toFloat()) }
+            builder.addStroke(
+                android.accessibilityservice.GestureDescription
+                    .StrokeDescription(path, s.startMs, duration),
+            )
+        }
+
+        val gesture = try {
+            builder.build()
+        } catch (e: IllegalStateException) {
+            return "时间线手势非法: ${e.message}"
+        }
+        val latch = CountDownLatch(1)
+        var completed = false
+        val ok = service.dispatchGesture(
+            gesture,
+            object : AccessibilityService.GestureResultCallback() {
+                override fun onCompleted(description: android.accessibilityservice.GestureDescription?) {
+                    completed = true
+                    latch.countDown()
+                }
+
+                override fun onCancelled(description: android.accessibilityservice.GestureDescription?) {
+                    Log.w(TAG, "时间线手势被取消")
+                    latch.countDown()
+                }
+            },
+            null,
+        )
+        if (!ok) return "dispatchGesture 返回 false（服务未就绪或手势非法）"
+        latch.await(span + 2000, TimeUnit.MILLISECONDS)
+        return if (completed) null else "时间线手势未完成（可能被真实触摸取消）"
     }
 
     /** 系统全局动作：BACK / HOME（对应 Python 侧 press "ESC" / press "HOME"） */

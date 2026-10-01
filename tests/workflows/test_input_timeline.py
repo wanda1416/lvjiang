@@ -251,6 +251,7 @@ class TestCompiler:
                 return int(cx * 1000), int(cy * 1000)
 
         class _Host(_TimelineMixin):
+            run_env = "desktop"
             _layout = _Layout()
             variables: dict = {}
             _input = SimpleNamespace()
@@ -326,3 +327,53 @@ class TestCompiler:
         with pytest.raises(WorkflowUserError, match="未在当前布局绑定"):
             self._compile(
                 "timeline\n    @0.0  click [general_combat].[nope]\nend\n")
+
+
+class TestEnvGuard:
+    """条目级 env 守卫：两端只有一两路不同时，共享的其余几路不必复制一遍"""
+
+    def test_parses_guard_after_offset(self):
+        prog = parse_text(
+            "timeline\n"
+            "    @0.0  env:\"desktop\" -> press \"S\" hold 2.4\n"
+            "    @0.0  env:\"android\" -> drag [general_move].[move_backward] "
+            "duration 0.1 hold 2.4\n"
+            "    @0.4  click [general_combat].[tiaoyue]\n"
+            "end\n")
+        entries = prog.body[0].entries
+        assert [e.env for e in entries] == ["desktop", "android", ""]
+
+    def test_filters_by_run_env(self):
+        """不匹配的那一路编译期就被过滤掉，根本不生成步骤。"""
+        host = TestCompiler._host()
+        src = ("timeline\n"
+               "    @0.0  env:\"desktop\" -> press \"S\" hold 2.4\n"
+               "    @0.0  env:\"android\" -> drag [general_move]."
+               "[move_backward] duration 0.1 hold 2.4\n"
+               "    @0.4  click [general_combat].[tiaoyue]\n"
+               "end\n")
+        node = parse_text(src).body[0]
+
+        host.run_env = "desktop"
+        kept = [e for e in node.entries if not e.env or e.env == host.run_env]
+        steps = [host._compile_timeline_entry(e) for e in kept]
+        assert [s.kind for s in steps] == ["key", "key"]
+        assert steps[0].key == "S"
+
+        host.run_env = "android"
+        kept = [e for e in node.entries if not e.env or e.env == host.run_env]
+        steps = [host._compile_timeline_entry(e) for e in kept]
+        assert [s.kind for s in steps] == ["touch", "key"]
+
+    def test_rejects_empty_env_name(self):
+        problems = check_syntax(
+            "timeline\n    @0.0  env:\"\" -> press \"S\" hold 1\n" "end\n")
+        assert problems and "环境名" in problems[0]
+
+    def test_guard_still_rejects_non_input_statements(self):
+        """守卫不是后门：块内仍然只允许输入类语句。"""
+        problems = check_syntax(
+            "timeline\n"
+            "    @0.0  env:\"desktop\" -> scan [a].[b] as $x by contains \"x\"\n"
+            "end\n")
+        assert problems

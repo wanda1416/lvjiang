@@ -367,9 +367,13 @@ class Global:
 
 @dataclass(frozen=True)
 class TimelineEntry:
-    """时间线上的一路输入：``offset`` 是相对块起点的绝对偏移（秒）"""
+    """时间线上的一路输入：``offset`` 是相对块起点的绝对偏移（秒）
+
+    ``env`` 非空表示这一路只在该工作环境生效，编译期按 run_env 过滤。
+    """
     offset: Any
     action: Any
+    env: str = ""
     line_no: int = 0
 
 

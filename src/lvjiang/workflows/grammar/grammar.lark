@@ -429,9 +429,17 @@ goto_stmt: "goto"i NAME _NL
 // 块内只允许输入类语句：scan/find/if/loop/call 一律在此报解析错误，错误直接指向
 // 那一行。允许识别就等于承认时序会漂，而「看着严格、实际漂移」比不支持更糟。
 // 边界与各后端落地见 docs/20-requirements/15-input-timeline.md。
+// 条目可带环境守卫，复用单行守卫那串 token：两端只有一两路不同时，共享的其余
+// 几路不必跟着复制一遍（复制正是漂移的来源）。守卫写在偏移之后，时间列保持对齐。
+//     @0.0  env:"desktop" -> press "S" hold 2.4
+//     @0.0  env:"android" -> drag [general_move].[move_backward] hold 2.4
+// 它是**编译期**选择：run_env 在块开始前就定了，过滤不消耗时间预算。这也是为什么
+// 守卫可以进来而 `if` 不行——后者的条件可以调 OCR。
 timeline_stmt: "timeline"i _NL (_NL | timeline_entry)* "end"i _NL
-timeline_entry: "@" timeline_offset timeline_action
+timeline_entry: "@" timeline_offset timeline_entry_action
 timeline_offset: number | var_ref | wait_range
+?timeline_entry_action: timeline_action | timeline_env_guard
+timeline_env_guard: "env"i ":" STRING "->" timeline_action
 ?timeline_action: click_stmt | drag_stmt | press_stmt | place_stmt
 
 // try/catch：异常处理

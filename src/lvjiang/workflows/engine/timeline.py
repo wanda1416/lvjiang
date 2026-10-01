@@ -4,10 +4,15 @@
 不执行。这不是洁癖——a11y 多 stroke 手势任一路失败是整组取消，半截状态会留下
 "摇杆推住了、点击没落地而手指还按着"，比不执行糟得多。
 
-跨端差异不在块内解决：块内禁止 `if`，所以桌面与设备端的不同打法要拆成两个
-timeline 块放在 `is_device()` 分支下。原因见 docs/20-requirements/15-input-timeline.md，
-简单说是——移动在两端不是"同一动作换绑定"，桌面按 WASD、设备推摇杆，arrow 没有
-activation_key，`drag` 在桌面不会转成按键。
+跨端差异用条目级的 `env:` 守卫表达，不必把整块复制两份：
+
+    @0.0  env:"desktop" -> press "S" hold 2.4
+    @0.0  env:"android" -> drag [general_move].[move_backward] hold 2.4
+    @0.4  click [general_combat].[tiaoyue]
+
+守卫是编译期选择（run_env 在块开始前已定），所以它不威胁时序；`if` 仍然禁止，
+因为它的条件可以调 OCR。移动之所以非分不可：桌面按 WASD、设备推摇杆，不是"同一
+动作换绑定"——arrow 没有 activation_key，`drag` 在桌面不会转成按键。
 """
 
 from __future__ import annotations
@@ -33,7 +38,11 @@ class _TimelineMixin:
     """timeline 块的编译与执行"""
 
     def _exec_timeline(self, node: Timeline) -> None:
-        steps = [self._compile_timeline_entry(entry) for entry in node.entries]
+        # 环境守卫在编译期过滤：run_env 在块开始前就定了，所以它不消耗时间预算，
+        # 这也是守卫能进块、而 `if`（条件可以调 OCR）不能的分界。
+        entries = [e for e in node.entries
+                   if not e.env or e.env == self.run_env]
+        steps = [self._compile_timeline_entry(entry) for entry in entries]
         logger.info(f"[时间线] {describe_timeline(steps)}")
         try:
             self._input.run_timeline(steps)

@@ -724,50 +724,66 @@ class _ActionsMixin:
         )
         self.press_keys(keys, mode=node.mode, duration=duration)
 
-    def _resolve_hold_duration(self, value, command: str) -> float:
-        """解析固定或区间 hold；click/press 共用同一套严格校验。"""
+    def _resolve_hold_duration(
+        self, value, command: str, *,
+        term: str = "hold", noun: str = "", allow_zero: bool = False,
+    ) -> float:
+        """解析固定或区间时长；click/press/timeline 共用同一套严格校验。
+
+        Args:
+            term: 出现在报错里的术语。时间线的 ``@偏移`` 与 hold 是两回事，
+                消息里不能都叫 hold。
+            noun: 标量报错里的完整名词，默认 ``"<term> 时长"``。hold 说的是
+                时长，而时间线的偏移不是，所以让调用方给出准确说法。
+            allow_zero: 允许 0。hold 为 0 等于没按，是写错；而偏移 0 就是
+                "本块一开始"，是最常见的第一条。
+        """
+        noun = noun or f"{term} 时长"
         resolved = self._resolve(value)
         if isinstance(resolved, tuple):
             if len(resolved) != 2:
                 raise WorkflowUserError(
-                    f"{command} hold 区间必须正好包含两个数值，"
+                    f"{command} {term} 区间必须正好包含两个数值，"
                     f"实际得到: {resolved!r}")
             lo_raw, hi_raw = resolved
             if (isinstance(lo_raw, bool) or isinstance(hi_raw, bool)
                     or not isinstance(lo_raw, (int, float))
                     or not isinstance(hi_raw, (int, float))):
                 raise WorkflowUserError(
-                    f"{command} hold 区间元素必须是数值，"
+                    f"{command} {term} 区间元素必须是数值，"
                     f"实际得到: {resolved!r}")
             lo, hi = float(lo_raw), float(hi_raw)
             if not math.isfinite(lo) or not math.isfinite(hi):
                 raise WorkflowUserError(
-                    f"{command} hold 区间端点必须是有限数值，"
+                    f"{command} {term} 区间端点必须是有限数值，"
                     f"实际得到: ({lo}, {hi})")
-            if lo <= 0 or hi <= 0:
+            invalid = (lo < 0 or hi < 0) if allow_zero else (lo <= 0 or hi <= 0)
+            if invalid:
+                limit = ">= 0" if allow_zero else "> 0"
                 raise WorkflowUserError(
-                    f"{command} hold 区间端点必须 > 0，"
+                    f"{command} {term} 区间端点必须 {limit}，"
                     f"实际得到: ({lo}, {hi})")
             if lo > hi:
                 raise WorkflowUserError(
-                    f"{command} hold 区间下限不能大于上限，"
+                    f"{command} {term} 区间下限不能大于上限，"
                     f"实际得到: ({lo}, {hi})")
             duration = random.uniform(lo, hi)
             logger.debug(
-                f"{command} hold 随机区间 ({lo}, {hi}) → {duration:.4f}s")
+                f"{command} {term} 随机区间 ({lo}, {hi}) → {duration:.4f}s")
             return duration
 
         if isinstance(resolved, bool) or not isinstance(resolved, (int, float)):
             raise WorkflowUserError(
-                f"{command} hold 时长必须是数值或二元数值 tuple，"
+                f"{command} {term} 时长必须是数值或二元数值 tuple，"
                 f"实际得到: {resolved!r}")
         duration = float(resolved)
         if not math.isfinite(duration):
             raise WorkflowUserError(
-                f"{command} hold 时长必须是有限数值，得到 {duration}")
-        if duration <= 0:
+                f"{command} {term} 时长必须是有限数值，得到 {duration}")
+        if duration < 0 or (duration == 0 and not allow_zero):
+            limit = ">= 0" if allow_zero else "> 0"
             raise WorkflowUserError(
-                f"{command} hold 时长必须 > 0，得到 {duration}")
+                f"{command} {noun}必须 {limit}，得到 {duration}")
         return duration
 
     def press_key(self, key: str) -> None:

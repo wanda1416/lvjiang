@@ -42,7 +42,7 @@ def test_system_general_combat_is_prominent_single_view_scene(tmp_path):
         *(region.key for region in combat.regions),
         *(point.key for point in combat.points),
     }
-    assert {"switch", "wuxueji", "qishu", "xuli", "bow"} <= combat_keys
+    assert {"weapon", "wuxueji", "qishu", "xuli", "bow"} <= combat_keys
     assert not combat_keys.intersection(
         {region.key for region in control.regions}
         | {point.key for point in control.points}

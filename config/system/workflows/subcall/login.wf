@@ -1,3 +1,5 @@
+#% name: 登录子过程集合
+
 # 登录页切换账号、选择角色及退出登录的公共过程。
 
 import "subcall/navigation.wf"

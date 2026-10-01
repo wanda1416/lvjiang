@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-
 from .key_names import KNOWN_PRESS_NAMES, normalize_pressable
 from .layout_models import Layout
 
@@ -20,36 +18,22 @@ def validate_layout_activation_keys(
     layout: Layout,
     scene_keys: set[str] | None = None,
 ) -> None:
-    """校验布局中区域和坐标点绑定的所有按键。
+    """校验布局中区域和坐标点绑定的所有按键是否是合法键名。
 
-    ``scene_keys`` 为 ``None`` 时校验整个布局。发现问题时一次列出
-    全部非法或同视图重复绑定，供 UI 与非 UI 保存入口共用。
+    ``scene_keys`` 为 ``None`` 时校验整个布局，发现问题时一次列出全部非法绑定，
+    供 UI 与非 UI 保存入口共用。
+
+    **不禁止同一视图内重复绑定**：绑定方向是「区域 → 按键」，一个区域用哪个键
+    激活与别的区域无关，同一个键服务多个区域是真实存在的——暗杀和拾取都用 F，
+    它们是同一画面上两个不同的区域（各有自己的 OCR 范围），只是共用触发键。
+    反过来「按键 → 区域」才需要唯一，而布局里没有这个方向的查询。
     """
     problems: list[str] = []
-    bindings: dict[tuple[str, str, str], list[str]] = defaultdict(list)
-    # 延迟导入避免 key_validation 与 layout_manager/scene_registry
-    # 在模块初始化期形成循环依赖。
-    from .scene_definition_models import BASE_VIEW_KEY
-    from .scene_registry import get_registry
-
-    registry = get_registry()
     mappings = (("区域", layout.regions), ("坐标", layout.points))
     for kind, scenes in mappings:
         for scene_key, items in scenes.items():
             if scene_keys is not None and scene_key not in scene_keys:
                 continue
-            scene = registry.get_scene(scene_key)
-            definitions = (
-                scene.regions if kind == "区域" else scene.points
-            ) if scene else []
-            view_by_key = {item.key: item.view for item in definitions}
-            if scene:
-                # 跨场景引用展开后的坐标属于当前场景，但其视图归属由
-                # SceneRefDef 声明；不能因为本地 definitions 中没有它就
-                # 回退到 base，否则会把不同视图的快捷键误判为冲突。
-                view_by_key.update({
-                    ref.entity: ref.view for ref in scene.references
-                })
             for item in items:
                 key_name = getattr(item, "activation_key", "")
                 if not key_name:
@@ -60,21 +44,11 @@ def validate_layout_activation_keys(
                     )
                     continue
                 try:
-                    normalized = validate_key_name(key_name)
+                    validate_key_name(key_name)
                 except ValueError:
                     problems.append(
                         f"[{scene_key}].[{item.key}] {kind}绑定 {key_name!r}"
                     )
                     continue
-                view = view_by_key.get(item.key) or BASE_VIEW_KEY
-                bindings[(scene_key, view, normalized)].append(
-                    f"{kind} [{item.key}]"
-                )
-    for (scene_key, view, key_name), targets in bindings.items():
-        if len(targets) > 1:
-            problems.append(
-                f"[{scene_key}] 视图 [{view}] 按键 {key_name} 重复绑定 "
-                + "、".join(targets)
-            )
     if problems:
         raise ValueError("布局按键绑定无效：" + "、".join(problems))

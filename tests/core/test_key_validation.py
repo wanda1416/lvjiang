@@ -15,14 +15,28 @@ def _region(key: str) -> Region:
     )
 
 
-def test_same_key_is_rejected_within_same_scene_view():
+def test_same_key_is_allowed_within_same_scene_view():
+    """绑定方向是「区域 → 按键」，同一个键服务多个区域是真实存在的。
+
+    暗杀和拾取都用 F：同一画面上两个不同区域（各有自己的 OCR 范围），只是共用
+    触发键。需要唯一的是反方向的「按键 → 区域」，而布局里没有这个查询。
+    """
     layout = Layout(
         regions={
             "training_xinfa": [_region("purchase"), _region("sanben_1")],
         }
     )
 
-    with pytest.raises(ValueError, match="zhihuan.*SPACE.*purchase.*sanben_1"):
+    validate_layout_activation_keys(layout)
+
+
+def test_invalid_key_name_is_still_rejected():
+    """放开重复不等于放开乱写：键名仍要能被 press 认出来。"""
+    region = _region("purchase")
+    region.activation_key = "NOT_A_KEY"
+    layout = Layout(regions={"training_xinfa": [region]})
+
+    with pytest.raises(ValueError, match="NOT_A_KEY"):
         validate_layout_activation_keys(layout)
 
 

@@ -128,7 +128,10 @@ class ParameterEditor(QWidget):
         self._loading = False
         self._selected_index = -1
         layout = QVBoxLayout(self)
-        bar = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        selector = QWidget()
+        bar = QHBoxLayout(selector)
+        bar.setContentsMargins(0, 0, 0, 0)
         self.list = QListWidget()
         self.list.setMinimumHeight(110)
         bar.addWidget(self.list, 1)
@@ -147,10 +150,17 @@ class ParameterEditor(QWidget):
         fit_button_width(*list_buttons)
         buttons.addStretch()
         bar.addLayout(buttons)
-        layout.addLayout(bar)
+        selector_form = QFormLayout()
+        selector_form.setContentsMargins(0, 0, 0, 0)
+        selector_form.setLabelAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        selector_form.addRow(tr("参数定义"), selector)
+        layout.addLayout(selector_form)
 
         self.details = QWidget()
         form = QFormLayout(self.details)
+        form.setContentsMargins(0, 0, 0, 0)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self._form = form
         self.name = QLineEdit()
         self.label = ExpandableText()
@@ -591,6 +601,7 @@ class MetadataPanel(QWidget):
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         content = QWidget()
         form = QFormLayout(content)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self.location_row = QWidget()
         location_layout = QHBoxLayout(self.location_row)
         location_layout.setContentsMargins(0, 0, 0, 0)
@@ -653,7 +664,7 @@ class MetadataPanel(QWidget):
         self.edit_batch_check = QLineEdit()
         form.addRow(tr("批量检查"), self.edit_batch_check)
         self.parameters = ParameterEditor()
-        form.addRow(tr("参数定义"), self.parameters)
+        form.addRow(self.parameters)
         scroll.setWidget(content)
         root.addWidget(scroll, 1)
         actions = QHBoxLayout()

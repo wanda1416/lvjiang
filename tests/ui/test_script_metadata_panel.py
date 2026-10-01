@@ -422,7 +422,8 @@ def test_developer_save_respects_layer_and_migrates(qtbot, tmp_path, monkeypatch
 
     widget.editor.insertPlainText("\n# 本地修改")
     widget._on_save()
-    assert "本地修改" in (tmp_path / "local/workflows/demo.wf").read_text()
+    assert "本地修改" in (tmp_path / "local/workflows/demo.wf").read_text(
+        encoding="utf-8")
     assert not (tmp_path / "system/workflows/demo.wf").exists()
     widget._dirty = False
 

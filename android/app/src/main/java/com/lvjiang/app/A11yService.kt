@@ -93,6 +93,12 @@ data class TimelineStroke(
 )
 
 object A11yBridge {
+    /** 保持段微动的最小振幅（像素）：再小就会被触摸去抖滤掉 */
+    private const val MIN_WIGGLE_PX = 2f
+
+    /** 微动段数上限：路程换时间，但别让 PathMeasure 背上几千段 */
+    private const val MAX_WIGGLE_SEGMENTS = 800f
+
 
     private const val TAG = "A11yBridge"
 
@@ -310,19 +316,12 @@ object A11yBridge {
 
         val builder = android.accessibilityservice.GestureDescription.Builder()
         for (s in strokes) {
+            val a = ScreenMap.mapPoint(s.x1, s.y1)
             val b = ScreenMap.mapPoint(s.x2, s.y2)
-            // 一条 stroke 只能匀速走完整条 path，表达不了"滑到位再停住"；而
-            // continueStroke 的续接段要另起一次 dispatchGesture（holdMove 就是
-            // 那么做的），放进同一个 GestureDescription 就不是并发了。
-            //
-            // 所以时间线里的推杆取**直接按在目标点上并保持**：手指整段时间都在
-            // 推满的位置，这正是"推到位停住"要的效果，只是没有滑动过程。
-            // moveMs 因此并入总时长而不单独插值。
             val duration = (s.moveMs + s.holdMs).coerceAtLeast(1)
-            val path = Path().apply { moveTo(b[0].toFloat(), b[1].toFloat()) }
             builder.addStroke(
                 android.accessibilityservice.GestureDescription
-                    .StrokeDescription(path, s.startMs, duration),
+                    .StrokeDescription(strokePath(a, b, s), s.startMs, duration),
             )
         }
 
@@ -351,6 +350,51 @@ object A11yBridge {
         if (!ok) return "dispatchGesture 返回 false（服务未就绪或手势非法）"
         latch.await(span + 2000, TimeUnit.MILLISECONDS)
         return if (completed) null else "时间线手势未完成（可能被真实触摸取消）"
+    }
+
+    /**
+     * 时间线单路触点的路径：起终点相同是按住不动，否则"快速推到位 + 保持"。
+     *
+     * 为什么不能只按在终点上：游戏的摇杆**没有固定区域**，第一个触点就是中心，
+     * 方向看之后手势往哪动。零位移的触点等于只给了个中心、没给方向，游戏会拿下
+     * 一个触点（比如跳跃键）去猜方向——实测表现成"往前跳"，而脚本要的是后退。
+     *
+     * 为什么不能靠 continueStroke：续接段必须另起一次 dispatchGesture
+     * （holdMove 就是那么做的），放进同一个 GestureDescription 就不是并发了。
+     *
+     * 所以保持段用**贴着终点沿同一轴的往复微动**把时间填满。一条 stroke 按弧长
+     * 匀速插值，时间正比于路程：把微动路程设成推进路程的 hold/move 倍，推进段就
+     * 正好占 moveMs、其余时间都在终点附近。振幅只有几像素，方向不变、幅度几乎
+     * 不变，等效于推住。
+     */
+    private fun strokePath(a: IntArray, b: IntArray, s: TimelineStroke): Path {
+        val path = Path()
+        path.moveTo(a[0].toFloat(), a[1].toFloat())
+        val dx = (b[0] - a[0]).toFloat()
+        val dy = (b[1] - a[1]).toFloat()
+        val dist = Math.hypot(dx.toDouble(), dy.toDouble()).toFloat()
+        if (dist < 1f) {
+            // 起终点重合：按住不动，单点 path 的时长就是按住时长
+            return path
+        }
+        path.lineTo(b[0].toFloat(), b[1].toFloat())
+        if (s.holdMs <= 0) return path
+
+        val moveMs = s.moveMs.coerceAtLeast(1)
+        val wiggleLen = dist * s.holdMs.toFloat() / moveMs.toFloat()
+        // 段数设上限：路程换时间需要很多小段，但 PathMeasure 不该背上几千段
+        val amplitude = Math.max(
+            MIN_WIGGLE_PX, Math.ceil((wiggleLen / MAX_WIGGLE_SEGMENTS).toDouble()).toFloat(),
+        )
+        val segments = Math.ceil((wiggleLen / amplitude).toDouble()).toInt()
+        val ux = dx / dist
+        val uy = dy / dist
+        val farX = b[0] + ux * amplitude
+        val farY = b[1] + uy * amplitude
+        for (i in 0 until segments) {
+            if (i % 2 == 0) path.lineTo(farX, farY) else path.lineTo(b[0].toFloat(), b[1].toFloat())
+        }
+        return path
     }
 
     /** 系统全局动作：BACK / HOME（对应 Python 侧 press "ESC" / press "HOME"） */

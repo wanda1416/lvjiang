@@ -19,7 +19,12 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.config import get_session_store
 from lvjiang.ui.button_styles import apply_button_style, fit_button_width
 
-from ...core.profile.models import ALL_MODELS, MODEL_LABELS
+from ...core.profile.models import (
+    ALL_MODELS,
+    DEFAULT_KEY_GROUP,
+    MODEL_LABELS,
+    group_key_definitions,
+)
 from ...core.profile.schema import (
     ProfileSchema,
     get_profile_config,
@@ -400,8 +405,14 @@ class ProfileColumnMixin:
     ) -> QPushButton:
         """创建级联菜单 key 选择按钮
 
-        一级菜单：模型类型（配额/再生/库存/备注）
-        二级菜单：该类型下的具体 key
+        三级菜单：模型类型（配额/再生/库存/备注）→ 分组 → 具体定义。
+
+        分组这一层来自定义本身的 ``KeyDef.group``（定义对话框里能改），与总览的
+        列分组无关。key 多起来之后，类型下面直接铺一长串定义根本找不到——而分组
+        本就是定义侧已有的组织方式，这里跟着用同一套，不另造一种归类。
+
+        只有一个分组且就是默认分组时不再套一层：那层菜单只会多一次点击，
+        什么信息都不提供。
 
         selected: 可变容器 [key]，选中后更新 selected[0]。
         """
@@ -417,7 +428,21 @@ class ProfileColumnMixin:
         btn.setMinimumWidth(200)
         apply_button_style(btn, variant="neutral")
 
-        def show_menu():
+        def _choose(key: str) -> None:
+            selected[0] = key
+            btn.setText(_label_for_key(key))
+
+        def _add_key_actions(target_menu, kds: list) -> None:
+            for kd in kds:
+                action = target_menu.addAction(f"{kd.label} ({kd.key})")
+                action.triggered.connect(
+                    lambda checked, k=kd.key: _choose(k))
+
+        def build_menu() -> QMenu:
+            """按 类型 → 分组 → 定义 建出菜单。
+
+            与 exec 分开：exec 会阻塞，菜单结构只有这样才能被断言。
+            """
             menu = QMenu(btn)
             # 按模型类型分组
             keys_by_model: dict[str, list] = {}
@@ -431,18 +456,25 @@ class ProfileColumnMixin:
                     continue
                 model_label = MODEL_LABELS.get(mt, mt)
                 submenu = menu.addMenu(model_label)
-                for kd in kds:
-                    action = submenu.addAction(f"{kd.label} ({kd.key})")
-                    action.triggered.connect(
-                        lambda checked, k=kd.key: (
-                            selected.__setitem__(0, k),
-                            btn.setText(_label_for_key(k)),
-                        )
-                    )
+                if submenu is None:
+                    continue
+                grouped = group_key_definitions(kds)
+                if len(grouped) == 1 and DEFAULT_KEY_GROUP in grouped:
+                    _add_key_actions(submenu, grouped[DEFAULT_KEY_GROUP])
+                    continue
+                for group_name, group_kds in grouped.items():
+                    label = (tr("默认") if group_name == DEFAULT_KEY_GROUP
+                             else group_name)
+                    group_menu = submenu.addMenu(label)
+                    if group_menu is not None:
+                        _add_key_actions(group_menu, group_kds)
+            return menu
 
-            menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
+        def show_menu():
+            build_menu().exec(btn.mapToGlobal(btn.rect().bottomLeft()))
 
         btn.clicked.connect(show_menu)
+        btn.build_key_menu = build_menu  # type: ignore[attr-defined]
         return btn
 
     def _set_column_field(self: ProfileTab, group_name: str, logical_index: int, field_key: str):  # type: ignore[misc]

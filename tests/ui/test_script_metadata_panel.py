@@ -279,6 +279,33 @@ def test_metadata_buttons_and_expansion_keep_stable_geometry(qtbot):
     assert scroll.viewport().width() == viewport_width
 
 
+def test_metadata_parameter_rows_align_with_outer_form(qtbot):
+    from PyQt6.QtCore import QPoint
+    from PyQt6.QtWidgets import QApplication
+
+    from lvjiang.ui.scripts.metadata_panel import MetadataPanel
+
+    panel = MetadataPanel()
+    qtbot.addWidget(panel)
+    panel.load_text(
+        "#% name: demo\n#% parameters:\n"
+        "#%   - {name: option, type: bool, default: true}\n",
+        editable=True,
+    )
+    for width in (480, 700):
+        panel.resize(width, 700)
+        panel.show()
+        QApplication.processEvents()
+        input_x = panel.edit_name.mapTo(panel, QPoint(0, 0)).x()
+        assert panel.parameters.list.mapTo(panel, QPoint(0, 0)).x() == input_x
+        assert panel.parameters.name.mapTo(panel, QPoint(0, 0)).x() == input_x
+        outer_form = panel.edit_name.parentWidget().layout()
+        outer_label = outer_form.labelForField(panel.edit_name)
+        inner_label = panel.parameters._form.labelForField(panel.parameters.name)
+        assert outer_label.mapTo(panel, QPoint(0, 0)).x() == (
+            inner_label.mapTo(panel, QPoint(0, 0)).x())
+
+
 def test_metadata_panel_edits_all_declared_fields_without_yaml_input(qtbot):
     from lvjiang.ui.scripts.metadata_panel import MetadataPanel, read_front_matter
 

@@ -18,62 +18,48 @@
     },
     {
       "key": "pickup",
-      "disabled": true
+      "disabled": true,
+      "activation_key": "F"
     }
   ],
   "points": [
     {
       "key": "wuxueji",
-      "cx_ratio": 0.7436439933547924,
-      "cy_ratio": 0.7420041320550339,
-      "r_ratio": 0.0503113897993085,
+      "cx_ratio": 0.8073648699827385,
+      "cy_ratio": 0.85547438000358,
+      "r_ratio": 0.02189803209521604,
       "disabled": true,
       "activation_key": "Q"
     },
     {
       "key": "teshuji",
-      "cx_ratio": 0.7335087259798797,
-      "cy_ratio": 0.9008272204791421,
-      "r_ratio": 0.0503113897993085,
+      "cx_ratio": 0.8369544370307226,
+      "cy_ratio": 0.7996826037514887,
+      "r_ratio": 0.021544275383754266,
       "disabled": true,
       "activation_key": "GRAVE"
     },
     {
       "key": "qishu",
-      "cx_ratio": 0.783974588377358,
-      "cy_ratio": 0.607159169148931,
-      "r_ratio": 0.0503113897993085,
       "disabled": true
     },
     {
       "key": "xieshi",
-      "cx_ratio": 0.8497942070944381,
-      "cy_ratio": 0.5371446576686366,
-      "r_ratio": 0.0503113897993085,
       "disabled": true,
       "activation_key": "E"
     },
     {
       "key": "xuli",
-      "cx_ratio": 0.9176706888964269,
-      "cy_ratio": 0.5051815111232848,
-      "r_ratio": 0.0503113897993085,
       "disabled": true,
       "activation_key": "R"
     },
     {
       "key": "qingji",
-      "cx_ratio": 0.847931277879307,
-      "cy_ratio": 0.7507569138182658,
-      "r_ratio": 0.0503113897993085,
       "disabled": true,
       "activation_key": "MOUSE_LEFT"
     },
     {
       "key": "shanbi",
-      "cx_ratio": 0.8282569353280059,
-      "cy_ratio": 0.9175211566635795,
-      "r_ratio": 0.0503113897993085,
       "disabled": true,
       "activation_key": "SHIFT"
     },

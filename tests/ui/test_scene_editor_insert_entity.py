@@ -93,3 +93,58 @@ class TestInsert:
         state["entity"] = "b"
         button._on_clicked()
         assert editor.toPlainText() == "[a].[b]"
+
+
+class TestFocusWatchLifetime:
+    """焦点监听不能活过对话框
+
+    focusChanged 挂在 QApplication 上，生命周期比对话框长得多。最初用 lambda 连，
+    lambda 没有关联的 QObject，连接在窗口关闭后依然存在，于是之后每次焦点变化都去
+    碰已销毁的 QTextEdit —— 退出场景管理后仍然持续崩溃，而且崩在跟场景管理毫无关系
+    的操作上。
+    """
+
+    def test_connection_is_dropped_on_close(self, qtbot):
+        from PyQt6.QtWidgets import QApplication
+
+        from lvjiang.core.layout_manager import LayoutConfigManager
+        from lvjiang.ui.scene_editor import SceneEditorDialog
+
+        app = QApplication.instance()
+        assert app is not None
+        before = app.receivers(app.focusChanged)
+
+        dialog = SceneEditorDialog(
+            layout_manager=LayoutConfigManager(), refresh_callback=lambda: None)
+        qtbot.addWidget(dialog)
+        assert app.receivers(app.focusChanged) == before + 1
+
+        dialog.close()
+        assert app.receivers(app.focusChanged) == before, (
+            "关闭后仍挂着监听，之后每次焦点变化都会回调到已销毁的控件")
+
+    def test_focus_changes_after_close_do_not_raise(self, qtbot):
+        """真实现场：退出场景管理后继续在别处切焦点。"""
+        from PyQt6.QtWidgets import QApplication, QLineEdit
+
+        from lvjiang.core.layout_manager import LayoutConfigManager
+        from lvjiang.ui.scene_editor import SceneEditorDialog
+
+        host = QWidget()
+        qtbot.addWidget(host)
+        first, second = QLineEdit(host), QLineEdit(host)
+        host.show()
+
+        dialog = SceneEditorDialog(
+            layout_manager=LayoutConfigManager(), refresh_callback=lambda: None)
+        qtbot.addWidget(dialog)
+        dialog.show()
+        dialog.close()
+
+        app = QApplication.instance()
+        assert app is not None
+        for _ in range(3):
+            first.setFocus()
+            app.processEvents()
+            second.setFocus()
+            app.processEvents()

@@ -249,6 +249,220 @@ def test_metadata_panel_preserves_batch_check(qtbot):
     assert parse_metadata(applied[0])["batch_check"] == "check_batch"
 
 
+def test_metadata_panel_edits_all_declared_fields_without_yaml_input(qtbot):
+    from lvjiang.ui.scripts.metadata_panel import MetadataPanel, read_front_matter
+
+    source = (
+        "#% id: example\n"
+        "#% name: 示例\n"
+        "#% note: |-\n"
+        "#%   第一行\n"
+        "#%   第二行\n"
+        "#% env: [desktop]\n"
+        "#% requires: [device_gesture]\n"
+        "#% scope: dedicated\n"
+        "#% runnable: true\n"
+        "#% batchable: true\n"
+        "#% hidden: true\n"
+        "#% batch_check: check_batch\n"
+        "#% batch_unit_prepare: true\n"
+        "#% parameters:\n"
+        "#%   - {name: enabled, type: bool, default: false}\n"
+        "#%   - name: target\n"
+        "#%     type: select\n"
+        "#%     default: first\n"
+        "#%     options: [first, {value: second, label: 第二项}]\n"
+        "#%   - {name: count, type: number, min: 1, max: 9, default: 3}\n"
+        "#%   - name: message\n"
+        "#%     type: text\n"
+        "#%     default: \"两行\\n内容\"\n"
+        "#%     placeholder: 提示\n"
+        "#%     multiline: true\n"
+        "#%     require: [\"$enabled\", \"$count > 0\"]\n"
+        "#%   - name: flags\n"
+        "#%     type: checkgroup\n"
+        "#%     options: [a, b]\n"
+        "#%     default: {a: false}\n"
+        "\nlog \"body\"\n"
+    )
+    panel = MetadataPanel()
+    qtbot.addWidget(panel)
+    panel.load_text(source, editable=True)
+    assert not panel.has_draft()
+    assert panel.edit_note.text() == "第一行\n第二行"
+    panel.edit_note.toggle.click()
+    assert panel.edit_note.text() == "第一行\n第二行"
+    panel.edit_note.toggle.click()
+    assert panel.check_batch_unit_prepare.isChecked()
+    assert panel.parameters.list.count() == 5
+    applied: list[str] = []
+    panel.text_applied.connect(applied.append)
+    panel._apply()
+    assert applied == [source]
+
+    panel.edit_note.toggle.click()
+    panel.edit_note.multi.setPlainText("更新\n说明")
+    panel.parameters.list.setCurrentRow(3)
+    assert panel.parameters.require_list.isChecked()
+    assert panel.parameters.require.text() == "$enabled\n$count > 0"
+    panel.parameters.list.setCurrentRow(4)
+    assert panel.parameters.values()[3]["default"] == "两行\n内容"
+    panel._apply()
+    result = read_front_matter(applied[-1])
+    assert result["note"] == "更新\n说明"
+    assert result["batch_unit_prepare"] is True
+    assert result["requires"] == ["device_gesture"]
+    assert result["parameters"][4]["default"] == {"a": False}
+    assert applied[-1].endswith('log "body"\n')
+
+
+def test_unknown_parameter_type_is_visible_and_can_be_corrected(qtbot):
+    from lvjiang.ui.scripts.metadata_panel import MetadataPanel
+
+    source = (
+        "#% parameters:\n"
+        "#%   - {name: retries, type: int, default: 12}\n"
+        "\nlog \"ok\"\n"
+    )
+    panel = MetadataPanel()
+    qtbot.addWidget(panel)
+    panel.load_text(source, editable=True)
+    assert panel.btn_apply.isEnabled()
+    assert panel.parameters.kind.currentData() == "int"
+    assert not panel.has_draft()
+
+    panel.parameters.kind.setCurrentIndex(panel.parameters.kind.findData("number"))
+    applied: list[str] = []
+    panel.text_applied.connect(applied.append)
+    panel._apply()
+    assert parse_metadata(applied[-1])["parameters"][0]["type"] == "number"
+    assert parse_metadata(applied[-1])["parameters"][0]["default"] == 12
+
+
+def test_developer_save_respects_layer_and_migrates(qtbot, tmp_path, monkeypatch):
+    from lvjiang.core.config import resolver as resolver_module
+    from lvjiang.ui.scripts.editor_dialog import ScriptEditorDialog
+
+    resolver = resolver_module.ConfigResolver(
+        tmp_path / "system", tmp_path / "local", dev_mode=True,
+    )
+    monkeypatch.setattr(resolver_module, "_resolver", resolver)
+    resolver.write_entity("workflows/demo.wf", "#% runnable: true\n\nlog \"ok\"\n")
+    widget = ScriptEditorDialog()
+    qtbot.addWidget(widget)
+    widget._load_entry(widget._entry("demo.wf"))
+    widget.metadata_panel.combo_location.setCurrentIndex(
+        widget.metadata_panel.combo_location.findData("local"))
+    assert widget.btn_save.isEnabled()
+    widget._on_save()
+    assert not (tmp_path / "system/workflows/demo.wf").exists()
+    assert (tmp_path / "local/workflows/demo.wf").exists()
+    assert widget._current.layer == "local"
+
+    widget.editor.insertPlainText("\n# 本地修改")
+    widget._on_save()
+    assert "本地修改" in (tmp_path / "local/workflows/demo.wf").read_text()
+    assert not (tmp_path / "system/workflows/demo.wf").exists()
+    widget._dirty = False
+
+
+def test_layer_migration_copies_referenced_input_trace(tmp_path):
+    from lvjiang.ui.scripts.editor_dialog import copy_trace_dependencies
+
+    source_root = tmp_path / "system/workflows"
+    target_root = tmp_path / "local/workflows"
+    source = source_root / "nested/demo.wf"
+    target = target_root / "nested/demo.wf"
+    old_trace = source_root / "lvtrace/example.lvtrace"
+    old_trace.parent.mkdir(parents=True)
+    old_trace.write_bytes(b"recorded-input")
+    text = 'replay input_trace "../lvtrace/example.lvtrace"\n'
+
+    copy_trace_dependencies(text, source, target, source_root, target_root)
+
+    assert (target_root / "lvtrace/example.lvtrace").read_bytes() == b"recorded-input"
+
+
+def test_regular_user_sees_system_read_only_and_local_location(qtbot, tmp_path, monkeypatch):
+    from lvjiang.core.config import resolver as resolver_module
+    from lvjiang.ui.scripts.editor_dialog import ScriptEditorDialog
+
+    system = tmp_path / "system/workflows/system_script.wf"
+    system.parent.mkdir(parents=True)
+    system.write_text("#% runnable: true\n\nlog \"system\"\n")
+    local = tmp_path / "local/workflows/local_script.wf"
+    local.parent.mkdir(parents=True)
+    local.write_text("#% runnable: true\n\nlog \"local\"\n")
+    resolver = resolver_module.ConfigResolver(
+        tmp_path / "system", tmp_path / "local", dev_mode=False,
+    )
+    monkeypatch.setattr(resolver_module, "_resolver", resolver)
+    widget = ScriptEditorDialog()
+    qtbot.addWidget(widget)
+
+    widget._load_entry(widget._entry("system_script.wf"))
+    assert widget.editor.isReadOnly()
+    assert widget.metadata_panel.location() == "system"
+    assert not widget.metadata_panel.combo_location.isEnabled()
+
+    widget._load_entry(widget._entry("local_script.wf"))
+    assert not widget.editor.isReadOnly()
+    assert widget.metadata_panel.location() == "local"
+    assert not widget.metadata_panel.combo_location.isEnabled()
+
+
+def test_metadata_draft_survives_tab_switch(qtbot, tmp_path, monkeypatch):
+    from lvjiang.core.config import resolver as resolver_module
+    from lvjiang.ui.scripts.editor_dialog import ScriptEditorDialog
+
+    resolver = resolver_module.ConfigResolver(
+        tmp_path / "system", tmp_path / "local", dev_mode=True,
+    )
+    monkeypatch.setattr(resolver_module, "_resolver", resolver)
+    resolver.write_entity("workflows/demo.wf", "#% name: 原名\n\nlog \"ok\"\n")
+    widget = ScriptEditorDialog()
+    qtbot.addWidget(widget)
+    widget._load_entry(widget._entry("demo.wf"))
+    widget.code_tabs.setCurrentWidget(widget.metadata_panel)
+    widget.metadata_panel.edit_name.setText("草稿")
+
+    widget.code_tabs.setCurrentWidget(widget.editor)
+    widget.code_tabs.setCurrentWidget(widget.metadata_panel)
+
+    assert widget.metadata_panel.edit_name.text() == "草稿"
+    widget.metadata_panel._reload()
+
+
+def test_save_does_not_discard_unapplied_metadata(qtbot, tmp_path, monkeypatch):
+    from PyQt6.QtWidgets import QMessageBox
+
+    from lvjiang.core.config import resolver as resolver_module
+    from lvjiang.ui.scripts.editor_dialog import ScriptEditorDialog
+
+    resolver = resolver_module.ConfigResolver(
+        tmp_path / "system", tmp_path / "local", dev_mode=True,
+    )
+    monkeypatch.setattr(resolver_module, "_resolver", resolver)
+    resolver.write_entity("workflows/demo.wf", "#% name: 原名\n\nlog \"ok\"\n")
+    widget = ScriptEditorDialog()
+    qtbot.addWidget(widget)
+    widget._load_entry(widget._entry("demo.wf"))
+    widget.metadata_panel.edit_name.setText("未应用")
+    widget.metadata_panel.combo_location.setCurrentIndex(
+        widget.metadata_panel.combo_location.findData("local"))
+    warnings: list[str] = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda _parent, title, _body: warnings.append(title))
+
+    widget._on_save()
+
+    assert warnings == ["元数据尚未应用"]
+    assert (tmp_path / "system/workflows/demo.wf").exists()
+    assert not (tmp_path / "local/workflows/demo.wf").exists()
+    widget.metadata_panel._reload()
+    widget.metadata_panel.set_location("system", developer=True, editable=True)
+    widget._dirty = False
+
+
 def test_recording_lands_in_result_pane_until_written(qtbot, tmp_path, monkeypatch):
     """录制占用中央页签；结果不自动改代码，写入后回到代码页。"""
     from lvjiang.core.config import resolver as resolver_module

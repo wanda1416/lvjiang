@@ -65,8 +65,9 @@ filterwarnings = ["error"]
 # 自定义 marker：slow 标记耗时测试（Excel 转换等），本地迭代可用 -m "not slow" 跳过
 markers = ["slow: 耗时测试（Excel 转换等），本地迭代可用 -m 'not slow' 跳过"]
 
-# 覆盖率当前只做度量，不设 fail_under。CI 输出分支覆盖率与 XML 报告，
-# 本地默认 pytest 不自动开启，避免拖慢日常快速验证。
+# 覆盖率当前只做度量，不设 fail_under。由 .github/workflows/coverage.yml 每周
+# 定时出数，不挂在每次推送的 CI 上（开着贵 2.36 倍）；本地默认 pytest 也不自动
+# 开启，避免拖慢日常快速验证。
 [tool.coverage.run]
 branch = true
 source = ["lvjiang"]

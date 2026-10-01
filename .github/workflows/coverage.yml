@@ -1,0 +1,49 @@
+name: Coverage
+
+# 覆盖率只做度量、不设 fail_under（见 pyproject.toml 的 [tool.coverage.run]），
+# 所以不该让每次推送都背它的开销：实测 --cov --cov-branch 让整套测试贵 2.36 倍
+# （本机 16 核 109s → 257s）。这里每周出一次数，需要时手动触发。
+#
+# 定时任务只在仓库默认分支上跑，且仓库连续 60 天无活动会被 GitHub 自动停用。
+on:
+  schedule:
+    # 周日 18:00 UTC = 周一 02:00（UTC+8）
+    - cron: "0 18 * * 0"
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    # 与 ci.yml 的 test job 保持同一环境：换平台或换 Python 版本，覆盖到的分支
+    # 就和实际门禁不是一套数了。
+    runs-on: windows-2022
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONIOENCODING: utf-8  # runner 默认 GBK 代码页，避免中文日志 UnicodeEncodeError
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e .[dev]
+
+      # pytest-cov 会自行合并各 worker 的覆盖数据。
+      - name: Run tests with coverage
+        run: >-
+          python -m pytest tests
+          -n auto
+          --cov=lvjiang
+          --cov-branch
+          --cov-report=term-missing:skip-covered
+          --cov-report=xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: coverage.xml
+          if-no-files-found: ignore

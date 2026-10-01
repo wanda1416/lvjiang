@@ -249,6 +249,36 @@ def test_metadata_panel_preserves_batch_check(qtbot):
     assert parse_metadata(applied[0])["batch_check"] == "check_batch"
 
 
+def test_metadata_buttons_and_expansion_keep_stable_geometry(qtbot):
+    from PyQt6.QtCore import QPoint, Qt
+    from PyQt6.QtWidgets import QApplication, QScrollArea
+
+    from lvjiang.ui.scripts.metadata_panel import MetadataPanel
+
+    panel = MetadataPanel()
+    qtbot.addWidget(panel)
+    panel.load_text("#% name: 示例\n#% note: 第一行\n", editable=True)
+    panel.resize(640, 440)
+    panel.show()
+    qtbot.waitExposed(panel)
+    scroll = panel.findChild(QScrollArea)
+    assert scroll is not None
+    assert scroll.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOn
+
+    toggle = panel.edit_note.toggle
+    viewport_width = scroll.viewport().width()
+    before = toggle.mapTo(panel, QPoint(0, 0))
+    toggle.click()
+    QApplication.processEvents()
+    after_expand = toggle.mapTo(panel, QPoint(0, 0))
+    assert after_expand == before
+    assert scroll.viewport().width() == viewport_width
+    toggle.click()
+    QApplication.processEvents()
+    assert toggle.mapTo(panel, QPoint(0, 0)) == before
+    assert scroll.viewport().width() == viewport_width
+
+
 def test_metadata_panel_edits_all_declared_fields_without_yaml_input(qtbot):
     from lvjiang.ui.scripts.metadata_panel import MetadataPanel, read_front_matter
 
@@ -289,6 +319,9 @@ def test_metadata_panel_edits_all_declared_fields_without_yaml_input(qtbot):
     qtbot.addWidget(panel)
     panel.load_text(source, editable=True)
     assert not panel.has_draft()
+    assert panel.scope_radios["dedicated"].isChecked()
+    form = panel.edit_batch_check.parentWidget().layout()
+    assert form.labelForField(panel.edit_batch_check).text() == "批量检查"
     assert panel.edit_note.text() == "第一行\n第二行"
     panel.edit_note.toggle.click()
     assert panel.edit_note.text() == "第一行\n第二行"
@@ -302,6 +335,7 @@ def test_metadata_panel_edits_all_declared_fields_without_yaml_input(qtbot):
 
     panel.edit_note.toggle.click()
     panel.edit_note.multi.setPlainText("更新\n说明")
+    panel.scope_radios["daily"].setChecked(True)
     panel.parameters.list.setCurrentRow(3)
     assert panel.parameters.require_list.isChecked()
     assert panel.parameters.require.text() == "$enabled\n$count > 0"
@@ -310,6 +344,7 @@ def test_metadata_panel_edits_all_declared_fields_without_yaml_input(qtbot):
     panel._apply()
     result = read_front_matter(applied[-1])
     assert result["note"] == "更新\n说明"
+    assert result["scope"] == "daily"
     assert result["batch_unit_prepare"] is True
     assert result["requires"] == ["device_gesture"]
     assert result["parameters"][4]["default"] == {"a": False}
@@ -351,8 +386,7 @@ def test_developer_save_respects_layer_and_migrates(qtbot, tmp_path, monkeypatch
     widget = ScriptEditorDialog()
     qtbot.addWidget(widget)
     widget._load_entry(widget._entry("demo.wf"))
-    widget.metadata_panel.combo_location.setCurrentIndex(
-        widget.metadata_panel.combo_location.findData("local"))
+    widget.metadata_panel.location_radios["local"].setChecked(True)
     assert widget.btn_save.isEnabled()
     widget._on_save()
     assert not (tmp_path / "system/workflows/demo.wf").exists()
@@ -403,12 +437,12 @@ def test_regular_user_sees_system_read_only_and_local_location(qtbot, tmp_path, 
     widget._load_entry(widget._entry("system_script.wf"))
     assert widget.editor.isReadOnly()
     assert widget.metadata_panel.location() == "system"
-    assert not widget.metadata_panel.combo_location.isEnabled()
+    assert not widget.metadata_panel.location_row.isEnabled()
 
     widget._load_entry(widget._entry("local_script.wf"))
     assert not widget.editor.isReadOnly()
     assert widget.metadata_panel.location() == "local"
-    assert not widget.metadata_panel.combo_location.isEnabled()
+    assert not widget.metadata_panel.location_row.isEnabled()
 
 
 def test_metadata_draft_survives_tab_switch(qtbot, tmp_path, monkeypatch):
@@ -448,8 +482,7 @@ def test_save_does_not_discard_unapplied_metadata(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(widget)
     widget._load_entry(widget._entry("demo.wf"))
     widget.metadata_panel.edit_name.setText("未应用")
-    widget.metadata_panel.combo_location.setCurrentIndex(
-        widget.metadata_panel.combo_location.findData("local"))
+    widget.metadata_panel.location_radios["local"].setChecked(True)
     warnings: list[str] = []
     monkeypatch.setattr(QMessageBox, "warning", lambda _parent, title, _body: warnings.append(title))
 

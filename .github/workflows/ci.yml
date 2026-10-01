@@ -32,20 +32,19 @@ jobs:
       - name: Type check (mypy)
         run: python -m mypy
 
-      # 并发跑（windows-2022 为 4 核）；pytest-cov 会自行合并各 worker 的覆盖数据。
+      # 并发跑（windows-2022 为 4 核）。
       # 代价是 Qt 后台线程类用例必须确定性 join 线程，不能只靠 waitUntil 轮询
       # UI 状态：满载并发下主线程可能先处理 deleteLater 而工作线程未退出，
       # 销毁运行中的 QThread 会让整个 worker 进程崩溃。
+      # 不带覆盖率：实测 --cov --cov-branch 让整套测试贵 2.36 倍（本机 16 核
+      # 109s → 257s），而覆盖率不设 fail_under、只做度量，没有理由让每次推送都
+      # 付这个钱。改由 coverage.yml 每周定时出数。
       - name: Run tests
         id: tests
         continue-on-error: true
         run: >-
           python -m pytest tests
           -n auto
-          --cov=lvjiang
-          --cov-branch
-          --cov-report=term-missing:skip-covered
-          --cov-report=xml
           --junitxml=pytest-results.xml
 
       - name: Annotate test failures
@@ -65,14 +64,6 @@ jobs:
             Write-Output "::error title=pytest failure::$details"
           }
           exit 1
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-${{ github.sha }}
-          path: coverage.xml
-          if-no-files-found: ignore
 
   # Kotlin 侧改动此前完全没有自动验证——只能靠眼睛看。这里编一次 debug 变体，
   # 语法、API 误用、Gradle 脚本错误都会当场暴露。

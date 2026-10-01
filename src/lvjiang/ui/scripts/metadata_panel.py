@@ -6,8 +6,9 @@ from copy import deepcopy
 from typing import Any
 
 import yaml
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QFormLayout,
@@ -18,6 +19,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QRadioButton,
     QScrollArea,
     QTableWidget,
     QTableWidgetItem,
@@ -28,7 +30,11 @@ from PyQt6.QtWidgets import (
 from ...core.config.resolver import load_available_envs
 from ...i18n import tr
 from ...workflows.metadata import CAPABILITIES, parse_metadata
-from ..button_styles import apply_button_style
+from ..button_styles import (
+    apply_button_style,
+    apply_compact_button_style,
+    fit_button_width,
+)
 
 
 def read_front_matter(text: str) -> dict[str, Any]:
@@ -68,18 +74,17 @@ class ExpandableText(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._has_multiline = False
-        row = QVBoxLayout(self)
+        row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
-        top = QHBoxLayout()
         self.line = QLineEdit()
         self.toggle = QPushButton(tr("展开"))
-        self.toggle.setFixedWidth(56)
-        top.addWidget(self.line, 1)
-        top.addWidget(self.toggle)
-        row.addLayout(top)
+        apply_compact_button_style(self.toggle, variant="neutral")
+        fit_button_width(self.toggle)
         self.multi = QPlainTextEdit()
         self.multi.setMinimumHeight(88)
-        row.addWidget(self.multi)
+        row.addWidget(self.line, 1)
+        row.addWidget(self.multi, 1)
+        row.addWidget(self.toggle, 0, Qt.AlignmentFlag.AlignTop)
         self.multi.hide()
         self.toggle.clicked.connect(self._toggle)
 
@@ -128,12 +133,18 @@ class ParameterEditor(QWidget):
         self.list.setMinimumHeight(110)
         bar.addWidget(self.list, 1)
         buttons = QVBoxLayout()
+        list_buttons = []
         for caption, handler in ((tr("新增"), self._add), (tr("删除"), self._remove),
                                  (tr("上移"), lambda: self._move(-1)),
                                  (tr("下移"), lambda: self._move(1))):
             button = QPushButton(caption)
+            apply_compact_button_style(
+                button, variant=("action" if caption == tr("新增") else
+                                 "danger" if caption == tr("删除") else "neutral"))
             button.clicked.connect(handler)
             buttons.addWidget(button)
+            list_buttons.append(button)
+        fit_button_width(*list_buttons)
         buttons.addStretch()
         bar.addLayout(buttons)
         layout.addLayout(bar)
@@ -163,13 +174,19 @@ class ParameterEditor(QWidget):
         self.options = QTableWidget(0, 3)
         self.options.setHorizontalHeaderLabels([tr("值"), tr("显示名"), tr("默认状态")])
         option_actions = QHBoxLayout()
+        option_buttons = []
         for caption, handler in ((tr("新增选项"), self._add_option),
                                  (tr("删除选项"), self._remove_option),
                                  (tr("上移选项"), lambda: self._move_option(-1)),
                                  (tr("下移选项"), lambda: self._move_option(1))):
             button = QPushButton(caption)
+            apply_compact_button_style(
+                button, variant=("action" if caption == tr("新增选项") else
+                                 "danger" if caption == tr("删除选项") else "neutral"))
             button.clicked.connect(handler)
             option_actions.addWidget(button)
+            option_buttons.append(button)
+        fit_button_width(*option_buttons)
         option_actions.addStretch()
         self.option_buttons = QWidget()
         self.option_buttons.setLayout(option_actions)
@@ -556,6 +573,7 @@ class MetadataPanel(QWidget):
         self._editable = False
         self._loaded_location = "local"
         self._fallback_id = ""
+        self._form_valid = False
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -570,25 +588,47 @@ class MetadataPanel(QWidget):
         root.addWidget(self.error)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         content = QWidget()
         form = QFormLayout(content)
-        self.combo_location = QComboBox()
-        self.combo_location.addItem("local", "local")
-        self.combo_location.addItem("system", "system")
-        self.combo_location.currentIndexChanged.connect(
-            lambda: self.location_changed.emit(self.combo_location.currentData()))
+        self.location_row = QWidget()
+        location_layout = QHBoxLayout(self.location_row)
+        location_layout.setContentsMargins(0, 0, 0, 0)
+        self.location_group = QButtonGroup(self.location_row)
+        self.location_radios = {
+            "local": QRadioButton(tr("本地 (local)")),
+            "system": QRadioButton(tr("系统 (system)")),
+        }
+        for button in self.location_radios.values():
+            self.location_group.addButton(button)
+            location_layout.addWidget(button)
+        location_layout.addStretch()
+        self.location_radios["local"].setChecked(True)
+        self.location_group.buttonToggled.connect(
+            lambda _button, checked: self.location_changed.emit(self.location())
+            if checked else None)
         self.edit_id = QLineEdit()
         self.edit_id.setToolTip(tr("稳定脚本标识；修改后已有引用不会自动更新"))
         self.edit_name = QLineEdit()
         self.edit_note = ExpandableText()
-        self.combo_scope = QComboBox()
-        self.combo_scope.addItem(tr("日常"), "daily")
-        self.combo_scope.addItem(tr("专用"), "dedicated")
-        form.addRow(tr("保存位置"), self.combo_location)
+        self.scope_row = QWidget()
+        scope_layout = QHBoxLayout(self.scope_row)
+        scope_layout.setContentsMargins(0, 0, 0, 0)
+        self.scope_group = QButtonGroup(self.scope_row)
+        self.scope_radios = {
+            "daily": QRadioButton(tr("日常")),
+            "dedicated": QRadioButton(tr("专用")),
+        }
+        for button in self.scope_radios.values():
+            self.scope_group.addButton(button)
+            scope_layout.addWidget(button)
+        scope_layout.addStretch()
+        self.scope_radios["daily"].setChecked(True)
+        form.addRow(tr("保存位置"), self.location_row)
         form.addRow("id", self.edit_id)
         form.addRow(tr("名称"), self.edit_name)
         form.addRow(tr("说明"), self.edit_note)
-        form.addRow(tr("脚本性质"), self.combo_scope)
+        form.addRow(tr("脚本性质"), self.scope_row)
         self._env_row = QHBoxLayout()
         self._env_checks: dict[str, QCheckBox] = {}
         self._env_row.addStretch()
@@ -611,7 +651,7 @@ class MetadataPanel(QWidget):
         traits.addStretch()
         form.addRow(tr("脚本声明"), traits)
         self.edit_batch_check = QLineEdit()
-        form.addRow(tr("批量检查子过程"), self.edit_batch_check)
+        form.addRow(tr("批量检查"), self.edit_batch_check)
         self.parameters = ParameterEditor()
         form.addRow(tr("参数定义"), self.parameters)
         scroll.setWidget(content)
@@ -649,19 +689,20 @@ class MetadataPanel(QWidget):
         return [key for key, check in self._env_checks.items() if check.isChecked()]
 
     def set_location(self, layer: str, *, developer: bool, editable: bool) -> None:
-        self.combo_location.blockSignals(True)
-        self.combo_location.setCurrentIndex(max(self.combo_location.findData(layer), 0))
-        self.combo_location.blockSignals(False)
+        self.location_group.blockSignals(True)
+        self.location_radios.get(layer, self.location_radios["local"]).setChecked(True)
+        self.location_group.blockSignals(False)
         self._loaded_location = layer
-        self.combo_location.setEnabled(developer and editable)
+        self.location_row.setEnabled(developer and editable and self._form_valid)
 
     def location(self) -> str:
-        return self.combo_location.currentData()
+        return "system" if self.location_radios["system"].isChecked() else "local"
 
     def load_text(self, text: str, *, editable: bool, fallback_id: str = "") -> None:
         self._text = text
         self._editable = editable
         self._fallback_id = fallback_id
+        self._form_valid = False
         try:
             meta = parse_metadata(text)
             raw = read_front_matter(text)
@@ -695,12 +736,13 @@ class MetadataPanel(QWidget):
             self.error.show()
             return
         self._raw = raw
+        self._form_valid = True
         self.error.hide()
         self._set_enabled(editable)
         self.edit_id.setText(str(meta.get("id") or fallback_id))
         self.edit_name.setText(str(meta.get("name") or ""))
         self.edit_note.setText(str(meta.get("note") or ""))
-        self.combo_scope.setCurrentIndex(max(self.combo_scope.findData(meta.get("scope") or "daily"), 0))
+        self.scope_radios.get(meta.get("scope") or "daily", self.scope_radios["daily"]).setChecked(True)
         self._set_env(list(meta.get("env") or []))
         self.parameters._set_checked(self.capabilities, list(meta.get("requires") or []))
         self.check_runnable.blockSignals(True)
@@ -716,7 +758,8 @@ class MetadataPanel(QWidget):
         self.btn_reload.setToolTip("")
 
     def _set_enabled(self, enabled: bool) -> None:
-        for widget in (self.edit_id, self.edit_name, self.edit_note, self.combo_scope,
+        for widget in (self.location_row, self.edit_id, self.edit_name, self.edit_note,
+                       self.scope_row,
                        *self._env_checks.values(), self.capabilities, self.check_runnable,
                        self.check_batchable, self.check_hidden, self.check_batch_unit_prepare,
                        self.edit_batch_check, self.parameters, self.btn_apply):
@@ -737,7 +780,8 @@ class MetadataPanel(QWidget):
         self._put(meta, "id", self.edit_id.text().strip(), self._fallback_id)
         self._put(meta, "name", self.edit_name.text(), "")
         self._put(meta, "note", self.edit_note.text(), "")
-        self._put(meta, "scope", self.combo_scope.currentData(), "daily")
+        self._put(meta, "scope", "dedicated" if self.scope_radios["dedicated"].isChecked()
+                  else "daily", "daily")
         env = self._selected_env()
         previous_env = meta.get("env", [])
         if len(env) == len(previous_env) and set(env) == set(previous_env):

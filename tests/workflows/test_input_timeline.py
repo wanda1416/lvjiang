@@ -210,3 +210,119 @@ class TestCapabilityMetadata:
         )
         with pytest.raises(WorkflowMetadataError, match="未知能力"):
             parse_metadata("#% id: x\n#% name: X\n#% requires: [gesture]\n")
+
+
+class TestCompiler:
+    """条目 → 后端原语：两个字段名的坑都出在这一层，必须用真实 AST 驱动
+
+    之前只测了模型层与解析层，compile 这一段没覆盖，于是 `@0.0` 被当成 hold
+    （要求 > 0）、`Press.duration` 被写成 `Press.hold`，两个都是上机才炸。
+    """
+
+    @staticmethod
+    def _host():
+        from types import SimpleNamespace
+
+        from lvjiang.core.layout_models import Arrow, Point, Region
+        from lvjiang.workflows.engine.actions import _ActionsMixin
+        from lvjiang.workflows.engine.timeline import _TimelineMixin
+
+        regions = [Region("tiaoyue", 0.4, 0.4, 0.1, 0.1,
+                          activation_key="SPACE"),
+                   Region("pickup", 0.5, 0.5, 0.1, 0.1)]
+        points = [Point("move_center", 0.2, 0.8),
+                  Point("move_backward", 0.2, 0.9)]
+        arrows = [Arrow("move_backward", from_key="move_center",
+                        to_key="move_backward")]
+
+        class _Layout:
+            def get_scene_regions(self, _scene): return regions
+            def get_scene_points(self, _scene): return points
+            def get_scene_arrows(self, _scene): return arrows
+
+        class _Workflow:
+            def _region_to_screen(self, region, jitter=True):
+                return int(region.x_ratio * 1000), int(region.y_ratio * 1000)
+
+            def _point_to_screen(self, point, jitter=True):
+                return int(point.cx_ratio * 1000), int(point.cy_ratio * 1000)
+
+            def _ratio_to_screen(self, cx, cy):
+                return int(cx * 1000), int(cy * 1000)
+
+        class _Host(_TimelineMixin):
+            _layout = _Layout()
+            variables: dict = {}
+            _input = SimpleNamespace()
+            _resolve_hold_duration = _ActionsMixin._resolve_hold_duration
+
+            def _resolve(self, value):
+                return getattr(value, "value", value)
+
+            def _ensure_workflow(self):
+                return _Workflow()
+
+        return _Host()
+
+    def _compile(self, src: str):
+        host = self._host()
+        node = parse_text(src).body[0]
+        return [host._compile_timeline_entry(e) for e in node.entries]
+
+    def test_zero_offset_is_valid(self):
+        """@0.0 是最常见的第一条，不能套用 hold「必须 > 0」的规则。"""
+        steps = self._compile(
+            "timeline\n    @0.0  press \"S\" hold 2.4\nend\n")
+        assert steps[0].offset == 0.0
+        assert steps[0].kind == "key"
+        assert steps[0].key == "S"
+        assert steps[0].hold == 2.4
+
+    def test_rejects_negative_offset(self):
+        from lvjiang.workflows.engine.signals import WorkflowUserError
+        with pytest.raises(WorkflowUserError, match=">= 0"):
+            self._compile("timeline\n    @-1  press \"S\" hold 1\nend\n")
+
+    def test_press_without_hold_is_a_tap(self):
+        steps = self._compile("timeline\n    @1.0  press \"SPACE\"\nend\n")
+        assert steps[0].hold == 0.0
+
+    def test_click_with_activation_key_becomes_key_step(self):
+        """桌面布局给 tiaoyue 绑了 SPACE，所以这一路应落成按键而不是触点。"""
+        steps = self._compile(
+            "timeline\n    @0.4  click [general_combat].[tiaoyue]\nend\n")
+        assert steps[0].kind == "key"
+        assert steps[0].key == "SPACE"
+
+    def test_click_without_activation_key_becomes_touch_step(self):
+        steps = self._compile(
+            "timeline\n    @0.0  click [general_combat].[pickup]\nend\n")
+        step = steps[0]
+        assert step.kind == "touch"
+        assert (step.x1, step.y1) == (step.x2, step.y2) == (500, 500)
+
+    def test_drag_arrow_becomes_touch_step_with_endpoints(self):
+        steps = self._compile(
+            "timeline\n"
+            "    @0.0  drag [general_move].[move_backward] "
+            "duration 0.1 hold 2.4\n"
+            "end\n")
+        step = steps[0]
+        assert step.kind == "touch"
+        assert (step.x1, step.y1) == (200, 800)     # move_center
+        assert (step.x2, step.y2) == (200, 900)     # move_backward
+        assert step.move == pytest.approx(0.1)
+        assert step.hold == pytest.approx(2.4)
+
+    def test_rejects_press_down_up(self):
+        from lvjiang.workflows.engine.signals import WorkflowUserError
+        for mode in ("down", "up"):
+            with pytest.raises(WorkflowUserError, match="hold"):
+                self._compile(
+                    f"timeline\n    @0.0  press \"S\" {mode}\nend\n")
+
+    def test_rejects_unbound_entity(self):
+        from lvjiang.workflows.engine.signals import WorkflowUserError
+        with pytest.raises(WorkflowUserError, match="未在当前布局绑定"):
+            self._compile(
+                "timeline\n    @0.0  click [general_combat].[nope]\nend\n")

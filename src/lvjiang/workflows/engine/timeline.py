@@ -47,7 +47,9 @@ class _TimelineMixin:
     # ─── 条目编译 ────────────────────────────────────────
 
     def _compile_timeline_entry(self, entry: TimelineEntry) -> TimelineStep:
-        offset = self._resolve_hold_duration(entry.offset, "timeline @偏移")
+        offset = self._resolve_hold_duration(
+            entry.offset, "timeline", term="@偏移", noun="@偏移 ",
+            allow_zero=True)
         action = entry.action
         if isinstance(action, Press):
             return self._compile_timeline_press(entry, offset, action)
@@ -70,9 +72,20 @@ class _TimelineMixin:
                 f"第 {entry.line_no} 行：timeline 内不能用 press ... "
                 f"{node.mode.value}，按住时长请写 hold"
             )
-        key = self._resolve(node.key) if isinstance(node.key, VarRef) else node.key
+        # 组合键一路一键：每一路本来就各带自己的偏移，写成多条更直白，
+        # 也省掉"一路步骤里塞多个键"这种既要排程又要同步的中间形态
+        chain = node.keys or (node.key,)
+        if len(chain) > 1:
+            raise WorkflowUserError(
+                f"第 {entry.line_no} 行：timeline 内的 press 不支持组合键，"
+                "请每个键各写一条 @偏移"
+            )
+        key = self._resolve(chain[0]) if isinstance(chain[0], VarRef) else chain[0]
+        if key is None:
+            raise WorkflowUserError(
+                f"第 {entry.line_no} 行：press 的按键变量未定义")
         hold = (
-            self._resolve_hold_duration(node.hold, "press")
+            self._resolve_hold_duration(node.duration, "press")
             if node.mode is PressMode.HOLD else 0.0
         )
         return TimelineStep(

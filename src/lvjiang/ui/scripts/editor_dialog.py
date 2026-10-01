@@ -33,6 +33,8 @@ system 目录。
 """
 from __future__ import annotations
 
+import re
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -69,7 +71,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.config.resolver import get_resolver
+from ...core.config.resolver import LAYER_LOCAL, LAYER_SYSTEM, get_resolver
 from ...i18n import tr
 from ...workflows.file_tree import (
     WORKFLOWS_DIR,
@@ -139,6 +141,27 @@ def wf_rel_path(rel_path: str) -> str:
 def join_rel(parent: str, sid: str) -> str:
     """目录 + id → workflows 内相对路径；顶层 parent 传空串"""
     return f"{parent}/{sid}.wf" if parent else f"{sid}.wf"
+
+
+_TRACE_REF = re.compile(r'^\s*replay\s+input_trace\s+"([^"]+)"', re.MULTILINE)
+
+
+def copy_trace_dependencies(text: str, source: Path, target: Path,
+                            source_root: Path, target_root: Path) -> None:
+    """迁移脚本时复制它引用的相对轨迹，保留原脚本可用直到迁移完成。"""
+    for reference in set(_TRACE_REF.findall(text)):
+        old = (source.parent / reference).resolve()
+        new = (target.parent / reference).resolve()
+        if not old.is_relative_to(source_root.resolve()) or not new.is_relative_to(target_root.resolve()):
+            raise ValueError(tr("录制轨迹引用超出工作流目录：{ref}").format(ref=reference))
+        if not old.is_file():
+            raise FileNotFoundError(tr("找不到录制轨迹：{path}").format(path=old))
+        if new.is_file():
+            if old.read_bytes() != new.read_bytes():
+                raise FileExistsError(tr("目标位置已有不同的录制轨迹：{path}").format(path=new))
+            continue
+        new.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(old, new)
 
 
 def list_script_files() -> list[ScriptEntry]:
@@ -307,6 +330,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self._current: ScriptEntry | None = None
         self._dirty = False
         self._metadata_checked_text: str | None = None
+        self._metadata_source_text: str | None = None
         self._pending_trace = None
         self._recording_active = False
         self._locked = False        # 工作台运行脚本期间锁定编辑
@@ -411,6 +435,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         from .record_dialog import ScriptRecordDialog
         self.metadata_panel = MetadataPanel(self)
         self.metadata_panel.text_applied.connect(self._apply_metadata_text)
+        self.metadata_panel.location_changed.connect(self._on_location_changed)
         self.record = ScriptRecordDialog(self._main, editor_host=self)
         self.code_tabs = QTabWidget()
         self.code_tabs.addTab(self.editor, tr("代码"))
@@ -557,6 +582,14 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             self._reveal(sel)
             self.tree.setCurrentItem(sel)
 
+    def _reload_list_silent(self, select_id: str) -> None:
+        """保存等程序化刷新后由调用方加载文件，不触发切换草稿确认。"""
+        blocked = self.tree.blockSignals(True)
+        try:
+            self._reload_list(select_id=select_id)
+        finally:
+            self.tree.blockSignals(blocked)
+
     def _expanded_dirs(self) -> set[str]:
         """当前展开着的目录（相对 workflows 根）"""
         return {d for d, node in getattr(self, "_dir_items", {}).items()
@@ -667,11 +700,11 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             QMessageBox.warning(self, tr("复制失败"), str(e))
             return
         # force：内容与系统逐字相同，不强制的话 write_entity 会判成空操作
-        if self._write(entry.rel_path, text, force=True) is None:
+        if self._write(entry.rel_path, text, force=True, layer=LAYER_LOCAL) is None:
             return
         self._changed_any = True
         self._current = None          # 强制按新的 layer 重新加载
-        self._reload_list(select_id=entry.rel_path)
+        self._reload_list_silent(entry.rel_path)
         self._load_entry(self._entry(entry.rel_path))
         self._set_status(tr("已复制到本地，现在可以编辑"))
 
@@ -697,7 +730,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         self._changed_any = True
         self._dirty = False
         self._current = None
-        self._reload_list(select_id=rel)
+        self._reload_list_silent(rel)
         self._load_entry(self._entry(rel))
         self._set_status(tr("已还原为{target}版本").format(target=target))
 
@@ -723,7 +756,8 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
                   if entry.file.is_remote else
                   tr("系统脚本只读——右键「复制到本地以修改」后才能编辑")))
         self._refresh_buttons()
-        self._sync_metadata_panel()
+        self._metadata_source_text = None
+        self._sync_metadata_panel(force=True)
 
     def _apply_read_only(self, entry: ScriptEntry | None):
         """系统脚本置灰编辑区，并把来源写进状态标签"""
@@ -763,13 +797,35 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         if self.code_tabs.widget(index) is self.metadata_panel:
             self._sync_metadata_panel()
 
-    def _sync_metadata_panel(self) -> None:
+    def _sync_metadata_panel(self, *, force: bool = False) -> None:
         entry = self._current
         editable = entry is not None and self._is_editable(entry)
+        text = self.editor.toPlainText()
+        if not force and self._metadata_source_text == text:
+            return
+        if not force and self.metadata_panel.has_draft():
+            answer = QMessageBox.question(
+                self, tr("元数据与代码均已修改"),
+                tr("代码中的元数据已变化，重新加载会丢弃元数据页尚未应用的修改。重新加载？"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
         self.metadata_panel.load_text(
-            self.editor.toPlainText(), editable=editable,
+            text, editable=editable,
             fallback_id=entry.id if entry else "",
         )
+        self._metadata_source_text = text
+        layer = entry.layer if entry is not None and entry.layer in (LAYER_LOCAL, LAYER_SYSTEM) \
+            else (LAYER_SYSTEM if get_resolver().is_dev_mode() else LAYER_LOCAL)
+        self.metadata_panel.set_location(
+            layer, developer=get_resolver().is_dev_mode(), editable=editable)
+
+    def _on_location_changed(self, _layer: str) -> None:
+        if self._current is not None and get_resolver().is_dev_mode():
+            self._dirty = True
+            self._refresh_buttons()
 
     def _apply_metadata_text(self, text: str) -> None:
         cursor = self.editor.textCursor()
@@ -777,6 +833,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         cursor.setPosition(min(cursor.position(), len(text)))
         self.editor.setTextCursor(cursor)
         self._refresh_metadata_warning()
+        self._metadata_source_text = text
         self.code_tabs.setCurrentWidget(self.editor)
 
     def _preferences_saved(self) -> None:
@@ -862,7 +919,8 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             include_record and getattr(self, "record", None)
             and self.record.has_pending_result
         )
-        if not self._dirty and not config_dirty and not record_dirty:
+        metadata_dirty = self.metadata_panel.has_draft()
+        if not self._dirty and not metadata_dirty and not config_dirty and not record_dirty:
             return True
         ret = QMessageBox.question(
             self, tr("放弃修改？"),
@@ -901,6 +959,25 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         )
         return ret == QMessageBox.StandardButton.Yes
 
+    def _confirm_new_location(self, rel: str, layer: str) -> bool:
+        resolver = get_resolver()
+        selected = resolver.local_dir if layer == LAYER_LOCAL else resolver.system_dir
+        other = resolver.system_dir if layer == LAYER_LOCAL else resolver.local_dir
+        target = selected / wf_rel_path(rel)
+        if target.is_file():
+            message = tr("{path} 已存在。覆盖该位置的脚本？").format(path=target)
+        elif (other / wf_rel_path(rel)).is_file():
+            message = (tr("同路径脚本已存在于另一保存位置。新建 local 文件会覆盖其运行效果，继续？")
+                       if layer == LAYER_LOCAL else
+                       tr("同路径脚本已存在于 local。新建 system 文件后仍由 local 版本生效，继续？"))
+        else:
+            return True
+        return QMessageBox.question(
+            self, tr("确认保存位置"), message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        ) == QMessageBox.StandardButton.Yes
+
     def _ask_script_id(self, title: str, default: str = "") -> str | None:
         """问一个 id，返回 workflows 内相对路径（含 .wf）；取消返回 None"""
         from ..form_dialog import FormField, ask_form
@@ -931,41 +1008,48 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         hint = tr("保存到 workflows/{dir}；显示名留空则用 id").format(
             dir=f"{parent}/" if parent else "")
         while True:
+            fields = [
+                FormField("sid", tr("脚本 id（文件名）"),
+                          placeholder=tr("Unicode 字母/数字/下划线"),
+                          validator=self._script_id_error),
+                FormField("name", tr("显示名"), placeholder=tr("留空 = id")),
+            ]
+            if get_resolver().is_dev_mode():
+                fields.insert(0, FormField(
+                    "layer", tr("保存位置"), LAYER_SYSTEM,
+                    choices=((LAYER_SYSTEM, "system"), (LAYER_LOCAL, "local"))))
             values = ask_form(
                 self, tr("新建脚本"),
-                [
-                    FormField("sid", tr("脚本 id（文件名）"),
-                              placeholder=tr("Unicode 字母/数字/下划线"),
-                              validator=self._script_id_error),
-                    FormField("name", tr("显示名"), placeholder=tr("留空 = id")),
-                ],
+                fields,
                 hint=hint,
             )
             if values is None:
                 return
             rel = join_rel(parent, values["sid"])
-            if not self._confirm_overwrite(rel):
+            if not self._confirm_new_location(rel, values.get("layer", LAYER_LOCAL)):
                 continue
             if not self.record.confirm_script_change(rel):
                 return
             break
         sid = values["sid"]
         text = new_script_text(values["name"] or sid)
-        path = self._write(rel, text)
+        path = self._write(rel, text, layer=values.get("layer", LAYER_LOCAL))
         if path is None:
             return
         self._changed_any = True
         self._current = None
-        self._reload_list(select_id=rel)
+        self._reload_list_silent(rel)
         self._load_entry(self._entry(rel))
         self._set_status(
             tr("已创建 {path}").format(path=path))
 
-    def _write(self, rel: str, text: str, *, force: bool = False) -> Path | None:
+    def _write(self, rel: str, text: str, *, force: bool = False,
+               layer: str | None = None) -> Path | None:
         """rel 是 workflows 内相对路径（含 .wf）"""
         try:
-            path = get_resolver().write_entity(wf_rel_path(rel), text, force=force)
-        except OSError as e:
+            path = get_resolver().write_entity(
+                wf_rel_path(rel), text, force=force, layer=layer)
+        except (OSError, PermissionError, ValueError) as e:
             QMessageBox.warning(self, tr("保存失败"), str(e))
             return None
         logger.info(f"脚本已写入: {path}")
@@ -979,17 +1063,54 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             self._set_status(
                 tr("系统脚本只读——右键「复制到本地以修改」后才能保存"), error=True)
             return
-        self._save_to(self._current.rel_path)
+        self._save_to(self._current.rel_path, move=True)
 
     def _on_save_as(self):
         rel = self._ask_script_id(
             tr("另存为"), default=self._current.id if self._current else "")
         if rel is None or not self.record.confirm_script_change(rel):
             return
-        self._save_to(rel)
+        self._save_to(rel, move=False)
 
-    def _save_to(self, rel: str):
+    def _save_to(self, rel: str, *, move: bool = False):
+        if self.metadata_panel.has_content_draft():
+            QMessageBox.warning(
+                self, tr("元数据尚未应用"),
+                tr("请先在“元数据”页点击“应用到代码”，再保存脚本。"),
+            )
+            return
+        resolver = get_resolver()
+        layer = self.metadata_panel.location() if resolver.is_dev_mode() else LAYER_LOCAL
+        if layer not in (LAYER_LOCAL, LAYER_SYSTEM):
+            QMessageBox.warning(self, tr("保存失败"), tr("无效的保存位置"))
+            return
+        target_root = resolver.local_dir if layer == LAYER_LOCAL else resolver.system_dir
+        target = target_root / wf_rel_path(rel)
+        source = self._current.path if self._current is not None else None
+        copying = source is not None and source != target
+        migrating = move and copying
+        if migrating and target.exists():
+            answer = QMessageBox.question(
+                self, tr("覆盖目标脚本？"),
+                tr("目标位置已有 {path}。继续会覆盖目标，并在成功保存后移除原文件。")
+                .format(path=target),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
         text = self.editor.toPlainText()
+        if copying and source is not None and self._current is not None:
+            source_layer = self._current.layer
+            source_root = ({LAYER_LOCAL: resolver.local_dir,
+                            LAYER_SYSTEM: resolver.system_dir}.get(
+                                source_layer, resolver.remote_dir) / "workflows")
+            try:
+                copy_trace_dependencies(text, source, target,
+                                        source_root, target_root / "workflows")
+            except (OSError, ValueError) as exc:
+                QMessageBox.warning(self, tr("迁移失败"), str(exc))
+                return
         # 保存是用户明确触发的校验边界；同时兼容程序化保存时
         # 编辑器未实际收到 FocusOut 的情况。
         self._refresh_metadata_warning()
@@ -998,11 +1119,11 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         if self._pending_trace is not None:
             from ...core.input_trace import save_input_trace_bundle
             resolver = get_resolver()
-            target = resolver.write_dir("workflows") / rel
+            workflow_root = target_root / "workflows"
             try:
                 path, trace_path, final_text = save_input_trace_bundle(
                     target, text, self._pending_trace,
-                    workflows_root=resolver.write_dir("workflows"),
+                    workflows_root=workflow_root,
                 )
             except Exception as e:  # noqa: BLE001
                 QMessageBox.warning(self, tr("保存失败"), str(e))
@@ -1014,17 +1135,30 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
             self.editor.blockSignals(False)
             self._pending_trace = None
         else:
-            written = self._write(rel, text)
+            written = self._write(rel, text, layer=layer)
             if written is None:
                 return
             path = written
+        if migrating and source is not None and self._current is not None:
+            try:
+                resolver.delete_entity(wf_rel_path(self._current.rel_path),
+                                       layer=self._current.layer)
+            except (OSError, PermissionError) as exc:
+                QMessageBox.warning(
+                    self, tr("迁移未完成"),
+                    tr("已写入目标位置，但无法移除原文件：{error}。请检查两份脚本。")
+                    .format(error=exc),
+                )
+                return
         self._changed_any = True
         self._dirty = False
         self._current = None
-        self._reload_list(select_id=rel)
+        self._reload_list_silent(rel)
         entry = self._entry(rel)
         self._current = entry
         self._apply_read_only(entry)
+        self._metadata_source_text = None
+        self._sync_metadata_panel(force=True)
         self._refresh_buttons()
         problems = check_syntax(text) or self._validate_on_disk(path)
         if problems:
@@ -1207,7 +1341,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         recording = record is not None and (
             record.is_recording
             or (bool(record.text_edit.toPlainText().strip()) and not record._preserved))
-        return self._dirty or config_dirty or recording
+        return self._dirty or self.metadata_panel.has_draft() or config_dirty or recording
 
     def closeEvent(self, event):  # noqa: N802 — Qt 虚函数
         if self.record.is_recording:

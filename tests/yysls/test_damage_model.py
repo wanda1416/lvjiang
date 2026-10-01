@@ -247,7 +247,14 @@ def test_all_shipped_models_match_excel_extraction(extractor):
 def test_extractor_finds_current_scheme_in_level_directory(extractor):
     scheme, data = extractor["_scheme"]("鸣金·虹")
     assert scheme == data["scheme"] == "基础方案"
-    assert data["model_level"] == 110
+    # 方案按等级分目录存放，_scheme 必须取最新一级。期望值从目录名推出，
+    # 新赛季模型入库后仍然成立，不跟着季度写死数字。
+    levels = {
+        int(path.parent.name.removesuffix("级"))
+        for path in extractor["SCHEME_DIR"].glob("*/鸣金·虹_*.json")
+    }
+    assert levels, "鸣金·虹 没有任何方案 JSON"
+    assert data["model_level"] == max(levels)
     assert data["source"]["file"]
 
 

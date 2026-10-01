@@ -95,12 +95,22 @@ class ScriptOpsMixin:
         self._status_bar.showMessage(f"已保存: {path}")
         logger.info(f"已保存脚本: {path}")
 
+    def _owner_main_window(self):
+        """宿主主窗口。
+
+        场景管理是独立顶层窗口（脱开父子关系才能被主界面压下去，见
+        ``MenuOpsMixin._show_modeless_tool``），所以不能再用 ``self.parent()``；
+        打开时注入的 ``_owner_window`` 才是宿主。回退到 parent() 是为了直接
+        构造该对话框的测试与其他调用方。
+        """
+        return getattr(self, "_owner_window", None) or self.parent()
+
     # ─── 脚本执行 ────────────────────────────────────────
 
     def showEvent(self, event: QShowEvent | None):  # type: ignore[misc]
         """对话框首次显示时填充用户下拉列表"""
         super().showEvent(event)  # type: ignore[misc]
-        main_win = self.parent()
+        main_win = self._owner_main_window()
         if main_win is not None and hasattr(main_win, '_user_manager'):
             self._refresh_script_user_combo(main_win)
 
@@ -136,8 +146,8 @@ class ScriptOpsMixin:
             self._result_text.setPlainText(tr("[错误] 脚本内容为空"))
             return
 
-        # 检查是否有父窗口（主窗口）提供运行环境
-        main_win = self.parent()
+        # 检查是否有宿主窗口（主窗口）提供运行环境
+        main_win = self._owner_main_window()
         if main_win is None:
             self._result_text.setPlainText(tr("[错误] 无主窗口，无法获取运行环境"))
             return

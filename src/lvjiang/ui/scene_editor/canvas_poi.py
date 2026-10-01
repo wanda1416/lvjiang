@@ -279,7 +279,12 @@ class CanvasPoiMixin:
         )
 
     def delete_point_by_key(self, key: str) -> bool:
-        """删除 point；被 arrow 引用时拒绝并返回 False"""
+        """从画布删除 point —— 只解除坐标绑定，保留与坐标无关的定义。
+
+        与区域同一条规则：``activation_key`` 与停用标记不依赖坐标，一起删掉等于
+        用户挪掉一个点却丢了按键绑定。被 arrow 引用时仍然拒绝——端点没了的方向
+        既画不出来也跑不了。
+        """
         point = self._resolve_point(key)
         if point is not None and point.is_reference:
             return False
@@ -287,7 +292,15 @@ class CanvasPoiMixin:
             QMessageBox.warning(self.window(), tr("无法删除"),
                                 tr("该坐标被方向引用，请先删除关联的方向。"))
             return False
+        before = len(self._points)
         self._points = [p for p in self._points if p.key != key]
+        # 只有真从可见列表里摘掉的才降级：命中的可能是被视图过滤到
+        # _hidden_points 的那份，那时什么都没删，再追加就成了重复条目
+        removed = len(self._points) != before
+        if removed and point is not None and (point.activation_key or point.disabled):
+            point.has_position = False
+            point.cx_ratio = point.cy_ratio = 0.0
+            self._nonvisual_points.append(point)
         self._selected_point_idx = -1
         self._notify_poi_changed()
         self.update()

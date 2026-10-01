@@ -504,14 +504,34 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
         return None
 
     def delete_selected(self):
-        """删除选中区域"""
-        if (self._selected_idx >= 0
-                and not self._regions[self._selected_idx].is_reference):
-            self._regions.pop(self._selected_idx)
-            self._selected_idx = -1
-            self._field_selected = False
-            self._notify_changed()
-            self.update()
+        """从画布删除选中区域 —— 只解除坐标绑定，不动与坐标无关的定义。
+
+        按键绑定（``activation_key``）与停用标记不依赖矩形：有按键绑定的区域
+        即使没有坐标也照样能 click（走按键通道）。把它们一起删掉，用户是在
+        "挪掉一个框"，结果却丢了按键绑定，而且要等脚本点不动才发现。
+
+        ``click_rect`` 与 ``template`` 相反，它们是**相对本区域**定义的：落点框
+        是区域的子集，模板在区域内搜索。矩形没了它们就无从依附，所以随坐标一起清。
+
+        没有任何可保留内容时仍整条移除——写一条只有 key 的空条目没有意义。
+        """
+        if self._selected_idx < 0:
+            return
+        region = self._regions[self._selected_idx]
+        if region.is_reference:
+            return
+        self._regions.pop(self._selected_idx)
+        if region.activation_key or region.disabled:
+            region.has_position = False
+            region.x_ratio = region.y_ratio = 0.0
+            region.w_ratio = region.h_ratio = 0.0
+            region.click_rect = None
+            region.template = None
+            self._nonvisual_regions.append(region)
+        self._selected_idx = -1
+        self._field_selected = False
+        self._notify_changed()
+        self.update()
 
     def clear_field_selection(self):
         """清除字段选择，回到全局调整模式"""

@@ -1,6 +1,7 @@
 #% name: 购买心法心得
 #% runnable: true
 #% batchable: true
+#% batch_check: check_xinfa_batch
 #% env: [android, desktop]
 #% parameters:
 #%   - name: open_bag_xinfa
@@ -38,6 +39,14 @@ import "subcall/profile_registry.wf"
 call $profile_ok = declare_profiles(["xinfa_of_week"])
 if $profile_ok < 0
     return -1
+end
+
+# 本周已兑换满就没有任何可做的事：散本里不会再有「自选」，走完导航也只是白跑一趟。
+# 与 batch_check 同一判据——那边在登录前拦住，这边兜住直接运行的入口。
+eval $xinfa_bought = profile_get("xinfa_of_week")
+if $xinfa_bought >= 600
+    log "本周心法心得已达兑换上限（xinfa_of_week=" + $xinfa_bought + "），结束任务"
+    return 0
 end
 
 default $open_bag_xinfa = false
@@ -209,3 +218,20 @@ scan [training_xinfa].[stock_of_week] as $weekly_stock
 call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_of_week", $xinfa_of_week, 600, "本周心法心得购买", "日常")
 call go_back()
 return -1
+
+# ─── check_xinfa_batch ─────────────────────────────────
+# 批量执行前置判定：本周心得已兑换满就不必为它登录。
+# 判据与正文开头一致（xinfa_of_week 记已购买数，上限 600）。
+# Profile 定义失败时保守返回 success：宁可白跑一轮，也不要因为读不到数据
+# 而漏掉真正该做的任务——正文里还会再试一次。
+def check_xinfa_batch($params)
+    call $profile_ok = declare_profiles(["xinfa_of_week"])
+    if $profile_ok < 0
+        return {"status": "success", "message": "Profile 定义失败，保守执行并在正文重试"}
+    end
+    eval $xinfa_bought = profile_get("xinfa_of_week")
+    if $xinfa_bought >= 600
+        return {"status": "skipped", "message": "本周心法心得已达兑换上限"}
+    end
+    return {"status": "success", "message": ""}
+end

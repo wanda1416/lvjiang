@@ -1,6 +1,7 @@
 #% name: 购买袅袅之音·绑
 #% runnable: true
 #% batchable: true
+#% batch_check: check_niaoniao_batch
 #% env: [android, desktop]
 #% parameters:
 #%   - name: max_scroll
@@ -28,6 +29,10 @@
 # 周额度与货币（profile 门控）：niaoniao_of_week 记录本周已购「绑」数（cap 2）。
 # 开头先读它，>= 2 直接跳过；再按长鸣玉 changmingyu 余额（每个 200）计算
 # 本次最多可买数量；买成后按本次个数把 niaoniao_of_week 累加回去，周周期自动清零。
+#
+# batch_check 只看 niaoniao_of_week，**不看长鸣玉**：余额不足只决定这次买几个，
+# 不构成"不必为它登录"的理由——同一轮里其他任务可能刚把长鸣玉扫出来或挣到手，
+# 拿一个可能过期的余额去否掉整次登录是本末倒置。
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
@@ -158,4 +163,20 @@ def niaoniao_purchase_count($bought_week, $cmyu)
         return 1
     end
     return $remaining
+end
+
+# ─── check_niaoniao_batch ──────────────────────────────
+# 批量执行前置判定：本周两个额度买满了就不必为它登录。
+# 只核查已购数量，不核查长鸣玉——理由见文件开头的说明。
+# Profile 定义失败时保守返回 success，正文里还会再读一次。
+def check_niaoniao_batch($params)
+    call $profile_ok = declare_profiles(["niaoniao_of_week"])
+    if $profile_ok < 0
+        return {"status": "success", "message": "Profile 定义失败，保守执行并在正文重试"}
+    end
+    eval $bought_week = profile_get("niaoniao_of_week")
+    if $bought_week >= 2
+        return {"status": "skipped", "message": "本周袅袅之音·绑已买满 2 个"}
+    end
+    return {"status": "success", "message": ""}
 end

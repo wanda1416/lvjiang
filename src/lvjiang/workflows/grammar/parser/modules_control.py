@@ -273,9 +273,20 @@ class _ModuleControlMixin:
     def timeline_offset(self, items):
         return items[0]
 
+    def timeline_env_guard(self, items):
+        """env:"desktop" -> <输入语句> — 条目级环境守卫，返回给 timeline_entry"""
+        env_name = self._unquote(str(items[0]))
+        if not env_name:
+            raise WorkflowUserError("timeline 条目的环境名不能为空")
+        return ("timeline_env", env_name, items[1])
+
     def timeline_entry(self, items):
-        """@<偏移> <输入语句> — 一路输入在时间线上的起点"""
+        """@<偏移> [env:"x" ->] <输入语句> — 一路输入在时间线上的起点"""
         offset, action = items[0], items[1]
+        env_name = ""
+        if (isinstance(action, tuple) and len(action) == 3
+                and action[0] == "timeline_env"):
+            _, env_name, action = action
         # 带 wait_clauses 的语句会被展开成 [waits..., action, waits...] 列表。
         # after wait 在块内是陷阱：时序由 @偏移 决定，写了也不会生效，
         # 而"写了没生效"比不支持更难发现。直接拒绝并指出该用什么。
@@ -285,7 +296,8 @@ class _ModuleControlMixin:
                 "各路的起跑时刻由 @偏移 决定；要表达持续时长请用 hold"
             )
         return TimelineEntry(
-            offset=offset, action=action, line_no=self._line(items))
+            offset=offset, action=action, env=env_name,
+            line_no=self._line(items))
 
     def timeline_stmt(self, items):
         """timeline ... end — 块内各路按偏移并发执行

@@ -153,14 +153,34 @@ git push public X.Y.Z
 发布工作流。任一远端推送失败时都应停止并修复一致性，不能把只存在于单个远端的标签
 视为发布完成。
 
-Release 工作流会依次完成：
+Release 工作流分三个作业：Windows 与 Android 各自构建并上传 artifact，最后一个作业
+统一创建 Release。
+
+**为什么拆开发布**：如果让 Windows 作业先发布、Android 作业再补传 APK，APK 构建一失败
+就会留下一个缺产物的已发布版本——而 Release 一旦发布禁止移动标签，只能递增补丁版本
+重发。拆成「两边都产出，最后统一发布」就是要么全有要么没发。
+
+`build-windows`：
 
 1. 校验标签严格为 `X.Y.Z`，并与 `pyproject.toml` 版本一致；
 2. 确认 `docs/50-releases/vX.Y.Z.md` 存在、一级标题以 `vX.Y.Z` 开头，且标签提交属于远端 `master`；
 3. 检查配置 `content_version` 完整性，运行 Ruff、mypy 与全量 pytest；
-4. 执行 `packaging\\package.bat`，并强制检查 ZIP 和 Inno Setup 安装器均已生成；
-5. 生成 `SHA256SUMS.txt`，保存 Actions artifact；
-6. 创建 GitHub Release，使用版本发布文档的一级标题和正文，并上传三个产物。
+4. 执行 `packaging\\package.bat`，并强制检查 ZIP 和 Inno Setup 安装器均已生成。
+
+`build-android`（Ubuntu runner）：
+
+1. 校验 `versionName` 与标签一致，且 `versionCode` 严格大于上一个标签的值
+   （它同时是设备端配置解压的 stamp，不递增则设备上仍是旧配置）；
+2. 从 secret 还原 keystore 并写出 `keystore.properties`，缺 secret 立即失败；
+3. `:app:assembleRelease`；
+4. 用 `apksigner` 独立核验签名人：必须不是 debug 证书，且指纹与
+   `android/release-cert-sha256.txt` 一致。详见 `android/README-signing.md`。
+
+`publish`：
+
+1. 取两个作业的 artifact，确认三个产物（ZIP / 安装器 / APK）都在且非空；
+2. 生成覆盖三者的 `SHA256SUMS.txt`；
+3. 创建 GitHub Release，使用版本发布文档的一级标题和正文，上传四个文件。
 
 任何一步失败都不会发布 GitHub Release。临时故障可直接重新运行该 workflow；
 需要修改代码时，只能在 Release 尚未发布的前提下删除失败标签，修复并合并后再
@@ -178,6 +198,11 @@ packaging\package.bat
 - `dist/lvjiang/lvjiang.exe` — 可执行文件
 - `dist/lvjiang-vX.Y.Z-win64.zip` — 发布压缩包（便携版）
 - `dist/lvjiang-vX.Y.Z-win64-setup.exe` — Windows 安装包（推荐）
+
+APK 由发布流水线产出（`dist/lvjiang-vX.Y.Z.apk`），本地排障用
+`cd android && ./gradlew :app:assembleDebug`——debug 变体不需要签名密钥。
+本地跑 `assembleRelease` 需要 `android/keystore.properties`，缺它会直接失败
+而不是退回 debug 签名。
 
 > **便携版升级必须解压到新目录。** ZIP 由用户自行解压，没有任何一方能删除旧文件，
 > 就地覆盖会留下上一版已经删除或移动过的 `config/system` 内容。发布说明里给便携版
@@ -224,9 +249,9 @@ packaging\package.bat
 - [ ] 所有变更已提交并推送
 - [ ] 发布提交已进入 `origin/master` 和 `public/master`，且两者指向同一提交
 - [ ] `X.Y.Z` 标签与 `pyproject.toml` 一致，已同时推送到 `origin` 和 `public`，且指向同一提交
-- [ ] GitHub Release 工作流中的配置检查、Ruff、mypy 和 pytest 全部通过
+- [ ] GitHub Release 工作流三个作业全部通过（含 Android 版本号校验与签名核验）
 - [ ] 云端 `packaging/package.bat` 打包成功，版本注入校验通过
-- [ ] GitHub Release 已发布，ZIP、安装器和 `SHA256SUMS.txt` 已上传
+- [ ] GitHub Release 已发布，ZIP、安装器、APK 和 `SHA256SUMS.txt` 已上传
 
 ---
 

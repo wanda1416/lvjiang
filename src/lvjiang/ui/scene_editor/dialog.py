@@ -1061,6 +1061,8 @@ class SceneEditorDialog(
         QDialog.closeEvent 会调用 reject()，且当 reject 后对话框仍可见时
         会 ignore 关闭事件，因此只需覆盖 reject 即可同时拦截 X 与 Esc。
         """
+        if not self._confirm_script_stopped_before_close():
+            return
         if not self._confirm_discard_changes(tr("关闭场景编辑器")):
             return
         super().reject()

@@ -2,10 +2,16 @@
 
 from loguru import logger
 from PyQt6.QtGui import QShowEvent
-from PyQt6.QtWidgets import QFileDialog, QPushButton, QTextEdit
+from PyQt6.QtWidgets import (
+    QFileDialog,
+    QMessageBox,
+    QPushButton,
+    QTextEdit,
+)
 
 from ...core.config.resolver import get_resolver
 from ...i18n import tr
+from ..button_styles import apply_button_style
 
 
 def _format_value(value) -> str:
@@ -139,17 +145,72 @@ class ScriptOpsMixin:
             self._script_user_combo.setCurrentIndex(idx)
         self._script_user_combo.blockSignals(False)
 
+    # ─── 脚本测试：启停 ──────────────────────────────────
+
+    def _script_is_running(self) -> bool:
+        worker = getattr(self, "_script_worker", None)
+        return worker is not None and worker.isRunning()
+
     def _on_script_test(self):
+        """「运行脚本 / 结束运行」同一个按钮：没在跑就启动，在跑就请求停止。"""
+        if self._script_is_running():
+            self._request_script_stop()
+            return
+        self._start_script_test()
+
+    def _request_script_stop(self):
+        """请求停止。引擎在语句边界查 stop_check，所以不是立刻返回。
+
+        按下后立即禁用按钮并改文案：停止是异步的，这段时间里重复点击既不会更快
+        停下，也会让人以为没响应。
+        """
+        self._script_stop_requested = True
+        self._btn_run_script.setEnabled(False)
+        self._btn_run_script.setText(tr("正在结束..."))
+        self._status_bar.showMessage(tr("已请求结束脚本，等待当前指令完成..."))
+
+    def _set_script_running_ui(self, running: bool):
+        """按钮在"运行脚本"与"结束运行"之间切换"""
+        self._btn_run_script.setEnabled(True)
+        if running:
+            self._btn_run_script.setText(tr("结束运行"))
+            apply_button_style(self._btn_run_script, variant="danger")
+        else:
+            self._btn_run_script.setText(tr("运行脚本"))
+            apply_button_style(self._btn_run_script)
+
+    def _confirm_script_stopped_before_close(self) -> bool:
+        """关闭前的脚本门禁：还在跑就先请求停止并留住窗口。
+
+        不能直接关：工作线程的 parent 是本对话框，而对话框带 WA_DeleteOnClose，
+        关掉就是在线程还在驱动鼠标键盘时销毁它的父对象。
+        """
+        if not self._script_is_running():
+            return True
+        self._request_script_stop()
+        QMessageBox.information(
+            self, tr("脚本仍在运行"),  # type: ignore[arg-type]
+            tr("已请求结束脚本测试，等它停下后再关闭窗口。"))
+        return False
+
+    def _start_script_test(self):
         """执行脚本测试器中的 DSL 脚本，结果输出到左侧 _result_text"""
         script = self._script_text.toPlainText().strip()
         if not script:
             self._result_text.setPlainText(tr("[错误] 脚本内容为空"))
             return
+        # 上一轮的停止标志必须先清掉，否则刚停过一次之后新的一轮会一启动就自杀
+        self._script_stop_requested = False
 
         # 检查是否有宿主窗口（主窗口）提供运行环境
         main_win = self._owner_main_window()
         if main_win is None:
             self._result_text.setPlainText(tr("[错误] 无主窗口，无法获取运行环境"))
+            return
+
+        if getattr(main_win, "_running", False):
+            self._result_text.setPlainText(
+                tr("[错误] 主窗口正在执行任务，请先停止后再运行脚本"))
             return
 
         backend = getattr(main_win, "_backend", "windows")
@@ -174,7 +235,7 @@ class ScriptOpsMixin:
         # 刷新用户下拉列表（每次运行前刷新，确保包含最新用户）
         self._refresh_script_user_combo(main_win)
 
-        try:
+        try:  # noqa: PLR1702 — 构建期的失败路径与原实现保持一致
             # 构建 WorkflowEngine
             from ...workflows.engine import DeviceWorkflowEngineBuilder
             layout_key = self._current_layout.key if self._current_layout else ""
@@ -199,7 +260,7 @@ class ScriptOpsMixin:
                 run_env=main_win._selected_run_env(),
                 window_left=window_left,
                 window_top=window_top,
-                stop_check=lambda: False,
+                stop_check=lambda: getattr(self, "_script_stop_requested", False),
             ).build()
             # session/context 装配（与主入口一致）
             # 使用下拉列表选中的用户，而非主页面的 active user
@@ -218,37 +279,69 @@ class ScriptOpsMixin:
                 save_editor_snapshot,
             )
             save_editor_snapshot(script)
-            with runtime_source(script) as temp_wf:
-                result = engine.execute(temp_wf)
-            return_value = engine.return_value
 
-            # 格式化输出结果到左侧结果区
-            import json
+            # 放进线程执行：引擎里有大量 OCR、等待和长按，同步跑会把编辑器
+            # 和主界面一起冻住——卡死期间连"结束运行"都点不到。
+            from ..main.run_control import WorkflowWorker
 
-            from ..main.run_control import _to_serializable
+            def _run():
+                with runtime_source(script) as temp_wf:
+                    result = engine.execute(temp_wf)
+                return (result, engine.return_value)
 
-            # 构建显示内容
-            lines = []
-
-            # 返回值
-            if return_value is not None:
-                lines.append(f"返回值：{_format_value(return_value)}")
-            else:
-                lines.append(tr("返回值：(无)"))
-
-            # 结果集
-            if result:
-                lines.append(tr("结果集："))
-                serializable = _to_serializable(result)
-                lines.append(json.dumps(serializable, ensure_ascii=False, indent=2))
-            else:
-                lines.append(tr("结果集：(空)"))
-
-            self._result_text.setPlainText("\n".join(lines))
-            self._status_bar.showMessage(tr("脚本测试完成"))
+            worker = WorkflowWorker("scene_editor_script", _run, self)
+            self._script_worker = worker
+            worker.finished.connect(self._on_script_test_finished)
+            self._set_script_running_ui(True)
+            worker.start()
 
         except Exception as e:
             import traceback
             self._result_text.setPlainText(f"[错误] {e}\n\n{traceback.format_exc()}")
             self._status_bar.showMessage(tr("脚本测试失败"))
             logger.error(f"脚本测试异常: {e}")
+            self._script_worker = None
+            self._set_script_running_ui(False)
+
+    def _on_script_test_finished(self):
+        """线程结束：格式化结果、恢复按钮。
+
+        无论正常结束、异常还是被停止，都要走到这里把按钮放回"运行脚本"——
+        否则按钮会永远停在"结束运行"，而脚本早就不跑了。
+        """
+        worker = getattr(self, "_script_worker", None)
+        self._script_worker = None
+        stopped = getattr(self, "_script_stop_requested", False)
+        self._script_stop_requested = False
+        self._set_script_running_ui(False)
+        if worker is None:
+            return
+
+        outcome = worker.result_or_exception
+        if isinstance(outcome, BaseException):
+            import traceback
+            detail = "".join(traceback.format_exception(
+                type(outcome), outcome, outcome.__traceback__))
+            self._result_text.setPlainText(f"[错误] {outcome}\n\n{detail}")
+            self._status_bar.showMessage(tr("脚本测试失败"))
+            return
+
+        import json
+
+        from ..main.run_control import _to_serializable
+
+        result, return_value = outcome if outcome is not None else (None, None)
+        lines = []
+        if return_value is not None:
+            lines.append(f"返回值：{_format_value(return_value)}")
+        else:
+            lines.append(tr("返回值：(无)"))
+        if result:
+            lines.append(tr("结果集："))
+            lines.append(json.dumps(
+                _to_serializable(result), ensure_ascii=False, indent=2))
+        else:
+            lines.append(tr("结果集：(空)"))
+        self._result_text.setPlainText("\n".join(lines))
+        self._status_bar.showMessage(
+            tr("脚本已结束运行") if stopped else tr("脚本测试完成"))

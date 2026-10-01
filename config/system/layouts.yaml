@@ -8,7 +8,7 @@ layouts:
       y_ratio: 0.0
       w_ratio: 1.0
       h_ratio: 1.0
-    aspect: "20:9"
+    aspect: '20:9'
   android_cast:
     name: 投屏布局
     extends: android
@@ -26,7 +26,7 @@ layouts:
       y_ratio: 0.0277033065236819
       w_ratio: 0.9917355371900827
       h_ratio: 0.9651474530831099
-    aspect: "16:9"
+    aspect: '16:9'
     aspect_tolerance: 0.02
   desktop_fullscreen:
     name: 桌面全屏
@@ -37,4 +37,4 @@ layouts:
       y_ratio: 0.0
       w_ratio: 1.0
       h_ratio: 1.0
-    aspect: "16:9"
+    aspect: '16:9'

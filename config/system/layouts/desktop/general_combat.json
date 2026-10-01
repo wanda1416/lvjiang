@@ -2,9 +2,23 @@
   "content_version": 1,
   "regions": [
     {
-      "key": "switch",
+      "key": "weapon",
       "disabled": true,
       "activation_key": "NUMPAD8"
+    },
+    {
+      "key": "bow",
+      "disabled": true,
+      "activation_key": "NUMPAD2"
+    },
+    {
+      "key": "assassinate",
+      "disabled": true,
+      "activation_key": "F"
+    },
+    {
+      "key": "pickup",
+      "disabled": true
     }
   ],
   "points": [
@@ -13,6 +27,7 @@
       "cx_ratio": 0.7436439933547924,
       "cy_ratio": 0.7420041320550339,
       "r_ratio": 0.0503113897993085,
+      "disabled": true,
       "activation_key": "Q"
     },
     {
@@ -20,6 +35,7 @@
       "cx_ratio": 0.7335087259798797,
       "cy_ratio": 0.9008272204791421,
       "r_ratio": 0.0503113897993085,
+      "disabled": true,
       "activation_key": "GRAVE"
     },
     {
@@ -34,6 +50,7 @@
       "cx_ratio": 0.8497942070944381,
       "cy_ratio": 0.5371446576686366,
       "r_ratio": 0.0503113897993085,
+      "disabled": true,
       "activation_key": "E"
     },
     {
@@ -41,6 +58,7 @@
       "cx_ratio": 0.9176706888964269,
       "cy_ratio": 0.5051815111232848,
       "r_ratio": 0.0503113897993085,
+      "disabled": true,
       "activation_key": "R"
     },
     {
@@ -48,6 +66,7 @@
       "cx_ratio": 0.847931277879307,
       "cy_ratio": 0.7507569138182658,
       "r_ratio": 0.0503113897993085,
+      "disabled": true,
       "activation_key": "MOUSE_LEFT"
     },
     {
@@ -55,49 +74,33 @@
       "cx_ratio": 0.8282569353280059,
       "cy_ratio": 0.9175211566635795,
       "r_ratio": 0.0503113897993085,
+      "disabled": true,
       "activation_key": "SHIFT"
     },
     {
       "key": "tiaoyue",
-      "cx_ratio": 0.9242438792904143,
-      "cy_ratio": 0.7150217189228415,
-      "r_ratio": 0.0503113897993085,
+      "disabled": true,
       "activation_key": "SPACE"
     },
     {
       "key": "qishu_1",
-      "cx_ratio": 0.027800262694985093,
-      "cy_ratio": 0.7231807649753814,
-      "r_ratio": 0.015109635900725527,
+      "disabled": true,
       "activation_key": "1"
     },
     {
       "key": "qishu_2",
-      "cx_ratio": 0.056689201807931244,
-      "cy_ratio": 0.7231807649753814,
-      "r_ratio": 0.015109635900725527,
+      "disabled": true,
       "activation_key": "2"
     },
     {
       "key": "qishu_3",
-      "cx_ratio": 0.08576278375184404,
-      "cy_ratio": 0.7231807649753814,
-      "r_ratio": 0.015109635900725527,
+      "disabled": true,
       "activation_key": "3"
     },
     {
       "key": "qishu_4",
-      "cx_ratio": 0.11474404428027353,
-      "cy_ratio": 0.7231807649753814,
-      "r_ratio": 0.015109635900725527,
+      "disabled": true,
       "activation_key": "4"
-    },
-    {
-      "key": "bow",
-      "cx_ratio": 0.14847004030409108,
-      "cy_ratio": 0.7231807649753814,
-      "r_ratio": 0.015109635900725527,
-      "activation_key": "NUMPAD2"
     }
   ]
 }

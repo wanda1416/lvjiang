@@ -75,6 +75,13 @@ class MenuOpsMixin:
             dialog = factory()
             dialog.setModal(False)
             dialog.setWindowModality(Qt.WindowModality.NonModal)
+            # 带 parent 的 QDialog 在窗管层是宿主的瞬态窗口，永远压在主界面之上
+            # ——用户点主界面也换不回来。这些工具窗是长时间并排使用的（一边看
+            # 场景管理一边操作主界面），所以改成独立顶层窗口，按点击顺序排序。
+            # 仍保留 parent：生命周期跟随、居中定位、_close_modeless_tools 统一
+            # 收尾都依赖它。
+            dialog.setWindowFlag(Qt.WindowType.Dialog, False)
+            dialog.setWindowFlag(Qt.WindowType.Window, True)
             dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
             windows[key] = dialog
         finally:

@@ -1,6 +1,7 @@
 """脚本测试混入类 - DSL 脚本测试器"""
 
 from loguru import logger
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QShowEvent
 from PyQt6.QtWidgets import (
     QFileDialog,
@@ -30,25 +31,50 @@ def _format_value(value) -> str:
     return str(value)
 
 
-class _SceneKeyButton(QPushButton):
-    """场景 key 按钮：点击后在脚本编辑器光标处插入当前场景 key"""
+class _InsertEntityButton(QPushButton):
+    """在脚本编辑器光标处插入当前选中实体的完整引用，形如 ``[scene].[entity]``。
 
-    def __init__(self, get_scene_key, parent=None):
-        super().__init__(tr("输入当前场景"), parent)
+    只插完整引用而不只插场景 key：脚本里引用实体从来都是两段式的，单给一个场景名
+    还要自己补 ``.[...]``，省不了多少事还容易漏写括号。
+
+    启用条件是两个都成立——脚本编辑区握着光标、右侧实体区确实选中了一项。按钮自身
+    设成 NoFocus，否则点一下焦点就被它抢走，光标条件立刻不成立，连插第二次都做不到。
+    """
+
+    def __init__(self, get_scene_key, get_entity_key, parent=None):
+        super().__init__(tr("插入当前实体"), parent)
         self._get_scene_key = get_scene_key
+        self._get_entity_key = get_entity_key
         self._target: QTextEdit | None = None
-        self.setToolTip(tr("点击在脚本编辑器光标处插入当前场景 key"))
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setEnabled(False)
+        self.setToolTip(tr(
+            "在脚本光标处插入形如 [scene].[entity] 的引用。"
+            "需要先在右侧选中一个实体，并把光标放在脚本编辑区"))
 
     def set_target(self, target: QTextEdit):
         self._target = target
 
+    def reference(self) -> str:
+        """当前可插入的引用；条件不满足时为空串"""
+        scene_key = self._get_scene_key()
+        entity_key = self._get_entity_key()
+        if not scene_key or not entity_key:
+            return ""
+        return f"[{scene_key}].[{entity_key}]"
+
+    def refresh_enabled(self):
+        """按"光标在脚本区 + 右侧有选中实体"刷新可用性"""
+        has_cursor = self._target is not None and self._target.hasFocus()
+        self.setEnabled(bool(has_cursor and self.reference()))
+
     def _on_clicked(self):
-        key = self._get_scene_key()
-        if key and self._target is not None:
-            cursor = self._target.textCursor()
-            cursor.insertText(key)
-            self._target.setTextCursor(cursor)
-            self._target.setFocus()
+        reference = self.reference()
+        if not reference or self._target is None:
+            return
+        cursor = self._target.textCursor()
+        cursor.insertText(reference)
+        self._target.setTextCursor(cursor)
 
 
 class ScriptOpsMixin:

@@ -732,6 +732,33 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
 
     # ─── 列表刷新 ────────────────────────────────────────
 
+    def selected_entity_key(self) -> str:
+        """右侧当前实体分类里选中的那一项的 key；没选中返回空串。
+
+        只看**当前可见**的那个分类：五个分类各自保留自己的选中行，若把它们合起来
+        找，用户看到的是"区域"页却插进一个坐标的 key，对不上眼前的画面。
+
+        方向表是普通 QTableWidget（key 在第 0 列文本），其余四个是
+        EntityOrderTable（key 存在第 0 列的 UserRole 里）。
+        """
+        table = {
+            0: getattr(self, "_region_table", None),
+            1: getattr(self, "_point_list", None),
+            2: getattr(self, "_arrow_list", None),
+            3: getattr(self, "_panel_table", None),
+            4: getattr(self, "_reference_table", None),
+        }.get(self._right_tabs.currentIndex())
+        if table is None:
+            return ""
+        row = table.currentRow()
+        if row < 0 or not table.selectionModel().hasSelection():
+            return ""
+        getter = getattr(table, "entity_key", None)
+        if getter is not None:
+            return getter(row)
+        item = table.item(row, 0)
+        return item.text() if item is not None else ""
+
     def _refresh_entity_tab_titles(self) -> None:
         """Refresh all entity totals; region/point counts include references."""
         scene = get_registry().get_scene(self._scene_key)

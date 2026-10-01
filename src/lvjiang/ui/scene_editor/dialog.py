@@ -5,6 +5,7 @@ from math import gcd
 from loguru import logger
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QFrame,
@@ -47,7 +48,7 @@ from .layout_ops import LayoutOpsMixin
 from .recognition_ops import RecognitionOpsMixin
 from .scene_ops import SceneOpsMixin
 from .scene_tab import SceneTab
-from .script_ops import ScriptOpsMixin, _SceneKeyButton
+from .script_ops import ScriptOpsMixin, _InsertEntityButton
 
 _REFERENCE_GROUP_COMBO_CHARACTER_CAPACITY = 8
 
@@ -187,6 +188,13 @@ class SceneEditorDialog(
     def closeEvent(self, event):
         self._save_window_size()
         super().closeEvent(event)
+
+    def _selected_entity_key(self) -> str:
+        """当前场景 Tab 右侧选中实体的 key；没有则空串"""
+        tab = self._current_scene_tab()
+        if tab is None:
+            return ""
+        return tab.selected_entity_key()
 
     # ─── UI 构建 ───────────────────────────────────────────
 
@@ -412,8 +420,9 @@ class SceneEditorDialog(
         self._btn_save_script = QPushButton(tr("保存文件"))
         self._btn_save_script.clicked.connect(self._on_save_script_file)
         script_btn_row.addWidget(self._btn_save_script)
-        # 当前场景 key 按钮
-        self._scene_key_btn = _SceneKeyButton(self._get_current_scene_key)
+        # 插入当前实体：[scene].[entity]
+        self._scene_key_btn = _InsertEntityButton(
+            self._get_current_scene_key, self._selected_entity_key)
         self._scene_key_btn.clicked.connect(self._scene_key_btn._on_clicked)
         script_btn_row.addWidget(self._scene_key_btn)
         apply_button_style(self._btn_run_script, self._btn_save_script)
@@ -435,6 +444,12 @@ class SceneEditorDialog(
 
         # 设置按钮目标为脚本编辑器
         self._scene_key_btn.set_target(self._script_text)
+        # 焦点变化就重算可用性：点进脚本区、点右侧实体行、换场景 Tab 都会改焦点，
+        # 一个信号全覆盖，不必给五张实体表各连一遍选中信号。
+        app = QApplication.instance()
+        if app is not None:
+            app.focusChanged.connect(
+                lambda *_a: self._scene_key_btn.refresh_enabled())
 
         self._bottom_splitter.addWidget(script_panel)
         self._bottom_splitter.setSizes([500, 500])

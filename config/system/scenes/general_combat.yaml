@@ -2,8 +2,13 @@ content_version: 1
 key: general_combat
 name: 战斗
 regions:
-- key: switch
+- key: weapon
   name: 切换武器
+  type: func
+  is_text: false
+  is_clickable: true
+- key: bow
+  name: 切换弓箭
   type: func
   is_text: false
   is_clickable: true
@@ -15,7 +20,7 @@ regions:
 - key: pickup
   name: 拾取
   type: func
-  is_text: true
+  is_text: false
   is_clickable: true
 points:
 - key: wuxueji
@@ -75,11 +80,6 @@ points:
   is_clickable: true
 - key: qishu_4
   name: 奇术4
-  type: func
-  is_text: false
-  is_clickable: true
-- key: bow
-  name: 弓箭
   type: func
   is_text: false
   is_clickable: true

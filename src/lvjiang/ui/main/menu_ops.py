@@ -75,13 +75,22 @@ class MenuOpsMixin:
             dialog = factory()
             dialog.setModal(False)
             dialog.setWindowModality(Qt.WindowModality.NonModal)
-            # 带 parent 的 QDialog 在窗管层是宿主的瞬态窗口，永远压在主界面之上
-            # ——用户点主界面也换不回来。这些工具窗是长时间并排使用的（一边看
-            # 场景管理一边操作主界面），所以改成独立顶层窗口，按点击顺序排序。
-            # 仍保留 parent：生命周期跟随、居中定位、_close_modeless_tools 统一
-            # 收尾都依赖它。
+            # 窗管层的"永远压在宿主之上"来自**父子关系**，不是窗口类型标志：
+            # 带 parent 的顶层窗口在 Windows 上是 owned window，而 owned window
+            # 的 Z 序永远高于 owner，改标志位没用（这是第一版没生效的原因）。
+            # 这些工具是长时间并排使用的——一边看场景区域、一边在主界面刷新
+            # 截图——所以必须真的脱开父子关系，让它按点击顺序排序。
+            #
+            # 脱开后仍要能回到主窗口：脚本工作台要读当前用户、连接后端和设备
+            # 状态。所以显式留一个宿主引用，取代原先的 self.parent()。
+            dialog._owner_window = self  # type: ignore[attr-defined]
+            flags = dialog.windowFlags()
+            # 两参 setParent 才保留窗口标志；单参版本会把它们重置掉
+            dialog.setParent(None, flags)
             dialog.setWindowFlag(Qt.WindowType.Dialog, False)
             dialog.setWindowFlag(Qt.WindowType.Window, True)
+            # 没有 Qt 父对象后，生命周期靠这里的字典引用 + WA_DeleteOnClose；
+            # 主窗口关闭时 _close_modeless_tools 逐个 close，顺序不变。
             dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
             windows[key] = dialog
         finally:

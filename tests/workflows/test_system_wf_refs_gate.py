@@ -94,7 +94,8 @@ def test_desktop_layout_has_required_activation_bindings():
     layout = _validator("desktop")._layout
     expected = {
         ("general_control", "confirm"): "SPACE",
-        ("general_combat", "switch"): "NUMPAD8",
+        ("general_combat", "weapon"): "NUMPAD8",
+        ("general_combat", "assassinate"): "F",
         ("general_combat", "wuxueji"): "Q",
         ("general_combat", "teshuji"): "GRAVE",
         ("general_combat", "xieshi"): "E",

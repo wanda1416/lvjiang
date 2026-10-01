@@ -187,7 +187,19 @@ class SceneEditorDialog(
 
     def closeEvent(self, event):
         self._save_window_size()
+        # 显式断开应用级信号：它活得比本对话框久，留着就是在已销毁的控件上回调
+        app = getattr(self, "_focus_watch_app", None)
+        if app is not None:
+            try:
+                app.focusChanged.disconnect(self._refresh_insert_entity_button)
+            except TypeError:
+                pass  # 已经断开（重复 close 等）
+            self._focus_watch_app = None
         super().closeEvent(event)
+
+    def _refresh_insert_entity_button(self, *_args) -> None:
+        """焦点变化后重算「插入当前实体」的可用性"""
+        self._scene_key_btn.refresh_enabled()
 
     def _selected_entity_key(self) -> str:
         """当前场景 Tab 右侧选中实体的 key；没有则空串"""
@@ -446,10 +458,15 @@ class SceneEditorDialog(
         self._scene_key_btn.set_target(self._script_text)
         # 焦点变化就重算可用性：点进脚本区、点右侧实体行、换场景 Tab 都会改焦点，
         # 一个信号全覆盖，不必给五张实体表各连一遍选中信号。
-        app = QApplication.instance()
-        if app is not None:
-            app.focusChanged.connect(
-                lambda *_a: self._scene_key_btn.refresh_enabled())
+        #
+        # focusChanged 挂在 QApplication 上，**生命周期比本对话框长得多**。必须连
+        # 绑定方法而不是 lambda：PyQt 只对前者持弱引用并在接收者销毁时自动断开，
+        # lambda 没有关联的 QObject，连接会一直留着，窗口关掉后每次焦点变化都去
+        # 碰已销毁的控件。closeEvent 里再显式断一次，不依赖回收时机。
+        self._focus_watch_app = QApplication.instance()
+        if self._focus_watch_app is not None:
+            self._focus_watch_app.focusChanged.connect(
+                self._refresh_insert_entity_button)
 
         self._bottom_splitter.addWidget(script_panel)
         self._bottom_splitter.setSizes([500, 500])

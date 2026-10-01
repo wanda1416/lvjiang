@@ -73,3 +73,42 @@ jobs:
           name: coverage-${{ github.sha }}
           path: coverage.xml
           if-no-files-found: ignore
+
+  # Kotlin 侧改动此前完全没有自动验证——只能靠眼睛看。这里编一次 debug 变体，
+  # 语法、API 误用、Gradle 脚本错误都会当场暴露。
+  #
+  # 只编不打包：assembleDebug 要走 Chaquopy 的 pip 安装（numpy/opencv/rapidocr 含
+  # 15.8MB 模型）再过一遍打包，CI 每次推送都跑代价太大；compileDebugKotlin 覆盖的
+  # 正是"改了 Kotlin 编不过"这个真实缺口。release 变体的完整构建由发布流水线负责。
+  #
+  # 不配签名密钥：debug 变体不需要，而 release 构建现在缺密钥就直接失败——这正是
+  # 期望行为，不该在 CI 里绕过。
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Chaquopy 的 buildPython 必须是 3.10，且 build.gradle.kts 在配置阶段就会
+      # 检查它存在，所以任何 gradle 调用都得先把它备好。
+      - uses: actions/setup-python@v5
+        id: buildpython
+        with:
+          python-version: "3.10"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-35 build-tools;34.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile Kotlin (debug)
+        env:
+          LVJIANG_BUILD_PYTHON: ${{ steps.buildpython.outputs.python-path }}
+        run: |
+          cd android
+          ./gradlew --no-daemon :app:compileDebugKotlin

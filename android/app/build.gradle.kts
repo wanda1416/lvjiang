@@ -32,9 +32,12 @@ android {
         buildConfig = true // AGP 8 默认关闭，ShellBridge 需要 BuildConfig.APPLICATION_ID
     }
 
-    // 签名配置：从 android/keystore.properties 读取，文件不存在时 release 走 debug 签名
-    // （assembleRelease 仍能跑，但产物无法直接发布；首次发布前用户需生成 keystore
-    // 并写入 keystore.properties，详见 android/README-signing.md）。
+    // 签名配置：从 android/keystore.properties 读取。
+    //
+    // **缺密钥时不再退回 debug 签名。** 那个兜底在本机很省事，但在 CI 上是陷阱：
+    // 构建照样成功，产出的却是签名错的 APK，装到用户机器上与正式版冲突，而且
+    // 没有任何一步会报错。所以 release 构建没有有效 keystore 就直接失败。
+    // debug 构建不受影响（DEPLOYMENT.md 的主流程用 assembleDebug，不需要密钥）。
     val ksPropsFile = rootProject.file("keystore.properties")
     if (ksPropsFile.exists()) {
         val ksProps = Properties()
@@ -59,11 +62,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // 签名可选：keystore.properties 存在则签，否则走 debug 签名兜底
-            if (ksPropsFile.exists()) {
-                signingConfig = signingConfigs.getByName("release")
+            // 没有正式 keystore 时留空而不是退回 debug：宁可产出未签名包被后续
+            // 步骤拦下，也不要产出一个"看起来能装"的错签名包
+            signingConfig = if (ksPropsFile.exists()) {
+                signingConfigs.getByName("release")
             } else {
-                signingConfig = signingConfigs.getByName("debug")
+                null
             }
         }
     }
@@ -102,6 +106,22 @@ if (!buildPythonExe.exists()) {
             "（PowerShell：\$env:UV_PYTHON_INSTALL_DIR=\"<repo>/.tooling/python\"; uv python install 3.10）\n" +
             "或用 -PbuildPython=<python 可执行文件> / 环境变量 LVJIANG_BUILD_PYTHON 指定"
     )
+}
+
+// release 任务没有有效签名就不许开工。放在配置阶段而不是打包阶段：等 R8 和
+// Chaquopy 跑完十几分钟再报"没密钥"毫无意义。
+// 只看本次调用的任务名，所以 assembleDebug 完全不受影响。
+run {
+    val wantsRelease = gradle.startParameter.taskNames.any { it.contains("Release") }
+    val keystoreProps = rootProject.file("keystore.properties")
+    if (wantsRelease && !keystoreProps.exists()) {
+        throw GradleException(
+            "release 构建需要正式签名，但找不到 $keystoreProps\n" +
+                "本机发布：按 android/README-signing.md 生成 keystore 并写入该文件\n" +
+                "CI：确认 ANDROID_KEYSTORE_BASE64 等四个 secret 已配置（见同一文档）\n" +
+                "只是想装到手机上测试请用 assembleDebug，它不需要密钥"
+        )
+    }
 }
 
 chaquopy {

@@ -14,7 +14,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-release:
+  # 三段式：两边各自构建并上传 artifact，最后一个作业统一创建 Release。
+  # 不让 Windows 作业直接发布再由 Android 作业补传——APK 构建一失败就会留下一个
+  # 缺产物的已发布版本，而 Release 一旦发布就禁止移动标签（见 packaging/readme.md），
+  # 只能递增补丁版本重发。
+  build-windows:
     runs-on: windows-2022
     env:
       QT_QPA_PLATFORM: offscreen
@@ -131,24 +135,197 @@ jobs:
       - name: Retain packages as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lvjiang-${{ steps.release.outputs.version }}-win64
+          name: windows-packages
           path: |
             ${{ steps.assets.outputs.zip }}
             ${{ steps.assets.outputs.setup }}
-            ${{ steps.assets.outputs.checksums }}
           if-no-files-found: error
 
+      - name: Retain release notes for the publish job
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: ${{ steps.release.outputs.notes }}
+          if-no-files-found: error
+
+  build-android:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Chaquopy 用 buildPython 建 venv 跑 pip，版本必须是 3.10：
+      # rapidocr_onnxruntime 的 Requires-Python 是 >=3.6,<3.13，而 opencv/shapely
+      # 在 Chaquopy 仓库里的最高 Android wheel 止于 cp310。
+      - name: Set up Chaquopy buildPython
+        id: buildpython
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # runner 预装的 SDK 组件随镜像变动，显式声明要用的版本，不靠预装
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-35 build-tools;34.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify Android version fields match the tag
+        run: |
+          set -euo pipefail
+          gradle_file=android/app/build.gradle.kts
+          version_name=$(grep -oP 'versionName\s*=\s*"\K[^"]+' "$gradle_file")
+          version_code=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' "$gradle_file")
+          if [ "$version_name" != "$RELEASE_TAG" ]; then
+            echo "versionName $version_name 与标签 $RELEASE_TAG 不一致" >&2
+            exit 1
+          fi
+          # versionCode 同时是设备端配置解压的 stamp：不递增则升级后仍走
+          # 「同版本跳过」分支，设备上还是旧配置（见 packaging/readme.md）。
+          previous=$(git tag --sort=-v:refname | grep -v "^${RELEASE_TAG}$" | head -1 || true)
+          if [ -n "$previous" ]; then
+            prev_code=$(git show "$previous:$gradle_file" \
+              | grep -oP 'versionCode\s*=\s*\K[0-9]+')
+            if [ "$version_code" -le "$prev_code" ]; then
+              echo "versionCode $version_code 未超过上一标签 $previous 的 $prev_code" >&2
+              exit 1
+            fi
+          fi
+          echo "versionName=$version_name versionCode=$version_code"
+
+      # 密钥只以 secret 形式存在，解码后的文件不会落进任何 artifact
+      - name: Restore signing material
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "缺少 ANDROID_KEYSTORE_BASE64，无法产出可发布的 APK" >&2
+            echo "配置方法见 android/README-signing.md" >&2
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/lvjiang.jks
+          umask 077
+          cat > android/keystore.properties <<EOF
+          storeFile=lvjiang.jks
+          storePassword=${KEYSTORE_PASSWORD}
+          keyAlias=${KEY_ALIAS}
+          keyPassword=${KEY_PASSWORD}
+          EOF
+
+      - name: Build release APK
+        env:
+          LVJIANG_BUILD_PYTHON: ${{ steps.buildpython.outputs.python-path }}
+        run: |
+          cd android
+          ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Verify APK signer and collect asset
+        id: apk
+        run: |
+          set -euo pipefail
+          apk=$(ls android/app/build/outputs/apk/release/*.apk)
+          [ -s "$apk" ] || { echo "APK 未生成或为空: $apk" >&2; exit 1; }
+
+          # 签名门禁。构建侧已经移除 debug 兜底，这里再独立核一次——签名是
+          # "错了也能装、装了才冲突"的那类问题，发布前是最后一道能拦住它的闸。
+          build_tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$build_tools/apksigner" verify --print-certs "$apk" | tee certs.txt
+
+          # 1) 必须是 debug 以外的签名人。debug 证书的 DN 是固定的，直接认它。
+          if grep -q 'CN=Android Debug' certs.txt; then
+            echo "APK 用的是 debug 签名，不能发布" >&2
+            exit 1
+          fi
+
+          # 2) 指纹钉死（可选）：仓库里放了期望值就必须一致。证书指纹不是机密，
+          #    写在仓库里比塞 secret 更容易核对；没放则跳过这一条。
+          pin=android/release-cert-sha256.txt
+          if [ -s "$pin" ]; then
+            expected=$(grep -v '^#' "$pin" | tr -d '[:space:][:punct:]' \
+              | tr 'A-F' 'a-f')
+            actual=$(grep -oP 'SHA-256 digest:\s*\K[0-9a-f]+' certs.txt | head -1)
+            if [ "$actual" != "$expected" ]; then
+              echo "APK 签名证书与 $pin 不符" >&2
+              echo "  期望: $expected" >&2
+              echo "  实际: $actual" >&2
+              exit 1
+            fi
+          else
+            echo "::warning title=签名指纹未钉死::未找到 $pin，仅校验了「非 debug 签名」"
+          fi
+
+          target="dist/lvjiang-v${RELEASE_TAG}.apk"
+          mkdir -p dist
+          cp "$apk" "$target"
+          echo "apk=$target" >> "$GITHUB_OUTPUT"
+
+      - name: Retain APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-package
+          path: ${{ steps.apk.outputs.apk }}
+          if-no-files-found: error
+
+  publish:
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+
+    steps:
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          path: incoming
+
+      - name: Assemble assets and checksums
+        id: assets
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find incoming -type f \( -name '*.zip' -o -name '*.exe' -o -name '*.apk' \) \
+            -exec cp {} dist/ \;
+          notes=$(find incoming -name 'v*.md' | head -1)
+          [ -n "$notes" ] || { echo "发布说明缺失" >&2; exit 1; }
+
+          cd dist
+          # 三个产物同一份校验和：少一个就说明某个作业没产出，不该发布
+          for name in "lvjiang-v${RELEASE_TAG}-win64.zip" \
+                      "lvjiang-v${RELEASE_TAG}-win64-setup.exe" \
+                      "lvjiang-v${RELEASE_TAG}.apk"; do
+            [ -s "$name" ] || { echo "缺少产物: $name" >&2; exit 1; }
+          done
+          sha256sum *.zip *.exe *.apk > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          cd ..
+          echo "notes=$notes" >> "$GITHUB_OUTPUT"
+
       - name: Publish GitHub Release
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TITLE: ${{ steps.release.outputs.title }}
         run: |
-          gh release create $env:RELEASE_TAG `
-            '${{ steps.assets.outputs.zip }}' `
-            '${{ steps.assets.outputs.setup }}' `
-            '${{ steps.assets.outputs.checksums }}' `
-            --verify-tag `
-            --title $env:RELEASE_TITLE `
-            --notes-file '${{ steps.release.outputs.notes }}' `
+          set -euo pipefail
+          title=$(grep -m1 '^#[[:space:]]' "${{ steps.assets.outputs.notes }}" \
+            | sed 's/^#[[:space:]]*//')
+          gh release create "$RELEASE_TAG" \
+            dist/*.zip dist/*.exe dist/*.apk dist/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$title" \
+            --notes-file "${{ steps.assets.outputs.notes }}" \
             --latest

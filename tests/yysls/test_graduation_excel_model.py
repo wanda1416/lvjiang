@@ -129,7 +129,8 @@ def test_runtime_uses_non_mingjin_element_inputs() -> None:
 
 
 def test_runtime_reports_workbook_baseline() -> None:
-    calculator = get_graduation_calculator("裂石·威")
+    # 锚定 110 级工作簿：期望值来自该模型，不随当前赛季等级漂移
+    calculator = get_graduation_calculator("裂石·威", world_level=110)
     assert calculator is not None
     assert calculator.baseline_dps() == pytest.approx(141520.37)
     assert calculator.combat_time() == pytest.approx(101.4)
@@ -229,7 +230,8 @@ def test_runtime_matches_mingjin_hong_excel_example(monkeypatch) -> None:
     import lvjiang.apps.yysls.core.graduation as grad_mod
     monkeypatch.setattr(grad_mod, "_get_session_baseline", lambda *a, **kw: None)
     invalidate_graduation_cache()
-    calculator = get_graduation_calculator("鸣金·虹")
+    # 输入与期望值均来自 110 级工作簿示例，显式钉住等级
+    calculator = get_graduation_calculator("鸣金·虹", world_level=110)
     assert calculator is not None
     attrs = CombatAttributes(
         min_outer=1696, max_outer=5624, outer_pen=63.5,

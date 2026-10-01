@@ -70,10 +70,14 @@ def test_graduation_carries_the_model_level(tmp_path, gc, qtbot):
 
 
 def test_two_labels_may_disagree(tmp_path, gc, qtbot):
-    """115 的角色配 110 的表：两个等级本来就不同，不能互相顶替。"""
+    """115 的角色配 110 的表：两个等级本来就不同，不能互相顶替。
+
+    用没有 115 级模型的流派构造该场景；全部流派都有同级模型时，
+    两个标签一致同样是正确行为。
+    """
     state = _state(tmp_path, gc)
 
-    dps, rate = _labels(state, "鸣金·虹", gc)
+    dps, rate = _labels(state, "破竹·风", gc)
 
     assert dps.startswith(f"{gc.current_equip_level()}级")
     assert rate.startswith("110级")

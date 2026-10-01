@@ -78,11 +78,18 @@ PC 端 ADB 模式原先只有两条路控制手机：`adb shell input tap/swipe`
 
 ### 输入时间线的落地细节
 
-`gesture` 的每条 stroke 取 `points` 的**终点**按住 `move_ms + hold_ms`，没有滑动
-过程。原因是一条 `StrokeDescription` 只能匀速走完整条 path，表达不了"滑到位再停住"；
-而 `continueStroke` 的续接段要另起一次 `dispatchGesture`（`hold_move` 就是那么做的），
-放进同一个 `GestureDescription` 就不是并发了。对推摇杆来说"直接按在推满位置并保持"
-正是要的效果，所以 `move_ms` 并入总时长而不单独插值。
+`gesture` 的每条 stroke：起终点相同是按住不动；不同则是「用 `move_ms` 推到位，再保持
+`hold_ms`」。
+
+保持段的实现是**贴着终点沿同一轴的往复微动**（振幅几像素），不是真的静止。一条
+`StrokeDescription` 只能按弧长匀速走完整条 path，时间正比于路程，所以"停住"只能用
+与时长成比例的路程来换：微动路程取推进路程的 `hold/move` 倍，推进段就正好占
+`move_ms`。`continueStroke` 的续接段必须另起一次 `dispatchGesture`（`hold_move` 就是
+那么做的），放进同一个 `GestureDescription` 就不是并发了，所以这条路走不通。
+
+**不能退化成"直接按在终点上"**：游戏的摇杆没有固定区域，第一个触点即中心、方向看之后
+手势往哪动。零位移的触点只给了中心没给方向，游戏会拿下一个触点（比如跳跃键）去猜方向
+——实测表现成"往前跳"，而脚本要的是后退。
 
 真机上还有三件事要实测（框架层支持是明确的，这三条与设备/游戏有关）：本机
 `getMaxStrokeCount()` 的实际值、游戏是否接受注入的多点触控、真实触摸取消整组手势

@@ -83,6 +83,7 @@ from .evaluation import _EvalMixin
 from .key_state import KeyStateRegistry
 from .panel import _PanelMixin
 from .signals import (
+    WorkflowAbort,
     WorkflowUserError,
     _BreakSignal,
     _ContinueSignal,
@@ -1014,6 +1015,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             # 用户停止，不应落入通用异常日志。
             logger.info("Python 工作流收到停止请求")
             result = workflow.output
+        except WorkflowAbort:
+            # 宿主中止不是工作流失败，不能包成 WorkflowExecutionError——那会
+            # 让宿主拿不到原始信号，按普通异常重试或报错。
+            logger.info("Python 工作流被宿主中止")
+            raise
         except Exception as exc:
             # 意外异常必须作为失败传播到运行线程/UI。过去这里返回部分 output，
             # 调用方会按“正常完成”保存 session 和结果，掩盖真实失败。
@@ -1078,6 +1084,11 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 raise  # break 直接穿透，由 loop/for 处理
             except _ContinueSignal:
                 raise  # continue 直接穿透，由循环处理
+            except WorkflowAbort:
+                # 宿主要求中止（无人值守撞弹窗）。这不是执行错误，按异常记账
+                # 会在每一层嵌套各打一遍 ERROR + traceback，把一次正常改道
+                # 渲染成连环崩溃；要不要记失败由宿主判断。
+                raise
             except BaseException as e:
                 if self._try_depth and isinstance(
                     e, (WorkflowUserError, KeyError, ValueError, TypeError)

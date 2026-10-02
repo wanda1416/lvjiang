@@ -16,6 +16,8 @@ BATCH_DOCUMENT_TYPE = "lvjiang.batch"
 BATCH_CONFIG_VERSION = 1
 _WORKFLOW_PHASES = (
     "batch_setup", "prepare_item", "finish_item", "batch_teardown",
+    # 无人值守恢复：不在正常流程里排程，只在引擎撞到弹窗后由调度器调用。
+    "recover_unattended",
 )
 
 
@@ -25,6 +27,7 @@ class BatchWorkflows:
     prepare_item: str = ""
     finish_item: str = ""
     batch_teardown: str = ""
+    recover_unattended: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -32,6 +35,7 @@ class BatchWorkflows:
             "prepare_item": self.prepare_item,
             "finish_item": self.finish_item,
             "batch_teardown": self.batch_teardown,
+            "recover_unattended": self.recover_unattended,
         }
 
     @staticmethod
@@ -39,7 +43,7 @@ class BatchWorkflows:
         source = data if isinstance(data, dict) else {}
         return BatchWorkflows(**{
             key: str(source.get(key, ""))
-            for key in ("batch_setup", "prepare_item", "finish_item", "batch_teardown")
+            for key in _WORKFLOW_PHASES
         })
 
 
@@ -68,6 +72,10 @@ class BatchConfigItem:
     workflow_params: dict[str, dict] = field(default_factory=dict)
     # 保留历史字段名以兼容已有 batch.json；当前“条目”就是选中的用户。
     skip_lifecycle_for_single_item: bool = True
+    #: 无人值守：长时间无人看守时勾选。引擎撞到 pause/confirm 不再弹窗等人，
+    #: 当前任务按异常记失败，随后由 recover_unattended 把游戏收回登录主页，
+    #: 再继续下一个任务。需要人工介入的批量自然不该勾选它。
+    unattended: bool = False
 
     def normalize(self) -> None:
         from .user_config import is_valid_username
@@ -106,6 +114,13 @@ class BatchConfigItem:
             for phase, values in self.workflow_params.items()
             if phase in _WORKFLOW_PHASES and isinstance(values, dict)
         }
+        if not isinstance(self.unattended, bool):
+            self.unattended = False
+        # 没有恢复 wf 的无人值守是个空承诺：撞上弹窗后没人点、也没人把游戏收回
+        # 初始页，整批会在错误页面上一路失败下去。手改过的 batch.json 同样在这里
+        # 被纠正，不止 UI 拦一层。
+        if not self.workflows.recover_unattended:
+            self.unattended = False
 
     def to_dict(self) -> dict:
         self.normalize()
@@ -122,6 +137,7 @@ class BatchConfigItem:
             "workflows": self.workflows.to_dict(),
             "workflow_params": self.workflow_params,
             "skip_lifecycle_for_single_item": self.skip_lifecycle_for_single_item,
+            "unattended": self.unattended,
         }
 
     @staticmethod
@@ -154,6 +170,7 @@ class BatchConfigItem:
                     source.get("skip_lifecycle_for_single_item", True), bool)
                 else True
             ),
+            unattended=bool(source.get("unattended", False)),
         )
         item.normalize()
         return item

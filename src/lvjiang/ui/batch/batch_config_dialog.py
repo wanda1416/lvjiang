@@ -129,6 +129,19 @@ class BatchConfigDialog(QDialog):
             tr("实际只选择一个用户单元时，直接执行任务；属性单元始终运行准备工作流")
         )
         wf_form.addRow("", self._skip_single_lifecycle)
+        self._unattended = QCheckBox(tr("无人值守"))
+        self._unattended_tip = tr(
+            "长时间无人看守时勾选：任务弹出暂停或确认框时不再等人，该任务按失败"
+            "记录并跳过，随后由「异常恢复 wf」把游戏收回登录主页；该用户还有未执行"
+            "的任务时，恢复流程会直接用当前角色重新登录。需要人工介入的批量不要勾选"
+        )
+        self._unattended.setToolTip(self._unattended_tip)
+        recover_row, recover_combo = self._create_wf_selector()
+        self._selectors["recover_unattended"] = recover_combo
+        recover_combo.currentTextChanged.connect(
+            lambda _text: self._sync_unattended_enabled())
+        wf_form.addRow(tr("异常恢复 wf："), recover_row)
+        wf_form.addRow("", self._unattended)
         layout.addLayout(wf_form)
 
         buttons = QHBoxLayout()
@@ -244,6 +257,24 @@ class BatchConfigDialog(QDialog):
         self._skip_single_lifecycle.setChecked(
             item.skip_lifecycle_for_single_item)
         self._skip_single_lifecycle.setEnabled(item.execution_unit_key == "user")
+        self._unattended.setChecked(item.unattended)
+        self._sync_unattended_enabled()
+
+    def _sync_unattended_enabled(self) -> None:
+        """没配异常恢复 wf 就不允许勾选无人值守。
+
+        禁用而不是隐藏：能力一直在，缺的是它依赖的恢复 wf，提示里直接说清。
+        已经勾上的情况下把恢复 wf 清空，也要同步取消勾选，不留下一个
+        「勾着但不生效」的状态。
+        """
+        combo = self._selectors["recover_unattended"]
+        ready = bool(combo.currentText().strip())
+        if not ready and self._unattended.isChecked():
+            self._unattended.setChecked(False)
+        self._unattended.setEnabled(ready)
+        self._unattended.setToolTip(self._unattended_tip if ready else tr(
+            "需要先配置「异常恢复 wf」：无人值守撞上弹窗后，要靠它把游戏收回"
+            "登录主页，否则整批会在错误页面上接连失败"))
 
     def _clear_editor(self) -> None:
         self._current_name = ""
@@ -253,6 +284,8 @@ class BatchConfigDialog(QDialog):
             combo.setCurrentText("")
         self._skip_single_lifecycle.setChecked(True)
         self._skip_single_lifecycle.setEnabled(False)
+        self._unattended.setChecked(False)
+        self._sync_unattended_enabled()
 
     def _save_current_config(self) -> None:
         item = self._cfg.configs.get(self._current_name)
@@ -277,6 +310,7 @@ class BatchConfigDialog(QDialog):
         })
         item.skip_lifecycle_for_single_item = (
             self._skip_single_lifecycle.isChecked())
+        item.unattended = self._unattended.isChecked()
 
     def _populate_user_list(self, item: BatchConfigItem) -> None:
         candidates = self._users.list_users()

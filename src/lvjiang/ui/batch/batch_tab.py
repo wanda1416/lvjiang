@@ -698,6 +698,9 @@ class BatchTab(QWidget):
             "prepare_item": tr("条目准备"),
             "finish_item": tr("条目收尾"),
             "batch_teardown": tr("批次收尾"),
+            # 异常恢复不在上面那四行只读摘要里，但它同样是生命周期 wf，
+            # 声明了参数就要能在这里编辑——少一个 key 就是 KeyError。
+            "recover_unattended": tr("异常恢复"),
         }
         definitions = lifecycle_parameter_definitions(item.workflows)
         for phase, params in definitions.items():

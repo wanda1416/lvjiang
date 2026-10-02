@@ -130,6 +130,12 @@ class RegionPanelMixin:
         layout.addLayout(btn_row)
 
         template_options_row = QHBoxLayout()
+        self._template_allow_inverted = QCheckBox(tr("兼容反色图标"))
+        self._template_allow_inverted.setToolTip(
+            tr("同一图标在深色和浅色背景下颜色反转时，同时尝试反色匹配"))
+        self._template_allow_inverted.toggled.connect(
+            self._on_template_inverted_changed)
+        template_options_row.addWidget(self._template_allow_inverted)
         self._template_score = QDoubleSpinBox()
         self._template_score.setRange(0.0, 1.0)
         self._template_score.setDecimals(2)
@@ -141,17 +147,11 @@ class RegionPanelMixin:
         template_options_row.addWidget(self._template_score)
         self._template_status = QLabel(tr("未绑定"))
         template_options_row.addWidget(self._template_status)
-        self._template_allow_inverted = QCheckBox(tr("兼容反色图标"))
-        self._template_allow_inverted.setToolTip(
-            tr("同一图标在深色和浅色背景下颜色反转时，同时尝试反色匹配"))
-        self._template_allow_inverted.toggled.connect(
-            self._on_template_inverted_changed)
-        template_options_row.addWidget(self._template_allow_inverted)
         template_options_row.addStretch()
         layout.addLayout(template_options_row)
 
         template_button_row = QHBoxLayout()
-        self._btn_capture_template = QPushButton(tr("截取模版"))
+        self._btn_capture_template = QPushButton(tr("+ 截取模版"))
         self._btn_capture_template.clicked.connect(
             self._on_capture_region_template)
         template_button_row.addWidget(self._btn_capture_template)

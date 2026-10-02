@@ -10,6 +10,8 @@ quality_thresholds:
 playstyles:
 - 无名
 - 九剑
+playstyle_switches:
+  九剑: keep_danti
 transmute_priority:
 - 最大外功攻击
 - 势

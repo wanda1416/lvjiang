@@ -113,13 +113,20 @@ class TestKeepDanti:
                        quality="purple")
         assert judge_pvp.judge(e).rating == Rating.TOP
 
-    def test_helm_danti_not_bound_by_playstyle(self):
-        """九剑只描述武学组合，不再隐式开启“保留单体奇术增”。"""
+    def test_helm_danti_bound_by_playstyle(self):
+        """九剑在本规则里绑定了 keep_danti，全局开关关着也按开着判。
+
+        绑定写在规则的 playstyle_switches 里——决定权在调律规则，不在玩法定义。
+        依据是毕业表：鸣金·影（九剑）的 single_qs_bonus 不为零，标准构筑本来
+        就带单体奇术增，不绑等于按一个到不了的目标判垃圾。
+
+        同组的无名没绑定，仍按原判定（见 test_helm_danti_off_junk）。
+        """
         judge = get_tuning_judge("huiyi_general",
                                   {"playstyles": ["九剑"]})
         e = make_equip("冠胄", ["会意率", "单体类奇术增伤", "最大外功攻击", "劲", "势"],
                        quality="purple")
-        assert judge.judge(e).rating == Rating.JUNK
+        assert judge.judge(e).rating == Rating.TOP
 
 
 class TestKeepWanjia:

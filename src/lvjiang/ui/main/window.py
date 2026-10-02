@@ -53,6 +53,7 @@ from ..button_styles import (
     apply_compact_button_style,
     apply_execution_button_style,
 )
+from ..layout_helpers import fit_combo_popup_to_contents
 from ..overlay import BorderOverlay
 from ..widgets import TrimmedLogEdit
 from .capture_ops import CaptureOpsMixin
@@ -806,6 +807,9 @@ class MainWindow(
         self._log_level_combo.setCurrentIndex(1)  # 默认 INFO，与 _log_min_level=20 一致
         self._log_level_combo.setToolTip(tr("切换日志显示级别：低于选中级别的日志将被隐藏"))
         self._log_level_combo.currentIndexChanged.connect(self._on_log_level_changed)
+        # 关着的下拉框按最短项排版，弹出来时 WARNING 这种长项会被截掉；
+        # 只放宽弹出列表，关着的宽度不变。
+        fit_combo_popup_to_contents(self._log_level_combo)
         filter_bar.addWidget(self._log_level_combo)
         filter_bar.addWidget(self._btn_clear_log)
         log_layout.addLayout(filter_bar)

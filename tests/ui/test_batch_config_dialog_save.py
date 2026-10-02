@@ -113,6 +113,20 @@ def test_dispatch_unit_and_profile_sort_are_edited_here(monkeypatch, qtbot):
     assert saved[0].by_name("组").execution_unit_key == "account"
 
 
+def test_newly_visible_user_immediately_contributes_dispatch_units(
+    monkeypatch, qtbot,
+):
+    """新建组勾选用户后应当一次配完，不能要求先保存再重新打开。"""
+    group = _group()
+    dialog = _dialog(monkeypatch, qtbot, BatchConfig({group.id: group}))
+
+    assert dialog._unit_combo.findData("account") < 0
+    row = dialog._user_list.topLevelItem(0)
+    row.setCheckState(0, Qt.CheckState.Checked)
+
+    assert dialog._unit_combo.findData("account") >= 0
+
+
 def test_single_user_passthrough_is_disabled_and_unchecked_for_attribute_units(
     monkeypatch, qtbot,
 ):
@@ -176,6 +190,34 @@ def test_lifecycle_parameters_are_edited_next_to_their_workflow(
 
     assert saved[0].by_name("组").workflow_params["finish_item"] == {
         "stop_app": True}
+
+
+def test_changing_one_workflow_keeps_other_unsaved_parameter_edits(
+    monkeypatch, qtbot,
+):
+    """重建参数面板前必须先收回控件值，不能覆盖同窗口的未保存草稿。"""
+    group = _group(workflows=BatchWorkflows(
+        prepare_item="prepare.wf", finish_item="finish.wf"))
+    dialog = _params_dialog(monkeypatch, qtbot, group, {
+        "batch_setup": [],
+        "prepare_item": [{
+            "name": "allow_restart", "type": "bool", "default": True,
+        }],
+        "finish_item": [{
+            "name": "stop_app", "type": "bool", "default": False,
+        }],
+        "batch_teardown": [],
+        "recover_unattended": [],
+    })
+    allow_restart = dialog._workflow_param_widgets[
+        ("prepare_item", "allow_restart")]
+    allow_restart.setChecked(False)
+
+    dialog._selectors["finish_item"].setCurrentText("other_finish.wf")
+
+    rebuilt = dialog._workflow_param_widgets[
+        ("prepare_item", "allow_restart")]
+    assert rebuilt.isChecked() is False
 
 
 def test_rename_keeps_position_and_identity(monkeypatch, qtbot):

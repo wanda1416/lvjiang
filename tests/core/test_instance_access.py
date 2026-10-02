@@ -196,6 +196,31 @@ def test_readonly_reload_refreshes_writable_state_and_keeps_transients(tmp_path,
     assert store.get_node("settings") == {"env": "android", "language": "en_US"}
 
 
+def test_readonly_batch_ui_state_does_not_change_primary_instance(
+    tmp_path, monkeypatch,
+):
+    """批量活动组和运行草稿都是实例自己的页面状态。"""
+    path = tmp_path / "session.json"
+    store = SessionStore(path)
+    store.set_node("ui_state", {
+        "batch": {"active_group_id": "primary", "drafts": {}}
+    })
+
+    monkeypatch.setattr(access, "_readonly", True)
+    store.mutate_node("ui_state", lambda old: {
+        **old,
+        "batch": {"active_group_id": "readonly", "drafts": {
+            "gid": {"rounds": 9},
+        }},
+    })
+
+    assert store.get_node("ui_state")["batch"]["active_group_id"] == "readonly"
+    disk = json.loads(path.read_text(encoding="utf-8"))
+    assert disk["ui_state"]["batch"] == {
+        "active_group_id": "primary", "drafts": {},
+    }
+
+
 def test_readonly_user_loadout_stays_editable_during_execution(tmp_path, monkeypatch):
     from lvjiang.apps.yysls.core.loadout.repository import LoadoutRepository
     monkeypatch.setattr(access, "_readonly", True)

@@ -277,6 +277,8 @@ class BatchConfigDialog(QDialog):
                 row.setCheckState(1, Qt.CheckState.Unchecked)
             finally:
                 self._updating_choices = False
+        if row.treeWidget() is self._user_list:
+            self._refresh_unit_candidates_from_choices()
 
     @staticmethod
     def _choice_key(row: QTreeWidgetItem | None) -> str:
@@ -582,27 +584,9 @@ class BatchConfigDialog(QDialog):
     def _refresh_scope_controls(self, item: BatchConfigItem | None) -> None:
         """填充调度单元与 Profile 排序：两者都是配置组定义。"""
 
-        self._unit_combo.blockSignals(True)
-        self._unit_combo.clear()
-        self._unit_combo.addItem(tr("用户名"), "user")
-        keys: dict[str, None] = {}
-        if item is not None:
-            for username in item.usernames:
-                user = self._users.get_user(username)
-                if user is None:
-                    continue
-                keys.update({
-                    key: None for key, value in user.attributes.items()
-                    if key and str(value).strip()
-                })
-            keys.setdefault(item.execution_unit_key, None)
-        for key in keys:
-            if key != "user":
-                self._unit_combo.addItem(key, key)
-        current_key = item.execution_unit_key if item is not None else "user"
-        self._unit_combo.setCurrentIndex(
-            max(0, self._unit_combo.findData(current_key)))
-        self._unit_combo.blockSignals(False)
+        self._refresh_unit_candidates(
+            item, current_key=(
+                item.execution_unit_key if item is not None else "user"))
 
         self._profile_sort_key_value = (
             item.profile_sort_key if item is not None else "")
@@ -612,6 +596,48 @@ class BatchConfigDialog(QDialog):
         self._profile_sort_direction.setCurrentIndex(
             max(0, self._profile_sort_direction.findData(direction)))
         self._profile_sort_direction.blockSignals(False)
+        self._apply_unit_dependent_state()
+
+    def _refresh_unit_candidates(
+        self,
+        item: BatchConfigItem | None,
+        usernames: list[str] | None = None,
+        current_key: str | None = None,
+    ) -> None:
+        """按当前可见用户刷新调度单元候选，并保留正在编辑的选择。"""
+        if current_key is None:
+            current_key = str(self._unit_combo.currentData() or "")
+            if not current_key:
+                current_key = (
+                    item.execution_unit_key if item is not None else "user")
+        self._unit_combo.blockSignals(True)
+        self._unit_combo.clear()
+        self._unit_combo.addItem(tr("用户名"), "user")
+        keys: dict[str, None] = {}
+        if item is not None:
+            for username in (item.usernames if usernames is None else usernames):
+                user = self._users.get_user(username)
+                if user is None:
+                    continue
+                keys.update({
+                    key: None for key, value in user.attributes.items()
+                    if key and str(value).strip()
+                })
+            keys.setdefault(current_key, None)
+        for key in keys:
+            if key != "user":
+                self._unit_combo.addItem(key, key)
+        self._unit_combo.setCurrentIndex(
+            max(0, self._unit_combo.findData(current_key)))
+        self._unit_combo.blockSignals(False)
+
+    def _refresh_unit_candidates_from_choices(self) -> None:
+        """可见用户尚未保存时，也应立即提供其属性作为调度单元。"""
+        item = self._cfg.configs.get(self._current_id)
+        if item is None:
+            return
+        usernames, _defaults = self._collect_choices(self._user_list)
+        self._refresh_unit_candidates(item, usernames)
         self._apply_unit_dependent_state()
 
     def _rebuild_sort_key_picker(self) -> None:
@@ -679,6 +705,10 @@ class BatchConfigDialog(QDialog):
         item = self._cfg.configs.get(self._current_id)
         if item is None:
             return
+        # 任意一个 wf 改动都会重建全部阶段的参数控件。先把当前控件值收回
+        # 对话框草稿，否则用户刚改完条目准备参数、再选择异常恢复 wf 时，
+        # 前面的未保存修改会被旧值覆盖。
+        item.workflow_params = self._collect_workflow_params()
         item.workflows = BatchWorkflows(**{
             key: combo.currentText().strip()
             for key, combo in self._selectors.items()

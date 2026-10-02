@@ -332,17 +332,47 @@ class BatchConfigStore:
         self._file_lock = InterProcessLock(str(self.path) + ".lock")
 
     def _load_unlocked(self) -> BatchConfig:
+        return BatchConfig.from_dict(self._read_document_unlocked())
+
+    def _read_document_unlocked(self) -> object:
         if not self.path.exists():
-            return BatchConfig()
+            return {}
         try:
-            return BatchConfig.from_dict(json.loads(self.path.read_text(encoding="utf-8")))
+            return json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             logger.error(f"批量配置读取失败: {self.path}: {exc}")
-            return BatchConfig()
+            return {}
 
     def load(self) -> BatchConfig:
         with self._thread_lock:
-            return self._load_unlocked()
+            document = self._read_document_unlocked()
+            if not (
+                isinstance(document, dict)
+                and document.get("document_type") == BATCH_DOCUMENT_TYPE
+                and document.get("version") == 1
+            ):
+                return BatchConfig.from_dict(document)
+
+            # v1 没有稳定 ID。只在内存里补 uuid 会导致每次 load 都得到一组
+            # 新 ID，主页面下拉框、活动组与运行草稿立即失去关联。迁移必须在
+            # 文件锁内重读最新磁盘并一次性写成 v2；另一个进程若已先迁移，
+            # 本进程直接使用它写出的结果。
+            self._acquire()
+            try:
+                latest = self._read_document_unlocked()
+                config = BatchConfig.from_dict(latest)
+                if (
+                    isinstance(latest, dict)
+                    and latest.get("document_type") == BATCH_DOCUMENT_TYPE
+                    and latest.get("version") == 1
+                ):
+                    text = json.dumps(
+                        config.to_dict(), ensure_ascii=False, indent=2)
+                    atomic_write_text(self.path, text, prefix=".batch_")
+                    logger.info("批量配置已从 v1 一次性迁移到 v2")
+                return config
+            finally:
+                self._file_lock.release()
 
     def _acquire(self) -> None:
         if not self._file_lock.acquire(blocking=True, timeout=self.LOCK_TIMEOUT):

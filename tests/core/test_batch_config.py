@@ -117,6 +117,30 @@ def test_v1_selection_is_read_as_default_selection(tmp_path):
     assert cfg.configs == {item.id: item}, "读入后一律按 ID 索引"
 
 
+def test_v1_migration_is_persisted_and_ids_stay_stable(tmp_path):
+    """v1 没有 ID，首次读取必须一次性落盘，不能每次 load 都随机生成。"""
+    path = tmp_path / "batch.json"
+    path.write_text(json.dumps({
+        "document_type": BATCH_DOCUMENT_TYPE,
+        "version": 1,
+        "active_group": "第二组",
+        "groups": {
+            "第一组": {"task_ids": ["a"]},
+            "第二组": {"task_ids": ["b"]},
+        },
+    }), encoding="utf-8")
+    store = BatchConfigStore(path)
+
+    first = store.load()
+    second = store.load()
+
+    assert list(first.configs) == list(second.configs)
+    assert first.names() == ["第一组", "第二组"]
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written["version"] == 2
+    assert list(written["groups"]) == list(first.configs)
+
+
 def test_single_user_lifecycle_skip_defaults_true_and_rejects_invalid_value():
     assert BatchConfigItem.from_dict(
         "默认", {}).skip_lifecycle_for_single_item is True

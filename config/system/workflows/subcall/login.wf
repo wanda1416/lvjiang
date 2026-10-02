@@ -250,17 +250,32 @@ end
 def select_account_and_login($tail, $max_roll_account, $login_target)
     click [game_login_page].[tap_user] after wait @page_refresh
 
-    # 2. 按条目准备参数限定的次数查找目标账号
-    eval $found_user = ""
-    loop $max_roll_account
-        find [game_login_page].[user_list] as $found_user by contains $tail
+    # 2. 查找目标账号：一轮向下翻到底，没找到就回到顶部再翻一轮。
+    #
+    # 入场时列表停在哪里是未知的——账号多的时候它常常停在中间，只向下翻永远
+    # 看不到上面的账号。所以失败一轮后必须先回顶，再从头完整走一遍。
+    #
+    # $max_roll_account 只是单轮的保险上限，不再是「预期要翻几次」：到底/到顶
+    # 由列表自己是否还在动来判定（见 user_list_unchanged），通常远早于上限结束。
+    eval $extra_passes = 1
+    eval $pass = 0
+    eval $found_user = 0
+    loop while $pass <= $extra_passes
+        call $found_user = search_account_down($tail, $max_roll_account)
         if $found_user
-            click $found_user
             break
         end
-        env:"android" -> drag [game_login_page].[point_2] to [game_login_page].[point_1]
-        env:"desktop" -> scroll [game_login_page].[user_list] down 2
-        wait @page_refresh
+        eval $pass_no = $pass + 1
+        log warn "第 " + $pass_no + " 轮翻到底仍未找到账号：" + $login_target
+        if $pass >= $extra_passes
+            break
+        end
+        call $at_top = scroll_user_list_to_top($max_roll_account)
+        if not $at_top
+            log warn "回顶时已达单轮滚动上限 " + $max_roll_account \
+                + "，下一轮从当前位置开始"
+        end
+        eval $pass = $pass + 1
     end
 
     # 找不到 → 暂停手动处理。这里不做二次校验：选没选对只有人能判断，
@@ -274,6 +289,83 @@ def select_account_and_login($tail, $max_roll_account, $login_target)
     # 3. 提交账号登录；登录后的页面由调用方按所在流程处理。
     click [game_login_page].[login] after wait @page_refresh
     return 1
+end
+
+
+# ─── 账号列表的翻动与到边判定 ─────────────────────────────
+
+# 列表是否不动了（= 已经到底或到顶）。
+#
+# 判据是 user_list 整面板的两次 OCR 快照逐格相同：滚一步而内容没变，说明
+# 已经到边。这样就不必预设「要翻几次」——账号数量、行高和设备分辨率都会影响
+# 实际步数，预设值只会在账号变多后悄悄失效。
+#
+# 行数取快照自己的 key，不问 panel_rows：后者读的是 _panel_alignments 这条
+# 侧信道，依赖「刚好对齐过这个面板」的调用次序，而这里要比的就是 scan 实际
+# 产出的那几格。
+#
+# $a 为空表示还没有上一帧（本轮第一步），此时不可能判定到边。
+# OCR 抖动只会让两帧「看起来不同」从而多滚一步，不会误判成到边；反过来两屏
+# 不同内容恰好识别成完全相同在这个面板上不现实。
+def user_list_unchanged($a, $b)
+    if $a is_empty
+        return 0
+    end
+    if len($a) != len($b)
+        return 0
+    end
+    eval $col = 1
+    for r in keys($b)
+        if $a.$r.$col != $b.$r.$col
+            return 0
+        end
+    end
+    return 1
+end
+
+
+# 向下翻找账号：命中即点击并返回 1；翻到底或达到上限仍未命中返回 0。
+#
+# 命中判定保持用 find：按文字精确 bbox 点击是原有行为，而「选没选对」只有人
+# 能判断，这条路径不动。快照只用于到边判定，每步各一次。
+def search_account_down($tail, $max_steps)
+    eval $prev = {}
+    loop $max_steps
+        find [game_login_page].[user_list] as $found_user by contains $tail
+        if $found_user
+            click $found_user
+            return 1
+        end
+        scan [game_login_page].[user_list] as $snap
+        call $stuck = user_list_unchanged($prev, $snap)
+        if $stuck
+            log info "账号列表已到底，本轮未找到目标账号"
+            return 0
+        end
+        eval $prev = $snap
+        env:"android" -> drag [game_login_page].[point_2] to [game_login_page].[point_1]
+        env:"desktop" -> scroll [game_login_page].[user_list] down 2
+        wait @page_refresh
+    end
+    return 0
+end
+
+
+# 回到列表顶部：到顶返回 1；达到上限仍没到顶返回 0（调用方只记日志，仍可继续）。
+def scroll_user_list_to_top($max_steps)
+    eval $prev = {}
+    loop $max_steps
+        scan [game_login_page].[user_list] as $snap
+        call $stuck = user_list_unchanged($prev, $snap)
+        if $stuck
+            return 1
+        end
+        eval $prev = $snap
+        env:"android" -> drag [game_login_page].[point_1] to [game_login_page].[point_2]
+        env:"desktop" -> scroll [game_login_page].[user_list] up 2
+        wait @page_refresh
+    end
+    return 0
 end
 
 

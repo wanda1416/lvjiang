@@ -217,6 +217,11 @@ class KeyDef:
     uses: list[str] = field(default_factory=list)
     sync_targets: list[SyncTargetDef] = field(default_factory=list)
     change_script: str = ""
+    #: 加载时的原始 dict。只用于写回时补齐**我们不认识的字段**——插件可能给
+    #: 定义加了自己的字段，而 from_dict 只认已知字段，直接重写就等于替用户
+    #: 删数据。不参与相等比较，也不出现在 repr 里。
+    raw: dict[str, Any] = field(
+        default_factory=dict, repr=False, compare=False)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> KeyDef:
@@ -236,9 +241,15 @@ class KeyDef:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """序列化为 dict（仅输出非默认值）"""
+        """序列化为 dict（仅输出非默认值）
+
+        已知字段一律以当前值为准——用户把某项清回默认值就该从 YAML 里消失，
+        不能被原始快照顶回来。只有**不认识的字段**才从 raw 里补回去。
+        """
         result: dict[str, Any] = {}
         for f in fields(self):
+            if f.name == "raw":
+                continue
             if f.name == "group":
                 # 默认分组也显式写出，并保持在 key 之后，便于直接阅读 YAML。
                 result["group"] = normalize_key_group(self.group)
@@ -256,6 +267,12 @@ class KeyDef:
                 result[f.name] = [v.to_dict() for v in val]
             else:
                 result[f.name] = val
+        known = {f.name for f in fields(self)}
+        preserved = {
+            name: value for name, value in (self.raw or {}).items()
+            if name not in known
+        }
+        result.update(preserved)
         return result
 
 
@@ -445,8 +462,14 @@ MODEL_CLASSES: dict[str, type[KeyDef]] = {
 
 
 def parse_key_def(model_type: str, data: dict[str, Any]) -> KeyDef:
-    """根据模型类型分发到对应数据类"""
+    """根据模型类型分发到对应数据类。
+
+    顺带把原始 dict 留底：各子类的 from_dict 只读已知字段，不留底的话，插件
+    自带的字段会在下一次保存时被静默抹掉。
+    """
     cls = MODEL_CLASSES.get(model_type)
     if cls is None:
         raise ValueError(f"未知模型类型: {model_type}")
-    return cls.from_dict(data)
+    key_def = cls.from_dict(data)
+    key_def.raw = dict(data)
+    return key_def

@@ -337,15 +337,17 @@ class TestUserConfigManagerCRUD:
 
         mgr = UserConfigManager()
         mgr.create_user("待删除")
-        save_batch_config(BatchConfig(
-            configs={"日常": BatchConfigItem(
-                name="日常", usernames=["default", "待删除"]
-            )},
-            active_config="日常",
-        ))
+        group = BatchConfigItem(
+            name="日常", usernames=["default", "待删除"],
+            default_usernames=["default", "待删除"])
+        save_batch_config(BatchConfig(configs={group.id: group}))
 
         assert mgr.delete_user("待删除")
-        assert load_batch_config().configs["日常"].usernames == ["default"]
+        restored = load_batch_config().by_name("日常")
+        assert restored is not None
+        assert restored.usernames == ["default"]
+        assert restored.default_usernames == ["default"], (
+            "默认勾选里也不能留下已删除的用户")
 
     def test_attributes_are_stored_in_user_file(self, session_env):
         import json

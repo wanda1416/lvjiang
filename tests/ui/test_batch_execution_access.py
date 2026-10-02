@@ -5,6 +5,7 @@ import pytest
 
 from lvjiang.core.access import AccessDeniedError, acquire_user
 from lvjiang.core.batch_config import BatchConfigItem, BatchWorkflows
+from lvjiang.core.batch_run import BatchRunDraft
 from lvjiang.core.config.session import reset_session_store
 from lvjiang.core.config.users import SessionManager
 from lvjiang.core.config.wf_configs import set_wf_config
@@ -15,6 +16,7 @@ from lvjiang.ui.batch.batch_runner import (
     ST_SKIPPED,
     BatchCheckResult,
     BatchContext,
+    BatchRunSpec,
     BatchScript,
     BatchStageResult,
     BatchWorker,
@@ -44,9 +46,13 @@ def make_worker(tmp_path, monkeypatch, *, rounds=1):
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        ["alice", "bob"],
-        [BatchScript("test", "test")],
-        BatchConfigItem(name="test", usernames=["alice", "bob"], rounds=rounds),
+        BatchRunSpec(
+            name="test",
+            entries=("alice", "bob"),
+            candidate_usernames=("alice", "bob"),
+            scripts=(BatchScript("test", "test"),),
+            rounds=rounds,
+        ),
         BatchContext(None, None, None, None), SessionManager(tmp_path), lambda: False,
     )
     monkeypatch.setattr(worker, "_save_result", lambda *a: None)
@@ -102,10 +108,12 @@ def test_single_user_direct_mode_skips_lifecycle_across_rounds(
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        ["alice"],
-        [BatchScript("test", "test")],
-        BatchConfigItem(
-            name="test", usernames=["alice"], rounds=2,
+        BatchRunSpec(
+            name="test",
+            entries=("alice",),
+            candidate_usernames=("alice",),
+            scripts=(BatchScript("test", "test"),),
+            rounds=2,
             skip_lifecycle_for_single_item=True,
         ),
         BatchContext(None, None, None, None),
@@ -142,10 +150,11 @@ def test_single_user_can_force_lifecycle(tmp_path, monkeypatch, qapp):
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        ["alice"],
-        [BatchScript("test", "test")],
-        BatchConfigItem(
-            name="test", usernames=["alice"],
+        BatchRunSpec(
+            name="test",
+            entries=("alice",),
+            candidate_usernames=("alice",),
+            scripts=(BatchScript("test", "test"),),
             skip_lifecycle_for_single_item=False,
         ),
         BatchContext(None, None, None, None),
@@ -295,10 +304,11 @@ def test_any_executable_task_makes_the_user_run_all_tasks(
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        ["alice"],
-        [BatchScript("skip", "skip"), BatchScript("run", "run")],
-        BatchConfigItem(
-            name="test", usernames=["alice"],
+        BatchRunSpec(
+            name="test",
+            entries=("alice",),
+            candidate_usernames=("alice",),
+            scripts=(BatchScript("skip", "skip"), BatchScript("run", "run")),
             skip_lifecycle_for_single_item=False,
         ),
         BatchContext(None, None, None, None),
@@ -418,7 +428,9 @@ def test_lifecycle_stage_receives_saved_workflow_parameters(
         }},
     )
     worker = BatchWorker(
-        ["alice"], [BatchScript("test", "test")], config,
+        BatchRunSpec.build(
+            config, BatchRunDraft(),
+            entries=["alice"], scripts=[BatchScript("test", "test")]),
         BatchContext(None, None, None, None), SessionManager(tmp_path), lambda: False,
     )
     received = {}
@@ -453,12 +465,16 @@ def test_batch_freezes_all_user_task_params_before_start(tmp_path, monkeypatch, 
     set_wf_config("test", {"count": "5"})
     set_user_workflow_params("alice", "test", {"count": "2"}, users_dir)
     worker = BatchWorker(
-        ["alice", "bob"],
-        [BatchScript(
-            "test", "test",
-            parameters=[{"name": "count", "type": "number", "default": 1}],
-        )],
-        BatchConfigItem(name="test", usernames=["alice", "bob"]),
+        BatchRunSpec(
+            name="test",
+            entries=("alice", "bob"),
+            candidate_usernames=("alice", "bob"),
+            scripts=(BatchScript(
+                "test", "test",
+                parameters=[{"name": "count", "type": "number",
+                             "default": 1}],
+            ),),
+        ),
         BatchContext(None, None, None, None), SessionManager(users_dir), lambda: False,
     )
 

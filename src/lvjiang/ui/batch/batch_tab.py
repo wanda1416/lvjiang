@@ -14,7 +14,7 @@ import math
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import cast
 
 from loguru import logger
 from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, pyqtSignal
@@ -29,9 +29,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
-    QLineEdit,
     QMenu,
-    QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -47,15 +45,21 @@ from PyQt6.QtWidgets import (
 from ...core.batch_config import (
     BatchConfigItem,
     declares_unit_prepare,
-    lifecycle_parameter_definitions,
     load_batch_config,
-    save_batch_config,
+)
+from ...core.batch_run import (
+    BatchRunDraft,
+    BatchSelection,
+    active_group_id,
+    forget_drafts,
+    load_draft,
+    save_draft,
+    set_active_group_id,
 )
 from ...core.profile.models import MODEL_QUOTA
 from ...core.profile.schema import get_profile_config
 from ...core.profile.service import profile_read
 from ...i18n import tr
-from ...workflows.builtins._coerce import to_bool
 from ..button_styles import (
     apply_button_style,
     apply_execution_button_style,
@@ -67,13 +71,14 @@ from ..main.run_control import (
     STATE_STOPPING,
 )
 from ..theme import get_theme_manager
-from ..widgets import add_top_aligned_row, fit_combo_popup_to_contents
+from ..widgets import add_top_aligned_row
 from .batch_runner import (
     ST_FAILED,
     ST_PENDING,
     ST_RUNNING,
     ST_SKIPPED,
     ST_SUCCESS,
+    BatchRunSpec,
     BatchScript,
     PlannedTask,
 )
@@ -193,6 +198,11 @@ class BatchTab(QWidget):
         self._progress_row_context: dict[int, tuple[int, str]] = {}
         self._progress_task_plan: dict[tuple[int, str], PlannedTask] = {}
         self._params_popup: QFrame | None = None
+        # 三层状态在本页的落点：_item 是配置组定义（只读），_draft 是本次运行
+        # 草稿（本页唯一可写的东西），_group_id 是两者的关联键。
+        self._group_id: str = ""
+        self._item: BatchConfigItem | None = None
+        self._draft: BatchRunDraft = BatchRunDraft()
         self._setup_ui()
 
         # 宿主状态信号
@@ -254,38 +264,37 @@ class BatchTab(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         summary_group = QGroupBox(tr("批量设置"))
         summary_form = QFormLayout(summary_group)
+        # 标签一律左对齐：这一页混着输入项与只读展示，右对齐时两种行的文字
+        # 起点会错开，读起来像两张表。
+        summary_form.setLabelAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         self._rounds_spin = QSpinBox()
         self._rounds_spin.setRange(1, 999)
         self._rounds_spin.setValue(1)
-        self._rounds_spin.valueChanged.connect(self._persist_rounds)
+        self._rounds_spin.valueChanged.connect(self._on_rounds_changed)
         summary_form.addRow(tr("执行轮数："), self._rounds_spin)
-        self._unit_combo = QComboBox()
-        self._unit_combo.currentIndexChanged.connect(self._persist_execution_unit)
-        summary_form.addRow(tr("调度单元："), self._unit_combo)
-        profile_sort_row = QWidget()
-        profile_sort_layout = QHBoxLayout(profile_sort_row)
-        profile_sort_layout.setContentsMargins(0, 0, 0, 0)
-        self._profile_sort_key = QComboBox()
-        self._profile_sort_direction = QComboBox()
-        self._profile_sort_direction.addItem(tr("升序"), "asc")
-        self._profile_sort_direction.addItem(tr("降序"), "desc")
-        self._profile_sort_key.currentTextChanged.connect(
-            self._profile_sort_key.setToolTip)
-        self._profile_sort_key.currentIndexChanged.connect(self._persist_profile_sort)
-        self._profile_sort_direction.currentIndexChanged.connect(self._persist_profile_sort)
-        profile_sort_layout.addWidget(self._profile_sort_key, 1)
-        profile_sort_layout.addWidget(self._profile_sort_direction)
+        # 调度单元与指定排序属于配置组定义（它们决定候选列表的内容和生命周期
+        # 契约），在「批量配置」里改；这里只如实显示本次用的是什么。
+        self._unit_value = QLabel()
+        self._unit_value.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        summary_form.addRow(tr("调度单元："), self._unit_value)
+        self._profile_sort_value = QLabel()
+        self._profile_sort_value.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
         self._profile_sort_label = QLabel(tr("指定排序："))
-        self._profile_sort_row = profile_sort_row
         self._summary_form = summary_form
-        summary_form.addRow(self._profile_sort_label)
-        summary_form.addRow(profile_sort_row)
+        summary_form.addRow(self._profile_sort_label, self._profile_sort_value)
+        self._unattended_check = QCheckBox()
+        self._unattended_check.toggled.connect(self._on_unattended_toggled)
+        summary_form.addRow(tr("无人值守："), self._unattended_check)
         self._workflow_labels: dict[str, QLabel] = {}
         for key, label in (
             ("batch_setup", tr("批次准备") + "："),
             ("prepare_item", tr("条目准备") + "："),
             ("finish_item", tr("条目收尾") + "："),
             ("batch_teardown", tr("批次收尾") + "："),
+            ("recover_unattended", tr("异常恢复") + "："),
         ):
             value = QLabel()
             value.setTextInteractionFlags(
@@ -295,13 +304,6 @@ class BatchTab(QWidget):
             add_top_aligned_row(summary_form, label, value)
         layout.addWidget(summary_group)
 
-        self._workflow_params_panel = QWidget()
-        self._workflow_params_layout = QVBoxLayout(self._workflow_params_panel)
-        self._workflow_params_layout.setContentsMargins(0, 0, 0, 0)
-        self._workflow_param_groups: list[QGroupBox] = []
-        self._workflow_param_widgets: dict[tuple[str, str], QWidget] = {}
-        self._workflow_param_types: dict[tuple[str, str], str] = {}
-        layout.addWidget(self._workflow_params_panel)
         layout.addStretch()
         return widget
 
@@ -585,292 +587,122 @@ class BatchTab(QWidget):
 
     # ─── 配置选择 ─────────────────────────────────────────
 
+    def _load_group_state(self, group_id: str = "") -> None:
+        """按 ID 载入定义与草稿，并按定义协调草稿。
+
+        协调规则见 `BatchSelection.reconcile`：配置组改了可见范围，用户刚调好的
+        本次顺序不该被清掉；新加进来的条目按定义层的默认勾选加入。
+        """
+        cfg = load_batch_config()
+        self._group_id = cfg.resolve_id(
+            group_id or self._group_id or active_group_id())
+        self._item = cfg.get(self._group_id)
+        self._draft = load_draft(self._group_id)
+        item = self._item
+        if item is None:
+            return
+        self._draft.reconcile(
+            task_candidates=list(item.task_ids),
+            task_defaults=list(item.default_task_ids),
+            entry_candidates=self._unit_candidates(item),
+            entry_defaults=self._entry_defaults(item),
+            unit_key=item.execution_unit_key,
+        )
+
+    def _entry_defaults(self, item: BatchConfigItem) -> list[str]:
+        """当前调度单元的默认勾选。属性单元没配过默认值时按全选处理。"""
+        if item.execution_unit_key == "user":
+            return list(item.default_usernames)
+        configured = item.default_units.get(item.execution_unit_key)
+        if configured is None:
+            return self._unit_candidates(item)
+        return list(configured)
+
+    def _entry_selection(self) -> BatchSelection:
+        key = self._item.execution_unit_key if self._item is not None else "user"
+        return self._draft.entry_selection(key)
+
+    def _save_draft(self) -> None:
+        """草稿立即落 session。它从不写 batch.json——定义层只由配置窗口改。"""
+        if self._group_id:
+            save_draft(self._group_id, self._draft)
+
     def _refresh_config_combo(self):
-        """刷新配置下拉框"""
+        """刷新配置下拉框。条目带稳定 ID，重命名不影响选中与草稿关联。"""
         cfg = load_batch_config()
         self._config_combo.blockSignals(True)
         self._config_combo.clear()
-        for name in cfg.configs:
-            self._config_combo.addItem(name)
-        # 选中 active_config
-        if cfg.active_config and cfg.active_config in cfg.configs:
-            idx = self._config_combo.findText(cfg.active_config)
-            if idx >= 0:
-                self._config_combo.setCurrentIndex(idx)
+        for group_id, item in cfg.configs.items():
+            self._config_combo.addItem(item.name, group_id)
+        current = cfg.resolve_id(self._group_id or active_group_id())
+        index = self._config_combo.findData(current)
+        if index >= 0:
+            self._config_combo.setCurrentIndex(index)
         self._config_combo.blockSignals(False)
+        forget_drafts(list(cfg.configs))
 
     def _on_config_changed(self, index: int):
-        """配置下拉框切换 → 刷新行列表 + 保存 active_config"""
+        """切换配置组 → 换到它自己的运行草稿，并记下主页面活动组。"""
         if index < 0:
             return
-        name = self._config_combo.itemText(index)
-        cfg = load_batch_config()
-        cfg.active_config = name
-        save_batch_config(cfg)
-        self._refresh_group_contents()
+        group_id = str(self._config_combo.itemData(index) or "")
+        set_active_group_id(group_id)
+        self._refresh_group_contents(group_id)
 
-    def _refresh_group_contents(self) -> None:
+    def _refresh_group_contents(self, group_id: str = "") -> None:
+        self._load_group_state(group_id)
         self._refresh_script_list()
         self._refresh_entry_list()
         self._refresh_params()
 
     def _refresh_params(self) -> None:
-        cfg = load_batch_config()
-        item = cfg.configs.get(self._current_config_name()) or cfg.get_active()
+        item = self._item
         self._rounds_spin.blockSignals(True)
-        self._rounds_spin.setValue(item.rounds if item is not None else 1)
+        self._rounds_spin.setValue(self._draft.rounds)
         self._rounds_spin.blockSignals(False)
-        self._unit_combo.blockSignals(True)
-        self._unit_combo.clear()
-        self._unit_combo.addItem(tr("用户名"), "user")
-        if item is not None:
-            manager = getattr(self._host, "_user_manager", None)
-            keys: dict[str, None] = {}
-            if manager is not None:
-                for username in item.usernames:
-                    user = manager.get_user(username)
-                    if user is not None:
-                        keys.update({key: None for key, value in user.attributes.items()
-                                     if key and str(value).strip()})
-            keys.setdefault(item.execution_unit_key, None)
-            for key in keys:
-                if key != "user":
-                    self._unit_combo.addItem(key, key)
-            self._unit_combo.setCurrentIndex(
-                max(0, self._unit_combo.findData(item.execution_unit_key)))
-        fit_combo_popup_to_contents(self._unit_combo)
-        self._unit_combo.blockSignals(False)
-        self._profile_sort_key.blockSignals(True)
-        self._profile_sort_direction.blockSignals(True)
-        self._profile_sort_key.clear()
-        self._profile_sort_key.addItem(tr("不指定"), "")
-        try:
-            definitions = get_profile_config().get_all_keys()
-        except (OSError, ValueError) as exc:
-            logger.warning(f"读取 Profile 定义失败，指定排序不可用: {exc}")
-            definitions = []
-        for definition in definitions:
-            profile_label = definition.label or definition.key
-            self._profile_sort_key.addItem(
-                f"{profile_label} ({definition.key})", definition.key)
-        selected_key = item.profile_sort_key if item is not None else ""
-        index = self._profile_sort_key.findData(selected_key)
-        if index < 0 and selected_key:
-            self._profile_sort_key.addItem(tr("定义已不存在：") + selected_key, selected_key)
-            index = self._profile_sort_key.count() - 1
-        self._profile_sort_key.setCurrentIndex(max(0, index))
-        fit_combo_popup_to_contents(self._profile_sort_key)
-        self._profile_sort_key.setToolTip(self._profile_sort_key.currentText())
-        direction = item.profile_sort_direction if item is not None else "asc"
-        self._profile_sort_direction.setCurrentIndex(
-            max(0, self._profile_sort_direction.findData(direction)))
-        self._profile_sort_key.blockSignals(False)
-        self._profile_sort_direction.blockSignals(False)
-        user_unit = item is not None and item.execution_unit_key == "user"
+        unit_key = item.execution_unit_key if item is not None else "user"
+        self._unit_value.setText(
+            tr("用户名") if unit_key == "user" else unit_key)
+        self._unit_value.setToolTip(
+            tr("调度单元属于配置组定义，在「工具 → 批量配置」中修改"))
+        user_unit = unit_key == "user"
+        sort_key = item.profile_sort_key if item is not None else ""
+        if sort_key:
+            direction = tr("升序") if (
+                item is not None and item.profile_sort_direction == "asc"
+            ) else tr("降序")
+            self._profile_sort_value.setText(f"{sort_key}（{direction}）")
+        else:
+            self._profile_sort_value.setText(tr("不指定"))
+        self._profile_sort_value.setToolTip(
+            tr("排序键属于配置组定义；在用户列表右键「按 Profile 排序」执行一次，"
+               "排完的顺序只属于本次运行"))
         self._summary_form.setRowVisible(self._profile_sort_label, user_unit)
-        self._summary_form.setRowVisible(self._profile_sort_row, user_unit)
-        self._profile_sort_key.setToolTip(self._profile_sort_key.currentText())
-        self._profile_sort_direction.setToolTip("")
+        recover_wf = (item.workflows.recover_unattended
+                      if item is not None else "")
+        self._unattended_check.blockSignals(True)
+        self._unattended_check.setChecked(
+            self._draft.unattended and bool(recover_wf))
+        self._unattended_check.blockSignals(False)
+        self._unattended_check.setEnabled(bool(recover_wf))
+        self._unattended_check.setToolTip(tr(
+            "本次长时间无人看守时勾选：任务弹出暂停或确认框时不再等人，该任务按"
+            "失败记录并跳过，随后由配置组的「异常恢复 wf」把游戏收回登录主页，"
+            "再继续下一个任务"
+        ) if recover_wf else tr(
+            "需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：无人值守"
+            "撞上弹窗后要靠它把游戏收回登录主页"))
         for key, label in self._workflow_labels.items():
             path = getattr(item.workflows, key) if item is not None else ""
             label.setText(path or tr("未配置"))
-        self._rebuild_workflow_params(item)
 
-    def _rebuild_workflow_params(self, item: BatchConfigItem | None) -> None:
-        while self._workflow_params_layout.count():
-            layout_item = self._workflow_params_layout.takeAt(0)
-            old_widget = layout_item.widget() if layout_item is not None else None
-            if old_widget is not None:
-                old_widget.deleteLater()
-        self._workflow_param_groups.clear()
-        self._workflow_param_widgets.clear()
-        self._workflow_param_types.clear()
-        # require 依赖按行控显隐：记下每个参数占用的行号与本阶段的参数定义
-        self._workflow_param_forms: dict[str, QFormLayout] = {}
-        self._workflow_param_rows: dict[tuple[str, str], list[int]] = {}
-        self._workflow_param_defs: dict[str, list[dict]] = {}
-        if item is None:
-            self._workflow_params_panel.setVisible(False)
-            return
+    def _on_rounds_changed(self, rounds: int) -> None:
+        self._draft.rounds = int(rounds)
+        self._save_draft()
 
-        phase_labels = {
-            "batch_setup": tr("批次准备"),
-            "prepare_item": tr("条目准备"),
-            "finish_item": tr("条目收尾"),
-            "batch_teardown": tr("批次收尾"),
-            # 异常恢复不在上面那四行只读摘要里，但它同样是生命周期 wf，
-            # 声明了参数就要能在这里编辑——少一个 key 就是 KeyError。
-            "recover_unattended": tr("异常恢复"),
-        }
-        definitions = lifecycle_parameter_definitions(item.workflows)
-        for phase, params in definitions.items():
-            if not params:
-                continue
-            group = QGroupBox(phase_labels[phase])
-            form = QFormLayout(group)
-            self._workflow_param_groups.append(group)
-            self._workflow_param_forms[phase] = form
-            self._workflow_param_defs[phase] = list(params)
-            saved = item.workflow_params.get(phase, {})
-            for definition in params:
-                name = str(definition["name"])
-                rows_before = form.rowCount()
-                label = str(definition.get("label") or name)
-                value = saved.get(name, definition.get("default"))
-                param_type = definition.get("type", "select")
-                widget: QWidget
-                if param_type == "bool":
-                    checkbox = QCheckBox()
-                    checkbox.setChecked(to_bool(value))
-                    checkbox.toggled.connect(self._persist_workflow_params)
-                    widget = checkbox
-                elif param_type == "number":
-                    spin = QSpinBox()
-                    spin.setRange(
-                        int(definition.get("min", 0)),
-                        int(definition.get("max", 999999)),
-                    )
-                    spin.setValue(int(value) if value is not None else 0)
-                    spin.valueChanged.connect(self._persist_workflow_params)
-                    widget = spin
-                elif param_type == "select":
-                    combo = QComboBox()
-                    for option in definition.get("options", []):
-                        if isinstance(option, dict):
-                            combo.addItem(str(option.get("label", option["value"])),
-                                          option["value"])
-                        else:
-                            combo.addItem(str(option), str(option))
-                    selected = combo.findData(value)
-                    if selected >= 0:
-                        combo.setCurrentIndex(selected)
-                    combo.currentIndexChanged.connect(self._persist_workflow_params)
-                    widget = combo
-                elif param_type == "checkgroup":
-                    container = QWidget()
-                    options_layout = QHBoxLayout(container)
-                    options_layout.setContentsMargins(0, 0, 0, 0)
-                    selected_values = value if isinstance(value, dict) else {}
-                    for option in definition.get("options", []):
-                        if isinstance(option, dict):
-                            option_name = str(option["value"])
-                            option_label = str(option.get("label", option_name))
-                        else:
-                            option_name = option_label = str(option)
-                        checkbox = QCheckBox(option_label)
-                        checkbox.setObjectName(option_name)
-                        checkbox.setChecked(bool(selected_values.get(option_name, True)))
-                        checkbox.toggled.connect(self._persist_workflow_params)
-                        options_layout.addWidget(checkbox)
-                    options_layout.addStretch()
-                    widget = container
-                else:
-                    edit = QPlainTextEdit() if definition.get("multiline") else QLineEdit()
-                    if isinstance(edit, QPlainTextEdit):
-                        edit.setMaximumHeight(100)
-                        edit.setPlainText(str(value or ""))
-                        edit.textChanged.connect(self._persist_workflow_params)
-                    else:
-                        edit.setText(str(value or ""))
-                        edit.textChanged.connect(self._persist_workflow_params)
-                    widget = edit
-                widget.setObjectName(name)
-                self._workflow_param_widgets[(phase, name)] = widget
-                self._workflow_param_types[(phase, name)] = str(param_type)
-                if isinstance(widget, QPlainTextEdit):
-                    form.addRow(QLabel(f"{label}："))
-                    form.addRow(widget)
-                else:
-                    form.addRow(f"{label}：", widget)
-                self._workflow_param_rows[(phase, name)] = list(
-                    range(rows_before, form.rowCount()))
-            self._workflow_params_layout.addWidget(group)
-        self._refresh_workflow_param_visibility()
-        self._workflow_params_panel.setVisible(bool(self._workflow_param_groups))
-
-    def _refresh_workflow_param_visibility(self) -> None:
-        """按 require 依赖隐藏当前取值下不适用的生命周期参数行。
-
-        只改显隐：控件和值都留着，运行时参数快照照旧包含它们。
-        """
-        defs_by_phase = getattr(self, "_workflow_param_defs", {})
-        if not any(item.get("require")
-                   for params in defs_by_phase.values() for item in params):
-            return
-        from ...core.param_require import RequireError, visible_parameter_names
-        collected = self._collect_workflow_params()
-        for phase, params in defs_by_phase.items():
-            form = self._workflow_param_forms.get(phase)
-            if form is None:
-                continue
-            try:
-                visible = visible_parameter_names(params, collected.get(phase, {}))
-            except RequireError as exc:
-                logger.warning(f"生命周期参数依赖求值失败，本次全部展示: {exc}")
-                continue
-            for (row_phase, name), indices in self._workflow_param_rows.items():
-                if row_phase != phase:
-                    continue
-                for index in indices:
-                    form.setRowVisible(index, name in visible)
-
-    def _collect_workflow_params(self) -> dict[str, dict]:
-        """从控件读出各阶段参数值；写回配置与算 require 可见性共用这一份。"""
-        values: dict[str, dict] = {}
-        for key, widget in self._workflow_param_widgets.items():
-            phase, name = key
-            param_type = self._workflow_param_types[key]
-            value: Any
-            if isinstance(widget, QCheckBox):
-                value = widget.isChecked()
-            elif isinstance(widget, QSpinBox):
-                value = widget.value()
-            elif isinstance(widget, QComboBox):
-                value = widget.currentData()
-            elif isinstance(widget, QPlainTextEdit):
-                value = widget.toPlainText()
-            elif param_type == "checkgroup":
-                value = {
-                    checkbox.objectName(): checkbox.isChecked()
-                    for checkbox in widget.findChildren(QCheckBox)
-                }
-            else:
-                value = cast(QLineEdit, widget).text()
-            values.setdefault(phase, {})[name] = value
-        return values
-
-    def _persist_workflow_params(self, *_args) -> None:
-        values = self._collect_workflow_params()
-        cfg = load_batch_config()
-        item = cfg.configs.get(self._current_config_name())
-        if item is not None:
-            item.workflow_params = values
-            save_batch_config(cfg)
-        self._refresh_workflow_param_visibility()
-
-    def _persist_rounds(self, rounds: int) -> None:
-        cfg = load_batch_config()
-        item = cfg.configs.get(self._current_config_name())
-        if item is None:
-            return
-        item.rounds = rounds
-        save_batch_config(cfg)
-
-    def _persist_execution_unit(self, index: int) -> None:
-        if index < 0:
-            return
-        cfg = load_batch_config()
-        item = cfg.configs.get(self._current_config_name())
-        if item is None:
-            return
-        key = str(self._unit_combo.itemData(index))
-        if item.execution_unit_key == key:
-            return
-        item.execution_unit_key = key
-        save_batch_config(cfg)
-        self._refresh_entry_list()
-        self._summary_form.setRowVisible(self._profile_sort_label, key == "user")
-        self._summary_form.setRowVisible(self._profile_sort_row, key == "user")
+    def _on_unattended_toggled(self, checked: bool) -> None:
+        self._draft.unattended = bool(checked)
+        self._save_draft()
 
     def _unit_candidates(self, config: BatchConfigItem) -> list[str]:
         if config.execution_unit_key == "user":
@@ -886,23 +718,6 @@ class BatchTab(QWidget):
             if value:
                 values[value] = None
         return list(values)
-
-    def _persist_profile_sort(self, *_args) -> None:
-        cfg = load_batch_config()
-        item = cfg.configs.get(self._current_config_name())
-        if item is None or item.execution_unit_key != "user":
-            return
-        item.profile_sort_key = str(self._profile_sort_key.currentData() or "")
-        item.profile_sort_direction = str(
-            self._profile_sort_direction.currentData() or "asc")
-        save_batch_config(cfg)
-
-    def _current_config_name(self) -> str:
-        """获取当前选中的配置名"""
-        idx = self._config_combo.currentIndex()
-        if idx < 0:
-            return ""
-        return self._config_combo.itemText(idx)
 
     # ─── 行列表 ──────────────────────────────────────────
 
@@ -949,8 +764,7 @@ class BatchTab(QWidget):
 
     def _refresh_entry_list(self):
         """刷新用户页的勾选列表。"""
-        cfg = load_batch_config()
-        config = cfg.configs.get(self._current_config_name())
+        config = self._item
         self._updating_user_list = True
         self._user_list.clear()
         if not config:
@@ -974,13 +788,12 @@ class BatchTab(QWidget):
         self._user_list.setColumnWidth(
             0, max(self._user_list.columnWidth(0),
                    header.fontMetrics().horizontalAdvance(candidate_label) + 24))
-        display_order = self._unit_candidates(config)
-        visible = set(display_order)
-        selected_values = (config.selected_usernames if key == "user" else
-                           config.selected_units.get(key, display_order))
-        selected = set(selected_values) & visible
+        # 顺序与勾选都取本次草稿：草稿已按定义层协调过（见 _load_group_state）
+        selection = self._entry_selection()
+        display_order = list(selection.order)
+        selected = set(selection.checked)
         self._user_candidate_order = list(display_order)
-        self._user_order = [name for name in display_order if name in selected]
+        self._user_order = selection.execution_order()
         row_height = _batch_list_row_height(self._user_list)
         for username in display_order:
             item = QTreeWidgetItem([username, ""])
@@ -1014,7 +827,7 @@ class BatchTab(QWidget):
             self._updating_user_list = False
         self._user_order = list(self._user_candidate_order) if checked else []
         self._refresh_user_order_column()
-        self._persist_user_selection()
+        self._store_entry_selection()
 
     @staticmethod
     def _user_name(item: QTreeWidgetItem | None) -> str:
@@ -1033,19 +846,19 @@ class BatchTab(QWidget):
             self._sync_user_order_from_rows()
 
     def _restore_user_order(self) -> None:
-        cfg = load_batch_config()
-        group = cfg.configs.get(self._current_config_name())
-        if group is None:
+        """恢复默认：顺序回到定义层初始顺序，勾选回到默认勾选。"""
+        item = self._item
+        if item is None:
             return
-        self._updating_user_list = True
-        try:
-            self._apply_tree_order(
-                self._user_list,
-                self._unit_candidates(group),
-                self._user_name)
-        finally:
-            self._updating_user_list = False
-        self._sync_user_order_from_rows()
+        defaults = BatchSelection.from_defaults(
+            self._unit_candidates(item), self._entry_defaults(item))
+        key = item.execution_unit_key
+        if key == "user":
+            self._draft.users = defaults
+        else:
+            self._draft.units[key] = defaults
+        self._save_draft()
+        self._refresh_entry_list()
 
     def _shuffle_user_order(self) -> None:
         order = self._tree_order(self._user_list, self._user_name)
@@ -1062,8 +875,7 @@ class BatchTab(QWidget):
 
         不缓存：Profile 定义可能在定义编辑器里被删掉，而批量页收不到通知。
         """
-        cfg = load_batch_config()
-        group = cfg.configs.get(self._current_config_name())
+        group = self._item
         if group is None or group.execution_unit_key != "user":
             return ProfileOrderStatus()
         key = group.profile_sort_key
@@ -1083,8 +895,7 @@ class BatchTab(QWidget):
 
     def _sort_user_order_by_profile(self) -> None:
         """按当前配置的 Profile 数值对用户行执行一次稳定排序。"""
-        cfg = load_batch_config()
-        group = cfg.configs.get(self._current_config_name())
+        group = self._item
         if group is None or not group.profile_sort_key:
             return
         if group.execution_unit_key != "user":
@@ -1151,7 +962,7 @@ class BatchTab(QWidget):
             if item.checkState(0) == Qt.CheckState.Checked:
                 self._user_order.append(username)
         self._refresh_user_order_column()
-        self._persist_user_selection()
+        self._store_entry_selection()
 
     def _refresh_user_order_column(self) -> None:
         order_by_name = {
@@ -1168,33 +979,15 @@ class BatchTab(QWidget):
         finally:
             self._updating_user_list = False
 
-    def _persist_user_selection(self, *_args) -> None:
-        name = self._current_config_name()
-        cfg = load_batch_config()
-        item = cfg.configs.get(name)
-        if item is None:
-            return
-        # 只保存勾选集合；用户页的拖拽、随机和 Profile 排序均为本次运行态。
-        selected = set(self._user_order)
-        key = item.execution_unit_key
-        if key == "user":
-            if set(item.selected_usernames) == selected:
-                return
-            item.selected_usernames = [
-                username for username in item.usernames if username in selected]
-        else:
-            visible = self._unit_candidates(item)
-            if set(item.selected_units.get(key, visible)) == selected:
-                return
-            item.selected_units[key] = [value for value in visible if value in selected]
-        save_batch_config(cfg)
+    def _store_entry_selection(self) -> None:
+        """把列表当前的顺序与勾选写回本次草稿。**不碰配置组定义。**"""
+        selection = self._entry_selection()
+        selection.order = list(self._user_candidate_order)
+        selection.checked = list(self._user_order)
+        self._save_draft()
 
     def _get_enabled_usernames(self) -> list[str]:
-        """按配置顺序返回本次勾选的用户名。"""
-        cfg = load_batch_config()
-        config = cfg.configs.get(self._current_config_name())
-        if not config:
-            return []
+        """本次实际执行顺序（用户名或属性值）。"""
         return list(self._user_order)
 
     # ─── 脚本列表 ─────────────────────────────────────────
@@ -1204,9 +997,7 @@ class BatchTab(QWidget):
         from ...workflows.discovery import list_exposed_scripts, script_display_name
 
         if checked_ids is None:
-            cfg = load_batch_config()
-            group = cfg.configs.get(self._current_config_name()) or cfg.get_active()
-            checked_ids = list(group.selected_task_ids) if group is not None else []
+            checked_ids = list(self._draft.tasks.checked)
 
         self._updating_script_list = True
         self._script_list.clear()
@@ -1220,16 +1011,12 @@ class BatchTab(QWidget):
         except Exception:
             discovered = []
         discovered_by_id = {cfg["id"]: cfg for cfg in discovered}
-        batch_cfg = load_batch_config()
-        group = batch_cfg.configs.get(self._current_config_name()) or batch_cfg.get_active()
-        visible_ids = list(group.task_ids) if group is not None else []
-        visible = set(visible_ids)
-        selected_visible_ids = [
-            task_id for task_id in checked_ids if task_id in visible
-        ]
-        selected_visible = set(selected_visible_ids)
-        display_ids = selected_visible_ids + [
-            task_id for task_id in visible_ids if task_id not in selected_visible
+        group = self._item
+        visible = set(group.task_ids) if group is not None else set()
+        # 显示顺序就是草稿里的本次顺序；取消勾选不该让条目跳到末尾，所以顺序
+        # 由 order 决定，与勾选集合无关。
+        display_ids = [
+            task_id for task_id in self._draft.tasks.order if task_id in visible
         ]
         configs = [
             discovered_by_id[task_id] for task_id in display_ids
@@ -1317,17 +1104,14 @@ class BatchTab(QWidget):
         self._persist_script_order()
 
     def _restore_script_order(self) -> None:
-        cfg = load_batch_config()
-        group = cfg.configs.get(self._current_config_name())
+        """恢复默认：顺序回到定义层初始顺序，勾选回到默认勾选。"""
+        group = self._item
         if group is None:
             return
-        self._updating_script_list = True
-        try:
-            self._apply_tree_order(
-                self._script_list, list(group.task_ids), self._script_id)
-        finally:
-            self._updating_script_list = False
-        self._on_script_rows_moved()
+        self._draft.tasks = BatchSelection.from_defaults(
+            list(group.task_ids), list(group.default_task_ids))
+        self._save_draft()
+        self._refresh_script_list()
 
     def _shuffle_script_order(self) -> None:
         order = self._tree_order(self._script_list, self._script_id)
@@ -1388,13 +1172,12 @@ class BatchTab(QWidget):
         return merged
 
     def _persist_script_order(self):
-        """立即保存当前配置组的实际任务勾选。"""
-        cfg = load_batch_config()
-        item = cfg.configs.get(self._current_config_name())
-        if item is None:
-            return
-        item.selected_task_ids = self._merged_script_ids()
-        save_batch_config(cfg)
+        """把列表当前顺序与勾选写回本次草稿。**不碰配置组定义。**"""
+        self._draft.tasks.order = list(self._script_candidate_order) + [
+            task_id for _index, task_id in self._missing_script_ids
+        ]
+        self._draft.tasks.checked = self._merged_script_ids()
+        self._save_draft()
 
     def _checked_script_ids(self) -> list[str]:
         """获取勾选的脚本 ID 列表"""
@@ -1449,10 +1232,7 @@ class BatchTab(QWidget):
             self._host.append_log(tr("[批量] 请至少勾选一个脚本"))
             return
 
-        cfg = load_batch_config()
-
-        # 构建进度表
-        config = cfg.configs.get(self._current_config_name())
+        config = self._item
         if config is not None and config.execution_unit_key != "user":
             # 属性单元的一个单元值可能对应多名用户，必须由条目准备 wf 选定并回传
             # 用户名。不声明这条协议的 wf 跑起来只会让每个单元都以同一个协议错误
@@ -1475,10 +1255,21 @@ class BatchTab(QWidget):
                         wf=config.workflows.prepare_item),
                 )
                 return
+        if config is None:
+            self._host.append_log(tr("[批量] 暂无配置组，请先通过 工具 → 批量配置 添加"))
+            return
         self._build_progress_table(usernames, config, scripts)
         self._set_config_enabled(False)
 
-        ok = self._host.run_batch(usernames, scripts)
+        # 定义 + 草稿 → 不可变快照。之后再改配置组、改用户资料或在本页重新勾选，
+        # 都不会影响这一批：调度器只认这份快照。
+        spec = BatchRunSpec.build(
+            config, self._draft, entries=usernames, scripts=scripts,
+            candidate_usernames=(
+                list(config.usernames)
+                if config.execution_unit_key != "user" else None),
+        )
+        ok = self._host.run_batch(spec)
         if not ok:
             self._set_config_enabled(True)
 
@@ -1736,4 +1527,7 @@ class BatchTab(QWidget):
         self._btn_user_none.setEnabled(enabled)
         self._user_list.setEnabled(enabled)
         self._rounds_spin.setEnabled(enabled)
-        self._workflow_params_panel.setEnabled(enabled)
+        self._unattended_check.setEnabled(
+            enabled and bool(
+                self._item is not None
+                and self._item.workflows.recover_unattended))

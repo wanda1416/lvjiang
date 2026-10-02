@@ -933,11 +933,14 @@ class MainWindow(
 
     # ─── 批处理执行 ───────────────────────────────────────
 
-    def run_batch(self, usernames, scripts) -> bool:
+    def run_batch(self, spec) -> bool:
         """启动批量执行，返回是否成功
 
-        usernames: 本次执行的用户名列表，列表顺序就是执行顺序
+        spec: 批量页已经冻结好的 `BatchRunSpec`——配置组定义与本次运行草稿在
+        点「开始」的那一刻合成的不可变计划。这里**不再**读 `batch.json` 或活动
+        配置组：那样拼出来的数据可能和页面上看到的不是同一份。
         """
+        scripts = list(spec.scripts)
         if not self._backend_ready():
             if self._backend == "adb":
                 self._log_append(tr("[错误] 请先连接设备"))
@@ -974,7 +977,6 @@ class MainWindow(
             window_left = self._target_window["left"]
             window_top = self._target_window["top"]
 
-        from ...core.batch_config import load_batch_config
         from ..batch import BatchContext, BatchWorker
 
         ctx = BatchContext(
@@ -994,22 +996,11 @@ class MainWindow(
             window_rebind_hook=self._on_target_window_rebound,
         )
 
-        # 获取当前配置
-        cfg = load_batch_config()
-        config = cfg.get_active()
-        if not config:
-            self._log_append(tr("[错误] 暂无配置，请先通过 工具 → 批量配置 添加"))
-            self._end_automation(tr("批量执行"))
-            return False
-
         worker = BatchWorker(
-            usernames=usernames,
-            scripts=scripts,
-            config=config,
+            spec=spec,
             ctx=ctx,
             session_manager=self._session_manager,
             stop_check=self._is_stopped,
-            candidate_usernames=list(config.usernames),
         )
         self._batch_tab.apply_task_plan(worker.task_plan_snapshot())
 

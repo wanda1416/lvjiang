@@ -3,12 +3,16 @@
 无人值守的全部价值在「没人看着的那几个小时里不卡死」，所以这些用例盯的是
 三件事：弹窗不再等人、当前任务按异常收尾且不重试、恢复 wf 拿到正确的阶段
 信号（本条目还有没有没跑的任务）。
+
+「本次是否无人值守」属于运行草稿（今晚没人看），而「异常恢复 wf」属于配置组
+定义（恢复能力本身）——有效值由执行快照把两者取与得出。
 """
 from unittest.mock import MagicMock
 
 import pytest
 
 from lvjiang.core.batch_config import BatchConfigItem, BatchWorkflows
+from lvjiang.core.batch_run import BatchRunDraft
 from lvjiang.core.config.users import SessionManager
 from lvjiang.core.user_config import User, save_user_metadata
 from lvjiang.ui.batch.batch_report import BatchReport
@@ -16,6 +20,7 @@ from lvjiang.ui.batch.batch_runner import (
     ST_FAILED,
     ST_SUCCESS,
     BatchContext,
+    BatchRunSpec,
     BatchScript,
     BatchStageResult,
     BatchWorker,
@@ -25,44 +30,35 @@ from lvjiang.ui.batch.batch_runner import (
 _RECOVER_WF = "batch/recover_to_login.wf"
 
 
-def _config(**kwargs) -> BatchConfigItem:
-    kwargs.setdefault("name", "group")
-    return BatchConfigItem(**kwargs)
+def _spec(**kwargs) -> BatchRunSpec:
+    """按"定义 + 草稿 → 快照"的真实路径构造，有效值不手写。"""
+    recover = kwargs.pop("recover_wf", _RECOVER_WF)
+    unattended = kwargs.pop("unattended", True)
+    scripts = kwargs.pop("scripts", [])
+    entries = kwargs.pop("entries", ["u1"])
+    item = BatchConfigItem(
+        name="group", usernames=list(entries),
+        workflows=BatchWorkflows(recover_unattended=recover), **kwargs)
+    return BatchRunSpec.build(
+        item, BatchRunDraft(unattended=unattended),
+        entries=entries, scripts=scripts)
 
 
-def test_unattended_requires_a_recovery_workflow():
+def test_effective_unattended_requires_a_recovery_workflow():
     """没配恢复 wf 就不成立：撞上弹窗后没人把游戏收回初始页，整批只会连环失败。
 
-    UI 会禁用勾选框，这里守的是手改过的 batch.json 同样不能生效。
+    这个与运算只在构造执行快照时做一次，调度器不必再判断前提。
     """
-    bare = BatchConfigItem.from_dict("bare", {"unattended": True})
-    assert bare.unattended is False
-
-    ready = BatchConfigItem.from_dict("ready", {
-        "unattended": True,
-        "workflows": {"recover_unattended": _RECOVER_WF},
-    })
-    assert ready.unattended is True
-    assert ready.to_dict()["unattended"] is True
+    assert _spec(unattended=True, recover_wf="").unattended is False
+    assert _spec(unattended=True).unattended is True
+    assert _spec(unattended=False).unattended is False
 
 
-def test_clearing_the_recovery_workflow_also_clears_unattended():
-    item = _config(
-        unattended=True,
-        workflows=BatchWorkflows(recover_unattended=_RECOVER_WF))
-    item.workflows.recover_unattended = ""
-    item.normalize()
-
-    assert item.unattended is False
-
-
-def _worker(tmp_path, scripts, **config_kwargs) -> BatchWorker:
+def _worker(tmp_path, spec) -> BatchWorker:
     save_user_metadata(User("u1"), tmp_path)
     return BatchWorker(
-        ["u1"], scripts, _config(usernames=["u1"], **config_kwargs),
-        BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False,
-    )
+        spec, BatchContext(None, None, None, None),
+        SessionManager(tmp_path), lambda: False)
 
 
 def test_notify_still_reaches_the_host_but_pause_interrupts(tmp_path, qapp):
@@ -71,10 +67,7 @@ def test_notify_still_reaches_the_host_but_pause_interrupts(tmp_path, qapp):
     放过 notify 才能在事后从告警面板看出这批跑过什么。
     """
     seen = []
-    worker = _worker(
-        tmp_path, [],
-        unattended=True,
-        workflows=BatchWorkflows(recover_unattended=_RECOVER_WF))
+    worker = _worker(tmp_path, _spec())
     worker._ctx = BatchContext(
         None, None, None, None,
         ui_callback=lambda kind, **kw: seen.append((kind, kw)) or "ok")
@@ -92,12 +85,10 @@ def test_notify_still_reaches_the_host_but_pause_interrupts(tmp_path, qapp):
 
 def test_unattended_off_keeps_waiting_for_a_human(tmp_path, qapp):
     """没勾选时行为完全不变：弹窗还是弹窗，不能被这个特性悄悄改掉。"""
-    worker = _worker(tmp_path, [])
-
-    assert worker._unattended_active() is False
+    assert _worker(tmp_path, _spec(unattended=False))._unattended_active() is False
 
 
-def _run_with_pause_on(tmp_path, monkeypatch, qapp, *, pause_index: int,
+def _run_with_pause_on(tmp_path, monkeypatch, *, pause_index: int,
                        script_count: int, recover_wf: str = _RECOVER_WF):
     """让第 pause_index 个任务撞上 pause，回放整条批量。"""
     import lvjiang.core.daily_history as history
@@ -107,9 +98,7 @@ def _run_with_pause_on(tmp_path, monkeypatch, qapp, *, pause_index: int,
 
     scripts = [BatchScript(f"task{i}", f"任务{i}") for i in range(script_count)]
     worker = _worker(
-        tmp_path, scripts,
-        unattended=True,
-        workflows=BatchWorkflows(recover_unattended=recover_wf))
+        tmp_path, _spec(scripts=scripts, recover_wf=recover_wf))
     executed: list[str] = []
     stages: list[tuple[str, dict]] = []
     statuses: list[tuple[str, str]] = []
@@ -144,9 +133,8 @@ def test_pause_fails_the_task_without_retry_and_recovers_for_the_rest(
     任务会在登录页上必然失败，白跑一轮。
     """
     executed, stages, statuses = _run_with_pause_on(
-        tmp_path, monkeypatch, qapp, pause_index=0, script_count=2)
+        tmp_path, monkeypatch, pause_index=0, script_count=2)
 
-    # 失败的任务只跑一次，后面的任务不受影响
     assert executed == ["task0", "task1"]
     assert ("task0", ST_FAILED) in statuses
     assert ("task1", ST_SUCCESS) in statuses
@@ -163,7 +151,7 @@ def test_recovery_only_returns_to_login_when_nothing_is_left(
 ):
     """最后一个任务撞弹窗时不必再登回游戏主页，停在登录主页等下一个用户。"""
     _executed, stages, _statuses = _run_with_pause_on(
-        tmp_path, monkeypatch, qapp, pause_index=1, script_count=2)
+        tmp_path, monkeypatch, pause_index=1, script_count=2)
 
     recoveries = [vars_ for phase, vars_ in stages
                   if phase == "recover_unattended"]
@@ -181,74 +169,19 @@ def test_task_failing_for_other_reasons_does_not_restart_the_client(
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
 
     worker = _worker(
-        tmp_path, [BatchScript("task0", "任务0")],
-        unattended=True,
-        workflows=BatchWorkflows(recover_unattended=_RECOVER_WF))
+        tmp_path, _spec(scripts=[BatchScript("task0", "任务0")]))
     stages: list[str] = []
     monkeypatch.setattr(
         worker, "_run_script",
         lambda *_a, **_kw: (_ for _ in ()).throw(ValueError("识别失败")))
     monkeypatch.setattr(
         worker, "_run_stage",
-        lambda phase, *_a, **_kw: stages.append(phase) or BatchStageResult(state={}))
+        lambda phase, *_a, **_kw: stages.append(phase) or BatchStageResult(
+            state={}))
     monkeypatch.setattr(worker, "_save_result", lambda *_args: None)
     worker.run()
 
     assert "recover_unattended" not in stages
-
-
-# ─── 配置界面：勾选框依赖恢复 wf ───────────────────────────
-
-class _Users:
-    @staticmethod
-    def list_users() -> list[str]:
-        return ["用户A"]
-
-
-def _dialog(monkeypatch, qtbot, item: BatchConfigItem):
-    from lvjiang.core.batch_config import BatchConfig
-    from lvjiang.ui.batch.batch_config_dialog import BatchConfigDialog
-
-    cfg = BatchConfig(configs={item.name: item}, active_config=item.name)
-    monkeypatch.setattr(
-        "lvjiang.ui.batch.batch_config_dialog.load_batch_config", lambda: cfg)
-    monkeypatch.setattr(
-        "lvjiang.ui.batch.batch_config_dialog.save_batch_config",
-        lambda _cfg: None)
-    dialog = BatchConfigDialog(_Users())
-    qtbot.addWidget(dialog)
-    return dialog
-
-
-def test_dialog_blocks_unattended_until_a_recovery_workflow_is_chosen(
-    monkeypatch, qtbot,
-):
-    """没配恢复 wf 时勾选框禁用并说明原因——禁用而不是隐藏，能力一直都在。"""
-    dialog = _dialog(monkeypatch, qtbot, _config(
-        name="日常", usernames=["用户A"]))
-
-    assert dialog._unattended.isEnabled() is False
-    assert "异常恢复" in dialog._unattended.toolTip()
-
-    dialog._selectors["recover_unattended"].setCurrentText(_RECOVER_WF)
-
-    assert dialog._unattended.isEnabled() is True
-
-
-def test_dialog_unchecks_unattended_when_the_recovery_workflow_is_removed(
-    monkeypatch, qtbot,
-):
-    """清掉恢复 wf 不能留下「勾着但不生效」的状态。"""
-    dialog = _dialog(monkeypatch, qtbot, _config(
-        name="日常", usernames=["用户A"], unattended=True,
-        workflows=BatchWorkflows(recover_unattended=_RECOVER_WF)))
-
-    assert dialog._unattended.isChecked() is True
-
-    dialog._selectors["recover_unattended"].setCurrentText("")
-
-    assert dialog._unattended.isChecked() is False
-    assert dialog._unattended.isEnabled() is False
 
 
 def test_stage_abort_is_recorded_as_a_redirect_not_a_stage_error(
@@ -261,10 +194,7 @@ def test_stage_abort_is_recorded_as_a_redirect_not_a_stage_error(
     """
     import lvjiang.ui.batch.batch_runner as runner_mod
 
-    worker = _worker(
-        tmp_path, [],
-        unattended=True,
-        workflows=BatchWorkflows(recover_unattended=_RECOVER_WF))
+    worker = _worker(tmp_path, _spec())
     engine = MagicMock()
     engine.execute.side_effect = UnattendedInterrupt("无法进入选择角色页面")
     monkeypatch.setattr(worker, "_create_engine", lambda: engine)

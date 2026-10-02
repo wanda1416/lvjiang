@@ -129,20 +129,7 @@ class RegionPanelMixin:
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
-        template_row = QHBoxLayout()
-        self._btn_capture_template = QPushButton(tr("截取模版"))
-        self._btn_capture_template.clicked.connect(
-            self._on_capture_region_template)
-        template_row.addWidget(self._btn_capture_template)
-        self._btn_crop_template = QPushButton(tr("部分截取"))
-        self._btn_crop_template.clicked.connect(self._on_crop_template)
-        template_row.addWidget(self._btn_crop_template)
-        self._btn_test_template = QPushButton(tr("测试匹配"))
-        self._btn_test_template.clicked.connect(self._on_test_template)
-        template_row.addWidget(self._btn_test_template)
-        self._btn_unbind_template = QPushButton(tr("解除绑定"))
-        self._btn_unbind_template.clicked.connect(self._on_unbind_template)
-        template_row.addWidget(self._btn_unbind_template)
+        template_options_row = QHBoxLayout()
         self._template_score = QDoubleSpinBox()
         self._template_score.setRange(0.0, 1.0)
         self._template_score.setDecimals(2)
@@ -151,20 +138,37 @@ class RegionPanelMixin:
         self._template_score.setPrefix(tr("阈值 "))
         self._template_score.editingFinished.connect(
             self._on_template_score_changed)
-        template_row.addWidget(self._template_score)
+        template_options_row.addWidget(self._template_score)
         self._template_status = QLabel(tr("未绑定"))
-        template_row.addWidget(self._template_status)
-        template_row.addStretch()
-        for button in (self._btn_capture_template, self._btn_crop_template,
-                       self._btn_test_template, self._btn_unbind_template):
-            apply_button_style(button, variant="neutral")
-        layout.addLayout(template_row)
+        template_options_row.addWidget(self._template_status)
         self._template_allow_inverted = QCheckBox(tr("兼容反色图标"))
         self._template_allow_inverted.setToolTip(
             tr("同一图标在深色和浅色背景下颜色反转时，同时尝试反色匹配"))
         self._template_allow_inverted.toggled.connect(
             self._on_template_inverted_changed)
-        layout.addWidget(self._template_allow_inverted)
+        template_options_row.addWidget(self._template_allow_inverted)
+        template_options_row.addStretch()
+        layout.addLayout(template_options_row)
+
+        template_button_row = QHBoxLayout()
+        self._btn_capture_template = QPushButton(tr("截取模版"))
+        self._btn_capture_template.clicked.connect(
+            self._on_capture_region_template)
+        template_button_row.addWidget(self._btn_capture_template)
+        self._btn_crop_template = QPushButton(tr("部分截取"))
+        self._btn_crop_template.clicked.connect(self._on_crop_template)
+        template_button_row.addWidget(self._btn_crop_template)
+        self._btn_test_template = QPushButton(tr("测试匹配"))
+        self._btn_test_template.clicked.connect(self._on_test_template)
+        template_button_row.addWidget(self._btn_test_template)
+        self._btn_unbind_template = QPushButton(tr("解除绑定"))
+        self._btn_unbind_template.clicked.connect(self._on_unbind_template)
+        template_button_row.addWidget(self._btn_unbind_template)
+        template_button_row.addStretch()
+        for button in (self._btn_capture_template, self._btn_crop_template,
+                       self._btn_test_template, self._btn_unbind_template):
+            apply_button_style(button, variant="neutral")
+        layout.addLayout(template_button_row)
         self._refresh_template_controls()
         return panel
 

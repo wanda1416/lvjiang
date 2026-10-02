@@ -127,6 +127,7 @@ class PoiPanelMixin:
         self._btn_del_point = QPushButton(tr("删除坐标"))
         self._btn_del_point.setToolTip(tr("从场景 YAML 中删除坐标点定义（meta 数据）"))
         self._btn_del_point.clicked.connect(self._on_delete_point_def)
+        self._btn_del_point.setEnabled(False)
         btn_row.addWidget(self._btn_del_point)
         self._btn_bind_point = QPushButton(tr("绑定坐标"))
         self._btn_bind_point.setToolTip(tr("在画布上放置一个坐标点（绑定到 YAML 定义）"))
@@ -174,6 +175,7 @@ class PoiPanelMixin:
         btn_row.addWidget(self._btn_new_arrow)
         self._btn_del_arrow = QPushButton(tr("删除方向"))
         self._btn_del_arrow.clicked.connect(self._on_delete_arrow)
+        self._btn_del_arrow.setEnabled(False)
         btn_row.addWidget(self._btn_del_arrow)
         apply_button_style(self._btn_new_arrow)
         apply_button_style(self._btn_del_arrow, variant="danger")
@@ -183,6 +185,18 @@ class PoiPanelMixin:
 
     # ─── 列表刷新 ────────────────────────────────────────
 
+    def _update_point_delete_button(self):
+        """删除按钮跟着选中状态走：没有选中项时禁用，而不是让它看着可点。
+
+        刷新也要走这里——行被删光或被视图过滤掉之后 currentRow 会退回 -1，
+        只靠选中信号补不上。
+        """
+        self._btn_del_point.setEnabled(self._point_list.currentRow() >= 0)
+
+    def _update_arrow_delete_button(self):
+        """同 _update_point_delete_button；方向列表各管各的按钮。"""
+        self._btn_del_arrow.setEnabled(self._arrow_list.currentRow() >= 0)
+
     def _refresh_point_list(self):
         """刷新坐标列表，显示已放置/未放置状态"""
         self._point_list.blockSignals(True)
@@ -191,6 +205,7 @@ class PoiPanelMixin:
         scene = registry.get_scene(self._scene_key)
         if not scene:
             self._point_list.blockSignals(False)
+            self._update_point_delete_button()
             return
         placed = {
             p.key for p in self._canvas.get_points()
@@ -248,6 +263,7 @@ class PoiPanelMixin:
 
         self._append_point_reference_rows(scene, placed)
         self._point_list.blockSignals(False)
+        self._update_point_delete_button()
 
     def _append_point_reference_rows(self, scene, placed) -> None:
         """追加跨场景引用的坐标行。
@@ -315,6 +331,7 @@ class PoiPanelMixin:
             )
             self._arrow_list.setCellWidget(row, 2, centered_cell_widget(cb))
         self._arrow_list.blockSignals(False)
+        self._update_arrow_delete_button()
         self._refresh_entity_tab_titles()
 
     def _on_toggle_poi_disabled(self, key: str, kind: str, state: int):
@@ -330,6 +347,7 @@ class PoiPanelMixin:
 
     def _on_point_selection(self, row: int):
         """选中已放置点 → 高亮；选中未放置点 → 进入落点模式"""
+        self._update_point_delete_button()
         if row < 0:
             self._canvas.clear_poi_selection()
             return
@@ -542,6 +560,7 @@ class PoiPanelMixin:
     # ─── arrow 列表选择 / 重命名 / 删除 ──────────────────
 
     def _on_arrow_selection(self, row: int):
+        self._update_arrow_delete_button()
         if row < 0:
             self._canvas.clear_poi_selection()
             return

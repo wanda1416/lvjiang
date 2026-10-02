@@ -146,6 +146,11 @@ class CanvasInteractionMixin(CanvasCoordMixin):
     _template_crop_idx: int
     _template_crop_start: QPointF | None
     _template_crop_current: QPointF | None
+    _group_selection: set[tuple[str, str]]
+    _group_band_start: QPointF | None
+    _group_band_current: QPointF | None
+    _group_drag_start: QPointF | None
+    _group_drag_orig: dict[tuple[str, str], tuple[float, float]]
 
     # ─── 命中检测 ────────────────────────────────────────
 
@@ -264,12 +269,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         return SNAP_PIXELS / hgt if hgt > 0 else 0.0
 
     def _collect_snap_targets(
-        self, exclude_kind: str, exclude_idx: int,
+        self, exclude: set[tuple[str, int]],
     ) -> tuple[list[float], list[float]]:
         """收集其他可见矩形的吸附参考线（归一化）。
 
         区域、面板和子场景引用共用同一套画布局部坐标。引用内部实体跟随
         外框变换且不可独立编辑，因此只纳入引用外边界。
+
+        ``exclude`` 是一组 ``(kind, idx)``：正在被拖动的实体不能当自己的吸附
+        目标。整组拖动时组内所有成员都要排除，否则成员互相吸附，组内相对
+        位置当场被破坏——而保住相对位置正是整组移动存在的理由。
 
         返回 (xs, ys)：xs 为竖线 x 值（左边/右边/中心），ys 为横线 y 值（上边/下边/中心）
         """
@@ -282,7 +291,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         )
         for kind, items in candidates:
             for i, rect in enumerate(items):
-                if kind == exclude_kind and i == exclude_idx:
+                if (kind, i) in exclude:
                     continue
                 xs.extend([
                     rect.x_ratio,
@@ -310,7 +319,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
     def _apply_move_snap(self, r, exclude_kind: str, exclude_idx: int):
         """移动时将矩形的左/右/中心、上/下/中心向其他矩形吸附。"""
-        xs, ys = self._collect_snap_targets(exclude_kind, exclude_idx)
+        xs, ys = self._collect_snap_targets({(exclude_kind, exclude_idx)})
         thx, thy = self._snap_threshold_x(), self._snap_threshold_y()
         self._snap_lines_x = []
         self._snap_lines_y = []
@@ -356,7 +365,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         if shift_held:
             return x1, y1, x2, y2
 
-        xs, ys = self._collect_snap_targets(exclude_kind, exclude_idx)
+        xs, ys = self._collect_snap_targets({(exclude_kind, exclude_idx)})
         thx, thy = self._snap_threshold_x(), self._snap_threshold_y()
         if moving_left:
             target = self._nearest(x1, xs, thx)
@@ -551,6 +560,33 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 return
             return
 
+        # ── Ctrl 组选区 ──
+        #
+        # 只在默认的区域编辑模式下介入，且排在「空白处拖拽新建区域」兜底
+        # 分支之前。模板裁剪、网格/引用放置、点击区域标定、画布编辑这些
+        # 有待定状态的模式各有自己的框选语义，上面已经先行返回，Ctrl 在
+        # 那里不生效——不按 Ctrl 的操作行为完全不变。
+        ctrl = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
+        if ctrl:
+            member = self._group_hit_any(pos)
+            if member is not None:
+                self._group_toggle(member)
+            else:
+                self._group_band_begin(pos)
+            self.update()
+            return
+        if self._group_selection:
+            inside = self._group_hit(pos)
+            if inside is not None:
+                # 点选区内的成员只启动整组拖动，不收缩成单选（一点就散）
+                self._group_drag_begin(pos)
+                self.update()
+                return
+            # 点到选区外的实体或空白画布：选区作废，继续走原有单体逻辑。
+            # 空白处按下紧接着会进入新建区域分支，而不足 1% 的矩形在释放时
+            # 本来就被丢弃，所以「点空白处取消多选」不会留下垃圾区域。
+            self.clear_group_selection()
+
         # ── 区域编辑模式（原有逻辑） ──
 
         # 全局调整模式：可以选中/移动/缩放已有区域，或创建新区域
@@ -700,6 +736,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             return
 
         # ── 区域编辑模式 ──
+
+        if self._group_band_start is not None:
+            self._group_band_update(pos)
+            self.update()
+            return
+
+        if self._group_drag_start is not None:
+            self._group_drag_update(pos)
+            self.update()
+            return
 
         if self._drag_mode == DragMode.DRAWING:
             sx, sy = self._widget_to_norm(pos)
@@ -866,6 +912,16 @@ class CanvasInteractionMixin(CanvasCoordMixin):
 
         # ── 区域编辑模式 ──
 
+        if self._group_band_start is not None:
+            self._group_band_finish()
+            self.update()
+            return
+
+        if self._group_drag_start is not None:
+            self._group_drag_finish()
+            self.update()
+            return
+
         if self._drag_mode == DragMode.DRAWING:
             r = self._regions[-1]
             # 矩形太小则忽略
@@ -918,6 +974,9 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             self.clear_selected_click_rect()
             return
         if event.key() == Qt.Key.Key_Escape:
+            if self.clear_group_selection():
+                self.update()
+                return
             if self._template_crop_idx >= 0:
                 self.cancel_template_crop()
                 self._notify_status("已取消模板截取")
@@ -929,6 +988,10 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             if self._poi_handle_escape():
                 return
         if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            if self._group_selection:
+                # 批量删除要展示受影响对象并二次确认，不能挂在一个裸按键上
+                self._notify_status(tr("多选状态下不支持删除，请先取消多选"))
+                return
             if 0 <= self._subscene_selected_idx < len(self._subscene_refs):
                 self._delete_selected_subscene_ref()
             elif 0 <= self._panel_selected_idx < len(self._panels):

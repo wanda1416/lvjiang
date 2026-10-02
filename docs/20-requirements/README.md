@@ -27,6 +27,7 @@
 | [16-workflow-metadata-editor.md](16-workflow-metadata-editor.md) | 工作流元数据表单与 local / system 保存位置 | ✅ 已实现 |
 | [17-unattended-batch.md](17-unattended-batch.md) | 无人值守批量：弹窗改道与异常恢复工作流 | ✅ 已实现 |
 | [18-batch-state-layers.md](18-batch-state-layers.md) | 批量状态分层：定义 / 运行草稿 / 执行快照 | ✅ 已实现 |
+| [19-canvas-group-selection.md](19-canvas-group-selection.md) | 画布组选区：Ctrl 多选与整组平移、修饰键语义 | ✅ 已实现 |
 
 ## 子需求
 

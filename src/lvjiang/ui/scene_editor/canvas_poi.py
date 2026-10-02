@@ -657,6 +657,9 @@ class CanvasPoiMixin:
             cx, cy = self._widget_to_canvas_norm(pos)
             a = self._arrows[self._selected_arrow_idx]
             a.to_cx_ratio, a.to_cy_ratio = cx, cy
+            # 这里不接 Shift：绝对端点本来就不走边线吸附，箭头的吸附是
+            # 画箭头时「停手吸附到附近坐标点」那一套（见 on_arrow_snap_tick），
+            # 两者语义不同，接上 Shift 只会让人以为有个能关的吸附。
             self._poi_drag_moved = True
             self.update()
             return True

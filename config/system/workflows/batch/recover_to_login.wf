@@ -1,0 +1,152 @@
+#% name: 批量异常恢复
+#% env: [android, desktop]
+#% parameters:
+#%   - name: max_roll_account
+#%     label: 单轮最大滚动次数
+#%     type: number
+#%     default: 50
+#%     min: 1
+#%     max: 50
+
+# 批量异常恢复：无人值守模式下由调度器调用，不出现在日常任务列表里。
+#
+# 触发时机：无人值守批量撞上 pause / confirm 这类要人动手的弹窗。调度器把当前
+# 任务按异常记失败（不重试），然后调用本流程把现场收干净，再继续下一项。
+#
+# 两个阶段，由调度器注入的 $batch_recover_pending 决定走到哪一步：
+#   1. 回到公共初始页「登录页 - 登录主页」。所有批量任务都从这个视图起步，
+#      所以无论原来卡在哪，收口只有这一个。
+#   2. 本条目还有未执行的任务时（pending 为真），继续用「当前角色」重新登录
+#      到游戏主页——否则调度器下一项任务会在登录页上必然失败，白跑一轮。
+#      任务已经全跑完了就停在登录主页，等调度器切下一个用户。
+#
+# 本流程自己绝不调用 pause：无人值守的前提就是没人在看。能自动收的收，收不了
+# 就如实返回 failed，让调度器记下来继续往下走。
+
+import "subcall/login.wf"
+import "subcall/page_detection.wf"
+
+default $max_roll_account = 50
+default $batch_recover_pending = 0
+default $batch_recover_username = ""
+
+call $at_login = recover_to_login_page($batch_recover_username, $max_roll_account)
+if not $at_login
+    return {
+        "status": "failed",
+        "message": "无法回到登录主页",
+        "state": $batch_state
+    }
+end
+eval $batch_state.role = ""
+eval $batch_state.page_state = 1
+
+if not $batch_recover_pending
+    return {
+        "status": "success",
+        "message": "已回到登录主页，等待下一个用户",
+        "state": $batch_state
+    }
+end
+
+call $at_main = relogin_current_role($batch_recover_username)
+if not $at_main
+    return {
+        "status": "failed",
+        "message": "已回到登录主页，但未能用当前角色重新登录到游戏主页",
+        "state": $batch_state
+    }
+end
+eval $batch_state.page_state = 2
+if $batch_recover_username
+    eval $batch_state.role = user_get($batch_recover_username, "role")
+end
+return {
+    "status": "success",
+    "message": "已重新登录至游戏主页，可继续本条目剩余任务",
+    "state": $batch_state
+}
+
+
+# ─── 阶段一：收回登录主页 ──────────────────────────────────
+
+# 按代价从低到高收：已经在登录主页就什么都不做，在启动页点一次返回，
+# 两处都不在才动用重启——重启要等客户端起来、还要重新选账号，是最后手段。
+def recover_to_login_page($username, $max_roll_account)
+    call $in_login = is_in_login_page()
+    if $in_login
+        log "已在登录主页，无需恢复"
+        return 1
+    end
+
+    call $in_startup = is_in_startup_page()
+    if $in_startup
+        log "当前在启动页，点击返回回到登录主页"
+        click [game_login_page].[back] after wait @page_refresh
+        call $in_login = is_in_login_page()
+        if $in_login
+            return 1
+        end
+    end
+
+    log warn "登录主页与启动页均未命中，重启客户端恢复"
+    if not $username
+        log error "调度器未提供本轮用户名，无法在重启后选定账号"
+        return 0
+    end
+    eval $account = user_get($username, "account")
+    eval $tail = user_get($username, "tail")
+    if not $account or not $tail
+        log error "用户 " + $username + " 缺少账号或尾号，无法在重启后选定账号"
+        return 0
+    end
+    eval $login_target = "账号 " + $account + "（尾号 " + $tail + "）"
+    call $in_login = ensure_login_page_by_restart(
+        "yyslscn", $tail, $account, $batch_state, $max_roll_account,
+        $login_target)
+    return $in_login
+end
+
+
+# ─── 阶段二：用当前角色重新登录 ────────────────────────────
+
+# 登录主页的「当前角色」就是上一次登录的角色，点它即可重进，不必再走一遍
+# 选账号选角色。
+#
+# 这里**必然**会撞上「其他角色在线」：异常中断或强杀客户端之后，服务端仍认为
+# 该角色在线。所以检测到在线标记就点确定把它顶下来——与正常流程里点取消改走
+# 跳过的处置相反，无人值守下没有「稍后再来」这个选项。
+def relogin_current_role($username)
+    scan [game_login_page].[current_role] as $role_ready
+    if not $role_ready
+        log error "登录主页未读到「当前角色」，无法重新登录"
+        return 0
+    end
+    click [game_login_page].[current_role] after wait @page_refresh
+
+    # 在线提示不一定在点下去的同一帧出现，等几拍再判；真的已经被服务端放开时
+    # 等满也无所谓，后面的落地流程会自己确认有没有进主页。
+    eval $kicked = 0
+    loop 10
+        scan [game_login_page].[online_label] as $online by contains "在线"
+        if $online
+            log "角色仍被服务端认为在线，点确定顶下线"
+            click [game_login_page].[confirm] after wait @page_refresh
+            eval $kicked = 1
+            break
+        end
+        wait @page_refresh
+    end
+    if not $kicked
+        log "未出现角色在线提示，直接等待登录落地"
+    end
+
+    # 复用正常登录的落地流程：它顺带处理战令领奖和活动弹窗。它内部在超时后会
+    # pause，无人值守下那会中止本次恢复并如实报 failed，不会把批量挂在弹窗上。
+    call login_to_main_page()
+    call $in_main = is_in_main_page()
+    if not $in_main
+        return 0
+    end
+    return 1
+end

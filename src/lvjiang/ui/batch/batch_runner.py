@@ -29,6 +29,7 @@ from ...core.config.resolver import get_resolver
 from ...core.config.users import SessionManager
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
+from ...workflows.errors import WorkflowAbort
 from .batch_report import BatchReport
 
 # 进度状态常量
@@ -116,6 +117,16 @@ class BatchCheckResult:
     message: str = ""
 
 
+class UnattendedInterrupt(WorkflowAbort):
+    """无人值守模式下工作流要求人工介入。
+
+    pause / confirm / input 都经由 ``engine._ui_callback`` 走到宿主，所以
+    无人值守只需要在这一处改道，不必去改 wf 里几十个调用点。抛出后当前任务
+    按异常记失败、不重试，调度器随即调用配置的恢复 wf 把游戏收回公共初始页，
+    再继续下一个任务。
+    """
+
+
 class BatchWorker(QThread):
     """批量执行工作线程
 
@@ -158,6 +169,8 @@ class BatchWorker(QThread):
         self._user_attributes: dict[str, dict[str, str]] = {}
         self._workflow_configs: dict[str, dict] = {}
         self._lifecycle_params: dict[str, dict] = {}
+        #: 最近一次无人值守中止的弹窗文本；恢复后清空（见 _recover_unattended）。
+        self._unattended_hit = ""
         self._build_execution_plan()
 
     def _build_execution_plan(self) -> None:
@@ -443,6 +456,10 @@ class BatchWorker(QThread):
                     if prepared.status == RESULT_STOPPED:
                         self._stopped = True
                         break
+                    # 条目准备失败就整条跳过，这个用户不会再跑任务，
+                    # 所以只需要回到登录主页等下一个用户。
+                    self._recover_unattended(
+                        run_idx, username, batch_state, pending=False)
                     continue
 
             # 2. 批量层显式传递用户：按行加载该用户 session，
@@ -453,7 +470,7 @@ class BatchWorker(QThread):
                 session = {}
 
             # 3. 顺序执行脚本
-            for script in self._scripts:
+            for script_idx, script in enumerate(self._scripts):
                 if self._stop_check():
                     self._stopped = True
                     break
@@ -537,6 +554,9 @@ class BatchWorker(QThread):
                     self.progress.emit(run_idx, label, script.id, ST_FAILED)
                     self.log.emit(f"[批量] {label} → {script.name} 失败: {e}")
                     report.end_script(ST_FAILED)
+                    self._recover_unattended(
+                        run_idx, username, batch_state,
+                        pending=script_idx + 1 < len(self._scripts))
 
             # 用户中断时，关闭尚未结束的脚本记录
             if self._stopped:
@@ -774,6 +794,8 @@ class BatchWorker(QThread):
                                 done.add(unit)
                         else:
                             done.add(unit)
+                        self._recover_unattended(
+                            run_idx, "", batch_state, pending=False)
                         continue
 
                     username = prepared.username
@@ -788,7 +810,7 @@ class BatchWorker(QThread):
                         for script in self._scripts
                     })
                     session = self._session_manager.load(username)
-                    for script in self._scripts:
+                    for script_idx, script in enumerate(self._scripts):
                         if self._stop_check():
                             self._stopped = True
                             break
@@ -868,7 +890,13 @@ class BatchWorker(QThread):
                                     logger.warning(
                                         f"任务历史收尾失败，继续批量任务: {history_exc}")
                         except Exception as exc:  # noqa: BLE001
-                            logger.exception(f"属性单元任务失败: {unit}/{script.id}")
+                            if isinstance(exc, WorkflowAbort):
+                                logger.info(
+                                    f"属性单元任务被无人值守中止: "
+                                    f"{unit}/{script.id}: {exc}")
+                            else:
+                                logger.exception(
+                                    f"属性单元任务失败: {unit}/{script.id}")
                             result_path = None
                             try:
                                 result_path = self._save_result(
@@ -890,6 +918,9 @@ class BatchWorker(QThread):
                                 except Exception as history_exc:  # noqa: BLE001
                                     logger.warning(
                                         f"任务历史收尾失败，继续批量任务: {history_exc}")
+                            self._recover_unattended(
+                                run_idx, username, batch_state,
+                                pending=script_idx + 1 < len(self._scripts))
                     if self._stopped:
                         report.finish_pending()
                     finished = self._run_stage(
@@ -1092,9 +1123,70 @@ class BatchWorker(QThread):
         ).build()
         # 生命周期与条目脚本必须复用宿主的主线程 UI broker；否则
         # pause/confirm 会退化为无法被 F10 关闭的系统原生阻塞框。
-        engine._ui_callback = ctx.ui_callback
+        engine._ui_callback = (
+            self._unattended_ui_callback if self._unattended_active()
+            else ctx.ui_callback)
         engine.window_rebind_hook = ctx.window_rebind_hook
         return engine
+
+    def _unattended_active(self) -> bool:
+        """无人值守是否真的生效：必须同时配好恢复 wf。
+
+        少了恢复 wf 就改道 pause/confirm 只会把整批推到错误页面上连环失败，
+        不如照旧弹窗等人。配置层已经拦了一道，这里不依赖它。
+        """
+        return bool(self._config.unattended
+                    and self._config.workflows.recover_unattended)
+
+    def _unattended_ui_callback(self, kind: str, **kwargs) -> object:
+        """无人值守下的 UI 回调：通知照常，要人动手的一律中止。
+
+        notify 本来就是非阻塞的（自动关闭 + 写告警面板），留着它事后才看得出
+        这批跑过什么。pause / confirm / input 都要人在场，无人值守时等下去就是
+        把整批卡死在一个弹窗上，所以立刻中止当前任务。
+        """
+        if kind == "notify":
+            callback = self._ctx.ui_callback
+            return callback(kind, **kwargs) if callback is not None else None
+        text = str(kwargs.get("message") or kwargs.get("prompt") or kind)
+        self._unattended_hit = text
+        raise UnattendedInterrupt(text)
+
+    def _recover_unattended(self, run_idx: int, username: str,
+                            batch_state: dict, *, pending: bool) -> None:
+        """无人值守中止后把游戏收回公共初始页（登录页 - 登录主页视图）。
+
+        所有批量任务都从这个视图起步，所以恢复目标只有这一个。具体怎么收——
+        先看是不是已经在登录主页、启动页点返回、还是强制重启客户端——交给
+        配置的恢复 wf：重启是框架能力，不该写进某个业务任务里。
+
+        只在确实撞了弹窗时动作：任务因别的原因失败时画面通常还在可用状态，
+        没有理由顺手重启一次客户端。
+
+        ``pending`` 为真表示本条目还有未执行的任务，恢复 wf 据此决定要不要
+        继续登录回游戏主页。
+        """
+        if not self._unattended_hit:
+            return
+        text, self._unattended_hit = self._unattended_hit, ""
+        wf_name = self._config.workflows.recover_unattended
+        if not wf_name:
+            self.log.emit(
+                f"[批量] 无人值守中止（{text}）；未配置恢复 wf，直接继续下一个任务")
+            return
+        self.log.emit(f"[批量] 无人值守中止（{text}）；执行恢复 wf 收回登录主页")
+        result = self._run_stage(
+            "recover_unattended", wf_name, run_idx, username, batch_state,
+            extra_variables={
+                # 本条目还有没跑的任务时，恢复流程不止回登录主页，还要用当前
+                # 角色重新登录到游戏主页，调度器才能接着跑下一项；全跑完了就
+                # 停在登录主页等下一个用户。
+                "batch_recover_pending": bool(pending),
+                "batch_recover_username": username,
+            })
+        self._unattended_hit = ""
+        if result.status != RESULT_SUCCESS:
+            self.log.emit(f"[批量] 无人值守恢复未成功：{result.message}")
 
     def _run_stage(
         self,
@@ -1106,6 +1198,7 @@ class BatchWorker(QThread):
         item_result: dict | None = None,
         round_number: int = 0,
         unit_members: list[str] | None = None,
+        extra_variables: dict | None = None,
     ) -> BatchStageResult:
         """执行一个生命周期 wf，并统一校验其返回协议。"""
         if not wf_name:
@@ -1137,6 +1230,8 @@ class BatchWorker(QThread):
             "batch_state": working_state,
             "batch_item_result": item_result or {},
         })
+        if extra_variables:
+            variables.update(copy.deepcopy(extra_variables))
         if unit_members is not None:
             variables.update({
                 "batch_unit_key": self._config.execution_unit_key,
@@ -1158,6 +1253,17 @@ class BatchWorker(QThread):
                     result, status=RESULT_STOPPED,
                     message=tr("执行被停止"))
             return replace(result, source=str(wf_path))
+        except WorkflowAbort as e:
+            # 无人值守改道，不是阶段 wf 出错。按失败记账（这条目不重试，直接
+            # 跳到下一个），但日志级别和文案都不该把预期分支说成异常。
+            logger.info(
+                f"批量阶段被无人值守中止 ({phase}, "
+                f"{username or 'batch'}): {e}")
+            return BatchStageResult(
+                status=RESULT_FAILED,
+                message=f"无人值守中止: {e}",
+                state=batch_state,
+            )
         except Exception as e:
             logger.error(
                 f"批量阶段失败 ({phase}, "

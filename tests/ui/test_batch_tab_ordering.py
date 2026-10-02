@@ -380,3 +380,27 @@ def test_profile_sort_is_hidden_for_attribute_units_and_restored_for_user(
     assert form.isRowVisible(tab._profile_sort_label)
     assert form.isRowVisible(tab._profile_sort_row)
     assert ("指定顺序排序", True) in _order_menu_actions(tab, monkeypatch)
+
+
+def test_recovery_workflow_parameters_get_a_group_label(monkeypatch, qtbot):
+    """异常恢复 wf 声明的参数也要能在批量参数面板里编辑。
+
+    它不在主页面那四行只读摘要里，但照样是生命周期阶段——参数分组的标签表
+    漏掉这个 key 就是一个 KeyError：凡是配了随包恢复 wf 的配置组，一打开参数
+    面板就崩。这里用真实的 lifecycle_parameter_definitions，所以随包恢复 wf
+    真的声明了参数这件事也一并守住。
+    """
+    group = BatchConfigItem(
+        name="日常",
+        workflows=BatchWorkflows(
+            recover_unattended="batch/recover_to_login.wf"),
+    )
+    _prepare_batch_tab(monkeypatch, BatchConfig({"日常": group}, "日常"))
+
+    tab = BatchTab(_Host())
+    qtbot.addWidget(tab)
+
+    widget = tab._workflow_param_widgets[
+        ("recover_unattended", "max_roll_account")]
+    group_box = widget.parentWidget()
+    assert group_box.title() == "异常恢复"

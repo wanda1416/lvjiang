@@ -23,6 +23,7 @@ from ...core.scene_registry import (
     get_subscene_ref_def,
 )
 from ...i18n import tr
+from .canvas_group import CanvasGroupMixin
 from .canvas_interaction import (
     HANDLE_SIZE,
     CanvasInteractionMixin,
@@ -54,7 +55,8 @@ TEMPLATE_CROP_COLOR = QColor(190, 90, 255)
 
 # ─── 画布组件 ────────────────────────────────────────────
 
-class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
+class RegionCanvas(CanvasInteractionMixin, CanvasGroupMixin, CanvasPoiMixin,
+                   QWidget):
     """可交互的图片画布，支持框选/拖拽/缩放矩形"""
 
     def __init__(self, parent=None):
@@ -178,6 +180,8 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
 
         # point / arrow 状态（CanvasPoiMixin）
         self._init_poi_state()
+        # Ctrl 组选区状态（CanvasGroupMixin）
+        self._init_group_state()
         # 停手吸附检测定时器：画箭头时周期性检查鼠标是否静止
         self._arrow_snap_timer = QTimer(self)
         self._arrow_snap_timer.setInterval(50)
@@ -1141,6 +1145,9 @@ class RegionCanvas(CanvasInteractionMixin, CanvasPoiMixin, QWidget):
             painter.setPen(QPen(TEMPLATE_CROP_COLOR, 2, Qt.PenStyle.DashLine))
             painter.setBrush(QColor(190, 90, 255, 35))
             painter.drawRect(preview)
+
+        # 组选区高亮与橡皮筋：画在所有实体之上，否则会被网格/引用盖住
+        self._draw_group_selection(painter)
 
         if self._template_test_result is not None:
             index, passed = self._template_test_result

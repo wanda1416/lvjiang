@@ -100,32 +100,33 @@ class PanelEditorMixin:
         )
         layout.addWidget(self._panel_table)
 
+        # 按钮行与区域/坐标/引用 Tab 对齐：创建 → 删除 → 绑定，一行排完；
+        # 「+」只给新增定义的动作。布局作用域由面板里的说明文字承担
+        # （见 _panel_layout_scope），不再写进按钮文本。
         btn_row = QHBoxLayout()
-        self._btn_new_panel = QPushButton(tr("+ 创建网格定义"))
+        self._btn_new_panel = QPushButton(tr("+ 创建网格"))
         self._btn_new_panel.setToolTip(tr("在场景 YAML 中新增 Panel 定义（声明式网格）"))
         self._btn_new_panel.clicked.connect(self._on_new_panel_def)
         btn_row.addWidget(self._btn_new_panel)
-        self._btn_del_panel = QPushButton(tr("删除网格定义"))
+        self._btn_del_panel = QPushButton(tr("删除网格"))
         self._btn_del_panel.setToolTip(tr("从场景 YAML 中删除 Panel 定义"))
         self._btn_del_panel.clicked.connect(self._on_delete_panel_def)
         self._btn_del_panel.setEnabled(False)
         btn_row.addWidget(self._btn_del_panel)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
-        btn_row = QHBoxLayout()
-        self._btn_bind_panel = QPushButton(tr("绑定到当前布局"))
+        self._btn_bind_panel = QPushButton(tr("绑定网格"))
         self._btn_bind_panel.setToolTip(
             tr("在画布上框选一个矩形区域，绑定到选中的 Panel 定义")
         )
         self._btn_bind_panel.clicked.connect(self._on_bind_panel)
         btn_row.addWidget(self._btn_bind_panel)
-        apply_button_style(self._btn_new_panel)
-        apply_button_style(self._btn_bind_panel, variant="neutral")
-        apply_button_style(self._btn_del_panel, variant="danger")
-        self._btn_unbind_panel = QPushButton(tr("解除当前布局绑定"))
+        self._btn_unbind_panel = QPushButton(tr("解除绑定"))
+        self._btn_unbind_panel.setToolTip(tr("只清除当前布局的矩形，保留场景 YAML 中的定义"))
         self._btn_unbind_panel.clicked.connect(self._on_unbind_panel)
-        apply_button_style(self._btn_unbind_panel, variant="neutral")
         btn_row.addWidget(self._btn_unbind_panel)
+        apply_button_style(self._btn_new_panel)
+        apply_button_style(self._btn_del_panel, variant="danger")
+        apply_button_style(self._btn_bind_panel, variant="neutral")
+        apply_button_style(self._btn_unbind_panel, variant="neutral")
         btn_row.addStretch()
         layout.addLayout(btn_row)
         return panel
@@ -437,7 +438,7 @@ class PanelEditorMixin:
 
     def _show_panel_definition_dialog(self, panel_def):
         dialog = QDialog(self)  # type: ignore[arg-type]
-        dialog.setWindowTitle(tr("创建网格定义"))
+        dialog.setWindowTitle(tr("创建网格"))
         outer = QVBoxLayout(dialog)
         page, get_result = self._definition_form(dialog, panel_def)
         outer.addWidget(page)

@@ -1258,7 +1258,7 @@ class CanvasInteractionMixin(CanvasCoordMixin):
         )
         copy_action = menu.addAction(tr("复制 DSL 引用"))
         edit_action = menu.addAction(tr("编辑当前布局绑定"))
-        delete_action = menu.addAction(tr("解除当前布局绑定"))
+        delete_action = menu.addAction(tr("解除绑定"))
         action = menu.exec(self.mapToGlobal(pos.toPoint()))
         if action not in (copy_action, edit_action, delete_action):
             return

@@ -720,6 +720,9 @@ auto_strings:
   (空行): (Blank Line)
   + 创建区域: + Create Region
   + 创建坐标: + Create Point
+  + 创建引用: + Create Reference
+  + 创建方向: + Create Direction
+  + 创建网格: + Create Grid
   '- 未分组 -': '- Ungrouped -'
   '- 未命名 -': '- Unnamed -'
   0=红 1=绿 2=蓝: 0=Red 1=Green 2=Blue
@@ -885,10 +888,12 @@ auto_strings:
   创建场景: Create Scene
   创建坐标: Create Point
   创建失败: Creation Failed
-  创建方向: Create Direction
+  创建引用: Create Reference
+  创建网格: Create Grid
   删除区域: Delete Region
   删除场景: Delete Scene
   删除坐标: Delete Point
+  删除网格: Delete Grid
   删除失败: Delete Failed
   删除方向: Delete Direction
   删除空间: Delete Space
@@ -1014,6 +1019,7 @@ auto_strings:
   复制到本地以修改: Copy to Local for Editing
   复制坐标: Copy Coordinates
   解除引用绑定: Unbind Reference
+  解除绑定: Unbind
   失败退出: Exit on Failure
   声明全局变量: Declare Global Variable
   声明后可在主流程与所有子过程中共享读写: Shared for reading and writing by the main flow and all subprocedures after declaration
@@ -1350,6 +1356,7 @@ auto_strings:
   纵向滚动: Vertical Scroll
   终点: End Point
   绑定坐标: Bind Point
+  绑定网格: Bind Grid
   绑定面板: Bind Panel
   结束: End
   结束任务: End Task

@@ -168,7 +168,7 @@ class PoiPanelMixin:
         layout.addWidget(self._arrow_list)
 
         btn_row = QHBoxLayout()
-        self._btn_new_arrow = QPushButton(tr("创建方向"))
+        self._btn_new_arrow = QPushButton(tr("+ 创建方向"))
         self._btn_new_arrow.setToolTip(tr("先选中一个已放置的坐标点，再从它拉出一条方向箭头"))
         self._btn_new_arrow.clicked.connect(self._on_new_arrow)
         btn_row.addWidget(self._btn_new_arrow)

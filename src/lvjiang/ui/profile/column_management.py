@@ -21,9 +21,6 @@ from lvjiang.ui.button_styles import apply_button_style, fit_button_width
 
 from ...core.profile.models import (
     ALL_MODELS,
-    DEFAULT_KEY_GROUP,
-    MODEL_LABELS,
-    group_key_definitions,
 )
 from ...core.profile.schema import (
     ProfileSchema,
@@ -403,79 +400,21 @@ class ProfileColumnMixin:
         self: ProfileTab,
         config, all_keys: list, current_key: str, selected: list,
     ) -> QPushButton:
-        """创建级联菜单 key 选择按钮
+        """创建级联菜单 key 选择按钮（类型 → 分组 → 定义）。
 
-        三级菜单：模型类型（配额/再生/库存/备注）→ 分组 → 具体定义。
-
-        分组这一层来自定义本身的 ``KeyDef.group``（定义对话框里能改），与总览的
-        列分组无关。key 多起来之后，类型下面直接铺一长串定义根本找不到——而分组
-        本就是定义侧已有的组织方式，这里跟着用同一套，不另造一种归类。
-
-        只有一个分组且就是默认分组时不再套一层：那层菜单只会多一次点击，
-        什么信息都不提供。
+        实现见 `ui/profile/key_picker.py`：批量配置的「指定排序」用的是同一套，
+        同一个概念在两处给两种选法等于逼用户学两次。
 
         selected: 可变容器 [key]，选中后更新 selected[0]。
         """
-        from PyQt6.QtWidgets import QMenu
+        from .key_picker import create_profile_key_picker
 
-        def _label_for_key(key: str) -> str:
-            kd = config.get_key(key)
-            if kd:
-                return f"{kd.label} ({kd.key})"
-            return key
-
-        btn = QPushButton(_label_for_key(current_key) if current_key else tr("（请选择）"))
-        btn.setMinimumWidth(200)
-        apply_button_style(btn, variant="neutral")
-
-        def _choose(key: str) -> None:
+        def _remember(key: str) -> None:
             selected[0] = key
-            btn.setText(_label_for_key(key))
 
-        def _add_key_actions(target_menu, kds: list) -> None:
-            for kd in kds:
-                action = target_menu.addAction(f"{kd.label} ({kd.key})")
-                action.triggered.connect(
-                    lambda checked, k=kd.key: _choose(k))
-
-        def build_menu() -> QMenu:
-            """按 类型 → 分组 → 定义 建出菜单。
-
-            与 exec 分开：exec 会阻塞，菜单结构只有这样才能被断言。
-            """
-            menu = QMenu(btn)
-            # 按模型类型分组
-            keys_by_model: dict[str, list] = {}
-            for kd in all_keys:
-                mt = config.get_model_type(kd.key) or ""
-                keys_by_model.setdefault(mt, []).append(kd)
-
-            for mt in ALL_MODELS:
-                kds = keys_by_model.get(mt, [])
-                if not kds:
-                    continue
-                model_label = MODEL_LABELS.get(mt, mt)
-                submenu = menu.addMenu(model_label)
-                if submenu is None:
-                    continue
-                grouped = group_key_definitions(kds)
-                if len(grouped) == 1 and DEFAULT_KEY_GROUP in grouped:
-                    _add_key_actions(submenu, grouped[DEFAULT_KEY_GROUP])
-                    continue
-                for group_name, group_kds in grouped.items():
-                    label = (tr("默认") if group_name == DEFAULT_KEY_GROUP
-                             else group_name)
-                    group_menu = submenu.addMenu(label)
-                    if group_menu is not None:
-                        _add_key_actions(group_menu, group_kds)
-            return menu
-
-        def show_menu():
-            build_menu().exec(btn.mapToGlobal(btn.rect().bottomLeft()))
-
-        btn.clicked.connect(show_menu)
-        btn.build_key_menu = build_menu  # type: ignore[attr-defined]
-        return btn
+        return create_profile_key_picker(
+            config, all_keys, current_key, _remember,
+            placeholder=tr("（请选择）"))
 
     def _set_column_field(self: ProfileTab, group_name: str, logical_index: int, field_key: str):  # type: ignore[misc]
         """设置指定分组的指定列字段"""

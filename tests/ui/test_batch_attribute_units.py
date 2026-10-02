@@ -5,6 +5,7 @@ import pytest
 from PyQt6.QtCore import QObject, Qt, pyqtSignal
 
 from lvjiang.core.batch_config import BatchConfig, BatchConfigItem, BatchWorkflows
+from lvjiang.core.batch_run import BatchRunDraft, load_draft
 from lvjiang.core.config.users import SessionManager
 from lvjiang.core.user_config import User, save_user_metadata
 from lvjiang.ui.batch.batch_config_dialog import BatchConfigDialog
@@ -16,6 +17,7 @@ from lvjiang.ui.batch.batch_runner import (
     ST_SUCCESS,
     BatchCheckResult,
     BatchContext,
+    BatchRunSpec,
     BatchScript,
     BatchStageResult,
     BatchWorker,
@@ -26,16 +28,16 @@ from lvjiang.ui.batch.batch_tab import BatchTab
 def test_old_batch_config_stays_in_user_mode():
     item = BatchConfigItem.from_dict("old", {
         "usernames": ["u1", "u2"],
-        "selected_usernames": ["u2"],
+        "default_usernames": ["u2"],
     })
     assert item.execution_unit_key == "user"
     assert item.usernames == ["u1", "u2"]
-    assert item.selected_usernames == ["u2"]
+    assert item.default_usernames == ["u2"]
     attribute_item = BatchConfigItem.from_dict("attribute", {
-        "execution_unit_key": "account", "selected_units": {"account": ["a"]},
+        "execution_unit_key": "account", "default_units": {"account": ["a"]},
         "visible_units": {"account": ["stale"]},
     })
-    assert attribute_item.selected_units == {"account": ["a"]}
+    assert attribute_item.default_units == {"account": ["a"]}
     assert "visible_units" not in attribute_item.to_dict()
 
 
@@ -43,10 +45,11 @@ def test_attribute_worker_members_follow_visible_users(tmp_path, qapp):
     save_user_metadata(User("u1", attributes={"account": "a"}), tmp_path)
     save_user_metadata(User("u2", attributes={"account": "a"}), tmp_path)
     worker = BatchWorker(
-        ["a"], [], BatchConfigItem(
-            name="group", usernames=["u1"], execution_unit_key="account"),
+        BatchRunSpec(
+            name="group", entries=("a",), candidate_usernames=("u1",),
+            execution_unit_key="account"),
         BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1"],
+        lambda: False,
     )
     assert worker._unit_members == {"a": ["u1"]}
     assert "u2" not in worker._user_attributes
@@ -70,9 +73,9 @@ def test_config_dialog_edits_only_visible_users(
     config = BatchConfig(configs={
         "group": BatchConfigItem(
             name="group", usernames=["u1", "u2"],
-            selected_usernames=["u1"],
+            default_usernames=["u1"],
         ),
-    }, active_config="group")
+    })
     saved = []
     monkeypatch.setattr(
         "lvjiang.ui.batch.batch_config_dialog.load_batch_config", lambda: config)
@@ -80,14 +83,14 @@ def test_config_dialog_edits_only_visible_users(
         "lvjiang.ui.batch.batch_config_dialog.save_batch_config", saved.append)
     dialog = BatchConfigDialog(Manager())
     qtbot.addWidget(dialog)
-    assert dialog._user_list.count() == 2
-    dialog._user_list.item(1).setCheckState(Qt.CheckState.Unchecked)
+    assert dialog._user_list.topLevelItemCount() == 2
+    dialog._user_list.topLevelItem(1).setCheckState(0, Qt.CheckState.Unchecked)
     dialog._on_save()
 
-    group = saved[0].configs["group"]
+    group = saved[0].by_name("group")
     assert group.execution_unit_key == "user"
     assert group.usernames == ["u1"]
-    assert group.selected_usernames == ["u1"]
+    assert group.default_usernames == ["u1"]
 
 
 def test_main_tab_filters_attribute_units_without_changing_user_mode(
@@ -124,29 +127,31 @@ def test_main_tab_filters_attribute_units_without_changing_user_mode(
     config = BatchConfig(configs={
         "group": BatchConfigItem(
             name="group", usernames=["u1", "u2"],
-            selected_usernames=["u1"], execution_unit_key="account",
-            selected_units={"account": ["b"]},
+            default_usernames=["u1"], execution_unit_key="account",
+            default_units={"account": ["b"]},
         ),
-    }, active_config="group")
+    })
     monkeypatch.setattr(
         "lvjiang.ui.batch.batch_tab.load_batch_config", lambda: config)
-    monkeypatch.setattr(
-        "lvjiang.ui.batch.batch_tab.save_batch_config", lambda _cfg: None)
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.list_exposed_scripts", lambda _env: [])
     tab = BatchTab(host)
     qtbot.addWidget(tab)
 
     assert tab._unit_label.text() == "<b>选择执行单元</b>"
-    assert tab._unit_combo.currentData() == "account"
+    # 调度单元由定义层决定：主页面只如实展示，不提供修改入口
+    assert tab._unit_value.text() == "account"
     assert tab._user_list.headerItem().text(0) == "单元候选（account）"
-    assert tab._get_enabled_usernames() == ["b"]
+    assert tab._get_enabled_usernames() == ["b"], "默认勾选来自定义层"
+
     tab._user_list.topLevelItem(0).setCheckState(0, Qt.CheckState.Checked)
-    assert config.configs["group"].selected_units["account"] == ["a", "b"]
-    assert config.configs["group"].selected_usernames == ["u1"]
-    tab._unit_combo.setCurrentIndex(tab._unit_combo.findData("user"))
-    assert tab._user_list.headerItem().text(0) == "单元候选（用户名）"
-    assert tab._get_enabled_usernames() == ["u1"]
+
+    # 主页面的勾选属于本次运行草稿，定义层一个字都不能改
+    assert config.by_name("group").default_units["account"] == ["b"]
+    assert config.by_name("group").default_usernames == ["u1"]
+    assert tab._get_enabled_usernames() == ["a", "b"]
+    assert load_draft(config.by_name("group").id).units[
+        "account"].checked == ["a", "b"]
 
 
 def test_start_is_blocked_when_prepare_wf_cannot_select_a_unit_user(
@@ -177,7 +182,7 @@ def test_start_is_blocked_when_prepare_wf_cannot_select_a_unit_user(
         def append_log(self, text):
             self.logs.append(text)
 
-        def run_batch(self, _usernames, _scripts):
+        def run_batch(self, _spec):
             raise AssertionError("不该走到启动批量")
 
     users = {"u1": User("u1", attributes={"account": "a"})}
@@ -190,16 +195,14 @@ def test_start_is_blocked_when_prepare_wf_cannot_select_a_unit_user(
     host._user_manager = Manager()
     config = BatchConfig(configs={
         "group": BatchConfigItem(
-            name="group", usernames=["u1"], selected_usernames=["u1"],
-            execution_unit_key="account", selected_units={"account": ["a"]},
-            task_ids=["t1"], selected_task_ids=["t1"],
+            name="group", usernames=["u1"], default_usernames=["u1"],
+            execution_unit_key="account", default_units={"account": ["a"]},
+            task_ids=["t1"], default_task_ids=["t1"],
             workflows=BatchWorkflows(prepare_item="batch/prepare_item.wf"),
         ),
-    }, active_config="group")
+    })
     monkeypatch.setattr(
         "lvjiang.ui.batch.batch_tab.load_batch_config", lambda: config)
-    monkeypatch.setattr(
-        "lvjiang.ui.batch.batch_tab.save_batch_config", lambda _cfg: None)
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.list_exposed_scripts",
         lambda _env=None: [{"id": "t1", "name": "任务一", "batchable": True,
@@ -217,7 +220,7 @@ def test_start_is_blocked_when_prepare_wf_cannot_select_a_unit_user(
     assert "batch_unit_prepare" in warnings[0]
 
     # 换成会回传 username 的准备 wf 就不再拦。
-    config.configs["group"].workflows = BatchWorkflows(
+    config.by_name("group").workflows = BatchWorkflows(
         prepare_item="batch/prepare_item_by_attr.wf")
     with pytest.raises(AssertionError, match="不该走到启动批量"):
         tab._start_batch()
@@ -238,13 +241,16 @@ def test_attribute_prepare_selects_real_user_for_task_and_session(
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     config = BatchConfigItem(
         name="attribute", execution_unit_key="account",
-        selected_units={"account": ["a"]},
+        default_units={"account": ["a"]},
         workflows=BatchWorkflows(prepare_item="batch/prepare_item_by_attr.wf"),
     )
     worker = BatchWorker(
-        ["a"], [BatchScript("task", "task")], config,
+        BatchRunSpec.build(
+            config, BatchRunDraft(), entries=["a"],
+            scripts=[BatchScript("task", "task")],
+            candidate_usernames=["u1", "u2"]),
         BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1", "u2"],
+        lambda: False,
     )
     seen = []
 
@@ -276,13 +282,16 @@ def test_skipped_prepare_consumes_round_and_uses_normal_loop(
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        ["a", "b"], [BatchScript("task", "task")],
-        BatchConfigItem(
-            name="attribute", execution_unit_key="account", rounds=2,
-            workflows=BatchWorkflows(prepare_item="prepare.wf"),
-        ),
+        BatchRunSpec.build(
+            BatchConfigItem(
+                name="attribute", execution_unit_key="account",
+                workflows=BatchWorkflows(prepare_item="prepare.wf"),
+            ),
+            BatchRunDraft(rounds=2), entries=["a", "b"],
+            scripts=[BatchScript("task", "task")],
+            candidate_usernames=["u1", "u2"]),
         BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1", "u2"],
+        lambda: False,
     )
     prepares = []
     executed = []
@@ -318,13 +327,16 @@ def test_attribute_lifecycle_stop_ends_whole_batch(
     monkeypatch.setattr(history, "try_create_task_run", lambda **_kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        ["a", "b"], [BatchScript("task", "task")],
-        BatchConfigItem(
-            name="attribute", execution_unit_key="account", rounds=2,
-            workflows=BatchWorkflows(prepare_item="prepare.wf", finish_item="finish.wf"),
-        ),
+        BatchRunSpec.build(
+            BatchConfigItem(
+                name="attribute", execution_unit_key="account",
+                workflows=BatchWorkflows(prepare_item="prepare.wf", finish_item="finish.wf"),
+            ),
+            BatchRunDraft(rounds=2), entries=["a", "b"],
+            scripts=[BatchScript("task", "task")],
+            candidate_usernames=["u1", "u2"]),
         BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1", "u2"],
+        lambda: False,
     )
     prepared = []
     executed = []
@@ -365,13 +377,16 @@ def test_attribute_setup_failure_marks_all_planned_rows(
     reports = []
     monkeypatch.setattr(BatchReport, "write", lambda self: reports.append(self) or None)
     worker = BatchWorker(
-        ["a", "b"], [BatchScript("task", "task")],
-        BatchConfigItem(
-            name="attribute", execution_unit_key="account", rounds=2,
-            workflows=BatchWorkflows(prepare_item="prepare.wf", batch_setup="setup.wf"),
-        ),
+        BatchRunSpec.build(
+            BatchConfigItem(
+                name="attribute", execution_unit_key="account",
+                workflows=BatchWorkflows(prepare_item="prepare.wf", batch_setup="setup.wf"),
+            ),
+            BatchRunDraft(rounds=2), entries=["a", "b"],
+            scripts=[BatchScript("task", "task")],
+            candidate_usernames=["u1", "u2"]),
         BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1", "u2"],
+        lambda: False,
     )
     monkeypatch.setattr(worker, "_run_stage", lambda *_args, **_kw:
                         BatchStageResult(status=setup_status, state={}))
@@ -423,13 +438,18 @@ def test_attribute_unit_runs_only_selected_members_successful_checks(
     reports = []
     monkeypatch.setattr(BatchReport, "write", lambda self: reports.append(self) or None)
     worker = BatchWorker(
-        ["a"], [BatchScript(key, key) for key in ("A", "B", "C")],
-        BatchConfigItem(
+        BatchRunSpec.build(
+            BatchConfigItem(
             name="attribute", execution_unit_key="account",
             workflows=BatchWorkflows(prepare_item="prepare.wf"),
         ),
-        BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1", "u2"],
+            BatchRunDraft(rounds=1),
+            entries=["a"], scripts=[BatchScript(key, key) for key in ("A", "B", "C")],
+            candidate_usernames=["u1", "u2"],
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: False,
     )
     checks = {
         "u1": {"A": "success", "B": "skipped", "C": "failed"},
@@ -489,11 +509,16 @@ def test_attribute_rechecks_each_script_after_previous_script(tmp_path, monkeypa
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: None)
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        ["a"], [BatchScript("A", "A"), BatchScript("B", "B")],
-        BatchConfigItem(name="group", execution_unit_key="account",
+        BatchRunSpec.build(
+            BatchConfigItem(name="group", execution_unit_key="account",
                         workflows=BatchWorkflows(prepare_item="prepare.wf")),
-        BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1"],
+            BatchRunDraft(rounds=1),
+            entries=["a"], scripts=[BatchScript("A", "A"), BatchScript("B", "B")],
+            candidate_usernames=["u1"],
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: False,
     )
     changed = False
     checks = []
@@ -544,11 +569,16 @@ def test_attribute_session_failure_keeps_successful_prepare(tmp_path, monkeypatc
     reports = []
     monkeypatch.setattr(BatchReport, "write", lambda self: reports.append(self) or None)
     worker = BatchWorker(
-        ["a"], [BatchScript("A", "A")],
-        BatchConfigItem(name="group", execution_unit_key="account",
+        BatchRunSpec.build(
+            BatchConfigItem(name="group", execution_unit_key="account",
                         workflows=BatchWorkflows(prepare_item="prepare.wf")),
-        BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1"],
+            BatchRunDraft(rounds=1),
+            entries=["a"], scripts=[BatchScript("A", "A")],
+            candidate_usernames=["u1"],
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: False,
     )
     monkeypatch.setattr(worker, "_run_stage", lambda phase, *_args, **_kw:
                         BatchStageResult(username="u1" if phase == "prepare_item" else "",
@@ -585,11 +615,16 @@ def test_attribute_lock_conflict_limit_reports_skipped_unit(tmp_path, monkeypatc
     reports = []
     monkeypatch.setattr(BatchReport, "write", lambda self: reports.append(self) or None)
     worker = BatchWorker(
-        ["a"], [BatchScript("A", "A")],
-        BatchConfigItem(name="group", execution_unit_key="account",
+        BatchRunSpec.build(
+            BatchConfigItem(name="group", execution_unit_key="account",
                         workflows=BatchWorkflows(prepare_item="prepare.wf")),
-        BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1"],
+            BatchRunDraft(rounds=1),
+            entries=["a"], scripts=[BatchScript("A", "A")],
+            candidate_usernames=["u1"],
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: False,
     )
     monkeypatch.setattr(worker, "_run_stage", lambda *_args, **_kw:
                         BatchStageResult(state={}))
@@ -634,13 +669,18 @@ def test_attribute_persistence_failure_does_not_change_business_result(
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: TaskRun())
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        ["a"], [BatchScript("A", "A"), BatchScript("B", "B")],
-        BatchConfigItem(
+        BatchRunSpec.build(
+            BatchConfigItem(
             name="attribute", execution_unit_key="account",
             workflows=BatchWorkflows(prepare_item="prepare.wf"),
         ),
-        BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1"],
+            BatchRunDraft(rounds=1),
+            entries=["a"], scripts=[BatchScript("A", "A"), BatchScript("B", "B")],
+            candidate_usernames=["u1"],
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: False,
     )
     monkeypatch.setattr(
         worker, "_run_stage",
@@ -694,13 +734,18 @@ def test_attribute_failed_task_history_failure_does_not_stop_next_task(
     monkeypatch.setattr(history, "try_create_task_run", lambda **kw: TaskRun())
     monkeypatch.setattr(BatchReport, "write", lambda self: None)
     worker = BatchWorker(
-        ["a"], [BatchScript("A", "A"), BatchScript("B", "B")],
-        BatchConfigItem(
+        BatchRunSpec.build(
+            BatchConfigItem(
             name="attribute", execution_unit_key="account",
             workflows=BatchWorkflows(prepare_item="prepare.wf"),
         ),
-        BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1"],
+            BatchRunDraft(rounds=1),
+            entries=["a"], scripts=[BatchScript("A", "A"), BatchScript("B", "B")],
+            candidate_usernames=["u1"],
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: False,
     )
     monkeypatch.setattr(
         worker, "_run_stage",
@@ -748,13 +793,18 @@ def test_attribute_batch_output_failure_still_emits_summary(
         lambda self: (_ for _ in ()).throw(OSError("report write failed")),
     )
     worker = BatchWorker(
-        ["a"], [BatchScript("A", "A")],
-        BatchConfigItem(
+        BatchRunSpec.build(
+            BatchConfigItem(
             name="attribute", execution_unit_key="account",
             workflows=BatchWorkflows(prepare_item="prepare.wf"),
         ),
-        BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=["u1"],
+            BatchRunDraft(rounds=1),
+            entries=["a"], scripts=[BatchScript("A", "A")],
+            candidate_usernames=["u1"],
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: False,
     )
     monkeypatch.setattr(
         worker, "_run_stage",
@@ -790,13 +840,18 @@ def test_unit_prepare_protocol_error_separates_the_two_causes(
 ):
     """两种违反协议的排查方向完全不同，报文必须分开，并带上实际加载路径。"""
     worker = BatchWorker(
-        ["a"], [BatchScript("task", "task")],
-        BatchConfigItem(
+        BatchRunSpec.build(
+            BatchConfigItem(
             name="attribute", execution_unit_key="account",
             workflows=BatchWorkflows(prepare_item="batch/prepare_item_by_attr.wf"),
         ),
-        BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: False, candidate_usernames=[],
+            BatchRunDraft(rounds=1),
+            entries=["a"], scripts=[BatchScript("task", "task")],
+            candidate_usernames=[],
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: False,
     )
     message = worker._unit_prepare_protocol_error(prepared, ["u1", "u2"])
     for fragment in expect:
@@ -839,13 +894,17 @@ def test_stop_during_unit_prepare_is_not_a_protocol_error(
             return {}
 
     worker = BatchWorker(
-        ["a", "b"], [BatchScript("task", "task")],
-        BatchConfigItem(
-            name="attribute", execution_unit_key="account", rounds=2,
-            workflows=BatchWorkflows(prepare_item="batch/prepare_item_by_attr.wf"),
+        BatchRunSpec.build(
+            BatchConfigItem(
+            name="attribute", execution_unit_key="account", workflows=BatchWorkflows(prepare_item="batch/prepare_item_by_attr.wf")
         ),
-        BatchContext(None, None, None, None), SessionManager(tmp_path),
-        lambda: stopped["value"], candidate_usernames=["u1", "u2"],
+            BatchRunDraft(rounds=2),
+            entries=["a", "b"], scripts=[BatchScript("task", "task")],
+            candidate_usernames=["u1", "u2"],
+        ),
+        BatchContext(None, None, None, None),
+        SessionManager(tmp_path),
+        lambda: stopped["value"],
     )
     monkeypatch.setattr(worker, "_create_engine", _StoppedEngine)
     monkeypatch.setattr(worker, "_check_script",

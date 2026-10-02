@@ -17,14 +17,19 @@ import json
 import time
 import traceback
 from contextlib import ExitStack, nullcontext
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Callable
 
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from ...core.batch_config import BatchConfigItem, lifecycle_parameter_definitions
+from ...core.batch_config import (
+    BatchConfigItem,
+    BatchWorkflows,
+    lifecycle_parameter_definitions,
+)
+from ...core.batch_run import BatchRunDraft
 from ...core.config.resolver import get_resolver
 from ...core.config.users import SessionManager
 from ...i18n import tr
@@ -72,6 +77,59 @@ class PlannedTask:
     script: BatchScript
     params: dict
     parameter_source: str
+
+
+@dataclass(frozen=True)
+class BatchRunSpec:
+    """点下「开始」那一刻冻结的一次批量计划。
+
+    配置组定义 + 运行草稿 → 这份快照。调度器只认它：运行期不再读 `batch.json`、
+    不再读 session、也不再看主页面控件。所以启动之后去改配置组、改用户资料或
+    在主页面重新勾选，都不会影响正在跑的这一批。
+
+    `unattended` 存的是**有效值**：草稿勾了无人值守、且配置组确实配了异常恢复
+    wf，才会是真。这个与运算只在构造快照时做一次，调度器不必再判断前提。
+    """
+
+    group_id: str = ""
+    name: str = ""
+    #: 本次执行顺序：用户模式是用户名，属性单元模式是属性值
+    entries: tuple[str, ...] = ()
+    #: 属性单元模式下参与分组的全部可见用户；用户模式与 entries 相同
+    candidate_usernames: tuple[str, ...] = ()
+    scripts: tuple[BatchScript, ...] = ()
+    execution_unit_key: str = "user"
+    rounds: int = 1
+    workflows: BatchWorkflows = field(default_factory=BatchWorkflows)
+    workflow_params: dict[str, dict] = field(default_factory=dict)
+    skip_lifecycle_for_single_item: bool = True
+    unattended: bool = False
+
+    @staticmethod
+    def build(
+        item: BatchConfigItem,
+        draft: BatchRunDraft,
+        *,
+        entries: list[str],
+        scripts: list[BatchScript],
+        candidate_usernames: list[str] | None = None,
+    ) -> "BatchRunSpec":
+        return BatchRunSpec(
+            group_id=item.id,
+            name=item.name,
+            entries=tuple(entries),
+            candidate_usernames=tuple(
+                entries if candidate_usernames is None else candidate_usernames),
+            scripts=tuple(copy.deepcopy(scripts)),
+            execution_unit_key=item.execution_unit_key,
+            rounds=draft.rounds,
+            workflows=copy.deepcopy(item.workflows),
+            workflow_params=copy.deepcopy(item.workflow_params),
+            skip_lifecycle_for_single_item=item.skip_lifecycle_for_single_item,
+            # 无人值守必须配套恢复 wf，否则改道弹窗只会让整批在错误页面上连环失败
+            unattended=bool(
+                draft.unattended and item.workflows.recover_unattended),
+        )
 
 
 @dataclass
@@ -144,21 +202,17 @@ class BatchWorker(QThread):
 
     def __init__(
         self,
-        usernames: list[str],
-        scripts: list[BatchScript],
-        config: BatchConfigItem,
+        spec: BatchRunSpec,
         ctx: BatchContext,
         session_manager: SessionManager,
         stop_check: Callable[[], bool],
         parent=None,
-        candidate_usernames: list[str] | None = None,
     ):
         super().__init__(parent)
-        self._usernames = list(usernames)
-        self._candidate_usernames = list(
-            usernames if candidate_usernames is None else candidate_usernames)
-        self._scripts = copy.deepcopy(scripts)
-        self._config = copy.deepcopy(config)
+        self._spec = spec
+        self._usernames = list(spec.entries)
+        self._candidate_usernames = list(spec.candidate_usernames)
+        self._scripts = copy.deepcopy(list(spec.scripts))
         self._ctx = ctx
         self._session_manager = session_manager
         self._stop_check = stop_check
@@ -185,7 +239,7 @@ class BatchWorker(QThread):
         }
         self._workflow_configs = copy.deepcopy(shared)
         users = {}
-        attr_mode = self._config.execution_unit_key != "user"
+        attr_mode = self._spec.execution_unit_key != "user"
         member_names = self._candidate_usernames if attr_mode else self._usernames
         for username in member_names:
             user = load_user_metadata(username, self._session_manager._users_dir)
@@ -196,7 +250,7 @@ class BatchWorker(QThread):
             groups: dict[str, list[str]] = {}
             for username in member_names:
                 value = str(self._user_attributes[username].get(
-                    self._config.execution_unit_key, "")).strip()
+                    self._spec.execution_unit_key, "")).strip()
                 if value:
                     groups.setdefault(value, []).append(username)
             self._unit_members = {
@@ -218,10 +272,10 @@ class BatchWorker(QThread):
                 else:
                     self._task_plan[(run_idx, script.id)] = planned
         for phase, definitions in lifecycle_parameter_definitions(
-            self._config.workflows,
+            self._spec.workflows,
         ).items():
             params, _source = merge_task_params(
-                definitions, self._config.workflow_params.get(phase, {}), None)
+                definitions, self._spec.workflow_params.get(phase, {}), None)
             self._lifecycle_params[phase] = params
 
     def task_plan_snapshot(self) -> dict[tuple[int, str], PlannedTask]:
@@ -252,12 +306,12 @@ class BatchWorker(QThread):
                 self._execution_lease = None
 
     def _run_locked(self):
-        if self._config.execution_unit_key != "user":
+        if self._spec.execution_unit_key != "user":
             self._run_locked_by_attr()
             return
         from ...core.daily_history import try_create_batch_run
         batch_run = try_create_batch_run(
-            config_name=self._config.name,
+            config_name=self._spec.name,
             input_snapshot={
                 "usernames": list(self._usernames),
                 "scripts": [
@@ -265,11 +319,11 @@ class BatchWorker(QThread):
                      "scope": item.scope}
                     for item in self._scripts
                 ],
-                "rounds": self._config.rounds,
-                "workflows": self._config.workflows.to_dict(),
+                "rounds": self._spec.rounds,
+                "workflows": self._spec.workflows.to_dict(),
                 "workflow_params": copy.deepcopy(self._lifecycle_params),
                 "skip_lifecycle_for_single_item": (
-                    self._config.skip_lifecycle_for_single_item),
+                    self._spec.skip_lifecycle_for_single_item),
             },
         )
         batch_run_id = batch_run.batch_run_id if batch_run is not None else ""
@@ -278,7 +332,7 @@ class BatchWorker(QThread):
             "batch_run_id": batch_run_id,
             "entries": {}, "stopped": False, "lifecycle": {},
         }
-        rounds = self._config.rounds
+        rounds = self._spec.rounds
         visits = [
             (round_number, run_idx, username)
             for round_number in range(1, rounds + 1)
@@ -287,7 +341,7 @@ class BatchWorker(QThread):
         total = len(visits)
         use_lifecycle = not (
             len(self._usernames) == 1
-            and self._config.skip_lifecycle_for_single_item
+            and self._spec.skip_lifecycle_for_single_item
         )
         self.log.emit(f"[批量] 开始：{len(self._usernames)} 用户 × "
                       f"{len(self._scripts)} 脚本 × {rounds} 轮")
@@ -308,9 +362,9 @@ class BatchWorker(QThread):
 
         # 初始化报告
         report = BatchReport(
-            config_name=self._config.name,
+            config_name=self._spec.name,
             scripts=[(s.id, s.name) for s in self._scripts],
-            workflows=(self._config.workflows.to_dict()
+            workflows=(self._spec.workflows.to_dict()
                        if use_lifecycle else {}),
             total_rows=total,
         )
@@ -320,7 +374,7 @@ class BatchWorker(QThread):
         can_run = True
         if use_lifecycle:
             setup = self._run_stage(
-                "batch_setup", self._config.workflows.batch_setup,
+                "batch_setup", self._spec.workflows.batch_setup,
                 -1, "", batch_state, round_number=0,
             )
             batch_state = setup.state if setup.state is not None else batch_state
@@ -438,7 +492,7 @@ class BatchWorker(QThread):
             prepared = BatchStageResult(state=batch_state)
             if use_lifecycle:
                 prepared = self._run_stage(
-                    "prepare_item", self._config.workflows.prepare_item,
+                    "prepare_item", self._spec.workflows.prepare_item,
                     run_idx, username, batch_state,
                     round_number=round_number,
                 )
@@ -572,7 +626,7 @@ class BatchWorker(QThread):
                     },
                 }
                 finished = self._run_stage(
-                    "finish_item", self._config.workflows.finish_item,
+                    "finish_item", self._spec.workflows.finish_item,
                     run_idx, username, batch_state, item_summary,
                     round_number=round_number,
                 )
@@ -600,7 +654,7 @@ class BatchWorker(QThread):
         # setup 非 success 时直接终止，不启动任何后续生命周期阶段。
         if use_lifecycle and can_run:
             teardown = self._run_stage(
-                "batch_teardown", self._config.workflows.batch_teardown,
+                "batch_teardown", self._spec.workflows.batch_teardown,
                 -1, "", batch_state,
                 {"stopped": self._stopped, "entries": summary["entries"]},
                 round_number=rounds,
@@ -648,11 +702,11 @@ class BatchWorker(QThread):
         from ...core.access import AccessDeniedError, acquire_user
         from ...core.daily_history import try_create_batch_run, try_create_task_run
 
-        if not self._config.workflows.prepare_item:
+        if not self._spec.workflows.prepare_item:
             raise ValueError("属性执行单元必须配置条目准备工作流")
-        unit_key = self._config.execution_unit_key
+        unit_key = self._spec.execution_unit_key
         batch_run = try_create_batch_run(
-            config_name=self._config.name,
+            config_name=self._spec.name,
             input_snapshot={
                 "execution_unit_key": unit_key,
                 "units": copy.deepcopy(self._unit_members),
@@ -661,8 +715,8 @@ class BatchWorker(QThread):
                     for name in members)),
                 "scripts": [{"task_id": s.id, "task_name": s.name,
                              "scope": s.scope} for s in self._scripts],
-                "rounds": self._config.rounds,
-                "workflows": self._config.workflows.to_dict(),
+                "rounds": self._spec.rounds,
+                "workflows": self._spec.workflows.to_dict(),
                 "workflow_params": copy.deepcopy(self._lifecycle_params),
             },
         )
@@ -671,15 +725,15 @@ class BatchWorker(QThread):
         summary: dict = {"batch_run_id": batch_run_id, "entries": {},
                          "stopped": False, "lifecycle": {}}
         report = BatchReport(
-            config_name=self._config.name,
+            config_name=self._spec.name,
             scripts=[(s.id, s.name) for s in self._scripts],
-            workflows=self._config.workflows.to_dict(),
-            total_rows=len(self._usernames) * self._config.rounds,
+            workflows=self._spec.workflows.to_dict(),
+            total_rows=len(self._usernames) * self._spec.rounds,
         )
         report.start_batch()
         batch_state: dict = {}
         setup = self._run_stage(
-            "batch_setup", self._config.workflows.batch_setup,
+            "batch_setup", self._spec.workflows.batch_setup,
             -1, "", batch_state)
         batch_state = setup.state if setup.state is not None else batch_state
         summary["lifecycle"]["batch_setup"] = setup.status
@@ -693,7 +747,7 @@ class BatchWorker(QThread):
             self._stopped = setup.status == RESULT_STOPPED
             done.update(self._usernames)
             self.log.emit(self._stage_message(tr("批次准备"), setup))
-            for round_number in range(1, self._config.rounds + 1):
+            for round_number in range(1, self._spec.rounds + 1):
                 for run_idx, unit in enumerate(self._usernames):
                     label = f"{unit} · 第 {round_number} 次"
                     skipped_entry = {
@@ -731,7 +785,7 @@ class BatchWorker(QThread):
             attempt += 1
             round_number = counts[unit] + 1
             label = f"{unit} · 第 {round_number} 次 · 尝试 {attempt}"
-            self.log.emit(f"[批量] {unit_key}={unit}，第 {round_number}/{self._config.rounds} 次")
+            self.log.emit(f"[批量] {unit_key}={unit}，第 {round_number}/{self._spec.rounds} 次")
             report.start_entry(label, "")
             entry: dict = {"prepare": ST_SKIPPED, "finish": ST_SKIPPED,
                            "username": "", "scripts": {}}
@@ -773,7 +827,7 @@ class BatchWorker(QThread):
                         continue
 
                     prepared = self._run_stage(
-                        "prepare_item", self._config.workflows.prepare_item,
+                        "prepare_item", self._spec.workflows.prepare_item,
                         run_idx, "", batch_state, round_number=round_number,
                         unit_members=eligible,
                     )
@@ -790,7 +844,7 @@ class BatchWorker(QThread):
                             done.add(unit)
                         elif prepared.status == RESULT_SKIPPED:
                             counts[unit] += 1
-                            if counts[unit] >= self._config.rounds:
+                            if counts[unit] >= self._spec.rounds:
                                 done.add(unit)
                         else:
                             done.add(unit)
@@ -924,7 +978,7 @@ class BatchWorker(QThread):
                     if self._stopped:
                         report.finish_pending()
                     finished = self._run_stage(
-                        "finish_item", self._config.workflows.finish_item,
+                        "finish_item", self._spec.workflows.finish_item,
                         run_idx, username, batch_state,
                         {"prepare": prepared.status,
                          "scripts": {key: self._ui_status_to_result(value)
@@ -939,7 +993,7 @@ class BatchWorker(QThread):
                     elif finished.status != RESULT_SUCCESS:
                         self.log.emit(self._stage_message(f"{label} 条目收尾", finished))
                     counts[unit] += 1
-                    if counts[unit] >= self._config.rounds:
+                    if counts[unit] >= self._spec.rounds:
                         done.add(unit)
             except AccessDeniedError as exc:
                 self.log.emit(f"[批量] {unit} 暂不可执行: {exc}")
@@ -968,10 +1022,10 @@ class BatchWorker(QThread):
         summary["stopped"] = self._stopped
         if setup.status == RESULT_SUCCESS:
             teardown = self._run_stage(
-                "batch_teardown", self._config.workflows.batch_teardown,
+                "batch_teardown", self._spec.workflows.batch_teardown,
                 -1, "", batch_state,
                 {"stopped": self._stopped, "entries": summary["entries"]},
-                round_number=self._config.rounds)
+                round_number=self._spec.rounds)
             summary["lifecycle"]["batch_teardown"] = teardown.status
         report.end_batch(stopped=self._stopped)
         report_path = None
@@ -1007,7 +1061,7 @@ class BatchWorker(QThread):
         排查方向，混成一句话会把人带到错误的地方；实际加载路径一并带上，因为
         config/local 与 config/remote 会顶替 system，用户自己改过的那份会永久生效。
         """
-        wf_name = self._config.workflows.prepare_item
+        wf_name = self._spec.workflows.prepare_item
         where = f"（实际加载 {prepared.source}）" if prepared.source else ""
         if not prepared.returned:
             return (
@@ -1135,8 +1189,8 @@ class BatchWorker(QThread):
         少了恢复 wf 就改道 pause/confirm 只会把整批推到错误页面上连环失败，
         不如照旧弹窗等人。配置层已经拦了一道，这里不依赖它。
         """
-        return bool(self._config.unattended
-                    and self._config.workflows.recover_unattended)
+        return bool(self._spec.unattended
+                    and self._spec.workflows.recover_unattended)
 
     def _unattended_ui_callback(self, kind: str, **kwargs) -> object:
         """无人值守下的 UI 回调：通知照常，要人动手的一律中止。
@@ -1169,7 +1223,7 @@ class BatchWorker(QThread):
         if not self._unattended_hit:
             return
         text, self._unattended_hit = self._unattended_hit, ""
-        wf_name = self._config.workflows.recover_unattended
+        wf_name = self._spec.workflows.recover_unattended
         if not wf_name:
             self.log.emit(
                 f"[批量] 无人值守中止（{text}）；未配置恢复 wf，直接继续下一个任务")
@@ -1226,7 +1280,7 @@ class BatchWorker(QThread):
             "batch_users": list(self._usernames),
             "batch_index": run_idx,
             "batch_round": round_number,
-            "batch_rounds": self._config.rounds,
+            "batch_rounds": self._spec.rounds,
             "batch_state": working_state,
             "batch_item_result": item_result or {},
         })
@@ -1234,7 +1288,7 @@ class BatchWorker(QThread):
             variables.update(copy.deepcopy(extra_variables))
         if unit_members is not None:
             variables.update({
-                "batch_unit_key": self._config.execution_unit_key,
+                "batch_unit_key": self._spec.execution_unit_key,
                 "batch_unit_value": self._usernames[run_idx],
                 "batch_unit_members": [
                     {"username": name, "attributes": copy.deepcopy(

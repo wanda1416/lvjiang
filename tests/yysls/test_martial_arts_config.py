@@ -68,8 +68,11 @@ class TestPlaystyleRegistry:
     def test_switch_stays_with_the_rule_not_the_playstyle(self):
         """开关控制的是非武器增伤这类判定口径，属于规则的事。
 
-        同一个玩法在不同规则下可以绑不同开关甚至不绑，所以它不能写进公共
-        玩法定义。提取时如果把它一起搬走，判定会静默改变。
+        守的是**归属**：公共玩法定义里不出现 switch，绑定只能由规则自己的
+        `playstyle_switches` 声明——同一个玩法在不同规则下可以绑不同开关甚至
+        不绑。随包给不给默认绑定是另一件事，不该混在这条里：上一版把它钉成
+        「没有任何规则声明 playstyle_switches」，于是 0.10.0 搬迁时顺手清空的
+        随包数据被固化成了契约，九剑/走地玉 的绑定丢了 8 个版本没人发现。
         """
         import glob
         from pathlib import Path
@@ -77,13 +80,25 @@ class TestPlaystyleRegistry:
         import yaml
 
         assert all("switch" not in cfg
-                   for cfg in get_game_config().get_playstyles().values())
+                   for cfg in get_game_config().get_playstyles().values()), (
+            "玩法定义不得决定怎么调律")
 
-        bound = {}
+        declared_in = {}
         for path in glob.glob("config/system/yysls/tuning_rules/*.yaml"):
             raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
-            bound.update(raw.get("playstyle_switches") or {})
-        assert bound == {}
+            for playstyle, switch in (raw.get("playstyle_switches") or {}).items():
+                declared_in.setdefault(playstyle, []).append(
+                    (raw.get("key"), switch))
+                assert playstyle in (raw.get("playstyles") or []), (
+                    f"{raw.get('key')} 绑定了自己没引用的玩法 {playstyle}")
+
+        # 随包当前的绑定。该不该绑由「组内玩法要求是否分歧」决定（组内统一就
+        # 直接写进条件，如 heal_fire 的冠胄硬条件）；绑给谁由毕业表
+        # single_qs_bonus 决定。当前只有这两组存在分歧。
+        assert declared_in == {
+            "九剑": [("huiyi_general", "keep_danti")],
+            "走地玉": [("huixin_yuyu", "keep_danti")],
+        }, declared_in
 
     def test_rules_only_reference_playstyles(self):
         """规则文件里不能再内嵌玩法定义——那正是重复的来源。"""

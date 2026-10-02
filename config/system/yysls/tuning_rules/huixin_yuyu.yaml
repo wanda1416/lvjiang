@@ -136,3 +136,5 @@ common_conditions:
 playstyles:
 - 走地玉
 - 飞天玉
+playstyle_switches:
+  走地玉: keep_danti

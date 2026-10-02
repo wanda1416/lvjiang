@@ -60,6 +60,7 @@ class SceneReferenceEditorMixin:
         self._btn_new_reference.clicked.connect(self._on_new_reference)
         self._btn_delete_reference = QPushButton(tr("删除引用"))
         self._btn_delete_reference.clicked.connect(self._on_delete_reference)
+        self._btn_delete_reference.setEnabled(False)
         self._btn_bind_reference = QPushButton(tr("绑定引用"))
         self._btn_bind_reference.clicked.connect(self._on_bind_reference)
         apply_button_style(self._btn_new_reference)
@@ -71,6 +72,15 @@ class SceneReferenceEditorMixin:
         buttons.addStretch()
         layout.addLayout(buttons)
         return widget
+
+    def _update_reference_delete_button(self):
+        """删除按钮跟着选中状态走：没有选中项时禁用，而不是让它看着可点。
+
+        刷新也要走这里——行被删光或被视图过滤掉之后 currentRow 会退回 -1，
+        只靠选中信号补不上。
+        """
+        self._btn_delete_reference.setEnabled(
+            self._reference_table.currentRow() >= 0)
 
     def _refresh_reference_list(self):
         if not hasattr(self, "_reference_table"):
@@ -92,9 +102,11 @@ class SceneReferenceEditorMixin:
             self._reference_table.setItem(row, 1, QTableWidgetItem(ref.key))
             self._reference_table.setItem(row, 2, QTableWidgetItem(ref.scene))
         self._reference_table.blockSignals(False)
+        self._update_reference_delete_button()
         self._refresh_entity_tab_titles()
 
     def _on_reference_selection(self, row, _col, _prev_row, _prev_col):
+        self._update_reference_delete_button()
         if row < 0:
             return
         item = self._reference_table.item(row, 1)

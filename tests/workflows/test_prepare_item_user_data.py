@@ -16,6 +16,7 @@ import pytest
 from lvjiang.core.config import load_user_config
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.core.layout_manager import load_layout_by_key
+from lvjiang.core.layout_models import FoundRegion
 from lvjiang.workflows.grammar import parse_text
 from tests.workflows.conftest import make_engine
 
@@ -369,3 +370,145 @@ def test_manual_pause_prompts_name_the_account_and_role_to_log_in(scenario):
     joined = " | ".join(prompts)
     assert "acc" in joined, joined
     assert "role" in joined, joined
+
+
+# ─── 账号列表翻动：到边判定与回顶重查 ─────────────────────
+
+class _ScrollList:
+    """可滚动的账号列表替身。
+
+    窗口行数取**真实布局**里 user_list 的 panel 行数，不写死 3：布局改行数时
+    这些用例跟着变，而不是悄悄测一个不存在的形状。
+    """
+
+    def __init__(self, engine, names, *, rows, offset=0):
+        self.engine = engine
+        self.names = list(names)
+        self.rows = rows
+        self.offset = offset
+        self.scrolls: list[str] = []
+        self.hits: list[str] = []
+        self.scans = 0
+
+    @property
+    def max_offset(self) -> int:
+        return max(0, len(self.names) - self.rows)
+
+    def visible(self) -> list[str]:
+        window = self.names[self.offset:self.offset + self.rows]
+        return window + [""] * (self.rows - len(window))
+
+    def install(self) -> None:
+        workflow = self.engine._ensure_workflow()
+        workflow.find_text_in_region = self._find
+        workflow.drag_between = self._drag
+        self.engine._scan_panel_whole = self._scan
+        self.engine._input.click_screen = lambda *a, **kw: None
+        self.engine._exec_wait = lambda _node: None
+
+    def _scan(self, scene_key, panel_key, var_name,
+              min_confidence=None, cleaning_group=None):
+        self.scans += 1
+        self.engine.variables[var_name] = {
+            str(i + 1): {"1": name} for i, name in enumerate(self.visible())
+        }
+
+    def _find(self, target_value, mode, search_region=None, **kwargs):
+        for name in self.visible():
+            if name and str(target_value) in name:
+                self.hits.append(name)
+                return FoundRegion(x_ratio=0.4, y_ratio=0.4, w_ratio=0.1,
+                                   h_ratio=0.05, text=name)
+        return ""
+
+    def _drag(self, from_cx, from_cy, from_r, to_cx, to_cy, to_r, label, **kw):
+        # point_2 → point_1（下→上）把内容往上拖，即向下翻页
+        if from_cy > to_cy:
+            self.scrolls.append("down")
+            self.offset = min(self.offset + 1, self.max_offset)
+        else:
+            self.scrolls.append("up")
+            self.offset = max(self.offset - 1, 0)
+
+
+def _scroll_list(names, *, offset=0):
+    engine = _engine()
+    engine._procs = _procs()
+    engine.variables = {}
+    panel = engine._find_panel_in_layout("game_login_page", "user_list")
+    lst = _ScrollList(engine, names, rows=panel.rows, offset=offset)
+    lst.install()
+    return engine, lst
+
+
+def _accounts(count: int) -> list[str]:
+    return [f"account{i:02d}" for i in range(count)]
+
+
+def test_search_stops_at_the_bottom_instead_of_burning_the_scroll_cap():
+    """到底就停：判据是列表不再变化，而不是把上限次数翻完。
+
+    预设次数是这个流程原来的毛病——账号一多，默认值就悄悄不够，表现成
+    「翻了几下说找不到」。上限只是保险，不该是正常结束条件。
+    """
+    engine, lst = _scroll_list(_accounts(6))
+
+    engine._exec_body(parse_text(
+        'call $r = search_account_down("nobody", 50)\n').body)
+
+    assert engine.variables["r"] == 0
+    # 6 个账号、窗口 3 行 → 3 步到底，再多一步才能确认「不动了」
+    assert lst.scrolls == ["down"] * (lst.max_offset + 1)
+    assert lst.offset == lst.max_offset
+
+
+def test_search_respects_the_cap_when_the_user_lowered_it():
+    """用户把参数调小仍然有效：上限到了就收手，不会无视设置一路翻到底。"""
+    engine, lst = _scroll_list(_accounts(30))
+
+    engine._exec_body(parse_text(
+        'call $r = search_account_down("nobody", 2)\n').body)
+
+    assert engine.variables["r"] == 0
+    assert lst.scrolls == ["down", "down"]
+
+
+def test_search_clicks_the_account_without_scrolling_when_already_visible():
+    engine, lst = _scroll_list(_accounts(9))
+
+    engine._exec_body(parse_text(
+        'call $r = search_account_down("account01", 50)\n').body)
+
+    assert engine.variables["r"] == 1
+    assert lst.hits == ["account01"]
+    assert lst.scrolls == []
+
+
+def test_scroll_to_top_stops_when_the_list_stops_moving():
+    engine, lst = _scroll_list(_accounts(9), offset=4)
+
+    engine._exec_body(parse_text(
+        'call $r = scroll_user_list_to_top(50)\n').body)
+
+    assert engine.variables["r"] == 1
+    assert lst.offset == 0
+    # 4 步回到顶，再一步确认不动了
+    assert lst.scrolls == ["up"] * 5
+
+
+def test_second_pass_returns_to_top_and_finds_an_account_above_the_entry():
+    """入场时列表停在中间，目标在上方——这是只向下翻永远找不到的现场。
+
+    额外一轮的全部意义就在这里：先翻到底确认真的没有，再回顶从头走一遍。
+    """
+    engine, lst = _scroll_list(_accounts(9), offset=5)
+
+    engine._exec_body(parse_text(
+        'call $r = select_account_and_login("account00", 50, "acc")\n').body)
+
+    assert engine.variables["r"] == 1
+    assert lst.hits == ["account00"]
+    # 先向下翻到底，再向上回顶，最后在顶部命中
+    assert "down" in lst.scrolls and "up" in lst.scrolls
+    assert lst.scrolls.index("down") < lst.scrolls.index("up")
+    assert lst.offset == 0

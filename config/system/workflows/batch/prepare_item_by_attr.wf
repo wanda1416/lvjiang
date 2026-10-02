@@ -5,24 +5,24 @@
 #%     type: text
 #%     default: ""
 #%   - name: max_roll_account
-#%     label: 最大滚动次数
+#%     label: 单轮最大滚动次数
 #%     type: number
-#%     default: 8
+#%     default: 50
 #%     min: 1
-#%     max: 20
+#%     max: 50
 #%   - name: skip_online_role
 #%     label: 角色在线跳过
 #%     type: bool
 #%     default: true
 #%   - name: online_role_max_wait
-#%     label: 最大等待时间（秒）
+#%     label: 最大等待时间
 #%     require: not $skip_online_role
 #%     type: number
 #%     default: 0
 #%     min: 0
 #%     max: 3600
 #%   - name: allow_restart_app
-#%     label: 准备时允许重启应用
+#%     label: 允许重启应用
 #%     type: bool
 #%     default: true
 # 仅供属性执行单元使用：按指定 Profile 的当前值选最小角色。

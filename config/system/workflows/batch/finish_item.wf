@@ -1,6 +1,6 @@
 #% parameters:
 #%   - name: stop_app
-#%     label: 结束时直接停止应用
+#%     label: 直接停止应用
 #%     type: bool
 #%     default: false
 # 批量条目收尾：默认退出当前角色并回到登录页。

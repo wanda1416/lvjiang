@@ -238,6 +238,27 @@ class AdbDevice:
             return False
         return True
 
+    def install(self, apk_path: str, *, timeout: float = 300.0) -> str:
+        """`adb install -r` 装包。失败抛 RuntimeError，消息里带 adb 的原话。
+
+        -r 保留数据升级；不加 -d（不允许降级）——降级装不上是对的，那通常意味着
+        用户拿了个更旧的包，静默允许只会把问题推到运行期。
+        """
+        logger.info(f"[ADB] 安装 APK: {apk_path}")
+        try:
+            result = subprocess.run(
+                [*self._base(), "install", "-r", str(apk_path)],
+                capture_output=True, text=True, timeout=timeout,
+                **SUBPROCESS_NO_WINDOW,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"adb install 超时（{timeout:.0f}s）") from exc
+        output = f"{result.stdout}\n{result.stderr}".strip()
+        # adb install 偶尔返回码为 0 却只在输出里报失败，所以两边都看
+        if result.returncode != 0 or "Success" not in output:
+            raise RuntimeError(output or f"adb install 失败（{result.returncode}）")
+        return output
+
     def start_shell_process(self, *args: str) -> subprocess.Popen:
         """启动一个 adb shell 子进程（历史用于常驻 minicap/minitouch，现保留为兼容桩）"""
         return subprocess.Popen(

@@ -49,6 +49,7 @@ READONLY_TRANSIENT_PATHS: frozenset[tuple[str, ...]] = frozenset({
     ("settings", "env"),
     ("daily", "workflow_id"),
     ("profile", "overview_active_group"),
+    ("ui_state", "batch"),
     ("ui_state", "main_page"),
     ("ui_state", "scene_editor"),
     ("ui_state", "reference_manager"),

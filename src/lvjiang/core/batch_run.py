@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 
@@ -165,8 +166,8 @@ class BatchRunDraft:
 # ─── session.json 的 ui_state.batch ─────────────────────────
 #
 # 放在 ui_state 下而不是新开顶层节点：它就是页面状态，和窗口尺寸、日常页选中项
-# 同一性质。`update_node` 的一级浅合并正好只替换 ui_state 里的 "batch" 这一个 key，
-# 不会碰到 main_page 那些别人写的字段。
+# 同一性质。batch 内部还有活动组和多份草稿，写入必须在 SessionStore 锁内修改
+# 最新节点；先 get 再整体 update 会让两个实例用各自的旧快照互相覆盖。
 
 _UI_STATE_KEY = "ui_state"
 _BATCH_SECTION = "batch"
@@ -180,11 +181,18 @@ def _batch_section() -> dict:
     return section if isinstance(section, dict) else {}
 
 
-def _write_batch_section(section: dict) -> None:
+def _mutate_batch_section(mutator: Callable[[dict], None]) -> None:
     from .config.session import get_session_store
 
-    get_session_store().update_node(
-        _UI_STATE_KEY, {_BATCH_SECTION: section})
+    def _merge(old: object) -> dict:
+        state = dict(old) if isinstance(old, dict) else {}
+        current = state.get(_BATCH_SECTION)
+        section = dict(current) if isinstance(current, dict) else {}
+        mutator(section)
+        state[_BATCH_SECTION] = section
+        return state
+
+    get_session_store().mutate_node(_UI_STATE_KEY, _merge)
 
 
 def active_group_id() -> str:
@@ -194,9 +202,10 @@ def active_group_id() -> str:
 
 
 def set_active_group_id(group_id: str) -> None:
-    section = _batch_section()
-    section["active_group_id"] = str(group_id or "")
-    _write_batch_section(section)
+    def _set(section: dict) -> None:
+        section["active_group_id"] = str(group_id or "")
+
+    _mutate_batch_section(_set)
 
 
 def load_draft(group_id: str) -> BatchRunDraft:
@@ -210,23 +219,26 @@ def load_draft(group_id: str) -> BatchRunDraft:
 def save_draft(group_id: str, draft: BatchRunDraft) -> None:
     if not group_id:
         return
-    section = _batch_section()
-    drafts = section.get("drafts")
-    drafts = dict(drafts) if isinstance(drafts, dict) else {}
-    drafts[group_id] = draft.to_dict()
-    section["drafts"] = drafts
-    _write_batch_section(section)
+
+    def _save(section: dict) -> None:
+        drafts = section.get("drafts")
+        drafts = dict(drafts) if isinstance(drafts, dict) else {}
+        drafts[group_id] = draft.to_dict()
+        section["drafts"] = drafts
+
+    _mutate_batch_section(_save)
 
 
 def forget_drafts(keep_group_ids: list[str]) -> None:
     """删除配置组后清掉它的草稿，避免 session 里堆积孤儿数据。"""
-    section = _batch_section()
-    drafts = section.get("drafts")
-    if not isinstance(drafts, dict):
-        return
     keep = set(keep_group_ids)
-    pruned = {key: value for key, value in drafts.items() if key in keep}
-    if pruned == drafts:
-        return
-    section["drafts"] = pruned
-    _write_batch_section(section)
+
+    def _forget(section: dict) -> None:
+        drafts = section.get("drafts")
+        if not isinstance(drafts, dict):
+            return
+        section["drafts"] = {
+            key: value for key, value in drafts.items() if key in keep
+        }
+
+    _mutate_batch_section(_forget)

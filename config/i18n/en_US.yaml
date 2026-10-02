@@ -833,7 +833,6 @@ auto_strings:
   亮段计数: Bright-Segment Count
   仅上报匿名的运行环境信息，不含任何游戏内数据。: Only reports anonymous runtime environment info, no in-game data of any kind.
   仅剩基底视图时可用，取消后所有定义归为无视图区分: Only available with base view remaining; canceling merges all definitions into no-view distinction
-  仅启用一个条目时，直接执行所选脚本，不运行四个生命周期 wf: When only one entry is enabled, run the selected script directly, skipping the four lifecycle .wf hooks
   仅用于所列功能改进，不公开发布原始数据: Used only to improve the listed features; raw data is never published
   从场景 YAML 中删除 Panel 定义: Delete Panel definition from scene YAML
   从场景 YAML 中删除坐标点定义（meta 数据）: Delete coordinate point definition from scene YAML (meta data)
@@ -925,7 +924,6 @@ auto_strings:
   区域里接近目标色的像素比例 0–1，判断按钮亮没亮/在哪个界面: Fraction (0-1) of pixels in the region close to the target color; used to tell whether a button is lit / which screen is showing
   匿名使用数据收集: Anonymous Usage Data Collection
   单cell尺寸: Cell Size
-  单条目执行时跳过上述生命周期操作: Skip the lifecycle hooks above when running a single entry
   单步: Step
   单步…: Step…
   单步模式：在第一条语句前停住: 'Step Mode: pause before the first statement'
@@ -1194,14 +1192,12 @@ auto_strings:
   新建空间: New Space
   新建脚本: New Script
   新建配置: New Config
-  新建面板: New Panel
   新热键已保存，但当前进程重建全局监听失败；本次运行继续使用原热键，重启后将重试新设置。: New hotkeys were saved, but the current process failed to rebuild the global listener; this run keeps using the old hotkeys, and the new settings will be retried after restart.
   方向: Direction
   方向/区域: Direction/Region
   无主窗口，无法截图: No main window; cannot take a screenshot
   无主窗口，无法获取运行环境: No main window; cannot get the runtime environment
   无可用坐标: No Available Points
-  无可用面板: No Available Panels
   无场景改动: No Scene Changes
   ? '无截图
 
@@ -1246,8 +1242,6 @@ auto_strings:
   本项目仅供学习交流使用: This project is for learning and communication purposes only
   本项目完全开源免费: This project is fully open-source and free
   条目: Entry
-  条目准备 wf：: 'Entry Prep wf:'
-  条目收尾 wf：: 'Entry Wrap-up wf:'
   查看待上报数据: View Data to Be Reported
   校准模式: Calibration Mode
   '校准模式:': 'Calibration Mode:'
@@ -1357,7 +1351,6 @@ auto_strings:
   终点: End Point
   绑定坐标: Bind Point
   绑定网格: Bind Grid
-  绑定面板: Bind Panel
   结束: End
   结束任务: End Task
   结果集：: 'Result Set:'
@@ -1413,8 +1406,6 @@ auto_strings:
   识别全部字段: Recognize All Fields
   识别全部材料: Recognize All Materials
   识别文字: Recognize Text
-  该场景尚未定义任何 Panel，请先创建面板定义。: No Panel defined for this scene, please create a panel definition first.
-  该场景所有 Panel 定义都已绑定。: All Panel definitions for this scene are already bound.
   该场景所有 YAML 坐标点都已放置。: All YAML coordinate points for this scene have been placed.
   该场景所有 YAML 坐标点都已放置，无法再复制新坐标。: All YAML coordinate points for this scene have been placed, cannot copy new points.
   该坐标被方向引用，请先删除关联的方向。: This point is referenced by a direction, please delete the associated direction first.
@@ -1465,12 +1456,10 @@ auto_strings:
   退出批量: Exit Batch
   退出画布编辑: Exit Canvas Edit
   退出阈值: Exit Threshold
-  选择 wf 文件...: Select wf file...
   选择参考图片: Select Reference Image
   选择工作流文件: Select Workflow File
   选择脚本文件: Select Script File
   选择要放置的坐标点：: 'Select coordinate point to place:'
-  选择要绑定的 Panel：: 'Select Panel to bind:'
   通用视觉 RPA 引擎（支持插件扩展）: General-purpose vision RPA engine (plugin-extensible)
   通道下限: Channel Lower Bound
   遍历列表: Iterate List
@@ -1561,32 +1550,6 @@ auto_strings:
   可能因为网络原因，无法访问 {url} 获取更新，请检查网络设置后重试: The network may be unavailable. Unable to access {url} for updates; check your network settings and try again.
   可能因为网络原因，无法访问 {url} 获取公告，请检查网络设置后重试: The network may be unavailable. Unable to access {url} for announcements; check your network settings and try again.
   无法访问 {url} 获取更新：HTTP {code}: 'Unable to access {url} for updates: HTTP {code}'
-  subscene_create_grid: + Create Grid
-  subscene_new_ref: + New Reference
-  subscene_delete_ref: Delete Reference
-  subscene_delete_grid: Delete Grid
-  subscene_reusable: Reusable as Subscene
-  subscene_multiview_blocked: Multi-view scenes cannot become subscenes; disable multiple views first
-  subscene_name: Subscene
-  'subscene_label:': 'Subscene:'
-  subscene_ref_undefined: Subscene reference is undefined
-  subscene_ref_unbound: Subscene reference has no bound coordinates
-  subscene_no_bound_refs: Scene has no bound subscene references
-  subscene_target_invalid: Reference target is not a subscene
-  subscene_reference: Reference
-  subscene_all_bound: All references are bound, or no references have been created.
-  subscene_new_reference: New Reference
-  subscene_no_available_ref: No Available Reference
-  subscene_none: No Subscenes
-  subscene_confirm_delete_{key}: Delete reference {key}?
-  subscene_bind_ref: Bind Reference
-  subscene_bind_grid: Bind Grid
-  subscene_edit_ref: Edit Reference
-  subscene_grid: Grid
-  subscene_crop_canvas: Crop Canvas
-  subscene_set_failed: Setting Failed
-  subscene_mark_help: Mark the target scene as a reusable subscene in Scene Management first.
-  subscene_exit_crop_canvas: Exit Crop Canvas
   '{filename} 的 kind 无效: {kind}；可选 {allowed}': '{filename} has an invalid kind: {kind}; allowed: {allowed}'
   '{label}: 五维词条需在 stats 中显式指定维度，不支持 full_affix': '{label}: dimension affixes must name the dimension in stats; full_affix is not supported'
   '{label}: 公式引用了未知源字段 {source}': '{label}: formula references unknown source field {source}'

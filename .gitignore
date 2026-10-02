@@ -43,6 +43,7 @@ src/lvjiang/apps/premium
 /data/video
 /data/picture
 /data/temp*
+/data/apk
 
 # OS
 Thumbs.db

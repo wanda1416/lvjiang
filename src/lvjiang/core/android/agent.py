@@ -151,6 +151,32 @@ class AgentClient:
         return bool(self._status.get("shizuku_granted"))
 
     @property
+    def max_strokes(self) -> int | None:
+        """本机同时可注入的手势笔划上限；旧版 app 不上报时为 None。
+
+        它决定一条输入时间线能写几路并发触点。AOSP 为 10，厂商 ROM 可能不同，
+        所以只能问设备，不能假定。
+        """
+        value = self._status.get("max_strokes")
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def app_version(self) -> str:
+        """设备端 app 版本；旧版不上报时为空串。"""
+        return str(self._status.get("app") or "")
+
+    @property
+    def protocol_version(self) -> int | None:
+        value = self._status.get("protocol")
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    @property
     def calib_identity(self) -> bool:
         """设备端屏幕映射是否恒等（旧版 app 没这个字段时视为恒等）"""
         return bool(self._status.get("calib_identity", True))

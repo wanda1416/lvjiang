@@ -188,6 +188,11 @@ class MenuOpsMixin:
             lambda: MenuOpsMixin._open_task_history(self))
         tools_menu.addAction(daily_history)
 
+        mobile_device = QAction(tr("移动设备"), self)
+        mobile_device.triggered.connect(
+            lambda: MenuOpsMixin._open_mobile_device(self))
+        tools_menu.addAction(mobile_device)
+
         # ── 插件菜单（一个插件一个菜单，插在帮助之前）──
         registry = get_registry()
         for builder in registry.get("menu_builders", []):
@@ -256,6 +261,24 @@ class MenuOpsMixin:
         save_settings({"theme": theme})
 
     # ─── 对话框 ──────────────────────────────────────────────
+
+    def _open_mobile_device(self) -> None:
+        """工具 → 移动设备。
+
+        安卓的 APK、并发手势、设备端状态本来都在，只是没有入口；这里是那个入口。
+        非模态：用户要一边照着体检结论去手机上开权限，一边看结果。
+        """
+        from ..mobile import MobileDeviceDialog
+
+        existing = getattr(self, "_mobile_dialog", None)
+        if existing is not None and existing.isVisible():
+            existing.raise_()
+            existing.activateWindow()
+            return
+        dialog = MobileDeviceDialog(self, self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self._mobile_dialog = dialog
+        dialog.show()
 
     def _open_ocr_dialog(self):
         from ..ocr import OCRDialog

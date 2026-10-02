@@ -1,5 +1,6 @@
 package com.lvjiang.app
 
+import android.accessibilityservice.GestureDescription
 import android.net.LocalServerSocket
 import android.net.LocalSocket
 import android.os.Build
@@ -245,6 +246,10 @@ object AgentServer {
         put("app", BuildConfig.VERSION_NAME)
         put("sdk", Build.VERSION.SDK_INT)
         put("a11y", A11yBridge.isReady())
+        // 本机同时可注入的手势笔划上限：AOSP 为 10，厂商 ROM 可能不同。它直接
+        // 决定一条输入时间线能写几路并发触点，所以报上去让 PC 侧能提前拦，而不是
+        // 等用户跑到一半被 A11yService 拒绝。静态 API，不依赖无障碍是否开启。
+        put("max_strokes", GestureDescription.getMaxStrokeCount())
         put("shizuku", ShellBridge.isShizukuAlive())
         put("shizuku_granted", ShellBridge.hasPermission())
         // 屏幕映射：非恒等时 PC 端在连接日志里提示一句，免得用户不知道点击坐标被改写过

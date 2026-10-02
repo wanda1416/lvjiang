@@ -9,8 +9,9 @@ import pytest
 from PyQt6.QtCore import QEvent, QPointF, Qt
 from PyQt6.QtGui import QMouseEvent
 
-from lvjiang.core.layout_models import Region
+from lvjiang.core.layout_models import Panel, Point, Region
 from lvjiang.ui.scene_editor.canvas import RegionCanvas
+from lvjiang.ui.scene_editor.canvas_poi import PoiDrag
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -110,3 +111,64 @@ def test_clicking_blank_cancels_the_selection_without_leaving_a_region(
 
     assert canvas._group_selection == set()
     assert len(canvas._regions) == 3
+
+
+def test_dragging_a_selected_point_moves_the_whole_group(qtbot):
+    """点一个已入组的坐标点必须整组走。
+
+    坐标点、网格、引用各有自己的命中分支，一命中就 return 并启动单体拖动。
+    组分支排在它们后面时，这一下只会挪走被点中的那个点——这正是接入点
+    必须在那三条分支之前的原因。
+    """
+    canvas = _canvas(qtbot)
+    canvas.set_points([
+        Point("p1", 0.2, 0.5, 0.03),
+        Point("p2", 0.6, 0.5, 0.03),
+    ])
+    for key in ("p1", "p2"):
+        _send(canvas, QEvent.Type.MouseButtonPress,
+              canvas._point_center_widget(
+                  next(p for p in canvas.get_points() if p.key == key)),
+              _CTRL)
+    assert canvas._group_selection == {("point", "p1"), ("point", "p2")}
+
+    start = canvas._point_center_widget(
+        next(p for p in canvas.get_points() if p.key == "p1"))
+    moved = QPointF(start.x() + 40, start.y())
+    _send(canvas, QEvent.Type.MouseButtonPress, start, _NONE)
+    # 接入点正确时 POI 的命中分支根本不该被走到；它一旦接手就会置
+    # _poi_drag = MOVE_POINT，然后只挪这一个点
+    assert canvas._poi_drag == PoiDrag.NONE
+    assert canvas._group_drag_start is not None
+    _send(canvas, QEvent.Type.MouseMove, moved, _NONE)
+    _send(canvas, QEvent.Type.MouseButtonRelease, moved, _NONE)
+
+    points = {p.key: p for p in canvas.get_points()}
+    assert points["p1"].cx_ratio > 0.2, "被点中的点要动"
+    assert points["p2"].cx_ratio > 0.6, "同组的另一个点也要动"
+    assert points["p2"].cx_ratio - points["p1"].cx_ratio == pytest.approx(0.4)
+
+
+def test_dragging_a_selected_panel_moves_the_whole_group(qtbot):
+    """网格的命中分支同样排在组分支之后，一起守住。"""
+    canvas = _canvas(qtbot)
+    canvas.set_panels([
+        Panel("g1", 0.1, 0.6, 0.1, 0.1, rows=2, cols=2),
+        Panel("g2", 0.4, 0.6, 0.1, 0.1, rows=2, cols=2),
+    ])
+    for key in ("g1", "g2"):
+        panel = next(p for p in canvas.get_panels() if p.key == key)
+        _send(canvas, QEvent.Type.MouseButtonPress,
+              canvas._panel_rect_widget(panel).center(), _CTRL)
+    assert canvas._group_selection == {("panel", "g1"), ("panel", "g2")}
+
+    panel = next(p for p in canvas.get_panels() if p.key == "g1")
+    start = canvas._panel_rect_widget(panel).center()
+    moved = QPointF(start.x(), start.y() - 40)
+    _send(canvas, QEvent.Type.MouseButtonPress, start, _NONE)
+    _send(canvas, QEvent.Type.MouseMove, moved, _NONE)
+    _send(canvas, QEvent.Type.MouseButtonRelease, moved, _NONE)
+
+    panels = {p.key: p for p in canvas.get_panels()}
+    assert panels["g1"].y_ratio < 0.6 and panels["g2"].y_ratio < 0.6
+    assert panels["g2"].x_ratio - panels["g1"].x_ratio == pytest.approx(0.3)

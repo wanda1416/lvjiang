@@ -486,6 +486,37 @@ class CanvasInteractionMixin(CanvasCoordMixin):
             # 继续往下走，进入全局模式逻辑
 
         # ── Panel 移动/缩放介入 ──
+        # ── Ctrl 组选区 ──
+        #
+        # 必须排在引用、网格、坐标点的命中判定**之前**：那三条分支一命中
+        # 就 return 并启动自己的单体拖动，组分支放在后面时，点一个已经入组
+        # 的坐标点或网格只会挪走那一个。
+        #
+        # 同时排在「空白处拖拽新建区域」兜底分支之前。更前面的模板裁剪、
+        # 网格/引用放置、点击区域标定都有自己的待定状态与框选语义，已经先行
+        # return，Ctrl 在那里不生效——不按 Ctrl 的操作行为完全不变。
+        if self._edit_mode == EditMode.REGION:
+            ctrl = bool(
+                event.modifiers() & Qt.KeyboardModifier.ControlModifier)
+            if ctrl:
+                member = self._group_hit_any(pos)
+                if member is not None:
+                    self._group_toggle(member)
+                else:
+                    self._group_band_begin(pos)
+                self.update()
+                return
+            if self._group_selection:
+                if self._group_hit(pos) is not None:
+                    # 点选区内的成员只启动整组拖动，不收缩成单选（一点就散）
+                    self._group_drag_begin(pos)
+                    self.update()
+                    return
+                # 点到选区外的实体或空白画布：选区作废，继续走原有单体逻辑。
+                # 空白处按下紧接着进入新建区域分支，而不足 1% 的矩形在释放时
+                # 本来就被丢弃，所以「点空白处取消多选」不会留下垃圾区域。
+                self.clear_group_selection()
+
         if self._edit_mode == EditMode.REGION and self._subscene_refs:
             ref_idx, ref_handle = self._hit_subscene_ref_test(pos)
             if ref_idx >= 0:
@@ -559,33 +590,6 @@ class CanvasInteractionMixin(CanvasCoordMixin):
                 self.update()
                 return
             return
-
-        # ── Ctrl 组选区 ──
-        #
-        # 只在默认的区域编辑模式下介入，且排在「空白处拖拽新建区域」兜底
-        # 分支之前。模板裁剪、网格/引用放置、点击区域标定、画布编辑这些
-        # 有待定状态的模式各有自己的框选语义，上面已经先行返回，Ctrl 在
-        # 那里不生效——不按 Ctrl 的操作行为完全不变。
-        ctrl = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
-        if ctrl:
-            member = self._group_hit_any(pos)
-            if member is not None:
-                self._group_toggle(member)
-            else:
-                self._group_band_begin(pos)
-            self.update()
-            return
-        if self._group_selection:
-            inside = self._group_hit(pos)
-            if inside is not None:
-                # 点选区内的成员只启动整组拖动，不收缩成单选（一点就散）
-                self._group_drag_begin(pos)
-                self.update()
-                return
-            # 点到选区外的实体或空白画布：选区作废，继续走原有单体逻辑。
-            # 空白处按下紧接着会进入新建区域分支，而不足 1% 的矩形在释放时
-            # 本来就被丢弃，所以「点空白处取消多选」不会留下垃圾区域。
-            self.clear_group_selection()
 
         # ── 区域编辑模式（原有逻辑） ──
 

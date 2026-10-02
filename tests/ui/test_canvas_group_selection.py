@@ -8,7 +8,7 @@
 import pytest
 from PyQt6.QtCore import QPointF, QRectF
 
-from lvjiang.core.layout_models import Point, Region
+from lvjiang.core.layout_models import Arrow, Point, Region
 from lvjiang.ui.scene_editor.canvas_group import (
     GROUP_KINDS,
     CanvasGroupMixin,
@@ -23,10 +23,11 @@ class _Host(CanvasGroupMixin):
 
     SCALE = 100.0
 
-    def __init__(self, regions=(), points=(), panels=()):
+    def __init__(self, regions=(), points=(), panels=(), arrows=()):
         self._regions = list(regions)
         self._points = list(points)
         self._panels = list(panels)
+        self._arrows = list(arrows)
         self._snap_lines_x: list[float] = []
         self._snap_lines_y: list[float] = []
         self._press_pos = QPointF(0, 0)
@@ -287,3 +288,81 @@ def test_only_regions_points_and_panels_participate():
     """引用外框和方向不进组：前者内部实体跟外框走，后者跟两端的点走，
     进组都会被位移两次。"""
     assert GROUP_KINDS == ("region", "point", "panel")
+
+
+# ─── 方向跟随 ────────────────────────────────────────────
+
+
+def test_absolute_arrow_end_follows_its_point():
+    """定义在组内坐标点上的方向必须跟着走，否则整组挪完方向就全变了。
+
+    绝对态终点不绑任何实体，起点的点挪走之后方向向量就变了。
+    """
+    host = _Host(
+        points=[_point("p", 0.2, 0.2)],
+        arrows=[Arrow(key="a", from_key="p",
+                      to_cx_ratio=0.4, to_cy_ratio=0.3)])
+    host._group_selection = {("point", "p")}
+
+    host.drag(10, 5)
+
+    arrow = host._arrows[0]
+    point = host._points[0]
+    # 方向向量不变才叫「跟着走」
+    assert arrow.to_cx_ratio - point.cx_ratio == pytest.approx(0.2)
+    assert arrow.to_cy_ratio - point.cy_ratio == pytest.approx(0.1)
+
+
+def test_snapped_arrow_is_left_alone():
+    """吸附态终点绑在另一个点上：那个点在组里就自动跟随，不在组里就该被
+    拉长——两种情况都不该在这里动它。"""
+    host = _Host(
+        points=[_point("p", 0.2, 0.2), _point("q", 0.6, 0.6)],
+        arrows=[Arrow(key="a", from_key="p", to_key="q")])
+    host._group_selection = {("point", "p")}
+
+    host.drag(10, 0)
+
+    arrow = host._arrows[0]
+    assert arrow.to_key == "q"
+    assert arrow.to_cx_ratio is None and arrow.to_cy_ratio is None
+
+
+def test_arrow_whose_start_is_not_selected_does_not_move():
+    host = _Host(
+        points=[_point("p", 0.2, 0.2), _point("other", 0.7, 0.7)],
+        arrows=[Arrow(key="a", from_key="other",
+                      to_cx_ratio=0.9, to_cy_ratio=0.9)])
+    host._group_selection = {("point", "p")}
+
+    host.drag(10, 0)
+
+    assert host._arrows[0].to_cx_ratio == pytest.approx(0.9)
+
+
+def test_following_arrow_end_takes_part_in_the_group_bounds():
+    """终点贴边时整组一起停：否则终点被单独夹在 0..1 上，方向当场改变。"""
+    host = _Host(
+        points=[_point("p", 0.2, 0.2)],
+        arrows=[Arrow(key="a", from_key="p",
+                      to_cx_ratio=0.95, to_cy_ratio=0.2)])
+    host._group_selection = {("point", "p")}
+
+    host.drag(100, 0)   # 想右移 1.0，终点只剩 0.05 的余量
+
+    arrow = host._arrows[0]
+    point = host._points[0]
+    assert arrow.to_cx_ratio == pytest.approx(1.0)
+    assert point.cx_ratio == pytest.approx(0.25)
+    assert arrow.to_cx_ratio - point.cx_ratio == pytest.approx(0.75)
+
+
+def test_moving_a_following_arrow_marks_the_layout_dirty():
+    host = _Host(
+        points=[_point("p", 0.2, 0.2)],
+        arrows=[Arrow(key="a", from_key="p",
+                      to_cx_ratio=0.4, to_cy_ratio=0.2)])
+    host._group_selection = {("point", "p")}
+
+    assert host.drag(5, 0) is True
+    assert host.poi_changed == 1

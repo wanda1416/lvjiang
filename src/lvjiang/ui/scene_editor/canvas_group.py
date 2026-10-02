@@ -9,7 +9,10 @@
 - 选区按 ``(kind, key)`` 存，不存索引。表格那边已经为此踩过坑——视图过滤后
   row 不再对应场景定义的索引。选区指错实体的后果是把错的东西挪走。
 - 参与的实体只有区域、坐标和网格。引用外框的内部实体跟随外框整体变换，
-  ``to_key`` 型箭头跟两端的点走，它们进选区会被位移两次。
+  箭头没有「位置」只有两个端点，它们进选区会被位移两次。
+- 定义在组内坐标点上的**方向要跟着走**：吸附态（``to_key``）箭头两端都是点，
+  自动跟随；绝对态（``to_cx/to_cy``）的终点是一块自由坐标，必须显式跟着起点
+  的点一起平移，否则整组挪完方向就全变了。
 - 夹取按**组**做而不是逐个做。逐个夹时只要有一个成员撞到边界，组就被剪切
   变形，而这正是本功能要防的事。
 - 整组移动期间**不吸附**：成员之间互相吸附会直接破坏组内相对位置，向外部
@@ -41,7 +44,7 @@ class CanvasGroupMixin:
     """组选区与整组平移
 
     依赖主类提供:
-        _regions, _points, _panels,
+        _regions, _points, _panels, _arrows,
         _region_rect_widget(), _panel_rect_widget(),
         _point_center_widget(), _point_radius_pixels(),
         _widget_delta_to_canvas_norm(), _beyond_dead_zone(),
@@ -83,6 +86,23 @@ class CanvasGroupMixin:
                 if (kind, item.key) in self._group_selection:
                     found.append((kind, item.key, item))
         return found
+
+    def _group_following_arrows(self) -> list:
+        """终点要跟着组一起平移的箭头。
+
+        只有绝对态终点需要处理：它不跟任何实体绑定，起点的坐标点挪走之后
+        方向就变了。吸附态（``to_key``）的终点绑在另一个点上——那个点在组里
+        就自动跟随，不在组里就该被拉长，两种情况都不该在这里动。
+        """
+        selected_points = {
+            key for kind, key in self._group_selection if kind == "point"}
+        return [
+            arrow for arrow in self._arrows
+            if arrow.to_key is None
+            and arrow.to_cx_ratio is not None
+            and arrow.to_cy_ratio is not None
+            and arrow.from_key in selected_points
+        ]
 
     def _group_entity_rect(self, kind: str, item) -> QRectF:
         """成员在 widget 中的外接矩形（坐标点按圆的外接正方形算）。"""
@@ -197,6 +217,9 @@ class CanvasGroupMixin:
             else:
                 self._group_drag_orig[(kind, key)] = (
                     item.x_ratio, item.y_ratio)
+        for arrow in self._group_following_arrows():
+            self._group_drag_orig[("arrow_end", arrow.key)] = (
+                arrow.to_cx_ratio, arrow.to_cy_ratio)
 
     def _group_drag_bounds(self) -> tuple[float, float, float, float]:
         """组内允许的位移区间 (min_dx, max_dx, min_dy, max_dy)。
@@ -221,6 +244,15 @@ class CanvasGroupMixin:
                 lo_y, hi_y = -oy, 1 - item.h_ratio - oy
             min_dx, max_dx = max(min_dx, lo_x), min(max_dx, hi_x)
             min_dy, max_dy = max(min_dy, lo_y), min(max_dy, hi_y)
+        for arrow in self._group_following_arrows():
+            orig = self._group_drag_orig.get(("arrow_end", arrow.key))
+            if orig is None:
+                continue
+            # 跟随的终点也要进区间：否则整组贴边时终点会被单独夹在 0..1 上，
+            # 方向当场改变——而「方向跟着走」正是把它纳进来的理由
+            ox, oy = orig
+            min_dx, max_dx = max(min_dx, -ox), min(max_dx, 1 - ox)
+            min_dy, max_dy = max(min_dy, -oy), min(max_dy, 1 - oy)
         # 组比画布还大时区间会反过来，此时只能原地不动
         if min_dx > max_dx:
             min_dx = max_dx = 0.0
@@ -249,6 +281,12 @@ class CanvasGroupMixin:
             # 跨场景引用成员在本场景只保存位置覆盖，和单体移动一致
             if getattr(item, "is_reference", False):
                 item.position_overridden = True
+        for arrow in self._group_following_arrows():
+            orig = self._group_drag_orig.get(("arrow_end", arrow.key))
+            if orig is None:
+                continue
+            arrow.to_cx_ratio = orig[0] + dx
+            arrow.to_cy_ratio = orig[1] + dy
         # 整组移动不吸附，顺带确保上一次单体拖动留下的参考线不会残留
         self._snap_lines_x = []
         self._snap_lines_y = []
@@ -265,6 +303,11 @@ class CanvasGroupMixin:
             now = ((item.cx_ratio, item.cy_ratio) if kind == "point"
                    else (item.x_ratio, item.y_ratio))
             if now != orig:
+                changed = True
+        for arrow in self._group_following_arrows():
+            orig = self._group_drag_orig.get(("arrow_end", arrow.key))
+            if orig is not None and (arrow.to_cx_ratio,
+                                     arrow.to_cy_ratio) != orig:
                 changed = True
         self._group_drag_start = None
         self._group_drag_orig = {}

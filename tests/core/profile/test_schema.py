@@ -169,14 +169,27 @@ class TestLoadConfig:
         with pytest.raises(ValueError, match="非 dict"):
             _load_config()
 
-    def test_load_rejects_unregistered_quota_period(self, profile_env):
+    def test_load_ignores_unregistered_quota_period(self, profile_env):
+        """未注册周期的定义被忽略，但不让整个文件失效，也不被改动。
+
+        周期可以由插件注册，核心算不出边界的定义不能进索引（否则后台 tick 会
+        持续失败），但为此判定整个 profile.yaml 无效会让所有 Profile 功能一起
+        瘫掉——而问题只在一条定义上。完整契约见
+        tests/core/profile/test_unknown_definitions.py。
+        """
         _write_profile_yaml(profile_env, {
             "quota": [
+                {"key": "ok", "label": "正常", "period": "week"},
                 {"key": "event", "label": "活动", "period": "missing_event"},
             ],
         })
-        with pytest.raises(ValueError, match="未注册周期"):
-            _load_config()
+
+        schema = _load_config()
+
+        assert [kd.key for kd in schema.get_all_keys()] == ["ok"]
+        assert schema.get_key("event") is None
+        assert schema.ignored_by_model["quota"][0][1]["period"] == (
+            "missing_event")
 
     def test_load_skips_empty_key(self, profile_env):
         """key 为空的条目被过滤（不报错）"""

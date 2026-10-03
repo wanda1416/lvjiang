@@ -1,8 +1,25 @@
 #% name: 页面状态判断子过程集合
 
 # 底层页面状态判断库。
-# 只负责识别当前所在页面，不执行导航或点击动作。
+# 只负责识别当前所在页面，不执行导航或点击动作；除 scan/find 外无副作用。
+# 判定全部基于文本/图像命中：命中即「在」，读不到就是「不在」，不抛异常、不重试。
+#
+# 包含过程（均为纯判定，返回 1=在 / 0=不在）：
+#   is_in_main_page()        — 是否在主界面
+#   is_in_menu_page()        — 是否在菜单页
+#   is_in_bag_page()         — 是否在背包页（不区分 tab）
+#   is_in_equip_tune_page()  — 是否在装备调律页
+#   is_in_role_select_page() — 是否在登录页的角色选择视图
+#   is_in_haoling_page()     — 是否在江湖号令页
 
+# ─── is_in_main_page ──────────────────────────────────────
+# 是否在主界面。
+#
+# 参数：无
+# 前置：无，任意页面均可调用。
+# 后置：无副作用（只截图识别），不切换页面。
+# 返回：1=在主界面；0=不在主界面。
+# 判据：主界面入口（菜单/活动/武林录/限时）命中任一，且 is_in_bag_page() 为 0。
 def is_in_main_page()
     eval $main_items = ["菜单", "活动", "武林录", "限时"]
     scan [game_main_page].[menu, huodong, wulinlu, xianshi] as $found by contains_any $main_items
@@ -15,6 +32,14 @@ def is_in_main_page()
     return 0
 end
 
+# ─── is_in_menu_page ──────────────────────────────────────
+# 是否在菜单页。
+#
+# 参数：无
+# 前置：无。
+# 后置：无副作用。
+# 返回：1=在菜单页；0=不在。
+# 判据：菜单项「包裹」「培养」命中任一。
 def is_in_menu_page()
    eval $menu_items = ["包裹", "培养"]
    scan [game_menu_page].[baoguo, peiyang] as $found by contains_any $menu_items
@@ -25,6 +50,14 @@ def is_in_menu_page()
    end
 end
 
+# ─── is_in_bag_page ───────────────────────────────────────
+# 是否在背包页（不区分当前 tab）。
+#
+# 参数：无
+# 前置：无。
+# 后置：无副作用。
+# 返回：1=在背包页；0=不在。
+# 判据：制造、整理或任一 tab 文案（培养/道具/任务/钱袋）命中。
 def is_in_bag_page()
    eval $bag_items = ["制造", "整理", "培养", "道具", "任务", "钱袋"]
    scan [bag_detail].[zhizao, zhengli, sub_baoguo] as $found by contains_any $bag_items
@@ -35,8 +68,15 @@ def is_in_bag_page()
    end
 end
 
-# 调律页底部动作会随装备状态显示「词库预览」「调律」或「定音」，
-# 不能作为页面判据。左上角固定标签进入页面后必然显示「装备调律」。
+# ─── is_in_equip_tune_page ────────────────────────────────
+# 是否在装备调律页。
+#
+# 参数：无
+# 前置：无。
+# 后置：无副作用。
+# 返回：1=在装备调律页；0=不在。
+# 判据：左上角固定标签「装备调律」。调律页底部动作会随装备状态显示
+# 「词库预览」「调律」或「定音」，不能作为页面判据；固定标签进入页面后必然显示。
 def is_in_equip_tune_page()
    scan [equip_tune_detail].[tune_label] as $found by contains "装备调律"
    if $found
@@ -46,9 +86,15 @@ def is_in_equip_tune_page()
    end
 end
 
+# ─── is_in_role_select_page ───────────────────────────────
 # 角色选择视图是否已打开。
-# 判据取「进入游戏」按钮：场景定义里 enter 属于 roles 视图，
-# 而「选择角色」标签在基底视图常驻，登录没完成时也读得到，不能当判据。
+#
+# 参数：无
+# 前置：无（登录页基底视图或角色选择视图都能调用）。
+# 后置：无副作用。
+# 返回：1=已进入角色选择视图；0=没有。
+# 判据：场景定义里 enter（「进入游戏」）属于 roles 视图；而「选择角色」标签在
+# 基底视图常驻，登录没完成时也读得到，不能当判据。
 def is_in_role_select_page()
     scan [game_login_page].[enter] as $found by contains "进入游戏"
     if $found
@@ -58,7 +104,14 @@ def is_in_role_select_page()
     end
 end
 
-# 同时扫描页面标题和“当周获取号令”，避免单个标题区域偶发识别失败。
+# ─── is_in_haoling_page ───────────────────────────────────
+# 是否在江湖号令页。
+#
+# 参数：无
+# 前置：无。
+# 后置：无副作用。
+# 返回：1=在江湖号令页；0=不在。
+# 判据：同时扫描页面标题和「当周获取号令」，避免单个标题区域偶发识别失败。
 def is_in_haoling_page()
    scan [activity_jianghu].[label_0, haoling_label] as $found by contains "号令"
    if $found

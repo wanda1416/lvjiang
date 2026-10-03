@@ -1,13 +1,26 @@
 #% name: 视觉状态判断子过程
 
-# 基于区域像素的通道关系判断业务视觉状态。
+# 基于区域像素的通道关系判断业务视觉状态：不依赖 OCR 文案，所以不受字库和
+# 文案改动影响；代价是阈值与采样步长必须按区域标定，比例落在中间带时要如实
+# 返回 unknown，把「不确定」交给调用方处理，而不是猜一个结果。
+#
+# 包含过程：
+#   detect_jianghu_reward_state      — 江湖号令奖励状态（unclaimed / claimed / unknown）
+#   detect_jianghu_card_reward_state — 指定一张号令卡片的奖励状态
+#   detect_equipment_lock_state      — 装备锁定状态（locked / unlock / unknown）
 
-# 江湖号令奖励状态。仅在刷新图标消失、任务已完成后调用；正常任务
-# 同样没有金光，单凭本过程不能判断任务是否完成。
-# label_region 应传入任务卡的 label 区域，例如：
-#   [activity_jianghu].[card_1].[label]
-# 待领取奖励的金色光效随亮度变化，因此使用 R/G/B 相对关系。
-# 返回 unclaimed / claimed / unknown；不确定时禁止点击领奖。
+# ─── detect_jianghu_reward_state ──────────────────────────
+# 江湖号令奖励状态：按 label 区域的金光覆盖比例区分待领取与已领取。
+#
+# 参数：
+#   $label_region — 任务卡的 label 区域，例如 [activity_jianghu].[card_1].[label]
+# 前置：仅在刷新图标消失、任务已完成后调用。
+# 后置：无副作用（只截图算比例），不点击领奖。
+# 返回：unclaimed / claimed / unknown。
+#
+# 正常任务同样没有金光，单凭本过程不能判断任务是否完成。
+# 待领取奖励的金色光效随亮度变化，因此使用 R/G/B 相对关系而不是绝对色值；
+# 比例落在中间带时返回 unknown，此时禁止点击领奖。
 def detect_jianghu_reward_state($label_region)
     eval $ratios = pixel_ratios($label_region, {
         "gold": {
@@ -26,6 +39,16 @@ def detect_jianghu_reward_state($label_region)
     return "unknown"
 end
 
+# ─── detect_jianghu_card_reward_state ─────────────────────
+# 指定号令卡片的奖励状态：把卡片 key 换成对应的 label 区域后转交
+# detect_jianghu_reward_state 判定。
+#
+# 参数：
+#   $card — 卡片 key，取 "card_1"…"card_6"
+# 前置：同 detect_jianghu_reward_state（刷新图标已消失、任务已完成）。
+# 后置：无副作用。
+# 返回：unclaimed / claimed / unknown；$card 不是六张卡之一时返回 unknown。
+#
 # 子场景引用可以在 scan/click 中动态选取，表达式中的区域引用必须使用
 # 静态 key；这里仅负责将六个卡片 key 转为各自的 label 区域。
 def detect_jianghu_card_reward_state($card)
@@ -48,10 +71,18 @@ def detect_jianghu_card_reward_state($card)
     return $state
 end
 
-# 装备锁定状态。
-# lock_region 应传入 [equip_detail].[lock]。阈值与当前 Python 判定保持一致：
-# 先确认区域有足够前景，再按红色主导像素比例区分锁定与未锁定。
-# 返回 locked / unlock / unknown。
+# ─── detect_equipment_lock_state ──────────────────────────
+# 装备锁定状态：先确认区域有足够前景，再按红色主导像素比例区分锁定与未锁定。
+#
+# 参数：
+#   $lock_region — 装备详情页的锁定区域，应传入 [equip_detail].[lock]
+# 前置：已经停在装备详情页。
+# 后置：无副作用（只截图算比例），不点击锁定开关。
+# 返回：locked / unlock / unknown。
+#
+# 阈值与当前 Python 判定（classify_lock_status）保持一致；前景不足或比例落在
+# 中间带时返回 unknown。生产路径走内建函数 equipment_lock_status，本过程目前
+# 仅用于独立验证，见 docs/30-architecture/32-grammar/06.4-vision-functions.md。
 def detect_equipment_lock_state($lock_region)
     eval $ratios = pixel_ratios($lock_region, {
         "foreground": {

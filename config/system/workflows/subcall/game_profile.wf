@@ -11,13 +11,17 @@
 #
 # Profile 定义由 subcall/profile_registry.wf 统一负责。
 
-# ─── 解析并同步每周进度 ──────────────────────────────────
+# ─── sync_weekly_progress ─────────────────────────────────
+# 解析「已获取/总量」周进度并同步进 profile，按本周期单调规则过滤脏数据。
+#
 # 参数：
 #   $raw   — 仅包含进度区域的 OCR 原文，例如 "@0/1500"
 #   $key   — 对应的 quota profile key
 #   $last  — 本轮上次有效值；首次读取传 -1
 #   $label — 日志名称
 #   $source — 写入 Profile 历史的业务来源
+# 前置：调用方已 scan 到只含进度区域的原文；页面位置与其它字段本过程不关心。
+# 后置：命中时把值写入 $key 对应的 profile（含历史来源 $source），不改变页面。
 # 返回：最终采用的进度；OCR 与 profile 均无有效值时返回 $last
 def sync_weekly_progress($raw, $key, $last, $label, $source)
     eval $progress = extract_progress($raw)
@@ -64,7 +68,9 @@ def sync_weekly_progress($raw, $key, $last, $label, $source)
     return $last
 end
 
-# ─── 解析周库存剩余量并同步已消耗配额 ─────────────────────
+# ─── sync_weekly_remaining ────────────────────────────────
+# 解析「剩余/总量」周库存并换算成已消耗量写入 profile，分母不符或回退时拒绝同步。
+#
 # 参数：
 #   $raw            — 仅包含库存区域的 OCR 原文，例如 "600/600"
 #   $key            — 记录本周已消耗数量的 quota profile key
@@ -72,6 +78,8 @@ end
 #   $expected_total — 固定周库存上限；OCR 分母不一致时拒绝同步
 #   $label          — 日志名称
 #   $source         — 写入 Profile 历史的业务来源
+# 前置：调用方已 scan 到只含库存区域的原文；库存上限由调用方按业务常量传入。
+# 后置：命中时把已消耗量写入 $key 对应的 profile，不改变页面。
 # 返回：最终采用的已消耗量；OCR 与 profile 均无有效值时返回 $last
 def sync_weekly_remaining($raw, $key, $last, $expected_total, $label, $source)
     eval $progress = extract_progress($raw)

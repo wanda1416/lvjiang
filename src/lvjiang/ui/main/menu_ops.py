@@ -455,8 +455,14 @@ class MenuOpsMixin:
         self._user_config.android_apps = apps
         # 正在持有的引擎也可能稍后才执行 app 指令；同步替换并清除绑定旧
         # 注册表的控制器。新建引擎则会直接使用上面的最新 UserConfig。
-        engine = getattr(self, "_current_engine", None)
-        if engine is not None:
+        manager = getattr(self, "_run_manager", None)
+        engines = (
+            [run.engine for run in manager.all_runs() if run.engine is not None]
+            if manager is not None else [])
+        if not engines:
+            engine = getattr(self, "_current_engine", None)
+            engines = [engine] if engine is not None else []
+        for engine in engines:
             engine._android_apps = dict(apps)
             engine._android_app_controller = None
             engine._app_controller = None

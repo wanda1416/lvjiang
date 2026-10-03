@@ -30,7 +30,7 @@
 | [19-canvas-group-selection.md](19-canvas-group-selection.md) | 画布组选区：Ctrl 多选与整组平移、修饰键语义 | ✅ 已实现 |
 | [19-build-calculator.md](19-build-calculator.md) | 出装搭配、角色模拟计算器及总词条合法分配 | 已实现；不含自动调律联动 |
 | [20-execution-targets.md](20-execution-targets.md) | 单窗口、多设备连接与显式执行目标 | ✅ 第一阶段已实现 |
-| [21-concurrent-target-execution.md](21-concurrent-target-execution.md) | 多执行目标并发任务、断线恢复与 Lv1 授权边界 | 需求已确认，尚未实现 |
+| [21-concurrent-target-execution.md](21-concurrent-target-execution.md) | 多执行目标并发任务、断线恢复与 Lv1 授权边界 | ✅ 已实现（待多设备实机验收） |
 
 ## 子需求
 

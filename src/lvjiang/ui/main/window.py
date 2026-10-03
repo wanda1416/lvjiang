@@ -79,7 +79,7 @@ from .window_ops import WindowOpsMixin, bg_capture_tip
 
 class _LogBridge(QObject):
     """信号桥：将后台线程的日志安全转发到主线程"""
-    append_log = pyqtSignal(str)
+    append_log = pyqtSignal(object)
 
 
 DEFAULT_TITLE = tr("律匠 - 通用视觉 RPA 引擎")
@@ -282,6 +282,8 @@ class MainWindow(
     _scrcpy_frame_ready = pyqtSignal(str, object)
     # 宿主信号：自动化状态（含暂停中/结束中过渡态）与用户切换
     automation_state_changed = pyqtSignal(str)
+    run_instance_state_changed = pyqtSignal(str, str, str)
+    concurrency_changed = pyqtSignal(int)
     user_changed = pyqtSignal(str)
     # app 业务事件统一走带命名空间的 AppEvent 信封。
     app_event = pyqtSignal(object)
@@ -306,8 +308,7 @@ class MainWindow(
         from .execution_runs import ExecutionRunManager
         self._run_manager = ExecutionRunManager(
             lv1_check=lambda: has_feature("lv1"),
-            # 迁移完成以前保持现有单任务产品门禁。
-            parallel_enabled=False,
+            parallel_enabled=True,
         )
         self._current_run_context = None
         self._candidate_backend = "windows"
@@ -343,7 +344,8 @@ class MainWindow(
         self._backend = None
         self._cleanup_callbacks: list = []  # 插件注册的关闭时清理回调
         # 左侧批量页早于右侧日志页构建；脚本配置告警可能在此期间产生。
-        self._log_buffer: list[tuple[int, str]] = []
+        from .run_logs import RunLogEvent
+        self._log_buffer: list[RunLogEvent] = []
         self._log_min_level = 20
 
         # ── OCR / 输入 ──
@@ -906,9 +908,9 @@ class MainWindow(
         self.log_text = TrimmedLogEdit()
         self.log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 12px;")
         log_layout.addWidget(self.log_text, 1)
-        for level, text in self._log_buffer:
-            if level >= self._log_min_level:
-                self.log_text.append(text)
+        for event in self._log_buffer:
+            if event.level >= self._log_min_level:
+                self.log_text.append(event.text)
 
         # 底部级别过滤栏
         filter_bar = QHBoxLayout()
@@ -918,6 +920,13 @@ class MainWindow(
         apply_button_style(self._btn_clear_log, variant="neutral")
         self._btn_clear_log.clicked.connect(self._clear_log)
         filter_bar.addStretch()
+        self._log_scope_combo = QComboBox()
+        self._log_scope_combo.addItem(tr("全部任务"), "all")
+        self._log_scope_combo.addItem(tr("当前目标"), "target")
+        self._log_scope_combo.currentIndexChanged.connect(
+            self._redraw_log_events)
+        fit_combo_popup_to_contents(self._log_scope_combo)
+        filter_bar.addWidget(self._log_scope_combo)
         filter_bar.addWidget(QLabel(tr("日志级别")))
         self._log_level_combo = QComboBox()
         self._log_level_combo.addItem("DEBUG", 10)
@@ -997,8 +1006,17 @@ class MainWindow(
 
     @property
     def is_running(self) -> bool:
-        """当前是否有自动化在运行"""
+        """当前查看的执行目标是否有自动化在运行。"""
         return self._running
+
+    @property
+    def is_any_running(self) -> bool:
+        """进程内是否仍有任意执行目标在运行。"""
+        return self._run_manager.is_any_running()
+
+    def run_for_target(self, target_id: str):
+        """返回执行目标当前占用的运行实例。"""
+        return self._run_manager.run_for_target(target_id)
 
     def request_stop(self):
         """请求停止当前自动化（等价 F10）"""
@@ -1012,30 +1030,42 @@ class MainWindow(
         """向运行日志面板追加一行消息"""
         self._log_append(text)
 
-    def _log_append(self, text: str):
+    def _log_append(self, value):
         """带级别检测的日志追加：缓冲全部，按当前级别过滤显示"""
-        import logging
-        # 支持两种格式：[LEVEL] 前缀 或 loguru 格式 "| LEVEL"
-        prefix = text[:40]
-        if text.startswith("[ERROR]") or "| ERROR" in prefix:
-            level = logging.ERROR
-        elif text.startswith("[WARNING]") or "| WARNING" in prefix:
-            level = logging.WARNING
-        elif text.startswith("[DEBUG]") or "| DEBUG" in prefix:
-            level = logging.DEBUG
+        from .run_logs import RunLogEvent
+        if isinstance(value, RunLogEvent):
+            event = value
+            text = event.text
         else:
-            level = logging.INFO
-        self._log_buffer.append((level, text))
-        if level >= self._log_min_level and hasattr(self, "log_text"):
-            self.log_text.append(text)
+            text = str(value)
+            event = RunLogEvent.from_text(text)
+        self._log_buffer.append(event)
+        if (event.level >= self._log_min_level
+                and MainWindow._log_event_visible(self, event)
+                and hasattr(self, "log_text")):
+            self.log_text.append(event.display_text())
+
+    def _log_event_visible(self, event) -> bool:
+        scope = (self._log_scope_combo.currentData()
+                 if hasattr(self, "_log_scope_combo") else "all")
+        if scope != "target":
+            return True
+        target_id = self._execution_targets.active_target_id
+        return bool(target_id and event.target_id == target_id)
+
+    def _redraw_log_events(self) -> None:
+        if not hasattr(self, "log_text"):
+            return
+        self.log_text.clear()
+        for event in self._log_buffer:
+            if (event.level >= self._log_min_level
+                    and MainWindow._log_event_visible(self, event)):
+                self.log_text.append(event.display_text())
 
     def _on_log_level_changed(self):
         """日志级别切换：更新阈值，重建显示"""
         self._log_min_level = self._log_level_combo.currentData()
-        self.log_text.clear()
-        for level, text in self._log_buffer:
-            if level >= self._log_min_level:
-                self.log_text.append(text)
+        MainWindow._redraw_log_events(self)
 
     def _clear_log(self):
         """清空本窗口日志记录及可见文本，避免切换级别时重新出现。"""
@@ -1050,7 +1080,16 @@ class MainWindow(
             def __init__(self, bridge):
                 self._bridge = bridge
             def write(self, message):
-                self._bridge.append_log.emit(message.strip())
+                from .run_logs import RunLogEvent
+                record = message.record
+                extra = record["extra"]
+                self._bridge.append_log.emit(RunLogEvent(
+                    level=int(record["level"].no),
+                    text=str(message).strip(),
+                    task_run_id=str(extra.get("task_run_id") or ""),
+                    target_id=str(extra.get("target_id") or ""),
+                    target_label=str(extra.get("target_label") or ""),
+                ))
 
         sink = QtSink(self._log_bridge)
         logger.add(sink, level="DEBUG", format="{time:HH:mm:ss} | {level:<7} | {message}")
@@ -1085,7 +1124,9 @@ class MainWindow(
                 tr("[错误] 当前环境不支持以下脚本：") + "、".join(unsupported))
             return False
 
-        if not self._begin_automation(tr("批量执行")):
+        # 批量运行不绑定某一个用户名；条目级跨目标互斥仍由 BatchWorker
+        # 获取用户执行锁，并按既有语义记录跳过原因后继续。
+        if not self._begin_automation(tr("批量执行"), username=""):
             return False
 
         run_context = self._current_run_context
@@ -1114,6 +1155,11 @@ class MainWindow(
 
         from ..batch import BatchContext, BatchWorker
 
+        def rebind_batch_window(
+            window: dict, target_id: str = run_context.target_id,
+        ) -> None:
+            self._on_target_window_rebound(target_id, window)
+
         ctx = BatchContext(
             capture=target_snapshot.capture,
             ocr=run_context.ocr,
@@ -1122,6 +1168,7 @@ class MainWindow(
             target_id=target_snapshot.id,
             target_kind=target_snapshot.kind,
             target_label=target_snapshot.display_name,
+            task_run_id=run_context.task_run_id,
             input_kind=target_snapshot.input_kind,
             layout_name=str(layout_name or ""),
             run_env=run_env,
@@ -1133,7 +1180,7 @@ class MainWindow(
             window_top=window_top,
             pause_event=getattr(self, '_pause_event', None),
             ui_callback=self._create_ui_callback(run_context),
-            window_rebind_hook=self._on_target_window_rebound,
+            window_rebind_hook=rebind_batch_window,
         )
 
         worker = BatchWorker(
@@ -1143,13 +1190,31 @@ class MainWindow(
             stop_check=stop_check,
         )
         run_context.worker = worker
-        self._batch_tab.apply_task_plan(worker.task_plan_snapshot())
+        run_context.metadata["batch"] = True
+        self._batch_tab.bind_run(run_context.task_run_id)
+        self._batch_tab.apply_run_task_plan(
+            run_context.task_run_id, worker.task_plan_snapshot())
 
         # 信号连接：进度 → batch_tab，日志 → log_text
         # （批量层显式传递用户，不再联动主页面用户下拉）
-        worker.progress.connect(self._batch_tab.update_progress)
-        worker.selected_task_plan.connect(self._batch_tab.apply_selected_unit_plan)
-        worker.log.connect(self._log_append)
+        worker.progress.connect(
+            lambda run_idx, label, script_id, status,
+            run_id=run_context.task_run_id:
+            self._batch_tab.update_run_progress(
+                run_id, run_idx, label, script_id, status))
+        worker.selected_task_plan.connect(
+            lambda run_idx, plan, run_id=run_context.task_run_id:
+            self._batch_tab.apply_run_selected_unit_plan(run_id, run_idx, plan))
+        from .run_logs import RunLogEvent
+        worker.log.connect(
+            lambda text, context=run_context: self._log_append(
+                RunLogEvent.from_text(
+                    str(text), task_run_id=context.task_run_id,
+                    target_id=context.target_id,
+                    target_label=context.target_snapshot.display_name,
+                )
+            )
+        )
         # finished_all 在 run() 尚未退出时发出；此时释放最后一个 QThread
         # 引用可能让 Qt 直接终止进程。等线程真正结束后再解锁界面。
         worker.finished.connect(
@@ -1174,10 +1239,11 @@ class MainWindow(
             logger.error(f"批量完成时找不到运行实例: {task_run_id}")
             return
         worker.wait()
-        self._batch_tab.on_batch_finished({})
         if run_context is None:
+            self._batch_tab.on_batch_finished({})
             self._end_automation(tr("批量执行"))
         else:
+            self._batch_tab.finish_run(task_run_id)
             self._end_automation(tr("批量执行"), run_context=run_context)
 
     def _open_batch_config(self):

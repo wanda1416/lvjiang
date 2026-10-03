@@ -84,6 +84,13 @@ from .batch_runner import (
 )
 
 
+@dataclass
+class _BatchProgressState:
+    rows: list[tuple[int, str, str, str, str]]
+    plans: dict[tuple[int, str], PlannedTask]
+    terminal: bool = False
+
+
 def _status_color(status: str):
     """返回随主题变化的批量任务状态背景色。"""
     from PyQt6.QtGui import QColor
@@ -198,6 +205,8 @@ class BatchTab(QWidget):
         self._progress_row_context: dict[int, tuple[int, str]] = {}
         self._progress_task_plan: dict[tuple[int, str], PlannedTask] = {}
         self._params_popup: QFrame | None = None
+        self._run_progress: dict[str, _BatchProgressState] = {}
+        self._visible_run_id = ""
         # 三层状态在本页的落点：_item 是配置组定义（只读），_draft 是本次运行
         # 草稿（本页唯一可写的东西），_group_id 是两者的关联键。
         self._group_id: str = ""
@@ -1324,6 +1333,77 @@ class BatchTab(QWidget):
                  if planned.parameter_source == "user" else "")
                 + tr("点击查看本轮任务参数"))
 
+    def bind_run(self, task_run_id: str) -> None:
+        """将当前刚初始化的进度表绑定到运行实例。"""
+        rows: list[tuple[int, str, str, str, str]] = []
+        for row, context in self._progress_row_context.items():
+            run_idx, script_id = context
+            label_item = self._progress_table.item(row, 0)
+            script_item = self._progress_table.item(row, 1)
+            status_item = self._progress_table.item(row, 2)
+            rows.append((
+                run_idx, script_id,
+                label_item.text() if label_item else "",
+                script_item.text() if script_item else "",
+                status_item.text() if status_item else ST_PENDING,
+            ))
+        self._run_progress[task_run_id] = _BatchProgressState(
+            rows=rows, plans=dict(self._progress_task_plan))
+        self._visible_run_id = task_run_id
+
+    def show_run(self, task_run_id: str) -> None:
+        state = self._run_progress.get(task_run_id)
+        if state is None:
+            self._visible_run_id = ""
+            self._progress_table.setRowCount(0)
+            self._progress_row_index = {}
+            self._progress_row_context = {}
+            self._progress_task_plan = {}
+            self._running = False
+            self._refresh_run_button("idle")
+            self._set_config_enabled(True)
+            return
+        self._visible_run_id = task_run_id
+        self._progress_table.setRowCount(0)
+        self._progress_row_index = {}
+        self._progress_row_context = {}
+        self._progress_task_plan = dict(state.plans)
+        for run_idx, script_id, label, script_name, status in state.rows:
+            row = self._progress_table.rowCount()
+            self._progress_table.insertRow(row)
+            self._progress_row_index[(run_idx, script_id)] = row
+            self._progress_row_context[row] = (run_idx, script_id)
+            self._progress_table.setItem(row, 0, QTableWidgetItem(label))
+            self._progress_table.setItem(row, 1, QTableWidgetItem(script_name))
+            status_item = QTableWidgetItem(status)
+            color = _status_color(status)
+            if color is not None:
+                status_item.setBackground(color)
+            self._progress_table.setItem(row, 2, status_item)
+        self.apply_task_plan(state.plans)
+        self._running = not state.terminal
+        self._refresh_run_button("running" if self._running else "idle")
+        self._set_config_enabled(not self._running)
+
+    def apply_run_task_plan(
+        self, task_run_id: str, plan: dict[tuple[int, str], PlannedTask],
+    ) -> None:
+        state = self._run_progress.get(task_run_id)
+        if state is not None:
+            state.plans = dict(plan)
+        if self._visible_run_id == task_run_id:
+            self.apply_task_plan(plan)
+
+    def apply_run_selected_unit_plan(
+        self, task_run_id: str, run_idx: int,
+        plan: dict[tuple[int, str], PlannedTask],
+    ) -> None:
+        state = self._run_progress.get(task_run_id)
+        if state is not None:
+            state.plans.update(plan)
+        if self._visible_run_id == task_run_id:
+            self.apply_selected_unit_plan(run_idx, plan)
+
     def apply_selected_unit_plan(
         self, _run_idx: int, plan: dict[tuple[int, str], PlannedTask],
     ) -> None:
@@ -1430,6 +1510,20 @@ class BatchTab(QWidget):
         self._progress_table.setItem(row, 2, status_item)
         self._progress_table.scrollToItem(status_item)
 
+    def update_run_progress(
+        self, task_run_id: str, run_idx: int, entry_label: str,
+        script_id: str, status: str,
+    ) -> None:
+        state = self._run_progress.get(task_run_id)
+        if state is not None:
+            for index, row in enumerate(state.rows):
+                if row[0] == run_idx and row[1] == script_id:
+                    state.rows[index] = (
+                        row[0], row[1], entry_label or row[2], row[3], status)
+                    break
+        if self._visible_run_id == task_run_id:
+            self.update_progress(run_idx, entry_label, script_id, status)
+
     def _refresh_status_colors(self, _theme: str) -> None:
         """实时切换主题后重绘现有进度行。"""
         for row in range(self._progress_table.rowCount()):
@@ -1445,6 +1539,13 @@ class BatchTab(QWidget):
         self._running = False
         self._set_config_enabled(True)
         self._refresh_run_button("idle")
+
+    def finish_run(self, task_run_id: str) -> None:
+        state = self._run_progress.get(task_run_id)
+        if state is not None:
+            state.terminal = True
+        if self._visible_run_id == task_run_id:
+            self.on_batch_finished({})
 
     def refresh_config(self):
         """外部配置变更后调用，刷新配置 + 脚本 + 行列表"""

@@ -1,8 +1,8 @@
 # 任务历史与批量历史
 
-> 多目标并发所需的执行端快照字段与展示边界见
-> [21-concurrent-target-execution.md](21-concurrent-target-execution.md#9-任务历史与执行结果)；
-> 当前数据库尚未记录执行目标。
+> 执行端快照字段与展示边界见
+> [21-concurrent-target-execution.md](21-concurrent-target-execution.md#9-任务历史与执行结果)。
+> 当前数据库已记录单任务和批次绑定的执行目标。
 
 ## 1. 目标
 

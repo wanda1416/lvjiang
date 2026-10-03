@@ -9,6 +9,7 @@ from PyQt6.QtCore import QDate, QSize, Qt, QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QDateEdit,
     QDialog,
     QGridLayout,
@@ -216,10 +217,10 @@ class DailyHistoryDialog(QDialog):
         results_layout.addLayout(batch_filter_row)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
-        self._task_table = QTableWidget(0, 10)
+        self._task_table = QTableWidget(0, 11)
         self._task_table.setHorizontalHeaderLabels([
             tr("开始时间"), tr("结束时间"), tr("耗时"), tr("用户"),
-            tr("任务"), tr("性质"), tr("方式"), tr("状态"),
+            tr("执行目标"), tr("任务"), tr("性质"), tr("方式"), tr("状态"),
             tr("任务记录 ID"), tr("批量记录 ID"),
         ])
         self._configure_table(self._task_table)
@@ -278,13 +279,17 @@ class DailyHistoryDialog(QDialog):
         self._batch_query_button = QPushButton(tr("查询"))
         self._batch_query_button.clicked.connect(self.refresh_batches)
         controls.addWidget(self._batch_query_button)
+        controls.addWidget(QLabel(tr("执行目标")))
+        self._batch_target_kind = self._build_target_kind_combo()
+        controls.addWidget(self._batch_target_kind)
         controls.addStretch(1)
         layout.addLayout(controls)
 
-        self._batch_table = QTableWidget(0, 8)
+        self._batch_table = QTableWidget(0, 9)
         self._batch_table.setHorizontalHeaderLabels([
             tr("开始时间"), tr("结束时间"), tr("耗时"), tr("配置"),
-            tr("状态"), tr("任务数"), tr("批量记录 ID"), tr("批量报告"),
+            tr("执行目标"), tr("状态"), tr("任务数"), tr("批量记录 ID"),
+            tr("批量报告"),
         ])
         self._configure_table(self._batch_table)
         self._batch_table.itemSelectionChanged.connect(self._show_selected_batch)
@@ -328,11 +333,23 @@ class DailyHistoryDialog(QDialog):
         self._end_date.setCalendarPopup(True)
         self._end_date.setDisplayFormat("yyyy-MM-dd")
         layout.addWidget(self._end_date, 1, 1)
+        layout.addWidget(QLabel(tr("执行目标")), 2, 0)
+        self._task_target_kind = self._build_target_kind_combo()
+        layout.addWidget(self._task_target_kind, 2, 1)
         self._query_button = QPushButton(tr("查询"))
         self._query_button.clicked.connect(self.refresh_tasks)
-        layout.addWidget(self._query_button, 2, 0, 1, 2)
+        layout.addWidget(self._query_button, 3, 0, 1, 2)
         apply_button_style(self._query_button, variant="action")
         return widget
+
+    @staticmethod
+    def _build_target_kind_combo() -> QComboBox:
+        combo = QComboBox()
+        combo.addItem(tr("全部"), None)
+        combo.addItem(tr("窗口"), "windows")
+        combo.addItem(tr("设备"), "adb")
+        combo.addItem(tr("未记录"), "")
+        return combo
 
     @staticmethod
     def _configure_table(table: QTableWidget) -> None:
@@ -392,6 +409,7 @@ class DailyHistoryDialog(QDialog):
                 task_ids=[str(item.data(Qt.ItemDataRole.UserRole))
                           for item in self._tasks.selectedItems()],
                 batch_run_id=self._batch_filter or None,
+                target_kind=self._task_target_kind.currentData(),
                 start_date=start, end_date=end,
             )
         except Exception as exc:  # noqa: BLE001
@@ -402,7 +420,7 @@ class DailyHistoryDialog(QDialog):
             values = (
                 _format_time(record.started_at), _format_time(record.finished_at),
                 self._duration(record.duration_ms, bool(record.finished_at)),
-                record.username, record.task_name,
+                record.username, record.target_label or tr("未记录"), record.task_name,
                 _SCOPE_LABELS.get(record.task_scope, record.task_scope),
                 _SOURCE_LABELS.get(record.source, record.source),
                 _STATUS_LABELS.get(record.status, record.status),
@@ -411,8 +429,8 @@ class DailyHistoryDialog(QDialog):
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 item.setToolTip(
-                    record.task_run_id if column == 8 else
-                    record.batch_run_id if column == 9 else "")
+                    record.task_run_id if column == 9 else
+                    record.batch_run_id if column == 10 else "")
                 self._task_table.setItem(row, column, item)
         self._task_table.resizeColumnsToContents()
         if self._task_records:
@@ -429,7 +447,8 @@ class DailyHistoryDialog(QDialog):
             return
         try:
             self._batch_records = self._repo().list_batch_runs(
-                start_date=start, end_date=end)
+                start_date=start, end_date=end,
+                target_kind=self._batch_target_kind.currentData())
         except Exception as exc:  # noqa: BLE001
             self._show_read_error(exc)
             return
@@ -438,13 +457,14 @@ class DailyHistoryDialog(QDialog):
             values = (
                 _format_time(record.started_at), _format_time(record.finished_at),
                 self._duration(record.duration_ms, bool(record.finished_at)),
-                record.config_name, _STATUS_LABELS.get(record.status, record.status),
+                record.config_name, record.target_label or tr("未记录"),
+                _STATUS_LABELS.get(record.status, record.status),
                 str(record.task_count), record.batch_run_id[:12],
                 tr("有") if record.report_path else tr("无"),
             )
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
-                if column == 6:
+                if column == 7:
                     item.setToolTip(record.batch_run_id)
                 self._batch_table.setItem(row, column, item)
         self._batch_table.resizeColumnsToContents()
@@ -470,7 +490,8 @@ class DailyHistoryDialog(QDialog):
             return
         self._task_summary.setText(
             f"task_run_id: {record.task_run_id}    "
-            f"batch_run_id: {record.batch_run_id or '—'}")
+            f"batch_run_id: {record.batch_run_id or '—'}    "
+            f"target: {record.target_label or record.target_id or '—'}")
         self._task_detail.setPlainText(json.dumps({
             "输入参数": record.params,
             "执行结果": str(resolve_history_path(record.result_path) or ""),
@@ -483,7 +504,9 @@ class DailyHistoryDialog(QDialog):
         self._set_batch_buttons(record)
         if record is None:
             return
-        self._batch_summary.setText(f"batch_run_id: {record.batch_run_id}")
+        self._batch_summary.setText(
+            f"batch_run_id: {record.batch_run_id}    "
+            f"target: {record.target_label or record.target_id or '—'}")
         self._batch_detail.setPlainText(json.dumps({
             "批量输入快照": record.input_snapshot,
             "批量报告": str(resolve_history_path(record.report_path) or ""),

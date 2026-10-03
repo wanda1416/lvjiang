@@ -174,11 +174,14 @@ class AdbDevice:
                     **SUBPROCESS_NO_WINDOW,
                 )
                 if r.returncode != 0:
-                    stderr_msg = r.stderr.strip()
+                    # 某些打包/代理环境在命令没有对应输出流时会返回 None。
+                    # shell() 的公开契约始终是文本，不能让可选的进程输出泄漏
+                    # 成 ``None.strip()``，进而把非关键的应用探测误报成异常。
+                    stderr_msg = (r.stderr or "").strip()
                     if self._is_disconnect_error(stderr_msg):
                         raise OSError(stderr_msg)
                     logger.debug(f"adb shell {args} 返回码 {r.returncode}: {stderr_msg}")
-                return r.stdout.strip()
+                return (r.stdout or "").strip()
             except (subprocess.TimeoutExpired, OSError) as e:
                 self._handle_connection_error(e, f"adb shell {args}")
                 retried = True

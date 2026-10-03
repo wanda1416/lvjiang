@@ -503,7 +503,7 @@ class MainWindow(
         main_layout.addLayout(top_row)
 
         # === ADB 断连警告条（单行，默认隐藏）===
-        # resume_event 存在主窗口级别，不随 device 对象断连/重连而丢失
+        # 主窗口字段投影当前执行设备的事件；每台设备各自持有独立事件。
         self._adb_resume_event = threading.Event()
         self._adb_resume_event.set()  # 初始为已恢复，不阻塞
         self._adb_banner = QFrame()

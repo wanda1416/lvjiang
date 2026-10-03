@@ -732,7 +732,8 @@ auto_strings:
   <span style="color:#888;">截图：—　　画布：—</span>: <span style="color:#888;">截图：—　　画布：—</span>
   ADB screencap 单帧截图: ADB screencap 单帧截图
   ADB shell input 指令执行: ADB shell input 指令执行
-  ADB 异常，请重连设备后点击恢复: ADB 异常，请重连设备后点击恢复
+  ADB 异常，请恢复设备连接后点击恢复；无法恢复时请按 F10 停止: ADB 异常，请恢复设备连接后点击恢复；无法恢复时请按 F10 停止
+  '[警告] ADB 连接异常，请恢复 {name} 的连接后点击恢复；若无法恢复，请按 F10 停止任务后重新连接: {error}': '[警告] ADB 连接异常，请恢复 {name} 的连接后点击恢复；若无法恢复，请按 F10 停止任务后重新连接: {error}'
   DesktopCapture 已停止: DesktopCapture 已停止
   ESC / HOME / 字母键；设备端 ESC=返回: ESC / HOME / 字母键；设备端 ESC=返回
   OCR 扫描区域: OCR 扫描区域
@@ -807,7 +808,7 @@ auto_strings:
   ■ 停止录制: ■ 停止录制
   ● 录制脚本: ● 录制脚本
   ● 有改动: ● 有改动
-  ⚠ ADB 连接异常，请重连设备后点击右侧「恢复」: ⚠ ADB 连接异常，请重连设备后点击右侧「恢复」
+  ⚠ ADB 连接异常：恢复设备连接后点击「恢复」；无法恢复时请按 F10 停止任务: ⚠ ADB 连接异常：恢复设备连接后点击「恢复」；无法恢复时请按 F10 停止任务
   '「{label}」应为 #rrggbb': '「{label}」应为 #rrggbb'
   「{label}」应为 {n} 个数: 「{label}」应为 {n} 个数
   「{label}」未填写: 「{label}」未填写

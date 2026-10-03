@@ -319,8 +319,6 @@ class WindowOpsMixin:
         target.device = self._device
         target.agent = getattr(self, "_agent", None)
         target.streaming = self._scrcpy_streaming
-        if target.kind == "adb":
-            target.capture_method = self._user_config.android_capture_method
         target.last_capture = self._last_capture
 
     @staticmethod
@@ -493,6 +491,10 @@ class WindowOpsMixin:
             self.log_text.append(tr("[提示] 任务运行中，执行目标已锁定"))
             self._refresh_execution_targets_ui()
             return
+        recorder = getattr(self, "_screen_recorder", None)
+        abort_recording = getattr(self, "_abort_screen_record", None)
+        if recorder is not None and callable(abort_recording):
+            abort_recording(tr("切换执行目标"))
         # 用 select 的返回值，而不是回头再查一次 active()：后者的返回类型是
         # 可空的，加守卫等于承认这里可能是 None，而实际上不可能。
         target = self._execution_targets.select(str(target_id))
@@ -507,11 +509,17 @@ class WindowOpsMixin:
         if target is None:
             self.preview_label.clear()
             self.preview_label.setText(tr("连接目标后可预览"))
+            refresh_capture_state = getattr(self, "_apply_rec_state", None)
+            if callable(refresh_capture_state):
+                refresh_capture_state()
             return
         if target.last_capture is not None:
             self._show_preview_image(target.last_capture)
         elif target.ready:
             self._capture_preview()
+        refresh_capture_state = getattr(self, "_apply_rec_state", None)
+        if callable(refresh_capture_state):
+            refresh_capture_state()
 
     def _refresh_connection_draft_ui(self, mode: str | None) -> None:
         """显示候选类型的连接草稿，不读取当前执行目标。"""
@@ -993,12 +1001,6 @@ class WindowOpsMixin:
             self._dispose_execution_target(old)
         self._sync_active_target_compat()
 
-        # 若工作流正阻塞在断连等待上（resume_event 未 set），
-        # 把新的截图/输入后端同步给运行中的引擎，否则引擎继续用已死的旧 scrcpy 流截图
-        if (self._running_target_id == target_id
-                and not resume_event.is_set()):
-            self._refresh_running_engine_backends()
-
         method_label = tr("流式截图") if capture_method == "scrcpy" \
             else tr("单帧截图")
         method_label = (
@@ -1029,17 +1031,6 @@ class WindowOpsMixin:
             self.btn_locate.setText(tr("连接"))
             self._set_locate_enabled(True)
 
-    def _stop_capture_backend(self):
-        """停止并丢弃当前截图后端（桌面/ADB/scrcpy 共用）。"""
-        if self._capture is None:
-            return
-        try:
-            self._capture.stop()
-        except Exception as e:
-            logger.debug(f"截图后端停止失败: {e}")
-        finally:
-            self._capture = None
-
     def _dispose_execution_target(self, target) -> None:
         """释放一个目标独占的资源，不影响其他已连接目标。"""
         capture = target.capture
@@ -1059,41 +1050,15 @@ class WindowOpsMixin:
             except RuntimeError:
                 pass
 
-    def _teardown_adb_backend(self):
-        """兼容入口：清理全部 Android 目标。"""
-        # 录屏进行中/待保存时先自动转正保存，再停止截图后端
-        if self._screen_recorder is not None:
-            self._abort_screen_record(tr("断连"))
-        ids = [target.id for target in self._execution_targets.all()
-               if target.kind == "adb"]
-        for target_id in ids:
-            target = self._execution_targets.remove(target_id)
-            if target is not None:
-                self._dispose_execution_target(target)
-        self._sync_active_target_compat()
-        if hasattr(self, "execution_target_list"):
-            self._refresh_execution_targets_ui()
-        # 停止后台扫描/连接线程
-        self._wait_device_thread()
-
     def _refresh_bg_mode_lock(self):
         """任务运行状态变化后刷新连接草稿的可编辑状态。"""
         self._refresh_connection_draft_ui(self._candidate_backend)
-
-    def _refresh_bg_capture_visibility(self, mode: str | None = None):
-        """兼容入口：刷新 Windows 连接草稿控件。"""
-        self._refresh_connection_draft_ui(mode or self._candidate_backend)
 
     def _apply_bg_capture_default(self):
         """后台模式启用时，把配置默认值写入连接草稿。"""
         if self._user_config.desktop_background_capture:
             self._window_connection_draft.background_capture = True
         self._refresh_connection_draft_ui("windows")
-
-    def _on_disconnect(self):
-        """兼容入口：断开当前执行目标。"""
-        target = self._active_execution_target()
-        self._disconnect_execution_target(target.id if target is not None else "")
 
     def _disconnect_execution_target(self, target_id: str) -> None:
         """按稳定 ID 断开一个目标，不影响其他连接。"""
@@ -1103,6 +1068,11 @@ class WindowOpsMixin:
         if self._running:
             self.log_text.append(tr("[提示] 任务运行中不能断开执行目标"))
             return
+        if target.id == self._execution_targets.active_target_id:
+            recorder = getattr(self, "_screen_recorder", None)
+            abort_recording = getattr(self, "_abort_screen_record", None)
+            if recorder is not None and callable(abort_recording):
+                abort_recording(tr("断开执行目标"))
         removed = self._execution_targets.remove(target.id)
         if removed is not None:
             self._dispose_execution_target(removed)
@@ -1273,6 +1243,10 @@ class WindowOpsMixin:
                 tr("[错误] {method} 截图后端不可用，保留原截图方式").format(
                     method=method))
             return
+        recorder = getattr(self, "_screen_recorder", None)
+        abort_recording = getattr(self, "_abort_screen_record", None)
+        if recorder is not None and callable(abort_recording):
+            abort_recording(tr("切换截图方式"))
         streaming = False
         if method == "scrcpy" and isinstance(capture, AndroidStreamCapture):
             capture.set_on_frame(
@@ -1292,6 +1266,9 @@ class WindowOpsMixin:
             self._sync_active_target_compat()
             if not streaming:
                 self._capture_preview()
+            refresh_capture_state = getattr(self, "_apply_rec_state", None)
+            if callable(refresh_capture_state):
+                refresh_capture_state()
         self._refresh_execution_targets_ui()
 
     def _reconnect_android_target(
@@ -1308,11 +1285,6 @@ class WindowOpsMixin:
             device_execution=device_execution,
             update_candidate_ui=False,
         )
-
-    def _device_combo_current_serial(self) -> str:
-        """获取当前下拉框中的设备 serial（用于日志）"""
-        d = self.window_combo.currentData()
-        return d.get("serial", "?") if d else "?"
 
     # ─── 窗口定位 ──────────────────────────────────────────
 

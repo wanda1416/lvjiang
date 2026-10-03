@@ -492,6 +492,11 @@ class MainWindow(
         self.layout_desc_label.setStyleSheet("color: palette(mid);")
         top_row.addWidget(self.layout_desc_label)
         top_row.addStretch()
+        self.btn_toggle_connection_console = QPushButton(tr("隐藏连接控制台"))
+        apply_button_style(self.btn_toggle_connection_console, variant="neutral")
+        self.btn_toggle_connection_console.clicked.connect(
+            self._on_toggle_connection_console)
+        top_row.addWidget(self.btn_toggle_connection_console)
         # 最小化到状态栏：单屏玩家看不到任务栏时靠托盘图标颜色判断运行状态。
         # 平时不显示托盘图标（不想常驻），点这个按钮才临时出现。
         self.btn_minimize_to_tray = QPushButton(tr("最小化到状态栏"))
@@ -523,6 +528,11 @@ class MainWindow(
         main_layout.addWidget(self._adb_banner)
 
         # === 连接目标 / 执行目标 ===
+        self.connection_console = QWidget()
+        connection_console_layout = QVBoxLayout(self.connection_console)
+        connection_console_layout.setContentsMargins(0, 0, 0, 0)
+        connection_console_layout.setSpacing(4)
+
         window_group = QGroupBox()
         self.window_group = window_group
         window_main_layout = QVBoxLayout(window_group)
@@ -684,7 +694,7 @@ class MainWindow(
         window_main_layout.addLayout(connection_row)
 
         self._apply_backend_ui(self._backend)
-        main_layout.addWidget(window_group)
+        connection_console_layout.addWidget(window_group)
 
         # === 截屏预览区（左：实时画面 / 右：采集控制面板）===
         self.preview_container = QWidget()
@@ -701,7 +711,8 @@ class MainWindow(
         preview_layout.addWidget(self._build_capture_panel())
 
         self.preview_container.setVisible(False)
-        main_layout.addWidget(self.preview_container)
+        connection_console_layout.addWidget(self.preview_container)
+        main_layout.addWidget(self.connection_console)
 
         # === 中部：左右分栏 ===
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -746,6 +757,13 @@ class MainWindow(
         self.setMinimumHeight(self.height())
         self._restore_ui_state()
         self._setup_log_redirect()
+
+    def _on_toggle_connection_console(self) -> None:
+        """收起或展开连接控制台，不改变任何连接与预览状态。"""
+        show_console = self.connection_console.isHidden()
+        self.connection_console.setVisible(show_console)
+        self.btn_toggle_connection_console.setText(
+            tr("隐藏连接控制台") if show_console else tr("显示连接控制台"))
 
     def _build_left_tabs(self):
         """构建左侧 Tab（通用：日常），再追加插件注入的 Tab。"""

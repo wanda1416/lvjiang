@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
-from PyQt6.QtCore import QCoreApplication, QLibraryInfo, QTranslator
+
+if TYPE_CHECKING:
+    from PyQt6.QtCore import QTranslator
 
 from ..constants import PROJECT_ROOT
 
@@ -155,6 +158,13 @@ def _install_qt_translation(language: str) -> bool:
     语言包。翻译器必须保留模块级引用，否则会被回收并立即失效。
     """
     global _qt_translator
+
+    try:
+        from PyQt6.QtCore import QCoreApplication, QLibraryInfo, QTranslator
+    except ModuleNotFoundError:
+        # Android/Chaquopy 使用原生界面，不随包分发 PyQt6；基础 tr() 与
+        # YAML 翻译仍应可用，仅跳过桌面 Qt 标准控件的翻译器安装。
+        return False
 
     app = QCoreApplication.instance()
     if app is None:

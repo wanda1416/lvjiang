@@ -464,6 +464,48 @@ class _StmtMixin:
         panel_ref = PanelRef(scene=scene_val, panel=panel_val, row=row, col=col)
         return Drag(scene=panel_ref, arrow=panel_ref, direction=direction, distance=distance, line_no=self._line(items))
 
+    #: 只指定一维时允许的方向：另一维对位移毫无影响，写反了就是脚本写错。
+    _AXIS_DIRECTIONS = {"row": ("up", "down"), "col": ("left", "right")}
+
+    def _grid_axis_drag(self, items, axis: str, index):
+        """[panel][row] / [panel][][col] 共用出口，并校验方向与维度相配。"""
+        allowed = self._AXIS_DIRECTIONS[axis]
+        direction, distance = items[-1]
+        line_no = self._line(items)
+        if direction not in allowed:
+            axis_label = "行" if axis == "row" else "列"
+            other = "列" if axis == "row" else "行"
+            raise WorkflowUserError(
+                f"drag: 只指定{axis_label}时方向必须是 {' / '.join(allowed)}，"
+                f"实际写的是 {direction}（第 {line_no} 行）。"
+                f"{direction} 是沿着{other}走的，指定{axis_label}对它没有影响")
+        scene_val = self._resolve_const_or_var(items[0])
+        panel_val = self._resolve_const_or_var(items[1])
+        grid = PanelGridDrag(
+            scene=scene_val, panel=panel_val, direction=direction,
+            distance=distance, line_no=line_no,
+            **{axis: index},
+        )
+        return Drag(scene=grid, arrow=None, direction=direction,
+                    distance=distance, line_no=line_no)
+
+    def drag_grid_row_target(self, items):
+        """drag [scene].[panel][row] up|down [n] — 该行中心起拖
+
+        与 drag_grid_target 共用 PanelGridDrag，只多带一个 row：位移算法、
+        对齐失效、静态检查都走同一条路，行号只影响起点。
+        """
+        return self._grid_axis_drag(items, "row", items[2])
+
+    def drag_grid_col_target(self, items):
+        """drag [scene].[panel][][col] left|right [n] — 该列中心起拖"""
+        # items[2] 是空行索引的占位，列号在 items[3]
+        return self._grid_axis_drag(items, "col", items[3])
+
+    def panel_empty_index(self, _items):
+        """`[]`：这一维不参与，不产生任何值。"""
+        return None
+
     def drag_grid_target(self, items):
         """drag [scene].[panel] up|down|left|right [n] — panel grid 级拖拽（中心起拖）"""
         scene_val = self._resolve_const_or_var(items[0])

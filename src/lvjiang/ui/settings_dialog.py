@@ -1,8 +1,8 @@
 """配置管理对话框（多 Tab）
 
-Tab1 基础配置、Tab2 应用注册、Tab3 输入模拟（引擎级点击参数）、Tab4 等待参数（命名等待）、
+Tab1 基础配置、Tab2 应用注册、Tab3 输入参数（引擎级点击与越界处理）、Tab4 等待参数（命名等待）、
 Tab5 方案设置（连接方案 + 可用工作环境）、Tab6 字体设置、Tab7 热键设置（F7~F12 按键位）。
-基础配置/字体/热键写 session.json（settings 节点）；应用注册、输入模拟、等待参数和
+基础配置/字体/热键写 session.json（settings 节点）；应用注册、输入参数、等待参数和
 方案设置的环境列表写 app.yaml（apps / input_simulation / delay_params / envs，
 system ← local 合并），保存后以配置文件为准覆盖代码默认值。方案本身写 session.json
 的 plans 节点——它是机器级运行态，与用户无关。热键保存后立即重建全局监听并生效。
@@ -56,7 +56,7 @@ _RANGE_FIELDS = [
 
 # 等待参数不可占用的保留 key（InputSimConfig 引擎级固定字段）
 _RESERVED_KEYS = {name for name, *_ in _RANGE_FIELDS} | {
-    "click_random_offset", "region_jitter_ratio",
+    "click_random_offset", "region_jitter_ratio", "clamp_out_of_bounds",
 }
 
 # 热键设置：HotkeyConfig 字段名 → 显示标签
@@ -112,7 +112,7 @@ def _form_divider() -> QFrame:
 
 
 class SettingsDialog(QDialog):
-    """配置管理：Tab1 基础配置 + Tab2 输入模拟 + Tab3 等待参数"""
+    """配置管理：Tab1 基础配置 + Tab2 输入参数 + Tab3 等待参数"""
 
     hotkeys_saved = pyqtSignal(dict)
     font_sizes_saved = pyqtSignal(dict)
@@ -139,7 +139,7 @@ class SettingsDialog(QDialog):
         self._tabs = QTabWidget()
         self._tabs.addTab(self._build_basic_tab(), tr("基础配置"))
         self._tabs.addTab(self._build_android_tab(), tr("应用注册"))
-        self._tabs.addTab(self._build_input_tab(), tr("输入模拟"))
+        self._tabs.addTab(self._build_input_tab(), tr("输入参数"))
         self._tabs.addTab(self._build_wait_tab(), tr("等待参数"))
         self._tabs.addTab(self._build_plan_tab(), tr("方案设置"))
         self._tabs.addTab(self._build_font_tab(), tr("字体设置"))
@@ -194,11 +194,14 @@ class SettingsDialog(QDialog):
             self._connect_android_app_row_dirty(entry)
         self._offset_spin.valueChanged.connect(self._mark_dirty)
         self._jitter_spin.valueChanged.connect(self._mark_dirty)
+        self._clamp_oob_cb.toggled.connect(self._mark_dirty)
         for lo_spin, hi_spin in self._range_spins.values():
             lo_spin.valueChanged.connect(self._mark_dirty)
             hi_spin.valueChanged.connect(self._mark_dirty)
         for entry in self._custom_rows:
             self._connect_row_dirty(entry)
+        for entry in self._env_rows:
+            self._connect_env_row_dirty(entry)
         for combo in self._hotkey_combos.values():
             combo.currentIndexChanged.connect(self._mark_dirty)
         self._overview_font_spin.valueChanged.connect(self._mark_dirty)
@@ -473,7 +476,7 @@ class SettingsDialog(QDialog):
         entry["card"].deleteLater()
         self._mark_dirty()
 
-    # ─── Tab2 输入模拟（引擎级点击参数）───────────────────
+    # ─── Tab2 输入参数（引擎级点击参数与越界处理）─────────
 
     def _build_input_tab(self) -> QWidget:
         tab = QWidget()
@@ -501,6 +504,29 @@ class SettingsDialog(QDialog):
             self._jitter_spin,
             tr("未单独标定点击区域时，落点框从区域中心向四边延伸的比例。"
                "0.25 = 落点覆盖区域中间的一半；必须小于 0.5")))
+
+        # 上面几项是「怎么点」的拟人参数，下面这项是「算错了怎么办」的失败
+        # 策略，两类不是一回事，用分隔线隔开
+        form.addRow(_form_divider())
+
+        self._clamp_oob_cb = QCheckBox(tr("越界坐标自动截断"))
+        self._clamp_oob_cb.setChecked(sim.clamp_out_of_bounds)
+        clamp_tip = tr(
+            "引擎算出的点击/拖拽坐标跑到画面外时怎么办。\n"
+            "不勾选（默认）：报错并结束本次运行——越界说明脚本的位移参数与当前"
+            "面板几何不匹配，自动截断会把「滚两行」悄悄变成「滚一行」，脚本和"
+            "日志都看不出来。\n"
+            "勾选：引擎截断到画面边界并记一条 warning，本次运行继续。\n"
+            "判定在引擎层完成：同一个越界坐标，设备端无障碍手势是硬拒绝，"
+            "而桌面与 adb shell input 会静默接受，指望后端拦不住。")
+        self._clamp_oob_cb.setToolTip(clamp_tip)
+        clamp_row = QWidget()
+        clamp_layout = QHBoxLayout(clamp_row)
+        clamp_layout.setContentsMargins(0, 0, 0, 0)
+        clamp_layout.addWidget(self._clamp_oob_cb)
+        clamp_layout.addStretch()
+        clamp_row.setToolTip(clamp_tip)
+        form.addRow(tr("坐标越界处理:"), clamp_row)
 
         return tab
 
@@ -1598,6 +1624,7 @@ class SettingsDialog(QDialog):
             input_sim[name] = [round(lo, 2), round(hi, 2)]
         input_sim["click_random_offset"] = self._offset_spin.value()
         input_sim["region_jitter_ratio"] = round(self._jitter_spin.value(), 2)
+        input_sim["clamp_out_of_bounds"] = self._clamp_oob_cb.isChecked()
         envs = self._collect_envs()
         save_app_config(input_sim, delay_params, envs, android_apps)
         from ..core.config.plans import save_plans

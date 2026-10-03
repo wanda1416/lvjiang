@@ -29,7 +29,7 @@ class DelayParam:
 
 @dataclass
 class InputSimConfig:
-    """输入模拟参数（引擎级点击/移动/抖动，InputBackend 各子类与引擎坐标钳位使用）"""
+    """输入参数（引擎级点击/移动/抖动与越界处理，InputBackend 各子类与引擎坐标钳位使用）"""
     before_click_wait: tuple[float, float] = (0.1, 0.3)   # 点击前延迟范围（模拟反应时间）
     after_click_wait: tuple[float, float] = (0.1, 0.2)    # 点击后延迟范围
     mouse_move_duration: tuple[float, float] = (0.3, 0.6) # 鼠标移动时长范围
@@ -38,6 +38,14 @@ class InputSimConfig:
     # 0.25 → 落点框为区域中间的一半。配置名为兼容存量配置而保留，实际的
     # 默认框统一由 layout_models.effective_click_rect 派生。
     region_jitter_ratio: float = 0.25
+    # 引擎算出的屏幕坐标跑到画面外时怎么办。默认报错结束：越界说明脚本的
+    # 位移参数与当前面板几何不匹配，静默截断会悄悄缩短位移——脚本以为滚了
+    # 两行，实际只滚了一行，而且没有任何地方会提示。
+    #
+    # 开启后引擎自行截断到画面边界并记一条 warning。设备端（无障碍手势）对
+    # 负坐标是硬拒绝（Path bounds must not be negative），而桌面与 adb shell
+    # input 会静默接受，所以这个判定必须放在引擎层，不能指望后端。
+    clamp_out_of_bounds: bool = False
 
     def __post_init__(self):
         self.before_click_wait = _pair(self.before_click_wait)
@@ -45,6 +53,7 @@ class InputSimConfig:
         self.mouse_move_duration = _pair(self.mouse_move_duration)
         self.click_random_offset = int(self.click_random_offset)
         self.region_jitter_ratio = float(self.region_jitter_ratio)
+        self.clamp_out_of_bounds = bool(self.clamp_out_of_bounds)
         if not (0 <= self.region_jitter_ratio < 0.5):
             raise ValueError(
                 f"region_jitter_ratio 必须在 [0, 0.5) 内: {self.region_jitter_ratio}")

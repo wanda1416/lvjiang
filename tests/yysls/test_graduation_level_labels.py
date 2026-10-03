@@ -72,14 +72,31 @@ def test_graduation_carries_the_model_level(tmp_path, gc, qtbot):
 def test_two_labels_may_disagree(tmp_path, gc, qtbot):
     """115 的角色配 110 的表：两个等级本来就不同，不能互相顶替。
 
-    用没有 115 级模型的流派构造该场景；全部流派都有同级模型时，
-    两个标签一致同样是正确行为。
+    需要一个**没有同级模型**的流派来构造这个场景。这个名单会随补表而变——
+    原来写死的破竹·风补上 115 表之后就不再满足条件了，所以从登记表现场挑；
+    全部流派都有同级模型时，两个标签一致同样是正确行为，整条跳过。
     """
+    level = gc.current_equip_level()
+
+    def resolved_level(name: str) -> int | None:
+        # 没有同级模型时会回落到低等级的那一份——正是本用例要展示的场景，
+        # 所以判据是「解析到的等级低于当前等级」，不是「解析不到」
+        ref = select_graduation_model(name, "基础方案", level)
+        return None if ref is None else ref.level
+
+    school = next(
+        (name for name in gc.get_schools()
+         if (resolved_level(name) or level) < level),
+        None,
+    )
+    if school is None:
+        pytest.skip(f"所有流派都有 {level} 级模型，两个标签一致是正确行为")
+
     state = _state(tmp_path, gc)
 
-    dps, rate = _labels(state, "破竹·风", gc)
+    dps, rate = _labels(state, school, gc)
 
-    assert dps.startswith(f"{gc.current_equip_level()}级")
+    assert dps.startswith(f"{level}级")
     assert rate.startswith("110级")
 
 

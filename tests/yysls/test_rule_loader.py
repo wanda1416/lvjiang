@@ -1021,11 +1021,11 @@ class TestDynamicAffixMap:
         assert eq["最小裂石攻击"] == "最小本属攻击"
         assert eq["最大破竹攻击"] == "最大外属攻击"
         assert eq["最小牵丝攻击"] == "最小外属攻击"
-        # 无相词条不参与归类（字面语义，仅武器掉落）
-        assert "最大无相攻击" not in eq
-        assert "最小无相攻击" not in eq
+        # 无相在武器上就是本属；真实名称仍保留。
+        assert eq["最大无相攻击"] == "最大本属攻击"
+        assert eq["最小无相攻击"] == "最小本属攻击"
         # 映射源覆盖全部具体属攻，目标均为动态词条
-        assert set(eq) == set(specific_attr_names())
+        assert set(eq) == set(specific_attr_names()) | {"最大无相攻击", "最小无相攻击"}
         assert set(eq.values()) == set(DYNAMIC_AFFIXES)
 
     def test_attr_candidates_include_generic_first(self):

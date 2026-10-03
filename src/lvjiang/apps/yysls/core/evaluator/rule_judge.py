@@ -24,12 +24,12 @@ GenericTuningJudge 加载 TuningRule（YAML 外置规则）完成 judge
 最高者。非武器部位按勾选玩法的不同属性去重展开（各属性各跑一次取
 最优）。
 
-非武器部位判定时按玩法属性做「属攻→动态词条」归类（双重
+判定时按玩法属性做「属攻→动态词条」归类（双重
 身份，非破坏性改写）：装备上的具体属攻同时以字面名与归类名
 （最大/最小本属攻击 =玩法属性、最大/最小外属攻击 =其余属性）
 参与匹配：规则写真实属攻（单流派字面精确）或动态词条（跨属性
-泛化）均可命中；武器部位保持字面匹配不做归类（无相词条为
-字面语义，仅武器掉落）；attr=通用（混搭流）不做任何归类。
+泛化）均可命中；武器无相归为本属，武器没有外属；
+attr=通用（混搭流）不做任何归类。
 
 品阶门槛与开关注册表从 tune_config.yaml 读取：
 - 品阶门槛按标准部位（武器/环/佩/防具四件）配置，规则级
@@ -50,7 +50,6 @@ from ..loadout.transmute import (
     transmute_targets,
 )
 from ..tuning_rules import (
-    DYNAMIC_AFFIXES,
     GENERIC_ATTR,
     PART_ALIAS,
     RATING_LABELS,
@@ -60,6 +59,7 @@ from ..tuning_rules import (
     dynamic_affix_map,
     get_tune_config,
 )
+from ..tuning_rules.models import expand_affix_names
 from .base import JudgeResult, Rating, TuningJudge, part_label
 
 # 评级排序（多玩法/转律模拟取评级上限最高的组合）
@@ -70,7 +70,7 @@ _RANK = {Rating.JUNK: 0, Rating.NORMAL: 1, Rating.EXCELLENT: 2,
 _RATING_BY_KEY = {"junk": Rating.JUNK, "normal": Rating.NORMAL,
                   "excellent": Rating.EXCELLENT, "top": Rating.TOP}
 
-# 武器部位 key（不做属攻→动态词条归类）
+# 武器部位 key（只将无相归为本属）
 _WEAPON_PARTS = ("主武器", "副武器")
 
 
@@ -180,11 +180,9 @@ class GenericTuningJudge(TuningJudge):
         first_token = equip.affixes[0].name
         tokens = [a.name for a in equip.affixes[1:]]
 
-        # 非武器部位：属攻→动态词条归类映射（双重身份，装备
+        # 属攻→动态词条归类映射（双重身份，装备
         # 词条同时以字面名与归类名参与匹配，不改写原名）
-        equiv: dict[str, str] = {}
-        if part_key not in _WEAPON_PARTS:
-            equiv = dynamic_affix_map(attr)
+        equiv = dynamic_affix_map(attr, weapon=part_key in _WEAPON_PARTS)
 
         # 首词条判断（字面名与归类名任一命中即符，不符即跳过）
         first_ids = {first_token} | (
@@ -215,7 +213,7 @@ class GenericTuningJudge(TuningJudge):
                ) -> tuple[Rating, str]:
         """完整定级核心（流程 2/3/4），潜力判定的填充/转律变体复用
 
-        alias 为字面名→动态归类名映射（双重身份，武器部位为空）。
+        alias 为字面名→动态归类名映射（双重身份，武器仅无相→本属）。
         switches 为有效开关上下文（None = 使用 self.switches）。
 
         Returns:
@@ -290,18 +288,14 @@ class GenericTuningJudge(TuningJudge):
         """
         from ...config import get_game_config
         gc = get_game_config()
-        part = result.equipment.part
         # 部位、武器绑定与生效等级都以游戏配置为准（normal_affix_candidates
         # 是唯一口径）。等级必须带上：不带的话 115 装备仍会把该等级已经调不
         # 出来的词条当成可填充候选，把潜力评级算高。
-        physical = set(normal_affix_candidates(
+        physical = normal_affix_candidates(
             {"type": result.equipment.type,
-             "level": result.equipment.level}, gc))
+             "level": result.equipment.level}, gc)
 
         def part_ok(name: str) -> bool:
-            # 动态词条不在游戏配置部位表中，仅非武器部位可作填充/转入候选
-            if name in DYNAMIC_AFFIXES:
-                return part != "武器"
             return name in physical
 
         def ids(name: str) -> set[str]:
@@ -316,7 +310,7 @@ class GenericTuningJudge(TuningJudge):
         # 填充候选：价值序 + 部位过滤 + 身份集去重
         candidates: list[str] = []
         cand_ids: set[str] = set()
-        for name in self.rule.affix_pool:
+        for name in expand_affix_names(self.rule.affix_pool, physical, equiv):
             if not part_ok(name):
                 continue
             if ids(name) & (present | cand_ids):
@@ -433,7 +427,8 @@ class GenericTuningJudge(TuningJudge):
                     # 同评级结果的稳定择优，不得缩小候选集。
                     gains = sorted(legal_gains, key=gain_order)
                 else:
-                    gains = self.rule.transmute_priority
+                    gains = expand_affix_names(
+                        self.rule.transmute_priority, physical, equiv)
                 for gain in gains:
                     if not part_ok(gain) or ids(gain) & excluded:
                         continue

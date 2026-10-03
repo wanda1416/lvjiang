@@ -3,15 +3,14 @@
 规则中的全部词条引用一律使用规则可引用词表（rule_affix_candidates：
 标准词条全集 + 四个动态词条）。具体属攻词条（如 最大裂石攻击）
 为字面精确引用，动态词条为跨属性泛化引用，两者均合法；最大/最小
-无相攻击为字面语义（仅匹配真实无相词条，游戏事实：仅武器
-掉落）。
+无相攻击仅武器掉落，同时具有对应的本属攻击身份；武器没有外属。
 
 schema 要点：
 - playstyles: 名字 → {main/sub: {weapon, damage}, attr}，damage 为
   具体增伤词条名或 null（不需要增伤），attr 为玩法属性（属性攻击
   词组组名，通用/鸣金/牵丝/裂石/破竹）；判定武器部位时按用户勾选
-  的名字展开尝试，装备武器名匹配主/副武器即产生一次判定；非武器
-  部位判定时装备具体属攻额外获得动态词条身份（字面名与归类名
+  的名字展开尝试，装备武器名匹配主/副武器即产生一次判定；武器无相、非武器
+  具体属攻额外获得动态词条身份（字面名与归类名
   双重匹配，本属 = 该属性、外属 = 其余属性，见 dynamic_affix_map）；
   attr=通用（混搭流）不做任何归类，且规则禁止引用动态词条；
 - patterns.<部位>: first + 四档条件 junk/normal/excellent/top_conditions，
@@ -25,8 +24,7 @@ schema 要点：
   excellent；patterns.<部位> 可选同名字段按部位覆盖；
 - affix_pool: 可用词条库（全局），声明序即价值序（越靠前越优先
   保留与填充），潜力判定据此填充空槽；transmute_priority 独立
-  （转律只能转出库内词条，转入取库中最高优先级）；字面无相与
-  动态词条可在库内并存（经部位过滤互不干扰）；
+  （转入推荐优先级）；优先使用动态本属，避免无相和具体属攻重复配置；
 - 开关注册表在 tune_config.yaml 的 switches 段（key → {name}），
   条件组 when 只能引用已注册开关。
 """
@@ -98,7 +96,7 @@ def standard_playstyle_attrs() -> list[str]:
 def specific_attr_names() -> list[str]:
     """具体属攻词条全集（属性攻击词组非通用组并集，按声明序）
 
-    即动态词条归类映射（dynamic_affix_map）的源词条全集。
+    不含武器无相词条；用于非武器的具体属性枚举。
     """
     from ...config import get_game_config
     groups = get_game_config().get_alias_groups(ATTR_ATTACK_CATEGORY)
@@ -123,7 +121,8 @@ def rule_affix_candidates() -> list[str]:
     return names
 
 
-def dynamic_affix_map(attr: str) -> dict[str, str]:
+def dynamic_affix_map(attr: str, *, game_config=None,
+                      weapon: bool = False) -> dict[str, str]:
     """属攻→动态词条归类映射：玩法属性 attr 视角下的额外身份
 
     attr 的最大/最小属攻 → 最大/最小本属攻击，其余属性的最大/
@@ -131,23 +130,35 @@ def dynamic_affix_map(attr: str) -> dict[str, str]:
     以字面名与归类名参与匹配（双重身份，非破坏性改写）。attr 为
     通用/空/未知时返回空 dict（不归类，规则中的动态词条永不匹配）。
     大/小按属性攻击词组内声明序位置对齐（第 1 个=最大、第 2 个=
-    最小）；无相词条不参与归类（字面语义，仅武器掉落）。
+    最小）。无相归为本属；weapon=True 时只返回无相映射，武器没有外属。
     """
     if not attr or attr == GENERIC_ATTR:
         return {}
     from ...config import get_game_config
-    groups = get_game_config().get_alias_groups(ATTR_ATTACK_CATEGORY)
+    groups = (game_config or get_game_config()).get_alias_groups(ATTR_ATTACK_CATEGORY)
     if attr not in groups:
         return {}
     mapping: dict[str, str] = {}
     for name, names in groups.items():
-        if name == GENERIC_ATTR:
+        if weapon and name != GENERIC_ATTR:
             continue
-        big, small = (DYNAMIC_AFFIXES[0:2] if name == attr
+        big, small = (DYNAMIC_AFFIXES[0:2] if name in (attr, GENERIC_ATTR)
                       else DYNAMIC_AFFIXES[2:4])
         for i, s in enumerate(names[:2]):
             mapping[s] = big if i == 0 else small
     return mapping
+
+
+def expand_affix_names(names: list[str], physical: list[str],
+                       aliases: dict[str, str]) -> list[str]:
+    """按配置优先级展开真实候选；去重但不把动态身份写入装备。"""
+    result: list[str] = []
+    for name in names:
+        for candidate in physical:
+            if (candidate == name or aliases.get(candidate) == name):
+                if candidate not in result:
+                    result.append(candidate)
+    return result
 
 
 # ─── 规则数据结构 ──────────────────────────────────────────
@@ -237,8 +248,8 @@ class WeaponSide:
 class Playstyle:
     """玩法设定（如 纯唐/双切）：规定主/副武器、各自增伤要求与玩法属性
 
-    attr 为属性攻击词组组名（通用/鸣金/牵丝/裂石/破竹），判定非武器
-    部位时装备具体属攻按该属性额外获得动态词条身份（见 dynamic_affix_map）。
+    attr 为属性攻击词组组名（通用/鸣金/牵丝/裂石/破竹），武器无相和非武器
+    具体属攻额外获得动态词条身份（见 dynamic_affix_map）。
     switch 为可选绑定开关 key：该玩法参与判定时等价于激活该开关
     （视为 true），使条件组 when 可按玩法区分行为；None = 不绑定。
     """

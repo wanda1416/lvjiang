@@ -342,6 +342,42 @@ def test_plan_candidates_are_intersection_of_part_and_rule_pool(monkeypatch):
     assert captured["candidates"] == ["最大牵丝攻击", "敏", "会心率"]
 
 
+@pytest.mark.parametrize("attr", ["鸣金", "牵丝", "裂石", "破竹"])
+@pytest.mark.parametrize("level", [110, 115])
+@pytest.mark.parametrize("kind,slot", [("剑", "main_weapon"), ("环", "ring")])
+def test_native_attack_search_and_transmute_use_real_names(attr, level, kind, slot):
+    from lvjiang.apps.yysls.config import get_game_config
+
+    evaluator = _bare_evaluator()
+    evaluator._game_config = get_game_config()
+    captured = []
+
+    class Capture(SearchStrategy):
+        def search(self, problem):
+            captured.extend(problem.candidates)
+            return SearchOutcome(SearchStatus.NO_IMPROVEMENT, "checked", 1.0, 1)
+
+    evaluator._strategy = Capture()
+    context = _PlanContext(
+        "p", "测试方案", "测试流派", object(), object(), {}, 1.0,
+        affix_pool=("最大本属攻击", "劲", "敏", "会心率"),
+        attribute=attr, plan_maximum_rate=1.0,
+    )
+    equipment = {
+        "type": kind, "level": level, "quality": "gold",
+        "affix_1": {"name": "最大外功攻击", "value": 100},
+        "affix_2": {"name": "会心率", "value": 5, "unit": "%"},
+    }
+    evaluator._search_branch(context, slot, "", equipment, SearchBudget(10))
+    expected = "最大无相攻击" if kind == "剑" else f"最大{attr}攻击"
+    assert expected in captured
+    assert {n for n in captured if "攻击" in n} == {expected}
+    branches = evaluator._transmute_branches(context, equipment)
+    targets = {branch["affix_2"]["name"] for _label, branch in branches[1:]}
+    assert expected in targets
+    assert {n for n in targets if "攻击" in n} == {expected}
+
+
 def test_transmute_search_removes_only_first_affix_outside_rule_pool(
         monkeypatch):
     evaluator = _bare_evaluator()

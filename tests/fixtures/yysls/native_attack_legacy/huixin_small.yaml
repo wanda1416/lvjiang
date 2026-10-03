@@ -1,8 +1,12 @@
 content_version: 1
-key: huixin_big
-name: 会心大外
-order: 30
+key: huixin_small
+name: 会心小外
+order: 20
 default_rating: excellent
+quality_thresholds:
+  佩:
+  - gold
+  - purple
 playstyles:
 - 纯唐
 - 双切
@@ -12,66 +16,68 @@ playstyles:
 - 翊翊
 - 樽樽
 transmute_priority:
-- 最大外功攻击
-- 劲
-- 敏
-- 会心率
 - 最小外功攻击
+- 敏
+- 最大无相攻击
 - 最大本属攻击
+- 会心率
 affix_pool:
 - 对首领单位增伤
 - 全武学增效
-- 最大外功攻击
-- 劲
+- 最小外功攻击
 - 敏
 - 会心率
-- 精准率
-- 最小外功攻击
+- 最大无相攻击
 - 最大本属攻击
-- 势
+- 精准率
+- 最小无相攻击
+- 最小本属攻击
+- 最小外属攻击
 - 单体类奇术增伤
 - 全奇术增伤
 - 对玩家单位增效
 common_conditions:
+  junk_conditions:
+  - - count_min:
+        symbols:
+        - 最小本属攻击
+        - 最小外属攻击
+        min: 2
+    - count_min:
+        symbols:
+        - 精准率
+        - 会心率
+        min: 1
   normal_conditions:
   - count_min:
       symbols:
-      - 势
-      min: 1
+      - 最小本属攻击
+      - 最小外属攻击
+      min: 2
   - count_max:
       symbols:
-      - 最大外功攻击
+      - 最小外功攻击
       max: 0
 patterns:
   主武器:
     first:
-    - 最大外功攻击
+    - 最小外功攻击
     top_conditions:
-    - - contains_all:
-        - 最大外功攻击
-        - 劲
-      - count_min:
-          symbols:
-          - 会心率
-          - 精准率
-          - 敏
-          min: 1
+    - contains_all:
+      - 最小外功攻击
+      - 敏
+      - 最大无相攻击
   副武器:
     first:
-    - 最大外功攻击
+    - 最小外功攻击
     top_conditions:
-    - - contains_all:
-        - 最大外功攻击
-        - 劲
-      - count_min:
-          symbols:
-          - 会心率
-          - 精准率
-          - 敏
-          min: 1
+    - contains_all:
+      - 最小外功攻击
+      - 敏
+      - 最大无相攻击
   环:
     first:
-    - 最大外功攻击
+    - 最小外功攻击
     junk_conditions:
     - count_max:
         symbols:
@@ -79,13 +85,13 @@ patterns:
         max: 0
     top_conditions:
     - - contains_all:
-        - 最大外功攻击
-        - 劲
+        - 最小外功攻击
+        - 敏
       - count_min:
           symbols:
           - 会心率
           - 精准率
-          - 敏
+          - 最大本属攻击
           min: 1
   冠胄:
     first:
@@ -102,14 +108,14 @@ patterns:
           min: 1
     top_conditions:
     - - contains_all:
-        - 最大外功攻击
-        - 劲
+        - 最小外功攻击
+        - 敏
+        - 最大本属攻击
       - count_min:
           symbols:
           - 会心率
           - 精准率
-          - 敏
-          min: 2
+          min: 1
       - count_max:
           symbols:
           - 精准率
@@ -117,7 +123,8 @@ patterns:
           include_first: true
   胫甲:
     first:
-    - 劲
+    - 会心率
+    - 精准率
     junk_conditions:
     - when:
         keep_wanjia: false
@@ -142,12 +149,7 @@ patterns:
           - 对玩家单位增效
           max: 0
     top_conditions:
-    - - contains_all:
-        - 最大外功攻击
-        - 劲
-      - count_min:
-          symbols:
-          - 会心率
-          - 精准率
-          - 敏
-          min: 1
+    - contains_all:
+      - 最小外功攻击
+      - 敏
+      - 最大本属攻击

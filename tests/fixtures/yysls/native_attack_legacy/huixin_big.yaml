@@ -1,26 +1,49 @@
 content_version: 1
-key: huixin_modao
-name: 威威大王(beta)
-order: 70
+key: huixin_big
+name: 会心大外
+order: 30
+default_rating: excellent
+playstyles:
+- 纯唐
+- 双切
+- 鸢鸢
+- 双刀
+- 尘尘
+- 翊翊
+- 樽樽
 transmute_priority:
 - 最大外功攻击
 - 劲
-- 势
-- 会心率
 - 敏
+- 会心率
+- 最小外功攻击
+- 最大无相攻击
 - 最大本属攻击
 affix_pool:
 - 对首领单位增伤
 - 全武学增效
 - 最大外功攻击
 - 劲
-- 势
+- 敏
 - 会心率
 - 精准率
 - 最小外功攻击
-- 敏
+- 最大无相攻击
 - 最大本属攻击
+- 势
+- 单体类奇术增伤
+- 全奇术增伤
 - 对玩家单位增效
+common_conditions:
+  normal_conditions:
+  - count_min:
+      symbols:
+      - 势
+      min: 1
+  - count_max:
+      symbols:
+      - 最大外功攻击
+      max: 0
 patterns:
   主武器:
     first:
@@ -29,10 +52,12 @@ patterns:
     - - contains_all:
         - 最大外功攻击
         - 劲
-      - count_max:
+      - count_min:
           symbols:
-          - 最大本属攻击
-          max: 0
+          - 会心率
+          - 精准率
+          - 敏
+          min: 1
   副武器:
     first:
     - 最大外功攻击
@@ -40,10 +65,12 @@ patterns:
     - - contains_all:
         - 最大外功攻击
         - 劲
-      - count_max:
+      - count_min:
           symbols:
-          - 最大本属攻击
-          max: 0
+          - 会心率
+          - 精准率
+          - 敏
+          min: 1
   环:
     first:
     - 最大外功攻击
@@ -56,22 +83,40 @@ patterns:
     - - contains_all:
         - 最大外功攻击
         - 劲
-      - count_max:
+      - count_min:
           symbols:
-          - 最大本属攻击
-          max: 0
+          - 会心率
+          - 精准率
+          - 敏
+          min: 1
   冠胄:
     first:
     - 会心率
     - 精准率
+    junk_conditions:
+    - when:
+        keep_danti: false
+      all:
+      - count_min:
+          symbols:
+          - 单体类奇术增伤
+          - 全奇术增伤
+          min: 1
     top_conditions:
     - - contains_all:
-        - 劲
         - 最大外功攻击
+        - 劲
+      - count_min:
+          symbols:
+          - 会心率
+          - 精准率
+          - 敏
+          min: 2
       - count_max:
           symbols:
-          - 最大本属攻击
-          max: 0
+          - 精准率
+          max: 1
+          include_first: true
   胫甲:
     first:
     - 劲
@@ -102,25 +147,9 @@ patterns:
     - - contains_all:
         - 最大外功攻击
         - 劲
-      - count_max:
+      - count_min:
           symbols:
-          - 最大本属攻击
-          max: 0
-default_rating: excellent
-playstyles:
-- 威威
-common_conditions:
-  normal_conditions:
-  - - count_min:
-        symbols:
-        - 最大本属攻击
-        min: 1
-    - count_min:
-        symbols:
-        - 会心率
-        - 精准率
-        min: 1
-  - count_max:
-      symbols:
-      - 最大外功攻击
-      max: 0
+          - 会心率
+          - 精准率
+          - 敏
+          min: 1

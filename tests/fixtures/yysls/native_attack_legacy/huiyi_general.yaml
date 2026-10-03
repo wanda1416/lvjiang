@@ -1,74 +1,48 @@
 content_version: 1
-key: huixin_big
-name: 会心大外
-order: 30
+key: huiyi_general
+name: 通用会意
+order: 10
 default_rating: excellent
+quality_thresholds:
+  环:
+  - gold
+  - purple
 playstyles:
-- 纯唐
-- 双切
-- 鸢鸢
-- 双刀
-- 尘尘
-- 翊翊
-- 樽樽
+- 无名
+- 九剑
+playstyle_switches:
+  九剑: keep_danti
 transmute_priority:
 - 最大外功攻击
+- 势
 - 劲
-- 敏
+- 会意率
+- 最大无相攻击
+- 最大鸣金攻击
 - 会心率
-- 最小外功攻击
-- 最大本属攻击
 affix_pool:
 - 对首领单位增伤
 - 全武学增效
 - 最大外功攻击
+- 势
 - 劲
-- 敏
+- 会意率
+- 最大无相攻击
+- 最大鸣金攻击
 - 会心率
 - 精准率
-- 最小外功攻击
-- 最大本属攻击
-- 势
 - 单体类奇术增伤
 - 全奇术增伤
 - 对玩家单位增效
-common_conditions:
-  normal_conditions:
-  - count_min:
-      symbols:
-      - 势
-      min: 1
-  - count_max:
-      symbols:
-      - 最大外功攻击
-      max: 0
 patterns:
   主武器:
     first:
     - 最大外功攻击
     top_conditions:
-    - - contains_all:
-        - 最大外功攻击
-        - 劲
-      - count_min:
-          symbols:
-          - 会心率
-          - 精准率
-          - 敏
-          min: 1
-  副武器:
-    first:
-    - 最大外功攻击
-    top_conditions:
-    - - contains_all:
-        - 最大外功攻击
-        - 劲
-      - count_min:
-          symbols:
-          - 会心率
-          - 精准率
-          - 敏
-          min: 1
+    - contains_all:
+      - 最大外功攻击
+      - 势
+      - 劲
   环:
     first:
     - 最大外功攻击
@@ -78,19 +52,13 @@ patterns:
         - 全武学增效
         max: 0
     top_conditions:
-    - - contains_all:
-        - 最大外功攻击
-        - 劲
-      - count_min:
-          symbols:
-          - 会心率
-          - 精准率
-          - 敏
-          min: 1
+    - contains_all:
+      - 劲
+      - 势
+      - 最大外功攻击
   冠胄:
     first:
-    - 会心率
-    - 精准率
+    - 会意率
     junk_conditions:
     - when:
         keep_danti: false
@@ -103,18 +71,31 @@ patterns:
     top_conditions:
     - - contains_all:
         - 最大外功攻击
-        - 劲
       - count_min:
           symbols:
-          - 会心率
-          - 精准率
-          - 敏
+          - 劲
+          - 势
           min: 2
       - count_max:
           symbols:
-          - 精准率
-          max: 1
-          include_first: true
+          - 最大鸣金攻击
+          max: 0
+    - when:
+        keep_danti: true
+      all:
+      - contains_all:
+        - 最大外功攻击
+      - count_min:
+          symbols:
+          - 势
+          - 劲
+          - 单体类奇术增伤
+          - 全奇术增伤
+          min: 2
+      - count_max:
+          symbols:
+          - 最大鸣金攻击
+          max: 0
   胫甲:
     first:
     - 劲
@@ -142,12 +123,37 @@ patterns:
           - 对玩家单位增效
           max: 0
     top_conditions:
+    - contains_all:
+      - 劲
+      - 势
+      - 最大外功攻击
+  副武器:
+    first:
+    - 最大外功攻击
+    top_conditions:
     - - contains_all:
-        - 最大外功攻击
         - 劲
+        - 势
+        - 最大外功攻击
       - count_min:
           symbols:
-          - 会心率
-          - 精准率
-          - 敏
+          - 会意率
+          - 最大无相攻击
           min: 1
+common_conditions:
+  junk_conditions:
+  - count_min:
+      symbols:
+      - 会心率
+      - 精准率
+      min: 2
+  normal_conditions:
+  - count_min:
+      symbols:
+      - 会心率
+      - 精准率
+      min: 1
+  - count_max:
+      symbols:
+      - 最大外功攻击
+      max: 0

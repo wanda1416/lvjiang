@@ -8,7 +8,8 @@ transmute_priority:
 - 会心率
 - 敏
 - 最小外功攻击
-- 最大本属攻击
+- 最大无相攻击
+- 最大牵丝攻击
 affix_pool:
 - 对首领单位增伤
 - 全武学增效
@@ -21,7 +22,8 @@ affix_pool:
 - 精准率
 - 势
 - 最小外功攻击
-- 最大本属攻击
+- 最大无相攻击
+- 最大牵丝攻击
 - 对玩家单位增效
 patterns:
   胫甲:
@@ -117,7 +119,8 @@ common_conditions:
     - count_min:
         symbols:
         - 势
-        - 最大本属攻击
+        - 最大牵丝攻击
+        - 最大无相攻击
         min: 1
   - count_max:
       symbols:
@@ -127,7 +130,8 @@ common_conditions:
   - count_min:
       symbols:
       - 势
-      - 最大本属攻击
+      - 最大牵丝攻击
+      - 最大无相攻击
       min: 1
 playstyles:
 - 走地玉

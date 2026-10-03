@@ -8,7 +8,8 @@ transmute_priority:
 - 势
 - 会心率
 - 敏
-- 最大本属攻击
+- 最大无相攻击
+- 最大裂石攻击
 affix_pool:
 - 对首领单位增伤
 - 全武学增效
@@ -19,7 +20,8 @@ affix_pool:
 - 精准率
 - 最小外功攻击
 - 敏
-- 最大本属攻击
+- 最大无相攻击
+- 最大裂石攻击
 - 对玩家单位增效
 patterns:
   主武器:
@@ -31,7 +33,7 @@ patterns:
         - 劲
       - count_max:
           symbols:
-          - 最大本属攻击
+          - 最大无相攻击
           max: 0
   副武器:
     first:
@@ -42,7 +44,7 @@ patterns:
         - 劲
       - count_max:
           symbols:
-          - 最大本属攻击
+          - 最大无相攻击
           max: 0
   环:
     first:
@@ -58,7 +60,7 @@ patterns:
         - 劲
       - count_max:
           symbols:
-          - 最大本属攻击
+          - 最大裂石攻击
           max: 0
   冠胄:
     first:
@@ -70,7 +72,7 @@ patterns:
         - 最大外功攻击
       - count_max:
           symbols:
-          - 最大本属攻击
+          - 最大裂石攻击
           max: 0
   胫甲:
     first:
@@ -104,7 +106,7 @@ patterns:
         - 劲
       - count_max:
           symbols:
-          - 最大本属攻击
+          - 最大裂石攻击
           max: 0
 default_rating: excellent
 playstyles:
@@ -113,7 +115,8 @@ common_conditions:
   normal_conditions:
   - - count_min:
         symbols:
-        - 最大本属攻击
+        - 最大裂石攻击
+        - 最大无相攻击
         min: 1
     - count_min:
         symbols:

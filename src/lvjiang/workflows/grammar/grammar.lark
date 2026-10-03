@@ -151,12 +151,17 @@ SCROLL_DIR: /up/i | /down/i
 // 逐格滚动间隔："interval" 关键字 + 秒数（与 wait stable 的 interval 关键字复用同一词）
 scroll_interval: "interval"i number
 
-// drag 支持五种目标：
-//   1. [scene].[panel][row][col] [up|down [n]] — panel cell 级拖拽
-//   2. [scene].[panel] up|down|left|right [n]  — panel grid 级拖拽（中心起拖）
-//   3. [scene].[point_1] to [scene].[point_2]   — 两个命名点之间拖拽
-//   4. scene.arrow — scene.arrow 引用
-//   5. (rx1, ry1) to (rx2, ry2) — 两坐标点
+// drag 支持六种目标：
+//   1. [scene].[panel][row][col] [up|down [n]] — panel cell 级拖拽（格子中心起拖）
+//   2. [scene].[panel][row] up|down [n]        — panel 行级拖拽（该行中心起拖）
+//   2b.[scene].[panel][][col] left|right [n]   — panel 列级拖拽（该列中心起拖）
+//   3. [scene].[panel] up|down|left|right [n]  — panel grid 级拖拽（面板中心起拖）
+//   4. [scene].[point_1] to [scene].[point_2]   — 两个命名点之间拖拽
+//   5. scene.arrow — scene.arrow 引用
+//   6. (rx1, ry1) to (rx2, ry2) — 两坐标点
+// 行级形态存在的理由：滚动只关心起点落在可滚动区的哪一行，不关心列。指定到
+// 格子（形态 1）会让人以为列也参与，而向上/向下滚时列对结果毫无影响；而面板
+// 中心（形态 3）又浪费了一半行程——向上滚时中心以下那半个面板本可用来起拖。
 // 两点形态必须写 to（与 move ... to 对齐），两个并排的点难以分辨谁是起点。
 // 修饰子句任意顺序、各至多一次：
 //   scale <n|$var>   起点→终点向量按倍数放大/缩小（仅 arrow / 两点形态）
@@ -168,6 +173,8 @@ drag_stmt: "drag"i drag_target drag_modifier* wait_clauses? _NL
 drag_scale: "scale"i (number | var_ref)
 drag_exact: "exact"i
 drag_target: const_or_var "." const_or_var panel_index panel_index drag_direction? -> drag_panel_target
+           | const_or_var "." const_or_var panel_index drag_direction           -> drag_grid_row_target
+           | const_or_var "." const_or_var panel_empty_index panel_index drag_direction -> drag_grid_col_target
            | const_or_var "." const_or_var drag_direction                       -> drag_grid_target
            | const_or_var "." const_or_var "to"i const_or_var "." const_or_var  -> drag_point_pair_target
            | const_or_var "." const_or_var                                      -> drag_scene_target
@@ -182,6 +189,10 @@ DRAG_DIR: /up/i | /down/i | /left/i | /right/i
 DRAG_DIST.2: /[0-9]+(\.[0-9]+)?/ | /\$[a-zA-Z_][a-zA-Z0-9_]*/
 
 // panel 索引：[数字] 或 [$var]，显式包含括号以避免与 bracket_list 歧义
+// 只指定列时行位留空：`[][2]`。空位比 `[*][2]` 这类占位符好——它在视觉上
+// 就是「这一维不参与」，而占位符会让人去猜它代表什么。
+panel_empty_index: "[" "]"
+
 panel_index: "[" INT "]" -> panel_index_int
            | "[" var_ref "]" -> panel_index_var
 

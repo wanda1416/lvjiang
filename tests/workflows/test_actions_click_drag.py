@@ -11,8 +11,10 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 from lark.exceptions import UnexpectedInput
 
+from lvjiang.core.config import InputSimConfig
 from lvjiang.core.layout_models import Region
 from lvjiang.workflows.align import GridAlignment
+from lvjiang.workflows.errors import WorkflowUserError
 from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.grammar.ast_nodes import Scroll
 from tests.workflows.conftest import make_engine
@@ -265,7 +267,7 @@ class TestDragStructuredTargets:
         with patch.object(eng, "drag_grid") as drag_grid:
             eng._exec_body(parse_text("drag [bag].[items] up 2\n").body)
         drag_grid.assert_called_once_with(
-            "bag", "items", "up", distance=2.0,
+            "bag", "items", "up", distance=2.0, row=None, col=None,
             duration=None, hold=None,
         )
 
@@ -392,3 +394,201 @@ def test_execute_injects_stop_check_into_input_backend(tmp_path):
     eng.execute(wf)
 
     assert eng._input.stop_check is stop
+
+
+class TestDragGridAxisAnchor:
+    """`[panel][row]` / `[panel][][col]`：只指定一维，起点落在那一行（列）的中心。
+
+    面板中心起拖会浪费一半行程：向上滚时，中心以下那半个面板本来可以用来起拖。
+    而指定到格子（`[row][col]`）又会让人以为两维都参与——上下滚时列对位移毫无
+    影响。所以单维形态存在，并且方向与维度必须相配。
+    """
+
+    @staticmethod
+    def _area(key: str):
+        return MagicMock(key=key, x_ratio=0.1, y_ratio=0.2,
+                         w_ratio=0.4, h_ratio=0.3, disabled=False)
+
+    @staticmethod
+    def _alignment():
+        return GridAlignment(
+            row_centers=[0.25, 0.75], col_centers=[0.125, 0.875],
+            row_bounds=[0.0, 0.5, 1.0], col_bounds=[0.0, 0.5, 1.0],
+            row_slot=0.2, row_span=0.04, col_slot=0.3, col_span=0.02,
+        )
+
+    def _engine(self):
+        eng = make_engine()
+        eng._layout.get_scene_panels.return_value = [self._area("list")]
+        eng._panel_alignments[("bag", "list")] = self._alignment()
+        # _panel_ratio_to_screen 会按 click_random_offset 做内缩钳位；
+        # conftest 给的 input_sim 是 MagicMock，拿它参与算术会直接 TypeError
+        eng._input_sim = InputSimConfig()
+        return eng
+
+    def _start(self, source: str):
+        eng = self._engine()
+        eng._exec_body(parse_text(source).body)
+        return eng._input.drag_screen.call_args.args[:4]
+
+    def test_row_anchor_moves_the_start_down_without_shifting_x(self):
+        centre = self._start("drag [bag].[list] up 1\n")
+        row2 = self._start("drag [bag].[list][2] up 1\n")
+
+        assert row2[0] == centre[0], "上下滚时列不参与，横向应与面板中心一致"
+        assert row2[1] > centre[1], "第 2 行中心应低于面板中心，换来更多向上行程"
+        # 位移量不受起点影响：两种写法的 dy 必须相同
+        assert row2[3] - row2[1] == centre[3] - centre[1]
+
+    def test_col_anchor_moves_the_start_right_without_shifting_y(self):
+        centre = self._start("drag [bag].[list] right 1\n")
+        col2 = self._start("drag [bag].[list][][2] right 1\n")
+
+        assert col2[1] == centre[1], "左右滚时行不参与，纵向应与面板中心一致"
+        assert col2[0] > centre[0]
+        assert col2[2] - col2[0] == centre[2] - centre[0]
+
+    def test_row_only_rejects_horizontal_directions(self):
+        """left/right 是沿着列走的，指定行对它没有影响——写错要当场报出来。"""
+        for direction in ("left", "right"):
+            with pytest.raises(Exception) as caught:
+                parse_text(f"drag [bag].[list][2] {direction} 1\n")
+            assert "up / down" in str(caught.value)
+
+    def test_col_only_rejects_vertical_directions(self):
+        for direction in ("up", "down"):
+            with pytest.raises(Exception) as caught:
+                parse_text(f"drag [bag].[list][][2] {direction} 1\n")
+            assert "left / right" in str(caught.value)
+
+    def test_cell_form_still_accepts_any_direction(self):
+        """两维都给的 cell 形态不受这条约束——它本来就是显式指定一个格子。"""
+        node = parse_text("drag [bag].[list][2][2] left 1\n").body[0]
+
+        assert node.scene.row == 2 and node.scene.col == 2
+
+    def test_out_of_range_index_skips_instead_of_dragging(self):
+        """行列数来自运行期对齐，越界是运行时状态：记日志跳过，但绝不能用
+        面板中心悄悄替代——那会滚一个用户没要求的距离。"""
+        eng = self._engine()
+
+        eng._exec_body(parse_text("drag [bag].[list][5] up 1\n").body)
+
+        assert not eng._input.drag_screen.called
+
+    def test_region_rejects_an_axis_index(self):
+        """region 没有网格，行列号无从解释——静默忽略会让脚本以为起点挪过去了。"""
+        eng = make_engine()
+        eng._layout.get_scene_panels.return_value = []
+        eng._layout.get_scene_regions.return_value = [
+            Region("scroll_area", 0.1, 0.2, 0.4, 0.3)]
+
+        with pytest.raises(WorkflowUserError, match="region"):
+            eng._exec_body(
+                parse_text("drag [bag].[scroll_area][2] up 1\n").body)
+
+
+class TestOutOfBoundsGuard:
+    """引擎层主动拦截越界坐标：默认报错结束，开关打开才自动截断。
+
+    判定必须在引擎层：同一个越界坐标，设备端无障碍手势是硬拒绝（一句
+    `Path bounds must not be negative`，看不出是 wf 的哪一行），而桌面
+    SendInput / PostMessage 与 adb shell input 会静默接受并自行截断——于是
+    PC 上一直在悄悄少走位移，没人发现。
+
+    默认报错而不是自动截断：越界说明脚本的位移参数与当前面板几何不匹配，
+    截断会把「滚两行」悄悄变成「滚一行」，脚本和日志都看不出来。起点怎么挪
+    是用户的决定（`[行]` / `[][列]` 形态），引擎不替他改。
+    """
+
+    @staticmethod
+    def _engine(*, clamp: bool):
+        eng = make_engine()
+        eng._input_sim = InputSimConfig(clamp_out_of_bounds=clamp)
+        eng._capture.get_capture_size.return_value = (1920, 1080)
+        return eng
+
+    def test_out_of_bounds_drag_fails_by_default(self):
+        eng = self._engine(clamp=False)
+
+        with pytest.raises(WorkflowUserError) as caught:
+            eng._send_drag(900, 300, 900, -220, "grid(bag.list) up 2")
+
+        message = str(caught.value)
+        assert "(900, -220)" in message, "必须报出到底哪个坐标越界"
+        assert "1920×1080" in message, "必须报出画面尺寸，否则无从判断差多少"
+        assert "越界坐标自动截断" in message, "要指路到那个开关"
+        assert not eng._input.drag_screen.called, "报错后不许再下发"
+
+    def test_enabling_the_switch_clamps_and_keeps_running(self):
+        eng = self._engine(clamp=True)
+
+        eng._send_drag(900, 300, 900, -220, "grid(bag.list) up 2")
+
+        assert eng._input.drag_screen.call_args.args[:4] == (900, 300, 900, 0)
+
+    def test_in_bounds_coordinates_pass_through_untouched(self):
+        """没越界时不许改动坐标——抖动与钳位都已经在别处做过了。"""
+        eng = self._engine(clamp=False)
+
+        eng._send_drag(900, 300, 900, 120, "grid(bag.list) up 1")
+        eng._send_click(10, 1079, "edge")
+
+        assert eng._input.drag_screen.call_args.args[:4] == (900, 300, 900, 120)
+        assert eng._input.click_screen.call_args.args[:2] == (10, 1079)
+
+    def test_start_point_is_checked_too(self):
+        """起点越界等于按在画面外，和终点一样要拦。"""
+        eng = self._engine(clamp=False)
+
+        with pytest.raises(WorkflowUserError, match="起点"):
+            eng._send_drag(-5, 300, 900, 300, "grid(bag.list) left 1")
+
+    def test_click_and_move_go_through_the_same_guard(self):
+        eng = self._engine(clamp=False)
+
+        with pytest.raises(WorkflowUserError, match="click"):
+            eng._send_click(1920, 500, "region(bag.slot)")
+        with pytest.raises(WorkflowUserError, match="move"):
+            eng._send_move(500, 1080, "point(bag.anchor)")
+
+    def test_desktop_window_offset_uses_absolute_capture_bounds(self):
+        """桌面后端收到的是绝对屏幕坐标，窗口偏移不能被当成内容越界。"""
+        eng = self._engine(clamp=False)
+        eng._window_left = 66
+        eng._window_top = 145
+
+        eng._send_click(66 + 1919, 145 + 1079, "bottom-right edge")
+        eng._send_drag(
+            66 + 1500, 145 + 900,
+            66 + 1500, 145 + 300,
+            "desktop menu scroll",
+        )
+
+        assert eng._input.click_screen.call_args.args[:2] == (1985, 1224)
+        assert eng._input.drag_screen.call_args.args[:4] == (
+            1566, 1045, 1566, 445,
+        )
+
+    def test_desktop_window_offset_still_rejects_true_local_overflow(self):
+        eng = self._engine(clamp=False)
+        eng._window_left = 66
+        eng._window_top = 145
+
+        with pytest.raises(WorkflowUserError) as caught:
+            eng._send_click(66 + 100, 145 + 1080, "below client")
+
+        message = str(caught.value)
+        assert "(166, 1225)" in message
+        assert "屏幕区域 (66, 145)-(1985, 1224)" in message
+
+    def test_desktop_window_offset_clamps_to_absolute_capture_bounds(self):
+        eng = self._engine(clamp=True)
+        eng._window_left = 66
+        eng._window_top = 145
+
+        eng._send_drag(60, 140, 2000, 1300, "desktop overflow")
+
+        assert eng._input.drag_screen.call_args.args[:4] == (
+            66, 145, 1985, 1224,
+        )

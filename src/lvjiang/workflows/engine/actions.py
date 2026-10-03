@@ -106,7 +106,7 @@ class _ActionsMixin:
             kw["post_delay"] = (0, 0)
         if isinstance(node.target, CoordPoint):
             x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
-            self._input.click_screen(x, y, f"coord({node.target.rx},{node.target.ry})", **kw)
+            self._send_click(x, y, f"coord({node.target.rx},{node.target.ry})", **kw)
             return
         if isinstance(node.target, PanelRef):
             ref = node.target
@@ -118,7 +118,7 @@ class _ActionsMixin:
             return
         if isinstance(node.target, SubsceneEntityRef):
             x, y, label = self._subscene_target_to_screen(node.target)
-            self._input.click_screen(
+            self._send_click(
                 x, y, label, **kw)
             return
         if isinstance(node.target, EntityRef):
@@ -142,13 +142,13 @@ class _ActionsMixin:
                 FoundRegionCls = _get_found_region_cls()
                 if isinstance(region_val, FoundRegionCls):
                     x, y = self._found_region_to_screen(region_val)
-                    self._input.click_screen(x, y, f"find({region_val.text!r})", **kw)
+                    self._send_click(x, y, f"find({region_val.text!r})", **kw)
                     return
                 # 尝试从 coord_meta 查找该 key 对应的 Region
                 region_obj = self._find_region_in_coord_meta(region_val)
                 if region_obj is not None:
                     x, y = self._ensure_workflow()._region_to_screen(region_obj, jitter=True)
-                    self._input.click_screen(x, y, f"{scene}/{region_val}", **kw)
+                    self._send_click(x, y, f"{scene}/{region_val}", **kw)
                     return
                 # 回退：作为 entity key 名查场景配置
                 self._ensure_workflow().click_any(str(scene), str(region_val), **kw)
@@ -164,12 +164,12 @@ class _ActionsMixin:
             # CoordRef 变量：直接点击中心（+ 抖动）
             if isinstance(region_val, CoordRef):
                 x, y = self._coord_ref_to_screen(region_val, jitter=True)
-                self._input.click_screen(x, y, f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})", **kw)
+                self._send_click(x, y, f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})", **kw)
                 return
             FoundRegionCls = _get_found_region_cls()
             if isinstance(region_val, FoundRegionCls):
                 x, y = self._found_region_to_screen(region_val)
-                self._input.click_screen(x, y, f"find({region_val.text!r})", **kw)
+                self._send_click(x, y, f"find({region_val.text!r})", **kw)
                 return
             raise WorkflowUserError(
                 f"click ${node.target.name}: 变量值不是可点击类型 "
@@ -217,21 +217,21 @@ class _ActionsMixin:
             raise WorkflowUserError(f"move: 未知移动模式 {node.mode}")
         if isinstance(node.target, CoordPoint):
             x, y = self._coord_ratio_to_screen(node.target.rx, node.target.ry)
-            self._input.move_screen(
+            self._send_move(
                 x, y, f"coord({node.target.rx},{node.target.ry})",
                 duration=duration)
             return
         if isinstance(node.target, PanelRef):
             x, y = self._panel_ref_to_screen(node.target)
             if x is not None and y is not None:
-                self._input.move_screen(
+                self._send_move(
                     x, y,
                     f"panel({node.target.scene}.{node.target.panel}[{node.target.row}][{node.target.col}])",
                     duration=duration)
             return
         if isinstance(node.target, SubsceneEntityRef):
             x, y, label = self._subscene_target_to_screen(node.target)
-            self._input.move_screen(x, y, label, duration=duration)
+            self._send_move(x, y, label, duration=duration)
             return
         if isinstance(node.target, EntityRef):
             # 解析 scene
@@ -253,13 +253,13 @@ class _ActionsMixin:
                 FoundRegionCls = _get_found_region_cls()
                 if isinstance(region_val, FoundRegionCls):
                     x, y = self._found_region_to_screen(region_val)
-                    self._input.move_screen(
+                    self._send_move(
                         x, y, f"find({region_val.text!r})", duration=duration)
                     return
                 region_obj = self._find_region_in_coord_meta(region_val)
                 if region_obj is not None:
                     x, y = self._ensure_workflow()._region_to_screen(region_obj, jitter=True)
-                    self._input.move_screen(
+                    self._send_move(
                         x, y, f"{scene}/{region_val}", duration=duration)
                     return
                 self._ensure_workflow().move_any(
@@ -275,7 +275,7 @@ class _ActionsMixin:
                 )
             if isinstance(region_val, CoordRef):
                 x, y = self._coord_ref_to_screen(region_val, jitter=True)
-                self._input.move_screen(
+                self._send_move(
                     x, y,
                     f"coord_ref({region_val.cx:.3f},{region_val.cy:.3f})",
                     duration=duration)
@@ -283,7 +283,7 @@ class _ActionsMixin:
             FoundRegionCls = _get_found_region_cls()
             if isinstance(region_val, FoundRegionCls):
                 x, y = self._found_region_to_screen(region_val)
-                self._input.move_screen(
+                self._send_move(
                     x, y, f"find({region_val.text!r})", duration=duration)
                 return
             raise WorkflowUserError(
@@ -449,9 +449,15 @@ class _ActionsMixin:
         self, scene_key: str, panel_key: str, direction: str, *,
         distance: float = 1.0, hold: float | None = None,
         duration: float | tuple[float, float] | None = None,
+        row=None, col=None,
         **kw,
     ) -> None:
-        """WorkflowEngine 的 panel/region grid 拖拽原语。"""
+        """WorkflowEngine 的 panel/region grid 拖拽原语。
+
+        ``row`` / ``col`` 都为 None 时起点取 panel/region 中心；给了 1-based
+        行号取该行中心、列号取该列中心（仅 panel 支持——region 没有网格）。
+        只会给其中一个：方向与维度是否相配在解析期已校验。
+        """
         panel_obj = self._find_panel_in_layout(scene_key, panel_key)
         if panel_obj is None:
             regions = self._layout.get_scene_regions(scene_key)
@@ -461,6 +467,12 @@ class _ActionsMixin:
                     f"drag grid: 布局中未定义 panel/region "
                     f"{scene_key}.{panel_key}")
             require_enabled(area, scene_key, "region")
+            if row is not None or col is not None:
+                # region 没有网格，行列号无从解释。静默忽略会让脚本以为起点被
+                # 挪过去了，而实际还在区域中心——按模块约定这算脚本配错，抛错。
+                raise WorkflowUserError(
+                    f"drag grid: {scene_key}.{panel_key} 是 region，没有网格，"
+                    "不能指定行号或列号")
             x, y, w, h, canvas = self._area_center_to_screen(area)
             vertical = area.h_ratio * canvas.h_ratio * h * distance
             horizontal = area.w_ratio * canvas.w_ratio * w * distance
@@ -485,8 +497,17 @@ class _ActionsMixin:
                 (cal.col_slot + cal.col_span / 2.0)
                 * area.w_ratio * canvas.w_ratio * w * distance
             )
+            if row is not None or col is not None:
+                # 指定行/列：起点取该行（列）中心，另一维仍是 panel 中心。
+                # 面板中心起拖会浪费一半行程——向上滚时中心以下那半个面板
+                # 本来可以用来起拖。
+                anchored = self._axis_anchor_to_screen(
+                    panel_obj, cal, row, col, scene_key, panel_key)
+                if anchored is None:
+                    return
+                x, y = anchored
         dx, dy = self._drag_delta(direction, vertical, horizontal)
-        self._input.drag_screen(
+        self._send_drag(
             x, y, x + dx, y + dy,
             f"grid({scene_key}.{panel_key}) {direction} {distance}",
             duration=duration, hold=hold, **kw,
@@ -511,6 +532,92 @@ class _ActionsMixin:
         except (TypeError, ValueError):
             raise WorkflowUserError(
                 f"{error_prefix}: 距离无效: {value}") from None
+
+    # ─── 越界守卫 ─────────────────────────────────────────
+
+    def _guard_screen_point(self, x: int, y: int, label: str) -> tuple[int, int]:
+        """坐标必须落在画面内；越界按 input_sim.clamp_out_of_bounds 处置。
+
+        判定放在引擎层而不是后端：同一个越界坐标，设备端无障碍手势是硬拒绝
+        （`Path bounds must not be negative`，一句 Java 异常看不出是 wf 的哪
+        一行），桌面 SendInput / PostMessage 与 adb shell input 却静默接受并
+        自行截断——于是 PC 上一直在悄悄少走位移，没人知道。
+
+        默认报错结束：越界说明脚本的位移参数与当前面板几何不匹配，自动截断会
+        把「滚两行」悄悄变成「滚一行」，而脚本和日志都看不出来。开了开关才由
+        引擎截断并记 warning。
+        """
+        width, height = self._capture.get_capture_size()
+        # DSL 坐标在换算完成后是屏幕绝对坐标，桌面窗口截图的 (0, 0)
+        # 则位于窗口客户区左上角。窗口不在屏幕原点时，直接拿绝对坐标和
+        # width / height 比较会把客户区底部、右侧的合法落点误判为越界。
+        # Android 后端的窗口原点为 (0, 0)，同样适用这套边界。
+        left = int(self._window_left)
+        top = int(self._window_top)
+        right = left + int(width) - 1
+        bottom = top + int(height) - 1
+        cx = max(left, min(right, x))
+        cy = max(top, min(bottom, y))
+        if (cx, cy) == (x, y):
+            return x, y
+        detail = (
+            f"{label}: 坐标 ({x}, {y}) 超出画面 {width}×{height}"
+            f"（屏幕区域 ({left}, {top})-({right}, {bottom})）"
+        )
+        if not self._input_sim.clamp_out_of_bounds:
+            raise WorkflowUserError(
+                f"{detail}。请调整拖拽距离或起点（panel 形态可用 "
+                f"[行] / [][列] 把起点挪向拖拽方向的反侧）；"
+                f"若确认截断可接受，到「配置管理 → 输入参数」打开"
+                f"「越界坐标自动截断」")
+        logger.warning(f"{detail}，已截断到 ({cx}, {cy})")
+        return cx, cy
+
+    def _send_click(self, x: int, y: int, label: str, **kw) -> None:
+        x, y = self._guard_screen_point(x, y, f"click {label}")
+        self._input.click_screen(x, y, label, **kw)
+
+    def _send_move(self, x: int, y: int, label: str, **kw) -> None:
+        x, y = self._guard_screen_point(x, y, f"move {label}")
+        self._input.move_screen(x, y, label, **kw)
+
+    def _send_drag(self, from_x: int, from_y: int, to_x: int, to_y: int,
+                   label: str, **kw) -> None:
+        # 起点和终点都要检查：起点越界等于按在画面外，终点越界会被设备端拒绝
+        from_x, from_y = self._guard_screen_point(
+            from_x, from_y, f"drag 起点 {label}")
+        to_x, to_y = self._guard_screen_point(
+            to_x, to_y, f"drag 终点 {label}")
+        self._input.drag_screen(from_x, from_y, to_x, to_y, label, **kw)
+
+    def _axis_anchor_to_screen(
+        self, panel_obj, cal, row, col, scene_key: str, panel_key: str,
+    ) -> tuple[int, int] | None:
+        """行号/列号 → 该行（列）中心的屏幕坐标；不可用时记日志返回 None。
+
+        行列数来自运行期对齐，所以越界属于「运行时状态」而不是脚本写错：按本
+        模块约定记日志后跳过，不抛错中断（见模块 docstring）。
+
+        另一维一律取 panel 中心 0.5：上下滚时列不参与、左右滚时行不参与，钉到
+        某一格只会让读者以为两维都有影响。
+        """
+        axis, value, centers, total = (
+            ("行", row, cal.row_centers, cal.n_rows) if row is not None
+            else ("列", col, cal.col_centers, cal.n_cols))
+        resolved = self._resolve(value) if isinstance(value, VarRef) else value
+        try:
+            index = int(float(resolved)) - 1
+        except (TypeError, ValueError):
+            raise WorkflowUserError(
+                f"drag grid: {axis}号非数值: {resolved!r}") from None
+        if not 0 <= index < total:
+            logger.error(
+                f"drag grid: {axis}号越界 [{index + 1}]，"
+                f"{scene_key}.{panel_key} 对齐到 {total} {axis}")
+            return None
+        if row is not None:
+            return self._panel_ratio_to_screen(panel_obj, 0.5, centers[index])
+        return self._panel_ratio_to_screen(panel_obj, centers[index], 0.5)
 
     @staticmethod
     def _drag_delta(
@@ -592,7 +699,7 @@ class _ActionsMixin:
         distance = self._drag_distance(grid.distance, "drag grid")
         self.drag_grid(
             grid.scene, grid.panel, grid.direction,
-            distance=distance,
+            distance=distance, row=grid.row, col=grid.col,
             duration=self._drag_duration(node), hold=node.hold, **kw,
         )
 
@@ -623,7 +730,7 @@ class _ActionsMixin:
             (cal.col_slot + cal.col_span / 2.0)
             * panel_obj.w_ratio * canvas.w_ratio * w * distance,
         )
-        self._input.drag_screen(
+        self._send_drag(
             x, y, x + dx, y + dy,
             f"panel({ref.scene}.{ref.panel}[{ref.row}][{ref.col}]) "
             f"{direction} {distance}",
@@ -697,7 +804,7 @@ class _ActionsMixin:
         dy = int(region.h_ratio * canvas.h_ratio * h)
         if abs(dy) < 10:
             dy = 10
-        self._input.drag_screen(
+        self._send_drag(
             x, y, x, y - dy, f"region({scene}.{key}) up",
             duration=duration, hold=hold, **kw,
         )

@@ -106,7 +106,7 @@ class _PanelMixin:
         x, y = self._panel_cell_to_screen(scene_key, panel_key, row, col)
         if x is None or y is None:
             return False
-        self._input.click_screen(
+        self._send_click(
             x, y, f"panel({scene_key}.{panel_key}[{row}][{col}])", **kw)
         return True
 

@@ -509,15 +509,25 @@ class PanelRef:
 
 @dataclass(frozen=True)
 class PanelGridDrag:
-    """panel grid 级拖拽：drag [scene].[panel] up|down|left|right [n]
+    """panel 级拖拽：drag [scene].[panel][row]? up|down|left|right [n]
 
-    起点为 panel 中心，拖拽距离按 slot+span/2 计算（支持浮点数，如 0.5 表示半行）。
+    拖拽距离按 slot+span/2 计算（支持浮点数，如 0.5 表示半行）。
+
+    ``row`` / ``col`` 都为空时起点取 panel 中心；给了行号取**该行中心**
+    （横向仍是 panel 中心），给了列号取**该列中心**（纵向仍是 panel 中心）。
+
+    只会给其中一个：滚动只关心起点落在可滚动区的哪一行（或哪一列），另一维
+    对结果毫无影响。指定到格子（``PanelRef``）会让人以为两维都参与。因此
+    行号只配上下滚、列号只配左右滚，解析期就校验（见 drag_grid_row_target /
+    drag_grid_col_target）。
     """
     scene: str
     panel: str
     direction: str        # "up" | "down" | "left" | "right"
     distance: Any = 1.0   # float | VarRef（支持整数、浮点数、变量引用）
     line_no: int = 0
+    row: Any = None       # None | int | VarRef（1-based 行号，配 up/down）
+    col: Any = None       # None | int | VarRef（1-based 列号，配 left/right）
 
 
 @dataclass(frozen=True)

@@ -273,10 +273,22 @@ class WindowOpsMixin:
         切走」。
         """
         allowed = getattr(self, "_locate_allowed_by_candidate", False)
-        running = bool(getattr(self, "_running", False))
-        self.btn_locate.setEnabled(allowed and not running)
+        busy = False
+        if self._candidate_backend == "windows":
+            from .execution_targets import WINDOW_TARGET_ID
+            busy = self._target_has_active_run(WINDOW_TARGET_ID)
+        elif self._candidate_backend == "adb":
+            candidate = self.window_combo.currentData()
+            if isinstance(candidate, dict):
+                existing = self._execution_targets.device(
+                    str(candidate.get("serial") or ""))
+                busy = bool(
+                    existing is not None
+                    and self._target_has_active_run(existing.id)
+                )
+        self.btn_locate.setEnabled(allowed and not busy)
         self.btn_locate.setToolTip(
-            tr("任务运行中不能定位或连接，请先停止任务") if running else "")
+            tr("该目标正在执行任务，不能重新定位或连接") if busy else "")
 
     def _sync_active_target_compat(self) -> None:
         """把当前执行目标投影到既有单目标字段。
@@ -376,9 +388,23 @@ class WindowOpsMixin:
         tree.clear()
         selected_item = None
         for target in self._execution_targets.all():
+            manager = getattr(self, "_run_manager", None)
+            run_context = manager.run_for_target(target.id) \
+                if manager is not None else None
+            if run_context is None:
+                state_text = tr("已连接") if target.ready else tr("已离线")
+            else:
+                state_text = {
+                    "starting": tr("启动中"),
+                    "running": tr("运行中"),
+                    "pausing": tr("暂停中"),
+                    "paused": tr("已暂停"),
+                    "waiting_target": tr("等待重连"),
+                    "stopping": tr("结束中"),
+                }.get(run_context.state.value, tr("运行中"))
             item = QTreeWidgetItem([
                 target.display_name,
-                tr("已连接") if target.ready else tr("已离线"),
+                state_text,
                 self._target_connection_details(target),
                 self._target_status_details(target),
                 "×",
@@ -490,10 +516,6 @@ class WindowOpsMixin:
         target_id = current.data(0, Qt.ItemDataRole.UserRole)
         if not target_id or target_id == self._execution_targets.active_target_id:
             return
-        if self._running:
-            self.log_text.append(tr("[提示] 任务运行中，执行目标已锁定"))
-            self._refresh_execution_targets_ui()
-            return
         recorder = getattr(self, "_screen_recorder", None)
         abort_recording = getattr(self, "_abort_screen_record", None)
         if recorder is not None and callable(abort_recording):
@@ -501,6 +523,7 @@ class WindowOpsMixin:
         # 用 select 的返回值，而不是回头再查一次 active()：后者的返回类型是
         # 可空的，加守卫等于承认这里可能是 None，而实际上不可能。
         target = self._execution_targets.select(str(target_id))
+        self._project_run_context_for_target(target.id)
         self._sync_active_target_compat()
         self._refresh_active_target_ui()
         self._refresh_run_button()
@@ -592,10 +615,6 @@ class WindowOpsMixin:
             # 按钮在非 Windows 已隐藏，此处为防御：投屏模式依赖 Win32 API
             self.log_text.append(tr("[提示] 当前平台不支持窗口投屏模式，请使用「扫描设备」"))
             return
-        if self._running:
-            self.log_text.append(tr("[提示] 请先停止当前任务，再重新扫描窗口"))
-            return
-
         self._apply_backend_ui("windows")
 
         self._set_locate_enabled(False)
@@ -645,10 +664,6 @@ class WindowOpsMixin:
         if self._device_scan_running():
             self._cancel_device_scan()
             return
-        if self._running:
-            self.log_text.append(tr("[提示] 请先停止当前任务，再重新扫描设备"))
-            return
-
         self._apply_backend_ui("adb")
 
         self._set_locate_enabled(False)
@@ -1075,8 +1090,8 @@ class WindowOpsMixin:
         target = self._execution_targets.get(target_id)
         if target is None:
             return
-        if self._running:
-            self.log_text.append(tr("[提示] 任务运行中不能断开执行目标"))
+        if self._target_has_active_run(target.id):
+            self.log_text.append(tr("[提示] 该目标正在执行任务，不能断开"))
             return
         if target.id == self._execution_targets.active_target_id:
             recorder = getattr(self, "_screen_recorder", None)
@@ -1104,8 +1119,8 @@ class WindowOpsMixin:
         target = self._execution_targets.get(target_id)
         if target is None:
             return
-        if self._running:
-            self.log_text.append(tr("[提示] 任务运行中不能刷新或重连目标"))
+        if self._target_has_active_run(target.id):
+            self.log_text.append(tr("[提示] 该目标正在执行任务，不能刷新或重连"))
             return
         if target.kind == "adb":
             self._reconnect_android_target(target_id)
@@ -1149,8 +1164,8 @@ class WindowOpsMixin:
         target = self._execution_targets.get(target_id)
         if target is None or target.kind != "windows" or target.window is None:
             return
-        if self._running:
-            self.log_text.append(tr("[提示] 任务运行中不能切换输入方式"))
+        if self._target_has_active_run(target.id):
+            self.log_text.append(tr("[提示] 该目标正在执行任务，不能切换输入方式"))
             return
         if not enabled:
             from ...core.desktop import WgcCapture
@@ -1201,8 +1216,8 @@ class WindowOpsMixin:
         target = self._execution_targets.get(target_id)
         if target is None or target.kind != "windows" or target.window is None:
             return
-        if self._running:
-            self.log_text.append(tr("[提示] 任务运行中不能切换截图方式"))
+        if self._target_has_active_run(target.id):
+            self.log_text.append(tr("[提示] 该目标正在执行任务，不能切换截图方式"))
             return
         if enabled and not bool(
                 getattr(target.input_ctrl, "background_mode", False)):
@@ -1242,8 +1257,8 @@ class WindowOpsMixin:
         target = self._execution_targets.get(target_id)
         if target is None or target.kind != "adb" or target.device is None:
             return
-        if self._running:
-            self.log_text.append(tr("[提示] 任务运行中不能切换截图方式"))
+        if self._target_has_active_run(target.id):
+            self.log_text.append(tr("[提示] 该目标正在执行任务，不能切换截图方式"))
             return
         method = "scrcpy" if enabled else "screencap"
         from ...core.android import AndroidStreamCapture, create_capture_backend
@@ -1300,14 +1315,13 @@ class WindowOpsMixin:
 
     def _on_locate_window(self):
         """连接当前候选；窗口单例替换，Android 按 serial 累加。"""
-        if self._running:
-            # 按钮已经禁用，但扫描里的「按窗口标题自动定位」是直接调本方法，
-            # 不经过按钮；少了这道判定就还是会把运行中引擎的截图通道拆掉。
-            self.log_text.append(
-                tr("[提示] 任务运行中不能定位或连接，请先停止任务"))
-            return
         if self._candidate_backend == "adb":
             self._on_connect_device()
+            return
+        from .execution_targets import WINDOW_TARGET_ID
+        if self._target_has_active_run(WINDOW_TARGET_ID):
+            self.log_text.append(
+                tr("[提示] 窗口目标正在执行任务，不能重新定位"))
             return
         w = self.window_combo.currentData()
         if not w:
@@ -1647,3 +1661,10 @@ class WindowOpsMixin:
             self.preview_label.setPixmap(scaled)
         except Exception as e:
             logger.debug(f"[scrcpy] 预览更新失败: {e}")
+
+    def _target_has_active_run(self, target_id: str) -> bool:
+        """目标是否被运行实例占用；兼容独立测试宿主尚未提供 RunManager。"""
+        manager = getattr(self, "_run_manager", None)
+        if manager is None:
+            return bool(getattr(self, "_running", False))
+        return manager.run_for_target(target_id) is not None

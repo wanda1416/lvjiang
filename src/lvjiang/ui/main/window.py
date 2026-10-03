@@ -278,7 +278,7 @@ class MainWindow(
     f9_pressed = pyqtSignal()
     f10_pressed = pyqtSignal()
     pause_pressed = pyqtSignal()
-    _pause_acknowledged = pyqtSignal()
+    _pause_acknowledged = pyqtSignal(str)
     _scrcpy_frame_ready = pyqtSignal(str, object)
     # 宿主信号：自动化状态（含暂停中/结束中过渡态）与用户切换
     automation_state_changed = pyqtSignal(str)
@@ -551,7 +551,7 @@ class MainWindow(
 
         self.execution_target_list = QTreeWidget()
         self.execution_target_list.setHeaderLabels(
-            [tr("目标"), tr("连接状态"), tr("连接信息"), tr("状态信息"), ""])
+            [tr("目标"), tr("连接/任务"), tr("连接信息"), tr("状态信息"), ""])
         self.execution_target_list.setRootIsDecorated(False)
         self.execution_target_list.setMaximumHeight(104)
         self.execution_target_list.setMinimumHeight(96)
@@ -1116,7 +1116,7 @@ class MainWindow(
 
         ctx = BatchContext(
             capture=target_snapshot.capture,
-            ocr=self._ocr,
+            ocr=run_context.ocr,
             input_ctrl=target_snapshot.input_ctrl,
             layout=layout,
             target_id=target_snapshot.id,

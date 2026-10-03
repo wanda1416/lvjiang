@@ -130,7 +130,7 @@ call sync_current_tili("日常")
 if env("android")
     # ─── 战斗养成：依次购买两个商品面板 ─────────────────────
     call $baoqian_1 = buy_panel("shangpin_1", $buy_keywords)
-    drag [bugan_detail].[shangpin_1] up 2 after wait @step_interval
+    drag [bugan_detail].[shangpin_2][2] up 2 after wait @step_interval
     call $baoqian_2 = buy_panel("shangpin_2", $buy_keywords)
     call close_item_prompts()
     eval $bought_baoqian = $baoqian_1 + $baoqian_2

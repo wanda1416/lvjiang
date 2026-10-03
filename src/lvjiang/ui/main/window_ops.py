@@ -5,7 +5,7 @@ from ctypes import wintypes
 
 import numpy as np
 from loguru import logger
-from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QMenu, QTreeWidgetItem
 
@@ -477,8 +477,14 @@ class WindowOpsMixin:
     def _on_execution_target_item_clicked(self, item, column: int) -> None:
         if column != 4:
             return
-        self._disconnect_execution_target(
-            self._execution_target_id_from_item(item))
+        target_id = self._execution_target_id_from_item(item)
+        if not target_id:
+            return
+        # 断开会 tree.clear() 掉触发本信号的那个 item。推到下一轮事件循环，
+        # 让 Qt 先把这次点击处理完；捕获的是稳定 ID 而不是 item，所以推迟
+        # 不会指错目标——注册表按 ID 索引正是为这种场合准备的。
+        QTimer.singleShot(
+            0, lambda: self._disconnect_execution_target(target_id))
 
     def _on_execution_target_context_menu(self, pos) -> None:
         item = self.execution_target_list.itemAt(pos)
@@ -559,13 +565,14 @@ class WindowOpsMixin:
             self.log_text.append(tr("[提示] 任务运行中，执行目标已锁定"))
             self._refresh_execution_targets_ui()
             return
-        self._execution_targets.select(str(target_id))
+        # 用 select 的返回值，而不是回头再查一次 active()：后者的返回类型是
+        # 可空的，加守卫等于承认这里可能是 None，而实际上不可能。
+        target = self._execution_targets.select(str(target_id))
         self._sync_active_target_compat()
         self._refresh_active_target_ui()
         self._refresh_run_button()
         self.log_text.append(
-            tr("[执行目标] 已切换到 {name}").format(
-                name=self._active_execution_target().display_name))
+            tr("[执行目标] 已切换到 {name}").format(name=target.display_name))
 
     def _refresh_active_target_ui(self) -> None:
         target = self._active_execution_target()
@@ -748,7 +755,6 @@ class WindowOpsMixin:
         """询问用户是否扫描局域网 ADB 设备"""
         self._wireless_dialog = _WirelessScanDialog(self)
         # 延迟到下一轮事件循环显示模态对话框，确保调用栈已返回事件循环
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self._show_wireless_dialog)
 
     def _show_wireless_dialog(self):
@@ -1471,24 +1477,32 @@ class WindowOpsMixin:
         )
 
     def _hide_red_box_after_locate(self):
-        """未勾选标定时，定位成功的红框提示只显示一秒。"""
-        if (
-            self._backend == "windows"
-            and self._target_window is not None
-            and not self.chk_red_box.isChecked()
-        ):
+        """未勾选标定时，定位成功的红框提示只显示一秒。
+
+        这个定时器只由 _on_locate_window 启动，要收的就是它自己一秒前亮的那个
+        框，所以除了「用户有没有要求持续标定」之外不该再有别的条件。
+
+        原来还判 `_backend == "windows"`——那是单目标时代的判据。连接与执行拆成
+        正交之后它变成了误判来源，而且有两条触发路径：手机已经是执行目标时去
+        定位窗口（put 刻意不夺取选中，_backend 全程是 adb），或者定位后一秒内
+        把执行目标切到手机（切换不碰定时器，一秒后读到的已经变了）。两种情况
+        都让红框永久留在桌面上。
+        """
+        if not self.chk_red_box.isChecked():
             self._overlay.hide_border()
 
     def _on_red_box_changed(self, state):
-        """红框标定仅控制本次运行中的持续显示，不写入用户配置。"""
-        self._red_box_flash_timer.stop()
-        if bool(state):
-            if self._target_window is not None:
-                w = self._target_window
-                self._overlay.show_border(w['left'], w['top'], w['width'], w['height'])
-                self._overlay.set_color("red")
-        else:
-            self._overlay.hide_border()
+        """红框标定仅控制本次运行中的持续显示，不写入用户配置。
+
+        红框属于**窗口目标**，与当前执行目标无关，所以直接委托给
+        _set_window_target_marker，不再读执行目标投影出来的 _target_window
+        ——那个在执行目标是手机时为 None，会让勾选静默无效。
+
+        复选框当前全程 setVisible(False)（唯一入口是目标列表的右键菜单），
+        这里保持与右键菜单同源，是为了将来放开它时不必再想一遍。
+        """
+        from .execution_targets import WINDOW_TARGET_ID
+        self._set_window_target_marker(WINDOW_TARGET_ID, bool(state))
 
     def _on_bg_mode_changed(self, state):
         """修改下一次窗口定位使用的输入方式。"""

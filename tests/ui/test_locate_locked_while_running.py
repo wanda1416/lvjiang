@@ -135,3 +135,43 @@ def test_idle_locate_still_replaces_the_window_target() -> None:
     assert host.disposed == [WINDOW_TARGET_ID]
     assert old_capture.stop.called
     assert host._execution_targets.get(WINDOW_TARGET_ID) is new_target
+
+
+# ─── 红框归属 ────────────────────────────────────────────
+
+
+class _RedBoxHost:
+    _hide_red_box_after_locate = WindowOpsMixin._hide_red_box_after_locate
+
+    def __init__(self, *, backend: str, persistent: bool):
+        # 定时器触发那一刻的执行目标类型；红框不该受它影响
+        self._backend = backend
+        self._target_window = None if backend == "adb" else {"left": 0}
+        self.chk_red_box = MagicMock()
+        self.chk_red_box.isChecked.return_value = persistent
+        self._overlay = MagicMock()
+
+
+def test_locate_flash_is_cleared_whatever_the_active_target_is() -> None:
+    """红框属于窗口目标，不该因为执行目标是手机就永远留在桌面上。
+
+    两条触发路径：手机已经是执行目标时去定位窗口（put 刻意不夺取选中，
+    `_backend` 全程是 adb），或者定位后一秒内把执行目标切到手机（切换不碰
+    这个定时器，一秒后读到的已经变了）。原来的判据读 `_backend`，两种情况
+    都收不掉框。
+    """
+    for backend in ("windows", "adb"):
+        host = _RedBoxHost(backend=backend, persistent=False)
+
+        host._hide_red_box_after_locate()
+
+        assert host._overlay.hide_border.called, backend
+
+
+def test_persistent_marker_survives_the_one_second_flash() -> None:
+    """勾了持续标定就不能被这个定时器收掉——它只负责收「闪一下」那次。"""
+    host = _RedBoxHost(backend="windows", persistent=True)
+
+    host._hide_red_box_after_locate()
+
+    assert not host._overlay.hide_border.called

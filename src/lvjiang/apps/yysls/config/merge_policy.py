@@ -19,6 +19,7 @@ from ....core.config.versioning import (
     register_versioned_dir,
     register_versioned_file,
 )
+from .builds import BUILDS_PATH
 from .game_config_files import GAME_CONFIG_FILES
 
 # tune_config.yaml 只剩品阶门槛与开关注册表；基础规则组与调律规则的存在性
@@ -41,6 +42,7 @@ register_protected_list_paths("yysls/game_config/seasons.yaml", {
 for _game_config_file in GAME_CONFIG_FILES:
     register_versioned_file(_game_config_file)
 register_versioned_file("yysls/tune_config.yaml")
+register_versioned_file(BUILDS_PATH)
 
 # 调律规则参与 remote 在线下发（带 content_version、可被远程更新）。
 #

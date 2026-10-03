@@ -230,6 +230,9 @@ class PlaystylePanel(QWidget):
         self._hint.setWordWrap(True)
         self._hint.setStyleSheet("color: palette(mid); font-size: 11px;")
         definition_layout.addWidget(self._hint)
+        from ..loadout.build_calculator import BuildListPanel
+        self._builds_panel = BuildListPanel(self)
+        right_layout.addWidget(self._builds_panel)
         right_layout.addStretch()
         scroll.setWidget(right_widget)
         splitter.addWidget(scroll)
@@ -343,6 +346,7 @@ class PlaystylePanel(QWidget):
             self._list.setCurrentRow(0)
 
     def _on_selected(self, name: str) -> None:
+        self._builds_panel.set_playstyle(name)
         cfg = next((e for e in self._entries() if e["name"] == name), {})
         school = str(cfg.get("school") or "")
         school_cfg = (self._data.get("schools") or {}).get(school) or {}
@@ -505,6 +509,13 @@ class PlaystylePanel(QWidget):
         if item is None:
             return
         name = item.text()
+        builds = self._builds_panel.repository.all(name)
+        if builds:
+            QMessageBox.warning(
+                self, tr("无法删除"),
+                tr("请先删除该玩法下的出装搭配：{builds}").format(
+                    builds="、".join(build.name for build in builds)))
+            return
         used = self._rules_referencing(name)
         if used:
             # 删了会让规则的引用悬空——那正是这次拆分要消灭的东西

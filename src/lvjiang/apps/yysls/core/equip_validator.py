@@ -28,6 +28,10 @@ from .equip_parser.models import Affix, EquipmentData
 # extra_data / _extra 中记录异常原因的键
 ILLEGAL_KEY = "illegal_equip"
 
+# 组合校验与总词条分配共用的普通槽位容量，首词条不计入。
+MAX_ATTRIBUTE_AFFIXES = 2
+MAX_DIVINE_AFFIXES = 1
+
 # 判定码（写日志、测试断言用；面向用户展示的是 message）
 CODE_DUPLICATE_AFFIX = "duplicate_affix"
 CODE_ATTACK_OVERFLOW = "attack_overflow"
@@ -291,13 +295,13 @@ def _validate_slots(slots: list[tuple[int, Affix]],
                     tr("神力词条「{name}」不能是转律产出：转律不会产出神力词条")
                     .format(name=affix.name),
                 ))
-    if attack_count > 2:
+    if attack_count > MAX_ATTRIBUTE_AFFIXES:
         reasons.append(IllegalReason(
             CODE_ATTACK_OVERFLOW,
             tr("属攻类词条（含无相）最多 2 条，当前词条 2-5 里有 {n} 条")
             .format(n=attack_count),
         ))
-    if divine_count > 1:
+    if divine_count > MAX_DIVINE_AFFIXES:
         reasons.append(IllegalReason(
             CODE_DIVINE_OVERFLOW,
             tr("神力词条最多 1 条，当前词条 2-5 里有 {n} 条").format(n=divine_count),

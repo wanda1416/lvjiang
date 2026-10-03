@@ -53,7 +53,11 @@ class CombatLayoutMixin:
         # sidebar 仅控制可见性，不改变 _display_mode 也不重排布局
         self._toolbar_widget.setVisible(False)
         collapsed = mode == "sidebar"
-        self._select_group.setVisible(not collapsed)
+        # preview 实例只负责展示四组战斗属性卡片；“当前属性”、编辑和
+        # 新建属于备战方案编辑上下文。构造时虽已隐藏，随后切换 full/half
+        # 不能再把这组控件显示出来。
+        self._select_group.setVisible(
+            not collapsed and not getattr(self, "_preview", False))
         self._attrs_scroll.setVisible(not collapsed)
         self.setMinimumWidth(0)
         self.setMinimumHeight(0)

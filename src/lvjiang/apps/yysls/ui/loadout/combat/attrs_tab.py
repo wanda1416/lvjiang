@@ -180,6 +180,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._preview_equipped: dict | None = None
         self._preview_world_level: int | None = None
         self._preview_gongjue_level: int | None = None
+        self._preview_base_attrs: CombatAttributes | None = None
+        self._preview_school: str = ""
 
         # ✅ 会话级缓存：避免反复load装备文件（多进程安全）
         self._session_user: str | None = None  # 当前会话的用户
@@ -440,6 +442,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
     def _get_current_school(self) -> str | None:
         """获取由当前方案武学组合派生的流派。"""
+        if self._preview and self._preview_school:
+            return self._preview_school
         return self._current_school_name or None
 
     def _on_play_style_changed(self, _name: str):
@@ -1115,6 +1119,8 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
     def _get_base_attrs(self) -> CombatAttributes:
         """获取当前选择的基础属性。"""
+        if self._preview and self._preview_base_attrs is not None:
+            return self._preview_base_attrs
         play_style = self._combo_play_style.currentText()
         if not play_style:
             return CombatAttributes()
@@ -1157,13 +1163,17 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self, equipped: dict, *, gongjue: str | None = None,
         world_level: int | None = None,
         gongjue_level: int | None = None,
+        base_attrs: CombatAttributes | None = None,
+        school: str | None = None,
     ) -> None:
-        """预览一套（已投影的）装备；``gongjue`` 覆盖当前弓玦套装。"""
+        """预览一套已投影装备；可注入冻结的基础属性与流派上下文。"""
         if not self._preview:
             raise RuntimeError("show_preview 只用于 preview 实例")
         self._preview_equipped = dict(equipped)
         self._preview_world_level = world_level
         self._preview_gongjue_level = gongjue_level
+        self._preview_base_attrs = base_attrs
+        self._preview_school = school or ""
         if gongjue is not None:
             self._combo_gongjue.blockSignals(True)
             index = self._combo_gongjue.findData(gongjue)

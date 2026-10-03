@@ -359,12 +359,11 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         btn_chengyin_merge.clicked.connect(self._on_chengyin_merge)
         action_row.addWidget(btn_chengyin_merge)
 
-        # 创建装备（原「模拟装备」，去掉菜单直接弹对话框）
-        btn_create = QPushButton(tr("模拟装备"))
-        btn_create.setToolTip(tr("创建模拟装备"))
+        btn_create = QPushButton(tr("模拟计算器"))
+        btn_create.setToolTip(tr("基于当前用户基础属性调整出装搭配"))
         btn_create.setMinimumWidth(96)
         btn_create.setStyleSheet(_ACTION_BTN_STYLE)
-        btn_create.clicked.connect(self._on_mock_create)
+        btn_create.clicked.connect(self._on_build_calculator)
         action_row.addWidget(btn_create)
 
         # 导出数据
@@ -445,6 +444,12 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._sort_filter.currentIndexChanged.connect(self._on_filter_changed)
         primary_filter_row.addWidget(self._sort_filter)
         primary_filter_row.addStretch()
+
+        self._btn_create_mock = QPushButton(tr("创建模拟装备"))
+        self._btn_create_mock.setToolTip(tr("为当前用户创建一件模拟装备，不修改角色基础属性"))
+        apply_button_style(self._btn_create_mock, variant="action")
+        self._btn_create_mock.clicked.connect(self._on_mock_create)
+        primary_filter_row.addWidget(self._btn_create_mock)
 
         self._btn_delete_filtered = QPushButton(tr("删除筛选装备"))
         self._btn_delete_filtered.setToolTip(tr(
@@ -1944,6 +1949,10 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             logger.debug(f"解析当前流派失败: {e}")
             return ""
 
+    def _on_build_calculator(self):
+        from ..build_calculator import open_build_calculator
+        open_build_calculator(self._host, self)
+
     def _on_mock_create(self):
         """创建模拟装备"""
         user_name = self._host.active_user_name()
@@ -1956,6 +1965,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             default_school=self._get_current_school(),
             delete_all_mock=self._delete_all_mock,
         )
+        dialog.setWindowTitle(f"{tr('创建模拟装备')} · {user_name}")
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         result = dialog.get_result()

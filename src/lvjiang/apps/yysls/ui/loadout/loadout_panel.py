@@ -162,7 +162,7 @@ class LoadoutPanel(QWidget):
             (tr("最优组合"), lambda: self._equipment._on_optimal_combo()),
             (tr("转律建议"), lambda: self._equipment._on_transmute()),
             (tr("培养建议"), lambda: self._equipment._on_affix_impact()),
-            (tr("模拟装备"), lambda: self._equipment._on_mock_create()),
+            (tr("模拟计算器"), lambda: self._equipment._on_build_calculator()),
             (tr("导出数据"), lambda: self._equipment._on_export()),
         ):
             button = QPushButton(label)

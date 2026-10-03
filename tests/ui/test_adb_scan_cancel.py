@@ -1,6 +1,7 @@
 """ADB 扫描取消状态机不阻塞 UI。"""
 
-from lvjiang.ui.main.window_ops import WindowOpsMixin
+from lvjiang.ui.main.window_ops import WindowOpsMixin, _WirelessScanDialog
+from lvjiang.ui.mobile.device_scan import DeviceScanPanel
 
 
 class _Button:
@@ -52,6 +53,13 @@ class _Host(WindowOpsMixin):
 
     def statusBar(self):
         return self._status_bar
+
+
+def test_no_device_fallback_reuses_shared_scan_panel(qtbot):
+    dialog = _WirelessScanDialog(None)
+    qtbot.addWidget(dialog._dialog)
+
+    assert isinstance(dialog._panel, DeviceScanPanel)
 
 
 def test_cancel_scan_changes_state_without_waiting_for_thread():

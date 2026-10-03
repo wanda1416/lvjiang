@@ -10,7 +10,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QMenu, QTreeWidgetItem
 
 from ...i18n import tr
-from ..button_styles import apply_button_style, fit_button_width
+from ..mobile.device_scan import DeviceScanPanel
 
 
 def bg_capture_tip() -> str:
@@ -179,12 +179,7 @@ class _WirelessScanDialog(QObject):
     def __init__(self, parent):
         super().__init__(parent)
         from PyQt6.QtWidgets import (
-            QComboBox,
             QDialog,
-            QHBoxLayout,
-            QLabel,
-            QProgressBar,
-            QPushButton,
             QVBoxLayout,
         )
         self._dialog = QDialog(parent)
@@ -193,101 +188,25 @@ class _WirelessScanDialog(QObject):
 
         layout = QVBoxLayout(self._dialog)
 
-        # 提示文字
-        self._msg_label = QLabel(
-            tr("未发现 USB 连接的 ADB 设备。\n\n"
-               "可选择网段扫描局域网（设备需已开启无线调试），\n"
-               "或直接扫描本机端口以发现模拟器。")
-        )
-        layout.addWidget(self._msg_label)
-
-        # 网段选择（多网卡时避免只扫到虚拟网卡那一段）
-        subnet_row = QHBoxLayout()
-        subnet_row.addWidget(QLabel(tr("扫描网段：")))
-        self._subnet_combo = QComboBox()
-        self._subnet_combo.addItem(tr("全部网卡（默认）"), None)
-        for iface in self._list_interfaces():
-            self._subnet_combo.addItem(iface.label, [iface.subnet])
-        subnet_row.addWidget(self._subnet_combo, 1)
-        layout.addLayout(subnet_row)
-
-        # 进度条（初始隐藏）
-        self._progress_bar = QProgressBar()
-        self._progress_bar.setVisible(False)
-        layout.addWidget(self._progress_bar)
-
-        # 状态标签（初始隐藏）
-        self._status_label = QLabel("")
-        self._status_label.setVisible(False)
-        self._status_label.setStyleSheet("color: gray;")
-        layout.addWidget(self._status_label)
-
-        # 按钮
-        btn_layout = QHBoxLayout()
-        self._scan_btn = QPushButton(tr("扫描局域网"))
-        self._local_btn = QPushButton(tr("本地扫描（模拟器）"))
-        self._cancel_btn = QPushButton(tr("取消"))
-        apply_button_style(self._scan_btn)
-        apply_button_style(self._local_btn, variant="neutral")
-        apply_button_style(self._cancel_btn, variant="neutral")
-        fit_button_width(self._scan_btn, self._local_btn, self._cancel_btn)
-        btn_layout.addStretch()
-        btn_layout.addWidget(self._scan_btn)
-        btn_layout.addWidget(self._local_btn)
-        btn_layout.addWidget(self._cancel_btn)
-        layout.addLayout(btn_layout)
-
-        # 信号连接
-        self._scan_btn.clicked.connect(self._on_scan_clicked)
-        self._local_btn.clicked.connect(self._on_local_clicked)
-        self._cancel_btn.clicked.connect(self._dialog.reject)
+        self._panel = DeviceScanPanel(self._dialog)
+        self._panel.scan_requested.connect(self._begin_scan)
+        self._panel.cancel_requested.connect(self._dialog.reject)
+        layout.addWidget(self._panel)
 
         # 回调
         self._on_scan_callback = None
         self._scan_started = False
 
-    @staticmethod
-    def _list_interfaces() -> list:
-        """枚举本机网卡；失败时下拉框只保留「全部网卡」"""
-        try:
-            from ...core.android import list_ipv4_interfaces
-            return list_ipv4_interfaces()
-        except Exception as e:  # 枚举失败不该挡住扫描
-            logger.warning(f"枚举本机网卡失败: {e}")
-            return []
-
-    def selected_subnets(self) -> list | None:
-        """当前选中的网段前缀列表；None 表示全部网卡"""
-        return self._subnet_combo.currentData()
-
-    def _begin_scan(self, mode: str):
+    def _begin_scan(self, mode: str, subnets: object):
         """进入扫描中状态并回调上层"""
-        self._scan_btn.setEnabled(False)
-        self._local_btn.setEnabled(False)
-        self._subnet_combo.setEnabled(False)
-        self._cancel_btn.setText(tr("取消扫描"))
-        self._cancel_btn.setEnabled(True)
-        self._progress_bar.setVisible(True)
-        self._status_label.setVisible(True)
         self._scan_started = True
         if self._on_scan_callback:
-            self._on_scan_callback(mode, self.selected_subnets())
-
-    def _on_scan_clicked(self):
-        """点击「扫描局域网」"""
-        self._scan_btn.setText(tr("扫描中..."))
-        self._begin_scan("lan")
-
-    def _on_local_clicked(self):
-        """点击「本地扫描（模拟器）」"""
-        self._local_btn.setText(tr("扫描中..."))
-        self._begin_scan("local")
+            selected = subnets if isinstance(subnets, list) else None
+            self._on_scan_callback(mode, selected)
 
     def update_progress(self, message: str, current: int, total: int):
         """更新进度"""
-        self._progress_bar.setMaximum(total)
-        self._progress_bar.setValue(current)
-        self._status_label.setText(message)
+        self._panel.update_progress(message, current, total)
 
     def exec(self, on_scan_callback) -> bool:
         """显示对话框，返回是否发起过扫描

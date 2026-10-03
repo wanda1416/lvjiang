@@ -7,6 +7,7 @@
 
 import pytest
 
+from lvjiang.apps.yysls.ui.game_settings import playstyle_panel
 from lvjiang.apps.yysls.ui.game_settings.playstyle_panel import PlaystylePanel
 
 
@@ -14,6 +15,10 @@ def _data() -> dict:
     arts = ["明川药典", "千香引魂蛊"]
     return {
         "schools": {},
+        "martial_arts": [
+            {"name": "明川药典", "weapon": "扇"},
+            {"name": "千香引魂蛊", "weapon": "伞"},
+        ],
         "playstyles": [
             {"name": "火拳", "school": "", "arts": list(arts),
              "match_keywords": ["输出"]},
@@ -79,3 +84,46 @@ def test_adding_a_keyword_saves_only_the_edited_playstyle(panel):
     assert _entry(data, "火拳")["match_keywords"] == ["输出", "爆发"]
     assert _entry(data, "纯奶")["match_keywords"] == ["奶", "治疗"]
     assert saves, "用户实际编辑后必须落盘"
+
+
+@pytest.mark.parametrize("control, field, empty_label", [
+    ("_combo_damage_a", "main_damage", "不需要增伤"),
+    ("_combo_damage_b", "sub_damage", "不需要增伤"),
+    ("_combo_output", "output_dingyin", "无特定定音"),
+    ("_combo_defense", "defense_dingyin", "无特定定音"),
+])
+def test_optional_affixes_save_values_not_display_labels(
+    qtbot, monkeypatch, control, field, empty_label,
+):
+    # 使用不同语言的展示文本，保证占位文案不会成为配置里的词条名称。
+    monkeypatch.setattr(playstyle_panel, "tr", lambda text: f"translated:{text}")
+    data = _data()
+    data["playstyles"][0][field] = ""
+    saves = []
+    widget = PlaystylePanel(data=data, on_changed=lambda: saves.append(1))
+    qtbot.addWidget(widget)
+    combo = getattr(widget, control)
+
+    assert combo.currentText() == f"translated:{empty_label}"
+    assert combo.currentData() == ""
+    assert not saves
+
+    # 真实选项能保存并在切换玩法后恢复。
+    assert combo.count() > 1
+    combo.setCurrentIndex(1)
+    chosen = combo.currentData()
+    assert _entry(data, "火拳")[field] == chosen
+    saves.clear()
+    _select(widget, "纯奶")
+    _select(widget, "火拳")
+    assert combo.currentData() == chosen
+    assert not saves
+
+    # 清除要求后仍写入原有空串，其他字段编辑也不得把提示文案写进去。
+    combo.setCurrentIndex(0)
+    widget._keywords.add_tag("测试匹配")
+    assert _entry(data, "火拳")[field] == ""
+    _select(widget, "纯奶")
+    _select(widget, "火拳")
+    assert combo.currentText() == f"translated:{empty_label}"
+    assert combo.currentData() == ""

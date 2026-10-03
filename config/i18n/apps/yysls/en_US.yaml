@@ -1,4 +1,13 @@
 yysls:
+  基础定义: Basic Definition
+  主武学增伤: Main art bonus
+  副武学增伤: Sub art bonus
+  全武学增伤: All-art bonus
+  奇术增伤: Mystic skill bonus
+  对单位增伤: Target bonus
+  不需要增伤: No bonus required
+  无特定定音: No specific tuning
+  全武学、奇术、对单位增伤仅作玩法说明 ⓘ: All-art, mystic skill and target bonuses are descriptive only ⓘ
   调律管理: Tuning Management
   当前任务: Current Task
   历史记录: History

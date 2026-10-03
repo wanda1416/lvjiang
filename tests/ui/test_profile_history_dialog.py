@@ -123,3 +123,21 @@ def test_empty_history_has_clear_page_status(qtbot, monkeypatch) -> None:
     assert "显示 0–0 / 共 0 条" in dialog._page_label.text()
     assert not dialog._previous_button.isEnabled()
     assert not dialog._next_button.isEnabled()
+
+
+def test_source_column_fits_nine_full_width_characters(qtbot, monkeypatch) -> None:
+    """来源列要放得下「限时活动：XXXX」这类 9 个全角字的来源。
+
+    来源词表允许用户输入任意文本；列宽写死像素时，长来源在不同系统字体下会
+    被截成前半截，而且截断不报错，只让人以为来源本来就短。
+    """
+    monkeypatch.setattr(dialogs, "db_count_history", lambda *_args, **_kw: 0)
+    monkeypatch.setattr(dialogs, "db_get_history", lambda *_args, **_kw: [])
+
+    dialog = dialogs.HistoryDialog(None, "quota", "target", "目标")
+    qtbot.addWidget(dialog)
+    table = dialog._table
+    metrics = table.fontMetrics()
+
+    assert table.columnWidth(5) >= metrics.horizontalAdvance("限时活动：XXXX")
+    assert table.columnWidth(5) >= metrics.horizontalAdvance("汉" * 9)

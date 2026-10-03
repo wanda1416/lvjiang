@@ -31,7 +31,6 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
-    QSplitter,
     QTabBar,
     QTableWidget,
     QTableWidgetItem,
@@ -206,7 +205,6 @@ class _SyncTargetsWidget(QWidget):
         self._table = QTableWidget()
         self._table.setColumnCount(5)
         self._table.setHorizontalHeaderLabels([tr("目标"), tr("倍率"), tr("方向"), tr("来源"), ""])
-        self._table.setMinimumHeight(110)
         v_header = self._table.verticalHeader()
         if v_header is not None:
             v_header.setVisible(False)
@@ -223,6 +221,7 @@ class _SyncTargetsWidget(QWidget):
         self._table.setColumnWidth(2, 90)
         self._table.setColumnWidth(3, 120)
         self._table.setColumnWidth(4, 44)
+        _fit_table_to_rows(self._table)
 
         layout.addWidget(self._table)
 
@@ -286,7 +285,6 @@ class _SyncTargetsWidget(QWidget):
 
         # 来源（可选）
         source_input = QLineEdit(target.source if target else "")
-        source_input.setPlaceholderText(tr("可选"))
         self._table.setCellWidget(row, 3, source_input)
 
         # 删除按钮（点击时按 widget 反查行号，避免删行后行号错位）
@@ -299,6 +297,7 @@ class _SyncTargetsWidget(QWidget):
             lambda _checked, b=btn_remove: self._remove_row(self._row_of_widget(b))
         )
         self._table.setCellWidget(row, 4, btn_remove)
+        _fit_table_to_rows(self._table)
 
     def _row_of_widget(self, widget: QWidget) -> int:
         """反查指定 cell widget 所在行（QTableWidget.row 只接受 QTableWidgetItem）"""
@@ -310,6 +309,7 @@ class _SyncTargetsWidget(QWidget):
     def _remove_row(self, row: int) -> None:
         if row >= 0:
             self._table.removeRow(row)
+            _fit_table_to_rows(self._table)
 
     def get_sync_targets(self) -> list[SyncTargetDef]:
         """收集所有有效的同步目标"""
@@ -354,9 +354,21 @@ class _AmountTagInputWidget(TagInputWidget):
         return [int(value) for value in self.tags()]
 
 
-class _ChangeRulesTable(QTableWidget):
-    """前三列按 2:2:6 分配，删除列固定贴在最右侧。"""
+class _RuleTermTagInputWidget(TagInputWidget):
+    """表格单元格内的多来源/用途输入。"""
 
+    def __init__(self, terms: list[str], parent=None) -> None:
+        super().__init__(terms, parent)
+        self.setFixedHeight(_AmountTagInputWidget._COMPACT_HEIGHT)
+        self._row.setContentsMargins(4, 1, 4, 1)
+        self._scroll.setStyleSheet("QScrollBar:horizontal { height: 7px; }")
+        self._input.setMinimumWidth(140)
+
+
+class _ChangeRulesTable(QTableWidget):
+    """类型和删除列固定，来源与数量按 6:4 分配剩余空间。"""
+
+    _TYPE_WIDTH = 132
     _REMOVE_WIDTH = 40
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
@@ -364,13 +376,29 @@ class _ChangeRulesTable(QTableWidget):
         viewport = self.viewport()
         if viewport is None:
             return
-        available = max(0, viewport.width() - self._REMOVE_WIDTH)
-        type_width = available * 2 // 10
-        name_width = available * 2 // 10
-        self.setColumnWidth(0, type_width)
+        available = max(
+            0, viewport.width() - self._TYPE_WIDTH - self._REMOVE_WIDTH
+        )
+        name_width = available * 6 // 10
+        self.setColumnWidth(0, self._TYPE_WIDTH)
         self.setColumnWidth(1, name_width)
-        self.setColumnWidth(2, available - type_width - name_width)
+        self.setColumnWidth(2, available - name_width)
         self.setColumnWidth(3, self._REMOVE_WIDTH)
+
+
+def _fit_table_to_rows(table: QTableWidget) -> None:
+    """表格默认显示实际数据行加一行留白。"""
+    header = table.horizontalHeader()
+    vertical = table.verticalHeader()
+    header_height = header.sizeHint().height() if header is not None else 0
+    default_row_height = (
+        vertical.defaultSectionSize() if vertical is not None else 30
+    )
+    rows_height = sum(table.rowHeight(row) for row in range(table.rowCount()))
+    table.setFixedHeight(
+        header_height + rows_height + default_row_height + table.frameWidth() * 2
+    )
+    table.updateGeometry()
 
 
 def _standalone_terms(vocabulary: list[str], steps: list[StepDef], *, positive: bool) -> list[str]:
@@ -410,7 +438,6 @@ class _ChangeRulesWidget(QWidget):
             [tr("类型"), tr("来源/用途"), tr("快捷数量"), ""]
         )
         self._table.setAlternatingRowColors(True)
-        self._table.setMinimumHeight(110)
         vertical_header = self._table.verticalHeader()
         if vertical_header is not None:
             vertical_header.setVisible(False)
@@ -425,6 +452,7 @@ class _ChangeRulesWidget(QWidget):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self._table.setColumnWidth(3, _ChangeRulesTable._REMOVE_WIDTH)
+        _fit_table_to_rows(self._table)
         layout.addWidget(self._table)
 
         buttons = QHBoxLayout()
@@ -441,23 +469,46 @@ class _ChangeRulesWidget(QWidget):
         buttons.addStretch()
         layout.addLayout(buttons)
 
-        # 展示顺序与快捷菜单一致：用途在上、来源在下；同名规则合并数量。
-        grouped: dict[tuple[str, str], list[int]] = {}
+        # 展示顺序与快捷菜单一致：用途在上、来源在下。
+        # 只还原配置中本来就是 values/sources 的组合行；
+        # 普通 value/source 每条保持独立，等用户自己编辑和删除。
         ordered_steps = [s for s in steps if s.value < 0]
         ordered_steps.extend(s for s in steps if s.value > 0)
+        seen_groups: set[tuple[str, str]] = set()
         for step in ordered_steps:
             kind = self._KIND_USE if step.value < 0 else self._KIND_SOURCE
-            amounts = grouped.setdefault((kind, step.source), [])
-            amount = abs(step.value)
-            if amount not in amounts:
-                amounts.append(amount)
-        for (kind, name), amounts in grouped.items():
-            self.add_row(kind, name, amounts)
+            if step._group_id:
+                group_key = (kind, step._group_id)
+                if group_key in seen_groups:
+                    continue
+                seen_groups.add(group_key)
+            self.add_row(kind, [step.source], [abs(step.value)])
+
+        # 上面先为组合规则放置了占位行，在原位合并其余成员。
+        group_rows: dict[tuple[str, str], int] = {}
+        row = 0
+        for step in ordered_steps:
+            kind = self._KIND_USE if step.value < 0 else self._KIND_SOURCE
+            if not step._group_id:
+                row += 1
+                continue
+            group_key = (kind, step._group_id)
+            if group_key not in group_rows:
+                group_rows[group_key] = row
+                row += 1
+                continue
+            target_row = group_rows[group_key]
+            name_input = self._table.cellWidget(target_row, 1)
+            amount_input = self._table.cellWidget(target_row, 2)
+            if isinstance(name_input, _RuleTermTagInputWidget):
+                name_input.add_tag(step.source)
+            if isinstance(amount_input, _AmountTagInputWidget):
+                amount_input.add_tag(str(abs(step.value)))
 
     def add_row(
         self,
         kind: str,
-        name: str = "",
+        names: list[str] | None = None,
         amounts: list[int] | None = None,
     ) -> None:
         row = self._table.rowCount()
@@ -471,10 +522,7 @@ class _ChangeRulesWidget(QWidget):
             kind_combo.setCurrentIndex(index)
         self._table.setCellWidget(row, 0, kind_combo)
 
-        name_input = QLineEdit(name)
-        name_input.setPlaceholderText(
-            tr("如：和鸣抽奖") if kind == self._KIND_USE else tr("如：邮件赠送")
-        )
+        name_input = _RuleTermTagInputWidget(names or [])
         self._table.setCellWidget(row, 1, name_input)
 
         amount_tags = _AmountTagInputWidget(amounts or [])
@@ -489,11 +537,13 @@ class _ChangeRulesWidget(QWidget):
             lambda _checked, button=remove_button: self._remove_widget_row(button)
         )
         self._table.setCellWidget(row, 3, remove_button)
+        _fit_table_to_rows(self._table)
 
     def _remove_widget_row(self, widget: QWidget) -> None:
         for row in range(self._table.rowCount()):
             if self._table.cellWidget(row, 3) is widget:
                 self._table.removeRow(row)
+                _fit_table_to_rows(self._table)
                 return
 
     def get_steps(self) -> list[StepDef]:
@@ -506,45 +556,45 @@ class _ChangeRulesWidget(QWidget):
             amount_tags = self._table.cellWidget(row, 2)
             if not (
                 isinstance(kind_combo, QComboBox)
-                and isinstance(name_input, QLineEdit)
+                and isinstance(name_input, _RuleTermTagInputWidget)
                 and isinstance(amount_tags, _AmountTagInputWidget)
             ):
                 continue
             kind = kind_combo.currentData()
             target = use_steps if kind == self._KIND_USE else source_steps
-            for amount in amount_tags.amounts():
-                target.append(
-                    StepDef(
-                        value=-amount if kind == self._KIND_USE else amount,
-                        source=name_input.text().strip(),
+            names = name_input.tags()
+            amounts = amount_tags.amounts()
+            group_id = f"editor:{row}" if len(names) * len(amounts) > 1 else ""
+            for name in names:
+                for amount in amounts:
+                    target.append(
+                        StepDef(
+                            value=-amount if kind == self._KIND_USE else amount,
+                            source=name,
+                            _group_id=group_id,
+                        )
                     )
-                )
         return use_steps + source_steps
 
     def validation_error(self) -> str:
-        """检查每条快捷规则都绑定了名称，且不存在完全重复项。"""
-        seen: set[tuple[str, str]] = set()
+        """检查每条快捷规则都绑定了名称和数量。"""
         for row in range(self._table.rowCount()):
             kind_combo = self._table.cellWidget(row, 0)
             name_input = self._table.cellWidget(row, 1)
             amount_tags = self._table.cellWidget(row, 2)
             if not (
                 isinstance(kind_combo, QComboBox)
-                and isinstance(name_input, QLineEdit)
+                and isinstance(name_input, _RuleTermTagInputWidget)
                 and isinstance(amount_tags, _AmountTagInputWidget)
             ):
                 continue
-            name = name_input.text().strip()
-            if not name:
+            names = name_input.tags()
+            if not names:
                 return tr("变动规则第 {row} 行设置了快捷数量，请填写来源或用途").format(
                     row=row + 1
                 )
             if not amount_tags.amounts():
                 return tr("变动规则第 {row} 行至少添加一个快捷数量").format(row=row + 1)
-            identity = (str(kind_combo.currentData()), name)
-            if identity in seen:
-                return tr("变动规则中的来源或用途重复，请把数量合并到同一行：{name}").format(name=name)
-            seen.add(identity)
         return ""
 
 
@@ -1116,18 +1166,16 @@ class ProfileDefinitionDialog(QDialog):
         dialog = QDialog(parent)
         title = tr("编辑") if existing else tr("新增")
         dialog.setWindowTitle(tr("{title} Key ({model})").format(title=title, model=MODEL_LABELS[model_type]))
-        dialog.setMinimumWidth(620)
+        dialog.setMinimumWidth(806)
 
         layout = QFormLayout(dialog)
 
         # 通用字段
         key_input = QLineEdit(existing.key if existing else "")
-        key_input.setPlaceholderText(tr("英文，如 "))
         key_input.setReadOnly(lock_key)
         layout.addRow("Key:", key_input)
 
         label_input = QLineEdit(existing.label if existing else "")
-        label_input.setPlaceholderText(tr("中文，如 周任务"))
         layout.addRow(tr("标签:"), label_input)
 
         change_script_input = _ChangeScriptFileField(
@@ -1358,27 +1406,8 @@ class ProfileDefinitionDialog(QDialog):
             change_rules_widget = _ChangeRulesWidget(existing_steps)
             widgets["change_rules"] = change_rules_widget
 
-            # 两块列表可能都很长，使用纵向 splitter 让用户按当前任务分配空间。
-            change_pane = QWidget()
-            change_layout = QFormLayout(change_pane)
-            change_layout.setContentsMargins(0, 0, 0, 0)
-            change_layout.addRow(tr("变动规则:"), change_rules_widget)
-
-            sync_pane = QWidget()
-            sync_layout = QFormLayout(sync_pane)
-            sync_layout.setContentsMargins(0, 0, 0, 0)
-            sync_layout.addRow(tr("同步目标:"), sync_targets_widget)
-
-            rules_splitter = QSplitter(Qt.Orientation.Vertical)
-            rules_splitter.setChildrenCollapsible(False)
-            rules_splitter.setHandleWidth(7)
-            rules_splitter.addWidget(change_pane)
-            rules_splitter.addWidget(sync_pane)
-            rules_splitter.setStretchFactor(0, 3)
-            rules_splitter.setStretchFactor(1, 2)
-            rules_splitter.setSizes([240, 180])
-            layout.addRow(rules_splitter)
-            widgets["rules_splitter"] = rules_splitter
+            layout.addRow(tr("变动规则:"), change_rules_widget)
+            layout.addRow(tr("同步目标:"), sync_targets_widget)
         else:
             layout.addRow(tr("同步目标:"), sync_targets_widget)
 

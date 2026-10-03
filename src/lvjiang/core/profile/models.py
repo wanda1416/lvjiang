@@ -161,11 +161,15 @@ class StepDef:
     """快捷增减幅度条目，携带来源描述
 
     旧格式 int 兼容：仅幅度，source 为空。
-    新格式 dict：{value: 幅度, source: 来源描述}。
+    dict 可使用 value/source 表示单项，也可使用 values/sources
+    表示多项；加载后统一展开为逐条 StepDef。
     """
 
     value: int = 0
     source: str = ""
+    # 只记录配置中显式的组合行边界；不参与业务相等比较，
+    # 也不单独持久化。避免仅因数值相同就自动合并用户规则。
+    _group_id: str = field(default="", repr=False, compare=False)
 
     @classmethod
     def from_raw(cls, raw) -> "StepDef":
@@ -184,10 +188,79 @@ class StepDef:
 
 
 def parse_steps(raw) -> list[StepDef]:
-    """解析 steps 配置（int / dict 混用列表）"""
+    """解析 steps 配置，将多来源紧凑写法展开为运行时逐条规则。"""
     if not isinstance(raw, list):
         return []
-    return [StepDef.from_raw(s) for s in raw]
+    result: list[StepDef] = []
+    for index, item in enumerate(raw):
+        if isinstance(item, dict) and (
+            isinstance(item.get("values"), list)
+            or isinstance(item.get("sources"), list)
+        ):
+            raw_values = (
+                item["values"]
+                if isinstance(item.get("values"), list)
+                else [item.get("value", 0)]
+            )
+            values = list(dict.fromkeys(int(value) for value in raw_values))
+            raw_sources = (
+                item["sources"]
+                if isinstance(item.get("sources"), list)
+                else [item.get("source", "")]
+            )
+            sources = list(dict.fromkeys(
+                str(source).strip() for source in raw_sources
+                if str(source).strip()
+            )) or [""]
+            result.extend(
+                StepDef(
+                    value=value,
+                    source=source,
+                    _group_id=f"loaded:{index}",
+                )
+                for source in sources
+                for value in values
+            )
+            continue
+        result.append(StepDef.from_raw(item))
+    return result
+
+
+def serialize_steps(steps: list[StepDef]) -> list[int | dict[str, Any]]:
+    """仅保留用户显式编辑的多值组合，不根据内容自动合并。"""
+    grouped: dict[str, list[StepDef]] = {}
+    for step in steps:
+        if step._group_id:
+            grouped.setdefault(step._group_id, []).append(step)
+
+    compact: list[int | dict[str, Any]] = []
+    emitted: set[str] = set()
+    for step in steps:
+        group_id = step._group_id
+        if not group_id:
+            compact.append(step.to_dict())
+            continue
+        if group_id in emitted:
+            continue
+        emitted.add(group_id)
+        members = grouped[group_id]
+        values = list(dict.fromkeys(member.value for member in members))
+        sources = list(dict.fromkeys(member.source for member in members))
+        pairs = {(member.source, member.value) for member in members}
+        expected_pairs = {
+            (source, value) for source in sources for value in values
+        }
+        if pairs != expected_pairs:
+            compact.extend(member.to_dict() for member in members)
+            continue
+        payload: dict[str, Any] = {
+            ("value" if len(values) == 1 else "values"):
+                values[0] if len(values) == 1 else values,
+            ("source" if len(sources) == 1 else "sources"):
+                sources[0] if len(sources) == 1 else sources,
+        }
+        compact.append(payload)
+    return compact
 
 
 @dataclass
@@ -262,8 +335,10 @@ class KeyDef:
             elif f.default_factory is not MISSING:
                 if val == f.default_factory():
                     continue
-            # 子 dataclass 列表（StepDef / SyncTargetDef）统一序列化
-            if isinstance(val, list) and val and hasattr(val[0], "to_dict"):
+            if f.name == "steps" and isinstance(val, list):
+                result[f.name] = serialize_steps(val)
+            # 其他子 dataclass 列表统一序列化
+            elif isinstance(val, list) and val and hasattr(val[0], "to_dict"):
                 result[f.name] = [v.to_dict() for v in val]
             else:
                 result[f.name] = val

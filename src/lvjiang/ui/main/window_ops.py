@@ -25,6 +25,20 @@ def bg_capture_tip() -> str:
         "窗口最小化时仍然拿不到画面。仅本次运行期间生效")
 
 
+def _find_auto_connect_window_index(
+        windows: list[dict], title_keyword: str) -> int | None:
+    """返回标题自动连接候选；其他律匠窗口只能手动选择。"""
+    if not title_keyword:
+        return None
+    for index, window in enumerate(windows):
+        title = str(window.get("title") or "")
+        if "律匠" in title:
+            continue
+        if title_keyword in title:
+            return index
+    return None
+
+
 class _AdbConnSignalBridge(QObject):
     """工作流线程 → 主线程的 ADB 断连信号桥"""
     adb_lost = pyqtSignal(str, str)
@@ -634,12 +648,15 @@ class WindowOpsMixin:
         # 自动匹配 window_title（配置管理保存的 desktop_window_title）
         keyword = self._user_config.desktop_window_title
         if keyword:
-            for i, w in enumerate(self._scanned_windows):
-                if keyword in w["title"]:
-                    self.window_combo.setCurrentIndex(i)
-                    self._on_locate_window()
-                    self.log_text.append(f"[扫描] 已自动匹配窗口: {w['title']}（关键字: {keyword}）")
-                    return
+            match_index = _find_auto_connect_window_index(
+                self._scanned_windows, keyword)
+            if match_index is not None:
+                window = self._scanned_windows[match_index]
+                self.window_combo.setCurrentIndex(match_index)
+                self._on_locate_window()
+                self.log_text.append(
+                    f"[扫描] 已自动匹配窗口: {window['title']}（关键字: {keyword}）")
+                return
             self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，未匹配到关键字「{keyword}」")
         else:
             self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，请下拉选择目标窗口")

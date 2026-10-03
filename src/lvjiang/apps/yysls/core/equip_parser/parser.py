@@ -432,6 +432,7 @@ class EquipmentParser:
         - 第 1 条（宫）必定出现
         - 第 2~4 条任一为空 → 后续全部丢弃
         - 第 5 条（羽）为空 → 正常结束（装备只有 4 条）
+        - 任一栏读到“套装” → 已进入套装说明区，该栏及后续全部忽略
 
         Returns:
             (affixes, warnings)
@@ -445,6 +446,8 @@ class EquipmentParser:
         parsed = [self._parse_single_affix(text) if text else None for text in texts]
         missing: list[str] = []
         for i, affix in enumerate(parsed):
+            if "套装" in texts[i]:
+                break
             if affix is None:
                 missing.append(f"{KEY_NAMES[i]}({AFFIX_KEYS[i]})")
             elif missing:
@@ -461,6 +464,8 @@ class EquipmentParser:
 
         for i, (key, cn_name) in enumerate(zip(AFFIX_KEYS, KEY_NAMES, strict=False)):
             text = texts[i]
+            if "套装" in text:
+                break
 
             if not text:
                 if i == 0:
@@ -481,10 +486,6 @@ class EquipmentParser:
             affix = parsed[i]
             if affix is None:
                 warnings.append(f"词条{cn_name}({key}) 无法解析: {text!r}")
-                # 套装信息等非词条内容，跳过但不中断
-                # text 是 OCR 截屏文字，恒为中文，不能过 tr()（同上）。
-                if "套装" in text:
-                    continue
                 break
             affixes.append(affix)
 

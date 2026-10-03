@@ -72,11 +72,11 @@
 
 | 项 | 值 |
 |---|---|
-| 位置 | `core/equip_validator.py` `_validate_slots()`；类别名在 `_categories()` |
+| 位置 | `core/equip_validator.py` `_validate_slots()`；类别名在 `_categories()`；`core/loadout/affix_distribution.py` 使用相同容量约束分配总词条，并交回校验器复核 |
 | 值 | ① 词条 2–5 互不重复，但允许与首词条同名（首词条是装备自带，不由调律产出）；② 归属为 **属攻类** 的词条最多 2 条；③ 神力词条最多 1 条，且转律不产神力（`transferred_divine`）；④ 神力 = 归属为 **增效类** 或 **武器类** 的词条 |
 | 依据 | 游戏调律产出规律，长期实测未见反例 |
 | 注意 | "属攻类 / 增效类 / 武器类"是**词组配置里的归属名字符串**，代码按字面匹配。改配置里的归属名会让规则静默失效 |
-| 变化时 | 数量上限改 `_validate_slots` 里的两个比较；类别集合改 `_categories()` |
+| 变化时 | 数量上限改 `equip_validator` 中的 `MAX_ATTRIBUTE_AFFIXES` / `MAX_DIVINE_AFFIXES` 及对应提示；分配器引用同一常量；类别集合改 `_categories()` |
 
 ### A7. 可转律槽位
 

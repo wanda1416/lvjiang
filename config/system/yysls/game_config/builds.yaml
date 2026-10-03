@@ -1,0 +1,8 @@
+content_version: 1
+common_requirements:
+  pve:
+  - affix: 对首领单位增伤
+    priority: required
+    minimum: 2
+    maximum: 2
+builds: {}

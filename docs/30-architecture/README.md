@@ -18,6 +18,7 @@
 | [09-io-backends.md](09-io-backends.md) | 截图与输入后端矩阵：PC 前台/后台、Android a11y/Shizuku/ADB、scrcpy、设备端各路径的能力、精度与限制 |
 | [10-maps.md](10-maps.md) | 地图定义与地图管理：世界系 POI、自带 HUD 场景、小地图朝向解析、地图管理对话框 |
 | [11-concurrent-execution.md](11-concurrent-execution.md) | 多目标并发执行：运行实例、目标资源重绑定、日志与调律多页隔离 |
+| [12-build-calculator.md](12-build-calculator.md) | 出装搭配独立存储、总词条分配与角色模拟状态边界 |
 
 ## 子系统索引
 

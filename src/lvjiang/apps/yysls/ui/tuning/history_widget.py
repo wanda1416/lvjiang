@@ -25,7 +25,7 @@ from .result_dialog import TuningResultsDialog
 from .result_store import TuningResultStore
 from .styles import HEADER_TITLE_STYLE
 
-_ANOMALY_COLUMN = 5
+_ANOMALY_COLUMN = 6
 
 _STATUS_LABELS = {
     "running": tr("进行中"),
@@ -83,9 +83,9 @@ class TuningHistoryWidget(QWidget):
             "padding: 8px 10px; color: palette(mid);")
         layout.addWidget(self._stats)
 
-        self._table = QTableWidget(0, 8)
+        self._table = QTableWidget(0, 9)
         self._table.setHorizontalHeaderLabels([
-            tr("开始时间"), tr("状态"), tr("用户"), tr("部位"),
+            tr("开始时间"), tr("状态"), tr("执行目标"), tr("用户"), tr("部位"),
             tr("处理结果"), tr("异常"), tr("总轮次"), tr("规则"),
         ])
         self._table.setSelectionBehavior(
@@ -153,7 +153,7 @@ class TuningHistoryWidget(QWidget):
                              for item in run.rule_snapshot if item.get("key"))
             values = (
                 started, _STATUS_LABELS.get(run.status, run.status),
-                run.username, slots, result,
+                run.target_label or tr("未记录"), run.username, slots, result,
                 str(run.anomaly_count) if run.anomaly_count else "",
                 str(run.total_rounds), rules or tr("默认规则"),
             )

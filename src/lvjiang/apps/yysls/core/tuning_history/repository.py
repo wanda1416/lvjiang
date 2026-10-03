@@ -130,9 +130,17 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
         "ALTER TABLE tuning_equipment ADD COLUMN cooldown_expires_at TEXT NOT NULL DEFAULT ''")
 
 
+def _migrate_v3(conn: sqlite3.Connection) -> None:
+    """冻结承载本轮调律的执行目标，历史不依赖后续重连或改名。"""
+    for column in ("task_run_id", "target_id", "target_kind", "target_label"):
+        conn.execute(
+            f"ALTER TABLE tuning_runs ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+
+
 MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "initial tuning history schema", _migrate_v1),
     (2, "track equipment lock and cooldown state", _migrate_v2),
+    (3, "track execution target snapshot", _migrate_v3),
 ]
 CURRENT_VERSION = MIGRATIONS[-1][0]
 
@@ -190,13 +198,17 @@ class TuningHistoryRepository:
                 INSERT INTO tuning_runs (
                     run_id, started_at, finished_at, username, status,
                     stop_reason, selected_slots_json, rule_snapshot_json,
-                    config_snapshot_json, markdown_path, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    config_snapshot_json, markdown_path,
+                    task_run_id, target_id, target_kind, target_label,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 summary.run_id, summary.started_at, summary.finished_at,
                 summary.username, summary.status, summary.stop_reason,
                 _json(summary.selected_slots), _json(summary.rule_snapshot),
-                _json(summary.config_snapshot), summary.markdown_path, now, now,
+                _json(summary.config_snapshot), summary.markdown_path,
+                summary.task_run_id, summary.target_id, summary.target_kind,
+                summary.target_label, now, now,
             ))
 
     def save_equipment(self, run_id: str, item: TuningEquipmentResult,
@@ -416,6 +428,8 @@ class TuningHistoryRepository:
             run_id=row["run_id"], started_at=row["started_at"],
             finished_at=row["finished_at"], username=row["username"],
             status=row["status"], stop_reason=row["stop_reason"],
+            task_run_id=row["task_run_id"], target_id=row["target_id"],
+            target_kind=row["target_kind"], target_label=row["target_label"],
             selected_slots=tuple(_load_json(row["selected_slots_json"], [])),
             rule_snapshot=tuple(_load_json(row["rule_snapshot_json"], [])),
             total_equipment=int(row["total_equipment"]),

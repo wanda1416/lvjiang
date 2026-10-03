@@ -1067,9 +1067,18 @@ class RunControlMixin:
                 context.ui_helper = None
         if context is not None:
             from .execution_runs import RunState
+            terminal_state = str(context.metadata.get("terminal_state") or "")
+            if terminal_state == "failed":
+                final_state = RunState.FAILED
+            elif terminal_state == "interrupted" or was_stopped:
+                final_state = RunState.INTERRUPTED
+            else:
+                final_state = RunState.COMPLETED
+            management = getattr(context.engine, "_tuning_management", None)
+            if management is not None:
+                management.mark_run_done(context.task_run_id, final_state.value)
             self._run_manager.finish(
-                context.task_run_id,
-                RunState.INTERRUPTED if was_stopped else RunState.COMPLETED,
+                context.task_run_id, final_state,
             )
         if not is_current:
             refresh_targets = getattr(self, "_refresh_execution_targets_ui", None)
@@ -1714,6 +1723,7 @@ class RunControlMixin:
         flow_name = getattr(worker, '_flow_name', flow_id) if worker else flow_id
 
         if isinstance(result_or_exception, BaseException):
+            run_context.metadata["terminal_state"] = "failed"
             self.log_text.append(f"[错误] {flow_name}流程异常退出: {result_or_exception}")
             logger.error(f"{flow_name}流程异常退出: {result_or_exception}")
             result_path = self._save_workflow_result(flow_id, {
@@ -1728,6 +1738,7 @@ class RunControlMixin:
             result = result_or_exception
             # 工作流预检失败返回 {"error": ...}：拒绝启动，不按正常完成处理
             if isinstance(result, dict) and result.get("error"):
+                run_context.metadata["terminal_state"] = "failed"
                 self.log_text.append(f"[错误] {flow_name}: {result['error']}")
                 logger.error(f"工作流 {flow_id} 启动被拒绝: {result['error']}")
                 result_path = self._save_workflow_result(
@@ -1738,6 +1749,8 @@ class RunControlMixin:
                     error_message=str(result["error"]))
                 return
             interrupted = run_context.stop_event.is_set()
+            run_context.metadata["terminal_state"] = (
+                "interrupted" if interrupted else "completed")
             if interrupted:
                 # 中途停止（F10）是常态（如自动调律），已收集的结果
                 # 照常落盘输出；仅不保存 session（中断点状态不完整）
@@ -1993,6 +2006,8 @@ class RunControlMixin:
             pause_event=self._pause_event,
         ).build()
         engine.window_rebind_hook = self._on_target_window_rebound
+        engine.task_run_id = run_context.task_run_id
+        engine.execution_target_snapshot = target_snapshot
         self._bind_engine_user(engine, username)
         from ...core.config.wf_configs import get_wf_config
         engine.workflow_config_snapshot = get_wf_config(impl_name)

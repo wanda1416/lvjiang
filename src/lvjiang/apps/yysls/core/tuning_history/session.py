@@ -35,6 +35,10 @@ class TuningRunSession:
         selected_slots: list[str],
         rule_snapshot: list[dict] | None = None,
         config_snapshot: dict | None = None,
+        task_run_id: str = "",
+        target_id: str = "",
+        target_kind: str = "",
+        target_label: str = "",
         clock=_now,
     ):
         self.repository = repository
@@ -48,6 +52,8 @@ class TuningRunSession:
             run_id=self.run_id,
             started_at=clock(), finished_at="", username=username,
             status="running", stop_reason="",
+            task_run_id=task_run_id, target_id=target_id,
+            target_kind=target_kind, target_label=target_label,
             selected_slots=tuple(selected_slots),
             rule_snapshot=tuple(rule_snapshot or ()),
             config_snapshot=dict(config_snapshot or {}),

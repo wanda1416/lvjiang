@@ -89,9 +89,48 @@ def test_snapshot_freezes_window_coordinates_and_backend_references() -> None:
     snapshot = target.snapshot()
     target.window["left"] = 99
 
-    assert snapshot.capture is capture
-    assert snapshot.input_ctrl is input_ctrl
+    assert snapshot.capture._resource() is capture
+    assert snapshot.input_ctrl._resource() is input_ctrl
     assert snapshot.window == {"hwnd": 1, "left": 10, "top": 20}
+
+
+def test_snapshot_handle_follows_reconnected_resources() -> None:
+    registry = ExecutionTargetRegistry()
+    original_capture = object()
+    original_input = object()
+    original = ExecutionTarget(
+        id=android_target_id("stable"), kind="adb", display_name="设备",
+        capture=original_capture, input_ctrl=original_input,
+    )
+    registry.put(original)
+    snapshot = original.snapshot()
+
+    replacement_capture = object()
+    replacement_input = object()
+    replacement = ExecutionTarget(
+        id=original.id, kind="adb", display_name="设备",
+        capture=replacement_capture, input_ctrl=replacement_input,
+    )
+    registry.put(replacement)
+
+    assert snapshot.capture._resource() is replacement_capture
+    assert snapshot.input_ctrl._resource() is replacement_input
+    assert snapshot.handle.binding().generation == 2
+
+
+def test_window_geometry_update_keeps_resource_generation() -> None:
+    target = ExecutionTarget(
+        id=WINDOW_TARGET_ID, kind="windows", display_name="游戏窗口",
+        capture=object(), input_ctrl=object(),
+        window={"hwnd": 1, "left": 10, "top": 20},
+    )
+    snapshot = target.snapshot()
+
+    snapshot.handle.update_window({"hwnd": 2, "left": 30})
+
+    binding = snapshot.handle.binding()
+    assert binding.generation == 1
+    assert binding.window == {"hwnd": 2, "left": 30, "top": 20}
 
 
 def test_android_connection_and_runtime_status_are_separate() -> None:

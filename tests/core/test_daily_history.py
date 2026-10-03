@@ -28,6 +28,7 @@ def test_single_task_records_ids_params_result_and_log(tmp_path):
 
     with session.capture_logs():
         logger.info("独立任务日志内容")
+        logger.bind(task_run_id="another-run").info("不应进入本任务")
     session.finish(status="completed", result_path=result_path)
 
     records = repository.list_task_runs()
@@ -47,6 +48,9 @@ def test_single_task_records_ids_params_result_and_log(tmp_path):
     assert record.duration_ms >= 0
     assert record.result_path
     assert "独立任务日志内容" in session.log_path.read_text(encoding="utf-8")
+    assert "不应进入本任务" not in session.log_path.read_text(encoding="utf-8")
+    assert len(repository.list_task_runs(target_kind="adb")) == 1
+    assert repository.list_task_runs(target_kind="windows") == []
 
 
 def test_batch_id_links_all_task_run_ids_and_supports_drilldown(tmp_path):
@@ -86,6 +90,8 @@ def test_batch_id_links_all_task_run_ids_and_supports_drilldown(tmp_path):
     assert (batches[0].target_id, batches[0].target_kind) == (
         "window", "windows")
     assert batches[0].input_snapshot["rows"][1]["user"] == "乙"
+    assert len(repository.list_batch_runs(target_kind="windows")) == 1
+    assert repository.list_batch_runs(target_kind="adb") == []
 
 
 def test_user_task_and_date_filters_can_be_combined(tmp_path):

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -35,6 +36,93 @@ class AndroidConnectionDraft:
     device_execution: bool = False
 
 
+@dataclass
+class LaunchDraft:
+    """某个执行目标在当前连接会话中的待运行编辑态。"""
+
+    username: str | None = None
+    workflow_id: str = ""
+    environment: str = ""
+    layout: str = ""
+    plan_id: str = ""
+    reference_space: str = ""
+    parameters: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ResourceBinding:
+    generation: int
+    capture: Any
+    input_ctrl: Any
+    device: Any
+    window: dict[str, Any] | None
+    resume_event: Any
+
+
+class TargetHandle:
+    """任务持有的稳定 I/O 句柄，重连只替换内部绑定。"""
+
+    def __init__(self, target: "ExecutionTarget") -> None:
+        self._lock = threading.RLock()
+        self._binding = ResourceBinding(
+            1, target.capture, target.input_ctrl, target.device,
+            dict(target.window) if target.window is not None else None,
+            target.resume_event,
+        )
+
+    def binding(self) -> ResourceBinding:
+        with self._lock:
+            return self._binding
+
+    def rebind(self, target: "ExecutionTarget") -> ResourceBinding:
+        with self._lock:
+            self._binding = ResourceBinding(
+                self._binding.generation + 1,
+                target.capture, target.input_ctrl, target.device,
+                dict(target.window) if target.window is not None else None,
+                target.resume_event,
+            )
+            return self._binding
+
+    def update_window(self, window: dict[str, Any]) -> ResourceBinding:
+        """更新同一窗口目标的几何信息，不改变资源代际。"""
+        with self._lock:
+            current = dict(self._binding.window or {})
+            current.update(window)
+            self._binding = ResourceBinding(
+                self._binding.generation,
+                self._binding.capture,
+                self._binding.input_ctrl,
+                self._binding.device,
+                current,
+                self._binding.resume_event,
+            )
+            return self._binding
+
+
+class _ResourceProxy:
+    """在每次属性/方法访问边界解析当前资源。"""
+
+    def __init__(self, handle: TargetHandle, field_name: str) -> None:
+        object.__setattr__(self, "_handle", handle)
+        object.__setattr__(self, "_field_name", field_name)
+
+    def _resource(self):
+        resource = getattr(
+            object.__getattribute__(self, "_handle").binding(),
+            object.__getattribute__(self, "_field_name"),
+        )
+        if resource is None:
+            raise RuntimeError("执行目标当前没有可用资源")
+        return resource
+
+    def __getattr__(self, name: str):
+        return getattr(self._resource(), name)
+
+    def __setattr__(self, name: str, value) -> None:
+        setattr(self._resource(), name, value)
+
+
 @dataclass(frozen=True)
 class ExecutionTargetSnapshot:
     """一次自动化冻结的目标资源；UI 后续状态变化不能替换这些引用。"""
@@ -48,6 +136,7 @@ class ExecutionTargetSnapshot:
     window: dict[str, Any] | None
     device: Any
     resume_event: Any
+    handle: TargetHandle
 
 
 @dataclass
@@ -73,6 +162,8 @@ class ExecutionTarget:
     connection_bridge: Any = None
     last_capture: Any = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    launch_draft: LaunchDraft | None = None
+    handle: TargetHandle | None = None
 
     @property
     def ready(self) -> bool:
@@ -80,16 +171,20 @@ class ExecutionTarget:
             and self.input_ctrl is not None
 
     def snapshot(self) -> ExecutionTargetSnapshot:
+        handle = self.handle or TargetHandle(self)
+        self.handle = handle
+        binding = handle.binding()
         return ExecutionTargetSnapshot(
             id=self.id,
             kind=self.kind,
             display_name=self.display_name,
-            capture=self.capture,
-            input_ctrl=self.input_ctrl,
+            capture=_ResourceProxy(handle, "capture"),
+            input_ctrl=_ResourceProxy(handle, "input_ctrl"),
             input_kind=self.input_kind,
             window=dict(self.window) if self.window is not None else None,
-            device=self.device,
-            resume_event=self.resume_event,
+            device=_ResourceProxy(handle, "device") if binding.device is not None else None,
+            resume_event=binding.resume_event,
+            handle=handle,
         )
 
 
@@ -122,6 +217,11 @@ class ExecutionTargetRegistry:
         if target.kind == "windows" and target.id != WINDOW_TARGET_ID:
             raise ValueError("窗口目标必须使用固定 ID")
         old = self._targets.get(target.id)
+        if old is not None and old.handle is not None:
+            target.handle = old.handle
+            target.handle.rebind(target)
+        elif target.handle is None:
+            target.handle = TargetHandle(target)
         self._targets[target.id] = target
         if self.active_target_id is None:
             self.active_target_id = target.id

@@ -10,7 +10,8 @@ from lvjiang.ui.main.execution_targets import (
     ExecutionTargetRegistry,
     android_target_id,
 )
-from lvjiang.ui.main.run_control import RunControlMixin
+from lvjiang.ui.main.run_control import LOCK_REASON_BATCH, RunControlMixin
+from lvjiang.ui.main.window import _ContextComboBox
 
 
 def _snapshot(identity: str):
@@ -55,6 +56,13 @@ def test_manager_enforces_target_user_and_lv1_independently() -> None:
     allowed, second = manager.try_begin(
         target=_snapshot("B"), username="乙", name="任务 B")
     assert allowed.allowed and second is not None
+    assert manager.active_count() == 2
+    assert manager.is_any_running()
+    assert manager.summary_state() == RunState.STARTING
+
+    manager.set_state(first.task_run_id, RunState.PAUSED)
+    manager.set_state(second.task_run_id, RunState.RUNNING)
+    assert manager.summary_state() == RunState.RUNNING
 
 
 def test_waiting_run_keeps_target_occupied_until_terminal_finish() -> None:
@@ -133,3 +141,51 @@ def test_switching_target_projects_only_that_targets_run_context() -> None:
     assert host._current_worker is run.worker
     assert host._current_engine is run.engine
     assert host._running_target_snapshot is run.target_snapshot
+
+
+def test_batch_context_lock_follows_viewed_target(qtbot) -> None:
+    """A 的批量任务不能把切换后的空闲 B 方案选择器一起锁住。"""
+    registry = ExecutionTargetRegistry()
+    first_target = ExecutionTarget(
+        id=android_target_id("A"), kind="adb", display_name="设备 A",
+        capture=object(), input_ctrl=object())
+    second_target = ExecutionTarget(
+        id=android_target_id("B"), kind="adb", display_name="设备 B",
+        capture=object(), input_ctrl=object())
+    registry.put(first_target)
+    registry.put(second_target)
+    manager = ExecutionRunManager(lv1_check=lambda: True, parallel_enabled=True)
+    _, run = manager.try_begin(
+        target=first_target.snapshot(), username="甲", name="批量任务")
+    assert run is not None
+    run.metadata["batch"] = True
+
+    host = type("Host", (RunControlMixin,), {})()
+    host._run_manager = manager
+    host._execution_targets = registry
+    host._current_run_context = run
+    host._run_state = "running"
+    host.plan_combo = _ContextComboBox()
+    host._env_combo = _ContextComboBox()
+    host.layout_combo = _ContextComboBox()
+    host.reference_space_combo = _ContextComboBox()
+    for combo in (
+        host.plan_combo, host._env_combo, host.layout_combo,
+        host.reference_space_combo,
+    ):
+        qtbot.addWidget(combo)
+
+    host._set_context_controls_locked(LOCK_REASON_BATCH, True)
+    assert not host.plan_combo.isEnabled()
+
+    registry.select(second_target.id)
+    host._project_run_context_for_target(second_target.id)
+    host._sync_projected_context_locks()
+    assert host.plan_combo.isEnabled()
+    assert host._env_combo.isEnabled()
+    assert host.layout_combo.isEnabled()
+
+    registry.select(first_target.id)
+    host._project_run_context_for_target(first_target.id)
+    host._sync_projected_context_locks()
+    assert not host.plan_combo.isEnabled()

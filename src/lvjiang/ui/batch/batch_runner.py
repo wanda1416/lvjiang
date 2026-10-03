@@ -142,6 +142,7 @@ class BatchContext:
     target_id: str = ""
     target_kind: str = ""
     target_label: str = ""
+    task_run_id: str = ""
     input_kind: str = ""
     layout_name: str = ""
     run_env: str = ""
@@ -305,6 +306,15 @@ class BatchWorker(QThread):
     # ─── 主循环 ─────────────────────────────────────────
 
     def run(self):
+        with logger.contextualize(
+            task_run_id=self._ctx.task_run_id,
+            target_id=self._ctx.target_id,
+            target_kind=self._ctx.target_kind,
+            target_label=self._ctx.target_label,
+        ):
+            self._run_with_context()
+
+    def _run_with_context(self):
         self._execution_lease = None
         self._user_scope = ExitStack()
         self._batch_run = None

@@ -26,11 +26,13 @@ class _Host:
 
     _set_locate_enabled = WindowOpsMixin._set_locate_enabled
     _apply_locate_lock = WindowOpsMixin._apply_locate_lock
+    _target_has_active_run = WindowOpsMixin._target_has_active_run
     _on_locate_window = WindowOpsMixin._on_locate_window
     _on_connect_device = WindowOpsMixin._on_connect_device
 
     def __init__(self, *, running: bool, candidate: str = "windows"):
         self._running = running
+        self._run_manager = None
         self._candidate_backend = candidate
         self._execution_targets = ExecutionTargetRegistry()
         self.btn_locate = MagicMock()
@@ -66,7 +68,7 @@ def test_locate_button_is_disabled_while_running() -> None:
     host._set_locate_enabled(True)
 
     host.btn_locate.setEnabled.assert_called_with(False)
-    assert "运行中" in host.btn_locate.setToolTip.call_args[0][0]
+    assert "执行任务" in host.btn_locate.setToolTip.call_args[0][0]
 
 
 def test_locate_button_comes_back_only_with_a_candidate() -> None:

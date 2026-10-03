@@ -11,7 +11,7 @@ def test_log_append_buffers_before_log_widget_exists():
     MainWindow._log_append(host, "[批量] 配置中的脚本当前不可用")
 
     assert len(host._log_buffer) == 1
-    assert host._log_buffer[0][1] == "[批量] 配置中的脚本当前不可用"
+    assert host._log_buffer[0].text == "[批量] 配置中的脚本当前不可用"
 
 
 def test_clear_log_removes_hidden_entries_and_new_logs_still_arrive(qtbot):

@@ -1,5 +1,6 @@
 """运行控制混入类 - 用户/布局选择器、启停控制、工作流通用执行"""
 
+import copy
 import json
 import threading
 import traceback
@@ -25,6 +26,7 @@ from .execution_access import guarded_finish, guarded_launch
 # import 本模块，反向 import 会成环。
 LOCK_REASON_BATCH = "batch"
 LOCK_REASON_PLAN = "plan"
+LOCK_REASON_RUNNING = "running"
 
 # 方案下拉的「不使用方案」项，userData 为空串。
 PLAN_CUSTOM_LABEL = tr("- 自定义 -")
@@ -446,6 +448,127 @@ class RunControlMixin:
         self._run_state = run_context.state.value
         self._running_target_id = run_context.target_id
         self._running_target_snapshot = run_context.target_snapshot
+
+    def _capture_launch_draft(self, target_id: str | None) -> None:
+        target = self._execution_targets.get(target_id)
+        if target is None or self._running:
+            return
+        from .execution_targets import LaunchDraft
+        selector = getattr(self, "_daily_execution_user_selector", None)
+        username = selector.combo.currentData() if selector is not None else None
+        flow_cfg = self._get_selected_flow_config()
+        parameters: dict[str, Any] = {}
+        if flow_cfg and flow_cfg.get("scope", "daily") == "daily":
+            parameters = self._collect_displayed_params(
+                flow_cfg.get("parameters", []))
+        target.launch_draft = LaunchDraft(
+            username=str(username) if username is not None else None,
+            workflow_id=str(self.workflow_combo.currentData() or ""),
+            environment=str(self._env_combo.currentData() or ""),
+            layout=str(self.layout_combo.currentData() or ""),
+            plan_id=str(self.plan_combo.currentData() or ""),
+            reference_space=self.reference_space_combo.currentText(),
+            parameters=parameters,
+        )
+
+    @staticmethod
+    def _set_combo_data(combo, value) -> None:
+        index = combo.findData(value)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+
+    def _restore_launch_draft(self, target_id: str, draft_override=None) -> None:
+        target = self._execution_targets.get(target_id)
+        draft = draft_override or (target.launch_draft if target is not None else None)
+        if draft is None:
+            return
+        selector = getattr(self, "_daily_execution_user_selector", None)
+        controls = (
+            self.plan_combo, self.reference_space_combo, self._env_combo,
+            self.layout_combo, self.workflow_combo,
+        )
+        for control in controls:
+            control.blockSignals(True)
+        if selector is not None:
+            selector.combo.blockSignals(True)
+        try:
+            self._set_combo_data(self.plan_combo, draft.plan_id)
+            if draft.reference_space:
+                index = self.reference_space_combo.findText(draft.reference_space)
+                if index >= 0:
+                    self.reference_space_combo.setCurrentIndex(index)
+            self._set_combo_data(self._env_combo, draft.environment)
+            self._set_combo_data(self.layout_combo, draft.layout)
+            self._set_combo_data(self.workflow_combo, draft.workflow_id)
+            if selector is not None:
+                self._set_combo_data(selector.combo, draft.username)
+        finally:
+            for control in controls:
+                control.blockSignals(False)
+            if selector is not None:
+                selector.combo.blockSignals(False)
+        flow_cfg = self._get_selected_flow_config()
+        self._displayed_script_id = flow_cfg["id"] if flow_cfg else None
+        for name in ("reference_space_combo", "_env_combo", "layout_combo"):
+            setter = getattr(getattr(self, name, None), "set_locked", None)
+            if setter is not None:
+                setter(LOCK_REASON_PLAN, bool(draft.plan_id))
+        self._rebuild_param_panel()
+        self._apply_launch_draft_parameters(draft.parameters)
+
+    def _apply_launch_draft_parameters(self, values: dict[str, Any]) -> None:
+        if not values:
+            return
+        from PyQt6.QtWidgets import (
+            QCheckBox,
+            QComboBox,
+            QLineEdit,
+            QPlainTextEdit,
+            QSpinBox,
+            QWidget,
+        )
+        for name, value in values.items():
+            widget = self._param_panel.findChild(QSpinBox, name)
+            if widget is not None:
+                widget.blockSignals(True)
+                widget.setValue(int(value))
+                widget.blockSignals(False)
+                continue
+            widget = self._param_panel.findChild(QCheckBox, name)
+            if widget is not None:
+                widget.blockSignals(True)
+                widget.setChecked(bool(value))
+                widget.blockSignals(False)
+                continue
+            combo = self._param_panel.findChild(QComboBox, name)
+            if combo is not None:
+                combo.blockSignals(True)
+                index = combo.findData(value)
+                if index < 0:
+                    index = combo.findText(str(value))
+                if index >= 0:
+                    combo.setCurrentIndex(index)
+                combo.blockSignals(False)
+                continue
+            line = self._param_panel.findChild(QLineEdit, name)
+            if line is not None:
+                line.blockSignals(True)
+                line.setText(str(value))
+                line.blockSignals(False)
+                continue
+            plain = self._param_panel.findChild(QPlainTextEdit, name)
+            if plain is not None:
+                plain.blockSignals(True)
+                plain.setPlainText(str(value))
+                plain.blockSignals(False)
+                continue
+            container = self._param_panel.findChild(QWidget, name)
+            if container is not None and isinstance(value, dict):
+                for check in container.findChildren(QCheckBox):
+                    check.blockSignals(True)
+                    check.setChecked(bool(value.get(check.objectName(), False)))
+                    check.blockSignals(False)
+        self._refresh_param_visibility()
 
     # ─── 工作流配置加载 ──────────────────────────────────
 
@@ -893,7 +1016,9 @@ class RunControlMixin:
 
     # ─── 自动化状态管理 ────────────────────────────────────
 
-    def _begin_automation(self, name: str, *, username: str = "") -> bool:
+    def _begin_automation(
+        self, name: str, *, username: str | None = None,
+    ) -> bool:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
         hk = self._user_config.hotkeys
         if self._running or (self._current_worker is not None and self._current_worker.isRunning()):
@@ -926,8 +1051,10 @@ class RunControlMixin:
             self._show_workflow_start_error(tr("当前没有可执行目标"))
             return False
         target_snapshot = target.snapshot()
+        self._capture_launch_draft(target.id)
         run_username = str(
-            username or getattr(self, "_execution_username_snapshot", "") or "")
+            getattr(self, "_execution_username_snapshot", "") or ""
+            if username is None else username)
         decision, run_context = self._run_manager.try_begin(
             target=target_snapshot, username=run_username, name=name)
         if run_context is None:
@@ -935,6 +1062,7 @@ class RunControlMixin:
             self.statusBar().showMessage(decision.reason)
             return False
         self._current_run_context = run_context
+        run_context.metadata["launch_draft"] = copy.deepcopy(target.launch_draft)
         run_context.lease = getattr(self, "_execution_lease", None)
         # RapidOCR/ONNX 的同实例并发安全没有契约保证；每个运行实例持有
         # 独立的懒加载引擎，避免多设备推理互相污染。
@@ -948,6 +1076,7 @@ class RunControlMixin:
         self._running_target_snapshot = target_snapshot
         from .execution_runs import RunState
         self._run_manager.set_state(run_context.task_run_id, RunState.RUNNING)
+        self._emit_run_instance_state(run_context, RunState.RUNNING.value)
         # 暂停事件：set=运行，clear=暂停阻塞
         signal = getattr(self, "_pause_acknowledged", None)
         notify = (lambda: signal.emit(run_context.task_run_id)) \
@@ -1077,9 +1206,11 @@ class RunControlMixin:
             management = getattr(context.engine, "_tuning_management", None)
             if management is not None:
                 management.mark_run_done(context.task_run_id, final_state.value)
+            self._emit_run_instance_state(context, final_state.value)
             self._run_manager.finish(
                 context.task_run_id, final_state,
             )
+            self._emit_concurrency_changed()
         if not is_current:
             refresh_targets = getattr(self, "_refresh_execution_targets_ui", None)
             if callable(refresh_targets):
@@ -1226,6 +1357,7 @@ class RunControlMixin:
             run_context.stop_event.set()
             from .execution_runs import RunState
             self._run_manager.set_state(run_context.task_run_id, RunState.STOPPING)
+            self._emit_run_instance_state(run_context, RunState.STOPPING.value)
         self._run_state = STATE_STOPPING
         # 先刷按钮再做日志、唤醒和对话框收尾，避免日志控件重排等
         # 工作让用户产生「没点到」的感觉。
@@ -1317,6 +1449,7 @@ class RunControlMixin:
         if run_context is not None:
             from .execution_runs import RunState
             self._run_manager.set_state(run_context.task_run_id, RunState.PAUSING)
+            self._emit_run_instance_state(run_context, RunState.PAUSING.value)
         pause_event = getattr(self, '_pause_event', None)
         if pause_event is not None:
             pause_event.clear()  # 阻塞工作流线程
@@ -1347,6 +1480,7 @@ class RunControlMixin:
             return
         from .execution_runs import RunState
         self._run_manager.set_state(run_context.task_run_id, RunState.PAUSED)
+        self._emit_run_instance_state(run_context, RunState.PAUSED.value)
         if run_context is not getattr(self, "_current_run_context", None):
             self._refresh_execution_targets_ui()
             return
@@ -1369,6 +1503,7 @@ class RunControlMixin:
         if run_context is not None:
             from .execution_runs import RunState
             self._run_manager.set_state(run_context.task_run_id, RunState.RUNNING)
+            self._emit_run_instance_state(run_context, RunState.RUNNING.value)
         pause_event = getattr(self, '_pause_event', None)
         if pause_event is not None:
             pause_event.set()  # 唤醒工作流线程
@@ -1413,17 +1548,26 @@ class RunControlMixin:
             return
         target.status = "offline"
         self._refresh_execution_targets_ui()
-        if target_id != self._running_target_id:
+        run_context = self._run_manager.run_for_target(target_id)
+        if run_context is None:
             if target_id == self._execution_targets.active_target_id:
                 self._sync_active_target_compat()
                 self._refresh_run_button()
             self.log_text.append(
                 f"[警告] 非运行目标 {target.display_name} 已离线: {error_msg}")
             return
-        self.log_text.append(tr(
+        from .execution_runs import RunState
+        self._run_manager.set_state(
+            run_context.task_run_id, RunState.WAITING_TARGET)
+        self._emit_run_instance_state(
+            run_context, RunState.WAITING_TARGET.value)
+        message = tr(
             "[警告] ADB 连接异常，请恢复 {name} 的连接后点击恢复；"
             "若无法恢复，请按 F10 停止任务后重新连接: {error}").format(
-                name=target.display_name, error=error_msg))
+                name=target.display_name, error=error_msg)
+        self.log_text.append(message)
+        if target_id != self._execution_targets.active_target_id:
+            return
         self.statusBar().showMessage(tr(
             "ADB 异常，请恢复设备连接后点击恢复；无法恢复时请按 F10 停止"))
         banner = getattr(self, '_adb_banner', None)
@@ -1448,6 +1592,16 @@ class RunControlMixin:
         resume_event = getattr(self, '_adb_resume_event', None)
         if resume_event is not None:
             resume_event.set()
+            run_context = getattr(self, "_current_run_context", None)
+            if run_context is not None:
+                from .execution_runs import RunState
+                next_state = (
+                    RunState.PAUSED
+                    if run_context.pause_event is not None
+                    and not run_context.pause_event.is_set()
+                    else RunState.RUNNING)
+                self._run_manager.set_state(run_context.task_run_id, next_state)
+                self._emit_run_instance_state(run_context, next_state.value)
             self.statusBar().showMessage(tr("已恢复，继续执行..."))
             self.log_text.append(tr("[操作] ADB 已恢复，工作流继续"))
         banner = getattr(self, '_adb_banner', None)
@@ -1601,7 +1755,10 @@ class RunControlMixin:
         from ...core.config.wf_configs import get_wf_config
         engine.workflow_config_snapshot = get_wf_config(flow_id)
         engine._ui_callback = self._create_ui_callback(run_context)
-        engine.window_rebind_hook = self._on_target_window_rebound
+        engine.window_rebind_hook = (
+            lambda window, target_id=run_context.target_id:
+            self._on_target_window_rebound(target_id, window)
+        )
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
         # 执行前先提交面板，再从统一解析器生成该用户的参数快照。
@@ -1837,6 +1994,28 @@ class RunControlMixin:
 
     # ─── 运行按钮 ──────────────────────────────────────────
 
+    def _emit_run_instance_state(self, context, state: str) -> None:
+        signal = getattr(self, "run_instance_state_changed", None)
+        if signal is not None:
+            signal.emit(context.task_run_id, context.target_id, state)
+        self._emit_concurrency_changed()
+
+    def _emit_concurrency_changed(self) -> None:
+        signal = getattr(self, "concurrency_changed", None)
+        manager = getattr(self, "_run_manager", None)
+        if signal is not None and manager is not None:
+            signal.emit(manager.active_count())
+
+    def _sync_projected_context_locks(self) -> None:
+        """按当前查看目标的运行实例刷新上下文专用锁。"""
+        run_context = getattr(self, "_current_run_context", None)
+        batch_locked = bool(
+            self._running
+            and run_context is not None
+            and run_context.metadata.get("batch")
+        )
+        self._set_context_controls_locked(LOCK_REASON_BATCH, batch_locked)
+
     def _refresh_run_button(self):
         """根据运行状态和定位状态刷新运行按钮，并广播状态给插件页面。"""
         run_state = getattr(self, '_run_state', 'idle')
@@ -1873,6 +2052,24 @@ class RunControlMixin:
                 tr("开始执行"), hk.start))
             apply_execution_button_style(self.btn_run_workflow, "run")
         self.automation_state_changed.emit(state)
+        self._emit_concurrency_changed()
+        # 批量锁原先只在批量启动/结束时直接改主窗口控件。多目标后这些
+        # 控件是“当前查看目标”的投影：A 正在跑批量时切到空闲的 B，A 的
+        # 锁不能继续残留在 B 上；切回 A 时又必须恢复。运行锁本来就是按
+        # 当前目标计算的，批量锁也在同一个刷新点按当前 RunContext 重算。
+        self._sync_projected_context_locks()
+        for combo_name in ("plan_combo", "reference_space_combo", "_env_combo",
+                           "layout_combo"):
+            combo = getattr(self, combo_name, None)
+            setter = getattr(combo, "set_locked", None)
+            if setter is not None:
+                setter(LOCK_REASON_RUNNING, self._running)
+        workflow_combo = getattr(self, "workflow_combo", None)
+        if workflow_combo is not None:
+            workflow_combo.setEnabled(not self._running)
+        param_panel = getattr(self, "_param_panel", None)
+        if param_panel is not None:
+            param_panel.setEnabled(not self._running)
         from ..execution_user_selector import ExecutionUserSelector
         for selector in self.findChildren(ExecutionUserSelector):
             selector.setEnabled(not self._running)
@@ -2005,7 +2202,10 @@ class RunControlMixin:
             stop_check=stop_check,
             pause_event=self._pause_event,
         ).build()
-        engine.window_rebind_hook = self._on_target_window_rebound
+        engine.window_rebind_hook = (
+            lambda window, target_id=run_context.target_id:
+            self._on_target_window_rebound(target_id, window)
+        )
         engine.task_run_id = run_context.task_run_id
         engine.execution_target_snapshot = target_snapshot
         self._bind_engine_user(engine, username)

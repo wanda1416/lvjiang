@@ -74,12 +74,14 @@ class TrayOpsMixin:
         menu = QMenu()
         self._tray_action_start = menu.addAction(tr("开始"), self._on_start)
         self._tray_action_pause = menu.addAction(tr("暂停"), self._on_pause_resume)
-        self._tray_action_stop = menu.addAction(tr("结束"), self._on_stop)
+        self._tray_action_stop = menu.addAction(
+            tr("结束当前目标"), self._on_stop)
         menu.addSeparator()
         menu.addAction(tr("打开主界面"), self._restore_from_tray)
         self._tray_icon.setContextMenu(menu)
         self._tray_icon.activated.connect(self._on_tray_activated)
         self.automation_state_changed.connect(self._refresh_tray_icon)
+        self.concurrency_changed.connect(self._refresh_tray_concurrency)
         self._refresh_tray_icon(getattr(self, "_run_state", "idle"))
 
     def _minimize_to_tray(self):
@@ -141,6 +143,14 @@ class TrayOpsMixin:
             self._tray_action_pause.setText(
                 tr("恢复") if state == "paused" else tr("暂停"))
         self._tray_action_stop.setText(
-            tr("结束中") if state == STATE_STOPPING else tr("结束"))
+            tr("结束中") if state == STATE_STOPPING else tr("结束当前目标"))
         self._tray_action_stop.setEnabled(
             state in ("running", STATE_PAUSING, "paused"))
+
+    def _refresh_tray_concurrency(self, count: int) -> None:
+        if self._tray_icon is None:
+            return
+        tooltip = self.windowTitle()
+        if count > 0:
+            tooltip += " - " + tr("{count} 个任务运行中").format(count=count)
+        self._tray_icon.setToolTip(tooltip)

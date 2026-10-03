@@ -516,6 +516,7 @@ class WindowOpsMixin:
         target_id = current.data(0, Qt.ItemDataRole.UserRole)
         if not target_id or target_id == self._execution_targets.active_target_id:
             return
+        self._capture_launch_draft(self._execution_targets.active_target_id)
         recorder = getattr(self, "_screen_recorder", None)
         abort_recording = getattr(self, "_abort_screen_record", None)
         if recorder is not None and callable(abort_recording):
@@ -524,9 +525,23 @@ class WindowOpsMixin:
         # 可空的，加守卫等于承认这里可能是 None，而实际上不可能。
         target = self._execution_targets.select(str(target_id))
         self._project_run_context_for_target(target.id)
+        run_context = self._run_manager.run_for_target(target.id)
+        frozen_draft = (
+            run_context.metadata.get("launch_draft")
+            if run_context is not None else None)
+        self._restore_launch_draft(target.id, frozen_draft)
+        batch_tab = getattr(self, "_batch_tab", None)
+        if batch_tab is not None:
+            batch_tab.show_run(
+                run_context.task_run_id
+                if run_context is not None and run_context.metadata.get("batch")
+                else "")
         self._sync_active_target_compat()
         self._refresh_active_target_ui()
         self._refresh_run_button()
+        redraw_logs = getattr(self, "_redraw_log_events", None)
+        if callable(redraw_logs):
+            redraw_logs()
         self.log_text.append(
             tr("[执行目标] 已切换到 {name}").format(name=target.display_name))
 
@@ -967,6 +982,11 @@ class WindowOpsMixin:
             device=device, input_sim=self._user_config.input_sim, agent=agent)
         identity = device.get_stable_identity()
         target_id = android_target_id(identity.value)
+        existing_target = self._execution_targets.get(target_id)
+        generation = (
+            existing_target.handle.binding().generation + 1
+            if existing_target is not None and existing_target.handle is not None
+            else 1)
 
         # scrcpy 模式下订阅帧回调，实现预览区实时视频流
         streaming = False
@@ -974,13 +994,21 @@ class WindowOpsMixin:
             from ...core.android import AndroidStreamCapture
             if isinstance(capture, AndroidStreamCapture):
                 capture.set_on_frame(
-                    lambda frame, tid=target_id: self._on_scrcpy_frame(tid, frame))
+                    lambda frame, tid=target_id, gen=generation:
+                    self._on_scrcpy_frame(tid, frame, gen))
                 streaming = True
                 logger.info("[连接] scrcpy 视频流预览已启用")
 
         # ── ADB 断连暂停恢复接线 ──
-        resume_event = threading.Event()
-        resume_event.set()
+        resume_event = (
+            existing_target.resume_event
+            if existing_target is not None and existing_target.resume_event is not None
+            else threading.Event())
+        # 先把旧 AdbDevice 的 transport 更新到新连接，再唤醒正在
+        # _handle_connection_error 中等待的失败命令，这样重试不会继续打旧 IP。
+        if existing_target is not None and existing_target.device is not None:
+            existing_target.device.serial = device.serial
+            existing_target.device.adb_path = device.adb_path
         device.resume_event = resume_event
         try:
             from ...core.app_controller import record_connected_android
@@ -995,7 +1023,9 @@ class WindowOpsMixin:
         bridge = _AdbConnSignalBridge(target_id)
         bridge.adb_lost.connect(self._on_adb_connection_lost)
         device.on_connection_lost = bridge.notify_lost
-        device.stop_check = lambda: self._stop_requested
+        device.stop_check = lambda tid=target_id: bool(
+            (run := self._run_manager.run_for_target(tid))
+            and run.stop_event.is_set())
 
         model = str(combo_data.get("model") or "").strip()
         short_id = target_id.rsplit(":", 1)[-1][:6]
@@ -1024,6 +1054,21 @@ class WindowOpsMixin:
         old = self._execution_targets.put(target)
         if old is not None:
             self._dispose_execution_target(old)
+        # 注册表和 TargetHandle 已切到新资源后才唤醒失败命令。
+        resume_event.set()
+        run_context = self._run_manager.run_for_target(target_id)
+        if run_context is not None and run_context.state.value == "waiting_target":
+            from .execution_runs import RunState
+            next_state = (
+                RunState.PAUSED
+                if run_context.pause_event is not None
+                and not run_context.pause_event.is_set()
+                else RunState.RUNNING)
+            self._run_manager.set_state(run_context.task_run_id, next_state)
+            self._emit_run_instance_state(run_context, next_state.value)
+            banner = getattr(self, "_adb_banner", None)
+            if banner is not None and target_id == self._execution_targets.active_target_id:
+                banner.setVisible(False)
         self._sync_active_target_compat()
 
         method_label = tr("流式截图") if capture_method == "scrcpy" \
@@ -1119,9 +1164,6 @@ class WindowOpsMixin:
         target = self._execution_targets.get(target_id)
         if target is None:
             return
-        if self._target_has_active_run(target.id):
-            self.log_text.append(tr("[提示] 该目标正在执行任务，不能刷新或重连"))
-            return
         if target.kind == "adb":
             self._reconnect_android_target(target_id)
             return
@@ -1151,6 +1193,11 @@ class WindowOpsMixin:
         if self._execution_targets.active_target_id == target.id:
             self._sync_active_target_compat()
             self._capture_preview()
+        run_context = self._run_manager.run_for_target(target.id)
+        if run_context is not None and run_context.engine is not None:
+            rebind = getattr(run_context.engine, "rebind_target_window", None)
+            if callable(rebind):
+                rebind(window)
         self._refresh_execution_targets_ui()
         self.statusBar().showMessage(tr("已刷新窗口位置"))
         self.log_text.append(
@@ -1583,22 +1630,25 @@ class WindowOpsMixin:
 
     # ─── 运行期窗口重绑 ───────────────────────────────────
 
-    def _on_target_window_rebound(self, window: dict):
+    def _on_target_window_rebound(self, target_id: str, window: dict):
         """工作流重启客户端后回调：把定位状态挪到新窗口上。
 
-        运行在工作流线程，因此只改纯数据 `_target_window`，不碰任何控件；
-        预览、场景编辑器和下一次运行都从它取值，不然定位状态会一直停在
-        已经销毁的句柄上，直到用户手动重新定位。
+        运行在工作流线程，因此只改该运行实例绑定目标的纯数据，不碰任何控件；
+        当前 UI 可能正在查看另一台设备，不能再依赖 `_target_window` 投影。
         """
-        target = self._target_window
-        if not target:
+        execution_target = self._execution_targets.get(target_id)
+        if execution_target is None or execution_target.window is None:
             return
+        target = execution_target.window
         for key in ("hwnd", "pid", "title", "executable",
                     "left", "top", "width", "height"):
             if window.get(key) is not None:
                 target[key] = window[key]
+        if execution_target.handle is not None:
+            execution_target.handle.update_window(target)
         logger.info(
-            f"[定位跟随] 客户端已重启，跟随到新窗口 hwnd={target.get('hwnd')}")
+            f"[定位跟随] {target_id} 客户端已重启，"
+            f"跟随到新窗口 hwnd={target.get('hwnd')}")
 
     # ─── Win32 工具 ───────────────────────────────────────
 
@@ -1623,9 +1673,15 @@ class WindowOpsMixin:
 
     # ─── scrcpy 帧回调 ────────────────────────────────────
 
-    def _on_scrcpy_frame(self, target_id: str, bgr: np.ndarray):
+    def _on_scrcpy_frame(
+            self, target_id: str, bgr: np.ndarray,
+            generation: int | None = None):
         """scrcpy 解码线程回调：通过 Qt 信号将帧转发到 UI 线程，并分叉喂给录屏器"""
         target = self._execution_targets.get(target_id)
+        if (target is None or generation is not None
+                and target.handle is not None
+                and target.handle.binding().generation != generation):
+            return
         if target is not None:
             target.last_capture = bgr
         if hasattr(self, "_scrcpy_frame_ready"):

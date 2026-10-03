@@ -106,7 +106,7 @@ class TuningManagementWidget(QWidget):
 
     def _close_run_page(self, index: int) -> None:
         page = self._tabs.widget(index)
-        if page is self.history_widget:
+        if page is None or page is self.history_widget:
             return
         run_id = next(
             (key for key, value in self._pages.items() if value is page), "")
@@ -121,11 +121,14 @@ class TuningManagementWidget(QWidget):
 
     def _hide_close_button(self, index: int) -> None:
         bar = self._tabs.tabBar()
+        assert bar is not None
         bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, None)
         bar.setTabButton(index, QTabBar.ButtonPosition.LeftSide, None)
 
     def _show_close_button(self, index: int) -> None:
-        button = QToolButton(self._tabs.tabBar())
+        bar = self._tabs.tabBar()
+        assert bar is not None
+        button = QToolButton(bar)
         button.setText("×")
         button.setToolTip(tr("关闭已结束的任务页"))
         button.setAutoRaise(True)
@@ -133,7 +136,7 @@ class TuningManagementWidget(QWidget):
         button.clicked.connect(
             lambda _checked=False, page=page:
             self._close_page_widget(page))
-        self._tabs.tabBar().setTabButton(
+        bar.setTabButton(
             index, QTabBar.ButtonPosition.RightSide, button)
 
     def _close_page_widget(self, page: QWidget | None) -> None:

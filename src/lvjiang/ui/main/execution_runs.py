@@ -1,8 +1,4 @@
-"""按执行目标管理自动化运行实例。
-
-第一阶段只接管运行身份、目标占用和结构化启动判定；现有主窗口仍保留
-单任务 UI 投影。并发入口必须等所有消费者迁移完成后再开放。
-"""
+"""按执行目标管理并发自动化运行实例与 Lv1 启动门禁。"""
 from __future__ import annotations
 
 import threading
@@ -99,7 +95,7 @@ class ExecutionRunManager:
                 run = next(iter(self._runs.values()))
                 return StartDecision(
                     False, StartDenial.LV1_REQUIRED,
-                    "同时运行多个执行目标需要激活 Lv1",
+                    "同时运行多个执行目标需要激活 Lv1，请在设置的「功能激活」中激活",
                     run.task_run_id, run.target_id,
                 )
             return StartDecision(True)
@@ -153,6 +149,24 @@ class ExecutionRunManager:
     def all_runs(self) -> tuple[ExecutionRunContext, ...]:
         with self._lock:
             return tuple(self._runs.values())
+
+    def is_any_running(self) -> bool:
+        with self._lock:
+            return bool(self._runs)
+
+    def active_count(self) -> int:
+        with self._lock:
+            return len(self._runs)
+
+    def summary_state(self) -> RunState | None:
+        """返回用于全局状态的最高优先级运行态。"""
+        priority = (
+            RunState.STOPPING, RunState.WAITING_TARGET, RunState.PAUSING,
+            RunState.RUNNING, RunState.PAUSED, RunState.STARTING,
+        )
+        with self._lock:
+            states = {run.state for run in self._runs.values()}
+        return next((state for state in priority if state in states), None)
 
     def request_stop_all(self) -> tuple[ExecutionRunContext, ...]:
         """向全部运行实例发出停止请求，并保留占用直到线程真正结束。"""

@@ -257,6 +257,7 @@ class TaskHistoryRepository:
     def list_task_runs(
         self, *, usernames: list[str] | None = None,
         task_ids: list[str] | None = None, batch_run_id: str | None = None,
+        target_kind: str | None = None,
         start_date: date | None = None, end_date: date | None = None,
         limit: int = 2000,
     ) -> list[TaskRunRecord]:
@@ -271,6 +272,9 @@ class TaskHistoryRepository:
         if batch_run_id:
             clauses.append("batch_run_id=?")
             args.append(batch_run_id)
+        if target_kind is not None:
+            clauses.append("target_kind=?")
+            args.append(target_kind)
         if start_date:
             clauses.append("started_at >= ?")
             args.append(f"{start_date.isoformat()}T00:00:00")
@@ -317,7 +321,8 @@ class TaskHistoryRepository:
 
     def list_batch_runs(
         self, *, start_date: date | None = None,
-        end_date: date | None = None, limit: int = 1000,
+        end_date: date | None = None, target_kind: str | None = None,
+        limit: int = 1000,
     ) -> list[BatchRunRecord]:
         clauses: list[str] = []
         args: list[Any] = []
@@ -327,6 +332,9 @@ class TaskHistoryRepository:
         if end_date:
             clauses.append("b.started_at < ?")
             args.append(f"{(end_date + timedelta(days=1)).isoformat()}T00:00:00")
+        if target_kind is not None:
+            clauses.append("b.target_kind=?")
+            args.append(target_kind)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         args.append(max(1, int(limit)))
         with self._connect() as conn:
@@ -415,6 +423,9 @@ class TaskRunSession:
     ):
         self.repository = repository or TaskHistoryRepository()
         self.task_run_id = task_run_id or uuid.uuid4().hex
+        self.target_id = target_id
+        self.target_kind = target_kind
+        self.target_label = target_label
         self.started_at = _now()
         self._started_monotonic = time.monotonic()
         user_dir = (log_root or default_log_root()) / _safe_component(
@@ -437,24 +448,32 @@ class TaskRunSession:
 
     @contextmanager
     def capture_logs(self) -> Iterator[None]:
-        thread_id = threading.get_ident()
-        try:
-            sink_id = logger.add(
-                str(self.log_path), level="DEBUG", encoding="utf-8",
-                format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {message}",
-                filter=lambda record: record["thread"].id == thread_id,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"任务独立日志创建失败，继续执行任务: {exc}")
-            yield
-            return
-        try:
-            yield
-        finally:
+        with logger.contextualize(
+            task_run_id=self.task_run_id,
+            target_id=self.target_id,
+            target_kind=self.target_kind,
+            target_label=self.target_label,
+        ):
             try:
-                logger.remove(sink_id)
+                sink_id = logger.add(
+                    str(self.log_path), level="DEBUG", encoding="utf-8",
+                    format=(
+                        "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | "
+                        "{message}"),
+                    filter=lambda record: record["extra"].get("task_run_id")
+                    == self.task_run_id,
+                )
             except Exception as exc:  # noqa: BLE001
-                logger.warning(f"任务独立日志关闭失败: {exc}")
+                logger.warning(f"任务独立日志创建失败，继续执行任务: {exc}")
+                yield
+                return
+            try:
+                yield
+            finally:
+                try:
+                    logger.remove(sink_id)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(f"任务独立日志关闭失败: {exc}")
 
     def finish(self, *, status: str, result_path: Path | None = None,
                error_message: str = "") -> None:

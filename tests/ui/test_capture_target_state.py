@@ -76,6 +76,7 @@ def test_switching_stream_backend_saves_recording_before_old_stream_stops(
     host = SimpleNamespace(
         _execution_targets=registry,
         _running=False,
+        _target_has_active_run=lambda _target_id: False,
         _screen_recorder=object(),
         _abort_screen_record=lambda reason: events.append(f"save:{reason}"),
         _sync_active_target_compat=lambda: events.append("sync"),

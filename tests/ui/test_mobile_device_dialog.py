@@ -4,9 +4,11 @@
 手势探针只有命令行，设备端 status 的十几个字段一个字都没显示过。所以用例盯的是
 "用户能不能从界面拿到这些东西"，而不是控件长什么样。
 """
+import threading
 from pathlib import Path
 
 import pytest
+from PyQt6.QtCore import QThread
 
 from lvjiang.core.android.apk_release import (
     ApkFile,
@@ -203,6 +205,7 @@ class _StubServer:
 
     def __init__(self, *_args, **_kwargs):
         self.stopped = False
+        self.path = Path(_args[0]) if _args else None
 
     def start(self):
         return self
@@ -213,7 +216,7 @@ class _StubServer:
 
     @property
     def route(self) -> str:
-        return "/lvjiang-v0.13.9.apk"
+        return f"/{self.path.name}" if self.path else "/lvjiang-v0.13.9.apk"
 
     def url_for(self, host: str) -> str:
         return f"http://{host}:{self.port}{self.route}"
@@ -222,7 +225,14 @@ class _StubServer:
         self.stopped = True
 
 
-def _dialog(qtbot, monkeypatch, *, devices=(), addresses=("192.168.1.5",)):
+def _dialog(
+    qtbot,
+    monkeypatch,
+    *,
+    devices=(),
+    addresses=("192.168.1.5",),
+    adopt_existing=False,
+):
     from lvjiang.ui.mobile.dialog import MobileDeviceDialog
 
     monkeypatch.setattr(
@@ -231,8 +241,12 @@ def _dialog(qtbot, monkeypatch, *, devices=(), addresses=("192.168.1.5",)):
     monkeypatch.setattr(
         "lvjiang.ui.mobile.dialog.lan_addresses", lambda: list(addresses))
     monkeypatch.setattr("lvjiang.ui.mobile.dialog.ApkLanServer", _StubServer)
+    if not adopt_existing:
+        monkeypatch.setattr(
+            "lvjiang.ui.mobile.dialog.find_local_apk", lambda *_a, **_kw: None)
     dialog = MobileDeviceDialog()
     qtbot.addWidget(dialog)
+    qtbot.waitUntil(lambda: dialog._device_worker is None)
     return dialog
 
 
@@ -387,8 +401,11 @@ def test_adopts_the_apk_downloaded_last_time(qtbot, monkeypatch, tmp_path):
         "lvjiang.ui.mobile.dialog.find_local_apk",
         lambda version, *a, **kw: apk if version == "0.13.9" else None)
     monkeypatch.setattr("lvjiang.ui.mobile.dialog.get_version", lambda: "0.13.9")
+    monkeypatch.setattr(
+        "lvjiang.ui.mobile.dialog.fetch_expected_sha256", lambda *_a, **_kw: None)
 
-    dialog = _dialog(qtbot, monkeypatch)
+    dialog = _dialog(qtbot, monkeypatch, adopt_existing=True)
+    qtbot.waitUntil(lambda: dialog._hash_worker is None)
 
     assert dialog._apk is not None
     assert dialog._apk.path == apk
@@ -409,7 +426,7 @@ def test_existing_apk_shows_up_before_the_hash_is_computed(qtbot, monkeypatch,
         "lvjiang.ui.mobile.dialog.MobileDeviceDialog._start_hash_worker",
         lambda self, path: started.append(path))
 
-    dialog = _dialog(qtbot, monkeypatch)
+    dialog = _dialog(qtbot, monkeypatch, adopt_existing=True)
 
     assert started == [apk], "必须把哈希算在后台线程里"
     assert dialog._apk is not None and dialog._apk.sha256 == ""
@@ -433,3 +450,251 @@ def test_download_and_lookup_share_one_directory():
 
     assert apk_release.default_download_dir().name == "apk"
     assert apk_release.default_download_dir().parent.name == "data"
+
+
+# ─── 异步边界与运行快照 ────────────────────────────────────
+
+def test_close_waits_for_worker_before_destroying_dialog(qtbot, monkeypatch):
+    """关闭只发取消请求；线程真正结束前不得销毁它的 Qt 父对象。"""
+    dialog = _dialog(qtbot, monkeypatch)
+
+    class _SlowWorker(QThread):
+        def run(self):
+            self.msleep(120)
+
+    worker = _SlowWorker(dialog)
+    dialog._track_worker(worker)
+    dialog.show()
+    worker.start()
+
+    dialog.close()
+
+    assert dialog._close_pending is True
+    assert dialog.isVisible(), "线程仍运行时 closeEvent 必须拒绝销毁"
+    qtbot.waitUntil(lambda: not dialog.isVisible())
+    assert not worker.isRunning()
+
+
+def test_agent_failure_restores_buttons_and_writes_result(qtbot, monkeypatch):
+    """ADB/Agent 异常必须回到 UI，不得把体检和测试按钮永久锁住。"""
+    dialog = _dialog(
+        qtbot, monkeypatch,
+        devices=[{"serial": "A", "model": "Phone"}],
+    )
+
+    def fail(_device):
+        raise RuntimeError("adb forward timeout")
+
+    monkeypatch.setattr(
+        "lvjiang.ui.mobile.dialog.connect_agent_diagnostic", fail)
+    dialog._run_agent(probe=True)
+    qtbot.waitUntil(lambda: dialog._agent_worker is None)
+
+    assert dialog._btn_check.isEnabled()
+    assert dialog._btn_probe.isEnabled()
+    assert "adb forward timeout" in dialog._gesture_text.toPlainText()
+    assert "正在连接" not in dialog._gesture_text.toPlainText()
+
+
+def test_agent_worker_keeps_handshake_status_after_probe_error(monkeypatch):
+    """探针异常不得丢掉已取得的设备状态，否则体检会误报未连接。"""
+    from lvjiang.ui.mobile.dialog import _AgentWorker
+
+    class _Agent:
+        status = _status()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(
+        "lvjiang.ui.mobile.dialog.connect_agent_diagnostic",
+        lambda _device: _Agent(),
+    )
+    monkeypatch.setattr(
+        "lvjiang.ui.mobile.dialog.screen_size",
+        lambda _agent: (_ for _ in ()).throw(RuntimeError("screen failed")),
+    )
+    results = []
+    worker = _AgentWorker("A", probe=True)
+    worker.done.connect(lambda *args: results.append(args))
+
+    worker.run()
+
+    assert len(results) == 1
+    assert results[0][0]["app"] == "0.13.9"
+    assert "screen failed" in results[0][5]
+
+
+def test_failed_gesture_connection_replaces_connecting_placeholder(
+    qtbot, monkeypatch,
+):
+    dialog = _dialog(qtbot, monkeypatch)
+    dialog._gesture_text.setPlainText("正在连接设备端代理…")
+
+    dialog._on_agent_done({}, "A", True, "", [], "")
+
+    assert "无法连接" in dialog._gesture_text.toPlainText()
+
+
+def test_report_keeps_the_device_used_for_health_check(qtbot, monkeypatch):
+    """完成后即使用户切换下拉框，报告仍应标记产生该状态的设备。"""
+    dialog = _dialog(
+        qtbot, monkeypatch,
+        devices=[
+            {"serial": "A", "model": "One"},
+            {"serial": "B", "model": "Two"},
+        ],
+    )
+    dialog._on_agent_done(_status(), "A", False, "", [], "")
+    dialog._device_combo.setCurrentIndex(dialog._device_combo.findData("B"))
+
+    dialog._on_copy_report()
+
+    from PyQt6.QtWidgets import QApplication
+
+    assert "设备序列号: A" in QApplication.clipboard().text()
+
+
+def test_old_hash_result_cannot_overwrite_newly_selected_apk(
+    qtbot, monkeypatch, tmp_path,
+):
+    dialog = _dialog(qtbot, monkeypatch)
+    old = tmp_path / "old.apk"
+    new = tmp_path / "new.apk"
+    old.write_bytes(b"old")
+    new.write_bytes(b"new")
+    dialog._set_apk(ApkFile(new, "0.13.9", "new-digest", True))
+
+    dialog._on_hash_done(str(old), "old-digest", False)
+
+    assert dialog._apk is not None
+    assert dialog._apk.path == new
+    assert dialog._apk.sha256 == "new-digest"
+    assert dialog._apk.verified is True
+
+
+def test_switching_apk_restarts_active_lan_server(
+    qtbot, monkeypatch, tmp_path,
+):
+    dialog = _dialog(qtbot, monkeypatch)
+    first = tmp_path / "first.apk"
+    second = tmp_path / "second.apk"
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+    dialog._set_apk(ApkFile(first, "0.13.9", "a", True))
+    dialog._source_lan.setChecked(True)
+    old_server = dialog._server
+
+    dialog._set_apk(ApkFile(second, "0.13.9", "b", True))
+
+    assert old_server is not None and old_server.stopped is True
+    assert dialog._server is not None and dialog._server is not old_server
+    assert dialog._server.path == second
+    assert dialog._qr.content.endswith("/second.apk")
+
+
+def test_switching_apk_falls_back_online_when_lan_restart_fails(
+    qtbot, monkeypatch, tmp_path,
+):
+    """换包后本机服务重启失败时，选中来源必须与二维码一致。"""
+    dialog = _dialog(qtbot, monkeypatch)
+    first = tmp_path / "first.apk"
+    second = tmp_path / "second.apk"
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+    dialog._set_apk(ApkFile(first, "0.13.9", "a", True))
+    dialog._source_lan.setChecked(True)
+    monkeypatch.setattr(dialog, "_start_server", lambda: False)
+
+    dialog._set_apk(ApkFile(second, "0.13.9", "b", True))
+
+    assert dialog._source_online.isChecked()
+    assert not dialog._source_lan.isChecked()
+    assert dialog._server is None
+    assert "github" in dialog._qr.content.lower()
+
+
+def test_adb_install_runs_outside_gui_thread(qtbot, monkeypatch, tmp_path):
+    """安装阻塞时事件循环仍可运行，完成结果再回到界面。"""
+    dialog = _dialog(
+        qtbot, monkeypatch,
+        devices=[{"serial": "A", "model": "Phone"}],
+    )
+    _give_apk(dialog, tmp_path)
+    entered = threading.Event()
+    release = threading.Event()
+
+    def install(_self, _path, *, timeout=300, cancel_check=None):
+        entered.set()
+        release.wait(2)
+        return "Success"
+
+    monkeypatch.setattr(
+        "lvjiang.ui.mobile.dialog.AdbDevice.install", install)
+
+    dialog._on_adb_install()
+    assert entered.wait(1)
+    assert dialog._install_worker is not None
+    assert dialog._install_worker.isRunning()
+    release.set()
+    qtbot.waitUntil(lambda: dialog._install_worker is None)
+    assert "安装完成" in dialog._apk_info.text()
+
+
+def test_device_scan_does_not_block_dialog_construction(qtbot, monkeypatch):
+    """adb devices 卡住时窗口仍应先构造出来。"""
+    from lvjiang.ui.mobile.dialog import MobileDeviceDialog
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    def scan(*_args, **_kwargs):
+        entered.set()
+        release.wait(2)
+        return []
+
+    monkeypatch.setattr("lvjiang.ui.mobile.dialog.list_adb_devices", scan)
+    monkeypatch.setattr(
+        "lvjiang.ui.mobile.dialog.find_local_apk", lambda *_a, **_kw: None)
+    monkeypatch.setattr("lvjiang.ui.mobile.dialog.lan_addresses", lambda: [])
+
+    dialog = MobileDeviceDialog()
+    qtbot.addWidget(dialog)
+
+    assert entered.wait(1)
+    assert dialog._device_worker is not None
+    assert dialog._device_worker.isRunning()
+    release.set()
+    qtbot.waitUntil(lambda: dialog._device_worker is None)
+
+
+def test_local_apk_inspection_runs_outside_gui_thread(
+    qtbot, monkeypatch, tmp_path,
+):
+    dialog = _dialog(qtbot, monkeypatch)
+    path = tmp_path / "picked.apk"
+    path.write_bytes(b"apk")
+    entered = threading.Event()
+    release = threading.Event()
+
+    monkeypatch.setattr(
+        "lvjiang.ui.mobile.dialog.QFileDialog.getOpenFileName",
+        lambda *_a, **_kw: (str(path), ""),
+    )
+
+    def inspect(selected, version):
+        entered.set()
+        release.wait(2)
+        return ApkFile(selected, version, "digest", True)
+
+    monkeypatch.setattr("lvjiang.ui.mobile.dialog.inspect_local_apk", inspect)
+
+    dialog._on_pick_local()
+
+    assert entered.wait(1)
+    assert dialog._inspect_worker is not None
+    assert dialog._inspect_worker.isRunning()
+    assert not dialog._btn_pick.isEnabled()
+    release.set()
+    qtbot.waitUntil(lambda: dialog._inspect_worker is None)
+    assert dialog._apk is not None and dialog._apk.path == path

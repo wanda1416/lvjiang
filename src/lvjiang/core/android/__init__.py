@@ -10,7 +10,8 @@
 - bootstrap.py     : 已废弃（保留为兼容桩）
 
 工厂函数：
-- connect_agent(device)：尝试连接设备端代理，不可达返回 None
+- connect_agent(device)：建立满足任务执行条件的严格连接
+- connect_agent_diagnostic(device)：只握手读取原始状态，供体检解释失败原因
 - create_input_backend(device, input_sim, agent)：有代理走 AgentInput，否则 AdbInput
 - create_capture_backend(device, method, agent)：screencap / scrcpy / agent
 """
@@ -19,7 +20,14 @@ from ...core.config import InputSimConfig
 from ..capture_base import CaptureBackend
 from ..input_base import InputBackend
 from .adb_capture import AdbCapture
-from .agent import AgentCapture, AgentClient, AgentError, AgentInput, connect_agent
+from .agent import (
+    AgentCapture,
+    AgentClient,
+    AgentError,
+    AgentInput,
+    connect_agent,
+    connect_agent_diagnostic,
+)
 from .app_controller import AndroidAppController, AndroidAppError
 from .device import AdbDevice, list_adb_devices
 from .input import AdbInput
@@ -93,6 +101,7 @@ __all__ = [
     "AgentInput",
     "AgentError",
     "connect_agent",
+    "connect_agent_diagnostic",
     "create_input_backend",
     "create_capture_backend",
     "scan_and_connect_wireless",

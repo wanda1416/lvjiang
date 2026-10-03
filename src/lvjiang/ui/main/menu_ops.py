@@ -270,15 +270,8 @@ class MenuOpsMixin:
         """
         from ..mobile import MobileDeviceDialog
 
-        existing = getattr(self, "_mobile_dialog", None)
-        if existing is not None and existing.isVisible():
-            existing.raise_()
-            existing.activateWindow()
-            return
-        dialog = MobileDeviceDialog(self, self)
-        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        self._mobile_dialog = dialog
-        dialog.show()
+        self._show_modeless_tool(
+            "mobile_device", lambda: MobileDeviceDialog(self, self))
 
     def _open_ocr_dialog(self):
         from ..ocr import OCRDialog

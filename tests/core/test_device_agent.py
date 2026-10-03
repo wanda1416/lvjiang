@@ -184,11 +184,54 @@ def test_connect_handshake_and_close(fake):
     assert not client.connected and dev.removed == [f"tcp:{srv.port}"]
 
 
+def test_connect_keeps_handshake_and_business_validation_atomic(monkeypatch):
+    """connect 必须在同一把锁内完成握手和业务校验。"""
+
+    class _TrackingLock:
+        def __init__(self):
+            self._lock = threading.RLock()
+            self.depth = 0
+
+        def __enter__(self):
+            self._lock.acquire()
+            self.depth += 1
+            return self
+
+        def __exit__(self, *_exc):
+            self.depth -= 1
+            self._lock.release()
+
+    client = AgentClient(_FakeDevice())
+    lock = _TrackingLock()
+    client._lock = lock
+
+    def diagnostic(_timeout):
+        assert lock.depth == 1
+        client._status = _status()
+        return True
+
+    monkeypatch.setattr(client, "connect_diagnostic", diagnostic)
+
+    assert client.connect() is True
+
+
 def test_connect_rejects_protocol_mismatch(fake):
     srv, dev = fake(lambda req: (_status(protocol=PROTOCOL_VERSION + 1), b""))
     client = AgentClient(dev)
     assert client.connect() is False
     assert not client.connected and dev.removed  # forward 已撤
+
+
+def test_diagnostic_connect_keeps_protocol_mismatch_status(fake):
+    """体检必须拿到不兼容协议的原始状态，不能先被严格连接清空。"""
+    expected = PROTOCOL_VERSION + 1
+    _, dev = fake(lambda req: (_status(protocol=expected), b""))
+    client = AgentClient(dev)
+
+    assert client.connect_diagnostic() is True
+    assert client.status["protocol"] == expected
+    assert client.connected
+    client.close()
 
 
 def test_connect_rejects_agent_without_usable_input_channel(fake):
@@ -197,6 +240,18 @@ def test_connect_rejects_agent_without_usable_input_channel(fake):
     client = AgentClient(dev)
     assert client.connect() is False
     assert not client.connected and dev.removed
+
+
+def test_diagnostic_connect_keeps_unavailable_channel_status(fake):
+    """无输入通道正是体检要解释的状态，握手成功后仍应返回。"""
+    _, dev = fake(
+        lambda req: (_status(a11y=False, shizuku_granted=False), b""))
+    client = AgentClient(dev)
+
+    assert client.connect_diagnostic() is True
+    assert client.status["a11y"] is False
+    assert client.status["shizuku_granted"] is False
+    client.close()
 
 
 def test_connect_fake_connection_closed_immediately(fake):

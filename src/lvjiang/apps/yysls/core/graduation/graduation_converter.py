@@ -387,7 +387,16 @@ def convert_workbook(
                         continue
                     formula = value.text if isinstance(value, ArrayFormula) else value
                     if isinstance(formula, str) and formula.startswith("="):
-                        parse_formula(formula)
+                        # 位置必须进异常：原来只报公式原文，用户拿着一串
+                        # `unsupported formula syntax` 既不知道是哪张表哪一格，
+                        # 也会以为是律匠不支持这种写法而不是表本身坏了。
+                        try:
+                            parse_formula(formula)
+                        except FormulaError as exc:
+                            raise FormulaError(
+                                f"{worksheet.title}!{cell.coordinate} "
+                                f"的公式无法解析：{exc}（公式：{formula}）"
+                            ) from exc
                         entry: dict[str, Any] = {"formula": formula}
                         cached_value = cached_sheet[cell.coordinate].value
                         if cached_value is not None:

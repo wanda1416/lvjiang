@@ -1,12 +1,12 @@
 # 伤害建模: 牵丝·玉
-# 由 scripts/extract_damage_model.py 从 牵丝玉110阶三合一竞速轴属性毕业率进阶计算器1.2.xlsx 抽取，勿手工重排
+# 由 scripts/extract_damage_model.py 从 牵丝玉110阶竞速轴属性毕业率进阶计算器1.2.xlsx 抽取，勿手工重排
 #
 # 只存那份编译程序里读不出来的东西：技能系数与增益。怪物、食物、
 # 固伤加成等环境参数在 graduation/ 的方案 JSON 里，不在这里重复。
 school: 牵丝·玉
 scheme: 基础方案
 source:
-  file: 牵丝玉110阶三合一竞速轴属性毕业率进阶计算器1.2.xlsx
+  file: 牵丝玉110阶竞速轴属性毕业率进阶计算器1.2.xlsx
   version: '1.2'
   sha256: 247422e6ab0e60c871262c91f931a5aaf8ff35353a708433f01dccbef4e26218
 skills:

@@ -50,20 +50,21 @@ def test_formula_parser_supports_workbook_subset() -> None:
 @pytest.mark.slow
 def test_converter_resolves_skill_alias_in_school_group() -> None:
     path = next(
-        (p for p in EXCEL_DIR.glob("*/*鸣金虹*.xlsx") if "副本" not in p.stem),
+        (p for p in EXCEL_DIR.glob("110级/*鸣金虹*.xlsx")
+         if "副本" not in p.stem),
         None,
     )
     if path is None:
-        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/*鸣金虹*.xlsx")
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/110级/*鸣金虹*.xlsx")
     model = convert_workbook(path, "鸣金·虹")
     assert model["baseline_attrs"]["extra_attrs"]["无名剑法蓄力技增伤"] == 0.32
 
 
 @pytest.mark.slow
 def test_converter_ignores_blank_skill_affix_label() -> None:
-    path = next(EXCEL_DIR.glob("*/*牵丝霖*.xlsx"), None)
+    path = next(EXCEL_DIR.glob("110级/*牵丝霖*.xlsx"), None)
     if path is None:
-        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/*牵丝霖*.xlsx")
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/110级/*牵丝霖*.xlsx")
     model = convert_workbook(path, "牵丝·霖")
     skill_group = set(
         get_game_config().get_alias_groups("指定技能增效")["牵丝·霖"]
@@ -74,9 +75,9 @@ def test_converter_ignores_blank_skill_affix_label() -> None:
 @pytest.mark.slow
 def test_converter_supports_multiple_skill_affixes_and_shifted_environment() -> None:
     """破竹·风比通用表多一行老鼠定音，后续环境行也随之下移。"""
-    path = next(EXCEL_DIR.glob("*/破竹风*.xlsx"), None)
+    path = next(EXCEL_DIR.glob("110级/破竹风*.xlsx"), None)
     if path is None:
-        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/破竹风*.xlsx")
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/110级/破竹风*.xlsx")
 
     model = convert_workbook(path, "破竹·风")
     extra = model["baseline_attrs"]["extra_attrs"]
@@ -406,3 +407,97 @@ def test_pozhu_feng_mouse_dingyin_reaches_formula_from_equipment() -> None:
     without_mouse = calculator.calculate(baseline)
     with_mouse = calculator.calculate(baseline + effective)
     assert with_mouse.dps > without_mouse.dps
+
+
+# ─── Excel 错误值 ────────────────────────────────────────
+
+
+def test_formula_parser_accepts_excel_error_literals() -> None:
+    """`#REF!` 这类是 Excel 写回的**值**，不是语法错误，解析阶段必须放过。
+
+    转换器会把整个工作簿的每个公式都过一遍解析做校验。解析阶段就拒绝的话，
+    任何一张表里的坏格都能挡住整份表的导入，而报错还会说成「不支持这种写法」。
+    """
+    ast = parse_formula('=IF(期望!#REF!="逆反",0,25)')
+    assert ast["args"][0]["left"] == {"op": "error", "code": "期望!#REF!"}
+    # 删表删行后 Excel 写回的是带表名的整体，裸写法也要认
+    assert parse_formula("=#DIV/0!") == {"op": "error", "code": "#DIV/0!"}
+    assert parse_formula("=IF('有 空格'!#N/A=1,2,3)")["args"][0]["left"]["code"] == (
+        "'有 空格'!#N/A")
+
+
+def test_excel_errors_propagate_like_excel_and_fail_at_the_boundary() -> None:
+    """错误值按 Excel 的方式**传播**，在取输出那一步才失败。
+
+    求值时一碰到就抛，一张表里任何一个没人取用的坏格都能挡住整份表的导入；
+    而把它当成 0 或静默跳过，又会算出一个数——那个数会被固化进毕业率模型，
+    之后没有任何地方会发现。所以：沿途按值传，边界上拒绝。
+    """
+    from lvjiang.apps.yysls.core.graduation.excel_formula import (
+        ExcelError,
+        FormulaError,
+        FormulaModel,
+    )
+
+    model = FormulaModel({"sheets": {"表": {
+        "dimensions": {"max_row": 3, "max_column": 2},
+        "cells": {
+            "A1": {"formula": "=#REF!"},
+            "A2": {"formula": '=IF(#REF!="x",1,2)'},
+            "A3": {"value": 5},
+            "B1": {"formula": "=A1+1"},
+            "B2": {"formula": "=SUM(A1:A3)"},
+            "B3": {"formula": "=IFERROR(#REF!,7)"},
+        },
+    }}})
+
+    # 坏格自身的值就是那个错误，并记住出处
+    assert model.value("A1", "表") == ExcelError("#REF!", "表!A1")
+    # 比较同样传播：当成 False 会让 IF 静默选错一边
+    assert isinstance(model.value("A2", "表"), ExcelError)
+    # 算术与 SUM 都传播，出处一路保留——SUM 尤其要盯：它按 isinstance 只收
+    # 数字，哨兵若被当文本跳过就会少加一项却照样返回一个数
+    for coord in ("B1", "B2"):
+        assert model.value(coord, "表") == ExcelError("#REF!", "表!A1")
+    # IFERROR 照 Excel 语义兜住
+    assert model.value("B3", "表") == 7
+
+    # 边界：真要当数用的时候必须失败，并指出坏在哪一格
+    with pytest.raises(FormulaError, match="表!A1"):
+        float(model.value("B2", "表"))
+
+
+@pytest.mark.slow
+def test_unused_broken_cell_does_not_block_import() -> None:
+    """破竹·风 115 表的 增益!F18 引用已失效（作者删行留下的 `#REF!`）。
+
+    但它不影响结果：`期望!AV2` 用 `XLOOKUP(S2:AL2, 增益!$A:$A, 增益!$F:$F, 0)`
+    查表，而这一行选中的增益里没有「蹭断」——Excel 自己算出来的 AV2 是 0.444
+    而不是 #REF!。所以判据只有一个：输出能不能和 Excel 的缓存值对上。
+
+    顺带钉住坏格不会在产物里留痕：它编译成死常量，剪枝时连同别的死分支一起丢掉。
+    """
+    import openpyxl
+
+    from lvjiang.apps.yysls.core.graduation.graduation_converter import OUTPUTS
+
+    path = next(EXCEL_DIR.glob("115级/破竹风*.xlsx"), None)
+    if path is None:
+        pytest.skip(f"Excel 源文件不存在: {EXCEL_DIR}/115级/破竹风*.xlsx")
+
+    model = convert_workbook(path, "破竹·风", model_level=115)
+    cached = openpyxl.load_workbook(path, data_only=True)
+    try:
+        reference = model.get("reference") or {}
+        assert reference, "没有产出 reference，无从对账"
+        for name, value in reference.items():
+            sheet, coord = OUTPUTS[name].rsplit("!", 1)
+            assert value == pytest.approx(
+                float(cached[sheet][coord].value)), name
+    finally:
+        cached.close()
+
+    assert not any(
+        entry[0] == "const" and type(entry[1]).__name__ == "ExcelError"
+        for entry in model["program"]["nodes"]
+    ), "没人取用的坏格不该留在产物里"

@@ -6,7 +6,7 @@ references and the functions present in the source workbooks.  It never calls ev
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from typing import Any, Iterable
 
@@ -15,9 +15,60 @@ class FormulaError(ValueError):
     """Raised when a model contains unsupported or invalid Excel syntax."""
 
 
+def _reject(value: "ExcelError") -> "FormulaError":
+    """构造「用到了错误值」异常，并把哨兵挂在异常上。
+
+    单元格自身求值成错误值是**合法**的（Excel 里那一格就显示 #REF!），只有真
+    要拿它当数、当真假、当比较对象时才算用到了。调用方靠 ``excel_error`` 区分
+    这两件事：前者把哨兵存成该格的值继续往下传，后者才失败。
+    """
+    error = FormulaError(f"用到了 Excel 错误值 {value}")
+    error.excel_error = value  # type: ignore[attr-defined]
+    return error
+
+
+@dataclass(frozen=True)
+class ExcelError:
+    """Excel 写回公式文本的错误值（`#REF!` 等），按**值**在表里传播。
+
+    Excel 的查表只取命中的那一个元素，返回列里其他行就算是 `#REF!` 也不影响
+    结果——破竹·风 115 表里 `增益!F18` 坏了而 `期望!AV2` 照样算出 0.444 就是
+    这么来的。所以求值时不能一碰到它就失败，要像 Excel 一样让它作为值往下传，
+    **真被取用**时才报错。
+
+    反过来，被取用时必须报错而不是当成 0：静默算出一个错数字会把它固化进毕业率
+    模型，之后没有任何地方会发现。
+    """
+
+    code: str
+    #: 产生它的单元格（`表!A1`），报错时指路用
+    cell: str = ""
+
+    def __str__(self) -> str:
+        return f"{self.cell} 的 {self.code}" if self.cell else self.code
+
+    def __float__(self) -> float:
+        # 转换器用 float(model.value(...)) 取输出，直接 TypeError 看不出所以然
+        raise _reject(self)
+
+
+#: Excel 把失效引用、除零等失败结果**作为值**写回公式文本。它们不是语法错误，
+#: 解析阶段必须放过——否则一张表里任何一个无人引用的坏格（例如作者删行后留下
+#: 的便签格）都会挡住整个工作簿的导入。真正读到它的求值路径会抛 FormulaError，
+#: 与 Excel 的错误传播一致，IFERROR 也因此能照常兜住。
+_ERROR_CODES = (
+    "#REF!", "#DIV/0!", "#N/A", "#VALUE!", "#NAME?",
+    "#NULL!", "#NUM!", "#SPILL!", "#CALC!", "#GETTING_DATA",
+)
+
 _TOKEN_RE = re.compile(
     r"\s*(?:"
     r'(?P<string>"(?:[^"]|"")*")|'
+    # 删行/删表后 Excel 写回的是 `期望!#REF!` 这种带表名的整体，所以表名前缀
+    # 要和错误码一起吃掉；裸 `#REF!` 也要能匹配。必须排在 ref 之前，否则
+    # ref 组会先在表名上失配，整条公式落到兜底分支。
+    r"(?P<error>(?:(?:'[^']+'|[^\s()+\-*/^&=<>%,!]+)!)?(?:"
+    + "|".join(re.escape(code) for code in _ERROR_CODES) + "))|"
     r"(?P<ref>(?:(?:'[^']+'|[^\s()+\-*/^&=<>%,]+)!)?"
     r"(?:\$?[A-Z]{1,3}\$?\d+(?::\$?[A-Z]{1,3}\$?\d+)?|"
     r"\$?[A-Z]{1,3}:\$?[A-Z]{1,3}))|"
@@ -89,6 +140,8 @@ class FormulaParser:
             left = {"op": "literal", "value": value / 100 if percent else value}
         elif token.kind == "string":
             left = {"op": "literal", "value": token.value[1:-1].replace('""', '"')}
+        elif token.kind == "error":
+            left = {"op": "error", "code": token.value}
         elif token.kind == "ref":
             left = {"op": "ref", "value": token.value}
         elif token.kind == "name":
@@ -196,7 +249,23 @@ class FormulaModel:
             if ast is None:
                 ast = parse_formula(formula)
                 self.ast_cache[formula] = ast
-            result = self._eval(ast, sheet)
+            try:
+                result = self._eval(ast, sheet)
+            except FormulaError as exc:
+                # 本格的值就是个错误值（Excel 里这格显示 #REF!）。按值存下来，
+                # 让查表之类的消费者自己决定取不取它；在这里抛会让一个没人取用
+                # 的坏格挡住整张表。
+                error = getattr(exc, "excel_error", None)
+                if error is None:
+                    raise
+                # 第一次落到某一格时记下它，之后沿途传播不再改写——报错要指的是
+                # 坏的那一格，不是把它引进来的那一串
+                result = error if error.cell else replace(error, cell=key)
+            if isinstance(result, ExcelError) and not result.cell:
+                # 坏格自身：公式直接求值成错误值，没经过上面那条吸收分支。
+                # 在这里打上出处，后面沿途传播都保留它——报错要指坏的那一格，
+                # 不是把它引进来的那一串。
+                result = replace(result, cell=key)
             self.cache[key] = result
             return result
         finally:
@@ -221,6 +290,9 @@ class FormulaModel:
             if operator in ("=", "<>", "<", ">", "<=", ">="):
                 return self._compare(left, right, operator)
             if operator == "&":
+                for side in (left, right):
+                    if isinstance(side, ExcelError):
+                        raise _reject(side)
                 return f"{left}{right}"
             a, b = self._number(left), self._number(right)
             return {"+": lambda: a + b, "-": lambda: a - b,
@@ -228,6 +300,8 @@ class FormulaModel:
                     "^": lambda: a ** b}[operator]()
         if op == "call":
             return self._call(node["name"], node["args"], sheet)
+        if op == "error":
+            return ExcelError(node["code"], node.get("cell", ""))
         raise FormulaError(f"unsupported AST node {op}")
 
     def _call(self, name: str, args: list[dict[str, Any]], sheet: str) -> Any:
@@ -241,9 +315,13 @@ class FormulaModel:
             if len(args) != 2:
                 raise FormulaError("IFERROR expects two arguments")
             try:
-                return self._eval(args[0], sheet)
+                result = self._eval(args[0], sheet)
             except (FormulaError, ArithmeticError):
                 return self._eval(args[1], sheet)
+            # 错误值现在按值传播，不再以异常形式到达这里
+            if isinstance(result, ExcelError):
+                return self._eval(args[1], sheet)
+            return result
         if name == "OR":
             return any(self._truth(self._eval(arg, sheet)) for arg in args)
         if name in ("MIN", "MAX", "SUM"):
@@ -255,6 +333,11 @@ class FormulaModel:
                         values.extend(item if isinstance(item, list) else [item])
                 else:
                     values.append(value)
+            for value in values:
+                if isinstance(value, ExcelError):
+                    # 这里原来按 isinstance 只收数字，哨兵会和文本一样被静默
+                    # 跳过，SUM 少加一项却照样返回——必须显式拦住
+                    raise _reject(value)
             numbers = [self._number(v) for v in values
                        if isinstance(v, (int, float, bool))]
             if name == "SUM":
@@ -345,6 +428,8 @@ class FormulaModel:
 
     @staticmethod
     def _number(value: Any) -> float:
+        if isinstance(value, ExcelError):
+            raise _reject(value)
         if value in (None, "", False):
             return 0.0
         if value is True:
@@ -358,10 +443,18 @@ class FormulaModel:
 
     @staticmethod
     def _truth(value: Any) -> bool:
+        if isinstance(value, ExcelError):
+            # bool(dataclass) 恒为 True，会让 IF 静默走错分支
+            raise _reject(value)
         return bool(value)
 
     @staticmethod
     def _compare(left: Any, right: Any, operator: str) -> bool:
+        for side in (left, right):
+            if isinstance(side, ExcelError):
+                # Excel 里 `#REF!="逆反"` 的结果是 #REF! 而不是 False；当成
+                # False 会让条件分支静默选错一边
+                raise _reject(side)
         cmp_a: Any
         cmp_b: Any
         if isinstance(left, str) or isinstance(right, str):

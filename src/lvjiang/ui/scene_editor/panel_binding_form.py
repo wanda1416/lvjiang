@@ -4,13 +4,14 @@ from dataclasses import dataclass
 
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QLabel,
     QSpinBox,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.layout_models import Panel
 from ...i18n import tr
@@ -58,12 +59,12 @@ class PanelBindingForm(QWidget):
         self.visible.setSingleStep(0.01)
         self.visible.setValue(config.min_visible)
         form.addRow(tr("最小可见比例:"), self.visible)
-        self.calibration = QComboBox()
+        self.calibration = AutoWidthComboBox()
         for value, label in (("auto", "自动模式"), ("even", "等分网格"), ("image", "图像检测")):
             self.calibration.addItem(tr(label), value)
         self.calibration.setCurrentIndex(self.calibration.findData(config.calibration))
         form.addRow(tr("校准模式:"), self.calibration)
-        self.direction = QComboBox()
+        self.direction = AutoWidthComboBox()
         for value, label in (("vertical", "纵向滚动"), ("horizontal", "横向滚动"),
                              ("both", "双向滚动"), ("none", "固定网格")):
             self.direction.addItem(tr(label), value)

@@ -53,6 +53,7 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.config_origin import layer_style, origin_tooltip
 from lvjiang.ui.layout_helpers import (
     configure_navigation_list,
@@ -402,7 +403,7 @@ class TuningRulesDialog(QDialog):
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(QLabel(tr("当前规则：")))
-        combo = QComboBox()
+        combo = AutoWidthComboBox()
         combo.currentIndexChanged.connect(
             lambda idx: self._on_group_dropdown_changed(idx, combo))
         row.addWidget(combo)
@@ -425,7 +426,7 @@ class TuningRulesDialog(QDialog):
             fit_combo_to_contents(combo, minimum=200)
             combo.blockSignals(False)
 
-    def _on_group_dropdown_changed(self, idx: int, combo: QComboBox):
+    def _on_group_dropdown_changed(self, idx: int, combo: AutoWidthComboBox):
         """下拉变更 → 切换基础规则组"""
         if self._syncing_group or idx < 0:
             return

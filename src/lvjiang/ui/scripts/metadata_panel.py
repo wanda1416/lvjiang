@@ -10,7 +10,6 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
-    QComboBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -26,6 +25,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.config.resolver import load_available_envs
 from ...i18n import tr
@@ -164,12 +165,12 @@ class ParameterEditor(QWidget):
         self._form = form
         self.name = QLineEdit()
         self.label = ExpandableText()
-        self.kind = QComboBox()
+        self.kind = AutoWidthComboBox()
         for kind in self.TYPES:
             self.kind.addItem(kind, kind)
         self.has_default = QCheckBox(tr("声明默认值"))
         self.default_text = ExpandableText()
-        self.default_choice = QComboBox()
+        self.default_choice = AutoWidthComboBox()
         self.default_bool = QCheckBox(tr("默认勾选"))
         self.minimum = QLineEdit()
         self.maximum = QLineEdit()
@@ -373,7 +374,7 @@ class ParameterEditor(QWidget):
         self.options.insertRow(row)
         self.options.setItem(row, 0, QTableWidgetItem(value))
         self.options.setItem(row, 1, QTableWidgetItem(label))
-        combo = QComboBox()
+        combo = AutoWidthComboBox()
         combo.addItem(tr("未声明（勾选）"), None)
         combo.addItem(tr("勾选"), True)
         combo.addItem(tr("不勾选"), False)
@@ -416,7 +417,7 @@ class ParameterEditor(QWidget):
             value = self.options.item(row, 0)
             label = self.options.item(row, 1)
             combo = self.options.cellWidget(row, 2)
-            if value is None or label is None or not isinstance(combo, QComboBox):
+            if value is None or label is None or not isinstance(combo, AutoWidthComboBox):
                 return
             rows.append((value.text(), label.text(), combo.currentIndex()))
         self._loading = True
@@ -427,7 +428,7 @@ class ParameterEditor(QWidget):
                 value_item.setText(values[0])
                 label_item.setText(values[1])
             combo = self.options.cellWidget(row, 2)
-            if isinstance(combo, QComboBox):
+            if isinstance(combo, AutoWidthComboBox):
                 combo.setCurrentIndex(values[2])
         self._loading = False
         self.options.selectRow(other)
@@ -479,7 +480,7 @@ class ParameterEditor(QWidget):
                 for row in range(self.options.rowCount()):
                     value_item = self.options.item(row, 0)
                     combo = self.options.cellWidget(row, 2)
-                    if (value_item is not None and isinstance(combo, QComboBox)
+                    if (value_item is not None and isinstance(combo, AutoWidthComboBox)
                             and combo.currentIndex() > 0):
                         defaults[value_item.text()] = bool(combo.currentData())
                 item["default"] = (None if original.get("default") is None

@@ -6,7 +6,6 @@ from PyQt6.QtCore import QRectF, QSize, QTimer
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -20,6 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_compact_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.user_toolbar import USER_ACTION_BTN_STYLE, add_user_toolbar_buttons
 
 from .....core.config import load_ui_page_state, update_ui_page_state
@@ -174,7 +174,7 @@ class LoadoutPanel(QWidget):
         # Row 2: plan management and martial arts.
         plan_row = QHBoxLayout()
         plan_row.addWidget(QLabel(tr("备战方案")))
-        self._plans = QComboBox()
+        self._plans = AutoWidthComboBox()
         self._plans.currentIndexChanged.connect(self._switch_plan)
         plan_row.addWidget(self._plans, 2)
         for label, callback, variant in (

@@ -18,7 +18,6 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -28,6 +27,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr
@@ -56,7 +56,7 @@ class _ConditionRow(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        self.kind_combo = QComboBox()
+        self.kind_combo = AutoWidthComboBox()
         for kind in kinds:
             self.kind_combo.addItem(tr(_KIND_NAMES[kind]), kind)
         fit_combo_to_contents(self.kind_combo)
@@ -232,14 +232,14 @@ class _ConditionGroupBox(QGroupBox):
         # 开关前提：绑定开关 key + 期望值，不绑定 = 恒生效
         when_row = QHBoxLayout()
         when_row.addWidget(QLabel(tr("开关前提：")))
-        self.when_combo = QComboBox()
+        self.when_combo = AutoWidthComboBox()
         self.when_combo.addItem(tr("（无，恒生效）"), "")
         for key in switch_keys:
             self.when_combo.addItem(key, key)
         fit_combo_to_contents(self.when_combo)
         self.when_combo.currentIndexChanged.connect(self._on_when_changed)
         when_row.addWidget(self.when_combo)
-        self.expect_combo = QComboBox()
+        self.expect_combo = AutoWidthComboBox()
         self.expect_combo.addItem(tr("开启时生效"), True)
         self.expect_combo.addItem(tr("关闭时生效"), False)
         fit_combo_to_contents(self.expect_combo)

@@ -45,6 +45,7 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr
@@ -77,7 +78,7 @@ class _NewGroupDialog(QDialog):
         # 保存位置只对开发者开放：私有规则组放 local，不写进随包的 system
         self._layer_combo: QComboBox | None = None
         if choose_layer:
-            self._layer_combo = QComboBox()
+            self._layer_combo = AutoWidthComboBox()
             for layer, label in _LAYER_CHOICES:
                 self._layer_combo.addItem(tr(label), layer)
             form.addRow(tr("保存位置："), self._layer_combo)
@@ -167,7 +168,7 @@ class BaseRuleGroupPage(QWidget):
         # 当前规则（切换即激活）
         combo_row = QHBoxLayout()
         combo_row.addWidget(QLabel("<b>" + tr("当前规则") + "</b>"))
-        self._combo = QComboBox()
+        self._combo = AutoWidthComboBox()
         self._combo.setToolTip(
             tr("切换后扫描处理/材料处理/调律处理页同步对准该组，"
                "不会修改用户在自动调律页选择的规则组"))
@@ -277,7 +278,7 @@ class BaseRuleGroupPage(QWidget):
 
     def _make_layer_combo(self, key: str) -> QComboBox:
         """保存位置下拉：改选即把规则组文件搬到另一层。"""
-        combo = QComboBox()
+        combo = AutoWidthComboBox()
         for layer, label in _LAYER_CHOICES:
             combo.addItem(tr(label), layer)
         current = self._manager.layer_of(key)

@@ -14,7 +14,6 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
-    QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -28,6 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.config.resolver import get_resolver
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from .....i18n import tr
 from .....ui.button_styles import (
@@ -147,7 +147,7 @@ class TuningTab(QWidget):
         min_level_row.setContentsMargins(0, 0, 0, 0)
         min_level_row.setSpacing(6)
         min_level_row.addWidget(QLabel("<b>" + tr("最低等级：") + "</b>"))
-        self._min_level_combo = QComboBox()
+        self._min_level_combo = AutoWidthComboBox()
         self._min_level_combo.addItem(tr("默认（跟随基础规则）"), None)
         self._refresh_min_level_combo()
         self._min_level_combo.currentIndexChanged.connect(

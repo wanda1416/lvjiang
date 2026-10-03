@@ -9,7 +9,6 @@ from loguru import logger
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QFrame,
     QGridLayout,
     QGroupBox,
@@ -25,6 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from lvjiang.ui.user_toolbar import add_user_nav_buttons
@@ -243,7 +243,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         base_layout.setContentsMargins(0, 0, 0, 0)
         self._base_attr_label = QLabel(tr("属性"))
         base_layout.addWidget(self._base_attr_label)
-        self._combo_play_style = QComboBox()
+        self._combo_play_style = AutoWidthComboBox()
         self._combo_play_style.setMinimumWidth(104)
         self._combo_play_style.setMinimumHeight(30)
         self._combo_play_style.currentTextChanged.connect(self._on_play_style_changed)
@@ -266,7 +266,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         gongjue_layout = QHBoxLayout(self._plan_gongjue_field)
         gongjue_layout.setContentsMargins(0, 0, 0, 0)
         gongjue_layout.addWidget(QLabel(tr("弓玦")))
-        self._combo_gongjue = QComboBox()
+        self._combo_gongjue = AutoWidthComboBox()
         self._combo_gongjue.setMinimumWidth(84)
         self._combo_gongjue.setMinimumHeight(30)
         self._combo_gongjue.addItem(tr("无"), "")
@@ -289,7 +289,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         scheme_layout = QHBoxLayout(self._plan_scheme_field)
         scheme_layout.setContentsMargins(0, 0, 0, 0)
         scheme_layout.addWidget(QLabel(tr("方案")))
-        self._combo_scheme = QComboBox()
+        self._combo_scheme = AutoWidthComboBox()
         self._combo_scheme.setMinimumWidth(104)
         self._combo_scheme.setMinimumHeight(30)
         self._combo_scheme.currentTextChanged.connect(self._on_scheme_changed)

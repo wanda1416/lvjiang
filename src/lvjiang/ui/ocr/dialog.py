@@ -11,7 +11,6 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
-    QComboBox,
     QDialog,
     QFileDialog,
     QFormLayout,
@@ -31,6 +30,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.ocr_cleaner import OCRCleaner
 from ...core.ocr_config import (
@@ -154,7 +155,7 @@ class OCRDialog(QDialog):
         # 分组选择下拉框
         group_row = QHBoxLayout()
         group_row.addWidget(QLabel(tr("匹配分组:")))
-        self._group_combo = QComboBox()
+        self._group_combo = AutoWidthComboBox()
         self._group_combo.addItem(tr("- 全部 -"), None)
         self._group_combo.setMinimumWidth(120)
         self._load_groups()
@@ -310,7 +311,7 @@ class OCRDialog(QDialog):
 
         group_row = QHBoxLayout()
         group_row.addWidget(QLabel(tr("清洗组：")))
-        self._cleaning_group_combo = QComboBox()
+        self._cleaning_group_combo = AutoWidthComboBox()
         self._cleaning_group_combo.setMinimumWidth(240)
         cleaner = OCRCleaner()
         self._cleaning_group_combo.addItem(tr("默认规则（全局）"), None)

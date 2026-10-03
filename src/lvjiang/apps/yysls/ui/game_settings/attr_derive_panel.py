@@ -46,6 +46,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr
@@ -104,7 +105,7 @@ class AttrDerivePanel(QWidget):
 
         top = QHBoxLayout()
         top.addWidget(QLabel(tr("流派")))
-        self._combo_school = QComboBox()
+        self._combo_school = AutoWidthComboBox()
         self._combo_school.addItems(list(get_game_config().get_schools()))
         self._combo_school.currentIndexChanged.connect(self._reload_school)
         top.addWidget(self._combo_school)
@@ -115,7 +116,7 @@ class AttrDerivePanel(QWidget):
         top.addWidget(self._combo_level)
 
         top.addWidget(QLabel(tr("对照基础属性")))
-        self._combo_reference = QComboBox()
+        self._combo_reference = AutoWidthComboBox()
         self._combo_reference.currentIndexChanged.connect(self._on_reference_changed)
         top.addWidget(self._combo_reference)
         top.addStretch()
@@ -135,8 +136,8 @@ class AttrDerivePanel(QWidget):
         slots_box = QGroupBox(tr("心法（{n} 个槽）").format(n=INNER_WAY_SLOTS))
         slots_form = QFormLayout(slots_box)
         for index in range(INNER_WAY_SLOTS):
-            name_combo = QComboBox()
-            tier_combo = QComboBox()
+            name_combo = AutoWidthComboBox()
+            tier_combo = AutoWidthComboBox()
             tier_combo.addItem(_EMPTY, 0)
             for tier, label in enumerate(INNER_WAY_TIERS, start=1):
                 tier_combo.addItem(label, tier)
@@ -153,7 +154,7 @@ class AttrDerivePanel(QWidget):
 
         others_box = QGroupBox(tr("其他来源"))
         others_form = QFormLayout(others_box)
-        self._combo_gongjue = QComboBox()
+        self._combo_gongjue = AutoWidthComboBox()
         self._combo_gongjue.addItem(tr("（不选）"), "")
         for gongjue in ("会意", "精准", "会心"):
             self._combo_gongjue.addItem(gongjue, gongjue)
@@ -176,7 +177,7 @@ class AttrDerivePanel(QWidget):
         for kind, policy in SELECTION_POLICIES.items():
             if policy != SELECT_SINGLE:
                 continue
-            combo = QComboBox()
+            combo = AutoWidthComboBox()
             combo.currentIndexChanged.connect(self._on_changed)
             others_form.addRow(tr(SOURCE_KIND_LABELS[kind]), combo)
             self._single_combos[kind] = combo
@@ -284,7 +285,7 @@ class AttrDerivePanel(QWidget):
 
         self._refresh_reference()
         self._apply_loadout(AttrLoadout.from_dict(get_loadout(self._school())))
-        for combo in self.findChildren(QComboBox):
+        for combo in self.findChildren(AutoWidthComboBox):
             fit_combo_to_contents(combo, minimum=max(100, combo.minimumWidth()))
         self._loading = False
         self._on_changed()

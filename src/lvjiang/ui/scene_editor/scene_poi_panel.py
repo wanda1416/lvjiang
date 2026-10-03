@@ -5,7 +5,6 @@ import re
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -20,6 +19,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.key_names import normalize_pressable
 from ...core.layout_manager import (
@@ -649,7 +650,7 @@ class PoiPanelMixin:
             name_edit.setText(point_def.name)
         form.addRow(tr("名称:"), name_edit)
 
-        type_combo = QComboBox()
+        type_combo = AutoWidthComboBox()
         type_combo.addItems(sorted(VALID_REGION_TYPES))
         if point_def:
             type_combo.setCurrentText(point_def.type)

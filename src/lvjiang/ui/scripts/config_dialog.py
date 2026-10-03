@@ -33,6 +33,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
+
 from ...i18n import tr
 from ...workflows.discovery import discover_scripts, script_display_name
 from ...workflows.policy import WorkflowDiscoveryPolicy as Policy
@@ -172,7 +174,7 @@ class ScriptConfigDialog(QDialog):
         self._table.setItem(row, self.COL_NAME, name_item)
 
         # 脚本性质：下拉框（日常 / 专用）
-        scope_combo = QComboBox()
+        scope_combo = AutoWidthComboBox()
         for key, label in self.SCOPE_LABELS.items():
             scope_combo.addItem(tr(label), key)
         scope_combo.setCurrentIndex(max(scope_combo.findData(scope), 0))

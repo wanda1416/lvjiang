@@ -13,7 +13,6 @@ from datetime import datetime
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -28,6 +27,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.profile.repository import db_count_history, db_get_history
 from ...i18n import tr
@@ -117,7 +118,7 @@ class HistoryDialog(QDialog):
 
         pager = QHBoxLayout()
         pager.addWidget(QLabel(tr("每页")))
-        self._page_size_combo = QComboBox(self)
+        self._page_size_combo = AutoWidthComboBox(self)
         for size in (50, 100, 200, 500):
             self._page_size_combo.addItem(str(size), size)
         self._page_size_combo.setCurrentIndex(
@@ -270,7 +271,7 @@ def ask_value_dialog(
         value_input.setText(str(initial_value) if is_float else str(int(initial_value)))
     layout.addRow(prompt, value_input)
 
-    combo = QComboBox()
+    combo = AutoWidthComboBox()
     combo.setEditable(True)
     combo.addItems(sources)
     layout.addRow(f"{source_label}:", combo)

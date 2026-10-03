@@ -7,7 +7,6 @@ from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
@@ -23,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.reference_db import ReferenceDatabase
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...i18n import tr
 from ..button_styles import apply_button_style
@@ -36,7 +36,7 @@ from .meta_schema_panel import MetaSchemaPanel
 _SPACE_COMBO_CHARACTER_CAPACITY = 6
 
 
-def _set_space_combo_minimum_capacity(combo: QComboBox) -> int:
+def _set_space_combo_minimum_capacity(combo: AutoWidthComboBox) -> int:
     """Keep enough room for six full-width Chinese characters."""
     return set_combo_minimum_character_capacity(
         combo, _SPACE_COMBO_CHARACTER_CAPACITY
@@ -104,7 +104,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         # ── 图库空间切换栏（图库内部概念，外部消费方无感）──
         space_bar = QHBoxLayout()
         space_bar.addWidget(QLabel(tr("图库空间:")))
-        self._space_combo = QComboBox()
+        self._space_combo = AutoWidthComboBox()
         self._fill_space_combo()
         self._space_combo.setCurrentText(self._db.get_active_space())
         _set_space_combo_minimum_capacity(self._space_combo)

@@ -8,7 +8,6 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
-    QComboBox,
     QDialog,
     QFileDialog,
     QFormLayout,
@@ -28,6 +27,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.batch_config import (
     BatchConfigItem,
@@ -62,7 +63,7 @@ class BatchConfigDialog(QDialog):
         layout = QVBoxLayout(self)
         config_row = QHBoxLayout()
         config_row.addWidget(QLabel(tr("配置：")))
-        self._config_combo = QComboBox()
+        self._config_combo = AutoWidthComboBox()
         self._config_combo.currentIndexChanged.connect(self._on_config_selected)
         config_row.addWidget(self._config_combo, 1)
         self._btn_new = QPushButton(tr("新建"))
@@ -131,7 +132,7 @@ class BatchConfigDialog(QDialog):
         # 按自己的最长标签算列宽，输入框的左边缘就对不齐了。
         scope_form.setLabelAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self._unit_combo = QComboBox()
+        self._unit_combo = AutoWidthComboBox()
         self._unit_combo.currentIndexChanged.connect(self._on_unit_changed)
         self._unit_combo.setToolTip(tr(
             "按用户名调度，还是按用户资料的某个属性调度。它决定主页面候选列表的"
@@ -147,7 +148,7 @@ class BatchConfigDialog(QDialog):
         self._sort_key_slot.setContentsMargins(0, 0, 0, 0)
         self._profile_sort_key_value = ""
         self._profile_sort_key: QPushButton | None = None
-        self._profile_sort_direction = QComboBox()
+        self._profile_sort_direction = AutoWidthComboBox()
         self._profile_sort_direction.addItem(tr("升序"), "asc")
         self._profile_sort_direction.addItem(tr("降序"), "desc")
         fit_combo_popup_to_contents(self._profile_sort_direction)
@@ -214,7 +215,7 @@ class BatchConfigDialog(QDialog):
 
     def _create_wf_selector(self):
         row = QHBoxLayout()
-        combo = QComboBox()
+        combo = AutoWidthComboBox()
         combo.setEditable(True)
         row.addWidget(combo, 1)
         browse = QPushButton(tr("浏览..."))
@@ -321,7 +322,7 @@ class BatchConfigDialog(QDialog):
         finally:
             self._updating_choices = False
 
-    def _browse_wf(self, combo: QComboBox) -> None:
+    def _browse_wf(self, combo: AutoWidthComboBox) -> None:
         from pathlib import Path
 
         from ...core.config import get_resolver
@@ -468,7 +469,7 @@ class BatchConfigDialog(QDialog):
                     spin.valueChanged.connect(self._on_workflow_param_changed)
                     widget = spin
                 elif param_type == "select":
-                    combo = QComboBox()
+                    combo = AutoWidthComboBox()
                     for option in definition.get("options", []):
                         if isinstance(option, dict):
                             combo.addItem(str(option.get("label", option["value"])),
@@ -559,7 +560,7 @@ class BatchConfigDialog(QDialog):
                 value = widget.isChecked()
             elif isinstance(widget, QSpinBox):
                 value = widget.value()
-            elif isinstance(widget, QComboBox):
+            elif isinstance(widget, AutoWidthComboBox):
                 value = widget.currentData()
             elif isinstance(widget, QPlainTextEdit):
                 value = widget.toPlainText()

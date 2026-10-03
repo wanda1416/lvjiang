@@ -5,6 +5,8 @@ from __future__ import annotations
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
+
 from ..i18n import tr
 
 
@@ -25,13 +27,14 @@ class ExecutionUserSelector(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
         layout.addWidget(QLabel(tr("执行用户：")))
-        self.combo = QComboBox()
+        self.combo = AutoWidthComboBox()
         self.combo.setObjectName("execution_user_combo")
         self.combo.setMinimumHeight(32)
         self.combo.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.combo.setMinimumContentsLength(12)
-        layout.addWidget(self.combo, stretch=1)
+        layout.addWidget(self.combo)
+        layout.addStretch()
         self.combo.currentIndexChanged.connect(
             lambda _index: self.resolved_user_changed.emit(self.resolve_username())
         )

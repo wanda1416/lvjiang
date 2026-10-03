@@ -11,14 +11,15 @@
 """
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QComboBox, QWidget
+from PyQt6.QtWidgets import QWidget
 
 from lvjiang.apps.yysls.config import get_game_config
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from .....i18n import tr
 
 
-class LevelCombo(QComboBox):
+class LevelCombo(AutoWidthComboBox):
     """装备等级下拉选择框
 
     自动从等级配置填充可选等级（降序排列，最高等级在前）。

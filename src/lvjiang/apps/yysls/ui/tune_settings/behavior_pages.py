@@ -72,6 +72,7 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import (
     fit_combo_popup_to_contents,
     fit_combo_to_contents,
@@ -194,7 +195,7 @@ class _PctCell(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(2, 0, 2, 0)
         layout.setSpacing(2)
-        self._op = QComboBox()
+        self._op = AutoWidthComboBox()
         for key in allowed_ops:
             self._op.addItem(PCT_OP_LABELS.get(key, key), key)
         # 符号列需容纳「符号 + 下拉箭头」，过窄会被箭头挤掉
@@ -353,7 +354,7 @@ class _AffixEntriesButton(QPushButton):
             self.setText("")
 
 
-class _JudgeScopeCell(QComboBox):
+class _JudgeScopeCell(AutoWidthComboBox):
     """规则行「判定语义」单元格：四选一下拉，自选经弹窗勾选
 
     选中「自选规则」时弹出勾选对话框（取消则回退原语义）；
@@ -599,7 +600,7 @@ class _BehaviorPageBase(QWidget):
         table.setCellWidget(row, self._ci["parts"], parts)
 
         # 品阶候选（不限/金装/紫色/紫装及以下/蓝装及以下）
-        quals = QComboBox()
+        quals = AutoWidthComboBox()
         for q in _QUALITY_KEYS:
             quals.addItem(_QUALITY_LABELS.get(q, q), q)
         fit_combo_to_contents(quals, minimum=112)
@@ -637,7 +638,7 @@ class _BehaviorPageBase(QWidget):
         fit_combo_popup_to_contents(judge, minimum=140)
         table.setCellWidget(row, self._ci["judge"], judge)
 
-        action = QComboBox()
+        action = AutoWidthComboBox()
         labels = _STAGE_ACTION_LABELS[self.STAGE]
         for key in BEHAVIOR_STAGE_ACTIONS[self.STAGE]:
             action.addItem(labels.get(key, key), key)
@@ -869,7 +870,7 @@ class ScanBehaviorPage(_BehaviorPageBase):
         threshold_row.addWidget(self._min_level_combo)
         threshold_row.addSpacing(half_line)
         threshold_row.addWidget(QLabel(tr("调律门槛")))
-        self._entry_combo = QComboBox()
+        self._entry_combo = AutoWidthComboBox()
         # 从高到低：顶级 → 优秀 → 一般 → 垃圾
         for key in reversed(RATING_KEYS):
             self._entry_combo.addItem(RATING_LABELS.get(key, key), key)
@@ -944,7 +945,7 @@ class TuneBehaviorPage(_BehaviorPageBase):
         head.addWidget(self._resets_spin)
         head.addSpacing(half_line)
         head.addWidget(QLabel(tr("次数用尽后")))
-        self._exhausted_combo = QComboBox()
+        self._exhausted_combo = AutoWidthComboBox()
         labels = _STAGE_ACTION_LABELS["tune"]
         for act in ("recycle", "skip"):
             self._exhausted_combo.addItem(labels.get(act, act), act)

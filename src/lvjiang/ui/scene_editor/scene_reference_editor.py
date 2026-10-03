@@ -1,7 +1,6 @@
 """子场景引用定义与布局绑定编辑。"""
 
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -14,6 +13,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.scene_definition_models import SubsceneRefDef
 from ...core.scene_registry import (
@@ -124,7 +125,7 @@ class SceneReferenceEditorMixin:
         form = QFormLayout(dialog)
         key_edit = QLineEdit(old.key if old else "")
         name_edit = QLineEdit(old.name if old else "")
-        scene_combo = QComboBox()
+        scene_combo = AutoWidthComboBox()
         for key, name in available:
             scene_combo.addItem(f"{name} ({key})", key)
         if old:

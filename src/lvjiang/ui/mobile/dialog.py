@@ -14,7 +14,6 @@ from loguru import logger
 from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QButtonGroup,
-    QComboBox,
     QDialog,
     QDoubleSpinBox,
     QFileDialog,
@@ -32,6 +31,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.android.agent import PROTOCOL_VERSION, connect_agent_diagnostic
 from ...core.android.apk_release import (
@@ -300,7 +301,7 @@ class MobileDeviceDialog(QDialog):
                 v=self._version, name=apk_asset_name(self._version))))
         header.addStretch()
         header.addWidget(QLabel(tr("设备：")))
-        self._device_combo = QComboBox()
+        self._device_combo = AutoWidthComboBox()
         self._device_combo.setMinimumWidth(220)
         header.addWidget(self._device_combo)
         self._btn_rescan = QPushButton(tr("重新扫描"))
@@ -384,7 +385,7 @@ class MobileDeviceDialog(QDialog):
         state_box = QGroupBox(tr("状态"))
         state_layout = QVBoxLayout(state_box)
         self._lan_form = QFormLayout()
-        self._lan_combo = QComboBox()
+        self._lan_combo = AutoWidthComboBox()
         self._lan_combo.setToolTip(tr(
             "手机要访问的本机地址。多网卡时选与手机同网段的那个；"
             "换地址只改链接，不会中断共享"))

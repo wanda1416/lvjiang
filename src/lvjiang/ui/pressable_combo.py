@@ -5,6 +5,8 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QWidget
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
+
 from ..core.key_names import normalize_pressable
 from ..i18n import tr
 
@@ -64,13 +66,13 @@ class PressableSelector(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        self.group_combo = QComboBox()
+        self.group_combo = AutoWidthComboBox()
         self.group_combo.addItems([tr(name) for name, _keys in PRESSABLE_GROUPS])
         self.group_combo.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToContents)
         layout.addWidget(self.group_combo)
 
-        self.key_combo = QComboBox()
+        self.key_combo = AutoWidthComboBox()
         self.key_combo.setEditable(True)
         self.key_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.key_combo.setMaxVisibleItems(24)

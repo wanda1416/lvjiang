@@ -40,6 +40,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
+
 from ...core.config.resolver import LAYER_LOCAL, LAYER_REMOTE, SystemContentProtected
 from ...core.maps import (
     FULL_VIEW_KEY,
@@ -238,7 +240,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self.edit_key.setReadOnly(True)
         self.edit_name = QLineEdit()
         self.edit_name.textEdited.connect(self._mark_dirty)
-        self.combo_mode = QComboBox()
+        self.combo_mode = AutoWidthComboBox()
         for value, label in _NAV_MODE_LABELS:
             self.combo_mode.addItem(tr(label), value)
         self.combo_mode.currentIndexChanged.connect(self._mark_dirty)
@@ -252,7 +254,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
 
         binding = QGroupBox(tr("HUD 场景绑定（坐标在场景编辑器里标定）"))
         bform = QFormLayout(binding)
-        self.combo_scene = QComboBox()
+        self.combo_scene = AutoWidthComboBox()
         self.combo_scene.setEditable(False)
         self.combo_scene.currentIndexChanged.connect(self._on_scene_changed)
         bform.addRow(tr("HUD 场景"), self.combo_scene)
@@ -264,7 +266,7 @@ class MapManagerDialog(EscapeCloseConfirmationMixin, QDialog):
             ("full_map", "大地图区域", "region"),
             ("close_map", "关闭地图", "region"),
         ):
-            combo = QComboBox()
+            combo = AutoWidthComboBox()
             combo.setEditable(False)
             combo.setProperty("entity_kind", kind)
             combo.currentTextChanged.connect(self._mark_dirty)

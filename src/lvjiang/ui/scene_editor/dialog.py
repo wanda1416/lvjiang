@@ -6,7 +6,6 @@ from loguru import logger
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QApplication,
-    QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -20,6 +19,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.layout_manager import (
     LayoutConfigManager,
@@ -53,7 +54,7 @@ from .script_ops import ScriptOpsMixin, _InsertEntityButton
 _REFERENCE_GROUP_COMBO_CHARACTER_CAPACITY = 8
 
 
-class _LazyReferenceGroupCombo(QComboBox):
+class _LazyReferenceGroupCombo(AutoWidthComboBox):
     """参考图库较大，只有用户展开筛选框时才读取分组。"""
 
     def __init__(self, loader):
@@ -217,7 +218,7 @@ class SceneEditorDialog(
         top_bar = QHBoxLayout()
 
         top_bar.addWidget(QLabel(tr("当前布局")))
-        self._layout_combo = QComboBox()
+        self._layout_combo = AutoWidthComboBox()
         self._layout_combo.setMinimumWidth(140)
         self._layout_combo.currentIndexChanged.connect(self._on_combo_changed)
         top_bar.addWidget(self._layout_combo)
@@ -368,7 +369,7 @@ class SceneEditorDialog(
         self._btn_recognize = QPushButton(tr("识别全部字段"))
         self._btn_recognize.clicked.connect(self._on_recognize)
         btn_row.addWidget(self._btn_recognize)
-        self._combo_ocr_group = QComboBox()
+        self._combo_ocr_group = AutoWidthComboBox()
         # 「默认规则（全局）」不是「不清洗」：normalization.default 那层对所有 OCR
         # 无条件生效，这里只决定要不要再叠一个业务组。叫法与「工具 → 图像识别」统一
         self._combo_ocr_group.addItem(tr("默认规则（全局）"), None)
@@ -423,7 +424,7 @@ class SceneEditorDialog(
         script_btn_row.addWidget(self._btn_run_script)
         # 当前用户下拉列表（仅影响脚本测试执行，不切换主页面用户）
         script_btn_row.addWidget(QLabel(tr("当前用户:")))
-        self._script_user_combo = QComboBox()
+        self._script_user_combo = AutoWidthComboBox()
         self._script_user_combo.setToolTip(tr("脚本测试执行时使用的用户，默认取主页面当前用户。切换不影响主页面。"))
         script_btn_row.addWidget(self._script_user_combo)
         self._btn_load_script = QPushButton(tr("加载文件"))

@@ -28,6 +28,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
+
 from .....i18n import tr
 from .....ui.button_styles import apply_button_style, apply_compact_button_style
 from .....ui.layout_helpers import fit_combo_to_contents
@@ -98,6 +100,80 @@ class AffixCounter(QWidget):
         self.plus.setEnabled(value < 40)
         if changed:
             self.valueChanged.emit(value)
+
+
+class RequirementEditor(QFrame):
+    """适合左侧窄栏的两行词条约束编辑卡片。"""
+
+    changed = pyqtSignal()
+    deleteRequested = pyqtSignal()
+
+    def __init__(self, names: list[str], data: dict, parent=None):
+        super().__init__(parent)
+        self.setProperty("surface", "card")
+        root = QVBoxLayout(self)
+        root.setContentsMargins(8, 6, 8, 6)
+        root.setSpacing(6)
+
+        affix_row = QHBoxLayout()
+        affix_row.setSpacing(6)
+        affix_row.addWidget(QLabel(tr("词条")))
+        self.affix = AutoWidthComboBox(content_width_cap=250)
+        self.affix.addItems(list(dict.fromkeys([
+            *names, str(data.get("affix") or ""),
+        ])))
+        self.affix.setCurrentText(str(data.get("affix") or ""))
+        affix_row.addWidget(self.affix, 1)
+        remove = QPushButton(tr("删除"))
+        apply_compact_button_style(remove, variant="danger")
+        remove.clicked.connect(lambda: self.deleteRequested.emit())
+        affix_row.addWidget(remove)
+        root.addLayout(affix_row)
+
+        range_row = QHBoxLayout()
+        range_row.setSpacing(6)
+        self.priority = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
+        for key, label in PRIORITY_LABELS.items():
+            self.priority.addItem(tr(label), key)
+        self.priority.setCurrentIndex(max(
+            0, self.priority.findData(data.get("priority", "required"))))
+        range_row.addWidget(self.priority)
+        range_row.addStretch()
+        range_row.addWidget(QLabel(tr("最少")))
+        self.minimum = QSpinBox()
+        self.minimum.setRange(0, 40)
+        self.minimum.setKeyboardTracking(False)
+        self.minimum.setValue(int(data.get("minimum", 0)))
+        range_row.addWidget(self.minimum)
+        range_row.addWidget(QLabel(tr("最多")))
+        self.maximum = QSpinBox()
+        self.maximum.setRange(0, 40)
+        self.maximum.setKeyboardTracking(False)
+        self.maximum.setValue(int(data.get("maximum", 40)))
+        range_row.addWidget(self.maximum)
+        root.addLayout(range_row)
+
+        self.minimum.valueChanged.connect(self._minimum_changed)
+        self.maximum.valueChanged.connect(self._maximum_changed)
+        self.affix.currentTextChanged.connect(lambda _text: self.changed.emit())
+        self.priority.currentIndexChanged.connect(lambda _index: self.changed.emit())
+        self.minimum.valueChanged.connect(lambda _value: self.changed.emit())
+        self.maximum.valueChanged.connect(lambda _value: self.changed.emit())
+        self._minimum_changed(self.minimum.value())
+
+    def _minimum_changed(self, value: int) -> None:
+        self.maximum.setMinimum(value)
+
+    def _maximum_changed(self, value: int) -> None:
+        self.minimum.setMaximum(value)
+
+    def to_dict(self) -> dict:
+        return {
+            "affix": self.affix.currentText(),
+            "priority": self.priority.currentData(),
+            "minimum": self.minimum.value(),
+            "maximum": self.maximum.value(),
+        }
 
 
 def _table(headers: list[str]) -> QTableWidget:
@@ -182,7 +258,7 @@ class BuildEditor(QWidget):
         root.addWidget(toolbar)
         selection = QHBoxLayout()
         selection.addWidget(QLabel(tr("出装搭配")))
-        self.build_combo = QComboBox()
+        self.build_combo = AutoWidthComboBox()
         self.build_combo.setMinimumContentsLength(18)
         self.build_combo.currentIndexChanged.connect(self._switch_build)
         selection.addWidget(self.build_combo, 1)
@@ -203,7 +279,7 @@ class BuildEditor(QWidget):
         toolbar_layout.addLayout(selection)
         settings = QHBoxLayout()
         settings.addWidget(QLabel(tr("装备等级")))
-        self.level = QComboBox()
+        self.level = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
         for cfg in self.gc.get_level_configs():
             self.level.addItem(str(cfg.level), cfg.level)
         self.level.currentIndexChanged.connect(self._level_changed)
@@ -212,14 +288,14 @@ class BuildEditor(QWidget):
         self.chengyin.setToolTip(tr("取消后按普通词条满值计算；装备基础属性和定音仍按所选等级"))
         self.chengyin.toggled.connect(self._changed)
         settings.addWidget(self.chengyin)
-        self.combat_type = QComboBox()
+        self.combat_type = AutoWidthComboBox()
         self.combat_type.addItem("PVE", "pve")
         self.combat_type.addItem("PVP", "pvp")
         fit_combo_to_contents(self.combat_type, minimum=72)
         self.combat_type.currentIndexChanged.connect(self._changed)
         settings.addWidget(self.combat_type)
         settings.addWidget(QLabel(tr("弓玦套装")))
-        self.gongjue = QComboBox()
+        self.gongjue = AutoWidthComboBox()
         self.gongjue.addItem(tr("无"), "")
         # 与现有战斗属性页共用候选，而非另写游戏事实。
         from .combat.attrs_tab import _GONGJUE_TYPES
@@ -275,17 +351,24 @@ class BuildEditor(QWidget):
         req_page = QWidget()
         req_layout = QVBoxLayout(req_page)
         req_layout.setContentsMargins(8, 8, 8, 8)
-        self.requirements = _table(["词条", "要求", "最少", "最多"])
-        req_layout.addWidget(self.requirements)
-        buttons = QHBoxLayout()
-        for label, callback in [("添加要求", self._add_requirement), ("删除所选要求", self._delete_requirement)]:
-            button = QPushButton(tr(label))
-            apply_compact_button_style(button, variant="danger" if callback == self._delete_requirement else "action")
-            button.clicked.connect(callback)
-            buttons.addWidget(button)
-        req_layout.addLayout(buttons)
+        req_scroll = QScrollArea()
+        req_scroll.setWidgetResizable(True)
+        req_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._requirement_container = QWidget()
+        self._requirement_layout = QVBoxLayout(self._requirement_container)
+        self._requirement_layout.setContentsMargins(0, 0, 0, 0)
+        self._requirement_layout.setSpacing(6)
+        self._requirement_layout.addStretch()
+        req_scroll.setWidget(self._requirement_container)
+        req_layout.addWidget(req_scroll, 1)
+        self._requirement_editors: list[RequirementEditor] = []
+        add_requirement = QPushButton(tr("添加约束"))
+        apply_button_style(add_requirement, variant="action")
+        add_requirement.clicked.connect(self._add_requirement)
+        req_layout.addWidget(add_requirement)
         self.requirement_status = QLabel()
         self.requirement_status.setWordWrap(True)
+        self.requirement_status.setProperty("tone", "muted")
         req_layout.addWidget(self.requirement_status)
         left_tabs.addTab(req_page, tr("词条约束"))
         splitter.addWidget(left_tabs)
@@ -359,7 +442,10 @@ class BuildEditor(QWidget):
         counts = distribution_counts(build.equipment, self.attribute, self.gc)
         self._populate_counts(counts)
         self._populate_sets()
-        self.requirements.setRowCount(0)
+        for editor in self._requirement_editors:
+            self._requirement_layout.removeWidget(editor)
+            editor.deleteLater()
+        self._requirement_editors.clear()
         for requirement in build.requirements:
             self._append_requirement(requirement)
         self._refresh_builds(build.id if persisted else "")
@@ -440,7 +526,7 @@ class BuildEditor(QWidget):
         self._sets.clear()
         for row, spec in enumerate(BUILD_DISPLAY_SLOTS):
             _cell(self.distribution_table, row, 0, spec.label)
-            combo = QComboBox()
+            combo = AutoWidthComboBox()
             combo.addItem(tr("无套装"), "")
             for key, cfg in self.gc.get_equipment_sets("left" if spec.key in LEFT_SET_SLOTS else "right").items():
                 combo.addItem(str(cfg.get("name") or key), key)
@@ -463,41 +549,29 @@ class BuildEditor(QWidget):
             self._changed()
 
     def _append_requirement(self, data: dict):
-        row = self.requirements.rowCount()
-        self.requirements.insertRow(row)
-        name = QComboBox()
-        name.addItems(list(dict.fromkeys([*self._counts, *self._legal_names(), str(data.get("affix") or "") ])))
-        name.setCurrentText(str(data.get("affix") or ""))
-        name.currentTextChanged.connect(self._changed)
-        self.requirements.setCellWidget(row, 0, name)
-        priority = QComboBox()
-        for key, label in PRIORITY_LABELS.items():
-            priority.addItem(tr(label), key)
-        priority.setCurrentIndex(max(0, priority.findData(data.get("priority", "required"))))
-        priority.currentIndexChanged.connect(self._changed)
-        self.requirements.setCellWidget(row, 1, priority)
-        for column, key, default in [(2, "minimum", 0), (3, "maximum", 40)]:
-            spin = AffixCounter(int(data.get(key, default)))
-            spin.valueChanged.connect(self._changed)
-            self.requirements.setCellWidget(row, column, spin)
-        self.requirements.resizeRowsToContents()
+        names = list(dict.fromkeys([*self._counts, *self._legal_names()]))
+        editor = RequirementEditor(names, data)
+        editor.changed.connect(self._changed)
+        editor.deleteRequested.connect(
+            lambda item=editor: self._delete_requirement(item))
+        self._requirement_layout.insertWidget(
+            self._requirement_layout.count() - 1, editor)
+        self._requirement_editors.append(editor)
 
     def _add_requirement(self):
         self._append_requirement({"affix": next(iter(self._counts), ""), "priority": "optimal"})
         self._changed()
 
-    def _delete_requirement(self):
-        row = self.requirements.currentRow()
-        if row >= 0:
-            self.requirements.removeRow(row)
-            self._changed()
+    def _delete_requirement(self, editor: RequirementEditor):
+        if editor not in self._requirement_editors:
+            return
+        self._requirement_editors.remove(editor)
+        self._requirement_layout.removeWidget(editor)
+        editor.deleteLater()
+        self._changed()
 
     def _requirement_rows(self) -> list[dict]:
-        return [{"affix": self.requirements.cellWidget(row, 0).currentText(),
-                 "priority": self.requirements.cellWidget(row, 1).currentData(),
-                 "minimum": self.requirements.cellWidget(row, 2).value(),
-                 "maximum": self.requirements.cellWidget(row, 3).value()}
-                for row in range(self.requirements.rowCount())]
+        return [editor.to_dict() for editor in self._requirement_editors]
 
     def _level_changed(self):
         if not self._loading:

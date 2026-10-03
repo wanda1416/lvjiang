@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QSignalBlocker
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QLabel,
@@ -16,6 +15,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import config_field_card, fit_combo_to_contents
 
 from .....i18n import tr
@@ -51,7 +51,7 @@ class PlanCreateDialog(QDialog):
         self._edit_name = QLineEdit()
         root.addWidget(config_field_card(tr("方案名称"), self._edit_name))
 
-        self._combo_school = QComboBox()
+        self._combo_school = AutoWidthComboBox()
         self._combo_school.addItem(tr("不选择流派"), "")
         for school in self._schools:
             self._combo_school.addItem(school, school)
@@ -64,24 +64,24 @@ class PlanCreateDialog(QDialog):
             for art in (plan.main_martial_art, plan.sub_martial_art):
                 if art and art not in martial_arts:
                     martial_arts.append(art)
-        self._combo_main = QComboBox()
+        self._combo_main = AutoWidthComboBox()
         self._combo_main.addItems([""] + martial_arts)
         fit_combo_to_contents(self._combo_main, minimum=160)
         self._combo_main.currentIndexChanged.connect(self._on_arts_changed)
         root.addWidget(config_field_card(tr("主武学"), self._combo_main))
-        self._combo_sub = QComboBox()
+        self._combo_sub = AutoWidthComboBox()
         self._combo_sub.addItems([""] + martial_arts)
         fit_combo_to_contents(self._combo_sub, minimum=160)
         self._combo_sub.currentIndexChanged.connect(self._on_arts_changed)
         root.addWidget(config_field_card(tr("副武学"), self._combo_sub))
 
-        self._combo_playstyle = QComboBox()
+        self._combo_playstyle = AutoWidthComboBox()
         self._combo_playstyle.currentIndexChanged.connect(
             self._on_playstyle_changed)
         root.addWidget(config_field_card(tr("玩法"), self._combo_playstyle))
         self._refresh_playstyles()
 
-        self._combo_combat = QComboBox()
+        self._combo_combat = AutoWidthComboBox()
         for kind in (COMBAT_TYPE_PVE, COMBAT_TYPE_PVP):
             self._combo_combat.addItem(combat_type_label(kind), kind)
         fit_combo_to_contents(self._combo_combat, minimum=160)

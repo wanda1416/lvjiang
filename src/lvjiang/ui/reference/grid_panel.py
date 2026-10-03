@@ -4,7 +4,6 @@ import numpy as np
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import (
-    QComboBox,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -18,6 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.reference_db import MetaFieldDef
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...i18n import tr
 from ..button_styles import apply_button_style
@@ -51,14 +51,14 @@ class CellEditor(QWidget):
         info_layout.setSpacing(4)
 
         info_layout.addWidget(QLabel(tr("名称:")), 0, 0)
-        self.label_edit = QComboBox()
+        self.label_edit = AutoWidthComboBox()
         self.label_edit.setEditable(True)
         self.label_edit.setMinimumWidth(100)
         info_layout.addWidget(self.label_edit, 0, 1)
 
         self._group_label = QLabel(tr("分组:"))
         info_layout.addWidget(self._group_label, 1, 0)
-        self.group_edit = QComboBox()
+        self.group_edit = AutoWidthComboBox()
         self.group_edit.setEditable(True)
         info_layout.addWidget(self.group_edit, 1, 1)
 
@@ -270,7 +270,7 @@ class GridPanel(QWidget):
         # 批量设置 + 提交
         batch_layout = QHBoxLayout()
         batch_layout.addWidget(QLabel(tr("批量分组:")))
-        self._batch_group = QComboBox()
+        self._batch_group = AutoWidthComboBox()
         self._batch_group.setEditable(True)
         self._batch_group.setMinimumWidth(100)
         batch_layout.addWidget(self._batch_group)

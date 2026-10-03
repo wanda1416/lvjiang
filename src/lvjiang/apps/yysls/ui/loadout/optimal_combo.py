@@ -16,7 +16,6 @@ from PyQt6.QtCore import (
 from PyQt6.QtWidgets import (
     QAbstractScrollArea,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFrame,
@@ -43,6 +42,7 @@ from lvjiang.ui.button_styles import (
     apply_compact_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 from lvjiang.ui.widgets import FlowLayout
 
@@ -992,7 +992,7 @@ class OptimalComboPage(QWidget):
         rating_label.setToolTip(
             tr("装备需至少有一条已选玩法给出该级别及以上的评级；不选玩法时不生效"))
         filter_row.addWidget(rating_label)
-        self._combo_min_rating = QComboBox()
+        self._combo_min_rating = AutoWidthComboBox()
         for rating in _MIN_RATING_CHOICES:
             self._combo_min_rating.addItem(domain_label(rating), rating)
         index = self._combo_min_rating.findData(_DEFAULT_MIN_RATING)
@@ -1035,7 +1035,7 @@ class OptimalComboPage(QWidget):
         equipment_set_label = QLabel(tr("攻具套装"))
         equipment_set_label.setProperty("tone", "muted")
         compute_row.addWidget(equipment_set_label)
-        self._combo_equipment_set = QComboBox()
+        self._combo_equipment_set = AutoWidthComboBox()
         from ...config import get_game_config
         for key, entry in get_game_config().get_equipment_sets("left").items():
             self._combo_equipment_set.addItem(

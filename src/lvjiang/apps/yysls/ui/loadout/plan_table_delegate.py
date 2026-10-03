@@ -14,11 +14,12 @@ from collections.abc import Callable
 
 from PyQt6.QtCore import QModelIndex
 from PyQt6.QtWidgets import (
-    QComboBox,
     QLineEdit,
     QStyledItemDelegate,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from .....i18n import tr
 from ...core.loadout import (
@@ -73,7 +74,7 @@ class PlanFieldDelegate(QStyledItemDelegate):
             editor = QLineEdit(parent)
             editor.setText(plan.name)
             return editor
-        combo = QComboBox(parent)
+        combo = AutoWidthComboBox(parent)
         for label, value in self._options(plan, column):
             combo.addItem(label, value)
         return combo
@@ -108,7 +109,7 @@ class PlanFieldDelegate(QStyledItemDelegate):
             editor.setText(plan.name)
             editor.selectAll()
             return
-        if isinstance(editor, QComboBox):
+        if isinstance(editor, AutoWidthComboBox):
             editor.setCurrentIndex(
                 max(editor.findData(self._current_value(plan, index.column())),
                     0))
@@ -130,7 +131,7 @@ class PlanFieldDelegate(QStyledItemDelegate):
             return
         if isinstance(editor, QLineEdit):
             value = editor.text().strip()
-        elif isinstance(editor, QComboBox):
+        elif isinstance(editor, AutoWidthComboBox):
             value = str(editor.currentData() or "")
         else:
             return

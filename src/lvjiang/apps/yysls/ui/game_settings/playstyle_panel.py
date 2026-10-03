@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 from lvjiang.ui.tag_input import TagInputWidget
 
@@ -175,17 +176,17 @@ class PlaystylePanel(QWidget):
         definition_layout.setSpacing(6)
         right_layout.addWidget(self._definition_content)
         self._definition_toggle.toggled.connect(self._toggle_definition)
-        self._combo_school = QComboBox()
-        self._combo_art_a = QComboBox()
-        self._combo_art_b = QComboBox()
-        self._combo_attr = QComboBox()
-        self._combo_damage_a = QComboBox()
-        self._combo_damage_b = QComboBox()
-        self._combo_output = QComboBox()
-        self._combo_defense = QComboBox()
-        self._combo_all_skill = QComboBox()
-        self._combo_qishu = QComboBox()
-        self._combo_unit = QComboBox()
+        self._combo_school = AutoWidthComboBox()
+        self._combo_art_a = AutoWidthComboBox()
+        self._combo_art_b = AutoWidthComboBox()
+        self._combo_attr = AutoWidthComboBox()
+        self._combo_damage_a = AutoWidthComboBox()
+        self._combo_damage_b = AutoWidthComboBox()
+        self._combo_output = AutoWidthComboBox()
+        self._combo_defense = AutoWidthComboBox()
+        self._combo_all_skill = AutoWidthComboBox()
+        self._combo_qishu = AutoWidthComboBox()
+        self._combo_unit = AutoWidthComboBox()
         self._combo_all_skill.addItems(list(_ALL_SKILL_REQUIREMENTS))
         self._combo_qishu.addItems(list(_QISHU_REQUIREMENTS))
         self._combo_unit.addItems(list(_UNIT_REQUIREMENTS))

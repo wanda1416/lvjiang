@@ -24,7 +24,6 @@ from typing import Callable
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -50,6 +49,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 )
 from lvjiang.core.config.resolver import LAYER_SYSTEM, EntityOrigin
 from lvjiang.ui.button_styles import apply_button_style, apply_compact_tool_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.config_origin import layer_style, origin_tooltip
 
 from .....i18n import tr
@@ -184,7 +184,7 @@ class RuleSettingsPage(QWidget):
         form.addRow(tr("规则名称："), name_row)
 
         # 默认判定：四档条件全不命中时的兜底档位
-        self._default_rating_combo = QComboBox()
+        self._default_rating_combo = AutoWidthComboBox()
         for rating_key in RATING_KEYS:
             self._default_rating_combo.addItem(
                 RATING_LABELS[rating_key], rating_key)
@@ -315,7 +315,7 @@ class RuleSettingsPage(QWidget):
         qualities = qualities or set()
         table = self._quality_table
         table.insertRow(row)
-        combo = QComboBox()
+        combo = AutoWidthComboBox()
         for part_key in QUALITY_PARTS:
             combo.addItem(domain_label(part_key), part_key)
         combo.setCurrentIndex(max(combo.findData(part or QUALITY_PARTS[0]), 0))
@@ -383,7 +383,7 @@ class RuleSettingsPage(QWidget):
                 self._playstyle_table.setItem(row, col, item)
             # 绑定开关属于本规则：开关控制的是非武器增伤这类判定口径，同一个
             # 玩法在不同规则下可以绑不同开关，甚至不绑。
-            combo = QComboBox()
+            combo = AutoWidthComboBox()
             combo.addItems(switch_keys)
             combo.setCurrentText(str(switches.get(name) or ""))
             combo.currentTextChanged.connect(

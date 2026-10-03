@@ -1,7 +1,26 @@
 #% name: 游戏备战方案导航
 
+# 游戏内「备战方案」页面的导航与选择：菜单 → 培养 → 功法 → 方案。
+# 依赖 navigation.wf 的通用导航。
+#
+# 包含过程：
+#   nav_main_to_game_plans()  — 主页 → 备战方案页（0=成功 / -1=失败）
+#   nav_game_plans_to_main()  — 备战方案页 → 主页（0=成功 / -1=用户放弃）
+#   collect_game_plan_names() — 读当前网格里可见的方案名列表
+#   select_game_plan($name)   — 选中指定方案并读出方案名与两门武学
+
 import "subcall/navigation.wf"
 
+# ─── nav_main_to_game_plans ───────────────────────────────
+# 从主页进入备战方案页。
+#
+# 参数：无
+# 前置：在主页或菜单页。
+# 后置：0=已按路径走到备战方案页；-1=没进菜单页或菜单里读不到「培养」。
+# 返回：0=成功；-1=失败。
+#
+# 后半段（功法 → 方案）不做到位校验，页面不对时会由随后的
+# collect_game_plan_names / select_game_plan 暴露。
 def nav_main_to_game_plans()
     call $result = nav_main_to_menu()
     if $result < 0
@@ -17,8 +36,16 @@ def nav_main_to_game_plans()
     return 0
 end
 
+# ─── nav_game_plans_to_main ───────────────────────────────
+# 从备战方案页返回主页。
+#
+# 参数：无
+# 前置：在备战方案页（或已退到菜单页）。
+# 后置：0=已确认在主页；-1=用户选择结束本次扫描，现场未确认。
+# 返回：0=成功；-1=用户在确认框选择停止。
+#
+# 按既定返回路径操作，只在终点确认主页；中途 OCR 偶发漏判不应终止整批扫描。
 def nav_game_plans_to_main()
-    # 按既定返回路径操作，只在终点确认主页；中途 OCR 偶发漏判不应终止整批扫描。
     click [training_plan].[back] after wait @page_refresh
     click [training_main].[back] after wait @page_refresh
     click [game_menu_page].[back] after wait @page_refresh
@@ -34,8 +61,16 @@ def nav_game_plans_to_main()
     return 0
 end
 
+# ─── collect_game_plan_names ──────────────────────────────
+# 读取当前网格里可见的方案名列表。
+#
+# 参数：无
+# 前置：在备战方案页。
+# 后置：无副作用（只识别，不滚动、不点击）。
+# 返回：方案名列表（按网格行顺序，空槽跳过）。
+#
+# 第一版只扫描当前网格可见行；空槽无文字，不滚动、不去重。
 def collect_game_plan_names()
-    # 第一版只扫描当前网格可见行；空槽无文字，不滚动、不去重。
     scan [training_plan].[plan_list] as $grid
     eval $names = []
     for row in keys($grid)
@@ -47,8 +82,16 @@ def collect_game_plan_names()
     return $names
 end
 
+# ─── select_game_plan ─────────────────────────────────────
+# 选中指定方案，并读出方案名与两门武学。
+#
+# 参数：
+#   $name — 方案名，必须是 collect_game_plan_names 读到的名字
+# 前置：在备战方案页，且方案在当前网格内（超出网格的方案暂不支持）。
+# 后置：成功时该方案已在使用；-2 时缺装备/未保存弹窗没能处理完，现场保留。
+# 返回：{"name", "main_art", "sub_art"}；-1=找不到方案或名称/武学识别不完整；
+#       -2=缺装备弹窗或未保存提示处理失败。
 def select_game_plan($name)
-    # 只定位先前从当前网格读到的方案，超出网格的方案暂不支持。
     find [training_plan].[plan_list] as $found by equals $name
     if not $found
         log error "游戏方案列表未找到: " + $name

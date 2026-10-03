@@ -1,9 +1,26 @@
 #% name: 指定方案基础属性扫描
 
+# 进入角色详情页采集基础属性，并按模式写入指定备战方案或弹出面板交人工确认。
+# 依赖 navigation.wf 的导航；面板文本解析与属性反推由 Python 侧完成。
+#
+# 包含过程：
+#   scan_role_base_attr_for_plan — 进角色页扫描并写入/弹面板（返回结果或状态码）
+#   capture_role_base_attrs      — 滚动采集属性面板原始文本（内部过程）
+
 import "subcall/navigation.wf"
 
-# 弹窗模式保留原有停在角色页的行为；静默模式失败后也回主页。
-# 返回 -2 表示本方案识别/写入失败但已回主页，-1 表示导航不安全。
+# ─── scan_role_base_attr_for_plan ─────────────────────────
+# 进入角色详情页采集基础属性，按模式写入方案或弹出创建面板。
+#
+# 参数：
+#   $name、$main_art、$sub_art — 目标方案与两门武学（静默模式下作为写入目标）
+#   $silent_write — true=自动写入方案；false=弹面板交人工确认
+#   $scroll_count — 属性列表向下滚动的轮数
+# 前置：在主页（内部走 nav_main_to_role 进角色页）。
+# 后置：弹窗模式成功时停在角色页供确认；静默模式成功或失败后都回主页
+#       （回不到主页时返回 -1）。
+# 返回："dialog"=已弹面板待确认；$saved_name=静默写入成功；-2=识别或写入失败
+#       但已回主页；-1=导航或页面不安全。
 def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scroll_count)
     call $nav_result = nav_main_to_role()
     if $nav_result < 0
@@ -52,7 +69,18 @@ def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scr
     return $saved_name
 end
 
-# 前置：角色详情页；返回解析后的面板属性，不做 UI 或存储写入。
+# ─── capture_role_base_attrs ──────────────────────────────
+# 滚动采集角色属性面板的原始文本，并解析成结构化属性（不做 UI 与存储写入）。
+#
+# 参数：
+#   $scroll_count — 向下滚动的轮数上限
+# 前置：角色详情页。
+# 后置：页面停在最后一次滚动位置；不改写任何配置或 profile。
+# 返回：结构化属性字典，另带 _right_*_valid 校验位（右区四段详情是否完整）。
+#
+# 连续两次识别到相同内容即认为已到列表底部并提前结束。
+# 四段右区详情独立解析和校验；左区的汇总值不能替代右区的基础/分流派数值。
+# 属性攻击至少要识别一门流派的完整区间；仅识别无相攻击不算成功。
 def capture_role_base_attrs($scroll_count)
     eval $data = {}
     eval $got_outer_attack = false

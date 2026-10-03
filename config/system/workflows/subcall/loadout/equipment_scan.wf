@@ -1,10 +1,26 @@
 #% name: 装备详情统一扫描
 
+# 装备详情页的统一扫描入口：武器与护甲两种详情场景共用一套字段名。
+#
+# 包含过程：
+#   scan_equipment_detail  — 按场景扫描装备详情，返回统一字段的字典
+#   apply_cooldown_affixes — 把冷却视图的六个区域回填到标准字段名（内部过程）
+#
 # 重置调律或词条转律处于冷却中/冷却完成时，游戏会在原「宫」词条位置
 # 插入状态提示，导致五个词条和定音整体下移。冷却提示使用独立的
 # cooldown_tips 区域读取，避免 affix_gong 宽度不足导致文案被截断；命中后
 # 再用冷却视图的六个专用区域重新截图 OCR，并映射回标准字段。
 
+# ─── scan_equipment_detail ────────────────────────────────
+# 扫描装备详情页，返回统一字段名的一张字典。
+#
+# 参数：
+#   $detail_scene — 详情场景名，仅支持 "equip_weapon_detail" 与 "equip_armor_detail"
+# 前置：已经停在对应装备详情页（详情区域已完全展开）。
+# 后置：无副作用（只截图识别）；场景不支持时只记错误日志，不做任何点击。
+# 返回：含各区域键（equip_type/equip_level/base_attr/五个词条/dingyin/zaoyi/
+#       status/cooldown_tips）与 lock_status、equip_detail 的字典；护甲多一个
+#       base_attr_2，命中冷却提示时额外带 cooldown_text；不支持的场景返回 null。
 def scan_equipment_detail($detail_scene)
     if $detail_scene == "equip_weapon_detail"
         scan [equip_weapon_detail].[equip_type, equip_level, base_attr, \
@@ -47,6 +63,16 @@ def scan_equipment_detail($detail_scene)
     return null
 end
 
+# ─── apply_cooldown_affixes ───────────────────────────────
+# 把冷却视图扫到的六个区域回填到标准字段名（内部过程，不单独对外调用）。
+#
+# 参数：
+#   $raw      — scan_equipment_detail 已扫到的原始字典（就地改写）
+#   $cooldown — 冷却视图六个区域的扫描结果
+# 前置：cooldown_tips 命中「冷却」，且冷却视图已经扫过一遍。
+# 后置：$raw 的 affix_gong/affix_shang/affix_jue/affix_zhi/affix_yu/dingyin
+#       被替换为冷却视图的值。
+# 返回：无返回值（隐式 null）。
 def apply_cooldown_affixes($raw, $cooldown)
     eval $raw.affix_gong = $cooldown.cooldown_affix_gong
     eval $raw.affix_shang = $cooldown.cooldown_affix_shang

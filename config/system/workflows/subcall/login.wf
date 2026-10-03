@@ -1,10 +1,49 @@
 #% name: 登录子过程集合
 
-# 登录页切换账号、选择角色及退出登录的公共过程。
+# 登录相关公共过程库：账号切换、角色选择与退出登录。
+# 登录页的现场判定（is_in_login_page / is_in_startup_page）定义在本文件，
+# page_detection.wf 只放通用页面判定。
+#
+# 与批量调度的约定：条目准备 / 收尾把 $batch_state 传进来，本文件就地更新它的
+# account / role / page_state 字段，并以 {"status", "message", "state"} 结果
+# 字典汇报；纯页面判定过程只返回 1/0，不起草结果字典。
+#
+# 包含过程（参数见各过程注释）：
+#   prepare_user                 — 登录总入口：切账号并选好角色，返回批量结果字典
+#   is_in_login_page             — 是否在登录主页（1=在 / 0=不在）
+#   ensure_login_page_by_restart — 重启客户端并恢复到登录主页（1=成功 / 0=失败）
+#   is_in_startup_page           — 是否停在游戏启动页（1=在 / 0=不在）
+#   leave_startup_page           — 启动页点返回进入登录主页（1=成功 / 0=失败）
+#   wait_for_switch_users_page   — 等 PC 端「切换用户」视图就绪（1=就绪 / 0=超时）
+#   exit_to_login                — 游戏内退回到登录页（无返回值）
+#   switch_account               — 登录页选账号并登录（1=成功 / 0=未完成）
+#   select_account_and_login     — 在切换用户视图里找到并登录账号（1=已提交）
+#   user_list_unchanged          — 账号列表是否已到边（1=不动了 / 0=还在动）
+#   search_account_down          — 向下翻找目标账号（1=已点击 / 0=未找到）
+#   scroll_user_list_to_top      — 把账号列表滚回顶部（1=已到顶 / 0=达上限）
+#   select_role                  — 选角色并进入游戏主页，返回批量结果字典
+#   wait_until_role_offline      — 处理「其他角色在线」弹窗（0=可登录 / 1=放弃）
+#   login_to_main_page           — 等登录加载完成并回主页（无返回值）
+#   claim_zhanling_reward        — 检测战令领奖入口，有则领取（无返回值）
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 
+# ─── prepare_user ─────────────────────────────────────────
+# 登录总入口：把指定用户带到「已进入游戏」的状态，供批量条目准备调用。
+#
+# 参数：
+#   $username             — 用户配置名，account/role/role_index/tail 都从这里读
+#   $batch_state          — 批量运行状态（就地更新 account/role/page_state）
+#   $skip_online_role     — true=角色在线直接跳过，false=等到 $online_role_max_wait
+#   $online_role_max_wait — 等待角色下线的秒数上限
+#   $max_roll_account     — 账号列表单轮滚动步数上限
+#   $allow_restart_app    — 不在登录页/启动页时是否允许重启客户端
+# 前置：任意页面；本过程按需要回登录页或重启客户端。
+# 后置：success=已在游戏主页且 $batch_state 记录 account/role/page_state=2；
+#       skipped=角色在线，已复位到登录页状态（page_state=1）；
+#       failed=停在当前现场，交给调用方处理。
+# 返回：{"status": "success"|"skipped"|"failed", "message": str, "state": $batch_state}
 def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait, $max_roll_account, $allow_restart_app)
     eval check_env(["android", "desktop"])
     eval $account = user_get($username, "account")
@@ -65,8 +104,15 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
 end
 
 
-# ─── 登录页确认 ────────────────────────────────────────────
-
+# ─── is_in_login_page ─────────────────────────────────────
+# 是否在登录主页。
+#
+# 参数：无
+# 前置：无。
+# 后置：无副作用（只识别，最多多等一拍）。
+# 返回：1=在登录主页；0=不在。
+# 判据：「选择角色」按钮命中；第一次读不到时隔 5 秒再确认一次，
+# 容忍刚切回登录页时页面还没渲染完的情况。
 def is_in_login_page()
     scan [game_login_page].[switch_role] as $login_check by contains "选择角色"
     if $login_check
@@ -81,12 +127,21 @@ def is_in_login_page()
 end
 
 
-# ─── 恢复到登录页 ───────────────────────────
-# 调用方优先识别登录主页或启动页；其他现场按参数重启客户端。
+# ─── ensure_login_page_by_restart ─────────────────────────
+# 重启客户端并恢复到登录主页：PC 重启后落在切换用户视图，安卓重启后落在启动页。
+#
+# 参数：
+#   $app_id           — 客户端 id（app stop / app start 用）
+#   $tail、$account   — 目标账号尾号与账号名
+#   $batch_state      — PC 分支成功后写入 account、清空 role、page_state=1
+#   $max_roll_account — 账号列表单轮滚动步数上限
+#   $login_target     — 人工提示文案（账号 + 角色）
+# 前置：调用方已确认当前既不在登录主页也不在启动页，且目标账号资料已校验齐全。
+# 后置：1=已回到登录主页（PC 端并登录了目标账号）；0=失败，现场停在中断处。
+# 返回：1=成功；0=失败。
+#
 # 登录页背景动画常驻，不等稳定帧；启动页用游戏 logo 识别。
-
-# PC 重启后直接处于切换用户视图；Android 重启后处于启动页面。
-# 调用方已检查当前不在登录主页和启动页面，并已校验目标账号资料。
+# 账号已在 PC 分支选定，prepare_user 随后会直接选择角色，不再重复切换账号。
 def ensure_login_page_by_restart($app_id, $tail, $account, $batch_state, $max_roll_account, $login_target)
     if app_is_running($app_id)
         app stop $app_id
@@ -120,6 +175,14 @@ def ensure_login_page_by_restart($app_id, $tail, $account, $batch_state, $max_ro
 end
 
 
+# ─── is_in_startup_page ───────────────────────────────────
+# 是否停在游戏启动页。
+#
+# 参数：无
+# 前置：无。
+# 后置：无副作用。
+# 返回：1=在启动页；0=不在。
+# 判据：启动 logo（图像匹配），启动过程有动画，只认 logo 不认其它元素。
 def is_in_startup_page()
     scan [game_login_page].[yysls_logo] as $logo by image
     if $logo
@@ -129,6 +192,14 @@ def is_in_startup_page()
 end
 
 
+# ─── leave_startup_page ───────────────────────────────────
+# 从启动页点返回，进入登录主页。
+#
+# 参数：无
+# 前置：客户端已启动（可能还在加载，最多等 60 拍直到 logo 出现）。
+# 后置：1=已进入登录主页；0=启动页和登录页都没识别到，现场未变。
+# 返回：1=成功；0=失败。
+#
 # back 仅是点击目标；启动页必须由 logo 判定。
 def leave_startup_page()
     eval $startup_ready = 0
@@ -160,6 +231,13 @@ def leave_startup_page()
 end
 
 
+# ─── wait_for_switch_users_page ───────────────────────────
+# 等 PC 端「切换用户」视图就绪。
+#
+# 参数：无
+# 前置：调用方已经把场景/view 切到 users 视图。
+# 后置：就绪或超时都停在原视图，不做点击。
+# 返回：1=已就绪；0=60 拍内没读到「进入游戏」，人工介入后仍未就绪。
 def wait_for_switch_users_page()
     eval $ready = 0
     loop 60
@@ -178,9 +256,15 @@ def wait_for_switch_users_page()
 end
 
 
-# ─── 主页 → 退出 → 回到登录页 ──────────────────────────────
-# 流程：主页进菜单 → 菜单点退出 → 二次确认弹窗点「登录」→ 回到登录页
-
+# ─── exit_to_login ────────────────────────────────────────
+# 从游戏内退回到登录页：主页进菜单 → 菜单点退出 → 二次确认弹窗点「登录」。
+#
+# 参数：无
+# 前置：在游戏主页（内部走 nav_main_to_menu，自带到位校验）。
+# 后置：成功时已在登录页；菜单没进去或找不到「返回登录」按钮时交给人工。
+# 返回：无返回值（隐式 null），是否真的退出由调用方按页面判定确认。
+#
+# 走标准导航而不是直接点菜单，是为了复用 nav_main_to_menu 的到位校验。
 def exit_to_login()
     # 1. 主页 → 菜单
     # 走标准导航并自带到位校验；click 由布局选择点菜单或按 ESC。
@@ -202,10 +286,20 @@ def exit_to_login()
 end
 
 
-# ─── 账号切换 ──────────────────────────────────────────────
-# 登录页 → 选账号 → 登录 → 回到登录页角色入口（page_state=1）
-# 不包含选角色，由调用方决定是否接着调用 select_role
-
+# ─── switch_account ───────────────────────────────────────
+# 登录页 → 选账号 → 登录 → 回到登录页角色入口（page_state=1）。
+#
+# 参数：
+#   $tail、$account    — 目标账号尾号与账号名
+#   $batch_state       — 成功后写入 account、清空 role、page_state=1
+#   $max_roll_account  — 账号列表单轮滚动步数上限
+#   $login_target      — 人工提示文案（账号 + 角色）
+# 前置：在登录主页。
+# 后置：1=已登录目标账号并回到角色入口；0=账号登录未完成。
+# 返回：1=成功；0=失败。
+#
+# 不包含选角色，由调用方决定是否接着调用 select_role。
+# 两端进用户视图的方式不同：PC 要先登出再点选择账号，安卓直接选用户即可。
 def switch_account($tail, $account, $batch_state, $max_roll_account, $login_target)
     log "当前匹配" + $tail
 
@@ -245,8 +339,20 @@ def switch_account($tail, $account, $batch_state, $max_roll_account, $login_targ
 end
 
 
-# 前置：已经进入切换用户视图。这里只负责选择并登录账号；登录后的页面流转由
+# ─── select_account_and_login ─────────────────────────────
+# 在切换用户视图里找到目标账号并提交登录。
+#
+# 参数：
+#   $tail             — 目标账号尾号（contains 匹配）
+#   $max_roll_account — 单轮滚动步数上限（保险值，到边由列表是否还在动判定）
+#   $login_target     — 人工提示文案（账号 + 角色）
+# 前置：已经进入切换用户视图。
+# 后置：1=已点击登录；账号没找到时先 pause 交人工选定再继续提交。
+# 返回：1=已提交登录（是否真的登进去由调用方按页面判定）。
+#
+# 这里只负责选择并登录账号；登录后的页面流转由
 # 调用方按“PC 重启”或“普通账号切换”各自处理。
+# 入场时列表停在哪里未知，失败一轮先回顶再从头翻，两轮覆盖全表。
 def select_account_and_login($tail, $max_roll_account, $login_target)
     click [game_login_page].[tap_user] after wait @page_refresh
 
@@ -292,9 +398,18 @@ def select_account_and_login($tail, $max_roll_account, $login_target)
 end
 
 
-# ─── 账号列表的翻动与到边判定 ─────────────────────────────
+# ─── 账号列表的翻动与到边判定 ─────────────────────────────────────────
+# 本节三个过程共用同一套到边判定：滚动一步后两次快照是否还在变化。
 
+# ─── user_list_unchanged ──────────────────────────────────
 # 列表是否不动了（= 已经到底或到顶）。
+#
+# 参数：
+#   $a — 上一帧 user_list 快照；空表示还没有上一帧（本轮第一步），此时不可能判定到边
+#   $b — 当前帧快照
+# 前置：两帧都由同一区域（game_login_page.user_list）scan 得到。
+# 后置：无副作用。
+# 返回：1=两帧逐格相同（到边）；0=还在动或无法判定。
 #
 # 判据是 user_list 整面板的两次 OCR 快照逐格相同：滚一步而内容没变，说明
 # 已经到边。这样就不必预设「要翻几次」——账号数量、行高和设备分辨率都会影响
@@ -304,7 +419,6 @@ end
 # 侧信道，依赖「刚好对齐过这个面板」的调用次序，而这里要比的就是 scan 实际
 # 产出的那几格。
 #
-# $a 为空表示还没有上一帧（本轮第一步），此时不可能判定到边。
 # OCR 抖动只会让两帧「看起来不同」从而多滚一步，不会误判成到边；反过来两屏
 # 不同内容恰好识别成完全相同在这个面板上不现实。
 def user_list_unchanged($a, $b)
@@ -324,7 +438,15 @@ def user_list_unchanged($a, $b)
 end
 
 
-# 向下翻找账号：命中即点击并返回 1；翻到底或达到上限仍未命中返回 0。
+# ─── search_account_down ──────────────────────────────────
+# 向下翻找目标账号，命中即点击。
+#
+# 参数：
+#   $tail      — 目标账号尾号（contains 匹配）
+#   $max_steps — 单轮滚动步数上限
+# 前置：在切换用户视图，账号列表可见。
+# 后置：命中时已点击该账号；未命中时列表停在到底位置。
+# 返回：1=已点击目标账号；0=翻到底或达到上限仍未命中。
 #
 # 命中判定保持用 find：按文字精确 bbox 点击是原有行为，而「选没选对」只有人
 # 能判断，这条路径不动。快照只用于到边判定，每步各一次。
@@ -351,7 +473,14 @@ def search_account_down($tail, $max_steps)
 end
 
 
-# 回到列表顶部：到顶返回 1；达到上限仍没到顶返回 0（调用方只记日志，仍可继续）。
+# ─── scroll_user_list_to_top ──────────────────────────────
+# 把账号列表滚回顶部，供第二轮搜索从头开始。
+#
+# 参数：
+#   $max_steps — 滚动步数上限
+# 前置：在切换用户视图。
+# 后置：到顶或到上限后停下，不做点击。
+# 返回：1=已到顶；0=达到上限仍没到顶（调用方只记日志，仍可继续）。
 def scroll_user_list_to_top($max_steps)
     eval $prev = {}
     loop $max_steps
@@ -369,8 +498,18 @@ def scroll_user_list_to_top($max_steps)
 end
 
 
-# ─── 选角色 + 进入游戏 ─────────────────────────────────────
-
+# ─── select_role ──────────────────────────────────────────
+# 选好角色并进入游戏主页。
+#
+# 参数：
+#   $role_index           — 角色在列表中的序号（1 起，对应角色列表行）
+#   $role                 — 角色名（日志与人工提示用）
+#   $batch_state          — 成功后写入 role 与 page_state=2
+#   $skip_online_role     — true=角色在线立即跳过，false=等到期限
+#   $online_role_max_wait — 等待角色下线的秒数上限
+# 前置：已在登录页角色入口（page_state=1）。
+# 后置：success=已在游戏主页；skipped=角色在线，已复位回登录页状态。
+# 返回：{"status": "success"|"skipped", "message": str, "state": $batch_state}
 def select_role($role_index, $role, $batch_state, $skip_online_role, $online_role_max_wait)
     log "当前下标" + $role_index
     eval $online_deadline = clock() + to_num($online_role_max_wait)
@@ -418,13 +557,22 @@ def select_role($role_index, $role, $batch_state, $skip_online_role, $online_rol
 end
 
 
-# ─── 等待角色下线 ──────────────────────────────────────────
+# ─── wait_until_role_offline ──────────────────────────────
+# 处理「其他角色在线」弹窗：等角色下线，或按策略放弃等待。
+#
+# 参数：
+#   $batch_state      — 放弃等待时就地复位（page_state=1、role 清空）
+#   $skip_online_role — true=发现在线立即放弃，false=等到 $online_deadline
+#   $online_deadline  — 等待截止时刻（clock() 时间戳）
+# 前置：刚点过「切换角色」，弹窗可能出现。
+# 后置：0=角色可登录（没有在线提示）；1=已放弃，弹窗已取消、界面干净。
+# 返回：0=可以继续登录；1=角色在线且已按策略放弃。
+#
 # 点「切换角色」可能撞上「其他角色在线」弹窗。弹窗必须取消——留着会挡住
 # 后续任何页面判定。等待模式下由本过程自己重试到期限：取消弹窗、等一会儿、
 # 重新点回「切换角色」再查；不重新点就永远读不到提示已经消失。
 # 放弃时把 batch_state 复位回登录页状态并返回 1，调用方据此以 skipped 收尾
-# （status/message 的措辞由调用方上下文决定）。返回 0 表示角色可登录。
-
+# （status/message 的措辞由调用方上下文决定）。
 def wait_until_role_offline($batch_state, $skip_online_role, $online_deadline)
     loop while 1 == 1
         scan [game_login_page].[online_label] as $online by contains "在线"
@@ -449,9 +597,15 @@ def wait_until_role_offline($batch_state, $skip_online_role, $online_deadline)
 end
 
 
-# ─── 登录加载到主页 ────────────────────────────────────────
+# ─── login_to_main_page ───────────────────────────────────
+# 等待登录加载完成并回到游戏主页（顺带领战令奖励、关掉挡路弹窗）。
+#
+# 参数：无
+# 前置：已经点击「进入游戏」。
+# 后置：回到主页；8 拍内没确认到主页时 pause 交给人工。
+# 返回：无返回值（隐式 null）。
+#
 # 等待加载条消失 → 检测主页元素 → 处理战令领奖/关闭弹窗
-
 def login_to_main_page()
     # 等待加载完成：检测 loading 区域的「加载」文字
     # 有「加载」→ 继续等；消失后再等 5 秒视为登录完成
@@ -495,9 +649,13 @@ def login_to_main_page()
 end
 
 
-# ─── 战令领奖 ──────────────────────────────────────────────
-# 检测战令领奖入口，有则进入领取并返回
-
+# ─── claim_zhanling_reward ────────────────────────────────
+# 检测战令领奖入口，有则进入一键领取并返回。
+#
+# 参数：无
+# 前置：登录后可能出现的战令领奖入口（不保证存在）。
+# 后置：入口存在时已领取并返回原页面；不存在时不做任何点击。
+# 返回：无返回值（隐式 null）。
 def claim_zhanling_reward()
     scan [game_login_page].[zllj_btn] as $zllj by contains "前往领奖"
     if $zllj

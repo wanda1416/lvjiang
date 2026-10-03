@@ -1,10 +1,25 @@
 #% name: 指定备战方案装备扫描
 
+# 按备战方案扫描八个装备槽位，并把结果写入该方案的装备数据。
+# 依赖 navigation.wf 的导航与 loadout/equipment_scan.wf 的详情解析。
+#
+# 包含过程：
+#   scan_equipped_plan  — 进装备列表扫八个槽位并写入（返回写入槽位数或状态码）
+#   scan_equipped_slots — 在装备列表页逐个扫描八个槽位（内部过程，不含导航）
+
 import "subcall/navigation.wf"
 import "subcall/loadout/equipment_scan.wf"
 
+# ─── scan_equipped_plan ───────────────────────────────────
+# 扫描指定备战方案的八个装备槽位并写入该方案。
+#
+# 参数：
+#   $name、$main_art、$sub_art — 目标方案名与两门武学（传给 bind_scanned_loadout）
 # 前置：游戏已经使用目标方案且当前在主页。
-# 返回实际成功写入的槽位数；-2 表示本方案失败但已安全回主页，-1 表示页面不确定。
+# 后置：成功时已回到主页并写入装备数据；写入目标不安全时整段跳过（-2），
+#       导航不确定时返回 -1 并停在现场。
+# 返回：实际成功写入的槽位数；-2=本方案失败但已安全回主页；-1=页面不确定。
+#
 # 绑定只作用于本次 WF，不改变 UI 活动方案。
 def scan_equipped_plan($name, $main_art, $sub_art)
     try
@@ -38,7 +53,16 @@ def scan_equipped_plan($name, $main_art, $sub_art)
     return $written
 end
 
-# 前置：背包装备列表；写入目标由 bind_scanned_loadout 绑定。
+# ─── scan_equipped_slots ──────────────────────────────────
+# 在背包装备列表页逐个扫描四个武器/饰品槽位与四个防具槽位，并读弓玦套装。
+#
+# 参数：无（写入目标由调用方先调用 bind_scanned_loadout 绑定）
+# 前置：背包装备列表页；写入目标已绑定。
+# 后置：各槽位已扫描并写入；弓玦识别不唯一时只跳过「基础属性反推」所需的数据。
+# 返回：成功写入的槽位数；弓玦套装识别失败或不唯一时返回 -1。
+#
+# 弓玦不占八个装备槽位，但基础属性反推必须扣除当前方案的弓玦加成，所以这里
+# 只读详情区域的套装关键词；识别不唯一时不沿用方案中可能过期的旧值。
 def scan_equipped_slots()
     eval $written = 0
     for slot in ["main_weapon", "sub_weapon", "ring", "pendant"]

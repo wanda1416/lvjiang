@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from copy import deepcopy
 
 from loguru import logger
@@ -301,6 +302,14 @@ class MainWindow(
         self._target_window = None
         self._scanned_windows = []
         self._execution_targets = ExecutionTargetRegistry()
+        from ...core.license import has_feature
+        from .execution_runs import ExecutionRunManager
+        self._run_manager = ExecutionRunManager(
+            lv1_check=lambda: has_feature("lv1"),
+            # 迁移完成以前保持现有单任务产品门禁。
+            parallel_enabled=False,
+        )
+        self._current_run_context = None
         self._candidate_backend = "windows"
         self._running_target_id = None
         self._running_target_snapshot = None
@@ -1079,6 +1088,10 @@ class MainWindow(
         if not self._begin_automation(tr("批量执行")):
             return False
 
+        run_context = self._current_run_context
+        assert run_context is not None
+        stop_check = run_context.stop_event.is_set
+
         layout_name = self.layout_combo.currentData()
         layout = self._layout_manager.load_layout(layout_name)
         if not layout:
@@ -1106,6 +1119,11 @@ class MainWindow(
             ocr=self._ocr,
             input_ctrl=target_snapshot.input_ctrl,
             layout=layout,
+            target_id=target_snapshot.id,
+            target_kind=target_snapshot.kind,
+            target_label=target_snapshot.display_name,
+            input_kind=target_snapshot.input_kind,
+            layout_name=str(layout_name or ""),
             run_env=run_env,
             input_sim=deepcopy(self._user_config.input_sim),
             delay_params=deepcopy(self._user_config.delay_params),
@@ -1114,7 +1132,7 @@ class MainWindow(
             window_left=window_left,
             window_top=window_top,
             pause_event=getattr(self, '_pause_event', None),
-            ui_callback=self._create_ui_callback(),
+            ui_callback=self._create_ui_callback(run_context),
             window_rebind_hook=self._on_target_window_rebound,
         )
 
@@ -1122,8 +1140,9 @@ class MainWindow(
             spec=spec,
             ctx=ctx,
             session_manager=self._session_manager,
-            stop_check=self._is_stopped,
+            stop_check=stop_check,
         )
+        run_context.worker = worker
         self._batch_tab.apply_task_plan(worker.task_plan_snapshot())
 
         # 信号连接：进度 → batch_tab，日志 → log_text
@@ -1133,21 +1152,33 @@ class MainWindow(
         worker.log.connect(self._log_append)
         # finished_all 在 run() 尚未退出时发出；此时释放最后一个 QThread
         # 引用可能让 Qt 直接终止进程。等线程真正结束后再解锁界面。
-        worker.finished.connect(self._on_batch_worker_finished)
+        worker.finished.connect(
+            lambda run_id=run_context.task_run_id:
+            self._on_batch_worker_finished(run_id)
+        )
 
         self._current_worker = worker  # type: ignore[assignment]
         self._set_context_controls_locked(LOCK_REASON_BATCH, True)
         worker.start()
         return True
 
-    def _on_batch_worker_finished(self) -> None:
+    def _on_batch_worker_finished(self, task_run_id: str = "") -> None:
         """批量线程完全退出后恢复界面并释放线程引用。"""
-        worker = self._current_worker
+        manager = getattr(self, "_run_manager", None)
+        run_context = manager.run(task_run_id) if manager is not None else None
+        worker = (
+            run_context.worker if run_context is not None
+            else getattr(self, "_current_worker", None)
+        )
         if worker is None:
+            logger.error(f"批量完成时找不到运行实例: {task_run_id}")
             return
         worker.wait()
         self._batch_tab.on_batch_finished({})
-        self._end_automation(tr("批量执行"))
+        if run_context is None:
+            self._end_automation(tr("批量执行"))
+        else:
+            self._end_automation(tr("批量执行"), run_context=run_context)
 
     def _open_batch_config(self):
         """工具菜单 → 批量配置：打开配置对话框"""
@@ -1194,10 +1225,12 @@ class MainWindow(
         if self._close_cleanup_started:
             super().closeEvent(event)
             return
-        if self._running:
+        active_runs = self._run_manager.all_runs()
+        if active_runs:
             reply = QMessageBox.question(
                 self, tr("工作流运行中"),
-                tr("当前有工作流正在运行，关闭程序将终止工作流。\n确定要退出吗？"),
+                tr("当前有 {count} 个工作流正在运行，关闭程序将先停止并等待收尾。\n"
+                   "确定要退出吗？").format(count=len(active_runs)),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -1209,8 +1242,28 @@ class MainWindow(
         if not self._close_modeless_tools():
             event.ignore()
             return
-        if self._running:
-            self._request_stop(stop_confirmed=True)
+        if active_runs:
+            runs = self._run_manager.request_stop_all()
+            for run in runs:
+                helper = run.ui_helper
+                if helper is not None:
+                    helper.close_active_dialog()
+            if self._running:
+                self._request_stop(stop_confirmed=True)
+            unfinished = self._wait_for_run_workers(timeout_ms=10_000)
+            if unfinished:
+                labels = "、".join(
+                    f"{run.name}（{run.target_snapshot.display_name}）"
+                    for run in unfinished
+                )
+                QMessageBox.warning(
+                    self, tr("任务仍在收尾"),
+                    tr("以下任务尚未安全结束，暂不关闭程序：\n{tasks}\n\n"
+                       "请稍后再次关闭；如任务无法结束，可从系统中强制结束律匠。")
+                    .format(tasks=labels),
+                )
+                event.ignore()
+                return
         self._close_cleanup_started = True
         if self._tray_icon is not None:
             self._tray_icon.hide()
@@ -1242,3 +1295,21 @@ class MainWindow(
         self._red_box_flash_timer.stop()
         self._overlay.destroy()
         super().closeEvent(event)
+
+    def _wait_for_run_workers(self, *, timeout_ms: int) -> tuple:
+        """限时等待全部已登记 QThread；超时返回仍未结束的运行上下文。"""
+        deadline = time.monotonic() + max(0, timeout_ms) / 1000.0
+        while True:
+            unfinished = self._run_manager.unfinished_workers()
+            if not unfinished:
+                return ()
+            remaining_ms = int(max(0.0, deadline - time.monotonic()) * 1000)
+            if remaining_ms <= 0:
+                return unfinished
+            # 分片等待，避免一个线程独占整个退出预算，也让多个实例都获得
+            # 响应停止请求的时间。finished 槽会在返回事件循环后统一收尾。
+            slice_ms = max(1, min(100, remaining_ms))
+            for run in unfinished:
+                worker = run.worker
+                if worker is not None:
+                    worker.wait(slice_ms)

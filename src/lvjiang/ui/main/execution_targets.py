@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -12,9 +13,10 @@ TargetKind = Literal["windows", "adb"]
 WINDOW_TARGET_ID = "window"
 
 
-def android_target_id(serial: str) -> str:
-    """返回稳定的 Android 目标 ID。"""
-    return f"android:{serial}"
+def android_target_id(device_identity: str) -> str:
+    """从逻辑设备身份生成不暴露原始设备标识的稳定目标 ID。"""
+    digest = hashlib.sha256(str(device_identity).encode("utf-8")).hexdigest()
+    return f"android:{digest[:24]}"
 
 
 @dataclass
@@ -39,6 +41,7 @@ class ExecutionTargetSnapshot:
 
     id: str
     kind: TargetKind
+    display_name: str
     capture: Any
     input_ctrl: Any
     input_kind: str
@@ -80,6 +83,7 @@ class ExecutionTarget:
         return ExecutionTargetSnapshot(
             id=self.id,
             kind=self.kind,
+            display_name=self.display_name,
             capture=self.capture,
             input_ctrl=self.input_ctrl,
             input_kind=self.input_kind,
@@ -138,4 +142,9 @@ class ExecutionTargetRegistry:
         return removed
 
     def device(self, serial: str) -> ExecutionTarget | None:
-        return self.get(android_target_id(serial))
+        """按当前 transport serial 查找已连接目标。"""
+        return next(
+            (target for target in self._targets.values()
+             if target.kind == "adb" and target.serial == serial),
+            None,
+        )

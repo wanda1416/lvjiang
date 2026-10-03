@@ -49,6 +49,19 @@ def test_connecting_another_target_does_not_steal_active_selection() -> None:
     assert registry.active() is phone_b
 
 
+def test_device_lookup_uses_current_transport_not_target_identity() -> None:
+    registry = ExecutionTargetRegistry()
+    phone = ExecutionTarget(
+        id=android_target_id("stable-device-id"), kind="adb",
+        display_name="手机", serial="192.168.1.20:5555",
+        capture=object(), input_ctrl=object(),
+    )
+    registry.put(phone)
+
+    assert registry.device("192.168.1.20:5555") is phone
+    assert registry.device("USB-SERIAL") is None
+
+
 def test_removing_active_target_selects_a_remaining_target() -> None:
     registry = ExecutionTargetRegistry()
     window = _target(WINDOW_TARGET_ID, "windows", "游戏窗口")

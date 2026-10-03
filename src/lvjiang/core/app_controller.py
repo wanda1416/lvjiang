@@ -45,7 +45,9 @@ def record_connected_window(window: dict) -> None:
             _active_connection_platform = "window"
 
 
-def record_connected_android(device, *, width: int = 0, height: int = 0) -> dict:
+def record_connected_android(
+    device, *, width: int = 0, height: int = 0, target_id: str = "",
+) -> dict:
     """查询并记录 ADB 设备当前前台应用。"""
     global _active_connection_platform
     import re
@@ -69,11 +71,11 @@ def record_connected_android(device, *, width: int = 0, height: int = 0) -> dict
             "landscape" if width > height else "portrait" if height > width else "any"),
         "serial": str(getattr(device, "serial", "") or ""),
     }
-    target_id = f"android:{info['serial']}"
+    registry_key = target_id or f"android:{info['serial']}"
     with _connected_apps_lock:
-        _connected_apps[target_id] = info
+        _connected_apps[registry_key] = info
         if _active_connection_platform not in _connected_apps:
-            _active_connection_platform = target_id
+            _active_connection_platform = registry_key
     return dict(info)
 
 

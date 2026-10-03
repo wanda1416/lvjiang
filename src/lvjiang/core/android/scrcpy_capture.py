@@ -45,8 +45,6 @@ if TYPE_CHECKING:
 _JAR_RELATIVE = Path("data") / "adb" / "scrcpy-server.jar"
 # 设备端 jar 路径
 _REMOTE_JAR_PATH = "/data/local/tmp/scrcpy-server.jar"
-# 默认视频端口
-_VIDEO_PORT = 27183
 # scrcpy 4.1 协议：forward 连接先发 1 字节 dummy byte
 _DUMMY_BYTE_SIZE = 1
 # scrcpy 4.1 协议：设备名固定 64 字节
@@ -99,6 +97,7 @@ class AndroidStreamCapture(CaptureBackend):
 
         self._scid: int = 0
         self._socket_name: str = ""
+        self._video_port: int | None = None
         self._server_proc: subprocess.Popen | None = None
         self._sock: socket.socket | None = None
         self._decoder: "av.CodecContext | None" = None
@@ -176,27 +175,27 @@ class AndroidStreamCapture(CaptureBackend):
                 self._running = False
                 return False
 
-            # 2. 清理旧 forward + 建立新 forward
+            # 2. 为本实例建立独占动态 forward。不能使用固定端口，也不能
+            # --remove-all，否则多设备会互相抢占并清掉 Agent 的映射。
             self._cleanup_forward()
-            r = subprocess.run(
-                [*self._device._base(), "forward",
-                 f"tcp:{_VIDEO_PORT}", f"localabstract:{self._socket_name}"],
-                capture_output=True, text=True, timeout=10, **SUBPROCESS_NO_WINDOW,
-            )
-            if r.returncode != 0:
-                logger.error(f"[AndroidStream] adb forward 失败: {r.stderr.strip()}")
+            self._video_port = self._device.forward_dynamic(
+                f"localabstract:{self._socket_name}")
+            if self._video_port is None:
+                logger.error("[AndroidStream] adb 动态 forward 失败")
                 self._running = False
                 return False
-            logger.debug(f"[AndroidStream] adb forward tcp:{_VIDEO_PORT} -> localabstract:{self._socket_name}")
+            logger.debug(
+                f"[AndroidStream] adb forward tcp:{self._video_port} "
+                f"-> localabstract:{self._socket_name}")
 
             # 3. 启动 server
             if not self._start_server():
-                self._running = False
+                self.stop()
                 return False
 
             # 4. 连接 socket
             if not self._connect_socket():
-                self._running = False
+                self.stop()
                 return False
 
             # 5. 读协议头（device meta + codec id + session packet）
@@ -226,11 +225,11 @@ class AndroidStreamCapture(CaptureBackend):
                         self._sock = None
                     time.sleep(0.5)
                     if not self._connect_socket():
-                        self._running = False
+                        self.stop()
                         return False
             else:
                 logger.error("[AndroidStream] 3 次尝试均无法读取协议头")
-                self._running = False
+                self.stop()
                 return False
 
             # 6. 启动解码线程
@@ -458,16 +457,20 @@ class AndroidStreamCapture(CaptureBackend):
 
     def _connect_socket(self) -> bool:
         """通过 adb forward 连接 server 的 video socket"""
+        port = self._video_port
+        if port is None:
+            logger.error("[AndroidStream] video forward 尚未建立")
+            return False
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline:
             try:
-                self._sock = socket.create_connection(("127.0.0.1", _VIDEO_PORT), timeout=2)
+                self._sock = socket.create_connection(("127.0.0.1", port), timeout=2)
                 self._sock.settimeout(5.0)
-                logger.debug(f"[AndroidStream] 已连接到 video socket (port {_VIDEO_PORT})")
+                logger.debug(f"[AndroidStream] 已连接到 video socket (port {port})")
                 return True
             except (ConnectionRefusedError, OSError):
                 time.sleep(0.2)
-        logger.error(f"[AndroidStream] 连接 video socket 超时 (port {_VIDEO_PORT})")
+        logger.error(f"[AndroidStream] 连接 video socket 超时 (port {port})")
         return False
 
     # ─── 内部：协议头解析 ─────────────────────────────────
@@ -724,8 +727,8 @@ class AndroidStreamCapture(CaptureBackend):
     # ─── 内部：forward 清理 ───────────────────────────────
 
     def _cleanup_forward(self):
-        """清理 adb forward 规则"""
-        subprocess.run(
-            [*self._device._base(), "forward", "--remove-all"],
-            capture_output=True, timeout=5, **SUBPROCESS_NO_WINDOW,
-        )
+        """只清理本实例创建的 adb forward 规则。"""
+        if self._video_port is None:
+            return
+        self._device.remove_forward(f"tcp:{self._video_port}")
+        self._video_port = None

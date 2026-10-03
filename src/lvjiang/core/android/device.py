@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import threading
 import time
+from dataclasses import dataclass
 from typing import Callable
 
 from loguru import logger
@@ -16,6 +17,15 @@ from ..platforms import SUBPROCESS_NO_WINDOW, adb_path_candidates
 
 class AdbConnectionError(RuntimeError):
     """ADB 连接/通信异常，用户恢复后重试或停止后终止"""
+
+
+@dataclass(frozen=True)
+class AndroidDeviceIdentity:
+    """与当前 ADB transport 分离的逻辑设备身份。"""
+
+    value: str
+    source: str
+    stable: bool
 
 
 def _resolve_adb_path() -> str:
@@ -107,6 +117,7 @@ class AdbDevice:
         self._resolution: tuple[int, int] | None = None
         self._abi: str | None = None
         self._sdk: int | None = None
+        self._identity: AndroidDeviceIdentity | None = None
         # ── 断连暂停恢复 ──
         self.on_connection_lost: Callable[[str], None] | None = None
         self.resume_event = threading.Event()
@@ -120,6 +131,35 @@ class AdbDevice:
         if self.serial:
             cmd += ["-s", self.serial]
         return cmd
+
+    def get_stable_identity(self) -> AndroidDeviceIdentity:
+        """读取跨 USB/无线 transport 一致的设备身份。
+
+        Android ID 通常对同一设备用户稳定，且不随 ADB 的连接地址变化；设备
+        未提供时再使用硬件序列属性。极少数设备两者都不可用时保留 transport
+        作为显式的不稳定回退，上层不得用它自动归并不同连接。
+        """
+        if self._identity is not None:
+            return self._identity
+
+        candidates = (
+            ("android_id", ("settings", "get", "secure", "android_id")),
+            ("ro.serialno", ("getprop", "ro.serialno")),
+            ("ro.boot.serialno", ("getprop", "ro.boot.serialno")),
+        )
+        for source, command in candidates:
+            try:
+                value = self.shell(*command, timeout=5.0).strip()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"读取 Android 设备身份 {source} 失败，尝试下一来源: {exc}")
+                continue
+            if value and value.lower() not in {"null", "unknown"}:
+                self._identity = AndroidDeviceIdentity(value, source, True)
+                return self._identity
+
+        value = str(self.serial or "").strip()
+        self._identity = AndroidDeviceIdentity(value, "transport", False)
+        return self._identity
 
     # ─── 断连检测 ─────────────────────────────────────────
 
@@ -219,6 +259,31 @@ class AdbDevice:
             logger.error(f"adb forward {local} {remote} 失败: {r.stderr.strip()}")
             return False
         return True
+
+    def forward_dynamic(self, remote: str) -> int | None:
+        """让 adb 分配空闲本地 TCP 端口并转发到 ``remote``。
+
+        ``adb forward tcp:0 ...`` 会在 stdout 返回实际分配的端口。端口由
+        调用方保存，停止时必须用 :meth:`remove_forward` 精确删除，不能清除
+        该设备的全部 forward。
+        """
+        r = subprocess.run(
+            [*self._base(), "forward", "tcp:0", remote],
+            capture_output=True, text=True, timeout=10, **SUBPROCESS_NO_WINDOW,
+        )
+        output = (r.stdout or "").strip()
+        if r.returncode != 0:
+            logger.error(f"adb forward tcp:0 {remote} 失败: {(r.stderr or '').strip()}")
+            return None
+        try:
+            port = int(output)
+        except (TypeError, ValueError):
+            logger.error(f"adb forward 未返回有效动态端口: {output!r}")
+            return None
+        if not 0 < port <= 65535:
+            logger.error(f"adb forward 返回越界端口: {port}")
+            return None
+        return port
 
     def remove_forward(self, local: str):
         """移除端口转发（忽略失败）"""

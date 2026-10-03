@@ -18,6 +18,7 @@ from loguru import logger
 from .. import constants
 
 _SCHEMA_LOCK = threading.Lock()
+CURRENT_SCHEMA_VERSION = 2
 
 
 def default_db_path() -> Path:
@@ -82,6 +83,12 @@ class TaskRunRecord:
     result_path: str
     log_path: str
     error_message: str
+    target_id: str = ""
+    target_kind: str = ""
+    target_label: str = ""
+    environment: str = ""
+    layout: str = ""
+    input_kind: str = ""
 
 
 @dataclass(frozen=True)
@@ -96,6 +103,75 @@ class BatchRunRecord:
     report_path: str
     error_message: str
     task_count: int = 0
+    target_id: str = ""
+    target_kind: str = ""
+    target_label: str = ""
+
+
+def _migration_1(conn: sqlite3.Connection) -> None:
+    """建立 0.13.x 初始任务历史结构。"""
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS batch_runs (
+            batch_run_id TEXT PRIMARY KEY,
+            config_name TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'running',
+            started_at TEXT NOT NULL,
+            finished_at TEXT NOT NULL DEFAULT '',
+            duration_ms INTEGER NOT NULL DEFAULT 0,
+            input_snapshot_json TEXT NOT NULL DEFAULT '{}',
+            report_path TEXT NOT NULL DEFAULT '',
+            error_message TEXT NOT NULL DEFAULT ''
+        );
+        CREATE TABLE IF NOT EXISTS task_runs (
+            task_run_id TEXT PRIMARY KEY,
+            batch_run_id TEXT REFERENCES batch_runs(batch_run_id),
+            username TEXT NOT NULL,
+            task_id TEXT NOT NULL,
+            task_name TEXT NOT NULL,
+            task_scope TEXT NOT NULL DEFAULT 'daily',
+            source TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'running',
+            started_at TEXT NOT NULL,
+            finished_at TEXT NOT NULL DEFAULT '',
+            duration_ms INTEGER NOT NULL DEFAULT 0,
+            params_json TEXT NOT NULL DEFAULT '{}',
+            result_path TEXT NOT NULL DEFAULT '',
+            log_path TEXT NOT NULL DEFAULT '',
+            error_message TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_task_runs_started
+            ON task_runs(started_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_task_runs_user_started
+            ON task_runs(username, started_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_task_runs_task_started
+            ON task_runs(task_id, started_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_task_runs_batch
+            ON task_runs(batch_run_id, started_at);
+        CREATE INDEX IF NOT EXISTS idx_batch_runs_started
+            ON batch_runs(started_at DESC);
+    """)
+
+
+def _migration_2(conn: sqlite3.Connection) -> None:
+    """为任务与批次记录增加执行目标快照。"""
+    for statement in (
+        "ALTER TABLE task_runs ADD COLUMN target_id TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE task_runs ADD COLUMN target_kind TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE task_runs ADD COLUMN target_label TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE task_runs ADD COLUMN environment TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE task_runs ADD COLUMN layout TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE task_runs ADD COLUMN input_kind TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE batch_runs ADD COLUMN target_id TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE batch_runs ADD COLUMN target_kind TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE batch_runs ADD COLUMN target_label TEXT NOT NULL DEFAULT ''",
+    ):
+        conn.execute(statement)
+
+
+_MIGRATIONS = (
+    (1, _migration_1),
+    (2, _migration_2),
+)
 
 
 class _ClosingConnection(sqlite3.Connection):
@@ -126,46 +202,22 @@ class TaskHistoryRepository:
     def _ensure_schema(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
-            conn.executescript("""
-                CREATE TABLE IF NOT EXISTS batch_runs (
-                    batch_run_id TEXT PRIMARY KEY,
-                    config_name TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'running',
-                    started_at TEXT NOT NULL,
-                    finished_at TEXT NOT NULL DEFAULT '',
-                    duration_ms INTEGER NOT NULL DEFAULT 0,
-                    input_snapshot_json TEXT NOT NULL DEFAULT '{}',
-                    report_path TEXT NOT NULL DEFAULT '',
-                    error_message TEXT NOT NULL DEFAULT ''
-                );
-                CREATE TABLE IF NOT EXISTS task_runs (
-                    task_run_id TEXT PRIMARY KEY,
-                    batch_run_id TEXT REFERENCES batch_runs(batch_run_id),
-                    username TEXT NOT NULL,
-                    task_id TEXT NOT NULL,
-                    task_name TEXT NOT NULL,
-                    task_scope TEXT NOT NULL DEFAULT 'daily',
-                    source TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'running',
-                    started_at TEXT NOT NULL,
-                    finished_at TEXT NOT NULL DEFAULT '',
-                    duration_ms INTEGER NOT NULL DEFAULT 0,
-                    params_json TEXT NOT NULL DEFAULT '{}',
-                    result_path TEXT NOT NULL DEFAULT '',
-                    log_path TEXT NOT NULL DEFAULT '',
-                    error_message TEXT NOT NULL DEFAULT ''
-                );
-                CREATE INDEX IF NOT EXISTS idx_task_runs_started
-                    ON task_runs(started_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_task_runs_user_started
-                    ON task_runs(username, started_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_task_runs_task_started
-                    ON task_runs(task_id, started_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_task_runs_batch
-                    ON task_runs(batch_run_id, started_at);
-                CREATE INDEX IF NOT EXISTS idx_batch_runs_started
-                    ON batch_runs(started_at DESC);
-            """)
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS schema_version "
+                "(version INTEGER PRIMARY KEY)")
+            row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+            current = int(row[0] or 0)
+            for version, migrate in _MIGRATIONS:
+                if version <= current:
+                    continue
+                migrate(conn)
+                conn.execute(
+                    "INSERT INTO schema_version(version) VALUES (?)", (version,))
+
+    def schema_version(self) -> int:
+        with self._connect() as conn:
+            row = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()
+        return int(row[0] or 0)
 
     def create_task_run(self, record: TaskRunRecord) -> None:
         with self._connect() as conn:
@@ -174,15 +226,18 @@ class TaskHistoryRepository:
                     task_run_id, batch_run_id, username, task_id, task_name,
                     task_scope, source, status, started_at, finished_at,
                     duration_ms, params_json, result_path, log_path,
-                    error_message
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    error_message, target_id, target_kind, target_label,
+                    environment, layout, input_kind
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 record.task_run_id, record.batch_run_id or None,
                 record.username, record.task_id, record.task_name,
                 record.task_scope, record.source, record.status,
                 record.started_at, record.finished_at, record.duration_ms,
                 _json(record.params), record.result_path, record.log_path,
-                record.error_message,
+                record.error_message, record.target_id, record.target_kind,
+                record.target_label, record.environment, record.layout,
+                record.input_kind,
             ))
 
     def finish_task_run(
@@ -235,13 +290,15 @@ class TaskHistoryRepository:
             conn.execute("""
                 INSERT INTO batch_runs (
                     batch_run_id, config_name, status, started_at, finished_at,
-                    duration_ms, input_snapshot_json, report_path, error_message
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    duration_ms, input_snapshot_json, report_path, error_message,
+                    target_id, target_kind, target_label
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 record.batch_run_id, record.config_name, record.status,
                 record.started_at, record.finished_at, record.duration_ms,
                 _json(record.input_snapshot), record.report_path,
-                record.error_message,
+                record.error_message, record.target_id, record.target_kind,
+                record.target_label,
             ))
 
     def finish_batch_run(
@@ -320,6 +377,11 @@ class TaskHistoryRepository:
             params=_load_json(row["params_json"], {}),
             result_path=str(row["result_path"]), log_path=str(row["log_path"]),
             error_message=str(row["error_message"]),
+            target_id=str(row["target_id"]),
+            target_kind=str(row["target_kind"]),
+            target_label=str(row["target_label"]),
+            environment=str(row["environment"]), layout=str(row["layout"]),
+            input_kind=str(row["input_kind"]),
         )
 
     @staticmethod
@@ -333,6 +395,9 @@ class TaskHistoryRepository:
             report_path=str(row["report_path"]),
             error_message=str(row["error_message"]),
             task_count=int(row["task_count"]),
+            target_id=str(row["target_id"]),
+            target_kind=str(row["target_kind"]),
+            target_label=str(row["target_label"]),
         )
 
 
@@ -342,11 +407,14 @@ class TaskRunSession:
     def __init__(
         self, *, username: str, task_id: str, task_name: str,
         task_scope: str, params: Any, source: str, batch_run_id: str = "",
+        task_run_id: str = "",
+        target_id: str = "", target_kind: str = "", target_label: str = "",
+        environment: str = "", layout: str = "", input_kind: str = "",
         repository: TaskHistoryRepository | None = None,
         log_root: Path | None = None,
     ):
         self.repository = repository or TaskHistoryRepository()
-        self.task_run_id = uuid.uuid4().hex
+        self.task_run_id = task_run_id or uuid.uuid4().hex
         self.started_at = _now()
         self._started_monotonic = time.monotonic()
         user_dir = (log_root or default_log_root()) / _safe_component(
@@ -362,7 +430,9 @@ class TaskRunSession:
             task_scope=task_scope, source=source, status="running",
             started_at=self.started_at, finished_at="", duration_ms=0,
             params=params, result_path="", log_path=_stored_path(self.log_path),
-            error_message="",
+            error_message="", target_id=target_id, target_kind=target_kind,
+            target_label=target_label, environment=environment, layout=layout,
+            input_kind=input_kind,
         ))
 
     @contextmanager
@@ -401,6 +471,8 @@ class BatchRunSession:
     """一次批量执行：生成 batch_run_id 并保存批量输入快照。"""
 
     def __init__(self, *, config_name: str, input_snapshot: Any,
+                 target_id: str = "", target_kind: str = "",
+                 target_label: str = "",
                  repository: TaskHistoryRepository | None = None):
         self.repository = repository or TaskHistoryRepository()
         self.batch_run_id = uuid.uuid4().hex
@@ -409,7 +481,8 @@ class BatchRunSession:
             batch_run_id=self.batch_run_id, config_name=config_name,
             status="running", started_at=_now(), finished_at="",
             duration_ms=0, input_snapshot=input_snapshot, report_path="",
-            error_message="",
+            error_message="", target_id=target_id, target_kind=target_kind,
+            target_label=target_label,
         ))
 
     def finish(self, *, status: str, report_path: Path | None = None,

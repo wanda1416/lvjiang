@@ -1,5 +1,9 @@
 # 调律历史与管理架构
 
+> 本文描述当前持久化结构。多目标并发将为调律运行补充执行端快照，并把实时管理改为
+> 历史固定首页与按 `task_run_id` 隔离的任务页；见
+> [11-concurrent-execution.md](11-concurrent-execution.md#10-调律管理多页模型)。
+
 代码位于 `src/lvjiang/apps/yysls/core/tuning_history/`（`models` / `projector` /
 `repository` / `session`）。它是自动调律的领域模型与持久化，不能脱离 core 独立
 存在，因此归入 core 而不是顶层包。

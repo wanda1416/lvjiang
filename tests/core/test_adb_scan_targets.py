@@ -247,3 +247,16 @@ def test_usb_adb_scan_terminates_process_when_cancelled(monkeypatch):
         cancel_check=lambda: True,
     ) == []
     assert process.terminated is True
+
+
+def test_adb_shell_normalizes_missing_process_output(monkeypatch):
+    """空 stdout/stderr 仍须履行 shell() 返回字符串的契约。"""
+    class Result:
+        returncode = 1
+        stdout = None
+        stderr = None
+
+    monkeypatch.setattr(
+        device_module.subprocess, "run", lambda *args, **kwargs: Result())
+
+    assert device_module.AdbDevice("serial").shell("dumpsys", "activity") == ""

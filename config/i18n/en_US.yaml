@@ -1219,6 +1219,7 @@ auto_strings:
   是: 'Yes'
   '显示名:': 'Display Name:'
   显示名称: Display Name
+  显示连接控制台: Show Connection Console
   暂停: Pause
   暂停 / 恢复: Pause / Resume
   暂停中...: Pausing...
@@ -1228,6 +1229,7 @@ auto_strings:
   更新失败: Update Failed
   最低分(0-1): Min Score (0-1)
   最小化到状态栏: Minimize to Tray
+  隐藏连接控制台: Hide Connection Console
   最长等待(秒): Max Wait (sec)
   未保存的修改: Unsaved Changes
   未匹配到参考图: No reference image matched

@@ -34,7 +34,7 @@ main_window:
   btn_hide_preview: 隐藏预览
   chk_bg_mode: 后台模式
   chk_scrcpy: 流式截图
-  chk_agent: 设备端手势
+  chk_agent: 设备端执行
   tab_daily: 日常
   tab_batch: 批量
   tab_log: 运行日志
@@ -71,7 +71,7 @@ settings_dialog:
   adb_capture_scrcpy: 视频流截图 (scrcpy)
   adb_capture_screencap: 静态截图 (screencap)
   adb_input_label: 'ADB 输入方式:'
-  adb_input_agent: 设备端手势 (律匠 app 无障碍)
+  adb_input_agent: 设备端执行 (律匠 app 无障碍)
   adb_input_shell: adb shell input
   adb_input_tip: 手机上安装律匠 app 并开启无障碍后，点击/拖拽/截图由 app 落地；app 不可达时自动回退 adb
   input_mode_label: '窗口输入模式:'
@@ -768,7 +768,7 @@ auto_strings:
   '[模式] 已切换到前台模式（SendInput，移动光标）': '[模式] 已切换到前台模式（SendInput，移动光标）'
   '[模式] 已切换到后台模式（PostMessage，不移动光标）': '[模式] 已切换到后台模式（PostMessage，不移动光标）'
   '[状态] 重新扫描窗口，旧定位已失效': '[状态] 重新扫描窗口，旧定位已失效'
-  '[设备端手势] App 不可达或设备端输入通道未就绪，回退 adb shell input': '[设备端手势] App 不可达或设备端输入通道未就绪，回退 adb shell input'
+  '[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input': '[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input'
   '[错误] 当前工作环境 {env} 不在该脚本支持的环境 {envs} 中': '[错误] 当前工作环境 {env} 不在该脚本支持的环境 {envs} 中'
   '[错误] 无主窗口，无法获取运行环境': '[错误] 无主窗口，无法获取运行环境'
   '[错误] 暂无配置，请先通过 工具 → 批量配置 添加': '[错误] 暂无配置，请先通过 工具 → 批量配置 添加'
@@ -1400,8 +1400,8 @@ auto_strings:
   '视图 Key:': '视图 Key:'
   '视图:': '视图:'
   '视图名称:': '视图名称:'
-  设备端手势 (Beta): 设备端手势 (Beta)
-  设备端手势（Beta，需安装律匠 App）: 设备端手势（Beta，需安装律匠 App）
+  设备端执行: 设备端执行
+  设备端执行（需安装律匠 App）: 设备端执行（需安装律匠 App）
   识别全部参考图: 识别全部参考图
   识别全部字段: 识别全部字段
   识别全部材料: 识别全部材料

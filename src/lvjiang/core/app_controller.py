@@ -30,8 +30,7 @@ def record_connected_window(window: dict) -> None:
     global _observed_window, _active_connection_platform
     _observed_window = dict(window)
     with _connected_apps_lock:
-        _active_connection_platform = "pc"
-        _connected_apps["pc"] = {
+        _connected_apps["window"] = {
             "platform": "pc",
             "executable": str(window.get("executable") or ""),
             "window_title": str(window.get("title") or ""),
@@ -42,6 +41,8 @@ def record_connected_window(window: dict) -> None:
             "width": window.get("width"),
             "height": window.get("height"),
         }
+        if _active_connection_platform not in _connected_apps:
+            _active_connection_platform = "window"
 
 
 def record_connected_android(device, *, width: int = 0, height: int = 0) -> dict:
@@ -68,17 +69,49 @@ def record_connected_android(device, *, width: int = 0, height: int = 0) -> dict
             "landscape" if width > height else "portrait" if height > width else "any"),
         "serial": str(getattr(device, "serial", "") or ""),
     }
+    target_id = f"android:{info['serial']}"
     with _connected_apps_lock:
-        _connected_apps["android"] = info
-        _active_connection_platform = "android"
+        _connected_apps[target_id] = info
+        if _active_connection_platform not in _connected_apps:
+            _active_connection_platform = target_id
     return dict(info)
 
 
 def get_connected_app_info(platform: str) -> dict | None:
-    """返回最近一次真实连接自动采集的信息副本。"""
+    """返回目标信息；兼容 ``pc``/``android`` 平台查询。"""
     with _connected_apps_lock:
-        value = _connected_apps.get(str(platform or "").lower())
+        key = str(platform or "")
+        alias = key.lower()
+        if alias == "pc":
+            key = "window"
+        if alias == "android":
+            active = _connected_apps.get(_active_connection_platform)
+            if active is not None and active.get("platform") == "android":
+                return dict(active)
+            value = next((item for target_id, item in reversed(
+                list(_connected_apps.items())) if target_id.startswith("android:")), None)
+            return dict(value) if value is not None else None
+        value = _connected_apps.get(key)
         return dict(value) if value is not None else None
+
+
+def set_active_connected_target(target_id: str) -> None:
+    """设置设置页等外围能力读取的显式执行目标。"""
+    global _active_connection_platform
+    with _connected_apps_lock:
+        if target_id in _connected_apps:
+            _active_connection_platform = target_id
+
+
+def remove_connected_target(target_id: str) -> None:
+    """移除一个连接目标，必要时选择任一剩余目标。"""
+    global _active_connection_platform, _observed_window
+    with _connected_apps_lock:
+        _connected_apps.pop(target_id, None)
+        if target_id == "window":
+            _observed_window = None
+        if _active_connection_platform == target_id:
+            _active_connection_platform = next(iter(_connected_apps), "")
 
 
 def get_active_connected_app_info() -> dict | None:
@@ -342,5 +375,6 @@ class AppController:
 __all__ = [
     "AppController", "AppControlError", "get_active_connected_app_info",
     "get_connected_app_info",
+    "remove_connected_target", "set_active_connected_target",
     "record_connected_android", "record_connected_window",
 ]

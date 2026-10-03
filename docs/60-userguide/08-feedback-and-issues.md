@@ -63,7 +63,7 @@ Android、模拟器或 ADB 环境还要提供：
 - 游戏画面分辨率和横屏/竖屏方向，例如 `2800×1260，横屏`。
 - 连接方式：USB ADB、无线 ADB 或模拟器 ADB。
 - 截图方式：静态截图 `screencap` 或视频流 `scrcpy`。
-- 输入方式：`adb shell input` 或设备端手势。
+- 输入方式：`adb shell input` 或设备端执行。
 - 日志是否提示截图或输入通道发生了自动回退。
 
 Desktop 环境还要提供：

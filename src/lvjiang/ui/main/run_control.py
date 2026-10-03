@@ -872,6 +872,14 @@ class RunControlMixin:
                 tr("自动化运行中"), (hk.stop, tr("结束"))))
             logger.warning(f"拒绝启动 {name}：已有自动化在运行")
             return False
+        target = self._current_execution_target()
+        if target is not None and target.kind == "windows" and target.window:
+            # hwnd 是窗口身份，坐标原点可能在连接后被用户拖动；冻结运行快照前
+            # 必须刷新一次，不能把“已连接”误解成矩形永远不变。
+            self._refresh_window_rect(target.window)
+            target.width = int(target.window.get("width") or 0)
+            target.height = int(target.window.get("height") or 0)
+            self._target_window = target.window
         admin_error = self._plan_admin_requirement_error()
         if admin_error:
             self.statusBar().showMessage(admin_error)
@@ -884,6 +892,11 @@ class RunControlMixin:
             return False
         self._stop_requested = False
         self._run_state = "running"
+        registry = getattr(self, "_execution_targets", None)
+        self._running_target_id = (
+            registry.active_target_id if registry is not None else None)
+        self._running_target_snapshot = (
+            target.snapshot() if target is not None else None)
         # 暂停事件：set=运行，clear=暂停阻塞
         signal = getattr(self, "_pause_acknowledged", None)
         notify = signal.emit if signal is not None else self._on_pause_acknowledged
@@ -993,6 +1006,8 @@ class RunControlMixin:
         if pause_event is not None:
             pause_event.set()
         self._current_worker = None
+        self._running_target_id = None
+        self._running_target_snapshot = None
         self._set_context_controls_locked(LOCK_REASON_BATCH, False)
         self._refresh_run_button()
         self._refresh_pause_button()
@@ -1290,9 +1305,22 @@ class RunControlMixin:
                 wf._input = input_ctrl
         logger.info("[恢复] 已为运行中的引擎刷新截图/输入后端引用")
 
-    def _on_adb_connection_lost(self, error_msg: str):
-        """ADB 断连通知（主线程，由信号桥投递）"""
-        self.log_text.append(f"[警告] ADB 连接异常，请重连设备后点击恢复: {error_msg}")
+    def _on_adb_connection_lost(self, target_id: str, error_msg: str):
+        """某台 ADB 设备断连；仅运行目标可以打断当前任务。"""
+        target = self._execution_targets.get(target_id)
+        if target is None:
+            return
+        target.status = "offline"
+        self._refresh_execution_targets_ui()
+        if target_id != self._running_target_id:
+            if target_id == self._execution_targets.active_target_id:
+                self._sync_active_target_compat()
+                self._refresh_run_button()
+            self.log_text.append(
+                f"[警告] 非运行目标 {target.display_name} 已离线: {error_msg}")
+            return
+        self.log_text.append(
+            f"[警告] ADB 连接异常，请重连 {target.display_name} 后点击恢复: {error_msg}")
         self.statusBar().showMessage(tr("ADB 异常，请重连设备后点击恢复"))
         banner = getattr(self, '_adb_banner', None)
         if banner is not None:
@@ -1322,11 +1350,19 @@ class RunControlMixin:
 
     # ─── 后端就绪判定 ──────────────────────────────────
 
+    def _current_execution_target(self):
+        """读取显式执行目标；允许 RunControlMixin 独立测试宿主不提供注册表。"""
+        registry = getattr(self, "_execution_targets", None)
+        return registry.active() if registry is not None else None
+
     def _backend_ready(self) -> bool:
-        """当前后端是否就绪（adb：设备已连接；windows：已定位窗口）"""
-        if self._backend == "adb":
-            return bool(self._device_ready)
-        return self._target_window is not None
+        """当前显式执行目标是否就绪。"""
+        target = self._current_execution_target()
+        if target is None and not hasattr(self, "_execution_targets"):
+            if getattr(self, "_backend", None) == "adb":
+                return bool(getattr(self, "_device_ready", False))
+            return getattr(self, "_target_window", None) is not None
+        return bool(target is not None and target.ready)
 
     def _plan_allows_backend(self) -> bool:
         """当前方案是否支持当前连接模式（自定义时永远放行）。"""
@@ -1358,7 +1394,11 @@ class RunControlMixin:
             return
 
         if not self._backend_ready():
-            if self._backend == "adb":
+            target = self._current_execution_target()
+            if target is None:
+                self.log_text.append(tr("[错误] 请先连接并选择执行目标"))
+                self.statusBar().showMessage(tr("未连接 | 请先定位窗口或连接设备"))
+            elif self._backend == "adb":
                 self.log_text.append(tr("[错误] 请先连接设备"))
                 self.statusBar().showMessage(tr("未连接设备 | 请先扫描并连接设备"))
             else:
@@ -1419,23 +1459,27 @@ class RunControlMixin:
 
         # 后台模式下（windows），刷新目标窗口句柄（窗口可能被重新打开导致 hwnd 变化）
         # ADB 模式无窗口句柄，且坐标为设备物理像素（原点左上），window_left/top 恒为 0
-        if self._backend == "adb":
+        target_snapshot = self._running_target_snapshot
+        assert target_snapshot is not None
+        if target_snapshot.kind == "adb":
             window_left, window_top = 0, 0
         else:
-            if self._input.background_mode and self._target_window:
-                self._input.target_hwnd = self._target_window["hwnd"]
-            window_left = self._target_window["left"]
-            window_top = self._target_window["top"]
+            target_window = target_snapshot.window
+            assert target_window is not None
+            if target_snapshot.input_ctrl.background_mode:
+                target_snapshot.input_ctrl.target_hwnd = target_window["hwnd"]
+            window_left = target_window["left"]
+            window_top = target_window["top"]
 
         engine = DeviceWorkflowEngineBuilder(
-            capture=self._capture,
+            capture=target_snapshot.capture,
             ocr=self._ocr,
-            input_ctrl=self._input,
+            input_ctrl=target_snapshot.input_ctrl,
             layout=layout,
             input_sim=self._user_config.input_sim,
             delay_params=self._user_config.delay_params,
             android_apps=self._user_config.android_apps,
-            android_device=getattr(self, "_device", None),
+            android_device=target_snapshot.device,
             run_env=current_env,
             window_left=window_left,
             window_top=window_top,
@@ -1657,7 +1701,9 @@ class RunControlMixin:
         elif not self._backend_ready():
             state = "not_ready"
             self.btn_run_workflow.setEnabled(True)
-            label = tr("未连接") if self._backend == "adb" else tr("未定位")
+            target = self._current_execution_target()
+            label = tr("未连接") if target is None or self._backend == "adb" \
+                else tr("未定位")
             self.btn_run_workflow.setText(label)
             apply_execution_button_style(self.btn_run_workflow, "not_ready")
         elif not self._plan_allows_backend():
@@ -1677,6 +1723,15 @@ class RunControlMixin:
         from ..execution_user_selector import ExecutionUserSelector
         for selector in self.findChildren(ExecutionUserSelector):
             selector.setEnabled(not self._running)
+        target_list = getattr(self, "execution_target_list", None)
+        if target_list is not None:
+            target_list.setEnabled(not self._running)
+            target_list.setToolTip(
+                tr("任务运行中，执行目标已锁定") if self._running else "")
+        disconnect = getattr(self, "btn_disconnect_target", None)
+        if disconnect is not None:
+            disconnect.setEnabled(
+                not self._running and self._current_execution_target() is not None)
         # 任务开始/结束/暂停恢复都会走到这里：顺带刷新"后台模式"开关的锁定态
         # （定位后可自由切换，仅任务运行期间锁定）
         if hasattr(self, "_refresh_bg_mode_lock"):
@@ -1740,7 +1795,9 @@ class RunControlMixin:
             return
 
         if not self._backend_ready():
-            if self._backend == "adb":
+            if self._current_execution_target() is None:
+                self.log_text.append(tr("[错误] 请先连接并选择执行目标"))
+            elif self._backend == "adb":
                 self.log_text.append(tr("[错误] 请先连接设备"))
             else:
                 self.log_text.append(tr("[错误] 请先定位窗口"))
@@ -1757,23 +1814,27 @@ class RunControlMixin:
             return
 
         # 窗口坐标
-        if self._backend == "adb":
+        target_snapshot = self._running_target_snapshot
+        assert target_snapshot is not None
+        if target_snapshot.kind == "adb":
             window_left, window_top = 0, 0
         else:
-            if self._input.background_mode and self._target_window:
-                self._input.target_hwnd = self._target_window["hwnd"]
-            window_left = self._target_window["left"]
-            window_top = self._target_window["top"]
+            target_window = target_snapshot.window
+            assert target_window is not None
+            if target_snapshot.input_ctrl.background_mode:
+                target_snapshot.input_ctrl.target_hwnd = target_window["hwnd"]
+            window_left = target_window["left"]
+            window_top = target_window["top"]
 
         engine = DeviceWorkflowEngineBuilder(
-            capture=self._capture,
+            capture=target_snapshot.capture,
             ocr=self._ocr,
-            input_ctrl=self._input,
+            input_ctrl=target_snapshot.input_ctrl,
             layout=layout,
             input_sim=self._user_config.input_sim,
             delay_params=self._user_config.delay_params,
             android_apps=self._user_config.android_apps,
-            android_device=getattr(self, "_device", None),
+            android_device=target_snapshot.device,
             run_env=self._selected_run_env(),
             window_left=window_left,
             window_top=window_top,
@@ -1789,9 +1850,9 @@ class RunControlMixin:
         from ...workflows.implementations import get_workflow_class
         wf_class = get_workflow_class(impl_name)
         wf_instance = wf_class(
-            capture=self._capture,
+            capture=target_snapshot.capture,
             ocr=self._ocr,
-            input_ctrl=self._input,
+            input_ctrl=target_snapshot.input_ctrl,
             layout=layout,
             input_sim=self._user_config.input_sim,
             delay_params=self._user_config.delay_params,

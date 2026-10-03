@@ -5,6 +5,11 @@ from types import SimpleNamespace
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QCheckBox, QLabel, QPushButton, QWidget
 
+from lvjiang.ui.main.execution_targets import (
+    WINDOW_TARGET_ID,
+    ExecutionTarget,
+    ExecutionTargetRegistry,
+)
 from lvjiang.ui.main.window_ops import WindowOpsMixin
 
 
@@ -27,6 +32,9 @@ class _Host(WindowOpsMixin, QWidget):
     def __init__(self):
         super().__init__()
         self._backend = "windows"
+        self._candidate_backend = "windows"
+        self._running = False
+        self._execution_targets = ExecutionTargetRegistry()
         self._device_ready = False
         self._target_window = None
         # 定位流程会按「后台截图」开关装配截图后端，宿主需提供这个字段
@@ -53,6 +61,25 @@ class _Host(WindowOpsMixin, QWidget):
         return 1.0
 
     def _set_connected_ui(self, _connected):
+        pass
+
+    def _build_window_execution_target(self, window):
+        return ExecutionTarget(
+            id=WINDOW_TARGET_ID,
+            kind="windows",
+            display_name=window["title"],
+            capture=object(),
+            input_ctrl=SimpleNamespace(background_mode=False),
+            window=window,
+        )
+
+    def _dispose_execution_target(self, _target):
+        pass
+
+    def _refresh_execution_targets_ui(self):
+        pass
+
+    def _refresh_active_target_ui(self):
         pass
 
     def _refresh_run_button(self):

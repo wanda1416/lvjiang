@@ -174,6 +174,29 @@ def test_connected_android_app_information_is_discovered():
     assert get_active_connected_app_info() == info
 
 
+def test_connected_android_apps_are_kept_per_serial(monkeypatch):
+    import lvjiang.core.app_controller as ac
+
+    monkeypatch.setattr(ac, "_connected_apps", {})
+    monkeypatch.setattr(ac, "_active_connection_platform", "")
+
+    class Device:
+        def __init__(self, serial):
+            self.serial = serial
+
+        def shell(self, *args, timeout=5):
+            return "mResumedActivity: ActivityRecord{1 u0 com.example/.Main t1}"
+
+    ac.record_connected_android(Device("A"), width=100, height=200)
+    ac.record_connected_android(Device("B"), width=200, height=100)
+
+    assert ac.get_connected_app_info("android:A")["serial"] == "A"
+    assert ac.get_connected_app_info("android:B")["serial"] == "B"
+    assert ac.get_active_connected_app_info()["serial"] == "A"
+    ac.set_active_connected_target("android:B")
+    assert ac.get_active_connected_app_info()["serial"] == "B"
+
+
 def test_scrcpy_packet_parser_waits_for_incomplete_packets():
     """半包不得消费：header 不足 12 字节、或 payload 未到齐都返回 None。"""
     from lvjiang.core.android.scrcpy_capture import AndroidStreamCapture

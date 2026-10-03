@@ -396,8 +396,13 @@ def test_pozhu_feng_mouse_dingyin_reaches_formula_from_equipment() -> None:
     assert calculator is not None
     baseline = get_graduation_scheme_combat_attrs("破竹·风", "基础方案")
     # 标定自洽：把方案自己的满值原样喂回去就是毕业率 1.0。
+    #
+    # 容差跟的是**源表自己的舍入**，不是我们的算术：随包 115 级各表的自洽度在
+    # 6e-9 ~ 2.6e-8 之间（破竹·风这份表 Excel 自己算出来的 期望!I16 就是
+    # 1.00000002228733），原来的 1e-8 是按 110 表标的，比源表本身还紧。模型与
+    # Excel 是否逐位一致由专门的对账用例守，这里只验标定方向没搞反。
     assert calculator.calculate(baseline).graduation_rate == pytest.approx(
-        1.0, rel=1e-8)
+        1.0, rel=1e-7)
 
     # 装备口径不再等于方案满值：这套方案是按 110 的抗性标定的，当前赛季抗性
     # 更高，同一条定音过完抗性后就到不了表里那个数。所以这里只验「装备上的

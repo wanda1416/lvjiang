@@ -30,14 +30,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-rem Copy factory config and adb/scrcpy next to exe
+rem Copy factory config and adb next to exe
 rem PyInstaller creates dist/lvjiang/ with lvjiang.exe at the root
 rem Exclude temp files with _ prefix from config/system
 robocopy config\system dist\lvjiang\config\system /E /XD _* /XF _* /NJH /NJS /NDL /NFL /NP /NC /NS >nul
 if errorlevel 8 exit /b 1
 xcopy /e /i /y data\adb dist\lvjiang\data\adb >nul
-if errorlevel 1 exit /b 1
-xcopy /e /i /y data\scrcpy dist\lvjiang\data\scrcpy >nul
 if errorlevel 1 exit /b 1
 xcopy /e /i /y data\image dist\lvjiang\data\image >nul
 if errorlevel 1 exit /b 1

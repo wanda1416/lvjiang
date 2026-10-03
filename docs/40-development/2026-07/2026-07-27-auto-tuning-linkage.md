@@ -157,7 +157,7 @@ DSL 指令 `click` / `drag` 新增三个可选等待参数：
 
 - 主窗口新增「采集」Tab（`capture_panel.py`）；
 - 支持录屏（mp4）/ 截屏（png）/ 回放；
-- 数据落盘 `data/video/` 与 `data/local/`。
+- 数据落盘 `data/capture/video/` 与 `data/local/`。
 
 ---
 

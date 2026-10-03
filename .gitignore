@@ -40,8 +40,8 @@ src/lvjiang/apps/premium
 
 # local data
 /data/local
-/data/video
-/data/picture
+/data/capture/picture
+/data/capture/video
 /data/temp*
 /data/apk
 

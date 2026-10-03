@@ -50,13 +50,14 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; `.wf` 换个目录就变成两份同 id 脚本（一份生效一份幽灵），被删掉的场景、布局、
 ; 参照图继续以旧内容加载，换依赖后的旧 .pyd/.dll 也会残留在 _internal 里。
 ;
-; 只能删这两个目录：config/local 是用户自己的覆盖，config/session 是运行数据，
-; 两者都不随包分发，删掉就是毁用户数据。
+; config/local 是用户自己的覆盖，config/session 与 data/capture 是运行数据，
+; 都不能删除。data/scrcpy 是旧版本随包目录，JAR 已迁入 data/adb，可安全清理。
 Type: filesandordirs; Name: "{app}\config\system"
 Type: filesandordirs; Name: "{app}\_internal"
+Type: filesandordirs; Name: "{app}\data\scrcpy"
 
 [Files]
-; PyInstaller onedir 产物 + 运行时依赖（config/system, data/adb, data/scrcpy）
+; PyInstaller onedir 产物 + 运行时依赖（config/system, data/adb）
 ; PyInstaller 创建 dist/lvjiang/ 结构，lvjiang.exe 位于该目录根部
 Source: "..\dist\lvjiang\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 

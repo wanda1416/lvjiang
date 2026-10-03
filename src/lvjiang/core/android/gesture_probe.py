@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from loguru import logger
 
 from ..timeline import TimelineStep
-from .agent import connect_agent
+from .agent import AgentInput, connect_agent
 from .device import AdbDevice
 
 
@@ -75,7 +75,11 @@ def run_concurrent_probe(agent, width: int, height: int,
     """
     steps, push, tap = build_probe_steps(width, height, hold)
     try:
-        agent.run_timeline(steps)
+        # 时间线下发在 AgentInput 上，不在 AgentClient 上：client 只管连接与
+        # RPC，输入后端才知道怎么把时间线编译成一次多 stroke 手势。探针拿到的
+        # 是 connect_agent 返回的 client，所以这里自己包一层——否则就是
+        # AttributeError: 'AgentClient' object has no attribute 'run_timeline'。
+        AgentInput(agent).run_timeline(steps)
     except Exception as exc:  # noqa: BLE001 — 探针要把任何失败原样展示
         return ProbeOutcome(
             ok=False, message=f"{type(exc).__name__}: {exc}",

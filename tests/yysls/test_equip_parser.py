@@ -405,6 +405,28 @@ class TestParseFullChain:
         parser._parse_affixes(_weapon_raw(affix_yu=tail))
         assert warnings == []
 
+    def test_suit_marker_discards_following_set_description(
+        self, parser, monkeypatch,
+    ):
+        """套装标题之后即使长得像合法属性，也不再当作装备词条。"""
+        log_warnings = []
+        monkeypatch.setattr(
+            "lvjiang.apps.yysls.core.equip_parser.parser.logger.warning",
+            lambda message, *args: log_warnings.append(message.format(*args)),
+        )
+        affixes, warnings = parser._parse_affixes({
+            "equip_type": "雁南飞缚 | 胫甲",
+            "affix_gong": "劲 59.3",
+            "affix_shang": "",
+            "affix_jue": "相套装4/4",
+            "affix_zhi": "二件套[生效等级：105]",
+            "affix_yu": "外功防御 +53",
+        })
+
+        assert [affix.name for affix in affixes] == ["劲"]
+        assert warnings == ["词条商(affix_shang) 为空，后续 3 条已丢弃"]
+        assert log_warnings == []
+
     def test_original_mark_does_not_truncate_later_affixes(self, parser):
         """[原] 以前整条解析不出来，还会级联丢掉它后面的所有词条。"""
         affixes, warnings = parser._parse_affixes(_weapon_raw(

@@ -258,6 +258,39 @@ def _give_apk(dialog, tmp_path) -> Path:
     return apk
 
 
+def test_mobile_tool_exposes_device_scan_and_renames_health_tab(
+    qtbot, monkeypatch,
+):
+    dialog = _dialog(qtbot, monkeypatch)
+
+    labels = [dialog._tabs.tabText(i) for i in range(dialog._tabs.count())]
+    assert labels == ["安装", "设备扫描", "设备体检", "手势测试"]
+
+
+def test_local_device_discovery_refreshes_shared_device_selector(
+    qtbot, monkeypatch,
+):
+    dialog = _dialog(qtbot, monkeypatch)
+    scanned = []
+
+    monkeypatch.setattr(
+        "lvjiang.ui.mobile.device_scan.scan_and_connect_local",
+        lambda **_kwargs: scanned.append("local"),
+    )
+    monkeypatch.setattr(
+        "lvjiang.ui.mobile.device_scan.list_adb_devices",
+        lambda **_kwargs: [{"serial": "127.0.0.1:5555", "model": "Emulator"}],
+    )
+
+    dialog._device_scan_panel.scan_local_button.click()
+    qtbot.waitUntil(lambda: dialog._discovery_worker is None)
+
+    assert scanned == ["local"]
+    assert dialog._device_combo.currentData() == "127.0.0.1:5555"
+    assert dialog._device_scan_panel.result_list.topLevelItemCount() == 1
+    assert "已发现并连接 1 台设备" in dialog._device_scan_panel.status_label.text()
+
+
 def test_only_one_qr_and_it_defaults_to_the_online_source(qtbot, monkeypatch):
     """同一时刻只有一个码该被扫，默认是在线下载。
 

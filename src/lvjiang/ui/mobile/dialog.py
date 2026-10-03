@@ -1,4 +1,4 @@
-"""「移动设备」工具：装包、体检、手势实测。
+"""「移动设备」工具：装包、设备扫描、设备体检、手势实测。
 
 安卓侧的能力早就齐了——APK 随 Release 发布、输入时间线能在设备端编译成并发手势、
 设备端还一直在上报协议与权限状态——但软件里没有任何一处告诉用户这些东西存在：
@@ -56,6 +56,7 @@ from ...core.android.gesture_probe import (
 from ...core.update import get_version
 from ...i18n import tr
 from ..button_styles import apply_button_style
+from .device_scan import DeviceDiscoveryWorker, DeviceScanPanel
 from .diagnostics import build_checks, build_report, capability_notes
 from .qr_widget import QrCodeWidget
 
@@ -277,6 +278,7 @@ class MobileDeviceDialog(QDialog):
         self._agent_worker: _AgentWorker | None = None
         self._hash_worker: _HashWorker | None = None
         self._device_worker: _DeviceScanWorker | None = None
+        self._discovery_worker: DeviceDiscoveryWorker | None = None
         self._inspect_worker: _ApkInspectWorker | None = None
         self._install_worker: _AdbInstallWorker | None = None
         self._workers: set[QThread] = set()
@@ -309,7 +311,13 @@ class MobileDeviceDialog(QDialog):
 
         self._tabs = QTabWidget()
         self._tabs.addTab(self._build_install_tab(), tr("安装"))
-        self._tabs.addTab(self._build_health_tab(), tr("体检"))
+        self._device_scan_panel = DeviceScanPanel()
+        self._device_scan_panel.scan_requested.connect(
+            self._start_device_discovery)
+        self._device_scan_panel.cancel_requested.connect(
+            self._cancel_device_discovery)
+        self._tabs.addTab(self._device_scan_panel, tr("设备扫描"))
+        self._tabs.addTab(self._build_health_tab(), tr("设备体检"))
         self._tabs.addTab(self._build_gesture_tab(), tr("手势测试"))
         layout.addWidget(self._tabs, 1)
 
@@ -448,6 +456,9 @@ class MobileDeviceDialog(QDialog):
         return str(self._device_combo.currentData() or "")
 
     def _refresh_devices(self) -> None:
+        if self._discovery_worker is not None \
+                and self._discovery_worker.isRunning():
+            return
         if self._device_worker is not None and self._device_worker.isRunning():
             return
         previous = self._current_serial()
@@ -467,6 +478,12 @@ class MobileDeviceDialog(QDialog):
         self, devices: object, error: str, previous: str,
     ) -> None:
         self._device_worker = None
+        self._apply_device_list(devices, error, previous)
+
+    def _apply_device_list(
+        self, devices: object, error: str, previous: str,
+    ) -> None:
+        """更新全局设备选择；扫描 Tab 与普通枚举共用同一出口。"""
         self._device_combo.clear()
         device_list = devices if isinstance(devices, list) else []
         for item in device_list:
@@ -487,6 +504,50 @@ class MobileDeviceDialog(QDialog):
         self._device_combo.setEnabled(True)
         self._btn_rescan.setEnabled(True)
         self._refresh_install_state()
+
+    def _start_device_discovery(
+        self, mode: str, subnets: object,
+    ) -> None:
+        """扫描新的 ADB transport，但不改变主窗口的执行目标。"""
+        if self._discovery_worker is not None \
+                and self._discovery_worker.isRunning():
+            return
+        if self._device_worker is not None and self._device_worker.isRunning():
+            self._device_scan_panel.finish(
+                [], error=tr("正在刷新设备列表，请稍后重试"))
+            return
+        previous = self._current_serial()
+        self._btn_rescan.setEnabled(False)
+        selected = subnets if isinstance(subnets, list) else None
+        worker = DeviceDiscoveryWorker(mode, selected, self)
+        worker.progress.connect(self._device_scan_panel.update_progress)
+        worker.done.connect(
+            lambda devices, error, cancelled: self._on_device_discovery_done(
+                devices, error, cancelled, previous))
+        self._discovery_worker = worker
+        self._track_worker(worker)
+        worker.start()
+
+    def _cancel_device_discovery(self) -> None:
+        worker = self._discovery_worker
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+
+    def _on_device_discovery_done(
+        self,
+        devices: object,
+        error: str,
+        cancelled: bool,
+        previous: str,
+    ) -> None:
+        self._discovery_worker = None
+        device_list = devices if isinstance(devices, list) else []
+        self._device_scan_panel.finish(
+            device_list, error=error, cancelled=cancelled)
+        if not cancelled:
+            self._apply_device_list(device_list, error, previous)
+        else:
+            self._btn_rescan.setEnabled(True)
 
     # ─── 安装页 ──────────────────────────────────────────
 

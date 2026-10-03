@@ -185,6 +185,35 @@ class TestQuotaKeyDef:
         assert d["steps"] == [{"value": -900, "source": "导入消耗"}, -1100]
         assert d["sync_targets"] == [{"key": "stock:res", "source": "同步来源"}]
 
+    def test_to_dict_does_not_auto_compact_similar_rules(self):
+        kd = QuotaKeyDef(
+            key="k", label="l",
+            steps=[
+                StepDef(1, "其他任务"), StepDef(5, "其他任务"),
+                StepDef(1, "妙妙喵"), StepDef(5, "妙妙喵"),
+                StepDef(1, "限时活动"),
+            ],
+        )
+
+        assert kd.to_dict()["steps"] == [
+            {"value": 1, "source": "其他任务"},
+            {"value": 5, "source": "其他任务"},
+            {"value": 1, "source": "妙妙喵"},
+            {"value": 5, "source": "妙妙喵"},
+            {"value": 1, "source": "限时活动"},
+        ]
+
+    def test_to_dict_preserves_an_explicit_multi_value_group(self):
+        serialized = {
+            "values": [1, 5],
+            "sources": ["其他任务", "妙妙喵"],
+        }
+        steps = parse_steps([serialized])
+        kd = QuotaKeyDef(key="k", label="l", steps=steps)
+
+        assert kd.to_dict()["steps"] == [serialized]
+        assert parse_steps([serialized]) == kd.steps
+
     def test_to_dict_default_steps_not_output(self):
         """steps=[] 是默认值，不输出"""
         kd = QuotaKeyDef(key="k", label="l")
@@ -332,6 +361,18 @@ class TestStepDef:
     def test_parse_steps_mixed(self):
         steps = parse_steps([1, {"value": 2, "source": "同步"}])
         assert steps == [StepDef(1), StepDef(2, "同步")]
+
+    def test_parse_steps_expands_plural_values_and_sources(self):
+        steps = parse_steps([
+            {"values": [1, 5], "sources": ["其他任务", "妙妙喵"]},
+            {"value": -1, "sources": ["商店", "活动"]},
+        ])
+
+        assert steps == [
+            StepDef(1, "其他任务"), StepDef(5, "其他任务"),
+            StepDef(1, "妙妙喵"), StepDef(5, "妙妙喵"),
+            StepDef(-1, "商店"), StepDef(-1, "活动"),
+        ]
 
     @case_matrix("input", ["invalid", None])
     def test_parse_steps_non_list(self, input):

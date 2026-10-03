@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from ...core.profile.repository import db_count_history, db_get_history
@@ -42,6 +43,22 @@ from .settings_dialog import ProfileDefinitionDialog  # noqa: F401
 __all__ = ["HistoryDialog", "ask_value_dialog", "ProfileDefinitionDialog"]
 
 # ─── 历史记录对话框 ────────────────────────────────────────────
+
+#: 来源列至少要完整显示 9 个全角字，覆盖「限时活动：XXXX」这类取值。
+_SOURCE_CHARACTER_CAPACITY = 9
+#: 单元左右内边距与边框；不量进来的话文字会贴边或被省略号吃掉。
+_COLUMN_CHROME_WIDTH = 24
+
+
+def _cjk_column_width(widget: QWidget, characters: int) -> int:
+    """量出 N 个全角汉字所需的列宽（含单元留白）。
+
+    不写死像素宽：来源允许用户输入任意文本，同一个 9 字来源在 Windows 的 UI
+    字体下比别处宽。列宽不够时表格不会报错，只把「限时活动：XXXX」截成前半截，
+    让人以为来源本来就短。
+    """
+    metrics = widget.fontMetrics()
+    return metrics.horizontalAdvance("汉" * characters) + _COLUMN_CHROME_WIDTH
 
 
 class HistoryDialog(QDialog):
@@ -87,7 +104,10 @@ class HistoryDialog(QDialog):
             table.setColumnWidth(0, 140)
             header.setSectionResizeMode(
                 1, QHeaderView.ResizeMode.ResizeToContents)
-            for col, w in ((2, 60), (3, 70), (4, 70), (5, 100)):
+            for col, w in (
+                (2, 60), (3, 70), (4, 70),
+                (5, _cjk_column_width(table, _SOURCE_CHARACTER_CAPACITY)),
+            ):
                 header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
                 table.setColumnWidth(col, w)
             header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
@@ -248,13 +268,11 @@ def ask_value_dialog(
 
     if initial_value is not None:
         value_input.setText(str(initial_value) if is_float else str(int(initial_value)))
-    value_input.setPlaceholderText(tr("请输入数值"))
     layout.addRow(prompt, value_input)
 
     combo = QComboBox()
     combo.setEditable(True)
     combo.addItems(sources)
-    combo.setPlaceholderText(tr("选择或输入新{label}").format(label=source_label))
     layout.addRow(f"{source_label}:", combo)
 
     sync_check: QCheckBox | None = None

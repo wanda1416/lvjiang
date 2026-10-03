@@ -11,8 +11,7 @@ transmute_priority:
 - 最小外功攻击
 - 敏
 - 会心率
-- 最大无相攻击
-- 最大牵丝攻击
+- 最大本属攻击
 affix_pool:
 - 对玩家单位增效
 - 全武学增效
@@ -21,10 +20,8 @@ affix_pool:
 - 最小外功攻击
 - 敏
 - 会心率
-- 最大无相攻击
-- 最大牵丝攻击
-- 最小无相攻击
-- 最小牵丝攻击
+- 最大本属攻击
+- 最小本属攻击
 - 势
 patterns:
   主武器:
@@ -35,8 +32,8 @@ patterns:
     - count_max:
         symbols:
         - 会心率
-        - 最大无相攻击
-        - 最小无相攻击
+        - 最大本属攻击
+        - 最小本属攻击
         - 势
         max: 0
   副武器:
@@ -46,8 +43,8 @@ patterns:
     top_conditions:
     - - count_max:
           symbols:
-          - 最大无相攻击
-          - 最小无相攻击
+          - 最大本属攻击
+          - 最小本属攻击
           - 势
           max: 0
       - not_together:
@@ -65,8 +62,8 @@ patterns:
     top_conditions:
     - - count_max:
           symbols:
-          - 最大牵丝攻击
-          - 最小牵丝攻击
+          - 最大本属攻击
+          - 最小本属攻击
           - 势
           max: 0
       - not_together:
@@ -78,8 +75,8 @@ patterns:
     top_conditions:
     - count_max:
         symbols:
-        - 最大牵丝攻击
-        - 最小牵丝攻击
+        - 最大本属攻击
+        - 最小本属攻击
         - 势
         max: 0
   胫甲:
@@ -93,8 +90,8 @@ patterns:
     top_conditions:
     - - count_max:
           symbols:
-          - 最大牵丝攻击
-          - 最小牵丝攻击
+          - 最大本属攻击
+          - 最小本属攻击
           - 势
           max: 0
       - not_together:
@@ -105,19 +102,15 @@ common_conditions:
   - count_min:
       symbols:
       - 势
-      - 最大无相攻击
-      - 最大牵丝攻击
-      - 最小无相攻击
-      - 最小牵丝攻击
+      - 最大本属攻击
+      - 最小本属攻击
       min: 2
   normal_conditions:
   - - count_min:
         symbols:
         - 势
-        - 最大无相攻击
-        - 最大牵丝攻击
-        - 最小无相攻击
-        - 最小牵丝攻击
+        - 最大本属攻击
+        - 最小本属攻击
         min: 1
     - count_min:
         symbols:

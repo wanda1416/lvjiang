@@ -1237,8 +1237,9 @@ class GameConfigManager:
         return cfg.get("attr") if cfg else None
 
     def get_transmute_pool(self, school: str) -> list[str]:
-        """获取流派级转律词条库（顺序即转入优先级）
+        """获取展开为真实名称的流派转律词条库（顺序即转入优先级）
 
+        本属/外属按该词条库所属流派解析；编辑器直接读写原始配置。
         流派不存在或未配置（含自建未填的流派）时返回空列表，
         由调用方自行决定回退策略。
         """
@@ -1246,7 +1247,18 @@ class GameConfigManager:
         pool = cfg.get("transmute_pool") if cfg else None
         if not isinstance(pool, list):
             return []
-        return [str(name).strip() for name in pool if str(name).strip()]
+        from ..core.tuning_rules.models import (
+            DYNAMIC_AFFIXES,
+            dynamic_affix_map,
+            expand_affix_names,
+        )
+
+        names = [str(name).strip() for name in pool if str(name).strip()]
+        aliases = dynamic_affix_map(str(cfg.get("attr") or ""), game_config=self)
+        # 保留字面配置；动态项按词条库所属流派展开，不能按使用者流派展开。
+        physical = list(dict.fromkeys(
+            [name for name in names if name not in DYNAMIC_AFFIXES] + list(aliases)))
+        return expand_affix_names(names, physical, aliases)
 
     def get_all_transmute_pools(self) -> dict[str, list[str]]:
         """全部流派的转律词条库（流派名 → 词条列表，保持配置声明顺序）"""

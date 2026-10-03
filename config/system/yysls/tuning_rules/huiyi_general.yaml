@@ -17,8 +17,7 @@ transmute_priority:
 - 势
 - 劲
 - 会意率
-- 最大无相攻击
-- 最大鸣金攻击
+- 最大本属攻击
 - 会心率
 affix_pool:
 - 对首领单位增伤
@@ -27,8 +26,7 @@ affix_pool:
 - 势
 - 劲
 - 会意率
-- 最大无相攻击
-- 最大鸣金攻击
+- 最大本属攻击
 - 会心率
 - 精准率
 - 单体类奇术增伤
@@ -78,7 +76,7 @@ patterns:
           min: 2
       - count_max:
           symbols:
-          - 最大鸣金攻击
+          - 最大本属攻击
           max: 0
     - when:
         keep_danti: true
@@ -94,7 +92,7 @@ patterns:
           min: 2
       - count_max:
           symbols:
-          - 最大鸣金攻击
+          - 最大本属攻击
           max: 0
   胫甲:
     first:
@@ -138,7 +136,7 @@ patterns:
       - count_min:
           symbols:
           - 会意率
-          - 最大无相攻击
+          - 最大本属攻击
           min: 1
 common_conditions:
   junk_conditions:

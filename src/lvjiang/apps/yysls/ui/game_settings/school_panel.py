@@ -538,9 +538,20 @@ class SchoolPanel(QWidget):
         if not school:
             return
         from ...config import get_game_config
-        candidates = get_game_config().get_normal_affix_names()
+        from ...core.tuning_rules.models import DYNAMIC_AFFIXES, dynamic_affix_map
+
+        gc = get_game_config()
+        aliases = dynamic_affix_map(str((self._schools().get(school) or {}).get("attr") or ""))
+        # 编辑器保存动态表达；已有字面选择仍保留，取消/重开不改写配置。
+        selected = self._pool_names()
+        candidates = list(dict.fromkeys([
+            *DYNAMIC_AFFIXES[:2],
+            *(name for name in gc.get_normal_affix_names()
+              if aliases.get(name) not in DYNAMIC_AFFIXES[:2]),
+            *selected,
+        ])) if aliases else gc.get_normal_affix_names()
         dlg = AffixSelectSortDialog(
-            candidates, self._pool_names(),
+            candidates, selected,
             tr("选择转律词条库（{school}）").format(school=school), self)
         if dlg.exec():
             self._write_transmute_pool(school, dlg.selected())

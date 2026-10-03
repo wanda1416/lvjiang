@@ -140,6 +140,9 @@ class _DeviceWorker(QObject):
         if w <= 0 or h <= 0:
             self.error.emit(tr("无法获取设备分辨率"))
             return
+        # 在后台线程读取稳定身份，避免把无线 ADB 的 IP:端口当成目标主键，
+        # 也避免在主线程额外执行 adb shell。
+        device.get_stable_identity()
 
         # 设备端代理只负责输入手势；截图严格服从用户选择的 screencap / scrcpy。
         # 这样启用 Beta 输入通道不会暗中改变截图命令。
@@ -881,8 +884,7 @@ class WindowOpsMixin:
         d = self.window_combo.currentData()
         if not d:
             return
-        from .execution_targets import android_target_id
-        existing = self._execution_targets.get(android_target_id(d["serial"]))
+        existing = self._execution_targets.device(d["serial"])
         if existing is not None and existing.ready:
             self._execution_targets.select(existing.id)
             self._sync_active_target_compat()
@@ -948,7 +950,8 @@ class WindowOpsMixin:
         # 创建输入控制器：有设备端代理走无障碍手势，否则 adb shell input
         input_ctrl = create_input_backend(
             device=device, input_sim=self._user_config.input_sim, agent=agent)
-        target_id = android_target_id(combo_data["serial"])
+        identity = device.get_stable_identity()
+        target_id = android_target_id(identity.value)
 
         # scrcpy 模式下订阅帧回调，实现预览区实时视频流
         streaming = False
@@ -966,7 +969,8 @@ class WindowOpsMixin:
         device.resume_event = resume_event
         try:
             from ...core.app_controller import record_connected_android
-            app_info = record_connected_android(device, width=w, height=h)
+            app_info = record_connected_android(
+                device, width=w, height=h, target_id=target_id)
             if app_info.get("package"):
                 self.log_text.append(
                     f"[应用识别] {app_info['package']}/{app_info['activity']}")
@@ -978,11 +982,13 @@ class WindowOpsMixin:
         device.on_connection_lost = bridge.notify_lost
         device.stop_check = lambda: self._stop_requested
 
+        model = str(combo_data.get("model") or "").strip()
+        short_id = target_id.rsplit(":", 1)[-1][:6]
+        display_name = f"{model or tr('设备')} · {short_id}"
         target = ExecutionTarget(
             id=target_id,
             kind="adb",
-            display_name=(
-                combo_data.get("model") or combo_data["serial"]),
+            display_name=display_name,
             capture=capture,
             input_ctrl=input_ctrl,
             input_kind=str(getattr(input_ctrl, "kind", "") or ""),
@@ -995,6 +1001,10 @@ class WindowOpsMixin:
             streaming=streaming,
             resume_event=resume_event,
             connection_bridge=bridge,
+            metadata={
+                "device_identity_source": identity.source,
+                "device_identity_stable": identity.stable,
+            },
         )
         old = self._execution_targets.put(target)
         if old is not None:

@@ -1,9 +1,11 @@
 """统一任务历史与批量历史仓储测试。"""
+import sqlite3
 from datetime import datetime
 
 from loguru import logger
 
 from lvjiang.core.daily_history import (
+    CURRENT_SCHEMA_VERSION,
     BatchRunSession,
     TaskHistoryRepository,
     TaskRunSession,
@@ -18,6 +20,9 @@ def test_single_task_records_ids_params_result_and_log(tmp_path):
         username="用户甲", task_id="auto_tuning", task_name="自动调律",
         task_scope="dedicated", params={"slots": ["weapon"]},
         source="single", repository=repository,
+        target_id="android:device-a", target_kind="adb",
+        target_label="设备 A", environment="android", layout="default",
+        input_kind="agent",
         log_root=tmp_path / "logs" / "daily",
     )
 
@@ -34,6 +39,10 @@ def test_single_task_records_ids_params_result_and_log(tmp_path):
     assert record.task_scope == "dedicated"
     assert record.params == {"slots": ["weapon"]}
     assert record.status == "completed"
+    assert (record.target_id, record.target_kind, record.target_label) == (
+        "android:device-a", "adb", "设备 A")
+    assert (record.environment, record.layout, record.input_kind) == (
+        "android", "default", "agent")
     assert record.finished_at
     assert record.duration_ms >= 0
     assert record.result_path
@@ -45,6 +54,7 @@ def test_batch_id_links_all_task_run_ids_and_supports_drilldown(tmp_path):
     batch = BatchRunSession(
         config_name="双用户日常",
         input_snapshot={"rows": [{"user": "甲"}, {"user": "乙"}]},
+        target_id="window", target_kind="windows", target_label="游戏窗口",
         repository=repository,
     )
     first = TaskRunSession(
@@ -73,6 +83,8 @@ def test_batch_id_links_all_task_run_ids_and_supports_drilldown(tmp_path):
     assert len(batches) == 1
     assert batches[0].batch_run_id == batch.batch_run_id
     assert batches[0].task_count == 2
+    assert (batches[0].target_id, batches[0].target_kind) == (
+        "window", "windows")
     assert batches[0].input_snapshot["rows"][1]["user"] == "乙"
 
 
@@ -93,3 +105,39 @@ def test_user_task_and_date_filters_can_be_combined(tmp_path):
     )
 
     assert [(item.username, item.task_id) for item in records] == [("甲", "a")]
+
+
+def test_legacy_database_migrates_without_losing_records(tmp_path):
+    db_path = tmp_path / "legacy.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript("""
+            CREATE TABLE batch_runs (
+                batch_run_id TEXT PRIMARY KEY, config_name TEXT NOT NULL,
+                status TEXT NOT NULL, started_at TEXT NOT NULL,
+                finished_at TEXT NOT NULL DEFAULT '', duration_ms INTEGER NOT NULL DEFAULT 0,
+                input_snapshot_json TEXT NOT NULL DEFAULT '{}', report_path TEXT NOT NULL DEFAULT '',
+                error_message TEXT NOT NULL DEFAULT ''
+            );
+            CREATE TABLE task_runs (
+                task_run_id TEXT PRIMARY KEY, batch_run_id TEXT REFERENCES batch_runs(batch_run_id),
+                username TEXT NOT NULL, task_id TEXT NOT NULL, task_name TEXT NOT NULL,
+                task_scope TEXT NOT NULL, source TEXT NOT NULL, status TEXT NOT NULL,
+                started_at TEXT NOT NULL, finished_at TEXT NOT NULL DEFAULT '',
+                duration_ms INTEGER NOT NULL DEFAULT 0, params_json TEXT NOT NULL DEFAULT '{}',
+                result_path TEXT NOT NULL DEFAULT '', log_path TEXT NOT NULL DEFAULT '',
+                error_message TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO task_runs (
+                task_run_id, batch_run_id, username, task_id, task_name,
+                task_scope, source, status, started_at
+            ) VALUES ('legacy-run', NULL, '旧用户', 'old-task', '旧任务',
+                      'daily', 'single', 'completed', '2026-01-01T00:00:00');
+        """)
+
+    repository = TaskHistoryRepository(db_path)
+
+    assert repository.schema_version() == CURRENT_SCHEMA_VERSION
+    record = repository.list_task_runs()[0]
+    assert record.task_run_id == "legacy-run"
+    assert record.target_id == ""
+    assert record.target_kind == ""

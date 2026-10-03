@@ -861,7 +861,7 @@ class RunControlMixin:
 
     # ─── 自动化状态管理 ────────────────────────────────────
 
-    def _begin_automation(self, name: str) -> bool:
+    def _begin_automation(self, name: str, *, username: str = "") -> bool:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
         hk = self._user_config.hotkeys
         if self._running or (self._current_worker is not None and self._current_worker.isRunning()):
@@ -890,13 +890,28 @@ class RunControlMixin:
             self.statusBar().showMessage(aspect_error)
             self._show_workflow_start_error(aspect_error)
             return False
+        if target is None:
+            self._show_workflow_start_error(tr("当前没有可执行目标"))
+            return False
+        target_snapshot = target.snapshot()
+        run_username = str(
+            username or getattr(self, "_execution_username_snapshot", "") or "")
+        decision, run_context = self._run_manager.try_begin(
+            target=target_snapshot, username=run_username, name=name)
+        if run_context is None:
+            self.log_text.append(f"[拒绝] {decision.reason}")
+            self.statusBar().showMessage(decision.reason)
+            return False
+        self._current_run_context = run_context
+        run_context.lease = getattr(self, "_execution_lease", None)
         self._stop_requested = False
         self._run_state = "running"
         registry = getattr(self, "_execution_targets", None)
         self._running_target_id = (
             registry.active_target_id if registry is not None else None)
-        self._running_target_snapshot = (
-            target.snapshot() if target is not None else None)
+        self._running_target_snapshot = target_snapshot
+        from .execution_runs import RunState
+        self._run_manager.set_state(run_context.task_run_id, RunState.RUNNING)
         # 暂停事件：set=运行，clear=暂停阻塞
         signal = getattr(self, "_pause_acknowledged", None)
         notify = signal.emit if signal is not None else self._on_pause_acknowledged
@@ -989,16 +1004,37 @@ class RunControlMixin:
             tolerance=f"{layout.aspect_tolerance * 100:.2f}%",
         )
 
-    def _end_automation(self, name: str):
+    def _end_automation(self, name: str, *, run_context=None):
         """结束自动化，恢复 UI 状态。由工作流线程实际结束后调用。"""
+        context = run_context or getattr(self, "_current_run_context", None)
+        is_current = context is getattr(self, "_current_run_context", None)
+        was_stopped = (
+            context.stop_event.is_set() if context is not None
+            else self._stop_requested
+        )
         stop_dialog = getattr(self, "_stop_confirmation_dialog", None)
-        if stop_dialog is not None:
+        if is_current and stop_dialog is not None:
             stop_dialog.reject()
-        helper = getattr(self, "_ui_helper", None)
+        helper = (
+            context.ui_helper if context is not None
+            else getattr(self, "_ui_helper", None)
+        )
         if helper is not None:
             helper.close_active_dialog()
             helper.deleteLater()
-            self._ui_helper = None
+            if getattr(self, "_ui_helper", None) is helper:
+                self._ui_helper = None
+            if context is not None:
+                context.ui_helper = None
+        if context is not None:
+            from .execution_runs import RunState
+            self._run_manager.finish(
+                context.task_run_id,
+                RunState.INTERRUPTED if was_stopped else RunState.COMPLETED,
+            )
+        if not is_current:
+            logger.info(f"后台运行实例结束: {name}")
+            return
         self._stop_requested = False
         self._run_state = "idle"
         # 确保 pause_event 为 set 状态，避免下次启动阻塞
@@ -1006,6 +1042,8 @@ class RunControlMixin:
         if pause_event is not None:
             pause_event.set()
         self._current_worker = None
+        if context is not None:
+            self._current_run_context = None
         self._running_target_id = None
         self._running_target_snapshot = None
         self._set_context_controls_locked(LOCK_REASON_BATCH, False)
@@ -1036,6 +1074,9 @@ class RunControlMixin:
 
     def _is_stopped(self) -> bool:
         """工作流回调：检查是否请求了停止"""
+        run_context = getattr(self, "_current_run_context", None)
+        if run_context is not None:
+            return run_context.stop_event.is_set()
         return self._stop_requested
 
     def _resolve_dsl_workflow_path(self, flow_cfg: dict) -> Path | None:
@@ -1082,7 +1123,7 @@ class RunControlMixin:
             tr("用户正在执行任务"), message,
         )
 
-    def _create_ui_callback(self):
+    def _create_ui_callback(self, run_context=None):
         """创建线程安全的任务交互回调。
 
         _UIHelper 常驻主线程并只展示非模态窗口；工作流线程用
@@ -1092,12 +1133,20 @@ class RunControlMixin:
         """
         import threading
 
-        helper = _UIHelper(self, stop_check=self._is_stopped)
+        context = run_context or getattr(self, "_current_run_context", None)
+        stop_check = (
+            context.stop_event.is_set if context is not None
+            else self._is_stopped
+        )
+        helper = _UIHelper(self, stop_check=stop_check)
+        if context is not None:
+            context.ui_helper = helper
+        # 迁移期兼容仍依赖当前运行实例的旧消费者；并发开放前会删除。
         self._ui_helper = helper
 
         def callback(action: str, **kwargs):
             # 工作流在 F10 后才走到交互语句时直接取消，不再投递弹窗。
-            if self._is_stopped():
+            if stop_check():
                 return None
             done_event = threading.Event()
             req = {"action": action, "kwargs": kwargs,
@@ -1121,6 +1170,9 @@ class RunControlMixin:
             return
         was_paused = self._run_state in ('paused', STATE_PAUSING)
         self._stop_requested = True
+        run_context = getattr(self, "_current_run_context", None)
+        if run_context is not None:
+            run_context.stop_event.set()
         self._run_state = STATE_STOPPING
         # 先刷按钮再做日志、唤醒和对话框收尾，避免日志控件重排等
         # 工作让用户产生「没点到」的感觉。
@@ -1134,7 +1186,10 @@ class RunControlMixin:
         self.log_text.append(tr("[操作] 收到停止请求"))
         logger.info("收到停止请求")
         # 若工作流正阻塞在交互对话框上，主动关闭以便停止生效
-        helper = self._ui_helper
+        helper = (
+            run_context.ui_helper if run_context is not None
+            else self._ui_helper
+        )
         if helper is not None:
             helper.close_active_dialog()
         # 若工作流正阻塞在 ADB 断连等待上，唤醒以便响应停止
@@ -1417,8 +1472,12 @@ class RunControlMixin:
             self.log_text.append(tr("[错误] 请选择有效的执行用户"))
             return
 
-        if not self._begin_automation(flow_name):
+        if not self._begin_automation(flow_name, username=username):
             return
+
+        run_context = self._current_run_context
+        assert run_context is not None
+        stop_check = run_context.stop_event.is_set
 
         layout_name = self.layout_combo.currentData()
         layout = self._layout_manager.load_layout(layout_name)
@@ -1457,14 +1516,14 @@ class RunControlMixin:
             run_env=current_env,
             window_left=window_left,
             window_top=window_top,
-            stop_check=self._is_stopped,
+            stop_check=stop_check,
             pause_event=self._pause_event,
         ).build()
         # session/context 初始化：启动时快照执行用户，全程只依赖此绑定值
         self._bind_engine_user(engine, username)
         from ...core.config.wf_configs import get_wf_config
         engine.workflow_config_snapshot = get_wf_config(flow_id)
-        engine._ui_callback = self._create_ui_callback()
+        engine._ui_callback = self._create_ui_callback(run_context)
         engine.window_rebind_hook = self._on_target_window_rebound
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
@@ -1494,15 +1553,15 @@ class RunControlMixin:
             from ...workflows.implementations import get_workflow_class
             wf_class = get_workflow_class(wf_class_name)
             wf_instance = wf_class(
-                capture=self._capture,
+                capture=target_snapshot.capture,
                 ocr=self._ocr,
-                input_ctrl=self._input,
+                input_ctrl=target_snapshot.input_ctrl,
                 layout=layout,
                 input_sim=self._user_config.input_sim,
                 delay_params=self._user_config.delay_params,
                 window_left=window_left,
                 window_top=window_top,
-                stop_check=self._is_stopped,
+                stop_check=stop_check,
                 pause_event=self._pause_event,
             )
             self._start_workflow(
@@ -1530,21 +1589,40 @@ class RunControlMixin:
         task_scope: str = "daily",
     ):
         """启动工作流线程"""
+        run_context = getattr(self, "_current_run_context", None)
+        if run_context is None:
+            raise RuntimeError("工作流启动时缺少运行上下文")
         task_run = None
         if record_history:
             from ...core.daily_history import try_create_task_run
+            target = run_context.target_snapshot
+            target_kwargs = {
+                "target_id": target.id,
+                "target_kind": target.kind,
+                "target_label": target.display_name,
+                "environment": self._selected_run_env(),
+                "layout": str(self.layout_combo.currentData() or ""),
+                "input_kind": target.input_kind,
+            }
             task_run = try_create_task_run(
                 username=username or "default", task_id=flow_id,
                 task_name=flow_name, task_scope=task_scope,
-                params=params if params is not None else {}, source="single")
-        lease = getattr(self, "_execution_lease", None)
+                params=params if params is not None else {}, source="single",
+                task_run_id=run_context.task_run_id,
+                **target_kwargs)
+        lease = run_context.lease
         def execute_authorized():
             if lease is None:
                 return workflow_fn()
             with lease.authorized():
                 return workflow_fn()
         worker = WorkflowWorker(flow_id, execute_authorized, task_run=task_run)
-        worker.finished.connect(self._on_workflow_finished)
+        run_context.worker = worker
+        run_context.engine = getattr(self, "_current_engine", None)
+        worker.finished.connect(
+            lambda run_id=run_context.task_run_id:
+            self._on_workflow_finished(run_id)
+        )
         self._current_worker = worker  # type: ignore[assignment]  # 保持引用防止被垃圾回收
         # 在 worker 上附加 flow_name 以便日志显示
         worker._flow_name = flow_name
@@ -1556,11 +1634,12 @@ class RunControlMixin:
         self._execution_started = True
 
     @guarded_finish
-    def _on_workflow_finished(self):
+    def _on_workflow_finished(self, task_run_id: str):
         """线程退出后的工作流完成回调（在主线程执行）。"""
-        worker = self.sender()
+        run_context = self._run_manager.run(task_run_id)
+        worker = run_context.worker if run_context is not None else None
         if not isinstance(worker, WorkflowWorker):
-            logger.error("工作流完成信号来源不是 WorkflowWorker")
+            logger.error(f"工作流完成时找不到运行实例: {task_run_id}")
             return
         flow_id = worker.flow_id
         result_or_exception = worker.result_or_exception
@@ -1572,7 +1651,7 @@ class RunControlMixin:
             result_path = self._save_workflow_result(flow_id, {
                 "error": str(result_or_exception),
                 "exception_type": type(result_or_exception).__name__,
-            })
+            }, task_run_id=task_run_id, run_context=run_context)
             self._finish_task_run(
                 worker, status="failed", result_path=result_path,
                 error_message=str(result_or_exception))
@@ -1583,21 +1662,24 @@ class RunControlMixin:
             if isinstance(result, dict) and result.get("error"):
                 self.log_text.append(f"[错误] {flow_name}: {result['error']}")
                 logger.error(f"工作流 {flow_id} 启动被拒绝: {result['error']}")
-                result_path = self._save_workflow_result(flow_id, result)
+                result_path = self._save_workflow_result(
+                    flow_id, result,
+                    task_run_id=task_run_id, run_context=run_context)
                 self._finish_task_run(
                     worker, status="failed", result_path=result_path,
                     error_message=str(result["error"]))
                 return
-            interrupted = self._stop_requested
+            interrupted = run_context.stop_event.is_set()
             if interrupted:
                 # 中途停止（F10）是常态（如自动调律），已收集的结果
                 # 照常落盘输出；仅不保存 session（中断点状态不完整）
                 self.log_text.append(f"[已停止] {flow_name}流程被用户中断")
             else:
                 # 正常结束 → 自动保存 session
-                self._auto_save_session()
+                self._auto_save_session(run_context)
             result_path = self._save_workflow_result(
-                flow_id, result, interrupted=interrupted)
+                flow_id, result, interrupted=interrupted,
+                task_run_id=task_run_id, run_context=run_context)
             self._finish_task_run(
                 worker,
                 status="interrupted" if interrupted else "completed",
@@ -1618,13 +1700,24 @@ class RunControlMixin:
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"任务历史收尾失败，继续退出任务: {exc}")
 
-    def _auto_save_session(self):
+    @staticmethod
+    def _worker_task_run_id(worker) -> str:
+        task_run = getattr(worker, "task_run", None)
+        return str(getattr(task_run, "task_run_id", "") or "")
+
+    def _auto_save_session(self, run_context=None):
         """正常结束时自动保存 session（存入启动时绑定的用户名）"""
-        engine = self._current_engine
+        engine = (
+            run_context.engine if run_context is not None
+            else self._current_engine
+        )
         if engine is not None and engine.run_username:
             self._session_manager.save(engine.run_username, engine.session)
 
-    def _save_workflow_result(self, flow_id: str, result, interrupted: bool = False):
+    def _save_workflow_result(
+        self, flow_id: str, result, interrupted: bool = False,
+        task_run_id: str = "", run_context=None,
+    ):
         """保存工作流结果到 local/output/{username}/{flow_id}_{timestamp}.json
 
         中断（F10）的部分结果同样落盘，文件名带 _interrupted 后缀；
@@ -1636,14 +1729,19 @@ class RunControlMixin:
             serializable = _to_serializable(result)
             from ...constants import OUTPUT_DIR
             # 输出目录归属启动时绑定的用户名，不受运行期间 UI 切换影响
-            engine = self._current_engine
+            engine = (
+                run_context.engine if run_context is not None
+                else self._current_engine
+            )
             username = (engine.run_username if engine is not None else "") or "default"
             user_output_dir = OUTPUT_DIR / username
             user_output_dir.mkdir(parents=True, exist_ok=True)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             suffix = "_interrupted" if interrupted else ""
-            save_path = user_output_dir / f"{flow_id}_{timestamp}{suffix}.json"
+            run_suffix = f"_{task_run_id}" if task_run_id else ""
+            save_path = user_output_dir / (
+                f"{flow_id}_{timestamp}{run_suffix}{suffix}.json")
             save_path.write_text(
                 json.dumps(serializable, ensure_ascii=False, indent=2),
                 encoding="utf-8",
@@ -1781,8 +1879,11 @@ class RunControlMixin:
                 self.log_text.append(tr("[错误] 请先定位窗口"))
             return
 
-        if not self._begin_automation(flow_name):
+        if not self._begin_automation(flow_name, username=username):
             return
+        run_context = self._current_run_context
+        assert run_context is not None
+        stop_check = run_context.stop_event.is_set
 
         layout_name = self.layout_combo.currentData()
         layout = self._layout_manager.load_layout(layout_name)
@@ -1816,14 +1917,14 @@ class RunControlMixin:
             run_env=self._selected_run_env(),
             window_left=window_left,
             window_top=window_top,
-            stop_check=self._is_stopped,
+            stop_check=stop_check,
             pause_event=self._pause_event,
         ).build()
         engine.window_rebind_hook = self._on_target_window_rebound
         self._bind_engine_user(engine, username)
         from ...core.config.wf_configs import get_wf_config
         engine.workflow_config_snapshot = get_wf_config(impl_name)
-        engine._ui_callback = self._create_ui_callback()
+        engine._ui_callback = self._create_ui_callback(run_context)
         self._current_engine = engine  # type: ignore[assignment]
         from ...workflows.implementations import get_workflow_class
         wf_class = get_workflow_class(impl_name)
@@ -1836,7 +1937,7 @@ class RunControlMixin:
             delay_params=self._user_config.delay_params,
             window_left=window_left,
             window_top=window_top,
-            stop_check=self._is_stopped,
+            stop_check=stop_check,
             pause_event=self._pause_event,
         )
 

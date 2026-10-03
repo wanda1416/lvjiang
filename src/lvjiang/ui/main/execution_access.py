@@ -49,19 +49,31 @@ def guarded_launch(method=None, *, user_selector: str | None = None):
 def guarded_finish(method):
     @wraps(method)
     def finish(self, *args, **kwargs):
-        lease = getattr(self, "_execution_lease", None)
+        task_run_id = str(args[0] if args else kwargs.get("task_run_id", ""))
+        manager = getattr(self, "_run_manager", None)
+        run_context = manager.run(task_run_id) if manager is not None else None
+        lease = (
+            run_context.lease if run_context is not None
+            else getattr(self, "_execution_lease", None)
+        )
         try:
             with lease.authorized() if lease is not None else nullcontext():
                 return method(self, *args, **kwargs)
         except Exception as exc:
             self.log_text.append(f"[错误] 执行收尾或保存失败: {exc}")
-            worker = self.sender()
+            worker = run_context.worker if run_context is not None else self.sender()
             self._finish_task_run(worker, status="failed", error_message=str(exc))
         finally:
             try:
-                self._end_automation("工作流")
+                if run_context is None:
+                    self._end_automation("工作流")
+                else:
+                    self._end_automation("工作流", run_context=run_context)
             finally:
                 if lease is not None:
                     lease.release()
-                    self._execution_lease = None
+                    if getattr(self, "_execution_lease", None) is lease:
+                        self._execution_lease = None
+                    if run_context is not None:
+                        run_context.lease = None
     return finish

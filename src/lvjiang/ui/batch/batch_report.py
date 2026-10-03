@@ -89,11 +89,13 @@ class BatchReport:
         scripts: list[tuple[str, str]],   # [(id, name), ...]
         workflows: dict[str, str],         # 生命周期 wf
         total_rows: int = 0,
+        batch_run_id: str = "",
     ):
         self._config_name = config_name
         self._scripts = scripts
         self._workflows = workflows
         self._total_rows = total_rows
+        self._batch_run_id = batch_run_id
 
         self._start_time: datetime | None = None
         self._end_time: datetime | None = None
@@ -169,7 +171,8 @@ class BatchReport:
 
         BATCH_REPORT_DIR.mkdir(parents=True, exist_ok=True)
         ts = self._start_time.strftime("%Y%m%d_%H%M%S")
-        path = BATCH_REPORT_DIR / f"批量报告_{ts}.md"
+        run_suffix = f"_{self._batch_run_id}" if self._batch_run_id else ""
+        path = BATCH_REPORT_DIR / f"批量报告_{ts}{run_suffix}.md"
         path.write_text(self.render(), encoding="utf-8")
         return path
 

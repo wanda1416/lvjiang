@@ -139,6 +139,11 @@ class BatchContext:
     ocr: object
     input_ctrl: object
     layout: object
+    target_id: str = ""
+    target_kind: str = ""
+    target_label: str = ""
+    input_kind: str = ""
+    layout_name: str = ""
     run_env: str = ""
     input_sim: object | None = None
     delay_params: dict | None = None
@@ -227,6 +232,21 @@ class BatchWorker(QThread):
         self._unattended_hit = ""
         self._build_execution_plan()
 
+    def _history_target_kwargs(self) -> dict[str, str]:
+        return {
+            "target_id": self._ctx.target_id,
+            "target_kind": self._ctx.target_kind,
+            "target_label": self._ctx.target_label,
+        }
+
+    def _task_history_target_kwargs(self) -> dict[str, str]:
+        return {
+            **self._history_target_kwargs(),
+            "environment": self._ctx.run_env,
+            "layout": self._ctx.layout_name,
+            "input_kind": self._ctx.input_kind,
+        }
+
     def _build_execution_plan(self) -> None:
         """在工作线程启动前冻结全部任务参数和用户配置。"""
         from ...core.config.wf_configs import get_wf_config
@@ -312,6 +332,7 @@ class BatchWorker(QThread):
         from ...core.daily_history import try_create_batch_run
         batch_run = try_create_batch_run(
             config_name=self._spec.name,
+            **self._history_target_kwargs(),
             input_snapshot={
                 "usernames": list(self._usernames),
                 "scripts": [
@@ -367,6 +388,7 @@ class BatchWorker(QThread):
             workflows=(self._spec.workflows.to_dict()
                        if use_lifecycle else {}),
             total_rows=total,
+            batch_run_id=batch_run_id,
         )
         report.start_batch()
 
@@ -541,6 +563,7 @@ class BatchWorker(QThread):
                     params=params, source="batch", batch_run_id=batch_run_id,
                     repository=(batch_run.repository
                                 if batch_run is not None else None),
+                    **self._task_history_target_kwargs(),
                 )
                 try:
                     capture = (task_run.capture_logs()
@@ -707,6 +730,7 @@ class BatchWorker(QThread):
         unit_key = self._spec.execution_unit_key
         batch_run = try_create_batch_run(
             config_name=self._spec.name,
+            **self._history_target_kwargs(),
             input_snapshot={
                 "execution_unit_key": unit_key,
                 "units": copy.deepcopy(self._unit_members),
@@ -729,6 +753,7 @@ class BatchWorker(QThread):
             scripts=[(s.id, s.name) for s in self._scripts],
             workflows=self._spec.workflows.to_dict(),
             total_rows=len(self._usernames) * self._spec.rounds,
+            batch_run_id=batch_run_id,
         )
         report.start_batch()
         batch_state: dict = {}
@@ -891,6 +916,7 @@ class BatchWorker(QThread):
                                 batch_run_id=batch_run_id,
                                 repository=(batch_run.repository
                                             if batch_run is not None else None),
+                                **self._task_history_target_kwargs(),
                             )
                             if check_run is not None:
                                 try:
@@ -911,6 +937,7 @@ class BatchWorker(QThread):
                             batch_run_id=batch_run_id,
                             repository=(batch_run.repository
                                         if batch_run is not None else None),
+                            **self._task_history_target_kwargs(),
                         )
                         try:
                             capture = (task_run.capture_logs()

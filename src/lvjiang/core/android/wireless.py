@@ -21,7 +21,12 @@ from typing import NamedTuple
 
 from loguru import logger
 
-from ..platforms import SUBPROCESS_NO_WINDOW, adb_path_candidates
+from ..platforms import (
+    SUBPROCESS_NO_WINDOW,
+    SUBPROCESS_TEXT,
+    SUBPROCESS_TEXT_OEM,
+    adb_path_candidates,
+)
 
 
 def resolve_adb() -> str:
@@ -47,7 +52,8 @@ def run_adb(adb: str, *args: str, timeout: float = 10) -> str:
     """执行 adb 命令，返回 stdout"""
     r = subprocess.run(
         [adb, *args],
-        capture_output=True, text=True, timeout=timeout, **SUBPROCESS_NO_WINDOW,
+        capture_output=True, timeout=timeout,
+        **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
     )
     return r.stdout.strip()
 
@@ -88,8 +94,8 @@ def _enumerate_local_ips() -> list[str]:
     if os.name == "nt":
         try:
             out = subprocess.run(
-                ["ipconfig"], capture_output=True, text=True,
-                timeout=5, **SUBPROCESS_NO_WINDOW,
+                ["ipconfig"], capture_output=True, timeout=5,
+                **SUBPROCESS_TEXT_OEM, **SUBPROCESS_NO_WINDOW,
             ).stdout
             for m in re.finditer(r"IPv4.*?:\s*(\d+\.\d+\.\d+\.\d+)", out):
                 ip = m.group(1)
@@ -154,8 +160,8 @@ def _iter_windows_interfaces() -> list[tuple[str, str]]:
     """解析 ipconfig 输出，返回 [(适配器名, IPv4), ...]"""
     try:
         out = subprocess.run(
-            ["ipconfig"], capture_output=True, text=True,
-            timeout=5, encoding="utf-8", errors="ignore", **SUBPROCESS_NO_WINDOW,
+            ["ipconfig"], capture_output=True, timeout=5,
+            **SUBPROCESS_TEXT_OEM, **SUBPROCESS_NO_WINDOW,
         ).stdout
     except Exception:
         return []
@@ -177,7 +183,7 @@ def _iter_unix_interfaces() -> list[tuple[str, str]]:
     for cmd in (["ip", "-4", "-o", "addr", "show"], ["ifconfig"]):
         try:
             out = subprocess.run(
-                [*cmd], capture_output=True, text=True, timeout=5,
+                [*cmd], capture_output=True, timeout=5, **SUBPROCESS_TEXT,
             ).stdout
         except Exception:
             continue
@@ -359,7 +365,8 @@ def connect_wireless(adb: str, ip: str, port: int, timeout: float = 5) -> bool:
     try:
         out = subprocess.run(
             [adb, "connect", target],
-            capture_output=True, text=True, timeout=timeout, **SUBPROCESS_NO_WINDOW,
+            capture_output=True, timeout=timeout,
+        **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
         ).stdout.strip()
         return "connected" in out.lower()
     except Exception:
@@ -397,7 +404,8 @@ def get_device_ip(adb: str, serial: str) -> str | None:
         try:
             out = subprocess.run(
                 [adb, "-s", serial, *cmd_args],
-                capture_output=True, text=True, timeout=5, **SUBPROCESS_NO_WINDOW,
+                capture_output=True, timeout=5,
+                **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
             ).stdout
             m = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)", out)
             if m:

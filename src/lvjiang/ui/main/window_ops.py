@@ -331,6 +331,31 @@ class WindowOpsMixin:
     def _active_execution_target(self):
         return self._execution_targets.active()
 
+    def _set_locate_enabled(self, enabled: bool) -> None:
+        """记录「候选侧是否允许定位」，并与运行锁取与后落到按钮上。
+
+        定位按钮原来由扫描流程的六处 setEnabled 各自决定，运行锁再往里插一处
+        就会互相覆盖——扫描结束把它打开，任务还在跑；任务结束把它打开，可是
+        下拉框里一个候选都没有。所以候选侧的意图单独存一份，真正的可用性由
+        这里统一算。
+        """
+        self._locate_allowed_by_candidate = enabled
+        self._apply_locate_lock()
+
+    def _apply_locate_lock(self) -> None:
+        """运行中禁止定位/连接：只能扫描，不能改变连接拓扑。
+
+        定位会替换窗口目标并 dispose 旧目标，而旧目标的 capture 正是运行中引擎
+        持有的那一个（快照存的是同一个对象引用），stop 掉它等于把正在跑的任务
+        的截图通道拆了。ADB 候选也走这个按钮，顺带堵住「点已连接设备把执行目标
+        切走」。
+        """
+        allowed = getattr(self, "_locate_allowed_by_candidate", False)
+        running = bool(getattr(self, "_running", False))
+        self.btn_locate.setEnabled(allowed and not running)
+        self.btn_locate.setToolTip(
+            tr("任务运行中不能定位或连接，请先停止任务") if running else "")
+
     def _sync_active_target_compat(self) -> None:
         """把当前执行目标投影到既有单目标字段。
 
@@ -627,7 +652,7 @@ class WindowOpsMixin:
 
         self._apply_backend_ui("windows")
 
-        self.btn_locate.setEnabled(False)
+        self._set_locate_enabled(False)
         self.statusBar().showMessage(tr("正在扫描窗口..."))
 
         from ...core.desktop import list_visible_windows
@@ -660,12 +685,12 @@ class WindowOpsMixin:
             self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，未匹配到关键字「{keyword}」")
         else:
             self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，请下拉选择目标窗口")
-        self.btn_locate.setEnabled(True)
+        self._set_locate_enabled(True)
         self.statusBar().showMessage(tr("已扫描窗口 | 请下拉选择目标窗口并点击定位"))
 
     def _on_window_selected(self, index):
         """下拉框选择了某项时，启用定位按钮"""
-        self.btn_locate.setEnabled(index >= 0)
+        self._set_locate_enabled(index >= 0)
 
     # ─── ADB 设备扫描/连接 ─────────────────────────────────
 
@@ -680,7 +705,7 @@ class WindowOpsMixin:
 
         self._apply_backend_ui("adb")
 
-        self.btn_locate.setEnabled(False)
+        self._set_locate_enabled(False)
         self.btn_scan_window.setEnabled(False)
         self.btn_scan_device.setEnabled(True)
         self.btn_scan_device.setText(tr("取消扫描"))
@@ -715,7 +740,7 @@ class WindowOpsMixin:
         for d in devices:
             label = d["serial"] + (f"  ({d['model']})" if d["model"] else "")
             self.window_combo.addItem(label, d)
-        self.btn_locate.setEnabled(True)
+        self._set_locate_enabled(True)
         self.log_text.append(f"[扫描] 找到 {len(devices)} 台设备，请选择并点击连接")
         self.statusBar().showMessage(tr("已扫描设备 | 请选择设备并点击连接"))
 
@@ -881,7 +906,7 @@ class WindowOpsMixin:
         for d in devices:
             label = d["serial"] + (f"  ({d['model']})" if d.get("model") else "")
             self.window_combo.addItem(label, d)
-        self.btn_locate.setEnabled(True)
+        self._set_locate_enabled(True)
         self.log_text.append(f"[扫描] 发现 {len(devices)} 台设备，请选择并点击连接")
         self.statusBar().showMessage(f"已发现 {len(devices)} 台设备 | 请选择并点击连接")
 
@@ -938,7 +963,7 @@ class WindowOpsMixin:
 
         # UI 进入连接中状态
         if update_candidate_ui:
-            self.btn_locate.setEnabled(False)
+            self._set_locate_enabled(False)
             self.btn_locate.setText(tr("连接中..."))
         self.statusBar().showMessage(tr("正在连接设备..."))
 
@@ -1050,7 +1075,7 @@ class WindowOpsMixin:
             (hk.start, tr("开始")), (hk.stop, tr("停止"))))
         if update_candidate_ui:
             self.btn_locate.setText(tr("连接"))
-            self.btn_locate.setEnabled(True)
+            self._set_locate_enabled(True)
         self._refresh_execution_targets_ui()
         self._refresh_active_target_ui()
         self._refresh_run_button()
@@ -1066,7 +1091,7 @@ class WindowOpsMixin:
         self.statusBar().showMessage(tr("连接失败 | 详见日志"))
         if update_candidate_ui:
             self.btn_locate.setText(tr("连接"))
-            self.btn_locate.setEnabled(True)
+            self._set_locate_enabled(True)
 
     def _stop_capture_backend(self):
         """停止并丢弃当前截图后端（桌面/ADB/scrcpy 共用）。"""
@@ -1357,6 +1382,12 @@ class WindowOpsMixin:
 
     def _on_locate_window(self):
         """连接当前候选；窗口单例替换，Android 按 serial 累加。"""
+        if self._running:
+            # 按钮已经禁用，但扫描里的「按窗口标题自动定位」是直接调本方法，
+            # 不经过按钮；少了这道判定就还是会把运行中引擎的截图通道拆掉。
+            self.log_text.append(
+                tr("[提示] 任务运行中不能定位或连接，请先停止任务"))
+            return
         if self._candidate_backend == "adb":
             self._on_connect_device()
             return

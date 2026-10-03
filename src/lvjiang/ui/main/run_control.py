@@ -1732,6 +1732,10 @@ class RunControlMixin:
         if disconnect is not None:
             disconnect.setEnabled(
                 not self._running and self._current_execution_target() is not None)
+        # 运行中只许扫描、不许定位/连接：定位会替换窗口目标并 stop 掉旧目标的
+        # capture，而那正是运行中引擎持有的同一个对象
+        if hasattr(self, "_apply_locate_lock"):
+            self._apply_locate_lock()
         # 任务开始/结束/暂停恢复都会走到这里：顺带刷新"后台模式"开关的锁定态
         # （定位后可自由切换，仅任务运行期间锁定）
         if hasattr(self, "_refresh_bg_mode_lock"):

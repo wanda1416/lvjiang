@@ -12,6 +12,7 @@
 """
 
 import pytest
+from PyQt6 import sip
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QWidget
 
@@ -82,3 +83,27 @@ def test_repeat_open_reuses_the_same_window(qtbot):
     first = host._show_modeless_tool("probe", lambda: QDialog(host))
     second = host._show_modeless_tool("probe", lambda: QDialog(host))
     assert first is second
+
+
+def test_mobile_device_can_reopen_after_qt_deletes_dialog(qtbot, monkeypatch):
+    """关闭移动设备窗口后，菜单二次进入必须创建新实例而非访问失效包装。"""
+    import lvjiang.ui.mobile as mobile_module
+
+    class _MobileDialog(QDialog):
+        def __init__(self, host, parent=None):
+            super().__init__(parent)
+            self.host = host
+
+    monkeypatch.setattr(mobile_module, "MobileDeviceDialog", _MobileDialog)
+    host = _host(qtbot)
+
+    host._open_mobile_device()
+    first = host._modeless_tool_windows["mobile_device"]
+    first.close()
+    qtbot.waitUntil(lambda: sip.isdeleted(first))
+
+    host._open_mobile_device()
+    second = host._modeless_tool_windows["mobile_device"]
+
+    assert second is not first
+    assert second.isVisible()

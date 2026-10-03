@@ -7,10 +7,11 @@ APK 只出现在 GitHub 的 Release 页，手势探针只有命令行，status �
 """
 from __future__ import annotations
 
+from html import escape
 from pathlib import Path
 
 from loguru import logger
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -32,7 +33,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ...core.android.agent import PROTOCOL_VERSION, connect_agent
+from ...core.android.agent import PROTOCOL_VERSION, connect_agent_diagnostic
 from ...core.android.apk_release import (
     ApkDownloadError,
     ApkFile,
@@ -75,6 +76,7 @@ class _DownloadWorker(QThread):
 
     def cancel(self) -> None:
         self._cancelled = True
+        self.requestInterruption()
 
     def run(self) -> None:
         try:
@@ -98,7 +100,7 @@ class _HashWorker(QThread):
     放在界面线程里，否则一打开对话框就卡住。
     """
 
-    done = pyqtSignal(str, object)  # sha256, verified: bool | None
+    done = pyqtSignal(str, str, object)  # path, sha256, verified: bool | None
 
     def __init__(self, path: Path, version: str, parent=None):
         super().__init__(parent)
@@ -110,11 +112,87 @@ class _HashWorker(QThread):
             digest = file_sha256(self._path)
         except OSError as exc:
             logger.warning(f"计算 APK 哈希失败: {exc}")
-            self.done.emit("", None)
+            self.done.emit(str(self._path), "", None)
+            return
+        if self.isInterruptionRequested():
+            self.done.emit(str(self._path), "", None)
             return
         expected = fetch_expected_sha256(self._version)
         self.done.emit(
-            digest, None if expected is None else digest == expected)
+            str(self._path), digest,
+            None if expected is None else digest == expected)
+
+    def cancel(self) -> None:
+        self.requestInterruption()
+
+
+class _DeviceScanWorker(QThread):
+    """后台枚举 ADB 设备，避免打开窗口前卡住主线程。"""
+
+    done = pyqtSignal(object, str)  # list[dict], error
+
+    def run(self) -> None:
+        try:
+            devices = list_adb_devices(
+                cancel_check=self.isInterruptionRequested)
+        except BaseException as exc:  # noqa: BLE001 — 线程必须回传完成态
+            logger.exception("枚举 ADB 设备失败")
+            self.done.emit([], f"{type(exc).__name__}: {exc}")
+        else:
+            self.done.emit(devices, "")
+
+    def cancel(self) -> None:
+        self.requestInterruption()
+
+
+class _ApkInspectWorker(QThread):
+    """后台校验用户选择的 APK。"""
+
+    done = pyqtSignal(object, str)  # ApkFile | None, error
+
+    def __init__(self, path: Path, version: str, parent=None):
+        super().__init__(parent)
+        self._path = path
+        self._version = version
+
+    def run(self) -> None:
+        try:
+            apk = inspect_local_apk(self._path, self._version)
+        except BaseException as exc:  # noqa: BLE001 — 线程必须回传完成态
+            logger.exception("校验本地 APK 失败")
+            self.done.emit(None, f"{type(exc).__name__}: {exc}")
+        else:
+            self.done.emit(apk, "")
+
+    def cancel(self) -> None:
+        self.requestInterruption()
+
+
+class _AdbInstallWorker(QThread):
+    """后台安装 APK；取消时终止 adb 子进程。"""
+
+    done = pyqtSignal(str, str, str, str)  # serial, path, output, error
+
+    def __init__(self, serial: str, path: Path, parent=None):
+        super().__init__(parent)
+        self._serial = serial
+        self._path = path
+
+    def run(self) -> None:
+        try:
+            output = AdbDevice(self._serial).install(
+                str(self._path),
+                cancel_check=self.isInterruptionRequested,
+            )
+        except BaseException as exc:  # noqa: BLE001 — 线程必须回传完成态
+            self.done.emit(
+                self._serial, str(self._path), "",
+                f"{type(exc).__name__}: {exc}")
+        else:
+            self.done.emit(self._serial, str(self._path), output, "")
+
+    def cancel(self) -> None:
+        self.requestInterruption()
 
 
 class _AgentWorker(QThread):
@@ -123,7 +201,8 @@ class _AgentWorker(QThread):
     连接与探针都是阻塞的（探针本身要按住两秒），必须离开 UI 线程。
     """
 
-    done = pyqtSignal(dict, str, str, list)  # status, serial, 探针结论, 延迟样本
+    # status, serial, 是否探针, 探针结论, 延迟样本, 异常
+    done = pyqtSignal(dict, str, bool, str, list, str)
 
     def __init__(self, serial: str, *, probe: bool = False,
                  hold: float = 2.0, parent=None):
@@ -133,31 +212,54 @@ class _AgentWorker(QThread):
         self._hold = hold
 
     def run(self) -> None:
-        device = AdbDevice(self._serial or None)
-        agent = connect_agent(device)
-        if agent is None:
-            self.done.emit({}, self._serial, "", [])
-            return
-        status = dict(agent.status or {})
+        agent = None
+        status: dict = {}
         message = ""
         samples: list[float] = []
         try:
+            device = AdbDevice(self._serial or None)
+            agent = connect_agent_diagnostic(device)
+            if agent is None:
+                self.done.emit(
+                    {}, self._serial, self._probe,
+                    tr("无法连接设备端代理"), [], "")
+                return
+            status = dict(agent.status or {})
             if self._probe:
-                width, height = screen_size(agent)
-                if not width or not height:
-                    message = tr("拿不到屏幕尺寸，无法下发手势")
+                if status.get("protocol") != PROTOCOL_VERSION:
+                    message = tr("协议版本不匹配，无法执行手势测试")
+                elif not status.get("a11y"):
+                    message = tr("无障碍服务未开启，无法执行手势测试")
+                elif self.isInterruptionRequested():
+                    message = tr("手势测试已取消")
                 else:
-                    outcome = run_concurrent_probe(
-                        agent, width, height, self._hold)
-                    prefix = "✔ " if outcome.ok else "✘ "
-                    message = (
-                        f"{prefix}{outcome.message}\n"
-                        + tr("落点：按住 {push}，期间点击 {tap}").format(
-                            push=outcome.push_point, tap=outcome.tap_point))
-                samples = measure_round_trip(agent)
+                    width, height = screen_size(agent)
+                    if not width or not height:
+                        message = tr("拿不到屏幕尺寸，无法下发手势")
+                    else:
+                        outcome = run_concurrent_probe(
+                            agent, width, height, self._hold)
+                        prefix = "✔ " if outcome.ok else "✘ "
+                        message = (
+                            f"{prefix}{outcome.message}\n"
+                            + tr("落点：按住 {push}，期间点击 {tap}").format(
+                                push=outcome.push_point,
+                                tap=outcome.tap_point))
+                if not self.isInterruptionRequested():
+                    samples = measure_round_trip(agent)
+            self.done.emit(
+                status, self._serial, self._probe, message, samples, "")
+        except BaseException as exc:  # noqa: BLE001 — 线程必须恢复 UI 状态
+            logger.exception("移动设备体检失败")
+            self.done.emit(
+                status, self._serial, self._probe, message, samples,
+                f"{type(exc).__name__}: {exc}")
         finally:
-            agent.close()
-        self.done.emit(status, self._serial, message, samples)
+            if agent is not None:
+                agent.close()
+
+    def cancel(self) -> None:
+        self.requestInterruption()
 
 
 class MobileDeviceDialog(QDialog):
@@ -174,7 +276,13 @@ class MobileDeviceDialog(QDialog):
         self._download: _DownloadWorker | None = None
         self._agent_worker: _AgentWorker | None = None
         self._hash_worker: _HashWorker | None = None
+        self._device_worker: _DeviceScanWorker | None = None
+        self._inspect_worker: _ApkInspectWorker | None = None
+        self._install_worker: _AdbInstallWorker | None = None
+        self._workers: set[QThread] = set()
+        self._close_pending = False
         self._status: dict = {}
+        self._status_serial = ""
         self._setup_ui()
         self._refresh_devices()
         self._adopt_existing_apk()
@@ -340,21 +448,45 @@ class MobileDeviceDialog(QDialog):
         return str(self._device_combo.currentData() or "")
 
     def _refresh_devices(self) -> None:
+        if self._device_worker is not None and self._device_worker.isRunning():
+            return
+        previous = self._current_serial()
         self._device_combo.clear()
-        try:
-            devices = list_adb_devices()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"枚举 ADB 设备失败: {exc}")
-            devices = []
-        for item in devices:
+        self._device_combo.addItem(tr("正在扫描…"), "")
+        self._device_combo.setEnabled(False)
+        self._btn_rescan.setEnabled(False)
+        worker = _DeviceScanWorker(self)
+        worker.done.connect(
+            lambda devices, error: self._on_devices_done(
+                devices, error, previous))
+        self._device_worker = worker
+        self._track_worker(worker)
+        worker.start()
+
+    def _on_devices_done(
+        self, devices: object, error: str, previous: str,
+    ) -> None:
+        self._device_worker = None
+        self._device_combo.clear()
+        device_list = devices if isinstance(devices, list) else []
+        for item in device_list:
             serial = str(item.get("serial") or "")
             model = str(item.get("model") or "")
             self._device_combo.addItem(
                 f"{model} ({serial})" if model else serial, serial)
-        if not devices:
-            self._device_combo.addItem(tr("未发现设备"), "")
-        self._btn_adb_install.setEnabled(
-            bool(devices) and self._apk is not None)
+        if not device_list:
+            self._device_combo.addItem(
+                tr("扫描失败") if error else tr("未发现设备"), "")
+            if error:
+                self._device_combo.setToolTip(error)
+        else:
+            restored = self._device_combo.findData(previous)
+            if restored >= 0:
+                self._device_combo.setCurrentIndex(restored)
+            self._device_combo.setToolTip("")
+        self._device_combo.setEnabled(True)
+        self._btn_rescan.setEnabled(True)
+        self._refresh_install_state()
 
     # ─── 安装页 ──────────────────────────────────────────
 
@@ -472,11 +604,14 @@ class MobileDeviceDialog(QDialog):
         worker = _HashWorker(path, self._version, self)
         worker.done.connect(self._on_hash_done)
         self._hash_worker = worker
+        self._track_worker(worker)
         worker.start()
 
-    def _on_hash_done(self, digest: str, verified: object) -> None:
+    def _on_hash_done(
+        self, path: str, digest: str, verified: object,
+    ) -> None:
         self._hash_worker = None
-        if self._apk is None or not digest:
+        if (self._apk is None or self._apk.path != Path(path) or not digest):
             return
         self._set_apk(ApkFile(
             path=self._apk.path, version=self._apk.version,
@@ -484,7 +619,16 @@ class MobileDeviceDialog(QDialog):
             verified=verified if isinstance(verified, bool) else None))
 
     def _set_apk(self, apk: ApkFile) -> None:
+        restart_server = (
+            self._server is not None
+            and (self._apk is None or self._apk.path != apk.path)
+        )
+        if restart_server:
+            self._stop_server()
         self._apk = apk
+        if restart_server and self._source_lan.isChecked():
+            if not self._start_server():
+                self._source_online.setChecked(True)
         if not apk.sha256:
             detail = tr("正在校验…")
         else:
@@ -498,6 +642,8 @@ class MobileDeviceDialog(QDialog):
         self._refresh_install_state()
 
     def _on_download(self) -> None:
+        if self._inspect_worker is not None and self._inspect_worker.isRunning():
+            return
         if self._download is not None and self._download.isRunning():
             self._download.cancel()
             return
@@ -505,10 +651,12 @@ class MobileDeviceDialog(QDialog):
         self._progress.setVisible(True)
         self._progress.setRange(0, 0)
         self._btn_download.setText(tr("取消下载"))
+        self._btn_pick.setEnabled(False)
         worker = _DownloadWorker(self._version, dest, self)
         worker.progress.connect(self._on_download_progress)
         worker.done.connect(self._on_download_done)
         self._download = worker
+        self._track_worker(worker)
         worker.start()
 
     def _on_download_progress(self, done: int, total: int) -> None:
@@ -521,6 +669,7 @@ class MobileDeviceDialog(QDialog):
     def _on_download_done(self, apk: object, error: str) -> None:
         self._progress.setVisible(False)
         self._btn_download.setText(tr("下载 APK 到本机"))
+        self._btn_pick.setEnabled(True)
         self._download = None
         if isinstance(apk, ApkFile):
             self._set_apk(apk)
@@ -528,32 +677,60 @@ class MobileDeviceDialog(QDialog):
         self._apk_info.setText(error or tr("下载失败"))
 
     def _on_pick_local(self) -> None:
+        if ((self._inspect_worker is not None
+             and self._inspect_worker.isRunning())
+                or (self._download is not None and self._download.isRunning())):
+            return
         path, _filter = QFileDialog.getOpenFileName(
             self, tr("选择 APK"), "", tr("Android 安装包 (*.apk)"))
         if not path:
             return
-        try:
-            self._set_apk(inspect_local_apk(Path(path), self._version))
-        except OSError as exc:
-            QMessageBox.warning(self, tr("无法读取"), str(exc))
+        self._btn_pick.setEnabled(False)
+        self._btn_download.setEnabled(False)
+        self._apk_info.setText(tr("正在校验本地 APK…"))
+        worker = _ApkInspectWorker(Path(path), self._version, self)
+        worker.done.connect(self._on_inspect_done)
+        self._inspect_worker = worker
+        self._track_worker(worker)
+        worker.start()
+
+    def _on_inspect_done(self, apk: object, error: str) -> None:
+        self._inspect_worker = None
+        self._btn_pick.setEnabled(True)
+        self._btn_download.setEnabled(True)
+        if isinstance(apk, ApkFile):
+            self._set_apk(apk)
+            return
+        self._apk_info.setText(tr("本地 APK 校验失败：{err}").format(err=error))
 
     def _on_adb_install(self) -> None:
-        if self._apk is None:
+        if (self._apk is None
+                or (self._install_worker is not None
+                    and self._install_worker.isRunning())):
             return
         serial = self._current_serial()
         if not serial:
             return
         self._btn_adb_install.setEnabled(False)
         self._apk_info.setText(tr("正在通过 ADB 安装…"))
-        try:
-            output = AdbDevice(serial).install(str(self._apk.path))
-        except Exception as exc:  # noqa: BLE001 — adb 的原话对排查最有用
-            QMessageBox.warning(self, tr("安装失败"), str(exc))
-            self._apk_info.setText(tr("安装失败：{err}").format(err=exc))
+        worker = _AdbInstallWorker(serial, self._apk.path, self)
+        worker.done.connect(self._on_install_done)
+        self._install_worker = worker
+        self._track_worker(worker)
+        worker.start()
+
+    def _on_install_done(
+        self, _serial: str, _path: str, output: str, error: str,
+    ) -> None:
+        self._install_worker = None
+        if self._apk is None or self._apk.path != Path(_path):
+            self._refresh_install_state()
+            return
+        if error:
+            self._apk_info.setText(tr("安装失败：{err}").format(err=error))
         else:
             self._apk_info.setText(tr("安装完成：{out}").format(out=output))
-        finally:
-            self._refresh_install_state()
+        self._refresh_install_state()
 
     def _stop_server(self) -> None:
         if self._server is None:
@@ -573,21 +750,39 @@ class MobileDeviceDialog(QDialog):
         target.setPlainText(tr("正在连接设备端代理…"))
         self._btn_check.setEnabled(False)
         self._btn_probe.setEnabled(False)
+        self._device_combo.setEnabled(False)
+        self._btn_rescan.setEnabled(False)
         worker = _AgentWorker(
             self._current_serial(), probe=probe,
             hold=float(self._hold_spin.value()), parent=self)
         worker.done.connect(self._on_agent_done)
         self._agent_worker = worker
+        self._track_worker(worker)
         worker.start()
 
-    def _on_agent_done(self, status: dict, _serial: str, message: str,
-                       samples: list) -> None:
+    def _on_agent_done(
+        self,
+        status: dict,
+        serial: str,
+        probe: bool,
+        message: str,
+        samples: list,
+        error: str,
+    ) -> None:
         self._btn_check.setEnabled(True)
         self._btn_probe.setEnabled(True)
+        self._device_combo.setEnabled(True)
+        self._btn_rescan.setEnabled(True)
         self._agent_worker = None
         self._status = dict(status)
-        self._health_text.setHtml(self._render_health(status))
-        if message or samples:
+        self._status_serial = serial
+        health = self._render_health(status)
+        if error:
+            health += (
+                f"<hr><div style='color:{_LEVEL_COLOR['bad']}'>"
+                f"{escape(tr('体检失败：{err}').format(err=error))}</div>")
+        self._health_text.setHtml(health)
+        if probe:
             lines = [message] if message else []
             if samples:
                 ordered = sorted(samples)
@@ -597,6 +792,10 @@ class MobileDeviceDialog(QDialog):
                     "最慢 {hi:.0f}）").format(
                         mid=median, n=len(samples),
                         lo=ordered[0], hi=ordered[-1]))
+            if error:
+                lines.append(tr("手势测试失败：{err}").format(err=error))
+            if not lines:
+                lines.append(tr("无法连接设备端代理"))
             self._gesture_text.setPlainText("\n".join(lines))
 
     def _render_health(self, status: dict) -> str:
@@ -620,7 +819,7 @@ class MobileDeviceDialog(QDialog):
             extra[tr("本地安装包")] = f"{self._apk.path.name} ({self._apk.sha256[:16]}…)"
         report = build_report(
             self._status, self._version, PROTOCOL_VERSION,
-            self._current_serial(), extra)
+            self._status_serial or self._current_serial(), extra)
         clipboard = QApplication.clipboard()
         if clipboard is not None:
             clipboard.setText(report)
@@ -628,14 +827,37 @@ class MobileDeviceDialog(QDialog):
 
     # ─── 生命周期 ────────────────────────────────────────
 
+    def _track_worker(self, worker: QThread) -> None:
+        """登记后台线程；关闭窗口前必须等登记集合真正清空。"""
+        self._workers.add(worker)
+        worker.finished.connect(lambda: self._on_worker_finished(worker))
+
+    def _on_worker_finished(self, worker: QThread) -> None:
+        self._workers.discard(worker)
+        if self._close_pending and not any(
+                item.isRunning() for item in self._workers):
+            QTimer.singleShot(0, self.close)
+
+    def _cancel_workers(self) -> None:
+        for worker in tuple(self._workers):
+            if not worker.isRunning():
+                continue
+            cancel = getattr(worker, "cancel", None)
+            if callable(cancel):
+                cancel()
+            else:
+                worker.requestInterruption()
+
     def closeEvent(self, event) -> None:  # noqa: N802
         """对话框关掉就收回临时开放的端口，不留后台服务。"""
-        if self._download is not None and self._download.isRunning():
-            self._download.cancel()
-            self._download.wait(3000)
-        if self._agent_worker is not None and self._agent_worker.isRunning():
-            self._agent_worker.wait(5000)
-        if self._hash_worker is not None and self._hash_worker.isRunning():
-            self._hash_worker.wait(5000)
+        running = [worker for worker in self._workers if worker.isRunning()]
+        if running:
+            self._close_pending = True
+            self._cancel_workers()
+            self._stop_server()
+            self.setEnabled(False)
+            self.setWindowTitle(tr("移动设备（正在停止后台操作…）"))
+            event.ignore()
+            return
         self._stop_server()
         super().closeEvent(event)

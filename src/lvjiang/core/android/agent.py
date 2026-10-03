@@ -224,7 +224,40 @@ class AgentClient:
     # ─── 连接管理 ─────────────────────────────────────────
 
     def connect(self, connect_timeout: float = 3.0) -> bool:
-        """建立转发并握手；失败返回 False（原因已记日志），不抛异常"""
+        """建立可执行业务的连接；协议或输入通道不可用时返回 False。
+
+        ADB 子进程本身启动失败、超时等基础设施异常仍可能抛出，由调用方按自己的
+        失败边界处理；只有已经得到明确握手结果的业务拒绝在这里转换为 False。
+        """
+        with self._lock:
+            if not self.connect_diagnostic(connect_timeout):
+                return False
+            header = self.status
+            if header.get("protocol") != PROTOCOL_VERSION:
+                logger.error(
+                    f"[Agent] 协议版本不匹配: 设备端 {header.get('protocol')} / "
+                    f"PC {PROTOCOL_VERSION}，请升级手机上的律匠 app")
+                self.close()
+                return False
+            if not self.a11y_ready and not self.shell_ready:
+                logger.warning(
+                    "[Agent] app 已连接，但无障碍服务未开启且 Shizuku 未授权，"
+                    "设备端没有可用输入通道"
+                )
+                self.close()
+                return False
+            logger.info(
+                f"[Agent] 已连接设备端代理 app={header.get('app')} "
+                f"a11y={header.get('a11y')} "
+                f"shizuku_granted={header.get('shizuku_granted')}")
+            return True
+
+    def connect_diagnostic(self, connect_timeout: float = 3.0) -> bool:
+        """只完成转发与握手并保留原始状态，不校验业务可执行性。
+
+        体检必须看得到“协议不匹配”和“输入通道未开启”本身；严格连接若先把
+        这些状态拒绝并清空，诊断页面就只能误报成笼统的“未连接”。
+        """
         with self._lock:
             self.close()
             port = self._setup_forward()
@@ -240,21 +273,7 @@ class AgentClient:
                 logger.warning(f"[Agent] 握手失败: {e}")
                 self.close()
                 return False
-            if header.get("protocol") != PROTOCOL_VERSION:
-                logger.error(f"[Agent] 协议版本不匹配: 设备端 {header.get('protocol')} / PC {PROTOCOL_VERSION}，"
-                             f"请升级手机上的律匠 app")
-                self.close()
-                return False
             self._status = header
-            if not self.a11y_ready and not self.shell_ready:
-                logger.warning(
-                    "[Agent] app 已连接，但无障碍服务未开启且 Shizuku 未授权，"
-                    "设备端没有可用输入通道"
-                )
-                self.close()
-                return False
-            logger.info(f"[Agent] 已连接设备端代理 app={header.get('app')} "
-                        f"a11y={header.get('a11y')} shizuku_granted={header.get('shizuku_granted')}")
             return True
 
     def close(self) -> None:
@@ -341,9 +360,15 @@ class AgentClient:
 
 
 def connect_agent(device: AdbDevice) -> AgentClient | None:
-    """便捷入口：连上返回客户端，连不上返回 None（原因已记日志）"""
+    """严格业务连接：明确拒绝返回 None，ADB 等基础设施异常仍会抛出。"""
     client = AgentClient(device)
     return client if client.connect() else None
+
+
+def connect_agent_diagnostic(device: AdbDevice) -> AgentClient | None:
+    """诊断连接：握手成功即返回客户端，由体检解释原始状态。"""
+    client = AgentClient(device)
+    return client if client.connect_diagnostic() else None
 
 
 # ─── 截图后端 ─────────────────────────────────────────────

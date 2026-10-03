@@ -238,25 +238,49 @@ class AdbDevice:
             return False
         return True
 
-    def install(self, apk_path: str, *, timeout: float = 300.0) -> str:
-        """`adb install -r` 装包。失败抛 RuntimeError，消息里带 adb 的原话。
+    def install(
+        self,
+        apk_path: str,
+        *,
+        timeout: float = 300.0,
+        cancel_check: Callable[[], bool] | None = None,
+    ) -> str:
+        """`adb install -r` 装包。
+
+        adb 执行失败、取消或超时抛 RuntimeError；进程无法启动时可能直接
+        传递 OSError，由调用方按自身失败边界处理。
 
         -r 保留数据升级；不加 -d（不允许降级）——降级装不上是对的，那通常意味着
         用户拿了个更旧的包，静默允许只会把问题推到运行期。
         """
         logger.info(f"[ADB] 安装 APK: {apk_path}")
-        try:
-            result = subprocess.run(
-                [*self._base(), "install", "-r", str(apk_path)],
-                capture_output=True, text=True, timeout=timeout,
-                **SUBPROCESS_NO_WINDOW,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(f"adb install 超时（{timeout:.0f}s）") from exc
-        output = f"{result.stdout}\n{result.stderr}".strip()
+        process = subprocess.Popen(
+            [*self._base(), "install", "-r", str(apk_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            **SUBPROCESS_NO_WINDOW,
+        )
+        deadline = time.monotonic() + timeout
+        while process.poll() is None:
+            if cancel_check is not None and cancel_check():
+                process.terminate()
+                try:
+                    process.communicate(timeout=1.0)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate()
+                raise RuntimeError("adb install 已取消")
+            if time.monotonic() >= deadline:
+                process.kill()
+                process.communicate()
+                raise RuntimeError(f"adb install 超时（{timeout:.0f}s）")
+            time.sleep(0.05)
+        stdout, stderr = process.communicate()
+        output = f"{stdout}\n{stderr}".strip()
         # adb install 偶尔返回码为 0 却只在输出里报失败，所以两边都看
-        if result.returncode != 0 or "Success" not in output:
-            raise RuntimeError(output or f"adb install 失败（{result.returncode}）")
+        if process.returncode != 0 or "Success" not in output:
+            raise RuntimeError(output or f"adb install 失败（{process.returncode}）")
         return output
 
     def start_shell_process(self, *args: str) -> subprocess.Popen:

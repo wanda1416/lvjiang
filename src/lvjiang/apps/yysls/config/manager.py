@@ -893,7 +893,7 @@ class GameConfigManager:
         return ""
 
     def recommended_equipment_set(self, school: str) -> str:
-        """返回流派配置的推荐左四套装；未登记时返回空串。"""
+        """返回流派配置的推荐攻具套装；未登记时返回空串。"""
         school = str(school or "").strip()
         for key, entry in self._equipment_sets["left"].items():
             if str(entry.get("recommended_school") or "").strip() == school:
@@ -1190,7 +1190,7 @@ class GameConfigManager:
     def get_affix_category_parts(self, category: str) -> list[str]:
         """词条类别声明的适用部位（affix_caps 内的 _parts）。
 
-        输出/防御的划分直接用它，不另建分组：`指定技能增效` 的 _parts 就是
+        攻具/防具的划分直接用它，不另建分组：`指定技能增效` 的 _parts 就是
         防具四件，粒度比全局二分更准，而且加部位时只改配置。
         """
         return list(self._category_parts.get(str(category or ""), []))
@@ -1218,7 +1218,7 @@ class GameConfigManager:
     def get_playstyle_dingyin(self, name: str, part: str) -> str:
         """该玩法在某部位应有的定音；未配置返回空串。
 
-        输出/防御的划分沿用词条类别自己的 _parts 声明，不另建分组。
+        攻具/防具的划分沿用词条类别自己的 _parts 声明，不另建分组。
         """
         cfg = self._playstyles.get(str(name or "").strip())
         if not cfg:

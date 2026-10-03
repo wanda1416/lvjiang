@@ -227,7 +227,7 @@ class TestPlaystyleRegistry:
         }
 
     def test_dingyin_target_splits_by_affix_category_parts(self):
-        """输出/防御的划分沿用词条类别自己的 _parts，不另建分组。"""
+        """攻具/防具的划分沿用词条类别自己的 _parts，不另建分组。"""
         g = get_game_config()
         assert g.get_affix_category_parts("指定技能增效") == [
             "冠胄", "胸甲", "胫甲", "腕甲"]

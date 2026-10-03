@@ -40,7 +40,7 @@ _UNIT_REQUIREMENTS = ("不需要", "首领", "玩家")
 
 
 class PlaystylePanel(QWidget):
-    """左侧玩法名，右侧属性 / 两个武学 / 增伤要求 / 输出与防御定音。"""
+    """左侧玩法名，右侧属性 / 两个武学 / 增伤要求 / 攻具与防具定音。"""
 
     def __init__(self, parent=None, *, data: dict | None = None, on_changed=None):
         super().__init__(parent)
@@ -110,8 +110,8 @@ class PlaystylePanel(QWidget):
             (tr("主武学增伤要求"), self._combo_damage_a),
             (tr("副武学"), self._combo_art_b),
             (tr("副武学增伤要求"), self._combo_damage_b),
-            (tr("输出装备定音"), self._combo_output),
-            (tr("防御装备定音"), self._combo_defense),
+            (tr("攻具定音"), self._combo_output),
+            (tr("防具定音"), self._combo_defense),
             (tr("全武学增伤要求"), self._combo_all_skill),
             (tr("奇术增伤要求"), self._combo_qishu),
             (tr("对单位增伤要求"), self._combo_unit),
@@ -284,7 +284,7 @@ class PlaystylePanel(QWidget):
         self._on_field_changed("")
 
     def _sync_derived(self, cfg: dict | None = None) -> None:
-        """按武学收敛增伤，按绑定流派收敛防御定音。
+        """按武学收敛增伤，按绑定流派收敛防具定音。
 
         增伤要求跟武器走（横刀武学增伤）。指定技能增效在游戏配置中以流派名
         分组；绑定流派时直接取该组，自定义玩法则展示全部。不能按武学名前缀
@@ -335,7 +335,7 @@ class PlaystylePanel(QWidget):
             self._hint.setText(tr("属性与主副武学由绑定流派提供，已锁定"))
         else:
             self._hint.setText(tr(
-                "自定义玩法可自由选择属性与武学，并显示全部防御定音"))
+                "自定义玩法可自由选择属性与武学，并显示全部防具定音"))
         self._loading = loading
 
     def _on_field_changed(self, _text: str) -> None:

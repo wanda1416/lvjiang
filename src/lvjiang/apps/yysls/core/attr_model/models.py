@@ -41,7 +41,7 @@ SOURCE_KINDS: tuple[str, ...] = (
     "dimension",     # 五维 → 战斗属性转换
     "martial_art",   # 武学天赋
     "inner_way",     # 心法
-    "gear_set",      # 输出套装与装备叠音
+    "gear_set",      # 攻具套装与装备叠音
     "gongjue",       # 弓玦（类型与等级独立于装备赛季等级）
     "arsenal",       # 武备
     "divinecraft",   # 神工

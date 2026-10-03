@@ -125,6 +125,7 @@ yysls:
   该原始等级装备承音后是否仍允许在已转律词条上无限转律: Whether equipment of this original level may infinitely retransfer its transferred affix after Chengyin
   装备名称结构：等阶名称 + 标准名称 | 部位名称: 'Equipment name format: Tier Name + Standard Name | Equipment Part Name'
   输出: Output
+  攻具: Attack Gear
   防具: Armor
   其他装备: Other Equipment
   其他装备展示开发中: Other equipment display under development…
@@ -1160,6 +1161,10 @@ auto_strings:
 
     To use this weapon, create a plan for the matching playstyle.'
   武器类: Weapon
+  攻具套装: Attack Gear Set
+  攻具套装定义: Attack Gear Set Definitions
+  攻具套装：{name}: 'Attack Gear Set: {name}'
+  请选择攻具套装: Please select an attack gear set
   武学属性: Martial Attributes
   每日: Daily
   每档由若干条件组定义：组间 OR、组内 AND，条件组可绑定开关前提 when: 'Each tier is defined by several condition groups: OR between groups, AND within a group; a group can bind a `when` switch precondition'

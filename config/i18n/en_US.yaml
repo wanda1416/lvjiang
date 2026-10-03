@@ -505,10 +505,10 @@ auto_strings:
   '玩法名称:': 'Playstyle name:'
   该武学已存在: That martial art already exists
   该玩法已存在: That playstyle already exists
-  输出装备定音: Offense dingyin
-  防御装备定音: Defense dingyin
+  攻具定音: Attack Gear Dingyin
+  防具定音: Armor Dingyin
   属性与主副武学由绑定流派提供，已锁定: Attribute and martial arts come from the bound school and are locked
-  自定义玩法可自由选择属性与武学，并显示全部防御定音: Custom playstyles can freely select attributes and martial arts and show all defense dingyin options
+  自定义玩法可自由选择属性与武学，并显示全部防具定音: Custom playstyles can freely select attributes and martial arts and show all armor dingyin options
   这两个武学尚未登记到任何玩法: These two arts are not registered to any playstyle yet
   以下流派仍在使用该武学：{schools}: 'Still used by these schools: {schools}'
   以下调律规则仍在引用该玩法：{rules}: 'Still referenced by these tuning rules: {rules}'

@@ -75,7 +75,7 @@ _PART_TO_NAME = dict(zip(BASE_ATTR_PARTS, EQUIP_PART_NAMES, strict=True))
 # 等阶名称与真实部位共用左侧导航，但它们不是装备类型，
 # 不参与基础属性、等级或品阶推断。
 _NAV_ITEMS = (
-    ("series", "output", tr("输出")),
+    ("series", "output", tr("攻具")),
     ("part", "weapon", tr("武器")),
     ("part", "ring", tr("环")),
     ("part", "pendant", tr("佩")),
@@ -289,7 +289,7 @@ class BaseAttrPanel(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(splitter)
 
-        # 左侧：输出/防具等阶名称 + 固定七个部位
+        # 左侧：攻具/防具等阶名称 + 固定七个部位
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -385,7 +385,7 @@ class BaseAttrPanel(QWidget):
         self._series_frame.setVisible(False)
         right_layout.addWidget(self._series_frame)
 
-        # 输出/防具套装与各自的等阶名称属于同一配置页，不再
+        # 攻具/防具套装与各自的等阶名称属于同一配置页，不再
         # 单独占用一个一级 Tab。
         self._equipment_set_editor = EquipmentSetEditor(
             data=self._data, on_changed=self._save_data)

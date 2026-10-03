@@ -9,10 +9,10 @@ from ....i18n import tr
 from .equipment_slots import SLOT_BY_KEY
 
 #: 调律遍历分组：(组名, ((槽位 key, 显示名), ...))，顺序即 UI 展示顺序。
-#: 这是调律扫描页的分组口径（“武器类”把首饰一起归入），不是游戏部位；
+#: 这是调律扫描页的攻具/防具分组口径，不是游戏部位；
 #: 槽位与显示名来自 equipment_slots 的唯一定义。
 SLOT_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
-    (tr("武器类"), tuple(
+    (tr("攻具"), tuple(
         (key, SLOT_BY_KEY[key].label)
         for key in ("main_weapon", "sub_weapon", "ring", "pendant"))),
     (tr("防具类"), tuple(

@@ -277,7 +277,7 @@ class MockEquipDialog(QDialog):
             and not (equip_data.get("_extra") or {}).get("is_mock", False)
         )
         self._result_data: dict | None = None
-        self._default_school = default_school  # 默认流派，用于右四件定音词条排序
+        self._default_school = default_school  # 默认流派，用于防具定音词条排序
         self._delete_all_mock = delete_all_mock
 
         if self._is_real_development:
@@ -453,7 +453,7 @@ class MockEquipDialog(QDialog):
         lbl_dingyin_idx.setStyleSheet("color: palette(mid); font-size: 12px;")
         dingyin_layout.addWidget(lbl_dingyin_idx)
 
-        # 定音词条选择：级联菜单按钮（左三件平铺，右四件按流派分组）
+        # 定音词条选择：级联菜单按钮（攻具部位平铺，防具按流派分组）
         self._btn_dingyin = QPushButton(tr("（无）"))
         self._btn_dingyin.setMinimumWidth(220)
         self._btn_dingyin.setStyleSheet(_DINGYIN_BUTTON_STYLE)
@@ -692,7 +692,7 @@ class MockEquipDialog(QDialog):
         return get_game_config().get_normal_affix_names()
 
     def _is_right_side_part(self) -> bool:
-        """判断当前部位是否为右四件（冠胄/胸甲/胫甲/腕甲）"""
+        """判断当前部位是否为防具（冠胄/胸甲/胫甲/腕甲）"""
         part_name = self._combo_part.currentData()
         if not part_name:
             return False
@@ -700,7 +700,7 @@ class MockEquipDialog(QDialog):
         return group_key in ("head", "chest", "leg", "wrist")
 
     def _get_dingyin_groups(self) -> list[str]:
-        """获取右四件定音词条的分组列表（指定技能增效的 _aliases keys）
+        """获取防具定音词条的分组列表（指定技能增效的 _aliases keys）
 
         根据 default_school 排序：将包含流派名的分组提到最前。
         仅返回当前部位有合法词条的分组。
@@ -789,7 +789,7 @@ class MockEquipDialog(QDialog):
             self._btn_dingyin.setText(self._dingyin_selected or tr("（无）"))
 
     def _show_dingyin_cascade_menu(self):
-        """显示定音词条级联菜单（左三件平铺，右四件按流派分组）"""
+        """显示定音词条级联菜单（攻具部位平铺，防具按流派分组）"""
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self)
         menu.setStyleSheet("""
@@ -813,7 +813,7 @@ class MockEquipDialog(QDialog):
             }
         """)
         if self._is_right_side_part():
-            # 右四件：按流派分组（指定技能增效）
+            # 防具：按流派分组（指定技能增效）
             groups = self._get_dingyin_groups()
             for group_name in groups:
                 affixes = self._get_dingyin_affixes_by_group(group_name)
@@ -826,7 +826,7 @@ class MockEquipDialog(QDialog):
                     action.triggered.connect(
                         lambda checked, n=affix_name: self._on_dingyin_affix_selected(n))
         else:
-            # 左三件：平铺显示
+            # 攻具的三个物理部位：平铺显示
             affixes = self._get_dingyin_affixes_filtered()
             for affix_name in affixes:
                 action = menu.addAction(affix_name)

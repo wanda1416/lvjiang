@@ -1,7 +1,7 @@
 """装备配置中的套装定义表。
 
-数据仍使用 ``equipment_sets.left/right`` 的稳定 key；界面把左四套装
-称为“输出套装”、右四套装称为“防具套装”。防具页的“关联套装”
+数据仍使用 ``equipment_sets.left/right`` 的稳定 key；界面分别称为
+“攻具套装”和“防具套装”。防具页的“关联套装”
 是 ``left.recommended_right`` 的反向编辑视图，不另存一份平行关系。
 """
 
@@ -23,7 +23,7 @@ from .....i18n import tr
 
 
 class EquipmentSetEditor(QFrame):
-    """嵌入装备配置“输出/防具”页的套装表。"""
+    """嵌入装备配置“攻具/防具”页的套装表。"""
 
     def __init__(
         self,
@@ -60,14 +60,14 @@ class EquipmentSetEditor(QFrame):
         self.set_series("output")
 
     def set_series(self, series: str) -> None:
-        """切换输出/防具视图并从共享数据重新加载。"""
+        """切换攻具/防具视图并从共享数据重新加载。"""
         if series not in {"output", "armor"}:
             self.setVisible(False)
             return
         self._series = series
         self.setVisible(True)
         if series == "output":
-            self._title.setText(tr("输出套装定义"))
+            self._title.setText(tr("攻具套装定义"))
             headers = [tr("套装名称"), tr("推荐流派"), tr("基础属性")]
         else:
             self._title.setText(tr("防具套装定义"))

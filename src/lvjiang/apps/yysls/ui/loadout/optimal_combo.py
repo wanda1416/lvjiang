@@ -745,7 +745,7 @@ class _ResultCard(QFrame):
         equipment_set_name = get_game_config().equipment_set_name(
             str(result.get("equipment_set") or ""))
         equipment_set_label = QLabel(
-            tr("装备套装：{name}").format(
+            tr("攻具套装：{name}").format(
                 name=equipment_set_name or tr("未选择")))
         equipment_set_label.setStyleSheet(
             "font-size: 12px; color: palette(mid);")
@@ -1009,7 +1009,7 @@ class OptimalComboPage(QWidget):
             self._persist_analysis_settings)
         compute_row.addWidget(self._chk_season_chengyin)
 
-        equipment_set_label = QLabel(tr("装备套装"))
+        equipment_set_label = QLabel(tr("攻具套装"))
         equipment_set_label.setProperty("tone", "muted")
         compute_row.addWidget(equipment_set_label)
         self._combo_equipment_set = QComboBox()
@@ -1253,7 +1253,7 @@ class OptimalComboPage(QWidget):
 
     @staticmethod
     def _apply_result_equipment_set(equipped: dict, result: dict) -> dict:
-        """把搜索时选定的左四套装只投影到结果副本。"""
+        """把搜索时选定的攻具套装只投影到结果副本。"""
         equipment_set = str(result.get("equipment_set") or "")
         if not equipment_set:
             return equipped
@@ -1598,7 +1598,7 @@ class OptimalComboPage(QWidget):
 
         equipment_set = str(self._combo_equipment_set.currentData() or "")
         if not equipment_set:
-            QMessageBox.warning(self, tr("无法搜索"), tr("请选择装备套装"))
+            QMessageBox.warning(self, tr("无法搜索"), tr("请选择攻具套装"))
             return
 
         gongjues = self._selected_gongjues() or [""]

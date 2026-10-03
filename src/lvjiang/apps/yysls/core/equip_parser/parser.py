@@ -85,7 +85,7 @@ class EquipmentParser:
         equip.quality = self._infer_quality(equip, category)
 
         # 套装名称位置会随词条/定音行数变化，统一从装备详情全文按注册表识别。
-        # 左四（武器、环佩）与右四（防具）是两套独立身份，不能跨侧误认。
+        # 攻具（武器、环、佩）与防具是两套独立身份，不能跨侧误认。
         set_side = "right" if category == "armor" else "left"
         equip.equipment_set = self._attr_config.resolve_equipment_set(
             str(raw.get("equip_detail") or ""), set_side)

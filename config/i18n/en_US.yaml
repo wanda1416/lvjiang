@@ -732,7 +732,8 @@ auto_strings:
   <span style="color:#888;">截图：—　　画布：—</span>: '<span style="color:#888;">Screenshot: —　　Canvas: —</span>'
   ADB screencap 单帧截图: ADB screencap (single frame)
   ADB shell input 指令执行: ADB shell input (command channel)
-  ADB 异常，请重连设备后点击恢复: ADB error, reconnect the device then click Resume
+  ADB 异常，请恢复设备连接后点击恢复；无法恢复时请按 F10 停止: ADB error. Restore the device connection and click Resume; if it cannot be restored, press F10 to stop
+  '[警告] ADB 连接异常，请恢复 {name} 的连接后点击恢复；若无法恢复，请按 F10 停止任务后重新连接: {error}': '[Warning] ADB connection error. Restore the connection to {name} and click Resume; if it cannot be restored, press F10 to stop the task and reconnect: {error}'
   DesktopCapture 已停止: DesktopCapture stopped
   ESC / HOME / 字母键；设备端 ESC=返回: ESC / HOME / letter keys; on-device ESC = Back
   OCR 扫描区域: OCR Scan Region
@@ -807,7 +808,7 @@ auto_strings:
   ■ 停止录制: ■ Stop Recording
   ● 录制脚本: ● Record Script
   ● 有改动: ● Modified
-  ⚠ ADB 连接异常，请重连设备后点击右侧「恢复」: ⚠ ADB connection error, reconnect the device then click "Resume" on the right
+  ⚠ ADB 连接异常：恢复设备连接后点击「恢复」；无法恢复时请按 F10 停止任务: ⚠ ADB connection error. Restore the device connection and click "Resume"; if it cannot be restored, press F10 to stop the task
   '「{label}」应为 #rrggbb': '"{label}" should be #rrggbb'
   「{label}」应为 {n} 个数: '"{label}" should be {n} numbers'
   「{label}」未填写: '"{label}" is not filled in'

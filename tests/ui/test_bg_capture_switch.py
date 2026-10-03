@@ -68,7 +68,7 @@ def test_disabled_not_hidden_while_foreground_input(qtbot, wgc_ok):
     """前台输入时禁用并给出原因，不是让它消失——消失会让整排控件跳位。"""
     host = _host(qtbot)
     host._window_connection_draft.background_input = False
-    host._refresh_bg_capture_visibility()
+    host._refresh_connection_draft_ui(host._candidate_backend)
     assert host.chk_bg_capture.isVisible()
     assert not host.chk_bg_capture.isEnabled()
     assert "后台模式" in host.chk_bg_capture.toolTip()
@@ -77,7 +77,7 @@ def test_disabled_not_hidden_while_foreground_input(qtbot, wgc_ok):
 def test_usable_once_background_input_is_on(qtbot, wgc_ok):
     host = _host(qtbot)
     host._window_connection_draft.background_input = True
-    host._refresh_bg_capture_visibility()
+    host._refresh_connection_draft_ui(host._candidate_backend)
     assert host.chk_bg_capture.isVisible()
     assert host.chk_bg_capture.isEnabled()
 
@@ -136,7 +136,7 @@ def test_switching_candidate_kind_preserves_both_drafts(qtbot, wgc_ok):
 def test_hidden_in_device_mode(qtbot, wgc_ok):
     """安卓截图本就来自设备，压根不适用——这种才该隐藏。"""
     host = _host(qtbot, backend="adb")
-    host._refresh_bg_capture_visibility()
+    host._refresh_connection_draft_ui(host._candidate_backend)
     assert not host.chk_bg_capture.isVisible()
 
 
@@ -145,7 +145,7 @@ def test_locked_while_running(qtbot, wgc_ok):
     host = _host(qtbot)
     host._window_connection_draft.background_input = True
     host._running = True
-    host._refresh_bg_capture_visibility()
+    host._refresh_connection_draft_ui(host._candidate_backend)
     assert host.chk_bg_capture.isVisible()
     assert not host.chk_bg_capture.isEnabled()
 
@@ -157,7 +157,7 @@ def test_disabled_with_reason_when_component_unavailable(qtbot, monkeypatch):
         desktop, "wgc_available", lambda: (False, "后台截图仅支持 Windows"))
     host = _host(qtbot, capture_default=True)
     host._window_connection_draft.background_input = True
-    host._refresh_bg_capture_visibility()
+    host._refresh_connection_draft_ui(host._candidate_backend)
     host._apply_bg_capture_default()
     assert host.chk_bg_capture.isVisible()
     assert not host.chk_bg_capture.isEnabled()
@@ -172,7 +172,7 @@ class TestDefaultFromConfig:
         """勾上后台模式，后台截图立刻可用并按配置跟上。"""
         host = _host(qtbot, capture_default=True)
         host._window_connection_draft.background_input = True
-        host._refresh_bg_capture_visibility()
+        host._refresh_connection_draft_ui(host._candidate_backend)
         host._apply_bg_capture_default()
         assert host.chk_bg_capture.isEnabled()
         assert host.chk_bg_capture.isChecked()
@@ -181,7 +181,7 @@ class TestDefaultFromConfig:
         """即使配置里设了后台截图，前台输入下也不勾——它此刻不可用。"""
         host = _host(qtbot, capture_default=True)
         host._window_connection_draft.background_input = False
-        host._refresh_bg_capture_visibility()
+        host._refresh_connection_draft_ui(host._candidate_backend)
         host._apply_bg_capture_default()
         assert not host.chk_bg_capture.isEnabled()
         assert not host.chk_bg_capture.isChecked()
@@ -189,7 +189,7 @@ class TestDefaultFromConfig:
     def test_foreground_default_leaves_it_off(self, qtbot, wgc_ok):
         host = _host(qtbot, capture_default=False)
         host._window_connection_draft.background_input = True
-        host._refresh_bg_capture_visibility()
+        host._refresh_connection_draft_ui(host._candidate_backend)
         host._apply_bg_capture_default()
         assert host.chk_bg_capture.isEnabled()
         assert not host.chk_bg_capture.isChecked()
@@ -198,13 +198,13 @@ class TestDefaultFromConfig:
         """本次运行内手动取消后，任务起停不能把默认值又打回来。"""
         host = _host(qtbot, capture_default=True)
         host._window_connection_draft.background_input = True
-        host._refresh_bg_capture_visibility()
+        host._refresh_connection_draft_ui(host._candidate_backend)
         host._apply_bg_capture_default()
         host._on_bg_capture_changed(False)      # 用户手动改回前台截图
 
         host._running = True
-        host._refresh_bg_capture_visibility()
+        host._refresh_connection_draft_ui(host._candidate_backend)
         host._running = False
-        host._refresh_bg_capture_visibility()
+        host._refresh_connection_draft_ui(host._candidate_backend)
 
         assert not host.chk_bg_capture.isChecked()

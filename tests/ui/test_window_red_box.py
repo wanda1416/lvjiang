@@ -60,9 +60,6 @@ class _Host(WindowOpsMixin, QWidget):
     def _get_window_dpi_ratio(self, _hwnd):
         return 1.0
 
-    def _set_connected_ui(self, _connected):
-        pass
-
     def _build_window_execution_target(self, window):
         return ExecutionTarget(
             id=WINDOW_TARGET_ID,
@@ -86,9 +83,6 @@ class _Host(WindowOpsMixin, QWidget):
         pass
 
     def _capture_preview(self):
-        pass
-
-    def _stop_capture_backend(self):
         pass
 
     def statusBar(self):  # noqa: N802 - Qt API shape
@@ -127,7 +121,7 @@ def test_checked_red_box_stays_visible_and_toggle_cancels_flash(qtbot, monkeypat
     host.chk_red_box.setChecked(False)
     assert not host._overlay.visible
 
-    host._on_disconnect()
+    host._disconnect_execution_target(WINDOW_TARGET_ID)
     host.chk_red_box.setChecked(True)
     host._on_locate_window()
     assert host._overlay.visible
@@ -140,7 +134,7 @@ def test_disconnect_cancels_flash_before_next_locate(qtbot, monkeypatch):
     qtbot.addWidget(host)
 
     host._on_locate_window()
-    host._on_disconnect()
+    host._disconnect_execution_target(WINDOW_TARGET_ID)
     assert not host._overlay.visible
     assert not host._red_box_flash_timer.isActive()
 

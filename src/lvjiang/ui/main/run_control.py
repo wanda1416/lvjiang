@@ -1274,37 +1274,6 @@ class RunControlMixin:
 
     # ─── ADB 断连暂停恢复 ────────────────────────────────
 
-    def _refresh_running_engine_backends(self):
-        """重连后把新的截图/输入后端同步给运行中的引擎
-
-        工作流运行中断连重连时，引擎及其 BaseWorkflow 委托仍持有旧后端：
-        scrcpy 截图后端的流已死，capture() 永远返回断连前的陈旧帧，OCR 全未命中。
-        仅在引擎阻塞在 resume_event 等待时调用（此时替换引用无并发风险）。
-        """
-        engine = getattr(self, '_current_engine', None)
-        if engine is None:
-            return
-        capture = getattr(self, '_capture', None)
-        input_ctrl = getattr(self, '_input', None)
-        if capture is not None:
-            engine._capture = capture
-        if input_ctrl is not None:
-            # execute() 只给执行开始时的后端注入一次；ADB 重连替换实例后
-            # 必须重新挂载，否则新后端的长按无法观察本轮停止状态。
-            input_ctrl.stop_check = engine._stop_check
-            engine._input = input_ctrl
-        engine._android_device = getattr(self, "_device", None)
-        # 两种应用控制器都绑定旧 AdbDevice；重连后必须按需重新创建。
-        engine._android_app_controller = None
-        engine._app_controller = None
-        wf = getattr(engine, '_workflow', None)
-        if wf is not None:
-            if capture is not None:
-                wf._capture = capture
-            if input_ctrl is not None:
-                wf._input = input_ctrl
-        logger.info("[恢复] 已为运行中的引擎刷新截图/输入后端引用")
-
     def _on_adb_connection_lost(self, target_id: str, error_msg: str):
         """某台 ADB 设备断连；仅运行目标可以打断当前任务。"""
         target = self._execution_targets.get(target_id)
@@ -1319,14 +1288,19 @@ class RunControlMixin:
             self.log_text.append(
                 f"[警告] 非运行目标 {target.display_name} 已离线: {error_msg}")
             return
-        self.log_text.append(
-            f"[警告] ADB 连接异常，请重连 {target.display_name} 后点击恢复: {error_msg}")
-        self.statusBar().showMessage(tr("ADB 异常，请重连设备后点击恢复"))
+        self.log_text.append(tr(
+            "[警告] ADB 连接异常，请恢复 {name} 的连接后点击恢复；"
+            "若无法恢复，请按 F10 停止任务后重新连接: {error}").format(
+                name=target.display_name, error=error_msg))
+        self.statusBar().showMessage(tr(
+            "ADB 异常，请恢复设备连接后点击恢复；无法恢复时请按 F10 停止"))
         banner = getattr(self, '_adb_banner', None)
         if banner is not None:
             label = getattr(self, '_adb_banner_label', None)
             if label is not None:
-                label.setText(tr("⚠ ADB 连接异常，请重连设备后点击右侧「恢复」"))
+                label.setText(tr(
+                    "⚠ ADB 连接异常：恢复设备连接后点击「恢复」；"
+                    "无法恢复时请按 F10 停止任务"))
             btn = getattr(self, '_adb_banner_btn', None)
             if btn is not None:
                 try:

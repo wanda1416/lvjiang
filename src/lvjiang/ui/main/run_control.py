@@ -412,8 +412,40 @@ class RunControlMixin:
 
     @property
     def _running(self) -> bool:
-        """运行状态派生自 _run_state（唯一事实来源）"""
+        """当前查看目标是否有运行实例。"""
+        manager = getattr(self, "_run_manager", None)
+        registry = getattr(self, "_execution_targets", None)
+        target_id = registry.active_target_id if registry is not None else None
+        if manager is not None and target_id:
+            return manager.run_for_target(target_id) is not None
         return getattr(self, '_run_state', 'idle') != 'idle'
+
+    def _project_run_context_for_target(self, target_id: str | None) -> None:
+        """把目标对应的运行实例投影到迁移期单任务 UI 字段。"""
+        run_context = (
+            self._run_manager.run_for_target(target_id) if target_id else None
+        )
+        self._current_run_context = run_context
+        if run_context is None:
+            self._current_worker = None
+            self._current_engine = None
+            self._execution_lease = None
+            self._ui_helper = None
+            self._pause_event = None
+            self._stop_requested = False
+            self._run_state = "idle"
+            self._running_target_id = None
+            self._running_target_snapshot = None
+            return
+        self._current_worker = run_context.worker
+        self._current_engine = run_context.engine
+        self._execution_lease = run_context.lease
+        self._ui_helper = run_context.ui_helper
+        self._pause_event = run_context.pause_event
+        self._stop_requested = run_context.stop_event.is_set()
+        self._run_state = run_context.state.value
+        self._running_target_id = run_context.target_id
+        self._running_target_snapshot = run_context.target_snapshot
 
     # ─── 工作流配置加载 ──────────────────────────────────
 
@@ -904,6 +936,10 @@ class RunControlMixin:
             return False
         self._current_run_context = run_context
         run_context.lease = getattr(self, "_execution_lease", None)
+        # RapidOCR/ONNX 的同实例并发安全没有契约保证；每个运行实例持有
+        # 独立的懒加载引擎，避免多设备推理互相污染。
+        from ...core.ocr import OCREngine
+        run_context.ocr = OCREngine()
         self._stop_requested = False
         self._run_state = "running"
         registry = getattr(self, "_execution_targets", None)
@@ -914,9 +950,12 @@ class RunControlMixin:
         self._run_manager.set_state(run_context.task_run_id, RunState.RUNNING)
         # 暂停事件：set=运行，clear=暂停阻塞
         signal = getattr(self, "_pause_acknowledged", None)
-        notify = signal.emit if signal is not None else self._on_pause_acknowledged
+        notify = (lambda: signal.emit(run_context.task_run_id)) \
+            if signal is not None \
+            else (lambda: self._on_pause_acknowledged(run_context.task_run_id))
         self._pause_event = _AcknowledgedPauseEvent(notify)
         self._pause_event.set()  # 初始为运行状态
+        run_context.pause_event = self._pause_event
         self._refresh_run_button()
         self._refresh_pause_button()
         self.statusBar().showMessage(self._hotkey_status(
@@ -1033,6 +1072,9 @@ class RunControlMixin:
                 RunState.INTERRUPTED if was_stopped else RunState.COMPLETED,
             )
         if not is_current:
+            refresh_targets = getattr(self, "_refresh_execution_targets_ui", None)
+            if callable(refresh_targets):
+                refresh_targets()
             logger.info(f"后台运行实例结束: {name}")
             return
         self._stop_requested = False
@@ -1173,6 +1215,8 @@ class RunControlMixin:
         run_context = getattr(self, "_current_run_context", None)
         if run_context is not None:
             run_context.stop_event.set()
+            from .execution_runs import RunState
+            self._run_manager.set_state(run_context.task_run_id, RunState.STOPPING)
         self._run_state = STATE_STOPPING
         # 先刷按钮再做日志、唤醒和对话框收尾，避免日志控件重排等
         # 工作让用户产生「没点到」的感觉。
@@ -1260,6 +1304,10 @@ class RunControlMixin:
         if getattr(self, '_run_state', 'idle') != 'running':
             return
         self._run_state = STATE_PAUSING
+        run_context = getattr(self, "_current_run_context", None)
+        if run_context is not None:
+            from .execution_runs import RunState
+            self._run_manager.set_state(run_context.task_run_id, RunState.PAUSING)
         pause_event = getattr(self, '_pause_event', None)
         if pause_event is not None:
             pause_event.clear()  # 阻塞工作流线程
@@ -1273,9 +1321,25 @@ class RunControlMixin:
         self.statusBar().showMessage(paused_status)
         logger.info("工作流暂停中")
 
-    def _on_pause_acknowledged(self) -> None:
+    def _on_pause_acknowledged(self, task_run_id: str = "") -> None:
         """主线程槽：工作流已走到暂停检查点，正式进入 paused。"""
-        if getattr(self, '_run_state', 'idle') != STATE_PAUSING:
+        run_context = (
+            self._run_manager.run(task_run_id) if task_run_id
+            else getattr(self, "_current_run_context", None)
+        ) if hasattr(self, "_run_manager") else None
+        if run_context is None:
+            if task_run_id or getattr(self, '_run_state', 'idle') != STATE_PAUSING:
+                return
+            self._run_state = 'paused'
+            self._refresh_pause_button()
+            self._refresh_run_button()
+            return
+        if run_context.state.value != STATE_PAUSING:
+            return
+        from .execution_runs import RunState
+        self._run_manager.set_state(run_context.task_run_id, RunState.PAUSED)
+        if run_context is not getattr(self, "_current_run_context", None):
+            self._refresh_execution_targets_ui()
             return
         self._run_state = 'paused'
         self._refresh_pause_button()
@@ -1292,6 +1356,10 @@ class RunControlMixin:
         if getattr(self, '_run_state', 'idle') != 'paused':
             return
         self._run_state = 'running'
+        run_context = getattr(self, "_current_run_context", None)
+        if run_context is not None:
+            from .execution_runs import RunState
+            self._run_manager.set_state(run_context.task_run_id, RunState.RUNNING)
         pause_event = getattr(self, '_pause_event', None)
         if pause_event is not None:
             pause_event.set()  # 唤醒工作流线程
@@ -1506,7 +1574,7 @@ class RunControlMixin:
 
         engine = DeviceWorkflowEngineBuilder(
             capture=target_snapshot.capture,
-            ocr=self._ocr,
+            ocr=run_context.ocr,
             input_ctrl=target_snapshot.input_ctrl,
             layout=layout,
             input_sim=self._user_config.input_sim,
@@ -1554,7 +1622,7 @@ class RunControlMixin:
             wf_class = get_workflow_class(wf_class_name)
             wf_instance = wf_class(
                 capture=target_snapshot.capture,
-                ocr=self._ocr,
+                ocr=run_context.ocr,
                 input_ctrl=target_snapshot.input_ctrl,
                 layout=layout,
                 input_sim=self._user_config.input_sim,
@@ -1797,9 +1865,13 @@ class RunControlMixin:
             selector.setEnabled(not self._running)
         target_list = getattr(self, "execution_target_list", None)
         if target_list is not None:
-            target_list.setEnabled(not self._running)
-            target_list.setToolTip(
-                tr("任务运行中，执行目标已锁定") if self._running else "")
+            # 目标列表始终可切换查看；运行实例持有自己的冻结快照，切换
+            # 只改变主页面投影，不会让正在执行的工作流改道。
+            target_list.setEnabled(True)
+            target_list.setToolTip("")
+            refresh_targets = getattr(self, "_refresh_execution_targets_ui", None)
+            if callable(refresh_targets):
+                refresh_targets()
         disconnect = getattr(self, "btn_disconnect_target", None)
         if disconnect is not None:
             disconnect.setEnabled(
@@ -1907,7 +1979,7 @@ class RunControlMixin:
 
         engine = DeviceWorkflowEngineBuilder(
             capture=target_snapshot.capture,
-            ocr=self._ocr,
+            ocr=run_context.ocr,
             input_ctrl=target_snapshot.input_ctrl,
             layout=layout,
             input_sim=self._user_config.input_sim,
@@ -1930,7 +2002,7 @@ class RunControlMixin:
         wf_class = get_workflow_class(impl_name)
         wf_instance = wf_class(
             capture=target_snapshot.capture,
-            ocr=self._ocr,
+            ocr=run_context.ocr,
             input_ctrl=target_snapshot.input_ctrl,
             layout=layout,
             input_sim=self._user_config.input_sim,

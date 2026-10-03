@@ -5,7 +5,12 @@ from lvjiang.ui.main.execution_runs import (
     RunState,
     StartDenial,
 )
-from lvjiang.ui.main.execution_targets import ExecutionTarget, android_target_id
+from lvjiang.ui.main.execution_targets import (
+    ExecutionTarget,
+    ExecutionTargetRegistry,
+    android_target_id,
+)
+from lvjiang.ui.main.run_control import RunControlMixin
 
 
 def _snapshot(identity: str):
@@ -91,3 +96,40 @@ def test_stop_all_signals_every_context_and_reports_running_workers() -> None:
     assert first.state == RunState.STOPPING
     assert second.state == RunState.STOPPING
     assert manager.unfinished_workers() == (first,)
+
+
+def test_switching_target_projects_only_that_targets_run_context() -> None:
+    registry = ExecutionTargetRegistry()
+    first_target = ExecutionTarget(
+        id=android_target_id("A"), kind="adb", display_name="设备 A",
+        capture=object(), input_ctrl=object())
+    second_target = ExecutionTarget(
+        id=android_target_id("B"), kind="adb", display_name="设备 B",
+        capture=object(), input_ctrl=object())
+    registry.put(first_target)
+    registry.put(second_target)
+    manager = ExecutionRunManager(lv1_check=lambda: True, parallel_enabled=True)
+    _, run = manager.try_begin(
+        target=first_target.snapshot(), username="甲", name="任务 A")
+    assert run is not None
+    run.worker = object()
+    run.engine = object()
+    run.pause_event = object()
+
+    host = type("Host", (), {})()
+    host._run_manager = manager
+    host._execution_targets = registry
+    host._current_run_context = None
+    registry.select(second_target.id)
+
+    RunControlMixin._project_run_context_for_target(host, second_target.id)
+    assert host._current_run_context is None
+    assert host._current_worker is None
+    assert host._run_state == "idle"
+
+    registry.select(first_target.id)
+    RunControlMixin._project_run_context_for_target(host, first_target.id)
+    assert host._current_run_context is run
+    assert host._current_worker is run.worker
+    assert host._current_engine is run.engine
+    assert host._running_target_snapshot is run.target_snapshot

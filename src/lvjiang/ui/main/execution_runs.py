@@ -9,7 +9,7 @@ import threading
 import uuid
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Callable
+from typing import Any, Callable
 
 from .execution_targets import ExecutionTargetSnapshot
 
@@ -52,9 +52,11 @@ class ExecutionRunContext:
     name: str
     state: RunState = RunState.STARTING
     engine: object | None = None
+    ocr: Any = None
     worker: object | None = None
     ui_helper: object | None = None
     lease: object | None = None
+    pause_event: object | None = None
     stop_event: threading.Event = field(default_factory=threading.Event)
     metadata: dict[str, object] = field(default_factory=dict)
 

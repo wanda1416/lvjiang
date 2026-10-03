@@ -742,7 +742,7 @@ class TestSettingsPageBasics:
 
 
 class TestPoolPage:
-    """可用词条库在上、转律词条库在下；转律候选收窄为可用 ∩ 可转律。"""
+    """可用词条库与转律词条库左右分列；转律候选收窄为可用 ∩ 可转律。"""
 
     @staticmethod
     def _page(qtbot, data: dict):
@@ -794,3 +794,46 @@ class TestPoolPage:
         page, _changes = self._page(qtbot, data)
         page._apply()
         assert data["transmute_priority"] == ["会心率"]
+
+    def test_columns_are_side_by_side_with_edit_button_at_the_bottom(
+            self, qtbot):
+        """两库左右分列、编辑按钮落在列底：一屏看全两库，按钮不挤占列表宽度。"""
+        from PyQt6.QtWidgets import QGroupBox, QPushButton
+
+        data = {"affix_pool": ["最大外功攻击", "会意率"],
+                "transmute_priority": ["会意率"]}
+        page, _changes = self._page(qtbot, data)
+        page.resize(900, 500)
+        page.show()
+        qtbot.waitExposed(page)
+
+        boxes = page.findChildren(QGroupBox)
+        pool_box = next(b for b in boxes if b.title().startswith("可用词条库"))
+        prio_box = next(b for b in boxes if b.title().startswith("转律词条库"))
+        assert pool_box.geometry().top() == prio_box.geometry().top()
+        assert pool_box.geometry().right() < prio_box.geometry().left()
+
+        for box, affix_list in ((pool_box, page._pool_list),
+                                (prio_box, page._prio_list)):
+            list_widget = affix_list._list
+            button = next(
+                b for b in box.findChildren(QPushButton) if b.text() == "编辑")
+            list_bottom = list_widget.mapTo(
+                box, list_widget.rect().bottomLeft()).y()
+            assert button.geometry().top() >= list_bottom
+
+    def test_affix_rows_use_larger_text_and_spacing(self, qtbot):
+        """词条名比正文大一档、行距更松：默认行高下几十个词条名挤成一团。"""
+        from PyQt6.QtWidgets import QListWidget
+
+        data = {"affix_pool": ["最大外功攻击"], "transmute_priority": []}
+        page, _changes = self._page(qtbot, data)
+
+        baseline = QListWidget()
+        qtbot.addWidget(baseline)
+        baseline.addItem("最大外功攻击")
+        shown = page._pool_list._list
+
+        assert (shown.fontMetrics().horizontalAdvance("最大外功攻击")
+                > baseline.fontMetrics().horizontalAdvance("最大外功攻击"))
+        assert shown.sizeHintForRow(0) > baseline.sizeHintForRow(0)

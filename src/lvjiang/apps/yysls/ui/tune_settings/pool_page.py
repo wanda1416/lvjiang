@@ -1,11 +1,11 @@
 """词条库设置页（规则顶层）
 
-可用词条库、转律词条库均为「已选词条纯展示 + 编辑
-（AffixSelectSortDialog）」。可用词条库候选为标准词条全集；转律
-词条库候选 = 可用词条库已选 ∩ 各流派转律词条库并集（动态类四个
-词条只要在可用词条库里就直接允许，不做并集推算），平铺勾选，
-避免写进游戏里实际转不出来的词条。选择与排序均在对话框内完成。
-编辑共享 raw dict 顶层字段，变更即回调保存。
+可用词条库与转律词条库均为「已选词条纯展示 + 编辑
+（AffixSelectSortDialog）」，两库左右分列、编辑按钮落在各列最底下。
+可用词条库候选为标准词条全集；转律词条库候选 = 可用词条库已选 ∩
+各流派转律词条库并集（动态类四个词条只要在可用词条库里就直接
+允许，不做并集推算），平铺勾选，避免写进游戏里实际转不出来的词条。
+选择与排序均在对话框内完成。编辑共享 raw dict 顶层字段，变更即回调保存。
 """
 
 from __future__ import annotations
@@ -40,7 +40,13 @@ class _AffixListBox(QWidget):
 
     fill=False 时高度按 rows 行数固定；fill=True 时 rows 仅作最小
     高度，列表随页面剩余空间拉伸（填满到底部）。
+    编辑按钮不在本控件里：由页面接在列表与说明之后（列的最底下），
+    用 make_edit_button() 取已接好线、套好样式的那个按钮。
     """
+
+    #: 行的上下内边距。这一页要逐条扫几十个词条名，默认行高贴着看很累。
+    _ITEM_PADDING_VERTICAL = 4
+    _ITEM_PADDING_HORIZONTAL = 8
 
     def __init__(self, candidates: CandidateSource,
                  on_changed: Callable[[], None],
@@ -52,16 +58,27 @@ class _AffixListBox(QWidget):
         self._title = title
         self._flat = flat
 
-        layout = QHBoxLayout(self)
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         # 纯展示：禁用选中/编辑交互
         self._list = QListWidget()
         self._list.setSelectionMode(
             QAbstractItemView.SelectionMode.NoSelection)
         self._list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        # 词条名放大一档并加行内边距：词条名是这一页唯一要逐条读的内容
+        self._list.setStyleSheet(
+            f"QListWidget::item {{ padding: {self._ITEM_PADDING_VERTICAL}px "
+            f"{self._ITEM_PADDING_HORIZONTAL}px; }}")
+        font = self._list.font()
+        if font.pointSizeF() > 0:
+            font.setPointSizeF(font.pointSizeF() + 1)
+        else:
+            font.setPixelSize(max(1, font.pixelSize()) + 2)
+        self._list.setFont(font)
         # 展示高度按行数折算（fill 时为最小值，否则固定，超出滚动）；
         # 用临时项测真实行高（fontMetrics 估算偏小，会导致实际
-        # 可见行数不足 rows）
+        # 可见行数不足 rows）。字体与内边距必须在这之前设好，
+        # 否则量到的是旧行高。
         self._list.addItem(tr("测高"))
         row_h = self._list.sizeHintForRow(0)
         self._list.takeItem(0)
@@ -72,13 +89,12 @@ class _AffixListBox(QWidget):
             self._list.setFixedHeight(height)
         layout.addWidget(self._list, 1)
 
-        btn_col = QVBoxLayout()
-        btn_edit = QPushButton(tr("编辑"))
-        btn_edit.clicked.connect(self._edit)
-        apply_button_style(btn_edit, variant="neutral")
-        btn_col.addWidget(btn_edit)
-        btn_col.addStretch()
-        layout.addLayout(btn_col)
+    def make_edit_button(self) -> QPushButton:
+        """编辑按钮（已接线、已套样式），摆在哪里由页面决定。"""
+        button = QPushButton(tr("编辑"))
+        button.clicked.connect(self._edit)
+        apply_button_style(button, variant="neutral")
+        return button
 
     # ── 数据往返 ──
 
@@ -128,7 +144,12 @@ class PoolPage(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
 
-        # ── 可用词条库（在上，填满剩余高度）──
+        # 两库左右分列：一屏能同时看到可用库与转律库，比上下堆叠省一半高度；
+        # 编辑按钮各自接在列底（列表与说明之后），不再占列表宽度。
+        columns = QHBoxLayout()
+        columns.setSpacing(12)
+
+        # ── 可用词条库（左列，列表填满剩余高度）──
         pool_box = QGroupBox(tr("可用词条库（全局，各部位词条混放）"))
         pool_layout = QVBoxLayout(pool_box)
         self._pool_list = _AffixListBox(
@@ -142,22 +163,34 @@ class PoolPage(QWidget):
         note.setWordWrap(True)
         note.setStyleSheet("color: gray; font-size: 12px;")
         pool_layout.addWidget(note)
-        layout.addWidget(pool_box, 1)
+        pool_layout.addLayout(self._edit_row(self._pool_list))
+        columns.addWidget(pool_box, 1)
 
-        # ── 转律词条库（在下，候选收窄为可用词条库 ∩ 可转律词条）──
+        # ── 转律词条库（右列，候选收窄为可用词条库 ∩ 可转律词条）──
         prio_box = QGroupBox(tr("转律词条库（全局，优先级从高到低）"))
         prio_layout = QVBoxLayout(prio_box)
         self._prio_list = _AffixListBox(
             self.transmute_candidates, self._apply, tr("转律词条库"),
-            rows=7, flat=True)
-        prio_layout.addWidget(self._prio_list)
+            rows=7, flat=True, fill=True)
+        prio_layout.addWidget(self._prio_list, 1)
         prio_note = QLabel(
             tr("只能从可用词条库里、且各流派转律词条库允许转出的词条中选择；"
                "动态类四个词条只要在可用词条库中即可选。"))
         prio_note.setWordWrap(True)
         prio_note.setStyleSheet("color: gray; font-size: 12px;")
         prio_layout.addWidget(prio_note)
-        layout.addWidget(prio_box)
+        prio_layout.addLayout(self._edit_row(self._prio_list))
+        columns.addWidget(prio_box, 1)
+
+        layout.addLayout(columns, 1)
+
+    @staticmethod
+    def _edit_row(affix_list: _AffixListBox) -> QHBoxLayout:
+        """列底操作行：编辑按钮靠左，其余留白（与其它页的按钮行一致）。"""
+        row = QHBoxLayout()
+        row.addWidget(affix_list.make_edit_button())
+        row.addStretch(1)
+        return row
 
     def transmute_candidates(self) -> list[str]:
         """转律词条库候选：可用词条库已选 ∩ 转律库并集，动态类直接放行。

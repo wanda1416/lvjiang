@@ -130,7 +130,7 @@ _AFFIX_KEY_MAP: dict[str, str] = {
     "外功抗性": "EXTERNAL_DEFENCE",
 }
 
-# 武器/环/佩 → 穿透类定音；其余 → 技能增伤类定音
+# 攻具 → 穿透类定音；防具 → 技能增伤类定音
 _PENETRATION_SLOTS = frozenset({"weapon", "ring", "pendant"})
 
 

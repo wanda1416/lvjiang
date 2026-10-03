@@ -450,7 +450,7 @@ def prune_dominated(
             dominated = False
             for j in range(n):
                 if slot_key in {"main_weapon", "sub_weapon", "ring", "pendant"}:
-                    # 左侧装备还参与组合级套装与平均等级计算。不同套装或等级的
+                    # 攻具还参与组合级套装与平均等级计算。不同套装或等级的
                     # 候选即使单件属性被支配，也不能互相剪掉。
                     identity_i = (
                         str(entries[i][0].get("equipment_set") or ""),
@@ -655,9 +655,9 @@ def search_optimal_combo(
     if equipment_set:
         known_sets = get_game_config().get_equipment_sets("left")
         if equipment_set not in known_sets:
-            raise ValueError(f"未知左四套装: {equipment_set!r}")
+            raise ValueError(f"未知攻具套装: {equipment_set!r}")
         # 游戏可随时切换已选套装；最优组合不搜索每件装备当前套装，
-        # 而是把用户选定的一种套装投影到全部左四虚拟候选。
+        # 而是把用户选定的一种套装投影到全部攻具虚拟候选。
         for slot_key in LEFT_SET_SLOTS:
             for variant in variants.get(slot_key, []):
                 variant.virtual["equipment_set"] = equipment_set
@@ -790,7 +790,7 @@ def search_optimal_combo(
             active_slots[si]: slot_equip_arrays[si][idx]
             for si, idx in enumerate(combo_indices)
         }
-        # 右四候选不影响左四套装。按左四的套装+等级状态缓存，
+        # 防具候选不影响攻具套装。按攻具的套装+等级状态缓存，
         # 才能在枚举不同防具组合时真正复用；完整组合 key 永远不重复。
         set_key = tuple(
             (

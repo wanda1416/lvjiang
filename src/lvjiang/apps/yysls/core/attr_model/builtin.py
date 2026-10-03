@@ -45,7 +45,7 @@ def full_gold_equipment_attrs(level: int, base_attr_lookup) -> CombatAttributes:
 
     固有攻击的权威值仍来自 ``game_config/equipment.yaml``；这里仅构造
     八个槽位交给既有聚合函数，避免在属性模型里平行硬编码 380 / 757。
-    当前只有双武器、环、佩提供已建模的外功攻击，四件防具仍保留在
+    当前只有四件攻具提供已建模的外功攻击，四件防具仍保留在
     完整槽位快照中，后续补生存属性时无需改变这条契约。
     """
     equipped = {

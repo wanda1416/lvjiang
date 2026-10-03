@@ -9,7 +9,7 @@ from lvjiang.apps.yysls.core.combat.combat_attrs import apply_hypothetical_caps
 
 @pytest.fixture
 def styled():
-    """临时给「纯唐」配上输出/防御定音目标。"""
+    """临时给「纯唐」配上攻具/防具定音目标。"""
     g = get_game_config()
     styles = g.get_playstyles()
     g._playstyles = {**styles, "纯唐": {
@@ -29,7 +29,7 @@ def _equip(part, dingyin_name):
 
 
 def test_non_target_dingyin_is_replaced_not_kept(styled):
-    """输出装备定了无相穿透——那个定音位是白定的，不能计入。"""
+    """攻具定了无相穿透——那个定音位是白定的，不能计入。"""
     out = apply_hypothetical_caps(
         {"main_weapon": _equip("主武器", "无相穿透")},
         full_dingyin=True, playstyle="纯唐")

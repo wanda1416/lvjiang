@@ -111,8 +111,8 @@ class EquipmentData:
     base_attr: EquipAttr | None = None
     base_attr_2: EquipAttr | None = None
     affixes: list[Affix] = field(default_factory=list)
-    # 定音词条 {"name": 原始词条名, "value": 数值}；左四（武器/环/佩）为
-    # 外功增益/属攻增益的原始词条名，右四（防具）为指定技能增效的原始词条名
+    # 定音词条 {"name": 原始词条名, "value": 数值}；攻具（武器/环/佩）为
+    # 外功增益/属攻增益的原始词条名，防具为指定技能增效的原始词条名
     dingyin: dict = field(default_factory=dict)
     # 止戈定音槽。一件装备可以同时定着两种音、游戏里随时无成本切换，所以两者
     # 各占一槽，扫描到哪种只写哪种，另一槽由仓储写入入口从旧记录合并回来。

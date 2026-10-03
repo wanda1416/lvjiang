@@ -21,7 +21,7 @@ def test_equipment_sets_are_embedded_in_output_and_armor_pages(qtbot):
 
     panel = tab._base_panel
     panel._part_list.setCurrentRow(0)
-    assert panel._equipment_set_editor._title.text() == "输出套装定义"
+    assert panel._equipment_set_editor._title.text() == "攻具套装定义"
     assert _headers(panel._equipment_set_editor) == [
         "套装名称", "推荐流派", "基础属性",
     ]

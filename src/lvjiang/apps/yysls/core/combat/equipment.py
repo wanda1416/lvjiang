@@ -263,7 +263,7 @@ class EquipmentInventory:
     def apply_combos(
         self, combo_equipped: dict[str, dict], *, equipment_set: str = "",
     ) -> None:
-        """应用最优组合，并把所选左四套装写入当前方案。
+        """应用最优组合，并把所选攻具套装写入当前方案。
 
         搜索候选来自方案解析副本，可能带着方案套装覆盖；写装备池时必须按
         ``PLAN_SCAN`` 口径保留仓储原始套装，不能把覆盖态反写为装备事实。

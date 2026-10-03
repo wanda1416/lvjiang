@@ -1,6 +1,6 @@
 """装备套装的统一属性计算。
 
-左四套装的两件套属性属于整套组合，不能摊进单件装备。评分、基础属性反推
+攻具套装的两件套属性属于整套组合，不能摊进单件装备。评分、基础属性反推
 和最优组合都必须调用这里，避免同一套装在不同入口得到不同结果。
 """
 
@@ -33,10 +33,10 @@ def _tier_value(average_level: float, affix_name: str, game_config) -> float | N
 
 
 def equipment_set_bonus(equipped: dict[str, dict], game_config) -> CombatAttributes:
-    """计算完整左四装备的两件套属性；信息不完整时保守返回零。
+    """计算完整攻具的两件套属性；信息不完整时保守返回零。
 
     历史数据没有套装信息时，扫描面板反推出来的基础属性已经包含旧套装加成。
-    因而四件左侧装备必须全部有合法套装和等级，才允许显式累计。
+    因而四件攻具必须全部有合法套装和等级，才允许显式累计。
     """
     registry = game_config.get_equipment_sets("left")
     raw_left = [equipped.get(slot) for slot in LEFT_SET_SLOTS]

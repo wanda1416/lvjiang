@@ -938,6 +938,7 @@ auto_strings:
   取点亮度: 取点亮度
   取点颜色: 取点颜色
   取画布: 取画布
+  取一帧、更新预览并保存到 data/capture/picture: 取一帧、更新预览并保存到 data/capture/picture
   变量: 变量
   变量名（不用写 $）: 变量名（不用写 $）
   另存为: 另存为

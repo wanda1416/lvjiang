@@ -6,8 +6,9 @@
 参照图继续以旧内容加载。这个缺陷已经在用户侧发生过一次，所以拿真实的打包脚本比对
 真实约定，而不是靠注释里的假设。
 
-反向约束同样重要：清理范围绝不能扩到 `config/local`（用户自己的覆盖）和
-`config/session`（账号、装备库、历史记录），删掉就是毁用户数据。
+反向约束同样重要：清理范围绝不能扩到 `config/local`（用户自己的覆盖）、
+`config/session`（账号、装备库、历史记录）和 `data/capture`（截图、录屏），
+删掉就是毁用户数据。
 """
 
 from pathlib import Path
@@ -16,6 +17,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _INSTALLER = _REPO_ROOT / "packaging" / "installer.iss"
+_PACKAGE_BAT = _REPO_ROOT / "packaging" / "package.bat"
 _ANDROID_APP = (
     _REPO_ROOT / "android" / "app" / "src" / "main" / "java"
     / "com" / "lvjiang" / "app" / "App.kt"
@@ -41,7 +43,11 @@ def _installer_delete_targets() -> list[str]:
     return targets
 
 
-@pytest.mark.parametrize("target", [r"{app}\config\system", r"{app}\_internal"])
+@pytest.mark.parametrize("target", [
+    r"{app}\config\system",
+    r"{app}\_internal",
+    r"{app}\data\scrcpy",
+])
 def test_installer_purges_shipped_dirs(target):
     """覆盖安装前必须清空随包分发的目录，Inno 自己不会删消失的文件。"""
     targets = _installer_delete_targets()
@@ -50,13 +56,24 @@ def test_installer_purges_shipped_dirs(target):
         f"当前声明：{targets}。缺了它，上一版残留的文件会一直留在用户机器上")
 
 
-@pytest.mark.parametrize("protected", ["config\\local", "config\\session"])
+@pytest.mark.parametrize("protected", [
+    "config\\local",
+    "config\\session",
+    "data\\capture",
+])
 def test_installer_never_touches_user_data(protected):
     """清理范围不得扩到用户数据目录——它们不随包分发，删掉无法恢复。"""
     for target in _installer_delete_targets():
         assert protected not in target, (
             f"installer.iss 声明删除 {target}，其中包含用户数据目录 {protected}；"
-            f"随包分发的只有 config\\system，其余目录必须原样保留")
+            "用户数据目录必须原样保留")
+
+
+def test_windows_package_distributes_scrcpy_server_with_adb():
+    """JAR 已并入 adb 目录，打包脚本不得继续维护旧的单文件目录。"""
+    source = _PACKAGE_BAT.read_text(encoding="utf-8").lower()
+    assert r"data\adb" in source
+    assert r"data\scrcpy" not in source
 
 
 def test_android_wipes_system_config_before_extract():

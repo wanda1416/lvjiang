@@ -7,7 +7,7 @@
 - lvjiang 的 .lark 语法文件是 package-data，同样需显式声明；
 - 插件（load_app("yysls")）与工作流实现均为运行时动态 import，
   collect_submodules 全量收集 lvjiang 子模块兜底；
-- config/system 与 data/adb、data/scrcpy 不进 _internal，由 package.bat 拷到 exe 旁
+- config/system 与 data/adb 不进 _internal，由 package.bat 拷到 exe 旁
   （用户可见，配合 config/local 覆盖机制；内置 adb 使用户免装 platform-tools）；
 - windows_capture（后台截图）只在用到时才 import，静态分析收不到，且它带一个原生
   .pyd —— collect_all 整包收集。没装时跳过：非 Windows 本来就不会打包。

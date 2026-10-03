@@ -41,8 +41,8 @@ from .device import AdbDevice
 if TYPE_CHECKING:
     import av
 
-# scrcpy server jar 本地路径（相对于项目 data 目录）
-_JAR_RELATIVE = Path("data") / "scrcpy" / "scrcpy-server.jar"
+# scrcpy server 与内置 adb 一起分发，避免为单个文件保留独立目录。
+_JAR_RELATIVE = Path("data") / "adb" / "scrcpy-server.jar"
 # 设备端 jar 路径
 _REMOTE_JAR_PATH = "/data/local/tmp/scrcpy-server.jar"
 # 默认视频端口
@@ -84,7 +84,7 @@ class AndroidStreamCapture(CaptureBackend):
             max_size: 输出画面较长边的上限像素，0 表示不限制（使用设备原始分辨率，默认）
                       注意：工作流坐标与 input tap 共享同一坐标系，截图必须保持原始分辨率
             max_fps: 帧率上限，默认 15
-            jar_path: scrcpy-server.jar 路径；None 则使用项目 data/scrcpy/ 下默认路径
+            jar_path: scrcpy-server.jar 路径；None 则使用项目 data/adb/ 下默认路径
         """
         self._device = device
         self._max_size = max_size

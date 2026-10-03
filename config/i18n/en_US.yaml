@@ -938,6 +938,7 @@ auto_strings:
   取点亮度: Sample Point Brightness
   取点颜色: Sample Point Color
   取画布: Take Canvas
+  取一帧、更新预览并保存到 data/capture/picture: Capture a frame, update the preview, and save it to data/capture/picture
   变量: Variable
   变量名（不用写 $）: Variable name (no need to write $)
   另存为: Save As

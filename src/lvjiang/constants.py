@@ -14,7 +14,7 @@ def _project_root() -> Path:
     桌面端：仓库根（src/ 的父级；本文件位于 src/lvjiang/ 下，故上溯两层）。
 
     打包端（PyInstaller）：__file__ 落在 _internal/ 解包目录，不能当根用；
-    根 = exe 所在目录（config/system、data/scrcpy 随包放在 exe 旁）。
+    根 = exe 所在目录（config/system、data/adb 随包放在 exe 旁）。
 
     安卓端（Chaquopy）：__file__ 落在 APK 解压目录，只读且路径随版本变，
     不能当根用。AndroidPlatform 会把 HOME 指到应用 filesDir，故改用
@@ -47,8 +47,9 @@ OUTPUT_DIR = SESSION_CONFIG_DIR / "output"
 
 # 用户采集产出（录屏/截屏，与场景布局截图、工作流产出分开）
 DATA_DIR = PROJECT_ROOT / "data"
-VIDEO_DIR = DATA_DIR / "video"
-PICTURE_DIR = DATA_DIR / "picture"
+CAPTURE_DIR = DATA_DIR / "capture"
+VIDEO_DIR = CAPTURE_DIR / "video"
+PICTURE_DIR = CAPTURE_DIR / "picture"
 
 # 延迟参数与输入模拟参数已拆分到 config.py 的 delay_params / InputSimConfig，
 # 由 app.yaml 统一加载，不再在此处定义默认值

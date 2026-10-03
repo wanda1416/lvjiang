@@ -126,7 +126,7 @@ class CaptureOpsMixin:
 
         # 截屏（独立于录屏状态机，点击立即保存）
         self.btn_snap = QPushButton(tr("截屏"))
-        self.btn_snap.setToolTip(tr("取一帧、更新预览并保存到 data/picture"))
+        self.btn_snap.setToolTip(tr("取一帧、更新预览并保存到 data/capture/picture"))
         self.btn_snap.setStyleSheet(_STYLE_SNAP)
         self.btn_snap.clicked.connect(self._on_snap)
         lay.addWidget(self.btn_snap)
@@ -327,7 +327,7 @@ class CaptureOpsMixin:
         self.statusBar().showMessage(tr("预览已刷新"), 2000)
 
     def _on_snap(self):
-        """截屏：更新预览并把这一帧保存到 data/picture"""
+        """截屏：更新预览并把这一帧保存到 data/capture/picture"""
         img = self._grab_capture_image()
         if img is None:
             self.log_text.append(tr("[截屏] 截屏失败：无可用画面"))

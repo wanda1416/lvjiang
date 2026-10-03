@@ -7,6 +7,7 @@ import numpy as np
 from loguru import logger
 from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtWidgets import QMenu, QTreeWidgetItem
 
 from ...i18n import tr
 from ..button_styles import apply_button_style, fit_button_width
@@ -26,10 +27,14 @@ def bg_capture_tip() -> str:
 
 class _AdbConnSignalBridge(QObject):
     """工作流线程 → 主线程的 ADB 断连信号桥"""
-    adb_lost = pyqtSignal(str)
+    adb_lost = pyqtSignal(str, str)
+
+    def __init__(self, target_id: str):
+        super().__init__()
+        self._target_id = target_id
 
     def notify_lost(self, error_msg: str):
-        self.adb_lost.emit(error_msg)
+        self.adb_lost.emit(self._target_id, error_msg)
 
 
 class _DeviceWorker(QObject):
@@ -129,9 +134,9 @@ class _DeviceWorker(QObject):
         if self._agent_mode:
             agent = connect_agent(device)
             if agent is None:
-                self.notice.emit(tr("[设备端手势] App 不可达或设备端输入通道未就绪，回退 adb shell input"))
+                self.notice.emit(tr("[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input"))
             else:
-                self.notice.emit(f"[设备端手势] 已连接 {agent.describe()}")
+                self.notice.emit(f"[设备端执行] 已连接 {agent.describe()}")
 
         capture = create_capture_backend(device=device, method=method)
         started = capture.start()
@@ -298,7 +303,7 @@ class WindowOpsMixin:
 
     依赖主类提供:
         _target_window, _scanned_windows, _overlay, _capture, _last_capture,
-        _layout_manager, _running, btn_locate, lbl_window_info, window_combo,
+        _layout_manager, _running, btn_locate, window_combo,
         preview_label, log_text, statusBar(), _refresh_run_button()
     scrcpy 帧信号:
         主类需定义 _scrcpy_frame_ready = pyqtSignal(object) 并连接 _on_scrcpy_frame_ui
@@ -307,21 +312,296 @@ class WindowOpsMixin:
     # 流式截图态的类级兜底：连接成功前被读也有明确默认值
     _scrcpy_streaming = False
 
+    # ─── 已连接目标 / 执行目标 ─────────────────────────────
+
+    def _active_execution_target(self):
+        return self._execution_targets.active()
+
+    def _sync_active_target_compat(self) -> None:
+        """把当前执行目标投影到既有单目标字段。
+
+        大量场景、采集和工作流入口仍通过这些字段访问后端；投影只发生在空闲期的
+        显式目标切换，运行中目标列表被锁定，因此不会让正在执行的引擎改道。
+        """
+        target = self._active_execution_target()
+        if target is None:
+            self._backend = None
+            self._capture = None
+            self._input = None
+            self._device = None
+            self._device_ready = False
+            self._target_window = None
+            self._agent = None
+            self._scrcpy_streaming = False
+            self._last_capture = None
+            return
+        self._backend = target.kind
+        self._capture = target.capture
+        self._input = target.input_ctrl
+        self._device = target.device
+        self._device_ready = target.kind == "adb" and target.ready
+        self._target_window = target.window
+        self._agent = target.agent
+        self._scrcpy_streaming = target.streaming
+        self._last_capture = target.last_capture
+        if target.resume_event is not None:
+            self._adb_resume_event = target.resume_event
+        from ...core.app_controller import set_active_connected_target
+        set_active_connected_target(target.id)
+
+    def _store_active_target_compat(self) -> None:
+        """把兼容字段上的后端替换写回当前目标。"""
+        target = self._active_execution_target()
+        if target is None:
+            return
+        target.capture = self._capture
+        target.input_ctrl = self._input
+        target.input_kind = str(getattr(self._input, "kind", "") or "")
+        target.window = self._target_window
+        target.device = self._device
+        target.agent = getattr(self, "_agent", None)
+        target.streaming = self._scrcpy_streaming
+        if target.kind == "adb":
+            target.capture_method = self._user_config.android_capture_method
+        target.last_capture = self._last_capture
+
+    @staticmethod
+    def _target_connection_details(target) -> str:
+        if target.kind == "adb":
+            size = f"{target.width}×{target.height}" \
+                if target.width and target.height else ""
+            return " · ".join(part for part in (target.serial, size) if part)
+        window = target.window or {}
+        size = f"{window.get('width', 0)}×{window.get('height', 0)}"
+        origin = f"({window.get('left', 0)}, {window.get('top', 0)})"
+        return tr("起点 {origin} · {size}").format(origin=origin, size=size)
+
+    @staticmethod
+    def _target_status_details(target) -> str:
+        if target.kind == "adb":
+            return " · ".join(part for part in (
+                target.capture_method,
+                tr("设备端执行") if target.agent is not None else "ADB",
+            ) if part)
+        from ...core.desktop import WgcCapture
+        input_mode = tr("后台模式") \
+            if bool(getattr(target.input_ctrl, "background_mode", False)) \
+            else tr("前台模式")
+        capture_mode = tr("后台截图") \
+            if isinstance(target.capture, WgcCapture) else tr("前台截图")
+        return tr("{input_mode} · {capture_mode}").format(
+            input_mode=input_mode,
+            capture_mode=capture_mode,
+        )
+
+    def _target_details(self, target) -> str:
+        """日志使用的完整摘要；UI 分列展示连接与状态。"""
+        return " · ".join(part for part in (
+            self._target_connection_details(target),
+            self._target_status_details(target),
+        ) if part)
+
+    def _refresh_execution_targets_ui(self) -> None:
+        tree = self.execution_target_list
+        selected_id = self._execution_targets.active_target_id
+        tree.blockSignals(True)
+        tree.clear()
+        selected_item = None
+        for target in self._execution_targets.all():
+            item = QTreeWidgetItem([
+                target.display_name,
+                tr("已连接") if target.ready else tr("已离线"),
+                self._target_connection_details(target),
+                self._target_status_details(target),
+                "×",
+            ])
+            item.setData(0, Qt.ItemDataRole.UserRole, target.id)
+            item.setTextAlignment(4, Qt.AlignmentFlag.AlignCenter)
+            item.setToolTip(
+                4, tr("断开定位") if target.kind == "windows"
+                else tr("断开连接"))
+            tree.addTopLevelItem(item)
+            if target.id == selected_id:
+                selected_item = item
+        if selected_item is not None:
+            tree.setCurrentItem(selected_item)
+        tree.resizeColumnToContents(0)
+        tree.resizeColumnToContents(1)
+        tree.blockSignals(False)
+
+    @staticmethod
+    def _execution_target_id_from_item(item) -> str:
+        if item is None:
+            return ""
+        return str(item.data(0, Qt.ItemDataRole.UserRole) or "")
+
+    def _on_execution_target_item_clicked(self, item, column: int) -> None:
+        if column != 4:
+            return
+        self._disconnect_execution_target(
+            self._execution_target_id_from_item(item))
+
+    def _on_execution_target_context_menu(self, pos) -> None:
+        item = self.execution_target_list.itemAt(pos)
+        target_id = self._execution_target_id_from_item(item)
+        target = self._execution_targets.get(target_id)
+        if target is None:
+            return
+        menu = QMenu(self.execution_target_list)
+        if target.kind == "windows":
+            background_action = menu.addAction(tr("后台模式"))
+            assert background_action is not None
+            background_action.setCheckable(True)
+            background_action.setChecked(
+                bool(getattr(target.input_ctrl, "background_mode", False)))
+            from ...core.desktop import WgcCapture
+            capture_action = menu.addAction(tr("后台截图"))
+            assert capture_action is not None
+            capture_action.setCheckable(True)
+            capture_action.setChecked(isinstance(target.capture, WgcCapture))
+            marker_action = menu.addAction(tr("红框标定"))
+            assert marker_action is not None
+            marker_action.setCheckable(True)
+            marker_action.setChecked(self.chk_red_box.isChecked())
+            menu.addSeparator()
+            refresh_action = menu.addAction(tr("刷新位置"))
+            disconnect_action = menu.addAction(tr("断开定位"))
+            assert refresh_action is not None
+            assert disconnect_action is not None
+            chosen = menu.exec(
+                self.execution_target_list.viewport().mapToGlobal(pos))
+            if chosen is background_action:
+                self._set_window_target_background_input(
+                    target_id, background_action.isChecked())
+            elif chosen is capture_action:
+                self._set_window_target_background_capture(
+                    target_id, capture_action.isChecked())
+            elif chosen is marker_action:
+                self._set_window_target_marker(
+                    target_id, marker_action.isChecked())
+            elif chosen is refresh_action:
+                self._refresh_or_reconnect_execution_target(target_id)
+            elif chosen is disconnect_action:
+                self._disconnect_execution_target(target_id)
+        else:
+            capture_action = menu.addAction(tr("流式截图"))
+            assert capture_action is not None
+            capture_action.setCheckable(True)
+            capture_action.setChecked(target.capture_method == "scrcpy")
+            execution_action = menu.addAction(tr("设备端执行"))
+            assert execution_action is not None
+            execution_action.setCheckable(True)
+            execution_action.setChecked(target.agent is not None)
+            menu.addSeparator()
+            refresh_action = menu.addAction(tr("重新连接"))
+            disconnect_action = menu.addAction(tr("断开连接"))
+            assert refresh_action is not None
+            assert disconnect_action is not None
+            chosen = menu.exec(
+                self.execution_target_list.viewport().mapToGlobal(pos))
+            if chosen is capture_action:
+                self._set_android_target_streaming(
+                    target_id, capture_action.isChecked())
+            elif chosen is execution_action:
+                self._reconnect_android_target(
+                    target_id, device_execution=execution_action.isChecked())
+            elif chosen is refresh_action:
+                self._refresh_or_reconnect_execution_target(target_id)
+            elif chosen is disconnect_action:
+                self._disconnect_execution_target(target_id)
+
+    def _on_execution_target_selected(self, current, _previous=None) -> None:
+        if current is None:
+            return
+        target_id = current.data(0, Qt.ItemDataRole.UserRole)
+        if not target_id or target_id == self._execution_targets.active_target_id:
+            return
+        if self._running:
+            self.log_text.append(tr("[提示] 任务运行中，执行目标已锁定"))
+            self._refresh_execution_targets_ui()
+            return
+        self._execution_targets.select(str(target_id))
+        self._sync_active_target_compat()
+        self._refresh_active_target_ui()
+        self._refresh_run_button()
+        self.log_text.append(
+            tr("[执行目标] 已切换到 {name}").format(
+                name=self._active_execution_target().display_name))
+
+    def _refresh_active_target_ui(self) -> None:
+        target = self._active_execution_target()
+        if target is None:
+            self.preview_label.clear()
+            self.preview_label.setText(tr("连接目标后可预览"))
+            return
+        if target.last_capture is not None:
+            self._show_preview_image(target.last_capture)
+        elif target.ready:
+            self._capture_preview()
+
+    def _refresh_connection_draft_ui(self, mode: str | None) -> None:
+        """显示候选类型的连接草稿，不读取当前执行目标。"""
+        is_adb = mode == "adb"
+        is_windows = mode == "windows"
+        self.chk_scrcpy.setVisible(is_adb)
+        self.chk_agent.setVisible(is_adb)
+        self.chk_bg_mode.setVisible(is_windows)
+        self.chk_bg_capture.setVisible(is_windows)
+        self.chk_red_box.setVisible(False)
+
+        for checkbox in (
+                self.chk_scrcpy, self.chk_agent,
+                self.chk_bg_mode, self.chk_bg_capture):
+            checkbox.setEnabled(not self._running)
+        if is_adb:
+            self.chk_scrcpy.blockSignals(True)
+            self.chk_scrcpy.setChecked(
+                self._android_connection_draft.capture_method == "scrcpy")
+            self.chk_scrcpy.blockSignals(False)
+            self.chk_agent.blockSignals(True)
+            self.chk_agent.setChecked(
+                self._android_connection_draft.device_execution)
+            self.chk_agent.blockSignals(False)
+        elif is_windows:
+            from ...core.desktop import wgc_available
+            available, unavailable_reason = wgc_available()
+            if not self._window_connection_draft.background_input:
+                self._window_connection_draft.background_capture = False
+                reason = tr(
+                    "需要先勾选「后台模式」：前台输入要求窗口在前台，配后台截图没有意义")
+            elif not available:
+                self._window_connection_draft.background_capture = False
+                reason = unavailable_reason
+            elif self._running:
+                reason = tr("运行中不能修改下一次连接参数")
+            else:
+                reason = ""
+            self.chk_bg_mode.blockSignals(True)
+            self.chk_bg_mode.setChecked(
+                self._window_connection_draft.background_input)
+            self.chk_bg_mode.blockSignals(False)
+            self.chk_bg_capture.blockSignals(True)
+            self.chk_bg_capture.setChecked(
+                self._window_connection_draft.background_capture)
+            self.chk_bg_capture.blockSignals(False)
+            self.chk_bg_capture.setEnabled(not reason)
+            self.chk_bg_capture.setToolTip(reason or bg_capture_tip())
+
     # ─── 后端模式切换 ──────────────────────────────────────
 
     def _apply_backend_ui(self, mode: str):
-        """根据当前后端模式调整定位按钮文案。
-        两个扫描按钮始终保留，用户点哪个即切到哪个模式。
-        """
+        """根据当前候选类型调整连接按钮；不改变执行目标。"""
+        self._candidate_backend = mode
         if mode == "adb":
             self.btn_locate.setText(tr("连接"))
         else:
             self.btn_locate.setText(tr("定位"))
+        self._refresh_connection_draft_ui(mode)
 
     # ─── 窗口扫描 ──────────────────────────────────────────
 
     def _on_scan_window(self):
-        """扫描所有可见窗口，填充列表（切换到 Windows 投屏模式）"""
+        """扫描所有可见窗口；只刷新候选，不改变连接或执行目标。"""
         from ...core.platforms import DESKTOP_BACKEND_AVAILABLE
         if not DESKTOP_BACKEND_AVAILABLE:
             # 按钮在非 Windows 已隐藏，此处为防御：投屏模式依赖 Win32 API
@@ -331,45 +611,10 @@ class WindowOpsMixin:
             self.log_text.append(tr("[提示] 请先停止当前任务，再重新扫描窗口"))
             return
 
-        # 切到 windows 模式：清理可能存在的 ADB 资源，恢复 Windows 输入控制器
-        self._teardown_adb_backend()
-        self._set_connected_ui(False)
-        self._backend = "windows"
-        self._input = self._win_input
         self._apply_backend_ui("windows")
 
-        # 显示后台模式开关，隐藏流式截图开关
-        if hasattr(self, "chk_bg_mode"):
-            if not self.chk_bg_mode.isVisible():
-                # 首次进入 Windows 模式，从配置读取初始状态
-                self.chk_bg_mode.blockSignals(True)
-                self.chk_bg_mode.setChecked(self._user_config.desktop_background_input)
-                self.chk_bg_mode.blockSignals(False)
-            self.chk_bg_mode.setVisible(True)
-            self.chk_bg_mode.setEnabled(True)
-        # 后台截图的可用性由「后台模式 + 组件可用性」决定，勾选状态取配置默认值
-        self._refresh_bg_capture_visibility()
-        self._apply_bg_capture_default()
-        # 红框标定随后台模式一起显示；勾选状态只在本次运行期间有效。
-        if hasattr(self, "chk_red_box"):
-            self.chk_red_box.setVisible(True)
-            self.chk_red_box.setEnabled(True)
-        if hasattr(self, "chk_scrcpy"):
-            self.chk_scrcpy.setVisible(False)
-        if hasattr(self, "chk_agent"):
-            self.chk_agent.setVisible(False)
-
-        had_target = self._target_window is not None
-        self._target_window = None
-        self._red_box_flash_timer.stop()
-        self._overlay.hide_border()
         self.btn_locate.setEnabled(False)
-        self.lbl_window_info.setText(tr("未定位窗口"))
-        self.lbl_window_info.setStyleSheet("color: gray;")
         self.statusBar().showMessage(tr("正在扫描窗口..."))
-        self._refresh_run_button()
-        if had_target:
-            self.log_text.append(tr("[状态] 重新扫描窗口，旧定位已失效"))
 
         from ...core.desktop import list_visible_windows
         self._scanned_windows = list_visible_windows()
@@ -399,8 +644,6 @@ class WindowOpsMixin:
         else:
             self.log_text.append(f"[扫描] 找到 {len(self._scanned_windows)} 个窗口，请下拉选择目标窗口")
         self.btn_locate.setEnabled(True)
-        self.lbl_window_info.setText(tr("请下拉选择目标窗口..."))
-        self.lbl_window_info.setStyleSheet("color: orange;")
         self.statusBar().showMessage(tr("已扫描窗口 | 请下拉选择目标窗口并点击定位"))
 
     def _on_window_selected(self, index):
@@ -410,7 +653,7 @@ class WindowOpsMixin:
     # ─── ADB 设备扫描/连接 ─────────────────────────────────
 
     def _on_scan_devices(self):
-        """扫描已连接（device 状态）的设备，填充下拉框（切换到 ADB 设备模式）"""
+        """扫描 ADB 设备；只刷新候选，不断开已连接目标。"""
         if self._device_scan_running():
             self._cancel_device_scan()
             return
@@ -418,50 +661,13 @@ class WindowOpsMixin:
             self.log_text.append(tr("[提示] 请先停止当前任务，再重新扫描设备"))
             return
 
-        # 切到 adb 模式：清理旧 ADB 资源与 Windows 定位状态
-        self._teardown_adb_backend()
-        self._set_connected_ui(False)
-        self._backend = "adb"
         self._apply_backend_ui("adb")
 
-        # 显示流式截图开关，隐藏后台模式开关
-        if hasattr(self, "chk_scrcpy"):
-            if not self.chk_scrcpy.isVisible():
-                # 首次进入 ADB 模式，从配置读取初始状态
-                is_scrcpy = self._user_config.android_capture_method == "scrcpy"
-                self.chk_scrcpy.blockSignals(True)
-                self.chk_scrcpy.setChecked(is_scrcpy)
-                self.chk_scrcpy.blockSignals(False)
-            self.chk_scrcpy.setVisible(True)
-            self.chk_scrcpy.setEnabled(True)
-        if hasattr(self, "chk_agent"):
-            if not self.chk_agent.isVisible():
-                self.chk_agent.blockSignals(True)
-                self.chk_agent.setChecked(
-                    self._user_config.android_input_method == "device_gesture")
-                self.chk_agent.blockSignals(False)
-            self.chk_agent.setVisible(True)
-            self.chk_agent.setEnabled(True)
-        if hasattr(self, "chk_bg_mode"):
-            self.chk_bg_mode.setVisible(False)
-        if hasattr(self, "chk_bg_capture"):
-            self.chk_bg_capture.setVisible(False)
-        if hasattr(self, "chk_red_box"):
-            self.chk_red_box.setVisible(False)
-        self._red_box_flash_timer.stop()
-        if self._target_window is not None:
-            self._target_window = None
-            self._overlay.hide_border()
-
-        self._device_ready = False
         self.btn_locate.setEnabled(False)
         self.btn_scan_window.setEnabled(False)
         self.btn_scan_device.setEnabled(True)
         self.btn_scan_device.setText(tr("取消扫描"))
-        self.lbl_window_info.setText(tr("未连接设备"))
-        self.lbl_window_info.setStyleSheet("color: gray;")
         self.statusBar().showMessage(tr("正在扫描设备..."))
-        self._refresh_run_button()
 
         # 异步扫描
         self._wait_device_thread()
@@ -493,8 +699,6 @@ class WindowOpsMixin:
             label = d["serial"] + (f"  ({d['model']})" if d["model"] else "")
             self.window_combo.addItem(label, d)
         self.btn_locate.setEnabled(True)
-        self.lbl_window_info.setText(tr("请下拉选择设备并点击连接..."))
-        self.lbl_window_info.setStyleSheet("color: orange;")
         self.log_text.append(f"[扫描] 找到 {len(devices)} 台设备，请选择并点击连接")
         self.statusBar().showMessage(tr("已扫描设备 | 请选择设备并点击连接"))
 
@@ -661,8 +865,6 @@ class WindowOpsMixin:
             label = d["serial"] + (f"  ({d['model']})" if d.get("model") else "")
             self.window_combo.addItem(label, d)
         self.btn_locate.setEnabled(True)
-        self.lbl_window_info.setText(f"已发现 {len(devices)} 台设备，请选择并点击连接")
-        self.lbl_window_info.setStyleSheet("color: green;")
         self.log_text.append(f"[扫描] 发现 {len(devices)} 台设备，请选择并点击连接")
         self.statusBar().showMessage(f"已发现 {len(devices)} 台设备 | 请选择并点击连接")
 
@@ -691,63 +893,93 @@ class WindowOpsMixin:
         self.statusBar().showMessage(tr("扫描失败 | 详见日志"))
 
     def _on_connect_device(self):
-        """ADB 模式：异步连接选中设备（adb shell input + adb screencap/scrcpy）"""
+        """异步连接候选设备；既有窗口和其他设备保持连接。"""
         d = self.window_combo.currentData()
         if not d:
             return
+        from .execution_targets import android_target_id
+        existing = self._execution_targets.get(android_target_id(d["serial"]))
+        if existing is not None and existing.ready:
+            self._execution_targets.select(existing.id)
+            self._sync_active_target_compat()
+            self._refresh_execution_targets_ui()
+            self._refresh_active_target_ui()
+            self._refresh_run_button()
+            self.statusBar().showMessage(
+                tr("设备已经连接，已切换为执行目标"))
+            return
 
-        # 若已连接旧设备，先清理资源
-        self._teardown_adb_backend()
+        self._start_device_connection(d)
+
+    def _start_device_connection(
+            self, combo_data: dict, *, capture_method: str | None = None,
+            device_execution: bool | None = None,
+            update_candidate_ui: bool = True) -> None:
+        """启动指定设备连接；成功前保留同 serial 的既有目标。"""
+        if update_candidate_ui:
+            self._apply_backend_ui("adb")
 
         # UI 进入连接中状态
-        self.btn_locate.setEnabled(False)
-        self.btn_locate.setText(tr("连接中..."))
+        if update_candidate_ui:
+            self.btn_locate.setEnabled(False)
+            self.btn_locate.setText(tr("连接中..."))
         self.statusBar().showMessage(tr("正在连接设备..."))
 
-        capture_method = self._user_config.android_capture_method
+        capture_method = (
+            capture_method or self._android_connection_draft.capture_method)
+        if device_execution is None:
+            device_execution = self._android_connection_draft.device_execution
 
         # 异步连接
         self._wait_device_thread()
         self._device_thread = QThread()
         self._device_worker = _DeviceWorker(
-            task="connect", serial=d["serial"], capture_method=capture_method,
-            agent_mode=self._user_config.android_input_method == "device_gesture",
+            task="connect", serial=combo_data["serial"],
+            capture_method=capture_method,
+            agent_mode=device_execution,
         )
         self._device_worker.moveToThread(self._device_thread)
         self._device_thread.started.connect(self._device_worker.run)
         self._device_worker.notice.connect(self.log_text.append)
         self._device_worker.connect_finished.connect(
-            lambda device, capture, method, w, h, agent: self._on_connect_done(d, device, capture, method, w, h, agent)
+            lambda device, capture, method, w, h, agent: self._on_connect_done(
+                combo_data, device, capture, method, w, h, agent,
+                update_candidate_ui=update_candidate_ui)
         )
-        self._device_worker.error.connect(self._on_connect_error)
+        self._device_worker.error.connect(
+            lambda message: self._on_connect_error(
+                message, update_candidate_ui=update_candidate_ui))
         self._bind_device_worker_lifecycle(self._device_worker, self._device_thread)
         self._device_thread.start()
 
-    def _on_connect_done(self, combo_data, device, capture, capture_method, w, h, agent=None):
+    def _on_connect_done(
+            self, combo_data, device, capture, capture_method, w, h,
+            agent=None, *, update_candidate_ui: bool = True):
         """连接成功回调（主线程）"""
+        import threading
+
         from ...core.android import create_input_backend
+        from .execution_targets import ExecutionTarget, android_target_id
 
         # 创建输入控制器：有设备端代理走无障碍手势，否则 adb shell input
-        self._agent = agent
-        self._input = create_input_backend(device=device, input_sim=self._user_config.input_sim, agent=agent)
+        input_ctrl = create_input_backend(
+            device=device, input_sim=self._user_config.input_sim, agent=agent)
+        target_id = android_target_id(combo_data["serial"])
 
         # scrcpy 模式下订阅帧回调，实现预览区实时视频流
-        self._scrcpy_streaming = False
+        streaming = False
         if capture_method == "scrcpy":
             from ...core.android import AndroidStreamCapture
             if isinstance(capture, AndroidStreamCapture):
-                capture.set_on_frame(self._on_scrcpy_frame)
-                self._scrcpy_streaming = True
+                capture.set_on_frame(
+                    lambda frame, tid=target_id: self._on_scrcpy_frame(tid, frame))
+                streaming = True
                 logger.info("[连接] scrcpy 视频流预览已启用")
 
         # ── ADB 断连暂停恢复接线 ──
-        # resume_event 存在主窗口级别（self._adb_resume_event），不随 device 断连/重连而丢失。
-        # 每次连接都指向同一个 event，确保工作流线程等待的和「恢复」按钮 set 的是同一个。
-        device.resume_event = self._adb_resume_event
-
-        self._capture = capture
-        self._device = device
-        self._device_ready = True
+        resume_event = threading.Event()
+        resume_event.set()
+        device.resume_event = resume_event
         try:
             from ...core.app_controller import record_connected_android
             app_info = record_connected_android(device, width=w, height=h)
@@ -757,42 +989,67 @@ class WindowOpsMixin:
         except Exception as exc:  # noqa: BLE001 - 连接不应因前台应用探测失败而失败
             logger.warning(f"ADB 当前应用信息获取失败: {exc}")
 
-        self._adb_conn_bridge = _AdbConnSignalBridge()
-        self._adb_conn_bridge.adb_lost.connect(self._on_adb_connection_lost)
-        device.on_connection_lost = self._adb_conn_bridge.notify_lost
+        bridge = _AdbConnSignalBridge(target_id)
+        bridge.adb_lost.connect(self._on_adb_connection_lost)
+        device.on_connection_lost = bridge.notify_lost
         device.stop_check = lambda: self._stop_requested
+
+        target = ExecutionTarget(
+            id=target_id,
+            kind="adb",
+            display_name=(
+                combo_data.get("model") or combo_data["serial"]),
+            capture=capture,
+            input_ctrl=input_ctrl,
+            input_kind=str(getattr(input_ctrl, "kind", "") or ""),
+            device=device,
+            agent=agent,
+            serial=combo_data["serial"],
+            width=w,
+            height=h,
+            capture_method=capture_method,
+            streaming=streaming,
+            resume_event=resume_event,
+            connection_bridge=bridge,
+        )
+        old = self._execution_targets.put(target)
+        if old is not None:
+            self._dispose_execution_target(old)
+        self._sync_active_target_compat()
 
         # 若工作流正阻塞在断连等待上（resume_event 未 set），
         # 把新的截图/输入后端同步给运行中的引擎，否则引擎继续用已死的旧 scrcpy 流截图
-        resume_event = getattr(self, '_adb_resume_event', None)
-        if resume_event is not None and not resume_event.is_set():
+        if (self._running_target_id == target_id
+                and not resume_event.is_set()):
             self._refresh_running_engine_backends()
 
         method_label = {"scrcpy": "scrcpy", "agent": "设备端截图"}.get(capture_method, "screencap")
         if agent is not None:
-            method_label += "  |  " + tr("设备端手势")
-        self.lbl_window_info.setText(f"已连接: {combo_data['serial']}  |  分辨率: {w}x{h}  |  {method_label}")
-        self.lbl_window_info.setStyleSheet("color: green;")
+            method_label += "  |  " + tr("设备端执行")
         self.log_text.append(f"[连接成功] {combo_data['serial']} ({w}x{h}) [{method_label}]")
         hk = self._user_config.hotkeys
         self.statusBar().showMessage(self._hotkey_status(
             f"已连接设备 {combo_data['serial']}",
             (hk.start, tr("开始")), (hk.stop, tr("停止"))))
-        self.btn_locate.setText(tr("断连"))
-        self.btn_locate.setEnabled(True)
-        self._set_connected_ui(True)
+        if update_candidate_ui:
+            self.btn_locate.setText(tr("连接"))
+            self.btn_locate.setEnabled(True)
+        self._refresh_execution_targets_ui()
+        self._refresh_active_target_ui()
         self._refresh_run_button()
         # screencap 模式手动刷新预览；scrcpy 模式自动推帧
-        if not self._scrcpy_streaming:
+        if self._execution_targets.active_target_id == target_id and not streaming:
             self._capture_preview()
 
-    def _on_connect_error(self, error_msg: str):
+    def _on_connect_error(
+            self, error_msg: str, *, update_candidate_ui: bool = True):
         """连接失败回调（主线程）"""
         logger.error(f"连接设备失败: {error_msg}")
         self.log_text.append(f"[错误] 连接设备失败: {error_msg}")
         self.statusBar().showMessage(tr("连接失败 | 详见日志"))
-        self.btn_locate.setText(tr("连接"))
-        self.btn_locate.setEnabled(True)
+        if update_candidate_ui:
+            self.btn_locate.setText(tr("连接"))
+            self.btn_locate.setEnabled(True)
 
     def _stop_capture_backend(self):
         """停止并丢弃当前截图后端（桌面/ADB/scrcpy 共用）。"""
@@ -805,159 +1062,274 @@ class WindowOpsMixin:
         finally:
             self._capture = None
 
+    def _dispose_execution_target(self, target) -> None:
+        """释放一个目标独占的资源，不影响其他已连接目标。"""
+        capture = target.capture
+        if capture is not None:
+            try:
+                capture.stop()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"截图后端停止失败: {exc}")
+        if target.agent is not None:
+            try:
+                target.agent.close()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"[设备端执行] 关闭代理失败: {exc}")
+        if target.connection_bridge is not None:
+            try:
+                target.connection_bridge.deleteLater()
+            except RuntimeError:
+                pass
+
     def _teardown_adb_backend(self):
-        """清理 ADB 后端资源，用于重连或退出（仅清理资源，不改 UI）"""
+        """兼容入口：清理全部 Android 目标。"""
         # 录屏进行中/待保存时先自动转正保存，再停止截图后端
         if self._screen_recorder is not None:
             self._abort_screen_record(tr("断连"))
-        self._device_ready = False
-        self._scrcpy_streaming = False
-        self._stop_capture_backend()
-        self._input = None
-        # 设备端代理：关 socket + 撤 adb forward
-        agent = getattr(self, "_agent", None)
-        if agent is not None:
-            try:
-                agent.close()
-            except Exception as e:
-                logger.debug(f"[设备端手势] 关闭代理失败: {e}")
-            self._agent = None
-        # 清理断连信号桥
-        if hasattr(self, '_adb_conn_bridge') and self._adb_conn_bridge is not None:
-            self._adb_conn_bridge.deleteLater()
-            self._adb_conn_bridge = None
-        self._device = None
+        ids = [target.id for target in self._execution_targets.all()
+               if target.kind == "adb"]
+        for target_id in ids:
+            target = self._execution_targets.remove(target_id)
+            if target is not None:
+                self._dispose_execution_target(target)
+        self._sync_active_target_compat()
+        if hasattr(self, "execution_target_list"):
+            self._refresh_execution_targets_ui()
         # 停止后台扫描/连接线程
         self._wait_device_thread()
 
-    def _set_connected_ui(self, connected: bool):
-        """连接/断连后统一更新 UI 控件可用性"""
-        self.btn_scan_window.setEnabled(not connected)
-        self.btn_scan_device.setEnabled(not connected)
-        self.window_combo.setEnabled(not connected)
-        if connected:
-            # 连接/定位后锁定 ADB 侧 checkbox，防止误切换。
-            # 后台模式不在此一并锁死：Windows 定位后允许再次切换（见 _refresh_bg_mode_lock），
-            # 避免每次切换都要断连重新定位；它只在任务运行期间被锁定。
-            if hasattr(self, "chk_scrcpy"):
-                self.chk_scrcpy.setEnabled(False)
-            if hasattr(self, "chk_agent"):
-                self.chk_agent.setEnabled(False)
-        else:
-            # 断连后恢复当前模式可见 checkbox 的可选状态
-            if hasattr(self, "chk_bg_mode") and self.chk_bg_mode.isVisible():
-                self.chk_bg_mode.setEnabled(True)
-            if hasattr(self, "chk_scrcpy") and self.chk_scrcpy.isVisible():
-                self.chk_scrcpy.setEnabled(True)
-            if hasattr(self, "chk_agent") and self.chk_agent.isVisible():
-                self.chk_agent.setEnabled(True)
-        self._refresh_bg_mode_lock()
-        # 采集面板（录屏/截屏）随连接态刷新可用性
-        if hasattr(self, "_apply_rec_state"):
-            self._apply_rec_state()
-
     def _refresh_bg_mode_lock(self):
-        """刷新"后台模式"开关的可用性。
+        """任务运行状态变化后刷新连接草稿的可编辑状态。"""
+        self._refresh_connection_draft_ui(self._candidate_backend)
 
-        Windows 定位后仍允许再次切换后台/前台输入模式，无需断连重新定位；
-        只在任务运行（含暂停）期间锁定，任务结束后自动恢复——避免每次切换
-        都要走一遍断连 + 重新定位。未定位状态由调用方直接控制可用性，这里
-        不覆盖。
-        """
-        if not hasattr(self, "chk_bg_mode") or not self.chk_bg_mode.isVisible():
-            return
-        if self._backend == "windows" and self._target_window is not None:
-            self.chk_bg_mode.setEnabled(not self._running)
-            # 运行中换截图后端会把正在用的实例停掉，和输入模式一样锁死；
-            # 可用性只在一处判断，这里统一走过去
-            self._refresh_bg_capture_visibility()
-
-    def _refresh_bg_capture_visibility(self):
-        """刷新「后台截图」开关的显隐、可用性与勾选状态。
-
-        在 Windows 投屏模式下**常驻显示**，只在不可用时整体置灰——随勾选凭空冒出来
-        会让整排控件跳位，而且「功能存在但当前不可用」按项目惯例就该禁用并给原因，
-        隐藏留给「压根不适用于当前环境」，比如安卓设备模式。
-
-        它跟着「后台模式」走：
-        - 未开后台模式：禁用且不勾选。前台输入（SendInput）要求游戏窗口在前台，
-          这时后台截图没有意义；真正危险的是反过来——只开后台截图、输入仍是前台，
-          用户以为可以把窗口盖起来，一盖输入就失效，现象还是「脚本点了没反应」。
-        - 勾上后台模式：立刻可用，并按配置（基础配置 → 窗口截图）的默认值自动勾上。
-          配置里那一项是绝对默认值，不受「窗口输入」设置的影响，两者的组合约束在这里
-          统一兜住，所以设置页不做互相禁用。
-
-        组件本身不可用（非 Windows、缺依赖）时同样禁用并把原因写进提示，不等用户
-        勾选后才报错。
-        """
-        if not hasattr(self, "chk_bg_capture"):
-            return
-        in_windows_mode = self._backend == "windows"
-        self.chk_bg_capture.setVisible(in_windows_mode)
-        if not in_windows_mode:
-            return
-
-        background_input = (
-            hasattr(self, "chk_bg_mode") and self.chk_bg_mode.isChecked())
-        from ...core.desktop import wgc_available
-        supported, unsupported_reason = wgc_available()
-
-        if not background_input:
-            reason = tr(
-                "需要先勾选「后台模式」：前台输入要求窗口在前台，配后台截图没有意义")
-        elif not supported:
-            reason = unsupported_reason
-        elif self._running:
-            reason = tr("运行中不能切换截图方式，请先停止任务")
-        else:
-            reason = ""
-        self.chk_bg_capture.setEnabled(not reason)
-        self.chk_bg_capture.setToolTip(reason or bg_capture_tip())
-
-        if (not background_input or not supported) \
-                and self.chk_bg_capture.isChecked():
-            # 退回前台截图，避免留下「前台输入 + 后台截图」的组合
-            self.chk_bg_capture.setChecked(False)
+    def _refresh_bg_capture_visibility(self, mode: str | None = None):
+        """兼容入口：刷新 Windows 连接草稿控件。"""
+        self._refresh_connection_draft_ui(mode or self._candidate_backend)
 
     def _apply_bg_capture_default(self):
-        """勾上「后台模式」时按配置默认值自动勾上「后台截图」。
-
-        只在后台模式刚打开（或刚进入投屏模式）时调用一次，不放进
-        ``_refresh_bg_capture_visibility``——那个方法也在任务起停时被调用，
-        放进去会把用户本次运行内手动取消的勾选又打回来。
-        """
-        if not hasattr(self, "chk_bg_capture"):
-            return
-        if not self._user_config.desktop_background_capture:
-            return
-        if self.chk_bg_capture.isEnabled() and not self.chk_bg_capture.isChecked():
-            self.chk_bg_capture.setChecked(True)
+        """后台模式启用时，把配置默认值写入连接草稿。"""
+        if self._user_config.desktop_background_capture:
+            self._window_connection_draft.background_capture = True
+        self._refresh_connection_draft_ui("windows")
 
     def _on_disconnect(self):
-        """通用断连：根据后端模式清理资源并恢复 UI"""
-        if self._backend == "adb":
-            serial = self._device_combo_current_serial()
-            self._teardown_adb_backend()
-            self._set_connected_ui(False)
-            self.btn_locate.setText(tr("连接"))
-            self.lbl_window_info.setText(tr("已断开连接"))
-            self.lbl_window_info.setStyleSheet("color: gray;")
-            self.preview_label.setText(tr("预览已停止"))
-            self.statusBar().showMessage(tr("已断开设备连接"))
-            self.log_text.append(f"[断连] 设备已断开: {serial}")
-        else:
-            # Windows 模式：清除定位状态，但保留窗口选择
-            self._target_window = None
+        """兼容入口：断开当前执行目标。"""
+        target = self._active_execution_target()
+        self._disconnect_execution_target(target.id if target is not None else "")
+
+    def _disconnect_execution_target(self, target_id: str) -> None:
+        """按稳定 ID 断开一个目标，不影响其他连接。"""
+        target = self._execution_targets.get(target_id)
+        if target is None:
+            return
+        if self._running:
+            self.log_text.append(tr("[提示] 任务运行中不能断开执行目标"))
+            return
+        removed = self._execution_targets.remove(target.id)
+        if removed is not None:
+            self._dispose_execution_target(removed)
+        if target.kind == "windows":
             self._red_box_flash_timer.stop()
             self._overlay.hide_border()
-            self._stop_capture_backend()
-            self._set_connected_ui(False)
-            self.btn_locate.setText(tr("定位"))
-            self.lbl_window_info.setText(tr("未定位窗口"))
-            self.lbl_window_info.setStyleSheet("color: gray;")
-            self.statusBar().showMessage(tr("已取消窗口定位"))
-            self.log_text.append(tr("[断连] 窗口定位已清除"))
+        from ...core.app_controller import remove_connected_target
+        remove_connected_target(target.id)
+        self._sync_active_target_compat()
+        self._refresh_execution_targets_ui()
+        self._refresh_active_target_ui()
+        self.statusBar().showMessage(
+            tr("已断开目标：{name}").format(name=target.display_name))
+        self.log_text.append(f"[断连] {target.display_name}")
         self._refresh_run_button()
+
+    def _refresh_or_reconnect_execution_target(self, target_id: str) -> None:
+        """刷新窗口坐标，或重新建立指定 Android 目标。"""
+        target = self._execution_targets.get(target_id)
+        if target is None:
+            return
+        if self._running:
+            self.log_text.append(tr("[提示] 任务运行中不能刷新或重连目标"))
+            return
+        if target.kind == "adb":
+            self._reconnect_android_target(target_id)
+            return
+
+        window = target.window
+        if window is None:
+            return
+        self._refresh_window_rect(window)
+        target.width = int(window.get("width") or 0)
+        target.height = int(window.get("height") or 0)
+        if target.capture is not None:
+            target.capture.set_capture_region(
+                int(window.get("left") or 0),
+                int(window.get("top") or 0),
+                target.width,
+                target.height,
+            )
+        if self.chk_red_box.isChecked():
+            self._overlay.show_border(
+                int(window.get("left") or 0),
+                int(window.get("top") or 0),
+                target.width,
+                target.height,
+            )
+        from ...core.app_controller import record_connected_window
+        record_connected_window(window)
+        if self._execution_targets.active_target_id == target.id:
+            self._sync_active_target_compat()
+            self._capture_preview()
+        self._refresh_execution_targets_ui()
+        self.statusBar().showMessage(tr("已刷新窗口位置"))
+        self.log_text.append(
+            tr("[定位刷新] {name} · {details}").format(
+                name=target.display_name,
+                details=self._target_details(target)))
+
+    def _set_window_target_background_input(
+            self, target_id: str, enabled: bool) -> None:
+        """只修改指定窗口目标的实际输入后端。"""
+        target = self._execution_targets.get(target_id)
+        if target is None or target.kind != "windows" or target.window is None:
+            return
+        if self._running:
+            self.log_text.append(tr("[提示] 任务运行中不能切换输入方式"))
+            return
+        if not enabled:
+            from ...core.desktop import WgcCapture
+            if isinstance(target.capture, WgcCapture):
+                self._set_window_target_background_capture(target_id, False)
+        if enabled:
+            from ...core.desktop import PostMessageInput
+            target.input_ctrl = PostMessageInput(
+                input_sim=self._user_config.input_sim,
+                hwnd=target.window["hwnd"],
+            )
+        else:
+            from ...core.desktop import SendInputInput
+            target.input_ctrl = SendInputInput(
+                input_sim=self._user_config.input_sim)
+        target.input_kind = str(
+            getattr(target.input_ctrl, "kind", "") or "")
+        if self._execution_targets.active_target_id == target_id:
+            self._sync_active_target_compat()
+        self._refresh_execution_targets_ui()
+        self.log_text.append(
+            tr("[模式] {name} 已切换到{mode}").format(
+                name=target.display_name,
+                mode=tr("后台模式") if enabled else tr("前台模式")))
+
+    def _set_window_target_marker(
+            self, target_id: str, enabled: bool) -> None:
+        """控制唯一窗口目标的持续红框，不改变执行目标。"""
+        target = self._execution_targets.get(target_id)
+        if target is None or target.kind != "windows" or target.window is None:
+            return
+        self.chk_red_box.blockSignals(True)
+        self.chk_red_box.setChecked(enabled)
+        self.chk_red_box.blockSignals(False)
+        self._red_box_flash_timer.stop()
+        if enabled:
+            window = target.window
+            self._overlay.show_border(
+                window["left"], window["top"],
+                window["width"], window["height"])
+            self._overlay.set_color("red")
+        else:
+            self._overlay.hide_border()
+
+    def _set_window_target_background_capture(
+            self, target_id: str, enabled: bool) -> None:
+        """只修改指定窗口目标的实际截图后端。"""
+        target = self._execution_targets.get(target_id)
+        if target is None or target.kind != "windows" or target.window is None:
+            return
+        if self._running:
+            self.log_text.append(tr("[提示] 任务运行中不能切换截图方式"))
+            return
+        if enabled and not bool(
+                getattr(target.input_ctrl, "background_mode", False)):
+            self._set_window_target_background_input(target_id, True)
+        from ...core.desktop import DesktopCapture, WgcCapture, wgc_available
+        if enabled:
+            available, reason = wgc_available()
+            if not available:
+                self.log_text.append(tr("[截图] 后台截图不可用：") + reason)
+                return
+        capture = WgcCapture() if enabled else DesktopCapture()
+        window = target.window
+        capture.set_capture_region(
+            window["left"], window["top"], window["width"], window["height"])
+        if isinstance(capture, WgcCapture) \
+                and not capture.attach_hwnd(window["hwnd"]):
+            capture.stop()
+            self.log_text.append(tr("[截图] 后台截图启动失败，保留原截图方式"))
+            return
+        old_capture = target.capture
+        target.capture = capture
+        target.capture_method = "wgc" if enabled else "mss"
+        target.last_capture = None
+        if old_capture is not None:
+            try:
+                old_capture.stop()
+            except Exception as exc:
+                logger.debug(f"停止旧截图后端时报错（忽略）: {exc}")
+        if self._execution_targets.active_target_id == target_id:
+            self._sync_active_target_compat()
+            self._capture_preview()
+        self._refresh_execution_targets_ui()
+
+    def _set_android_target_streaming(
+            self, target_id: str, enabled: bool) -> None:
+        """只修改指定设备目标的实际截图后端。"""
+        target = self._execution_targets.get(target_id)
+        if target is None or target.kind != "adb" or target.device is None:
+            return
+        if self._running:
+            self.log_text.append(tr("[提示] 任务运行中不能切换截图方式"))
+            return
+        method = "scrcpy" if enabled else "screencap"
+        from ...core.android import AndroidStreamCapture, create_capture_backend
+        capture = create_capture_backend(device=target.device, method=method)
+        if not capture.start():
+            self.log_text.append(
+                tr("[错误] {method} 截图后端不可用，保留原截图方式").format(
+                    method=method))
+            return
+        streaming = False
+        if method == "scrcpy" and isinstance(capture, AndroidStreamCapture):
+            capture.set_on_frame(
+                lambda frame, tid=target_id: self._on_scrcpy_frame(tid, frame))
+            streaming = True
+        old_capture = target.capture
+        target.capture = capture
+        target.capture_method = method
+        target.streaming = streaming
+        target.last_capture = None
+        if old_capture is not None:
+            try:
+                old_capture.stop()
+            except Exception as exc:
+                logger.debug(f"停止旧截图后端时报错（忽略）: {exc}")
+        if self._execution_targets.active_target_id == target_id:
+            self._sync_active_target_compat()
+            if not streaming:
+                self._capture_preview()
+        self._refresh_execution_targets_ui()
+
+    def _reconnect_android_target(
+            self, target_id: str, *, device_execution: bool | None = None) -> None:
+        """沿用指定设备的实际参数重新连接，可覆盖执行方式。"""
+        target = self._execution_targets.get(target_id)
+        if target is None or target.kind != "adb":
+            return
+        if device_execution is None:
+            device_execution = target.agent is not None
+        self._start_device_connection(
+            {"serial": target.serial, "model": target.display_name},
+            capture_method=target.capture_method or "screencap",
+            device_execution=device_execution,
+            update_candidate_ui=False,
+        )
 
     def _device_combo_current_serial(self) -> str:
         """获取当前下拉框中的设备 serial（用于日志）"""
@@ -967,20 +1339,16 @@ class WindowOpsMixin:
     # ─── 窗口定位 ──────────────────────────────────────────
 
     def _on_locate_window(self):
-        """定位选中的窗口 / 连接设备；已连接/定位后变为断连"""
-        if self._device_ready or self._target_window is not None:
-            # 已连接/已定位 → 断连
-            self._on_disconnect()
-            return
-        if self._backend == "adb":
+        """连接当前候选；窗口单例替换，Android 按 serial 累加。"""
+        if self._candidate_backend == "adb":
             self._on_connect_device()
             return
         w = self.window_combo.currentData()
         if not w:
             return
         self._refresh_window_rect(w)
-        self._target_window = w
         from ...core.app_controller import record_connected_window
+        from .execution_targets import WINDOW_TARGET_ID
         record_connected_window(w)
 
         ratio = self._get_window_dpi_ratio(w["hwnd"])
@@ -989,12 +1357,6 @@ class WindowOpsMixin:
             f" DPI={ratio}"
         )
 
-        self.lbl_window_info.setText(
-            f"已定位: {w['title']}  |  "
-            f"位置: ({w['left']}, {w['top']})  大小: {w['width']}x{w['height']}"
-            + (f"  DPI缩放: {ratio:.1f}x" if ratio != 1.0 else "")
-        )
-        self.lbl_window_info.setStyleSheet("color: green;")
         self.log_text.append(
             f"[定位成功] {w['title']}  "
             f"({w['width']}x{w['height']} @ {w['left']},{w['top']})"
@@ -1005,26 +1367,60 @@ class WindowOpsMixin:
         self._overlay.set_color("red")
         if not self.chk_red_box.isChecked():
             self._red_box_flash_timer.start(1000)
-        self._set_connected_ui(True)
-        self.btn_locate.setText(tr("断连"))
+        target = self._build_window_execution_target(w)
+        old = self._execution_targets.put(target)
+        if old is not None:
+            self._dispose_execution_target(old)
+        self._sync_active_target_compat()
+        self._refresh_execution_targets_ui()
+        self._refresh_active_target_ui()
         self._refresh_run_button()
-        self._capture_preview()
+        if self._execution_targets.active_target_id == WINDOW_TARGET_ID:
+            self._capture_preview()
 
-        # 定位成功后按开关建立截图后端（后台截图要在这里才拿得到 hwnd 建会话）
-        self._rebuild_desktop_capture()
-
-        # 定位成功后根据 checkbox 状态选择输入后端
-        if hasattr(self, 'chk_bg_mode'):
-            if self.chk_bg_mode.isChecked():
-                from ...core.desktop import PostMessageInput
-                self._input = PostMessageInput(
-                    input_sim=self._user_config.input_sim,
-                    hwnd=w["hwnd"],
-                )
-            else:
-                from ...core.desktop import SendInputInput
-                self._input = SendInputInput(input_sim=self._user_config.input_sim)
-                self.log_text.append(tr("[模式] 已切换到前台模式（SendInput，移动光标）"))
+    def _build_window_execution_target(self, w: dict):
+        """为已定位窗口建立独占截图/输入资源。"""
+        # 窗口目标有自己的截图和输入实例；连接它不触碰当前 Android 目标。
+        from ...core.desktop import (
+            DesktopCapture,
+            PostMessageInput,
+            SendInputInput,
+            WgcCapture,
+        )
+        from .execution_targets import WINDOW_TARGET_ID, ExecutionTarget
+        want_bg_capture = (
+            self._window_connection_draft.background_input
+            and self._window_connection_draft.background_capture)
+        capture = WgcCapture() if want_bg_capture else DesktopCapture()
+        capture.set_capture_region(w["left"], w["top"], w["width"], w["height"])
+        if (want_bg_capture and isinstance(capture, WgcCapture)
+                and not capture.attach_hwnd(w["hwnd"])):
+            capture.stop()
+            capture = DesktopCapture()
+            capture.set_capture_region(
+                w["left"], w["top"], w["width"], w["height"])
+            self.chk_bg_capture.blockSignals(True)
+            self.chk_bg_capture.setChecked(False)
+            self.chk_bg_capture.blockSignals(False)
+        actual_bg_capture = isinstance(capture, WgcCapture)
+        input_ctrl: object
+        if self._window_connection_draft.background_input:
+            input_ctrl = PostMessageInput(
+                input_sim=self._user_config.input_sim, hwnd=w["hwnd"])
+        else:
+            input_ctrl = SendInputInput(input_sim=self._user_config.input_sim)
+        return ExecutionTarget(
+            id=WINDOW_TARGET_ID,
+            kind="windows",
+            display_name=str(w.get("title") or tr("游戏窗口")),
+            capture=capture,
+            input_ctrl=input_ctrl,
+            input_kind=str(getattr(input_ctrl, "kind", "") or ""),
+            window=w,
+            width=int(w.get("width") or 0),
+            height=int(w.get("height") or 0),
+            capture_method="wgc" if actual_bg_capture else "mss",
+        )
 
     def _hide_red_box_after_locate(self):
         """未勾选标定时，定位成功的红框提示只显示一秒。"""
@@ -1047,31 +1443,17 @@ class WindowOpsMixin:
             self._overlay.hide_border()
 
     def _on_bg_mode_changed(self, state):
-        """后台模式开关切换：在 PostMessageInput / SendInputInput 之间替换整个 _input 实例"""
-        self._refresh_bg_capture_visibility()
-        if bool(state):
-            # 后台截图这下可用了，按配置默认值跟上
-            self._apply_bg_capture_default()
-        if not self._target_window:
-            return
-        hwnd = self._target_window["hwnd"]
-        if bool(state):
-            from ...core.desktop import PostMessageInput
-            self._input = PostMessageInput(
-                input_sim=self._user_config.input_sim,
-                hwnd=hwnd,
-            )
-            self.log_text.append(tr("[模式] 已切换到后台模式（PostMessage，不移动光标）"))
-        else:
-            from ...core.desktop import SendInputInput
-            self._input = SendInputInput(input_sim=self._user_config.input_sim)
-            self.log_text.append(tr("[模式] 已切换到前台模式（SendInput，移动光标）"))
+        """修改下一次窗口定位使用的输入方式。"""
+        enabled = bool(state)
+        self._window_connection_draft.background_input = enabled
+        if not enabled:
+            self._window_connection_draft.background_capture = False
+        elif self._user_config.desktop_background_capture:
+            self._window_connection_draft.background_capture = True
+        self._refresh_connection_draft_ui("windows")
 
     def _on_bg_capture_changed(self, state):
-        """后台截图开关切换：在 WgcCapture / DesktopCapture 之间重建截图后端
-
-        与后台模式（输入）同样是本次运行期间的切换，初始值来自用户配置。
-        """
+        """修改下一次窗口定位使用的截图方式。"""
         if bool(state):
             from ...core.desktop import wgc_available
             ok, reason = wgc_available()
@@ -1081,28 +1463,18 @@ class WindowOpsMixin:
                 self.chk_bg_capture.setChecked(False)
                 self.chk_bg_capture.blockSignals(False)
                 return
-        self._rebuild_desktop_capture()
-        if not self._target_window:
-            # 还没定位窗口，等定位时再真正建会话
-            return
-        if bool(state):
-            self.log_text.append(
-                tr("[截图] 已切换到后台截图（WGC，窗口被遮挡也能截；最小化仍不行）"))
-        else:
-            self.log_text.append(tr("[截图] 已切换到前台截图（mss，窗口需可见无遮挡）"))
+        self._window_connection_draft.background_capture = bool(state)
 
-    def _rebuild_desktop_capture(self):
-        """按开关状态重建桌面截图后端并绑定当前窗口，返回该后端。
+    def _rebuild_desktop_capture(self, want_bg: bool | None = None):
+        """按目标实际状态重建桌面截图后端并绑定当前窗口。
 
         后端实例带着会话状态（WGC 的取帧线程），切换时必须整个换掉而不是改标志位。
         WGC 建会话失败就退回 mss 并复位开关——让用户停在一个截不到图的状态比报错更糟。
         """
         from ...core.desktop import DesktopCapture, WgcCapture
-        want_bg = bool(
-            getattr(self, "chk_bg_capture", None) is not None
-            and self.chk_bg_capture.isChecked()
-        )
         current = self._capture
+        if want_bg is None:
+            want_bg = isinstance(current, WgcCapture)
         if current is None or isinstance(current, WgcCapture) != want_bg:
             if current is not None:
                 try:
@@ -1114,77 +1486,31 @@ class WindowOpsMixin:
         w = self._target_window
         if not w:
             return self._capture
-        self._capture.set_capture_region(w["left"], w["top"], w["width"], w["height"])
-        if want_bg and not self._capture.attach_hwnd(w["hwnd"]):
+        capture = self._capture
+        assert capture is not None
+        capture.set_capture_region(w["left"], w["top"], w["width"], w["height"])
+        if isinstance(capture, WgcCapture) and not capture.attach_hwnd(w["hwnd"]):
             self.log_text.append(
                 tr("[截图] 后台截图启动失败，已退回前台截图（窗口最小化时用不了）"))
             try:
-                self._capture.stop()
+                capture.stop()
             except Exception:
                 pass
             self._capture = DesktopCapture()
             self._capture.set_capture_region(
                 w["left"], w["top"], w["width"], w["height"])
-            if getattr(self, "chk_bg_capture", None) is not None:
-                self.chk_bg_capture.blockSignals(True)
-                self.chk_bg_capture.setChecked(False)
-                self.chk_bg_capture.blockSignals(False)
+        self._store_active_target_compat()
         return self._capture
 
     def _on_capture_method_changed(self, state):
-        """截图方式开关切换：在 screencap / scrcpy 之间重建截图后端"""
-        method = "scrcpy" if state else "screencap"
-
-        # 录屏依赖流式推帧，切换前自动转正保存
-        if self._screen_recorder is not None:
-            self._abort_screen_record(tr("切换截图方式"))
-
-        if not self._device:
-            # 未连接设备时仅更新内存配置
-            self._user_config.android_capture_method = method
-            return
-
-        # 已连接设备时只在 screencap / scrcpy 之间重建截图后端。
-        self._user_config.android_capture_method = method
-        from ...core.android import create_capture_backend
-        old_capture = self._capture
-        self._capture = create_capture_backend(device=self._device, method=method)
-        if self._capture.start():
-            # scrcpy 模式订阅帧回调
-            self._scrcpy_streaming = False
-            if method == "scrcpy":
-                from ...core.android import AndroidStreamCapture
-                if isinstance(self._capture, AndroidStreamCapture):
-                    self._capture.set_on_frame(self._on_scrcpy_frame)
-                    self._scrcpy_streaming = True
-            # 清理旧后端
-            if old_capture:
-                try:
-                    old_capture.stop()
-                except Exception:
-                    pass
-            mode_label = tr("scrcpy 流式") if method == "scrcpy" else "ADB screencap"
-            self.log_text.append(f"[模式] 已切换到 {mode_label} 截图")
-            if not self._scrcpy_streaming:
-                self._capture_preview()
-        else:
-            self.log_text.append(f"[错误] {method} 截图后端不可用，回退到 screencap")
-            self._user_config.android_capture_method = "screencap"
-            if hasattr(self, "chk_scrcpy"):
-                self.chk_scrcpy.blockSignals(True)
-                self.chk_scrcpy.setChecked(False)
-                self.chk_scrcpy.blockSignals(False)
-            # 回退到 screencap
-            self._capture = create_capture_backend(device=self._device, method="screencap")
-            self._capture.start()
-        # 流式状态变化后刷新采集面板可用性
-        if hasattr(self, "_apply_rec_state"):
-            self._apply_rec_state()
+        """修改下一次设备连接使用的截图方式。"""
+        self._android_connection_draft.capture_method = (
+            "scrcpy" if state else "screencap")
 
     def _on_agent_mode_changed(self, state):
-        """设备端手势开关：只改内存配置，下次连接生效（已连接时开关被锁定）"""
-        self._user_config.android_input_method = "device_gesture" if state else "adb"
-        label = tr("设备端手势（Beta，需安装律匠 App）") if state else "ADB shell input"
+        """修改下一次设备连接使用的执行方式。"""
+        self._android_connection_draft.device_execution = bool(state)
+        label = tr("设备端执行（需安装律匠 App）") if state else "ADB shell input"
         self.log_text.append(f"[模式] 安卓输入方式: {label}（下次连接生效）")
 
     # ─── 截屏 ─────────────────────────────────────────────
@@ -1205,6 +1531,9 @@ class WindowOpsMixin:
         预览白抓第二次——两帧之间画面可能已经变了，存下来的和看到的还对不上。
         """
         self._last_capture = img
+        target = self._active_execution_target()
+        if target is not None:
+            target.last_capture = img
         try:
             h, w_img = img.shape[:2]
             rgb = np.ascontiguousarray(img[:, :, ::-1])
@@ -1305,21 +1634,24 @@ class WindowOpsMixin:
 
     # ─── scrcpy 帧回调 ────────────────────────────────────
 
-    def _on_scrcpy_frame(self, bgr: np.ndarray):
+    def _on_scrcpy_frame(self, target_id: str, bgr: np.ndarray):
         """scrcpy 解码线程回调：通过 Qt 信号将帧转发到 UI 线程，并分叉喂给录屏器"""
+        target = self._execution_targets.get(target_id)
+        if target is not None:
+            target.last_capture = bgr
         if hasattr(self, "_scrcpy_frame_ready"):
-            self._scrcpy_frame_ready.emit(bgr)
+            self._scrcpy_frame_ready.emit(target_id, bgr)
         # 录屏分叉：push 仅入队不阻塞解码线程，暂停/停止态内部直接丢弃
         rec = self._screen_recorder
-        if rec is not None:
+        if rec is not None and target_id == self._execution_targets.active_target_id:
             rec.push(bgr)
 
-    def _on_scrcpy_frame_ui(self, bgr: np.ndarray):
+    def _on_scrcpy_frame_ui(self, target_id: str, bgr: np.ndarray):
         """UI 线程槽：更新预览区显示（由 _scrcpy_frame_ready 信号触发）
 
         预览隐藏时仅更新 _last_capture，跳过 BGR→RGB→QPixmap 转换以节省 CPU。
         """
-        if not self._device_ready:
+        if target_id != self._execution_targets.active_target_id:
             return
         # 始终更新最新帧，供 capture() 使用
         self._last_capture = bgr

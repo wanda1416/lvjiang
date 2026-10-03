@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -36,6 +37,7 @@ from PyQt6.QtWidgets import (
     QStyleOptionComboBox,
     QSystemTrayIcon,
     QTabWidget,
+    QTreeWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -57,6 +59,11 @@ from ..layout_helpers import fit_combo_popup_to_contents
 from ..overlay import BorderOverlay
 from ..widgets import TrimmedLogEdit
 from .capture_ops import CaptureOpsMixin
+from .execution_targets import (
+    AndroidConnectionDraft,
+    ExecutionTargetRegistry,
+    WindowConnectionDraft,
+)
 from .menu_ops import MenuOpsMixin
 from .run_control import (
     LOCK_REASON_BATCH,
@@ -271,7 +278,7 @@ class MainWindow(
     f10_pressed = pyqtSignal()
     pause_pressed = pyqtSignal()
     _pause_acknowledged = pyqtSignal()
-    _scrcpy_frame_ready = pyqtSignal(object)
+    _scrcpy_frame_ready = pyqtSignal(str, object)
     # 宿主信号：自动化状态（含暂停中/结束中过渡态）与用户切换
     automation_state_changed = pyqtSignal(str)
     user_changed = pyqtSignal(str)
@@ -293,6 +300,10 @@ class MainWindow(
         # ── 状态属性 ──
         self._target_window = None
         self._scanned_windows = []
+        self._execution_targets = ExecutionTargetRegistry()
+        self._candidate_backend = "windows"
+        self._running_target_id = None
+        self._running_target_snapshot = None
         self._device = None
         self._device_ready = False
         self._stop_requested = False
@@ -311,6 +322,15 @@ class MainWindow(
         self._layout_manager = LayoutConfigManager()
         self._reference_db = ReferenceDatabase()
         self._user_config = load_user_config()
+        self._window_connection_draft = WindowConnectionDraft(
+            background_input=self._user_config.desktop_background_input,
+            background_capture=self._user_config.desktop_background_capture,
+        )
+        self._android_connection_draft = AndroidConnectionDraft(
+            capture_method=self._user_config.android_capture_method,
+            device_execution=(
+                self._user_config.android_input_method == "device_gesture"),
+        )
         self._backend = None
         self._cleanup_callbacks: list = []  # 插件注册的关闭时清理回调
         # 左侧批量页早于右侧日志页构建；脚本配置告警可能在此期间产生。
@@ -502,12 +522,58 @@ class MainWindow(
         _bl.addWidget(self._adb_banner_btn)
         main_layout.addWidget(self._adb_banner)
 
-        # === 窗口/设备选择 ===
+        # === 连接目标 / 执行目标 ===
         window_group = QGroupBox()
         self.window_group = window_group
         window_main_layout = QVBoxLayout(window_group)
 
-        row1 = QHBoxLayout()
+        connection_row = QHBoxLayout()
+        connection_row.setSpacing(10)
+
+        self.execution_target_list = QTreeWidget()
+        self.execution_target_list.setHeaderLabels(
+            [tr("目标"), tr("连接状态"), tr("连接信息"), tr("状态信息"), ""])
+        self.execution_target_list.setRootIsDecorated(False)
+        self.execution_target_list.setMaximumHeight(104)
+        self.execution_target_list.setMinimumHeight(96)
+        target_header = self.execution_target_list.header()
+        target_header.setStretchLastSection(False)
+        target_header.setSectionResizeMode(
+            0, QHeaderView.ResizeMode.ResizeToContents)
+        target_header.setSectionResizeMode(
+            1, QHeaderView.ResizeMode.ResizeToContents)
+        target_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        target_header.setSectionResizeMode(
+            3, QHeaderView.ResizeMode.ResizeToContents)
+        target_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.execution_target_list.setColumnWidth(4, 28)
+        self.execution_target_list.currentItemChanged.connect(
+            self._on_execution_target_selected)
+        self.execution_target_list.itemClicked.connect(
+            self._on_execution_target_item_clicked)
+        self.execution_target_list.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self.execution_target_list.customContextMenuRequested.connect(
+            self._on_execution_target_context_menu)
+        connection_row.addWidget(self.execution_target_list, stretch=7)
+
+        connection_controls = QWidget()
+        controls_layout = QVBoxLayout(connection_controls)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.setSpacing(4)
+
+        action_row = QHBoxLayout()
+        action_row.setContentsMargins(0, 0, 0, 0)
+
+        self.btn_hide_window = QPushButton(tr("显示预览"))
+        self.btn_hide_window.setFixedWidth(90)
+        self.btn_hide_window.setCheckable(True)
+        self.btn_hide_window.setChecked(False)
+        self.btn_hide_window.clicked.connect(self._on_toggle_preview)
+        action_row.addWidget(self.btn_hide_window)
+
+        action_row.addStretch()
+
         self.btn_scan_window = QPushButton(tr("扫描窗口"))
         self.btn_scan_window.setFixedWidth(90)
         self.btn_scan_window.clicked.connect(self._on_scan_window)
@@ -515,44 +581,58 @@ class MainWindow(
         if not DESKTOP_BACKEND_AVAILABLE:
             # 非 Windows 仅支持 ADB 模式，隐藏窗口投屏入口
             self.btn_scan_window.setVisible(False)
-        row1.addWidget(self.btn_scan_window)
+        action_row.addWidget(self.btn_scan_window)
 
         self.btn_scan_device = QPushButton(tr("扫描设备"))
         self.btn_scan_device.setFixedWidth(90)
         self.btn_scan_device.clicked.connect(self._on_scan_devices)
-        row1.addWidget(self.btn_scan_device)
+        action_row.addWidget(self.btn_scan_device)
+
+        action_row.addSpacing(16)
+
+        self.btn_locate = QPushButton(tr("定位"))
+        self.btn_locate.setFixedWidth(90)
+        self.btn_locate.setEnabled(False)
+        self.btn_locate.clicked.connect(self._on_locate_window)
+        action_row.addWidget(self.btn_locate)
+        controls_layout.addLayout(action_row)
 
         self.window_combo = QComboBox()
         self.window_combo.setMinimumWidth(300)
         self.window_combo.currentIndexChanged.connect(self._on_window_selected)
-        row1.addWidget(self.window_combo)
+        controls_layout.addWidget(self.window_combo)
 
-        self.btn_locate = QPushButton(tr("定位"))
-        self.btn_locate.setFixedWidth(70)
-        self.btn_locate.setEnabled(False)
-        self.btn_locate.clicked.connect(self._on_locate_window)
-        row1.addWidget(self.btn_locate)
-
-        self.btn_hide_window = QPushButton(tr("显示预览"))
-        self.btn_hide_window.setFixedWidth(80)
-        self.btn_hide_window.setCheckable(True)
-        self.btn_hide_window.setChecked(True)
-        self.btn_hide_window.clicked.connect(self._on_toggle_preview)
-        row1.addWidget(self.btn_hide_window)
         apply_button_style(
+            self.btn_hide_window,
             self.btn_scan_window,
             self.btn_scan_device,
             self.btn_locate,
-            self.btn_hide_window,
             variant="neutral",
         )
-        window_main_layout.addLayout(row1)
 
-        row2 = QHBoxLayout()
-        self.lbl_window_info = QLabel(tr("未选择窗口"))
-        self.lbl_window_info.setStyleSheet("color: gray;")
-        row2.addWidget(self.lbl_window_info)
-        row2.addStretch()
+        controls_layout.addStretch()
+
+        settings_container = QWidget()
+        settings_container.setFixedHeight(
+            self.btn_locate.sizeHint().height())
+        settings_row = QHBoxLayout(settings_container)
+        settings_row.setContentsMargins(0, 0, 0, 0)
+        settings_row.setSpacing(4)
+
+        option_slot_1 = QWidget()
+        option_slot_1.setFixedWidth(108)
+        option_slot_1_layout = QHBoxLayout(option_slot_1)
+        option_slot_1_layout.setContentsMargins(0, 0, 0, 0)
+
+        option_slot_2 = QWidget()
+        option_slot_2.setFixedWidth(120)
+        option_slot_2_layout = QHBoxLayout(option_slot_2)
+        option_slot_2_layout.setContentsMargins(0, 0, 0, 0)
+
+        option_slot_3 = QWidget()
+        option_slot_3.setFixedWidth(140)
+        option_slot_3_layout = QHBoxLayout(option_slot_3)
+        option_slot_3_layout.setContentsMargins(0, 0, 0, 0)
 
         # 红框标定：默认只在定位成功后短暂显示，勾选后持续显示；
         # 勾选状态仅在本次运行期间有效。
@@ -561,12 +641,12 @@ class MainWindow(
         self.chk_red_box.setChecked(False)
         self.chk_red_box.setToolTip(tr("定位成功后红框显示 1 秒；勾选后持续显示至断连，仅本次运行期间生效"))
         self.chk_red_box.stateChanged.connect(self._on_red_box_changed)
-        row2.addWidget(self.chk_red_box)
+        option_slot_3_layout.addWidget(self.chk_red_box)
 
         self.chk_bg_mode = QCheckBox(tr("后台模式"))
         self.chk_bg_mode.setVisible(False)
         self.chk_bg_mode.stateChanged.connect(self._on_bg_mode_changed)
-        row2.addWidget(self.chk_bg_mode)
+        option_slot_1_layout.addWidget(self.chk_bg_mode)
 
         # Beta 截图通道：WGC 与部分脚本的识别/时序假设还没磨合好，所以标注并在
         # 提示里写明不受理不可用反馈——别让人把「脚本跑不通」当 bug 报回来
@@ -575,20 +655,28 @@ class MainWindow(
         self.chk_bg_capture.setChecked(False)
         self.chk_bg_capture.setToolTip(bg_capture_tip())
         self.chk_bg_capture.stateChanged.connect(self._on_bg_capture_changed)
-        row2.addWidget(self.chk_bg_capture)
+        option_slot_2_layout.addWidget(self.chk_bg_capture)
 
         self.chk_scrcpy = QCheckBox(tr("流式截图"))
         self.chk_scrcpy.setVisible(False)
         self.chk_scrcpy.stateChanged.connect(self._on_capture_method_changed)
-        row2.addWidget(self.chk_scrcpy)
+        option_slot_1_layout.addWidget(self.chk_scrcpy)
 
-        # Beta 输入通道：只替代 adb shell input，不接管截图方式；连接时生效
-        self.chk_agent = QCheckBox(tr("设备端手势 (Beta)"))
+        # 设备端执行只替代 adb shell input，不接管截图方式；连接时生效
+        self.chk_agent = QCheckBox(tr("设备端执行"))
         self.chk_agent.setVisible(False)
-        self.chk_agent.setToolTip(tr("需安装律匠 App 并开启无障碍服务；仅改变输入通道，不改变截图方式；不可达时回退 ADB shell input"))
+        self.chk_agent.setToolTip(tr("需安装律匠 App 并开启无障碍服务；仅改变执行通道，不改变截图方式；不可达时回退 ADB shell input"))
         self.chk_agent.stateChanged.connect(self._on_agent_mode_changed)
-        row2.addWidget(self.chk_agent)
-        window_main_layout.addLayout(row2)
+        option_slot_2_layout.addWidget(self.chk_agent)
+
+        settings_row.addWidget(option_slot_1)
+        settings_row.addWidget(option_slot_2)
+        settings_row.addWidget(option_slot_3)
+        settings_row.addStretch()
+        controls_layout.addWidget(settings_container)
+
+        connection_row.addWidget(connection_controls, stretch=6)
+        window_main_layout.addLayout(connection_row)
 
         self._apply_backend_ui(self._backend)
         main_layout.addWidget(window_group)
@@ -946,7 +1034,9 @@ class MainWindow(
         """
         scripts = list(spec.scripts)
         if not self._backend_ready():
-            if self._backend == "adb":
+            if self._active_execution_target() is None:
+                self._log_append(tr("[错误] 请先连接并选择执行目标"))
+            elif self._backend == "adb":
                 self._log_append(tr("[错误] 请先连接设备"))
             else:
                 self._log_append(tr("[错误] 请先定位窗口"))
@@ -973,26 +1063,31 @@ class MainWindow(
             self._end_automation(tr("批量执行"))
             return False
 
-        if self._backend == "adb":
+        target_snapshot = self._running_target_snapshot
+        assert target_snapshot is not None
+        if target_snapshot.kind == "adb":
             window_left, window_top = 0, 0
         else:
-            if self._input.background_mode and self._target_window:
-                self._input.target_hwnd = self._target_window["hwnd"]
-            window_left = self._target_window["left"]
-            window_top = self._target_window["top"]
+            input_ctrl = target_snapshot.input_ctrl
+            target_window = target_snapshot.window
+            assert target_window is not None
+            if input_ctrl.background_mode:
+                input_ctrl.target_hwnd = target_window["hwnd"]
+            window_left = target_window["left"]
+            window_top = target_window["top"]
 
         from ..batch import BatchContext, BatchWorker
 
         ctx = BatchContext(
-            capture=self._capture,
+            capture=target_snapshot.capture,
             ocr=self._ocr,
-            input_ctrl=self._input,
+            input_ctrl=target_snapshot.input_ctrl,
             layout=layout,
             run_env=run_env,
             input_sim=deepcopy(self._user_config.input_sim),
             delay_params=deepcopy(self._user_config.delay_params),
             android_apps=deepcopy(self._user_config.android_apps),
-            android_device=getattr(self, "_device", None),
+            android_device=target_snapshot.device,
             window_left=window_left,
             window_top=window_top,
             pause_event=getattr(self, '_pause_event', None),
@@ -1118,10 +1213,9 @@ class MainWindow(
                 logger.warning(f"插件清理回调失败: {e}")
         # 录屏进行中/待保存时自动转正保存，不丢数据
         self._abort_screen_record(tr("关闭程序"))
-        if self._backend == "adb":
-            self._teardown_adb_backend()
-        else:
-            self._stop_capture_backend()
+        for target in list(self._execution_targets.all()):
+            self._execution_targets.remove(target.id)
+            self._dispose_execution_target(target)
         self._red_box_flash_timer.stop()
         self._overlay.destroy()
         super().closeEvent(event)

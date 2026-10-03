@@ -241,7 +241,7 @@ class SettingsDialog(QDialog):
             self._config.desktop_background_capture)
         self._desktop_capture_fg_radio.setChecked(
             not self._config.desktop_background_capture)
-        # 细则只挂悬浮提示，不铺在页面上——和「设备端手势」同一处理
+        # 细则只挂悬浮提示，不铺在页面上——和「设备端执行」同一处理
         self._desktop_capture_tip = tr(
             "实验功能：很多脚本暂时无法在该模式下跑通，不受理该功能的不可用反馈。"
             "后台截图让游戏窗口被别的窗口盖住时也能截图，代价是比前台截图略慢；"
@@ -264,7 +264,7 @@ class SettingsDialog(QDialog):
         self._android_input_group = QButtonGroup(self)
         self._android_input_adb_radio = QRadioButton(tr("ADB shell input"))
         self._android_input_agent_radio = QRadioButton(
-            tr("设备端手势（Beta，需安装律匠 App）"))
+            tr("设备端执行（需安装律匠 App）"))
         self._android_input_group.addButton(self._android_input_adb_radio)
         self._android_input_group.addButton(self._android_input_agent_radio)
         self._android_input_adb_radio.setChecked(

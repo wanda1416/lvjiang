@@ -454,7 +454,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             raise WorkflowUserError(
                 f"本脚本要求 {CAPABILITIES.get(name, name)}，"
                 f"当前输入通道是 {kind.value}，无法执行。"
-                "请在「配置管理 → 基础配置 → 安卓输入」里选择「设备端手势」"
+                "请在「配置管理 → 基础配置 → 安卓输入」里选择「设备端执行」"
                 "并重新连接设备"
             )
 

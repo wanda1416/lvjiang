@@ -34,7 +34,7 @@ main_window:
   btn_hide_preview: Hide Preview
   chk_bg_mode: Background Mode
   chk_scrcpy: Streaming Capture
-  chk_agent: On-device Gestures
+  chk_agent: On-device Execution
   tab_daily: Daily
   tab_batch: Batch
   tab_log: Run Log
@@ -71,7 +71,7 @@ settings_dialog:
   adb_capture_scrcpy: Streaming (scrcpy)
   adb_capture_screencap: Static (screencap)
   adb_input_label: 'ADB Input Mode:'
-  adb_input_agent: On-device gestures (Lvjiang app accessibility)
+  adb_input_agent: On-device execution (Lvjiang app accessibility)
   adb_input_shell: adb shell input
   adb_input_tip: With the Lvjiang app installed and accessibility enabled, taps/drags/screenshots are performed by the app; falls back to adb when unreachable
   input_mode_label: 'Window Input Mode:'
@@ -768,7 +768,7 @@ auto_strings:
   '[模式] 已切换到前台模式（SendInput，移动光标）': '[Mode] Switched to Foreground Mode (SendInput, moves the cursor)'
   '[模式] 已切换到后台模式（PostMessage，不移动光标）': '[Mode] Switched to Background Mode (PostMessage, cursor stays put)'
   '[状态] 重新扫描窗口，旧定位已失效': '[Status] Rescanning windows; the old location is no longer valid'
-  '[设备端手势] App 不可达或设备端输入通道未就绪，回退 adb shell input': '[Device-side Gesture] App is unreachable or no device-side input channel is ready; falling back to adb shell input'
+  '[设备端执行] App 不可达或设备端执行通道未就绪，回退 adb shell input': '[On-device Execution] App is unreachable or no on-device execution channel is ready; falling back to adb shell input'
   '[错误] 当前工作环境 {env} 不在该脚本支持的环境 {envs} 中': '[Error] Current environment {env} is not among the environments {envs} this script supports'
   '[错误] 无主窗口，无法获取运行环境': '[Error] No main window; cannot get the runtime environment'
   '[错误] 暂无配置，请先通过 工具 → 批量配置 添加': '[Error] No config yet; add one via Tools -> Batch Config first'
@@ -1400,8 +1400,8 @@ auto_strings:
   '视图 Key:': 'View Key:'
   '视图:': 'View:'
   '视图名称:': 'View Name:'
-  设备端手势 (Beta): On-Device Gesture (Beta)
-  设备端手势（Beta，需安装律匠 App）: On-Device Gesture (Beta, requires the LvJiang App)
+  设备端执行: On-Device Execution
+  设备端执行（需安装律匠 App）: On-Device Execution (requires the LvJiang App)
   识别全部参考图: Recognize All Reference Images
   识别全部字段: Recognize All Fields
   识别全部材料: Recognize All Materials

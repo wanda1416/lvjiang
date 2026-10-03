@@ -15,6 +15,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
+
 from ...core.scene_definition import BASE_VIEW_KEY
 from ...core.scene_registry import get_registry, get_scene_views, is_view_visible
 from ...i18n import tr
@@ -26,7 +28,7 @@ def add_scene_combo_row(form: QFormLayout, current_scene_key: str) -> QComboBox:
 
     条目显示 `场景名 (key)`，userData 存 scene_key，默认选中当前场景。
     """
-    combo = QComboBox()
+    combo = AutoWidthComboBox()
     registry = get_registry()
     for key, scene in registry.all_scenes().items():
         combo.addItem(f"{scene.name} ({key})", userData=key)
@@ -44,7 +46,7 @@ def add_view_combo_row(
     条目显示视图名，userData 存 view key（基底视图为 BASE_VIEW_KEY）。
     selected_view 空视为基底。
     """
-    combo = QComboBox()
+    combo = AutoWidthComboBox()
     _populate_view_combo(combo, scene_key, selected_view)
     form.addRow(tr("视图:"), combo)
     return combo
@@ -200,9 +202,9 @@ class SceneAreaReferenceBatchPicker(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         filters = QHBoxLayout()
-        self.group = QComboBox()
-        self.scene = QComboBox()
-        self.view = QComboBox()
+        self.group = AutoWidthComboBox()
+        self.scene = AutoWidthComboBox()
+        self.view = AutoWidthComboBox()
         self.group.setToolTip(tr("分组"))
         self.scene.setToolTip(tr("场景"))
         self.view.setToolTip(tr("视图"))
@@ -449,15 +451,15 @@ class TransitionPicker(QWidget):
         self._local_views_button.setToolTip(
             tr("快速选择当前场景内的目标视图"))
         apply_button_style(self._local_views_button, variant="neutral")
-        self._group = QComboBox()
-        self._scene = QComboBox()
-        self._view = QComboBox()
+        self._group = AutoWidthComboBox()
+        self._scene = AutoWidthComboBox()
+        self._view = AutoWidthComboBox()
         for combo, stretch in ((self._group, 2), (self._scene, 3),
                                (self._view, 2)):
             row.addWidget(combo, stretch)
 
         self._available_from = QLineEdit()
-        self._navigation = QComboBox()
+        self._navigation = AutoWidthComboBox()
         for label, nav_value in [("未声明行为", ""), ("打开（记录调用方）", "open"), ("页内切换（保留调用方）", "switch"), ("替换当前页面", "replace")]:
             self._navigation.addItem(tr(label), nav_value)
         layout.addWidget(self._navigation)

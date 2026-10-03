@@ -53,6 +53,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 
 from .....i18n import tr
@@ -136,7 +137,7 @@ class SchoolPanel(QWidget):
         row_attr = QHBoxLayout()
         row_attr.setSpacing(28)
         row_attr.addWidget(QLabel(tr("属性")))
-        self._combo_attr = QComboBox()
+        self._combo_attr = AutoWidthComboBox()
         self._combo_attr.setMinimumWidth(100)
         row_attr.addWidget(self._combo_attr)
         row_attr.addStretch()
@@ -146,13 +147,13 @@ class SchoolPanel(QWidget):
         # 武学是下拉（来自武学配置），武器由武学派生且只读——这两个字段以前
         # 各录各的，写成「武器=枪 + 武学=无名剑法」也存得下来，然后毕业率按枪
         # 算、词条按剑法找，全程静默。派生之后这种不一致在数据层就不存在。
-        self._combo_main_martial = QComboBox()
+        self._combo_main_martial = AutoWidthComboBox()
         self._combo_main_martial.setMinimumWidth(100)
         self._edit_main_weapon = QLineEdit()
         self._edit_main_weapon.setReadOnly(True)
         self._edit_main_weapon.setMinimumWidth(140)
         self._edit_main_weapon.setPlaceholderText(tr("随武学"))
-        self._combo_sub_martial = QComboBox()
+        self._combo_sub_martial = AutoWidthComboBox()
         self._combo_sub_martial.setMinimumWidth(100)
         self._edit_sub_weapon = QLineEdit()
         self._edit_sub_weapon.setReadOnly(True)

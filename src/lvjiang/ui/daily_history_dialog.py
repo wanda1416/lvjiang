@@ -30,6 +30,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
+
 from ..core.daily_history import (
     BatchRunRecord,
     TaskHistoryRepository,
@@ -344,7 +346,7 @@ class DailyHistoryDialog(QDialog):
 
     @staticmethod
     def _build_target_kind_combo() -> QComboBox:
-        combo = QComboBox()
+        combo = AutoWidthComboBox()
         combo.addItem(tr("全部"), None)
         combo.addItem(tr("窗口"), "windows")
         combo.addItem(tr("设备"), "adb")

@@ -17,7 +17,6 @@ from PyQt6.QtGui import QFontMetrics, QIntValidator
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDoubleSpinBox,
     QFileDialog,
@@ -38,6 +37,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.profile.models import (
     ALL_MODELS,
@@ -244,7 +245,7 @@ class _SyncTargetsWidget(QWidget):
         from ...core.profile import get_profile_config
         config = get_profile_config()
 
-        combo = QComboBox()
+        combo = AutoWidthComboBox()
         combo.addItem(tr("（请选择）"), "")
         exclude = (
             self._exclude_key_input.text().strip()
@@ -275,7 +276,7 @@ class _SyncTargetsWidget(QWidget):
         self._table.setCellWidget(row, 1, ratio_spin)
 
         # 方向限定
-        direction_combo = QComboBox()
+        direction_combo = AutoWidthComboBox()
         for val, text in DIRECTION_LABELS.items():
             direction_combo.addItem(text, val)
         dir_idx = direction_combo.findData(target.direction if target else DIR_BOTH)
@@ -316,7 +317,7 @@ class _SyncTargetsWidget(QWidget):
         targets: list[SyncTargetDef] = []
         for row in range(self._table.rowCount()):
             combo = self._table.cellWidget(row, 0)
-            if not isinstance(combo, QComboBox):
+            if not isinstance(combo, AutoWidthComboBox):
                 continue
             key = combo.currentData()
             if not key:
@@ -327,7 +328,7 @@ class _SyncTargetsWidget(QWidget):
             ratio = ratio_spin.value() if isinstance(ratio_spin, QDoubleSpinBox) else 1.0
             direction = (
                 direction_combo.currentData()
-                if isinstance(direction_combo, QComboBox) else DIR_BOTH
+                if isinstance(direction_combo, AutoWidthComboBox) else DIR_BOTH
             )
             source = source_input.text().strip() if isinstance(source_input, QLineEdit) else ""
             targets.append(SyncTargetDef(key=key, ratio=ratio, direction=direction, source=source))
@@ -514,7 +515,7 @@ class _ChangeRulesWidget(QWidget):
         row = self._table.rowCount()
         self._table.setRowCount(row + 1)
 
-        kind_combo = QComboBox()
+        kind_combo = AutoWidthComboBox()
         kind_combo.addItem(tr("用途（减少）"), self._KIND_USE)
         kind_combo.addItem(tr("来源（增加）"), self._KIND_SOURCE)
         index = kind_combo.findData(kind)
@@ -555,7 +556,7 @@ class _ChangeRulesWidget(QWidget):
             name_input = self._table.cellWidget(row, 1)
             amount_tags = self._table.cellWidget(row, 2)
             if not (
-                isinstance(kind_combo, QComboBox)
+                isinstance(kind_combo, AutoWidthComboBox)
                 and isinstance(name_input, _RuleTermTagInputWidget)
                 and isinstance(amount_tags, _AmountTagInputWidget)
             ):
@@ -583,7 +584,7 @@ class _ChangeRulesWidget(QWidget):
             name_input = self._table.cellWidget(row, 1)
             amount_tags = self._table.cellWidget(row, 2)
             if not (
-                isinstance(kind_combo, QComboBox)
+                isinstance(kind_combo, AutoWidthComboBox)
                 and isinstance(name_input, _RuleTermTagInputWidget)
                 and isinstance(amount_tags, _AmountTagInputWidget)
             ):
@@ -1245,7 +1246,7 @@ class ProfileDefinitionDialog(QDialog):
 
         if model_type == MODEL_QUOTA:
             kd = existing if isinstance(existing, QuotaKeyDef) else QuotaKeyDef()
-            period_combo = QComboBox()
+            period_combo = AutoWidthComboBox()
             for period in list_profile_periods():
                 period_combo.addItem(tr(period.label), period.name)
             idx = period_combo.findData(kd.period)
@@ -1293,7 +1294,7 @@ class ProfileDefinitionDialog(QDialog):
         elif model_type == MODEL_REGEN:
             rt_kd = existing if isinstance(existing, RegenKeyDef) else RegenKeyDef()
 
-            regen_type_combo = QComboBox()
+            regen_type_combo = AutoWidthComboBox()
             regen_type_combo.addItem(tr("实时恢复"), "realtime")
             regen_type_combo.addItem(tr("准点恢复"), "boundary")
             idx = regen_type_combo.findData(rt_kd.regen_type)
@@ -1302,7 +1303,7 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow(tr("恢复类型:"), regen_type_combo)
             widgets["regen_type"] = regen_type_combo
 
-            regen_period_combo = QComboBox()
+            regen_period_combo = AutoWidthComboBox()
             regen_period_combo.addItem(tr("分钟"), "minute")
             regen_period_combo.addItem(tr("小时"), "hour")
             regen_period_combo.addItem(tr("天"), "day")
@@ -1313,7 +1314,7 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow(tr("准点周期:"), regen_period_combo)
             widgets["regen_period"] = regen_period_combo
 
-            regen_rate_unit_combo = QComboBox()
+            regen_rate_unit_combo = AutoWidthComboBox()
             regen_rate_unit_combo.addItem(tr("分钟"), "minute")
             regen_rate_unit_combo.addItem(tr("小时"), "hour")
             regen_rate_unit_combo.addItem(tr("天"), "day")

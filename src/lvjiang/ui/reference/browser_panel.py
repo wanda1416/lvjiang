@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, ReferenceEntry
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...i18n import tr
 from ..button_styles import apply_button_style
@@ -157,13 +158,13 @@ class BrowserPanel(QWidget):
         # ── 过滤栏 ──
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel(tr("分组:")))
-        self._group_filter = QComboBox()
+        self._group_filter = AutoWidthComboBox()
         self._group_filter.addItem(tr("全部"), "")
         self._group_filter.setMinimumWidth(120)
         filter_layout.addWidget(self._group_filter)
 
         filter_layout.addWidget(QLabel(tr("名称:")))
-        self._label_filter = QComboBox()
+        self._label_filter = AutoWidthComboBox()
         self._label_filter.addItem(tr("全部"), "")
         self._label_filter.setMinimumWidth(120)
         filter_layout.addWidget(self._label_filter)
@@ -253,7 +254,7 @@ class BrowserPanel(QWidget):
 
         row_group = QHBoxLayout()
         row_group.addWidget(QLabel(tr("分组:")))
-        self._group_edit = QComboBox()
+        self._group_edit = AutoWidthComboBox()
         self._group_edit.setEditable(True)
         row_group.addWidget(self._group_edit, 1)  # stretch=1 让它填充剩余空间
         edit_layout.addLayout(row_group)
@@ -300,7 +301,7 @@ class BrowserPanel(QWidget):
 
         brow_group = QHBoxLayout()
         brow_group.addWidget(QLabel(tr("分组:")))
-        self._batch_group_edit = QComboBox()
+        self._batch_group_edit = AutoWidthComboBox()
         self._batch_group_edit.setEditable(True)
         brow_group.addWidget(self._batch_group_edit, 1)
         batch_edit_layout.addLayout(brow_group)
@@ -396,7 +397,7 @@ class BrowserPanel(QWidget):
             # 可筛选字段生成筛选下拉
             if field.filterable:
                 self._meta_filter_layout.addWidget(QLabel(f"{field.name}:"))
-                combo = QComboBox()
+                combo = AutoWidthComboBox()
                 combo.setMinimumWidth(80)
                 combo.currentIndexChanged.connect(self._on_filter_changed)
                 self._meta_filter_layout.addWidget(combo)

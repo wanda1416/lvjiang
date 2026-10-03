@@ -43,6 +43,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
 )
 from lvjiang.apps.yysls.core.tuning_rules.models import FOOD_LABELS
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ......i18n import tr
 from ...domain_labels import domain_label
@@ -94,7 +95,7 @@ class EquipAffixEditor(QWidget):
         form = QFormLayout(self)
         form.setContentsMargins(0, 0, 0, 0)
 
-        self.part_combo = QComboBox()
+        self.part_combo = AutoWidthComboBox()
         for part in PART_ITEMS:
             self.part_combo.addItem(domain_label(part), part)
         self.part_combo.currentIndexChanged.connect(self._on_part_changed)
@@ -102,14 +103,14 @@ class EquipAffixEditor(QWidget):
 
         # 二级选择：部位为「武器」时显示，选具体武器
         self._weapon_label = QLabel(tr("武器："))
-        self.weapon_combo = QComboBox()
+        self.weapon_combo = AutoWidthComboBox()
         for weapon in WEAPON_TYPES:
             self.weapon_combo.addItem(domain_label(weapon), weapon)
         self.weapon_combo.currentIndexChanged.connect(
             self._rebuild_affix_options)
         form.addRow(self._weapon_label, self.weapon_combo)
 
-        self.quality_combo = QComboBox()
+        self.quality_combo = AutoWidthComboBox()
         self.quality_combo.addItem(tr("金色"), "gold")
         self.quality_combo.addItem(tr("紫色"), "purple")
         form.addRow(tr("品阶："), self.quality_combo)
@@ -126,7 +127,7 @@ class EquipAffixEditor(QWidget):
             row = QWidget()
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
-            combo = QComboBox()
+            combo = AutoWidthComboBox()
             combo.currentIndexChanged.connect(
                 lambda _idx, r=i: self._on_affix_selected(r))
             spin = QDoubleSpinBox()

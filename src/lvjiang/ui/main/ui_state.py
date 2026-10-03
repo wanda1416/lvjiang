@@ -25,6 +25,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
+
 from ...i18n import tr
 from ...workflows.builtins._coerce import to_bool
 from ..widgets import FlowLayout
@@ -125,7 +127,6 @@ class UiStateMixin:
         params: dict = {}
         from PyQt6.QtWidgets import (
             QCheckBox,
-            QComboBox,
             QLineEdit,
             QSpinBox,
             QWidget,
@@ -397,7 +398,7 @@ class UiStateMixin:
                 self._param_layout.addRow(QLabel(label + ":"))
                 self._param_layout.addRow(container)
             else:
-                combo = QComboBox()
+                combo = AutoWidthComboBox()
                 combo.setObjectName(name)
                 if param_type == "select" and options:
                     for opt in options:

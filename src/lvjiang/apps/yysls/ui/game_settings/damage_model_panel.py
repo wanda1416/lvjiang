@@ -16,7 +16,6 @@ from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -39,6 +38,7 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 from lvjiang.ui.theme import get_theme_manager
 
@@ -110,7 +110,7 @@ class DamageModelPanel(QWidget):
 
         top = QHBoxLayout()
         top.addWidget(QLabel(tr("流派")))
-        self._combo_school = QComboBox()
+        self._combo_school = AutoWidthComboBox()
         self._combo_school.currentIndexChanged.connect(self._refresh_skills)
         top.addWidget(self._combo_school)
         self._source = QLabel()

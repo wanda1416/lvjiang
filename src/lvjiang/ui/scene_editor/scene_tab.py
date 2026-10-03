@@ -6,7 +6,6 @@ import numpy as np
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -20,6 +19,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.layout_manager import (
     get_active_screenshot_index,
@@ -196,7 +197,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
             QSizePolicy.Policy.Fixed,
         )
         bar.addWidget(self._view_label)
-        self._view_combo = QComboBox()
+        self._view_combo = AutoWidthComboBox()
         self._view_combo.setMinimumWidth(120)
         self._view_combo.currentIndexChanged.connect(self._on_view_combo_changed)
         bar.addWidget(self._view_combo)
@@ -214,7 +215,7 @@ class SceneTab(RegionPanelMixin, PoiPanelMixin, PanelEditorMixin,
             QSizePolicy.Policy.Fixed,
         )
         bar.addWidget(self._screenshot_label)
-        self._screenshot_combo = QComboBox()
+        self._screenshot_combo = AutoWidthComboBox()
         self._screenshot_combo.setMinimumWidth(80)
         self._screenshot_combo.currentIndexChanged.connect(
             self._on_screenshot_combo_changed)

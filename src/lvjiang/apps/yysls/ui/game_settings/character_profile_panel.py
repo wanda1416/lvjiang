@@ -5,7 +5,6 @@ from copy import deepcopy
 
 import yaml
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -26,6 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style, apply_dialog_button_box_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr
@@ -97,7 +97,7 @@ class CharacterProfilePanel(QWidget):
         layout = QVBoxLayout(self)
         top = QHBoxLayout()
         top.addWidget(QLabel(tr("流派")))
-        self._school = QComboBox()
+        self._school = AutoWidthComboBox()
         self._school.addItems(self._manager.schools())
         fit_combo_to_contents(self._school, minimum=160)
         top.addWidget(self._school)

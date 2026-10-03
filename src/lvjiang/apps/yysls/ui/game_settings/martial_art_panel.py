@@ -9,7 +9,6 @@ from __future__ import annotations
 from loguru import logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QComboBox,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -22,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import config_field_card, configure_navigation_list
 
 from .....i18n import tr
@@ -76,8 +76,8 @@ class MartialArtPanel(QWidget):
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
-        self._combo_weapon = QComboBox()
-        self._combo_attr = QComboBox()
+        self._combo_weapon = AutoWidthComboBox()
+        self._combo_attr = AutoWidthComboBox()
         self._combo_attr.addItems(_ATTRS)
         for combo in (self._combo_weapon, self._combo_attr):
             combo.currentTextChanged.connect(self._on_field_changed)

@@ -16,7 +16,6 @@ from typing import Callable
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QComboBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -27,6 +26,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...i18n import tr
 from ...workflows import action_catalog as cat
@@ -199,7 +200,7 @@ class ActionPalette(QWidget):
     def _make_field(self, slot: cat.Slot) -> QWidget:
         kind = slot.kind
         if kind == "scene":
-            cb = QComboBox()
+            cb = AutoWidthComboBox()
             cb.setEditable(True)
             for k, n in self._p.scenes():
                 cb.addItem(f"{k}  {n}", k)
@@ -208,14 +209,14 @@ class ActionPalette(QWidget):
             cb.currentTextChanged.connect(self._refresh_preview)
             return cb
         if kind == "region":
-            cb = QComboBox()
+            cb = AutoWidthComboBox()
             cb.setEditable(True)
             cb.setCurrentIndex(-1)
             cb.setEditText(slot.default)
             cb.currentTextChanged.connect(self._refresh_preview)
             return cb
         if kind == "delay":
-            cb = QComboBox()
+            cb = AutoWidthComboBox()
             cb.setEditable(True)
             if slot.optional:
                 cb.addItem("", "")
@@ -227,7 +228,7 @@ class ActionPalette(QWidget):
             cb.currentTextChanged.connect(self._refresh_preview)
             return cb
         if kind == "template":
-            cb = QComboBox()
+            cb = AutoWidthComboBox()
             cb.setEditable(True)
             for n in self._p.templates():
                 cb.addItem(n, n)
@@ -236,7 +237,7 @@ class ActionPalette(QWidget):
             cb.currentTextChanged.connect(self._refresh_preview)
             return cb
         if kind == "choice":
-            cb = QComboBox()
+            cb = AutoWidthComboBox()
             for c in slot.choices:
                 cb.addItem(c or tr("（无）"), c)
             idx = cb.findData(slot.default)
@@ -283,7 +284,7 @@ class ActionPalette(QWidget):
         def refill(_text=None):
             scene = self._value_of("scene")
             for rw in region_ws:
-                assert isinstance(rw, QComboBox)
+                assert isinstance(rw, AutoWidthComboBox)
                 cur = rw.currentText()
                 rw.blockSignals(True)
                 rw.clear()
@@ -293,7 +294,7 @@ class ActionPalette(QWidget):
                 rw.setEditText(cur)
                 rw.blockSignals(False)
 
-        assert isinstance(scene_w, QComboBox)
+        assert isinstance(scene_w, AutoWidthComboBox)
         scene_w.currentTextChanged.connect(refill)
         refill()
 
@@ -307,7 +308,7 @@ class ActionPalette(QWidget):
         w = self._fields.get(key)
         if w is None:
             return ""
-        if isinstance(w, QComboBox):
+        if isinstance(w, AutoWidthComboBox):
             data = w.currentData()
             text = w.currentText()
             # 下拉项带 "key  名称" 展示文本：选中项用 data；手填用原文
@@ -324,7 +325,7 @@ class ActionPalette(QWidget):
 
     def set_value(self, key: str, value: str):
         w = self._fields[key]
-        if isinstance(w, QComboBox):
+        if isinstance(w, AutoWidthComboBox):
             idx = w.findData(value)
             if idx >= 0:
                 w.setCurrentIndex(idx)

@@ -48,6 +48,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     rule_affix_candidates,
 )
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
 from .....i18n import tr
@@ -143,7 +144,7 @@ class MaterialConfigPage(QWidget):
         self._stone_min.valueChanged.connect(lambda _v: self._apply())
         stone_row.addWidget(self._stone_min)
         stone_row.addWidget(QLabel(tr("不足时")))
-        self._stone_action = QComboBox()
+        self._stone_action = AutoWidthComboBox()
         for key, label in STONE_ACTION_LABELS.items():
             self._stone_action.addItem(label, key)
         self._stone_action.setToolTip(
@@ -232,7 +233,7 @@ class MaterialConfigPage(QWidget):
         parts.set_selected(rule.parts)
         self._table.setCellWidget(row, self._ci["parts"], parts)
 
-        quality = QComboBox()
+        quality = AutoWidthComboBox()
         for key in _QUALITY_KEYS:
             quality.addItem(_QUALITY_LABELS.get(key, key), key)
         fit_combo_to_contents(quality, minimum=112)
@@ -257,7 +258,7 @@ class MaterialConfigPage(QWidget):
             "ge", rule.pct, self._apply, allowed_ops=("ge",))
         self._table.setCellWidget(row, self._ci["pct"], pct)
 
-        food = QComboBox()
+        food = AutoWidthComboBox()
         food.addItem(_NO_FOOD, "")
         for label in FOOD_LABELS:
             food.addItem(label, label)
@@ -266,7 +267,7 @@ class MaterialConfigPage(QWidget):
         food.currentIndexChanged.connect(lambda _i: self._apply())
         self._table.setCellWidget(row, self._ci["food"], food)
 
-        action = QComboBox()
+        action = AutoWidthComboBox()
         for key, label in INSUFFICIENT_LABELS.items():
             action.addItem(label, key)
         fit_combo_to_contents(action, minimum=132)

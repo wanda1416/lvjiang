@@ -11,7 +11,6 @@ import re
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDoubleSpinBox,
     QHBoxLayout,
     QHeaderView,
@@ -25,6 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.core.reference_db import MetaFieldDef, ReferenceDatabase, validate_crop
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...i18n import tr
 from ..button_styles import apply_button_style
@@ -196,7 +196,7 @@ class MetaSchemaPanel(QWidget):
         self._input_table.setItem(row, 1, key_item)
 
         # 类型下拉（col 2）
-        type_combo = QComboBox()
+        type_combo = AutoWidthComboBox()
         for label, val in _TYPE_OPTIONS:
             type_combo.addItem(label, val)
         type_combo.setCurrentIndex(
@@ -209,7 +209,7 @@ class MetaSchemaPanel(QWidget):
         self._input_table.setCellWidget(row, 2, type_combo)
 
         # 排序下拉（col 3）
-        sort_combo = QComboBox()
+        sort_combo = AutoWidthComboBox()
         for label, val in _SORT_OPTIONS:
             sort_combo.addItem(label, val)
         sort_combo.setCurrentIndex(
@@ -259,11 +259,11 @@ class MetaSchemaPanel(QWidget):
 
     def _input_row_type(self, row: int) -> str:
         combo = self._input_table.cellWidget(row, 2)
-        return combo.currentData() if isinstance(combo, QComboBox) else "text"
+        return combo.currentData() if isinstance(combo, AutoWidthComboBox) else "text"
 
     def _input_row_sort_by(self, row: int) -> str:
         combo = self._input_table.cellWidget(row, 3)
-        return combo.currentData() if isinstance(combo, QComboBox) else "asc"
+        return combo.currentData() if isinstance(combo, AutoWidthComboBox) else "asc"
 
     # ── 槽函数 ──
 

@@ -30,6 +30,7 @@ yysls:
   "最少": "Minimum"
   "最多": "Maximum"
   "添加要求": "Add requirement"
+  "添加约束": "Add constraint"
   "删除所选要求": "Remove selected requirement"
   "出装要求": "Build requirements"
   "从当前方案开始": "Start from current loadout"

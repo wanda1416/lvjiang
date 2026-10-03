@@ -4,7 +4,6 @@ import re
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -20,6 +19,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.layout_manager import rename_view_screenshots
 from ...core.scene_definition import BASE_VIEW_KEY
@@ -81,13 +82,13 @@ class ViewManagerDialog(QDialog):
         layout.addWidget(self._list, 1)
 
         relation_row = QHBoxLayout()
-        self._relation = QComboBox()
+        self._relation = AutoWidthComboBox()
         for label, key in [("独立页面", "page"), ("同页取景", "viewport"),
                            ("页内标签", "tab"), ("浮层窗口", "modal")]:
             self._relation.addItem(tr(label), key)
-        self._owner_group = QComboBox()
-        self._owner_scene = QComboBox()
-        self._owner_view = QComboBox()
+        self._owner_group = AutoWidthComboBox()
+        self._owner_scene = AutoWidthComboBox()
+        self._owner_view = AutoWidthComboBox()
         self._owner_group.currentIndexChanged.connect(self._on_owner_group_changed)
         self._owner_scene.currentIndexChanged.connect(self._on_owner_scene_changed)
         self._btn_save_relation = QPushButton(tr("保存关系"))

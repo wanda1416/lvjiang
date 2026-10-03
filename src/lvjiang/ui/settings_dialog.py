@@ -37,6 +37,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
+
 from ..core.config import (
     load_available_envs,
     load_user_config,
@@ -227,7 +229,7 @@ class SettingsDialog(QDialog):
 
         # ── 语言 ──
         from ..i18n import available_languages, current_language
-        self._lang_combo = QComboBox()
+        self._lang_combo = AutoWidthComboBox()
         for lang in available_languages():
             self._lang_combo.addItem(
                 f"{lang['name']} ({lang['code']})", lang["code"])
@@ -397,7 +399,7 @@ class SettingsDialog(QDialog):
         activity_edit = QLineEdit(activity)
         activity_edit.setPlaceholderText(tr("留空自动解析 Launcher"))
         android_form.addRow(tr("Activity："), activity_edit)
-        orientation_combo = QComboBox()
+        orientation_combo = AutoWidthComboBox()
         orientation_combo.addItem(tr("不限"), "any")
         orientation_combo.addItem(tr("横屏"), "landscape")
         orientation_combo.addItem(tr("竖屏"), "portrait")
@@ -618,14 +620,14 @@ class SettingsDialog(QDialog):
         self._plan_name_edit = QLineEdit()
         self._plan_name_edit.textChanged.connect(self._on_plan_name_edited)
         form.addRow(tr("名称") + ":", self._plan_name_edit)
-        self._plan_space_combo = QComboBox()
+        self._plan_space_combo = AutoWidthComboBox()
         self._plan_space_combo.addItems(self._available_spaces())
         form.addRow(tr("图库") + ":", self._plan_space_combo)
-        self._plan_env_combo = QComboBox()
+        self._plan_env_combo = AutoWidthComboBox()
         for key, display in load_available_envs():
             self._plan_env_combo.addItem(display, key)
         form.addRow(tr("环境") + ":", self._plan_env_combo)
-        self._plan_layout_combo = QComboBox()
+        self._plan_layout_combo = AutoWidthComboBox()
         for entry in self._available_layouts():
             self._plan_layout_combo.addItem(entry.name, entry.key)
         form.addRow(tr("布局") + ":", self._plan_layout_combo)
@@ -980,7 +982,7 @@ class SettingsDialog(QDialog):
         hk = self._config.hotkeys
         self._hotkey_combos: dict[str, QComboBox] = {}
         for name, label in _HOTKEY_FIELDS:
-            combo = QComboBox()
+            combo = AutoWidthComboBox()
             combo.addItems(_HOTKEY_CHOICES)
             combo.setFixedWidth(_HOTKEY_COMBO_WIDTH)
             idx = combo.findText(getattr(hk, name))

@@ -18,7 +18,6 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFrame,
@@ -49,6 +48,7 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 
 from .....i18n import tr
@@ -240,7 +240,7 @@ class AffixCapsPanel(QWidget):
         unit_layout = QHBoxLayout(unit_frame)
         unit_layout.setContentsMargins(8, 4, 8, 4)
         unit_layout.addWidget(QLabel(tr("词组单位")))
-        self._unit_combo = QComboBox()
+        self._unit_combo = AutoWidthComboBox()
         self._unit_combo.addItems(["", "%"])
         self._unit_combo.currentTextChanged.connect(self._on_unit_combo_changed)
         unit_layout.addWidget(self._unit_combo)
@@ -1119,7 +1119,7 @@ class AffixCapsPanel(QWidget):
         row_layout.addWidget(name_widget)
 
         # 归属下拉（空串 + 5 类；定音词组禁用并置空）
-        combo = QComboBox()
+        combo = AutoWidthComboBox()
         combo.addItem("", "")
         for category in AFFIX_CATEGORY_NAMES:
             combo.addItem(domain_label(category), category)
@@ -1304,7 +1304,7 @@ class AffixCapsPanel(QWidget):
                     lambda _c, r=row: self._pick_upgrade_sources(r))
                 self._upgrade_table.setCellWidget(row, 2, from_btn)
 
-                to_combo = QComboBox()
+                to_combo = AutoWidthComboBox()
                 to_combo.addItem(tr("（未选择）"), "")
                 for alias in aliases:
                     to_combo.addItem(alias, alias)
@@ -1359,7 +1359,7 @@ class AffixCapsPanel(QWidget):
                 rules[row].pop(key, None)
         to_combo = self._upgrade_table.cellWidget(row, 3)
         target = str(to_combo.currentData() or "") if isinstance(
-            to_combo, QComboBox) else ""
+            to_combo, AutoWidthComboBox) else ""
         if target:
             rules[row]["to"] = target
         else:

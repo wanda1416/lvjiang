@@ -22,7 +22,6 @@ from PyQt6.QtGui import QAction, QDropEvent
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
-    QComboBox,
     QFormLayout,
     QFrame,
     QGroupBox,
@@ -41,6 +40,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.batch_config import (
     BatchConfigItem,
@@ -251,7 +252,7 @@ class BatchTab(QWidget):
         config_row.setContentsMargins(0, 0, 0, 0)
         config_row.setSpacing(8)
         config_row.addWidget(QLabel(tr("当前配置：")))
-        self._config_combo = QComboBox()
+        self._config_combo = AutoWidthComboBox()
         self._config_combo.setMinimumWidth(150)
         self._config_combo.setMinimumHeight(32)
         self._config_combo.currentIndexChanged.connect(self._on_config_changed)

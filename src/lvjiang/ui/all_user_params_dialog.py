@@ -7,7 +7,6 @@ from pathlib import Path
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -22,6 +21,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ..core.task_params import parameters_for_env, resolve_task_params
 from ..i18n import tr
@@ -71,7 +72,7 @@ class AllUserParamsDialog(QDialog):
         task_row.setContentsMargins(0, 0, 0, 0)
         task_row.setSpacing(8)
         task_row.addWidget(QLabel(tr("任务")))
-        self._task_combo = QComboBox()
+        self._task_combo = AutoWidthComboBox()
         self._task_combo.setObjectName("all_user_params_task")
         from ..workflows.discovery import script_display_name
         for config in self._configs:

@@ -35,6 +35,7 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.user_toolbar import REFRESH_BTN_STYLE as _REFRESH_BTN_STYLE
 from lvjiang.ui.user_toolbar import add_user_nav_buttons
 
@@ -104,7 +105,7 @@ class _MultiSelectMenu(QMenu):
         super().mouseReleaseEvent(event)
 
 
-def _fit_filter_combo(combo: QComboBox) -> int:
+def _fit_filter_combo(combo: AutoWidthComboBox) -> int:
     """按主题边框、箭头和最长选项计算筛选框与弹出列表的宽度。"""
     from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
@@ -420,7 +421,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         lbl_source = QLabel(tr("类型"))
         lbl_source.setStyleSheet(_filter_lbl_style)
         primary_filter_row.addWidget(lbl_source)
-        self._source_filter = QComboBox()
+        self._source_filter = AutoWidthComboBox()
         self._source_filter.addItem(tr("全部"), "all")
         self._source_filter.addItem(tr("背包"), "bag")
         self._source_filter.addItem(tr("模拟"), "mock")
@@ -434,7 +435,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         lbl_sort = QLabel(tr("排序"))
         lbl_sort.setStyleSheet(_filter_lbl_style)
         primary_filter_row.addWidget(lbl_sort)
-        self._sort_filter = QComboBox()
+        self._sort_filter = AutoWidthComboBox()
         self._sort_filter.addItem(tr("默认"), "default")
         self._sort_filter.addItem(tr("等级倒序"), "level_desc")
         self._sort_filter.addItem(tr("等级正序"), "level_asc")
@@ -476,7 +477,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         lbl_part = QLabel(tr("部位"))
         lbl_part.setStyleSheet(_filter_lbl_style)
         advanced_filter_row.addWidget(lbl_part)
-        self._type_filter = QComboBox()
+        self._type_filter = AutoWidthComboBox()
         self._type_filter.addItem(tr("全部"), "all")
         for sk, dn, _ in [
             ("main_weapon", tr("主武"), "weapon"),
@@ -504,7 +505,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         lbl_quality = QLabel(tr("品阶"))
         lbl_quality.setStyleSheet(_filter_lbl_style)
         advanced_filter_row.addWidget(lbl_quality)
-        self._quality_filter = QComboBox()
+        self._quality_filter = AutoWidthComboBox()
         self._quality_filter.addItem(tr("全部"), "all")
         self._quality_filter.addItem(tr("金装"), "gold")
         self._quality_filter.addItem(tr("紫装"), "purple")
@@ -518,7 +519,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         lbl_level = QLabel(tr("等级"))
         lbl_level.setStyleSheet(_filter_lbl_style)
         advanced_filter_row.addWidget(lbl_level)
-        self._level_filter = QComboBox()
+        self._level_filter = AutoWidthComboBox()
         self._level_filter.addItem(tr("全部"), "all")
         from lvjiang.apps.yysls.config import get_game_config
         for lvl in sorted([c.level for c in get_game_config().get_level_configs()], reverse=True):
@@ -532,7 +533,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         lbl_affix = QLabel(tr("词条"))
         lbl_affix.setStyleSheet(_filter_lbl_style)
         advanced_filter_row.addWidget(lbl_affix)
-        self._affix_filter = QComboBox()
+        self._affix_filter = AutoWidthComboBox()
         self._affix_filter.addItem(tr("全部"), "all")
         self._affix_filter.addItem(tr("已定音"), "dingyin")
         self._affix_filter.addItem(tr("满调律"), "full_tuning")
@@ -544,7 +545,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         lbl_status = QLabel(tr("状态"))
         lbl_status.setStyleSheet(_filter_lbl_style)
         advanced_filter_row.addWidget(lbl_status)
-        self._status_filter = QComboBox()
+        self._status_filter = AutoWidthComboBox()
         self._status_filter.addItem(tr("全部"), "all")
         self._status_filter.addItem(tr("备战中"), "referenced")
         self._status_filter.addItem(tr("未备战"), "unreferenced")
@@ -557,7 +558,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         lbl_scan_time = QLabel(tr("扫描时间"))
         lbl_scan_time.setStyleSheet(_filter_lbl_style)
         advanced_filter_row.addWidget(lbl_scan_time)
-        self._scan_time_filter = QComboBox()
+        self._scan_time_filter = AutoWidthComboBox()
         self._scan_time_filter.addItem(tr("全部"), "all")
         self._scan_time_filter.addItem(tr("超过 1 小时"), "1h")
         self._scan_time_filter.addItem(tr("超过 1 天"), "1d")

@@ -3,7 +3,6 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -13,6 +12,8 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.layout_manager import (
     delete_scene_screenshot,
@@ -116,7 +117,7 @@ class ScreenshotManagerDialog(QDialog):
 
         format_row = QHBoxLayout()
         format_row.addWidget(QLabel(tr("当前视图新截图格式：")))
-        self._format_combo = QComboBox()
+        self._format_combo = AutoWidthComboBox()
         self._format_combo.addItem(tr("WebP（质量 90，默认）"), "webp")
         self._format_combo.addItem(tr("PNG（无损，适合识别困难时）"), "png")
         selected = get_scene_screenshot_format(layout_name, scene_key, view)

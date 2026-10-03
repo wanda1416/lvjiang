@@ -44,6 +44,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.apps import get_registry
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.config import load_available_envs, load_env, load_user_config
 from ...core.config.users import SessionManager
@@ -95,7 +96,7 @@ _LOCK_MESSAGES = (
 )
 
 
-class _ContextComboBox(QComboBox):
+class _ContextComboBox(AutoWidthComboBox):
     """顶部上下文选择器：用户交互可按「原因」锁定。
 
     锁定原因可以叠加（批量运行中 + 选中了方案），任一存在即锁定，解除其中
@@ -438,7 +439,7 @@ class MainWindow(
         # 方案是后三者的具名组合：选中方案即锁定并填充它们。
         top_row = QHBoxLayout()
         top_row.addWidget(QLabel(tr("用户")))
-        self.user_combo = QComboBox()
+        self.user_combo = AutoWidthComboBox()
         self.user_combo.setMinimumWidth(150)
         self.user_combo.currentIndexChanged.connect(self._on_user_changed)
         top_row.addWidget(self.user_combo)
@@ -618,7 +619,7 @@ class MainWindow(
         action_row.addWidget(self.btn_locate)
         controls_layout.addLayout(action_row)
 
-        self.window_combo = QComboBox()
+        self.window_combo = AutoWidthComboBox()
         self.window_combo.setMinimumWidth(300)
         self.window_combo.currentIndexChanged.connect(self._on_window_selected)
         controls_layout.addWidget(self.window_combo)
@@ -816,7 +817,7 @@ class MainWindow(
 
         wf_group = QGroupBox(tr("脚本"))
         wf_layout = QHBoxLayout(wf_group)
-        self.workflow_combo = QComboBox()
+        self.workflow_combo = AutoWidthComboBox()
         self.workflow_combo.setFixedHeight(34)
         # 脚本名可以很长，下拉框随左侧分栏一起变宽
         _set_combo_character_capacity(
@@ -920,7 +921,7 @@ class MainWindow(
         apply_button_style(self._btn_clear_log, variant="neutral")
         self._btn_clear_log.clicked.connect(self._clear_log)
         filter_bar.addStretch()
-        self._log_scope_combo = QComboBox()
+        self._log_scope_combo = AutoWidthComboBox()
         self._log_scope_combo.addItem(tr("全部任务"), "all")
         self._log_scope_combo.addItem(tr("当前目标"), "target")
         self._log_scope_combo.currentIndexChanged.connect(
@@ -928,7 +929,7 @@ class MainWindow(
         fit_combo_popup_to_contents(self._log_scope_combo)
         filter_bar.addWidget(self._log_scope_combo)
         filter_bar.addWidget(QLabel(tr("日志级别")))
-        self._log_level_combo = QComboBox()
+        self._log_level_combo = AutoWidthComboBox()
         self._log_level_combo.addItem("DEBUG", 10)
         self._log_level_combo.addItem("INFO", 20)
         self._log_level_combo.addItem("WARNING", 30)

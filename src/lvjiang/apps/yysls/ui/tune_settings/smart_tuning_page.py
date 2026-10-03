@@ -8,7 +8,6 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
-    QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -25,6 +24,7 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     RATING_LABELS,
     TuningGroupManager,
 )
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from .....i18n import tr
 
@@ -80,7 +80,7 @@ class SmartTuningPage(QWidget):
         evaluation_layout.addWidget(self._evaluation_enabled)
         operator_row = QHBoxLayout()
         operator_row.addWidget(QLabel(tr("候选装备最大可能毕业率")))
-        self._operator = QComboBox()
+        self._operator = AutoWidthComboBox()
         self._operator.addItem(tr("大于"), "gt")
         self._operator.addItem(tr("大于等于"), "gte")
         self._operator.setMinimumWidth(110)
@@ -89,7 +89,7 @@ class SmartTuningPage(QWidget):
         operator_row.addWidget(QLabel(tr("当前方案三满极限")))
         operator_row.addSpacing(16)
         operator_row.addWidget(QLabel(tr("毕业率精度")))
-        self._precision = QComboBox()
+        self._precision = AutoWidthComboBox()
         self._precision.addItem("1%", 0.01)
         self._precision.addItem("0.1%", 0.001)
         self._precision.addItem("0.01%", 0.0001)
@@ -112,7 +112,7 @@ class SmartTuningPage(QWidget):
         action_layout.addWidget(self._action_enabled)
         action_row = QHBoxLayout()
         action_row.addWidget(QLabel(tr("处理动作")))
-        self._action = QComboBox()
+        self._action = AutoWidthComboBox()
         self._action.setMinimumWidth(180)
         for key in BEHAVIOR_ACTIONS:
             self._action.addItem(BEHAVIOR_ACTION_LABELS.get(key, key), key)
@@ -129,7 +129,7 @@ class SmartTuningPage(QWidget):
         keep_layout = QHBoxLayout(self._keep_min_rating_row)
         keep_layout.setContentsMargins(0, 0, 0, 0)
         keep_layout.addWidget(QLabel(tr("强制保留")))
-        self._keep_min_rating = QComboBox()
+        self._keep_min_rating = AutoWidthComboBox()
         self._keep_min_rating.setMinimumWidth(110)
         for key in reversed(RATING_KEYS):
             self._keep_min_rating.addItem(RATING_LABELS[key], key)

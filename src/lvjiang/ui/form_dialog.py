@@ -21,6 +21,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
+
 
 @dataclass
 class FormField:
@@ -64,7 +66,7 @@ class FormDialog(QDialog):
         for item in self._fields:
             widget: QLineEdit | QComboBox
             if item.choices:
-                combo = QComboBox()
+                combo = AutoWidthComboBox()
                 for data, text in item.choices:
                     combo.addItem(text, data)
                 index = combo.findData(item.default)

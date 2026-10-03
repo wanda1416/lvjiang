@@ -28,7 +28,6 @@ from loguru import logger
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -53,6 +52,7 @@ from lvjiang.ui.button_styles import (
     apply_button_style,
     apply_dialog_button_box_style,
 )
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 from lvjiang.ui.theme import get_theme_manager
 
@@ -413,7 +413,7 @@ class AttrSourcePanel(QWidget):
             status_item.setForeground(_status_color(key))
             self._table.setItem(row, 1, status_item)
 
-            mode = QComboBox()
+            mode = AutoWidthComboBox()
             mode.addItems([tr(text) for text in _COLUMNS] + [tr(MODE_ADVANCED)])
             fit_combo_to_contents(mode, minimum=158)
             mode.setCurrentIndex(self._mode_index(effect))
@@ -423,7 +423,7 @@ class AttrSourcePanel(QWidget):
 
             self._table.setCellWidget(row, 3, self._value_widget(row, effect))
 
-            scope = QComboBox()
+            scope = AutoWidthComboBox()
             scope.addItem(tr("进面板"), SCOPE_PANEL)
             scope.addItem(tr("仅战斗内"), SCOPE_COMBAT)
             scope.setCurrentIndex(0 if effect.scope == SCOPE_PANEL else 1)
@@ -463,7 +463,7 @@ class AttrSourcePanel(QWidget):
     def _value_widget(self, row: int, effect) -> QWidget:
         index = self._mode_index(effect)
         if index == _COLUMNS.index(MODE_FULL_AFFIX):
-            combo = QComboBox()
+            combo = AutoWidthComboBox()
             # 只列求值器真正支持的类别。列全部 15 类会造成
             # 「可选择、可保存、推导时才报错」，而一个条目报错整次求值全废。
             for category in SUPPORTED_FULL_AFFIX_CATEGORIES:
@@ -478,7 +478,7 @@ class AttrSourcePanel(QWidget):
             holder = QWidget()
             box = QHBoxLayout(holder)
             box.setContentsMargins(0, 0, 0, 0)
-            field = QComboBox()
+            field = AutoWidthComboBox()
             for display, name in _stat_choices():
                 field.addItem(display, name)
             spin = QDoubleSpinBox()
@@ -528,7 +528,7 @@ class AttrSourcePanel(QWidget):
 
         value_widget = self._table.cellWidget(row, 3)
         if index == _COLUMNS.index(MODE_FULL_AFFIX):
-            if reset_value or not isinstance(value_widget, QComboBox):
+            if reset_value or not isinstance(value_widget, AutoWidthComboBox):
                 categories = get_game_config().get_all_affix_categories()
                 payload["full_affix"] = categories[0] if categories else ""
             else:
@@ -540,7 +540,7 @@ class AttrSourcePanel(QWidget):
         if reset_value or value_widget is None:
             payload["stats"] = {_DEFAULT_STAT_FIELD: 0.0}
             return payload
-        field = value_widget.findChild(QComboBox)
+        field = value_widget.findChild(AutoWidthComboBox)
         spin = value_widget.findChild(QDoubleSpinBox)
         if field is None or spin is None:
             payload["stats"] = {_DEFAULT_STAT_FIELD: 0.0}

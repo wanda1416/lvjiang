@@ -17,7 +17,6 @@ from loguru import logger
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -38,6 +37,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.config import BASE_ATTR_PARTS, EQUIP_PART_NAMES, WUXUE_CATEGORY
 from lvjiang.ui.button_styles import apply_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list
 
 from .....i18n import tr
@@ -318,7 +318,7 @@ class BaseAttrPanel(QWidget):
         # 属性跟随控件（合入基础属性行，仅控制基础属性表格）
         self._check_follow = QCheckBox(tr("属性跟随"))
         self._check_follow.toggled.connect(self._on_follow_toggled)
-        self._combo_follow = QComboBox()
+        self._combo_follow = AutoWidthComboBox()
         self._combo_follow.setMinimumWidth(120)
         self._combo_follow.currentIndexChanged.connect(self._on_follow_target_changed)
         self._follow_hint = QLabel("")
@@ -428,7 +428,7 @@ class BaseAttrPanel(QWidget):
         wuxue_layout = QHBoxLayout()
         wuxue_layout.setContentsMargins(0, 4, 0, 0)
         wuxue_layout.addWidget(QLabel(tr("武学增效")))
-        self._combo_wuxue_affix = QComboBox()
+        self._combo_wuxue_affix = AutoWidthComboBox()
         self._combo_wuxue_affix.currentTextChanged.connect(self._on_wuxue_affix_changed)
         wuxue_layout.addWidget(self._combo_wuxue_affix, 1)
         weapon_layout.addLayout(wuxue_layout)

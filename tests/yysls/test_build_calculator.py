@@ -20,9 +20,11 @@ from lvjiang.apps.yysls.core.loadout.affix_distribution import (
 )
 from lvjiang.apps.yysls.ui.loadout.build_calculator import (
     BuildEditor,
+    RequirementEditor,
     template_for_playstyle,
 )
 from lvjiang.core.config.resolver import ConfigResolver
+from lvjiang.ui.combo_box import combo_contents_width
 
 
 @pytest.fixture
@@ -227,6 +229,36 @@ def test_editor_load_adjust_save_and_invalid_clear(qtbot, repository):
     assert not editor.save_button.isEnabled()
     assert editor._left_tabs.count() == 2
     assert editor.distribution_table.item(0, 1).text() == "—"
+
+
+def test_requirement_editor_uses_narrow_cards_and_valid_ranges(qtbot, repository):
+    build = BuildDefinition.create("约束布局", "无名", 115)
+    build.equipment = allocate(counts()).equipment
+    build.requirements = [{
+        "affix": "最大外功攻击",
+        "priority": "recommended",
+        "minimum": 2,
+        "maximum": 6,
+    }]
+    editor = BuildEditor("无名", repository=repository, initial=build)
+    qtbot.addWidget(editor)
+
+    assert editor.level.minimumWidth() >= combo_contents_width(editor.level)
+    assert len(editor._requirement_editors) == 1
+    requirement = editor._requirement_editors[0]
+    assert isinstance(requirement, RequirementEditor)
+    assert requirement.priority.minimumWidth() >= combo_contents_width(
+        requirement.priority)
+    assert requirement.to_dict() == build.requirements[0]
+
+    requirement.minimum.setValue(8)
+    assert requirement.maximum.value() == 8
+    requirement.minimum.setValue(0)
+    requirement.maximum.setValue(3)
+    assert requirement.minimum.maximum() == 3
+    requirement.deleteRequested.emit()
+    assert editor._requirement_editors == []
+    editor._timer.stop()
 
 
 def test_cancel_switch_keeps_editor_draft(qtbot, monkeypatch, repository):

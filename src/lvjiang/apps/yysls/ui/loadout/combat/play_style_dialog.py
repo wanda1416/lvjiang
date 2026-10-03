@@ -26,6 +26,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
+
 from ......i18n import tr
 from ......ui.button_styles import apply_dialog_button_box_style
 from ....core.combat.combat_attrs import (
@@ -61,7 +63,7 @@ class PlayStyleDialogMixin:
     - self._equipped_snapshot() -> dict | None（原始穿戴，未套任何假设）
     - self._compute_gongjue_attrs() -> CombatAttributes
     - self._refresh_play_styles()
-    - self._combo_play_style (QComboBox)
+    - self._combo_play_style (AutoWidthComboBox)
     """
 
     _workflow_play_style_dialog: _CreatePlayStyleDialog | None
@@ -460,7 +462,7 @@ class _CreatePlayStyleDialog(QDialog):
         name_label = QLabel(tr("基础属性名称"))
         name_label.setStyleSheet("font-size: 13px; font-weight: 600;")
         name_row.addWidget(name_label)
-        self._combo_name = QComboBox()
+        self._combo_name = AutoWidthComboBox()
         self._combo_name.setEditable(True)
         self._combo_name.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self._combo_name.addItems(self._existing_names)

@@ -18,7 +18,6 @@ from typing import Callable
 
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (
-    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -32,6 +31,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.apps.yysls.core.tuning_rules import RATING_KEYS, RATING_LABELS
 from lvjiang.ui.button_styles import apply_button_style, apply_compact_tool_button_style
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from .....i18n import tr
 from .affix_picker import AffixSelectSortDialog
@@ -147,7 +147,7 @@ class PartPatternPage(QWidget):
         # ② 默认判定：全档不命中时的兜底档位（空 = 跟随规则设置页）
         rating_row = QHBoxLayout()
         rating_row.addWidget(QLabel("<b>" + tr("默认判定") + "</b>"))
-        self._rating_combo = QComboBox()
+        self._rating_combo = AutoWidthComboBox()
         self._rating_combo.addItem(tr("（跟随规则设置）"), "")
         for rating_key in RATING_KEYS:
             self._rating_combo.addItem(RATING_LABELS[rating_key], rating_key)

@@ -5,7 +5,6 @@ from __future__ import annotations
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import (
-    QComboBox,
     QHBoxLayout,
     QLabel,
     QProgressBar,
@@ -15,6 +14,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.android import (
     list_adb_devices,
@@ -89,7 +90,7 @@ class DeviceScanPanel(QWidget):
 
         controls = QHBoxLayout()
         controls.addWidget(QLabel(tr("扫描网段：")))
-        self.subnet_combo = QComboBox()
+        self.subnet_combo = AutoWidthComboBox()
         self.subnet_combo.addItem(tr("全部网卡（默认）"), None)
         try:
             interfaces = list_ipv4_interfaces()

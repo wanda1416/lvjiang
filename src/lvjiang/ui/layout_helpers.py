@@ -2,56 +2,30 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import (
-    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QSizePolicy,
-    QStyle,
-    QStyleOptionComboBox,
     QWidget,
 )
 
+from .combo_box import (
+    combo_contents_width,
+    fit_combo_popup_to_contents,
+    fit_combo_to_contents,
+)
 
-def combo_contents_width(combo: QComboBox, *, minimum: int = 0) -> int:
-    """Return a styled width that can display the longest item in full."""
-    combo.ensurePolished()
-    text_width = max(
-        (combo.fontMetrics().horizontalAdvance(combo.itemText(index))
-         for index in range(combo.count())),
-        default=0,
-    )
-    option = QStyleOptionComboBox()
-    option.initFrom(combo)
-    style = combo.style()
-    assert style is not None
-    width = style.sizeFromContents(
-        QStyle.ContentsType.CT_ComboBox,
-        option,
-        QSize(text_width, combo.fontMetrics().height()),
-        combo,
-    ).width()
-    width = max(minimum, width + 12)
-    return width
-
-
-def fit_combo_popup_to_contents(combo: QComboBox, *, minimum: int = 0) -> int:
-    """Keep the popup readable while allowing the closed combo to stay compact."""
-    width = combo_contents_width(combo, minimum=minimum)
-    view = combo.view()
-    assert view is not None
-    view.setMinimumWidth(width)
-    return width
-
-
-def fit_combo_to_contents(combo: QComboBox, *, minimum: int = 0) -> int:
-    """Keep both the combo and its popup wide enough for the longest item."""
-    width = fit_combo_popup_to_contents(combo, minimum=minimum)
-    combo.setMinimumWidth(width)
-    return width
+__all__ = [
+    "combo_contents_width",
+    "fit_combo_popup_to_contents",
+    "fit_combo_to_contents",
+    "mark_navigation_list",
+    "configure_navigation_list",
+    "config_field_card",
+    "navigation_width_for_chars",
+]
 
 
 def mark_navigation_list(nav: QListWidget) -> None:

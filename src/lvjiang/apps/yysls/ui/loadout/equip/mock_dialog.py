@@ -14,7 +14,6 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -31,6 +30,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import fit_combo_to_contents
 
 from ......i18n import tr
@@ -112,7 +112,7 @@ class _AffixRow(QWidget):
         layout.addWidget(lbl_idx)
 
         # 词条名下拉
-        self._combo_name = QComboBox()
+        self._combo_name = AutoWidthComboBox()
         self._combo_name.setMinimumWidth(220)
         self._combo_name.addItem(tr("（空）"), "")
         for name in affix_names:
@@ -330,14 +330,14 @@ class MockEquipDialog(QDialog):
         basic_layout = self._basic_form
 
         # 部位
-        self._combo_part = QComboBox()
+        self._combo_part = AutoWidthComboBox()
         for part_name in _PART_TO_GROUP.keys():
             self._combo_part.addItem(part_name, part_name)
         basic_layout.addRow(tr("部位:"), self._combo_part)
 
         # 武器类型（直接加入表单布局，与部位输入框对齐）
         self._lbl_weapon_type = QLabel(tr("类型:"))
-        self._combo_weapon_type = QComboBox()
+        self._combo_weapon_type = AutoWidthComboBox()
         self._refresh_weapon_types()
         basic_layout.insertRow(1, self._lbl_weapon_type, self._combo_weapon_type)
         self._combo_part.currentIndexChanged.connect(self._on_part_changed)
@@ -350,14 +350,14 @@ class MockEquipDialog(QDialog):
         basic_layout.addRow(tr("名称:"), self._edit_name)
 
         # 等级
-        self._combo_level = QComboBox()
+        self._combo_level = AutoWidthComboBox()
         from ....config import get_game_config
         for lvl in sorted([c.level for c in get_game_config().get_level_configs()], reverse=True):
             self._combo_level.addItem(str(lvl), lvl)
         basic_layout.addRow(tr("等级:"), self._combo_level)
 
         # 品质
-        self._combo_quality = QComboBox()
+        self._combo_quality = AutoWidthComboBox()
         for label, value in _QUALITY_OPTIONS:
             self._combo_quality.addItem(label, value)
         basic_layout.addRow(tr("品质:"), self._combo_quality)

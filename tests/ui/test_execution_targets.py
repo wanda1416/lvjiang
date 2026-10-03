@@ -97,8 +97,9 @@ def test_android_connection_and_runtime_status_are_separate() -> None:
 
     assert WindowOpsMixin._target_connection_details(target) == (
         "serial-1 · 2560×1440")
+    # 状态信息固定「输入方式 · 截图方式」，每段四字，不露实现 key
     assert WindowOpsMixin._target_status_details(target) == (
-        "scrcpy · 设备端执行")
+        "端侧执行 · 流式截图")
 
 
 def test_window_connection_and_runtime_status_are_separate() -> None:
@@ -114,4 +115,67 @@ def test_window_connection_and_runtime_status_are_separate() -> None:
     assert WindowOpsMixin._target_connection_details(target) == (
         "起点 (10, 20) · 1920×1080")
     assert WindowOpsMixin._target_status_details(target) == (
-        "前台模式 · 前台截图")
+        "前台输入 · 前台截图")
+
+
+# ─── 状态信息列的取值全集 ───────────────────────────────
+
+
+def _window_target(*, background_input: bool, wgc: bool) -> ExecutionTarget:
+    from lvjiang.core.desktop import WgcCapture
+    return ExecutionTarget(
+        id=WINDOW_TARGET_ID, kind="windows", display_name="游戏窗口",
+        input_ctrl=type("Input", (), {"background_mode": background_input})(),
+        # 只看类型，不建真实后端（Linux 上 WGC 起不来）
+        capture=WgcCapture.__new__(WgcCapture) if wgc else object(),
+    )
+
+
+def _device_target(*, device_execution: bool, method: str) -> ExecutionTarget:
+    return ExecutionTarget(
+        id=android_target_id("A"), kind="adb", display_name="手机",
+        capture=object(), input_ctrl=object(),
+        agent=object() if device_execution else None,
+        capture_method=method,
+    )
+
+
+def test_status_column_is_always_four_characters_per_segment() -> None:
+    """状态信息固定「输入方式 · 截图方式」，两段都是四个汉字。
+
+    这一列原来一段讲「模式」一段讲「截图」，对不上维度；ADB 分支还是反序，
+    并且把 `screencap` / `scrcpy` / `ADB` 这些实现 key 原样摆给用户看。四字
+    对齐之后列宽恒定，也和连接选项那两个复选框槽位（槽 1 怎么操作、槽 2 怎么
+    取画面）同序，两处可以直接对读。
+    """
+    cases = {
+        # 前台输入 + 后台截图不可达：关掉后台输入会连带关掉 WGC 截图
+        ("windows", False, False): "前台输入 · 前台截图",
+        ("windows", True, False): "后台输入 · 前台截图",
+        ("windows", True, True): "后台输入 · 后台截图",
+        ("adb", False, "screencap"): "指令执行 · 单帧截图",
+        ("adb", False, "scrcpy"): "指令执行 · 流式截图",
+        ("adb", True, "screencap"): "端侧执行 · 单帧截图",
+        ("adb", True, "scrcpy"): "端侧执行 · 流式截图",
+    }
+    for (kind, flag, capture), expected in cases.items():
+        target = _window_target(background_input=flag, wgc=capture) \
+            if kind == "windows" \
+            else _device_target(device_execution=flag, method=str(capture))
+
+        actual = WindowOpsMixin._target_status_details(target)
+
+        assert actual == expected, (kind, flag, capture)
+        head, _, tail = actual.partition(" · ")
+        assert len(head) == 4 and len(tail) == 4, actual
+
+
+def test_status_column_never_leaks_implementation_keys() -> None:
+    """实现 key 不进 UI：这一列是给普通用户看的。"""
+    for method in ("screencap", "scrcpy"):
+        for device_execution in (False, True):
+            text = WindowOpsMixin._target_status_details(
+                _device_target(
+                    device_execution=device_execution, method=method))
+            assert method not in text
+            assert "ADB" not in text

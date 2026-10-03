@@ -336,17 +336,26 @@ class WindowOpsMixin:
 
     @staticmethod
     def _target_status_details(target) -> str:
+        """状态信息列：固定「输入方式 · 截图方式」，每段四个汉字。
+
+        顺序与连接选项的两个复选框槽位一致（槽 1 怎么操作、槽 2 怎么取画面），
+        两处可以直接对读。原来 ADB 分支是「截图 · 执行」的反序，而且把
+        ``screencap`` / ``scrcpy`` / ``ADB`` 这些实现 key 原样摆给用户看。
+        """
         if target.kind == "adb":
-            return " · ".join(part for part in (
-                target.capture_method,
-                tr("设备端执行") if target.agent is not None else "ADB",
-            ) if part)
-        from ...core.desktop import WgcCapture
-        input_mode = tr("后台模式") \
-            if bool(getattr(target.input_ctrl, "background_mode", False)) \
-            else tr("前台模式")
-        capture_mode = tr("后台截图") \
-            if isinstance(target.capture, WgcCapture) else tr("前台截图")
+            input_mode = tr("端侧执行") if target.agent is not None \
+                else tr("指令执行")
+            # 截图方式只可能是 scrcpy / screencap（UserConfig 有白名单校验）；
+            # 设备端代理只接管输入，不改变截图命令
+            capture_mode = tr("流式截图") \
+                if target.capture_method == "scrcpy" else tr("单帧截图")
+        else:
+            from ...core.desktop import WgcCapture
+            input_mode = tr("后台输入") \
+                if bool(getattr(target.input_ctrl, "background_mode", False)) \
+                else tr("前台输入")
+            capture_mode = tr("后台截图") \
+                if isinstance(target.capture, WgcCapture) else tr("前台截图")
         return tr("{input_mode} · {capture_mode}").format(
             input_mode=input_mode,
             capture_mode=capture_mode,
@@ -413,7 +422,7 @@ class WindowOpsMixin:
             return
         menu = QMenu(self.execution_target_list)
         if target.kind == "windows":
-            background_action = menu.addAction(tr("后台模式"))
+            background_action = menu.addAction(tr("后台输入"))
             assert background_action is not None
             background_action.setCheckable(True)
             background_action.setChecked(
@@ -452,7 +461,7 @@ class WindowOpsMixin:
             assert capture_action is not None
             capture_action.setCheckable(True)
             capture_action.setChecked(target.capture_method == "scrcpy")
-            execution_action = menu.addAction(tr("设备端执行"))
+            execution_action = menu.addAction(tr("端侧执行"))
             assert execution_action is not None
             execution_action.setCheckable(True)
             execution_action.setChecked(target.agent is not None)
@@ -990,9 +999,11 @@ class WindowOpsMixin:
                 and not resume_event.is_set()):
             self._refresh_running_engine_backends()
 
-        method_label = {"scrcpy": "scrcpy", "agent": "设备端截图"}.get(capture_method, "screencap")
-        if agent is not None:
-            method_label += "  |  " + tr("设备端执行")
+        method_label = tr("流式截图") if capture_method == "scrcpy" \
+            else tr("单帧截图")
+        method_label = (
+            (tr("端侧执行") if agent is not None else tr("指令执行"))
+            + "  |  " + method_label)
         self.log_text.append(f"[连接成功] {combo_data['serial']} ({w}x{h}) [{method_label}]")
         hk = self._user_config.hotkeys
         self.statusBar().showMessage(self._hotkey_status(
@@ -1183,7 +1194,7 @@ class WindowOpsMixin:
         self.log_text.append(
             tr("[模式] {name} 已切换到{mode}").format(
                 name=target.display_name,
-                mode=tr("后台模式") if enabled else tr("前台模式")))
+                mode=tr("后台输入") if enabled else tr("前台输入")))
 
     def _set_window_target_marker(
             self, target_id: str, enabled: bool) -> None:
@@ -1491,7 +1502,8 @@ class WindowOpsMixin:
     def _on_agent_mode_changed(self, state):
         """修改下一次设备连接使用的执行方式。"""
         self._android_connection_draft.device_execution = bool(state)
-        label = tr("设备端执行（需安装律匠 App）") if state else "ADB shell input"
+        label = tr("端侧执行（需安装律匠 App）") if state \
+            else tr("指令执行（adb shell input）")
         self.log_text.append(f"[模式] 安卓输入方式: {label}（下次连接生效）")
 
     # ─── 截屏 ─────────────────────────────────────────────

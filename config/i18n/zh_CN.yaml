@@ -730,8 +730,8 @@ auto_strings:
   <b>选择要执行的行：</b>: <b>选择要执行的行：</b>
   <span style="color:#888;">截图：—  画布：—</span>: <span style="color:#888;">截图：—  画布：—</span>
   <span style="color:#888;">截图：—　　画布：—</span>: <span style="color:#888;">截图：—　　画布：—</span>
-  ADB screencap 静态截图: ADB screencap 静态截图
-  ADB shell input: ADB shell input
+  ADB screencap 单帧截图: ADB screencap 单帧截图
+  ADB shell input 指令执行: ADB shell input 指令执行
   ADB 异常，请重连设备后点击恢复: ADB 异常，请重连设备后点击恢复
   DesktopCapture 已停止: DesktopCapture 已停止
   ESC / HOME / 字母键；设备端 ESC=返回: ESC / HOME / 字母键；设备端 ESC=返回
@@ -1401,7 +1401,7 @@ auto_strings:
   '视图:': '视图:'
   '视图名称:': '视图名称:'
   设备端执行: 设备端执行
-  设备端执行（需安装律匠 App）: 设备端执行（需安装律匠 App）
+  端侧执行（需安装律匠 App）: 端侧执行（需安装律匠 App）
   识别全部参考图: 识别全部参考图
   识别全部字段: 识别全部字段
   识别全部材料: 识别全部材料
@@ -1646,6 +1646,18 @@ auto_strings:
   '无静态属性': '无静态属性'
   '本页已确认 {done}/{total}　全部来源 {all_done}/{all_total}': '本页已确认 {done}/{total}　全部来源 {all_done}/{all_total}'
   '尚未配装，先在左侧选心法与其他来源': '尚未配装，先在左侧选心法与其他来源'
+  前台输入 (SendInput): 前台输入 (SendInput)
+  前台输入: 前台输入
+  后台输入: 后台输入
+  前台截图: 前台截图
+  后台截图: 后台截图
+  指令执行: 指令执行
+  端侧执行: 端侧执行
+  单帧截图: 单帧截图
+  流式截图: 流式截图
+  端侧执行（需安装律匠 App）: 端侧执行（需安装律匠 App）
+  指令执行（adb shell input）: 指令执行（adb shell input）
+  持续从投屏流取帧；不勾选则每次请求单独截一帧（单帧截图）: 持续从投屏流取帧；不勾选则每次请求单独截一帧（单帧截图）
 task_history:
   task: 任务
   title: 任务历史

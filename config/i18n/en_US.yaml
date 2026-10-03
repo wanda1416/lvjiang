@@ -730,8 +730,8 @@ auto_strings:
   <b>选择要执行的行：</b>: <b>Select lines to execute:</b>
   <span style="color:#888;">截图：—  画布：—</span>: '<span style="color:#888;">Screenshot: —  Canvas: —</span>'
   <span style="color:#888;">截图：—　　画布：—</span>: '<span style="color:#888;">Screenshot: —　　Canvas: —</span>'
-  ADB screencap 静态截图: ADB screencap (static screenshot)
-  ADB shell input: ADB shell input
+  ADB screencap 单帧截图: ADB screencap (single frame)
+  ADB shell input 指令执行: ADB shell input (command channel)
   ADB 异常，请重连设备后点击恢复: ADB error, reconnect the device then click Resume
   DesktopCapture 已停止: DesktopCapture stopped
   ESC / HOME / 字母键；设备端 ESC=返回: ESC / HOME / letter keys; on-device ESC = Back
@@ -1401,7 +1401,7 @@ auto_strings:
   '视图:': 'View:'
   '视图名称:': 'View Name:'
   设备端执行: On-Device Execution
-  设备端执行（需安装律匠 App）: On-Device Execution (requires the LvJiang App)
+  端侧执行（需安装律匠 App）: On-Device Execution (requires the LvJiang App)
   识别全部参考图: Recognize All Reference Images
   识别全部字段: Recognize All Fields
   识别全部材料: Recognize All Materials
@@ -1646,6 +1646,18 @@ auto_strings:
   '无静态属性': 'No static stats'
   '本页已确认 {done}/{total}　全部来源 {all_done}/{all_total}': 'This page {done}/{total} confirmed　All sources {all_done}/{all_total}'
   '尚未配装，先在左侧选心法与其他来源': 'Nothing equipped yet — pick inner ways and other sources on the left'
+  前台输入 (SendInput): Foreground Input (SendInput)
+  前台输入: Foreground Input
+  后台输入: Background Input
+  前台截图: Foreground Capture
+  后台截图: Background Capture
+  指令执行: Command Execution
+  端侧执行: On-Device Execution
+  单帧截图: Single-Frame Capture
+  流式截图: Streaming Capture
+  端侧执行（需安装律匠 App）: On-Device Execution (requires the LvJiang App)
+  指令执行（adb shell input）: Command Execution (adb shell input)
+  持续从投屏流取帧；不勾选则每次请求单独截一帧（单帧截图）: Keeps pulling frames from the mirroring stream; unchecked grabs one frame per request (single-frame capture)
 task_history:
   task: Task
   title: Task History

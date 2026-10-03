@@ -643,14 +643,24 @@ class MainWindow(
         self.chk_red_box.stateChanged.connect(self._on_red_box_changed)
         option_slot_3_layout.addWidget(self.chk_red_box)
 
-        self.chk_bg_mode = QCheckBox(tr("后台模式"))
+        # 两类目标的连接选项都按「输入方式 · 截图方式」排：槽 1 永远是怎么操作，
+        # 槽 2 永远是怎么取画面。状态信息列用同样的顺序，复选框与那一列就能直接
+        # 对读，不必在脑子里换一次序。
+        self.chk_bg_mode = QCheckBox(tr("后台输入"))
         self.chk_bg_mode.setVisible(False)
         self.chk_bg_mode.stateChanged.connect(self._on_bg_mode_changed)
         option_slot_1_layout.addWidget(self.chk_bg_mode)
 
-        # Beta 截图通道：WGC 与部分脚本的识别/时序假设还没磨合好，所以标注并在
-        # 提示里写明不受理不可用反馈——别让人把「脚本跑不通」当 bug 报回来
-        self.chk_bg_capture = QCheckBox(tr("后台截图 (Beta)"))
+        # 设备端执行只替代 adb shell input，不接管截图方式；连接时生效
+        self.chk_agent = QCheckBox(tr("端侧执行"))
+        self.chk_agent.setVisible(False)
+        self.chk_agent.setToolTip(tr("需安装律匠 App 并开启无障碍服务；仅改变执行通道，不改变截图方式；不可达时回退 ADB shell input"))
+        self.chk_agent.stateChanged.connect(self._on_agent_mode_changed)
+        option_slot_1_layout.addWidget(self.chk_agent)
+
+        # Beta 截图通道：WGC 与部分脚本的识别/时序假设还没磨合好，不受理不可用
+        # 反馈这件事写在提示里（见 bg_capture_tip），标题保持四字与其他项对齐
+        self.chk_bg_capture = QCheckBox(tr("后台截图"))
         self.chk_bg_capture.setVisible(False)
         self.chk_bg_capture.setChecked(False)
         self.chk_bg_capture.setToolTip(bg_capture_tip())
@@ -659,15 +669,10 @@ class MainWindow(
 
         self.chk_scrcpy = QCheckBox(tr("流式截图"))
         self.chk_scrcpy.setVisible(False)
+        self.chk_scrcpy.setToolTip(tr(
+            "持续从投屏流取帧；不勾选则每次请求单独截一帧（单帧截图）"))
         self.chk_scrcpy.stateChanged.connect(self._on_capture_method_changed)
-        option_slot_1_layout.addWidget(self.chk_scrcpy)
-
-        # 设备端执行只替代 adb shell input，不接管截图方式；连接时生效
-        self.chk_agent = QCheckBox(tr("设备端执行"))
-        self.chk_agent.setVisible(False)
-        self.chk_agent.setToolTip(tr("需安装律匠 App 并开启无障碍服务；仅改变执行通道，不改变截图方式；不可达时回退 ADB shell input"))
-        self.chk_agent.stateChanged.connect(self._on_agent_mode_changed)
-        option_slot_2_layout.addWidget(self.chk_agent)
+        option_slot_2_layout.addWidget(self.chk_scrcpy)
 
         settings_row.addWidget(option_slot_1)
         settings_row.addWidget(option_slot_2)

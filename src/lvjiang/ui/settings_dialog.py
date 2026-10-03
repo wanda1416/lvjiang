@@ -86,6 +86,23 @@ def _radio_row(*buttons: QRadioButton) -> QWidget:
     return row
 
 
+def _align_radio_columns(*rows: list[QRadioButton]) -> None:
+    """让各行的第二个单选纵向对齐。
+
+    每行第一个单选的文字长短不一（「前台输入 (SendInput)」比
+    「ADB shell input 指令执行」短），HBoxLayout 紧挨着排，第二个单选的起始位置
+    就各行各样。把第一列按最宽的那个撑成等宽，第二列自然成列。
+
+    按 sizeHint 算而不是写死像素：这些文案要过 i18n，英文下宽度完全不同。
+    """
+    first_column = [row[0] for row in rows if row]
+    if not first_column:
+        return
+    width = max(button.sizeHint().width() for button in first_column)
+    for button in first_column:
+        button.setMinimumWidth(width)
+
+
 def _form_divider() -> QFrame:
     """功能分组之间的分隔线"""
     line = QFrame()
@@ -222,7 +239,7 @@ class SettingsDialog(QDialog):
         # 前台在前、后台在后，和下面「窗口截图」的两项一一对应，扫一眼就能看出
         # 「前台输入 + 前台截图」「后台输入 + 后台截图」这两种常规搭配
         self._input_group = QButtonGroup(self)
-        self._input_fg_radio = QRadioButton(tr("光标输入 (SendInput)"))
+        self._input_fg_radio = QRadioButton(tr("前台输入 (SendInput)"))
         self._input_bg_radio = QRadioButton(tr("后台输入 (PostMessage)"))
         self._input_group.addButton(self._input_fg_radio)
         self._input_group.addButton(self._input_bg_radio)
@@ -262,9 +279,9 @@ class SettingsDialog(QDialog):
 
         # ── 安卓 ──
         self._android_input_group = QButtonGroup(self)
-        self._android_input_adb_radio = QRadioButton(tr("ADB shell input"))
+        self._android_input_adb_radio = QRadioButton(tr("ADB shell input 指令执行"))
         self._android_input_agent_radio = QRadioButton(
-            tr("设备端执行（需安装律匠 App）"))
+            tr("端侧执行（需安装律匠 App）"))
         self._android_input_group.addButton(self._android_input_adb_radio)
         self._android_input_group.addButton(self._android_input_agent_radio)
         self._android_input_adb_radio.setChecked(
@@ -282,7 +299,7 @@ class SettingsDialog(QDialog):
 
         self._capture_group = QButtonGroup(self)
         self._capture_stream_radio = QRadioButton(tr("Scrcpy 流式截图"))
-        self._capture_static_radio = QRadioButton(tr("ADB screencap 静态截图"))
+        self._capture_static_radio = QRadioButton(tr("ADB screencap 单帧截图"))
         self._capture_group.addButton(self._capture_stream_radio)
         self._capture_group.addButton(self._capture_static_radio)
         self._capture_stream_radio.setChecked(
@@ -291,6 +308,14 @@ class SettingsDialog(QDialog):
             self._config.android_capture_method == "screencap")
         form.addRow(tr("安卓截图:"), _radio_row(
             self._capture_stream_radio, self._capture_static_radio))
+
+        # 四行的第二个单选纵向对齐（后台输入 / 后台截图 / 端侧执行 / 单帧截图）
+        _align_radio_columns(
+            [self._input_fg_radio, self._input_bg_radio],
+            [self._desktop_capture_fg_radio, self._desktop_capture_bg_radio],
+            [self._android_input_adb_radio, self._android_input_agent_radio],
+            [self._capture_stream_radio, self._capture_static_radio],
+        )
 
         return tab
 

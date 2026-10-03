@@ -111,7 +111,7 @@ def test_upgraded_affix_still_feeds_the_calculation(qtbot, gc):
 
     before = aggregate_equipment_attrs(effective_equipped({"head": equip}, gc))
     after = aggregate_equipment_attrs(effective_equipped({"head": result}, gc))
-    assert before.single_qs_bonus == pytest.approx(0.154)
+    assert before.all_qs_bonus == pytest.approx(0.154)
     assert after.all_qs_bonus == pytest.approx(0.154)
 
 

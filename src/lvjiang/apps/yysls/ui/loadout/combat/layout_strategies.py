@@ -53,7 +53,15 @@ class CardLayoutStrategy:
         """resizeEvent 回调。默认 no-op。"""
 
     def on_refresh_display(self, tab) -> None:
-        """_refresh_display 结束后的策略特定刷新。默认 no-op。"""
+        """仅全屏保留空的动态增益槽，半屏按实际内容展示。"""
+        self.update_dynamic_slots(tab)
+
+    @staticmethod
+    def update_dynamic_slots(tab) -> None:
+        for slots_name in ('_weapon_bonus_slots', '_skill_bonus_slots'):
+            for widget, name_label, _ in getattr(tab, slots_name, ()):
+                widget.setVisible(
+                    tab._display_mode == DISPLAY_MODE_FULL or bool(name_label.text()))
 
     def deactivate(self, tab) -> None:
         """离开当前策略前清理其专属布局状态。默认 no-op。"""
@@ -73,6 +81,7 @@ class FullCardLayout(CardLayoutStrategy):
     """全屏模式：2×2 网格 + 配置栏 1 行 6 列。"""
 
     def arrange_cards(self, tab, cards) -> None:
+        self.update_dynamic_slots(tab)
         self.drain_layout(tab._main_layout)
         for card in cards:
             card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
@@ -109,6 +118,7 @@ class HalfCardLayout(CardLayoutStrategy):
     """半屏模式：垂直堆叠 + 配置栏 2 行 3 列 + resize 退化监听。"""
 
     def arrange_cards(self, tab, cards) -> None:
+        self.update_dynamic_slots(tab)
         self.drain_layout(tab._main_layout)
         for card in cards:
             card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
@@ -173,6 +183,7 @@ class HalfCompactCardLayout(CardLayoutStrategy):
 
     def on_refresh_display(self, tab) -> None:
         """刷新显示后重新应用退化布局（恢复 + 重应用）。"""
+        self.update_dynamic_slots(tab)
         HalfCompactCardLayout._restore_zero_attack_rows(tab)
         HalfCompactCardLayout._restore_grid_normal(tab)
         HalfCompactCardLayout._reset_name_label_widths(tab)
@@ -198,6 +209,7 @@ class HalfCompactCardLayout(CardLayoutStrategy):
 
     def _apply(self, tab) -> None:
         """应用退化布局：过滤零值 + 网格单列 + 标签对齐。"""
+        self.update_dynamic_slots(tab)
         self._filter_zero_attack_rows(tab)
         self._rearrange_grid_compact(tab)
         self._align_name_labels(tab)
@@ -223,7 +235,7 @@ class HalfCompactCardLayout(CardLayoutStrategy):
             grid.setColumnStretch(0, 0)
             grid.setColumnStretch(1, 0)
             new_row = 0
-            for widget, _, _ in items:
+            for widget, _, _ in sorted(items, key=lambda item: (item[1], item[2])):
                 # isVisible() 会把祖先容器的隐藏状态算进去：在其它顶层 Tab
                 # 切换用户时，所有属性行都会被误判为不可见并永久移出网格。
                 # 此处只跳过零值过滤明确 hide 的行，不受祖先显隐影响。

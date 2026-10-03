@@ -10,22 +10,28 @@
 from __future__ import annotations
 
 from loguru import logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import (
     QComboBox,
+    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLayout,
     QListWidget,
     QMessageBox,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QSplitter,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from lvjiang.ui.button_styles import apply_button_style
-from lvjiang.ui.layout_helpers import config_field_card, configure_navigation_list
+from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
 from lvjiang.ui.tag_input import TagInputWidget
 
 from .....i18n import tr
@@ -37,6 +43,66 @@ _CUSTOM_SCHOOL = ""
 _ALL_SKILL_REQUIREMENTS = ("需要", "不需要")
 _QISHU_REQUIREMENTS = ("不需要", "群体", "单体")
 _UNIT_REQUIREMENTS = ("不需要", "首领", "玩家")
+
+
+class _DefinitionFields(QWidget):
+    """玩法基础字段：宽屏双列，窄屏按字段顺序退回单列。"""
+
+    def __init__(self, fields: list[tuple[str, QComboBox]]) -> None:
+        super().__init__()
+        self._grid = QGridLayout(self)
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        self._grid.setHorizontalSpacing(16)
+        self._grid.setVerticalSpacing(6)
+        # 双列布局的最小宽度不能锁住整个页面，否则无法缩窄到单列。
+        self._grid.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._columns = 0
+        self._fields: list[QWidget] = []
+        self._combos = [combo for _, combo in fields]
+        labels = [QLabel(text) for text, _ in fields]
+        label_width = max(label.sizeHint().width() for label in labels)
+        for label, (_, combo) in zip(labels, fields, strict=True):
+            field = QWidget(self)
+            row = QHBoxLayout(field)
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(8)
+            label.setFixedWidth(label_width)
+            label.setBuddy(combo)
+            row.addWidget(label)
+            combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            row.addWidget(combo, 1)
+            self._fields.append(field)
+        self.refresh_widths()
+
+    def refresh_widths(self) -> None:
+        for combo in self._combos:
+            fit_combo_to_contents(combo, minimum=120)
+        self._reflow(force=True)
+
+    def minimumSizeHint(self):
+        return QSize(
+            max(field.minimumSizeHint().width() for field in self._fields),
+            self._grid.sizeHint().height(),
+        )
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reflow()
+
+    def _reflow(self, *, force: bool = False) -> None:
+        field_width = max(field.minimumSizeHint().width() for field in self._fields)
+        columns = 2 if self.width() >= field_width * 2 + 16 else 1
+        if not force and columns == self._columns:
+            return
+        self._columns = columns
+        while self._grid.count():
+            self._grid.takeAt(0)
+        for index, field in enumerate(self._fields):
+            self._grid.addWidget(field, index // columns, index % columns)
+        self._grid.setColumnStretch(0, 1)
+        self._grid.setColumnStretch(1, int(columns == 2))
+        self.updateGeometry()
 
 
 class PlaystylePanel(QWidget):
@@ -80,12 +146,35 @@ class PlaystylePanel(QWidget):
         left_layout.addLayout(row)
         splitter.addWidget(left_widget)
 
-        # 右侧：每项配置单独成区。玩法字段较多，普通 QFormLayout 会全部
-        # 缩在左上角，也很难快速区分两个武学及各自的增伤要求。
+        # 基础定义集中在顶部；后续出装搭配可直接接在同页下方。
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(8)
+        self._definition_toggle = QToolButton()
+        self._definition_toggle.setText(tr("基础定义"))
+        self._definition_toggle.setCheckable(True)
+        self._definition_toggle.setChecked(True)
+        self._definition_toggle.setAutoRaise(True)
+        self._definition_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._definition_toggle.setArrowType(Qt.ArrowType.DownArrow)
+        self._summary = QLabel()
+        self._summary.setWordWrap(True)
+        self._summary.setVisible(False)
+        header = QHBoxLayout()
+        header.addWidget(self._definition_toggle)
+        header.addWidget(self._summary, 1)
+        header.addStretch()
+        right_layout.addLayout(header)
+        self._definition_content = QWidget()
+        definition_layout = QVBoxLayout(self._definition_content)
+        definition_layout.setContentsMargins(8, 0, 8, 8)
+        definition_layout.setSpacing(6)
+        right_layout.addWidget(self._definition_content)
+        self._definition_toggle.toggled.connect(self._toggle_definition)
         self._combo_school = QComboBox()
         self._combo_art_a = QComboBox()
         self._combo_art_b = QComboBox()
@@ -103,44 +192,47 @@ class PlaystylePanel(QWidget):
         # 沿用「主/副」这两个用户熟悉的叫法，但**语义上不绑定顺序**：纯唐和
         # 双切的武学对完全相同，区别只在增伤要求落在哪一边，所以按武学查玩法
         # 是无序匹配（get_playstyles_for_arts），两个都会列出来由用户挑。
-        for label, editor in (
+        self._definition_fields = _DefinitionFields([
             (tr("流派"), self._combo_school),
             (tr("属性"), self._combo_attr),
             (tr("主武学"), self._combo_art_a),
-            (tr("主武学增伤要求"), self._combo_damage_a),
+            (tr("主武学增伤"), self._combo_damage_a),
             (tr("副武学"), self._combo_art_b),
-            (tr("副武学增伤要求"), self._combo_damage_b),
+            (tr("副武学增伤"), self._combo_damage_b),
             (tr("攻具定音"), self._combo_output),
             (tr("防具定音"), self._combo_defense),
-            (tr("全武学增伤要求"), self._combo_all_skill),
-            (tr("奇术增伤要求"), self._combo_qishu),
-            (tr("对单位增伤要求"), self._combo_unit),
-        ):
-            right_layout.addWidget(config_field_card(label, editor))
-        metadata_hint = QLabel(tr(
-            "以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算"))
+            (tr("全武学增伤"), self._combo_all_skill),
+            (tr("奇术增伤"), self._combo_qishu),
+            (tr("对单位增伤"), self._combo_unit),
+        ])
+        definition_layout.addWidget(self._definition_fields)
+        metadata_hint = QLabel(tr("全武学、奇术、对单位增伤仅作玩法说明 ⓘ"))
         metadata_hint.setWordWrap(True)
-        metadata_hint.setContentsMargins(14, 2, 14, 0)
+        metadata_hint.setToolTip(tr(
+            "以上三项仅作玩法说明，不参与评级、自动调律或毕业率计算"))
         metadata_hint.setStyleSheet("color: palette(mid); font-size: 11px;")
-        right_layout.addWidget(metadata_hint)
+        definition_layout.addWidget(metadata_hint)
         # 关键字是**参与匹配**的，必须排在上面那句「仅作玩法说明」之后，
         # 否则会被它一并否定掉。
         self._keywords = TagInputWidget([])
-        right_layout.addWidget(config_field_card(tr("匹配关键字"), self._keywords))
-        keyword_hint = QLabel(tr(
+        keyword_label = QLabel(tr("匹配关键字"))
+        keyword_row = QHBoxLayout()
+        keyword_row.setSpacing(8)
+        keyword_row.addWidget(keyword_label)
+        keyword_row.addWidget(self._keywords, 1)
+        definition_layout.addLayout(keyword_row)
+        keyword_hint = tr(
             "扫描全部备战方案时，方案名直接含玩法名优先；否则命中关键字的玩法"
-            "胜出，多个命中取最长关键字。按 Enter 添加"))
-        keyword_hint.setWordWrap(True)
-        keyword_hint.setContentsMargins(14, 2, 14, 0)
-        keyword_hint.setStyleSheet("color: palette(mid); font-size: 11px;")
-        right_layout.addWidget(keyword_hint)
+            "胜出，多个命中取最长关键字。按 Enter 添加")
+        keyword_label.setToolTip(keyword_hint)
+        self._keywords.setToolTip(keyword_hint)
         self._hint = QLabel()
         self._hint.setWordWrap(True)
-        self._hint.setContentsMargins(14, 2, 14, 0)
         self._hint.setStyleSheet("color: palette(mid); font-size: 11px;")
-        right_layout.addWidget(self._hint)
+        definition_layout.addWidget(self._hint)
         right_layout.addStretch()
-        splitter.addWidget(right_widget)
+        scroll.setWidget(right_widget)
+        splitter.addWidget(scroll)
 
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
@@ -156,6 +248,23 @@ class PlaystylePanel(QWidget):
         for combo in (self._combo_art_a, self._combo_art_b):
             combo.currentTextChanged.connect(self._on_arts_changed)
         self._keywords.tags_changed.connect(lambda: self._on_field_changed(""))
+
+    def _toggle_definition(self, expanded: bool) -> None:
+        self._definition_content.setVisible(expanded)
+        self._summary.setVisible(not expanded)
+        self._definition_toggle.setArrowType(
+            Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
+
+    @staticmethod
+    def _set_affix_options(
+        combo: QComboBox, names: list[str], empty_label: str, saved: str = "",
+    ) -> None:
+        """显示明确的无要求选项；持久化仍用空串，不写入展示文案。"""
+        combo.clear()
+        combo.addItem(empty_label, "")
+        for name in names:
+            combo.addItem(name, name)
+        combo.setCurrentIndex(max(0, combo.findData(saved)))
 
     def _editors(self) -> tuple[QComboBox, ...]:
         return (self._combo_school, self._combo_art_a, self._combo_art_b,
@@ -215,10 +324,11 @@ class PlaystylePanel(QWidget):
             self._combo_school.addItem(school, school)
         self._combo_attr.clear()
         self._combo_attr.addItems([_GENERIC, "鸣金", "裂石", "破竹", "牵丝"])
-        self._combo_output.clear()
-        self._combo_output.addItems(
-            [""] + sorted(gc.get_affix_names_in_category("外功增益")
-                          + gc.get_affix_names_in_category("属攻增益")))
+        self._set_affix_options(
+            self._combo_output,
+            sorted(gc.get_affix_names_in_category("外功增益")
+                   + gc.get_affix_names_in_category("属攻增益")),
+            tr("无特定定音"))
         current_item = self._list.currentItem()
         keep = current_item.text() if current_item else ""
         self._list.clear()
@@ -304,22 +414,21 @@ class PlaystylePanel(QWidget):
         ):
             weapon = self._art_of(art).get("weapon", "")
             affix = gc.get_weapon_wuxue_affix(weapon) if weapon else ""
-            combo.clear()
-            combo.addItems([""] + ([affix] if affix else []))
-            combo.setCurrentText(saved)
+            self._set_affix_options(
+                combo, [affix] if affix else [], tr("不需要增伤"), str(saved or ""))
 
         school = str(self._combo_school.currentData() or "")
         skills = sorted(
             gc.get_affix_names_in_group("指定技能增效", school)
             if school else
             gc.get_affix_names_in_category("指定技能增效"))
-        self._combo_defense.clear()
-        self._combo_defense.addItems([""] + skills)
         saved_defense = str(cfg.get("defense_dingyin") or "")
         if not school and saved_defense and saved_defense not in skills:
-            self._combo_defense.addItem(saved_defense)
-        self._combo_defense.setCurrentText(saved_defense)
-        self._combo_output.setCurrentText(cfg.get("output_dingyin", ""))
+            skills.append(saved_defense)
+        self._set_affix_options(
+            self._combo_defense, skills, tr("无特定定音"), saved_defense)
+        self._combo_output.setCurrentIndex(max(0, self._combo_output.findData(
+            str(cfg.get("output_dingyin") or ""))))
         self._combo_all_skill.setCurrentText(str(
             cfg.get("all_skill_requirement") or "需要"))
         self._combo_qishu.setCurrentText(str(
@@ -336,6 +445,10 @@ class PlaystylePanel(QWidget):
         else:
             self._hint.setText(tr(
                 "自定义玩法可自由选择属性与武学，并显示全部防具定音"))
+        self._summary.setText(" · ".join(filter(None, (
+            self._combo_school.currentText(), " / ".join(filter(None, picked)),
+        ))))
+        self._definition_fields.refresh_widths()
         self._loading = loading
 
     def _on_field_changed(self, _text: str) -> None:
@@ -356,10 +469,10 @@ class PlaystylePanel(QWidget):
                     "attr": self._combo_attr.currentText(),
                     "main_weapon": self._art_of(arts[0]).get("weapon", ""),
                     "sub_weapon": self._art_of(arts[1]).get("weapon", ""),
-                    "main_damage": self._combo_damage_a.currentText(),
-                    "sub_damage": self._combo_damage_b.currentText(),
-                    "output_dingyin": self._combo_output.currentText(),
-                    "defense_dingyin": self._combo_defense.currentText(),
+                    "main_damage": self._combo_damage_a.currentData() or "",
+                    "sub_damage": self._combo_damage_b.currentData() or "",
+                    "output_dingyin": self._combo_output.currentData() or "",
+                    "defense_dingyin": self._combo_defense.currentData() or "",
                     "all_skill_requirement":
                         self._combo_all_skill.currentText(),
                     "qishu_requirement": self._combo_qishu.currentText(),

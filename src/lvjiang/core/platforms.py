@@ -95,6 +95,31 @@ SUBPROCESS_NO_WINDOW: dict = (
     {"creationflags": subprocess.CREATE_NO_WINDOW} if IS_WINDOWS else {}
 )
 
+# 读 CLI 输出统一用这组参数，不要裸写 text=True。
+#
+# `text=True` 不带 encoding 时按**本地 locale** 解码：中文 Windows 上是 GBK，
+# 而 adb / Android 的输出是 UTF-8。轻则中文窗口标题变乱码，重则直接抛
+# UnicodeDecodeError——`dumpsys window windows` 有几百 KB，里面混进一个非 GBK
+# 字节，subprocess 的读取线程就在 fh.read() 处炸掉，调用方只拿到一条孤立的
+# 线程 traceback，而那次探测静默失败。
+#
+# errors="replace" 而不是 "ignore"：dumpsys 这类大块输出里混进非法字节是常态，
+# 要的是「尽量读出可用文本」；ignore 会悄悄删字符，replace 留下的 U+FFFD 至少
+# 能让人看出这里原本有东西。
+#
+# 用法：subprocess.run([...], **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW)
+SUBPROCESS_TEXT: dict = {
+    "text": True, "encoding": "utf-8", "errors": "replace",
+}
+
+# Windows 自带 CLI（ipconfig 等）的输出走**控制台代码页**而不是 UTF-8，
+# 按 UTF-8 解会把中文适配器名解成乱码。"oem" 正是 Python 为这种场合提供的
+# 别名；非 Windows 上没有这个编码，回落到 UTF-8（那边本来就是 UTF-8）。
+SUBPROCESS_TEXT_OEM: dict = (
+    {"text": True, "encoding": "oem", "errors": "replace"} if IS_WINDOWS
+    else SUBPROCESS_TEXT
+)
+
 
 # ─── 桌面输入后端 ─────────────────────────────────────────
 
@@ -168,7 +193,7 @@ def _osascript(script: str, blocking: bool = True) -> str:
     if not blocking:
         subprocess.Popen(cmd)
         return ""
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    r = subprocess.run(cmd, capture_output=True, **SUBPROCESS_TEXT)
     return r.stdout.strip()
 
 

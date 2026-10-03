@@ -12,7 +12,11 @@ from typing import Callable
 from loguru import logger
 
 from ...constants import PROJECT_ROOT
-from ..platforms import SUBPROCESS_NO_WINDOW, adb_path_candidates
+from ..platforms import (
+    SUBPROCESS_NO_WINDOW,
+    SUBPROCESS_TEXT,
+    adb_path_candidates,
+)
 
 
 class AdbConnectionError(RuntimeError):
@@ -62,7 +66,7 @@ def list_adb_devices(
             [adb, "devices", "-l"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            **SUBPROCESS_TEXT,
             **SUBPROCESS_NO_WINDOW,
         )
         deadline = time.monotonic() + 10.0
@@ -210,8 +214,8 @@ class AdbDevice:
                     logger.info(f"ADB 重试: adb shell {' '.join(args)}")
                 r = subprocess.run(
                     [*self._base(), "shell", *args],
-                    capture_output=True, text=True, timeout=timeout,
-                    **SUBPROCESS_NO_WINDOW,
+                    capture_output=True, timeout=timeout,
+                    **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
                 )
                 if r.returncode != 0:
                     # 某些打包/代理环境在命令没有对应输出流时会返回 None。
@@ -253,7 +257,8 @@ class AdbDevice:
         """建立端口转发 local -> remote，成功返回 True"""
         r = subprocess.run(
             [*self._base(), "forward", local, remote],
-            capture_output=True, text=True, timeout=10, **SUBPROCESS_NO_WINDOW,
+            capture_output=True, timeout=10,
+            **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
         )
         if r.returncode != 0:
             logger.error(f"adb forward {local} {remote} 失败: {r.stderr.strip()}")
@@ -269,7 +274,8 @@ class AdbDevice:
         """
         r = subprocess.run(
             [*self._base(), "forward", "tcp:0", remote],
-            capture_output=True, text=True, timeout=10, **SUBPROCESS_NO_WINDOW,
+            capture_output=True, timeout=10,
+            **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
         )
         output = (r.stdout or "").strip()
         if r.returncode != 0:
@@ -299,7 +305,8 @@ class AdbDevice:
         """推送文件到设备，成功返回 True"""
         r = subprocess.run(
             [*self._base(), "push", local_path, remote_path],
-            capture_output=True, text=True, timeout=60, **SUBPROCESS_NO_WINDOW,
+            capture_output=True, timeout=60,
+            **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
         )
         if r.returncode != 0:
             logger.error(f"adb push {local_path} 失败: {r.stderr.strip()}")
@@ -326,7 +333,7 @@ class AdbDevice:
             [*self._base(), "install", "-r", str(apk_path)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            **SUBPROCESS_TEXT,
             **SUBPROCESS_NO_WINDOW,
         )
         deadline = time.monotonic() + timeout

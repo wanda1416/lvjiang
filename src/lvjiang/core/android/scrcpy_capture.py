@@ -35,7 +35,7 @@ from loguru import logger
 from ...constants import PROJECT_ROOT
 from ...i18n import tr
 from ..capture_base import CaptureBackend
-from ..platforms import SUBPROCESS_NO_WINDOW
+from ..platforms import SUBPROCESS_NO_WINDOW, SUBPROCESS_TEXT
 from .device import AdbDevice
 
 if TYPE_CHECKING:
@@ -409,7 +409,8 @@ class AndroidStreamCapture(CaptureBackend):
             return False
         r = subprocess.run(
             [*self._device._base(), "push", str(self._jar_local), _REMOTE_JAR_PATH],
-            capture_output=True, text=True, timeout=30, **SUBPROCESS_NO_WINDOW,
+            capture_output=True, timeout=30,
+            **SUBPROCESS_TEXT, **SUBPROCESS_NO_WINDOW,
         )
         if r.returncode != 0:
             logger.error(f"[AndroidStream] 推送 jar 失败: {r.stderr.strip()}")

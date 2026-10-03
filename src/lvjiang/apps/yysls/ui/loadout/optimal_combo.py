@@ -84,6 +84,10 @@ _MIN_RATING_CHOICES: tuple[str, ...] = ("顶级", "优秀", "一般")
 #: 默认要求。一般是「这件装备还能用」的下限，比顶级/优秀都不容易把候选筛空。
 _DEFAULT_MIN_RATING = "一般"
 
+#: 单个部位候选区默认最多展示的候选行数。候选再多也只占这些行的高度，
+#: 剩余由该区域自己的滚动条承担——部位候选数量不参与对话框高度计算。
+_VISIBLE_CANDIDATE_ROWS = 10
+
 
 def _global_top_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """跨弓玦场景按毕业率统一排名，只保留全局 Top N。"""
@@ -488,6 +492,8 @@ class _SlotGroup(QFrame):
         layout.setSpacing(3)
 
         header = QHBoxLayout()
+        # 保留标题行引用：区域高度按「标题 + N 行候选」换算（见 visible_height）
+        self._header = header
         title = QLabel(display_name)
         title.setStyleSheet("font-size: 13px; font-weight: 700;")
         header.addWidget(title)
@@ -528,6 +534,23 @@ class _SlotGroup(QFrame):
         # 候选少时卡片仍填满网格单元，内容固定贴顶；候选多时
         # 布局的最小高度会交给外层 QScrollArea 产生独立滚动条。
         layout.addStretch()
+
+    def visible_height(self, rows: int = _VISIBLE_CANDIDATE_ROWS) -> int:
+        """只展示 ``rows`` 行候选时该区域应占的高度（标题 + 行 + 内边距）。
+
+        用于给候选区设高度上限：候选再多也只占这么多行，其余交给本区滚动条。
+        """
+        layout = self.layout()
+        if layout is None:
+            return 0
+        margins = layout.contentsMargins()
+        spacing = max(int(layout.spacing()), 0)
+        height = margins.top() + margins.bottom()
+        height += self._header.sizeHint().height() + spacing
+        row_height = max((row.sizeHint().height() for row in self.rows), default=0)
+        if row_height > 0:
+            height += rows * row_height + spacing * (rows - 1)
+        return height
 
     def get_selected(self) -> list[dict]:
         """返回勾选的装备列表。"""
@@ -1116,8 +1139,9 @@ class OptimalComboPage(QWidget):
             col = idx % 4
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
-            # 候选数量不参与外层 2×4 网格的尺寸计算：八个区域
-            # 始终等高填满，每个区域内部再按需滚动。
+            # 候选数量不参与外层 2×4 网格的尺寸计算：八个区域始终等高，
+            # 高度上限在 _cap_candidate_area_height 里按行数统一给定，
+            # 每个区域内部再按需滚动。
             scroll.setSizeAdjustPolicy(
                 QAbstractScrollArea.SizeAdjustPolicy.AdjustIgnored)
             scroll.setSizePolicy(
@@ -1131,6 +1155,8 @@ class OptimalComboPage(QWidget):
             self._slot_scroll_areas[slot_key] = scroll
         for c in range(4):
             grid.setColumnStretch(c, 1)
+        # 两行候选区平分可用高度，但都受 _cap_candidate_area_height 给的高度
+        # 上限约束：窗口再高，单个部位也只展示 10 行候选，其余交给本区滚动条。
         for r in range(2):
             grid.setRowStretch(r, 1)
         candidates_layout.addLayout(grid, 1)
@@ -1495,6 +1521,25 @@ class OptimalComboPage(QWidget):
         self._combo_min_rating.setEnabled(enabled)
         self._refresh_tuning_display()
 
+    def _cap_candidate_area_height(self) -> None:
+        """把每个部位候选区的高度上限压到「10 行候选」。
+
+        候选数量不参与对话框高度计算：某个部位候选再多，最多也只占这 10 行，
+        其余由该区域自己的滚动条承担。上限取八个部位的统一值，保证网格里
+        八个区域始终等高。
+        """
+        heights = [
+            group.visible_height()
+            for group in self._slot_groups.values() if group.rows
+        ]
+        if not heights:
+            return
+        cap = max(heights)
+        for scroll in self._slot_scroll_areas.values():
+            scroll.setMaximumHeight(cap)
+        logger.debug(
+            f"候选区高度上限: {cap}px（{_VISIBLE_CANDIDATE_ROWS} 行候选）")
+
     def _load_candidates(self) -> None:
         """从 session 加载候选装备并按槽位分组。
 
@@ -1560,6 +1605,7 @@ class OptimalComboPage(QWidget):
                 # 因此空间会留在底部，候选行始终顶部对齐。
                 scroll.setWidget(group)
 
+        self._cap_candidate_area_height()
         self._slot_labels = slot_labels
         self._candidate_summary.setText(
             tr("已载入 {count} 件候选装备，覆盖 {slots}/8 个部位。"

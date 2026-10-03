@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .excel_formula import (
+    ExcelError,
     FormulaError,
     FormulaModel,
     column_name,
@@ -34,6 +35,8 @@ class ProgramCompiler:
         self.node_index: dict[tuple[Any, ...], int] = {}
         self.cell_nodes: dict[str, int] = {}
         self.active: set[str] = set()
+        #: 正在编译哪一格，错误值哨兵用它指出坏在哪里
+        self._current_cell = ""
 
     def compile(self, outputs: dict[str, str]) -> dict[str, Any]:
         output_nodes = {name: self._ref(ref) for name, ref in outputs.items()}
@@ -121,9 +124,30 @@ class ProgramCompiler:
             result = self._constant(cell.get("value", 0))
         else:
             self.active.add(key)
+            previous_cell = self._current_cell
+            self._current_cell = key
             try:
                 result = self._scalar(self._expr(parse_formula(cell["formula"]), sheet))
+            except FormulaError as exc:
+                error = getattr(exc, "excel_error", None)
+                if error is not None:
+                    # 本格的值就是个错误值（Excel 里这格显示 #REF!）。折成常量
+                    # 往下传，由真正取用它的地方失败；在这里抛会让一个没人取用
+                    # 的坏格挡住整张表的导入。没人取用时它是死 const，_prune 丢掉。
+                    result = self._constant(error)
+                    self.cell_nodes[key] = result
+                    return result
+                # 只在最内层那一格贴位置：外层只是把它引进来的，继续往上贴
+                # 会得到一串十几层的链路，反而看不出该去改哪一格。
+                if getattr(exc, "cell", None) is not None:
+                    raise
+                located = FormulaError(f"{key} {exc}")
+                # 标记必须打在**新**异常上：外层每一帧都会再捕一次，不标就会
+                # 把整条引用链一层层叠进消息，真正要改的那一格反而埋在中间。
+                located.cell = key  # type: ignore[attr-defined]
+                raise located from exc
             finally:
+                self._current_cell = previous_cell
                 self.active.remove(key)
         self.cell_nodes[key] = result
         return result
@@ -149,6 +173,15 @@ class ProgramCompiler:
                 "<=": "le", ">=": "ge",
             }
             return self._emit(names[ast["operator"]], [left, right])
+        if op == "error":
+            # 当成常量折进去，不在这里抛。Excel 的查表只取命中的那一个元素，
+            # 返回列里其他行是 #REF! 也不影响结果；而编译器会把整列都物化，
+            # 一碰到就抛等于让一个没人取用的坏格挡住整张表的导入。
+            #
+            # 真被取用时，_emit 的常量折叠会在 _number 里失败并带出位置；
+            # 没被取用的只是一个死 const 节点，_prune 会连同其他死分支丢掉。
+            return self._constant(
+                ExcelError(ast["code"], self._current_cell))
         if op != "call":
             raise FormulaError(f"unsupported AST node {op}")
         return self._call(ast["name"].removeprefix("_XLFN."), ast["args"], sheet)

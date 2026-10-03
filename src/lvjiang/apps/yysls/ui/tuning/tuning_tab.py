@@ -435,12 +435,6 @@ class TuningTab(QWidget):
         else:
             self.btn_run_tuning.setText(hotkey_label(tr("开始调律"), hk.start))
             apply_execution_button_style(self.btn_run_tuning, "run")
-            # 工作流结束：通知调律进度 Tab 标记完成
-            engine = getattr(self._host, '_current_engine', None)
-            if engine is not None and hasattr(engine, '_progress_hub'):
-                widget = self._find_progress_widget()
-                if widget is not None:
-                    widget.mark_done()
         # 刷新暂停/恢复按钮
         if state == "running":
             self.btn_pause_resume.setText(hotkey_label(tr("暂停"), hk.pause))
@@ -457,7 +451,13 @@ class TuningTab(QWidget):
         # 进度面板的暂停提示：独立于按钮，避免只看右侧面板时误以为卡死
         widget = self._find_progress_widget()
         if widget is not None:
-            widget.set_paused(state == "paused")
+            context = getattr(self._host, "_current_run_context", None)
+            if (context is not None
+                    and hasattr(widget, "set_run_paused")):
+                widget.set_run_paused(
+                    context.task_run_id, state == "paused")
+            else:
+                widget.set_paused(state == "paused")
 
     def _on_pause_resume_clicked(self):
         """暂停/恢复按钮点击 → 转发给宿主"""
@@ -659,8 +659,18 @@ class TuningTab(QWidget):
                 # 连接右侧调律管理中的进度页
                 widget = self._find_progress_widget()
                 if widget is not None:
-                    widget.reconnect(engine._progress_hub)
-                    widget.reset_state()
+                    task_run_id = str(getattr(engine, "task_run_id", "") or "")
+                    target = getattr(engine, "execution_target_snapshot", None)
+                    target_label = str(
+                        getattr(target, "display_name", "") or tr("未知目标"))
+                    title = f"{target_label} · {execution_username}"
+                    if task_run_id and hasattr(widget, "register_run"):
+                        engine._tuning_management = widget
+                        widget.register_run(
+                            task_run_id, engine._progress_hub, title=title)
+                    else:
+                        widget.reconnect(engine._progress_hub)
+                        widget.reset_state()
                 else:
                     logger.warning("未找到调律进度控件，进度信号不会显示")
 

@@ -22,6 +22,8 @@ def _run(run_id="run-1", started_at="2026-09-01T01:00:00+00:00"):
     return TuningRunSummary(
         run_id=run_id, started_at=started_at, finished_at="",
         username="小明", status="running", stop_reason="",
+        task_run_id="task-1", target_id="adb:device-1",
+        target_kind="adb", target_label="Pixel · USB",
         selected_slots=("chest",), rule_snapshot=({"key": "rule"},),
     )
 
@@ -70,6 +72,12 @@ def test_results_round_trip_preserves_processing_order(tmp_path):
     assert results[0].lock_status == "locked"
     assert results[0].cooldown_kind == "reset"
     assert results[0].cooldown_state == "completed"
+    summary = repo.get_run("run-1")
+    assert summary is not None
+    assert summary.task_run_id == "task-1"
+    assert summary.target_id == "adb:device-1"
+    assert summary.target_kind == "adb"
+    assert summary.target_label == "Pixel · USB"
 
 
 def test_only_recent_unreported_telemetry_is_selected(tmp_path):

@@ -602,9 +602,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             config["game_config_customized"] = vocab.game_config_customized()
             config["season"] = vocab.current_season_number()
             repo = TuningHistoryRepository(self.ctx.history_db_path)
+            target = getattr(self.engine, "execution_target_snapshot", None)
             self._history_session = TuningRunSession(
                 repo, username=username, selected_slots=slots,
                 rule_snapshot=rules, config_snapshot=config,
+                task_run_id=str(getattr(self.engine, "task_run_id", "") or ""),
+                target_id=str(getattr(target, "id", "") or ""),
+                target_kind=str(getattr(target, "kind", "") or ""),
+                target_label=str(getattr(target, "display_name", "") or ""),
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"调律历史初始化失败，本轮不保存历史: {exc}")

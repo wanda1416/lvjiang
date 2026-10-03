@@ -74,6 +74,10 @@ class TuningRunSummary:
     username: str
     status: str
     stop_reason: str
+    task_run_id: str = ""
+    target_id: str = ""
+    target_kind: str = ""
+    target_label: str = ""
     selected_slots: tuple[str, ...] = ()
     rule_snapshot: tuple[dict, ...] = ()
     total_equipment: int = 0

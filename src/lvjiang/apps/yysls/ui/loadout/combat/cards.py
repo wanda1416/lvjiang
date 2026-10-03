@@ -163,11 +163,9 @@ class CombatCardsMixin:
             (0, 0, "外功穿透", "outer_pen"),
             (0, 1, "属攻穿透", "__attr_pen__"),
             (2, 0, "全武学增效", "all_skill_bonus"),
-            (3, 0, "单体类奇术增伤", "single_qs_bonus"),
-            (3, 1, "群体类奇术增伤", "group_qs_bonus"),
-            (4, 0, "对首领单位增伤", "boss_bonus"),
-            (4, 1, "对玩家单位增效", "player_bonus"),
-            (5, 0, "全奇术增伤", "all_qs_bonus"),
+            (2, 1, "全奇术增伤", "all_qs_bonus"),
+            (3, 0, "对首领单位增伤", "boss_bonus"),
+            (3, 1, "对玩家单位增效", "player_bonus"),
         )
         # 存储原始布局位置用于自适应重排
         self._gain_grid_items: list[tuple[QWidget, int, int]] = []
@@ -183,13 +181,14 @@ class CombatCardsMixin:
             self._create_dynamic_slot(grid, 1, col) for col in range(2)
         ]
         self._skill_bonus_slots = [
-            self._create_dynamic_slot(grid, 5, col) for col in range(2)
+            self._create_dynamic_slot(grid, row, col)
+            for row in (4, 5) for col in range(2)
         ]
         # 存储动态槽位置
         for slot_widget, _, _ in self._weapon_bonus_slots:
             self._gain_grid_items.append((slot_widget, 1, 0 if slot_widget is self._weapon_bonus_slots[0][0] else 1))
-        for slot_widget, _, _ in self._skill_bonus_slots:
-            self._gain_grid_items.append((slot_widget, 5, 0 if slot_widget is self._skill_bonus_slots[0][0] else 1))
+        for index, (slot_widget, _, _) in enumerate(self._skill_bonus_slots):
+            self._gain_grid_items.append((slot_widget, 4 + index // 2, index % 2))
         self._gain_grid = grid
         self._extra_labels: dict[str, QLabel] = {}
         grid.setColumnStretch(0, 1)
@@ -251,6 +250,11 @@ class CombatCardsMixin:
         name_label = QLabel()
         name_label.setStyleSheet(_NAME_STYLE)
         value_label = self._create_value_label()
+        # 空的动态槽仍须保留一行高度：全屏模式下增益卡片必须与左侧
+        # 六行攻击卡片等高，不能因定音数量少而让下方卡片上移。
+        widget.setMinimumHeight(max(
+            name_label.fontMetrics().height(), value_label.fontMetrics().height(),
+        ))
         layout.addWidget(name_label)
         layout.addStretch()
         layout.addWidget(value_label)

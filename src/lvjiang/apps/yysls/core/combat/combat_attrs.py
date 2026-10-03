@@ -802,6 +802,12 @@ def aggregate_equipment_attrs(
         )
         result = result + five_dim_attrs
 
+    # 115 起角色面板只保留「全奇术增伤」。旧装备仍可能携带单体/群体
+    # 奇术词条；在装备属性聚合边界折入统一字段，不改写原始装备数据。
+    result.all_qs_bonus += result.single_qs_bonus + result.group_qs_bonus
+    result.single_qs_bonus = 0.0
+    result.group_qs_bonus = 0.0
+
     return result
 
 

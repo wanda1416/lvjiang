@@ -20,6 +20,61 @@ from lvjiang.apps.yysls.ui.loadout.combat.attrs_tab import CombatAttrsTab
 from tests.case_matrix import case_matrix
 
 
+def test_gain_card_slots_never_share_a_grid_cell(qtbot) -> None:
+    """防具技能定音不能与全奇术增伤叠画在同一个网格坐标。"""
+    from PyQt6.QtWidgets import QVBoxLayout, QWidget
+
+    from lvjiang.apps.yysls.ui.loadout.combat.cards import CombatCardsMixin
+
+    class Cards(CombatCardsMixin, QWidget):
+        def __init__(self):
+            super().__init__()
+            self._attr_labels = {}
+
+        @staticmethod
+        def _set_resistance_text(label, original, _effective, unit):
+            label.setText(f"{original}{unit}")
+
+    cards = Cards()
+    qtbot.addWidget(cards)
+    layout = QVBoxLayout(cards)
+    cards._add_gain_card(layout)
+
+    positions = [(row, column) for _, row, column in cards._gain_grid_items]
+    assert len(positions) == len(set(positions))
+    assert (2, 1) in positions  # 全奇术增伤
+    assert {(4, 0), (4, 1)} <= set(positions)  # 防具定音技能
+    assert len(cards._skill_bonus_slots) == 4
+    assert {(5, 0), (5, 1)} <= set(positions)
+    assert all(not slot[0].isHidden() for slot in cards._skill_bonus_slots)
+
+    names = list(dict.fromkeys(
+        get_game_config().get_aliases_for_category("指定技能增效")
+    ))[:4]
+    assert len(names) == 4
+    CombatAttrsTab._refresh_extra_attrs(
+        cards, {name: 0.08 for name in names}, 0.0,
+    )
+    assert [slot[1].text() for slot in cards._skill_bonus_slots] == sorted(names)
+    positions = [(row, column) for _, row, column in cards._gain_grid_items]
+    assert len(positions) == len(set(positions))
+    assert {(5, 0), (5, 1)} <= set(positions)
+
+
+def test_legacy_qishu_affixes_fold_into_all_qishu_without_mutating_equipment() -> None:
+    equipped = {
+        "head": {"affix_1": {"name": "单体类奇术增伤", "value": 8.0}},
+        "chest": {"affix_1": {"name": "群体类奇术增伤", "value": 7.0}},
+    }
+
+    attrs = aggregate_equipment_attrs(equipped, normalize=False)
+
+    assert attrs.all_qs_bonus == pytest.approx(0.15)
+    assert attrs.single_qs_bonus == 0.0
+    assert attrs.group_qs_bonus == 0.0
+    assert equipped["head"]["affix_1"]["name"] == "单体类奇术增伤"
+
+
 def test_wuxiang_penetration_is_a_fixed_numeric_field() -> None:
     attrs = aggregate_equipment_attrs({
         "head": {"dingyin": {"name": "无相穿透", "value": 14.5}},

@@ -31,6 +31,47 @@ class _Host(QObject):
         return None
 
 
+def test_gain_empty_slots_are_reserved_only_in_full_mode(qtbot):
+    from lvjiang.apps.yysls.ui.loadout.combat.layout_strategies import (
+        HalfCompactCardLayout,
+    )
+
+    panel = LoadoutPanel(_Host())
+    qtbot.addWidget(panel)
+    combat = panel._character._combat_attrs_tab
+    slots = combat._weapon_bonus_slots + combat._skill_bonus_slots
+    for _, name, value in slots:
+        name.clear()
+        value.clear()
+    slots[0][1].setText("测试武学增效")
+    slots[0][2].setText("8.00%")
+
+    combat.set_embedded_mode("half")
+    assert not slots[0][0].isHidden()
+    assert all(widget.isHidden() for widget, _, _ in slots[1:])
+    combat._strategy.on_refresh_display(combat)
+    assert all(widget.isHidden() for widget, _, _ in slots[1:])
+
+    combat._display_mode = "half_compact"
+    combat._strategy = HalfCompactCardLayout()
+    combat._strategy.on_refresh_display(combat)
+    visible = [widget for widget, _, _ in sorted(
+        combat._gain_grid_items, key=lambda item: (item[1], item[2]))
+        if not widget.isHidden()]
+    assert [combat._gain_grid.itemAtPosition(row, 0).widget()
+            for row in range(len(visible))] == visible
+    assert combat._gain_grid.count() == len(visible)
+
+    combat.set_embedded_mode("full")
+    assert all(not widget.isHidden() for widget, _, _ in slots)
+    combat._strategy.on_refresh_display(combat)
+    assert all(not widget.isHidden() for widget, _, _ in slots)
+    combat.set_embedded_mode("half")
+    slots[0][1].clear()
+    combat._strategy.on_refresh_display(combat)
+    assert all(widget.isHidden() for widget, _, _ in slots)
+
+
 def test_assumptions_share_public_metric_row(qtbot):
     panel = LoadoutPanel(_Host())
     qtbot.addWidget(panel)

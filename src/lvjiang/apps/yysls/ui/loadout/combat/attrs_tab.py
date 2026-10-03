@@ -908,7 +908,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._refresh_extra_attrs(combat_attrs.extra_attrs, buff_resistance)
         self._schedule_graduation(graduation_attrs)
 
-        # 所有模式走统一策略钩子；full/half 默认 no-op，compact 自行重排。
+        # 所有模式更新动态槽显隐；compact 额外重排为单列。
         self._strategy.on_refresh_display(self)
 
     def _refresh_attr_bonus(self, combat_attrs: CombatAttributes) -> None:
@@ -1056,7 +1056,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
     def _refresh_extra_attrs(
         self, extra_attrs: dict[str, float], buff_resistance: float,
     ) -> None:
-        """按配置词组分类动态增益，技能定音按需扩展到第七行。"""
+        """按配置词组分类动态增益，技能定音按需扩展到第六行。"""
         from ....config import get_game_config
         from ....core.combat.combat_attrs import apply_bonus_resistance, has_resistance
 
@@ -1071,24 +1071,12 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
             else:
                 weapon_items.append((key, value))
 
-        # 常态只保留第六行两个槽位；第三、第四个技能定音出现时，
-        # 才创建并显示第七行。
-        if len(skill_items) > 2 and len(self._skill_bonus_slots) < 4:
-            for col in range(2):
-                slot = self._create_dynamic_slot(self._gain_grid, 6, col)
-                self._skill_bonus_slots.append(slot)
-                # half_compact 会按此清单移除并重排全部控件。动态槽若不
-                # 登记，会滞留在原 (6, col)，与重排到第 6 行的固定属性
-                # 重叠；登记后卡片会按实际可见槽位自然扩高。
-                self._gain_grid_items.append((slot[0], 6, col))
-        show_seventh_row = len(skill_items) > 2
-        for index, (widget, name_label, value_label) in enumerate(
+        # 重置槽内容；是否保留空槽由当前布局策略决定。
+        for widget, name_label, value_label in (
                 self._weapon_bonus_slots + self._skill_bonus_slots):
             name_label.clear()
             value_label.clear()
             widget.setToolTip("")
-            if index >= len(self._weapon_bonus_slots) + 2:
-                widget.setVisible(show_seventh_row)
 
         def fill_slots(items: list[tuple[str, float]], slots) -> None:
             overflow = items[len(slots):]
@@ -1112,10 +1100,6 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
         fill_slots(weapon_items, self._weapon_bonus_slots)
         fill_slots(skill_items, self._skill_bonus_slots)
-
-        # 隐藏没有内容的动态槽位，避免单列模式产生空行
-        for widget, name_label, _ in self._weapon_bonus_slots + self._skill_bonus_slots:
-            widget.setVisible(bool(name_label.text()))
 
     def _get_base_attrs(self) -> CombatAttributes:
         """获取当前选择的基础属性。"""

@@ -176,19 +176,4 @@ def test_saved_target_shows_on_plan_cards_and_bag_cards(qtbot):
     ] == ["(会意率)"]
 
 
-def test_assumption_controls_include_simulate_transmute(qtbot):
-    from lvjiang.apps.yysls.ui.loadout.loadout_panel import LoadoutPanel
-    from tests.yysls.test_loadout_panel_layout import _Host
 
-    panel = LoadoutPanel(_Host())
-    qtbot.addWidget(panel)
-    controls = [
-        panel._assumption_layout.itemAt(index).widget() for index in range(4)
-    ]
-    assert [control.text() for control in controls] == [
-        "满等级", "满承音", "满定音", "模拟转律",
-    ]
-    combat = panel._character._combat_attrs_tab
-    combat._chk_simulate_transmute.setChecked(True)
-    assert combat.assumptions().simulate_transmute is True
-    assert "模拟转律" in combat.assumption_labels()

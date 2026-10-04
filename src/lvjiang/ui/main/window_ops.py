@@ -1280,7 +1280,9 @@ class WindowOpsMixin:
         else:
             from ...core.desktop import SendInputInput
             target.input_ctrl = SendInputInput(
-                input_sim=self._user_config.input_sim)
+                input_sim=self._user_config.input_sim,
+                target_hwnd=target.window["hwnd"],
+            )
         target.input_kind = str(
             getattr(target.input_ctrl, "kind", "") or "")
         self._rebind_target_resources(target)
@@ -1498,7 +1500,10 @@ class WindowOpsMixin:
             input_ctrl = PostMessageInput(
                 input_sim=self._user_config.input_sim, hwnd=w["hwnd"])
         else:
-            input_ctrl = SendInputInput(input_sim=self._user_config.input_sim)
+            input_ctrl = SendInputInput(
+                input_sim=self._user_config.input_sim,
+                target_hwnd=w["hwnd"],
+            )
         return ExecutionTarget(
             id=WINDOW_TARGET_ID,
             kind="windows",

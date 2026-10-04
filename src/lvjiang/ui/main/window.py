@@ -1146,8 +1146,9 @@ class MainWindow(
             input_ctrl = target_snapshot.input_ctrl
             target_window = target_snapshot.window
             assert target_window is not None
-            if input_ctrl.background_mode:
-                input_ctrl.target_hwnd = target_window["hwnd"]
+            # PostMessage 依赖句柄投递，SendInput 也依赖句柄在按键前激活
+            # 正确窗口。前台模式不能只靠「窗口碰巧仍在前台」。
+            input_ctrl.target_hwnd = target_window["hwnd"]
             window_left = target_window["left"]
             window_top = target_window["top"]
 

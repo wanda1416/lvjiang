@@ -4,7 +4,7 @@
 #% env: [android, desktop]
 #% parameters:
 #%   - name: tol_tongbao
-#%     label: 通宝允许差值(万)
+#%     label: 通宝允许差值（万）
 #%     type: number
 #%     default: 0
 #%   - name: tol_bugan
@@ -12,7 +12,7 @@
 #%     type: number
 #%     default: 0
 #%   - name: tol_baoqian
-#%     label: 宝钱允许差值(万)
+#%     label: 宝钱允许差值（万）
 #%     type: number
 #%     default: 0
 #%   - name: tol_changmingyu
@@ -48,6 +48,10 @@
 # 选取策略：
 #   同一货币可能在多个格子出现（如么玉在 row1 和 row2 都识别到），
 #   取置信度最高的结果写入，避免低置信度覆盖高置信度。
+#
+# 前置：在主页（内部走 nav_main_to_wallet 进钱袋页）。
+# 后置：成功时已回到主页，识别到的货币已按容差规则写入对应 profile。
+# 返回：-1=Profile 声明失败或导航失败；否则正常结束。
 
 default $tol_tongbao = 0
 default $tol_bugan = 0
@@ -58,19 +62,19 @@ import "subcall/navigation.wf"
 import "subcall/game_profile.wf"
 import "subcall/profile_registry.wf"
 
-# ─── 声明本任务依赖的 Profile 数据模型 ───────────────────
+# ─── 声明本任务依赖的 Profile 数据模型 ────────────────────────────────
 call $profile_ok = declare_profiles(["tongbao", "bugan", "baoqian", "changmingyu", "bugan_of_week"])
 if $profile_ok < 0
     return -1
 end
 
-# ─── 导航到钱袋页面 ──────────────────────────────────────
+# ─── 导航到钱袋页面 ──────────────────────────────────────────────
 call $nav_result = nav_main_to_wallet()
 if $nav_result < 0
     return -1
 end
 
-# ─── 扫描区域货币（money_1, 1×4） ────────────────────────
+# ─── 扫描区域货币（money_1, 1×4） ─────────────────────────────────
 # 四种可能：宋元通宝、月华通宝、周元通宝、墨筹
 # recognize as rich 返回 {行: {列: {label, count, confidence, ...}}}
 recognize [bag_wallet_detail].[money_1] as rich $money1 on group "货币资产" with yysls_rich_parse
@@ -156,25 +160,33 @@ end
 
 log "钱袋货币扫描完成"
 
-# ─── 点击么玉进入不肝页面，获取不肝进度 ──────────────────
+# ─── 点击么玉进入不肝页面，获取不肝进度 ────────────────────────────────────
 if $bugan_pos
     eval $bugan_row = $bugan_pos.row
     eval $bugan_col = $bugan_pos.col
     click [bag_wallet_detail].[money_2][$bugan_row][$bugan_col] after wait @step_interval
-    
+
     scan [bag_wallet_detail].[bugan_jindu] as $jindu_str
     call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度", "日常活动")
 end
 
-# ─── 返回主界面 ──────────────────────────────────────────
+# ─── 返回主界面 ────────────────────────────────────────────────
 call nav_back_to_main()
 return 0
 
-# ─── 上拉 1 行后重建面板数据 ──────────────────────────────
-# $data 是滚动前的整面板数据，$fresh 是滚动后只补扫了最后一行（$rows）
-# 的结果。整个面板上拉 1 行会让每一行的画面内容整体上移：旧第 r 行的
-# 内容现在显示在新第 r-1 行；旧第 1 行滚出屏幕丢弃；新的最后一行
-# （$rows）用 $fresh 的补扫结果填。返回准确反映滚动后当前画面的字典。
+# ─── shift_rows_after_scroll ──────────────────────────────
+# 整个面板上拉 1 行后重建面板数据（内部过程）。
+#
+# 参数：
+#   $data  — 滚动前的整面板数据
+#   $fresh — 滚动后只补扫了最后一行（$rows）的结果
+#   $rows  — 面板行数
+# 前置：刚对整个面板上拉 1 行，且已补扫新的最后一行。
+# 后置：无副作用（不修改入参）。
+# 返回：准确反映滚动后当前画面的字典。
+#
+# 上拉 1 行会让每一行的画面内容整体上移：旧第 r 行的内容现在显示在新第 r-1
+# 行；旧第 1 行滚出屏幕丢弃；新的最后一行（$rows）用 $fresh 的补扫结果填。
 def shift_rows_after_scroll($data, $fresh, $rows)
     eval $shifted = {}
     for r in range(2, $rows)
@@ -188,8 +200,17 @@ def shift_rows_after_scroll($data, $fresh, $rows)
     return $shifted
 end
 
-# ─── 三个目标货币一次性取值 ──────────────────────────────
-# 把 么玉/宝钱/长鸣玉 三次 scan_get 调用合并成一次，供补扫前后各调一遍
+# ─── scan_targets ─────────────────────────────────────────
+# 一次性取出三个目标货币的数量（内部过程）。
+#
+# 参数：
+#   $data — 整面板数据（$rows 行 × 6 列）
+#   $rows — 面板行数
+# 前置：面板数据已按当前画面重建过。
+# 后置：无副作用。
+# 返回：{"bugan", "baoqian", "changmingyu"}；某项没识别到时为 0。
+#
+# 把三次 scan_get 调用合并成一次，供补扫前后各调一遍。
 def scan_targets($data, $rows)
     call $bugan = scan_get($data, $rows, "么玉")
     call $baoqian = scan_get($data, $rows, "宝钱")
@@ -201,9 +222,16 @@ def scan_targets($data, $rows)
     return $result
 end
 
-# ─── 最高置信度取值子过程 ────────────────────────────────
-# 遍历面板 $rows×6 所有格子（$rows 由 panel_rows() 按环境动态取得，
-# 安卓3/桌面4），返回目标货币在最高置信度下的数量
+# ─── scan_get ─────────────────────────────────────────────
+# 取目标货币在最高置信度下的数量（内部过程）。
+#
+# 参数：
+#   $data   — 整面板数据（$rows 行 × 6 列）
+#   $rows   — 面板行数（由 panel_rows() 按环境动态取得，安卓 3 / 桌面 4）
+#   $target — 目标货币名（与 OCR label 精确相等）
+# 前置：面板数据已按当前画面重建过。
+# 后置：无副作用。
+# 返回：最高置信度那一格的数量；没识别到返回 0。
 def scan_get($data, $rows, $target)
     eval $best_val = 0
     eval $best_conf = -1
@@ -223,8 +251,16 @@ def scan_get($data, $rows, $target)
     return $best_val
 end
 
-# ─── 查找目标位置子过程 ──────────────────────────────
-# 遍历面板 $rows×6 所有格子，返回目标货币最高置信度的行列位置
+# ─── find_cell ────────────────────────────────────────────
+# 取目标货币最高置信度那一格的位置（内部过程）。
+#
+# 参数：
+#   $data   — 整面板数据（$rows 行 × 6 列）
+#   $rows   — 面板行数
+#   $target — 目标货币名（与 OCR label 精确相等）
+# 前置：面板数据已按当前画面重建过。
+# 后置：无副作用。
+# 返回：{"row", "col"}；没识别到返回空字典。
 def find_cell($data, $rows, $target)
     eval $best_row = 0
     eval $best_col = 0
@@ -249,8 +285,18 @@ def find_cell($data, $rows, $target)
     return {}
 end
 
-# ─── 容差写入子过程 ────────────────────────────────────
-# 校验新值与旧值差值是否在容差范围内，通过则写入，否则跳过
+# ─── safe_set ─────────────────────────────────────────────
+# 带容差校验地写入 profile（内部过程）。
+#
+# 参数：
+#   $key       — profile key
+#   $new_val   — 本次识别到的新值
+#   $tolerance — 允许差值；0 表示不限制
+#   $label     — 日志名称
+#   $source    — 写入 Profile 历史的业务来源
+# 前置：$key 已声明；$tolerance > 0 时要求 profile 里已有旧值可比对。
+# 后置：通过校验时已写入 profile；否则只记日志、保留旧值。
+# 返回：无返回值（隐式 null）。
 def safe_set($key, $new_val, $tolerance, $label, $source)
     eval $old = profile_get($key)
     if $tolerance > 0 and $old

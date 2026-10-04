@@ -1,3 +1,4 @@
+#% name: 批量条目准备
 #% parameters:
 #%   - name: max_roll_account
 #%     label: 单轮最大滚动次数
@@ -20,10 +21,22 @@
 #%     label: 允许重启应用
 #%     type: bool
 #%     default: false
-# 批量条目准备：从登录页切换到当前用户并进入游戏。
+# 批量条目准备：把一个批量用户从登录页带到「已进入游戏」的状态。
+# 动作全部转交 subcall/login.wf 的 prepare_user，本流程只按调度器给出的下标
+# 解析本轮用户，并把结果字典原样交回。
+#
+# 参数：
+#   max_roll_account     — 账号列表单轮滚动步数上限
+#   skip_online_role     — true=角色在线直接跳过，false=等到 online_role_max_wait
+#   online_role_max_wait — 等待角色下线的秒数上限（仅 skip_online_role=false 时有意义）
+#   allow_restart_app    — 不在登录页/启动页时是否允许重启客户端
+# 前置：调度器已注入 $batch_users、$batch_index 与 $batch_state。
+# 后置：同 prepare_user；成功时已在游戏主页，$batch_state 就地更新。
+# 返回：{"status": "success"|"skipped"|"failed", "message": str, "state": $batch_state}
 
 import "subcall/login.wf"
 
+# 本轮条目对应的用户配置名由调度器给出的下标决定。
 eval $username = $batch_users.$batch_index
 call $result = prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wait, $max_roll_account, $allow_restart_app)
 return $result

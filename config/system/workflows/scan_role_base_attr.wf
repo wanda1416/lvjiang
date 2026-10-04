@@ -3,6 +3,10 @@
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]
+#% note: |-
+#%   关闭静默写入时只扫描并弹出创建面板，由用户确认后写入。
+#%   打开后自动写入：方案名留空表示使用当前方案，两门武学留空表示按方案里记录的
+#%   取值；要指定武学必须同时填写两门，且与本地方案的武学一致。
 #% parameters:
 #%   - name: scroll_count
 #%     label: 滚动次数
@@ -15,21 +19,31 @@
 #%     type: bool
 #%     default: false
 #%   - name: plan_name
-#%     label: 目标方案（留空用当前）
+#%     label: 目标方案
 #%     require: $silent_write
 #%     type: text
 #%     default: ""
 #%   - name: main_art
-#%     label: 主武学（可留空）
+#%     label: 主武学
 #%     require: $silent_write
 #%     type: text
 #%     default: ""
 #%   - name: sub_art
-#%     label: 副武学（可留空）
+#%     label: 副武学
 #%     require: $silent_write
 #%     type: text
 #%     default: ""
 
+# 扫描基础属性：进角色详情页滚动采集面板文本，按模式写入备战方案或弹出创建面板。
+#
+# 参数：
+#   scroll_count — 属性列表向下滚动的轮数
+#   silent_write — true=自动写入方案；false=弹出创建面板交人工确认
+#   plan_name、main_art、sub_art — 静默写入的目标方案与两门武学，仅 silent_write=true 时使用
+# 前置：在主页（内部走 nav_main_to_role 进角色页）。
+# 后置：弹窗模式成功时停在角色页供确认；静默模式结束前先回主页。
+# 返回：-1=导航、识别或写入失败（含未能确认回主页）；否则正常结束。
+#
 # 直接运行与被其他 WF 调用共用 scan_role_base_attr_for_plan 子过程。
 default $scroll_count = 8
 default $silent_write = false

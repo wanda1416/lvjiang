@@ -2,20 +2,32 @@
 #% runnable: true
 #% batchable: true
 #% env: [android, desktop]
+#% note: |-
+#%   方案名留空表示使用当前方案，两门武学留空表示按方案里记录的取值。
+#%   要指定武学必须同时填写两门，且与本地方案的武学一致。
 #% parameters:
 #%   - name: plan_name
-#%     label: 备战方案名称（留空使用当前方案）
+#%     label: 备战方案名称
 #%     type: text
 #%     default: ""
 #%   - name: main_art
-#%     label: 主武学（可留空从方案读取）
+#%     label: 主武学
 #%     type: text
 #%     default: ""
 #%   - name: sub_art
-#%     label: 副武学（可留空从方案读取）
+#%     label: 副武学
 #%     type: text
 #%     default: ""
 
+# 扫描备战装备：解析参数后交给 subcall/loadout/equipped.wf 的 scan_equipped_plan 执行。
+#
+# 参数：
+#   plan_name — 目标备战方案；留空表示使用当前方案
+#   main_art、sub_art — 目标方案的两门武学；留空时从游戏方案读取
+# 前置：游戏已使用目标方案且当前在主页。
+# 后置：成功时已回到主页，八个槽位已写入该方案；写入目标不安全时整段跳过。
+# 返回：成功写入的槽位数；-1=导航或页面不确定，调用方按失败处理。
+#
 # 直接运行只负责解析参数；可复用逻辑位于 scan_equipped_plan 子过程。
 default $plan_name = ""
 default $main_art = ""

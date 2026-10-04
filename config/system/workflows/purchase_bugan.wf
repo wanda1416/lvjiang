@@ -64,6 +64,9 @@
 #                    （值是 {类目名: 是否购买} 字典，键即 OCR 匹配关键词）
 #   buy_shengsheng — 是否购买营生，默认购买
 #   赛季类目保持全买，不做成参数
+# 前置：在主页（内部走 nav_main_to_menu 进不肝商店）。
+# 后置：成功时已退回主页；购买了外观兑换会回写 nn_bugan_of_week=1。
+# 返回：-1=Profile 声明失败或导航失败；否则正常结束。
 
 # 参数未注入时（如批量执行且从未在日常页存过配置）回落到全买，
 # 与做成参数之前的行为一致；已注入时 default 不覆盖。
@@ -83,13 +86,13 @@ import "subcall/game_profile.wf"
 import "subcall/page_action.wf"
 import "subcall/profile_registry.wf"
 
-# ─── 声明本任务依赖的 Profile 数据模型 ───────────────────
+# ─── 声明本任务依赖的 Profile 数据模型 ────────────────────────────────
 call $profile_ok = declare_profiles(["bugan_of_week", "nn_bugan_of_week", "changmingyu", "tili"])
 if $profile_ok < 0
     return -1
 end
 
-# ─── 导航：从首页到不肝商店视图 ─────────────────────────
+# ─── 导航：从首页到不肝商店视图 ────────────────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
     return -1
@@ -101,7 +104,7 @@ if not $nav_check
 end
 click [game_menu_page].[bugan] after wait @page_refresh
 
-# ─── 获取本周不肝进度 ──────────────────────────────────
+# ─── 获取本周不肝进度 ─────────────────────────────────────────────
 click [bugan_detail].[bugan_view] after wait @step_interval
 scan [bugan_detail].[bugan_jindu] as $jindu_str
 call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度", "日常活动")
@@ -144,7 +147,7 @@ if $bought_baoqian
     call sync_current_tili("宝钱")
 end
 
-# ─── 营生（类目5）：只买第一格（先确认格子内容是营生） ────
+# ─── 营生（类目5）：只买第一格（先确认格子内容是营生） ────────────────────────────
 # 两端都在 cat_5，滚动前就能点到
 if $buy_shengsheng
     click [bugan_detail].[cat_5] after wait @page_refresh
@@ -159,7 +162,7 @@ else
     log "未勾选购买营生，跳过营生类目"
 end
 
-# ─── 赛季（类目6）：shangpin_1 按当前布局的面板行列全部购买 ───
+# ─── 赛季（类目6）：shangpin_1 按当前布局的面板行列全部购买 ────────────────────
 # 类目栏一屏放不下七列（见顶部映射表）：
 #   手机端可视 5 列，必须先在类目列表内滚动一次，滚动后赛季落到 cat_4（映射 4→6）；
 #   PC 端一屏显示 6.5 列，赛季直接就在 cat_6，不滚动（滚动会挤进半列外观，对不齐）。
@@ -188,7 +191,7 @@ for r in range(1, $season_rows)
 end
 call close_item_prompts()
 
-# ─── 外观（类目7）：只买 (1,1) 的袅袅之音 ──────────────
+# ─── 外观（类目7）：只买 (1,1) 的袅袅之音 ───────────────────────────────
 # 先过 profile 前置检查（waiguan_profile_skip）：本周已购标记或长命玉
 # 不足时整段跳过，不切类目不滚动。安卓端赛季段已在类目栏滚动过一次，
 # 沿用滚动结果直接点 cat_5（映射 5→7）；PC 端第 7 列只露出半列，需在类目栏
@@ -226,14 +229,20 @@ if not $waiguan_skip
     end
 end
 
-# ─── 返回主页 ──────────────────────────────────────────
+# ─── 返回主页 ─────────────────────────────────────────────────
 click [bugan_detail].[back] after wait @step_interval
 click [game_menu_page].[back] after wait @step_interval
 log "不肝商店购买流程结束。"
 
-# ─── 关键词命中判断 ────────────────────────────────────
-# $keywords 是 {类目名: 是否购买} 字典（checkgroup 参数原样传入），
-# 只在勾选的类目里找；返回命中的第一个关键词，未命中返回 ""
+# ─── match_keyword ────────────────────────────────────────
+# 在勾选的类目里找第一个命中的关键词（内部过程）。
+#
+# 参数：
+#   $text     — 商品格子的 OCR 原文
+#   $keywords — {类目名: 是否购买} 字典（checkgroup 参数原样传入）
+# 前置：无。
+# 后置：无副作用。
+# 返回：命中的第一个关键词；未命中返回 ""。
 def match_keyword($text, $keywords)
     for kw in keys($keywords)
         if not $keywords.$kw
@@ -246,8 +255,14 @@ def match_keyword($text, $keywords)
     return ""
 end
 
-# ─── 判断商品格子是否可购买 ────────────────────────────
-# 返回不可购买原因（"库存不足"/"条件不足"），可购买返回 ""
+# ─── buy_block_reason ─────────────────────────────────────
+# 判断商品格子当前是否不可购买（内部过程）。
+#
+# 参数：
+#   $cell — 商品格子的 OCR 原文
+# 前置：无。
+# 后置：无副作用。
+# 返回：不可购买原因（"库存不足" / "条件不足"）；可购买返回 ""。
 def buy_block_reason($cell)
     if $cell contains "库存不足"
         return "库存不足"
@@ -258,18 +273,33 @@ def buy_block_reason($cell)
     return ""
 end
 
-# ─── 购买单个格子：点击格子 → 全部添加 → 购买 ─────────
+# ─── buy_cell ─────────────────────────────────────────────
+# 购买一个商品格子：点击格子 → 全部添加 → 购买（内部过程）。
+#
+# 参数：
+#   $panel_key — 商品面板的布局区域 key（shangpin_1 / shangpin_2）
+#   $r、$c     — 格子在面板中的行列号
+# 前置：面板已滚动到位、格子内有可购买商品（可购买性由调用方先判）。
+# 后置：已提交一次购买；买成与否由调用方后续的识别决定。
+# 返回：无返回值（隐式 null）。
 def buy_cell($panel_key, $r, $c)
     click [bugan_detail].$panel_key[$r][$c] after wait @step_interval
     click [bugan_detail].[add_all] after wait @step_interval
     click [bugan_detail].[purchase] after wait @step_interval
 end
 
-# ─── 同步当前体力到 profile ──────────────────────────
+# ─── sync_current_tili ────────────────────────────────────
+# 把不肝商店第一栏展示的当前体力同步进 profile（内部过程）。
+#
+# 参数：
+#   $source — 写入 Profile 历史的业务来源
+# 前置：在不肝商店的战斗养成类目。
+# 后置：识别成功时已写入 tili；失败只记日志，不改变现场。
+# 返回：恒为 0（恒成功，失败也按不阻断处理）。
+#
 # 体力只在战斗养成第一栏展示，格式同进度对（支持千分位，如 1,950/2,500）。
 # tili 是 regen 模型：profile_set 写入观察值与时间戳，之后的回复由引擎
 # 按周期规则推算，不适用 quota 的 sync_weekly_progress 单调语义。
-# 识别失败只记日志不阻断；返回 0。
 def sync_current_tili($source)
     scan [bugan_detail].[current_tili] as $tili_scan
     eval $tili_progress = extract_progress($tili_scan.current_tili)
@@ -282,10 +312,17 @@ def sync_current_tili($source)
     return 0
 end
 
-# ─── 按关键词购买单个商品面板 ──────────────────────────
-# 整面板 OCR 后逐格判断，命中目标类目则购买
-# 行列数从 panel 实际布局读取（PC 端可显示 3×5）
-# 返回：是否购买了宝钱（1/0）——宝钱会消耗体力，主流程据此再同步一次
+# ─── buy_panel ────────────────────────────────────────────
+# 按关键词购买单个商品面板（内部过程）。
+#
+# 参数：
+#   $panel_key — 商品面板的布局区域 key（shangpin_1 / shangpin_2）
+#   $keywords  — {类目名: 是否购买} 字典
+# 前置：面板已滚动到位、整面板可见。
+# 后置：命中且可购买的格子均已提交购买；库存不足/条件不足的格子跳过。
+# 返回：1=本次买到了宝钱（会消耗体力，主流程据此再同步一次体力）；0=没买到。
+#
+# 整面板 OCR 后逐格判断，行列数从面板实际布局读取（PC 端可显示 3×5）。
 def buy_panel($panel_key, $keywords)
     eval $bought_baoqian = 0
     scan [bugan_detail].$panel_key as $grid
@@ -314,10 +351,17 @@ def buy_panel($panel_key, $keywords)
     return $bought_baoqian
 end
 
-# ─── 判断格子是否为袅袅之音·绑 ────────────────────────
+# ─── is_niaoniao_bind ─────────────────────────────────────
+# 判断外观兑换格子的文案是否为袅袅之音·绑（内部过程）。
+#
+# 参数：
+#   $text — 格子的 OCR 原文
+# 前置：无。
+# 后置：无副作用。
+# 返回：1=命中；0=未命中。
+#
 # 同时含「音」与「绑」：OCR 会把袅误识为枭（袅袅之音→枭袅之音），
 # 所以不匹配「袅」；「音+绑」既容错误字又与绕梁之音区分。
-# 返回：1 是，0 否
 def is_niaoniao_bind($text)
     if not $text contains "音"
         return 0
@@ -328,11 +372,17 @@ def is_niaoniao_bind($text)
     return 1
 end
 
-# ─── 外观兑换 profile 前置检查 ──────────────────────────
+# ─── waiguan_profile_skip ─────────────────────────────────
+# 外观兑换的 profile 前置检查（内部过程）。
+#
+# 参数：无
+# 前置：已声明 nn_bugan_of_week 与 changmingyu（key 存在定义才拦截）。
+# 后置：无副作用（只读 profile）。
+# 返回：1=应跳过外观兑换段；0=可以继续。
+#
 # nn_bugan_of_week = 1 表示本周袅袅之音已购买过；
-# changmingyu < 200 表示长命玉不足一次兑换门槛。
-# key 未在 profile 定义时不拦截（无信息，交给后续格子/按钮检查兑底）。
-# 返回：1 应跳过，0 可继续
+# changmingyu < 200 表示长鸣玉不足一次兑换门槛。
+# key 未在 profile 定义时不拦截（无信息，交给后续格子/按钮检查兜底）。
 def waiguan_profile_skip()
     eval $model = profile_model("nn_bugan_of_week")
     if $model

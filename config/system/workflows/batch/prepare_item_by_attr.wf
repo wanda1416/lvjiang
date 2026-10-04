@@ -1,3 +1,4 @@
+#% name: 批量属性单元条目准备
 #% batch_unit_prepare: true
 #% parameters:
 #%   - name: profile_key
@@ -25,10 +26,25 @@
 #%     label: 允许重启应用
 #%     type: bool
 #%     default: true
-# 仅供属性执行单元使用：按指定 Profile 的当前值选最小角色。
+
+# 仅供属性执行单元使用：在单元成员里挑出指定 Profile 进度最小的一个角色，再交给
+# subcall/login.wf 的 prepare_user 登录。声明了 #% batch_unit_prepare，调度器据此
+# 认定本流程会返回本单元实际使用的用户名。
+#
+# 参数：
+#   profile_key          — 参与比较的 Profile key，必须是数值型（stock / quota / regen）
+#   max_roll_account     — 账号列表单轮滚动步数上限
+#   skip_online_role     — true=角色在线直接跳过，false=等到 online_role_max_wait
+#   online_role_max_wait — 等待角色下线的秒数上限
+#   allow_restart_app    — 不在登录页/启动页时是否允许重启客户端
+# 前置：调度器已注入 $batch_unit_members 与 $batch_state；key 已在本单元声明。
+# 后置：成功时已在游戏主页，$batch_state 就地更新；本单元无可执行角色时以 skipped 收尾。
+# 返回：{"status", "message", "state"}，成功时另带 username=本轮选中的用户；
+#       Profile key 缺失或类型不对时返回 failed。
 
 import "subcall/login.wf"
 
+# 选择依据必须是数值型 Profile：note 之类没有大小关系，无法参与比较。
 if not $profile_key
     return {"status": "failed", "message": "请配置选择角色所用的 Profile key", "state": $batch_state}
 end

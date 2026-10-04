@@ -3,26 +3,34 @@
 #% batchable: true
 #% env: [android, desktop]
 #% note: |-
-#%   左侧活动名称与右侧领奖关键字必须逐行对应。
+#%   左侧活动名称与右侧领奖关键字逐行对应：两边都是每行一条、行数需相同，
+#%   活动名称不能重复，也不能出现空行。
 #% parameters:
 #%   - name: activity_names
-#%     label: 左侧活动名称（每行一个）
+#%     label: 左侧活动名称
 #%     type: text
 #%     multiline: true
 #%     default: "朝夕共赏"
 #%   - name: reward_keywords
-#%     label: 右侧领奖关键字（与活动名称逐行对应）
+#%     label: 右侧领奖关键字
 #%     type: text
 #%     multiline: true
 #%     default: "签到"
 
-# 每日自动签到流程
+# 每日自动签到：进活动页逐屏扫描，按「左侧活动名 ↔ 右侧领奖关键字」逐条领奖。
 #
 # 流程结构：
 #   1. 执行前校验两份逐行对应的活动配置
 #   2. 从游戏首页进入菜单 → 活动页面
 #   3. 逐屏扫描活动列表，每屏检查所有尚未处理的活动
 #   4. 全部完成后从菜单退回主页
+#
+# 参数：
+#   activity_names  — 左侧活动名称，每行一个
+#   reward_keywords — 右侧领奖关键字，与 activity_names 逐行对应
+# 前置：在游戏首页或菜单页。
+# 后置：已领到的活动从待处理集合移除；没找到的活动只记日志，最后退回主页。
+# 返回：-1=配置校验不通过或菜单页打不开；否则正常结束。
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
@@ -30,7 +38,7 @@ import "subcall/page_detection.wf"
 default $activity_names = "朝夕共赏"
 default $reward_keywords = "签到"
 
-# ─── 校验并整理逐行配置 ──────────────────────────────────
+# ─── 校验并整理逐行配置 ────────────────────────────────────────────
 eval $activity_lines = split_lines($activity_names)
 eval $reward_lines = split_lines($reward_keywords)
 
@@ -75,7 +83,7 @@ for activity_name in $activities
     eval append($pending, $activity_name, $reward_keyword)
 end
 
-# ─── 从游戏首页进入活动页面 ──────────────────────────────
+# ─── 从游戏首页进入活动页面 ──────────────────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
     return -1
@@ -87,7 +95,7 @@ if not $nav_check
 end
 click [game_menu_page].[huodong] after wait @page_refresh
 
-# ─── 逐屏查找并领取各活动奖励 ────────────────────────────
+# ─── 逐屏查找并领取各活动奖励 ─────────────────────────────────────────
 # 初始视口加最多 5 次滚动；每个视口检查全部尚未处理的活动。
 eval $previous_list_text = ""
 eval $scroll_count = 0
@@ -128,12 +136,24 @@ for activity_name in keys($pending)
     log "未找到活动“" + $activity_name + "”，可能未开放、已结束或不在当前滚动范围。"
 end
 
-# ─── 从活动退回菜单，再退回主页 ──────────────────────────
+# ─── 从活动退回菜单，再退回主页 ────────────────────────────────────────
 click [activity_main].[back] after wait @step_interval
 click [game_menu_page].[back] after wait @step_interval
 log "每日签到流程结束。"
 
-# ─── 当前列表视口的通用活动领奖过程 ──────────────────────
+# ─── 当前列表视口的通用活动领奖过程 ──────────────────────────────────────
+
+# ─── claim_visible_activity ───────────────────────────────
+# 在当前视口的活动列表里找到 $activity_name，切换到它并领取 $reward_keyword 奖励。
+#
+# 参数：
+#   $activity_name  — 左侧活动名称（find contains 匹配）
+#   $reward_keyword — 右侧领奖关键字（find contains 匹配）
+# 前置：在活动页面，且目标活动在当前视口内（调用方负责逐屏滚动）。
+# 后置：命中时已切换活动并领取可领奖励，随后点空白处关闭领奖展示；
+#       未命中时不点击任何东西。
+# 返回：1=列表里找到了该活动（不管奖励是否领到）；0=当前视口内没有该活动。
+#
 # 活动列表与领奖区处于同一页面；这里只切换活动并领奖，不执行返回。
 def claim_visible_activity($activity_name, $reward_keyword)
     find [activity_main].[reward_list] as $found by contains $activity_name

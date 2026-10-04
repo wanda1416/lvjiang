@@ -45,28 +45,28 @@
 #%     type: bool
 #%     default: true
 #
-# 江湖号令任务刷新流程
+# 江湖号令日常：在号令页把六张任务卡刷成目标任务并执行，按配置领取奖励。
 #
 # 流程结构：
-#   0. 起始定位：通过公共页面判断确认在活动页，否则先导航
-#   调用过程遍历 6 组 card_N
-#      0. 再次校验仍在号令页；不在则阻塞弹窗提示用户手动
-#         处理（前一个任务卡住退出时可能漏回号令页，需及时拦截，
-#         避免后续任务在错误页面上继续乱点）
-#      1. 通过刷新按钮判断任务是否已经完成，再识别卡片文字是否命中目标
-#      2. 命中 → 读取任务文本，分发执行对应动作
-#      3. 未命中 → 点击卡片刷新按钮，等待后重新识别，直到命中或达到刷新上限
-#   4. 第一轮若遇到处理前已完成的任务，回到号令页补扫一次，覆盖任务换位
-#   5. 收尾：若仍在活动页，退回游戏首页；本次为合影切换过多人模式，则
-#      再经菜单切回单人模式，并确认回到游戏主页
+#   1. 起始定位与首次同步：确认在号令页（允许自动导航），并读一次当周已获取声望
+#   2. 处理六张任务卡：逐卡校验页面 → 判断是否已完成 → 命中目标则执行动作 →
+#      按配置领奖；未命中则刷新到命中或达到 $max_refresh
+#   3. 首轮遇到「处理前就已完成」的任务时补扫一轮，覆盖任务换位
+#   4. 收尾：退回游戏首页；本次为合影切过多人模式则回到主页后切回单人模式
 #
 # 参数：
-#   max_refresh — 单个任务最大刷新次数，默认 50
-#   claim_reward — 是否领取奖励，默认 false
+#   max_refresh          — 单个任务最大刷新次数，默认 50
+#   claim_reward         — 是否领取奖励，默认 false
 #   max_claim_reputation — 最大领取声望，默认 1500；仅当任务确实完成且
 #                          当周已领取声望小于该值时才领奖
 #   do_heying / do_huanzhuang / do_qingjing — 是否执行合影、换装、情境
 #   do_kanbao / do_yinjiu / do_juezhanglin — 是否执行看报、饮酒、觉障林
+# 前置：在游戏首页或江湖号令活动页（两种入口都按页面判定自行收敛）。
+# 后置：成功时已退回游戏首页；为合影切过多人模式时已切回单人模式。
+# 返回：0=六项都没勾选，未做任何操作或正常收尾；-1=Profile 声明失败、
+#       页面校验失败或导航失败。
+#
+# 各过程在下方以 `# ─── 过程名 ───` 分隔，注释给出参数、前置、后置与返回。
 
 default $claim_reward = false
 default $max_refresh = 50
@@ -90,6 +90,7 @@ import "subcall/game_profile.wf"
 import "subcall/profile_registry.wf"
 import "subcall/visual_state.wf"
 
+# ─── 起始定位与首次同步 ────────────────────────────────────────────
 call $profile_ok = declare_profiles(["haoling_of_week"])
 if $profile_ok < 0
    return -1
@@ -119,6 +120,7 @@ end
 # 此后只有领奖会改变该值，故「读取即写入」足以保证实时与存储一致。
 call $haoling_of_week = sync_haoling_of_week()
 
+# ─── 处理六张任务卡 ──────────────────────────────────────────────
 call $first_pass = process_jianghu_cards(false)
 if not $first_pass.ok
    return -1
@@ -142,6 +144,7 @@ end
 
 log "六个任务刷新处理完成"
 
+# ─── 收尾：退回首页与切回单人模式 ───────────────────────────────────────
 # 收尾：末个任务非合影时仍停在江湖号令页，连点三次返回退回游戏首页
 call $at_haoling = is_in_haoling_page()
 if $at_haoling
@@ -157,9 +160,15 @@ if $mode_switched
    call restore_single_mode()
 end
 
-# 完整处理当前页面的六张任务卡。返回：
-#   ok                 — 六张卡是否正常处理完；
-#   found_precompleted — 是否有卡片在本轮执行前就已完成。
+# ─── process_jianghu_cards ────────────────────────────────
+# 完整处理当前页面的六张任务卡。
+#
+# 参数：
+#   $is_rescan — true=本轮是补扫（已完成卡片不再重复领奖）
+# 前置：已在江湖号令页；每张卡内部还会再校验一次页面。
+# 后置：六张卡都过了一遍；未勾选执行的任务保留原样。
+# 返回：{"ok": 六张卡是否正常处理完, "found_precompleted": 是否有卡片在本轮执行前就已完成}。
+#
 # 调用方仅依据第一轮结果决定是否补扫一次，第二轮不会继续递归。
 def process_jianghu_cards($is_rescan)
    eval $found_precompleted = false
@@ -251,8 +260,17 @@ def process_jianghu_cards($is_rescan)
    return {"ok": true, "found_precompleted": $found_precompleted}
 end
 
-# 判断卡片是否已经完成。任务完成后文字仍会保留，但右上角刷新按钮消失；
-# 所有调用点统一使用布局绑定模板，避免 OCR 文案长度造成误判。
+# ─── is_task_completed ────────────────────────────────────
+# 卡片是否已经完成。
+#
+# 参数：
+#   $label — 卡片 key（card_1 … card_6）
+# 前置：在江湖号令页。
+# 后置：无副作用（只识别，不点击）。
+# 返回：1=已完成；0=任务仍在进行中（右上角刷新按钮还在）。
+#
+# 任务完成后文字仍会保留，但右上角刷新按钮消失；所有调用点统一使用布局绑定
+# 模板，避免 OCR 文案长度造成误判。
 def is_task_completed($label)
    scan [activity_jianghu].$label.[refresh] as $refresh_found by image
    if $refresh_found
@@ -261,11 +279,28 @@ def is_task_completed($label)
    return 1
 end
 
+# ─── has_selected_task ────────────────────────────────────
+# 六个执行开关里是否至少勾选了一项。
+#
+# 参数：无
+# 前置：无。
+# 后置：无副作用。
+# 返回：1=至少勾选一项；0=六项全关。
+#
 # 仅用于六项全关时快速退出，不参与目标候选判定。
 def has_selected_task()
    return $do_heying or $do_huanzhuang or $do_qingjing or $do_kanbao or $do_yinjiu or $do_juezhanglin
 end
 
+# ─── is_target_task ───────────────────────────────────────
+# 卡片文案是否属于六类目标任务。
+#
+# 参数：
+#   $text — 卡片 label 区域的 OCR 原文
+# 前置：无。
+# 后置：无副作用。
+# 返回：1=属于六类之一；0=不是目标任务（应继续刷新）。
+#
 # targets 领域约束：六类任务关键词由游戏文案保证互斥，一张任务卡片只会
 # 命中其中一个关键词，不存在多个目标关键词同时命中的正交情况。
 # 界面使用用户熟悉的“看报”和“饮酒”，OCR 仍分别匹配“东方”和“醉意”。
@@ -292,6 +327,15 @@ def is_target_task($text)
    return 0
 end
 
+# ─── should_execute_task ──────────────────────────────────
+# 用户开关是否允许执行这个已命中的目标任务。
+#
+# 参数：
+#   $text — 卡片 label 区域的 OCR 原文
+# 前置：$text 已确认属于六类目标任务。
+# 后置：无副作用。
+# 返回：1=对应开关已勾选，可以执行；0=开关关闭或不属于六类。
+#
 # 用户开关只控制已匹配目标是否执行；关闭时保留该任务，不执行动作和领奖。
 def should_execute_task($text)
    if $text contains "合影"
@@ -315,8 +359,18 @@ def should_execute_task($text)
    return 0
 end
 
-# 按 OCR 任务文字分发动作。返回 1 表示动作明确无法完成，主流程应跳过
-# 领奖检测；当前仅饮酒未找到黄泉酿时返回 1。
+# ─── execute_target_task ──────────────────────────────────
+# 按 OCR 任务文字分发到对应动作。
+#
+# 参数：
+#   $task_text — 卡片 label 区域的 OCR 原文（决定执行哪个动作）
+#   $label     — 卡片 key（card_1 … card_6）
+#   $idx       — 任务序号，用于判断是否为末个任务
+# 前置：已在号令页，且开关允许执行该任务。
+# 后置：对应动作已执行完；各动作自行负责把页面收回到号令页或首页。
+# 返回：1=动作明确无法完成，主流程应跳过领奖检测；0=可以继续判领奖。
+#
+# 当前仅饮酒未找到黄泉酿时返回 1。
 def execute_target_task($task_text, $label, $idx)
    eval $skip_reward_check = 0
    if $task_text contains "换装"
@@ -340,7 +394,18 @@ def execute_target_task($task_text, $label, $idx)
    return $skip_reward_check
 end
 
-# 刷新非目标任务，直到出现一种终态：
+# ─── refresh_task_until_terminal ──────────────────────────
+# 反复刷新非目标任务，直到出现一种终态。
+#
+# 参数：
+#   $label        — 卡片 key（card_1 … card_6）
+#   $idx          — 任务序号，仅用于日志
+#   $initial_text — 初次扫描到的任务文字（作为刷新前的基线）
+# 前置：在江湖号令页，且该卡片不是目标任务。
+# 后置：停在号令页，卡片内容为最后一轮刷新后的状态。
+# 返回：{"status": "target"|"completed"|"exhausted", "task_text": 最后一次 OCR}。
+#
+# 三种终态：
 #   target    — 已刷新到目标任务，task_text 为命中的任务文字；
 #   completed — 刷新按钮消失，说明卡片已经完成；
 #   exhausted — 达到刷新上限仍未命中。
@@ -374,9 +439,19 @@ def refresh_task_until_terminal($label, $idx, $initial_text)
    return {"status": "exhausted", "task_text": $previous_task_text}
 end
 
-# 对已经确认完成的任务检查奖励金光与声望上限后领奖。刷新图标消失
-# 只能证明任务完成，不能证明奖励尚未领取；领奖入口必须再次区分两种状态。
-# haoling_of_week 在六轮任务间持续更新，max_claim_reputation 是运行配置。
+# ─── claim_completed_reward ───────────────────────────────
+# 对已经确认完成的任务检查奖励金光与声望上限后领奖。
+#
+# 参数：
+#   $label — 卡片 key（card_1 … card_6）
+#   $idx   — 任务序号，仅用于日志
+# 前置：该卡片已确认完成（刷新按钮消失），且当周声望已同步过。
+# 后置：领奖成功时已刷新并写回 haoling_of_week；不领奖时现场不变。
+# 返回：恒为 0；是否真的领了由日志与 profile 值体现。
+#
+# 刷新图标消失只能证明任务完成，不能证明奖励尚未领取；领奖入口必须再次区分
+# 两种状态。haoling_of_week 在六轮任务间持续更新，max_claim_reputation 是运行
+# 配置。
 def claim_completed_reward($label, $idx)
    if $haoling_of_week < 0
       log "任务 " + $idx + " 已完成，但当周声望识别无效，跳过领奖"
@@ -404,21 +479,33 @@ def claim_completed_reward($label, $idx)
    return 0
 end
 
-# 读取号令页的当周累计声望，按完整 a/b 进度解析并同步 profile。
-# 这是当周声望的唯一读取入口；公共同步过程负责 OCR 失败回退、本轮防回退，
-# Profile 底层负责同周期防回写并允许跨周后的合法归零。
+# ─── sync_haoling_of_week ─────────────────────────────────
+# 读取号令页的当周累计声望并同步 profile。
+#
+# 参数：无
+# 前置：在江湖号令页。
+# 后置：识别到有效值时已写入 haoling_of_week；识别失败只回退取值、不报错。
+# 返回：本次采用的当周声望；无有效值时沿用本轮上次有效值。
+#
+# 按完整 a/b 进度解析。这是当周声望的唯一读取入口；公共同步过程负责 OCR 失败
+# 回退、本轮防回退，Profile 底层负责同周期防回写并允许跨周后的合法归零。
 def sync_haoling_of_week()
    scan [activity_jianghu].[haoling_of_week] as $result
    call $value = sync_weekly_progress($result.haoling_of_week, "haoling_of_week", $haoling_of_week, "当周获取号令", "江湖号令")
    return $value
 end
 
+# ─── ensure_at_haoling ────────────────────────────────────
 # 校验当前是否位于江湖号令页，不在则先设法回到号令页再校验一次。
-#   $idx     — 调用点标识，仅用于日志（"起始" 或任务序号）
+#
+# 参数：
+#   $idx      — 调用点标识，仅用于日志（"起始" 或任务序号）
 #   $auto_nav — 1：视为停在游戏首页，调 back_to_haoling() 自动导航；
 #               0：停在未知页面（上个任务卡住未收尾），自动导航不可靠，
 #                  改为阻塞弹窗提示用户手动返回号令页
-# 返回：0=已在号令页；-1=补救后仍不在，调用方应终止流程
+# 前置：无（任意页面均可调用）。
+# 后置：0 时已在号令页；-1 时停在补救失败的位置。
+# 返回：0=已在号令页；-1=补救后仍不在，调用方应终止流程。
 def ensure_at_haoling($idx, $auto_nav)
    call $at_haoling = is_in_haoling_page()
    if $at_haoling
@@ -442,9 +529,16 @@ def ensure_at_haoling($idx, $auto_nav)
    return -1
 end
 
-# 领取奖励：动作完成后再次点击任务标签领取。
-# 调用时必定已在号令页（状态由各动作保证：非末个任务动作结束后
-# 主动返回；末个任务需领奖时动作内也已返回），无需再扫描定位。
+# ─── claim_reward ─────────────────────────────────────────
+# 点击任务标签领取奖励。
+#
+# 参数：
+#   $label — 卡片 key（card_1 … card_6）
+#   $idx   — 任务序号，仅用于日志
+# 前置：已在号令页（状态由各动作保证），且奖励状态已判定为待领取。
+# 后置：已点击领奖并点空白区域关掉全屏奖励窗口，页面回到号令页。
+# 返回：无返回值（隐式 null）。
+#
 # 领奖后弹出全屏奖励窗口，点一次空白区域关闭，否则遮挡下一轮页面校验。
 def claim_reward($label, $idx)
    click [activity_jianghu].$label.[label] after wait @step_interval
@@ -452,10 +546,20 @@ def claim_reward($label, $idx)
    click [general_control].[blank_area] after wait @step_interval
 end
 
-# ─── 各活动动作过程 ────────────────────────────────────────
-# 每个 def 接收命中任务的卡片引用 key（如 "card_1"），
-# 从江湖号令页面出发执行对应活动，完成后需回到本页面。
+# ─── 各活动动作过程 ──────────────────────────────────────────────
+# 每个过程接收命中任务的卡片引用 key（如 "card_1"），从江湖号令页出发执行
+# 对应活动，并按下面的约定把页面收回到号令页或游戏首页。
 
+# ─── finish_external_task ─────────────────────────────────
+# 外部任务（合影/看报/饮酒）执行完后的收尾（内部过程）。
+#
+# 参数：
+#   $idx       — 任务序号，用于判断是否为末个任务
+#   $task_name — 任务名，仅用于日志
+# 前置：该动作已执行完，当前停在游戏首页。
+# 后置：末个任务且不领奖时留在游戏首页；其他情况已回到号令页。
+# 返回：恒为 0。
+#
 # 合影、看报、饮酒都会落在游戏首页：非末个任务或需要领奖时返回号令页；
 # 末个任务且无需领奖时保持在首页。调用位置和导航时机由各动作自行决定。
 def finish_external_task($idx, $task_name)
@@ -467,7 +571,16 @@ def finish_external_task($idx, $task_name)
    return 0
 end
 
-# 换装：点击任务 → 浮层前往 → 外观衣柜（穿搭方案 → 方案1 → 套用方案）
+# ─── action_huanzhuang ────────────────────────────────────
+# 换装动作。
+#
+# 参数：
+#   $label — 卡片 key（card_1 … card_6）
+# 前置：在江湖号令页，且该卡片已命中「换装」。
+# 后置：执行完已回到号令页基底（浮层已关闭）。
+# 返回：无返回值（隐式 null）。
+#
+# 路径：点击任务 → 浮层前往 → 外观衣柜（穿搭方案 → 方案1 → 套用方案）
 # → 衣柜返回任务浮层 → 关闭浮层回到号令基底
 def action_huanzhuang($label)
    click [activity_jianghu].$label.[label] after wait @step_interval
@@ -480,9 +593,20 @@ def action_huanzhuang($label)
    click [activity_jianghu].[overlay_back] after wait @step_interval
 end
 
-# 合影拍照：点击任务 → 前往 → 拍照页面（动作控制·拍照）→ 等待刷新 → 返回×2 → 可选确认
+# ─── action_heying ────────────────────────────────────────
+# 合影拍照动作。
+#
+# 参数：
+#   $label — 卡片 key（card_1 … card_6）
+#   $idx   — 任务序号，交给 finish_external_task 决定是否返回号令页
+# 前置：在江湖号令页，且该卡片已命中「合影」。
+# 后置：末个任务且不领奖时留在游戏首页；其他情况已回到号令页。
+# 返回：无返回值（隐式 null）。
+#
+# 路径：点击任务 → 前往 → 拍照页面（动作控制·拍照）→ 等待刷新 → 返回×2 → 可选确认。
 # 退出拍照会落到游戏首页（桌面），拍照结束后主动返回号令页；
-# 末个任务仅在需要领奖时才返回，否则留在桌面
+# 末个任务仅在需要领奖时才返回，否则留在桌面。
+# 本次为合影切过多人模式时由主流程收尾切回单人模式。
 def action_heying($label, $idx)
    click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait stable @page_refresh least 0.5
@@ -496,7 +620,16 @@ def action_heying($label, $idx)
    call finish_external_task($idx, "合影")
 end
 
-# 情境：点击任务 → 弹出情境视图（展开 → 前往编辑情境）
+# ─── action_qingjing ──────────────────────────────────────
+# 情境动作。
+#
+# 参数：
+#   $label — 卡片 key（card_1 … card_6）
+# 前置：在江湖号令页，且该卡片已命中「情境」。
+# 后置：执行完已回到号令页基底（浮层已关闭）。
+# 返回：无返回值（隐式 null）。
+#
+# 路径：点击任务 → 弹出情境视图（展开 → 前往编辑情境）
 # → 情境编辑视图（保存 → 取消按钮出现则点一次 → 轮询等待保存完成）
 # → 退出编辑（若回到外观情境 tab 则退出外观）→ 号令情境层返回任务浮层 → 关闭浮层
 def action_qingjing($label)
@@ -517,7 +650,7 @@ def action_qingjing($label)
 
    # 保存后弹窗需要渲染时间，先等一下再扫描
    click [appearance_main].[save] after wait @secondary_confirm
-   
+
    # 保存后可能弹出二次确认，识别到取消按钮才点一次
    scan [general_control].[cancel] as $has_cancel by contains "取消"
    if $has_cancel
@@ -549,10 +682,19 @@ def action_qingjing($label)
    click [activity_jianghu].[overlay_back] after wait @step_interval
 end
 
-# 看报（任务文字“东方第一枝”）：点击任务 → 前往 → 立刻进入表情动作视图
-# → 整面板扫描 actions 定位「看报」格子并点击 → 等 5s 弹出报纸阅读视图
-# → 点第一个选择 → 连点两次返回回到游戏首页（桌面），看报结束后主动返回号令页；
-# 末个任务仅在需要领奖时才返回，否则留在桌面
+# ─── action_kanbao ────────────────────────────────────────
+# 看报动作（任务文字「东方第一枝」）。
+#
+# 参数：
+#   $label — 卡片 key（card_1 … card_6）
+#   $idx   — 任务序号，交给 finish_external_task 决定是否返回号令页
+# 前置：在江湖号令页，且该卡片已命中「东方」（看报）。
+# 后置：末个任务且不领奖时留在游戏首页；其他情况已回到号令页。
+# 返回：无返回值（隐式 null）。
+#
+# 路径：点击任务 → 前往 → 立刻进入表情动作视图 → 整面板扫描 actions 定位
+# 「看报」格子并点击 → 等 5s 弹出报纸阅读视图 → 点第一个选择 → 连点两次返回
+# 回到游戏首页（桌面）。看报动作未解锁时只记日志，跳过看报操作。
 def action_kanbao($label, $idx)
    click [activity_jianghu].$label.[label] after wait @step_interval
    click [activity_jianghu].[goto] after wait @step_interval
@@ -588,7 +730,7 @@ def action_kanbao($label, $idx)
    end
    # 看报动作生效需时间，固定等 5 秒弹出报纸阅读视图
    wait 5
-   
+
    # 检查是否仍在主页（看报动作未解锁，未进入表情动作视图）
    call $in_main = is_in_main_page()
    if $in_main
@@ -603,9 +745,15 @@ def action_kanbao($label, $idx)
    call finish_external_task($idx, "看报")
 end
 
-# ─── 看报操作 ─────────────────────────────────────────────
-# 前提：已进入表情动作视图（不在主页）
-# 点第一个选择 → 返回 → 处理确认弹窗 → 检查是否已回到主页
+# ─── perform_kanbao ───────────────────────────────────────
+# 看报阅读视图内的操作（内部过程）。
+#
+# 参数：无
+# 前置：已进入表情动作视图（不在主页）。
+# 后置：已点选择、处理确认弹窗并尝试返回；仍在表情动作视图时会再点一次返回。
+# 返回：无返回值（隐式 null）。
+#
+# 点第一个选择 → 返回 → 处理确认弹窗 → 检查是否已回到主页。
 def perform_kanbao()
    click [general_action].[choose_1] after wait stable @page_refresh least 0.5
    click [general_control].[blank_area] after wait stable @page_refresh least 0.5
@@ -624,7 +772,18 @@ def perform_kanbao()
    end
 end
 
-# 饮酒（醉意）：号令 → 退回首页 → 菜单 → 包裹 → 道具 - 普通道具 → 找黄泉酿食用 → 退回首页 → 返回号令
+# ─── action_yinjiu ────────────────────────────────────────
+# 饮酒动作（任务文字「醉意」）。
+#
+# 参数：
+#   $label — 卡片 key（card_1 … card_6）
+#   $idx   — 任务序号，交给 finish_external_task 决定是否返回号令页
+# 前置：在江湖号令页，且该卡片已命中「醉意」。
+# 后置：末个任务且不领奖时留在游戏首页；其他情况已回到号令页。
+# 返回：1=没找到黄泉酿（动作无法完成，调用方应跳过领奖检测）；0=已食用或导航失败。
+#
+# 路径：号令 → 退回首页 → 菜单 → 包裹 → 道具 - 普通道具 → 找黄泉酿食用
+# → 退回首页 → 返回号令
 def action_yinjiu($label, $idx)
    # ── 从江湖号令退回首页 ──
    click [activity_jianghu].[back] after wait stable @page_refresh least 0.5
@@ -651,7 +810,7 @@ def action_yinjiu($label, $idx)
 
       # 点击黄泉酿所在格子，打开道具详情
       click [bag_item_detail].[bag_grid][$yinjiu_r][$yinjiu_c] after wait stable @page_refresh least 0.5
-      
+
       if env("android")
          # 在详情面板中寻找「食用」按钮
          find [bag_item_detail].[main_area] as $btn by contains "食用"
@@ -683,17 +842,31 @@ def action_yinjiu($label, $idx)
    return 0
 end
 
-# 觉障林：动作暂未实现
+# ─── action_juezhanglin ───────────────────────────────────
+# 觉障林动作占位。
+#
+# 参数：
+#   $label — 卡片 key（card_1 … card_6）
+# 前置：在江湖号令页。
+# 后置：不做任何操作（动作暂未实现）。
+# 返回：无返回值（隐式 null）。
+#
+# 动作暂未实现：只记一条日志，卡片按「未执行动作」处理，主流程跳过领奖。
 def action_juezhanglin($label)
    log "觉障林动作暂未实现"
 end
 
-# 切换游戏模式：前置在菜单页。$target 为 "mp"（多人）或 "sp"（单人），
-# 两种模式在模式选择页结构对称，只是按钮不同。
-# 模式标签已显示目标模式则不动作；否则经模式选择页切换并踏入，
-# 轮询等待回到游戏主页。
-# 返回：1=执行了切换（当前在游戏主页，调用方需重新打开菜单）；
-#       0=已是目标模式，未动作（仍在菜单页）
+# ─── switch_game_mode ─────────────────────────────────────
+# 切换游戏模式（单人 / 多人）。
+#
+# 参数：
+#   $target — "mp"=多人模式；"sp"=单人模式
+# 前置：在菜单页。
+# 后置：1 时已在游戏主页；0 时仍在菜单页且未做任何点击。
+# 返回：1=执行了切换（调用方需重新打开菜单）；0=已是目标模式，未动作。
+#
+# 两种模式在模式选择页结构对称，只是按钮不同。模式标签已显示目标模式则不动
+# 作；否则经模式选择页切换并踏入，轮询等待回到游戏主页。
 def switch_game_mode($target)
    if $target == "mp"
       eval $from_text = "单人"
@@ -732,7 +905,15 @@ def switch_game_mode($target)
    return 1
 end
 
-# 收尾切回单人模式：主页 → 菜单 → 切换单人模式 → 确认回到游戏主页。
+# ─── restore_single_mode ──────────────────────────────────
+# 收尾把游戏切回单人模式。
+#
+# 参数：无
+# 前置：本次为合影切换过多人模式。
+# 后置：0=已确认在游戏主页；-1=菜单打不开或切完仍未回到主页（已 pause 提示）。
+# 返回：0=成功；-1=失败。
+#
+# 路径：主页 → 菜单 → 切换单人模式 → 确认回到游戏主页。
 # 已是单人模式（用户中途手动切回）则只关闭菜单。
 def restore_single_mode()
    log "本次为合影切换过多人模式，收尾切回单人模式"
@@ -756,8 +937,17 @@ def restore_single_mode()
    return 0
 end
 
-# 首页 → 江湖号令页：菜单 → find 门派 → 门派首页 → find 江湖号令
-# 每步找不到时 pause 通知用户手动定位，用户点确定后重试一次
+# ─── back_to_haoling ──────────────────────────────────────
+# 从游戏首页导航到江湖号令页。
+#
+# 参数：无
+# 前置：在游戏首页（或菜单页）。
+# 后置：0=已点击号令入口（或已交由用户手动处理后继续）；-1=找不到门派或号令。
+# 返回：0=成功；-1=失败。
+#
+# 路径：菜单 → find 门派 → 门派首页 → find 江湖号令。
+# 每步找不到时 pause 通知用户手动定位，用户点确定后重试一次。
+# 首次打开菜单时会按合影开关检查游戏模式，需要时切到多人模式并重新打开菜单。
 def back_to_haoling()
    call $nav_result = nav_main_to_menu()
    if $nav_result < 0

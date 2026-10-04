@@ -1,10 +1,19 @@
+#% name: 批量条目收尾
 #% parameters:
 #%   - name: stop_app
 #%     label: 直接停止应用
 #%     type: bool
 #%     default: false
-# 批量条目收尾：默认退出当前角色并回到登录页。
-# 对业务已转到服务端运行的任务，可选择直接停止应用。
+
+# 批量条目收尾：一个用户的全部任务跑完后由调度器调用，把现场收回公共初始页。
+# 默认退出当前角色回到登录页；对业务已转到服务端运行、不再需要客户端的任务，
+# 可选择直接停止应用。
+#
+# 参数：
+#   stop_app — true=直接停止应用并把 page_state 记为 0；false=走 exit_to_login 回登录页
+# 前置：该用户的任务已执行完，客户端仍在运行。
+# 后置：已在登录页（stop_app=false）或应用已停止（stop_app=true），角色字段已清空。
+# 返回：{"status": "success", "message": "", "state": $batch_state}
 
 import "subcall/login.wf"
 
@@ -18,7 +27,7 @@ end
 
 eval $batch_state.role = ""
 return {
-    "status": "success", 
-    "message": "", 
+    "status": "success",
+    "message": "",
     "state": $batch_state
 }

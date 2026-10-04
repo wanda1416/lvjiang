@@ -47,6 +47,21 @@ default $key_dz = "3"
 default $qishu_yy = "qishu_2"
 default $qishu_dz = "qishu_3"
 
+# 鸣金虹木桩测伤：按录制整理出的按键时间线打一整套循环，用于复现输出轴。
+#
+# 流程结构：
+#   1. 按环境分发：桌面端走按键时间线，安卓端走控制场景的各按钮
+#   2. 两端结构对称：奇术 → 武学技 → 卸势 → 切武器 → 多轮剑气蓄力 →
+#      枪Q 挂 buff → 拉距离，循环数轮后以最后一次剑气收尾
+#   3. 全程没有页面判定与到位校验，起点或键位一变整套轴就失效
+#
+# 参数：
+#   key_yy、key_dz     — 桌面端阴阳迷踪步与萧吟千浪的按键
+#   qishu_yy、qishu_dz — 安卓端两个奇术对应的按钮区域 key
+# 前置：角色面向目标且处于攻击范围；桌面端按键需要前台发送（后台模式不生效）。
+# 后置：整套循环打完即结束，不校验页面、不回收现场，也没有返回值。
+# 返回：无返回值（隐式 null）；环境既不是 desktop 也不是 android 时记错误日志后结束。
+
 if env("desktop")
     goto desktop
 end
@@ -56,6 +71,7 @@ end
 log error "无名木桩测伤仅支持 desktop/android 环境"
 return
 
+# ─── desktop：按键时间线 ────────────────────────────────────────
 @desktop
 
 press $key_yy hold 0.06 after wait 0.15
@@ -89,12 +105,12 @@ press "R" hold 1.47 after wait 0.8
 # 二次点剑
 log info "第二次点剑+瞬发剑气"
 press "Q" hold 0.06 after wait 0.28
-press "R" hold 0.06 after wait 0.78 
+press "R" hold 0.06 after wait 0.78
 
 # 三道剑气
-press "R" hold 1.468 after wait 0.8 
-press "R" hold 1.468 after wait 0.8 
-press "R" hold 1.47 after wait 0.8 
+press "R" hold 1.468 after wait 0.8
+press "R" hold 1.468 after wait 0.8
+press "R" hold 1.47 after wait 0.8
 
 # 枪Q 挂buff，这里容易出现切剑没切回来
 log info "第二次枪Q，挂 buff"
@@ -143,6 +159,14 @@ press "R" hold 1.47 after wait 0.8
 # 最后一次剑气，打不出来就是延迟问题
 press "R" hold 1.47
 
+# ─── qiang_wuxueji ────────────────────────────────────────
+# 桌面端枪 Q 连段：切枪 → 武学技 → 卸势 → 切回剑（内部过程）。
+#
+# 参数：
+#   $buff — 1=本次要挂 buff（各段等待更长），0=普通连段
+# 前置：当前持剑且已站在木桩攻击范围内。
+# 后置：连段按键已发完，结束时持剑。
+# 返回：无返回值（隐式 null）。
 def qiang_wuxueji($buff)
     # 按键低于 50ms 很容易被忽略，保守起见直接 60ms，并且挂 buff 时更长一些
     if $buff
@@ -160,6 +184,7 @@ end
 
 return
 
+# ─── android：控制场景按钮时间线 ────────────────────────────────────
 @android
 
 click [general_combat].$qishu_yy hold 0.06 after wait 0.15
@@ -247,8 +272,16 @@ click [general_combat].[xuli] hold 1.52 after wait 0.8
 # 最后一次剑气，打不出来就是延迟问题
 click [general_combat].[xuli] hold 1.52
 
+# ─── qiang_wuxueji_android ────────────────────────────────
+# 安卓端枪 Q 连段：切枪 → 武学技 → 卸势 → 切回剑（内部过程）。
+#
+# 参数：
+#   $buff — 1=本次要挂 buff（武学技等待更长），0=普通连段
+# 前置：当前持剑且已站在木桩攻击范围内。
+# 后置：连段按钮已点完，结束时持剑。
+# 返回：无返回值（隐式 null）。
 def qiang_wuxueji_android($buff)
-    # 切枪 → 武学技 → 卸势 → 切回剑；挂 buff 时为武学技留更长等待
+    # 切武器 → 武学技 → 卸势 → 切回剑；挂 buff 时为武学技留更长等待
     if $buff
         click [general_combat].[weapon] hold 0.08 after wait 0.07
         click [general_combat].[wuxueji] hold 0.12 after wait 0.3

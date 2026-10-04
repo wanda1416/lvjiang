@@ -42,6 +42,14 @@
 # min_level 的装备后立即结束当前槽位扫描。
 # min_affix_count=0 表示不过滤；1～5 表示词条不足的装备仍参与扫描去重，
 # 但不写入装备库。定音不计入普通词条数量。
+#
+# 参数：
+#   slots           — 要扫描的部位（checkgroup，键为槽位 key）
+#   min_level       — 最低等级；低于它的装备触发当前槽位截断
+#   min_affix_count — 最少词条数，0 表示不过滤
+# 前置：在主页（内部走 nav_main_to_equip 进背包装备列表）。
+# 后置：成功时已回到主页，命中的装备已写入公共装备池。
+# 返回：-1=导航失败或未能回到主页；否则正常结束。
 
 default $min_level = 110
 default $min_affix_count = 0
@@ -82,6 +90,18 @@ if $nav_result < 0
 end
 
 
+# ─── scan_slot_bag ────────────────────────────────────────
+# 扫描一个部位的整个背包窗口，逐窗口写到装备池。
+#
+# 参数：
+#   $slot            — 穿戴槽位 key（点击它把右侧背包过滤到该部位）
+#   $group           — 装备池分组名（weapon / armor）
+#   $detail_kind     — 详情场景种类（"weapon" / "armor"，决定用哪套详情字段）
+#   $min_level       — 最低等级，低于它触发当前槽位截断
+#   $min_affix_count — 最少词条数，0 表示不过滤
+# 前置：在背包装备列表页。
+# 后置：本部位窗口全部扫完并写入；桌面端不遗留详情层。
+# 返回：无返回值（隐式 null）；失败只体现在装备池内容与日志里。
 def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
     log "═══ 开始扫描部位: " + $group + " (detail=" + $detail_kind + ", min_level=" + $min_level + ", min_affix_count=" + $min_affix_count + ") ═══"
     # 点击穿戴槽位会把右侧背包过滤到对应部位并回到该列表顶部。
@@ -252,7 +272,16 @@ def scan_slot_bag($slot, $group, $detail_kind, $min_level, $min_affix_count)
     log "═══ 部位 " + $group + " 扫描完成，写入 " + $total_count + " 件，过滤 " + $filtered_count + " 件 ═══"
 end
 
-# 扫描当前格子并解析装备，同时根据原始详情字段判断详情层是否仍然打开。
+# ─── scan_cell ────────────────────────────────────────────
+# 扫描当前格子并解析装备，同时判断详情层是否仍然打开（内部过程）。
+#
+# 参数：
+#   $detail_kind — 详情场景种类（"weapon" / "armor"）
+# 前置：已点开一个装备格子的详情（也可能点到空槽）。
+# 后置：无副作用（只截图识别）。
+# 返回：{"equip": 解析后的装备, "detail_open": 1/0}；equip.type 为空即
+#       本格没有可用详情。
+#
 # equip_type 单字段可能 OCR 失败，不能单独用它区分空槽和识别失败。
 def scan_cell($detail_kind)
     if $detail_kind == "weapon"

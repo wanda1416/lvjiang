@@ -1,6 +1,22 @@
 #% name: 纯逻辑排序与查找过程
 
-# 数字升序；三路划分保留相等元素的原顺序，不修改输入。
+# 纯逻辑排序与查找过程库：升序排序、归并、边界与二分查找，供各工作流
+# import 后调用。只处理内存中的数字列表，不做识别、点击，也不读写配置。
+#
+# 包含过程：
+#   quicksort($items)         — 数字升序排序（返回新列表）
+#   merge_sorted($left, $right) — 合并两个已升序列表（返回新列表）
+#   lower_bound($items, $value) — 第一个 >= $value 的下标
+#   binary_search($items, $value) — 第一个相等值的下标（未找到返回 -1）
+
+# ─── quicksort ────────────────────────────────────────────
+# 数字升序排序。
+#
+# 参数：
+#   $items — 数字列表
+# 前置：无。
+# 后置：无副作用（不修改 $items）。
+# 返回：升序新列表；三路划分保留相等元素的原顺序。
 def quicksort($items)
     if len($items) <= 1
         return slice($items, 0, len($items) - 1)
@@ -35,7 +51,14 @@ def quicksort($items)
     return $result
 end
 
-# 合并两个已升序的数字列表，相等时先取左侧。
+# ─── merge_sorted ─────────────────────────────────────────
+# 合并两个已升序的数字列表。
+#
+# 参数：
+#   $left、$right — 已按升序排好的数字列表
+# 前置：两个列表都已升序（本过程不再校验）。
+# 后置：无副作用（不修改入参）。
+# 返回：合并后的升序新列表；相等时先取 $left 的元素。
 def merge_sorted($left, $right)
     eval $result = []
     eval $i = 0
@@ -60,7 +83,15 @@ def merge_sorted($left, $right)
     return $result
 end
 
-# 已升序列表中第一个 >= value 的位置；都小于 value 时返回列表长度。
+# ─── lower_bound ──────────────────────────────────────────
+# 已升序列表中第一个 >= $value 的位置。
+#
+# 参数：
+#   $items — 已按升序排好的数字列表
+#   $value — 比较值
+# 前置：$items 已升序（本过程不再校验）。
+# 后置：无副作用。
+# 返回：满足条件的下标；所有元素都小于 $value 时返回列表长度。
 def lower_bound($items, $value)
     eval $lo = 0
     eval $hi = len($items)
@@ -75,7 +106,15 @@ def lower_bound($items, $value)
     return $lo
 end
 
-# 已升序列表中第一个相等值的位置；未找到返回 -1。
+# ─── binary_search ────────────────────────────────────────
+# 已升序列表中第一个相等值的位置。
+#
+# 参数：
+#   $items — 已按升序排好的数字列表
+#   $value — 查找目标
+# 前置：$items 已升序（本过程不再校验）。
+# 后置：无副作用。
+# 返回：第一个相等值的下标；未找到返回 -1。
 def binary_search($items, $value)
     call $index = lower_bound($items, $value)
     if $index < len($items)

@@ -18,6 +18,22 @@
 #%     type: bool
 #%     default: false
 
+# 扫描全部备战方案：以游戏内方案列表为来源，逐个切换到该方案，扫描八个装备
+# 槽位并接着采集基础属性。
+#
+# 流程结构：
+#   1. 进入备战方案页，读出当前网格内可见的方案名
+#   2. 逐个方案：在本地方案库建立或复用目标 → 回主页扫装备 → 扫基础属性
+#   3. 每轮都回到方案页继续下一个，全部结束后确认回到主页
+#
+# 参数：
+#   scroll_count             — 基础属性列表向下滚动的轮数
+#   skip_existing            — 跳过本地已存在的备战方案
+#   skip_existing_base_attrs — 装备已扫过时跳过基础属性重扫
+# 前置：在主页；游戏方案与本地方案按名称与两门武学匹配。
+# 后置：扫完的方案已写入本地；未识别或未匹配的方案跳过并记日志。
+# 返回：-1=导航失败、方案列表为空或没有任何方案完成扫描；否则正常结束。
+
 default $scroll_count = 8
 default $skip_existing = false
 default $skip_existing_base_attrs = false
@@ -25,6 +41,7 @@ import "subcall/loadout/game_plans.wf"
 import "subcall/loadout/equipped.wf"
 import "subcall/loadout/role_attrs.wf"
 
+# ─── 收集游戏方案 ───────────────────────────────────────────────
 # 以游戏列表为扫描来源；主界面活动方案保持不变。
 call $nav_result = nav_main_to_game_plans()
 if $nav_result < 0
@@ -45,6 +62,8 @@ eval $completed = 0
 eval $attempted = 0
 eval $skipped_existing = 0
 eval $skipped_base_attrs = 0
+# ─── 逐方案扫描 ────────────────────────────────────────────────
+# 每轮从方案页挑一个方案：选中 → 回主页 → 扫装备 → 扫基础属性。
 for name in $names
     if $skip_existing and has_key($existing_names, $name)
         log info "跳过已存在的备战方案: " + $name
@@ -120,6 +139,8 @@ for name in $names
     end
     log info "已扫描备战方案: " + $target.name + "，基础属性: " + $saved
 end
+
+# ─── 收尾：回到主页并汇报结果 ─────────────────────────────────────────
 if $in_game_plans
     call $nav_result = nav_game_plans_to_main()
     if $nav_result < 0

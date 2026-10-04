@@ -28,6 +28,14 @@
 #      e. 检查是否出现确认弹窗（未出现说明书票不足）→ 返回并结束
 #      f. 最大数量添加 → 确认购买 → 点击空白处重置
 #   4. 重复步骤 3 直到无法继续购买
+#
+# 参数：
+#   open_bag_xinfa  — 是否先打开背包里的全部心法心得
+#   max_xinfa_boxes — 背包里最多打开多少个（仅 open_bag_xinfa=true 时使用）
+# 前置：在主页（内部走 nav_main_to_menu 进培养）。
+# 后置：成功时已退回主页，库存变化已换算并同步到 xinfa_of_week。
+# 返回：0=本周心得已兑换满，未做任何操作；-1=Profile 声明失败、导航失败
+#       或流程正常收尾（本流程固定以 -1 结束）。
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
@@ -52,7 +60,7 @@ end
 default $open_bag_xinfa = false
 default $max_xinfa_boxes = 5
 
-# ─── 可选：打开背包中的全部心法心得 ─────────────────────
+# ─── 可选：打开背包中的全部心法心得 ──────────────────────────────────────
 if $open_bag_xinfa
     call $open_result = open_all_bag_xinfa()
     if $open_result < 0
@@ -66,7 +74,7 @@ if $open_bag_xinfa
     end
 end
 
-# ─── 导航：从首页到心法置换视图 ─────────────────────────
+# ─── 导航：从首页到心法置换视图 ────────────────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
     return -1
@@ -90,14 +98,27 @@ end
 scan [training_xinfa].[stock_of_week] as $weekly_stock
 call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_of_week", -1, 600, "本周心法心得购买", "日常")
 
-# ─── 返回导航 ────────────────────────────────────────────
+# ─── go_back ──────────────────────────────────────────────
+# 从心法置换页逐级退回主页（内部过程）。
+#
+# 参数：无
+# 前置：在心得置换视图（或已退到更外层）。
+# 后置：已点过置换页、培养页、菜单页三级返回；不校验最终落点。
+# 返回：无返回值（隐式 null）。
 def go_back()
     click [training_xinfa].[back] after wait @page_refresh
     click [training_main].[back] after wait @page_refresh
     click [game_menu_page].[back] after wait @page_refresh
 end
 
-# ─── 打开背包中的全部心法心得 ───────────────────────────
+# ─── open_all_bag_xinfa ───────────────────────────────────
+# 打开背包普通道具里的全部心法心得（内部过程）。
+#
+# 参数：无（上限由运行配置 $max_xinfa_boxes 决定）
+# 前置：在主页（内部走 nav_main_to_item 进背包道具页）。
+# 后置：0=已尽力打开并停在背包道具页；-1=导航失败或详情里找不到「打开」按钮。
+# 返回：0=正常结束；-1=导航失败或按钮识别失败。
+#
 # 每次 recognize by 只返回第一个命中的格子；处理并等待背包补位后重新扫描。
 # 当前页找不到时按实际可见行数滚动 rows-1 行，并且只滚动一次。
 # 命中分支最多执行 max_xinfa_boxes 次：含滚动后的可见范围内一般不会有更多
@@ -219,8 +240,15 @@ call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_
 call go_back()
 return -1
 
-# ─── check_xinfa_batch ─────────────────────────────────
+# ─── check_xinfa_batch ────────────────────────────────────
 # 批量执行前置判定：本周心得已兑换满就不必为它登录。
+#
+# 参数：
+#   $params — 批量调度器冻结的任务参数字典（本判定不读它）
+# 前置：无。
+# 后置：无副作用（只读 profile）。
+# 返回：{"status", "message"}；skipped=本周已兑换满，success=仍需登录。
+#
 # 判据与正文开头一致（xinfa_of_week 记已购买数，上限 600）。
 # Profile 定义失败时保守返回 success：宁可白跑一轮，也不要因为读不到数据
 # 而漏掉真正该做的任务——正文里还会再试一次。

@@ -33,6 +33,12 @@
 # batch_check 只看 niaoniao_of_week，**不看长鸣玉**：余额不足只决定这次买几个，
 # 不构成"不必为它登录"的理由——同一轮里其他任务可能刚把长鸣玉扫出来或挣到手，
 # 拿一个可能过期的余额去否掉整次登录是本末倒置。
+#
+# 参数：
+#   max_scroll — 在道具网格中向下滚动查找的最大次数
+# 前置：在主页（内部走 nav_main_to_menu 进商店）。
+# 后置：成功时已回到主页；买成后按实际个数累加 niaoniao_of_week。
+# 返回：0=已买满、货币不足或没命中（含正常结束）；-1=Profile 声明或导航失败。
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
@@ -42,7 +48,7 @@ import "subcall/profile_registry.wf"
 # 参数缺省回落（批量注入缺失时用默认值）
 default $max_scroll = 2
 
-# ─── profile 依赖与本周额度检查（买满或不足 200 长鸣玉则整段跳过） ───
+# ─── profile 依赖与本周额度检查（买满或不足 200 长鸣玉则整段跳过） ────────────────
 # niaoniao_of_week：本周已购「绑」数量（quota，周周期自动清零，cap 2）。
 # changmingyu：长鸣玉余额（stock），袅袅之音·绑 每个 200。
 # 本周已买满 2 个、或长鸣玉连 1 个都买不起，则不导航直接跳过。
@@ -72,7 +78,7 @@ if $want < $remaining
     log "长鸣玉现有 " + $cmyu + "，本次可购买 " + $want + " 个 袅袅之音·绑"
 end
 
-# ─── 导航：菜单 → 商店 → 精选 → 道具 ────────────────────
+# ─── 导航：菜单 → 商店 → 精选 → 道具 ─────────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
     return -1
@@ -91,7 +97,7 @@ click [shop_detail].[jingxuan] after wait @page_refresh
 # 精选页左侧默认在「礼包」，切到「道具」
 click [shop_detail].[daoju] after wait @page_refresh
 
-# ─── 在道具网格中查找含「绑」的袅袅之音并购买 ───────────
+# ─── 在道具网格中查找含「绑」的袅袅之音并购买 ─────────────────────────────────
 eval $bought = 0
 eval $tries = 0
 loop while $tries < $max_scroll
@@ -127,7 +133,7 @@ if not $bought
     log "未购买 袅袅之音·绑（可能周库存已购满、货币不足，或滚动到尽头仍未命中）"
 end
 
-# ─── 返回主页 ──────────────────────────────────────────
+# ─── 返回主页 ─────────────────────────────────────────────────
 # 购买后无任何弹窗提示，但右侧购买面板可能仍开着（比网格多一层），
 # 故用检测式逐级回退：在菜单页点菜单返回，否则点商店返回，命中主页即停。
 eval $back_tries = 0
@@ -146,7 +152,16 @@ loop while $back_tries < 5
 end
 log "购买袅袅流程结束。"
 
-# 按本周剩余额度和长鸣玉余额计算本次购买数量（周上限 2，每个 200）。
+# ─── niaoniao_purchase_count ──────────────────────────────
+# 按本周已购数量与长鸣玉余额算本次可购买数量（周上限 2，每个 200）。
+#
+# 参数：
+#   $bought_week — 本周已购「绑」数（niaoniao_of_week）
+#   $cmyu        — 长鸣玉余额；未知时传 null
+# 前置：无。
+# 后置：无副作用（只计算，不写 profile）。
+# 返回：本次最多可购买的数量；0 表示不值得走购买流程。
+#
 # 余额未知时沿用原行为，交给购买面板的「最大」按钮按实际条件选择数量。
 def niaoniao_purchase_count($bought_week, $cmyu)
     if $bought_week >= 2
@@ -165,8 +180,15 @@ def niaoniao_purchase_count($bought_week, $cmyu)
     return $remaining
 end
 
-# ─── check_niaoniao_batch ──────────────────────────────
+# ─── check_niaoniao_batch ─────────────────────────────────
 # 批量执行前置判定：本周两个额度买满了就不必为它登录。
+#
+# 参数：
+#   $params — 批量调度器冻结的任务参数字典（本判定不读它）
+# 前置：无。
+# 后置：无副作用（只读 profile）。
+# 返回：{"status", "message"}；skipped=本周已买满，success=仍需登录。
+#
 # 只核查已购数量，不核查长鸣玉——理由见文件开头的说明。
 # Profile 定义失败时保守返回 success，正文里还会再读一次。
 def check_niaoniao_batch($params)

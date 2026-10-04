@@ -7,18 +7,30 @@
 #%   安卓端不使用此参数，只处理一次手动输入；也允许自行确认后再点继续。
 #% parameters:
 #%   - name: redeem_code
-#%     label: 兑换码（PC 每行一个）
+#%     label: 兑换码
 #%     type: text
 #%     multiline: true
 #%     default: ""
-#%     placeholder: PC 每行一个兑换码；安卓留空，在游戏内手动输入
 
-# 前置：主页或菜单。每次兑换结束必须回到设置的其他 tab，全部完成再回主页。
+# 输入兑换码：从主页进入菜单 → 设置 → 其他 → 兑换码，逐条提交后回主页。
+#
+# 流程结构：
+#   1. 整理兑换码：桌面端按行拆分并去掉空行，安卓端只处理一次手动输入
+#   2. 导航：主页 → 菜单 → 设置 → 其他（兑换码输入区所在 tab）
+#   3. 逐条兑换：输入/粘贴一个码 → 确认 → 收口弹窗，再处理下一个
+#   4. 返回主页
+#
+# 参数：
+#   redeem_code — 桌面端每行一个兑换码；安卓端不使用该参数
+# 前置：在主页或菜单页。
+# 后置：全部兑换码处理完并回到主页；未确认回到主页时只记 warn 并返回 -1。
+# 返回：-1=兑换码为空、导航失败或未回到主页；否则正常结束。
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 
 default $redeem_code = ""
 
+# ─── 整理兑换码列表 ──────────────────────────────────────────────
 # 安卓只处理一次，不拆分或粘贴参数；桌面先清理空行再导航。
 eval $codes = [""]
 if env("desktop")
@@ -35,6 +47,7 @@ if env("desktop")
     end
 end
 
+# ─── 导航到设置的其他页 ────────────────────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
     return -1
@@ -55,6 +68,7 @@ else
     click [game_settings].[other] after wait @page_refresh
 end
 
+# ─── 逐条兑换 ─────────────────────────────────────────────────
 for code in $codes
     click [game_settings].[redeem_code] after wait @page_refresh
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
@@ -94,6 +108,16 @@ end
 
 log "兑换码流程结束。"
 
+# ─── finish_redeem ────────────────────────────────────────
+# 收口一次兑换提交后的弹窗：确认有效则关闭，无效或被判为已兑换则取消兜底。
+#
+# 参数：无
+# 前置：刚提交过一次兑换码，兑换窗口可能已经关闭。
+# 后置：0=兑换窗口已关闭；停在设置的其他 tab，不做导航。
+# 返回：0=窗口已关闭（含用户已手动关闭）；恒为 0，调用方靠页面判定确认流程。
+#
+# 确认后仍能读到「兑换奖励」只有两种可能：该码已被使用导致确认无效，或窗口
+# 没关掉。两种都按「再取消一次」处理，仍关不掉才交给人工。
 def finish_redeem()
     # 安卓用户可能已自行关闭弹窗；是否仍在兑换窗口只看“兑换奖励”。
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"

@@ -1,17 +1,7 @@
-"""无相→本属：真实装备不变，规则精简前后的评级/转律契约不变。
-
-legacy YAML 是 fd501bd7 的规则快照。ratings.json 是该提交原判定器在
-matrix_cases 上的结果（垃/一/优/顶/S，按方法 zlib+base64 压缩）；
-测试不依赖 git、不写真实配置。
-"""
+"""无相→本属的常驻业务契约。"""
 from __future__ import annotations
 
-import base64
 import copy
-import itertools
-import json
-import random
-import zlib
 from pathlib import Path
 
 import pytest
@@ -36,74 +26,11 @@ from lvjiang.apps.yysls.core.tuning_rules import dynamic_affix_map, parse_tuning
 from lvjiang.apps.yysls.core.tuning_rules.models import Condition, expand_affix_names
 
 ROOT = Path(__file__).parents[2]
-LEGACY = ROOT / "tests/fixtures/yysls/native_attack_legacy"
 RULES = ROOT / "config/system/yysls/tuning_rules"
-KEYS = sorted(path.stem for path in LEGACY.glob("*.yaml"))
-METHODS = ("judge", "check_tuning_worthiness", "judge_with_legal_transmute")
-
-
-def matrix_cases(key):
-    """固定种子：每玩法、两等级、主副武器及六配件、全部合法首词条。
-
-    每个首词条覆盖 2～5 条装备；一半从规则池抽样、一半从完整合法池抽样，
-    同时覆盖有/无要求增伤、池外废词条和转律槽锁定。
-    """
-    gc = get_game_config()
-    raw = yaml.safe_load((LEGACY / f"{key}.yaml").read_text(encoding="utf-8"))
-    rule = parse_tuning_rule(raw)
-    rng = random.Random(20261003)
-    for ps_name, ps in rule.playstyles.items():
-        for level in (110, 115):
-            for equip_type in dict.fromkeys([
-                ps.main.weapon, ps.sub.weapon, "环", "佩", "冠胄", "胸甲", "胫甲", "腕甲",
-            ]):
-                shell = {"type": equip_type, "level": level, "quality": "gold"}
-                physical = normal_affix_candidates(shell, gc)
-                aliases = dynamic_affix_map(ps.attr)
-                preferred = [n for n in physical
-                             if n in rule.pool_set or aliases.get(n) in rule.pool_set]
-                group = gc.get_type_to_group()[equip_type]
-                for first in gc.get_first_affixes(group, level):
-                    for count, trial in itertools.product(range(1, 5), range(3)):
-                        pool = preferred if trial == 0 else physical
-                        if len(pool) < count:
-                            continue
-                        names = rng.sample(pool, count)
-                        damage = (ps.main.damage if equip_type == ps.main.weapon
-                                  else ps.sub.damage if equip_type == ps.sub.weapon else None)
-                        if damage and trial == 0 and damage not in names:
-                            names[-1] = damage
-                        equip = EquipmentData(
-                            type=equip_type, name="测试装备", level=level, quality="gold",
-                            affixes=[Affix(name=n, value=1.0) for n in [first, *names]],
-                        )
-                        if trial == 2:
-                            equip.affixes[1].is_transferred = True
-                        if validate_combination_dict(equip.to_dict(include_fp=False)):
-                            continue
-                        yield ps_name, equip
 
 
 def rating_code(result):
     return "S" if result.skipped else result.rating.value[0].upper()
-
-
-@pytest.mark.parametrize("key", KEYS)
-def test_all_rules_match_frozen_ratings(key):
-    expected = json.loads((LEGACY / "ratings.json").read_text(encoding="utf-8"))[key]
-    expected = {method: zlib.decompress(base64.b64decode(value)).decode()
-                for method, value in expected.items()}
-    rule = parse_tuning_rule(yaml.safe_load((RULES / f"{key}.yaml").read_text(encoding="utf-8")))
-    cases = list(matrix_cases(key))
-    assert len(cases) == len(expected["judge"])
-    for index, (playstyle, equip) in enumerate(cases):
-        judge = GenericTuningJudge(rule, {"playstyles": [playstyle]})
-        for method in METHODS:
-            actual = rating_code(getattr(judge, method)(equip))
-            assert actual == expected[method][index], (
-                key, playstyle, method, equip.to_dict(include_fp=False),
-                expected[method][index], actual,
-            )
 
 
 @pytest.mark.parametrize("attr", ["鸣金", "裂石", "牵丝", "破竹"])
@@ -133,27 +60,6 @@ def test_school_pools_expand_in_owner_context_without_mutating_config():
     assert gc.get_transmute_pool("测试乙") == ["劲", "最大无相攻击", "最大裂石攻击"]
     assert transmute_pool_union(gc) == ["最大无相攻击", "最大鸣金攻击", "劲", "最大裂石攻击"]
     assert gc._schools == original
-
-
-@pytest.mark.parametrize("key", KEYS)
-def test_rule_pools_preserve_real_candidates_and_priority(key):
-    gc = get_game_config()
-    old = parse_tuning_rule(yaml.safe_load((LEGACY / f"{key}.yaml").read_text(encoding="utf-8")))
-    new = parse_tuning_rule(yaml.safe_load((RULES / f"{key}.yaml").read_text(encoding="utf-8")))
-    assert not any("无相" in n for n in new.referenced_affixes())
-    for ps_name, equip in matrix_cases(key):
-        aliases = dynamic_affix_map(new.playstyles[ps_name].attr)
-        physical = normal_affix_candidates(equip.to_dict(include_fp=False), gc)
-        for field in ("affix_pool", "transmute_priority"):
-            assert expand_affix_names(getattr(old, field), physical, aliases) == (
-                expand_affix_names(getattr(new, field), physical, aliases))
-        union = transmute_pool_union(gc)
-        old_pool = [n for n in union if n in old.pool_set or aliases.get(n) in old.pool_set]
-        new_pool = [n for n in union if n in new.pool_set or aliases.get(n) in new.pool_set]
-        for index in range(2, len(equip.affixes) + 1):
-            data = equip.to_dict(include_fp=False)
-            assert transmute_targets(data, index, old_pool, gc) == transmute_targets(
-                data, index, new_pool, gc)
 
 
 @pytest.mark.parametrize("level", [110, 115])

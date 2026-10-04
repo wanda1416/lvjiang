@@ -89,6 +89,8 @@ jobs:
         run: python -m mypy
 
       - name: Test
+        # 单进程跑，比 CI 的 -n auto 慢；闸门只拦挂死，不拦正常回归。
+        timeout-minutes: 45
         run: python -m pytest tests
 
       - name: Build Windows packages

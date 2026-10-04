@@ -42,6 +42,9 @@ jobs:
       - name: Run tests
         id: tests
         continue-on-error: true
+        # 用例挂死时 pytest 不会自己退出。没有这道闸，卡住的 worker 会让整个
+        # 步骤一直等到手动取消（实测挂过 88 分钟）。
+        timeout-minutes: 30
         run: >-
           python -m pytest tests
           -n auto

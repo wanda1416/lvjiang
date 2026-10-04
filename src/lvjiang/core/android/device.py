@@ -188,6 +188,12 @@ class AdbDevice:
         """ADB 命令失败 → 通知 UI → 暂停工作流线程等待用户点「恢复」"""
         err_msg = f"{cmd_desc} 失败: {error}"
         logger.warning(f"ADB 连接异常: {err_msg}")
+        if self.on_connection_lost is None and self.stop_check is None:
+            # 没人能收到通知去点「恢复」，也没人能喊停：等下去只会让调用线程
+            # 永久卡住。没有恢复通道时失败必须可见，直接报错交回上层。
+            raise AdbConnectionError(
+                f"{cmd_desc} 失败且无恢复通道: {error}"
+            ) from None
         if self.on_connection_lost:
             try:
                 self.on_connection_lost(err_msg)

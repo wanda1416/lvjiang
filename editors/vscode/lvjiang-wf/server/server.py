@@ -3,9 +3,8 @@
 Provides real-time diagnostics for .wf files by reusing the project's
 existing Lark-based parser.
 
-Level 2: syntax error diagnostics + keyword typo detection
-Level 3: semantic checks (scene/call/import validation, param count)
-         + editor features (folding, symbols, goto, hover)
+Syntax diagnostics and suggestions at actual parse errors; project-aware import,
+call, metadata, scene and optional layout checks; navigation and completion.
 """
 from __future__ import annotations
 
@@ -29,15 +28,25 @@ def _die(msg: str) -> NoReturn:
 
 try:
     from lsprotocol.types import (
+        TEXT_DOCUMENT_COMPLETION,
+        TEXT_DOCUMENT_DEFINITION,
         TEXT_DOCUMENT_DID_CHANGE,
+        TEXT_DOCUMENT_DID_CLOSE,
         TEXT_DOCUMENT_DID_OPEN,
         TEXT_DOCUMENT_DID_SAVE,
         TEXT_DOCUMENT_DOCUMENT_SYMBOL,
         TEXT_DOCUMENT_FOLDING_RANGE,
         TEXT_DOCUMENT_HOVER,
+        TEXT_DOCUMENT_REFERENCES,
+        TEXT_DOCUMENT_RENAME,
+        CompletionItem,
+        CompletionItemKind,
+        CompletionParams,
+        DefinitionParams,
         Diagnostic,
         DiagnosticSeverity,
         DidChangeTextDocumentParams,
+        DidCloseTextDocumentParams,
         DidOpenTextDocumentParams,
         DidSaveTextDocumentParams,
         DocumentSymbol,
@@ -47,11 +56,17 @@ try:
         FoldingRangeParams,
         Hover,
         HoverParams,
+        Location,
         MarkupContent,
         MarkupKind,
         Position,
         Range,
+        ReferenceContext,
+        ReferenceParams,
+        RenameParams,
         SymbolKind,
+        TextEdit,
+        WorkspaceEdit,
     )
     from pygls.server import LanguageServer
 except ImportError as e:
@@ -72,27 +87,28 @@ if _src_dir.is_dir() and str(_src_dir) not in sys.path:
     sys.path.insert(0, str(_src_dir))
 
 try:
+    from lark.exceptions import (  # noqa: E402
+        LarkError,
+        UnexpectedCharacters,
+        UnexpectedToken,
+    )
+
+    from lvjiang.core.config.resolver import get_resolver  # noqa: E402
+    from lvjiang.workflows.engine.core import _normalize_import_path  # noqa: E402
     from lvjiang.workflows.grammar import parse_text  # noqa: E402
-    from lvjiang.workflows.grammar.parser.api import _get_parser, _preprocess_line_continuation  # noqa: E402
     from lvjiang.workflows.grammar.ast_nodes import (  # noqa: E402
         CallProc,
         For,
         ForRange,
         If,
-        Import,
         Loop,
         ProcDef,
         Try,
         UntilLoop,
         WhileLoop,
     )
+    from lvjiang.workflows.metadata import metadata_error  # noqa: E402
     from lvjiang.workflows.workflow_references import collect_refs  # noqa: E402
-    from lark.exceptions import (  # noqa: E402
-        LarkError,
-        UnexpectedCharacters,
-        UnexpectedToken,
-    )
-    from lark import Tree, Token  # noqa: E402
 except ImportError as e:
     _die(
         f"cannot import 'lvjiang' ({e}). Expected the project source at {_src_dir} "
@@ -137,7 +153,7 @@ def _levenshtein_distance(s1: str, s2: str) -> int:
         return _levenshtein_distance(s2, s1)
     if len(s2) == 0:
         return len(s1)
-    previous_row = range(len(s2) + 1)
+    previous_row = list(range(len(s2) + 1))
     for i, c1 in enumerate(s1):
         current_row = [i + 1]
         for j, c2 in enumerate(s2):
@@ -147,46 +163,6 @@ def _levenshtein_distance(s1: str, s2: str) -> int:
             current_row.append(min(insertions, deletions, substitutions))
         previous_row = current_row
     return previous_row[-1]
-
-
-def _find_keyword_typos(source: str) -> list[tuple[int, int, str, str]]:
-    """Find identifiers that look like typos of DSL keywords.
-    
-    Returns list of (line, col, typo_name, suggested_keyword) tuples.
-    Line and column are 0-based.
-    
-    Only flags identifiers with edit distance 1 from a keyword to avoid
-    false positives on legitimate variable names.
-    """
-    typos: list[tuple[int, int, str, str]] = []
-    try:
-        parser = _get_parser()
-        text = _preprocess_line_continuation(source)
-        if not text.endswith("\n"):
-            text += "\n"
-        tree = parser.parse(text)
-    except Exception:
-        # If parsing fails, skip typo detection
-        return typos
-    
-    # Walk the tree to find all NAME tokens
-    def walk(tree: Tree, line_offset: int = 0) -> None:
-        for child in tree.children:
-            if isinstance(child, Token) and child.type == "NAME":
-                name = str(child)
-                # Only flag if edit distance is exactly 1 (reduces false positives)
-                for kw in DSL_KEYWORDS:
-                    if name != kw and _levenshtein_distance(name, kw) == 1:
-                        # Lark uses 1-based line/column
-                        line = max(child.line - 1, 0)
-                        col = max(child.column - 1, 0)
-                        typos.append((line, col, name, kw))
-                        break  # Only suggest the first match
-            elif isinstance(child, Tree):
-                walk(child, line_offset)
-    
-    walk(tree)
-    return typos
 
 
 def _find_closest_keyword(name: str) -> str | None:
@@ -217,7 +193,7 @@ def _line_range(line_no: int, end_line: int | None = None) -> Range:
     end = end_line if end_line is not None else line
     return Range(
         start=Position(line=line, character=0),
-        end=Position(line=end, character=0),
+        end=Position(line=end, character=0 if end != line else 1),
     )
 
 
@@ -243,34 +219,37 @@ def _walk_stmts(body: list) -> list:
 
 _scene_registry = None
 _scene_registry_error: str | None = None
-_scenes_yaml_mtime: float = 0.0
+_scene_stamp: tuple[tuple[str, int], ...] = ()
 
 
-def _get_scenes_yaml_mtime() -> float:
-    """Get the mtime of scenes.yaml (or 0 if not found)."""
-    scenes_yaml = _project_root / "config" / "system" / "scenes.yaml"
-    try:
-        return os.path.getmtime(scenes_yaml)
-    except OSError:
-        return 0.0
+def _scene_files_stamp() -> tuple[tuple[str, int], ...]:
+    """Detect edits made outside the app's config change notification path."""
+    resolver = get_resolver()
+    files = []
+    for root in (resolver.system_dir, resolver.remote_dir, resolver.local_dir):
+        files.extend(root.glob("scenes.yaml"))
+        files.extend((root / "scenes").glob("*.yaml"))
+    return tuple(sorted((str(path), path.stat().st_mtime_ns) for path in files))
 
 
 def _get_scene_registry():
-    """Lazily load the scene registry, invalidating cache if scenes.yaml changed."""
-    global _scene_registry, _scene_registry_error, _scenes_yaml_mtime
-    current_mtime = _get_scenes_yaml_mtime()
-    # Invalidate cache if scenes.yaml was modified
-    if _scene_registry is not None and current_mtime != _scenes_yaml_mtime:
+    """Load the scene registry and refresh it after external YAML edits."""
+    global _scene_registry, _scene_registry_error, _scene_stamp
+    current_stamp = _scene_files_stamp()
+    if _scene_stamp and current_stamp != _scene_stamp:
         _scene_registry = None
         _scene_registry_error = None
     if _scene_registry is not None or _scene_registry_error is not None:
         return _scene_registry
     try:
-        from lvjiang.core.scene_registry import get_registry
+        from lvjiang.core.scene_registry import get_registry, reload_scene_registry
+        if _scene_stamp and current_stamp != _scene_stamp:
+            reload_scene_registry()
         _scene_registry = get_registry()
-        _scenes_yaml_mtime = current_mtime
+        _scene_stamp = current_stamp
     except Exception as e:
         _scene_registry_error = str(e)
+        _scene_stamp = current_stamp
     return _scene_registry
 
 
@@ -289,7 +268,8 @@ def _check_scene_exists(program) -> list[Diagnostic]:
         diagnostics.append(Diagnostic(range=_line_range(line), message=message,
                                       severity=DiagnosticSeverity.Warning))
     valid_scenes = set(registry.all_scene_keys())
-    refs = collect_refs(program.body, program.procs, source=program.source)
+    refs = collect_refs(program.body, program.procs,
+                        source=program.source, reachable_only=False)
     seen_scenes: set[str] = set()
     for ref in refs:
         if ref.scene in seen_scenes:
@@ -304,6 +284,27 @@ def _check_scene_exists(program) -> list[Diagnostic]:
     return diagnostics
 
 
+def _check_layout_refs(program) -> list[Diagnostic]:
+    """Validate only when the editor explicitly knows the intended layout."""
+    layout_key = os.environ.get("LVJIANG_WF_LAYOUT_KEY", "").strip()
+    if not layout_key:
+        return []
+    from lvjiang.core.layout_manager import load_layout_by_key
+    from lvjiang.workflows.static_check import check_refs
+
+    layout = load_layout_by_key(layout_key)
+    if layout is None:
+        return [Diagnostic(
+            range=_line_range(1), message=f"布局不存在: {layout_key}",
+            severity=DiagnosticSeverity.Warning)]
+    refs = collect_refs(program.body, program.procs, source=program.source,
+                        reachable_only=False)
+    return [Diagnostic(range=_line_range(problem.ref.line_no),
+                       message=f"[{problem.ref.scene}].[{problem.ref.key}]: {problem.reason}",
+                       severity=DiagnosticSeverity.Warning)
+            for problem in check_refs(refs, layout)]
+
+
 def _all_call_stmts(program) -> list:
     """Collect all CallProc statements from main body and all proc bodies."""
     stmts = _walk_stmts(program.body)
@@ -313,10 +314,10 @@ def _all_call_stmts(program) -> list:
     return stmts
 
 
-def _check_call_exists(program) -> list[Diagnostic]:
+def _check_call_exists(program, procs: dict | None = None) -> list[Diagnostic]:
     """Check that all call targets are defined procedures."""
     diagnostics = []
-    defined = set(program.procs.keys())
+    defined = set(procs if procs is not None else program.procs)
     for stmt in _all_call_stmts(program):
         if isinstance(stmt, CallProc) and stmt.name not in defined:
             diagnostics.append(Diagnostic(
@@ -327,27 +328,83 @@ def _check_call_exists(program) -> list[Diagnostic]:
     return diagnostics
 
 
-def _check_import_exists(program, source_path: Path) -> list[Diagnostic]:
-    """Check that all imported .wf files exist on disk."""
-    diagnostics = []
-    base_dir = source_path.parent if source_path.is_file() else _project_root
-    for imp in program.imports:
-        imp_path = base_dir / imp.path
-        if not imp_path.exists():
-            diagnostics.append(Diagnostic(
-                range=_line_range(imp.line_no),
-                message=f"导入文件不存在: {imp.path}",
-                severity=DiagnosticSeverity.Error,
-            ))
-    return diagnostics
+_import_cache: dict[Path, tuple[int, int, object]] = {}
+_open_documents: dict[Path, tuple[str, str]] = {}
 
 
-def _check_proc_param_count(program) -> list[Diagnostic]:
+def _parse_imported(path: Path):
+    """Avoid reparsing an unchanged import graph on every keystroke."""
+    from lvjiang.workflows.grammar import parse_file
+
+    open_doc = _open_documents.get(path)
+    if open_doc is not None:
+        text = open_doc[1]
+        signature = (len(text), hash(text))
+        cached = _import_cache.get(path)
+        if cached and cached[:2] == signature:
+            return cached[2]
+        parsed = parse_text(text, source=str(path))
+        _import_cache[path] = (*signature, parsed)
+        return parsed
+    stat = path.stat()
+    cached = _import_cache.get(path)
+    if cached and cached[:2] == (stat.st_mtime_ns, stat.st_size):
+        return cached[2]
+    parsed = parse_file(path)
+    _import_cache[path] = (stat.st_mtime_ns, stat.st_size, parsed)
+    return parsed
+
+
+def _load_import_graph(program, source_path: Path) -> tuple[dict, dict, list[Diagnostic]]:
+    """Resolve the import graph with the engine's path and layer rules."""
+    diagnostics: list[Diagnostic] = []
+    procs = dict(program.procs)
+    sources = {name: source_path for name in procs}
+    visited: set[Path] = set()
+    resolver = get_resolver()
+
+    def visit(current, stack: tuple[Path, ...], root_line: int = 0) -> None:
+        for imp in current.imports:
+            diagnostic_line = root_line or imp.line_no
+            try:
+                rel = _normalize_import_path(imp.path)
+                resolved = resolver.resolve_read(f"workflows/{rel}")
+                if resolved is None:
+                    raise ValueError(f"导入文件不存在: {imp.path}")
+                path = resolved.resolve()
+                if path in stack:
+                    raise ValueError(f"循环 import: {imp.path}")
+                if path in visited:
+                    continue
+                imported = _parse_imported(path)
+            except Exception as exc:
+                diagnostics.append(Diagnostic(
+                    range=_line_range(diagnostic_line),
+                    message=f"{stack[-1].name}:{imp.line_no}: {exc}",
+                    severity=DiagnosticSeverity.Error))
+                continue
+            visited.add(path)
+            for name, proc in imported.procs.items():
+                if name in procs:
+                    diagnostics.append(Diagnostic(
+                        range=_line_range(diagnostic_line),
+                        message=f"过程 '{name}' 与 {sources[name]} 中的定义重复",
+                        severity=DiagnosticSeverity.Error))
+                else:
+                    procs[name] = proc
+                    sources[name] = path
+            visit(imported, (*stack, path), diagnostic_line)
+
+    visit(program, (source_path.resolve(),))
+    return procs, sources, diagnostics
+
+
+def _check_proc_param_count(program, procs: dict | None = None) -> list[Diagnostic]:
     """Check that call arguments match the procedure definition."""
     diagnostics = []
     for stmt in _all_call_stmts(program):
         if isinstance(stmt, CallProc):
-            proc_def = program.procs.get(stmt.name)
+            proc_def = (procs if procs is not None else program.procs).get(stmt.name)
             if proc_def and len(stmt.args) != len(proc_def.params):
                 expected = len(proc_def.params)
                 actual = len(stmt.args)
@@ -364,28 +421,22 @@ def _validate_and_publish(uri: str, source: str) -> None:
     diagnostics: list[Diagnostic] = []
     source_path = _uri_to_path(uri)
 
+    meta_problem = metadata_error(source)
+    if meta_problem:
+        diagnostics.append(Diagnostic(
+            range=_line_range(1), message=meta_problem,
+            severity=DiagnosticSeverity.Error))
+
     try:
         program = parse_text(source)
-        # --- Level 2: keyword typo detection ---
-        lines = source.splitlines()
-        for line, col, typo, suggestion in _find_keyword_typos(source):
-            line_len = len(lines[line]) if line < len(lines) else col + len(typo)
-            end_col = min(col + len(typo), line_len)
-            diagnostics.append(
-                Diagnostic(
-                    range=Range(
-                        start=Position(line=line, character=col),
-                        end=Position(line=line, character=max(end_col, col + 1)),
-                    ),
-                    message=f"'{typo}' 看起来像是关键字 '{suggestion}' 的拼写错误",
-                    severity=DiagnosticSeverity.Warning,
-                )
-            )
-        # --- Level 3: semantic checks ---
+        # Semantic checks use the parsed program; valid identifiers are never
+        # treated as keyword typos merely because their spelling is similar.
+        procs, _, import_problems = _load_import_graph(program, source_path)
+        diagnostics.extend(import_problems)
         diagnostics.extend(_check_scene_exists(program))
-        diagnostics.extend(_check_call_exists(program))
-        diagnostics.extend(_check_import_exists(program, source_path))
-        diagnostics.extend(_check_proc_param_count(program))
+        diagnostics.extend(_check_layout_refs(program))
+        diagnostics.extend(_check_call_exists(program, procs))
+        diagnostics.extend(_check_proc_param_count(program, procs))
     except (UnexpectedCharacters, UnexpectedToken) as e:
         # Lark provides 1-based line/column; LSP uses 0-based.
         line = max(getattr(e, "line", 1) - 1, 0)
@@ -394,7 +445,7 @@ def _validate_and_publish(uri: str, source: str) -> None:
         lines = source.splitlines()
         line_len = len(lines[line]) if line < len(lines) else col + 1
         end_col = min(col + 20, line_len)
-        
+
         # Try to extract the problematic token and check for typos
         error_msg = str(e)
         # Look for the actual text at the error position
@@ -410,7 +461,7 @@ def _validate_and_publish(uri: str, source: str) -> None:
                 closest = _find_closest_keyword(token)
                 if closest:
                     error_msg = f"'{token}' 未识别。你是不是想写 '{closest}'？"
-        
+
         diagnostics.append(
             Diagnostic(
                 range=Range(
@@ -455,19 +506,40 @@ def _validate_and_publish(uri: str, source: str) -> None:
 
 @server.feature(TEXT_DOCUMENT_DID_OPEN)
 def on_open(params: DidOpenTextDocumentParams) -> None:
-    _validate_and_publish(params.text_document.uri, params.text_document.text)
+    uri = params.text_document.uri
+    _open_documents[_uri_to_path(uri).resolve()] = (uri, params.text_document.text)
+    _validate_open_documents()
 
 
 @server.feature(TEXT_DOCUMENT_DID_SAVE)
 def on_save(params: DidSaveTextDocumentParams) -> None:
     doc = server.workspace.get_text_document(params.text_document.uri)
-    _validate_and_publish(params.text_document.uri, doc.source)
+    _open_documents[_uri_to_path(params.text_document.uri).resolve()] = (
+        params.text_document.uri, doc.source)
+    _validate_open_documents()
 
 
 @server.feature(TEXT_DOCUMENT_DID_CHANGE)
 def on_change(params: DidChangeTextDocumentParams) -> None:
     doc = server.workspace.get_text_document(params.text_document.uri)
-    _validate_and_publish(params.text_document.uri, doc.source)
+    _open_documents[_uri_to_path(params.text_document.uri).resolve()] = (
+        params.text_document.uri, doc.source)
+    _validate_open_documents()
+
+
+@server.feature(TEXT_DOCUMENT_DID_CLOSE)
+def on_close(params: DidCloseTextDocumentParams) -> None:
+    path = _uri_to_path(params.text_document.uri).resolve()
+    _open_documents.pop(path, None)
+    _import_cache.pop(path, None)
+    server.publish_diagnostics(params.text_document.uri, [])
+    _validate_open_documents()
+
+
+def _validate_open_documents() -> None:
+    """Refresh importers when an unsaved dependency changes."""
+    for uri, source in _open_documents.values():
+        _validate_and_publish(uri, source)
 
 
 # ---------------------------------------------------------------------------
@@ -641,8 +713,9 @@ def on_hover(params: HoverParams) -> Hover | None:
     if not word:
         return None
     # Check if it's a procedure name
-    if word in program.procs:
-        proc = program.procs[word]
+    procs, _, _ = _load_import_graph(program, _uri_to_path(params.text_document.uri))
+    if word in procs:
+        proc = procs[word]
         if isinstance(proc, ProcDef):
             params_str = ", ".join(f"${p}" for p in proc.params) if proc.params else ""
             return Hover(
@@ -660,3 +733,278 @@ def on_hover(params: HoverParams) -> Hover | None:
             ),
         )
     return None
+
+
+@server.feature(TEXT_DOCUMENT_COMPLETION)
+def on_completion(params: CompletionParams) -> list[CompletionItem]:
+    """Offer keys only where the current statement gives them a clear meaning."""
+    doc = server.workspace.get_text_document(params.text_document.uri)
+    lines = doc.source.splitlines()
+    if params.position.line >= len(lines):
+        return []
+    prefix = lines[params.position.line][:params.position.character]
+    import_match = re.search(r'\bimport\s+"([^"\n]*)$', prefix)
+    if import_match:
+        from lvjiang.workflows.file_tree import list_workflow_files
+        edit_range = Range(
+            start=Position(line=params.position.line,
+                           character=import_match.start(1)),
+            end=Position(line=params.position.line,
+                         character=params.position.character))
+        return [CompletionItem(label=item.rel_path, kind=CompletionItemKind.File,
+                               text_edit=TextEdit(range=edit_range,
+                                                  new_text=item.rel_path))
+                for item in list_workflow_files()]
+    registry = _get_scene_registry()
+    entity = re.search(r'\[([A-Za-z_][A-Za-z_0-9]*)\]\.\[[A-Za-z_0-9]*$', prefix)
+    if entity and registry is not None:
+        scene = registry.get_scene(entity.group(1))
+        if scene is None:
+            return []
+        keys = {item.key for group in (scene.regions, scene.points,
+                                       scene.arrows, scene.panels)
+                for item in group}
+        return [CompletionItem(label=key, kind=CompletionItemKind.Field)
+                for key in sorted(keys)]
+    if re.search(r'\[[A-Za-z_0-9]*$', prefix) and registry is not None:
+        return [CompletionItem(label=key, kind=CompletionItemKind.Class,
+                               detail="场景 key")
+                for key in registry.all_scene_keys()]
+    if re.search(r'\b(?:eval\s+\$\w+\s*=|\$\w+\s*=)\s*\w*$', prefix):
+        from lvjiang.workflows.builtins import list_functions
+        return [CompletionItem(label=name, kind=CompletionItemKind.Function,
+                               detail="内置函数")
+                for name in sorted(list_functions())]
+    if not re.search(r'\bcall\s+(?:\$\w+\s*=\s*)?\w*$', prefix):
+        return []
+    try:
+        program = _parse_for_editing(doc.source, params.position.line)
+        procs, _, _ = _load_import_graph(program, _uri_to_path(params.text_document.uri))
+    except Exception:
+        return []
+    return [CompletionItem(label=name, kind=CompletionItemKind.Function,
+                            detail=f"def {name}({', '.join('$' + p for p in proc.params)})")
+             for name, proc in sorted(procs.items())]
+
+
+def _parse_for_editing(source: str, active_line: int):
+    """Keep completions available while the current statement is incomplete."""
+    try:
+        return parse_text(source)
+    except Exception:
+        lines = source.splitlines(keepends=True)
+        if active_line >= len(lines):
+            raise
+        lines[active_line] = "# editing\n"
+        return parse_text("".join(lines))
+
+
+@server.feature(TEXT_DOCUMENT_DEFINITION)
+def on_definition(params: DefinitionParams) -> Location | None:
+    """Navigate imports and procedure calls to their effective source files."""
+    doc = server.workspace.get_text_document(params.text_document.uri)
+    lines = doc.source.splitlines()
+    line_no = params.position.line
+    if line_no >= len(lines):
+        return None
+    line = lines[line_no]
+    col = params.position.character
+    imported = re.search(r'\bimport\s+"([^"\n]+)"', line)
+    if imported and imported.start(1) <= col <= imported.end(1):
+        try:
+            rel = _normalize_import_path(imported.group(1))
+            path = get_resolver().resolve_read(f"workflows/{rel}")
+        except Exception:
+            return None
+        if path is None:
+            return None
+        pos = Position(line=0, character=0)
+        return Location(uri=path.resolve().as_uri(), range=Range(start=pos, end=pos))
+    scene_ref = next((m for m in re.finditer(
+        r'\[([A-Za-z_][A-Za-z_0-9]*)\](?:\.\[([A-Za-z_][A-Za-z_0-9]*)\])?', line)
+        if m.start() <= col <= m.end()), None)
+    if scene_ref is not None:
+        scene_key = scene_ref.group(1)
+        target = get_resolver().resolve_read(f"scenes/{scene_key}.yaml")
+        if target is None:
+            return None
+        key = scene_ref.group(2) if scene_ref.start(2) <= col <= scene_ref.end(2) else scene_key
+        target_lines = target.read_text(encoding="utf-8-sig").splitlines()
+        found = next((i for i, text in enumerate(target_lines)
+                      if re.match(rf'\s*-?\s*key:\s*{re.escape(key)}\s*$', text)), 0)
+        pos = Position(line=found, character=0)
+        return Location(uri=target.resolve().as_uri(), range=Range(start=pos, end=pos))
+    selected = _procedure_under_cursor(
+        params.text_document.uri, doc.source, line_no, col)
+    if selected is None:
+        return None
+    name, target = selected
+    source = _open_documents.get(target, ("", ""))[1]
+    if not source:
+        source = (doc.source if target == _uri_to_path(params.text_document.uri).resolve()
+                  else target.read_text(encoding="utf-8-sig"))
+    target_lines = source.splitlines()
+    definition_line = _find_def_line(name, target_lines)
+    if definition_line < 0:
+        return None
+    pos = Position(line=definition_line, character=0)
+    return Location(uri=target.as_uri(), range=Range(start=pos, end=pos))
+
+
+_PROC_NAME = r"[A-Za-z_\u4e00-\u9fff][A-Za-z_0-9\u4e00-\u9fff]*"
+
+
+def _procedure_under_cursor(uri: str, source: str, line_no: int,
+                            character: int) -> tuple[str, Path] | None:
+    lines = source.splitlines()
+    if line_no >= len(lines):
+        return None
+    line = lines[line_no]
+    match = re.search(rf"\b(?:call\s+(?:\${_PROC_NAME}\s*=\s*)?|def\s+)({_PROC_NAME})", line)
+    if match is None or not match.start(1) <= character <= match.end(1):
+        return None
+    try:
+        program = parse_text(source)
+        procs, sources, _ = _load_import_graph(program, _uri_to_path(uri))
+    except Exception:
+        return None
+    name = match.group(1)
+    if name not in procs:
+        return None
+    is_definition = (re.match(r"\s*def\b", line) is not None
+                     and _find_def_line(name, lines) == line_no)
+    is_call = any(isinstance(stmt, CallProc) and stmt.name == name
+                  and stmt.line_no == line_no + 1
+                  for stmt in _all_call_stmts(program))
+    if not is_definition and not is_call:
+        return None
+    return name, sources[name].resolve()
+
+
+def _proc_locations(path: Path, program, name: str,
+                    *, include_definition: bool) -> list[Location]:
+    """Locate AST-backed calls; never search arbitrary text or comments."""
+    source = _open_documents.get(path, ("", ""))[1]
+    if not source:
+        source = path.read_text(encoding="utf-8-sig")
+    lines = source.splitlines()
+    locations: list[Location] = []
+    if include_definition and name in program.procs:
+        index = _find_def_line(name, lines)
+        if index >= 0:
+            match = re.search(rf"\bdef\s+({re.escape(name)})\b", lines[index])
+            if match:
+                locations.append(Location(uri=path.as_uri(), range=Range(
+                    start=Position(line=index, character=match.start(1)),
+                    end=Position(line=index, character=match.end(1)))))
+    for stmt in _all_call_stmts(program):
+        if not isinstance(stmt, CallProc) or stmt.name != name:
+            continue
+        index = stmt.line_no - 1
+        if not 0 <= index < len(lines):
+            continue
+        match = re.search(rf"\bcall\s+(?:\${_PROC_NAME}\s*=\s*)?({re.escape(name)})\s*\(",
+                          lines[index])
+        if match:
+            locations.append(Location(uri=path.as_uri(), range=Range(
+                start=Position(line=index, character=match.start(1)),
+                end=Position(line=index, character=match.end(1)))))
+    return locations
+
+
+@server.feature(TEXT_DOCUMENT_REFERENCES)
+def on_references(params: ReferenceParams) -> list[Location]:
+    doc = server.workspace.get_text_document(params.text_document.uri)
+    selected = _procedure_under_cursor(
+        params.text_document.uri, doc.source,
+        params.position.line, params.position.character)
+    if selected is None:
+        return []
+    name, definition = selected
+    from lvjiang.workflows.file_tree import list_workflow_files
+
+    resolver = get_resolver()
+    files = {resolver.resolve_read(f"workflows/{item.rel_path}")
+             for item in list_workflow_files()}
+    files.discard(None)
+    files.add(_uri_to_path(params.text_document.uri))
+    locations: list[Location] = []
+    for candidate in sorted(path.resolve() for path in files):
+        try:
+            program = _parse_imported(candidate)
+            _, sources, _ = _load_import_graph(program, candidate)
+        except Exception:
+            continue
+        if sources.get(name) != definition:
+            continue
+        locations.extend(_proc_locations(
+            candidate, program, name,
+            include_definition=params.context.include_declaration))
+    return locations
+
+
+@server.feature(TEXT_DOCUMENT_RENAME)
+def on_rename(params: RenameParams) -> WorkspaceEdit | None:
+    """Rename one procedure only when all effective callers can be edited safely."""
+    doc = server.workspace.get_text_document(params.text_document.uri)
+    selected = _procedure_under_cursor(
+        params.text_document.uri, doc.source,
+        params.position.line, params.position.character)
+    if selected is None:
+        return None
+    old_name, _ = selected
+    new_name = params.new_name
+    if new_name == old_name:
+        return WorkspaceEdit(changes={})
+    if re.fullmatch(_PROC_NAME, new_name) is None:
+        return None
+    # The parser is authoritative for keywords and other reserved names.
+    try:
+        parse_text(f"def {new_name}()\n    return 1\nend\n")
+    except Exception:
+        return None
+    from lvjiang.workflows.file_tree import list_workflow_files
+
+    resolver = get_resolver()
+    for item in list_workflow_files():
+        candidate = resolver.resolve_read(f"workflows/{item.rel_path}")
+        if candidate is None:
+            continue
+        candidate = candidate.resolve()
+        source = _open_documents.get(candidate, ("", ""))[1]
+        if not source:
+            source = candidate.read_text(encoding="utf-8-sig")
+        if re.search(rf"\b{re.escape(old_name)}\b", source):
+            try:
+                _parse_imported(candidate)
+            except Exception:
+                return None
+    references = on_references(ReferenceParams(
+        text_document=params.text_document, position=params.position,
+        context=ReferenceContext(include_declaration=True)))
+    if not references:
+        return None
+    changes: dict[str, list[TextEdit]] = {}
+    for location in references:
+        path = _uri_to_path(location.uri).resolve()
+        if not path.is_file() or not os.access(path, os.W_OK):
+            return None
+        source = _open_documents.get(path, ("", ""))[1]
+        if not source:
+            source = path.read_text(encoding="utf-8-sig")
+        lines = source.splitlines()
+        line = location.range.start.line
+        start = location.range.start.character
+        end = location.range.end.character
+        if line >= len(lines) or lines[line][start:end] != old_name:
+            return None
+        try:
+            program = _parse_imported(path)
+            procs, _, problems = _load_import_graph(program, path)
+        except Exception:
+            return None
+        if problems or new_name in procs:
+            return None
+        changes.setdefault(location.uri, []).append(TextEdit(
+            range=location.range, new_text=new_name))
+    return WorkspaceEdit(changes=changes)

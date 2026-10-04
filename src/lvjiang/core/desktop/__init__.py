@@ -31,13 +31,13 @@ def create_input_backend(
     Args:
         mode: "send"（SendInput，前台）或 "post"（PostMessage，后台，默认）
         input_sim: 输入模拟参数
-        hwnd: 目标窗口句柄（PostMessage 模式使用）
+        hwnd: 目标窗口句柄（PostMessage 投递、SendInput 前台激活均使用）
 
     Returns:
         SendInputInput 或 PostMessageInput 实例
     """
     if mode == "send":
-        return SendInputInput(input_sim=input_sim)
+        return SendInputInput(input_sim=input_sim, target_hwnd=hwnd)
     elif mode == "post":
         return PostMessageInput(input_sim=input_sim, hwnd=hwnd)
     else:

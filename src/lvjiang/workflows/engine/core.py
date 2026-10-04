@@ -250,7 +250,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         空转到各处 pause，正是无人值守调度最不能接受的失败方式。
         """
         hwnd = int(window.get("hwnd") or 0)
-        if hwnd and getattr(self._input, "background_mode", False):
+        if hwnd and hasattr(self._input, "target_hwnd"):
             assert self._input is not None
             self._input.target_hwnd = hwnd
         left, top = window.get("left"), window.get("top")

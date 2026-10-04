@@ -297,8 +297,28 @@ def resolve_message_target(hwnd: int, client_x: int, client_y: int) -> int:
 
 # ─── 前台激活辅助（SDL/投屏窗口需要窗口激活才处理鼠标）──────────
 
+#: 已经报过「激活失败」的窗口。一次任务里每个动作都要激活，失败时不能每次都
+#: warning——几百次点击就是几百条同样的告警。首次失败给完整告警，之后降级到
+#: debug；一旦激活成功就清掉，下次再失败仍然会显眼地报一次。
+_activation_warned: set[int] = set()
+
+
+def window_title(hwnd: int) -> str:
+    """读窗口标题，只用于日志；读不到返回空串。"""
+    if _user32 is None or not hwnd:
+        return ""
+    try:
+        buf = ctypes.create_unicode_buffer(256)
+        _user32.GetWindowTextW(wintypes.HWND(hwnd), buf, 256)
+        return buf.value
+    except (AttributeError, OSError):
+        return ""
+
+
 def activate_window(hwnd: int, restore: bool = True) -> bool:
-    """瞬时激活目标窗口，让 SDL 类窗口（scrcpy 等）产生鼠标事件。
+    """激活目标窗口；返回**激活本身是否成功**。
+
+    `restore=True` 时随后又把前台让回原窗口，返回值仍指激活那一步的结果。
 
     这类窗口只有处于前台/焦点状态才把鼠标消息转成 SDL 事件，
     后台直接投递 PostMessage 会被忽略（实测 PostMessage/SendMessage
@@ -306,6 +326,12 @@ def activate_window(hwnd: int, restore: bool = True) -> bool:
 
     restore=True 时投递完成后把焦点还原给原前台窗口，尽量不影响
     用户正在使用的窗口（后台跑）。
+
+    返回值必须如实反映结果。`SetForegroundWindow` 会被 Windows 以调用进程
+    不在前台为由拒绝，窗口最小化时也不会被恢复（这里不调 ShowWindow，强行
+    恢复用户最小化的窗口是更强的侵入）。失败却返回成功的话，前台输入会静悄悄
+    地发给**别的**窗口：日志里 key_down/key_up 一切正常，游戏毫无反应，排查时
+    完全看不出输入落在哪——已经为此绕过一次。
     """
     # 记录原前台窗口（用于还原）
     _user32.GetForegroundWindow.restype = ctypes.c_void_p
@@ -328,6 +354,7 @@ def activate_window(hwnd: int, restore: bool = True) -> bool:
     except (AttributeError, OSError):
         attached = False
 
+    activated = False
     try:
         _user32.SetForegroundWindow.argtypes = [wintypes.HWND]
         _user32.SetForegroundWindow.restype = wintypes.BOOL
@@ -339,10 +366,11 @@ def activate_window(hwnd: int, restore: bool = True) -> bool:
         for _ in range(20):
             _user32.GetForegroundWindow.restype = wintypes.HWND
             if _user32.GetForegroundWindow() == hwnd:
+                activated = True
                 break
             time.sleep(0.01)
-    except (AttributeError, OSError):
-        pass
+    except (AttributeError, OSError) as exc:
+        logger.debug(f"激活窗口 {hwnd} 时 Win32 调用失败: {exc}")
 
     if restore and prev and prev != hwnd:
         try:
@@ -357,7 +385,23 @@ def activate_window(hwnd: int, restore: bool = True) -> bool:
             _user32.AttachThreadInput(cur, fg_tid, False)
         except (AttributeError, OSError):
             pass
-    return True
+
+    if activated:
+        _activation_warned.discard(hwnd)
+        return True
+
+    # 这条决定后续输入有没有落在目标窗口上，必须带上两边的身份才可行动。
+    actual = _user32.GetForegroundWindow() or 0
+    detail = (f"激活窗口失败：目标 {hwnd}「{window_title(hwnd)}」，"
+              f"实际前台 {actual}「{window_title(actual)}」")
+    if hwnd in _activation_warned:
+        logger.debug(detail)
+    else:
+        _activation_warned.add(hwnd)
+        logger.warning(
+            f"{detail}。前台输入会发给实际前台窗口，游戏不会有反应；"
+            f"窗口被最小化或律匠不在前台时会出现，请切回游戏窗口后重试")
+    return False
 
 
 def postmessage_click(

@@ -1739,7 +1739,8 @@ class RunControlMixin:
         # 场景绑定校验：DSL 脚本由 engine 执行时按 AST 搜集场景自动校验；
         # 内置类脚本不做预校验（缺场景运行到该指令再报错）。
 
-        # 后台模式下（windows），刷新目标窗口句柄（窗口可能被重新打开导致 hwnd 变化）
+        # Windows 输入始终刷新目标窗口句柄：PostMessage 用它投递消息，
+        # SendInput 用它在输入前激活正确窗口。
         # ADB 模式无窗口句柄，且坐标为设备物理像素（原点左上），window_left/top 恒为 0
         target_snapshot = self._running_target_snapshot
         assert target_snapshot is not None
@@ -1748,8 +1749,7 @@ class RunControlMixin:
         else:
             target_window = target_snapshot.window
             assert target_window is not None
-            if target_snapshot.input_ctrl.background_mode:
-                target_snapshot.input_ctrl.target_hwnd = target_window["hwnd"]
+            target_snapshot.input_ctrl.target_hwnd = target_window["hwnd"]
             window_left = target_window["left"]
             window_top = target_window["top"]
 
@@ -2262,8 +2262,7 @@ class RunControlMixin:
         else:
             target_window = target_snapshot.window
             assert target_window is not None
-            if target_snapshot.input_ctrl.background_mode:
-                target_snapshot.input_ctrl.target_hwnd = target_window["hwnd"]
+            target_snapshot.input_ctrl.target_hwnd = target_window["hwnd"]
             window_left = target_window["left"]
             window_top = target_window["top"]
 

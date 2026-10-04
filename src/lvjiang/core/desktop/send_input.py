@@ -68,13 +68,18 @@ class SendInputInput(InputBackend):
 
     kind = InputBackendKind.SEND
 
-    def __init__(self, input_sim: InputSimConfig | None = None):
+    def __init__(
+        self,
+        input_sim: InputSimConfig | None = None,
+        target_hwnd: int | None = None,
+    ):
         self._inject_input_sim(self, input_sim)
         # 兼容属性：SendInput 模式无后台概念
         self.background_mode = False
-        self.target_hwnd = None
+        self.target_hwnd = target_hwnd
         # SDL/游戏窗口（scrcpy、燕云十六声等）只有处于前台/焦点才处理
-        # SendInput 事件。点击前先瞬时激活目标窗口（随后还原焦点）。
+        # SendInput 事件。输入前激活目标窗口，并让它保持前台直到后续动作
+        # 完成；若在事件发出前恢复原窗口，ESC 等键盘事件会被发给错误窗口。
         self.activate_before_send = True
 
     # ─── 点击 ─────────────────────────────────────────────────
@@ -362,16 +367,17 @@ class SendInputInput(InputBackend):
             f"滚轮 {label}: {direction} x{amount} @ ({screen_x}, {screen_y}){gap}")
 
     def _activate_target(self):
-        """点击/拖拽前瞬时激活目标窗口（若设置了 hwnd）。
+        """输入前激活目标窗口（若设置了 hwnd）。
 
         SDL/游戏窗口只有处于前台/焦点才处理 SendInput 事件（历史验证：
-        燕云十六声、scrcpy 均需激活窗口到前台才能收到点击）。激活后
-        activate_window 会自动还原原前台窗口焦点。
+        燕云十六声、scrcpy 均需激活窗口到前台才能收到输入）。SendInput
+        是前台输入模式，不能在事件发出前恢复原窗口；否则日志虽然记录了
+        key_down/key_up，事件实际会落到别的前台窗口。
         """
         if self.target_hwnd and self.activate_before_send:
             if _user32.GetForegroundWindow() == self.target_hwnd:
                 return
-            activate_window(self.target_hwnd)
+            activate_window(self.target_hwnd, restore=False)
 
     def _move_to(self, x: int, y: int):
         """移动鼠标到指定位置（时长随机化）"""

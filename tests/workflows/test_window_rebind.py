@@ -39,13 +39,13 @@ def test_rebind_moves_input_capture_and_origin_to_the_new_window():
     assert engine._last_capture_frame is None
 
 
-def test_rebind_keeps_foreground_backend_untouched():
-    """前台注入按屏幕坐标走，不该被塞进一个它不使用的句柄。"""
+def test_rebind_updates_foreground_backend_target_window():
+    """SendInput 也靠句柄激活窗口，重启换 HWND 后必须跟随更新。"""
     engine = _engine(background=False)
 
     engine.rebind_target_window(dict(_NEW))
 
-    assert engine._input.target_hwnd == 111
+    assert engine._input.target_hwnd == _NEW["hwnd"]
     assert (engine._window_left, engine._window_top) == (64, 32)
 
 

@@ -104,3 +104,30 @@ def test_click_screen_unknown_button_falls_back_to_left(monkeypatch):
     backend, events = _make_backend(monkeypatch)
     backend.click_screen(10, 10, "test", button="mouse6")
     assert events == [(_MOUSEEVENTF_LEFTDOWN, 0), (_MOUSEEVENTF_LEFTUP, 0)]
+
+
+def test_target_activation_keeps_window_foreground_until_input(monkeypatch):
+    """恢复原窗口必须发生在输入之后；输入之前恢复会把 ESC 发错窗口。"""
+    user32 = MagicMock()
+    user32.GetForegroundWindow.return_value = 7
+    activate = MagicMock()
+    monkeypatch.setattr(send_input_module, "_user32", user32)
+    monkeypatch.setattr(send_input_module, "activate_window", activate)
+    backend = SendInputInput(target_hwnd=42)
+
+    backend._activate_target()
+
+    activate.assert_called_once_with(42, restore=False)
+
+
+def test_target_activation_skips_already_foreground_window(monkeypatch):
+    user32 = MagicMock()
+    user32.GetForegroundWindow.return_value = 42
+    activate = MagicMock()
+    monkeypatch.setattr(send_input_module, "_user32", user32)
+    monkeypatch.setattr(send_input_module, "activate_window", activate)
+    backend = SendInputInput(target_hwnd=42)
+
+    backend._activate_target()
+
+    activate.assert_not_called()

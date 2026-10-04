@@ -147,10 +147,10 @@ def test_android_connection_and_runtime_status_are_separate() -> None:
         agent=object(),
     )
 
+    # serial 是名称列的内容；目标大小只显示尺寸
+    assert WindowOpsMixin._target_size_details(target) == "2560×1440"
+    # 连接信息固定「输入方式 · 截图方式」，每段四字，不露实现 key
     assert WindowOpsMixin._target_connection_details(target) == (
-        "serial-1 · 2560×1440")
-    # 状态信息固定「输入方式 · 截图方式」，每段四字，不露实现 key
-    assert WindowOpsMixin._target_status_details(target) == (
         "端侧执行 · 流式截图")
 
 
@@ -164,13 +164,12 @@ def test_window_connection_and_runtime_status_are_separate() -> None:
         window={"left": 10, "top": 20, "width": 1920, "height": 1080},
     )
 
+    assert WindowOpsMixin._target_size_details(target) == "1920×1080"
     assert WindowOpsMixin._target_connection_details(target) == (
-        "起点 (10, 20) · 1920×1080")
-    assert WindowOpsMixin._target_status_details(target) == (
         "前台输入 · 前台截图")
 
 
-# ─── 状态信息列的取值全集 ───────────────────────────────
+# ─── 连接信息列的取值全集 ───────────────────────────────
 
 
 def _window_target(*, background_input: bool, wgc: bool) -> ExecutionTarget:
@@ -193,7 +192,7 @@ def _device_target(*, device_execution: bool, method: str) -> ExecutionTarget:
 
 
 def test_status_column_is_always_four_characters_per_segment() -> None:
-    """状态信息固定「输入方式 · 截图方式」，两段都是四个汉字。
+    """连接信息固定「输入方式 · 截图方式」，两段都是四个汉字。
 
     这一列原来一段讲「模式」一段讲「截图」，对不上维度；ADB 分支还是反序，
     并且把 `screencap` / `scrcpy` / `ADB` 这些实现 key 原样摆给用户看。四字
@@ -215,7 +214,7 @@ def test_status_column_is_always_four_characters_per_segment() -> None:
             if kind == "windows" \
             else _device_target(device_execution=flag, method=str(capture))
 
-        actual = WindowOpsMixin._target_status_details(target)
+        actual = WindowOpsMixin._target_connection_details(target)
 
         assert actual == expected, (kind, flag, capture)
         head, _, tail = actual.partition(" · ")
@@ -226,7 +225,7 @@ def test_status_column_never_leaks_implementation_keys() -> None:
     """实现 key 不进 UI：这一列是给普通用户看的。"""
     for method in ("screencap", "scrcpy"):
         for device_execution in (False, True):
-            text = WindowOpsMixin._target_status_details(
+            text = WindowOpsMixin._target_connection_details(
                 _device_target(
                     device_execution=device_execution, method=method))
             assert method not in text

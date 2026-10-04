@@ -140,8 +140,16 @@ class AdbDevice:
         """读取跨 USB/无线 transport 一致的设备身份。
 
         Android ID 通常对同一设备用户稳定，且不随 ADB 的连接地址变化；设备
-        未提供时再使用硬件序列属性。极少数设备两者都不可用时保留 transport
-        作为显式的不稳定回退，上层不得用它自动归并不同连接。
+        未提供时再使用硬件序列属性。
+
+        三者都不可用时再读内核 boot_id：它对本次开机的同一台设备恒定、不同
+        设备必然不同，因此足以把 USB 和无线两条 transport 归并为一个目标；
+        代价是重启后换值，于是重启前的目标行会留在列表里由用户自己断开。这
+        比让一台设备变成两个可执行目标要好得多——目标互斥是按 target_id 算
+        的，分裂之后同一台手机可以被两个任务同时操作。
+
+        连 boot_id 都读不到才保留 transport 作为显式的不稳定回退，上层不得
+        用它自动归并不同连接。
         """
         if self._identity is not None:
             return self._identity
@@ -150,6 +158,7 @@ class AdbDevice:
             ("android_id", ("settings", "get", "secure", "android_id")),
             ("ro.serialno", ("getprop", "ro.serialno")),
             ("ro.boot.serialno", ("getprop", "ro.boot.serialno")),
+            ("boot_id", ("cat", "/proc/sys/kernel/random/boot_id")),
         )
         for source, command in candidates:
             try:

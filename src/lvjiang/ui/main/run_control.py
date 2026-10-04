@@ -34,6 +34,8 @@ PLAN_CUSTOM_LABEL = tr("- 自定义 -")
 # automation_state_changed 的非常规状态。订阅方必须显式处理——
 # 它们的 else 分支都会把未知状态当成「就绪」。
 STATE_PLAN_UNSUPPORTED = "plan_unsupported"
+#: 目标空闲但并发门禁不允许再起一个任务（当前仅 Lv1 未激活会命中）
+STATE_START_DENIED = "start_denied"
 STATE_PAUSING = "pausing"
 STATE_STOPPING = "stopping"
 
@@ -1339,6 +1341,22 @@ class RunControlMixin:
 
         return callback
 
+    def _run_resume_event(self, run_context=None):
+        """返回某个运行实例自己的 ADB 恢复事件。
+
+        不能直接用主窗口的 `_adb_resume_event`：它只在被选中目标自带
+        resume_event 时才被覆盖，而窗口目标没有这个字段，于是切到窗口目标后
+        它仍然指向上一台设备。那时停止窗口任务或点「恢复」，会把那台设备上
+        正在等待重连的任务一起唤醒，让它继续去打已经死掉的连接。
+        """
+        context = run_context or getattr(self, "_current_run_context", None)
+        if context is not None:
+            # 窗口目标没有 ADB 等待，它的运行实例就该解析出 None。退回兼容
+            # 字段等于把「这个任务没有等待」错当成「用上一台设备的等待」。
+            snapshot = getattr(context, "target_snapshot", None)
+            return getattr(snapshot, "resume_event", None)
+        return getattr(self, "_adb_resume_event", None)
+
     def _request_stop(self, *, stop_confirmed: bool = False):
         """统一停止入口：立即进入结束中，再等工作线程收尾。"""
         # 暂停中点结束先二次确认：暂停/结束热键位置接近，容易手误
@@ -1378,7 +1396,7 @@ class RunControlMixin:
         if helper is not None:
             helper.close_active_dialog()
         # 若工作流正阻塞在 ADB 断连等待上，唤醒以便响应停止
-        resume_event = getattr(self, '_adb_resume_event', None)
+        resume_event = self._run_resume_event(run_context)
         if resume_event is not None:
             resume_event.set()
         banner = getattr(self, '_adb_banner', None)
@@ -1588,11 +1606,11 @@ class RunControlMixin:
 
     def _resume_adb(self):
         """用户点击「恢复」：唤醒工作流线程，重试失败的 ADB 命令"""
-        # 直接用主窗口级别的 resume_event，不依赖 device 对象
-        resume_event = getattr(self, '_adb_resume_event', None)
+        # 横幅只为当前查看目标显示，因此唤醒的也必须是该目标的运行实例
+        run_context = getattr(self, "_current_run_context", None)
+        resume_event = self._run_resume_event(run_context)
         if resume_event is not None:
             resume_event.set()
-            run_context = getattr(self, "_current_run_context", None)
             if run_context is not None:
                 from .execution_runs import RunState
                 next_state = (
@@ -2016,6 +2034,58 @@ class RunControlMixin:
         )
         self._set_context_controls_locked(LOCK_REASON_BATCH, batch_locked)
 
+    def _describe_running_user(self, username: str) -> str:
+        """返回占用该用户的运行实例描述；没有占用返回空串。
+
+        供批量等工作线程把「用户锁冲突」补成具体的目标和运行 ID。只读
+        RunManager（内部自带锁），不碰任何控件。
+        """
+        manager = getattr(self, "_run_manager", None)
+        if manager is None or not username:
+            return ""
+        for run in manager.all_runs():
+            if run.username == username:
+                return tr("占用目标 {target}，运行 {run_id}").format(
+                    target=run.target_snapshot.display_name,
+                    run_id=run.task_run_id[:8])
+        return ""
+
+    def _start_denial(self):
+        """返回当前选中目标被并发门禁拒绝的理由；允许启动时返回 None。
+
+        判定只能来自 RunManager（能力真源），UI 不另算一套布尔条件。这里传空
+        用户名：用户执行锁属于「点下去才知道」的即时冲突，而目标占用和 Lv1
+        是用户按下按钮前就该看到的状态。
+        """
+        manager = getattr(self, "_run_manager", None)
+        registry = getattr(self, "_execution_targets", None)
+        target_id = registry.active_target_id if registry is not None else None
+        if manager is None or not target_id:
+            return None
+        decision = manager.can_start(target_id=target_id, username="")
+        return None if decision.allowed else decision
+
+    def start_denied_label(self) -> str:
+        """并发门禁拒绝时运行按钮应显示的文字；允许启动时返回空串。
+
+        插件页面的运行按钮也订阅同一个状态，文案只在这里定义一次。
+        """
+        denial = self._start_denial()
+        if denial is None:
+            return ""
+        from .execution_runs import StartDenial
+        return (tr("需激活 Lv1")
+                if denial.denial_code == StartDenial.LV1_REQUIRED
+                else tr("已有任务运行"))
+
+    def _notify_start_denied(self) -> None:
+        """左下角状态栏 + 运行日志说明为什么开始执行是灰的。"""
+        decision = self._start_denial()
+        if decision is None:
+            return
+        self.log_text.append(f"[{tr('拒绝')}] {decision.reason}")
+        self.statusBar().showMessage(decision.reason)
+
     def _refresh_run_button(self):
         """根据运行状态和定位状态刷新运行按钮，并广播状态给插件页面。"""
         run_state = getattr(self, '_run_state', 'idle')
@@ -2044,6 +2114,13 @@ class RunControlMixin:
             state = STATE_PLAN_UNSUPPORTED
             self.btn_run_workflow.setEnabled(True)
             self.btn_run_workflow.setText(tr("方案不支持"))
+            apply_execution_button_style(self.btn_run_workflow, "disabled")
+        elif denied_label := self.start_denied_label():
+            # 同「方案不支持」：只置灰不 setEnabled(False)，点击后在左下角
+            # 说明原因，而不是让用户对着绿色按钮点完才知道要激活 Lv1。
+            state = STATE_START_DENIED
+            self.btn_run_workflow.setEnabled(True)
+            self.btn_run_workflow.setText(denied_label)
             apply_execution_button_style(self.btn_run_workflow, "disabled")
         else:
             state = "idle"
@@ -2105,6 +2182,9 @@ class RunControlMixin:
         # F9 与托盘「开始」都走这里；不拦这一层，灰按钮就形同虚设。
         if not self._plan_allows_backend():
             self._notify_plan_unsupported()
+            return
+        if self._start_denial() is not None:
+            self._notify_start_denied()
             return
         tabs = self._left_tabs
         widget = tabs.currentWidget() if tabs is not None else None

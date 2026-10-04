@@ -51,6 +51,8 @@ class _EntryRecord:
     username: str
     status: str = ""
     prepare_status: str = ""
+    #: 条目未执行的具体原因（如用户锁被哪个目标的运行实例占用）
+    skip_reason: str = ""
     finish_status: str = ""
     error: str = ""
     scripts: list[_ScriptRecord] = field(default_factory=list)
@@ -123,6 +125,15 @@ class BatchReport:
     def record_prepare(self, status: str) -> None:
         if self._current_entry:
             self._current_entry.prepare_status = status
+
+    def record_skip_reason(self, message: str) -> None:
+        """记录条目被跳过的具体原因。
+
+        报告只写 `跳过` 的话，用户事后无法分辨是自己没勾、是用户锁被另一个
+        目标的任务占着，还是条目准备失败。
+        """
+        if self._current_entry:
+            self._current_entry.skip_reason = message
 
     def record_finish(self, status: str) -> None:
         if self._current_entry:
@@ -219,6 +230,8 @@ class BatchReport:
 
             if entry.prepare_status:
                 lines.append(f"- 条目准备：{entry.prepare_status}")
+            if entry.skip_reason:
+                lines.append(f"- 跳过原因：{entry.skip_reason}")
             if entry.finish_status:
                 lines.append(f"- 条目收尾：{entry.finish_status}")
             if entry.error:

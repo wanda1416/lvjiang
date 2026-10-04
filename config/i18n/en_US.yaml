@@ -361,6 +361,8 @@ run_control:
   label_not_connected: Not Connected
   label_not_located: Not Located
 window_ops:
+  目标大小: Target Size
+  连接信息: Connection Details
   no_window_found: No window found
   window_located: Window located
   window_closed: Window closed

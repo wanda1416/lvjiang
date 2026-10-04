@@ -361,6 +361,8 @@ run_control:
   label_not_connected: 未连接
   label_not_located: 未定位
 window_ops:
+  目标大小: 目标大小
+  连接信息: 连接信息
   no_window_found: 未找到窗口
   window_located: 已定位窗口
   window_closed: 窗口已关闭

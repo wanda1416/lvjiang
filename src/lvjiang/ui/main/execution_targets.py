@@ -10,6 +10,8 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from ...i18n import tr
+
 TargetKind = Literal["windows", "adb"]
 WINDOW_TARGET_ID = "window"
 
@@ -18,6 +20,20 @@ def android_target_id(device_identity: str) -> str:
     """从逻辑设备身份生成不暴露原始设备标识的稳定目标 ID。"""
     digest = hashlib.sha256(str(device_identity).encode("utf-8")).hexdigest()
     return f"android:{digest[:24]}"
+
+
+def window_target_label(window: dict[str, Any] | None) -> str:
+    """窗口目标的默认名称：`HWND_<十六进制>`。
+
+    不用窗口标题：标题在运行期会变（加载态、角色名、多开编号都会改它），而名称
+    要能跨一次运行保持同一个含义，还会被原样写进任务历史快照。hwnd 才是 Windows
+    层面的唯一 ID，和 Android 的 serial 同一个性质。
+
+    带 `HWND_` 前缀并补齐到 6 位：裸句柄可能只有三四位数字，摆在目标列表里看不出
+    是什么；补齐之后宽度稳定，也和 Win32 工具里的十六进制句柄能直接对照。
+    """
+    hwnd = (window or {}).get("hwnd")
+    return f"HWND_{int(hwnd):06X}" if hwnd else tr("游戏窗口")
 
 
 @dataclass

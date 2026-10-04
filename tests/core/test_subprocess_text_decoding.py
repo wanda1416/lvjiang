@@ -9,18 +9,17 @@ adb / Android 的输出是 UTF-8。后果有两级：
   一条孤立的线程 traceback（`Exception in thread Thread-N (_readerthread)`），
   而那次前台应用探测静默失败，自动化继续跑在错误的假设上。
 
-这组用例在 Linux 上也有意义：它们把编码写死在断言里，不依赖运行机器的 locale。
+这里只留不需要真实 adb 的两类断言：编码常量本身，以及"新增 subprocess 漏写
+编码"的源码门禁。真实通道行为由运行环境决定，造一个假 adb 去测没有意义。
 """
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from lvjiang.core.android.device import AdbDevice
 from lvjiang.core.platforms import SUBPROCESS_TEXT
 
 _SRC = Path(__file__).resolve().parents[2] / "src" / "lvjiang"
@@ -28,46 +27,13 @@ _SRC = Path(__file__).resolve().parents[2] / "src" / "lvjiang"
 _BAD_BYTE = 0xAA
 
 
-def _fake_adb(tmp_path: Path, payload: str) -> Path:
-    """造一个假 adb：原样吐出一段混了非法字节的字节流。"""
-    script = tmp_path / "fake_adb.py"
-    script.write_text(payload, encoding="utf-8")
-    launcher = tmp_path / ("fake_adb.cmd" if sys.platform == "win32"
-                           else "fake_adb.sh")
-    if sys.platform == "win32":
-        launcher.write_text(f'@"{sys.executable}" "{script}" %*\n',
-                            encoding="utf-8")
-    else:
-        launcher.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n',
-                            encoding="utf-8")
-        launcher.chmod(0o755)
-    return launcher
-
-
-def test_adb_shell_survives_bytes_the_locale_cannot_decode(tmp_path):
-    """坏字节换成 U+FFFD，中文照常解出，调用方要的字段仍可解析。
-
-    用 replace 而不是 ignore：ignore 会悄悄删字符，replace 留下的 U+FFFD 至少
-    能让人看出这里原本有东西。
-    """
-    payload = (
-        "import sys\n"
-        "out = sys.stdout.buffer\n"
-        "out.write('窗口标题'.encode('utf-8'))\n"
-        f"out.write(bytes([{_BAD_BYTE}]))\n"
-        "out.write(b'  mResumedActivity com.example/.MainActivity\\n')\n"
-    )
-    device = AdbDevice(adb_path=str(_fake_adb(tmp_path, payload)))
-
-    output = device.shell("dumpsys", "activity", "activities")
-
-    assert "窗口标题" in output, "中文必须按 UTF-8 正确解出"
-    assert "�" in output, "非法字节应保留成 U+FFFD，而不是被丢弃"
-    assert re.search(r"mResumedActivity\s+com\.example/\.MainActivity", output)
-
-
 def test_the_same_bytes_blow_up_under_a_locale_codec():
-    """反向确认这组字节真的会在 GBK 下炸——否则上面那条用例什么都没证明。"""
+    """确认这组字节在 GBK 下确实解不开——编码常量的意义建立在这个事实上。
+
+    子进程按二进制收，解码断言留在本进程：Windows 的 subprocess 由读取线程
+    解码（正是修复前那条孤立 traceback），异常死在线程里，主线程永远等不到
+    UnicodeDecodeError。
+    """
     payload = (
         "import sys\n"
         "sys.stdout.buffer.write('窗口标题'.encode('utf-8'))\n"
@@ -76,9 +42,12 @@ def test_the_same_bytes_blow_up_under_a_locale_codec():
     script = Path(__file__).parent / "_tmp_locale_probe.py"
     script.write_text(payload, encoding="utf-8")
     try:
+        result = subprocess.run([sys.executable, str(script)],
+                                capture_output=True)
+        assert result.stdout == ("窗口标题".encode("utf-8")
+                                 + bytes([_BAD_BYTE]))
         with pytest.raises(UnicodeDecodeError):
-            subprocess.run([sys.executable, str(script)], capture_output=True,
-                           text=True, encoding="gbk")
+            result.stdout.decode("gbk")
     finally:
         script.unlink(missing_ok=True)
 

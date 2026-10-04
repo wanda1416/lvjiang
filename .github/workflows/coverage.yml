@@ -32,6 +32,8 @@ jobs:
 
       # pytest-cov 会自行合并各 worker 的覆盖数据。
       - name: Run tests with coverage
+        # 覆盖率让整套测试贵 2.36 倍，正常也要二十分钟量级；闸门只拦挂死。
+        timeout-minutes: 60
         run: >-
           python -m pytest tests
           -n auto

@@ -30,8 +30,12 @@ class RunLogEvent:
         return cls(level, text, task_run_id, target_id, target_label)
 
     def display_text(self) -> str:
-        """返回实时合流视图使用的带目标标识文本。"""
+        """返回实时合流视图使用的带目标标识文本。
+
+        运行 ID 用 ` - ` 而不是 ` · ` 接在后面：` · ` 是目标名称内部的分隔符
+        （型号 · 连接地址），两级用同一个符号就看不出哪一段才是任务。
+        """
         if not self.task_run_id:
             return self.text
         target = self.target_label or self.target_id or "—"
-        return f"[{target} · {self.task_run_id[:8]}] {self.text}"
+        return f"[{target} - {self.task_run_id[:8]}] {self.text}"

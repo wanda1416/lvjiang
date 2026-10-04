@@ -64,6 +64,11 @@ class TrayOpsMixin:
     # 类级兜底：系统不支持托盘（如无 X 环境）时 _build_tray_icon 提前返回，
     # 其他方法仍可能被调用到，靠这个默认值避免 AttributeError。
     _tray_icon = None
+    # 托盘只有一个物理实例：图标取全局聚合状态，菜单和文案取当前查看目标。
+    # 两路信号各自记下自己的输入，再由 _apply_tray_state 统一渲染，否则后到
+    # 的那条会把另一条刚写好的 tooltip 整条覆盖掉。
+    _tray_state = "idle"
+    _tray_run_count = 0
 
     def _build_tray_icon(self):
         self._tray_hint_shown = False
@@ -114,28 +119,70 @@ class TrayOpsMixin:
 
     def _refresh_tray_icon(self, state: str):
         """随 automation_state_changed 广播刷新托盘图标/菜单可用性。"""
+        self._tray_state = state
+        self._apply_tray_state()
+
+    def _refresh_tray_concurrency(self, count: int) -> None:
+        self._tray_run_count = count
+        self._apply_tray_state()
+
+    def _aggregate_tray_state(self, current: str) -> str:
+        """图标状态取全局最严重的运行态，而不是当前查看目标的状态。
+
+        托盘图标是整个程序唯一的那一个。设备 A 在跑、UI 停在空闲的窗口目标上
+        时，若图标跟着当前目标显示绿色空闲，用户会以为没有任务在执行。
+        """
+        manager = getattr(self, "_run_manager", None)
+        summary = manager.summary_state() if manager is not None else None
+        return str(summary.value) if summary is not None else current
+
+    def _tray_icon_state(self, current: str) -> str:
+        """把全局聚合状态映射成三种图标之一。
+
+        启动中和等待重连都算「有任务在跑」：它们的线程活着、目标被占用，图标
+        显示空闲会让用户以为可以直接关程序。
+        """
+        from .run_control import STATE_PAUSING, STATE_STOPPING
+        aggregate = self._aggregate_tray_state(current)
+        if aggregate in ("starting", "waiting_target"):
+            return "running"
+        return aggregate if aggregate in (
+            "running", STATE_PAUSING, "paused", STATE_STOPPING) else "idle"
+
+    def _apply_tray_state(self) -> None:
         if self._tray_icon is None:
             return
         from .run_control import (
             STATE_PAUSING,
             STATE_PLAN_UNSUPPORTED,
+            STATE_START_DENIED,
             STATE_STOPPING,
         )
+        state = self._tray_state
         active_states = ("running", STATE_PAUSING, "paused", STATE_STOPPING)
-        icon_state = state if state in active_states else "idle"
-        self._tray_icon.setIcon(_make_tray_icon(icon_state))
+        self._tray_icon.setIcon(_make_tray_icon(self._tray_icon_state(state)))
         status_text = {
             "running": tr("运行中"),
             STATE_PAUSING: tr("暂停中"),
             "paused": tr("已暂停"),
             STATE_STOPPING: tr("结束中"),
+            "waiting_target": tr("等待重连"),
             "not_ready": tr("未就绪"),
             STATE_PLAN_UNSUPPORTED: tr("方案不支持"),
+            STATE_START_DENIED: tr("不能启动"),
         }.get(state, tr("空闲"))
-        self._tray_icon.setToolTip(f"{self.windowTitle()} - {status_text}")
-        # 方案不支持时托盘的「开始」也得灰掉，否则等于给灰按钮开了后门。
+        # 当前目标的文案 + 其余任务的数量：两者都要，缺一个就看不出“这台在跑”
+        # 还是“别的在跑”。
+        others = max(0, self._tray_run_count - (1 if state in active_states else 0))
+        tooltip = f"{self.windowTitle()} - {status_text}"
+        if others > 0:
+            tooltip += " | " + tr("另有 {count} 个任务运行").format(count=others)
+        self._tray_icon.setToolTip(tooltip)
+        # 方案不支持、并发门禁拒绝时托盘的「开始」也得灰掉，否则等于给灰按钮
+        # 开了后门。菜单只控制当前查看目标，因此判据是 state 而不是聚合值。
         self._tray_action_start.setEnabled(
-            state not in active_states and state != STATE_PLAN_UNSUPPORTED)
+            state not in active_states
+            and state not in (STATE_PLAN_UNSUPPORTED, STATE_START_DENIED))
         self._tray_action_pause.setEnabled(state in ("running", "paused"))
         if state == STATE_PAUSING:
             self._tray_action_pause.setText(tr("暂停中"))
@@ -146,11 +193,3 @@ class TrayOpsMixin:
             tr("结束中") if state == STATE_STOPPING else tr("结束当前目标"))
         self._tray_action_stop.setEnabled(
             state in ("running", STATE_PAUSING, "paused"))
-
-    def _refresh_tray_concurrency(self, count: int) -> None:
-        if self._tray_icon is None:
-            return
-        tooltip = self.windowTitle()
-        if count > 0:
-            tooltip += " - " + tr("{count} 个任务运行中").format(count=count)
-        self._tray_icon.setToolTip(tooltip)

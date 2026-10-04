@@ -78,6 +78,8 @@ def test_switching_stream_backend_saves_recording_before_old_stream_stops(
         _running=False,
         _target_has_active_run=lambda _target_id: False,
         _screen_recorder=object(),
+        # 录制来源是这台设备，所以换绑它的截图后端必须先把录制转正
+        _record_target_id=target_id,
         _abort_screen_record=lambda reason: events.append(f"save:{reason}"),
         _sync_active_target_compat=lambda: events.append("sync"),
         _capture_preview=lambda: events.append("preview"),
@@ -86,6 +88,13 @@ def test_switching_stream_backend_saves_recording_before_old_stream_stops(
         log_text=SimpleNamespace(append=lambda _message: None),
     )
 
+    # 这两个守卫是真实实现：录制来源判定和 TargetHandle 换绑都要进入本用例
+    host._abort_recording_for_target = (
+        lambda tid, reason: WindowOpsMixin._abort_recording_for_target(
+            host, tid, reason))
+    host._rebind_target_resources = (
+        lambda bound: WindowOpsMixin._rebind_target_resources(host, bound))
+
     WindowOpsMixin._set_android_target_streaming(host, target_id, False)
 
     assert events.index("save:切换截图方式") < events.index("stop:old")
@@ -93,3 +102,5 @@ def test_switching_stream_backend_saves_recording_before_old_stream_stops(
     assert target.capture_method == "screencap"
     assert target.streaming is False
     assert "refresh" in events
+    # 换绑同步到 handle，否则下一次启动会把已 stop 的旧流喂给引擎
+    assert target.handle.binding().capture is new_capture

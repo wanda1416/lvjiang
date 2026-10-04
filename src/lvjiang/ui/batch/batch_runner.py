@@ -156,6 +156,9 @@ class BatchContext:
     ui_callback: Callable[..., object] | None = None
     # 条目准备重启客户端后，宿主据此把定位状态跟到新窗口。
     window_rebind_hook: Callable[[dict], None] | None = None
+    # 用户锁冲突时，宿主据此说明是哪个目标的哪个运行实例占着这个用户。
+    # 用户锁本身是进程级的，不知道目标，所以必须由持有 RunManager 的宿主回答。
+    user_conflict_describer: Callable[[str], str] | None = None
 
 
 @dataclass(frozen=True)
@@ -458,9 +461,11 @@ class BatchWorker(QThread):
                     self._execution_lease = acquire_user(
                         username, self._session_manager._users_dir)
                 except AccessDeniedError as exc:
+                    reason = self._describe_user_conflict(username, exc)
                     entry_result = {
                         "prepare": ST_SKIPPED,
                         "finish": ST_SKIPPED,
+                        "skip_reason": reason,
                         "scripts": {
                             script.id: ST_SKIPPED for script in self._scripts
                         },
@@ -468,11 +473,12 @@ class BatchWorker(QThread):
                     summary["entries"][label] = entry_result
                     report.start_entry(label, username)
                     report.record_prepare(ST_SKIPPED)
+                    report.record_skip_reason(reason)
                     report.end_entry()
                     for script in self._scripts:
                         self.progress.emit(
                             run_idx, label, script.id, ST_SKIPPED)
-                    self.log.emit(f"[批量] {label} 跳过: {exc}")
+                    self.log.emit(f"[批量] {label} 跳过: {reason}")
                     continue
                 self._user_scope.enter_context(self._execution_lease.authorized())
             self.log.emit(f"[批量] ── [{visit_index + 1}/{total}] {label} ──")
@@ -1033,9 +1039,12 @@ class BatchWorker(QThread):
                     if counts[unit] >= self._spec.rounds:
                         done.add(unit)
             except AccessDeniedError as exc:
-                self.log.emit(f"[批量] {unit} 暂不可执行: {exc}")
+                reason = self._describe_user_conflict(entry.get("username", ""), exc)
+                self.log.emit(f"[批量] {unit} 暂不可执行: {reason}")
                 entry["prepare"] = ST_SKIPPED
+                entry["skip_reason"] = reason
                 report.record_prepare(ST_SKIPPED)
+                report.record_skip_reason(reason)
                 deferrals[unit] += 1
                 next_ready[unit] = time.monotonic() + 60
                 if deferrals[unit] >= 30:
@@ -1186,6 +1195,23 @@ class BatchWorker(QThread):
             ST_PENDING: "pending",
             ST_RUNNING: "running",
         }.get(status, RESULT_FAILED)
+
+    def _describe_user_conflict(self, username: str, exc: Exception) -> str:
+        """把用户锁冲突补成「哪个用户 · 哪个目标 · 哪个运行实例」。
+
+        用户锁是进程级的，本身不知道目标，所以具体占用情况必须问宿主的
+        RunManager。拿不到时退回异常原文，绝不编一个目标名出来。
+        """
+        detail = str(exc)
+        describer = self._ctx.user_conflict_describer
+        if describer is None or not username:
+            return detail
+        try:
+            extra = describer(username)
+        except Exception as describe_exc:  # noqa: BLE001
+            logger.debug(f"查询用户锁占用情况失败: {describe_exc}")
+            return detail
+        return f"{detail}（{extra}）" if extra else detail
 
     @staticmethod
     def _stage_message(label: str, result: BatchStageResult) -> str:

@@ -554,21 +554,18 @@ class MainWindow(
 
         self.execution_target_list = QTreeWidget()
         self.execution_target_list.setHeaderLabels(
-            [tr("目标"), tr("连接/任务"), tr("连接信息"), tr("状态信息"), ""])
+            [tr("目标"), tr("状态"), tr("目标大小"), tr("连接信息"), ""])
         self.execution_target_list.setRootIsDecorated(False)
         self.execution_target_list.setMaximumHeight(104)
         self.execution_target_list.setMinimumHeight(96)
         target_header = self.execution_target_list.header()
         target_header.setStretchLastSection(False)
-        target_header.setSectionResizeMode(
-            0, QHeaderView.ResizeMode.ResizeToContents)
-        target_header.setSectionResizeMode(
-            1, QHeaderView.ResizeMode.ResizeToContents)
-        target_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        target_header.setSectionResizeMode(
-            3, QHeaderView.ResizeMode.ResizeToContents)
+        for column in range(4):
+            target_header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
         target_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        self.execution_target_list.setColumnWidth(4, 28)
+        self.execution_target_list.setColumnWidth(
+            4, self.execution_target_list.fontMetrics().horizontalAdvance("×") + 32)
+        target_header.geometriesChanged.connect(self._resize_execution_target_columns)
         self.execution_target_list.currentItemChanged.connect(
             self._on_execution_target_selected)
         self.execution_target_list.itemClicked.connect(
@@ -1182,6 +1179,7 @@ class MainWindow(
             pause_event=getattr(self, '_pause_event', None),
             ui_callback=self._create_ui_callback(run_context),
             window_rebind_hook=rebind_batch_window,
+            user_conflict_describer=self._describe_running_user,
         )
 
         worker = BatchWorker(

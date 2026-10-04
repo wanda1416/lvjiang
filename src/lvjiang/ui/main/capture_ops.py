@@ -70,6 +70,9 @@ class CaptureOpsMixin:
     _screen_recorder = None
     _rec_state = "idle"
     _rec_timer = None
+    #: 录制来源在开始录制时冻结。录屏属于观察面，但帧来自某一个具体目标，
+    #: 切换观察目标不能让视频中途换成另一台设备的画面。
+    _record_target_id = None
 
     # ─── 面板构建 ─────────────────────────────────────────
 
@@ -240,6 +243,8 @@ class CaptureOpsMixin:
             self.log_text.append(tr("[录屏] 启动失败（详见日志）"))
             return
         self._screen_recorder = recorder
+        self._record_target_id = getattr(
+            getattr(self, "_execution_targets", None), "active_target_id", None)
         self._rec_state = "recording"
         self._rec_timer.start()
         self.log_text.append(f"[录屏] 开始录制 → {path.name}")
@@ -284,6 +289,7 @@ class CaptureOpsMixin:
         else:
             self.log_text.append(tr("[录屏] 保存失败（详见日志）"))
         self._screen_recorder = None
+        self._record_target_id = None
         self._rec_state = "idle"
         self._rec_timer.stop()
         self._apply_rec_state()
@@ -295,6 +301,7 @@ class CaptureOpsMixin:
         rec.discard()
         self.log_text.append(tr("[录屏] 已放弃本次录制，文件已删除"))
         self._screen_recorder = None
+        self._record_target_id = None
         self._rec_state = "idle"
         self._rec_timer.stop()
         self._apply_rec_state()
@@ -306,6 +313,7 @@ class CaptureOpsMixin:
             return
         final = rec.finalize()  # 内部先 stop() 再转正
         self._screen_recorder = None
+        self._record_target_id = None
         self._rec_state = "idle"
         if self._rec_timer is not None:
             self._rec_timer.stop()

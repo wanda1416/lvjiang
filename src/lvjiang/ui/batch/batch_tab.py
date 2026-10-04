@@ -69,6 +69,7 @@ from ..button_styles import (
 from ..main.run_control import (
     STATE_PAUSING,
     STATE_PLAN_UNSUPPORTED,
+    STATE_START_DENIED,
     STATE_STOPPING,
 )
 from ..theme import get_theme_manager
@@ -1593,8 +1594,12 @@ class BatchTab(QWidget):
             self._btn_run.setText(tr("未连接"))
             self._btn_run.setEnabled(True)
             apply_execution_button_style(self._btn_run, "not_ready")
-        elif state == STATE_PLAN_UNSUPPORTED:
-            self._btn_run.setText(tr("方案不支持"))
+        elif state in (STATE_PLAN_UNSUPPORTED, STATE_START_DENIED):
+            # 不能落进下面的 else：并发门禁拒绝时这里也必须是灰的，否则绿色
+            # 按钮点下去才报「需要激活 Lv1」。
+            self._btn_run.setText(
+                tr("方案不支持") if state == STATE_PLAN_UNSUPPORTED
+                else self._host.start_denied_label() or tr("不能启动"))
             self._btn_run.setEnabled(True)
             apply_execution_button_style(self._btn_run, "disabled")
         else:

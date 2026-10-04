@@ -29,6 +29,9 @@ class _Overlay:
 
 
 class _Host(WindowOpsMixin, QWidget):
+    def _restore_active_target_view(self):
+        self._sync_active_target_compat()
+
     def __init__(self):
         super().__init__()
         self._backend = "windows"

@@ -293,8 +293,9 @@ class WindowOpsMixin:
     def _sync_active_target_compat(self) -> None:
         """把当前执行目标投影到既有单目标字段。
 
-        大量场景、采集和工作流入口仍通过这些字段访问后端；投影只发生在空闲期的
-        显式目标切换，运行中目标列表被锁定，因此不会让正在执行的引擎改道。
+        大量场景、采集和工作流入口仍通过这些字段访问后端。目标列表在运行中
+        同样可以切换（运行实例持有自己的冻结快照），因此这些字段只代表“当前
+        查看的目标”，运行线程一律不得读取，否则切换观察目标就会让引擎改道。
         """
         target = self._active_execution_target()
         if target is None:
@@ -317,8 +318,9 @@ class WindowOpsMixin:
         self._agent = target.agent
         self._scrcpy_streaming = target.streaming
         self._last_capture = target.last_capture
-        if target.resume_event is not None:
-            self._adb_resume_event = target.resume_event
+        # 无条件覆盖：窗口目标没有 resume_event，若这里跳过赋值，字段会继续
+        # 指向上一台设备，停止窗口任务时就会误唤醒那台设备等待重连的任务。
+        self._adb_resume_event = target.resume_event
         from ...core.app_controller import set_active_connected_target
         set_active_connected_target(target.id)
 
@@ -337,19 +339,17 @@ class WindowOpsMixin:
         target.last_capture = self._last_capture
 
     @staticmethod
-    def _target_connection_details(target) -> str:
+    def _target_size_details(target) -> str:
         if target.kind == "adb":
-            size = f"{target.width}×{target.height}" \
+            # serial 已经是名称列的内容，不在相邻一列再重复一遍
+            return f"{target.width}×{target.height}" \
                 if target.width and target.height else ""
-            return " · ".join(part for part in (target.serial, size) if part)
         window = target.window or {}
-        size = f"{window.get('width', 0)}×{window.get('height', 0)}"
-        origin = f"({window.get('left', 0)}, {window.get('top', 0)})"
-        return tr("起点 {origin} · {size}").format(origin=origin, size=size)
+        return f"{window.get('width', 0)}×{window.get('height', 0)}"
 
     @staticmethod
-    def _target_status_details(target) -> str:
-        """状态信息列：固定「输入方式 · 截图方式」，每段四个汉字。
+    def _target_connection_details(target) -> str:
+        """连接信息列：固定「输入方式 · 截图方式」，每段四个汉字。
 
         顺序与连接选项的两个复选框槽位一致（槽 1 怎么操作、槽 2 怎么取画面），
         两处可以直接对读。原来 ADB 分支是「截图 · 执行」的反序，而且把
@@ -377,8 +377,8 @@ class WindowOpsMixin:
     def _target_details(self, target) -> str:
         """日志使用的完整摘要；UI 分列展示连接与状态。"""
         return " · ".join(part for part in (
+            self._target_size_details(target),
             self._target_connection_details(target),
-            self._target_status_details(target),
         ) if part)
 
     def _refresh_execution_targets_ui(self) -> None:
@@ -405,11 +405,17 @@ class WindowOpsMixin:
             item = QTreeWidgetItem([
                 target.display_name,
                 state_text,
+                self._target_size_details(target),
                 self._target_connection_details(target),
-                self._target_status_details(target),
                 "×",
             ])
             item.setData(0, Qt.ItemDataRole.UserRole, target.id)
+            if self._identity_unconfirmed(target):
+                # 连接信息列的格式由「四个汉字 · 四个汉字」固定，这类少见的
+                # 身份问题放 tooltip，不挤占那两段。
+                item.setToolTip(0, tr(
+                    "设备标识未确认：只能按当前连接地址区分，重启或换用另一种"
+                    "连接方式后会被视为新目标"))
             item.setTextAlignment(4, Qt.AlignmentFlag.AlignCenter)
             item.setToolTip(
                 4, tr("断开定位") if target.kind == "windows"
@@ -419,9 +425,29 @@ class WindowOpsMixin:
                 selected_item = item
         if selected_item is not None:
             tree.setCurrentItem(selected_item)
-        tree.resizeColumnToContents(0)
-        tree.resizeColumnToContents(1)
+        self._resize_execution_target_columns()
         tree.blockSignals(False)
+
+    def _resize_execution_target_columns(self) -> None:
+        """四个信息列均分剩余空间；文本放不下时滚动，操作列保持独立留白。"""
+        if getattr(self, "_target_columns_resizing", False):
+            return
+        self._target_columns_resizing = True
+        try:
+            tree = self.execution_target_list
+            metrics = tree.fontMetrics()
+            content_width = max(
+                [metrics.horizontalAdvance(tree.headerItem().text(column))
+                 for column in range(4)] +
+                [metrics.horizontalAdvance(tree.topLevelItem(row).text(column))
+                 for row in range(tree.topLevelItemCount()) for column in range(4)])
+            action_width = metrics.horizontalAdvance("×") + 32
+            width = max(content_width + 24, (tree.viewport().width() - action_width) // 4)
+            for column, desired in enumerate([width] * 4 + [action_width]):
+                if tree.columnWidth(column) != desired:
+                    tree.setColumnWidth(column, desired)
+        finally:
+            self._target_columns_resizing = False
 
     @staticmethod
     def _execution_target_id_from_item(item) -> str:
@@ -517,19 +543,24 @@ class WindowOpsMixin:
         if not target_id or target_id == self._execution_targets.active_target_id:
             return
         self._capture_launch_draft(self._execution_targets.active_target_id)
-        recorder = getattr(self, "_screen_recorder", None)
-        abort_recording = getattr(self, "_abort_screen_record", None)
-        if recorder is not None and callable(abort_recording):
-            abort_recording(tr("切换执行目标"))
+        # 这里不中断录制：录制来源已在开始时冻结，切换观察目标只改预览。
         # 用 select 的返回值，而不是回头再查一次 active()：后者的返回类型是
         # 可空的，加守卫等于承认这里可能是 None，而实际上不可能。
         target = self._execution_targets.select(str(target_id))
-        self._project_run_context_for_target(target.id)
-        run_context = self._run_manager.run_for_target(target.id)
+        self._restore_active_target_view()
+        self.log_text.append(
+            tr("[执行目标] 已切换到 {name}").format(name=target.display_name))
+
+    def _restore_active_target_view(self) -> None:
+        """手动选中和删除后的自动选中共用完整投影，不依赖列表选择信号。"""
+        target_id = self._execution_targets.active_target_id
+        self._project_run_context_for_target(target_id)
+        run_context = self._run_manager.run_for_target(target_id) if target_id else None
         frozen_draft = (
             run_context.metadata.get("launch_draft")
             if run_context is not None else None)
-        self._restore_launch_draft(target.id, frozen_draft)
+        if target_id:
+            self._restore_launch_draft(target_id, frozen_draft)
         batch_tab = getattr(self, "_batch_tab", None)
         if batch_tab is not None:
             batch_tab.show_run(
@@ -542,8 +573,6 @@ class WindowOpsMixin:
         redraw_logs = getattr(self, "_redraw_log_events", None)
         if callable(redraw_logs):
             redraw_logs()
-        self.log_text.append(
-            tr("[执行目标] 已切换到 {name}").format(name=target.display_name))
 
     def _refresh_active_target_ui(self) -> None:
         target = self._active_execution_target()
@@ -982,6 +1011,22 @@ class WindowOpsMixin:
             device=device, input_sim=self._user_config.input_sim, agent=agent)
         identity = device.get_stable_identity()
         target_id = android_target_id(identity.value)
+        conflict = self._unconfirmed_identity_conflict(target_id, identity.stable)
+        if conflict is not None:
+            # 读不到任何稳定标识时，无法判断这条 transport 是不是已连目标的
+            # 另一条通道。放行就可能让同一台设备变成两个可执行目标，两个任务
+            # 各自以为独占它；自动归并又可能把两台设备错当成一台。两者都不能
+            # 猜，所以拦在前台应用探测、历史登记这些副作用之前。
+            self._release_rejected_connection(capture, agent)
+            self.log_text.append(tr(
+                "[拒绝] 无法读取 {serial} 的稳定设备标识，它可能与已连接的"
+                "「{name}」是同一台设备。请先断开该目标再连接。"
+            ).format(serial=combo_data["serial"], name=conflict.display_name))
+            self.statusBar().showMessage(tr("设备标识未确认，已拒绝连接"))
+            if update_candidate_ui:
+                self.btn_locate.setText(tr("连接"))
+                self._set_locate_enabled(True)
+            return
         existing_target = self._execution_targets.get(target_id)
         generation = (
             existing_target.handle.binding().generation + 1
@@ -1027,13 +1072,13 @@ class WindowOpsMixin:
             (run := self._run_manager.run_for_target(tid))
             and run.stop_event.is_set())
 
-        model = str(combo_data.get("model") or "").strip()
-        short_id = target_id.rsplit(":", 1)[-1][:6]
-        display_name = f"{model or tr('设备')} · {short_id}"
+        # 名字就是 serial：它唯一、用户能对上（哪根线、哪个 IP），同型号两台设备
+        # 也由它分开。不用 target_id 的哈希前缀——那是主键的一截，对用户零信息量；
+        # 也不再拼型号——serial 已经把设备认出来了，型号只是重复一遍。
         target = ExecutionTarget(
             id=target_id,
             kind="adb",
-            display_name=display_name,
+            display_name=str(combo_data["serial"]),
             capture=capture,
             input_ctrl=input_ctrl,
             input_kind=str(getattr(input_ctrl, "kind", "") or ""),
@@ -1077,6 +1122,12 @@ class WindowOpsMixin:
             (tr("端侧执行") if agent is not None else tr("指令执行"))
             + "  |  " + method_label)
         self.log_text.append(f"[连接成功] {combo_data['serial']} ({w}x{h}) [{method_label}]")
+        if not identity.stable:
+            logger.warning(
+                f"[连接] {combo_data['serial']} 读不到稳定设备标识，"
+                f"目标身份退化为连接地址")
+            self.log_text.append(tr(
+                "[警告] 该设备未提供稳定标识，USB 与无线连接会被当成两个目标"))
         hk = self._user_config.hotkeys
         self.statusBar().showMessage(self._hotkey_status(
             f"已连接设备 {combo_data['serial']}",
@@ -1138,11 +1189,8 @@ class WindowOpsMixin:
         if self._target_has_active_run(target.id):
             self.log_text.append(tr("[提示] 该目标正在执行任务，不能断开"))
             return
-        if target.id == self._execution_targets.active_target_id:
-            recorder = getattr(self, "_screen_recorder", None)
-            abort_recording = getattr(self, "_abort_screen_record", None)
-            if recorder is not None and callable(abort_recording):
-                abort_recording(tr("断开执行目标"))
+        was_active = target.id == self._execution_targets.active_target_id
+        self._abort_recording_for_target(target.id, tr("断开执行目标"))
         removed = self._execution_targets.remove(target.id)
         if removed is not None:
             self._dispose_execution_target(removed)
@@ -1151,13 +1199,18 @@ class WindowOpsMixin:
             self._overlay.hide_border()
         from ...core.app_controller import remove_connected_target
         remove_connected_target(target.id)
-        self._sync_active_target_compat()
         self._refresh_execution_targets_ui()
-        self._refresh_active_target_ui()
+        if was_active:
+            # remove 已更新 active_target_id；列表刷新屏蔽信号，不能等点击恢复。
+            self._restore_active_target_view()
+        else:
+            # 删除未选中目标不重载当前目标的草稿和进度。
+            self._sync_active_target_compat()
+            self._refresh_active_target_ui()
+            self._refresh_run_button()
         self.statusBar().showMessage(
             tr("已断开目标：{name}").format(name=target.display_name))
         self.log_text.append(f"[断连] {target.display_name}")
-        self._refresh_run_button()
 
     def _refresh_or_reconnect_execution_target(self, target_id: str) -> None:
         """刷新窗口坐标，或重新建立指定 Android 目标。"""
@@ -1230,6 +1283,7 @@ class WindowOpsMixin:
                 input_sim=self._user_config.input_sim)
         target.input_kind = str(
             getattr(target.input_ctrl, "kind", "") or "")
+        self._rebind_target_resources(target)
         if self._execution_targets.active_target_id == target_id:
             self._sync_active_target_compat()
         self._refresh_execution_targets_ui()
@@ -1288,6 +1342,7 @@ class WindowOpsMixin:
         target.capture = capture
         target.capture_method = "wgc" if enabled else "mss"
         target.last_capture = None
+        self._rebind_target_resources(target)
         if old_capture is not None:
             try:
                 old_capture.stop()
@@ -1315,20 +1370,24 @@ class WindowOpsMixin:
                 tr("[错误] {method} 截图后端不可用，保留原截图方式").format(
                     method=method))
             return
-        recorder = getattr(self, "_screen_recorder", None)
-        abort_recording = getattr(self, "_abort_screen_record", None)
-        if recorder is not None and callable(abort_recording):
-            abort_recording(tr("切换截图方式"))
+        self._abort_recording_for_target(target_id, tr("切换截图方式"))
+        # 帧回调必须带代次：解码线程在 start() 之后就开始推帧，而
+        # _on_scrcpy_frame 的守卫只对携带代次的回调生效。这里预测换绑后的
+        # 代次（rebind 固定 +1），否则这条流的旧帧将永远绕过代次校验。
         streaming = False
         if method == "scrcpy" and isinstance(capture, AndroidStreamCapture):
+            generation = (target.handle.binding().generation + 1
+                          if target.handle is not None else 1)
             capture.set_on_frame(
-                lambda frame, tid=target_id: self._on_scrcpy_frame(tid, frame))
+                lambda frame, tid=target_id, gen=generation:
+                self._on_scrcpy_frame(tid, frame, gen))
             streaming = True
         old_capture = target.capture
         target.capture = capture
         target.capture_method = method
         target.streaming = streaming
         target.last_capture = None
+        self._rebind_target_resources(target)
         if old_capture is not None:
             try:
                 old_capture.stop()
@@ -1352,7 +1411,7 @@ class WindowOpsMixin:
         if device_execution is None:
             device_execution = target.agent is not None
         self._start_device_connection(
-            {"serial": target.serial, "model": target.display_name},
+            {"serial": target.serial},
             capture_method=target.capture_method or "screencap",
             device_execution=device_execution,
             update_candidate_ui=False,
@@ -1414,7 +1473,11 @@ class WindowOpsMixin:
             SendInputInput,
             WgcCapture,
         )
-        from .execution_targets import WINDOW_TARGET_ID, ExecutionTarget
+        from .execution_targets import (
+            WINDOW_TARGET_ID,
+            ExecutionTarget,
+            window_target_label,
+        )
         want_bg_capture = (
             self._window_connection_draft.background_input
             and self._window_connection_draft.background_capture)
@@ -1439,7 +1502,7 @@ class WindowOpsMixin:
         return ExecutionTarget(
             id=WINDOW_TARGET_ID,
             kind="windows",
-            display_name=str(w.get("title") or tr("游戏窗口")),
+            display_name=window_target_label(w),
             capture=capture,
             input_ctrl=input_ctrl,
             input_kind=str(getattr(input_ctrl, "kind", "") or ""),
@@ -1686,9 +1749,12 @@ class WindowOpsMixin:
             target.last_capture = bgr
         if hasattr(self, "_scrcpy_frame_ready"):
             self._scrcpy_frame_ready.emit(target_id, bgr)
-        # 录屏分叉：push 仅入队不阻塞解码线程，暂停/停止态内部直接丢弃
+        # 录屏分叉：push 仅入队不阻塞解码线程，暂停/停止态内部直接丢弃。
+        # 来源是开始录制时冻结的目标，不是当前预览目标——否则切换观察目标会
+        # 把两台设备的画面静默拼进同一个视频。
         rec = self._screen_recorder
-        if rec is not None and target_id == self._execution_targets.active_target_id:
+        if rec is not None and target_id == getattr(
+                self, "_record_target_id", None):
             rec.push(bgr)
 
     def _on_scrcpy_frame_ui(self, target_id: str, bgr: np.ndarray):
@@ -1717,6 +1783,66 @@ class WindowOpsMixin:
             self.preview_label.setPixmap(scaled)
         except Exception as e:
             logger.debug(f"[scrcpy] 预览更新失败: {e}")
+
+    @staticmethod
+    def _identity_unconfirmed(target) -> bool:
+        """该目标的身份是否只能靠 transport 地址区分。"""
+        return target.kind == "adb" and not bool(
+            target.metadata.get("device_identity_stable", True))
+
+    def _unconfirmed_identity_conflict(self, target_id: str, stable: bool):
+        """返回与待连接设备身份无法区分的已连接目标；没有冲突返回 None。
+
+        同一个 target_id 的重连不算冲突：那就是同一个目标换了条 transport。
+        """
+        if stable:
+            return None
+        return next(
+            (other for other in self._execution_targets.all()
+             if other.id != target_id and self._identity_unconfirmed(other)),
+            None,
+        )
+
+    @staticmethod
+    def _release_rejected_connection(capture, agent) -> None:
+        """释放一条被拒绝的连接已经建立的资源，不影响任何已登记目标。"""
+        for name, resource, close in (
+            ("截图后端", capture, "stop"), ("设备端代理", agent, "close"),
+        ):
+            if resource is None:
+                continue
+            try:
+                getattr(resource, close)()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"释放被拒绝连接的{name}失败: {exc}")
+
+    def _abort_recording_for_target(self, target_id: str, reason: str) -> None:
+        """只有被改动的目标正是录制来源时，才先安全结束当前录制。
+
+        换绑截图后端或断开连接会让帧流中断，两次 binding 的帧不能静默拼成
+        一个视频；但动的是别的目标时，正在录的那一路不该被牵连。
+        """
+        if target_id != getattr(self, "_record_target_id", None):
+            return
+        recorder = getattr(self, "_screen_recorder", None)
+        abort_recording = getattr(self, "_abort_screen_record", None)
+        if recorder is not None and callable(abort_recording):
+            abort_recording(reason)
+
+    def _rebind_target_resources(self, target) -> int:
+        """资源换绑后同步 TargetHandle，返回新的资源代次。
+
+        任务持有的是 TargetHandle 而不是裸后端引用，所以只改
+        ``target.capture/input_ctrl`` 等于只改了 UI 投影：handle 仍指向上一次
+        连接时的绑定，下一次启动会把已经 ``stop()`` 的后端喂给引擎。流式截图
+        停掉后 ``capture()`` 仍返回最后一帧，错误不会报出来，工作流直接按几分钟
+        前的画面点击，所以每处换绑都必须走这里。
+        """
+        if target.handle is None:
+            from .execution_targets import TargetHandle
+            target.handle = TargetHandle(target)
+            return target.handle.binding().generation
+        return target.handle.rebind(target).generation
 
     def _target_has_active_run(self, target_id: str) -> bool:
         """目标是否被运行实例占用；兼容独立测试宿主尚未提供 RunManager。"""

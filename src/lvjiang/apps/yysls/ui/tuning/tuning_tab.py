@@ -37,7 +37,10 @@ from .....ui.button_styles import (
 )
 from .....ui.execution_user_selector import ExecutionUserSelector
 from .....ui.hotkeys import hotkey_label
-from .....ui.main.run_control import STATE_PLAN_UNSUPPORTED
+from .....ui.main.run_control import (
+    STATE_PLAN_UNSUPPORTED,
+    STATE_START_DENIED,
+)
 from ...config.auto_tuning_config import (
     load_user_auto_tuning_config,
     save_user_auto_tuning_config,
@@ -428,9 +431,12 @@ class TuningTab(QWidget):
         elif state == "not_ready":
             self.btn_run_tuning.setText(tr("未就绪"))
             apply_execution_button_style(self.btn_run_tuning, "not_ready")
-        elif state == STATE_PLAN_UNSUPPORTED:
-            # 不能落进下面的 else：那里还会 mark_done()，会误报完成。
-            self.btn_run_tuning.setText(tr("方案不支持"))
+        elif state in (STATE_PLAN_UNSUPPORTED, STATE_START_DENIED):
+            # 不能落进下面的 else：那里还会 mark_done()，会误报完成；并发门禁
+            # 拒绝时也必须是灰的，不能让用户点完才知道要激活 Lv1。
+            self.btn_run_tuning.setText(
+                tr("方案不支持") if state == STATE_PLAN_UNSUPPORTED
+                else self._host.start_denied_label() or tr("不能启动"))
             apply_execution_button_style(self.btn_run_tuning, "disabled")
         else:
             self.btn_run_tuning.setText(hotkey_label(tr("开始调律"), hk.start))

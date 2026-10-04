@@ -516,11 +516,18 @@ object AgentServer {
         val isGlobal = keycode == 4 || keycode == 3
         return withVia(req) { via ->
             when {
-                via == "a11y" && isGlobal -> gestureResult(
-                    via,
-                    if (keycode == 4) A11yBridge.globalBack() else A11yBridge.globalHome(),
-                    "全局动作 $keycode",
-                )
+                via == "a11y" && isGlobal -> {
+                    val done = if (keycode == 4) {
+                        A11yBridge.globalBack()
+                    } else {
+                        A11yBridge.globalHome()
+                    }
+                    gestureResult(
+                        via,
+                        if (done) null else "performGlobalAction 返回 false",
+                        "全局动作 $keycode",
+                    )
+                }
                 via == "a11y" -> {
                     // 请求没强制通道、且 Shizuku 在，就转 shell 发 keyevent
                     if (req.optString("via", "auto") == "auto" && ShellBridge.hasPermission()) {

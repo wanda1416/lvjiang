@@ -14,7 +14,8 @@
 - 新增 `LoadoutPanel` UI：方案切换、武学绑定、折叠按钮对称布局；
 - 新增 `equipment_ingest` 工作流内置函数：`write_equipment`/`write_equipped`；
 - 适配 `equip_scan`/`equip_analysis` 工作流到新架构；
-- 新增迁移脚本 `migrate_loadouts.py`；配套测试覆盖 repository/panel/migrate/ingest。
+- 新增一次性迁移脚本；历史脚本与验证现归档在
+  `scripts/one_off/loadout_migration/`，不进入常驻 CI。
 
 ### 1.2 装备页功能增强与 bug 修复（`16b2458`）
 

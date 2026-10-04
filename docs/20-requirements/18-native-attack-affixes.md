@@ -22,8 +22,9 @@
 
 对照基线为 `fd501bd7` 的七套规则与原判定器。固定种子生成 18,019 件合法
 装备，冻结完整评级、调律潜力、无限转律评级共 54,057 个结果；另外逐件比较
-真实候选及优先级。基线保存在 `tests/fixtures/yysls/native_attack_legacy`，
-测试入口为 `tests/yysls/test_native_attack_affixes.py`。
+真实候选及优先级。该验证只服务于这次配置迁移，不属于常驻 CI 回归；冻结基线与
+手动入口保存在 `scripts/one_off/native_attack_equivalence/`。日常业务契约仍由
+`tests/yysls/test_native_attack_affixes.py` 覆盖。
 
 旧火拳测试中两组“扇子带最大牵丝攻击”的不合法样本改为最大无相攻击，
 保持原有优秀／一般评级断言；单独验证武器不会将具体属攻匹配为本属。

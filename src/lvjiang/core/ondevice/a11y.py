@@ -54,21 +54,35 @@ def screenshot_rgba(timeout_ms: int = 5000):
     return int(width), int(height), bytes(data)
 
 
-def tap(x: int, y: int, duration_ms: int = 50) -> bool:
-    return bool(_bridge().tap(int(x), int(y), int(duration_ms)))
+# 手势函数一律返回「失败原因」：成功是 None，失败是设备端给出的具体原因。
+# 不用 bool：失败有服务未连接、dispatchGesture 被拒、被真实触摸打断、等回调
+# 超时四种来源，压成一个 Boolean 之后调用方只能猜，而这句最终要显示给用户。
 
 
-def swipe(x1: int, y1: int, x2: int, y2: int, duration_ms: int) -> bool:
-    return bool(_bridge().swipe(int(x1), int(y1), int(x2), int(y2), int(duration_ms)))
+def _reason(value) -> str | None:
+    """把 Kotlin 的 String? 规整成 Python 的 str | None。"""
+    return None if value is None else (str(value) or None)
 
 
-def long_press(x: int, y: int, duration_ms: int) -> bool:
-    return bool(_bridge().longPress(int(x), int(y), int(duration_ms)))
+def tap(x: int, y: int, duration_ms: int = 50) -> str | None:
+    return _reason(_bridge().tap(int(x), int(y), int(duration_ms)))
 
 
-def hold_move(x1: int, y1: int, x2: int, y2: int, move_ms: int, hold_ms: int) -> bool:
+def swipe(x1: int, y1: int, x2: int, y2: int, duration_ms: int) -> str | None:
+    return _reason(
+        _bridge().swipe(int(x1), int(y1), int(x2), int(y2), int(duration_ms)))
+
+
+def long_press(x: int, y: int, duration_ms: int) -> str | None:
+    return _reason(_bridge().longPress(int(x), int(y), int(duration_ms)))
+
+
+def hold_move(
+    x1: int, y1: int, x2: int, y2: int, move_ms: int, hold_ms: int,
+) -> str | None:
     """推到位后按住 hold_ms 再抬起（两段 stroke，见 A11yBridge.holdMove）"""
-    return bool(_bridge().holdMove(int(x1), int(y1), int(x2), int(y2), int(move_ms), int(hold_ms)))
+    return _reason(_bridge().holdMove(
+        int(x1), int(y1), int(x2), int(y2), int(move_ms), int(hold_ms)))
 
 
 def back() -> bool:

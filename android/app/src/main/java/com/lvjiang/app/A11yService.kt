@@ -72,8 +72,12 @@ class A11yService : AccessibilityService() {
  * A11yBridge — 无障碍能力的同步门面，供 Python 侧调用。
  *
  * 系统给的截图与手势 API 都是异步回调式，而工作流引擎是同步的顺序脚本，
- * 所以这里统一用 CountDownLatch 折叠成阻塞调用。所有方法都不抛异常，
- * 失败一律返回空值 / false，由 Python 侧按返回值判断并落进自检报告。
+ * 所以这里统一用 CountDownLatch 折叠成阻塞调用。所有方法都不抛异常。
+ *
+ * 手势方法一律「成功返回 null，失败返回具体原因」：失败有四种互不相干的来源
+ * （服务未连接 / dispatchGesture 拒绝 / 被取消 / 等回调超时），压成一个 Boolean
+ * 之后调用方只能猜，而这条链最终是要显示给用户看的。截图仍返回 null 表示失败，
+ * 全局动作沿用系统 performGlobalAction 的 Boolean。
  *
  * 注意 Kotlin object 在 Chaquopy 里要走 A11yBridge.INSTANCE：编译后那些方法
  * 仍是实例方法，挂在编译器生成的 INSTANCE 静态字段上。
@@ -180,15 +184,15 @@ object A11yBridge {
     // 绝大多数设备是恒等）。映射放在这个注入口而不是各调用方：PC 代理通道与设备端 Python
     // 通道都经过这里，标定一次两边同时生效。
 
-    /** 单点点击；durationMs 是按住时长 */
-    fun tap(x: Int, y: Int, durationMs: Long = 50): Boolean {
+    /** 单点点击；durationMs 是按住时长。成功返回 null，失败返回原因 */
+    fun tap(x: Int, y: Int, durationMs: Long = 50): String? {
         val p = ScreenMap.mapPoint(x, y)
         val path = Path().apply { moveTo(p[0].toFloat(), p[1].toFloat()) }
         return dispatch(path, 0, durationMs)
     }
 
-    /** 直线滑动 */
-    fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long): Boolean {
+    /** 直线滑动。成功返回 null，失败返回原因 */
+    fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long): String? {
         val a = ScreenMap.mapPoint(x1, y1)
         val b = ScreenMap.mapPoint(x2, y2)
         val path = Path().apply {
@@ -202,16 +206,16 @@ object A11yBridge {
      * 长按：dispatchGesture 单个 stroke 的时长上限约 1 分钟，实际业务里
      * 长按都是几百毫秒到几秒，直接用 stroke 时长表达即可。
      */
-    fun longPress(x: Int, y: Int, durationMs: Long): Boolean {
+    fun longPress(x: Int, y: Int, durationMs: Long): String? {
         val p = ScreenMap.mapPoint(x, y)
         val path = Path().apply { moveTo(p[0].toFloat(), p[1].toFloat()) }
         return dispatch(path, 0, durationMs)
     }
 
-    private fun dispatch(path: Path, startTime: Long, durationMs: Long): Boolean {
+    private fun dispatch(path: Path, startTime: Long, durationMs: Long): String? {
         val service = A11yService.instance ?: run {
             Log.w(TAG, "手势失败：无障碍服务未连接")
-            return false
+            return "无障碍服务未连接（辅助开关被系统或省电策略关掉？）"
         }
 
         val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(
@@ -241,16 +245,18 @@ object A11yBridge {
         )
         if (!ok) {
             Log.w(TAG, "dispatchGesture 返回 false（服务未就绪或手势非法）")
-            return false
+            return "dispatchGesture 返回 false（服务未就绪或手势非法）"
         }
 
         // 等回调而不是立即返回：上层脚本紧接着就要截图看结果，手势没落地就截等于白截。
         // 超时给足 stroke 时长 + 3s 余量。
         if (!latch.await(durationMs + 3000, TimeUnit.MILLISECONDS)) {
             Log.w(TAG, "等待手势回调超时")
-            return false
+            return "等待手势回调超时（${durationMs + 3000}ms 内系统没有回调）"
         }
-        return completed
+        // 回调来了但不是 onCompleted，只剩 onCancelled 这一种可能
+        return if (completed) null
+        else "手势被系统取消（真实触摸、系统弹窗或其他无障碍服务打断）"
     }
 
     /**
@@ -261,10 +267,12 @@ object A11yBridge {
      * continueStroke 的 dwell 段 path 只有 1px，时长却是 holdMs，这才是按住不动。
      * 两段各等回调，总耗时 ≈ moveMs + holdMs。
      */
-    fun holdMove(x1: Int, y1: Int, x2: Int, y2: Int, moveMs: Long, holdMs: Long): Boolean {
+    fun holdMove(
+        x1: Int, y1: Int, x2: Int, y2: Int, moveMs: Long, holdMs: Long,
+    ): String? {
         val service = A11yService.instance ?: run {
             Log.w(TAG, "手势失败：无障碍服务未连接")
-            return false
+            return "无障碍服务未连接（辅助开关被系统或省电策略关掉？）"
         }
         val a = ScreenMap.mapPoint(x1, y1)
         val b = ScreenMap.mapPoint(x2, y2)
@@ -275,14 +283,14 @@ object A11yBridge {
         val moveStroke = android.accessibilityservice.GestureDescription.StrokeDescription(
             movePath, 0, moveMs.coerceAtLeast(1), holdMs > 0,
         )
-        if (!dispatchAndWait(service, moveStroke, moveMs)) return false
-        if (holdMs <= 0) return true
+        dispatchAndWait(service, moveStroke, moveMs)?.let { return "推到位阶段：$it" }
+        if (holdMs <= 0) return null
         val dwellPath = Path().apply {
             moveTo(b[0].toFloat(), b[1].toFloat())
             lineTo(b[0] + 1f, b[1].toFloat())
         }
         val dwellStroke = moveStroke.continueStroke(dwellPath, 0, holdMs, false)
-        return dispatchAndWait(service, dwellStroke, holdMs)
+        return dispatchAndWait(service, dwellStroke, holdMs)?.let { "按住阶段：$it" }
     }
 
     /**
@@ -414,7 +422,7 @@ object A11yBridge {
         service: AccessibilityService,
         stroke: android.accessibilityservice.GestureDescription.StrokeDescription,
         durationMs: Long,
-    ): Boolean {
+    ): String? {
         val gesture = android.accessibilityservice.GestureDescription.Builder()
             .addStroke(stroke)
             .build()
@@ -437,13 +445,14 @@ object A11yBridge {
         )
         if (!ok) {
             Log.w(TAG, "dispatchGesture 返回 false（服务未就绪或手势非法）")
-            return false
+            return "dispatchGesture 返回 false（服务未就绪或手势非法）"
         }
         if (!latch.await(durationMs + 3000, TimeUnit.MILLISECONDS)) {
             Log.w(TAG, "等待手势回调超时")
-            return false
+            return "等待手势回调超时（${durationMs + 3000}ms 内系统没有回调）"
         }
-        return completed
+        return if (completed) null
+        else "手势被系统取消（真实触摸、系统弹窗或其他无障碍服务打断）"
     }
 
     /** 服务能力自检信息，出问题时用来确认配置 xml 里的 flag 真的生效了 */

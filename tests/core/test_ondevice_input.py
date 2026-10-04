@@ -17,7 +17,11 @@ def calls(monkeypatch):
     """记录对 a11y / shell 桥的调用；time.sleep 置空，前后延迟不真等"""
     log: list[tuple] = []
     monkeypatch.setattr(dev_input.time, "sleep", lambda *_: None)
-    for name in ("tap", "swipe", "long_press", "hold_move", "back", "home"):
+    # 手势桥接「成功返回 None，失败返回原因」，别用 True 冒充成功：那样每次调用
+    # 都会被当成失败并把 True 当原因打出来。
+    for name in ("tap", "swipe", "long_press", "hold_move"):
+        monkeypatch.setattr(a11y, name, lambda *a, _n=name: log.append((_n, *a)))
+    for name in ("back", "home"):
         monkeypatch.setattr(a11y, name, lambda *a, _n=name: log.append((_n, *a)) or True)
     for name in ("tap", "swipe"):
         monkeypatch.setattr(shell, name, lambda *a, _n=name: log.append(("shell." + _n, *a)) or "")
@@ -86,6 +90,29 @@ def test_a11y_failed_global_action_does_not_raise(calls, monkeypatch, capsys):
     monkeypatch.setattr(a11y, "back", lambda: False)
     dev_input.A11yInput(_cfg()).key_down("ESC")
     assert "未成功" in capsys.readouterr().out
+
+
+def test_a11y_gesture_failure_prints_the_device_reason(calls, monkeypatch, capsys):
+    """手势失败要带出设备端的原因，不能再自己猜「无障碍开关未开？」。
+
+    失败有四种互不相干的来源（服务未连接 / dispatchGesture 被拒 / 被真实触摸
+    打断 / 等回调超时），猜错一次就会把排查引到完全无关的方向。
+    """
+    monkeypatch.setattr(
+        a11y, "tap",
+        lambda *_a: "手势被系统取消（真实触摸、系统弹窗或其他无障碍服务打断）")
+    dev_input.A11yInput(_cfg()).click_screen(10, 20)
+
+    out = capsys.readouterr().out
+    assert "点击未成功：手势被系统取消" in out
+    assert "无障碍开关未开" not in out
+
+
+def test_a11y_gesture_success_prints_nothing(calls, capsys):
+    """成功是 None：别把成功当失败刷日志。"""
+    dev_input.A11yInput(_cfg()).click_screen(10, 20)
+
+    assert "未成功" not in capsys.readouterr().out
 
 
 # ─── ShellInput ──────────────────────────────────────────

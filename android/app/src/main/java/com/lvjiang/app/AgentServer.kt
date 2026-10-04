@@ -322,9 +322,10 @@ object AgentServer {
         if (!req.optBoolean("tap", false)) return ok(header)
         return withVia(req) { via ->
             // 走各桥接的 tap：它们内部会再做一次同样的映射，因此传原始 (x, y)
-            val done = if (via == "a11y") A11yBridge.tap(x, y, req.optLong("duration_ms", 50))
-            else ShellBridge.tap(x, y).isEmpty()
-            if (done) ok(header.put("via", via)) else fail("标定点击未成功")
+            val reason = if (via == "a11y") A11yBridge.tap(x, y, req.optLong("duration_ms", 50))
+            else ShellBridge.tap(x, y).takeIf { it.isNotEmpty() }?.let { "shell 命令返回: $it" }
+            if (reason == null) ok(header.put("via", via))
+            else fail("标定点击未成功：$reason")
         }
     }
 
@@ -381,8 +382,16 @@ object AgentServer {
         if (out.isEmpty()) ok(JSONObject().put("via", via))
         else fail("shell 命令返回: $out")
 
-    private fun gestureResult(via: String, done: Boolean, what: String): Pair<JSONObject, ByteArray?> =
-        if (done) ok(JSONObject().put("via", via)) else fail("$what 未成功（手势被取消或超时）")
+    /**
+     * 手势结果：[reason] 为 null 表示成功，否则是设备端给出的具体原因。
+     *
+     * 不要把原因压回一句笼统的「被取消或超时」：PC 侧日志就是这条链的终点，
+     * 服务未连接、dispatchGesture 被拒、被真实触摸打断和等回调超时要分别处理，
+     * 看不到区别就只能去翻 logcat。
+     */
+    private fun gestureResult(via: String, reason: String?, what: String): Pair<JSONObject, ByteArray?> =
+        if (reason == null) ok(JSONObject().put("via", via))
+        else fail("$what 未成功：$reason")
 
     // ─── 各 op ──────────────────────────────────────────────
 

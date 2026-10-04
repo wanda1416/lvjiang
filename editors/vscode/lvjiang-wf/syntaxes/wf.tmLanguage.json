@@ -97,15 +97,15 @@
     },
     "keywords-control": {
       "name": "keyword.control.wf",
-      "match": "\\b(env|if|else|end|for|in|loop|while|until|break|continue|return|goto|try|catch)\\b"
+      "match": "\\b(env|if|else|end|for|in|loop|while|until|break|continue|return|goto|try|catch|timeline)\\b"
     },
     "keywords-instruction": {
       "name": "keyword.operator.wf",
-      "match": "\\b(scene|click|drag|wait|scan|recognize|collect|log|screenshot|eval|default|align|find|import|def|call)\\b"
+      "match": "\\b(scene|click|drag|move|scroll|press|paste|replay|wait|scan|recognize|collect|log|screenshot|eval|default|global|align|find|import|def|call)\\b"
     },
     "keywords-clause": {
       "name": "keyword.operator.wf",
-      "match": "\\b(as|by|view|unknown|where|on|group|hold)\\b"
+      "match": "\\b(as|by|view|unknown|where|on|group|hold|place|to|with|full|exact|image)\\b"
     },
     "keywords-timing": {
       "name": "keyword.other.timing.wf",

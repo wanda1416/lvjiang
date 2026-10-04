@@ -1,267 +1,71 @@
-# 工作流 DSL 编辑器插件需求文档
-
-## 1. 概述
-
-律匠的工作流使用自定义 DSL（领域特定语言）编写，文件扩展名为 `.wf`。该 DSL 基于 Lark 解析器，具有关键字、场景引用、字符串插值、过程定义等语法元素。
-
-为了提升 `.wf` 文件的编写效率和正确性，需要开发编辑器插件，提供语法高亮和实时错误诊断能力。插件以 VS Code 扩展形式实现，兼容所有基于 VS Code 的编辑器（VS Code、Qoder、Cursor 等）。
-
----
-
-## 2. 功能分级
-
-插件功能按三个层级递进实现：
-
-| 层级 | 能力 | 说明 |
-|------|------|------|
-| **Level 1** | 语法高亮 | TextMate grammar，纯静态正则匹配 |
-| **Level 2** | 实时诊断 | Language Server，复用 Lark 解析器做语法校验 |
-| **Level 3** | 语义智能 | 场景名/区域 key 存在性、过程调用校验、跳转定义、悬停提示等 |
-
----
-
-## 3. DSL 语法要素
-
-插件需要覆盖的 DSL 语法元素：
-
-### 3.1 关键字
-
-| 分类 | 关键字 |
-|------|--------|
-| 流程控制 | `main`, `proc`, `return`, `call`, `try`, `catch`, `as`, `by` |
-| 动作指令 | `tap`, `wait`, `drag`, `ocr`, `find`, `screenshot` |
-| 条件/循环 | `if`, `elif`, `else`, `while`, `for`, `in`, `break`, `continue` |
-| 布尔/空值 | `true`, `false`, `null` |
-| 逻辑运算 | `and`, `or`, `not` |
-| 时序控制 | `before`, `after`, `around` |
-| 匹配模式 | `equals`, `contains`, `equals_any`, `contains_any` |
-| 子句关键字 | `where`, `on`, `group`, `hold`, `session`, `context` |
-| 特殊变量 | `this`, `error` |
-
-### 3.2 注释
-
-| 类型 | 语法 | 用途 |
-|------|------|------|
-| 普通注释 | `# ...` | 单行注释 |
-| 文档注释 | `#% ...` | 过程/模块级文档说明 |
-
-### 3.3 字面量
-
-| 类型 | 示例 |
-|------|------|
-| 字符串 | `"hello"`, `"result: {value}"`（支持 `{expr}` 插值） |
-| 数字 | `42`, `3.14` |
-| 布尔 | `true`, `false` |
-| 空值 | `null` |
-
-### 3.4 场景引用
-
-- 格式：`scene_name.key_name`，如 `main_menu.btn_start`
-- 需与数值字面量中的 range（`10..20`）区分
-
-### 3.5 运算符
-
-- 算术：`+`, `-`, `*`, `/`, `%`
-- 比较：`==`, `!=`, `<`, `<=`, `>`, `>=`
-- 逻辑：`and`, `or`, `not`
-- 赋值：`=`
-- 范围：`..`
-
----
-
-## 4. Level 1：语法高亮（已实现）
-
-### 4.1 技术方案
-
-- **TextMate grammar**：`syntaxes/wf.tmLanguage.json`
-- 正则匹配，无需后端进程
-- 通过 `package.json` 的 `contributes.grammars` 注册
-
-### 4.2 高亮规则
-
-| scope 名称 | 匹配目标 | 对应高亮色 |
-|------------|----------|-----------|
-| `comment.line.number-sign` | `# ...` 注释 | 注释色 |
-| `comment.line.documentation` | `#% ...` 文档注释 | 文档注释色 |
-| `keyword.control.wf` | 流程控制/条件/循环关键字 | 关键字色 |
-| `keyword.control.trycatch.wf` | `try`, `catch` | 关键字色 |
-| `keyword.clause.wf` | `as`, `by`, `where`, `on`, `group`, `hold` | 关键字色 |
-| `keyword.timing.wf` | `before`, `after`, `around` | 关键字色 |
-| `keyword.match.wf` | `equals`, `contains`, `equals_any`, `contains_any` | 关键字色 |
-| `keyword.special.wf` | `session`, `context` | 关键字色 |
-| `keyword.operator.logical.wf` | `and`, `or`, `not` | 运算符色 |
-| `constant.language.wf` | `true`, `false`, `null` | 常量色 |
-| `entity.name.function.wf` | `proc` / `main` 后的过程名 | 函数名色 |
-| `entity.name.scene-ref.wf` | `scene.key` 场景引用 | 特殊标识色 |
-| `string.interpolated.wf` | `"..."` 字符串 | 字符串色 |
-| `constant.character.escape.wf` | `{...}` 插值表达式 | 转义色 |
-| `constant.numeric.wf` | 数字字面量 | 数字色 |
-
-### 4.3 语言配置
-
-- `language-configuration.json`：定义注释符、括号配对、自动闭合对
-- 支持 `[]`, `()`, `{}` 括号配对和 `""` 引号配对
-
----
-
-## 5. Level 2：实时诊断（已实现）
-
-### 5.1 技术方案
-
-- **Language Server Protocol (LSP)**
-- 服务端：Python，基于 `pygls >= 1.3, < 2.0` 框架
-- 客户端：TypeScript，基于 `vscode-languageclient`
-- 复用项目已有的 `lvjiang.workflows.grammar.parse_text()` 解析器
-
-### 5.2 架构
-
-```
-┌─────────────────────────────────┐
-│  VS Code / Qoder / Cursor       │
-│  ┌───────────────────────────┐  │
-│  │ extension.ts (LSP Client) │  │
-│  │  - 启动 Python 进程        │  │
-│  │  - 自动检测 .venv          │  │
-│  └─────────┬─────────────────┘  │
-│            │ JSON-RPC (stdio)    │
-│  ┌─────────▼─────────────────┐  │
-│  │ server.py (LSP Server)    │  │
-│  │  - parse_text() 语法解析   │  │
-│  │  - 发布 Diagnostic         │  │
-│  └───────────────────────────┘  │
-└─────────────────────────────────┘
-```
-
-### 5.3 诊断触发时机
-
-| 事件 | 行为 |
-|------|------|
-| 文件打开（`didOpen`） | 立即解析并发布诊断 |
-| 文件保存（`didSave`） | 重新解析并发布诊断 |
-| 内容变更（`didChange`） | 每次编辑后重新解析并发布诊断 |
-
-### 5.4 错误定位
-
-- 利用 Lark 抛出的 `UnexpectedCharacters` / `UnexpectedToken` 异常中的 `line` 和 `column` 信息
-- 将 Lark 的 1-based 行列号转换为 LSP 的 0-based `Position`
-- 诊断范围：从错误位置起，延伸至 `min(col + 20, 行尾)` 字符
-
-### 5.5 Python 环境检测
-
-扩展按以下优先级查找 Python 解释器：
-
-1. `lvjiangWf.pythonPath` 显式配置
-2. VS Code Python 扩展的 `python.defaultInterpreterPath` 设置
-3. 自动检测工作区 `.venv`（Windows: `.venv/Scripts/python.exe`，Unix: `.venv/bin/python`）
-4. 回退到系统 `python`
-
-### 5.6 三层异常兜底
-
-| 异常类型 | 诊断严重度 | 说明 |
-|----------|-----------|------|
-| `UnexpectedCharacters` / `UnexpectedToken` | Error | 精确行/列定位 |
-| `LarkError`（其他） | Error | 无精确位置时定位到文件首行 |
-| `Exception`（兜底） | Warning | 内部解析器错误，提示用户 |
-
----
-
-## 6. Level 3：语义智能
-
-### 6.1 P0 — 高价值基础校验
-
-这些功能的基础设施（`scene_scan.collect_refs()`、`static_check.check_refs()`、场景注册表）已在项目主体中就绪，只需在 Language Server 中接入。
-
-| 功能 | 说明 | 依赖模块 | 状态 |
-|------|------|----------|------|
-| **关键字拼写模糊匹配** | 标识符与 DSL 关键字编辑距离 ≤ 2 时发布 Warning | AST NAME 节点遍历 + Levenshtein 距离 | ✅ 已实现 |
-| **场景名存在性检查** | `[scene].[key]` 中的 `scene` 不存在于 `scenes.yaml` 时报错 | `SceneRegistry.all_scene_keys()` | ✅ 已实现 |
-| **区域 key 检查** | `[scene].[key]` 中的 `key` 在该场景下不存在时报错 | `static_check.check_refs()` + layout | 🔲 待实现（需 layout 上下文） |
-| **过程调用存在性检查** | `call proc()` 中 `proc` 未定义时报错 | AST 遍历 `ProcDef` | ✅ 已实现 |
-| **import 文件检查** | `import "path.wf"` 的文件不存在时报错 | 文件系统 `Path.exists()` | ✅ 已实现 |
-
-### 6.2 P1 — 中级语义校验
-
-| 功能 | 说明 | 状态 |
-|------|------|------|
-| **变量作用域检查** | 使用未声明变量时警告（过程参数 / `for` 循环变量 / `this`） | 🔲 待实现 |
-| **过程参数数量检查** | `call proc(a, b)` 的参数数量与 `proc` 定义不匹配时报错 | ✅ 已实现 |
-| **重复过程名检查** | 同一文件中出现同名 `def` 定义时报错 | 🔲 待实现（解析器已处理覆盖） |
-
-### 6.3 P2 — 编辑器体验增强
-
-| 功能 | 说明 | 状态 |
-|------|------|------|
-| **代码折叠** | `def`/`if`/`loop`/`try` 块可折叠 | ✅ 已实现 |
-| **文档符号大纲** | 在 Outline 面板显示所有 `def` 定义 | ✅ 已实现 |
-| **跳转定义** | Ctrl+点击场景引用跳转到对应 `scenes.yaml` 或 `.wf` 过程定义 | 🔲 待实现 |
-| **悬停提示** | 鼠标悬停过程名显示参数列表，悬停关键字显示提示 | ✅ 已实现 |
-| **代码片段** | 输入 `def`/`if`/`while`/`try`/`click`/`scan` 等自动展开为模板 | ✅ 已实现 |
-
----
-
-## 7. 扩展目录结构
-
-```
-editors/vscode/lvjiang-wf/
-├── package.json                 # 扩展清单（语言注册、语法注册、配置项）
-├── tsconfig.json                # TypeScript 编译配置
-├── language-configuration.json  # 语言配置（注释符、括号配对）
-├── syntaxes/
-│   └── wf.tmLanguage.json       # TextMate 语法高亮规则
-├── src/
-│   └── extension.ts             # LSP 客户端入口
-├── server/
-│   ├── __main__.py              # LSP 服务端入口
-│   └── server.py                # Language Server 核心逻辑
-├── install.bat                  # 一键安装脚本（支持 vscode/qoder/cursor）
-├── .vscodeignore                # 打包排除规则
-└── out/                         # TypeScript 编译产物（gitignore）
-```
-
----
-
-## 8. 安装方式
-
-### 8.1 开发模式安装
-
-```batch
-cd editors\vscode\lvjiang-wf
-install.bat [vscode|qoder|cursor]
-```
-
-脚本自动完成：
-1. `npm install` 安装 Node.js 依赖
-2. `npm run compile` 编译 TypeScript
-3. `mklink /J` 创建 Junction 链接到编辑器扩展目录
-
-### 8.2 依赖要求
-
-| 依赖 | 用途 | 安装方式 |
-|------|------|----------|
-| Node.js >= 18 | 编译 TypeScript、运行 LSP 客户端 | 系统安装 |
-| Python >= 3.10 | 运行 Language Server | 项目 `.venv` |
-| `pygls >= 1.3, < 2.0` | LSP 服务端框架 | `pyproject.toml` dev 依赖 |
-| `vscode-languageclient ^8.1` | LSP 客户端库 | `package.json` 依赖 |
-
----
-
-## 9. 当前实现状态
-
-| 功能 | 状态 | 说明 |
-|------|------|------|
-| Level 1 语法高亮 | ✅ 已实现 | 全部关键字分组、场景引用、字符串插值、文档注释 |
-| Level 2 实时诊断 | ✅ 已实现 | 语法错误实时下划线，三层异常兜底 |
-| Level 2 Python 环境检测 | ✅ 已实现 | 四级 fallback 自动检测 |
-| Level 2 多编辑器支持 | ✅ 已实现 | install.bat 支持 vscode/qoder/cursor |
-| Level 3 关键字拼写模糊匹配 | ✅ 已实现 | 编辑距离 ≤ 2 时发布 Warning 提示 |
-| Level 3 场景名存在性检查 | ✅ 已实现 | 接入 SceneRegistry，检查场景是否存在 |
-| Level 3 过程调用存在性检查 | ✅ 已实现 | AST 遍历 CallProc，检查过程是否定义 |
-| Level 3 import 文件检查 | ✅ 已实现 | 文件系统 Path.exists() 检查 |
-| Level 3 过程参数数量检查 | ✅ 已实现 | 比对 CallProc.args 与 ProcDef.params |
-| Level 3 代码折叠 | ✅ 已实现 | def/if/loop/try 块可折叠 |
-| Level 3 文档符号大纲 | ✅ 已实现 | Outline 面板显示所有 def 定义 |
-| Level 3 悬停提示 | ✅ 已实现 | 悬停过程名显示参数列表 |
-| Level 3 代码片段 | ✅ 已实现 | def/if/while/try/click/scan 等模板 |
-| Level 3 区域 key 检查 | 🔲 待实现 | 需 layout 上下文 |
-| Level 3 跳转定义 | 🔲 待实现 | 需实现 textDocument/definition |
-| Level 3 变量作用域检查 | 🔲 待实现 | 需符号表与嵌套作用域分析 |
+# VS Code 工作流编辑支持
+
+## 目标与边界
+
+`.wf` 是项目的工作流 DSL。VS Code 扩展提供静态编辑辅助；脚本运行、单步、
+变量查看及设备截图仍由应用内脚本工作台负责。扩展只读取脚本和配置，
+不会替用户保存、运行或改写工作流。
+
+语言注册、TextMate 高亮、括号配对与片段不依赖 Python。Python 环境缺失或
+依赖不全时，语言服务安静停用，原因写入 **LvJiang WF** 输出面板；
+创建环境后可执行 **WF: Restart Language Server**。扩展不得回退到未经验证的
+系统 Python，也不得在每次打开 VS Code 时弹窗要求创建 `.venv`。
+
+## 实际语义
+
+- 语法以 `src/lvjiang/workflows/grammar/grammar.lark` 和解析器为准。典型语句为
+  `def name($arg) ... end`、`call name($arg)`、`click [scene].[key]`。
+- `import "subcall/navigation.wf"` 相对 workflows 根目录，经过配置解析器选择
+  local、remote 或 system 生效文件；不相对当前 `.wf` 文件目录。
+- 打开的脚本及已打开的导入文件按内存文本解析，保存不是诊断的前提；
+  编辑导入文件时同步刷新其他已打开脚本。跨文件校验以导入图中的过程为准；
+  不存在的导入、循环导入、重复过程、未定义调用和参数数量错误应能定位到对应语句。
+- 文件头连续 `#%` 行是 YAML 元数据，使用工作流现有解析器校验。
+- 只有解析器确实遇到不认识的语句时才给出关键词拼写建议；合法过程名、变量名
+  不因与关键词相似而告警。
+- 场景名和声明视图使用场景注册表校验。区域、坐标点、面板的绑定依赖具体布局；
+  只有明确设置 `lvjiangWf.layoutKey` 后才按该布局检查，不猜测运行目标。
+  例如项目桌面布局的 key 是 `desktop`，安卓布局的 key 是 `android`；
+  实际可选项以 `config/system/layouts.yaml` 为准。
+
+## 编辑辅助
+
+- `import` 字符串中补全按配置层生效的 `.wf` 路径；`call` 后补全本地和导入过程；
+  `[scene]`、`[scene].[key]` 中补全场景和实体 key；赋值表达式中补全公共内置函数。
+- 跳转定义支持 import 文件、过程定义和场景 YAML 中的静态 key。
+- 过程名的“查找引用”按解析后的定义文件身份筛选调用，不把注释、字符串和
+  另一个同名但未导入的过程算作引用。
+- 过程重命名只生成 VS Code 工作区编辑建议；定义及生效调用文件必须可写，
+  新名称必须符合 DSL 语法且不能与导入图中的现有过程冲突。条件不满足时拒绝重命名。
+  场景和区域 key 的重命名需跨配置层修改，不在此功能范围内。
+- 悬停显示过程参数及关键词提示；大纲列出当前文件过程；折叠覆盖主要代码块。
+- 文本规则与片段只是输入辅助，最终是否合法由 DSL 解析器和项目配置判定。
+
+## 安装与环境
+
+开发模式在 Windows 中进入 `editors/vscode/lvjiang-wf`，执行
+`install.bat [vscode|qoder|cursor]`。脚本编译 TypeScript，并以 junction 链接到
+编辑器扩展目录。仓库开发环境使用 Python 3.11–3.12，语言服务需要项目依赖
+及 `pygls`（位于 `pyproject.toml` 的 dev extra）。可通过
+`lvjiangWf.pythonPath` 指定解释器；扩展也检查编辑器 Python 设置、
+工作区和扩展所在仓库的 `.venv`。没有合格解释器时仍可用基础文本能力。
+
+## 本轮实现状态与剩余边界
+
+| 能力 | 状态 | 边界 |
+|---|---|---|
+| 高亮、片段、括号与注释 | 已有 | TextMate 规则不等同完整 DSL 解析 |
+| 启动前依赖检查、安静降级、手动重启 | 已实现 | 环境建立后需手动重启语言服务 |
+| 当前缓冲区语法与元数据诊断 | 已实现 | 元数据错误定位在文件首行 |
+| 配置层 import 图、调用与参数校验 | 已实现 | 未打开的导入文件按磁盘内容读取 |
+| 场景与显式布局绑定检查 | 已实现 | 未选布局时不检查绑定；不推断执行平台 |
+| import、过程、场景与实体补全 | 已实现 | 补全依赖可解析的上下文，不做变量类型推导 |
+| import、过程、场景定义跳转 | 已实现 | 动态变量引用无法静态跳转 |
+| 过程查找引用 | 已实现 | 只搜索配置层当前生效的脚本与当前文件 |
+| 过程重命名 | 已实现 | 仅处理有效配置层中的静态过程符号；不可写或冲突时拒绝 |
+| 场景/区域重命名、变量作用域分析 | 未实现 | 需跨配置层引用模型及变量作用域模型 |
+| VS Code 内运行、单步和变量查看 | 不在本轮范围 | 需要应用执行会话与目标接口 |
+
+相关权威文档：[DSL 语法](../30-architecture/32-grammar/README.md)、
+[子工作流路径语义](../30-architecture/32-grammar/07-subworkflows.md)、
+[应用内脚本工作台](../60-userguide/06-workflows.md)。

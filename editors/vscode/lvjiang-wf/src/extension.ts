@@ -1,23 +1,27 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
-import { ExtensionContext, workspace, window } from 'vscode';
+import { commands, ExtensionContext, OutputChannel, workspace, window } from 'vscode';
 import {
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
 } from 'vscode-languageclient/node';
 
-let client: LanguageClient;
+let client: LanguageClient | undefined;
+let output: OutputChannel;
+let startup: Promise<void> = Promise.resolve();
 
 /** Max parent directories to walk up from a workspace folder when looking for .venv. */
 const VENV_SEARCH_DEPTH = 6;
 
-/** Check whether *cmd* resolves to a runnable executable on PATH. */
-function commandExists(cmd: string): boolean {
+/** Check that this interpreter can import the actual language server. */
+function canRunServer(cmd: string, serverModule: string): boolean {
   try {
-    const result = spawnSync(cmd, ['--version'], { stdio: 'ignore' });
-    return !result.error;
+    const probe = `import sys; sys.path.insert(0, ${JSON.stringify(path.dirname(serverModule))}); import server`;
+    const result = spawnSync(cmd, ['-c', probe],
+      { stdio: 'pipe', timeout: 5000 });
+    return !result.error && result.status === 0;
   } catch {
     return false;
   }
@@ -46,22 +50,21 @@ function findVenvUpwards(startDir: string): string | undefined {
 
 /**
  * Resolve the Python interpreter path.
- * Priority: explicit setting > VS Code Python setting > auto-detect .venv (walking up
- * from each workspace folder) > system python3/python.
+ * Priority: explicit setting > VS Code Python setting > workspace .venv >
+ * extension checkout .venv. Every candidate must load the server successfully.
  */
-function resolvePythonPath(): string {
+function resolvePythonPath(context: ExtensionContext, serverModule: string): string | undefined {
+  const candidates: string[] = [];
   // 1. Explicit extension setting
   const configured = workspace.getConfiguration('lvjiangWf').get<string>('pythonPath')?.trim();
   if (configured) {
-    window.showInformationMessage(`LvJiang WF: Using configured Python path: ${configured}`);
-    return configured;
+    candidates.push(configured);
   }
 
   // 2. VS Code Python extension setting
   const vscodePython = workspace.getConfiguration('python').get<string>('defaultInterpreterPath')?.trim();
   if (vscodePython && vscodePython !== 'python') {
-    window.showInformationMessage(`LvJiang WF: Using VS Code Python path: ${vscodePython}`);
-    return vscodePython;
+    candidates.push(vscodePython);
   }
 
   // 3. Auto-detect .venv, walking up from each workspace folder (handles opening a subfolder)
@@ -69,61 +72,77 @@ function resolvePythonPath(): string {
   if (folders) {
     for (const folder of folders) {
       const found = findVenvUpwards(folder.uri.fsPath);
-      if (found) {
-        window.showInformationMessage(`LvJiang WF: Auto-detected .venv at: ${found}`);
-        return found;
-      }
+      if (found) { candidates.push(found); }
     }
   }
-
-  // 4. Fall back to a system interpreter. Prefer python3 on POSIX, since plain
-  // `python` frequently doesn't exist there (only on Windows is it the norm).
-  const candidates = process.platform === 'win32' ? ['python', 'py'] : ['python3', 'python'];
-  for (const candidate of candidates) {
-    if (commandExists(candidate)) {
-      window.showWarningMessage(
-        `LvJiang WF: No .venv found, falling back to system "${candidate}". ` +
-        `The language server needs "pygls" installed there (pip install -e ".[dev]"), ` +
-        `or set "lvjiangWf.pythonPath" to your project's .venv interpreter. ` +
-        `Folders: ${folders?.map(f => f.uri.fsPath).join(', ') || 'none'}`,
-      );
-      return candidate;
-    }
+  const extensionVenv = findVenvUpwards(fs.realpathSync(context.extensionPath));
+  if (extensionVenv) { candidates.push(extensionVenv); }
+  for (const candidate of [...new Set(candidates)]) {
+    if (canRunServer(candidate, serverModule)) { return candidate; }
+    output.appendLine(`Skipping Python without WF server dependencies: ${candidate}`);
   }
-
-  window.showErrorMessage(
-    `LvJiang WF: No Python interpreter found (tried ${candidates.join(', ')}). ` +
-    `Set "lvjiangWf.pythonPath" in settings to a Python interpreter with "lvjiang" and "pygls" installed.`,
-  );
-  return candidates[0];
+  output.appendLine('WF language server disabled: no suitable Python environment. Syntax highlighting and snippets remain available.');
+  return undefined;
 }
 
-export function activate(context: ExtensionContext) {
+async function startServer(context: ExtensionContext): Promise<void> {
   const serverModule = context.asAbsolutePath(path.join('server', '__main__.py'));
-  const pythonPath = resolvePythonPath();
+  const pythonPath = resolvePythonPath(context, serverModule);
+  if (!pythonPath) { return; }
 
   const serverOptions: ServerOptions = {
     command: pythonPath,
     args: [serverModule],
+    options: {
+      env: {
+        ...process.env,
+        LVJIANG_WF_LAYOUT_KEY: workspace.getConfiguration('lvjiangWf').get<string>('layoutKey') || '',
+      },
+    },
   };
 
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: 'file', language: 'wf' }],
   };
 
-  client = new LanguageClient(
+  const nextClient = new LanguageClient(
     'lvjiangWfServer',
     'LvJiang WF Server',
     serverOptions,
     clientOptions,
   );
 
-  client.start();
+  try {
+    await nextClient.start();
+    client = nextClient;
+    output.appendLine(`WF language server started with ${pythonPath}`);
+  } catch (error) {
+    output.appendLine(`WF language server failed: ${String(error)}`);
+  }
 }
 
-export function deactivate(): Thenable<void> | undefined {
-  if (!client) {
-    return undefined;
-  }
-  return client.stop();
+export function activate(context: ExtensionContext) {
+  output = window.createOutputChannel('LvJiang WF');
+  context.subscriptions.push(output);
+  context.subscriptions.push(commands.registerCommand('lvjiangWf.restartServer', async () => {
+    startup = startup.then(async () => {
+      if (client) { await client.stop(); client = undefined; }
+      await startServer(context);
+    });
+    await startup;
+  }));
+  context.subscriptions.push(workspace.onDidChangeConfiguration(event => {
+    if (event.affectsConfiguration('lvjiangWf.pythonPath') ||
+        event.affectsConfiguration('lvjiangWf.layoutKey') ||
+        event.affectsConfiguration('python.defaultInterpreterPath')) {
+      void commands.executeCommand('lvjiangWf.restartServer');
+    }
+  }));
+  void commands.executeCommand('lvjiangWf.restartServer');
+}
+
+export function deactivate(): Thenable<void> {
+  return startup.then(async () => {
+    if (client) { await client.stop(); client = undefined; }
+  });
 }

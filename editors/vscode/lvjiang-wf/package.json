@@ -42,10 +42,21 @@
         "lvjiangWf.pythonPath": {
           "type": "string",
           "default": "",
-          "description": "Python interpreter path with lvjiang installed. Leave empty to let the extension auto-detect (VS Code Python setting, then workspace .venv, then system python)."
+          "description": "Python interpreter path with the WF language server dependencies. Leave empty to check the VS Code Python setting and project .venv."
+        },
+        "lvjiangWf.layoutKey": {
+          "type": "string",
+          "default": "",
+          "description": "Optional layout key for validating scene bindings. Leave empty to check scene names only."
         }
       }
     },
+    "commands": [
+      {
+        "command": "lvjiangWf.restartServer",
+        "title": "WF: Restart Language Server"
+      }
+    ],
     "snippets": [
       {
         "language": "wf",

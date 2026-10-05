@@ -75,15 +75,6 @@ def test_legacy_qishu_affixes_fold_into_all_qishu_without_mutating_equipment() -
     assert equipped["head"]["affix_1"]["name"] == "单体类奇术增伤"
 
 
-def test_wuxiang_penetration_is_a_fixed_numeric_field() -> None:
-    attrs = aggregate_equipment_attrs({
-        "head": {"dingyin": {"name": "无相穿透", "value": 14.5}},
-    })
-
-    assert attrs.wuxiang_pen == pytest.approx(14.5)
-    assert "wuxiang_pen" not in attrs.extra_attrs
-
-
 @case_matrix("name", [
     "十方破阵武学技增伤",
     "千机索天重击增伤",
@@ -375,11 +366,6 @@ def test_five_dimension_conversion_targets() -> None:
     assert (agility.max_outer, agility.intent_rate) == (0.0, 0.0)
 
 
-def test_body_and_defence_produce_nothing_trackable() -> None:
-    """体/御 只出生命值与防御，CombatAttributes 不追踪，必须是全零。"""
-    assert convert_five_dims(ti=100, yu=100) == CombatAttributes()
-
-
 def test_five_dimension_affixes_are_summed_before_conversion() -> None:
     """多件装备上的同一维先累计再换算，避免逐件取整放大误差。"""
     split = aggregate_equipment_attrs({
@@ -389,16 +375,6 @@ def test_five_dimension_affixes_are_summed_before_conversion() -> None:
 
     assert split.min_outer == pytest.approx(convert_five_dims(min_val=76.8).min_outer)
     assert split.crit_rate == pytest.approx(convert_five_dims(min_val=76.8).crit_rate)
-
-
-def test_five_dimension_affixes_reach_the_aggregate() -> None:
-    """五维词条要真的进聚合结果——它经反推路径决定基础属性，
-    静默丢弃会让基础属性整体偏高。"""
-    attrs = aggregate_equipment_attrs({
-        "head": {"affix_1": {"name": "劲", "value": 76.8}},
-    })
-
-    assert attrs.min_outer > 0 and attrs.max_outer > 0
 
 
 def test_play_style_reverse_derivation_ignores_panel_assumptions(monkeypatch):

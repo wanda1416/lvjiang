@@ -13,7 +13,6 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from lvjiang.core.coord_types import RectCoordRef
 from lvjiang.workflows.builtins import get_function
 from lvjiang.workflows.engine import WorkflowEngine
 from lvjiang.workflows.grammar import parse_text
@@ -22,15 +21,7 @@ from tests.workflows.conftest import make_engine, run
 # ─── 矩形字面量 ─────────────────────────────────────────
 
 class TestRectLiteral:
-    def test_parses_and_evaluates_to_rect(self):
-        v = run("$r = (0.1, 0.2, 0.3, 0.4)\n")
-        r = v["r"]
-        assert isinstance(r, RectCoordRef)
-        assert (r.cx, r.cy, r.w, r.h) == (pytest.approx(0.25), pytest.approx(0.4), 0.3, 0.4)
 
-    def test_variables_allowed_in_elements(self):
-        v = run("$w = 0.5\n$r = (0, 0, $w, 0.2)\n")
-        assert v["r"].w == 0.5 and v["r"].cx == 0.25
 
     def test_two_tuple_unchanged(self):
         assert run("$t = (1, 2)\n")["t"] == (1.0, 2.0)

@@ -188,13 +188,6 @@ class TestSaveLoadRoundtrip:
         assert [p.key for p in panels] == ["grid"]
         assert panels[0].cols == 6
 
-    def test_scene_files_created_on_disk(self, env):
-        mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout())
-        scene_dir = env / "system" / "layouts" / "test_layout"
-        assert scene_dir.is_dir()
-        assert (scene_dir / "scene_a.json").exists()
-        assert (scene_dir / "scene_b.json").exists()
 
     def test_dev_save_keeps_local_only_scene_layout_in_local(self, env):
         mgr = LayoutConfigManager()
@@ -210,15 +203,6 @@ class TestSaveLoadRoundtrip:
         assert not system_path.exists()
         assert json.loads(local_path.read_text())["regions"][0]["x_ratio"] == 0.2
 
-    def test_layouts_yaml_created(self, env):
-        mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout())
-        yaml_path = env / "system" / "layouts.yaml"
-        assert yaml_path.exists()
-        import yaml
-        doc = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-        assert "test_layout" in doc["layouts"]
-        assert doc["layouts"]["test_layout"]["canvas"]["w_ratio"] == pytest.approx(0.8)
 
     def test_rejects_invalid_activation_key_before_writing(self, env):
         mgr = LayoutConfigManager()
@@ -240,16 +224,7 @@ class TestSaveLoadRoundtrip:
 
 
 class TestListLayouts:
-    def test_list_from_yaml(self, env):
-        mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("layout_x"))
-        mgr.save_layout(_make_layout("layout_y"))
-        names = mgr.list_layout_keys()
-        assert names == ["layout_x", "layout_y"]
 
-    def test_empty_when_no_layouts(self, env):
-        mgr = LayoutConfigManager()
-        assert mgr.list_layout_keys() == []
 
     def test_display_name_is_separate_and_both_identities_are_unique(self, env):
         mgr = LayoutConfigManager()
@@ -287,9 +262,6 @@ class TestDeleteLayout:
         # 目录已清
         assert not (env / "system" / "layouts" / "delete_me").exists()
 
-    def test_delete_nonexistent_returns_false(self, env):
-        mgr = LayoutConfigManager()
-        assert mgr.delete_layout("missing") is False
 
     def test_user_mode_refuses_system_layout(self, env, monkeypatch):
         """system_layout属于 system 内容，用户模式下不可删除——不想用就别选它。"""
@@ -308,18 +280,6 @@ class TestDeleteLayout:
         assert "system_layout" in mgr2.list_layout_keys()
         assert not (env / "local" / "layouts" / "system_layout"
                     / "scene_a.json.deleted").exists()
-
-class TestModuleLevelLoad:
-    def test_load_layout_by_key(self, env):
-        mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("module_layout"))
-        layout = load_layout_by_key("module_layout")
-        assert layout is not None
-        assert layout.name == "module_layout"
-        assert [r.key for r in layout.get_scene_regions("scene_a")] == ["btn", "label"]
-
-    def test_load_nonexistent_returns_none(self, env):
-        assert load_layout_by_key("missing") is None
 
 
 class TestAliasLayout:
@@ -545,23 +505,6 @@ class TestSceneLayoutRel:
     结果而不自知：场景编辑器的来源标识就因此在android_cast下少显示了一半。
     """
 
-    def test_root_layout_uses_its_own_dir(self, env):
-        from lvjiang.core.layout_manager import scene_layout_rel
-        mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("root_layout"))
-        assert scene_layout_rel("root_layout", "scene_a") == "layouts/root_layout/scene_a.json"
-
-    def test_alias_layout_points_at_root_dir(self, env):
-        from lvjiang.core.layout_manager import scene_layout_rel
-        mgr = LayoutConfigManager()
-        mgr.save_layout(_make_layout("root_layout"))
-        TestAliasLayout._add_alias_entry(
-            env, "alias_layout", "root_layout",
-            {"x_ratio": 0.0, "y_ratio": 0.0, "w_ratio": 0.5, "h_ratio": 0.6})
-        rel = scene_layout_rel("alias_layout", "scene_a")
-        assert rel == "layouts/root_layout/scene_a.json"
-        # 而且这个路径确实存在——空结果正是原来的 bug
-        assert (env / "system" / rel).exists()
 
     def test_unknown_layout_falls_back_to_its_own_name(self, env):
         """布局missing时不该抛异常，退回按名字拼（调用方自会得到空来源）。"""

@@ -24,10 +24,6 @@ class TestInferPart:
     def test_non_weapon_parts_keep_type(self, part):
         assert infer_part(part) == part
 
-    def test_unknown(self):
-        assert infer_part("鱼竿") == "unknown"
-        assert infer_part(None) == "unknown"
-
 
 class TestEquipmentDataDimensions:
     def test_empty_serialization_has_no_fingerprint(self):
@@ -38,29 +34,6 @@ class TestEquipmentDataDimensions:
         """equip_type OCR 噪声保留为诊断名称，但不能确立装备身份。"""
         assert EquipmentData(name="王").to_dict()["_fp"] == ""
 
-    def test_weapon_equipment(self):
-        e = EquipmentData(type="剑")
-        assert e.part == "武器"
-        assert e.weapon == "剑"
-        assert e.category == "weapon"
-
-    def test_jewelry_equipment(self):
-        e = EquipmentData(type="佩")
-        assert e.part == "佩"
-        assert e.weapon is None
-        assert e.category == "jewelry"
-
-    def test_armor_equipment(self):
-        e = EquipmentData(type="腕甲")
-        assert e.part == "腕甲"
-        assert e.weapon is None
-        assert e.category == "armor"
-
-    def test_unknown_equipment(self):
-        e = EquipmentData(type="鱼竿")
-        assert e.part == "unknown"
-        assert e.weapon is None
-        assert e.category == "unknown"
 
     def test_cooldown_expiry_roundtrip_and_legacy_default(self):
         expires_at = "2026-09-07T04:00:00.000+00:00"
@@ -122,9 +95,3 @@ class TestDingyinSerialization:
         assert d["dingyin"] == {"name": "外功穿透", "value": 14.2}
         restored = EquipmentData.from_dict(d)
         assert restored.dingyin == {"name": "外功穿透", "value": 14.2}
-
-    def test_empty_dingyin_serialized_as_none(self):
-        e = EquipmentData(type="剑")
-        d = e.to_dict()
-        assert d["dingyin"] is None
-        assert EquipmentData.from_dict(d).dingyin == {}

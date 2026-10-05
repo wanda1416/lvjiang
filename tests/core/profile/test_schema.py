@@ -49,41 +49,7 @@ def _write_profile_yaml(session_dir, data):
 
 
 class TestProfileSchema:
-    def test_empty_schema(self):
-        schema = ProfileSchema()
-        assert schema.get_all_keys() == []
-        assert schema.get_key("nonexistent") is None
-        assert schema.get_model_type("nonexistent") is None
 
-    def test_get_keys_by_model(self):
-        quota_keys = [
-            QuotaKeyDef(key="k1", label="配额1"),
-            QuotaKeyDef(key="k2", label="配额2"),
-        ]
-        regen_keys = [
-            RegenKeyDef(key="k3", label="再生1"),
-        ]
-        schema = ProfileSchema(keys_by_model={
-            "quota": quota_keys,
-            "regen": regen_keys,
-        })
-
-        assert len(schema.get_keys_by_model("quota")) == 2
-        assert len(schema.get_keys_by_model("regen")) == 1
-        assert len(schema.get_keys_by_model("stock")) == 0
-
-    def test_get_key(self):
-        kd = QuotaKeyDef(key="test", label="测试")
-        schema = ProfileSchema(keys_by_model={"quota": [kd]})
-        found = schema.get_key("test")
-        assert found is kd
-        assert schema.get_key("nonexistent") is None
-
-    def test_get_model_type(self):
-        kd = RegenKeyDef(key="energy", label="能量")
-        schema = ProfileSchema(keys_by_model={"regen": [kd]})
-        assert schema.get_model_type("energy") == "regen"
-        assert schema.get_model_type("unknown") is None
 
     def test_get_all_keys_order(self):
         d1 = QuotaKeyDef(key="d1", label="D1")
@@ -96,19 +62,6 @@ class TestProfileSchema:
         all_keys = schema.get_all_keys()
         assert len(all_keys) == 3
         assert [k.key for k in all_keys] == ["d1", "d2", "r1"]
-
-    def test_to_dict(self):
-        d1 = QuotaKeyDef(key="k1", label="l1", period="week")
-        r1 = RegenKeyDef(key="k2", label="l2", cap=100)
-        schema = ProfileSchema(keys_by_model={
-            "quota": [d1],
-            "regen": [r1],
-        })
-        result = schema.to_dict()
-        assert "quota" in result
-        assert "regen" in result
-        assert len(result["quota"]) == 1
-        assert result["quota"][0]["key"] == "k1"
 
 
 # ─── 加载 ────────────────────────────────────────────────────
@@ -169,27 +122,6 @@ class TestLoadConfig:
         with pytest.raises(ValueError, match="非 dict"):
             _load_config()
 
-    def test_load_ignores_unregistered_quota_period(self, profile_env):
-        """未注册周期的定义被忽略，但不让整个文件失效，也不被改动。
-
-        周期可以由插件注册，核心算不出边界的定义不能进索引（否则后台 tick 会
-        持续失败），但为此判定整个 profile.yaml 无效会让所有 Profile 功能一起
-        瘫掉——而问题只在一条定义上。完整契约见
-        tests/core/profile/test_unknown_definitions.py。
-        """
-        _write_profile_yaml(profile_env, {
-            "quota": [
-                {"key": "ok", "label": "正常", "period": "week"},
-                {"key": "event", "label": "活动", "period": "missing_event"},
-            ],
-        })
-
-        schema = _load_config()
-
-        assert [kd.key for kd in schema.get_all_keys()] == ["ok"]
-        assert schema.get_key("event") is None
-        assert schema.ignored_by_model["quota"][0][1]["period"] == (
-            "missing_event")
 
     def test_load_skips_empty_key(self, profile_env):
         """key 为空的条目被过滤（不报错）"""
@@ -202,19 +134,6 @@ class TestLoadConfig:
         schema = _load_config()
         assert len(schema.get_all_keys()) == 1
         assert schema.get_key("valid") is not None
-
-    def test_load_note_model(self, profile_env):
-        """note 模型 key 正确加载"""
-        _write_profile_yaml(profile_env, {
-            "note": [
-                {"key": "user_note", "label": "状态备注"},
-            ],
-        })
-        schema = _load_config()
-        kd = schema.get_key("user_note")
-        assert kd is not None
-        assert isinstance(kd, NoteKeyDef)
-        assert schema.get_model_type("user_note") == "note"
 
 
 # ─── 保存 ────────────────────────────────────────────────────

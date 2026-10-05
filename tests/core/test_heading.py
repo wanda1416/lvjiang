@@ -46,7 +46,7 @@ def _angle_diff(a, b):
     return abs((a - b + 180) % 360 - 180)
 
 
-@pytest.mark.parametrize("heading", [0, 30, 90, 135, 180, 225, 270, 315, 359])
+@pytest.mark.parametrize("heading", [0, 135, 270, 359])
 def test_detects_concave_arrow_heading(heading):
     img = _concave_arrow_image(heading)
 

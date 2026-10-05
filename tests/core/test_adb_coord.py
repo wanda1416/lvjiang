@@ -37,8 +37,8 @@ def _make_wf(device_size=(1080, 1920), canvas=None, regions=None, points=None):
     )
 
 
-def test_region_to_screen_full_canvas_no_jitter():
-    # 满画布、无抖动：区域中心归一化比例 × 设备分辨率
+def test_full_canvas_coordinate_forms():
+    # region_to_screen_full_canvas_no_jitter
     region = Region(key="r", x_ratio=0.5, y_ratio=0.5, w_ratio=0.1, h_ratio=0.1)
     wf = _make_wf(device_size=(1080, 1920), regions=[region])
     x, y = wf._region_to_screen(region, jitter=False)
@@ -46,25 +46,22 @@ def test_region_to_screen_full_canvas_no_jitter():
     assert x == int(0.55 * 1080)   # 594
     assert y == int(0.55 * 1920)   # 1056
 
-
-def test_point_to_screen_zero_radius_deterministic():
-    # r_ratio=0 消除随机偏移，point 中心即精确像素
+    # point_to_screen_zero_radius_deterministic
     point = Point(key="p", cx_ratio=0.3, cy_ratio=0.7, r_ratio=0.0)
     wf = _make_wf(device_size=(1080, 1920), points=[point])
     x, y = wf._point_to_screen(point)
     assert x == int(0.3 * 1080)   # 324
     assert y == int(0.7 * 1920)   # 1344
 
-
-def test_ratio_to_screen_full_canvas():
+    # ratio_to_screen_full_canvas
     wf = _make_wf(device_size=(1080, 1920))
     x, y = wf._ratio_to_screen(0.25, 0.8)
     assert x == int(0.25 * 1080)   # 270
     assert y == int(0.8 * 1920)    # 1536
 
 
-def test_ratio_to_screen_offset_canvas():
-    # 非满画布：验证画布原点 + 画布尺寸缩放同样成立
+def test_offset_canvas_coordinate_forms():
+    # ratio_to_screen_offset_canvas
     canvas = CanvasConfig(x_ratio=0.1, y_ratio=0.05, w_ratio=0.8, h_ratio=0.9)
     wf = _make_wf(device_size=(1080, 1920), canvas=canvas)
     x, y = wf._ratio_to_screen(0.5, 0.5)
@@ -72,8 +69,7 @@ def test_ratio_to_screen_offset_canvas():
     assert x == int(0.5 * 1080)   # 540
     assert y == int(0.5 * 1920)   # 960
 
-
-def test_region_to_screen_offset_canvas_no_jitter():
+    # region_to_screen_offset_canvas_no_jitter
     canvas = CanvasConfig(x_ratio=0.1, y_ratio=0.1, w_ratio=0.8, h_ratio=0.8)
     region = Region(key="r", x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5)
     wf = _make_wf(device_size=(1000, 2000), canvas=canvas, regions=[region])

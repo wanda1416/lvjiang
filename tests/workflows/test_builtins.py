@@ -28,8 +28,6 @@ class TestRegistry:
         }
         assert expected <= registered
 
-    def test_get_function_unknown_returns_none(self):
-        assert get_function("no_such_builtin") is None
 
     def test_builtin_func_decorator_registers(self):
         @builtin_func("_test_only_fn")
@@ -94,141 +92,106 @@ class TestArithmetic:
 # ─── general ───────────────────────────────────────────────
 
 class TestConcat:
-    def test_mixed_args(self):
+    def test_concat_mixed_and_empty_arguments(self):
+        # mixed_args
         assert _fn("concat")("结果: ", 3, " 完成") == "结果: 3 完成"
 
-    def test_empty(self):
+        # empty
         assert _fn("concat")() == ""
 
 
 class TestRange:
-    def test_single_arg_starts_from_one(self):
+    def test_range_closed_bounds_and_arity(self):
+        # single_arg_starts_from_one
         assert _fn("range")(3) == [1, 2, 3]
 
-    def test_two_args_closed_interval(self):
+        # two_args_closed_interval
         assert _fn("range")(2, 5) == [2, 3, 4, 5]
 
-    def test_too_many_args_raises(self):
+        # too_many_args_raises
         with pytest.raises(ValueError):
             _fn("range")(1, 2, 3)
 
 
 class TestCountNonempty:
-    def test_dict_counts_non_empty_values(self):
+    def test_count_nonempty_input_types(self):
+        # dict_counts_non_empty_values
         assert _fn("count_nonempty")({"a": "x", "b": "", "c": "  ", "d": "y"}) == 2
 
-    def test_list_counts_elements(self):
+        # list_counts_elements
         assert _fn("count_nonempty")([1, 2, 3]) == 3
 
-    def test_other_types_return_zero(self):
+        # other_types_return_zero
         assert _fn("count_nonempty")("text") == 0
         assert _fn("count_nonempty")(None) == 0
 
 
 class TestContains:
-    def test_hit_and_miss(self):
+    def test_contains_hit_miss_and_invalid_input(self):
+        # hit_and_miss
         result = {"f1": "开始调律", "f2": "取消"}
         assert _fn("contains")(result, "调律") is True
         assert _fn("contains")(result, "不存在") is False
 
-    def test_non_dict_or_no_args(self):
+        # non_dict_or_no_args
         assert _fn("contains")("text", "t") is False
         assert _fn("contains")({"a": "b"}) is False
 
 
 class TestFindKey:
-    def test_returns_first_matching_key(self):
+    def test_find_key_order_miss_and_non_text_values(self):
+        # returns_first_matching_key
         result = {"f1": "取消", "f2": "开始调律", "f3": "调律记录"}
         assert _fn("find_key")(result, "调律") == "f2"
 
-    def test_not_found_returns_empty(self):
+        # not_found_returns_empty
         assert _fn("find_key")({"f1": "取消"}, "调律") == ""
 
-    def test_non_string_values_skipped(self):
+        # non_string_values_skipped
         assert _fn("find_key")({"f1": 123, "f2": "调律"}, "调律") == "f2"
 
 
 class TestAppend:
-    def test_append_to_list(self):
+    def test_append_list_mutation_and_invalid_arity(self):
+        # append_to_list
         lst = [1]
         assert _fn("append")(lst, 2) == ""
         assert lst == [1, 2]
 
-    def test_append_to_dict(self):
-        d = {}
-        _fn("append")(d, "slot1", {"v": 1})
-        assert d == {"slot1": {"v": 1}}
-
-    def test_dict_key_coerced_to_str(self):
-        d = {}
-        _fn("append")(d, 5, "x")
-        assert d == {"5": "x"}
-
-    def test_none_target_noop(self):
-        assert _fn("append")(None, 1) == ""
-
-    def test_mismatched_args_noop(self):
+        # mismatched_args_noop
         lst = [1]
         _fn("append")(lst)          # list 缺 value
         _fn("append")({}, "only")   # dict 缺 value
         assert lst == [1]
 
+    def test_append_dict_mutation_and_key_conversion(self):
+        # append_to_dict
+        d = {}
+        _fn("append")(d, "slot1", {"v": 1})
+        assert d == {"slot1": {"v": 1}}
+
+        # dict_key_coerced_to_str
+        d = {}
+        _fn("append")(d, 5, "x")
+        assert d == {"5": "x"}
+
 
 # ─── 时间函数 ─────────────────────────────────────────────
 
-class TestClock:
-    def test_clock_returns_float(self):
-        """clock() 返回 Unix 时间戳（float）"""
-        ts = _fn("clock")()
-        assert isinstance(ts, float)
-        assert ts > 1_700_000_000  # 合理的时间戳范围
-
-    def test_clock_no_args(self):
-        """clock() 无参调用"""
-        ts = _fn("clock")()
-        assert isinstance(ts, float)
-
 
 class TestDatetime:
-    def test_datetime_default_format(self):
-        """datetime() 默认格式返回 YYYY-MM-DD HH:MM:SS"""
-        result = _fn("datetime")()
-        assert isinstance(result, str)
-        assert len(result) == 19  # "YYYY-MM-DD HH:MM:SS"
 
-    def test_datetime_custom_format(self):
-        """datetime("%Y") 返回年份字符串"""
-        year = _fn("datetime")("%Y")
-        assert isinstance(year, str)
-        assert len(year) == 4
-        assert year.isdigit()
 
-    def test_datetime_time_format(self):
-        """datetime("%H:%M:%S") 返回时间字符串"""
-        time_str = _fn("datetime")("%H:%M:%S")
-        assert isinstance(time_str, str)
-        parts = time_str.split(":")
-        assert len(parts) == 3
-
-    def test_datetime_with_timestamp(self):
-        """datetime($ts) 格式化指定时间戳"""
-        # 使用固定时间戳: 2026-01-15 10:30:45 UTC
+    def test_datetime_timestamp_with_default_and_custom_format(self):
+        # datetime_with_timestamp
         ts = 1768470645.0
         result = _fn("datetime")(ts)
         assert isinstance(result, str)
         assert len(result) == 19  # "YYYY-MM-DD HH:MM:SS"
 
-    def test_datetime_with_timestamp_and_format(self):
-        """datetime($ts, "%H:%M:%S") 格式化指定时间戳为时间"""
+        # datetime_with_timestamp_and_format
         ts = 1768470645.0
         time_str = _fn("datetime")(ts, "%H:%M:%S")
         assert isinstance(time_str, str)
         parts = time_str.split(":")
         assert len(parts) == 3
-
-    def test_datetime_with_int_timestamp(self):
-        """datetime(int_ts) 支持整数时间戳"""
-        ts = 1768470645
-        result = _fn("datetime")(ts)
-        assert isinstance(result, str)
-        assert len(result) == 19

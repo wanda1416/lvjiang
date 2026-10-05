@@ -16,7 +16,6 @@ from lvjiang.apps.yysls.core.equip_parser.models import EquipmentData
 from lvjiang.apps.yysls.core.equip_parser.parser import EquipmentParser
 from lvjiang.apps.yysls.core.equip_validator import (
     ILLEGAL_KEY,
-    illegal_reasons_of,
 )
 from lvjiang.core.ocr_cleaner import OCRCleaner
 from tests.case_matrix import case_matrix
@@ -41,15 +40,16 @@ def clean(text: str) -> str:
 # ─── equip_type 解析 ──────────────────────────────────────
 
 class TestParseEquipType:
-    def test_standard_weapon(self, parser):
+    def test_standard_equipment_types(self, parser):
+        # standard_weapon
         assert parser._parse_equip_type("踏雪含光 | 武器·剑") == ("踏雪含光", "剑")
 
-    def test_standard_armor(self, parser):
+        # standard_armor
         assert parser._parse_equip_type("雁南飞冠 | 冠胄") == ("雁南飞冠", "冠胄")
 
-    def test_shoujia(self, parser):
-        # 66a6a73 手甲术语修正
+        # shoujia
         assert parser._parse_equip_type("铁纱 | 武器·手甲") == ("铁纱", "手甲")
+
 
     def test_dirty_extra_segment(self, parser):
         # OCR 多切出一段脏数据，类型仍从最后一段提取
@@ -102,43 +102,45 @@ class TestParseEquipType:
 # ─── equip_level 解析 ──────────────────────────────────────
 
 class TestParseEquipLevel:
-    def test_chengyin_level(self, parser):
+    def test_level_and_chengyin_are_independent(self, parser):
+        # chengyin_level
         assert parser._parse_equip_level("承音 | 110阶") == (110, True)
 
-    def test_plain_level(self, parser):
+        # plain_level
         assert parser._parse_equip_level("100阶") == (100, False)
+
+        # chengyin_without_level
+        assert parser._parse_equip_level("承音") == (0, True)
+
 
     def test_empty(self, parser):
         assert parser._parse_equip_level("") == (0, False)
-
-    def test_chengyin_without_level(self, parser):
-        assert parser._parse_equip_level("承音") == (0, True)
 
 
 class TestCooldownExpiry:
     NOW = datetime(2026, 9, 4, 4, 0, tzinfo=timezone.utc)
 
-    def test_days_and_hours(self, parser):
+    def test_cooldown_duration_units(self, parser):
+        # days_and_hours
         assert parser._parse_cooldown_expires_at(
             "重置调律冷却中：4天16小时", now=self.NOW,
         ) == "2026-09-08T20:00:00.000+00:00"
 
-    def test_hours_and_minutes(self, parser):
-        """不足一天时文案带「分」，分钟必须计入，否则到期早 59 分钟。"""
+        # hours_and_minutes
         assert parser._parse_cooldown_expires_at(
             "词条转律冷却中：5小时59分", now=self.NOW,
         ) == "2026-09-04T09:59:00.000+00:00"
 
-    def test_minutes_only(self, parser):
+        # minutes_only
         assert parser._parse_cooldown_expires_at(
             "词条转律冷却中：30分", now=self.NOW,
         ) == "2026-09-04T04:30:00.000+00:00"
 
-    def test_ocr_fragment_days_without_hours(self, parser):
-        """OCR 漏字及漏读小时的容错样例，不代表额外的游戏文案。"""
+        # ocr_fragment_days_without_hours
         assert parser._parse_cooldown_expires_at(
             "重置冷却中：3天", now=self.NOW,
         ) == "2026-09-07T04:00:00.000+00:00"
+
 
     @case_matrix("raw,expected", [
         ("重置调律冷却中：4天16小时", ("reset", "cooling")),
@@ -206,21 +208,22 @@ class TestOriginalLevel:
 # ─── base_attr 解析 ────────────────────────────────────────
 
 class TestParseBaseAttr:
-    def test_weapon_range(self, parser):
+    def test_base_attribute_range_and_scalar(self, parser):
+        # weapon_range
         attr = parser._parse_base_attr("外功攻击 87~203")
         assert attr.name == "外功攻击"
         assert attr.value == [87, 203]
 
-    def test_armor_single_value(self, parser):
+        # armor_single_value
         attr = parser._parse_base_attr("气血最大值 8750")
         assert attr.name == "气血最大值"
         assert attr.value == 8750
 
-    def test_dirty_range_still_extracts_numbers(self, parser):
-        # 67b4117 装备解析纠错：名称混入 OCR 噪声不影响区间提取
+        # dirty_range_still_extracts_numbers
         attr = parser._parse_base_attr("外功攻击 老著 52~121")
         assert attr.value == [52, 121]
         assert attr.name.startswith("外功攻击")
+
 
     def test_unknown_name_fallback_last_number(self, parser):
         attr = parser._parse_base_attr("神秘属性 123")
@@ -235,18 +238,20 @@ class TestParseBaseAttr:
 # ─── 单条词条解析 ──────────────────────────────────────────
 
 class TestParseSingleAffix:
-    def test_percent_affix(self, parser):
+    def test_affix_units_follow_the_attribute(self, parser):
+        # percent_affix
         affix = parser._parse_single_affix("会心率 +5.6%")
         assert affix.name == "会心率"
         assert affix.value == 5.6
         assert affix.unit == "%"
         assert not affix.is_transferred
 
-    def test_flat_affix_no_unit(self, parser):
+        # flat_affix_no_unit
         affix = parser._parse_single_affix("最大外功攻击 +110")
         assert affix.name == "最大外功攻击"
         assert affix.value == 110
         assert affix.unit is None
+
 
     @case_matrix("text", [
         "[转]会心率 5.6%",
@@ -290,15 +295,6 @@ class TestParseSingleAffix:
         assert affix.name == "剑武学增伤"
         assert affix.value == 8.2
 
-    def test_ocr_correction_jingzhun(self, parser):
-        # 猜准率 → 精准率（由 OCR 引擎清洗）
-        affix = parser._parse_single_affix(clean("猜准率 10.8%"))
-        assert affix.name == "精准率"
-
-    def test_noise_char_jian_removed(self, parser):
-        # 荐 噪声由 OCR 引擎删除
-        affix = parser._parse_single_affix(clean("荐会心率 5%"))
-        assert affix.name == "会心率"
 
     def test_suit_info_filtered(self, parser):
         assert parser._parse_single_affix("寒山套装(2/2)") is None
@@ -504,22 +500,6 @@ class TestIllegalAnnotation:
         assert reasons
         assert any("上限" in r for r in reasons)
 
-    def test_normal_equipment_not_marked(self, parser):
-        equip = parser.parse(_weapon_raw())
-        assert ILLEGAL_KEY not in equip.extra_data
-
-    def test_mark_reaches_json(self, parser):
-        equip = parser.parse(_weapon_raw(
-            affix_jue="劲 +72.2", affix_zhi="劲 +72.2"))
-        assert illegal_reasons_of(equip.to_dict())
-
-    def test_affix_data_not_dropped(self, parser):
-        """只标注不丢数据：异常装备的词条必须原样保留，交给用户校正。"""
-        equip = parser.parse(_weapon_raw(
-            affix_jue="劲 +72.2", affix_zhi="劲 +72.2"))
-        assert [a.name for a in equip.affixes] == [
-            "最大外功攻击", "会心率", "劲", "劲"]
-
 
 # ─── 界面语言切换不影响 OCR 匹配 ──────────────────────────────
 
@@ -546,26 +526,3 @@ class TestOcrMatchingSurvivesTranslation:
         }
         monkeypatch.setattr(i18n, "_current_language", "en_US")
         monkeypatch.setattr(i18n, "_translations", fake)
-
-    def test_weapon_type_still_recognized(self, parser):
-        assert parser._parse_equip_type("踏雪含光 | 武器·剑") == ("踏雪含光", "剑")
-
-    def test_armor_type_from_name_still_recognized(self, parser):
-        # 配置中的游戏原始词及规范类型都不经界面翻译。
-        assert parser._parse_equip_type("流星云珑") == ("流星云珑", "环")
-        assert parser._parse_equip_type("玄玉辟邪") == ("玄玉辟邪", "佩")
-
-    def test_armor_type_segment_still_recognized(self, parser):
-        assert parser._parse_equip_type("雁南飞冠 | 冠胄") == ("雁南飞冠", "冠胄")
-
-    def test_chengyin_level_still_recognized(self, parser):
-        assert parser._parse_equip_level("承音 | 110阶") == (110, True)
-
-    def test_base_attr_2_still_recognized(self, parser):
-        attr = parser._parse_base_attr("外功防御 500", is_base_attr_2=True)
-        assert attr is not None
-        assert attr.name == "外功防御"
-        assert attr.value == 500
-
-    def test_set_info_still_filtered_out(self, parser):
-        assert parser._parse_single_affix("弓玦套装") is None

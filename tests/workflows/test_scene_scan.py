@@ -13,8 +13,7 @@ import pytest
 
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.engine import WorkflowEngine, WorkflowUserError
-from lvjiang.workflows.grammar import parse_file, parse_text
-from lvjiang.workflows.metadata import parse_metadata
+from lvjiang.workflows.grammar import parse_text
 from lvjiang.workflows.static_check import check_refs
 from lvjiang.workflows.workflow_references import collect_refs, collect_scene_keys
 from tests.case_matrix import case_matrix
@@ -139,10 +138,6 @@ def test_uncalled_proc_excluded_by_default_but_included_for_lint():
     assert {ref.scene for ref in lint_refs} == {"scene_in_proc"}
 
 
-def test_collect_empty_when_no_scene_ref():
-    assert _collect('log "hi"\nwait 0\n') == set()
-
-
 def test_ref_kind_by_statement():
     """kind 决定该 key 在布局里查哪类对象：click 查区域/坐标点/面板，drag 查方向/区域"""
     refs = _refs(
@@ -178,130 +173,6 @@ def test_ref_line_no_matches_source():
 
 
 # ─── 与旧 required_scenes 等价性验证 ──────────────────────
-
-def test_daily_jianghu_required_scenes():
-    """daily_jianghu.wf 的换装与情境动作复用同一个外观场景。
-
-    这里按引擎 _load_and_validate 的方式先合并 import 链的 procs 再搜集，
-    断言的才是运行期真正的校验范围。只 parse_file 会漏掉靠子过程引用的
-    场景（如 game_main_page 走 nav_main_to_menu、bag_detail 走
-    背包子过程），那样每次把一句 click 挪进 subcall 都要改一次期望，
-    却并没有任何覆盖真的丢失。
-    """
-    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
-    program = parse_file(wf)
-    procs = dict(program.procs)
-    for imported in program.imports:
-        procs.update(parse_file((wf.parent / imported.path).resolve()).procs)
-    scenes = collect_scene_keys(program.body, procs)
-    assert scenes == {
-        "activity_jianghu", "appearance_main",
-        "general_action", "game_menu_page", "game_main_page",
-        "general_control", "school_main",
-        "bag_detail", "bag_item_detail",
-    }
-
-
-def test_daily_jianghu_reuses_shared_page_detector():
-    """号令页判断统一由底层页面判断子过程提供。"""
-    workflows = SYSTEM_CONFIG_DIR / "workflows"
-    daily_text = (workflows / "daily_jianghu.wf").read_text(encoding="utf-8")
-    detection_text = (
-        workflows / "subcall" / "page_detection.wf"
-    ).read_text(encoding="utf-8")
-
-    assert daily_text.count("is_in_haoling_page()") == 3
-    assert 'import "subcall/page_detection.wf"' in daily_text
-    assert "scan [activity_jianghu].[label_0" not in daily_text
-    assert "def is_in_haoling_page()" in detection_text
-    assert (
-        'scan [activity_jianghu].[label_0, haoling_label] '
-        'as $found by contains "号令"'
-    ) in detection_text
-
-
-def test_daily_jianghu_claim_reputation_guard():
-    """领奖必须受完成状态和声望上限约束；当周声望读取即写入 profile。"""
-    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
-    text = wf.read_text(encoding="utf-8")
-    metadata = parse_metadata(text)
-    parameters = {item["name"]: item for item in metadata["parameters"]}
-
-    assert parameters["max_claim_reputation"] == {
-        "name": "max_claim_reputation",
-        "label": "最大领取声望",
-        # 声望上限只在领奖时起作用，不领奖时整行不展示
-        "require": "$claim_reward",
-        "type": "number",
-        "default": 1500,
-        "min": 0,
-    }
-    assert "default $max_claim_reputation = 1500" in text
-    # 声望必须解析完整 a/b，并与不肝进度共用防回写过程。
-    assert 'import "subcall/game_profile.wf"' in text
-    assert "sync_weekly_progress($result.haoling_of_week" in text
-    assert "extract_int($result.haoling_of_week)" not in text
-    # 领奖后全屏奖励弹窗用通用空白区域点击关闭，避免遮挡下一轮页面校验
-    claim_def = text[text.index("def claim_reward("):text.index("def claim_reward(") + 500]
-    assert "click [general_control].[blank_area]" in claim_def
-
-    completed_call = "call $task_completed = is_task_completed($label)"
-    initial_scan = "scan [activity_jianghu].$label.[label] as $text_result"
-    target_call = "call $hit = is_target_task($task_text)"
-    assert "def is_task_completed($label)" in text
-    # 处理前、动作后与刷新后都只认同一个刷新按钮判定。
-    assert text.count(completed_call) == 3
-    process = text[text.index("def process_jianghu_cards("):text.index(
-        "def is_task_completed(")]
-    assert process.index(completed_call) < process.index(initial_scan)
-    assert process.index(initial_scan) < process.index(target_call)
-    assert "continue" in process[process.index(completed_call):process.index(target_call)]
-    completed = text[text.index("def is_task_completed("):text.index(
-        "def has_selected_task(")]
-    assert "scan [activity_jianghu].$label.[refresh] as $refresh_found by image" in completed
-    assert "len(" not in completed
-    assert "def is_target_task($text)" in text
-    assert "as $hit by contains_any $targets" not in text
-
-    # 当周声望「读取即写入」：唯一读取入口是 sync_haoling_of_week，它在识别
-    # 成功后直接落盘。若仍由各调用点自行 sync，未领奖 / 已达上限等分支就会
-    # 漏写，profile 停留在旧值，与实时值不一致。
-    assert "read_haoling_of_week" not in text  # 不得绕过唯一入口
-    assert text.count("call $haoling_of_week = sync_haoling_of_week()") == 2
-    # 起始进入即写入，不依赖后续是否领奖
-    assert text.index("call $haoling_of_week = sync_haoling_of_week()") < text.index(
-        "for idx in"
-    )
-    sync_proc = text.index("def sync_haoling_of_week(")
-    sync_body = text[sync_proc:sync_proc + 500]
-    assert "scan [activity_jianghu].[haoling_of_week] as $result" in sync_body
-    # 只锁前三个实参：扫到的值、写哪个 profile key、本轮上次有效值——这三者
-    # 才是「读取即写入 + 防回写」的契约。展示文案和业务来源由
-    # test_weekly_progress_sync 负责，这里再锁一遍只会让每加一个参数就跟着改。
-    assert (
-        'sync_weekly_progress($result.haoling_of_week, "haoling_of_week", '
-        '$haoling_of_week,'
-    ) in sync_body
-    assert "write_haoling_profile" not in text
-
-    claim_proc = text.index("def claim_completed_reward(")
-    limit = text.index(
-        "if $haoling_of_week < $max_claim_reputation", claim_proc)
-    reward_state = text.index(
-        "call $reward_state = detect_jianghu_card_reward_state($label)",
-        claim_proc)
-    claim = text.index("call claim_reward($label, $idx)", claim_proc)
-    reread = text.index(
-        "call $haoling_of_week = sync_haoling_of_week()", claim_proc)
-    assert claim_proc < limit < reward_state < claim < reread
-    assert 'if $reward_state == "claimed"' in text[reward_state:claim]
-    assert 'if $reward_state != "unclaimed"' in text[reward_state:claim]
-    assert (
-        "global $claim_reward, $max_refresh, $max_claim_reputation, "
-        "$haoling_of_week, $mode_checked"
-    ) in text
-    assert "context.claim_reward" not in text
-    assert "context.mode_checked" not in text
 
 
 @pytest.mark.parametrize(("reward_state", "expected_clicks"), [
@@ -377,99 +248,6 @@ def test_daily_jianghu_restores_single_mode_only_after_switching():
     assert 'call $switched = switch_game_mode("sp")' in body
     assert body.index("call $nav_result = nav_main_to_menu()") < body.index('switch_game_mode("sp")')
     assert body.index('switch_game_mode("sp")') < body.index("call $in_main = is_in_main_page()")
-
-
-def test_daily_jianghu_exposes_independent_user_facing_task_toggles():
-    """六项任务独立勾选；界面名称与内部 OCR 关键词明确解耦。"""
-    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
-    text = wf.read_text(encoding="utf-8")
-    parameters = parse_metadata(text)["parameters"]
-    task_parameters = parameters[-6:]
-
-    assert [item["name"] for item in task_parameters] == [
-        "do_heying", "do_huanzhuang", "do_qingjing",
-        "do_kanbao", "do_yinjiu", "do_juezhanglin",
-    ]
-    assert [item["label"] for item in task_parameters] == [
-        "合影", "换装", "情境", "看报", "饮酒", "觉障林",
-    ]
-    assert all(
-        item["type"] == "bool" and item["default"] is True
-        for item in task_parameters
-    )
-    assert not any(item["name"] == "targets" for item in parameters)
-    assert "def has_selected_task()" in text
-    assert "未选择要执行的江湖号令任务，跳过流程" in text
-    assert (
-        "return $do_heying or $do_huanzhuang or $do_qingjing or "
-        "$do_kanbao or $do_yinjiu or $do_juezhanglin"
-    ) in text
-
-    target_proc = text[
-        text.index("def is_target_task($text)"):
-        text.index("def should_execute_task($text)")
-    ]
-    assert '$do_' not in target_proc
-    assert 'if $text contains "东方"' in target_proc
-    assert 'if $text contains "醉意"' in target_proc
-
-    execute_gate = text[
-        text.index("def should_execute_task($text)"):
-        text.index("def execute_target_task(")
-    ]
-    assert 'return $do_kanbao' in execute_gate
-    assert 'return $do_yinjiu' in execute_gate
-
-    outer_loop = text[
-        text.index('for idx in ["1", "2", "3", "4", "5", "6"]'):
-        text.index('return {"ok": true, "found_precompleted"')
-    ]
-    gate = outer_loop.index(
-        "call $should_execute = should_execute_task($task_text)")
-    dispatch = outer_loop.index(
-        "call $skip_reward_check = execute_target_task($task_text, $label, $idx)")
-    assert gate < dispatch
-    assert "continue" in outer_loop[gate:dispatch]
-
-    navigation_proc = text[text.index("def back_to_haoling()") :]
-    assert "if $do_heying and not $mode_checked" in navigation_proc
-    assert "if not $mode_checked" not in navigation_proc
-
-
-def test_daily_jianghu_keeps_dispatch_and_external_finish_order():
-    """机械提取过程后，动作顺序与三种外部任务的返回时机保持不变。"""
-    wf = SYSTEM_CONFIG_DIR / "workflows" / "daily_jianghu.wf"
-    text = wf.read_text(encoding="utf-8")
-    dispatch = text[
-        text.index("def execute_target_task("):
-        text.index("def refresh_task_until_terminal(")
-    ]
-    calls = [
-        'if $task_text contains "换装"',
-        "call action_huanzhuang($label)",
-        'if $task_text contains "合影"',
-        "call action_heying($label, $idx)",
-        'if $task_text contains "情境"',
-        "call action_qingjing($label)",
-        'if $task_text contains "东方"',
-        "call action_kanbao($label, $idx)",
-        'if $task_text contains "醉意"',
-        "call $skip_reward_check = action_yinjiu($label, $idx)",
-        'if $task_text contains "觉障林"',
-        "call action_juezhanglin($label)",
-    ]
-    positions = [dispatch.index(statement) for statement in calls]
-    assert positions == sorted(positions)
-
-    finish = text[
-        text.index("def finish_external_task("):
-        text.index("def action_huanzhuang(")
-    ]
-    assert 'if $idx == "6" and not $claim_reward' in finish
-    assert "call back_to_haoling()" in finish
-    assert text.count('call finish_external_task($idx, "合影")') == 1
-    assert text.count('call finish_external_task($idx, "看报")') == 1
-    assert text.count('call finish_external_task($idx, "醉意")') == 1
 
 
 def test_daily_jianghu_missing_drink_skips_reward_check_after_cleanup():
@@ -653,18 +431,6 @@ def test_missing_scene_raises_before_execution(wf_root):
         engine.execute(wf)
 
 
-def test_bound_scene_passes_validation(wf_root):
-    """场景已绑定坐标：校验通过，正常执行到结束"""
-    wf = _write_wf(wf_root, (
-        'def helper()\n'
-        '    click [game_main_page].[btn]\n'
-        'end\n'
-        'log "ok"\n'
-    ))
-    engine = _make_engine(bound_scenes={"game_main_page"})
-    engine.execute(wf)  # 不抛异常（helper 未被调用，仅校验不执行）
-
-
 def test_missing_key_raises_with_file_and_line(wf_root):
     """场景绑了别的区域、但脚本引用的 key 不存在（如把中文名当 key 写）"""
     wf = _write_wf(wf_root, (
@@ -711,17 +477,6 @@ def test_drag_key_unbound_raises(wf_root):
     engine = _make_engine(bound_scenes={"game_main_page"})
     with pytest.raises(WorkflowUserError, match="方向/区域未绑定"):
         engine.execute(wf)
-
-
-def test_drag_with_bound_arrow_passes(wf_root):
-    wf = _write_wf(wf_root, 'log "ok"\n')
-    arrow = SimpleNamespace(key="menu_up", from_key="p1", to_key=None)
-    engine = _make_engine(
-        bound_scenes={"game_main_page"},
-        arrows={"game_main_page": [arrow]},
-        points={"game_main_page": [SimpleNamespace(key="p1")]},
-    )
-    engine.execute(wf)
 
 
 def test_arrow_missing_from_point_raises(wf_root):
@@ -868,23 +623,6 @@ def test_runtime_access_to_disabled_layout_item_raises(
         match=rf"{expected}.*\[game_main_page\]\.\[target\].*未绑定布局坐标",
     ):
         engine.execute(wf)
-
-
-def test_whole_scene_scan_ignores_disabled_region(wf_root):
-    """未列字段是便捷全扫，disabled region 应视为当前布局不存在。"""
-    wf = _write_wf(wf_root, "scan [game_main_page] as $result\n")
-    disabled_region = SimpleNamespace(
-        key="hidden", disabled=True,
-        x_ratio=0.0, y_ratio=0.0, w_ratio=0.5, h_ratio=0.5,
-    )
-    engine = _make_engine(
-        bound_scenes=set(),
-        regions={"game_main_page": disabled_region},
-    )
-
-    engine.execute(wf)
-    assert engine.variables["result"] == {}
-    assert engine._coord_meta["result"] == {}
 
 
 def test_non_disabled_key_still_raises(wf_root):

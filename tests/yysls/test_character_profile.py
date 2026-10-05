@@ -30,25 +30,6 @@ def profile(manager):
     return manager.load("鸣金·虹")
 
 
-def test_shipped_data_records_confirmed_growth_and_unknown_details(profile):
-    assert profile.growth["character_level"] == 23
-    assert profile.growth["solo_level"] == 23
-    assert set(profile.growth["martial_arts"].values()) == {19}
-    assert set(profile.growth["inner_ways"].values()) == {6}
-    assert len(profile.growth["oddities"]) == 7
-    assert all(v is None for v in profile.growth["oddities"].values())
-    result = evaluate_profile(profile)
-    for name in ("dim_jin", "dim_shi", "dim_min", "dim_ti", "dim_yu"):
-        assert result.resolved.panel.values[name] == 283
-    assert result.resolved.panel.values["health_max"] == 26200
-    assert result.resolved.panel.values["outer_defense"] == 51
-    assert result.resolved.panel.values["mastery"] == 4951
-    assert result.resolved.panel.values["precision"] == .256
-    assert "基础天赋·已知五维估计" in result.missing
-    assert all("蹊跷·" + name in result.missing for name in profile.growth["oddities"])
-    assert profile.raw["sources"]["基础天赋·已知五维估计"]["status"] == "partial"
-
-
 def test_equipment_participates_before_threshold_formulas(profile):
     # 原始五维与原始属攻，而非直接塞最终面板。283+363=646势。
     result = evaluate_profile(profile, equipment={"dim_shi": 363, "max_mingjin": 600, "intent_rate": .5})

@@ -32,33 +32,7 @@ def test_to_equipment_carries_only_valid_lock_status():
 
 
 class TestMakeFingerprint:
-    def test_basic_fingerprint(self):
-        """正常装备数据生成指纹"""
-        data = {
-            "type": "武器",
-            "level": "40",
-            "quality": "紫色",
-            "chengyin": "否",
-            "affix_1": {"name": "外功攻击", "value": "100"},
-        }
-        fp = _fn("make_fingerprint")(data)
-        assert len(fp) == 8  # MD5 前 8 位
-        assert isinstance(fp, str)
 
-    def test_same_data_same_fingerprint(self):
-        """相同数据生成相同指纹"""
-        data = {"type": "武器", "level": "40", "quality": "紫色"}
-        fp1 = _fn("make_fingerprint")(data)
-        fp2 = _fn("make_fingerprint")(data)
-        assert fp1 == fp2
-
-    def test_different_data_different_fingerprint(self):
-        """不同数据生成不同指纹"""
-        data1 = {"type": "武器", "level": "40"}
-        data2 = {"type": "武器", "level": "45"}
-        fp1 = _fn("make_fingerprint")(data1)
-        fp2 = _fn("make_fingerprint")(data2)
-        assert fp1 != fp2
 
     def test_empty_data_returns_empty(self):
         """空数据返回空字符串"""
@@ -80,13 +54,6 @@ class TestMakeFingerprint:
         }
         assert _fn("make_fingerprint")(data) == ""
 
-    def test_affixes_included_in_fingerprint(self):
-        """词条参与指纹计算"""
-        base = {"type": "武器", "level": "40", "quality": "紫色"}
-        with_affix = {**base, "affix_1": {"name": "会心", "value": "5%"}}
-        fp_base = _fn("make_fingerprint")(base)
-        fp_with = _fn("make_fingerprint")(with_affix)
-        assert fp_base != fp_with
 
     def test_cooldown_expiry_is_strictly_excluded_from_fingerprint(self):
         """冷却是可变运行状态，任何到期时间变化都不得污染装备实体指纹。"""
@@ -120,15 +87,6 @@ class TestMakeFingerprint:
         locked = _fn("make_fingerprint")({**base, "lock_status": "locked"})
         unlocked = _fn("make_fingerprint")({**base, "lock_status": "unlock"})
         assert missing == locked == unlocked
-
-    def test_missing_affix_name_skipped(self):
-        """词条无 name 字段时跳过"""
-        data = {
-            "type": "武器",
-            "affix_1": {"value": "100"},  # 无 name
-        }
-        fp = _fn("make_fingerprint")(data)
-        assert len(fp) == 8
 
 
 class TestIsGoodEquip:

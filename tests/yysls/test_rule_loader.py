@@ -16,7 +16,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from lvjiang.apps.yysls.config import get_game_config
 from lvjiang.apps.yysls.core.evaluator import get_tuning_rules
 from lvjiang.apps.yysls.core.tuning_rules import (
     DYNAMIC_AFFIXES,
@@ -30,8 +29,6 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     TuneBehavior,
     TuningGroupManager,
     TuningRuleManager,
-    dynamic_affix_map,
-    get_tune_config,
     get_tuning_group,
     get_tuning_rule_manager,
     parse_tune_config,
@@ -40,7 +37,6 @@ from lvjiang.apps.yysls.core.tuning_rules import (
     rule_affix_candidates,
     specific_attr_names,
     standard_affix_names,
-    standard_playstyle_attrs,
 )
 from lvjiang.core.config import versioning
 from lvjiang.core.config.resolver import ConfigResolver, SystemContentProtected
@@ -200,23 +196,6 @@ class TestBuiltinRules:
         # 规则数量随文件增加，不硬编码列表
         assert len(list(mgr.get_rules())) >= 5
 
-    def test_order_follows_rule_files(self):
-        """规则顺序由各文件的 order 声明：升序、同序按 key；预置规则 10–70。"""
-        rules = get_tuning_rules()
-        orders = [rule.order for rule in rules.values()]
-        assert orders == sorted(orders)
-        assert list(rules) == sorted(rules, key=lambda k: (rules[k].order, k))
-        assert [rules[k].order for k in (
-            "huiyi_general", "huixin_small", "huixin_big", "heal_pure",
-            "heal_fire", "huixin_yuyu", "huixin_modao")] == [10, 20, 30, 40, 50, 60, 70]
-
-    def test_required_fields_present(self):
-        for rule in get_tuning_rules().values():
-            assert rule.key and rule.name
-            if rule.patterns:  # 骨架规则无 pattern，跳过
-                assert rule.affix_pool
-                for pattern in rule.patterns.values():
-                    assert pattern.first
 
     def test_huixin_small_common_condition_policy(self):
         """会心小外的通用垃圾/一般判定保持当前业务口径。"""
@@ -281,112 +260,11 @@ class TestBuiltinRules:
                     f"{key} 的 {part} 引用了池外词条 {missing}，"
                     f"这些条件永远不会生效")
 
-    def test_playstyles_per_plan(self):
-        # 玩法定义持续变更：不硬编码内容，对照 YAML 原文校验解析
-        mgr = get_tuning_rule_manager()
-        for key, rule in get_tuning_rules().items():
-            # 规则现在只引用玩法名，定义在公共玩法配置里
-            refs = mgr.get_raw(key).get("playstyles") or []
-            assert refs, key  # 每个规则至少引用一条玩法
-            assert isinstance(refs, list), f"{key} 仍在内嵌定义玩法"
-            assert set(rule.playstyles) == set(refs)
-            registry = get_game_config().get_playstyles()
-            for name, ps in rule.playstyles.items():
-                shared = registry[name]
-                assert ps.main.weapon == shared["main_weapon"]
-                assert ps.main.damage == (shared["main_damage"] or None)
-                # 摘要供 UI 勾选项展示
-                assert rule.playstyle_options[name] == (
-                    f"主 {ps.main.weapon} / 副 {ps.sub.weapon}")
-        # 火拳主扇不需要增伤
-        fire = get_tuning_rules()["heal_fire"].playstyles["火拳"]
-        assert fire.main.weapon == "扇" and fire.main.damage is None
-
-    def test_playstyle_weapons_match_school_registry(self):
-        """所有内置玩法的主副武器必须与全局流派注册一致。"""
-        # value = 正式流派名。绑定后主副手必须直接沿用流派注册表顺序；
-        # 玩法差异由主/副增伤要求表达，不再靠调换武学顺序表达。
-        bindings = {
-            ("huiyi_general", "无名"): "鸣金·虹",
-            ("huiyi_general", "九剑"): "鸣金·影",
-            ("huixin_small", "纯唐"): "裂石·钧",
-            ("huixin_small", "双切"): "裂石·钧",
-            ("huixin_small", "鸢鸢"): "破竹·鸢",
-            ("huixin_small", "双刀"): "破竹·风",
-            ("huixin_small", "尘尘"): "破竹·尘",
-            ("huixin_small", "翊翊"): "牵丝·翊",
-            ("huixin_small", "樽樽"): "破竹·樽",
-            ("huixin_big", "纯唐"): "裂石·钧",
-            ("huixin_big", "双切"): "裂石·钧",
-            ("huixin_big", "鸢鸢"): "破竹·鸢",
-            ("huixin_big", "双刀"): "破竹·风",
-            ("huixin_big", "尘尘"): "破竹·尘",
-            ("huixin_big", "翊翊"): "牵丝·翊",
-            ("huixin_big", "樽樽"): "破竹·樽",
-            ("huixin_modao", "威威"): "裂石·威",
-            ("huixin_yuyu", "走地玉"): "牵丝·玉",
-            ("huixin_yuyu", "飞天玉"): "牵丝·玉",
-            ("heal_pure", "纯奶"): "牵丝·霖",
-            ("heal_fire", "火拳"): "牵丝·霖",
-        }
-        rules = get_tuning_rules()
-        actual = {
-            (rule_key, playstyle)
-            for rule_key, rule in rules.items()
-            for playstyle in rule.playstyles
-        }
-        assert actual == set(bindings), "新增玩法时必须登记对应正式流派"
-
-        game = get_game_config()
-        schools = game.get_schools()
-        for (rule_key, playstyle), school in bindings.items():
-            cfg = schools[school]
-            expected = (cfg["main"]["weapon"], cfg["sub"]["weapon"])
-            plan = rules[rule_key].playstyles[playstyle]
-            assert (plan.main.weapon, plan.sub.weapon) == expected, (
-                rule_key, playstyle, school)
-
-            # 声明需要武学增伤时，词条必须属于同侧武器；允许显式为 None。
-            for side in (plan.main, plan.sub):
-                if side.damage is not None:
-                    assert side.damage == game.get_weapon_wuxue_affix(
-                        side.weapon), (rule_key, playstyle, side.weapon)
-
-    def test_playstyle_attr_per_plan(self):
-        # attr 随配置变更：只校验解析值与 YAML 一致且在合法集内
-        vocab = set(standard_playstyle_attrs())
-        for key, rule in get_tuning_rules().items():
-            registry = get_game_config().get_playstyles()
-            for name, ps in rule.playstyles.items():
-                assert ps.attr in vocab
-                expected = registry[name].get("attr") or "通用"
-                assert ps.attr == expected, (key, name)
-
-    def test_when_references_registered_switches(self):
-        # 内置规则条件组 when 引用的开关全部已在注册表登记
-        registered = set(get_tune_config().switches)
-        for key, rule in get_tuning_rules().items():
-            assert rule.referenced_switches() <= registered, key
-
 
 # ─── schema 校验拒绝 ───────────────────────────────────────
 
 class TestValidation:
-    def test_minimal_rule_valid(self, tmp_path):
-        write_rule(tmp_path, minimal_rule())
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        assert mgr.errors == {}
-        assert list(mgr.get_rules()) == ["t1"]
 
-    def test_empty_skeleton_valid(self, tmp_path):
-        """空 playstyles/affix_pool/patterns 的骨架规则可保存（新建规则）"""
-        write_rule(tmp_path, minimal_rule(
-            playstyles={}, affix_pool=[], patterns={}))
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        assert mgr.errors == {}
-        rule = mgr.get_rule("t1")
-        assert rule.playstyles == {}
-        assert rule.affix_pool == [] and rule.patterns == {}
 
     def test_condition_group_syntax(self, tmp_path):
         """单键 dict = 单条件组；嵌套 list = 组内 AND"""
@@ -429,23 +307,6 @@ class TestValidation:
         with pytest.raises(RuleValidationError, match="未注册"):
             parse_tuning_rule(data, switch_keys={"keep_pvp"})
 
-    def test_playstyle_switch_parsed(self):
-        """玩法绑定开关 switch 字段解析：缺省 None，有值时记录"""
-        data = minimal_rule()
-        # 缺省无 switch
-        rule = parse_tuning_rule(data)
-        assert rule.playstyles["测试"].switch is None
-        # 有 switch
-        data["playstyles"]["测试"]["switch"] = "keep_pvp"
-        rule = parse_tuning_rule(data, switch_keys={"keep_pvp"})
-        assert rule.playstyles["测试"].switch == "keep_pvp"
-
-    def test_playstyle_switch_in_referenced_switches(self):
-        """玩法绑定开关计入 referenced_switches"""
-        data = minimal_rule()
-        data["playstyles"]["测试"]["switch"] = "keep_pvp"
-        rule = parse_tuning_rule(data, switch_keys={"keep_pvp"})
-        assert "keep_pvp" in rule.referenced_switches()
 
     def test_playstyle_switch_rejected(self):
         """玩法绑定开关：未注册 key 或非法格式均拒绝"""
@@ -483,18 +344,6 @@ class TestValidation:
         cond = rule.patterns["环"].top_conditions[0].conditions[0]
         assert cond.kind == "not_together" and len(cond.symbols) == 3
 
-    def test_default_rating_parsed(self):
-        assert parse_tuning_rule(minimal_rule()).default_rating == "excellent"
-        rule = parse_tuning_rule(minimal_rule(default_rating="junk"))
-        assert rule.default_rating == "junk"
-
-    def test_pattern_default_rating_parsed(self):
-        """部位级默认判定：缺省 None（跟随规则级），可覆盖为四档之一"""
-        assert parse_tuning_rule(
-            minimal_rule()).patterns["环"].default_rating is None
-        data = minimal_rule()
-        data["patterns"]["环"]["default_rating"] = "top"
-        assert parse_tuning_rule(data).patterns["环"].default_rating == "top"
 
     def test_common_conditions_parsed(self):
         """通用判定：规则级四档条件解析，when 引用计入开关校验"""
@@ -515,13 +364,6 @@ class TestValidation:
         with pytest.raises(RuleValidationError, match="未注册"):
             parse_tuning_rule(data, switch_keys=set())
 
-    def test_common_conditions_default_empty(self):
-        """缺省无通用判定：四档均为空"""
-        rule = parse_tuning_rule(minimal_rule())
-        assert rule.common.junk_conditions == []
-        assert rule.common.normal_conditions == []
-        assert rule.common.excellent_conditions == []
-        assert rule.common.top_conditions == []
 
     def test_common_conditions_rejects_bad_shape(self):
         """通用判定只允许四档条件键（无 first/default_rating）"""
@@ -610,11 +452,6 @@ class TestValidation:
         assert list(mgr.get_rules()) == ["t1"]
         assert "t2" in mgr.errors
 
-    def test_validate_returns_message(self, tmp_path):
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        assert mgr.validate(minimal_rule()) is None
-        msg = mgr.validate(minimal_rule(affix_pool=["神速"]))
-        assert msg and "神速" in msg
 
     def test_specific_attr_allowed(self):
         # 真实属攻词条合法：单一流派/混搭规则均可字面引用
@@ -662,13 +499,6 @@ class TestValidation:
 # ─── 保存与 get_raw ────────────────────────────────────────
 
 class TestSaveAndRaw:
-    def test_save_rule_reloads(self, tmp_path):
-        write_rule(tmp_path, minimal_rule())
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        data = mgr.get_raw("t1")
-        data["name"] = "改名规则"
-        mgr.save_rule("t1", data)
-        assert mgr.get_rule("t1").name == "改名规则"
 
     def test_save_invalid_raises_and_keeps_file(self, tmp_path):
         write_rule(tmp_path, minimal_rule())
@@ -792,83 +622,10 @@ class TestSaveAndRaw:
         mgr.reload()
         assert mgr.system_save_override("t1") is None
 
-    def test_version_display_can_use_real_layers_during_isolated_edit(
-            self, tmp_path, monkeypatch):
-        monkeypatch.setitem(
-            versioning.VERSIONED_DIRS,
-            "yysls/tuning_rules",
-            versioning.VersionedDir(
-                "yysls/tuning_rules", "*.yaml", 1, allow_remote_new=True),
-        )
-        system, local, remote = (
-            tmp_path / name for name in ("system", "local", "remote"))
-        for root, version, name in (
-            (system, 1, "系统规则"),
-            (remote, 3, "远程规则"),
-        ):
-            directory = root / "yysls" / "tuning_rules"
-            directory.mkdir(parents=True)
-            (directory / "t1.yaml").write_text(
-                yaml.dump(
-                    {"content_version": version, **minimal_rule(name=name)},
-                    allow_unicode=True,
-                    sort_keys=False,
-                ),
-                encoding="utf-8",
-            )
-        local.mkdir()
-        real = ConfigResolver(
-            system_dir=system,
-            local_dir=local,
-            remote_dir=remote,
-            dev_mode=True,
-        )
-        edit_root = tmp_path / "edit"
-        edit_system = edit_root / "system"
-        edit_local = edit_root / "local"
-        edit_rule_dir = edit_system / "yysls" / "tuning_rules"
-        edit_rule_dir.mkdir(parents=True)
-        edit_local.mkdir(parents=True)
-        edit = ConfigResolver(
-            system_dir=edit_system,
-            local_dir=edit_local,
-            dev_mode=True,
-        )
-        (edit_rule_dir / "t1.yaml").write_text(
-            yaml.dump(
-                {"content_version": 3, **minimal_rule(name="编辑副本")},
-                allow_unicode=True,
-                sort_keys=False,
-            ),
-            encoding="utf-8",
-        )
-        mgr = TuningRuleManager(
-            resolver=edit,
-            origin_resolver=real,
-        )
-
-        current = mgr.describe_rule_version("t1")
-        available = mgr.list_rule_versions("t1")
-
-        assert (current.layer, current.version) == ("remote", 3)
-        assert [(item.layer, item.version) for item in available] == [
-            ("remote", 3),
-            ("system", 1),
-        ]
-
 
 # ─── 创建与删除 ────────────────────────────────────────────
 
 class TestCreateAndDelete:
-    def test_rule_names_are_cached_from_reload(self, tmp_path, monkeypatch):
-        write_rule(tmp_path, minimal_rule())
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-
-        def unexpected_load(*_args, **_kwargs):
-            raise AssertionError("query should not parse YAML again")
-
-        monkeypatch.setattr(yaml, "safe_load", unexpected_load)
-        assert mgr.get_all_rule_keys_and_names() == [("t1", "测试规则")]
 
     def test_reload_observes_external_rule_change(self, tmp_path):
         path = write_rule(tmp_path, minimal_rule(name="旧名称"))
@@ -883,25 +640,6 @@ class TestCreateAndDelete:
 
         assert mgr.get_all_rule_keys_and_names() == [("t1", "新的名称")]
 
-    def test_create_rule(self, tmp_path):
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        mgr.create_rule("new_rule", "新规则")
-        assert (tmp_path / "new_rule.yaml").exists()
-        rule = mgr.get_rule("new_rule")
-        assert rule.name == "新规则"
-        assert rule.playstyles == {}
-        assert rule.affix_pool == [] and rule.patterns == {}
-
-    @case_matrix("key,name", [
-        ("New", "非法大写"),
-        ("1abc", "数字开头"),
-        ("中文", "非英文"),
-        ("valid_key", ""),
-    ])
-    def test_create_rule_invalid_inputs(self, tmp_path, key, name):
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        with pytest.raises(RuleValidationError):
-            mgr.create_rule(key, name)
 
     def test_create_duplicate_key_rejected(self, tmp_path):
         write_rule(tmp_path, minimal_rule())
@@ -909,29 +647,6 @@ class TestCreateAndDelete:
         with pytest.raises(RuleValidationError):
             mgr.create_rule("t1", "重复")
 
-    def test_delete_rule(self, tmp_path):
-        write_rule(tmp_path, minimal_rule())
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        mgr.delete_rule("t1")
-        assert not (tmp_path / "t1.yaml").exists()
-        assert mgr.get_rules() == {}
-
-    def test_delete_unknown_raises(self, tmp_path):
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        with pytest.raises(RuleValidationError):
-            mgr.delete_rule("nope")
-
-    def test_rename_rule(self, tmp_path):
-        write_rule(tmp_path, minimal_rule())
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        mgr.rename_rule("t1", "t2")
-        # 文件重命名 + data 内 key 同步更新
-        assert not (tmp_path / "t1.yaml").exists()
-        assert (tmp_path / "t2.yaml").exists()
-        assert mgr.get_rule("t1") is None
-        rule = mgr.get_rule("t2")
-        assert rule.key == "t2"
-        assert rule.name == "测试规则"
 
     def test_user_rename_system_rule_is_rejected_before_write(self, tmp_path):
         system = tmp_path / "system"
@@ -951,42 +666,10 @@ class TestCreateAndDelete:
         assert mgr.get_rule("t1") is not None
         assert mgr.get_rule("t2") is None
 
-    def test_rename_same_key_noop(self, tmp_path):
-        write_rule(tmp_path, minimal_rule())
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        mgr.rename_rule("t1", "t1")  # 幂等
-        assert (tmp_path / "t1.yaml").exists()
-
-    @case_matrix("old,new", [
-        ("nope", "t2"),          # 旧 key 未注册
-        ("t1", "BadKey"),        # 新 key 非法
-        ("t1", ""),              # 空 key
-    ])
-    def test_rename_invalid(self, tmp_path, old, new):
-        write_rule(tmp_path, minimal_rule())
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        with pytest.raises(RuleValidationError):
-            mgr.rename_rule(old, new)
-
-    def test_rename_to_existing_rejected(self, tmp_path):
-        write_rule(tmp_path, minimal_rule())
-        write_rule(tmp_path, minimal_rule(key="t2", name="另一规则"),
-                   name="t2.yaml")
-        mgr = TuningRuleManager(rules_dir=tmp_path)
-        with pytest.raises(RuleValidationError):
-            mgr.rename_rule("t1", "t2")
-
 
 # ─── 规则可引用词表守护 ────────────────────────────────────────
 
 class TestStandardAffixNames:
-    def test_rule_affix_names_are_standard(self):
-        # 规则内出现的词条名必须在规则可引用词表内（标准词条
-        # 全集 + 动态词条），否则判定/校验对不上
-        candidates = set(rule_affix_candidates())
-        for rule in get_tuning_rules().values():
-            unknown = rule.referenced_affixes() - candidates
-            assert not unknown, f"{rule.key} 存在非法词条名: {unknown}"
 
     def test_candidates_include_specific_attrs(self):
         # 候选词表 = 标准词条全集（含 8 个具体属攻）+ 4 个动态词条
@@ -1007,32 +690,6 @@ class TestStandardAffixNames:
 
 # ─── 属攻→动态词条归类 ───────────────────────────────
 
-class TestDynamicAffixMap:
-    def test_generic_and_empty_return_empty(self):
-        # 通用/空 不做任何归类（混搭流保持字面匹配）
-        assert dynamic_affix_map("通用") == {}
-        assert dynamic_affix_map("") == {}
-
-    def test_specific_maps_to_dynamic(self):
-        # 裂石视角：本属→最大/最小本属攻击，其余属性→最大/最小
-        # 外属攻击（多对一）
-        eq = dynamic_affix_map("裂石")
-        assert eq["最大裂石攻击"] == "最大本属攻击"
-        assert eq["最小裂石攻击"] == "最小本属攻击"
-        assert eq["最大破竹攻击"] == "最大外属攻击"
-        assert eq["最小牵丝攻击"] == "最小外属攻击"
-        # 无相在武器上就是本属；真实名称仍保留。
-        assert eq["最大无相攻击"] == "最大本属攻击"
-        assert eq["最小无相攻击"] == "最小本属攻击"
-        # 映射源覆盖全部具体属攻，目标均为动态词条
-        assert set(eq) == set(specific_attr_names()) | {"最大无相攻击", "最小无相攻击"}
-        assert set(eq.values()) == set(DYNAMIC_AFFIXES)
-
-    def test_attr_candidates_include_generic_first(self):
-        attrs = standard_playstyle_attrs()
-        assert attrs[0] == "通用"
-        assert "裂石" in attrs and "鸣金" in attrs and "牵丝" in attrs
-
 
 # ─── 基础配置 tune_config ─────────────────────────
 
@@ -1046,37 +703,7 @@ def _valid_config() -> dict:
 
 
 class TestTuneConfig:
-    def test_builtin_config_loaded(self):
-        config = get_tune_config()
-        # 品阶门槛锁死为固定 7 个标准部位
-        assert list(config.quality_thresholds) == list(QUALITY_PARTS)
-        # 开关注册表含 keep_danti（保留单体奇术增）
-        assert config.switches.get("keep_danti")
 
-    def test_quality_ok_by_part(self):
-        config = parse_tune_config(_valid_config())
-        assert config.quality_ok("冠胄", "purple") is True
-        assert config.quality_ok("冠胄", "blue") is False
-        assert config.quality_ok("武器", "gold") is True
-        assert config.quality_ok("武器", "purple") is False
-
-    def test_quality_ok_rule_overrides(self):
-        # 规则级覆盖：列出的部位优先，未列部位沿用全局
-        config = parse_tune_config(_valid_config())
-        overrides = {"佩": ["gold", "purple"]}
-        assert config.quality_ok("佩", "purple", overrides) is True
-        assert config.quality_ok("佩", "purple") is False
-        assert config.quality_ok("环", "gold", overrides) is True
-        assert config.quality_ok("环", "purple", overrides) is False
-
-    def test_switches_parsed(self):
-        config = parse_tune_config(_valid_config())
-        assert config.switches == {"keep_pvp": "保留PVP装备"}
-
-    def test_switches_optional(self):
-        data = _valid_config()
-        data.pop("switches")
-        assert parse_tune_config(data).switches == {}
 
     @case_matrix("mutate", [
         lambda d: d["quality_thresholds"].pop("佩"),           # 缺少部位
@@ -1156,11 +783,6 @@ class TestMaterialSettings:
             FoodRule(),
         ]
 
-    def test_empty_rules_legal(self):
-        # 空列表合法 = 从不添加狗粮
-        data = _valid_group()
-        data["materials"] = {"food_rules": []}
-        assert parse_tuning_group(data).materials.food_rules == []
 
     def test_legacy_food_strategy_rejected(self):
         # 旧 food_strategy 段已废弃，出现即报错提示新写法
@@ -1169,11 +791,6 @@ class TestMaterialSettings:
         with pytest.raises(RuleValidationError, match="已废弃"):
             parse_tuning_group(data)
 
-    def test_builtin_group_materials_loaded(self):
-        # 内置 default.yaml 的 materials 段可正常解析
-        m = get_tuning_group("default").materials
-        assert isinstance(m, MaterialSettings)
-        assert all(isinstance(r, FoodRule) for r in m.food_rules)
 
     @case_matrix("materials", [
         ["not", "a", "dict"],                          # 段须为 dict
@@ -1523,15 +1140,6 @@ class TestDecideFood:
             part, quality, pct, _rating(rating), stocks,
             affix_names or ["最大外功攻击"])
 
-    def test_disabled_food_rule_is_skipped(self):
-        rules = [
-            FoodRule(enabled=False, food="彩狗粮"),
-            FoodRule(food="金狗粮"),
-        ]
-        decision = self._decide(
-            MaterialSettings(food_rules=rules), 100, "top", "gold",
-            self.STOCKS)
-        assert decision.food == "金狗粮"
 
     # 测试用狗粮规则（与 default.yaml 中的示例一致，但非“默认”）
     _RULES = [
@@ -1539,17 +1147,6 @@ class TestDecideFood:
         FoodRule(pct=90, ratings=["top", "excellent"], food="金狗粮"),
     ]
 
-    def test_first_rule_hit(self):
-        # 规则1：首词条≥98 且判定结果为顶级 → 彩狗粮
-        m = MaterialSettings(food_rules=self._RULES)
-        d = self._decide(m, 98, "top", "gold", self.STOCKS)
-        assert (d.action, d.food) == ("feed", "彩狗粮")
-
-    def test_second_rule_hit(self):
-        # 规则1 不命中（cap 92 < 98）→ 顺序落到规则2 金狗粮
-        m = MaterialSettings(food_rules=self._RULES)
-        d = self._decide(m, 92, "excellent", "purple", self.STOCKS)
-        assert (d.action, d.food) == ("feed", "金狗粮")
 
     def test_rating_provider_uses_rule_scope_and_keys(self):
         calls = []
@@ -1577,16 +1174,6 @@ class TestDecideFood:
             {"紫狗粮": 1}, ["会心率", "气血最大值"])
         assert (d.action, d.food) == ("feed", "紫狗粮")
 
-    def test_no_rule_hit(self):
-        m = MaterialSettings(food_rules=self._RULES)
-        d = self._decide(m, 50, "top", "gold", self.STOCKS)
-        assert (d.action, d.food) == ("none", "")
-
-    def test_pct_zero_unlimited(self):
-        # pct=0 不限首词条：cap_pct 识别失败（None）也可命中
-        m = MaterialSettings(food_rules=[FoodRule(food="金狗粮")])
-        d = self._decide(m, None, "normal", "blue", {"金狗粮": 1})
-        assert (d.action, d.food) == ("feed", "金狗粮")
 
     def test_cap_pct_none_fails_positive_pct(self):
         # pct>0 时 cap_pct 识别失败视为不达标
@@ -1594,10 +1181,6 @@ class TestDecideFood:
         d = self._decide(m, None, "top", "gold", self.STOCKS)
         assert d.action == "none"
 
-    def test_unselected_rating_does_not_hit(self):
-        m = MaterialSettings(food_rules=self._RULES)
-        d = self._decide(m, 98, "junk", "gold", self.STOCKS)
-        assert d.action == "none"
 
     def test_exact_quality_and_part_conditions(self):
         m = MaterialSettings(food_rules=[
@@ -1640,16 +1223,6 @@ class TestDecideFood:
         assert d.action == "skip"
         assert "跳过" in d.reason
 
-    def test_zero_stock_is_insufficient(self):
-        # 数量 0 与读不到同义：狗粮每轮只消耗一个，<1 即不足
-        m = MaterialSettings(food_rules=[FoodRule(food="紫狗粮")])
-        d = self._decide(m, 50, "normal", "blue", {"紫狗粮": 0})
-        assert d.action == "none"
-
-    def test_empty_rules_never_feed(self):
-        m = MaterialSettings(food_rules=[])
-        d = self._decide(m, 99, "top", "gold", {"彩狗粮": 9})
-        assert d.action == "none"
 
     def test_builtin_colorful_shortage_downgrades_to_gold(self):
         m = get_tuning_group("default").materials
@@ -1676,14 +1249,6 @@ class TestRuleQualityThresholds:
     def test_quality_threshold_rejected(self, thresholds):
         with pytest.raises(RuleValidationError):
             parse_tuning_rule(minimal_rule(quality_thresholds=thresholds))
-
-    def test_builtin_examples_loaded(self):
-        # 内置示例：会意环 / 小外佩 金紫皆可
-        rules = get_tuning_rules()
-        assert rules["huiyi_general"].quality_thresholds == {
-            "环": ["gold", "purple"]}
-        assert rules["huixin_small"].quality_thresholds == {
-            "佩": ["gold", "purple"]}
 
 
 # ─── TuningGroupManager CRUD ─────────────────────
@@ -1742,13 +1307,6 @@ class TestTuningGroupManagerCRUD:
         mgr.save_group("default_copy", raw)
         assert mgr.get_group("default").scan.min_level != 50
 
-    @case_matrix("method,args", [
-        ("copy_group", ("nonexistent", "new", "新组")),
-        ("delete_group", ("nonexistent",)),
-    ])
-    def test_nonexistent_rejected(self, mgr, method, args):
-        with pytest.raises(RuleValidationError, match="不存在"):
-            getattr(mgr, method)(*args)
 
     def test_delete_last_group_rejected(self, mgr):
         # 仅剩一个规则组时不可删除

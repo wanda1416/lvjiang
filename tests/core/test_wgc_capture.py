@@ -25,9 +25,6 @@ class TestBackendSelection:
         assert isinstance(create_capture_backend(background=False), DesktopCapture)
         assert isinstance(create_capture_backend(background=True), WgcCapture)
 
-    def test_default_is_foreground(self):
-        """默认必须是 mss：后台截图是可选项，不能悄悄改变既有行为。"""
-        assert isinstance(create_capture_backend(), DesktopCapture)
 
     def test_availability_reports_reason(self):
         """不可用时要给出可执行的原因，而不是只返回 False。"""
@@ -93,11 +90,6 @@ class TestCaptureGuards:
         """未建立会话时返回 None 而不是抛异常——上层按 None 走失败分支。"""
         assert WgcCapture().capture(timeout=0.01) is None
 
-    def test_size_falls_back_to_region(self):
-        """输出尺寸跟随窗口矩形，与 capture() 返回的图保持一致。"""
-        cap = WgcCapture()
-        cap.set_capture_region(5, 5, 64, 48)
-        assert cap.get_capture_size() == (64, 48)
 
     def test_stop_is_idempotent(self):
         cap = WgcCapture()

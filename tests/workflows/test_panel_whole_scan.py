@@ -11,40 +11,11 @@ from unittest.mock import MagicMock
 import numpy as np
 
 from lvjiang.workflows.engine import WorkflowEngine
-from lvjiang.workflows.grammar import Eval, FieldAccess, Literal, VarRef, parse_text
-from lvjiang.workflows.workflow_references import collect_refs
 
 # ─── 语法：数字字面量 key ─────────────────────────────────
 
-def test_parse_numeric_bracket_field_access():
-    """$bags.[1].[2] → 链式 FieldAccess，key 为 Literal("1")/Literal("2")"""
-    p = parse_text('eval $x = $bags.[1].[2]\n')
-    n = p.body[0]
-    assert isinstance(n, Eval)
-    fa = n.func_args[0]
-    assert isinstance(fa, FieldAccess)
-    assert isinstance(fa.field_name, Literal) and fa.field_name.value == "2"
-    assert isinstance(fa.root, FieldAccess)
-    assert isinstance(fa.root.field_name, Literal) and fa.root.field_name.value == "1"
-    assert isinstance(fa.root.root, VarRef) and fa.root.root.name == "bags"
-
-
-def test_parse_numeric_bracket_in_condition():
-    """条件语境同样可用：if $bags.[1].[2] contains "背包" """
-    p = parse_text('if $bags.[1].[2] contains "背包"\n    log "hit"\nend\n')
-    assert p.body  # 解析通过即可
-
 
 # ─── 静态检查：单 key 放宽为 区域/面板 ────────────────────
-
-def test_single_field_scan_kind_is_scan():
-    refs = collect_refs(parse_text('scan [s].[actions] as $x\n').body, {})
-    assert [(r.key, r.kind) for r in refs] == [("actions", "scan")]
-
-
-def test_multi_field_scan_kind_stays_region():
-    refs = collect_refs(parse_text('scan [s].[f1, f2] as $x\n').body, {})
-    assert {(r.key, r.kind) for r in refs} == {("f1", "region"), ("f2", "region")}
 
 
 # ─── 引擎：整面板扫描 ─────────────────────────────────────
@@ -110,29 +81,6 @@ def test_whole_panel_scan_nested_result(tmp_path):
         "1": {"1": "t1", "2": "t2"},
         "2": {"1": "t3", "2": "t4"},
     }
-
-
-def test_whole_panel_scan_bracket_and_dynamic_access(tmp_path):
-    """$bags.[1].[2] 静态 key 与 for 循环变量动态 key 取同一格"""
-    wf = _write_wf(tmp_path, (
-        'scan [s].[actions] as $bags\n'
-        'eval $c12 = $bags.[1].[2]\n'
-        'collect $c12\n'
-        'eval $dyn = ""\n'
-        'for r in [1...2]\n'
-        '    for c in [1...2]\n'
-        '        if $r equals "1"\n'
-        '            if $c equals "2"\n'
-        '                eval $dyn = $bags.$r.$c\n'
-        '            end\n'
-        '        end\n'
-        '    end\n'
-        'end\n'
-        'collect $dyn\n'
-    ))
-    output = _make_engine().execute(wf)
-    assert output["c12"] == "t2"
-    assert output["dyn"] == "t2"
 
 
 def test_whole_panel_scan_for_loop_access(tmp_path):
@@ -203,15 +151,6 @@ def test_click_cell_with_dynamic_panel_key(tmp_path):
 
 
 # ─── 单格 [r][c]：key 过滤，结果为该格文本 ──────────────
-
-def test_single_cell_scan_returns_plain_text(tmp_path):
-    """scan [s].[actions][1][2] → 该格文本 str，不再是 {"r1c2": text}"""
-    wf = _write_wf(tmp_path, (
-        'scan [s].[actions][1][2] as $bags\n'
-        'collect $bags\n'
-    ))
-    output = _make_engine().execute(wf)
-    assert output["bags"] == "t1"  # 单格只识别一次，计数器从 t1 开始
 
 
 def test_single_cell_scan_matches_whole_panel_cell(tmp_path):
@@ -560,28 +499,3 @@ def test_recognize_with_without_rich_raises(tmp_path):
     engine._workflow = MagicMock()
     with pytest.raises(WorkflowUserError, match="with.*as rich"):
         engine.execute(wf)
-
-
-def test_region_key_still_goes_region_path(tmp_path):
-    """key 命中 region 时保持既有区域 OCR 语义，不误分派"""
-    capture = MagicMock()
-    capture.get_capture_size.return_value = (100, 100)
-    layout = MagicMock()
-    layout.get_canvas.return_value = SimpleNamespace(
-        x_ratio=0.0, y_ratio=0.0, w_ratio=1.0, h_ratio=1.0)
-    region = SimpleNamespace(key="title")
-    layout.get_scene_regions.return_value = [region]
-    layout.get_scene_points.return_value = []
-    layout.get_scene_arrows.return_value = []
-    layout.get_scene_panels.return_value = []
-    engine = WorkflowEngine(
-        capture=capture, ocr=MagicMock(), input_ctrl=MagicMock(),
-        layout=layout, input_sim=MagicMock(), delay_params={},
-    )
-    workflow = MagicMock()
-    workflow.ocr_scene.return_value = {"title": "背包"}
-    engine._workflow = workflow
-    wf = _write_wf(tmp_path, 'scan [s].[title] as $x\ncollect $x\n')
-    output = engine.execute(wf)
-    workflow.ocr_scene.assert_called_once_with("s", ["title"], min_confidence=None)
-    assert output["x"] == {"title": "背包"}

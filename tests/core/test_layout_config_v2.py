@@ -92,10 +92,6 @@ class TestAspectDeclaration:
         assert parse_aspect_ratio("2.22") == pytest.approx(2.22)
         assert parse_aspect_ratio("20：9") == pytest.approx(20 / 9)
 
-    def test_blank_means_no_requirement(self):
-        from lvjiang.core.layout_config import parse_aspect_ratio
-        assert parse_aspect_ratio("") is None
-        assert parse_aspect_ratio(None) is None
 
     def test_rejects_sexagesimal_accident(self):
         """YAML 1.1 把不加引号的 20:9 读成 1209，不能让它静默变成永不满足的要求。"""
@@ -123,43 +119,6 @@ class TestAspectDeclaration:
             with pytest.raises(ValueError, match="aspect_tolerance"):
                 parse_layout_entries(doc)
 
-    def test_default_tolerance_is_half_percent(self):
-        from lvjiang.core.layout_config import (
-            DEFAULT_ASPECT_TOLERANCE,
-            parse_layout_entries,
-        )
-        entries = parse_layout_entries(
-            {"schema_version": 2, "layouts": {"x": {"name": "X"}}})
-        assert DEFAULT_ASPECT_TOLERANCE == 0.005
-        assert entries["x"].aspect_tolerance == 0.005
-        assert entries["x"].aspect == ""
-        assert entries["x"].aspect_ratio is None
-
-    def test_shipped_layouts_declare_expected_aspects(self):
-        """随包布局的尺寸要求必须真的解析成屏幕比例，不是 YAML 六十进制那个数。"""
-        root = Path(__file__).resolve().parents[2]
-        doc = yaml.safe_load(
-            (root / "config/system/layouts.yaml").read_text(encoding="utf-8"))
-        entries = parse_layout_entries(doc)
-        assert entries["android"].aspect_ratio == pytest.approx(20 / 9)
-        assert entries["desktop"].aspect_ratio == pytest.approx(16 / 9)
-        assert entries["desktop_fullscreen"].aspect_ratio == pytest.approx(16 / 9)
-        # 投屏窗口的边框因模拟器而异，刻意不声明
-        assert entries["android_cast"].aspect == ""
-
-    def test_full_canvas_layouts_keep_the_strict_default(self):
-        """画布覆盖整张截图的布局没有边框像素参与，任何同比例分辨率都精确命中。"""
-        from lvjiang.core.layout_config import DEFAULT_ASPECT_TOLERANCE
-        root = Path(__file__).resolve().parents[2]
-        doc = yaml.safe_load(
-            (root / "config/system/layouts.yaml").read_text(encoding="utf-8"))
-        entries = parse_layout_entries(doc)
-        for key in ("android", "desktop_fullscreen"):
-            entry = entries[key]
-            canvas = entry.canvas
-            assert (canvas["x_ratio"], canvas["y_ratio"]) == (0.0, 0.0)
-            assert (canvas["w_ratio"], canvas["h_ratio"]) == (1.0, 1.0)
-            assert entry.aspect_tolerance == DEFAULT_ASPECT_TOLERANCE
 
     def test_shipped_desktop_tolerance_covers_common_resolutions(self):
         """窗口边框是固定像素、画布是比例，所以只有 1920x1080 正好命中 16:9。

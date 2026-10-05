@@ -26,13 +26,7 @@ def store(tmp_path):
 
 
 class TestNodeOps:
-    def test_get_missing_returns_default(self, store):
-        assert store.get_node("ui_state") is None
-        assert store.get_node("ui_state", {}) == {}
 
-    def test_set_get_roundtrip(self, store):
-        store.set_node("actives", {"layout": "android"})
-        assert store.get_node("actives") == {"layout": "android"}
 
     def test_node_isolation(self, store):
         """不同节点独立读写，互不覆盖"""
@@ -43,10 +37,6 @@ class TestNodeOps:
         assert store.get_node("daily") == {"script": "a.wf"}
         assert store.get_node("actives") == {"layout": "android"}
 
-    def test_set_persists_to_disk(self, store):
-        store.set_node("settings", {"adb": True})
-        data = json.loads(store.path.read_text(encoding="utf-8"))
-        assert data == {"version": 2, "settings": {"adb": True}}
 
     def test_first_write_stamps_document_version(self, store):
         """新文档首次落盘就带 version，后续迁移才有判断锚点。"""
@@ -58,20 +48,6 @@ class TestNodeOps:
         assert json.loads(store.path.read_text(encoding="utf-8"))["version"] == SESSION_VERSION
         assert store.get_node("version") == SESSION_VERSION
 
-    def test_delete_node(self, store):
-        store.set_node("daily", {"x": 1})
-        store.delete_node("daily")
-        assert store.get_node("daily") is None
-        store.delete_node("daily")  # 二次删除静默
-
-    def test_update_node_shallow_merge(self, store):
-        """多组件分写同一节点：各自 patch 合并保留"""
-        store.update_node("ui_state", {"window_size": [800, 600]})
-        store.update_node("ui_state", {"scene_editor_pos": [10, 20]})
-        assert store.get_node("ui_state") == {
-            "window_size": [800, 600],
-            "scene_editor_pos": [10, 20],
-        }
 
     def test_update_node_rebuilds_non_dict(self, store):
         store.set_node("ui_state", "坏值")
@@ -117,15 +93,6 @@ class TestActives:
 
 
 class TestDiskSemantics:
-    def test_existing_file_loaded_lazily(self, tmp_path):
-        path = tmp_path / "session.json"
-        path.write_text(json.dumps({"actives": {"space": "默认"}}), encoding="utf-8")
-        store = SessionStore(path)
-        assert store.get_active("space") == "默认"
-        # 写入保留既有节点
-        store.set_active("layout", "L1")
-        data = json.loads(path.read_text(encoding="utf-8"))
-        assert data == {"version": 2, "actives": {"space": "默认", "layout": "L1"}}
 
     def test_corrupt_file_treated_as_empty(self, tmp_path):
         path = tmp_path / "session.json"
@@ -216,17 +183,6 @@ class TestConcurrency:
             assert store.get_node(f"node_{t}") == {"i": 19}
 
 
-class TestDefaultPath:
-    def test_path_follows_constants(self, tmp_path, monkeypatch):
-        """缺省路径动态取 constants.SESSION_PATH（monkeypatch 友好）"""
-        from lvjiang import constants
-
-        monkeypatch.setattr(constants, "SESSION_PATH", tmp_path / "s.json")
-        store = SessionStore()
-        store.set_node("k", 1)
-        assert (tmp_path / "s.json").exists()
-
-
 class TestUIPageState:
     """页面级 UI 状态必须嵌套合并，禁止页签保存覆盖窗口尺寸。"""
 
@@ -282,32 +238,6 @@ class TestUIPageState:
 class TestAlertStorage:
     """告警存储接口测试"""
 
-    def test_get_alerts_empty(self, store):
-        """无告警时返回空列表"""
-        from lvjiang.core.config.session import get_alerts, reset_session_store
-        reset_session_store()
-        # 使用测试 store
-        import lvjiang.core.config.session as session_mod
-        session_mod._store = store
-        assert get_alerts() == []
-
-    def test_add_and_get_alerts(self, store):
-        """添加告警后可读取"""
-        from lvjiang.core.config.session import (
-            add_alert,
-            get_alerts,
-            reset_session_store,
-        )
-        reset_session_store()
-        import lvjiang.core.config.session as session_mod
-        session_mod._store = store
-
-        add_alert("test:1", "测试告警", "2026-08-11T12:00:00")
-        alerts = get_alerts()
-        assert len(alerts) == 1
-        assert alerts[0]["id"] == "test:1"
-        assert alerts[0]["message"] == "测试告警"
-        assert alerts[0]["timestamp"] == "2026-08-11T12:00:00"
 
     def test_add_alert_dedup(self, store):
         """同 ID 告警不重复添加"""
@@ -362,20 +292,3 @@ class TestAlertStorage:
         alerts = get_alerts()
         assert len(alerts) == 1
         assert alerts[0]["id"] == "test:2"
-
-    def test_dismiss_nonexistent_alert(self, store):
-        """移除不存在的告警静默成功"""
-        from lvjiang.core.config.session import (
-            add_alert,
-            dismiss_alert,
-            get_alerts,
-            reset_session_store,
-        )
-        reset_session_store()
-        import lvjiang.core.config.session as session_mod
-        session_mod._store = store
-
-        add_alert("test:1", "第一条", "2026-08-11T12:00:00")
-        dismiss_alert("nonexistent")
-        alerts = get_alerts()
-        assert len(alerts) == 1

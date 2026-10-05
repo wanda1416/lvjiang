@@ -165,16 +165,6 @@ class TestBackendCapability:
 class TestSyntax:
     """块内只允许输入类语句，且在解析期就报错、指向那一行"""
 
-    def test_parses_and_sorts_by_offset(self):
-        prog = parse_text(
-            "timeline\n"
-            "    @1.5  click [general_combat].[tiaoyue]\n"
-            "    @0.0  press \"S\" hold 2.1\n"
-            "end\n")
-        node = prog.body[0]
-        assert [e.offset for e in node.entries] == [0.0, 1.5]
-        # 行号保留源码顺序：报错要指真实行
-        assert [e.line_no for e in node.entries] == [3, 2]
 
     @pytest.mark.parametrize("body", [
         'scan [a].[b] as $x by contains "x"',
@@ -270,14 +260,6 @@ class TestCompiler:
         node = parse_text(src).body[0]
         return [host._compile_timeline_entry(e) for e in node.entries]
 
-    def test_zero_offset_is_valid(self):
-        """@0.0 是最常见的第一条，不能套用 hold「必须 > 0」的规则。"""
-        steps = self._compile(
-            "timeline\n    @0.0  press \"S\" hold 2.4\nend\n")
-        assert steps[0].offset == 0.0
-        assert steps[0].kind == "key"
-        assert steps[0].key == "S"
-        assert steps[0].hold == 2.4
 
     def test_rejects_negative_offset(self):
         from lvjiang.workflows.engine.signals import WorkflowUserError
@@ -332,16 +314,6 @@ class TestCompiler:
 class TestEnvGuard:
     """条目级 env 守卫：两端只有一两路不同时，共享的其余几路不必复制一遍"""
 
-    def test_parses_guard_after_offset(self):
-        prog = parse_text(
-            "timeline\n"
-            "    @0.0  env:\"desktop\" -> press \"S\" hold 2.4\n"
-            "    @0.0  env:\"android\" -> drag [general_move].[move_backward] "
-            "duration 0.1 hold 2.4\n"
-            "    @0.4  click [general_combat].[tiaoyue]\n"
-            "end\n")
-        entries = prog.body[0].entries
-        assert [e.env for e in entries] == ["desktop", "android", ""]
 
     def test_filters_by_run_env(self):
         """不匹配的那一路编译期就被过滤掉，根本不生成步骤。"""

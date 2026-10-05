@@ -84,8 +84,8 @@ def test_base_view_target_requires_multi_view():
     assert validate_transitions(scenes)  # 未开启多视图却指向 base
 
 
-def test_unreachable_views_are_reported():
-    """没有任何入口的非基底视图 = 死视图，要么漏声明入口，要么不该存在。"""
+def test_unreachable_base_and_same_layer_views():
+    # unreachable_views_are_reported
     scenes = {"tune": _scene(
         "tune", views=("base", "result", "return_good"),
         regions=[RegionDef(key="tune_btn", name="调律", is_clickable=True,
@@ -94,19 +94,11 @@ def test_unreachable_views_are_reported():
     # result 有入口，return_good 没有
     assert find_unreachable_views(scenes) == ["tune/return_good"]
 
-
-def test_base_view_never_counts_as_unreachable():
-    """基底是场景入口，不需要场景内的按钮指向它。"""
+    # base_view_never_counts_as_unreachable
     scenes = {"a": _scene("a", views=("base",))}
     assert find_unreachable_views(scenes) == []
 
-
-def test_same_layer_views_are_exempt():
-    """同层视图与基底处于同一图层，只是滚动后的另一个取景，本就没有“进入”这回事。
-
-    菜单的 page_1 / page_2 就是典型：没有按钮进入它们，你只是把同一页滚过去了。
-    不豁免的话死视图检测会满屏假警报。
-    """
+    # same_layer_views_are_exempt
     scenes = {"menu": _scene(
         "menu", views=("base", "page_1", "page_2"),
         same_layer=("page_1", "page_2"))}

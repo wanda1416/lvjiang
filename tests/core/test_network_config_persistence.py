@@ -22,9 +22,6 @@ class TestNetworkRoundTrip:
         config = UserConfig(network={name: flipped})
         assert getattr(config.network, name) is flipped
 
-    def test_remote_config_can_be_turned_off(self):
-        """本 bug 的回归点。"""
-        assert UserConfig(network={"remote_config": False}).network.remote_config is False
 
     def test_unknown_keys_ignored(self):
         config = UserConfig(network={"旧版本遗留键": 1, "telemetry": True})

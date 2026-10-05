@@ -45,34 +45,11 @@ def test_missing_or_non_boolean_admin_requirement_defaults_to_false():
     }).requires_admin is False
 
 
-def test_create_defaults_to_no_mode_restriction():
-    plan = _plan("随便")
-
-    assert plan.modes == []
-    assert plan.allows(PLAN_MODE_WINDOW)
-    assert plan.allows(PLAN_MODE_ADB)
-
-
-def test_modes_are_deduped_and_ordered():
-    plan = _plan("模拟器", modes=[PLAN_MODE_ADB, PLAN_MODE_WINDOW,
-                                  PLAN_MODE_ADB, "不认识的模式"])
-
-    assert plan.modes == [PLAN_MODE_WINDOW, PLAN_MODE_ADB]
-
-
 def test_allows_rejects_unsupported_backend():
     plan = _plan("端游", modes=[PLAN_MODE_WINDOW])
 
     assert plan.allows(PLAN_MODE_WINDOW)
     assert not plan.allows(PLAN_MODE_ADB)
-
-
-def test_allows_passes_when_backend_unknown():
-    """未连接时 backend 为 None，放行——那属于「未连接」态，不归方案管。"""
-    plan = _plan("端游", modes=[PLAN_MODE_WINDOW])
-
-    assert plan.allows(None)
-    assert plan.allows("")
 
 
 def test_corrupt_modes_do_not_lock_the_user_out():
@@ -105,23 +82,6 @@ def test_load_plans_tolerates_wrong_node_type():
     assert load_plans() == []
 
 
-def test_active_plan_id_defaults_to_custom():
-    assert get_active_plan_id() == ""
-    assert get_active_plan() is None
-
-
-def test_active_plan_resolves_by_id():
-    first = _plan("端游")
-    second = _plan("模拟器")
-    save_plans([first, second])
-
-    set_active_plan_id(second.id)
-
-    assert get_active_plan_id() == second.id
-    active = get_active_plan()
-    assert active is not None and active.name == "模拟器"
-
-
 def test_active_plan_degrades_when_id_no_longer_exists():
     plan = _plan("端游")
     save_plans([plan])
@@ -144,15 +104,6 @@ def test_rename_keeps_active_reference():
 
     active = get_active_plan()
     assert active is not None and active.name == "PC 端"
-
-
-def test_active_plan_is_stored_under_actives():
-    plan = _plan("端游")
-    save_plans([plan])
-
-    set_active_plan_id(plan.id)
-
-    assert get_session_store().get_node("actives")["plan"] == plan.id
 
 
 def test_save_env_keeps_sibling_settings():

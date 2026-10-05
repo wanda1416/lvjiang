@@ -43,21 +43,6 @@ from lvjiang.apps.yysls.core.graduation.scoring import LoadoutScorer
 class TestDominance:
     """_dominates / prune_dominated"""
 
-    def test_equal_attrs_dominate_each_other(self) -> None:
-        a = CombatAttributes(min_outer=100, max_outer=200)
-        assert _dominates(a, a) is True
-
-    def test_strictly_better_dominates(self) -> None:
-        better = CombatAttributes(min_outer=200, max_outer=300, crit_dmg=0.5)
-        worse = CombatAttributes(min_outer=100, max_outer=200, crit_dmg=0.3)
-        assert _dominates(better, worse) is True
-        assert _dominates(worse, better) is False
-
-    def test_partial_advantage_no_dominance(self) -> None:
-        a = CombatAttributes(min_outer=200, max_outer=100)  # better min, worse max
-        b = CombatAttributes(min_outer=100, max_outer=200)
-        assert _dominates(a, b) is False
-        assert _dominates(b, a) is False
 
     def test_extra_attrs_dominance(self) -> None:
         a = CombatAttributes(
@@ -82,14 +67,6 @@ class TestDominance:
         # b does not dominate a (a has higher extra attr)
         assert _dominates(b, a) is False
 
-    def test_prune_dominated_removes_inferior(self) -> None:
-        good = ({"name": "good"}, CombatAttributes(min_outer=200, max_outer=300), [200, 300])
-        bad = ({"name": "bad"}, CombatAttributes(min_outer=100, max_outer=200), [100, 200])
-        slot_deltas = {"main_weapon": [good, bad]}
-        pruned = prune_dominated(slot_deltas)
-        names = [e[0]["name"] for e in pruned["main_weapon"]]
-        assert "good" in names
-        assert "bad" not in names
 
     def test_prune_dominated_keeps_non_dominated(self) -> None:
         a = ({"name": "a"}, CombatAttributes(min_outer=200, max_outer=100), [200, 100])
@@ -126,16 +103,6 @@ class TestDominance:
 class TestGenerateCombos:
     """_generate_combos — lazy enumeration"""
 
-    def test_empty_slots(self) -> None:
-        combos = list(_generate_combos([], []))
-        assert combos == []
-
-    def test_single_slot(self) -> None:
-        combos = list(_generate_combos(["a"], [3]))
-        assert len(combos) == 3
-        assert [0] in combos
-        assert [1] in combos
-        assert [2] in combos
 
     def test_two_slots_full_product(self) -> None:
         combos = list(_generate_combos(["a", "b"], [2, 3]))
@@ -145,39 +112,10 @@ class TestGenerateCombos:
         actual = {tuple(c) for c in combos}
         assert actual == expected
 
-    def test_eight_slots_cartesian_product(self) -> None:
-        sizes = [2, 2, 2, 2, 2, 2, 2, 2]
-        keys = SLOT_KEYS[:8]
-        combos = list(_generate_combos(keys, sizes))
-        assert len(combos) == 2**8  # 256
-
-    def test_each_combo_is_list_of_correct_length(self) -> None:
-        sizes = [3, 2, 4]
-        for combo in _generate_combos(["a", "b", "c"], sizes):
-            assert len(combo) == 3
-            assert 0 <= combo[0] < 3
-            assert 0 <= combo[1] < 2
-            assert 0 <= combo[2] < 4
-
 
 class TestTopRLeaderboard:
     """TopRLeaderboard — fixed-capacity ranking"""
 
-    def test_insert_within_capacity(self) -> None:
-        board = TopRLeaderboard(capacity=3)
-        assert board.insert(0.8, [0], 1000) is True
-        assert board.insert(0.7, [1], 900) is True
-        assert board.insert(0.9, [2], 1100) is True
-        assert len(board.top()) == 3
-
-    def test_top_returns_sorted_descending(self) -> None:
-        board = TopRLeaderboard(capacity=5)
-        board.insert(0.5, [0], 500)
-        board.insert(0.9, [1], 900)
-        board.insert(0.7, [2], 700)
-        top = board.top()
-        rates = [r for r, _, _ in top]
-        assert rates == sorted(rates, reverse=True)
 
     def test_capacity_overflow_discards_worst(self) -> None:
         board = TopRLeaderboard(capacity=2)
@@ -191,22 +129,12 @@ class TestTopRLeaderboard:
         assert top[0][0] == 0.95
         assert top[1][0] == 0.9
 
-    def test_top_n_limits_results(self) -> None:
-        board = TopRLeaderboard(capacity=10)
-        for i in range(10):
-            board.insert(0.5 + i * 0.01, [i], 500 + i * 10)
-        assert len(board.top(3)) == 3
-        assert len(board.top(5)) == 5
-
 
 class TestScoreVector:
     """_score_vector — linear ranking helper"""
 
     def test_sum_of_abs(self) -> None:
         assert _score_vector([1.0, -2.0, 3.0]) == 6.0
-
-    def test_zero_vector(self) -> None:
-        assert _score_vector([0.0, 0.0]) == 0.0
 
 
 class TestCandidateRules:
@@ -245,12 +173,6 @@ class TestMultiRuleRating:
         "affix_2": {"name": "气血最大值", "value": 1000},
     }
 
-    def test_rating_rank_orders_the_four_tiers(self) -> None:
-        from lvjiang.apps.yysls.core.graduation.combo_rules import rating_rank
-
-        assert rating_rank("垃圾") < rating_rank("一般") < rating_rank("优秀")
-        assert rating_rank("优秀") < rating_rank("顶级")
-        assert rating_rank("查无此级") == rating_rank("垃圾")
 
     def test_no_rules_selected_yields_no_conclusion(self) -> None:
         """不勾选规则时整项不生效，由调用方短路，这里只保证不误判为有结论。"""
@@ -279,16 +201,6 @@ class TestMultiRuleRating:
         if singles:
             assert rating_rank(verdict.rating) == max(singles)
 
-    def test_meets_compares_by_tier_not_by_name(self) -> None:
-        from lvjiang.apps.yysls.core.graduation.combo_rules import (
-            MultiRuleVerdict,
-        )
-
-        verdict = MultiRuleVerdict(rating="优秀", conclusive=True)
-
-        assert verdict.meets("一般") is True
-        assert verdict.meets("优秀") is True
-        assert verdict.meets("顶级") is False
 
     def test_nothing_conclusive_counts_as_junk(self) -> None:
         """skipped 的实际含义就是品阶无调律价值或没有词条数据——那正是

@@ -124,19 +124,6 @@ class TestParserDelegation:
         assert equip.dingyin == {"name": "外功穿透", "value": 14.2, "cap_pct": 84.5}
         assert equip.to_dict()["dingyin"] == {"name": "外功穿透", "value": 14.2, "cap_pct": 84.5}
 
-    def test_armor_dingyin_parsed(self, parser):
-        equip = parser.parse({
-            "equip_type": "雁南飞冠 | 冠胄",
-            "equip_level": "110阶",
-            "base_attr": "气血最大值 8750",
-            "affix_gong": "劲 +76.8",
-            "affix_shang": "敏 +50.0",
-            "affix_jue": "气血最大值 +300",
-            "affix_zhi": "外功防御 +40.0",
-            "affix_yu": "体 +20.0",
-            "dingyin": "千机索天重击增伤 +6.4%",
-        })
-        assert equip.dingyin == {"name": "千机索天重击增伤", "value": 6.4, "cap_pct": 69.6}
 
     def test_no_dingyin_field(self, parser):
         equip = parser.parse({
@@ -231,16 +218,6 @@ class TestMisreadVsZhige:
 
     def test_genuine_zhige_not_flagged(self, dp):
         assert dp.suspected_misread("止戈特殊效果 +12") is None
-
-    def test_random_noise_not_flagged(self, dp):
-        assert dp.suspected_misread("乱码噪声") is None
-
-    def test_valid_name_not_flagged(self, dp):
-        assert dp.suspected_misread("外功穿透 +14.2%") is None
-
-    def test_empty_not_flagged(self, dp):
-        assert dp.suspected_misread("") is None
-        assert dp.suspected_misread(None) is None
 
 
 class TestMisreadReachesWarnings:

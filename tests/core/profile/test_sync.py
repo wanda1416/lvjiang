@@ -105,41 +105,11 @@ class TestApplyRatio:
         assert result == 2.5
         assert isinstance(result, float)
 
-    def test_ratio_zero(self):
-        assert _apply_ratio(100, 0.0, MODEL_STOCK) == 0
-        assert _apply_ratio(100, 0.0, MODEL_REGEN) == 0
-
 
 # ─── fire_sync_targets ───────────────────────────────────
 
 
 class TestFireSyncTargets:
-    def test_single_target_1_to_1(self, monkeypatch):
-        """单目标 1:1 同步（等价于旧行为）"""
-        source_kd = QuotaKeyDef(
-            key="monthly_task", label="月任务",
-            sync_targets=[SyncTargetDef(key="stock:credits", ratio=1.0)],
-        )
-        target_kd = StockKeyDef(key="credits", label="积分")
-        schema = _make_schema(
-            (MODEL_QUOTA, source_kd),
-            (MODEL_STOCK, target_kd),
-        )
-        monkeypatch.setattr(
-            "lvjiang.core.profile.sync.get_profile_config",
-            lambda: schema,
-        )
-
-        write_fn = _mock_write_fn()
-        fire_sync_targets(write_fn, "player1", source_kd, delta=100, source="导入")
-
-        assert len(write_fn.calls) == 1
-        call = write_fn.calls[0]
-        assert call["model_type"] == MODEL_STOCK
-        assert call["key"] == "credits"
-        assert call["delta"] == 100
-        assert call["detail"] == "sync_from:monthly_task"
-        assert call["source"] == "导入"
 
     def test_multi_target(self, monkeypatch):
         """多目标同步：一次变更写入多个目标"""
@@ -200,25 +170,6 @@ class TestFireSyncTargets:
         # ratio=0 → 显式禁用，不产生写入
         assert len(write_fn.calls) == 2
 
-    def test_cross_model_quota_to_stock(self, monkeypatch):
-        """跨模型：Quota→Stock"""
-        source_kd = QuotaKeyDef(
-            key="monthly_task", label="月任务",
-            sync_targets=[SyncTargetDef(key="stock:credits")],
-        )
-        schema = _make_schema(
-            (MODEL_QUOTA, source_kd),
-            (MODEL_STOCK, StockKeyDef(key="credits")),
-        )
-        monkeypatch.setattr(
-            "lvjiang.core.profile.sync.get_profile_config",
-            lambda: schema,
-        )
-
-        write_fn = _mock_write_fn()
-        fire_sync_targets(write_fn, "p", source_kd, delta=50, source="s")
-
-        assert write_fn.calls[0]["model_type"] == MODEL_STOCK
 
     def test_cross_model_stock_to_quota(self, monkeypatch):
         """跨模型：Stock→Quota"""

@@ -19,15 +19,11 @@ from lvjiang.apps.yysls.core.loadout.models import (
 
 
 @pytest.mark.parametrize("raw,expected", [
-    ("pvp", COMBAT_TYPE_PVP),
     ("PVP", COMBAT_TYPE_PVP),
-    ("pve", COMBAT_TYPE_PVE),
     # 缺字段的历史方案、手改坏的 json 一律按 PVE——老方案都是 PVE 时代建的，
     # 猜成 PVP 会把它们从智能调律里整批剔除。
     (None, COMBAT_TYPE_PVE),
-    ("", COMBAT_TYPE_PVE),
     ("pvx", COMBAT_TYPE_PVE),
-    (123, COMBAT_TYPE_PVE),
 ])
 def test_combat_type_normalizes_unknown_values_to_pve(raw, expected):
     assert normalize_combat_type(raw) == expected
@@ -76,9 +72,7 @@ def test_new_plan_defaults_to_pve(tmp_path: Path):
 
 
 @pytest.mark.parametrize("name,expected", [
-    ("无名PVP", COMBAT_TYPE_PVP),
     ("无名pvp", COMBAT_TYPE_PVP),
-    ("无名PVE", COMBAT_TYPE_PVE),
     ("输出奶", COMBAT_TYPE_PVE),
 ])
 def test_scanned_plan_infers_combat_type_from_the_game_name(

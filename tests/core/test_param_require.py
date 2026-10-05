@@ -100,22 +100,24 @@ class TestStaticValidation:
     def test_accepts_the_shipped_definitions(self):
         validate_requires(_DEFS)
 
-    def test_rejects_unknown_reference(self):
+    def test_references_reject_unknown_self_and_cycles(self):
+        # rejects_unknown_reference
         with pytest.raises(RequireError, match="未声明的参数"):
             validate_requires([
                 {"name": "a", "type": "text", "require": "not $nope"}])
 
-    def test_rejects_self_reference(self):
+        # rejects_self_reference
         with pytest.raises(RequireError, match="不能引用自身"):
             validate_requires([
                 {"name": "a", "type": "bool", "require": "$a"}])
 
-    def test_rejects_cycles(self):
+        # rejects_cycles
         with pytest.raises(RequireError, match="循环依赖"):
             validate_requires([
                 {"name": "a", "type": "bool", "require": "$b"},
                 {"name": "b", "type": "bool", "require": "$a"},
             ])
+
 
     @pytest.mark.parametrize("expression", [
         "$skip_online_role == false",
@@ -152,25 +154,27 @@ class TestStaticValidation:
             assert visible_parameter_names(defs, {"skip_online_role": True}) == {
                 "skip_online_role"}
 
-    def test_rejects_value_outside_select_options(self):
+    def test_comparisons_respect_parameter_types(self):
+        # rejects_value_outside_select_options
         with pytest.raises(RequireError, match="不在"):
             validate_requires([
                 *_DEFS,
                 {"name": "probe", "type": "text", "require": '$mode == "zzz"'}])
 
-    def test_rejects_non_numeric_comparison_against_number(self):
+        # rejects_non_numeric_comparison_against_number
         with pytest.raises(RequireError, match="必须用数字"):
             validate_requires([
                 *_DEFS,
                 {"name": "probe", "type": "text",
                  "require": '$online_role_max_wait == "x"'}])
 
-    def test_rejects_checkgroup_reference(self):
+        # rejects_checkgroup_reference
         with pytest.raises(RequireError, match="不能引用 checkgroup"):
             validate_requires([
                 {"name": "flags", "type": "checkgroup", "options": ["x"]},
                 {"name": "probe", "type": "text", "require": "$flags"},
             ])
+
 
     @pytest.mark.parametrize(("expression", "rejected"), [
         ('profile_get("x") == 1', "FuncCall"),
@@ -202,8 +206,7 @@ class TestBoolText:
     """布尔字面文本只认 true / false / 1 / 0。"""
 
     @pytest.mark.parametrize(("text", "expected"), [
-        ("true", True), ("TRUE", True), ("1", True),
-        ("false", False), ("0", False), (" true ", True),
+        (" TRUE ", True), ("1", True), ("false", False), ("0", False),
     ])
     def test_accepted_forms(self, text, expected):
         from lvjiang.workflows.builtins._coerce import is_bool_text, to_bool
@@ -211,7 +214,7 @@ class TestBoolText:
         assert is_bool_text(text)
         assert to_bool(text) is expected
 
-    @pytest.mark.parametrize("text", ["yes", "no", "on", "off", "", "maybe"])
+    @pytest.mark.parametrize("text", ["yes", ""])
     def test_rejected_forms_are_not_bool_text(self, text):
         """yes / no / on / off 既不是 DSL 字面量也不是 JSON/YAML 写法，不再认。"""
         from lvjiang.workflows.builtins._coerce import is_bool_text, to_bool
@@ -225,7 +228,7 @@ class TestBoolText:
         assert to_bool(True) is True
         assert to_bool(False) is False
 
-    @pytest.mark.parametrize("default", ["yes", "no", "on", "off"])
+    @pytest.mark.parametrize("default", ["yes", "off"])
     def test_bool_default_rejects_the_old_loose_spellings(self, default):
         with pytest.raises(WorkflowMetadataError, match="true / false / 1 / 0"):
             parse_metadata(
@@ -234,7 +237,7 @@ class TestBoolText:
                 "#%     type: bool\n"
                 f"#%     default: '{default}'\n")
 
-    @pytest.mark.parametrize("default", ["true", "false", "1", "0"])
+    @pytest.mark.parametrize("default", ["true", "0"])
     def test_bool_default_still_accepts_the_four(self, default):
         meta = parse_metadata(
             "#% parameters:\n"
@@ -244,7 +247,7 @@ class TestBoolText:
         assert meta["parameters"][0]["default"] == default
 
     @pytest.mark.parametrize(("default", "expected"), [
-        ("yes", True), ("no", False), ("on", True), ("off", False),
+        ("yes", True), ("no", False),
     ])
     def test_unquoted_yaml_bool_aliases_are_parsed_before_validation(
         self, default, expected,

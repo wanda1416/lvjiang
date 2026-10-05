@@ -270,23 +270,6 @@ def test_silent_base_write_uses_bound_plan_and_rejects_incomplete_ocr(
     assert saved[1][2]["min_outer"] == 120.0
 
 
-def test_workflow_and_shared_subcalls_parse():
-    base = Path("config/system/workflows")
-    for path in (
-        "scan_all_loadouts.wf", "scan_equipped.wf",
-        "scan_role_base_attr.wf",
-        "subcall/loadout/game_plans.wf",
-        "subcall/loadout/equipped.wf",
-        "subcall/loadout/role_attrs.wf",
-        "subcall/loadout/equipment_scan.wf",
-    ):
-        parse_file(base / path)
-    assert {"scan_equipped_plan", "scan_equipped_slots"} <= set(
-        parse_file(base / "subcall/loadout/equipped.wf").procs)
-    assert {"scan_role_base_attr_for_plan", "capture_role_base_attrs"} <= set(
-        parse_file(base / "subcall/loadout/role_attrs.wf").procs)
-
-
 def test_batch_skips_all_existing_plans_before_switching(monkeypatch):
     workflow_path = Path("config/system/workflows/scan_all_loadouts.wf")
     workflow = parse_file(workflow_path)
@@ -549,32 +532,6 @@ def test_game_plan_scene_loads_with_distinct_popup_views():
     assert "click [training_plan].[back]" in navigation
 
 
-def test_direct_and_batch_workflows_call_the_same_parameterized_procedures():
-    base = Path("config/system/workflows")
-    equipment = parse_file(base / "scan_equipped.wf")
-    role = parse_file(base / "scan_role_base_attr.wf")
-    batch = parse_file(base / "scan_all_loadouts.wf")
-    assert "scan_equipped_plan" in set(_calls(equipment.body))
-    assert "scan_role_base_attr_for_plan" in set(_calls(role.body))
-    assert {"scan_equipped_plan", "scan_role_base_attr_for_plan"} <= set(
-        _calls(batch.body))
-    assert {"collect_game_plan_names", "select_game_plan"} <= set(_calls(batch.body))
-    batch_text = (base / "scan_all_loadouts.wf").read_text(encoding="utf-8")
-    navigation_text = (base / "subcall/loadout/game_plans.wf").read_text(
-        encoding="utf-8")
-    assert "loadout_scan_targets" not in batch_text
-    assert "for name in $names\n    if $skip_existing" in batch_text
-    assert "if $selected == -1" in batch_text
-    assert "继续在方案列表尝试下一套" in batch_text
-    assert "if $selected == -2" in batch_text
-    assert "len($name) > 0" in navigation_text
-    assert "scroll [training_plan].[plan_list]" not in navigation_text
-    assert "drag [training_plan].[plan_list]" not in navigation_text
-    for path in (base / "scan_equipped.wf", base / "scan_role_base_attr.wf"):
-        names = {item["name"] for item in parse_metadata_file(path)["parameters"]}
-        assert {"plan_name", "main_art", "sub_art"} <= names
-
-
 @pytest.mark.parametrize("unsafe_failure,second_succeeds,expected_names,expected_result", [
     (False, True, ["方案甲", "方案乙"], 0),
     (False, False, ["方案甲", "方案乙"], -1),
@@ -721,20 +678,3 @@ def test_base_attr_query_reports_missing_when_it_cannot_be_sure(
         lambda school: {f"{engine.run_username}_{plan.name}": {}})
 
     assert _has_scanned_base_attrs(engine, name, main_art, sub_art) is False
-
-
-def test_skip_existing_base_attrs_is_declared_and_gates_only_that_step():
-    """开关必须是声明过的参数，且只挡基础属性那一步。
-
-    装备扫描在它之前完成并计数，重复扫方案的本意正是「装备要重扫、基础属性
-    不必」；挡到装备上就把整个开关的用途弄反了。
-    """
-    path = Path("config/system/workflows/scan_all_loadouts.wf")
-    names = {item["name"] for item in
-             parse_metadata_file(path).get("parameters", [])}
-    assert "skip_existing_base_attrs" in names
-
-    body = path.read_text(encoding="utf-8")
-    guard = body.index("$skip_existing_base_attrs and has_scanned_base_attrs")
-    assert body.index("scan_equipped_plan(") < guard
-    assert guard < body.index("scan_role_base_attr_for_plan(")

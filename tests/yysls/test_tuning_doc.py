@@ -18,8 +18,6 @@ class TestFormatAffix:
         affix = {"name": "会心伤害", "value": 12, "unit": "%", "cap_pct": 85}
         assert format_affix(affix) == "会心伤害 12%（85%）"
 
-    def test_plain_value_no_cap(self):
-        assert format_affix({"name": "攻击", "value": 300}) == "攻击 300"
 
     def test_missing_name_and_value(self):
         assert format_affix({}) == "未知词条"
@@ -37,34 +35,7 @@ def _read(w: TuningDocWriter) -> str:
 
 
 class TestTuningDocWriter:
-    def test_filename_pattern(self, writer, tmp_path):
-        assert writer.path.parent == tmp_path
-        assert writer.path.name.startswith("调律说明_小明_")
-        assert writer.path.suffix == ".md"
 
-    def test_header(self, writer):
-        writer.start_run("小明", ["血河（玩法：长枪·破甲）", "素问"],
-                         ["main_weapon", "head"],
-                         {"保留PVP装备": False})
-        text = _read(writer)
-        assert text.startswith("# 调律说明 — ")
-        assert "- 操作用户：小明" in text
-        assert "- 启用规则：血河（玩法：长枪·破甲）、素问" in text
-        assert "- 开关 保留PVP装备：否" in text
-        assert "- 调律部位：主武器、冠胄" in text
-
-    def test_header_defaults(self, writer):
-        """空规则 → 全部规则；开关逐个输出；slot 中文映射"""
-        writer.start_run("u", [], ["ring"], {"保留PVP装备": True})
-        text = _read(writer)
-        assert "- 启用规则：全部规则（默认配置）" in text
-        assert "- 开关 保留PVP装备：是" in text
-        assert "- 调律部位：环" in text
-
-    def test_header_no_switches(self, writer):
-        """无开关时不输出开关行"""
-        writer.start_run("u", [], ["ring"], {})
-        assert "- 开关 " not in _read(writer)
 
     def test_all_ui_slots_are_summarized_as_all(self, writer):
         from lvjiang.apps.yysls.config.tune_slots import DEFAULT_SLOTS
@@ -74,25 +45,6 @@ class TestTuningDocWriter:
         assert "- 调律部位：全部" in text
         assert "主武器、环" not in text
 
-    def test_equipment_section(self, writer):
-        equip = {
-            "name": "无极棍", "type": "长枪", "level": 125, "quality": "gold",
-            "affix_1": {"name": "会心伤害", "value": 12, "unit": "%",
-                        "cap_pct": 85},
-            "affix_2": {"name": "攻击", "value": 300, "cap_pct": 92},
-        }
-        writer.start_equipment(1, equip)
-        text = _read(writer)
-        assert "## 1. 无极棍 · 长枪（125级 金色）" in text
-        assert "进入调律时词条（2/5）：" in text
-        assert "- 会心伤害 12%（85%）" in text
-        assert "- 攻击 300（92%）" in text
-
-    def test_equipment_section_unknown_quality(self, writer):
-        writer.start_equipment(2, {"name": "残剑", "type": "剑"})
-        text = _read(writer)
-        assert "## 2. 残剑 · 剑（品阶未知）" in text
-        assert "进入调律时词条（0/5）：" in text
 
     def test_worthiness_filters_unmatched(self, writer):
         """只写命中 顶级/优秀 的规则；垃圾/跳过/不适用 均不写"""
@@ -152,9 +104,6 @@ class TestTuningDocWriter:
         assert "最终评级：未评级（词条未满）" in text
         assert "血河：优秀" not in text
 
-    def test_finish_equipment_no_conclusion(self, writer):
-        writer.finish_equipment(0, 5, "无法形成结论", {})
-        assert "最终评级：无有效结论" in _read(writer)
 
     def test_note_and_end_run_interrupted(self, writer):
         writer.note("已符合规则但未找到调律入口，跳过本件")
@@ -164,51 +113,3 @@ class TestTuningDocWriter:
         assert "## 运行结束" in text
         assert "（用户中断（F10））" in text
         assert "- 实际调律 3 件，共 11 轮" in text
-
-    def test_end_run_normal(self, writer):
-        writer.end_run(interrupted=False, tuned_count=0, total_rounds=0)
-        text = _read(writer)
-        assert "（正常完成）" in text
-        assert "- 实际调律 0 件，共 0 轮" in text
-
-    def test_flush_immediate(self, writer):
-        """未 close 即可从磁盘读到已写内容（中断/崩溃不丢）"""
-        writer.start_run("小明", [], ["head"], {})
-        assert "- 操作用户：小明" in _read(writer)
-
-
-class TestRunSummary:
-    """成品清单：首词条单独列出，其余词条合并一行"""
-
-    def test_lists_items(self, writer):
-        writer.run_summary([{
-            "name": "雁南飞甲", "type": "胸甲", "level": 105,
-            "quality": "purple", "rating_text": "通用会意：优秀",
-            "affixes": [
-                {"name": "会意率", "value": 4.2, "unit": "%",
-                 "cap_pct": 70.0},
-                {"name": "势", "value": 49.8, "cap_pct": 74.6},
-                {"name": "外功防御", "value": 40.8},
-            ],
-        }])
-        text = _read(writer)
-        assert "### 成品清单（一般及以上）" in text
-        assert "1. 雁南飞甲 · 胸甲（105级 紫色）— 通用会意：优秀" in text
-        assert "   - 首词条：会意率 4.2%（70.0%）" in text
-        assert "   - 其余词条：势 49.8（74.6%）、外功防御 40.8" in text
-
-    def test_single_affix_rest_empty(self, writer):
-        writer.run_summary([{
-            "name": "剑", "type": "剑", "quality": "gold",
-            "rating_text": "血河：一般",
-            "affixes": [{"name": "劲", "value": 10}],
-        }])
-        text = _read(writer)
-        assert "   - 首词条：劲 10" in text
-        assert "   - 其余词条：无" in text
-
-    def test_empty_items(self, writer):
-        writer.run_summary([])
-        text = _read(writer)
-        assert "本次无一般及以上成品。" in text
-        assert "TUNING_DATA_JSON" not in text

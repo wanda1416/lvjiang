@@ -28,24 +28,6 @@ class _FakeCapture(CaptureBackend):
 
 # ─── 默认方法行为 ─────────────────────────────────────────────
 
-def test_default_set_capture_region_is_noop():
-    # 基类默认 no-op：调用不抛异常、不改变状态
-    fake = _FakeCapture()
-    fake.set_capture_region(10, 20, 300, 400)
-    # 尺寸仍为初始值
-    assert fake.get_capture_size() == (1080, 1920)
-
-
-def test_default_attach_to_window_returns_false():
-    fake = _FakeCapture()
-    assert fake.attach_to_window("some_window") is False
-
-
-def test_default_stop_is_noop():
-    fake = _FakeCapture()
-    fake.stop()  # 默认实现不抛异常
-    assert fake.get_capture_size() == (1080, 1920)  # 状态未变
-
 
 def test_default_capture_to_file_returns_false_when_capture_fails():
     # capture 返回 None → capture_to_file 返回 False

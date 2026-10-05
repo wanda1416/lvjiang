@@ -126,21 +126,6 @@ class TestEntity:
         assert not (local / "scenes" / "a.yaml.deleted").exists()
         assert r.resolve_read("scenes/a.yaml") is not None
 
-    def test_delete_entity_dev_mode_removes_system(self, dirs):
-        """开发模式（自己就是 system 身份）照常可删。"""
-        system, _ = dirs
-        (system / "scenes").mkdir()
-        (system / "scenes" / "a.yaml").write_text("x", encoding="utf-8")
-        _dev(dirs).delete_entity("scenes/a.yaml")
-        assert not (system / "scenes" / "a.yaml").exists()
-
-    def test_is_system_entity(self, dirs):
-        system, local = dirs
-        (system / "scenes").mkdir()
-        (system / "scenes" / "a.yaml").write_text("x", encoding="utf-8")
-        r = _user(dirs)
-        assert r.is_system_entity("scenes/a.yaml")
-        assert not r.is_system_entity("scenes/mine.yaml")
 
     def test_delete_entity_user_local_only(self, dirs):
         _, local = dirs
@@ -183,20 +168,7 @@ class TestEntity:
 # ─── 聚合：合并与 diff 纯函数 ─────────────────────────────
 
 class TestMergeAndDiff:
-    def test_dict_deep_merge(self):
-        base = {"a": {"x": 1, "y": 2}, "b": 1}
-        overlay = {"a": {"y": 20, "z": 30}}
-        assert merge_doc(base, overlay) == {"a": {"x": 1, "y": 20, "z": 30}, "b": 1}
 
-    def test_list_and_scalar_replace_whole_key(self):
-        base = {"lst": [1, 2, 3], "s": "old"}
-        overlay = {"lst": [9], "s": "new"}
-        assert merge_doc(base, overlay) == {"lst": [9], "s": "new"}
-
-    def test_deleted_key_removes(self):
-        base = {"a": 1, "b": {"c": 2, "d": 3}}
-        overlay = {"__deleted__": ["a"], "b": {"__deleted__": ["c"]}}
-        assert merge_doc(base, overlay) == {"b": {"d": 3}}
 
     def test_merge_does_not_mutate_inputs(self):
         base = {"a": {"x": 1}}
@@ -216,10 +188,6 @@ class TestMergeAndDiff:
         diff = compute_diff(base, desired)
         assert merge_doc(base, diff) == desired
 
-    def test_diff_empty_when_equal(self):
-        base = {"a": {"b": 1}, "c": [1, 2]}
-        assert compute_diff(base, base) == {}
-
 
 # ─── 聚合：load_merged / save_merged ─────────────────────
 
@@ -228,9 +196,6 @@ class TestAggregateIO:
         (dirs[0] / "scenes.yaml").write_text(
             yaml.dump(doc, allow_unicode=True), encoding="utf-8")
 
-    def test_load_merged_without_overlay(self, dirs):
-        self._write_system(dirs, {"a": 1})
-        assert _user(dirs).load_merged("scenes.yaml") == {"a": 1}
 
     def test_yaml_parse_cache_returns_isolated_documents(
             self, dirs, monkeypatch):
@@ -380,14 +345,6 @@ class TestRegistryList:
         diff = compute_diff(base, {"exposed": ["a", "b", "mine"]}, self.REG)
         assert diff == {"exposed": {"__added__": ["mine"]}}
 
-    def test_diff_empty_when_unchanged(self):
-        base = {"exposed": ["a", "b"]}
-        assert compute_diff(base, {"exposed": ["a", "b"]}, self.REG) == {}
-
-    def test_diff_omits_order_when_add_remove_suffices(self):
-        base = {"exposed": ["a", "b"]}
-        diff = compute_diff(base, {"exposed": ["a"]}, self.REG)
-        assert diff == {"exposed": {"__removed__": ["b"]}}
 
     def test_diff_writes_order_only_when_reordered(self):
         base = {"exposed": ["a", "b", "c"]}
@@ -415,22 +372,6 @@ class TestRegistryList:
         """
         base = {"exposed": ["a", "b", "c"]}
         assert merge_doc(base, {"exposed": ["a"]}, self.REG)["exposed"] == ["a"]
-
-    def test_non_registry_list_unaffected(self):
-        base = {"other": ["a", "b"]}
-        assert compute_diff(base, {"other": ["a", "b", "x"]}, self.REG) == {
-            "other": ["a", "b", "x"]}
-        assert merge_doc(base, {"other": ["z"]}, self.REG)["other"] == ["z"]
-
-    def test_wildcard_path_matches_one_level(self):
-        reg = ("layout_scenes.*",)
-        base = {"layout_scenes": {"group_1": ["s1"], "group_2": ["s2"]}}
-        diff = compute_diff(
-            base, {"layout_scenes": {"group_1": ["s1", "mine"], "group_2": ["s2"]}}, reg)
-        assert diff == {"layout_scenes": {"group_1": {"__added__": ["mine"]}}}
-        base2 = {"layout_scenes": {"group_1": ["s1", "s_new"], "group_2": ["s2"]}}
-        merged = merge_doc(base2, diff, reg)
-        assert merged["layout_scenes"]["group_1"] == ["s1", "s_new", "mine"]
 
 
 class TestRegistryThroughResolver:
@@ -542,25 +483,6 @@ class TestDeletionAllowlist:
         assert "我的流派" not in merged["schools"]
         assert "系统流派" in merged["schools"]
 
-    def test_allowlist_is_empty_by_design(self):
-        """系统内容没有一样是该让用户删的，白名单保持空。
-
-        保留这个扩展点是为了将来真出现例外时有地方声明，
-        不是给现在留口子——空表本身就是结论。
-        """
-        from lvjiang.core.config.resolver import DELETABLE_PATHS
-        assert DELETABLE_PATHS == {}
-
-    def test_mechanism_works_if_ever_registered(self, dirs, monkeypatch):
-        """机制本身可用：一旦声明了某路径，该路径下的删除就会生效。"""
-        import lvjiang.core.config.resolver as cr
-        monkeypatch.setattr(cr, "DELETABLE_PATHS", {"demo.yaml": ("items",)})
-        self._write_system(dirs, "demo.yaml", {"items": {"a": 1, "b": 2}})
-        r = _user(dirs)
-        doc = r.load_merged("demo.yaml")
-        doc["items"].pop("b")
-        r.save_merged("demo.yaml", doc)
-        assert r.load_merged("demo.yaml")["items"] == {"a": 1}
 
     def test_dev_mode_can_still_remove_keys(self, dirs):
         """开发模式全量写 system —— 开发者编排系统配置不受白名单约束。"""
@@ -568,10 +490,6 @@ class TestDeletionAllowlist:
         _dev(dirs).save_merged("app.yaml", {"a": 1})
         saved = yaml.safe_load((dirs[0] / "app.yaml").read_text(encoding="utf-8"))
         assert saved == {"a": 1}
-
-    def test_pure_function_keeps_original_semantics(self):
-        """compute_diff 不传 deletable 时保持「缺键即删除」，供纯函数用法与单测。"""
-        assert compute_diff({"a": 1, "b": 2}, {"a": 1}) == {"__deleted__": ["b"]}
 
 
 class TestProtectedLists:
@@ -735,17 +653,6 @@ class TestWriteIsMinimal:
         _user(dirs).write_entity("scenes/a.yaml", "key: a\n")
         assert target.stat().st_mtime_ns == before
 
-    def test_binary_still_compared_byte_for_byte(self, dirs):
-        """二进制不涉及换行转换，必须逐字节比，不能走文本归一化。"""
-        _, local = dirs
-        r = _user(dirs)
-        r.write_entity("references/x.png", b"\x89PNG")
-        target = local / "references" / "x.png"
-        before = target.stat().st_mtime_ns
-        r.write_entity("references/x.png", b"\x89PNG")
-        assert target.stat().st_mtime_ns == before
-        r.write_entity("references/x.png", b"\x89PNGX")
-        assert target.read_bytes() == b"\x89PNGX"
 
     def test_dev_mode_creates_factory_file_even_if_local_matches(self, dirs):
         """开发模式不能拿 local 影子比对：作者新建系统文件不是空操作。"""

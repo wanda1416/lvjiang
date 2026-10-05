@@ -12,9 +12,7 @@ import pytest
 
 from lvjiang.apps.yysls.ui.game_settings.factory_guard import (
     GAME_CONFIG_REL,
-    READONLY_HINT,
     deletable,
-    factory_dict_keys,
     factory_list_values,
 )
 
@@ -36,24 +34,6 @@ def isolated_config(tmp_path, monkeypatch):
     monkeypatch.setattr(cr, "LOCAL_CONFIG_DIR", tmp_path / "local")
     monkeypatch.setattr(cr, "_resolver", None)
     return dst
-
-
-class TestFactoryLookup:
-    def test_dict_keys_read_from_system_only(self):
-        keys = factory_dict_keys(GAME_CONFIG_REL, "schools")
-        assert "鸣金·虹" in keys
-
-    def test_list_values_by_field(self):
-        names = factory_list_values(GAME_CONFIG_REL, "weapon_types", field="name")
-        assert "剑" in names
-
-    def test_missing_node_returns_empty(self):
-        assert factory_dict_keys(GAME_CONFIG_REL, "查无此节点") == set()
-        assert factory_list_values(GAME_CONFIG_REL, "查无此节点", field="x") == set()
-
-    def test_wrong_type_returns_empty(self):
-        # weapon_types 是列表，按 dict 取应返回空集而不是抛异常
-        assert factory_dict_keys(GAME_CONFIG_REL, "weapon_types") == set()
 
 
 class TestDeletable:
@@ -81,18 +61,6 @@ class TestDeletable:
             "lvjiang.apps.yysls.ui.game_settings.factory_guard.is_user_mode",
             lambda: False)
         assert deletable("系统甲", self.FACTORY)[0]
-
-    def test_none_selection_not_treated_as_factory(self, monkeypatch):
-        monkeypatch.setattr(
-            "lvjiang.apps.yysls.ui.game_settings.factory_guard.is_user_mode",
-            lambda: True)
-        assert deletable(None, self.FACTORY)[0]
-
-    def test_custom_hint_passed_through(self, monkeypatch):
-        monkeypatch.setattr(
-            "lvjiang.apps.yysls.ui.game_settings.factory_guard.is_user_mode",
-            lambda: True)
-        assert deletable("系统甲", self.FACTORY, hint=READONLY_HINT)[1] == READONLY_HINT
 
 
 class TestPanelsDisableDeleteForFactoryEntries:

@@ -63,8 +63,8 @@ class BuildDefinition:
 
         if not self.name.strip() or not self.playstyle or self.level <= 0:
             raise ValueError("请填写出装名称、玩法及装备等级")
-        if self.combat_type not in ("pve", "pvp"):
-            raise ValueError("请选择 PVE 或 PVP")
+        if self.combat_type != "pve":
+            raise ValueError("出装搭配目前只支持 PVE")
         if set(self.equipment) - set(EQUIPMENT_SLOTS):
             raise ValueError("出装搭配包含未知装备槽位")
         for row in self.requirements:

@@ -435,13 +435,6 @@ class BuildEditor(QWidget):
         self.chengyin = QCheckBox(tr("承音数值"))
         self.chengyin.setToolTip(tr("取消后按普通词条满值计算；装备基础属性和定音仍按所选等级"))
         self.chengyin.toggled.connect(self._changed)
-        settings.addWidget(self.chengyin)
-        self.combat_type = AutoWidthComboBox()
-        self.combat_type.addItem("PVE", "pve")
-        self.combat_type.addItem("PVP", "pvp")
-        fit_combo_to_contents(self.combat_type, minimum=72)
-        self.combat_type.currentIndexChanged.connect(self._changed)
-        settings.addWidget(self.combat_type)
         settings.addWidget(QLabel(tr("弓玦套装")))
         self.gongjue = AutoWidthComboBox()
         self.gongjue.addItem(tr("无"), "")
@@ -456,6 +449,8 @@ class BuildEditor(QWidget):
         self.gongjue_level.setRange(1, 999)
         self.gongjue_level.valueChanged.connect(self._changed)
         settings.addWidget(self.gongjue_level)
+        settings.addSpacing(12)
+        settings.addWidget(self.chengyin)
         settings.addStretch()
         self.metrics = QLabel()
         self.metrics.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -582,7 +577,6 @@ class BuildEditor(QWidget):
             index = self.level.count() - 1
         self.level.setCurrentIndex(index)
         self.chengyin.setChecked(build.chengyin)
-        self.combat_type.setCurrentIndex(max(0, self.combat_type.findData(build.combat_type)))
         self.gongjue.setCurrentIndex(max(0, self.gongjue.findData(build.gongjue)))
         self.gongjue_level.setValue(build.gongjue_level or self.gc.gongjue_level_for(build.level))
         self._templates = template_for_playstyle(self.playstyle, self.gc)
@@ -613,7 +607,7 @@ class BuildEditor(QWidget):
 
     def _populate_counts(self, counts: dict[str, int]):
         allowed = set(counts)
-        allowed.update(row["affix"] for row in self.repository.common_requirements(self.combat_type.currentData()))
+        allowed.update(row["affix"] for row in self.repository.common_requirements("pve"))
         aliases = dynamic_affix_map(self.attribute, game_config=self.gc)
         for rule in get_tuning_rule_manager().get_rules().values():
             if self.playstyle in rule.playstyles:
@@ -789,7 +783,7 @@ class BuildEditor(QWidget):
                     equip[f"affix_{index}"] = affix
         if self.result.feasible:
             self._templates = copy.deepcopy(self.result.equipment)
-        requirements = self.repository.common_requirements(self.combat_type.currentData()) + self._requirement_rows()
+        requirements = self.repository.common_requirements("pve") + self._requirement_rows()
         evaluated = check_requirements(counts, requirements)
         labels = [f"{tr(PRIORITY_LABELS[row['priority']])} · {row['affix']}：{row['actual']} / "
                   f"{row.get('minimum', 0)}～{row.get('maximum', TOTAL_AFFIXES_MAX)}"
@@ -863,7 +857,7 @@ class BuildEditor(QWidget):
             build.name = self.name_edit.text().strip()
         build.level = int(self.level.currentData())
         build.chengyin = self.chengyin.isChecked()
-        build.combat_type = self.combat_type.currentData()
+        build.combat_type = "pve"
         build.gongjue, build.gongjue_level = self.gongjue.currentData(), self.gongjue_level.value()
         build.equipment = copy.deepcopy(self.result.equipment)
         build.requirements = self._requirement_rows()

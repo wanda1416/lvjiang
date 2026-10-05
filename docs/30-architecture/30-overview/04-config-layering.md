@@ -49,10 +49,12 @@ local 文件可直接删除；system/remote 预置文件不允许用户删除，
 | `scenes.yaml` | `schema_version: 2` / `scenes` | `core/scene_config.py`、`scene_registry.py`、`scene_definition.py` |
 | `layouts.yaml` | `schema_version: 2` / `layouts` | `core/layout_manager.py`、`screen_calib.py` |
 | `ocr.yaml` | OCR 识别参数与文本规范化规则 | `core/ocr_config.py` / `core/ocr_cleaner.py` |
-| `yysls/game_config/*.yaml` | 八份文件：七份领域配置合并为统一视图，`builds.yaml` 由 `BuildRepository` 独立管理 | `apps/yysls/config/game_config_files.py`、`manager.py` |
+| `yysls/game_config/*.yaml` | 七份领域配置合并为统一视图 | `apps/yysls/config/game_config_files.py`、`manager.py` |
+| `yysls/gear_sets/*.yaml` | 一搭配一文件，约束随搭配保存，来源区分系统预置和本地 | `apps/yysls/config/builds.py` |
 | `yysls/tune_config.yaml` | `quality_thresholds` / `switches` | `core/tuning_rules/manager.py` |
 
-游戏配置目录现有八个文件，不再增加子目录（`builds.yaml` 见 [04-build-calculator.md](../39-runtime/04-build-calculator.md)，不并入统一视图）：
+游戏配置目录现有七个文件；出装搭配独立放在 `yysls/gear_sets/`，不并入统一视图，
+见 [04-build-calculator.md](../39-runtime/04-build-calculator.md)：
 
 | 文件 | 内容 |
 |------|------|
@@ -63,7 +65,6 @@ local 文件可直接删除；system/remote 预置文件不允许用户删除，
 | `martial_arts.yaml` | 武学 |
 | `schools.yaml` | 流派 |
 | `playstyles.yaml` | 玩法 |
-| `builds.yaml` | 出装搭配（`common_requirements` + `builds`），由 `BuildRepository` 独立管理，不加入整份游戏配置的合并视图（见 [04-build-calculator.md](../39-runtime/04-build-calculator.md)） |
 
 `scenes.yaml` 的当前结构版本为 2，与 `layouts.yaml` 一样使用单一领域顶层键：
 

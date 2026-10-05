@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QTabBar,
     QTableWidget,
@@ -826,6 +827,22 @@ class _ModelTab(QWidget):
                 self._table.setCurrentCell(row + 1, 0)
 
 
+def _rename_unavailable_reason(parent: QWidget) -> str:
+    from ...core.access import is_readonly
+    from ...core.profile.triggers import _runner
+    if is_readonly():
+        return tr("只读实例不可以重命名 key")
+    if _runner is not None and _runner.is_busy:
+        return tr("Profile 变更脚本仍在执行，请等待队列完成后重命名")
+    ancestor: QWidget | None = parent
+    while ancestor is not None:
+        manager = getattr(ancestor, "_run_manager", None)
+        if manager is not None and manager.is_any_running():
+            return tr("请停止所有任务后再重命名 Profile key")
+        ancestor = ancestor.parentWidget()
+    return ""
+
+
 class ProfileDefinitionDialog(QDialog):
     """用户 Profile 数据模型定义对话框"""
 
@@ -834,6 +851,8 @@ class ProfileDefinitionDialog(QDialog):
         self.setWindowTitle(tr("用户数据模型定义"))
         self.setMinimumSize(800, 550)
         self._drafts: dict[str, list[KeyDef]] = {}
+        self._baseline: dict[str, list[KeyDef]] = {}
+        self.has_saved_changes = False
         self._setup_ui()
         self._load_data()
 
@@ -857,7 +876,7 @@ class ProfileDefinitionDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
-        btn_ok = QPushButton(tr("确定"))
+        btn_ok = QPushButton(tr("保存"))
         btn_ok.setFixedWidth(80)
         btn_ok.clicked.connect(self._on_save)
         btn_row.addWidget(btn_ok)
@@ -880,6 +899,7 @@ class ProfileDefinitionDialog(QDialog):
         for model_type in _MODEL_ORDER:
             # 编辑器只修改自己的深拷贝；取消不会污染运行中的配置单例。
             self._drafts[model_type] = deepcopy(config.get_keys_by_model(model_type))
+            self._baseline[model_type] = deepcopy(self._drafts[model_type])
             self._refresh_model_tab(model_type)
 
     def _refresh_model_tab(
@@ -1021,14 +1041,15 @@ class ProfileDefinitionDialog(QDialog):
 
     def _add_key(self, model_type: str):
         """新增 key"""
+        tab = self._tabs[model_type]
         kd = self.open_key_editor(
-            self, model_type, None, self._defined_key_names())
+            self, model_type, None, self._defined_key_names(), initial_group=tab.current_group)
         if kd is None:
             return
 
-        tab = self._tabs[model_type]
-        kd = replace(kd, group=tab.current_group)
         self._drafts[model_type].append(kd)
+        self._baseline[model_type].append(deepcopy(kd))
+        self.has_saved_changes = True
         self._refresh_model_tab(model_type, kd.group, kd.key)
 
     def _edit_key(self, model_type: str, row: int):
@@ -1049,7 +1070,25 @@ class ProfileDefinitionDialog(QDialog):
 
         drafts = self._drafts[model_type]
         drafts[drafts.index(old_kd)] = kd
-        self._refresh_model_tab(model_type, kd.group, kd.key)
+        baseline = self._baseline[model_type]
+        for index, definition in enumerate(baseline):
+            if definition.key == old_kd.key:
+                baseline[index] = deepcopy(kd)
+                break
+        else:
+            baseline.append(deepcopy(kd))
+        if kd.key != old_kd.key:
+            from ...core.profile.key_rename import rename_schema_references
+            from ...core.profile.schema import ProfileSchema
+            renames = [(model_type, old_kd.key, kd.key)]
+            self._drafts = rename_schema_references(
+                ProfileSchema(keys_by_model=self._drafts), renames).keys_by_model
+            self._baseline = rename_schema_references(
+                ProfileSchema(keys_by_model=self._baseline), renames).keys_by_model
+        self.has_saved_changes = True
+        for kind in _MODEL_ORDER:
+            self._refresh_model_tab(kind, kd.group if kind == model_type else None,
+                                    kd.key if kind == model_type else None)
 
     def _edit_key_groups(self, model_type: str, rows: list[int]) -> None:
         """通过可编辑下拉框批量修改所选 key 的定义分组。"""
@@ -1155,13 +1194,40 @@ class ProfileDefinitionDialog(QDialog):
         return result
 
     @staticmethod
+    def _save_key_definition(model_type: str, original_key: str | None, definition: KeyDef) -> None:
+        """单 key 保存合并最新配置，不把外层编辑草稿整体写回。"""
+        from ...core.profile.key_rename import save_renamed_definitions
+        from ...core.profile.maintenance import profile_lock
+        from ...core.profile.schema import reload_profile_config, save_profile_config
+        with profile_lock:
+            current = deepcopy(reload_profile_config())
+            definitions = current.keys_by_model.setdefault(model_type, [])
+            if original_key is None:
+                if current.get_key(definition.key) is not None:
+                    raise ValueError(tr("Key '{key}' 已存在").format(key=definition.key))
+                definitions.append(deepcopy(definition))
+            else:
+                for index, item in enumerate(definitions):
+                    if item.key == original_key:
+                        definitions[index] = deepcopy(definition)
+                        break
+                else:
+                    raise ValueError(tr("原 key 已不存在，请重新打开编辑对话框"))
+            current._rebuild_index()
+            if original_key is not None and original_key != definition.key:
+                save_renamed_definitions(current, [(model_type, original_key, definition.key)])
+            else:
+                save_profile_config(current)
+                reload_profile_config()
+
+    @staticmethod
     def open_key_editor(
         parent: QWidget,
         model_type: str,
         existing: KeyDef | None,
         known_keys: set[str],
         *,
-        lock_key: bool = False,
+        initial_group: str = DEFAULT_KEY_GROUP,
     ) -> KeyDef | None:
         """打开 key 编辑对话框，返回新的 KeyDef 或 None"""
         dialog = QDialog(parent)
@@ -1170,11 +1236,31 @@ class ProfileDefinitionDialog(QDialog):
         dialog.setMinimumWidth(806)
 
         layout = QFormLayout(dialog)
+        margins = layout.contentsMargins()
+        layout.setContentsMargins(
+            margins.left(), margins.top(), margins.right(), dialog.fontMetrics().lineSpacing() // 3)
 
         # 通用字段
         key_input = QLineEdit(existing.key if existing else "")
-        key_input.setReadOnly(lock_key)
-        layout.addRow("Key:", key_input)
+        key_input.setEnabled(existing is None)
+        key_row = QHBoxLayout()
+        key_row.addWidget(key_input)
+        if existing is not None:
+            edit_key = QPushButton(tr("编辑"))
+            apply_button_style(edit_key, variant="neutral")
+            def begin_key_edit() -> None:
+                from ...core.access import is_readonly
+                if is_readonly():
+                    QMessageBox.information(dialog, tr("提示"), tr("只读实例不可以重命名 key"))
+                    return
+                key_input.setEnabled(True)
+                key_input.setFocus()
+                key_input.selectAll()
+                edit_key.setEnabled(False)
+
+            edit_key.clicked.connect(begin_key_edit)
+            key_row.addWidget(edit_key)
+        layout.addRow("Key:", key_row)
 
         label_input = QLineEdit(existing.label if existing else "")
         layout.addRow(tr("标签:"), label_input)
@@ -1410,39 +1496,70 @@ class ProfileDefinitionDialog(QDialog):
             layout.addRow(tr("变动规则:"), change_rules_widget)
             layout.addRow(tr("同步目标:"), sync_targets_widget)
         else:
-            layout.addRow(tr("同步目标:"), sync_targets_widget)
+            # 备注不执行数值同步；保留旧配置，但不展示无效的编辑入口。
+            sync_targets_widget.setParent(dialog)
+            sync_targets_widget.hide()
 
         # 按钮行
+        error_label = QLabel()
+        error_label.setStyleSheet("color: red;")
+        error_label.setWordWrap(True)
+        error_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        error_label.hide()
+
+        def show_error(message: str) -> None:
+            error_label.setText(message)
+            error_label.setVisible(bool(message))
+
         btn_row = QHBoxLayout()
+        from ...core.profile.schema import get_profile_config
+        persisted_key = (
+            existing.key if existing and get_profile_config().get_key(existing.key, model_type=model_type)
+            else None
+        )
+        btn_rename_history = QPushButton(tr("查看 key 重命名记录"))
+        btn_rename_history.setEnabled(persisted_key is not None)
+        if persisted_key is None:
+            btn_rename_history.setToolTip(tr("尚未保存的 key 没有重命名记录"))
+
+        def show_rename_history() -> None:
+            from .dialogs import KeyRenameHistoryDialog
+            if persisted_key is not None:
+                KeyRenameHistoryDialog(model_type, persisted_key, dialog).exec()
+
+        btn_rename_history.clicked.connect(show_rename_history)
+        btn_row.addWidget(btn_rename_history)
+        btn_row.addWidget(error_label, stretch=1)
         btn_row.addStretch()
-        btn_ok = QPushButton(tr("保存") if lock_key else tr("确定"))
+        btn_ok = QPushButton(tr("保存"))
         btn_row.addWidget(btn_ok)
         btn_cancel = QPushButton(tr("取消"))
         btn_cancel.clicked.connect(dialog.reject)
         btn_row.addWidget(btn_cancel)
         apply_button_style(btn_ok)
         apply_button_style(btn_cancel, variant="neutral")
-        layout.addRow(btn_row)
-
-        # 错误提示
-        error_label = QLabel()
-        error_label.setStyleSheet("color: red;")
-        layout.addRow(error_label)
+        apply_button_style(btn_rename_history, variant="neutral")
+        button_area = QWidget()
+        button_layout = QVBoxLayout(button_area)
+        button_layout.setContentsMargins(0, dialog.fontMetrics().lineSpacing(), 0, 0)
+        button_layout.addLayout(btn_row)
+        layout.addRow(button_area)
 
         result_kd: list[KeyDef | None] = [None]
 
         def on_accept():
+            show_error("")
             key = key_input.text().strip()
             label = label_input.text().strip()
 
             if not key:
-                error_label.setText(tr("请输入 Key"))
+                show_error(tr("请输入 Key"))
                 return
             if not key.replace("_", "").isalnum():
-                error_label.setText(tr("Key 只能包含字母、数字和下划线"))
+                show_error(tr("Key 只能包含字母、数字和下划线"))
                 return
             if not label:
-                error_label.setText(tr("请输入标签"))
+                show_error(tr("请输入标签"))
                 return
 
             # 检查 key 唯一性（排除自身）
@@ -1450,7 +1567,7 @@ class ProfileDefinitionDialog(QDialog):
             if existing:
                 all_keys.discard(existing.key)
             if key in all_keys:
-                error_label.setText(tr("Key '{key}' 已存在").format(key=key))
+                show_error(tr("Key '{key}' 已存在").format(key=key))
                 return
 
             source_input = widgets["source_tags"]
@@ -1463,7 +1580,7 @@ class ProfileDefinitionDialog(QDialog):
             if isinstance(change_rules, _ChangeRulesWidget):
                 rules_error = change_rules.validation_error()
                 if rules_error:
-                    error_label.setText(rules_error)
+                    show_error(rules_error)
                     return
                 steps_list = change_rules.get_steps()
 
@@ -1476,8 +1593,8 @@ class ProfileDefinitionDialog(QDialog):
 
             # 禁止同步目标指向自身（兼容：行已存在时 key 被改名的情况）
             self_sync_key = f"{model_type}:{key}"
-            if any(t.key == self_sync_key for t in sync_targets_list):
-                error_label.setText(tr("同步目标不能指向自身"))
+            if model_type != MODEL_NOTE and any(t.key == self_sync_key for t in sync_targets_list):
+                show_error(tr("同步目标不能指向自身"))
                 return
 
             # 通用上限字段（三种模型通用）
@@ -1487,7 +1604,7 @@ class ProfileDefinitionDialog(QDialog):
             show_cap_final = widgets["show_cap"].isChecked()
             decimal_final = widgets["decimal"].isChecked()
             change_script = change_script_input.text().strip()
-            group = existing.group if existing else DEFAULT_KEY_GROUP
+            group = existing.group if existing else initial_group
 
             # 构造 KeyDef
             if model_type == MODEL_QUOTA:
@@ -1563,6 +1680,26 @@ class ProfileDefinitionDialog(QDialog):
                     change_script=change_script,
                 )
 
+            if persisted_key is not None and persisted_key != kd.key:
+                reason = _rename_unavailable_reason(parent)
+                if reason:
+                    show_error(reason)
+                    return
+                message = tr(
+                    "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。"
+                    "工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？")
+                if QMessageBox.question(
+                    dialog, tr("确认重命名"), message,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                ) != QMessageBox.StandardButton.Yes:
+                    return
+            try:
+                ProfileDefinitionDialog._save_key_definition(model_type, persisted_key, kd)
+            except Exception as exc:
+                logger.error(f"保存 key 定义失败: {exc}")
+                show_error(tr("保存 profile.yaml 失败:\n{e}").format(e=exc))
+                return
             result_kd[0] = kd
             dialog.accept()
 
@@ -1575,19 +1712,38 @@ class ProfileDefinitionDialog(QDialog):
     # ─── 保存 ────────────────────────────────────────────────
 
     def _on_save(self):
-        """保存所有模型类型的 key 定义到 profile.yaml"""
-        from ...core.profile.schema import ProfileSchema, save_profile_config
-
-        # 保存完整草稿；当前分组只是过滤视图，不能遗漏其他组。
-        keys_by_model = {
-            model_type: list(self._drafts[model_type])
-            for model_type in _MODEL_ORDER
-        }
-
-        schema = ProfileSchema(keys_by_model=keys_by_model)
-
+        """只合并外层尚未保存的增删、分组和排序，不覆盖已保存的定义。"""
+        from ...core.profile.maintenance import profile_lock
+        from ...core.profile.schema import reload_profile_config, save_profile_config
         try:
-            save_profile_config(schema)
+            with profile_lock:
+                current = deepcopy(reload_profile_config())
+                for model_type in _MODEL_ORDER:
+                    baseline = {kd.key: kd for kd in self._baseline[model_type]}
+                    desired = {kd.key: kd for kd in self._drafts[model_type]}
+                    latest = current.get_keys_by_model(model_type)
+                    merged = [
+                        replace(kd, group=desired[kd.key].group)
+                        if kd.key in desired and kd.key in baseline and desired[kd.key].group != baseline[kd.key].group
+                        else kd
+                        for kd in latest if kd.key not in baseline or kd.key in desired
+                    ]
+                    latest_names = {kd.key for kd in latest}
+                    for key, kd in desired.items():
+                        if key not in latest_names:
+                            if key not in baseline:
+                                merged.append(deepcopy(kd))
+                            elif kd != baseline[key]:
+                                raise ValueError(tr("原 key 已不存在，请重新打开编辑对话框"))
+                    if list(desired) != list(baseline):
+                        by_key = {kd.key: kd for kd in merged}
+                        ordered = iter(by_key[key] for key in desired if key in by_key)
+                        merged = [next(ordered) if kd.key in desired else kd for kd in merged]
+                    current.keys_by_model[model_type] = merged
+                current._rebuild_index()
+                save_profile_config(current)
+                reload_profile_config()
+            self.has_saved_changes = True
             self.accept()
         except Exception as e:
             logger.error(f"保存失败: {e}")

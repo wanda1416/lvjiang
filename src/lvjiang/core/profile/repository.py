@@ -227,6 +227,9 @@ class ProfileDB:
         finally:
             conn.close()
 
+        from .key_rename import recover_rename
+        recover_rename(self)
+
     # ─── 读取 ───
 
     def get_entry(self, username: str, type_: str, key: str) -> dict:
@@ -480,6 +483,77 @@ class ProfileDB:
             return True
         finally:
             conn.close()
+
+    def rename_keys(
+        self, renames: list[tuple[str, str, str]], *,
+        operation_id: str, save_references: Callable[[], None],
+    ) -> None:
+        """全用户身份重命名；SQL 变化与审计共用事务，不触发数值事件。"""
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for model, old, new in renames:
+                if old == new or not new or not new.replace("_", "").isalnum():
+                    raise ValueError("无效的 key 重命名")
+                if conn.execute(
+                    "SELECT 1 FROM profile_entries WHERE key=? "
+                    "UNION SELECT 1 FROM profile_history WHERE key=? LIMIT 1", (new, new),
+                ).fetchone():
+                    raise ValueError(f"目标 key {new} 已有数据或历史，不能合并")
+                entries = conn.execute(
+                    "UPDATE profile_entries SET key=? WHERE type=? AND key=?", (new, model, old),
+                ).rowcount
+                history = conn.execute(
+                    "UPDATE profile_history SET key=? WHERE type=? AND key=?", (new, model, old),
+                ).rowcount
+                # 未限定模型的旧来源，仅在身份没有歧义时更新。
+                ambiguous = conn.execute(
+                    "SELECT 1 FROM profile_entries WHERE key=? AND type!=? "
+                    "UNION SELECT 1 FROM profile_history WHERE key=? AND type!=? LIMIT 1",
+                    (old, model, old, model),
+                ).fetchone()
+                refs = [f"{model}:{old}"]
+                if not ambiguous:
+                    refs.append(old)
+                sync = 0
+                for reference in refs:
+                    sync += conn.execute(
+                        "UPDATE profile_history SET sync_from=? WHERE sync_from=?",
+                        (f"{model}:{new}", reference),
+                    ).rowcount
+                conn.execute(
+                    "INSERT INTO profile_key_renames "
+                    "(ts, operation_id, type, old_key, new_key, entries_count, history_count, sync_count) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (datetime.now().isoformat(timespec="seconds"), operation_id,
+                     model, old, new, entries, history, sync),
+                )
+            save_references()
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def get_key_renames(self, type_: str, key: str) -> list[dict]:
+        """按重命名链追溯曾用名，包括连续多次重命名。"""
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT ts, old_key, new_key, entries_count, history_count, sync_count "
+                "FROM profile_key_renames WHERE type=? ORDER BY id DESC", (type_,),
+            ).fetchall()
+        finally:
+            conn.close()
+        result = []
+        names = {key}
+        for ts, old, new, entries, history, sync in rows:
+            if new in names:
+                names.add(old)
+                result.append(dict(ts=ts, old_key=old, new_key=new,
+                                   entries_count=entries, history_count=history, sync_count=sync))
+        return result
 
     # ─── History 查询 ───
 

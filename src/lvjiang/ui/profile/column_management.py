@@ -19,15 +19,7 @@ from PyQt6.QtWidgets import (
 from lvjiang.core.config import get_session_store
 from lvjiang.ui.button_styles import apply_button_style, fit_button_width
 
-from ...core.profile.models import (
-    ALL_MODELS,
-)
-from ...core.profile.schema import (
-    ProfileSchema,
-    get_profile_config,
-    reload_profile_config,
-    save_profile_config,
-)
+from ...core.profile.schema import get_profile_config
 from ...core.profile.store import (
     get_groups,
     insert_overview_column,
@@ -257,36 +249,11 @@ class ProfileColumnMixin:
             model_type,
             key_def,
             {item.key for item in config.get_all_keys()},
-            lock_key=True,
         )
         if edited is None:
             return
 
-        keys_by_model = {
-            item_model: config.get_keys_by_model(item_model)
-            for item_model in ALL_MODELS
-        }
-        model_keys = keys_by_model[model_type]
-        for index, existing in enumerate(model_keys):
-            if existing.key == key:
-                model_keys[index] = edited
-                break
-        else:
-            return
-
-        try:
-            save_profile_config(ProfileSchema(keys_by_model=keys_by_model))
-            reload_profile_config()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(
-                self,
-                tr("保存失败"),
-                tr("保存 profile.yaml 失败:\n{e}").format(e=exc),
-            )
-            return
-
-        # key 被锁定，编辑定义不会改变分组或列结构。原表就地刷新即可，
-        # 避免重建 QTableWidget 时丢失用户总览当前的字体等视图状态。
+        # 保存由共享编辑器完成；重命名时也已更新总览列引用。
         self.refresh()
 
     def _on_header_double_clicked(self: ProfileTab, logical_index: int, group_name: str):  # type: ignore[misc]

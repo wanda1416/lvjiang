@@ -859,6 +859,25 @@ auto_strings:
   停止中: Stopping
   隐藏标题: Hide Header
   显示标题: Show Header
+  重命名记录: Rename History
+  key 重命名记录: Key Rename History
+  查看 key 重命名记录: View Key Rename History
+  尚未保存的 key 没有重命名记录: Unsaved keys have no rename history
+  尚无 key 重命名记录: No key rename history
+  原 key: Previous Key
+  新 key: New Key
+  当前记录数: Current Records
+  历史记录数: History Records
+  同步引用数: Sync References
+  原 key 已不存在，请重新打开编辑对话框: The original key no longer exists. Reopen the editor
+  确认重命名: Confirm Rename
+  变动量: Delta
+  同步来源: Synced From
+  只读实例不能重命名 Profile key: A read-only instance cannot rename Profile keys
+  只读实例不可以重命名 key: A read-only instance cannot rename keys
+  请停止所有任务后再重命名 Profile key: Stop all tasks before renaming a Profile key
+  Profile 变更脚本仍在执行，请等待队列完成后重命名: Profile change scripts are still running. Wait for the queue to finish before renaming
+  "重命名将修改所有用户的当前记录、历史记录、同步来源和配置引用。工作流和变更脚本中的 key 不会自动替换，需自行修改。\n\n是否继续？": "Renaming updates all users' current records, history, sync sources and configuration references. Keys in workflows and change scripts are not replaced automatically; update them manually.\n\nContinue?"
   元数据字段定义已保存: Metadata field definitions saved
   元数据定义: Metadata Definition
   先选中一个已放置的坐标点，再从它拉出一条方向箭头: First select a placed coordinate point, then drag to create a direction arrow

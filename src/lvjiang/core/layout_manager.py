@@ -1099,7 +1099,9 @@ class LayoutConfigManager:
         entry = load_layout_entries().get(key)
         return entry.name if entry is not None else key
 
-    def new_layout(self, key: str, name: str) -> Layout:
+    def new_layout(
+        self, key: str, name: str, *, activate: bool = True,
+    ) -> Layout:
         """创建空布局（所有场景初始为空 regions）
 
         Raises:
@@ -1114,7 +1116,8 @@ class LayoutConfigManager:
         for scene_key in SCENE_REGIONS:
             layout.regions[scene_key] = []
         self.save_layout(layout)
-        self.set_active_layout(key)
+        if activate:
+            self.set_active_layout(key)
         logger.info(f"布局已新建: {name} ({key})")
         return layout
 

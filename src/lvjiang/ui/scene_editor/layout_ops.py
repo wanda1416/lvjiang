@@ -372,10 +372,10 @@ class LayoutOpsMixin:
         self._update_ui_state()
         self._status_bar.showMessage(f"已加载布局「{name}」到画布")
 
-    def _auto_load_active(self):
-        """启动时自动加载激活布局"""
+    def _auto_load_active(self, initial_layout_key: str = ""):
+        """加载调用方传入的初始布局；未传入时才回退到全局活动布局。"""
         self._refresh_combo()
-        key = self._manager.get_active_layout_key()
+        key = initial_layout_key or self._manager.get_active_layout_key()
         idx = self._layout_combo.findData(key) if key else -1
         # 防御失效的 session 选择或配置刷新竞态：下拉已有有效布局时，
         # 首次打开必须真正加载一项，不能只在界面上看似选中了第一项。
@@ -404,14 +404,11 @@ class LayoutOpsMixin:
         if identity is None:
             return
         key, name = identity
-        prev_active = self._manager.get_active_layout_key()
         try:
-            layout = self._manager.new_layout(key, name)
+            layout = self._manager.new_layout(key, name, activate=False)
         except ValueError as e:
             QMessageBox.warning(self, tr("新建失败"), str(e))
             return
-        if prev_active and prev_active != key:
-            self._manager.set_active_layout(prev_active)
         self._current_layout = layout
         self._apply_layout_to_tabs()
         self._refresh_combo()

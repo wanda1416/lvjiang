@@ -18,6 +18,7 @@ from lvjiang.apps.yysls.core.loadout.affix_distribution import (
     distribute_affixes,
     distribution_counts,
 )
+from lvjiang.apps.yysls.core.loadout.affix_swap import swap_affixes
 from lvjiang.apps.yysls.ui.loadout.build_calculator import (
     BuildEditor,
     template_for_playstyle,
@@ -192,6 +193,130 @@ def test_requirements_do_not_mutate_targets():
     assert not check_requirements({"最大外功攻击": 11}, targets)[0]["satisfied"]
     assert check_requirements({"最大外功攻击": 12}, targets)[0]["satisfied"]
     assert targets == before
+
+
+def test_swap_checks_reverse_destination_and_first_slot_duplicates():
+    gc = get_game_config()
+    equipment = {
+        "main_weapon": {"type": "剑", "level": 115, "original_level": 115,
+                        "affix_1": {"name": "最大外功攻击", "value": 1},
+                        "affix_2": {"name": "剑武学增伤", "value": 1}},
+        "sub_weapon": {"type": "枪", "level": 115, "original_level": 115,
+                       "affix_1": {"name": "最大外功攻击", "value": 1},
+                       "affix_2": {"name": "劲", "value": 1}},
+    }
+    before = copy.deepcopy(equipment)
+    # 劲能进入剑，但剑武学增伤不能反向进入枪。
+    changed, reason = swap_affixes(equipment, ("sub_weapon", 2), ("main_weapon", 2), gc)
+    assert changed is None and reason
+    equipment["main_weapon"]["affix_2"] = {"name": "最大外功攻击", "value": 1}
+    equipment["main_weapon"]["affix_3"] = {"name": "势", "value": 1}
+    changed, reason = swap_affixes(equipment, ("main_weapon", 1), ("main_weapon", 3), gc)
+    assert changed is None and "重复" in reason
+    assert before["sub_weapon"] == equipment["sub_weapon"]
+
+
+def test_swapped_positions_survive_recalculate_and_save(qtbot, repository):
+    from PyQt6.QtCore import QPointF
+
+    from lvjiang.apps.yysls.ui.loadout.build_calculator import BUILD_DISPLAY_SLOTS
+
+    build = BuildDefinition.create("交换位置", "无名", 115)
+    build.equipment = allocate(counts() | {"劲": 9}).equipment
+    repository.save(build)
+    editor = BuildEditor("无名", repository=repository, initial=build)
+    qtbot.addWidget(editor)
+    changed, reason = swap_affixes(editor.result.equipment,
+                                  ("main_weapon", 2), ("main_weapon", 5), editor.gc)
+    assert changed is not None, reason
+    table = editor.distribution_table
+    row = next(i for i, spec in enumerate(BUILD_DISPLAY_SLOTS) if spec.key == "main_weapon")
+    table._source = ("main_weapon", 2)
+    accepted = []
+    event = SimpleNamespace(source=lambda: table,
+                            position=lambda: QPointF(table.visualItemRect(table.item(row, 5)).center()),
+                            acceptProposedAction=lambda: accepted.append(True),
+                            ignore=lambda: accepted.append(False))
+    table.dropEvent(event)
+    table._source = None
+    assert accepted == [True]
+    assert editor._dirty
+    expected = distribution_counts(changed, editor.attribute, editor.gc)
+    editor.recalculate()
+    assert editor.result.equipment == changed
+
+    # 跨装备交换也不能被保存前的自动分配回滚。
+    cross = None
+    positions = [(slot, index) for slot in changed for index in range(1, 6)]
+    for source in positions:
+        for target in positions:
+            if source[0] == target[0]:
+                continue
+            if (changed[source[0]].get(f"affix_{source[1]}") or {}).get("name") == (changed[target[0]].get(f"affix_{target[1]}") or {}).get("name"):
+                continue
+            cross, _ = swap_affixes(changed, source, target, editor.gc)
+            if cross is not None:
+                break
+        if cross is not None:
+            break
+    assert cross is not None
+    editor._templates = copy.deepcopy(cross)
+    editor.save()
+    assert editor.result.equipment == cross
+    assert editor.counts() == expected
+    saved = repository.all()[0]
+    for slot in cross:
+        for index in range(1, 6):
+            assert (saved.equipment[slot].get(f"affix_{index}") or {}).get("name") == (cross[slot].get(f"affix_{index}") or {}).get("name")
+
+
+def test_drag_precomputes_targets_and_cancel_keeps_distribution(qtbot, repository, monkeypatch):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QDrag
+
+    from lvjiang.apps.yysls.ui.loadout.build_calculator import BUILD_DISPLAY_SLOTS
+
+    build = BuildDefinition.create("拖拽候选", "无名", 115)
+    build.equipment = allocate(counts()).equipment
+    editor = BuildEditor("无名", repository=repository, initial=build)
+    qtbot.addWidget(editor)
+    table = editor.distribution_table
+    before = copy.deepcopy(editor.result.equipment)
+    table.setCurrentCell(0, 2)
+
+    def check_targets(_drag, _actions):
+        assert not _drag.pixmap().isNull()
+        assert table.item(0, 2).text() == ""
+        assert table.item(0, 2).background() != table.palette().highlight()
+        assert editor.result.equipment == before
+        for row, spec in enumerate(BUILD_DISPLAY_SLOTS):
+            for index in range(1, 6):
+                changed, reason = swap_affixes(before, (BUILD_DISPLAY_SLOTS[0].key, 2),
+                                              (spec.key, index), editor.gc)
+                expected = "正在拖动" if (row, index) == (0, 2) else "可交换" if changed is not None else reason
+                assert table.item(row, index).toolTip() == expected
+        return Qt.DropAction.IgnoreAction
+
+    monkeypatch.setattr(QDrag, "exec", check_targets)
+    table.startDrag(Qt.DropAction.MoveAction)
+    assert table._source is None
+    assert editor.result.equipment == before
+    assert table.item(0, 2).text() == before[BUILD_DISPLAY_SLOTS[0].key]["affix_2"]["name"]
+
+
+def test_first_show_has_same_row_heights_as_recalculation(qtbot, repository):
+    """首次打开的窄列宽不能留下折行行高，用户无需拖动词条才能恢复。"""
+    build = BuildDefinition.create("首次行高", "无名", 115)
+    build.equipment = allocate(counts()).equipment
+    editor = BuildEditor("无名", repository=repository, initial=build)
+    qtbot.addWidget(editor)
+    editor.resize(1320, 820)
+    editor.show()
+    qtbot.waitExposed(editor)
+    table = editor.distribution_table
+    initial = [table.rowHeight(row) for row in range(8)]
+    editor.recalculate()
+    assert [table.rowHeight(row) for row in range(8)] == initial
 
 
 def test_editor_load_adjust_save_and_invalid_clear(qtbot, repository):

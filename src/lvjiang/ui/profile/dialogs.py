@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
+from ...core.profile.models import format_sync_label
 from ...core.profile.repository import db_count_history, db_get_history
 from ...i18n import tr
 from ..button_styles import (
@@ -65,7 +66,7 @@ def _cjk_column_width(widget: QWidget, characters: int) -> int:
 class HistoryDialog(QDialog):
     """按 key 查看变更记录；可限定单个用户，也可跨用户分页。"""
 
-    _TYPE_LABEL = {"tick": tr("定时"), "action": tr("操作"), "override": tr("覆写")}  # runtime tr()
+    _TYPE_LABEL = {"tick": tr("恢复"), "reset": tr("重置"), "action": tr("操作"), "override": tr("覆写")}  # runtime tr()
 
     def __init__(
         self, user_name: str | None, model_type: str, key: str,
@@ -86,10 +87,10 @@ class HistoryDialog(QDialog):
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         table = QTableWidget(self)
-        table.setColumnCount(7)
+        table.setColumnCount(8)
         table.setHorizontalHeaderLabels([
             tr("时间"), tr("用户名"), tr("类型"), tr("旧值"),
-            tr("新值"), tr("来源"), tr("详情"),
+            tr("新值"), tr("来源"), tr("变动量"), tr("同步来源"),
         ])
         table.setColumnHidden(1, self._user_name is not None)
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -111,7 +112,8 @@ class HistoryDialog(QDialog):
             ):
                 header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
                 table.setColumnWidth(col, w)
-            header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
 
         self._table = table
         layout.addWidget(table)
@@ -209,7 +211,10 @@ class HistoryDialog(QDialog):
             table.setItem(row, 3, QTableWidgetItem(old_str))
             table.setItem(row, 4, QTableWidgetItem(new_str))
             table.setItem(row, 5, QTableWidgetItem(rec.get("source", "")))
-            table.setItem(row, 6, QTableWidgetItem(rec.get("detail", "")))
+            delta = rec.get("delta_value")
+            table.setItem(row, 6, QTableWidgetItem(f"{delta:+g}" if delta is not None else "—"))
+            sync_from = rec.get("sync_from") or ""
+            table.setItem(row, 7, QTableWidgetItem(format_sync_label(sync_from) if sync_from else ""))
 
         start = (self._page - 1) * self._page_size + 1 if total else 0
         end = start + len(history) - 1 if history else 0

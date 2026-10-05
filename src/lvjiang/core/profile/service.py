@@ -6,7 +6,7 @@
 - DSL profile_set / profile_inc / profile_get / profile_all
 - sync_engine 递归写入（_sync_write_adapter）
 
-所有路径共享同一套 clamp → delta → detail → db_upsert → sync_targets 管线，
+所有路径共享同一套 clamp → delta → db_upsert → sync_targets 管线，
 保证行为一致：历史记录格式、触发器同步、上下限钳位。
 """
 
@@ -222,8 +222,8 @@ def profile_observe(
                 expected_updated_at=entry.get("updated_at", ""),
                 expected_entry_exists=bool(entry),
                 new_value=0,
-                change_type="tick",
-                detail="reset:0",
+                change_type="reset",
+                delta_value=-float(entry.get("value", 0) or 0),
             )
             if not reset:
                 continue
@@ -283,7 +283,7 @@ def profile_action(
     """统一 profile 写入入口
 
     数值模型（quota/regen/stock）：
-    读当前值 → 计算新值 → clamp → 算 actual_delta → detail → db_upsert → sync_targets
+    读当前值 → 计算新值 → clamp → 算 actual_delta → db_upsert → sync_targets
 
     note 模型：
     直接写入 value_text 列，不走数值管线，不触发同步。
@@ -377,9 +377,6 @@ def profile_action(
     actual_delta = _normalize_float_noise(new_value - current_value)
     semantic_new_value = new_value
 
-    # ── 5. detail ──
-    detail = f"delta:{actual_delta:+g}" if is_action else f"override:{new_value}"
-
     # ── 6. regen 连续恢复规范化 ──
     custom_updated_at = None
     write_value = new_value  # 默认：语义值 = 入库值
@@ -427,7 +424,7 @@ def profile_action(
             new_value=write_value,
             new_updated_at=custom_updated_at,
             change_type=change_type,
-            detail=detail,
+            delta_value=actual_delta,
             source=source,
         )
         if not updated:
@@ -437,12 +434,12 @@ def profile_action(
             username, model_type, key, write_value,
             updated_at=custom_updated_at,
             change_type=change_type,
-            detail=detail,
+            delta_value=actual_delta,
             source=source,
         )
     logger.debug(
         f"profile_action: {username}.{model_type}.{key} = "
-        f"{semantic_new_value} ({detail})"
+        f"{semantic_new_value} (delta={actual_delta:+g})"
     )
 
     # ── 8. 触发器同步 ──
@@ -472,7 +469,7 @@ def sync_write_adapter(
     *,
     delta: int | float,
     change_type: str = "action",
-    detail: str = "",
+    sync_from: str | None = None,
     source: str = "",
 ) -> tuple[int | float, int | float] | None:
     """同步引擎的写入适配器：读当前值 → 加 delta → clamp → 写入
@@ -528,7 +525,8 @@ def sync_write_adapter(
             user_name, model_type, key, new_value,
             updated_at=custom_updated_at,
             change_type=change_type,
-            detail=detail,
+            delta_value=actual_delta,
+            sync_from=sync_from,
             source=source,
         )
     except Exception as e:

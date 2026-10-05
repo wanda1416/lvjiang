@@ -315,7 +315,7 @@ class ProfileEngine(QThread):
             if not entry:
                 # 首次初始化：entry 不存在，直接 upsert 创建
                 db_upsert(user_name, "quota", kd.key, 0,
-                          change_type="tick", detail="reset:0")
+                          change_type="reset", delta_value=0)
                 logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 首次初始化")
                 modified = True
                 continue
@@ -334,8 +334,8 @@ class ProfileEngine(QThread):
                 expected_value=stored_value,
                 expected_updated_at=updated_at_str,
                 new_value=0,
-                change_type="tick",
-                detail="reset:0",
+                change_type="reset",
+                delta_value=-stored_value,
             )
             if updated:
                 logger.debug(f"[ProfileEngine] {user_name} quota.{kd.key} 周期重置")
@@ -347,7 +347,7 @@ class ProfileEngine(QThread):
                     old_value=stored_value,
                     new_value=0,
                     source="周期重置",
-                    change_type="tick",
+                    change_type="reset",
                     script=kd.change_script,
                 )
                 modified = True
@@ -380,7 +380,7 @@ class ProfileEngine(QThread):
                     new_value=computed,
                     new_updated_at=regen_result.updated_at,
                     change_type="tick",
-                    detail=f"regen:{delta:+.4f}",
+                    delta_value=delta,
                 )
                 if updated:
                     from .triggers import enqueue_profile_change

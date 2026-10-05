@@ -2,7 +2,8 @@
 
 替代早期 user.json 中的 profile 节点（该文件已不存在），提供：
 - profile_entries: 当前值（upsert 覆盖）
-- profile_history: 变更历史（append-only，记录 action/manual/tick 三类变更）
+- profile_history: 变更历史（action/override/tick/reset；身份重命名更新引用）
+- profile_key_renames: 全用户 key 重命名审计
 - schema_version: 轻量版本管理，支持未来增量迁移
 
 数据库路径: config/session/profile.db（单文件集中存储）
@@ -20,6 +21,8 @@ from pathlib import Path
 from loguru import logger
 
 from lvjiang.constants import SESSION_CONFIG_DIR
+
+from .history_migration import migrate_structured_history
 
 # 数据库路径
 _DB_PATH = SESSION_CONFIG_DIR / "profile.db"
@@ -143,6 +146,7 @@ MIGRATIONS: list[tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (4, "entries add value_text column", _migrate_v4),
     (5, "history add old/new_value_text columns", _migrate_v5),
     (6, "history add type/key index", _migrate_v6),
+    (7, "structured history and key rename audit", migrate_structured_history),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1][0]
@@ -188,6 +192,16 @@ class ProfileDB:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = self._connect()
         try:
+            # backup 必须在 BEGIN 前执行，避免对已持有写事务的连接调用 backup。
+            has_version = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE name='schema_version'"
+            ).fetchone()
+            if has_version:
+                version = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
+                backup_path = self._db_path.with_suffix(".before-v7.db")
+                if version and version < 7 and not backup_path.exists():
+                    with sqlite3.connect(backup_path) as backup:
+                        conn.backup(backup)
             # 在读取版本前取得写锁。并发初始化者会在 busy_timeout 范围内
             # 等待，取得锁后重新读取已经提交的新版本，不会重复执行迁移。
             conn.execute("BEGIN IMMEDIATE")
@@ -268,9 +282,10 @@ class ProfileDB:
         value: float | int,
         updated_at: str | None = None,
         change_type: str | None = None,
-        detail: str = "",
+        delta_value: float | None = None,
         source: str = "",
         value_text: str = "",
+        sync_from: str | None = None,
     ) -> None:
         """INSERT OR REPLACE 单条 entry
 
@@ -304,7 +319,7 @@ class ProfileDB:
             # history 记录
             if change_type is not None:
                 should_record = False
-                if change_type in ("action", "override"):
+                if change_type in ("action", "override", "reset"):
                     # 用户主动操作始终记录
                     should_record = True
                 elif type_ == "note":
@@ -319,11 +334,11 @@ class ProfileDB:
                     conn.execute(
                         "INSERT INTO profile_history "
                         "(ts, username, type, key, old_value, new_value, "
-                        "old_value_text, new_value_text, change_type, detail, source) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "old_value_text, new_value_text, change_type, delta_value, source, sync_from) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (write_ts, username, type_, key, old_value, float(value),
                          old_value_text or "", value_text,
-                         change_type, detail, source),
+                         change_type, delta_value, source, sync_from),
                     )
 
             conn.commit()
@@ -335,7 +350,7 @@ class ProfileDB:
     ) -> None:
         """批量 upsert（事务包裹），用于 tick 写入
 
-        entries 元素: (type_, key, value, updated_at, change_type, detail[, source[, value_text]])
+        entries 元素: (type_, key, value, updated_at, change_type, delta_value[, source[, value_text[, sync_from]]])
         """
         conn = self._connect()
         try:
@@ -344,7 +359,8 @@ class ProfileDB:
             for entry in entries:
                 source = entry[6] if len(entry) > 6 else ""
                 value_text = entry[7] if len(entry) > 7 else ""
-                type_, key, value, updated_at, change_type, detail = entry[:6]
+                type_, key, value, updated_at, change_type, delta_value = entry[:6]
+                sync_from = entry[8] if len(entry) > 8 else None
                 write_ts = datetime.now().isoformat(timespec="seconds")
                 ts = updated_at or write_ts
 
@@ -365,7 +381,7 @@ class ProfileDB:
 
                 if change_type is not None:
                     should_record = False
-                    if change_type in ("action", "override"):
+                    if change_type in ("action", "override", "reset"):
                         should_record = True
                     elif type_ == "note":
                         if old_value_text != value_text:
@@ -377,11 +393,11 @@ class ProfileDB:
                         conn.execute(
                             "INSERT INTO profile_history "
                             "(ts, username, type, key, old_value, new_value, "
-                            "old_value_text, new_value_text, change_type, detail, source) "
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            "old_value_text, new_value_text, change_type, delta_value, source, sync_from) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (write_ts, username, type_, key, old_value, float(value),
                              old_value_text or "", value_text,
-                             change_type, detail, source),
+                             change_type, delta_value, source, sync_from),
                         )
 
             conn.commit()
@@ -400,8 +416,9 @@ class ProfileDB:
         new_value: float | int,
         new_updated_at: str | None = None,
         change_type: str | None = None,
-        detail: str = "",
+        delta_value: float | None = None,
         source: str = "",
+        sync_from: str | None = None,
     ) -> bool:
         """CAS 更新单条 entry。
 
@@ -444,7 +461,7 @@ class ProfileDB:
 
             if change_type is not None:
                 should_record = False
-                if change_type in ("action", "override"):
+                if change_type in ("action", "override", "reset"):
                     should_record = True
                 elif history_old_value != value:
                     should_record = True
@@ -453,10 +470,10 @@ class ProfileDB:
                     conn.execute(
                         "INSERT INTO profile_history "
                         "(ts, username, type, key, old_value, new_value, "
-                        "change_type, detail, source) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "change_type, delta_value, source, sync_from) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (write_ts, username, type_, key, history_old_value, value,
-                         change_type, detail, source),
+                         change_type, delta_value, source, sync_from),
                     )
 
             conn.commit()
@@ -481,7 +498,7 @@ class ProfileDB:
         try:
             rows = conn.execute(
                 f"SELECT id, ts, username, type, key, old_value, new_value, "
-                f"old_value_text, new_value_text, change_type, detail, source "
+                f"old_value_text, new_value_text, change_type, delta_value, source, sync_from "
                 f"FROM profile_history "
                 f"WHERE {where} ORDER BY id DESC LIMIT ? OFFSET ?",
                 (*params, limit, offset),
@@ -495,7 +512,7 @@ class ProfileDB:
                 "type": r[3], "key": r[4],
                 "old_value": r[5], "new_value": r[6],
                 "old_value_text": r[7] or "", "new_value_text": r[8] or "",
-                "change_type": r[9], "detail": r[10], "source": r[11],
+                "change_type": r[9], "delta_value": r[10], "source": r[11], "sync_from": r[12],
             }
             for r in rows
         ]
@@ -587,11 +604,12 @@ def db_upsert(
     value: float | int,
     updated_at: str | None = None,
     change_type: str | None = None,
-    detail: str = "",
+    delta_value: float | None = None,
     source: str = "",
     value_text: str = "",
+    sync_from: str | None = None,
 ) -> None:
-    get_profile_db().upsert(username, type_, key, value, updated_at, change_type, detail, source, value_text)
+    get_profile_db().upsert(username, type_, key, value, updated_at, change_type, delta_value, source, value_text, sync_from)
 
 
 def db_upsert_many(username: str, entries: list[tuple]) -> None:
@@ -609,8 +627,9 @@ def db_update_if_current(
     new_value: float | int,
     new_updated_at: str | None = None,
     change_type: str | None = None,
-    detail: str = "",
+    delta_value: float | None = None,
     source: str = "",
+    sync_from: str | None = None,
 ) -> bool:
     return get_profile_db().update_if_current(
         username,
@@ -622,7 +641,8 @@ def db_update_if_current(
         new_value=new_value,
         new_updated_at=new_updated_at,
         change_type=change_type,
-        detail=detail,
+        delta_value=delta_value,
+        sync_from=sync_from,
         source=source,
     )
 

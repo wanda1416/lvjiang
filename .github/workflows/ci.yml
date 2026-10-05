@@ -32,6 +32,14 @@ jobs:
       - name: Type check (mypy)
         run: python -m mypy
 
+      # 文档门禁：链接/锚点/孤儿/编号/层索引时效锚，以及归档索引是否与目录
+      # 一一对应。规范见 docs/00-meta/00-doc-standard.md；两个脚本都是纯静态
+      # 检查，不联网。
+      - name: Docs check (links / orphans / index)
+        run: |
+          python scripts/docs_check.py
+          python scripts/docs_index.py --check
+
       # 并发跑（windows-2022 为 4 核）。
       # 代价是 Qt 后台线程类用例必须确定性 join 线程，不能只靠 waitUntil 轮询
       # UI 状态：满载并发下主线程可能先处理 deleteLater 而工作线程未退出，

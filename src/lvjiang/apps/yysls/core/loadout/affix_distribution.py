@@ -102,6 +102,12 @@ class _Flow:
         return sent
 
 
+#: 八件装备各有首词条，所以全套至少 8 条；上限 40 条。分配引擎的准入校验与
+#: 编辑器里加号按钮的可用性都读这一份，避免两处各写一个 40 后悄悄走偏。
+TOTAL_AFFIXES_MIN = 8
+TOTAL_AFFIXES_MAX = 40
+
+
 def distribute_affixes(
     counts: dict[str, int], templates: dict[str, dict], *, attribute: str,
     level: int, chengyin: bool, game_config,
@@ -109,15 +115,17 @@ def distribute_affixes(
     """返回合法真实装备及可获取位置。不会修改 templates/counts。
 
     templates 仅提供槽位武器类型、套装及位置偏好；数值统一按所选等级口径生成。
-    未满 40 条可以返回部分普通词条，但八件装备必须各有合法首词条。
+    未满 TOTAL_AFFIXES_MAX 条可以返回部分普通词条，但八件装备必须各有合法首词条。
     """
     result = DistributionResult()
     if any(isinstance(n, bool) or not isinstance(n, int) or n < 0 for n in counts.values()):
         result.errors.append("词条数量必须为非负整数")
         return result
     wanted = sum(counts.values())
-    if not 8 <= wanted <= 40:
-        result.errors.append(f"当前共 {wanted} 条；八件装备至少需要 8 条首词条，最多 40 条")
+    if not TOTAL_AFFIXES_MIN <= wanted <= TOTAL_AFFIXES_MAX:
+        result.errors.append(
+            f"当前共 {wanted} 条；八件装备至少需要 {TOTAL_AFFIXES_MIN} 条首词条，"
+            f"最多 {TOTAL_AFFIXES_MAX} 条")
         return result
     aliases = dynamic_affix_map(attribute, game_config=game_config)
     flow = _Flow()

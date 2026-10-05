@@ -44,6 +44,7 @@ from ...core.combat.equipment_sets import LEFT_SET_SLOTS
 from ...core.graduation.context import PlanScoringContext, gongjue_attrs
 from ...core.graduation.scoring import LoadoutScorer
 from ...core.loadout.affix_distribution import (
+    TOTAL_AFFIXES_MAX,
     DistributionResult,
     distribute_affixes,
     distribution_counts,
@@ -65,6 +66,7 @@ class AffixCounter(QWidget):
     def __init__(self, value=0, parent=None):
         super().__init__(parent)
         self._value = 0
+        self._total_full = False
         row = QHBoxLayout(self)
         row.setContentsMargins(4, 4, 4, 4)
         row.setSpacing(6)
@@ -72,7 +74,8 @@ class AffixCounter(QWidget):
         self.plus = QPushButton("+")
         self.number = QLabel()
         self.number.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.number.setMinimumWidth(self.fontMetrics().horizontalAdvance("40") + 8)
+        self.number.setMinimumWidth(
+            self.fontMetrics().horizontalAdvance(str(TOTAL_AFFIXES_MAX)) + 8)
         for button in (self.minus, self.plus):
             apply_compact_button_style(button, variant="neutral" if button is self.minus else "action")
             button.setAutoDefault(False)
@@ -91,15 +94,32 @@ class AffixCounter(QWidget):
     def value(self) -> int:
         return self._value
 
+    def set_total_full(self, full: bool) -> None:
+        """全套词条已达上限，再加任何一条都会越界。
+
+        总量由所有计数器共享，单个计数器看不到别的列，所以由所属编辑器注入。
+        """
+        if full == self._total_full:
+            return
+        self._total_full = full
+        self._sync_buttons()
+
     def setValue(self, value: int):
-        value = max(0, min(40, value))
+        value = max(0, min(TOTAL_AFFIXES_MAX, value))
         changed = value != self._value
         self._value = value
         self.number.setText(str(value))
-        self.minus.setEnabled(value > 0)
-        self.plus.setEnabled(value < 40)
+        self._sync_buttons()
         if changed:
             self.valueChanged.emit(value)
+
+    def _sync_buttons(self) -> None:
+        self.minus.setEnabled(self._value > 0)
+        self.plus.setEnabled(
+            self._value < TOTAL_AFFIXES_MAX and not self._total_full)
+        self.plus.setToolTip(
+            tr("全套最多 {count} 条词条，请先减少其他词条").format(
+                count=TOTAL_AFFIXES_MAX) if self._total_full else "")
 
 
 class RequirementEditor(QFrame):
@@ -141,15 +161,15 @@ class RequirementEditor(QFrame):
         range_row.addStretch()
         range_row.addWidget(QLabel(tr("最少")))
         self.minimum = QSpinBox()
-        self.minimum.setRange(0, 40)
+        self.minimum.setRange(0, TOTAL_AFFIXES_MAX)
         self.minimum.setKeyboardTracking(False)
         self.minimum.setValue(int(data.get("minimum", 0)))
         range_row.addWidget(self.minimum)
         range_row.addWidget(QLabel(tr("最多")))
         self.maximum = QSpinBox()
-        self.maximum.setRange(0, 40)
+        self.maximum.setRange(0, TOTAL_AFFIXES_MAX)
         self.maximum.setKeyboardTracking(False)
-        self.maximum.setValue(int(data.get("maximum", 40)))
+        self.maximum.setValue(int(data.get("maximum", TOTAL_AFFIXES_MAX)))
         range_row.addWidget(self.maximum)
         root.addLayout(range_row)
 
@@ -484,6 +504,18 @@ class BuildEditor(QWidget):
         self._count_caps.clear()
         for name in names:
             self._append_count(name, counts.get(name, 0))
+        self._sync_count_limits()
+
+    def _sync_count_limits(self) -> None:
+        """全套 40 条上限由所有计数器共同承担：总数到顶，谁都不能再加。
+
+        单列自身的边界由 AffixCounter 判断，这里只回答「再加一条会不会越界」，
+        这样点加号之前按钮就已经不可用，而不是等引擎报错。
+        """
+        total = sum(spin.value() for spin in self._counts.values())
+        full = total >= TOTAL_AFFIXES_MAX
+        for spin in self._counts.values():
+            spin.set_total_full(full)
 
     def _append_count(self, name: str, count=0):
         if name in self._counts:
@@ -581,6 +613,7 @@ class BuildEditor(QWidget):
 
     def _changed(self, *_args):
         if not self._loading:
+            self._sync_count_limits()
             self._dirty = True
             self.metrics.setText(tr("正在重新计算…"))
             self.save_button.setEnabled(False)
@@ -602,7 +635,8 @@ class BuildEditor(QWidget):
         requirements = self.repository.common_requirements(self.combat_type.currentData()) + self._requirement_rows()
         evaluated = check_requirements(counts, requirements)
         labels = [f"{tr(PRIORITY_LABELS[row['priority']])} · {row['affix']}：{row['actual']} / "
-                  f"{row.get('minimum', 0)}～{row.get('maximum', 40)} {'✓' if row['satisfied'] else '未满足'}"
+                  f"{row.get('minimum', 0)}～{row.get('maximum', TOTAL_AFFIXES_MAX)}"
+                  f" {'✓' if row['satisfied'] else '未满足'}"
                   for row in evaluated]
         self.requirement_status.setText("\n".join(labels) or tr("未设置额外要求"))
         required_ok = all(row["satisfied"] for row in evaluated if row["priority"] == "required")
@@ -627,7 +661,9 @@ class BuildEditor(QWidget):
                 self._show_calculation()
             except (ValueError, KeyError, ArithmeticError) as exc:
                 self.metrics.setText(tr("计算失败：") + str(exc))
-        valid_requirements = all(row.get("minimum", 0) <= row.get("maximum", 40) for row in requirements)
+        valid_requirements = all(
+            row.get("minimum", 0) <= row.get("maximum", TOTAL_AFFIXES_MAX)
+            for row in requirements)
         can_save = self.result.feasible and valid_requirements and bool(self.name_edit.text().strip())
         self.save_button.setEnabled(can_save)
         self.save_as_button.setEnabled(can_save)

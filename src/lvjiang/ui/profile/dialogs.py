@@ -227,6 +227,21 @@ class HistoryDialog(QDialog):
 
 # ─── 通用数值输入对话框 ────────────────────────────────────────────
 
+# 浮点输入的显示精度，与 QDoubleValidator 允许的小数位数共用同一口径
+_FLOAT_DECIMALS = 4
+
+
+def format_number_text(value: float, decimals: int = _FLOAT_DECIMALS) -> str:
+    """把数值渲染成定点文本：不用科学计数法，去掉多余的尾随零
+
+    对话框的提示与输入框共用它，避免出现两套口径（提示显示 ``242.39``、
+    输入框显示 ``242.39000000000001``）。原始 float 的 ``str()`` 会给出
+    17 位有效数字，既超出 ``QDoubleValidator`` 允许的 4 位小数被判为无效，
+    又会在编辑器失焦时被 Qt 归一成科学计数法（``2.4239E+02``）。
+    """
+    text = f"{float(value):.{decimals}f}".rstrip("0").rstrip(".")
+    return text or "0"
+
 
 def ask_value_dialog(
     parent,
@@ -238,13 +253,13 @@ def ask_value_dialog(
     sources: list[str],
     initial_value: float | None = None,
     sync_checkbox: bool = False,
-    sync_default: bool = True,
+    sync_default: bool = False,
     source_label: str = tr("来源"),
 ) -> tuple[float | int, str, bool, bool]:
     """数值输入 + 来源/用途下拉（可输入新词条）的通用对话框
 
     sync_checkbox: 是否展示「同步变更依赖方」复选框
-    sync_default:  复选框的默认勾选状态
+    sync_default:  复选框的默认勾选状态（默认不勾选＝纯覆写语义，仅写本 key）
     source_label:  下拉行标签（增加用「来源」，减少用「用途」）
 
     Returns: (value, source, sync_checked, ok)
@@ -261,14 +276,22 @@ def ask_value_dialog(
     value_input = QLineEdit()
     validator: QDoubleValidator | QIntValidator
     if is_float:
-        validator = QDoubleValidator(float(min_val), 999999.0, 4, value_input)
+        validator = QDoubleValidator(
+            float(min_val), 999999.0, _FLOAT_DECIMALS, value_input)
+        # QDoubleValidator 默认是科学计数法记法：文本一旦被判无效（例如
+        # 超出小数位数的长小数），编辑器失焦时会把它归一成 2.4239E+02。
+        # 这里的输入都是普通数量值，定点记法既好读也不会被改写。
+        validator.setNotation(QDoubleValidator.Notation.StandardNotation)
         value_input.setValidator(validator)
     else:
         validator = QIntValidator(min_val, 999999, value_input)
         value_input.setValidator(validator)
 
     if initial_value is not None:
-        value_input.setText(str(initial_value) if is_float else str(int(initial_value)))
+        if is_float:
+            value_input.setText(format_number_text(initial_value))
+        else:
+            value_input.setText(str(int(initial_value)))
     layout.addRow(prompt, value_input)
 
     combo = AutoWidthComboBox()

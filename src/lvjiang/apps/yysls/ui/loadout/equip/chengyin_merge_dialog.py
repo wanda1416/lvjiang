@@ -172,16 +172,32 @@ class ChengyinMergeDialog(QDialog):
 
         footer = QHBoxLayout()
         footer.addStretch()
+        # 候选动辄几十组，逐个点勾选框太费事；先全选再取消掉不需要的那几组。
+        self.check_all_button = QPushButton(tr("一键勾选"))
+        self.check_all_button.setToolTip(tr("勾选全部候选，再取消掉不需要合并的那几组"))
+        self.check_all_button.setEnabled(bool(self._pairs))
+        self.check_all_button.clicked.connect(self._check_all)
         self.merge_button = QPushButton(tr("合并选中项"))
         self.merge_button.setEnabled(False)
         self.merge_button.clicked.connect(self.accept)
         cancel_button = QPushButton(tr("取消合并"))
         cancel_button.clicked.connect(self.reject)
+        apply_button_style(self.check_all_button, variant="neutral")
         apply_button_style(self.merge_button, variant="action")
         apply_button_style(cancel_button, variant="neutral")
+        footer.addWidget(self.check_all_button)
         footer.addWidget(self.merge_button)
         footer.addWidget(cancel_button)
         root.addLayout(footer)
+
+    def _check_all(self) -> None:
+        """一次勾选全部候选。
+
+        勾选会经 toggled 触发 _update_merge_enabled，合并按钮随之可用，
+        这里不必再手动同步一次。
+        """
+        for pair in self._pairs:
+            pair.checkbox.setChecked(True)
 
     def _update_merge_enabled(self) -> None:
         self.merge_button.setEnabled(any(

@@ -1,6 +1,9 @@
 """系统工作流的条件比较统一使用 == / !=。"""
 
 from dataclasses import fields, is_dataclass
+from pathlib import Path
+
+import pytest
 
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.workflows.grammar import Equals, parse_file
@@ -20,9 +23,20 @@ def _walk(value):
             yield from _walk(item)
 
 
-def test_system_workflows_use_symbolic_string_equality():
-    workflows = SYSTEM_CONFIG_DIR / "workflows"
-    legacy = [str(path.relative_to(workflows))
-              for path in sorted(workflows.rglob("*.wf"))
-              if any(_walk(parse_file(path)))]
-    assert not legacy, f"条件比较请使用 == / !=；by equals 匹配模式可保留：{legacy}"
+def _system_wf_files() -> list[Path]:
+    workflows_dir = SYSTEM_CONFIG_DIR / "workflows"
+    return sorted(workflows_dir.rglob("*.wf"))
+
+
+@pytest.mark.parametrize(
+    "wf_path", _system_wf_files(),
+    ids=lambda p: p.relative_to(SYSTEM_CONFIG_DIR / "workflows").as_posix())
+def test_system_workflows_use_symbolic_string_equality(wf_path):
+    """条件比较请使用 == / !=；by equals 匹配模式可保留。
+
+    按脚本参数化：每个脚本都要读盘解析，折成单项会让 xdist 只能在一个 worker
+    上串行跑完，成为整条流水线的长尾。
+    """
+    assert not any(_walk(parse_file(wf_path))), (
+        f"{wf_path.relative_to(SYSTEM_CONFIG_DIR / 'workflows')}: "
+        "条件比较请使用 == / !=")

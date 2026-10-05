@@ -446,6 +446,13 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         primary_filter_row.addWidget(self._sort_filter)
         primary_filter_row.addStretch()
 
+        self._btn_import_build = QPushButton(tr("导入出装搭配"))
+        self._btn_import_build.setEnabled(False)
+        self._btn_import_build.setToolTip(tr("请先选择用户、备战方案及玩法"))
+        apply_button_style(self._btn_import_build, variant="action")
+        self._btn_import_build.clicked.connect(self._on_build_import)
+        primary_filter_row.addWidget(self._btn_import_build)
+
         self._btn_create_mock = QPushButton(tr("创建模拟装备"))
         self._btn_create_mock.setToolTip(tr("为当前用户创建一件模拟装备，不修改角色基础属性"))
         apply_button_style(self._btn_create_mock, variant="action")
@@ -1322,6 +1329,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
 
     def _clear_inventory(self) -> None:
         self._inv = None
+        self._update_build_import_button()
         self._equipped = {}
         self._bag_items = {}
         self._mock_items = {}
@@ -1357,6 +1365,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         self._equipped = self._inv.equipped
         self._bag_items = self._inv.bag_items
         self._mock_items = self._inv.mock_items
+        self._update_build_import_button()
         self._refresh_slots()
         self._rebuild_grid()
         if notify:
@@ -1953,6 +1962,30 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
     def _on_build_calculator(self):
         from ..build_calculator import open_build_calculator
         open_build_calculator(self._host, self)
+
+    def _update_build_import_button(self):
+        from ....config.builds import BuildRepository
+        reason = ""
+        if self._inv is None or not self._host.active_user_name():
+            reason = tr("请先选择用户和备战方案")
+        elif not self._inv.active_plan.playstyle:
+            reason = tr("请先为当前备战方案选择玩法")
+        elif not BuildRepository().all(self._inv.active_plan.playstyle):
+            reason = tr("当前玩法没有可导入的出装搭配")
+        self._btn_import_build.setEnabled(not reason)
+        self._btn_import_build.setToolTip(reason or tr("生成八件模拟装备并替换当前出装，原装备保留"))
+
+    def _on_build_import(self):
+        from ....core.loadout.repository import LoadoutRepository
+        from ..build_import import BuildImportDialog
+        user_name = self._host.active_user_name()
+        if not user_name:
+            return
+        dialog = BuildImportDialog(user_name, LoadoutRepository(user_name), parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._refresh_all()
+            get_event_hub(self._host).publish(EQUIPMENT_CHANGED, user_name)
+            logger.info("出装搭配已导入，原装备保留")
 
     def _on_mock_create(self):
         """创建模拟装备"""

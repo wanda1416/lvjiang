@@ -765,7 +765,7 @@ class MainWindow(
         hk = self._user_config.hotkeys
         self.statusBar().showMessage(self._hotkey_status(
             tr("就绪"), (hk.start, tr("开始")),
-            (hk.pause, tr("暂停")), (hk.stop, tr("结束"))))
+            (hk.pause, tr("暂停")), (hk.stop, tr("停止"))))
         self.adjustSize()
         self.setMinimumHeight(self.height())
         self._restore_ui_state()
@@ -1128,7 +1128,9 @@ class MainWindow(
 
         # 批量运行不绑定某一个用户名；条目级跨目标互斥仍由 BatchWorker
         # 获取用户执行锁，并按既有语义记录跳过原因后继续。
-        if not self._begin_automation(tr("批量执行"), username=""):
+        if not self._begin_automation(
+            tr("批量执行"), username="", execution_scope="batch",
+        ):
             return False
 
         run_context = self._current_run_context

@@ -38,8 +38,11 @@ from .....ui.button_styles import (
 from .....ui.execution_user_selector import ExecutionUserSelector
 from .....ui.hotkeys import hotkey_label
 from .....ui.main.run_control import (
+    STATE_PAUSING,
     STATE_PLAN_UNSUPPORTED,
     STATE_START_DENIED,
+    STATE_STOPPING,
+    other_task_running_label,
 )
 from ...config.auto_tuning_config import (
     load_user_auto_tuning_config,
@@ -425,8 +428,18 @@ class TuningTab(QWidget):
 
     def _on_automation_state(self, state: str):
         hk = self._host._user_config.hotkeys
-        if state in ("running", "paused"):
-            self.btn_run_tuning.setText(hotkey_label(tr("结束"), hk.stop))
+        other_label = other_task_running_label(self._host, "auto_tuning")
+        self.btn_run_tuning.setEnabled(True)
+        if other_label:
+            self.btn_run_tuning.setText(other_label)
+            self.btn_run_tuning.setEnabled(False)
+            apply_execution_button_style(self.btn_run_tuning, "disabled")
+        elif state == STATE_STOPPING:
+            self.btn_run_tuning.setText(tr("停止中"))
+            self.btn_run_tuning.setEnabled(False)
+            apply_execution_button_style(self.btn_run_tuning, "stopping")
+        elif state in ("running", STATE_PAUSING, "paused"):
+            self.btn_run_tuning.setText(hotkey_label(tr("停止"), hk.stop))
             apply_execution_button_style(self.btn_run_tuning, "stop")
         elif state == "not_ready":
             self.btn_run_tuning.setText(tr("未就绪"))
@@ -442,7 +455,15 @@ class TuningTab(QWidget):
             self.btn_run_tuning.setText(hotkey_label(tr("开始调律"), hk.start))
             apply_execution_button_style(self.btn_run_tuning, "run")
         # 刷新暂停/恢复按钮
-        if state == "running":
+        if other_label:
+            self.btn_pause_resume.setText(tr("暂停"))
+            self.btn_pause_resume.setEnabled(False)
+            apply_execution_button_style(self.btn_pause_resume, "disabled")
+        elif state == STATE_PAUSING:
+            self.btn_pause_resume.setText(tr("暂停中"))
+            self.btn_pause_resume.setEnabled(False)
+            apply_execution_button_style(self.btn_pause_resume, "pausing")
+        elif state == "running":
             self.btn_pause_resume.setText(hotkey_label(tr("暂停"), hk.pause))
             self.btn_pause_resume.setEnabled(True)
             apply_execution_button_style(self.btn_pause_resume, "pause")

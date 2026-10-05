@@ -301,10 +301,15 @@ class MenuOpsMixin:
             "scene_editor",
             lambda: SceneEditorDialog(
                 layout_manager=self._layout_manager,
+                initial_layout_key=str(
+                    self.layout_combo.currentData() or ""),
                 refresh_callback=self._refresh_capture,
                 parent=self,
             ),
-            lambda _dialog: self._refresh_layout_combo(),
+            # 场景管理只会新增、删除或重命名布局条目；它内部正在查看哪个布局
+            # 不能覆盖主页面（尤其是方案锁定后）的活动选择。
+            lambda _dialog: self._refresh_layout_combo(
+                preferred_key=str(self.layout_combo.currentData() or "")),
         )
 
     def _open_map_manager(self):

@@ -863,14 +863,17 @@ class RunControlMixin:
 
     # ─── 布局选择器 ────────────────────────────────────────
 
-    def _refresh_layout_combo(self):
-        """刷新布局选择器下拉列表"""
+    def _refresh_layout_combo(self, preferred_key: str = ""):
+        """刷新布局列表，并优先保留调用方当前展示的选择。"""
         self.layout_combo.blockSignals(True)
         self.layout_combo.clear()
-        active = self._layout_manager.get_active_layout_key()
+        selected = preferred_key or self._layout_manager.get_active_layout_key()
         for entry in self._layout_manager.list_layout_entries():
             self.layout_combo.addItem(entry.name, entry.key)
-        idx = self.layout_combo.findData(active)
+        idx = self.layout_combo.findData(selected)
+        if idx < 0:
+            idx = self.layout_combo.findData(
+                self._layout_manager.get_active_layout_key())
         if idx >= 0:
             self.layout_combo.setCurrentIndex(idx)
         self.layout_combo.blockSignals(False)

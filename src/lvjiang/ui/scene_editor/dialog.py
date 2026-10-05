@@ -88,6 +88,8 @@ class SceneEditorDialog(
         layout_manager=None,
         refresh_callback=None,
         parent=None,
+        *,
+        initial_layout_key: str = "",
     ):
         super().__init__(parent)
         # Windows 会在复杂控件树构造期间提前绘制尚未完成布局的原生窗口。
@@ -122,7 +124,7 @@ class SceneEditorDialog(
         self._setup_ui()
         get_theme_manager().theme_changed.connect(self._update_info_label)
         self._auto_load_script()
-        self._auto_load_active()
+        self._auto_load_active(initial_layout_key)
         self._restore_window_size()
 
     def showEvent(self, event):  # type: ignore[override]

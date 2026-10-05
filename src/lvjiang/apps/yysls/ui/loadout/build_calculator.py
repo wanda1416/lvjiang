@@ -4,12 +4,15 @@ from __future__ import annotations
 import copy
 from uuid import uuid4
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QMimeData, QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QDrag, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
+    QDialogButtonBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -24,6 +27,7 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -50,12 +54,135 @@ from ...core.loadout.affix_distribution import (
     distribution_counts,
     native_name,
 )
+from ...core.loadout.affix_swap import swap_affixes
 from ...core.tuning_rules import get_tuning_rule_manager
 from ...core.tuning_rules.models import dynamic_affix_map
 
 PRIORITY_LABELS = {"required": "强制要求", "optimal": "最佳要求", "recommended": "推荐要求"}
 # 仅改变此表的展示顺序，不改变全局装备槽位或分配引擎。
 BUILD_DISPLAY_SLOTS = tuple(sorted(SLOT_SPECS, key=lambda spec: spec.key not in LEFT_SET_SLOTS))
+
+
+class AffixDistributionTable(QTableWidget):
+    """拖拽开始就计算全部目标，放下时再次验证。"""
+
+    def __init__(self, editor):
+        super().__init__(0, 7, editor)
+        self.editor = editor
+        self.setHorizontalHeaderLabels([tr(s) for s in ["位置", "宫", "商", "角", "徵", "羽", "套装"]])
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
+        header = self.horizontalHeader()
+        assert header is not None
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        vertical = self.verticalHeader()
+        assert vertical is not None
+        vertical.hide()
+        self.setShowGrid(False)
+        self.setAlternatingRowColors(True)
+        self.setTextElideMode(Qt.TextElideMode.ElideNone)
+        # 首次填充时列宽尚未展开；单行词条不能按隐藏窗口的窄列宽折成多行。
+        self.setWordWrap(False)
+        strip_focus_rect(self)
+        self._source: tuple[str, int] | None = None
+        self._press_position: QPoint | None = None
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        self._press_position = event.position().toPoint() if event.button() == Qt.MouseButton.LeftButton else None
+        item = self.itemAt(event.position().toPoint())
+        if item is not None:
+            self.setCurrentItem(item)
+
+    def mouseMoveEvent(self, event):
+        if (self._press_position is not None and event.buttons() & Qt.MouseButton.LeftButton
+                and (event.position().toPoint() - self._press_position).manhattanLength()
+                >= QApplication.startDragDistance()):
+            self._press_position = None
+            self.startDrag(Qt.DropAction.MoveAction)
+            return
+        super().mouseMoveEvent(event)
+
+    def startDrag(self, supportedActions):
+        if self.editor._timer.isActive():
+            self.editor.recalculate()
+        item = self.currentItem()
+        if item is None or not 1 <= item.column() <= 5 or not self.editor.result.feasible:
+            return
+        source = (BUILD_DISPLAY_SLOTS[item.row()].key, item.column())
+        if not self.editor.result.equipment[source[0]].get(f"affix_{source[1]}"):
+            return
+        text = item.text()
+        self._source = source
+        for row, spec in enumerate(BUILD_DISPLAY_SLOTS):
+            for index in range(1, 6):
+                changed, reason = swap_affixes(self.editor.result.equipment, source,
+                                              (spec.key, index), self.editor.gc)
+                cell = self.item(row, index)
+                if cell is not None:
+                    cell.setBackground(self.palette().highlight() if changed is not None
+                                       else self.palette().alternateBase())
+                    cell.setToolTip(tr("可交换") if changed is not None else tr(reason))
+        item.setText("")
+        item.setBackground(QColor("#d49a36"))
+        item.setToolTip(tr("正在拖动"))
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData("application/x-lvjiang-affix-swap", b"swap")
+        drag.setMimeData(mime)
+        metrics = self.fontMetrics()
+        preview = QPixmap(metrics.horizontalAdvance(text) + 24, metrics.height() + 16)
+        preview.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(preview)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setFont(self.font())
+        painter.setBrush(self.palette().base())
+        painter.setPen(self.palette().highlight().color())
+        painter.drawRoundedRect(preview.rect().adjusted(1, 1, -1, -1), 6, 6)
+        painter.setPen(self.palette().text().color())
+        painter.drawText(preview.rect(), Qt.AlignmentFlag.AlignCenter, text)
+        painter.end()
+        drag.setPixmap(preview)
+        drag.setHotSpot(QPoint(preview.width() // 2, preview.height() // 2))
+        try:
+            drag.exec(Qt.DropAction.MoveAction)
+        finally:
+            self._source = None
+            QToolTip.hideText()
+            self.editor.recalculate()
+
+    def dragEnterEvent(self, event):
+        if event.source() is self and self._source is not None:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        item = self.itemAt(event.position().toPoint())
+        if event.source() is self and self._source is not None and item is not None and 1 <= item.column() <= 5:
+            changed, reason = swap_affixes(self.editor.result.equipment, self._source,
+                                     (BUILD_DISPLAY_SLOTS[item.row()].key, item.column()), self.editor.gc)
+            QToolTip.showText(self.viewport().mapToGlobal(event.position().toPoint()),
+                              tr("可交换") if changed is not None else tr(reason), self)
+            if changed is not None:
+                event.acceptProposedAction()
+                return
+        event.ignore()
+
+    def dropEvent(self, event):
+        item = self.itemAt(event.position().toPoint())
+        if event.source() is self and self._source is not None and item is not None and 1 <= item.column() <= 5:
+            changed, _ = swap_affixes(self.editor.result.equipment, self._source,
+                                     (BUILD_DISPLAY_SLOTS[item.row()].key, item.column()), self.editor.gc)
+            if changed is not None:
+                self.editor._templates = copy.deepcopy(changed)
+                self.editor.result.equipment = changed
+                self.editor._dirty = True
+                event.acceptProposedAction()
+                return
+        event.ignore()
 
 
 class AffixCounter(QWidget):
@@ -398,7 +525,7 @@ class BuildEditor(QWidget):
         result_layout = QVBoxLayout(result_page)
         result_layout.setContentsMargins(0, 0, 0, 0)
         result_layout.setSpacing(6)
-        self.distribution_table = _table(["位置", "宫", "商", "角", "徵", "羽", "套装"])
+        self.distribution_table = AffixDistributionTable(self)
         self.distribution_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.distribution_table.setMinimumHeight(380)
         header = self.distribution_table.horizontalHeader()
@@ -575,9 +702,22 @@ class BuildEditor(QWidget):
         names = [n for n in self._legal_names() if n not in self._counts]
         if not names:
             return
-        name, accepted = QInputDialog.getItem(self, tr("添加可用词条"), tr("词条"), names, editable=False)
-        if accepted:
-            self._append_count(name)
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("添加可用词条"))
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
+        layout.addWidget(QLabel(tr("词条")))
+        combo = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
+        combo.addItems(names)
+        layout.addWidget(combo)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.resize(max(460, dialog.sizeHint().width()), max(190, dialog.sizeHint().height()))
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._append_count(combo.currentText())
             self._changed()
 
     def _append_requirement(self, data: dict):
@@ -632,6 +772,22 @@ class BuildEditor(QWidget):
         self.result = distribute_affixes(
             counts, templates, attribute=self.attribute,
             level=int(self.level.currentData() or 0), chengyin=self.chengyin.isChecked(), game_config=self.gc)
+        # 分配器保留部位偏好；普通槽位顺序由当前草稿拥有，保存/重算不能打乱。
+        for slot, equip in self.result.equipment.items():
+            remaining = [equip.pop(f"affix_{i}", None) for i in range(2, 6)]
+            for i in range(2, 6):
+                name = (templates[slot].get(f"affix_{i}") or {}).get("name")
+                match = next((n for n, affix in enumerate(remaining)
+                              if affix and affix["name"] == name), None)
+                if match is not None:
+                    equip[f"affix_{i}"] = remaining[match]
+                    remaining[match] = None
+            for affix in remaining:
+                if affix:
+                    index = next(i for i in range(2, 6) if f"affix_{i}" not in equip)
+                    equip[f"affix_{index}"] = affix
+        if self.result.feasible:
+            self._templates = copy.deepcopy(self.result.equipment)
         requirements = self.repository.common_requirements(self.combat_type.currentData()) + self._requirement_rows()
         evaluated = check_requirements(counts, requirements)
         labels = [f"{tr(PRIORITY_LABELS[row['priority']])} · {row['affix']}：{row['actual']} / "

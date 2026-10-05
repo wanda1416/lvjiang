@@ -348,6 +348,10 @@ class MainWindow(
         from .run_logs import RunLogEvent
         self._log_buffer: list[RunLogEvent] = []
         self._log_min_level = 20
+        # 预览默认关闭。解码线程只在用户展开预览后才向 UI 投递帧，避免隐藏的
+        # 视频流占满事件队列，拖慢执行目标和左侧任务视图切换。
+        self._preview_enabled = False
+        self._preview_frame_emit_at: dict[str, float] = {}
 
         # ── OCR / 输入 ──
         from ...core.ocr import OCREngine
@@ -1054,11 +1058,11 @@ class MainWindow(
     def _redraw_log_events(self) -> None:
         if not hasattr(self, "log_text"):
             return
-        self.log_text.clear()
-        for event in self._log_buffer:
+        self.log_text.replace_lines(
+            event.display_text()
+            for event in self._log_buffer
             if (event.level >= self._log_min_level
-                    and MainWindow._log_event_visible(self, event)):
-                self.log_text.append(event.display_text())
+                and MainWindow._log_event_visible(self, event)))
 
     def _on_log_level_changed(self):
         """日志级别切换：更新阈值，重建显示"""

@@ -1,6 +1,7 @@
 """窗口操作混入类 - 窗口扫描、定位、截屏、DPI 检测"""
 
 import ctypes
+import time
 from ctypes import wintypes
 
 import numpy as np
@@ -571,22 +572,31 @@ class WindowOpsMixin:
         self._refresh_active_target_ui()
         self._refresh_run_button()
         redraw_logs = getattr(self, "_redraw_log_events", None)
-        if callable(redraw_logs):
+        log_scope = getattr(self, "_log_scope_combo", None)
+        # “全部任务”视图与当前目标无关，切换时无需重建；只有按目标过滤的
+        # 日志才随选择变化。
+        if (callable(redraw_logs) and log_scope is not None
+                and log_scope.currentData() == "target"):
             redraw_logs()
 
     def _refresh_active_target_ui(self) -> None:
         target = self._active_execution_target()
+        preview_enabled = bool(getattr(self, "_preview_enabled", False))
         if target is None:
-            self.preview_label.clear()
-            self.preview_label.setText(tr("连接目标后可预览"))
+            if preview_enabled:
+                self.preview_label.clear()
+                self.preview_label.setText(tr("连接目标后可预览"))
             refresh_capture_state = getattr(self, "_apply_rec_state", None)
             if callable(refresh_capture_state):
                 refresh_capture_state()
             return
-        if target.last_capture is not None:
+        if preview_enabled and target.last_capture is not None:
             self._show_preview_image(target.last_capture)
-        elif target.ready:
-            self._capture_preview()
+        elif preview_enabled:
+            # 切换目标的核心是恢复左侧任务视图，不能在 UI 线程里顺带执行最长
+            # 10 秒的 ADB screencap。用户需要新画面时使用预览区“刷新”。
+            self.preview_label.clear()
+            self.preview_label.setText(tr("暂无缓存画面，请点击刷新"))
         refresh_capture_state = getattr(self, "_apply_rec_state", None)
         if callable(refresh_capture_state):
             refresh_capture_state()
@@ -1139,7 +1149,9 @@ class WindowOpsMixin:
         self._refresh_active_target_ui()
         self._refresh_run_button()
         # screencap 模式手动刷新预览；scrcpy 模式自动推帧
-        if self._execution_targets.active_target_id == target_id and not streaming:
+        if (self._execution_targets.active_target_id == target_id
+                and not streaming
+                and getattr(self, "_preview_enabled", False)):
             self._capture_preview()
 
     def _on_connect_error(
@@ -1266,7 +1278,8 @@ class WindowOpsMixin:
         record_connected_window(window)
         if self._execution_targets.active_target_id == target.id:
             self._sync_active_target_compat()
-            self._capture_preview()
+            if getattr(self, "_preview_enabled", False):
+                self._capture_preview()
         run_context = self._run_manager.run_for_target(target.id)
         if run_context is not None and run_context.engine is not None:
             rebind = getattr(run_context.engine, "rebind_target_window", None)
@@ -1377,7 +1390,8 @@ class WindowOpsMixin:
                 logger.debug(f"停止旧截图后端时报错（忽略）: {exc}")
         if self._execution_targets.active_target_id == target_id:
             self._sync_active_target_compat()
-            self._capture_preview()
+            if getattr(self, "_preview_enabled", False):
+                self._capture_preview()
         self._refresh_execution_targets_ui()
 
     def _set_android_target_streaming(
@@ -1422,7 +1436,7 @@ class WindowOpsMixin:
                 logger.debug(f"停止旧截图后端时报错（忽略）: {exc}")
         if self._execution_targets.active_target_id == target_id:
             self._sync_active_target_compat()
-            if not streaming:
+            if not streaming and getattr(self, "_preview_enabled", False):
                 self._capture_preview()
             refresh_capture_state = getattr(self, "_apply_rec_state", None)
             if callable(refresh_capture_state):
@@ -1493,7 +1507,8 @@ class WindowOpsMixin:
         self._refresh_execution_targets_ui()
         self._refresh_active_target_ui()
         self._refresh_run_button()
-        if self._execution_targets.active_target_id == WINDOW_TARGET_ID:
+        if (self._execution_targets.active_target_id == WINDOW_TARGET_ID
+                and getattr(self, "_preview_enabled", False)):
             self._capture_preview()
 
     def _build_window_execution_target(self, w: dict):
@@ -1821,8 +1836,19 @@ class WindowOpsMixin:
             return
         if target is not None:
             target.last_capture = bgr
-        if hasattr(self, "_scrcpy_frame_ready"):
-            self._scrcpy_frame_ready.emit(target_id, bgr)
+        # 隐藏预览或查看其他目标时不向 Qt 主线程投递帧。缓存仍在目标上更新，
+        # 再次展开预览即可立即显示最近一帧。
+        if (getattr(self, "_preview_enabled", False)
+                and target_id == self._execution_targets.active_target_id
+                and hasattr(self, "_scrcpy_frame_ready")):
+            # 自动化和录屏仍消费原始帧率；主界面预览最多 10 FPS，避免高分辨率
+            # BGR 转换、QImage 复制与缩放持续占满 UI 线程。
+            now = time.monotonic()
+            emitted_at = getattr(self, "_preview_frame_emit_at", {})
+            if now - emitted_at.get(target_id, 0.0) >= 0.1:
+                emitted_at[target_id] = now
+                self._preview_frame_emit_at = emitted_at
+                self._scrcpy_frame_ready.emit(target_id, bgr)
         # 录屏分叉：push 仅入队不阻塞解码线程，暂停/停止态内部直接丢弃。
         # 来源是开始录制时冻结的目标，不是当前预览目标——否则切换观察目标会
         # 把两台设备的画面静默拼进同一个视频。

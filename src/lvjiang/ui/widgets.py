@@ -133,6 +133,14 @@ class TrimmedLogEdit(QTextEdit):
             cursor.removeSelectedText()
             cursor.deleteChar()  # 删除残留换行
 
+    def replace_lines(self, lines) -> None:
+        """批量替换可见日志，避免逐行 append 反复触发布局。"""
+        visible = list(lines)[-self._max_lines:]
+        self.setPlainText("\n".join(visible))
+        cursor = self.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        self.setTextCursor(cursor)
+
 
 class FlowLayout(QLayout):
     """自动换行的流式布局"""

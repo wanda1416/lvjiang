@@ -841,6 +841,10 @@ auto_strings:
   从场景 YAML 中删除坐标点定义（meta 数据）: Delete coordinate point definition from scene YAML (meta data)
   以下为系统级全局热键，保存后立即生效。: The following are system-wide global hotkeys; changes take effect immediately after saving.
   任务暂停中，是否直接结束？: Task is paused. End it now?
+  任务暂停中，是否直接停止？: Task is paused. Stop it now?
+  确认停止: Confirm Stop
+  停止任务: Stop Task
+  '{name}运行中': '{name} running'
   低精度录制中…连续移动将合并，: Low-precision recording…consecutive moves are merged,
   使用实时图像: Use Live Image
   保存文件: Save File
@@ -852,6 +856,7 @@ auto_strings:
   停止 / 结束: Stop / End
   停止中... | 等待当前步骤结束: Stopping... | Waiting for the current step to finish
   停止中…: Stopping…
+  停止中: Stopping
   元数据字段定义已保存: Metadata field definitions saved
   元数据定义: Metadata Definition
   先选中一个已放置的坐标点，再从它拉出一条方向箭头: First select a placed coordinate point, then drag to create a direction arrow

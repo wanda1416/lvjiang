@@ -40,6 +40,14 @@ STATE_PAUSING = "pausing"
 STATE_STOPPING = "stopping"
 
 
+def other_task_running_label(host: Any, scope: str) -> str:
+    """只读当前查看目标的运行快照，非所属页面仅展示占用状态。"""
+    context = getattr(host, "_current_run_context", None)
+    if context is None or context.metadata.get("execution_scope", "daily") == scope:
+        return ""
+    return tr("{name}运行中").format(name=context.name)
+
+
 class _AcknowledgedPauseEvent(threading.Event):
     """首次被工作线程观察为 clear 时通知 UI 已到达暂停临界点。"""
 
@@ -333,7 +341,7 @@ class _UIHelper(QObject):
                 tr("继续"), QMessageBox.ButtonRole.AcceptRole
             )
             stop_button = box.addButton(
-                tr("结束任务"), QMessageBox.ButtonRole.RejectRole
+                tr("停止任务"), QMessageBox.ButtonRole.RejectRole
             )
             if continue_button is not None:
                 box.setDefaultButton(continue_button)
@@ -1023,6 +1031,7 @@ class RunControlMixin:
 
     def _begin_automation(
         self, name: str, *, username: str | None = None,
+        execution_scope: str = "daily",
     ) -> bool:
         """开始自动化，返回是否成功。若已有自动化在运行则拒绝。"""
         hk = self._user_config.hotkeys
@@ -1031,7 +1040,7 @@ class RunControlMixin:
                 tr("[拒绝] 已有自动化在运行中，请等待结束"),
                 (hk.stop, tr("停止"))))
             self.statusBar().showMessage(self._hotkey_status(
-                tr("自动化运行中"), (hk.stop, tr("结束"))))
+                tr("自动化运行中"), (hk.stop, tr("停止"))))
             logger.warning(f"拒绝启动 {name}：已有自动化在运行")
             return False
         target = self._current_execution_target()
@@ -1081,6 +1090,7 @@ class RunControlMixin:
             self.statusBar().showMessage(decision.reason)
             return False
         self._current_run_context = run_context
+        run_context.metadata["execution_scope"] = execution_scope
         run_context.metadata["launch_draft"] = copy.deepcopy(target.launch_draft)
         run_context.lease = getattr(self, "_execution_lease", None)
         # RapidOCR/ONNX 的同实例并发安全没有契约保证；每个运行实例持有
@@ -1108,7 +1118,7 @@ class RunControlMixin:
         self._refresh_pause_button()
         self.statusBar().showMessage(self._hotkey_status(
             f"{name} {tr('运行中')}", (hk.pause, tr("暂停")),
-            (hk.stop, tr("结束"))))
+            (hk.stop, tr("停止"))))
         logger.info(f"开始自动化: {name}")
         return True
 
@@ -1437,7 +1447,7 @@ class RunControlMixin:
 
         box = QMessageBox(
             QMessageBox.Icon.Question,
-            tr("确认结束"), tr("任务暂停中，是否直接结束？"),
+            tr("确认停止"), tr("任务暂停中，是否直接停止？"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             self if isinstance(self, QWidget) else None,  # type: ignore[arg-type]
         )
@@ -1493,7 +1503,7 @@ class RunControlMixin:
         # 请求已发出，但要等工作线程第一次观察到 clear，才进入 paused。
         hk = self._user_config.hotkeys
         paused_status = self._hotkey_status(
-            tr("暂停中..."), (hk.pause, tr("恢复")), (hk.stop, tr("结束")))
+            tr("暂停中..."), (hk.pause, tr("恢复")), (hk.stop, tr("停止")))
         self.log_text.append(f"{tr('[操作] ')}{paused_status}")
         self.statusBar().showMessage(paused_status)
         logger.info("工作流暂停中")
@@ -1524,7 +1534,7 @@ class RunControlMixin:
         self._refresh_run_button()
         hk = self._user_config.hotkeys
         paused_status = self._hotkey_status(
-            tr("已暂停"), (hk.pause, tr("恢复")), (hk.stop, tr("结束")))
+            tr("已暂停"), (hk.pause, tr("恢复")), (hk.stop, tr("停止")))
         self.log_text.append(f"{tr('[操作] ')}{paused_status}")
         self.statusBar().showMessage(paused_status)
         logger.info("工作流已暂停")
@@ -1547,7 +1557,7 @@ class RunControlMixin:
         hk = self._user_config.hotkeys
         self.log_text.append(tr("[操作] 已恢复，继续执行..."))
         self.statusBar().showMessage(self._hotkey_status(
-            tr("已恢复"), (hk.pause, tr("暂停")), (hk.stop, tr("结束"))))
+            tr("已恢复"), (hk.pause, tr("暂停")), (hk.stop, tr("停止"))))
         logger.info("工作流已恢复")
 
     def _refresh_pause_button(self):
@@ -1557,7 +1567,11 @@ class RunControlMixin:
             return
         run_state = getattr(self, '_run_state', 'idle')
         hk = self._user_config.hotkeys
-        if run_state == 'running':
+        if other_task_running_label(self, "daily"):
+            btn.setText(tr("暂停"))
+            btn.setEnabled(False)
+            apply_execution_button_style(btn, "disabled")
+        elif run_state == 'running':
             btn.setText(self._hotkey_label(tr("暂停"), hk.pause))
             btn.setEnabled(True)
             apply_execution_button_style(btn, "pause")
@@ -2107,15 +2121,20 @@ class RunControlMixin:
         """根据运行状态和定位状态刷新运行按钮，并广播状态给插件页面。"""
         run_state = getattr(self, '_run_state', 'idle')
         hk = self._user_config.hotkeys
-        if run_state == STATE_STOPPING:
+        if label := other_task_running_label(self, "daily"):
+            state = run_state
+            self.btn_run_workflow.setText(label)
+            self.btn_run_workflow.setEnabled(False)
+            apply_execution_button_style(self.btn_run_workflow, "disabled")
+        elif run_state == STATE_STOPPING:
             state = STATE_STOPPING
-            self.btn_run_workflow.setText(tr("结束中"))
+            self.btn_run_workflow.setText(tr("停止中"))
             self.btn_run_workflow.setEnabled(False)
             apply_execution_button_style(self.btn_run_workflow, "stopping")
         elif self._running:
             state = run_state  # running 或 paused
             self.btn_run_workflow.setEnabled(True)
-            self.btn_run_workflow.setText(self._hotkey_label(tr("结束"), hk.stop))
+            self.btn_run_workflow.setText(self._hotkey_label(tr("停止"), hk.stop))
             apply_execution_button_style(self.btn_run_workflow, "stop")
         elif not self._backend_ready():
             state = "not_ready"
@@ -2145,6 +2164,7 @@ class RunControlMixin:
             self.btn_run_workflow.setText(self._hotkey_label(
                 tr("开始执行"), hk.start))
             apply_execution_button_style(self.btn_run_workflow, "run")
+        self._refresh_pause_button()
         self.automation_state_changed.emit(state)
         self._emit_concurrency_changed()
         # 批量锁原先只在批量启动/结束时直接改主窗口控件。多目标后这些
@@ -2258,7 +2278,9 @@ class RunControlMixin:
                 self.log_text.append(tr("[错误] 请先定位窗口"))
             return
 
-        if not self._begin_automation(flow_name, username=username):
+        if not self._begin_automation(
+            flow_name, username=username, execution_scope=impl_name,
+        ):
             return
         run_context = self._current_run_context
         assert run_context is not None

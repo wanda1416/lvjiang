@@ -41,7 +41,7 @@ def test_escape_does_not_close_pause_dialog(qtbot, focus_target):
     target = {
         "dialog": dialog,
         "continue": buttons["继续"],
-        "stop": buttons["结束任务"],
+        "stop": buttons["停止任务"],
     }[focus_target]
     target.setFocus()
     qtbot.keyClick(target, Qt.Key.Key_Escape)
@@ -63,7 +63,7 @@ def test_stop_button_still_requests_workflow_stop(qtbot):
     dialog = helper._active_dialog
 
     stop_button = next(
-        button for button in dialog.buttons() if button.text() == "结束任务"
+        button for button in dialog.buttons() if button.text() == "停止任务"
     )
     qtbot.mouseClick(stop_button, Qt.MouseButton.LeftButton)
 

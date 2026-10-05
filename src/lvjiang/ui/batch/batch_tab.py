@@ -1589,13 +1589,22 @@ class BatchTab(QWidget):
 
     def _refresh_run_button(self, state: str):
         from ..hotkeys import hotkey_label
+        from ..main.run_control import other_task_running_label
         hk = self._host._user_config.hotkeys
+        if label := other_task_running_label(self._host, "batch"):
+            self._btn_run.setText(label)
+            self._btn_run.setEnabled(False)
+            apply_execution_button_style(self._btn_run, "disabled")
+            self._btn_pause_resume.setText(tr("暂停"))
+            self._btn_pause_resume.setEnabled(False)
+            apply_execution_button_style(self._btn_pause_resume, "disabled")
+            return
         if state == STATE_STOPPING:
-            self._btn_run.setText(tr("结束中"))
+            self._btn_run.setText(tr("停止中"))
             self._btn_run.setEnabled(False)
             apply_execution_button_style(self._btn_run, "stopping")
         elif state in ("running", STATE_PAUSING, "paused"):
-            self._btn_run.setText(hotkey_label(tr("结束"), hk.stop))
+            self._btn_run.setText(hotkey_label(tr("停止"), hk.stop))
             self._btn_run.setEnabled(True)
             apply_execution_button_style(self._btn_run, "stop")
         elif state == "not_ready":

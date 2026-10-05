@@ -41,6 +41,7 @@ from ...core.profile.store import (
     get_groups,
     remove_overview_group,
     rename_overview_group,
+    reorder_overview_groups,
     set_active_group,
 )
 from ...i18n import tr
@@ -256,6 +257,8 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
 
         # ── 内容区：QTabWidget ──
         self._tab_widget = QTabWidget()
+        self._tab_widget.setMovable(True)
+        self._tab_widget.tabBar().tabMoved.connect(self._on_groups_reordered)
         self._tab_widget.currentChanged.connect(self._on_tab_changed)
         layout.addWidget(self._tab_widget, stretch=1)
 
@@ -525,6 +528,13 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
             self._build_groups()
 
     # ─── 分组管理 ──────────────────────────────────────────────
+
+    def _on_groups_reordered(self, _from: int, _to: int) -> None:
+        """与列头拖动一致：保存页签顺序，不重建当前表格。"""
+        reorder_overview_groups([
+            self._tab_widget.tabText(index)
+            for index in range(self._tab_widget.count())
+        ])
 
     def _get_current_group_name(self) -> str:
         """获取当前 Tab 对应的分组名"""

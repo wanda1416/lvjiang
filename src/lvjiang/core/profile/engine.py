@@ -21,6 +21,7 @@ from lvjiang.core.config.session import add_alert
 from lvjiang.core.user_config import UserConfigManager
 
 from ...i18n import tr
+from .maintenance import profile_operation
 from .models import RegenKeyDef
 from .periods import (
     get_period_boundary as _get_period_boundary,
@@ -275,6 +276,7 @@ class ProfileEngine(QThread):
 
         logger.info("ProfileEngine 已停止")
 
+    @profile_operation
     def _tick(self):
         """单次 tick：遍历所有用户执行计算"""
         config = get_profile_config()

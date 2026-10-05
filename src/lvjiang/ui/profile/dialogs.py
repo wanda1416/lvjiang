@@ -42,7 +42,7 @@ from ..button_styles import (
 # ProfileDefinitionDialog 位于 settings_dialog.py，此处 re-export 便于统一导入。
 from .settings_dialog import ProfileDefinitionDialog  # noqa: F401
 
-__all__ = ["HistoryDialog", "ask_value_dialog", "ProfileDefinitionDialog"]
+__all__ = ["HistoryDialog", "KeyRenameHistoryDialog", "ask_value_dialog", "ProfileDefinitionDialog"]
 
 # ─── 历史记录对话框 ────────────────────────────────────────────
 
@@ -61,6 +61,40 @@ def _cjk_column_width(widget: QWidget, characters: int) -> int:
     """
     metrics = widget.fontMetrics()
     return metrics.horizontalAdvance("汉" * characters) + _COLUMN_CHROME_WIDTH
+
+
+class KeyRenameHistoryDialog(QDialog):
+    """独立展示模型定义的重命名审计，不混入数值变更历史。"""
+
+    def __init__(self, model_type: str, key: str, parent=None):
+        super().__init__(parent)
+        from ...core.profile.repository import get_profile_db
+        self.setWindowTitle(tr("key 重命名记录"))
+        self.resize(780, 360)
+        layout = QVBoxLayout(self)
+        records = get_profile_db().get_key_renames(model_type, key)
+        table = QTableWidget(len(records), 6, self)
+        table.setHorizontalHeaderLabels([
+            tr("时间"), tr("原 key"), tr("新 key"),
+            tr("当前记录数"), tr("历史记录数"), tr("同步引用数"),
+        ])
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setAlternatingRowColors(True)
+        header = table.horizontalHeader()
+        assert header is not None
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setStretchLastSection(True)
+        for row, record in enumerate(records):
+            for column, field in enumerate(("ts", "old_key", "new_key", "entries_count", "history_count", "sync_count")):
+                table.setItem(row, column, QTableWidgetItem(str(record[field])))
+        layout.addWidget(table)
+        if not records:
+            layout.addWidget(QLabel(tr("尚无 key 重命名记录")))
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        apply_dialog_button_box_style(buttons)
+        layout.addWidget(buttons)
 
 
 class HistoryDialog(QDialog):

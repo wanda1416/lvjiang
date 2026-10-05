@@ -523,7 +523,7 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         from ...core.profile import reload_profile_config
         from .dialogs import ProfileDefinitionDialog
         dialog = ProfileDefinitionDialog(self)
-        if dialog.exec():
+        if dialog.exec() or dialog.has_saved_changes:
             reload_profile_config()
             self._build_groups()
 

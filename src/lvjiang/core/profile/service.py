@@ -18,6 +18,7 @@ from datetime import datetime
 from loguru import logger
 
 from ...i18n import tr
+from .maintenance import profile_operation
 from .models import (
     MODEL_NOTE,
     MODEL_QUOTA,
@@ -167,6 +168,7 @@ def profile_read_all(username: str) -> dict:
     return data
 
 
+@profile_operation
 def profile_observe(
     username: str,
     key: str,
@@ -265,6 +267,7 @@ def profile_observe(
 # ─── 共享写入管线 ─────────────────────────────────────────────
 
 
+@profile_operation
 def profile_action(
     username: str,
     key: str,
@@ -462,6 +465,7 @@ def profile_action(
 # ─── sync_engine 独立写入适配器 ──────────────────────────────
 
 
+@profile_operation
 def sync_write_adapter(
     user_name: str,
     model_type: str,

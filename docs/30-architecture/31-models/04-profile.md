@@ -20,13 +20,21 @@ DSL 读写函数，以及「用户总览」和「用户信息」两个通用页�
 
 ## 存储契约
 
-Profile 的运行数据契约保持不变；定义文件增加了仅用于编辑器组织的字段：
+以下为开发分支当前契约，schema v7 尚未随正式版本发布：
 
 - `config/session/profile.yaml` 仍以四个模型的列表保存 key。每个 `KeyDef` 带
   `group`；旧条目缺失或空白时归入稳定 key `default`，下次保存显式写出。
-- `config/session/profile.db` 仍为 schema v5。
+- `config/session/profile.db` 为 schema v7，按 `schema_version` 顺序升级。
 - `profile_entries` 仍以 `(username, type, key)` 为复合主键。
-- `profile_history` 表结构不变。
+- `profile_history` 保留 ID、时间、用户、模型、key、数值/文本旧新值和来源；
+  `detail` 替换为 `delta_value REAL NULL` 与 `sync_from TEXT NULL`。
+  同步来源使用 `model:key`，变动量记录 clamp 后实际变化，不能拿入库整数相减
+  代替连续再生的语义变动。NULL 表示未知，不等于零。
+- `change_type` 为 `action`、`override`、`tick`、`reset`；`tick` 只表示自动恢复，
+  周期清零使用 `reset`，传给变更脚本的事件类型也一致。
+- `profile_key_renames` 保存全用户重命名时间、操作 ID、模型、旧新 key，以及
+  entries/history/sync_from 更新数量；独立的 key 重命名记录对话框按链显示曾用名，
+  不混入数值历史页。
 - `session.json.profile` 中的分组、活跃分组和告警历史节点不变。
 
 定义分组不另建顶层或模型内的 `groups` 节点。编辑器从一个模型的完整 `KeyDef`
@@ -38,6 +46,42 @@ Profile 的运行数据契约保持不变；定义文件增加了仅用于编辑
 
 `session.json.profile.overview_groups` 继续由用户总览拥有，负责用户可见列和布局。
 它与 `KeyDef.group` 没有同步、重命名或默认选择关系。
+
+## 历史升级与身份维护
+
+v7 升级前通过 SQLite backup 接口保存 `profile.before-v7.db`，包括 WAL 中已提交
+的数据。升级与版本登记处于一个 `BEGIN IMMEDIATE` 事务；失败回滚，成功后不再
+解释旧字符串。`delta:`、`regen:` 解析实际变动量；`tick + reset:0` 改为 `reset`。
+`sync_from:` 解析来源，模型能唯一确定时补齐命名空间；旧同步记录中的连续再生
+变动无法准确反推时留 NULL。无法理解的非空原文按历史 ID 存入
+`profile_history_legacy`，只供迁移核对，不参与业务读写。
+
+数据模型定义和总览列的「编辑当前列」共用 `open_key_editor()`。既有 key 输入框
+默认禁用，必须先点击 key 行的「编辑」按钮，才能聚焦、选择与修改。
+单 key 对话框右下角统一为「保存」「取消」；左下角「查看 key 重命名记录」打开
+独立审计页，未保存的新定义禁用该按钮。查看始终针对已保存的身份，不使用正在
+输入的新名称。内层「保存」立即保存该定义；重命名调用
+`key_rename.save_renamed_definitions()`，取消内层不修改数据库。
+目标 key 已有定义、当前值或历史时拒绝，不自动合并。
+重命名只更新身份，保留数值、文本、更新时间及历史时间，不触发变更脚本。
+
+维护更新所有用户的 entries.key、history.key、history.sync_from，并同步定义的
+sync_targets、总览列、告警去重标识、批量指定排序及生命周期参数 profile_key。
+每次内层保存单独生成重命名审计，不在外层确认时延迟或合并操作。外层同步更新
+草稿与基线；外层取消不会撤销已保存的修改。外层「保存」只合并尚未保存的删除、
+分组和排序等变化，不以旧的定义快照覆盖最新标签、上限或重命名结果。
+设备任务仍在运行、Profile 脚本队列忙碌或处于只读实例时拒绝重命名；普通数据
+写入和周期 tick 通过进程内维护锁与重命名串行，不引入用户执行锁。
+
+配置文件与 SQLite 不能共用物理事务。操作开始前创建临时恢复日志，保存所涉及
+文件的旧内容；SQL 更新、审计与文件保存都成功后才提交。失败或异常退出时，
+以审计中的 operation_id 判断 SQL 是否已提交，未提交则恢复文件；下次数据库
+初始化也会完成恢复。恢复完成清理日志并重载缓存，不永久维护旧 key 别名。
+
+DSL 文件不扫描、不自动全文替换。确认窗口只提示用户自行核对引用；用户
+必须自行修改脚本、声明注册表及其他自由参数，否则脚本可能继续写入旧 key。
+真实 session 的一次性复核使用 `scripts/one_off/verify_profile_key_rename.py`，只在
+临时副本中运行，不属于 CI，且不会输出用户或 key 原文。
 
 「用户信息」页的便利贴不属于 Profile：它不需要预先在
 `profile.yaml` 定义 key，也不参与 DSL、周期计算或变更历史。便利贴

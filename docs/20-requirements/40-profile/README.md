@@ -33,7 +33,7 @@ Profile 是主引擎共享的用户数据能力。它不属于燕云插件；燕
 - 四模型架构：quota（配额/周期任务）、regen（再生/恢复状态）、stock（存量/资源计数）、
   note（自由文本备注——非数值状态，如「主玩会心双刀」这类无法归入前三种数值模型的标记）
 - SQLite 持久化：`config/session/profile.db`（WAL 模式 + busy_timeout）
-- 变更历史：`profile_history` 表记录所有变更（action/manual/tick 三类）
+- 变更历史：区分主动操作 action、覆写 override、自动恢复 tick 和周期重置 reset
 - 周期自动重置：quota 到期自动清零，支持 day/week/month/season/half_season
 - 再生自动计算：regen 显式区分 realtime（按速率连续恢复）与 boundary（按准点边界恢复），封顶 cap
 - 超标预警：regen 达到 alert_above 阈值时触发提醒
@@ -241,7 +241,8 @@ note:
 显示滚动按钮。表格右键菜单提供「更改分组」；可编辑下拉框既列出本类型的已有
 分组，也允许直接输入新名称。多选行时一次修改所有所选 key，双击分组列不触发
 编辑。新增、删除、上移、下移只作用于当前分组中的 key。切换分组属于编辑器状态，
-确定时保存全部分组，取消不修改持久化配置。
+外层保存时提交尚未保存的分组和排序等草稿；单个 key 的内层保存即时生效，外层
+取消只放弃剩余草稿，不撤销已经明确保存的定义修改。
 
 这里的类型内分组属于 `profile.yaml` 的 key 定义，只组织定义编辑器中的长列表；
 它与 `session.json.profile.overview_groups` 中用户总览的展示分组相互独立，不改变
@@ -262,7 +263,9 @@ CREATE TABLE profile_entries (
     type       TEXT NOT NULL,  -- quota/regen/stock/note
     key        TEXT NOT NULL,
     value      REAL NOT NULL DEFAULT 0,
+    value_text TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT '',
+    updated_time TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (username, type, key)
 );
 
@@ -275,8 +278,12 @@ CREATE TABLE profile_history (
     key         TEXT    NOT NULL,
     old_value   REAL,
     new_value   REAL    NOT NULL,
-    change_type TEXT    NOT NULL,  -- reset/regen/manual/override/sync_from/sync_to
-    detail      TEXT    DEFAULT ''
+    old_value_text TEXT DEFAULT '',
+    new_value_text TEXT DEFAULT '',
+    change_type TEXT    NOT NULL,  -- action/override/tick/reset
+    source      TEXT    DEFAULT '',
+    delta_value REAL,
+    sync_from   TEXT
 );
 ```
 
@@ -347,7 +354,26 @@ CREATE TABLE profile_history (
 └─────────────────────────────────────────┘
 ```
 
-### 4.4 待实现 UI
+### 4.4 key 重命名（开发分支）
+
+既有 key 输入框默认禁用，必须通过 key 行的「编辑」按钮开启重命名。
+数据模型定义与总览列右键入口共用相同对话框。点击内层「保存」立即完成定义修改
+及重命名，不等待外层确认，也不会因外层取消而撤销。重命名作为全用户重操作
+执行，不允许目标 key 与任何已有定义或数据冲突，也不允许改变模型类型。
+取消尚未保存的内层编辑不落盘。
+
+重命名保留当前值与旧历史，并更新结构化同步来源和相关配置引用。
+内层编辑对话框的「查看 key 重命名记录」按钮打开独立审计页，显示曾用名与变更
+时间；普通数值历史不展示重命名审计。尚未保存的新定义禁用该按钮。
+同步写入同时记录实际变动量和同步来源；周期重置明确使用 reset，而非普通 tick。
+旧数据库一次性升级，无法解释的旧详情留存核对，不能猜测为零或静默删除。
+
+运行中的任务或未完成的 Profile 脚本队列必须先结束，再执行重命名。
+工作流与变更脚本中的字符串引用不扫描、不自动替换，用户需自行核对和调整。
+此能力已在开发分支实现，尚未正式发布；存储与恢复细节见
+[Profile 共享模块](../../30-architecture/31-models/04-profile.md)。
+
+### 4.5 待实现 UI
 
 **毕业率面板**（待实现）
 ```

@@ -74,24 +74,58 @@ def test_appearance_tabs_and_independent_editors(appearance_config):
     ]
 
 
-def test_appearance_bindings_and_all_workflow_references(appearance_config):
+def _system_wf_files() -> list:
+    """系统 .wf 清单，跳过 `_` 前缀的编辑器临时脚本。
+
+    临时运行脚本不属于发布配置，可能保留用户上次调试的旧引用。
+    """
+    workflows_dir = SYSTEM_CONFIG_DIR / "workflows"
+    return sorted(
+        p for p in workflows_dir.rglob("*.wf")
+        if not any(part.startswith("_")
+                   for part in p.relative_to(workflows_dir).parts)
+    )
+
+
+@pytest.mark.parametrize(
+    "wf_path", _system_wf_files(),
+    ids=lambda p: p.relative_to(SYSTEM_CONFIG_DIR / "workflows").as_posix())
+def test_workflow_appearance_references_are_bound(appearance_config, wf_path):
+    """系统脚本对外观场景的引用必须指向场景定义里存在的区域。
+
+    按脚本参数化：每个脚本都要读盘解析，折成单项会让 xdist 只能在一个 worker
+    上串行跑完，成为整条流水线的长尾。
+    """
     _, registry = appearance_config
     scene = registry.get_scene("appearance_main")
     assert scene is not None
     expected_keys = {r.key for r in scene.regions}
-    refs = []
-    workflows_dir = SYSTEM_CONFIG_DIR / "workflows"
-    for path in workflows_dir.rglob("*.wf"):
-        # 编辑器临时运行脚本不属于发布配置，可能保留用户上次调试的旧引用。
-        if any(part.startswith("_") for part in path.relative_to(workflows_dir).parts):
-            continue
-        program = parse_file(path)
-        for ref in collect_refs(program.body, program.procs, reachable_only=False):
-            assert ref.scene not in {"waiguan_yigui", "waiguan_qingjing"}, path
-            if ref.scene == "appearance_main":
-                assert ref.key in expected_keys, (path, ref)
-                refs.append(ref)
-    assert refs
+    program = parse_file(wf_path)
+    for ref in collect_refs(program.body, program.procs, reachable_only=False):
+        assert ref.scene not in {"waiguan_yigui", "waiguan_qingjing"}, wf_path
+        if ref.scene == "appearance_main":
+            assert ref.key in expected_keys, (wf_path, ref)
+
+
+def test_appearance_scene_is_referenced_by_some_workflow():
+    """前提门禁：确实有脚本引用 appearance_main，否则上面的绑定检查会空转。"""
+    hits = [
+        path for path in _system_wf_files()
+        if "appearance_main" in path.read_text(encoding="utf-8")
+    ]
+    assert hits, "没有任何系统脚本引用 appearance_main"
+
+
+def test_appearance_bindings_match_scene_definition(appearance_config):
+    """三套布局与磁盘上的绑定文件都必须与场景定义一对一。
+
+    引用脚本的 key 已由 ``test_workflow_appearance_references_are_bound``
+    逐个限定在场景定义内，这里只需保证布局与存储文件覆盖同一集合。
+    """
+    _, registry = appearance_config
+    scene = registry.get_scene("appearance_main")
+    assert scene is not None
+    expected_keys = {r.key for r in scene.regions}
     for name in ("android", "desktop", "android_cast"):
         layout = layout_manager.load_layout_by_key(name)
         assert layout is not None
@@ -100,7 +134,6 @@ def test_appearance_bindings_and_all_workflow_references(appearance_config):
         assert len(bound) == len(regions)
         assert set(bound) == expected_keys
         assert not {"waiguan_yigui", "waiguan_qingjing"} & set(layout.regions)
-        assert all(ref.key in bound for ref in refs)
         if name == "desktop":
             assert bound["back"].activation_key == "ESC"
             for key in ("save", "edit_qingjing", "taoyong"):

@@ -185,9 +185,7 @@ def test_plan_context_from_plan_includes_fixed_gongjue(monkeypatch):
         plan, game_config=gc, world_level=115)
     assert context.school == "鸣金·虹" and context.attribute == "鸣金"
     # 抗性严格按个人世界等级 115，模型等级不得反向覆盖角色等级。模型等级
-    # 本身交给注册表选（同级优先，缺则回退到更低一级的表），不写死季度；
-    # 两个等级分歧的场景见 test_graduation_level_labels.py::
-    # test_two_labels_may_disagree。
+    # 本身交给注册表选（同级优先，缺则回退到更低一级的表），不写死季度。
     assert context.world_level == 115
     expected = select_graduation_model("鸣金·虹", "基础方案", 115)
     assert expected is not None

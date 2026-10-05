@@ -338,3 +338,31 @@ def test_merge_dialog_displays_username_for_each_candidate(qtbot):
         label.text().endswith("：alice")
         for label in dialog._pairs[0].findChildren(QLabel)
     )
+
+
+def test_check_all_button_selects_every_candidate(qtbot):
+    """「一键勾选」要能一次勾满全部候选。
+
+    候选动辄几十组，逐个点勾选框不现实；这条路径是批量合并可用的前提，
+    勾满之后合并按钮也应当随之可用。
+    """
+    from lvjiang.apps.yysls.ui.loadout.equip.chengyin_merge_dialog import (
+        UserChengyinMergeCandidate,
+    )
+
+    entries = []
+    for index in range(3):
+        old = _equip(level=100, values=(10 + index, 20, 30, 40, 50))
+        new = _equip(level=105, values=(11 + index, 21, 31, 41, 51))
+        entries.append(
+            UserChengyinMergeCandidate(f"user{index}", _find(old, new)[0]))
+
+    dialog = ChengyinMergeDialog(entries, {})
+    qtbot.addWidget(dialog)
+
+    assert not dialog.merge_button.isEnabled()
+    dialog.check_all_button.click()
+
+    assert all(pair.checkbox.isChecked() for pair in dialog._pairs)
+    assert dialog.merge_button.isEnabled()
+    assert len(dialog.selected_candidates()) == 3

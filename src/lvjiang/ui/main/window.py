@@ -560,8 +560,9 @@ class MainWindow(
         self.execution_target_list.setHeaderLabels(
             [tr("目标"), tr("状态"), tr("目标大小"), tr("连接信息"), ""])
         self.execution_target_list.setRootIsDecorated(False)
-        self.execution_target_list.setMaximumHeight(104)
-        self.execution_target_list.setMinimumHeight(96)
+        self.execution_target_list.setHeaderHidden(True)
+        self.execution_target_list.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored)
         target_header = self.execution_target_list.header()
         target_header.setStretchLastSection(False)
         for column in range(4):
@@ -595,6 +596,11 @@ class MainWindow(
         self.btn_hide_window.clicked.connect(self._on_toggle_preview)
         action_row.addWidget(self.btn_hide_window)
 
+        self.btn_toggle_target_header = QPushButton(tr("显示标题"))
+        self.btn_toggle_target_header.setFixedWidth(90)
+        self.btn_toggle_target_header.clicked.connect(self._on_toggle_target_header)
+        action_row.addWidget(self.btn_toggle_target_header)
+
         action_row.addStretch()
 
         self.btn_scan_window = QPushButton(tr("扫描窗口"))
@@ -620,20 +626,21 @@ class MainWindow(
         action_row.addWidget(self.btn_locate)
         controls_layout.addLayout(action_row)
 
-        self.window_combo = AutoWidthComboBox()
-        self.window_combo.setMinimumWidth(300)
+        self.window_combo = AutoWidthComboBox(
+            width_mode="popup", minimum_width=180)
         self.window_combo.currentIndexChanged.connect(self._on_window_selected)
-        controls_layout.addWidget(self.window_combo)
+        selection_row = QHBoxLayout()
+        selection_row.setContentsMargins(0, 0, 0, 0)
+        selection_row.addWidget(self.window_combo, stretch=1)
 
         apply_button_style(
             self.btn_hide_window,
+            self.btn_toggle_target_header,
             self.btn_scan_window,
             self.btn_scan_device,
             self.btn_locate,
             variant="neutral",
         )
-
-        controls_layout.addStretch()
 
         settings_container = QWidget()
         settings_container.setFixedHeight(
@@ -646,11 +653,15 @@ class MainWindow(
         option_slot_1.setFixedWidth(108)
         option_slot_1_layout = QHBoxLayout(option_slot_1)
         option_slot_1_layout.setContentsMargins(0, 0, 0, 0)
+        # 槽宽按状态列固定，而复选框只需要四字标题的宽度：左侧先占一块余量，
+        # 复选框才不会被拉伸去填满整槽、把文字顶在槽左边。
+        option_slot_1_layout.addStretch()
 
         option_slot_2 = QWidget()
         option_slot_2.setFixedWidth(120)
         option_slot_2_layout = QHBoxLayout(option_slot_2)
         option_slot_2_layout.setContentsMargins(0, 0, 0, 0)
+        option_slot_2_layout.addStretch()
 
         option_slot_3 = QWidget()
         option_slot_3.setFixedWidth(140)
@@ -699,10 +710,19 @@ class MainWindow(
 
         settings_row.addWidget(option_slot_1)
         settings_row.addWidget(option_slot_2)
-        settings_row.addWidget(option_slot_3)
-        settings_row.addStretch()
-        controls_layout.addWidget(settings_container)
+        # 红框标定已由目标右键菜单控制，不占候选区的可见空间。
+        option_slot_3.setParent(connection_controls)
+        option_slot_3.hide()
+        selection_row.addWidget(settings_container)
+        controls_layout.addLayout(selection_row)
+        controls_layout.addStretch()
 
+        # 默认紧凑展示约三行目标；多出的目标滚动查看，也可拖动下边界扩展。
+        self.execution_target_list.setMinimumHeight(max(
+            controls_layout.sizeHint().height(),
+            3 * (self.execution_target_list.fontMetrics().height() + 4)
+            + 2 * self.execution_target_list.frameWidth(),
+        ))
         connection_row.addWidget(connection_controls, stretch=6)
         window_main_layout.addLayout(connection_row)
 
@@ -725,7 +745,6 @@ class MainWindow(
 
         self.preview_container.setVisible(False)
         connection_console_layout.addWidget(self.preview_container)
-        main_layout.addWidget(self.connection_console)
 
         # === 中部：左右分栏 ===
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -759,7 +778,16 @@ class MainWindow(
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([333, 667])
         self._main_splitter = splitter
-        main_layout.addWidget(splitter, stretch=1)
+        self._connection_splitter = QSplitter(Qt.Orientation.Vertical)
+        self._connection_splitter.setChildrenCollapsible(False)
+        self._connection_splitter.addWidget(self.connection_console)
+        self._connection_splitter.addWidget(splitter)
+        self._connection_splitter.setStretchFactor(0, 0)
+        self._connection_splitter.setStretchFactor(1, 1)
+        self._connection_splitter.setSizes([
+            self.connection_console.minimumSizeHint().height(), 1000,
+        ])
+        main_layout.addWidget(self._connection_splitter, stretch=1)
 
         # === 底部状态栏 ===
         hk = self._user_config.hotkeys
@@ -770,6 +798,13 @@ class MainWindow(
         self.setMinimumHeight(self.height())
         self._restore_ui_state()
         self._setup_log_redirect()
+
+    def _on_toggle_target_header(self) -> None:
+        """仅切换目标表头，保持控制台高度与连接状态不变。"""
+        show_header = self.execution_target_list.isHeaderHidden()
+        self.execution_target_list.setHeaderHidden(not show_header)
+        self.btn_toggle_target_header.setText(
+            tr("隐藏标题") if show_header else tr("显示标题"))
 
     def _on_toggle_connection_console(self) -> None:
         """收起或展开连接控制台，不改变任何连接与预览状态。"""

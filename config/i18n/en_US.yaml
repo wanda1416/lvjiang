@@ -857,6 +857,8 @@ auto_strings:
   停止中... | 等待当前步骤结束: Stopping... | Waiting for the current step to finish
   停止中…: Stopping…
   停止中: Stopping
+  隐藏标题: Hide Header
+  显示标题: Show Header
   元数据字段定义已保存: Metadata field definitions saved
   元数据定义: Metadata Definition
   先选中一个已放置的坐标点，再从它拉出一条方向箭头: First select a placed coordinate point, then drag to create a direction arrow

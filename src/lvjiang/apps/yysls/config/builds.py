@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import copy
+import re
 from dataclasses import asdict, dataclass, field
 from uuid import uuid4
 
 import fasteners
+import yaml
+from loguru import logger
 
 from ....core.config.resolver import (
     ConfigResolver,
@@ -14,7 +17,8 @@ from ....core.config.resolver import (
 )
 from .equipment_slots import EQUIPMENT_SLOTS
 
-BUILDS_PATH = "yysls/game_config/builds.yaml"
+GEAR_SETS_DIR = "yysls/gear_sets"
+BUILD_SCHEMA_VERSION = 2
 REQUIREMENT_PRIORITIES = ("required", "optimal", "recommended")
 
 
@@ -30,6 +34,8 @@ class BuildDefinition:
     gongjue_level: int = 0
     equipment: dict[str, dict] = field(default_factory=dict)
     requirements: list[dict] = field(default_factory=list)
+    storage: str = "local"  # 读取来源／保存目标；不写进文件。
+    content_version: int = 1
 
     @classmethod
     def create(cls, name: str, playstyle: str, level: int) -> BuildDefinition:
@@ -44,13 +50,15 @@ class BuildDefinition:
             gongjue=str(data.get("gongjue") or ""), gongjue_level=int(data.get("gongjue_level") or 0),
             equipment=copy.deepcopy(data.get("equipment") or {}),
             requirements=copy.deepcopy(data.get("requirements") or []),
+            content_version=int(data.get("content_version") or 1),
         )
 
     def to_dict(self) -> dict:
         from ..core.loadout.affix_distribution import equipment_template
 
         data = asdict(self)
-        data.pop("id")
+        data.pop("storage")
+        data = {"content_version": data.pop("content_version"), "schema_version": BUILD_SCHEMA_VERSION, **data}
         data["equipment"] = equipment_template(self.equipment)
         data["requirements"] = [
             {key: row[key] for key in ("affix", "priority", "minimum", "maximum") if key in row}
@@ -63,6 +71,10 @@ class BuildDefinition:
 
         if not self.name.strip() or not self.playstyle or self.level <= 0:
             raise ValueError("请填写出装名称、玩法及装备等级")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", self.id):
+            raise ValueError("搭配 ID 格式无效")
+        if self.storage not in ("system", "local"):
+            raise ValueError("请选择系统预置或本地保存位置")
         if self.combat_type != "pve":
             raise ValueError("出装搭配目前只支持 PVE")
         if set(self.equipment) - set(EQUIPMENT_SLOTS):
@@ -82,55 +94,61 @@ class BuildRepository:
         self.resolver = resolver or get_resolver()
 
     def all(self, playstyle: str | None = None) -> list[BuildDefinition]:
-        document = self.resolver.load_merged(BUILDS_PATH)
         result = []
-        for key, raw in (document.get("builds") or {}).items():
-            if not isinstance(raw, dict) or (playstyle is not None and raw.get("playstyle") != playstyle):
+        for filename in self.resolver.enumerate_entities(GEAR_SETS_DIR, "*.yaml"):
+            rel_path = f"{GEAR_SETS_DIR}/{filename}"
+            path = self.resolver.resolve_read(rel_path)
+            if path is None:
                 continue
             try:
-                result.append(BuildDefinition.from_dict(key, raw))
-            except (TypeError, ValueError) as exc:
-                from loguru import logger
-                logger.error("出装搭配 {} 无法读取，请检查等级和数据格式：{}", key, exc)
-        return result
-
-    def common_requirements(self, combat_type: str) -> list[dict]:
-        raw = self.resolver.load_merged(BUILDS_PATH)
-        return copy.deepcopy((raw.get("common_requirements") or {}).get(combat_type) or [])
+                raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+                if not isinstance(raw, dict) or raw.get("schema_version") != BUILD_SCHEMA_VERSION:
+                    raise ValueError("搭配文件结构版本不支持")
+                if raw.get("id") != filename.removesuffix(".yaml"):
+                    raise ValueError("搭配 ID 与文件名不一致")
+                build = BuildDefinition.from_dict(raw["id"], raw)
+                build.storage = "local" if path == self.resolver.local_dir / rel_path else "system"
+                build.validate()
+                if playstyle is None or build.playstyle == playstyle:
+                    result.append(build)
+            except (OSError, TypeError, ValueError, yaml.YAMLError) as exc:
+                logger.error("出装搭配 {} 无法读取，请检查文件：{}", filename, exc)
+        return sorted(result, key=lambda build: (build.storage != "system", build.name, build.id))
 
     def save(self, build: BuildDefinition, *, expected: dict | None = None) -> None:
         build.validate()
-        self._mutate(build.id, build.to_dict(), expected)
+        if not self.can_write(build):
+            raise SystemContentProtected("系统预置只读，请复制或另存为本地搭配")
+        self._mutate(build, build.to_dict(), expected)
 
     def delete(self, build: BuildDefinition) -> None:
+        build.validate()
         if not self.can_delete(build):
             raise SystemContentProtected("系统预设不能删除，请复制后编辑")
-        self._mutate(build.id, None, build.to_dict())
+        self._mutate(build, None, build.to_dict())
 
     def can_delete(self, build: BuildDefinition) -> bool:
-        if self.resolver.is_dev_mode():
-            return True
-        # 和 load_merged/save_merged 选择同一个有效基底，远端新增预设也受保护。
-        base_dir = (self.resolver.remote_dir if self.resolver.remote_supersedes(BUILDS_PATH)
-                    else self.resolver.system_dir)
-        return build.id not in (self.resolver._load_yaml(base_dir / BUILDS_PATH).get("builds") or {})
+        return self.can_write(build) and (self.resolver.is_dev_mode() or not self.resolver.is_system_entity(
+            f"{GEAR_SETS_DIR}/{build.id}.yaml"))
 
-    def _mutate(self, key: str, value: dict | None, expected: dict | None) -> None:
-        # 多窗口/多进程只合并当前实体；比较打开时快照，拒绝覆盖同一搭配的新修改。
-        lock_path = self.resolver.local_dir / "yysls/game_config/builds.lock"
+    def can_write(self, build: BuildDefinition) -> bool:
+        return build.storage == "local" or self.resolver.is_dev_mode()
+
+    def _mutate(self, build: BuildDefinition, value: dict | None, expected: dict | None) -> None:
+        rel_path = f"{GEAR_SETS_DIR}/{build.id}.yaml"
+        lock_path = self.resolver.local_dir / f"{GEAR_SETS_DIR}/.locks/{build.id}.lock"
         lock_path.parent.mkdir(parents=True, exist_ok=True)
         with fasteners.InterProcessLock(str(lock_path)):
-            document = copy.deepcopy(self.resolver.load_merged(BUILDS_PATH))
-            rows = document.setdefault("builds", {})
-            current = rows.get(key)
-            if current != expected:
+            current = next((item for item in self.all() if item.id == build.id), None)
+            if (current is None and self.resolver.resolve_read(rel_path) is not None) or (
+                    (current.to_dict() if current else None) != expected) or (
+                    current is not None and current.storage != build.storage):
                 raise ValueError("该出装搭配已被其他窗口修改或删除，请重新加载；当前草稿未丢失")
             if value is None:
-                rows.pop(key, None)
+                self.resolver.delete_entity(rel_path, layer=build.storage)
             else:
-                rows[key] = value
-            document.setdefault("content_version", 1)
-            self.resolver.save_merged(BUILDS_PATH, document)
+                self.resolver.write_entity(rel_path, yaml.safe_dump(value, allow_unicode=True, sort_keys=False),
+                                           layer=build.storage, force=True)
 
 
 def check_requirements(counts: dict[str, int], requirements: list[dict]) -> list[dict]:

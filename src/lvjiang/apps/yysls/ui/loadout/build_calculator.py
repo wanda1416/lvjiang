@@ -5,7 +5,7 @@ import copy
 from uuid import uuid4
 
 from PyQt6.QtCore import QMimeData, QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QDrag, QPainter, QPixmap
+from PyQt6.QtGui import QColor, QDrag, QPainter, QPixmap, QStandardItemModel
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -410,6 +410,18 @@ class BuildEditor(QWidget):
         self.build_combo.setMinimumContentsLength(18)
         self.build_combo.currentIndexChanged.connect(self._switch_build)
         selection.addWidget(self.build_combo, 1)
+        selection.addWidget(QLabel(tr("保存位置")))
+        self.save_location = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
+        self.save_location.addItem(tr("本地"), "local")
+        self.save_location.addItem(tr("系统预置"), "system")
+        if not self.repository.resolver.is_dev_mode():
+            model = self.save_location.model()
+            assert isinstance(model, QStandardItemModel)
+            model.item(1).setEnabled(False)
+            model.item(1).setToolTip(tr("普通用户不能写入系统预置"))
+        self.save_location.setToolTip(tr("保存到其他位置会另存一份，原搭配保留"))
+        self.save_location.currentIndexChanged.connect(self._changed)
+        selection.addWidget(self.save_location)
         self.name_edit = QLineEdit()
         self.name_edit.setPlaceholderText(tr("出装搭配名称"))
         self.name_edit.textChanged.connect(self._changed)
@@ -570,6 +582,7 @@ class BuildEditor(QWidget):
         self._loading = True
         self._build = copy.deepcopy(build)
         self._expected = build.to_dict() if persisted else None
+        self.save_location.setCurrentIndex(max(0, self.save_location.findData(build.storage)))
         self.name_edit.setText(build.name)
         index = self.level.findData(build.level)
         if index < 0:
@@ -607,7 +620,6 @@ class BuildEditor(QWidget):
 
     def _populate_counts(self, counts: dict[str, int]):
         allowed = set(counts)
-        allowed.update(row["affix"] for row in self.repository.common_requirements("pve"))
         aliases = dynamic_affix_map(self.attribute, game_config=self.gc)
         for rule in get_tuning_rule_manager().get_rules().values():
             if self.playstyle in rule.playstyles:
@@ -783,7 +795,7 @@ class BuildEditor(QWidget):
                     equip[f"affix_{index}"] = affix
         if self.result.feasible:
             self._templates = copy.deepcopy(self.result.equipment)
-        requirements = self.repository.common_requirements("pve") + self._requirement_rows()
+        requirements = self._requirement_rows()
         evaluated = check_requirements(counts, requirements)
         labels = [f"{tr(PRIORITY_LABELS[row['priority']])} · {row['affix']}：{row['actual']} / "
                   f"{row.get('minimum', 0)}～{row.get('maximum', TOTAL_AFFIXES_MAX)}"
@@ -816,7 +828,10 @@ class BuildEditor(QWidget):
             row.get("minimum", 0) <= row.get("maximum", TOTAL_AFFIXES_MAX)
             for row in requirements)
         can_save = self.result.feasible and valid_requirements and bool(self.name_edit.text().strip())
-        self.save_button.setEnabled(can_save)
+        target = self.save_location.currentData()
+        writable = target == "local" or self.repository.resolver.is_dev_mode()
+        self.save_button.setEnabled(can_save and writable)
+        self.save_button.setToolTip("" if writable else tr("系统预置只读，请选择本地保存位置或另存为新搭配"))
         self.save_as_button.setEnabled(can_save)
 
     def _show_calculation(self):
@@ -845,9 +860,13 @@ class BuildEditor(QWidget):
 
     def save(self, as_new=False):
         self.recalculate()
-        if not self.save_button.isEnabled() or self._build is None:
+        if not (self.save_as_button if as_new else self.save_button).isEnabled() or self._build is None:
             return
         build = copy.deepcopy(self._build)
+        target = str(self.save_location.currentData() or "local")
+        if as_new and not self.repository.resolver.is_dev_mode():
+            target = "local"
+        copy_to_location = self._expected is not None and target != self._build.storage
         if as_new:
             name, ok = QInputDialog.getText(self, tr("另存为新搭配"), tr("名称"), text=self.name_edit.text())
             if not ok or not name.strip():
@@ -855,6 +874,11 @@ class BuildEditor(QWidget):
             build.id, build.name = uuid4().hex, name.strip()
         else:
             build.name = self.name_edit.text().strip()
+            if copy_to_location:
+                build.id = uuid4().hex
+        build.storage = target
+        if as_new or copy_to_location:
+            build.content_version = 1
         build.level = int(self.level.currentData())
         build.chengyin = self.chengyin.isChecked()
         build.combat_type = "pve"
@@ -862,7 +886,7 @@ class BuildEditor(QWidget):
         build.equipment = copy.deepcopy(self.result.equipment)
         build.requirements = self._requirement_rows()
         try:
-            self.repository.save(build, expected=None if as_new else self._expected)
+            self.repository.save(build, expected=None if as_new or copy_to_location else self._expected)
         except (ValueError, OSError) as exc:
             QMessageBox.warning(self, tr("保存失败"), str(exc))
             return
@@ -955,7 +979,7 @@ class BuildListPanel(QWidget):
         content_layout.setSpacing(6)
         layout.addWidget(self._content)
         self._toggle.toggled.connect(self._toggle_content)
-        self.table = _table(["名称", "等级", "词条数", "弓玦套装"])
+        self.table = _table(["名称", "等级", "词条数", "弓玦套装", "保存位置"])
         header = self.table.horizontalHeader()
         assert header is not None
         header.setStretchLastSection(False)
@@ -992,7 +1016,8 @@ class BuildListPanel(QWidget):
         self.table.setRowCount(len(self._items))
         for row, build in enumerate(self._items):
             count = sum(1 for e in build.equipment.values() for i in range(1, 6) if e.get(f"affix_{i}"))
-            for col, text in enumerate([build.name, build.level, f"{count}/40", build.gongjue or tr("无")]):
+            for col, text in enumerate([build.name, build.level, f"{count}/40", build.gongjue or tr("无"),
+                                        tr("系统预置") if build.storage == "system" else tr("本地")]):
                 _cell(self.table, row, col, text)
         self._update_actions()
 
@@ -1034,6 +1059,8 @@ class BuildListPanel(QWidget):
             if ok and name.strip():
                 build = copy.deepcopy(build)
                 build.id, build.name = uuid4().hex, name.strip()
+                build.storage = "local"
+                build.content_version = 1
                 try:
                     self.repository.save(build)
                 except (ValueError, OSError) as exc:

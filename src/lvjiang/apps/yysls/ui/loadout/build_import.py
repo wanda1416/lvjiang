@@ -106,7 +106,7 @@ class BuildImportDialog(QDialog):
         self.table.resizeRowsToContents()
         attribute = str((self.gc.get_playstyle(build.playstyle) or {}).get("attr") or "")
         counts = distribution_counts(self._equipment, attribute, self.gc)
-        requirements = check_requirements(counts, self.builds_repo.common_requirements(build.combat_type) + build.requirements)
+        requirements = check_requirements(counts, build.requirements)
         missing = [row["affix"] for row in requirements if row["priority"] == "required" and not row["satisfied"]]
         self.status.setText(tr("词条数：{count}/40").format(count=sum(counts.values()))
                             + (tr("；强制要求未满足：") + "、".join(missing) if missing else ""))

@@ -144,21 +144,23 @@ def test_native_attack_resolves_by_equipment_position():
 def test_system_override_can_clear_an_affix_without_deleting_preset(repository):
     import yaml
 
-    from lvjiang.apps.yysls.config.builds import BUILDS_PATH
+    from lvjiang.apps.yysls.config.builds import GEAR_SETS_DIR
     from lvjiang.core.config.resolver import SystemContentProtected
 
     build = BuildDefinition.create("预设", "无名", 115)
     build.equipment = allocate(counts()).equipment
-    path = repository.resolver.system_dir / BUILDS_PATH
+    path = repository.resolver.system_dir / GEAR_SETS_DIR / f"{build.id}.yaml"
     path.parent.mkdir(parents=True)
-    path.write_text(yaml.safe_dump({"content_version": 1, "builds": {build.id: build.to_dict()}}), encoding="utf-8")
+    path.write_text(yaml.safe_dump(build.to_dict()), encoding="utf-8")
+    build = repository.all()[0]
     assert not repository.can_delete(build)
     with pytest.raises(SystemContentProtected):
         repository.delete(build)
     expected = build.to_dict()
     build.equipment["main_weapon"].pop("affix_5")
-    repository.save(build, expected=expected)
-    assert repository.all()[0].equipment["main_weapon"]["affix_5"] is None
+    with pytest.raises(SystemContentProtected):
+        repository.save(build, expected=expected)
+    assert repository.all()[0].equipment["main_weapon"]["affix_5"] is not None
 
 
 def test_repository_merges_only_selected_build_and_rejects_stale_save(repository):
@@ -357,7 +359,7 @@ def test_cancel_switch_keeps_editor_draft(qtbot, monkeypatch, repository):
     editor.build_combo.setCurrentIndex(editor.build_combo.findData(second.id))
     assert editor.build_combo.currentData() == first.id
     assert editor.name_edit.text() == "尚未保存"
-    assert [b.name for b in repository.all()] == ["甲", "乙"]
+    assert {b.name for b in repository.all()} == {"甲", "乙"}
 
 
 def test_counter_clicks_update_distribution_without_saving(qtbot, repository):

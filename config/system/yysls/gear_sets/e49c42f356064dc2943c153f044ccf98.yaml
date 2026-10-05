@@ -1,0 +1,132 @@
+content_version: 1
+schema_version: 2
+id: e49c42f356064dc2943c153f044ccf98
+name: 满值搭配
+playstyle: 无名
+level: 115
+chengyin: false
+combat_type: pve
+gongjue: 会意
+gongjue_level: 115
+equipment:
+  main_weapon:
+    type: 剑
+    equipment_set: yudou
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 劲
+    affix_3:
+      name: 势
+    affix_4:
+      name: 剑武学增伤
+    affix_5:
+      name: 最大外功攻击
+  sub_weapon:
+    type: 枪
+    equipment_set: yudou
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 会意率
+    affix_3:
+      name: 势
+    affix_4:
+      name: 最大外功攻击
+    affix_5:
+      name: 劲
+  head:
+    type: 冠胄
+    equipment_set: yixiang
+    affix_1:
+      name: 会意率
+    affix_2:
+      name: 劲
+    affix_3:
+      name: 会意率
+    affix_4:
+      name: 最大外功攻击
+    affix_5:
+      name: 势
+  chest:
+    type: 胸甲
+    equipment_set: yixiang
+    affix_1:
+      name: 会意率
+    affix_2:
+      name: 会意率
+    affix_3:
+      name: 势
+    affix_4:
+      name: 劲
+    affix_5:
+      name: 最大外功攻击
+  ring:
+    type: 环
+    equipment_set: yudou
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 势
+    affix_3:
+      name: 劲
+    affix_4:
+      name: 全武学增效
+    affix_5:
+      name: 最大外功攻击
+  pendant:
+    type: 佩
+    equipment_set: yudou
+    affix_1:
+      name: 最大外功攻击
+    affix_2:
+      name: 劲
+    affix_3:
+      name: 最大外功攻击
+    affix_4:
+      name: 全武学增效
+    affix_5:
+      name: 势
+  leg:
+    type: 胫甲
+    equipment_set: yixiang
+    affix_1:
+      name: 劲
+    affix_2:
+      name: 劲
+    affix_3:
+      name: 对首领单位增伤
+    affix_4:
+      name: 最大外功攻击
+    affix_5:
+      name: 势
+  wrist:
+    type: 腕甲
+    equipment_set: yixiang
+    affix_1:
+      name: 劲
+    affix_2:
+      name: 对首领单位增伤
+    affix_3:
+      name: 势
+    affix_4:
+      name: 劲
+    affix_5:
+      name: 最大外功攻击
+requirements:
+- affix: 对首领单位增伤
+  priority: required
+  minimum: 2
+  maximum: 2
+- affix: 剑武学增伤
+  priority: required
+  minimum: 1
+  maximum: 1
+- affix: 全武学增效
+  priority: required
+  minimum: 2
+  maximum: 2
+- affix: 最大外功攻击
+  priority: optimal
+  minimum: 10
+  maximum: 12

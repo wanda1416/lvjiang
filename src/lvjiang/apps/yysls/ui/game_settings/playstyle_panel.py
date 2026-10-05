@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QInputDialog,
     QLabel,
     QLayout,
+    QLineEdit,
     QListWidget,
     QMessageBox,
     QPushButton,
@@ -33,7 +34,6 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.button_styles import apply_button_style
 from lvjiang.ui.combo_box import AutoWidthComboBox
 from lvjiang.ui.layout_helpers import configure_navigation_list, fit_combo_to_contents
-from lvjiang.ui.tag_input import TagInputWidget
 
 from .....i18n import tr
 from ...config import get_game_config
@@ -49,7 +49,7 @@ _UNIT_REQUIREMENTS = ("不需要", "首领", "玩家")
 class _DefinitionFields(QWidget):
     """玩法基础字段：宽屏双列，窄屏按字段顺序退回单列。"""
 
-    def __init__(self, fields: list[tuple[str, QComboBox]]) -> None:
+    def __init__(self, fields: list[tuple[str, QComboBox]], *, first_hint: QLabel | None = None) -> None:
         super().__init__()
         self._grid = QGridLayout(self)
         self._grid.setContentsMargins(0, 0, 0, 0)
@@ -63,6 +63,9 @@ class _DefinitionFields(QWidget):
         self._combos = [combo for _, combo in fields]
         labels = [QLabel(text) for text, _ in fields]
         label_width = max(label.sizeHint().width() for label in labels)
+        # 面板里还有不落在本网格中的字段行（如匹配关键字），它们按这个宽度
+        # 对齐标签列，才能和上面的字段看起来是同一种排版。
+        self._label_width = label_width
         for label, (_, combo) in zip(labels, fields, strict=True):
             field = QWidget(self)
             row = QHBoxLayout(field)
@@ -73,8 +76,21 @@ class _DefinitionFields(QWidget):
             row.addWidget(label)
             combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             row.addWidget(combo, 1)
+            if not self._fields and first_hint is not None:
+                container = QWidget(self)
+                column = QVBoxLayout(container)
+                column.setContentsMargins(0, 0, 0, 0)
+                column.setSpacing(6)
+                column.addWidget(field)
+                column.addWidget(first_hint)
+                field = container
             self._fields.append(field)
         self.refresh_widths()
+
+    @property
+    def label_width(self) -> int:
+        """标签列宽度，供同一面板内不参与网格的字段行对齐使用。"""
+        return self._label_width
 
     def refresh_widths(self) -> None:
         for combo in self._combos:
@@ -100,7 +116,7 @@ class _DefinitionFields(QWidget):
         while self._grid.count():
             self._grid.takeAt(0)
         for index, field in enumerate(self._fields):
-            self._grid.addWidget(field, index // columns, index % columns)
+            self._grid.addWidget(field, index // columns, index % columns, Qt.AlignmentFlag.AlignTop)
         self._grid.setColumnStretch(0, 1)
         self._grid.setColumnStretch(1, int(columns == 2))
         self.updateGeometry()
@@ -193,6 +209,9 @@ class PlaystylePanel(QWidget):
         # 沿用「主/副」这两个用户熟悉的叫法，但**语义上不绑定顺序**：纯唐和
         # 双切的武学对完全相同，区别只在增伤要求落在哪一边，所以按武学查玩法
         # 是无序匹配（get_playstyles_for_arts），两个都会列出来由用户挑。
+        self._hint = QLabel()
+        self._hint.setWordWrap(True)
+        self._hint.setStyleSheet("color: palette(mid); font-size: 11px;")
         self._definition_fields = _DefinitionFields([
             (tr("流派"), self._combo_school),
             (tr("属性"), self._combo_attr),
@@ -205,7 +224,7 @@ class PlaystylePanel(QWidget):
             (tr("全武学增伤"), self._combo_all_skill),
             (tr("奇术增伤"), self._combo_qishu),
             (tr("对单位增伤"), self._combo_unit),
-        ])
+        ], first_hint=self._hint)
         definition_layout.addWidget(self._definition_fields)
         metadata_hint = QLabel(tr("全武学、奇术、对单位增伤仅作玩法说明 ⓘ"))
         metadata_hint.setWordWrap(True)
@@ -215,22 +234,29 @@ class PlaystylePanel(QWidget):
         definition_layout.addWidget(metadata_hint)
         # 关键字是**参与匹配**的，必须排在上面那句「仅作玩法说明」之后，
         # 否则会被它一并否定掉。
-        self._keywords = TagInputWidget([])
-        keyword_label = QLabel(tr("匹配关键字"))
+        self._keyword_values: list[str] = []
+        # 值用只读输入框而不是标签：它是配置内容，长得像输入框才和上面那排
+        # 字段同属一类；底色压淡以区别于可编辑输入框。
+        self._keywords_display = QLineEdit()
+        self._keywords_display.setReadOnly(True)
+        self._keywords_display.setStyleSheet(
+            "QLineEdit{background:palette(midlight); color:palette(text);"
+            " border:1px solid palette(mid); border-radius:3px; padding:2px 6px;}")
         keyword_row = QHBoxLayout()
         keyword_row.setSpacing(8)
-        keyword_row.addWidget(keyword_label)
-        keyword_row.addWidget(self._keywords, 1)
+        self._keywords_label = QLabel(tr("匹配关键字"))
+        self._keywords_label.setFixedWidth(self._definition_fields.label_width)
+        keyword_row.addWidget(self._keywords_label)
+        keyword_row.addWidget(self._keywords_display, 1)
+        self._keywords_edit = QPushButton(tr("编辑"))
+        apply_button_style(self._keywords_edit, variant="neutral")
+        self._keywords_edit.clicked.connect(self._edit_keywords)
+        keyword_row.addWidget(self._keywords_edit)
         definition_layout.addLayout(keyword_row)
         keyword_hint = tr(
             "扫描全部备战方案时，方案名直接含玩法名优先；否则命中关键字的玩法"
-            "胜出，多个命中取最长关键字。按 Enter 添加")
-        keyword_label.setToolTip(keyword_hint)
-        self._keywords.setToolTip(keyword_hint)
-        self._hint = QLabel()
-        self._hint.setWordWrap(True)
-        self._hint.setStyleSheet("color: palette(mid); font-size: 11px;")
-        definition_layout.addWidget(self._hint)
+            "胜出，多个命中取最长关键字。")
+        self._keywords_display.setToolTip(keyword_hint)
         from ..loadout.build_calculator import BuildListPanel
         self._builds_panel = BuildListPanel(self)
         right_layout.addWidget(self._builds_panel)
@@ -251,7 +277,24 @@ class PlaystylePanel(QWidget):
             combo.currentTextChanged.connect(self._on_field_changed)
         for combo in (self._combo_art_a, self._combo_art_b):
             combo.currentTextChanged.connect(self._on_arts_changed)
-        self._keywords.tags_changed.connect(lambda: self._on_field_changed(""))
+        self._refresh_keywords()
+
+    def _refresh_keywords(self) -> None:
+        self._keywords_display.setText(
+            "、".join(self._keyword_values) or tr("无"))
+        # 关键字多起来会超出框宽，只读框默认停在尾部；拨回开头才看得到前几个。
+        self._keywords_display.setCursorPosition(0)
+        self._keywords_edit.setEnabled(self._list.currentItem() is not None)
+
+    def _edit_keywords(self) -> None:
+        if self._list.currentItem() is None:
+            return
+        text, accepted = QInputDialog.getMultiLineText(
+            self, tr("编辑匹配关键字"), tr("每行一个关键字"), "\n".join(self._keyword_values))
+        if accepted:
+            self._keyword_values = list(dict.fromkeys(line.strip() for line in text.splitlines() if line.strip()))
+            self._refresh_keywords()
+            self._on_field_changed("")
 
     def _toggle_definition(self, expanded: bool) -> None:
         self._definition_content.setVisible(expanded)
@@ -366,7 +409,8 @@ class PlaystylePanel(QWidget):
         self._combo_art_a.setCurrentText(arts[0] if arts else "")
         self._combo_art_b.setCurrentText(arts[1] if len(arts) > 1 else "")
         self._combo_attr.setCurrentText(attr)
-        self._keywords.set_tags(list(cfg.get("match_keywords") or []))
+        self._keyword_values = list(cfg.get("match_keywords") or [])
+        self._refresh_keywords()
         self._loading = False
         self._sync_derived(cfg)
 
@@ -482,7 +526,7 @@ class PlaystylePanel(QWidget):
                         self._combo_all_skill.currentText(),
                     "qishu_requirement": self._combo_qishu.currentText(),
                     "unit_requirement": self._combo_unit.currentText(),
-                    "match_keywords": self._keywords.tags(),
+                    "match_keywords": list(self._keyword_values),
                 })
                 break
         self._data["playstyles"] = entries

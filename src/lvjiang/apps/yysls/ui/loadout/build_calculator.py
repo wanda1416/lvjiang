@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
+    QToolButton,
     QToolTip,
     QVBoxLayout,
     QWidget,
@@ -946,12 +947,29 @@ class BuildListPanel(QWidget):
         self.playstyle = ""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(QLabel(tr("出装搭配")))
+        self._toggle = QToolButton()
+        self._toggle.setText(tr("出装搭配"))
+        self._toggle.setCheckable(True)
+        self._toggle.setChecked(True)
+        self._toggle.setAutoRaise(True)
+        self._toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._toggle.setArrowType(Qt.ArrowType.DownArrow)
+        layout.addWidget(self._toggle, alignment=Qt.AlignmentFlag.AlignLeft)
+        self._content = QWidget()
+        content_layout = QVBoxLayout(self._content)
+        content_layout.setContentsMargins(8, 0, 8, 8)
+        content_layout.setSpacing(6)
+        layout.addWidget(self._content)
+        self._toggle.toggled.connect(self._toggle_content)
         self.table = _table(["名称", "等级", "词条数", "弓玦套装"])
+        header = self.table.horizontalHeader()
+        assert header is not None
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setMinimumHeight(170)
         self.table.cellDoubleClicked.connect(lambda *_: self.edit())
-        layout.addWidget(self.table)
+        content_layout.addWidget(self.table)
         row = QHBoxLayout()
         self._buttons: dict[str, QPushButton] = {}
         for label, callback in [("新建出装搭配", self.create), ("编辑", self.edit), ("复制", self.duplicate), ("删除", self.delete)]:
@@ -961,10 +979,14 @@ class BuildListPanel(QWidget):
             row.addWidget(button)
             self._buttons[label] = button
         row.addStretch()
-        layout.addLayout(row)
+        content_layout.addLayout(row)
         self._items: list[BuildDefinition] = []
         self.table.itemSelectionChanged.connect(self._update_actions)
         self._update_actions()
+
+    def _toggle_content(self, expanded: bool) -> None:
+        self._content.setVisible(expanded)
+        self._toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
 
     def set_playstyle(self, playstyle: str):
         self.playstyle = playstyle

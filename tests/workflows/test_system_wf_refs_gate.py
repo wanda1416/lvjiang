@@ -10,11 +10,12 @@ config/local 影子文件影响，CI 与开发机结论一致。
 """
 
 
+import pytest
+
 from lvjiang.core.config import load_user_config
 from lvjiang.core.config.resolver import SYSTEM_CONFIG_DIR
 from lvjiang.core.key_validation import validate_layout_activation_keys
 from lvjiang.workflows.engine import WorkflowEngine
-from tests.case_matrix import case_matrix
 
 
 def _system_wf_files() -> list:
@@ -138,11 +139,10 @@ def test_desktop_layout_has_no_activation_key_conflicts():
     validate_layout_activation_keys(_validator("desktop")._layout)
 
 
-@case_matrix("layout_name", _system_layouts())
-@case_matrix(
+@pytest.mark.parametrize(
     "wf_path", _system_wf_files(),
     ids=lambda p: p.relative_to(SYSTEM_CONFIG_DIR / "workflows").as_posix())
-def test_wf_refs_all_bound(wf_path, layout_name):
+def test_wf_refs_all_bound(wf_path):
     """每个系统 .wf 引用的场景/区域/坐标点/方向/面板都已在该布局绑定
 
     失败信息即 format_problems 的清单（含文件名:行号），直接照着补绑即可。
@@ -150,11 +150,16 @@ def test_wf_refs_all_bound(wf_path, layout_name):
     只校验脚本自己声明支持的环境：`#% env: [android]` 的脚本不该因为桌面布局
     没标定对应场景而报错 —— 那不是漏绑，是这个平台还没支持。未声明 env 的
     脚本（子过程库、批量生命周期）不限制环境，仍然按全部布局校验。
+
+    按 ``wf_path`` 参数化、把环境留在函数内循环，而不是把整张矩阵折进单个
+    用例：每个脚本都要读盘并完整解析，折成单项会让 xdist 只能在一个 worker
+    上串行跑完全部脚本，成为整条流水线的长尾（实测占 CI 墙钟六成）。
     """
     declared = _declared_envs(wf_path)
-    if declared and _layout_env(layout_name) not in declared:
-        return
-    _validator(layout_name).validate_only(wf_path)
+    for layout_name in _system_layouts():
+        if declared and _layout_env(layout_name) not in declared:
+            continue
+        _validator(layout_name).validate_only(wf_path)
 
 
 def test_declared_envs_are_real_platform_keys():

@@ -1,6 +1,5 @@
 """DSL 解析器验证测试"""
 
-from pathlib import Path
 
 import pytest
 from lark.exceptions import LarkError, VisitError
@@ -38,7 +37,6 @@ from lvjiang.workflows.grammar import (
     Place,
     Press,
     ProcDef,
-    Program,
     Recognize,
     ReplayInputTrace,
     Scan,
@@ -52,23 +50,6 @@ from lvjiang.workflows.grammar import (
 )
 from lvjiang.workflows.grammar.ast_nodes import PressMode
 from tests.case_matrix import case_matrix
-
-# ─── 现有 .wf 文件验证 ─────────────────────────────────────
-
-def test_workflow_parser():
-    """测试读取所有注册的 workflow 文件并解析"""
-    print("\n=== 测试所有 workflow 文件解析 ===")
-    wf_dir = Path("config/system/workflows")
-    wf_files = list(wf_dir.rglob("*.wf"))
-    print(f"  找到 {len(wf_files)} 个 .wf 文件")
-
-    for wf_path in sorted(wf_files):
-        program = parse_file(wf_path)
-        stmt_count = len(program.body)
-        print(f"  ✓ {wf_path} ({stmt_count} statements)")
-        assert isinstance(program, Program)
-
-    print(f"  全部 {len(wf_files)} 个文件解析成功")
 
 
 def test_parse_file_tolerates_utf8_bom(tmp_path):
@@ -2413,8 +2394,6 @@ def test_replay_input_trace():
 
 
 if __name__ == "__main__":
-    test_workflow_parser()
-
     # click
     test_click_scene_ref()
     test_click_dynamic_region()

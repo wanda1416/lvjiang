@@ -220,6 +220,7 @@ def test_extractor_rejects_unknown_active_mechanics(extractor):
     assert extractor["_buffs"](book, book) == {"测试增益": {"generic": 0.1}}
 
 
+@pytest.mark.slow
 def test_all_shipped_models_match_excel_extraction(extractor):
     import openpyxl
     root = Path(__file__).resolve().parents[2]

@@ -45,9 +45,16 @@ jobs:
         # 用例挂死时 pytest 不会自己退出。没有这道闸，卡住的 worker 会让整个
         # 步骤一直等到手动取消（实测挂过 88 分钟）。
         timeout-minutes: 30
+        # --durations=20：把最慢的 20 条打进日志，长尾退化时能第一时间看见。
+        # 静态门禁（系统 .wf 引用校验等）已按文件参数化拆开，长尾从单条 268s
+        # 降到 ~50s，可正常并行。
+        # 注意：这里**不加** -m "not slow"，也不加 --dist worksteal —— 实测两者
+        # 都会让 xdist 在全量收集阶段静默退出（没有任何输出、退出码为 0），
+        # 那等于 CI 假通过。slow 标记（Excel 类）仅用于本地 `-m "not slow"`。
         run: >-
           python -m pytest tests
           -n auto
+          --durations=20
           --junitxml=pytest-results.xml
 
       - name: Annotate test failures

@@ -2,6 +2,7 @@
 
 统一管理 session.json 中 profile 节点的所有读写，包括：
 - overview_groups: 总览分组配置 {group_name: {"columns": [key, ...]}}
+- overview_group_order: 总览分组的拖动顺序，未记录时沿用分组配置顺序
 - overview_active_group: 当前活跃分组名
 - alert_history: 提醒去重记录 {alert_key: timestamp}
 
@@ -24,6 +25,7 @@ _PROFILE_KEY = "profile"
 
 # profile 节点内的子 key
 _SUB_GROUPS = "overview_groups"
+_SUB_GROUP_ORDER = "overview_group_order"
 _SUB_ACTIVE_GROUP = "overview_active_group"
 _SUB_ALERT_HISTORY = "alert_history"
 
@@ -39,7 +41,17 @@ def _load() -> dict[str, Any]:
 
 def get_groups() -> dict:
     """获取总览分组配置 {group_name: {"columns": [key, ...]}}"""
-    return _load().get(_SUB_GROUPS, {})
+    return _ordered_groups(_load())
+
+
+def _ordered_groups(data: dict) -> dict:
+    groups = data.get(_SUB_GROUPS, {})
+    ordered = {
+        name: groups[name] for name in data.get(_SUB_GROUP_ORDER, [])
+        if name in groups
+    }
+    ordered.update(groups)
+    return ordered
 
 
 def _mutate_groups(mutator) -> None:
@@ -47,9 +59,11 @@ def _mutate_groups(mutator) -> None:
     def _merge(old):
         data = old if isinstance(old, dict) else {}
         current = data.get(_SUB_GROUPS, {})
-        groups = deepcopy(current) if isinstance(current, dict) else {}
+        groups = deepcopy(_ordered_groups(data)) if isinstance(current, dict) else {}
         mutator(groups)
         data[_SUB_GROUPS] = groups
+        # dict 相等不比较顺序；显式列表确保仅排序也会被 SessionStore 落盘。
+        data[_SUB_GROUP_ORDER] = list(groups)
         return data
 
     get_session_store().mutate_node(_PROFILE_KEY, _merge)
@@ -82,6 +96,17 @@ def rename_overview_group(old_name: str, new_name: str) -> None:
 def remove_overview_group(name: str) -> None:
     """删除分组。至少保留一个分组的交互约束由 UI 负责。"""
     _mutate_groups(lambda groups: groups.pop(name, None))
+
+
+def reorder_overview_groups(ordered_names: list[str]) -> None:
+    """重排已展示分组，保留其他进程新建的分组及所有分组内容。"""
+    def _reorder(groups: dict) -> None:
+        reordered = {name: groups[name] for name in ordered_names if name in groups}
+        reordered.update(groups)
+        groups.clear()
+        groups.update(reordered)
+
+    _mutate_groups(_reorder)
 
 
 def insert_overview_column(group_name: str, index: int, key: str) -> None:

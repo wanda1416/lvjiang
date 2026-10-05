@@ -221,8 +221,8 @@ class BorderOverlay:
         finally:
             user32.EndPaint(hwnd, ctypes.byref(ps))
 
-    def show_border(self, left: int, top: int, width: int, height: int):
-        """在 Win32 窗口坐标上显示边框。"""
+    def show_border(self, left: int, top: int, width: int, height: int) -> bool:
+        """在 Win32 窗口坐标上显示边框，返回是否定位成功。"""
         self._ensure_window()
         user32 = ctypes.windll.user32
         user32.SetWindowPos.restype = wintypes.BOOL
@@ -239,7 +239,8 @@ class BorderOverlay:
         user32.InvalidateRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT), wintypes.BOOL]
         user32.UpdateWindow.restype = wintypes.BOOL
         user32.UpdateWindow.argtypes = [wintypes.HWND]
-        user32.SetWindowPos(
+        ctypes.set_last_error(0)
+        moved = bool(user32.SetWindowPos(
             self._hwnd,
             wintypes.HWND(-1),  # HWND_TOPMOST
             int(left),
@@ -247,10 +248,16 @@ class BorderOverlay:
             max(1, int(width)),
             max(1, int(height)),
             0x0010 | 0x0040 | 0x0200,  # NOACTIVATE | SHOWWINDOW | NOOWNERZORDER
-        )
+        ))
+        if not moved:
+            logger.error(
+                f"Overlay SetWindowPos 失败: error={ctypes.get_last_error()} "
+                f"target=({left},{top},{width}x{height})")
+            return False
         user32.InvalidateRect(self._hwnd, None, True)
         user32.UpdateWindow(self._hwnd)
         logger.debug(f"Overlay Win32: ({left},{top},{width}x{height})")
+        return True
 
     def hide_border(self):
         """隐藏边框。"""

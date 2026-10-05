@@ -1,8 +1,12 @@
+import ctypes
+from types import SimpleNamespace
+
 from lvjiang.ui.main.execution_targets import (
     WINDOW_TARGET_ID,
     ExecutionTarget,
     ExecutionTargetRegistry,
     android_target_id,
+    window_target_label,
 )
 from lvjiang.ui.main.window_ops import WindowOpsMixin
 
@@ -15,6 +19,54 @@ def _target(target_id: str, kind: str, name: str) -> ExecutionTarget:
         capture=object(),
         input_ctrl=object(),
     )
+
+
+def test_window_target_name_uses_process_id_not_window_handle() -> None:
+    window = {"pid": 12345, "hwnd": 0x1A2B3C}
+
+    assert window_target_label(window) == "WINDOWS:12345"
+
+
+def test_refresh_window_rect_rejects_a_disappeared_window(monkeypatch) -> None:
+    user32 = SimpleNamespace(IsWindow=lambda hwnd: False)
+    monkeypatch.setattr(
+        ctypes, "windll", SimpleNamespace(user32=user32), raising=False)
+    window = {
+        "pid": 12345, "hwnd": 0x1A2B3C,
+        "left": 10, "top": 20, "width": 100, "height": 200,
+    }
+
+    assert not WindowOpsMixin._refresh_window_rect(object(), window)
+    assert (window["left"], window["top"]) == (10, 20)
+
+
+def test_refresh_window_rect_updates_a_matching_live_window(monkeypatch) -> None:
+    class User32:
+        @staticmethod
+        def IsWindow(hwnd) -> bool:
+            return True
+
+        @staticmethod
+        def GetWindowThreadProcessId(hwnd, pid_ptr) -> int:
+            pid_ptr._obj.value = 12345
+            return 1
+
+        @staticmethod
+        def GetWindowRect(hwnd, rect_ptr) -> bool:
+            rect = rect_ptr._obj
+            rect.left, rect.top, rect.right, rect.bottom = 30, 40, 330, 240
+            return True
+
+    monkeypatch.setattr(
+        ctypes, "windll", SimpleNamespace(user32=User32()), raising=False)
+    window = {
+        "pid": 12345, "hwnd": 0x1A2B3C,
+        "left": 10, "top": 20, "width": 100, "height": 200,
+    }
+
+    assert WindowOpsMixin._refresh_window_rect(object(), window)
+    assert (window["left"], window["top"], window["width"], window["height"]) == (
+        30, 40, 300, 200)
 
 
 def test_registry_keeps_one_window_and_multiple_devices() -> None:

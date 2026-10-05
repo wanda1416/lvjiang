@@ -1035,7 +1035,21 @@ class RunControlMixin:
         if target is not None and target.kind == "windows" and target.window:
             # hwnd 是窗口身份，坐标原点可能在连接后被用户拖动；冻结运行快照前
             # 必须刷新一次，不能把“已连接”误解成矩形永远不变。
-            self._refresh_window_rect(target.window)
+            if not self._refresh_window_rect(target.window):
+                target.status = "offline"
+                self._red_box_flash_timer.stop()
+                self._overlay.hide_border()
+                from ...core.app_controller import remove_connected_target
+                remove_connected_target(target.id)
+                self._refresh_execution_targets_ui()
+                self._sync_active_target_compat()
+                self._refresh_run_button()
+                message = tr("窗口已消失或句柄失效，请重新定位")
+                self.statusBar().showMessage(message)
+                self.log_text.append(
+                    tr("[启动失败] {name}：{message}").format(
+                        name=target.display_name, message=message))
+                return False
             target.width = int(target.window.get("width") or 0)
             target.height = int(target.window.get("height") or 0)
             self._target_window = target.window

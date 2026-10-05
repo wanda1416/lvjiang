@@ -1224,7 +1224,25 @@ class WindowOpsMixin:
         window = target.window
         if window is None:
             return
-        self._refresh_window_rect(window)
+        old_rect = tuple(window.get(key) for key in (
+            "left", "top", "width", "height"))
+        if not self._refresh_window_rect(window):
+            target.status = "offline"
+            self._red_box_flash_timer.stop()
+            self._overlay.hide_border()
+            from ...core.app_controller import remove_connected_target
+            remove_connected_target(target.id)
+            self._refresh_execution_targets_ui()
+            if self._execution_targets.active_target_id == target.id:
+                self._sync_active_target_compat()
+                self._refresh_run_button()
+            message = tr("窗口已消失或句柄失效，请重新定位")
+            self.statusBar().showMessage(message)
+            self.log_text.append(
+                tr("[定位失效] {name}：{message}").format(
+                    name=target.display_name, message=message))
+            return
+        target.status = "connected"
         target.width = int(window.get("width") or 0)
         target.height = int(window.get("height") or 0)
         if target.capture is not None:
@@ -1234,13 +1252,16 @@ class WindowOpsMixin:
                 target.width,
                 target.height,
             )
+        marker_ok = True
         if self.chk_red_box.isChecked():
-            self._overlay.show_border(
+            marker_ok = self._overlay.show_border(
                 int(window.get("left") or 0),
                 int(window.get("top") or 0),
                 target.width,
                 target.height,
             )
+        if target.handle is not None:
+            target.handle.update_window(window)
         from ...core.app_controller import record_connected_window
         record_connected_window(window)
         if self._execution_targets.active_target_id == target.id:
@@ -1252,10 +1273,14 @@ class WindowOpsMixin:
             if callable(rebind):
                 rebind(window)
         self._refresh_execution_targets_ui()
-        self.statusBar().showMessage(tr("已刷新窗口位置"))
+        new_rect = tuple(window.get(key) for key in (
+            "left", "top", "width", "height"))
+        self.statusBar().showMessage(
+            tr("已刷新窗口位置") if marker_ok
+            else tr("窗口位置已刷新，但红框移动失败"))
         self.log_text.append(
-            tr("[定位刷新] {name} · {details}").format(
-                name=target.display_name,
+            tr("[定位刷新] {name} · {old} → {new} · {details}").format(
+                name=target.display_name, old=old_rect, new=new_rect,
                 details=self._target_details(target)))
 
     def _set_window_target_background_input(
@@ -1434,7 +1459,12 @@ class WindowOpsMixin:
         w = self.window_combo.currentData()
         if not w:
             return
-        self._refresh_window_rect(w)
+        if not self._refresh_window_rect(w):
+            message = tr("所选窗口已消失，请重新扫描窗口")
+            self.statusBar().showMessage(message)
+            self.log_text.append(tr("[定位失败] {message}").format(
+                message=message))
+            return
         from ...core.app_controller import record_connected_window
         from .execution_targets import WINDOW_TARGET_ID
         record_connected_window(w)
@@ -1712,6 +1742,9 @@ class WindowOpsMixin:
                     "left", "top", "width", "height"):
             if window.get(key) is not None:
                 target[key] = window[key]
+        from .execution_targets import window_target_label
+        execution_target.display_name = window_target_label(target)
+        execution_target.status = "connected"
         if execution_target.handle is not None:
             execution_target.handle.update_window(target)
         logger.info(
@@ -1720,14 +1753,50 @@ class WindowOpsMixin:
 
     # ─── Win32 工具 ───────────────────────────────────────
 
-    def _refresh_window_rect(self, w: dict):
-        """通过 Win32 GetWindowRect 实时刷新窗口位置。"""
+    def _refresh_window_rect(self, w: dict) -> bool:
+        """验证窗口身份并刷新位置；窗口消失或已换进程时返回 False。"""
+        user32 = ctypes.windll.user32
+        hwnd_value = int(w.get("hwnd") or 0)
+        hwnd = wintypes.HWND(hwnd_value)
+        if not hwnd or not user32.IsWindow(hwnd):
+            logger.warning(f"刷新窗口位置失败：HWND 已失效 hwnd=0x{hwnd_value:X}")
+            return False
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        expected_pid = int(w.get("pid") or 0)
+        if not pid.value:
+            logger.warning(
+                f"刷新窗口位置失败：无法读取窗口进程 hwnd=0x{hwnd_value:X}")
+            return False
+        if expected_pid and int(pid.value) != expected_pid:
+            logger.warning(
+                f"刷新窗口位置失败：HWND 已被其他进程复用 "
+                f"hwnd=0x{hwnd_value:X} expected_pid={expected_pid} "
+                f"actual_pid={pid.value}")
+            return False
         rect = wintypes.RECT()
-        if ctypes.windll.user32.GetWindowRect(wintypes.HWND(w['hwnd']), ctypes.byref(rect)):
-            w['left'] = rect.left
-            w['top'] = rect.top
-            w['width'] = rect.right - rect.left
-            w['height'] = rect.bottom - rect.top
+        set_last_error = getattr(ctypes, "set_last_error", None)
+        if set_last_error is not None:
+            set_last_error(0)
+        if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+            get_last_error = getattr(ctypes, "get_last_error", lambda: 0)
+            logger.warning(
+                f"刷新窗口位置失败：GetWindowRect error={get_last_error()} "
+                f"hwnd=0x{hwnd_value:X} pid={pid.value}")
+            return False
+        width = rect.right - rect.left
+        height = rect.bottom - rect.top
+        if width <= 0 or height <= 0:
+            logger.warning(
+                f"刷新窗口位置失败：窗口矩形无效 hwnd=0x{hwnd_value:X} "
+                f"pid={pid.value} rect=({rect.left},{rect.top},"
+                f"{rect.right},{rect.bottom})")
+            return False
+        w['left'] = rect.left
+        w['top'] = rect.top
+        w['width'] = width
+        w['height'] = height
+        return True
 
     def _get_window_dpi_ratio(self, hwnd: int) -> float:
         """返回目标窗口所在屏幕的 DPI 缩放比，仅用于日志展示。"""

@@ -23,17 +23,13 @@ def android_target_id(device_identity: str) -> str:
 
 
 def window_target_label(window: dict[str, Any] | None) -> str:
-    """窗口目标的默认名称：`HWND_<十六进制>`。
+    """窗口目标的默认名称：`WINDOWS:<pid>`。
 
-    不用窗口标题：标题在运行期会变（加载态、角色名、多开编号都会改它），而名称
-    要能跨一次运行保持同一个含义，还会被原样写进任务历史快照。hwnd 才是 Windows
-    层面的唯一 ID，和 Android 的 serial 同一个性质。
-
-    带 `HWND_` 前缀并补齐到 6 位：裸句柄可能只有三四位数字，摆在目标列表里看不出
-    是什么；补齐之后宽度稳定，也和 Win32 工具里的十六进制句柄能直接对照。
+    PID 与 Android 展示的 transport serial 一样，是用户可以直接核对的当前连接端；
+    HWND 仍保留在窗口绑定中供截图、输入和有效性检查使用，不暴露为目标名称。
     """
-    hwnd = (window or {}).get("hwnd")
-    return f"HWND_{int(hwnd):06X}" if hwnd else tr("游戏窗口")
+    pid = (window or {}).get("pid")
+    return f"WINDOWS:{int(pid)}" if pid else tr("游戏窗口")
 
 
 @dataclass

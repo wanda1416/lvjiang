@@ -17,7 +17,7 @@ from lvjiang.apps.yysls.core.graduation.model_registry import (  # noqa: E402
     model_filename,
 )
 
-EXCEL_DIR = ROOT / "data" / "temp" / "excel"
+EXCEL_DIR = ROOT / "data" / "excel"
 OUTPUT_DIR = ROOT / "config" / "system" / "yysls" / "graduation"
 FILE_TO_SCHOOL = {
     "鸣金虹": "鸣金·虹", "鸣金影": "鸣金·影",

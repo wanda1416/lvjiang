@@ -69,7 +69,7 @@ def _profile_set(
     """写入 profile 属性值（自动识别模型类型）
 
     走共享写入管线 profile_action()，与 UI 增减完全一致：
-    数值模型: clamp → delta → detail → db_upsert → sync_targets。
+    数值模型: clamp → delta_value → db_upsert → sync_targets。
     note 模型: 文本直接写入 value_text 列，不走数值管线。
     source 可由工作流显式传入；省略时兼容使用 "DSL 写入"。
 
@@ -136,7 +136,7 @@ def _profile_inc(
     """增减 profile 属性值（自动识别模型类型）
 
     走共享写入管线 profile_action()，与 UI 增减完全一致：
-    clamp → delta → detail → db_upsert → sync_targets。
+    clamp → delta_value → db_upsert → sync_targets。
     source 可由工作流显式传入；省略时兼容使用 "DSL 写入"。
 
     .wf 用法:

@@ -17,7 +17,7 @@ from loguru import logger
 from .models import DIR_NEG, DIR_POS, KeyDef, parse_sync_key
 from .schema import get_profile_config
 
-# write_fn 签名：(user_name, model_type, key, delta, change_type, detail, source)
+# write_fn 签名：(user_name, model_type, key, delta, change_type, sync_from, source)
 # -> (new_value, applied_delta)；写入失败返回 None
 SyncWriteFn = Callable[..., tuple[int | float, int | float] | None]
 
@@ -36,7 +36,7 @@ def fire_sync_targets(
     ----------
     write_fn:
         注入的写入函数，签名为
-        ``(user_name, model_type, key, *, delta, change_type, detail, source)
+        ``(user_name, model_type, key, *, delta, change_type, sync_from, source)
         -> (new_value, applied_delta) | None``。
         负责读取当前值、加 delta、clamp、写入；applied_delta 是 clamp 后的实际生效量，
         失败时返回 None。
@@ -92,7 +92,7 @@ def fire_sync_targets(
         result = write_fn(
             user_name, target_model, target_kd.key,
             delta=scaled_delta, change_type="action",
-            detail=f"sync_from:{source_kd.key}",
+            sync_from=f"{config.get_model_type(source_kd.key)}:{source_kd.key}",
             source=effective_source,
         )
         if result is None:

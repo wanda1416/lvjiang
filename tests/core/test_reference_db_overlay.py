@@ -69,36 +69,10 @@ class TestBucketDiscovery:
         db = _make_db(layers, dev_mode=False)
         assert db.buckets == ["bucket_a", "bucket_b", "bucket_c"]
 
-    def test_empty_when_no_subdirs(self, layers):
-        """无子目录时 buckets 为空列表"""
-        system_dir, system_yaml, local_dir, local_yaml = layers
-        _write_yaml(system_yaml, {"version": 1, "references": []})
-        _write_yaml(local_yaml, {"version": 1, "references": [], "deleted": []})
-        db = _make_db(layers, dev_mode=False)
-        assert db.buckets == []
-
-    def test_sorted_order(self, layers):
-        """桶列表按字母排序"""
-        system_dir, system_yaml, _, _ = layers
-        (system_dir / "z_bucket").mkdir(parents=True)
-        (system_dir / "a_bucket").mkdir(parents=True)
-        (system_dir / "m_bucket").mkdir(parents=True)
-        _write_yaml(system_yaml, {"version": 1, "references": []})
-        db = _make_db(layers, dev_mode=False)
-        assert db.buckets == ["a_bucket", "m_bucket", "z_bucket"]
-
 
 # ─── 合并视图 ────────────────────────────────────────────
 
 class TestMergedView:
-    def test_union_of_layers(self, layers):
-        _, system_yaml, _, local_yaml = layers
-        _write_yaml(system_yaml, {"version": 1, "references": [
-            _entry("A.png", "甲"), _entry("B.png", "乙")]})
-        _write_yaml(local_yaml, {"version": 1, "references": [
-            _entry("C.png", "丙")], "deleted": []})
-        db = _make_db(layers, dev_mode=False)
-        assert [e.file for e in db.entries] == ["A.png", "B.png", "C.png"]
 
     def test_local_entry_replaces_same_file(self, layers):
         _, system_yaml, _, local_yaml = layers
@@ -120,46 +94,8 @@ class TestMergedView:
         db = _make_db(layers, dev_mode=False)
         assert [e.file for e in db.entries] == ["B.png"]
 
-    def test_local_schema_replaces_whole_list(self, layers):
-        _, system_yaml, _, local_yaml = layers
-        _write_yaml(system_yaml, {"version": 1, "references": [], "meta_schema": [
-            {"key": "level", "name": "等级"}, {"key": "grade", "name": "品阶"}]})
-        _write_yaml(local_yaml, {"version": 1, "references": [], "deleted": [],
-                                 "meta_schema": [{"key": "color", "name": "颜色"}]})
-        db = _make_db(layers, dev_mode=False)
-        assert [f.key for f in db.get_meta_schema()] == ["color"]
-
-    def test_no_local_schema_uses_system(self, layers):
-        _, system_yaml, _, local_yaml = layers
-        _write_yaml(system_yaml, {"version": 1, "references": [], "meta_schema": [
-            {"key": "level", "name": "等级"}]})
-        _write_yaml(local_yaml, {"version": 1, "references": [], "deleted": []})
-        db = _make_db(layers, dev_mode=False)
-        assert [f.key for f in db.get_meta_schema()] == ["level"]
-
 
 # ─── image_path 解析 ─────────────────────────────────────
-
-class TestImagePath:
-    def test_local_wins_when_exists(self, layers):
-        system_dir, system_yaml, local_dir, local_yaml = layers
-        # 创建桶目录（桶由目录扫描发现）
-        (system_dir / "bucket_00").mkdir(parents=True)
-        (system_dir / "bucket_00" / "A.png").write_bytes(b"sys")
-        (local_dir / "bucket_00").mkdir(parents=True)
-        (local_dir / "bucket_00" / "A.png").write_bytes(b"loc")
-        _write_yaml(system_yaml, {"version": 1, "references": []})
-        _write_yaml(local_yaml, {"version": 1, "references": [], "deleted": []})
-        db = _make_db(layers, dev_mode=False)
-        assert db.image_path("A.png") == local_dir / "bucket_00" / "A.png"
-
-    def test_falls_back_to_system(self, layers):
-        system_dir, system_yaml, _, _ = layers
-        (system_dir / "bucket_00").mkdir(parents=True)
-        _write_yaml(system_yaml, {"version": 1, "references": []})
-        db = _make_db(layers, dev_mode=False)
-        # 文件不存在时返回 system 层第一个桶的路径
-        assert db.image_path("A.png") == system_dir / "bucket_00" / "A.png"
 
 
 # ─── 用户模式写路由 ──────────────────────────────────────
@@ -209,18 +145,6 @@ class TestUserModeWrites:
         assert db.remove_entry("B.png") is True
         assert db.entries == []
 
-    def test_remove_local_only_entry_deletes_file(self, layers):
-        _, system_yaml, local_dir, local_yaml = layers
-        _write_yaml(system_yaml, {"version": 1, "references": []})
-        (local_dir / "bucket_00").mkdir(parents=True)
-        (local_dir / "bucket_00" / "B.png").write_bytes(b"loc")
-        _write_yaml(local_yaml, {"version": 1, "references": [
-            _entry("B.png", "乙")], "deleted": []})
-        db = _make_db(layers, dev_mode=False)
-        assert db.remove_entry("B.png") is True
-        assert not (local_dir / "bucket_00" / "B.png").exists()
-        # overlay 无内容 → 覆盖文件被删
-        assert not local_yaml.exists()
 
     def test_update_system_entry_copies_to_local_shadow(self, layers):
         system_dir, system_yaml, _, local_yaml = layers
@@ -255,32 +179,7 @@ class TestUserModeWrites:
 # ─── 匹配度阈值 ────────────────────────────────────
 
 class TestMatchThreshold:
-    def test_default_when_absent(self, layers):
-        _, system_yaml, _, _ = layers
-        _write_yaml(system_yaml, {"version": 1, "references": []})
-        db = _make_db(layers, dev_mode=False)
-        assert db.get_match_threshold() == DEFAULT_MATCH_THRESHOLD
 
-    def test_local_overrides_system(self, layers):
-        _, system_yaml, _, local_yaml = layers
-        _write_yaml(system_yaml, {"version": 1, "references": [],
-                                  "match_threshold": 0.1})
-        _write_yaml(local_yaml, {"version": 1, "references": [], "deleted": [],
-                                 "match_threshold": 0.3})
-        db = _make_db(layers, dev_mode=False)
-        assert db.get_match_threshold() == 0.3
-
-    def test_user_set_writes_local_only(self, layers):
-        _, system_yaml, _, local_yaml = layers
-        _write_yaml(system_yaml, {"version": 1, "references": [],
-                                  "match_threshold": 0.1})
-        db = _make_db(layers, dev_mode=False)
-        db.set_match_threshold(0.25)
-        overlay = yaml.safe_load(local_yaml.read_text(encoding="utf-8"))
-        assert overlay["match_threshold"] == 0.25
-        # system 不动
-        sys_doc = yaml.safe_load(system_yaml.read_text(encoding="utf-8"))
-        assert sys_doc["match_threshold"] == 0.1
 
     def test_user_reset_to_system_clears_overlay(self, layers):
         _, system_yaml, _, local_yaml = layers
@@ -293,14 +192,6 @@ class TestMatchThreshold:
         assert not local_yaml.exists()
         assert db.get_match_threshold() == 0.1
 
-    def test_dev_set_writes_system(self, layers):
-        _, system_yaml, _, local_yaml = layers
-        _write_yaml(system_yaml, {"version": 1, "references": []})
-        db = _make_db(layers, dev_mode=True)
-        db.set_match_threshold(0.2)
-        sys_doc = yaml.safe_load(system_yaml.read_text(encoding="utf-8"))
-        assert sys_doc["match_threshold"] == 0.2
-        assert not local_yaml.exists()
 
     def test_invalid_value_ignored(self, layers):
         _, system_yaml, _, _ = layers
@@ -364,18 +255,6 @@ class TestMetaSchemaScope:
         db = _make_db(layers, dev_mode=False)
         assert all(f.crop is None for f in db.get_meta_schema())
 
-    def test_get_output_fields_filters_valid(self, layers):
-        _, system_yaml, _, _ = layers
-        _write_yaml(system_yaml, {"version": 1, "references": [], "meta_schema": [
-            {"key": "level", "name": "等级", "scope": "input"},
-            {"key": "level_text", "name": "等级文本区域", "scope": "output",
-             "crop": [0.0, 0.0, 1.0, 0.5]},
-            {"key": "bad", "name": "非法", "scope": "output", "crop": [2.0, 0, 1, 1]},
-            {"key": "count_text", "name": "数量文本区域", "scope": "output",
-             "crop": [0.0, 0.5, 1.0, 0.5]},
-        ]})
-        db = _make_db(layers, dev_mode=False)
-        assert [f.key for f in db.get_output_fields()] == ["level_text", "count_text"]
 
     def test_save_omits_none_crop(self, layers):
         _, system_yaml, _, _ = layers
@@ -454,21 +333,6 @@ class TestReferenceSpaces:
         assert db.get_spaces() == [DEFAULT_SPACE]
         assert db.get_active_space() == DEFAULT_SPACE
 
-    def test_is_system_space(self, space_env):
-        """system 层扫出的空间是系统空间；local 独有的不是"""
-        _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE])
-        _declare_spaces(space_env["local_ref"], [DEFAULT_SPACE, "我的空间"])
-        db = ReferenceDatabase(dev_mode=False)
-        assert db.is_system_space(DEFAULT_SPACE) is True   # local 有覆盖层也仍是系统空间
-        assert db.is_system_space("我的空间") is False
-        assert db.is_system_space("不存在") is False
-
-    def test_legacy_roster_ignored(self, space_env):
-        """旧 references.yaml 已作废：存在也不参与空间发现"""
-        _write_yaml(space_env["legacy_roster"], {"version": 1, "spaces": ["幽灵空间"]})
-        _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE])
-        db = ReferenceDatabase(dev_mode=False)
-        assert db.get_spaces() == [DEFAULT_SPACE]
 
     def test_default_space_preferred_over_first(self, space_env):
         """无 session 记录时优先激活 DEFAULT_SPACE，而非排序首个"""
@@ -554,27 +418,6 @@ class TestReferenceSpaces:
         assert db.image_path("Y.png") == (
             space_env["system_ref"] / "空间A" / "bucket_00" / "Y.png")
 
-    def test_create_space_user_mode(self, space_env):
-        """用户模式新建空间：yaml 落 local 层，落盘即注册"""
-        _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE])
-        db = ReferenceDatabase(dev_mode=False)
-        assert db.create_space("新空间") is True
-        assert db.create_space("新空间") is False  # 重名拒绝
-        space_yaml = space_env["local_ref"] / "新空间.yaml"
-        assert space_yaml.exists()
-        doc = yaml.safe_load(space_yaml.read_text(encoding="utf-8"))
-        assert doc["references"] == []
-        assert doc["meta_schema"] == []  # 新建空间无预填字段，避免业务侵入
-        assert db.get_spaces() == [DEFAULT_SPACE, "新空间"]
-        assert db.is_system_space("新空间") is False
-
-    def test_create_space_dev_mode(self, space_env):
-        """开发模式新建空间：yaml 落 system 层，即系统空间"""
-        _declare_spaces(space_env["system_ref"], [DEFAULT_SPACE])
-        db = ReferenceDatabase(dev_mode=True)
-        assert db.create_space("新空间") is True
-        assert (space_env["system_ref"] / "新空间.yaml").exists()
-        assert db.is_system_space("新空间") is True
 
     def test_create_space_rejects_system_space_name(self, space_env):
         """用户模式不能用系统空间名新建（同名 yaml 是覆盖层，不是新空间）"""

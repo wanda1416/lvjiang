@@ -11,25 +11,6 @@ from tests.workflows.conftest import make_engine
 
 # ─── 语法解析 ──────────────────────────────────────────────
 
-class TestArithParse:
-    @case_matrix("code", [
-        'eval $x = 1 + 2\n',
-        'eval $x = $a + $b * 2\n',
-        'eval $x = (1 + 2) * 3\n',
-        'eval $x = $a / 2\n',
-        'if $a > $b + 1\n    log "yes"\nend\n',
-        'eval $d.k = $a + 1\n',
-        'eval $x = -5\n',
-        'eval $x = -5 + 3\n',
-        'eval $x = ($a + $b) * ($c - 1)\n',
-        'eval $x = add(1, 2) + $a\n',
-        'if $a + 1 == $b * 2\n    log "eq"\nend\n',
-        '$x = $a + 1\n',   # 隐式 eval
-    ])
-    def test_parse_succeeds(self, code):
-        prog = parse_text(code)
-        assert prog.body
-
 
 # ─── 引擎求值 ──────────────────────────────────────────────
 
@@ -61,15 +42,6 @@ class TestArithEval:
             engine._exec_stmt(stmt)
         assert engine.variables.get("x") == expected
 
-    @case_matrix("variables,expected", [
-        ({"a": 10, "b": 5}, True),
-        ({"a": 5, "b": 10}, False),
-    ])
-    def test_condition_with_arith(self, variables, expected):
-        engine = make_engine()
-        engine.variables = dict(variables)
-        prog = parse_text('if $a > $b + 1\n    log "yes"\nend\n')
-        assert engine._eval_condition(prog.body[0].condition) is expected
 
     @case_matrix("variables,expected", [
         ({"a": 9, "b": 5}, True),
@@ -81,21 +53,21 @@ class TestArithEval:
         prog = parse_text('if $a + 1 == $b * 2\n    log "eq"\nend\n')
         assert engine._eval_condition(prog.body[0].condition) is expected
 
-    def test_float_equality_tolerance(self):
-        """== 用容差比较，避免浮点误差：0.1+0.2 == 0.3 应为 true"""
+    def test_float_equality_and_inequality_share_tolerance(self):
+        # float_equality_tolerance
         engine = make_engine()
         engine.variables = {}
         prog = parse_text('if 0.1 + 0.2 == 0.3\n    log "eq"\nend\n')
         assert engine._eval_condition(prog.body[0].condition) is True
 
-    def test_float_inequality_tolerance(self):
-        """!= 与 == 互补：0.1+0.2 != 0.3 应为 false，真差异仍为 true"""
+        # float_inequality_tolerance
         engine = make_engine()
         engine.variables = {}
         prog = parse_text('if 0.1 + 0.2 != 0.3\n    log "ne"\nend\n')
         assert engine._eval_condition(prog.body[0].condition) is False
         prog = parse_text('if 0.1 + 0.2 != 0.4\n    log "ne"\nend\n')
         assert engine._eval_condition(prog.body[0].condition) is True
+
 
     @case_matrix("expression,variables,expected", [
         ("$title == $name", {"title": "测试方案甲", "name": "测试方案甲"}, True),

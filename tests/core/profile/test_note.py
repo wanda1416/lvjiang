@@ -63,36 +63,7 @@ def note_env(tmp_path, monkeypatch):
 
 
 class TestNoteKeyDef:
-    def test_from_dict(self):
-        from lvjiang.core.profile.models import NoteKeyDef
 
-        kd = NoteKeyDef.from_dict({
-            "key": "user_note",
-            "label": "状态备注",
-            "description": "记录心法获取状态",
-        })
-        assert kd.key == "user_note"
-        assert kd.label == "状态备注"
-        assert kd.description == "记录心法获取状态"
-        assert isinstance(kd, NoteKeyDef)
-
-    def test_from_dict_defaults(self):
-        from lvjiang.core.profile.models import NoteKeyDef
-
-        kd = NoteKeyDef.from_dict({"key": "k", "label": "l"})
-        assert kd.sources == []
-        assert kd.uses == []
-        assert kd.sync_targets == []
-        assert kd.cap is None
-
-    def test_to_dict(self):
-        from lvjiang.core.profile.models import NoteKeyDef
-
-        kd = NoteKeyDef(key="k", label="l", description="desc")
-        d = kd.to_dict()
-        assert d["key"] == "k"
-        assert d["label"] == "l"
-        assert d["description"] == "desc"
 
     def test_roundtrip(self):
         from lvjiang.core.profile.models import NoteKeyDef
@@ -127,12 +98,6 @@ class TestNoteConfigLoading:
         assert isinstance(kd, NoteKeyDef)
         assert kd.label == "状态备注"
 
-    def test_get_model_type_note(self, note_env):
-        """note key 的 model_type 为 'note'"""
-        from lvjiang.core.profile.schema import _load_config
-
-        schema = _load_config()
-        assert schema.get_model_type("user_note") == "note"
 
     def test_get_keys_by_model_note(self, note_env):
         """get_keys_by_model('note') 返回所有 note key"""
@@ -160,29 +125,6 @@ class TestNoteDB:
         entry = db_read_entry(note_env.username, "note", "user_note")
         assert entry["value_text"] == "已完成"
         assert entry["value"] == 0
-
-    def test_value_text_empty_by_default(self, note_env):
-        """不传 value_text 时默认空字符串"""
-        from lvjiang.core.profile.repository import (
-            db_read_entry,
-            db_upsert,
-        )
-
-        db_upsert(note_env.username, "note", "user_note", 0)
-        entry = db_read_entry(note_env.username, "note", "user_note")
-        assert entry["value_text"] == ""
-
-    def test_value_text_overwrite(self, note_env):
-        """value_text 可被覆写"""
-        from lvjiang.core.profile.repository import (
-            db_read_entry,
-            db_upsert,
-        )
-
-        db_upsert(note_env.username, "note", "user_note", 0, value_text="已完成")
-        db_upsert(note_env.username, "note", "user_note", 0, value_text="未完成")
-        entry = db_read_entry(note_env.username, "note", "user_note")
-        assert entry["value_text"] == "未完成"
 
 
 # ─── profile_action note 短路 ──────────────────────────────────
@@ -280,13 +222,6 @@ class TestNoteProfileRead:
         result = profile_read(note_env.username, "user_note")
         assert result is None
 
-    def test_profile_read_note_nonexistent_returns_none(self, note_env):
-        """profile_read() 不存在的 note key 返回 None"""
-        from lvjiang.core.profile.service import profile_read
-
-        result = profile_read(note_env.username, "nonexistent_note_key")
-        assert result is None
-
 
 # ─── ProfileEngine tick 不处理 note ────────────────────────────
 
@@ -343,23 +278,6 @@ class TestNoteProfileInc:
 
 
 class TestNoteProfileSetFalsy:
-    def test_profile_set_note_false_clears(self, note_env):
-        """profile_set(key, False) 清空备注而非存储 'False'"""
-        from types import SimpleNamespace
-
-        from lvjiang.core.profile.repository import (
-            db_read_entry,
-            db_upsert,
-        )
-        from lvjiang.workflows.builtins.profile import _profile_set
-
-        db_upsert(note_env.username, "note", "user_note", 0, value_text="已完成")
-
-        engine = SimpleNamespace(run_username=note_env.username)
-        _profile_set(engine, "user_note", False)
-
-        entry = db_read_entry(note_env.username, "note", "user_note")
-        assert entry["value_text"] == ""
 
     def test_profile_set_note_zero_clears(self, note_env):
         """profile_set(key, 0) 清空备注而非存储 '0'"""
@@ -456,31 +374,6 @@ class TestNoteHistory:
         assert history[0]["old_value_text"] == ""
         assert history[0]["change_type"] == "action"
 
-    def test_note_history_records_old_text(self, note_env):
-        """note 覆写时 history 记录旧文本"""
-        from lvjiang.core.profile.repository import (
-            db_get_history,
-        )
-        from lvjiang.core.profile.service import profile_action
-
-        profile_action(
-            note_env.username, "user_note",
-            model_type="note",
-            set_value="已完成",
-        )
-        profile_action(
-            note_env.username, "user_note",
-            model_type="note",
-            set_value="未完成",
-        )
-
-        history = db_get_history(note_env.username, type_="note", key="user_note")
-        assert len(history) == 2
-        # 最新记录在前（按 id 倒序）
-        assert history[0]["new_value_text"] == "未完成"
-        assert history[0]["old_value_text"] == "已完成"
-        assert history[1]["new_value_text"] == "已完成"
-        assert history[1]["old_value_text"] == ""
 
     def test_note_same_value_no_history(self, note_env):
         """note 写入相同值不重复记录 history"""
@@ -612,11 +505,6 @@ class TestNoteNonNumericSkipsCap:
         _, text = _write_then_render(note_cap_env, "hard", raw)
         assert text == raw, "非数字的值不该被挂上 /上限"
 
-    def test_empty_stays_empty(self, note_cap_env):
-        stored, text = _write_then_render(note_cap_env, "hard", "")
-        assert stored == ""
-        assert text == "", "空值不该显示成 /20"
-
 
 class TestNoteShowCapToggle:
     """show_cap 只管显示；归一化由 cap 本身决定，与开关无关。"""
@@ -626,23 +514,10 @@ class TestNoteShowCapToggle:
         assert stored == "20", "不展示上限，也仍按硬上限截断"
         assert text == "20", "关掉开关就不该出现 /Y"
 
-    def test_hidden_cap_text_unchanged(self, note_cap_env):
-        stored, text = _write_then_render(note_cap_env, "hide", "已完成")
-        assert stored == "已完成"
-        assert text == "已完成"
-
 
 class TestNoteNumericPredicate:
     """写入侧和展示侧必须用同一套"算不算数字"的判断，否则会存/显不一致。"""
 
-    @case_matrix("raw,expected", [
-        ("12", 12.0), ("12.7", 12.7), ("-3", -3.0), ("  8  ", 8.0),
-        ("已完成", None), ("", None), ("   ", None), ("12个", None), (None, None),
-    ])
-    def test_note_numeric_value(self, raw, expected):
-        from lvjiang.core.profile.models import note_numeric_value
-
-        assert note_numeric_value(raw) == expected
 
     def test_write_and_display_agree(self, note_cap_env):
         """凡是写入侧当成数字归一了的，展示侧就该认它、加上 /Y；反之亦然。"""

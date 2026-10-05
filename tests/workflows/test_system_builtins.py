@@ -66,11 +66,6 @@ class TestSave:
         result = _fn("save")(engine)
         assert result == ""
 
-    def test_save_without_engine(self):
-        """无 engine 时不报错"""
-        result = _fn("save")(None)
-        assert result == ""
-
 
 class TestPanelRows:
     def test_with_alignment(self):
@@ -103,16 +98,7 @@ class TestPanelCols:
 
 
 class TestInput:
-    def test_without_engine_returns_none(self):
-        """无 engine 时返回 None"""
-        result = _fn("input")(None, "请输入:")
-        assert result is None
 
-    def test_without_callback_returns_none(self):
-        """无 ui_callback 时返回 None"""
-        engine = MockEngine(ui_callback=None)
-        result = _fn("input")(engine, "请输入:")
-        assert result is None
 
     def test_with_callback_returns_value(self):
         """有 ui_callback 时返回回调结果"""

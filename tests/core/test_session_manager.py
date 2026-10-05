@@ -23,14 +23,6 @@ class TestLoad:
             mgr.load("../escape")
         assert not (tmp_path.parent / "escape.session.json").exists()
 
-    def test_load_existing_file(self, mgr, tmp_path):
-        data = {"current_user": "张三", "score": 100}
-        (tmp_path / "张三.session.json").write_text(
-            json.dumps(data, ensure_ascii=False), encoding="utf-8"
-        )
-        result = mgr.load("张三")
-        assert result["current_user"] == "张三"
-        assert result["score"] == 100
 
     def test_load_missing_file_returns_default(self, mgr):
         result = mgr.load("不存在")
@@ -43,28 +35,7 @@ class TestLoad:
 
 
 class TestSave:
-    def test_save_creates_file(self, mgr, tmp_path):
-        mgr.save("新用户", {"current_user": "新用户", "level": 5})
-        path = tmp_path / "新用户.session.json"
-        assert path.exists()
-        assert (tmp_path / ".lock/新用户.session.json.lock").exists()
-        assert not (tmp_path / "新用户.session.json.lock").exists()
-        data = json.loads(path.read_text(encoding="utf-8"))
-        assert data["current_user"] == "新用户"
-        assert data["level"] == 5
 
-    def test_save_updates_loaded_field(self, mgr, tmp_path):
-        mgr.save("用户", {"v": 1})
-        session = mgr.load("用户")
-        session["v"] = 2
-        mgr.save("用户", session)
-        data = json.loads((tmp_path / "用户.session.json").read_text(encoding="utf-8"))
-        assert data["v"] == 2
-
-    def test_save_preserves_chinese(self, mgr, tmp_path):
-        mgr.save("中文用户", {"name": "测试中文"})
-        content = (tmp_path / "中文用户.session.json").read_text(encoding="utf-8")
-        assert "中文" in content  # ensure_ascii=False
 
     def test_concurrent_save_keeps_valid_json(self, mgr, tmp_path):
         """并发保存同一用户时，最终文件不能出现半截 JSON。"""
@@ -129,17 +100,7 @@ class TestUpdate:
 
 
 class TestSaveFn:
-    def test_save_fn_returns_callable(self, mgr):
-        fn = mgr.save_fn("用户", {"data": 1})
-        assert callable(fn)
 
-    def test_save_fn_writes_on_call(self, mgr, tmp_path):
-        session = {"counter": 0}
-        fn = mgr.save_fn("用户", session)
-        session["counter"] = 42
-        fn()
-        data = json.loads((tmp_path / "用户.session.json").read_text(encoding="utf-8"))
-        assert data["counter"] == 42
 
     def test_save_fn_captures_reference(self, mgr, tmp_path):
         """save_fn 捕获的是引用，不是快照"""

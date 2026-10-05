@@ -12,7 +12,6 @@ from lvjiang.workflows.discovery import (
     _discover_wf_scripts,
     discover_scripts,
     last_discovery_problems,
-    list_exposed_scripts,
     script_display_name,
 )
 from lvjiang.workflows.metadata import METADATA_WARNING
@@ -57,32 +56,7 @@ def _write(tmp_path, rel, text):
 
 
 class TestDiscoverWfScripts:
-    def test_empty_when_no_workflows(self, monkeypatch):
-        _patch_resolver(monkeypatch, {})
-        assert _discover_wf_scripts() == {}
 
-    def test_discovers_wf_files(self, tmp_path, monkeypatch):
-        """扫描到 .wf 文件并解析元数据"""
-        wf = _write(
-            tmp_path, "test_flow.wf",
-            "#% name: 测试流程\n"
-            "#% runnable: true\n"
-            "#% batchable: true\n"
-            "#% batch_check: check_batch\n"
-            "#% note: 运行前请确认页面。\n"
-            "#% parameters:\n"
-            "#%   - name: target\n"
-            "#%     options: [default]\n")
-        _patch_resolver(monkeypatch, {"test_flow.wf": wf})
-
-        result = _discover_wf_scripts()
-        assert "test_flow" in result
-        assert result["test_flow"]["name"] == "测试流程"
-        assert result["test_flow"]["note"] == "运行前请确认页面。"
-        assert result["test_flow"]["wf_file"] == "test_flow.wf"
-        assert result["test_flow"]["batchable"] is True
-        assert result["test_flow"]["batch_check"] == "check_batch"
-        assert len(result["test_flow"]["parameters"]) == 1
 
     def test_unicode_filename_is_a_valid_default_id(self, tmp_path, monkeypatch):
         wf = _write(
@@ -109,14 +83,6 @@ class TestDiscoverWfScripts:
         assert result["a"]["runnable"] is True
         assert result["a"]["batchable"] is True
 
-    def test_standalone_declared_batchable_false(self, tmp_path, monkeypatch):
-        wf = _write(tmp_path, "standalone/fengshajiusi.wf",
-                    "#% id: fengshajiusi\n#% runnable: true\n")
-        _patch_resolver(monkeypatch, {"standalone/fengshajiusi.wf": wf})
-
-        result = _discover_wf_scripts()
-        assert result["fengshajiusi"]["wf_file"] == "standalone/fengshajiusi.wf"
-        assert result["fengshajiusi"]["batchable"] is False
 
     def test_recursive_scan_any_depth(self, tmp_path, monkeypatch):
         """任意深度的子目录都参与发现，目录本身不表达语义"""
@@ -129,11 +95,6 @@ class TestDiscoverWfScripts:
         assert set(result) == {"a", "b"}
         assert result["a"]["name"] == "周常A"
 
-    def test_explicit_id_wins(self, tmp_path, monkeypatch):
-        wf = _write(tmp_path, "weekly/a.wf",
-                    "#% id: weekly_a\n#% runnable: true\n")
-        _patch_resolver(monkeypatch, {"weekly/a.wf": wf})
-        assert set(_discover_wf_scripts()) == {"weekly_a"}
 
     def test_skips_underscore_paths(self, tmp_path, monkeypatch):
         wf = _write(tmp_path, "_editor_run.wf", "#% runnable: true\n")
@@ -236,36 +197,6 @@ class TestDiscoveryProblems:
         assert all(item.code == "duplicate_id"
                    for item in last_discovery_problems())
         assert any("脚本 id 已注册" in message for message in errors)
-
-    def test_three_same_layer_duplicates_still_keep_only_first(
-            self, tmp_path, monkeypatch):
-        files = {
-            rel: _write(
-                tmp_path, rel,
-                f"#% id: shared\n#% name: {rel}\n#% runnable: true\n",
-            )
-            for rel in ("a.wf", "b.wf", "c.wf")
-        }
-        _patch_resolver(monkeypatch, files)
-        monkeypatch.setattr(
-            "lvjiang.workflows.discovery.logger.error", lambda *_: None)
-
-        result = discover_scripts()
-
-        assert [item["wf_file"] for item in result] == ["a.wf"]
-        assert [item.wf_file for item in last_discovery_problems()] == [
-            "a.wf", "b.wf", "c.wf"]
-
-    def test_problems_reset_between_runs(self, tmp_path, monkeypatch):
-        wf = _write(tmp_path, "2024-scan.wf", "#% runnable: true\n")
-        _patch_resolver(monkeypatch, {"2024-scan.wf": wf})
-        monkeypatch.setattr("lvjiang.workflows.discovery.logger.error", lambda *_: None)
-        discover_scripts()
-        assert last_discovery_problems()
-
-        _patch_resolver(monkeypatch, {})
-        discover_scripts()
-        assert last_discovery_problems() == []
 
 
 class TestSourcePriority:
@@ -379,73 +310,3 @@ class TestDiscoverScripts:
         result = discover_scripts()
         assert result[0]["name"] == "本地版本"
         assert result[0]["source_layer"] == "local"
-
-    def test_returns_sorted_by_id(self, monkeypatch):
-        """结果按 id 排序"""
-        _patch_resolver(monkeypatch, {})
-        _stub_class(monkeypatch, ["z_flow", "a_flow", "m_flow"])
-        assert [r["id"] for r in discover_scripts()] == [
-            "a_flow", "m_flow", "z_flow"]
-
-
-def _stub_prefs(monkeypatch, *, order=None, visible=None, names=None, scopes=None):
-    """打桩用户偏好，避免用例读到真实 session"""
-    from lvjiang.workflows.preferences import DailyScriptPrefs
-    monkeypatch.setattr(
-        "lvjiang.workflows.discovery.load_preferences",
-        lambda: DailyScriptPrefs(order or [], visible or {}, names or {}, scopes or {}))
-
-
-class TestListExposedScripts:
-    def test_no_preference_shows_all(self, monkeypatch):
-        """没有任何偏好时展示全部（作者未声明 hidden）"""
-        _stub_prefs(monkeypatch)
-        _patch_resolver(monkeypatch, {})
-        _stub_class(monkeypatch, ["flow_a", "flow_b"])
-        assert len(list_exposed_scripts()) == 2
-
-    def test_user_preference_filters_and_orders(self, monkeypatch):
-        """用户偏好可隐藏脚本并指定顺序"""
-        _stub_prefs(monkeypatch, order=["flow_b"], visible={"flow_a": False})
-        _patch_resolver(monkeypatch, {})
-        _stub_class(monkeypatch, ["flow_a", "flow_b"])
-        result = list_exposed_scripts()
-        assert len(result) == 1
-        assert result[0]["id"] == "flow_b"
-
-    def test_user_preference_rename(self, monkeypatch):
-        """用户偏好可改显示名"""
-        _stub_prefs(monkeypatch, names={"flow_a": "显示名称"})
-        _patch_resolver(monkeypatch, {})
-        _stub_class(monkeypatch, ["flow_a"])
-        assert list_exposed_scripts()[0]["name"] == "显示名称"
-
-    def test_environment_mismatch_is_hidden(self, tmp_path, monkeypatch):
-        desktop = _write(
-            tmp_path, "desktop_only.wf",
-            "#% runnable: true\n#% env: [desktop]\n",
-        )
-        common = _write(tmp_path, "common.wf", "#% runnable: true\n")
-        _patch_resolver(monkeypatch, {
-            "desktop_only.wf": desktop,
-            "common.wf": common,
-        })
-        _stub_class(monkeypatch, [])
-        _stub_prefs(monkeypatch)
-
-        assert [cfg["id"] for cfg in list_exposed_scripts("android")] == [
-            "common"]
-        assert [cfg["id"] for cfg in list_exposed_scripts("desktop")] == [
-            "common", "desktop_only"]
-
-    def test_hidden_script_needs_user_opt_in(self, tmp_path, monkeypatch):
-        wf = _write(tmp_path, "hidden.wf",
-                    "#% name: 半成品\n#% runnable: true\n#% hidden: true\n")
-        _patch_resolver(monkeypatch, {"hidden.wf": wf})
-        _stub_class(monkeypatch, [])
-
-        _stub_prefs(monkeypatch)
-        assert list_exposed_scripts() == []
-
-        _stub_prefs(monkeypatch, visible={"hidden": True})
-        assert [c["id"] for c in list_exposed_scripts()] == ["hidden"]

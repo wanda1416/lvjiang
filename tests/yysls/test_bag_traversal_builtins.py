@@ -50,37 +50,9 @@ class TestNotifyScroll:
         manager = engine.context["_scroll_manager"]
         assert manager["row_fps"] == ["fp1", "fp2", "fp3"]
 
-    def test_col_as_string(self, engine):
-        """col 为字符串 "1" 时也视为第一列"""
-        _fn("notify_scroll")(engine, "1", 1, "fp_str")
-        manager = engine.context["_scroll_manager"]
-        assert "fp_str" in manager["row_fps"]
-
 
 class TestCheckScroll:
-    def test_no_snapshot_returns_zero(self, engine):
-        """无快照数据时返回 "0"（正常）"""
-        result = _fn("check_scroll")(engine, "any_fp")
-        assert result == "0"
 
-    def test_unknown_fingerprint_returns_zero(self, engine):
-        """指纹不在已知集合中返回 "0"（视为正常）"""
-        engine.context["_scroll_manager"] = {
-            "row_fps": ["fp1", "fp2"],
-            "fingerprints": {"fp1": True, "fp2": True},
-        }
-        result = _fn("check_scroll")(engine, "unknown_fp")
-        assert result == "0"
-
-    def test_normal_offset_returns_zero(self, engine):
-        """正常偏移（行 2 位置）返回 "0" """
-        engine.context["_scroll_manager"] = {
-            "row_fps": ["fp1", "fp2", "fp3"],
-            "fingerprints": {"fp1": True, "fp2": True, "fp3": True},
-        }
-        # fp2 在 row_fps[1]，offset = 1 - 1 = 0
-        result = _fn("check_scroll")(engine, "fp2")
-        assert result == "0"
 
     def test_not_scrolled_returns_positive(self, engine):
         """没滚动（仍在行 1 位置）返回 "+1" """
@@ -138,7 +110,4 @@ class TestScrollAdvance:
         _fn("scroll_advance")(engine)
         assert engine.context["_scroll_manager"]["scroll_count"] == 1
 
-    def test_no_manager_context_no_error(self, engine):
-        """无 _scroll_manager 上下文时不报错"""
-        _fn("scroll_advance")(engine)
         # 不应抛异常

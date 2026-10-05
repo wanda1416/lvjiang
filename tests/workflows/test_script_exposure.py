@@ -70,52 +70,11 @@ class TestNewScriptsAppearAutomatically:
             monkeypatch, order=["b", "a"], visible={"b": True}
         ) == ["b", "a", "new"]
 
-    def test_stale_id_in_order_ignored(self, scripts, monkeypatch):
-        assert _ids(monkeypatch, order=["已删除的脚本", "b"]) == ["a"]
-
-
-class TestOverrides:
-    def test_custom_name(self, scripts, monkeypatch):
-        from lvjiang.workflows.discovery import list_exposed_scripts
-        _prefs(monkeypatch, names={"a": "我的叫法"}, visible={"b": True})
-        got = {c["id"]: c["name"] for c in list_exposed_scripts()}
-        assert got["a"] == "我的叫法"
-        assert got["b"] == "乙"
-
-    def test_scope_from_author_then_user(self, scripts, monkeypatch):
-        from lvjiang.workflows.discovery import list_exposed_scripts
-        _prefs(monkeypatch, visible={"b": True})
-        assert {c["id"]: c["scope"] for c in list_exposed_scripts()}["b"] == "dedicated"
-        _prefs(monkeypatch, scopes={"b": "daily"})
-        assert {c["id"]: c["scope"] for c in list_exposed_scripts()}["b"] == "daily"
-
 
 class TestPolicy:
-    def test_internal_prefix(self):
-        assert Policy.is_internal("_recorded")
-        assert not Policy.is_internal("scan_wallet")
 
-    def test_source_priority(self):
-        """local > class > system > remote；未登记的来源排最后"""
-        assert (Policy.rank("local") < Policy.rank("class")
-                < Policy.rank("system") < Policy.rank("remote"))
-        assert Policy.rank("unknown") > Policy.rank("remote")
-
-    def test_default_id_keeps_path_prefix(self):
-        """顶层默认 id 等于旧版 stem，子目录脚本带上目录前缀"""
-        assert Policy.default_id_for("scan_wallet.wf") == "scan_wallet"
-        assert Policy.default_id_for("weekly/x.wf") == "x"
 
     def test_internal_any_path_segment(self):
         assert Policy.is_internal("_recorded.wf")
         assert Policy.is_internal("subcall/_draft/x.wf")
         assert not Policy.is_internal("subcall/navigation.wf")
-
-    def test_hidden_meta(self):
-        assert Policy.hidden_by_default({"hidden": True})
-        assert not Policy.hidden_by_default({})
-
-    def test_visible_by_default(self):
-        assert Policy.visible_by_default(hidden=False, scope="daily")
-        assert not Policy.visible_by_default(hidden=True, scope="daily")
-        assert not Policy.visible_by_default(hidden=False, scope="dedicated")

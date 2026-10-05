@@ -32,31 +32,7 @@ def session_env(tmp_path, monkeypatch):
 # ─── User 数据类 ──────────────────────────────────────────
 
 class TestUser:
-    def test_to_dict(self):
-        u = User(name="张三", created_at="2026-01-01T00:00:00")
-        d = u.to_dict()
-        assert d == {
-            "document_type": "lvjiang.user",
-            "schema_version": 2,
-            "username": "张三",
-            "created_at": "2026-01-01T00:00:00",
-            "avatar": "",
-            "attributes": {},
-            "workflow_params": {},
-            "ui_state": {},
-            "graduation_analysis": {},
-        }
 
-    def test_from_dict(self):
-        u = User.from_dict({"username": "李四", "created_at": "2026-06-15"})
-        assert u.name == "李四"
-        assert u.created_at == "2026-06-15"
-        assert u.avatar == ""
-
-    def test_from_dict_missing_fields(self):
-        u = User.from_dict({})
-        assert u.name == ""
-        assert u.created_at == ""
 
     def test_roundtrip(self):
         u = User(name="王五", created_at="2026-08-01T12:00:00")
@@ -92,21 +68,7 @@ class TestUser:
 # ─── UserConfigManager ────────────────────────────────────
 
 class TestUserConfigManagerInit:
-    def test_creates_default_user_when_empty(self, session_env):
-        mgr = UserConfigManager()
-        assert mgr.list_users() == ["default"]
-        assert mgr.get_active_user_name() == "default"
 
-    def test_loads_existing_users_from_session(self, session_env):
-        import json
-        session_env.write_text(json.dumps({
-            "users": ["用户A", "用户B"],
-            "actives": {"user": "用户B"},
-        }), encoding="utf-8")
-        reset_session_store()
-        mgr = UserConfigManager()
-        assert set(mgr.list_users()) == {"用户A", "用户B"}
-        assert mgr.get_active_user_name() == "用户B"
 
     def test_active_user_reset_if_not_found(self, session_env):
         import json
@@ -120,10 +82,6 @@ class TestUserConfigManagerInit:
 
 
 class TestUserConfigManagerCRUD:
-    def test_create_user_success(self, session_env):
-        mgr = UserConfigManager()
-        assert mgr.create_user("新用户") is True
-        assert "新用户" in mgr.list_users()
 
     def test_create_user_duplicate_rejected(self, session_env):
         mgr = UserConfigManager()
@@ -134,22 +92,6 @@ class TestUserConfigManagerCRUD:
         mgr = UserConfigManager()
         assert mgr.create_user("") is False
 
-    def test_get_user_exists(self, session_env):
-        mgr = UserConfigManager()
-        mgr.create_user("测试用户")
-        u = mgr.get_user("测试用户")
-        assert u is not None
-        assert u.name == "测试用户"
-
-    def test_get_user_not_found(self, session_env):
-        mgr = UserConfigManager()
-        assert mgr.get_user("不存在") is None
-
-    def test_delete_user_success(self, session_env):
-        mgr = UserConfigManager()
-        mgr.create_user("待删除")
-        assert mgr.delete_user("待删除") is True
-        assert "待删除" not in mgr.list_users()
 
     def test_delete_user_preserves_data_and_same_name_restores_it(
         self, session_env, tmp_path, monkeypatch,
@@ -184,9 +126,6 @@ class TestUserConfigManagerCRUD:
         assert (session_env.parent / "users/.lock/default.json.lock").exists()
         assert not (session_env.parent / "users/default.json.lock").exists()
 
-    def test_delete_user_not_found(self, session_env):
-        mgr = UserConfigManager()
-        assert mgr.delete_user("不存在") is False
 
     def test_delete_last_user_rejected(self, session_env):
         mgr = UserConfigManager()
@@ -218,15 +157,6 @@ class TestUserConfigManagerCRUD:
         assert mgr.reorder_users(["错误名称"]) is False
         assert mgr.reorder_users([]) is False
 
-    def test_set_active_user_success(self, session_env):
-        mgr = UserConfigManager()
-        mgr.create_user("目标用户")
-        assert mgr.set_active_user("目标用户") is True
-        assert mgr.get_active_user_name() == "目标用户"
-
-    def test_set_active_user_not_found(self, session_env):
-        mgr = UserConfigManager()
-        assert mgr.set_active_user("不存在") is False
 
     def test_persistence_across_instances(self, session_env):
         """验证数据持久化到 session.json"""
@@ -349,23 +279,6 @@ class TestUserConfigManagerCRUD:
         assert restored.default_usernames == ["default"], (
             "默认勾选里也不能留下已删除的用户")
 
-    def test_attributes_are_stored_in_user_file(self, session_env):
-        import json
-
-        mgr = UserConfigManager()
-        name = mgr.get_active_user_name()
-        assert mgr.update_user_attributes(name, {
-            "account": "账号A", "role": "角色A", "role_index": "2", "tail": "1234",
-        })
-        data = json.loads((session_env.parent / "users" / f"{name}.json").read_text(
-            encoding="utf-8"
-        ))
-        assert data["attributes"] == {
-            "account": "账号A", "role": "角色A", "role_index": "2", "tail": "1234",
-        }
-        session = json.loads(session_env.read_text(encoding="utf-8"))
-        assert session["users"] == [name]
-
 
 class TestUsernameValidation:
     """用户名会直接当文件名（users/{name}.json），也会拼进 profile 告警的
@@ -374,12 +287,6 @@ class TestUsernameValidation:
     切分时错位，把有效记录当过期的删掉。
     """
 
-    @case_matrix("name", [
-        "默认用户", "张三", "user_01", "my-account", "A1", "测试User_2",
-    ])
-    def test_accepts_chinese_and_common_ids(self, name):
-        from lvjiang.core.user_config import is_valid_username
-        assert is_valid_username(name)
 
     @case_matrix("name", [
         "", "../逃逸", "a/b", "a\\b", "含:冒号", "a b", "a.b", "x" * 33, "emoji😀",

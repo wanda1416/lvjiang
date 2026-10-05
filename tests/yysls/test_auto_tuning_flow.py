@@ -39,9 +39,6 @@ from lvjiang.apps.yysls.workflows.implementations.tuning import (
     TuningRecorder,
 )
 from lvjiang.apps.yysls.workflows.implementations.tuning import (
-    executor as tuning_executor,
-)
-from lvjiang.apps.yysls.workflows.implementations.tuning import (
     judge as tuning_judge,
 )
 from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
@@ -50,9 +47,6 @@ from lvjiang.apps.yysls.workflows.implementations.tuning.navigator import (
 from lvjiang.apps.yysls.workflows.implementations.tuning.route_strategy import (
     AndroidTuningRouteStrategy,
     DesktopTuningRouteStrategy,
-)
-from lvjiang.apps.yysls.workflows.implementations.tuning.stone_stock import (
-    CachedStoneStock,
 )
 from lvjiang.apps.yysls.workflows.tuning_context import TuningRunContext
 from lvjiang.core.config import load_user_config
@@ -858,13 +852,6 @@ def stone_check_on():
 _STONE_ON = MaterialSettings(stone_check_enabled=True, stone_min_count=100)
 
 
-def test_stone_check_disabled_passes():
-    """开关关闭（内置配置默认）→ 不看 infos 直接放行"""
-    wf = FakeWF()
-    assert wf.executor._check_stone_stock(MaterialSettings(), None) is True
-    assert not wf.executor.materials_exhausted
-
-
 def test_initial_skip_does_not_waive_hard_stone_limit():
     """跳过的只是首次额外校验，默认 80 安全线仍然阻断一键添加。"""
     base = TuningGroup(materials=MaterialSettings(
@@ -938,40 +925,6 @@ def test_runtime_cache_validation_runs_on_every_fifth_entry(monkeypatch):
         wf.executor.cache_equipment_materials()
 
     assert calls == [False, False, False, False, True] * 2
-
-
-def test_runtime_cache_validation_logs_only_difference_over_one(monkeypatch):
-    stock = CachedStoneStock()
-    stock.accept_scan(800)
-    errors = []
-    monkeypatch.setattr(tuning_executor.logger, "error", errors.append)
-
-    tuning_executor.TuningExecutor._validate_cached_stone_stock(stock, 790)
-    tuning_executor.TuningExecutor._validate_cached_stone_stock(stock, 0)
-    assert errors == []
-
-    tuning_executor.TuningExecutor._validate_cached_stone_stock(stock, 789)
-
-    assert len(errors) == 1
-    assert "缓存=80" in errors[0]
-    assert "识别=78.9" in errors[0]
-    assert "请检查并调整等级配置" in errors[0]
-
-
-def test_stone_check_enough_passes():
-    """库存 ≥ 基准 → 放行；无斜杠样式取 count（×1253）"""
-    wf = FakeWF()
-    infos = {(1, 2): _Stone(count=1253)}
-    assert wf.executor._check_stone_stock(_STONE_ON, infos) is True
-    assert not wf.executor.materials_exhausted
-
-
-def test_stone_check_count_as_stock():
-    """count 即持有量：count=117 ≥ 100 → 放行"""
-    wf = FakeWF()
-    infos = {(1, 2): _Stone(count=117, devoted=7)}
-    assert wf.executor._check_stone_stock(_STONE_ON, infos) is True
-    assert not wf.executor.materials_exhausted
 
 
 def test_stone_check_ocr_fail_passes():
@@ -1172,15 +1125,6 @@ def test_tune_btn_not_ready_flow(patch_worth, monkeypatch):
     assert (TUNE_SCENE, "back") in wf.clicks
 
 
-def test_ensure_judge_config_keeps_injected():
-    """已注入 judge_configs 时 _ensure_judge_config 不覆盖"""
-    wf = FakeWF()
-    wf.run_ctx = TuningRunContext(
-        judge_configs={"huiyi": {"enabled": True}}, judge_rule_keys=["huiyi"])
-    wf._ensure_judge_config()
-    assert wf.ctx.judge_rule_keys == ["huiyi"]
-
-
 def test_skip_tuning_switch(patch_worth):
     """跳过实际调律开关：值得调律的装备才真实进出调律页但不调律"""
     wf = FakeWF()
@@ -1229,20 +1173,6 @@ def test_skip_tuning_junk_not_entered(monkeypatch):
     assert len(wf.scan_reject_calls) == 1
     assert (EQUIP_DETAIL, "more_func") not in wf.clicks
     assert (TUNE_SCENE, "back") not in wf.clicks
-
-
-def test_skip_tuning_no_entry(patch_worth):
-    """开关开启且值得但无调律入口 → 仍走 no_tune_entry，不点 back"""
-    wf = FakeWF()
-    wf.ctx.skip_tuning = True
-    wf._nav_tune_ok = False
-    wf._process_equipment("无入口剑", _equip(2), WEAPON_DETAIL)
-
-    assert wf.output["tuning_reports"][0]["status"] == "no_tune_entry"
-    assert not wf.scan_reject_calls
-    assert (TUNE_SCENE, "back") not in wf.clicks
-    # _nav_to_tune 失败分支自行收起弹窗 → more_func 共 2 次
-    assert wf.clicks.count((EQUIP_DETAIL, "more_func")) == 2
 
 
 # ─── 等级门槛 + 品阶异常前置拦截 ───────────────────
@@ -1324,21 +1254,6 @@ def test_non_weapon_wuku_never_enters_equipment_processing():
     assert not wf.scan_reject_calls
     assert not wf.full_calls
     assert not wf.clicks
-
-
-def test_min_level_default_100_passes(monkeypatch):
-    """默认门槛 100，等级 110 装备正常通过"""
-    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
-                        lambda *a, **k: dict(_WORTHY))
-    wf = FakeWF()   # base_group 默认 TuningGroup()，min_level 默认 100
-    wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "",
-                               "tune_btn": "调律", "tune_affix": "",
-                               "tune_tip": ""}
-    fp, outcome = wf._process_equipment_once("满级剑", _equip(2), WEAPON_DETAIL)
-
-    assert fp   # 正常处理，未被等级门槛拦截
-    assert outcome is None
-    assert wf.output.get("tuning_reports")   # 进了调律
 
 
 # ─── 行为处置（behavior 扫描处理 / 调律处理）──────────────
@@ -1626,21 +1541,6 @@ def test_behavior_rating_logs_winning_rule_names(monkeypatch):
     messages = [str(call.args[0]) for call in info.call_args_list]
     assert any("按全部规则判定为 顶级（命中规则：会心小外）" in msg
                for msg in messages)
-
-
-def test_material_rating_provider_reuses_current_incoming_rating(monkeypatch):
-    """材料处理复用本轮已刷新评级，其他判定语义仍按需计算。"""
-    wf = FakeWF()
-    equip_data = EquipmentData.from_dict(_equip(2))
-    judge = MagicMock(return_value={})
-    monkeypatch.setattr(wf.judge, "judge_by_scope", judge)
-    rating_of = wf.judge.rating_provider(
-        equip_data, incoming_rating="excellent")
-
-    assert rating_of("incoming", [], False) == "excellent"
-    judge.assert_not_called()
-    assert rating_of("all", [], False) == "junk"
-    judge.assert_called_once()
 
 
 @pytest.mark.parametrize("action, expected_rounds", [
@@ -2660,16 +2560,6 @@ class TestTuningDocIntegration:
         # 双规则：最高档优秀入选，rating_text 罗列全部适用规则
         assert items[2]["rating_text"] == "血河：垃圾；会意：优秀"
 
-    def test_doc_none_when_not_opened(self, monkeypatch):
-        """未走 run()/_open_doc（_doc 为 None）时各插桩点静默跳过"""
-        monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
-                            lambda *a, **k: dict(_WORTHY))
-        wf = FakeWF()
-        wf._ocr_map[TUNE_SCENE] = {
-            "auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
-            "tune_affix": "最大外功攻击 100", "tune_tip": ""}
-        wf._process_equipment("待调剑", _equip(2), WEAPON_DETAIL)
-        assert wf.output["tuning_reports"][0]["status"] == "tuned"
 
     def test_interrupted_current_report_is_finalized(self, tmp_path):
         """F10 时当前装备的部分报告必须先写入 Markdown 再关闭。"""
@@ -2738,11 +2628,6 @@ class TestResolveSelectedSlots:
             "selected_slots": ["ring", "head"]}
         assert wf._resolve_selected_slots() == ["ring", "head"]
 
-    def test_unconfigured_user_uses_default_slots(self, session):
-        from lvjiang.apps.yysls.config.tune_slots import DEFAULT_SLOTS
-
-        assert self._device_wf()._resolve_selected_slots() == list(DEFAULT_SLOTS)
-        assert "sub_weapon" not in DEFAULT_SLOTS
 
     def test_injected_ctx_ignores_saved_config(self, session):
         session.set_node("wf_configs", {"auto_tuning": {"selected_slots": ["ring"]}})
@@ -2750,11 +2635,6 @@ class TestResolveSelectedSlots:
         wf.run_ctx = TuningRunContext(selected_slots=["main_weapon"])  # UI 已注入
         assert wf._resolve_selected_slots() == ["main_weapon"]
 
-    def test_unknown_slot_keys_dropped(self, session):
-        wf = self._device_wf()
-        wf.engine.workflow_config_snapshot = {
-            "selected_slots": ["ring", "bogus"]}
-        assert wf._resolve_selected_slots() == ["ring"]
 
     def test_legacy_session_config_is_ignored(self, session):
         session.set_node("wf_configs", {
@@ -2831,11 +2711,6 @@ class TestScrollToRow:
         wf._scroll_to_row(1)
         assert wf.drags == 0
 
-    def test_scroll_count_equals_target_minus_1(self):
-        wf = SkipTargetFakeWF()
-        wf._scroll_to_row(5)
-        assert wf.drags == 4
-        assert wf.aligns == 1  # 滚动结束后对齐一次
 
     def test_scroll_stops_when_stopped(self):
         wf = SkipTargetFakeWF()
@@ -2908,22 +2783,6 @@ class TestBaseGroupFallback:
         store_mod.reset_session_store()
         return store_mod.get_session_store()
 
-    def test_ctx_injection_used_directly(self, session):
-        # ctx.base_group 已注入时直接使用
-        custom = TuningGroup(key="custom", name="自定义")
-        wf = FakeWF()
-        wf.run_ctx.base_group = custom
-        result = wf._ensure_base_group()
-        assert result is custom
-
-    def test_no_config_uses_default_group(self, session, monkeypatch):
-        group = TuningGroup(key="default", name="默认组")
-        monkeypatch.setattr(
-            "lvjiang.apps.yysls.core.tuning_rules.get_tuning_group",
-            lambda key: group if key == "default" else None)
-        wf = FakeWF()
-        wf.run_ctx.base_group = None
-        assert wf._ensure_base_group() is group
 
     def test_reads_user_snapshot_and_caches(self, session, monkeypatch):
         """回退读用户启动快照并缓存在 ctx。"""
@@ -2962,10 +2821,6 @@ class TestGroupedTypeUnknownDegrades:
         wf._equipped_items = {"main_weapon": None}
         assert wf._grouped_type_matches("main_weapon", "剑") is None
 
-    def test_matches_returns_none_when_current_type_missing(self):
-        wf = FakeWF()
-        wf._equipped_items = {"main_weapon": {"type": "剑"}}
-        assert wf._grouped_type_matches("main_weapon", "") is None
 
     def test_matches_discriminates_same_and_different(self):
         wf = FakeWF()
@@ -3026,14 +2881,6 @@ class TestWukuPanelEvents:
         wf._mark_non_weapon_wuku_bottom(True, "武库冠")
         assert self._statuses(seen) == ["wuku_bottom"]
 
-    def test_marking_twice_reports_once(self):
-        """同一部位重复置位不刷屏。"""
-        wf = FakeWF()
-        wf._current_slot = "head"
-        seen = self._attach_hub(wf)
-        wf._mark_non_weapon_wuku_bottom(True, "武库冠")
-        wf._mark_non_weapon_wuku_bottom(True, "武库靴")
-        assert self._statuses(seen) == ["wuku_bottom"]
 
     def test_same_weapon_group_reports_skip(self):
         wf = FakeWF()

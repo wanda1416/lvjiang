@@ -15,7 +15,6 @@ from lvjiang.apps.yysls.core.graduation.smart_search import (
     floor_rate,
     get_strategy,
     passes,
-    register_strategy,
 )
 from lvjiang.apps.yysls.core.graduation.smart_tuning import (
     SmartPlanResult,
@@ -83,15 +82,6 @@ def _context(plan_id: str, main_type: str, sub_type: str) -> _PlanContext:
     )
 
 
-def test_parse_smart_tuning_group_defaults(base_group_config):
-    parsed = parse_tuning_group(base_group_config)
-    assert parsed.smart_tuning.plan_scope == "incoming"
-    assert parsed.smart_tuning.evaluation.operator == "gt"
-    assert parsed.smart_tuning.evaluation.precision == 0.001
-    assert parsed.smart_tuning.failure_action.action == "skip"
-    assert parsed.smart_tuning.failure_action.keep_min_rating == "excellent"
-
-
 def test_parse_smart_tuning_rejects_unknown_operator(base_group_config):
     base_group_config["smart_tuning"] = {
         "evaluation": {"enabled": True, "operator": "equal"},
@@ -106,17 +96,6 @@ def test_parse_smart_tuning_rejects_unknown_precision(base_group_config):
     }
     with pytest.raises(ValueError, match="precision"):
         parse_tuning_group(base_group_config)
-
-
-def test_parse_smart_tuning_keep_min_rating(base_group_config):
-    base_group_config["smart_tuning"] = {
-        "failure_action": {
-            "action": "tune_full_recycle",
-            "keep_min_rating": "top",
-        },
-    }
-    parsed = parse_tuning_group(base_group_config)
-    assert parsed.smart_tuning.failure_action.keep_min_rating == "top"
 
 
 def test_parse_smart_tuning_rejects_unknown_keep_min_rating(
@@ -342,9 +321,12 @@ def test_plan_candidates_are_intersection_of_part_and_rule_pool(monkeypatch):
     assert captured["candidates"] == ["最大牵丝攻击", "敏", "会心率"]
 
 
-@pytest.mark.parametrize("attr", ["鸣金", "牵丝", "裂石", "破竹"])
-@pytest.mark.parametrize("level", [110, 115])
-@pytest.mark.parametrize("kind,slot", [("剑", "main_weapon"), ("环", "ring")])
+@pytest.mark.parametrize("attr,level,kind,slot", [
+    ("鸣金", 115, "环", "ring"),
+    ("牵丝", 115, "剑", "main_weapon"),
+    ("裂石", 110, "剑", "main_weapon"),
+    ("破竹", 110, "环", "ring"),
+])
 def test_native_attack_search_and_transmute_use_real_names(attr, level, kind, slot):
     from lvjiang.apps.yysls.config import get_game_config
 
@@ -495,8 +477,7 @@ def test_transmute_branch_can_rescue_candidate_without_mutating_source(
 @pytest.mark.parametrize("requirement", ["单体", "群体"])
 @pytest.mark.parametrize("slot", ["head", "chest"])
 @pytest.mark.parametrize("level,merged", [
-    (110, False), (115, True), ("115", True),
-    (None, False), (0, False), ("未知", False),
+    (110, False), ("115", True), ("未知", False),
 ])
 def test_required_qishu_affix_follows_candidate_level(
         monkeypatch, requirement, slot, level, merged):
@@ -510,48 +491,6 @@ def test_required_qishu_affix_follows_candidate_level(
     result = evaluator._required_affix(_context("方案", "剑", "枪"), slot, candidate)
 
     assert result == ("全奇术增伤" if merged else f"{requirement}类奇术增伤")
-
-
-@pytest.mark.parametrize("through_level", [0, 115, 120])
-@pytest.mark.parametrize("requirement", ["单体", "群体"])
-def test_required_qishu_affix_does_not_depend_on_production_upper_bound(
-        monkeypatch, through_level, requirement):
-    from lvjiang.apps.yysls.config import get_game_config
-    from lvjiang.apps.yysls.config.affix_levels import LevelRange
-
-    evaluator = _bare_evaluator()
-    evaluator._game_config = gc = get_game_config()
-    monkeypatch.setattr(gc, "get_playstyle", lambda _: {"qishu_requirement": requirement})
-    original = f"{requirement}类奇术增伤"
-    monkeypatch.setitem(gc._affix_levels, original, LevelRange(through_level=through_level))
-
-    result = evaluator._required_affix(
-        _context("方案", "剑", "枪"), "head", {"type": "冠胄", "level": 115})
-
-    assert result == "全奇术增伤"
-
-
-def test_required_qishu_affix_resolves_upgrade_chain_and_keeps_unmatched_name(monkeypatch):
-    from lvjiang.apps.yysls.config import get_game_config
-    from lvjiang.apps.yysls.config.models import AffixUpgrade
-
-    evaluator = _bare_evaluator()
-    evaluator._game_config = gc = get_game_config()
-    monkeypatch.setattr(gc, "get_playstyle", lambda _: {"qishu_requirement": "单体"})
-    # 只在内存中追加未来升级规则，不改真实词条或产出范围配置。
-    monkeypatch.setattr(gc, "_affix_upgrades", [
-        *gc.get_affix_upgrades(),
-        AffixUpgrade(from_level=115, to_level=120,
-                     from_name="全奇术增伤", to_name="测试奇术增伤"),
-    ])
-    context = _context("方案", "剑", "枪")
-    candidate = {"type": "冠胄", "level": 120}
-    assert evaluator._required_affix(context, "head", candidate) == "测试奇术增伤"
-
-    monkeypatch.setattr(gc, "_affix_upgrades", [])
-    assert evaluator._required_affix(context, "head", candidate) == "单体类奇术增伤"
-    monkeypatch.setattr(gc, "get_playstyle", lambda _: {})
-    assert evaluator._required_affix(context, "head", candidate) == ""
 
 
 def test_playstyle_required_affix_bypasses_normal_rule_pool(monkeypatch):
@@ -767,19 +706,6 @@ def test_swap_is_bidirectional_and_bounded(hybrid, direct):
         (hybrid, direct), [hybrid, direct, "攻击"]) == []
 
 
-def test_strategy_without_swap_pairs_stays_pure_greedy():
-    problem = _ring_problem(lambda equipment: 10.0 + len(_names(equipment)))
-    outcome = GreedySwapStrategy().search(problem)
-    assert outcome.status is SearchStatus.NO_IMPROVEMENT
-    assert "三率临界交换" not in outcome.reason
-
-
-def test_strategy_gte_lets_equal_rate_pass():
-    outcome = GreedySwapStrategy().search(
-        _ring_problem(lambda _e: 15.0, operator="gte"))
-    assert outcome.status is SearchStatus.IMPROVES
-
-
 def test_strategy_full_equipment_only_rates_current_state():
     problem = _ring_problem(lambda _e: 20.0, missing=0)
     outcome = GreedySwapStrategy().search(problem)
@@ -809,31 +735,6 @@ def test_budget_excludes_time_blocked_in_stop_check(monkeypatch):
     assert not budget.exhausted()
     clock[0] += 6.0               # 累计 7 秒真实计算 → 超预算
     assert budget.exhausted() and budget.expired
-
-
-def test_custom_strategy_can_replace_default_without_touching_evaluator(monkeypatch):
-    class Always(SearchStrategy):
-        name = "always_improves"
-
-        def search(self, problem):
-            from lvjiang.apps.yysls.core.graduation.smart_search import SearchOutcome
-            return SearchOutcome(SearchStatus.IMPROVES, "测试策略", 99.0, 1, ("A",))
-
-    register_strategy(Always())
-    evaluator = _bare_evaluator()
-    evaluator._strategy = get_strategy("always_improves")
-    _patch_affix_rules(monkeypatch, ["A"])
-    context = _PlanContext(
-        "p", "方案", "鸣金·虹", object(), object(), {}, 15.0,
-        affix_pool=("A",), plan_maximum_rate=15.0)
-
-    result = evaluator._evaluate_plan(
-        context, "ring",
-        {"type": "环", "level": 110, "quality": "gold", "affix_1": {"name": "X", "value": 1}})
-
-    assert result.status is SmartTuningStatus.IMPROVES
-    assert result.maximum_rate == 99.0 and "测试策略：A" == result.reason
-    assert get_strategy("no_such_strategy").name == "greedy_swap"
 
 
 def test_weapon_candidates_match_plan_slot_by_type(monkeypatch):

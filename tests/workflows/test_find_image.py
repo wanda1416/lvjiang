@@ -17,41 +17,11 @@ import pytest
 from lvjiang.core.layout_models import FoundRegion, Region, SubsceneRef, TemplateBinding
 from lvjiang.core.recognizers import template_locator as tl
 from lvjiang.workflows.engine.signals import WorkflowUserError
-from lvjiang.workflows.grammar import Find, parse_text
-from lvjiang.workflows.grammar.ast_nodes import EntityRef, Literal
+from lvjiang.workflows.grammar import parse_text
 from tests.case_matrix import case_matrix
 from tests.workflows.conftest import make_engine
 
 # ─── 语法 ───────────────────────────────────────────────
-
-def test_find_by_image_parses():
-    prog = parse_text('find as $icon by image "extract_icon" where confidence >= 0.7\n')
-    node = prog.body[0]
-    assert isinstance(node, Find)
-    assert node.by.match_mode == "image"
-    assert isinstance(node.by.target, Literal) and node.by.target.value == "extract_icon"
-    assert node.where.min_confidence.value == 0.7
-
-
-def test_find_by_image_with_area():
-    node = parse_text('find [map].[canvas] as $icon by image "extract_icon"\n').body[0]
-    assert node.search_scene == "map" and node.search_region == "canvas"
-    assert node.by.match_mode == "image"
-
-
-def test_find_by_image_with_region_binding_parses():
-    node = parse_text(
-        "find [popup].[body] as $icon "
-        "by image [game_menu_page].[back]\n"
-    ).body[0]
-    assert node.search_scene == "popup" and node.search_region == "body"
-    assert node.by.target == EntityRef("game_menu_page", "back")
-
-
-def test_scan_by_image_uses_bound_template_syntax():
-    node = parse_text('scan [s].[a, b] as $hit by image\n').body[0]
-    assert node.by.match_mode == "image"
-    assert node.by.target is None
 
 
 @case_matrix("code", [

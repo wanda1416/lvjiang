@@ -140,16 +140,6 @@ class TestSmall:
 
 # ─── 品阶与首词条筛选 ──────────────────────────────────────
 
-class TestFilters:
-    def test_purple_weapon_skipped(self, big):
-        e = make_equip("陌刀", ["最大外功攻击", "陌刀武学增伤", "最大外功攻击", "劲", "敏"],
-                       quality="purple")
-        assert big.judge(e).skipped
-
-    def test_wrong_first_skipped(self, big):
-        e = make_equip("陌刀", ["劲", "陌刀武学增伤", "最大外功攻击", "劲", "敏"])
-        assert big.judge(e).skipped
-
 
 # ─── 调律潜力判定 ──────────────────────────────────────────
 

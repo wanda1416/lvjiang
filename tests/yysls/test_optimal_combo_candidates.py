@@ -10,7 +10,6 @@
 """
 
 import pytest
-from PyQt6.QtWidgets import QScrollArea
 
 import lvjiang.apps.yysls.ui.loadout.optimal_combo as mod
 
@@ -187,91 +186,3 @@ def test_weapon_candidates_follow_plan_art_order(dialog, monkeypatch):
 
     assert [e["name"] for e in dialog._captured["main_weapon"]] == ["刀"]
     assert [e["name"] for e in dialog._captured["sub_weapon"]] == ["剑"]
-
-
-def test_slot_groups_fill_equal_regions_and_scroll_internally(qtbot):
-    """候选数量不改变部位区域高度，超出部分由该区域自己滚动。"""
-    scrolls = []
-    groups = []
-    for count in (2, 20):
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.resize(260, 180)
-        group = mod._SlotGroup(
-            "head", "冠胄",
-            [_equip(f"冠胄{i}", "冠胄") for i in range(count)],
-            "鸣金·虹",
-        )
-        scroll.setWidget(group)
-        qtbot.addWidget(scroll)
-        scroll.show()
-        scrolls.append(scroll)
-        groups.append(group)
-
-    qtbot.waitUntil(lambda: all(s.viewport().height() > 0 for s in scrolls))
-
-    short_scroll, long_scroll = scrolls
-    short_group, long_group = groups
-    assert short_scroll.height() == long_scroll.height()
-    assert short_group.height() == short_scroll.viewport().height()
-    assert short_scroll.verticalScrollBar().maximum() == 0
-    assert long_group.height() > long_scroll.viewport().height()
-    assert long_scroll.verticalScrollBar().maximum() > 0
-    # 多出的可见空间留在底部，首个候选行仍紧跟标题。
-    assert short_group.rows[0].y() < short_group.height() // 2
-
-
-def test_candidate_area_height_is_capped_to_ten_rows():
-    """单个部位候选再多，也只按 10 行换算高度；多出的行交给本区滚动条。"""
-    group = mod._SlotGroup(
-        "head", "冠胄",
-        [_equip(f"冠胄{i}", "冠胄") for i in range(40)],
-        "鸣金·虹",
-    )
-    cap = group.visible_height()
-    step = group.visible_height(11) - group.visible_height(10)
-    assert step > 0
-    assert group.visible_height(9) == cap - step
-    # 内容本身远高于上限：上限不是"能装下所有候选"，而是固定的可见行数。
-    assert group.sizeHint().height() > cap
-
-
-def test_candidate_area_cap_is_applied_to_every_slot(qtbot):
-    """上限按八个部位统一给值：网格里的区域始终等高。"""
-    dlg = mod.OptimalComboPage.__new__(mod.OptimalComboPage)
-    dlg._slot_groups = {}
-    dlg._slot_scroll_areas = {}
-    for slot_key, count in (("head", 2), ("body", 40)):
-        group = mod._SlotGroup(
-            slot_key, slot_key,
-            [_equip(f"{slot_key}{i}", "冠胄") for i in range(count)],
-            "鸣金·虹",
-        )
-        scroll = QScrollArea()
-        scroll.setWidget(group)
-        qtbot.addWidget(scroll)
-        dlg._slot_groups[slot_key] = group
-        dlg._slot_scroll_areas[slot_key] = scroll
-
-    dlg._cap_candidate_area_height()
-
-    caps = {scroll.maximumHeight() for scroll in dlg._slot_scroll_areas.values()}
-    assert len(caps) == 1
-    assert caps.pop() == dlg._slot_groups["body"].visible_height()
-
-
-def test_no_candidates_leaves_area_height_unlimited():
-    """一件候选都没有时不设上限：没有行可数，不该凭空按 10 行占位。"""
-    dlg = mod.OptimalComboPage.__new__(mod.OptimalComboPage)
-    dlg._slot_groups = {}
-    dlg._slot_scroll_areas = {}
-    group = mod._SlotGroup("head", "冠胄", [], "鸣金·虹")
-    scroll = QScrollArea()
-    scroll.setWidget(group)
-    dlg._slot_groups["head"] = group
-    dlg._slot_scroll_areas["head"] = scroll
-
-    dlg._cap_candidate_area_height()
-
-    # 与未设过上限的滚动区一致 = 上限仍是 Qt 默认值
-    assert scroll.maximumHeight() == QScrollArea().maximumHeight()

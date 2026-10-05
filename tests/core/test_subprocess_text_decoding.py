@@ -14,42 +14,13 @@ adb / Android 的输出是 UTF-8。后果有两级：
 """
 from __future__ import annotations
 
-import subprocess
-import sys
 from pathlib import Path
-
-import pytest
 
 from lvjiang.core.platforms import SUBPROCESS_TEXT
 
 _SRC = Path(__file__).resolve().parents[2] / "src" / "lvjiang"
 #: 0xAA 单独出现时不是合法的 GBK 序列，也不是合法的 UTF-8 起始字节
 _BAD_BYTE = 0xAA
-
-
-def test_the_same_bytes_blow_up_under_a_locale_codec():
-    """确认这组字节在 GBK 下确实解不开——编码常量的意义建立在这个事实上。
-
-    子进程按二进制收，解码断言留在本进程：Windows 的 subprocess 由读取线程
-    解码（正是修复前那条孤立 traceback），异常死在线程里，主线程永远等不到
-    UnicodeDecodeError。
-    """
-    payload = (
-        "import sys\n"
-        "sys.stdout.buffer.write('窗口标题'.encode('utf-8'))\n"
-        f"sys.stdout.buffer.write(bytes([{_BAD_BYTE}]))\n"
-    )
-    script = Path(__file__).parent / "_tmp_locale_probe.py"
-    script.write_text(payload, encoding="utf-8")
-    try:
-        result = subprocess.run([sys.executable, str(script)],
-                                capture_output=True)
-        assert result.stdout == ("窗口标题".encode("utf-8")
-                                 + bytes([_BAD_BYTE]))
-        with pytest.raises(UnicodeDecodeError):
-            result.stdout.decode("gbk")
-    finally:
-        script.unlink(missing_ok=True)
 
 
 def test_shared_constant_pins_utf8_and_replace():

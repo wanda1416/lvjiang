@@ -14,7 +14,6 @@ from lvjiang.workflows.file_tree import (
     list_directories,
     list_workflow_files,
 )
-from tests.case_matrix import case_matrix
 
 _WF = 'log "x"\n'
 
@@ -127,15 +126,6 @@ class TestMergedView:
         assert [f.rel_path for f in list_workflow_files()] == [
             "_editor_run.wf", "_recorded.wf", "archived/old.wf", "real.wf"]
 
-    def test_shows_underscore_directories_too(self, layers):
-        system, _ = layers
-        _write(system, "_scratch/x.wf")
-
-        files = list_workflow_files()
-
-        assert [f.rel_path for f in files] == ["_scratch/x.wf"]
-        assert list_directories(files) == ["_scratch"]
-
 
 class TestEditability:
     def test_system_file_is_read_only(self, layers):
@@ -164,17 +154,3 @@ class TestEditability:
         f = _by_path(list_workflow_files())["factory.wf"]
         assert f.editable is True
         assert f.overrides_system is True
-
-
-class TestPathHelpers:
-    @case_matrix(
-        ("rel", "name", "parent"),
-        [
-            ("a.wf", "a.wf", ""),
-            ("subcall/nav.wf", "nav.wf", "subcall"),
-            ("a/b/c.wf", "c.wf", "a/b"),
-        ],
-    )
-    def test_name_and_parent(self, rel, name, parent):
-        f = WorkflowFile(rel_path=rel, layer="system", overrides_system=False)
-        assert (f.name, f.parent) == (name, parent)

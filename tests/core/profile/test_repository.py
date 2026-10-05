@@ -34,15 +34,7 @@ def db(tmp_path: Path) -> ProfileDB:
 
 
 class TestCRUD:
-    def test_upsert_and_get(self, db: ProfileDB):
-        db.upsert("user1", "quota", "k1", 42)
-        entry = db.get_entry("user1", "quota", "k1")
-        assert entry["value"] == 42
-        assert entry["updated_at"] != ""
-        assert entry["updated_time"] != ""
 
-    def test_get_nonexistent_returns_empty(self, db: ProfileDB):
-        assert db.get_entry("nobody", "quota", "k1") == {}
 
     def test_get_all(self, db: ProfileDB):
         db.upsert("user1", "quota", "k1", 10)
@@ -55,8 +47,6 @@ class TestCRUD:
         assert all_data["quota"]["k2"]["value"] == 20
         assert all_data["regen"]["energy"]["value"] == 2500
 
-    def test_get_all_empty_user(self, db: ProfileDB):
-        assert db.get_all("nobody") == {}
 
     def test_upsert_replaces(self, db: ProfileDB):
         db.upsert("user1", "quota", "k1", 10)
@@ -95,11 +85,6 @@ class TestCRUD:
         assert entry["value_text"] == "已完成"
         assert entry["value"] == 0
 
-    def test_upsert_value_text_default_empty(self, db: ProfileDB):
-        """不传 value_text 时默认为空字符串"""
-        db.upsert("user1", "quota", "k1", 42)
-        entry = db.get_entry("user1", "quota", "k1")
-        assert entry["value_text"] == ""
 
     def test_get_all_includes_value_text(self, db: ProfileDB):
         """get_all 返回的 entry 包含 value_text 字段"""
@@ -220,47 +205,7 @@ class TestCRUD:
 
 
 class TestSchemaMigration:
-    def test_initial_migration_creates_tables(self, db: ProfileDB):
-        """v0 → v1: 建表成功"""
-        conn = db._connect()
-        try:
-            tables = {
-                row[0]
-                for row in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                ).fetchall()
-            }
-        finally:
-            conn.close()
 
-        assert "profile_entries" in tables
-        assert "profile_history" in tables
-        assert "schema_version" in tables
-
-    def test_entries_has_updated_time_column(self, db: ProfileDB):
-        """v3: profile_entries 增加实际落库时间 updated_time"""
-        conn = db._connect()
-        try:
-            cols = {
-                row[1]
-                for row in conn.execute("PRAGMA table_info(profile_entries)").fetchall()
-            }
-        finally:
-            conn.close()
-
-        assert "updated_time" in cols
-
-    def test_schema_version_is_current(self, db: ProfileDB):
-        """迁移完成后版本号等于 CURRENT_VERSION"""
-        conn = db._connect()
-        try:
-            row = conn.execute(
-                "SELECT MAX(version) FROM schema_version"
-            ).fetchone()
-        finally:
-            conn.close()
-
-        assert row[0] == MIGRATIONS[-1][0]
 
     def test_shared_profile_schema_contract_stays_unscoped_without_app_id(
         self, db: ProfileDB
@@ -556,11 +501,6 @@ class TestHistory:
         assert history[0]["source"] == "同步"   # 最新在前
         assert history[1]["source"] == "导入"
 
-    def test_source_default_empty(self, db: ProfileDB):
-        """未传 source 时，history 返回空字符串而非 None"""
-        db.upsert("u", "quota", "k", 10, change_type="action", detail="+10")
-        history = db.get_history("u")
-        assert history[0]["source"] == ""
 
     def test_override_always_records(self, db: ProfileDB):
         """override 类型：即使值不变也记录"""

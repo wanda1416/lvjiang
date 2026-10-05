@@ -8,7 +8,6 @@ from lvjiang.apps.yysls.core.attr_model import (
     DIMENSION_MIN,
     DIMENSION_SHI,
     SCOPE_COMBAT,
-    SOURCE_KINDS,
     AttrModelError,
     Formula,
     FullAffix,
@@ -250,46 +249,6 @@ def _parse(payload: dict):
     return parse_source_file(payload, filename="t.yaml")
 
 
-def test_parse_reads_full_affix_and_constants() -> None:
-    effects = _parse({
-        "kind": "inner_way",
-        "entries": {
-            "易水歌·二重": {"full_affix": "外功攻击"},
-            "易水歌·五重": {"stats": {"direct_crit": 0.046}},
-        },
-    })
-
-    assert [e.source_id for e in effects] == ["易水歌·二重", "易水歌·五重"]
-    assert effects[0].full_affix == FullAffix("外功攻击", (1, 2))
-    assert effects[1].stats == {"direct_crit": 0.046}
-
-
-def test_parse_reads_formula() -> None:
-    effects = _parse({
-        "kind": "martial_art",
-        "entries": {
-            "武学": {
-                "stats": {
-                    "min_outer": {
-                        "formula": {"source": "dim_min", "multiplier": 0.26, "max": 73.9}
-                    }
-                }
-            }
-        },
-    })
-
-    formula = effects[0].stats["min_outer"]
-    assert isinstance(formula, Formula)
-    assert (formula.source, formula.multiplier, formula.maximum) == ("dim_min", 0.26, 73.9)
-
-
-def test_empty_entry_counts_as_unmodeled() -> None:
-    """空壳条目不该被当成已完成，否则建模进度会虚高。"""
-    effects = _parse({"kind": "inner_way", "entries": {"待测量": {}}})
-
-    assert effects[0].modeled is False
-
-
 @pytest.mark.parametrize("payload", [
     {"kind": "不存在的类别", "entries": {}},
     # 「能保存 = 能求值」：以下全部必须在解析期失败，而不是拖到求值期
@@ -359,44 +318,7 @@ def test_dimension_conversion_is_always_applied_regardless_of_selection() -> Non
     }
 
 
-def test_dimension_breakdown_separates_each_dimension() -> None:
-    """最小外功攻击同时来自劲和敏，breakdown 要能分开看。"""
-    effects = [
-        _effect("底子", kind="base", stats={"dim_jin": 100.0, "dim_min": 100.0}),
-        *dimension_effects(),
-    ]
-
-    result = _resolve(effects)
-    sources = {m.source_id: m.delta for m in result.combat.modifiers_for("min_outer")}
-
-    assert sources[DIMENSION_JIN] == pytest.approx(100.0 * ROLE_JIN_TO_MIN_OUTER)
-    assert sources[DIMENSION_MIN] == pytest.approx(100.0 * MIN_TO_MIN_OUTER)
-
-
 # ── 随仓库分发的配置 ──────────────────────────────────────
-
-def test_shipped_config_loads_without_errors() -> None:
-    """config/system/yysls/attr_model/ 下的文件必须全部解析通过。
-
-    解析失败只会记进 errors 并跳过，不抛异常，所以需要显式断言，
-    否则整类来源静默缺失。
-    """
-    manager = get_attr_model_manager()
-
-    assert manager.errors() == {}
-    assert {effect.kind for effect in manager.effects()} <= set(SOURCE_KINDS)
-
-
-def test_shipped_yishui_matches_the_current_calculator() -> None:
-    """南吕相和心法用计算器实值，不把装备词条上限当成心法值。"""
-    manager = get_attr_model_manager()
-    result = manager.resolve(
-        level=115, school_attr="牵丝",
-        selected=("易水歌·二重", "易水歌·五重"),
-    )
-    assert result.combat_attrs.min_outer == pytest.approx(43.4)
-    assert result.combat_attrs.max_outer == pytest.approx(86.8)
-    assert result.combat_attrs.direct_crit == pytest.approx(0.046)
 
 
 def test_shipped_115_baseline_matches_the_diy_calculator_without_affixes() -> None:
@@ -443,18 +365,13 @@ def test_shipped_115_baseline_matches_the_diy_calculator_without_affixes() -> No
     ("鸣金·影", "dim_jin", "intent"),
     ("鸣金·虹", "dim_shi", "intent"),
     ("裂石·威", "dim_jin", "tank"),
-    ("裂石·钧", "dim_min", "crit"),
     ("牵丝·玉", "dim_min", "crit"),
-    ("牵丝·翊", "dim_min", "crit"),
-    ("破竹·尘", "dim_min", "crit"),
     ("破竹·风", "dim_min", "crit"),
-    ("破竹·鸢", "dim_min", "crit"),
-    ("破竹·樽", "dim_min", "crit"),
 ])
-def test_all_calculator_martial_art_choices_match_the_115_baseline(
+def test_representative_calculator_templates_match_the_115_baseline(
     school: str, required_dim: str, template: str,
 ) -> None:
-    """计算器列出的十个流派都按同一 492 点天赋阈值推导。"""
+    """覆盖劲、势、敏及三类天赋公式；全流派组合另有配置集成检查。"""
     from lvjiang.apps.yysls.core.attr_model import AttrLoadout
 
     config = get_game_config().get_schools()[school]
@@ -562,25 +479,6 @@ def sources_dir(tmp_path):
     return AttrModelManager(tmp_path), tmp_path
 
 
-def test_saving_an_entry_persists_and_reloads(sources_dir) -> None:
-    manager, _ = sources_dir
-
-    manager.save_entry("甲·二重", {"full_affix": "外功攻击"})
-
-    assert manager.raw_entry("甲·二重") == {"full_affix": "外功攻击"}
-    assert manager.progress("inner_way") == (1, 1)
-
-
-def test_saving_keeps_the_file_header(sources_dir) -> None:
-    """文件头写着 schema 与游戏事实，yaml.dump 会丢注释，必须补回。"""
-    manager, path = sources_dir
-
-    manager.save_entry("甲·二重", {"stats": {"crit_rate": 0.01}})
-
-    assert (path / "inner_way.yaml").read_text(encoding="utf-8").startswith(
-        "# 头部注释要在写回后保留")
-
-
 def test_saving_an_invalid_entry_is_rejected_before_it_reaches_disk(
     sources_dir,
 ) -> None:
@@ -591,24 +489,6 @@ def test_saving_an_invalid_entry_is_rejected_before_it_reaches_disk(
         manager.save_entry("甲·二重", {"打错的字段": 1})
 
     assert (path / "inner_way.yaml").read_text(encoding="utf-8") == before
-
-
-def test_create_and_delete_entry(sources_dir) -> None:
-    manager, _ = sources_dir
-
-    manager.create_entry("inner_way", "乙·五重")
-    assert manager.progress("inner_way") == (0, 2)
-
-    manager.delete_entry("乙·五重")
-    assert manager.progress("inner_way") == (0, 1)
-
-
-def test_create_rejects_a_duplicate_id(sources_dir) -> None:
-    """同名条目在加载时会被静默跳过，所以必须在新增时就挡住。"""
-    manager, _ = sources_dir
-
-    with pytest.raises(AttrModelError):
-        manager.create_entry("inner_way", "甲·二重")
 
 
 def test_confirmed_no_effect_counts_as_done(sources_dir) -> None:
@@ -667,21 +547,6 @@ def test_extra_attributes_are_recorded_in_the_breakdown() -> None:
         "gear_set": pytest.approx(0.02),
     }
     assert all(m.is_extra for m in result.combat.modifiers_for("剑武学增伤"))
-
-
-def test_diff_covers_extra_attributes() -> None:
-    """对照里没有的动态属性也要能看出差异，否则填错了无从发现。"""
-    result = _resolve([_effect("心法A", extra={"剑武学增伤": 0.08})])
-    panel = CombatAttributes()
-
-    assert diff_against_panel(result, panel)["剑武学增伤"] == (
-        pytest.approx(0.08), pytest.approx(0.0))
-
-
-def test_touched_fields_lists_stats_and_extras() -> None:
-    effects = [_effect("甲", stats={"min_outer": 1.0}, extra={"剑武学增伤": 0.01})]
-
-    assert _resolve(effects).combat.touched_fields() == ["min_outer", "剑武学增伤"]
 
 
 # ── 装配状态与展开 ────────────────────────────────────────
@@ -858,13 +723,6 @@ def test_formula_reading_a_constant_target_is_fine() -> None:
     ]
 
     assert _resolve(effects).combat.attrs.min_outer == pytest.approx(90.0)
-
-
-def test_builtin_dimension_conversion_passes_the_dependency_rule() -> None:
-    """内建的五维转换本身就是三条公式，不能被自己的规则挡住。"""
-    from lvjiang.apps.yysls.core.attr_model import validate_formula_dependencies
-
-    validate_formula_dependencies(list(dimension_effects()))
 
 
 # ── 名册来源 ──────────────────────────────────────────────

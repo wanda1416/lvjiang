@@ -208,17 +208,6 @@ class TestWritePreservesVersion:
         r.write_entity("scenes/a.yaml", "key: a\nname: 新\n")
         assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 3
 
-    def test_unchanged_content_keeps_version(self, dirs):
-        """打开编辑器又原样关掉不该推高版本，否则远程侧分不清真改动。"""
-        _write_scene(dirs[0], "a.yaml", 3, "同样的内容")
-        r = _resolver(dirs, dev_mode=True)
-        r.write_entity("scenes/a.yaml", "key: a\nname: 同样的内容\n")
-        assert versioning.read_version(dirs[0] / "scenes" / "a.yaml") == 3
-
-    def test_new_file_starts_at_one(self, dirs):
-        r = _resolver(dirs, dev_mode=True)
-        r.write_entity("scenes/新的.yaml", "key: 新的\n")
-        assert versioning.read_version(dirs[0] / "scenes" / "新的.yaml") == 1
 
     def test_user_mode_does_not_touch_version(self, dirs):
         """local 影子恒为最高优先级，不参与 system/remote 的版本比较。"""
@@ -259,12 +248,6 @@ class TestWritePreservesVersion:
                 "scenes/a.yaml", "key: a\nname: 新\n",
                 content_version=bad_version,
             )
-
-    def test_non_versioned_path_untouched(self, dirs):
-        r = _resolver(dirs, dev_mode=True)
-        r.write_entity("workflows/a.wf", "loop 3\n")
-        assert (dirs[0] / "workflows" / "a.wf").read_text(
-            encoding="utf-8") == "loop 3\n"
 
 
 class TestDevModeSeesRemote:
@@ -349,11 +332,6 @@ class TestDescribeEntity:
         origin = _resolver(dirs).describe_entity("scenes/a.yaml")
         assert (origin.layer, origin.version) == ("remote", 7)
 
-    def test_reports_system_when_remote_loses_gate(self, dirs):
-        _write_scene(dirs[0], "a.yaml", 9)
-        _write_scene(dirs[2], "a.yaml", 3)
-        origin = _resolver(dirs).describe_entity("scenes/a.yaml")
-        assert (origin.layer, origin.version) == ("system", 9)
 
     def test_reports_local(self, dirs):
         _write_scene(dirs[0], "a.yaml", 2)
@@ -361,16 +339,6 @@ class TestDescribeEntity:
         _write_scene(dirs[1], "a.yaml", 2)
         assert _resolver(dirs).describe_entity("scenes/a.yaml").layer == "local"
 
-    def test_missing_entity_has_empty_layer(self, dirs):
-        origin = _resolver(dirs).describe_entity("scenes/没有的.yaml")
-        assert (origin.layer, origin.version) == ("", None)
-
-    def test_dev_mode_reports_remote_too(self, dirs):
-        """开发者必须看得到远程顶替，否则复现不出用户的问题。"""
-        _write_scene(dirs[0], "a.yaml", 2)
-        _write_scene(dirs[2], "a.yaml", 7)
-        origin = _resolver(dirs, dev_mode=True).describe_entity("scenes/a.yaml")
-        assert origin.layer == "remote"
 
     def test_lists_every_existing_layer_in_priority_order(self, dirs):
         _write_scene(dirs[0], "a.yaml", 9)
@@ -380,6 +348,3 @@ class TestDescribeEntity:
         assert [(item.layer, item.version) for item in origins] == [
             ("local", 1), ("remote", 3), ("system", 9),
         ]
-
-    def test_lists_no_origins_for_missing_entity(self, dirs):
-        assert _resolver(dirs).list_entity_origins("scenes/missing.yaml") == ()

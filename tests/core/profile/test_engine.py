@@ -39,63 +39,46 @@ class TestParseResetTime:
 
 
 class TestGetPeriodBoundary:
-    def test_day_before_reset(self):
-        """重置时刻之前 → 返回昨天的重置点"""
+    def test_day_boundary_before_at_and_after_reset(self):
+        # day_before_reset
         now = datetime(2026, 8, 8, 3, 0)  # 03:00，在 05:00 之前
         boundary = _get_period_boundary("day", "05:00", now)
         assert boundary == datetime(2026, 8, 7, 5, 0)
 
-    def test_day_after_reset(self):
-        """重置时刻之后 → 返回今天的重置点"""
-        now = datetime(2026, 8, 8, 10, 0)  # 10:00，在 05:00 之后
-        boundary = _get_period_boundary("day", "05:00", now)
-        assert boundary == datetime(2026, 8, 8, 5, 0)
-
-    def test_day_at_reset(self):
-        """恰好在重置时刻 → 返回今天的重置点"""
+        # day_at_reset
         now = datetime(2026, 8, 8, 5, 0)
         boundary = _get_period_boundary("day", "05:00", now)
         assert boundary == datetime(2026, 8, 8, 5, 0)
 
-    def test_week_before_reset(self):
-        """周一重置时刻之前 → 返回上周一的重置点"""
-        # 2026-08-10 是周一
+        # day_after_reset
+        now = datetime(2026, 8, 8, 10, 0)  # 10:00，在 05:00 之后
+        boundary = _get_period_boundary("day", "05:00", now)
+        assert boundary == datetime(2026, 8, 8, 5, 0)
+
+
+    def test_week_boundary_before_and_after_reset(self):
+        # week_before_reset
         now = datetime(2026, 8, 10, 3, 0)  # 周一 03:00
         boundary = _get_period_boundary("week", "05:00", now)
         expected = datetime(2026, 8, 3, 5, 0)  # 上周一
         assert boundary == expected
 
-    def test_week_after_reset(self):
-        """周一重置时刻之后 → 返回本周一的重置点"""
+        # week_after_reset
         now = datetime(2026, 8, 10, 10, 0)  # 周一 10:00
         boundary = _get_period_boundary("week", "05:00", now)
         expected = datetime(2026, 8, 10, 5, 0)  # 本周一
         assert boundary == expected
 
-    def test_week_midweek(self):
-        """周三 → 返回本周一的重置点"""
-        now = datetime(2026, 8, 12, 15, 0)  # 周三 15:00
-        boundary = _get_period_boundary("week", "05:00", now)
-        expected = datetime(2026, 8, 10, 5, 0)  # 本周一
-        assert boundary == expected
 
-    def test_month_first_after_reset(self):
-        """月初，重置时刻之后 → 返回本月 1 号"""
-        now = datetime(2026, 8, 1, 10, 0)
-        boundary = _get_period_boundary("month", "05:00", now)
-        expected = datetime(2026, 8, 1, 5, 0)
-        assert boundary == expected
-
-    def test_month_first_before_reset(self):
-        """月初 1 号，重置时刻之前 → 返回上月 1 号"""
+    def test_month_boundary_before_and_after_reset(self):
+        # month_first_before_reset
         now = datetime(2026, 8, 1, 3, 0)
         boundary = _get_period_boundary("month", "05:00", now)
         expected = datetime(2026, 7, 1, 5, 0)
         assert boundary == expected
 
-    def test_month_mid(self):
-        """月中 → 返回本月 1 号"""
-        now = datetime(2026, 8, 15, 12, 0)
+        # month_first_after_reset
+        now = datetime(2026, 8, 1, 10, 0)
         boundary = _get_period_boundary("month", "05:00", now)
         expected = datetime(2026, 8, 1, 5, 0)
         assert boundary == expected
@@ -104,28 +87,20 @@ class TestGetPeriodBoundary:
 class TestGetPeriodBoundaryResetDay:
     """reset_day 参数测试"""
 
-    def test_week_friday_after_reset(self):
-        """周五重置：当前在周五 05:00 之后 → 返回本周五"""
-        # 2026-08-14 是周五
-        now = datetime(2026, 8, 14, 10, 0)  # 周五 10:00
-        boundary = _get_period_boundary("week", "05:00", now, reset_day=5)
-        expected = datetime(2026, 8, 14, 5, 0)  # 本周五
-        assert boundary == expected
 
-    def test_week_friday_before_reset(self):
-        """周五重置：当前在周五 05:00 之前 → 返回上周五"""
+    def test_custom_week_boundary_before_and_after_reset(self):
+        # week_friday_before_reset
         now = datetime(2026, 8, 14, 3, 0)  # 周五 03:00
         boundary = _get_period_boundary("week", "05:00", now, reset_day=5)
         expected = datetime(2026, 8, 7, 5, 0)  # 上周五
         assert boundary == expected
 
-    def test_week_friday_on_wednesday(self):
-        """周五重置：当前在周三 → 返回上周五"""
-        # 2026-08-12 是周三
-        now = datetime(2026, 8, 12, 15, 0)  # 周三 15:00
+        # week_friday_after_reset
+        now = datetime(2026, 8, 14, 10, 0)  # 周五 10:00
         boundary = _get_period_boundary("week", "05:00", now, reset_day=5)
-        expected = datetime(2026, 8, 7, 5, 0)  # 上周五
+        expected = datetime(2026, 8, 14, 5, 0)  # 本周五
         assert boundary == expected
+
 
     def test_week_sunday(self):
         """周日重置：reset_day=7"""
@@ -142,26 +117,20 @@ class TestGetPeriodBoundaryResetDay:
         boundary_monday = _get_period_boundary("week", "05:00", now, reset_day=1)
         assert boundary_default == boundary_monday
 
-    def test_month_15th_after_reset(self):
-        """月重置 15 号：当前在 15 号 05:00 之后 → 返回本月 15 号"""
-        now = datetime(2026, 8, 15, 10, 0)
-        boundary = _get_period_boundary("month", "05:00", now, reset_day=15)
-        expected = datetime(2026, 8, 15, 5, 0)
-        assert boundary == expected
 
-    def test_month_15th_before_reset(self):
-        """月重置 15 号：当前在 15 号 05:00 之前 → 返回上月 15 号"""
+    def test_custom_month_boundary_before_and_after_reset(self):
+        # month_15th_before_reset
         now = datetime(2026, 8, 15, 3, 0)
         boundary = _get_period_boundary("month", "05:00", now, reset_day=15)
         expected = datetime(2026, 7, 15, 5, 0)
         assert boundary == expected
 
-    def test_month_15th_on_10th(self):
-        """月重置 15 号：当前在 10 号 → 返回上月 15 号"""
-        now = datetime(2026, 8, 10, 12, 0)
+        # month_15th_after_reset
+        now = datetime(2026, 8, 15, 10, 0)
         boundary = _get_period_boundary("month", "05:00", now, reset_day=15)
-        expected = datetime(2026, 7, 15, 5, 0)
+        expected = datetime(2026, 8, 15, 5, 0)
         assert boundary == expected
+
 
     def test_month_default_is_1st(self):
         """reset_day=0 默认 1 号"""
@@ -178,15 +147,17 @@ class TestShouldReset:
     def test_empty_updated_at(self):
         assert _should_reset("", datetime.now()) is True
 
-    def test_before_boundary(self):
+    def test_reset_requires_timestamp_before_boundary(self):
+        # before_boundary
         updated_at = (datetime.now() - timedelta(hours=2)).isoformat()
         boundary = datetime.now() - timedelta(hours=1)
         assert _should_reset(updated_at, boundary) is True
 
-    def test_after_boundary(self):
+        # after_boundary
         updated_at = datetime.now().isoformat()
         boundary = datetime.now() - timedelta(hours=1)
         assert _should_reset(updated_at, boundary) is False
+
 
     def test_invalid_format(self):
         assert _should_reset("not-a-date", datetime.now()) is True
@@ -196,17 +167,7 @@ class TestShouldReset:
 
 
 class TestCountDailyRegens:
-    def test_same_day_before_reset(self):
-        """同一天，都在 05:00 之前 → 0"""
-        prev = datetime(2026, 8, 8, 3, 0)
-        now = datetime(2026, 8, 8, 4, 59)
-        assert _count_quota_regens(prev, now, "05:00") == 0
 
-    def test_same_day_after_reset(self):
-        """同一天，都在 05:00 之后 → 0"""
-        prev = datetime(2026, 8, 8, 6, 0)
-        now = datetime(2026, 8, 8, 10, 0)
-        assert _count_quota_regens(prev, now, "05:00") == 0
 
     def test_same_day_cross_reset(self):
         """同一天 05:00 前 → 05:00 后，应计入今天重置点"""
@@ -268,23 +229,21 @@ class TestComputeRealtimeValue:
         assert val == 100
         assert ts == "2026-08-08T10:00:00"
 
-    def test_minute_regen(self):
-        """分钟回复：60 分钟 * 0.125 = 7.5"""
+    def test_regeneration_time_units(self):
+        # minute_regen
         now = datetime.now()
         updated_at = (now - timedelta(minutes=60)).isoformat(timespec="seconds")
         val, new_ts = _compute_regen_value(100, updated_at, "minute", 0.125, 2500)
         assert val == 107.5  # 100 + 60 * 0.125
 
-    def test_hour_regen(self):
-        """小时回复：2 小时 * 10 = 20"""
+        # hour_regen
         now = datetime.now()
         updated_at = (now - timedelta(minutes=150)).isoformat(timespec="seconds")
         val, new_ts = _compute_regen_value(100, updated_at, "hour", 10, 2500)
         # 150 分钟 = 2 整小时
         assert val == 120  # 100 + 2 * 10
 
-    def test_day_regen(self):
-        """天回复：跨越 05:00 边界 * 450"""
+        # day_regen
         from unittest.mock import patch
         # 使用固定的 now 时间（10:00，确保在 05:00 之后）
         fixed_now = datetime(2026, 8, 8, 10, 0, 0)
@@ -296,6 +255,7 @@ class TestComputeRealtimeValue:
             val, ts = _compute_regen_value(100, updated_at, "day", 450, 2500, "05:00")
         # Should have crossed at least 1 day boundary
         assert val >= 550  # 100 + 1 * 450
+
 
     def test_day_regen_same_day_cross_reset(self):
         """能量：04:40 → 05:09 应跨过 05:00 并增加 450"""

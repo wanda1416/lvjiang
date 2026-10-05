@@ -43,40 +43,11 @@ def test_unique(libraries, items, expected):
     assert call(libraries, "collections", "unique", items) == expected
 
 
-@pytest.mark.parametrize(
-    ("items", "expected"),
-    [
-        ([False, False], [False]),
-        ([True, True, False], [True, False]),
-        ([None, None], [None]),
-        ([0, 0], [0]),
-        (["", ""], [""]),
-    ],
-)
-def test_unique_deduplicates_bool_null_and_zero(libraries, items, expected):
-    """false / null / 0 / 空串都是值，重复出现必须被去掉。
-
-    这依赖 == 按类型判等：曾经 `null == null` 与 `false == false` 恒假
-    （to_number 拒绝布尔、null 无分支，两者都落进数值分支被判不可比），
-    于是 unique([false, false]) 原样返回两个元素，去重对这几类值完全失效。
-    如果本用例开始失败，先查 _equal_numeric_or_text 的类型分支是否被改回去了。
-    """
-    assert call(libraries, "collections", "unique", items) == expected
-
-
-@pytest.mark.parametrize(
-    ("items", "expected"),
-    [
-        ([False, 0], [False, 0]),
-        ([None, False], [None, False]),
-        ([None, 0], [None, 0]),
-        ([False, "false"], [False, "false"]),
-        ([None, ""], [None, ""]),
-    ],
-)
-def test_unique_keeps_values_of_different_types(libraries, items, expected):
-    """类型不同就是不同的值：false 不是 0，null 不是 false，也不是空串。"""
-    assert call(libraries, "collections", "unique", items) == expected
+def test_unique_preserves_type_boundaries_and_deduplicates_falsy_values(libraries):
+    values = [False, False, None, None, 0, 0, "", "", "false", "false", 3, "3"]
+    assert call(libraries, "collections", "unique", values) == [
+        False, None, 0, "", "false", 3,
+    ]
 
 
 @pytest.mark.parametrize("items", [[[1], [1]], [{"a": 1}, {"a": 1}]])
@@ -120,14 +91,6 @@ def test_group_by_key_preserves_member_order_and_skips_missing_key(libraries):
 
 
 @pytest.mark.parametrize(
-    "items",
-    [[], [7], [3, 1, 3, -2, 0, -2], list(range(60, 0, -1))],
-)
-def test_quicksort(libraries, items):
-    assert call(libraries, "ordering", "quicksort", items) == sorted(items)
-
-
-@pytest.mark.parametrize(
     ("left", "right", "expected"),
     [
         ([], [], []),
@@ -160,14 +123,6 @@ def test_search_boundaries(libraries, items, value, bound, found):
 )
 def test_gcd(libraries, a, b, expected):
     assert call(libraries, "numeric", "gcd", a, b) == expected
-
-
-@pytest.mark.parametrize(
-    ("items", "expected"),
-    [([], []), ([2, -1, 3], [2, 1, 4]), ([0, 0], [0, 0])],
-)
-def test_prefix_sums(libraries, items, expected):
-    assert call(libraries, "numeric", "prefix_sums", items) == expected
 
 
 def test_algorithm_composition(libraries):

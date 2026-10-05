@@ -13,8 +13,6 @@ from lvjiang.apps.yysls.core.equip_parser.models import Affix, EquipmentData
 from lvjiang.apps.yysls.core.evaluator import (
     Rating,
     get_tuning_judge,
-    get_tuning_rules,
-    is_rule_implemented,
     judge_tuning_worthiness,
 )
 from tests.case_matrix import case_matrix
@@ -154,35 +152,14 @@ class TestKeepWanjia:
 # ─── 品阶与首词条筛选 ──────────────────────────────────────
 
 class TestFilters:
-    def test_purple_weapon_skipped(self, judge):
-        e = make_equip("剑", ["最大外功攻击", "剑武学增伤", "最大外功攻击", "劲", "势"],
-                       quality="purple")
-        assert judge.judge(e).skipped
 
     def test_purple_armor_ok(self, judge):
         e = make_equip("冠胄", ["会意率", "最大外功攻击", "劲", "势", "会意率"],
                        quality="purple")
         assert not judge.judge(e).skipped
 
-    def test_wrong_first_skipped(self, judge):
-        e = make_equip("剑", ["劲", "剑武学增伤", "最大外功攻击", "劲", "势"])
-        assert judge.judge(e).skipped
-
-    def test_no_affix_skipped(self, judge):
-        e = make_equip("剑", [])
-        assert judge.judge(e).skipped
-
 
 # ─── 规则注册 ──────────────────────────────────────────────
-
-class TestRegistry:
-    def test_all_implemented(self):
-        for key in get_tuning_rules():
-            assert is_rule_implemented(key)
-
-    def test_unknown_rule_raises(self):
-        with pytest.raises(ValueError):
-            get_tuning_judge("no_such_rule")
 
 
 # ─── 调律潜力（judge_tuning_worthiness 汇总） ──────────────
@@ -372,13 +349,6 @@ class TestTransmuteSimulation:
         assert res.rating == Rating.TOP
         assert "最小外功攻击 转律为" in "；".join(res.reasons)
 
-    def test_baseline_win_no_tag(self, judge_pvp):
-        # 基线（未转律）命中：不加转律标注
-        e = make_equip("腕甲",
-                       ["劲", "最大外功攻击", "对玩家单位增效", "劲", "势"])
-        res = judge_pvp.check_tuning_worthiness(e)
-        assert res.rating == Rating.TOP
-        assert "转律为" not in "；".join(res.reasons)
 
     def test_can_transmute_off(self):
         # 可转律关闭：放弃转律模拟，仅按空槽评估

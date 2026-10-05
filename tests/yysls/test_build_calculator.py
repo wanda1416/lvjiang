@@ -261,6 +261,29 @@ def test_counter_clicks_update_distribution_without_saving(qtbot, repository):
     editor._timer.stop()
 
 
+def test_full_total_disables_every_increase(qtbot, repository):
+    """40 条上限由整套共享：满了以后任何一格都不能再加，减掉别处才解锁。
+
+    单列自己没到 40 也能越过上限，正是这里要拦的。
+    """
+    build = BuildDefinition.create("总数上限", "无名", 115)
+    build.equipment = allocate(counts()).equipment
+    repository.save(build)
+    editor = BuildEditor("无名", repository=repository, initial=build)
+    qtbot.addWidget(editor)
+    outer = editor._counts["最大外功攻击"]
+    shi = editor._counts["势"]
+    assert sum(c.value() for c in editor._counts.values()) == 40
+    assert not outer.plus.isEnabled()
+    assert not shi.plus.isEnabled()
+
+    shi.setValue(shi.value() - 1)
+
+    assert outer.plus.isEnabled()
+    assert shi.plus.isEnabled()
+    editor._timer.stop()
+
+
 def test_distribution_cells_match_saved_slots_and_set_owners(qtbot, repository):
     build = BuildDefinition.create("逐格分配", "无名", 115)
     build.equipment = allocate(counts()).equipment

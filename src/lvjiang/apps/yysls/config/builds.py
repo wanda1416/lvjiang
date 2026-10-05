@@ -59,6 +59,8 @@ class BuildDefinition:
         return data
 
     def validate(self) -> None:
+        from ..core.loadout.affix_distribution import TOTAL_AFFIXES_MAX
+
         if not self.name.strip() or not self.playstyle or self.level <= 0:
             raise ValueError("请填写出装名称、玩法及装备等级")
         if self.combat_type not in ("pve", "pvp"):
@@ -68,9 +70,11 @@ class BuildDefinition:
         for row in self.requirements:
             if not row.get("affix") or row.get("priority") not in REQUIREMENT_PRIORITIES:
                 raise ValueError("要求必须选择词条和优先级")
-            lo, hi = row.get("minimum", 0), row.get("maximum", 40)
-            if not isinstance(lo, int) or not isinstance(hi, int) or not 0 <= lo <= hi <= 40:
-                raise ValueError("要求的数量范围必须满足 0 ≤ 最少 ≤ 最多 ≤ 40")
+            lo, hi = row.get("minimum", 0), row.get("maximum", TOTAL_AFFIXES_MAX)
+            if (not isinstance(lo, int) or not isinstance(hi, int)
+                    or not 0 <= lo <= hi <= TOTAL_AFFIXES_MAX):
+                raise ValueError(
+                    f"要求的数量范围必须满足 0 ≤ 最少 ≤ 最多 ≤ {TOTAL_AFFIXES_MAX}")
 
 
 class BuildRepository:
@@ -131,8 +135,11 @@ class BuildRepository:
 
 def check_requirements(counts: dict[str, int], requirements: list[dict]) -> list[dict]:
     """不篡改用户目标；要求的满足程度供 UI 与后续智能分析共同消费。"""
+    from ..core.loadout.affix_distribution import TOTAL_AFFIXES_MAX
+
     return [
         {**copy.deepcopy(row), "actual": counts.get(row["affix"], 0),
-         "satisfied": row.get("minimum", 0) <= counts.get(row["affix"], 0) <= row.get("maximum", 40)}
+         "satisfied": (row.get("minimum", 0) <= counts.get(row["affix"], 0)
+                       <= row.get("maximum", TOTAL_AFFIXES_MAX))}
         for row in requirements
     ]

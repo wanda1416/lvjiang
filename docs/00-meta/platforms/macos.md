@@ -1,4 +1,5 @@
 # macOS 平台支持 — 计划与进度
+> 状态：部分实现（2026-10-06，基线 v0.13.11）。Phase 2 窗口模式未开始，P1 待 mac 真机验证。
 
 > 最后更新：2026-07-31（Phase 1 平台门控 + 平台适配层重构完成，待 mac 真机验证）
 >
@@ -16,7 +17,7 @@
 
 | Phase | 状态 | 说明 |
 |---|---|---|
-| Phase 0：依赖可行性验证（需 mac 真机） | ⏳ 未开始 | 基线已定 macOS 11+，待实测 onnxruntime 版本矩阵 |
+| Phase 0：依赖可行性验证（需 mac 真机） | ✅ 已完成（2026-07-31 实测） | 基线 macOS 11+；版本矩阵见下方 P0 清单 |
 | Phase 1：ADB 模式跑通 | 🔶 大部完成 | 平台门控 + 适配层重构已完成，仅剩 P1-g 真机验证 |
 | Phase 2：窗口模式（Quartz） | ⏳ 未开始 | 可无限期后置 |
 | Phase 3：打包分发（可选） | ⏳ 未开始 | Gatekeeper 签名/公证，独立课题 |
@@ -27,7 +28,7 @@
 
 ### 唯一硬阻塞点
 
-`ui/main_window.py` L101 启动时无条件 `from ..core.desktop import create_input_backend`，
+`ui/main/window.py` 启动时无条件 `from ..core.desktop import create_input_backend`，
 而 `core/desktop/win32_util.py` L15 **模块级**执行 `ctypes.windll.user32` ——
 mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是启动路径上唯一一处。
 
@@ -94,7 +95,9 @@ mac 上 `ctypes.windll` 不存在，import 阶段直接 AttributeError。这是�
   新增 `core/platforms.py` 统一收口主流程平台差异（桌面输入后端创建、全局热键启动策略、
   原生弹窗回退、adb 候选路径、投屏入口可见性）；`main_window` / `system.py` / `device.py` /
   `window_ops` 的 `sys.platform` 分支全部改读适配层；Windows 行为语义零变化
-- [ ] **P1-g** mac 真机验证（依赖 Phase 0）：
+- [ ] **P1-g** mac 真机验证（依赖 Phase 0）：本节状态停留在 2026-07；
+  后续 macOS 出包与代理通道实机验证见
+  [2026-08-23-screen-calibration.md](../../40-development/2026-08/2026-08-23-screen-calibration.md)：
   连设备 → scrcpy 流截图 → OCR → 跑一条完整调律工作流
 
 ## Phase 2 待办：窗口模式（8~10 天，可无限期后置）

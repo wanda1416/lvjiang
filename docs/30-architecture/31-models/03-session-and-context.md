@@ -47,13 +47,13 @@
 
 | 数据类型 | 现在存哪 | 读写方式 |
 |---------|---------|---------|
-| 调律材料库存、承音/定音石数量、装备评级历史等玩家数据 | `config/session/profile.db`（SQLite） | `profile_action()` / `profile_read()` 内置函数，见 [02-player-profile.md](../../20-requirements/02-player-profile.md) |
-| App/UI 层持久状态（当前用户、当前布局、日常脚本参数、窗口位置…） | `config/session/session.json`（`SessionStore` 节点） | 不经 DSL；Python 层经 `core.config.session.get_session_store()` 读写，见 [05-config-layering.md §四](../05-config-layering.md#四用户偏好不进配置层) |
+| 调律材料库存、承音/定音石数量、装备评级历史等玩家数据 | `config/session/profile.db`（SQLite） | `profile_get()` / `profile_set()` 内置函数，见 [../../20-requirements/40-profile/README.md](../../20-requirements/40-profile/README.md) |
+| App/UI 层持久状态（当前用户、当前布局、日常脚本参数、窗口位置…） | `config/session/session.json`（`SessionStore` 节点） | 不经 DSL；Python 层经 `core.config.session.get_session_store()` 读写，见 [04-config-layering.md §四](../30-overview/04-config-layering.md#四用户偏好不进配置层) |
 
 `session` DSL 关键字与上面两套都**不是**同一个存储——它读写的是
 `users/{username}.session.json` 这一份独立文件，目前处于"机制通了、没人用"的状态。
 若确实需要"跨次运行持久、按用户隔离、DSL 里直接读写"的数据，且不适合归入
-`profile_action()` 的 quota/regen/stock/note 四模型，这里仍是可用的落点；
+`profile_model()` 的 quota/regen/stock/note 四模型，这里仍是可用的落点；
 新增前建议确认 `core.profile` 的模型确实覆盖不了这个场景。
 
 ---
@@ -142,7 +142,7 @@ config/session/
 │   ├── attr_derivations.json
 │   └── _meta.json                     ← 一次性旧数据迁移版本
 ├── profile.db                          ← SQLite：quota/regen/stock/note 四模型的
-│                                          玩家数据（见 02-player-profile.md）
+│                                          玩家数据（见 20-requirements/40-profile/README.md）
 └── users/
     ├── 测试用户A.json                 ← 用户资料
     ├── 测试用户A.session.json         ← SessionManager：DSL `session` 关键字的落点
@@ -161,6 +161,29 @@ config/session/
 - `users/{username}.json`：用户资料，包括账号名、角色名、角色序号和账号尾号；
 - `users/{username}.session.json`：工作流通过 `session` 关键字维护的持久状态；
 - `users/{username}.notes.json`、`users/{username}.loadouts.json`：各自功能的旁路数据。
+
+### 燕云会话数据分文件存储
+
+`config/session/yysls/` 下的四个业务文件（`play_styles.json`、`graduations.json`、
+`attr_loadout.json`、`attr_derivations.json`）由代码固定登记，文件内容直接是原
+`session.json.yysls.<key>` 的值；新增状态必须先在代码里登记文件名，未知键不会
+自动生成文件。
+
+启动燕云插件时读 `_meta.json` 里的迁移版本：
+
+- 版本为 `1`：只用新目录，不再检查旧节点；
+- 没有版本记录：在 `SessionStore` 写锁内读 `session.json.yysls`，校验全部子项，
+  逐项写入对应文件，成功后删除旧节点并写版本记录；旧节点不存在时直接创建空文件
+  并记录版本。
+
+迁移中断时旧节点仍在，下次启动可重试；已经写入且内容与旧值相同的文件可复用；内容
+冲突、旧节点形状错误或出现未知子项时停止迁移并保留原数据。`play_styles` 与
+`attr_derivations` 的联合更新走可恢复事务，保存 / 删除 / 重命名基础属性后两份状态
+保持一致。
+
+目录锁、原子读写、版本校验与事务恢复由
+`core.config.document_store.DocumentDirectoryStore` 提供；燕云适配器只登记上述文件
+并实现旧节点迁移，因此该抽取不改变磁盘格式与初始化顺序。
 
 ---
 
@@ -213,5 +236,5 @@ class WorkflowEngine:
 |------|------|
 | [01-equipment-models.md](01-equipment-models.md) | 装备领域模型完整定义 |
 | [02-scene-implementations.md](02-scene-implementations.md) | 场景实现与区域定义 |
-| [../05-config-layering.md](../05-config-layering.md) | `session.json`（SessionStore）的节点划分与合并规则 |
-| [../../20-requirements/02-player-profile.md](../../20-requirements/02-player-profile.md) | quota/regen/stock/note 四模型（玩家持久数据现在的落点） |
+| [04-config-layering.md](../30-overview/04-config-layering.md) | `session.json`（SessionStore）的节点划分与合并规则 |
+| [../../20-requirements/40-profile/README.md](../../20-requirements/40-profile/README.md) | quota/regen/stock/note 四模型（玩家持久数据现在的落点） |

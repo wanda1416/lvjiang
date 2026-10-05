@@ -143,11 +143,11 @@ points:
 
 ### 2. 注册到布局配置
 
-在 `config/default.yaml` 的 `layout_scenes` 中添加场景 key：
+在 `config/system/scenes.yaml` 的 `scenes.<分组>.items` 中添加场景 key：
 
 ```yaml
-# config/default.yaml
-layout_scenes:
+# config/system/scenes.yaml
+scenes:
   - bag_equip_detail
   - bag_item_detail
   - equip_weapon_detail

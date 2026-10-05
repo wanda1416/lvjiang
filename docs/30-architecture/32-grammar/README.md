@@ -1,5 +1,7 @@
 # DSL 语法速查
 
+> 最后更新：2026-10-06（基线 v0.13.11）。本层描述如与代码或配置不符，以代码与配置为准。
+
 工作流 DSL（Domain Specific Language）语法规范，用于描述 `.wf` 工作流文件。
 
 > 本文档汇总所有指令的语法格式。详细说明请点击对应链接。
@@ -469,9 +471,9 @@ $a + 1 > $b * 2                       # 两侧支持 + - * /
 
 falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 
-## 十、内置函数（84 个）
+## 十、内置函数（96 个）
 
-> 完整签名与说明见 [06-functions.md](06-functions.md)。数量为 core 67 + yysls 插件 17，可
+> 完整签名与说明见 [06-functions.md](06-functions.md)。数量为 core 69 + yysls 插件 27，可
 > 用 `list_functions()` 复核。
 
 | 类别 | 函数 |
@@ -479,16 +481,17 @@ falsy 值：`null` / `false` / `""` / `0` / `{}` / `[]`
 | **基础运算（8）** | `add` `sub` `mul` `div` `mod` `min` `max` `abs` |
 | **字典/列表（12）** | `len` `keys` `values` `has_key` `del_key` `remove` `slice` `range` `count_nonempty` `contains` `find_key` `append` |
 | **字符串（13）** | `concat` `substr` `split` `split_lines` `replace` `match` `trim` `upper` `lower` `to_num` `extract_int` `extract_num` `extract_progress` |
-| **装备（7）** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` `yysls_rich_parse` |
+| **装备（8）** | `to_equipment` `make_fingerprint` `affix_cap` `chengyin_cap` `is_good_equip` `evaluate` `yysls_rich_parse` `equipment_lock_status` |
 | **背包遍历（3）** | `check_scroll` `notify_scroll` `scroll_advance` |
 | **背包游标（3）** | `bag_cursor_init` `bag_cursor_visit` `bag_cursor_finish_window` |
-| **入库与角色属性（6）** | `scanned_loadout_names` `write_bag_item` `write_equipped` `set_scanned_loadout_gongjue` `to_role_base_attrs` `open_base_attr_form` |
+| **入库与角色属性（12）** | `scanned_loadout_names` `ensure_scanned_loadout` `bind_scanned_loadout` `loadout_scan_target` `write_bag_item` `mark_equipment_seen` `write_equipped` `set_scanned_loadout_gongjue` `has_scanned_base_attrs` `save_scanned_base_attrs` `to_role_base_attrs` `open_base_attr_form` |
+| **游戏属性（1）** | `game_attr` |
 | **时间（2）** | `clock` `datetime` |
 | **用户交互与系统（7）** | `confirm` `pause` `notify` `input` `save` `panel_rows` `panel_cols` |
 | **应用生命周期（6）** | `app_is_running` `app_stop` `app_start` `android_app_stop` `android_app_start` `android_wait_stable_frame` |
 | **运行环境与后端（5）** | `env` `check_env` `is_send` `is_post` `is_device` |
-| **图色（7）** | `pixel` `bright` `color_ratio` `bright_segs` `color_vec` `find_icons` `find_multi_color` |
-| **玩家档案（7）** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` `profile_observe` `user_get` |
+| **图色（8）** | `pixel` `bright` `color_ratio` `pixel_ratios` `bright_segs` `color_vec` `find_icons` `find_multi_color` |
+| **玩家档案（8）** | `profile_get` `profile_set` `profile_inc` `profile_model` `profile_all` `profile_observe` `profile_declare` `user_get` |
 
 ## 十一、模块化
 

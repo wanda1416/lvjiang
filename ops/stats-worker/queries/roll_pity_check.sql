@@ -5,7 +5,7 @@
 -- ⚠️ 这条查询**不分层**，只能当粗筛，不能当结论：高轮次桶只包含"前面都没中"
 -- 的会话，它们的部位/材料构成与低桶不同，读到的差异可能全部来自样本构成。
 -- 分层版本在 scripts/analyze_telemetry_rolls.py 第 3 节，见
--- docs/10-game/20-affix-analysis/README.md 偏差 5。
+-- docs/40-development/analysis/README.md 偏差 5。
 SELECT
   CASE
     WHEN r.key + 1 <= 1  THEN '1'

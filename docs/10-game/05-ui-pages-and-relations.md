@@ -46,10 +46,11 @@
 
 ### 2.2 数量与覆盖
 
-- 注册表共有 6 个配置分组、29 个 Scene 定义。
-- 安卓布局和桌面布局各绑定 28 个 Scene。
+- 注册表共有 6 个配置分组、37 个 Scene 定义（`config/system/scenes/` 下每个场景一个文件）。
+- 安卓布局绑定 35 个 Scene，桌面布局绑定 36 个。
 - `jianghu_card` 作为子场景被 `activity_jianghu` 的 6 个实例复用。
-- `huoyun_card` 已注册且有定义，但当前没有布局绑定，是明确的占位缺口。
+- `activity_jianghuyi` 已注册且有定义，但两端都没有布局绑定，是明确的占位缺口
+  （`huoyun_card` 只在桌面布局绑定，安卓端未绑定）。
 - `投屏布局` 不重复保存场景文件，而是继承 Android 的 `安卓布局`，只调整全局
   画布裁剪；桌面布局为 1920×1080，并有独立的逐场景坐标和按键绑定。
 
@@ -498,4 +499,4 @@ verify: equip_tune_detail.tune_btn contains 词库预览
 - 单轮执行：[executor.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/executor.py)
 - 重置处理：[resetter.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/resetter.py)
 - 回收处理：[recycler.py](../../src/lvjiang/apps/yysls/workflows/implementations/tuning/recycler.py)
-- 自动调律完整需求：[01-auto-tuning.md](../20-requirements/01-auto-tuning.md)
+- 自动调律完整需求：[01-auto-tuning.md](../20-requirements/10-tuning/01-auto-tuning.md)

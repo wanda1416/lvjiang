@@ -2,7 +2,7 @@
 
 ## 批量导入
 
-将所有流派的 Excel 源文件放入 `data/temp/excel/` 后执行批量导入：
+将所有流派的 Excel 源文件放入 `data/excel/` 后执行批量导入：
 
 ```powershell
 # 检查模式：解析全部公式，与 Excel 缓存值对账，不写入文件
@@ -12,7 +12,7 @@
 .venv\Scripts\python.exe scripts\extract_graduation_data.py --level 110 --version 1
 
 # 运行测试验证
-.venv\Scripts\python.exe -m pytest tests\test_graduation_excel_model.py -q -p no:cacheprovider
+.venv\Scripts\python.exe -m pytest tests\yysls\test_graduation_excel_model.py -q -p no:cacheprovider
 ```
 
 ### 批量脚本的文件命名约定
@@ -64,6 +64,14 @@
 5. 成功后自动注册逻辑方案；同名同等级再次导入会新增版本，不覆盖旧版本
 
 导入完成后会清除模型注册表与模型内容缓存，确保后续计算立即选择新版本。
+
+### 落地细节
+
+- 生成的模型文件按身份命名：
+  `config/system/yysls/graduation/{流派}_{方案}_{等级}_v{版本}.json`，运行时只读 JSON。
+- 注册后的逻辑方案写在流派配置的 `schools.<流派>.schemes` 下。
+- 备战方案面板的属性区在「弓玦」之后显示「方案」下拉框，选中的方案即当前方案，
+  决定计算器用哪份公式模型（`attrs_tab._combo_scheme`）。
 
 ## 验证对账
 

@@ -1,7 +1,7 @@
 # 律匠开发路线图 v3
 
 > 本文保存早期 Phase 0~9 的规划和 2026-08-15 的阶段快照，不代表当前
-> 待办或实现范围。0.13.4 的已交付能力见[发布说明](../50-releases/v0.13.4.md)，
+> 待办或实现范围。0.13.11 的已交付能力见[发布说明](../50-releases/v0.13.11.md)，
 > 当前待办线索见[待办页](02-backlog.md)；下方原始路径、数量和计划不应
 > 直接用于新版本的操作说明。
 
@@ -331,7 +331,7 @@ Phase 9 之后的延伸工作（07-26 ~ 08-16）：
 
 - **自动调律端到端流水线**：背包遍历 → 潜力判定 → 实际调律 → 终局判定 → 调律说明文档。
 - **Android 独立执行端**：三通道 PoC 闭环、系统配置随 APK 分发、设备端工作流引擎、原生调律参数配置页、release 实机复验。
-- **设备端代理通道**（2026-08-22）：PC 端 ADB 模式经手机上的律匠 app 用无障碍截图 + 手势（`adb forward` → `AgentServer`），替代 `adb shell input`；app 不可达自动回退。契约见 `30-architecture/04-device-agent-protocol.md`。
+- **设备端代理通道**（2026-08-22）：PC 端 ADB 模式经手机上的律匠 app 用无障碍截图 + 手势（`adb forward` → `AgentServer`），替代 `adb shell input`；app 不可达自动回退。契约见 `30-architecture/38-platform/01-device-agent-protocol.md`。
 - **屏幕标定**（2026-08-23）：换机后在 app 内用参照大厅截图 + 几组地标对齐布局画布（`core/screen_calib.py` + `CalibActivity`）；设备端 ScreenMap 补"截图网格 ≠ 触摸网格"的机器；macOS 也能出包，代理通道真机验证通过。
 - **打包分发**：PyInstaller onedir 一键打包 + 内置 adb，用户免装 platform-tools。
 - **平台适配**：抽离 core/platforms.py；macOS Phase 0（依赖验证 + 退出崩溃修复）。

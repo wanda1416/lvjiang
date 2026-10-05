@@ -1,5 +1,7 @@
 # 开发日志 2026-09-02
 
+> 本文里的**场景 schema v2 与页面跳转契约**已成现行规格，正文见 [34-scene/04-page-transition-contract.md](../../30-architecture/34-scene/04-page-transition-contract.md) 与 [31-models/02-scene-implementations.md](../../30-architecture/31-models/02-scene-implementations.md)；本文只留决策与踩坑。
+
 > 接续 08-30 可复用引用场景、配置版本显式治理、v0.9.0 发布。
 > 本轮主题：**调律历史结构化持久化 + 场景 schema v2 与页面跳转契约 + 武学/流派/玩法三层拆分 + 用户头像与执行用户 + 自动调律安全性重做 + v0.10.0 发布**。
 

@@ -32,7 +32,7 @@ python scripts/analyze_telemetry_rolls.py rolls.json -o report.md
 
 分层、置信区间、重抽样这类分析在 SQL 里写会很难读也很难复核。导出文件含
 `install_id`，只放本机、不提交仓库、不随 issue 外发。方法论见
-[`docs/10-game/20-affix-analysis/`](../../../docs/10-game/20-affix-analysis/README.md)。
+[`docs/40-development/analysis/`](../../../docs/40-development/analysis/README.md)。
 
 ## 保留期
 

@@ -334,7 +334,7 @@ def section_slot(sessions: list[dict], top: int) -> list[str]:
     """
     L = ["## 7. 槽位词条分布（终态重建）", "",
          "统计对象是**每件装备最终留下的**词条（按 `resets` 重建，见"
-         "`docs/10-game/20-affix-analysis/README.md`「重置会把装备清回只剩"
+         "`docs/40-development/analysis/README.md`「重置会把装备清回只剩"
          "首词条」一节），不是调律过程中每次 roll 的原始产出。转律件（会话内"
          "出现过一次转律即算）整条排除，理由与词条分布/cap_pct 一致。", "",
          "第 1 格（首词条）通常是装备自带、不是调律调出来的，单列一节"
@@ -443,5 +443,5 @@ def section_caveats(n_raw: int, n_used: int, max_per_install: int | None) -> lis
         "- **不给 p 值**：几十个词条 × 7 部位 × 4 材料，逐格检验必然量产假阳性，"
         "而在这个场景里没有预注册的假设可供校正。置信区间 + 效应量能支撑决策，"
         "p 值只会制造「显著」的错觉。",
-        "", "方法论详见 `docs/10-game/20-affix-analysis/README.md`。",
+        "", "方法论详见 `docs/40-development/analysis/README.md`。",
     ]

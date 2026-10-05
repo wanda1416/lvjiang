@@ -1,6 +1,11 @@
 # 01 · 四条感知通道
 
 > Layer: L3 · 目标：给定一个问题，能一眼决定该走哪条通道，不走错。
+>
+> 通道选定之后，`scan` / `recognize` 底层的截屏与裁剪数据流见
+> [33-engine/01-screenshot-and-crop.md](../33-engine/01-screenshot-and-crop.md)；
+> 各后端实际支持哪些截图与输入方式见
+> [38-platform/03-io-backends.md](../38-platform/03-io-backends.md)。
 
 游戏 UI 不在无障碍树里。律匠的感知层是**四条独立通道**，各自解决不同性质的问题：
 
@@ -17,7 +22,7 @@
 **不能回答**：纯图标（没有字形）、非汉英混排之外的符号。
 
 - 实现：`src/lvjiang/core/recognizers/ocr_recognizer.py`（RapidOCR ONNX）
-- 清洗：`config/system/ocr_rules.yaml`（分组）
+- 清洗：`config/system/ocr.yaml`（分组）
 - DSL：`scan`（读文字）、`find ... "关键词"`（找文字位置）
 - 慢且吃 CPU。**能用图色秒判的场景不要走 OCR**。
 
@@ -62,7 +67,7 @@
 
 - 实现：`src/lvjiang/core/recognizers/color_ops.py`
 - DSL 层：`src/lvjiang/workflows/builtins/vision.py`
-- 7 个内置函数：`pixel` / `bright` / `color_ratio` / `bright_segs` / `color_vec` / `find_icons` / `find_multi_color`
+- 8 个内置函数：`pixel` / `bright` / `color_ratio` / `pixel_ratios` / `bright_segs` / `color_vec` / `find_icons` / `find_multi_color`
 - 详细展开见 [02-color-ops-internals.md](02-color-ops-internals.md)
 
 **典型用法**：判定"在对局中"→ `color_ratio(HUD 顶部, 白, 30) >= 0.05`；找地图标记 → `find_icons(绿主导)` 返回列表。

@@ -1,5 +1,7 @@
 # 37 · 视觉感知子系统（Vision）
 
+> 最后更新：2026-10-06（基线 v0.13.11）。本层描述如与代码或配置不符，以代码与配置为准。
+
 > Layer: L3（架构解释）· Stability: evolving
 > 目标读者：需要**选通道 / 调阈值 / 排查不命中 / 扩算法**的贡献者
 > 上层文法契约见 [32-grammar/04.4-image-template.md](../32-grammar/04.4-image-template.md) 与 [06.4-vision-functions.md](../32-grammar/06.4-vision-functions.md)

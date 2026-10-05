@@ -6,7 +6,7 @@ roll 观测**，包括后来被重置抹掉、或被同一格后续重新调出�
 两者是不同的问题，后者（终态）才是"腿甲部位首词条为劲时第 2-5 格最终是
 什么"这类问题真正要问的。
 
-`docs/10-game/20-affix-analysis/README.md` 里"遥测数据答不了（没有词条
+`docs/40-development/analysis/README.md` 里"遥测数据答不了（没有词条
 组合）"的说法是旧版逐轮上报 schema（一轮一条事件）时代写的，`一件装备一条`
 的新 schema（`initial_affixes[]` + `rolls[].slot`，按 `resets` 能重建终态）
 已经能回答了——该文档需要同步更新，见 PR 说明。

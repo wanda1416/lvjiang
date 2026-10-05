@@ -1,5 +1,7 @@
 # 数据模型
 
+> 最后更新：2026-10-06（基线 v0.13.11）。本层描述如与代码或配置不符，以代码与配置为准。
+
 核心领域对象的结构化定义，作为各模块间的共同数据契约。
 
 ## 文档索引
@@ -11,6 +13,7 @@
 | [03-session-and-context.md](03-session-and-context.md) | Session 与 Context 数据模型：持久状态与运行时上下文 |
 | [04-profile.md](04-profile.md) | Profile 共享模块：存储契约、周期扩展与 UI 边界 |
 | [05-martial-arts-and-playstyles.md](05-martial-arts-and-playstyles.md) | 武学/流派/玩法三层：玩法决定调律方向，流派决定毕业率 |
+| [06-base-attr-model.md](06-base-attr-model.md) | 基础属性来源模型：心法/武学/套装等如何合成装备之外的战斗属性 |
 
 ## 关联文档
 

@@ -10,7 +10,7 @@
 --
 -- 导出的是含 install_id 的原始数据，落到本地就等同于一份可关联的样本：
 -- 只放在本机分析目录，不要提交进仓库，也不要随 issue 附件外发。
--- 方法论与偏差清单见 docs/10-game/20-affix-analysis/README.md。
+-- 方法论与偏差清单见 docs/40-development/analysis/README.md。
 --
 -- 时间窗按需改；roll_batch 本身只保留 90 天（见 schema.sql 的清理钩子）。
 SELECT install_id, day, app_version, plugin, n_events, payload

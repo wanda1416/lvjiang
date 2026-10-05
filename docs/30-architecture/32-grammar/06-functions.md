@@ -15,14 +15,14 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 
 ## 速查表
 
-共 **86 个**内置函数（core 68 个 + yysls 插件 18 个），按功能分为 14 类。
+共 **96 个**内置函数（core 69 个 + yysls 插件 27 个），按功能分为 14 类。
 
 > 本节列表与注册表一致，核对方式：
 >
 > ```python
 > from lvjiang.workflows import builtins as b
 > import lvjiang.apps.yysls.workflows.builtins  # 触发插件注册
-> print(sorted(b.list_functions()))           # → 86 个
+> print(sorted(b.list_functions()))           # → 96 个
 > ```
 
 ### 基础运算（8）
@@ -73,7 +73,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `extract_num` | `(str) -> int \| float` | 提取文本中第一项非负数（可含小数点），找不到返回 `-1` |
 | `extract_progress` | `(str) -> dict` | 提取 `当前/总量` 进度对，返回 `{valid, current, total}` |
 
-### 装备处理（7）
+### 装备处理（8）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -84,6 +84,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `is_good_equip` | `(dict) -> bool` | 判定装备是否值得保留（高价值词条 ≥ 2） |
 | `evaluate` | `(dict) -> dict` | 使用流派规则评估装备，返回评级结果字典 |
 | `yysls_rich_parse` | `(dict) -> dict` | `as rich` 的转换函数：解析 `level_text`/`count_text` 并删除原字段 |
+| `equipment_lock_status` | `(ref) -> str` | 从紧邻的装备详情截图识别锁定状态，返回 `"locked"` / `"unlock"` / `""` |
 
 ### 背包遍历（3）
 
@@ -101,7 +102,7 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `bag_cursor_visit` | `(fingerprint) -> str` | 登记行首锚点，返回 `"new"` / `"skip"` / `"end"` |
 | `bag_cursor_finish_window` | `(visible_rows, expected_rows) -> str` | 提交一个窗口，返回 `"scroll"`（继续滚动）或 `"end"`（到底） |
 
-### 装备入库与角色属性（6）
+### 装备入库与角色属性（12）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -111,6 +112,12 @@ DSL 通过 `eval` 调用引擎内置函数，支持基础运算、数据清洗�
 | `set_scanned_loadout_gongjue` | `(gongjue) -> str` | 设置本次扫描绑定方案的弓玦套装，不切换活动方案 |
 | `to_role_base_attrs` | `(dict) -> dict` | 解析角色详情页 OCR 原始数据为基础属性字典 |
 | `open_base_attr_form` | `(dict) -> null` | 弹出「创建基础属性」面板并预填数值，不阻塞工作流 |
+| `ensure_scanned_loadout` | `(name, main_art, sub_art) -> dict` | 按名称匹配游戏方案，不存在则新建备战方案且不切换活动方案；返回 `{ok, name, main_art, sub_art, playstyle, created}` |
+| `bind_scanned_loadout` | `(name, main_art, sub_art) -> str` | 按名称与武学匹配唯一本地方案并绑定写入目标，返回方案 ID；名称或武学不一致时报错 |
+| `loadout_scan_target` | `(name?, main_art?, sub_art?) -> dict` | 解析直接执行的扫描目标且不切换活动方案，返回 `{name, main_art, sub_art, playstyle}` |
+| `mark_equipment_seen` | `(dict) -> bool` | 记录一次真实装备观察以刷新时间元数据，返回是否命中已有装备 |
+| `has_scanned_base_attrs` | `(name?, main_art?, sub_art?) -> bool` | 该用户在该备战方案下的基础属性是否已保存；无法确定时返回 false |
+| `save_scanned_base_attrs` | `(dict) -> str` | 把识别出的基础属性静默写入已绑定方案所属流派；未绑定方案或结果不完整时报错 |
 
 ### 游戏属性（1）
 
@@ -191,7 +198,7 @@ end
 > 坐标入参是 `$ref = [scene].[region]` 的求值结果、4 元矩形字面量或 find 产出；
 > 距离类参数按画布高比例。详见 [06.4-vision-functions.md](06.4-vision-functions.md)。
 
-### 玩家档案（7）
+### 玩家档案（8）
 
 | 函数 | 签名 | 说明 |
 |---|---|---|
@@ -202,3 +209,4 @@ end
 | `profile_all` | `() -> dict` | 获取全部 profile 数据，regen 条目返回计算后的当前值 |
 | `profile_observe` | `(key, value) -> dict` | 上报外部观测值（仅 quota 模型），同周期内拒绝更小的值 |
 | `user_get` | `(username, key) -> any \| null` | 按内部用户名读取用户资料属性，取不到返回 null |
+| `profile_declare` | `(model_type, key, definition) -> dict` | 声明工作流依赖的 profile key，不存在时按 definition 创建（幂等）；返回 `{ok, created, key}` |

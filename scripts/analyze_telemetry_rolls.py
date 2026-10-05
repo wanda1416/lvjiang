@@ -12,7 +12,7 @@
 3. 裸 JSON 数组 —— 上面两种的中间产物，或手工拼的样本。
 
 方法论、每一节怎么读、以及这份数据已知的系统性偏差，见
-``docs/10-game/20-affix-analysis/README.md``。报告本身也会把关键口径
+``docs/40-development/analysis/README.md``。报告本身也会把关键口径
 重复一遍，因为报告会被单独转发，不该依赖读者手边有文档。
 
 只用标准库：本仓库运行期不依赖 numpy/pandas/scipy，分析脚本也不该引入

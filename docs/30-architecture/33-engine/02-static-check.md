@@ -28,7 +28,7 @@ DSL 只认 key，不认场景定义里的中文名 —— `[返回]` 写成字�
 
 ## 二、搜集范围
 
-`scene_scan.collect_refs` 遍历：
+`workflow_references.collect_refs` 遍历：
 
 - 顶层语句
 - 所有 `def` 过程体，**包括未被 `call` 的**（宁可多报，不可漏）

@@ -14,7 +14,7 @@ WorkflowEngine._exec_scan / _exec_recognize     (workflows/engine/data_ops.py)
    │  解析 scene_name 与 field_keys
    ▼
 BaseWorkflow.ocr_scene / recognize_references    (workflows/base/recognition.py)
-   │  ① 调用 ScreenCapture.capture() 截全屏大图（仅 1 次）
+   │  ① 调用 DesktopCapture.capture() 截全屏大图（仅 1 次）
    │  ② 从 layout 取出该场景的 Region 列表
    │  ③ 按 field_keys 过滤（若指定）
    │  ④ 对每个 Region：归一化坐标 → 像素坐标 → 裁剪小图
@@ -69,6 +69,11 @@ for region in regions:
 numpy 切片是**视图**,不复制像素数据,所以裁剪本身几乎零成本。真正贵的是截屏那一下。
 
 ## 四、识别:两条分支
+
+这两条分支就是感知通道里最常用的两条（OCR 与参考图匹配），"什么时候该走哪条"见
+[37-vision/01-perception-channels.md](../37-vision/01-perception-channels.md)。本节
+第二节的 `capture.py` 只覆盖桌面截图；全部后端的截图与输入能力矩阵见
+[38-platform/03-io-backends.md](../38-platform/03-io-backends.md)。
 
 裁剪出的小图进入不同的识别器:
 

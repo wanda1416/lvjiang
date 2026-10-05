@@ -1,5 +1,7 @@
 # 游戏领域知识
 
+> 最后更新：2026-10-06（基线 v0.13.11）。本层描述如与代码或配置不符，以代码与配置为准。
+
 记录《燕云十六声》中与律匠相关的客观机制，以及律匠采用的调律评价规格。
 
 客观机制与评价规格分开维护：机制描述游戏允许什么，评价规格描述律匠如何判断和处置装备。
@@ -15,15 +17,15 @@
 | [05-ui-pages-and-relations.md](05-ui-pages-and-relations.md) | 游戏 UI 页面、叠层、视图状态及自动化流程关联图 |
 | [06-mechanics-conventions.md](06-mechanics-conventions.md) | 游戏机制约定登记表：写死在代码、未进配置的规则事实（五维系数、弓玦、三率上限、调律铁律、部位归并等），含位置与依据 |
 | [10-tuning-rules/](10-tuning-rules/README.md) | 律匠评价规格：装备分级、流派规则、转律模拟与熔断 |
-| [20-affix-analysis/](20-affix-analysis/README.md) | 词条分布规律分析：数据来源、分析脚本、已知偏差清单 |
+| [../40-development/analysis/](../40-development/analysis/README.md) | 词条分布规律分析：数据来源、分析脚本、已知偏差清单（方法与过程，落户开发层） |
 
-## 待补充
+## 待补充（尚未创建）
 
 - `affix-compendium.md` — 词条大全：名称、类型、数值范围、出现规则
 - `rarity-rules.md` — 稀有词条规则
 
 这两篇要填的是**结论**（游戏实际怎么出词条），而结论得先从观测数据里推出来——
-方法与脚本见 [20-affix-analysis/](20-affix-analysis/README.md)。
+方法与脚本见 [开发层的分析篇](../40-development/analysis/README.md)。
 
 各流派毕业标准与调律评级不是同一概念，毕业率模型见
 [毕业率计算](../30-architecture/36-graduation/README.md)。

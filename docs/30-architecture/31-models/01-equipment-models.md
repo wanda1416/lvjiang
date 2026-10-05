@@ -135,7 +135,7 @@
 | `unit` | string \| null | 单位，百分比类为 `"%"`，否则为 `null` |
 | `is_transferred` | bool | 是否为转律产出 |
 | `cap_pct` | float \| null | 数值占该等级上限的百分比；无上限数据时为 `null` |
-| `target_transmute_name` | str（可选） | 模拟转律目标词条名；只是计划，不改变 `name`/`value`，不参与指纹。一件装备至多一条词条带此字段，须与 `target_transmute_value` 同时有效，见 [模拟转律需求](../../20-requirements/09-transmute-simulation.md) |
+| `target_transmute_name` | str（可选） | 模拟转律目标词条名；只是计划，不改变 `name`/`value`，不参与指纹。一件装备至多一条词条带此字段，须与 `target_transmute_value` 同时有效，见 [模拟转律需求](../../20-requirements/10-tuning/04-transmute-simulation.md) |
 | `target_transmute_value` | float（可选） | 目标词条按实际装备等级／承音状态的上限值（未承音普通上限、承音承音上限）；计算时按投影副本重新取值 |
 
 ---
@@ -355,7 +355,7 @@ OCR 识别输出为原始文本，需经过清洗才能转换为上述结构化�
 | `XX阶` | 提取数字为 `level` |
 | `攻击100~232` | 解析为二元组 `[100, 232]` |
 
-**数据清洗模块**：词条清洗逻辑待实现，将作为 OCR 后处理步骤集成到工作流引擎（`WorkflowEngine` + `.wf` DSL）中。
+**数据清洗模块**：词条清洗逻辑已实现——`src/lvjiang/core/ocr_cleaner.py` 负责 OCR 文本规范化，`src/lvjiang/apps/yysls/core/equip_parser/parser.py` 把清洗后的文本解析为结构化装备，作为 OCR 后处理集成在 `WorkflowEngine` 的 `scan` / `to_equipment` 路径中。
 
 ---
 

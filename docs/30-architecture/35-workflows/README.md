@@ -1,5 +1,7 @@
 # 流程编排（Workflows）
 
+> 最后更新：2026-10-06（基线 v0.13.11）。本层描述如与代码或配置不符，以代码与配置为准。
+
 流程编排描述如何组合多个场景来完成一个完整的业务目标。
 
 ## 与场景的关系
@@ -13,7 +15,7 @@
 | 编号 | 文件 | 主题 | 依赖场景 | 插件 |
 |------|------|------|----------|------|
 | 01 | [01-current-equip-analysis.md](01-current-equip-analysis.md) | 用户当前装备分析 | bag_equip_detail, equip_weapon_detail, equip_armor_detail | yysls |
-| 02 | [01-auto-tuning.md](../../20-requirements/01-auto-tuning.md) | 自动调律（背包滚动遍历） | bag_equip_detail, equip_weapon_detail, equip_armor_detail | yysls |
+| 02 | [02-auto-tuning.md](02-auto-tuning.md) | 自动调律（背包滚动遍历） | bag_equip_detail, equip_weapon_detail, equip_armor_detail | yysls |
 
 > 注：以上流程均为燕云十六声插件（`src/lvjiang/apps/yysls/`）专属工作流。通用 DSL 语法见 [32-grammar](../32-grammar/README.md)。
 

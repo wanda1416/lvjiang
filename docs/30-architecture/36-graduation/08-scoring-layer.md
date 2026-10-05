@@ -37,11 +37,11 @@ LoadoutScorer.rate(projected)              # effective_equipped → 聚合 → b
 
 | 环节 | 转入词条来源 | 为什么不同 |
 |---|---|---|
-| 规则评级潜力（`evaluator/rule_judge.py`） | 规则的 `transmute_priority`，按优先级取 | 没有毕业率数据，只能按规则作者的价值序 |
-| 智能调律（`smart_tuning.py`） | 各流派转律库并集 ∩ 本规则词条库 | 已选调律规则，收益由毕业率决定 |
-| 备战方案转律建议（`loadout/transmute.py`） | 各流派转律库并集 | 不承诺用户是什么流派 |
+| 规则评级潜力（`apps/yysls/core/evaluator/rule_judge.py`） | 规则的 `transmute_priority`，按优先级取 | 没有毕业率数据，只能按规则作者的价值序 |
+| 智能调律（`apps/yysls/core/graduation/smart_tuning.py`） | 各流派转律库并集 ∩ 本规则词条库 | 已选调律规则，收益由毕业率决定 |
+| 备战方案转律建议（`apps/yysls/core/loadout/transmute.py`） | 各流派转律库并集 | 不承诺用户是什么流派 |
 
-三者共用 `loadout/transmute.py` 的两个函数：`retransfer_capability()`（再次转律能力：承音看
+三者共用 `apps/yysls/core/loadout/transmute.py` 的两个函数：`retransfer_capability()`（再次转律能力：承音看
 原始等级与承音后开关，未承音看当前等级）与 `transmute_targets(equip, index, pool)`（部位
 合法性、去掉第 2～5 条已有、整件校验）。`judge_transmute_eligibility(require_retransfer=…)`
 区分“只支持一次转律的装备是否参与”：备战方案不参与，自动调律参与。

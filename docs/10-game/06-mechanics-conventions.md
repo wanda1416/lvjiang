@@ -185,4 +185,4 @@
 - 新增写死的游戏规则：先登记再写代码，PR 描述里引用条目编号。
 - 决定把某条配置化时：从本表删除，并在对应配置文档（`60-userguide/04.05-game-config.md`）里补字段说明。
 - 本表由 2026-09-18 的代码审计整理，对应提交 `9e5f9d1f` 之后的 `dev`。
-- 引用本表的文档：[01-equipment-system.md](01-equipment-system.md)、[03-damage-mechanics.md](03-damage-mechanics.md)、[04-tuning-mechanics.md](04-tuning-mechanics.md)、[../30-architecture/08-base-attr-model.md](../30-architecture/08-base-attr-model.md)、[../30-architecture/36-graduation/08-scoring-layer.md](../30-architecture/36-graduation/08-scoring-layer.md)、[../60-userguide/04.05-game-config.md](../60-userguide/04.05-game-config.md)。
+- 引用本表的文档：[01-equipment-system.md](01-equipment-system.md)、[03-damage-mechanics.md](03-damage-mechanics.md)、[04-tuning-mechanics.md](04-tuning-mechanics.md)、[31-models/06-base-attr-model.md](../30-architecture/31-models/06-base-attr-model.md)、[../30-architecture/36-graduation/08-scoring-layer.md](../30-architecture/36-graduation/08-scoring-layer.md)、[../60-userguide/04.05-game-config.md](../60-userguide/04.05-game-config.md)。

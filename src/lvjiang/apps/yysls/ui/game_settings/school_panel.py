@@ -594,7 +594,10 @@ class SchoolPanel(QWidget):
             return
         self._btn_import_scheme.setEnabled(True)
         from ...core.graduation.model_registry import available_models
-        for ref in available_models(school):
+        for ref in sorted(
+            available_models(school),
+            key=lambda ref: (-ref.level, -ref.version, ref.scheme),
+        ):
             row = self._scheme_list.rowCount()
             self._scheme_list.insertRow(row)
             level_item = QTableWidgetItem(

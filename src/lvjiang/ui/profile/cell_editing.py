@@ -44,7 +44,7 @@ from .cell_formatting import (
     apply_cell_style,
     format_profile_cell,
 )
-from .dialogs import HistoryDialog, ask_value_dialog
+from .dialogs import HistoryDialog, ask_value_dialog, format_number_text
 
 if TYPE_CHECKING:
     from .tab import ProfileTab
@@ -477,7 +477,7 @@ class ProfileCellEditingMixin:
             vocab_label = tr("来源")
 
         if kd.decimal:
-            current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
+            current_text = format_number_text(current_value)
             is_float = True
         else:
             current_text = str(int(current_value))
@@ -535,11 +535,11 @@ class ProfileCellEditingMixin:
     ):
         """覆写（编辑语义）：输入目标值，计算 delta 走 CAS 写入。
 
-        默认勾选「同步变更依赖方」→ 走 action 路径（触发 sync_targets 同步）。
-        取消勾选 → 纯覆写语义（仅写本 key，不触发任何同步）。
+        默认不勾选「同步变更依赖方」→ 纯覆写语义（仅写本 key，不触发任何同步）；
+        需要连带更新依赖方时再手动勾选，才走 action 路径触发 sync_targets。
         """
         if kd.decimal:
-            current_text = f"{current_value:.4f}".rstrip("0").rstrip(".")
+            current_text = format_number_text(current_value)
             is_float = True
         else:
             current_text = str(int(current_value))
@@ -555,7 +555,7 @@ class ProfileCellEditingMixin:
             sources=kd.sources + [u for u in kd.uses if u not in kd.sources],
             initial_value=current_value,
             sync_checkbox=True,
-            sync_default=True,
+            sync_default=False,
             source_label=tr("来源/用途"),
         )
         if not ok:
@@ -568,7 +568,11 @@ class ProfileCellEditingMixin:
             and _is_continuous_regen(kd)
             and abs(new_value - math.floor(new_value)) > 1e-9
         )
-        if delta == 0:
+        if kd.decimal:
+            # 初值按显示精度回填，用户「打开就确定」时不该把值截断成显示精度
+            if format_number_text(new_value) == format_number_text(current_value):
+                return
+        elif delta == 0:
             return
 
         # 新词条归入实际变动方向对应的词表：增加→来源，减少→用途

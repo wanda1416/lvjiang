@@ -69,6 +69,56 @@ def test_refresh_window_rect_updates_a_matching_live_window(monkeypatch) -> None
         30, 40, 300, 200)
 
 
+def test_switching_target_never_captures_a_preview() -> None:
+    """目标切换必须先恢复任务视图，不能在 UI 线程同步执行 ADB 截图。"""
+    registry = ExecutionTargetRegistry()
+    target = ExecutionTarget(
+        id=android_target_id("A"), kind="adb", display_name="设备",
+        capture=object(), input_ctrl=object(), status="connected",
+    )
+    registry.put(target)
+
+    class PreviewLabel:
+        def clear(self) -> None:
+            pass
+
+        def setText(self, text: str) -> None:
+            self.text = text
+
+    host = type("Host", (WindowOpsMixin,), {})()
+    host._execution_targets = registry
+    host._preview_enabled = True
+    host.preview_label = PreviewLabel()
+    host._capture_preview = lambda: (_ for _ in ()).throw(AssertionError(
+        "切换目标不应主动截图"))
+
+    host._refresh_active_target_ui()
+
+    assert host.preview_label.text == "暂无缓存画面，请点击刷新"
+
+
+def test_hidden_preview_does_not_queue_scrcpy_frames() -> None:
+    registry = ExecutionTargetRegistry()
+    target = ExecutionTarget(
+        id=android_target_id("A"), kind="adb", display_name="设备",
+        capture=object(), input_ctrl=object(), status="connected",
+    )
+    registry.put(target)
+    emitted: list[tuple] = []
+    host = type("Host", (WindowOpsMixin,), {})()
+    host._execution_targets = registry
+    host._preview_enabled = False
+    host._screen_recorder = None
+    host._scrcpy_frame_ready = SimpleNamespace(
+        emit=lambda *args: emitted.append(args))
+    frame = object()
+
+    host._on_scrcpy_frame(target.id, frame)
+
+    assert target.last_capture is frame
+    assert emitted == []
+
+
 def test_registry_keeps_one_window_and_multiple_devices() -> None:
     registry = ExecutionTargetRegistry()
     window = _target(WINDOW_TARGET_ID, "windows", "游戏窗口")

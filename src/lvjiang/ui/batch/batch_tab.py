@@ -1354,6 +1354,14 @@ class BatchTab(QWidget):
         self._visible_run_id = task_run_id
 
     def show_run(self, task_run_id: str) -> None:
+        self._progress_table.setUpdatesEnabled(False)
+        try:
+            self._show_run_contents(task_run_id)
+        finally:
+            self._progress_table.setUpdatesEnabled(True)
+
+    def _show_run_contents(self, task_run_id: str) -> None:
+        """恢复任务进度内容；调用方负责暂停表格重绘。"""
         state = self._run_progress.get(task_run_id)
         if state is None:
             self._visible_run_id = ""

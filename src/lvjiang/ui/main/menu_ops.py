@@ -530,6 +530,10 @@ class MenuOpsMixin:
         status_bar.showMessage(tr("热键已更新并立即生效"), 3000)
 
     def _on_toggle_preview(self, checked: bool):
+        self._preview_enabled = checked
         self.preview_container.setVisible(checked)
         self.btn_hide_window.setText(
             tr("隐藏预览") if checked else tr("显示预览"))
+        if checked:
+            # 展开时只显示目标已有缓存；需要最新画面由“刷新”按钮显式触发。
+            self._refresh_active_target_ui()

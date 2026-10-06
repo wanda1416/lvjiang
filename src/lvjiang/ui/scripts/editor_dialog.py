@@ -281,7 +281,7 @@ class WfHighlighter(QSyntaxHighlighter):
         r"\b(click|move|scroll|drag|press|wait|scan|recognize|collect|log|screenshot|"
         r"scene|eval|default|global|align|find|import|def|call)\b"
     )
-    _MODIFIERS = r"\b(view|unknown|as|by|where|on|group|hold|rich|full|with|stable|threshold|interval|duration|least)\b"
+    _MODIFIERS = r"\b(view|unknown|as|by|where|on|group|hold|rich|full|with|stable|threshold|interval|duration|least|from|last)\b"
     _TIMING = r"\b(before|after|around)\b"
     _MATCH = r"\b(equals_any|contains_any|equals|contains|image)\b"
     _CONST = r"\b(true|false|null|not|and|or|is_empty|up|down|left|right|session|context)\b"

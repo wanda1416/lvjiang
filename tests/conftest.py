@@ -223,3 +223,10 @@ def distributed_plans_store(monkeypatch):
         plans_mod, "_save_distributed_raw",
         lambda items: store.__setitem__("plans", items))
     return store
+
+
+@pytest.fixture(autouse=True)
+def _isolate_workflow_diagnostic_images(tmp_path, monkeypatch):
+    """WF 失败分支会真实留图，全部写入本用例临时目录，禁止污染项目 logs。"""
+    # engine.core 的 PROJECT_ROOT 仅用于 screenshot 输出；配置读取根不变。
+    monkeypatch.setattr("lvjiang.workflows.engine.core.PROJECT_ROOT", tmp_path)

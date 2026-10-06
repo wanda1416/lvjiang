@@ -9,7 +9,8 @@
 # 重置调律或词条转律处于冷却中/冷却完成时，游戏会在原「宫」词条位置
 # 插入状态提示，导致五个词条和定音整体下移。冷却提示使用独立的
 # cooldown_tips 区域读取，避免 affix_gong 宽度不足导致文案被截断；命中后
-# 再用冷却视图的六个专用区域重新截图 OCR，并映射回标准字段。
+# 再从同一原始截图裁剪冷却视图的六个专用区域 OCR，并映射回标准字段。
+# 基础字段、冷却字段、锁状态和详情共用一帧，不在读取期间重新截图。
 
 # ─── scan_equipment_detail ────────────────────────────────
 # 扫描装备详情页，返回统一字段名的一张字典。
@@ -31,11 +32,11 @@ def scan_equipment_detail($detail_scene)
             scan [equip_weapon_detail].[cooldown_affix_gong, \
                 cooldown_affix_shang, cooldown_affix_jue, \
                 cooldown_affix_zhi, cooldown_affix_yu, \
-                cooldown_dingyin] as $cooldown with "equip"
+                cooldown_dingyin] as $cooldown from last with "equip"
             call apply_cooldown_affixes($raw, $cooldown)
         end
         eval $raw.lock_status = equipment_lock_status([equip_detail].[lock])
-        scan [equip_detail].[equip_detail] as $set_detail with "equip"
+        scan [equip_detail].[equip_detail] as $set_detail from last with "equip"
         eval $raw.equip_detail = $set_detail.equip_detail
         return $raw
     end
@@ -50,11 +51,11 @@ def scan_equipment_detail($detail_scene)
             scan [equip_armor_detail].[cooldown_affix_gong, \
                 cooldown_affix_shang, cooldown_affix_jue, \
                 cooldown_affix_zhi, cooldown_affix_yu, \
-                cooldown_dingyin] as $cooldown with "equip"
+                cooldown_dingyin] as $cooldown from last with "equip"
             call apply_cooldown_affixes($raw, $cooldown)
         end
         eval $raw.lock_status = equipment_lock_status([equip_detail].[lock])
-        scan [equip_detail].[equip_detail] as $set_detail with "equip"
+        scan [equip_detail].[equip_detail] as $set_detail from last with "equip"
         eval $raw.equip_detail = $set_detail.equip_detail
         return $raw
     end

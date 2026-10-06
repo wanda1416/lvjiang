@@ -14,7 +14,7 @@ WorkflowEngine._exec_scan / _exec_recognize     (workflows/engine/data_ops.py)
    │  解析 scene_name 与 field_keys
    ▼
 BaseWorkflow.ocr_scene / recognize_references    (workflows/base/recognition.py)
-   │  ① 调用 DesktopCapture.capture() 截全屏大图（仅 1 次）
+   │  ① 经 CaptureSnapshotMixin.capture_frame() 获取大图（默认新截图，from last 复用）
    │  ② 从 layout 取出该场景的 Region 列表
    │  ③ 按 field_keys 过滤（若指定）
    │  ④ 对每个 Region：归一化坐标 → 像素坐标 → 裁剪小图
@@ -25,7 +25,13 @@ OCREngine.ocr_scene_regions / ReferenceRecognizer.recognize
 返回 dict[field_key, 识别结果]
 ```
 
-**关键事实:一次 DSL 指令 = 一次截屏 + N 次裁剪 + N 次识别。**
+**默认行为：获取新帧后裁剪、识别；显式 `from last` 则直接复用最近完整原始帧。**
+
+截图来源由 DSL 语句作用域传递，区域、子场景、模板和面板路径共同使用
+`capture_frame()`；复用时不访问设备，也不更新来源、时间和 `frame_seq`。
+快照按工作流隔离，运行开始以及截图返回空/抛错时清空。识别 debug 日志
+携带帧序号；`screenshot from last` 保存原图并以 info 记录完整路径和同一序号。
+异常策略属于 WF 的分支和 try/catch，引擎没有自动异常截图。
 
 ## 二、截屏:全屏大图只截一次
 
@@ -125,7 +131,7 @@ self._coord_meta[var_name] = {r.key: r for r in regions}
 
 ## 六、DSL 写法对截屏次数的影响
 
-**这是最容易踩坑的地方。** DSL 语法上支持"单字段识别",但引擎层面**每次 recognize 指令都独立截屏一次**。
+**这是最容易踩坑的地方。** DSL 语法上支持"单字段识别",但引擎层面**未带 `from last` 的 recognize 指令都独立截屏**。
 
 ### ❌ 反模式:循环里单次识别
 
@@ -178,10 +184,10 @@ end
 A: 语法上允许是为了灵活性,比如只想识别一个字段时少写点字。但性能敏感的循环里应该用多字段形式。
 
 **Q: `scan` 和 `recognize` 能共享同一张截图吗?**
-A: 不能。两条 DSL 指令各自独立截屏。如果同一工作流里既需要 OCR 又需要材料识别,且画面没变,目前仍会截两次屏。这是已知限制,未来可以通过"缓存最近一次截图"优化,但需要引入过期策略。
+A: 可以。后一条指令在 `as $var` 后写 `from last`，复用前一次截图。是否需要观察新画面由脚本显式决定，不设置自动过期或自动刷新。
 
 **Q: 裁剪的小图会不会很大,占内存?**
-A: numpy 切片是视图,不复制像素。真正占内存的是那张全屏大图,截屏后由 `capture()` 返回,被多个裁剪视图共享引用,直到指令结束才释放。
+A: numpy 切片是视图,不复制像素。真正占内存的是那张全屏大图,截屏后由 `capture()` 返回,被多个裁剪视图共享引用,最近一张完整截图由工作流快照持有，直到被新截图替换或生命周期清理。
 
 **Q: 截屏失败会怎样?**
 A: `capture()` 返回 None,`ocr_scene` / `recognize_references` 直接返回空 dict,工作流继续执行(不会抛异常)。日志里会看到"截图失败"。

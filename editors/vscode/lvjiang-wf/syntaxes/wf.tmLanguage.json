@@ -105,7 +105,7 @@
     },
     "keywords-clause": {
       "name": "keyword.operator.wf",
-      "match": "\\b(as|by|view|unknown|where|on|group|hold|place|to|with|full|exact|image)\\b"
+      "match": "\\b(as|by|view|unknown|where|on|group|hold|place|to|with|full|exact|image|from|last)\\b"
     },
     "keywords-timing": {
       "name": "keyword.other.timing.wf",

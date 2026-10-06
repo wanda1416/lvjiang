@@ -169,6 +169,7 @@ class Scan:
     where: Any = None  # WhereClause | None（where 子句：识别结果过滤）
     cleaning_group: str | None = None  # with "key" 指定 OCR 清洗组
     line_no: int = 0
+    from_last: bool = False
 
 
 @dataclass(frozen=True)
@@ -183,6 +184,7 @@ class Recognize:
     rich: bool = False  # as rich 模式：返回包含输入/输出元数据的富 dict
     with_func: Any = None  # Literal(函数名) | None — with 子句指定的 dict->dict 转换函数
     line_no: int = 0
+    from_last: bool = False
 
 
 @dataclass(frozen=True)
@@ -202,6 +204,7 @@ class Find:
     where: Any = None           # WhereClause | None（where 子句：识别结果过滤）
     cleaning_group: str | None = None  # with "key" 指定 OCR 清洗组
     line_no: int = 0
+    from_last: bool = False
 
 
 @dataclass(frozen=True)
@@ -258,8 +261,9 @@ class Log:
 
 @dataclass(frozen=True)
 class Screenshot:
-    """截取当前画面并保存到 logs/image/"""
+    """保存当前新截图或 from last 原始帧到 logs/image/"""
     line_no: int = 0
+    from_last: bool = False
 
 
 class PressMode(Enum):

@@ -69,6 +69,23 @@ def _run_wait_stable(cap: _SeqCapture, **kw):
 
 
 class TestWaitStableExecution:
+    def test_sampling_preserves_last_recognition_frame(self):
+        """稳定等待中的空帧和新帧均不能覆盖 from last 的识别依据。"""
+        original = _frame(10)
+        cap = _SeqCapture([original, None, *[_frame(200) for _ in range(30)]])
+        wf = _workflow_with_capture(cap)
+        wf.capture_frame(source="ocr_scene")
+        original_time = wf._engine._last_capture_time_ns
+
+        wf.wait_stable(timeout=5.0, interval=0.01, stable_duration=0.02,
+                       least=0.02, _clock=FakeClock(), _sleep=_no_sleep)
+
+        assert cap._idx > 2
+        assert wf.get_last_capture_frame() is original
+        assert wf.last_capture_seq == 1
+        assert wf.last_capture_source == "ocr_scene"
+        assert wf._engine._last_capture_time_ns == original_time
+
     def test_stable_screen_returns(self):
         """画面变化后稳定 → 正常返回，capture 被多次调用"""
         frames = [

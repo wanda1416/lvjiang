@@ -401,7 +401,8 @@ class _ActionMixin:
                 logger.debug("wait stable: 收到停止请求，提前结束")
                 return
 
-            img = self.capture_frame(source="wait_stable")
+            # 稳定检测是临时采样，不覆盖识别依据，也不分配诊断帧序号。
+            img = self._capture.capture()
             if img is None:
                 _sleep(interval)
                 continue

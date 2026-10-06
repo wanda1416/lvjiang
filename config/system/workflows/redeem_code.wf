@@ -83,7 +83,11 @@ for code in $codes
         # 移除输入框的焦点
         click [game_settings].[redeem_label] after wait @step_interval
     else
-        eval pause("请在游戏内输入或粘贴一个兑换码后点击继续；也可自行确认并返回其他页后再继续。多个兑换码请自行逐条操作。")
+        eval $continue_redeem = confirm("请在游戏内输入或粘贴一个兑换码，完成后选择是继续；也可自行确认并返回其他页后继续。选择否结束本次兑换。多个兑换码请自行逐条操作。")
+        if not $continue_redeem
+            log info "用户选择结束本次兑换"
+            return 0
+        end
     end
 
     call $closed = finish_redeem()

@@ -184,7 +184,7 @@ class BatchConfigDialog(QDialog):
         recover_row, recover_combo = self._create_wf_selector()
         self._selectors["recover_unattended"] = recover_combo
         recover_combo.setToolTip(tr(
-            "无人值守撞上暂停或确认框后，用它把游戏收回登录主页。"
+            "无人值守撞上异常暂停后，用它把游戏收回登录主页。"
             "主页面的「无人值守」要等这里配好才能勾选"))
         wf_form.addRow(tr("异常恢复工作流："), recover_row)
         layout.addLayout(wf_form)

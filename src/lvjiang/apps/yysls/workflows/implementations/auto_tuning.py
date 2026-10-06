@@ -1441,7 +1441,6 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
 
         # 返回背包浏览页，并由环境策略恢复装备详情页的可操作状态。
         self.executor.invalidate_cache()  # 退出调律页，清空材料缓存
-        self._emit_operation("finish", "正在返回背包并完成当前装备收尾")
         # Android 的 for_recycle=True 会保留“更多”菜单，供回收入口复用。
         # 已识别为锁定时不会真正回收，必须走普通退出路径收起菜单。
         will_recycle = (
@@ -1449,8 +1448,12 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             and not self.is_stopped
             and equip_data.lock_status != "locked"
         )
-        self.navigator.leave_tune(
-            for_recycle=will_recycle)
+        # 用户已明确结束时保留现场，不在未知重置弹层上继续返回操作。
+        if self.run_state.end_requested:
+            self._emit_operation("finish", "用户选择结束任务，保留当前现场")
+        else:
+            self._emit_operation("finish", "正在返回背包并完成当前装备收尾")
+            self.navigator.leave_tune(for_recycle=will_recycle)
 
         final_affix_count = len(equip_data.affixes)
         is_final = final_affix_count >= self.MAX_AFFIX

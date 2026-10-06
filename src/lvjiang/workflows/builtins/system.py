@@ -50,7 +50,9 @@ def pause_user(_engine=None, message: str = "", *args) -> str:
 
 @builtin_func("pause")
 def _pause(_engine=None, message: str = "", *args) -> str:
-    """暂停 DSL 执行，直到用户点击确定。
+    """声明异常阻断，暂停 DSL 执行，直到用户点击确定。
+
+    无人值守批量会中断当前任务并恢复页面；正常决策应使用 confirm/input。
 
     通过 engine._ui_callback 调度到 Qt 主线程显示。
 

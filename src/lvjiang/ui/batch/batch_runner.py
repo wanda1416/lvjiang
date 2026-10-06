@@ -185,9 +185,9 @@ class BatchCheckResult:
 
 
 class UnattendedInterrupt(WorkflowAbort):
-    """无人值守模式下工作流要求人工介入。
+    """无人值守模式下工作流通过 pause 声明异常阻断。
 
-    pause / confirm / input 都经由 ``engine._ui_callback`` 走到宿主，所以
+    pause 经由 ``engine._ui_callback`` 走到宿主，所以
     无人值守只需要在这一处改道，不必去改 wf 里几十个调用点。抛出后当前任务
     按异常记失败、不重试，调度器随即调用配置的恢复 wf 把游戏收回公共初始页，
     再继续下一个任务。
@@ -1249,23 +1249,18 @@ class BatchWorker(QThread):
     def _unattended_active(self) -> bool:
         """无人值守是否真的生效：必须同时配好恢复 wf。
 
-        少了恢复 wf 就改道 pause/confirm 只会把整批推到错误页面上连环失败，
+        少了恢复 wf 就改道 pause 只会把整批推到错误页面上连环失败，
         不如照旧弹窗等人。配置层已经拦了一道，这里不依赖它。
         """
         return bool(self._spec.unattended
                     and self._spec.workflows.recover_unattended)
 
     def _unattended_ui_callback(self, kind: str, **kwargs) -> object:
-        """无人值守下的 UI 回调：通知照常，要人动手的一律中止。
-
-        notify 本来就是非阻塞的（自动关闭 + 写告警面板），留着它事后才看得出
-        这批跑过什么。pause / confirm / input 都要人在场，无人值守时等下去就是
-        把整批卡死在一个弹窗上，所以立刻中止当前任务。
-        """
-        if kind == "notify":
+        """Only pause declares an abnormal interruption; forward other UI requests."""
+        if kind != "pause":
             callback = self._ctx.ui_callback
             return callback(kind, **kwargs) if callback is not None else None
-        text = str(kwargs.get("message") or kwargs.get("prompt") or kind)
+        text = str(kwargs.get("message") or kind)
         self._unattended_hit = text
         raise UnattendedInterrupt(text)
 

@@ -17,7 +17,8 @@ WORKFLOW_PATH = Path(__file__).resolve().parents[2] / "config/system/workflows/r
 class RedeemGame:
     def __init__(self, monkeypatch, *, platform="desktop", codes="ABC",
                  outcomes=("success",), manual="input", cancel_fails=False,
-                 open_fails=False, other_fails=False, repair_after=1):
+                 open_fails=False, other_fails=False, repair_after=1, continue_redeem=True):
+        self.continue_redeem = continue_redeem
         self.state = "main"
         self.platform = platform
         self.input_focused = False
@@ -57,7 +58,7 @@ class RedeemGame:
         monkeypatch.setattr(self.engine, "_exec_paste", self.paste)
         monkeypatch.setattr(self.engine, "_exec_wait", lambda _node: None)
         monkeypatch.setattr(logger, "warning", lambda message: self.warnings.append(str(message)))
-        self.engine._ui_callback = self.pause
+        self.engine._ui_callback = self.interact
 
     def click(self, node):
         scene, key = node.target.scene, node.target.entity
@@ -114,20 +115,23 @@ class RedeemGame:
         assert self.state == "input" and self.input_focused
         self.events.append(("paste", self.engine._resolve(node.value)))
 
-    def pause(self, action, **kwargs):
-        assert action == "pause"
+    def interact(self, action, **kwargs):
         message = kwargs.get("message", "")
         if "兑换窗口还在" in message:
+            assert action == "pause"
             assert self.state in ("input", "used")
             self.repair_messages.append(message)
             self.events.append(("pause", "repair"))
             if len(self.repair_messages) >= self.repair_after:
                 self.state = "other"
             return ""
+        assert action == "confirm"
         assert self.state == "input"
-        self.events.append(("pause", "input"))
+        self.events.append(("confirm", "input"))
+        if not self.continue_redeem:
+            return False
         self.state = {"input": "input", "completed": "other", "used": "used"}[self.manual]
-        return ""
+        return True
 
     def run(self):
         self.engine.execute(str(WORKFLOW_PATH))
@@ -181,7 +185,7 @@ def test_android_only_handles_one_manual_entry(monkeypatch, manual, confirms, ca
     assert game.clicks.count("confirm") == confirms
     assert game.clicks.count("cancel") == cancels
     assert len(game.warnings) == cancels
-    assert game.events.count(("pause", "input")) == 1
+    assert game.events.count(("confirm", "input")) == 1
     assert not any(kind in ("paste", "press") for kind, _ in game.events)
     assert game.state == "main"
 
@@ -247,3 +251,13 @@ def test_cancel_failure_pauses_until_manual_close_then_continues(
     assert game.events.index(("paste", "B")) > last_pause
     assert game.clicks.count("cancel") == 1
     assert game.state == "main"
+
+
+def test_android_declining_manual_input_confirmation_leaves_game_untouched(monkeypatch):
+    game = RedeemGame(monkeypatch, platform="android", codes="", continue_redeem=False).run()
+    assert ("confirm", "input") in game.events
+    assert not any(action == "pause" for action, _ in game.events)
+    assert "confirm" not in game.clicks
+    assert "cancel" not in game.clicks
+    assert game.state == "input"
+    assert game.engine.return_value == 0

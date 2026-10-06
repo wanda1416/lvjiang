@@ -2947,3 +2947,24 @@ def test_food_refund_popup_closed_only_when_detected(patch_worth, monkeypatch):
     wf, rounds = run("点击空白区域关闭")
     assert wf.clicks.count((TUNE_SCENE, "close_btn")) == rounds * 2
     assert wf.executor.round_food_refunded is True
+
+
+def test_user_end_during_reset_keeps_unknown_page_untouched(monkeypatch):
+    """重置询问拒绝已设置结束标记，装备收尾不能继续点击未知弹层。"""
+    monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
+                        lambda *a, **k: dict(_WORTHY))
+    monkeypatch.setattr(tuning_judge, "judge_equipment_potential",
+                        lambda *a, **k: dict(_WORTHY))
+    wf = _wf_with(_behavior_base())
+
+    def end_reset(*args, **kwargs):
+        wf.run_state.end_requested = True
+        wf.output["stop_reason"] = "用户选择结束本次调律"
+        return "skip", "用户选择结束本次调律", 0, 2
+
+    monkeypatch.setattr(wf, "_execute_tuning_processing", end_reset)
+    monkeypatch.setattr(wf.navigator, "leave_tune", MagicMock())
+    wf._process_equipment("待确认装备", _equip(2, quality="gold", cap_pct=50), WEAPON_DETAIL)
+    assert wf.is_stopped is True
+    wf.navigator.leave_tune.assert_not_called()
+    assert not wf.output.get("recycled_items")

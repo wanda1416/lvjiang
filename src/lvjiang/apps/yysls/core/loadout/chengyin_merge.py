@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import combinations
 
 from ...config.models import LevelConfig
@@ -33,6 +33,7 @@ class ChengyinMergeCandidate:
     new_fp: str
     old: dict
     new: dict
+    requires_review: bool = False
 
 
 def _affixes(equip: dict) -> list[dict] | None:
@@ -186,7 +187,7 @@ def find_chengyin_merge_candidates(
     equipment_items: dict[str, dict],
     level_configs: list[LevelConfig],
 ) -> list[ChengyinMergeCandidate]:
-    """返回所有疑似同件装备对。
+    """返回疑似同件装备对，移除明确历史链中的冗余中间关系。
 
     双向兼容（互为对方的合法后继）时由 :func:`_freshness` 决定保留哪份。
     """
@@ -223,7 +224,64 @@ def find_chengyin_merge_candidates(
             old=old,
             new=new,
         ))
-    return result
+    return _normalize_candidates(result, levels)
+
+
+def _normalize_candidates(
+    candidates: list[ChengyinMergeCandidate],
+    levels: dict[int, LevelConfig],
+) -> list[ChengyinMergeCandidate]:
+    successors: dict[str, set[str]] = {}
+    for candidate in candidates:
+        successors.setdefault(candidate.old_fp, set()).add(candidate.new_fp)
+    terminal_cache: dict[str, set[str] | None] = {}
+
+    def terminals(fp: str, visiting: set[str]) -> set[str] | None:
+        if fp in visiting:
+            return None  # 循环不能当作明确历史链。
+        if fp in terminal_cache:
+            return terminal_cache[fp]
+        targets = successors.get(fp)
+        if not targets:
+            return {fp}
+        result: set[str] = set()
+        for target in targets:
+            final = terminals(target, visiting | {fp})
+            if final is None:
+                return None
+            result.update(final)
+        terminal_cache[fp] = result
+        return result
+
+    pairs = {(c.old_fp, c.new_fp) for c in candidates}
+    normalized = []
+    for candidate in candidates:
+        final = terminals(candidate.new_fp, set())
+        # 只删冗余边，绝不凭传递关系补造 A→C；分歧或循环保留供人工核对。
+        if final is not None and len(final) == 1:
+            target = next(iter(final))
+            if target != candidate.new_fp and (candidate.old_fp, target) in pairs:
+                continue
+        normalized.append(candidate)
+
+    by_target: dict[str, list[ChengyinMergeCandidate]] = {}
+    old_targets: dict[str, set[str]] = {}
+    for candidate in normalized:
+        by_target.setdefault(candidate.new_fp, []).append(candidate)
+        old_targets.setdefault(candidate.old_fp, set()).add(candidate.new_fp)
+    review_targets = set()
+    for target, group in by_target.items():
+        if target in old_targets or any(
+            len(old_targets[c.old_fp]) > 1 or c.old_fp in by_target for c in group
+        ):
+            review_targets.add(target)
+        # 多个旧快照各自能达到同一新版本，并不证明它们彼此属于同一件装备。
+        if any(not (_can_follow(a.old, b.old, levels)
+                    or _can_follow(b.old, a.old, levels))
+               for a, b in combinations(group, 2)):
+            review_targets.add(target)
+    return [replace(c, requires_review=c.new_fp in review_targets)
+            for c in normalized]
 
 
 __all__ = ["ChengyinMergeCandidate", "find_chengyin_merge_candidates"]

@@ -35,12 +35,15 @@ _CARD_STYLE = """
         border-radius: 6px;
     }
 """
-_TITLE_STYLE = "font-size: 15px; font-weight: 600;"
-_NAME_STYLE = "font-size: 13px; color: palette(mid);"
-_VALUE_STYLE = "font-size: 15px; font-weight: 600;"
+ATTR_NAME_FONT_PX = 13
+ATTR_VALUE_FONT_PX = 15
+ATTR_ROW_SPACING = 8
+_TITLE_STYLE = f"font-size: {ATTR_VALUE_FONT_PX}px; font-weight: 600;"
+_NAME_STYLE = f"font-size: {ATTR_NAME_FONT_PX}px; color: palette(mid);"
+_VALUE_STYLE = f"font-size: {ATTR_VALUE_FONT_PX}px; font-weight: 600;"
 _YELLOW_VALUE_COLOR = "#d4a017"
 _YELLOW_VALUE_STYLE = (
-    f"font-size: 15px; font-weight: 600; color: {_YELLOW_VALUE_COLOR};"
+    f"font-size: {ATTR_VALUE_FONT_PX}px; font-weight: 600; color: {_YELLOW_VALUE_COLOR};"
 )
 
 
@@ -75,7 +78,7 @@ class CombatCardsMixin:
     def _add_attack_card(self, parent_layout: QVBoxLayout):
         self._attribute_sources_link = QLabel(
             f'<a href="sources" style="color: #0078d4;">{tr("属性来源")}</a>')
-        self._attribute_sources_link.setStyleSheet("font-size: 13px;")
+        self._attribute_sources_link.setStyleSheet(f"font-size: {ATTR_NAME_FONT_PX}px;")
         self._attribute_sources_link.setCursor(Qt.CursorShape.PointingHandCursor)
         self._attribute_sources_link.setToolTip(tr("查看当前战斗属性的各项来源"))
         self._attribute_sources_link.linkActivated.connect(self._show_attribute_sources)
@@ -83,7 +86,7 @@ class CombatCardsMixin:
         grid = QGridLayout()
         grid.setContentsMargins(14, 2, 14, 14)
         grid.setHorizontalSpacing(20)
-        grid.setVerticalSpacing(8)
+        grid.setVerticalSpacing(ATTR_ROW_SPACING)
         attacks = (
             ("外功", "min_outer", "max_outer"),
             ("鸣金", "min_mingjin", "max_mingjin"),

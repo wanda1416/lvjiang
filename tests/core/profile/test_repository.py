@@ -502,6 +502,59 @@ class TestHistory:
         assert history[0]["source"] == "同步"   # 最新在前
         assert history[1]["source"] == "导入"
 
+    def test_history_source_edit_uses_original_value_as_guard(self, db: ProfileDB):
+        db.upsert(
+            "u", "quota", "k", 10,
+            change_type="action", delta_value=10, source="误填来源",
+        )
+        record = db.get_history("u")[0]
+
+        assert db.update_history_source(
+            record["id"], expected_source="误填来源", new_source="正确来源",
+        )
+        assert not db.update_history_source(
+            record["id"], expected_source="误填来源", new_source="过期覆盖",
+        )
+        assert db.get_history("u")[0]["source"] == "正确来源"
+
+    def test_undo_latest_history_restores_value_and_records_audit(self, db: ProfileDB):
+        db.upsert("u", "quota", "k", 3)
+        db.upsert(
+            "u", "quota", "k", 5,
+            change_type="action", delta_value=2, source="误操作",
+        )
+        record = db.get_history("u")[0]
+
+        assert db.undo_history(record["id"])
+        assert db.get_entry("u", "quota", "k")["value"] == 3
+        history = db.get_history("u")
+        assert history[0]["change_type"] == "undo"
+        assert history[0]["old_value"] == 5
+        assert history[0]["new_value"] == 3
+        assert history[0]["delta_value"] == -2
+        assert history[0]["source"] == "撤销：误操作"
+        assert not db.undo_history(record["id"])
+
+    def test_undo_rejects_stale_record_without_touching_other_user(self, db: ProfileDB):
+        db.upsert("u1", "quota", "k", 1, change_type="action")
+        stale = db.get_history("u1")[0]
+        db.upsert("u1", "quota", "k", 2, change_type="action")
+        db.upsert("u2", "quota", "k", 9, change_type="action")
+
+        assert not db.undo_history(stale["id"])
+        assert db.get_entry("u1", "quota", "k")["value"] == 2
+        assert db.get_entry("u2", "quota", "k")["value"] == 9
+
+    def test_undo_rejects_sync_derived_record(self, db: ProfileDB):
+        db.upsert(
+            "u", "quota", "k", 2, change_type="action",
+            delta_value=2, sync_from="stock:source",
+        )
+        record = db.get_history("u")[0]
+
+        assert not db.undo_history(record["id"])
+        assert db.get_entry("u", "quota", "k")["value"] == 2
+
 
     def test_override_always_records(self, db: ProfileDB):
         """override 类型：即使值不变也记录"""

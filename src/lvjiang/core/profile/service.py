@@ -35,7 +35,15 @@ from .regen import (
     is_realtime_regen,
     normalize_realtime_write,
 )
-from .repository import db_read_all, db_read_entry, db_update_if_current, db_upsert
+from .repository import (
+    db_get_history,
+    db_get_history_record,
+    db_read_all,
+    db_read_entry,
+    db_undo_history,
+    db_update_if_current,
+    db_upsert,
+)
 from .schema import get_profile_config
 
 # ─── 内部工具函数 ─────────────────────────────────────────────
@@ -43,6 +51,68 @@ from .schema import get_profile_config
 
 class ProfileWriteConflict(RuntimeError):
     """CAS 写入冲突。"""
+
+
+def profile_history_undo_unavailable_reason(
+    record: dict, *, is_latest: bool | None = None,
+) -> str | None:
+    """返回历史记录不能安全撤销的原因；可撤销时返回 ``None``。"""
+    if not record:
+        return tr("历史记录不存在")
+    if record.get("change_type") not in ("action", "override"):
+        return tr("仅可撤销操作或覆写记录")
+    if record.get("sync_from"):
+        return tr("同步产生的记录不能单独撤销")
+
+    username = str(record.get("username", ""))
+    model_type = str(record.get("type", ""))
+    key = str(record.get("key", ""))
+    if is_latest is None:
+        latest = db_get_history(username, model_type, key, limit=1)
+        is_latest = bool(latest and latest[0].get("id") == record.get("id"))
+    if not is_latest:
+        return tr("只能撤销该用户此数据项的最新记录")
+
+    kd = get_profile_config().get_key(key, model_type=model_type)
+    if kd is None:
+        return tr("当前数据模型中已不存在此数据项")
+    if kd.sync_targets:
+        return tr("该数据项会同步其他数据，不能在此单独撤销")
+    if kd.change_script:
+        return tr("该数据项关联了变更脚本，不能在此单独撤销")
+    if model_type == MODEL_REGEN and _is_continuous_regen(kd):
+        return tr("连续恢复的数据不能按历史值直接撤销")
+
+    old_value = record.get("old_value")
+    new_value = record.get("new_value")
+    if new_value is None:
+        return tr("历史记录缺少新值")
+    old_text = record.get("old_value_text", "") or ""
+    new_text = record.get("new_value_text", "") or ""
+    if model_type == MODEL_NOTE:
+        if old_text == new_text:
+            return tr("该记录没有改变值")
+    elif old_value == new_value:
+        return tr("该记录没有改变值")
+
+    current = db_read_entry(username, model_type, key)
+    if not current:
+        return tr("当前数据已不存在")
+    if float(current.get("value", 0)) != float(new_value):
+        return tr("当前值已发生变化，不能覆盖后续操作")
+    if model_type == MODEL_NOTE and (current.get("value_text", "") or "") != new_text:
+        return tr("当前值已发生变化，不能覆盖后续操作")
+    return None
+
+
+def undo_profile_history(history_id: int) -> None:
+    """安全撤销一条历史变更，不触发同步目标或变更脚本。"""
+    record = db_get_history_record(history_id)
+    reason = profile_history_undo_unavailable_reason(record)
+    if reason is not None:
+        raise ValueError(reason)
+    if not db_undo_history(history_id):
+        raise ProfileWriteConflict(tr("数据已发生变化，请刷新后重试"))
 
 
 def _is_continuous_regen(kd) -> bool:

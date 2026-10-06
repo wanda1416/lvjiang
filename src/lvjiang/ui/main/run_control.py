@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QMessageBox
 from lvjiang.apps import get_registry
 
 from ...core.config.resolver import get_resolver
+from ...core.fs_util import dated_output_dir
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ..button_styles import apply_execution_button_style
@@ -1875,6 +1876,7 @@ class RunControlMixin:
         run_context = getattr(self, "_current_run_context", None)
         if run_context is None:
             raise RuntimeError("工作流启动时缺少运行上下文")
+        run_context.metadata["output_started_at"] = datetime.now().astimezone()
         task_run = None
         if record_history:
             from ...core.daily_history import try_create_task_run
@@ -1892,6 +1894,7 @@ class RunControlMixin:
                 task_name=flow_name, task_scope=task_scope,
                 params=params if params is not None else {}, source="single",
                 task_run_id=run_context.task_run_id,
+                started_at=run_context.metadata["output_started_at"],
                 **target_kwargs)
         lease = run_context.lease
         def execute_authorized():
@@ -2005,7 +2008,7 @@ class RunControlMixin:
         self, flow_id: str, result, interrupted: bool = False,
         task_run_id: str = "", run_context=None,
     ):
-        """保存工作流结果到 local/output/{username}/{flow_id}_{timestamp}.json
+        """保存工作流结果到 session/output/{username}/YYYY-MM/DD/。
 
         中断（F10）的部分结果同样落盘，文件名带 _interrupted 后缀；
         即使结果为空也保留 JSON，确保历史记录始终能定位本次返回值。
@@ -2021,7 +2024,10 @@ class RunControlMixin:
                 else self._current_engine
             )
             username = (engine.run_username if engine is not None else "") or "default"
-            user_output_dir = OUTPUT_DIR / username
+            started_at = datetime.now()
+            if run_context is not None:
+                started_at = run_context.metadata["output_started_at"]
+            user_output_dir = dated_output_dir(OUTPUT_DIR / username, started_at)
             user_output_dir.mkdir(parents=True, exist_ok=True)
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -2038,7 +2044,7 @@ class RunControlMixin:
             self.log_text.append(f"[警告] {flow_id} 结果 JSON 保存失败: {exc}")
             return None
         logger.info(f"工作流结果已保存: {save_path}")
-        self.log_text.append(f"[保存] {flow_id} → output/{username}/{save_path.name}")
+        self.log_text.append(f"[保存] {flow_id} → output/{save_path.relative_to(OUTPUT_DIR)}")
         return save_path
 
     # ─── 运行按钮 ──────────────────────────────────────────

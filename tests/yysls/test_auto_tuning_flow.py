@@ -2502,7 +2502,7 @@ class TestTuningDocIntegration:
                               WEAPON_DETAIL)
         wf._close_doc()
 
-        docs = list(tmp_path.glob("调律说明_小明_*.md"))
+        docs = list(tmp_path.rglob("调律说明_小明_*.md"))
         assert len(docs) == 1
         text = docs[0].read_text(encoding="utf-8")
         # 文档头
@@ -2589,7 +2589,7 @@ class TestTuningDocIntegration:
         assert report["status"] == "interrupted"
         assert report["rounds"] == 1
         assert report["stop_reason"] == "用户中断"
-        text = next(tmp_path.glob("调律说明_小明_*.md")).read_text(encoding="utf-8")
+        text = next(tmp_path.rglob("调律说明_小明_*.md")).read_text(encoding="utf-8")
         assert "用户中断，保存当前装备的部分调律结果" in text
         assert "本件小结：共 1 轮，词条 3/5" in text
         assert "## 运行结束" in text

@@ -16,6 +16,7 @@ from typing import Any, Iterator
 from loguru import logger
 
 from .. import constants
+from .fs_util import dated_output_dir
 
 _SCHEMA_LOCK = threading.Lock()
 CURRENT_SCHEMA_VERSION = 2
@@ -420,16 +421,20 @@ class TaskRunSession:
         environment: str = "", layout: str = "", input_kind: str = "",
         repository: TaskHistoryRepository | None = None,
         log_root: Path | None = None,
+        started_at: datetime | None = None,
     ):
         self.repository = repository or TaskHistoryRepository()
         self.task_run_id = task_run_id or uuid.uuid4().hex
         self.target_id = target_id
         self.target_kind = target_kind
         self.target_label = target_label
-        self.started_at = _now()
+        self.started_at = (started_at or datetime.now().astimezone()).isoformat(
+            timespec="milliseconds")
         self._started_monotonic = time.monotonic()
-        user_dir = (log_root or default_log_root()) / _safe_component(
-            username, "default")
+        user_dir = dated_output_dir(
+            (log_root or default_log_root()) / _safe_component(username, "default"),
+            datetime.fromisoformat(self.started_at),
+        )
         user_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         self.log_path = user_dir / (

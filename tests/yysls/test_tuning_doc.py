@@ -5,6 +5,8 @@
 全部写入 tmp_path，不触碰 logs/tuning/。
 """
 
+from datetime import datetime
+
 import pytest
 
 from lvjiang.apps.yysls.workflows.tuning_doc import (
@@ -35,6 +37,17 @@ def _read(w: TuningDocWriter) -> str:
 
 
 class TestTuningDocWriter:
+
+    def test_document_uses_user_and_run_start_date(self, tmp_path):
+        with_start = TuningDocWriter(
+            "小明", doc_dir=tmp_path, started_at=datetime(2025, 12, 31, 23, 59),
+        )
+        try:
+            assert with_start.path.parent == tmp_path / "小明" / "2025-12" / "31"
+            with_start.note("归档后仍可读取")
+            assert "归档后仍可读取" in _read(with_start)
+        finally:
+            with_start.close()
 
 
     def test_all_ui_slots_are_summarized_as_all(self, writer):

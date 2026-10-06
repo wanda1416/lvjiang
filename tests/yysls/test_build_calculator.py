@@ -197,6 +197,50 @@ def test_requirements_do_not_mutate_targets():
     assert targets == before
 
 
+def test_unmet_requirements_grow_from_bottom_and_share_count_scroll(qtbot, repository):
+    """提示只占实际行高；词条和提示超高时一起滚动，不设提示条数上限。"""
+    build = BuildDefinition.create("约束提示", "无名", 115)
+    build.equipment = allocate(counts()).equipment
+    build.requirements = [
+        {"affix": "会意率", "priority": "recommended", "minimum": 6, "maximum": 40},
+        {"affix": "劲", "priority": "optimal", "minimum": 11, "maximum": 40},
+        {"affix": "势", "priority": "required", "minimum": 9, "maximum": 40},
+        {"affix": "最大外功攻击", "priority": "required", "minimum": 12, "maximum": 12},
+    ]
+    editor = BuildEditor("无名", repository=repository, initial=build)
+    qtbot.addWidget(editor)
+    editor.resize(1320, 820)
+    editor.show()
+    qtbot.waitExposed(editor)
+    assert [label.property("priority") for label in editor._unmet_labels] == ["required", "optimal", "recommended"]
+    assert "势" in editor._unmet_labels[0].text() and "当前 8 条" in editor._unmet_labels[0].text()
+    assert editor._left_tabs.currentIndex() == 0
+    content = editor._count_scroll.widget()
+    assert content is editor._count_content
+    assert editor._unmet_content.parentWidget() is content
+    assert editor._count_container.parentWidget() is content
+    assert editor._unmet_content.geometry().bottom() >= content.height() - 2
+    for row in editor._requirement_editors[:2]:
+        row.minimum.setValue(editor.counts()[row.affix.currentText()])
+    editor.recalculate()
+    qtbot.waitUntil(lambda: len(editor._unmet_labels) == 1)
+    qtbot.waitUntil(lambda: editor._unmet_content.height() == editor._unmet_labels[0].sizeHint().height())
+    assert editor._unmet_content.geometry().bottom() >= content.height() - 2
+    for name in editor._legal_names():
+        editor._append_count(name)
+    for _ in range(12):
+        editor._append_requirement(build.requirements[0])
+    editor.recalculate()
+    qtbot.waitUntil(lambda: editor._count_scroll.verticalScrollBar().maximum() > 0)
+    assert len(editor._unmet_labels) == 13
+    assert editor._count_container.geometry().bottom() < editor._unmet_content.geometry().top()
+    for row in editor._requirement_editors:
+        row.minimum.setValue(editor.counts()[row.affix.currentText()])
+    editor.recalculate()
+    assert not editor._unmet_labels
+    assert editor._unmet_content.isHidden()
+
+
 def test_swap_checks_reverse_destination_and_first_slot_duplicates():
     gc = get_game_config()
     equipment = {
@@ -344,7 +388,7 @@ def test_editor_load_adjust_save_and_invalid_clear(qtbot, repository):
     assert not editor.result.feasible
     assert not editor.save_button.isEnabled()
     assert editor._left_tabs.count() == 2
-    assert editor.distribution_table.item(0, 1).text() == "—"
+    assert editor.distribution_table.item(0, 1).text() == ""
 
 
 def test_cancel_switch_keeps_editor_draft(qtbot, monkeypatch, repository):

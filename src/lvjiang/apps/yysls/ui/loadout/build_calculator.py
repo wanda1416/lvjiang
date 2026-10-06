@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QInputDialog,
     QLabel,
+    QLayout,
     QLineEdit,
     QMessageBox,
     QPushButton,
@@ -490,13 +491,27 @@ class BuildEditor(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._count_content = QWidget()
+        content_layout = QVBoxLayout(self._count_content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(4)
+        content_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self._count_container = QWidget()
         self._count_layout = QVBoxLayout(self._count_container)
         self._count_layout.setContentsMargins(0, 0, 0, 0)
         self._count_layout.setSpacing(4)
         self._count_layout.addStretch()
-        scroll.setWidget(self._count_container)
+        content_layout.addWidget(self._count_container)
+        content_layout.addStretch(1)
+        scroll.setWidget(self._count_content)
+        self._count_scroll = scroll
         left_layout.addWidget(scroll, 1)
+        self._unmet_content = QWidget()
+        self._unmet_layout = QVBoxLayout(self._unmet_content)
+        self._unmet_layout.setContentsMargins(0, 0, 0, 0)
+        self._unmet_layout.setSpacing(4)
+        self._unmet_labels: list[QLabel] = []
+        content_layout.addWidget(self._unmet_content)
         add = QPushButton(tr("添加可用词条"))
         apply_button_style(add, variant="neutral")
         add.clicked.connect(self._add_affix)
@@ -521,10 +536,6 @@ class BuildEditor(QWidget):
         apply_button_style(add_requirement, variant="action")
         add_requirement.clicked.connect(self._add_requirement)
         req_layout.addWidget(add_requirement)
-        self.requirement_status = QLabel()
-        self.requirement_status.setWordWrap(True)
-        self.requirement_status.setProperty("tone", "muted")
-        req_layout.addWidget(self.requirement_status)
         left_tabs.addTab(req_page, tr("词条约束"))
         splitter.addWidget(left_tabs)
 
@@ -770,6 +781,29 @@ class BuildEditor(QWidget):
     def counts(self) -> dict[str, int]:
         return {name: spin.value() for name, spin in self._counts.items() if spin.value()}
 
+    def _show_unmet_requirements(self, evaluated: list[dict]) -> None:
+        for label in self._unmet_labels:
+            self._unmet_layout.removeWidget(label)
+            label.deleteLater()
+        self._unmet_labels.clear()
+        for priority in PRIORITY_LABELS:
+            for row in evaluated:
+                if row["priority"] != priority or row["satisfied"]:
+                    continue
+                label = QLabel(tr("{priority} · {affix}：当前 {actual} 条，要求 {minimum}～{maximum} 条").format(
+                    priority=tr(PRIORITY_LABELS[priority]), affix=row["affix"], actual=row["actual"],
+                    minimum=row.get("minimum", 0), maximum=row.get("maximum", TOTAL_AFFIXES_MAX)))
+                label.setTextFormat(Qt.TextFormat.PlainText)
+                label.setWordWrap(False)
+                label.setProperty("priority", priority)
+                if priority == "recommended":
+                    label.setProperty("tone", "muted")
+                else:
+                    label.setStyleSheet("color: #c62828;" if priority == "required" else "color: #D97706;")
+                self._unmet_layout.addWidget(label)
+                self._unmet_labels.append(label)
+        self._unmet_content.setVisible(bool(self._unmet_labels))
+
     def recalculate(self):
         self._timer.stop()
         counts = self.counts()
@@ -797,11 +831,7 @@ class BuildEditor(QWidget):
             self._templates = copy.deepcopy(self.result.equipment)
         requirements = self._requirement_rows()
         evaluated = check_requirements(counts, requirements)
-        labels = [f"{tr(PRIORITY_LABELS[row['priority']])} · {row['affix']}：{row['actual']} / "
-                  f"{row.get('minimum', 0)}～{row.get('maximum', TOTAL_AFFIXES_MAX)}"
-                  f" {'✓' if row['satisfied'] else '未满足'}"
-                  for row in evaluated]
-        self.requirement_status.setText("\n".join(labels) or tr("未设置额外要求"))
+        self._show_unmet_requirements(evaluated)
         required_ok = all(row["satisfied"] for row in evaluated if row["priority"] == "required")
         complete = sum(counts.values()) == 40 and required_ok and self.result.feasible
         state = tr("完整且满足强制要求") if complete else tr("草稿／要求未满足")
@@ -810,7 +840,7 @@ class BuildEditor(QWidget):
         for row, spec in enumerate(BUILD_DISPLAY_SLOTS):
             equip = self.result.equipment.get(spec.key) or {}
             for index in range(1, 6):
-                _cell(self.distribution_table, row, index, (equip.get(f"affix_{index}") or {}).get("name", "—"))
+                _cell(self.distribution_table, row, index, (equip.get(f"affix_{index}") or {}).get("name", ""))
         self.count_summary.setText(f"{sum(counts.values())} / 40")
         self.count_summary.setToolTip(state)
         self._refresh_count_caps()

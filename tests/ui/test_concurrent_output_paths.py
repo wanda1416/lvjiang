@@ -20,10 +20,22 @@ class _LogText:
         pass
 
 
+def _freeze_datetime(monkeypatch, target: str, when: datetime):
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return when.astimezone(tz) if tz is not None else when
+
+    monkeypatch.setattr(target, FrozenDatetime)
+
+
 def test_workflow_result_filename_contains_task_run_id(tmp_path, monkeypatch):
     monkeypatch.setattr("lvjiang.constants.OUTPUT_DIR", tmp_path)
     monkeypatch.setattr("lvjiang.constants.PROJECT_ROOT", tmp_path)
     started_at = datetime(2025, 12, 31, 23, 59)
+    next_day = datetime(2026, 1, 1, 0, 1)
+    _freeze_datetime(monkeypatch, "lvjiang.core.daily_history.datetime", next_day)
+    _freeze_datetime(monkeypatch, "lvjiang.ui.main.run_control.datetime", next_day)
     repository = TaskHistoryRepository(tmp_path / "history.db")
     task = TaskRunSession(
         username="用户甲", task_id="daily", task_name="日常",
@@ -46,6 +58,8 @@ def test_workflow_result_filename_contains_task_run_id(tmp_path, monkeypatch):
 
     assert path is not None
     assert "run-123" in path.name
+    assert path.name.startswith("daily_20251231_235900_")
+    assert task.log_path.name.startswith("daily_20251231_235900_")
     assert path.parent == tmp_path / "用户甲" / "2025-12" / "31"
     assert task.log_path.parent == tmp_path / "logs" / "用户甲" / "2025-12" / "31"
     task.finish(status="completed", result_path=path)
@@ -69,20 +83,29 @@ def test_workflow_result_filename_contains_task_run_id(tmp_path, monkeypatch):
 
 def test_batch_result_uses_task_start_date(tmp_path, monkeypatch):
     monkeypatch.setattr("lvjiang.constants.OUTPUT_DIR", tmp_path)
+    _freeze_datetime(
+        monkeypatch, "lvjiang.ui.batch.batch_runner.datetime", datetime(2026, 1, 1, 0, 1),
+    )
     path = BatchWorker._save_result(
         "用户甲", SimpleNamespace(id="daily"), {"ok": True},
         datetime(2025, 12, 31, 23, 59),
     )
     assert path.parent == tmp_path / "用户甲" / "2025-12" / "31"
     assert path.is_file()
+    assert path.name.startswith("daily_20251231_235900_")
 
 
 def test_batch_report_filename_contains_batch_run_id(tmp_path, monkeypatch):
     monkeypatch.setattr(report_module, "BATCH_REPORT_DIR", tmp_path)
+    _freeze_datetime(
+        monkeypatch, "lvjiang.ui.batch.batch_report.datetime", datetime(2025, 12, 31, 23, 59),
+    )
     report = BatchReport(
         "配置", [("daily", "日常")], {}, batch_run_id="batch-456")
     report.start_batch()
-    report._start_time = datetime(2025, 12, 31, 23, 59)
+    _freeze_datetime(
+        monkeypatch, "lvjiang.ui.batch.batch_report.datetime", datetime(2026, 1, 1, 0, 1),
+    )
     report.start_entry("用户甲", "用户甲")
     report.end_entry()
     report.end_batch()
@@ -91,4 +114,5 @@ def test_batch_report_filename_contains_batch_run_id(tmp_path, monkeypatch):
 
     assert path is not None
     assert "batch-456" in path.name
+    assert path.name.startswith("批量报告_20251231_235900_")
     assert path.parent == tmp_path / "2025-12" / "31"

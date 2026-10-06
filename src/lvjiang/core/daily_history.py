@@ -428,15 +428,16 @@ class TaskRunSession:
         self.target_id = target_id
         self.target_kind = target_kind
         self.target_label = target_label
-        self.started_at = (started_at or datetime.now().astimezone()).isoformat(
-            timespec="milliseconds")
+        self.started_at = (started_at.isoformat(timespec="milliseconds")
+                           if started_at is not None else _now())
         self._started_monotonic = time.monotonic()
+        start_time = datetime.fromisoformat(self.started_at)
         user_dir = dated_output_dir(
             (log_root or default_log_root()) / _safe_component(username, "default"),
-            datetime.fromisoformat(self.started_at),
+            start_time,
         )
         user_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        stamp = start_time.strftime("%Y%m%d_%H%M%S_%f")
         self.log_path = user_dir / (
             f"{_safe_component(task_id, 'task')}_{stamp}_"
             f"{self.task_run_id[:8]}.log")

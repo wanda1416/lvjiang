@@ -1505,9 +1505,10 @@ class BatchWorker(QThread):
                 return obj.to_dict()
             return obj
 
-        user_dir = dated_output_dir(OUTPUT_DIR / role, started_at or datetime.now())
+        started_at = started_at or datetime.now()
+        user_dir = dated_output_dir(OUTPUT_DIR / role, started_at)
         user_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        ts = started_at.strftime("%Y%m%d_%H%M%S_%f")
         path = user_dir / f"{script.id}_{ts}.json"
         path.write_text(
             json.dumps(_ser(result), ensure_ascii=False, indent=2),

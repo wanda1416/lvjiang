@@ -29,8 +29,8 @@ PC 端 ADB 模式原先只有两条路控制手机：`adb shell input tap/swipe`
 - PC 侧握手不仅校验协议，还要求无障碍或 Shizuku 至少一条输入通道可用；App 在线但输入
   通道均未就绪时拒绝代理并回退 ADB。传输失败（断线/超时）就地重连一次，再失败抛
   `AgentTransportError`；设备端返回 `ok=false` 也向工作流传播，不能把未执行的手势当成功。
-- App 主页每秒刷新“辅助 / PC 连接 / 最近指令”状态。PC 连接存在期间悬浮球自动隐藏并
-  收起面板，避免进入 PC 截图或与 PC 工作流并行操作；最后一条连接断开后恢复显示。
+- App 主页每秒刷新“辅助 / PC 连接 / 最近指令”状态。普通连接和同步不隐藏悬浮球；
+  PC 工作流取得 `control_begin` 租约时隐藏，`control_end` 或持有者断线时恢复。
 
 ## 帧格式
 
@@ -137,8 +137,34 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 
 ## 两端改动约定
 
-- 改协议（新 op / 改字段）必须同时改 `AgentServer.kt` 与 `agent.py`，并 bump 两边的 `PROTOCOL_VERSION`
+- 不兼容的协议修改必须同时改 `AgentServer.kt` 与 `agent.py`，并 bump 两边的 `PROTOCOL_VERSION`
   （v1 基础 op；v2 加 `calib_*` 与 status 的 `calib_identity` / `screen`）；
   PC 端握手时版本不一致直接拒绝（提示升级手机 app），避免静默错位。
 - PC 侧单测 `tests/core/test_device_agent.py` 用本地假服务端覆盖线协议与后端行为；
   Kotlin 侧可用 `kotlinc -cp android.jar` 做编译检查（见开发日志 2026-08-22）。
+
+## 离线执行扩展（offline_protocol = 1）
+
+基础输入协议保持 v3，新增能力通过握手字段 `offline_protocol:1` 探测；旧 APK 不发送
+控制租约或离线 op。`pc_controlling` 表示实际占用，区别于诊断连接数。
+
+| op | 请求字段 | 响应 |
+|---|---|---|
+| `control_begin` / `control_end` | — | 取得/释放本连接的 PC 输入控制权；手机活跃任务拒绝取得 |
+| `offline_status` | — | 任务状态、原因、日志、输出及最近同步 |
+| `offline_tasks` | — | 仅暴露支持 android 的任务；未同步提示先同步 |
+| `offline_start` | `task_id` | 使用同步的用户和参数启动；必须先开启悬浮服务 |
+| `offline_pause` / `offline_resume` / `offline_stop` | — | 请求暂停、继续或结束 |
+| `offline_diagnostics` | — | `report`：依赖/插件/引擎与实际 OCR 检查；手机执行中拒绝检查 |
+| `offline_sync_begin` | `size`,`sha256` | 建立暂存上传，最大 256 MiB |
+| `offline_sync_chunk` | `offset`,`data`（Base64） | 顺序写入，重复块内容相同才允许重试 |
+| `offline_sync_commit` | — | 验证完整包和逐文件哈希、版本、DB 后交换 config；重载失败回滚 |
+
+手机任务状态为 idle/running/pausing/paused/stopping/done/failed/stopped。
+pausing/paused/stopping 同样占用任务槽。暂停确认在引擎实际等待点发生，结束会唤醒暂停。
+PC 断线不停止手机任务；PC 租约在重连后重新申请，防止重连绕过执行互斥。
+
+配置包仅包含 config/system、local、remote、session 的数据文件（排除 Git、锁与诊断
+归档）。DB 由 SQLite backup 生成，不能直接复制仍有 WAL 的数据库。手机校验后整体
+交换 config，留存上一份 offline-backup/config；应用与启动共用锁，并清理配置单例和
+引擎缓存。Python 实现随 APK 打包，不通过配置同步热更新。

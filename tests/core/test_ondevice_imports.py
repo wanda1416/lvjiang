@@ -28,9 +28,16 @@ def test_ondevice_entrypoints_import_without_pyqt6() -> None:
         init_i18n("zh_CN")
 
         from lvjiang.core.ondevice import task_runner
+        from lvjiang.core.ondevice import offline, workflow_runner, plugins
+        from lvjiang.core.profile import service
         from lvjiang.apps.yysls.ondevice import tuning_config
 
+        plugins.configure_apps("yysls")
+        plugins.ensure_loaded()
         assert task_runner.STATE_IDLE == "idle"
+        assert callable(workflow_runner.create_engine)
+        assert callable(offline.apply_sync)
+        assert callable(service.profile_action)
         assert callable(tuning_config.get_tuning_config)
         """
     )

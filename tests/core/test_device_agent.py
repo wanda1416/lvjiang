@@ -388,6 +388,36 @@ def _ops(srv):
     return [r for r in srv.requests if r["op"] not in ("ping", "status")]
 
 
+def test_execution_lease_is_optional_for_legacy_apk(fake):
+    srv, dev = fake(_ok_handler())
+    client = AgentClient(dev)
+    assert client.connect()
+    inp = AgentInput(client, _cfg())
+    inp.begin_execution()
+    inp.end_execution()
+    assert _ops(srv) == []
+    client.close()
+
+
+def test_execution_lease_releases_connection_after_end_failure(fake):
+    def handler(req):
+        if req["op"] == "ping":
+            return _status(offline_protocol=1), b""
+        if req["op"] == "control_end":
+            return {"ok": False, "error": "lease release failed"}, b""
+        return {"ok": True}, b""
+
+    srv, dev = fake(handler)
+    client = AgentClient(dev)
+    assert client.connect()
+    inp = AgentInput(client, _cfg())
+    inp.begin_execution()
+    assert client._owns_execution
+    inp.end_execution()
+    assert not client._owns_execution and not client.connected
+    assert [item["op"] for item in _ops(srv)] == ["control_begin", "control_end"]
+
+
 def test_agent_input_dispatch(fake, monkeypatch):
     monkeypatch.setattr(agent_mod.time, "sleep", lambda *_: None)
     srv, dev = fake(_ok_handler())

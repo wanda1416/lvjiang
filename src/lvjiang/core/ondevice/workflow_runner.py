@@ -21,7 +21,7 @@ from loguru import logger
 from ...core.capture_base import CaptureBackend
 from ...core.config import load_user_config
 from ...core.config.resolver import get_resolver
-from ...core.config.session import get_session_store, load_env
+from ...core.config.session import get_session_store
 from ...core.input_base import InputBackend
 from ...core.layout_models import Layout
 from ...core.ocr import OCREngine
@@ -86,6 +86,7 @@ def _load_layout(name: str) -> Layout:
 def create_engine(
     layout_name: str | None = None,
     stop_check: Callable[[], bool] | None = None,
+    pause_event=None,
 ) -> WorkflowEngine:
     """创建设备端工作流引擎
 
@@ -118,12 +119,27 @@ def create_engine(
         input_sim=user_config.input_sim,
         delay_params=user_config.delay_params,
         android_apps=user_config.android_apps,
-        run_env=load_env(),
+        android_device=_LocalShellDevice(),
+        run_env="android",
         window_left=0,
         window_top=0,
         stop_check=stop_check,
+        pause_event=pause_event,
     ).build()
     return engine
+
+
+class _LocalShellDevice:
+    """复用公共应用生命周期控制器，命令由本机 Shizuku 通道执行。"""
+
+    def shell(self, *args: str, timeout: float = 15.0) -> str:
+        from . import shell
+        if not shell.is_shizuku_alive() or not shell.has_permission():
+            raise RuntimeError("此任务需要重启应用，请先启动并授权 Shizuku")
+        output = shell.exec_text(*args)
+        if "[stderr]" in output:
+            raise RuntimeError(f"本机应用控制失败: {output.strip()}")
+        return output
 
 
 def run_workflow(

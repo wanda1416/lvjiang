@@ -55,7 +55,7 @@ class _FakeEngine:
 
 
 @pytest.fixture(autouse=True)
-def _clean_state(monkeypatch):
+def _clean_state(monkeypatch, tmp_path):
     """每个用例都从干净状态起跑
 
     _STATE 与 _ENGINE 都是模块级单例（设备端一个进程只有一个任务），
@@ -63,11 +63,27 @@ def _clean_state(monkeypatch):
     """
     monkeypatch.setattr(task_runner, "_STATE", task_runner._TaskState())
     monkeypatch.setattr(task_runner, "_ENGINE", None)
+    monkeypatch.setattr(task_runner, "_PAUSE_GATE", task_runner._PauseGate())
+    task_runner._PAUSE_GATE.set()
+    from lvjiang import constants
+    from lvjiang.core.config.session import get_session_store
+    from lvjiang.core.user_config import User, save_user_metadata
+
+    monkeypatch.setattr(constants, "USERS_DIR", tmp_path / "users")
+    constants.SESSION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    (constants.SESSION_CONFIG_DIR / "offline.json").write_text(
+        json.dumps({"username": "tester", "layout": "android"}))
+    save_user_metadata(User("tester"), constants.USERS_DIR)
+    get_session_store().set_active("user", "tester")
     # 默认放行无障碍检查，需要测「未就绪」的用例自己覆盖
     monkeypatch.setattr(
         "lvjiang.core.ondevice.a11y.is_ready", lambda: True, raising=False
     )
     yield
+    if task_runner.is_running():
+        task_runner.stop_task()
+    if task_runner._STATE._thread is not None:
+        task_runner._STATE._thread.join(2)
 
 
 def _fake_tasks(*items):
@@ -78,7 +94,8 @@ def _fake_tasks(*items):
             "name": i.get("name", i["id"]),
             "wf_file": i.get("wf_file", f"{i['id']}.wf"),
             "class": i.get("class", ""),
-            "parameters": [],
+            "parameters": i.get("parameters", []),
+            "env": i.get("env", []),
         }
         for i in items
     ]
@@ -147,6 +164,13 @@ def test_list_tasks_swallows_discovery_error(monkeypatch):
 
 
 # ─── start_task 前置校验 ─────────────────────────────────────
+
+def test_unsynced_phone_cannot_start_or_list_tasks():
+    from lvjiang import constants
+    (constants.SESSION_CONFIG_DIR / "offline.json").unlink()
+    assert not json.loads(task_runner.list_tasks())["ok"]
+    result = json.loads(task_runner.start_task("task"))
+    assert not result["ok"] and "同步" in result["message"]
 
 def test_start_rejects_when_a11y_not_ready(monkeypatch):
     _patch_discovery(monkeypatch, _fake_tasks({"id": "t1"}))
@@ -226,6 +250,27 @@ def test_initial_variables_reach_engine(monkeypatch):
     assert _wait_until(lambda: _status()["state"] == task_runner.STATE_DONE)
 
     assert engine.variables == {"部位": "武器"}
+
+
+def test_synced_user_and_parameter_override_are_bound_before_execution(monkeypatch):
+    from lvjiang import constants
+    from lvjiang.core.config.wf_configs import set_wf_config
+    from lvjiang.core.user_config import set_user_workflow_params
+
+    _patch_discovery(monkeypatch, _fake_tasks({
+        "id": "task", "parameters": [{"name": "count", "default": 1}],
+    }))
+    set_wf_config("task", {"count": 3})
+    set_user_workflow_params("tester", "task", {"count": 4}, constants.USERS_DIR)
+    engine = _FakeEngine("ok")
+    _patch_engine(monkeypatch, engine)
+    _patch_source(monkeypatch)
+
+    assert json.loads(task_runner.start_task("task"))["ok"]
+    assert _wait_until(lambda: _status()["state"] == task_runner.STATE_DONE)
+    assert engine.run_username == "tester"
+    assert engine.variables["count"] == 4
+    assert engine.session["current_user"] == "tester"
 
 
 def test_failure_is_captured_as_failed(monkeypatch):
@@ -365,4 +410,3 @@ def test_state_snapshot_is_thread_safe():
         t.join()
 
     assert errors == []
-

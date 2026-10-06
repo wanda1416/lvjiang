@@ -11,7 +11,8 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.lvjiang.app"
+        applicationId = providers.gradleProperty("lvjiangTestApplicationId").orElse("com.lvjiang.app").get()
+        manifestPlaceholders["lvjiangLabel"] = if (applicationId == "com.lvjiang.app") "@string/app_name" else "律匠离线验收"
         minSdk = 26
         targetSdk = 35
         // versionCode 同时是配置解压的 stamp（见 App.kt）：改了**设备端会读的**
@@ -24,7 +25,8 @@ android {
         versionCode = 60
         versionName = "0.13.12"
         // 设备为 arm64（vivo V2415A），Chaquopy 按 ABI 打包 Python 运行时
-        ndk { abiFilters += listOf("arm64-v8a") }
+        // 正式默认仍为 arm64；软件模拟器验收可显式 -PlvjiangAbi=x86_64。
+        ndk { abiFilters += listOf(providers.gradleProperty("lvjiangAbi").orElse("arm64-v8a").get()) }
     }
 
     buildFeatures {
@@ -157,6 +159,7 @@ chaquopy {
             install("PyYAML==6.0.1")
             install("loguru==0.7.3")
             install("lark==1.3.1")
+            install("fasteners==0.20")
         }
     }
 

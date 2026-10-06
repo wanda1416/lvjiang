@@ -73,7 +73,13 @@ class CombatCardsMixin:
         return card
 
     def _add_attack_card(self, parent_layout: QVBoxLayout):
-        card = self._create_card(tr("攻击属性"))
+        self._attribute_sources_link = QLabel(
+            f'<a href="sources" style="color: #0078d4;">{tr("属性来源")}</a>')
+        self._attribute_sources_link.setStyleSheet("font-size: 13px;")
+        self._attribute_sources_link.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._attribute_sources_link.setToolTip(tr("查看当前战斗属性的各项来源"))
+        self._attribute_sources_link.linkActivated.connect(self._show_attribute_sources)
+        card = self._create_card(tr("攻击属性"), self._attribute_sources_link)
         grid = QGridLayout()
         grid.setContentsMargins(14, 2, 14, 14)
         grid.setHorizontalSpacing(20)

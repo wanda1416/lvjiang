@@ -1,21 +1,14 @@
 #!/usr/bin/env python
-"""把心法的条目骨架并入 config/system/yysls/attr_model/。
+"""补齐统一心法配置中已登记心法的一至六重骨架。
 
-只增不改：已存在的条目原样保留，只补进缺失的行。所以游戏出新心法时
-重跑一次即可，已经填好的数值不会被覆盖。也可以直接在「属性配置 →
-心法」里按「+ 心法」新增，那边一次也是建满六重。
-
-武学不在此列：名册以 game_config.yaml 的 martial_arts 为准，加载时
-自动补齐，不需要也不应该在这里生成一份。
-
-条目本身不带数值——数值由使用者在「游戏配置 → 属性来源」里填。脚本
-的价值是把几百行的名字和重数先摆好，让补数据只剩「选词条 / 填数字 /
-标无贡献」。
+名册以 inner_way.yaml 为唯一来源，内置名册及满重基线来自 DIY 计算器。
+不再维护另一份社区名称列表；新心法通过属性配置界面新增。
+仅为已有 group 补齐缺失重数，不改已填数据，不重新引入旧名称。
 
 用法::
 
-    .venv/bin/python scripts/gen_attr_model_entries.py            # 并入
-    .venv/bin/python scripts/gen_attr_model_entries.py --dry-run  # 只看会加什么
+    .venv/bin/python scripts/gen_attr_model_entries.py
+    .venv/bin/python scripts/gen_attr_model_entries.py --dry-run
 """
 from __future__ import annotations
 
@@ -30,23 +23,6 @@ TARGET_DIR = ROOT / "config" / "system" / "yysls" / "attr_model"
 
 #: 心法重数。游戏里固定六重，不随等级变化。
 TIERS = ("一重", "二重", "三重", "四重", "五重", "六重")
-
-#: 心法名。取自社区整理的心法表，按流派分组便于核对；国际服尚未放出的
-#: 流派（裂石·钧 / 牵丝·翊 / 破竹·尘 / 破竹·鸢 / 破竹·樽）不在其中，
-#: 需要在 UI 里自行新增。
-INNER_WAYS: dict[str, tuple[str, ...]] = {
-    "通用": (
-        "易水歌", "泣血婆娑", "生龙活虎", "长生无相", "苦四时", "四时无常",
-        "山月无影", "抗造大法", "归燕经", "晚雪间", "铁身决", "征人归",
-        "御风之翼",
-    ),
-    "鸣金·虹": ("威猛歌", "千山法", "无名心法", "燎原星火"),
-    "鸣金·影": ("移经易武", "凝神章", "剑气纵横", "逐狼心经"),
-    "牵丝·霖": ("极乐", "杏花不见", "指玄篇注", "君臣药"),
-    "牵丝·玉": ("花上月令", "葫芦飞飞", "纵地摘星", "春雷篇"),
-    "破竹·风": ("忘川绝响", "断石之构", "所恨年年", "复仇"),
-    "裂石·威": ("持其不攻", "山河绝韵", "磐石诀", "困兽心经"),
-}
 
 
 def _load(path: Path) -> dict:
@@ -69,7 +45,8 @@ def _merge(path: Path, kind: str, wanted: list[str], *, dry_run: bool) -> int:
         print(f"  {path.name}: 将新增 {len(added)} 条，例如 {added[:3]}")
         return len(added)
     for name in added:
-        entries[name] = {"modeled": False}
+        group, tier = name.rsplit("·", 1)
+        entries[name] = {"modeled": False, "group": group, "tier": TIERS.index(tier) + 1}
     data["kind"] = kind
     data["entries"] = entries
     header = "\n".join(
@@ -87,12 +64,10 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="只报告，不写文件")
     args = parser.parse_args()
 
-    inner_way_ids = [
-        f"{name}·{tier}"
-        for names in INNER_WAYS.values()
-        for name in names
-        for tier in TIERS
-    ]
+    path = TARGET_DIR / "inner_way.yaml"
+    entries = _load(path).get("entries") or {}
+    names = dict.fromkeys(entry["group"] for entry in entries.values() if entry.get("group"))
+    inner_way_ids = [f"{name}·{tier}" for name in names for tier in TIERS]
     print(f"目标目录：{TARGET_DIR}")
     total = _merge(
         TARGET_DIR / "inner_way.yaml", "inner_way", inner_way_ids,

@@ -321,6 +321,22 @@ def test_dimension_conversion_is_always_applied_regardless_of_selection() -> Non
 # ── 随仓库分发的配置 ──────────────────────────────────────
 
 
+def test_inner_way_full_total_is_counted_once_without_a_source_group() -> None:
+    """选满重心法时只计一次累计值，编辑时可直接定位这门心法。"""
+    from lvjiang.apps.yysls.core.attr_model import AttrLoadout, InnerWaySlot
+
+    manager = get_attr_model_manager()
+    effects = [effect for effect in manager.effects_for_loadout(
+        AttrLoadout(level=115, school="破竹·鸢", inner_ways=(InnerWaySlot("四时无常", 6),)),
+    ) if effect.kind == "inner_way"]
+    assert {effect.group for effect in effects} == {"四时无常"}
+    assert all(manager.source_file(effect.source_id) == "inner_way.yaml" for effect in effects)
+    assert sum(effect.stats.get("min_outer", 0) for effect in effects) == pytest.approx(43.4)
+    assert sum(effect.stats.get("max_outer", 0) for effect in effects) == pytest.approx(86.8)
+    assert sum(effect.stats.get("outer_bonus", 0) for effect in effects) == pytest.approx(0.028)
+    assert not any(effect.group == "苦四时" for effect in manager.effects(("inner_way",)))
+
+
 def test_shipped_115_baseline_matches_the_diy_calculator_without_affixes() -> None:
     """表格默认组合去掉 40 条普通词条后，来源与装备基础值应可复算。"""
     from lvjiang.apps.yysls.core.attr_model import AttrLoadout, InnerWaySlot

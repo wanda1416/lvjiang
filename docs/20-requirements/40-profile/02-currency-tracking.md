@@ -1,6 +1,6 @@
 # 货币追踪 — 子需求文档
 
-> 状态：部分实现（2026-10-06，基线 v0.13.11）。货币追踪已上线，但实现不是本文描述的 `currencies.jsonl` /
+> 状态：部分实现（2026-10-06，基线 v0.13.12）。货币追踪已上线，但实现不是本文描述的 `currencies.jsonl` /
 > `CurrencySnapshot` 与历史趋势折线图，而是 Profile 的 stock 模型
 > （`config/session/profile.yaml`，如 `stock:baoqian`）加上
 > [扫描钱袋货币](../../60-userguide/06-workflows.md) 工作流

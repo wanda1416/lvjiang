@@ -6,7 +6,8 @@
 默认每秒记录资源、每五秒抓一次 Python 栈；--no-stack 禁用抓栈。
 py-spy dump 可能短暂暂停目标，不是零干扰采样。Windows 通常需要管理员
 权限，打包程序/原生线程可能无法取得 Python 栈；失败原因会写入报告。
-输出不记录命令行、环境变量或栈局部变量，但栈可能包含本地路径和函数名。
+报告默认写入仓库的 config/local/diagnostics，不进入主仓库历史。
+输出移除 py-spy 的进程命令行头，不记录环境变量或栈局部变量；栈仍可能包含本地路径。
 """
 
 from __future__ import annotations
@@ -37,7 +38,10 @@ def dump_stack(executable: str, pid: int) -> dict:
         )
         return {"started_at": started, "finished_at": timestamp(),
                 "exit_code": result.returncode,
-                "stdout": result.stdout, "stderr": result.stderr}
+                "stdout": "\n".join(
+                    line for line in result.stdout.splitlines()
+                    if not line.startswith("Process ")),
+                "stderr": result.stderr}
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"started_at": started, "finished_at": timestamp(),
                 "error": str(exc)}
@@ -72,7 +76,7 @@ def main() -> int:
     spy = None if args.no_stack else shutil.which(args.py_spy or "py-spy")
     if not args.no_stack and not spy:
         print("未找到 py-spy：仅采样资源，没有 Python 栈。可用 --py-spy 指定路径。")
-    output = args.output or Path("data/diagnostics") / (
+    output = args.output or Path(__file__).resolve().parents[2] / "config/local/diagnostics" / (
         f"process-{args.pid}-{datetime.now():%Y%m%d-%H%M%S}-{os.getpid()}")
     output.mkdir(parents=True, exist_ok=False)
     metadata = {

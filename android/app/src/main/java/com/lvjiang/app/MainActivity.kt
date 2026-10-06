@@ -10,14 +10,19 @@ import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.View
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Button
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import androidx.activity.OnBackPressedCallback
 import java.util.concurrent.Executors
 
 /**
- * MainActivity — 主页：权限状态卡 + 功能区 + 开发者自检。
+ * MainActivity — 悬浮控制首页，菜单进入权限、高级功能与诊断。
  *
  * 权限状态卡（普通用户可见面）：明确显示辅助与 PC 连接状态。PC 设备端手势
  * 只要求无障碍（或高级用户使用 Shizuku），不把手机独立任务所需的悬浮窗
@@ -26,16 +31,18 @@ import java.util.concurrent.Executors
  * 功能区：调律参数配置入口（TuningConfigActivity，不依赖任何权限）+
  * 悬浮图标启停合一按钮（文案随 FloatService.isRunning 切换）。
  *
- * 高级面板（默认折叠）：Phase 0 以来的开发者自检按钮全部在这里。
+ * 二级页面只是临时导航状态，不写任务或同步配置。
  *
  * 另外接受一个由 adb 触发的自检入口，用于不依赖手点按钮的验证：
  *   adb shell am start -n com.lvjiang.app/.MainActivity --es selftest ocr
- * 自检模式下隐藏权限卡与功能区、展开高级面板：布局回到与实机验证过的
- * 旧版一致，e2e 闭环的 OCR 目标（「自检：点击回显」按钮与状态行）不受干扰。
+ * 自检模式显示诊断页面，保留点击回显目标、状态行与报告回读。
  */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
+    private enum class Page { HOME, PERMISSIONS, ADVANCED, DIAGNOSTICS }
+    private var page = Page.HOME
+    private lateinit var backToHome: OnBackPressedCallback
     private var runtimeReport = "尚未检查运行环境"
     private val executor = Executors.newSingleThreadExecutor()
     private val ui = Handler(Looper.getMainLooper())
@@ -52,13 +59,17 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        setSupportActionBar(findViewById<Toolbar>(R.id.main_toolbar))
+        backToHome = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() { showPage(Page.HOME) }
+        }
+        onBackPressedDispatcher.addCallback(this, backToHome)
 
         statusText = findViewById(R.id.status_text)
+        findViewById<Button>(R.id.btn_home_permissions).setOnClickListener { showPage(Page.PERMISSIONS) }
+        findViewById<Button>(R.id.btn_copy_report).isEnabled = false
 
-        findViewById<TextView>(R.id.advanced_toggle).setOnClickListener { toggleAdvanced() }
-        findViewById<Button>(R.id.btn_next).setOnClickListener { onNextStep() }
-
-        // 功能区：配置页不依赖任何权限，随时可进；悬浮启停合一按钮
+        // 诊断与首页操作：仅点击时执行，导航不会触发自检。
         findViewById<Button>(R.id.btn_runtime_check).setOnClickListener { checkRuntime() }
         findViewById<Button>(R.id.btn_copy_report).setOnClickListener {
             (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager)
@@ -66,8 +77,7 @@ class MainActivity : AppCompatActivity() {
             toast("诊断报告已复制，请分享前核对本地路径等私人信息")
         }
         findViewById<Button>(R.id.btn_float_toggle).setOnClickListener { onFloatToggle() }
-        // 屏幕标定：从主页进来游戏不在底下，页内再按「重新截图」前请先切到游戏大厅，
-        // 常规入口是悬浮面板里的「屏幕标定」（游戏在前台时直接拍）
+        // 从高级功能进入标定，重新截图前需先切到游戏。
         findViewById<Button>(R.id.btn_calib).setOnClickListener {
             startActivity(Intent(this, CalibActivity::class.java))
         }
@@ -129,28 +139,60 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        findViewById<Button>(R.id.btn_test_python).setOnClickListener {
-            checkRuntime()
-        }
-
         // 三通道闭环自检的被点目标：只做一件事——把状态行换成一个点击前不存在的文案。
         // 于是「点击确实落地了」这件事可以由下一张截图 + OCR 自己读出来，不需要人眼确认。
         findViewById<Button>(R.id.btn_test_click).setOnClickListener {
             statusText.text = getString(R.string.status_click_ok)
         }
 
+        val restored = savedInstanceState?.getString("main_page")
+        showPage(Page.entries.firstOrNull { it.name == restored } ?: Page.HOME)
         handleSelfTest(intent)
     }
 
-    // ── 首次启动引导 ──────────────────────────────────────
-
-    /** 当前引导进度：PC 手势只把辅助通道作为硬门槛。 */
-    private enum class GuideStep { A11Y, READY }
-
-    private fun currentStep(): GuideStep = when {
-        !A11yBridge.isReady() -> GuideStep.A11Y
-        else -> GuideStep.READY
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menu.add(0, MENU_PERMISSIONS, 0, R.string.menu_permissions)
+        menu.add(0, MENU_ADVANCED, 1, R.string.menu_advanced)
+        menu.add(0, MENU_DIAGNOSTICS, 2, R.string.menu_diagnostics)
+        return true
     }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            android.R.id.home -> showPage(Page.HOME)
+            MENU_PERMISSIONS -> showPage(Page.PERMISSIONS)
+            MENU_ADVANCED -> showPage(Page.ADVANCED)
+            MENU_DIAGNOSTICS -> showPage(Page.DIAGNOSTICS)
+            else -> return super.onOptionsItemSelected(item)
+        }
+        return true
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("main_page", page.name)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun showPage(next: Page) {
+        page = next
+        findViewById<View>(R.id.features_section).visibility = if (next == Page.HOME) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.guide_card).visibility = if (next == Page.PERMISSIONS) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.advanced_panel).visibility =
+            if (next == Page.ADVANCED || next == Page.DIAGNOSTICS) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.advanced_tools).visibility = if (next == Page.ADVANCED) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.diagnostics_panel).visibility = if (next == Page.DIAGNOSTICS) View.VISIBLE else View.GONE
+        supportActionBar?.setTitle(when (next) {
+            Page.HOME -> R.string.app_name
+            Page.PERMISSIONS -> R.string.menu_permissions
+            Page.ADVANCED -> R.string.menu_advanced
+            Page.DIAGNOSTICS -> R.string.menu_diagnostics
+        })
+        supportActionBar?.setDisplayHomeAsUpEnabled(next != Page.HOME)
+        backToHome.isEnabled = next != Page.HOME
+        findViewById<ScrollView>(R.id.main_scroll).scrollTo(0, 0)
+    }
+
+    // ── 权限与首页状态 ──────────────────────────────────────
 
     private fun refreshGuide() {
         val a11y = A11yBridge.isReady()
@@ -169,18 +211,14 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.check_notification).text =
             "${mark(notif)} 通知（建议，缺了只是看不到运行状态通知）"
 
-        val btn = findViewById<Button>(R.id.btn_next)
-        val hint = findViewById<TextView>(R.id.guide_hint)
-        when (currentStep()) {
-            GuideStep.A11Y -> {
-                btn.text = getString(R.string.guide_step_a11y)
-                hint.text = getString(R.string.guide_hint_a11y)
-            }
-            GuideStep.READY -> {
-                btn.text = getString(R.string.guide_all_ready)
-                hint.text = getString(R.string.guide_hint_ready)
-            }
+        findViewById<TextView>(R.id.home_permission_hint).text = when {
+            !a11y -> "任务运行需要开启无障碍服务，可在权限设置中开启。"
+            !overlay -> "启动悬浮图标需要悬浮窗权限，点击启动即可前往授权。"
+            FloatService.isRunning -> "悬浮图标已启动，切到游戏后点击图标选择任务。"
+            else -> "权限已就绪，启动悬浮图标即可在游戏中控制任务。"
         }
+        findViewById<Button>(R.id.btn_home_permissions).visibility =
+            if (!a11y || !overlay) View.VISIBLE else View.GONE
 
         // 悬浮启停合一按钮：文案随运行状态切换
         findViewById<Button>(R.id.btn_float_toggle).text = getString(
@@ -213,19 +251,6 @@ class MainActivity : AppCompatActivity() {
         statusText.postDelayed({ refreshGuide() }, 500)
     }
 
-    private fun onNextStep() {
-        when (currentStep()) {
-            GuideStep.A11Y -> {
-                toast("请在列表里找到「律匠自动操作」并开启")
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }
-            GuideStep.READY -> toast(
-                if (AgentServer.isPcConnected()) "辅助已开启，PC 已连接"
-                else "辅助已开启，同步配置后可用悬浮图标独立运行"
-            )
-        }
-    }
-
     private fun notificationGranted(): Boolean =
         android.os.Build.VERSION.SDK_INT < 33 ||
             checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
@@ -233,22 +258,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun mark(ok: Boolean) = if (ok) "✅" else "⬜"
 
-    private fun toggleAdvanced() {
-        val panel = findViewById<View>(R.id.advanced_panel)
-        val expanded = panel.visibility == View.VISIBLE
-        panel.visibility = if (expanded) View.GONE else View.VISIBLE
-        findViewById<TextView>(R.id.advanced_toggle).text =
-            getString(if (expanded) R.string.advanced_collapsed else R.string.advanced_expanded)
-    }
-
-    /** 自检模式：隐藏权限卡与功能区、展开高级面板，让布局回到实机验证过的旧版形态 */
+    /** ADB 自检使用同一诊断页，仍保留报告和点击回显控件。 */
     private fun enterSelfTestLayout() {
-        for (id in intArrayOf(R.id.guide_card, R.id.features_section)) {
-            findViewById<View>(id).visibility = View.GONE
-        }
-        findViewById<View>(R.id.advanced_panel).visibility = View.VISIBLE
-        findViewById<TextView>(R.id.advanced_toggle).text =
-            getString(R.string.advanced_expanded)
+        ui.removeCallbacks(statusPoller)
+        showPage(Page.DIAGNOSTICS)
     }
 
     // launchMode 是默认的 standard，重复 am start 通常会走 onCreate；
@@ -259,8 +272,7 @@ class MainActivity : AppCompatActivity() {
         if (isSelfTest()) {
             handleSelfTest(intent)
         } else {
-            findViewById<View>(R.id.guide_card).visibility = View.VISIBLE
-            findViewById<View>(R.id.features_section).visibility = View.VISIBLE
+            showPage(Page.HOME)
             refreshGuide()
             refreshStatus()
             ui.removeCallbacks(statusPoller)
@@ -326,13 +338,14 @@ class MainActivity : AppCompatActivity() {
         } else {
             "未连接"
         }
-        statusText.text =
-            "PC：$pc\n辅助：$a11y\n悬浮窗：$overlay（手机独立运行可选）\nShizuku：$shizuku（可选）"
+        if (page == Page.ADVANCED) {
+            statusText.text = "PC：$pc\n辅助：$a11y\n悬浮窗：$overlay\nShizuku：$shizuku（可选）"
+        }
         executor.execute {
             val status = PyBridge.status(this)
             val sync = status.optJSONObject("sync")
             val text = if (sync?.optBoolean("synced") == true) {
-                "最近同步：${sync.optString("synced_at")}\n执行用户：${sync.optString("username")}\n布局：${sync.optString("layout")}\n手机结果暂不回传，下次同步会覆盖手机 DB。"
+                "最近同步：${sync.optString("synced_at")}\n执行用户：${sync.optString("username")}\n当前布局：${sync.optString("layout")}\n手机结果暂不回传，下次同步会覆盖手机 DB。"
             } else {
                 status.optString("message").ifEmpty { "尚未从 PC 同步任务配置" }
             }
@@ -351,6 +364,7 @@ class MainActivity : AppCompatActivity() {
             ui.post {
                 runtimeStatus.text = result.optString("message")
                 button.isEnabled = true
+                findViewById<Button>(R.id.btn_copy_report).isEnabled = true
             }
         }
     }
@@ -366,5 +380,8 @@ class MainActivity : AppCompatActivity() {
         /** 哨兵行：adb 侧靠它判断报告已输出完整，不必靠等固定秒数 */
         private const val SELFTEST_END = "=== SELFTEST END ==="
         private const val STATUS_POLL_INTERVAL_MS = 1000L
+        private const val MENU_PERMISSIONS = 1
+        private const val MENU_ADVANCED = 2
+        private const val MENU_DIAGNOSTICS = 3
     }
 }

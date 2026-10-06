@@ -1,5 +1,18 @@
 <resources>
     <string name="app_name">律匠</string>
+    <string name="home_control_title">在游戏中运行任务</string>
+    <string name="home_control_hint">启动悬浮图标后，切到游戏选择任务。支持暂停、继续和结束。</string>
+    <string name="home_sync_title">任务与数据</string>
+    <string name="home_sync_empty">尚未同步。请在 PC 的移动设备窗口下发任务配置。</string>
+    <string name="menu_permissions">权限设置</string>
+    <string name="menu_advanced">高级功能</string>
+    <string name="menu_diagnostics">自检与诊断</string>
+    <string name="permissions_hint">本机任务需要无障碍服务；悬浮图标需要悬浮窗权限。通知用于展示运行状态，非执行前提。</string>
+    <string name="advanced_hint">屏幕标定用于对齐游戏布局；Shizuku 用于需要重启游戏的任务，其他任务无需授权。</string>
+    <string name="diagnostics_hint">遇到运行问题时检查环境并复制报告。报告可能包含本地信息，分享前请核对。</string>
+    <string name="btn_runtime_check">检查离线执行环境</string>
+    <string name="runtime_unchecked">运行环境尚未检查</string>
+    <string name="btn_copy_report">复制诊断报告</string>
     <string name="status_placeholder">权限状态检测中…</string>
 
     <!-- 首次启动引导。注意：这里的文案不能出现「已生效」三个字，
@@ -27,10 +40,10 @@
     <string name="tuning_config_loading">加载配置…</string>
     <string name="tuning_config_save">保存</string>
 
-    <string name="btn_overlay">1. 授予悬浮窗权限</string>
-    <string name="btn_a11y">2. 开启无障碍服务（必需）</string>
-    <string name="btn_shizuku">3. 授予 Shizuku 权限（可选）</string>
-    <string name="btn_notification">4. 授予通知权限</string>
+    <string name="btn_overlay">授予悬浮窗权限</string>
+    <string name="btn_a11y">开启无障碍服务</string>
+    <string name="btn_shizuku">授予 Shizuku 权限（可选）</string>
+    <string name="btn_notification">授予通知权限</string>
     <string name="btn_start_float">启动悬浮图标</string>
     <string name="btn_stop_float">停止悬浮图标</string>
     <string name="btn_test_shell">自检：shell 通道（id）</string>

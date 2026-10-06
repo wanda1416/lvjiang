@@ -1,219 +1,104 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp">
-
-        <!-- ── 权限状态卡：一行一个权限，主按钮永远指向下一件要做的事。
-             自检模式整卡隐藏（enterSelfTestLayout），布局回到旧版形态 ── -->
-
-        <LinearLayout
-            android:id="@+id/guide_card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/bg_card"
-            android:padding="16dp">
-
-            <TextView
-                android:id="@+id/guide_title"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/guide_title"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:paddingBottom="4dp" />
-
-            <TextView
-                android:id="@+id/guide_subtitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/guide_subtitle"
-                android:textSize="14sp"
-                android:paddingBottom="16dp" />
-
-            <TextView
-                android:id="@+id/check_a11y"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="15sp"
-                android:paddingBottom="6dp" />
-
-            <TextView
-                android:id="@+id/check_pc_connection"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="15sp"
-                android:paddingBottom="6dp" />
-
-            <TextView
-                android:id="@+id/check_overlay"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="15sp"
-                android:paddingBottom="6dp" />
-
-            <TextView
-                android:id="@+id/check_notification"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="15sp"
-                android:paddingBottom="16dp" />
-
-            <Button
-                android:id="@+id/btn_next"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="16sp" />
-
-            <TextView
-                android:id="@+id/guide_hint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="13sp"
-                android:paddingTop="8dp" />
-
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:fitsSystemWindows="true">
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/main_toolbar"
+        android:layout_width="match_parent" android:layout_height="?attr/actionBarSize"
+        android:background="?android:attr/colorBackground"
+        android:elevation="4dp" />
+    <ScrollView android:id="@+id/main_scroll"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:fillViewport="true">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:padding="16dp">
+            <LinearLayout android:id="@+id/features_section"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:background="@drawable/bg_card" android:padding="20dp">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/home_control_title" android:textSize="22sp" android:textStyle="bold" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" android:text="@string/home_control_hint" android:textSize="14sp" />
+                    <Button android:id="@+id/btn_float_toggle"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:minHeight="56dp" android:layout_marginTop="16dp"
+                        android:text="@string/btn_start_float" android:textSize="17sp" />
+                    <TextView android:id="@+id/home_permission_hint"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" android:textSize="13sp" />
+                    <Button android:id="@+id/btn_home_permissions" style="?attr/borderlessButtonStyle"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="@string/menu_permissions" />
+                </LinearLayout>
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp" android:orientation="vertical"
+                    android:background="@drawable/bg_card" android:padding="20dp">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/home_sync_title" android:textSize="16sp" android:textStyle="bold" />
+                    <TextView android:id="@+id/offline_status"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" android:text="@string/home_sync_empty" android:textSize="14sp" />
+                    <TextView android:id="@+id/check_pc_connection"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp" android:textSize="13sp" />
+                </LinearLayout>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/guide_card"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:visibility="gone"
+                android:background="@drawable/bg_card" android:padding="20dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="@string/permissions_hint" android:textSize="14sp" android:layout_marginBottom="16dp" />
+                <TextView android:id="@+id/check_a11y"
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="15sp" />
+                <Button android:id="@+id/btn_a11y"
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_a11y" />
+                <TextView android:id="@+id/check_overlay"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp" android:textSize="15sp" />
+                <Button android:id="@+id/btn_overlay"
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_overlay" />
+                <TextView android:id="@+id/check_notification"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp" android:textSize="15sp" />
+                <Button android:id="@+id/btn_notification"
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_notification" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/advanced_panel"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:visibility="gone">
+                <LinearLayout android:id="@+id/advanced_tools"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:background="@drawable/bg_card" android:padding="20dp">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/advanced_hint" android:textSize="14sp" />
+                    <Button android:id="@+id/btn_calib"
+                        android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_calib" />
+                    <Button android:id="@+id/btn_shizuku"
+                        android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_shizuku" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/diagnostics_panel"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical" android:background="@drawable/bg_card" android:padding="20dp">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/diagnostics_hint" android:textSize="14sp" />
+                    <Button android:id="@+id/btn_runtime_check"
+                        android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_runtime_check" />
+                    <TextView android:id="@+id/runtime_status"
+                        android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/runtime_unchecked" android:textSize="14sp" />
+                    <Button android:id="@+id/btn_copy_report"
+                        android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_copy_report" />
+                    <Button android:id="@+id/btn_test_shell"
+                        android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_test_shell" />
+                    <Button android:id="@+id/btn_test_click"
+                        android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/btn_test_click" />
+                </LinearLayout>
+                <TextView android:id="@+id/status_text"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp" android:text="@string/status_placeholder" android:textSize="14sp" />
+            </LinearLayout>
         </LinearLayout>
-
-        <!-- ── 功能区：配置入口 + 悬浮图标启停（自检模式同样整体隐藏） ── -->
-
-        <LinearLayout
-            android:id="@+id/features_section"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/bg_card"
-            android:padding="16dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="16dp">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/section_features"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:paddingBottom="4dp" />
-
-            <TextView
-                android:id="@+id/offline_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="尚未同步任务配置；请在 PC 的移动设备窗口同步。手机结果暂不回传。"
-                android:textSize="14sp" />
-
-            <Button
-                android:id="@+id/btn_runtime_check"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="检查离线执行环境" />
-
-            <TextView
-                android:id="@+id/runtime_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="运行环境尚未检查"
-                android:textSize="14sp" />
-
-            <Button
-                android:id="@+id/btn_copy_report"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="复制诊断报告" />
-
-            <Button
-                android:id="@+id/btn_float_toggle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_start_float" />
-
-        </LinearLayout>
-
-        <!-- ── 状态行：自检报告回填 + 点击回显目标，e2e 闭环靠 OCR 读这里 ── -->
-
-        <TextView
-            android:id="@+id/status_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/status_placeholder"
-            android:textSize="15sp"
-            android:paddingBottom="16dp" />
-
-        <!-- ── 高级面板：开发者自检按钮，默认折叠；adb 触发自检时自动展开 ── -->
-
-        <TextView
-            android:id="@+id/advanced_toggle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/advanced_collapsed"
-            android:textSize="15sp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp" />
-
-        <LinearLayout
-            android:id="@+id/advanced_panel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <Button
-                android:id="@+id/btn_calib"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_calib" />
-
-            <Button
-                android:id="@+id/btn_overlay"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_overlay" />
-
-            <Button
-                android:id="@+id/btn_a11y"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_a11y" />
-
-            <Button
-                android:id="@+id/btn_shizuku"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_shizuku" />
-
-            <Button
-                android:id="@+id/btn_notification"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_notification" />
-
-            <Button
-                android:id="@+id/btn_test_shell"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_test_shell" />
-
-            <Button
-                android:id="@+id/btn_test_python"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_test_python" />
-
-            <!-- 三通道闭环自检的被点目标：点中后上方状态行会出现「已生效」，
-                 而这三个字在点击前的界面上不存在，因此 OCR 自己就能判定点击是否真的落地 -->
-            <Button
-                android:id="@+id/btn_test_click"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/btn_test_click" />
-
-        </LinearLayout>
-
-    </LinearLayout>
-</ScrollView>
+    </ScrollView>
+</LinearLayout>

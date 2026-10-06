@@ -161,6 +161,9 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 | `offline_sync_commit` | — | 验证完整包和逐文件哈希、版本、DB 后交换 config；重载失败回滚 |
 
 手机任务状态为 idle/running/pausing/paused/stopping/done/failed/stopped。
+APK 主页面使用应用栏菜单导航，首页突出悬浮服务启停；权限、高级功能与诊断是独立
+展示上下文，页面切换不写配置或启动任务。旋转恢复当前页面，系统返回和应用栏返回
+均先回首页；既有 ADB 自检与只读报告通道保持不变。
 状态额外携带有界 `log_records`（seq/text/level）和每次启动递增的
 `log_generation`，供手机增量显示和重置日志；原 `logs` 文本列表保持不变。
 设备状态保留最近 200 条日志记录供 PC 读取，悬浮窗仅保留最近 20 行展示。

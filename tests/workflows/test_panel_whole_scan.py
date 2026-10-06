@@ -499,3 +499,13 @@ def test_recognize_with_without_rich_raises(tmp_path):
     engine._workflow = MagicMock()
     with pytest.raises(WorkflowUserError, match="with.*as rich"):
         engine.execute(wf)
+
+
+def test_panel_range_scan_uses_alignment_bounds(tmp_path):
+    """范围 OCR 使用公共对齐边界，只返回请求的行列，不调用不存在的 crop_slot。"""
+    engine = _make_engine()
+    script = _write_wf(tmp_path, (
+        'scan [s].[actions][1...1][1...2] as $cells\n'
+        'collect $cells\n'
+    ))
+    assert engine.execute(script)["cells"] == {"1": {"1": "t1", "2": "t2"}}

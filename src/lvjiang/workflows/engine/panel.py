@@ -268,6 +268,7 @@ class _PanelMixin:
             return
 
         min_conf = self._resolve_min_confidence(node.where)
+        ph, pw = panel_img.shape[:2]
         result: dict[str, dict[str, str]] = {}
         for r_1based in range(row_start, row_end + 1):
             for c_1based in range(col_start, col_end + 1):
@@ -275,8 +276,11 @@ class _PanelMixin:
                 if not (0 <= r_idx < cal.n_rows and 0 <= c_idx < cal.n_cols):
                     result.setdefault(str(r_1based), {})[str(c_1based)] = ""
                     continue
-                slot_img = cal.crop_slot(panel_img, r_idx, c_idx)
-                if slot_img is None:
+                x1_r, y1_r, x2_r, y2_r = cal.slot_bounds(r_idx, c_idx)
+                x1, y1 = max(0, int(x1_r * pw)), max(0, int(y1_r * ph))
+                x2, y2 = min(pw, int(x2_r * pw)), min(ph, int(y2_r * ph))
+                slot_img = panel_img[y1:y2, x1:x2]
+                if slot_img.size == 0:
                     result.setdefault(str(r_1based), {})[str(c_1based)] = ""
                     continue
                 ocr_results = (self._ocr.recognize(

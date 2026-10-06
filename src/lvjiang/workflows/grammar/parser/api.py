@@ -5,7 +5,11 @@
     parse_text(text) -> Program
 """
 
+from copy import deepcopy
+from dataclasses import replace
+from functools import lru_cache
 from pathlib import Path
+from threading import RLock
 
 from lark import Lark
 
@@ -15,6 +19,7 @@ from .transformer import _DSLTransformer
 # ─── Lark 实例（延迟初始化） ──────────────────────────────
 
 _parser: Lark | None = None
+_file_parse_lock = RLock()
 
 
 def _get_parser() -> Lark:
@@ -86,10 +91,23 @@ def _preprocess_line_continuation(text: str) -> str:
 # ─── 公共接口 ─────────────────────────────────────────────
 
 def parse_file(path: Path | str) -> Program:
-    """解析 .wf 文件，返回 Program AST 节点"""
+    """按实际内容复用文件解析结果，每次返回独立 AST。
+
+    不按 mtime 判断，保留同大小/同时间戳修改、删除和 import 热加载语义。
+    缓存仅保存语法树，不能共享其中的可变列表或字典给引擎。
+    """
     path = Path(path)
     text = path.read_text(encoding="utf-8-sig")
-    return parse_text(text, source=str(path))
+    # lru_cache 自身允许并发 miss 重复计算；显式锁避免多个任务同时解析
+    # 同一文件。读取和副本构造不持锁，缓存内容不会交给调用方修改。
+    with _file_parse_lock:
+        program = _parse_cached_file(str(path.resolve()), text)
+    return replace(deepcopy(program), source=str(path))
+
+
+@lru_cache(maxsize=128)
+def _parse_cached_file(source: str, text: str) -> Program:
+    return parse_text(text, source=source)
 
 
 def parse_text(text: str, source: str = "<text>") -> Program:

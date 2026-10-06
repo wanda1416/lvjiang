@@ -2,9 +2,11 @@
 import json
 import sqlite3
 import zipfile
+from contextlib import closing
 
 import pytest
 
+from lvjiang.core import offline_bundle
 from lvjiang.core.offline_bundle import build_offline_bundle, install_offline_bundle
 
 
@@ -24,7 +26,7 @@ def bundle(tmp_path):
     (source / "config/local/.git/config").write_text("excluded")
     archive = tmp_path / "snapshot.zip"
     # 保持 WAL 连接打开，验收快照是否含未 checkpoint 的已提交数据。
-    with sqlite3.connect(session / "profile.db") as db:
+    with closing(sqlite3.connect(session / "profile.db")) as db:
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("CREATE TABLE entries (value INTEGER)")
         db.execute("INSERT INTO entries VALUES (7)")
@@ -48,7 +50,7 @@ def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path
     session = json.loads((phone / "config/session/session.json").read_text())
     assert session["actives"] == {"user": "tester", "layout": "android"}
     assert session["settings"]["env"] == "android"
-    with sqlite3.connect(phone / "config/session/profile.db") as db:
+    with closing(sqlite3.connect(phone / "config/session/profile.db")) as db:
         assert db.execute("SELECT value FROM entries").fetchone() == (7,)
     assert (phone / "offline-backup/config/session/old.json").read_text() == "previous"
     with zipfile.ZipFile(archive) as package:
@@ -70,6 +72,63 @@ def test_corrupted_package_preserves_phone_configuration(bundle, tmp_path):
 
     assert (phone / "config/keep").read_text() == "original"
     assert not (phone / "config/session").exists()
+
+
+@pytest.fixture
+def connections(monkeypatch):
+    """保留连接引用，避免 GC 在 Linux 上掩盖 Windows 文件句柄泄漏。"""
+    opened = []
+    connect = sqlite3.connect
+
+    def track(*args, **kwargs):
+        connection = connect(*args, **kwargs)
+        opened.append(connection)
+        return connection
+
+    monkeypatch.setattr(offline_bundle.sqlite3, "connect", track)
+    yield opened
+    for connection in opened:
+        connection.close()
+
+
+def test_snapshot_and_integrity_check_release_database_handles(bundle, connections, tmp_path):
+    source, _ = bundle
+    archive = tmp_path / "handles.zip"
+    build_offline_bundle(source, archive, username="tester", layout="android")
+
+    assert connections
+    for connection in connections:
+        with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+            connection.execute("SELECT 1")
+
+    snapshot_connections = len(connections)
+
+    def before_directory_swap_finishes():
+        assert len(connections) > snapshot_connections
+        for connection in connections:
+            with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+                connection.execute("SELECT 1")
+
+    install_offline_bundle(archive, tmp_path / "phone", on_applied=before_directory_swap_finishes)
+
+
+def test_snapshot_creation_failure_releases_source_handle(bundle, connections, monkeypatch, tmp_path):
+    source, _ = bundle
+    connect = offline_bundle.sqlite3.connect
+
+    def fail_target_creation(*args, **kwargs):
+        if connections:
+            raise sqlite3.OperationalError("snapshot creation failed")
+        return connect(*args, **kwargs)
+
+    monkeypatch.setattr(offline_bundle.sqlite3, "connect", fail_target_creation)
+    with pytest.raises(sqlite3.OperationalError, match="snapshot creation failed"):
+        build_offline_bundle(source, tmp_path / "failure.zip", username="tester", layout="android")
+
+    assert connections
+    for connection in connections:
+        with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+            connection.execute("SELECT 1")
 
 
 def test_reload_failure_rolls_back_applied_configuration(bundle, tmp_path):

@@ -19,7 +19,7 @@ from collections.abc import Callable
 REPO = pathlib.Path(__file__).resolve().parent.parent
 DEVLOG_ROOT = REPO / "docs" / "40-development"
 RELEASES = REPO / "docs" / "50-releases"
-MONTHLY_DIRS = ("2026-07", "2026-08", "2026-09")
+MONTHLY_DIRS = ("2026-07", "2026-08", "2026-09", "2026-10")
 
 H1 = re.compile(r"^#\s+(.*)$", re.M)
 DATE_IN_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})-")

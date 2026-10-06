@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 
 from lvjiang.apps.yysls.workflows.implementations.tuning.ports import ResetHostPort
-from lvjiang.workflows.builtins.system import pause_user
 
 from ......i18n import tr
 from ....core.tuning_history.models import (
@@ -195,16 +194,22 @@ class TuningResetter:
             # 而是账号开了安全锁需要解锁，机器自己点不出来。此时既不能替用户
             # 猜着取消（取消要先退模态、再退确认重置视图，中途状态不可控），
             # 也不能当没事继续，只能停下来交给人。
-            logger.error("  未识别到二次重置确认按钮，暂停等待人工介入")
+            logger.error("  未识别到二次重置确认按钮，等待用户确认处理")
             wf._emit_operation(
-                "reset", "重置二次确认未出现，已暂停等待人工处理",
+                "reset", "重置二次确认未出现，等待用户处理并确认继续",
                 reason=why, resets=resets_used)
-            pause_user(
-                wf.engine,
+            confirmed = wf.call_function("confirm", [
                 "重置：点击确认重置后没有出现二次确认弹窗。"
                 "常见原因是账号开启了安全锁，需要先手动解锁。"
-                "请处理好现场后点击确定，程序会重新检查一次。",
-            )
+                "请处理好现场后选择是，程序会重新检查一次；"
+                "选择否结束本次调律并保留现场。",
+            ], engine=wf.engine)
+            if not confirmed:
+                message = tr("用户选择结束本次调律：重置二次确认未出现")
+                wf.run_state.end_requested = True
+                wf.output.setdefault("stop_reason", message)
+                logger.info(message)
+                return (RESET_FAILED, message)
             if not self._routes.scan_and_confirm("重置二次确认"):
                 logger.warning("  人工介入后仍未识别到二次确认，跳过该装备")
                 self._close_dialog()

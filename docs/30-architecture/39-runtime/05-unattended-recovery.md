@@ -6,9 +6,15 @@
 
 ## 拦截点只有一个
 
-`pause` / `confirm` / `input` 都经由 `engine._ui_callback` 走到宿主，而批量的生命周期
-脚本与条目脚本共用同一个回调，所以改道不必去碰工作流里几十个调用点。拦截后按异常
-记失败且不重试；`notify` 放过。
+所有任务交互都经由 `engine._ui_callback` 走到宿主；生命周期脚本与条目脚本
+共用同一个回调。无人值守回调仅在 `kind == "pause"` 时抛出
+`UnattendedInterrupt`，按异常记失败且不重试。`confirm/input/choose/notify`
+及其他事件正常转发到宿主，保留返回值；不会设置异常恢复标记。
+
+自动调律向公共导航的 `nav_main_to_equip`、`nav_equip_to_tune` 传入
+`ask_confirm=true`，并传递至背包导航，因此这些路径使用确认而非 pause。
+其他调用省略参数时保持异常 pause。重置二次确认缺失也通过 confirm 等待用户；
+拒绝时使用既有 `TuningRunState.end_requested` 结束运行，不再操作未知页面。
 
 ## 调度器注入的信号
 

@@ -42,7 +42,7 @@ class TuningRouteStrategy(ABC):
         engine.load_subcalls(_EQUIPMENT_SCAN_FILE)
 
     def enter_equip(self) -> bool:
-        result = self._call_subcall("nav_main_to_equip")
+        result = self._call_subcall("nav_main_to_equip", [True])
         return self._subcall_succeeded(result)
 
     def return_main(self) -> bool:
@@ -50,7 +50,7 @@ class TuningRouteStrategy(ABC):
         return self._subcall_succeeded(result)
 
     def enter_tune_detail(self) -> bool:
-        result = self._call_subcall("nav_equip_to_tune")
+        result = self._call_subcall("nav_equip_to_tune", [True])
         return self._subcall_succeeded(result)
 
     def leave_tune_detail(self, *, for_recycle: bool = False) -> None:

@@ -1,7 +1,7 @@
 """无人值守批量：弹窗改道、任务记失败、随后由恢复 wf 收回初始页。
 
-无人值守的全部价值在「没人看着的那几个小时里不卡死」，所以这些用例盯的是
-三件事：弹窗不再等人、当前任务按异常收尾且不重试、恢复 wf 拿到正确的阶段
+这些用例保护：pause 异常中断，正常确认/输入/选择仍等待用户，当前异常任务
+不重试，以及恢复 wf 拿到正确的阶段
 信号（本条目还有没有没跑的任务）。
 
 「本次是否无人值守」属于运行草稿（今晚没人看），而「异常恢复 wf」属于配置组
@@ -61,26 +61,28 @@ def _worker(tmp_path, spec) -> BatchWorker:
         SessionManager(tmp_path), lambda: False)
 
 
-def test_notify_still_reaches_the_host_but_pause_interrupts(tmp_path, qapp):
-    """notify 是非阻塞的，无人值守下照旧送到宿主；pause/confirm/input 一律中止。
-
-    放过 notify 才能在事后从告警面板看出这批跑过什么。
-    """
+def test_only_pause_interrupts_and_other_interactions_keep_host_results(tmp_path, qapp):
+    """用户决策等待并原样返回；只有 pause 触发异常恢复。"""
     seen = []
     worker = _worker(tmp_path, _spec())
+    results = {"notify": None, "confirm": False, "input": "12", "choose": "kept"}
     worker._ctx = BatchContext(
         None, None, None, None,
-        ui_callback=lambda kind, **kw: seen.append((kind, kw)) or "ok")
+        ui_callback=lambda kind, **kw: seen.append((kind, kw)) or results[kind])
 
     assert worker._unattended_active() is True
-    assert worker._unattended_ui_callback("notify", message="提示") == "ok"
-    assert seen == [("notify", {"message": "提示"})]
-
-    for kind, kwargs in (("pause", {"message": "请手动处理"}),
+    for kind, kwargs in (("notify", {"message": "提示"}),
                          ("confirm", {"message": "要继续吗"}),
-                         ("input", {"prompt": "输入名称"})):
-        with pytest.raises(UnattendedInterrupt):
-            worker._unattended_ui_callback(kind, **kwargs)
+                         ("input", {"prompt": "输入数量"}),
+                         ("choose", {"message": "选择结果", "cancel_value": "end"})):
+        assert worker._unattended_ui_callback(kind, **kwargs) == results[kind]
+        assert seen[-1] == (kind, kwargs)
+        assert not worker._unattended_hit
+
+    with pytest.raises(UnattendedInterrupt):
+        worker._unattended_ui_callback("pause", message="请手动处理")
+    assert worker._unattended_hit == "请手动处理"
+    assert len(seen) == 4
 
 
 def test_unattended_off_keeps_waiting_for_a_human(tmp_path, qapp):

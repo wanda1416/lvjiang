@@ -435,51 +435,60 @@ def test_first_confirm_ocr_failure_skips_instead_of_exhausting_resets():
     assert call.click_region(CONTROL_SCENE, "confirm") not in wf.method_calls
 
 
-def test_second_confirm_missing_pauses_for_the_user(monkeypatch):
-    """二次确认弹不出来 → 暂停等人工，不替用户猜着走取消路径。
-
-    首次确认点下去后必然弹二次确认；弹不出来通常是账号开了安全锁，机器
-    点不出来。取消要先退模态再退确认重置视图，中途状态不可控，所以停下来
-    交给人，人处理完再复查一次。
-    """
-    paused: list[str] = []
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.workflows.implementations.tuning.resetter.pause_user",
-        lambda _engine, message: paused.append(message))
-
+def test_second_confirm_missing_asks_user_then_rechecks():
+    """二次确认缺失时询问用户并复查，不使用无人值守异常 pause。"""
     wf = _reset_wf(confirm="", cancel="")
     wf.engine.call_subcall.side_effect = [0, 0]
+    wf.call_function.return_value = True
     resetter = TuningResetter(wf, DesktopTuningRouteStrategy(wf))
 
     result = resetter.try_reset_tune(
         SimpleNamespace(max_resets=3), resets_used=0, why="测试规则命中",
         min_material_count=2)
 
-    assert len(paused) == 1
-    assert "安全锁" in paused[0]
-    # 绝不点取消，也绝不把二次确认点下去。
+    assert wf.call_function.call_args.args[0] == "confirm"
+    assert "安全锁" in wf.call_function.call_args.args[1][0]
+    assert wf.call_function.call_args.kwargs["engine"] is wf.engine
     assert call.click_region(CONTROL_SCENE, "cancel") not in wf.method_calls
     assert call.click_region(CONTROL_SCENE, "confirm") not in wf.method_calls
     outcome, message = result
     assert outcome == RESET_FAILED and message
 
 
-def test_second_confirm_recovers_after_the_user_intervenes(monkeypatch):
-    """人工解锁后复查能读到确认，就继续把重置做完。"""
+def test_second_confirm_recovers_after_the_user_intervenes():
+    """用户确认处理完成后，复查能读到确认就继续把重置做完。"""
     wf = _reset_wf()
     wf.engine.call_subcall.side_effect = [0, 1]
-    monkeypatch.setattr(
-        "lvjiang.apps.yysls.workflows.implementations.tuning.resetter.pause_user",
-        lambda _engine, message: None)
+    wf.call_function.return_value = True
     resetter = TuningResetter(wf, DesktopTuningRouteStrategy(wf))
 
     assert resetter.try_reset_tune(
         SimpleNamespace(max_resets=3), resets_used=0, why="测试规则命中",
         min_material_count=2) is True
+    assert wf.call_function.call_args.args[0] == "confirm"
     assert wf.engine.call_subcall.call_args_list == [
         call("scan_and_confirm", ["重置二次确认", 1]),
         call("scan_and_confirm", ["重置二次确认", 1]),
     ]
+
+
+def test_declining_reset_confirmation_ends_run_without_touching_unknown_page():
+    from lvjiang.apps.yysls.workflows.implementations.tuning.state import TuningRunState
+
+    wf = _reset_wf()
+    wf.run_state = TuningRunState()
+    wf.output = {}
+    wf.engine.call_subcall.return_value = 0
+    wf.call_function.return_value = False
+    result = TuningResetter(wf, DesktopTuningRouteStrategy(wf)).try_reset_tune(
+        SimpleNamespace(max_resets=3), resets_used=0, why="测试规则命中",
+        min_material_count=2)
+
+    assert wf.run_state.end_requested is True
+    assert "用户选择结束" in wf.output["stop_reason"]
+    assert result[0] == RESET_FAILED
+    wf.engine.call_subcall.assert_called_once()
+    assert call.click_region("equip_tune_detail", "reset_back") not in wf.method_calls
 
 
 def test_second_confirm_is_delegated_to_shared_subcall():
@@ -714,3 +723,37 @@ def test_material_shortage_closes_the_dialog_with_the_reset_view_back():
     assert call.click_region("equip_tune_detail", "reset_back") \
         in wf.method_calls
     assert call.click_region("equip_tune_detail", "back") not in wf.method_calls
+
+
+def test_auto_tuning_navigation_asks_confirm_instead_of_pause(monkeypatch):
+    """真实公共导航在自动调律显式确认模式下，不触发无人值守 pause。"""
+    from pathlib import Path
+
+    from lvjiang.workflows.grammar import parse_text
+    from tests.workflows.conftest import make_engine
+
+    engine = make_engine(run_env="android")
+    nav = Path(__file__).parents[2] / "config/system/workflows/subcall/navigation.wf"
+    engine._procs.update(parse_text(nav.read_text(encoding="utf-8")).procs)
+    original_call = engine._exec_call_proc
+
+    def call_proc(node):
+        if node.name.startswith("is_in_"):
+            engine.variables[node.result_var] = 0
+        else:
+            original_call(node)
+
+    def scan(node):
+        engine.variables[node.target.name] = "sub_func_1"
+
+    monkeypatch.setattr(engine, "_exec_call_proc", call_proc)
+    monkeypatch.setattr(engine, "_exec_scan", scan)
+    monkeypatch.setattr(engine, "_exec_click", MagicMock())
+    monkeypatch.setattr(engine, "_exec_wait", MagicMock())
+    interactions = []
+    engine._ui_callback = lambda kind, **kw: interactions.append(kind) or False
+    routes = AndroidTuningRouteStrategy(MagicMock(engine=engine))
+
+    assert routes.enter_equip() is False
+    assert routes.enter_tune_detail() is False
+    assert interactions == ["confirm", "confirm"]

@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from lvjiang.core.layout_models import Region
     from lvjiang.core.recognizers import ReferenceInfo
 
+    from .state import TuningRunState
+
 
 class RouteHostPort(SceneAutomationPort, Protocol):
     """平台路径适配器可使用的 Workflow 原语。"""
@@ -45,6 +47,12 @@ class ResetHostPort(Protocol):
 
     TUNE_SCENE: str
     CONTROL_SCENE: str
+    output: dict
+
+    @property
+    def run_state(self) -> TuningRunState: ...
+
+    def call_function(self, func_name: str, args: list, engine=None) -> Any: ...
 
     @property
     def engine(self) -> SubcallEnginePort | None: ...

@@ -697,12 +697,12 @@ class BatchTab(QWidget):
         self._unattended_check.blockSignals(False)
         self._unattended_check.setEnabled(bool(recover_wf))
         self._unattended_check.setToolTip(tr(
-            "本次长时间无人看守时勾选：任务弹出暂停或确认框时不再等人，该任务按"
+            "本次长时间无人看守时勾选：任务遇到异常暂停时不再等人，该任务按"
             "失败记录并跳过，随后由配置组的「异常恢复 wf」把游戏收回登录主页，"
-            "再继续下一个任务"
+            "再继续下一个任务。确认、输入和选择仍等待用户交互"
         ) if recover_wf else tr(
             "需要先在「工具 → 批量配置」为本配置组配置「异常恢复 wf」：无人值守"
-            "撞上弹窗后要靠它把游戏收回登录主页"))
+            "撞上异常暂停后要靠它把游戏收回登录主页"))
         for key, label in self._workflow_labels.items():
             path = getattr(item.workflows, key) if item is not None else ""
             label.setText(path or tr("未配置"))

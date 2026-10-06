@@ -40,6 +40,7 @@ def test_title_link_opens_readonly_sources_and_refreshes_snapshot(qtbot):
     assert dialog._caption.text() == "当前方案快照"
     tree = dialog._tree
     rows = {tree.topLevelItem(i).text(0): tree.topLevelItem(i) for i in range(tree.topLevelItemCount())}
+    assert set(rows) == {"最小外功攻击", "会心率"}
     assert rows["最小外功攻击"].text(1) == "100.0"
     assert rows["会心率"].text(1) == "2.30%"
     assert rows["会心率"].text(7) == rows["会心率"].text(8)
@@ -51,7 +52,7 @@ def test_title_link_opens_readonly_sources_and_refreshes_snapshot(qtbot):
     cards._attribute_report_caption = "更新后的方案快照"
     assert rows["最小外功攻击"].text(1) == "100.0"
     dialog.refresh()
-    assert tree.topLevelItemCount() == len(rows)
+    assert tree.topLevelItemCount() == 1
     assert tree.topLevelItem(0).text(1) == "200.0"
     assert dialog._caption.text() == "更新后的方案快照"
 

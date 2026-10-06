@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -20,6 +21,7 @@ from lvjiang.ui.button_styles import apply_button_style, apply_dialog_button_box
 from ......i18n import tr
 from ....core.combat.attribute_sources import SOURCE_CATEGORIES, AttributeSourceReport
 from ....core.combat.combat_attrs import COMBAT_ATTR_FIELDS, CombatAttributes
+from .cards import ATTR_NAME_FONT_PX, ATTR_ROW_SPACING, ATTR_VALUE_FONT_PX
 
 _CATEGORY_LABELS = {
     "base": "基础属性", "gongjue": "弓玦套装", "equipment_set": "装备套装",
@@ -44,9 +46,10 @@ class AttributeSourcesDialog(QDialog):
         super().__init__(parent)
         self._provider = provider
         self.setWindowTitle(tr("属性来源"))
-        self.resize(1120, 700)
+        self.resize(1320, 760)
         layout = QVBoxLayout(self)
         self._caption = QLabel()
+        self._caption.setStyleSheet(f"font-size: {ATTR_NAME_FONT_PX}px;")
         self._caption.setWordWrap(True)
         layout.addWidget(self._caption)
         self._tree = QTreeWidget()
@@ -55,12 +58,25 @@ class AttributeSourcesDialog(QDialog):
             + [tr(_CATEGORY_LABELS[key]) for key in SOURCE_CATEGORIES]
             + [tr("合计（白字）"), tr("生效（黄字）")])
         self._tree.setAlternatingRowColors(True)
+        self._tree.setUniformRowHeights(True)
+        self._tree.setStyleSheet(
+            f"QTreeWidget {{ font-size: {ATTR_NAME_FONT_PX}px; }}"
+            f"QTreeWidget::item {{ padding: {ATTR_ROW_SPACING // 2}px 10px; }}"
+            f"QHeaderView::section {{ font-size: {ATTR_VALUE_FONT_PX}px; "
+            "font-weight: 600; padding: 6px 10px; }"
+        )
+        self._name_font = QFont(self._tree.font())
+        self._name_font.setPixelSize(ATTR_NAME_FONT_PX)
+        self._value_font = QFont(self._tree.font())
+        self._value_font.setPixelSize(ATTR_VALUE_FONT_PX)
+        self._value_font.setWeight(QFont.Weight.DemiBold)
         header = self._tree.header()
         if header is not None:
-            header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
             header.setStretchLastSection(False)
         layout.addWidget(self._tree, 1)
         self._notes = QLabel()
+        self._notes.setStyleSheet(f"font-size: {ATTR_NAME_FONT_PX}px;")
         self._notes.setWordWrap(True)
         self._notes.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self._notes)
@@ -83,11 +99,13 @@ class AttributeSourcesDialog(QDialog):
                 for field, label, unit, _ in COMBAT_ATTR_FIELDS]
         rows.extend((field, field, True, True) for field in sorted(report.raw.extra_attrs))
         for field, label, percent, extra in rows:
-            texts = [label] + [_format(_value(totals[key], field, extra), percent)
-                               for key in SOURCE_CATEGORIES]
-            texts += [_format(_value(attrs, field, extra), percent)
-                      for attrs in (report.raw, report.effective)]
+            values = [_value(totals[key], field, extra) for key in SOURCE_CATEGORIES]
+            values += [_value(attrs, field, extra) for attrs in (report.raw, report.effective)]
+            if not any(values):
+                continue
+            texts = [label] + [_format(value, percent) for value in values]
             item = QTreeWidgetItem(texts)
+            self._style_row(item)
             self._tree.addTopLevelItem(item)
             for contribution in report.contributions:
                 value = _value(contribution.attrs, field, extra)
@@ -96,9 +114,15 @@ class AttributeSourcesDialog(QDialog):
                 detail = QTreeWidgetItem([contribution.label])
                 column = SOURCE_CATEGORIES.index(contribution.category) + 1
                 detail.setText(column, _format(value, percent))
+                self._style_row(detail)
                 item.addChild(detail)
-            for column in range(1, len(texts)):
-                item.setTextAlignment(column, Qt.AlignmentFlag.AlignRight)
+        # 按全部明细测量一次，随后冻结自动宽度；展开/收起不会挤动其他列。
+        self._tree.setUpdatesEnabled(False)
+        self._tree.expandAll()
+        for column in range(self._tree.columnCount()):
+            self._tree.resizeColumnToContents(column)
+        self._tree.collapseAll()
+        self._tree.setUpdatesEnabled(True)
         notes = [tr("基础属性使用当前所选的已存数值，尚未拆分的内容仍归这一列。五维转换已计入对应词条，不重复相加。")]
         notes.append(tr("判定抗性 {judge:.1f}%，增益抗性 {buff:.1f}%；黄字按公共规则折算与封顶。").format(
             judge=report.context.judge_resistance, buff=report.context.buff_resistance))
@@ -108,3 +132,10 @@ class AttributeSourcesDialog(QDialog):
             notes.append(tr("以下词条未计入（按部位规则或同名只取最高处理）：")
                          + "、".join(report.excluded))
         self._notes.setText("\n".join(notes))
+
+    def _style_row(self, item: QTreeWidgetItem) -> None:
+        item.setFont(0, self._name_font)
+        for column in range(1, self._tree.columnCount()):
+            item.setFont(column, self._value_font)
+            item.setTextAlignment(
+                column, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)

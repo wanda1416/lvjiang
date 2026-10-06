@@ -18,7 +18,7 @@ def _project_root() -> Path:
 
     安卓端（Chaquopy）：__file__ 落在 APK 解压目录，只读且路径随版本变，
     不能当根用。AndroidPlatform 会把 HOME 指到应用 filesDir，故改用
-    $HOME/lvjiang；系统配置由 App 启动时从 assets 解压到这里（见 App.kt）。
+    $HOME/lvjiang；业务配置由 PC 同步到这里，APK 不内置业务配置。
 
     LVJIANG_ROOT 环境变量可在各端显式覆盖（测试/多实例隔离用）。
     """

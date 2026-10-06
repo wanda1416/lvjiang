@@ -368,7 +368,7 @@ selections:                 # 单选类来源
 通用心法满值，也不替换毕业率的 Excel 基线。
 
 Windows 打包通过 `package.bat` 的递归复制分发整个 `config/system`；
-Android 的 `syncSystemConfig` 也包含该目录，无需另维护数据副本。
+PC→Android 的配置同步也包含该目录，无需另维护数据副本；APK 不再内置业务配置。
 用户模式编辑遵循 ConfigResolver：写 local 覆盖，内置 system 保持不变。
 
 ### 已记录的鸣金·虹

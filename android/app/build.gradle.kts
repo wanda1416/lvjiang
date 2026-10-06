@@ -15,16 +15,9 @@ android {
         manifestPlaceholders["lvjiangLabel"] = if (applicationId == "com.lvjiang.app") "@string/app_name" else "律匠离线验收"
         minSdk = 26
         targetSdk = 35
-        // versionCode 同时是配置解压的 stamp（见 App.kt）：改了**设备端会读的**
-        // config/system 内容（场景/工作流 .wf/布局/参照图）就要 +1，否则升级后
-        // 仍走「同版本跳过」分支，设备上还是旧配置。
-        //
-        // 只有桌面端读的那几个目录（attr_model / damage_model / graduation）不算：
-        // 它们照样打进 APK，但设备上没有代码读，重解压不改变任何行为。日常按
-        // 发版节奏走即可，别把它当成提交计数器。
+        // 应用版本仅在发布时递增。业务配置统一由 PC 同步，不再随 APK 解压。
         versionCode = 60
         versionName = "0.13.12"
-        // 设备为 arm64（vivo V2415A），Chaquopy 按 ABI 打包 Python 运行时
         // 正式默认仍为 arm64；软件模拟器验收可显式 -PlvjiangAbi=x86_64。
         ndk { abiFilters += listOf(providers.gradleProperty("lvjiangAbi").orElse("arm64-v8a").get()) }
     }
@@ -187,17 +180,4 @@ dependencies {
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 }
 
-// 系统配置（场景/工作流 YAML + 布局 + 参照图）随 APK 分发：从仓库 config/system
-// 同步进 assets，App 启动时解压到 filesDir/lvjiang/config/system（见 App.kt）。
-// 用 Sync 任务而非手拷一份：仓库里只有 config/system 一个数据源，不会两处失同步。
-val syncSystemConfig = tasks.register<Sync>("syncSystemConfig") {
-    from(rootProject.file("../config/system"))
-    exclude("workflows/_*.wf")  // 编辑器临时/草稿脚本不进 APK
-    into(layout.buildDirectory.dir("generated/lvjiang_assets/config/system"))
-}
-android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/lvjiang_assets"))
-// 把 sync 任务挂到 preBuild 上：AGP 8 + Gradle 8.10 的 strict task validation 会抓
-// generateReleaseLintVitalReportModel 等任务对 assets 目录的隐式依赖，只挂 generate*Assets
-// 不够（lint 任务不走这条命名规则）。preBuild 是构建生命周期的最早任务，所有下游都会
-// 等它完成，依赖关系因此显式化。
-tasks.named("preBuild") { dependsOn(syncSystemConfig) }
+// 业务配置不进入 assets。config/system/local/remote/session 统一通过 PC 同步。

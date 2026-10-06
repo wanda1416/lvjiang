@@ -30,6 +30,11 @@
     <fields>;
 }
 
+# Python 侧记录任务阶段并读取内存快照；这些入口不能被反射外的 R8 分析删除。
+-keep class com.lvjiang.app.RuntimeDiagnostics {
+    public *;
+}
+
 # PyBridge：Kotlin 调 Python 的入口，Chaquopy 反射找 com.chaquo.python.Python.start
 # 本身已被 Chaquopy 规则覆盖；但 PyBridge 自己的方法名（ensureStarted / call）
 # 在 Kotlin 侧被显式引用，R8 能看到，不需要额外 keep。

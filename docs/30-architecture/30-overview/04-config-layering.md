@@ -574,9 +574,9 @@ QMessageBox，非主线程弹原生模态框是未定义行为）。所以 `buil
 
 ### 尚未覆盖
 
-- **设备端（Android）**：`versionCode` 兼着"配置解压 stamp"
-  （见 `android/app/build.gradle.kts` 注释），与整目录解压那套怎么共存要
-  单独设计，当前只做桌面端。
+- **设备端（Android）**：APK 不携带业务配置；PC 将 system/local/remote/session
+  完整快照下发，手机不单独下载远端配置。同步后重建 resolver 与插件缓存，应用升级
+  不解压或覆盖已同步数据。版本码只用于应用升级，与配置下发独立。
 - 其余配置（`app.yaml`、`workflows/`、`references/`）暂不参与，机制已就位，
   需要时按上表加一行注册即可。
 

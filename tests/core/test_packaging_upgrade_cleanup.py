@@ -1,4 +1,4 @@
-"""升级清理门禁：随包分发的 config/system 必须被替换，而不是叠加
+"""Windows 升级清理门禁：随包分发的 config/system 必须被替换，而不是叠加
 
 `config/system` 在用户侧是只读出厂数据（用户改动落 config/local），升级时必须做到
 「与包内容完全一致」。只覆盖同名文件的话，上游删除或移动过的文件会永远留在用户机器
@@ -18,10 +18,6 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _INSTALLER = _REPO_ROOT / "packaging" / "installer.iss"
 _PACKAGE_BAT = _REPO_ROOT / "packaging" / "package.bat"
-_ANDROID_APP = (
-    _REPO_ROOT / "android" / "app" / "src" / "main" / "java"
-    / "com" / "lvjiang" / "app" / "App.kt"
-)
 
 
 def _installer_delete_targets() -> list[str]:
@@ -74,16 +70,3 @@ def test_windows_package_distributes_scrcpy_server_with_adb():
     source = _PACKAGE_BAT.read_text(encoding="utf-8").lower()
     assert r"data\adb" in source
     assert r"data\scrcpy" not in source
-
-
-def test_android_wipes_system_config_before_extract():
-    """APK 升级解压前先删整个 config/system，否则残留同上。"""
-    source = _ANDROID_APP.read_text(encoding="utf-8")
-    body = source.partition("private fun syncSystemConfig()")[2]
-    assert body, "App.kt 里找不到 syncSystemConfig，测试需要跟着改"
-    delete_at = body.find("deleteRecursively")
-    copy_at = body.find("copyAssetDir")
-    assert delete_at != -1, (
-        "syncSystemConfig 没有删除旧的 config/system，升级后会残留上一版文件")
-    assert copy_at != -1 and delete_at < copy_at, (
-        "删除必须发生在解压之前，否则等于把刚写进去的新配置删掉")

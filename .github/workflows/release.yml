@@ -193,8 +193,7 @@ jobs:
             echo "versionName $version_name 与标签 $RELEASE_TAG 不一致" >&2
             exit 1
           fi
-          # versionCode 同时是设备端配置解压的 stamp：不递增则升级后仍走
-          # 「同版本跳过」分支，设备上还是旧配置（见 packaging/readme.md）。
+          # 正式发布递增应用版本码；业务配置由 PC 下发，不再由 APK 解压。
           previous=$(git tag --sort=-v:refname | grep -v "^${RELEASE_TAG}$" | head -1 || true)
           if [ -n "$previous" ]; then
             prev_code=$(git show "$previous:$gradle_file" \
@@ -242,6 +241,16 @@ jobs:
           set -euo pipefail
           apk=$(ls android/app/build/outputs/apk/release/*.apk)
           [ -s "$apk" ] || { echo "APK 未生成或为空: $apk" >&2; exit 1; }
+
+          # 检查实际产物，防止业务配置重新被打入 APK 并覆盖 PC 下发数据。
+          python3 - "$apk" <<'PY'
+          import sys
+          import zipfile
+          with zipfile.ZipFile(sys.argv[1]) as package:
+              configs = [name for name in package.namelist() if name.startswith("assets/config/")]
+          if configs:
+              raise SystemExit("APK 不应携带业务配置: " + ", ".join(configs[:5]))
+          PY
 
           # 签名门禁。构建侧已经移除 debug 兜底，这里再独立核一次——签名是
           # "错了也能装、装了才冲突"的那类问题，发布前是最后一道能拦住它的闸。

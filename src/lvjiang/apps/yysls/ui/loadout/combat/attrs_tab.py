@@ -191,6 +191,10 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         # _restore_selection 批量回填下拉时抑制刷新，见该方法
         self._restoring = False
         self._current_combat_attrs = CombatAttributes()
+        self._attribute_report = None
+        self._attribute_report_caption = ""
+        self._attribute_sources_dialog = None
+        self._current_plan_name = ""
         self._judgment_popup: _JudgmentOutcomePopup | None = None
         self._resistance_only = False
 
@@ -206,6 +210,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         self._display_mode: str = DISPLAY_MODE_FULL
         self._strategy: CardLayoutStrategy = FullCardLayout()
         self._setup_ui()
+        self._attribute_sources_link.setEnabled(False)
         # 构造期只填下拉框、不算属性：穿戴快照由备战方案面板本轮加载后经
         # set_equipment_snapshot 注入并统一刷新一次；预览实例则等 show_preview。
         self._load_data(refresh_display=False)
@@ -400,6 +405,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
     def _load_data(self, *, refresh_display: bool = True):
         """加载数据并刷新显示"""
         self._current_school_name = ""
+        self._current_plan_name = ""
         self._refresh_play_styles()
         self._refresh_schemes()
         self._restore_selection()
@@ -702,6 +708,7 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
             if plan is None:
                 plan = LoadoutRepository(user_name).load().active_plan
+            self._current_plan_name = plan.name
             if school is None:
                 from ....config import get_game_config
                 from ....core.loadout import resolve_school
@@ -817,6 +824,25 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
         )
         self._judgment_popup.show()
 
+    def _show_attribute_sources(self, _link: str = "") -> None:
+        from .attribute_sources_dialog import AttributeSourcesDialog
+
+        if self._attribute_report is None:
+            return
+        if self._attribute_sources_dialog is not None:
+            self._attribute_sources_dialog.raise_()
+            self._attribute_sources_dialog.activateWindow()
+            return
+        # provider 只取已经展示的快照，不加载仓库，也不保存任何选择。
+        def provider():
+            return self._attribute_report, self._attribute_report_caption
+
+        dialog = AttributeSourcesDialog(provider, self)
+        self._attribute_sources_dialog = dialog
+        dialog.destroyed.connect(lambda: setattr(self, "_attribute_sources_dialog", None))
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.show()
+
     def _show_judgment_display_menu(self, position, source=None) -> None:
         """右键判定属性或增益效果卡片，切换共享的显示状态。"""
         source = source or self._judgment_card
@@ -910,6 +936,30 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
         # 所有模式更新动态槽显隐；compact 额外重排为单列。
         self._strategy.on_refresh_display(self)
+
+        from ....core.combat.attribute_sources import build_attribute_source_report
+
+        self._attribute_report = build_attribute_source_report(
+            base_attrs, gongjue_attrs, equipped or {}, context=context,
+            school=school, game_config=get_game_config())
+        self._attribute_sources_link.setEnabled(True)
+        user = tr("预览") if self._preview else (self._session_user or tr("未选择用户"))
+        plan = tr("预览") if self._preview else self._current_plan_name
+        assumptions = () if self._preview else self.assumption_labels()
+        gongjue_level = (
+            self._preview_gongjue_level if self._preview
+            else self._gongjue_level.value()
+        ) or get_game_config().gongjue_level_for(world_level)
+        self._attribute_report_caption = tr(
+            "用户：{user}　方案：{plan}　流派：{school}　基础属性：{base}　世界等级：{level}　弓玦：{gongjue}（{gongjue_level}级）"
+        ).format(
+            user=user, plan=plan, school=school,
+            base=(tr("预览基础属性") if self._preview and self._preview_base_attrs is not None
+                  else self._combo_play_style.currentText() or tr("无")),
+            level=world_level, gongjue=self._get_current_gongjue() or tr("无"),
+            gongjue_level=gongjue_level)
+        if assumptions:
+            self._attribute_report_caption += tr("　假设：{labels}").format(labels="、".join(assumptions))
 
     def _refresh_attr_bonus(self, combat_attrs: CombatAttributes) -> None:
         """显示当前流派属攻伤害加成，并提供四系悬浮明细。"""

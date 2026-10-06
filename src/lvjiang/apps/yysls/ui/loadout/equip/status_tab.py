@@ -1808,7 +1808,6 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
     def _on_chengyin_merge(self):
         """汇总全部用户候选，确认后按用户迁移引用并删除旧快照。"""
         from ....config import get_game_config
-        from ....core.loadout import LoadoutRepository
         from .chengyin_merge_dialog import (
             ChengyinMergeDialog,
             load_user_chengyin_candidates,
@@ -1820,9 +1819,18 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
         )
         dialog = ChengyinMergeDialog(
             candidates, self._display_params, self)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
+        dialog.merge_requested.connect(lambda: self._merge_chengyin_selection(dialog))
+        dialog.exec()
+
+    def _merge_chengyin_selection(self, dialog):
+        """执行当前选择并重读候选，合并成功或失败都保留确认窗口。"""
+        from ....config import get_game_config
+        from ....core.loadout import LoadoutRepository
+        from .chengyin_merge_dialog import load_user_chengyin_candidates
+
         selected = dialog.selected_candidates()
+        if not selected:
+            return
         replacements_by_user: dict[str, dict[str, str]] = {}
         for entry in selected:
             candidate = entry.candidate
@@ -1830,26 +1838,40 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             existing = replacements.get(candidate.old_fp)
             if existing is not None and existing != candidate.new_fp:
                 QMessageBox.warning(
-                    self, tr("合并失败"),
+                    dialog, tr("合并失败"),
                     tr("选中项包含冲突关系，请确保同一旧装备只合并到一个新版本。"))
                 return
             replacements[candidate.old_fp] = candidate.new_fp
+        completed_users = []
+        error = None
         try:
             for username, replacements in replacements_by_user.items():
                 LoadoutRepository(username).merge_items(replacements)
+                completed_users.append(username)
         except Exception as exc:
             logger.exception("承音装备合并失败")
-            QMessageBox.critical(self, tr("合并失败"), str(exc))
-            return
-        self._refresh_all()
+            error = exc
+        if completed_users:
+            self._refresh_all()
         # 承音合并会写多个用户，逐个通知——只报当前用户会漏掉其余几个。
         hub = get_event_hub(self._host)
-        for username in replacements_by_user:
+        for username in completed_users:
             hub.publish(EQUIPMENT_CHANGED, username)
-        QMessageBox.information(
-            self, tr("合并完成"),
-            tr("已合并 {count} 份旧装备快照。此操作保留右侧版本，并迁移所有备战方案引用。")
-            .format(count=len(selected)))
+        # 即使后一个用户失败，前面已成功的合并也不能留在旧候选中重复执行。
+        dialog.set_candidates(load_user_chengyin_candidates(
+            self._host.user_manager.list_users(),
+            get_game_config().get_level_configs(),
+        ))
+        count = sum(len(replacements_by_user[name]) for name in completed_users)
+        if error is not None:
+            dialog.result_label.setText(tr(
+                "本次成功合并 {count} 份旧装备快照，其余操作未完成。请核对错误后重新选择；已完成的合并不会撤销。"
+            ).format(count=count))
+            QMessageBox.critical(dialog, tr("合并失败"), str(error))
+        else:
+            dialog.result_label.setText(tr(
+                "已合并 {count} 份旧装备快照，方案引用已迁移。可继续选择其他候选；取消合并仅关闭窗口，不撤销已完成操作。"
+            ).format(count=count))
 
     def _on_mock_delete_requested(self, equip_data: dict, group_key: str):
         """处理模拟装备删除请求"""

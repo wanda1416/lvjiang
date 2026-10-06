@@ -457,3 +457,68 @@ def test_incompatible_old_snapshots_sharing_target_are_not_auto_selected(qtbot):
     assert len(dialog._pairs) == 1
     dialog._check_all()
     assert dialog.selected_candidates() == []
+
+
+def test_merge_keeps_dialog_open_and_reloads_remaining_candidates(qtbot, tmp_path, monkeypatch):
+    """合并第一组后不退出；候选从磁盘重读，可继续合并直至空列表。"""
+    from types import SimpleNamespace
+    from unittest.mock import Mock, patch
+
+    from lvjiang.apps.yysls import config
+    from lvjiang.apps.yysls.core import loadout
+    from lvjiang.apps.yysls.ui.loadout.equip import chengyin_merge_dialog, status_tab
+
+    old = _equip()
+    new = _equip(level=105, values=(11, 21, 31, 41, 51))
+    for username in ("alice", "bob"):
+        repo = LoadoutRepository(username, tmp_path)
+        repo.upsert_item(old)
+        repo.upsert_item(new)
+    # 所有默认仓储/候选读取必须路由临时用户目录，不能污染真实配置。
+    monkeypatch.setattr(loadout, "LoadoutRepository", lambda username, users_dir=None:
+                        LoadoutRepository(username, tmp_path))
+    monkeypatch.setattr(chengyin_merge_dialog, "LoadoutRepository", lambda username, users_dir=None:
+                        LoadoutRepository(username, tmp_path))
+    monkeypatch.setattr(config.get_game_config(), "get_level_configs", _levels)
+    hub = SimpleNamespace(publish=Mock())
+    monkeypatch.setattr(status_tab, "get_event_hub", lambda _host: hub)
+    owner = SimpleNamespace(
+        _host=SimpleNamespace(user_manager=SimpleNamespace(list_users=lambda: ["alice", "bob"])),
+        _refresh_all=Mock(),
+    )
+    # helper 的原函数默认仓储构造已由上面的 monkeypatch 指向 tmp_path。
+    dialog = ChengyinMergeDialog(
+        load_user_chengyin_candidates(["alice", "bob"], _levels(), tmp_path), {})
+    qtbot.addWidget(dialog)
+    dialog.merge_requested.connect(lambda:
+        status_tab.EquipStatusTab._merge_chengyin_selection(owner, dialog))
+    finished = []
+    dialog.finished.connect(finished.append)
+    dialog.show()
+    errors = []
+    monkeypatch.setattr(status_tab.QMessageBox, "critical", lambda *args: errors.append(args))
+    dialog._pairs[0].checkbox.setChecked(True)
+    with patch.object(LoadoutRepository, "merge_items", side_effect=ValueError("合并失败")):
+        dialog.merge_button.click()
+    assert errors and dialog.isVisible() and not finished
+    assert len(dialog._pairs) == 2
+    assert old["_fp"] in LoadoutRepository("alice", tmp_path).load().equipment_items
+    dialog._pairs[0].checkbox.setChecked(True)
+    dialog.merge_button.click()
+    assert dialog.isVisible()
+    assert not finished
+    assert [pair.entry.username for pair in dialog._pairs] == ["bob"]
+    assert dialog.selected_candidates() == []
+    assert not dialog.merge_button.isEnabled()
+    assert old["_fp"] not in LoadoutRepository("alice", tmp_path).load().equipment_items
+
+    dialog.check_all_button.click()
+    dialog.merge_button.click()
+    assert dialog.isVisible() and not finished
+    assert not dialog._pairs
+    assert not dialog.check_all_button.isEnabled()
+    assert owner._refresh_all.call_count == 2
+    assert [call.args[1] for call in hub.publish.call_args_list] == ["alice", "bob"]
+    dialog.cancel_button.click()
+    assert finished and not dialog.isVisible()
+    assert old["_fp"] not in LoadoutRepository("bob", tmp_path).load().equipment_items

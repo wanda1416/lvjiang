@@ -4,6 +4,7 @@
 那层全局规范化，再去除首尾空白——没有「完全不清洗」这条路径。
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -30,16 +31,24 @@ class OCREngine:
 
     _instance = None
 
-    def __init__(self, *, rapidocr_options: dict[str, Any] | None = None):
+    def __init__(self, *, rapidocr_options: dict[str, Any] | None = None,
+                 backend_factory: Callable[[], Any] | None = None,
+                 region_pixel_budget: int | None = None):
         self._ocr: Any = None
         self._available = False
         self._rapidocr_options = dict(rapidocr_options or {})
+        self._backend_factory = backend_factory
+        self._region_pixel_budget = region_pixel_budget
 
     def close(self) -> None:
         """释放后端会话；设备端不能仅丢弃 Python 引用来回收 JNI 原生资源。"""
         backend, self._ocr = self._ocr, None
         self._available = False
         failure = None
+        close_backend = getattr(backend, "close", None)
+        if callable(close_backend):
+            close_backend()
+            return
         for name in ("text_det", "text_cls", "text_rec"):
             session = getattr(getattr(backend, name, None), "session", None)
             close = getattr(session, "close", None)
@@ -56,19 +65,26 @@ class OCREngine:
         if self._ocr is not None:
             return self._available
         try:
-            from rapidocr_onnxruntime import RapidOCR
-            self._ocr = RapidOCR(**self._rapidocr_options)
+            if self._backend_factory is not None:
+                self._ocr = self._backend_factory()
+            else:
+                from rapidocr_onnxruntime import RapidOCR
+                self._ocr = RapidOCR(**self._rapidocr_options)
             self._available = True
-            logger.info("RapidOCR 引擎加载成功（ONNX Runtime）")
+            logger.info("OCR 引擎加载成功（{}）", "native" if self._backend_factory else "RapidOCR")
         except MemoryError:
             raise
         except ImportError as e:
+            if self._backend_factory is not None:
+                raise RuntimeError(f"手机 OCR 原生后端依赖加载失败：{e}") from e
             logger.error(
                 f"RapidOCR 未安装: {e}\n"
                 "请执行: pip install rapidocr-onnxruntime"
             )
             self._available = False
         except Exception as e:
+            if self._backend_factory is not None:
+                raise
             logger.error(f"RapidOCR 初始化失败: {e}")
             self._available = False
         return self._available
@@ -91,6 +107,9 @@ class OCREngine:
         except MemoryError:
             raise
         except Exception as e:
+            if self._backend_factory is not None:
+                # 原生后端的结构/模型错误不是正常未识别，不允许静默继续点击。
+                raise
             logger.error(f"OCR 识别失败: {e}")
             return []
 
@@ -219,17 +238,23 @@ class OCREngine:
         batches: list[list[tuple[str, np.ndarray]]] = []
         current: list[tuple[str, np.ndarray]] = []
         content_height = 0
+        content_width = 0
         for item in valid:
             crop_height = item[1].shape[0]
             added = crop_height + (region_batch.gap if current else 0)
-            if (current and content_height + added
-                    > region_batch.max_content_height):
+            next_width = max(content_width, item[1].shape[1], region_batch.min_canvas_side)
+            next_height = max(content_height + added, region_batch.min_canvas_side)
+            over_pixels = (self._region_pixel_budget is not None
+                           and next_width * next_height > self._region_pixel_budget)
+            if current and (content_height + added > region_batch.max_content_height or over_pixels):
                 batches.append(current)
                 current = []
                 content_height = 0
+                content_width = 0
                 added = crop_height
             current.append(item)
             content_height += added
+            content_width = max(content_width, item[1].shape[1])
         if current:
             batches.append(current)
 

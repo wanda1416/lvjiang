@@ -499,6 +499,9 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
                       "用户已结束任务" if _STATE.should_stop() else reason)
     finally:
         from .diagnostics import record
+        # from last 仅属于本轮；终态不再留整屏图像等下一次任务。
+        if _ENGINE is not None:
+            _ENGINE.clear_capture_snapshot()
         record("task_end", json.dumps({"task": task["id"], "state": _STATE.snapshot()["state"]}, ensure_ascii=False))
         if sink is not None:
             from loguru import logger

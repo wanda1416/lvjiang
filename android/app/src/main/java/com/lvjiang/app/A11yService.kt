@@ -12,6 +12,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * A11yService — 截图与输入的主通道。
@@ -140,7 +141,8 @@ object A11yBridge {
         }
 
         val latch = CountDownLatch(1)
-        var result: Array<Any>? = null
+        val result = AtomicReference<Array<Any>?>(null)
+        var accepting = true // 由 result 的 monitor 保护，超时后的回调只释放资源。
         var outOfMemory: OutOfMemoryError? = null
 
         service.takeScreenshot(
@@ -149,7 +151,9 @@ object A11yBridge {
             object : AccessibilityService.TakeScreenshotCallback {
                 override fun onSuccess(screenshot: ScreenshotResult) {
                     try {
-                        result = toRgba(screenshot)
+                        synchronized(result) {
+                            if (accepting) result.set(toRgba(screenshot))
+                        }
                     } catch (e: Throwable) {
                         if (e is OutOfMemoryError) outOfMemory = e
                         screenshotFailed("截图转换失败：${e.javaClass.simpleName}: ${e.message}")
@@ -175,11 +179,18 @@ object A11yBridge {
         )
 
         if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+            synchronized(result) {
+                accepting = false
+                result.set(null)
+            }
             screenshotFailed("截图回调超时 ${timeoutMs}ms")
             return null
         }
         outOfMemory?.let { throw it }
-        return result
+        return synchronized(result) {
+            accepting = false
+            result.getAndSet(null) // 转移所有权，系统保留回调时也不再保留整屏像素。
+        }
     }
 
     /**

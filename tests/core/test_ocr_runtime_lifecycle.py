@@ -1,4 +1,4 @@
-"""保护 OCR 内存生命周期和 Android 单条批次，不让 OOM 变成空识别继续执行。"""
+"""保护 OCR 后端边界、生命周期，不让真实故障变成空识别继续执行。"""
 import json
 from types import SimpleNamespace
 
@@ -8,18 +8,22 @@ from lvjiang.core.ocr import OCREngine
 from lvjiang.core.ondevice import offline, task_runner, workflow_runner
 
 
-def test_android_batches_are_bounded_without_changing_pc_defaults(monkeypatch):
+def test_android_uses_native_backend_without_changing_pc_defaults(monkeypatch):
     options = []
+    device_configs = []
 
     def backend(**kwargs):
         options.append(kwargs)
         return SimpleNamespace()
 
     monkeypatch.setattr("rapidocr_onnxruntime.RapidOCR", backend)
-    monkeypatch.setattr("lvjiang.core.ondevice.onnx_session.install", lambda: None)
+    monkeypatch.setattr("lvjiang.core.ondevice.native_ocr.NativeOCRBackend",
+                        lambda config: device_configs.append(config) or SimpleNamespace())
     assert OCREngine()._ensure_loaded()
     assert workflow_runner._create_ocr()._ensure_loaded()
-    assert options == [{}, {"rec_batch_num": 1, "cls_batch_num": 1}]
+    assert options == [{}]
+    assert device_configs[0].threads == 2
+    assert device_configs[0].max_detector_pixels == 2_000_000
 
 
 def test_close_releases_all_sessions_once_and_allows_reinitialization(monkeypatch):
@@ -42,6 +46,26 @@ def test_close_releases_all_sessions_once_and_allows_reinitialization(monkeypatc
     assert closed == ["text_det", "text_cls", "text_rec"]
     assert engine._ensure_loaded()
     assert engine._ocr is backends[1] and len(backends) == 2
+
+
+def test_native_backend_fault_propagates_and_close_is_idempotent():
+    import pytest
+
+    closed = []
+
+    class Backend:
+        def __call__(self, image):
+            raise RuntimeError("model output shape mismatch")
+
+        def close(self):
+            closed.append(True)
+
+    engine = OCREngine(backend_factory=Backend)
+    with pytest.raises(RuntimeError, match="shape mismatch"):
+        engine.recognize(np.zeros((32, 32, 3), dtype=np.uint8))
+    engine.close()
+    engine.close()
+    assert closed == [True]
 
 
 def test_oom_propagates_instead_of_becoming_no_text():

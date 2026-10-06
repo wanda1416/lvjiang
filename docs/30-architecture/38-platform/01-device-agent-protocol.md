@@ -161,6 +161,12 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 | `offline_sync_commit` | — | 验证完整包和逐文件哈希、版本、DB 后交换 config；重载失败回滚 |
 
 手机任务状态为 idle/running/pausing/paused/stopping/done/failed/stopped。
+手机 OCR 使用 C++ 后端完成检测、分类、识别和 CTC 解码，复用 APK 中同一份
+ONNX Runtime 1.20.0 和现有模型。跨语言只传 BGR 字节图像、返回文字/置信度/四角
+坐标，不传模型浮点输入输出。公共 OCREngine 继续负责区域归属、清洗和字段拼接；
+PC 使用原 RapidOCR 后端。原生后端故障向上传播，不能作为空识别继续操作。
+模型会话跨任务复用，图像与推理临时对象按调用释放；任务终态清除 from last 帧。
+诊断记录各模型运行次数、最大输入/输出字节和尺寸，不记录识别原文。
 APK 主页面使用应用栏菜单导航，首页突出悬浮服务启停；权限、高级功能与诊断是独立
 展示上下文，页面切换不写配置或启动任务。旋转恢复当前页面，系统返回和应用栏返回
 均先回首页；既有 ADB 自检与只读报告通道保持不变。

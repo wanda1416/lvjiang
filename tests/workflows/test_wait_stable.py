@@ -69,6 +69,14 @@ def _run_wait_stable(cap: _SeqCapture, **kw):
 
 
 class TestWaitStableExecution:
+    def test_orientation_change_restarts_stability_baseline(self):
+        """游戏退出/重启切换横竖屏不能 absdiff 崩溃，也不能沿用旧稳定计时。"""
+        landscape = np.full((50, 100, 3), 100, dtype=np.uint8)
+        portrait = np.full((100, 50, 3), 100, dtype=np.uint8)
+        cap = _SeqCapture([landscape, landscape, portrait, *[portrait for _ in range(20)]])
+        _run_wait_stable(cap, timeout=5.0, interval=0.01, stable_duration=0.1)
+        assert cap._idx > 4
+
     def test_sampling_preserves_last_recognition_frame(self):
         """稳定等待中的空帧和新帧均不能覆盖 from last 的识别依据。"""
         original = _frame(10)

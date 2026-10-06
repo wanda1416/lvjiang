@@ -3,7 +3,7 @@
 设备端没有 UI 层，需要自己把各组件装配起来供 DSL 引擎使用：
 - A11yCapture（截图）
 - A11yInput（输入）
-- OCREngine（OCR，需要先 patch RapidOCR）
+- OCREngine（手机 C++ OCR 后端，共用清洗与区域归属）
 - Layout（从 JSON 文件加载）
 - WorkflowEngine（DSL 执行）
 
@@ -42,11 +42,12 @@ def _create_input(input_sim=None) -> InputBackend:
 
 
 def _create_ocr() -> OCREngine:
-    """创建设备端 OCR 引擎（已 patch RapidOCR）"""
-    from .onnx_session import install
-    install()
-    # 手机与游戏共享内存，识别/方向分类单条处理，避免六条输出同时复制到 Java 堆。
-    return OCREngine(rapidocr_options={"rec_batch_num": 1, "cls_batch_num": 1})
+    """设备端原生 OCR；共享清洗、区域归属和业务解析保持不变。"""
+    from ..ocr_config import load_device_ocr_config
+    from .native_ocr import NativeOCRBackend
+    config = load_device_ocr_config()
+    return OCREngine(backend_factory=lambda: NativeOCRBackend(config),
+                     region_pixel_budget=config.max_detector_pixels)
 
 
 def _default_layout_name() -> str:

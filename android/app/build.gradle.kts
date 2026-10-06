@@ -6,9 +6,24 @@ plugins {
     id("com.chaquo.python")
 }
 
+// C++ 与 Java 复用同一份 ORT AAR，不另打包一个推理运行库。
+val nativeOrt by configurations.creating
+val prepareNativeOrt by tasks.registering(Sync::class) {
+    from({ zipTree(nativeOrt.singleFile) }) { include("jni/**") }
+    into(layout.buildDirectory.dir("native-ort"))
+}
+val nativeOpenCv by configurations.creating
+val prepareNativeOpenCv by tasks.registering(Sync::class) {
+    from({ zipTree(nativeOpenCv.singleFile) }) {
+        include("prefab/modules/opencv_java4/include/**", "jni/**/libopencv_java4.so")
+    }
+    into(layout.buildDirectory.dir("native-opencv"))
+}
+
 android {
     namespace = "com.lvjiang.app"
     compileSdk = 35
+    ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = providers.gradleProperty("lvjiangTestApplicationId").orElse("com.lvjiang.app").get()
@@ -20,6 +35,13 @@ android {
         versionName = "0.13.12"
         // 正式默认仍为 arm64；软件模拟器验收可显式 -PlvjiangAbi=x86_64。
         ndk { abiFilters += listOf(providers.gradleProperty("lvjiangAbi").orElse("arm64-v8a").get()) }
+        externalNativeBuild {
+            cmake {
+                arguments += "-DORT_ROOT=${layout.buildDirectory.dir("native-ort").get().asFile.absolutePath}"
+                arguments += "-DANDROID_STL=c++_shared"
+                arguments += "-DOPENCV_ROOT=${layout.buildDirectory.dir("native-opencv").get().asFile.absolutePath}"
+            }
+        }
     }
 
     buildFeatures {
@@ -74,8 +96,20 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    sourceSets.getByName("main").jniLibs.srcDir(layout.buildDirectory.dir("native-opencv/jni"))
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
 }
 
+tasks.configureEach {
+    if (name == "preBuild" || name.startsWith("configureCMake") || name.startsWith("buildCMake")) {
+        dependsOn(prepareNativeOrt, prepareNativeOpenCv)
+    }
+}
 // Chaquopy 用 buildPython 建一个 venv 来跑 pip，因此 pip 看到的解释器版本就是它的版本。
 // 若沿用系统 Python 3.13，rapidocr_onnxruntime 的 Requires-Python (>=3.6,<3.13) 会把安装
 // 直接拦下；版本对齐后还能顺带预编译 .pyc（否则设备首次导入明显变慢）。
@@ -178,6 +212,8 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
     // ONNX Runtime：Phase 1 起承载 RapidOCR 同款模型推理
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+    nativeOrt("com.microsoft.onnxruntime:onnxruntime-android:1.20.0@aar")
+    nativeOpenCv("org.opencv:opencv:4.10.0@aar")
 }
 
 // 业务配置不进入 assets。config/system/local/remote/session 统一通过 PC 同步。

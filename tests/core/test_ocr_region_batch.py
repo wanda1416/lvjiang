@@ -4,6 +4,7 @@ import numpy as np
 
 from lvjiang.core.layout_models import CanvasConfig, Region
 from lvjiang.core.ocr import OCREngine, OCRResult
+from lvjiang.core.ocr_config import RegionBatchConfig
 from lvjiang.core.scene_definition_models import RegionDef
 
 
@@ -19,6 +20,25 @@ def _patch_text_defs(monkeypatch, *keys: str) -> None:
             for key in keys
         ],
     )
+
+
+def test_pixel_budget_splits_wide_batches_without_losing_field_mapping(monkeypatch):
+    engine = OCREngine(region_pixel_budget=400_000)
+    monkeypatch.setattr("lvjiang.core.ocr.load_region_batch_config",
+                        lambda: RegionBatchConfig(min_canvas_side=16, gap=16))
+    shapes = []
+
+    def recognize(sheet, cleaning_group=None):
+        shapes.append(sheet.shape)
+        return [OCRResult(str(int(sheet[0, 0, 0])), 1, _bbox(0, 0, 10, 10))]
+
+    monkeypatch.setattr(engine, "recognize", recognize)
+    result = engine._recognize_region_crops([
+        ("first", np.full((600, 500, 3), 1, dtype=np.uint8)),
+        ("second", np.full((600, 500, 3), 2, dtype=np.uint8)),
+    ])
+    assert shapes == [(600, 500, 3), (600, 500, 3)]
+    assert result == {"first": "1", "second": "2"}
 
 
 def test_multiple_regions_share_one_ocr_call_and_restore_fields(monkeypatch):

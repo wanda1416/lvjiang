@@ -60,7 +60,8 @@ def screenshot_rgba(timeout_ms: int = 5000):
         logger.info(f"无障碍截图失败：{reason}")
         return None
     width, height, data = got
-    return int(width), int(height), bytes(data)
+    # Java byte[] 实现 buffer 协议，直接交给 numpy；不再先复制整屏 Python bytes。
+    return int(width), int(height), data
 
 
 # 手势函数一律返回「失败原因」：成功是 None，失败是设备端给出的具体原因。

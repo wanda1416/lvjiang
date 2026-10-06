@@ -128,3 +128,14 @@ def patch_all(session_factory) -> None:
     """
     patch_unclip()
     patch_infer_session(session_factory)
+    # 保留旧推理适配用于同图对照时，避免检测预处理临时升为 float64。
+    from rapidocr_onnxruntime.ch_ppocr_det.utils import DetPreProcess
+    DetPreProcess.normalize = _normalize_float32
+
+
+def _normalize_float32(self, img: np.ndarray) -> np.ndarray:
+    result = img.astype(np.float32)
+    result *= np.float32(self.scale)
+    result -= np.asarray(self.mean, dtype=np.float32)
+    result /= np.asarray(self.std, dtype=np.float32)
+    return result

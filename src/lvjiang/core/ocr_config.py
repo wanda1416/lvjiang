@@ -21,6 +21,25 @@ class RegionBatchConfig:
     gap: int = 16
 
 
+@dataclass(frozen=True)
+class DeviceOCRConfig:
+    """手机资源预算；不影响 PC 的识别参数。"""
+
+    threads: int = 2
+    max_detector_pixels: int = 2_000_000
+
+
+def load_device_ocr_config() -> DeviceOCRConfig:
+    config = (load_ocr_config().get("recognition") or {}).get("device_ocr") or {}
+    value = DeviceOCRConfig(
+        threads=int(config.get("threads", 2)),
+        max_detector_pixels=int(config.get("max_detector_pixels", 2_000_000)),
+    )
+    if value.threads < 1 or value.max_detector_pixels < 1024:
+        raise ValueError("手机 OCR 线程数至少为 1，检测像素预算至少为 1024")
+    return value
+
+
 def load_ocr_config() -> dict[str, Any]:
     """读取 OCR 聚合配置，并兼容旧版 local 清洗规则。"""
     from .config import get_resolver

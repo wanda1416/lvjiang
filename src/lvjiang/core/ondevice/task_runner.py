@@ -304,12 +304,12 @@ def list_tasks(require_sync: bool = True) -> str:
         )
 
 
-def start_task(task_id: str, initial_variables: str = "") -> str:
+def start_task(task_id: str, initial_variables: str = "", username: str = "") -> str:
     with CONTROL_LOCK:
-        return _start_task(task_id, initial_variables)
+        return _start_task(task_id, initial_variables, username)
 
 
-def _start_task(task_id: str, initial_variables: str = "") -> str:
+def _start_task(task_id: str, initial_variables: str = "", username: str = "") -> str:
     """启动一个任务（非阻塞，立刻返回）
 
     Args:
@@ -354,6 +354,14 @@ def _start_task(task_id: str, initial_variables: str = "") -> str:
     except Exception as e:
         return json.dumps({"ok": False, "message": str(e)}, ensure_ascii=False)
 
+    if username:
+        try:
+            from ..config.session import get_session_store
+            if username not in _synced_user_names():
+                raise ValueError("执行用户资料尚未同步或不可用")
+            get_session_store().set_active("user", username)
+        except Exception as exc:
+            return json.dumps({"ok": False, "message": str(exc)}, ensure_ascii=False)
     _STATE.begin(task_id, task["name"])
     thread = threading.Thread(
         target=_run_in_thread,
@@ -396,8 +404,55 @@ def get_status() -> str:
     Returns:
         JSON 文本，字段见 ``_TaskState.snapshot``
     """
+    from ..config.session import get_session_store
     from .offline import sync_status
-    return json.dumps({**_STATE.snapshot(), "sync": sync_status()}, ensure_ascii=False, default=str)
+    sync = sync_status()
+    if sync.get("synced"):
+        sync["execution_username"] = get_session_store().get_active("user", sync.get("username", ""))
+    return json.dumps({**_STATE.snapshot(), "sync": sync}, ensure_ascii=False, default=str)
+
+
+def _synced_user_names() -> list[str]:
+    from ...constants import USERS_DIR
+    from ..config.session import get_session_store
+    from ..user_config import is_valid_username, load_user_metadata
+    from .offline import sync_status
+
+    sync = sync_status()
+    if not sync.get("synced"):
+        return []
+    names = get_session_store().get_node("users", [])
+    candidates = [*(names if isinstance(names, list) else []), sync.get("username", "")]
+    return list(dict.fromkeys(
+        name for name in candidates
+        if isinstance(name, str) and is_valid_username(name)
+        and load_user_metadata(name, USERS_DIR) is not None
+    ))
+
+
+def list_users() -> str:
+    """只展示同步名册中有有效资料的用户，不创建/修复缺失资料。"""
+    try:
+        from ..config.session import get_session_store
+        return json.dumps({"ok": True, "users": _synced_user_names(),
+                           "selected": get_session_store().get_active("user", "")}, ensure_ascii=False)
+    except Exception as exc:
+        return json.dumps({"ok": False, "users": [], "message": str(exc)}, ensure_ascii=False)
+
+
+def select_user(username: str) -> str:
+    """只改变手机活动用户，下一次任务重新冻结该用户参数与 Session。"""
+    with CONTROL_LOCK:
+        if _STATE.is_running():
+            return json.dumps({"ok": False, "message": "请先停止当前任务再选择用户"}, ensure_ascii=False)
+        try:
+            from ..config.session import get_session_store
+            if username not in _synced_user_names():
+                raise ValueError("该用户资料尚未同步或不可用，请重新从 PC 同步")
+            get_session_store().set_active("user", username)
+            return json.dumps({"ok": True, "message": "执行用户已切换，请确认游戏角色一致"}, ensure_ascii=False)
+        except Exception as exc:
+            return json.dumps({"ok": False, "message": str(exc)}, ensure_ascii=False)
 
 
 def is_running() -> bool:

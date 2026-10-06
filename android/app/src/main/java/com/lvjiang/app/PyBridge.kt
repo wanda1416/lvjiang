@@ -82,13 +82,21 @@ object PyBridge {
 
     /** 可执行任务清单：`{ok, tasks:[{id,name,source}], error}` */
     fun listTasks(context: Context): JSONObject = callJson(context, "list_tasks")
-
-    /** 启动任务：`{ok, message}`。ok=false 时任务未启动，message 可直接 toast。 */
-    fun startTask(context: Context, taskId: String): JSONObject = synchronized(AgentServer.executionLock) {
+    fun listUsers(context: Context): JSONObject = callJson(context, "list_users")
+    fun selectUser(context: Context, username: String): JSONObject = synchronized(AgentServer.executionLock) {
         if (AgentServer.pcControlsDevice()) {
             JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束 PC 任务")
         } else {
-            callJson(context, "start_task", taskId, "")
+            callJson(context, "select_user", username)
+        }
+    }
+
+    /** 启动任务：`{ok, message}`。ok=false 时任务未启动，message 可直接 toast。 */
+    fun startTask(context: Context, taskId: String, username: String = ""): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) {
+            JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束 PC 任务")
+        } else {
+            callJson(context, "start_task", taskId, "", username)
         }
     }
 

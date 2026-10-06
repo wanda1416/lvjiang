@@ -345,7 +345,7 @@ class MainActivity : AppCompatActivity() {
             val status = PyBridge.status(this)
             val sync = status.optJSONObject("sync")
             val text = if (sync?.optBoolean("synced") == true) {
-                "最近同步：${sync.optString("synced_at")}\n执行用户：${sync.optString("username")}\n当前布局：${sync.optString("layout")}\n手机结果暂不回传，下次同步会覆盖手机 DB。"
+                "最近同步：${sync.optString("synced_at")}\n执行用户：${sync.optString("execution_username", sync.optString("username"))}\n当前布局：${sync.optString("layout")}\n手机结果暂不回传，下次同步会覆盖手机 DB。"
             } else {
                 status.optString("message").ifEmpty { "尚未从 PC 同步任务配置" }
             }

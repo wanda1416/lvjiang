@@ -14,7 +14,11 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+import yaml
+
 from .._version import __version__
+from .config.resolver import ConfigResolver
+from .layout_config import load_layout_doc
 from .user_config import is_valid_username
 
 FORMAT_VERSION = 1
@@ -27,6 +31,15 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
     if not is_valid_username(username) or not layout:
         raise ValueError("请选择有效执行用户和安卓布局")
     config = root / "config"
+    layout_doc = load_layout_doc(ConfigResolver(
+        system_dir=config / "system", local_dir=config / "local", remote_dir=config / "remote",
+    ))
+    entries = layout_doc["layouts"]
+    if layout not in entries:
+        raise ValueError("所选同步布局不存在")
+    layout_scope = {layout}
+    if entries[layout].get("extends"):
+        layout_scope.add(entries[layout]["extends"])
     if not (config / "session/users" / f"{username}.json").is_file():
         raise ValueError("执行用户资料不存在")
     manifest: dict[str, Any] = {
@@ -57,7 +70,17 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                         or path.name.endswith((".lock", ".tmp", ".db-wal", ".db-shm", ".db-journal"))
                         or rel.as_posix() in {"session/profile.db", "session/offline.json", "local/license.txt"}):
                     continue
+                if len(rel.parts) >= 3 and rel.parts[1] == "layouts" and rel.parts[2] not in layout_scope:
+                    continue
                 data = path.read_bytes()
+                if rel.as_posix() in {"system/layouts.yaml", "local/layouts.yaml", "remote/layouts.yaml"}:
+                    doc = yaml.safe_load(data) or {}
+                    layouts = doc.get("layouts") or {}
+                    doc["layouts"] = {key: value for key, value in layouts.items() if key in layout_scope}
+                    deleted = [key for key in layouts.get("__deleted__", []) if key in layout_scope]
+                    if deleted:
+                        doc["layouts"]["__deleted__"] = deleted
+                    data = yaml.safe_dump(doc, allow_unicode=True, sort_keys=False).encode("utf-8")
                 if rel.as_posix() == "session/session.json":
                     session = json.loads(data)
                     session.setdefault("actives", {}).update(user=username, layout=layout)

@@ -109,6 +109,17 @@ object A11yBridge {
     /** 截图回调线程池：单线程够用，截图本身是串行的 */
     private val executor = Executors.newSingleThreadExecutor()
 
+    @Volatile
+    private var lastScreenshotError: String? = null
+
+    fun getLastScreenshotError(): String? = lastScreenshotError
+
+    private fun screenshotFailed(reason: String) {
+        lastScreenshotError = reason
+        Log.w(TAG, reason)
+        RuntimeDiagnostics.recordMessage("capture_failed", reason)
+    }
+
     /** 无障碍服务是否已连接（唯一的「通道可用」判据） */
     fun isReady(): Boolean = A11yService.instance != null
 
@@ -122,13 +133,15 @@ object A11yBridge {
      * ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT，调用方需自行留间隔。
      */
     fun screenshotRgba(timeoutMs: Long = 5000): Array<Any>? {
+        lastScreenshotError = null
         val service = A11yService.instance ?: run {
-            Log.w(TAG, "截图失败：无障碍服务未连接")
+            screenshotFailed("无障碍服务未连接")
             return null
         }
 
         val latch = CountDownLatch(1)
         var result: Array<Any>? = null
+        var outOfMemory: OutOfMemoryError? = null
 
         service.takeScreenshot(
             Display.DEFAULT_DISPLAY,
@@ -138,6 +151,8 @@ object A11yBridge {
                     try {
                         result = toRgba(screenshot)
                     } catch (e: Throwable) {
+                        if (e is OutOfMemoryError) outOfMemory = e
+                        screenshotFailed("截图转换失败：${e.javaClass.simpleName}: ${e.message}")
                         Log.e(TAG, "截图转换失败", e)
                     } finally {
                         // HardwareBuffer 不释放会很快耗尽缓冲区，后续截图全部失败
@@ -147,16 +162,23 @@ object A11yBridge {
                 }
 
                 override fun onFailure(errorCode: Int) {
-                    Log.w(TAG, "截图失败 errorCode=$errorCode")
+                    val reason = when (errorCode) {
+                        AccessibilityService.ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT -> "截图请求间隔过短"
+                        AccessibilityService.ERROR_TAKE_SCREENSHOT_NO_ACCESSIBILITY_ACCESS -> "无障碍截图权限不可用"
+                        AccessibilityService.ERROR_TAKE_SCREENSHOT_INVALID_DISPLAY -> "截图显示器无效"
+                        else -> "系统截图失败"
+                    }
+                    screenshotFailed("$reason（errorCode=$errorCode）")
                     latch.countDown()
                 }
             },
         )
 
         if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
-            Log.w(TAG, "截图超时 ${timeoutMs}ms")
+            screenshotFailed("截图回调超时 ${timeoutMs}ms")
             return null
         }
+        outOfMemory?.let { throw it }
         return result
     }
 
@@ -167,17 +189,19 @@ object A11yBridge {
     private fun toRgba(screenshot: ScreenshotResult): Array<Any> {
         val hardware = Bitmap.wrapHardwareBuffer(screenshot.hardwareBuffer, screenshot.colorSpace)
             ?: throw IllegalStateException("wrapHardwareBuffer 返回 null")
-        val bitmap = hardware.copy(Bitmap.Config.ARGB_8888, false)
-            ?: throw IllegalStateException("copy 到 ARGB_8888 失败")
-        hardware.recycle()
-
-        val buffer = ByteBuffer.allocate(bitmap.byteCount)
-        bitmap.copyPixelsToBuffer(buffer)
-        val width = bitmap.width
-        val height = bitmap.height
-        bitmap.recycle()
-
-        return arrayOf(width, height, buffer.array())
+        try {
+            val bitmap = hardware.copy(Bitmap.Config.ARGB_8888, false)
+                ?: throw IllegalStateException("copy 到 ARGB_8888 失败")
+            try {
+                val buffer = ByteBuffer.allocate(bitmap.byteCount)
+                bitmap.copyPixelsToBuffer(buffer)
+                return arrayOf(bitmap.width, bitmap.height, buffer.array())
+            } finally {
+                bitmap.recycle()
+            }
+        } finally {
+            hardware.recycle()
+        }
     }
 
     // 所有手势的坐标都是调用方在截图上量出来的，进来先过一遍 ScreenMap（截图空间 → 输入空间，

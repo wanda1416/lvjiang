@@ -188,6 +188,22 @@ def _get_engine():
         return _ENGINE
 
 
+def release_engine() -> None:
+    global _ENGINE
+    from .diagnostics import record
+    from .onnx_session import close_sessions
+
+    with _ENGINE_LOCK:
+        engine, _ENGINE = _ENGINE, None
+        try:
+            if engine is not None:
+                engine.clear_capture_snapshot()
+                engine._ocr.close()
+        finally:
+            close_sessions()
+            record("ocr_engine_released")
+
+
 def _reset_engine_state(engine) -> None:
     """清掉上一轮的执行残留
 
@@ -256,10 +272,10 @@ def list_tasks(require_sync: bool = True) -> str:
         # 工作流注册表，未加载会退化成同名旧 .wf（见 plugins 模块说明）。
         ensure_loaded()
 
-        # 日常清单与桌面下拉共用暴露层：目录约定给全集，作者声明默认可见性，
-        # 用户偏好（顺序/启停/改名）存 session，设备端与桌面因此天然一致。
+        # 共用排序、启停和改名偏好，但设备端没有桌面专用配置页，需允许
+        # 作者明确声明的设备专用任务（如自动调律）进入悬浮面板。
         # 冒烟自检任务源码已内联，不再出现在清单里，由 _resolve_task 内置合成。
-        items = list_exposed_scripts()
+        items = list_exposed_scripts("android", device_entry=True)
 
         tasks = [
             {
@@ -409,6 +425,7 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
 
         from ..config.wf_configs import get_wf_config
         from ..task_params import resolve_task_params
+        from .diagnostics import record
 
         worker_id = threading.get_ident()
         sink = logger.add(lambda message: _STATE.log(str(message).strip()),
@@ -416,9 +433,16 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
                           format="{message}", level="INFO")
         _STATE.set_message("正在初始化引擎")
         _STATE.log(f"任务开始：{name}")
+        record("task_begin", task["id"])
         engine = _get_engine()
         _reset_engine_state(engine)
         engine.workflow_config_snapshot = deepcopy(get_wf_config(task["id"]))
+        if task.get("class"):
+            from ...workflows.implementations import get_workflow_class
+
+            loader = getattr(get_workflow_class(task["class"]), "CONFIG_SNAPSHOT_LOADER", None)
+            if loader is not None:
+                engine.workflow_config_snapshot = deepcopy(loader(engine.run_username, engine.users_dir))
         params, _ = resolve_task_params(task["id"], engine.run_username, task.get("parameters", []), engine.users_dir)
         if variables:
             params.update(variables)
@@ -441,17 +465,31 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         collected = len(result or {})
         _STATE.log(f"任务完成，收集 {collected} 项")
         _STATE.finish(STATE_DONE, f"已完成：{name}", dict(result or {}))
+    except MemoryError as exc:
+        _STATE.log(f"内存不足，任务已中止：{exc}")
+        _STATE.finish(STATE_FAILED, "手机 OCR 内存不足，已中止任务，请查看诊断日志")
+        release_engine()
     except WorkflowAbort as exc:
         _STATE.log(str(exc))
         _STATE.finish(STATE_STOPPED if _STATE.should_stop() else STATE_FAILED, str(exc))
     except Exception as e:
+        from ...workflows.errors import WorkflowExecutionError
+
         detail = traceback.format_exc().rstrip()
         _STATE.log(f"任务异常：{type(e).__name__}: {e}")
         for line in detail.splitlines()[-8:]:
             _STATE.log(line)
+        cause = e.__cause__ if isinstance(e, WorkflowExecutionError) else None
+        reason = f"{type(e).__name__}: {e}"
+        if cause is not None:
+            reason += f"：{cause}"
+        if isinstance(cause, MemoryError):
+            release_engine()
         _STATE.finish(STATE_STOPPED if _STATE.should_stop() else STATE_FAILED,
-                      "用户已结束任务" if _STATE.should_stop() else f"{type(e).__name__}: {e}")
+                      "用户已结束任务" if _STATE.should_stop() else reason)
     finally:
+        from .diagnostics import record
+        record("task_end", json.dumps({"task": task["id"], "state": _STATE.snapshot()["state"]}, ensure_ascii=False))
         if sink is not None:
             from loguru import logger
             logger.remove(sink)

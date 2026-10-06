@@ -47,8 +47,17 @@ def screenshot_rgba(timeout_ms: int = 5000):
 
     Kotlin 侧回的是 Object[]{Int, Int, byte[]}，Chaquopy 映射成 Python list。
     """
-    got = _bridge().screenshotRgba(int(timeout_ms))
+    from java.lang import OutOfMemoryError
+
+    try:
+        got = _bridge().screenshotRgba(int(timeout_ms))
+    except OutOfMemoryError as exc:
+        raise MemoryError("手机截图内存不足，已中止任务；请查看运行诊断日志") from exc
     if got is None:
+        from loguru import logger
+
+        reason = _bridge().getLastScreenshotError() or "系统未返回截图"
+        logger.info(f"无障碍截图失败：{reason}")
         return None
     width, height, data = got
     return int(width), int(height), bytes(data)

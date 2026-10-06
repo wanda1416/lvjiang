@@ -107,7 +107,7 @@ def _patch_discovery(monkeypatch, tasks):
     )
     # list_tasks 现在直接调 list_exposed_scripts，绕过 workflows.yaml 过滤
     monkeypatch.setattr(
-        "lvjiang.workflows.discovery.list_exposed_scripts", lambda: tasks
+        "lvjiang.workflows.discovery.list_exposed_scripts", lambda *_args, **_kw: tasks
     )
 
 
@@ -161,6 +161,30 @@ def test_list_tasks_swallows_discovery_error(monkeypatch):
     assert data["ok"] is False
     assert data["tasks"] == []
     assert "OSError" in data["error"]
+
+
+def test_device_lists_tuning_without_exposing_other_dedicated_tasks(monkeypatch):
+    from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
+        AutoTuningWorkflow,
+    )
+    from lvjiang.workflows import discovery, implementations
+    from lvjiang.workflows.preferences import DailyScriptPrefs
+
+    monkeypatch.setattr(implementations, "list_workflows", lambda: ["auto_tuning"])
+    monkeypatch.setattr(implementations, "get_workflow_class", lambda _name: AutoTuningWorkflow)
+    monkeypatch.setattr(discovery, "_discover_wf_scripts", lambda *_: {
+        "helper": {"id": "helper", "scope": "dedicated", "source_layer": "system"},
+        "pc_only": {"id": "pc_only", "env": ["windows"], "source_layer": "system"},
+    })
+    monkeypatch.setattr(discovery, "load_preferences", lambda: DailyScriptPrefs([], {}, {}, {}))
+    monkeypatch.setattr("lvjiang.core.ondevice.plugins.ensure_loaded", lambda: None)
+
+    assert "auto_tuning" not in [item["id"] for item in discovery.list_exposed_scripts("android")]
+    tasks = json.loads(task_runner.list_tasks())["tasks"]
+    assert tasks == [{"id": "auto_tuning", "name": "自动调律", "source": "class"}]
+    monkeypatch.setattr(discovery, "load_preferences",
+                        lambda: DailyScriptPrefs([], {"auto_tuning": False}, {}, {}))
+    assert json.loads(task_runner.list_tasks())["tasks"] == []
 
 
 # ─── start_task 前置校验 ─────────────────────────────────────
@@ -271,6 +295,54 @@ def test_synced_user_and_parameter_override_are_bound_before_execution(monkeypat
     assert engine.run_username == "tester"
     assert engine.variables["count"] == 4
     assert engine.session["current_user"] == "tester"
+
+
+def test_tuning_freezes_synced_user_config_instead_of_shared_config(monkeypatch):
+    from lvjiang import constants
+    from lvjiang.apps.yysls.workflows.implementations.auto_tuning import (
+        AutoTuningWorkflow,
+    )
+    from lvjiang.core.config.wf_configs import set_wf_config
+    from lvjiang.core.user_config import set_user_workflow_params
+
+    _patch_discovery(monkeypatch, _fake_tasks({"id": "auto_tuning", "class": "auto_tuning"}))
+    monkeypatch.setattr("lvjiang.workflows.implementations.get_workflow_class",
+                        lambda _name: AutoTuningWorkflow)
+    set_wf_config("auto_tuning", {"selected_slots": ["head"]})
+    saved = {"selected_slots": ["ring"], "rules": {"huiyi_general": {"enabled": True}}}
+    set_user_workflow_params("tester", "auto_tuning", saved, constants.USERS_DIR)
+    engine = _FakeEngine("ok")
+    _patch_engine(monkeypatch, engine)
+    _patch_source(monkeypatch)
+
+    assert json.loads(task_runner.start_task("auto_tuning"))["ok"]
+    assert _wait_until(lambda: _status()["state"] == task_runner.STATE_DONE)
+    snapshot = engine.workflow_config_snapshot
+    assert snapshot["selected_slots"] == ["ring"]
+    assert snapshot["rules"] == saved["rules"]
+    set_user_workflow_params("tester", "auto_tuning", {"selected_slots": ["chest"]}, constants.USERS_DIR)
+    assert snapshot["selected_slots"] == ["ring"]
+
+
+def test_wrapped_workflow_oom_keeps_reason_and_releases_engine(monkeypatch):
+    from unittest.mock import Mock
+
+    from lvjiang.workflows.errors import WorkflowExecutionError
+
+    _patch_discovery(monkeypatch, _fake_tasks({"id": "t1"}))
+    error = WorkflowExecutionError("TestWorkflow", {})
+    error.__cause__ = MemoryError("手机截图内存不足")
+    engine = _FakeEngine()
+    engine.execute = Mock(side_effect=error)
+    release = Mock()
+    monkeypatch.setattr(task_runner, "release_engine", release)
+    _patch_engine(monkeypatch, engine)
+    _patch_source(monkeypatch)
+
+    assert json.loads(task_runner.start_task("t1"))["ok"]
+    assert _wait_until(lambda: _status()["state"] == task_runner.STATE_FAILED)
+    assert "手机截图内存不足" in _status()["message"]
+    release.assert_called_once()
 
 
 def test_failure_is_captured_as_failed(monkeypatch):

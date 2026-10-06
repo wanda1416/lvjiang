@@ -157,7 +157,7 @@ cd android && ./gradlew :app:assembleDebug
 
 ## 9. 离线验收
 
-先在独立测试应用内验证，不能用合成配置覆盖正式应用的用户 DB。
+默认使用正式应用保留数据覆盖更新，不能用合成配置覆盖正式应用的用户 DB。
 `am start -n <package>/com.lvjiang.app.MainActivity --es selftest runtime` 会执行实际依赖、
 插件、引擎和 OCR 检查；release 包可通过
 `content read --uri content://<package>.selftest/log` 读取结构化报告和结束标记。
@@ -166,6 +166,14 @@ cd android && ./gradlew :app:assembleDebug
 启动后可暂停/继续、暂停后结束能唤醒、断开全部 PC 连接后仍能完成。必须用截图及点击
 验证悬浮启动和安全控制，不能只测 RPC 返回值。检查失败、运行中再次启动/同步以及 PC
 代理输入冲突必须明确拒绝。游戏业务操作单独验收，不把合成任务通过写成全部游戏已验证。
+
+APK 不内置业务配置，启动和升级不解压 config/system。新装应用尚未同步时，运行环境
+检查只验证依赖并提示 PC 下发配置；不能为了测试向正式应用写入合成用户/DB。
+正式包可保留已有同步配置，用 offline_diagnostics 的 screen_repetitions 参数在游戏
+前台进行只读连续 OCR，结合游戏 PID、退出记录和运行日志测量内存。
+运行日志可通过 content://<package>.selftest/runtime 与 /runtime-previous 回读，文件
+位于应用私有 data/diagnostics，当前/上一份各约 2 MiB。日志有真实任务信息，分享前应
+检查，但源码/测试/提交不得保存真实用户名或设备身份。
 
 注意：`uiautomator dump` 会在读树期间暂时抑制其它无障碍服务；并行跑工作流会出现
 工具造成的“辅助未连接”。用截图检查悬浮窗，或等待读树结束且代理重新报告 a11y=true。

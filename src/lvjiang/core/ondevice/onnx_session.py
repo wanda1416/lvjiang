@@ -9,10 +9,14 @@ com.lvjiang.app.OnnxBridge（onnxruntime-android）承担。本模块负责两�
 与 PC 端同一份权重，因此差异只来自推理引擎实现本身。
 """
 
+from weakref import WeakSet
+
 import numpy as np
 
 from ...i18n import tr
 from .rapidocr_adapter import patch_all
+
+_sessions: WeakSet["JavaInferSession"] = WeakSet()
 
 
 class JavaInferSession:
@@ -33,6 +37,8 @@ class JavaInferSession:
 
         threads = int(config.get("intra_op_num_threads", -1) or -1)
         self._bridge = OnnxBridge(str(model_path), threads)
+        self._closed = False
+        _sessions.add(self)
 
     def __call__(self, input_content: np.ndarray):
         """单输入推理，返回 [输出数组]
@@ -45,7 +51,17 @@ class JavaInferSession:
         """
         arr = np.ascontiguousarray(input_content, dtype=np.float32)
         # shape 显式转成 int 列表：numpy 的整型标量不会被 Chaquopy 认成 long
-        output = self._bridge.run(arr.tobytes(), [int(d) for d in arr.shape])
+        from ai.onnxruntime import OrtException
+        from java.lang import OutOfMemoryError
+        try:
+            output = self._bridge.run(arr.tobytes(), [int(d) for d in arr.shape])
+        except OutOfMemoryError as exc:
+            raise MemoryError("手机 OCR 内存不足，已中止任务；请查看运行诊断日志") from exc
+        except OrtException as exc:
+            message = str(exc).lower()
+            if "allocate memory" in message or "bad_alloc" in message:
+                raise MemoryError("手机 ONNX 原生内存分配失败，已中止任务") from exc
+            raise
         data = np.frombuffer(output.data, dtype=np.float32)
         return [data.reshape(tuple(output.shape))]
 
@@ -59,7 +75,23 @@ class JavaInferSession:
         return value.splitlines()
 
     def close(self) -> None:
-        self._bridge.close()
+        if not getattr(self, "_closed", True):
+            self._bridge.close()
+            self._closed = True
+            _sessions.discard(self)
+
+    def __del__(self):
+        # 覆盖 RapidOCR 构造到一半失败时已经创建的会话。
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
+def close_sessions() -> None:
+    """同步重载前显式释放设备端全部旧会话，不依赖 Java/Python GC 时机。"""
+    for session in list(_sessions):
+        session.close()
 
 
 def install() -> None:

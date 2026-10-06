@@ -36,6 +36,7 @@ from typing import Any
 from loguru import logger
 
 from lvjiang.apps.yysls.config import get_game_config
+from lvjiang.apps.yysls.config.auto_tuning_config import load_user_auto_tuning_config
 from lvjiang.apps.yysls.config.tune_slots import SLOT_LABELS
 from lvjiang.apps.yysls.core.equip_parser import EquipmentData
 from lvjiang.apps.yysls.core.evaluator import (
@@ -123,6 +124,10 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     DISPLAY_NAME = "自动调律"
     # 专用脚本：日常 Tab 不画其参数面板，由专属配置页自行管理
     SCOPE = "dedicated"
+    # 手机没有专用配置页；使用 PC 同步的配置，从悬浮任务入口启动。
+    DEVICE_VISIBLE = True
+    # 通用运行入口通过此加载器冻结用户配置，不读取废弃的共享调律配置。
+    CONFIG_SNAPSHOT_LOADER = staticmethod(load_user_auto_tuning_config)
 
     # ─── 共享常量 ──────────────────────────────────────────
 
@@ -696,9 +701,26 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """通过共享 DSL 子过程扫描详情，并修正冷却提示造成的词条下移。"""
         if self.engine is None:
             raise RuntimeError("自动调律未注入 WorkflowEngine，无法扫描装备详情")
-        raw = self.engine.call_subcall(
-            "scan_equipment_detail", [detail_scene])
-        return raw if isinstance(raw, dict) else {}
+        # 先取得并固定本轮新截图：包括已同步到手机的旧 DSL 子过程，也不能
+        # 在首次截图失败后继续 from last，更不能用回收前的旧帧。
+        for attempt in range(3):
+            if self.engine.capture_frame(source="equipment_detail") is not None:
+                break
+            if attempt < 2:
+                logger.info("装备详情截图失败，稍后重试")
+                self.wait_seconds(0.4)
+        else:
+            message = "装备详情截图连续失败，自动调律已停止；请检查无障碍服务及截图诊断日志"
+            logger.error(message)
+            raise RuntimeError(message)
+        with self.engine.capture_source(from_last=True):
+            raw = self.engine.call_subcall(
+                "scan_equipment_detail", [detail_scene])
+        if not isinstance(raw, dict) or not raw:
+            message = "装备详情扫描未返回有效结果，自动调律已停止；请检查场景和扫描日志"
+            logger.error(message)
+            raise RuntimeError(message)
+        return raw
 
     def _read_equipped(self, slot: str) -> dict | None:
         """读取当前槽位已装备的装备信息。

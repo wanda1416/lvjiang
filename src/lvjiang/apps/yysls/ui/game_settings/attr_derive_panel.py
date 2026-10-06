@@ -62,13 +62,13 @@ from ...core.attr_model import (
     COMBAT_NUMERIC_FIELDS,
     INNER_WAY_SLOTS,
     INNER_WAY_TIERS,
+    PERCENT_FIELDS,
     SELECT_SINGLE,
     SELECTION_POLICIES,
     SOURCE_KIND_LABELS,
     AttrLoadout,
     AttrModelError,
     InnerWaySlot,
-    diff_against_panel,
     get_attr_model_manager,
     invalidate_attr_model_cache,
 )
@@ -79,8 +79,22 @@ from ...core.combat.combat_attrs import (
 )
 from .level_combo import LevelCombo
 
-#: 差异大于该值才算对不上。面板只显示到小数点后一位。
-_DIFF_EPSILON = 0.05
+
+def _display_value(name: str, value: float, *, is_extra: bool = False) -> float:
+    """按字段单位量化展示值；不改变模型及保存的原始精度。"""
+    percent = is_extra or name in PERCENT_FIELDS
+    shown = round(value * 100 if percent else value, 2 if percent else 1)
+    return shown if shown else 0.0
+
+
+def _format_value(
+    name: str, value: float, *, is_extra: bool = False, signed: bool = False,
+) -> str:
+    percent = is_extra or name in PERCENT_FIELDS
+    shown = _display_value(name, value, is_extra=is_extra)
+    sign = "+" if signed and shown else ""
+    digits = 2 if percent else 1
+    return f"{shown:{sign}.{digits}f}" + ("%" if percent else "")
 
 
 #: 心法槽的空选项
@@ -460,9 +474,15 @@ class AttrDerivePanel(QWidget):
             self._table.setRowCount(0)
             return
 
-        differences = (
-            diff_against_panel(result, reference) if reference is not None else {}
-        )
+        differences = 0
+        if reference is not None:
+            for name, _display, is_extra in self._rows(result, reference):
+                derived = (result.panel_attrs.extra_attrs.get(name, 0.0) if is_extra
+                           else getattr(result.panel_attrs, name, 0.0))
+                actual = (reference.extra_attrs.get(name, 0.0) if is_extra
+                          else getattr(reference, name, 0.0))
+                differences += _display_value(name, derived, is_extra=is_extra) != _display_value(
+                    name, actual, is_extra=is_extra)
         self._fill_table(result, reference, residual)
 
         # 只数真正有贡献的：空装配时五维转换也会记 6 条 0 值明细，
@@ -472,15 +492,20 @@ class AttrDerivePanel(QWidget):
             parts = [tr("尚未配装，先在左侧选心法与其他来源")]
         else:
             parts = [tr("参与推导 {n} 项").format(n=effective)]
-        if residual:
-            parts.append(tr("{n} 个属性靠补足").format(n=len(residual)))
+        visible_residual = sum(
+            bool(_display_value(name.removeprefix("extra:"), value,
+                                is_extra=name.startswith("extra:")))
+            for name, value in residual.items()
+        )
+        if visible_residual:
+            parts.append(tr("{n} 个属性靠补足").format(n=visible_residual))
         if result.unmodeled:
             parts.append(tr("其中 {n} 项尚未填数值").format(n=len(result.unmodeled)))
         if reference is None:
             parts.append(tr("未选对照，只显示推导值"))
         elif differences:
             parts.append(tr("与对照有 {n} 项不一致，看「按来源拆分」定位")
-                         .format(n=len(differences)))
+                         .format(n=differences))
         else:
             parts.append(tr("与对照完全一致"))
         combat_only = len(result.combat.modifiers) - len(result.panel.modifiers)
@@ -519,12 +544,15 @@ class AttrDerivePanel(QWidget):
             )
             name_cell = QTableWidgetItem(display)
             self._table.setItem(row, 0, name_cell)
-            self._table.setItem(row, 1, QTableWidgetItem(f"{derived:.4g}"))
+            self._table.setItem(row, 1, QTableWidgetItem(
+                _format_value(name, derived, is_extra=is_extra)))
 
             # 补足 = 对照 − 推导，即尚未建模的那部分
             gap = residual.get(f"extra:{name}" if is_extra else name, 0.0)
             self._table.setItem(
-                row, 2, QTableWidgetItem(f"{gap:+.4g}" if gap else "-"))
+                row, 2, QTableWidgetItem(
+                    _format_value(name, gap, is_extra=is_extra, signed=True)
+                    if _display_value(name, gap, is_extra=is_extra) else "-"))
 
             actual = 0.0
             if reference is None:
@@ -534,23 +562,28 @@ class AttrDerivePanel(QWidget):
                     reference.extra_attrs.get(name, 0.0) if is_extra
                     else getattr(reference, name, 0.0)
                 )
-                cell = QTableWidgetItem(f"{actual:.4g}")
+                cell = QTableWidgetItem(_format_value(name, actual, is_extra=is_extra))
                 # 补足之后仍对不上才算异常——补足本身就是为了抹平缺口
-                if abs(actual - derived - gap) > _DIFF_EPSILON:
+                if _display_value(name, actual, is_extra=is_extra) != _display_value(
+                    name, derived + gap, is_extra=is_extra,
+                ):
                     cell.setForeground(Qt.GlobalColor.red)
                 self._table.setItem(row, 3, cell)
 
             breakdown = panel.contribution_by_kind(name)
             text = "　".join(
-                f"{tr(SOURCE_KIND_LABELS.get(kind, kind))} {value:+.4g}"
-                for kind, value in breakdown.items() if value
+                f"{tr(SOURCE_KIND_LABELS.get(kind, kind))} "
+                f"{_format_value(name, value, is_extra=is_extra, signed=True)}"
+                for kind, value in breakdown.items()
+                if _display_value(name, value, is_extra=is_extra)
             )
             self._table.setItem(row, 4, QTableWidgetItem(text))
 
             # 推导、补足、对照三者皆无的行调淡。全列出来是为了让「模型
             # 不管这个属性」和「这个属性恰好是 0」能分辨，但四十多行里
             # 真正在动的常常只有十几行，不调淡就没法一眼扫过去。
-            if not derived and not gap and not actual:
+            if not any(_display_value(name, value, is_extra=is_extra)
+                       for value in (derived, gap, actual)):
                 for column in range(self._table.columnCount()):
                     item = self._table.item(row, column)
                     if item is not None:

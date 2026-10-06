@@ -1,5 +1,5 @@
 # 任务历史与批量历史
-> 状态：已实现（2026-10-06，基线 v0.13.11）。
+> 状态：已实现（2026-10-06，基线 v0.13.12）。
 
 > 执行端快照字段与展示边界见
 > [05-concurrent-target-execution.md](../50-platform/05-concurrent-target-execution.md#9-任务历史与执行结果)。

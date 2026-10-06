@@ -1,6 +1,6 @@
 # 批量的状态分层
 
-> 状态：已实现（2026-10-06，基线 v0.13.11）。
+> 状态：已实现（2026-10-06，基线 v0.13.12）。
 >
 > 数据归属、协调算法、`batch.json` v2 迁移与落点见
 > [39-runtime/06-batch-state-layers.md](../../30-architecture/39-runtime/06-batch-state-layers.md)。

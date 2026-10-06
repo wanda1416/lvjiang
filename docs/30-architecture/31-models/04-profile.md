@@ -20,7 +20,7 @@ DSL 读写函数，以及「用户总览」和「用户信息」两个通用页�
 
 ## 存储契约
 
-以下为开发分支当前契约，schema v7 尚未随正式版本发布：
+以下为 v0.13.12 起的当前契约，数据模型数据库使用 schema v7：
 
 - `config/session/profile.yaml` 仍以四个模型的列表保存 key。每个 `KeyDef` 带
   `group`；旧条目缺失或空白时归入稳定 key `default`，下次保存显式写出。

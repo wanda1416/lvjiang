@@ -1,6 +1,6 @@
 # 毕业率分析 — 子需求文档
 
-> 状态：已实现（2026-10-06，基线 v0.13.11）。毕业率分析已上线，但**实现方式与本文描述的早期方案不同**：本文后半部分
+> 状态：已实现（2026-10-06，基线 v0.13.12）。毕业率分析已上线，但**实现方式与本文描述的早期方案不同**：本文后半部分
 > 的 `config/system/graduation/{流派}.xlsx`、`CharacterProfile`、`character_detail`
 > 场景与 `nav_to_character.wf` 都不存在。现行实现是
 > [毕业率计算引擎](../../30-architecture/36-graduation/README.md)

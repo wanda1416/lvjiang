@@ -1,6 +1,8 @@
 package com.lvjiang.app
 
 import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -12,7 +14,6 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.chaquo.python.Python
 import java.util.concurrent.Executors
 
 /**
@@ -35,6 +36,7 @@ import java.util.concurrent.Executors
 class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
+    private var runtimeReport = "尚未检查运行环境"
     private val executor = Executors.newSingleThreadExecutor()
     private val ui = Handler(Looper.getMainLooper())
     private val statusPoller = object : Runnable {
@@ -57,8 +59,11 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_next).setOnClickListener { onNextStep() }
 
         // 功能区：配置页不依赖任何权限，随时可进；悬浮启停合一按钮
-        findViewById<Button>(R.id.btn_tuning_config).setOnClickListener {
-            startActivity(Intent(this, TuningConfigActivity::class.java))
+        findViewById<Button>(R.id.btn_runtime_check).setOnClickListener { checkRuntime() }
+        findViewById<Button>(R.id.btn_copy_report).setOnClickListener {
+            (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager)
+                .setPrimaryClip(ClipData.newPlainText("律匠诊断", runtimeReport))
+            toast("诊断报告已复制，请分享前核对本地路径等私人信息")
         }
         findViewById<Button>(R.id.btn_float_toggle).setOnClickListener { onFloatToggle() }
         // 屏幕标定：从主页进来游戏不在底下，页内再按「重新截图」前请先切到游戏大厅，
@@ -125,15 +130,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btn_test_python).setOnClickListener {
-            executor.execute {
-                val result = try {
-                    PyBridge.ensureStarted(this)?.let { throw IllegalStateException(it) }
-                    Python.getInstance().getModule("hello").callAttr("smoke_test").toString()
-                } catch (e: Throwable) {
-                    "Python 启动失败：$e"
-                }
-                runOnUiThread { statusText.text = "Python 自检：$result" }
-            }
+            checkRuntime()
         }
 
         // 三通道闭环自检的被点目标：只做一件事——把状态行换成一个点击前不存在的文案。
@@ -161,11 +158,11 @@ class MainActivity : AppCompatActivity() {
         val notif = notificationGranted()
 
         findViewById<TextView>(R.id.check_a11y).text =
-            "${mark(a11y)} 辅助已开启（PC 端手势必需）"
+            "${mark(a11y)} 无障碍（本机截图与任务输入必需）"
         findViewById<TextView>(R.id.check_pc_connection).text = if (AgentServer.isPcConnected()) {
             "✅ PC 已连接（${AgentServer.activeConnectionCount()}）"
         } else {
-            "⬜ PC 未连接（等待 ADB 连接）"
+            "PC 未连接（已同步任务仍可离线执行）"
         }
         findViewById<TextView>(R.id.check_overlay).text =
             "${mark(overlay)} 悬浮窗（仅手机独立运行任务需要）"
@@ -195,7 +192,10 @@ class MainActivity : AppCompatActivity() {
     /** 功能区悬浮图标启停：未运行时启动（需悬浮窗权限），运行中停止 */
     private fun onFloatToggle() {
         if (FloatService.isRunning) {
-            stopService(Intent(this, FloatService::class.java))
+            executor.execute {
+                PyBridge.stopTask(this)
+                runOnUiThread { stopService(Intent(this, FloatService::class.java)) }
+            }
         } else {
             if (!Settings.canDrawOverlays(this)) {
                 toast("手机独立运行任务需要悬浮窗权限")
@@ -221,7 +221,7 @@ class MainActivity : AppCompatActivity() {
             }
             GuideStep.READY -> toast(
                 if (AgentServer.isPcConnected()) "辅助已开启，PC 已连接"
-                else "辅助已开启，正在等待 PC 通过 ADB 连接"
+                else "辅助已开启，同步配置后可用悬浮图标独立运行"
             )
         }
     }
@@ -256,22 +256,31 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleSelfTest(intent)
+        if (isSelfTest()) {
+            handleSelfTest(intent)
+        } else {
+            findViewById<View>(R.id.guide_card).visibility = View.VISIBLE
+            findViewById<View>(R.id.features_section).visibility = View.VISIBLE
+            refreshGuide()
+            refreshStatus()
+            ui.removeCallbacks(statusPoller)
+            ui.postDelayed(statusPoller, STATUS_POLL_INTERVAL_MS)
+        }
     }
 
     /** 响应 `--es selftest <target>`，在后台线程跑 Python 自检并把报告落盘 */
     private fun handleSelfTest(intent: Intent?) {
-        val target = intent?.getStringExtra("selftest") ?: return
+        if (intent?.getStringExtra("selftest") == null) return
         enterSelfTestLayout()
-        // 与 Python 侧 smoke._log_path() 同一个文件（HOME 就是 filesDir）
         val logFile = java.io.File(filesDir, SELFTEST_LOG)
         executor.execute {
             val report = try {
                 PyBridge.ensureStarted(this)?.let { throw IllegalStateException(it) }
-                Python.getInstance()
-                    .getModule("lvjiang.core.ondevice.smoke")
-                    .callAttr("run", target)
-                    .toString()
+                val result = PyBridge.checkRuntime(this)
+                val text = result.toString(2)
+                logFile.writeText(text + "\n" + SELFTEST_END + "\n")
+                text.lineSequence().forEach { Log.i(SELFTEST_TAG, it) }
+                text
             } catch (e: Throwable) {
                 // Python 侧自己会捕获各步异常；能走到这里说明连模块都没导入成功，
                 // 这种情况 Python 一个字都写不出来，报告和哨兵都只能由这里补上
@@ -280,8 +289,7 @@ class MainActivity : AppCompatActivity() {
                 text.lineSequence().forEach { Log.i(SELFTEST_TAG, it) }
                 text
             }
-            // 报告正文与哨兵行都由 Python 侧逐行实时写同一个文件（卡住时也能看到进度），
-            // 这里不再重复写，只把完整报告回填到界面上
+            // 完成后输出结构化报告和结束标记，供 release APK 的 adb 验收读取。
             runOnUiThread { statusText.text = report }
         }
     }
@@ -307,7 +315,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshStatus() {
         val overlay = if (Settings.canDrawOverlays(this)) "已授予" else "未授予"
-        val a11y = if (A11yBridge.isReady()) "已开启" else "未开启（PC 手势必需）"
+        val a11y = if (A11yBridge.isReady()) "已开启" else "未开启（本机任务输入必需）"
         val shizuku = when {
             !ShellBridge.isShizukuAlive() -> "未运行"
             ShellBridge.hasPermission() -> "已授权"
@@ -320,6 +328,31 @@ class MainActivity : AppCompatActivity() {
         }
         statusText.text =
             "PC：$pc\n辅助：$a11y\n悬浮窗：$overlay（手机独立运行可选）\nShizuku：$shizuku（可选）"
+        executor.execute {
+            val status = PyBridge.status(this)
+            val sync = status.optJSONObject("sync")
+            val text = if (sync?.optBoolean("synced") == true) {
+                "最近同步：${sync.optString("synced_at")}\n执行用户：${sync.optString("username")}\n布局：${sync.optString("layout")}\n手机结果暂不回传，下次同步会覆盖手机 DB。"
+            } else {
+                status.optString("message").ifEmpty { "尚未从 PC 同步任务配置" }
+            }
+            ui.post { findViewById<TextView>(R.id.offline_status).text = text }
+        }
+    }
+
+    private fun checkRuntime() {
+        val button = findViewById<Button>(R.id.btn_runtime_check)
+        val runtimeStatus = findViewById<TextView>(R.id.runtime_status)
+        button.isEnabled = false
+        runtimeStatus.text = "正在检查依赖、插件、引擎与 OCR…"
+        executor.execute {
+            val result = PyBridge.checkRuntime(this)
+            runtimeReport = result.toString(2)
+            ui.post {
+                runtimeStatus.text = result.optString("message")
+                button.isEnabled = true
+            }
+        }
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()

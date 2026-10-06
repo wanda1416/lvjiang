@@ -57,6 +57,7 @@
 | [04-execution-targets.md](50-platform/04-execution-targets.md) | 单窗口、多设备连接与显式执行目标 | 已实现 |
 | [05-concurrent-target-execution.md](50-platform/05-concurrent-target-execution.md) | 多执行目标并发任务、断线恢复与 Lv1 授权边界 | 已实现（待多设备实机验收） |
 | [06-workflow-capture-reuse.md](50-platform/06-workflow-capture-reuse.md) | WF 显式截图复用、同帧识别与诊断留图 | 已实现（待偶发菜单失败实机取证） |
+| [07-android-offline.md](50-platform/07-android-offline.md) | PC 单向同步与 Android 悬浮控制离线任务 | 第一阶段实现，游戏验收待完成 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

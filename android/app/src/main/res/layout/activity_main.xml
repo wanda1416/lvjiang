@@ -101,17 +101,31 @@
                 android:textStyle="bold"
                 android:paddingBottom="4dp" />
 
-            <Button
-                android:id="@+id/btn_tuning_config"
+            <TextView
+                android:id="@+id/offline_status"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/btn_tuning_config" />
+                android:text="尚未同步任务配置；请在 PC 的移动设备窗口同步。手机结果暂不回传。"
+                android:textSize="14sp" />
 
             <Button
-                android:id="@+id/btn_calib"
+                android:id="@+id/btn_runtime_check"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/btn_calib" />
+                android:text="检查离线执行环境" />
+
+            <TextView
+                android:id="@+id/runtime_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="运行环境尚未检查"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_copy_report"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="复制诊断报告" />
 
             <Button
                 android:id="@+id/btn_float_toggle"
@@ -148,6 +162,12 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:visibility="gone">
+
+            <Button
+                android:id="@+id/btn_calib"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_calib" />
 
             <Button
                 android:id="@+id/btn_overlay"

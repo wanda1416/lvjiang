@@ -9,6 +9,7 @@ import sqlite3
 import tempfile
 import zipfile
 from collections.abc import Callable
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -38,8 +39,10 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
         database = config / "session/profile.db"
         snapshot = Path(temp) / "profile.db"
         if database.is_file():
-            with (sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True) as source,
-                  sqlite3.connect(snapshot) as target):
+            # SQLite 的连接上下文只处理事务，不释放文件句柄。
+            # 必须在读取快照和清理临时目录前关闭，Windows 不允许删除打开的 DB。
+            with (closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)) as source,
+                  closing(sqlite3.connect(snapshot)) as target):
                 source.backup(target)
         with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             def add(name: str, data: bytes) -> None:
@@ -115,7 +118,7 @@ def install_offline_bundle(
             raise ValueError("同步包活动选择与清单不一致")
         database = staged_config / "session/profile.db"
         if database.exists():
-            with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as conn:
+            with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
                 if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                     raise ValueError("Profile 数据库快照校验失败")
         old = staging / "old-config"

@@ -151,7 +151,7 @@ collect session.equipped as "equipment"
 | 主工作流 | `engine.execute()` 返回值（Python 调用方） |
 | 子过程调用 | `call proc() as $output` 绑定到变量 |
 | 场景编辑器 | 结果区「结果集」显示 |
-| 批处理 | 落盘到 `output/{role}/{script_id}_{timestamp}.json` |
+| 批处理 | 落盘到 `output/{role}/YYYY-MM/DD/{script_id}_{timestamp}.json` |
 
 **典型用途**：向调度者报告执行结果（成功/失败、统计数据、采集的数据）。
 

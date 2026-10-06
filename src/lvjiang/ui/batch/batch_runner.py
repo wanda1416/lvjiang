@@ -32,6 +32,7 @@ from ...core.batch_config import (
 from ...core.batch_run import BatchRunDraft
 from ...core.config.resolver import get_resolver
 from ...core.config.users import SessionManager
+from ...core.fs_util import dated_output_dir
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ...workflows.errors import WorkflowAbort
@@ -573,10 +574,12 @@ class BatchWorker(QThread):
                 planned = self._task_plan[(run_idx, script.id)]
                 params = copy.deepcopy(planned.params)
                 from ...core.daily_history import try_create_task_run
+                task_started_at = datetime.now().astimezone()
                 task_run = try_create_task_run(
                     username=username or "unknown", task_id=script.id,
                     task_name=script.name, task_scope=script.scope,
                     params=params, source="batch", batch_run_id=batch_run_id,
+                    started_at=task_started_at,
                     repository=(batch_run.repository
                                 if batch_run is not None else None),
                     **self._task_history_target_kwargs(),
@@ -608,7 +611,7 @@ class BatchWorker(QThread):
                     report.end_script(ST_SUCCESS, result)
                     try:
                         result_path = self._save_result(
-                            username or "unknown", script, result)
+                            username or "unknown", script, result, task_started_at)
                     except Exception as output_exc:  # noqa: BLE001
                         result_path = None
                         logger.warning(f"批量结果保存失败，继续任务收尾: {output_exc}")
@@ -632,7 +635,7 @@ class BatchWorker(QThread):
                             username or "unknown", script, {
                                 "error": str(e),
                                 "exception_type": type(e).__name__,
-                            })
+                            }, task_started_at)
                     except Exception as output_exc:  # noqa: BLE001
                         logger.warning(f"批量失败结果保存失败: {output_exc}")
                     if task_run is not None:
@@ -946,11 +949,12 @@ class BatchWorker(QThread):
                             continue
                         self.progress.emit(run_idx, label, script.id, ST_RUNNING)
                         report.start_script(script.id, script.name)
+                        task_started_at = datetime.now().astimezone()
                         task_run = try_create_task_run(
                             username=username, task_id=script.id,
                             task_name=script.name, task_scope=script.scope,
                             params=copy.deepcopy(planned.params), source="batch",
-                            batch_run_id=batch_run_id,
+                            batch_run_id=batch_run_id, started_at=task_started_at,
                             repository=(batch_run.repository
                                         if batch_run is not None else None),
                             **self._task_history_target_kwargs(),
@@ -969,7 +973,7 @@ class BatchWorker(QThread):
                             self.log.emit(f"[批量] {label} → {script.name} 完成")
                             try:
                                 result_path = self._save_result(
-                                    username, script, result)
+                                    username, script, result, task_started_at)
                             except Exception as output_exc:  # noqa: BLE001
                                 result_path = None
                                 logger.warning(
@@ -1000,7 +1004,7 @@ class BatchWorker(QThread):
                                     username, script, {
                                         "error": str(exc),
                                         "exception_type": type(exc).__name__,
-                                    })
+                                    }, task_started_at)
                             except Exception as output_exc:  # noqa: BLE001
                                 logger.warning(f"批量失败结果保存失败: {output_exc}")
                             entry["scripts"][script.id] = ST_FAILED
@@ -1483,8 +1487,11 @@ class BatchWorker(QThread):
         return engine.execute(wf_path, initial_variables=params)
 
     @staticmethod
-    def _save_result(role: str, script: BatchScript, result: dict):
-        """结果落盘 output/{role}/{script_id}_{timestamp}.json"""
+    def _save_result(
+        role: str, script: BatchScript, result: dict,
+        started_at: datetime | None = None,
+    ):
+        """结果落盘 output/{role}/YYYY-MM/DD/，日期取任务启动时间。"""
         if not isinstance(result, (dict, list)):
             return None
         from ...constants import OUTPUT_DIR
@@ -1498,7 +1505,7 @@ class BatchWorker(QThread):
                 return obj.to_dict()
             return obj
 
-        user_dir = OUTPUT_DIR / role
+        user_dir = dated_output_dir(OUTPUT_DIR / role, started_at or datetime.now())
         user_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         path = user_dir / f"{script.id}_{ts}.json"

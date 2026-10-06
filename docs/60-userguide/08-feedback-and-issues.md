@@ -104,7 +104,7 @@ logs/crashes/
 工作流结果通常位于：
 
 ```text
-config/session/output/<用户>/
+config/session/output/<用户>/YYYY-MM/DD/
 ```
 
 普通问题至少提供从本次任务 `[开始]` 之前到异常发生之后的连续日志，不要只复制最后一行。

@@ -641,11 +641,14 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
         """创建本次运行的说明文档并写文档头；失败只警告不中断流程。
 
         操作用户名取引擎启动时绑定的 run_username；输出目录可用
-        ctx.doc_dir 覆盖（供测试），缺省 logs/tuning/。
+        ctx.doc_dir 覆盖根目录（供测试），缺省 logs/tuning/。
         """
         username = (self.engine.run_username if self.engine else "") or "default"
         try:
-            doc = TuningDocWriter(username, self.ctx.doc_dir)
+            history = getattr(self, "_history_session", None)
+            started_at = (datetime.fromisoformat(history.summary.started_at).astimezone()
+                          if history is not None else datetime.now())
+            doc = TuningDocWriter(username, self.ctx.doc_dir, started_at=started_at)
         except OSError as e:
             logger.warning(f"调律说明文档创建失败，本次不生成说明: {e}")
             self.recorder.set_doc(None)

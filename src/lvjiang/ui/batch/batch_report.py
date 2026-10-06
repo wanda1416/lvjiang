@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ...constants import PROJECT_ROOT
+from ...core.fs_util import dated_output_dir
 from ...i18n import tr
 
 # 报告输出目录
@@ -180,10 +181,11 @@ class BatchReport:
         if not self._start_time or not self._entries:
             return None
 
-        BATCH_REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        output_dir = dated_output_dir(BATCH_REPORT_DIR, self._start_time)
+        output_dir.mkdir(parents=True, exist_ok=True)
         ts = self._start_time.strftime("%Y%m%d_%H%M%S")
         run_suffix = f"_{self._batch_run_id}" if self._batch_run_id else ""
-        path = BATCH_REPORT_DIR / f"批量报告_{ts}{run_suffix}.md"
+        path = output_dir / f"批量报告_{ts}{run_suffix}.md"
         path.write_text(self.render(), encoding="utf-8")
         return path
 

@@ -113,7 +113,8 @@ _NAV_BACK_TO_MAIN = (_NAV_FILE, "nav_back_to_main")
 - 装备节：每件值得调律的装备的判定过程、调律轮次、狗粮策略、结束决策
 - 运行小结：成品清单（一般评级及以上的装备）
 
-输出目录：`logs/tuning/{username}/`。
+输出目录：`logs/tuning/{username}/YYYY-MM/DD/`，日期取调律运行开始时的本地日期。
+历史库保存文档实际路径，旧文档不搬迁。
 
 ## 5. 场景与布局配置
 

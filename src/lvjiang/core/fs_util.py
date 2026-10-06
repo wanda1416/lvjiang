@@ -10,7 +10,13 @@ from __future__ import annotations
 
 import os
 import tempfile
+from datetime import datetime
 from pathlib import Path
+
+
+def dated_output_dir(root: Path, started_at: datetime) -> Path:
+    """按启动日期定位产出目录；不搬迁旧文件，也不执行清理。"""
+    return root / started_at.strftime("%Y-%m") / started_at.strftime("%d")
 
 
 def atomic_write_bytes(
@@ -85,4 +91,4 @@ def atomic_write_text(
         raise
 
 
-__all__ = ["atomic_write_bytes", "atomic_write_text"]
+__all__ = ["atomic_write_bytes", "atomic_write_text", "dated_output_dir"]

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from lvjiang.apps.yysls.config.tune_slots import DEFAULT_SLOTS, SLOT_LABELS
 from lvjiang.constants import PROJECT_ROOT
+from lvjiang.core.fs_util import dated_output_dir
 
 from ....i18n import tr
 
@@ -44,10 +45,15 @@ def format_affix(affix: dict) -> str:
 class TuningDocWriter:
     """调律说明文档写手（Markdown，顺序追加写 + 逐次 flush）"""
 
-    def __init__(self, username: str, doc_dir: Path | str | None = None):
-        base = Path(doc_dir) if doc_dir else TUNING_DOC_DIR
+    def __init__(
+        self, username: str, doc_dir: Path | str | None = None,
+        *, started_at: datetime | None = None,
+    ):
+        started_at = started_at or datetime.now()
+        root = Path(doc_dir) if doc_dir else TUNING_DOC_DIR
+        base = dated_output_dir(root / username, started_at)
         base.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ts = started_at.strftime("%Y%m%d_%H%M%S")
         self.path = base / f"调律说明_{username}_{ts}.md"
         self._fh = self.path.open("w", encoding="utf-8")
 

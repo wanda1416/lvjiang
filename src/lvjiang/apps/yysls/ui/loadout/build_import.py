@@ -100,7 +100,7 @@ class BuildImportDialog(QDialog):
             equip = self._equipment[spec.key]
             _cell(self.table, row, 0, spec.label)
             for i in range(1, 6):
-                _cell(self.table, row, i, (equip.get(f"affix_{i}") or {}).get("name", "—"))
+                _cell(self.table, row, i, (equip.get(f"affix_{i}") or {}).get("name", ""))
             set_key = equip.get("equipment_set") or ""
             _cell(self.table, row, 6, (self.gc.get_equipment_sets().get(set_key) or {}).get("name") or tr("无"))
         self.table.resizeRowsToContents()

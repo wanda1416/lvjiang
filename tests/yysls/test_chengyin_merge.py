@@ -366,3 +366,94 @@ def test_check_all_button_selects_every_candidate(qtbot):
     assert all(pair.checkbox.isChecked() for pair in dialog._pairs)
     assert dialog.merge_button.isEnabled()
     assert len(dialog.selected_candidates()) == 3
+
+
+def _merge_dialog(qtbot, candidates):
+    from lvjiang.apps.yysls.ui.loadout.equip.chengyin_merge_dialog import (
+        UserChengyinMergeCandidate,
+    )
+    dialog = ChengyinMergeDialog(
+        [UserChengyinMergeCandidate("tester", c) for c in candidates], {})
+    qtbot.addWidget(dialog)
+    return dialog
+
+
+def test_three_snapshots_merge_as_one_group_and_migrate_references(qtbot, tmp_path):
+    """两次培养后一起扫描：一键勾选只保留最终版本，旧方案引用不丢失。"""
+    first = _equip()
+    middle = _equip(level=105, values=(11, 21, 31, 41, 51))
+    latest = _equip(level=110, values=(12, 22, 32, 42, 52))
+    candidates = _find(first, middle, latest)
+    assert {(c.old_fp, c.new_fp) for c in candidates} == {
+        (first["_fp"], latest["_fp"]), (middle["_fp"], latest["_fp"])}
+    dialog = _merge_dialog(qtbot, candidates)
+    assert len(dialog._pairs) == 1
+    assert len(dialog._pairs[0].entries) == 2
+    dialog.check_all_button.click()
+    selected = dialog.selected_candidates()
+    assert len(selected) == 2
+
+    repo = LoadoutRepository("tester", users_dir=tmp_path)
+    for equip in (first, middle, latest):
+        repo.upsert_item(equip)
+    plan_id = repo.load().active_plan_id
+    repo.assign_equipment(plan_id, "main_weapon", first)
+    repo.assign_equipment(plan_id, "sub_weapon", middle)
+    repo.merge_items({entry.candidate.old_fp: entry.candidate.new_fp for entry in selected})
+    state = repo.load()
+    assert set(state.equipment_items) == {latest["_fp"]}
+    assert state.plans[plan_id].equipment["main_weapon"] == latest["_fp"]
+    assert state.plans[plan_id].equipment["sub_weapon"] == latest["_fp"]
+
+
+def test_ambiguous_targets_require_manual_mutually_exclusive_choice(qtbot):
+    """同一旧记录指向两个互不兼容的新版本，全选跳过且选择立即互斥。"""
+    old = _equip()
+    left = _equip(level=105, values=(12, 21, 31, 41, 51))
+    right = _equip(level=105, values=(11, 22, 31, 41, 51))
+    candidates = _find(old, left, right)
+    assert len(candidates) == 2
+    assert all(c.requires_review for c in candidates)
+    dialog = _merge_dialog(qtbot, candidates)
+    dialog._check_all()
+    assert dialog.selected_candidates() == []
+    assert not dialog.merge_button.isEnabled()
+    first, second = dialog._pairs
+    first.checkbox.setChecked(True)
+    second.checkbox.setChecked(True)
+    assert not first.checkbox.isChecked()
+    assert len(dialog.selected_candidates()) == 1
+    assert dialog.selected_candidates()[0].candidate.new_fp == right["_fp"]
+
+
+def test_nontransitive_chain_cannot_delete_a_selected_retained_version(qtbot):
+    """转律换回原词但数值降低：不能凭 A→B→C 推导不合法的 A→C。"""
+    first = _equip()
+    middle = _equip(level=105, values=(11, 21, 8, 41, 51),
+                    names=("词一", "词二", "新词三", "词四", "词五"), transferred=3)
+    latest = _equip(level=110, values=(12, 22, 9, 42, 52), transferred=3)
+    candidates = _find(first, middle, latest)
+    assert {(c.old_fp, c.new_fp) for c in candidates} == {
+        (first["_fp"], middle["_fp"]), (middle["_fp"], latest["_fp"])}
+    dialog = _merge_dialog(qtbot, candidates)
+    dialog._check_all()
+    assert dialog.selected_candidates() == []
+    first_group, second_group = dialog._pairs
+    first_group.checkbox.setChecked(True)
+    second_group.checkbox.setChecked(True)
+    assert not first_group.checkbox.isChecked()
+    assert len(dialog.selected_candidates()) == 1
+
+
+def test_incompatible_old_snapshots_sharing_target_are_not_auto_selected(qtbot):
+    """两个不同旧装备也可能各自匹配一个新记录，不能当成明确历史链。"""
+    left = _equip(values=(10, 21, 30, 40, 50))
+    right = _equip(values=(11, 20, 30, 40, 50))
+    latest = _equip(level=105, values=(12, 22, 32, 42, 52))
+    candidates = _find(left, right, latest)
+    assert len(candidates) == 2
+    assert all(c.requires_review for c in candidates)
+    dialog = _merge_dialog(qtbot, candidates)
+    assert len(dialog._pairs) == 1
+    dialog._check_all()
+    assert dialog.selected_candidates() == []

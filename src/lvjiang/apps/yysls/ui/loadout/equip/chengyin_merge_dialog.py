@@ -66,13 +66,16 @@ def load_user_chengyin_candidates(
 class _CandidatePair(QFrame):
     def __init__(
         self,
-        entry: UserChengyinMergeCandidate,
+        entries: list[UserChengyinMergeCandidate],
         display_params: dict,
         parent=None,
     ):
         super().__init__(parent)
-        self.entry = entry
-        candidate = entry.candidate
+        self.entries = entries
+        self.entry = entries[0]
+        self.old_fps = {entry.candidate.old_fp for entry in entries}
+        self.requires_review = any(entry.candidate.requires_review for entry in entries)
+        candidate = self.entry.candidate
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet(
             "_CandidatePair {border:1px solid palette(midlight);"
@@ -81,22 +84,34 @@ class _CandidatePair(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(6)
-        username = QLabel(f"{tr('用户名')}：{entry.username}")
+        username = QLabel(f"{tr('用户名')}：{self.entry.username}")
         username.setStyleSheet("font-weight:600;")
         layout.addWidget(username)
+        self.review_label = QLabel(tr("存在多个可能版本或兼容性分歧，请人工核对；一键勾选不选择本组。"))
+        self.review_label.setWordWrap(True)
+        self.review_label.setStyleSheet("color:#c57f17;")
+        self.review_label.setVisible(self.requires_review)
+        layout.addWidget(self.review_label)
 
         comparison = QHBoxLayout()
         comparison.setSpacing(8)
-        comparison.addWidget(self._card_column(
-            tr("旧版本"), candidate.old, display_params), 1)
+        old_versions = QWidget()
+        old_layout = QVBoxLayout(old_versions)
+        old_layout.setContentsMargins(0, 0, 0, 0)
+        for index, entry in enumerate(entries, 1):
+            title = (tr("旧版本") if len(entries) == 1
+                     else tr("旧版本 {index}").format(index=index))
+            old_layout.addWidget(self._card_column(
+                title, entry.candidate.old, display_params))
+        comparison.addWidget(old_versions, 1)
         arrow = QLabel("→")
         arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
         arrow.setStyleSheet("font-size:20px;color:palette(mid);")
         comparison.addWidget(arrow)
         comparison.addWidget(self._card_column(
             tr("保留版本"), candidate.new, display_params), 1)
-        self.checkbox = QCheckBox(tr("合并"))
-        self.checkbox.setToolTip(tr("删除左侧旧版本，并把备战方案引用迁移到右侧版本"))
+        self.checkbox = QCheckBox(tr("合并本组"))
+        self.checkbox.setToolTip(tr("删除左侧全部旧版本，并把备战方案引用迁移到右侧版本；冲突组互斥选择"))
         comparison.addWidget(
             self.checkbox, alignment=Qt.AlignmentFlag.AlignVCenter)
         layout.addLayout(comparison)
@@ -145,6 +160,10 @@ class ChengyinMergeDialog(QDialog):
         summary.setStyleSheet("font-size:14px;font-weight:600;")
         root.addWidget(summary)
 
+        grouped: dict[tuple[str, str], list[UserChengyinMergeCandidate]] = {}
+        for entry in candidates:
+            grouped.setdefault((entry.username, entry.candidate.new_fp), []).append(entry)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -153,9 +172,10 @@ class ChengyinMergeDialog(QDialog):
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(10)
-        for index, candidate in enumerate(candidates):
-            pair = _CandidatePair(candidate, display_params)
-            pair.checkbox.toggled.connect(self._update_merge_enabled)
+        for index, entries in enumerate(grouped.values()):
+            pair = _CandidatePair(entries, display_params)
+            pair.checkbox.toggled.connect(
+                lambda checked, pair=pair: self._on_group_toggled(pair, checked))
             self._pairs.append(pair)
             grid.addWidget(pair, index // 2, index % 2)
         for column in range(2):
@@ -166,16 +186,26 @@ class ChengyinMergeDialog(QDialog):
             empty.setStyleSheet(
                 "color:palette(mid);font-size:14px;padding:48px;")
             grid.addWidget(empty, 0, 0, 1, 2)
-        grid.setRowStretch((len(candidates) + 1) // 2, 1)
+        for pair in self._pairs:
+            pair.requires_review |= any(
+                self._groups_conflict(pair, other)
+                for other in self._pairs if other is not pair)
+            pair.review_label.setVisible(pair.requires_review)
+        review_count = sum(pair.requires_review for pair in self._pairs)
+        summary.setText(tr(
+            "识别出 {count} 组合并候选，其中 {review_count} 组需要人工核对。"
+            "左侧全部旧版本合并到右侧保留版本；有分歧的组不自动勾选。"
+        ).format(count=len(self._pairs), review_count=review_count))
+        grid.setRowStretch((len(self._pairs) + 1) // 2, 1)
         scroll.setWidget(content)
         root.addWidget(scroll, 1)
 
         footer = QHBoxLayout()
         footer.addStretch()
-        # 候选动辄几十组，逐个点勾选框太费事；先全选再取消掉不需要的那几组。
+        # 歧义组必须人工决定，不能用全选把疑似关系当成已确认的同件关系。
         self.check_all_button = QPushButton(tr("一键勾选"))
-        self.check_all_button.setToolTip(tr("勾选全部候选，再取消掉不需要合并的那几组"))
-        self.check_all_button.setEnabled(bool(self._pairs))
+        self.check_all_button.setToolTip(tr("仅勾选无歧义候选；有多个可能版本的组请人工核对"))
+        self.check_all_button.setEnabled(any(not pair.requires_review for pair in self._pairs))
         self.check_all_button.clicked.connect(self._check_all)
         self.merge_button = QPushButton(tr("合并选中项"))
         self.merge_button.setEnabled(False)
@@ -191,13 +221,26 @@ class ChengyinMergeDialog(QDialog):
         root.addLayout(footer)
 
     def _check_all(self) -> None:
-        """一次勾选全部候选。
-
-        勾选会经 toggled 触发 _update_merge_enabled，合并按钮随之可用，
-        这里不必再手动同步一次。
-        """
+        """一次勾选无歧义候选，保留用户已人工选择的歧义组。"""
         for pair in self._pairs:
-            pair.checkbox.setChecked(True)
+            if not pair.requires_review:
+                pair.checkbox.setChecked(True)
+
+    @staticmethod
+    def _groups_conflict(left: _CandidatePair, right: _CandidatePair) -> bool:
+        if left.entry.username != right.entry.username:
+            return False
+        return bool(
+            left.old_fps & right.old_fps
+            or left.entry.candidate.new_fp in right.old_fps
+            or right.entry.candidate.new_fp in left.old_fps)
+
+    def _on_group_toggled(self, pair: _CandidatePair, checked: bool) -> None:
+        if checked:
+            for other in self._pairs:
+                if other is not pair and self._groups_conflict(pair, other):
+                    other.checkbox.setChecked(False)
+        self._update_merge_enabled()
 
     def _update_merge_enabled(self) -> None:
         self.merge_button.setEnabled(any(
@@ -205,8 +248,9 @@ class ChengyinMergeDialog(QDialog):
 
     def selected_candidates(self) -> list[UserChengyinMergeCandidate]:
         return [
-            pair.entry for pair in self._pairs
+            entry for pair in self._pairs
             if pair.checkbox.isChecked()
+            for entry in pair.entries
         ]
 
 

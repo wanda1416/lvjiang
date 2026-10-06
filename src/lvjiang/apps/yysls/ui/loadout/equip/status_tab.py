@@ -1848,7 +1848,7 @@ class EquipStatusTab(BatchCopyMixin, QWidget):
             hub.publish(EQUIPMENT_CHANGED, username)
         QMessageBox.information(
             self, tr("合并完成"),
-            tr("已合并 {count} 组装备。此操作保留右侧版本，并迁移所有备战方案引用。")
+            tr("已合并 {count} 份旧装备快照。此操作保留右侧版本，并迁移所有备战方案引用。")
             .format(count=len(selected)))
 
     def _on_mock_delete_requested(self, equip_data: dict, group_key: str):

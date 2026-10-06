@@ -161,6 +161,9 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 | `offline_sync_commit` | — | 验证完整包和逐文件哈希、版本、DB 后交换 config；重载失败回滚 |
 
 手机任务状态为 idle/running/pausing/paused/stopping/done/failed/stopped。
+状态额外携带有界 `log_records`（seq/text/level）和每次启动递增的
+`log_generation`，供手机增量显示和重置日志；原 `logs` 文本列表保持不变。
+设备状态保留最近 200 条日志记录供 PC 读取，悬浮窗仅保留最近 20 行展示。
 pausing/paused/stopping 同样占用任务槽。暂停确认在引擎实际等待点发生，结束会唤醒暂停。
 PC 断线不停止手机任务；PC 租约在重连后重新申请，防止重连绕过执行互斥。
 

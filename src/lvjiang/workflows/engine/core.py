@@ -657,7 +657,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
         供 Python 工作流经 call_subcall 复用 DSL 子过程，避免同一导航/
         操作序列在 Python 与 DSL 两处重复维护。
 
-        每次调用都重新解析文件，确保修改立即生效。后加载的同名过程覆盖
+        每次调用都读取当前文件内容，未变化内容复用解析结果，修改立即生效。后加载的同名过程覆盖
         先加载的。相对路径以 workflows 根为基准经 resolver 解析（local
         影子层优先）；import 链递归加载；与 _execute_dsl 同样跑两道静态
         校验（命名等待 / 布局引用）。
@@ -677,7 +677,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
 
         program = parse_file(resolved)
         # 每次显式调用都创建新的加载集合：本次 import 图内去重，
-        # 但下一次 load_subcalls 仍会重新解析，保留热更新语义。
+        # 但下一次 load_subcalls 仍会检查当前文件内容，保留热更新语义。
         loaded_procs: dict[str, ProcDef] = {}
         loaded_sources: dict[str, str] = {}
         old_base, old_rel = self._base_dir, self._wf_rel_dir

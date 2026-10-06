@@ -55,7 +55,7 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                         or any(part in _EXCLUDED_DIRS or part.startswith(".") for part in rel.parts)
                         or rel.parts[0] not in {"system", "local", "remote", "session"}
                         or path.name.endswith((".lock", ".tmp", ".db-wal", ".db-shm", ".db-journal"))
-                        or rel.as_posix() in {"session/profile.db", "session/offline.json"}):
+                        or rel.as_posix() in {"session/profile.db", "session/offline.json", "local/license.txt"}):
                     continue
                 data = path.read_bytes()
                 if rel.as_posix() == "session/session.json":

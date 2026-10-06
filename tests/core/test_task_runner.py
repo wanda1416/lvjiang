@@ -135,6 +135,27 @@ def _status():
 
 # ─── list_tasks ─────────────────────────────────────────────
 
+def test_log_cursor_preserves_levels_and_resets_between_runs():
+    state = task_runner._TaskState()
+    state.begin("first", "first")
+    state.log("progress")
+    state.log("failure", "ERROR")
+    first = state.snapshot()
+    records = first["log_records"]
+    assert [record["level"] for record in records] == ["INFO", "ERROR"]
+    assert [record["text"] for record in records] == first["logs"]
+    assert records[1]["seq"] > records[0]["seq"]
+    records[0]["level"] = "DEBUG"
+    assert state.snapshot()["log_records"][0]["level"] == "INFO"
+    state.begin("second", "second")
+    assert state.snapshot()["log_records"] == []
+    assert state.snapshot()["log_generation"] > first["log_generation"]
+    for _ in range(task_runner._LOG_CAPACITY + 1):
+        state.log("progress")
+    second = state.snapshot()
+    assert len(second["log_records"]) == task_runner._LOG_CAPACITY
+    assert second["log_records"][0]["seq"] > records[-1]["seq"]
+
 def test_list_tasks_shape(monkeypatch):
     """清单每项只暴露 id / name / source 三个字段"""
     _patch_discovery(monkeypatch, _fake_tasks(

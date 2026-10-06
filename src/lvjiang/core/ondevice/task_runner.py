@@ -63,6 +63,9 @@ class _TaskState:
         self._finished_at = 0.0
         self._result: dict[str, Any] = {}
         self._logs: deque[str] = deque(maxlen=_LOG_CAPACITY)
+        self._log_records: deque[dict[str, Any]] = deque(maxlen=_LOG_CAPACITY)
+        self._log_seq = 0
+        self._log_generation = 0
 
     # ── 状态读写 ──────────────────────────────────────────
 
@@ -74,9 +77,12 @@ class _TaskState:
         """交给引擎的 stop_check：不加锁，Event 自身线程安全"""
         return self._stop_event.is_set()
 
-    def log(self, line: str) -> None:
+    def log(self, line: str, level: str = "INFO") -> None:
         with self._lock:
-            self._logs.append(f"{time.strftime('%H:%M:%S')} {line}")
+            text = f"{time.strftime('%H:%M:%S')} {line}"
+            self._logs.append(text)
+            self._log_seq += 1
+            self._log_records.append({"seq": self._log_seq, "text": text, "level": level})
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
@@ -94,6 +100,8 @@ class _TaskState:
                 "stopping": self._stop_event.is_set() and self._state in ACTIVE_STATES,
                 "result": self._result,
                 "logs": list(self._logs),
+                "log_records": [dict(record) for record in self._log_records],
+                "log_generation": self._log_generation,
             }
 
     def begin(self, task_id: str, task_name: str) -> None:
@@ -107,6 +115,8 @@ class _TaskState:
             self._finished_at = 0.0
             self._result = {}
             self._logs.clear()
+            self._log_records.clear()
+            self._log_generation += 1
             _PAUSE_GATE.set()
 
     def finish(self, state: str, message: str, result: dict | None = None) -> None:
@@ -428,7 +438,7 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         from .diagnostics import record
 
         worker_id = threading.get_ident()
-        sink = logger.add(lambda message: _STATE.log(str(message).strip()),
+        sink = logger.add(lambda message: _STATE.log(str(message).strip(), message.record["level"].name),
                           filter=lambda record: record["thread"].id == worker_id,
                           format="{message}", level="INFO")
         _STATE.set_message("正在初始化引擎")
@@ -466,7 +476,7 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         _STATE.log(f"任务完成，收集 {collected} 项")
         _STATE.finish(STATE_DONE, f"已完成：{name}", dict(result or {}))
     except MemoryError as exc:
-        _STATE.log(f"内存不足，任务已中止：{exc}")
+        _STATE.log(f"内存不足，任务已中止：{exc}", "ERROR")
         _STATE.finish(STATE_FAILED, "手机 OCR 内存不足，已中止任务，请查看诊断日志")
         release_engine()
     except WorkflowAbort as exc:
@@ -476,9 +486,9 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         from ...workflows.errors import WorkflowExecutionError
 
         detail = traceback.format_exc().rstrip()
-        _STATE.log(f"任务异常：{type(e).__name__}: {e}")
+        _STATE.log(f"任务异常：{type(e).__name__}: {e}", "ERROR")
         for line in detail.splitlines()[-8:]:
-            _STATE.log(line)
+            _STATE.log(line, "ERROR")
         cause = e.__cause__ if isinstance(e, WorkflowExecutionError) else None
         reason = f"{type(e).__name__}: {e}"
         if cause is not None:

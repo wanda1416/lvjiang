@@ -24,6 +24,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.Toast
 import java.util.concurrent.Executors
 import kotlin.math.abs
@@ -33,8 +35,8 @@ import kotlin.math.abs
  *
  * 交互：
  * - 图标可拖动；单击展开任务面板，再单击收起；
- * - 面板空闲时列出全部可执行任务，点一项即开跑；
- * - 运行中面板只给「停止」，并实时显示状态行与最近日志；
+ * - 面板空闲时选择任务后启动；
+ * - 运行中可暂停/结束，暂停后可继续/结束，并显示最近日志；
  * - 图标颜色反映状态：空闲无色 / 运行中绿 / 失败红 / 已停止橙。
  *
  * 面板用代码搭而不是 XML：它只有「一行状态 + 一列按钮」，
@@ -62,8 +64,8 @@ class FloatService : Service() {
     private val poller = object : Runnable {
         override fun run() {
             refreshStatus()
-            // 只在运行中持续轮询：终态之后状态不会自己变，再轮下去纯属耗电
-            if (lastState == STATE_RUNNING) ui.postDelayed(this, POLL_INTERVAL_MS)
+            // 同步或远程启动也会改变面板；悬浮服务存活时持续刷新。
+            if (isRunning) ui.postDelayed(this, POLL_INTERVAL_MS)
         }
     }
 
@@ -78,6 +80,7 @@ class FloatService : Service() {
         addFloatIcon()
         // 解释器初始化是秒级的，放在这里预热，等用户点开面板时任务清单已经能秒出
         executor.execute { PyBridge.ensureStarted(this) }
+        ui.post(poller)
     }
 
     override fun onDestroy() {
@@ -87,6 +90,7 @@ class FloatService : Service() {
         closePanel()
         floatView?.let { runCatching { windowManager.removeView(it) } }
         floatView = null
+        executor.execute { PyBridge.stopTask(this) }
         executor.shutdown()
         super.onDestroy()
     }
@@ -168,6 +172,7 @@ class FloatService : Service() {
     private fun tintIcon(state: String) {
         val color = when (state) {
             STATE_RUNNING -> COLOR_RUNNING
+            STATE_PAUSING, STATE_PAUSED, STATE_STOPPING -> COLOR_STOPPED
             STATE_FAILED -> COLOR_FAILED
             STATE_STOPPED -> COLOR_STOPPED
             STATE_DONE -> COLOR_DONE
@@ -236,14 +241,7 @@ class FloatService : Service() {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
             )
         }
-        root.addView(
-            ScrollView(this).apply {
-                addView(actions)
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(170),
-                )
-            }
-        )
+        root.addView(actions)
         actionArea = actions
 
         root.addView(smallButton("收起") { closePanel() })
@@ -326,7 +324,6 @@ class FloatService : Service() {
             val message = status.optString("message", "")
             val taskName = status.optString("task_name", "")
             val elapsed = status.optDouble("elapsed", 0.0)
-            val stopping = status.optBoolean("stopping", false)
             val logs = status.optJSONArray("logs")
             val tail = buildString {
                 if (logs != null) {
@@ -340,13 +337,19 @@ class FloatService : Service() {
 
             ui.post {
                 val header = when (state) {
-                    STATE_RUNNING ->
+                    STATE_RUNNING, STATE_PAUSING, STATE_PAUSED, STATE_STOPPING ->
                         "运行中：$taskName（${"%.0f".format(elapsed)}s）" +
-                            if (stopping) "\n停止中…" else "\n$message"
+                            when (state) {
+                                STATE_PAUSED -> "\n已暂停 · $message"
+                                STATE_PAUSING -> "\n正在暂停 · $message"
+                                STATE_STOPPING -> "\n正在结束…"
+                                else -> "\n$message"
+                            }
                     STATE_IDLE -> "空闲：选择一个任务开始"
                     else -> message.ifEmpty { "空闲：选择一个任务开始" }
                 }
-                statusLine?.text = header
+                val sync = status.optJSONObject("sync")
+                statusLine?.text = header + if (sync?.optBoolean("synced") == true) "\n用户：${sync.optString("username")}" else "\n尚未从 PC 同步配置"
                 agentLine?.text = if (AgentServer.isPcConnected()) {
                     "PC 已连接 · ${AgentServer.lastCommandSummary()}"
                 } else {
@@ -355,33 +358,38 @@ class FloatService : Service() {
                 logLine?.text = tail
                 tintIcon(state)
                 updateNotification(
-                    if (state == STATE_RUNNING) "运行中：$taskName" else header.replace('\n', ' ')
+                    if (state in activeStates) "${if (state == STATE_PAUSED) "已暂停" else "运行中"}：$taskName" else header.replace('\n', ' ')
                 )
                 if (state != lastState) {
                     lastState = state
                     rebuildActions(state)
-                    if (state == STATE_RUNNING) {
-                        ui.removeCallbacks(poller)
-                        ui.postDelayed(poller, POLL_INTERVAL_MS)
-                    }
                 }
             }
         }
     }
 
-    /** 空闲态填任务清单，运行态只留「停止」 */
+    /** 只有任务列表滚动，启动与安全控制按钮始终可见。 */
     private fun rebuildActions(state: String) {
         val area = actionArea ?: return
         area.removeAllViews()
 
-        if (state == STATE_RUNNING) {
-            area.addView(smallButton("停止任务") {
+        if (state in activeStates) {
+            if (state == STATE_RUNNING || state == STATE_PAUSED) {
+                area.addView(smallButton(if (state == STATE_PAUSED) "继续任务" else "暂停任务") {
+                    executor.execute {
+                        val r = if (state == STATE_PAUSED) PyBridge.resumeTask(this) else PyBridge.pauseTask(this)
+                        toast(r.optString("message"))
+                        refreshStatus()
+                    }
+                })
+            }
+            area.addView(smallButton("结束任务") {
                 executor.execute {
                     val r = PyBridge.stopTask(this)
                     toast(r.optString("message", "已请求停止"))
                     ui.post { refreshStatus() }
                 }
-            })
+            }.apply { isEnabled = state != STATE_STOPPING })
             return
         }
 
@@ -403,44 +411,35 @@ class FloatService : Service() {
                         setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                         text = result.optString("error").ifEmpty { "没有可执行任务" }
                     })
-                    // 配置页 / 标定页不依赖任务清单，清单拉不到时也给入口
-                    area.addView(smallButton("调律配置") { openTuningConfig() })
-                    area.addView(smallButton("屏幕标定") { openCalib() })
                     return@post
                 }
+                val choices = RadioGroup(this)
+                var selectedId = ""
+                var selectedName = ""
+                val start = smallButton("启动任务") { launchTask(selectedId, selectedName) }.apply { isEnabled = false }
                 for (i in 0 until tasks.length()) {
                     val item = tasks.optJSONObject(i) ?: continue
                     val id = item.optString("id")
                     val name = item.optString("name").ifEmpty { id }
-                    area.addView(smallButton(name) { launchTask(id, name) })
+                    choices.addView(RadioButton(this).apply {
+                        text = name
+                        setTextColor(Color.WHITE)
+                        setOnClickListener {
+                            selectedId = id
+                            selectedName = name
+                            start.isEnabled = true
+                        }
+                    })
                 }
-                area.addView(smallButton("调律配置") { openTuningConfig() })
-                area.addView(smallButton("屏幕标定") { openCalib() })
+                area.addView(ScrollView(this).apply {
+                    addView(choices)
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dp(170),
+                    )
+                })
+                area.addView(start)
             }
         }
-    }
-
-    /** 打开屏幕标定页：游戏此刻在前台，让标定页一进去就先把游戏画面截下来 */
-    private fun openCalib() {
-        closePanel()
-        runCatching {
-            startActivity(
-                Intent(this, CalibActivity::class.java)
-                    .putExtra(CalibActivity.EXTRA_CAPTURE, true)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        }.onFailure { Log.w(TAG, "打开屏幕标定页失败", it) }
-    }
-
-    /** 打开调律参数配置页：先收面板再跳，配置页是全屏 Activity 不需要悬浮层 */
-    private fun openTuningConfig() {
-        closePanel()
-        runCatching {
-            startActivity(
-                Intent(this, TuningConfigActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        }.onFailure { Log.w(TAG, "打开调律配置页失败", it) }
     }
 
     private fun launchTask(taskId: String, taskName: String) {
@@ -532,7 +531,7 @@ class FloatService : Service() {
         var iconHidden = false
             private set
 
-        /** PC 代理连接期间隐藏悬浮 UI，防止它进入截图或与 PC 工作流并发操作。 */
+        /** 仅 PC 实际控制期间隐藏悬浮 UI；同步和状态连接不隐藏。 */
         @Volatile
         private var pcConnected = false
 
@@ -568,6 +567,10 @@ class FloatService : Service() {
         // 与 Python 侧 task_runner 的状态常量一一对应
         private const val STATE_IDLE = "idle"
         private const val STATE_RUNNING = "running"
+        private const val STATE_PAUSING = "pausing"
+        private const val STATE_PAUSED = "paused"
+        private const val STATE_STOPPING = "stopping"
+        private val activeStates = setOf(STATE_RUNNING, STATE_PAUSING, STATE_PAUSED, STATE_STOPPING)
         private const val STATE_DONE = "done"
         private const val STATE_FAILED = "failed"
         private const val STATE_STOPPED = "stopped"

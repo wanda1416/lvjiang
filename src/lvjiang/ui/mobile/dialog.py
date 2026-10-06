@@ -320,6 +320,11 @@ class MobileDeviceDialog(QDialog):
         self._tabs.addTab(self._device_scan_panel, tr("设备扫描"))
         self._tabs.addTab(self._build_health_tab(), tr("设备体检"))
         self._tabs.addTab(self._build_gesture_tab(), tr("手势测试"))
+        from .offline import OfflineControlPage
+        self._offline_page = OfflineControlPage(host=self._host, serial=self._current_serial,
+                                                track_worker=self._track_worker, parent=self)
+        self._tabs.addTab(self._offline_page, tr("离线任务"))
+        self._device_combo.currentIndexChanged.connect(lambda _: self._offline_page.device_changed())
         layout.addWidget(self._tabs, 1)
 
         footer = QHBoxLayout()

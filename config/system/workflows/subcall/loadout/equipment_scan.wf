@@ -24,9 +24,21 @@
 #       base_attr_2，命中冷却提示时额外带 cooldown_text；不支持的场景返回 null。
 def scan_equipment_detail($detail_scene)
     if $detail_scene == "equip_weapon_detail"
-        scan [equip_weapon_detail].[equip_type, equip_level, base_attr, \
-            affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu, \
-            dingyin, zaoyi, status, cooldown_tips] as $raw with "equip"
+        for attempt in [1, 2, 3]
+            scan [equip_weapon_detail].[equip_type, equip_level, base_attr, \
+                affix_gong, affix_shang, affix_jue, affix_zhi, affix_yu, \
+                dingyin, zaoyi, status, cooldown_tips] as $raw with "equip"
+            if len($raw) > 0
+                break
+            end
+            if $attempt < 3
+                wait 0.4
+            end
+        end
+        if len($raw) == 0
+            log error "装备详情截图连续失败，未执行锁状态和后续同帧扫描"
+            return null
+        end
         if $raw.cooldown_tips contains "冷却"
             eval $raw.cooldown_text = $raw.cooldown_tips
             scan [equip_weapon_detail].[cooldown_affix_gong, \
@@ -42,10 +54,22 @@ def scan_equipment_detail($detail_scene)
     end
 
     if $detail_scene == "equip_armor_detail"
-        scan [equip_armor_detail].[equip_type, equip_level, base_attr, \
-            base_attr_2, affix_gong, affix_shang, affix_jue, \
-            affix_zhi, affix_yu, dingyin, zaoyi, status, cooldown_tips] \
-            as $raw with "equip"
+        for attempt in [1, 2, 3]
+            scan [equip_armor_detail].[equip_type, equip_level, base_attr, \
+                base_attr_2, affix_gong, affix_shang, affix_jue, \
+                affix_zhi, affix_yu, dingyin, zaoyi, status, cooldown_tips] \
+                as $raw with "equip"
+            if len($raw) > 0
+                break
+            end
+            if $attempt < 3
+                wait 0.4
+            end
+        end
+        if len($raw) == 0
+            log error "装备详情截图连续失败，未执行锁状态和后续同帧扫描"
+            return null
+        end
         if $raw.cooldown_tips contains "冷却"
             eval $raw.cooldown_text = $raw.cooldown_tips
             scan [equip_armor_detail].[cooldown_affix_gong, \

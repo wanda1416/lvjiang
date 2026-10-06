@@ -7,13 +7,13 @@
 主通道选无障碍而不是 Shizuku：后者必须由 adb 引导启动，手机重启一次就失效，
 对普通用户不成立。两边都返回同一形状的 BGR numpy，上层无需区分。
 
-不用 loguru：设备端依赖里没有它（见 android/app/build.gradle.kts 的 pip 块）。
-错误通过返回 None + print 暴露。
+失败原因通过任务日志暴露，截图失败返回 None，内存耗尽向上传播。
 """
 
 import time
 
 import numpy as np
+from loguru import logger
 
 from ...i18n import tr
 from ..capture_base import CaptureBackend
@@ -46,7 +46,7 @@ class A11yCapture(CaptureBackend):
         width, height, data = got
         expect = width * height * 4
         if len(data) != expect:
-            print(f"[A11yCapture] 字节数不对：{len(data)} != {width}x{height}x4={expect}")
+            logger.error(f"[A11yCapture] 字节数不对：{len(data)} != {width}x{height}x4={expect}")
             return None
 
         import cv2
@@ -66,23 +66,25 @@ class A11yCapture(CaptureBackend):
         """
         for attempt in range(1, self._MAX_ATTEMPTS + 1):
             if not a11y.is_ready():
-                print(tr("[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启"))
+                logger.error(tr("[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启"))
                 return None
 
             try:
                 got = a11y.screenshot_rgba(int(timeout * 1000))
+            except MemoryError:
+                raise
             except Exception as e:
-                print(f"[A11yCapture] takeScreenshot 调用异常: {e}")
+                logger.error(f"[A11yCapture] takeScreenshot 调用异常: {e}")
                 return None
 
             if got is not None:
                 return got
 
             if attempt < self._MAX_ATTEMPTS:
-                print(f"[A11yCapture] 截图失败（疑似节流），{self._RETRY_DELAY}s 后重试 {attempt}/{self._MAX_ATTEMPTS - 1}")
+                logger.info(f"[A11yCapture] 截图失败，{self._RETRY_DELAY}s 后重试 {attempt}/{self._MAX_ATTEMPTS - 1}")
                 time.sleep(self._RETRY_DELAY)
 
-        print(f"[A11yCapture] 截图连续 {self._MAX_ATTEMPTS} 次失败")
+        logger.error(f"[A11yCapture] 截图连续 {self._MAX_ATTEMPTS} 次失败")
         return None
 
     def get_capture_size(self) -> tuple[int, int]:

@@ -7,13 +7,16 @@ import android.util.Log
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicInteger
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * 一次推理的输出：扁平 float32 字节流 + 形状。
  *
  * 不直接返回 ORT 的嵌套数组（OnnxTensor.getValue 会为 1x3xHxW 这种张量构造出
- * 成千上万个 Java 子数组），而是把 float32 原样拷进 ByteArray，由 Python 侧
- * np.frombuffer + reshape 零拷贝还原。
+ * 成千上万个 Java 子数组）。只提取一份 float32 ByteBuffer 的底层数组，
+ * 不再先复制为 FloatBuffer、再复制为 ByteArray。
  */
 class OnnxOutput(
     @JvmField val data: ByteArray,
@@ -35,19 +38,32 @@ class OnnxOutput(
 class OnnxBridge(modelPath: String, intraOpNumThreads: Int) {
 
     private val session: OrtSession
+    private val options: OrtSession.SessionOptions
+    private val modelName = File(modelPath).name
+    private var inputBuffer: ByteBuffer? = null
+    private var closed = false
 
     init {
         val file = File(modelPath)
         if (!file.isFile) {
             throw IllegalArgumentException("模型文件不存在：$modelPath")
         }
-        val options = OrtSession.SessionOptions()
-        if (intraOpNumThreads > 0) {
-            options.setIntraOpNumThreads(intraOpNumThreads)
+        options = OrtSession.SessionOptions()
+        try {
+            // 与 PC 的 RapidOCR 一致：不保留随动态输入增长的 CPU arena。
+            options.setCPUArenaAllocator(false)
+            if (intraOpNumThreads > 0) {
+                options.setIntraOpNumThreads(intraOpNumThreads)
+            }
+            options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+            session = env.createSession(modelPath, options)
+        } catch (error: Throwable) {
+            options.close()
+            throw error
         }
-        options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-        session = env.createSession(modelPath, options)
         Log.i(TAG, "session ready: ${file.name} (${file.length()} bytes)")
+        RuntimeDiagnostics.record("onnx_session_open", JSONObject()
+            .put("model", modelName).put("cpu_arena", false).put("sessions", liveSessions.incrementAndGet()))
     }
 
     fun inputNames(): Array<String> = session.inputNames.toTypedArray()
@@ -64,36 +80,57 @@ class OnnxBridge(modelPath: String, intraOpNumThreads: Int) {
      * @param shape 输入张量形状
      * @return 第一个输出的 float32 字节流与形状
      */
+    @Synchronized
     fun run(inputData: ByteArray, shape: LongArray): OnnxOutput {
-        // ORT 只在 buffer 是 direct 时才能零拷贝，否则它自己会再拷一遍
-        val buffer = ByteBuffer.allocateDirect(inputData.size)
-            .order(ByteOrder.nativeOrder())
-        buffer.put(inputData)
-        buffer.rewind()
-
-        val inputName = session.inputNames.first()
-        OnnxTensor.createTensor(env, buffer.asFloatBuffer(), shape).use { tensor ->
-            session.run(mapOf(inputName to tensor)).use { result ->
-                val out = result[0] as OnnxTensor
-                val floats = out.floatBuffer
-                val bytes = ByteArray(floats.remaining() * Float.SIZE_BYTES)
-                ByteBuffer.wrap(bytes).order(ByteOrder.nativeOrder())
-                    .asFloatBuffer().put(floats)
-                return OnnxOutput(bytes, out.info.shape)
+        check(!closed) { "推理会话已关闭" }
+        val started = System.nanoTime()
+        val fields = JSONObject().put("model", modelName)
+            .put("input_shape", JSONArray(shape.toList())).put("input_bytes", inputData.size)
+        RuntimeDiagnostics.record("onnx_run_begin", fields)
+        try {
+            var buffer = inputBuffer
+            if (buffer == null || buffer.capacity() < inputData.size) {
+                buffer = ByteBuffer.allocateDirect(inputData.size).order(ByteOrder.nativeOrder())
+                inputBuffer = buffer
             }
+            buffer.clear()
+            buffer.put(inputData)
+            buffer.flip()
+            fields.put("input_capacity", buffer.capacity())
+            OnnxTensor.createTensor(env, buffer.asFloatBuffer(), shape).use { tensor ->
+                session.run(mapOf(session.inputNames.first() to tensor)).use { result ->
+                    val out = result[0] as OnnxTensor
+                    val bytes = out.byteBuffer.array()
+                    fields.put("output_shape", JSONArray(out.info.shape.toList())).put("output_bytes", bytes.size)
+                    return OnnxOutput(bytes, out.info.shape)
+                }
+            }
+        } catch (error: Throwable) {
+            fields.put("error", error.javaClass.simpleName).put("message", error.message?.take(500))
+            throw error
+        } finally {
+            fields.put("elapsed_ms", (System.nanoTime() - started) / 1_000_000)
+            RuntimeDiagnostics.record("onnx_run_end", fields)
         }
     }
 
+    @Synchronized
     fun close() {
+        if (closed) return
         try {
             session.close()
-        } catch (e: Throwable) {
-            Log.w(TAG, "session close failed", e)
+        } finally {
+            options.close()
+            inputBuffer = null
+            closed = true
+            RuntimeDiagnostics.record("onnx_session_close", JSONObject()
+                .put("model", modelName).put("sessions", liveSessions.decrementAndGet()))
         }
     }
 
     companion object {
         private const val TAG = "OnnxBridge"
+        private val liveSessions = AtomicInteger()
 
         /** OrtEnvironment 是进程级单例，三个模型（det/cls/rec）共用 */
         private val env: OrtEnvironment by lazy { OrtEnvironment.getEnvironment() }

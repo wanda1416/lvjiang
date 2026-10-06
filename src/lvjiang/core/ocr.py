@@ -5,6 +5,7 @@
 """
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from loguru import logger
@@ -29,9 +30,26 @@ class OCREngine:
 
     _instance = None
 
-    def __init__(self):
-        self._ocr = None
+    def __init__(self, *, rapidocr_options: dict[str, Any] | None = None):
+        self._ocr: Any = None
         self._available = False
+        self._rapidocr_options = dict(rapidocr_options or {})
+
+    def close(self) -> None:
+        """释放后端会话；设备端不能仅丢弃 Python 引用来回收 JNI 原生资源。"""
+        backend, self._ocr = self._ocr, None
+        self._available = False
+        failure = None
+        for name in ("text_det", "text_cls", "text_rec"):
+            session = getattr(getattr(backend, name, None), "session", None)
+            close = getattr(session, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception as exc:
+                    failure = failure or exc
+        if failure is not None:
+            raise failure
 
     def _ensure_loaded(self) -> bool:
         """懒加载 RapidOCR，首次调用时初始化"""
@@ -39,9 +57,11 @@ class OCREngine:
             return self._available
         try:
             from rapidocr_onnxruntime import RapidOCR
-            self._ocr = RapidOCR()
+            self._ocr = RapidOCR(**self._rapidocr_options)
             self._available = True
             logger.info("RapidOCR 引擎加载成功（ONNX Runtime）")
+        except MemoryError:
+            raise
         except ImportError as e:
             logger.error(
                 f"RapidOCR 未安装: {e}\n"
@@ -68,6 +88,8 @@ class OCREngine:
             processed = self._preprocess_for_ocr(image)
             result, _ = self._ocr(processed)
             return self._parse_result(result, cleaning_group)
+        except MemoryError:
+            raise
         except Exception as e:
             logger.error(f"OCR 识别失败: {e}")
             return []

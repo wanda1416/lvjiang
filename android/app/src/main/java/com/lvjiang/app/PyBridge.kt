@@ -98,8 +98,8 @@ object PyBridge {
     fun resumeTask(context: Context): JSONObject = callJson(context, "resume_task")
     fun applySync(context: Context, path: String): JSONObject =
         callJson(context, "apply_sync", path, moduleName = OFFLINE_MODULE)
-    fun checkRuntime(context: Context, ocr: Boolean = true): JSONObject =
-        callJson(context, "check_runtime", ocr, moduleName = OFFLINE_MODULE)
+    fun checkRuntime(context: Context, ocr: Boolean = true, screenRepetitions: Int = 0): JSONObject =
+        callJson(context, "check_runtime", ocr, screenRepetitions, moduleName = OFFLINE_MODULE)
 
     /** 状态快照：`{state, task_name, message, elapsed, stopping, logs}` */
     fun status(context: Context): JSONObject = callJson(context, "get_status")

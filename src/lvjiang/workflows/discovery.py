@@ -191,6 +191,7 @@ def _discover_class_scripts() -> dict[str, dict]:
             "batch_check": "",
             "scope": getattr(cls, "SCOPE", None) or "daily",
             "hidden": bool(getattr(cls, Policy.HIDDEN_CLASS_ATTR, False)),
+            "device_visible": bool(getattr(cls, "DEVICE_VISIBLE", False)),
             "source_layer": "class",
             "is_remote": False,
         }
@@ -229,7 +230,9 @@ def script_supports_env(config: dict, run_env: str | None) -> bool:
     return not allowed or not run_env or run_env in allowed
 
 
-def list_exposed_scripts(run_env: str | None = None) -> list[dict]:
+def list_exposed_scripts(
+    run_env: str | None = None, *, device_entry: bool = False,
+) -> list[dict]:
     """通用入口展示的脚本：全集 → 作者声明的默认可见性 → 用户偏好覆盖。
 
     三层来源各司其职：
@@ -241,7 +244,9 @@ def list_exposed_scripts(run_env: str | None = None) -> list[dict]:
 
     因此系统新增的日常脚本会自动出现在列表里，不需要用户做任何事，也不会
     因为用户存过偏好就被冻住；新增专用脚本仍保持隐藏。桌面下拉与设备端
-    悬浮面板共用本函数。
+    悬浮面板共用本函数。设备入口可通过 ``device_entry`` 展示类实现明确声明
+    ``DEVICE_VISIBLE`` 的专用任务；不改变桌面默认展示，也不展示其他专用任务。
+    作者 hidden 和用户显式启停仍然生效。
 
     Returns:
         脚本配置列表，shape 同 ``discover_scripts()``，``name`` 已套用用户
@@ -255,6 +260,8 @@ def list_exposed_scripts(run_env: str | None = None) -> list[dict]:
             return prefs.visible[sid]
         cfg = discovered[sid]
         scope = prefs.scopes.get(sid) or cfg.get("scope") or "daily"
+        if device_entry and cfg.get("device_visible"):
+            return not bool(cfg.get("hidden", False))
         return Policy.visible_by_default(
             hidden=bool(cfg.get("hidden", False)), scope=scope)
 

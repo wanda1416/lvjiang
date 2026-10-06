@@ -245,11 +245,15 @@ def test_template_scan_and_find_reuse_original_frame(tmp_path, monkeypatch):
     assert engine.last_capture_seq == 1
 
 
-def test_equipment_cooldown_lock_and_detail_use_one_frame(monkeypatch):
+@pytest.mark.parametrize("fail_first", [False, True])
+def test_equipment_cooldown_lock_and_detail_use_one_frame(monkeypatch, fail_first):
     # Register the real domain builtin; fake only its pixel classifier.
     import lvjiang.apps.yysls.workflows.builtins.equipment  # noqa: F401
 
     engine, frame = _engine()
+    engine.wait_seconds = MagicMock()
+    if fail_first:
+        engine._capture.capture.side_effect = [None, frame]
     script = (Path(__file__).parents[2] / "config" / "system" / "workflows"
               / "subcall" / "loadout" / "equipment_scan.wf")
     engine._procs.update(parse_text(script.read_text(encoding="utf-8")).procs)
@@ -274,9 +278,28 @@ def test_equipment_cooldown_lock_and_detail_use_one_frame(monkeypatch):
     monkeypatch.setattr(
         "lvjiang.apps.yysls.core.equip_parser.lock_state.classify_lock_status", classify)
     _run(engine, 'call $raw = scan_equipment_detail("equip_weapon_detail")\n')
-    engine._capture.capture.assert_called_once()
+    assert engine._capture.capture.call_count == (2 if fail_first else 1)
     assert engine.variables["raw"]["affix_gong"] == "cooldown_affix_gong"
     assert engine.variables["raw"]["equip_detail"] == "equip_detail"
     assert engine.variables["raw"]["lock_status"] == "locked"
     assert len(lock_crops) == 1
     assert engine.last_capture_seq == 1
+
+
+def test_equipment_capture_failure_does_not_reuse_old_frame_or_scan_more():
+    engine, old_frame = _engine()
+    engine.capture_frame(source="previous_equipment")
+    assert engine.get_last_capture_frame() is old_frame
+    engine._capture.capture.reset_mock()
+    engine._capture.capture.return_value = None
+    engine.wait_seconds = MagicMock()
+    script = (Path(__file__).parents[2] / "config" / "system" / "workflows"
+              / "subcall" / "loadout" / "equipment_scan.wf")
+    engine._procs.update(parse_text(script.read_text(encoding="utf-8")).procs)
+
+    _run(engine, 'call $raw = scan_equipment_detail("equip_armor_detail")\n')
+
+    assert engine.variables["raw"] is None
+    assert engine._capture.capture.call_count == 3
+    engine._ocr.ocr_scene_regions.assert_not_called()
+    assert engine.get_last_capture_frame() is None

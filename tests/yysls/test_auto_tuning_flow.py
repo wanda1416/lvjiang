@@ -180,7 +180,8 @@ class FakeWF(AutoTuningWorkflow):
         if scene_key == "bag_detail":
             data.setdefault("sub_baoguo", "培养")
         if field_keys:
-            return {k: v for k, v in data.items() if k in field_keys}
+            # 真实 OCR 对成功截图保留每个文字字段，未识别到文字的值为空串。
+            return {k: data.get(k, "") for k in field_keys}
         return data
 
     def ocr_scene_by(self, scene_key, field_keys, target_value, mode, min_confidence=None):
@@ -451,6 +452,16 @@ def test_equipment_scan_reads_cooldown_from_dedicated_tips(
         "cooldown_affix_jue", "cooldown_affix_zhi",
         "cooldown_affix_yu", "cooldown_dingyin",
     ]
+
+
+def test_equipment_capture_failure_stops_tuning_instead_of_treating_as_empty_slot():
+    wf = FakeWF()
+    wf.engine._capture.capture.return_value = None
+    wf.engine.call_subcall = MagicMock()
+    with pytest.raises(RuntimeError, match="装备详情截图连续失败"):
+        wf._scan_equipment_detail(WEAPON_DETAIL)
+    assert wf.engine._capture.capture.call_count == 3
+    wf.engine.call_subcall.assert_not_called()
 
 
 def test_desktop_empty_slot_does_not_press_escape(monkeypatch):

@@ -152,10 +152,10 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 |---|---|---|
 | `control_begin` / `control_end` | — | 取得/释放本连接的 PC 输入控制权；手机活跃任务拒绝取得 |
 | `offline_status` | — | 任务状态、原因、日志、输出及最近同步 |
-| `offline_tasks` | — | 仅暴露支持 android 的任务；未同步提示先同步 |
+| `offline_tasks` | — | 仅暴露支持 android 的任务，包括类实现以 `DEVICE_VISIBLE` 明确开放的专用任务；未同步提示先同步 |
 | `offline_start` | `task_id` | 使用同步的用户和参数启动；必须先开启悬浮服务 |
 | `offline_pause` / `offline_resume` / `offline_stop` | — | 请求暂停、继续或结束 |
-| `offline_diagnostics` | — | `report`：依赖/插件/引擎与实际 OCR 检查；手机执行中拒绝检查 |
+| `offline_diagnostics` | 可选 `screen_repetitions`（0～10，默认 0） | `report`：依赖/插件/引擎、OCR 和内存；同步后可仅采集真实屏幕连续推理，不注入游戏动作；手机执行中拒绝检查 |
 | `offline_sync_begin` | `size`,`sha256` | 建立暂存上传，最大 256 MiB |
 | `offline_sync_chunk` | `offset`,`data`（Base64） | 顺序写入，重复块内容相同才允许重试 |
 | `offline_sync_commit` | — | 验证完整包和逐文件哈希、版本、DB 后交换 config；重载失败回滚 |
@@ -168,3 +168,15 @@ PC 断线不停止手机任务；PC 租约在重连后重新申请，防止重�
 归档）。DB 由 SQLite backup 生成，不能直接复制仍有 WAL 的数据库。手机校验后整体
 交换 config，留存上一份 offline-backup/config；应用与启动共用锁，并清理配置单例和
 引擎缓存。Python 实现随 APK 打包，不通过配置同步热更新。
+
+APK 不打包 config/system，也不在启动时解压配置；没有同步标记时不装配引擎。
+配置重载前关闭旧 OCR 后端的 det/cls/rec 会话及其 SessionOptions，再丢弃缓存。
+Android 关闭 CPU arena，与 PC 默认一致；rec/cls 单条批次，输入 direct buffer 在会话内
+复用，输出只取一份 ByteBuffer 底层数组。Java 或 ORT 分配失败转换为 MemoryError，
+穿透识别失败隔离层并终止任务，释放模型资源。
+
+运行诊断位于 data/diagnostics/android-runtime.jsonl，每份最大约 2 MiB，保留当前和上
+一份；Native 日志记录模型名、会话数、推理输入/输出形状与字节、耗时、Java/native
+分配及 RSS/Swap，Python 记录任务首尾与真实屏幕验收采样。没有截图、OCR 原文或配置
+全文。SelfTestProvider 新增 /runtime、/runtime-previous 只读路径，沿用 shell/root/
+本应用 UID 校验；配置同步不包含 data/diagnostics。

@@ -18,7 +18,7 @@ import java.io.File
  *
  *     adb shell content read --uri content://com.lvjiang.app.selftest/log
  *
- * 安全面收敛到最小：只实现 openFile、只认 /log 一个路径、只回 selftest.log 一个文件，
+ * 只实现 openFile，只允许自检报告和当前/上一份运行日志三个固定只读路径，
  * 且校验调用方必须是 shell/root/自身 —— 其他应用即使看到这个 exported provider
  * 也拿不到任何东西。
  */
@@ -32,8 +32,13 @@ class SelfTestProvider : ContentProvider() {
             "仅限 adb shell 访问"
         }
         require(mode == "r") { "只读通道" }
-        require(uri.path == "/log") { "未知路径: ${uri.path}" }
-        val file = File(requireNotNull(context).filesDir, "selftest.log")
+        val relative = when (uri.path) {
+            "/log" -> "selftest.log"
+            "/runtime" -> "lvjiang/data/diagnostics/android-runtime.jsonl"
+            "/runtime-previous" -> "lvjiang/data/diagnostics/android-runtime.previous.jsonl"
+            else -> throw IllegalArgumentException("未知路径: ${uri.path}")
+        }
+        val file = File(requireNotNull(context).filesDir, relative)
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 

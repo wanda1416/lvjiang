@@ -45,7 +45,8 @@ def _create_ocr() -> OCREngine:
     """创建设备端 OCR 引擎（已 patch RapidOCR）"""
     from .onnx_session import install
     install()
-    return OCREngine()
+    # 手机与游戏共享内存，识别/方向分类单条处理，避免六条输出同时复制到 Java 堆。
+    return OCREngine(rapidocr_options={"rec_batch_num": 1, "cls_batch_num": 1})
 
 
 def _default_layout_name() -> str:
@@ -99,8 +100,11 @@ def create_engine(
     """
     # 先加插件：.wf 里的游戏专属内置函数（to_equipment 等）靠插件导入时注册，
     # 未加载则 DSL 调用直接报未知函数（见 plugins 模块说明）。
+    from .offline import sync_status
     from .plugins import ensure_loaded
 
+    if not sync_status().get("synced"):
+        raise RuntimeError("请先在 PC 同步脚本、配置和执行用户")
     ensure_loaded()
 
     capture = _create_capture()

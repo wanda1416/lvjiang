@@ -294,7 +294,8 @@ object AgentServer {
             if (!FloatService.isRunning) fail("请先在手机开启悬浮控制")
             else Pair(PyBridge.startTask(requireNotNull(appContext), req.getString("task_id")), null)
         }
-        "offline_diagnostics" -> ok(JSONObject().put("report", PyBridge.checkRuntime(requireNotNull(appContext))))
+        "offline_diagnostics" -> ok(JSONObject().put("report", PyBridge.checkRuntime(
+            requireNotNull(appContext), true, req.optInt("screen_repetitions", 0))))
         "offline_sync_begin" -> beginSync(req)
         "offline_sync_chunk" -> syncChunk(req)
         "offline_sync_commit" -> commitSync()

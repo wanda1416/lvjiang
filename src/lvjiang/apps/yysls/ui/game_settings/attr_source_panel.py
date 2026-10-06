@@ -1,6 +1,6 @@
 """属性来源面板：填写装备之外的战斗属性从哪来。
 
-补数据是这块的真正瓶颈——心法 37 门 × 6 重就是 222 行。所以界面按
+补数据是这块的真正瓶颈——每门心法有六重。所以界面按
 「一组一屏」组织：左侧选心法/武学，右侧只显示这一组的几行，每行两次
 点击填完：
 
@@ -278,7 +278,8 @@ class AttrSourcePanel(QWidget):
         if header is not None:
             # 放 cell widget 的列必须显式给宽度：ResizeToContents 只量
             # 单元格里的文本项，不量嵌进去的控件，下拉会溢出列边界。
-            for column, width in ((0, 110), (1, 100), (2, 170), (4, 120)):
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            for column, width in ((1, 100), (2, 170), (4, 120)):
                 header.setSectionResizeMode(
                     column, QHeaderView.ResizeMode.Fixed)
                 self._table.setColumnWidth(column, width)
@@ -326,11 +327,15 @@ class AttrSourcePanel(QWidget):
         multi = len(self._kinds) > 1
         for effect in self._manager().effects(self._kinds):
             group = effect.source_id.split(SEPARATOR)[0]
+            if effect.kind == "inner_way" and effect.group:
+                group = effect.group
             # 一个 tab 管多类来源时给分组加类别前缀，否则两类里恰好
             # 同名的分组会被并成一条。
             if multi:
                 group = f"[{tr(SOURCE_KIND_LABELS[effect.kind])}] {group}"
-            if keyword and keyword not in effect.source_id:
+            if keyword and not any(keyword in text for text in (
+                group, effect.label, effect.source_id,
+            )):
                 continue
             groups.setdefault(group, []).append(effect.source_id)
         return groups
@@ -399,8 +404,9 @@ class AttrSourcePanel(QWidget):
         self._table.setRowCount(len(source_ids))
         for row, source_id in enumerate(source_ids):
             effect = self._effect(source_id)
-            tail = source_id.split(SEPARATOR, 1)
-            label = tail[1] if len(tail) > 1 else source_id
+            display_label = effect.label if effect.kind == "inner_way" else source_id
+            tail = display_label.split(SEPARATOR, 1)
+            label = tail[1] if len(tail) > 1 else display_label
             self._table.setItem(row, 0, QTableWidgetItem(label))
 
             if effect.no_effect:

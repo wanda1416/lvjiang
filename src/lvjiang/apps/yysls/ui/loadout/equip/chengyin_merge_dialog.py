@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from loguru import logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -136,7 +136,9 @@ class _CandidatePair(QFrame):
 
 
 class ChengyinMergeDialog(QDialog):
-    """两列展示全部候选，只有用户勾选并确认后才返回选择。"""
+    """合并在窗口内执行，只有取消或关闭窗口才结束对话框。"""
+
+    merge_requested = pyqtSignal()
 
     def __init__(
         self,
@@ -146,6 +148,7 @@ class ChengyinMergeDialog(QDialog):
     ):
         super().__init__(parent)
         self._pairs: list[_CandidatePair] = []
+        self._display_params = display_params
         self.setWindowTitle(tr("承音装备"))
         self.resize(1500, 760)
         self.setMinimumSize(1000, 620)
@@ -153,27 +156,51 @@ class ChengyinMergeDialog(QDialog):
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(10)
-        summary = QLabel(tr(
-            "全部用户中识别出 {count} 组疑似同一件装备，请核对用户名和左右装备后选择是否合并。"
-        ).format(count=len(candidates)))
-        summary.setWordWrap(True)
-        summary.setStyleSheet("font-size:14px;font-weight:600;")
-        root.addWidget(summary)
+        self.summary = QLabel()
+        self.summary.setWordWrap(True)
+        self.summary.setStyleSheet("font-size:14px;font-weight:600;")
+        root.addWidget(self.summary)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        root.addWidget(self._scroll, 1)
+        self.result_label = QLabel()
+        self.result_label.setWordWrap(True)
+        root.addWidget(self.result_label)
 
+        footer = QHBoxLayout()
+        footer.addStretch()
+        # 歧义组必须人工决定，不能用全选把疑似关系当成已确认的同件关系。
+        self.check_all_button = QPushButton(tr("一键勾选"))
+        self.check_all_button.setToolTip(tr("仅勾选无歧义候选；有多个可能版本的组请人工核对"))
+        self.check_all_button.clicked.connect(self._check_all)
+        self.merge_button = QPushButton(tr("合并选中项"))
+        self.merge_button.setEnabled(False)
+        self.merge_button.clicked.connect(self.merge_requested.emit)
+        self.cancel_button = QPushButton(tr("取消合并"))
+        self.cancel_button.clicked.connect(self.reject)
+        apply_button_style(self.check_all_button, variant="neutral")
+        apply_button_style(self.merge_button, variant="action")
+        apply_button_style(self.cancel_button, variant="neutral")
+        footer.addWidget(self.check_all_button)
+        footer.addWidget(self.merge_button)
+        footer.addWidget(self.cancel_button)
+        root.addLayout(footer)
+        self.set_candidates(candidates)
+
+    def set_candidates(self, candidates: list[UserChengyinMergeCandidate]) -> None:
+        """按最新装备池重建候选，清除旧勾选，不关闭窗口。"""
         grouped: dict[tuple[str, str], list[UserChengyinMergeCandidate]] = {}
         for entry in candidates:
             grouped.setdefault((entry.username, entry.candidate.new_fp), []).append(entry)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
         content = QWidget()
         grid = QGridLayout(content)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(10)
+        self._pairs = []
         for index, entries in enumerate(grouped.values()):
-            pair = _CandidatePair(entries, display_params)
+            pair = _CandidatePair(entries, self._display_params)
             pair.checkbox.toggled.connect(
                 lambda checked, pair=pair: self._on_group_toggled(pair, checked))
             self._pairs.append(pair)
@@ -183,42 +210,25 @@ class ChengyinMergeDialog(QDialog):
         if not candidates:
             empty = QLabel(tr("全部用户中没有找到符合条件的疑似重复装备"))
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            empty.setStyleSheet(
-                "color:palette(mid);font-size:14px;padding:48px;")
+            empty.setStyleSheet("color:palette(mid);font-size:14px;padding:48px;")
             grid.addWidget(empty, 0, 0, 1, 2)
         for pair in self._pairs:
             pair.requires_review |= any(
                 self._groups_conflict(pair, other)
                 for other in self._pairs if other is not pair)
             pair.review_label.setVisible(pair.requires_review)
-        review_count = sum(pair.requires_review for pair in self._pairs)
-        summary.setText(tr(
+        self.summary.setText(tr(
             "识别出 {count} 组合并候选，其中 {review_count} 组需要人工核对。"
             "左侧全部旧版本合并到右侧保留版本；有分歧的组不自动勾选。"
-        ).format(count=len(self._pairs), review_count=review_count))
+        ).format(count=len(self._pairs), review_count=sum(p.requires_review for p in self._pairs)))
         grid.setRowStretch((len(self._pairs) + 1) // 2, 1)
-        scroll.setWidget(content)
-        root.addWidget(scroll, 1)
-
-        footer = QHBoxLayout()
-        footer.addStretch()
-        # 歧义组必须人工决定，不能用全选把疑似关系当成已确认的同件关系。
-        self.check_all_button = QPushButton(tr("一键勾选"))
-        self.check_all_button.setToolTip(tr("仅勾选无歧义候选；有多个可能版本的组请人工核对"))
-        self.check_all_button.setEnabled(any(not pair.requires_review for pair in self._pairs))
-        self.check_all_button.clicked.connect(self._check_all)
-        self.merge_button = QPushButton(tr("合并选中项"))
-        self.merge_button.setEnabled(False)
-        self.merge_button.clicked.connect(self.accept)
-        cancel_button = QPushButton(tr("取消合并"))
-        cancel_button.clicked.connect(self.reject)
-        apply_button_style(self.check_all_button, variant="neutral")
-        apply_button_style(self.merge_button, variant="action")
-        apply_button_style(cancel_button, variant="neutral")
-        footer.addWidget(self.check_all_button)
-        footer.addWidget(self.merge_button)
-        footer.addWidget(cancel_button)
-        root.addLayout(footer)
+        scrollbar = self._scroll.verticalScrollBar()
+        position = scrollbar.value() if scrollbar is not None else 0
+        self._scroll.setWidget(content)
+        if scrollbar is not None:
+            scrollbar.setValue(position)
+        self.check_all_button.setEnabled(any(not p.requires_review for p in self._pairs))
+        self._update_merge_enabled()
 
     def _check_all(self) -> None:
         """一次勾选无歧义候选，保留用户已人工选择的歧义组。"""

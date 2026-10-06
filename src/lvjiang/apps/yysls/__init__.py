@@ -17,6 +17,16 @@ def _initialize_session_storage() -> None:
     initialize_session_storage()
 
 
+def _reload_configuration() -> None:
+    from .config.manager import reset_game_config
+    from .config.session_node import reset_session_storage
+    from .core.graduation.model_registry import invalidate_model_registry
+
+    reset_game_config()
+    reset_session_storage()
+    invalidate_model_registry()
+
+
 def _build_tuning_tab(host):
     from .ui.tuning import TuningTab
     return TuningTab(host)
@@ -101,4 +111,5 @@ hooks = AppHooks(
     config_policy_modules=[
         "lvjiang.apps.yysls.config.merge_policy",
     ],
+    configuration_reload_callbacks=[_reload_configuration],
 )

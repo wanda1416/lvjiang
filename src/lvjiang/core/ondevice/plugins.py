@@ -25,6 +25,10 @@ _loaded_app_ids: set[str] = set()
 _lock = threading.Lock()
 
 
+def configured_apps() -> tuple[str, ...]:
+    return _configured_app_ids
+
+
 def configure_apps(app_ids: str | tuple[str, ...] | list[str]) -> None:
     """由设备构建组合根声明要加载的 app；逗号分隔字符串也可用。"""
     global _configured_app_ids
@@ -43,8 +47,8 @@ def ensure_loaded(app_ids: tuple[str, ...] | list[str] | None = None) -> None:
     """幂等加载调用方指定或设备构建已配置的 app。
 
     在任何依赖工作流注册表或内置函数的入口调用（list_tasks / 任务执行 /
-    引擎装配）。单个插件加载失败只记日志不抛出——让任务在真正用到缺失
-    实现时报具体错误，比在列任务阶段整体失败更好定位。
+    引擎装配）。配置的插件加载失败时明确报告，避免同名类任务静默退化为
+    旧 DSL 实现或运行到一半才发现缺失的内置函数。
     """
     targets = tuple(app_ids) if app_ids is not None else _configured_app_ids
     with _lock:
@@ -59,3 +63,4 @@ def ensure_loaded(app_ids: tuple[str, ...] | list[str] | None = None) -> None:
                 logger.info(f"[ondevice] 插件已加载: {name}")
             except Exception as e:  # noqa: BLE001
                 logger.error(f"[ondevice] 插件加载失败 {name}: {e}")
+                raise RuntimeError(f"设备端插件 {name} 加载失败: {e}") from e

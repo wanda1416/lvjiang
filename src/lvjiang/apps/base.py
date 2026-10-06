@@ -87,3 +87,6 @@ class AppHooks:
     # 调用 core.config.resolver 的 register_registry_list_paths /
     # register_protected_list_paths 声明。
     config_policy_modules: list[str] = field(default_factory=list)
+
+    # 外部完整配置快照应用后清理插件自己的只读缓存，不重注册 UI 或执行任务。
+    configuration_reload_callbacks: list[Callable[[], None]] = field(default_factory=list)

@@ -123,6 +123,7 @@ class AgentClient:
         self._port: int | None = None
         self._lock = threading.RLock()
         self._status: dict = {}
+        self._owns_execution = False
 
     @property
     def device(self) -> AdbDevice:
@@ -323,7 +324,13 @@ class AgentClient:
             self._sock = None
         if self._port is None:
             return False
-        return self._open_socket(3.0)
+        if not self._open_socket(3.0):
+            return False
+        if self._owns_execution:
+            header, _ = self._roundtrip("control_begin")
+            if not header.get("ok"):
+                raise AgentOpError(str(header.get("error") or "无法恢复设备执行占用"))
+        return True
 
     # ─── 调用 ─────────────────────────────────────────────
 
@@ -349,7 +356,7 @@ class AgentClient:
                     raise
                 header, payload = self._roundtrip(op, timeout, **params)
             if not header.get("ok"):
-                raise AgentOpError(str(header.get("error", "设备端未说明原因")),
+                raise AgentOpError(str(header.get("error") or header.get("message") or "设备端未说明原因"),
                                    retryable=bool(header.get("retryable")))
             return header, payload
 
@@ -469,6 +476,22 @@ class AgentInput(InputBackend):
         self._client = client
         self.background_mode = True
         self.target_hwnd = None
+
+    def begin_execution(self) -> None:
+        if self._client.status.get("offline_protocol") == 1:
+            self._client.call("control_begin")
+            self._client._owns_execution = True
+
+    def end_execution(self) -> None:
+        if self._client._owns_execution:
+            try:
+                self._client.call("control_end")
+            except AgentError as exc:
+                # 关闭连接也会释放手机的控制租约；不能遮蔽工作流原始异常。
+                logger.warning(f"PC 控制释放失败，关闭代理连接: {exc}")
+                self._client.close()
+            finally:
+                self._client._owns_execution = False
 
     @property
     def client(self) -> AgentClient:

@@ -24,13 +24,19 @@ from collections import deque
 from typing import Any
 
 from ...i18n import tr
+from ...workflows.errors import WorkflowAbort
 
-#: 状态机取值。running 之外都是终态，可直接再起下一个任务。
+#: 活跃状态（包括暂停/结束中）均占用任务槽，终态才允许启动下一项。
 STATE_IDLE = "idle"
 STATE_RUNNING = "running"
+STATE_PAUSING = "pausing"
+STATE_PAUSED = "paused"
+STATE_STOPPING = "stopping"
 STATE_DONE = "done"
 STATE_FAILED = "failed"
 STATE_STOPPED = "stopped"
+ACTIVE_STATES = {STATE_RUNNING, STATE_PAUSING, STATE_PAUSED, STATE_STOPPING}
+CONTROL_LOCK = threading.RLock()
 
 #: 日志环形缓冲容量。悬浮面板只显示最后几行，留 200 行够回溯一段流程。
 _LOG_CAPACITY = 200
@@ -62,7 +68,7 @@ class _TaskState:
 
     def is_running(self) -> bool:
         with self._lock:
-            return self._state == STATE_RUNNING
+            return self._state in ACTIVE_STATES
 
     def should_stop(self) -> bool:
         """交给引擎的 stop_check：不加锁，Event 自身线程安全"""
@@ -85,7 +91,7 @@ class _TaskState:
                 "task_name": self._task_name,
                 "message": self._message,
                 "elapsed": round(elapsed, 1),
-                "stopping": self._stop_event.is_set() and self._state == STATE_RUNNING,
+                "stopping": self._stop_event.is_set() and self._state in ACTIVE_STATES,
                 "result": self._result,
                 "logs": list(self._logs),
             }
@@ -101,6 +107,7 @@ class _TaskState:
             self._finished_at = 0.0
             self._result = {}
             self._logs.clear()
+            _PAUSE_GATE.set()
 
     def finish(self, state: str, message: str, result: dict | None = None) -> None:
         with self._lock:
@@ -115,7 +122,33 @@ class _TaskState:
 
     def request_stop(self) -> None:
         self._stop_event.set()
-        self.set_message("已请求停止，等当前步骤结束")
+        _PAUSE_GATE.set()
+        with self._lock:
+            self._state = STATE_STOPPING
+            self._message = "已请求结束，等当前步骤结束"
+
+    def request_pause(self, message: str = "") -> bool:
+        with self._lock:
+            if self._state != STATE_RUNNING:
+                return False
+            self._state = STATE_PAUSING
+            self._message = message or "正在暂停，等当前步骤结束"
+            _PAUSE_GATE.clear()
+            return True
+
+    def acknowledge_pause(self) -> None:
+        with self._lock:
+            if self._state == STATE_PAUSING:
+                self._state = STATE_PAUSED
+
+    def resume(self) -> bool:
+        with self._lock:
+            if self._state not in {STATE_PAUSING, STATE_PAUSED}:
+                return False
+            self._state = STATE_RUNNING
+            self._message = "执行中"
+            _PAUSE_GATE.set()
+            return True
 
     def bind_thread(self, thread: threading.Thread) -> None:
         with self._lock:
@@ -123,6 +156,17 @@ class _TaskState:
 
 
 _STATE = _TaskState()
+
+
+class _PauseGate(threading.Event):
+    def wait(self, timeout=None):
+        if not self.is_set():
+            _STATE.acknowledge_pause()
+        return super().wait(timeout)
+
+
+_PAUSE_GATE = _PauseGate()
+_PAUSE_GATE.set()
 
 #: 引擎缓存。OCR 模型加载要几秒，每次点一下任务都重建等于白等。
 _ENGINE = None
@@ -140,7 +184,7 @@ def _get_engine():
         if _ENGINE is None:
             from .workflow_runner import create_engine
 
-            _ENGINE = create_engine(stop_check=_STATE.should_stop)
+            _ENGINE = create_engine(stop_check=_STATE.should_stop, pause_event=_PAUSE_GATE)
         return _ENGINE
 
 
@@ -154,7 +198,7 @@ def _reset_engine_state(engine) -> None:
     engine.variables = {}
     engine.output = {}
     engine.context = {}
-    engine.workflow_config_snapshot = None
+    engine._ui_callback = _task_ui
 
     # 设备端没有执行用户下拉，每次任务启动都绑定 session 中的当前用户。
     from ... import constants
@@ -163,18 +207,48 @@ def _reset_engine_state(engine) -> None:
     username = get_session_store().get_active("user", "")
     engine.run_username = username if isinstance(username, str) else ""
     engine.users_dir = constants.USERS_DIR
+    if not engine.run_username:
+        raise RuntimeError("尚未同步执行用户，请在 PC 移动设备窗口同步配置")
+    from ..config.users import SessionManager
+    from ..user_config import load_user_metadata
+
+    manager = SessionManager(constants.USERS_DIR)
+    engine.session = manager.load(engine.run_username)
+    engine._save_callback = manager.save_fn(engine.run_username, engine.session)
+    user = load_user_metadata(engine.run_username, constants.USERS_DIR)
+    engine.user_attributes_snapshot = {engine.run_username: dict(user.attributes) if user else {}}
+
+
+def _task_ui(action: str, **kwargs):
+    """异常暂停必须真的停住；不支持的交互明确失败，不能静默继续。"""
+    text = str(kwargs.get("message") or kwargs.get("prompt") or "请手动处理后继续")
+    if action == "notify":
+        _STATE.log(text)
+        return None
+    if action not in {"pause", "confirm"}:
+        raise RuntimeError(f"手机暂不支持 {action} 交互，请在 PC 配置任务参数")
+    _STATE.request_pause(text)
+    while not _PAUSE_GATE.wait(0.2):
+        if _STATE.should_stop():
+            break
+    if _STATE.should_stop():
+        raise WorkflowAbort("用户已结束任务")
+    return True if action == "confirm" else None
 
 
 # ── 对外接口（返回 JSON 文本） ─────────────────────────────
 
 
-def list_tasks() -> str:
+def list_tasks(require_sync: bool = True) -> str:
     """可执行任务清单
 
     Returns:
         JSON 文本 ``{"ok": bool, "tasks": [{"id","name","source"}], "error": str}``
     """
     try:
+        from .offline import sync_status
+        if require_sync and not sync_status().get("synced"):
+            return json.dumps({"ok": False, "tasks": [], "error": "请先在 PC 移动设备窗口同步离线任务配置"}, ensure_ascii=False)
         from ...workflows.discovery import list_exposed_scripts, script_display_name
         from .plugins import ensure_loaded
 
@@ -194,6 +268,7 @@ def list_tasks() -> str:
                 "source": "class" if item.get("class") else "wf",
             }
             for item in items
+            if not item.get("env") or "android" in item["env"]
         ]
         return json.dumps({"ok": True, "tasks": tasks, "error": ""}, ensure_ascii=False)
     except Exception as e:
@@ -204,6 +279,11 @@ def list_tasks() -> str:
 
 
 def start_task(task_id: str, initial_variables: str = "") -> str:
+    with CONTROL_LOCK:
+        return _start_task(task_id, initial_variables)
+
+
+def _start_task(task_id: str, initial_variables: str = "") -> str:
     """启动一个任务（非阻塞，立刻返回）
 
     Args:
@@ -217,6 +297,9 @@ def start_task(task_id: str, initial_variables: str = "") -> str:
         return json.dumps(
             {"ok": False, "message": "已有任务在运行，请先停止"}, ensure_ascii=False
         )
+    from .offline import sync_status
+    if not sync_status().get("synced"):
+        return json.dumps({"ok": False, "message": "请先从 PC 同步任务配置与执行用户"}, ensure_ascii=False)
 
     try:
         from . import a11y
@@ -271,13 +354,24 @@ def stop_task() -> str:
     return json.dumps({"ok": True, "message": "已请求停止"}, ensure_ascii=False)
 
 
+def pause_task() -> str:
+    ok = _STATE.request_pause()
+    return json.dumps({"ok": ok, "message": "已请求暂停" if ok else "当前任务不能暂停"}, ensure_ascii=False)
+
+
+def resume_task() -> str:
+    ok = _STATE.resume()
+    return json.dumps({"ok": ok, "message": "已继续" if ok else "当前没有暂停任务"}, ensure_ascii=False)
+
+
 def get_status() -> str:
     """当前状态快照
 
     Returns:
         JSON 文本，字段见 ``_TaskState.snapshot``
     """
-    return json.dumps(_STATE.snapshot(), ensure_ascii=False)
+    from .offline import sync_status
+    return json.dumps({**_STATE.snapshot(), "sync": sync_status()}, ensure_ascii=False, default=str)
 
 
 def is_running() -> bool:
@@ -297,6 +391,8 @@ def _resolve_task(task_id: str) -> dict:
 
     for item in discover_scripts():
         if item["id"] == task_id:
+            if item.get("env") and "android" not in item["env"]:
+                raise ValueError("此任务不支持安卓运行")
             return item
     available = ", ".join(item["id"] for item in discover_scripts()) or tr("（空）")
     raise ValueError(f"未找到任务 {task_id!r}，可选：{available}")
@@ -305,15 +401,31 @@ def _resolve_task(task_id: str) -> dict:
 def _run_in_thread(task: dict, variables: dict | None) -> None:
     """任务线程主体：任何异常都收进状态，绝不让线程带着栈自己消失"""
     name = task["name"]
+    sink = None
     try:
+        from copy import deepcopy
+
+        from loguru import logger
+
+        from ..config.wf_configs import get_wf_config
+        from ..task_params import resolve_task_params
+
+        worker_id = threading.get_ident()
+        sink = logger.add(lambda message: _STATE.log(str(message).strip()),
+                          filter=lambda record: record["thread"].id == worker_id,
+                          format="{message}", level="INFO")
         _STATE.set_message("正在初始化引擎")
         _STATE.log(f"任务开始：{name}")
         engine = _get_engine()
         _reset_engine_state(engine)
+        engine.workflow_config_snapshot = deepcopy(get_wf_config(task["id"]))
+        params, _ = resolve_task_params(task["id"], engine.run_username, task.get("parameters", []), engine.users_dir)
+        if variables:
+            params.update(variables)
 
         source = _build_source(task, engine)
         _STATE.set_message("执行中")
-        result = engine.execute(source, initial_variables=variables)
+        result = engine.execute(source, initial_variables=params)
 
         if _STATE.should_stop():
             _STATE.log("任务被停止")
@@ -329,12 +441,20 @@ def _run_in_thread(task: dict, variables: dict | None) -> None:
         collected = len(result or {})
         _STATE.log(f"任务完成，收集 {collected} 项")
         _STATE.finish(STATE_DONE, f"已完成：{name}", dict(result or {}))
+    except WorkflowAbort as exc:
+        _STATE.log(str(exc))
+        _STATE.finish(STATE_STOPPED if _STATE.should_stop() else STATE_FAILED, str(exc))
     except Exception as e:
         detail = traceback.format_exc().rstrip()
         _STATE.log(f"任务异常：{type(e).__name__}: {e}")
         for line in detail.splitlines()[-8:]:
             _STATE.log(line)
-        _STATE.finish(STATE_FAILED, f"{type(e).__name__}: {e}")
+        _STATE.finish(STATE_STOPPED if _STATE.should_stop() else STATE_FAILED,
+                      "用户已结束任务" if _STATE.should_stop() else f"{type(e).__name__}: {e}")
+    finally:
+        if sink is not None:
+            from loguru import logger
+            logger.remove(sink)
 
 
 def _build_source(task: dict, engine):
@@ -357,6 +477,7 @@ def _build_source(task: dict, engine):
             window_left=engine._window_left,
             window_top=engine._window_top,
             stop_check=_STATE.should_stop,
+            pause_event=_PAUSE_GATE,
         )
 
     from ..config.resolver import get_resolver

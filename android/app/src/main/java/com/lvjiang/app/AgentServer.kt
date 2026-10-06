@@ -6,12 +6,16 @@ import android.net.LocalSocket
 import android.os.Build
 import android.os.Process
 import android.util.Log
+import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.EOFException
 import java.io.IOException
+import java.io.File
+import java.io.RandomAccessFile
+import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -35,7 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object AgentServer {
 
-    const val SOCKET_NAME = "lvjiang-agent"
+    val SOCKET_NAME = if (BuildConfig.APPLICATION_ID == "com.lvjiang.app") "lvjiang-agent" else "lvjiang-agent-offlinecheck"
     const val PROTOCOL_VERSION = 3
 
     private const val TAG = "AgentServer"
@@ -71,7 +75,17 @@ object AgentServer {
     var appContext: android.content.Context? = null
 
     /** 所有 op 串行：手势与截图本来就不该并发，省掉各桥接对象的并发考虑 */
-    private val dispatchLock = Any()
+    val executionLock = Any()
+    @Volatile private var pcOwner: Long? = null
+    private var uploadFile: File? = null
+    private var uploadSize = 0L
+    private var uploadHash = ""
+    private val controlOps = setOf("screenshot", "tap", "long_press", "swipe", "hold_move", "gesture", "key", "shell", "calib_set", "calib_clear", "calib_mark")
+
+    fun pcControlsDevice(): Boolean = pcOwner != null
+
+    private fun localTaskActive(): Boolean = PyBridge.status(requireNotNull(appContext))
+        .optString("state") in setOf("running", "pausing", "paused", "stopping")
 
     fun isRunning(): Boolean = server != null
 
@@ -151,7 +165,7 @@ object AgentServer {
             }
             // PC 控制期间隐藏悬浮球并收起面板，避免进入 screencap/scrcpy 截图，
             // 也避免用户从悬浮面板并行发起另一套操作。
-            FloatService.setPcConnected(true)
+            // 仅连接不占用执行；control_begin 才隐藏悬浮入口。
             val input = DataInputStream(client.inputStream.buffered())
             val output = DataOutputStream(client.outputStream.buffered())
             while (true) {
@@ -173,6 +187,12 @@ object AgentServer {
             Log.d(TAG, "连接结束: ${e.message}")
         } finally {
             if (counted) {
+                synchronized(executionLock) {
+                    if (pcOwner == Thread.currentThread().id) {
+                        pcOwner = null
+                        FloatService.setPcConnected(false)
+                    }
+                }
                 val remaining = activeClients.decrementAndGet().coerceAtLeast(0)
                 if (remaining == 0) {
                     connectedSinceMs = 0L
@@ -209,7 +229,15 @@ object AgentServer {
         }
         val op = req.optString("op", "")
         val result = try {
-            synchronized(dispatchLock) { dispatch(op, req) }
+            synchronized(executionLock) {
+                if (op in controlOps && localTaskActive()) {
+                    fail("手机离线任务正在执行，请先结束任务")
+                } else if (op in controlOps && pcOwner != null && pcOwner != Thread.currentThread().id) {
+                    fail("设备已被另一条 PC 执行连接占用")
+                } else {
+                    dispatch(op, req)
+                }
+            }
         } catch (e: Throwable) {
             Log.e(TAG, "op=$op 执行异常", e)
             fail("$op 执行异常: $e")
@@ -238,11 +266,45 @@ object AgentServer {
         "calib_mark" -> calibMark(req)
         "calib_hide" -> calibHide()
         "float_icon" -> floatIcon(req)
+        "control_begin" -> {
+            if (localTaskActive() || pcOwner != null && pcOwner != Thread.currentThread().id) fail("设备正在执行其他任务")
+            else {
+                pcOwner = Thread.currentThread().id
+                FloatService.setPcConnected(true)
+                ok()
+            }
+        }
+        "control_end" -> {
+            if (pcOwner == Thread.currentThread().id) {
+                pcOwner = null
+                FloatService.setPcConnected(false)
+            }
+            ok()
+        }
+        "offline_status" -> {
+            val result = PyBridge.status(requireNotNull(appContext))
+            if (!result.has("ok")) result.put("ok", true)
+            Pair(result, null)
+        }
+        "offline_tasks" -> Pair(PyBridge.listTasks(requireNotNull(appContext)), null)
+        "offline_pause" -> Pair(PyBridge.pauseTask(requireNotNull(appContext)), null)
+        "offline_resume" -> Pair(PyBridge.resumeTask(requireNotNull(appContext)), null)
+        "offline_stop" -> Pair(PyBridge.stopTask(requireNotNull(appContext)), null)
+        "offline_start" -> {
+            if (!FloatService.isRunning) fail("请先在手机开启悬浮控制")
+            else Pair(PyBridge.startTask(requireNotNull(appContext), req.getString("task_id")), null)
+        }
+        "offline_diagnostics" -> ok(JSONObject().put("report", PyBridge.checkRuntime(requireNotNull(appContext))))
+        "offline_sync_begin" -> beginSync(req)
+        "offline_sync_chunk" -> syncChunk(req)
+        "offline_sync_commit" -> commitSync()
         else -> fail("未知 op: $op")
     }
 
     private fun status(): JSONObject = JSONObject().apply {
         put("protocol", PROTOCOL_VERSION)
+        put("offline_protocol", 1)
+        put("pc_controlling", pcControlsDevice())
         put("app", BuildConfig.VERSION_NAME)
         put("sdk", Build.VERSION.SDK_INT)
         put("a11y", A11yBridge.isReady())
@@ -261,6 +323,60 @@ object AgentServer {
         put("last_op", lastOp)
         put("last_op_ok", lastOpOk)
         put("last_op_at_ms", lastOpAtMs)
+    }
+
+    private fun beginSync(req: JSONObject): Pair<JSONObject, ByteArray?> {
+        if (localTaskActive() || pcControlsDevice()) return fail("请先结束设备上的任务再同步")
+        val size = req.getLong("size")
+        if (size <= 0 || size > 256L * 1024 * 1024) return fail("同步包大小非法")
+        uploadFile?.delete()
+        uploadFile = File.createTempFile("offline-sync-", ".zip", requireNotNull(appContext).cacheDir)
+        uploadSize = size
+        uploadHash = req.getString("sha256")
+        return ok()
+    }
+
+    private fun syncChunk(req: JSONObject): Pair<JSONObject, ByteArray?> {
+        val file = uploadFile ?: return fail("请先开始同步")
+        val offset = req.getLong("offset")
+        val bytes = Base64.decode(req.getString("data"), Base64.DEFAULT)
+        if (offset < 0 || bytes.size > 256 * 1024 || offset + bytes.size > uploadSize) return fail("同步分块大小非法")
+        RandomAccessFile(file, "rw").use {
+            if (offset < it.length()) {
+                if (offset + bytes.size > it.length()) return fail("同步分块顺序不一致")
+                it.seek(offset)
+                val existing = ByteArray(bytes.size)
+                it.readFully(existing)
+                if (!existing.contentEquals(bytes)) return fail("重传分块内容不一致")
+            } else {
+                if (offset != it.length()) return fail("同步分块顺序不一致")
+                it.seek(offset)
+                it.write(bytes)
+            }
+        }
+        return ok()
+    }
+
+    private fun commitSync(): Pair<JSONObject, ByteArray?> {
+        val file = uploadFile ?: return fail("没有待应用的同步包")
+        if (localTaskActive() || pcControlsDevice()) return fail("请先结束任务再应用同步")
+        try {
+            if (file.length() != uploadSize) return fail("同步包未传输完整")
+            val digest = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(65536)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            if (digest.digest().joinToString("") { "%02x".format(it) } != uploadHash) return fail("同步包校验失败")
+            return Pair(PyBridge.applySync(requireNotNull(appContext), file.absolutePath), null)
+        } finally {
+            file.delete()
+            uploadFile = null
+        }
     }
 
     // ─── 屏幕映射标定（截图坐标 → 输入坐标，见 ScreenMap / CalibOverlay）──────
@@ -552,7 +668,7 @@ object AgentServer {
 
     // ─── 响应构造 ───────────────────────────────────────────
 
-    private fun ok(header: JSONObject): Pair<JSONObject, ByteArray?> = header.put("ok", true) to null
+    private fun ok(header: JSONObject = JSONObject()): Pair<JSONObject, ByteArray?> = header.put("ok", true) to null
 
     private fun okBin(header: JSONObject, payload: ByteArray): Pair<JSONObject, ByteArray?> =
         header.put("ok", true) to payload

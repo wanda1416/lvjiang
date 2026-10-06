@@ -25,6 +25,7 @@ object PyBridge {
     private const val MODULE = "lvjiang.core.ondevice.task_runner"
     private const val TUNING_MODULE = "lvjiang.apps.yysls.ondevice.tuning_config"
     private const val CALIB_MODULE = "lvjiang.core.ondevice.screen_calib_api"
+    private const val OFFLINE_MODULE = "lvjiang.core.ondevice.offline"
 
     @Volatile
     private var startFailure: String? = null
@@ -83,11 +84,22 @@ object PyBridge {
     fun listTasks(context: Context): JSONObject = callJson(context, "list_tasks")
 
     /** 启动任务：`{ok, message}`。ok=false 时任务未启动，message 可直接 toast。 */
-    fun startTask(context: Context, taskId: String): JSONObject =
-        callJson(context, "start_task", taskId, "")
+    fun startTask(context: Context, taskId: String): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) {
+            JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束 PC 任务")
+        } else {
+            callJson(context, "start_task", taskId, "")
+        }
+    }
 
     /** 请求停止：`{ok, message}` */
     fun stopTask(context: Context): JSONObject = callJson(context, "stop_task")
+    fun pauseTask(context: Context): JSONObject = callJson(context, "pause_task")
+    fun resumeTask(context: Context): JSONObject = callJson(context, "resume_task")
+    fun applySync(context: Context, path: String): JSONObject =
+        callJson(context, "apply_sync", path, moduleName = OFFLINE_MODULE)
+    fun checkRuntime(context: Context, ocr: Boolean = true): JSONObject =
+        callJson(context, "check_runtime", ocr, moduleName = OFFLINE_MODULE)
 
     /** 状态快照：`{state, task_name, message, elapsed, stopping, logs}` */
     fun status(context: Context): JSONObject = callJson(context, "get_status")

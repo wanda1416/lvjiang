@@ -346,11 +346,19 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
     def execute(self, source, *, initial_variables: dict | None = None,
                 _reset_context: bool = True) -> dict:
         """使用用户执行锁运行设备工作流。"""
-        return self._execute_unlocked(
-            source,
-            initial_variables=initial_variables,
-            _reset_context=_reset_context,
-        )
+        begin = getattr(self._input, "begin_execution", None) if _reset_context else None
+        end = getattr(self._input, "end_execution", None) if _reset_context else None
+        if begin is not None:
+            begin()
+        try:
+            return self._execute_unlocked(
+                source,
+                initial_variables=initial_variables,
+                _reset_context=_reset_context,
+            )
+        finally:
+            if end is not None:
+                end()
 
     def _execute_unlocked(self, source, *, initial_variables: dict | None = None,
                           _reset_context: bool = True) -> dict:

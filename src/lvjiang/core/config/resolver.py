@@ -426,6 +426,11 @@ class ConfigResolver:
 
     # ─── 失效通知 ────────────────────────────────────────
 
+    def clear_read_cache(self) -> None:
+        """外部完整配置快照应用后使读取缓存失效，不改变层优先级或监听器。"""
+        self._yaml_cache.clear()
+        self._logged_supersedes.clear()
+
     def add_change_listener(self, cb: Callable[[str], None]):
         if cb not in self._listeners:
             self._listeners.append(cb)

@@ -50,6 +50,7 @@ if $nav_result < 0
 end
 call $names = collect_game_plan_names()
 if not $names
+    screenshot from last
     log error "游戏方案列表未识别到任何方案"
     return -1
 end

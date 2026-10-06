@@ -48,6 +48,8 @@ def nav_main_to_bag($ask_confirm)
                     log info "从主页进入菜单页"
                     click [game_main_page].[menu] after wait @page_refresh
                 else
+                    log warn "进入背包前未确认主页或菜单页"
+                    screenshot from last
                     if $ask_confirm
                         eval $continue_nav = confirm("未进入菜单页面，请手动导航后选择是继续检查，选择否放弃本次导航")
                         if not $continue_nav
@@ -87,6 +89,7 @@ def nav_main_to_bag($ask_confirm)
         if $zhengli_text.zhengli contains "整理"
             log info "通过整理按钮确认在背包页"
         else
+            screenshot from last
             log error "未进入包裹页面"
             eval $tab = -1
         end
@@ -118,6 +121,8 @@ def nav_main_to_equip($ask_confirm)
     # 最终校验
     scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
     if not $recycle_check
+        log warn "未确认已进入装备列表"
+        screenshot from last
         if $ask_confirm
             eval $continue_nav = confirm("未进入装备列表，请手动导航后选择是继续检查，选择否放弃本次导航")
             if not $continue_nav
@@ -128,6 +133,7 @@ def nav_main_to_equip($ask_confirm)
         end
         scan [bag_equip_detail].[recycle] as $recycle_check by contains "回收"
         if not $recycle_check
+            screenshot from last
             return -1
         end
     end
@@ -155,9 +161,12 @@ def nav_main_to_wallet()
     # 校验是否到达钱袋页
     scan [bag_detail].[sub_baoguo] as $wallet_check by contains "钱袋"
     if not $wallet_check
+        log warn "未确认已进入钱袋页面"
+        screenshot from last
         eval pause("未进入钱袋页面，请手动导航后点击继续")
         scan [bag_detail].[sub_baoguo] as $wallet_check by contains "钱袋"
         if not $wallet_check
+            screenshot from last
             return -1
         end
     end
@@ -209,9 +218,12 @@ def nav_main_to_menu()
     click [game_main_page].[menu] after wait @page_refresh
     call $in_menu = is_in_menu_page()
     if not $in_menu
+        log error "打开菜单后未识别到包裹或培养"
+        screenshot from last
         eval pause("未进入菜单页面，请手动导航后点击继续")
         call $in_menu = is_in_menu_page()
         if not $in_menu
+            screenshot from last
             return -1
         end
     end
@@ -239,10 +251,12 @@ def nav_main_to_role()
     end
     if not $found
         log "找不到「角色」，请手动定位后继续"
+        screenshot from last
         eval pause("找不到「角色」，请手动定位到角色入口后点击确定")
         find [game_menu_page].[menu] as $found by contains "角色"
     end
     if not $found
+        screenshot from last
         log "仍未找到「角色」，无法进入角色详情页"
         return -1
     end
@@ -276,9 +290,12 @@ def nav_back_to_main()
 
     call $in_main = is_in_main_page()
     if not $in_main
+        log warn "返回后未确认游戏主页"
+        screenshot from last
         eval confirm("当前未回到主页，请手动回到主页后点击确定")
         call $in_main = is_in_main_page()
         if not $in_main
+            screenshot from last
             return -1
         end
     end
@@ -325,6 +342,8 @@ def nav_equip_to_tune($ask_confirm)
     # 使用固定页面标签校验；tune_btn 会随装备状态变化，不能作为页面判据。
     call $in_tune = is_in_equip_tune_page()
     if not $in_tune
+        log warn "未确认已进入调律页面"
+        screenshot from last
         if $ask_confirm
             eval $continue_nav = confirm("未进入调律页面，请手动导航后选择是继续检查，选择否放弃本次导航")
             if not $continue_nav
@@ -335,6 +354,7 @@ def nav_equip_to_tune($ask_confirm)
         end
         call $in_tune = is_in_equip_tune_page()
         if not $in_tune
+            screenshot from last
             return -1
         end
     end

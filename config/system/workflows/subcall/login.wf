@@ -76,6 +76,7 @@ def prepare_user($username, $batch_state, $skip_online_role, $online_role_max_wa
                 "yyslscn", $tail, $account, $batch_state, $max_roll_account,
                 $login_target)
         else
+            screenshot from last
             eval pause("当前不在登录页，请切换到登录页后点击继续。本次目标："
                 + $login_target)
             call $in_login_page = is_in_login_page()
@@ -211,6 +212,7 @@ def leave_startup_page()
         wait @page_refresh
     end
     if not $startup_ready
+        screenshot from last
         eval pause("未检测到游戏启动页标志，请手动回到登录主页后点击继续")
         call $in_login_page = is_in_login_page()
         if $in_login_page
@@ -218,14 +220,19 @@ def leave_startup_page()
         end
         call $startup_ready = is_in_startup_page()
         if not $startup_ready
+            screenshot from last
             return 0
         end
     end
     click [game_login_page].[back] after wait @page_refresh
     call $in_login_page = is_in_login_page()
     if not $in_login_page
+        screenshot from last
         eval pause("点击启动页返回后未进入登录主页，请手动处理后点击继续")
         call $in_login_page = is_in_login_page()
+        if not $in_login_page
+            screenshot from last
+        end
     end
     return $in_login_page
 end
@@ -247,11 +254,13 @@ def wait_for_switch_users_page()
         end
         wait @page_refresh
     end
+    screenshot from last
     eval pause("未检测到切换用户页的「进入游戏」，请手动定位后点击继续")
     scan [game_login_page].[login] as $ready by contains "进入游戏"
     if $ready
         return 1
     end
+    screenshot from last
     return 0
 end
 
@@ -281,6 +290,7 @@ def exit_to_login()
     if $result
         click [game_login_page].[back_to_login] after wait @secondary_confirm
     else
+        screenshot from last
         eval pause("未找到「返回登录界面」按钮，请手动退出到登录页后点击继续")
     end
 end
@@ -387,6 +397,9 @@ def select_account_and_login($tail, $max_roll_account, $login_target)
     # 找不到 → 暂停手动处理。这里不做二次校验：选没选对只有人能判断，
     # 所以提示必须写清该登录哪个账号，把正确性交给人工确认。
     if not $found_user
+        log warn "两轮账号搜索未命中，记录最后观察帧和当前列表"
+        screenshot from last
+        screenshot
         eval pause("未找到账号，请手动选定并登录：" + $login_target
             + "，选好后点击继续")
     end
@@ -538,6 +551,7 @@ def select_role($role_index, $role, $batch_state, $skip_online_role, $online_rol
         log "未进入选择角色页面，重试"
     end
     if not $role_page
+        screenshot from last
         eval pause("无法进入选择角色页面，请手动进入角色列表后点击继续。"
             + "本次目标角色：" + $role + "（第 " + $role_index + " 个）")
     end
@@ -619,19 +633,27 @@ def login_to_main_page()
         wait 3
     end
     if not $loading_done
+        screenshot from last
         eval pause("等待加载超时，请手动检查后点击确定")
     end
     wait 5
 
     # 等待主页加载完成：检测主界面入口按钮
     # 能读到 → 登录完成；否则先检查战令领奖，再尝试关闭活动弹窗
+    eval $main_attempt = 0
     loop 8
+        eval $main_attempt = $main_attempt + 1
         call $in_main = is_in_main_page()
         if $in_main
             log "主页加载完成"
             # 检查是否有战令领奖入口
             call claim_zhanling_reward()
             return
+        end
+
+        if $main_attempt == 8
+            log warn "最后一轮登录主页校验未命中，记录判断帧"
+            screenshot from last
         end
 
         # 未检测到主页，先检查战令领奖
@@ -645,6 +667,8 @@ def login_to_main_page()
         end
         wait @page_refresh
     end
+    log warn "登录自动处理后仍无法确认主页，记录当前现场"
+    screenshot
     eval pause("无法确认已登录至主页，请手动检查后点击确定")
 end
 

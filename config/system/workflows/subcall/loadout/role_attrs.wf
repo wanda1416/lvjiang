@@ -53,11 +53,13 @@ def scan_role_base_attr_for_plan($name, $main_art, $sub_art, $silent_write, $scr
     # 菜单第二页没有“包裹/培养”；背景的“限时”也不能单独证明已回主页。
     scan [general_control].[back] as $remaining_back by image
     if $remaining_back
+        screenshot from last
         log error "退出角色页后仍检测到返回按钮，未确认已回主页"
         return -1
     end
     call $in_main = is_in_main_page()
     if not $in_main
+        screenshot from last
         log error "退出角色页后未识别到主页"
         return -1
     end

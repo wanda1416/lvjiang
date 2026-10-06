@@ -197,6 +197,34 @@ def test_screenshot_failure_is_nonfatal_and_never_falls_back(tmp_path, monkeypat
     assert not list((tmp_path / "logs" / "image").glob("*.png"))
 
 
+def test_menu_navigation_records_failed_observation_before_pause(tmp_path, monkeypatch):
+    monkeypatch.setattr("lvjiang.workflows.engine.core.PROJECT_ROOT", tmp_path)
+    engine, frame = _engine()
+    engine._layout.get_scene_regions.return_value = [
+        Region(key="baoguo", x_ratio=0, y_ratio=0, w_ratio=0.5, h_ratio=1),
+        Region(key="peiyang", x_ratio=0.5, y_ratio=0, w_ratio=0.5, h_ratio=1),
+    ]
+    root = Path(__file__).parents[2] / "config" / "system" / "workflows" / "subcall"
+    for name in ("page_detection.wf", "navigation.wf"):
+        engine._procs.update(parse_text((root / name).read_text(encoding="utf-8")).procs)
+    monkeypatch.setattr(engine, "_exec_click", MagicMock())
+    monkeypatch.setattr(engine, "_exec_wait", MagicMock())
+    pauses = []
+
+    def pause(action, **kwargs):
+        assert action == "pause"
+        image, = (tmp_path / "logs" / "image").glob("*.png")
+        np.testing.assert_array_equal(cv2.imread(str(image)), frame)
+        pauses.append(kwargs["message"])
+
+    engine._ui_callback = pause
+    _run(engine, 'call $result = nav_main_to_menu()\n')
+    assert engine.variables["result"] == -1
+    assert len(pauses) == 1
+    assert engine._capture.capture.call_count == 3
+    engine._exec_click.assert_called_once()
+
+
 def test_template_scan_and_find_reuse_original_frame(tmp_path, monkeypatch):
     engine, frame = _engine()
     icon = np.random.default_rng(0).integers(0, 255, (8, 8, 3), dtype=np.uint8)

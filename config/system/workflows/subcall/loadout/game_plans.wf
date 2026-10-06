@@ -28,6 +28,8 @@ def nav_main_to_game_plans()
     end
     scan [game_menu_page].[peiyang] as $entry by contains "培养"
     if not $entry
+        log error "菜单页未识别到培养入口，无法进入游戏方案"
+        screenshot from last
         return -1
     end
     click [game_menu_page].[peiyang] after wait @page_refresh
@@ -51,6 +53,7 @@ def nav_game_plans_to_main()
     click [game_menu_page].[back] after wait @page_refresh
     call $in_main = is_in_main_page()
     loop while not $in_main
+        screenshot from last
         eval $retry = confirm("未确认已返回主页。请手动回到主页后点击是重试检查；点击否结束本次扫描")
         if not $retry
             log warn "用户选择停止：未能确认已返回主页"
@@ -94,6 +97,7 @@ end
 def select_game_plan($name)
     find [training_plan].[plan_list] as $found by equals $name
     if not $found
+        screenshot from last
         log error "游戏方案列表未找到: " + $name
         return -1
     end
@@ -103,6 +107,7 @@ def select_game_plan($name)
     eval $main_art = trim($detail.main_art)
     eval $sub_art = trim($detail.sub_art)
     if $title != $name or not $main_art or not $sub_art
+        screenshot from last
         log error "游戏方案名称或武学识别不完整: " + $name
         return -1
     end
@@ -117,6 +122,7 @@ def select_game_plan($name)
             if $message.modal_message contains "装备缺失"
                 scan [training_plan].[smart_fill] as $action by contains "智能填充"
                 if not $action
+                    screenshot from last
                     log error "缺装备弹窗未识别到智能填充按钮"
                     return -2
                 end
@@ -124,6 +130,8 @@ def select_game_plan($name)
             else if $message.modal_message contains "未保存"
                 scan [general_control].[confirm] as $action by contains "切换"
                 if not $action
+                    log error "未保存提示未识别到切换按钮"
+                    screenshot from last
                     return -2
                 end
                 click [general_control].[confirm] after wait @page_refresh
@@ -133,6 +141,8 @@ def select_game_plan($name)
         end
         scan [training_plan].[modal_message] as $message
         if $message.modal_message contains "装备缺失" or $message.modal_message contains "未保存"
+            log error "游戏方案切换补救后弹窗仍未关闭"
+            screenshot from last
             return -2
         end
     end

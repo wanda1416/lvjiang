@@ -156,6 +156,38 @@ def test_log_cursor_preserves_levels_and_resets_between_runs():
     assert len(second["log_records"]) == task_runner._LOG_CAPACITY
     assert second["log_records"][0]["seq"] > records[-1]["seq"]
 
+
+def test_user_selection_only_changes_phone_active_user(monkeypatch):
+    from lvjiang import constants
+    from lvjiang.core.config.session import get_session_store
+    from lvjiang.core.user_config import User, save_user_metadata
+
+    save_user_metadata(User("second", workflow_params={"task": {"count": 2}}), constants.USERS_DIR)
+    store = get_session_store()
+    store.set_node("users", ["tester", "second", "missing"])
+    before = (constants.SESSION_CONFIG_DIR / "offline.json").read_bytes()
+    listed = json.loads(task_runner.list_users())
+    assert listed["users"] == ["tester", "second"]
+    assert store.get_active("user") == "tester" # 展示候选不能改变执行用户。
+    assert json.loads(task_runner.select_user("second"))["ok"]
+    status = json.loads(task_runner.get_status())
+    assert status["sync"]["execution_username"] == "second"
+    assert status["sync"]["username"] == "tester"
+    assert (constants.SESSION_CONFIG_DIR / "offline.json").read_bytes() == before
+    assert not (constants.USERS_DIR / "missing.json").exists()
+    assert not json.loads(task_runner.select_user("../outside"))["ok"]
+    assert store.get_active("user") == "second"
+
+
+def test_user_selection_is_rejected_while_task_is_active():
+    from lvjiang.core.config.session import get_session_store
+
+    task_runner._STATE.begin("task", "task")
+    task_runner._STATE.request_pause()
+    task_runner._STATE.acknowledge_pause()
+    assert not json.loads(task_runner.select_user("tester"))["ok"]
+    assert get_session_store().get_active("user") == "tester"
+
 def test_list_tasks_shape(monkeypatch):
     """清单每项只暴露 id / name / source 三个字段"""
     _patch_discovery(monkeypatch, _fake_tasks(
@@ -226,6 +258,23 @@ def test_start_rejects_when_a11y_not_ready(monkeypatch):
     assert data["ok"] is False
     assert "无障碍" in data["message"]
     assert _status()["state"] == task_runner.STATE_IDLE
+
+
+def test_remote_start_binds_selected_synced_user_before_execution(monkeypatch):
+    from lvjiang import constants
+    from lvjiang.core.config.session import get_session_store
+    from lvjiang.core.user_config import User, save_user_metadata
+
+    save_user_metadata(User("second"), constants.USERS_DIR)
+    get_session_store().set_node("users", ["tester", "second"])
+    _patch_discovery(monkeypatch, _fake_tasks({"id": "t1"}))
+    engine = _FakeEngine("ok")
+    _patch_engine(monkeypatch, engine)
+    _patch_source(monkeypatch)
+    assert json.loads(task_runner.start_task("t1", username="second"))["ok"]
+    assert _wait_until(lambda: _status()["state"] == task_runner.STATE_DONE)
+    assert engine.run_username == "second"
+    assert engine.session["current_user"] == "second"
 
 
 def test_start_rejects_unknown_task(monkeypatch):
@@ -393,7 +442,9 @@ def test_stop_marks_stopped(monkeypatch):
 
     result = json.loads(task_runner.stop_task())
     assert result["ok"] is True
-    assert _status()["stopping"] is True
+    # 工作线程可能已在读取状态前完成停止，不能要求瞬态至少持续一次轮询。
+    snapshot = _status()
+    assert snapshot["stopping"] or snapshot["state"] == task_runner.STATE_STOPPED
 
     assert _wait_until(lambda: _status()["state"] == task_runner.STATE_STOPPED)
     assert "长任务" in _status()["message"]

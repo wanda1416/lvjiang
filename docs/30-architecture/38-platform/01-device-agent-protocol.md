@@ -153,7 +153,8 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 | `control_begin` / `control_end` | — | 取得/释放本连接的 PC 输入控制权；手机活跃任务拒绝取得 |
 | `offline_status` | — | 任务状态、原因、日志、输出及最近同步 |
 | `offline_tasks` | — | 仅暴露支持 android 的任务，包括类实现以 `DEVICE_VISIBLE` 明确开放的专用任务；未同步提示先同步 |
-| `offline_start` | `task_id` | 使用同步的用户和参数启动；必须先开启悬浮服务 |
+| `offline_users` | — | 已同步且资料有效的用户名册和手机活动用户 |
+| `offline_start` | `task_id`、可选 `username` | 在同一控制锁内绑定已同步用户并启动；省略用户时沿用手机活动用户；必须先开启悬浮服务 |
 | `offline_pause` / `offline_resume` / `offline_stop` | — | 请求暂停、继续或结束 |
 | `offline_diagnostics` | 可选 `screen_repetitions`（0～10，默认 0） | `report`：依赖/插件/引擎、OCR 和内存；同步后可仅采集真实屏幕连续推理，不注入游戏动作；手机执行中拒绝检查 |
 | `offline_sync_begin` | `size`,`sha256` | 建立暂存上传，最大 256 MiB |
@@ -172,7 +173,11 @@ APK 主页面使用应用栏菜单导航，首页突出悬浮服务启停；权�
 均先回首页；既有 ADB 自检与只读报告通道保持不变。
 状态额外携带有界 `log_records`（seq/text/level）和每次启动递增的
 `log_generation`，供手机增量显示和重置日志；原 `logs` 文本列表保持不变。
-设备状态保留最近 200 条日志记录供 PC 读取，悬浮窗仅保留最近 20 行展示。
+设备状态保留最近 200 条日志记录供 PC 读取，悬浮窗仅保留最近 100 行展示。
+手机用户选择读取同步用户名册并校验资料，空闲时仅更新手机 Session 的活动用户；
+运行、暂停和结束中在 UI 与 CONTROL_LOCK 下拒绝切换，不重载本轮参数/Session。
+状态增加 `sync.execution_username` 表示当前活动用户；`sync.username` 保留同步来源
+的初始用户，不重写同步清单，也不回写 PC。选择本身不创建用户或修改 Profile DB。
 pausing/paused/stopping 同样占用任务槽。暂停确认在引擎实际等待点发生，结束会唤醒暂停。
 PC 断线不停止手机任务；PC 租约在重连后重新申请，防止重连绕过执行互斥。
 

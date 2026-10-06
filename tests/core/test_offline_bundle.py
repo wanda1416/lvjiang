@@ -13,6 +13,9 @@ from lvjiang.core.offline_bundle import build_offline_bundle, install_offline_bu
 @pytest.fixture
 def bundle(tmp_path):
     source = tmp_path / "pc"
+    (source / "config/system").mkdir(parents=True)
+    (source / "config/system/layouts.yaml").write_text(
+        "schema_version: 2\nlayouts:\n  android:\n    name: Android\n")
     session = source / "config/session"
     (session / "users").mkdir(parents=True)
     (session / "users/tester.json").write_text('{}')
@@ -57,6 +60,37 @@ def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path
     with zipfile.ZipFile(archive) as package:
         assert all(".git" not in name and "diagnostics" not in name for name in package.namelist())
         assert "config/local/license.txt" not in package.namelist()
+
+
+def test_bundle_keeps_all_users_and_tasks_but_only_selected_layout_dependencies(bundle, tmp_path):
+    import yaml
+
+    source, _ = bundle
+    config = source / "config"
+    layouts = {"android": {"name": "Android"}, "cast": {"name": "Cast", "extends": "android"},
+               "desktop": {"name": "Desktop"}}
+    (config / "system/layouts.yaml").write_text(yaml.safe_dump({"schema_version": 2, "layouts": layouts}))
+    for name in layouts:
+        folder = config / "system/layouts" / name
+        folder.mkdir(parents=True)
+        (folder / "scene.json").write_text('{}')
+    (config / "session/users/second.json").write_text('{}')
+    workflows = config / "system/workflows"
+    workflows.mkdir()
+    (workflows / "first.wf").write_text("wait 1")
+    (workflows / "second.wf").write_text("wait 2")
+    archive = tmp_path / "selected.zip"
+    build_offline_bundle(source, archive, username="tester", layout="cast")
+    with zipfile.ZipFile(archive) as package:
+        names = package.namelist()
+        assert "config/session/users/second.json" in names
+        assert "config/system/workflows/first.wf" in names
+        assert "config/system/workflows/second.wf" in names
+        assert "config/system/layouts/desktop/scene.json" not in names
+        assert "config/system/layouts/android/scene.json" in names
+        assert "config/system/layouts/cast/scene.json" in names
+        assert set(yaml.safe_load(package.read("config/system/layouts.yaml"))["layouts"]) == {"cast", "android"}
+    assert set(yaml.safe_load((config / "system/layouts.yaml").read_text())["layouts"]) == set(layouts)
 
 
 def test_corrupted_package_preserves_phone_configuration(bundle, tmp_path):

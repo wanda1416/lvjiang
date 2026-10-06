@@ -287,12 +287,13 @@ object AgentServer {
             Pair(result, null)
         }
         "offline_tasks" -> Pair(PyBridge.listTasks(requireNotNull(appContext)), null)
+        "offline_users" -> Pair(PyBridge.listUsers(requireNotNull(appContext)), null)
         "offline_pause" -> Pair(PyBridge.pauseTask(requireNotNull(appContext)), null)
         "offline_resume" -> Pair(PyBridge.resumeTask(requireNotNull(appContext)), null)
         "offline_stop" -> Pair(PyBridge.stopTask(requireNotNull(appContext)), null)
         "offline_start" -> {
             if (!FloatService.isRunning) fail("请先在手机开启悬浮控制")
-            else Pair(PyBridge.startTask(requireNotNull(appContext), req.getString("task_id")), null)
+            else Pair(PyBridge.startTask(requireNotNull(appContext), req.getString("task_id"), req.optString("username", "")), null)
         }
         "offline_diagnostics" -> ok(JSONObject().put("report", PyBridge.checkRuntime(
             requireNotNull(appContext), true, req.optInt("screen_repetitions", 0))))

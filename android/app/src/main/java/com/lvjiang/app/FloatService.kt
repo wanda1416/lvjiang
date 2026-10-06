@@ -57,6 +57,8 @@ class FloatService : Service() {
     private var userLine: TextView? = null
     private var taskLine: TextView? = null
     private var selectButton: Button? = null
+    private var selectUserButton: Button? = null
+    private var showingUsers = false
     private var logLine: TextView? = null
     private var logScroll: ScrollView? = null
     private var latestButton: Button? = null
@@ -216,6 +218,8 @@ class FloatService : Service() {
         userLine = null
         taskLine = null
         selectButton = null
+        selectUserButton = null
+        showingUsers = false
         logLine = null
         logScroll = null
         latestButton = null
@@ -257,8 +261,13 @@ class FloatService : Service() {
         }
         main.addView(task)
         taskLine = task
+        val selectors = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val selectUser = smallButton("选择用户") { openUserSelection() }
+        selectors.addView(selectUser, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
+        selectUserButton = selectUser
         val select = smallButton("选择任务") { openTaskSelection() }
-        main.addView(select)
+        selectors.addView(select, LinearLayout.LayoutParams(0, -2, 1f))
+        main.addView(selectors)
         selectButton = select
         val status = TextView(this).apply {
             setTextColor(Color.WHITE)
@@ -396,21 +405,24 @@ class FloatService : Service() {
             val elapsed = status.optDouble("elapsed", 0.0)
             ui.post {
                 statusPending = false
+                val stateTitle = when (state) {
+                    STATE_PAUSED -> "已暂停"
+                    STATE_PAUSING -> "正在暂停"
+                    STATE_STOPPING -> "正在停止"
+                    else -> "运行中"
+                }
+                val detail = message.trim().takeUnless {
+                    it.isEmpty() || it == stateTitle || state == STATE_RUNNING && it in setOf("执行中", "运行中")
+                }
                 val header = when (state) {
                     STATE_RUNNING, STATE_PAUSING, STATE_PAUSED, STATE_STOPPING ->
-                        "运行中（${"%.0f".format(elapsed)}s）" +
-                            when (state) {
-                                STATE_PAUSED -> "\n已暂停 · $message"
-                                STATE_PAUSING -> "\n正在暂停 · $message"
-                                STATE_STOPPING -> "\n正在结束…"
-                                else -> "\n$message"
-                            }
+                        "$stateTitle（${"%.0f".format(elapsed)}s）" + (detail?.let { "\n$it" } ?: "")
                     STATE_IDLE -> "空闲"
                     else -> message.ifEmpty { "空闲：选择一个任务开始" }
                 }
                 val sync = status.optJSONObject("sync")
                 synced = sync?.optBoolean("synced") == true
-                userLine?.text = if (synced) "用户：${sync?.optString("username")}" else "尚未从 PC 同步配置"
+                userLine?.text = if (synced) "用户：${sync?.optString("execution_username", sync.optString("username"))}" else "尚未从 PC 同步配置"
                 statusLine?.text = header
                 if (state in activeStates) {
                     selectedTaskId = status.optString("task_id")
@@ -419,6 +431,7 @@ class FloatService : Service() {
                 }
                 taskLine?.text = "任务：${selectedTaskName.ifEmpty { "未选择" }}"
                 selectButton?.isEnabled = synced && state !in activeStates
+                selectUserButton?.isEnabled = synced && state !in activeStates
                 appendLogs(status)
                 tintIcon(state)
                 updateNotification(
@@ -470,7 +483,7 @@ class FloatService : Service() {
             }
             changed = true
         }
-        while (logLengths.size > LOG_VISIBLE_LINES || text.length > 32000) {
+        while (logLengths.size > LOG_VISIBLE_LINES) {
             val count = logLengths.removeFirst()
             val scroll = logScroll
             val oldHeight = logLine?.height ?: 0
@@ -489,22 +502,24 @@ class FloatService : Service() {
         area.removeAllViews()
 
         if (state in activeStates) {
-            if (state == STATE_RUNNING || state == STATE_PAUSED) {
-                area.addView(smallButton(if (state == STATE_PAUSED) "继续任务" else "暂停任务") {
-                    executor.execute {
-                        val r = if (state == STATE_PAUSED) PyBridge.resumeTask(this) else PyBridge.pauseTask(this)
-                        toast(r.optString("message"))
-                        ui.post { refreshStatus() }
-                    }
-                })
-            }
-            area.addView(smallButton("结束任务") {
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            row.addView(smallButton("停止任务") {
                 executor.execute {
                     val r = PyBridge.stopTask(this)
                     toast(r.optString("message", "已请求停止"))
                     ui.post { refreshStatus() }
                 }
-            }.apply { isEnabled = state != STATE_STOPPING })
+            }.apply { isEnabled = state != STATE_STOPPING },
+                LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
+            row.addView(smallButton(if (state == STATE_PAUSED) "继续任务" else "暂停任务") {
+                    executor.execute {
+                        val r = if (state == STATE_PAUSED) PyBridge.resumeTask(this) else PyBridge.pauseTask(this)
+                        toast(r.optString("message"))
+                        ui.post { refreshStatus() }
+                    }
+                }.apply { isEnabled = state == STATE_RUNNING || state == STATE_PAUSED },
+                LinearLayout.LayoutParams(0, -2, 1f))
+            area.addView(row)
             return
         }
 
@@ -540,17 +555,64 @@ class FloatService : Service() {
                 selectedTaskName = selected?.second ?: ""
                 taskLine?.text = "任务：${selectedTaskName.ifEmpty { "未选择" }}"
                 rebuildActions(lastState)
-                if (selectionArea?.visibility == View.VISIBLE) renderTaskSelection()
+                if (selectionArea?.visibility == View.VISIBLE && !showingUsers) renderTaskSelection()
             }
         }
     }
 
     private fun openTaskSelection() {
         if (!synced || lastState in activeStates) return
+        showingUsers = false
         mainArea?.visibility = View.GONE
         selectionArea?.visibility = View.VISIBLE
         renderTaskSelection()
         loadTasks()
+    }
+
+    private fun openUserSelection() {
+        if (!synced || lastState in activeStates) return
+        showingUsers = true
+        mainArea?.visibility = View.GONE
+        selectionArea?.visibility = View.VISIBLE
+        selectionArea?.removeAllViews()
+        selectionArea?.addView(TextView(this).apply { text = "读取用户…"; setTextColor(Color.WHITE) })
+        selectionArea?.addView(smallButton("返回") { closeTaskSelection() })
+        executor.execute {
+            val result = PyBridge.listUsers(this)
+            ui.post {
+                if (!isRunning || !showingUsers || selectionArea?.visibility != View.VISIBLE) return@post
+                if (lastState in activeStates) { closeTaskSelection(); return@post }
+                val area = selectionArea ?: return@post
+                area.removeAllViews()
+                val users = result.optJSONArray("users")
+                val selected = result.optString("selected")
+                area.addView(TextView(this).apply {
+                    text = if (result.optBoolean("ok") && users != null && users.length() > 0)
+                        "选择执行用户（不切换游戏角色）" else result.optString("message", "没有已同步用户")
+                    setTextColor(Color.WHITE)
+                })
+                val choices = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                if (users != null) for (index in 0 until users.length()) {
+                    val username = users.optString(index)
+                    choices.addView(smallButton(if (username == selected) "✓ $username" else username) {
+                        if (lastState in activeStates) return@smallButton
+                        choices.isEnabled = false
+                        for (child in 0 until choices.childCount) choices.getChildAt(child).isEnabled = false
+                        executor.execute {
+                            val response = PyBridge.selectUser(this, username)
+                            toast(response.optString("message"))
+                            ui.post {
+                                if (response.optBoolean("ok")) closeTaskSelection()
+                                else for (child in 0 until choices.childCount) choices.getChildAt(child).isEnabled = true
+                                refreshStatus()
+                            }
+                        }
+                    })
+                }
+                area.addView(ScrollView(this).apply { addView(choices) }, LinearLayout.LayoutParams(-1, 0, 1f))
+                area.addView(smallButton("返回") { closeTaskSelection() })
+            }
+        }
     }
 
     private fun renderTaskSelection() {
@@ -574,6 +636,7 @@ class FloatService : Service() {
     }
 
     private fun closeTaskSelection() {
+        showingUsers = false
         selectionArea?.visibility = View.GONE
         mainArea?.visibility = View.VISIBLE
     }
@@ -696,7 +759,7 @@ class FloatService : Service() {
         private const val NOTIFICATION_ID = 1
         /** 轮询间隔：任务是秒级节奏的，1s 足够跟上，也不至于把 Binder 打满 */
         private const val POLL_INTERVAL_MS = 1000L
-        private const val LOG_VISIBLE_LINES = 20
+        private const val LOG_VISIBLE_LINES = 100
 
         // 与 Python 侧 task_runner 的状态常量一一对应
         private const val STATE_IDLE = "idle"

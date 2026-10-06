@@ -208,4 +208,19 @@ config/session/output/<用户>/
 
 ---
 
+### 源码环境：采集卡顿现场
+
+在运行律匠的电脑上安装独立诊断依赖，并在复现前指定律匠进程 PID：
+
+```powershell
+python -m pip install psutil py-spy
+python scripts/diagnostics/python_process.py --pid 1234 --duration 180
+```
+
+默认报告存入 `config/local/diagnostics/` 的独立时间目录，不需要在主仓库提交。
+记录进程与线程 CPU、内存、子进程、系统负载和 Python 栈；Ctrl+C 可提前结束。
+Windows 抓栈通常需要管理员权限，失败原因会记录在报告中；`--no-stack` 仅采集资源。
+抓栈可能短暂暂停目标。报告移除了进程启动命令，但仍可能含本地路径，分享前检查隐私。
+同时说明卡顿发生的时间和操作，便于与采样对齐。
+
 上一步：[← 常见问题](07-faq.md) | [返回用户指南目录](README.md)

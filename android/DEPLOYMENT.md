@@ -13,6 +13,7 @@ App 能明确显示连接状态，设备端辅助已开启，并能真实执行�
 
 - JDK 17 或 21；
 - Android SDK Platform 35、Build Tools 34.0.0、Platform Tools；
+- Android NDK 26.1.10909125、CMake 3.22.1（原生 OCR）；
 - Python 3.10 作为 Chaquopy `buildPython`；
 - 真机已开启开发者选项和 USB 调试，`adb devices -l` 显示 `device`；
 - 正式分发需要本机 `android/keystore.properties`，格式见 `README-signing.md`。
@@ -24,6 +25,13 @@ UV_PYTHON_INSTALL_DIR="$PWD/.tooling/python" uv python install 3.10
 ```
 
 也可通过 `-PbuildPython=/绝对路径/python3.10` 或 `LVJIANG_BUILD_PYTHON` 指定。
+
+原生 OCR 使用同一份 ONNX Runtime 1.20.0 AAR，OpenCV 4.10.0 从 Maven 取得；
+不额外打包 OpenCV AAR 的 STL，由 NDK 提供唯一的 `libc++_shared.so`。ORT 头文件在
+CMake 构建目录下载并校验固定 SHA-256，首次构建需要访问 GitHub 和 Maven。
+SDK 工具可通过 `sdkmanager "ndk;26.1.10909125" "cmake;3.22.1"` 安装。
+OpenCV 与 ONNX Runtime 的许可证随上游依赖保留；算法参考 RapidOCR/PaddleOCR，
+手机原生后端不引入不同模型或另一套清洗规则。
 
 ## 3. 构建
 

@@ -420,6 +420,11 @@ class _ActionMixin:
                     img = img[y1:y2, x1:x2]
 
             # least 期间：只截图建立基准，不判断稳定
+            if prev is not None and prev.shape != img.shape:
+                # 横竖屏切换（例如游戏退出/重启）不是稳定画面，重新建立基准。
+                stable_since = None
+                prev = None
+                logger.debug("wait stable: 截图尺寸变化，重建稳定基准")
             if prev is not None and _clock() >= least_until:
                 diff = float(cv2.absdiff(prev, img).mean()) / 255.0
                 if diff < threshold:

@@ -23,6 +23,7 @@
 -keep class com.lvjiang.app.OnnxBridge {
     public *;
 }
+-keep class com.lvjiang.app.NativeOcrBridge { *; }
 # OnnxOutput：run() 的返回类，Python 侧读 .data / .shape 字段。
 # 只 keep 方法不 keep 字段时 R8 会把它砍成 'q' object has no attribute 'data'（e2e 实机踩到）
 -keep class com.lvjiang.app.OnnxOutput {

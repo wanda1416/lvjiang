@@ -2030,7 +2030,7 @@ class RunControlMixin:
             user_output_dir = dated_output_dir(OUTPUT_DIR / username, started_at)
             user_output_dir.mkdir(parents=True, exist_ok=True)
 
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            timestamp = started_at.strftime("%Y%m%d_%H%M%S_%f")
             suffix = "_interrupted" if interrupted else ""
             run_suffix = f"_{task_run_id}" if task_run_id else ""
             save_path = user_output_dir / (

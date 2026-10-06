@@ -12,6 +12,7 @@ already_full / 未达进入门槛 / no_tune_entry / tuned（含材料不足提�
 
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 import lvjiang.apps.yysls.workflows.builtins.equipment  # noqa: F401
@@ -96,6 +97,7 @@ def _make_subcall_engine(wf, run_env: str = "android") -> WorkflowEngine:
     """装配最小引擎：后端全 mock，DSL 动作委派到 wf 的覆写原语"""
     capture = MagicMock()
     capture.get_capture_size.return_value = (1920, 1080)
+    capture.capture.return_value = np.zeros((10, 10, 3), dtype=np.uint8)
     engine = WorkflowEngine(
         capture=capture, ocr=MagicMock(), input_ctrl=MagicMock(),
         layout=_system_layout(), input_sim=MagicMock(),
@@ -160,6 +162,7 @@ class FakeWF(AutoTuningWorkflow):
 
     def ocr_scene(self, scene_key, field_keys=None, min_confidence=None,
                   cleaning_group=None):
+        self.engine.capture_frame(source="ocr_scene")
         self.ocr_calls.append((scene_key, field_keys))
         data = dict(self._ocr_map.get(scene_key, {}))
         # 默认值：标准确认弹窗包含「确认」（除非测试显式覆盖）。
@@ -181,6 +184,7 @@ class FakeWF(AutoTuningWorkflow):
         return data
 
     def ocr_scene_by(self, scene_key, field_keys, target_value, mode, min_confidence=None):
+        self.engine.capture_frame(source="ocr_scene_by")
         # page_action.scan_and_confirm 通过 by contains_any 扫描通用确认区。
         if scene_key == CONTROL_SCENE and "confirm" in field_keys:
             targets = target_value if isinstance(target_value, list) else [target_value]

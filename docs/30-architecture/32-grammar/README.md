@@ -234,7 +234,8 @@ click [scene].[button] after wait stable 5 on [scene].[content]
 
 ```
 align [scene].[panel]                   # 手动触发面板自对齐
-screenshot                              # 截图保存到 logs/image/
+screenshot                              # 新截图保存到 logs/image/
+screenshot from last                    # 保存最近截图原图，info 输出路径和帧序号
 ```
 
 ### press — 键盘与鼠标按钮输入

@@ -1136,11 +1136,14 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             case Align():
                 self._exec_align(node)
             case Scan():
-                self._exec_scan(node)
+                with self.capture_source(from_last=node.from_last):
+                    self._exec_scan(node)
             case Recognize():
-                self._exec_recognize(node)
+                with self.capture_source(from_last=node.from_last):
+                    self._exec_recognize(node)
             case Find():
-                self._exec_find(node)
+                with self.capture_source(from_last=node.from_last):
+                    self._exec_find(node)
             case Collect():
                 self._exec_collect(node)
             case Log():
@@ -1157,7 +1160,7 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
                 }.get(node.level, logger.info)
                 _log_func(msg)
             case Screenshot():
-                self._exec_screenshot()
+                self._exec_screenshot(from_last=node.from_last)
             case If():
                 self._exec_if(node)
             case For():
@@ -1257,21 +1260,28 @@ class WorkflowEngine(CaptureSnapshotMixin, _ActionsMixin, _PanelMixin, _DataOpsM
             pause_event=self._pause_event,
         )
 
-    def _exec_screenshot(self):
-        """截取当前画面并保存到 logs/image/"""
-        img = self.capture_frame(source="screenshot")
-        if img is None:
-            logger.warning("screenshot: 截图失败")
-            return
+    def _exec_screenshot(self, *, from_last: bool = False):
+        """Save the explicitly selected frame; recording failure is non-fatal."""
+        try:
+            img = (self.get_last_capture_frame() if from_last
+                   else self.capture_frame(source="screenshot"))
+            if img is None:
+                reason = "没有可复用截图" if from_last else "截图失败"
+                logger.warning(f"screenshot: {reason}，未保存图片")
+                return
 
-        # 生成文件名：image + 日期时间精确到毫秒
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # 毫秒
-        filename = f"image_{timestamp}.png"
-
-        # 保存目录
-        out_dir = PROJECT_ROOT / "logs" / "image"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / filename
-
-        cv2.imwrite(str(out_path), img)
-        logger.info(f"screenshot: 已保存 {filename}")
+            seq = self.last_capture_seq
+            source = self.last_capture_source
+            age = self.last_capture_age_seconds
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            out_dir = PROJECT_ROOT / "logs" / "image"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_path = out_dir / f"image_{timestamp}_frame_{seq}.png"
+            if not cv2.imwrite(str(out_path), img):
+                logger.warning(f"screenshot: 图片保存失败 path={out_path} frame_seq={seq}")
+                return
+            logger.info(
+                f"screenshot: 已保存 {out_path.resolve()} frame_seq={seq} "
+                f"source={source} age={age:.3f}s")
+        except Exception as exc:  # 留图失败不能覆盖原业务问题
+            logger.warning(f"screenshot: 图片记录失败: {exc}")

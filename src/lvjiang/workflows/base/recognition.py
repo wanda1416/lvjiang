@@ -97,7 +97,7 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         result = self._ocr.ocr_scene_regions(
             img, canvas, regions, scene_key, **kwargs)
         fields_display = field_keys if field_keys else [r.key for r in regions]
-        logger.debug(f"OCR [{scene_key}]:{fields_display} => {result}")
+        logger.debug(f"frame_seq={self.last_capture_seq} OCR [{scene_key}]:{fields_display} => {result}")
         return result
 
     # ─── 参考图识别 ────────────────────────────────────────
@@ -170,12 +170,12 @@ class _RecognitionMixin(CaptureSnapshotMixin):
             else:
                 result[region.key] = info.label
             logger.debug(
-                f"参考图匹配 [{scene_key}].[{region.key}]: "
+                f"frame_seq={self.last_capture_seq} 参考图匹配 [{scene_key}].[{region.key}]: "
                 f"label={info.label!r} confidence={info.confidence:.3f}"
             )
 
         fields_display = slot_keys if slot_keys else [r.key for r in regions]
-        logger.info(f"参考图匹配 [{scene_key}]:{fields_display} => {result}")
+        logger.info(f"frame_seq={self.last_capture_seq} 参考图匹配 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
     def recognize_references_rich(
@@ -257,12 +257,12 @@ class _RecognitionMixin(CaptureSnapshotMixin):
                     base = transform(base)
                 result[region.key] = base
             logger.debug(
-                f"rich 匹配 [{scene_key}].[{region.key}]: "
+                f"frame_seq={self.last_capture_seq} rich 匹配 [{scene_key}].[{region.key}]: "
                 f"label={info.label!r}"
             )
 
         fields_display = slot_keys if slot_keys else [r.key for r in regions]
-        logger.info(f"rich 匹配 [{scene_key}]:{fields_display} => {result}")
+        logger.info(f"frame_seq={self.last_capture_seq} rich 匹配 [{scene_key}]:{fields_display} => {result}")
         return result, region_map
 
     def recognize_references_info_panel(
@@ -317,7 +317,7 @@ class _RecognitionMixin(CaptureSnapshotMixin):
 
         summary = {f"({r},{c})": i.label if i.label else tr("空")
                    for (r, c), i in infos.items()}
-        logger.info(f"参考图识别 panel [{scene_key}/{panel_key}]: => {summary}")
+        logger.info(f"frame_seq={self.last_capture_seq} 参考图识别 panel [{scene_key}/{panel_key}]: => {summary}")
         return infos
 
     # ─── by 子句：短路识别 ──────────────────────────────────
@@ -415,7 +415,7 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         for region in ordered_regions:
             crop = self._crop_region(img, region, canvas)
             if crop is None:
-                logger.debug(f"by OCR: region {region.key} 裁剪为空，跳过")
+                logger.debug(f"frame_seq={self.last_capture_seq} by OCR: region {region.key} 裁剪为空，跳过")
                 seen.append(f"{region.key}=<裁剪为空>")
                 continue
             ocr_results = (self._ocr.recognize(
@@ -425,12 +425,12 @@ class _RecognitionMixin(CaptureSnapshotMixin):
                 ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
             text = " | ".join(r.text for r in ocr_results) if ocr_results else ""
             if self._match_text(text, target_value, mode):
-                logger.debug(f"by OCR 命中: [{scene_key}].[{region.key}] text={text!r} mode={mode}")
+                logger.debug(f"frame_seq={self.last_capture_seq} by OCR 命中: [{scene_key}].[{region.key}] text={text!r} mode={mode}")
                 return region.key
             seen.append(f"{region.key}={text!r}")
 
         logger.debug(
-            f"by OCR 未命中: [{scene_key}] mode={mode} target={target_value!r} "
+            f"frame_seq={self.last_capture_seq} by OCR 未命中: [{scene_key}] mode={mode} target={target_value!r} "
             f"实际读到: {'; '.join(seen) if seen else '<无区域>'}")
         return ""
 
@@ -488,13 +488,13 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         for region in ordered_regions:
             crop = self._crop_region(img, region, canvas)
             if crop is None:
-                logger.debug(f"by 参考图识别: region {region.key} 裁剪为空，跳过")
+                logger.debug(f"frame_seq={self.last_capture_seq} by 参考图识别: region {region.key} 裁剪为空，跳过")
                 continue
             # by 只消费标签和置信度，输出 OCR 字段不会进入返回值。
             info = self.reference_recognizer.recognize(
                 crop, group=group, include_output_ocr=False)
             if min_confidence is not None and info.confidence < min_confidence:
-                logger.debug(f"by 参考图识别: region {region.key} 置信度 {info.confidence:.3f} < {min_confidence}，跳过")
+                logger.debug(f"frame_seq={self.last_capture_seq} by 参考图识别: region {region.key} 置信度 {info.confidence:.3f} < {min_confidence}，跳过")
                 continue
             if self._match_text(info.label, target_value, mode):
                 if full:
@@ -502,17 +502,17 @@ class _RecognitionMixin(CaptureSnapshotMixin):
                     if info.confidence > best_confidence:
                         best_key = region.key
                         best_confidence = info.confidence
-                    logger.debug(f"full by 参考图识别: region {region.key} label={info.label!r} confidence={info.confidence:.3f}")
+                    logger.debug(f"frame_seq={self.last_capture_seq} full by 参考图识别: region {region.key} label={info.label!r} confidence={info.confidence:.3f}")
                 else:
                     # 短路模式：首个命中即返回
-                    logger.info(f"by 参考图识别命中: [{scene_key}].[{region.key}] label={info.label!r} mode={mode} group={group}")
+                    logger.info(f"frame_seq={self.last_capture_seq} by 参考图识别命中: [{scene_key}].[{region.key}] label={info.label!r} mode={mode} group={group}")
                     return region.key
 
         if full and best_key:
-            logger.info(f"full by 参考图识别命中: [{scene_key}].[{best_key}] confidence={best_confidence:.3f} mode={mode} group={group}")
+            logger.info(f"frame_seq={self.last_capture_seq} full by 参考图识别命中: [{scene_key}].[{best_key}] confidence={best_confidence:.3f} mode={mode} group={group}")
             return best_key
 
-        logger.info(f"by 参考图识别未命中: [{scene_key}]:{field_keys} mode={mode} group={group}")
+        logger.info(f"frame_seq={self.last_capture_seq} by 参考图识别未命中: [{scene_key}]:{field_keys} mode={mode} group={group}")
         return ""
 
     # ─── find 指令：文字搜索 ─────────────────────────────────
@@ -573,14 +573,14 @@ class _RecognitionMixin(CaptureSnapshotMixin):
             crop, cleaning_group=cleaning_group)
             if cleaning_group else self._ocr.recognize(crop))
         if not ocr_results:
-            logger.debug("find: OCR 无结果")
+            logger.debug(f"frame_seq={self.last_capture_seq} find: OCR 无结果")
             return ""
 
         # 置信度过滤
         if min_confidence is not None:
             ocr_results = [r for r in ocr_results if r.confidence >= min_confidence]
             if not ocr_results:
-                logger.debug(f"find: 置信度过滤后无结果（阈值 {min_confidence}）")
+                logger.debug(f"frame_seq={self.last_capture_seq} find: 置信度过滤后无结果（阈值 {min_confidence}）")
                 return ""
 
         # 遍历 OCR 结果，找第一个匹配的文字
@@ -613,12 +613,12 @@ class _RecognitionMixin(CaptureSnapshotMixin):
                     text=text,
                 )
                 logger.info(
-                    f"find 命中: text={text!r} mode={mode} "
+                    f"frame_seq={self.last_capture_seq} find 命中: text={text!r} mode={mode} "
                     f"region=({ratio_x1:.3f},{ratio_y1:.3f},{ratio_x2 - ratio_x1:.3f},{ratio_y2 - ratio_y1:.3f})"
                 )
                 return found
 
-        logger.debug(f"find 未命中: target={target_value!r} mode={mode}")
+        logger.debug(f"frame_seq={self.last_capture_seq} find 未命中: target={target_value!r} mode={mode}")
         return ""
 
 
@@ -676,7 +676,7 @@ class _RecognitionMixin(CaptureSnapshotMixin):
             allow_inverted=allow_inverted,
         )
         if hit is None:
-            logger.debug(f"find: 模板 {template_name} 未命中")
+            logger.debug(f"frame_seq={self.last_capture_seq} find: 模板 {template_name} 未命中")
             return ""
         found = FoundRegion(
             x_ratio=(hit.cx - hit.w / 2 - canvas_px_x) / canvas_px_w,
@@ -686,7 +686,7 @@ class _RecognitionMixin(CaptureSnapshotMixin):
             text=template_name,
         )
         logger.info(
-            f"find 命中模板: {template_name} score={hit.score:.3f} scale={hit.scale:.2f} "
+            f"frame_seq={self.last_capture_seq} find 命中模板: {template_name} score={hit.score:.3f} scale={hit.scale:.2f} "
             f"center=({found.center_ratios()[0]:.3f},{found.center_ratios()[1]:.3f})"
         )
         return found
@@ -717,7 +717,7 @@ class _RecognitionMixin(CaptureSnapshotMixin):
         if not regions:
             return ""
 
-        img = self.capture_frame(source="recognize_rich")
+        img = self.capture_frame(source="scan_by_image")
         if img is None:
             self._log_capture_failed(
                 "scan by image", scene_key, [r.key for r in regions])
@@ -743,7 +743,7 @@ class _RecognitionMixin(CaptureSnapshotMixin):
                 allow_inverted=binding.allow_inverted)
             if hit is not None:
                 logger.info(
-                    f"scan by image 命中: scene={scene_key} region={region.key} "
+                    f"frame_seq={self.last_capture_seq} scan by image 命中: scene={scene_key} region={region.key} "
                     f"template={binding.name} score={hit.score:.3f} "
                     f"scale={hit.scale:.2f} inverted={hit.inverted}")
                 return region.key

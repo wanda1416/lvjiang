@@ -91,3 +91,28 @@ VS Code 扩展不负责运行或单步，需使用下述脚本工作台。编辑
 ---
 
 上一步：[← 5.6 计算最优毕业率组合](05.06-optimal-equipment-combination.md) | 下一步：[常见问题 →](07-faq.md) | [返回用户指南目录](README.md)
+
+### 同一画面识别与失败留图
+
+需要从同一张截图继续识别其他区域时，在 `scan`、`find`、`recognize` 的
+`as $var` 后写 `from last`。装备详情的基础字段、冷却字段、锁状态和详情已
+采用同帧读取。复用不会重新截图，也不增加帧序号。
+
+```text
+scan [game_menu_page].[baoguo, peiyang] as $menu
+if not ($menu.baoguo contains "包裹" or $menu.peiyang contains "培养")
+    log error "未识别到菜单入口"
+    screenshot from last
+    eval pause("请检查菜单页面后继续")
+end
+```
+
+`screenshot from last` 保存用于判断的原始帧；`screenshot` 重新截取当前画面。
+图片保存在 `logs/image/`，info 日志给出完整路径与 `frame_seq`，识别 debug
+日志使用同一序号。
+
+最近帧可能被后续识别、图色、`wait stable` 或普通 `screenshot` 替换，留图
+应紧接失败判断。点击或普通等待不会刷新最近帧，操作后要识别新画面时应
+省略 `from last`。无最近帧的识别复用会报错；诊断留图缺帧或保存失败只记录
+原因。引擎不会自动判断异常并保存图片，其他失败分支可按脚本需要显式添加
+留图，也可写在已有的 `try/catch` 中。

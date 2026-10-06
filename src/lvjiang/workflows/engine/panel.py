@@ -234,7 +234,7 @@ class _PanelMixin:
                 ocr_results = [r for r in ocr_results if r.confidence >= min_conf]
             text = " ".join(r.text for r in ocr_results).strip()
             self.variables[var_name] = text
-        logger.info(f"scan panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
+        logger.info(f"frame_seq={self.last_capture_seq} scan panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
 
     def _scan_panel_range(self, node: Scan):
         """scan [scene].[panel][r1...r2][c1...c2] as $var [by ...] [where ...] — 面板范围 OCR
@@ -292,7 +292,7 @@ class _PanelMixin:
                 result.setdefault(str(r_1based), {})[str(c_1based)] = text
 
         self.variables[var_name] = result
-        logger.info(f"scan panel range [{scene_key}.{panel_key}][{row_start}...{row_end}][{col_start}...{col_end}] => {result}")
+        logger.info(f"frame_seq={self.last_capture_seq} scan panel range [{scene_key}.{panel_key}][{row_start}...{row_end}][{col_start}...{col_end}] => {result}")
 
     def _recognize_panel_cell(self, node: Recognize):
         """recognize [scene].[panel][row][col] as [rich] $var [by ...] [on group ...] [where ...]
@@ -343,7 +343,7 @@ class _PanelMixin:
                 self.variables[var_name] = ""
             else:
                 self.variables[var_name] = info.label
-        logger.info(f"recognize panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
+        logger.info(f"frame_seq={self.last_capture_seq} recognize panel cell [{ref.scene}.{ref.panel}][{slot_key}] => {self.variables[var_name]}")
 
     def _aligned_panel_image(self, scene_key: str, panel_key: str):
         """自动 align 并截取 panel 全图，返回 (panel_img, cal)；失败 (None, None)"""
@@ -398,7 +398,7 @@ class _PanelMixin:
                 text = " ".join(t.text for t in ocr_results).strip()
             result.setdefault(str(r + 1), {})[str(c + 1)] = text
         self.variables[var_name] = result
-        logger.info(f"scan panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
+        logger.info(f"frame_seq={self.last_capture_seq} scan panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
 
     def _recognize_panel_whole(self, scene_key: str, panel_key: str, var_name: str, group=None, min_confidence: float | None = None, rich: bool = False, with_func=None):
         """recognize [scene].[panel] as [rich] $var [...] — 整面板逐格参考图识别
@@ -441,7 +441,7 @@ class _PanelMixin:
                     cell_value = info.label
             result.setdefault(str(r + 1), {})[str(c + 1)] = cell_value
         self.variables[var_name] = result
-        logger.info(f"recognize panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
+        logger.info(f"frame_seq={self.last_capture_seq} recognize panel [{scene_key}.{panel_key}] {cal.n_rows}×{cal.n_cols} => {result}")
 
     def _resolve_range_endpoint(self, val) -> int:
         """解析范围端点：int 直接返回，VarRef 查变量表"""
@@ -522,16 +522,16 @@ class _PanelMixin:
                                 best_confidence = confidence
                         else:
                             self.variables[var_name] = {"row": r_1based, "col": c_1based}
-                            logger.info(f"recognize panel range by [{scene_key}.{panel_key}] matched at row={r_1based}, col={c_1based}: {info.label!r}")
+                            logger.info(f"frame_seq={self.last_capture_seq} recognize panel range by [{scene_key}.{panel_key}] matched at row={r_1based}, col={c_1based}: {info.label!r}")
                             return
 
             if full and best_pos is not None:
                 self.variables[var_name] = best_pos
-                logger.info(f"recognize panel range full by [{scene_key}.{panel_key}] matched at row={best_pos['row']}, col={best_pos['col']} confidence={best_confidence:.3f}")
+                logger.info(f"frame_seq={self.last_capture_seq} recognize panel range full by [{scene_key}.{panel_key}] matched at row={best_pos['row']}, col={best_pos['col']} confidence={best_confidence:.3f}")
                 return
 
             self.variables[var_name] = {}
-            logger.info(f"recognize panel range by [{scene_key}.{panel_key}] no match")
+            logger.info(f"frame_seq={self.last_capture_seq} recognize panel range by [{scene_key}.{panel_key}] no match")
             return
 
         # 无 by 子句：返回完整 dict
@@ -582,7 +582,7 @@ class _PanelMixin:
 
         self.variables[var_name] = result
         logger.info(
-            f"recognize panel range [{scene_key}.{panel_key}]"
+            f"frame_seq={self.last_capture_seq} recognize panel range [{scene_key}.{panel_key}]"
             f"[{row_start}...{row_end}][{col_start}...{col_end}] => {result}"
         )
 
@@ -609,10 +609,10 @@ class _PanelMixin:
                 text = " ".join(t.text for t in ocr_results).strip()
             if self._match_text(text, target_value, match_mode):
                 self.variables[var_name] = {"row": r + 1, "col": c + 1}
-                logger.info(f"scan panel by [{scene_key}.{panel_key}] matched at row={r+1}, col={c+1}: {text!r}")
+                logger.info(f"frame_seq={self.last_capture_seq} scan panel by [{scene_key}.{panel_key}] matched at row={r+1}, col={c+1}: {text!r}")
                 return
         self.variables[var_name] = {}
-        logger.info(f"scan panel by [{scene_key}.{panel_key}] no match")
+        logger.info(f"frame_seq={self.last_capture_seq} scan panel by [{scene_key}.{panel_key}] no match")
 
     def _recognize_panel_by(self, scene_key: str, panel_key: str, var_name: str, by_clause, group=None, min_confidence: float | None = None):
         """recognize [scene].[panel] as $var [full] by ... — 参考图识别 + by 匹配
@@ -650,20 +650,20 @@ class _PanelMixin:
                     if confidence > best_confidence:
                         best_pos = {"row": r + 1, "col": c + 1}
                         best_confidence = confidence
-                    logger.debug(f"full by panel: [{scene_key}.{panel_key}] row={r+1}, col={c+1} type={mat_type!r} confidence={confidence:.3f}")
+                    logger.debug(f"frame_seq={self.last_capture_seq} full by panel: [{scene_key}.{panel_key}] row={r+1}, col={c+1} type={mat_type!r} confidence={confidence:.3f}")
                 else:
                     # 短路模式：首个命中即返回
                     self.variables[var_name] = {"row": r + 1, "col": c + 1}
-                    logger.info(f"recognize panel by [{scene_key}.{panel_key}] matched at row={r+1}, col={c+1}: {mat_type!r}")
+                    logger.info(f"frame_seq={self.last_capture_seq} recognize panel by [{scene_key}.{panel_key}] matched at row={r+1}, col={c+1}: {mat_type!r}")
                     return
 
         if full and best_pos is not None:
             self.variables[var_name] = best_pos
-            logger.info(f"recognize panel full by [{scene_key}.{panel_key}] matched at row={best_pos['row']}, col={best_pos['col']} confidence={best_confidence:.3f}")
+            logger.info(f"frame_seq={self.last_capture_seq} recognize panel full by [{scene_key}.{panel_key}] matched at row={best_pos['row']}, col={best_pos['col']} confidence={best_confidence:.3f}")
             return
 
         self.variables[var_name] = {}
-        logger.info(f"recognize panel by [{scene_key}.{panel_key}] no match")
+        logger.info(f"frame_seq={self.last_capture_seq} recognize panel by [{scene_key}.{panel_key}] no match")
 
     def _match_text(self, text: str, target: str, mode: str) -> bool:
         """文本匹配（用于 by 子句短路识别）"""

@@ -169,8 +169,8 @@ class _ExprMixin:
         return items[0]
 
     def screenshot_stmt(self, items):
-        """screenshot: 截取当前画面并保存"""
-        return Screenshot(line_no=self._line(items))
+        """screenshot [from last]: 保存指定来源的截图"""
+        return Screenshot(from_last=("__from_last__",) in items, line_no=self._line(items))
 
     def eval_discard_expr(self, items):
         """eval func(...) — 对统一表达式中的函数调用求值并丢弃结果。"""

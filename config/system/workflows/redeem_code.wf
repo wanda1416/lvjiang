@@ -57,6 +57,7 @@ click [game_menu_page].[settings] after wait @page_refresh
 
 scan [game_settings].[store] as $in_settings by contains "存储"
 if not $in_settings
+    screenshot from last
     eval pause("未进入设置页，请手动导航到设置页后点击继续")
 end
 
@@ -73,6 +74,7 @@ for code in $codes
     click [game_settings].[redeem_code] after wait @page_refresh
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     if not $in_redeem
+        screenshot from last
         log error "未打开兑换码输入框，未识别到兑换奖励，已中止"
         return -1
     end
@@ -106,6 +108,7 @@ end
 
 call $in_main = is_in_main_page()
 if not $in_main
+    screenshot from last
     log warn "兑换码流程已处理，但未回到主页，请手动确认当前页面。"
     return -1
 end
@@ -141,6 +144,7 @@ def finish_redeem()
 
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     loop while $in_redeem
+        screenshot from last
         eval pause("兑换窗口还在，请手动取消，并检查修复兑换码任务。关闭兑换窗口后点击继续。")
         scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     end

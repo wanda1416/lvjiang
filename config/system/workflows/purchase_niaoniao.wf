@@ -87,6 +87,7 @@ end
 # 菜单页 → 商店
 scan [game_menu_page].[shop] as $nav_check by contains "商店"
 if not $nav_check
+    screenshot from last
     eval pause("未找到「商店」入口，请确认在菜单页后点击继续")
 end
 click [game_menu_page].[shop] after wait @page_refresh
@@ -118,6 +119,7 @@ loop while $tries < $max_scroll
             break
         else
             # 命中的「绑」不是袅袅之音，或名称异常：绝不购买，回退中止
+            screenshot from last
             log error "购买面板道具名不合规（'" + $pn.item_name + "'），疑似误选，中止且不购买"
             click [general_purchase].[back] after wait @step_interval
             break

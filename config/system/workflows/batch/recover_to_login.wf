@@ -123,6 +123,8 @@ def recover_to_login_page($username, $max_roll_account)
         return 0
     end
     eval $login_target = "账号 " + $account + "（尾号 " + $tail + "）"
+    log info "异常恢复：记录重启前页面现场"
+    screenshot from last
     call $in_login = ensure_login_page_by_restart(
         "yyslscn", $tail, $account, $batch_state, $max_roll_account,
         $login_target)
@@ -150,6 +152,7 @@ end
 def relogin_current_role($username)
     scan [game_login_page].[current_role] as $role_ready
     if not $role_ready
+        screenshot from last
         log error "登录主页未读到「当前角色」，无法重新登录"
         return 0
     end

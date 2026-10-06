@@ -81,6 +81,7 @@ if $nav_result < 0
 end
 scan [game_menu_page].[peiyang] as $nav_check by contains "培养"
 if not $nav_check
+    screenshot from last
     eval pause("未找到「培养」入口，请确认当前在菜单页后点击继续")
 end
 click [game_menu_page].[peiyang] after wait @page_refresh
@@ -91,6 +92,7 @@ click [training_xinfa].[exchange] after wait @page_refresh
 
 scan [training_xinfa].[exchange] as $nav_check by contains "置换"
 if not $nav_check
+    screenshot from last
     eval pause("未进入心得置换页面，请手动导航后点击继续")
 end
 
@@ -152,6 +154,7 @@ def open_all_bag_xinfa()
             find [bag_item_detail].$area_name as $open_btn by contains "打开"
             if not $open_btn
                 log warn "找到心法心得，但主功能区未找到「打开」按钮"
+                screenshot from last
                 eval pause("心法心得详情中未找到「打开」按钮，请保持现场并检查布局")
                 return -1
             end

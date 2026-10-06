@@ -100,6 +100,7 @@ end
 
 scan [game_menu_page].[bugan] as $nav_check by contains "不肝"
 if not $nav_check
+    screenshot from last
     eval pause("未找到「不肝」入口，请确认当前在菜单页后点击继续")
 end
 click [game_menu_page].[bugan] after wait @page_refresh
@@ -124,6 +125,7 @@ click [bugan_detail].[shop] after wait @page_refresh
 
 scan [bugan_detail].[liebiao] as $nav_check by contains "战斗养成"
 if not $nav_check
+    screenshot from last
     eval pause("未进入商店购买区域，请确认当前在不肝商店后点击继续")
 end
 

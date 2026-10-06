@@ -517,6 +517,7 @@ def ensure_at_haoling($idx, $auto_nav)
       call back_to_haoling()
    else
       log "任务 " + $idx + " 开始前检测到不在江湖号令页，可能是上个任务未正常收尾"
+      screenshot from last
       eval pause("检测到当前不在江湖号令页，请手动返回号令页后点击继续")
    end
 
@@ -525,6 +526,7 @@ def ensure_at_haoling($idx, $auto_nav)
       return 0
    end
 
+   screenshot from last
    log "仍未进入江湖号令页，终止流程"
    return -1
 end
@@ -669,6 +671,7 @@ def action_qingjing($label)
       end
    end
    if not $save_found
+      screenshot from last
       eval pause("保存情境失败，请手动处理")
    end
 
@@ -900,6 +903,7 @@ def switch_game_mode($target)
    end
    if not $in_main
       log "等待 20s 仍未回到游戏主页"
+      screenshot from last
       eval pause("切换" + $target_name + "后未检测到游戏主页，请手动处理后点击确定")
    end
    return 1
@@ -930,6 +934,7 @@ def restore_single_mode()
    call $in_main = is_in_main_page()
    if not $in_main
       log "切回单人模式后未回到游戏主页"
+      screenshot from last
       eval pause("切回单人模式后未检测到游戏主页，请手动回到主页后点击确定")
       return -1
    end
@@ -954,6 +959,7 @@ def back_to_haoling()
       eval pause("打不开菜单页，请手动定位到菜单页后点击确定")
       call $in_menu = is_in_menu_page()
       if $in_menu < 1
+         screenshot from last
          return -1
       end
    end
@@ -982,10 +988,12 @@ def back_to_haoling()
    end
    if not $found
       log "找不到门派，请手动定位后继续"
+      screenshot from last
       eval pause("找不到「门派」，请手动定位到门派入口后点击确定")
       find [game_menu_page].[menu] as $found by contains "门派"
    end
    if not $found
+      screenshot from last
       log "仍未找到门派，无法前往江湖号令页"
       return -1
    end
@@ -1006,11 +1014,12 @@ def back_to_haoling()
    # 门派页三种形态均含「号令」文字，find 统一搜索
    find as $haoling_key by contains "号令"
    if $haoling_key
-      screenshot
+      screenshot from last
       log "全图扫识别到江湖号令，已截图，建议检查问题"
       click $haoling_key after wait @step_interval
    else
       log "找不到江湖号令，请手动定位后继续"
+      screenshot from last
       eval pause("找不到「江湖号令」，请手动定位到号令页后点击确定")
    end
    return 0

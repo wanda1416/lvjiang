@@ -7,7 +7,14 @@ import hashlib
 from pathlib import Path
 from typing import Callable
 
+from ..license import has_feature
 from .agent import AgentClient
+
+
+def require_offline_sync_access() -> None:
+    """PC 向手机下发配置属于 Lv1；不约束已有配置的手机离线执行。"""
+    if not has_feature("lv1"):
+        raise PermissionError("向手机下发配置需要激活 Lv1，请在设置的「功能激活」中激活")
 
 
 def sync_offline_bundle(
@@ -15,6 +22,7 @@ def sync_offline_bundle(
     cancelled: Callable[[], bool] = lambda: False,
     progress: Callable[[int, int], None] = lambda _done, _total: None,
 ) -> dict:
+    require_offline_sync_access()
     if agent.status.get("offline_protocol") != 1:
         raise RuntimeError("手机 APK 尚不支持离线同步，请先更新 APK")
     digest = hashlib.sha256()

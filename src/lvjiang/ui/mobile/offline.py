@@ -22,8 +22,9 @@ from PyQt6.QtWidgets import (
 from ...constants import PROJECT_ROOT
 from ...core.android.agent import connect_agent_diagnostic
 from ...core.android.device import AdbDevice
-from ...core.android.offline import sync_offline_bundle
+from ...core.android.offline import require_offline_sync_access, sync_offline_bundle
 from ...core.layout_config import load_layout_entries
+from ...core.license import has_feature
 from ...core.offline_bundle import build_offline_bundle
 from ...i18n import tr
 from ..button_styles import apply_button_style
@@ -45,6 +46,8 @@ class _OfflineWorker(QThread):
     def run(self) -> None:
         agent = None
         try:
+            if self.action == "sync":
+                require_offline_sync_access()
             agent = connect_agent_diagnostic(AdbDevice(self.serial))
             if agent is None or agent.status.get("offline_protocol") != 1:
                 raise RuntimeError(tr("无法连接离线执行接口，请先打开手机 App 并更新 APK"))
@@ -131,7 +134,10 @@ class OfflineControlPage(QWidget):
         active = self._state in {"running", "pausing", "paused", "stopping"}
         for button in self.buttons.values():
             button.setEnabled(not busy)
-        self.buttons["sync"].setEnabled(not busy and not active and bool(self.user.currentData()))
+        sync_allowed = has_feature("lv1")
+        self.buttons["sync"].setEnabled(sync_allowed and not busy and not active and bool(self.user.currentData()))
+        self.buttons["sync"].setToolTip(
+            "" if sync_allowed else tr("向手机下发配置需要激活 Lv1，请在设置的「功能激活」中激活"))
         self.buttons["start"].setEnabled(not busy and not active and bool(self.task.currentData()))
         self.buttons["pause"].setEnabled(not busy and self._state == "running")
         self.buttons["resume"].setEnabled(not busy and self._state in {"pausing", "paused"})
@@ -140,6 +146,13 @@ class OfflineControlPage(QWidget):
         self.layout_choice.setEnabled(not busy)
 
     def _run(self, action: str) -> None:
+        if action == "sync":
+            try:
+                require_offline_sync_access()
+            except PermissionError as exc:
+                self.report.setPlainText(tr(str(exc)))
+                self._update_buttons()
+                return
         serial = self._serial()
         if not serial:
             self.report.setPlainText(tr("请先选择在线设备"))

@@ -24,6 +24,7 @@ def bundle(tmp_path):
     (source / "config/local/diagnostics/private.log").write_text("excluded")
     (source / "config/local/.git").mkdir()
     (source / "config/local/.git/config").write_text("excluded")
+    (source / "config/local/license.txt").write_text("synthetic-license-not-for-phone")
     archive = tmp_path / "snapshot.zip"
     # 保持 WAL 连接打开，验收快照是否含未 checkpoint 的已提交数据。
     with closing(sqlite3.connect(session / "profile.db")) as db:
@@ -55,6 +56,7 @@ def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path
     assert (phone / "offline-backup/config/session/old.json").read_text() == "previous"
     with zipfile.ZipFile(archive) as package:
         assert all(".git" not in name and "diagnostics" not in name for name in package.namelist())
+        assert "config/local/license.txt" not in package.namelist()
 
 
 def test_corrupted_package_preserves_phone_configuration(bundle, tmp_path):

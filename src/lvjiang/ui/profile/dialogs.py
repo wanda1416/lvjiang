@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QDoubleValidator, QIntValidator
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -31,7 +32,16 @@ from PyQt6.QtWidgets import (
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...core.profile.models import format_sync_label
-from ...core.profile.repository import db_count_history, db_get_history
+from ...core.profile.repository import (
+    db_count_history,
+    db_get_history,
+    db_update_history_source,
+)
+from ...core.profile.service import (
+    ProfileWriteConflict,
+    profile_history_undo_unavailable_reason,
+    undo_profile_history,
+)
 from ...i18n import tr
 from ..button_styles import (
     apply_button_style,
@@ -100,7 +110,14 @@ class KeyRenameHistoryDialog(QDialog):
 class HistoryDialog(QDialog):
     """按 key 查看变更记录；可限定单个用户，也可跨用户分页。"""
 
-    _TYPE_LABEL = {"tick": tr("恢复"), "reset": tr("重置"), "action": tr("操作"), "override": tr("覆写")}  # runtime tr()
+    _TYPE_LABEL = {
+        "tick": tr("恢复"), "reset": tr("重置"), "action": tr("操作"),
+        "override": tr("覆写"), "undo": tr("撤销"),
+    }  # runtime tr()
+    _SOURCE_COLUMN = 5
+    _ACTION_COLUMN = 8
+    _HISTORY_ID_ROLE = int(Qt.ItemDataRole.UserRole)
+    _ORIGINAL_SOURCE_ROLE = _HISTORY_ID_ROLE + 1
 
     def __init__(
         self, user_name: str | None, model_type: str, key: str,
@@ -110,26 +127,30 @@ class HistoryDialog(QDialog):
         self._user_name = user_name
         self._model_type = model_type
         self._key = key
+        self._key_label = key_label
         self._page = 1
         self._page_size = 100
+        self._loading_history = False
+        self.values_changed = False
         title = f"{key_label} — {user_name}" if user_name is not None else key_label
         self.setWindowTitle(f"{title} " + tr("变更记录"))
-        self.resize(820 if user_name is not None else 960, 480)
+        self.resize(900 if user_name is not None else 1040, 480)
         self._setup_ui()
         self._load_page()
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         table = QTableWidget(self)
-        table.setColumnCount(8)
+        table.setColumnCount(9)
         table.setHorizontalHeaderLabels([
             tr("时间"), tr("用户名"), tr("类型"), tr("旧值"),
-            tr("新值"), tr("来源"), tr("变动量"), tr("同步来源"),
+            tr("新值"), tr("来源"), tr("变动量"), tr("同步来源"), "",
         ])
         table.setColumnHidden(1, self._user_name is not None)
-        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setEditTriggers(QTableWidget.EditTrigger.DoubleClicked)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         table.setAlternatingRowColors(True)
+        table.itemChanged.connect(self._on_item_changed)
         vh = table.verticalHeader()
         if vh is not None:
             vh.setVisible(False)
@@ -148,6 +169,8 @@ class HistoryDialog(QDialog):
                 table.setColumnWidth(col, w)
             header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
             header.setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(8, QHeaderView.ResizeMode.Fixed)
+            table.setColumnWidth(8, _cjk_column_width(table, 3))
 
         self._table = table
         layout.addWidget(table)
@@ -209,7 +232,16 @@ class HistoryDialog(QDialog):
         )
         table = self._table
 
+        self._loading_history = True
         table.setRowCount(len(history))
+        latest_ids: dict[str, int | None] = {}
+        for rec in history:
+            username = str(rec.get("username", ""))
+            if username not in latest_ids:
+                latest = db_get_history(
+                    username, self._model_type, self._key, limit=1,
+                )
+                latest_ids[username] = int(latest[0]["id"]) if latest else None
         for row, rec in enumerate(history):
             # 格式化时间
             raw_ts = rec.get("ts", "")
@@ -239,16 +271,48 @@ class HistoryDialog(QDialog):
                     else str(new_val) if new_val is not None else "—"
                 )
 
-            table.setItem(row, 0, QTableWidgetItem(formatted_ts))
-            table.setItem(row, 1, QTableWidgetItem(rec.get("username", "")))
-            table.setItem(row, 2, QTableWidgetItem(tr(self._TYPE_LABEL.get(ct, ct))))
-            table.setItem(row, 3, QTableWidgetItem(old_str))
-            table.setItem(row, 4, QTableWidgetItem(new_str))
-            table.setItem(row, 5, QTableWidgetItem(rec.get("source", "")))
+            for column, text in enumerate((
+                formatted_ts,
+                rec.get("username", ""),
+                tr(self._TYPE_LABEL.get(ct, ct)),
+                old_str,
+                new_str,
+            )):
+                item = QTableWidgetItem(str(text))
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                table.setItem(row, column, item)
+
+            source = rec.get("source", "") or ""
+            source_item = QTableWidgetItem(source)
+            source_item.setData(self._HISTORY_ID_ROLE, rec.get("id"))
+            source_item.setData(self._ORIGINAL_SOURCE_ROLE, source)
+            source_item.setToolTip(tr("双击修改来源"))
+            table.setItem(row, self._SOURCE_COLUMN, source_item)
             delta = rec.get("delta_value")
-            table.setItem(row, 6, QTableWidgetItem(f"{delta:+g}" if delta is not None else "—"))
+            delta_item = QTableWidgetItem(f"{delta:+g}" if delta is not None else "—")
+            delta_item.setFlags(delta_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            table.setItem(row, 6, delta_item)
             sync_from = rec.get("sync_from") or ""
-            table.setItem(row, 7, QTableWidgetItem(format_sync_label(sync_from) if sync_from else ""))
+            sync_item = QTableWidgetItem(format_sync_label(sync_from) if sync_from else "")
+            sync_item.setFlags(sync_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            table.setItem(row, 7, sync_item)
+
+            username = str(rec.get("username", ""))
+            reason = profile_history_undo_unavailable_reason(
+                rec, is_latest=latest_ids.get(username) == rec.get("id"),
+            )
+            undo_button = QPushButton(tr("撤销"), table)
+            apply_button_style(undo_button, variant="neutral")
+            fit_button_width(undo_button)
+            undo_button.setEnabled(reason is None)
+            if reason is not None:
+                undo_button.setToolTip(reason)
+            undo_button.clicked.connect(
+                lambda _checked=False, record=rec, old=old_str, new=new_str:
+                self._confirm_undo(record, old, new)
+            )
+            table.setCellWidget(row, self._ACTION_COLUMN, undo_button)
+        self._loading_history = False
 
         start = (self._page - 1) * self._page_size + 1 if total else 0
         end = start + len(history) - 1 if history else 0
@@ -262,6 +326,63 @@ class HistoryDialog(QDialog):
         self._previous_button.setEnabled(self._page > 1)
         self._next_button.setEnabled(self._page < self._page_count)
         self._last_button.setEnabled(self._page < self._page_count)
+
+    def _on_item_changed(self, item: QTableWidgetItem) -> None:
+        if self._loading_history or item.column() != self._SOURCE_COLUMN:
+            return
+        history_id = item.data(self._HISTORY_ID_ROLE)
+        old_source = item.data(self._ORIGINAL_SOURCE_ROLE) or ""
+        new_source = item.text().strip()
+        if new_source == old_source:
+            if item.text() != old_source:
+                self._loading_history = True
+                item.setText(old_source)
+                self._loading_history = False
+            return
+        if not db_update_history_source(
+            int(history_id), expected_source=old_source, new_source=new_source,
+        ):
+            QMessageBox.warning(
+                self, tr("修改失败"), tr("该条历史记录已发生变化，请刷新后重试"),
+            )
+            self._load_page()
+            return
+        self._loading_history = True
+        item.setText(new_source)
+        item.setData(self._ORIGINAL_SOURCE_ROLE, new_source)
+        self._loading_history = False
+
+    def _confirm_undo(self, record: dict, old_value: str, new_value: str) -> None:
+        message = tr(
+            "确定撤销这条变更吗？\n\n"
+            "用户：{username}\n"
+            "数据项：{label}\n"
+            "当前值：{new_value}\n"
+            "撤销后：{old_value}\n\n"
+            "撤销会新增一条变更记录。"
+        ).format(
+            username=record.get("username", ""),
+            label=self._key_label,
+            new_value=new_value,
+            old_value=old_value,
+        )
+        answer = QMessageBox.question(
+            self,
+            tr("确认撤销"),
+            message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            undo_profile_history(int(record["id"]))
+        except (ProfileWriteConflict, ValueError) as exc:
+            QMessageBox.warning(self, tr("撤销失败"), str(exc))
+            self._load_page()
+            return
+        self.values_changed = True
+        self._load_page()
 
 
 # ─── 通用数值输入对话框 ────────────────────────────────────────────

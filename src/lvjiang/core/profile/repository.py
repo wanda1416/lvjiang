@@ -591,6 +591,129 @@ class ProfileDB:
             for r in rows
         ]
 
+    def get_history_record(self, history_id: int) -> dict:
+        """按稳定 id 读取单条变更历史；不存在返回空 dict。"""
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT id, ts, username, type, key, old_value, new_value, "
+                "old_value_text, new_value_text, change_type, delta_value, source, sync_from "
+                "FROM profile_history WHERE id=?",
+                (history_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        if row is None:
+            return {}
+        return {
+            "id": row[0], "ts": row[1], "username": row[2],
+            "type": row[3], "key": row[4],
+            "old_value": row[5], "new_value": row[6],
+            "old_value_text": row[7] or "", "new_value_text": row[8] or "",
+            "change_type": row[9], "delta_value": row[10],
+            "source": row[11] or "", "sync_from": row[12],
+        }
+
+    def update_history_source(
+        self, history_id: int, *, expected_source: str, new_source: str,
+    ) -> bool:
+        """只修改指定历史记录的来源；原值已变化时拒绝覆盖。"""
+        conn = self._connect()
+        try:
+            cursor = conn.execute(
+                "UPDATE profile_history SET source=? "
+                "WHERE id=? AND COALESCE(source, '')=?",
+                (new_source, history_id, expected_source),
+            )
+            conn.commit()
+            return cursor.rowcount == 1
+        finally:
+            conn.close()
+
+    def undo_history(self, history_id: int) -> bool:
+        """原子撤销一条历史记录并追加 ``undo`` 审计记录。
+
+        只接受 action/override 的当前最新记录，且当前 entry 仍须等于该记录
+        的新值。更高层负责排除带同步、变更脚本或连续再生语义的 key。
+        """
+        write_ts = datetime.now().isoformat(timespec="seconds")
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT username, type, key, old_value, new_value, "
+                "old_value_text, new_value_text, change_type, source, sync_from "
+                "FROM profile_history WHERE id=?",
+                (history_id,),
+            ).fetchone()
+            if row is None:
+                conn.rollback()
+                return False
+            (
+                username, type_, key, old_value, new_value,
+                old_value_text, new_value_text, change_type, source, sync_from,
+            ) = row
+            if change_type not in ("action", "override") or sync_from:
+                conn.rollback()
+                return False
+
+            latest = conn.execute(
+                "SELECT id FROM profile_history "
+                "WHERE username=? AND type=? AND key=? ORDER BY id DESC LIMIT 1",
+                (username, type_, key),
+            ).fetchone()
+            if latest is None or latest[0] != history_id:
+                conn.rollback()
+                return False
+
+            current = conn.execute(
+                "SELECT value, value_text FROM profile_entries "
+                "WHERE username=? AND type=? AND key=?",
+                (username, type_, key),
+            ).fetchone()
+            current_text = current[1] or "" if current is not None else ""
+            if (
+                current is None
+                or float(current[0]) != float(new_value)
+                or (type_ == "note" and current_text != (new_value_text or ""))
+            ):
+                conn.rollback()
+                return False
+
+            restored_value = float(old_value) if old_value is not None else 0.0
+            restored_text = old_value_text or ""
+            undo_delta = (
+                None if type_ == "note" else restored_value - float(new_value)
+            )
+            conn.execute(
+                "UPDATE profile_entries SET value=?, value_text=?, "
+                "updated_at=?, updated_time=? "
+                "WHERE username=? AND type=? AND key=?",
+                (
+                    restored_value, restored_text, write_ts, write_ts,
+                    username, type_, key,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO profile_history "
+                "(ts, username, type, key, old_value, new_value, "
+                "old_value_text, new_value_text, change_type, delta_value, source, sync_from) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'undo', ?, ?, NULL)",
+                (
+                    write_ts, username, type_, key, float(new_value), restored_value,
+                    new_value_text or "", restored_text,
+                    undo_delta,
+                    f"撤销：{source}" if source else "撤销",
+                ),
+            )
+            conn.commit()
+            return True
+        except BaseException:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def count_history(
         self,
         username: str | None,
@@ -729,6 +852,22 @@ def db_get_history(
     offset: int = 0,
 ) -> list[dict]:
     return get_profile_db().get_history(username, type_, key, limit, offset)
+
+
+def db_get_history_record(history_id: int) -> dict:
+    return get_profile_db().get_history_record(history_id)
+
+
+def db_update_history_source(
+    history_id: int, *, expected_source: str, new_source: str,
+) -> bool:
+    return get_profile_db().update_history_source(
+        history_id, expected_source=expected_source, new_source=new_source,
+    )
+
+
+def db_undo_history(history_id: int) -> bool:
+    return get_profile_db().undo_history(history_id)
 
 
 def db_count_history(

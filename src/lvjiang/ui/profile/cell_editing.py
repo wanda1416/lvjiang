@@ -637,6 +637,8 @@ class ProfileCellEditingMixin:
         """打开共用历史查看器；无用户名时展示该 key 的所有用户记录。"""
         dialog = HistoryDialog(user_name, model_type, key, key_label, self)
         dialog.exec()
+        if dialog.values_changed:
+            self.refresh()
 
 
 # ─── 值解析（模块级） ────────────────────────────────────────────

@@ -944,6 +944,36 @@ class RunControlMixin:
                 return plan
         return None
 
+    def _ensure_target_plan(self) -> None:
+        """为闲置目标选择兼容方案，不改全局默认或其他目标的草稿。"""
+        target = self._current_execution_target()
+        plan = self._selected_plan()
+        if (target is None or self._running or plan is None
+                or plan.allows(target.kind)):
+            return
+        from ...core.config.plans import load_plans
+
+        for candidate in load_plans():
+            if not candidate.allows(target.kind):
+                continue
+            if ((candidate.space and self.reference_space_combo.findText(candidate.space) < 0)
+                    or (candidate.env and self._env_combo.findData(candidate.env) < 0)
+                    or (candidate.layout and self.layout_combo.findData(candidate.layout) < 0)):
+                continue
+            index = self.plan_combo.findData(candidate.id)
+            if index < 0:
+                continue
+            blocked = self.plan_combo.blockSignals(True)
+            self.plan_combo.setCurrentIndex(index)
+            self.plan_combo.blockSignals(blocked)
+            self._apply_selected_plan(persist=False)
+            self._capture_launch_draft(target.id)
+            self.log_text.append(
+                tr("[执行目标] 当前方案不适用，已自动切换到「{name}」").format(
+                    name=candidate.name))
+            return
+        self.log_text.append(tr("[提示] 没有适用于当前执行目标的方案，请配置连接方案"))
+
     def _on_plan_changed(self, index: int):
         """方案下拉切换：选方案则填充并锁定三个选择器，选自定义则放开。"""
         if index < 0:

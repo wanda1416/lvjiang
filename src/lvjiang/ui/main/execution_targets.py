@@ -229,6 +229,8 @@ class ExecutionTargetRegistry:
         if target.kind == "windows" and target.id != WINDOW_TARGET_ID:
             raise ValueError("窗口目标必须使用固定 ID")
         old = self._targets.get(target.id)
+        if old is not None and target.launch_draft is None:
+            target.launch_draft = old.launch_draft
         if old is not None and old.handle is not None:
             target.handle = old.handle
             target.handle.rebind(target)

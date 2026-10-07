@@ -552,6 +552,18 @@ class WindowOpsMixin:
         self.log_text.append(
             tr("[执行目标] 已切换到 {name}").format(name=target.display_name))
 
+    def _activate_connected_target(self, target, old) -> None:
+        """新连接进入自己的编辑视图；后台重连保持当前观察目标。"""
+        if old is None:
+            if target.id != self._execution_targets.active_target_id:
+                self._capture_launch_draft(self._execution_targets.active_target_id)
+                self._execution_targets.select(target.id)
+            self._restore_active_target_view()
+        else:
+            self._sync_active_target_compat()
+            if target.id == self._execution_targets.active_target_id:
+                self._ensure_target_plan()
+
     def _restore_active_target_view(self) -> None:
         """手动选中和删除后的自动选中共用完整投影，不依赖列表选择信号。"""
         target_id = self._execution_targets.active_target_id
@@ -569,6 +581,7 @@ class WindowOpsMixin:
                 if run_context is not None and run_context.metadata.get("batch")
                 else "")
         self._sync_active_target_compat()
+        self._ensure_target_plan()
         self._refresh_active_target_ui()
         self._refresh_run_button()
         redraw_logs = getattr(self, "_redraw_log_events", None)
@@ -1124,7 +1137,7 @@ class WindowOpsMixin:
             banner = getattr(self, "_adb_banner", None)
             if banner is not None and target_id == self._execution_targets.active_target_id:
                 banner.setVisible(False)
-        self._sync_active_target_compat()
+        self._activate_connected_target(target, old)
 
         method_label = tr("流式截图") if capture_method == "scrcpy" \
             else tr("单帧截图")
@@ -1503,7 +1516,7 @@ class WindowOpsMixin:
         old = self._execution_targets.put(target)
         if old is not None:
             self._dispose_execution_target(old)
-        self._sync_active_target_compat()
+        self._activate_connected_target(target, old)
         self._refresh_execution_targets_ui()
         self._refresh_active_target_ui()
         self._refresh_run_button()
@@ -1568,11 +1581,8 @@ class WindowOpsMixin:
         这个定时器只由 _on_locate_window 启动，要收的就是它自己一秒前亮的那个
         框，所以除了「用户有没有要求持续标定」之外不该再有别的条件。
 
-        原来还判 `_backend == "windows"`——那是单目标时代的判据。连接与执行拆成
-        正交之后它变成了误判来源，而且有两条触发路径：手机已经是执行目标时去
-        定位窗口（put 刻意不夺取选中，_backend 全程是 adb），或者定位后一秒内
-        把执行目标切到手机（切换不碰定时器，一秒后读到的已经变了）。两种情况
-        都让红框永久留在桌面上。
+        不能依据 `_backend` 判断：定位后一秒内可能已切换到手机，
+        切换不碰定时器，而红框仍属于刚定位的窗口。
         """
         if not self.chk_red_box.isChecked():
             self._overlay.hide_border()

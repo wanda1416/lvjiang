@@ -71,7 +71,7 @@ log info "毒塔挂机：第 " + $loop_count + " 轮"
 env:"desktop" -> press $skill_key hold 0.05 after wait 1.8
 env:"android" -> click [general_combat].[qishu] hold 0.05 after wait 1.8
 
-# 多人挂机：进重击前多等一拍
+# 多人挂机：进卸势前多等一拍
 if $multiplayer
    wait 0.3
 end
@@ -80,7 +80,7 @@ end
 # 卸势
 click [general_combat].[xieshi] hold 0.1 after wait 0.2
 
-# 多人挂机：进重击前多等一拍
+# 多人挂机：进重击 1 前多等一拍
 if $multiplayer
    wait 0.3
 end
@@ -88,7 +88,7 @@ end
 # 重击1
 click [general_combat].[xuli] hold 0.2 after wait 0.2
 
-# 多人挂机：进重击前多等一拍
+# 多人挂机：进重击 2 前多等一拍
 if $multiplayer
    wait 0.2
 end

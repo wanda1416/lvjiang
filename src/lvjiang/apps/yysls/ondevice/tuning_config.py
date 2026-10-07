@@ -1,8 +1,8 @@
-"""设备端调律参数配置 — 原生配置页（TuningConfigActivity）的 Python 侧入口
+"""设备端调律参数配置 — 任务设置的专用适配器。
 
 Kotlin 侧不写死任何规则/玩法/部位清单：get_tuning_config() 把可配置项
 （规则注册表 + 开关注册表 + 部位常量）与当前保存值合并后一次性返回，
-Activity 只负责按 JSON 渲染表单；save_tuning_config() 校验后写入当前用户的
+Activity 只负责按 JSON 渲染表单；save_tuning_config() 校验后写入指定配置用户的
 ``workflow_params.auto_tuning`` —— 与桌面调律 Tab 同一落点，
 auto_tuning._ensure_judge_config() 的回退路径直接消费，工作流零改动。
 
@@ -15,7 +15,7 @@ import json
 from ....i18n import tr
 
 
-def get_tuning_config() -> str:
+def get_tuning_config(username: str) -> str:
     """可配置项 + 当前保存值合并视图
 
     Returns:
@@ -36,7 +36,6 @@ def get_tuning_config() -> str:
         ensure_loaded(("yysls",))
 
         from ..config.auto_tuning_config import (
-            active_username,
             load_user_auto_tuning_config,
         )
         from ..config.tune_slots import (
@@ -50,7 +49,6 @@ def get_tuning_config() -> str:
             get_tuning_group_manager,
         )
 
-        username = active_username()
         tc = load_user_auto_tuning_config(username)
 
         # 基础规则组：单选，无持久值时取第一个可用
@@ -120,7 +118,7 @@ def get_tuning_config() -> str:
         )
 
 
-def save_tuning_config(payload: str) -> str:
+def save_tuning_config(payload: str, username: str) -> str:
     """校验并保存调律配置
 
     Args:
@@ -141,13 +139,13 @@ def save_tuning_config(payload: str) -> str:
         ensure_loaded(("yysls",))
 
         from ..config.auto_tuning_config import (
-            active_username,
             load_user_auto_tuning_config,
             save_user_auto_tuning_config,
         )
         from ..config.tune_slots import LOCKED_SLOTS, SLOT_LABELS
         from ..core.evaluator import get_tuning_rules
         from ..core.tuning_rules import (
+            get_tune_config,
             get_tuning_group_manager,
         )
 
@@ -200,10 +198,10 @@ def save_tuning_config(payload: str) -> str:
 
         raw_switches = data.get("switches")
         raw_switches = raw_switches if isinstance(raw_switches, dict) else {}
-        switches = {str(k): bool(v) for k, v in raw_switches.items()}
+        switch_keys = get_tune_config().switches
+        switches = {key: bool(raw_switches.get(key, False)) for key in switch_keys}
 
         # 桌面端调试/后台参数不进设备端 UI，保存时保留该用户的原值。
-        username = active_username()
         old = load_user_auto_tuning_config(username)
 
         # 基础规则组：按注册表校验，非法/缺省回退原值
@@ -217,7 +215,7 @@ def save_tuning_config(payload: str) -> str:
             **old,
             "selected_slots": selected_slots,
             "rules": rules_cfg,
-            "switches": switches,
+            "switches": {**old.get("switches", {}), **switches},
             "base_group": base_group,
         })
         return json.dumps({"ok": True, "message": tr("已保存")}, ensure_ascii=False)
@@ -226,3 +224,24 @@ def save_tuning_config(payload: str) -> str:
             {"ok": False, "message": f"{type(e).__name__}: {e}"},
             ensure_ascii=False,
         )
+
+
+def get_settings(username: str) -> dict:
+    """专用手机编辑器协议，所有候选仍来自调律权威注册表。"""
+    view = json.loads(get_tuning_config(username))
+    if not view["ok"]:
+        raise ValueError(view["error"])
+    values = {
+        "base_group": next((group["key"] for group in view["base_groups"] if group["checked"]), ""),
+        "selected_slots": [slot["key"] for group in view["slot_groups"] for slot in group["slots"] if slot["checked"]],
+        "rules": {rule["key"]: {"enabled": rule["enabled"], "playstyles": [
+            item["name"] for item in rule["playstyles"] if item["checked"]]} for rule in view["rules"]},
+        "switches": {item["key"]: item["checked"] for item in view["switches"]},
+    }
+    return {"kind": "tuning", "values": values, "schema": view}
+
+
+def save_settings(username: str, values: dict) -> None:
+    result = json.loads(save_tuning_config(json.dumps(values, ensure_ascii=False), username))
+    if not result["ok"]:
+        raise ValueError(result["message"])

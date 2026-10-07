@@ -124,8 +124,9 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
     DISPLAY_NAME = "自动调律"
     # 专用脚本：日常 Tab 不画其参数面板，由专属配置页自行管理
     SCOPE = "dedicated"
-    # 手机没有专用配置页；使用 PC 同步的配置，从悬浮任务入口启动。
+    # 手机配置入口使用专用适配器，运行仍复用公共配置快照。
     DEVICE_VISIBLE = True
+    DEVICE_SETTINGS_MODULE = "lvjiang.apps.yysls.ondevice.tuning_config"
     # 通用运行入口通过此加载器冻结用户配置，不读取废弃的共享调律配置。
     CONFIG_SNAPSHOT_LOADER = staticmethod(load_user_auto_tuning_config)
 

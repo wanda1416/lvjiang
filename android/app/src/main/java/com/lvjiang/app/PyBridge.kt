@@ -23,7 +23,7 @@ object PyBridge {
     private const val TAG = "PyBridge"
     private const val CONFIGURED_APPS = "yysls"
     private const val MODULE = "lvjiang.core.ondevice.task_runner"
-    private const val TUNING_MODULE = "lvjiang.apps.yysls.ondevice.tuning_config"
+    private const val SETTINGS_MODULE = "lvjiang.core.ondevice.task_settings"
     private const val CALIB_MODULE = "lvjiang.core.ondevice.screen_calib_api"
     private const val OFFLINE_MODULE = "lvjiang.core.ondevice.offline"
 
@@ -112,13 +112,23 @@ object PyBridge {
     /** 状态快照：`{state, task_name, message, elapsed, stopping, logs}` */
     fun status(context: Context): JSONObject = callJson(context, "get_status")
 
-    /** 调律配置合并视图：`{ok, rules, slot_groups, switches, error}` */
-    fun getTuningConfig(context: Context): JSONObject =
-        callJson(context, "get_tuning_config", moduleName = TUNING_MODULE)
+    fun listTaskSettings(context: Context, username: String): JSONObject =
+        callJson(context, "list_settings", username, moduleName = SETTINGS_MODULE)
 
-    /** 保存调律配置：`{ok, message}`。ok=false 时 message 为校验失败原因。 */
-    fun saveTuningConfig(context: Context, payload: String): JSONObject =
-        callJson(context, "save_tuning_config", payload, moduleName = TUNING_MODULE)
+    fun getTaskSettings(context: Context, username: String, taskId: String): JSONObject =
+        callJson(context, "get_settings", username, taskId, moduleName = SETTINGS_MODULE)
+
+    fun previewTaskSettings(context: Context, username: String, taskId: String, payload: String): JSONObject =
+        callJson(context, "preview_parameters", username, taskId, payload, moduleName = SETTINGS_MODULE)
+
+    fun saveTaskSettings(context: Context, username: String, taskId: String, token: String,
+                         payload: String, reset: Boolean = false): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) {
+            JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束 PC 任务")
+        } else {
+            callJson(context, "save_settings", username, taskId, token, payload, reset, moduleName = SETTINGS_MODULE)
+        }
+    }
 
     /** 屏幕标定接口（CalibActivity 用）：calib_info / calib_capture / calib_locate / calib_solve / calib_save / … */
     fun calib(context: Context, fn: String, vararg args: Any?): JSONObject =

@@ -28,7 +28,7 @@ import java.util.concurrent.Executors
  * 只要求无障碍（或高级用户使用 Shizuku），不把手机独立任务所需的悬浮窗
  * 误报为前置条件；悬浮窗与通知都在功能区按需授权。
  *
- * 功能区：调律参数配置入口（TuningConfigActivity，不依赖任何权限）+
+ * 功能区：独立任务参数配置入口（TaskSettingsActivity，不依赖任何权限）+
  * 悬浮图标启停合一按钮（文案随 FloatService.isRunning 切换）。
  *
  * 二级页面只是临时导航状态，不写任务或同步配置。
@@ -151,6 +151,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menu.add(0, MENU_TASK_SETTINGS, 0, "任务设置")
         menu.add(0, MENU_PERMISSIONS, 0, R.string.menu_permissions)
         menu.add(0, MENU_ADVANCED, 1, R.string.menu_advanced)
         menu.add(0, MENU_DIAGNOSTICS, 2, R.string.menu_diagnostics)
@@ -159,6 +160,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            MENU_TASK_SETTINGS -> startActivity(Intent(this, TaskSettingsActivity::class.java))
             android.R.id.home -> showPage(Page.HOME)
             MENU_PERMISSIONS -> showPage(Page.PERMISSIONS)
             MENU_ADVANCED -> showPage(Page.ADVANCED)
@@ -383,5 +385,6 @@ class MainActivity : AppCompatActivity() {
         private const val MENU_PERMISSIONS = 1
         private const val MENU_ADVANCED = 2
         private const val MENU_DIAGNOSTICS = 3
+        private const val MENU_TASK_SETTINGS = 4
     }
 }

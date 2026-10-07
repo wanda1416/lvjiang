@@ -1,0 +1,5 @@
+<resources>
+    <color name="settings_foreground">#202124</color>
+    <color name="settings_secondary_foreground">#4F545B</color>
+    <color name="settings_disabled_foreground">#888D95</color>
+</resources>

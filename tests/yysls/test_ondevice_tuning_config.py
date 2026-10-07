@@ -41,7 +41,7 @@ def session_path(tmp_path, monkeypatch):
 
 
 def _save(payload: dict) -> dict:
-    return json.loads(save_tuning_config(json.dumps(payload, ensure_ascii=False)))
+    return json.loads(save_tuning_config(json.dumps(payload, ensure_ascii=False), "测试用户"))
 
 
 class TestSaveValidation:
@@ -94,7 +94,7 @@ class TestSaveRoundtrip:
         assert saved["switches"] == {"keep_danti": True, "keep_wanjia": True}
         assert saved["skip_tuning"] is False
 
-        view = json.loads(get_tuning_config())
+        view = json.loads(get_tuning_config("测试用户"))
         assert view["ok"] is True
         rules = {r["key"]: r for r in view["rules"]}
         assert rules["huiyi_general"]["enabled"] is True

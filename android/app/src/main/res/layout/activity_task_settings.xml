@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/settings_root"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="?android:attr/colorBackground">
+    <androidx.appcompat.widget.Toolbar android:id="@+id/settings_toolbar"
+        android:layout_width="match_parent" android:layout_height="?attr/actionBarSize"
+        android:background="?android:attr/colorBackground"
+        app:titleTextColor="?attr/colorOnSurface" />
+    <TextView android:id="@+id/settings_context"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="@color/settings_primary_text"
+        android:paddingHorizontal="20dp" android:paddingVertical="8dp" />
+    <TextView android:id="@+id/settings_notice"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="@color/settings_secondary_text"
+        android:paddingHorizontal="20dp" android:paddingBottom="12dp"
+        android:text="手机修改不会同步回电脑，下次同步会覆盖。" />
+    <ScrollView android:id="@+id/settings_scroll"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:fillViewport="true">
+        <LinearLayout android:id="@+id/settings_content"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:paddingHorizontal="20dp" android:paddingBottom="24dp"
+            android:orientation="vertical" />
+    </ScrollView>
+</LinearLayout>

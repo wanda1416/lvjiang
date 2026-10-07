@@ -4,6 +4,8 @@
 #% env: [android, desktop]
 #% note: |-
 #%   请准备好'黄泉酿'并收藏
+#%   如果反复匹配不上黄泉酿，可将「黄泉酿置信度」适当降低
+#%   但不要太低——阈值过低容易把其他道具误认成黄泉酿。
 #% parameters:
 #%   - name: claim_reward
 #%     label: 领取奖励
@@ -44,6 +46,11 @@
 #%     label: 觉障林
 #%     type: bool
 #%     default: true
+#%   - name: min_yinjiu_confidence
+#%     label: 黄泉酿置信度
+#%     type: select
+#%     default: "0.65"
+#%     options: ["0.65", "0.6", "0.55", "0.5"]
 #
 # 江湖号令日常：在号令页把六张任务卡刷成目标任务并执行，按配置领取奖励。
 #
@@ -61,6 +68,8 @@
 #                          当周已领取声望小于该值时才领奖
 #   do_heying / do_huanzhuang / do_qingjing — 是否执行合影、换装、情境
 #   do_kanbao / do_yinjiu / do_juezhanglin — 是否执行看报、饮酒、觉障林
+#   min_yinjiu_confidence — 黄泉酿识别置信度阈值，默认 0.65；反复匹配
+#                          不上时可降到 0.5 以上，但不要太低以免误认
 # 前置：在游戏首页或江湖号令活动页（两种入口都按页面判定自行收敛）。
 # 后置：成功时已退回游戏首页；为合影切过多人模式时已切回单人模式。
 # 返回：0=六项都没勾选，未做任何操作或正常收尾；-1=Profile 声明失败、
@@ -77,11 +86,15 @@ default $do_qingjing = true
 default $do_kanbao = true
 default $do_yinjiu = true
 default $do_juezhanglin = true
+default $min_yinjiu_confidence = "0.65"
 
 # 各任务过程共享运行配置与跨任务状态；当前任务的 idx / label / task_text
 # 仍显式传递，避免子过程依赖隐藏的当前任务上下文。
+# $min_yinjiu_confidence 必须在 global 中声明：过程作用域的变量表是全局表副本，
+# 漏声明时 action_yinjiu 内读不到阈值，where 会静默失效（等于不过滤、任意分数都命中）。
 global $claim_reward, $max_refresh, $max_claim_reputation, $haoling_of_week, $mode_checked, $mode_switched
 global $do_heying, $do_huanzhuang, $do_qingjing, $do_kanbao, $do_yinjiu, $do_juezhanglin
+global $min_yinjiu_confidence
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
@@ -787,6 +800,7 @@ end
 #
 # 路径：号令 → 退回首页 → 菜单 → 包裹 → 道具 - 普通道具 → 找黄泉酿食用
 # → 退回首页 → 返回号令
+# 阈值：$min_yinjiu_confidence（默认 0.65，可降至 0.5 以上；过低会误认其他道具）
 def action_yinjiu($label, $idx)
    # ── 从江湖号令退回首页 ──
    click [activity_jianghu].[back] after wait stable @page_refresh least 0.5
@@ -801,10 +815,13 @@ def action_yinjiu($label, $idx)
    end
 
    # ── 在背包网格中寻找黄泉酿 ──
+   # 阈值来自 select 参数，值本身是字符串档位；显式转成数值再做比较，
+   # 不依赖 where 内部的隐式转换（$min_yinjiu_confidence 必须已在 global 中声明）。
+   eval $yinjiu_threshold = to_num($min_yinjiu_confidence)
    recognize [bag_item_detail].[bag_grid][1...2][1...6] as $result \
       by equals "黄泉酿" \
       on group ["增益道具"] \
-      where confidence >= 0.65
+      where confidence >= $yinjiu_threshold
 
    if $result
       eval $yinjiu_r = $result.row

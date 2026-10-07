@@ -30,11 +30,13 @@ def bundle(tmp_path):
     (source / "config/local/license.txt").write_text("synthetic-license-not-for-phone")
     archive = tmp_path / "snapshot.zip"
     # 保持 WAL 连接打开，验收快照是否含未 checkpoint 的已提交数据。
-    with closing(sqlite3.connect(session / "profile.db")) as db:
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("CREATE TABLE entries (value INTEGER)")
-        db.execute("INSERT INTO entries VALUES (7)")
-        db.commit()
+    with (closing(sqlite3.connect(session / "profile.db")) as db,
+          closing(sqlite3.connect(session / "tuning_history.db")) as history):
+        for connection in (db, history):
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("CREATE TABLE entries (value INTEGER)")
+            connection.execute("INSERT INTO entries VALUES (7)")
+            connection.commit()
         build_offline_bundle(source, archive, username="tester", layout="android")
     return source, archive
 
@@ -54,12 +56,43 @@ def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path
     session = json.loads((phone / "config/session/session.json").read_text())
     assert session["actives"] == {"user": "tester", "layout": "android"}
     assert session["settings"]["env"] == "android"
-    with closing(sqlite3.connect(phone / "config/session/profile.db")) as db:
-        assert db.execute("SELECT value FROM entries").fetchone() == (7,)
+    for name in ("profile.db", "tuning_history.db"):
+        with closing(sqlite3.connect(phone / "config/session" / name)) as db:
+            assert db.execute("SELECT value FROM entries").fetchone() == (7,)
     assert (phone / "offline-backup/config/session/old.json").read_text() == "previous"
     with zipfile.ZipFile(archive) as package:
         assert all(".git" not in name and "diagnostics" not in name for name in package.namelist())
         assert "config/local/license.txt" not in package.namelist()
+
+
+def test_bundle_whitelist_preserves_runtime_assets_not_editor_files(bundle, tmp_path):
+    source, _ = bundle
+    included = {
+        "local/workflows/custom.wf", "local/scenes/custom.yaml",
+        "local/references/custom.yaml", "local/references/custom/bucket/reference.png",
+        "remote/templates/android/scene/match.png", "local/maps/custom/map.yaml",
+        "local/maps/custom/base.png", "local/yysls/tuning_rules/custom.yaml",
+        "local/yysls/gear_sets/custom.yaml", "session/users/tester.session.json",
+        "session/profile.yaml", "session/yysls/play_styles.json",
+    }
+    excluded = {
+        "session/screenshots/android/scene.png", "session/output/report.json",
+        "session/yysls/unknown.json", "session/unknown.json",
+        "local/data/calculator/screenshot.png", "local/data/notes.xlsx",
+        "local/data/axis.json", "local/new_directory/unknown.yaml",
+        "system/new_directory/unknown.yaml", "remote/new_directory/unknown.yaml",
+        "local/workflows/script.py", "local/references/custom/bucket/notes.txt",
+    }
+    for relative in included | excluded:
+        path = source / "config" / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"synthetic")
+    archive = tmp_path / "whitelist.zip"
+    build_offline_bundle(source, archive, username="tester", layout="android")
+    with zipfile.ZipFile(archive) as package:
+        names = set(package.namelist())
+        assert {"config/" + name for name in included} <= names
+        assert not {"config/" + name for name in excluded} & names
 
 
 def test_bundle_keeps_all_users_and_tasks_but_only_selected_layout_dependencies(bundle, tmp_path):

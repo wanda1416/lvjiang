@@ -35,7 +35,6 @@ scenes:
     - bugan_detail
     - zhanling_detail
     - shop_detail
-    - baiye_shop
   social:
     name: 社交
     items:

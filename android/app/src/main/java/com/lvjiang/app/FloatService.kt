@@ -5,11 +5,13 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
+import android.os.Looper
 import android.os.IBinder
 import android.text.Editable
 import android.text.SpannableString
@@ -33,6 +35,8 @@ import android.widget.Toast
 import org.json.JSONObject
 import java.util.ArrayDeque
 import java.util.concurrent.Executors
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 /**
@@ -95,10 +99,18 @@ class FloatService : Service() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        isRunning = true
-        startForeground(NOTIFICATION_ID, buildNotification("悬浮控制运行中"))
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        addFloatIcon()
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification("悬浮控制运行中"))
+            addFloatIcon()
+            isRunning = true
+            finishStart(null)
+        } catch (e: Exception) {
+            Log.e(TAG, "悬浮控制初始化失败", e)
+            finishStart("悬浮控制初始化失败：${e.message}")
+            stopSelf()
+            return
+        }
         // 解释器初始化是秒级的，放在这里预热，等用户点开面板时任务清单已经能秒出
         executor.execute { PyBridge.ensureStarted(this) }
         ui.post(poller)
@@ -722,6 +734,89 @@ class FloatService : Service() {
         (value * resources.displayMetrics.density).toInt()
 
     companion object {
+        private var starting: CompletableFuture<String?>? = null
+        private var startupIcon: View? = null
+        private var startupWindowManager: WindowManager? = null
+
+        /** RPC 工作线程调用；只在图标与前台服务都就绪后允许启动任务。 */
+        fun ensureStarted(context: Context): String? {
+            check(Looper.myLooper() != Looper.getMainLooper())
+            if (!Settings.canDrawOverlays(context)) return "请先在手机授予律匠悬浮窗权限"
+            if (isRunning) {
+                setIconHidden(false)
+                instance?.let { svc -> svc.ui.post { svc.closePanel() } }
+                return null
+            }
+            val result = CompletableFuture<String?>()
+            val main = Handler(Looper.getMainLooper())
+            main.post {
+                if (result.isDone) return@post
+                if (isRunning) {
+                    result.complete(null)
+                    return@post
+                }
+                starting = result
+                iconHidden = false
+                try {
+                    // Android 15 的后台 FGS 豁免要求已有可见覆盖层，先显示启动图标。
+                    val manager = context.getSystemService(WINDOW_SERVICE) as WindowManager
+                    val size = (42 * context.resources.displayMetrics.density).toInt()
+                    val icon = ImageView(context).apply { setImageResource(R.drawable.ic_float) }
+                    val params = WindowManager.LayoutParams(size, size,
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                        PixelFormat.TRANSLUCENT).apply {
+                        gravity = Gravity.TOP or Gravity.START
+                        x = (12 * context.resources.displayMetrics.density).toInt()
+                        y = (120 * context.resources.displayMetrics.density).toInt()
+                    }
+                    startupIcon = icon
+                    startupWindowManager = manager
+                    manager.addView(icon, params)
+                    icon.viewTreeObserver.addOnDrawListener(object : android.view.ViewTreeObserver.OnDrawListener {
+                        private var requested = false
+                        override fun onDraw() {
+                            if (requested) return
+                            requested = true
+                            icon.post {
+                                icon.viewTreeObserver.removeOnDrawListener(this)
+                                if (result.isDone) return@post
+                                try {
+                                    context.startForegroundService(Intent(context, FloatService::class.java))
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "自动开启悬浮控制失败", e)
+                                    finishStart("系统拒绝自动开启悬浮控制，请在手机首页开启后重试：${e.message}")
+                                }
+                            }
+                        }
+                    })
+                } catch (e: Exception) {
+                    finishStart("自动开启悬浮控制失败：${e.message}")
+                }
+            }
+            return try {
+                result.get(8, TimeUnit.SECONDS)
+            } catch (e: Exception) {
+                result.complete("悬浮控制启动超时，请在手机首页开启后重试")
+                main.post {
+                    if (starting === result) {
+                        finishStart("悬浮控制启动超时")
+                        context.stopService(Intent(context, FloatService::class.java))
+                    }
+                }
+                "悬浮控制启动超时，请在手机首页开启后重试"
+            }
+        }
+
+        /** 只由主线程调用，移除临时图标并完成 RPC 等待。 */
+        private fun finishStart(error: String?) {
+            startupIcon?.let { view -> runCatching { startupWindowManager?.removeView(view) } }
+            startupIcon = null
+            startupWindowManager = null
+            starting?.complete(error)
+            starting = null
+        }
+
         /** 悬浮图标是否在运行：引导页据此决定主按钮是「启动」还是「就绪」。
          *  服务与 Activity 同进程，静态标志足够，不值得上 dumpsys/绑定查询 */
         @Volatile

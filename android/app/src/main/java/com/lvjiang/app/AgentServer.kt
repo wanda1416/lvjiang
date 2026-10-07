@@ -293,8 +293,10 @@ object AgentServer {
         "offline_resume" -> Pair(PyBridge.resumeTask(requireNotNull(appContext)), null)
         "offline_stop" -> Pair(PyBridge.stopTask(requireNotNull(appContext)), null)
         "offline_start" -> {
-            if (!FloatService.isRunning) fail("请先在手机开启悬浮控制")
-            else Pair(PyBridge.startTask(requireNotNull(appContext), req.getString("task_id"), req.optString("username", "")), null)
+            val context = requireNotNull(appContext)
+            val error = if (pcControlsDevice()) "PC 正在控制设备，请先停止 PC 任务" else FloatService.ensureStarted(context)
+            if (error != null) fail(error)
+            else Pair(PyBridge.startTask(context, req.getString("task_id"), req.optString("username", "")), null)
         }
         "offline_diagnostics" -> ok(JSONObject().put("report", PyBridge.checkRuntime(
             requireNotNull(appContext), true, req.optInt("screen_repetitions", 0))))
@@ -307,6 +309,7 @@ object AgentServer {
     private fun status(): JSONObject = JSONObject().apply {
         put("protocol", PROTOCOL_VERSION)
         put("offline_protocol", 2)
+        put("float_running", FloatService.isRunning)
         put("pc_controlling", pcControlsDevice())
         put("app", BuildConfig.VERSION_NAME)
         put("sdk", Build.VERSION.SDK_INT)

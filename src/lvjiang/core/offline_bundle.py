@@ -8,7 +8,7 @@ import shutil
 import sqlite3
 import tempfile
 import zipfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -23,7 +23,34 @@ from .user_config import is_valid_username
 
 FORMAT_VERSION = 1
 MAX_BUNDLE_BYTES = 256 << 20
-_EXCLUDED_DIRS = {".git", ".locks", ".lock", "__pycache__", "diagnostics", "output", "avatars"}
+# 同步契约按消费者登记；新增目录默认不下发，不能递归复制整个配置层。
+_LAYER_PATTERNS = (
+    "app.yaml", "ocr.yaml", "ocr_rules.yaml", "scenes.yaml", "layouts.yaml",
+    "workflows/**/*.wf", "scenes/*.yaml",
+    "references/*.yaml", "references/**/*.png", "templates/**/*.png",
+    "maps/*/map.yaml", "maps/*/*.png", "yysls/tune_config.yaml",
+    "yysls/game_config/*.yaml", "yysls/tuning_rules/*.yaml",
+    "yysls/gear_sets/*.yaml", "yysls/base_groups/*.yaml",
+    "yysls/damage_model/*.yaml", "yysls/attr_model/**/*.yaml",
+    "yysls/graduation/**/*.json",
+)
+_SESSION_FILES = ("session.json", "profile.yaml")
+_DATABASE_FILES = ("profile.db", "daily_history.db", "tuning_history.db")
+
+
+def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[Path]:
+    from ..apps.yysls.config.session_node import DOCUMENT_FILES
+
+    for layer in ("system", "local", "remote"):
+        root = config / layer
+        paths = {path for pattern in _LAYER_PATTERNS for path in root.glob(pattern)}
+        for layout in layout_scope:
+            paths.update((root / "layouts" / layout).glob("*.json"))
+        yield from sorted(paths)
+    session = config / "session"
+    yield from (session / name for name in _SESSION_FILES)
+    yield from sorted((session / "users").glob("*.json"))
+    yield from (session / "yysls" / name for name in DOCUMENT_FILES.values())
 
 
 def build_offline_bundle(root: Path, destination: Path, *, username: str, layout: str) -> dict:
@@ -49,28 +76,27 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
         "files": {},
     }
     with tempfile.TemporaryDirectory(prefix="lvjiang-offline-db-") as temp:
-        database = config / "session/profile.db"
-        snapshot = Path(temp) / "profile.db"
-        if database.is_file():
+        snapshots = []
+        for name in _DATABASE_FILES:
+            database = config / "session" / name
+            snapshot = Path(temp) / name
+            if not database.is_file() or database.is_symlink():
+                continue
             # SQLite 的连接上下文只处理事务，不释放文件句柄。
             # 必须在读取快照和清理临时目录前关闭，Windows 不允许删除打开的 DB。
             with (closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)) as source,
                   closing(sqlite3.connect(snapshot)) as target):
                 source.backup(target)
+            snapshots.append(snapshot)
         with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             def add(name: str, data: bytes) -> None:
                 manifest["files"][name] = hashlib.sha256(data).hexdigest()
                 archive.writestr(name, data)
 
-            for path in sorted(config.rglob("*")):
+            for path in _configuration_files(config, layout_scope):
                 rel = path.relative_to(config)
                 if (not path.is_file() or path.is_symlink()
-                        or any(part in _EXCLUDED_DIRS or part.startswith(".") for part in rel.parts)
-                        or rel.parts[0] not in {"system", "local", "remote", "session"}
-                        or path.name.endswith((".lock", ".tmp", ".db-wal", ".db-shm", ".db-journal"))
-                        or rel.as_posix() in {"session/profile.db", "session/offline.json", "session/preset.json", "local/license.txt"}):
-                    continue
-                if len(rel.parts) >= 3 and rel.parts[1] == "layouts" and rel.parts[2] not in layout_scope:
+                        or any(part.startswith(".") for part in rel.parts)):
                     continue
                 data = path.read_bytes()
                 if rel.as_posix() in {"system/layouts.yaml", "local/layouts.yaml", "remote/layouts.yaml"}:
@@ -87,8 +113,8 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                     session.setdefault("settings", {})["env"] = "android"
                     data = json.dumps(session, ensure_ascii=False).encode("utf-8")
                 add("config/" + rel.as_posix(), data)
-            if snapshot.is_file():
-                add("config/session/profile.db", snapshot.read_bytes())
+            for snapshot in snapshots:
+                add("config/session/" + snapshot.name, snapshot.read_bytes())
             # 不携带 PC 旧的同步状态；此记录只属于这次单向快照。
             summary = {key: value for key, value in manifest.items() if key != "files"}
             add("config/session/offline.json", json.dumps(summary, ensure_ascii=False).encode())
@@ -140,11 +166,13 @@ def install_offline_bundle(
         if (session.get("actives", {}).get("user") != manifest["username"]
                 or session.get("actives", {}).get("layout") != manifest["layout"]):
             raise ValueError("同步包活动选择与清单不一致")
-        database = staged_config / "session/profile.db"
-        if database.exists():
+        for name in _DATABASE_FILES:
+            database = staged_config / "session" / name
+            if not database.exists():
+                continue
             with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
                 if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-                    raise ValueError("Profile 数据库快照校验失败")
+                    raise ValueError(f"数据库快照校验失败：{name}")
         if preserve_task_params and target.exists():
             _preserve_task_parameters(target, staged_config)
         # 此标记只记录 APK 官方代次，与是否覆盖用户参数无关。

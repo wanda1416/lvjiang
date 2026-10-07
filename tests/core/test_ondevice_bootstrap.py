@@ -51,6 +51,12 @@ def test_never_synced_phone_has_default_user_empty_database_and_can_start_task(p
     monkeypatch.setattr(task_runner, "_build_source", lambda *_: "collect $result = 1")
     engine = SimpleNamespace(execute=lambda *_args, **_kwargs: {"result": 1})
     monkeypatch.setattr(task_runner, "_get_engine", lambda: engine)
+    monkeypatch.setattr("lvjiang.core.ondevice.plugins.ensure_loaded", lambda: None)
+    monkeypatch.setattr(task_runner, "list_tasks", lambda **_: json.dumps({
+        "ok": True, "tasks": [task]}))
+    runtime = json.loads(offline.check_runtime(ocr=False))
+    assert runtime["ok"] and runtime["sync"]["ready"]
+    assert not runtime["sync"]["synced"]
     monkeypatch.setattr("lvjiang.core.ondevice.a11y.is_ready", lambda: True)
     assert json.loads(task_runner.start_task("sample"))["ok"]
     task_runner._STATE._thread.join(2)

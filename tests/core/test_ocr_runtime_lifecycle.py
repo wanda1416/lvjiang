@@ -81,16 +81,16 @@ def test_oom_propagates_instead_of_becoming_no_text():
         engine.recognize(np.zeros((10, 10, 3), dtype=np.uint8))
 
 
-def test_unsynced_apk_checks_dependencies_without_creating_engine(monkeypatch):
-    monkeypatch.setattr(offline, "sync_status", lambda: {"synced": False})
+def test_uninitialized_apk_checks_dependencies_without_creating_engine(monkeypatch):
+    monkeypatch.setattr(offline, "configuration_status", lambda: {"ready": False})
     monkeypatch.setattr(task_runner, "is_running", lambda: False)
 
     def not_allowed():
-        raise AssertionError("未同步时不应初始化引擎")
+        raise AssertionError("预置配置未初始化时不应初始化引擎")
 
     monkeypatch.setattr(task_runner, "_get_engine", not_allowed)
     result = json.loads(offline.check_runtime())
-    assert not result["ok"] and "PC" in result["message"]
+    assert not result["ok"] and "预置配置尚未初始化" in result["message"]
     assert result["stages"] == ["运行依赖与 Profile 管线加载通过"]
 
 

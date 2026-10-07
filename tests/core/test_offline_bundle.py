@@ -11,7 +11,8 @@ from lvjiang.core.offline_bundle import build_offline_bundle, install_offline_bu
 
 
 @pytest.fixture
-def bundle(tmp_path):
+def bundle(tmp_path, monkeypatch):
+    monkeypatch.setattr(offline_bundle, "get_registered_app_ids", lambda: ("yysls",))
     source = tmp_path / "pc"
     (source / "config/system").mkdir(parents=True)
     (source / "config/system/layouts.yaml").write_text(

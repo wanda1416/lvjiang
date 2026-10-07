@@ -33,6 +33,20 @@ def _judge(switches: dict[str, bool] | None = None):
     return get_tuning_judge("huixin_modao", config)
 
 
+# ─── 转律优先级的收录口径 ─────────────────────────────────
+
+def test_transmute_priority_skips_defects_and_secondary_rates():
+    """转律不主动去凑 敏/最小外功攻击（缺陷词条）与 会意率/精准率（次优率）。
+
+    这四个词条都留在可用词条库里（出库即判垃圾，拿不到「1 条一般」），
+    但不该进转律优先级：敏/小外 出现 1 条就一般封顶，转进来不可能提升评级，
+    把它们列进去只会让模拟转律向用户推荐一个永远无效的转律目标。
+    """
+    priority = _judge().rule.transmute_priority
+    assert not {"敏", "最小外功攻击", "会意率", "精准率"} & set(priority)
+    assert set(priority) <= set(_judge().rule.affix_pool)
+
+
 # ─── 缺陷词条：敏 / 最小外功攻击 ───────────────────────────
 
 class TestDefectAffixes:
@@ -105,26 +119,30 @@ class TestDensityJunk:
     按部位含各自的神力词条（环含全武学增效、胫甲含对首领增伤与对玩家增效）。
     """
 
-    @case_matrix("equip_type,affixes,expected", [
+    # 品阶必须按部位给足：武器与环的品阶门槛是「仅金色」，紫色会先被品阶
+    # 短路成垃圾，根本走不到密度条件，用例也就测不到自己声称的契约。
+    @case_matrix("equip_type,quality,affixes,expected", [
         # 主武器：次要 3 条、核心 0 条
-        ("陌刀", ["最大外功攻击", "陌刀武学增伤", "势", "势", "会心率"],
+        ("陌刀", "gold", ["最大外功攻击", "陌刀武学增伤", "势", "势", "会心率"],
          Rating.JUNK),
-        # 副武器：次要 3 条、核心 1 条（≤1 即触发）
-        ("枪", ["最大外功攻击", "会心率", "精准率", "势", "劲"],
+        # 副武器：次要 3 条（精准/会意/会心）、核心 1 条（大本属）
+        ("枪", "gold", ["最大外功攻击", "会心率", "精准率", "会意率",
+                        "最大无相攻击"],
          Rating.JUNK),
         # 环：次要 3 条、核心只有全武学增效
-        ("环", ["最大外功攻击", "全武学增效", "会心率", "精准率", "会意率"],
+        ("环", "gold", ["最大外功攻击", "全武学增效", "会心率", "精准率", "会意率"],
          Rating.JUNK),
         # 胫甲：次要 3 条、核心只有对首领增伤
-        ("胫甲", ["劲", "对首领单位增伤", "会心率", "精准率", "势"],
+        ("胫甲", "purple", ["劲", "对首领单位增伤", "会心率", "精准率", "势"],
          Rating.JUNK),
     ])
-    def test_density_junk(self, equip_type, affixes, expected):
+    def test_density_junk(self, equip_type, quality, affixes, expected):
         assert _judge().judge(
-            make_equip(equip_type, affixes, "purple")).rating == expected
+            make_equip(equip_type, affixes, quality)).rating == expected
 
     def test_core_count_at_threshold_escapes_junk(self):
-        # 核心 2 条（>1）不再触发密度垃圾；该件只剩「非首缺大外」问题 → 一般
+        # 核心 2 条（势 + 劲，副武器把 势 计入核心）不再触发密度垃圾；
+        # 该件只剩「非首缺大外」问题 → 一般
         e = make_equip("枪", ["最大外功攻击", "会心率", "精准率", "势", "劲"])
         assert _judge().judge(e).rating == Rating.NORMAL
 

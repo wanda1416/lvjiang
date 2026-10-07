@@ -1,6 +1,6 @@
 content_version: 1
 key: huixin_modao
-name: 威威大王(beta)
+name: 威威大王
 order: 70
 transmute_priority:
 - 最大外功攻击
@@ -8,7 +8,6 @@ transmute_priority:
 - 势
 - 会心率
 - 最大本属攻击
-- 敏
 affix_pool:
 - 对首领单位增伤
 - 全武学增效

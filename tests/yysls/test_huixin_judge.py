@@ -66,8 +66,9 @@ class TestBigWeaponRules:
 
     def test_qiang_belongs_to_weiwei_rule_only(self, big):
         # 枪只属于 威威 副武器；威威已从会心大外拆到 huixin_modao，
-        # 大外不再判定，否则两条规则按 or 取优会让大外的口径盖过专属规则
-        e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "劲", "敏", "会心率"])
+        # 大外不再判定，否则两条规则按 or 取优会让大外的口径盖过专属规则。
+        # 样例不带 敏：威威大王已把 敏 当缺陷词条（出现即一般封顶）。
+        e = make_equip("枪", ["最大外功攻击", "最大外功攻击", "劲", "劲", "会心率"])
         r = big.judge(e)
         assert r.not_applicable
         modao = get_tuning_judge("huixin_modao")

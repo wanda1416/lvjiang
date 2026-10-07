@@ -1,5 +1,6 @@
 """来源页只读取面板快照，刷新不读写用户配置。"""
 
+from PyQt6 import sip
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
@@ -23,17 +24,19 @@ def test_title_link_opens_readonly_sources_and_refreshes_snapshot(qtbot):
 
     class Cards(CombatCardsMixin, QWidget):
         _show_attribute_sources = CombatAttrsTab._show_attribute_sources
+        _clear_attribute_sources_dialog = CombatAttrsTab._clear_attribute_sources_dialog
 
-        def __init__(self):
-            super().__init__()
+        def __init__(self, parent):
+            super().__init__(parent)
             self._attr_labels = {}
             self._attribute_report = report
             self._attribute_report_caption = "当前方案快照"
             self._attribute_sources_dialog = None
             self._add_attack_card(QVBoxLayout(self))
 
-    cards = Cards()
-    qtbot.addWidget(cards)
+    owner = QWidget()
+    qtbot.addWidget(owner)
+    cards = Cards(owner)
     cards._attribute_sources_link.linkActivated.emit("sources")
     dialog = cards._attribute_sources_dialog
     assert dialog.isVisible()
@@ -55,6 +58,15 @@ def test_title_link_opens_readonly_sources_and_refreshes_snapshot(qtbot):
     assert tree.topLevelItemCount() == 1
     assert tree.topLevelItem(0).text(1) == "200.0"
     assert dialog._caption.text() == "更新后的方案快照"
+    dialog.close()
+    qtbot.waitUntil(lambda: cards._attribute_sources_dialog is None)
+    cards._attribute_sources_link.linkActivated.emit("sources")
+    reopened = cards._attribute_sources_dialog
+    assert reopened is not dialog and reopened.isVisible()
+    # 关闭面板时仍打开着来源窗口；销毁子窗口不得回调已析构的面板。
+    cards.deleteLater()
+    qtbot.waitUntil(lambda: sip.isdeleted(cards))
+    assert sip.isdeleted(reopened)
 
 
 def test_preview_sources_use_preview_equipment_and_frozen_base(qtbot, monkeypatch):

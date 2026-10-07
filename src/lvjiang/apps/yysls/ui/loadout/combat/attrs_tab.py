@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from loguru import logger
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot
 from PyQt6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -839,9 +839,14 @@ class CombatAttrsTab(CombatCardsMixin, CombatGraduationMixin, CombatLayoutMixin,
 
         dialog = AttributeSourcesDialog(provider, self)
         self._attribute_sources_dialog = dialog
-        dialog.destroyed.connect(lambda: setattr(self, "_attribute_sources_dialog", None))
+        dialog.destroyed.connect(self._clear_attribute_sources_dialog)
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.show()
+
+    @pyqtSlot()
+    def _clear_attribute_sources_dialog(self) -> None:
+        # QObject 接收者销毁时自动断开，不能用 lambda 留住正在析构的父面板。
+        self._attribute_sources_dialog = None
 
     def _show_judgment_display_menu(self, position, source=None) -> None:
         """右键判定属性或增益效果卡片，切换共享的显示状态。"""

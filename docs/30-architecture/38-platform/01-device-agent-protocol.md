@@ -143,10 +143,10 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 - PC 侧单测 `tests/core/test_device_agent.py` 用本地假服务端覆盖线协议与后端行为；
   Kotlin 侧可用 `kotlinc -cp android.jar` 做编译检查（见开发日志 2026-08-22）。
 
-## 离线执行扩展（offline_protocol = 1）
+## 离线执行扩展（offline_protocol = 2）
 
-基础输入协议保持 v3，新增能力通过握手字段 `offline_protocol:1` 探测；旧 APK 不发送
-控制租约或离线 op。`pc_controlling` 表示实际占用，区别于诊断连接数。
+基础输入协议保持 v3，新增能力通过握手字段 `offline_protocol:2` 探测；未提供离线能力
+的更早 APK 不携带此字段。`pc_controlling` 表示实际占用，区别于诊断连接数。
 
 | op | 请求字段 | 响应 |
 |---|---|---|
@@ -157,7 +157,7 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 | `offline_start` | `task_id`、可选 `username` | 在同一控制锁内绑定已同步用户并启动；省略用户时沿用手机活动用户；必须先开启悬浮服务 |
 | `offline_pause` / `offline_resume` / `offline_stop` | — | 请求暂停、继续或结束 |
 | `offline_diagnostics` | 可选 `screen_repetitions`（0～10，默认 0） | `report`：依赖/插件/引擎、OCR 和内存；同步后可仅采集真实屏幕连续推理，不注入游戏动作；手机执行中拒绝检查 |
-| `offline_sync_begin` | `size`,`sha256` | 建立暂存上传，最大 256 MiB |
+| `offline_sync_begin` | `size`,`sha256`,`preserve_task_params` | 建立暂存上传，最大 256 MiB；必须显式选择保留参数与否 |
 | `offline_sync_chunk` | `offset`,`data`（Base64） | 顺序写入，重复块内容相同才允许重试 |
 | `offline_sync_commit` | — | 验证完整包和逐文件哈希、版本、DB 后交换 config；重载失败回滚 |
 

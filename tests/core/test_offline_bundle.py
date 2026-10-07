@@ -182,3 +182,44 @@ def test_reload_failure_rolls_back_applied_configuration(bundle, tmp_path):
 
     assert (phone / "config/keep").read_text() == "original"
     assert not (phone / "config/session").exists()
+
+
+def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(bundle, tmp_path):
+    source, _ = bundle
+    pc = source / "config/session"
+    (pc / "session.json").write_text(json.dumps({"users": ["tester"], "wf_configs": {
+        "existing": {"pc": True}, "new": {"new": True}}, "actives": {"user": "tester"}}))
+    (pc / "users/tester.json").write_text(json.dumps({"attributes": {"role": "pc"}, "workflow_params": {
+        "existing": {"pc": True}, "new": {"new": True}}}))
+    archive = tmp_path / "keep.zip"
+    build_offline_bundle(source, archive, username="tester", layout="android")
+    phone = tmp_path / "phone"
+    users = phone / "config/session/users"
+    users.mkdir(parents=True)
+    old_session = {"users": ["tester", "phone_only"], "wf_configs": {"existing": {"phone": True}},
+                   "actives": {"user": "phone_only", "layout": "other"}}
+    (users.parent / "session.json").write_text(json.dumps(old_session))
+    for name in old_session["users"]:
+        (users / f"{name}.json").write_text(json.dumps({"username": name, "attributes": {"role": "phone"},
+                                                       "workflow_params": {"existing": {"phone": True}}}))
+    (users.parent / "preset.json").write_text('{"preset_id":"original"}')
+    install_offline_bundle(archive, phone, preserve_task_params=True)
+    session = json.loads((users.parent / "session.json").read_text())
+    assert session["users"] == ["tester", "phone_only"]
+    assert session["wf_configs"] == {"existing": {"phone": True}, "new": {"new": True}}
+    assert session["actives"] == {"user": "phone_only", "layout": "android"}
+    user = json.loads((users / "tester.json").read_text())
+    assert user["attributes"] == {"role": "pc"}
+    assert user["workflow_params"] == {"existing": {"phone": True}, "new": {"new": True}}
+    assert json.loads((users / "phone_only.json").read_text())["attributes"] == {"role": "phone"}
+    with closing(sqlite3.connect(users.parent / "profile.db")) as db:
+        assert db.execute("SELECT value FROM entries").fetchone() == (7,)
+    assert json.loads((users.parent / "preset.json").read_text())["preset_id"] == "original"
+
+    # 明确取消保留后恢复全量覆盖；APK 代次标记仍不能被 PC 同步丢掉。
+    install_offline_bundle(archive, phone, preserve_task_params=False)
+    session = json.loads((users.parent / "session.json").read_text())
+    assert session["users"] == ["tester"]
+    assert session["wf_configs"]["existing"] == {"pc": True}
+    assert not (users / "phone_only.json").exists()
+    assert (users.parent / "preset.json").exists()

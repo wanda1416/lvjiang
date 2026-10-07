@@ -29,7 +29,7 @@ def declare_profiles($keys)
         "haoling_of_week": {"model": "quota", "definition": {"label": "当周获取号令", "period": "week", "increment_only": true, "sources": ["江湖号令"]}},
         "huaruizhi_of_week": {"model": "quota", "definition": {"label": "花蕊织本周", "cap": 4000, "period": "week", "increment_only": true, "sources": ["渡尘墟"]}},
         "baiye_dividend_of_week": {"model": "quota", "definition": {"label": "百业每周分红", "cap": 1, "period": "week", "reset_time": "05:00", "reset_day": 1, "increment_only": true, "sources": ["百业分红"]}},
-        "baiye_chijin_box_of_week": {"model": "quota", "definition": {"label": "赤金小铺礼盒", "cap": 3, "period": "week", "reset_time": "05:00", "reset_day": 1, "increment_only": true, "sources": ["赤金小铺"]}},
+        "baiye_of_week": {"model": "quota", "definition": {"label": "赤金小铺礼盒", "cap": 3, "period": "week", "reset_time": "05:00", "reset_day": 1, "increment_only": true, "sources": ["赤金小铺"]}},
         "baiye_raoliang_of_month": {"model": "quota", "definition": {"label": "百业绕梁之音", "cap": 2, "period": "month", "reset_time": "05:00", "reset_day": 1, "increment_only": true, "sources": ["百业声望", "银百叶"]}},
         "baiye_silver_box_of_month": {"model": "quota", "definition": {"label": "银百叶礼盒", "cap": 3, "period": "month", "reset_time": "05:00", "reset_day": 1, "increment_only": true, "sources": ["银百叶"]}},
         "tili": {"model": "regen", "definition": {"label": "体力", "cap": 2500, "regen_type": "boundary", "regen_amount": 450, "regen_period": "day", "reset_time": "05:00"}}

@@ -61,7 +61,6 @@
 | [07-android-offline.md](50-platform/07-android-offline.md) | PC 单向同步与 Android 悬浮控制离线任务 | 已实现（Beta，复杂任务内存问题未解决） |
 | [08-android-task-settings.md](50-platform/08-android-task-settings.md) | 手机按用户编辑任务参数与自动调律设置 | 已实现 |
 | [09-android-preset.md](50-platform/09-android-preset.md) | 官方预置、手机用户管理与同步参数保留 | 已实现 |
-| [10-baiye-rewards.md](50-platform/10-baiye-rewards.md) | Android 百业周/月领奖、共享月度限购与顶部活动奖励 | 已实现（待月度购买与迁移后界面实机验收） |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

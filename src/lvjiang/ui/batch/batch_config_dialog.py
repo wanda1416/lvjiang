@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFileDialog,
-    QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -20,6 +20,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QSplitter,
     QTreeWidget,
@@ -28,7 +30,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
 
 from ...core.batch_config import (
     BatchConfigItem,
@@ -42,6 +44,7 @@ from ...i18n import tr
 from ...workflows.builtins._coerce import to_bool
 from ..button_styles import apply_button_style
 from ..layout_helpers import fit_combo_popup_to_contents
+from .compact_fields import CompactFields
 
 
 class BatchConfigDialog(QDialog):
@@ -125,19 +128,20 @@ class BatchConfigDialog(QDialog):
         user_layout.addWidget(self._user_list)
         choices.addWidget(user_box)
         choices.setSizes([430, 430])
+        header = self._task_list.header()
+        assert header is not None
+        choices.setMinimumHeight(
+            self._task_list.fontMetrics().height() * 6 + header.sizeHint().height()
+            + task_header.sizeHint().height() + task_layout.spacing())
         layout.addWidget(choices, 1)
 
-        scope_form = QFormLayout()
-        # 标签左对齐，并且所有行共用同一个表单：分成两个 QFormLayout 时各自
-        # 按自己的最长标签算列宽，输入框的左边缘就对不齐了。
-        scope_form.setLabelAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        scope_form = CompactFields(self)
         self._unit_combo = AutoWidthComboBox()
         self._unit_combo.currentIndexChanged.connect(self._on_unit_changed)
         self._unit_combo.setToolTip(tr(
             "按用户名调度，还是按用户资料的某个属性调度。它决定主页面候选列表的"
             "内容、生命周期契约和条目准备工作流的合法性，所以属于配置组定义"))
-        scope_form.addRow(tr("调度单元："), self._unit_combo)
+        scope_form.add_field(tr("调度单元："), self._unit_combo)
         sort_row = QHBoxLayout()
         # 去掉内边距：外层包了一个 QWidget 才能放两个控件，默认边距会让这一行
         # 比上下行的输入框整体右缩一截，左边缘就对不齐了。
@@ -160,34 +164,38 @@ class BatchConfigDialog(QDialog):
         self._profile_sort_widget.setToolTip(tr(
             "定义主页面右键「按 Profile 排序」用哪个键、什么方向。排完的顺序只属于"
             "本次运行，不写回这里"))
-        scope_form.addRow(self._profile_sort_label, self._profile_sort_widget)
+        scope_form.add_field(self._profile_sort_label, self._profile_sort_widget)
         self._scope_form = scope_form
 
         wf_form = scope_form
         self._selectors = {}
         for key, label in (
             ("batch_setup", tr("批次准备工作流：")),
+            ("batch_teardown", tr("批次收尾工作流：")),
             ("prepare_item", tr("条目准备工作流：")),
             ("finish_item", tr("条目收尾工作流：")),
-            ("batch_teardown", tr("批次收尾工作流：")),
         ):
             row, combo = self._create_wf_selector()
             self._selectors[key] = combo
-            wf_form.addRow(label, row)
+            selector = QWidget()
+            selector.setLayout(row)
+            wf_form.add_field(label, selector, new_row=key in ("batch_setup", "prepare_item"))
         self._skip_single_lifecycle = QCheckBox(
             tr("单个执行单元时跳过上述生命周期工作流")
         )
         self._skip_single_lifecycle.setToolTip(
             tr("实际只选择一个用户单元时，直接执行任务；属性单元始终运行准备工作流")
         )
-        wf_form.addRow("", self._skip_single_lifecycle)
         recover_row, recover_combo = self._create_wf_selector()
         self._selectors["recover_unattended"] = recover_combo
         recover_combo.setToolTip(tr(
             "无人值守撞上异常暂停后，用它把游戏收回登录主页。"
             "主页面的「无人值守」要等这里配好才能勾选"))
-        wf_form.addRow(tr("异常恢复工作流："), recover_row)
-        layout.addLayout(wf_form)
+        recover_widget = QWidget()
+        recover_widget.setLayout(recover_row)
+        wf_form.add_field(tr("异常恢复工作流："), recover_widget, new_row=True)
+        wf_form.add_field(None, self._skip_single_lifecycle)
+        layout.addWidget(wf_form)
         # 生命周期参数紧跟它所属的 wf：wf 在这里选，参数却要去另一个窗口填，
         # 是上一版把同一件事拆到两处的典型。
         self._workflow_params_panel = QWidget()
@@ -196,7 +204,12 @@ class BatchConfigDialog(QDialog):
         self._workflow_param_groups: list[QGroupBox] = []
         self._workflow_param_widgets: dict[tuple[str, str], QWidget] = {}
         self._workflow_param_types: dict[tuple[str, str], str] = {}
-        layout.addWidget(self._workflow_params_panel)
+        self._workflow_params_scroll = QScrollArea(self)
+        self._workflow_params_scroll.setWidgetResizable(True)
+        self._workflow_params_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._workflow_params_scroll.setWidget(self._workflow_params_panel)
+        self._workflow_params_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        layout.addWidget(self._workflow_params_scroll)
         for combo in self._selectors.values():
             combo.currentTextChanged.connect(self._on_workflow_changed)
 
@@ -215,6 +228,7 @@ class BatchConfigDialog(QDialog):
 
     def _create_wf_selector(self):
         row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
         combo = AutoWidthComboBox()
         combo.setEditable(True)
         row.addWidget(combo, 1)
@@ -420,12 +434,11 @@ class BatchConfigDialog(QDialog):
         self._workflow_param_groups.clear()
         self._workflow_param_widgets.clear()
         self._workflow_param_types.clear()
-        # require 依赖按行控显隐：记下每个参数占用的行号与本阶段的参数定义
-        self._workflow_param_forms: dict[str, QFormLayout] = {}
-        self._workflow_param_rows: dict[tuple[str, str], list[int]] = {}
+        # require 控制整个字段，不依赖会随双列重排变化的行号。
+        self._workflow_param_forms: dict[str, CompactFields] = {}
         self._workflow_param_defs: dict[str, list[dict]] = {}
         if item is None:
-            self._workflow_params_panel.setVisible(False)
+            self._workflow_params_scroll.setVisible(False)
             return
 
         phase_labels = {
@@ -433,8 +446,7 @@ class BatchConfigDialog(QDialog):
             "prepare_item": tr("条目准备"),
             "finish_item": tr("条目收尾"),
             "batch_teardown": tr("批次收尾"),
-            # 异常恢复不在上面那四行只读摘要里，但它同样是生命周期 wf，
-            # 声明了参数就要能在这里编辑——少一个 key 就是 KeyError。
+            # 异常恢复也可声明参数，不能遗漏这个阶段的编辑入口。
             "recover_unattended": tr("异常恢复"),
         }
         definitions = lifecycle_parameter_definitions(item.workflows)
@@ -442,14 +454,15 @@ class BatchConfigDialog(QDialog):
             if not params:
                 continue
             group = QGroupBox(phase_labels[phase])
-            form = QFormLayout(group)
+            group_layout = QVBoxLayout(group)
+            form = CompactFields(group)
+            group_layout.addWidget(form)
             self._workflow_param_groups.append(group)
             self._workflow_param_forms[phase] = form
             self._workflow_param_defs[phase] = list(params)
             saved = item.workflow_params.get(phase, {})
             for definition in params:
                 name = str(definition["name"])
-                rows_before = form.rowCount()
                 label = str(definition.get("label") or name)
                 value = saved.get(name, definition.get("default"))
                 param_type = definition.get("type", "select")
@@ -469,7 +482,7 @@ class BatchConfigDialog(QDialog):
                     spin.valueChanged.connect(self._on_workflow_param_changed)
                     widget = spin
                 elif param_type == "select":
-                    combo = AutoWidthComboBox()
+                    combo = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
                     for option in definition.get("options", []):
                         if isinstance(option, dict):
                             combo.addItem(str(option.get("label", option["value"])),
@@ -512,16 +525,11 @@ class BatchConfigDialog(QDialog):
                 widget.setObjectName(name)
                 self._workflow_param_widgets[(phase, name)] = widget
                 self._workflow_param_types[(phase, name)] = str(param_type)
-                if isinstance(widget, QPlainTextEdit):
-                    form.addRow(QLabel(f"{label}："))
-                    form.addRow(widget)
-                else:
-                    form.addRow(f"{label}：", widget)
-                self._workflow_param_rows[(phase, name)] = list(
-                    range(rows_before, form.rowCount()))
+                form.add_field(f"{label}：", widget, full_row=param_type not in ("bool", "number", "select"))
             self._workflow_params_layout.addWidget(group)
         self._refresh_workflow_param_visibility()
-        self._workflow_params_panel.setVisible(bool(self._workflow_param_groups))
+        self._workflow_params_scroll.setVisible(bool(self._workflow_param_groups))
+        self._update_workflow_params_height()
 
     def _refresh_workflow_param_visibility(self) -> None:
         """按 require 依赖隐藏当前取值下不适用的生命周期参数行。
@@ -543,11 +551,20 @@ class BatchConfigDialog(QDialog):
             except RequireError as exc:
                 logger.warning(f"生命周期参数依赖求值失败，本次全部展示: {exc}")
                 continue
-            for (row_phase, name), indices in self._workflow_param_rows.items():
-                if row_phase != phase:
-                    continue
-                for index in indices:
-                    form.setRowVisible(index, name in visible)
+            for (row_phase, name), widget in self._workflow_param_widgets.items():
+                if row_phase == phase:
+                    form.set_field_visible(widget, name in visible)
+        self._update_workflow_params_height()
+
+    def _update_workflow_params_height(self) -> None:
+        scroll = getattr(self, "_workflow_params_scroll", None)
+        if scroll is not None:
+            content_height = self._workflow_params_layout.sizeHint().height()
+            scroll.setMaximumHeight(min(content_height, max(140, self.height() // 3)))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 - Qt API
+        super().resizeEvent(event)
+        self._update_workflow_params_height()
 
     def _collect_workflow_params(self) -> dict[str, dict]:
         """从控件读出各阶段参数值；写回配置与算 require 可见性共用这一份。"""
@@ -699,7 +716,7 @@ class BatchConfigDialog(QDialog):
             "按属性调度时不适用：一个属性值可能对应多名用户，必须由条目准备"
             "工作流选定并回传用户名，所以生命周期始终执行。切回「用户名」会恢复"
             "你原来的选择"))
-        self._scope_form.setRowVisible(self._profile_sort_label, user_unit)
+        self._scope_form.set_field_visible(self._profile_sort_widget, user_unit)
 
     def _on_workflow_changed(self, *_args) -> None:
         """wf 换了就重读它声明的参数，参数面板跟着变。"""

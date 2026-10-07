@@ -17,6 +17,7 @@ from typing import Any
 import yaml
 
 from .._version import __version__
+from ..apps import get_registered_app_ids, load_app
 from .config.resolver import ConfigResolver
 from .layout_config import load_layout_doc
 from .user_config import is_valid_username
@@ -28,29 +29,28 @@ _LAYER_PATTERNS = (
     "app.yaml", "ocr.yaml", "ocr_rules.yaml", "scenes.yaml", "layouts.yaml",
     "workflows/**/*.wf", "scenes/*.yaml",
     "references/*.yaml", "references/**/*.png", "templates/**/*.png",
-    "maps/*/map.yaml", "maps/*/*.png", "yysls/tune_config.yaml",
-    "yysls/game_config/*.yaml", "yysls/tuning_rules/*.yaml",
-    "yysls/gear_sets/*.yaml", "yysls/base_groups/*.yaml",
-    "yysls/damage_model/*.yaml", "yysls/attr_model/**/*.yaml",
-    "yysls/graduation/**/*.json",
+    "maps/*/map.yaml", "maps/*/*.png",
 )
 _SESSION_FILES = ("session.json", "profile.yaml")
 _DATABASE_FILES = ("profile.db", "daily_history.db", "tuning_history.db")
 
 
 def _configuration_files(config: Path, layout_scope: set[str]) -> Iterator[Path]:
-    from ..apps.yysls.config.session_node import DOCUMENT_FILES
-
+    hooks = [load_app(name) for name in get_registered_app_ids()]
+    patterns = (*_LAYER_PATTERNS, *(
+        pattern for app in hooks for pattern in app.offline_configuration_patterns))
     for layer in ("system", "local", "remote"):
         root = config / layer
-        paths = {path for pattern in _LAYER_PATTERNS for path in root.glob(pattern)}
+        paths = {path for pattern in patterns for path in root.glob(pattern)}
         for layout in layout_scope:
             paths.update((root / "layouts" / layout).glob("*.json"))
         yield from sorted(paths)
     session = config / "session"
     yield from (session / name for name in _SESSION_FILES)
     yield from sorted((session / "users").glob("*.json"))
-    yield from (session / "yysls" / name for name in DOCUMENT_FILES.values())
+    for app in hooks:
+        if app.offline_session_files is not None:
+            yield from (session / name for name in app.offline_session_files())
 
 
 def build_offline_bundle(root: Path, destination: Path, *, username: str, layout: str) -> dict:

@@ -27,6 +27,12 @@ def _reload_configuration() -> None:
     invalidate_model_registry()
 
 
+def _offline_session_files() -> tuple[str, ...]:
+    from .config.session_node import DOCUMENT_FILES
+
+    return tuple(f"yysls/{name}" for name in DOCUMENT_FILES.values())
+
+
 def _build_tuning_tab(host):
     from .ui.tuning import TuningTab
     return TuningTab(host)
@@ -112,4 +118,11 @@ hooks = AppHooks(
         "lvjiang.apps.yysls.config.merge_policy",
     ],
     configuration_reload_callbacks=[_reload_configuration],
+    offline_configuration_patterns=(
+        "yysls/tune_config.yaml", "yysls/game_config/*.yaml",
+        "yysls/tuning_rules/*.yaml", "yysls/gear_sets/*.yaml",
+        "yysls/base_groups/*.yaml", "yysls/damage_model/*.yaml",
+        "yysls/attr_model/**/*.yaml", "yysls/graduation/**/*.json",
+    ),
+    offline_session_files=_offline_session_files,
 )

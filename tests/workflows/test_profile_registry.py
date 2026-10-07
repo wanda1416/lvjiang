@@ -129,31 +129,3 @@ def test_profile_consumers_use_the_central_registry() -> None:
     )
     assert "profile_declare(" not in business_sources
     assert "check_profile(" not in business_sources
-
-
-def test_baiye_periods_have_no_business_group_and_keep_user_group(
-    isolated_profile_config: Path,
-) -> None:
-    from lvjiang.core.profile.models import DEFAULT_KEY_GROUP
-    from lvjiang.core.profile.schema import get_profile_config, save_profile_config
-
-    expected = {
-        "baiye_dividend_of_week": (1, "week"),
-        "baiye_chijin_box_of_week": (3, "week"),
-        "baiye_raoliang_of_month": (2, "month"),
-        "baiye_silver_box_of_month": (3, "month"),
-    }
-    assert _declare(list(expected)) == 0
-    config = get_profile_config()
-    for key, (cap, period) in expected.items():
-        definition = config.get_key(key)
-        assert definition.cap == cap
-        assert definition.period == period
-        assert definition.reset_time == "05:00"
-        assert definition.reset_day == 1
-        assert definition.increment_only
-        assert definition.group == DEFAULT_KEY_GROUP
-    config.get_key("baiye_raoliang_of_month").group = "自选分组"
-    save_profile_config(config)
-    assert _declare(list(expected)) == 0
-    assert config.get_key("baiye_raoliang_of_month").group == "自选分组"

@@ -16,7 +16,6 @@
 |------|------|------|----------|------|
 | 01 | [01-current-equip-analysis.md](01-current-equip-analysis.md) | 用户当前装备分析 | bag_equip_detail, equip_weapon_detail, equip_armor_detail | yysls |
 | 02 | [02-auto-tuning.md](02-auto-tuning.md) | 自动调律（背包滚动遍历） | bag_equip_detail, equip_weapon_detail, equip_armor_detail | yysls |
-| 03 | [03-baiye-rewards.md](03-baiye-rewards.md) | Android 百业周/月领奖与顶部活动奖励 | baiye_main, baiye_shop, baiye_activity_card | yysls |
 
 > 注：以上流程均为燕云十六声插件（`src/lvjiang/apps/yysls/`）专属工作流。通用 DSL 语法见 [32-grammar](../32-grammar/README.md)。
 

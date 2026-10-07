@@ -1,0 +1,124 @@
+#% id: gather_du_gao
+#% name: 刷毒和膏
+#% runnable: true
+#% env: [android, desktop]
+#% requires: [device_gesture]
+#% note: |-
+#%   适用于 秦念夭-第九版精装多人刷毒塔 图纸，无限循环
+#%   PC 端：运行前请关闭后台模式，并让游戏窗口保持前台，白义马放置在楼梯上楼后的木板处
+#%   然后前进千斤坠到精英怪背后位置，切换明川药典，将奇术-神龙吐火调整为奇术技能 4（或按下方配置改按键）
+#%   Android 端：采用默认面板，把默认奇术键设为神龙吐火（脚本直接点奇术按钮）
+#%   战斗面板只在战斗姿态下显示奇术等按钮，脚本开打前会先点一次轻击进战斗姿态
+#%   如果出现卡脚或者撞墙等现象，注意调整朝向
+#%   并需要「设备端手势」：前跳那段是"推住前进摇杆的同时点跳跃"，ADB shell input 注入不了并发输入
+#% parameters:
+#%   - name: skill_key
+#%     label: 奇术按键
+#%     env: [desktop]
+#%     type: select
+#%     default: "4"
+#%     options: ["1", "2", "3", "4"]
+#%   - name: multiplayer
+#%     label: 多人挂机
+#%     type: bool
+#%     default: false
+
+default $skill_key = "4"
+default $multiplayer = false
+
+# 毒塔挂机：按图纸打一套循环，无限重复，每轮打一条 info 日志。
+#
+# 流程结构：吐火 →（多人各环节多等一拍）卸势 → 两次重击 → 后退 → 两次跳跃 → 前跳复位 → 武学技 → 回到轮首。
+# 全程没有页面判定与到位校验，起点或键位一变整套轴就失效。
+#
+# 跨端差异有三处：
+#   1. 移动：桌面按 WASD，安卓推虚拟摇杆——它们不是同一个动作换绑定（arrow 没有
+#      activation_key，drag 在桌面不会转成按键），所以"按住 S""按住 W"用单行 env 守卫分开写。
+#   2. 技能：其余动作都写 [场景].[实体]，各端按 activation_key 自行决定按键还是触点，
+#      一份脚本两端通用。奇术在桌面读按键参数、在安卓直接点奇术按钮。
+#   3. 进场：安卓的战斗面板只在战斗姿态下显示奇术等按钮，开打前先点一次轻击；桌面面板常驻。
+#
+# 参数：
+#   skill_key   — 奇术-神龙吐火对应的按键（仅桌面端）
+#   multiplayer — 多人挂机时各环节多等一拍
+# 前置：角色在精英怪背后位置、已切换明川药典；PC 端需要前台发送（后台模式不生效）。
+# 后置：脚本不会自行结束，需要手动停止；不校验页面、不回收现场。
+# 返回：参数不合法或处于后台模式时记错误日志并返回 -1。
+
+# ─── 参数校验 ─────────────────────────────────────────────────
+if not $skill_key in ["1", "2", "3", "4"]
+   log error "毒塔挂机：奇术按键只允许配置 1-4"
+   return -1
+end
+
+if is_post()
+   log error "毒塔挂机：按键不支持后台模式，请关闭后台模式后重试"
+   return -1
+end
+
+eval $loop_count = 0
+
+# 安卓端进场：非战斗姿态下战斗面板不显示奇术等按钮，先点一次轻击进入战斗姿态。
+# 只做一次——循环期间角色一直在战斗中，面板不会收起。等待复用「操作间隔」。
+env:"android" -> click [general_combat].[qingji] after wait @step_interval
+
+@one_round
+
+eval $loop_count = $loop_count + 1
+log info "毒塔挂机：第 " + $loop_count + " 轮"
+
+# 吐火：桌面按奇术按键，安卓点奇术按钮（需在面板里把奇术设为神龙吐火）
+env:"desktop" -> press $skill_key hold 0.05 after wait 1.8
+env:"android" -> click [general_combat].[qishu] hold 0.05 after wait 1.8
+
+# 多人挂机：进重击前多等一拍
+if $multiplayer
+   wait 0.3
+end
+
+
+# 卸势
+click [general_combat].[xieshi] hold 0.1 after wait 0.2
+
+# 多人挂机：进重击前多等一拍
+if $multiplayer
+   wait 0.3
+end
+
+# 重击1
+click [general_combat].[xuli] hold 0.2 after wait 0.2
+
+# 多人挂机：进重击前多等一拍
+if $multiplayer
+   wait 0.2
+end
+
+# 重击2
+click [general_combat].[xuli] hold 0.2 after wait 0.6
+
+# 后退
+env:"desktop" -> press "S" hold 1.5 after wait 0.1
+env:"android" -> drag [general_move].[move_backward] duration 0.1 hold 1.5 after wait 0.1
+
+# 跳跃
+click [general_combat].[tiaoyue] hold 0.05 after wait 0.4
+click [general_combat].[tiaoyue] hold 0.05 after wait 1
+wait 2
+
+# 前跳：按住前进，期间跳两次（第一跳起跳、第二跳收尾），再松开前进。桌面按住 W、
+# 安卓推前进摇杆——移动非分不可；跳跃两端都写 [general_combat].[tiaoyue]，各端按
+# activation_key 自行决定是空格还是触点，所以共享一路。两跳都要在前进键按住期间完成，
+# 因此前进一直保持到第二跳结束（比原来只跳一次时更长）；@偏移 是开始时刻，不是间隔。
+timeline
+    @0.0  env:"desktop" -> press "W" hold 1.3
+    @0.0  env:"android" -> drag [general_move].[move_forward] duration 0.1 hold 1.2
+    @0.26 click [general_combat].[tiaoyue] hold 0.2
+    @1.0  click [general_combat].[tiaoyue] hold 0.2
+end
+
+wait 0.6
+
+# 千斤坠
+click [general_combat].[wuxueji] hold 0.05 after wait @page_refresh
+
+goto one_round

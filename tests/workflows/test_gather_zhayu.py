@@ -16,7 +16,7 @@ from lvjiang.workflows.metadata import parse_metadata
 
 WORKFLOW_PATH = (
     Path(__file__).resolve().parents[2]
-    / "config/system/workflows/gather_zhayu.wf"
+    / "config/system/workflows/gather/gather_zhayu.wf"
 )
 
 

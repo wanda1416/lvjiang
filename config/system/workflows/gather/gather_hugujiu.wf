@@ -1,0 +1,75 @@
+#% id: gather_hugujiu
+#% name: 刷虎骨酒
+#% runnable: true
+#% env: [android, desktop]
+#% requires: [device_gesture]
+#% note: |-
+#%   适用于 七次轮变-刷酒塔(全玩家通用版) 图纸，无限循环，目前 PC 端更稳定
+#%   面向精英怪背后，等 F 提示出现后暗杀 + 拾取，再后跳复位
+#%   最好将顶部背向的栅栏换成实体墙，否则容易后退起跳时卡脚
+#%   安卓端需要「设备端手势」：后跳那段是"后退键按住的同时跳三次"
+
+# 刷虎骨酒
+#
+# 一轮：暗杀精英怪 → 拾取掉落 → 前跳 → 后跳复位 → 收招。时序照搬原桌面脚本，
+# 只把表达方式换成跨端的写法。
+#
+# 两端差异只在"移动"这一项：桌面按 WASD，安卓推虚拟摇杆——它们不是同一个动作换
+# 绑定，而是两个不同动作（general_move 的方向是 arrow，arrow 没有 activation_key，
+# drag 在桌面不会转成按键）。其余动作都写 [场景].[实体]，各端按 activation_key
+# 自行决定按键还是触点，一份脚本两端通用。
+#
+# 前置：角色站在精英怪背后，面向它
+
+@start
+
+# ─── 暗杀 + 拾取 ───────────────────────────────────────
+click [general_combat].[assassinate] after wait (2.5, 3)
+click [general_combat].[pickup] after wait (2.5, 3)
+
+# ─── 前跳 ──────────────────────────────────────────────
+# 这三跳发生在移动键**松开之后**，是顺序动作，不需要时间线。
+env:"desktop" -> press "W" hold (0.5, 1.0) after wait 0.5
+env:"android" -> drag [general_move].[move_forward] duration 0.1 hold 0.75 after wait 0.5
+click [general_combat].[tiaoyue] after wait 0.5
+click [general_combat].[tiaoyue] after wait 0.5
+click [general_combat].[tiaoyue] after wait 6
+
+# ─── 后跳复位 ──────────────────────────────────────────
+# 整个脚本非要并发不可的就是这一段：后退从 0 按到 2.4 秒，期间跳三次，松开后再跳
+# 一次。原来靠 press "S" down / up 夹住中间的三次 SPACE，那种写法只有桌面能跑。
+#
+# 两端只有第一路不同（桌面按 S、安卓推摇杆），用条目级 env 守卫表达，共享的四次
+# 跳跃只写一遍——复制两份的话，调 2.4 这个数值时得记住改两处。
+timeline
+    @0.0  env:"desktop" -> press "S" hold 2.4
+    @0.0  env:"android" -> drag [general_move].[move_backward] duration 0.1 hold 2.4
+    @0.4  click [general_combat].[tiaoyue]
+    @1.4  click [general_combat].[tiaoyue]
+    @2.4  click [general_combat].[tiaoyue]
+    @2.9  click [general_combat].[tiaoyue]
+end
+
+# ─── 千斤坠，两次，避免第一次没识别到 ──────────────────
+click [general_combat].[wuxueji] after wait 0.5
+click [general_combat].[wuxueji] after wait 2
+
+goto start
+
+# ─── wait_for_prompt ───────────────────────────────────
+# 等屏幕中央的 F 提示出现，最多约 10 秒（4 轮 @page_refresh）。
+# 前置：在战斗画面
+# 后置：提示已出现，或等待超时
+# 返回：0 已出现；-1 超时
+def wait_for_prompt($region, $text)
+    eval $prompt = null
+    loop 4
+        scan [general_combat].$region as $prompt by contains $text
+        if $prompt
+            return 0
+        end
+        wait @page_refresh
+    end
+    log warn "等不到「" + $text + "」提示，本轮跳过"
+    return -1
+end

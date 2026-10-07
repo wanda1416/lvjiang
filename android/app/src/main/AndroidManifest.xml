@@ -27,12 +27,12 @@
             </intent-filter>
         </activity>
 
-        <!-- 调律参数配置页：主页功能区与悬浮面板都能进。
-             透明主题：叠在游戏画面上，游戏不被挤到后台（防 LMK 击杀） -->
+        <!-- 参数配置使用普通全屏主题，游戏执行期间只读。 -->
         <activity
-            android:name=".TuningConfigActivity"
+            android:name=".TaskSettingsActivity"
             android:exported="false"
-            android:theme="@style/Theme.Lvjiang.Translucent" />
+            android:theme="@style/Theme.Lvjiang.Settings"
+            android:windowSoftInputMode="adjustResize" />
 
         <!-- 屏幕标定页：同样透明叠在游戏上——截图时把自己藏起来就能拍到底下的游戏画面。
              独立 task（taskAffinity 空）：从悬浮面板 NEW_TASK 启动时不能被拉进律匠主页所在的

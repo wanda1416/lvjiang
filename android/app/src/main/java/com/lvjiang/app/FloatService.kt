@@ -632,6 +632,13 @@ class FloatService : Service() {
             })
         }
         area.addView(ScrollView(this).apply { addView(choices) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        area.addView(smallButton("设置任务参数") {
+            startActivity(Intent(this, TaskSettingsActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                putExtra("task_id", selectedTaskId)
+            })
+            closePanel()
+        })
         area.addView(smallButton("返回") { closeTaskSelection() })
     }
 

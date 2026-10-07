@@ -282,7 +282,7 @@ def list_tasks(require_sync: bool = True) -> str:
         # 工作流注册表，未加载会退化成同名旧 .wf（见 plugins 模块说明）。
         ensure_loaded()
 
-        # 共用排序、启停和改名偏好，但设备端没有桌面专用配置页，需允许
+        # 共用排序、启停和改名偏好，设备端专用配置通过适配器提供，需允许
         # 作者明确声明的设备专用任务（如自动调律）进入悬浮面板。
         # 冒烟自检任务源码已内联，不再出现在清单里，由 _resolve_task 内置合成。
         items = list_exposed_scripts("android", device_entry=True)

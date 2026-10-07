@@ -197,3 +197,17 @@ Android 关闭 CPU arena，与 PC 默认一致；rec/cls 单条批次，输入 d
 分配及 RSS/Swap，Python 记录任务首尾与真实屏幕验收采样。没有截图、OCR 原文或配置
 全文。SelfTestProvider 新增 /runtime、/runtime-previous 只读路径，沿用 shell/root/
 本应用 UID 校验；配置同步不包含 data/diagnostics。
+
+## 手机任务设置桥（应用内部，不改变代理线协议）
+
+`core.ondevice.task_settings` 通过 `list_settings`、`get_settings`、
+`preview_parameters`、`save_settings` 向原生列表/详情页提供用户上下文、参数定义、
+生效值、联动可见字段和逐字段错误。编辑用户由调用方显式传入，不修改活动执行用户。
+写入与手机任务启动、配置同步共享 `CONTROL_LOCK`，Kotlin 桥同时拒绝 PC 代理控制期间写入。
+配置校验令牌覆盖同步状态、参数定义、生效值和当前任务用户覆盖，拒绝陈旧草稿。
+
+代码工作流可声明 `DEVICE_SETTINGS_MODULE` 专用适配器，模块提供
+`get_settings(username) -> dict`（kind/schema/values）及
+`save_settings(username, values) -> None`（失败抛出可行动错误）。业务候选与校验仍归
+插件领域层所有；目前自动调律使用该协议，不在公共桥硬编码调律规则。
+普通脚本直接复用任务元数据与 `task_params`，不增加平行手机配置仓储。

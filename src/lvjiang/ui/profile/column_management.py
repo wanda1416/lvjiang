@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from lvjiang.core.config import get_session_store
+from lvjiang.core.config import get_interface_store
 from lvjiang.ui.button_styles import apply_button_style, fit_button_width
 
 from ...core.profile.schema import get_profile_config
@@ -38,7 +38,7 @@ _COLUMN_WIDTHS_KEY = "profile_overview_column_widths"
 
 def _get_column_widths() -> dict:
     """获取各分组列宽配置 {group_name: [width, ...]}"""
-    ui_state = get_session_store().get_node("ui_state", {})
+    ui_state = get_interface_store().get_node("ui_state", {})
     if isinstance(ui_state, dict):
         return ui_state.get(_COLUMN_WIDTHS_KEY, {})
     return {}
@@ -46,7 +46,7 @@ def _get_column_widths() -> dict:
 
 def _save_column_widths(widths: dict) -> None:
     """保存各分组列宽到 ui_state"""
-    get_session_store().update_node("ui_state", {_COLUMN_WIDTHS_KEY: widths})
+    get_interface_store().update_node("ui_state", {_COLUMN_WIDTHS_KEY: widths})
 
 
 class ProfileColumnMixin:

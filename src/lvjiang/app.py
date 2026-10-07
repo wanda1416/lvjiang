@@ -108,6 +108,8 @@ def run_app(hooks_list: list[Any] | None = None) -> int:
     logger.info("[app] 启动主窗口，已加载插件: %s",
                 [getattr(h, "name", "?") for h in hooks_list] or "无")
 
+    from .core.config.interface import initialize_state_stores
+    initialize_state_stores()
     _app = QApplication(sys.argv)
 
     # 窗口创建前应用主题，避免启动时先闪出系统浅色再切换。

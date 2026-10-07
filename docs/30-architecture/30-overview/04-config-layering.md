@@ -277,7 +277,8 @@ local 改造来获得所需行为，不允许删除系统预置文件。历史 `
 `daily.scripts.visible` 是**覆盖**而非全集，只记与作者声明不同的项，
 因此系统新增的脚本自动出现，用户不用做任何事。
 
-> `ui_state` 节点严格只放与业务无关的窗口控件位置关系，脚本偏好不放那里。
+> `interface.json` 的 `ui_state` 保存界面状态及批量运行草稿；日常脚本偏好仍放在
+> `session.json` 的 `daily.scripts`。
 
 ---
 
@@ -587,3 +588,32 @@ QMessageBox，非主线程弹原生模态框是未定义行为）。所以 `buil
 - 实体模型与指纹：[31-models/01-equipment-models.md](../31-models/01-equipment-models.md)
 - 调律规则的启用与顺序：[10-game/10-tuning-rules/](../../10-game/10-tuning-rules/README.md)
 - 用户视角的脚本管理：[60-userguide/06-workflows.md](../../60-userguide/06-workflows.md)
+
+## 八、运行与界面状态分文件
+
+`config/session/session.json` 由 `SessionStore` 管理执行选择和设置等运行节点。
+`config/session/interface.json` 由 `InterfaceStore` 管理以下五个业务根节点：
+
+| 节点 | 内容 |
+|------|------|
+| `ui_state` | 窗口尺寸、分栏、页签、列宽，以及批量活动组和运行草稿 |
+| `profile` | 总览分组、列定义、顺序和活动组 |
+| `alert_history` | Profile 提醒去重历史，原为 `profile.alert_history` |
+| `alert_info` | 告警面板消息列表 |
+| `server_config` | 更新提示、公告、在线配置与遥测状态 |
+
+新文件元数据 `version: 1` 表示首版格式。初始化入口 `initialize_state_stores()`
+必须在 QApplication 和页面构造前执行；读取与一次性迁移同步完成后才允许显示窗口。
+
+`InterfaceStore` 复用 `SessionStore` 的节点读写原语，并使用独立路径、文件锁、格式版本
+和只读实例临时字段清单。UI 页面继续统一通过 `load_ui_page_state` / `update_ui_page_state`
+读取和浅合并自己的子节点；业务消费者直接使用新存储对应节点，不维护平行缓存。
+
+仅新文件不存在时，迁移会在 interface → session 的固定锁序内读取旧格式。先原子写入
+新文件和 `migration: {source: session, version: 1}` 标记，再删除旧文件四个节点，最后
+移除标记。新文件已存在但标记尚在时只重试清理；不存在标记时不回读旧数据。
+旧文件损坏不会被空数据覆盖。更完整的边界见
+[任务历史与界面状态需求](../../20-requirements/60-editor/02-task-history.md#5-界面与辅助状态独立存储)。
+
+手机同步包含新文件，配置应用后重置并加载两个存储。Profile key 重命名维护新文件，
+失败恢复日志也覆盖新路径。用户元数据内按用户保存的界面状态仍属于 `users/*.json`。

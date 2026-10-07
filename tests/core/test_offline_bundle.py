@@ -23,6 +23,7 @@ def bundle(tmp_path, monkeypatch):
     (session / "session.json").write_text(json.dumps({
         "version": 2, "actives": {"user": "other", "layout": "desktop"},
         "settings": {"env": "desktop"},
+        "profile": {"alert_history": {"tester:demo": "now"}},
     }))
     (source / "config/local/diagnostics").mkdir(parents=True)
     (source / "config/local/diagnostics/private.log").write_text("excluded")
@@ -57,6 +58,9 @@ def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path
     session = json.loads((phone / "config/session/session.json").read_text())
     assert session["actives"] == {"user": "tester", "layout": "android"}
     assert session["settings"]["env"] == "android"
+    interface = json.loads((phone / "config/session/interface.json").read_text())
+    assert interface["alert_history"] == {"tester:demo": "now"}
+    assert "profile" not in session
     for name in ("profile.db", "tuning_history.db"):
         with closing(sqlite3.connect(phone / "config/session" / name)) as db:
             assert db.execute("SELECT value FROM entries").fetchone() == (7,)

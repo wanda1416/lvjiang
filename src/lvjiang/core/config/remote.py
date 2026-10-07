@@ -429,11 +429,11 @@ def sync_to_dir(manifest: RemoteManifest, remote_dir: Path, *,
     )
 
 
-# ─── Session 状态（server_config.remote_config）────────────
+# ─── interface.json 状态（server_config.remote_config）────────────
 
 def _state() -> dict[str, Any]:
-    from .session import get_session_store
-    server = get_session_store().get_node("server_config", {})
+    from .interface import get_interface_store
+    server = get_interface_store().get_node("server_config", {})
     if not isinstance(server, dict):
         return {}
     state = server.get("remote_config")
@@ -441,7 +441,7 @@ def _state() -> dict[str, Any]:
 
 
 def _update_state(patch: dict[str, Any]) -> None:
-    from .session import get_session_store
+    from .interface import get_interface_store
 
     def update(server: Any) -> dict[str, Any]:
         result = dict(server) if isinstance(server, dict) else {}
@@ -451,7 +451,7 @@ def _update_state(patch: dict[str, Any]) -> None:
         result["remote_config"] = state
         return result
 
-    get_session_store().mutate_node("server_config", update)
+    get_interface_store().mutate_node("server_config", update)
 
 
 def is_enabled() -> bool:

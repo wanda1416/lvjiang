@@ -124,8 +124,8 @@ def build_heartbeat_payload(*, install_id: str, first_seen: str) -> dict:
 # ─── 节流：每 UTC 日最多一次 ─────────────────────────────────
 
 def _state() -> dict:
-    from ..config.session import get_session_store
-    server = get_session_store().get_node("server_config", {})
+    from ..config.interface import get_interface_store
+    server = get_interface_store().get_node("server_config", {})
     if not isinstance(server, dict):
         return {}
     node = server.get("telemetry")
@@ -152,7 +152,7 @@ def should_send_heartbeat() -> bool:
 def mark_attempt(*, success: bool) -> None:
     """必须在主线程调用（写 SessionStore）。``last_report_date`` 只在
     成功后写——失败的一天不能算已上报。"""
-    from ..config.session import get_session_store
+    from ..config.interface import get_interface_store
 
     def _merge(existing):
         existing = existing if isinstance(existing, dict) else {}
@@ -163,4 +163,4 @@ def mark_attempt(*, success: bool) -> None:
         existing["telemetry"] = node
         return existing
 
-    get_session_store().mutate_node("server_config", _merge)
+    get_interface_store().mutate_node("server_config", _merge)

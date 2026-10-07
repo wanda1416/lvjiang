@@ -51,6 +51,8 @@ def reset_configuration() -> None:
     task_runner.release_engine()
     get_resolver().clear_read_cache()
     reset_session_store()
+    from ..config.interface import initialize_state_stores
+    initialize_state_stores()
     reset_profile_db()
     reload_profile_config()
     reload_scene_registry()

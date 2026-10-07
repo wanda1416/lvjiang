@@ -18,7 +18,7 @@ from enum import Enum
 
 from loguru import logger
 
-from ..config.session import get_session_store
+from ..config.interface import get_interface_store
 
 
 class ConsentState(str, Enum):
@@ -34,7 +34,7 @@ class NetFeature(str, Enum):
 
 
 def _telemetry_state_node() -> dict:
-    server = get_session_store().get_node("server_config", {})
+    server = get_interface_store().get_node("server_config", {})
     if not isinstance(server, dict):
         return {}
     node = server.get("telemetry")
@@ -81,7 +81,7 @@ def record_consent_choice(granted: bool) -> None:
         server["telemetry"] = node
         return server
 
-    get_session_store().mutate_node("server_config", _merge)
+    get_interface_store().mutate_node("server_config", _merge)
     # set_telemetry_enabled 负责：写 settings.network.telemetry + 生成/清除本地标识与缓冲
     set_telemetry_enabled(granted)
     logger.info(

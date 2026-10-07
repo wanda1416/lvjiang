@@ -248,7 +248,7 @@ def declares_unit_prepare(wf_name: str) -> bool:
 class BatchConfig:
     """全部配置组。按**稳定 ID** 索引，名称只用于展示。
 
-    当前活动组属于主页面状态，存在 session 的 `ui_state.batch.active_group_id`，
+    当前活动组属于主页面状态，存在 interface.json 的 `ui_state.batch.active_group_id`，
     不在这里——"编辑哪个组"和"主页面默认跑哪个组"是两件事，放一起就会出现
     「在配置窗口切一下编辑对象，主页面默认组跟着变」这类越界。
     """

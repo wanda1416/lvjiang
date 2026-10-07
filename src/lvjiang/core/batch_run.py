@@ -4,7 +4,7 @@
 
 - **配置组定义** `BatchConfigItem`（`batch.json`）——可见范围、初始顺序、默认勾选、
   调度单元、生命周期 wf 及其参数。只在「批量配置」窗口里改。
-- **运行草稿** `BatchRunDraft`（`session.json` 的 `ui_state.batch`）——本次要跑哪些、
+- **运行草稿** `BatchRunDraft`（`interface.json` 的 `ui_state.batch`）——本次要跑哪些、
   按什么顺序、跑几轮、有没有人看守。主页面改它，**永不反写定义层**。
 - **执行快照** `BatchRunSpec`（内存，见 `ui/batch/batch_runner.py`）——点开始那一刻
   把上面两层合成一份冻结数据，调度器只认它。
@@ -163,7 +163,7 @@ class BatchRunDraft:
         )
 
 
-# ─── session.json 的 ui_state.batch ─────────────────────────
+# ─── interface.json 的 ui_state.batch ─────────────────────────
 #
 # 放在 ui_state 下而不是新开顶层节点：它就是页面状态，和窗口尺寸、日常页选中项
 # 同一性质。batch 内部还有活动组和多份草稿，写入必须在 SessionStore 锁内修改
@@ -174,15 +174,15 @@ _BATCH_SECTION = "batch"
 
 
 def _batch_section() -> dict:
-    from .config.session import get_session_store
+    from .config.interface import get_interface_store
 
-    node = get_session_store().get_node(_UI_STATE_KEY, {}) or {}
+    node = get_interface_store().get_node(_UI_STATE_KEY, {}) or {}
     section = node.get(_BATCH_SECTION) if isinstance(node, dict) else None
     return section if isinstance(section, dict) else {}
 
 
 def _mutate_batch_section(mutator: Callable[[dict], None]) -> None:
-    from .config.session import get_session_store
+    from .config.interface import get_interface_store
 
     def _merge(old: object) -> dict:
         state = dict(old) if isinstance(old, dict) else {}
@@ -192,7 +192,7 @@ def _mutate_batch_section(mutator: Callable[[dict], None]) -> None:
         state[_BATCH_SECTION] = section
         return state
 
-    get_session_store().mutate_node(_UI_STATE_KEY, _merge)
+    get_interface_store().mutate_node(_UI_STATE_KEY, _merge)
 
 
 def active_group_id() -> str:

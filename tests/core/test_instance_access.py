@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from lvjiang.core import access
+from lvjiang.core.config.interface import InterfaceStore
 from lvjiang.core.config.resolver import ConfigResolver
 from lvjiang.core.config.session import SessionStore
 from lvjiang.core.config.users import SessionManager
@@ -91,11 +92,12 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
     session.set_active("plan", "original")
     session.set_node("settings", {"env": "desktop", "language": "zh_CN"})
     session.set_node("daily", {"workflow_id": "old", "scripts": {"order": ["a"]}})
-    session.set_node("profile", {
+    interface = InterfaceStore(tmp_path / "interface.json")
+    interface.set_node("profile", {
         "overview_active_group": "old",
         "overview_groups": {"old": {"columns": ["name"]}},
     })
-    session.set_node("ui_state", {
+    interface.set_node("ui_state", {
         "main_page": {"left_tab_index": 0},
         "loadout_user:alice": {"equip_filter": {"type": "all"}},
     })
@@ -108,11 +110,11 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
     session.update_node("daily", {
         "workflow_id": "new", "scripts": {"order": ["b"]},
     })
-    session.update_node("profile", {
+    interface.update_node("profile", {
         "overview_active_group": "new",
         "overview_groups": {"new": {"columns": ["progress"]}},
     })
-    session.mutate_node("ui_state", lambda old: {
+    interface.mutate_node("ui_state", lambda old: {
         **old,
         "main_page": {"left_tab_index": 1},
         "loadout_user:alice": {"equip_filter": {"type": "ring"}},
@@ -123,18 +125,20 @@ def test_readonly_only_discards_whitelisted_session_paths(tmp_path, monkeypatch)
     assert session.get_active("plan") == "temporary"
     assert session.get_node("settings") == {"env": "android", "language": "en_US"}
     assert session.get_node("daily")["workflow_id"] == "new"
-    assert session.get_node("profile")["overview_active_group"] == "new"
-    assert session.get_node("ui_state")["main_page"]["left_tab_index"] == 1
+    assert interface.get_node("profile")["overview_active_group"] == "new"
+    assert interface.get_node("ui_state")["main_page"]["left_tab_index"] == 1
 
     disk = json.loads((tmp_path / "session.json").read_text(encoding="utf-8"))
     assert disk["actives"]["plan"] == "original"
     assert disk["settings"] == {"env": "desktop", "language": "en_US"}
     assert disk["daily"] == {"workflow_id": "old", "scripts": {"order": ["b"]}}
-    assert disk["profile"] == {
+    interface.reload()
+    interface_disk = json.loads((tmp_path / "interface.json").read_text(encoding="utf-8"))
+    assert interface_disk["profile"] == {
         "overview_active_group": "old",
         "overview_groups": {"new": {"columns": ["progress"]}},
     }
-    assert disk["ui_state"] == {
+    assert interface_disk["ui_state"] == {
         "main_page": {"left_tab_index": 0},
         "loadout_user:alice": {"equip_filter": {"type": "ring"}},
     }
@@ -169,17 +173,18 @@ store.save('alice', data)
 
 
 def test_readonly_history_write_does_not_flush_temporary_settings(tmp_path, monkeypatch):
-    store = SessionStore(tmp_path / "session.json")
+    store = InterfaceStore(tmp_path / "interface.json")
     store.set_node("profile", {"overview_active_group": "original"})
     monkeypatch.setattr(access, "_readonly", True)
     store.update_node("profile", {"overview_active_group": "temporary"})
-    store.mutate_runtime_path("profile", "alert_history", lambda _: {"alice:key": "now"})
+    store.mutate_node("alert_history", lambda _: {"alice:key": "now"})
     assert store.get_node("profile")["overview_active_group"] == "temporary"
-    disk = json.loads((tmp_path / "session.json").read_text(encoding="utf-8"))
+    disk = json.loads((tmp_path / "interface.json").read_text(encoding="utf-8"))
     assert disk["profile"] == {
-        "overview_active_group": "original", "alert_history": {"alice:key": "now"},
+        "overview_active_group": "original",
     }
 
+    assert disk["alert_history"] == {"alice:key": "now"}
 
 def test_readonly_reload_refreshes_writable_state_and_keeps_transients(tmp_path, monkeypatch):
     path = tmp_path / "session.json"
@@ -200,8 +205,8 @@ def test_readonly_batch_ui_state_does_not_change_primary_instance(
     tmp_path, monkeypatch,
 ):
     """批量活动组和运行草稿都是实例自己的页面状态。"""
-    path = tmp_path / "session.json"
-    store = SessionStore(path)
+    path = tmp_path / "interface.json"
+    store = InterfaceStore(path)
     store.set_node("ui_state", {
         "batch": {"active_group_id": "primary", "drafts": {}}
     })

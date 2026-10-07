@@ -154,7 +154,7 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 | `offline_status` | — | 任务状态、原因、日志、输出及最近同步 |
 | `offline_tasks` | — | 暴露支持 android 的任务（含 DEVICE_VISIBLE 专用任务），预置或同步配置就绪即可发现 |
 | `offline_users` | — | 手机资料有效的用户名册和活动用户 |
-| `offline_start` | `task_id`、可选 `username` | 在同一控制锁内绑定有效用户并启动；省略用户时沿用手机活动用户；必须先开启悬浮服务 |
+| `offline_start` | `task_id`、可选 `username` | 自动准备悬浮服务并等待控制图标就绪，再在同一控制锁内绑定有效用户并启动；省略用户时沿用手机活动用户；缺少悬浮权限、准备失败或 PC 正在控制时拒绝启动 |
 | `offline_pause` / `offline_resume` / `offline_stop` | — | 请求暂停、继续或结束 |
 | `offline_diagnostics` | 可选 `screen_repetitions`（0～10，默认 0） | `report`：依赖/插件/引擎、OCR 和内存；同步后可仅采集真实屏幕连续推理，不注入游戏动作；手机执行中拒绝检查 |
 | `offline_sync_begin` | `size`,`sha256`,`preserve_task_params` | 建立暂存上传，最大 256 MiB；必须显式选择保留参数与否 |

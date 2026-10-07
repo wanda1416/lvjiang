@@ -104,7 +104,7 @@ capture/input；业务配置仍保持启动快照。见
 | 机制 | mss 抓窗口区域，专用工作线程 | Windows Graphics Capture 按 hwnd 取帧，推送式 | `takeScreenshot` RGBA 裸字节 | scrcpy 服务端 H.264 流，后台线程持续解码 | `adb exec-out screencap -p`，逐帧子进程 + PNG 编解码 | a11y `takeScreenshot` 或 Shizuku `screencap` |
 | 单帧耗时 | 十几 ms | `capture()` 零等待返回最新帧 | 几十 ms | `capture()` 零等待返回最新帧 | 300–800 ms | 同 a11y/shell |
 | 前置条件 | 目标窗口可见（最小化拿不到） | Win10 1903+、装了 windows-capture；窗口未最小化 | Android 11+、无障碍已开 | 设备端推 scrcpy-server.jar | 只需 adb | app 常驻 |
-| 限制 | 被遮挡部分是遮挡物；DPI 感知换算 | **被遮挡仍可用**；最小化后停帧；部分系统版本会画捕获边框 | 有节流（连续调用最小间隔数百毫秒）；`FLAG_SECURE` 窗口不可截 | 有压缩失真；`capture_lossless` 另取 | 慢；无 UI 实时预览 | 同 a11y/shell |
+| 限制 | 被遮挡部分是遮挡物；DPI 感知换算 | **被遮挡仍可用**；最小化后停帧；部分系统版本会画捕获边框 | 框架限流（距上一次请求 <=333ms 即失败，按服务连接计时，后端自行补齐节拍并通过 `min_capture_interval` 告知采样循环）；`FLAG_SECURE` 窗口不可截 | 有压缩失真；`capture_lossless` 另取 | 慢；无 UI 实时预览 | 同 a11y/shell |
 | 尺寸来源 | 窗口客户区 | 对齐到窗口矩形，与 mss 同构 | 截图实际尺寸 | 设备原始分辨率（不缩放，与 tap 同坐标系） | 实际截图尺寸（横屏游戏 wm size 可能是竖屏，以截图为准） | 同左 |
 | 实时预览 | ✅ | ✅ | ✅ 轮询 | ✅ 帧回调 | ❌ | — |
 

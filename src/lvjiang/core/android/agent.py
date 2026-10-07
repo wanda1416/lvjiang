@@ -29,7 +29,7 @@ import numpy as np
 from loguru import logger
 
 from ...core.config import InputSimConfig
-from ..capture_base import CaptureBackend
+from ..capture_base import A11yScreenshotThrottle, CaptureBackend
 from ..input_base import InputBackend, InputBackendKind
 from .device import AdbDevice
 from .input import _KEY_TO_ANDROID_KEYCODE
@@ -380,11 +380,14 @@ def connect_agent_diagnostic(device: AdbDevice) -> AgentClient | None:
 
 # ─── 截图后端 ─────────────────────────────────────────────
 
-class AgentCapture(CaptureBackend):
+class AgentCapture(A11yScreenshotThrottle, CaptureBackend):
     """经设备端代理截图
 
     via="auto"：无障碍可用走 takeScreenshot（RGBA 裸字节，免 PNG 编解码），否则 Shizuku screencap。
-    takeScreenshot 有数百毫秒级节流，设备端标 retryable 的失败这里退避重试。
+
+    打的是设备端同一个无障碍服务连接，因此和设备端直连后端共用同一份请求节拍：
+    发请求前先补齐框架要求的最小间隔，设备端标 retryable 的失败仍退避重试。
+    实际走哪条通道由设备端决定并回在响应头里，走 screencap 的帧不限频。
     """
 
     _RETRY_DELAY = 0.4
@@ -394,6 +397,7 @@ class AgentCapture(CaptureBackend):
         self._client = client
         self._via = via
         self._size: tuple[int, int] | None = None
+        self._init_throttle(throttled=via != "shell")
 
     @property
     def client(self) -> AgentClient:
@@ -407,6 +411,7 @@ class AgentCapture(CaptureBackend):
 
     def capture(self, timeout: float = 10.0) -> np.ndarray | None:
         for attempt in range(1, self._MAX_ATTEMPTS + 1):
+            self._pace()
             try:
                 header, payload = self._client.call(
                     "screenshot", timeout=timeout + 5.0,
@@ -422,6 +427,7 @@ class AgentCapture(CaptureBackend):
             except AgentError as e:
                 logger.error(f"[Agent] 截图失败: {e}")
                 return None
+            self._set_throttled(header.get("via") != "shell")
             img = decode_frame(header, payload)
             if img is None:
                 return None

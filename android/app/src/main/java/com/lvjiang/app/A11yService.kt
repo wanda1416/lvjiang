@@ -130,8 +130,9 @@ object A11yBridge {
      * 刻意不编码成 PNG：Python 侧拿 RGBA 裸字节可以直接 numpy.frombuffer + reshape，
      * 省掉「PNG 压缩 → imdecode 解压」这一对纯浪费的往返。
      *
-     * takeScreenshot 有节流（数百毫秒级最小间隔），连续调用过快会返回
-     * ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT，调用方需自行留间隔。
+     * takeScreenshot 由框架限流：距上一次请求 <=333ms 即返回
+     * ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT（时间戳按服务连接记录，被限流的
+     * 请求不更新它）。节拍由调用方补齐，Python 侧统一在截图后端里做。
      */
     fun screenshotRgba(timeoutMs: Long = 5000): Array<Any>? {
         lastScreenshotError = null

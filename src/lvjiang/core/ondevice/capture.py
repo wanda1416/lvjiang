@@ -7,6 +7,9 @@
 主通道选无障碍而不是 Shizuku：后者必须由 adb 引导启动，手机重启一次就失效，
 对普通用户不成立。两边都返回同一形状的 BGR numpy，上层无需区分。
 
+无障碍通道的框架限流节拍由 core.capture_base.A11yScreenshotThrottle 统一提供，
+与 PC 代理通道共用一份实现。
+
 失败原因通过任务日志暴露，截图失败返回 None，内存耗尽向上传播。
 """
 
@@ -16,27 +19,28 @@ import numpy as np
 from loguru import logger
 
 from ...i18n import tr
-from ..capture_base import CaptureBackend
+from ..capture_base import A11yScreenshotThrottle, CaptureBackend
 from . import a11y, shell
 
 
-class A11yCapture(CaptureBackend):
+class A11yCapture(A11yScreenshotThrottle, CaptureBackend):
     """基于无障碍 takeScreenshot 的截图后端（主通道）
 
     比 screencap 快一个量级：拿到的是 RGBA 裸字节，numpy 直接 reshape，
     省掉「PNG 压缩 → imdecode 解压」这一对纯浪费的往返。
 
-    代价是 takeScreenshot 有节流（数百毫秒级最小间隔），连续调用过快会失败。
-    调律场景是「操作一步 → 截一张」的秒级节奏，够用；真需高帧率再上
-    MediaProjection（它底层就是 scrcpy 那套 VirtualDisplay，不限频）。
+    代价是 takeScreenshot 被框架限流，节拍由 A11yScreenshotThrottle 统一补齐，
+    不把间隔留给各调用方去猜。调律场景是「操作一步 → 截一张」的秒级节奏，够用；
+    真需高帧率再上 MediaProjection（它底层就是 scrcpy 那套 VirtualDisplay，不限频）。
     """
 
-    #: 节流退避：takeScreenshot 的最小间隔是数百毫秒级，失败后干等一下大多能成
+    #: 退避重试：节拍已由 _pace 保证，这里只覆盖系统侧的偶发失败
     _RETRY_DELAY = 0.4
     _MAX_ATTEMPTS = 3
 
     def __init__(self):
         self._size: tuple[int, int] | None = None
+        self._init_throttle()
 
     def capture(self, timeout: float = 10.0) -> np.ndarray | None:
         got = self._grab(timeout)
@@ -60,15 +64,18 @@ class A11yCapture(CaptureBackend):
     def _grab(self, timeout: float):
         """取一帧 RGBA，失败时重试；返回 (宽, 高, 字节) 或 None
 
+        每次请求前先补齐节拍（_pace），把限流挡在发请求之前而不是靠失败重试。
+
         分两种失败区别对待：无障碍服务掉线是硬故障（重试没有意义，直接报清楚，
-        由上层引导用户去开开关）；返回 None 但服务在线则大概率是截图节流，
-        退避一下再试。长任务里连续截图撞上节流是常态，不重试就会中途莫名失败。
+        由上层引导用户去开开关）；返回 None 但服务在线是系统侧的偶发失败，
+        退避一下再试，长任务不该因为一帧没拿到就中途失败。
         """
         for attempt in range(1, self._MAX_ATTEMPTS + 1):
             if not a11y.is_ready():
                 logger.error(tr("[A11yCapture] 无障碍服务未连接（开关未开或被系统关掉），请重新开启"))
                 return None
 
+            self._pace()
             try:
                 got = a11y.screenshot_rgba(int(timeout * 1000))
             except MemoryError:

@@ -18,6 +18,8 @@ def make_engine(**overrides) -> WorkflowEngine:
     """
     capture = MagicMock()
     capture.get_capture_size.return_value = (1920, 1080)
+    # 代表 PC 后端：不限频。真实后端的下限由 CaptureBackend.min_capture_interval 声明。
+    capture.min_capture_interval = 0.0
     layout = MagicMock()
     layout.get_canvas.return_value = MagicMock(
         x_ratio=0, y_ratio=0, w_ratio=1, h_ratio=1)

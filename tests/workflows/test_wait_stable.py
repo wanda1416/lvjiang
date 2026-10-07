@@ -68,6 +68,29 @@ def _run_wait_stable(cap: _SeqCapture, **kw):
     return wf, clock
 
 
+class TestWaitStableSamplingInterval:
+    """采样间隔必须尊重截图后端的限流，PC 后端不受影响。"""
+
+    @staticmethod
+    def _sampling_sleeps(cap, **kw) -> list[float]:
+        wf = _workflow_with_capture(cap)
+        slept: list[float] = []
+        wf.wait_stable(timeout=5.0, interval=0.1, stable_duration=0.02,
+                       least=0.0, _clock=FakeClock(), _sleep=slept.append, **kw)
+        return slept
+
+    def test_interval_raised_to_backend_throttle(self):
+        """Android 无障碍 0.3s 以下的采样必然撞限流，间隔由后端下限决定。"""
+        cap = _SeqCapture([_frame(100), *[_frame(200) for _ in range(30)]])
+        cap.min_capture_interval = 0.35
+        assert self._sampling_sleeps(cap)[0] == 0.35
+
+    def test_pc_backend_keeps_requested_interval(self):
+        """PC 截图不限频，不能被手机的退避拖慢。"""
+        cap = _SeqCapture([_frame(100), *[_frame(200) for _ in range(30)]])
+        assert self._sampling_sleeps(cap)[0] == 0.1
+
+
 class TestWaitStableExecution:
     def test_orientation_change_restarts_stability_baseline(self):
         """游戏退出/重启切换横竖屏不能 absdiff 崩溃，也不能沿用旧稳定计时。"""

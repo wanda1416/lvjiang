@@ -42,6 +42,9 @@ def _fake_resolver(files, layers=None):
 
 
 def _patch_resolver(monkeypatch, files, layers=None):
+    # 文件发现使用完整 fake；不能混入前序插件测试注册的真实类任务。
+    monkeypatch.setattr(
+        "lvjiang.workflows.discovery.implementations.list_workflows", lambda: [])
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.get_resolver",
         lambda: _fake_resolver(files, layers),

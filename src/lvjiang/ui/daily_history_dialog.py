@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from datetime import date, datetime
+from typing import TypeGuard
 
 from loguru import logger
 from PyQt6.QtCore import QDate, Qt
@@ -30,6 +31,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox, ComboWidthMode
 
+from ..core.config import load_ui_page_state, update_ui_page_state
 from ..core.daily_history import (
     BatchRunRecord,
     TaskHistoryRepository,
@@ -141,8 +143,37 @@ class DailyHistoryDialog(QDialog):
         self._task_records: list[TaskRunRecord] = []
         self._batch_records: list[BatchRunRecord] = []
         self._batch_filter = ""
+        state = load_ui_page_state("task_history")
         self._build_ui()
+        self._restore_ui_state(state)
         self.refresh_options()
+
+    def _restore_ui_state(self, state: dict) -> None:
+        size = state.get("window_size")
+        if self._valid_sizes(size):
+            self.resize(*size)
+        for key, splitter in (("task_splitter_sizes", self._task_splitter),
+                              ("batch_splitter_sizes", self._batch_splitter)):
+            sizes = state.get(key)
+            if self._valid_sizes(sizes):
+                splitter.setSizes(sizes)
+
+    @staticmethod
+    def _valid_sizes(value: object) -> TypeGuard[list[int]]:
+        return (isinstance(value, list) and len(value) == 2
+                and all(type(size) is int and size > 0 for size in value))
+
+    def done(self, result: int) -> None:
+        # QDialog 的窗口关闭、Esc 和 accept/reject 都经由 done 收尾。
+        try:
+            update_ui_page_state("task_history", {
+                "window_size": [self.width(), self.height()],
+                "task_splitter_sizes": self._task_splitter.sizes(),
+                "batch_splitter_sizes": self._batch_splitter.sizes(),
+            })
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"保存任务历史窗口状态失败: {exc}")
+        super().done(result)
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -202,6 +233,7 @@ class DailyHistoryDialog(QDialog):
         split.addWidget(left)
         split.addWidget(self._task_viewer)
         split.setSizes([540, 650])
+        self._task_splitter = split
         apply_button_style(self._clear_batch_filter_button, variant="neutral")
         return page
 
@@ -256,6 +288,7 @@ class DailyHistoryDialog(QDialog):
         split.addWidget(left)
         split.addWidget(self._batch_viewer)
         split.setSizes([540, 650])
+        self._batch_splitter = split
         apply_button_style(self._batch_query_button, self._view_batch_tasks_button, variant="action")
         return page
 

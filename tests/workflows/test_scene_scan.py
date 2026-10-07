@@ -190,6 +190,7 @@ def test_daily_jianghu_claim_guard_executes(reward_state, expected_clicks):
         "global $reward_probe, $claimed_clicks, $haoling_of_week, "
         "$max_claim_reputation\n"
         + claim
+        + text[text.index("def new_jianghu_result("):]
         + """
 def detect_jianghu_card_reward_state($label)
    return $reward_probe

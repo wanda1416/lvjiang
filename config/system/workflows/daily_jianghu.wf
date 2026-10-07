@@ -95,6 +95,7 @@ default $min_yinjiu_confidence = "0.65"
 global $claim_reward, $max_refresh, $max_claim_reputation, $haoling_of_week, $mode_checked, $mode_switched
 global $do_heying, $do_huanzhuang, $do_qingjing, $do_kanbao, $do_yinjiu, $do_juezhanglin
 global $min_yinjiu_confidence
+global $jianghu_result, $jianghu_item
 
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
@@ -104,8 +105,14 @@ import "subcall/profile_registry.wf"
 import "subcall/visual_state.wf"
 
 # ─── 起始定位与首次同步 ────────────────────────────────────────────
+# 仅记录已有流程的事实：共享可变对象在顶层 collect，子过程更新也保留部分结果。
+call $jianghu_result = new_jianghu_result()
+eval $jianghu_item = {}
+collect $jianghu_result as "jianghu"
+
 call $profile_ok = declare_profiles(["haoling_of_week"])
 if $profile_ok < 0
+   call record_jianghu_failure("profile_declaration_failed")
    return -1
 end
 
@@ -118,6 +125,9 @@ eval $mode_switched = false
 call $has_task = has_selected_task()
 if not $has_task
    log "未选择要执行的江湖号令任务，跳过流程"
+   eval $jianghu_result.status = "skipped"
+   eval $jianghu_result.reason = "no_selected_task"
+   eval $jianghu_result.finished = true
    return 0
 end
 
@@ -125,6 +135,7 @@ end
 # 读不到「号令」标题即视为在首页，先自动导航进活动页（auto_nav=1）
 call $haoling_ok = ensure_at_haoling("起始", 1)
 if $haoling_ok < 0
+   call record_jianghu_failure("initial_page_failed")
    return -1
 end
 
@@ -132,10 +143,12 @@ end
 # 当前用户 profile 的同步值。两者都无效时才保留本轮上次有效值。
 # 此后只有领奖会改变该值，故「读取即写入」足以保证实时与存储一致。
 call $haoling_of_week = sync_haoling_of_week()
+eval $jianghu_result.reputation.before = $haoling_of_week
 
 # ─── 处理六张任务卡 ──────────────────────────────────────────────
 call $first_pass = process_jianghu_cards(false)
 if not $first_pass.ok
+   call record_jianghu_failure("first_pass_page_failed")
    return -1
 end
 
@@ -147,10 +160,12 @@ if $first_pass.found_precompleted
    # 复用既有页面校验，已在号令页时不导航，否则按主页路径返回。
    call $haoling_ok = ensure_at_haoling("补扫", 1)
    if $haoling_ok < 0
+      call record_jianghu_failure("rescan_page_failed")
       return -1
    end
    call $second_pass = process_jianghu_cards(true)
    if not $second_pass.ok
+      call record_jianghu_failure("rescan_processing_failed")
       return -1
    end
 end
@@ -165,6 +180,7 @@ if $at_haoling
    click [activity_jianghu].[back] after wait @step_interval
    click [school_main].[back] after wait @step_interval
    click [game_menu_page].[back] after wait @step_interval
+   eval $jianghu_result.cleanup.home = "return_attempted"
 end
 
 # 本次为合影切到过多人模式：从主页进菜单切回单人模式，再确认回到主页。
@@ -172,6 +188,8 @@ end
 if $mode_switched
    call restore_single_mode()
 end
+
+call finish_jianghu_result()
 
 # ─── process_jianghu_cards ────────────────────────────────
 # 完整处理当前页面的六张任务卡。
@@ -184,15 +202,22 @@ end
 #
 # 调用方仅依据第一轮结果决定是否补扫一次，第二轮不会继续递归。
 def process_jianghu_cards($is_rescan)
+   if $is_rescan
+      eval $jianghu_result.passes = 2
+   else
+      eval $jianghu_result.passes = 1
+   end
    eval $found_precompleted = false
 
    for idx in ["1", "2", "3", "4", "5", "6"]
+      call $jianghu_item = begin_jianghu_record($is_rescan, $idx)
 
       # 任务开头再校验一次是否仍在号令页：前一个任务若卡住退出，
       # 可能未回到号令页，导致后续任务全部错乱。此时停在未知页面，
       # 不能自动导航（auto_nav=0），阻塞弹窗提示用户手动处理
       call $haoling_ok = ensure_at_haoling($idx, 0)
       if $haoling_ok < 0
+         call record_jianghu_outcome("failed", "page_check_failed")
          return {"ok": false, "found_precompleted": $found_precompleted}
       end
 
@@ -202,8 +227,17 @@ def process_jianghu_cards($is_rescan)
       # 完成后的任务仍保留原文案，右上角刷新按钮才是稳定状态信号。
       # 只有这个执行前入口会记录 found_precompleted；本轮动作完成不触发补扫。
       call $task_completed = is_task_completed($label)
+      if $jianghu_item
+         if $task_completed
+            eval $jianghu_item.refresh_icon_before = false
+         else
+            eval $jianghu_item.refresh_icon_before = true
+         end
+      end
       if $task_completed
          eval $found_precompleted = true
+         call record_jianghu_outcome("already_done", "completed_before_processing")
+         call record_jianghu_completion("completed", false)
          log "任务 " + $idx + " 在处理前已经完成，跳过任务切换与执行"
          # 首轮已经处理过全部可领取奖励；补扫只补漏任务，不重复点击
          # 已完成卡片。补扫中新执行完成的任务仍走下方正常领奖分支。
@@ -218,6 +252,9 @@ def process_jianghu_cards($is_rescan)
 
       # 复用上面的 OCR 文字判断是否为目标任务，不重复扫描。
       eval $task_text = $text_result.label
+      if $jianghu_item
+         eval $jianghu_item.initial_text = $task_text
+      end
       call $hit = is_target_task($task_text)
       if $hit
          log "任务 " + $idx + " 已是目标任务"
@@ -226,8 +263,13 @@ def process_jianghu_cards($is_rescan)
             $label, $idx, $task_text)
          eval $refresh_status = $refresh_result.status
          eval $task_text = $refresh_result.task_text
+         if $jianghu_item
+            eval $jianghu_item.task_text = $task_text
+         end
 
          if $refresh_status == "completed"
+            call record_jianghu_outcome("already_done", "completed_during_refresh")
+            call record_jianghu_completion("completed", false)
             if $claim_reward
                call claim_completed_reward($label, $idx)
             end
@@ -238,32 +280,45 @@ def process_jianghu_cards($is_rescan)
             eval $hit = 1
          else
             log "任务 " + $idx + " 达到刷新上限仍未命中，跳过"
+            call record_jianghu_outcome("refresh_exhausted", "refresh_limit")
          end
       end
 
       # 命中目标任务 → 读取任务文本，分发执行对应动作
       if $hit
          call $should_execute = should_execute_task($task_text)
+         call identify_jianghu_record($is_rescan, $idx, $task_text, $should_execute)
          if not $should_execute
             log "任务 " + $idx + "（" + $label + "）属于固定目标，但用户未勾选执行，保留任务并跳过动作与领奖"
+            call record_jianghu_outcome("disabled", "user_disabled")
+            call record_jianghu_reward("disabled", "user_disabled")
             continue
          end
          log "任务 " + $idx + "（" + $label + "）执行前：" + $task_text
 
+         call record_jianghu_outcome("executing", "")
          call $skip_reward_check = execute_target_task($task_text, $label, $idx)
          if $skip_reward_check
             log "任务 " + $idx + " 未完成，跳过领奖检测"
+            call record_jianghu_reward("task_incomplete", "action_blocked")
             continue
          end
+
+         call record_jianghu_action_returned()
 
          # 领取奖励（勾选时）：完成后任务文字仍会保留，刷新按钮消失才
          # 表示任务已经真正完成。觉障林未实现，无论是否勾选均跳过领奖。
          if $claim_reward and not $task_text contains "觉障林"
             call $task_completed = is_task_completed($label)
             if $task_completed
+               call record_jianghu_completion("completed", false)
+               call record_jianghu_outcome("completed", "completion_observed")
                call claim_completed_reward($label, $idx)
             else
                log "任务 " + $idx + " 执行后刷新按钮仍存在，判定未真正完成，跳过领奖"
+               call record_jianghu_completion("incomplete", true)
+               call record_jianghu_outcome("incomplete", "refresh_icon_present")
+               call record_jianghu_reward("task_incomplete", "refresh_icon_present")
             end
          end
       end
@@ -352,21 +407,27 @@ end
 # 用户开关只控制已匹配目标是否执行；关闭时保留该任务，不执行动作和领奖。
 def should_execute_task($text)
    if $text contains "合影"
+      call record_jianghu_task("heying", "合影")
       return $do_heying
    end
    if $text contains "换装"
+      call record_jianghu_task("huanzhuang", "换装")
       return $do_huanzhuang
    end
    if $text contains "情境"
+      call record_jianghu_task("qingjing", "情境")
       return $do_qingjing
    end
    if $text contains "东方"
+      call record_jianghu_task("kanbao", "看报")
       return $do_kanbao
    end
    if $text contains "醉意"
+      call record_jianghu_task("yinjiu", "饮酒")
       return $do_yinjiu
    end
    if $text contains "觉障林"
+      call record_jianghu_task("juezhanglin", "觉障林")
       return $do_juezhanglin
    end
    return 0
@@ -428,6 +489,9 @@ def refresh_task_until_terminal($label, $idx, $initial_text)
 
    loop $max_refresh
       click [activity_jianghu].$label.[refresh] after wait stable @page_refresh least 0.3
+      if $jianghu_item
+         eval $jianghu_item.refresh_count = $jianghu_item.refresh_count + 1
+      end
 
       # 任务文字可能保持不变，不能据此推断完成；每次刷新后只认刷新按钮。
       call $task_completed = is_task_completed($label)
@@ -438,6 +502,9 @@ def refresh_task_until_terminal($label, $idx, $initial_text)
 
       scan [activity_jianghu].$label.[label] as $text_result
       eval $task_text = trim($text_result.label)
+      if $jianghu_item
+         eval $jianghu_item.task_text = $task_text
+      end
       log "任务 " + $idx + "（" + $label + "）刷新扫描：" + $task_text
 
       call $hit = is_target_task($task_text)
@@ -468,18 +535,25 @@ end
 def claim_completed_reward($label, $idx)
    if $haoling_of_week < 0
       log "任务 " + $idx + " 已完成，但当周声望识别无效，跳过领奖"
+      call record_jianghu_reward("progress_unknown", "invalid_weekly_progress")
       return 0
    end
    if $haoling_of_week < $max_claim_reputation
       call $reward_state = detect_jianghu_card_reward_state($label)
+      if $jianghu_item
+         eval $jianghu_item.reward.observed_state = $reward_state
+      end
       if $reward_state == "claimed"
          log "任务 " + $idx + " 已完成且奖励已领取，跳过重复点击"
+         call record_jianghu_reward("already_claimed", "reward_already_claimed")
          return 0
       end
       if $reward_state != "unclaimed"
          log "任务 " + $idx + " 已完成但奖励金光状态无法确认，跳过领奖"
+         call record_jianghu_reward("reward_unknown", "reward_state_unknown")
          return 0
       end
+      call record_jianghu_reward("claim_attempted", "claim_not_verified")
       call claim_reward($label, $idx)
       # 领奖改变了当周累计值，立即刷新并写入 profile；识别失败或数值回退
       # 会保留上次有效值，后续继续按该值判断是否领奖。
@@ -489,6 +563,7 @@ def claim_completed_reward($label, $idx)
    # $haoling_of_week 来自上一次 sync_haoling_of_week，当时已写入 profile，
    # 未领奖即无变化，无需重复写
    log "当周已领取声望 " + $haoling_of_week + "，达到最大领取声望 " + $max_claim_reputation + "，跳过领奖"
+   call record_jianghu_reward("limit_reached", "weekly_limit")
    return 0
 end
 
@@ -505,6 +580,8 @@ end
 def sync_haoling_of_week()
    scan [activity_jianghu].[haoling_of_week] as $result
    call $value = sync_weekly_progress($result.haoling_of_week, "haoling_of_week", $haoling_of_week, "当周获取号令", "江湖号令")
+   eval append($jianghu_result.reputation.observations, {"raw_text": $result.haoling_of_week, "adopted_value": $value})
+   eval $jianghu_result.reputation.after = $value
    return $value
 end
 
@@ -751,6 +828,7 @@ def action_kanbao($label, $idx)
    call $in_main = is_in_main_page()
    if $in_main
        log "仍在主页，看报动作可能未解锁，跳过看报操作"
+       call record_jianghu_outcome("blocked", "reading_not_entered")
    else
        call perform_kanbao()
    end
@@ -811,6 +889,7 @@ def action_yinjiu($label, $idx)
    call $nav_result = nav_main_to_item()
    if $nav_result < 0
       # 保持既有导航失败处理：仅“没找到黄泉酿”会跳过领奖检测。
+      call record_jianghu_outcome("failed", "item_navigation_failed")
       return 0
    end
 
@@ -844,12 +923,14 @@ def action_yinjiu($label, $idx)
             end
          else
             log "找不到食用按钮"
+            call record_jianghu_outcome("blocked", "use_button_not_found")
          end
       else
          press "F" after wait @step_interval
       end
    else
       log "找不到黄泉酿"
+      call record_jianghu_outcome("blocked", "item_not_found")
    end
 
    # ── 关闭背包，退回首页 ──
@@ -874,6 +955,8 @@ end
 # 动作暂未实现：只记一条日志，卡片按「未执行动作」处理，主流程跳过领奖。
 def action_juezhanglin($label)
    log "觉障林动作暂未实现"
+   call record_jianghu_outcome("not_implemented", "action_not_implemented")
+   call record_jianghu_reward("task_incomplete", "action_not_implemented")
 end
 
 # ─── switch_game_mode ─────────────────────────────────────
@@ -937,10 +1020,12 @@ end
 # 路径：主页 → 菜单 → 切换单人模式 → 确认回到游戏主页。
 # 已是单人模式（用户中途手动切回）则只关闭菜单。
 def restore_single_mode()
+   eval $jianghu_result.cleanup.mode = "restoring"
    log "本次为合影切换过多人模式，收尾切回单人模式"
    call $nav_result = nav_main_to_menu()
    if $nav_result < 0
       log "打不开菜单页，无法切回单人模式"
+      eval $jianghu_result.cleanup.mode = "failed"
       return -1
    end
    call $switched = switch_game_mode("sp")
@@ -951,11 +1036,14 @@ def restore_single_mode()
    call $in_main = is_in_main_page()
    if not $in_main
       log "切回单人模式后未回到游戏主页"
+      eval $jianghu_result.cleanup.mode = "failed"
       screenshot from last
       eval pause("切回单人模式后未检测到游戏主页，请手动回到主页后点击确定")
       return -1
    end
    log "已切回单人模式并回到游戏主页"
+   eval $jianghu_result.cleanup.mode = "restored"
+   eval $jianghu_result.cleanup.home = "confirmed"
    return 0
 end
 
@@ -1040,4 +1128,153 @@ def back_to_haoling()
       eval pause("找不到「江湖号令」，请手动定位到号令页后点击确定")
    end
    return 0
+end
+
+# ─── 结果记录（只更新输出对象，不参与原有动作决策）──────────────────
+def new_jianghu_result()
+   return {"schema_version": 1, "status": "running", "finished": false, "reason": "", "passes": 0, "counts": {}, "tasks": {}, "unidentified": [], "reputation": {"before": -1, "after": -1, "observations": []}, "cleanup": {"home": "unknown", "mode": "not_needed"}}
+end
+
+def make_jianghu_record($pass, $idx)
+   eval $reward = "not_checked"
+   if not $claim_reward
+      eval $reward = "disabled"
+   end
+   return {"pass": $pass, "card": "card_" + $idx, "task": "", "task_name": "", "initial_text": "", "task_text": "", "refresh_count": 0, "outcome": "unknown", "reason": "", "completion": "unknown", "refresh_icon_before": "unknown", "refresh_icon_after": "unknown", "action": {"status": "not_attempted", "reason": ""}, "events": [], "reward": {"status": $reward, "reason": "", "observed_state": "unknown"}}
+end
+
+def begin_jianghu_record($is_rescan, $idx)
+   if $is_rescan
+      call $record = make_jianghu_record(2, $idx)
+      return $record
+   end
+   call $record = make_jianghu_record(1, $idx)
+   eval append($jianghu_result.unidentified, $record)
+   return $record
+end
+
+# 使用既有任务分发给出的稳定类型 key，位置和 OCR 原文都不是任务身份。
+# 条件只过滤结果写入，不改变原有刷新、动作、领奖或补扫决策。
+def identify_jianghu_record($is_rescan, $idx, $text, $allowed)
+   eval $task_key = $jianghu_item.task
+   if $is_rescan
+      if $task_key is_empty or has_key($jianghu_result.tasks, $task_key) or not $allowed or $task_key == "juezhanglin"
+         eval $jianghu_item = {}
+         return 0
+      end
+   else
+      if $task_key is_empty
+         return 0
+      end
+      eval remove($jianghu_result.unidentified, $jianghu_item)
+   end
+   eval $jianghu_item.task_text = $text
+   if not has_key($jianghu_result.tasks, $task_key)
+      eval append($jianghu_result.tasks, $task_key, {"task_name": $jianghu_item.task_name, "records": []})
+   end
+   eval $task_group = $jianghu_result.tasks.$task_key
+   eval append($task_group.records, $jianghu_item)
+   return 0
+end
+
+def record_jianghu_task($key, $name)
+   if $jianghu_item
+      eval $jianghu_item.task = $key
+      eval $jianghu_item.task_name = $name
+   end
+end
+
+def record_jianghu_outcome($outcome, $reason)
+   if $jianghu_item
+      eval $jianghu_item.outcome = $outcome
+      eval $jianghu_item.reason = $reason
+      eval append($jianghu_item.events, {"stage": "action", "outcome": $outcome, "reason": $reason})
+      if $outcome == "executing"
+         eval $jianghu_item.action.status = "running"
+      else if $outcome == "blocked" or $outcome == "failed"
+         eval $jianghu_item.action.status = $outcome
+         eval $jianghu_item.action.reason = $reason
+      else if $outcome == "disabled" or $outcome == "not_implemented"
+         eval $jianghu_item.action.status = "skipped"
+         eval $jianghu_item.action.reason = $reason
+      else if $outcome == "executed_unverified"
+         eval $jianghu_item.action.status = "executed"
+      end
+   end
+end
+
+def record_jianghu_action_returned()
+   if $jianghu_item and $jianghu_item.outcome == "executing"
+      call record_jianghu_outcome("executed_unverified", "completion_not_checked")
+   end
+end
+
+def record_jianghu_completion($completion, $refresh_icon)
+   if $jianghu_item
+      eval $jianghu_item.completion = $completion
+      eval $jianghu_item.refresh_icon_after = $refresh_icon
+   end
+end
+
+def record_jianghu_reward($status, $reason)
+   if $jianghu_item
+      eval $jianghu_item.reward.status = $status
+      eval $jianghu_item.reward.reason = $reason
+      eval append($jianghu_item.events, {"stage": "reward", "status": $status, "reason": $reason})
+   end
+end
+
+def record_jianghu_failure($reason)
+   eval $jianghu_result.status = "failed"
+   eval $jianghu_result.reason = $reason
+   eval $jianghu_result.finished = true
+end
+
+def finish_jianghu_result()
+   eval $counts = {}
+   eval $status = "skipped"
+   eval $records = []
+   for record in $jianghu_result.unidentified
+      eval append($records, $record)
+   end
+   for task_key in keys($jianghu_result.tasks)
+      eval $task_group = $jianghu_result.tasks.$task_key
+      for record in $task_group.records
+         eval append($records, $record)
+      end
+   end
+   for record in $records
+      eval $outcome = $record.outcome
+      eval $count = 0
+      if has_key($counts, $outcome)
+         eval $count = $counts.$outcome
+      end
+      eval append($counts, $outcome, $count + 1)
+      if $record.outcome != "disabled" and $record.outcome != "already_done"
+         if $status == "skipped"
+            eval $status = "success"
+         end
+         if $record.outcome != "completed"
+            eval $status = "partial"
+         end
+      end
+      if $record.action.status == "blocked" or $record.action.status == "failed"
+         eval $status = "partial"
+      end
+      if $record.reward.status == "reward_unknown" or $record.reward.status == "progress_unknown" or $record.reward.status == "claim_attempted"
+         eval $status = "partial"
+      end
+   end
+   if $status == "skipped" and has_key($counts, "already_done")
+      if $counts.already_done == len($records)
+         eval $status = "already_done"
+      end
+   end
+   if $jianghu_result.cleanup.mode == "failed"
+      eval $status = "failed"
+      eval $jianghu_result.reason = "mode_restore_failed"
+   end
+   eval $jianghu_result.counts = $counts
+   eval $jianghu_result.status = $status
+   eval $jianghu_result.finished = true
 end

@@ -35,6 +35,7 @@ scenes:
     - bugan_detail
     - zhanling_detail
     - shop_detail
+    - baiye_shop
   social:
     name: 社交
     items:
@@ -55,3 +56,4 @@ scenes:
     items:
     - jianghu_card
     - huoyun_card
+    - baiye_activity_card

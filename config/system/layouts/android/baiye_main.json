@@ -107,6 +107,20 @@
       "h_ratio": 0.2013888888888889
     }
   ],
+  "points": [
+    {
+      "key": "activity_scroll_start",
+      "cx_ratio": 0.6875,
+      "cy_ratio": 0.7638888888888888,
+      "r_ratio": 0.001
+    },
+    {
+      "key": "activity_scroll_end",
+      "cx_ratio": 0.6875,
+      "cy_ratio": 0.2722222222222222,
+      "r_ratio": 0.001
+    }
+  ],
   "subscene_refs": [
     {
       "key": "card_1",
@@ -135,20 +149,6 @@
       "y_ratio": 0.4305555555555556,
       "w_ratio": 0.240625,
       "h_ratio": 0.24166666666666667
-    }
-  ],
-  "points": [
-    {
-      "key": "activity_scroll_start",
-      "cx_ratio": 0.6875,
-      "cy_ratio": 0.7638888888888888,
-      "r_ratio": 0.001
-    },
-    {
-      "key": "activity_scroll_end",
-      "cx_ratio": 0.6875,
-      "cy_ratio": 0.2722222222222222,
-      "r_ratio": 0.001
     }
   ]
 }

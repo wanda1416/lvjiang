@@ -1242,7 +1242,7 @@ class ProfileDefinitionDialog(QDialog):
 
         # 通用字段
         key_input = QLineEdit(existing.key if existing else "")
-        key_input.setEnabled(existing is None)
+        key_input.setReadOnly(existing is not None)
         key_row = QHBoxLayout()
         key_row.addWidget(key_input)
         if existing is not None:
@@ -1253,7 +1253,7 @@ class ProfileDefinitionDialog(QDialog):
                 if is_readonly():
                     QMessageBox.information(dialog, tr("提示"), tr("只读实例不可以重命名 key"))
                     return
-                key_input.setEnabled(True)
+                key_input.setReadOnly(False)
                 key_input.setFocus()
                 key_input.selectAll()
                 edit_key.setEnabled(False)

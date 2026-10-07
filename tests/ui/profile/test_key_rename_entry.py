@@ -27,7 +27,10 @@ def test_key_edit_feedback_cancel_and_confirmed_save(qapp, monkeypatch):
 
     def edit(dialog):
         key_input = next(field for field in dialog.findChildren(QLineEdit) if field.text() == "credits")
-        assert not key_input.isEnabled()
+        assert key_input.isEnabled()
+        assert key_input.isReadOnly()
+        key_input.selectAll()
+        assert key_input.selectedText() == "credits"
         edit = next(button for button in dialog.findChildren(QPushButton) if button.text() == "编辑")
         assert edit.isEnabled()
         messages = []
@@ -36,10 +39,12 @@ def test_key_edit_feedback_cancel_and_confirmed_save(qapp, monkeypatch):
             patch.setattr(QMessageBox, "information", lambda parent, title, text: messages.append(text))
             edit.click()
             assert messages == ["只读实例不可以重命名 key"]
-            assert not key_input.isEnabled()
+            assert key_input.isEnabled()
+            assert key_input.isReadOnly()
             assert edit.isEnabled()
         edit.click()
         assert key_input.isEnabled()
+        assert not key_input.isReadOnly()
         assert key_input.selectedText() == "credits"
         assert not edit.isEnabled()
         key_input.setText("coins")
@@ -105,7 +110,8 @@ def test_overview_column_uses_shared_editor_and_independent_rename_history(qapp,
             viewed.append(True)
             return QDialog.DialogCode.Rejected
         key_input = next(field for field in dialog.findChildren(QLineEdit) if field.text() == "coins")
-        assert not key_input.isEnabled()
+        assert key_input.isEnabled()
+        assert key_input.isReadOnly()
         audit = next(button for button in dialog.findChildren(QPushButton) if button.text() == "查看 key 重命名记录")
         assert audit.isEnabled()
         audit.click()

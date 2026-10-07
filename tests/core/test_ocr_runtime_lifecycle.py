@@ -1,5 +1,6 @@
 """保护 OCR 后端边界、生命周期，不让真实故障变成空识别继续执行。"""
 import json
+import sys
 from types import SimpleNamespace
 
 import numpy as np
@@ -16,7 +17,7 @@ def test_android_uses_native_backend_without_changing_pc_defaults(monkeypatch):
         options.append(kwargs)
         return SimpleNamespace()
 
-    monkeypatch.setattr("rapidocr_onnxruntime.RapidOCR", backend)
+    monkeypatch.setitem(sys.modules, "rapidocr_onnxruntime", SimpleNamespace(RapidOCR=backend))
     monkeypatch.setattr("lvjiang.core.ondevice.native_ocr.NativeOCRBackend",
                         lambda config: device_configs.append(config) or SimpleNamespace())
     assert OCREngine()._ensure_loaded()
@@ -38,7 +39,7 @@ def test_close_releases_all_sessions_once_and_allows_reinitialization(monkeypatc
         backends.append(value)
         return value
 
-    monkeypatch.setattr("rapidocr_onnxruntime.RapidOCR", backend)
+    monkeypatch.setitem(sys.modules, "rapidocr_onnxruntime", SimpleNamespace(RapidOCR=backend))
     engine = OCREngine()
     assert engine._ensure_loaded()
     engine.close()

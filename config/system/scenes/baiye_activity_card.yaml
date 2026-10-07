@@ -1,6 +1,6 @@
 content_version: 1
 key: baiye_activity_card
-name: 百业活动卡片
+name: 活动卡片
 type: subscene
 regions:
 - key: title

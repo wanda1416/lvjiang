@@ -11,6 +11,10 @@ views:
 - key: reward
   name: 领奖结果
   same_layer: false
+- key: chijin_shop
+  name: 赤金小铺
+  kind: page
+  owner: /base
 regions:
 - key: back
   name: 返回
@@ -61,6 +65,7 @@ regions:
   is_text: true
   is_clickable: true
   view: base
+  to: /chijin_shop
 - key: weekly_dividend
   name: 每周分红
   type: func
@@ -103,6 +108,85 @@ regions:
   is_text: true
   is_clickable: false
   view: dividend
+- key: shop_title
+  name: 商店标题
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: chijin_shop
+- key: shop_back
+  name: 返回百业
+  type: func
+  is_text: false
+  is_clickable: true
+  view: chijin_shop
+  to: /base
+- key: chijin
+  name: 赤金小铺
+  type: func
+  is_text: true
+  is_clickable: true
+  view: chijin_shop
+- key: reputation
+  name: 百业声望
+  type: func
+  is_text: true
+  is_clickable: true
+  view: chijin_shop
+- key: silver
+  name: 银百叶
+  type: func
+  is_text: true
+  is_clickable: true
+  view: chijin_shop
+- key: items
+  name: 商品列表
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: chijin_shop
+- key: item_name
+  name: 商品名称
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: chijin_shop
+- key: stock
+  name: 限购库存
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: chijin_shop
+- key: restock
+  name: 补货周期
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: chijin_shop
+- key: add_max
+  name: 最大数量
+  type: func
+  is_text: false
+  is_clickable: true
+  view: chijin_shop
+- key: quantity
+  name: 购买数量
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: chijin_shop
+- key: purchase
+  name: 购买
+  type: func
+  is_text: true
+  is_clickable: true
+  view: chijin_shop
+- key: purchase_glow
+  name: 购买按钮金色
+  type: attr
+  is_text: false
+  is_clickable: false
+  view: chijin_shop
 subscene_refs:
 - key: card_1
   name: 活动卡片1
@@ -133,3 +217,21 @@ points:
   is_text: false
   is_clickable: true
   view: activity
+- key: scroll_top
+  name: 商品上方
+  type: func
+  is_text: false
+  is_clickable: true
+  view: chijin_shop
+- key: scroll_bottom
+  name: 商品下方
+  type: func
+  is_text: false
+  is_clickable: true
+  view: chijin_shop
+- key: search_end
+  name: 搜索滑动终点
+  type: func
+  is_text: false
+  is_clickable: true
+  view: chijin_shop

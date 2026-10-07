@@ -22,7 +22,7 @@ from lvjiang.ui.button_styles import apply_button_style, fit_button_width
 from ...core.profile.schema import get_profile_config
 from ...core.profile.store import (
     get_groups,
-    insert_overview_column,
+    insert_overview_columns,
     remove_overview_column,
     reorder_overview_columns,
     replace_overview_column,
@@ -159,8 +159,8 @@ class ProfileColumnMixin:
             h_header.resizeSection(idx, w)
         self._restoring_widths = False
 
-    def _insert_column_width(self: ProfileTab, group_name: str, data_insert_idx: int, table: QTableWidget) -> None:  # type: ignore[misc]
-        """新增数据列时同步列宽数组；第 0 列为用户名。"""
+    def _insert_column_widths(self: ProfileTab, group_name: str, data_insert_idx: int, table: QTableWidget, count: int) -> None:  # type: ignore[misc]
+        """批量新增数据列时同步列宽数组；第 0 列为用户名。"""
         h_header = table.horizontalHeader()
         assert h_header is not None
         all_widths = _get_column_widths()
@@ -169,7 +169,7 @@ class ProfileColumnMixin:
             widths = [h_header.sectionSize(i) for i in range(h_header.count())]
         width_idx = max(1, min(data_insert_idx + 1, len(widths)))
         new_width = h_header.defaultSectionSize()
-        widths.insert(width_idx, new_width)
+        widths[width_idx:width_idx] = [new_width] * count
         all_widths[group_name] = widths
         _save_column_widths(all_widths)
 
@@ -301,55 +301,43 @@ class ProfileColumnMixin:
                 self._set_column_field(group_name, data_index, selected[0])
 
     def _add_column(self: ProfileTab, group_name: str, after_index: int):  # type: ignore[misc]
-        """在指定分组的指定列后新增一列"""
+        """在原列右侧一次添加多个字段，取消时不修改任何配置。"""
+        from .multi_key_dialog import ProfileKeyMultiSelectDialog
+
         config = get_profile_config()
-
-        # 过滤掉该分组已有的 key
         groups = get_groups()
-        group_data = groups.get(group_name, {"columns": []})
-        used_keys = set(group_data.get("columns", []))
+        group_existed = group_name in groups
+        used_keys = set(groups.get(group_name, {}).get("columns", []))
         all_keys = [kd for kd in config.get_all_keys() if kd.key not in used_keys]
-
         if not all_keys:
-            QMessageBox.information(self, tr("提示"), tr("没有可用的数据模型 key，请先在数据模型定义中添加"))
+            QMessageBox.information(self, tr("提示"), tr("当前分组没有可添加的字段"))
             return
-
-        dialog = QDialog(self)
-        dialog.setWindowTitle(tr("选择字段"))
-        dialog.setMinimumWidth(250)
-        layout = QVBoxLayout(dialog)
-
-        selected = [""]  # 可变容器，供级联菜单回调
-        btn = self._create_key_picker(config, all_keys, "", selected)
-        layout.addWidget(btn)
-
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
-        btn_ok = QPushButton(tr("确定"))
-        btn_ok.clicked.connect(dialog.accept)
-        btn_row.addWidget(btn_ok)
-        btn_cancel = QPushButton(tr("取消"))
-        btn_cancel.clicked.connect(dialog.reject)
-        btn_row.addWidget(btn_cancel)
-        apply_button_style(btn_ok)
-        apply_button_style(btn_cancel, variant="neutral")
-        fit_button_width(btn_ok, btn_cancel)
-        layout.addLayout(btn_row)
-
-        if dialog.exec():
-            selected_key = selected[0]
-            if selected_key:
-                groups = get_groups()
-                group_data = groups.get(group_name, {"columns": []})
-                column_keys = list(group_data.get("columns", []))
-                if selected_key in column_keys:
-                    QMessageBox.warning(self, tr("重复"), tr("Key '{key}' 已在该分组中显示").format(key=selected_key))
-                    return
-                configured_after = self._configured_index(group_name, after_index)
-                insert_idx = 0 if configured_after is None else configured_after + 1
-                insert_overview_column(group_name, insert_idx, selected_key)
-                self._insert_column_width(group_name, after_index + 1, self._tables[group_name])
-                self._refresh_group(group_name, self._tables[group_name])
+        visible = self._visible_columns(group_name)
+        after_key = visible[after_index] if 0 <= after_index < len(visible) else None
+        dialog = ProfileKeyMultiSelectDialog(config, all_keys, self)
+        try:
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            selected = dialog.selected_keys()
+        finally:
+            dialog.deleteLater()
+        if not selected:
+            return
+        # 编辑器只合并本次新增项，不能覆盖窗口打开期间其他进程更新的整组配置。
+        if group_existed and group_name not in get_groups():
+            QMessageBox.information(self, tr("提示"), tr("原分组已被移除，请重新选择"))
+            return
+        try:
+            inserted = insert_overview_columns(group_name, after_key, selected)
+        except ValueError:
+            QMessageBox.information(self, tr("提示"), tr("原列已被移除，请重新选择插入位置"))
+            return
+        table = self._tables[group_name]
+        if inserted:
+            columns = get_groups()[group_name]["columns"]
+            visible_keys = [key for key in columns if config.get_key(key) is not None]
+            self._insert_column_widths(group_name, visible_keys.index(inserted[0]), table, len(inserted))
+        self._refresh_group(group_name, table)
 
     def _remove_column(self: ProfileTab, group_name: str, logical_index: int):  # type: ignore[misc]
         """从指定分组中删除指定列"""
@@ -369,8 +357,8 @@ class ProfileColumnMixin:
     ) -> QPushButton:
         """创建级联菜单 key 选择按钮（类型 → 分组 → 定义）。
 
-        实现见 `ui/profile/key_picker.py`：批量配置的「指定排序」用的是同一套，
-        同一个概念在两处给两种选法等于逼用户学两次。
+        实现见 `ui/profile/key_picker.py`：用于替换当前列，
+        批量配置的「指定排序」仍复用同一单选控件。
 
         selected: 可变容器 [key]，选中后更新 selected[0]。
         """

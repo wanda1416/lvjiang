@@ -142,7 +142,7 @@ class BatchConfigDialog(QDialog):
         # 去掉内边距：外层包了一个 QWidget 才能放两个控件，默认边距会让这一行
         # 比上下行的输入框整体右缩一截，左边缘就对不齐了。
         sort_row.setContentsMargins(0, 0, 0, 0)
-        # key 用和「用户总览 → 新增列」同一套三级选择（类型 → 分组 → 定义）：
+        # key 用和「用户总览 → 替换当前列」同一套单选（类型 → 分组 → 定义）：
         # Profile key 多起来之后，平铺的下拉框根本看不完也选不动。
         self._sort_key_slot = QHBoxLayout()
         self._sort_key_slot.setContentsMargins(0, 0, 0, 0)

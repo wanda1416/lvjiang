@@ -21,6 +21,134 @@
       "y_ratio": 0.19021442956995596,
       "w_ratio": 0.10076086956521738,
       "h_ratio": 0.6436824518190561
+    },
+    {
+      "key": "title",
+      "x_ratio": 0.05625,
+      "y_ratio": 0.027777777777777776,
+      "w_ratio": 0.090625,
+      "h_ratio": 0.0763888888888889
+    },
+    {
+      "key": "home_tab",
+      "x_ratio": 0.0675,
+      "y_ratio": 0.19444444444444445,
+      "w_ratio": 0.05125,
+      "h_ratio": 0.07222222222222222
+    },
+    {
+      "key": "dividend_tab",
+      "x_ratio": 0.0675,
+      "y_ratio": 0.4097222222222222,
+      "w_ratio": 0.05125,
+      "h_ratio": 0.07222222222222222
+    },
+    {
+      "key": "activity_tab",
+      "x_ratio": 0.0675,
+      "y_ratio": 0.5166666666666667,
+      "w_ratio": 0.05125,
+      "h_ratio": 0.07222222222222222
+    },
+    {
+      "key": "shop",
+      "x_ratio": 0.7325,
+      "y_ratio": 0.8944444444444445,
+      "w_ratio": 0.09625,
+      "h_ratio": 0.06944444444444445
+    },
+    {
+      "key": "weekly_dividend",
+      "x_ratio": 0.570625,
+      "y_ratio": 0.1527777777777778,
+      "w_ratio": 0.0875,
+      "h_ratio": 0.33611111111111114
+    },
+    {
+      "key": "dividend_glow",
+      "x_ratio": 0.575,
+      "y_ratio": 0.3809722222222222,
+      "w_ratio": 0.0768125,
+      "h_ratio": 0.10319444444444444
+    },
+    {
+      "key": "activity_list_tab",
+      "x_ratio": 0.5,
+      "y_ratio": 0.1111111111111111,
+      "w_ratio": 0.1625,
+      "h_ratio": 0.0625
+    },
+    {
+      "key": "activity_list",
+      "x_ratio": 0.353125,
+      "y_ratio": 0.18472222222222223,
+      "w_ratio": 0.48875,
+      "h_ratio": 0.6555555555555556
+    },
+    {
+      "key": "reward_title",
+      "x_ratio": 0.4375,
+      "y_ratio": 0.1597222222222222,
+      "w_ratio": 0.125,
+      "h_ratio": 0.07777777777777778
+    },
+    {
+      "key": "reward_close",
+      "x_ratio": 0.40625,
+      "y_ratio": 0.9041666666666667,
+      "w_ratio": 0.1875,
+      "h_ratio": 0.08055555555555556
+    },
+    {
+      "key": "weekly_dividend_label",
+      "x_ratio": 0.53625,
+      "y_ratio": 0.22916666666666666,
+      "w_ratio": 0.036875,
+      "h_ratio": 0.2013888888888889
+    }
+  ],
+  "subscene_refs": [
+    {
+      "key": "card_1",
+      "x_ratio": 0.353125,
+      "y_ratio": 0.18472222222222223,
+      "w_ratio": 0.240625,
+      "h_ratio": 0.24166666666666667
+    },
+    {
+      "key": "card_2",
+      "x_ratio": 0.60125,
+      "y_ratio": 0.18472222222222223,
+      "w_ratio": 0.240625,
+      "h_ratio": 0.24166666666666667
+    },
+    {
+      "key": "card_3",
+      "x_ratio": 0.353125,
+      "y_ratio": 0.4305555555555556,
+      "w_ratio": 0.240625,
+      "h_ratio": 0.24166666666666667
+    },
+    {
+      "key": "card_4",
+      "x_ratio": 0.60125,
+      "y_ratio": 0.4305555555555556,
+      "w_ratio": 0.240625,
+      "h_ratio": 0.24166666666666667
+    }
+  ],
+  "points": [
+    {
+      "key": "activity_scroll_start",
+      "cx_ratio": 0.6875,
+      "cy_ratio": 0.7638888888888888,
+      "r_ratio": 0.001
+    },
+    {
+      "key": "activity_scroll_end",
+      "cx_ratio": 0.6875,
+      "cy_ratio": 0.2722222222222222,
+      "r_ratio": 0.001
     }
   ]
 }

@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 
-def test_ondevice_entrypoints_import_without_pyqt6() -> None:
+def test_ondevice_entrypoints_import_without_pyqt6(tmp_path) -> None:
+    shutil.copytree(Path(__file__).parents[2] / "config/system", tmp_path / "config/system")
     script = textwrap.dedent(
         """
         import importlib.abc
@@ -52,6 +56,8 @@ def test_ondevice_entrypoints_import_without_pyqt6() -> None:
         [sys.executable, "-c", script],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8", "LVJIANG_ROOT": str(tmp_path)},
         timeout=30,
         check=False,
     )

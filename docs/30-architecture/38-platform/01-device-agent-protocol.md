@@ -152,9 +152,9 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 |---|---|---|
 | `control_begin` / `control_end` | — | 取得/释放本连接的 PC 输入控制权；手机活跃任务拒绝取得 |
 | `offline_status` | — | 任务状态、原因、日志、输出及最近同步 |
-| `offline_tasks` | — | 仅暴露支持 android 的任务，包括类实现以 `DEVICE_VISIBLE` 明确开放的专用任务；未同步提示先同步 |
-| `offline_users` | — | 已同步且资料有效的用户名册和手机活动用户 |
-| `offline_start` | `task_id`、可选 `username` | 在同一控制锁内绑定已同步用户并启动；省略用户时沿用手机活动用户；必须先开启悬浮服务 |
+| `offline_tasks` | — | 暴露支持 android 的任务（含 DEVICE_VISIBLE 专用任务），预置或同步配置就绪即可发现 |
+| `offline_users` | — | 手机资料有效的用户名册和活动用户 |
+| `offline_start` | `task_id`、可选 `username` | 在同一控制锁内绑定有效用户并启动；省略用户时沿用手机活动用户；必须先开启悬浮服务 |
 | `offline_pause` / `offline_resume` / `offline_stop` | — | 请求暂停、继续或结束 |
 | `offline_diagnostics` | 可选 `screen_repetitions`（0～10，默认 0） | `report`：依赖/插件/引擎、OCR 和内存；同步后可仅采集真实屏幕连续推理，不注入游戏动作；手机执行中拒绝检查 |
 | `offline_sync_begin` | `size`,`sha256`,`preserve_task_params` | 建立暂存上传，最大 256 MiB；必须显式选择保留参数与否 |
@@ -177,7 +177,7 @@ APK 主页面使用应用栏菜单导航，首页突出悬浮服务启停；权�
 状态额外携带有界 `log_records`（seq/text/level）和每次启动递增的
 `log_generation`，供手机增量显示和重置日志；原 `logs` 文本列表保持不变。
 设备状态保留最近 200 条日志记录供 PC 读取，悬浮窗仅保留最近 100 行展示。
-手机用户选择读取同步用户名册并校验资料，空闲时仅更新手机 Session 的活动用户；
+手机用户选择读取本地用户名册并校验资料，空闲时仅更新手机 Session 的活动用户；
 运行、暂停和结束中在 UI 与 CONTROL_LOCK 下拒绝切换，不重载本轮参数/Session。
 状态增加 `sync.execution_username` 表示当前活动用户；`sync.username` 保留同步来源
 的初始用户，不重写同步清单，也不回写 PC。选择本身不创建用户或修改 Profile DB。
@@ -189,7 +189,11 @@ PC 断线不停止手机任务；PC 租约在重连后重新申请，防止重�
 交换 config，留存上一份 offline-backup/config；应用与启动共用锁，并清理配置单例和
 引擎缓存。Python 实现随 APK 打包，不通过配置同步热更新。
 
-APK 不打包 config/system，也不在启动时解压配置；没有同步标记时不装配引擎。
+APK 从官方 config/system 生成预置 ZIP，以摘要记录已安装代次，仅交换 system。
+首次初始化默认用户、安卓布局与空 DB；配置就绪与同步历史分离，未同步也可装配引擎。
+PC 同步默认保留 wf_configs 和用户 workflow_params，按用户/任务整体择取手机值，
+保留手机独有用户；不合并 DB。保留在暂存区完成，之后沿用目录交换与失败回滚。
+协议 v1 仍可读取状态和安全控制，但不能执行新版同步，旧客户端缺少保留标志时也拒绝同步。
 配置重载前关闭旧 OCR 后端的 det/cls/rec 会话及其 SessionOptions，再丢弃缓存。
 Android 关闭 CPU arena，与 PC 默认一致；rec/cls 单条批次，输入 direct buffer 在会话内
 复用，输出只取一份 ByteBuffer 底层数组。Java 或 ORT 分配失败转换为 MemoryError，

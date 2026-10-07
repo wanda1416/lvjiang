@@ -4,7 +4,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 
-/** 所有业务配置由 PC 下发；应用启动、升级不改动手机配置和数据库。 */
+/** 预置配置在 Python 首次使用时初始化；启动不覆盖手机用户参数和数据库。 */
 class App : Application() {
     override fun onCreate() {
         super.onCreate()

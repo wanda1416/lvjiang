@@ -1,7 +1,6 @@
 package com.lvjiang.app
 
 import android.os.Bundle
-import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
@@ -20,9 +19,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import org.json.JSONArray
@@ -67,24 +63,7 @@ class TaskSettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        setContentView(R.layout.activity_task_settings)
-        val root = findViewById<View>(R.id.settings_root)
-        // SDK 35 强制 edge-to-edge；边距来自系统，旋转、刘海和键盘均重新计算。
-        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-            val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-            view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard))
-            WindowInsetsCompat.CONSUMED
-        }
-        val light = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_YES
-        WindowCompat.getInsetsController(window, root).apply {
-            isAppearanceLightStatusBars = light
-            isAppearanceLightNavigationBars = light
-        }
-        ViewCompat.requestApplyInsets(root)
-        setSupportActionBar(findViewById(R.id.settings_toolbar))
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        SettingsUi.install(this)
         content = findViewById(R.id.settings_content)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { back() }
@@ -189,7 +168,7 @@ class TaskSettingsActivity : AppCompatActivity() {
         title = "任务设置"
         contextLine()
         if (username.isEmpty()) {
-            content.addView(label("暂无用户，请先从 PC 同步配置。"))
+            content.addView(label("暂无用户，请先在用户管理中创建。"))
             return
         }
         request({ PyBridge.listTaskSettings(this, username) }) { result ->
@@ -198,7 +177,7 @@ class TaskSettingsActivity : AppCompatActivity() {
             } else {
                 readonly = result.optBoolean("readonly") || AgentServer.pcControlsDevice()
                 content.removeAllViews()
-                row("配置用户", username) { chooseUser() }
+                row("配置用户", SettingsUi.userLabel(username)) { chooseUser() }
                 val tasks = result.optJSONArray("tasks") ?: JSONArray()
                 if (tasks.length() == 0) content.addView(label("没有可配置参数的任务。"))
                 objects(tasks).forEach { task ->
@@ -223,7 +202,7 @@ class TaskSettingsActivity : AppCompatActivity() {
     private fun chooseUser() {
         if (busy) return
         AlertDialog.Builder(this).setTitle("选择配置用户")
-            .setSingleChoiceItems(users.toTypedArray(), users.indexOf(username)) { dialog, index ->
+            .setSingleChoiceItems(users.map { SettingsUi.userLabel(it) }.toTypedArray(), users.indexOf(username)) { dialog, index ->
                 username = users[index]
                 dialog.dismiss()
                 loadList()
@@ -525,7 +504,7 @@ class TaskSettingsActivity : AppCompatActivity() {
 
     private fun contextLine() {
         findViewById<TextView>(R.id.settings_context).apply {
-            text = (if (page != "list") "配置用户：$username" else "") +
+            text = (if (page != "list") "配置用户：${SettingsUi.userLabel(username)}" else "") +
                 if (readonly) (if (page != "list") "\n" else "") + "停止任务后可修改参数" else ""
             visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
         }
@@ -535,25 +514,7 @@ class TaskSettingsActivity : AppCompatActivity() {
         content.addView(settingRow(title, summary).apply { setOnClickListener { if (!busy) action() } })
     }
 
-    private fun settingRow(title: String, summary: String): LinearLayout = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = android.view.Gravity.CENTER_VERTICAL
-        minimumHeight = dp(72)
-        val labels = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(label(title, 16f))
-            addView(label(summary, 14f).apply {
-                setTextColor(ContextCompat.getColorStateList(context, R.color.settings_secondary_text))
-            })
-        }
-        addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
-        addView(label("›", 24f).apply { setPadding(dp(16), 0, 0, 0) })
-        isClickable = true
-        isFocusable = true
-        val attr = android.util.TypedValue()
-        theme.resolveAttribute(android.R.attr.selectableItemBackground, attr, true)
-        setBackgroundResource(attr.resourceId)
-    }
+    private fun settingRow(title: String, summary: String) = SettingsUi.row(this, title, summary)
 
     private fun toggle(title: String, checked: Boolean, action: (Boolean) -> Unit): SwitchCompat = SwitchCompat(this).apply {
         setTextColor(ContextCompat.getColorStateList(context, R.color.settings_primary_text))
@@ -572,12 +533,7 @@ class TaskSettingsActivity : AppCompatActivity() {
             .setNegativeButton("放弃修改", null).show()
     }
 
-    private fun label(value: String, size: Float = 14f) = TextView(this).apply {
-        setTextColor(ContextCompat.getColorStateList(context, R.color.settings_primary_text))
-        text = value
-        textSize = size
-        setPadding(0, dp(4), 0, dp(4))
-    }
+    private fun label(value: String, size: Float = 14f) = SettingsUi.label(this, value, size)
 
     private fun showError(result: JSONObject) {
         Toast.makeText(this, result.optString("message").ifEmpty { "配置加载失败" }, Toast.LENGTH_LONG).show()

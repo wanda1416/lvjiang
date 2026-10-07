@@ -245,3 +245,31 @@ def save_settings(username: str, values: dict) -> None:
     result = json.loads(save_tuning_config(json.dumps(values, ensure_ascii=False), username))
     if not result["ok"]:
         raise ValueError(result["message"])
+
+
+def validate_for_run(username: str) -> None:
+    from ..config.auto_tuning_config import load_user_auto_tuning_config
+    from ..config.tune_slots import LOCKED_SLOTS, SLOT_LABELS
+    view = get_settings(username)
+    schema = view["schema"]
+    saved = load_user_auto_tuning_config(username)
+    rules = {rule["key"]: rule for rule in schema["rules"]}
+    for key, entry in (saved.get("rules") or {}).items():
+        if not entry.get("enabled"):
+            continue
+        if key not in rules:
+            raise ValueError("调律规则已变更，请在任务设置中重新选择规则")
+        options = {item["name"] for item in rules[key]["playstyles"]}
+        selected = entry.get("playstyles")
+        if selected is not None and set(selected) - options:
+            raise ValueError("调律玩法已变更，请在任务设置中重新选择玩法")
+    selected_slots = saved.get("selected_slots") or []
+    if not any(slot in SLOT_LABELS and slot not in LOCKED_SLOTS for slot in selected_slots):
+        raise ValueError("请先在任务设置中选择调律部位")
+    if any(slot not in SLOT_LABELS for slot in selected_slots):
+        raise ValueError("调律部位已变更，请在任务设置中重新选择部位")
+    enabled = [rule for rule in rules.values() if rule["enabled"]]
+    if not enabled:
+        raise ValueError("请先在任务设置中启用调律规则")
+    if any(rule["playstyles"] and not any(item["checked"] for item in rule["playstyles"]) for rule in enabled):
+        raise ValueError("请先为启用的调律规则选择玩法")

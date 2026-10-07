@@ -20,7 +20,7 @@ def editor(tmp_path, monkeypatch):
     monkeypatch.setattr(constants, "USERS_DIR", tmp_path / "users")
     monkeypatch.setattr(task_runner, "_STATE", task_runner._TaskState())
     monkeypatch.setattr(task_settings, "sync_status", lambda: {"synced": True, "synced_at": "first"})
-    monkeypatch.setattr(task_runner, "_synced_user_names", lambda: ["runner", "editor"])
+    monkeypatch.setattr(task_runner, "_local_user_names", lambda: ["runner", "editor"])
     monkeypatch.setattr(task_settings, "_adapter", lambda _task: None)
     for name in ("runner", "editor"):
         save_user_metadata(User(name), constants.USERS_DIR)
@@ -156,3 +156,10 @@ def test_one_missing_editor_module_does_not_hide_other_task_settings(editor, mon
     assert result["tasks"][0]["id"] == "sample"
     assert "error" not in result["tasks"][0]
     assert "配置模块不可用" in result["tasks"][1]["error"]
+
+
+def test_preserved_parameter_that_no_longer_fits_script_blocks_execution(editor):
+    task = {"id": "sample", "parameters": editor}
+    set_user_workflow_params("editor", "sample", {"mode": "removed_option"})
+    with pytest.raises(ValueError, match="任务设置"):
+        task_settings.validate_for_run(task, "editor")

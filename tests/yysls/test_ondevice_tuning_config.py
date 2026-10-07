@@ -13,6 +13,7 @@ import lvjiang.core.ondevice.plugins as plugins_module
 from lvjiang.apps.yysls.ondevice.tuning_config import (
     get_tuning_config,
     save_tuning_config,
+    validate_for_run,
 )
 from lvjiang.core.user_config import (
     User,
@@ -45,6 +46,13 @@ def _save(payload: dict) -> dict:
 
 
 class TestSaveValidation:
+    def test_preserved_empty_slots_cannot_silently_run_with_default_slots(self, session_path):
+        set_user_workflow_params("测试用户", "auto_tuning", {
+            "selected_slots": [], "rules": {"huiyi_general": {"enabled": True}},
+        })
+        with pytest.raises(ValueError, match="调律部位"):
+            validate_for_run("测试用户")
+
     def test_empty_slots_rejected(self, session_path):
         result = _save({
             "selected_slots": [],

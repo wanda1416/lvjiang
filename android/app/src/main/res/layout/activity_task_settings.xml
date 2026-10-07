@@ -16,7 +16,7 @@
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:textColor="@color/settings_secondary_text"
         android:paddingHorizontal="20dp" android:paddingBottom="12dp"
-        android:text="手机修改不会同步回电脑，下次同步会覆盖。" />
+        android:text="手机参数独立保存，不会回传电脑。PC 同步时可选择保留。" />
     <ScrollView android:id="@+id/settings_scroll"
         android:layout_width="match_parent" android:layout_height="0dp"
         android:layout_weight="1" android:fillViewport="true">

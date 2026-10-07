@@ -68,7 +68,7 @@ class FloatService : Service() {
     private var selectedTaskId = ""
     private var selectedTaskName = ""
     private var tasks: List<Pair<String, String>> = emptyList()
-    private var synced = false
+    private var ready = false
     private var syncStamp = ""
     private var statusPending = false
     private var followLogs = true
@@ -421,8 +421,8 @@ class FloatService : Service() {
                     else -> message.ifEmpty { "空闲：选择一个任务开始" }
                 }
                 val sync = status.optJSONObject("sync")
-                synced = sync?.optBoolean("synced") == true
-                userLine?.text = if (synced) "用户：${sync?.optString("execution_username", sync.optString("username"))}" else "尚未从 PC 同步配置"
+                ready = sync?.optBoolean("ready") == true
+                userLine?.text = if (ready) "用户：${SettingsUi.userLabel(sync?.optString("execution_username").orEmpty())}" else "预置配置未就绪"
                 statusLine?.text = header
                 if (state in activeStates) {
                     selectedTaskId = status.optString("task_id")
@@ -430,8 +430,8 @@ class FloatService : Service() {
                     closeTaskSelection()
                 }
                 taskLine?.text = "任务：${selectedTaskName.ifEmpty { "未选择" }}"
-                selectButton?.isEnabled = synced && state !in activeStates
-                selectUserButton?.isEnabled = synced && state !in activeStates
+                selectButton?.isEnabled = ready && state !in activeStates
+                selectUserButton?.isEnabled = ready && state !in activeStates
                 appendLogs(status)
                 tintIcon(state)
                 updateNotification(
@@ -441,8 +441,8 @@ class FloatService : Service() {
                     lastState = state
                     rebuildActions(state)
                 }
-                val stamp = sync?.optString("synced_at", "") ?: ""
-                if (synced && stamp != syncStamp && state !in activeStates) {
+                val stamp = sync?.optString("synced_at", "preset") ?: ""
+                if (ready && stamp != syncStamp && state !in activeStates) {
                     syncStamp = stamp
                     loadTasks()
                 }
@@ -524,7 +524,7 @@ class FloatService : Service() {
         }
 
         area.addView(smallButton("启动任务") { launchTask(selectedTaskId, selectedTaskName) }
-            .apply { isEnabled = synced && selectedTaskId.isNotEmpty() })
+            .apply { isEnabled = ready && selectedTaskId.isNotEmpty() })
     }
 
     private fun loadTasks() {
@@ -561,7 +561,7 @@ class FloatService : Service() {
     }
 
     private fun openTaskSelection() {
-        if (!synced || lastState in activeStates) return
+        if (!ready || lastState in activeStates) return
         showingUsers = false
         mainArea?.visibility = View.GONE
         selectionArea?.visibility = View.VISIBLE
@@ -570,7 +570,7 @@ class FloatService : Service() {
     }
 
     private fun openUserSelection() {
-        if (!synced || lastState in activeStates) return
+        if (!ready || lastState in activeStates) return
         showingUsers = true
         mainArea?.visibility = View.GONE
         selectionArea?.visibility = View.VISIBLE
@@ -588,13 +588,14 @@ class FloatService : Service() {
                 val selected = result.optString("selected")
                 area.addView(TextView(this).apply {
                     text = if (result.optBoolean("ok") && users != null && users.length() > 0)
-                        "选择执行用户（不切换游戏角色）" else result.optString("message", "没有已同步用户")
+                        "选择执行用户（不切换游戏角色）" else result.optString("message", "没有可用用户")
                     setTextColor(Color.WHITE)
                 })
                 val choices = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 if (users != null) for (index in 0 until users.length()) {
                     val username = users.optString(index)
-                    choices.addView(smallButton(if (username == selected) "✓ $username" else username) {
+                    val label = SettingsUi.userLabel(username)
+                    choices.addView(smallButton(if (username == selected) "✓ $label" else label) {
                         if (lastState in activeStates) return@smallButton
                         choices.isEnabled = false
                         for (child in 0 until choices.childCount) choices.getChildAt(child).isEnabled = false

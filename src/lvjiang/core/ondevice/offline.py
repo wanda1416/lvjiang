@@ -21,6 +21,22 @@ def sync_status() -> dict:
         return {"synced": False, "message": f"同步状态读取失败: {exc}"}
 
 
+def configuration_status() -> dict:
+    """运行配置就绪与同步历史分开；预置初始化不伪造 PC 同步记录。"""
+    from ..config.session import get_session_store
+    sync = sync_status()
+    marker = constants.SESSION_CONFIG_DIR / "preset.json"
+    system = constants.SESSION_CONFIG_DIR.parent / "system"
+    preset_ready = marker.is_file() and all((system / name).is_file() for name in ("app.yaml", "ocr.yaml", "layouts.yaml"))
+    ready = bool(sync.get("synced") or preset_ready)
+    store = get_session_store()
+    return {**sync, "ready": ready, "source": "pc" if sync.get("synced") else "preset",
+            "execution_username": store.get_active("user", ""),
+            "layout": store.get_active("layout", sync.get("layout", "")),
+            "message": "使用应用预置配置" if preset_ready and not sync.get("synced") else
+                sync.get("message", "") if ready else "预置配置未就绪，请重新打开或更新应用"}
+
+
 def reset_configuration() -> None:
     from ...apps import load_app
     from ..config.resolver import get_resolver
@@ -89,16 +105,16 @@ def _check_runtime(ocr: bool, screen_repetitions: int) -> str:
                      "lvjiang.core.profile.service", "lvjiang.core.ondevice.workflow_runner"):
             importlib.import_module(name)
         stages.append("运行依赖与 Profile 管线加载通过")
-        if not sync_status().get("synced"):
-            return json.dumps({"ok": False, "message": "运行依赖就绪；请先从 PC 下发脚本与配置",
-                               "stages": stages, "sync": sync_status(), "memory": memory_snapshot()}, ensure_ascii=False)
+        if not configuration_status().get("ready"):
+            return json.dumps({"ok": False, "message": "运行依赖就绪；预置配置尚未初始化",
+                               "stages": stages, "sync": configuration_status(), "memory": memory_snapshot()}, ensure_ascii=False)
         from .plugins import ensure_loaded
         ensure_loaded()
         stages.append("设备端插件加载通过")
         from .task_runner import _get_engine, list_tasks
         engine = _get_engine()
         stages.append("工作流引擎装配通过")
-        tasks = json.loads(list_tasks(require_sync=False))
+        tasks = json.loads(list_tasks(require_ready=False))
         if not tasks.get("ok"):
             raise RuntimeError(tasks.get("error", "任务发现失败"))
         stages.append(f"发现 {len(tasks['tasks'])} 个安卓任务")
@@ -129,9 +145,9 @@ def _check_runtime(ocr: bool, screen_repetitions: int) -> str:
         if samples:
             stages.append(f"真实屏幕连续 OCR {len(samples)} 次通过")
         record("runtime_check_ok")
-        return json.dumps({"ok": True, "message": "离线执行环境就绪", "stages": stages, "sync": sync_status(),
+        return json.dumps({"ok": True, "message": "离线执行环境就绪", "stages": stages, "sync": configuration_status(),
                            "memory": memory_snapshot(), "screen_samples": samples}, ensure_ascii=False)
     except Exception as exc:
         return json.dumps({"ok": False, "message": f"执行环境未就绪: {type(exc).__name__}: {exc}",
-                           "detail": traceback.format_exc(), "stages": stages, "sync": sync_status(),
+                           "detail": traceback.format_exc(), "stages": stages, "sync": configuration_status(),
                            "memory": memory_snapshot()}, ensure_ascii=False)

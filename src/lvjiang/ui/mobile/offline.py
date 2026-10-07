@@ -96,8 +96,8 @@ class OfflineControlPage(QWidget):
         self._host = host
         root = QVBoxLayout(self)
         hint = QLabel(tr(
-            "PC 配置任务后，一键同步脚本、配置和最新 Profile DB 到手机。"
-            "手机可断开 PC 独立执行；第一阶段不回传结果，下次同步会覆盖手机数据。"
+            "手机内置任务，可独立配置和执行，无需先连接 PC。"
+            "也可同步 PC 的脚本、配置和最新 Profile DB；手机结果不回传，DB 仍单向覆盖。"
         ))
         hint.setWordWrap(True)
         root.addWidget(hint)
@@ -258,6 +258,8 @@ class OfflineControlPage(QWidget):
         if sync.get("synced"):
             lines.append(tr("手机执行用户：{user}；最近同步：{time}").format(
                 user=sync.get("execution_username", sync.get("username", "")), time=sync.get("synced_at", "")))
+        elif sync.get("ready"):
+            lines.append(tr("使用应用预置配置；执行用户：{user}").format(user=sync.get("execution_username", "")))
         lines.extend(status.get("logs", [])[-8:])
         if data.get("diagnostics"):
             lines.append(json.dumps(data["diagnostics"], ensure_ascii=False, indent=2))

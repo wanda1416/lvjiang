@@ -104,8 +104,8 @@ object PyBridge {
     fun stopTask(context: Context): JSONObject = callJson(context, "stop_task")
     fun pauseTask(context: Context): JSONObject = callJson(context, "pause_task")
     fun resumeTask(context: Context): JSONObject = callJson(context, "resume_task")
-    fun applySync(context: Context, path: String): JSONObject =
-        callJson(context, "apply_sync", path, moduleName = OFFLINE_MODULE)
+    fun applySync(context: Context, path: String, preserveTaskParams: Boolean): JSONObject =
+        callJson(context, "apply_sync", path, preserveTaskParams, moduleName = OFFLINE_MODULE)
     fun checkRuntime(context: Context, ocr: Boolean = true, screenRepetitions: Int = 0): JSONObject =
         callJson(context, "check_runtime", ocr, screenRepetitions, moduleName = OFFLINE_MODULE)
 

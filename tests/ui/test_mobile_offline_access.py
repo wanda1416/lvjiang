@@ -31,6 +31,7 @@ def test_sync_is_disabled_but_existing_task_controls_remain_available(qapp, monk
     finally:
         page.close()
         page.deleteLater()
+        assert page.preserve_task_params.isChecked()
 
 
 def test_unlicensed_worker_cannot_connect_or_build_snapshot(qapp, monkeypatch):

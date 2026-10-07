@@ -484,7 +484,7 @@ class AgentInput(InputBackend):
         self.target_hwnd = None
 
     def begin_execution(self) -> None:
-        if self._client.status.get("offline_protocol") == 1:
+        if self._client.status.get("offline_protocol") in (1, 2):
             self._client.call("control_begin")
             self._client._owns_execution = True
 

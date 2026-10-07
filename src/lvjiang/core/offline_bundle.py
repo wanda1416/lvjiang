@@ -68,7 +68,7 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                         or any(part in _EXCLUDED_DIRS or part.startswith(".") for part in rel.parts)
                         or rel.parts[0] not in {"system", "local", "remote", "session"}
                         or path.name.endswith((".lock", ".tmp", ".db-wal", ".db-shm", ".db-journal"))
-                        or rel.as_posix() in {"session/profile.db", "session/offline.json", "local/license.txt"}):
+                        or rel.as_posix() in {"session/profile.db", "session/offline.json", "session/preset.json", "local/license.txt"}):
                     continue
                 if len(rel.parts) >= 3 and rel.parts[1] == "layouts" and rel.parts[2] not in layout_scope:
                     continue
@@ -100,6 +100,7 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
 
 def install_offline_bundle(
     archive_path: Path, root: Path, *, on_applied: Callable[[], None] | None = None,
+    preserve_task_params: bool = True,
 ) -> dict:
     """校验后交换 config 目录；保留上一份备份，交换失败恢复原配置。"""
     root = root.resolve()
@@ -144,6 +145,12 @@ def install_offline_bundle(
             with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as conn:
                 if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                     raise ValueError("Profile 数据库快照校验失败")
+        if preserve_task_params and target.exists():
+            _preserve_task_parameters(target, staged_config)
+        # 此标记只记录 APK 官方代次，与是否覆盖用户参数无关。
+        marker = target / "session/preset.json"
+        if marker.is_file():
+            shutil.copyfile(marker, staged_config / "session/preset.json")
         old = staging / "old-config"
         if target.exists():
             target.rename(old)
@@ -174,3 +181,48 @@ def install_offline_bundle(
         if not swapped and (staging / "old-config").exists() and not target.exists():
             (staging / "old-config").rename(target)
         shutil.rmtree(staging)
+
+
+def _preserve_task_parameters(old: Path, incoming: Path) -> None:
+    """在校验后的暂存区按任务整体保留；不拷贝 DB 或用户运行 session。"""
+    old_path = old / "session/session.json"
+    if not old_path.is_file():
+        return
+    old_session = json.loads(old_path.read_text(encoding="utf-8"))
+    new_path = incoming / "session/session.json"
+    new_session = json.loads(new_path.read_text(encoding="utf-8"))
+    old_shared = old_session.get("wf_configs", {})
+    new_shared = new_session.get("wf_configs", {})
+    if not isinstance(old_shared, dict) or not isinstance(new_shared, dict):
+        raise ValueError("任务通用配置格式不正确，无法保留手机参数")
+    new_session["wf_configs"] = {**new_shared, **old_shared}
+    names = list(new_session.get("users", []))
+    new_users = incoming / "session/users"
+    new_users.mkdir(exist_ok=True)
+    for username in old_session.get("users", []):
+        if not isinstance(username, str) or not is_valid_username(username):
+            continue
+        source = old / "session/users" / f"{username}.json"
+        if not source.is_file():
+            continue
+        destination = new_users / f"{username}.json"
+        phone = json.loads(source.read_text(encoding="utf-8"))
+        phone_params = phone.get("workflow_params", {})
+        if not isinstance(phone_params, dict):
+            raise ValueError("手机用户任务参数格式不正确，无法保留")
+        if destination.exists():
+            pc = json.loads(destination.read_text(encoding="utf-8"))
+            pc_params = pc.get("workflow_params", {})
+            if not isinstance(pc_params, dict):
+                raise ValueError("同步用户任务参数格式不正确")
+            pc["workflow_params"] = {**pc_params, **phone_params}
+            destination.write_text(json.dumps(pc, ensure_ascii=False), encoding="utf-8")
+        else:
+            shutil.copyfile(source, destination)
+        if username not in names:
+            names.append(username)
+    new_session["users"] = names
+    active = old_session.get("actives", {}).get("user")
+    if active in names and (new_users / f"{active}.json").is_file():
+        new_session.setdefault("actives", {})["user"] = active
+    new_path.write_text(json.dumps(new_session, ensure_ascii=False), encoding="utf-8")

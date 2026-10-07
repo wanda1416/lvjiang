@@ -45,7 +45,7 @@ def reset_configuration() -> None:
             callback()
 
 
-def apply_sync(path: str) -> str:
+def apply_sync(path: str, preserve_task_params: bool = True) -> str:
     from ..offline_bundle import install_offline_bundle
     from .task_runner import CONTROL_LOCK, is_running
 
@@ -53,7 +53,8 @@ def apply_sync(path: str) -> str:
         if is_running():
             return json.dumps({"ok": False, "message": "请先结束手机任务再同步"}, ensure_ascii=False)
         try:
-            summary = install_offline_bundle(Path(path), constants.PROJECT_ROOT, on_applied=reset_configuration)
+            summary = install_offline_bundle(Path(path), constants.PROJECT_ROOT,
+                                             preserve_task_params=preserve_task_params, on_applied=reset_configuration)
             return json.dumps({"ok": True, "message": "脚本、配置与 DB 已同步到手机", "sync": summary}, ensure_ascii=False)
         except Exception as exc:
             # 安装器已恢复旧配置；同时丢弃重载失败前创建的部分缓存。

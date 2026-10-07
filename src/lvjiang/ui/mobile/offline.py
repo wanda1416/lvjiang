@@ -9,6 +9,7 @@ from typing import Any
 
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -36,10 +37,12 @@ class _OfflineWorker(QThread):
     done = pyqtSignal(object, str)
     progress = pyqtSignal(int, int)
 
-    def __init__(self, serial: str, action: str, username: str, layout: str, task_id: str, parent=None):
+    def __init__(self, serial: str, action: str, username: str, layout: str, task_id: str, parent=None,
+                 *, preserve_task_params: bool = True):
         super().__init__(parent)
         self.serial, self.action = serial, action
         self.username, self.layout, self.task_id = username, layout, task_id
+        self.preserve_task_params = preserve_task_params
 
     def cancel(self) -> None:
         self.requestInterruption()
@@ -50,15 +53,18 @@ class _OfflineWorker(QThread):
             if self.action == "sync":
                 require_offline_sync_access()
             agent = connect_agent_diagnostic(AdbDevice(self.serial))
-            if agent is None or agent.status.get("offline_protocol") != 1:
+            if agent is None or agent.status.get("offline_protocol") not in (1, 2):
                 raise RuntimeError(tr("无法连接离线执行接口，请先打开手机 App 并更新 APK"))
             data: dict[str, Any] = {"serial": self.serial}
             if self.action == "sync":
+                if agent.status.get("offline_protocol") != 2:
+                    raise RuntimeError(tr("请先更新 APK：旧版本不支持保留手机任务参数"))
                 with tempfile.TemporaryDirectory(prefix="lvjiang-offline-sync-") as temp:
                     archive = Path(temp) / "snapshot.zip"
                     build_offline_bundle(PROJECT_ROOT, archive, username=self.username, layout=self.layout)
                     data["operation"] = sync_offline_bundle(
-                        agent, archive, cancelled=self.isInterruptionRequested, progress=self.progress.emit)
+                        agent, archive, cancelled=self.isInterruptionRequested, progress=self.progress.emit,
+                        preserve_task_params=self.preserve_task_params)
             elif self.action == "diagnostics":
                 data["diagnostics"], _ = agent.call("offline_diagnostics", timeout=180)
             elif self.action != "status":
@@ -66,7 +72,7 @@ class _OfflineWorker(QThread):
                                                  username=self.username if self.action == "start" else "")
             if not self.isInterruptionRequested():
                 data["status"], _ = agent.call("offline_status")
-                if data["status"].get("sync", {}).get("synced"):
+                if data["status"].get("sync", {}).get("ready") or data["status"].get("sync", {}).get("synced"):
                     data["tasks"], _ = agent.call("offline_tasks", timeout=60)
                     data["users"], _ = agent.call("offline_users")
                 else:
@@ -112,11 +118,15 @@ class OfflineControlPage(QWidget):
         scope = QLabel(tr("下发全部用户、任务配置和最新 DB，仅携带所选布局及其继承依赖。用户与任务在执行时选择。"))
         scope.setWordWrap(True)
         sync_layout.addWidget(scope)
+        self.preserve_task_params = QCheckBox(tr("保留手机任务参数"))
+        self.preserve_task_params.setChecked(True)
+        self.preserve_task_params.setToolTip(tr("保留各用户的任务设置（含自动调律）和手机独有用户；脚本、布局和 Profile DB 仍更新。"))
+        sync_layout.addWidget(self.preserve_task_params)
         root.addWidget(sync_group)
         execution_group = QGroupBox(tr("远程执行"))
         execution_layout = QVBoxLayout(execution_group)
         form = QFormLayout()
-        form.addRow(tr("执行用户（手机已同步）"), self.user)
+        form.addRow(tr("执行用户（手机资料）"), self.user)
         form.addRow(tr("执行任务"), self.task)
         execution_layout.addLayout(form)
         row = QHBoxLayout()
@@ -161,6 +171,7 @@ class OfflineControlPage(QWidget):
         self.user.setEnabled(not busy and not active)
         self.task.setEnabled(not busy and not active)
         self.layout_choice.setEnabled(not busy and not active)
+        self.preserve_task_params.setEnabled(not busy and not active)
 
     def _sync_username(self) -> str:
         manager = getattr(self._host, "user_manager", None)
@@ -185,14 +196,17 @@ class OfflineControlPage(QWidget):
             return
         if action == "sync" and QMessageBox.question(
             self, tr("同步到手机"),
-            tr("将用 PC 配置和最新 DB 替换手机配置及数据，手机此前的离线结果不会回传。确认同步？"),
+            tr("将更新脚本、布局和用户数据，保留手机任务参数及手机独有用户；Profile DB 仍由 PC 快照覆盖，离线结果不会回传。确认同步？")
+            if self.preserve_task_params.isChecked() else
+            tr("将用 PC 配置和最新 DB 替换手机配置及数据，包括手机任务参数和用户名册；手机此前的离线结果不会回传。确认同步？"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         ) != QMessageBox.StandardButton.Yes:
             return
         worker = _OfflineWorker(
             serial, action, self._sync_username() if action == "sync" else str(self.user.currentData() or ""),
-            str(self.layout_choice.currentData() or ""), str(self.task.currentData() or ""), self)
+            str(self.layout_choice.currentData() or ""), str(self.task.currentData() or ""), self,
+            preserve_task_params=self.preserve_task_params.isChecked())
         self._worker = worker
         self._track_worker(worker)
         worker.done.connect(self._done)

@@ -6,8 +6,7 @@ from collections import Counter
 from datetime import date, datetime
 
 from loguru import logger
-from PyQt6.QtCore import QDate, Qt, QUrl
-from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -25,7 +24,6 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -40,6 +38,7 @@ from ..core.daily_history import (
 )
 from ..i18n import tr
 from .button_styles import apply_button_style
+from .history_viewer import HistoryViewer
 
 _STATUS_LABELS = {
     "running": tr("进行中"), "completed": tr("已完成"),
@@ -137,7 +136,7 @@ class DailyHistoryDialog(QDialog):
                  repository: TaskHistoryRepository | None = None):
         super().__init__(parent)
         self.setWindowTitle(tr("任务历史"))
-        self.resize(1220, 780)
+        self.resize(1220, 660)
         self._repository = repository
         self._task_records: list[TaskRunRecord] = []
         self._batch_records: list[BatchRunRecord] = []
@@ -154,29 +153,30 @@ class DailyHistoryDialog(QDialog):
 
     def _build_task_page(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout(page)
+        layout = QHBoxLayout(page)
+        split = QSplitter(Qt.Orientation.Horizontal)
+        split.setChildrenCollapsible(False)
+        layout.addWidget(split)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(self._build_date_controls())
         self._task_filter_splitter = QSplitter(Qt.Orientation.Vertical)
         self._task_filter_splitter.setChildrenCollapsible(False)
-        layout.addWidget(self._task_filter_splitter)
-
-        filters = QWidget()
-        filter_layout = QVBoxLayout(filters)
-        filter_layout.setContentsMargins(0, 0, 0, 0)
-        filter_layout.addWidget(self._build_date_controls())
-        choices = QHBoxLayout()
+        choices = QWidget()
+        choices_layout = QHBoxLayout(choices)
+        choices_layout.setContentsMargins(0, 0, 0, 0)
         self._users = _HistoryChoices(tr("用户"))
         self._tasks = _HistoryChoices(tr("任务"))
-        choices.addWidget(self._users, 1)
-        choices.addWidget(self._tasks, 1)
-        filter_layout.addLayout(choices)
-        self._task_filter_splitter.addWidget(filters)
-
+        choices_layout.addWidget(self._users, 1)
+        choices_layout.addWidget(self._tasks, 1)
+        self._task_filter_splitter.addWidget(choices)
         results = QWidget()
         results_layout = QVBoxLayout(results)
         results_layout.setContentsMargins(0, 0, 0, 0)
-
         batch_filter_row = QHBoxLayout()
         self._batch_filter_label = QLabel()
+        self._batch_filter_label.setWordWrap(True)
         self._batch_filter_label.setVisible(False)
         batch_filter_row.addWidget(self._batch_filter_label, 1)
         self._clear_batch_filter_button = QPushButton(tr("返回全部任务"))
@@ -184,72 +184,50 @@ class DailyHistoryDialog(QDialog):
         self._clear_batch_filter_button.setVisible(False)
         batch_filter_row.addWidget(self._clear_batch_filter_button)
         results_layout.addLayout(batch_filter_row)
-
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        self._task_table = QTableWidget(0, 9)
+        self._task_table = QTableWidget(0, 5)
         self._task_table.setHorizontalHeaderLabels([
             tr("开始时间"), tr("用户"), tr("任务"), tr("状态"), tr("耗时"),
-            tr("执行目标"), tr("性质"), tr("方式"), tr("结束时间"),
         ])
         self._configure_table(self._task_table)
         self._task_table.itemSelectionChanged.connect(self._show_selected_task)
         self._task_table.cellDoubleClicked.connect(
             lambda _row, _column: self._open_task_result())
-        splitter.addWidget(self._task_table)
-
-        detail = QWidget()
-        detail_layout = QVBoxLayout(detail)
-        header = QHBoxLayout()
-        self._task_summary = QLabel(tr("选择一条记录查看详情"))
-        self._task_summary.setWordWrap(True)
-        self._task_summary.setTextFormat(Qt.TextFormat.PlainText)
-        self._task_summary.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse)
-        header.addWidget(self._task_summary, 1)
-        self._open_result_button = QPushButton(tr("打开执行结果"))
-        self._open_result_button.clicked.connect(self._open_task_result)
-        header.addWidget(self._open_result_button)
-        self._open_log_button = QPushButton(tr("打开执行日志"))
-        self._open_log_button.clicked.connect(self._open_task_log)
-        header.addWidget(self._open_log_button)
-        detail_layout.addLayout(header)
-        self._task_detail = QTextEdit()
-        self._task_detail.setReadOnly(True)
-        detail_layout.addWidget(self._task_detail)
-        splitter.addWidget(detail)
-        splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 1)
-        results_layout.addWidget(splitter, 1)
+        results_layout.addWidget(self._task_table)
         self._task_filter_splitter.addWidget(results)
         self._task_filter_splitter.setStretchFactor(0, 0)
         self._task_filter_splitter.setStretchFactor(1, 1)
-        self._task_filter_splitter.setSizes([220, 500])
-        splitter.setSizes([360, 120])
-        apply_button_style(
-            self._clear_batch_filter_button,
-            self._open_result_button,
-            self._open_log_button,
-            variant="neutral",
-        )
-        self._set_task_buttons(None)
+        self._task_filter_splitter.setSizes([170, 350])
+        left_layout.addWidget(self._task_filter_splitter, 1)
+        self._task_viewer = HistoryViewer()
+        split.addWidget(left)
+        split.addWidget(self._task_viewer)
+        split.setSizes([540, 650])
+        apply_button_style(self._clear_batch_filter_button, variant="neutral")
         return page
 
     def _build_batch_page(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout(page)
-        controls = QHBoxLayout()
-        controls.addWidget(QLabel(tr("开始日期")))
+        layout = QHBoxLayout(page)
+        split = QSplitter(Qt.Orientation.Horizontal)
+        split.setChildrenCollapsible(False)
+        layout.addWidget(split)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        dates = QHBoxLayout()
+        dates.addWidget(QLabel(tr("开始日期")))
         self._batch_start_date = QDateEdit()
         self._batch_start_date.setCalendarPopup(True)
         self._batch_start_date.setDisplayFormat("yyyy-MM-dd")
-        controls.addWidget(self._batch_start_date)
-        controls.addWidget(QLabel(tr("结束日期")))
+        dates.addWidget(self._batch_start_date)
+        dates.addWidget(QLabel(tr("结束日期")))
         self._batch_end_date = QDateEdit()
         self._batch_end_date.setCalendarPopup(True)
         self._batch_end_date.setDisplayFormat("yyyy-MM-dd")
-        controls.addWidget(self._batch_end_date)
-        self._batch_query_button = QPushButton(tr("查询"))
-        self._batch_query_button.clicked.connect(self.refresh_batches)
+        dates.addWidget(self._batch_end_date)
+        dates.addStretch(1)
+        left_layout.addLayout(dates)
+        controls = QHBoxLayout()
         controls.addWidget(QLabel(tr("执行目标")))
         self._batch_target_kind = self._build_target_kind_combo()
         controls.addWidget(self._batch_target_kind)
@@ -257,69 +235,59 @@ class DailyHistoryDialog(QDialog):
         self._batch_status = self._build_status_combo()
         controls.addWidget(self._batch_status)
         controls.addStretch(1)
+        self._batch_query_button = QPushButton(tr("查询"))
+        self._batch_query_button.clicked.connect(self.refresh_batches)
         controls.addWidget(self._batch_query_button)
-        layout.addLayout(controls)
-
-        self._batch_table = QTableWidget(0, 8)
+        left_layout.addLayout(controls)
+        self._batch_table = QTableWidget(0, 5)
         self._batch_table.setHorizontalHeaderLabels([
-            tr("开始时间"), tr("配置"), tr("状态"), tr("耗时"),
-            tr("任务数"), tr("执行目标"), tr("结束时间"),
-            tr("批量报告"),
+            tr("开始时间"), tr("配置"), tr("状态"), tr("耗时"), tr("任务数"),
         ])
         self._configure_table(self._batch_table)
         self._batch_table.itemSelectionChanged.connect(self._show_selected_batch)
         self._batch_table.cellDoubleClicked.connect(
             lambda _row, _column: self._view_batch_tasks())
-        layout.addWidget(self._batch_table, 4)
-
-        header = QHBoxLayout()
-        self._batch_summary = QLabel(tr("选择一条批量记录查看输入快照"))
-        self._batch_summary.setWordWrap(True)
-        self._batch_summary.setTextFormat(Qt.TextFormat.PlainText)
-        self._batch_summary.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse)
-        header.addWidget(self._batch_summary, 1)
+        left_layout.addWidget(self._batch_table, 1)
         self._view_batch_tasks_button = QPushButton(tr("查看全部单任务"))
         self._view_batch_tasks_button.clicked.connect(self._view_batch_tasks)
-        header.addWidget(self._view_batch_tasks_button)
-        self._open_batch_report_button = QPushButton(tr("打开批量报告"))
-        self._open_batch_report_button.clicked.connect(self._open_batch_report)
-        header.addWidget(self._open_batch_report_button)
-        layout.addLayout(header)
-        self._batch_detail = QTextEdit()
-        self._batch_detail.setReadOnly(True)
-        layout.addWidget(self._batch_detail, 1)
-        self._set_batch_buttons(None)
-        apply_button_style(
-            self._batch_query_button, self._view_batch_tasks_button,
-            variant="action")
-        apply_button_style(self._open_batch_report_button, variant="neutral")
+        self._view_batch_tasks_button.setEnabled(False)
+        left_layout.addWidget(self._view_batch_tasks_button)
+        self._batch_viewer = HistoryViewer(batch=True)
+        split.addWidget(left)
+        split.addWidget(self._batch_viewer)
+        split.setSizes([540, 650])
+        apply_button_style(self._batch_query_button, self._view_batch_tasks_button, variant="action")
         return page
 
     def _build_date_controls(self) -> QWidget:
         widget = QWidget()
-        layout = QHBoxLayout(widget)
+        layout = QVBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(QLabel(tr("开始日期")))
+        dates = QHBoxLayout()
+        dates.addWidget(QLabel(tr("开始日期")))
         self._start_date = QDateEdit()
         self._start_date.setCalendarPopup(True)
         self._start_date.setDisplayFormat("yyyy-MM-dd")
-        layout.addWidget(self._start_date)
-        layout.addWidget(QLabel(tr("结束日期")))
+        dates.addWidget(self._start_date)
+        dates.addWidget(QLabel(tr("结束日期")))
         self._end_date = QDateEdit()
         self._end_date.setCalendarPopup(True)
         self._end_date.setDisplayFormat("yyyy-MM-dd")
-        layout.addWidget(self._end_date)
-        layout.addWidget(QLabel(tr("执行目标")))
+        dates.addWidget(self._end_date)
+        dates.addStretch(1)
+        layout.addLayout(dates)
+        controls = QHBoxLayout()
+        controls.addWidget(QLabel(tr("执行目标")))
         self._task_target_kind = self._build_target_kind_combo()
-        layout.addWidget(self._task_target_kind)
-        layout.addWidget(QLabel(tr("状态")))
+        controls.addWidget(self._task_target_kind)
+        controls.addWidget(QLabel(tr("状态")))
         self._task_status = self._build_status_combo()
-        layout.addWidget(self._task_status)
-        layout.addStretch(1)
+        controls.addWidget(self._task_status)
+        controls.addStretch(1)
         self._query_button = QPushButton(tr("查询"))
         self._query_button.clicked.connect(self.refresh_tasks)
-        layout.addWidget(self._query_button)
+        controls.addWidget(self._query_button)
+        layout.addLayout(controls)
         apply_button_style(self._query_button, variant="action")
         return widget
 
@@ -406,10 +374,6 @@ class DailyHistoryDialog(QDialog):
                 _format_time(record.started_at), record.username or tr("未记录用户"),
                 record.task_name, _STATUS_LABELS.get(record.status, record.status),
                 self._duration(record.duration_ms, bool(record.finished_at)),
-                record.target_label or tr("未记录"),
-                _SCOPE_LABELS.get(record.task_scope, record.task_scope),
-                _SOURCE_LABELS.get(record.source, record.source),
-                _format_time(record.finished_at),
             )
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
@@ -423,9 +387,7 @@ class DailyHistoryDialog(QDialog):
             self._task_table.selectRow(0)
             self._show_selected_task()
         else:
-            self._task_summary.setText(tr("没有符合条件的任务历史"))
-            self._task_detail.clear()
-            self._set_task_buttons(None)
+            self._task_viewer.clear()
 
     def refresh_batches(self) -> None:
         start = self._batch_start_date.date().toPyDate()
@@ -446,9 +408,7 @@ class DailyHistoryDialog(QDialog):
                 _format_time(record.started_at), record.config_name,
                 _STATUS_LABELS.get(record.status, record.status),
                 self._duration(record.duration_ms, bool(record.finished_at)),
-                str(record.task_count), record.target_label or tr("未记录"),
-                _format_time(record.finished_at),
-                tr("有") if record.report_path else tr("无"),
+                str(record.task_count),
             )
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
@@ -462,9 +422,8 @@ class DailyHistoryDialog(QDialog):
             self._batch_table.selectRow(0)
             self._show_selected_batch()
         else:
-            self._batch_summary.setText(tr("没有符合条件的批量历史"))
-            self._batch_detail.clear()
-            self._set_batch_buttons(None)
+            self._batch_viewer.clear()
+            self._view_batch_tasks_button.setEnabled(False)
 
     def _selected_task(self) -> TaskRunRecord | None:
         row = self._task_table.currentRow()
@@ -476,39 +435,47 @@ class DailyHistoryDialog(QDialog):
 
     def _show_selected_task(self) -> None:
         record = self._selected_task()
-        self._set_task_buttons(record)
         if record is None:
+            self._task_viewer.clear()
             return
-        self._task_summary.setText(
-            f"{record.username or tr('未记录用户')} · {record.task_name} · "
-            f"{_STATUS_LABELS.get(record.status, record.status)}")
-        self._task_detail.setPlainText(self._detail_text(record, {
-            "输入参数": record.params,
-            "执行结果": str(resolve_history_path(record.result_path) or ""),
-            "执行日志": str(resolve_history_path(record.log_path) or ""),
-            "错误": record.error_message,
-            "任务记录 ID": record.task_run_id,
-            "批量记录 ID": record.batch_run_id,
-        }))
+        self._task_viewer.set_record(
+            log=resolve_history_path(record.log_path),
+            content=resolve_history_path(record.result_path),
+            details=self._detail_text(record, {
+                "用户": record.username,
+                "任务": record.task_name,
+                "性质": _SCOPE_LABELS.get(record.task_scope, record.task_scope),
+                "方式": _SOURCE_LABELS.get(record.source, record.source),
+                "输入参数": record.params,
+                "执行结果": str(resolve_history_path(record.result_path) or ""),
+                "执行日志": str(resolve_history_path(record.log_path) or ""),
+                "错误": record.error_message,
+                "任务记录 ID": record.task_run_id,
+                "批量记录 ID": record.batch_run_id,
+            }))
 
     def _show_selected_batch(self) -> None:
         record = self._selected_batch()
-        self._set_batch_buttons(record)
+        self._view_batch_tasks_button.setEnabled(record is not None)
         if record is None:
+            self._batch_viewer.clear()
             return
-        self._batch_summary.setText(
-            f"{record.config_name} · {_STATUS_LABELS.get(record.status, record.status)} · "
-            f"{record.task_count} " + tr("项任务"))
-        self._batch_detail.setPlainText(self._detail_text(record, {
-            "批量输入快照": record.input_snapshot,
-            "批量报告": str(resolve_history_path(record.report_path) or ""),
-            "错误": record.error_message,
-            "批量记录 ID": record.batch_run_id,
-        }))
+        self._batch_viewer.set_record(
+            content=resolve_history_path(record.report_path),
+            details=self._detail_text(record, {
+                "配置": record.config_name,
+                "任务数": record.task_count,
+                "批量输入快照": record.input_snapshot,
+                "批量报告": str(resolve_history_path(record.report_path) or ""),
+                "错误": record.error_message,
+                "批量记录 ID": record.batch_run_id,
+            }))
 
     @staticmethod
     def _detail_text(record: TaskRunRecord | BatchRunRecord, fields: dict) -> str:
         lines = [
+            tr("状态") + f"：{_STATUS_LABELS.get(record.status, record.status)}",
+            tr("耗时") + f"：{DailyHistoryDialog._duration(record.duration_ms, bool(record.finished_at))}",
             tr("执行目标") + f"：{record.target_label or record.target_id or '—'}",
             tr("开始时间") + f"：{_format_time(record.started_at)}",
             tr("结束时间") + f"：{_format_time(record.finished_at)}",
@@ -556,36 +523,8 @@ class DailyHistoryDialog(QDialog):
         self._clear_batch_filter_button.setVisible(False)
         self.refresh_tasks()
 
-    def _set_task_buttons(self, record: TaskRunRecord | None) -> None:
-        result = resolve_history_path(record.result_path) if record else None
-        log = resolve_history_path(record.log_path) if record else None
-        self._open_result_button.setEnabled(bool(result and result.is_file()))
-        self._open_log_button.setEnabled(bool(log and log.is_file()))
-
-    def _set_batch_buttons(self, record: BatchRunRecord | None) -> None:
-        report = resolve_history_path(record.report_path) if record else None
-        self._view_batch_tasks_button.setEnabled(record is not None)
-        self._open_batch_report_button.setEnabled(bool(report and report.is_file()))
-
     def _open_task_result(self) -> None:
-        record = self._selected_task()
-        self._open_path(record.result_path if record else "")
-
-    def _open_task_log(self) -> None:
-        record = self._selected_task()
-        self._open_path(record.log_path if record else "")
-
-    def _open_batch_report(self) -> None:
-        record = self._selected_batch()
-        self._open_path(record.report_path if record else "")
-
-    def _open_path(self, stored_path: str) -> None:
-        path = resolve_history_path(stored_path)
-        if path is None or not path.is_file():
-            QMessageBox.information(
-                self, tr("文件不存在"), tr("对应文件不存在或已被移动"))
-            return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
+        self._task_viewer.show_content()
 
     def _valid_dates(self, start: date, end: date) -> bool:
         if start <= end:

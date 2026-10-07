@@ -363,6 +363,19 @@ def test_engine_find_image_where_threshold(synthetic_store, tmp_path):
     assert v["strict"] == ""
 
 
+def test_engine_find_image_where_threshold_accepts_string_variable(synthetic_store, tmp_path):
+    """where 阈值支持变量引用；select 参数传进来的是字符串（如 "0.65"），也要生效。"""
+    frame = _frame_with_icon(synthetic_store, at=(300, 120), size=(640, 360))
+    frame[120:160, 300:340] = cv2.GaussianBlur(frame[120:160, 300:340], (5, 5), 1.5)
+    tpl = tl.TemplateStore(tmp_path).get("ico")
+    probe = tl.locate(frame, tpl, 0, 0, 639, 359, scales=[1.0], min_score=0.0)
+    assert 0.8 < probe.score < 0.999, probe.score
+    eng = _engine_with(frame)
+    v = _run(eng, 'eval $th = "0.999"\nfind as $loose by image "ico"\nfind as $strict by image "ico" where confidence >= $th\n')
+    assert isinstance(v["loose"], FoundRegion)
+    assert v["strict"] == ""
+
+
 def test_engine_find_image_missing_template_raises(synthetic_store):
     eng = _engine_with(_frame_with_icon(synthetic_store))
     with pytest.raises(ValueError, match="模板 nope 不存在"):

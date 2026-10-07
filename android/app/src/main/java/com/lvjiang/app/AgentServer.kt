@@ -517,7 +517,7 @@ object AgentServer {
         if (via == "a11y") {
             val timeout = req.optLong("timeout_ms", 5000)
             val got = A11yBridge.screenshotRgba(timeout)
-                ?: return@withVia fail("takeScreenshot 失败（节流或服务异常）", retryable = true)
+                ?: return@withVia fail("takeScreenshot 失败（限流或服务异常）", retryable = true)
             val header = JSONObject()
                 .put("via", via)
                 .put("fmt", "rgba")

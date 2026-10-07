@@ -359,6 +359,8 @@ class _ActionMixin:
 
         每 interval 秒截图一次，相邻两帧的像素差异率低于 threshold 时
         视为「画面没变」。连续稳定时长达到 stable_duration 秒后返回。
+        interval 会被抬到截图后端自身的限流间隔之上（Android 无障碍通道），
+        PC 后端不限频，取值保持原样。
 
         crop_box: 像素裁剪框 {'x', 'y', 'w', 'h'}，只对指定区域做 diff 对比。
         用于半屏 UI + 半屏动画场景，避免游戏画面动画干扰稳定检测。
@@ -389,6 +391,11 @@ class _ActionMixin:
             timeout_val = (lo + hi) / 2.0
         else:
             timeout_val = float(timeout)
+
+        # 采样间隔不得低于截图后端自身的限流间隔：Android 无障碍 takeScreenshot
+        # 在框架侧按 <=333ms 判定「间隔过短」，0.3s 的默认值正好踩在线上。
+        # PC 后端声明 0（不限频），取 max 后行为不变。
+        interval = max(interval, getattr(self._capture, "min_capture_interval", 0.0))
 
         start_time = _clock()
         deadline = start_time + max(0.0, timeout_val)

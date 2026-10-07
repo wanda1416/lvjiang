@@ -23,7 +23,7 @@ def test_android_uses_native_backend_without_changing_pc_defaults(monkeypatch):
     assert workflow_runner._create_ocr()._ensure_loaded()
     assert options == [{}]
     assert device_configs[0].threads == 2
-    assert device_configs[0].max_detector_pixels == 2_000_000
+    assert device_configs[0].max_detector_pixels == 1_200_000
 
 
 def test_close_releases_all_sessions_once_and_allows_reinitialization(monkeypatch):

@@ -8,6 +8,7 @@
 #include <array>
 #include <cmath>
 #include <memory>
+#include <utility>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -84,18 +85,20 @@ struct Config {
 };
 
 // Single float32 CHW allocation, no HWC float64 array or Java tensor copy.
+// Each channel plane is converted straight into its slice of that allocation:
+// OpenCV vectorizes the scaling, and only one uint8 channel is held per step
+// instead of a second full float image. Padding columns stay zero.
 std::vector<float> normalize(const cv::Mat& image, int paddedWidth = 0) {
     int width = std::max(image.cols, paddedWidth);
     size_t plane = static_cast<size_t>(width) * image.rows;
     std::vector<float> result(plane * 3, 0.f);
-    for (int y = 0; y < image.rows; ++y) {
-        const auto* row = image.ptr<cv::Vec3b>(y);
-        for (int x = 0; x < image.cols; ++x) {
-            for (int channel = 0; channel < 3; ++channel) {
-                result[channel * plane + y * width + x] =
-                    (static_cast<float>(row[x][channel]) / 255.f - .5f) / .5f;
-            }
-        }
+    cv::Mat channel;
+    for (int index = 0; index < 3; ++index) {
+        cv::Mat target(image.rows, width, CV_32F, result.data() + index * plane);
+        cv::Mat content = target.colRange(0, image.cols);
+        cv::extractChannel(image, channel, index);
+        // (v / 255 - 0.5) / 0.5 == v / 127.5 - 1
+        channel.convertTo(content, CV_32F, 1. / 127.5, -1.);
     }
     return result;
 }
@@ -290,8 +293,11 @@ public:
         : config_(config), detector_(det, threads), classifier_(cls, threads),
           recognizer_(rec, threads), characters_(recognizer_.characters()) {}
 
-    std::string run(const cv::Mat& raw) {
+    // Takes the frame by value so the full-screen BGR buffer can be handed over
+    // and released as soon as the scaled detector input exists.
+    std::string run(cv::Mat raw) {
         detector_.resetStats(); classifier_.resetStats(); recognizer_.resetStats();
+        const int rawWidth = raw.cols, rawHeight = raw.rows;
         cv::Mat image = raw;
         int longest = std::max(image.cols, image.rows);
         if (longest > config_.i[0]) {
@@ -303,7 +309,8 @@ public:
             double ratio = double(config_.i[1]) / shortest;
             cv::resize(image, image, cv::Size(aligned(image.cols * ratio), aligned(image.rows * ratio)));
         }
-        double scaleX = raw.cols / double(image.cols), scaleY = raw.rows / double(image.rows);
+        double scaleX = rawWidth / double(image.cols), scaleY = rawHeight / double(image.rows);
+        raw.release(); // Scaled already owns its own pixels; drop the original frame.
         int top = 0;
         if (image.rows <= config_.i[2] ||
             (config_.i[3] > 0 && image.cols / double(image.rows) > config_.i[3])) {
@@ -326,8 +333,8 @@ public:
             json << '[' << '[';
             for (size_t n = 0; n < box.size(); ++n) {
                 if (n) json << ',';
-                json << '[' << std::clamp((box[n].x) * scaleX, 0., double(raw.cols))
-                     << ',' << std::clamp((box[n].y - top) * scaleY, 0., double(raw.rows)) << ']';
+                json << '[' << std::clamp((box[n].x) * scaleX, 0., double(rawWidth))
+                     << ',' << std::clamp((box[n].y - top) * scaleY, 0., double(rawHeight)) << ']';
             }
             json << "]," << quote(result.first) << ',' << result.second << ']';
         }
@@ -383,7 +390,7 @@ Java_com_lvjiang_app_NativeOcrBridge_run(JNIEnv* env, jobject, jlong handle, jby
         env->GetByteArrayRegion(bytes, 0, env->GetArrayLength(bytes),
                                reinterpret_cast<jbyte*>(image.data));
         if (env->ExceptionCheck()) return nullptr;
-        auto text = reinterpret_cast<Engine*>(handle)->run(image);
+        auto text = reinterpret_cast<Engine*>(handle)->run(std::move(image));
         auto result = env->NewByteArray(static_cast<jsize>(text.size()));
         if (result) env->SetByteArrayRegion(result, 0, static_cast<jsize>(text.size()),
                                            reinterpret_cast<const jbyte*>(text.data()));

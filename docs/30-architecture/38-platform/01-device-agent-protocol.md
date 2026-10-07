@@ -162,6 +162,9 @@ inp = create_input_backend(device, input_sim, agent=agent)   # 有代理 → Age
 | `offline_sync_commit` | — | 验证完整包和逐文件哈希、版本、DB 后交换 config；重载失败回滚 |
 
 手机任务状态为 idle/running/pausing/paused/stopping/done/failed/stopped。
+设备端截图后端自行满足无障碍 `takeScreenshot` 的框架限流（AOSP <=333ms 判定间隔
+过短，按服务连接计时）：请求前补齐节拍，并通过 `CaptureBackend.min_capture_interval`
+把下限告知采样循环；PC 后端声明 0，取 max 后行为不变。
 手机 OCR 使用 C++ 后端完成检测、分类、识别和 CTC 解码，复用 APK 中同一份
 ONNX Runtime 1.20.0 和现有模型。跨语言只传 BGR 字节图像、返回文字/置信度/四角
 坐标，不传模型浮点输入输出。公共 OCREngine 继续负责区域归属、清洗和字段拼接；

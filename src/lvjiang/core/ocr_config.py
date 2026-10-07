@@ -23,17 +23,23 @@ class RegionBatchConfig:
 
 @dataclass(frozen=True)
 class DeviceOCRConfig:
-    """手机资源预算；不影响 PC 的识别参数。"""
+    """手机资源预算；不影响 PC 的识别参数。
+
+    ``max_detector_pixels`` 默认 1,200,000：检测模型的设计输入是短边
+    ``limit_side_len=736``，16:9 下约 736x1636，再放大并不提升小字命中，
+    却按面积线性放大检测输入与中间特征图，是手机侧内存峰值的主要来源。
+    """
 
     threads: int = 2
-    max_detector_pixels: int = 2_000_000
+    max_detector_pixels: int = 1_200_000
 
 
 def load_device_ocr_config() -> DeviceOCRConfig:
     config = (load_ocr_config().get("recognition") or {}).get("device_ocr") or {}
     value = DeviceOCRConfig(
         threads=int(config.get("threads", 2)),
-        max_detector_pixels=int(config.get("max_detector_pixels", 2_000_000)),
+        max_detector_pixels=int(
+            config.get("max_detector_pixels", DeviceOCRConfig.max_detector_pixels)),
     )
     if value.threads < 1 or value.max_detector_pixels < 1024:
         raise ValueError("手机 OCR 线程数至少为 1，检测像素预算至少为 1024")

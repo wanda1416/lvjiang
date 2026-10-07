@@ -8,9 +8,43 @@
 - AdbCapture：基于 adb exec-out screencap -p 的设备截图
 """
 
+import time
 from abc import ABC, abstractmethod
 
 import numpy as np
+
+
+class A11yScreenshotThrottle:
+    """无障碍 takeScreenshot 的请求节拍
+
+    这是平台事实而非本项目策略：AOSP 的 AbstractAccessibilityServiceConnection
+    以「距上一次请求 <=333ms」判定间隔过短，直接回
+    ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT；时间戳按服务连接记录，换 display
+    或换线程都绕不开，被限流的那次请求不更新时间戳，所以退避一次就能成。
+
+    设备端直连和 PC 代理两条通道打的是同一个服务连接的限流，节拍只应有一份实现：
+    发请求前先等到最小间隔之上，而不是撞上失败再盲退避。走 Shizuku screencap 的
+    帧不受限流，此时节拍为 0。
+    """
+
+    #: 333ms 阈值之上留的余量：请求发出时一定越过阈值。
+    #: 厂商 ROM 可能把间隔调大，真遇到再按实测抬高这个值。
+    MIN_REQUEST_INTERVAL = 0.35
+
+    def _init_throttle(self, *, throttled: bool = True) -> None:
+        self._last_request = 0.0
+        self._set_throttled(throttled)
+
+    def _set_throttled(self, throttled: bool) -> None:
+        """按本帧实际走的通道更新采样下限（无障碍受限流，shell 不受）"""
+        self.min_capture_interval = self.MIN_REQUEST_INTERVAL if throttled else 0.0
+
+    def _pace(self) -> None:
+        """等到允许发请求的时刻，并记下本次请求时间"""
+        waiting = self._last_request + self.min_capture_interval - time.monotonic()
+        if waiting > 0:
+            time.sleep(waiting)
+        self._last_request = time.monotonic()
 
 
 class CaptureBackend(ABC):
@@ -22,7 +56,14 @@ class CaptureBackend(ABC):
     - get_capture_size()：返回当前捕获区域的宽高 (width, height)
     - set_capture_region(left, top, width, height)：设置捕获区域（ADB 为 no-op）
     - attach_to_window(title_keyword)：附着到指定窗口（ADB 为 no-op）
+    - min_capture_interval：后端自身的最小截图间隔（秒），0 表示不限频
     """
+
+    #: 后端自身的最小截图间隔（秒），0 表示不限频。
+    #: Android 无障碍 ``takeScreenshot`` 由框架限流（AOSP 判定两次请求间隔
+    #: <=333ms 为「间隔过短」），采样循环必须据此抬高自己的间隔；PC 后端保持
+    #: 0，取 max 后行为不变。
+    min_capture_interval: float = 0.0
 
     @abstractmethod
     def capture(self, timeout: float = 5.0) -> np.ndarray | None:

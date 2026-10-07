@@ -8,6 +8,32 @@
 #   detect_jianghu_reward_state      — 江湖号令奖励状态（unclaimed / claimed / unknown）
 #   detect_jianghu_card_reward_state — 指定一张号令卡片的奖励状态
 #   detect_equipment_lock_state      — 装备锁定状态（locked / unlock / unknown）
+#   detect_baiye_reward_state        — 百业按钮/活动底栏（claimable / unavailable / unknown）
+#   detect_baiye_dividend_state      — 百业分红（claimable / unavailable / unknown）
+
+# 不含金光只表示当前不可领取，不能据此回写“已领”。区域由 Android 调用方传入，
+# 公共库不增加 Android 专属布局引用。采样活动底栏时必须避开奖励物品图标。
+def detect_baiye_reward_state($region)
+    eval $ratios = pixel_ratios($region, {"gold": {"r_min": 100, "g_min": 90, "r_g_min": -5, "g_b_min": 8}}, 2)
+    if $ratios.gold >= 0.30
+        return "claimable"
+    end
+    if $ratios.gold <= 0.10
+        return "unavailable"
+    end
+    return "unknown"
+end
+
+def detect_baiye_dividend_state($region)
+    eval $ratios = pixel_ratios($region, {"gold": {"r_min": 140, "g_min": 120, "r_g_min": -5, "g_b_min": 25}}, 2)
+    if $ratios.gold >= 0.30
+        return "claimable"
+    end
+    if $ratios.gold <= 0.10
+        return "unavailable"
+    end
+    return "unknown"
+end
 
 # ─── detect_jianghu_reward_state ──────────────────────────
 # 江湖号令奖励状态：按 label 区域的金光覆盖比例区分待领取与已领取。

@@ -6,6 +6,11 @@ views:
   name: 基底
 - key: activity
   name: 活动
+- key: dividend
+  name: 分红
+- key: reward
+  name: 领奖结果
+  same_layer: false
 regions:
 - key: back
   name: 返回
@@ -15,6 +20,7 @@ regions:
   views:
   - base
   - activity
+  - dividend
 - key: goto_baiye
   name: 返回驻地
   type: func
@@ -25,3 +31,105 @@ regions:
   type: func
   is_text: true
   is_clickable: true
+- key: title
+  name: 百业标题
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: base
+- key: home_tab
+  name: 首页
+  type: func
+  is_text: true
+  is_clickable: true
+  view: base
+- key: dividend_tab
+  name: 分红
+  type: func
+  is_text: true
+  is_clickable: true
+  view: base
+- key: activity_tab
+  name: 活动
+  type: func
+  is_text: true
+  is_clickable: true
+  view: base
+- key: shop
+  name: 商店
+  type: func
+  is_text: true
+  is_clickable: true
+  view: base
+- key: weekly_dividend
+  name: 每周分红
+  type: func
+  is_text: false
+  is_clickable: true
+  view: dividend
+- key: dividend_glow
+  name: 分红金光
+  type: attr
+  is_text: false
+  is_clickable: false
+  view: dividend
+- key: activity_list_tab
+  name: 活动列表
+  type: func
+  is_text: true
+  is_clickable: true
+  view: activity
+- key: activity_list
+  name: 活动列表内容
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: activity
+- key: reward_title
+  name: 获得
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: reward
+- key: reward_close
+  name: 关闭领奖结果
+  type: func
+  is_text: true
+  is_clickable: true
+  view: reward
+- key: weekly_dividend_label
+  name: 每周分红标签
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: dividend
+subscene_refs:
+- key: card_1
+  name: 活动卡片1
+  scene: baiye_activity_card
+  view: activity
+- key: card_2
+  name: 活动卡片2
+  scene: baiye_activity_card
+  view: activity
+- key: card_3
+  name: 活动卡片3
+  scene: baiye_activity_card
+  view: activity
+- key: card_4
+  name: 活动卡片4
+  scene: baiye_activity_card
+  view: activity
+points:
+- key: activity_scroll_start
+  name: 活动翻页起点
+  type: func
+  is_text: false
+  is_clickable: true
+  view: activity
+- key: activity_scroll_end
+  name: 活动翻页终点
+  type: func
+  is_text: false
+  is_clickable: true
+  view: activity

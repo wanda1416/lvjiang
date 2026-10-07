@@ -1,0 +1,378 @@
+#% name: 周常百业领奖
+#% runnable: true
+#% batchable: true
+#% env: [android]
+#% note: |-
+#%   从游戏主页进入百业，领取每周分红、兑换周/月限购道具，再领顶部可领奖活动。
+#%   赤金小铺兑换百业惊喜礼盒；月度兑换绕梁之音和银百叶礼盒。
+#%   购买使用对应商店货币并选择最大数量。已完成的周期项目自动跳过，活动仍检查。
+
+import "subcall/navigation.wf"
+import "subcall/profile_registry.wf"
+import "subcall/visual_state.wf"
+
+call $profile_ok = declare_profiles(["baiye_dividend_of_week", "baiye_chijin_box_of_week", "baiye_raoliang_of_month", "baiye_silver_box_of_month"])
+if $profile_ok < 0
+    return -1
+end
+
+call $nav = nav_main_to_menu()
+if $nav < 0
+    return -1
+end
+# 菜单项目会移动，按菜单文字定位，不使用历史固定百业按钮坐标。
+find [game_menu_page].[menu] as $entry by contains "百业"
+if not $entry
+    log error "菜单中未找到百业入口，保持现场"
+    screenshot from last
+    return -1
+end
+click $entry after wait @page_refresh
+call $page = is_in_baiye_page()
+if not $page
+    log error "未确认百业页面，保持现场"
+    screenshot from last
+    return -1
+end
+
+call $dividend = claim_baiye_dividend()
+if $dividend < 0
+    return -1
+end
+
+# 上限只跳过对应商品；即使全部周期配额已满，也要检查活动。
+if not profile_get("baiye_chijin_box_of_week") >= 3 or not profile_get("baiye_raoliang_of_month") >= 2 or not profile_get("baiye_silver_box_of_month") >= 3
+    click [baiye_main].[shop] after wait @page_refresh
+    scan [baiye_shop].[title] as $shop_page by contains "赤金小铺"
+    if not $shop_page
+        log error "未确认百业商店，保持现场"
+        screenshot from last
+        return -1
+    end
+    call $bought = buy_baiye_item("chijin", "百业惊喜礼盒", "baiye_chijin_box_of_week", 3, "周库存", "赤金小铺")
+    if $bought < 0
+        return -1
+    end
+    call $bought = buy_baiye_item("reputation", "绕梁之音", "baiye_raoliang_of_month", 2, "月库存", "百业声望")
+    if $bought < 0
+        return -1
+    end
+    # 同一个月度 key；声望入口不存在或未买满时，再尝试银百叶。
+    call $bought = buy_baiye_item("silver", "绕梁之音", "baiye_raoliang_of_month", 2, "月库存", "银百叶")
+    if $bought < 0
+        return -1
+    end
+    call $bought = buy_baiye_item("silver", "百业惊喜礼盒", "baiye_silver_box_of_month", 3, "月库存", "银百叶")
+    if $bought < 0
+        return -1
+    end
+    click [baiye_shop].[back] after wait @page_refresh
+end
+
+# 百业会记住上次页签，必须显式回首页再进活动列表。
+click [baiye_main].[home_tab] after wait @page_refresh
+click [baiye_main].[activity_tab] after wait @page_refresh
+click [baiye_main].[activity_list_tab] after wait @page_refresh
+scan [baiye_main].[activity_list_tab] as $list_page
+call $list_text = baiye_compact_text($list_page.activity_list_tab)
+if not $list_text contains "活动列表"
+    log error "未确认百业活动列表，保持现场"
+    screenshot from last
+    return -1
+end
+call $activities = claim_baiye_activities()
+if $activities < 0
+    return -1
+end
+click [baiye_main].[back] after wait @page_refresh
+call $in_menu = is_in_menu_page()
+if not $in_menu
+    log error "百业返回后未确认菜单，保持现场"
+    screenshot from last
+    return -1
+end
+click [game_menu_page].[back] after wait @page_refresh
+call $in_main = is_in_main_page()
+if not $in_main
+    log error "百业领奖结束后未确认游戏主页"
+    screenshot from last
+    return -1
+end
+log "百业领奖检查完成，已返回主页"
+return 0
+
+# 确认获得浮层再关闭。结果缺失不点击背景，防止误操作下面的页面。
+def close_baiye_reward()
+    loop 3
+        scan [baiye_main].[reward_title] as $obtained by contains "获得"
+        if $obtained
+            screenshot from last
+            click [baiye_main].[reward_close] after wait @page_refresh
+            call $page = is_in_baiye_page()
+            if $page
+                return 1
+            end
+            log error "领奖浮层关闭后未恢复百业页面"
+            return -1
+        end
+        wait @page_refresh
+    end
+    log error "未检测到领取结果，保持现场，不回写完成记录"
+    screenshot from last
+    return -1
+end
+
+# 页眉书法字体会把“百业”拆成“白/业”，以两个稳定页签确认页面。
+# 菜单进入百业实测有黑屏过渡，有限轮询等待页面，不在黑屏时继续点击。
+def is_in_baiye_page()
+    loop 3
+        scan [baiye_main].[home_tab, dividend_tab] as $tabs
+        call $home_text = baiye_compact_text($tabs.home_tab)
+        call $dividend_text = baiye_compact_text($tabs.dividend_tab)
+        if $home_text contains "首页" and $dividend_text contains "分红"
+            return 1
+        end
+        wait @page_refresh
+    end
+    return 0
+end
+
+# 同一行文字可能被 OCR 拆成多个框，scan 用“ | ”连接；只消除框间分隔。
+def baiye_compact_text($raw)
+    eval $text = replace($raw, "|", "")
+    return replace($text, " ", "")
+end
+
+def claim_baiye_dividend()
+    if profile_get("baiye_dividend_of_week") >= 1
+        log "每周分红已有完成记录，跳过"
+        return 0
+    end
+    click [baiye_main].[dividend_tab] after wait @page_refresh
+    scan [baiye_main].[weekly_dividend_label] as $card
+    call $card_text = baiye_compact_text($card.weekly_dividend_label)
+    if not $card_text contains "每周分红"
+        log error "未确认每周分红卡片，保持现场"
+        screenshot from last
+        return -1
+    end
+    call $state = detect_baiye_dividend_state([baiye_main].[dividend_glow])
+    if $state == "unavailable"
+        log "每周分红当前不可领取，不写完成记录"
+        return 0
+    end
+    if $state != "claimable"
+        log error "每周分红颜色无法确认，保持现场"
+        screenshot from last
+        return -1
+    end
+    screenshot from last
+    click [baiye_main].[weekly_dividend] after wait @page_refresh
+    call $result = close_baiye_reward()
+    if $result < 0
+        return -1
+    end
+    call $after = detect_baiye_dividend_state([baiye_main].[dividend_glow])
+    if $after != "unavailable"
+        log error "分红结果已出现，但卡片金光未确认消失，不写完成记录"
+        screenshot from last
+        return -1
+    end
+    eval $observed = profile_observe("baiye_dividend_of_week", 1, "百业分红")
+    if not $observed.accepted
+        log error "分红已领取，Profile 写入失败: " + $observed.reason
+        return -1
+    end
+    log "每周分红领取成功，已记录"
+    return 1
+end
+
+# 周/月库存语义相同；只采用本次有效观察，不以旧 Profile 冒充 OCR 库存。
+def observe_baiye_stock($raw, $key, $total, $period_label, $source)
+    call $raw = baiye_compact_text($raw)
+    if not $raw contains $period_label
+        log error $source + "库存周期不符: " + $raw
+        return -1
+    end
+    eval $stock = extract_progress($raw)
+    if not $stock.valid or $stock.total != $total
+        log error $source + "库存无法确认: " + $raw
+        return -1
+    end
+    eval $consumed = $total - $stock.current
+    eval $observed = profile_observe($key, $consumed, $source)
+    if not $observed.accepted
+        log error $source + "库存与档案不一致，停止购买: " + $observed.reason
+        return -1
+    end
+    log $source + "已购买 " + $consumed + "/" + $total
+    return $stock.current
+end
+
+def buy_baiye_item($category, $name, $key, $total, $period_label, $source)
+    if profile_get($key) >= $total
+        log $source + "「" + $name + "」已有满额记录，跳过"
+        return 0
+    end
+    click [baiye_shop].$category after wait @page_refresh
+    # 每个分类可能保留旧滚动位置，先滚回顶部；搜索只针对目标商品。
+    drag [baiye_shop].[scroll_top] to [baiye_shop].[scroll_bottom] after wait @page_refresh
+    drag [baiye_shop].[scroll_top] to [baiye_shop].[scroll_bottom] after wait @page_refresh
+    eval $found = false
+    eval $query = $name
+    if $name == "绕梁之音"
+        eval $query = "绕梁"
+    end
+    loop 6
+        find [baiye_shop].[items] as $item by contains $query
+        if $item
+            click $item after wait @page_refresh
+            eval $found = true
+            break
+        end
+        drag [baiye_shop].[scroll_bottom] to [baiye_shop].[search_end] after wait @page_refresh
+    end
+    if not $found
+        log $source + "当前未找到「" + $name + "」，保留未完成状态"
+        return 0
+    end
+    scan [baiye_shop].[item_name] as $named
+    call $detail_name = baiye_compact_text($named.item_name)
+    if $detail_name != $name
+        log error "商品详情名称不符，停止购买"
+        screenshot from last
+        return -1
+    end
+    scan [baiye_shop].[stock] as $inventory
+    call $before = observe_baiye_stock($inventory.stock, $key, $total, $period_label, $source)
+    if $before < 0
+        screenshot from last
+        return -1
+    end
+    if $before == 0
+        return 0
+    end
+    click [baiye_shop].[add_max] after wait @step_interval
+    scan [baiye_shop].[quantity] as $quantity
+    eval $amount = extract_num($quantity.quantity)
+    if $amount <= 0 or $amount > $before
+        log error $source + "购买数量无法确认，停止购买"
+        screenshot from last
+        return -1
+    end
+    scan [baiye_shop].[purchase] as $button by contains "购买"
+    call $state = detect_baiye_reward_state([baiye_shop].[purchase_glow])
+    if not $button or $state == "unavailable"
+        log $source + "当前不可购买，保留剩余配额"
+        return 0
+    end
+    if $state != "claimable"
+        log error $source + "购买按钮颜色无法确认，停止购买"
+        screenshot from last
+        return -1
+    end
+    screenshot from last
+    click [baiye_shop].[purchase] after wait @page_refresh
+    # 商店购买只有道具提示，不假设必有全屏“获得”。依据详情库存变化写实际数量。
+    loop 3
+        eval $valid_stock = false
+        scan [baiye_shop].[item_name] as $named
+        call $detail_name = baiye_compact_text($named.item_name)
+        if $detail_name != $name
+            log error "购买后商品详情丢失，保持现场"
+            screenshot from last
+            return -1
+        end
+        scan [baiye_shop].[stock] as $inventory
+        call $stock_text = baiye_compact_text($inventory.stock)
+        eval $stock = extract_progress($stock_text)
+        if $stock.valid and $stock.total == $total and $stock_text contains $period_label
+            eval $valid_stock = true
+            if $stock.current > $before
+                log error "购买后库存回退，保持现场，不回写本次结果"
+                screenshot from last
+                return -1
+            end
+        end
+        if $stock.valid and $stock.total == $total and $stock.current < $before
+            if $before - $stock.current != $amount
+                log error "购买库存变化与所选数量不一致，不回写本次结果"
+                screenshot from last
+                return -1
+            end
+            call $after = observe_baiye_stock($inventory.stock, $key, $total, $period_label, $source)
+            if $after < 0
+                return -1
+            end
+            log $source + "「" + $name + "」购买成功，实际数量 " + $amount
+            return 1
+        end
+        wait @page_refresh
+    end
+    if not $valid_stock
+        log error "购买后库存无法确认，保持现场，不回写本次结果"
+        screenshot from last
+        return -1
+    end
+    log $source + "库存未确认减少，不记录购买成功，本轮不重试购买"
+    screenshot from last
+    return 0
+end
+
+# 固定引用仅用于把 Android 四个完整可见卡片的采色区域传给公共库。
+def baiye_card_state($card)
+    if $card == "card_1"
+        call $state = detect_baiye_reward_state([baiye_main].[card_1].[footer])
+    else if $card == "card_2"
+        call $state = detect_baiye_reward_state([baiye_main].[card_2].[footer])
+    else if $card == "card_3"
+        call $state = detect_baiye_reward_state([baiye_main].[card_3].[footer])
+    else if $card == "card_4"
+        call $state = detect_baiye_reward_state([baiye_main].[card_4].[footer])
+    else
+        return "unknown"
+    end
+    return $state
+end
+
+def claim_baiye_activities()
+    # 只推进可领奖/已结束前缀。遇到首个未完成卡片即止，不遍历下方不可领奖任务。
+    loop 12
+        for card in ["card_1", "card_2", "card_3", "card_4"]
+            scan [baiye_main].$card.[ended] as $ended by contains "已结束"
+            if $ended
+                continue
+            end
+            call $state = baiye_card_state($card)
+            if $state == "unavailable"
+                log "已到不可领奖活动，顶部奖励检查结束"
+                return 0
+            end
+            if $state != "claimable"
+                log error "活动卡片颜色无法确认，保持现场"
+                screenshot from last
+                return -1
+            end
+            scan [baiye_main].$card.[title] as $title
+            log "领取百业活动: " + $title.title
+            screenshot from last
+            click [baiye_main].$card.[claim] after wait @page_refresh
+            call $result = close_baiye_reward()
+            if $result < 0
+                return -1
+            end
+            call $after = baiye_card_state($card)
+            if $after != "unavailable"
+                log error "活动领取后金光未确认消失，停止重复点击"
+                screenshot from last
+                return -1
+            end
+            log "百业活动领取成功: " + $title.title
+        end
+        # 四张卡片均已领取或已结束才移动两行，滚动范围限于顶部奖励前缀。
+        drag [baiye_main].[activity_scroll_start] to [baiye_main].[activity_scroll_end] after wait @page_refresh
+    end
+    log error "百业活动前缀超过检查上限，请检查当前列表和布局"
+    screenshot from last
+    return -1
+end

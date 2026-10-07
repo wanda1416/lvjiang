@@ -1,0 +1,30 @@
+content_version: 1
+key: baiye_activity_card
+name: 百业活动卡片
+type: subscene
+regions:
+- key: title
+  name: 活动名称
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: progress
+  name: 任务进度
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: footer
+  name: 领奖光效
+  type: attr
+  is_text: false
+  is_clickable: false
+- key: ended
+  name: 已结束
+  type: attr
+  is_text: true
+  is_clickable: false
+- key: claim
+  name: 领取卡片
+  type: func
+  is_text: false
+  is_clickable: true

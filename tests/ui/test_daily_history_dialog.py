@@ -143,3 +143,43 @@ def test_preview_refresh_missing_files_invalid_json_and_large_log(qtbot, tmp_pat
     viewer.clear()
     assert viewer.details.toPlainText() == ""
     assert viewer.log.toPlainText() == ""
+
+
+def test_dialog_size_and_each_page_split_restore_without_overwriting_state(qtbot, tmp_path):
+    from lvjiang.core.config import load_ui_page_state, update_ui_page_state
+    from lvjiang.core.config.session import reset_session_store
+
+    repository, _, _ = _history(tmp_path)
+    update_ui_page_state("main_page", {"window_size": [1200, 700]})
+    update_ui_page_state("task_history", {"other_field": "keep"})
+    dialog = DailyHistoryDialog(repository=repository)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    dialog.resize(1400, 720)
+    qtbot.waitUntil(lambda: dialog.width() == 1400)
+    dialog._task_splitter.setSizes([700, 660])
+    dialog._tabs.setCurrentIndex(1)
+    dialog._batch_splitter.setSizes([590, 770])
+    task_sizes = dialog._task_splitter.sizes()
+    batch_sizes = dialog._batch_splitter.sizes()
+    # 模拟其他写入方在打开窗口后新增页面字段。
+    update_ui_page_state("task_history", {"new_field": "keep too"})
+    dialog.reject()  # Esc 和标题栏关闭都须保存。
+    reset_session_store()
+    state = load_ui_page_state("task_history")
+    assert state == {
+        "window_size": [1400, 720], "task_splitter_sizes": task_sizes,
+        "batch_splitter_sizes": batch_sizes, "other_field": "keep", "new_field": "keep too"}
+    assert load_ui_page_state("main_page") == {"window_size": [1200, 700]}
+    reopened = DailyHistoryDialog(repository=repository)
+    qtbot.addWidget(reopened)
+    reopened.show()
+    assert [reopened.width(), reopened.height()] == [1400, 720]
+    actual = reopened._task_splitter.sizes()
+    assert abs(actual[0] / sum(actual) - task_sizes[0] / sum(task_sizes)) < 0.01
+    reopened._tabs.setCurrentIndex(1)
+    actual = reopened._batch_splitter.sizes()
+    assert abs(actual[0] / sum(actual) - batch_sizes[0] / sum(batch_sizes)) < 0.01
+    reopened.resize(1450, 750)
+    reopened.close()  # 标题栏关闭路径。
+    assert load_ui_page_state("task_history")["window_size"] == [1450, 750]

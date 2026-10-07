@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object AgentServer {
 
-    val SOCKET_NAME = if (BuildConfig.APPLICATION_ID == "com.lvjiang.app") "lvjiang-agent" else "lvjiang-agent-offlinecheck"
+    val SOCKET_NAME = if (BuildConfig.APPLICATION_ID == "com.lvjiang.app") "lvjiang-agent" else "lvjiang-agent-${BuildConfig.APPLICATION_ID.substringAfterLast('.')}"
     const val PROTOCOL_VERSION = 3
 
     private const val TAG = "AgentServer"

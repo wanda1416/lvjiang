@@ -175,8 +175,9 @@ cd android && ./gradlew :app:assembleDebug
 验证悬浮启动和安全控制，不能只测 RPC 返回值。检查失败、运行中再次启动/同步以及 PC
 代理输入冲突必须明确拒绝。游戏业务操作单独验收，不把合成任务通过写成全部游戏已验证。
 
-APK 不内置业务配置，启动和升级不解压 config/system。新装应用尚未同步时，运行环境
-检查只验证依赖并提示 PC 下发配置；不能为了测试向正式应用写入合成用户/DB。
+APK 内置由官方 config/system 生成的预置包，首次建立默认用户、安卓布局和空 DB。
+用全新独立应用目录验证从未 PC 同步时的任务发现、参数页和运行环境，不向正式应用
+写入合成用户/DB。新预置代次只更新 system；同代次重启不覆盖 PC 下发配置。
 正式包可保留已有同步配置，用 offline_diagnostics 的 screen_repetitions 参数在游戏
 前台进行只读连续 OCR，结合游戏 PID、退出记录和运行日志测量内存。
 运行日志可通过 content://<package>.selftest/runtime 与 /runtime-previous 回读，文件

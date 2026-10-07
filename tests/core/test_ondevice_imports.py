@@ -28,7 +28,7 @@ def test_ondevice_entrypoints_import_without_pyqt6() -> None:
         init_i18n("zh_CN")
 
         from lvjiang.core.ondevice import task_runner
-        from lvjiang.core.ondevice import offline, workflow_runner, plugins, task_settings
+        from lvjiang.core.ondevice import offline, workflow_runner, plugins, task_settings, bootstrap, user_settings
         from lvjiang.core.profile import service
         from lvjiang.apps.yysls.ondevice import tuning_config
 
@@ -40,6 +40,7 @@ def test_ondevice_entrypoints_import_without_pyqt6() -> None:
         assert callable(service.profile_action)
         assert callable(tuning_config.get_tuning_config)
         assert callable(task_settings.get_settings)
+        assert callable(bootstrap.initialize) and callable(user_settings.create_user)
         from lvjiang.apps.yysls.workflows.implementations.auto_tuning import AutoTuningWorkflow
         import importlib
         adapter = importlib.import_module(AutoTuningWorkflow.DEVICE_SETTINGS_MODULE)

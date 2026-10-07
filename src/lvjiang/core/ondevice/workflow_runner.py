@@ -101,11 +101,11 @@ def create_engine(
     """
     # 先加插件：.wf 里的游戏专属内置函数（to_equipment 等）靠插件导入时注册，
     # 未加载则 DSL 调用直接报未知函数（见 plugins 模块说明）。
-    from .offline import sync_status
+    from .offline import configuration_status
     from .plugins import ensure_loaded
 
-    if not sync_status().get("synced"):
-        raise RuntimeError("请先在 PC 同步脚本、配置和执行用户")
+    if not configuration_status().get("ready"):
+        raise RuntimeError("预置配置未就绪，请重新打开或更新应用")
     ensure_loaded()
 
     capture = _create_capture()

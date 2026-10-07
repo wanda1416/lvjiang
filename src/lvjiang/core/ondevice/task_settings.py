@@ -13,7 +13,7 @@ from ..user_config import (
     set_user_workflow_params,
 )
 from . import task_runner
-from .offline import sync_status
+from .offline import configuration_status, sync_status
 
 
 def _json(value: Any) -> str:
@@ -24,8 +24,8 @@ def _tasks() -> list[dict]:
     from ...workflows.discovery import list_exposed_scripts
     from .plugins import ensure_loaded
     ensure_loaded()
-    if not sync_status().get("synced"):
-        raise ValueError("请先从 PC 同步任务配置")
+    if not configuration_status().get("ready"):
+        raise ValueError("预置配置未就绪，请重新打开或更新应用")
     return list_exposed_scripts("android", device_entry=True)
 
 
@@ -46,8 +46,8 @@ def _task(task_id: str) -> dict:
 
 
 def _user(username: str) -> None:
-    if username not in task_runner._synced_user_names():
-        raise ValueError("用户资料不可用，请重新从 PC 同步")
+    if username not in task_runner._local_user_names():
+        raise ValueError("用户资料不可用，请在用户管理中检查")
 
 
 def _view(username: str, task_id: str) -> dict:
@@ -164,6 +164,30 @@ def _validate(definition: dict, value: Any) -> Any:
             ):
                 raise ValueError("请选择有效项目")
     return value
+
+
+def validate_for_run(task: dict, username: str, extra_values: dict | None = None) -> None:
+    """保留旧参数后，按新定义校验实际使用的手机字段；不落盘。"""
+    adapter = _adapter(task)
+    if adapter and hasattr(adapter, "validate_for_run"):
+        adapter.validate_for_run(username)
+        return
+    definitions = task.get("parameters", [])
+    values, _ = resolve_task_params(task["id"], username, definitions)
+    values.update(extra_values or {})
+    from ...workflows.builtins._coerce import to_bool
+    for definition in definitions:
+        if definition.get("type") == "bool" and definition["name"] in values:
+            values[definition["name"]] = to_bool(values[definition["name"]])
+    mobile = parameters_for_env(definitions, "android")
+    for definition in parameters_for_values(mobile, values):
+        name = definition["name"]
+        if name not in values:
+            continue
+        try:
+            _validate(definition, values[name])
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"任务参数「{definition.get('label', name)}」不适用于当前脚本，请在任务设置中修改：{exc}") from exc
 
 
 def save_settings(username: str, task_id: str, token: str, payload: str, reset: bool = False) -> str:

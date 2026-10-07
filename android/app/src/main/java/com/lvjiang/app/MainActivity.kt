@@ -152,6 +152,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menu.add(0, MENU_TASK_SETTINGS, 0, "任务设置")
+        menu.add(0, MENU_USER_SETTINGS, 1, "用户管理")
         menu.add(0, MENU_PERMISSIONS, 0, R.string.menu_permissions)
         menu.add(0, MENU_ADVANCED, 1, R.string.menu_advanced)
         menu.add(0, MENU_DIAGNOSTICS, 2, R.string.menu_diagnostics)
@@ -161,6 +162,7 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             MENU_TASK_SETTINGS -> startActivity(Intent(this, TaskSettingsActivity::class.java))
+            MENU_USER_SETTINGS -> startActivity(Intent(this, UserSettingsActivity::class.java))
             android.R.id.home -> showPage(Page.HOME)
             MENU_PERMISSIONS -> showPage(Page.PERMISSIONS)
             MENU_ADVANCED -> showPage(Page.ADVANCED)
@@ -206,7 +208,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.check_pc_connection).text = if (AgentServer.isPcConnected()) {
             "✅ PC 已连接（${AgentServer.activeConnectionCount()}）"
         } else {
-            "PC 未连接（已同步任务仍可离线执行）"
+            "PC 未连接（手机任务可独立执行）"
         }
         findViewById<TextView>(R.id.check_overlay).text =
             "${mark(overlay)} 悬浮窗（仅手机独立运行任务需要）"
@@ -346,10 +348,11 @@ class MainActivity : AppCompatActivity() {
         executor.execute {
             val status = PyBridge.status(this)
             val sync = status.optJSONObject("sync")
-            val text = if (sync?.optBoolean("synced") == true) {
-                "最近同步：${sync.optString("synced_at")}\n执行用户：${sync.optString("execution_username", sync.optString("username"))}\n当前布局：${sync.optString("layout")}\n手机结果暂不回传，下次同步会覆盖手机 DB。"
+            val text = if (sync?.optBoolean("ready") == true) {
+                val history = if (sync.optBoolean("synced")) sync.optString("synced_at") else "未同步（应用预置）"
+                "最近同步：$history\n执行用户：${SettingsUi.userLabel(sync.optString("execution_username"))}\n当前布局：${sync.optString("layout")}\n手机结果暂不回传，同步时可保留任务参数，DB 仍覆盖。"
             } else {
-                status.optString("message").ifEmpty { "尚未从 PC 同步任务配置" }
+                sync?.optString("message")?.ifEmpty { "预置配置未就绪" } ?: status.optString("message")
             }
             ui.post { findViewById<TextView>(R.id.offline_status).text = text }
         }
@@ -386,5 +389,6 @@ class MainActivity : AppCompatActivity() {
         private const val MENU_ADVANCED = 2
         private const val MENU_DIAGNOSTICS = 3
         private const val MENU_TASK_SETTINGS = 4
+        private const val MENU_USER_SETTINGS = 5
     }
 }

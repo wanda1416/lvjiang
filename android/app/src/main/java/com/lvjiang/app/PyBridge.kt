@@ -6,6 +6,7 @@ import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import org.json.JSONObject
+import java.io.File
 
 /**
  * PyBridge — Chaquopy 调用的唯一入口。
@@ -24,11 +25,13 @@ object PyBridge {
     private const val CONFIGURED_APPS = "yysls"
     private const val MODULE = "lvjiang.core.ondevice.task_runner"
     private const val SETTINGS_MODULE = "lvjiang.core.ondevice.task_settings"
+    private const val USER_SETTINGS_MODULE = "lvjiang.core.ondevice.user_settings"
     private const val CALIB_MODULE = "lvjiang.core.ondevice.screen_calib_api"
     private const val OFFLINE_MODULE = "lvjiang.core.ondevice.offline"
 
     @Volatile
     private var startFailure: String? = null
+    private var presetInitialized = false
 
     /** 启动解释器（幂等）。失败原因会被记住，避免每次调用都重跑一遍必然失败的初始化。 */
     @Synchronized
@@ -41,6 +44,16 @@ object PyBridge {
             Python.getInstance()
                 .getModule("lvjiang.core.ondevice.plugins")
                 .callAttr("configure_apps", CONFIGURED_APPS)
+            if (!presetInitialized) {
+                val preset = File(context.cacheDir, "lvjiang-preset.zip")
+                context.assets.open("lvjiang-preset.zip").use { input ->
+                    preset.outputStream().use { output -> input.copyTo(output) }
+                }
+                val result = JSONObject(Python.getInstance().getModule("lvjiang.core.ondevice.bootstrap")
+                    .callAttr("initialize", preset.absolutePath).toString())
+                if (!result.optBoolean("ok")) throw IllegalStateException(result.optString("message"))
+                presetInitialized = true
+            }
             null
         } catch (e: Throwable) {
             val msg = "Python 启动失败：${e.message}"
@@ -83,6 +96,18 @@ object PyBridge {
     /** 可执行任务清单：`{ok, tasks:[{id,name,source}], error}` */
     fun listTasks(context: Context): JSONObject = callJson(context, "list_tasks")
     fun listUsers(context: Context): JSONObject = callJson(context, "list_users")
+    fun getUserSettings(context: Context, username: String): JSONObject =
+        callJson(context, "get_user", username, moduleName = USER_SETTINGS_MODULE)
+
+    fun createUser(context: Context, username: String): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束 PC 任务")
+        else callJson(context, "create_user", username, moduleName = USER_SETTINGS_MODULE)
+    }
+
+    fun saveUserAttributes(context: Context, username: String, payload: String, baseline: String): JSONObject = synchronized(AgentServer.executionLock) {
+        if (AgentServer.pcControlsDevice()) JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束 PC 任务")
+        else callJson(context, "save_attributes", username, payload, baseline, moduleName = USER_SETTINGS_MODULE)
+    }
     fun selectUser(context: Context, username: String): JSONObject = synchronized(AgentServer.executionLock) {
         if (AgentServer.pcControlsDevice()) {
             JSONObject().put("ok", false).put("message", "PC 正在执行，请先结束 PC 任务")

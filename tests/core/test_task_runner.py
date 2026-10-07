@@ -242,12 +242,12 @@ def test_device_lists_tuning_without_exposing_other_dedicated_tasks(monkeypatch)
 
 # ─── start_task 前置校验 ─────────────────────────────────────
 
-def test_unsynced_phone_cannot_start_or_list_tasks():
+def test_phone_without_ready_configuration_cannot_start_or_list_tasks():
     from lvjiang import constants
     (constants.SESSION_CONFIG_DIR / "offline.json").unlink()
     assert not json.loads(task_runner.list_tasks())["ok"]
     result = json.loads(task_runner.start_task("task"))
-    assert not result["ok"] and "同步" in result["message"]
+    assert not result["ok"] and "预置配置未就绪" in result["message"]
 
 def test_start_rejects_when_a11y_not_ready(monkeypatch):
     _patch_discovery(monkeypatch, _fake_tasks({"id": "t1"}))
@@ -352,7 +352,7 @@ def test_synced_user_and_parameter_override_are_bound_before_execution(monkeypat
     from lvjiang.core.user_config import set_user_workflow_params
 
     _patch_discovery(monkeypatch, _fake_tasks({
-        "id": "task", "parameters": [{"name": "count", "default": 1}],
+        "id": "task", "parameters": [{"name": "count", "type": "number", "default": 1}],
     }))
     set_wf_config("task", {"count": 3})
     set_user_workflow_params("tester", "task", {"count": 4}, constants.USERS_DIR)

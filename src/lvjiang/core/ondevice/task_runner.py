@@ -226,7 +226,7 @@ def _reset_engine_state(engine) -> None:
     engine.context = {}
     engine._ui_callback = _task_ui
 
-    # 设备端没有执行用户下拉，每次任务启动都绑定 session 中的当前用户。
+    # 每次任务启动绑定手机已选择的用户，不要求该资料来自 PC。
     from ... import constants
     from ..config.session import get_session_store
 
@@ -234,7 +234,7 @@ def _reset_engine_state(engine) -> None:
     engine.run_username = username if isinstance(username, str) else ""
     engine.users_dir = constants.USERS_DIR
     if not engine.run_username:
-        raise RuntimeError("尚未同步执行用户，请在 PC 移动设备窗口同步配置")
+        raise RuntimeError("尚未选择执行用户，请在用户管理中创建资料并选择")
     from ..config.users import SessionManager
     from ..user_config import load_user_metadata
 
@@ -265,16 +265,16 @@ def _task_ui(action: str, **kwargs):
 # ── 对外接口（返回 JSON 文本） ─────────────────────────────
 
 
-def list_tasks(require_sync: bool = True) -> str:
+def list_tasks(require_ready: bool = True) -> str:
     """可执行任务清单
 
     Returns:
         JSON 文本 ``{"ok": bool, "tasks": [{"id","name","source"}], "error": str}``
     """
     try:
-        from .offline import sync_status
-        if require_sync and not sync_status().get("synced"):
-            return json.dumps({"ok": False, "tasks": [], "error": "请先在 PC 移动设备窗口同步离线任务配置"}, ensure_ascii=False)
+        from .offline import configuration_status
+        if require_ready and not configuration_status().get("ready"):
+            return json.dumps({"ok": False, "tasks": [], "error": "预置配置未就绪，请重新打开或更新应用"}, ensure_ascii=False)
         from ...workflows.discovery import list_exposed_scripts, script_display_name
         from .plugins import ensure_loaded
 
@@ -323,9 +323,9 @@ def _start_task(task_id: str, initial_variables: str = "", username: str = "") -
         return json.dumps(
             {"ok": False, "message": "已有任务在运行，请先停止"}, ensure_ascii=False
         )
-    from .offline import sync_status
-    if not sync_status().get("synced"):
-        return json.dumps({"ok": False, "message": "请先从 PC 同步任务配置与执行用户"}, ensure_ascii=False)
+    from .offline import configuration_status
+    if not configuration_status().get("ready"):
+        return json.dumps({"ok": False, "message": "预置配置未就绪，请重新打开或更新应用"}, ensure_ascii=False)
 
     try:
         from . import a11y
@@ -354,14 +354,17 @@ def _start_task(task_id: str, initial_variables: str = "", username: str = "") -
     except Exception as e:
         return json.dumps({"ok": False, "message": str(e)}, ensure_ascii=False)
 
-    if username:
-        try:
-            from ..config.session import get_session_store
-            if username not in _synced_user_names():
-                raise ValueError("执行用户资料尚未同步或不可用")
+    try:
+        from ..config.session import get_session_store
+        from .task_settings import validate_for_run
+        selected_user = username or get_session_store().get_active("user", "")
+        validate_for_run(task, selected_user, variables)
+        if username:
+            if username not in _local_user_names():
+                raise ValueError("执行用户资料不可用，请在用户管理中检查")
             get_session_store().set_active("user", username)
-        except Exception as exc:
-            return json.dumps({"ok": False, "message": str(exc)}, ensure_ascii=False)
+    except Exception as exc:
+        return json.dumps({"ok": False, "message": str(exc)}, ensure_ascii=False)
     _STATE.begin(task_id, task["name"])
     thread = threading.Thread(
         target=_run_in_thread,
@@ -405,21 +408,21 @@ def get_status() -> str:
         JSON 文本，字段见 ``_TaskState.snapshot``
     """
     from ..config.session import get_session_store
-    from .offline import sync_status
-    sync = sync_status()
-    if sync.get("synced"):
+    from .offline import configuration_status
+    sync = configuration_status()
+    if sync.get("ready"):
         sync["execution_username"] = get_session_store().get_active("user", sync.get("username", ""))
     return json.dumps({**_STATE.snapshot(), "sync": sync}, ensure_ascii=False, default=str)
 
 
-def _synced_user_names() -> list[str]:
+def _local_user_names() -> list[str]:
     from ...constants import USERS_DIR
     from ..config.session import get_session_store
     from ..user_config import is_valid_username, load_user_metadata
-    from .offline import sync_status
+    from .offline import configuration_status
 
-    sync = sync_status()
-    if not sync.get("synced"):
+    sync = configuration_status()
+    if not sync.get("ready"):
         return []
     names = get_session_store().get_node("users", [])
     candidates = [*(names if isinstance(names, list) else []), sync.get("username", "")]
@@ -434,7 +437,7 @@ def list_users() -> str:
     """只展示同步名册中有有效资料的用户，不创建/修复缺失资料。"""
     try:
         from ..config.session import get_session_store
-        return json.dumps({"ok": True, "users": _synced_user_names(),
+        return json.dumps({"ok": True, "users": _local_user_names(),
                            "selected": get_session_store().get_active("user", "")}, ensure_ascii=False)
     except Exception as exc:
         return json.dumps({"ok": False, "users": [], "message": str(exc)}, ensure_ascii=False)
@@ -447,8 +450,8 @@ def select_user(username: str) -> str:
             return json.dumps({"ok": False, "message": "请先停止当前任务再选择用户"}, ensure_ascii=False)
         try:
             from ..config.session import get_session_store
-            if username not in _synced_user_names():
-                raise ValueError("该用户资料尚未同步或不可用，请重新从 PC 同步")
+            if username not in _local_user_names():
+                raise ValueError("该用户资料不可用，请在用户管理中检查")
             get_session_store().set_active("user", username)
             return json.dumps({"ok": True, "message": "执行用户已切换，请确认游戏角色一致"}, ensure_ascii=False)
         except Exception as exc:

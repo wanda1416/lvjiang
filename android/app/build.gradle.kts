@@ -30,7 +30,7 @@ android {
         manifestPlaceholders["lvjiangLabel"] = if (applicationId == "com.lvjiang.app") "@string/app_name" else "律匠离线验收"
         minSdk = 26
         targetSdk = 35
-        // 应用版本仅在发布时递增。业务配置统一由 PC 同步，不再随 APK 解压。
+        // 应用版本仅在发布时递增；预置配置以内容摘要更新，不提升 content_version。
         versionCode = 60
         versionName = "0.13.12"
         // 正式默认仍为 arm64；软件模拟器验收可显式 -PlvjiangAbi=x86_64。
@@ -216,4 +216,16 @@ dependencies {
     nativeOpenCv("org.opencv:opencv:4.10.0@aar")
 }
 
-// 业务配置不进入 assets。config/system/local/remote/session 统一通过 PC 同步。
+// 预置只从官方 system 生成，绝不打包个人 local/remote/session 或 DB。
+val presetAssets = layout.buildDirectory.dir("generated/systemPreset/assets")
+val generateSystemPreset by tasks.registering(Exec::class) {
+    inputs.dir(rootProject.file("../config/system"))
+    inputs.file(rootProject.file("../src/lvjiang/_version.py"))
+    inputs.file(rootProject.file("../src/lvjiang/core/system_preset.py"))
+    inputs.file(rootProject.file("../scripts/build_android_preset.py"))
+    outputs.file(presetAssets.map { it.file("lvjiang-preset.zip") })
+    commandLine(buildPythonExe.absolutePath, rootProject.file("../scripts/build_android_preset.py").absolutePath,
+        presetAssets.get().file("lvjiang-preset.zip").asFile.absolutePath)
+}
+android.sourceSets.getByName("main").assets.srcDir(presetAssets)
+tasks.named("preBuild").configure { dependsOn(generateSystemPreset) }

@@ -122,6 +122,26 @@ def insert_overview_column(group_name: str, index: int, key: str) -> None:
     _mutate_groups(_insert)
 
 
+def insert_overview_columns(
+    group_name: str, after_key: str | None, keys: list[str],
+) -> list[str]:
+    """按稳定原列定位，原子添加多个字段；返回实际新增字段的顺序。"""
+    inserted: list[str] = []
+
+    def _insert(groups: dict) -> None:
+        group = groups.setdefault(group_name, {"columns": []})
+        columns = list(group.get("columns", []))
+        if after_key is not None and after_key not in columns:
+            raise ValueError("原列已被移除，请重新选择插入位置")
+        index = columns.index(after_key) + 1 if after_key is not None else 0
+        inserted.extend(key for key in dict.fromkeys(keys) if key not in columns)
+        columns[index:index] = inserted
+        group["columns"] = columns
+
+    _mutate_groups(_insert)
+    return inserted
+
+
 def remove_overview_column(group_name: str, key: str) -> None:
     """按 key 删除列，避免 UI 可见下标误删其他配置。"""
     def _remove(groups: dict) -> None:

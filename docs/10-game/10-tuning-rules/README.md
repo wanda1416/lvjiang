@@ -42,7 +42,7 @@
 | 会心小外 | 指定流派和玩法 | 保留 PVP 装备 |
 | 会心大外 | 指定流派和玩法 | 保留 PVP 装备 |
 | 治疗 | 纯奶和/或火拳奶 | 无 |
-| 威威大王(beta) | 无 | 无 |
+| 威威大王 | 无 | 无 |
 | 玉玉大王(beta) | 无 | 无 |
 
 规则本体位于 `config/system/yysls/tuning_rules/*.yaml`：目录里有哪些文件就是哪些
@@ -234,7 +234,7 @@
 | [03-huixin-small.md](03-huixin-small.md) | 会心-小外流 | 指定流派（裂石/破竹/牵丝，可多选）和玩法 | 保留 PVP 装备 |
 | [04-heal-pure.md](04-heal-pure.md) | 治疗-纯奶（牵丝·霖） | 玩法（纯奶/火拳，可同时勾选） | 无 |
 | [05-heal-fire.md](05-heal-fire.md) | 治疗-火拳奶（牵丝·霖） | 玩法（纯奶/火拳，可同时勾选） | 无 |
-| [06-weiwie-dawang.md](06-weiwie-dawang.md) | 威威大王（裂石·威） | 无 | 无 |
+| [06-weiwei-dawang.md](06-weiwei-dawang.md) | 威威大王（裂石·威） | 无 | 无 |
 
 `config/system/yysls/tuning_rules/` 里另有 `huixin_yuyu`（玉玉大王）这套 beta
 规则，暂无规格文档，口径以 YAML 为准。
@@ -243,5 +243,5 @@
 未勾选对应流派（裂石或牵丝）时，不必出现玩法选项。
 各流派、玩法所需的武学增效见本文「流派与玩法配置」。
 
-`huixin_modao`（威威大王）和 `huixin_yuyu`（玉玉大王）目前为 beta 规则，默认启用。
+`huixin_yuyu`（玉玉大王）目前仍是 beta 规则，默认启用。
 裂石·威 只由威威大王判定，会心大外的玩法列表不再包含它。

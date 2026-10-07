@@ -258,12 +258,15 @@ class TaskHistoryRepository:
     def list_task_runs(
         self, *, usernames: list[str] | None = None,
         task_ids: list[str] | None = None, batch_run_id: str | None = None,
-        target_kind: str | None = None,
+        target_kind: str | None = None, status: str | None = None,
         start_date: date | None = None, end_date: date | None = None,
         limit: int = 2000,
     ) -> list[TaskRunRecord]:
         clauses: list[str] = []
         args: list[Any] = []
+        if status is not None:
+            clauses.append("status=?")
+            args.append(status)
         if usernames:
             clauses.append("username IN (%s)" % ",".join("?" * len(usernames)))
             args.extend(usernames)
@@ -323,10 +326,14 @@ class TaskHistoryRepository:
     def list_batch_runs(
         self, *, start_date: date | None = None,
         end_date: date | None = None, target_kind: str | None = None,
+        status: str | None = None,
         limit: int = 1000,
     ) -> list[BatchRunRecord]:
         clauses: list[str] = []
         args: list[Any] = []
+        if status is not None:
+            clauses.append("b.status=?")
+            args.append(status)
         if start_date:
             clauses.append("b.started_at >= ?")
             args.append(f"{start_date.isoformat()}T00:00:00")

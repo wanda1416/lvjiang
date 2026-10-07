@@ -147,3 +147,30 @@ def test_legacy_database_migrates_without_losing_records(tmp_path):
     assert record.task_run_id == "legacy-run"
     assert record.target_id == ""
     assert record.target_kind == ""
+
+
+def test_status_filters_before_limit_and_keeps_batch_task_count(tmp_path):
+    """最新记录成功时仍能找到较早失败，批次计数包含所有状态子任务。"""
+    repository = TaskHistoryRepository(tmp_path / "history.db")
+    old_batch = BatchRunSession(config_name="旧批次", input_snapshot={}, repository=repository)
+    new_batch = BatchRunSession(config_name="新批次", input_snapshot={}, repository=repository)
+    runs = []
+    for batch, status in ((old_batch, "failed"), (old_batch, "completed"),
+                          (new_batch, "completed")):
+        run = TaskRunSession(
+            username="甲", task_id="a", task_name="任务", task_scope="daily",
+            params={}, source="batch", batch_run_id=batch.batch_run_id,
+            repository=repository, log_root=tmp_path / "logs")
+        run.finish(status=status)
+        runs.append(run)
+    old_batch.finish(status="failed")
+    new_batch.finish(status="completed")
+    # 显式日期避免依赖毫秒时钟的先后顺序。
+    with sqlite3.connect(repository.db_path) as conn:
+        conn.execute("UPDATE task_runs SET started_at='2026-01-01T00:00:00' WHERE task_run_id=?",
+                     (runs[0].task_run_id,))
+        conn.execute("UPDATE batch_runs SET started_at='2026-01-01T00:00:00' WHERE batch_run_id=?",
+                     (old_batch.batch_run_id,))
+    assert repository.list_task_runs(status="failed", limit=1)[0].task_run_id == runs[0].task_run_id
+    batches = repository.list_batch_runs(status="failed", limit=1)
+    assert [(batch.batch_run_id, batch.task_count) for batch in batches] == [(old_batch.batch_run_id, 2)]

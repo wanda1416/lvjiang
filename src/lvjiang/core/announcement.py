@@ -3,7 +3,7 @@
 公告通过 GitHub Pages 静态 JSON 下发，不依赖 GitHub API。远程
 ``notice_version`` 必须单调递增；客户端只在版本推进且存在适用于当前
 客户端的公告时自动展示。公告缓存与最后已处理版本存放在
-``session.json/server_config.announcement``。
+``interface.json/server_config.announcement``。
 """
 from __future__ import annotations
 
@@ -196,8 +196,8 @@ def applicable_notices(
 
 
 def _announcement_state() -> dict[str, Any]:
-    from .config.session import get_session_store
-    server = get_session_store().get_node("server_config", {})
+    from .config.interface import get_interface_store
+    server = get_interface_store().get_node("server_config", {})
     if not isinstance(server, dict):
         return {}
     state = server.get("announcement")
@@ -226,7 +226,7 @@ def get_cached_etag() -> str:
 
 
 def _update_announcement_state(patch: dict[str, Any]) -> None:
-    from .config.session import get_session_store
+    from .config.interface import get_interface_store
 
     def update(server: Any) -> dict[str, Any]:
         result = dict(server) if isinstance(server, dict) else {}
@@ -242,7 +242,7 @@ def _update_announcement_state(patch: dict[str, Any]) -> None:
         result["announcement"] = state
         return result
 
-    get_session_store().mutate_node("server_config", update)
+    get_interface_store().mutate_node("server_config", update)
 
 
 def cache_manifest(manifest: AnnouncementManifest, etag: str = "") -> None:

@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from lvjiang.core.config.session import add_alert
+from lvjiang.core.config.interface import add_alert
 from lvjiang.core.user_config import UserConfigManager
 
 from ...i18n import tr

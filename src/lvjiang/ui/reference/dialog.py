@@ -76,7 +76,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._restore_window_size()
 
     def _restore_window_size(self):
-        """从 session.json 恢复窗口大小"""
+        """从 interface.json 恢复窗口大小"""
         from lvjiang.core.config import load_ui_page_state
         rm = load_ui_page_state("reference_manager")
         if not isinstance(rm, dict):
@@ -86,7 +86,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
             self.resize(int(size[0]), int(size[1]))
 
     def _save_window_size(self):
-        """保存窗口大小到 session.json（写入 ui_state.reference_manager）"""
+        """保存窗口大小到 interface.json（写入 ui_state.reference_manager）"""
         try:
             from lvjiang.core.config import update_ui_page_state
             update_ui_page_state(
@@ -342,7 +342,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._grid_panel.set_meta_fields(self._db.get_meta_schema())
         # 第一组：网格参数实时响应
         self._grid_panel.grid_params_changed.connect(self._on_grid_params_changed)
-        # 五项网格参数手动改动 → 落盘 session.json（下次打开作为默认值）
+        # 五项网格参数手动改动 → 落盘 interface.json（下次打开作为默认值）
         self._grid_panel.grid_defaults_changed.connect(self._on_grid_defaults_changed)
         # 第二组：生成网格
         self._grid_panel.generate_grid_requested.connect(self._on_generate_grid)

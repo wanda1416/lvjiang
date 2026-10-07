@@ -64,17 +64,17 @@ def recover_rename(db: ProfileDB) -> None:
     if not committed:
         _restore_files(journal)
     path.unlink()
-    from ..config import get_session_store
+    from ..config import get_interface_store
     from .schema import reload_profile_config
-    get_session_store().reload()
+    get_interface_store().reload()
     reload_profile_config()
 
 
-def _rename_session(data: dict, renames: list[tuple[str, str, str]]) -> None:
+def _rename_interface(data: dict, renames: list[tuple[str, str, str]]) -> None:
     profile = data.get("profile", {})
     for group in profile.get("overview_groups", {}).values():
         group["columns"] = [replace_key(key, renames) for key in group.get("columns", [])]
-    alerts = profile.get("alert_history", {})
+    alerts = data.get("alert_history", {})
     # 告警标识为 username:key:level:current，与引擎生成格式一致。
     for name in list(alerts):
         parts = name.split(":")
@@ -105,7 +105,8 @@ def save_renamed_definitions(
     """仅用于定义编辑器确认保存；调用前必须确认设备任务已停止。"""
     from ... import constants
     from ..access import is_readonly
-    from ..config import get_session_store
+    from ..config import get_interface_store
+    from ..config.interface import interface_path
     from . import schema as schema_module
     from .repository import get_profile_db
     from .triggers import _runner
@@ -128,8 +129,9 @@ def save_renamed_definitions(
             )
             if current.get_key(new) is not None or declared:
                 raise ValueError(f"目标 key {new} 已存在，不能合并")
+        get_interface_store()  # 在引用维护前完成存储迁移。
         new_schema = rename_schema_references(schema, renames)
-        paths = [schema_module._PROFILE_PATH, constants.SESSION_PATH, constants.BATCH_CONFIG_PATH]
+        paths = [schema_module._PROFILE_PATH, interface_path(), constants.BATCH_CONFIG_PATH]
         operation_id = uuid4().hex
         journal = {
             "operation_id": operation_id,
@@ -141,10 +143,10 @@ def save_renamed_definitions(
 
         def save_references() -> None:
             schema_module.save_profile_config(new_schema)
-            if constants.SESSION_PATH.exists():
-                data = json.loads(constants.SESSION_PATH.read_text(encoding="utf-8"))
-                _rename_session(data, renames)
-                atomic_write_text(constants.SESSION_PATH, json.dumps(data, ensure_ascii=False, indent=2), prefix=".profile_rename_")
+            if interface_path().exists():
+                data = json.loads(interface_path().read_text(encoding="utf-8"))
+                _rename_interface(data, renames)
+                atomic_write_text(interface_path(), json.dumps(data, ensure_ascii=False, indent=2), prefix=".profile_rename_")
             if constants.BATCH_CONFIG_PATH.exists():
                 data = json.loads(constants.BATCH_CONFIG_PATH.read_text(encoding="utf-8"))
                 _rename_batch_parameters(data, renames)
@@ -155,7 +157,7 @@ def save_renamed_definitions(
         finally:
             # 数据库审计判断提交结果，避免 commit 成功后的清理失败误回滚文件。
             recover_rename(db)
-            get_session_store().reload()
+            get_interface_store().reload()
             schema_module.reload_profile_config()
         from .engine import _engine
         if _engine is not None:

@@ -166,15 +166,15 @@ def is_newer_version(latest: str, current: str) -> bool:
 
 def get_skip_version() -> str:
     """获取用户选择跳过的版本号"""
-    from .config.session import get_session_store
-    node = get_session_store().get_node("server_config") or {}
+    from .config.interface import get_interface_store
+    node = get_interface_store().get_node("server_config") or {}
     return node.get("skip_version", "")
 
 
 def set_skip_version(version: str) -> None:
     """设置用户选择跳过的版本号"""
-    from .config.session import get_session_store
-    get_session_store().update_node("server_config", {"skip_version": version})
+    from .config.interface import get_interface_store
+    get_interface_store().update_node("server_config", {"skip_version": version})
 
 
 def should_prompt_update(latest_version: str) -> bool:

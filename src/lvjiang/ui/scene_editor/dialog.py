@@ -138,7 +138,7 @@ class SceneEditorDialog(
         self.update()
 
     def _restore_window_size(self):
-        """从 session.json 恢复窗口位置 + 大小 + 分割器尺寸"""
+        """从 interface.json 恢复窗口位置 + 大小 + 分割器尺寸"""
         from ...core.config import load_ui_page_state
         se = load_ui_page_state("scene_editor")
         if not isinstance(se, dict):
@@ -170,7 +170,7 @@ class SceneEditorDialog(
         logger.debug(f"场景编辑器恢复 Tab 分割器（延迟）：{self._pending_tab_split}")
 
     def _save_window_size(self):
-        """保存窗口位置 + 大小 + 分割器尺寸到 session.json（写入 ui_state.scene_editor）"""
+        """保存窗口位置 + 大小 + 分割器尺寸到 interface.json（写入 ui_state.scene_editor）"""
         se = {
             "pos": [self.x(), self.y()],
             "size": [self.width(), self.height()],

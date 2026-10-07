@@ -218,9 +218,9 @@ class TestUIPageState:
         assert load_ui_page_state("scene_editor") == {"size": [900, 700]}
 
     def test_invalid_page_node_is_rebuilt_without_damaging_siblings(self):
-        from lvjiang.core.config import get_session_store
+        from lvjiang.core.config import get_interface_store
 
-        get_session_store().set_node("ui_state", {
+        get_interface_store().set_node("ui_state", {
             "main_page": "bad",
             "scene_editor": {"size": [800, 600]},
         })
@@ -239,34 +239,24 @@ class TestAlertStorage:
     """告警存储接口测试"""
 
 
-    def test_add_alert_dedup(self, store):
+    def test_add_alert_dedup(self):
         """同 ID 告警不重复添加"""
-        from lvjiang.core.config.session import (
+        from lvjiang.core.config.interface import (
             add_alert,
             get_alerts,
-            reset_session_store,
         )
-        reset_session_store()
-        import lvjiang.core.config.session as session_mod
-        session_mod._store = store
-
         assert add_alert("test:1", "第一次", "2026-08-11T12:00:00") is True
         assert add_alert("test:1", "第二次", "2026-08-11T12:01:00") is False
         alerts = get_alerts()
         assert len(alerts) == 1
         assert alerts[0]["message"] == "第一次"  # 保留第一次
 
-    def test_add_alert_lifo_order(self, store):
+    def test_add_alert_lifo_order(self):
         """新告警插入栈顶（列表头部）"""
-        from lvjiang.core.config.session import (
+        from lvjiang.core.config.interface import (
             add_alert,
             get_alerts,
-            reset_session_store,
         )
-        reset_session_store()
-        import lvjiang.core.config.session as session_mod
-        session_mod._store = store
-
         add_alert("test:1", "第一条", "2026-08-11T12:00:00")
         add_alert("test:2", "第二条", "2026-08-11T12:01:00")
         alerts = get_alerts()
@@ -274,18 +264,13 @@ class TestAlertStorage:
         assert alerts[0]["id"] == "test:2"  # 最新的在前
         assert alerts[1]["id"] == "test:1"
 
-    def test_dismiss_alert(self, store):
+    def test_dismiss_alert(self):
         """移除指定 ID 的告警"""
-        from lvjiang.core.config.session import (
+        from lvjiang.core.config.interface import (
             add_alert,
             dismiss_alert,
             get_alerts,
-            reset_session_store,
         )
-        reset_session_store()
-        import lvjiang.core.config.session as session_mod
-        session_mod._store = store
-
         add_alert("test:1", "第一条", "2026-08-11T12:00:00")
         add_alert("test:2", "第二条", "2026-08-11T12:01:00")
         dismiss_alert("test:1")

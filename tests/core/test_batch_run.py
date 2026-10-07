@@ -126,20 +126,20 @@ def test_two_session_instances_merge_batch_fields_atomically(
     tmp_path, monkeypatch,
 ):
     """活动组与草稿不能拿各自缓存的整段 batch 状态互相覆盖。"""
-    from lvjiang.core.config.session import SessionStore
+    from lvjiang.core.config.interface import InterfaceStore
 
-    path = tmp_path / "session.json"
-    first = SessionStore(path)
-    second = SessionStore(path)
+    path = tmp_path / "interface.json"
+    first = InterfaceStore(path)
+    second = InterfaceStore(path)
     monkeypatch.setattr(
-        "lvjiang.core.config.session.get_session_store", lambda: first)
+        "lvjiang.core.config.interface.get_interface_store", lambda: first)
     set_active_group_id("gid-1")
 
     # second 构造在第一次写入之前，内存缓存是旧的；锁内 mutate 必须重新读取磁盘。
     monkeypatch.setattr(
-        "lvjiang.core.config.session.get_session_store", lambda: second)
+        "lvjiang.core.config.interface.get_interface_store", lambda: second)
     save_draft("gid-1", BatchRunDraft(rounds=4))
 
-    saved = SessionStore(path).get_node("ui_state")
+    saved = InterfaceStore(path).get_node("ui_state")
     assert saved["batch"]["active_group_id"] == "gid-1"
     assert saved["batch"]["drafts"]["gid-1"]["rounds"] == 4

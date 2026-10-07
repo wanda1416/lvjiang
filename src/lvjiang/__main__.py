@@ -99,6 +99,8 @@ def main() -> int:
     atexit.register(close_instance)
     _configure_dpi()
     _configure_logging()
+    from .core.config.interface import initialize_state_stores
+    initialize_state_stores()
 
     # 插件会在 QApplication 创建前加载；先初始化文本翻译，避免插件 hooks
     # 和模块级显示标签永远按默认中文固化。run_app 会在 QApplication 创建后

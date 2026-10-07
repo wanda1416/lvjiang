@@ -1,12 +1,12 @@
 """档案总览会话数据存储
 
-统一管理 session.json 中 profile 节点的所有读写，包括：
+统一管理 interface.json 中 profile 与根节点 alert_history 的读写，包括：
 - overview_groups: 总览分组配置 {group_name: {"columns": [key, ...]}}
 - overview_group_order: 总览分组的拖动顺序，未记录时沿用分组配置顺序
 - overview_active_group: 当前活跃分组名
-- alert_history: 提醒去重记录 {alert_key: timestamp}
+- 根节点 alert_history: 提醒去重记录 {alert_key: timestamp}
 
-所有调用方必须通过本模块的函数访问 profile 节点，禁止直接 get_node/set_node。
+所有调用方必须通过本模块的函数访问这些节点，禁止直接 get_node/set_node。
 
 多进程安全：使用 SessionStore.mutate_node() 提供的文件锁机制。
 不再使用进程内锁（threading.Lock），因为其在多进程场景中无效。
@@ -18,21 +18,21 @@ from collections import Counter
 from copy import deepcopy
 from typing import Any
 
-from lvjiang.core.config import get_session_store
+from lvjiang.core.config import get_interface_store
 
-# session.json 中的顶层 key
+# interface.json 中的顶层 key
 _PROFILE_KEY = "profile"
 
 # profile 节点内的子 key
 _SUB_GROUPS = "overview_groups"
 _SUB_GROUP_ORDER = "overview_group_order"
 _SUB_ACTIVE_GROUP = "overview_active_group"
-_SUB_ALERT_HISTORY = "alert_history"
+_ALERT_HISTORY_KEY = "alert_history"
 
 
 def _load() -> dict[str, Any]:
     """加载 profile 节点（深拷贝）"""
-    data = get_session_store().get_node(_PROFILE_KEY, {})
+    data = get_interface_store().get_node(_PROFILE_KEY, {})
     return data if isinstance(data, dict) else {}
 
 
@@ -66,7 +66,7 @@ def _mutate_groups(mutator) -> None:
         data[_SUB_GROUP_ORDER] = list(groups)
         return data
 
-    get_session_store().mutate_node(_PROFILE_KEY, _merge)
+    get_interface_store().mutate_node(_PROFILE_KEY, _merge)
 
 
 def create_overview_group(name: str) -> None:
@@ -200,7 +200,7 @@ def set_active_group(name: str) -> None:
         data[_SUB_ACTIVE_GROUP] = name
         return data
 
-    get_session_store().mutate_node(_PROFILE_KEY, _merge)
+    get_interface_store().mutate_node(_PROFILE_KEY, _merge)
 
 
 # ─── 提醒历史 ────────────────────────────────────────────────
@@ -208,14 +208,14 @@ def set_active_group(name: str) -> None:
 
 def get_alert_history() -> dict[str, str]:
     """获取提醒去重历史 {alert_key: timestamp}"""
-    history = get_session_store().get_runtime_path(_PROFILE_KEY, _SUB_ALERT_HISTORY)
+    history = get_interface_store().get_node(_ALERT_HISTORY_KEY)
     return history if isinstance(history, dict) else {}
 
 
 def set_alert_history(history: dict[str, str]) -> None:
     """整体替换提醒历史（多进程安全）"""
-    get_session_store().mutate_runtime_path(
-        _PROFILE_KEY, _SUB_ALERT_HISTORY, lambda _: dict(history))
+    get_interface_store().mutate_node(
+        _ALERT_HISTORY_KEY, lambda _: dict(history))
 
 
 def mark_alert(alert_key: str, timestamp: str) -> None:
@@ -225,7 +225,7 @@ def mark_alert(alert_key: str, timestamp: str) -> None:
         history[alert_key] = timestamp
         return history
 
-    get_session_store().mutate_runtime_path(_PROFILE_KEY, _SUB_ALERT_HISTORY, _merge)
+    get_interface_store().mutate_node(_ALERT_HISTORY_KEY, _merge)
 
 
 def is_alert_marked(alert_key: str) -> bool:
@@ -240,4 +240,4 @@ def unmark_alert(alert_key: str) -> None:
         history.pop(alert_key, None)
         return history
 
-    get_session_store().mutate_runtime_path(_PROFILE_KEY, _SUB_ALERT_HISTORY, _merge)
+    get_interface_store().mutate_node(_ALERT_HISTORY_KEY, _merge)

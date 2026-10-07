@@ -10,7 +10,7 @@
 |---|---|---|---|
 | 配置组定义 | `BatchConfigItem` | `batch.json` | 只有「批量配置」窗口 |
 | 配置编辑器草稿 | 对话框内部 `_cfg` | 内存 | 对话框自己，点保存才落盘 |
-| 本次运行草稿 | `BatchRunDraft` | `session.json` 的 `ui_state.batch` | 只有主页面批量页 |
+| 本次运行草稿 | `BatchRunDraft` | `interface.json` 的 `ui_state.batch` | 只有主页面批量页 |
 | 执行快照 | `BatchRunSpec` | 内存（并进执行历史） | 点「开始」时冻结，之后不可变 |
 
 ## 字段归属

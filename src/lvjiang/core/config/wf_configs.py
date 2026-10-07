@@ -4,7 +4,7 @@
 各 Tab 只关心自己的 wf_id，核心层零感知工作流语义。
 
 读写委托 SessionStore（锁内原子读-改-写），与 session.json 其他
-节点（ui_state / settings / daily 等）互不干扰。
+节点（settings / daily 等）互不干扰。
 """
 from __future__ import annotations
 

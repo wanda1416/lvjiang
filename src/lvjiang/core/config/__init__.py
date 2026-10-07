@@ -4,6 +4,7 @@
 - 元数据（config/system + config/local）→ ConfigResolver
   双层合并读、按模式路由写（开发→system，用户→local 影子/diff）
 - 运行态（config/session/session.json）→ SessionStore
+- 界面与辅助状态（config/session/interface.json）→ InterfaceStore
   全量内存缓存 + 线程锁 + 写即原子落盘，节点级 get/set
 
 另有：
@@ -18,6 +19,12 @@ from typing import Any
 import yaml
 
 from .document_store import DocumentDirectoryStore
+from .interface import (
+    InterfaceStore,
+    get_interface_store,
+    load_ui_page_state,
+    update_ui_page_state,
+)
 from .models import (
     AndroidAppConfig,
     DelayParam,
@@ -57,11 +64,9 @@ from .session import (
     load_env,
     load_reference_grid,
     load_settings,
-    load_ui_page_state,
     save_env,
     save_reference_grid,
     save_settings,
-    update_ui_page_state,
 )
 from .users import SessionManager
 from .wf_configs import (
@@ -82,6 +87,8 @@ __all__ = [
     "get_resolver",
     "merge_doc",
     "SessionStore",
+    "InterfaceStore",
+    "get_interface_store",
     "get_session_store",
     "load_ui_page_state",
     "update_ui_page_state",

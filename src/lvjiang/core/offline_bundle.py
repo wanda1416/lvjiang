@@ -31,7 +31,7 @@ _LAYER_PATTERNS = (
     "references/*.yaml", "references/**/*.png", "templates/**/*.png",
     "maps/*/map.yaml", "maps/*/*.png",
 )
-_SESSION_FILES = ("session.json", "profile.yaml")
+_SESSION_FILES = ("session.json", "interface.json", "profile.yaml")
 _DATABASE_FILES = ("profile.db", "daily_history.db", "tuning_history.db")
 
 
@@ -58,6 +58,8 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
     if not is_valid_username(username) or not layout:
         raise ValueError("请选择有效执行用户和安卓布局")
     config = root / "config"
+    from .config.interface import InterfaceStore
+    InterfaceStore(config / "session/interface.json")
     layout_doc = load_layout_doc(ConfigResolver(
         system_dir=config / "system", local_dir=config / "local", remote_dir=config / "remote",
     ))

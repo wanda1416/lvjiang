@@ -7,12 +7,10 @@
 - 写即落盘：每次变更立即原子落盘（tmp + os.replace），杜绝半截文件
 - 写锁最小化：仅在磁盘写入时持有锁（6-14ms），不阻塞读操作
 
-节点语义：session.json 顶层 key 即节点（ui_state / daily / settings /
+节点语义：session.json 顶层 key 即节点（daily / settings /
 actives 等），各调用方只操作自己的节点。
 
-ui_state 的页面子节点禁止直接通过 update_node 嵌套写入；该方法只做
-顶层浅合并，会整体覆盖同名页面。页面状态统一使用
-load_ui_page_state / update_ui_page_state。
+界面、Profile 总览、告警与服务器状态独立存于 interface.json，见 interface 模块。
 
 ⚠️ 多进程约束：
    1. 只在写入瞬间申请文件锁（不全程持有）
@@ -48,11 +46,6 @@ READONLY_TRANSIENT_PATHS: frozenset[tuple[str, ...]] = frozenset({
     ("actives",),
     ("settings", "env"),
     ("daily", "workflow_id"),
-    ("profile", "overview_active_group"),
-    ("ui_state", "batch"),
-    ("ui_state", "main_page"),
-    ("ui_state", "scene_editor"),
-    ("ui_state", "reference_manager"),
 })
 
 _MISSING = object()
@@ -86,8 +79,10 @@ def _overlay_path(target: dict, source: dict, path: tuple[str, ...]) -> None:
         parent[leaf] = deepcopy(source_value)
 
 
-def _overlay_readonly_transients(target: dict, source: dict) -> None:
-    for path in READONLY_TRANSIENT_PATHS:
+def _overlay_readonly_transients(
+    target: dict, source: dict, paths=READONLY_TRANSIENT_PATHS,
+) -> None:
+    for path in paths:
         _overlay_path(target, source, path)
 
 
@@ -101,6 +96,9 @@ class SessionStore:
     - 使用文件锁（fasteners）保护写入（跨平台：Windows/Unix/macOS）
     - 锁仅在磁盘I/O时持有（6-14ms）
     """
+
+    FORMAT_VERSION = SESSION_VERSION
+    TRANSIENT_PATHS = READONLY_TRANSIENT_PATHS
 
     LOCK_TIMEOUT = 5  # 文件锁超时秒数
 
@@ -120,15 +118,19 @@ class SessionStore:
         from ... import constants
         return constants.SESSION_PATH
 
-    def _read_disk(self) -> dict:
+    def _read_disk(self, *, strict: bool = False) -> dict:
         path = self.path
         if not path.exists():
             return {}
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
+            if strict and not isinstance(data, dict):
+                raise ValueError(f"{path.name} 顶层必须为对象")
             return data if isinstance(data, dict) else {}
         except Exception as e:  # noqa: BLE001 损坏文件不应阻断启动
-            logger.error(f"session.json 解析失败，按空配置处理: {path}: {e}")
+            if strict:
+                raise
+            logger.error(f"{path.name} 解析失败，按空配置处理: {path}: {e}")
             return {}
 
     def _acquire_write_lock(self, timeout: float = LOCK_TIMEOUT) -> None:
@@ -138,7 +140,7 @@ class SessionStore:
         """
         acquired = self._file_lock.acquire(blocking=True, timeout=timeout)
         if not acquired:
-            raise TimeoutError(f"无法在 {timeout}s 内获取 session.json 写锁")
+            raise TimeoutError(f"无法在 {timeout}s 内获取 {self.path.name} 写锁")
 
     def _write_disk_atomic(self, data: dict) -> None:
         """【关键】原子写入磁盘（必须在持有锁的情况下调用）
@@ -146,10 +148,10 @@ class SessionStore:
         tmp 文件 + os.replace，确保不会产生半截文件
         """
         text = json.dumps(data, ensure_ascii=False, indent=2)
-        atomic_write_text(self.path, text, prefix=".session_")
+        atomic_write_text(self.path, text, prefix=f".{self.path.stem}_")
 
     def _mutate_disk(
-        self, mutator: Callable[[dict], Any], *, stamp_version: bool = True,
+        self, mutator: Callable[[dict], Any], *, stamp_version: bool = True, strict: bool = False,
     ) -> Any:
         """在文件锁内对最新磁盘快照执行变更并原子落盘。
 
@@ -162,23 +164,23 @@ class SessionStore:
             readonly = is_readonly()
             self._acquire_write_lock(self.LOCK_TIMEOUT)
             try:
-                disk_data = self._read_disk()
+                disk_data = self._read_disk(strict=strict)
                 working = deepcopy(disk_data)
                 if stamp_version:
-                    working.setdefault("version", SESSION_VERSION)
+                    working.setdefault("version", self.FORMAT_VERSION)
                 if readonly:
-                    _overlay_readonly_transients(working, self._data)
+                    _overlay_readonly_transients(working, self._data, self.TRANSIENT_PATHS)
                 result = mutator(working)
 
                 persisted = deepcopy(working)
                 if readonly:
-                    _overlay_readonly_transients(persisted, disk_data)
+                    _overlay_readonly_transients(persisted, disk_data, self.TRANSIENT_PATHS)
                 if persisted != disk_data:
                     self._write_disk_atomic(persisted)
 
                 self._data = deepcopy(persisted)
                 if readonly:
-                    _overlay_readonly_transients(self._data, working)
+                    _overlay_readonly_transients(self._data, working, self.TRANSIENT_PATHS)
                 return result
             finally:
                 self._file_lock.release()
@@ -257,25 +259,6 @@ class SessionStore:
         self._mutate_disk(_consume, stamp_version=False)
         return consumed
 
-    def get_runtime_path(self, node: str, key: str) -> Any:
-        """Read a runtime leaf from the current Session snapshot."""
-        with self._thread_lock:
-            data = self._data.get(node, {})
-            return deepcopy(data.get(key)) if isinstance(data, dict) else None
-
-    def mutate_runtime_path(self, node: str, key: str, fn: Callable) -> Any:
-        """Persist a business-runtime leaf without flushing transient sibling fields."""
-        def mutate(data):
-            parent = data.get(node)
-            if not isinstance(parent, dict):
-                parent = {}
-                data[node] = parent
-            value = fn(deepcopy(parent.get(key)))
-            parent[key] = value
-            return value
-
-        return self._mutate_disk(mutate)
-
     # ─── 激活项（actives）─────────────────────────────────
 
     def get_active(self, kind: str, default: Any = None) -> Any:
@@ -307,7 +290,7 @@ class SessionStore:
             from ..access import is_readonly
             disk_data = self._read_disk()
             if is_readonly():
-                _overlay_readonly_transients(disk_data, self._data)
+                _overlay_readonly_transients(disk_data, self._data, self.TRANSIENT_PATHS)
             self._data = disk_data
 
 
@@ -327,40 +310,8 @@ def reset_session_store() -> None:
     """丢弃模块级单例（测试用：monkeypatch SESSION_PATH 后避免内存态跨用例残留）"""
     global _store
     _store = None
-
-
-# ─── UI 页面状态安全入口 ──────────────────────────────────
-
-def load_ui_page_state(page_key: str) -> dict[str, Any]:
-    """读取 ``ui_state.<page_key>``，非法或缺失时返回空字典。"""
-    state = get_session_store().get_node("ui_state", {})
-    if not isinstance(state, dict):
-        return {}
-    page = state.get(page_key)
-    return page if isinstance(page, dict) else {}
-
-
-def update_ui_page_state(page_key: str, patch: dict[str, Any]) -> dict:
-    """原子浅合并 ``ui_state.<page_key>``，保留该页面其他字段。
-
-    这是页面级 UI 状态的唯一写入口。不得写成
-    ``update_node("ui_state", {page_key: patch})``，后者会整体替换页面，
-    例如保存页签索引时删除窗口大小。
-    """
-    if not isinstance(page_key, str) or not page_key:
-        raise ValueError("page_key 必须是非空字符串")
-    if not isinstance(patch, dict):
-        raise TypeError("patch 必须是 dict")
-
-    def _merge(old):
-        state = dict(old) if isinstance(old, dict) else {}
-        page = state.get(page_key)
-        page = dict(page) if isinstance(page, dict) else {}
-        page.update(patch)
-        state[page_key] = page
-        return state
-
-    return get_session_store().mutate_node("ui_state", _merge)
+    from .interface import reset_interface_store
+    reset_interface_store()
 
 
 # ─── 便捷函数：settings / reference_grid ───────────────────
@@ -427,39 +378,3 @@ def save_env(env: str) -> None:
     别的组件写进 settings 的内容整体覆盖掉。
     """
     get_session_store().update_node("settings", {"env": env})
-
-
-# ─── 便捷函数：alert_info 告警存储 ────────────────────────────
-
-
-def get_alerts() -> list[dict[str, Any]]:
-    """读取 session.json 的 alert_info 节点（告警列表，最新在前）"""
-    value = get_session_store().get_node("alert_info")
-    return value if isinstance(value, list) else []
-
-
-def add_alert(alert_id: str, message: str, timestamp: str) -> bool:
-    """追加告警到栈顶（列表头部），最新优先展示。返回 True 表示新增成功，False 表示已存在"""
-    added = False
-
-    def _mutate(current):
-        nonlocal added
-        alerts = current if isinstance(current, list) else []
-        # 去重：同 ID 告警不重复添加
-        for alert in alerts:
-            if alert.get("id") == alert_id:
-                return alerts
-        new_alert = {"id": alert_id, "message": message, "timestamp": timestamp}
-        added = True
-        return ([new_alert] + alerts)[:200]  # 插入到头部，截断防无限膨胀
-
-    get_session_store().mutate_node("alert_info", _mutate)
-    return added
-
-
-def dismiss_alert(alert_id: str) -> None:
-    """移除指定 ID 的告警"""
-    def _mutate(current):
-        alerts = current if isinstance(current, list) else []
-        return [a for a in alerts if a.get("id") != alert_id]
-    get_session_store().mutate_node("alert_info", _mutate)

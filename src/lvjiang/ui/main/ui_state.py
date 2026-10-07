@@ -1,4 +1,4 @@
-"""会话状态持久化混入类 - session.json 的 ui_state 与 daily 两个节点
+"""会话状态持久化混入类 - interface.json 的 ui_state 与 session.json 的 daily 节点
 
 ``ui_state.main_page`` 存窗口尺寸、分栏比例与左右 Tab 页签；``daily`` 存
 日常页当前选中的脚本，脚本参数则按脚本 id 落在 wf_configs 里。

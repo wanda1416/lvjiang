@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from lvjiang import constants
+from lvjiang.core.config.interface import interface_path
 from lvjiang.core.profile import key_rename, repository, schema
 from lvjiang.core.profile.models import StockKeyDef, SyncTargetDef
 from lvjiang.core.profile.repository import MIGRATIONS, ProfileDB
@@ -68,17 +69,17 @@ def test_rename_updates_all_users_refs_and_audit_without_changing_values(tmp_pat
 
 
 def test_definition_rename_restores_files_and_sql_on_failure(tmp_path, monkeypatch):
-    constants.SESSION_PATH.parent.mkdir(parents=True, exist_ok=True)
+    interface_path().parent.mkdir(parents=True, exist_ok=True)
     old = schema.ProfileSchema(keys_by_model={"stock": [
         StockKeyDef(key="credits", label="资源"),
         StockKeyDef(key="reward", label="奖励", sync_targets=[SyncTargetDef(key="stock:credits")]),
     ]})
     schema.save_profile_config(old)
     schema.reload_profile_config()
-    constants.SESSION_PATH.write_text(json.dumps({"profile": {
+    interface_path().write_text(json.dumps({"profile": {
         "overview_groups": {"group": {"columns": ["stock:credits"]}}}}))
     constants.BATCH_CONFIG_PATH.write_text(json.dumps({"groups": {"group": {"profile_sort_key": "credits"}}}))
-    paths = (schema._PROFILE_PATH, constants.SESSION_PATH, constants.BATCH_CONFIG_PATH)
+    paths = (schema._PROFILE_PATH, interface_path(), constants.BATCH_CONFIG_PATH)
     before = {path: path.read_bytes() for path in paths}
     db = repository.get_profile_db()
     db.upsert("tester", "stock", "credits", 12)
@@ -107,13 +108,13 @@ def test_definition_rename_restores_files_and_sql_on_failure(tmp_path, monkeypat
     journal_path = key_rename._journal_path(db)
     images = {str(path): base64.b64encode(content).decode() for path, content in before.items()}
     journal_path.write_text(json.dumps({"operation_id": "crashed", "files": images}))
-    constants.SESSION_PATH.write_text("{}")
+    interface_path().write_text("{}")
     ProfileDB(db._db_path)  # 模拟 SQL 未提交时进程退出，再次启动恢复旧文件。
     assert all(path.read_bytes() == before[path] for path in paths)
     key_rename.save_renamed_definitions(updated, [("stock", "credits", "coins")], db=db)
     assert db.get_entry("tester", "stock", "coins")["value"] == 12
     assert schema.get_profile_config().get_key("reward").sync_targets[0].key == "stock:coins"
-    assert json.loads(constants.SESSION_PATH.read_text())["profile"]["overview_groups"]["group"]["columns"] == ["stock:coins"]
+    assert json.loads(interface_path().read_text())["profile"]["overview_groups"]["group"]["columns"] == ["stock:coins"]
     assert json.loads(constants.BATCH_CONFIG_PATH.read_text())["groups"]["group"]["profile_sort_key"] == "coins"
     committed_files = {path: path.read_bytes() for path in paths}
     with db._connect() as conn:

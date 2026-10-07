@@ -3,7 +3,7 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QTableWidget, QWidget
 
-from lvjiang.core.config import get_session_store
+from lvjiang.core.config import get_interface_store
 from lvjiang.core.profile import store
 from lvjiang.core.profile.models import QuotaKeyDef, StockKeyDef
 from lvjiang.core.profile.schema import ProfileSchema
@@ -103,10 +103,10 @@ def test_batch_add_merges_current_columns_preserves_widths_and_refreshes_once(ov
 
 
 def test_cancel_does_not_save_or_refresh(overview, monkeypatch):
-    before = get_session_store().path.read_bytes()
+    before = get_interface_store().path.read_bytes()
     monkeypatch.setattr(ProfileKeyMultiSelectDialog, 'exec', lambda _: QDialog.DialogCode.Rejected)
     overview._add_column('group', -1)
-    assert get_session_store().path.read_bytes() == before
+    assert get_interface_store().path.read_bytes() == before
     assert overview.refreshes == []
 
 
@@ -114,7 +114,7 @@ def test_store_inserts_ordered_unique_batch_and_rejects_removed_anchor():
     assert store.insert_overview_columns('group', None, ['a', 'z']) == ['a', 'z']
     assert store.insert_overview_columns('group', 'a', ['b', 'c', 'b', 'z']) == ['b', 'c']
     assert store.get_groups()['group']['columns'] == ['a', 'b', 'c', 'z']
-    before = get_session_store().path.read_bytes()
+    before = get_interface_store().path.read_bytes()
     with pytest.raises(ValueError, match='原列'):
         store.insert_overview_columns('group', 'removed', ['new'])
-    assert get_session_store().path.read_bytes() == before
+    assert get_interface_store().path.read_bytes() == before

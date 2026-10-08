@@ -62,9 +62,6 @@ class AppHooks:
     # 复杂工作流实现注册：{name: "dotted.path.ClassName"}
     workflow_implementations: dict[str, str] = field(default_factory=dict)
 
-    # Already reported in dedicated UI/history; avoid logging the whole result twice.
-    result_log_suppressed_ids: list[str] = field(default_factory=list)
-
     # 内置函数模块路径列表：["lvjiang.apps.yysls.workflows.builtins.equipment", ...]
     builtin_modules: list[str] = field(default_factory=list)
 

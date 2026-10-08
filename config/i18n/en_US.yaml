@@ -1534,7 +1534,6 @@ auto_strings:
   （未截图）: (No Screenshot)
   （正常完成）: (Completed Normally)
   （用户中断）: (User Interrupted)
-  （用户中断，部分结果）: (User Interrupted, Partial Result)
   （空）: (Empty)
   ，请选择 保存 或 放弃: ', please choose Save or Discard'
   '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} is a system script. To change it, right-click it in the tree and choose "Copy to Local for Editing".'

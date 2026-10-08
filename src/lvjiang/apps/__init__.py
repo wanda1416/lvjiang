@@ -120,11 +120,6 @@ def register_hooks(hooks: AppHooks, registry: dict[str, Any] | None = None) -> N
             logger.exception("[plugin] 工作流注册失败")
         logger.info("[plugin]   workflows: %s", list(hooks.workflow_implementations.keys()))
 
-    if hooks.result_log_suppressed_ids:
-        registry.setdefault("result_log_suppressed_ids", set()).update(
-            hooks.result_log_suppressed_ids
-        )
-
     if hooks.builtin_modules:
         registry.setdefault("builtin_modules", []).extend(hooks.builtin_modules)
         # 实际导入模块触发 @builtin_func 装饰器注册

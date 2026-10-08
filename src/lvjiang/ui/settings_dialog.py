@@ -1,7 +1,7 @@
 """配置管理对话框（多 Tab）
 
-Tab1 基础配置、Tab2 应用注册、Tab3 输入参数（引擎级点击与越界处理）、Tab4 等待参数（命名等待）、
-Tab5 方案设置（连接方案 + 可用工作环境）、Tab6 字体设置、Tab7 热键设置（F7~F12 按键位）。
+基础配置、应用注册、输入参数、等待参数、方案设置、字体设置、热键设置、
+AI 设置、功能激活、网络与隐私。
 基础配置/字体/热键写 session.json（settings 节点）；应用注册、输入参数、等待参数和
 方案设置的环境列表写 app.yaml（apps / input_simulation / delay_params / envs，
 system ← local 合并），保存后以配置文件为准覆盖代码默认值。方案本身写 session.json
@@ -114,7 +114,7 @@ def _form_divider() -> QFrame:
 
 
 class SettingsDialog(QDialog):
-    """配置管理：Tab1 基础配置 + Tab2 输入参数 + Tab3 等待参数"""
+    """配置管理：按职责分块的设置页。"""
 
     hotkeys_saved = pyqtSignal(dict)
     font_sizes_saved = pyqtSignal(dict)
@@ -146,6 +146,10 @@ class SettingsDialog(QDialog):
         self._tabs.addTab(self._build_plan_tab(), tr("方案设置"))
         self._tabs.addTab(self._build_font_tab(), tr("字体设置"))
         self._tabs.addTab(self._build_hotkey_tab(), tr("热键设置"))
+        from .ai_settings import AISettingsPage
+        self._ai_page = AISettingsPage(self)
+        self._ai_tab_index = self._tabs.addTab(self._ai_page, tr("AI 设置"))
+        self.finished.connect(self._ai_page.cancel_test)
         self._tabs.addTab(self._build_license_tab(), tr("功能激活"))
         self._privacy_tab_index = self._tabs.addTab(
             self._build_privacy_tab(), tr("网络与隐私"))
@@ -177,8 +181,8 @@ class SettingsDialog(QDialog):
             self._save_btn.setEnabled(True)
 
     def _refresh_save_button_visibility(self, index: int) -> None:
-        """即时保存的网络与隐私页不展示无意义的全局保存按钮。"""
-        self._save_btn.setVisible(index != self._privacy_tab_index)
+        """独立保存的 AI 页和即时保存的隐私页隐藏全局保存按钮。"""
+        self._save_btn.setVisible(index not in {self._privacy_tab_index, self._ai_tab_index})
 
     def _connect_dirty_signals(self):
         """UI 构建完成后统一连接变更信号（避免初始赋值触发）"""

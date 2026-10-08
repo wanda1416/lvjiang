@@ -12,11 +12,14 @@
 - windows_capture（后台截图）只在用到时才 import，静态分析收不到，且它带一个原生
   .pyd —— collect_all 整包收集。没装时跳过：非 Windows 本来就不会打包。
 """
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
 
 datas, binaries, hiddenimports = collect_all("rapidocr_onnxruntime")
 datas += [("../src/lvjiang/workflows/grammar", "lvjiang/workflows/grammar")]
 hiddenimports += collect_submodules("lvjiang")
+# keyring 通过运行时发现加载 Windows 凭据后端。
+hiddenimports += ["keyring.backends.Windows"]
+datas += copy_metadata("keyring")
 
 try:
     wc_datas, wc_binaries, wc_hidden = collect_all("windows_capture")

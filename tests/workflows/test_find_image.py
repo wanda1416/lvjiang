@@ -470,3 +470,32 @@ def test_bound_template_search_never_escapes_region(synthetic_store):
     ]
 
     assert _run(eng, 'scan [s].[left] as $hit by image\n')["hit"] == ""
+
+
+def test_runtime_area_locates_icon_then_reads_adjacent_text(synthetic_store):
+    """动态标记必须能排除小地图，并在命中位置附近读文字，不依赖固定场景。"""
+    from lvjiang.core.ocr import OCRResult
+
+    frame = _frame_with_icon(synthetic_store, at=(300, 120), size=(640, 360))
+    frame[40:80, 40:80] = synthetic_store  # 相同图标在左侧，必须排除。
+    eng = _engine_with(frame)
+    eng._ocr.recognize.return_value = [OCRResult(
+        "89米", 0.99, [(0, 0), (20, 0), (20, 10), (0, 10)])]
+    variables = _run(eng, '''
+    eval $area = (0.25, 0.08, 0.5, 0.7)
+    find $area as $marker by image "ico"
+    eval $text_area = ($marker.x_ratio, $marker.y_ratio + $marker.h_ratio, 0.1, 0.05)
+    find $text_area as $distance from last by contains "米"
+    eval $text = $distance.text
+    ''')
+    assert variables["marker"].x_ratio == pytest.approx(300 / 640, abs=1e-3)
+    assert variables["text"] == "89米"
+    assert eng._capture.capture.call_count == 1
+    assert eng._ocr.recognize.call_args.args[0].shape[:2] == (18, 64)
+
+
+def test_runtime_find_rejects_empty_rectangle(synthetic_store):
+    eng = _engine_with(_frame_with_icon(synthetic_store))
+    with pytest.raises(WorkflowUserError, match="宽高必须大于零"):
+        _run(eng, 'eval $area = (0.25, 0.08, 0, 0.7)\nfind $area as $marker by image "ico"\n')
+    eng._capture.capture.assert_not_called()

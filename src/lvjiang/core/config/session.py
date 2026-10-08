@@ -314,7 +314,7 @@ def reset_session_store() -> None:
     reset_interface_store()
 
 
-# ─── 便捷函数：settings / reference_grid ───────────────────
+# ─── 便捷函数：settings ───────────────────
 
 def load_settings() -> dict[str, Any]:
     """读取 session.json 的 settings 节点"""
@@ -332,25 +332,6 @@ def save_settings(settings: dict[str, Any]) -> None:
         # 合并新设置
         merged = {**existing, **settings}
         return merged
-
-    get_session_store().mutate_node("settings", _merge)
-
-
-def load_reference_grid() -> dict[str, Any]:
-    """读取 settings.reference_grid。"""
-    value = load_settings().get("reference_grid")
-    return value if isinstance(value, dict) else {}
-
-
-def save_reference_grid(grid: dict[str, Any]) -> None:
-    """保存参考图网格。
-
-    ⚠️ 使用 mutate_node 确保并发安全，禁止直接 load+save 模式
-    """
-    def _merge(existing):
-        existing = existing if isinstance(existing, dict) else {}
-        existing["reference_grid"] = grid
-        return existing
 
     get_session_store().mutate_node("settings", _merge)
 

@@ -231,7 +231,7 @@ def _from_known(cls, raw: dict):
 class UserConfig:
     """用户配置（代码默认值 + session.json / app.yaml 覆盖，只读）
 
-    settings / reference_grid 来自 config/session/session.json（纯运行态）；
+    settings 来自 config/session/session.json（纯运行态）；
     输入模拟 input_sim + 延迟参数 delay_params 来自 config/**/app.yaml
     （system 系统默认 ← local 用户覆盖，随版本分发，见 core.config）。
     """
@@ -245,7 +245,6 @@ class UserConfig:
     # 且后台截图依赖后台输入——前台输入要求窗口本来就在前台，配它没有意义。
     # 窗口最小化时两者都拿不到画面。
     desktop_background_capture: bool = False
-    reference_grid: ReferenceGridConfig = field(default_factory=ReferenceGridConfig)
     input_sim: InputSimConfig = field(default_factory=InputSimConfig)     # 输入模拟
     delay_params: dict[str, DelayParam] = field(default_factory=dict)     # 命名延迟参数
     android_apps: dict[str, AndroidAppConfig] = field(default_factory=dict)  # 应用注册表（兼容字段名）
@@ -260,8 +259,6 @@ class UserConfig:
             self.android_capture_method = "scrcpy"
         if self.android_input_method not in {"adb", "device_gesture"}:
             self.android_input_method = "adb"
-        if isinstance(self.reference_grid, dict):
-            self.reference_grid = ReferenceGridConfig(**self.reference_grid)
         if isinstance(self.input_sim, dict):
             self.input_sim = InputSimConfig(**self.input_sim)
         if isinstance(self.hotkeys, dict):

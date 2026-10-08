@@ -22,7 +22,9 @@ from .document_store import DocumentDirectoryStore
 from .interface import (
     InterfaceStore,
     get_interface_store,
+    load_reference_grid,
     load_ui_page_state,
+    save_reference_grid,
     update_ui_page_state,
 )
 from .models import (
@@ -62,10 +64,8 @@ from .session import (
     SessionStore,
     get_session_store,
     load_env,
-    load_reference_grid,
     load_settings,
     save_env,
-    save_reference_grid,
     save_settings,
 )
 from .users import SessionManager
@@ -161,9 +161,6 @@ def load_user_config() -> UserConfig:
     settings = load_settings()
     if settings:
         data.update(settings)
-    grid = load_reference_grid()
-    if grid:
-        data["reference_grid"] = grid
 
     # app.yaml 合并视图
     app = load_app_config()

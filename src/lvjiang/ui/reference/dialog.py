@@ -63,9 +63,9 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
             | Qt.WindowType.WindowMaximizeButtonHint
         )
 
-        # 加载用户配置
-        from lvjiang.core.config import load_user_config
-        self._config = load_user_config()
+        # 加载图库工具自身的界面参数
+        from lvjiang.core.config import ReferenceGridConfig, load_reference_grid
+        self._grid_config = ReferenceGridConfig(**load_reference_grid())
 
         self._db = ReferenceDatabase()
         self._db.load()
@@ -330,11 +330,11 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._deselect_all_btn.clicked.connect(self._canvas.deselect_all_cells)
 
         self._grid_panel = GridPanel(
-            rows=self._config.reference_grid.rows,
-            cols=self._config.reference_grid.cols,
-            gap=self._config.reference_grid.gap,
-            height=self._config.reference_grid.height,
-            width=self._config.reference_grid.width,
+            rows=self._grid_config.rows,
+            cols=self._grid_config.cols,
+            gap=self._grid_config.gap,
+            height=self._grid_config.height,
+            width=self._grid_config.width,
         )
         # 初始化已知分组列表（供批量分组下拉使用）
         self._grid_panel.set_known_groups(self._db.get_groups(), self._db.get_all_labels_by_group())
@@ -460,7 +460,7 @@ class ReferenceManagerDialog(EscapeCloseConfirmationMixin, QDialog):
         self._update_info_label()
 
     def _on_grid_defaults_changed(self, grid: dict):
-        """五项网格参数手动改动后写入 settings.reference_grid。"""
+        """五项网格参数手动改动后写入 interface.ui_state.reference_manager.grid。"""
         from lvjiang.core.config import save_reference_grid
         save_reference_grid(grid)
 

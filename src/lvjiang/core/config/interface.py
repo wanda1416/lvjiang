@@ -137,6 +137,17 @@ def update_ui_page_state(page_key: str, patch: dict[str, Any]) -> dict:
     return get_interface_store().mutate_node("ui_state", _merge)
 
 
+def load_reference_grid() -> dict[str, Any]:
+    """读取图库工具的网格参数，不读取 session.settings 的旧节点。"""
+    value = load_ui_page_state("reference_manager").get("grid")
+    return value if isinstance(value, dict) else {}
+
+
+def save_reference_grid(grid: dict[str, Any]) -> None:
+    """只合并网格参数，保留图库窗口大小及其他界面状态。"""
+    update_ui_page_state("reference_manager", {"grid": grid})
+
+
 # ─── 便捷函数：alert_info 告警存储 ────────────────────────────
 
 

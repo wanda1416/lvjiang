@@ -38,6 +38,7 @@
 | [02-instance-access.md](38-platform/02-instance-access.md) | 多实例执行锁与用户数据访问边界 |
 | [03-io-backends.md](38-platform/03-io-backends.md) | 截图与输入后端矩阵：PC 前台/后台、Android a11y/Shizuku/ADB、scrcpy 的能力与限制 |
 | [04-telemetry.md](38-platform/04-telemetry.md) | 匿名统计：D1 表结构、写入粒度设计、校验边界、分析查询 |
+| [05-ai-connection.md](38-platform/05-ai-connection.md) | AI 连接参数、系统凭据库、可取消文本请求与设置页边界 |
 
 ### 39-runtime（运行期能力）
 

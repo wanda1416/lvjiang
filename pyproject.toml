@@ -27,6 +27,8 @@ dependencies = [
     # 后台截图（Windows Graphics Capture）：窗口被遮挡也能取帧。仅 Windows 有
     # 这套 API，其他平台不装；代码里是惰性 import，缺了只是开关不可用。
     "windows-capture>=2.0; sys_platform == 'win32'",
+    "httpx>=0.28,<0.29",
+    "keyring>=25,<26",
 ]
 
 [project.optional-dependencies]

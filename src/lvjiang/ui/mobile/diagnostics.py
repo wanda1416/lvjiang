@@ -119,11 +119,16 @@ def build_checks(status: dict, pc_version: str,
     else:
         items.append(CheckItem(tr("屏幕标定"), tr("已标定"), _OK))
 
+    # 体检自己就占着一条连接，设备端上报的是含它在内的总数；这里减掉自己，
+    # 只告诉用户"除本窗口外还有几路"。同机另开一个窗口和另一台电脑都会让这个
+    # 数字变大，无法从连接数区分，所以只陈述现象，不断言来源。
     connections = status.get("pc_connections")
-    if isinstance(connections, int) and connections > 1:
+    others = connections - 1 if isinstance(connections, int) else 0
+    if others > 0:
         items.append(CheckItem(
-            tr("PC 连接数"), str(connections), _WARN,
-            tr("有多台电脑同时连着这台手机，操作会互相打断")))
+            tr("其他连接"), str(others), _WARN,
+            tr("除本窗口外还有 {n} 路连接连着这台手机，可能来自另一个窗口"
+               "或另一台电脑，操作会互相打断").format(n=others)))
 
     last_op = status.get("last_op")
     if last_op:

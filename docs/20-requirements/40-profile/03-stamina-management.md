@@ -1,6 +1,6 @@
 # 心力体力管理 — 子需求文档
 
-> 状态：部分实现（2026-10-07，基线 v0.13.13）。心力体力的读取已上线，但实现不是本文描述的 `stamina.jsonl` /
+> 状态：部分实现（2026-10-08，基线 v0.13.14）。心力体力的读取已上线，但实现不是本文描述的 `stamina.jsonl` /
 > `StaminaSnapshot` 与恢复预测报表，而是 Profile 的 regen 模型
 > （`config/session/profile.yaml` 的 `regen:xinli`、`regen:tili`）：工作流把观察到
 > 的值写入 profile，引擎按周期规则推算回复，不写历史文件。

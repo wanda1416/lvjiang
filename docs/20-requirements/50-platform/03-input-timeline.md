@@ -1,6 +1,6 @@
 # 输入时间线 — 描述严格并发的操作序列
 
-> 状态：已实现（2026-10-07，基线 v0.13.13）。待真机验证并发手势；安卓端 `press` 不支持。
+> 状态：已实现（2026-10-08，基线 v0.13.14）。待真机验证并发手势；安卓端 `press` 不支持。
 > **语法与语义规范**见 [32-grammar/03.7-timeline.md](../../30-architecture/32-grammar/03.7-timeline.md)，
 > **协议落点**见
 > [38-platform/01-device-agent-protocol.md](../../30-architecture/38-platform/01-device-agent-protocol.md)，

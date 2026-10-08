@@ -17,9 +17,14 @@ from pathlib import Path
 import pytest
 
 from tests.config_write_guard import install_project_config_write_guard
+from tests.pytest_resources import install_closed_directory_scan
 
 # 在收集测试模块前就封死真实 config；不能只依赖各用例自觉使用 tmp_path。
 install_project_config_write_guard(Path(__file__).parents[1] / "config")
+
+# 收集阶段就修正 pytest 的目录句柄生命周期，覆盖 controller、worker 和会话收尾。
+# 用例级 monkeypatch 会在临时目录清理前撤销，不能在 fixture 里安装。
+install_closed_directory_scan()
 
 
 @pytest.fixture(autouse=True)

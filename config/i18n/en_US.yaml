@@ -1535,6 +1535,8 @@ auto_strings:
   （正常完成）: (Completed Normally)
   （用户中断）: (User Interrupted)
   （空）: (Empty)
+  '{name}（已失效）': '{name} (obsolete)'
+  对应的任务脚本已不存在；取消勾选并保存即可从列表移除: The task script no longer exists; uncheck it and save to remove it from the list
   ，请选择 保存 或 放弃: ', please choose Save or Discard'
   '{rel} 是系统脚本。要改它请在树里右键「复制到本地以修改」。': '{rel} is a system script. To change it, right-click it in the tree and choose "Copy to Local for Editing".'
   丢弃 {name} 的本地修改，恢复系统版本？此操作不可恢复。: Discard local changes to {name} and restore the system version? This cannot be undone.

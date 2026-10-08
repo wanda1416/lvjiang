@@ -1,6 +1,6 @@
 """配置管理对话框（多 Tab）
 
-基础配置、应用注册、输入参数、等待参数、方案设置、字体设置、热键设置、
+基础配置（常规、字体、热键）、应用注册、执行参数（输入、等待）、方案设置、
 AI 设置、功能激活、网络与隐私。
 基础配置/字体/热键写 session.json（settings 节点）；应用注册、输入参数、等待参数和
 方案设置的环境列表写 app.yaml（apps / input_simulation / delay_params / envs，
@@ -124,8 +124,8 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("配置管理"))
-        self.setMinimumSize(720, 480)
-        self.resize(760, 520)
+        self.setMinimumSize(820, 560)
+        self.resize(940, 720)
         self._config = load_user_config()
         # 构建方案页时可能会把旧版空值/失效值归一化为表单实际显示值，
         # 此时底部保存按钮尚未创建；先独立记录脏状态，等按钮创建后同步。
@@ -139,13 +139,17 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         self._tabs = QTabWidget()
-        self._tabs.addTab(self._build_basic_tab(), tr("基础配置"))
+        self._tabs.addTab(self._build_grouped_tab([
+            (tr("常规设置"), self._build_basic_tab()),
+            (tr("字体设置"), self._build_font_tab()),
+            (tr("热键设置"), self._build_hotkey_tab()),
+        ]), tr("基础配置"))
         self._tabs.addTab(self._build_android_tab(), tr("应用注册"))
-        self._tabs.addTab(self._build_input_tab(), tr("输入参数"))
-        self._tabs.addTab(self._build_wait_tab(), tr("等待参数"))
+        self._tabs.addTab(self._build_grouped_tab([
+            (tr("输入参数"), self._build_input_tab()),
+            (tr("等待参数"), self._build_wait_tab()),
+        ]), tr("执行参数"))
         self._tabs.addTab(self._build_plan_tab(), tr("方案设置"))
-        self._tabs.addTab(self._build_font_tab(), tr("字体设置"))
-        self._tabs.addTab(self._build_hotkey_tab(), tr("热键设置"))
         from .ai_settings import AISettingsPage
         self._ai_page = AISettingsPage(self)
         self._ai_tab_index = self._tabs.addTab(self._ai_page, tr("AI 设置"))
@@ -171,6 +175,29 @@ class SettingsDialog(QDialog):
         layout.addLayout(btn_row)
         self._tabs.currentChanged.connect(self._refresh_save_button_visibility)
         self._refresh_save_button_visibility(self._tabs.currentIndex())
+
+    @staticmethod
+    def _build_grouped_tab(sections: list[tuple[str, QWidget]]) -> QScrollArea:
+        """组合既有设置表单；滚动承接小屏幕与可增长的参数列表。"""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        for title, section in sections:
+            section_layout = section.layout()
+            if section_layout is not None:
+                section_layout.setContentsMargins(0, 0, 0, 0)
+                last = section_layout.itemAt(section_layout.count() - 1)
+                if last is not None and last.spacerItem() is not None:
+                    section_layout.takeAt(section_layout.count() - 1)
+            group = QGroupBox(title)
+            group_layout = QVBoxLayout(group)
+            group_layout.addWidget(section)
+            layout.addWidget(group)
+        layout.addStretch()
+        scroll.setWidget(content)
+        return scroll
 
     # ─── 脏状态跟踪 ──────────────────────────────────
 

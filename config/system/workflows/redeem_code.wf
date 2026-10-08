@@ -25,6 +25,11 @@
 # 前置：在主页或菜单页。
 # 后置：全部兑换码处理完并回到主页；未确认回到主页时只记 warn 并返回 -1。
 # 返回：-1=兑换码为空、导航失败或未回到主页；否则正常结束。
+import "subcall/result_records.wf"
+global $record_result
+call $record_result = new_record_result()
+collect $record_result as "redeem_code"
+
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 
@@ -43,6 +48,7 @@ if env("desktop")
     end
     if len($codes) == 0
         log error "请输入兑换码，每行一个"
+        call record_finish_if_open("failed", "未填写兑换码")
         return -1
     end
 end
@@ -50,6 +56,7 @@ end
 # ─── 导航到设置的其他页 ────────────────────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
+    call record_finish_if_open("failed", "导航失败")
     return -1
 end
 
@@ -70,12 +77,17 @@ else
 end
 
 # ─── 逐条兑换 ─────────────────────────────────────────────────
+global $record_code, $record_redeem_status, $record_redeem_reason
 for code in $codes
+    eval $record_code = $code
+    eval $record_redeem_status = "closed_by_user"
+    eval $record_redeem_reason = "用户已关闭窗口，兑换结果未知"
     click [game_settings].[redeem_code] after wait @page_refresh
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     if not $in_redeem
         screenshot from last
         log error "未打开兑换码输入框，未识别到兑换奖励，已中止"
+        call record_finish_if_open("failed", "未识别到兑换码输入框")
         return -1
     end
 
@@ -87,13 +99,16 @@ for code in $codes
     else
         eval $continue_redeem = confirm("请在游戏内输入或粘贴一个兑换码，完成后选择是继续；也可自行确认并返回其他页后继续。选择否结束本次兑换。多个兑换码请自行逐条操作。")
         if not $continue_redeem
+            call record_finish("user_finished", "用户选择结束兑换")
             log info "用户选择结束本次兑换"
             return 0
         end
     end
 
     call $closed = finish_redeem()
+    call record_item("codes", "兑换码", $record_redeem_status, $record_redeem_reason, {"code": $record_code})
     if $closed < 0
+        call record_finish_if_open("failed", "兑换窗口收口失败")
         return -1
     end
 end
@@ -110,10 +125,12 @@ call $in_main = is_in_main_page()
 if not $in_main
     screenshot from last
     log warn "兑换码流程已处理，但未回到主页，请手动确认当前页面。"
+    call record_finish_if_open("failed", "处理兑换码后未确认回到主页")
     return -1
 end
 
 log "兑换码流程结束。"
+call record_finish("processed", "兑换窗口处理完成，兑换是否成功未读取")
 
 # ─── finish_redeem ────────────────────────────────────────
 # 收口一次兑换提交后的弹窗：确认有效则关闭，无效或被判为已兑换则取消兜底。
@@ -133,6 +150,8 @@ def finish_redeem()
     end
 
     click [game_settings].[confirm] after wait @page_refresh
+    eval $record_redeem_status = "submit_attempted"
+    eval $record_redeem_reason = "已提交，兑换结果未确认"
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     if not $in_redeem
         return 0
@@ -141,6 +160,8 @@ def finish_redeem()
     # 已使用的兑换码会使 confirm 无效，标题仍为“兑换奖励”，需取消关闭。
     log warn "确认后兑换码弹窗仍在，按已兑换或确认无效处理，取消一次。"
     click [game_settings].[cancel] after wait @page_refresh
+    eval $record_redeem_status = "cancelled_fallback"
+    eval $record_redeem_reason = "确认无效后取消，具体原因见日志"
 
     scan [game_settings].[redeem_label] as $in_redeem by contains "兑换奖励"
     loop while $in_redeem

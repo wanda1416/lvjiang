@@ -32,6 +32,11 @@
 # 后置：已领到的活动从待处理集合移除；没找到的活动只记日志，最后退回主页。
 # 返回：-1=配置校验不通过或菜单页打不开；否则正常结束。
 
+import "subcall/result_records.wf"
+global $record_result
+call $record_result = new_record_result()
+collect $record_result as "daily_checkin"
+
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 
@@ -44,10 +49,12 @@ eval $reward_lines = split_lines($reward_keywords)
 
 if len($activity_lines) == 0
     log error "每日签到配置无效：请至少填写一个左侧活动名称。"
+    call record_finish_if_open("failed", "活动配置校验不通过")
     return -1
 end
 if len($activity_lines) != len($reward_lines)
     log error "每日签到配置无效：左侧活动名称有 " + len($activity_lines) + " 项，右侧领奖关键字有 " + len($reward_lines) + " 项，请逐行对应填写。"
+    call record_finish_if_open("failed", "活动配置校验不通过")
     return -1
 end
 
@@ -58,6 +65,7 @@ for activity_line in $activity_lines
     eval $activity_name = trim($activity_line)
     if $activity_name is_empty
         log error "每日签到配置无效：左侧活动名称不能包含空行。"
+        call record_finish_if_open("failed", "活动配置校验不通过")
         return -1
     end
     eval append($activities, $activity_name)
@@ -66,6 +74,7 @@ for reward_line in $reward_lines
     eval $reward_keyword = trim($reward_line)
     if $reward_keyword is_empty
         log error "每日签到配置无效：右侧领奖关键字不能包含空行。"
+        call record_finish_if_open("failed", "活动配置校验不通过")
         return -1
     end
     eval append($rewards, $reward_keyword)
@@ -78,6 +87,7 @@ for activity_name in $activities
     eval remove($rewards, $reward_keyword)
     if has_key($pending, $activity_name)
         log error "每日签到配置无效：左侧活动名称“" + $activity_name + "”重复。"
+        call record_finish_if_open("failed", "活动配置校验不通过")
         return -1
     end
     eval append($pending, $activity_name, $reward_keyword)
@@ -86,6 +96,7 @@ end
 # ─── 从游戏首页进入活动页面 ──────────────────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
+    call record_finish_if_open("failed", "导航失败")
     return -1
 end
 
@@ -134,6 +145,7 @@ loop 6
 end
 
 for activity_name in keys($pending)
+    call record_item("activities", "签到活动", "not_found", "滚动范围内未找到活动", {"activity_name": $activity_name})
     log "未找到活动“" + $activity_name + "”，可能未开放、已结束或不在当前滚动范围。"
 end
 
@@ -141,6 +153,8 @@ end
 click [activity_main].[back] after wait @step_interval
 click [game_menu_page].[back] after wait @step_interval
 log "每日签到流程结束。"
+call record_count("scrolls", $scroll_count)
+call record_finish("processed", "已处理可见活动；具体结果见活动记录")
 
 # ─── 当前列表视口的通用活动领奖过程 ──────────────────────────────────────
 
@@ -169,10 +183,12 @@ def claim_visible_activity($activity_name, $reward_keyword)
     if $reward
         log "检测到“" + $reward_keyword + "”，点击领取。"
         click $reward after wait @page_refresh
+        call record_item("activities", "签到活动", "claim_attempted", "检测到领奖关键字；未读取领取凭据", {"activity_name": $activity_name, "reward_keyword": $reward_keyword})
         log "活动“" + $activity_name + "”领取完成。"
         click [general_control].[blank_area] after wait @step_interval
     else
         log "活动“" + $activity_name + "”未找到“" + $reward_keyword + "”，可能已经领取。"
+        call record_item("activities", "签到活动", "no_reward_detected", "未检测到领奖关键字，不能确定已领取", {"activity_name": $activity_name, "reward_keyword": $reward_keyword})
     end
 
     return 1

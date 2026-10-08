@@ -1,0 +1,97 @@
+#% name: 任务结果摘要
+# 仅写运行结果与排查日志，不做识别、游戏操作或配置写入。
+def new_record_result()
+    return {"status": "running", "items": {}}
+end
+
+def record_item($key, $name, $status, $reason, $data)
+    if not $record_result
+        return
+    end
+    log debug $name + ": " + $status + " " + $reason
+    eval $record = {"status": $status}
+    if not $reason is_empty
+        eval $record.reason = $reason
+    end
+    # 位置、OCR、过程返回值是日志信息；只保留必要业务数据。
+    eval $details = {}
+    for field in ["activity_name", "reward_keyword", "code", "planned_quantity", "confirmed_quantity", "old_value", "observed_value", "tolerance", "friend", "item", "quantity", "purchased", "total"]
+        if has_key($data, $field)
+            eval append($details, $field, $data.$field)
+        end
+    end
+    if len($details) > 0
+        eval $record.data = $details
+    end
+    if not has_key($record_result.items, $key)
+        eval append($record_result.items, $key, {"name": $name, "records": []})
+    end
+    eval $group = $record_result.items.$key
+    eval append($group.records, $record)
+end
+
+def record_observation($key, $raw, $value)
+    if not $record_result
+        return
+    end
+    log debug $key + " 观察: " + $raw + "；采用: " + $value
+    # 原文和历次观察只进日志，结果保留最终采用值。
+    if $key != "regional_currency"
+        if not $key contains "_goods"
+            if not has_key($record_result, "values")
+                eval $record_result.values = {}
+            end
+            eval append($record_result.values, $key, $value)
+        end
+    end
+end
+
+def record_count($key, $amount)
+    if not $record_result
+        return
+    end
+    if $amount == 0
+        return
+    end
+    if not has_key($record_result, "counts")
+        eval $record_result.counts = {}
+    end
+    eval $count = 0
+    if has_key($record_result.counts, $key)
+        eval $count = $record_result.counts.$key
+    end
+    eval append($record_result.counts, $key, $count + $amount)
+end
+
+def record_finish($status, $reason)
+    if $record_result
+        eval $record_result.status = $status
+        if $status != "processed"
+            if not $reason is_empty
+                eval $record_result.reason = $reason
+            end
+        end
+    end
+end
+
+def record_finish_if_open($status, $reason)
+    if $record_result and $record_result.status == "running"
+        call record_finish($status, $reason)
+    end
+end
+
+# 独立奖励项只保留最终结论，不保存阶段事件。
+def record_set($key, $name, $status, $reason, $data)
+    if not $record_result
+        return
+    end
+    eval $item = {"name": $name, "status": $status}
+    if not $reason is_empty
+        eval $item.reason = $reason
+    end
+    if len($data) > 0
+        eval $item.data = $data
+    end
+    eval append($record_result.items, $key, $item)
+    log debug $name + ": " + $status + " " + $reason
+end

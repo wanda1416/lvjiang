@@ -37,6 +37,14 @@
 # 返回：0=本周心得已兑换满，未做任何操作；-1=Profile 声明失败、导航失败
 #       或流程正常收尾（本流程固定以 -1 结束）。
 
+import "subcall/result_records.wf"
+global $record_result
+call $record_result = new_record_result()
+collect $record_result as "purchase_xinfa"
+call record_count("box_open_attempts", 0)
+call record_count("recycle_attempts", 0)
+call record_count("purchase_attempts", 0)
+
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 import "subcall/game_profile.wf"
@@ -46,13 +54,16 @@ import "subcall/profile_registry.wf"
 # 因此 600/600 对应 profile=0，0/600 对应 profile=600。
 call $profile_ok = declare_profiles(["xinfa_of_week"])
 if $profile_ok < 0
+    call record_finish_if_open("failed", "Profile 声明失败")
     return -1
 end
 
 # 本周已兑换满就没有任何可做的事：散本里不会再有「自选」，走完导航也只是白跑一趟。
 # 与 batch_check 同一判据——那边在登录前拦住，这边兜住直接运行的入口。
 eval $xinfa_bought = profile_get("xinfa_of_week")
+call record_observation("cached_xinfa_of_week", null, $xinfa_bought)
 if $xinfa_bought >= 600
+    call record_finish("already_done", "本周心法心得已达兑换上限")
     log "本周心法心得已达兑换上限（xinfa_of_week=" + $xinfa_bought + "），结束任务"
     return 0
 end
@@ -61,15 +72,20 @@ default $open_bag_xinfa = false
 default $max_xinfa_boxes = 5
 
 # ─── 可选：打开背包中的全部心法心得 ──────────────────────────────────────
+if not $open_bag_xinfa
+    call record_item("bag_xinfa", "背包心法心得", "disabled", "未启用打开背包心法", {})
+end
 if $open_bag_xinfa
     call $open_result = open_all_bag_xinfa()
     if $open_result < 0
+        call record_finish_if_open("failed", "打开背包心法失败")
         return -1
     end
 
     # 原购买流程以主页为起点；清理背包后先恢复原有前置状态。
     call $back_result = nav_back_to_main()
     if $back_result < 0
+        call record_finish_if_open("failed", "从背包返回主页失败")
         return -1
     end
 end
@@ -77,6 +93,7 @@ end
 # ─── 导航：从首页到心法置换视图 ────────────────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
+    call record_finish_if_open("failed", "导航失败")
     return -1
 end
 scan [game_menu_page].[peiyang] as $nav_check by contains "培养"
@@ -99,6 +116,7 @@ end
 # 进入循环前记录一次周库存基线。分母必须识别为固定上限 600，避免脏 OCR 回写。
 scan [training_xinfa].[stock_of_week] as $weekly_stock
 call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_of_week", -1, 600, "本周心法心得购买", "日常")
+call record_observation("xinfa_of_week", $weekly_stock.stock_of_week, $xinfa_of_week)
 
 # ─── go_back ──────────────────────────────────────────────
 # 从心法置换页逐级退回主页（内部过程）。
@@ -153,6 +171,7 @@ def open_all_bag_xinfa()
             env:"desktop" -> $area_name = "sub_func_area"
             find [bag_item_detail].$area_name as $open_btn by contains "打开"
             if not $open_btn
+                call record_item("bag_xinfa", "背包心法心得", "not_found", "未找到打开按钮", {"row": $xinfa_row, "col": $xinfa_col})
                 log warn "找到心法心得，但主功能区未找到「打开」按钮"
                 screenshot from last
                 eval pause("心法心得详情中未找到「打开」按钮，请保持现场并检查布局")
@@ -178,7 +197,9 @@ def open_all_bag_xinfa()
 
             wait stable @page_refresh on [general_control].[menu_area]
             eval $opened_count = $opened_count + 1
+            call record_count("box_open_attempts", 1)
             if $opened_count >= $max_xinfa_boxes
+                call record_item("bag_xinfa", "背包心法心得", "limit_reached", "达到开箱尝试上限", {"attempts": $opened_count, "limit": $max_xinfa_boxes})
                 log warn "已打开 " + $opened_count \
                     + " 件心法心得，达到上限 " + $max_xinfa_boxes \
                     + "，停止扫描并继续购买心法流程"
@@ -197,6 +218,7 @@ def open_all_bag_xinfa()
             continue
         end
 
+        call record_item("bag_xinfa", "背包心法心得", "no_more_detected", "背包两段可见范围均未检测到心法心得", {"attempts": $opened_count})
         log info "背包两段可见范围均无心法心得，继续购买心法流程"
         break
     end
@@ -210,6 +232,7 @@ loop while 1 == 1
     wait @step_interval
     scan [training_xinfa].[sanben_1,sanben_2,sanben_3,sanben_4,sanben_5] as $zixuan by contains "自选"
     if not $zixuan
+       call record_item("xinfa", "心法心得", "no_choice_detected", "未找到自选散本", {})
        log "找不到自选散本，结束"
        break
     end
@@ -218,15 +241,18 @@ loop while 1 == 1
     click [training_xinfa].[count] after wait @step_interval
     click [training_xinfa].[recycle_entry] after wait @step_interval
     click [training_xinfa].[recycle] after wait @step_interval
+    call record_count("recycle_attempts", 1)
     click [training_xinfa].[confirm] after wait @page_refresh
 
     click [training_xinfa].$zixuan after wait @step_interval
     click [training_xinfa].[add_all] after wait @step_interval
     click [training_xinfa].[purchase] after wait @page_refresh
+    call record_count("purchase_attempts", 1)
 
     # 检查购买后是否出现确认按钮（未出现则数量不足）
     scan [training_xinfa].[confirm] as $confirm by contains "确认"
     if not $confirm
+       call record_item("xinfa", "心法心得", "no_confirmation", "购买后未检测到确认按钮", {})
        log "书票数量不足，结束"
        break
     end
@@ -240,7 +266,9 @@ end
 # 循环结束时再读取一次，最后一次成功购买造成的库存下降会换算为已购买量。
 scan [training_xinfa].[stock_of_week] as $weekly_stock
 call $xinfa_of_week = sync_weekly_remaining($weekly_stock.stock_of_week, "xinfa_of_week", $xinfa_of_week, 600, "本周心法心得购买", "日常")
+call record_observation("xinfa_of_week", $weekly_stock.stock_of_week, $xinfa_of_week)
 call go_back()
+call record_finish("processed", "购买循环已结束；保留原返回值，成交数量以已读库存为依据")
 return -1
 
 # ─── check_xinfa_batch ────────────────────────────────────

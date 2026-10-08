@@ -5,6 +5,7 @@ from typing import Any, cast
 
 from loguru import logger
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -44,6 +45,7 @@ from ...i18n import tr
 from ...workflows.builtins._coerce import to_bool
 from ..button_styles import apply_button_style
 from ..layout_helpers import fit_combo_popup_to_contents
+from ..theme import get_theme_manager
 from .compact_fields import CompactFields
 
 
@@ -264,7 +266,7 @@ class BatchConfigDialog(QDialog):
 
     def _add_choice_row(
         self, tree: QTreeWidget, key: str, label: str,
-        *, visible: bool, default: bool,
+        *, visible: bool, default: bool, missing: bool = False,
     ) -> None:
         row = QTreeWidgetItem([label, ""])
         row.setData(0, Qt.ItemDataRole.UserRole, key)
@@ -277,6 +279,12 @@ class BatchConfigDialog(QDialog):
             1, Qt.CheckState.Checked
             if (visible and default) else Qt.CheckState.Unchecked)
         row.setTextAlignment(1, Qt.AlignmentFlag.AlignCenter)
+        if missing:
+            # 配置组里留着历史任务 ID，而对应脚本已经不在了。这里只做展示区分，
+            # 不禁用勾选：用户得能取消勾选并保存，才能清掉这个悬空引用。
+            row.setForeground(
+                0, QBrush(QColor(get_theme_manager().tokens.text_muted)))
+            row.setToolTip(0, tr("对应的任务脚本已不存在；取消勾选并保存即可从列表移除"))
         tree.addTopLevelItem(row)
 
     def _on_choice_item_changed(
@@ -408,11 +416,13 @@ class BatchConfigDialog(QDialog):
             for task_id in ordered_task_ids:
                 cfg = scripts_by_id.get(task_id)
                 label = (script_display_name(cfg)
-                         if cfg is not None else task_id)
+                         if cfg is not None
+                         else tr("{name}（已失效）").format(name=task_id))
                 self._add_choice_row(
                     self._task_list, task_id, label,
                     visible=task_id in visible_tasks,
-                    default=task_id in default_tasks)
+                    default=task_id in default_tasks,
+                    missing=cfg is None)
             self._populate_user_list(item)
         finally:
             self._updating_choices = False

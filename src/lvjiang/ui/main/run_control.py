@@ -42,9 +42,18 @@ STATE_STOPPING = "stopping"
 def other_task_running_label(host: Any, scope: str) -> str:
     """只读当前查看目标的运行快照，非所属页面仅展示占用状态。"""
     context = getattr(host, "_current_run_context", None)
-    if context is None or context.metadata.get("execution_scope", "daily") == scope:
+    if context is None:
         return ""
-    return tr("{name}运行中").format(name=context.name)
+    execution_scope = context.metadata.get("execution_scope", "daily")
+    if execution_scope == scope:
+        return ""
+    labels = {
+        "daily": tr("日常任务运行中"),
+        "batch": tr("批量任务运行中"),
+        "auto_tuning": tr("调律任务运行中"),
+        "auto_gather": tr("采集任务运行中"),
+    }
+    return labels.get(execution_scope, tr("任务运行中"))
 
 
 class _AcknowledgedPauseEvent(threading.Event):

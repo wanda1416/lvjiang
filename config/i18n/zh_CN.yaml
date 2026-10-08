@@ -1773,3 +1773,13 @@ settings_sections:
   general: 常规设置
   execution: 执行参数
   ai: AI 设置
+
+ai_models:
+  text_0: "获取模型"
+  text_1: "取消请求"
+  text_2: "AI 请求已取消"
+  text_3: "AI 请求失败，请检查连接配置"
+  text_4: "正在获取模型列表…"
+  text_5: "已获取 {count} 个模型；请选择模型后测试连接"
+  text_6: "服务返回的模型列表为空，可手动填写模型名称后测试连接"
+  text_7: "服务未返回有效的模型列表，可手动填写模型名称后测试连接"

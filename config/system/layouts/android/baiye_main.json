@@ -196,6 +196,27 @@
       "y_ratio": 0.8888888888888888,
       "w_ratio": 0.160625,
       "h_ratio": 0.0875
+    },
+    {
+      "key": "activity_detail_title",
+      "x_ratio": 0.703125,
+      "y_ratio": 0.018055555555555554,
+      "w_ratio": 0.13125,
+      "h_ratio": 0.07777777777777778
+    },
+    {
+      "key": "activity_track",
+      "x_ratio": 0.71,
+      "y_ratio": 0.8833333333333333,
+      "w_ratio": 0.2325,
+      "h_ratio": 0.06805555555555555
+    },
+    {
+      "key": "activity_detail_back",
+      "x_ratio": 0.920625,
+      "y_ratio": 0.02361111111111111,
+      "w_ratio": 0.03625,
+      "h_ratio": 0.06666666666666667
     }
   ],
   "points": [

@@ -2,6 +2,9 @@
 
 - `<name>.png`：要在画面里定位的小图（截图工具框选保存即可；带 alpha 时透明区按黑处理）
 - 用户层覆盖：同名文件放 `config/local/templates/`。
+- `common/tracked_person_avatar.png`：默认人物追踪头像，仅包含头像与深色底，
+  不含动态距离、姓名或场景。桌面和 Android 引用同一模板；搜索范围由调用方限定在
+  画面横向 `[0.25, 0.75]`，不搜索小地图。
 
 录制画布宽高、匹配阈值和模板名统一保存在 Layout JSON 的 Region `template`
 绑定中，`templates/` 目录不生成 sidecar JSON。

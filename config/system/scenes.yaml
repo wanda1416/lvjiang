@@ -56,3 +56,7 @@ scenes:
     - jianghu_card
     - huoyun_card
     - baiye_activity_card
+  map:
+    name: 地图
+    items:
+    - baiye_residence

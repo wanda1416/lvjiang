@@ -42,6 +42,97 @@
       "y_ratio": 0.8822333872360675,
       "w_ratio": 0.2318147332998568,
       "h_ratio": 0.06606424969359781
+    },
+    {
+      "key": "supply_title",
+      "x_ratio": 0.085,
+      "y_ratio": 0.033,
+      "w_ratio": 0.21,
+      "h_ratio": 0.07
+    },
+    {
+      "key": "supply_items",
+      "x_ratio": 0.052,
+      "y_ratio": 0.125,
+      "w_ratio": 0.427,
+      "h_ratio": 0.73
+    },
+    {
+      "key": "supply_item_name",
+      "x_ratio": 0.653,
+      "y_ratio": 0.14,
+      "w_ratio": 0.27,
+      "h_ratio": 0.085
+    },
+    {
+      "key": "supply_stock",
+      "x_ratio": 0.856,
+      "y_ratio": 0.275,
+      "w_ratio": 0.096,
+      "h_ratio": 0.047
+    },
+    {
+      "key": "supply_held",
+      "x_ratio": 0.653,
+      "y_ratio": 0.275,
+      "w_ratio": 0.15,
+      "h_ratio": 0.047
+    },
+    {
+      "key": "supply_balance",
+      "x_ratio": 0.703,
+      "y_ratio": 0.023,
+      "w_ratio": 0.105,
+      "h_ratio": 0.055
+    },
+    {
+      "key": "supply_quantity",
+      "x_ratio": 0.819,
+      "y_ratio": 0.739,
+      "w_ratio": 0.065,
+      "h_ratio": 0.045
+    },
+    {
+      "key": "supply_max",
+      "x_ratio": 0.915,
+      "y_ratio": 0.737,
+      "w_ratio": 0.029,
+      "h_ratio": 0.05
+    },
+    {
+      "key": "supply_price",
+      "x_ratio": 0.868,
+      "y_ratio": 0.809,
+      "w_ratio": 0.081,
+      "h_ratio": 0.046
+    },
+    {
+      "key": "supply_buy",
+      "x_ratio": 0.835,
+      "y_ratio": 0.89,
+      "w_ratio": 0.165,
+      "h_ratio": 0.08
+    },
+    {
+      "key": "supply_back",
+      "x_ratio": 0.912,
+      "y_ratio": 0.023,
+      "w_ratio": 0.043,
+      "h_ratio": 0.067
+    }
+  ],
+  "points": [
+    {
+      "key": "supply_scroll_high",
+      "cx_ratio": 0.32,
+      "cy_ratio": 0.27,
+      "r_ratio": 0.001
+    },
+    {
+      "key": "supply_scroll_low",
+      "cx_ratio": 0.32,
+      "cy_ratio": 0.8,
+      "r_ratio": 0.001
     }
   ]
 }

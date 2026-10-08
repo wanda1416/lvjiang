@@ -7,6 +7,34 @@
       "y_ratio": 0.3088101725703905,
       "w_ratio": 0.1952770208900999,
       "h_ratio": 0.34917751539004943
+    },
+    {
+      "key": "speaker",
+      "x_ratio": 0.45,
+      "y_ratio": 0.735,
+      "w_ratio": 0.1,
+      "h_ratio": 0.045
+    },
+    {
+      "key": "dialogue_options",
+      "x_ratio": 0.65,
+      "y_ratio": 0.57,
+      "w_ratio": 0.24,
+      "h_ratio": 0.18
+    },
+    {
+      "key": "dialogue_continue",
+      "x_ratio": 0.475,
+      "y_ratio": 0.875,
+      "w_ratio": 0.05,
+      "h_ratio": 0.065
+    },
+    {
+      "key": "dialogue_exit",
+      "x_ratio": 0.9,
+      "y_ratio": 0.015,
+      "w_ratio": 0.065,
+      "h_ratio": 0.075
     }
   ]
 }

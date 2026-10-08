@@ -54,6 +54,27 @@
         "record_w": 2800,
         "record_h": 1260
       }
+    },
+    {
+      "key": "currency_notice",
+      "x_ratio": 0.37,
+      "y_ratio": 0.47,
+      "w_ratio": 0.12,
+      "h_ratio": 0.055
+    },
+    {
+      "key": "currency_checkbox",
+      "x_ratio": 0.344,
+      "y_ratio": 0.475,
+      "w_ratio": 0.018,
+      "h_ratio": 0.041
+    },
+    {
+      "key": "currency_check_mark",
+      "x_ratio": 0.3485714285714286,
+      "y_ratio": 0.48333333333333334,
+      "w_ratio": 0.01,
+      "h_ratio": 0.023809523809523808
     }
   ],
   "points": [

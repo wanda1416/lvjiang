@@ -31,6 +31,7 @@ def declare_profiles($keys)
         "baiye_of_week": {"model": "quota", "definition": {"label": "赤金小铺礼盒", "cap": 3, "period": "week", "reset_time": "05:00", "reset_day": 1, "increment_only": true, "sources": ["赤金小铺"]}},
         "baiye_raoliang_of_month": {"model": "quota", "definition": {"label": "百业绕梁之音", "cap": 2, "period": "month", "reset_time": "05:00", "reset_day": 1, "increment_only": true, "sources": ["百业声望", "银百叶"]}},
         "baiye_silver_box_of_month": {"model": "quota", "definition": {"label": "银百叶礼盒", "cap": 3, "period": "month", "reset_time": "05:00", "reset_day": 1, "increment_only": true, "sources": ["银百叶"]}},
+        "baiye_freight_of_week": {"model": "quota", "definition": {"label": "百业货运本周", "cap": 3, "period": "week", "reset_time": "05:00", "reset_day": 1, "increment_only": true, "sources": ["百业货运"]}},
         "tili": {"model": "regen", "definition": {"label": "体力", "cap": 2500, "regen_type": "boundary", "regen_amount": 450, "regen_period": "day", "reset_time": "05:00"}}
     }
 

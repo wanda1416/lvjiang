@@ -7,6 +7,159 @@
       "y_ratio": 0.017150725028655122,
       "w_ratio": 0.033092037228541926,
       "h_ratio": 0.07813397678961277
+    },
+    {
+      "key": "title",
+      "x_ratio": 0.088,
+      "y_ratio": 0.023,
+      "w_ratio": 0.21,
+      "h_ratio": 0.059
+    },
+    {
+      "key": "material_name",
+      "x_ratio": 0.63,
+      "y_ratio": 0.147,
+      "w_ratio": 0.28,
+      "h_ratio": 0.084
+    },
+    {
+      "key": "material_count",
+      "x_ratio": 0.63,
+      "y_ratio": 0.228,
+      "w_ratio": 0.225,
+      "h_ratio": 0.058
+    },
+    {
+      "key": "materials",
+      "x_ratio": 0.157,
+      "y_ratio": 0.339,
+      "w_ratio": 0.433,
+      "h_ratio": 0.516
+    },
+    {
+      "key": "get_sources",
+      "x_ratio": 0.631,
+      "y_ratio": 0.539,
+      "w_ratio": 0.308,
+      "h_ratio": 0.078
+    },
+    {
+      "key": "submit",
+      "x_ratio": 0.835,
+      "y_ratio": 0.89,
+      "w_ratio": 0.165,
+      "h_ratio": 0.08
+    },
+    {
+      "key": "round_progress",
+      "x_ratio": 0.22,
+      "y_ratio": 0.18,
+      "w_ratio": 0.36,
+      "h_ratio": 0.09
+    },
+    {
+      "key": "round_chest",
+      "x_ratio": 0.168,
+      "y_ratio": 0.158,
+      "w_ratio": 0.053,
+      "h_ratio": 0.114
+    },
+    {
+      "key": "source_panel",
+      "x_ratio": 0.44,
+      "y_ratio": 0.065,
+      "w_ratio": 0.224,
+      "h_ratio": 0.92
+    },
+    {
+      "key": "sources_close",
+      "x_ratio": 0.765,
+      "y_ratio": 0.106,
+      "w_ratio": 0.045,
+      "h_ratio": 0.026
+    },
+    {
+      "key": "reward_title",
+      "x_ratio": 0.709,
+      "y_ratio": 0.019,
+      "w_ratio": 0.124,
+      "h_ratio": 0.066
+    },
+    {
+      "key": "reward_claim",
+      "x_ratio": 0.71,
+      "y_ratio": 0.881,
+      "w_ratio": 0.232,
+      "h_ratio": 0.069
+    },
+    {
+      "key": "reward_back",
+      "x_ratio": 0.919,
+      "y_ratio": 0.02,
+      "w_ratio": 0.042,
+      "h_ratio": 0.069
+    }
+  ],
+  "points": [
+    {
+      "key": "material_1",
+      "cx_ratio": 0.21,
+      "cy_ratio": 0.47,
+      "r_ratio": 0.018
+    },
+    {
+      "key": "material_2",
+      "cx_ratio": 0.32,
+      "cy_ratio": 0.47,
+      "r_ratio": 0.018
+    },
+    {
+      "key": "material_3",
+      "cx_ratio": 0.43,
+      "cy_ratio": 0.47,
+      "r_ratio": 0.018
+    },
+    {
+      "key": "material_4",
+      "cx_ratio": 0.54,
+      "cy_ratio": 0.47,
+      "r_ratio": 0.018
+    },
+    {
+      "key": "material_5",
+      "cx_ratio": 0.21,
+      "cy_ratio": 0.79,
+      "r_ratio": 0.018
+    },
+    {
+      "key": "material_6",
+      "cx_ratio": 0.32,
+      "cy_ratio": 0.79,
+      "r_ratio": 0.018
+    },
+    {
+      "key": "material_7",
+      "cx_ratio": 0.43,
+      "cy_ratio": 0.79,
+      "r_ratio": 0.018
+    },
+    {
+      "key": "material_8",
+      "cx_ratio": 0.54,
+      "cy_ratio": 0.79,
+      "r_ratio": 0.018
+    },
+    {
+      "key": "sources_scroll_start",
+      "cx_ratio": 0.555,
+      "cy_ratio": 0.92,
+      "r_ratio": 0.01
+    },
+    {
+      "key": "sources_scroll_end",
+      "cx_ratio": 0.555,
+      "cy_ratio": 0.65,
+      "r_ratio": 0.01
     }
   ]
 }

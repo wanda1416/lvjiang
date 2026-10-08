@@ -1,9 +1,39 @@
 content_version: 1
 key: general_chat
 name: 对话
+views:
+- key: base
+  name: 人物交互
+- key: dialogue
+  name: 人物对话
 regions:
 - key: chat_area
   name: 对话区域
   type: func
   is_text: true
   is_clickable: true
+  view: base
+- key: speaker
+  name: 对话人物
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: dialogue
+- key: dialogue_options
+  name: 对话选项
+  type: func
+  is_text: true
+  is_clickable: true
+  view: dialogue
+- key: dialogue_continue
+  name: 继续对话
+  type: func
+  is_text: false
+  is_clickable: true
+  view: dialogue
+- key: dialogue_exit
+  name: 退出对话
+  type: func
+  is_text: true
+  is_clickable: true
+  view: dialogue

@@ -1,0 +1,12 @@
+{
+  "content_version": 1,
+  "regions": [
+    {
+      "key": "exit",
+      "x_ratio": 0.81625,
+      "y_ratio": 0.019444444444444445,
+      "w_ratio": 0.045,
+      "h_ratio": 0.10972222222222222
+    }
+  ]
+}

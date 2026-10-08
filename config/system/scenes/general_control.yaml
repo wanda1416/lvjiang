@@ -8,6 +8,8 @@ views:
   name: 确认
 - key: blank
   name: 弹窗
+- key: currency
+  name: 货币兑换确认
 regions:
 - key: confirm
   name: 确认
@@ -48,6 +50,24 @@ regions:
   is_clickable: true
   view: base
   to: '@caller'
+- key: currency_notice
+  name: 本赛季不再提醒
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: currency
+- key: currency_checkbox
+  name: 不再提醒勾选框
+  type: func
+  is_text: false
+  is_clickable: true
+  view: currency
+- key: currency_check_mark
+  name: 勾选状态
+  type: attr
+  is_text: false
+  is_clickable: false
+  view: currency
 points:
 - key: material_slot_1
   name: 材料格1

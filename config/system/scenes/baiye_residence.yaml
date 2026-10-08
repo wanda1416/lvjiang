@@ -8,4 +8,3 @@ regions:
   is_text: true
   is_clickable: true
   to: game_main_page
-  navigation: back

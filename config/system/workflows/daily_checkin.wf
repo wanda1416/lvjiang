@@ -1,3 +1,4 @@
+#% id: daily_checkin
 #% name: 每日自动签到
 #% runnable: true
 #% batchable: true

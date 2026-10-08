@@ -1,6 +1,6 @@
 # 律匠需求文档
 
-> 最后更新：2026-10-07（基线 v0.13.13）。本层描述如与代码或配置不符，以代码与配置为准。
+> 最后更新：2026-10-08（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
 
 > 需求文档索引。游戏机制介绍见 [10-game](../10-game/README.md)，架构设计见 [30-architecture](../30-architecture/README.md)。
 
@@ -72,6 +72,8 @@
 | [02-task-history.md](60-editor/02-task-history.md) | 任务历史：单任务/批量两级 ID、参数与产出查询、独立日志 | 已实现 |
 | [03-workflow-metadata-editor.md](60-editor/03-workflow-metadata-editor.md) | 工作流元数据表单与 local / system 保存位置 | 已实现 |
 | [04-canvas-group-selection.md](60-editor/04-canvas-group-selection.md) | 画布组选区：Ctrl 多选与整组平移、修饰键语义 | 已实现 |
+| [05-runtime-find-area.md](60-editor/05-runtime-find-area.md) | 动态矩形识别区域、命中坐标与相邻文字读取 | 已实现 |
+| [06-runtime-drag-hold.md](60-editor/06-runtime-drag-hold.md) | 拖拽保持时长变量、区间与 timeline 校验 | 已实现 |
 
 待办事项与平台推进计划已移至 [00-meta](../00-meta/README.md)：
 [02-backlog.md](../00-meta/02-backlog.md)、

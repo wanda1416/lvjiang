@@ -1799,3 +1799,13 @@ settings_sections:
   general: General Settings
   execution: Execution Parameters
   ai: AI Settings
+
+ai_models:
+  text_0: "Fetch Models"
+  text_1: "Cancel Request"
+  text_2: "AI request cancelled"
+  text_3: "AI request failed. Check connection settings."
+  text_4: "Fetching model list…"
+  text_5: "Fetched {count} models. Select a model and test the connection."
+  text_6: "The model list is empty. Enter a model name manually and test the connection."
+  text_7: "No valid model list was returned. Enter a model name manually and test the connection."

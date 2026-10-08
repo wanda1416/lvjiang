@@ -17,7 +17,7 @@ def test_test_connection_does_not_save_draft(qtbot, tmp_path, monkeypatch):
     page = AISettingsPage(store=store)
     qtbot.addWidget(page)
     page.url.setText("https://example.invalid/v1")
-    page.model.setText("draft-model")
+    page.model.setEditText("draft-model")
     page.key.setText("test-only-key")
     page.test()
     qtbot.waitUntil(lambda: page._worker is None)
@@ -42,7 +42,7 @@ def test_cancel_aborts_request_and_reenables_form(qtbot, tmp_path, monkeypatch):
     page = AISettingsPage(store=AIStore(tmp_path / "ai.json"))
     qtbot.addWidget(page)
     page.url.setText("https://example.invalid/v1")
-    page.model.setText("test-model")
+    page.model.setEditText("test-model")
     page.test()
     assert not page.test_button.isEnabled()
     page.cancel_test()
@@ -50,3 +50,32 @@ def test_cancel_aborts_request_and_reenables_form(qtbot, tmp_path, monkeypatch):
     assert stopped == [True]
     assert page.test_button.isEnabled()
     assert "取消" in page.status.text()
+
+
+def test_auto_models_preserves_draft_and_does_not_repeat_or_save(qtbot, tmp_path, monkeypatch):
+    from lvjiang.core.ai import AIModelList
+
+    requests = []
+
+    async def models(service):
+        requests.append(service.settings.base_url)
+        return AIModelList(("model-a", "model-b"), 0.1)
+
+    monkeypatch.setattr(AIService, "list_models", models)
+    page = AISettingsPage(store=AIStore(tmp_path / "ai.json"))
+    qtbot.addWidget(page)
+    page.url.setText("https://example.invalid/v1")
+    page.model.setEditText("custom-model")
+    page.show()
+    qtbot.waitUntil(lambda: page.model.count() == 2 and page._worker is None)
+    assert page.model.currentText() == "custom-model"
+    assert not page.store.path.exists()
+    assert "测试连接" in page.status.text()
+    page._auto_fetch()
+    assert page._worker is None
+    assert len(requests) == 1
+    page.key.setText("test-only-key")
+    assert page.model.count() == 0
+    page.key.editingFinished.emit()
+    qtbot.waitUntil(lambda: len(requests) == 2 and page._worker is None)
+    assert page.model.currentText() == "custom-model"

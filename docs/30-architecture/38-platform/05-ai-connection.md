@@ -5,6 +5,9 @@
 `core/ai` 不依赖 Qt 或游戏插件。AISettings 是冻结的请求参数；AIService 使用
 HTTPX AsyncClient 调用 `/chat/completions`，返回文本、模型、耗时与服务实际提供的
 token 用量。未提供用量时不估算。asyncio 总超时和任务取消关闭客户端，不自动重试。
+AIService.list_models 使用 GET `/models`，返回去重排序后的模型 ID 与耗时，
+不要求预先选择模型；complete/test_connection 仍严格要求模型。两类请求复用
+同一传输和错误处理。模型列表不进入持久化配置。
 错误仅含固定说明和状态码，不传播响应正文、网络异常字符串或请求凭据。
 
 AIStore 复用 SessionStore 的文件锁与原子写入，独立 ai.json，不迁移旧节点。

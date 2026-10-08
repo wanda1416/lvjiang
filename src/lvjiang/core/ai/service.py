@@ -24,7 +24,7 @@ class AISettings:
     model: str = ""
     timeout: float = 30.0
 
-    def validated(self) -> AISettings:
+    def validated(self, *, require_model: bool = True) -> AISettings:
         url = self.base_url.strip().rstrip("/")
         try:
             parsed = urlsplit(url)
@@ -35,7 +35,7 @@ class AISettings:
                 or parsed.username or parsed.password or parsed.query or parsed.fragment
                 or port == 0):
             raise AIError("config", "请填写完整的 HTTP/HTTPS 接口根地址，不含凭据、查询参数或片段")
-        if not self.model.strip():
+        if require_model and not self.model.strip():
             raise AIError("config", "请填写模型名称")
         if not 1 <= self.timeout <= 300:
             raise AIError("config", "请求超时应为 1 至 300 秒")
@@ -50,28 +50,33 @@ class AIReply:
     usage: dict[str, int] | None
 
 
+@dataclass(frozen=True)
+class AIModelList:
+    models: tuple[str, ...]
+    elapsed: float
+
+
 class AIService:
     """每次调用使用冻结的设置；总超时可取消，不自动重试或跟随重定向。"""
 
     def __init__(self, settings: AISettings, api_key: str = "", *,
                  transport: httpx.AsyncBaseTransport | None = None):
-        self.settings = settings.validated()
+        self.settings = settings.validated(require_model=False)
         self._api_key = api_key.strip()
         self._transport = transport
 
-    async def complete(self, messages: list[dict[str, str]]) -> AIReply:
+    async def _request(self, method: str, path: str, *,
+                       payload: dict | None = None) -> httpx.Response:
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
-        started = time.monotonic()
         try:
             async with asyncio.timeout(self.settings.timeout):
                 async with httpx.AsyncClient(
                     timeout=self.settings.timeout, follow_redirects=False,
                     transport=self._transport,
                 ) as client:
-                    response = await client.post(
-                        self.settings.base_url + "/chat/completions",
-                        headers=headers,
-                        json={"model": self.settings.model, "messages": messages, "stream": False},
+                    response = await client.request(
+                        method, self.settings.base_url + path,
+                        headers=headers, json=payload,
                     )
         except (TimeoutError, httpx.TimeoutException):
             raise AIError("timeout", "请求超时，请检查网络或增加超时时间") from None
@@ -86,6 +91,28 @@ class AIService:
             raise AIError("rate_limit", "服务限流或额度不足，请检查服务商账户")
         if not 200 <= status < 300:
             raise AIError("http", f"服务请求失败（HTTP {status}）")
+        return response
+
+    async def list_models(self) -> AIModelList:
+        started = time.monotonic()
+        response = await self._request("GET", "/models")
+        try:
+            items = response.json()["data"]
+            if not isinstance(items, list):
+                raise ValueError("invalid models")
+            models = tuple(sorted({item["id"].strip() for item in items
+                                   if isinstance(item, dict)
+                                   and isinstance(item.get("id"), str) and item["id"].strip()}))
+        except (ValueError, KeyError, TypeError):
+            raise AIError("response", "服务未返回有效的模型列表，可手动填写模型名称后测试连接") from None
+        return AIModelList(models, time.monotonic() - started)
+
+    async def complete(self, messages: list[dict[str, str]]) -> AIReply:
+        self.settings.validated()
+        started = time.monotonic()
+        response = await self._request("POST", "/chat/completions", payload={
+            "model": self.settings.model, "messages": messages, "stream": False,
+        })
         try:
             data: Any = response.json()
             choice = data["choices"][0]

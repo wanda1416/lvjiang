@@ -80,3 +80,34 @@ def test_settings_persist_without_key_and_credentials_are_scoped(tmp_path, monke
     assert not store.path.with_name("session.json").exists()
     store.save(settings, "")
     assert store.get_key(settings.base_url) == ""
+
+
+def test_models_can_be_fetched_without_selecting_a_model():
+    def respond(request):
+        assert request.method == "GET"
+        assert request.url == "https://example.invalid/v1/models"
+        assert request.headers["authorization"] == "Bearer test-only-key"
+        return httpx.Response(200, json={"data": [
+            {"id": "model-b"}, {"id": "model-a"}, {"id": "model-b"},
+        ]})
+
+    service = AIService(AISettings("https://example.invalid/v1"), "test-only-key",
+                        transport=httpx.MockTransport(respond))
+    result = asyncio.run(service.list_models())
+    assert result.models == ("model-a", "model-b")
+    with pytest.raises(AIError, match="请填写模型名称"):
+        asyncio.run(service.test_connection())
+
+
+def test_unsupported_model_listing_keeps_manual_call_available():
+    def respond(request):
+        if request.url.path.endswith("/models"):
+            return httpx.Response(200, json={"data": "invalid"})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "OK"}}]})
+
+    service = AIService(AISettings("https://example.invalid/v1", "manual-model"),
+                        transport=httpx.MockTransport(respond))
+    with pytest.raises(AIError) as caught:
+        asyncio.run(service.list_models())
+    assert caught.value.code == "response"
+    assert asyncio.run(service.test_connection()).text == "OK"

@@ -247,6 +247,7 @@ def test_no_wrong_character_for_the_rope_dart_arts():
     wrong = chr(0x6817)
     tracked = subprocess.run(
         ["git", "ls-files"], capture_output=True, text=True, check=True,
+        encoding="utf-8",
     ).stdout.split()
     offenders = []
     for path in tracked:

@@ -103,7 +103,7 @@ def test_summary_keeps_outcomes_and_stable_keys_without_diagnostic_payload(monke
 
 def test_partial_summary_survives_nested_updates_and_stop(monkeypatch):
     engine = make_engine()
-    engine._procs = parse_text(WORKFLOW.read_text()).procs
+    engine._procs = parse_text(WORKFLOW.read_text(encoding="utf-8")).procs
     engine._exec_body(parse_text('''global $jianghu_result, $jianghu_item, $claim_reward
     eval $claim_reward = false
     call $jianghu_result = new_jianghu_result()
@@ -124,7 +124,7 @@ def test_partial_summary_survives_nested_updates_and_stop(monkeypatch):
 
 
 def test_explicit_failure_summary_preserves_legacy_return():
-    program = parse_text(WORKFLOW.read_text())
+    program = parse_text(WORKFLOW.read_text(encoding="utf-8"))
     engine = make_engine()
     engine._procs = {**program.procs, **parse_text("def declare_profiles($keys)\nreturn -1\nend\n").procs}
     with pytest.raises(_ReturnSignal) as caught:
@@ -137,7 +137,7 @@ def test_explicit_failure_summary_preserves_legacy_return():
 
 def test_drink_failure_then_completion_keeps_problem_without_stage_events():
     engine = make_engine()
-    engine._procs = parse_text(WORKFLOW.read_text()).procs
+    engine._procs = parse_text(WORKFLOW.read_text(encoding="utf-8")).procs
     engine._exec_body(parse_text('''global $jianghu_result, $jianghu_item, $claim_reward
     eval $claim_reward = false
     call $jianghu_result = new_jianghu_result()

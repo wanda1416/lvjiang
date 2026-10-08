@@ -156,6 +156,7 @@ def collect_group(scc: str, group: Group) -> Result:
         command,
         cwd=ROOT,
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
     )

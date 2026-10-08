@@ -10,11 +10,12 @@ from tests.workflows.conftest import make_engine
 from tests.workflows.test_redeem_code import RedeemGame
 
 WORKFLOWS = Path(__file__).resolve().parents[2] / "config/system/workflows"
-HELPERS = parse_text((WORKFLOWS / "subcall/result_records.wf").read_text()).procs
+HELPERS = parse_text(
+    (WORKFLOWS / "subcall/result_records.wf").read_text(encoding="utf-8")).procs
 
 
 def prepare(name, **variables):
-    program = parse_text((WORKFLOWS / f"{name}.wf").read_text())
+    program = parse_text((WORKFLOWS / f"{name}.wf").read_text(encoding="utf-8"))
     engine = make_engine()
     engine.variables.update(variables)
     engine._procs = {**program.procs, **HELPERS}

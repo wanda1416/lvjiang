@@ -5,6 +5,7 @@ from typing import Any
 from loguru import logger
 
 from ...core.coord_types import CoordRef, Offset, RectCoordRef, to_offset
+from ...core.layout_models import FoundRegion
 from ..builtins._coerce import to_number
 from ..grammar import (
     And,
@@ -256,6 +257,10 @@ class _EvalMixin:
             return ""
 
         # dict 按 key 取
+        if isinstance(current, FoundRegion):
+            if isinstance(key, str) and key in {"x_ratio", "y_ratio", "w_ratio", "h_ratio", "text"}:
+                return getattr(current, key)
+            return None
         if isinstance(current, dict):
             if key in current:
                 return current[key]

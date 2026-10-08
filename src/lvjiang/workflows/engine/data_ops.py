@@ -694,6 +694,17 @@ class _DataOpsMixin:
 
         # 解析搜索区域（支持 region 和 panel）
         search_region: Region | None = None
+        if isinstance(node.search_scene, VarRef) and node.search_region is None:
+            area = self.variables.get(node.search_scene.name)
+            if isinstance(area, RectCoordRef):
+                if area.w <= 0 or area.h <= 0:
+                    raise WorkflowUserError("find: 矩形搜索范围宽高必须大于零")
+                search_region = Region(
+                    key="", x_ratio=area.cx - area.w / 2, y_ratio=area.cy - area.h / 2,
+                    w_ratio=area.w, h_ratio=area.h,
+                )
+            elif not isinstance(area, str) or not area:
+                raise WorkflowUserError("find: 独立搜索范围变量必须是矩形坐标")
         if node.search_scene is not None and node.search_region is not None:
             # 解析场景名
             if isinstance(node.search_scene, VarRef):

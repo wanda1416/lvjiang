@@ -1768,3 +1768,8 @@ ai_connection:
   text_28: "系统凭据库不可用；可临时填写 Key 测试，保存 Key 需要启用系统凭据库"
   text_29: "无法读取系统凭据库，请检查凭据库是否已解锁"
   text_30: "无法更新系统凭据库，连接配置未保存"
+
+settings_sections:
+  general: 常规设置
+  execution: 执行参数
+  ai: AI 设置

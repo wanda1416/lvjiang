@@ -1794,3 +1794,8 @@ ai_connection:
   text_28: "System credential store unavailable. You can enter a key temporarily for testing; enable the credential store to save it."
   text_29: "Cannot read system credentials. Check that the credential store is unlocked."
   text_30: "Cannot update system credentials. Connection settings were not saved."
+
+settings_sections:
+  general: General Settings
+  execution: Execution Parameters
+  ai: AI Settings

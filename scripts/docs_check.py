@@ -3,15 +3,13 @@
 用法：
 
     python scripts/docs_check.py            # 全量检查，有问题时退出码 1
-    python scripts/docs_check.py --stamp    # 把全库时效锚刷成当前版本与日期
 
 检查范围是 `docs/` 下全部 `.md`；链接目标可以是仓库内任意文件（源码、配置、
 打包手册都允许被引用）。纯静态检查，不联网、不依赖 Qt，可以直接进 CI。
 
 约定见 `docs/00-meta/00-doc-standard.md`：层索引写明基线，会被实现进度推翻的
-文档（20-requirements、平台进度）写明状态，归档文档写明「状态止于」。状态行里
-的版本号必须等于 `src/lvjiang/_version.py`，所以发布改版本后跑一次 `--stamp`
-即可，不必手工翻全库。
+文档（20-requirements、平台进度）写明状态，归档文档写明「状态止于」。
+日期与基线记录实际内容核对的时间和版本，不要求跟随应用发版更新；本脚本只读检查。
 """
 
 from __future__ import annotations
@@ -20,7 +18,6 @@ import argparse
 import collections
 import pathlib
 import re
-from datetime import date
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 DOCS = REPO / "docs"
@@ -48,13 +45,6 @@ STATUS_LINE = re.compile(
     r"^>\s*状态\s*[：:]\s*(已实现|部分实现|规划)"
     r"\s*（(\d{4}-\d{2}-\d{2})，基线\s*v?(\d+\.\d+(?:\.\d+)?)）", re.M)
 ARCHIVE_LINE = re.compile(r"^>\s*状态止于\s*\d{4}-\d{2}-\d{2}", re.M)
-VERSION = re.compile(r'__version__\s*=\s*"([^"]+)"')
-#: --stamp 只改时效锚里的日期与版本，不动正文
-STAMP_STATUS = re.compile(
-    r"(^>\s*状态\s*[：:]\s*(?:已实现|部分实现|规划)\s*（)\d{4}-\d{2}-\d{2}"
-    r"(，基线\s*)v?\d+\.\d+(?:\.\d+)?(）)", re.M)
-STAMP_FRESH = re.compile(
-    r"(> 最后更新：)\d{4}-\d{2}-\d{2}(（基线\s*)v?\d+\.\d+(?:\.\d+)?(）)")
 #: 状态行与时效锚都只看正文最前面这一段
 HEAD_LINES = 15
 
@@ -170,11 +160,6 @@ def check_freshness(files: list[pathlib.Path]) -> list[str]:
     return problems
 
 
-def current_version() -> str:
-    match = VERSION.search(read(REPO / "src/lvjiang/_version.py"))
-    return match.group(1) if match else ""
-
-
 def status_docs(files: list[pathlib.Path]) -> list[pathlib.Path]:
     """需要状态行的文档：20-requirements 全部与平台进度文档，层索引除外。"""
     out: list[pathlib.Path] = []
@@ -191,12 +176,12 @@ def head_of(path: pathlib.Path) -> str:
     return "\n".join(read(path).splitlines()[:HEAD_LINES])
 
 
-def check_status(files: list[pathlib.Path], version: str) -> list[str]:
+def check_status(files: list[pathlib.Path]) -> list[str]:
     """活文档写状态行（含基线版本），归档文档写「状态止于」。
 
     状态行把「已实现 / 部分实现 / 规划」与基线版本钉在文档开头，避免再出现
-    “文档写着待实现、代码早已上线”这类腐烂；版本号与 `_version.py` 不一致即失败，
-    发布后跑 `--stamp` 一次刷齐。
+    “文档写着待实现、代码早已上线”这类腐烂。基线是文档实际核对版本，
+    允许早于应用版本，不以应用发版要求重写未修改文档。
     """
     problems: list[str] = []
     for path in status_docs(files):
@@ -206,8 +191,6 @@ def check_status(files: list[pathlib.Path], version: str) -> list[str]:
             problems.append(
                 "缺状态行（前 15 行需 `> 状态：已实现|部分实现|规划（YYYY-MM-DD，基线 vX.Y.Z）`）"
                 f" {rel}")
-        elif match.group(3) != version:
-            problems.append(f"状态行基线过期（写 {match.group(3)}，当前 {version}） {rel}")
     for path in files:
         rel = path.relative_to(DOCS).as_posix()
         if "/archive/" not in rel or path.name == "README.md":
@@ -249,21 +232,6 @@ def check_index_status(files: list[pathlib.Path]) -> list[str]:
     return problems
 
 
-def apply_stamp(files: list[pathlib.Path], version: str, today: str) -> int:
-    """把时效锚（层索引基线行与状态行）刷成当前版本与日期，返回改动文件数。"""
-    changed = 0
-    for path in files:
-        text = read(path)
-        patched = STAMP_STATUS.sub(
-            lambda m: f"{m.group(1)}{today}{m.group(2)}v{version}{m.group(3)}", text)
-        patched = STAMP_FRESH.sub(
-            lambda m: f"{m.group(1)}{today}{m.group(2)}v{version}{m.group(3)}", patched)
-        if patched != text:
-            path.write_text(patched, encoding="utf-8")
-            changed += 1
-    return changed
-
-
 def check_index_coverage() -> list[str]:
     problems: list[str] = []
     for name in INDEX_DIRS:
@@ -287,17 +255,9 @@ def check_index_coverage() -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="docs 静态检查")
     parser.add_argument("--quiet", action="store_true", help="只打印失败项")
-    parser.add_argument("--stamp", action="store_true",
-                        help="把全库时效锚刷成当前版本与日期（发布准备用）")
     args = parser.parse_args()
 
     files = sorted(DOCS.rglob("*.md"))
-    version = current_version()
-    if args.stamp:
-        changed = apply_stamp(files, version, date.today().isoformat())
-        print(f"已把 {changed} 个文件的时效锚刷到 v{version}（{date.today().isoformat()}）")
-        return 0
-
     link_problems, inbound = check_links(files)
     groups: dict[str, list[str]] = {
         "死链与锚点": link_problems,
@@ -305,7 +265,7 @@ def main() -> int:
         "一级标题": check_titles(files),
         "编号冲突": check_duplicate_numbers(files),
         "时效锚": check_freshness(files),
-        "状态行": check_status(files, version),
+        "状态行": check_status(files),
         "索引状态": check_index_status(files),
         "索引覆盖": check_index_coverage(),
     }

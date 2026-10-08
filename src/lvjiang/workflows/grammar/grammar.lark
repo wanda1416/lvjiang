@@ -209,7 +209,7 @@ coord_point: "(" number "," number ")"
 //   drag [general_move].[move_backward] duration 0.1 hold 2.1
 drag_duration: "duration"i (number | bracket_list | var_ref)
 
-drag_hold: "hold"i number
+drag_hold: "hold"i press_hold_value
 
 wait_stmt: "wait"i (delay_ref | number | bracket_expr | var_ref | wait_range) _NL
 

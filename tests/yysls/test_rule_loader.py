@@ -163,6 +163,7 @@ for name in ("default.yaml", "aggressive.yaml"):
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
 
     assert result.returncode == 0, result.stderr

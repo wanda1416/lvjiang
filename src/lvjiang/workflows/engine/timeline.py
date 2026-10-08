@@ -157,7 +157,8 @@ class _TimelineMixin:
                 arrow.to_cx_ratio, arrow.to_cy_ratio)
         move = self._resolve_hold_duration(
             node.duration, "drag duration") if node.duration is not None else 0.1
-        hold = float(node.hold) if node.hold is not None else 0.0
+        hold = (self._resolve_hold_duration(node.hold, "drag")
+                if node.hold is not None else 0.0)
         return TimelineStep(
             offset=offset, kind="touch", x1=x1, y1=y1, x2=x2, y2=y2,
             move=move, hold=hold, label=f"{scene}/{key}")

@@ -575,8 +575,11 @@ class _StmtMixin:
         return ("drag_duration", value)
 
     def drag_hold(self, items):
-        """hold <seconds> → float"""
-        return ("drag_hold", float(items[0]))
+        """与 press/click 共用 hold 数值、区间、变量表达式。"""
+        value = items[0]
+        if isinstance(value, (int, float)):
+            value = float(value)
+        return ("drag_hold", value)
 
     def drag_scale(self, items):
         """scale <number|$var>，保留表达式供运行时解析。"""

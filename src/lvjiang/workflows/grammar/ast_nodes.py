@@ -107,7 +107,7 @@ class Drag:
     scene: Any      # EntityRef（静态 [scene].[entity]）| PanelRef（panel 三级索引）| None（坐标/点对模式）
     arrow: Any      # EntityRef | None（坐标/点对模式）
     duration: Any = None  # Literal(秒数) | list[Literal](二元组范围) | None(默认)
-    hold: float | None = None  # 到达目标后按住不放的时长（秒）
+    hold: Any = None  # float | TupleLiteral | VarRef | None：到位后保持时长
     from_point: Any = None  # CoordPoint | None（坐标模式起点）
     to_point: Any = None    # CoordPoint | None（坐标模式终点）
     from_scene_ref: Any = None  # EntityRef | None（点对模式起点）

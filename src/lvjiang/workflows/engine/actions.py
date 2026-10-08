@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import random
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -424,6 +425,8 @@ class _ActionsMixin:
         若为点对模式（from_scene_ref/to_scene_ref），则查找两个命名点的屏幕坐标。
         若为 panel 模式，则查校准缓存获取格子中心坐标。
         """
+        if node.hold is not None:
+            node = replace(node, hold=self._resolve_hold_duration(node.hold, "drag"))
         kw = {}
         if getattr(node, 'suppress_defaults', False):
             kw["pre_delay"] = (0, 0)

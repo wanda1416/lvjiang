@@ -10,9 +10,10 @@ AIService.list_models 使用 GET `/models`，返回去重排序后的模型 ID �
 同一传输和错误处理。模型列表不进入持久化配置。
 错误仅含固定说明和状态码，不传播响应正文、网络异常字符串或请求凭据。
 
-AIStore 复用 SessionStore 的文件锁与原子写入，独立 ai.json，不迁移旧节点。
-连接节点只保存 base_url、model、timeout；系统凭据库账户由配置绝对路径及接口地址
-摘要确定。允许系统安全后端，不降级到明文文件后端。连接配置不在移动同步白名单中。
+AIStore 使用共享 SessionStore，在 settings.ai 保存 base_url、model、timeout，
+写入只合并该子节点，保留其他设置。系统凭据库账户由 session.json 绝对路径及接口地址
+摘要确定。允许系统安全后端，不降级到明文文件后端。连接参数随 session.json 正常同步。
+不读取或迁移旧 ai.json 与旧凭据。
 
 UI 的 AISettingsPage 独立保存自己的草稿；QRunnable 在后台运行独立 asyncio 循环。
 取消事件终止请求，关闭配置窗口触发取消；Qt 信号把结果送回页面，不从工作线程改控件。

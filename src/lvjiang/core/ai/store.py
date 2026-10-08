@@ -1,4 +1,4 @@
-"""连接参数独立保存；API Key 只进入系统凭据库。"""
+"""连接参数保存在 session.json/settings/ai；API Key 只进入系统凭据库。"""
 from __future__ import annotations
 
 import hashlib
@@ -7,21 +7,21 @@ from pathlib import Path
 
 import keyring
 
-from ..config.session import SessionStore
+from ..config.session import SessionStore, get_session_store
 from .service import AIError, AISettings
 
 
-class AIStore(SessionStore):
-    FORMAT_VERSION = 1
-    TRANSIENT_PATHS = frozenset()
+class AIStore:
+    def __init__(self, path: Path | str | None = None):
+        self._store = SessionStore(path) if path is not None else get_session_store()
 
     @property
     def path(self) -> Path:
-        from ... import constants
-        return self._path_override or constants.SESSION_PATH.with_name("ai.json")
+        return self._store.path
 
     def settings(self) -> AISettings:
-        node = self.get_node("connection", {})
+        settings = self._store.get_node("settings", {})
+        node = settings.get("ai", {}) if isinstance(settings, dict) else {}
         if not isinstance(node, dict):
             return AISettings()
         timeout = node.get("timeout", 30.0)
@@ -34,7 +34,7 @@ class AIStore(SessionStore):
         settings = settings.validated()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.set_key(settings.base_url, api_key)
-        self.set_node("connection", asdict(settings))
+        self._store.update_node("settings", {"ai": asdict(settings)})
 
     def _account(self, base_url: str) -> str:
         identity = str(self.path.resolve()) + "\n" + base_url.strip().rstrip("/")

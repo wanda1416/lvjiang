@@ -13,7 +13,7 @@ def test_test_connection_does_not_save_draft(qtbot, tmp_path, monkeypatch):
         return AIReply("OK", service.settings.model, 0.1, None)
 
     monkeypatch.setattr(AIService, "test_connection", reply)
-    store = AIStore(tmp_path / "ai.json")
+    store = AIStore(tmp_path / "session.json")
     page = AISettingsPage(store=store)
     qtbot.addWidget(page)
     page.url.setText("https://example.invalid/v1")
@@ -39,7 +39,7 @@ def test_cancel_aborts_request_and_reenables_form(qtbot, tmp_path, monkeypatch):
             stopped.append(True)
 
     monkeypatch.setattr(AIService, "test_connection", slow)
-    page = AISettingsPage(store=AIStore(tmp_path / "ai.json"))
+    page = AISettingsPage(store=AIStore(tmp_path / "session.json"))
     qtbot.addWidget(page)
     page.url.setText("https://example.invalid/v1")
     page.model.setEditText("test-model")
@@ -62,7 +62,7 @@ def test_auto_models_preserves_draft_and_does_not_repeat_or_save(qtbot, tmp_path
         return AIModelList(("model-a", "model-b"), 0.1)
 
     monkeypatch.setattr(AIService, "list_models", models)
-    page = AISettingsPage(store=AIStore(tmp_path / "ai.json"))
+    page = AISettingsPage(store=AIStore(tmp_path / "session.json"))
     qtbot.addWidget(page)
     page.url.setText("https://example.invalid/v1")
     page.model.setEditText("custom-model")

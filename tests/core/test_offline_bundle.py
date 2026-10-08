@@ -22,7 +22,9 @@ def bundle(tmp_path, monkeypatch):
     (session / "users/tester.json").write_text('{}')
     (session / "session.json").write_text(json.dumps({
         "version": 2, "actives": {"user": "other", "layout": "desktop"},
-        "settings": {"env": "desktop"},
+        "settings": {"env": "desktop", "ai": {
+            "base_url": "https://example.invalid/v1", "model": "test-model", "timeout": 30,
+        }},
         "profile": {"alert_history": {"tester:demo": "now"}},
     }))
     (source / "config/local/diagnostics").mkdir(parents=True)
@@ -58,6 +60,7 @@ def test_sync_copies_wal_database_without_changing_pc_selection(bundle, tmp_path
     session = json.loads((phone / "config/session/session.json").read_text())
     assert session["actives"] == {"user": "tester", "layout": "android"}
     assert session["settings"]["env"] == "android"
+    assert session["settings"]["ai"] == pc_session["settings"]["ai"]
     interface = json.loads((phone / "config/session/interface.json").read_text())
     assert interface["alert_history"] == {"tester:demo": "now"}
     assert "profile" not in session

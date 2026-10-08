@@ -153,6 +153,22 @@ AI Agent 的授权边界、提交组织和执行门禁。
 - `warning`/`error` 只用于真正异常或需要用户处理的状态。可选弹窗未出现、允许为空的 OCR
   等正常分支不能制造告警噪声；实际数据矛盾、可能误操作或状态机失配必须明确报错。
 
+### 2.10 跨平台与文件编码
+
+- 仓库中的 `.wf`、`.json`、`.yaml`、`.md` 等文本一律按 UTF-8 存储。Python 的 `open()`、
+  `Path.read_text()` / `write_text()` 与 `subprocess` 文本模式**默认使用系统编码**：
+  Windows 中文环境是 GBK（ANSI 代码页），CI 的 Windows runner 是 cp1252，只有 Linux /
+  macOS 才是 UTF-8。凡是读写这些文件都必须显式写 `encoding="utf-8"`，不得依赖默认值。
+- 典型症状是 `UnicodeDecodeError: 'gbk' codec can't decode byte ...`（CI 上表现为
+  `'charmap'`）。它发生在模块导入或测试收集阶段时，会让**整个文件**无法运行，而不是只挂
+  一条用例；本地控制台显示乱码只是表象，与文件本身是否编码正确无关。
+- 读取仓库内的配置、脚本、布局与模板同样显式指定 UTF-8；写文件也一样，否则中文会被写成
+  GBK，其它平台直接读不了。测试使用的临时文件若含中文，读写两端都要注明编码。
+- 子进程抓文本要 `text=True, encoding="utf-8"`。CI 设的 `PYTHONIOENCODING=utf-8` 只管
+  stdio，管不到 `open()` 与 `read_text()` 的默认编码，不能当作替代。
+- 门禁：新增或修改文件读写代码时检查 `encoding`；改动必须能在默认编码为 GBK 的 Windows
+  上通过，不得依赖开发机或 CI 的隐式行为。遇到旧的漏写应当顺手补齐。
+
 ## 三、提交基本原则
 
 提交以“可独立理解、可独立审阅、可安全回退”为目标。这既不是追求最少数量，更不是

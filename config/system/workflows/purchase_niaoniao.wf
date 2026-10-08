@@ -40,6 +40,11 @@
 # 后置：成功时已回到主页；买成后按实际个数累加 niaoniao_of_week。
 # 返回：0=已买满、货币不足或没命中（含正常结束）；-1=Profile 声明或导航失败。
 
+import "subcall/result_records.wf"
+global $record_result
+call $record_result = new_record_result()
+collect $record_result as "purchase_niaoniao"
+
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 import "subcall/page_action.wf"
@@ -54,14 +59,17 @@ default $max_scroll = 2
 # 本周已买满 2 个、或长鸣玉连 1 个都买不起，则不导航直接跳过。
 call $profile_ok = declare_profiles(["niaoniao_of_week", "changmingyu"])
 if $profile_ok < 0
+    call record_finish_if_open("failed", "Profile 声明失败")
     return -1
 end
 
 eval $bought_week = profile_get("niaoniao_of_week")
+call record_observation("niaoniao_of_week", null, $bought_week)
 if $bought_week == null
     eval $bought_week = 0
 end
 if $bought_week >= 2
+    call record_finish("already_done", "本周已买满")
     log "本周袅袅之音·绑已买满（niaoniao_of_week=" + $bought_week + " >= 2），跳过购买"
     return 0
 end
@@ -70,7 +78,9 @@ end
 eval $remaining = 2 - $bought_week
 eval $cmyu = profile_get("changmingyu")
 call $want = niaoniao_purchase_count($bought_week, $cmyu)
+call record_observation("purchase_plan", null, {"bought_week": $bought_week, "balance": $cmyu, "planned_quantity": $want})
 if $want <= 0
+    call record_finish("blocked", "长鸣玉不足")
     log "长鸣玉不足：购买 1 个需 200，现有 " + $cmyu + "，跳过购买"
     return 0
 end
@@ -81,6 +91,7 @@ end
 # ─── 导航：菜单 → 商店 → 精选 → 道具 ─────────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
+    call record_finish_if_open("failed", "导航失败")
     return -1
 end
 
@@ -116,9 +127,11 @@ loop while $tries < $max_scroll
             eval profile_inc("niaoniao_of_week", $want, "百珍商店")
             log "已购买 " + $want + " 个 袅袅之音·绑，niaoniao_of_week 增加 " + $want
             eval $bought = 1
+            call record_item("niaoniao", "袅袅之音·绑", "purchase_attempted", "已点击购买；未读取成交凭据", {"item_name": $pn.item_name, "planned_quantity": $want, "confirmed_quantity": null})
             break
         else
             # 命中的「绑」不是袅袅之音，或名称异常：绝不购买，回退中止
+            call record_item("niaoniao", "袅袅之音·绑", "rejected", "商品名称未通过安全校验", {"item_name": $pn.item_name})
             screenshot from last
             log error "购买面板道具名不合规（'" + $pn.item_name + "'），疑似误选，中止且不购买"
             click [general_purchase].[back] after wait @step_interval
@@ -132,6 +145,10 @@ loop while $tries < $max_scroll
 end
 
 if not $bought
+    if not has_key($record_result.items, "niaoniao")
+        call record_item("niaoniao", "袅袅之音·绑", "not_found", "滚动查找范围内未命中绑定商品", {"scrolls": $tries, "max_scroll": $max_scroll})
+    end
+    call record_finish("not_purchased", "未提交购买；原因见记录或原流程日志")
     log "未购买 袅袅之音·绑（可能周库存已购满、货币不足，或滚动到尽头仍未命中）"
 end
 
@@ -153,6 +170,8 @@ loop while $back_tries < 5
     eval $back_tries = $back_tries + 1
 end
 log "购买袅袅流程结束。"
+call record_count("scrolls", $tries)
+call record_finish_if_open("purchase_attempted", "已提交购买，成交数量未确认")
 
 # ─── niaoniao_purchase_count ──────────────────────────────
 # 按本周已购数量与长鸣玉余额算本次可购买数量（周上限 2，每个 200）。

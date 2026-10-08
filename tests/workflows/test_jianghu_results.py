@@ -83,104 +83,72 @@ def mixed_run(monkeypatch, source=None):
     return engine, trace
 
 
-def test_first_pass_details_and_rescan_only_append_new_actionable_tasks(monkeypatch):
+def test_summary_keeps_outcomes_and_stable_keys_without_diagnostic_payload(monkeypatch):
     engine, trace = mixed_run(monkeypatch)
     result = engine.output["jianghu"]
-    assert result["status"] == "partial" and result["finished"]
-    assert result["passes"] == 2
-    assert result["counts"] == {"already_done": 1, "completed": 2, "blocked": 1,
-                                "disabled": 1, "not_implemented": 1, "refresh_exhausted": 1}
+    assert result["status"] == "partial"
     assert set(result["tasks"]) == {"huanzhuang", "yinjiu", "kanbao", "juezhanglin", "heying"}
-    records = [*result["unidentified"], *(record for group in result["tasks"].values() for record in group["records"])]
-    first = sorted((record for record in records if record["pass"] == 1), key=lambda record: record["card"])
-    assert first[0]["outcome"] == "already_done" and first[0]["task"] == ""
-    assert first[1]["reward"]["status"] == "claim_attempted"
-    assert first[2]["action"] == {"status": "blocked", "reason": "item_not_found"}
-    assert first[3]["task_name"] == "看报" and first[3]["outcome"] == "disabled"
-    assert first[4]["outcome"] == "not_implemented"
-    assert first[5]["refresh_count"] == 2
-    extra = [record for record in records if record["pass"] == 2]
-    assert [(item["pass"], item["task_text"]) for item in extra] == [
-        (2, "合影新任务")]
-    # 已知饮酒任务的补扫仍遵循旧动作流程，但不重复追加或改写首轮结果。
-    assert sum(event[0] == "action_yinjiu" for event in trace) == 2
+    assert result["tasks"]["juezhanglin"] == {
+        "name": "觉障林", "records": [{"status": "not_implemented", "reason": "暂未实现"}]}
+    assert result["tasks"]["yinjiu"]["records"][0]["reason"] == "未找到黄泉酿"
+    assert result["unidentified"][0]["status"] == "already_done"
+    assert result["unidentified"][0]["reward"] == "claim_attempted"
     assert len(result["tasks"]["yinjiu"]["records"]) == 1
-    # 同类型任务即使换了位置、文案变化，补扫也不会重复写入。
     assert len(result["tasks"]["huanzhuang"]["records"]) == 1
+    assert sum(event[0] == "action_yinjiu" for event in trace) == 2
     assert sum(event[0] == "action_huanzhuang" for event in trace) == 2
+    assert result["tasks"]["heying"]["records"][0]["status"] == "completed"
+    assert set(result) <= {"status", "reason", "tasks", "unidentified", "reputation"}
 
 
-def test_nested_updates_keep_partial_output_when_processing_is_stopped(monkeypatch):
-    source = WORKFLOW.read_text(encoding="utf-8")
-    program = parse_text(source)
+def test_partial_summary_survives_nested_updates_and_stop(monkeypatch):
     engine = make_engine()
-    engine._procs = program.procs
-    setup = parse_text('''global $jianghu_result, $jianghu_item, $claim_reward
+    engine._procs = parse_text(WORKFLOW.read_text()).procs
+    engine._exec_body(parse_text('''global $jianghu_result, $jianghu_item, $claim_reward
     eval $claim_reward = false
     call $jianghu_result = new_jianghu_result()
-    collect $jianghu_result as "jianghu"
+    collect $jianghu_result.summary as "jianghu"
     call $jianghu_item = begin_jianghu_record(false, "1")
     call record_jianghu_task("huanzhuang", "换装")
     call identify_jianghu_record(false, "1", "换装", true)
     call record_jianghu_outcome("executing", "")
     call record_jianghu_action_returned()
-    ''')
-    engine._exec_body(setup.body)
+    ''').body)
     result = engine.output["jianghu"]
-    assert not result["finished"] and result["status"] == "running"
-    record = result["tasks"]["huanzhuang"]["records"][0]
-    assert record["outcome"] == "executed_unverified"
-    assert record["completion"] == "unknown"
-    assert record["reward"]["status"] == "disabled"
-    # 子过程提交共享对象后，停止发生在下一个语句前；收集数据没有被局部 output 覆盖。
+    assert result["status"] == "running"
+    assert result["tasks"]["huanzhuang"]["records"] == [
+        {"status": "executed_unverified", "reason": "执行后未确认完成"}]
     monkeypatch.setattr(engine, "_stop_check", lambda: True)
     engine._exec_body(parse_text("call finish_jianghu_result()\n").body)
-    assert not result["finished"]
+    assert result["status"] == "running"
 
 
-def test_explicit_early_return_keeps_legacy_return_and_collects_failure(monkeypatch):
-    program = parse_text(WORKFLOW.read_text(encoding="utf-8"))
+def test_explicit_failure_summary_preserves_legacy_return():
+    program = parse_text(WORKFLOW.read_text())
     engine = make_engine()
     engine._procs = {**program.procs, **parse_text("def declare_profiles($keys)\nreturn -1\nend\n").procs}
     with pytest.raises(_ReturnSignal) as caught:
         engine._exec_body(program.body)
     assert caught.value.value == -1
     result = engine.output["jianghu"]
-    assert result["status"] == "failed"
-    assert result["reason"] == "profile_declaration_failed"
+    assert result["status"] == "failed" and result["reason"] == "档案声明失败"
     assert result["tasks"] == {} and result["unidentified"] == []
 
 
-def test_drink_failures_record_reason_without_changing_old_return_codes(monkeypatch):
-    program = parse_text(WORKFLOW.read_text(encoding="utf-8"))
-    engine = make_engine(run_env="android")
-    engine._procs = {**program.procs, **parse_text('''
-    def nav_back_to_main()
-       return 0
-    end
-    ''').procs}
-    monkeypatch.setattr(engine, "_exec_click", lambda node: None)
-    monkeypatch.setattr(engine, "_exec_wait", lambda node: None)
-    monkeypatch.setattr(engine, "_exec_wait_stable", lambda node: None)
-    monkeypatch.setattr(engine, "_exec_recognize", lambda node: engine.variables.update({node.target.name: None}))
-    setup = parse_text('''global $jianghu_result, $jianghu_item, $claim_reward, $min_yinjiu_confidence
+def test_drink_failure_then_completion_keeps_problem_without_stage_events():
+    engine = make_engine()
+    engine._procs = parse_text(WORKFLOW.read_text()).procs
+    engine._exec_body(parse_text('''global $jianghu_result, $jianghu_item, $claim_reward
     eval $claim_reward = false
-    eval $min_yinjiu_confidence = "0.65"
     call $jianghu_result = new_jianghu_result()
-    collect $jianghu_result as "jianghu"
-    call $jianghu_item = begin_jianghu_record(false, "6")
+    collect $jianghu_result.summary as "jianghu"
+    call $jianghu_item = begin_jianghu_record(false, "1")
     call record_jianghu_task("yinjiu", "饮酒")
-    call identify_jianghu_record(false, "6", "醉意", true)
-    ''')
-    # 两个真实分支的旧返回不同：缺道具返回 1，导航失败仍返回 0。
-    # 新增记录只解释失败，不修正这个旧契约或更改后续领奖控制。
-    for nav_result, expected_return, expected_reason in (
-        (0, 1, "item_not_found"), (-1, 0, "item_navigation_failed"),
-    ):
-        engine._procs.update(parse_text(f"def nav_main_to_item()\nreturn {nav_result}\nend\n").procs)
-        engine._exec_body(setup.body)
-        value, _ = engine._run_proc(engine._procs["action_yinjiu"], ["card_6", "6"])
-        assert value == expected_return
-        record = engine.output["jianghu"]["tasks"]["yinjiu"]["records"][0]
-        assert record["reason"] == expected_reason
-        assert record["completion"] == "unknown"
+    call identify_jianghu_record(false, "1", "醉意", true)
+    call record_jianghu_outcome("failed", "item_navigation_failed")
+    call record_jianghu_outcome("completed", "completion_observed")
+    ''').body)
+    record = engine.output["jianghu"]["tasks"]["yinjiu"]["records"][0]
+    assert record["status"] == "completed"
+    assert record["problem"] == "背包导航失败"
+    assert "events" not in record

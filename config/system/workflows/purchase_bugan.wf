@@ -80,6 +80,11 @@ if not $buy_keyword_keys contains "振玉"
     eval $buy_keywords.振玉 = true
 end
 
+import "subcall/result_records.wf"
+global $record_result
+call $record_result = new_record_result()
+collect $record_result as "purchase_bugan"
+
 import "subcall/navigation.wf"
 import "subcall/page_detection.wf"
 import "subcall/game_profile.wf"
@@ -87,14 +92,18 @@ import "subcall/page_action.wf"
 import "subcall/profile_registry.wf"
 
 # ─── 声明本任务依赖的 Profile 数据模型 ────────────────────────────────
+global $record_category
+eval $record_category = "combat"
 call $profile_ok = declare_profiles(["bugan_of_week", "nn_bugan_of_week", "changmingyu", "tili"])
 if $profile_ok < 0
+    call record_finish_if_open("failed", "Profile 声明失败")
     return -1
 end
 
 # ─── 导航：从首页到不肝商店视图 ────────────────────────────────────────
 call $nav_result = nav_main_to_menu()
 if $nav_result < 0
+    call record_finish_if_open("failed", "导航失败")
     return -1
 end
 
@@ -109,6 +118,7 @@ click [game_menu_page].[bugan] after wait @page_refresh
 click [bugan_detail].[bugan_view] after wait @step_interval
 scan [bugan_detail].[bugan_jindu] as $jindu_str
 call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度", "日常活动")
+call record_observation("bugan_of_week", $jindu_str.bugan_jindu, $bugan_of_week)
 
 # 领取不肝进度奖励
 scan [bugan_detail].[purchase] as $found by contains "全部领取"
@@ -119,6 +129,7 @@ if $found
     click [general_control].[blank_area] after wait @page_refresh
     call scan_and_cancel("领取不肝奖励")
     log "领取本周不肝奖励"
+    call record_item("progress_reward", "不肝周奖励", "claim_attempted", "已点击全部领取；未读取奖励凭据", {})
 end
 
 click [bugan_detail].[shop] after wait @page_refresh
@@ -152,15 +163,19 @@ end
 # ─── 营生（类目5）：只买第一格（先确认格子内容是营生） ────────────────────────────
 # 两端都在 cat_5，滚动前就能点到
 if $buy_shengsheng
+    eval $record_category = "shengsheng"
     click [bugan_detail].[cat_5] after wait @page_refresh
     scan [bugan_detail].[shangpin_1][1][1] as $shengsheng_cell
     if $shengsheng_cell contains "营生"
        call buy_cell("shangpin_1", 1, 1)
+       call record_observation("shengsheng_goods", $shengsheng_cell, null)
        call close_item_prompts()
     else
+       call record_item("shengsheng", "不肝商店商品", "not_found", "未命中营生", {})
        log "营生 (1,1) 未命中，跳过购买"
     end
 else
+    call record_item("shengsheng", "不肝商店商品", "disabled", "未勾选购买营生", {})
     log "未勾选购买营生，跳过营生类目"
 end
 
@@ -176,6 +191,7 @@ if env("android")
 else
     eval $season_cat = "cat_6"
 end
+eval $record_category = "season"
 click [bugan_detail].$season_cat after wait @page_refresh
 scan [bugan_detail].[shangpin_1] as $season_grid
 eval $season_rows = panel_rows("bugan_detail", "shangpin_1")
@@ -185,10 +201,12 @@ for r in range(1, $season_rows)
         eval $cell = $season_grid.$r.$c
         call $reason = buy_block_reason($cell)
         if $reason
+            call record_item("season", "不肝商店商品", "blocked", $reason, {"raw": $cell, "row": $r, "col": $c})
             log "赛季追赶 行" + $r + "列" + $c + " " + $reason + "，跳过"
             continue
         end
         call buy_cell("shangpin_1", $r, $c)
+        call record_observation("season_goods", $cell, {"row": $r, "col": $c})
     end
 end
 call close_item_prompts()
@@ -203,6 +221,7 @@ call close_item_prompts()
 # 所以不匹配「袅」；「音+绑」的组合既容错 OCR 误字，又不会与绕梁之音
 # 混淆。购买完成后回写 nn_bugan_of_week=1（key 存在定义才写），配合
 # weekly 周期自动重置实现每周只买一次。
+eval $record_category = "niaoniao"
 call $waiguan_skip = waiguan_profile_skip()
 if not $waiguan_skip
     if env("android")
@@ -217,11 +236,14 @@ if not $waiguan_skip
     # 双子串判定封装在 is_niaoniao_bind 里逐条判断
     call $is_nn = is_niaoniao_bind($waiguan_cell)
     if not $is_nn
+        call record_item("niaoniao", "不肝商店商品", "not_found", "未命中绑定袅袅之音", {})
         log "外观 (1,1) 未命中袅袅之音·绑（已购买过或未上架），跳过"
     else if $bugan_of_week < 20000
+        call record_item("niaoniao", "不肝商店商品", "blocked", "不肝进度不足", {})
         log "本周不肝进度 " + $bugan_of_week + " < 20000，不满足外观兑换条件，跳过"
     else
         call buy_cell("shangpin_1", 1, 1)
+        call record_observation("niaoniao_goods", $waiguan_cell, null)
         log "购买外观兑换：袅袅之音"
         eval $nn_model = profile_model("nn_bugan_of_week")
         if $nn_model
@@ -235,6 +257,7 @@ end
 click [bugan_detail].[back] after wait @step_interval
 click [game_menu_page].[back] after wait @step_interval
 log "不肝商店购买流程结束。"
+call record_finish("processed", "已按原流程处理购买；成交结果未额外读取")
 
 # ─── match_keyword ────────────────────────────────────────
 # 在勾选的类目里找第一个命中的关键词（内部过程）。
@@ -288,6 +311,7 @@ def buy_cell($panel_key, $r, $c)
     click [bugan_detail].$panel_key[$r][$c] after wait @step_interval
     click [bugan_detail].[add_all] after wait @step_interval
     click [bugan_detail].[purchase] after wait @step_interval
+    call record_item($record_category, "不肝商店商品", "purchase_attempted", "已点击购买；未读取成交凭据", {"panel": $panel_key, "row": $r, "col": $c})
 end
 
 # ─── sync_current_tili ────────────────────────────────────
@@ -306,9 +330,11 @@ def sync_current_tili($source)
     scan [bugan_detail].[current_tili] as $tili_scan
     eval $tili_progress = extract_progress($tili_scan.current_tili)
     if $tili_progress.valid
+        call record_observation("tili", $tili_scan.current_tili, $tili_progress.current)
         eval profile_set("tili", $tili_progress.current, $source)
         log "当前体力: " + $tili_progress.current + "/" + $tili_progress.total
     else
+        call record_observation("tili", $tili_scan.current_tili, null)
         log "当前体力识别失败: '" + $tili_scan.current_tili + "'，跳过同步"
     end
     return 0
@@ -326,6 +352,7 @@ end
 #
 # 整面板 OCR 后逐格判断，行列数从面板实际布局读取（PC 端可显示 3×5）。
 def buy_panel($panel_key, $keywords)
+    eval $record_category = "combat"
     eval $bought_baoqian = 0
     scan [bugan_detail].$panel_key as $grid
     eval $rows = panel_rows("bugan_detail", $panel_key)
@@ -339,11 +366,13 @@ def buy_panel($panel_key, $keywords)
             end
             call $reason = buy_block_reason($cell)
             if $reason
+                call record_item("combat", "不肝商店商品", "blocked", $reason, {"raw": $cell, "row": $r, "col": $c})
                 log "战斗养成 [" + $panel_key + "] 行" + $r + "列" + $c + " " + $reason + "，跳过"
                 continue
             end
             log "命中商品 [" + $panel_key + "] 行" + $r + "列" + $c + " (" + $hit + "): " + $cell
             call buy_cell($panel_key, $r, $c)
+            call record_observation("combat_goods", $cell, {"keyword": $hit, "panel": $panel_key, "row": $r, "col": $c})
             # 字符串直接用 == 精确比较。
             if $hit == "宝钱"
                 eval $bought_baoqian = 1
@@ -390,6 +419,7 @@ def waiguan_profile_skip()
     if $model
         eval $flag = profile_get("nn_bugan_of_week")
         if $flag == 1
+            call record_item("niaoniao", "不肝商店商品", "already_done", "本周已购标记", {})
             log "profile nn_bugan_of_week=1，袅袅之音本周已购买，跳过外观兑换"
             return 1
         end
@@ -398,6 +428,7 @@ def waiguan_profile_skip()
     if $model
         eval $stock = profile_get("changmingyu")
         if $stock < 200
+            call record_item("niaoniao", "不肝商店商品", "blocked", "长鸣玉不足", {})
             log "profile changmingyu=" + $stock + "，不足 200，资金不足跳过外观兑换"
             return 1
         end

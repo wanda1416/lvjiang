@@ -58,6 +58,11 @@ default $tol_bugan = 0
 default $tol_baoqian = 0
 default $tol_changmingyu = 0
 
+import "subcall/result_records.wf"
+global $record_result
+call $record_result = new_record_result()
+collect $record_result as "scan_wallet"
+
 import "subcall/navigation.wf"
 import "subcall/game_profile.wf"
 import "subcall/profile_registry.wf"
@@ -65,12 +70,14 @@ import "subcall/profile_registry.wf"
 # ─── 声明本任务依赖的 Profile 数据模型 ────────────────────────────────
 call $profile_ok = declare_profiles(["tongbao", "bugan", "baoqian", "changmingyu", "bugan_of_week"])
 if $profile_ok < 0
+    call record_finish_if_open("failed", "Profile 声明失败")
     return -1
 end
 
 # ─── 导航到钱袋页面 ──────────────────────────────────────────────
 call $nav_result = nav_main_to_wallet()
 if $nav_result < 0
+    call record_finish_if_open("failed", "导航失败")
     return -1
 end
 
@@ -158,6 +165,12 @@ if $vals.changmingyu > 0
     call safe_set("changmingyu", $vals.changmingyu, $tol_changmingyu, "长鸣玉", "日常获取")
 end
 
+for record_key in ["bugan", "baoqian", "changmingyu"]
+    if $vals.$record_key <= 0
+        call record_item($record_key, "钱袋货币", "not_written", "未读取到正数；无法区分未识别与余额为零", {"observed_value": $vals.$record_key})
+    end
+end
+call record_observation("regional_currency", $money1, $tongbao_wan)
 log "钱袋货币扫描完成"
 
 # ─── 点击么玉进入不肝页面，获取不肝进度 ────────────────────────────────────
@@ -168,10 +181,12 @@ if $bugan_pos
 
     scan [bag_wallet_detail].[bugan_jindu] as $jindu_str
     call $bugan_of_week = sync_weekly_progress($jindu_str.bugan_jindu, "bugan_of_week", -1, "本周不肝进度", "日常活动")
+    call record_observation("bugan_of_week", $jindu_str.bugan_jindu, $bugan_of_week)
 end
 
 # ─── 返回主界面 ────────────────────────────────────────────────
 call nav_back_to_main()
+call record_finish("processed", "扫描完成；各货币写入或拒绝原因见记录")
 return 0
 
 # ─── shift_rows_after_scroll ──────────────────────────────
@@ -304,9 +319,11 @@ def safe_set($key, $new_val, $tolerance, $label, $source)
         eval $diff = abs($delta)
         if $diff > $tolerance
             log $label + " 差值 " + $diff + " 超过容差 " + $tolerance + "，跳过写入"
+            call record_item($key, $label, "tolerance_rejected", "识别值超过允许差值，保留旧值", {"old_value": $old, "observed_value": $new_val, "tolerance": $tolerance})
             return
         end
     end
     eval profile_set($key, $new_val, $source)
+    call record_item($key, $label, "write_attempted", "已调用原有 Profile 写入", {"old_value": $old, "observed_value": $new_val, "tolerance": $tolerance})
     log $label + ": " + $new_val
 end

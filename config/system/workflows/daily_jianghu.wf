@@ -108,7 +108,7 @@ import "subcall/visual_state.wf"
 # 仅记录已有流程的事实：共享可变对象在顶层 collect，子过程更新也保留部分结果。
 call $jianghu_result = new_jianghu_result()
 eval $jianghu_item = {}
-collect $jianghu_result as "jianghu"
+collect $jianghu_result.summary as "jianghu"
 
 call $profile_ok = declare_profiles(["haoling_of_week"])
 if $profile_ok < 0
@@ -125,6 +125,8 @@ eval $mode_switched = false
 call $has_task = has_selected_task()
 if not $has_task
    log "未选择要执行的江湖号令任务，跳过流程"
+   eval $jianghu_result.summary.status = "skipped"
+   eval $jianghu_result.summary.reason = "未选择执行任务"
    eval $jianghu_result.status = "skipped"
    eval $jianghu_result.reason = "no_selected_task"
    eval $jianghu_result.finished = true
@@ -144,6 +146,7 @@ end
 # 此后只有领奖会改变该值，故「读取即写入」足以保证实时与存储一致。
 call $haoling_of_week = sync_haoling_of_week()
 eval $jianghu_result.reputation.before = $haoling_of_week
+eval $jianghu_result.summary.reputation.before = $haoling_of_week
 
 # ─── 处理六张任务卡 ──────────────────────────────────────────────
 call $first_pass = process_jianghu_cards(false)
@@ -582,6 +585,8 @@ def sync_haoling_of_week()
    call $value = sync_weekly_progress($result.haoling_of_week, "haoling_of_week", $haoling_of_week, "当周获取号令", "江湖号令")
    eval append($jianghu_result.reputation.observations, {"raw_text": $result.haoling_of_week, "adopted_value": $value})
    eval $jianghu_result.reputation.after = $value
+   eval $jianghu_result.summary.reputation.after = $value
+   log debug "号令周声望原文：" + $result.haoling_of_week + "；采用：" + $value
    return $value
 end
 
@@ -1132,7 +1137,7 @@ end
 
 # ─── 结果记录（只更新输出对象，不参与原有动作决策）──────────────────
 def new_jianghu_result()
-   return {"schema_version": 1, "status": "running", "finished": false, "reason": "", "passes": 0, "counts": {}, "tasks": {}, "unidentified": [], "reputation": {"before": -1, "after": -1, "observations": []}, "cleanup": {"home": "unknown", "mode": "not_needed"}}
+   return {"summary": {"status": "running", "tasks": {}, "unidentified": [], "reputation": {}}, "schema_version": 1, "status": "running", "finished": false, "reason": "", "passes": 0, "counts": {}, "tasks": {}, "unidentified": [], "reputation": {"before": -1, "after": -1, "observations": []}, "cleanup": {"home": "unknown", "mode": "not_needed"}}
 end
 
 def make_jianghu_record($pass, $idx)
@@ -1140,7 +1145,7 @@ def make_jianghu_record($pass, $idx)
    if not $claim_reward
       eval $reward = "disabled"
    end
-   return {"pass": $pass, "card": "card_" + $idx, "task": "", "task_name": "", "initial_text": "", "task_text": "", "refresh_count": 0, "outcome": "unknown", "reason": "", "completion": "unknown", "refresh_icon_before": "unknown", "refresh_icon_after": "unknown", "action": {"status": "not_attempted", "reason": ""}, "events": [], "reward": {"status": $reward, "reason": "", "observed_state": "unknown"}}
+   return {"summary": {"status": "unknown"}, "pass": $pass, "card": "card_" + $idx, "task": "", "task_name": "", "initial_text": "", "task_text": "", "refresh_count": 0, "outcome": "unknown", "reason": "", "completion": "unknown", "refresh_icon_before": "unknown", "refresh_icon_after": "unknown", "action": {"status": "not_attempted", "reason": ""}, "events": [], "reward": {"status": $reward, "reason": "", "observed_state": "unknown"}}
 end
 
 def begin_jianghu_record($is_rescan, $idx)
@@ -1150,6 +1155,7 @@ def begin_jianghu_record($is_rescan, $idx)
    end
    call $record = make_jianghu_record(1, $idx)
    eval append($jianghu_result.unidentified, $record)
+   eval append($jianghu_result.summary.unidentified, $record.summary)
    return $record
 end
 
@@ -1167,13 +1173,17 @@ def identify_jianghu_record($is_rescan, $idx, $text, $allowed)
          return 0
       end
       eval remove($jianghu_result.unidentified, $jianghu_item)
+      eval remove($jianghu_result.summary.unidentified, $jianghu_item.summary)
    end
    eval $jianghu_item.task_text = $text
    if not has_key($jianghu_result.tasks, $task_key)
       eval append($jianghu_result.tasks, $task_key, {"task_name": $jianghu_item.task_name, "records": []})
+      eval append($jianghu_result.summary.tasks, $task_key, {"name": $jianghu_item.task_name, "records": []})
    end
    eval $task_group = $jianghu_result.tasks.$task_key
    eval append($task_group.records, $jianghu_item)
+   eval $summary_group = $jianghu_result.summary.tasks.$task_key
+   eval append($summary_group.records, $jianghu_item.summary)
    return 0
 end
 
@@ -1188,7 +1198,14 @@ def record_jianghu_outcome($outcome, $reason)
    if $jianghu_item
       eval $jianghu_item.outcome = $outcome
       eval $jianghu_item.reason = $reason
-      eval append($jianghu_item.events, {"stage": "action", "outcome": $outcome, "reason": $reason})
+      log debug "号令 " + $jianghu_item.task_name + "：" + $outcome + " " + $reason
+      eval $jianghu_item.summary.status = $outcome
+      if not $reason is_empty
+         call $description = jianghu_reason_text($reason)
+         eval $jianghu_item.summary.reason = $description
+      else
+         eval del_key($jianghu_item.summary, "reason")
+      end
       if $outcome == "executing"
          eval $jianghu_item.action.status = "running"
       else if $outcome == "blocked" or $outcome == "failed"
@@ -1199,6 +1216,12 @@ def record_jianghu_outcome($outcome, $reason)
          eval $jianghu_item.action.reason = $reason
       else if $outcome == "executed_unverified"
          eval $jianghu_item.action.status = "executed"
+      end
+      if $outcome == "completed"
+         if $jianghu_item.action.status == "blocked" or $jianghu_item.action.status == "failed"
+            call $problem = jianghu_reason_text($jianghu_item.action.reason)
+            eval $jianghu_item.summary.problem = $problem
+         end
       end
    end
 end
@@ -1220,11 +1243,17 @@ def record_jianghu_reward($status, $reason)
    if $jianghu_item
       eval $jianghu_item.reward.status = $status
       eval $jianghu_item.reward.reason = $reason
-      eval append($jianghu_item.events, {"stage": "reward", "status": $status, "reason": $reason})
+      log debug "号令领奖 " + $jianghu_item.task_name + "：" + $status + " " + $reason
+      if $status != "task_incomplete" and $status != "disabled" and $status != "not_checked"
+         eval $jianghu_item.summary.reward = $status
+      end
    end
 end
 
 def record_jianghu_failure($reason)
+   eval $jianghu_result.summary.status = "failed"
+   call $description = jianghu_reason_text($reason)
+   eval $jianghu_result.summary.reason = $description
    eval $jianghu_result.status = "failed"
    eval $jianghu_result.reason = $reason
    eval $jianghu_result.finished = true
@@ -1275,6 +1304,20 @@ def finish_jianghu_result()
       eval $jianghu_result.reason = "mode_restore_failed"
    end
    eval $jianghu_result.counts = $counts
+   eval $jianghu_result.summary.status = $status
+   if not $jianghu_result.reason is_empty
+      call $description = jianghu_reason_text($jianghu_result.reason)
+      eval $jianghu_result.summary.reason = $description
+   end
    eval $jianghu_result.status = $status
    eval $jianghu_result.finished = true
+end
+
+# 展示解释只属于结果，不参与任务判断。
+def jianghu_reason_text($reason)
+   eval $descriptions = {"action_not_implemented": "暂未实现", "user_disabled": "未启用", "completed_before_processing": "执行前已完成", "completed_during_refresh": "刷新时已完成", "completion_not_checked": "执行后未确认完成", "completion_observed": "已确认完成", "refresh_icon_present": "仍未完成", "refresh_limit": "达到刷新上限", "reading_not_entered": "未进入阅读", "item_not_found": "未找到黄泉酿", "use_button_not_found": "未找到食用按钮", "item_navigation_failed": "背包导航失败", "profile_declaration_failed": "档案声明失败", "mode_restore_failed": "恢复单人模式失败", "initial_page_failed": "初始页面检查失败", "first_pass_page_failed": "首轮页面检查失败", "rescan_page_failed": "补扫页面检查失败", "rescan_processing_failed": "补扫处理失败", "page_check_failed": "号令页面检查失败"}
+   if has_key($descriptions, $reason)
+      return $descriptions.$reason
+   end
+   return $reason
 end

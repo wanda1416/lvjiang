@@ -14,8 +14,6 @@ from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QMessageBox
 
-from lvjiang.apps import get_registry
-
 from ...core.config.resolver import get_resolver
 from ...core.fs_util import dated_output_dir
 from ...i18n import tr
@@ -115,22 +113,6 @@ def _to_history_snapshot(obj):
         except Exception:  # noqa: BLE001
             pass
     return str(obj)
-
-
-def _log_workflow_result(flow_id: str, result: Any, *, interrupted: bool) -> bool:
-    """Log a workflow's structured result unless it has a dedicated report.
-
-    A plugin may already write its own detailed report and history.
-    """
-    if flow_id in get_registry().get("result_log_suppressed_ids", ()):
-        return False
-    serializable = _to_serializable(result)
-    tag = tr("（用户中断，部分结果）") if interrupted else ""
-    logger.info(
-        f"工作流 {flow_id} 结果{tag}: "
-        f"{json.dumps(serializable, ensure_ascii=False, indent=2)}"
-    )
-    return True
 
 
 class WorkflowWorker(QThread):
@@ -2005,8 +1987,6 @@ class RunControlMixin:
                 status="interrupted" if interrupted else "completed",
                 result_path=result_path,
             )
-            # 通用控制台输出；已有专用报告的工作流不再重复倾倒结果。
-            _log_workflow_result(flow_id, result, interrupted=interrupted)
             if not interrupted:
                 self.log_text.append(f"[完成] {flow_name} 结果已保存")
 

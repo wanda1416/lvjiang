@@ -16,17 +16,13 @@ def test_uninstalled_optional_app_has_clear_error():
 
 def test_installed_optional_app_registers_by_module_name(monkeypatch):
     module = ModuleType("lvjiang.apps.optional_demo")
-    module.hooks = AppHooks(
-        id="optional_demo",
-        result_log_suppressed_ids=["optional_task"],
-    )
+    module.hooks = AppHooks(id="optional_demo")
     monkeypatch.setitem(sys.modules, module.__name__, module)
 
     registry = {}
     register_hooks(load_app("optional_demo"), registry)
 
     assert registry["app_ids"] == ["optional_demo"]
-    assert registry["result_log_suppressed_ids"] == {"optional_task"}
 
 
 def test_builtin_app_does_not_include_optional_gather():

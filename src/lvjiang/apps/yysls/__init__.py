@@ -80,7 +80,6 @@ hooks = AppHooks(
     workflow_implementations={
         "auto_tuning": "lvjiang.apps.yysls.workflows.implementations.auto_tuning.AutoTuningWorkflow",
     },
-    result_log_suppressed_ids=["auto_tuning"],
 
     # 燕云专属内置函数模块（导入即触发 @builtin_func 注册）
     builtin_modules=[

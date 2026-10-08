@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     # Windows 视觉自动化工具，与目标平台保持一致；Qt offscreen 开箱即用
-    # windows-latest 已升至 Server 2025，ONNX Runtime 不支持；锁定 2022
+    # 固定 Server 2022 保持回归环境稳定；Windows 的 ONNX Runtime 1.24.1+ 已识别 Server 2022/2025
     runs-on: windows-2022
     env:
       QT_QPA_PLATFORM: offscreen

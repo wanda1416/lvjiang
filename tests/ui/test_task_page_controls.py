@@ -40,7 +40,7 @@ def test_task_pages_disable_foreign_run_controls_and_restore_after_finish(qapp):
 
     def refresh(scope, state, owner):
         host._current_run_context = (
-            SimpleNamespace(name="测试任务", metadata={"execution_scope": scope})
+            SimpleNamespace(name="很长的具体任务名称" * 20, metadata={"execution_scope": scope})
             if scope else None)
         host._running = bool(scope)
         host._run_state = state
@@ -49,7 +49,12 @@ def test_task_pages_disable_foreign_run_controls_and_restore_after_finish(qapp):
         TuningTab._on_automation_state(tuning, state)
         for index, (start, pause) in enumerate(buttons):
             if scope and index != owner:
-                assert start.text() == "测试任务运行中"
+                assert start.text() == {
+                    "daily": "日常任务运行中",
+                    "batch": "批量任务运行中",
+                    "auto_tuning": "调律任务运行中",
+                    "auto_gather": "采集任务运行中",
+                }[scope]
                 assert not start.isEnabled() and not pause.isEnabled()
                 start.click()
                 pause.click()

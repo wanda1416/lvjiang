@@ -1,11 +1,11 @@
 """用户配置加载链与保存函数测试
 
 覆盖链路：
-- 代码默认值 ← session.json（settings 及其 reference_grid 子节点）
+- 代码默认值 ← session.json（settings 节点）
 - 代码默认值 ← app.yaml（input_simulation/delay_params，经 core.config 合并）
 
 保存函数：
-- save_settings / save_reference_grid（读改写 session.json 的 settings 节点，各自保留对方字段）
+- save_settings 写 session.json/settings；save_reference_grid 写 interface.json/ui_state/reference_manager/grid
 - save_app_config（经 core.config 写入 app.yaml）
 """
 
@@ -19,6 +19,7 @@ from lvjiang.core.config import (
     save_reference_grid,
     save_settings,
 )
+from lvjiang.core.config.interface import reset_interface_store
 from lvjiang.core.config.session import reset_session_store
 
 
@@ -29,8 +30,10 @@ def session_env(tmp_path, monkeypatch):
     session_path = tmp_path / "session.json"
     monkeypatch.setattr(constants, "SESSION_PATH", session_path)
     reset_session_store()
+    reset_interface_store()
     yield session_path
     reset_session_store()
+    reset_interface_store()
 
 
 class TestLoadUserConfig:
@@ -44,10 +47,6 @@ class TestLoadUserConfig:
         assert config.android_input_method == "adb"
         assert config.desktop_background_input is True
         assert config.desktop_window_title == ""
-        assert config.reference_grid.rows == 3
-        assert config.reference_grid.cols == 6
-        assert config.reference_grid.height == 122
-        assert config.reference_grid.width == 122
         assert config.input_sim.click_random_offset == 3
         assert config.delay_params == {}
         assert config.android_apps == {}
@@ -220,11 +219,15 @@ class TestSaveSessionNodes:
         assert data["ui_state"] == {"a": 1}
 
     def test_save_reference_grid_creates_file(self, session_env):
-        """文件不存在时 save_reference_grid 自动创建"""
+        """网格写入界面状态，保存时保留同页窗口大小。"""
         grid = {"rows": 2, "cols": 3, "gap": 1, "height": 80, "width": 90}
+        from lvjiang.core.config import load_reference_grid, update_ui_page_state
+        update_ui_page_state("reference_manager", {"size": [900, 600]})
         save_reference_grid(grid)
-        data = json.loads(session_env.read_text(encoding="utf-8"))
-        assert data == {"version": 2, "settings": {"reference_grid": grid}}
+        data = json.loads(session_env.with_name("interface.json").read_text(encoding="utf-8"))
+        assert data["ui_state"]["reference_manager"] == {"size": [900, 600], "grid": grid}
+        assert load_reference_grid() == grid
+        assert not session_env.exists()
 
 class TestSaveAppConfig:
     INPUT_SIM = {"before_click_wait": [0.1, 0.3], "click_random_offset": 5,

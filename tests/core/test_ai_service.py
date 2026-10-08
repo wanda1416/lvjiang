@@ -70,14 +70,20 @@ def test_settings_persist_without_key_and_credentials_are_scoped(tmp_path, monke
             secrets.pop((service, account))
 
     monkeypatch.setattr(AIStore, "_credentials", staticmethod(lambda: Credentials()))
-    store = AIStore(tmp_path / "session" / "ai.json")
+    store = AIStore(tmp_path / "session" / "session.json")
+    store.path.parent.mkdir(parents=True)
+    store.path.write_text(json.dumps({"version": 2, "settings": {"theme": "dark"}}), encoding="utf-8")
+    store._store.reload()
     settings = AISettings("https://example.invalid/v1", "test-model")
     store.save(settings, "test-only-key")
     assert AIStore(store.path).settings() == settings
+    data = json.loads(store.path.read_text(encoding="utf-8"))
+    assert data["settings"]["theme"] == "dark"
+    assert data["settings"]["ai"]["model"] == "test-model"
     assert "test-only-key" not in store.path.read_text(encoding="utf-8")
     assert store.get_key(settings.base_url) == "test-only-key"
     assert store.get_key("https://other.invalid/v1") == ""
-    assert not store.path.with_name("session.json").exists()
+    assert not store.path.with_name("ai.json").exists()
     store.save(settings, "")
     assert store.get_key(settings.base_url) == ""
 

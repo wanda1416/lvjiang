@@ -462,6 +462,9 @@ class ProcDef:
     name: str
     params: list          # list[str] — 参数名列表
     body: list            # list[statement]
+    line_no: int = 0      # 过程名所在行，1-based；0 表示非解析器构造
+    name_col: int = 0     # 过程名起始列，1-based；0 表示未知
+    name_end_col: int = 0  # 过程名结束列，1-based 开区间；0 表示未知
 
 
 @dataclass(frozen=True)
@@ -472,6 +475,9 @@ class CallProc:
     result_var: str | None = None  # 返回值绑定变量名，None 表示不绑定
     output_var: str | None = None  # output dict 绑定变量名，None 表示丢弃
     line_no: int = 0
+    name_line: int = 0    # 过程名所在行，1-based；0 表示与 line_no 相同或未知
+    name_col: int = 0     # 过程名起始列，1-based；0 表示未知
+    name_end_col: int = 0  # 过程名结束列，1-based 开区间；0 表示未知
 
 
 # ─── 表达式 ───────────────────────────────────────────────

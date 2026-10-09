@@ -50,7 +50,6 @@ from PyQt6.QtGui import (
     QTextCharFormat,
     QTextCursor,
     QTextDocument,
-    QTextFormat,
 )
 from PyQt6.QtWidgets import (
     QDialog,
@@ -58,13 +57,11 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMenu,
     QMessageBox,
-    QPlainTextEdit,
     QPushButton,
     QSizePolicy,
     QSplitter,
     QStyle,
     QTabWidget,
-    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -83,6 +80,7 @@ from ...workflows.metadata import SCRIPT_ID_RE, metadata_error
 from ..button_styles import apply_button_style
 from ..dialog_guards import EscapeCloseConfirmationMixin
 from ..theme import get_theme_manager
+from .wf_code_edit import WfCodeEdit
 
 # ─── 纯逻辑（可离线测试）────────────────────────────────
 
@@ -410,15 +408,16 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
         right = QWidget()
         rl = QVBoxLayout(right)
         rl.setContentsMargins(0, 0, 0, 0)
-        self.editor = QPlainTextEdit()
+        self.editor = WfCodeEdit()
         font = QFont("Menlo" if self._is_mac() else "Consolas")
         font.setStyleHint(QFont.StyleHint.Monospace)
         font.setPointSize(12)
         self.editor.setFont(font)
         self.editor.setTabStopDistance(4 * self.editor.fontMetrics().horizontalAdvance(" "))
         self.editor.setPlaceholderText(tr("左侧选择脚本，或点「新建」"))
-        self.editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self.editor.setLineWrapMode(WfCodeEdit.LineWrapMode.NoWrap)
         self.editor.textChanged.connect(self._on_text_changed)
+        self.editor.definition_requested.connect(self._open_proc_definition)
         self.editor.installEventFilter(self)
         self._highlighter = WfHighlighter(self.editor.document())
         self.lbl_metadata = QLabel("")
@@ -626,6 +625,41 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
     def _entry(self, rel_path: str) -> ScriptEntry | None:
         return next((e for e in self._entries if e.rel_path == rel_path), None)
 
+    def _open_proc_definition(self, definition) -> None:
+        """打开 call 对应的 def。当前文件直接定位，其他文件走树切换确认。"""
+        path = definition.path
+        if path is None or (
+            self._current is not None
+            and self._current.path.resolve() == path.resolve()
+        ):
+            self._reveal_definition(definition.line)
+            return
+        entry = next(
+            (item for item in self._entries if item.path.resolve() == path.resolve()),
+            None,
+        )
+        target = self._file_items.get(entry.rel_path) if entry is not None else None
+        if entry is None or target is None:
+            self._set_status(
+                tr("找不到过程 {name} 的定义").format(name=definition.name),
+                error=True,
+            )
+            return
+        self.tree.setCurrentItem(target)
+        if self._current is not None and self._current.rel_path == entry.rel_path:
+            self._reveal_definition(definition.line)
+
+    def _reveal_definition(self, line: int) -> None:
+        """切回代码页，并把光标放到 def 那一行。"""
+        self.code_tabs.setCurrentWidget(self.editor)
+        block = self.editor.document().findBlockByNumber(line - 1)
+        if not block.isValid():
+            return
+        cursor = QTextCursor(block)
+        self.editor.setTextCursor(cursor)
+        self.editor.setFocus()
+        self.editor.ensureCursorVisible()
+
     def _on_select(self, item: QTreeWidgetItem | None, _prev=None):
         if item is None:
             return
@@ -746,6 +780,7 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
                 self.editor.setPlainText("")
                 self._set_status(tr("读取失败: {e}").format(e=e), error=True)
         self.editor.blockSignals(False)
+        self.editor.set_source_path(None if entry is None else entry.path)
         self._refresh_metadata_warning()
         self._dirty = False
         self._pending_trace = None
@@ -1296,27 +1331,20 @@ class ScriptEditorDialog(EscapeCloseConfirmationMixin, QDialog):
 
     def highlight_line(self, line_no: int | None) -> None:
         """高亮当前执行行（None 清除）并滚到可见"""
+        self.editor.set_execution_line(line_no)
         if line_no is None or line_no <= 0:
-            self.editor.setExtraSelections([])
             return
         block = self.editor.document().findBlockByNumber(line_no - 1)
         if not block.isValid():
-            self.editor.setExtraSelections([])
             return
-        sel = QTextEdit.ExtraSelection()
-        sel.format.setBackground(
-            QColor(get_theme_manager().tokens.warning_surface)
-        )
-        sel.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
         cur = QTextCursor(block)
-        sel.cursor = cur
-        self.editor.setExtraSelections([sel])
         self.editor.setTextCursor(cur)
         self.editor.ensureCursorVisible()
 
     def set_locked(self, locked: bool) -> None:
         """运行期间编辑器只读——行号变了高亮就对不上"""
         self._locked = locked
+        self.editor.set_navigation_enabled(not locked)
         self.tree.setEnabled(not locked)
         if locked:
             self.editor.setReadOnly(True)

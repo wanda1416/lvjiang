@@ -36,28 +36,36 @@ def _get_parser() -> Lark:
 
 # ─── 预处理：换行续行 ────────────────────────────────────
 
-def _preprocess_line_continuation(text: str) -> str:
-    """处理两种换行续行：
+def _preprocess_line_continuation(text: str) -> tuple[str, list[int]]:
+    """处理两种换行续行，并记下每个输出字符来自原文的哪个下标。
 
     1. 显式续行：行尾反斜杠 \\ → 与下一行拼接
     2. 隐式续行：{} [] () 内部的换行视为空格（不终结语句）
 
     被吐掉的换行会在逻辑行结束后补回（以空行形式），保证后续语句
     的行号与源文件一致 —— 静态校验的报错要报真实行号。
+    补出来的换行没有原文下标，记为 -1。调用方用这张表把解析器看到的
+    token 位置还原到续行之前的源文本。
     """
     result: list[str] = []
+    origin: list[int] = []
     depth = 0
     in_string = False
     pending_nl = 0  # 当前逻辑行内吐掉的换行数
     i = 0
+
+    def emit(ch: str, src: int) -> None:
+        result.append(ch)
+        origin.append(src)
+
     while i < len(text):
         ch = text[i]
         if ch == '"' and (i == 0 or text[i - 1] != '\\'):
             in_string = not in_string
-            result.append(ch)
+            emit(ch, i)
         elif not in_string and ch == '\\' and text[i + 1:i + 2] in ('\n', '\r'):
-            # 显式续行：\\\n 或 \\\r\n
-            result.append(' ')
+            # 显式续行：\\\n 或 \\\r\n。空格占住反斜杠的位置，换行稍后补回。
+            emit(' ', i)
             pending_nl += 1
             i += 2
             if text[i - 1] == '\r' and text[i:i + 1] == '\n':
@@ -66,26 +74,28 @@ def _preprocess_line_continuation(text: str) -> str:
         elif not in_string:
             if ch in ('(', '[', '{'):
                 depth += 1
-                result.append(ch)
+                emit(ch, i)
             elif ch in (')', ']', '}'):
                 depth = max(0, depth - 1)
-                result.append(ch)
+                emit(ch, i)
             elif ch == '\n' and depth > 0:
                 # 括号内换行 → 空格
-                result.append(' ')
+                emit(' ', i)
                 pending_nl += 1
             elif ch == '\n':
                 # 逻辑行结束：补回吐掉的换行，保住总行数
-                result.append('\n' * (1 + pending_nl))
+                emit('\n', i)
+                for _ in range(pending_nl):
+                    emit('\n', -1)
                 pending_nl = 0
             else:
-                result.append(ch)
+                emit(ch, i)
         else:
-            result.append(ch)
+            emit(ch, i)
         i += 1
-    if pending_nl:
-        result.append('\n' * pending_nl)
-    return ''.join(result)
+    for _ in range(pending_nl):
+        emit('\n', -1)
+    return ''.join(result), origin
 
 
 # ─── 公共接口 ─────────────────────────────────────────────
@@ -113,11 +123,15 @@ def _parse_cached_file(source: str, text: str) -> Program:
 def parse_text(text: str, source: str = "<text>") -> Program:
     """从字符串解析 DSL 文本，返回 Program AST 节点（主要用于测试）"""
     parser = _get_parser()
-    # 预处理：换行续行
-    text = _preprocess_line_continuation(text)
+    # 预处理：换行续行。origin[i] 是预处理文本第 i 个字符在原文中的下标。
+    original = text
+    text, origin = _preprocess_line_continuation(original)
     # 确保文本以换行结尾（grammar 要求 _NL 终止）
     if not text.endswith("\n"):
         text += "\n"
+        origin.append(-1)
     tree = parser.parse(text)
-    program = _DSLTransformer().transform(tree)
+    transformer = _DSLTransformer()
+    transformer.set_source_map(original, text, origin)
+    program = transformer.transform(tree)
     return Program(body=program.body, imports=program.imports, procs=program.procs, source=source)

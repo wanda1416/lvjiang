@@ -11,8 +11,7 @@
       "scripts": {
         "order":   ["scan_wallet", ...],     # 用户调整过的顺序
         "visible": {"weekly_baiye_freight": true, "scan_wallet": false},
-        "names":   {"scan_wallet": "查钱包"},  # 自定义显示名
-        "scopes":  {"scan_wallet": "dedicated"}  # 脚本性质覆盖
+        "names":   {"scan_wallet": "查钱包"}   # 自定义显示名
       }
     }
 
@@ -49,7 +48,6 @@ class DailyScriptPrefs(NamedTuple):
     order: list[str]
     visible: dict[str, bool]
     names: dict[str, str]
-    scopes: dict[str, str]
 
 
 def load_preferences() -> DailyScriptPrefs:
@@ -65,13 +63,11 @@ def load_preferences() -> DailyScriptPrefs:
         order=_list("order"),
         visible=_map("visible", bool),
         names={k: v for k, v in _map("names", str).items() if v},
-        scopes={k: v for k, v in _map("scopes", str).items() if v},
     )
 
 
 def save_preferences(order: list[str], visible: dict[str, bool],
-                     names: dict[str, str],
-                     scopes: dict[str, str] | None = None) -> None:
+                     names: dict[str, str]) -> None:
     """写回偏好；空值不落盘，保持 session 干净"""
     from ..core.config import get_session_store
     prefs: dict = {}
@@ -81,8 +77,6 @@ def save_preferences(order: list[str], visible: dict[str, bool],
         prefs["visible"] = {k: bool(v) for k, v in visible.items()}
     if names:
         prefs["names"] = {k: v for k, v in names.items() if v}
-    if scopes:
-        prefs["scopes"] = {k: v for k, v in scopes.items() if v}
     try:
         get_session_store().update_node(_NODE, {_KEY: prefs})
     except Exception as e:  # noqa: BLE001

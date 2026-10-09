@@ -229,14 +229,14 @@ def test_device_lists_tuning_without_exposing_other_dedicated_tasks(monkeypatch)
         "helper": {"id": "helper", "scope": "dedicated", "source_layer": "system"},
         "pc_only": {"id": "pc_only", "env": ["windows"], "source_layer": "system"},
     })
-    monkeypatch.setattr(discovery, "load_preferences", lambda: DailyScriptPrefs([], {}, {}, {}))
+    monkeypatch.setattr(discovery, "load_preferences", lambda: DailyScriptPrefs([], {}, {}))
     monkeypatch.setattr("lvjiang.core.ondevice.plugins.ensure_loaded", lambda: None)
 
     assert "auto_tuning" not in [item["id"] for item in discovery.list_exposed_scripts("android")]
     tasks = json.loads(task_runner.list_tasks())["tasks"]
     assert tasks == [{"id": "auto_tuning", "name": "自动调律", "source": "class"}]
     monkeypatch.setattr(discovery, "load_preferences",
-                        lambda: DailyScriptPrefs([], {"auto_tuning": False}, {}, {}))
+                        lambda: DailyScriptPrefs([], {"auto_tuning": False}, {}))
     assert json.loads(task_runner.list_tasks())["tasks"] == []
 
 

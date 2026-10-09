@@ -1,8 +1,9 @@
 """PyInstaller 打包专用入口。
 
 职责（均只在 frozen 环境生效，开发环境请用 dev.bat / python -m lvjiang）：
-1. 锚定工作目录到 exe 旁 —— loguru 的 "logs/..." 与 crash_handler 的
-   "logs/crashes" 均为相对路径，快捷方式启动时 CWD 可能在别处；
+1. 锚定工作目录到 exe 旁 —— 本模块在日志系统建立前写 logs/crashes/launcher_error.log
+   用的是相对路径，快捷方式启动时 CWD 可能在别处（应用自身的 logs/ 路径由
+   constants.PROJECT_ROOT 锚定，frozen 下即 exe 目录）；
 2. windowed（无控制台）模式下 sys.stdout/stderr 为 None，而
    _configure_logging 会 logger.add(sys.stderr)，必须先兜底成 devnull；
 3. freeze_support —— loguru enqueue=True 与 scrcpy/OCR 均涉及

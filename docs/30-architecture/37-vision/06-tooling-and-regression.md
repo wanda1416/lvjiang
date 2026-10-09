@@ -142,7 +142,7 @@ memory `双目录截图比例验证的容差感知脚本编写方法` 描述的�
 | `recognition.py` L687 | `find 命中模板: ... score=... scale=... center=(x,y)` |
 | `recognition.py` L621 | `find 未命中: target=... mode=...` |
 
-**排查未命中**：`grep "最佳分" logs/lvjiang_*.log` 找到分数与阈值差多少。
+**排查未命中**：`grep "最佳分" logs/lvjiang_*.log logs/logs/*/*.log` 找到分数与阈值差多少。
 
 - 差 0.05 内 → 阈值稍紧，可微降或换帧
 - 差 0.2+ → 大概率不是同一个东西（跨布局未重录、T2 场景）

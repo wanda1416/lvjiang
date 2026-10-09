@@ -20,6 +20,49 @@ def wf_server():
     return module
 
 
+@pytest.fixture
+def parse_cache_server(wf_server):
+    wf_server._parse_snapshot.cache_clear()
+    yield wf_server
+    wf_server._parse_snapshot.cache_clear()
+
+
+def test_buffer_parse_returns_independent_ast(parse_cache_server):
+    """修改某次返回的过程和内部指令，不能污染其它编辑功能的解析结果。"""
+    text = "def navigate()\n    return 1\nend\n"
+    first = parse_cache_server._parse_cached(text)
+    second = parse_cache_server._parse_cached(text)
+    first.procs["navigate"].body.clear()
+    first.procs.clear()
+    third = parse_cache_server._parse_cached(text)
+    assert set(second.procs) == set(third.procs) == {"navigate"}
+    assert len(second.procs["navigate"].body) == 1
+    assert len(third.procs["navigate"].body) == 1
+
+
+def test_editing_same_line_reuses_fallback_parse(
+    parse_cache_server, monkeypatch: pytest.MonkeyPatch,
+):
+    """连续输入不完整调用时，复用相同备用文本并保持过程补全可用。"""
+    parsed_texts = []
+    original_parse = parse_cache_server.parse_text
+
+    def counted_parse(text):
+        parsed_texts.append(text)
+        return original_parse(text)
+
+    monkeypatch.setattr(parse_cache_server, "parse_text", counted_parse)
+    prefix = "def navigate()\n    return 1\nend\n"
+    first = parse_cache_server._parse_for_editing(prefix + "call navigate(\n", 3)
+    second = parse_cache_server._parse_for_editing(prefix + "call navigate(1\n", 3)
+    assert set(first.procs) == set(second.procs) == {"navigate"}
+    assert parsed_texts == [
+        prefix + "call navigate(\n",
+        prefix + "# editing\n",
+        prefix + "call navigate(1\n",
+    ]
+
+
 def test_imports_use_workflows_root_and_resolve_calls(
     wf_server, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

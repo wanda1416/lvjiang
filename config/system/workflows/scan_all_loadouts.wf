@@ -35,6 +35,7 @@
 # 后置：扫完的方案已写入本地；未识别或未匹配的方案跳过并记日志。
 # 返回：-1=导航失败、方案列表为空或没有任何方案完成扫描；否则正常结束。
 
+eval $scan_results = []
 default $scroll_count = 8
 default $skip_existing = false
 default $skip_existing_base_attrs = false
@@ -67,11 +68,17 @@ eval $skipped_base_attrs = 0
 # ─── 逐方案扫描 ────────────────────────────────────────────────
 # 每轮从方案页挑一个方案：选中 → 回主页 → 扫装备 → 扫基础属性。
 for name in $names
+    eval $scan_record = {"name": $name, "status": "pending", "reason": "", "base_attributes": "not_scanned"}
+    eval append($scan_results, $scan_record)
     if $skip_existing and has_key($existing_names, $name)
+        eval $scan_record.status = "skipped"
+        eval $scan_record.reason = "existing_plan"
         log info "跳过已存在的备战方案: " + $name
         eval $skipped_existing = $skipped_existing + 1
         continue
     end
+    eval $scan_record.status = "failed"
+    eval $scan_record.reason = "navigation_or_scan_failed"
     eval $attempted = $attempted + 1
     if not $in_game_plans
         call $nav_result = nav_main_to_game_plans()
@@ -82,10 +89,12 @@ for name in $names
     end
     call $selected = select_game_plan($name)
     if $selected == -1
+        eval $scan_record.reason = "selection_failed"
         log warn "跳过未能识别或切换的游戏方案，继续在方案列表尝试下一套: " + $name
         continue
     end
     if $selected == -2
+        eval $scan_record.reason = "unsafe_page_state"
         log error "方案页面状态不确定，停止后续扫描: " + $name
         return -1
     end
@@ -102,10 +111,12 @@ for name in $names
         eval $target_error = $err
     end
     if $target_error
+        eval $scan_record.reason = $target_error
         log warn "跳过游戏方案 " + $selected.name + ": " + $target_error
         continue
     end
     if not $target.ok
+        eval $scan_record.reason = $target.reason
         log error "跳过游戏方案 " + $selected.name + ": " + $target.reason
         continue
     end
@@ -115,11 +126,15 @@ for name in $names
         return -1
     end
     if $written != 8
+        eval $scan_record.reason = "incomplete_equipment"
         log warn "备战方案装备未完整扫描，跳过基础属性: " + $target.name
         continue
     end
+    eval $scan_record.status = "completed"
+    eval $scan_record.reason = ""
     eval $completed = $completed + 1
     if not $target.playstyle
+        eval $scan_record.base_attributes = "missing_playstyle"
         log warn "备战方案没有匹配玩法，已扫描装备但跳过基础属性: " + $target.name
         continue
     end
@@ -128,6 +143,7 @@ for name in $names
     if $skip_existing_base_attrs and has_scanned_base_attrs(
             $target.name, $target.main_art, $target.sub_art)
         log info "跳过已存在的基础属性: " + $target.name
+        eval $scan_record.base_attributes = "skipped_existing"
         eval $skipped_base_attrs = $skipped_base_attrs + 1
         continue
     end
@@ -137,8 +153,10 @@ for name in $names
         return -1
     end
     if $saved == -2
+        eval $scan_record.base_attributes = "failed"
         continue
     end
+    eval $scan_record.base_attributes = "completed"
     log info "已扫描备战方案: " + $target.name + "，基础属性: " + $saved
 end
 

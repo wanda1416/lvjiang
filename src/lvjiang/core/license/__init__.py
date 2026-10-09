@@ -32,6 +32,7 @@ from .store import clear_code, license_path, load_code, save_code
 #: 多执行目标并发是首个 Lv1 能力：第一个任务不需要授权，同时启动第二个
 #: 执行目标时由运行管理器校验 ``has_feature("lv1")``。
 #: PC 向手机下发离线配置也属于 Lv1；手机已有配置的离线执行不受此门禁限制。
+#: 外部 Agent 智能调律属于 Lv1，所有 MCP 请求（含发现和文档读取）均需激活。
 
 __all__ = [
     "Entitlement",

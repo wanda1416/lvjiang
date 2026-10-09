@@ -541,12 +541,12 @@ class TuningTab(QWidget):
         self._status_label.hide()
         self._status_label.setText("")
 
-    def _start_tuning(self):
+    def _start_tuning(self, *, execution_username=None, config=None, smart_state=None):
         """从统一存储读取调律配置，校验后启动 auto_tuning 工作流"""
         host = self._host
         self._clear_status()
 
-        execution_username = self._execution_user_selector.resolve_username()
+        execution_username = execution_username or self._execution_user_selector.resolve_username()
         if not execution_username:
             msg = tr("请选择有效的执行用户")
             host.append_log(f"[错误] {msg}")
@@ -561,124 +561,37 @@ class TuningTab(QWidget):
             return
 
         # 启动快照与上方执行用户绑定，运行中不再重新读取配置。
-        tc = load_user_auto_tuning_config(
+        tc = config if config is not None else load_user_auto_tuning_config(
             execution_username, self._users_dir())
 
-        selected_slots = tc.get("selected_slots") or []
-        if not selected_slots:
-            msg = tr("请至少选择一个调律部位")
-            host.append_log(f"[错误] {msg}")
-            self._show_status_error(msg)
+        from ...core.agent.launch import prepare_tuning
+        try:
+            run_context = prepare_tuning(tc)
+            run_context.smart_state = smart_state
+        except ValueError as exc:
+            self._show_status_error(str(exc))
+            host.append_log(f"[错误] {exc}")
             return
-
-        # 获取调律规则配置（按规则分组的层级 dict）并创建判定器
-        from ...core.evaluator import (
-            get_rule_names,
-            get_tuning_judge,
-            get_tuning_rules,
-            is_rule_implemented,
-        )
-        rules_cfg = tc.get("rules", {})
-        enabled = {k: cfg for k, cfg in rules_cfg.items() if cfg.get("enabled")}
-        if not enabled:
-            msg = tr("请至少选择一个调律规则")
-            host.append_log(f"[错误] {msg}")
-            self._show_status_error(msg)
-            return
-        rule_judges = []
-        rule_map = get_tuning_rules()
-        switches = {str(k): bool(v) for k, v in tc.get("switches", {}).items()}
-        skip_tuning = bool(tc.get("skip_tuning", False))
-        pc_background_scroll = bool(tc.get("pc_background_scroll", False))
-        skip_locked_equipment = bool(tc.get("skip_locked_equipment", True))
-        use_stone_cache = bool(tc.get("use_stone_cache", True))
-        initial_stone_min_count = tc.get("initial_stone_min_count")
-        initial_stone_check_enabled = bool(tc.get(
-            "initial_stone_check_enabled",
-            initial_stone_min_count is not None,
-        ))
-        if initial_stone_min_count is not None:
-            initial_stone_min_count = int(initial_stone_min_count)
-        elif initial_stone_check_enabled:
-            initial_stone_min_count = 80
-        if not initial_stone_check_enabled:
-            initial_stone_min_count = None
-        validate_stone_cache = bool(tc.get("validate_stone_cache", False))
-        scroll_strategy = (
-            "positional"
-            if tc.get("scroll_strategy") == "positional"
-            else ""
-        )
-        for rule_key, cfg in enabled.items():
-            if not is_rule_implemented(rule_key):
-                host.append_log(f"[警告] 规则「{get_rule_names().get(rule_key, rule_key)}」判定暂未实现，已跳过")
-                continue
-            rule = rule_map[rule_key]
-            wr_cfg = cfg.get("playstyles")
-            if rule.playstyles and wr_cfg is not None and not wr_cfg:
-                msg = f"{tr('规则「{name}」需至少勾选一个玩法')}".format(name=rule.name)
-                host.append_log(f"[错误] {msg}")
-                self._show_status_error(msg)
-                return
-            rule_judges.append(
-                get_tuning_judge(rule_key, {**cfg, "switches": switches}))
-        if not rule_judges:
-            msg = tr("选中的规则均未实现判定逻辑")
-            host.append_log(f"[错误] {msg}")
-            self._show_status_error(msg)
-            return
-
+        # Only the human UI supplies unsaved positional controls.
+        if config is None:
+            if self._cb_skip.isChecked() and self._cb_skip.isEnabled():
+                run_context.skip_start = (self._sp_skip_row.value(), self._sp_skip_col.value())
+            if self._cb_target.isChecked() and self._cb_target.isEnabled():
+                run_context.target_cell = (self._sp_target_row.value(), self._sp_target_col.value())
+            run_context.min_level = self._min_level_combo.currentData()
         flow_name = tr("自动调律")
-
-        # 基础规则组（启动时快照注入）
-        from ...core.tuning_rules import get_tuning_group
-        group_key = tc.get("base_group", "")
-        base_group = get_tuning_group(group_key) if group_key else None
-        if base_group is None:
-            msg = tr("基础规则组 '{key}' 不存在，拒绝启动").format(key=group_key)
-            host.append_log(f"[错误] {msg}")
-            self._show_status_error(msg)
-            return
-        smart_enabled_by_group = tc.get("smart_tuning_enabled")
-        smart_tuning_enabled = bool(
-            smart_enabled_by_group.get(group_key, False)
-            if isinstance(smart_enabled_by_group, dict) else False)
-
-        # 运行时瞬态字段（启动时从 UI 即时读取，保存时也会持久化）
-        skip_start = None
-        if self._cb_skip.isChecked() and self._cb_skip.isEnabled():
-            skip_start = (self._sp_skip_row.value(), self._sp_skip_col.value())
-        target_cell = None
-        if self._cb_target.isChecked() and self._cb_target.isEnabled():
-            target_cell = (self._sp_target_row.value(), self._sp_target_col.value())
-        # 最低等级覆盖（None=跟随基础规则）
-        min_level_override = self._min_level_combo.currentData()
-        if min_level_override is not None:
-            min_level_override = int(min_level_override)
+        rule_judges = run_context.rule_judges
+        switches = tc.get("switches", {})
+        skip_tuning = run_context.skip_tuning
+        selected_slots = run_context.selected_slots
+        min_level_override = run_context.min_level
+        base_group = run_context.base_group
+        assert base_group is not None
 
         def configure(wf_instance, engine):
-            from ...workflows.tuning_context import TuningRunContext
-            engine.workflow_config_snapshot = dict(tc)
-            wf_instance.run_ctx = TuningRunContext(
-                selected_slots=selected_slots,
-                rule_judges=rule_judges,
-                judge_configs={
-                    k: {**cfg, "switches": switches} for k, cfg in enabled.items()},
-                judge_rule_keys=list(enabled),
-                base_group=base_group,
-                skip_tuning=skip_tuning,
-                pc_background_scroll=pc_background_scroll,
-                skip_locked_equipment=skip_locked_equipment,
-                use_stone_cache=use_stone_cache,
-                initial_stone_check_enabled=initial_stone_check_enabled,
-                initial_stone_min_count=initial_stone_min_count,
-                validate_stone_cache=validate_stone_cache,
-                scroll_strategy=scroll_strategy,
-                skip_start=skip_start,
-                target_cell=target_cell,
-                min_level=min_level_override,
-                smart_tuning_enabled=smart_tuning_enabled,
-            )
+            import copy
+            engine.workflow_config_snapshot = copy.deepcopy(tc)
+            wf_instance.run_ctx = copy.deepcopy(run_context)
             # 创建调律进度信号桥（右侧进度 Tab 由 _find_progress_widget 查找并连接）
             if engine is not None:
                 from .progress_hub import TuningProgressHub

@@ -1717,7 +1717,7 @@ class RunControlMixin:
     # ─── 通用工作流执行 ────────────────────────────────────
 
     @guarded_launch(user_selector="_daily_execution_user_selector")
-    def _on_run_workflow(self):
+    def _on_run_workflow(self, *, flow_config=None, execution_username=None, parameter_overrides=None):
         """执行选中的工作流（异步）；运行中点击则作为停止按钮。"""
         # 运行中时该按钮文字为“停止 (F10)”，点击应触发停止而非重复启动
         if self._running:
@@ -1742,7 +1742,7 @@ class RunControlMixin:
             self._notify_plan_unsupported()
             return
 
-        flow_cfg = self._get_selected_flow_config()
+        flow_cfg = flow_config if flow_config is not None else self._get_selected_flow_config()
         if flow_cfg is None:
             self.log_text.append(tr("[错误] 请选择一个工作流"))
             return
@@ -1769,7 +1769,7 @@ class RunControlMixin:
                     tr("工作流文件不存在: {path}").format(path=wf_file))
                 return
 
-        username = self._execution_username_snapshot
+        username = execution_username or self._execution_username_snapshot
         if not username:
             self.log_text.append(tr("[错误] 请选择有效的执行用户"))
             return
@@ -1833,7 +1833,7 @@ class RunControlMixin:
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
         # 执行前先提交面板，再从统一解析器生成该用户的参数快照。
-        if hasattr(self, '_save_displayed_params'):
+        if flow_config is None and hasattr(self, '_save_displayed_params'):
             self._save_displayed_params()
         if flow_cfg.get("scope", "daily") == "daily":
             from ...core.task_params import resolve_task_params
@@ -1845,7 +1845,9 @@ class RunControlMixin:
             # 专用脚本的参数面板由日常页隐藏，仍由专属配置页管理。
             from ...core.config.wf_configs import get_wf_config
             flow_params = get_wf_config(flow_cfg["id"]) or {}
-        if hasattr(self, '_save_daily_config'):
+        if parameter_overrides is not None:
+            flow_params.update(parameter_overrides)
+        if flow_config is None and hasattr(self, '_save_daily_config'):
             self._save_daily_config()
 
         self.log_text.append(f"[开始] {flow_name} 流程...")
@@ -1967,6 +1969,10 @@ class RunControlMixin:
         else:
             result = result_or_exception
             # 工作流预检失败返回 {"error": ...}：拒绝启动，不按正常完成处理
+            if (flow_id == "scan_all_loadouts" and isinstance(result, dict)
+                    and getattr(run_context.engine, "return_value", None) == -1
+                    and not run_context.stop_event.is_set()):
+                result = {**result, "error": tr("备战方案扫描失败，请查看逐方案结果和导航提示")}
             if isinstance(result, dict) and result.get("error"):
                 run_context.metadata["terminal_state"] = "failed"
                 self.log_text.append(f"[错误] {flow_name}: {result['error']}")

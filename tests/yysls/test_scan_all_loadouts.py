@@ -350,6 +350,8 @@ def test_batch_continues_after_one_plan_base_attr_failure(monkeypatch):
     assert returned.value.value == 0
     assert [name for proc, name in calls if proc == "scan_role_base_attr_for_plan"] == [
         "方案甲", "方案乙"]
+    assert [(row["status"], row["base_attributes"]) for row in engine.variables["scan_results"]] == [
+        ("completed", "failed"), ("completed", "completed")]
 
 
 @pytest.mark.parametrize("scan_kind", ["equipment", "base_attrs"])

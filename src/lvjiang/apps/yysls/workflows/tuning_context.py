@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from ..core.loadout.models import LoadoutState
     from ..core.tuning_rules import TuningGroup
 
 
@@ -45,6 +46,7 @@ class TuningRunContext:
     base_group: TuningGroup | None = None        # 基础规则组（None=回退 session）
     min_level: int | None = None                 # 最低等级覆盖（None=跟随基础规则 scan.min_level）
     smart_tuning_enabled: bool | None = None     # 当前用户+规则组启用；None=从用户配置读取
+    smart_state: LoadoutState | None = None      # Agent 目标方案派生快照，不改持久化方案
 
 
 class TuningContextMixin:

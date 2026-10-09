@@ -1,6 +1,6 @@
 # 律匠需求文档
 
-> 最后更新：2026-10-08（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
+> 最后更新：2026-10-09（基线 v0.13.14）。本层描述如与代码或配置不符，以代码与配置为准。
 
 > 需求文档索引。游戏机制介绍见 [10-game](../10-game/README.md)，架构设计见 [30-architecture](../30-architecture/README.md)。
 
@@ -64,6 +64,8 @@
 | [10-ai-connection.md](50-platform/10-ai-connection.md) | AI 连接配置、系统凭据存储与后台连接测试 | 已实现（桌面端） |
 | [09-android-preset.md](50-platform/09-android-preset.md) | 官方预置、手机用户管理与同步参数保留 | 已实现 |
 | [11-protected-config.md](50-platform/11-protected-config.md) | Lv1 加密配置下发、云端授权与双来源 remote 同步 | 部分实现（真实云端链路已验证，正式内容待发布） |
+| [12-agent-mcp.md](50-platform/12-agent-mcp.md) | 外部 Agent MCP 接入：发行版能力包、调律配置启动、授权与验收 | 部分实现 |
+| [13-agent-docs-access.md](50-platform/13-agent-docs-access.md) | Agent 文档逐篇收录、目录拆分与配置文件访问清单 | 部分实现 |
 
 ### 60-editor（编辑器与查看工具：DSL 插件、任务历史、元数据表单、画布组选区）
 

@@ -40,6 +40,10 @@ if errorlevel 1 exit /b 1
 xcopy /e /i /y data\image dist\lvjiang\data\image >nul
 if errorlevel 1 exit /b 1
 
+rem Build only the public Agent document allowlist and actual MCP tool schemas.
+uv run python scripts\build_agent_bundle.py --output dist\lvjiang\agent --zip dist\lvjiang-agent-v%APP_VERSION%.zip
+if errorlevel 1 exit /b 1
+
 rem License text ships with the binary: the disclaimer and liability limit only
 rem protect if they travel with the software, not just the download page.
 rem Named .txt so it opens on double-click; the installer picks it up via

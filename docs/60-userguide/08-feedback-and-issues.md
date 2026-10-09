@@ -89,10 +89,11 @@ Desktop 环境还要提供：
 
 ## 8.6 日志、截图和其他证据
 
-程序日志位于：
+程序日志按日期位于：
 
 ```text
-logs/lvjiang_日期.log
+logs/lvjiang_日期.log              # 当天
+logs/logs/年月/lvjiang_日期.log    # 最近 7 天内的更早日期，下次启动时归入；再早的会删除
 ```
 
 崩溃现场位于：

@@ -47,7 +47,12 @@ def _configure_dpi() -> None:
 
 
 def _configure_logging() -> None:
-    """配置 loguru（控制台 + logs/ 落盘），标准库 logging 保底控制台。"""
+    """配置 loguru（控制台 + logs/ 落盘），标准库 logging 保底控制台。
+
+    落盘文件按天命名 ``logs/lvjiang_YYYY-MM-DD.log``；午夜（00:00）换新文件。
+    启动时把仍在 7 天保留期内的更早日志归入 ``logs/logs/YYYY-MM/``，再早的删除。
+    归档目录不在 FileSink 的文件名模式里，保留期由归档自己执行。
+    """
     from loguru import logger
 
     logger.remove()  # 移除默认 handler
@@ -58,8 +63,9 @@ def _configure_logging() -> None:
     )
     logger.add(
         str(PROJECT_ROOT / "logs" / "lvjiang_{time:YYYY-MM-DD}.log"),
-        rotation="1 day",
-        retention="7 days",
+        # 用午夜对齐而不是 "1 day"：后者按「创建满 24 小时」轮转，会让文件名与
+        # 内容所属日期错位（例如 08 号文件里混进 09 号上午），归档时按名搬错。
+        rotation="00:00",
         encoding="utf-8",
         level="DEBUG",
         enqueue=True,  # 异步写入，防止进程崩溃时缓冲丢失
@@ -69,6 +75,22 @@ def _configure_logging() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
+
+
+def _archive_old_logs() -> None:
+    """归入 7 天内的历史日志，并删除更早的主日志（只在启动时做一次）。"""
+    from loguru import logger
+
+    from .core.log_files import archive_old_logs
+
+    logs_dir = PROJECT_ROOT / "logs"
+    try:
+        archived = archive_old_logs(logs_dir)
+    except OSError as e:  # 归档失败不能挡住启动，当天日志照常写入
+        logger.warning(f"[logs] 历史日志归档失败: {e}")
+        return
+    if archived:
+        logger.info(f"[logs] 已归档 {len(archived)} 份历史日志到 {logs_dir / 'logs'}")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -99,6 +121,7 @@ def main() -> int:
     atexit.register(close_instance)
     _configure_dpi()
     _configure_logging()
+    _archive_old_logs()
     from .core.config.interface import initialize_state_stores
     initialize_state_stores()
 

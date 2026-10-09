@@ -49,9 +49,9 @@ scenes:
     - activity_main
     - activity_jianghu
     - activity_huoyun
+    - activity_fujingxingzhou
     - activity_mengzhu
     - activity_jianghuyi
-    - activity_fujingxingzhou
   component:
     name: 组件
     items:

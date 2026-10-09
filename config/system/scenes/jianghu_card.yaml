@@ -1,6 +1,6 @@
 content_version: 1
 key: jianghu_card
-name: 任务卡片
+name: 号令任务
 type: subscene
 regions:
 - key: label

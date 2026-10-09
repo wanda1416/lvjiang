@@ -206,9 +206,20 @@ def _find_closest_keyword(name: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 def _uri_to_path(uri: str) -> Path:
-    """Convert a file URI to a Path (handles Windows drive letters correctly)."""
-    parsed = urlparse(uri)
-    return Path(url2pathname(parsed.path))
+    """Convert a file URI to a Path (handles Windows drive letters correctly).
+
+    The VS Code client percent-encodes the drive colon (``file:///c%3A/...``).
+    ``url2pathname`` maps that form to the rooted-but-driveless ``\\c:\\...``;
+    its ``resolve()`` result is drive-relative, so ``Path.as_uri()`` raises
+    ``ValueError: relative path can't be expressed as a file URI``. Restore the
+    drive letter so client URIs keep resolving to absolute local paths.
+    """
+    path = url2pathname(urlparse(uri).path)
+    if os.name == "nt":
+        drive = re.match(r"^[\\/]([A-Za-z]):", path)
+        if drive:
+            path = f"{drive.group(1)}:{path[drive.end():]}"
+    return Path(path)
 
 
 def _line_range(line_no: int, end_line: int | None = None) -> Range:

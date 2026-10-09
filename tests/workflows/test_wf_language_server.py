@@ -238,3 +238,38 @@ def test_procedure_rename_checks_collisions_and_edits_only_symbols(
     imported.write_text("def navigate()\n    return 1\nend\ndef travel()\n    return 2\nend\n",
                         encoding="utf-8")
     assert wf_server.on_rename(params) is None
+
+
+def _client_uri(path: Path) -> str:
+    """Reproduce the URI form the VS Code client sends (drive colon as %3A)."""
+    head, _, tail = path.as_uri().partition(":///")
+    if len(tail) > 1 and tail[1] == ":":
+        tail = tail[0] + "%3A" + tail[2:]
+    return head + ":///" + tail
+
+
+def test_definition_in_same_file_survives_client_encoded_uri(
+    wf_server, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A call defined in the current file must still yield a usable location.
+
+    The VS Code client encodes the Windows drive colon as %3A, which used to
+    convert into a drive-relative path; as_uri() then raised ValueError and
+    F12 on a locally defined procedure failed instead of navigating.
+    """
+    source = tmp_path / "main.wf"
+    content = "def navigate($target)\n    return $target\nend\ncall navigate(1)\n"
+    source.write_text(content, encoding="utf-8")
+
+    monkeypatch.setattr(wf_server, "get_resolver", lambda: SimpleNamespace(
+        resolve_read=lambda rel_path: None))
+    monkeypatch.setattr(wf_server, "server", SimpleNamespace(
+        workspace=SimpleNamespace(
+            get_text_document=lambda uri: SimpleNamespace(source=content))))
+    params = SimpleNamespace(
+        text_document=SimpleNamespace(uri=_client_uri(source)),
+        position=SimpleNamespace(line=3, character=7))
+    location = wf_server.on_definition(params)
+    assert location is not None
+    assert wf_server._uri_to_path(location.uri).resolve() == source.resolve()
+    assert location.range.start.line == 0

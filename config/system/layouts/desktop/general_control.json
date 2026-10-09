@@ -18,6 +18,13 @@
       "activation_key": "ESC"
     },
     {
+      "key": "label",
+      "x_ratio": 0.32,
+      "y_ratio": 0.4,
+      "w_ratio": 0.63,
+      "h_ratio": 0.15
+    },
+    {
       "key": "close_item",
       "disabled": true
     },

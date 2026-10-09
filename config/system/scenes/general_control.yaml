@@ -25,6 +25,12 @@ regions:
   is_clickable: true
   view: confirm
   to: '@caller'
+- key: label
+  name: 提示内容
+  type: attr
+  is_text: true
+  is_clickable: false
+  view: confirm
 - key: close_item
   name: 关闭提示
   type: func

@@ -259,7 +259,7 @@ def list_exposed_scripts(
         if sid in prefs.visible:
             return prefs.visible[sid]
         cfg = discovered[sid]
-        scope = prefs.scopes.get(sid) or cfg.get("scope") or "daily"
+        scope = cfg.get("scope") or "daily"
         if device_entry and cfg.get("device_visible"):
             return not bool(cfg.get("hidden", False))
         return Policy.visible_by_default(
@@ -277,7 +277,7 @@ def list_exposed_scripts(
             continue
         if prefs.names.get(sid):
             cfg["name"] = prefs.names[sid]
-        cfg["scope"] = prefs.scopes.get(sid) or cfg.get("scope") or "daily"
+        cfg["scope"] = cfg.get("scope") or "daily"
         result.append(cfg)
     return result
 

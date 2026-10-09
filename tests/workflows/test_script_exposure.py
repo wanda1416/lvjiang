@@ -1,8 +1,8 @@
-"""脚本暴露的三层职责：目录约定 / 作者声明 / 用户偏好
+"""脚本暴露的三层职责：可运行声明 / 作者声明 / 用户偏好
 
-- **全集**由 WorkflowDiscoveryPolicy 的目录约定决定，不可配置
+- **全集**由脚本可运行声明决定，不可配置
 - **默认是否展示**由作者声明（hidden 脚本和 dedicated 专用脚本默认不展示）
-- **顺序、启停、显示名、性质**是用户偏好，存 session 的 daily.scripts
+- **顺序、启停、显示名**是用户偏好；性质由元数据声明
 
 关键性质：系统新增的脚本自动出现，不会因为用户存过偏好被冻住——
 这正是当初把 exposed 存进 workflows.yaml 的病根。
@@ -31,7 +31,7 @@ def _prefs(monkeypatch, **kw):
     monkeypatch.setattr(
         "lvjiang.workflows.discovery.load_preferences",
         lambda: DailyScriptPrefs(kw.get("order", []), kw.get("visible", {}),
-                                 kw.get("names", {}), kw.get("scopes", {})))
+                                 kw.get("names", {})))
 
 
 def _ids(monkeypatch, **kw):
@@ -41,6 +41,17 @@ def _ids(monkeypatch, **kw):
 
 
 class TestAuthorDeclaration:
+    def test_metadata_scope_cannot_be_overridden_by_saved_preferences(self, scripts, monkeypatch):
+        from lvjiang.workflows.discovery import list_exposed_scripts
+
+        prefs = {"scopes": {"a": "dedicated", "b": "daily"}}
+        monkeypatch.setattr("lvjiang.workflows.preferences._load", lambda: prefs)
+        assert [cfg["id"] for cfg in list_exposed_scripts()] == ["a"]
+        prefs["visible"] = {"b": True}
+        assert {cfg["id"]: cfg["scope"] for cfg in list_exposed_scripts()} == {
+            "a": "daily", "b": "dedicated",
+        }
+
     def test_hidden_script_not_shown_by_default(self, scripts, monkeypatch):
         assert _ids(monkeypatch) == ["a"]
 

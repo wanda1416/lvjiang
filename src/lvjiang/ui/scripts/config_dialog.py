@@ -1,11 +1,11 @@
-"""脚本配置对话框 - 管理日常页暴露哪些脚本、顺序、显示名、脚本性质
+"""脚本配置对话框 - 按元数据性质分组管理展示、顺序和显示名
 
 作为「工具 → 脚本编辑」工作台中的配置页使用；独立对话框外壳仅供兼容。
 
 脚本本体（.wf 文件 + 内置类实现）由发现层 ``discover_scripts()`` 自动扫描，
-本对话框只负责「暴露」：勾选是否在日常下拉展示、调整顺序、覆盖显示名、
-设置脚本性质（日常 / 专用）。
-保存写入 session 的 ``daily.scripts`` 节点——顺序、勾选、显示名、性质都是
+本对话框按元数据声明分为日常、专用两页，只负责「暴露」：
+勾选是否在日常下拉展示、调整同类脚本顺序、覆盖显示名。
+保存写入 session 的 ``daily.scripts`` 节点——顺序、勾选、显示名都是
 **用户偏好**，不写回系统配置：写回去会把系统后续新增的脚本冻住。
 
 脚本性质：
@@ -22,18 +22,15 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import (
     QAbstractItemView,
-    QComboBox,
     QDialog,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
 )
-
-from lvjiang.ui.combo_box import AutoWidthComboBox
 
 from ...i18n import tr
 from ...workflows.discovery import discover_scripts, script_display_name
@@ -48,13 +45,11 @@ class ScriptConfigDialog(QDialog):
     # 列索引
     COL_EXPOSE = 0
     COL_NAME = 1
-    COL_SCOPE = 2
-    COL_SOURCE = 3
-    COL_ID = 4
-    COL_PARAMS = 5
+    COL_SOURCE = 2
+    COL_ID = 3
+    COL_PARAMS = 4
 
-    # 脚本性质选项
-    SCOPE_LABELS = {"daily": tr("日常"), "dedicated": tr("专用")}
+    TAB_SCOPES = ("daily", "dedicated")
     REMOTE_PREFIX = "[远程] "
 
     preferences_saved = pyqtSignal()
@@ -72,6 +67,7 @@ class ScriptConfigDialog(QDialog):
         # id -> 发现层原始显示名（用于判断是否需要写 overrides）
         self._base_names: dict[str, str] = {}
         self._scripts: dict[str, dict] = {}
+        self._ordered_ids: list[str] = []
         self._setup_ui()
         self._load()
 
@@ -79,28 +75,26 @@ class ScriptConfigDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
 
-        hint = QLabel(
-            tr("勾选「暴露」决定日常页下拉是否展示；「脚本性质」决定日常 Tab 是否管理参数："
-               "日常 = 日常页绘制参数面板并读写配置；专用 = 日常页不碰，由专属页面管理。"
-               "专用脚本默认不暴露，需要时可显式勾选。"
-               "用上移/下移调整暴露顺序；显示名可双击编辑（留空恢复默认）。")
-        )
-        hint.setWordWrap(True)
-        hint.setStyleSheet("color: palette(mid);")
-        layout.addWidget(hint)
-
-        self._table = QTableWidget(0, 6)
-        self._table.setHorizontalHeaderLabels(
-            [tr("暴露"), tr("显示名"), tr("脚本性质"), tr("来源"), "id", tr("参数数")])
-        self._table.verticalHeader().setVisible(False)
-        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        header = self._table.horizontalHeader()
-        fm = QFontMetrics(header.font())
-        header.setMinimumSectionSize(fm.horizontalAdvance("测") * 3)
-        for col in range(self._table.columnCount()):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
-        layout.addWidget(self._table)
+        self._tabs = QTabWidget()
+        self._tables: dict[str, QTableWidget] = {}
+        for scope, label in zip(self.TAB_SCOPES, (tr("日常"), tr("专用")), strict=True):
+            table = QTableWidget(0, 5)
+            table.setHorizontalHeaderLabels(
+                [tr("暴露"), tr("显示名"), tr("来源"), "id", tr("参数数")])
+            table.verticalHeader().setVisible(False)
+            table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+            table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+            header = table.horizontalHeader()
+            fm = QFontMetrics(header.font())
+            header.setMinimumSectionSize(fm.horizontalAdvance("测") * 3)
+            for col in range(table.columnCount()):
+                header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+            table.itemChanged.connect(self._mark_dirty)
+            table.itemSelectionChanged.connect(self._refresh_buttons)
+            self._tables[scope] = table
+            self._tabs.addTab(table, label)
+        self._tabs.currentChanged.connect(self._refresh_buttons)
+        layout.addWidget(self._tabs)
 
         # 底部单行操作栏：顺序调整居左，保存/取消居右
         btn_bar = QHBoxLayout()
@@ -125,8 +119,15 @@ class ScriptConfigDialog(QDialog):
         btn_bar.addWidget(self._btn_save)
         btn_bar.addWidget(self._btn_cancel)
         layout.addLayout(btn_bar)
-        self._table.itemChanged.connect(self._mark_dirty)
         self._refresh_buttons()
+
+    @property
+    def _table(self) -> QTableWidget:
+        return self._tables[self.TAB_SCOPES[self._tabs.currentIndex()]]
+
+    @staticmethod
+    def _script_scope(script: dict) -> str:
+        return "dedicated" if script.get("scope") == "dedicated" else "daily"
 
     # ─── 数据加载 ────────────────────────────────────────
     def _load(self):
@@ -140,57 +141,38 @@ class ScriptConfigDialog(QDialog):
         ordered_ids = [i for i in prefs.order if i in scripts]
         ordered_ids += sorted(i for i in scripts if i not in ordered_ids)
 
-        self._table.setRowCount(len(ordered_ids))
-        for row, sid in enumerate(ordered_ids):
-            cfg = scripts[sid]
-            scope = prefs.scopes.get(sid) or cfg.get("scope") or "daily"
-            # 勾选状态：用户明确改过则以用户为准，否则用作者声明的默认可见性
-            checked = prefs.visible.get(
-                sid,
-                Policy.visible_by_default(
-                    hidden=bool(cfg.get("hidden", False)), scope=scope),
-            )
-            self._fill_row(
-                row, cfg, checked=checked,
-                display=prefs.names.get(sid) or cfg["name"],
-                scope=scope)
+        self._ordered_ids = ordered_ids
+        for scope, table in self._tables.items():
+            ids = [sid for sid in ordered_ids if self._script_scope(scripts[sid]) == scope]
+            table.setRowCount(len(ids))
+            for row, sid in enumerate(ids):
+                cfg = scripts[sid]
+                checked = prefs.visible.get(
+                    sid,
+                    Policy.visible_by_default(
+                        hidden=bool(cfg.get("hidden", False)), scope=scope),
+                )
+                self._fill_row(
+                    table, row, cfg, checked=checked,
+                    display=prefs.names.get(sid) or cfg["name"])
         self._loading = False
         self._dirty = False
         self._refresh_buttons()
 
-    def _fill_row(self, row: int, script: dict, checked: bool, display: str,
-                  scope: str = "daily"):
+    def _fill_row(self, table: QTableWidget, row: int, script: dict,
+                  checked: bool, display: str):
         sid = script["id"]
 
         expose_item = QTableWidgetItem()
         expose_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled |
                              Qt.ItemFlag.ItemIsSelectable)
         expose_item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
-        self._table.setItem(row, self.COL_EXPOSE, expose_item)
+        table.setItem(row, self.COL_EXPOSE, expose_item)
 
         display_cfg = {**script, "name": display}
         name_item = QTableWidgetItem(script_display_name(display_cfg))
         name_item.setData(Qt.ItemDataRole.UserRole, sid)  # 行标识：脚本 id
-        self._table.setItem(row, self.COL_NAME, name_item)
-
-        # 脚本性质：下拉框（日常 / 专用）
-        scope_combo = AutoWidthComboBox()
-        for key, label in self.SCOPE_LABELS.items():
-            scope_combo.addItem(tr(label), key)
-        scope_combo.setCurrentIndex(max(scope_combo.findData(scope), 0))
-        scope_combo.currentIndexChanged.connect(
-            lambda _index, combo=scope_combo, item=expose_item, cfg=script:
-            item.setCheckState(
-                Qt.CheckState.Checked
-                if Policy.visible_by_default(
-                    hidden=bool(cfg.get("hidden", False)),
-                    scope=combo.currentData() or "daily",
-                )
-                else Qt.CheckState.Unchecked
-            )
-        )
-        scope_combo.currentIndexChanged.connect(self._mark_dirty)
-        self._table.setCellWidget(row, self.COL_SCOPE, scope_combo)
+        table.setItem(row, self.COL_NAME, name_item)
 
         if script.get("wf_file"):
             prefix = "[远程] " if script.get("is_remote") else ""
@@ -199,16 +181,16 @@ class ScriptConfigDialog(QDialog):
             source = f"内置类: {script['class']}"
         source_item = QTableWidgetItem(source)
         source_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-        self._table.setItem(row, self.COL_SOURCE, source_item)
+        table.setItem(row, self.COL_SOURCE, source_item)
 
         id_item = QTableWidgetItem(sid)
         id_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-        self._table.setItem(row, self.COL_ID, id_item)
+        table.setItem(row, self.COL_ID, id_item)
 
         count_item = QTableWidgetItem(str(len(script.get("parameters") or [])))
         count_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
         count_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._table.setItem(row, self.COL_PARAMS, count_item)
+        table.setItem(row, self.COL_PARAMS, count_item)
 
     # ─── 顺序调整 ────────────────────────────────────────
     def _move_row(self, delta: int):
@@ -229,37 +211,35 @@ class ScriptConfigDialog(QDialog):
         self._dirty = True
         self._refresh_buttons()
 
-    def _refresh_buttons(self) -> None:
+    def _refresh_buttons(self, *_args) -> None:
         if not hasattr(self, "_btn_save"):
             return
         if self._embedded:
             self._btn_save.setEnabled(self._dirty)
             self._btn_cancel.setEnabled(self._dirty)
+        row = self._table.currentRow()
+        self._btn_up.setEnabled(row > 0)
+        self._btn_down.setEnabled(0 <= row < self._table.rowCount() - 1)
 
     def _on_undo(self) -> None:
         if self._dirty:
             self._load()
 
     def _swap_rows(self, a: int, b: int):
-        # QTableWidget 拥有 setCellWidget() 放入的控件。不能把现有 QComboBox
-        # remove 后再塞回另一格：这会跨越 Qt 的所有权/延迟销毁边界，Windows
-        # 上曾在随后的 setCurrentCell() 触发 native access violation。
-        # 先按值快照，再用新 item/widget 原地重建两行，不复用任何旧包装器。
         state_a = self._row_state(a)
         state_b = self._row_state(b)
         self._restore_row(a, state_b)
         self._restore_row(b, state_a)
 
-    def _row_state(self, row: int) -> tuple[str, bool, str, str]:
+    def _row_state(self, row: int) -> tuple[str, bool, str]:
         name_item = self._table.item(row, self.COL_NAME)
         expose_item = self._table.item(row, self.COL_EXPOSE)
-        scope_combo: QComboBox = self._table.cellWidget(row, self.COL_SCOPE)
+        assert name_item is not None and expose_item is not None
         sid = str(name_item.data(Qt.ItemDataRole.UserRole))
         return (
             sid,
             expose_item.checkState() == Qt.CheckState.Checked,
             self._raw_display(name_item.text(), sid),
-            str(scope_combo.currentData() or "daily"),
         )
 
     def _raw_display(self, text: str, sid: str) -> str:
@@ -270,56 +250,53 @@ class ScriptConfigDialog(QDialog):
         return text
 
     def _restore_row(
-        self, row: int, state: tuple[str, bool, str, str],
+        self, row: int, state: tuple[str, bool, str],
     ) -> None:
-        sid, checked, display, scope = state
+        sid, checked, display = state
         self._fill_row(
-            row, self._scripts[sid], checked=checked,
-            display=display, scope=scope,
+            self._table, row, self._scripts[sid], checked=checked,
+            display=display,
         )
 
     # ─── 读写用户偏好（session.daily.scripts）──────────────
 
     def _on_save(self):
-        """把顺序/勾选/显示名/性质写进 session 的用户偏好
+        """把两页的顺序/勾选/显示名写进 session 的用户偏好
 
         这些都是**用户偏好**，不写回系统配置：写回去会把系统后续新增的脚本
         冻住，用户除非删掉本地配置否则再也看不到新脚本。
         可见性只记「与作者声明不同」的项，系统新增脚本因此自动出现。
         """
         scripts = getattr(self, "_scripts", {})
-        order: list[str] = []
         visible: dict[str, bool] = {}
         names: dict[str, str] = {}
-        scopes: dict[str, str] = {}
-        for row in range(self._table.rowCount()):
-            name_item = self._table.item(row, self.COL_NAME)
-            sid = name_item.data(Qt.ItemDataRole.UserRole)
-            order.append(sid)
-            cfg = scripts.get(sid) or {}
+        grouped_order: dict[str, list[str]] = {}
+        for scope, table in self._tables.items():
+            grouped_order[scope] = []
+            for row in range(table.rowCount()):
+                name_item = table.item(row, self.COL_NAME)
+                sid = str(name_item.data(Qt.ItemDataRole.UserRole))
+                grouped_order[scope].append(sid)
+                cfg = scripts[sid]
+                checked = (table.item(row, self.COL_EXPOSE).checkState()
+                           == Qt.CheckState.Checked)
+                default_visible = Policy.visible_by_default(
+                    hidden=bool(cfg.get("hidden", False)), scope=scope)
+                if checked != default_visible:
+                    visible[sid] = checked
+                display = self._raw_display(name_item.text() or "", sid).strip()
+                if display and display != self._base_names.get(sid, ""):
+                    names[sid] = display
 
-            checked = (self._table.item(row, self.COL_EXPOSE).checkState()
-                       == Qt.CheckState.Checked)
-
-            scope_combo: QComboBox = self._table.cellWidget(row, self.COL_SCOPE)
-            scope = scope_combo.currentData() if scope_combo else "daily"
-            default_visible = Policy.visible_by_default(
-                hidden=bool(cfg.get("hidden", False)), scope=scope)
-            if checked != default_visible:
-                visible[sid] = checked      # 与作者声明的默认值相反才记
-
-            display = self._raw_display(
-                name_item.text() or "", str(sid)).strip()
-            if display and display != self._base_names.get(sid, ""):
-                names[sid] = display
-
-            if scope and scope != (cfg.get("scope") or "daily"):
-                scopes[sid] = scope
-
-        save_preferences(order, visible, names, scopes)
+        # 只替换同类脚本的顺序，保留专用/日常在原入口列表中的交错位置。
+        iterators = {scope: iter(ids) for scope, ids in grouped_order.items()}
+        order = [next(iterators[self._script_scope(scripts[sid])])
+                 for sid in self._ordered_ids]
+        save_preferences(order, visible, names)
+        self._ordered_ids = order
         logger.info(
             f"日常脚本偏好已保存：{len(order)} 项，"
-            f"可见性覆盖 {len(visible)}，改名 {len(names)}，性质覆盖 {len(scopes)}")
+            f"可见性覆盖 {len(visible)}，改名 {len(names)}")
         self._dirty = False
         self._refresh_buttons()
         self.preferences_saved.emit()

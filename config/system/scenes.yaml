@@ -51,6 +51,7 @@ scenes:
     - activity_huoyun
     - activity_mengzhu
     - activity_jianghuyi
+    - activity_fujingxingzhou
   component:
     name: 组件
     items:

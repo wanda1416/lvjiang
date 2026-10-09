@@ -126,21 +126,22 @@ server = LanguageServer("lvjiang-wf-server", "v0.1")
 # Buffer parse cache
 # ---------------------------------------------------------------------------
 
-# 同一份缓冲区文本会被诊断、跳转、补全和查找引用分别解析；DSL 解析成本很高
-# （1300 行脚本单次约 7s），必须复用结果。缓存只保存语法树，对外返回深拷贝，
+# 同一份缓冲区文本会被诊断、跳转、补全和查找引用分别解析，复用结果避免重复工作。
+# 保留 8 份文本快照，供多文件切换及编辑备用文本复用；缓存只保存语法树，对外返回深拷贝，
 # 避免调用方共享其中的可变列表或字典（与 lvjiang.workflows.grammar.parser
 # 的 parse_file 采用同一约定）。
-_PARSE_CACHE_SIZE = 4
+_PARSE_CACHE_SIZE = 8
 
 
 @lru_cache(maxsize=_PARSE_CACHE_SIZE)
-def _parse_snapshot(source: str) -> Program:
-    return parse_text(source)
+def _parse_snapshot(text: str) -> Program:
+    """只缓存当前缓冲区文本，不承载来源标识。"""
+    return parse_text(text)
 
 
-def _parse_cached(source: str) -> Program:
-    """Parse *source* once per distinct buffer text."""
-    return deepcopy(_parse_snapshot(source))
+def _parse_cached(text: str) -> Program:
+    """Return an independent AST for the buffer text."""
+    return deepcopy(_parse_snapshot(text))
 
 
 # ---------------------------------------------------------------------------
@@ -830,6 +831,7 @@ def _parse_for_editing(source: str, active_line: int):
         lines = source.splitlines(keepends=True)
         if active_line >= len(lines):
             raise
+        # 失败正文不缓存；同一行连续输入时，替代文本可保持相同并命中缓存。
         lines[active_line] = "# editing\n"
         return _parse_cached("".join(lines))
 

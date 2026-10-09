@@ -58,6 +58,15 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
     if not is_valid_username(username) or not layout:
         raise ValueError("请选择有效执行用户和安卓布局")
     config = root / "config"
+    from .config import protected_remote
+    protected_paths = protected_remote.owned(config / "remote")
+    resolver = ConfigResolver(system_dir=config / "system", local_dir=config / "local",
+                              remote_dir=config / "remote")
+    effective_protected = {name for name in protected_paths if resolver.remote_supersedes(name)}
+    # 手机继续离线运行，不复制 PC 激活码或授权状态。把已授权的有效基底冻结
+    # 为手机 system 快照，保留 local 覆盖；不改变 PC 的任何配置层。
+    baseline = ConfigResolver(system_dir=config / "system", local_dir=config / ".bundle-no-local",
+                              remote_dir=config / "remote")
     from .config.interface import InterfaceStore
     InterfaceStore(config / "session/interface.json")
     layout_doc = load_layout_doc(ConfigResolver(
@@ -100,7 +109,22 @@ def build_offline_bundle(root: Path, destination: Path, *, username: str, layout
                 if (not path.is_file() or path.is_symlink()
                         or any(part.startswith(".") for part in rel.parts)):
                     continue
+                name = Path(*rel.parts[1:]).as_posix()
+                if rel.parts[0] == "system" and name in effective_protected:
+                    continue
+                if rel.parts[0] == "remote" and name in protected_paths:
+                    if name not in effective_protected:
+                        continue
+                    rel = Path("system") / name
                 data = path.read_bytes()
+                if name in effective_protected and rel.parts[0] == "system":
+                    if name == "scenes.yaml":
+                        from .scene_config import load_scene_doc
+                        data = yaml.safe_dump(load_scene_doc(baseline), allow_unicode=True,
+                                              sort_keys=False).encode("utf-8")
+                    elif name == "layouts.yaml":
+                        data = yaml.safe_dump(baseline.load_merged(name), allow_unicode=True,
+                                              sort_keys=False).encode("utf-8")
                 if rel.as_posix() in {"system/layouts.yaml", "local/layouts.yaml", "remote/layouts.yaml"}:
                     doc = yaml.safe_load(data) or {}
                     layouts = doc.get("layouts") or {}

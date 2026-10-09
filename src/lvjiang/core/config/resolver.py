@@ -466,7 +466,14 @@ class ConfigResolver:
            目录才接受远程新增
         3. remote 侧版本号可读且严格大于 system
         """
+        from .protected_remote import path_status
+        protected = path_status(self.remote_dir, rel_path)
+        if protected is False:
+            return False
         spec = versioning.spec_for(rel_path)
+        if protected and (spec is None or spec.remote_mode == "append_only"
+                          or not (self.system_dir / rel_path).exists()):
+            return (self.remote_dir / rel_path).is_file()
         if spec is None:
             return False
         remote = self.remote_dir / rel_path
@@ -893,6 +900,10 @@ class ConfigResolver:
             else self.system_dir / rel_path
         )
         base = self._load_yaml(base_path)
+        from .protected_bundle import REGISTRIES
+        if rel_path in REGISTRIES and base_path.parent == self.remote_dir:
+            base = merge_doc(self._load_yaml(self.system_dir / rel_path), base,
+                             REGISTRY_LIST_PATHS.get(rel_path, ()))
         overlay_path = self.local_dir / rel_path
         if not overlay_path.exists():
             return base

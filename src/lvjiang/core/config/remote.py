@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -49,6 +49,7 @@ from urllib.request import Request, urlopen
 from loguru import logger
 
 from . import versioning
+from .protected_remote import ProtectedAccess
 
 REMOTE_CONFIG_URL = "https://wanda1416.github.io/lvjiang/config/config.json"
 REMOTE_CONFIG_SCHEMA_VERSION = 1
@@ -93,6 +94,7 @@ class SyncJob:
     enabled: bool = True
     #: 本地已同步到的清单版本，用于拒绝倒退的过期清单（见 run_sync）
     config_version: int = 0
+    protected: ProtectedAccess | None = field(default=None, repr=False)
 
     @property
     def is_empty(self) -> bool:
@@ -351,7 +353,7 @@ def _local_files(remote_dir: Path) -> set[str]:
     if not remote_dir.is_dir():
         return set()
     return {p.relative_to(remote_dir).as_posix()
-            for p in remote_dir.rglob("*") if p.is_file()}
+            for p in remote_dir.rglob("*") if p.is_file() and p.name != ".protected.json"}
 
 
 def _prune_empty_dirs(root: Path) -> None:
@@ -363,18 +365,21 @@ def _prune_empty_dirs(root: Path) -> None:
 
 
 def sync_to_dir(manifest: RemoteManifest, remote_dir: Path, *,
-                app_version: str | None = None, timeout: float = 10.0) -> SyncResult:
+                app_version: str | None = None, timeout: float = 10.0,
+                preserve_paths: frozenset[str] = frozenset()) -> SyncResult:
     """把 manifest 声明的文件同步到 remote_dir，并删掉它没声明的。
 
     单个文件失败（网络/校验）不中断整轮——其余文件照常更新，失败的保持
     本地原样并记 warning。一份配置拉不下来不该让另外几十份也停在旧版本。
     """
     entries = applicable_entries(manifest, app_version)
-    wanted = {e.rel_path for e in entries}
+    wanted = {e.rel_path for e in entries} | preserve_paths
 
     updated: list[str] = []
     skipped: list[str] = []
     for entry in entries:
+        if entry.rel_path in preserve_paths:
+            continue
         target = remote_dir / entry.rel_path
         spec = versioning.spec_for(entry.rel_path)
         if spec is not None and spec.remote_mode == "append_only" \
@@ -517,6 +522,8 @@ def prepare_stage() -> Path:
     """
     from .resolver import REMOTE_CONFIG_DIR
     stage = stage_dir()
+    from .protected_remote import recover
+    recover(stage)
     if stage.exists():
         return stage          # 上一轮下载完还没提升，接着用
     stage.mkdir(parents=True, exist_ok=True)
@@ -540,8 +547,16 @@ def promote_pending() -> bool:
     """
     import shutil
 
+    from .protected_remote import purge_invalid, recover
     from .resolver import REMOTE_CONFIG_DIR
     stage = stage_dir()
+    recover(stage)
+    recover(REMOTE_CONFIG_DIR)
+    purged_stage = purge_invalid(stage)
+    purged_active = purge_invalid(REMOTE_CONFIG_DIR)
+    if purged_stage or purged_active:
+        # 删除受保护覆盖后，需要重新下载相同路径的公开版本。
+        _update_state({"etag": ""})
     retired = REMOTE_CONFIG_DIR.with_name(REMOTE_CONFIG_DIR.name + ".old")
     shutil.rmtree(retired, ignore_errors=True)   # 清掉上次可能的残留
 
@@ -572,7 +587,13 @@ def build_sync_job() -> SyncJob:
     from ..update import get_version
     if not is_enabled():
         return SyncJob(enabled=False)
-    return SyncJob(etag=get_cached_etag(), app_version=get_version(),
+    from .protected_remote import snapshot
+    try:
+        access = snapshot()
+    except (ValueError, OSError) as error:
+        logger.warning(f"[在线配置] 加密服务配置无效: {error}")
+        access = None
+    return SyncJob(protected=access, etag=get_cached_etag(), app_version=get_version(),
                    enabled=True, config_version=get_config_version())
 
 
@@ -591,10 +612,30 @@ def run_sync(job: SyncJob, *, remote_dir: Path | None = None,
 
     target_dir = remote_dir if remote_dir is not None else prepare_stage()
 
-    manifest, etag = fetch_manifest(etag=job.etag, timeout=timeout)
+    from . import protected_remote
+    protected_updated: tuple[str, ...] = ()
+    protected_removed: tuple[str, ...] = ()
+    had_protected = bool(protected_remote.owned(target_dir))
+    try:
+        protected_updated, protected_removed = protected_remote.sync(
+            job.protected, target_dir, job.app_version, timeout)
+    except (ValueError, OSError, RemoteConfigError, protected_remote.ServiceError) as error:
+        logger.warning(f"[在线配置] 加密内容同步未完成: {error}")
+    protected_paths = frozenset(protected_remote.owned(target_dir))
+    try:
+        manifest, etag = fetch_manifest(etag="" if protected_removed else job.etag, timeout=timeout)
+    except RemoteConfigError:
+        if not (job.protected or had_protected):
+            raise
+        logger.warning("[在线配置] 公开清单暂时无法同步，加密来源结果已保留")
+        return SyncResult(updated=protected_updated, removed=protected_removed,
+                          config_version=job.config_version,
+                          not_modified=not bool(protected_removed),
+                          etag="" if protected_removed else job.etag)
     if manifest is None:
         logger.info("[在线配置] 清单未变化（304）")
-        return SyncResult(not_modified=True, etag=job.etag)
+        return SyncResult(not_modified=True, etag=job.etag,
+                          updated=protected_updated, removed=protected_removed)
 
     if manifest.config_version < job.config_version:
         # 清单版本比本地已同步过的旧 —— 拿到的是过期清单（CDN 缓存未失效、
@@ -603,10 +644,15 @@ def run_sync(job: SyncJob, *, remote_dir: Path | None = None,
         logger.warning(
             f"[在线配置] 清单版本回退（本地 v{job.config_version} → "
             f"远程 v{manifest.config_version}），已忽略本轮")
-        return SyncResult(config_version=job.config_version, performed=False)
+        return SyncResult(config_version=job.config_version,
+                          not_modified=not bool(protected_removed),
+                          etag="" if protected_removed else job.etag,
+                          updated=protected_updated, removed=protected_removed,
+                          performed=bool(protected_updated or protected_removed))
 
     result = sync_to_dir(manifest, target_dir,
-                         app_version=job.app_version or None, timeout=timeout)
+                         app_version=job.app_version or None, timeout=timeout,
+                         preserve_paths=protected_paths)
     if result.changed:
         logger.info(
             f"[在线配置] 同步完成 v{manifest.config_version}："
@@ -614,8 +660,8 @@ def run_sync(job: SyncJob, *, remote_dir: Path | None = None,
             + (f"、跳过 {len(result.skipped)}" if result.skipped else ""))
     return SyncResult(
         config_version=manifest.config_version,
-        updated=result.updated,
-        removed=result.removed,
+        updated=tuple(dict.fromkeys(result.updated + protected_updated)),
+        removed=tuple(dict.fromkeys(result.removed + protected_removed)),
         skipped=result.skipped,
         # 有文件没拿到就**不记 etag**：记了的话下次带 If-None-Match 会收到
         # 304，整轮直接跳过，这些文件就永远停在旧版/缺失，直到作者恰好又发

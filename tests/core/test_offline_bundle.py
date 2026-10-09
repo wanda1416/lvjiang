@@ -264,3 +264,31 @@ def test_preservation_keeps_phone_task_choices_and_users_but_replaces_database(b
     assert session["wf_configs"]["existing"] == {"pc": True}
     assert not (users / "phone_only.json").exists()
     assert (users.parent / "preset.json").exists()
+
+
+def test_protected_snapshot_keeps_phone_offline_and_does_not_export_invalid_content(bundle, tmp_path, monkeypatch):
+    from lvjiang.core.config import protected_remote
+    source, archive = bundle
+    config = source / "config"
+    system = config / "system/workflows/shared.wf"
+    system.parent.mkdir(parents=True)
+    system.write_text('log "system"', encoding="utf-8")
+    remote = config / "remote/workflows/shared.wf"
+    remote.parent.mkdir(parents=True)
+    remote.write_text('log "protected"', encoding="utf-8")
+    marker = config / "remote/.protected.json"
+    marker.write_text(json.dumps({"files": {"workflows/shared.wf": "test"}}), encoding="utf-8")
+    monkeypatch.setattr(protected_remote, "authorized", lambda doc: True)
+    build_offline_bundle(source, archive, username="tester", layout="android")
+    with zipfile.ZipFile(archive) as package:
+        assert package.read("config/system/workflows/shared.wf") == b'log "protected"'
+        assert "config/remote/workflows/shared.wf" not in package.namelist()
+        assert "config/remote/.protected.json" not in package.namelist()
+        assert "config/local/license.txt" not in package.namelist()
+        assert len(package.namelist()) == len(set(package.namelist()))
+    assert system.read_text(encoding="utf-8") == 'log "system"'
+    monkeypatch.setattr(protected_remote, "authorized", lambda doc: False)
+    build_offline_bundle(source, archive, username="tester", layout="android")
+    with zipfile.ZipFile(archive) as package:
+        assert package.read("config/system/workflows/shared.wf") == b'log "system"'
+        assert "config/remote/workflows/shared.wf" not in package.namelist()

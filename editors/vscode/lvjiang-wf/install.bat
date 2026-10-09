@@ -1,9 +1,12 @@
 @echo off
 rem Install the LvJiang WF VS Code extension in development mode.
-rem Supports VS Code, Qoder, and other VS Code-based editors.
+rem Supports VS Code, Qoder, Cursor, CodeBuddy, and other VS Code-based editors.
 rem
 rem Usage: install.bat [editor]
-rem   editor: vscode (default) | qoder | cursor
+rem   editor: vscode (default) | qoder | cursor | codebuddy | codebuddycn
+rem
+rem   codebuddy   -> CodeBuddy (international)
+rem   codebuddycn -> CodeBuddy CN (China)
 cd /d "%~dp0"
 
 rem Parse command line argument
@@ -17,9 +20,13 @@ if /i "%EDITOR%"=="vscode" (
     set "EXTENSIONS_DIR=%USERPROFILE%\.qoder\extensions"
 ) else if /i "%EDITOR%"=="cursor" (
     set "EXTENSIONS_DIR=%USERPROFILE%\.cursor\extensions"
+) else if /i "%EDITOR%"=="codebuddy" (
+    set "EXTENSIONS_DIR=%USERPROFILE%\.codebuddy\extensions"
+) else if /i "%EDITOR%"=="codebuddycn" (
+    set "EXTENSIONS_DIR=%USERPROFILE%\.codebuddycn\extensions"
 ) else (
     echo Unknown editor: %EDITOR%
-    echo Supported editors: vscode, qoder, cursor
+    echo Supported editors: vscode, qoder, cursor, codebuddy, codebuddycn
     exit /b 1
 )
 

@@ -45,8 +45,11 @@
 ## 安装与环境
 
 开发模式在 Windows 中进入 `editors/vscode/lvjiang-wf`，执行
-`install.bat [vscode|qoder|cursor]`。脚本编译 TypeScript，并以 junction 链接到
-编辑器扩展目录。仓库开发环境使用 Python 3.11–3.12，语言服务需要项目依赖
+`install.bat [vscode|qoder|cursor|codebuddy|codebuddycn]`。脚本编译 TypeScript，
+并以 junction 链接到编辑器扩展目录；`codebuddy` 对应 CodeBuddy 国际版
+（`.codebuddy`），`codebuddycn` 对应 CodeBuddy CN（`.codebuddycn`）。同一扩展
+目录中若已存在通过 VSIX 安装的同名包，应先删除，避免两个同 id 扩展并存。
+仓库开发环境使用 Python 3.11–3.12，语言服务需要项目依赖
 及 `pygls`（位于 `pyproject.toml` 的 dev extra）。可通过
 `lvjiangWf.pythonPath` 指定解释器；扩展也检查编辑器 Python 设置、
 工作区和扩展所在仓库的 `.venv`。没有合格解释器时仍可用基础文本能力。

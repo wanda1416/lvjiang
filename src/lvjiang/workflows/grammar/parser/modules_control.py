@@ -43,7 +43,8 @@ class _ModuleControlMixin:
 
         items 结构: NAME Token, [def_param_list], body_stmts...
         """
-        name = str(items[0])
+        name_token = items[0]
+        name_line, name_col, name_end_col = self._token_span(name_token)
         params = []
         raw_body = []
         for item in items[1:]:
@@ -53,7 +54,10 @@ class _ModuleControlMixin:
                 raw_body.append(item)
         # 展平语法糖产生的列表（click/drag + wait_clause）
         body = self._flatten_body(raw_body)
-        return ProcDef(name=name, params=params, body=body)
+        return ProcDef(
+            name=str(name_token), params=params, body=body,
+            line_no=name_line, name_col=name_col, name_end_col=name_end_col,
+        )
 
     def def_param_list(self, items):
         """$p1, $p2 → [str, str]"""
@@ -65,7 +69,8 @@ class _ModuleControlMixin:
 
     def call_proc_stmt(self, items):
         """call proc_name($arg1, "arg2", ...) [as $output] — 调用过程"""
-        name = str(items[0])
+        name_token = items[0]
+        name_line, name_col, name_end_col = self._token_span(name_token)
         args = []
         output_var = None
         for item in items[1:]:
@@ -76,14 +81,19 @@ class _ModuleControlMixin:
                 output_var = item
             elif item is not None and not isinstance(item, Token):
                 args.append(item)
-        return CallProc(name=name, args=args, output_var=output_var, line_no=self._line(items))
+        return CallProc(
+            name=str(name_token), args=args, output_var=output_var,
+            line_no=self._line(items), name_line=name_line,
+            name_col=name_col, name_end_col=name_end_col,
+        )
 
     def call_proc_assign_stmt(self, items):
         """call $result = proc_name($arg1, "arg2", ...) [as $output] — 调用过程并绑定返回值"""
         # 语法: "call" "$" NAME "=" NAME "(" [call_arg_list] ")" [call_output_clause]
         # items: [result_var_name, proc_name, ...args, output_var?]
         result_var = str(items[0])
-        proc_name = str(items[1])
+        name_token = items[1]
+        name_line, name_col, name_end_col = self._token_span(name_token)
         args = []
         output_var = None
         for item in items[2:]:
@@ -94,7 +104,11 @@ class _ModuleControlMixin:
                 output_var = item
             elif item is not None and not isinstance(item, Token):
                 args.append(item)
-        return CallProc(name=proc_name, args=args, result_var=result_var, output_var=output_var, line_no=self._line(items))
+        return CallProc(
+            name=str(name_token), args=args, result_var=result_var,
+            output_var=output_var, line_no=self._line(items),
+            name_line=name_line, name_col=name_col, name_end_col=name_end_col,
+        )
 
     def call_output_as(self, items):
         """as $output → str(变量名)"""

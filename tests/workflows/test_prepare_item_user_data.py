@@ -43,6 +43,7 @@ class _Screen:
     def install(self, engine) -> None:
         workflow = engine._ensure_workflow()
         workflow.ocr_scene_by = self._ocr
+        workflow.ocr_scene = self._ocr_fields
         workflow.click_region = self._click
         workflow.wait_seconds = self.waits.append
 
@@ -60,6 +61,16 @@ class _Screen:
 
     def _click(self, scene, key, **kwargs):
         self.clicks.append((scene, key))
+
+    def _ocr_fields(self, scene, keys, **kwargs):
+        result = {}
+        for key in keys:
+            if (scene, key) == ("game_login_page", "online_label") and self.online_times > 0:
+                self.online_times -= 1
+                result[key] = "其他角色在线"
+            else:
+                result[key] = self._texts.get((scene, key), "")
+        return result
 
 
 def _engine():

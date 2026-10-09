@@ -33,7 +33,7 @@
 #
 # 包含过程（阶段一/阶段二各一个，正文按 $batch_recover_pending 串联）：
 #   recover_to_login_page($username, $max_roll_account) — 收回登录主页（1=成功 / 0=失败）
-#   relogin_current_role($username)                     — 用当前角色重新登录（1=成功 / 0=失败）
+#   relogin_current_role($username, $batch_state) — 用当前角色重新登录（1=成功 / 0=失败）
 
 import "subcall/login.wf"
 import "subcall/page_detection.wf"
@@ -61,7 +61,7 @@ if not $batch_recover_pending
     }
 end
 
-call $at_main = relogin_current_role($batch_recover_username)
+call $at_main = relogin_current_role($batch_recover_username, $batch_state)
 if not $at_main
     return {
         "status": "failed",
@@ -149,7 +149,7 @@ end
 # 这里**必然**会撞上「其他角色在线」：异常中断或强杀客户端之后，服务端仍认为
 # 该角色在线。所以检测到在线标记就点确定把它顶下来——与正常流程里点取消改走
 # 跳过的处置相反，无人值守下没有「稍后再来」这个选项。
-def relogin_current_role($username)
+def relogin_current_role($username, $batch_state)
     scan [game_login_page].[current_role] as $role_ready
     if not $role_ready
         screenshot from last
@@ -162,8 +162,12 @@ def relogin_current_role($username)
     # 等满也无所谓，后面的落地流程会自己确认有没有进主页。
     eval $kicked = 0
     loop 10
-        scan [game_login_page].[online_label] as $online by contains "在线"
-        if $online
+        call $notice = read_login_notice()
+        if $notice == "update"
+            call $result = relogin_after_update($username, $batch_state)
+            return $result
+        end
+        if $notice == "online"
             log "角色仍被服务端认为在线，点确定顶下线"
             click [game_login_page].[confirm] after wait @page_refresh
             eval $kicked = 1
@@ -177,10 +181,33 @@ def relogin_current_role($username)
 
     # 复用正常登录的落地流程：它顺带处理战令领奖和活动弹窗。它内部在超时后会
     # pause，无人值守下那会中止本次恢复并如实报 failed，不会把批量挂在弹窗上。
-    call login_to_main_page()
+    call $landed = login_to_main_page()
+    if $landed == 2
+        call $result = relogin_after_update($username, $batch_state)
+        return $result
+    end
     call $in_main = is_in_main_page()
     if not $in_main
         return 0
     end
     return 1
+end
+
+# 更新后回到角色入口，沿异常恢复的在线确认策略选择本次目标角色。
+def relogin_after_update($username, $batch_state)
+    call $recovered = recover_login_after_update($batch_state)
+    if not $recovered
+        return 0
+    end
+    eval $role_index = user_get($username, "role_index")
+    eval $role = user_get($username, "role")
+    if not $role_index or not $role
+        log error "更新后重新选择角色需要有效的角色名和序号"
+        return 0
+    end
+    call $result = select_role_with_policy($role_index, $role, $batch_state, false, 0, true)
+    if $result.status == "success"
+        return 1
+    end
+    return 0
 end

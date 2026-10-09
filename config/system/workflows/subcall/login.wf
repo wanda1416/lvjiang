@@ -23,7 +23,7 @@
 #   scroll_user_list_to_top      — 把账号列表滚回顶部（1=已到顶 / 0=达上限）
 #   select_role                  — 选角色并进入游戏主页，返回批量结果字典
 #   wait_until_role_offline      — 处理「其他角色在线」弹窗（0=可登录 / 1=放弃）
-#   login_to_main_page           — 等登录加载完成并回主页（无返回值）
+#   login_to_main_page           — 等登录加载完成并回主页（更新提示返回 2）
 #   claim_zhanling_reward        — 检测战令领奖入口，有则领取（无返回值）
 
 import "subcall/navigation.wf"
@@ -173,6 +173,54 @@ def ensure_login_page_by_restart($app_id, $tail, $account, $batch_state, $max_ro
     scene [game_login_page] view [init]
     call $in_login_page = leave_startup_page()
     return $in_login_page
+end
+
+
+# 登录提示只按“更新”和“在线”分流，更新优先；一帧文字只识别一次。
+def login_notice_kind($text)
+    if $text contains "更新"
+        return "update"
+    end
+    if $text contains "在线"
+        return "online"
+    end
+    return ""
+end
+
+def read_login_notice()
+    scan [game_login_page].[online_label] as $notice
+    call $kind = login_notice_kind($notice.online_label)
+    return $kind
+end
+
+# 更新保留当前账号，不调用 select_account_and_login/switch_account。
+# 返回 1=已恢复登录主页；0=失败。确认前由调用方已判定更新提示。
+def recover_login_after_update($batch_state)
+    log info "检测到登录更新提示，确认后重新启动客户端，保留当前账号"
+    click [game_login_page].[confirm] after wait @page_refresh
+    eval $batch_state.role = ""
+    eval $batch_state.page_state = 0
+    if app_is_running("yyslscn")
+        app stop "yyslscn"
+    end
+    app start "yyslscn" timeout 30
+    if env("desktop")
+        scene [game_login_page] view [users]
+        call $ready = wait_for_switch_users_page()
+        if not $ready
+            return 0
+        end
+        click [game_login_page].[login] after wait @page_refresh
+    end
+    scene [game_login_page] view [init]
+    call $ready = leave_startup_page()
+    if not $ready
+        return 0
+    end
+    eval $batch_state.role = ""
+    eval $batch_state.page_state = 1
+    log info "更新后已恢复登录主页，继续选择原账号下的目标角色"
+    return 1
 end
 
 
@@ -522,52 +570,60 @@ end
 #   $online_role_max_wait — 等待角色下线的秒数上限
 # 前置：已在登录页角色入口（page_state=1）。
 # 后置：success=已在游戏主页；skipped=角色在线，已复位回登录页状态。
-# 返回：{"status": "success"|"skipped", "message": str, "state": $batch_state}
+# 返回：{"status": "success"|"skipped"|"failed", "message": str, "state": $batch_state}
 def select_role($role_index, $role, $batch_state, $skip_online_role, $online_role_max_wait)
+    call $result = select_role_with_policy($role_index, $role, $batch_state, $skip_online_role, $online_role_max_wait, false)
+    return $result
+end
+
+# 异常恢复保留在线确认顶下线策略；正常登录仍取消/等待，不互相借用策略。
+def select_role_with_policy($role_index, $role, $batch_state, $skip_online_role, $online_role_max_wait, $force_online)
     log "当前下标" + $role_index
-    eval $online_deadline = clock() + to_num($online_role_max_wait)
-
-    # 打开角色选择页。不假设点一次就进去了：登录鉴权、页面加载都可能还没完，
-    # 此时盲点下去两次空点都不报错（panel 坐标算不出时是静默 return），
-    # 错误要拖到 login_to_main_page 才以「无法确认已登录至主页」暴露，对不上因。
-    # 故每点一次等一拍，以「进入游戏」是否出现为判据，最多重试 5 次。
-    # 这 5 次只计「没进去角色列表」的重试；等角色下线由子过程按期限自己收敛。
-    # 两个上界不能共用一个计数器，否则等待会把重试次数吃光。
-    eval $role_page = 0
-    loop 5
-        click [game_login_page].[switch_role] after wait @secondary_confirm
-
-        # 角色在线时会弹二次确认（confirm 区域含「其他角色」），
-        # 这种情况下不可能进入角色列表。
-        call $online = wait_until_role_offline($batch_state, $skip_online_role, $online_deadline)
-        if $online
-            return {"status": "skipped", "message": "角色在线", "state": $batch_state}
+    loop while 1 == 1
+        eval $online_deadline = clock() + to_num($online_role_max_wait)
+        eval $role_page = 0
+        eval $role_attempt = 0
+        loop while $role_attempt < 5
+            click [game_login_page].[switch_role] after wait @secondary_confirm
+            call $online = resolve_role_entry_notice($batch_state, $skip_online_role, $online_deadline, $force_online)
+            if $online < 0
+                return {"status": "failed", "message": "更新后未能恢复登录主页", "state": $batch_state}
+            end
+            if $online == 2
+                # 更新不计入页面失败次数；恢复后重启在线等待计时。
+                eval $online_deadline = clock() + to_num($online_role_max_wait)
+                continue
+            end
+            if $online == 1
+                return {"status": "skipped", "message": "角色在线", "state": $batch_state}
+            end
+            call $role_page = is_in_role_select_page()
+            if $role_page
+                break
+            end
+            eval $role_attempt = $role_attempt + 1
+            log "未进入选择角色页面，重试"
         end
-
-        call $role_page = is_in_role_select_page()
-        if $role_page
-            break
+        if not $role_page
+            screenshot from last
+            eval pause("无法进入选择角色页面，请手动进入角色列表后点击继续。"
+                + "本次目标角色：" + $role + "（第 " + $role_index + " 个）")
         end
-        log "未进入选择角色页面，重试"
+        click [game_login_page].[role_list][$role_index][1] after wait @page_refresh
+        click [game_login_page].[enter] after wait @secondary_confirm
+        call $landed = login_to_main_page()
+        if $landed == 2
+            call $recovered = recover_login_after_update($batch_state)
+            if not $recovered
+                return {"status": "failed", "message": "更新后未能恢复登录主页", "state": $batch_state}
+            end
+            continue
+        end
+        eval $batch_state.page_state = 2
+        eval $batch_state.role = $role
+        wait @step_interval
+        return {"status": "success", "message": "", "state": $batch_state}
     end
-    if not $role_page
-        screenshot from last
-        eval pause("无法进入选择角色页面，请手动进入角色列表后点击继续。"
-            + "本次目标角色：" + $role + "（第 " + $role_index + " 个）")
-    end
-
-    # 选角色（role_list: 1列4行，role_index 1-4 → panel 行 1-4）
-    click [game_login_page].[role_list][$role_index][1] after wait @page_refresh
-    # 进入游戏
-    click [game_login_page].[enter] after wait @secondary_confirm
-
-    # 等待加载完成并进入主页
-    call login_to_main_page()
-
-    eval $batch_state.page_state = 2
-    eval $batch_state.role = $role
-    wait @step_interval
-    return {"status": "success", "message": "", "state": $batch_state}
 end
 
 
@@ -580,7 +636,7 @@ end
 #   $online_deadline  — 等待截止时刻（clock() 时间戳）
 # 前置：刚点过「切换角色」，弹窗可能出现。
 # 后置：0=角色可登录（没有在线提示）；1=已放弃，弹窗已取消、界面干净。
-# 返回：0=可以继续登录；1=角色在线且已按策略放弃。
+# 返回：0=可登录；1=在线放弃；2=更新已恢复；-1=更新恢复失败。
 #
 # 点「切换角色」可能撞上「其他角色在线」弹窗。弹窗必须取消——留着会挡住
 # 后续任何页面判定。等待模式下由本过程自己重试到期限：取消弹窗、等一会儿、
@@ -588,9 +644,27 @@ end
 # 放弃时把 batch_state 复位回登录页状态并返回 1，调用方据此以 skipped 收尾
 # （status/message 的措辞由调用方上下文决定）。
 def wait_until_role_offline($batch_state, $skip_online_role, $online_deadline)
+    call $result = resolve_role_entry_notice($batch_state, $skip_online_role, $online_deadline, false)
+    return $result
+end
+
+# 0=无阻挡；1=在线放弃；2=更新已恢复，需要重新选角色；-1=更新恢复失败。
+def resolve_role_entry_notice($batch_state, $skip_online_role, $online_deadline, $force_online)
     loop while 1 == 1
-        scan [game_login_page].[online_label] as $online by contains "在线"
-        if not $online
+        call $notice = read_login_notice()
+        if $notice == "update"
+            call $recovered = recover_login_after_update($batch_state)
+            if $recovered
+                return 2
+            end
+            return -1
+        end
+        if $notice != "online"
+            return 0
+        end
+        if $force_online
+            log info "角色仍被服务端认为在线，确认后继续重新登录"
+            click [game_login_page].[confirm] after wait @page_refresh
             return 0
         end
         click [game_login_page].[cancel] after wait @page_refresh
@@ -617,7 +691,7 @@ end
 # 参数：无
 # 前置：已经点击「进入游戏」。
 # 后置：回到主页；8 拍内没确认到主页时 pause 交给人工。
-# 返回：无返回值（隐式 null）。
+# 返回：2=发现更新，交调用方恢复；其它路径保持隐式 null。
 #
 # 等待加载条消失 → 检测主页元素 → 处理战令领奖/关闭弹窗
 def login_to_main_page()
@@ -625,8 +699,12 @@ def login_to_main_page()
     # 有「加载」→ 继续等；消失后再等 5 秒视为登录完成
     eval $loading_done = 0
     loop 10
-        scan [game_login_page].[loading] as $load_text by contains "加载"
-        if not $load_text
+        scan [game_login_page].[loading, online_label] as $load_state
+        call $notice = login_notice_kind($load_state.online_label)
+        if $notice == "update"
+            return 2
+        end
+        if not $load_state.loading contains "加载"
             eval $loading_done = 1
             break
         end
@@ -654,6 +732,11 @@ def login_to_main_page()
         if $main_attempt == 8
             log warn "最后一轮登录主页校验未命中，记录判断帧"
             screenshot from last
+        end
+
+        call $notice = read_login_notice()
+        if $notice == "update"
+            return 2
         end
 
         # 未检测到主页，先检查战令领奖

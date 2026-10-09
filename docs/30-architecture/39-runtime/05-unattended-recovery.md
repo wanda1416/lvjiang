@@ -4,6 +4,23 @@
 > [20-requirements/30-batch/03-unattended-batch.md](../../20-requirements/30-batch/03-unattended-batch.md)。
 > 本文只描述实现契约：拦截点、注入信号、配置兜底与落点。
 
+## 登录更新恢复
+
+开发分支新增更新分支，尚未完成真机复验。`login_notice_kind` 从提示文字判断
+`update`、`online` 或空值，更新优先，`read_login_notice` 只读取一次 `online_label`。
+`recover_login_after_update` 确认更新并重启客户端，PC 直接登录默认账号，Android
+直接等待启动页；随后复用 `leave_startup_page` 回到登录主页。它保留 account，
+重启期间将 role 清空、page_state 设为 0，确认登录主页后才设为 1。
+
+`resolve_role_entry_notice` 返回 0（无阻挡）、1（在线放弃）、2（更新已恢复）或
+-1（更新恢复失败）。正常登录保持在线取消/等待策略；异常恢复通过
+`select_role_with_policy` 的明确参数保留确认顶下线策略。更新不消耗角色页面重试次数，
+并重设在线等待截止时间。
+
+`login_to_main_page` 正常路径保持原返回行为，加载或主页等待阶段检测到更新时返回 2，
+由两个调用方重新恢复并选择目标角色。`relogin_current_role` 现在显式接收 batch_state，
+避免子过程作用域丢失恢复状态；更新路径不调用账号搜索过程。
+
 ## 拦截点只有一个
 
 所有任务交互都经由 `engine._ui_callback` 走到宿主；生命周期脚本与条目脚本

@@ -44,6 +44,18 @@ _CLICK_BUTTON_ALIASES = {"back": "x1", "forward": "x2"}
 class _StmtMixin:
     """程序入口、基础指令（click/drag/wait/scan/recognize）与 align/panel 索引回调"""
 
+    def click_button(self, items):
+        """共享方向字面量，但保留 click 消费的按钮 token 类型与位置。"""
+        return Token.new_borrow_pos("CLICK_BUTTON", str(items[0]), items[0])
+
+    def scroll_dir(self, items):
+        """滚动仅接受上下；输出沿用 SCROLL_DIR 契约。"""
+        return Token.new_borrow_pos("SCROLL_DIR", str(items[0]), items[0])
+
+    def drag_dir(self, items):
+        """拖拽接受四向；输出沿用 DRAG_DIR 契约。"""
+        return Token.new_borrow_pos("DRAG_DIR", str(items[0]), items[0])
+
     # ─── 程序入口 ─────────────────────────────────────────
 
     def scene_location(self, items):

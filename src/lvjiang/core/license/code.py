@@ -27,9 +27,6 @@ from loguru import logger
 #: 码格式版本，换格式时用它区分
 _PREFIX = "LVJ1"
 
-#: 签发者公钥（base32 编码的 32 字节 Ed25519 公钥）。
-#: 由 ``ops/license-issuer/keygen.py`` 生成后粘贴到这里；留空表示尚未配置签发
-#: 密钥——此时所有激活码一律不通过，高级功能整体关闭，而不是报错崩溃。
 PUBLIC_KEY_B32 = "ZUZ4VUALCH5L5W2SEE7P3JFBDCBEGM5PQERJARZSVYY23FXOYAGA"
 
 

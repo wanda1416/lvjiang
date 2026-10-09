@@ -29,6 +29,7 @@ dependencies = [
     "windows-capture>=2.0; sys_platform == 'win32'",
     "httpx>=0.28,<0.29",
     "keyring>=25,<26",
+    "mcp>=1.30,<2",  # Desktop local MCP transport; imported only when enabled.
 ]
 
 [project.optional-dependencies]

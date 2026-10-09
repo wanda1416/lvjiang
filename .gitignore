@@ -82,3 +82,6 @@ ops/stats-worker/.wrangler/
 # stats-client 本地缓存/凭据（含 install_id 与本地文件回退的 token，不进仓库）
 ops/stats-client/data/
 ops/stats-client/.env
+
+# Generated public Agent bundle; source lives in docs/10-game/10-public and docs/70-agent.
+/agent/

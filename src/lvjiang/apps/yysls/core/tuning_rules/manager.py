@@ -729,6 +729,37 @@ def get_tuning_group(key: str) -> TuningGroup | None:
     return get_tuning_group_manager().get_group(key)
 
 
+def create_generated_entities(
+    resolver: ConfigResolver, group: dict, rules: list[dict],
+) -> list[Path]:
+    """Create a validated independent local set; never replace any existing layer.
+
+    The caller owns publication of the private result and holds a generation lock.
+    Returned paths are exclusively owned by this operation and may be removed if
+    publishing that result fails. Existing UI creation APIs remain unchanged.
+    """
+    parse_tuning_group(group)
+    switches = set(resolver.load_merged(_CONFIG_REL_PATH).get("switches", {}))
+    for rule in rules:
+        parse_tuning_rule(rule, switches)
+    created: list[Path] = []
+    try:
+        for directory, data in [("base_groups", group), *[("tuning_rules", r) for r in rules]]:
+            rel = f"yysls/{directory}/{data['key']}.yaml"
+            if resolver.resolve_read(rel) is not None:
+                raise ValueError("新配置 key 已存在，拒绝覆盖")
+            path = resolver.local_dir / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("x", encoding="utf-8") as stream:
+                created.append(path)
+                yaml.safe_dump(data, stream, allow_unicode=True, sort_keys=False)
+        return created
+    except Exception:
+        for path in created:
+            path.unlink(missing_ok=True)
+        raise
+
+
 class TuneConfigManager:
     """全局调律配置管理器（单文件 tune_config.yaml）
 

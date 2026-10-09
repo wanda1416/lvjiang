@@ -1717,6 +1717,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
                 config,
                 username=username,
                 incoming_rule_configs=self.ctx.judge_configs,
+                state=self.ctx.smart_state,
                 users_dir=users_dir,
                 # is_stopped 同时是暂停检查点；长组合搜索期间仍能
                 # 响应暂停与结束，不会等整件装备算完才生效。

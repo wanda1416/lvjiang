@@ -108,8 +108,9 @@ jobs:
           $version = '${{ steps.release.outputs.version }}'
           $zip = "dist/lvjiang-v$version-win64.zip"
           $setup = "dist/lvjiang-v$version-win64-setup.exe"
+          $agent = "dist/lvjiang-agent-v$version.zip"
           $mainExe = "dist/lvjiang/lvjiang.exe"
-          foreach ($path in @($mainExe, $zip, $setup)) {
+          foreach ($path in @($mainExe, $zip, $setup, $agent)) {
             if (-not (Test-Path $path -PathType Leaf)) {
               throw "Expected package was not generated: $path"
             }
@@ -124,7 +125,7 @@ jobs:
           }
 
           $checksumFile = "dist/SHA256SUMS.txt"
-          $lines = foreach ($path in @($zip, $setup)) {
+          $lines = foreach ($path in @($zip, $setup, $agent)) {
             $hash = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $([IO.Path]::GetFileName($path))"
           }
@@ -132,6 +133,7 @@ jobs:
 
           "zip=$zip" >> $env:GITHUB_OUTPUT
           "setup=$setup" >> $env:GITHUB_OUTPUT
+          "agent=$agent" >> $env:GITHUB_OUTPUT
           "checksums=$checksumFile" >> $env:GITHUB_OUTPUT
 
       - name: Retain packages as workflow artifact
@@ -141,6 +143,7 @@ jobs:
           path: |
             ${{ steps.assets.outputs.zip }}
             ${{ steps.assets.outputs.setup }}
+            ${{ steps.assets.outputs.agent }}
           if-no-files-found: error
 
       - name: Retain release notes for the publish job
@@ -315,9 +318,10 @@ jobs:
           [ -n "$notes" ] || { echo "发布说明缺失" >&2; exit 1; }
 
           cd dist
-          # 三个产物同一份校验和：少一个就说明某个作业没产出，不该发布
+          # 四个产物同一份校验和：少一个就说明某个作业没产出，不该发布
           for name in "lvjiang-v${RELEASE_TAG}-win64.zip" \
                       "lvjiang-v${RELEASE_TAG}-win64-setup.exe" \
+                      "lvjiang-agent-v${RELEASE_TAG}.zip" \
                       "lvjiang-v${RELEASE_TAG}.apk"; do
             [ -s "$name" ] || { echo "缺少产物: $name" >&2; exit 1; }
           done

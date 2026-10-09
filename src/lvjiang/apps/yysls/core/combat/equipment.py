@@ -11,12 +11,12 @@ from ..loadout.repository import stamp_equipment_write
 
 
 class EquipmentInventory:
-    def __init__(self, user_name: str) -> None:
-        self._repo = LoadoutRepository(user_name)
-        self.reload()
+    def __init__(self, user_name: str, *, users_dir=None, state=None) -> None:
+        self._repo = LoadoutRepository(user_name, users_dir)
+        self.reload(state=state)
 
-    def reload(self) -> None:
-        self._state = self._repo.load()
+    def reload(self, *, state=None) -> None:
+        self._state = copy.deepcopy(state) if state is not None else self._repo.load()
         # 每次加载都用当前游戏配置刷新异常状态，使历史装备无需重新扫描也能
         # 发现新增的合法性异常。
         try:

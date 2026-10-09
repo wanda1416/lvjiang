@@ -54,6 +54,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; 都不能删除。data/scrcpy 是旧版本随包目录，JAR 已迁入 data/adb，可安全清理。
 Type: filesandordirs; Name: "{app}\config\system"
 Type: filesandordirs; Name: "{app}\_internal"
+Type: filesandordirs; Name: "{app}\agent"
 Type: filesandordirs; Name: "{app}\data\scrcpy"
 
 [Files]

@@ -190,9 +190,9 @@ Release 工作流分三个作业：Windows 与 Android 各自构建并上传 art
 
 `publish`：
 
-1. 取两个作业的 artifact，确认三个产物（ZIP / 安装器 / APK）都在且非空；
-2. 生成覆盖三者的 `SHA256SUMS.txt`；
-3. 创建 GitHub Release，使用版本发布文档的一级标题和正文，上传四个文件。
+1. 取两个作业的 artifact，确认四个产物（便携 ZIP / 安装器 / APK / Agent ZIP）都在且非空；
+2. 生成覆盖四者的 `SHA256SUMS.txt`；
+3. 创建 GitHub Release，使用版本发布文档的一级标题和正文，上传四个产物与校验和。
 
 任何一步失败都不会发布 GitHub Release。临时故障可直接重新运行该 workflow；
 需要修改代码时，只能在 Release 尚未发布的前提下删除失败标签，修复并合并后再
@@ -210,6 +210,7 @@ packaging\package.bat
 - `dist/lvjiang/lvjiang.exe` — 可执行文件
 - `dist/lvjiang-vX.Y.Z-win64.zip` — 发布压缩包（便携版）
 - `dist/lvjiang-vX.Y.Z-win64-setup.exe` — Windows 安装包（推荐）
+- `dist/lvjiang-agent-vX.Y.Z.zip` — 外部 Agent 的公开文档与接口 schema（不包含本机接入令牌或用户数据）
 
 APK 由发布流水线产出（`dist/lvjiang-vX.Y.Z.apk`），本地排障用
 `cd android && ./gradlew :app:assembleDebug`——debug 变体不需要签名密钥。
@@ -224,7 +225,8 @@ APK 由发布流水线产出（`dist/lvjiang-vX.Y.Z.apk`），本地排障用
 打包脚本会自动：
 1. 从 `pyproject.toml` 读取版本号注入到 `src/lvjiang/_version.py`
 2. 调用 PyInstaller 构建
-3. 复制配置、ADB、scrcpy 等运行时依赖
+3. 复制配置、ADB、scrcpy 等运行时依赖，并构建明确收录的 Agent 文档与 schema；
+   同一份结果放入 `dist/lvjiang/agent` 并输出独立 Agent ZIP，安装升级清理旧官方 `agent` 目录
 4. 压缩为 zip
 5. 调用 Inno Setup 生成安装包（需安装 [Inno Setup 6](https://jrsoftware.org/isdl.php)）
 

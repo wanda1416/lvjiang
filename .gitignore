@@ -32,6 +32,9 @@ logs/
 # premium 
 src/lvjiang/apps/premium
 
+# Private administration checkout and its nested public site repository.
+/admin/
+
 # local config (user overlay / session runtime / 在线下发层)
 /config/local*
 /config/session*

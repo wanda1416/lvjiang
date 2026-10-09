@@ -28,7 +28,8 @@ def _get_parser() -> Lark:
         grammar_path = Path(__file__).parent.parent / "grammar.lark"
         _parser = Lark(
             grammar_path.read_text(encoding="utf-8"),
-            parser="earley",
+            parser="lalr",
+            lexer="contextual",
             propagate_positions=True,
         )
     return _parser

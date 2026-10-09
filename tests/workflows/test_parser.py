@@ -2,11 +2,12 @@
 
 
 import pytest
-from lark.exceptions import LarkError, VisitError
+from lark.exceptions import LarkError, UnexpectedInput, VisitError
 
 from lvjiang.workflows.grammar import (
     Click,
     CoordPoint,
+    Drag,
     EntityRef,
     Eval,
     Find,
@@ -156,16 +157,16 @@ def test_wait():
 
 def test_bare_named_delay_is_syntax_error():
     """裸标识符（无 @ 前缀）应为语法错误"""
-    from lark.exceptions import UnexpectedCharacters
-    with pytest.raises(UnexpectedCharacters):
+    with pytest.raises(UnexpectedInput) as error:
         parse_text("wait step_interval")
+    assert (error.value.line, error.value.column) == (1, 6)
 
 
 def test_bare_delay_in_clause_is_syntax_error():
     """click ... after wait step_interval（无 @）也应为语法错误"""
-    from lark.exceptions import UnexpectedCharacters
-    with pytest.raises(UnexpectedCharacters):
+    with pytest.raises(UnexpectedInput) as error:
         parse_text("click [s].[r] after wait step_interval")
+    assert (error.value.line, error.value.column) == (1, 26)
 
 
 # ─── 泛化元组混合引用测试 ─────────────────────────────────
@@ -271,6 +272,25 @@ def test_relative_move_components_must_stay_in_signed_unit_range(source):
 
 
 # ─── scroll 解析测试 ─────────────────────────────────────────────
+
+
+def test_direction_words_keep_instruction_specific_meaning():
+    """共享方向词不能让滚动、拖拽与按键状态互相抢 token。"""
+    program = parse_text(
+        'scroll [s].[r] UP 2\n'
+        'drag [s].[panel] LEFT 0.5\n'
+        'press "W" DOWN\n'
+    )
+    scroll, drag, press = program.body
+    assert isinstance(scroll, Scroll)
+    assert (scroll.direction, scroll.amount, scroll.line_no) == ("up", 2, 1)
+    assert isinstance(drag, Drag)
+    assert (drag.direction, drag.distance, drag.line_no) == ("left", 0.5, 2)
+    assert isinstance(press, Press)
+    assert (press.mode, press.line_no) == (PressMode.DOWN, 3)
+    with pytest.raises(UnexpectedInput) as error:
+        parse_text("scroll [s].[r] left")
+    assert (error.value.line, error.value.column) == (1, 16)
 
 
 # ─── scroll interval 测试 ─────────────────────────────

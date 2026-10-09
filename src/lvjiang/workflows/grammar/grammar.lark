@@ -108,7 +108,7 @@ find_stmt: "find"i scene_target "as"i var_ref capture_source_clause? by_clause w
 //
 // 鼠标键可选，紧跟目标之后（与 scroll 的方向紧随目标同一风格），
 // 省略时默认左键。hold 支持固定秒数、区间字面量或 tuple 变量。
-click_stmt: "click"i click_target CLICK_BUTTON? click_hold? wait_clauses? _NL
+click_stmt: "click"i click_target click_button? click_hold? wait_clauses? _NL
 click_target: const_or_var "." const_or_var panel_index panel_index -> click_panel_target
             | const_or_var "." const_or_var "." const_or_var       -> click_subscene_target
             | const_or_var "." const_or_var                          -> click_scene_target
@@ -119,7 +119,8 @@ click_target: const_or_var "." const_or_var panel_index panel_index -> click_pan
 // （left/right/middle/x1/x2），另外接受更直观的 back/forward 作为
 // x1/x2 的别名——Windows 默认把 X1 映射到"后退"、X2 映射到"前进"，
 // 但鼠标驱动可自定义，不是绝对规则，写脚本时按实测行为选。
-CLICK_BUTTON: /left/i | /right/i | /middle/i | /x1/i | /x2/i | /back/i | /forward/i
+// 与方向规则共享字面量 token；! 保留值，由 transformer 恢复按钮 token 契约。
+!click_button: "left"i | "right"i | "middle"i | "x1"i | "x2"i | "back"i | "forward"i
 
 click_hold: "hold"i press_hold_value
 
@@ -145,8 +146,8 @@ replay_input_trace_stmt: "replay"i "input_trace"i STRING _NL
 // 数量：可选，滚动格数（默认 1），支持数字或变量
 // 间隔：可选，逐格滚动之间的固定间隔（秒），如 interval 0.1；省略则用后端默认随机间隔
 // 目标在前、方向紧随其后、数量收尾——与 drag_stmt 语法形状保持一致
-scroll_stmt: "scroll"i click_target? SCROLL_DIR (number | var_ref)? scroll_interval? wait_clauses? _NL
-SCROLL_DIR: /up/i | /down/i
+scroll_stmt: "scroll"i click_target? scroll_dir (number | var_ref)? scroll_interval? wait_clauses? _NL
+!scroll_dir: "up"i | "down"i
 
 // 逐格滚动间隔："interval" 关键字 + 秒数（与 wait stable 的 interval 关键字复用同一词）
 scroll_interval: "interval"i number
@@ -184,8 +185,8 @@ drag_target: const_or_var "." const_or_var panel_index panel_index drag_directio
 // up/down 按行计算，left/right 按列计算
 // 距离支持整数、浮点数（如 0.5 表示半行）、变量引用
 // 使用 DRAG_DIST 终端并给 .2 优先级，确保在 drag_direction 上下文中优先匹配
-drag_direction: DRAG_DIR DRAG_DIST?
-DRAG_DIR: /up/i | /down/i | /left/i | /right/i
+drag_direction: drag_dir DRAG_DIST?
+!drag_dir: "up"i | "down"i | "left"i | "right"i
 DRAG_DIST.2: /[0-9]+(\.[0-9]+)?/ | /\$[a-zA-Z_][a-zA-Z0-9_]*/
 
 // panel 索引：[数字] 或 [$var]，显式包含括号以避免与 bracket_list 歧义
@@ -241,7 +242,7 @@ delay_ref: "@" NAME
 wait_clauses: wait_clause+
 
 wait_clause: WAIT_TIMING "wait"i (wait_stable_ref | delay_ref | number | bracket_expr | var_ref | wait_range)
-WAIT_TIMING: /before/i | /after/i | /around/i
+WAIT_TIMING.1: /before/i | /after/i | /around/i
 
 wait_range: "(" tuple_elem "," tuple_elem ")"
 
@@ -306,10 +307,8 @@ cleaning_clause: "with"i STRING
 // 场景目标：支持静态/动态场景名 + 静态/动态字段
 // 场景名：[scene] / $var（不再支持 "scene" 字符串形式）
 // 字段：.[field] / .$var / .[f1,f2] / 无字段
-scene_target: scene_name "." var_ref         -> scene_target_dyn
-            | scene_name field_list?         -> scene_target_static
-
-?scene_name: bracket_expr | var_ref
+scene_target: const_or_var "." var_ref         -> scene_target_dyn
+            | const_or_var field_list?         -> scene_target_static
 
 collect_stmt: "collect"i collect_source collect_as_clause? _NL
 
@@ -323,7 +322,7 @@ collect_as_clause: "as"i (STRING | var_ref)
 // 默认 info
 log_stmt: "log"i LOG_LEVEL? log_arg _NL
 
-LOG_LEVEL: /debug/i | /info/i | /warn/i | /error/i
+LOG_LEVEL.1: /debug/i | /info/i | /warn/i | /error/i
 
 // log 参数：任何能求值为字符串的表达式（支持 + 拼接）
 ?log_arg: expression

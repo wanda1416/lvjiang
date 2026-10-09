@@ -11,6 +11,8 @@ from __future__ import annotations
 import os
 import re
 import sys
+from copy import deepcopy
+from functools import lru_cache
 from pathlib import Path
 from typing import NoReturn
 from urllib.parse import urlparse
@@ -103,6 +105,7 @@ try:
         If,
         Loop,
         ProcDef,
+        Program,
         Try,
         UntilLoop,
         WhileLoop,
@@ -118,6 +121,27 @@ except ImportError as e:
     )
 
 server = LanguageServer("lvjiang-wf-server", "v0.1")
+
+# ---------------------------------------------------------------------------
+# Buffer parse cache
+# ---------------------------------------------------------------------------
+
+# 同一份缓冲区文本会被诊断、跳转、补全和查找引用分别解析；DSL 解析成本很高
+# （1300 行脚本单次约 7s），必须复用结果。缓存只保存语法树，对外返回深拷贝，
+# 避免调用方共享其中的可变列表或字典（与 lvjiang.workflows.grammar.parser
+# 的 parse_file 采用同一约定）。
+_PARSE_CACHE_SIZE = 4
+
+
+@lru_cache(maxsize=_PARSE_CACHE_SIZE)
+def _parse_snapshot(source: str) -> Program:
+    return parse_text(source)
+
+
+def _parse_cached(source: str) -> Program:
+    """Parse *source* once per distinct buffer text."""
+    return deepcopy(_parse_snapshot(source))
+
 
 # ---------------------------------------------------------------------------
 # DSL keywords for typo detection
@@ -428,7 +452,7 @@ def _validate_and_publish(uri: str, source: str) -> None:
             severity=DiagnosticSeverity.Error))
 
     try:
-        program = parse_text(source)
+        program = _parse_cached(source)
         # Semantic checks use the parsed program; valid identifiers are never
         # treated as keyword typos merely because their spelling is similar.
         procs, _, import_problems = _load_import_graph(program, source_path)
@@ -624,7 +648,7 @@ def on_folding(params: FoldingRangeParams) -> list[FoldingRange]:
     """Provide folding ranges for def/end, if/end, loop/end, try/end blocks."""
     doc = server.workspace.get_text_document(params.text_document.uri)
     try:
-        program = parse_text(doc.source)
+        program = _parse_cached(doc.source)
     except Exception:
         return []
     lines = doc.source.splitlines()
@@ -648,7 +672,7 @@ def on_document_symbol(params: DocumentSymbolParams) -> list[DocumentSymbol]:
     """Provide document symbols for Outline panel (all def definitions)."""
     doc = server.workspace.get_text_document(params.text_document.uri)
     try:
-        program = parse_text(doc.source)
+        program = _parse_cached(doc.source)
     except Exception:
         return []
     symbols: list[DocumentSymbol] = []
@@ -693,7 +717,7 @@ def on_hover(params: HoverParams) -> Hover | None:
     """Show hover information for procedure names and scene references."""
     doc = server.workspace.get_text_document(params.text_document.uri)
     try:
-        program = parse_text(doc.source)
+        program = _parse_cached(doc.source)
     except Exception:
         return None
     line = params.position.line
@@ -790,13 +814,13 @@ def on_completion(params: CompletionParams) -> list[CompletionItem]:
 def _parse_for_editing(source: str, active_line: int):
     """Keep completions available while the current statement is incomplete."""
     try:
-        return parse_text(source)
+        return _parse_cached(source)
     except Exception:
         lines = source.splitlines(keepends=True)
         if active_line >= len(lines):
             raise
         lines[active_line] = "# editing\n"
-        return parse_text("".join(lines))
+        return _parse_cached("".join(lines))
 
 
 @server.feature(TEXT_DOCUMENT_DEFINITION)
@@ -864,7 +888,7 @@ def _procedure_under_cursor(uri: str, source: str, line_no: int,
     if match is None or not match.start(1) <= character <= match.end(1):
         return None
     try:
-        program = parse_text(source)
+        program = _parse_cached(source)
         procs, sources, _ = _load_import_graph(program, _uri_to_path(uri))
     except Exception:
         return None

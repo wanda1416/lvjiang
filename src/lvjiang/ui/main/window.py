@@ -862,6 +862,7 @@ class MainWindow(
         wf_layout.addWidget(self.workflow_combo)
         from ..combo_box import ComboWidthMode
         wf_actions = QHBoxLayout()
+        wf_actions.setSpacing(max(8, self.fontMetrics().horizontalAdvance("测")))
         self.workflow_group_combo = AutoWidthComboBox(width_mode=ComboWidthMode.POPUP)
         self.workflow_group_combo.setMinimumHeight(34)
         self.workflow_group_combo.setToolTip(tr("展示分组，仅筛选脚本列表"))
@@ -875,9 +876,15 @@ class MainWindow(
         self.btn_load_workflow = QPushButton(tr("加载"))
         self.btn_load_workflow.setMinimumHeight(34)
         self.btn_load_workflow.clicked.connect(self._on_load_workflow)
-        self.btn_load_workflow.setStyleSheet(
-            "background-color: #607D8B; color: white; font-weight: bold; padding: 6px;"
+        apply_button_style(self.btn_refresh_workflows, self.btn_load_workflow, variant="neutral")
+        for button in (self.btn_refresh_workflows, self.btn_load_workflow):
+            button.ensurePolished()
+        action_width = max(
+            button.sizeHint().width() + button.fontMetrics().horizontalAdvance("测测")
+            for button in (self.btn_refresh_workflows, self.btn_load_workflow)
         )
+        for button in (self.btn_refresh_workflows, self.btn_load_workflow):
+            button.setMinimumWidth(action_width)
         wf_actions.addWidget(self.btn_load_workflow)
         wf_layout.addLayout(wf_actions)
         daily_layout.addWidget(wf_group)

@@ -41,8 +41,7 @@ class ExecutionUserSelector(QWidget):
         self.combo.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.combo.setMinimumContentsLength(12)
-        layout.addWidget(self.combo)
-        layout.addStretch()
+        layout.addWidget(self.combo, 1)
         self.combo.currentIndexChanged.connect(
             lambda _index: self.resolved_user_changed.emit(self.resolve_username())
         )

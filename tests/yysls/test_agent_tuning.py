@@ -178,3 +178,27 @@ def test_discovered_plan_id_reaches_analysis_without_device_or_tuning_result(set
     assert service.store.load("results") == {}
     assert state.to_dict() == before
     assert "plan_id" not in plan.to_dict()  # 接口补充 ID 不改变磁盘序列化格式。
+
+
+def test_generation_contract_explains_pattern_aliases_without_merging_behavior_parts(setup_service):
+    """Agent 在预览前获取映射，错误提示区分 patterns 与实际行为部位。"""
+    from lvjiang.apps.yysls.core.tuning_rules import (
+        PART_ALIAS,
+        PART_KEYS,
+        QUALITY_PARTS,
+        RuleValidationError,
+        parse_tuning_group,
+    )
+
+    service, payload = setup_service
+    contract = service.get_tuning_config("test_user")["rule_contract"]
+    assert contract["pattern_parts"] == list(PART_KEYS)
+    assert contract["pattern_part_aliases"] == PART_ALIAS
+    assert contract["behavior_parts"] == list(QUALITY_PARTS)
+    payload["base_group"]["scan"]["rules"] = [{"action": "recycle", "parts": ["佩"]}]
+    preview = service.preview_generated_tuning("test_user", payload)
+    assert parse_tuning_group(preview["base_group"]).scan.rules[0].parts == ["佩"]
+    payload["rules"][0]["patterns"]["佩"] = copy.deepcopy(payload["rules"][0]["patterns"]["环"])
+    with pytest.raises(RuleValidationError, match=r"佩.*环.*patterns\.环.*parts.*佩"):
+        service.preview_generated_tuning("test_user", payload)
+    assert not service.resolver.local_dir.exists()

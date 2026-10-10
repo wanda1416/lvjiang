@@ -1,7 +1,13 @@
 # 生成独立调律配置与启动
 
 先读 get_tuning_config 获取当前有效基础组、规则模板及开关注册表，结合用户目标
-和计算结果生成 payload。可以参考已有配置，但不会改写它们。payload 字段为：
+和计算结果生成 payload。可以参考已有配置，但不会改写它们。
+
+生成前必须读取 get_tuning_config 返回的 rule_contract，不能靠模板中出现过的键推断接口范围。pattern_parts 列出合法 patterns 键，pattern_part_aliases 给出实际部位到模式的归并，behavior_parts 列出行为条件 parts 的合法部位。归并关系为：佩使用环的模式、胸甲使用冠胄的模式、腕甲使用胫甲的模式，主武器和副武器分别定义。这是共用判定规则，不是缺少对这些装备的支持。
+
+归并只适用于 patterns；行为条件 parts 仍使用实际部位。例如 patterns.环 同时判定环和佩，但行为条件 parts: [佩] 只筛选佩。不得把行为条件中的佩、胸甲、腕甲也替换成归并键；不要逐个尝试无效 patterns 键来发现约定。
+
+payload 字段为：
 
 | 字段 | 含义 |
 |------|------|

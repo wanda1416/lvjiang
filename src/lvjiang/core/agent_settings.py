@@ -40,7 +40,8 @@ class AgentSettings:
             transport = item.get("transport", "streamable-http")
             if key in keys or transport not in {"streamable-http", "streamableHttp", "http"}:
                 raise ValueError("Agent 标识重复或接入格式无效")
-            target = AgentTarget(key, item["name"].strip(), item["export_path"].strip(), transport)
+            # 这些值是同一协议的客户端拼写，读取旧配置后统一为标准名称。
+            target = AgentTarget(key, item["name"].strip(), item["export_path"].strip())
             if not target.path.is_absolute():
                 raise ValueError("Agent 导出路径需为绝对路径或以 ~/ 开头")
             keys.add(key)

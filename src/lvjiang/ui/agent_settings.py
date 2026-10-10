@@ -22,24 +22,22 @@ from ..core.agent_settings import AgentSettings, load_agent_settings
 from ..core.config.resolver import save_app_config_node
 from ..i18n import tr
 from .button_styles import apply_button_style
-from .combo_box import AutoWidthComboBox, ComboWidthMode
 
 
 class AgentSettingsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        note = QLabel(tr("配置外部 Agent 的名称和默认导出文件。智能调律中选择使用哪个 Agent；接入令牌不会保存在这里。"))
+        note = QLabel(tr("配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。智能调律中选择使用哪个 Agent；接入令牌不会保存在这里。"))
         note.setWordWrap(True)
         layout.addWidget(note)
-        self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels([tr("Agent 名称"), tr("默认导出文件"), tr("接入格式")])
+        self.table = QTableWidget(0, 2)
+        self.table.setHorizontalHeaderLabels([tr("Agent 名称"), tr("默认导出文件")])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         header = self.table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.table)
         form = QFormLayout()
         self.download = QLineEdit()
@@ -63,24 +61,18 @@ class AgentSettingsPage(QWidget):
         try:
             settings = load_agent_settings()
             for item in settings.items:
-                self.add_row(item.key, item.name, item.export_path, item.transport)
+                self.add_row(item.key, item.name, item.export_path)
             self.download.setText(settings.download_url)
         except (ValueError, OSError) as exc:
             self.status.setText(str(exc))
 
-    def add_row(self, key=None, name="", path="", transport="streamable-http"):
+    def add_row(self, key=None, name="", path=""):
         row = self.table.rowCount()
         self.table.insertRow(row)
         label = QTableWidgetItem(name)
         label.setData(Qt.ItemDataRole.UserRole, key or uuid4().hex)
         self.table.setItem(row, 0, label)
         self.table.setItem(row, 1, QTableWidgetItem(path))
-        protocol = AutoWidthComboBox(width_mode=ComboWidthMode.FULL)
-        protocol.addItem("Streamable HTTP", "streamable-http")
-        protocol.addItem("WorkBuddy", "streamableHttp")
-        protocol.addItem("HTTP", "http")
-        protocol.setCurrentIndex(protocol.findData(transport))
-        self.table.setCellWidget(row, 2, protocol)
 
     def remove_selected(self):
         for row in sorted({index.row() for index in self.table.selectedIndexes()}, reverse=True):
@@ -91,10 +83,9 @@ class AgentSettingsPage(QWidget):
             items = []
             for row in range(self.table.rowCount()):
                 name, path = self.table.item(row, 0), self.table.item(row, 1)
-                protocol = self.table.cellWidget(row, 2)
-                assert name is not None and path is not None and isinstance(protocol, AutoWidthComboBox)
+                assert name is not None and path is not None
                 items.append({"key": name.data(Qt.ItemDataRole.UserRole), "name": name.text(),
-                              "export_path": path.text(), "transport": protocol.currentData()})
+                              "export_path": path.text()})
             settings = AgentSettings.from_dict({"items": items, "download_agent": {"url": self.download.text()}})
             save_app_config_node("agents", settings.to_dict())
             self.status.setText(tr("Agent 设置已保存"))

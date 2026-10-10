@@ -66,6 +66,7 @@ class TuningExecutor:
         self.round_food = ""
         self.round_food_reason = ""
         self.round_food_refunded = False  # 本轮狗粮是否被概率返还
+        self.round_fill_count = 1
         self.materials_exhausted = False
         self._tune_ready_waived = False
         self._material_caches: dict[int, _LevelMaterialCache] = {}
@@ -474,7 +475,8 @@ class TuningExecutor:
     def tune_once(self, equip_data: EquipmentData,
                   expect_rating: str | None,
                   full_recycle_mode: bool = False,
-                  round_no: int | None = None) -> dict | None:
+                  round_no: int | None = None,
+                  fill_count: int = 1) -> dict | None:
         """执行一轮调律：展开材料区→逐轮狗粮决策→一键添加→调律→收结果。
 
         石头检查与狗粮决策共用同一次材料区识别；决策结果存入
@@ -489,6 +491,7 @@ class TuningExecutor:
         self.round_food = ""
         self.round_food_reason = ""
         self.round_food_refunded = False  # 重置返还标记
+        self.round_fill_count = 1
         add_scan = wf.ocr_scene(wf.TUNE_SCENE, ["auto_add", "auto_add_2"])
         # "添加" 匹配的是游戏截屏 OCR 结果，恒为中文，不能过 tr()
         # （英文界面下会拿翻译后的英文去匹配中文截屏，永远匹配不上）。
@@ -525,6 +528,8 @@ class TuningExecutor:
         infos = self._material_cache
         if not self._check_stone_stock(settings, infos):
             return None
+        if full_recycle_mode:
+            self.round_fill_count = self._batch_fill_count(equip_data, settings, fill_count)
 
         # 调满后回收模式：跳过狗粮决策
         food = ""
@@ -573,7 +578,15 @@ class TuningExecutor:
             wf.click_panel(wf.TUNE_SCENE, wf.MATERIAL_PANEL, row, col)
             wf.wait_delay("step_interval")
 
-        wf.click_region(wf.TUNE_SCENE, "auto_add")
+        if self.round_fill_count > 1:
+            logger.info(f"调满后回收：连续添加 {self.round_fill_count} 个词条的材料，一次调律")
+        for index in range(self.round_fill_count):
+            if wf.is_stopped:
+                self.abort_reason = tr("用户停止调律")
+                return None
+            wf.click_region(wf.TUNE_SCENE, "auto_add")
+            if index + 1 < self.round_fill_count:
+                wf.wait_delay("click_interval")
         wf.wait_delay("step_interval")
         if self._cache_volatile:
             # 一键添加可能刚把小律准石用光，槽位随之左移，缓存作废
@@ -616,6 +629,26 @@ class TuningExecutor:
                 wf.wait_delay("step_interval")
                 self.round_food_refunded = True  # 标记返还，调用方据此恢复缓存
         return result
+
+    def _batch_fill_count(self, equip_data: EquipmentData,
+                         settings: MaterialSettings, requested: int) -> int:
+        """按原逐轮库存门槛限制批量次数；成本未知时沿用单轮路径。"""
+        if not settings.stone_check_enabled or requested <= 1:
+            return requested
+        strategy = self._wf.stone_stock
+        available = strategy.stock_units
+        if available is None:
+            return 1
+        count = 0
+        for target in range(len(equip_data.affixes) + 1, len(equip_data.affixes) + requested + 1):
+            cost = strategy.required_tune_units(equip_data, target)
+            if cost is None:
+                return 1
+            if available < settings.stone_min_count * 10 or available < cost:
+                break
+            available -= cost
+            count += 1
+        return max(1, count)
 
     def _validate_tuning_materials(self, infos: dict) -> dict:
         """调律流程材料校验：投入必须为 0（仅记录 error，不阻断）

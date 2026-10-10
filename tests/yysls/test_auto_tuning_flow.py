@@ -1559,9 +1559,9 @@ def test_behavior_rating_logs_winning_rule_names(monkeypatch):
 
 
 @pytest.mark.parametrize("action, expected_rounds", [
-    ("recycle", 0), ("tune_full_recycle", 3),
+    ("recycle", 0), ("tune_full_recycle", 1),
 ])
-def test_tune_recycles_after_hit(monkeypatch, action, expected_rounds):
+def test_tune_recycles_after_hit(monkeypatch, patch_collect_affix, action, expected_rounds):
     """调律处理回收：普通回收在详情页直达，调满后回收仍先调满。"""
     monkeypatch.setattr(auto_tuning, "judge_equipment_potential",
                         lambda *a, **k: dict(_WORTHY))
@@ -1570,7 +1570,10 @@ def test_tune_recycles_after_hit(monkeypatch, action, expected_rounds):
     wf = _wf_with(base)
     wf._ocr_map[TUNE_SCENE] = {"auto_add": "一键添加", "auto_add_2": "", "tune_btn": "调律",
                                "tune_affix": "最大外功攻击 100",
-                               "tune_tip": ""}
+                               "tune_tip": "", "affix_jue": "最大外功攻击 100",
+                               "affix_zhi": "劲 10", "affix_yu": "会心率 1%"}
+    tuned_slots = []
+    wf.stone_stock.record_tune = lambda equip, target: tuned_slots.append(target)
     fp = wf._process_equipment("命中剑", _equip(2, quality="gold",
                                              cap_pct=50), WEAPON_DETAIL)
 
@@ -1585,6 +1588,11 @@ def test_tune_recycles_after_hit(monkeypatch, action, expected_rounds):
         reports = wf.output["tuning_reports"]
         assert reports[0]["status"] == "tuned"
         assert reports[0]["rounds"] == expected_rounds
+        assert wf.clicks.count((TUNE_SCENE, "auto_add")) == 3
+        assert wf.clicks.count((TUNE_SCENE, "tune_btn")) == 1
+        assert tuned_slots == [3, 4, 5]
+        assert len(reports[0]["latest_affixes"]) == 5
+        assert reports[0]["tune_results"][0]["filled_count"] == 3
         assert reports[0]["recycled"] is True
         assert (wf.clicks.index((TUNE_SCENE, "back"))
                 < wf.clicks.index((CONTROL_SCENE, "confirm")))
@@ -2979,3 +2987,24 @@ def test_user_end_during_reset_keeps_unknown_page_untouched(monkeypatch):
     assert wf.is_stopped is True
     wf.navigator.leave_tune.assert_not_called()
     assert not wf.output.get("recycled_items")
+
+
+def test_full_recycle_batch_obeys_each_slot_stone_safety_line(monkeypatch):
+    """批量添加前逐槽预计消耗；不会跨过原逐轮库存门槛。"""
+    from lvjiang.apps.yysls.workflows.implementations.tuning.stone_stock import (
+        CachedStoneStock,
+    )
+
+    wf = FakeWF()
+    wf.run_ctx.use_stone_cache = True
+    stock = wf.stone_stock
+    assert isinstance(stock, CachedStoneStock)
+    stock.set_manual(600)
+    monkeypatch.setattr(stock, "required_tune_units", lambda _equip, _target: 100)
+    equip = EquipmentData.from_dict(_equip(2))
+    settings = MaterialSettings(stone_check_enabled=True, stone_min_count=50)
+    # 添加第三条前剩 60、第四条前剩 50，可以添加；第五条前剩 40，不再添加。
+    assert wf.executor._batch_fill_count(equip, settings, 3) == 2
+    assert stock.stock_units == 600  # 添加准备不提前记实际消耗。
+    monkeypatch.setattr(stock, "required_tune_units", lambda _equip, _target: None)
+    assert wf.executor._batch_fill_count(equip, settings, 3) == 1

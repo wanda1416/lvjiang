@@ -83,6 +83,8 @@ class TuningRoundHostPort(Protocol):
     MATERIAL_PANEL: str
     MATERIAL_GROUP: str
     @property
+    def is_stopped(self) -> bool: ...
+    @property
     def base_group(self) -> Any: ...
 
     @property

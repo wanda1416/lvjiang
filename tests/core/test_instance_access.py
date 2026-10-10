@@ -201,29 +201,36 @@ def test_readonly_reload_refreshes_writable_state_and_keeps_transients(tmp_path,
     assert store.get_node("settings") == {"env": "android", "language": "en_US"}
 
 
-def test_readonly_batch_ui_state_does_not_change_primary_instance(
+def test_readonly_instance_keeps_batch_drafts_but_not_active_group(
     tmp_path, monkeypatch,
 ):
-    """批量活动组和运行草稿都是实例自己的页面状态。"""
+    """活动组是实例私有选择，运行草稿是用户数据——只读实例只挡前者。
+
+    草稿曾和活动组同在 ui_state 下，于是多开时抢不到实例锁的那个实例调好的
+    勾选与顺序，重启后全丢；而需求要的是"应用重启后恢复上次页面状态"。
+    """
+    from lvjiang.core import batch_run
+    from lvjiang.core.batch_run import BatchRunDraft, BatchSelection
+
     path = tmp_path / "interface.json"
     store = InterfaceStore(path)
-    store.set_node("ui_state", {
-        "batch": {"active_group_id": "primary", "drafts": {}}
-    })
+    monkeypatch.setattr(
+        "lvjiang.core.config.interface.get_interface_store", lambda: store)
+    store.set_node("batch", {"active_group_id": "primary", "drafts": {}})
 
     monkeypatch.setattr(access, "_readonly", True)
-    store.mutate_node("ui_state", lambda old: {
-        **old,
-        "batch": {"active_group_id": "readonly", "drafts": {
-            "gid": {"rounds": 9},
-        }},
-    })
+    batch_run.set_active_group_id("readonly")
+    batch_run.save_draft("gid", BatchRunDraft(
+        tasks=BatchSelection.from_dict({"keys": ["a"], "all": False}),
+        users=BatchSelection.from_dict({"keys": ["u"], "all": False}),
+        rounds=9, unattended=True))
 
-    assert store.get_node("ui_state")["batch"]["active_group_id"] == "readonly"
+    # 活动组不落盘，磁盘上仍是主实例的值。
+    assert batch_run.active_group_id() == "readonly"
     disk = json.loads(path.read_text(encoding="utf-8"))
-    assert disk["ui_state"]["batch"] == {
-        "active_group_id": "primary", "drafts": {},
-    }
+    assert disk["batch"]["active_group_id"] == "primary"
+    # 草稿必须落盘，否则只读实例的用户白调一遍。
+    assert disk["batch"]["drafts"]["gid"]["rounds"] == 9
 
 
 def test_readonly_user_loadout_stays_editable_during_execution(tmp_path, monkeypatch):

@@ -40,7 +40,7 @@ def dialog(qtbot, monkeypatch):
     monkeypatch.setattr(module, 'lifecycle_parameter_definitions', lambda _: definitions)
     users = SimpleNamespace(list_users=lambda: ['tester'],
                             get_user=lambda _: SimpleNamespace(attributes={'team': 'demo'}))
-    get_interface_store().update_node('ui_state', {'batch': {'active_group_id': 'first'}})
+    get_interface_store().update_node('batch', {'active_group_id': 'first'})
     widget = module.BatchConfigDialog(users)
     qtbot.addWidget(widget)
     widget.resize(1000, 700)
@@ -82,7 +82,7 @@ def test_unit_and_editor_switch_do_not_change_skip_preference_or_active_group(di
     assert widget._skip_single_lifecycle.isEnabled() and widget._skip_single_lifecycle.isChecked()
     assert not widget._profile_sort_widget.isHidden()
     widget._config_combo.setCurrentIndex(widget._config_combo.findData('second'))
-    assert get_interface_store().get_node('ui_state')['batch']['active_group_id'] == 'first'
+    assert get_interface_store().get_node('batch')['active_group_id'] == 'first'
 
 
 def test_task_row_marks_ids_whose_script_is_gone(dialog, monkeypatch):

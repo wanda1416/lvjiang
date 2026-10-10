@@ -23,9 +23,12 @@ class InterfaceStore(SessionStore):
     FORMAT_VERSION = INTERFACE_VERSION
     TRANSIENT_PATHS = frozenset({
         ("profile", "overview_active_group"),
-        ("ui_state", "batch"), ("ui_state", "main_page"),
+        ("ui_state", "main_page"),
         ("ui_state", "scene_editor"), ("ui_state", "reference_manager"),
         ("ui_state", "task_history"),
+        # 批量节点的活动组是"本实例在看哪个组"；同一节点下的运行草稿是用户
+        # 一行行调出来的数据，必须落盘，所以只标这一个字段而不是整棵子树。
+        ("batch", "active_group_id"),
     })
 
     def __init__(self, path: Path | str | None = None, *, legacy_path: Path | None = None):

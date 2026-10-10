@@ -10,7 +10,7 @@
 |---|---|---|---|
 | 配置组定义 | `BatchConfigItem` | `batch.json` | 只有「批量配置」窗口 |
 | 配置编辑器草稿 | 对话框内部 `_cfg` | 内存 | 对话框自己，点保存才落盘 |
-| 本次运行草稿 | `BatchRunDraft` | `interface.json` 的 `ui_state.batch` | 只有主页面批量页 |
+| 本次运行草稿 | `BatchRunDraft` | `interface.json` 根节点的 `batch` | 只有主页面批量页 |
 | 执行快照 | `BatchRunSpec` | 内存（并进执行历史） | 点「开始」时冻结，之后不可变 |
 
 ## 字段归属
@@ -23,6 +23,11 @@
 运行草稿：本次勾选与实际顺序（`BatchSelection.order` / `checked`）、本次轮数、本次
 是否无人值守，以及主页面当前配置组 `active_group_id`。草稿按稳定配置组 ID 隔离，
 存在会话里只是为了应用重启后恢复页面状态。
+
+两者同在根节点 `batch` 下，但落盘语义不同：`active_group_id` 回答"本实例在看哪个
+组"，列在 `InterfaceStore.TRANSIENT_PATHS` 里，多开时抢不到实例锁的只读实例改它不
+落盘；`drafts` 是用户一行行调出来的数据，必须落盘。两者曾在 `ui_state.batch` 下同处
+一棵子树，而 TRANSIENT 只能按子树标记，于是只读实例调好的勾选与顺序重启后全丢。
 
 ## 协调与快照
 

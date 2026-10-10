@@ -140,6 +140,6 @@ def test_two_session_instances_merge_batch_fields_atomically(
         "lvjiang.core.config.interface.get_interface_store", lambda: second)
     save_draft("gid-1", BatchRunDraft(rounds=4))
 
-    saved = InterfaceStore(path).get_node("ui_state")
-    assert saved["batch"]["active_group_id"] == "gid-1"
-    assert saved["batch"]["drafts"]["gid-1"]["rounds"] == 4
+    saved = InterfaceStore(path).get_node("batch")
+    assert saved["active_group_id"] == "gid-1"
+    assert saved["drafts"]["gid-1"]["rounds"] == 4

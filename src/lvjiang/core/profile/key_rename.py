@@ -83,7 +83,7 @@ def _rename_interface(data: dict, renames: list[tuple[str, str, str]]) -> None:
             if replaced != parts[1]:
                 parts[1] = replaced
                 alerts[":".join(parts)] = alerts.pop(name)
-    batch = data.get("ui_state", {}).get("batch", {})
+    batch = data.get("batch", {})
     for draft in batch.get("drafts", {}).values():
         if "profile_sort_key" in draft:
             draft["profile_sort_key"] = replace_key(draft["profile_sort_key"], renames)

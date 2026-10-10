@@ -4,7 +4,7 @@
 
 - **配置组定义** `BatchConfigItem`（`batch.json`）——可见范围、初始顺序、默认勾选、
   调度单元、生命周期 wf 及其参数。只在「批量配置」窗口里改。
-- **运行草稿** `BatchRunDraft`（`interface.json` 的 `ui_state.batch`）——本次要跑哪些、
+- **运行草稿** `BatchRunDraft`（`interface.json` 根节点的 `batch`）——本次要跑哪些、
   按什么顺序、跑几轮、有没有人看守。主页面改它，**永不反写定义层**。
 - **执行快照** `BatchRunSpec`（内存，见 `ui/batch/batch_runner.py`）——点开始那一刻
   把上面两层合成一份冻结数据，调度器只认它。
@@ -163,41 +163,47 @@ class BatchRunDraft:
         )
 
 
-# ─── interface.json 的 ui_state.batch ─────────────────────────
+# ─── interface.json 根节点的 batch ─────────────────────────
 #
-# 放在 ui_state 下而不是新开顶层节点：它就是页面状态，和窗口尺寸、日常页选中项
-# 同一性质。batch 内部还有活动组和多份草稿，写入必须在 SessionStore 锁内修改
-# 最新节点；先 get 再整体 update 会让两个实例用各自的旧快照互相覆盖。
+# 不放 ui_state 下：ui_state 整片是"实例私有的界面状态"，多开时抢不到实例锁的
+# 只读实例改它会整片不落盘。而运行草稿是用户一行行调出来的数据，需求要求"应用
+# 重启后恢复上次页面状态"，放进 ui_state 会连它一起被排除掉。
+#
+# 活动组确实属于"本实例在看什么"，所以单独留在 TRANSIENT_PATHS 里（见
+# InterfaceStore.TRANSIENT_PATHS 的 ("batch", "active_group_id")）。
+#
+# 写入必须在 SessionStore 锁内改最新节点；先 get 再整体 update 会让两个实例用
+# 各自的旧快照互相覆盖。
 
-_UI_STATE_KEY = "ui_state"
-_BATCH_SECTION = "batch"
+_BATCH_NODE = "batch"
 
 
-def _batch_section() -> dict:
+def _batch_node() -> dict:
     from .config.interface import get_interface_store
 
-    node = get_interface_store().get_node(_UI_STATE_KEY, {}) or {}
-    section = node.get(_BATCH_SECTION) if isinstance(node, dict) else None
-    return section if isinstance(section, dict) else {}
+    node = get_interface_store().get_node(_BATCH_NODE, {})
+    return node if isinstance(node, dict) else {}
 
 
-def _mutate_batch_section(mutator: Callable[[dict], None]) -> None:
+def _mutate_batch_node(mutator: Callable[[dict], None]) -> None:
     from .config.interface import get_interface_store
 
     def _merge(old: object) -> dict:
-        state = dict(old) if isinstance(old, dict) else {}
-        current = state.get(_BATCH_SECTION)
-        section = dict(current) if isinstance(current, dict) else {}
-        mutator(section)
-        state[_BATCH_SECTION] = section
-        return state
+        node = dict(old) if isinstance(old, dict) else {}
+        mutator(node)
+        return node
 
-    get_interface_store().mutate_node(_UI_STATE_KEY, _merge)
+    get_interface_store().mutate_node(_BATCH_NODE, _merge)
 
 
 def active_group_id() -> str:
-    """主页面当前选中的配置组 ID。属于页面状态，不进 batch.json。"""
-    value = _batch_section().get("active_group_id")
+    """主页面当前选中的配置组 ID。
+
+    与运行草稿同在 batch 节点，但语义不同：它回答"本实例在看哪个组"，只读
+    实例下不落盘（见 InterfaceStore.TRANSIENT_PATHS）；草稿是必须保存的
+    用户数据。不进 batch.json。
+    """
+    value = _batch_node().get("active_group_id")
     return value if isinstance(value, str) else ""
 
 
@@ -205,13 +211,13 @@ def set_active_group_id(group_id: str) -> None:
     def _set(section: dict) -> None:
         section["active_group_id"] = str(group_id or "")
 
-    _mutate_batch_section(_set)
+    _mutate_batch_node(_set)
 
 
 def load_draft(group_id: str) -> BatchRunDraft:
     if not group_id:
         return BatchRunDraft()
-    drafts = _batch_section().get("drafts")
+    drafts = _batch_node().get("drafts")
     raw = drafts.get(group_id) if isinstance(drafts, dict) else None
     return BatchRunDraft.from_dict(raw)
 
@@ -226,7 +232,7 @@ def save_draft(group_id: str, draft: BatchRunDraft) -> None:
         drafts[group_id] = draft.to_dict()
         section["drafts"] = drafts
 
-    _mutate_batch_section(_save)
+    _mutate_batch_node(_save)
 
 
 def forget_drafts(keep_group_ids: list[str]) -> None:
@@ -241,4 +247,4 @@ def forget_drafts(keep_group_ids: list[str]) -> None:
             key: value for key, value in drafts.items() if key in keep
         }
 
-    _mutate_batch_section(_forget)
+    _mutate_batch_node(_forget)

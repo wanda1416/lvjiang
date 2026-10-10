@@ -100,8 +100,9 @@ touch src/lvjiang/apps/mygame/__init__.py
 
 运行时使用 `-reg mygame` 显式加载 `lvjiang.apps.mygame`。
 插件目录可由独立仓库提供，无需修改主仓库的插件名册；不传 `-reg` 时不会加载。
-本地 `dev.sh` / `dev.bat` 默认只加载 `yysls`，显式传 `--all` 才额外加载
-`premium`。公开发布在干净检出上构建，不包含独立私有仓库。
+本地 `dev.sh` / `dev.bat` 与主程序一致：不传 `-reg` 就是纯通用模式，`--all`
+按固定名册加载全部插件（`yysls`、`premium`），不按目录内容推断。公开发布在干净
+检出上构建，不包含独立私有仓库。
 
 ### 3. 实现 hooks
 

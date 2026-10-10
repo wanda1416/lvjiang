@@ -15,16 +15,20 @@ rem launched from a fresh/elevated shell where the venv is not activated.
 set "PY=%~dp0.venv\Scripts\python.exe"
 if not exist "%PY%" set "PY=python"
 
+rem No plugin is loaded unless asked for: -reg/--register APP (repeatable)
+rem passes one through, --all means the whole roster this repo ships —
+rem yysls then premium, a fixed list in a fixed order, not whatever happens
+rem to be sitting in the apps directory.
 set "EXTRA_APPS="
 set "FORWARD_ARGS="
 :parse_args
 if "%~1"=="" goto launch
-if /I "%~1"=="--all" goto add_premium
+if /I "%~1"=="--all" goto add_all
 set "FORWARD_ARGS=%FORWARD_ARGS% %1"
 shift
 goto parse_args
-:add_premium
-set "EXTRA_APPS=-reg premium"
+:add_all
+set "EXTRA_APPS=-reg yysls -reg premium"
 shift
 goto parse_args
 :launch
@@ -32,4 +36,4 @@ if defined EXTRA_APPS if not exist "%~dp0src\lvjiang\apps\premium\__init__.py" (
     echo [ERROR] --all requires the premium repository at src\lvjiang\apps\premium 1>&2
     exit /b 1
 )
-"%PY%" -m lvjiang -reg yysls %EXTRA_APPS% %FORWARD_ARGS%
+"%PY%" -m lvjiang %EXTRA_APPS% %FORWARD_ARGS%

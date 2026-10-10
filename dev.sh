@@ -90,10 +90,11 @@ main() {
     local python_cmd
     local extra_apps=()
     local forwarded=()
-
+    # 默认不加载任何插件：-reg/--register APP 逐个显式指定；--all 表示本仓库
+    # 随包提供的全部插件（yysls 后 premium 的固定顺序），不按目录内容推断。
     for arg in "$@"; do
         if [[ "$arg" == "--all" ]]; then
-            extra_apps=(-reg premium)
+            extra_apps=(-reg yysls -reg premium)
         else
             forwarded+=("$arg")
         fi
@@ -102,7 +103,7 @@ main() {
         error "--all requires the premium repository at src/lvjiang/apps/premium"
         exit 1
     fi
-    
+
     python_cmd=$(find_python) || exit 1
     
     info "Using Python: $python_cmd"
@@ -113,7 +114,12 @@ main() {
     # allows running bare python without pip install -e .
     export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
     
-    exec "$python_cmd" -m lvjiang -reg yysls "${extra_apps[@]}" "${forwarded[@]}"
+    # 空数组在 bash 3.2 下直接展开会触发 set -u 的 unbound variable，而 macOS
+    # 自带的就是 3.2；按长度逐个追加。args 本身恒非空。
+    local args=(-m lvjiang)
+    if (( ${#extra_apps[@]} )); then args+=("${extra_apps[@]}"); fi
+    if (( ${#forwarded[@]} )); then args+=("${forwarded[@]}"); fi
+    exec "$python_cmd" "${args[@]}"
 }
 
 main "$@"

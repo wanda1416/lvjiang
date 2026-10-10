@@ -194,8 +194,10 @@ python -m lvjiang
 # 方式二：加载燕云插件（通用引擎 + 燕云装备调律）
 python -m lvjiang -reg yysls
 
-# 方式三：Windows 快捷脚本（默认加载燕云插件，自动设置 PYTHONPATH）
-.\dev.bat
+# 方式三：Windows 快捷脚本（自动设置 PYTHONPATH，不默认加载任何插件）
+.\dev.bat                    # 纯通用模式
+.\dev.bat -reg yysls         # 通用 + 燕云插件
+.\dev.bat --all              # 加载全部插件（yysls + premium）
 ```
 
 > src-layout 下 `lvjiang` 包位于 `src/` 内：已 `pip install -e .` 则直接可用；否则需先将 `src` 加入 `PYTHONPATH`（`dev.bat` 已处理）。

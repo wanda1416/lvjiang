@@ -66,14 +66,14 @@ source .venv/bin/activate
 
 pip install -e ".[dev]"
 
-# 3. 启动（加载燕云调律插件）
+# 3. 启动（-reg 指定要加载的插件，不传则不加载任何插件）
 python -m lvjiang -reg yysls
 
-# 或使用快捷脚本（自动处理 PYTHONPATH）
+# 或使用快捷脚本（自动处理 PYTHONPATH，同样不默认加载插件）
 # Windows:
-.\dev.bat
+.\dev.bat -reg yysls
 # macOS / Linux:
-./dev.sh
+./dev.sh -reg yysls
 ```
 
 启动后进入主窗口「律匠 - 燕云十六声装备调律工具」。

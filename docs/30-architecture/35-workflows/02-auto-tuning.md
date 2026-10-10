@@ -1,8 +1,7 @@
 # 流程：自动调律（Auto Tuning）
 
-> 需求与行为规格（为什么要 Panel、遍历策略语义、指纹模型、决策编排三行为点、回收
-> 处理）见 [20-requirements/10-tuning/01-auto-tuning.md](../../20-requirements/10-tuning/01-auto-tuning.md)。
-> 本文只写实现侧：Panel 数据结构、图像自校准、模块拆分与配置落点。
+> 产品需求见 [自动调律需求](../../20-requirements/10-tuning/01-auto-tuning.md)。
+> 本文定义 Panel 与模块编排；[遍历契约](03-bag-traversal.md)和[决策契约](04-tuning-decisions.md)分别维护算法与执行语义。
 
 ## 1. Panel 数据结构
 

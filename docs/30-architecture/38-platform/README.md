@@ -14,3 +14,5 @@
 | [04-telemetry.md](04-telemetry.md) | 匿名统计：D1 表结构、写入粒度设计、校验边界、分析查询 |
 | [06-protected-config.md](06-protected-config.md) | 受保护包协议、云端取密钥与现有 remote 同步衔接 |
 | [07-agent-mcp.md](07-agent-mcp.md) | 外部 Agent 本机 MCP、授权、独立配置生成与发行文档包 |
+
+- [08-i18n.md](08-i18n.md)：翻译模块、核心/插件合并、回退与内容一致性契约。

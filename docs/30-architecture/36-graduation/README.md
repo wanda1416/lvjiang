@@ -33,7 +33,9 @@
 | [03-json-model.md](03-json-model.md) | JSON v3 Schema 契约：字段定义、类型、约束 |
 | [04-alias-resolution.md](04-alias-resolution.md) | 别名解析规则：约束求解流程、错误处理、配置依赖 |
 | [05-compiler-runtime.md](05-compiler-runtime.md) | 编译器与运行时：部分求值、opcode 语义表、执行模型 |
-| [06-operations.md](06-operations.md) | 操作指南：导入、验证、对账、扩展、故障排查 |
+| [06-operations.md](06-operations.md) | 导入验证、模型版本与缓存契约 |
 | [07-skill-rotation.md](07-skill-rotation.md) | 技能轴查看：从原始 Excel 读竞速轴，把 DPS 拆回每个技能 |
 | [08-scoring-layer.md](08-scoring-layer.md) | 评分层：`PlanScoringContext` → `Assumptions` → `LoadoutScorer`，五个入口的公共骨架与转律三套口径 |
 | [references/leoq7-data-format.md](references/leoq7-data-format.md) | 装备数据外部交换格式（V2）：导出到 `yysls.leoq7.com` 的传输格式（`export_leoq7()`，实现于 `apps/yysls/ui/loadout/leoq7_export.py`） |
+
+- [09-transmute-simulation.md](09-transmute-simulation.md)：转律候选、贪心搜索、三满投影与目标保存。

@@ -95,7 +95,7 @@ Qt Store 只负责信号和集合；SQLite repository 不依赖 Qt。投影器�
 `TuningResetter.try_reset_tune` 的跳过分支返回 `(outcome, message)` 而不是裸
 字符串：调用方直接透传 outcome，不再从中文原因串反推档位——那些串都过了
 `tr()`，英文界面下必然认错档。`False` 严格保留给"确定且永久的重置不可用"
-（见[自动调律 §6.5](../../20-requirements/10-tuning/01-auto-tuning.md#65-重置处理reset-动作的执行)）。
+（见[自动调律 §6.5](../35-workflows/04-tuning-decisions.md#65-重置处理reset-动作的执行)）。
 
 每次运行的异常件数由 `list_runs()` / `get_run()` 的子查询实时聚合，**没有**
 落到 `tuning_runs` 的列上，因此不需要迁移。更重要的是 `finish_run` 只在正常

@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from .tab import ProfileTab
 
 # 列宽配置存储在 ui_state 下
-_COLUMN_WIDTHS_KEY = "profile_overview_column_widths"
+_COLUMN_WIDTHS_KEY = "profile_overview"
 
 
 def _get_column_widths() -> dict:

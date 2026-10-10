@@ -6,7 +6,7 @@ import hashlib
 import json
 import threading
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -27,21 +27,6 @@ def revision(value) -> str:
     ).encode("utf-8")).hexdigest()
 
 
-@dataclass(frozen=True)
-class AgentGrant:
-    user: str = ""
-    target_id: str = ""
-    read_data: bool = True
-    scan: bool = False
-    generate: bool = False
-    save_selection: bool = False
-    execute: bool = False
-    recycle: bool = False
-    reset: bool = False
-    food: bool = False
-    lock: bool = False
-
-
 class AgentService:
     def __init__(self, root: Path, *, dispatch: Callable, game_config=None):
         self.root = root
@@ -56,8 +41,7 @@ class AgentService:
         self.dispatch = dispatch
         self._game_config = game_config
         self._lock = threading.RLock()
-        self._grant_lock = threading.RLock()
-        self.grant = AgentGrant()
+        self.enabled = False
         self._jobs: dict[str, dict] = {}
 
     @property
@@ -67,9 +51,17 @@ class AgentService:
             return get_game_config()
         return self._game_config
 
-    def authorize(self, grant: AgentGrant) -> None:
-        with self._grant_lock:
-            self.grant = grant
+    def set_enabled(self, enabled: bool) -> None:
+        self.enabled = enabled
+
+    def _ensure_enabled(self) -> None:
+        if not self.enabled:
+            raise PermissionError("MCP 服务已关闭，请在智能调律页启动 MCP 服务")
+
+    def list_users(self) -> dict:
+        """读取当前用户和全部用户；切换用户不影响连接，无需重新导出配置。"""
+        self._ensure_enabled()
+        return self.dispatch("context", {})
 
     def _entity(self, path: str) -> dict:
         source = self.resolver.resolve_read(path)
@@ -80,28 +72,32 @@ class AgentService:
             raise ValueError("配置格式无效")
         return value
 
-    def _check(self, user: str, permission: str = "read_data") -> AgentGrant:
-        with self._grant_lock:
-            grant = self.grant
-        if not user or user != grant.user or not getattr(grant, permission):
-            raise PermissionError("当前连接未获该用户或操作的授权")
-        return grant
+    def _check(self, user: str) -> None:
+        from .....core.user_config import is_valid_username
+        self._ensure_enabled()
+        if not is_valid_username(user) or user not in self.list_users()["users"]:
+            raise ValueError("用户不存在，请调用 list_users 获取当前用户与全部用户")
 
     def get_capabilities(self) -> dict:
-        """先读取实际版本、权限及范围，再选择工具；不依赖内置 AI 设置。"""
-        return {"version": __version__, "api_version": 1,
-                "permissions": asdict(self.grant),
+        """先读取动态用户/目标和功能状态；开启服务即开放现有 MCP 能力。"""
+        context = self.list_users()
+        return {"version": __version__, "api_version": 2, **context,
+                **self.list_targets(),
                 "scan_coverage": "visible_game_plan_grid",
                 "configuration_policy": "create_new_local_only",
                 "cultivation_policy": "analysis_only",
-                "instructions": "先读 entry 文档；目标在对话中确认；生成新规则和基础组后可一键启动。"}
+                "instructions": "先读 entry 文档；当前用户随主界面变化，所有用户均可指定。设备和用户在每次调用中选择，不绑定连接配置。功能不可用时按接口原因告知用户。"}
 
     def list_targets(self) -> dict:
-        """返回本连接授权的执行目标及可用状态。"""
-        return self.dispatch("targets", {"target_id": self.grant.target_id})
+        """列出本实例全部窗口/设备、当前选中目标及可执行状态。"""
+        self._ensure_enabled()
+        return self.dispatch("targets", {})
+
+    def _resolve_target(self, target_id: str) -> str:
+        return str(self.dispatch("resolve_target", {"target_id": target_id})["target_id"])
 
     def list_plans(self, user: str) -> dict:
-        """查询授权用户的备战方案；采集默认玩法不等于用户最终目标。"""
+        """查询指定用户的备战方案；采集默认玩法不等于用户最终目标。"""
         self._check(user)
         state = LoadoutRepository(user, self.users_dir).load()
         return {"revision": revision(state.to_dict()),
@@ -135,6 +131,7 @@ class AgentService:
     def get_game_config(self, section: str = "playstyles") -> dict:
         """按主题读实际生效的游戏配置；不开放 app、场景、布局或任意路径。"""
         from ...config.game_config_files import GAME_CONFIG_SECTION_FILES
+        self._ensure_enabled()
         path = GAME_CONFIG_SECTION_FILES.get(section)
         if path is None:
             raise ValueError("不支持该公共配置主题")
@@ -144,6 +141,7 @@ class AgentService:
     def list_graduation_schemes(self) -> dict:
         """列出实际可用毕业率模型；没有适用模型时不得编造毕业率。"""
         from ..graduation.model_registry import list_graduation_models
+        self._ensure_enabled()
         return {"models": [{k: v for k, v in asdict(model).items() if k != "rel_path"}
                            for model in list_graduation_models()]}
 
@@ -167,7 +165,7 @@ class AgentService:
         from .....core.user_config import mutate_user_metadata
         from ...config.auto_tuning_config import default_auto_tuning_config
         from .launch import prepare_tuning
-        self._check(user, "save_selection")
+        self._check(user)
         allowed = set(default_auto_tuning_config()) - {"skip_tuning"}
         if set(patch) - allowed:
             raise ValueError("设置补丁包含不开放的字段")
@@ -191,7 +189,7 @@ class AgentService:
                 else:
                     current[key] = value
             prepare_tuning(current)
-            self._check(user, "save_selection")
+            self._check(user)
             metadata.workflow_params["auto_tuning"] = current
         saved = mutate_user_metadata(user, mutate, self.users_dir).workflow_params["auto_tuning"]
         return {"config": saved, "revision": revision(saved)}
@@ -277,7 +275,7 @@ class AgentService:
         return self._job(user, calculate)
 
     def search_best_combo(self, user: str, plan_id: str, overrides: dict | None = None) -> dict:
-        """异步搜索授权用户装备库的真实组合；排除模拟装备，不应用结果。"""
+        """异步搜索指定用户装备库的真实组合；排除模拟装备，不应用结果。"""
         from ..combat.equipment import EquipmentInventory
         from ..graduation.candidate_pool import CandidateFilter, collect_candidates
         from ..graduation.optimal_combo import search_optimal_combo
@@ -317,7 +315,7 @@ class AgentService:
             return {key: value for key, value in job.items() if key not in {"cancelled", "user"}}
 
     def _generated(self, user: str, payload: dict, result_id: str) -> tuple[dict, list[dict], dict]:
-        self._check(user, "generate")
+        self._check(user)
         from .....core.access import is_readonly
         if is_readonly():
             raise PermissionError("当前律匠实例为共享配置只读模式，不能生成规则")
@@ -399,7 +397,7 @@ class AgentService:
 
     def create_generated_tuning(self, user: str, request_id: str, payload: dict) -> dict:
         """成套创建新 local 配置和私人结果记录；重试幂等，已有定义永不覆盖。"""
-        self._check(user, "generate")
+        self._check(user)
         if not request_id or len(request_id) > 128:
             raise ValueError("必须提供不超过 128 字符的幂等请求 ID")
         result_id = revision([user, request_id])[:24]
@@ -407,7 +405,7 @@ class AgentService:
         digest = revision(payload)
         self.store.ensure_initialized()
         with self._lock, InterProcessLock(str(self.store.root / "generation.lock")):
-            self._check(user, "generate")
+            self._check(user)
             records = self.store.load("results")
             existing = records.get(result_id)
             if existing:
@@ -424,7 +422,7 @@ class AgentService:
                           "plan_targets": payload.get("plan_targets", {}),
                           "definitions_revision": revision([group, rules]), "payload_revision": digest,
                           "created_at": datetime.now(timezone.utc).isoformat(), "status": "ready"}
-                self._check(user, "generate")
+                self._check(user)
                 self.store.mutate("results", lambda data: {**data, result_id: record})
             except Exception:
                 for path in created:
@@ -434,13 +432,13 @@ class AgentService:
         return record
 
     def list_generated_tuning(self, user: str) -> dict:
-        """查询授权用户的生成结果，供智能调律页一键启动。"""
+        """查询指定用户的生成结果，供 Agent 展示及调用启动。"""
         self._check(user)
         return {"results": [r for r in self.store.load("results").values() if r["user"] == user]}
 
-    def validate_auto_tuning(self, user: str, result_id: str) -> dict:
-        """复核新配置修订、任务权限和间接回收/重置/材料动作。"""
-        grant = self._check(user, "execute")
+    def validate_auto_tuning(self, user: str, result_id: str, target_id: str = "") -> dict:
+        """复核新配置修订及指定设备的运行前提；回收/重置等行为由配置定义。"""
+        self._check(user)
         record = self.store.load("results").get(result_id)
         if record is None or record["user"] != user or record["status"] != "ready":
             raise ValueError("没有该用户可启动的生成结果")
@@ -449,18 +447,8 @@ class AgentService:
         rules = [self._entity(f"yysls/tuning_rules/{key}.yaml") for key in config["rules"]]
         if revision([group, rules]) != record["definitions_revision"]:
             raise ValueError("生成配置已被修改，请重新生成或重新核对后启动")
-        parsed = parse_tuning_group(group)
-        actions = [r.action for r in (*parsed.scan.rules, *parsed.tune.rules) if r.enabled]
-        if parsed.smart_tuning.failure_action.enabled:
-            actions.append(parsed.smart_tuning.failure_action.action)
-        actions.append(parsed.tune.reset_exhausted_action)
-        for action, allowed in (("recycle", grant.recycle), ("reset", grant.reset)):
-            if not allowed and any(action in value for value in actions):
-                raise PermissionError(f"生成配置包含未授权动作：{action}")
-        if parsed.tune.lock_qualified and not grant.lock:
-            raise PermissionError("生成配置包含未授权的装备锁定")
-        if any(r.enabled and r.food for r in parsed.materials.food_rules) and not grant.food:
-            raise PermissionError("生成配置包含未授权的狗粮使用")
+        parse_tuning_group(group)
+        target_id = self._resolve_target(target_id)
         state = LoadoutRepository(user, self.users_dir).load()
         if record["plan_ids"]:
             selected = {key: state.plans[key] for key in record["plan_ids"] if key in state.plans}
@@ -471,33 +459,33 @@ class AgentService:
         for key, overrides in record.get("plan_targets", {}).items():
             for field, value in overrides.items():
                 setattr(state.plans[key], field, value)
-        self.dispatch("validate", {"user": user, "target_id": grant.target_id, "config": config})
+        self.dispatch("validate", {"user": user, "target_id": target_id, "config": config})
         return {"ready": True, "result_id": result_id, "config": config,
                 "smart_state": state.to_dict(),
-                "target_id": grant.target_id}
+                "target_id": target_id}
 
-    def start_auto_tuning(self, user: str, result_id: str, request_id: str) -> dict:
+    def start_auto_tuning(self, user: str, result_id: str, request_id: str, target_id: str = "") -> dict:
         """按生成结果启动现有调律；本次参数不自动设为默认。"""
-        validated = self.validate_auto_tuning(user, result_id)
+        validated = self.validate_auto_tuning(user, result_id, target_id)
         return self.dispatch("start_tuning", {**validated, "user": user, "request_id": request_id})
 
-    def start_scan_all_loadouts(self, user: str, request_id: str, skip_existing: bool = False) -> dict:
+    def start_scan_all_loadouts(self, user: str, request_id: str, skip_existing: bool = False,
+                                target_id: str = "") -> dict:
         """采集游戏可见网格内方案，会切换游戏方案并写入方案/装备/基础属性；不会改应用活动方案。"""
-        grant = self._check(user, "scan")
-        return self.dispatch("scan", {"user": user, "target_id": grant.target_id,
+        self._check(user)
+        target_id = self._resolve_target(target_id)
+        return self.dispatch("scan", {"user": user, "target_id": target_id,
                                      "request_id": request_id, "skip_existing": skip_existing})
 
     def get_task_status(self, user: str, task_id: str, action: str = "status") -> dict:
         """查询本连接启动的游戏任务，或 pause/resume/stop；终态和停止请求分别返回。"""
-        grant = self._check(user)
-        if action != "status" and not (grant.execute or grant.scan):
-            raise PermissionError("未授权任务控制")
+        self._check(user)
         if action not in {"status", "pause", "resume", "stop"}:
             raise ValueError("任务操作无效")
         return self.dispatch("task", {"user": user, "task_id": task_id, "action": action})
 
     def query_tuning_history(self, user: str, limit: int = 20) -> dict:
-        """查询授权用户的实际调律历史，不返回私有日志路径。"""
+        """查询指定用户的实际调律历史，不返回私有日志路径。"""
         from ..tuning_history.repository import TuningHistoryRepository
         self._check(user)
         if not 1 <= limit <= 100:
@@ -507,7 +495,7 @@ class AgentService:
                          for r in repo.list_runs(1000) if r.username == user][:limit]}
 
     def get_tuning_results(self, user: str, run_id: str, offset: int = 0, limit: int = 30) -> dict:
-        """分页读取授权用户某次实际调律的逐件结果。"""
+        """分页读取指定用户某次实际调律的逐件结果。"""
         from ..tuning_history.repository import TuningHistoryRepository
         self._check(user)
         if offset < 0 or not 1 <= limit <= 100:

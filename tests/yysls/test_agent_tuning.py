@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from lvjiang.apps.yysls.core.agent.service import AgentGrant, AgentService
+from lvjiang.apps.yysls.core.agent.service import AgentService
 
 
 @pytest.fixture
@@ -18,8 +18,14 @@ def setup_service(tmp_path):
         dest = system / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text((source / rel).read_text(encoding="utf-8"), encoding="utf-8")
-    service = AgentService(tmp_path, dispatch=lambda *_args: {})
-    service.authorize(AgentGrant(user="test_user", target_id="test_target", generate=True, execute=True))
+    def dispatch(operation, args):
+        if operation == "context":
+            return {"current_user": "test_user", "users": ["test_user", "another_user"]}
+        if operation == "resolve_target":
+            return {"target_id": args["target_id"] or "test_target"}
+        return {}
+    service = AgentService(tmp_path, dispatch=dispatch)
+    service.set_enabled(True)
     base = yaml.safe_load((system / "base_groups/default.yaml").read_text(encoding="utf-8"))
     base["materials"]["food_rules"] = []
     base["scan"]["rules"] = []
@@ -73,21 +79,21 @@ def test_generation_does_not_automatically_activate_disabled_rule(setup_service)
     assert not service.resolver.local_dir.exists()
 
 
-def test_permissions_cover_indirect_recycle_and_changed_generated_rules(setup_service):
+def test_all_users_are_available_and_execution_checks_configuration_at_call_time(setup_service):
     service, payload = setup_service
-    with pytest.raises(PermissionError):
-        service.list_plans("another_user")
+    assert service.list_plans("another_user")["plans"]
+    with pytest.raises(ValueError, match="用户不存在"):
+        service.list_plans("missing_user")
     payload["base_group"]["smart_tuning"]["failure_action"]["action"] = "tune_full_recycle"
     record = service.create_generated_tuning("test_user", "request", payload)
-    with pytest.raises(PermissionError, match="recycle"):
-        service.validate_auto_tuning("test_user", record["id"])
-
-    service.authorize(AgentGrant(user="test_user", execute=True, recycle=True))
     assert service.validate_auto_tuning("test_user", record["id"])["ready"]
     path = next((service.resolver.local_dir / "yysls/tuning_rules").glob("*.yaml"))
     path.write_text(path.read_text(encoding="utf-8") + "\ndescription: human change\n", encoding="utf-8")
     with pytest.raises(ValueError, match="已被修改"):
         service.validate_auto_tuning("test_user", record["id"])
+    service.set_enabled(False)
+    with pytest.raises(PermissionError, match="服务已关闭"):
+        service.list_plans("another_user")
 
 
 def test_generated_goal_uses_derived_plan_snapshot_not_persistent_defaults(setup_service):
@@ -119,7 +125,6 @@ def test_user_selection_patch_preserves_other_workflows_and_rejects_stale_revisi
     config["rules"] = {"huiyi_general": {"enabled": True, "playstyles": ["无名"]}}
     user = User("test_user", workflow_params={"auto_tuning": config, "other": {"enabled": True}})
     save_user_metadata(user, service.users_dir)
-    service.authorize(AgentGrant(user="test_user", save_selection=True))
     result = service.update_tuning_config("test_user", revision(config), {"selected_slots": ["ring"]})
     saved = load_user_metadata("test_user", service.users_dir)
     assert saved.workflow_params["other"] == {"enabled": True}

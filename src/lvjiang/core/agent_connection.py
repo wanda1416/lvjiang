@@ -58,7 +58,7 @@ class AgentConnection:
             path.chmod(0o600)
 
 
-def export_agent(root: Path, config: dict, path: Path, *, transport: str = "streamable-http") -> Path:
+def export_agent(config: dict, path: Path, *, server_name: str, transport: str = "streamable-http") -> Path:
     """共同的 JSON 配置合并；各客户端由自己的适配器选择目标文件。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     lock = InterProcessLock(str(path) + ".lvjiang.lock")
@@ -67,7 +67,7 @@ def export_agent(root: Path, config: dict, path: Path, *, transport: str = "stre
         if not isinstance(data, dict) or not isinstance(data.get("mcpServers", {}), dict):
             raise ValueError("Agent 配置格式无效，未覆盖原文件")
         servers = dict(data.get("mcpServers", {}))
-        servers[f"lvjiang-{installation_id(root)}"] = {**config["mcpServers"]["lvjiang"], "type": transport}
+        servers[server_name] = {**config["mcpServers"]["lvjiang"], "type": transport}
         data["mcpServers"] = servers
         atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n", prefix=".mcp-")
         if os.name != "nt":

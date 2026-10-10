@@ -7,7 +7,6 @@ from lvjiang.core import agent_connection, agent_mcp
 from lvjiang.core.agent_connection import (
     AgentConnection,
     export_agent,
-    installation_id,
 )
 
 
@@ -25,27 +24,27 @@ def test_connection_persists_enabled_port_token_and_isolates_installations(tmp_p
     assert AgentConnection.load(first).token == setting.token
 
 
-def test_exports_preserve_other_settings_and_separate_installations(tmp_path, monkeypatch):
+def test_exports_preserve_other_settings_and_use_configured_connection_names(tmp_path, monkeypatch):
     path = tmp_path / "mcp.json"
     path.write_text(json.dumps({"custom": True, "mcpServers": {"other": {"command": "other"}}}), encoding="utf-8")
     config = {"mcpServers": {"lvjiang": {"type": "streamableHttp", "url": "http://127.0.0.1:19001/mcp"}}}
-    export_agent(tmp_path / "first", config, path)
-    export_agent(tmp_path / "second", config, path)
+    export_agent(config, path, server_name="律匠(lvjiang)")
+    export_agent(config, path, server_name="律匠二号(lvjiang-2)")
     result = json.loads(path.read_text(encoding="utf-8"))
     assert result["custom"] is True
     assert result["mcpServers"]["other"] == {"command": "other"}
-    assert set(result["mcpServers"]) == {"other", "lvjiang-" + installation_id(tmp_path / "first"),
-                                          "lvjiang-" + installation_id(tmp_path / "second")}
+    assert set(result["mcpServers"]) == {"other", "律匠(lvjiang)",
+                                          "律匠二号(lvjiang-2)"}
     qoder = tmp_path / "qoderwork/mcp.json"
     qoder.parent.mkdir()
     qoder.write_bytes(path.read_bytes())
-    export_agent(tmp_path / "third", config, qoder, transport="streamable-http")
+    export_agent(config, qoder, server_name="律匠(lvjiang)", transport="streamable-http")
     qoder_result = json.loads(qoder.read_text(encoding="utf-8"))
     assert qoder_result["mcpServers"]["other"] == {"command": "other"}
-    assert qoder_result["mcpServers"]["lvjiang-" + installation_id(tmp_path / "third")]["type"] == "streamable-http"
+    assert qoder_result["mcpServers"]["律匠(lvjiang)"]["type"] == "streamable-http"
     path.write_text("broken", encoding="utf-8")
     with pytest.raises(ValueError):
-        export_agent(tmp_path / "first", config, path)
+        export_agent(config, path, server_name="律匠(lvjiang)")
     assert path.read_text(encoding="utf-8") == "broken"
 
 

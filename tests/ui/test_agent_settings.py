@@ -22,6 +22,8 @@ def test_global_agent_drafts_only_save_agents_node(qtbot, tmp_path, monkeypatch)
     monkeypatch.setattr(resolver, "_resolver", store)
     page = AgentSettingsPage()
     qtbot.addWidget(page)
+    assert page.server_name.text() == "律匠(lvjiang)"
+    page.server_name.setText("律匠二号(lvjiang-2)")
     page.table.item(0, 0).setText("修改名称")
     page.add_row(name="第二个 Agent", path=str(tmp_path / "second.json"))
     assert load_agent_settings().items[0].name == "Agent 示例"
@@ -32,6 +34,7 @@ def test_global_agent_drafts_only_save_agents_node(qtbot, tmp_path, monkeypatch)
     page.save()
     settings = load_agent_settings()
     assert [item.name for item in settings.items] == ["修改名称", "第二个 Agent"]
+    assert settings.server_name == "律匠二号(lvjiang-2)"
     assert settings.items[0].key == "example"
     assert settings.to_dict()["items"][0]["transport"] == "streamable-http"
     assert resolver.load_app_config()["other"] == {"keep": "updated"}
@@ -71,6 +74,7 @@ def test_instance_selection_override_and_download_leave_global_defaults_unchange
                                       running=False, stop=lambda: None)
         page._export()
         doc = json.loads((tmp_path / "custom.json").read_text(encoding="utf-8"))
+        assert set(doc["mcpServers"]) == {"律匠(lvjiang)"}
         assert list(doc["mcpServers"].values())[0]["type"] == "streamable-http"
         assert not (tmp_path / "first.json").exists()
         page.reload_agents()

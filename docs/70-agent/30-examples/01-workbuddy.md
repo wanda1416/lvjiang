@@ -17,7 +17,7 @@ list_targets 查询，启动时可指定 target_id；设备未连接或忙碌时
 导出格式为 mcpServers、type=streamable-http、url 和 Authorization 请求头，符合
 [WorkBuddy 官方说明](https://open.workbuddy.cn/docs/connector)。客户端须运行在
 能访问本机 127.0.0.1 的同一台电脑。GUI 对本机 HTTP 的实际接受情况待实机验收。
-默认端口 18765；不同安装需要手动设置不同端口，连接名称自动按安装目录区分。只有主实例可启动 MCP。
+默认端口 18765；不同安装需要手动设置不同端口，连接名称默认“律匠(lvjiang)”，在外部 Agent 设置中修改。只有主实例可启动 MCP。
 
 接入配置不包含用户数据或模型 API Key。令牌属于私人连接信息，请勿公开分享。
 端口和令牌跨重启保持稳定，无需手动重导；停用取消自启，关闭对话框不关闭 MCP。MCP 停用不停止已启动任务。

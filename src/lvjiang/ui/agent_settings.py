@@ -31,6 +31,12 @@ class AgentSettingsPage(QWidget):
         note = QLabel(tr("配置外部 Agent 的名称和默认导出文件，统一使用 Streamable HTTP 接入。智能调律中选择使用哪个 Agent；接入令牌不会保存在这里。"))
         note.setWordWrap(True)
         layout.addWidget(note)
+        form = QFormLayout()
+        self.server_name = QLineEdit()
+        form.addRow(tr("MCP 连接名称"), self.server_name)
+        self.download = QLineEdit()
+        form.addRow(tr("下载 Agent 链接"), self.download)
+        layout.addLayout(form)
         self.table = QTableWidget(0, 2)
         self.table.setHorizontalHeaderLabels([tr("Agent 名称"), tr("默认导出文件")])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -39,10 +45,6 @@ class AgentSettingsPage(QWidget):
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
-        form = QFormLayout()
-        self.download = QLineEdit()
-        form.addRow(tr("下载 Agent 链接"), self.download)
-        layout.addLayout(form)
         row = QHBoxLayout()
         self.add_button = QPushButton(tr("添加 Agent"))
         self.remove_button = QPushButton(tr("删除所选"))
@@ -63,6 +65,7 @@ class AgentSettingsPage(QWidget):
             for item in settings.items:
                 self.add_row(item.key, item.name, item.export_path)
             self.download.setText(settings.download_url)
+            self.server_name.setText(settings.server_name)
         except (ValueError, OSError) as exc:
             self.status.setText(str(exc))
 
@@ -86,7 +89,8 @@ class AgentSettingsPage(QWidget):
                 assert name is not None and path is not None
                 items.append({"key": name.data(Qt.ItemDataRole.UserRole), "name": name.text(),
                               "export_path": path.text()})
-            settings = AgentSettings.from_dict({"items": items, "download_agent": {"url": self.download.text()}})
+            settings = AgentSettings.from_dict({"items": items, "server_name": self.server_name.text(),
+                                                "download_agent": {"url": self.download.text()}})
             save_app_config_node("agents", settings.to_dict())
             self.status.setText(tr("Agent 设置已保存"))
         except (ValueError, OSError, RuntimeError) as exc:

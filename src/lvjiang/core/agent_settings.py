@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from .config.resolver import load_app_config
 
+DEFAULT_SERVER_NAME = "律匠(lvjiang)"
 
 @dataclass(frozen=True)
 class AgentTarget:
@@ -24,6 +25,7 @@ class AgentTarget:
 class AgentSettings:
     items: tuple[AgentTarget, ...] = ()
     download_url: str = ""
+    server_name: str = DEFAULT_SERVER_NAME
 
     @classmethod
     def from_dict(cls, data: dict) -> AgentSettings:
@@ -52,11 +54,15 @@ class AgentSettings:
         url = download.get("url", "").strip()
         if url and (urlparse(url).scheme not in {"http", "https"} or not urlparse(url).netloc):
             raise ValueError("Agent 下载链接需为 HTTP 或 HTTPS 地址")
-        return cls(tuple(items), url)
+        name = data.get("server_name", DEFAULT_SERVER_NAME)
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("请填写 MCP 连接名称")
+        return cls(tuple(items), url, name.strip())
 
     def to_dict(self) -> dict:
         from dataclasses import asdict
         return {"items": [asdict(item) for item in self.items],
+                "server_name": self.server_name,
                 "download_agent": {"url": self.download_url}}
 
 

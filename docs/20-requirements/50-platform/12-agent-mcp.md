@@ -18,7 +18,7 @@ MCP 的前提。首版仍是 PC 本机 Streamable HTTP，不含公网托管、An
 
 服务绑定 127.0.0.1，默认固定端口 18765，可在服务未运行时修改。端口占用时提示手动修改，不随机改端口。不同安装目录各自保存端口、启用状态与稳定 Bearer 令牌，私人配置位于用户目录 `.lvjiang/mcp/`，不写入项目或台账。
 
-接入分为两级。AI 设置的“外部 Agent”维护 `app.yaml` 顶层 `agents`，可配置多个稳定 key、展示名称、默认导出文件与接入格式。`agents.download_agent.url` 提供统一下载引导，系统预置 WorkBuddy 邀请链接；下载按钮不受 Lv1 门槛限制。编辑保持草稿，明确保存才更新 agents 节点，并保留其他 app.yaml 配置。
+接入分为两级。AI 设置的“外部 Agent”维护 `app.yaml` 顶层 `agents`，可配置多个稳定 key、展示名称与默认导出文件，统一使用 Streamable HTTP；旧配置中的 streamableHttp/http 别名读取后归一，不要求用户重配。`agents.download_agent.url` 提供统一下载引导，系统预置 WorkBuddy 邀请链接；下载按钮不受 Lv1 门槛限制。编辑保持草稿，明确保存才更新 agents 节点，并保留其他 app.yaml 配置。
 
 智能调律对话框选择当前安装使用的 Agent，并可覆盖该 Agent 的导出文件；所选 key 和覆盖路径与端口、启用状态一起保存在私人安装级配置，不改全局默认路径。默认列表包含 WorkBuddy 和 QoderWork，导出路径分别为 `~/.workbuddy/mcp.json` 与 `~/.qoderwork/mcp.json`，但运行代码统一读取配置而不重复维护这份列表。切换 Agent 或修改路径时自动同步运行中的接入，启动时自动同步所选 Agent。
 

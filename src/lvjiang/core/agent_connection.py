@@ -58,7 +58,7 @@ class AgentConnection:
             path.chmod(0o600)
 
 
-def export_agent(root: Path, config: dict, path: Path, *, transport: str = "streamableHttp") -> Path:
+def export_agent(root: Path, config: dict, path: Path, *, transport: str = "streamable-http") -> Path:
     """共同的 JSON 配置合并；各客户端由自己的适配器选择目标文件。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     lock = InterProcessLock(str(path) + ".lvjiang.lock")

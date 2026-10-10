@@ -14,7 +14,7 @@
 切换律匠主界面用户，或让 Agent 处理另一个用户，不需要重导接入配置。设备通过
 list_targets 查询，启动时可指定 target_id；设备未连接或忙碌时由接口返回原因。
 
-导出格式为 mcpServers、type=streamableHttp、url 和 Authorization 请求头，符合
+导出格式为 mcpServers、type=streamable-http、url 和 Authorization 请求头，符合
 [WorkBuddy 官方说明](https://open.workbuddy.cn/docs/connector)。客户端须运行在
 能访问本机 127.0.0.1 的同一台电脑。GUI 对本机 HTTP 的实际接受情况待实机验收。
 默认端口 18765；不同安装需要手动设置不同端口，连接名称自动按安装目录区分。只有主实例可启动 MCP。

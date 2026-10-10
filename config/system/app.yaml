@@ -5,7 +5,7 @@ agents:
   - key: workbuddy
     name: WorkBuddy
     export_path: ~/.workbuddy/mcp.json
-    transport: streamableHttp
+    transport: streamable-http
   - key: qoderwork
     name: QoderWork
     export_path: ~/.qoderwork/mcp.json

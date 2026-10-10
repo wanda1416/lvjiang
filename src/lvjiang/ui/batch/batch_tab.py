@@ -42,6 +42,12 @@ from PyQt6.QtWidgets import (
 )
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
+from lvjiang.ui.execution_feedback import (
+    ExecutionFeedback,
+    apply_idle_start,
+    idle_start_state,
+    show_running_feedback,
+)
 
 from ...core.batch_config import (
     BatchConfigItem,
@@ -68,8 +74,6 @@ from ..button_styles import (
 )
 from ..main.run_control import (
     STATE_PAUSING,
-    STATE_PLAN_UNSUPPORTED,
-    STATE_START_DENIED,
     STATE_STOPPING,
 )
 from ..theme import get_theme_manager
@@ -198,6 +202,8 @@ class BatchTab(QWidget):
         host: MainWindow 实例（提供 run_batch / request_stop / 信号等）
     """
 
+    execution_scope = "batch"
+
     def __init__(self, host):
         super().__init__()
         self._host = host
@@ -248,6 +254,10 @@ class BatchTab(QWidget):
         self._btn_pause_resume.clicked.connect(self._on_pause_resume_clicked)
         btn_layout.addWidget(self._btn_pause_resume, 1)
         layout.addLayout(btn_layout)
+
+        self._start_feedback = ExecutionFeedback()
+        self.execution_feedback = self._start_feedback
+        layout.addWidget(self._start_feedback)
 
         config_row = QHBoxLayout()
         config_row.setContentsMargins(0, 0, 0, 0)
@@ -638,6 +648,7 @@ class BatchTab(QWidget):
         """草稿立即落 session。它从不写 batch.json——定义层只由配置窗口改。"""
         if self._group_id:
             save_draft(self._group_id, self._draft)
+        self._refresh_start_feedback()
 
     def _refresh_config_combo(self):
         """刷新配置下拉框。条目带稳定 ID，重命名不影响选中与草稿关联。"""
@@ -666,6 +677,7 @@ class BatchTab(QWidget):
         self._refresh_script_list()
         self._refresh_entry_list()
         self._refresh_params()
+        self._refresh_start_feedback()
 
     def _refresh_params(self) -> None:
         item = self._item
@@ -1234,14 +1246,20 @@ class BatchTab(QWidget):
         self._start_batch()
 
     def _start_batch(self):
+        self._start_feedback.clear_failure()
+        state = idle_start_state(self._host)
+        if state != "idle":
+            self._refresh_run_button(state)
+            self._host.append_log(f"[批量] {self._start_feedback.text()}")
+            return
         usernames = self._get_enabled_usernames()
         scripts = self._checked_scripts()
 
         if not usernames:
-            self._host.append_log(tr("[批量] 暂无启用的单元，请到「单元」页勾选"))
+            self._show_start_error(tr("暂无启用的单元，请到「单元」页勾选"))
             return
         if not scripts:
-            self._host.append_log(tr("[批量] 请至少勾选一个脚本"))
+            self._show_start_error(tr("请至少勾选一个脚本"))
             return
 
         config = self._item
@@ -1251,12 +1269,14 @@ class BatchTab(QWidget):
             # 被丢弃，整批空跑，所以在动客户端之前就拦住。
             from PyQt6.QtWidgets import QMessageBox
             if not config.workflows.prepare_item:
+                self._show_start_error(tr("请在「工具 → 批量配置」中配置条目准备工作流"))
                 QMessageBox.warning(
                     self, tr("无法开始批量任务"),
                     tr("当前按属性调度，请先在「工具 → 批量配置」中配置条目准备 wf。"),
                 )
                 return
             if not declares_unit_prepare(config.workflows.prepare_item):
+                self._show_start_error(tr("条目准备工作流不支持当前属性调度，请到批量配置中修改"))
                 QMessageBox.warning(
                     self, tr("无法开始批量任务"),
                     tr("当前按「{key}」调度，但条目准备工作流「{wf}」不会选定并返回"
@@ -1268,7 +1288,7 @@ class BatchTab(QWidget):
                 )
                 return
         if config is None:
-            self._host.append_log(tr("[批量] 暂无配置组，请先通过 工具 → 批量配置 添加"))
+            self._show_start_error(tr("暂无配置组，请先通过「工具 → 批量配置」添加"))
             return
         self._build_progress_table(usernames, config, scripts)
         self._set_config_enabled(False)
@@ -1571,6 +1591,8 @@ class BatchTab(QWidget):
         的显示名不更新，取消暴露的脚本仍留在列表里并且照跑不误。
         """
         self._refresh_script_list()
+        if hasattr(self, "_start_feedback"):
+            self._refresh_start_feedback()
 
     # ─── 状态联动 ─────────────────────────────────────────
 
@@ -1588,11 +1610,31 @@ class BatchTab(QWidget):
         """暂停/恢复按钮点击 → 转发给宿主"""
         self._host.request_pause_resume()
 
+    def _show_start_error(self, message: str) -> None:
+        self._start_feedback.show_failure(message)
+        self._host.append_log(f"[批量] {message}")
+
+    def _start_reason(self) -> str:
+        if hasattr(self, "_item") and self._item is None:
+            return tr("暂无配置组，请先通过「工具 → 批量配置」添加")
+        if hasattr(self, "_script_order") and not self._script_order:
+            return tr("请到「脚本」页至少勾选一个脚本")
+        if hasattr(self, "_user_order") and not self._user_order:
+            return tr("请到「单元」页至少勾选一个执行单元")
+        return ""
+
+    def _refresh_start_feedback(self) -> None:
+        if not self._running:
+            self._start_feedback.clear_failure()
+            self._refresh_run_button(idle_start_state(self._host))
+
     def _refresh_run_button(self, state: str):
         from ..hotkeys import hotkey_label
         from ..main.run_control import other_task_running_label
         hk = self._host._user_config.hotkeys
         if label := other_task_running_label(self._host, "batch"):
+            self._btn_run.setToolTip("")
+            show_running_feedback(getattr(self, "_start_feedback", None), label)
             self._btn_run.setText(label)
             self._btn_run.setEnabled(False)
             apply_execution_button_style(self._btn_run, "disabled")
@@ -1608,22 +1650,12 @@ class BatchTab(QWidget):
             self._btn_run.setText(hotkey_label(tr("停止"), hk.stop))
             self._btn_run.setEnabled(True)
             apply_execution_button_style(self._btn_run, "stop")
-        elif state == "not_ready":
-            self._btn_run.setText(tr("未连接"))
-            self._btn_run.setEnabled(True)
-            apply_execution_button_style(self._btn_run, "not_ready")
-        elif state in (STATE_PLAN_UNSUPPORTED, STATE_START_DENIED):
-            # 不能落进下面的 else：并发门禁拒绝时这里也必须是灰的，否则绿色
-            # 按钮点下去才报「需要激活 Lv1」。
-            self._btn_run.setText(
-                tr("方案不支持") if state == STATE_PLAN_UNSUPPORTED
-                else self._host.start_denied_label() or tr("不能启动"))
-            self._btn_run.setEnabled(True)
-            apply_execution_button_style(self._btn_run, "disabled")
         else:
-            self._btn_run.setText(hotkey_label(tr("开始执行"), hk.start))
-            self._btn_run.setEnabled(True)
-            apply_execution_button_style(self._btn_run, "run")
+            apply_idle_start(self._btn_run, getattr(self, "_start_feedback", None), self._host,
+                             state, hotkey_label(tr("开始执行"), hk.start), BatchTab._start_reason(self))
+        if state in ("running", STATE_PAUSING, "paused", STATE_STOPPING):
+            self._btn_run.setToolTip("")
+            show_running_feedback(getattr(self, "_start_feedback", None))
         # 刷新暂停/恢复按钮
         if state == "running":
             self._btn_pause_resume.setText(hotkey_label(tr("暂停"), hk.pause))

@@ -843,6 +843,10 @@ class MainWindow(
         btn_layout.addWidget(self.btn_pause_resume, 1)
         daily_layout.addLayout(btn_layout)
 
+        from ..execution_feedback import ExecutionFeedback
+        self._daily_start_feedback = ExecutionFeedback()
+        daily_layout.addWidget(self._daily_start_feedback)
+
         from ..execution_user_selector import ExecutionUserSelector
         self._daily_execution_user_selector = ExecutionUserSelector(
             self._user_manager)

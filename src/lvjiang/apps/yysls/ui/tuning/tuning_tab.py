@@ -35,12 +35,16 @@ from .....ui.button_styles import (
     apply_execution_button_style,
     fit_button_width,
 )
+from .....ui.execution_feedback import (
+    ExecutionFeedback,
+    apply_idle_start,
+    idle_start_state,
+    show_running_feedback,
+)
 from .....ui.execution_user_selector import ExecutionUserSelector
 from .....ui.hotkeys import hotkey_label
 from .....ui.main.run_control import (
     STATE_PAUSING,
-    STATE_PLAN_UNSUPPORTED,
-    STATE_START_DENIED,
     STATE_STOPPING,
     other_task_running_label,
 )
@@ -112,6 +116,11 @@ class TuningTab(QWidget):
         btn_layout.addWidget(self.btn_pause_resume, 1)
         tab_layout.addLayout(btn_layout)
 
+        self._status_label = ExecutionFeedback()
+        self.execution_scope = "auto_tuning"
+        self.execution_feedback = self._status_label
+        tab_layout.addWidget(self._status_label)
+
         self._execution_user_selector = ExecutionUserSelector(
             self._host.user_manager)
         tab_layout.addWidget(self._execution_user_selector)
@@ -121,13 +130,6 @@ class TuningTab(QWidget):
         self._config_tabs.addTab(self._build_slots_page(), tr("部位"))
         self._config_tabs.addTab(self._build_parameters_page(), tr("参数"))
         tab_layout.addWidget(self._config_tabs)
-
-        # 底部状态栏（显示启动失败原因）
-        self._status_label = QLabel("")
-        self._status_label.setStyleSheet("color: #d32f2f; padding: 4px; font-size: 12px;")
-        self._status_label.setWordWrap(True)
-        self._status_label.hide()
-        tab_layout.addWidget(self._status_label)
 
     def _wrap_scroll(self, panel: QWidget) -> QScrollArea:
         """页面统一包可滚动容器（禁水平滚动，最小宽避免内容被裁切）"""
@@ -441,19 +443,14 @@ class TuningTab(QWidget):
         elif state in ("running", STATE_PAUSING, "paused"):
             self.btn_run_tuning.setText(hotkey_label(tr("停止"), hk.stop))
             apply_execution_button_style(self.btn_run_tuning, "stop")
-        elif state == "not_ready":
-            self.btn_run_tuning.setText(tr("未就绪"))
-            apply_execution_button_style(self.btn_run_tuning, "not_ready")
-        elif state in (STATE_PLAN_UNSUPPORTED, STATE_START_DENIED):
-            # 不能落进下面的 else：那里还会 mark_done()，会误报完成；并发门禁
-            # 拒绝时也必须是灰的，不能让用户点完才知道要激活 Lv1。
-            self.btn_run_tuning.setText(
-                tr("方案不支持") if state == STATE_PLAN_UNSUPPORTED
-                else self._host.start_denied_label() or tr("不能启动"))
-            apply_execution_button_style(self.btn_run_tuning, "disabled")
         else:
-            self.btn_run_tuning.setText(hotkey_label(tr("开始调律"), hk.start))
-            apply_execution_button_style(self.btn_run_tuning, "run")
+            selector = getattr(self, "_execution_user_selector", None)
+            reason = tr("请选择有效的执行用户") if selector is not None and not selector.resolve_username() else ""
+            apply_idle_start(self.btn_run_tuning, getattr(self, "_status_label", None),
+                             self._host, state, hotkey_label(tr("开始调律"), hk.start), reason)
+        if other_label or state in ("running", STATE_PAUSING, "paused", STATE_STOPPING):
+            self.btn_run_tuning.setToolTip("")
+            show_running_feedback(getattr(self, "_status_label", None), other_label)
         # 刷新暂停/恢复按钮
         if other_label:
             self.btn_pause_resume.setText(tr("暂停"))
@@ -503,11 +500,16 @@ class TuningTab(QWidget):
     def _on_execution_user_changed(self, username: str) -> None:
         """固定执行用户改变时，切换到该用户的调律配置。"""
         self._load_tuning_config(username)
+        self._status_label.clear_failure()
+        self._on_automation_state(idle_start_state(self._host))
 
     def _on_active_user_changed(self, username: str) -> None:
         """跟随当前用户时，主用户切换同步刷新调律配置。"""
         if self._execution_user_selector.combo.currentData() is None:
             self._load_tuning_config(username)
+            self._status_label.clear_failure()
+            if not self._host.is_running:
+                self._on_automation_state(idle_start_state(self._host))
 
     def _users_dir(self):
         return getattr(self._host.user_manager, "users_dir", None)
@@ -532,19 +534,24 @@ class TuningTab(QWidget):
         self._start_tuning()
 
     def _show_status_error(self, message: str):
-        """在底部状态栏显示错误信息"""
-        self._status_label.setText(message)
-        self._status_label.show()
+        """在执行按钮下方显示启动错误。"""
+        self._status_label.show_failure(message)
 
     def _clear_status(self):
         """清除底部状态栏"""
-        self._status_label.hide()
-        self._status_label.setText("")
+        self._status_label.clear_failure()
 
     def _start_tuning(self, *, execution_username=None, config=None, smart_state=None):
         """从统一存储读取调律配置，校验后启动 auto_tuning 工作流"""
         host = self._host
         self._clear_status()
+
+        state = idle_start_state(host)
+        if state != "idle":
+            self._on_automation_state(state)
+            message = self._status_label.text()
+            host.append_log(f"[拒绝] {message}")
+            return
 
         execution_username = execution_username or self._execution_user_selector.resolve_username()
         if not execution_username:

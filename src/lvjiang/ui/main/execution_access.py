@@ -3,6 +3,7 @@ from contextlib import nullcontext
 from functools import wraps
 
 from ...core.access import AccessDeniedError, acquire_user
+from ..execution_feedback import report_start_failure
 
 
 def guarded_launch(method=None, *, user_selector: str | None = None):
@@ -13,6 +14,8 @@ def guarded_launch(method=None, *, user_selector: str | None = None):
     def launch(self, *args, **kwargs):
         if self._running:
             return method(self, *args, **kwargs)
+        scope = (str(kwargs.get("impl_name", args[0] if args else "daily"))
+                 if user_selector is None else "daily")
         username = kwargs.get("execution_username")
         if username is None:
             selector = getattr(self, user_selector, None) if user_selector else None
@@ -22,12 +25,14 @@ def guarded_launch(method=None, *, user_selector: str | None = None):
             lease = acquire_user(username, self._session_manager._users_dir)
         except AccessDeniedError as exc:
             self.log_text.append(f"[拒绝] {exc}")
+            report_start_failure(self, str(exc), scope)
             show_busy = getattr(self, "_show_user_execution_busy", None)
             if callable(show_busy):
                 show_busy(str(exc))
             return None
         except Exception as exc:
             self.log_text.append(f"[拒绝] {exc}")
+            report_start_failure(self, str(exc), scope)
             return None
         self._execution_lease = lease
         self._execution_username_snapshot = username
@@ -38,6 +43,7 @@ def guarded_launch(method=None, *, user_selector: str | None = None):
         except Exception as exc:
             self.log_text.append(f"[错误] 启动失败: {exc}")
             self._end_automation("启动失败")
+            report_start_failure(self, str(exc), scope)
             return None
         finally:
             if not self._execution_started:

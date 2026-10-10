@@ -19,6 +19,12 @@ from ...core.fs_util import dated_output_dir
 from ...i18n import tr
 from ...workflows.engine import DeviceWorkflowEngineBuilder, WorkflowEngine
 from ..button_styles import apply_execution_button_style
+from ..execution_feedback import (
+    apply_idle_start,
+    idle_start_state,
+    report_start_failure,
+    show_running_feedback,
+)
 from .execution_access import guarded_finish, guarded_launch
 
 # 顶部上下文选择器的锁定原因。定义在这里而不是 window.py：window 已经
@@ -1107,6 +1113,7 @@ class RunControlMixin:
                 self.log_text.append(
                     tr("[启动失败] {name}：{message}").format(
                         name=target.display_name, message=message))
+                report_start_failure(self, message, execution_scope)
                 return False
             target.width = int(target.window.get("width") or 0)
             target.height = int(target.window.get("height") or 0)
@@ -1114,15 +1121,15 @@ class RunControlMixin:
         admin_error = self._plan_admin_requirement_error()
         if admin_error:
             self.statusBar().showMessage(admin_error)
-            self._show_workflow_start_error(admin_error)
+            self._show_workflow_start_error(admin_error, scope=execution_scope)
             return False
         aspect_error = self._layout_aspect_error()
         if aspect_error:
             self.statusBar().showMessage(aspect_error)
-            self._show_workflow_start_error(aspect_error)
+            self._show_workflow_start_error(aspect_error, scope=execution_scope)
             return False
         if target is None:
-            self._show_workflow_start_error(tr("当前没有可执行目标"))
+            self._show_workflow_start_error(tr("当前没有可执行目标"), scope=execution_scope)
             return False
         target_snapshot = target.snapshot()
         self._capture_launch_draft(target.id)
@@ -1134,6 +1141,7 @@ class RunControlMixin:
         if run_context is None:
             self.log_text.append(f"[拒绝] {decision.reason}")
             self.statusBar().showMessage(decision.reason)
+            report_start_failure(self, decision.reason, execution_scope)
             return False
         self._current_run_context = run_context
         run_context.metadata["execution_scope"] = execution_scope
@@ -1348,11 +1356,12 @@ class RunControlMixin:
             flow_cfg["wf_file"] = resolved_file
         return path
 
-    def _show_workflow_start_error(self, message: str):
+    def _show_workflow_start_error(self, message: str, *, scope: str = "daily"):
         """报告启动前错误，但不因提示窗口禁用主界面。"""
         from PyQt6.QtWidgets import QMessageBox, QWidget
 
         self.log_text.append(f"[错误] {message}")
+        report_start_failure(self, message, scope)
         logger.error(message)
         box = QMessageBox(
             QMessageBox.Icon.Critical,
@@ -1748,6 +1757,10 @@ class RunControlMixin:
             self._request_stop()
             return
 
+        feedback = getattr(self, "_daily_start_feedback", None)
+        if feedback is not None:
+            feedback.clear_failure()
+
         if not self._backend_ready():
             target = self._current_execution_target()
             if target is None:
@@ -1769,6 +1782,8 @@ class RunControlMixin:
         flow_cfg = flow_config if flow_config is not None else self._get_selected_flow_config()
         if flow_cfg is None:
             self.log_text.append(tr("[错误] 请选择一个工作流"))
+            if feedback is not None:
+                feedback.show_failure(tr("请选择一个脚本"))
             return
 
         # env 限制检查：脚本声明了 env 且当前环境不在列表中，阻止执行
@@ -1776,9 +1791,11 @@ class RunControlMixin:
         env_list = flow_cfg.get("env") or []
         if env_list:
             if current_env not in env_list:
-                self.log_text.append(
-                    tr("[错误] 当前工作环境 {env} 不在该脚本支持的环境 {envs} 中").format(
-                        env=current_env, envs=", ".join(env_list)))
+                message = tr("当前工作环境 {env} 不在该脚本支持的环境 {envs} 中").format(
+                    env=current_env, envs=", ".join(env_list))
+                self.log_text.append(f"[错误] {message}")
+                if feedback is not None:
+                    feedback.show_failure(message)
                 return
 
         flow_name = flow_cfg["name"]
@@ -1796,6 +1813,8 @@ class RunControlMixin:
         username = execution_username or self._execution_username_snapshot
         if not username:
             self.log_text.append(tr("[错误] 请选择有效的执行用户"))
+            if feedback is not None:
+                feedback.show_failure(tr("请选择有效的执行用户"))
             return
 
         if not self._begin_automation(flow_name, username=username):
@@ -1811,6 +1830,7 @@ class RunControlMixin:
         if not layout:
             self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
             self._end_automation(flow_name)
+            report_start_failure(self, tr("无法加载布局：{name}").format(name=layout_name))
             return
 
         # 场景绑定校验：DSL 脚本由 engine 执行时按 AST 搜集场景自动校验；
@@ -2172,6 +2192,25 @@ class RunControlMixin:
         self.log_text.append(f"[{tr('拒绝')}] {decision.reason}")
         self.statusBar().showMessage(decision.reason)
 
+    def _daily_start_reason(self) -> str:
+        if hasattr(self, "_workflow_configs") and self._get_selected_flow_config() is None:
+            return tr("请选择一个脚本；列表为空时可刷新脚本或调整展示分组")
+        selector = getattr(self, "_daily_execution_user_selector", None)
+        if selector is not None and not selector.resolve_username():
+            return tr("请选择有效的执行用户")
+        return ""
+
+    def _refresh_daily_start_feedback(self):
+        if self._running or other_task_running_label(self, "daily"):
+            self.btn_run_workflow.setToolTip("")
+            return
+        feedback = getattr(self, "_daily_start_feedback", None)
+        if feedback is not None:
+            feedback.clear_failure()
+        apply_idle_start(self.btn_run_workflow, feedback, self, idle_start_state(self),
+                         self._hotkey_label(tr("开始执行"), self._user_config.hotkeys.start),
+                         self._daily_start_reason())
+
     def _refresh_run_button(self):
         """根据运行状态和定位状态刷新运行按钮，并广播状态给插件页面。"""
         run_state = getattr(self, '_run_state', 'idle')
@@ -2191,34 +2230,15 @@ class RunControlMixin:
             self.btn_run_workflow.setEnabled(True)
             self.btn_run_workflow.setText(self._hotkey_label(tr("停止"), hk.stop))
             apply_execution_button_style(self.btn_run_workflow, "stop")
-        elif not self._backend_ready():
-            state = "not_ready"
-            self.btn_run_workflow.setEnabled(True)
-            target = self._current_execution_target()
-            label = tr("未连接") if target is None or self._backend == "adb" \
-                else tr("未定位")
-            self.btn_run_workflow.setText(label)
-            apply_execution_button_style(self.btn_run_workflow, "not_ready")
-        elif not self._plan_allows_backend():
-            # 只置灰不 setEnabled(False)：禁用的控件收不到鼠标事件，点了就
-            # 没有任何反馈，也就没法在左下角说明原因。
-            state = STATE_PLAN_UNSUPPORTED
-            self.btn_run_workflow.setEnabled(True)
-            self.btn_run_workflow.setText(tr("方案不支持"))
-            apply_execution_button_style(self.btn_run_workflow, "disabled")
-        elif denied_label := self.start_denied_label():
-            # 同「方案不支持」：只置灰不 setEnabled(False)，点击后在左下角
-            # 说明原因，而不是让用户对着绿色按钮点完才知道要激活 Lv1。
-            state = STATE_START_DENIED
-            self.btn_run_workflow.setEnabled(True)
-            self.btn_run_workflow.setText(denied_label)
-            apply_execution_button_style(self.btn_run_workflow, "disabled")
         else:
-            state = "idle"
-            self.btn_run_workflow.setEnabled(True)
-            self.btn_run_workflow.setText(self._hotkey_label(
-                tr("开始执行"), hk.start))
-            apply_execution_button_style(self.btn_run_workflow, "run")
+            state = idle_start_state(self)
+            apply_idle_start(self.btn_run_workflow, getattr(self, "_daily_start_feedback", None),
+                             self, state, self._hotkey_label(tr("开始执行"), hk.start),
+                             RunControlMixin._daily_start_reason(self))
+        if self._running or other_task_running_label(self, "daily"):
+            show_running_feedback(getattr(self, "_daily_start_feedback", None),
+                                  other_task_running_label(self, "daily"))
+            self.btn_run_workflow.setToolTip("")
         self._refresh_pause_button()
         self.automation_state_changed.emit(state)
         self._emit_concurrency_changed()
@@ -2324,6 +2344,7 @@ class RunControlMixin:
         )
         if not username or username not in self._user_manager.list_users():
             self.log_text.append(tr("[错误] 请选择有效的执行用户"))
+            report_start_failure(self, tr("请选择有效的执行用户"), impl_name)
             return
 
         if not self._backend_ready():
@@ -2348,6 +2369,7 @@ class RunControlMixin:
         if not layout:
             self.log_text.append(f"[错误] 无法加载布局: {layout_name}")
             self._end_automation(flow_name)
+            report_start_failure(self, tr("无法加载布局：{name}").format(name=layout_name), impl_name)
             return
 
         # 窗口坐标

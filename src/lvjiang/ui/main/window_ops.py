@@ -11,6 +11,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QMenu, QTreeWidgetItem
 
 from ...i18n import tr
+from ..execution_feedback import clear_start_failures
 from ..mobile.device_scan import DeviceScanPanel
 
 
@@ -566,6 +567,7 @@ class WindowOpsMixin:
 
     def _restore_active_target_view(self) -> None:
         """手动选中和删除后的自动选中共用完整投影，不依赖列表选择信号。"""
+        clear_start_failures(self)
         target_id = self._execution_targets.active_target_id
         self._project_run_context_for_target(target_id)
         run_context = self._run_manager.run_for_target(target_id) if target_id else None

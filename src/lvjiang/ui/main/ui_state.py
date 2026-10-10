@@ -272,6 +272,9 @@ class UiStateMixin:
         仅对 scope=daily 的脚本绘制参数面板；专用脚本不画面板，
         其参数由专属配置页面管理。
         """
+        refresh_feedback = getattr(self, "_refresh_daily_start_feedback", None)
+        if callable(refresh_feedback):
+            refresh_feedback()
         while self._param_layout.rowCount() > 0:
             self._param_layout.removeRow(0)
         flow_cfg = self._get_selected_flow_config()

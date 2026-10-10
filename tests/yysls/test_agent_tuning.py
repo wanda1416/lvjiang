@@ -132,3 +132,49 @@ def test_user_selection_patch_preserves_other_workflows_and_rejects_stale_revisi
     with pytest.raises(ValueError, match="已改变"):
         service.update_tuning_config("test_user", revision(config), {"min_level": 105})
     assert load_user_metadata("test_user", service.users_dir).workflow_params == saved.workflow_params
+
+
+def test_discovered_plan_id_reaches_analysis_without_device_or_tuning_result(setup_service, monkeypatch):
+    """名称查询得到的 ID 可直接用于分析，设备忙和未生成配置不影响读取链路。"""
+    from types import SimpleNamespace
+
+    from lvjiang.apps.yysls.core.graduation.context import PlanScoringContext
+    from lvjiang.apps.yysls.core.loadout import LoadoutRepository
+    from lvjiang.apps.yysls.core.loadout.models import (
+        EQUIPMENT_SLOTS,
+        LoadoutPlan,
+        LoadoutState,
+    )
+
+    service, _ = setup_service
+    plan = LoadoutPlan(id="example-plan-id", name="方案示例")
+    plan.equipment = {slot: f"equipment-{slot}" for slot in EQUIPMENT_SLOTS}
+    state = LoadoutState(plans={plan.id: plan}, active_plan_id=plan.id,
+                         equipment_items={fingerprint: {} for fingerprint in plan.equipment.values()})
+    before = copy.deepcopy(state.to_dict())
+    monkeypatch.setattr(LoadoutRepository, "load", lambda _self: state)
+    service._game_config = SimpleNamespace(get_schools=lambda: {})
+    monkeypatch.setattr(PlanScoringContext, "from_plan", lambda *_args, **_kwargs: object())
+
+    def dispatch(operation, _arguments):
+        if operation == "context":
+            return {"current_user": "test_user", "users": ["test_user"]}
+        if operation == "targets":
+            return {"targets": [{"busy": True}]}
+        pytest.fail(f"读取和分析不得触发设备执行检查：{operation}")
+
+    service.dispatch = dispatch
+    scheduled = []
+    monkeypatch.setattr(service, "_job", lambda user, calculation:
+                        scheduled.append((user, calculation)) or {"job_id": "example-job", "state": "running"})
+    assert service.list_targets()["targets"][0]["busy"]
+    listed = service.list_plans("test_user")["plans"]
+    selected = next(item for item in listed if item["name"] == "方案示例")
+    plan_id = selected["plan_id"]
+    assert plan_id == plan.id
+    assert service.get_plan_context("test_user", plan_id)["plan"]["plan_id"] == plan_id
+    assert service.analyze_cultivation("test_user", plan_id)["job_id"] == "example-job"
+    assert scheduled[0][0] == "test_user" and callable(scheduled[0][1])
+    assert service.store.load("results") == {}
+    assert state.to_dict() == before
+    assert "plan_id" not in plan.to_dict()  # 接口补充 ID 不改变磁盘序列化格式。

@@ -86,7 +86,7 @@ class AgentService:
                 "scan_coverage": "visible_game_plan_grid",
                 "configuration_policy": "create_new_local_only",
                 "cultivation_policy": "analysis_only",
-                "instructions": "先读 entry 文档；当前用户随主界面变化，所有用户均可指定。设备和用户在每次调用中选择，不绑定连接配置。功能不可用时按接口原因告知用户。"}
+                "instructions": "先读 entry 文档；当前用户随主界面变化，所有用户均可指定。毕业率分析先调用 list_plans 取得 plan_id，只读分析不要求设备空闲或调律配置结果 ID。设备检查和结果 ID 属于扫描/调律执行流程。功能不可用时按接口原因告知用户。"}
 
     def list_targets(self) -> dict:
         """列出本实例全部窗口/设备、当前选中目标及可执行状态。"""
@@ -97,11 +97,11 @@ class AgentService:
         return str(self.dispatch("resolve_target", {"target_id": target_id})["target_id"])
 
     def list_plans(self, user: str) -> dict:
-        """查询指定用户的备战方案；采集默认玩法不等于用户最终目标。"""
+        """查询指定用户备战方案及 plan_id，供详情和分析接口使用；不要求设备空闲。"""
         self._check(user)
         state = LoadoutRepository(user, self.users_dir).load()
         return {"revision": revision(state.to_dict()),
-                "plans": [p.to_dict() for p in state.plans.values()]}
+                "plans": [{"plan_id": p.id, **p.to_dict()} for p in state.plans.values()]}
 
     def query_equipment(self, user: str, offset: int = 0, limit: int = 30) -> dict:
         """分页查询装备；is_mock 表示模拟装备，不得当作游戏真实产出。"""
@@ -123,7 +123,7 @@ class AgentService:
         from ...config.play_styles import get_play_styles
         from ..loadout.models import resolve_school
         school = resolve_school(plan.main_martial_art, plan.sub_martial_art, self.game_config.get_schools())
-        return {"plan": plan.to_dict(), "equipment": state.resolved_equipment(plan_id),
+        return {"plan": {"plan_id": plan.id, **plan.to_dict()}, "equipment": state.resolved_equipment(plan_id),
                 "base_attributes": get_play_styles(school).get(plan.base_attribute, {}) if school else {},
                 "revision": revision(state.to_dict()),
                 "documents": ["equipment", "schools", "damage", "analysis", "generation"]}
@@ -243,7 +243,7 @@ class AgentService:
         return {"job_id": job_id, "state": "running"}
 
     def analyze_cultivation(self, user: str, plan_id: str, overrides: dict | None = None) -> dict:
-        """异步计算当前毕业率、合法培养潜力、词条敏感度和联合转律建议；不写回装备。"""
+        """用 list_plans 返回的 plan_id 异步分析毕业率和培养潜力；不写回、不操作游戏，无需设备空闲或调律配置结果 ID。"""
         from ..graduation.affix_impact import analyze_affix_impacts
         from ..graduation.assumptions import Assumptions
         from ..graduation.transmute_optimizer import (

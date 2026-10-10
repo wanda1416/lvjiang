@@ -4,6 +4,8 @@
 明确实际想玩的两门武学、玩法、目标方案和养成目标。主副武学按无序组合匹配；
 装备主副槽仍按实际武器类型分别定位。采集创建的默认玩法不等于用户意图。
 
+list_plans 每个方案的 plan_id 是详情与分析接口使用的稳定 ID，按用户给出的名称找到方案后传递该 ID，不能用方案名替代 ID。get_plan_context 的 plan 同样返回 plan_id。读取已有数据分析毕业率不要求设备空闲，也不需要生成调律配置的结果 ID；只有需要重新扫描装备或启动调律时才进入设备执行检查。不要因设备忙或尚无调律配置而阻断已有方案的分析。
+
 analyze_cultivation 接受 user、plan_id，以及可选 overrides：playstyle、
 graduation_scheme、base_attribute。覆盖只在本次分析副本上生效，不改原方案。
 可用毕业率模型见 list_graduation_schemes；八件装备、基础属性和毕业率方案缺失

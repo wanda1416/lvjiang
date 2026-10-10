@@ -4,7 +4,7 @@ from __future__ import annotations
 
 def tool_catalog(service, documents) -> dict:
     names = (
-        "get_capabilities", "list_targets", "list_plans", "query_equipment", "get_plan_context",
+        "get_capabilities", "list_users", "list_targets", "list_plans", "query_equipment", "get_plan_context",
         "get_game_config", "list_graduation_schemes", "get_tuning_config", "analyze_cultivation",
         "update_tuning_config",
         "search_best_combo", "get_analysis_job", "preview_generated_tuning", "create_generated_tuning",

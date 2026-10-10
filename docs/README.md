@@ -14,7 +14,7 @@
 | [40-development/](40-development/README.md) | 按日期归档的开发日志与技术参考 | 开发者 |
 | [50-releases/](50-releases/README.md) | 各版本发布说明 | 所有人 |
 | [60-userguide/](60-userguide/README.md) | 安装、配置、运行的完整操作指引 | 用户 |
-| [70-agent/](70-agent/README.md) | 外部 Agent 接入、权限与业务操作契约 | 用户 / Agent |
+| [70-agent/](70-agent/README.md) | 外部 Agent 接入、发现与业务操作契约 | 用户 / Agent |
 
 ## 常用入口
 

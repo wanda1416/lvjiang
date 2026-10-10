@@ -226,7 +226,7 @@ APK 由发布流水线产出（`dist/lvjiang-vX.Y.Z.apk`），本地排障用
 1. 从 `pyproject.toml` 读取版本号注入到 `src/lvjiang/_version.py`
 2. 调用 PyInstaller 构建
 3. 复制配置、ADB、scrcpy 等运行时依赖，并构建明确收录的 Agent 文档与 schema；
-   同一份结果放入 `dist/lvjiang/agent` 并输出独立 Agent ZIP，安装升级清理旧官方 `agent` 目录
+   同一份结果放入 `dist/lvjiang/docs` 并输出独立 Agent ZIP，保留 `10-game`、`30-architecture`、`60-userguide`、`70-agent` 的原目录；安装升级清理这些官方文档目录与旧 `agent` 目录
 4. 压缩为 zip
 5. 调用 Inno Setup 生成安装包（需安装 [Inno Setup 6](https://jrsoftware.org/isdl.php)）
 

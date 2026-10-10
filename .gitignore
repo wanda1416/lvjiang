@@ -83,5 +83,5 @@ ops/stats-worker/.wrangler/
 ops/stats-client/data/
 ops/stats-client/.env
 
-# Generated public Agent bundle; source lives in docs/10-game/10-public and docs/70-agent.
+# Generated public Agent bundle; source stays in docs/10-game, docs/30-architecture, docs/60-userguide and docs/70-agent.
 /agent/

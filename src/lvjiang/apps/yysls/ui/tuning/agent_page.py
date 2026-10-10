@@ -1,4 +1,4 @@
-"""External Agent connection and generated tuning results; Qt owns task launching."""
+"""MCP service lifecycle and Qt task bridge; business interaction lives in the Agent."""
 from __future__ import annotations
 
 import copy
@@ -6,15 +6,13 @@ import json
 import threading
 from concurrent.futures import Future, TimeoutError
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
-    QCheckBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
@@ -23,32 +21,7 @@ from ..... import constants
 from .....core.agent_docs import AgentDocuments
 from .....core.agent_mcp import LV1_REQUIRED_MESSAGE, LocalMCPServer, has_agent_access
 from .....i18n import tr
-from .....ui.combo_box import AutoWidthComboBox
-from .....ui.execution_user_selector import ExecutionUserSelector
-from ...core.agent.service import AgentGrant, AgentService, revision
-
-
-class AgentUserSelector(ExecutionUserSelector):
-    """Authorization is a fixed user, not a view that follows the main editor."""
-
-    def __init__(self, user_manager, parent=None):
-        self._initial_user = user_manager.get_active_user_name()
-        super().__init__(user_manager, parent)
-
-    def refresh_users(self) -> None:
-        selected = (self.combo.currentData() if self.combo.count()
-                    else self._initial_user)
-        self._initial_user = ""
-        self.combo.blockSignals(True)
-        self.combo.clear()
-        for username in self._user_manager.list_users():
-            self.combo.addItem(str(username), str(username))
-        self.combo.setCurrentIndex(self.combo.findData(selected))
-        self.combo.blockSignals(False)
-
-    def resolve_username(self) -> str:
-        selected = self.combo.currentData()
-        return str(selected) if selected in self._user_manager.list_users() else ""
+from ...core.agent.service import AgentService, revision
 
 
 class AgentTaskBridge(QObject):
@@ -66,6 +39,10 @@ class AgentTaskBridge(QObject):
         self.request.connect(self._handle)
 
     def call(self, operation: str, arguments: dict) -> dict:
+        if QThread.currentThread() == self.thread():
+            if self.closed:
+                raise ValueError("律匠正在关闭")
+            return self.perform(operation, arguments)
         future: Future = Future()
         with self._pending_lock:
             if self.closed:
@@ -97,6 +74,8 @@ class AgentTaskBridge(QObject):
             future.set_exception(exc)
 
     def perform(self, operation: str, args: dict) -> dict:
+        if self.service is not None:
+            self.service._ensure_enabled()
         host = self.host
         if operation == "reload_rules":
             from ...core.tuning_rules import (
@@ -106,21 +85,32 @@ class AgentTaskBridge(QObject):
             get_tuning_rule_manager().reload()
             get_tuning_group_manager().reload()
             return {"updated": True}
+        if operation == "context":
+            return {"current_user": host.user_manager.get_active_user_name(),
+                    "users": host.user_manager.list_users()}
         if operation == "targets":
-            return {"targets": [{"id": target.id, "name": target.display_name,
-                                  "kind": target.kind, "ready": target.ready,
-                                  "selected": target.id == host._execution_targets.active_target_id}
-                                 for target in host._execution_targets.all()
-                                 if target.id == args["target_id"]]}
+            return {"current_target_id": host._execution_targets.active_target_id,
+                    "targets": [{"id": target.id, "name": target.display_name,
+                                 "kind": target.kind, "ready": target.ready,
+                                 "selected": target.id == host._execution_targets.active_target_id,
+                                 "busy": host._run_manager.run_for_target(target.id) is not None}
+                                for target in host._execution_targets.all()]}
+        if operation == "resolve_target":
+            target_id = args.get("target_id") or host._execution_targets.active_target_id
+            target = host._execution_targets.get(target_id)
+            if target is None or not target.ready:
+                raise ValueError("执行目标未连接或不可用，请调用 list_targets 查看窗口和设备状态")
+            return {"target_id": target.id}
         if operation == "validate":
             from ...core.agent.launch import prepare_tuning
             prepare_tuning(args["config"])
-            target = host._current_execution_target()
-            if target is None or target.id != args["target_id"] or not target.ready:
-                raise ValueError("请先在律匠连接并选中已授权的执行目标")
+            target = host._execution_targets.get(args["target_id"])
+            if target is None or not target.ready:
+                raise ValueError("执行目标未连接或不可用，请调用 list_targets 查看状态")
             decision = host._run_manager.can_start(target_id=target.id, username=args["user"])
             if not decision.allowed:
                 raise ValueError(decision.reason)
+            self._select_target(target.id)
             if not host._backend_ready() or not host._plan_allows_backend():
                 raise ValueError("当前连接方案或执行环境不可用")
             from .tuning_tab import TuningTab
@@ -141,16 +131,12 @@ class AgentTaskBridge(QObject):
             run = task["run"]
             action = args["action"]
             if self.service is not None:
-                grant = self.service._check(args["user"], "read_data" if action == "status" else (
-                    "scan" if task["kind"] == "scan" else "execute"))
-                if action != "status" and grant.target_id != run.target_id:
-                    raise PermissionError("该任务目标已不在授权范围")
+                self.service._check(args["user"])
             active = host._run_manager.run(run.task_run_id)
             if action != "status":
                 if active is None:
                     raise ValueError("任务已经结束")
-                if host._current_run_context is not active:
-                    raise ValueError("请先在律匠中选中该任务的执行目标再控制")
+                self._select_target(run.target_id, require_ready=action != "stop")
                 if action == "stop":
                     host._request_stop(stop_confirmed=True)
                 elif action == "pause":
@@ -173,9 +159,7 @@ class AgentTaskBridge(QObject):
         if operation not in {"scan", "start_tuning"}:
             raise ValueError("不支持的任务操作")
         if self.service is not None:
-            grant = self.service._check(args["user"], "scan" if operation == "scan" else "execute")
-            if grant.target_id != args["target_id"]:
-                raise PermissionError("执行目标授权已改变，请重新预检")
+            self.service._check(args["user"])
         if not args.get("request_id"):
             raise ValueError("启动必须提供幂等请求 ID")
         request_key = (args["user"], args["request_id"])
@@ -193,15 +177,16 @@ class AgentTaskBridge(QObject):
                     return {"task_id": saved["task_id"], "state": saved["state"], "kind": saved["kind"],
                             "note": "返回原任务，未重新启动。"}
             if operation == "start_tuning":
-                # Recheck after queued UI edits/revocation, immediately before launch.
-                args = {**args, **self.service.validate_auto_tuning(args["user"], args["result_id"])}
-        target = host._current_execution_target()
-        if target is None or target.id != args["target_id"] or not target.ready:
-            raise ValueError("请先在律匠中连接并选中已授权的执行目标")
+                # Recheck configuration and user existence immediately before launch.
+                args = {**args, **self.service.validate_auto_tuning(args["user"], args["result_id"], args["target_id"])}
+        target = host._execution_targets.get(args["target_id"])
+        if target is None or not target.ready:
+            raise ValueError("执行目标未连接或不可用，请调用 list_targets 查看状态")
         if host._run_manager.run_for_target(target.id) is not None:
             raise ValueError("执行目标正在运行任务")
         if args["user"] not in host.user_manager.list_users():
             raise ValueError("执行用户已不存在")
+        self._select_target(target.id)
         if operation == "scan":
             from .....core.config.resolver import get_resolver
             from .....workflows.metadata import build_flow_config
@@ -250,212 +235,126 @@ class AgentTaskBridge(QObject):
         return result
 
 
+    def _select_target(self, target_id: str, *, require_ready: bool = True) -> None:
+        host = self.host
+        target = host._execution_targets.get(target_id)
+        if target is None or (require_ready and not target.ready):
+            raise ValueError("执行目标未连接或不可用")
+        if host._execution_targets.active_target_id != target_id:
+            host._capture_launch_draft(host._execution_targets.active_target_id)
+            host._execution_targets.select(target_id)
+            host._restore_active_target_view()
+
+
 class AgentTuningPage(QWidget):
+    """Only connection lifecycle lives here; users, targets and actions live in MCP."""
+
     def __init__(self, host):
         super().__init__(host)
         self.host = host
         self.bridge = AgentTaskBridge(host)
         self.service = AgentService(constants.PROJECT_ROOT, dispatch=self.bridge.call)
         self.bridge.service = self.service
-        self._records: dict = {}
         self.server: LocalMCPServer | None = None
         layout = QVBoxLayout(self)
         description = QLabel(tr(
-            "在 WorkBuddy 等外部 Agent 中交流流派和养成目标，扫描备战方案，"
-            "分析装备并生成新的调律配置，再回到这里一键启动。"))
+            "启动 MCP 后，在 WorkBuddy 等外部 Agent 中交流流派和养成目标。"
+            "AI 可以了解当前用户与全部用户、查询装备、扫描备战方案、生成新配置并启动调律。"
+            "切换用户或设备无需重新导出接入配置。"))
         description.setWordWrap(True)
         layout.addWidget(description)
-        self.user = AgentUserSelector(host.user_manager)
-        layout.addWidget(self.user)
-        target_row = QHBoxLayout()
-        target_row.addWidget(QLabel(tr("授权执行目标：")))
-        self.target = AutoWidthComboBox(width_mode="popup")
-        target_row.addWidget(self.target, 1)
-        refresh = QPushButton(tr("刷新目标"))
-        refresh.clicked.connect(self._refresh_targets)
-        target_row.addWidget(refresh)
-        layout.addLayout(target_row)
-        self.permissions = {}
-        for key, label in (("read_data", "读取方案与装备"), ("scan", "扫描并更新备战方案"),
-                           ("generate", "创建新的调律配置"), ("execute", "启动和控制任务"),
-                           ("save_selection", "保存用户调律选择"),
-                           ("recycle", "允许回收"), ("reset", "允许重置"),
-                           ("food", "允许使用狗粮"), ("lock", "允许锁定装备")):
-            checkbox = QCheckBox(tr(label))
-            checkbox.setChecked(key == "read_data")
-            checkbox.toggled.connect(self._authorize)
-            self.permissions[key] = checkbox
-            layout.addWidget(checkbox)
         actions = QHBoxLayout()
-        self.toggle = QPushButton(tr("开启 MCP 接入"))
-        self.toggle.clicked.connect(self._toggle)
-        actions.addWidget(self.toggle)
-        copy_button = QPushButton(tr("复制 WorkBuddy 配置"))
-        copy_button.clicked.connect(lambda: self._connection(False))
-        actions.addWidget(copy_button)
-        export = QPushButton(tr("导出接入配置"))
-        export.clicked.connect(lambda: self._connection(True))
-        actions.addWidget(export)
+        self.start_service = QPushButton(tr("启动 MCP 服务"))
+        self.start_service.clicked.connect(self._start_service)
+        actions.addWidget(self.start_service)
+        self.export = QPushButton(tr("导出 MCP 接入配置"))
+        self.export.clicked.connect(self._export)
+        actions.addWidget(self.export)
+        self.stop_service = QPushButton(tr("关闭 MCP 服务"))
+        self.stop_service.clicked.connect(self._stop_service)
+        actions.addWidget(self.stop_service)
         layout.addLayout(actions)
-        self.status = QLabel(tr("接入未开启；勾选的权限只对指定用户和执行目标生效。"))
-        self.status.setWordWrap(True)
-        layout.addWidget(self.status)
         self.entitlement = QLabel()
         self.entitlement.setWordWrap(True)
         layout.addWidget(self.entitlement)
-        self.results = AutoWidthComboBox(width_mode="popup")
-        self.results.currentIndexChanged.connect(self._show_result)
-        layout.addWidget(self.results)
-        self.detail = QTextBrowser()
-        layout.addWidget(self.detail, 1)
-        self.start = QPushButton(tr("一键启动调律"))
-        self.start.clicked.connect(self._start)
-        self.start.setEnabled(False)
-        layout.addWidget(self.start)
-        self.user.resolved_user_changed.connect(self._authorize)
-        if hasattr(host, "user_changed"):
-            host.user_changed.connect(self._refresh_users)
-        self.target.currentIndexChanged.connect(self._authorize)
-        self._refresh_targets()
+        self.status = QLabel(tr("MCP 服务未启动。导出的配置包含私人连接令牌，请勿公开分享。"))
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
+        layout.addStretch()
         self.timer = QTimer(self)
         self.timer.setInterval(2000)
-        self.timer.timeout.connect(self._refresh_results)
+        self.timer.timeout.connect(self._refresh_state)
         self.timer.start()
+        self._refresh_state()
         app = QApplication.instance()
         if app is not None:
             app.aboutToQuit.connect(self._shutdown)
 
-    def _authorize(self, *_args):
-        old_user = self.service.grant.user
-        self.service.authorize(AgentGrant(
-            user=self.user.resolve_username(), target_id=str(self.target.currentData() or ""),
-            **{key: value.isChecked() for key, value in self.permissions.items()},
-        ))
-        if old_user != self.service.grant.user and hasattr(self, "results"):
-            self._records = {}
-            self.results.clear()
-        if hasattr(self, "start"):
-            self._show_result()
+    def _refresh_state(self):
+        licensed = has_agent_access()
+        running = bool(self.server and self.server.running)
+        self.entitlement.setText("" if licensed else tr(LV1_REQUIRED_MESSAGE))
+        self.start_service.setEnabled(licensed and not running)
+        self.start_service.setToolTip("" if licensed else tr(LV1_REQUIRED_MESSAGE))
+        self.export.setEnabled(running and self.service.enabled)
+        self.stop_service.setEnabled(running and self.service.enabled)
 
-    def _refresh_users(self, *_args):
-        self.user.refresh_users()
-        self._authorize()
-
-    def _refresh_targets(self):
-        selected = self.target.currentData() or self.host._execution_targets.active_target_id
-        self.target.blockSignals(True)
-        self.target.clear()
-        for target in self.host._execution_targets.all():
-            self.target.addItem(target.display_name, target.id)
-        self.target.setCurrentIndex(self.target.findData(selected))
-        self.target.blockSignals(False)
-        self._authorize()
-
-    def _toggle(self):
+    def _start_service(self):
         try:
-            if self.server and self.server.running:
-                self.server.stop()
-                self.service.authorize(AgentGrant(read_data=False))
-                self.toggle.setText(tr("开启 MCP 接入"))
-                self.status.setText(tr("接入已关闭；游戏任务按原流程继续，可在调律管理中停止。"))
-                return
             if not has_agent_access():
                 raise PermissionError(tr(LV1_REQUIRED_MESSAGE))
-            self._authorize()
-            docs = AgentDocuments(constants.PROJECT_ROOT / "agent")
-            docs.list_docs()  # Fail before exposing an incomplete installation.
+            if self.server and self.server.running:
+                return
+            import asyncio
+            import sys
+
             from ...core.agent.catalog import tool_catalog
-            methods = tool_catalog(self.service, docs)
-            self.server = LocalMCPServer(methods, instructions="先调用 get_capabilities、read_doc('entry')。仅在用户授权内操作，生成新配置，不修改已有规则。")
-            @self.server.mcp.resource("lvjiang://docs/{doc_id}")
-            def read_document(doc_id: str) -> str:
-                return docs.read_doc(doc_id)["text"]
-            self.server.start()
-            self.toggle.setText(tr("关闭 MCP 接入"))
-            self.status.setText(tr("接入已开启。复制配置到 WorkBuddy 的自定义 MCP；配置为私人连接信息，重启后需重新导出。"))
+            docs = AgentDocuments(constants.PROJECT_ROOT / "docs",
+                                  source_mode=not getattr(sys, "frozen", False))
+            server = LocalMCPServer(tool_catalog(self.service, docs), instructions=(
+                "先调用 get_capabilities、list_users 和 read_doc('entry')。游戏机制读 10-game，操作指导读 60-userguide，DSL 与架构读 30-architecture，接口契约读 70-agent。"
+                "开启服务即可使用全部已开放能力；用户和目标按每次调用选择。"
+                "切换用户不需改连接配置；调用受限时向用户解释接口返回原因。"
+                "生成新配置，不修改已有规则。"))
+            docs.schema_provider = lambda: json.dumps(
+                [tool.model_dump(mode="json") for tool in asyncio.run(server.mcp.list_tools())],
+                ensure_ascii=False, indent=2) + "\n"
+            docs.list_docs()
+
+            @server.mcp.resource("lvjiang://docs/{doc_id}")
+            async def read_document(doc_id: str) -> str:
+                document = await asyncio.to_thread(docs.read_doc, doc_id)
+                return document["text"]
+
+            server.start()
+            self.server = server
+            self.service.set_enabled(True)
+            self.status.setText(tr("MCP 服务已启动。导出配置到 WorkBuddy；用户和设备由 AI 通过接口发现，切换时无需重新导出。"))
         except Exception as exc:  # noqa: BLE001 - show actionable local setup failure
             self.status.setText(str(exc))
+        self._refresh_state()
 
-    def _connection(self, export: bool):
+    def _stop_service(self):
+        self.service.set_enabled(False)
+        if self.server:
+            self.server.stop()
+        self.status.setText(tr("MCP 服务已关闭；已启动的游戏任务继续运行，可在调律管理中停止。"))
+        self._refresh_state()
+
+    def _export(self):
         try:
             if self.server is None:
-                raise ValueError(tr("请先开启 MCP 接入"))
+                raise ValueError(tr("请先启动 MCP 服务"))
             text = json.dumps(self.server.connection_config(), ensure_ascii=False, indent=2)
-            if export:
-                name, _ = QFileDialog.getSaveFileName(self, tr("导出私人接入配置"), "lvjiang-mcp.json", "JSON (*.json)")
-                if name:
-                    from pathlib import Path
-                    Path(name).write_text(text + "\n", encoding="utf-8")
-            else:
-                clipboard = QApplication.clipboard()
-                if clipboard is not None:
-                    clipboard.setText(text)
+            name, _ = QFileDialog.getSaveFileName(self, tr("导出私人接入配置"), "lvjiang-mcp.json", "JSON (*.json)")
+            if name:
+                from pathlib import Path
+                Path(name).write_text(text + "\n", encoding="utf-8")
         except (ValueError, OSError) as exc:
-            self.status.setText(str(exc))
-
-    def _refresh_results(self):
-        if not self.isVisible():
-            return
-        self._show_result()
-        user = self.user.resolve_username()
-        if not user:
-            return
-        try:
-            records = {r["id"]: r for r in self.service.store.load("results").values() if r["user"] == user}
-        except (ValueError, OSError) as exc:
-            self.status.setText(tr("无法读取生成结果：") + str(exc))
-            return
-        if records == self._records:
-            return
-        self._records = records
-        selected = self.results.currentData()
-        self.results.blockSignals(True)
-        self.results.clear()
-        for key, record in reversed(list(records.items())):
-            self.results.addItem(record["name"], key)
-        index = self.results.findData(selected)
-        if index >= 0:
-            self.results.setCurrentIndex(index)
-        self.results.blockSignals(False)
-        self._show_result()
-
-    def _show_result(self, *_args):
-        record = self._records.get(self.results.currentData())
-        allowed = self.permissions["execute"].isChecked()
-        licensed = has_agent_access()
-        self.entitlement.setText("" if licensed else tr(LV1_REQUIRED_MESSAGE))
-        self.toggle.setEnabled(licensed or bool(self.server and self.server.running))
-        self.toggle.setToolTip("" if licensed else tr(LV1_REQUIRED_MESSAGE))
-        self.start.setEnabled(record is not None and allowed and licensed)
-        self.start.setToolTip(tr(LV1_REQUIRED_MESSAGE) if not licensed else (
-            "" if allowed else tr("请先允许启动和控制任务")))
-        if record:
-            from ...config.tune_slots import SLOT_LABELS
-            slots = "、".join(SLOT_LABELS.get(key, key) for key in record["run_config"]["selected_slots"])
-            lines = [record["goal"], tr("调律部位：") + slots,
-                     tr("调律规则：") + str(len(record["run_config"]["rules"])) + tr(" 条"), ""]
-            lines.extend(record["suggestions"])
-            self.detail.setPlainText("\n".join(lines))
-        else:
-            self.detail.setPlainText(tr("尚无生成结果。接入 Agent 后，可以先扫描备战方案并讨论养成目标。"))
-
-    def _start(self):
-        try:
-            if not has_agent_access():
-                raise PermissionError(tr(LV1_REQUIRED_MESSAGE))
-            self._authorize()
-            user = self.user.resolve_username()
-            result = self.service.validate_auto_tuning(user, str(self.results.currentData() or ""))
-            import uuid
-            started = self.bridge.perform("start_tuning", {
-                **result, "user": user, "request_id": uuid.uuid4().hex,
-            })
-            self.status.setText(tr("调律已启动，请在调律管理中查看进度。") + f" ({started['state']})")
-        except (ValueError, PermissionError) as exc:
             self.status.setText(str(exc))
 
     def _shutdown(self):
+        self.service.set_enabled(False)
         self.bridge.close()
-        self.service.authorize(AgentGrant(read_data=False))
         if self.server:
             self.server.stop()

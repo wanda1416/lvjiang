@@ -55,6 +55,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Type: filesandordirs; Name: "{app}\config\system"
 Type: filesandordirs; Name: "{app}\_internal"
 Type: filesandordirs; Name: "{app}\agent"
+Type: filesandordirs; Name: "{app}\docs\10-game"
+Type: filesandordirs; Name: "{app}\docs\30-architecture"
+Type: filesandordirs; Name: "{app}\docs\60-userguide"
+Type: filesandordirs; Name: "{app}\docs\70-agent"
 Type: filesandordirs; Name: "{app}\data\scrcpy"
 
 [Files]

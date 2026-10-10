@@ -483,7 +483,7 @@ class AgentTuningPage(QWidget):
             if target is None:
                 raise ValueError(tr("请先在 AI 设置的外部 Agent 中添加接入配置"))
             path = Path(self.connection.export_paths.get(target.key, target.export_path)).expanduser()
-            export_agent(self.root, config, path, transport=target.transport)
+            export_agent(config, path, server_name=self.agent_settings.server_name, transport=target.transport)
             self.status.setText(tr("MCP 服务已启动，{agent} 接入配置已同步；重启无需重新导出。").format(agent=target.name))
         except (ValueError, OSError) as exc:
             self.status.setText(str(exc))

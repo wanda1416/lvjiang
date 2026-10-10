@@ -461,6 +461,9 @@ class RunControlMixin:
         target = self._execution_targets.get(target_id)
         if target is None or self._running:
             return
+        save_params = getattr(self, "_save_displayed_params", None)
+        if callable(save_params):
+            save_params()
         from .execution_targets import LaunchDraft
         selector = getattr(self, "_daily_execution_user_selector", None)
         username = selector.combo.currentData() if selector is not None else None
@@ -577,6 +580,10 @@ class RunControlMixin:
                     check.setChecked(bool(value.get(check.objectName(), False)))
                     check.blockSignals(False)
         self._refresh_param_visibility()
+        if self._running and hasattr(self, "_displayed_param_baseline"):
+            # 冻结运行快照只是只读展示，结束/退出时不能回写其历史参数。
+            self._displayed_param_baseline = copy.deepcopy(
+                self._collect_displayed_params(self._displayed_param_defs))
 
     # ─── 工作流配置加载 ──────────────────────────────────
 
@@ -1757,6 +1764,8 @@ class RunControlMixin:
             self._request_stop()
             return
 
+        self._save_displayed_params()
+
         feedback = getattr(self, "_daily_start_feedback", None)
         if feedback is not None:
             feedback.clear_failure()
@@ -1867,8 +1876,10 @@ class RunControlMixin:
         ).build()
         # session/context 初始化：启动时快照执行用户，全程只依赖此绑定值
         self._bind_engine_user(engine, username)
-        from ...core.config.wf_configs import get_wf_config
-        engine.workflow_config_snapshot = get_wf_config(flow_id)
+        from ...core.config.wf_configs import TRANSIENT_ID_PREFIX, get_wf_config
+        temporary = flow_id.startswith(TRANSIENT_ID_PREFIX)
+        engine.workflow_config_snapshot = (copy.deepcopy(flow_cfg.get("_saved_params", {}))
+                                           if temporary else get_wf_config(flow_id))
         engine._ui_callback = self._create_ui_callback(run_context)
         engine.window_rebind_hook = (
             lambda window, target_id=run_context.target_id:
@@ -1876,15 +1887,17 @@ class RunControlMixin:
         )
         # 保存 engine 引用供完成回调使用
         self._current_engine = engine
-        # 执行前先提交面板，再从统一解析器生成该用户的参数快照。
-        if flow_config is None and hasattr(self, '_save_displayed_params'):
-            self._save_displayed_params()
+        # 面板已在启动前保存；此处只构造该用户的执行快照。
         if flow_cfg.get("scope", "daily") == "daily":
-            from ...core.task_params import resolve_task_params
-            flow_params, _parameter_source = resolve_task_params(
-                flow_id, username, flow_cfg.get("parameters", []),
-                self._session_manager._users_dir,
-            )
+            from ...core.task_params import merge_task_params, resolve_task_params
+            if temporary:
+                flow_params, _parameter_source = merge_task_params(
+                    flow_cfg.get("parameters", []), flow_cfg.get("_saved_params", {}), None)
+            else:
+                flow_params, _parameter_source = resolve_task_params(
+                    flow_id, username, flow_cfg.get("parameters", []),
+                    self._session_manager._users_dir,
+                )
         else:
             # 专用脚本的参数面板由日常页隐藏，仍由专属配置页管理。
             from ...core.config.wf_configs import get_wf_config

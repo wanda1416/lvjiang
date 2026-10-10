@@ -13,7 +13,10 @@
     _displayed_script_id / _get_selected_flow_config
 """
 
+from copy import deepcopy
+
 from loguru import logger
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -27,6 +30,7 @@ from PyQt6.QtWidgets import (
 
 from lvjiang.ui.combo_box import AutoWidthComboBox
 
+from ...core.config.wf_configs import TRANSIENT_ID_PREFIX
 from ...i18n import tr
 from ...workflows.builtins._coerce import to_bool
 from ..widgets import FlowLayout
@@ -144,6 +148,11 @@ class UiStateMixin:
                 continue
             widget = self._param_panel.findChild(QSpinBox, name)
             if widget is not None:
+                blocked = widget.blockSignals(True)
+                try:
+                    widget.interpretText()
+                finally:
+                    widget.blockSignals(blocked)
                 params[name] = str(widget.value())
                 continue
             widget = self._param_panel.findChild(QCheckBox, name)
@@ -165,27 +174,34 @@ class UiStateMixin:
         return params
 
     def _save_displayed_params(self):
-        """将当前参数面板的值写入 _displayed_script_id 对应的配置项
+        """保存面板固定归属的修改字段，停止待保存计时器。
 
         仅对 scope=daily 的脚本生效；专用脚本的参数由专属页面管理，
         日常页禁止读写。
         """
-        sid = getattr(self, '_displayed_script_id', None)
+        timer = getattr(self, "_param_save_timer", None)
+        if timer is not None:
+            timer.stop()
+        target_cfg = getattr(self, "_displayed_param_cfg", None)
         # 切到批量 Tab 后参数面板不可见，但里面的控件和值仍然有效；批量启动
         # 前的兜底同步必须允许从这个隐藏面板收集。脚本 scope 在下方另行校验。
-        if not sid or not self._param_panel:
+        if target_cfg is None or not self._param_panel or not self._param_panel.isEnabled():
             return
-        # 找到对应配置项，临时用 _collect_flow_params 的逻辑从面板搜集值
-        target_cfg = next((c for c in self._workflow_configs if c["id"] == sid), None)
-        if not target_cfg:
-            return
+        sid = target_cfg["id"]
         # ⚠️ 专用脚本的参数由专属页面管理，日常页禁止读写
         if target_cfg.get("scope", "daily") != "daily":
             return
         if not target_cfg.get("parameters"):
             return
-        params = self._collect_displayed_params(target_cfg.get("parameters", []))
-        if getattr(self, "_displayed_param_is_user_override", False):
+        params = self._collect_displayed_params(self._displayed_param_defs)
+        baseline = self._displayed_param_baseline
+        patch = {key: value for key, value in params.items()
+                 if key not in baseline or baseline[key] != value}
+        if not patch:
+            return
+        if sid.startswith(TRANSIENT_ID_PREFIX):
+            target_cfg["_saved_params"] = {**target_cfg.get("_saved_params", {}), **patch}
+        elif getattr(self, "_displayed_param_is_user_override", False):
             username = getattr(self, "_displayed_param_username", "")
             if username:
                 # 用户管理对话框可能已删除当前展示用户，随后才刷新主窗口。
@@ -194,35 +210,43 @@ class UiStateMixin:
                 if (user_manager is not None
                         and username not in user_manager.list_users()):
                     return
-                from ...core.user_config import (
-                    get_user_workflow_params,
-                    set_user_workflow_params,
-                )
-                existing = get_user_workflow_params(
-                    username, sid, self._user_manager._users_dir) or {}
-                set_user_workflow_params(
-                    username, sid, {**existing, **params},
-                    self._user_manager._users_dir)
+                from ...core.user_config import User, mutate_user_metadata
+
+                def merge(user: User) -> None:
+                    user.workflow_params.setdefault(sid, {}).update(patch)
+
+                mutate_user_metadata(username, merge, self._user_manager._users_dir)
         else:
-            target_cfg["_saved_params"] = params
-            from ...core.config.wf_configs import prune_wf_configs, update_wf_config
-            from ...workflows.discovery import discover_scripts
-            update_wf_config(sid, params)
-            # 顺带清掉早已不存在的脚本的配置（改名/删除遗留）。按全集判定，
-            # 不用 _workflow_configs——那是入口展示的子集，会误删专用脚本配置。
-            removed = prune_wf_configs(
-                {sid, *(cfg["id"] for cfg in discover_scripts())})
-            if removed:
-                logger.info(f"清理失效脚本配置: {removed}")
+            from ...core.config.wf_configs import update_wf_config
+            update_wf_config(sid, patch)
+        self._displayed_param_baseline = deepcopy(params)
+        feedback = getattr(self, "_daily_start_feedback", None)
+        if feedback is not None:
+            feedback.clear_failure()
 
     def _persist_param_change(self, *_args):
-        """参数控件变更后立即写回共享配置。
-
-        日常与批量执行共用 ``wf_configs``。如果只在切换脚本或单独运行时
-        保存，用户改完参数直接启动批量时，批量线程会读到上一次的值。
-        """
-        self._save_displayed_params()
+        """文本输入合并保存；显隐立即更新，所有启动入口先完成待保存编辑。"""
         self._refresh_param_visibility()
+        if isinstance(self.sender(), (QLineEdit, QPlainTextEdit)):
+            if not hasattr(self, "_param_save_timer"):
+                self._param_save_timer = QTimer(self)
+                self._param_save_timer.setSingleShot(True)
+                self._param_save_timer.setInterval(250)
+                self._param_save_timer.timeout.connect(self._save_pending_params)
+            self._param_save_timer.start()
+        else:
+            self._save_displayed_params()
+
+    def _save_pending_params(self) -> None:
+        """计时器保存失败保留修改，下一次编辑或显式保存可重试。"""
+        try:
+            self._save_displayed_params()
+        except (OSError, RuntimeError) as exc:
+            message = tr("参数保存失败，请检查配置文件权限或占用后重试：{error}").format(error=exc)
+            logger.warning(message)
+            feedback = getattr(self, "_daily_start_feedback", None)
+            if feedback is not None:
+                feedback.show_failure(message)
 
     def _save_daily_config(self):
         """保存日常页脚本选择；参数由 _save_displayed_params 按脚本字段级落盘
@@ -272,6 +296,9 @@ class UiStateMixin:
         仅对 scope=daily 的脚本绘制参数面板；专用脚本不画面板，
         其参数由专属配置页面管理。
         """
+        self._save_displayed_params()
+        self._displayed_param_cfg = None
+        self._displayed_param_baseline = {}
         refresh_feedback = getattr(self, "_refresh_daily_start_feedback", None)
         if callable(refresh_feedback):
             refresh_feedback()
@@ -306,9 +333,13 @@ class UiStateMixin:
         username = selector.resolve_username() if selector is not None else ""
         user_manager = getattr(self, "_user_manager", None)
         users_dir = getattr(user_manager, "_users_dir", None)
-        from ...core.task_params import resolve_task_params
-        saved, source = resolve_task_params(
-            str(flow_cfg["id"]), username, params, users_dir)
+        from ...core.task_params import merge_task_params, resolve_task_params
+        temporary = str(flow_cfg["id"]).startswith(TRANSIENT_ID_PREFIX)
+        if temporary:
+            saved, source = merge_task_params(params, flow_cfg.get("_saved_params", {}), None)
+        else:
+            saved, source = resolve_task_params(str(flow_cfg["id"]), username, params, users_dir)
+        self._displayed_param_cfg = flow_cfg
         self._displayed_param_username = username
         self._displayed_param_is_user_override = source == "user"
         set_title = getattr(self._param_panel, "setTitle", None)
@@ -321,9 +352,9 @@ class UiStateMixin:
             independent.setEnabled(bool(username))
             independent.setChecked(source == "user")
             independent.blockSignals(False)
-            independent.setVisible(True)
+            independent.setVisible(not temporary)
         if all_user_params is not None:
-            all_user_params.setVisible(True)
+            all_user_params.setVisible(not temporary)
         # require 依赖要按行控制显隐，这里记下每个参数占用的行号（多行控件占两行）
         self._displayed_param_defs = list(params)
         self._param_rows: dict[str, list[int]] = {}
@@ -340,6 +371,7 @@ class UiStateMixin:
                 spin.setObjectName(name)
                 spin.setRange(param_def.get("min", 0), param_def.get("max", 999999))
                 spin.setValue(int(default) if default is not None else 1)
+                spin.setKeyboardTracking(False)
                 spin.valueChanged.connect(self._persist_param_change)
                 self._param_layout.addRow(label + ":", spin)
             elif param_type == "bool":
@@ -364,9 +396,7 @@ class UiStateMixin:
                 placeholder = param_def.get("placeholder", "")
                 if placeholder:
                     edit.setPlaceholderText(placeholder)
-                # 与其余控件一致用即时信号：批量执行读的是 wf_configs 而不是
-                # 控件，若等到失焦才落盘，用户敲完直接点批量启动就会跑上一次
-                # 的值（见 _persist_param_change 的说明）。
+                # 显隐即时更新，连续输入合并；启动/切换入口负责立即保存。
                 edit.textChanged.connect(self._persist_param_change)
                 if isinstance(edit, QPlainTextEdit):
                     # 多行输入从标签下一行起占满表单宽度。
@@ -418,6 +448,7 @@ class UiStateMixin:
             self._param_rows[str(name)] = list(
                 range(rows_before, self._param_layout.rowCount()))
         self._refresh_param_visibility()
+        self._displayed_param_baseline = deepcopy(self._collect_displayed_params(params))
         self._param_panel.setVisible(True)
 
     def _refresh_param_visibility(self) -> None:
@@ -447,6 +478,7 @@ class UiStateMixin:
 
     def _on_independent_params_toggled(self, enabled: bool) -> None:
         """在共享参数与当前用户的独立参数之间切换。"""
+        self._save_displayed_params()
         flow_cfg = self._get_selected_flow_config()
         username = self._daily_execution_user_selector.resolve_username()
         if not flow_cfg or not username:

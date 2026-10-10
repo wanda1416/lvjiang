@@ -1163,6 +1163,14 @@ class MainWindow(
         点「开始」的那一刻合成的不可变计划。这里**不再**读 `batch.json` 或活动
         配置组：那样拼出来的数据可能和页面上看到的不是同一份。
         """
+        try:
+            self._save_displayed_params()
+        except (OSError, RuntimeError) as exc:
+            from ..execution_feedback import report_start_failure
+            message = tr("参数保存失败，本次批量未启动：{error}").format(error=exc)
+            self._log_append(message)
+            report_start_failure(self, message, "batch")
+            return False
         scripts = list(spec.scripts)
         if not self._backend_ready():
             if self._active_execution_target() is None:

@@ -1362,22 +1362,37 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             result = self.executor.tune_once(
                 equip_data, self.equipment_session.expected_rating,
                 self.equipment_session.tune_full_recycle,
-                round_no=rounds + 1)
+                round_no=rounds + 1,
+                fill_count=max(1, self.MAX_AFFIX - affix_count)
+                if self.equipment_session.tune_full_recycle else 1)
             if result is None:
                 stop_reason = self.executor.abort_reason or "无法继续调律"
                 stop_key = "cannot_continue"
                 self.recorder.report_set("stop_reason", stop_reason)
                 self.recorder.doc_note(f"{stop_reason}，结束调律")
                 break
-            self.stone_stock.record_tune(equip_data, affix_count + 1)
+            filled = self.executor.round_fill_count
+            for target_affix in range(affix_count + 1, affix_count + filled + 1):
+                self.stone_stock.record_tune(equip_data, target_affix)
             rounds += 1
-            affix_count += 1
+            previous_affix_count = affix_count
+            affix_count += filled
+            if filled > 1:
+                fields = ["affix_gong", "affix_shang", "affix_jue", "affix_zhi", "affix_yu"]
+                batch = self.ocr_scene(self.TUNE_SCENE, fields, cleaning_group="equip")
+                result["batch_affixes"] = batch
+                result["filled_count"] = filled
             # 每轮结果挂在本件 report 下，与装备一一对应
             self.recorder.report_append("tune_results", result)
             _affix_count_before = len(equip_data.affixes)
-            new_affix = self.navigator.collect_new_affix(
-                equip_data, result.get("tune_affix", "")) \
-                or result.get("tune_affix", "")
+            if filled > 1:
+                new_affix = "；".join(self.navigator.collect_new_affix(equip_data, batch.get(field, ""))
+                                      or batch.get(field, "")
+                                      for field in fields[previous_affix_count:affix_count])
+            else:
+                new_affix = self.navigator.collect_new_affix(
+                    equip_data, result.get("tune_affix", "")) \
+                    or result.get("tune_affix", "")
             self.recorder.report_set("rounds", rounds)
             self.recorder.report_set("final_affix_count", affix_count)
             self.recorder.report_set(
@@ -1403,6 +1418,7 @@ class AutoTuningWorkflow(TuningContextMixin, BaseWorkflow):
             # 进度信号：单轮调律完成（含更新后的评级）
             self._emit_progress("tune_round_completed", {
                 "round_no": rounds,
+                "filled_count": filled,
                 "new_affix": new_affix,
                 "food_used": self.executor.round_food,
                 "food_reason": self.executor.round_food_reason,

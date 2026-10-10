@@ -94,6 +94,10 @@ class ProfileCellEditingMixin:
         """
         if self._loading:
             return
+        table = self._tables.get(group_name)
+        # 合计行不是用户：双击它只会拿「总和」当用户名去读 profile。
+        if not table or table.is_totals_row(row):
+            return
 
         from ...core.profile import get_profile_config
         config = get_profile_config()
@@ -113,9 +117,6 @@ class ProfileCellEditingMixin:
 
         model_type = config.get_model_type(column_keys[col - 1]) or ""
 
-        table = self._tables.get(group_name)
-        if not table:
-            return
         item = table.item(row, col)
         if not item:
             return
@@ -140,7 +141,8 @@ class ProfileCellEditingMixin:
         row = item.row()
         col = item.column()
         table = item.tableWidget()
-        if not table:
+        # 合计行只读，但程序化 setText 同样会走这条回写路径。
+        if not table or table.is_totals_row(row):
             return
 
         from ...core.profile import get_profile_config
@@ -225,6 +227,9 @@ class ProfileCellEditingMixin:
 
         item = table.itemAt(pos)
         if not item:
+            return
+        # 合计行没有对应的用户，菜单里的增减会写到一个叫「总和」的用户上。
+        if table.is_totals_row(item.row()):
             return
 
         row = item.row()

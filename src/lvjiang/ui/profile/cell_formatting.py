@@ -222,6 +222,36 @@ def format_profile_cell(kd: KeyDef, model_type: str, data: dict) -> tuple[str, s
     return str(value), ""
 
 
+#: 参与合计的模型：quota / regen / stock 都是可累加的数值。
+#: note 是自由文本（「已完成」这类），相加没有意义，合计行留空。
+SUMMABLE_MODELS = frozenset({MODEL_QUOTA, MODEL_REGEN, MODEL_STOCK})
+
+
+def sum_profile_column(kd: KeyDef, model_type: str, users_data: dict[str, dict]) -> str:
+    """合计行单元格文本：可累加模型返回该列数值之和，其余一律返回空串。
+
+    regen 用与单元格显示同一套计算值（`compute_regen_entry`），否则合计会和
+    用户实际看到的数字对不上。空缺值按不参与累加处理；结果是整数时不带小数点。
+    """
+    if model_type not in SUMMABLE_MODELS:
+        return ""
+    total = 0.0
+    for data in users_data.values():
+        entry = data.get(model_type, {}).get(kd.key, {})
+        if not entry:
+            continue
+        value = entry.get("value")
+        if value is None:
+            continue
+        if model_type == MODEL_REGEN and isinstance(kd, RegenKeyDef):
+            value = compute_regen_entry(entry, kd).value
+        try:
+            total += float(value)
+        except (TypeError, ValueError):
+            continue
+    return str(int(total)) if total == int(total) else f"{total:g}"
+
+
 def is_sync_target_at_hard_cap(sync_key: str, data: dict) -> bool:
     """检查同步目标（`model_type:key` 命名空间）是否已达硬上限
 

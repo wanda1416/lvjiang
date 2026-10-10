@@ -22,10 +22,12 @@ from lvjiang.ui.button_styles import apply_button_style, fit_button_width
 from ...core.profile.schema import get_profile_config
 from ...core.profile.store import (
     get_groups,
+    get_overview_totals,
     insert_overview_columns,
     remove_overview_column,
     reorder_overview_columns,
     replace_overview_column,
+    set_overview_totals,
 )
 from ...i18n import tr
 
@@ -204,6 +206,13 @@ class ProfileColumnMixin:
 
         if logical_index == 0:
             menu.addAction(tr("右侧新增列"), lambda: self._add_column(group_name, -1))
+            # 合计行开关按分组存放：每个分组的表格自己决定要不要这一行。
+            menu.addSeparator()
+            totals_action = menu.addAction(tr("展示总和行"))
+            totals_action.setCheckable(True)
+            totals_action.setChecked(get_overview_totals(group_name))
+            totals_action.triggered.connect(
+                lambda checked: self._set_group_totals(group_name, checked))
         else:
             # 数据列索引需要减 1（跳过用户名列）
             data_index = logical_index - 1
@@ -228,6 +237,13 @@ class ProfileColumnMixin:
             menu.addAction(tr("删除当前列"), lambda: self._remove_column(group_name, data_index))
 
         menu.exec(h_header.mapToGlobal(pos))
+
+    def _set_group_totals(self: ProfileTab, group_name: str, enabled: bool) -> None:  # type: ignore[misc]
+        """切换该分组的合计行并立即重绘；只影响这一个分组。"""
+        set_overview_totals(group_name, enabled)
+        table = self._tables.get(group_name)
+        if table is not None:
+            self._refresh_group(group_name, table)
 
     def _edit_column_definition(self: ProfileTab, group_name: str, data_index: int) -> None:  # type: ignore[misc]
         """直接编辑当前列对应的 key 定义并立即保存。"""

@@ -1,7 +1,8 @@
 """档案总览会话数据存储
 
 统一管理 interface.json 中 profile 与根节点 alert_history 的读写，包括：
-- overview_groups: 总览分组配置 {group_name: {"columns": [key, ...]}}
+- overview_groups: 总览分组配置
+  {group_name: {"columns": [key, ...], "show_totals": bool}}
 - overview_group_order: 总览分组的拖动顺序，未记录时沿用分组配置顺序
 - overview_active_group: 当前活跃分组名
 - 根节点 alert_history: 提醒去重记录 {alert_key: timestamp}
@@ -27,6 +28,7 @@ _PROFILE_KEY = "profile"
 _SUB_GROUPS = "overview_groups"
 _SUB_GROUP_ORDER = "overview_group_order"
 _SUB_ACTIVE_GROUP = "overview_active_group"
+_SUB_TOTALS = "show_totals"
 _ALERT_HISTORY_KEY = "alert_history"
 
 
@@ -183,6 +185,33 @@ def reorder_overview_columns(group_name: str, ordered_keys: list[str]) -> None:
         group["columns"] = list(ordered_keys)
 
     _mutate_groups(_reorder)
+
+
+# ─── 合计行 ────────────────────────────────────────────────
+
+
+def get_overview_totals(group_name: str) -> bool:
+    """该分组的总览表是否展示合计行；从未记录过时默认隐藏。"""
+    groups = _load().get(_SUB_GROUPS, {})
+    if not isinstance(groups, dict):
+        return False
+    group = groups.get(group_name)
+    if not isinstance(group, dict):
+        return False
+    return group.get(_SUB_TOTALS) is True
+
+
+def set_overview_totals(group_name: str, enabled: bool) -> None:
+    """设置分组是否展示合计行（多进程安全）。
+
+    只写自己这一项：分组配置可能正被别的进程或页面改动，不能整份回写。
+    """
+    def _set(groups: dict) -> None:
+        group = groups.setdefault(group_name, {"columns": []})
+        if isinstance(group, dict):
+            group[_SUB_TOTALS] = bool(enabled)
+
+    _mutate_groups(_set)
 
 
 # ─── 活跃分组 ────────────────────────────────────────────────

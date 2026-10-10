@@ -39,6 +39,7 @@ from ...core.profile.store import (
     create_overview_group,
     get_active_group,
     get_groups,
+    get_overview_totals,
     remove_overview_group,
     rename_overview_group,
     reorder_overview_groups,
@@ -52,6 +53,7 @@ from .cell_formatting import (
     format_cell_tooltip,
     format_profile_cell,
     is_sync_target_at_hard_cap,
+    sum_profile_column,
 )
 from .column_management import (
     ProfileColumnMixin,
@@ -83,14 +85,24 @@ class ProfileOverviewTable(QTableWidget):
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.cellClicked.connect(self._select_username_row)
+        #: 合计行所在行号，-1 表示当前不显示。它不是一个用户，选行时要跳过。
+        self.totals_row = -1
 
         header = self.horizontalHeader()
         assert header is not None
         header.sectionClicked.connect(self.selectColumn)
 
     def _select_username_row(self, row: int, column: int) -> None:
-        if column == 0:
+        if column == 0 and row != self.totals_row:
             self.selectRow(row)
+
+    def is_totals_row(self, row: int) -> bool:
+        """该行是否是合计行。
+
+        合计行不是用户，所有"按行号取第 0 列当用户名"的入口都要先问这一句，
+        否则双击、右键或程序化写值都会去找一个叫「总和」的用户。
+        """
+        return row == self.totals_row
 
     def _selected_text(self) -> str:
         """按表格当前视觉顺序将选中单元格序列化为 TSV。"""
@@ -485,6 +497,8 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
 
                 table.setItem(row, col + 1, item)
 
+        self._apply_totals_row(table, group_name, key_defs, config, users_data)
+
         header = table.horizontalHeader()
         assert header is not None
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
@@ -492,6 +506,33 @@ class ProfileTab(ProfileColumnMixin, ProfileCellEditingMixin, QWidget):
         header.setStretchLastSection(False)
         self._loading = False
         self._restore_column_widths(group_name, table)
+
+    def _apply_totals_row(
+        self, table: QTableWidget, group_name: str, key_defs: list,
+        config, users_data: dict[str, dict],
+    ) -> None:
+        """按分组开关在表尾追加合计行。
+
+        表格每次刷新都是整表重建，所以合计必须跟着重算：数据变了而合计没变，
+        比不显示更容易误导。关掉开关时把行号复位，否则点用户名列选行会跳过一个
+        已经不存在的位置。
+        """
+        table.totals_row = -1
+        if not get_overview_totals(group_name):
+            return
+        row = table.rowCount()
+        table.insertRow(row)
+        label = QTableWidgetItem(tr("总和"))
+        label.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setFlags(label.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        table.setItem(row, 0, label)
+        for col, kd in enumerate(key_defs):
+            model_type = config.get_model_type(kd.key) or ""
+            item = QTableWidgetItem(sum_profile_column(kd, model_type, users_data))
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            table.setItem(row, col + 1, item)
+        table.totals_row = row
 
     # ─── 用户数据加载 ──────────────────────────────────────
 

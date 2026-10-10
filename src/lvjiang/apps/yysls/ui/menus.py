@@ -41,7 +41,7 @@ def build_menu(host, menubar) -> None:
         (tr("游戏配置"), _open_game_config, "F5"),
         (tr("调律配置"), _open_tuning_rules, "F6"),
         (tr("属性配置"), _open_attr_config, ""),
-        (tr("智能调律 Agent（实验性）"), _open_agent_tuning, ""),
+        (tr("智能调律"), _open_agent_tuning, ""),
     ]
 
     for label, handler, shortcut in entries:

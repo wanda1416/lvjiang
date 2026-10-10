@@ -277,7 +277,7 @@ class AgentTuningPage(QWidget):
         self.server: LocalMCPServer | None = None
         layout = QVBoxLayout(self)
         description = QLabel(tr(
-            "实验性功能：启动 MCP 后，在 WorkBuddy 等外部 Agent 中交流流派和养成目标。"
+            "启动 MCP 后，在 WorkBuddy 等外部 Agent 中交流流派和养成目标。"
             "AI 可以了解当前用户与全部用户、查询装备、扫描备战方案、生成新配置并启动调律。"
             "启用后每次主实例启动时自动开启服务并同步接入配置。"))
         description.setWordWrap(True)
@@ -510,7 +510,7 @@ class AgentTuningDialog(QDialog):
 
     def __init__(self, host):
         super().__init__(host)
-        self.setWindowTitle(tr("智能调律 Agent（实验性）"))
+        self.setWindowTitle(tr("智能调律"))
         self.resize(760, 330)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMinimizeButtonHint
                             | Qt.WindowType.WindowMaximizeButtonHint)
